@@ -1,0 +1,6 @@
+39717fd2ce970970a1b27f79d35bae4234e15f0fb6ef3e0e7c316657b3456191  app/renderer/src/chat/chat-store.ts
+7472c2e61bc875df47075238e63883680a421c07b6f98c29ddaa4343b9cd7e64  app/renderer/src/stores/confirm-store.ts
+8410670bfd115d15f5d208565c80604e0dd0687033f63a5a1ce880bf84862943  app/renderer/src/shell/GovernancePanel.tsx
+1ae04e580006da02eaa6c27f18cece667d22f370992d4f8896028f86b20f76f3  app/renderer/src/shell/phase4b.css
+93053b15a8f63887452ec4a1dfc68352cfeb22ea057631f224d66c2b157485be  app/renderer/src/shell/ReportCard.tsx
+4bf50d86ecf7b877c90eccf44a65fc84fa36d1666e8a90b1313a2b3cd5560a5b  test/桌面应用/e2e/uiux-v2.mjs

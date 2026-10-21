@@ -1,0 +1,49 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "GOV pin-mismatch status row",
+      "value": true
+    },
+    {
+      "name": "GOV pin-mismatch empty state reuses su empty host",
+      "value": true
+    },
+    {
+      "name": "GOV preview reuses non-modal #governance-preview",
+      "value": true
+    },
+    {
+      "name": "GOV preview file/write/pin/warning lines",
+      "value": true
+    },
+    {
+      "name": "GOV preview adds no modal or fourth entry",
+      "value": true
+    },
+    {
+      "name": "GOV cancel keeps mismatch state and hides preview",
+      "value": true
+    },
+    {
+      "name": "GOV success text after completed",
+      "value": true
+    }
+  ],
+  "previewCalls": [
+    {
+      "projectRoot": "/offline-uiux-fixture"
+    },
+    {
+      "projectRoot": "/offline-uiux-fixture"
+    }
+  ],
+  "reacceptCalls": [
+    {
+      "projectRoot": "/offline-uiux-fixture",
+      "confirm": true,
+      "previewDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ]
+}

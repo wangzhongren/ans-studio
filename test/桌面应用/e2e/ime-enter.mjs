@@ -8,6 +8,14 @@ import { app, BrowserWindow, ipcMain } from "electron";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.resolve(HERE, "..", "..", "..", "app");
+// Phase 3A/5B：默认构建产物入口；ANS_RENDERER_ENTRY 显式覆盖。
+// 5A：显式入口必须存在（fail-fast，不静默回退）。
+const EXPLICIT_RENDERER_ENTRY = process.env.ANS_RENDERER_ENTRY || "";
+const RENDERER_ENTRY = EXPLICIT_RENDERER_ENTRY || path.join(APP_DIR, "renderer", "dist", "index.html");
+if (EXPLICIT_RENDERER_ENTRY && !fs.existsSync(EXPLICIT_RENDERER_ENTRY)) {
+  console.error("ANS_RENDERER_ENTRY does not exist: " + EXPLICIT_RENDERER_ENTRY);
+  process.exit(2);
+}
 const OUTDIR = process.env.ANS_IME_OUTDIR || fs.mkdtempSync(path.join(os.tmpdir(), "ans-ime-enter-"));
 fs.mkdirSync(path.join(OUTDIR, "user-data"), { recursive: true });
 app.setPath("userData", path.join(OUTDIR, "user-data"));
@@ -80,7 +88,7 @@ app.whenReady().then(async () => {
   const watchdog = setTimeout(() => { report.push("WATCHDOG=1"); fs.writeFileSync(path.join(OUTDIR, "report.txt"), report.join("\n")); app.exit(1); }, 15000);
   try {
     win = new BrowserWindow({ width: 1100, height: 760, show: process.env.ANS_IME_VISIBLE === "1", webPreferences: { preload: path.join(APP_DIR, "preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: false } });
-    await win.loadFile(path.join(APP_DIR, "renderer", "index.html"));
+    await win.loadFile(RENDERER_ENTRY);
     await js("window.__ansRenderer.loadProject('/ime-project')");
     await js("window.__ansRenderer.selectRole('A')");
     await attachImage();

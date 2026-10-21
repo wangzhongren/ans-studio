@@ -1,0 +1,291 @@
+{
+  "checks": [
+    {
+      "name": "OCCLUSION_S0_CTA_480",
+      "value": true,
+      "detail": {
+        "a": {
+          "exists": true,
+          "bottom": 207.2265625,
+          "composerTop": 215,
+          "composerH": 95,
+          "visible": true,
+          "above": true
+        },
+        "m": {
+          "composerTop": 215,
+          "composerH": 95,
+          "midW": 232,
+          "scrollPadding": "104px",
+          "docOv": 0,
+          "innerWidth": 480,
+          "innerHeight": 310
+        }
+      }
+    },
+    {
+      "name": "OCCLUSION_S0_CTA_680",
+      "value": true,
+      "detail": {
+        "a": {
+          "exists": true,
+          "bottom": 326.984375,
+          "composerTop": 335,
+          "composerH": 95,
+          "visible": true,
+          "above": true
+        },
+        "m": {
+          "composerTop": 335,
+          "composerH": 95,
+          "midW": 432,
+          "scrollPadding": "104px",
+          "docOv": 0,
+          "innerWidth": 680,
+          "innerHeight": 430
+        }
+      }
+    },
+    {
+      "name": "OCCLUSION_REPORT_480",
+      "value": true,
+      "detail": {
+        "a": {
+          "exists": true,
+          "bottom": 207.171875,
+          "composerTop": 215,
+          "composerH": 95,
+          "visible": true,
+          "above": true
+        },
+        "m": {
+          "composerTop": 215,
+          "composerH": 95,
+          "midW": 232,
+          "scrollPadding": "104px",
+          "docOv": 0,
+          "innerWidth": 480,
+          "innerHeight": 310
+        }
+      }
+    },
+    {
+      "name": "OCCLUSION_REPORT_680",
+      "value": true,
+      "detail": {
+        "a": {
+          "exists": true,
+          "bottom": 326.921875,
+          "composerTop": 335,
+          "composerH": 95,
+          "visible": true,
+          "above": true
+        },
+        "m": {
+          "composerTop": 335,
+          "composerH": 95,
+          "midW": 432,
+          "scrollPadding": "104px",
+          "docOv": 0,
+          "innerWidth": 680,
+          "innerHeight": 430
+        }
+      }
+    },
+    {
+      "name": "OCCLUSION_REPORT_TOP_480",
+      "value": true,
+      "detail": {
+        "a": {
+          "exists": true,
+          "bottom": 207.15625,
+          "composerTop": 215,
+          "composerH": 95,
+          "visible": true,
+          "above": true
+        },
+        "m": {
+          "composerTop": 215,
+          "composerH": 95,
+          "midW": 232,
+          "scrollPadding": "104px",
+          "docOv": 0,
+          "innerWidth": 480,
+          "innerHeight": 310
+        }
+      }
+    },
+    {
+      "name": "OCCLUSION_REPORT_TOP_680",
+      "value": true,
+      "detail": {
+        "a": {
+          "exists": true,
+          "bottom": 327.1796875,
+          "composerTop": 335,
+          "composerH": 95,
+          "visible": true,
+          "above": true
+        },
+        "m": {
+          "composerTop": 335,
+          "composerH": 95,
+          "midW": 432,
+          "scrollPadding": "104px",
+          "docOv": 0,
+          "innerWidth": 680,
+          "innerHeight": 430
+        }
+      }
+    },
+    {
+      "name": "OCCLUSION_GOV_PREVIEW_480",
+      "value": true,
+      "detail": {
+        "a": {
+          "exists": true,
+          "bottom": 205.9296875,
+          "composerTop": 427.6875,
+          "composerH": 95,
+          "visible": true,
+          "above": true
+        },
+        "m": {
+          "composerTop": 427.6875,
+          "composerH": 95,
+          "midW": 232,
+          "scrollPadding": "104px",
+          "docOv": 0,
+          "innerWidth": 480,
+          "innerHeight": 310
+        }
+      }
+    },
+    {
+      "name": "OCCLUSION_GOV_PREVIEW_680",
+      "value": true,
+      "detail": {
+        "a": {
+          "exists": true,
+          "bottom": 326.2578125,
+          "composerTop": 589.5859375,
+          "composerH": 95,
+          "visible": true,
+          "above": true
+        },
+        "m": {
+          "composerTop": 589.5859375,
+          "composerH": 95,
+          "midW": 432,
+          "scrollPadding": "104px",
+          "docOv": 0,
+          "innerWidth": 680,
+          "innerHeight": 430
+        },
+        "pv": "static"
+      }
+    },
+    {
+      "name": "OCCLUSION_MIRROR_ACTIONS_480",
+      "value": true,
+      "detail": {
+        "a": {
+          "exists": true,
+          "bottom": 207.1796875,
+          "composerTop": 215,
+          "composerH": 95,
+          "visible": true,
+          "above": true
+        },
+        "m": {
+          "composerTop": 215,
+          "composerH": 95,
+          "midW": 232,
+          "scrollPadding": "104px",
+          "docOv": 0,
+          "innerWidth": 480,
+          "innerHeight": 310
+        }
+      }
+    },
+    {
+      "name": "OCCLUSION_DELIVERY_480",
+      "value": true,
+      "detail": {
+        "a": {
+          "exists": true,
+          "bottom": 207.1484375,
+          "composerTop": 215,
+          "composerH": 95,
+          "visible": true,
+          "above": true
+        },
+        "m": {
+          "composerTop": 215,
+          "composerH": 95,
+          "midW": 232,
+          "scrollPadding": "104px",
+          "docOv": 0,
+          "innerWidth": 480,
+          "innerHeight": 310
+        }
+      }
+    },
+    {
+      "name": "OCCLUSION_MIRROR_ACTIONS_680",
+      "value": true,
+      "detail": {
+        "a": {
+          "exists": true,
+          "bottom": 326.9296875,
+          "composerTop": 335,
+          "composerH": 95,
+          "visible": true,
+          "above": true
+        },
+        "m": {
+          "composerTop": 335,
+          "composerH": 95,
+          "midW": 432,
+          "scrollPadding": "104px",
+          "docOv": 0,
+          "innerWidth": 680,
+          "innerHeight": 430
+        }
+      }
+    },
+    {
+      "name": "OCCLUSION_DELIVERY_680",
+      "value": true,
+      "detail": {
+        "a": {
+          "exists": true,
+          "bottom": 327.1015625,
+          "composerTop": 335,
+          "composerH": 95,
+          "visible": true,
+          "above": true
+        },
+        "m": {
+          "composerTop": 335,
+          "composerH": 95,
+          "midW": 432,
+          "scrollPadding": "104px",
+          "docOv": 0,
+          "innerWidth": 680,
+          "innerHeight": 430
+        }
+      }
+    },
+    {
+      "name": "OCCLUSION_ZERO_CONSOLE",
+      "value": true,
+      "detail": {
+        "errs": [],
+        "didFail": []
+      }
+    }
+  ],
+  "console": [],
+  "didFail": []
+}

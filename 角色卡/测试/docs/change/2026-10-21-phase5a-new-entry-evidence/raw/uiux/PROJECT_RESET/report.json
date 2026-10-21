@@ -1,0 +1,24 @@
+{
+  "reports": [
+    {
+      "name": "old project status fixture is visible",
+      "value": true
+    },
+    {
+      "name": "new project first DOM clears old badges before events",
+      "value": false
+    },
+    {
+      "name": "new project first DOM clears old badges before events observed",
+      "value": {
+        "chat": "开始与 A 对话点下方按钮开启会话；发送消息后，这里会显示对话与工具记录。开始与 A 对话",
+        "assistant": [],
+        "denied": [],
+        "model": null
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: new project first DOM clears old badges before events\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: new project first DOM clears old badges before events\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:66:474)\n    at async projectResetChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:683:3)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1351:26"
+}

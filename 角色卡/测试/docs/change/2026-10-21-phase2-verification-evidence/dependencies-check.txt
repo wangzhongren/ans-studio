@@ -1,0 +1,19 @@
+react: expected 19.3.1 exact; actual=19.3.1 (devDependencies) exact=true
+react-dom: expected 19.3.1 exact; actual=19.3.1 (devDependencies) exact=true
+@base-ui/react: expected 1.9.0 exact; actual=1.9.0 (devDependencies) exact=true
+lucide-react: expected 1.60.0 exact; actual=1.60.0 (devDependencies) exact=true
+motion: expected 14.4.0 exact; actual=14.4.0 (devDependencies) exact=true
+react-resizable-panels: expected 4.14.8 exact; actual=4.14.8 (devDependencies) exact=true
+zustand: expected 5.0.15 exact; actual=5.0.15 (devDependencies) exact=true
+clsx: expected 2.1.1 exact; actual=2.1.1 (devDependencies) exact=true
+tailwind-merge: expected 3.7.0 exact; actual=3.7.0 (devDependencies) exact=true
+class-variance-authority: expected 0.7.1 exact; actual=0.7.1 (devDependencies) exact=true
+vite: expected 8.3.4 exact; actual=8.3.4 (devDependencies) exact=true
+@vitejs/plugin-react: expected 6.1.2 exact; actual=6.1.2 (devDependencies) exact=true
+tailwindcss: expected 4.3.3 exact; actual=4.3.3 (devDependencies) exact=true
+@tailwindcss/vite: expected 4.3.3 exact; actual=4.3.3 (devDependencies) exact=true
+@types/react: expected 19.3.0 exact; actual=19.3.0 (devDependencies) exact=true
+@types/react-dom: expected 19.3.0 exact; actual=19.3.0 (devDependencies) exact=true
+ALL_16_MATCH_EXACT_AND_DEV: true
+forbidden direct deps: []
+typescript (pre-existing): ^7.0.2 (^ not normalized; PM 实施中确认项)

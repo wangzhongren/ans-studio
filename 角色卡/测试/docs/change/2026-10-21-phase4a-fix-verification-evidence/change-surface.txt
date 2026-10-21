@@ -1,0 +1,24 @@
+=== old renderer core / main / preload vs HEAD ===
+UNCHANGED app/renderer/index.html
+UNCHANGED app/renderer/renderer.js
+UNCHANGED app/renderer/styles.css
+UNCHANGED app/renderer/tool-rows.js
+UNCHANGED app/renderer/role-status.js
+UNCHANGED app/renderer/runtime-ui.js
+UNCHANGED app/renderer/ui-labels.js
+UNCHANGED app/renderer/engine-selector.js
+UNCHANGED app/main.ts
+UNCHANGED app/preload.cjs
+
+=== deps ===
+markdown-it 15.0.3 typescript 7.0.2
+lock removed 0 changed 0 added 107
+
+=== DOM exceptions ===
+128:const DEFER_TOOL_ROWS_WHEN_CLOSED = 40;
+136:  const deferClosed = !open && summary.calls > DEFER_TOOL_ROWS_WHEN_CLOSED;
+380:      <div className="op-actions" hidden={closed}>
+386:              hidden={closed}
+392:            <button className="op-cancel" type="button" hidden={closed} disabled={closed} onClick={() => respond({ kind: "choice", cancelled: true })}>
+398:            <button className="op-confirm" type="button" hidden={closed} disabled={closed} onClick={() => respond({ kind: "confirm", confirmed: true })}>
+401:            <button className="op-deny" type="button" hidden={closed} disabled={closed} onClick={() => respond({ kind: "confirm", confirmed: false })}>

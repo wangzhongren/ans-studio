@@ -1,6 +1,6 @@
 # 同一套治理工具与隔离会话
 
-编排在用户选择 Pi、Codex 或 Claude 后，交给核心固定的角色和已注入能力。核心让这些引擎收到相同的工具与处理器：被拒绝的写入不会创建目录或文件，客户拒绝或停止也不会变成同意。开启持久化后，可读历史按角色和引擎隔离保存。
+编排在用户选择 Pi、Codex 或 Claude 后，交给核心固定的角色和已注入能力。核心让这些引擎收到相同的工具与处理器：初次门禁拒绝不创建目录或文件；写前重判拒绝不提交目标文件，但可能保留已创建的父目录。客户拒绝或停止也不会变成同意。开启持久化后，可读历史按角色和引擎隔离保存。
 
 状态：C1 核心已实现及无网络验证；三种 SDK 与 CLI/桌面入口最终接线由各原属主验证。
 
@@ -20,7 +20,12 @@ flowchart TD
   native --> call{工具请求?}
   call -->|写或编辑| writegate{写 gate 允许且未停止?}
   writegate -->|否| deny[拒绝 无写入副作用]
-  writegate -->|是| guard[复核真实路径 原子写随停止信号取消]
+  writegate -->|是| guard{真实路径与目标状态有效?}
+  guard -->|否| deny
+  guard -->|是| prepare[write_file按需建父目录 edit_file保留原目录]
+  prepare --> regate{同一写gate重判且真实父目录未变?}
+  regate -->|否| stopped[拒绝 未提交文件 可能已有父目录]
+  regate -->|是| atomic[读取普通mode 临时文件写入并恢复权限后原子替换 随信号取消]
   call -->|shell| shellgate{审核明确 allow 且未停止?}
   shellgate -->|否| deny
   shellgate -->|是| child[剥离凭据后执行 argv]
@@ -32,7 +37,8 @@ flowchart TD
   stop -->|是| abort[每轮一次中止请求]
   abort -->|一秒清理失败| quarantine[报错 隔离当前会话]
   abort -->|清理完成| terminal[一个 settled 标明实际 outcome]
-  guard --> terminal
+  atomic --> terminal
+  stopped --> terminal
   child --> terminal
   deny --> terminal
   no --> terminal
@@ -47,6 +53,8 @@ flowchart TD
 ```
 
 使用核心 API 的最小调用是 `createRuntimeAdapter({ runtime, gate, projectRoot, skillRoot, providerFactories }).bindRole(role)`；需要写入时明确传项目根 writeRoot，需要存历史时传 `persistSession: true`。`providerFactories` 在测试中接收与真实 adapter 完全相同的 tools/storage，测试直接调用实际 handler。公开完整参数见 [api-spec](../../api-spec.md)。
+
+2026-10-21 D3：写文件和编辑文件在提交前复用同一 `WriteGate`，实际目标是否满足角色边界和任务写集仍由门禁决定。核心复核真实父目录与首次守卫一致，拒绝目标文件本身的链接或其他非普通文件；状态读取仅 `ENOENT` 可按新文件处理。POSIX 已有文件保留 `mode & 0777`，共享原子写在临时句柄恢复权限、同步后才替换目标；新文件仍按 `0600` 和 umask 创建。失败或中止不提交半成品，但这不提供无竞态的 OS 隔离。Windows 原生结果仍待独立验证。当前核心回归和限制见 [D3 修复记录](../fix/2026-10-21_fix_d3-file-write.md)。
 
 每条原始输入可在 `PromptOptions.onTurnStarted` 同步获知Core真正创建的 `turnId/roleId/runtime`。通知在前置检查通过、生成UUID后且任何输入持久化/native工作前恰一次；未创建轮次的前置拒绝没有通知。Window只在原direct/queued发送闭包捕获此ID，再按actualturn映射自己的clientMessageId，不按FIFO/latest/文本猜测。Core不会收到或存储clientMessageId；回调抛错仍按单failed终态收尾，后续合法轮次不被占住。细节及当前核心证据见 [C1A](../fix/2026-10-14_fix_prompt-start-acknowledgement.md)，实际窗口映射/renderer去重仍由D1/U1/T1验证。
 
@@ -118,3 +126,5 @@ flowchart TD
 2026-10-15：A4/C2文本补充1核心实现与自测完成，消费者整合待验。[实际候选与故障证据](../change/2026-10-15_change_complete-flow-core.md)，[公共API](../../api-spec.md)。
 
 工具展示仅处理真实工具结构；普通引擎失败即使kind=denied，仍是原失败，不产生空工具名或虚构blocked阶段。live和历史同判断，未知detail不侧车回传，真实failed终态与安全summary保持。2026-10-15该必要边界修复已Core77/77及原独验1/1通过，消费者整体重测待续：[当前修复](../fix/2026-10-15_fix_non-tool-event-routing.md)。
+
+2026-10-21 思考等级轻量兼容：设置保存后沿现有配置版本与安全重建路径生效。Core 仍仅在合法显式值时注入 `reasoningEffort`；留空或非法值不注入，由平台默认策略接管。Pi 恢复时须重新应用模型/全局/当前版本默认而非残留旧档，默认预算同样保护。参数明确被拒时，适配器按 D1 的有限兼容路径继续；普通网络/鉴权/限流故障不改档。提示在活动轮内作为 `source:system` 的普通消息显示和回放，不进入助手反馈，不使用“已思考”事实通道；只有正常结果才提示兼容成功。核心本次只同步注释和契约说明，平台实现/真实请求证据由各所有者提供，见 [默认契约修复记录](../fix/2026-10-21_fix_reasoning-default-contract.md)。

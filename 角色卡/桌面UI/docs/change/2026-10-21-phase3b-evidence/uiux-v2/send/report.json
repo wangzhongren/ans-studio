@@ -1,0 +1,53 @@
+{
+  "reports": [
+    {
+      "name": "P7 structured aborted reply keeps current handle and cleared accepted draft",
+      "value": true
+    },
+    {
+      "name": "P7 accepted unknown result does not restore prompt or clear current handle",
+      "value": true
+    },
+    {
+      "name": "P7 wrong actual turn cannot overwrite original send outcome",
+      "value": true
+    },
+    {
+      "name": "P7 delayed actual aborted terminal resolves unknown without changing new draft",
+      "value": true
+    },
+    {
+      "name": "P7 actual aborted stream before failed promise remains usable",
+      "value": true
+    },
+    {
+      "name": "P7 true accepted failed outcome remains error without requeueing accepted prompt",
+      "value": true
+    },
+    {
+      "name": "P7 genuine unaccepted rejection restores draft and retains known current handle",
+      "value": true
+    },
+    {
+      "name": "P7 old runtime rejected result cannot disable current runtime or overwrite draft",
+      "value": false
+    },
+    {
+      "name": "P7 old runtime rejected result cannot disable current runtime or overwrite draft observed",
+      "value": {
+        "chat": "已接收停止消息\n实际收尾 aborted返回先于收尾\n实际收尾 failed实际收尾 aborted收尾先于返回\n实际收尾 aborted真实失败不能伪中止\n实际收尾 failed未接受拒发保留\n发送失败：rejected before input后台Pi拒发\n发送失败：old runtime rejected",
+        "assistant": [],
+        "denied": [],
+        "model": {
+          "count": 13,
+          "lastIndex": 12,
+          "operators": [],
+          "rowGap": 16
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: P7 old runtime rejected result cannot disable current runtime or overwrite draft\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: P7 old runtime rejected result cannot disable current runtime or overwrite draft\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:60:474)\n    at async sendFactsChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:360:2)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1339:270"
+}

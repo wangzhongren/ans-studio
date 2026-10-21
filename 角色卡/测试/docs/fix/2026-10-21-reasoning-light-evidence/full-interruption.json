@@ -1,0 +1,8 @@
+{
+  "at": "2026-10-21T02:56:07.414545+00:00",
+  "action": "SIGTERM only child 69293 of full-suite parent 69273, authorized by scheduler",
+  "file": "test/pi-adapter/compatibility-loopback.test.ts",
+  "reason": "Only remaining child, no TCP connections, one localhost listener; final result was not obtainable without ending stuck fixture. Owner notified.",
+  "hypothesis": "100ms timeout before second HTTP request may settle work while await arrived.promise remains pending; owner investigating.",
+  "not_a_pass": true
+}

@@ -1,0 +1,433 @@
+{
+  "oldCount": 357,
+  "newCount": 366,
+  "onlyOld": [
+    "P13_NEW_SEMANTICS"
+  ],
+  "onlyNew": [
+    "NAVIGATION_BLOCKED",
+    "P13_CONTINUE_AFTER_RETURN",
+    "P13_OLD_PROJECT_BUSY",
+    "P13_OLD_SESSION_LIVE_AFTER_SWITCH",
+    "P13_QUEUED_BEFORE_SWITCH",
+    "P13_QUEUE_SURVIVES_SWITCH",
+    "P13_RETURN_RESUMES_SESSION",
+    "P13_SWITCH_IMMEDIATE",
+    "PROMISE_TIMEOUT",
+    "WAIT_TIMEOUT"
+  ],
+  "valueDiff": {
+    "ANCHOR_CARD_ANSWERED": {
+      "old": "true",
+      "new": "false"
+    },
+    "ANCHOR_CARD_AT_ARRIVAL": {
+      "old": "6",
+      "new": "-1"
+    },
+    "ANCHOR_NO_DUPLICATE_ROW": {
+      "old": "true",
+      "new": "false"
+    },
+    "ANCHOR_ROW_AFTER_SWITCHBACK": {
+      "old": "{\"count\":207,\"last\":206,\"ops\":[{\"index\":6,\"requestId\":\"op-6\"}]}",
+      "new": "{\"count\":205,\"last\":204,\"ops\":[]}"
+    },
+    "ANCHOR_STABLE_NOT_TAIL_ONCE": {
+      "old": "true",
+      "new": "false"
+    },
+    "ANCHOR_STABLE_NOT_TAIL_TWICE": {
+      "old": "true",
+      "new": "false"
+    },
+    "ANCHOR_TABLE_REGISTERED": {
+      "old": "true",
+      "new": "false"
+    },
+    "BADGES_CLEAR_ON_EMPTY": {
+      "old": "true",
+      "new": "false"
+    },
+    "BADGE_ON_WORK_WHILE_COLLAPSED": {
+      "old": "true",
+      "new": "false"
+    },
+    "BOOTSTRAP_CENTER_CTA_PRESENT": {
+      "old": "true",
+      "new": "false"
+    },
+    "BOOTSTRAP_MENTION_COUNT": {
+      "old": "1",
+      "new": "0"
+    },
+    "BOOTSTRAP_MENTION_IN_CENTER_EMPTY": {
+      "old": "true",
+      "new": "false"
+    },
+    "DENIED_OPEN_COUNT": {
+      "old": "2",
+      "new": "0"
+    },
+    "DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS": {
+      "old": "true",
+      "new": "false"
+    },
+    "DISPATCH_ROW_NO_WITHDRAW": {
+      "old": "true",
+      "new": "false"
+    },
+    "DRAWER_CLOSED_AFTER_PI": {
+      "old": "true",
+      "new": "false"
+    },
+    "DRAWER_ESC_CLOSES": {
+      "old": "true",
+      "new": "false"
+    },
+    "E2E_FAILURES": {
+      "old": "RECOVERY_SAME_PENDING_CARD_ONCE",
+      "new": "SESSION_REPAIR_SAME_ROLE_CONFIRMS_BACKEND, SESSION_REPAIR_EXPLICIT_RECOVERY_DELIVERS_ONCE, SESSION_REPAIR_FAILED_OPEN_DOES_NOT_SEND, SESSION_REPAIR_FAILED_OPEN_NO_USER_BUBBLE, SESSION_REPAIR_FAILED_OPEN_NO_REPLAY, PENDING_EXPLICIT_SAME_ROLE_CARD_AND_BUTTON_VISIBLE, RECOVERY_SAME_PENDING_CARD_ONCE, RECOVERY_OLD_REQUEST_STILL_ANSWERABLE, RECOVERY_ENDED_REQUEST_NOT_REPLAYED, DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS"
+    },
+    "HAS_DENIED_INLINE": {
+      "old": "2",
+      "new": "0"
+    },
+    "INJECTED_CHIP_LABEL": {
+      "old": "原始交接内容 · 来源未确认",
+      "new": "回交投递 · 来自 规划者"
+    },
+    "LINK_OPEN_EXTERNAL_CALLED": {
+      "old": "true",
+      "new": "false"
+    },
+    "OPEN_CARD_AT_ARRIVAL": {
+      "old": "207",
+      "new": "-1"
+    },
+    "OPEN_CARD_CHIP_VISIBLE": {
+      "old": "true",
+      "new": "false"
+    },
+    "OPEN_CARD_ROWS_AFTER_SWITCHBACK": {
+      "old": "{\"count\":208,\"last\":207,\"ops\":[{\"index\":6,\"requestId\":\"op-6\"},{\"index\":207,\"requestId\":\"op-7\"}]}",
+      "new": "{\"count\":205,\"last\":204,\"ops\":[]}"
+    },
+    "OPEN_CARD_STABLE_AT_ANCHOR": {
+      "old": "true",
+      "new": "false"
+    },
+    "OPX_ANSWERED": {
+      "old": "true",
+      "new": "false"
+    },
+    "OPX_BADGE_CLEARED": {
+      "old": "true",
+      "new": "false"
+    },
+    "OPX_POINTER_IN_VIEWED_PANE": {
+      "old": "true",
+      "new": "false"
+    },
+    "OP_CANCEL_DECLINED": {
+      "old": "true",
+      "new": "false"
+    },
+    "OP_CARD_FROZEN": {
+      "old": "true",
+      "new": "false"
+    },
+    "OP_CARD_PRESENT": {
+      "old": "true",
+      "new": "false"
+    },
+    "OP_CARD_TITLE_SHOWS": {
+      "old": "true",
+      "new": "false"
+    },
+    "OP_CONFIRM_ANSWERED": {
+      "old": "true",
+      "new": "false"
+    },
+    "OP_MULTI_ANSWERED": {
+      "old": "true",
+      "new": "false"
+    },
+    "OP_MULTI_HAS_CHECKBOX": {
+      "old": "true",
+      "new": "false"
+    },
+    "OP_PREVIEW_COLLAPSED": {
+      "old": "true",
+      "new": "false"
+    },
+    "OP_SELECT_ANSWERED": {
+      "old": "true",
+      "new": "false"
+    },
+    "OP_SELECT_HAS_RADIO": {
+      "old": "true",
+      "new": "false"
+    },
+    "OP_SUBMIT_DISABLED_INITIALLY": {
+      "old": "true",
+      "new": "false"
+    },
+    "OUTDIR": {
+      "old": "/tmp/ans-p5a-old.6MXYfg",
+      "new": "/tmp/ans-p5a-new.78nIuC"
+    },
+    "P1_ARRIVAL_DEBUG": {
+      "old": "{\"hasCard\":true,\"dist\":46,\"st\":3011,\"sh\":3491,\"ch\":434,\"crTop\":517,\"crBottom\":640,\"ccTop\":287,\"ccBottom\":721,\"chipHidden\":false}",
+      "new": "{\"hasCard\":false,\"dist\":0,\"st\":3138,\"sh\":3639,\"ch\":501,\"crTop\":null,\"crBottom\":null,\"ccTop\":233,\"ccBottom\":734,\"chipHidden\":false}"
+    },
+    "P1_ARRIVAL_SCROLLED": {
+      "old": "true",
+      "new": "false"
+    },
+    "P1_CHIP_CLICK_LOCATES": {
+      "old": "true",
+      "new": "false"
+    },
+    "P1_CHIP_COUNT1_AFTER_TERMINAL": {
+      "old": "true",
+      "new": "false"
+    },
+    "P1_CHIP_HIDDEN_AFTER_ALL_TERMINAL": {
+      "old": "true",
+      "new": "false"
+    },
+    "P1_CHIP_SECOND_CARD": {
+      "old": "true",
+      "new": "false"
+    },
+    "P1_CLEANUP_CHIP_HIDDEN": {
+      "old": "true",
+      "new": "false"
+    },
+    "P1_SWITCHBACK_SCROLLS_TO_CARD": {
+      "old": "true",
+      "new": "false"
+    },
+    "PENDING_EXPLICIT_SAME_ROLE_CARD_AND_BUTTON_VISIBLE": {
+      "old": "true",
+      "new": "false"
+    },
+    "PI_FIELDS_MATCH_REGISTRY": {
+      "old": "true",
+      "new": "false"
+    },
+    "PI_FIELD_COUNT": {
+      "old": "5",
+      "new": "6"
+    },
+    "PI_KEYS_ARE_FIVE": {
+      "old": "true",
+      "new": "false"
+    },
+    "PI_SAVE_STATUS": {
+      "old": "已保存到 .env（改动键：ANTHROPIC_AUTH_TOKEN、ANS_PI_BASE_URL、ANS_PI_MODEL）。必填配置已齐备。下一次开启会话时应用。",
+      "new": "已保存到 .env（改动键 3 个）。必填配置已齐备。下一次开启会话时应用。"
+    },
+    "RECOVERY_ENDED_REQUEST_NOT_REPLAYED": {
+      "old": "true",
+      "new": "false"
+    },
+    "RECOVERY_OLD_REQUEST_STILL_ANSWERABLE": {
+      "old": "true",
+      "new": "false"
+    },
+    "RENDERER_ENTRY": {
+      "old": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/index.html",
+      "new": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/dist/src/index.html"
+    },
+    "REPLAY_DEDUP_REBUILD": {
+      "old": "true",
+      "new": "false"
+    },
+    "REPORT_DELIVERY_DETAILS_COLLAPSED": {
+      "old": "true",
+      "new": "false"
+    },
+    "RESTORE_NO_SUCCESS_DIVIDER": {
+      "old": "true",
+      "new": "false"
+    },
+    "RESTORE_SU_CHAT_SNIPPET": {
+      "old": "SU 的历史问题",
+      "new": "会话记录已恢复SU 的历史问题"
+    },
+    "RESTORE_SU_REPLAY_ROWS": {
+      "old": "1",
+      "new": "2"
+    },
+    "RESTORE_SU_RESTORED_FLAG": {
+      "old": "{\"hadSession\":true,\"error\":false,\"awaitingConfirm\":false,\"restored\":true,\"lastSummary\":\"\",\"lastAt\":\"\",\"historyNotice\":\"\",\"contextText\":\"新会话；可读历史保留，模型未恢复\",\"contextWarning\":\"\",\"readableHistoryAtOpen\":true}",
+      "new": "{\"error\":false,\"hadSession\":true,\"restored\":true,\"contextText\":\"新会话；可读历史保留，模型未恢复\",\"live\":true}"
+    },
+    "RESUME_HINT": {
+      "old": "已在该角色的会话中，续接当前会话。",
+      "new": ""
+    },
+    "RIGHT_QUEUE_RUNNING_FIRST": {
+      "old": "true",
+      "new": "false"
+    },
+    "RIGHT_QUEUE_SOURCES": {
+      "old": "true",
+      "new": "false"
+    },
+    "ROLE_STATE_BADGE_HAS_ICON": {
+      "old": "true",
+      "new": "false"
+    },
+    "ROLE_STATE_BADGE_HOVER_FULL": {
+      "old": "true",
+      "new": "false"
+    },
+    "ROLE_STATE_BADGE_WORKING_PENDING": {
+      "old": "true",
+      "new": "false"
+    },
+    "ROLE_STATE_QUEUE_ROW": {
+      "old": "true",
+      "new": "false"
+    },
+    "SESSION_REPAIR_EXPLICIT_RECOVERY_DELIVERS_ONCE": {
+      "old": "true",
+      "new": "false"
+    },
+    "SESSION_REPAIR_FAILED_OPEN_DOES_NOT_SEND": {
+      "old": "true",
+      "new": "false"
+    },
+    "SESSION_REPAIR_FAILED_OPEN_NO_REPLAY": {
+      "old": "true",
+      "new": "false"
+    },
+    "SESSION_REPAIR_FAILED_OPEN_NO_USER_BUBBLE": {
+      "old": "true",
+      "new": "false"
+    },
+    "SESSION_REPAIR_SAME_ROLE_CONFIRMS_BACKEND": {
+      "old": "true",
+      "new": "false"
+    },
+    "SHOT_00_TITLEBAR": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/00-titlebar.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/00-titlebar.png"
+    },
+    "SHOT_01B_SU": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/01b-su.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/01b-su.png"
+    },
+    "SHOT_01_IMPORT": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/01-import.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/01-import.png"
+    },
+    "SHOT_02_CHAT": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/02-chat.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/02-chat.png"
+    },
+    "SHOT_03_DENIED": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/03-denied.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/03-denied.png"
+    },
+    "SHOT_04_PROFILE": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/04-profile.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/04-profile.png"
+    },
+    "SHOT_05_BOOTSTRAP": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/05-bootstrap.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/05-bootstrap.png"
+    },
+    "SHOT_06_REFRESH": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/06-refresh.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/06-refresh.png"
+    },
+    "SHOT_07_HANDBACK": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/07-handback.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/07-handback.png"
+    },
+    "SHOT_08_SU_PANE": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/08-su-pane.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/08-su-pane.png"
+    },
+    "SHOT_09_PI_PANEL": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/09-pi-panel.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/09-pi-panel.png"
+    },
+    "SHOT_10_PI_SAVED": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/10-pi-saved.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/10-pi-saved.png"
+    },
+    "SHOT_11_OPERATOR": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/11-operator-card.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/11-operator-card.png"
+    },
+    "SHOT_12_COMPOSER": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/12-composer.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/12-composer.png"
+    },
+    "SHOT_12_RESTORE": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/12-restore.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/12-restore.png"
+    },
+    "SHOT_14_OP_CROSSPANE": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/14-operator-crosspane.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/14-operator-crosspane.png"
+    },
+    "SHOT_15_ANCHOR": {
+      "old": "/tmp/ans-p5a-old.6MXYfg/15-anchor-reanchor.png",
+      "new": "/tmp/ans-p5a-new.78nIuC/15-anchor-reanchor.png"
+    },
+    "STATUS_BADGE_TEXT": {
+      "old": "●空闲",
+      "new": "空闲"
+    },
+    "STATUS_LAST_EVENT_RECORDED": {
+      "old": "true",
+      "new": "false"
+    },
+    "SWITCH_CONFIRM_ON_BUSY": {
+      "old": "true",
+      "new": "false"
+    },
+    "SWITCH_CONFIRM_RELOADED": {
+      "old": "true",
+      "new": "false"
+    },
+    "SWITCH_IDLE_HINT": {
+      "old": "true",
+      "new": "false"
+    },
+    "SYS_ROWS": {
+      "old": "sys sys-context-event | sys sys-settled | sys sys-settled",
+      "new": "sys sys-call sys-unknown-tool-event | sys sys-call | sys sys-settled | sys sys-call sys-unknown-tool-event | sys sys-call | sys sys-settled"
+    },
+    "TAB_CARD_ACTIVE": {
+      "old": "true",
+      "new": "false"
+    },
+    "TAB_WORK_ACTIVE": {
+      "old": "true",
+      "new": "false"
+    },
+    "TAB_WORK_ACTIVE_STILL": {
+      "old": "true",
+      "new": "false"
+    },
+    "U1_NORMAL_TO_BOTTOM": {
+      "old": "false",
+      "new": "true"
+    },
+    "U1_NORMAL_TO_BOTTOM_DIST": {
+      "old": "10",
+      "new": "0"
+    },
+    "U1_PANE_HEIGHT": {
+      "old": "12683",
+      "new": "12580"
+    }
+  }
+}

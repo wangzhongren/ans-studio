@@ -1,0 +1,6 @@
+lastJs=(() => { const el = document.querySelector('.ti-status.st-working .ts-ico .spin-arc') || document.querySelector('#chat .tool-current .spin-arc'); if (!el) retur
+AssertionError [ERR_ASSERTION]: v3 验收断言未过（12 条）：1-W1-行距16±1 ⇒ paneGap=0px；6-可见行≥9 ⇒ fullyVisibleRows=6 viewportH=576.4；S3-无chip时尾行兜底 ⇒ chip={"hidden":false,"x":1088,"y":682.4} current=null；W6b-系统正文去前缀 ⇒ chip=undefined body=；W6-注入盒行高1.6 ⇒ mi-body lineHeight=undefined；S2-chip对齐阅读列≤8 ⇒ {"hidden":false,"chipX":1088,"paneX":354,"diff":734,"tail":null}；S1-截断目标仍可见 ⇒ {"rows":2,"truncated":false,"summary":"本轮 2 个调用：run_shell / read_file · 含状态未记录"}；11-W11-loading同款转轮 ⇒ null；9-W9-徽标12pxSVG ⇒ {"hasSvg":false,"boxW":16.7,"svgCssW":null,"svgCssH":null,"anim":null}；9-W9-转轮0.9±0.2s ⇒ anim=；10-W10-尾行含转轮 ⇒ anim=null；12-reduced-motion静止弧 ⇒ null
+
+12 !== 0
+
+    at file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-design-audit.mjs:404:12

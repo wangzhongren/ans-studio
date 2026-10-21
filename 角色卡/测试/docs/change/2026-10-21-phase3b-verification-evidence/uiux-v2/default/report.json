@@ -1,0 +1,65 @@
+{
+  "reports": [
+    {
+      "name": "routine collapsed; failure direct; assistant untouched",
+      "value": true
+    },
+    {
+      "name": "single brief real write fact",
+      "value": true
+    },
+    {
+      "name": "default failure shows known path",
+      "value": true
+    },
+    {
+      "name": "known shell exit survives literal semicolon",
+      "value": true
+    },
+    {
+      "name": "full target plus unknown target honest",
+      "value": true
+    },
+    {
+      "name": "live failed reason visible in summary",
+      "value": true
+    },
+    {
+      "name": "before-execution rejection keeps visible reason",
+      "value": true
+    },
+    {
+      "name": "unknown is honest count",
+      "value": true
+    },
+    {
+      "name": "one independent work list without duplicated role documents",
+      "value": false
+    },
+    {
+      "name": "one independent work list without duplicated role documents observed",
+      "value": {
+        "chat": "本轮 3 个调用：read_file ×2 / legacy · 含状态未记录未记录read_filea.md调用发起未记录read_filea.md执行完成未记录legacylegacy.md状态未记录文件不存在missing.md文件不存在本轮 1 个调用：read_file未记录read_fileb.md调用发起真实助手答复保持原文。\nread_file 执行失败known/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/lost.mdread_file 执行失败未执行：命令被拒绝目标未记录未执行：命令被拒绝run_shell 已执行：false; echo literal（exit 2）run_shell 已执行：false; echo literal（exit 2）拒绝写入：目标不在角色允许范围outside.md拒绝写入：目标不在角色允许范围进行中正在处理当前请求客户消息第 1 位客户长消息：超过80字的队列摘要用于核对换行、时间与操作归属。超过80字的队列摘要用于核对换行、时间与操作归属。超过80字的队列摘要用于核对换行、时间与操作归属。超过80字的队列摘要用于核对换行、时间与操作归属。超过80字的队列摘要用于核对换行、时间与操作归属。超过80字的队列摘要用于核对换行、时间与操作归属。客户消息撤回第 2 位派发任务派发 · 来自 B第 3 位回交报告回交 · 来自 B正在工作…",
+        "assistant": [
+          "真实助手答复保持原文。\n"
+        ],
+        "denied": [
+          "文件不存在missing.md文件不存在",
+          "read_file 执行失败known/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/long-target/lost.mdread_file 执行失败",
+          "未执行：命令被拒绝目标未记录未执行：命令被拒绝",
+          "run_shell 已执行：false; echo literal（exit 2）run_shell 已执行：false; echo literal（exit 2）",
+          "拒绝写入：目标不在角色允许范围outside.md拒绝写入：目标不在角色允许范围"
+        ],
+        "model": {
+          "count": 8,
+          "lastIndex": 7,
+          "operators": [],
+          "rowGap": 16
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: one independent work list without duplicated role documents\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: one independent work list without duplicated role documents\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:60:474)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1368:3"
+}

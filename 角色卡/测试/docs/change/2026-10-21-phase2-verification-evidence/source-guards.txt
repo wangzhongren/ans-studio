@@ -1,0 +1,7 @@
+
+## 源码级守卫复扫（独立 grep，非属主测试）
+node:/require( import hits in app/renderer/src: 0
+src/ import hits: 0
+<svg> hits: 0
+hex color hits in tsx/ts (excluding css): 0
+raw color hits in shell.css: 0

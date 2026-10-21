@@ -1,0 +1,84 @@
+# main.mjs 5A 双端报告差异摘要（自动生成，PM §19 重锚后）
+
+- old names: 391; new names: 397; common: 390; only-old: 1; only-new: 7; value-diff: 77
+- only-old: P13_NEW_SEMANTICS
+- only-new: P13_CONTINUE_AFTER_RETURN, P13_OLD_PROJECT_BUSY, P13_OLD_SESSION_LIVE_AFTER_SWITCH, P13_QUEUED_BEFORE_SWITCH, P13_QUEUE_SURVIVES_SWITCH, P13_RETURN_RESUMES_SESSION, P13_SWITCH_IMMEDIATE
+
+## 值差异（逐名）
+- `ANCHOR_CARD_AT_ARRIVAL`: OLD=`6` NEW=`4`
+- `ANCHOR_ROW_AFTER_SWITCHBACK`: OLD=`{"count":207,"last":206,"ops":[{"index":6,"requestId":"op-6"}]}` NEW=`{"count":206,"last":206,"ops":[{"index":4,"requestId":"op-6"}]}`
+- `BADGES_CLEAR_ON_EMPTY`: OLD=`true` NEW=`false`
+- `BADGE_ON_WORK_WHILE_COLLAPSED`: OLD=`true` NEW=`false`
+- `BADGE_ROLE_SINGLE_COUNT_WHILE_COLLAPSED`: OLD=`false` NEW=`true`
+- `DENIED_OPEN_COUNT`: OLD=`3` NEW=`1`
+- `DIAGNOSTIC_EVENT_NAMES`: OLD=`window.load.start,ipc.start,ipc.end,window.load.end,session.stop,session.open.start,session.open.ready,session.open.end,session.send.start,session.send.end,handback.chat.skipped,governance.feedback.skip,session.abort.requested,session.send.queued,delivery.claim.start,delivery.start,delivery.claim.end,delivery.blocked,delivery.end,session.dispose,renderer.replay,interaction.presented,interaction.response,interaction.response.end,session.open.failed,renderer.viewport,renderer.event-error,session.rebuild.start,session.rebuild.end,ipc.failed,interaction.closed,window.renderer.gone,interaction.replayed,renderer.recovery` NEW=`window.load.start,window.load.end,ipc.start,ipc.end,session.open.start,session.open.ready,renderer.viewport,session.open.end,session.send.start,session.send.end,handback.chat.skipped,governance.feedback.skip,session.abort.requested,session.send.queued,delivery.claim.start,delivery.start,delivery.claim.end,delivery.blocked,delivery.end,renderer.replay,session.dispose,interaction.presented,interaction.response,interaction.response.end,session.open.failed,session.stop,session.rebuild.start,session.rebuild.end,ipc.failed,renderer.event-error,interaction.closed,window.renderer.gone,interaction.replayed,renderer.recovery`
+- `DISPATCH_ROW_NO_WITHDRAW`: OLD=`true` NEW=`false`
+- `DRAWER_CLOSED_AFTER_PI`: OLD=`true` NEW=`false`
+- `E2E_FAILURES`: OLD=`RECOVERY_SAME_PENDING_CARD_ONCE` NEW=``
+- `E2E_PASS`: OLD=`false` NEW=`true`
+- `HAS_DENIED_INLINE`: OLD=`3` NEW=`1`
+- `HAS_DENIED_INLINE_ANY`: OLD=`3` NEW=`1`
+- `INJECTED_CHIP_DELIVERY_LABEL`: OLD=`false` NEW=`true`
+- `INJECTED_CHIP_LABEL`: OLD=`原始交接内容 · 来源未确认` NEW=`回交投递 · 来自 规划者`
+- `OPEN_CARD_ROWS_AFTER_SWITCHBACK`: OLD=`{"count":208,"last":207,"ops":[{"index":6,"requestId":"op-6"},{"index":207,"requestId":"op-7"}]}` NEW=`{"count":207,"last":207,"ops":[{"index":4,"requestId":"op-6"},{"index":207,"requestId":"op-7"}]}`
+- `OPX_POINTER_IN_VIEWED_PANE`: OLD=`true` NEW=`false`
+- `OP_CARD_FROZEN`: OLD=`true` NEW=`false`
+- `OP_CARD_PRESENT`: OLD=`true` NEW=`false`
+- `OP_MULTI_HAS_CHECKBOX`: OLD=`true` NEW=`false`
+- `OP_SELECT_HAS_RADIO`: OLD=`true` NEW=`false`
+- `OUTDIR`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p` NEW=`/tmp/ans-p5a-final-new.lIlikI`
+- `P1_ARRIVAL_DEBUG`: OLD=`{"hasCard":true,"dist":46,"st":3011,"sh":3491,"ch":434,"crTop":517,"crBottom":640,"ccTop":287,"ccBottom":721,"chipHidden":false}` NEW=`{"hasCard":true,"dist":0,"st":3131,"sh":3632,"ch":501,"crTop":472,"crBottom":572,"ccTop":233,"ccBottom":734,"chipHidden":false}`
+- `P1_CHIP_SECOND_CARD`: OLD=`true` NEW=`false`
+- `PENDING_DIAG`: OLD=`{"count":1,"confirmButtons":1,"scrollTop":21856,"chatRect":{"top":239.1875,"bottom":657.40625},"selectedRoleId":"桌面窗口","pendingKeys":[],"rowCount":473,"anyCards":1,"paneRoleIds":["桌面窗口"],"cards":[{"top":469.390625,"bottom":562.828125,"text":"重载后仍需客户明确作答确认不同意"}]}` NEW=`{"count":1,"confirmButtons":1,"scrollTop":25571,"chatRect":{"top":196.390625,"bottom":670.203125},"selectedRoleId":"桌面窗口","pendingKeys":[],"rowCount":488,"anyCards":1,"paneRoleIds":["桌面窗口"],"cards":[{"top":492.21875,"bottom":570.359375,"text":"重载后仍需客户明确作答确认拒绝"}]}`
+- `PI_FIELDS_MATCH_REGISTRY`: OLD=`true` NEW=`false`
+- `PI_FIELD_COUNT`: OLD=`5` NEW=`6`
+- `PI_KEYS_ARE_FIVE`: OLD=`true` NEW=`false`
+- `PI_SAVE_STATUS`: OLD=`已保存到 .env（改动键：ANTHROPIC_AUTH_TOKEN、ANS_PI_BASE_URL、ANS_PI_MODEL）。必填配置已齐备。下一次开启会话时应用。` NEW=`已保存到 .env（改动键 3 个）。必填配置已齐备。下一次开启会话时应用。`
+- `RECOVERY_CARD_DIAG`: OLD=`{"count":0,"confirmButtons":0,"scrollTop":8394,"chatRect":{"top":258.59375,"bottom":721.40625},"cards":[]}` NEW=`{"count":1,"confirmButtons":1,"scrollTop":7774,"chatRect":{"top":231.796875,"bottom":734.203125},"cards":[{"top":556.453125,"bottom":634.59375,"text":"重载后仍需客户明确作答确认拒绝"}]}`
+- `RECOVERY_SAME_PENDING_CARD_ONCE`: OLD=`false` NEW=`true`
+- `RENDERER_ENTRY`: OLD=`/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/index.html` NEW=`/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/dist/src/index.html`
+- `REPAIR_AFTER_STOP_OPEN_CALLS`: OLD=`34` NEW=`36`
+- `REPAIR_OPEN_CALLS_AFTER_SAME_ROLE`: OLD=`33` NEW=`35`
+- `REPAIR_OPEN_CALLS_BEFORE_SAME_ROLE`: OLD=`32` NEW=`34`
+- `REPLAY_DEDUP_REBUILD`: OLD=`true` NEW=`false`
+- `REPLAY_DEDUP_REBUILD_UNIQUE_TEXT`: OLD=`false` NEW=`true`
+- `REPORT_DELIVERY_DETAILS_COLLAPSED`: OLD=`true` NEW=`false`
+- `RESTORE_NO_SUCCESS_DIVIDER`: OLD=`true` NEW=`false`
+- `RESTORE_SU_CHAT_SNIPPET`: OLD=`SU 的历史问题` NEW=`会话记录已恢复SU 的历史问题`
+- `RESTORE_SU_REPLAY_ROWS`: OLD=`1` NEW=`2`
+- `RESTORE_SU_RESTORED_FLAG`: OLD=`{"hadSession":true,"error":false,"awaitingConfirm":false,"restored":true,"lastSummary":"","lastAt":"","historyNotice":"","contextText":"新会话；可读历史保留，模型未恢复","contextWarning":"","readableHistoryAtOpen":true}` NEW=`{"error":false,"hadSession":true,"restored":true,"contextText":"新会话；可读历史保留，模型未恢复","live":true}`
+- `RESUME_HINT`: OLD=`已在该角色的会话中，续接当前会话。` NEW=``
+- `RIGHT_QUEUE_RUNNING_FIRST`: OLD=`true` NEW=`false`
+- `RIGHT_QUEUE_SOURCES`: OLD=`true` NEW=`false`
+- `ROLE_STATE_BADGE_HAS_ICON`: OLD=`true` NEW=`false`
+- `ROLE_STATE_BADGE_HOVER_FULL`: OLD=`true` NEW=`false`
+- `ROLE_STATE_BADGE_SINGLE_COUNT_WORKING`: OLD=`false` NEW=`true`
+- `ROLE_STATE_BADGE_WORKING_PENDING`: OLD=`true` NEW=`false`
+- `ROLE_STATE_QUEUE_ROW`: OLD=`true` NEW=`false`
+- `SHOT_00_TITLEBAR`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/00-titlebar.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/00-titlebar.png`
+- `SHOT_01B_SU`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/01b-su.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/01b-su.png`
+- `SHOT_01_IMPORT`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/01-import.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/01-import.png`
+- `SHOT_02_CHAT`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/02-chat.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/02-chat.png`
+- `SHOT_03_DENIED`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/03-denied.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/03-denied.png`
+- `SHOT_04_PROFILE`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/04-profile.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/04-profile.png`
+- `SHOT_05_BOOTSTRAP`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/05-bootstrap.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/05-bootstrap.png`
+- `SHOT_06_REFRESH`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/06-refresh.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/06-refresh.png`
+- `SHOT_07_HANDBACK`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/07-handback.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/07-handback.png`
+- `SHOT_08_SU_PANE`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/08-su-pane.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/08-su-pane.png`
+- `SHOT_09_PI_PANEL`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/09-pi-panel.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/09-pi-panel.png`
+- `SHOT_10_PI_SAVED`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/10-pi-saved.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/10-pi-saved.png`
+- `SHOT_11_OPERATOR`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/11-operator-card.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/11-operator-card.png`
+- `SHOT_12_COMPOSER`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/12-composer.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/12-composer.png`
+- `SHOT_12_RESTORE`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/12-restore.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/12-restore.png`
+- `SHOT_14_OP_CROSSPANE`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/14-operator-crosspane.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/14-operator-crosspane.png`
+- `SHOT_15_ANCHOR`: OLD=`/tmp/ans-p5a-final-old.J1Sg1p/15-anchor-reanchor.png` NEW=`/tmp/ans-p5a-final-new.lIlikI/15-anchor-reanchor.png`
+- `STATUS_BADGE_TEXT`: OLD=`●空闲` NEW=`空闲`
+- `STATUS_LAST_EVENT_FIELD_NEW`: OLD=`false` NEW=`true`
+- `STATUS_LAST_EVENT_RECORDED`: OLD=`true` NEW=`false`
+- `SWITCH_CONFIRM_ON_BUSY`: OLD=`true` NEW=`false`
+- `SWITCH_CONFIRM_RELOADED`: OLD=`true` NEW=`false`
+- `SWITCH_IDLE_HINT`: OLD=`true` NEW=`false`
+- `SYS_ROWS`: OLD=`sys sys-context-event | sys sys-settled | sys sys-settled` NEW=`sys sys-call sys-unknown-tool-event | sys sys-call | sys sys-settled | sys sys-call sys-unknown-tool-event | sys sys-call | sys sys-settled`
+- `U1_NORMAL_TO_BOTTOM`: OLD=`false` NEW=`true`
+- `U1_NORMAL_TO_BOTTOM_DIST`: OLD=`10` NEW=`0`
+- `U1_PANE_HEIGHT`: OLD=`12683` NEW=`12580`

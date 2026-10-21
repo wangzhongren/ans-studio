@@ -1,0 +1,20 @@
+=== Old renderer / main / preload vs HEAD (Phase 2b) ===
+UNCHANGED app/renderer/index.html sha256=03f493e36d9a74e76676c19c478208912b74eb3c5c4bd87dc73f9114f1968a92
+UNCHANGED app/renderer/renderer.js sha256=1ca3837e64c8de268059e32bc5170f7dd60e33b0734198b5f777951958ef2c38
+UNCHANGED app/renderer/styles.css sha256=f71f4783c9715ae9d398497fb1a4d8b228db6138ab41778efe185405a08a15b6
+UNCHANGED app/renderer/markdown.js sha256=3dd807854a6bb452fc9715aa042c92be5f6bd147d3400dc4a756fa87d6fb37cb
+UNCHANGED app/renderer/engine-selector.js sha256=db7d14973461e96663a34ec9f3b0bf6332e65e587d2d7e3c196cbee497dad855
+UNCHANGED app/renderer/role-status.js sha256=b1d086a2edc87dc89f4177cd48db59a05c17c195fbaa59c064e1065481ce0b1c
+UNCHANGED app/renderer/runtime-ui.js sha256=1a0ca51a1a12a21e0c103165c5e8d365801a8e187cb83132f8573e11c8d33f35
+UNCHANGED app/renderer/tool-rows.js sha256=66fc2915bc5f04fe13e524048debae1ac26bb5b6dfaeaa64b3963205977cb794
+UNCHANGED app/renderer/ui-labels.js sha256=6e2a67fda48bd756d0de759ca5184e72622ad72503898d0fd7556e0187d4b31d
+UNCHANGED app/preload.cjs sha256=98dde83a4930c7f586a4dd5bee8d7697cffc6fd95c3771149dea2fcf3cbc3e5b
+UNCHANGED app/main.ts sha256=59654afddf9088c7bbf768f6c1bcdfef5402facdd451237fad285fa75fcb4cfd
+
+=== app/desktop vs HEAD ===
+(empty = unchanged)
+
+=== app/ working tree (Phase 2 surface) ===
+?? app/renderer/components.json
+?? app/renderer/src/
+?? app/renderer/tsconfig.json

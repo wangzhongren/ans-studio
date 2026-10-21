@@ -1,0 +1,49 @@
+{
+  "entry": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/index.html",
+  "tag": "old-final",
+  "before": {
+    "groupH": 603.13,
+    "rowH": [
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09
+    ],
+    "scrollTop": 13938,
+    "scrollHeight": 15057,
+    "clientHeight": 565,
+    "anchor": 150,
+    "mounted": 0
+  },
+  "after": {
+    "groupH": 32,
+    "rowH": [
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09,
+      47.09
+    ],
+    "scrollTop": 13938,
+    "scrollHeight": 14519,
+    "clientHeight": 565,
+    "anchor": 150,
+    "mounted": 0
+  },
+  "delta": 0
+}

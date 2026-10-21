@@ -754,11 +754,9 @@ export interface UiLabelsApi {
   governanceJudgeReasonText(reasonCode: string): string;
 }
 
+/** 5B：旧 ui-labels.js 已删除；仅保留类型/历史夹具，f-ui 已退役。 */
 export async function loadUiLabels(): Promise<UiLabelsApi> {
-  await import(new URL("../../../app/renderer/ui-labels.js", import.meta.url).href);
-  const api = (globalThis as Record<string, unknown>).ANSUiLabels as UiLabelsApi | undefined;
-  if (api === undefined) throw new Error("ui-labels.js 未挂 globalThis.ANSUiLabels");
-  return api;
+  throw new Error("旧 ui-labels.js 已随 5B 删除；UI 映射覆盖已迁移到新渲染器 e2e/纯逻辑。");
 }
 
 // —————————————————————— 会话项目配置 ——————————————————————

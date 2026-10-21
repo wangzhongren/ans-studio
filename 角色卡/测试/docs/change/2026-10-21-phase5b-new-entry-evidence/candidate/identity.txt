@@ -1,0 +1,7 @@
+date=2026-10-21T21:06:28+08:00
+HEAD=224cf831f7a26fd2fac8af7155790a75fa31f6b5
+branch=main
+node=v24.14.0
+electron=v44.7.0
+uname=Darwin wangzhongrendeMacBook-Pro.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:16:20 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T8142 arm64
+entry=app/renderer/dist/index.html

@@ -39,3 +39,14 @@ SDK 为 `@anthropic-ai/claude-agent-sdk@0.3.299`，正式 peers `zod@4.6.7`、`@
 **不持久化/不写项目**：判断模式忽略注入的 `storage`（`persistSession:false`、不读写会话索引、不创建项目 `.ans`），原生配置根使用临时目录并在 `dispose` 清理；系统提示不拼接已安装技能节，改为只读判断会话说明（项目文件与命令文本视为不可信数据）。`report_governance_judgement` 与 shell report 一样只把模型原始参数交回回调，规范化/required-read/逐路径复核在编排侧，适配器不裁决。工具注解固定为只读、非破坏、不触网。读取沙箱、敏感排除与预算仍由运行时核心 judge 工具负责，适配器不改判。
 
 **验证**：`test/claude-adapter/session.test.ts` 判断模式用例覆盖两套三件套——shell：工具集恰三项、写/shell/交互/回交/派发/外来 MCP/WebSearch 均被结构性拒绝或 hook deny、`report_shell_judgement` 原样回调、敏感文件被拒、`ANS_CLAUDE_WEB_SEARCH=1` 不生效、不持久化/临时根清理、工具集误配在 SDK 加载前失败、判断模式 abort 仍走原生命周期；治理：工具集恰三项、另一套 report 结构性不可用、`report_governance_judgement` 原样回调、`pathDecisions` 等额外参数不裁剪、非白名单 hook deny、无网络/无外来 MCP、临时根清理；另钉两个冻结三件套均可装配、混合/缺项/多项集合在 SDK 加载前被拒，以及普通模式无 `disallowedTools` 且联网搜索能力位照旧。
+
+
+## 思考等级兼容继续（2026-10-21 D1）
+
+`RuntimeProviderOptions.reasoningEffort` 的正常映射保持。活动 prompt 内首次发普通 `message`，`detail.source="system"`、`reasonCode="claude-reasoning"`，state 为 configured/trying/compatible；SDK 合成 API 错误帧只发安全 request-error 提示，不当真实思考输出。字段仅为普通消息附加事实，不新增共享事件协议。
+
+兼容只接受明确的 HTTP 400/422 参数拒绝：优先识别 JSON 的 type/code/param；明确其他参数（例如 model）不触发，缺 param 的文本只接受已覆盖的明确拒绝句式。401/403/408/429/5xx、运输、取消/超时及无关报错不改变策略。每次 prompt 至多一次 ANS 兼容尝试，SDK 自身重试不变。
+
+兼容引擎省略 SDK effort/thinking，并在其局部 env 设置 `CLAUDE_CODE_EFFORT_LEVEL=unset`、`CLAUDE_CODE_DISABLE_THINKING=1`；真正省略请求体字段由真实 SDK 回环钉住。成功才确认当前活会话兼容，失败/取消后下一轮原配置不变，不写 `.env` 或主进程环境。正常输出/工具启动后不整轮重放；副作用保护包括 ANS handler 执行前以及三类工具 PreToolUse 放行前。
+
+模型能力钳制和 SDK 原生恢复/失败语义保持；没有引入跨会话缓存、模型能力表或 UI 改动。详见 [修复记录](docs/fix/2026-10-21_fix_reasoning-compatibility.md)。

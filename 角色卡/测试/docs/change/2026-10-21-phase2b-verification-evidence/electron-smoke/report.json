@@ -1,0 +1,549 @@
+{
+  "startedAt": "2026-10-21T02:39:23.505Z",
+  "versions": {
+    "electron": "44.7.0",
+    "chrome": "152.0.7977.130",
+    "node": "24.21.0",
+    "platform": "darwin"
+  },
+  "checks": [
+    {
+      "name": "CDP_PSEUDO_STATE_AVAILABLE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "ROOT_MOUNTED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "HTML_DARK_CLASS",
+      "value": true,
+      "detail": {
+        "htmlClass": "dark",
+        "colorScheme": "dark"
+      }
+    },
+    {
+      "name": "DARK_SURFACE",
+      "value": true,
+      "detail": "rgb(20, 23, 26)"
+    },
+    {
+      "name": "LAYOUT_BASELINE",
+      "value": true,
+      "detail": {
+        "titlebarH": 36,
+        "sidebarW": 248,
+        "capsuleW": 900,
+        "roleCount": 5
+      }
+    },
+    {
+      "name": "SEND_DISABLED_NEUTRAL",
+      "value": true,
+      "detail": {
+        "bg": "rgb(37, 42, 48)",
+        "color": "rgb(167, 173, 181)",
+        "opacity": "1",
+        "fontSize": "13px"
+      }
+    },
+    {
+      "name": "DRIVER_AND_BRIDGE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "NO_STYLE_TAGS_AT_RUNTIME",
+      "value": true,
+      "detail": 0
+    },
+    {
+      "name": "ENGINE_CLOSED_ARIA",
+      "value": true,
+      "detail": {
+        "role": "combobox",
+        "haspopup": "listbox",
+        "controls": "runtime-options",
+        "expanded": "false",
+        "activedesc": null,
+        "value": "claude",
+        "label": "会话引擎，当前 Claude",
+        "menuRole": "listbox",
+        "menuHidden": true
+      }
+    },
+    {
+      "name": "ENGINE_OPEN_LISTBOX_OPTIONS",
+      "value": true,
+      "detail": {
+        "expanded": "true",
+        "activedesc": "runtime-option-claude",
+        "hidden": false,
+        "menuRole": "listbox",
+        "optionCount": 3,
+        "options": [
+          {
+            "id": "runtime-option-pi",
+            "role": "option",
+            "selected": "false",
+            "runtime": "pi"
+          },
+          {
+            "id": "runtime-option-codex",
+            "role": "option",
+            "selected": "false",
+            "runtime": "codex"
+          },
+          {
+            "id": "runtime-option-claude",
+            "role": "option",
+            "selected": "true",
+            "runtime": "claude"
+          }
+        ],
+        "width": 180,
+        "direction": "down"
+      }
+    },
+    {
+      "name": "ENGINE_OPEN_ARIA_ACTIVEDESC",
+      "value": true,
+      "detail": "runtime-option-claude"
+    },
+    {
+      "name": "ENGINE_KEYBOARD_BROWSE",
+      "value": true,
+      "detail": {
+        "up": "runtime-option-codex",
+        "home": "runtime-option-pi",
+        "end": "runtime-option-claude"
+      }
+    },
+    {
+      "name": "ENGINE_KEYBOARD_SELECT",
+      "value": true,
+      "detail": {
+        "runtime": "claude",
+        "value": "claude",
+        "label": "会话引擎，当前 Claude",
+        "expanded": "false",
+        "hidden": true,
+        "active": "runtime-select",
+        "selectedClaude": "true"
+      }
+    },
+    {
+      "name": "ENGINE_ESC_CLOSES_AND_FOCUS_RETURNS",
+      "value": true,
+      "detail": {
+        "expanded": "false",
+        "hidden": true,
+        "active": "runtime-select",
+        "prevented": true
+      }
+    },
+    {
+      "name": "ENGINE_TAB_LEAVES_NATURALLY",
+      "value": true,
+      "detail": {
+        "expanded": "false",
+        "hidden": true,
+        "notPrevented": true
+      }
+    },
+    {
+      "name": "SIDEBAR_DRAG_328",
+      "value": true,
+      "detail": {
+        "before": 248,
+        "after": 328,
+        "aria": "328",
+        "stored": "328",
+        "settled": 328
+      }
+    },
+    {
+      "name": "SIDEBAR_DBLCLICK_248",
+      "value": true,
+      "detail": {
+        "w": 248,
+        "aria": "248"
+      }
+    },
+    {
+      "name": "SIDEBAR_KEYBOARD_STEPS",
+      "value": true,
+      "detail": {
+        "shifted": 272,
+        "plain": 264,
+        "back": 272
+      }
+    },
+    {
+      "name": "SIDEBAR_COLLAPSE",
+      "value": true,
+      "detail": {
+        "collapsed": true,
+        "width": 0,
+        "expandHidden": false,
+        "stored": "1"
+      }
+    },
+    {
+      "name": "SIDEBAR_EXPAND_KEEPS_272",
+      "value": true,
+      "detail": {
+        "collapsed": false,
+        "width": 272,
+        "stored": "0"
+      }
+    },
+    {
+      "name": "DRAWER_424_ESC_FOCUS",
+      "value": true,
+      "detail": {
+        "opened": {
+          "width": 424,
+          "role": "dialog",
+          "modal": "true",
+          "focus": "drawer-close"
+        },
+        "closed": true,
+        "focusAfter": "tab-card"
+      }
+    },
+    {
+      "name": "CONFIRM_640_DEFAULT_FOCUS_DENY",
+      "value": true,
+      "detail": {
+        "width": 640,
+        "focus": "sc-deny"
+      }
+    },
+    {
+      "name": "CONFIRM_COMMAND_VERBATIM",
+      "value": true,
+      "detail": "echo \"phase2b\""
+    },
+    {
+      "name": "CONFIRM_ALLOW_BORDER_INPUT",
+      "value": true,
+      "detail": {
+        "border": "rgb(107, 117, 126)",
+        "width": "1px"
+      }
+    },
+    {
+      "name": "CONFIRM_DENY_PRIMARY_BG",
+      "value": true,
+      "detail": "rgb(111, 160, 139)"
+    },
+    {
+      "name": "BUTTON_FONT_13",
+      "value": true,
+      "detail": "13px"
+    },
+    {
+      "name": "FOCUS_RING_BUTTON_OUTLINE",
+      "value": true,
+      "detail": {
+        "forced": true,
+        "outline-width": "2px",
+        "outline-style": "solid",
+        "outline-color": "rgb(111, 160, 139)",
+        "outline-offset": "3px"
+      }
+    },
+    {
+      "name": "FOCUS_RING_BUTTON_DEFAULT",
+      "value": true,
+      "detail": {
+        "forced": true,
+        "outline-width": "2px",
+        "outline-style": "solid",
+        "outline-color": "rgb(111, 160, 139)",
+        "outline-offset": "3px"
+      }
+    },
+    {
+      "name": "FOCUS_RING_TEXTAREA",
+      "value": true,
+      "detail": {
+        "forced": true,
+        "outline-width": "2px",
+        "outline-style": "solid",
+        "outline-color": "rgb(111, 160, 139)",
+        "outline-offset": "3px"
+      }
+    },
+    {
+      "name": "FOCUS_RING_ENGINE_TRIGGER",
+      "value": true,
+      "detail": {
+        "forced": true,
+        "outline-width": "2px",
+        "outline-style": "solid",
+        "outline-color": "rgb(111, 160, 139)",
+        "outline-offset": "3px"
+      }
+    },
+    {
+      "name": "CONFIRM_DENY_STATIC_RING",
+      "value": true,
+      "detail": {
+        "outline-width": "2px",
+        "outline-style": "solid",
+        "outline-color": "rgb(111, 160, 139)",
+        "outline-offset": "3px"
+      }
+    },
+    {
+      "name": "PRIMARY_HOVER_SUCCESS_HOVER",
+      "value": true,
+      "detail": {
+        "hover": true,
+        "bg": "rgb(127, 178, 155)"
+      }
+    },
+    {
+      "name": "PRIMARY_ACTIVE_TOKEN",
+      "value": true,
+      "detail": {
+        "active": true,
+        "bg": "rgb(94, 143, 122)"
+      }
+    },
+    {
+      "name": "CONFIRM_MOUSE_DENY_CLOSED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "CHECKBOX_CHECKED_WARNING",
+      "value": true,
+      "detail": {
+        "bg": "rgb(196, 161, 95)",
+        "border": "rgb(196, 161, 95)",
+        "matched": true
+      }
+    },
+    {
+      "name": "CONFIRM_ESC_DENY",
+      "value": true,
+      "detail": "deny"
+    },
+    {
+      "name": "IME_COMPOSITION_ENTER_NOT_SENT",
+      "value": true,
+      "detail": {
+        "prevented": false,
+        "text": "中文候选",
+        "status": "演示骨架：发送、附件与自动判断均未接入业务。"
+      }
+    },
+    {
+      "name": "IME_AFTER_COMMIT_ENTER_INTERCEPTED",
+      "value": true,
+      "detail": {
+        "prevented": true,
+        "text": "中文候选",
+        "status": "演示：发送未接入业务，本条未发送。"
+      }
+    },
+    {
+      "name": "IME_GUARDS_229_ISCOMPOSING",
+      "value": true,
+      "detail": {
+        "k229": false,
+        "isComposing": false,
+        "shift": false
+      }
+    },
+    {
+      "name": "SEND_STILL_DISABLED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "NARROW_960_NO_OVERFLOW",
+      "value": true,
+      "detail": {
+        "inner": [
+          960,
+          620
+        ],
+        "noOverflow": true,
+        "paneW": 664,
+        "capsuleW": 664,
+        "demoDisplay": "none",
+        "scopeDisplay": "block",
+        "scopeText": "产品 / Claude · 演示",
+        "scopeFits": true,
+        "headH": 60
+      }
+    },
+    {
+      "name": "NARROW_SCOPE_DEMO_HIDDEN",
+      "value": true,
+      "detail": {
+        "demoDisplay": "none",
+        "scope": "产品 / Claude · 演示",
+        "fits": true
+      }
+    },
+    {
+      "name": "PAGE_CSP_VIOLATIONS_ZERO",
+      "value": true,
+      "detail": 0
+    },
+    {
+      "name": "NO_CONSOLE_ERRORS",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "NO_CSP_OR_MODULE_CONSOLE_ERRORS",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "NO_DID_FAIL_LOAD",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "NO_PRELOAD_ERRORS",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "NO_RENDER_GONE",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "SCREENSHOT_CAPTURED",
+      "value": true,
+      "detail": {
+        "path": "/tmp/ans-p2b-smoke-output/smoke-1360-default.png",
+        "bytes": 94137
+      }
+    }
+  ],
+  "consoleMessages": [],
+  "didFailLoad": [],
+  "preloadErrors": [],
+  "renderGone": [],
+  "pageCspViolations": [],
+  "screenshot": {
+    "path": "/tmp/ans-p2b-smoke-output/smoke-1360-default.png",
+    "bytes": 94137
+  },
+  "base": {
+    "htmlClass": "dark",
+    "htmlDark": true,
+    "colorScheme": "dark",
+    "bodyBg": "rgb(20, 23, 26)",
+    "titlebarH": 36,
+    "sidebarW": 248,
+    "capsuleW": 900,
+    "roleCount": 5,
+    "sendDisabled": true,
+    "sendBg": "rgb(37, 42, 48)",
+    "sendColor": "rgb(167, 173, 181)",
+    "sendOpacity": "1",
+    "sendFontSize": "13px",
+    "driver": "object",
+    "bridge": "object",
+    "styleTags": 0
+  },
+  "engineOpen": {
+    "expanded": "true",
+    "activedesc": "runtime-option-claude",
+    "hidden": false,
+    "menuRole": "listbox",
+    "optionCount": 3,
+    "options": [
+      {
+        "id": "runtime-option-pi",
+        "role": "option",
+        "selected": "false",
+        "runtime": "pi"
+      },
+      {
+        "id": "runtime-option-codex",
+        "role": "option",
+        "selected": "false",
+        "runtime": "codex"
+      },
+      {
+        "id": "runtime-option-claude",
+        "role": "option",
+        "selected": "true",
+        "runtime": "claude"
+      }
+    ],
+    "width": 180,
+    "direction": "down"
+  },
+  "engineKeys": {
+    "afterUp": "runtime-option-codex",
+    "afterHome": "runtime-option-pi",
+    "afterEnd": "runtime-option-claude",
+    "afterEnter": {
+      "runtime": "claude",
+      "value": "claude",
+      "label": "会话引擎，当前 Claude",
+      "expanded": "false",
+      "hidden": true,
+      "active": "runtime-select",
+      "selectedClaude": "true"
+    },
+    "reopened": "true",
+    "afterEsc": {
+      "expanded": "false",
+      "hidden": true,
+      "active": "runtime-select",
+      "prevented": true
+    },
+    "afterTab": {
+      "expanded": "false",
+      "hidden": true,
+      "notPrevented": true
+    },
+    "restored": "claude"
+  },
+  "confirm": {
+    "width": 640,
+    "focus": "sc-deny",
+    "command": "echo \"phase2b\"",
+    "allowBorder": "rgb(107, 117, 126)",
+    "allowBorderWidth": "1px",
+    "allowFontSize": "13px",
+    "denyBg": "rgb(111, 160, 139)",
+    "denyColor": "rgb(20, 23, 26)"
+  },
+  "narrow": {
+    "inner": [
+      960,
+      620
+    ],
+    "noOverflow": true,
+    "paneW": 664,
+    "capsuleW": 664,
+    "demoDisplay": "none",
+    "scopeDisplay": "block",
+    "scopeText": "产品 / Claude · 演示",
+    "scopeFits": true,
+    "headH": 60
+  },
+  "finishedAt": "2026-10-21T02:39:29.074Z",
+  "summary": {
+    "total": 49,
+    "passed": 49,
+    "failed": 0
+  }
+}

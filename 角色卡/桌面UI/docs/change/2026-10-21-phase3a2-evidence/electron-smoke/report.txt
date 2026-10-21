@@ -1,0 +1,14 @@
+CTA_STYLED={"tag":"BUTTON","className":"group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-[13px] font-medium whitespace-nowrap transition-colors duration-[120ms] outline-none select-none focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-ring active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-[0.45] aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-success-hover active:bg-primary-active h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 chat-cta","bg":"rgb(111, 160, 139)","color":"rgb(20, 23, 26)","height":32,"font":"13px","border":"rgba(0, 0, 0, 0)"}
+SYS_CONFIG_DANGER={"text":"开启会话失败：离线受控拒绝：会话未开启","color":"rgb(201, 122, 109)"}
+MARKDOWN_TYPOGRAPHY={"h1":{"fontSize":"15px","marginTop":"16px","marginBottom":"6px","lineHeight":"21px"},"h2":{"fontSize":"15px","marginTop":"16px","marginBottom":"6px"},"h3":{"fontSize":"14px","marginTop":"16px","marginBottom":"6px"},"ul":{"marginTop":"4px","marginBottom":"18px","paddingLeft":"20px"},"blockquote":{"marginBottom":"8px","paddingLeft":"10px","borderLeftWidth":"2px","borderLeftColor":"rgb(58, 65, 72)"},"p":{"marginBottom":"10px"},"table":{"outlineWidth":"1px","outlineColor":"rgb(58, 65, 72)","fontSize":"12.5px"},"th":{"backgroundColor":"rgb(30, 35, 40)","paddingTop":"6px","paddingRight":"10px","paddingBottom":"6px","paddingLeft":"10px","borderBottomColor":"rgb(58, 65, 72)"},"td":{"paddingTop":"6px","paddingRight":"10px","paddingBottom":"6px","paddingLeft":"10px"}}
+REPLAY_AND_BLOCKED={"replayOpacity":"0.88","blocked":{"opacity":"1","borderLeftWidth":"3px","borderLeftColor":"rgb(201, 122, 109)"}}
+TOOL_FACTS={"time":"18:00","timeTitle":"2026-10-21T10:00:01Z","timeoutColor":"rgb(201, 122, 109)","summary":"本轮 1 个调用：run_shell · 含 1 条失败","summaryColor":"rgb(201, 122, 109)"}
+EXPAND_CHEVRONS={"records":{"content":"\"›\"","transform":"matrix(1, 0, 0, 1, 0, 0)"},"denied":{"content":"\"›\"","transform":"matrix(1, 0, 0, 1, 0, 0)"}}
+OPERATOR_CHOICE={"labelHeight":40,"labelPadding":"8px","accent":"rgb(242, 244, 246)","cancelBorder":"rgb(107, 117, 126)","submitBg":"rgb(111, 160, 139)","selectedState":{"selected":true,"checked":true,"bg":"rgb(42, 48, 55)"}}
+VIRTUAL_STATE_RESTORED={"beforeState":{"group":true,"reason":true,"handback":true,"selected":true,"checked":true},"offscreen":{"operator":0,"group":0},"afterState":{"group":true,"reason":true,"handback":true,"selected":true,"checked":true}}
+SCREENSHOTS=["chat-1360.png","choice-1360.png","choice-960.png","chat-960.png"]
+NO_DID_FAIL_LOAD=[]
+NO_CONSOLE_ERRORS=[]
+SMOKE_DONE=true
+CONSOLE_ERRORS=0
+DID_FAIL_LOAD=0

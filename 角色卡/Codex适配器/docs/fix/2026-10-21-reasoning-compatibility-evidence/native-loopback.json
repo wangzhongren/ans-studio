@@ -1,0 +1,1137 @@
+{
+  "node": "v24.14.0",
+  "platform": "darwin/arm64",
+  "cli": "0.162.1",
+  "credentials": "fake only",
+  "externalModelCalls": 0,
+  "selectedCases": [],
+  "sourceHashes": {
+    "../../src/provider/codex/session.ts": "89ae8e37085876fe655767b7214314d7accfa6bfc514f75c7ffd90d78a22050b",
+    "../../src/common/codex-adapter/protocol.ts": "31ab8a1b65a0cf5623931730225ed813f23c06b5184b23a3f04122ef611fa468",
+    "../../src/common/codex-adapter/config.ts": "4194d3f430e0563c99befa70f887c785994554a5b6651980076b3a712f2347e7",
+    "./reasoning-loopback.probe.ts": "8e4225de75f899acf9e5ba67d3e059c6e626c8d7f2f9ba05ee215a5c09318ab9"
+  },
+  "passed": false,
+  "reports": [
+    {
+      "name": "mapping-low",
+      "passed": true,
+      "wire": [
+        {
+          "effort": "low",
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 200,
+          "historySentinelPresent": false
+        }
+      ],
+      "system": [
+        {
+          "summary": "本会话向 Codex SDK 请求的思考等级：low；服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "mapping-low"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "completed"
+        }
+      ]
+    },
+    {
+      "name": "mapping-medium",
+      "passed": true,
+      "wire": [
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 200,
+          "historySentinelPresent": false
+        }
+      ],
+      "system": [
+        {
+          "summary": "本会话向 Codex SDK 请求的思考等级：medium；服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "mapping-medium"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "completed"
+        }
+      ]
+    },
+    {
+      "name": "mapping-high",
+      "passed": true,
+      "wire": [
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 200,
+          "historySentinelPresent": false
+        }
+      ],
+      "system": [
+        {
+          "summary": "本会话向 Codex SDK 请求的思考等级：high；服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "mapping-high"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "completed"
+        }
+      ]
+    },
+    {
+      "name": "mapping-xhigh",
+      "passed": true,
+      "wire": [
+        {
+          "effort": "xhigh",
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 200,
+          "historySentinelPresent": false
+        }
+      ],
+      "system": [
+        {
+          "summary": "本会话向 Codex SDK 请求的思考等级：xhigh；服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "mapping-xhigh"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "completed"
+        }
+      ]
+    },
+    {
+      "name": "mapping-off",
+      "passed": true,
+      "wire": [
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 200,
+          "historySentinelPresent": false
+        }
+      ],
+      "system": [
+        {
+          "summary": "Codex 未覆盖思考等级：不表示关闭推理，实际推理强度未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "mapping-off"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "completed"
+        }
+      ]
+    },
+    {
+      "name": "catalog-default-preserves-history",
+      "passed": true,
+      "wire": [
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 200,
+          "historySentinelPresent": true
+        },
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 400,
+          "historySentinelPresent": true
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 200,
+          "historySentinelPresent": true
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 200,
+          "historySentinelPresent": true
+        }
+      ],
+      "system": [
+        {
+          "summary": "本会话向 Codex SDK 请求的思考等级：high；服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "catalog-default-preserves-history"
+        },
+        {
+          "summary": "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-compatibility",
+            "state": "trying"
+          },
+          "turnId": "catalog-default-preserves-history"
+        },
+        {
+          "summary": "本会话已使用兼容请求完成，后续沿用该方式；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-compatibility",
+            "state": "completed"
+          },
+          "turnId": "catalog-default-preserves-history"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "completed"
+        },
+        {
+          "outcome": "completed"
+        },
+        {
+          "outcome": "completed"
+        }
+      ]
+    },
+    {
+      "name": "field-removal-ephemeral",
+      "passed": true,
+      "wire": [
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 400,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 200,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 200,
+          "historySentinelPresent": false
+        }
+      ],
+      "system": [
+        {
+          "summary": "本会话向 Codex SDK 请求的思考等级：high；服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "field-removal-ephemeral"
+        },
+        {
+          "summary": "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-compatibility",
+            "state": "trying"
+          },
+          "turnId": "field-removal-ephemeral"
+        },
+        {
+          "summary": "本会话已使用兼容请求完成，后续沿用该方式；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-compatibility",
+            "state": "completed"
+          },
+          "turnId": "field-removal-ephemeral"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "completed"
+        },
+        {
+          "outcome": "completed"
+        }
+      ]
+    },
+    {
+      "name": "field-removal-persistent",
+      "passed": true,
+      "wire": [
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 400,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 200,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 200,
+          "historySentinelPresent": false
+        }
+      ],
+      "system": [
+        {
+          "summary": "本会话向 Codex SDK 请求的思考等级：high；服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "field-removal-persistent"
+        },
+        {
+          "summary": "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-compatibility",
+            "state": "trying"
+          },
+          "turnId": "field-removal-persistent"
+        },
+        {
+          "summary": "本会话已使用兼容请求完成，后续沿用该方式；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-compatibility",
+            "state": "completed"
+          },
+          "turnId": "field-removal-persistent"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "completed"
+        },
+        {
+          "outcome": "completed"
+        }
+      ]
+    },
+    {
+      "name": "restore-500",
+      "passed": true,
+      "wire": [
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 400,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 200,
+          "historySentinelPresent": false
+        }
+      ],
+      "system": [
+        {
+          "summary": "本会话向 Codex SDK 请求的思考等级：high；服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "restore-500"
+        },
+        {
+          "summary": "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-compatibility",
+            "state": "trying"
+          },
+          "turnId": "restore-500"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "failed",
+          "error": "We’re currently experiencing high demand, which may cause temporary errors."
+        },
+        {
+          "outcome": "completed"
+        }
+      ]
+    },
+    {
+      "name": "restore-cancel",
+      "passed": true,
+      "wire": [
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 400,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 200,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 200,
+          "historySentinelPresent": false
+        }
+      ],
+      "system": [
+        {
+          "summary": "本会话向 Codex SDK 请求的思考等级：high；服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "restore-cancel"
+        },
+        {
+          "summary": "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-compatibility",
+            "state": "trying"
+          },
+          "turnId": "restore-cancel"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "aborted"
+        },
+        {
+          "outcome": "completed"
+        }
+      ]
+    },
+    {
+      "name": "restore-timeout",
+      "passed": true,
+      "wire": [
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 400,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 200,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 200,
+          "historySentinelPresent": false
+        }
+      ],
+      "system": [
+        {
+          "summary": "本会话向 Codex SDK 请求的思考等级：high；服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "restore-timeout"
+        },
+        {
+          "summary": "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-compatibility",
+            "state": "trying"
+          },
+          "turnId": "restore-timeout"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "timed_out",
+          "error": "Codex 本轮运行超过最后兜底（700ms），已中止以免无限挂起。"
+        },
+        {
+          "outcome": "completed"
+        }
+      ]
+    },
+    {
+      "name": "restore-field-500",
+      "passed": true,
+      "wire": [
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 400,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": null,
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 500,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 200,
+          "historySentinelPresent": false
+        }
+      ],
+      "system": [
+        {
+          "summary": "本会话向 Codex SDK 请求的思考等级：high；服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "restore-field-500"
+        },
+        {
+          "summary": "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-compatibility",
+            "state": "trying"
+          },
+          "turnId": "restore-field-500"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "failed",
+          "error": "We’re currently experiencing high demand, which may cause temporary errors."
+        },
+        {
+          "outcome": "completed"
+        }
+      ]
+    },
+    {
+      "name": "model-error-no-compatibility",
+      "passed": true,
+      "wire": [
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 400,
+          "historySentinelPresent": false
+        }
+      ],
+      "system": [
+        {
+          "summary": "本会话向 Codex SDK 请求的思考等级：high；服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "model-error-no-compatibility"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "failed",
+          "error": "{\"error\":{\"message\":\"Unsupported parameter: model\",\"type\":\"invalid_request_error\",\"code\":\"unsupported_parameter\",\"param\":\"model\"}}"
+        }
+      ]
+    },
+    {
+      "name": "whole-reasoning-interface-limit",
+      "passed": true,
+      "wire": [
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 400,
+          "historySentinelPresent": false
+        }
+      ],
+      "system": [
+        {
+          "summary": "本会话向 Codex SDK 请求的思考等级：high；服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "whole-reasoning-interface-limit"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "failed",
+          "error": "{\"error\":{\"message\":\"Unsupported parameter: reasoning\",\"type\":\"invalid_request_error\",\"code\":\"unsupported_parameter\",\"param\":\"reasoning\"}}"
+        }
+      ]
+    },
+    {
+      "name": "completed-tool-never-replayed",
+      "passed": true,
+      "wire": [
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 200,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "probe-model",
+          "status": 400,
+          "historySentinelPresent": false
+        }
+      ],
+      "system": [
+        {
+          "summary": "本会话向 Codex SDK 请求的思考等级：high；服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "completed-tool-never-replayed"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "failed",
+          "error": "{\"error\":{\"message\":\"Unsupported parameter: reasoning.effort\",\"type\":\"invalid_request_error\",\"code\":\"unsupported_parameter\",\"param\":\"reasoning.effort\"}}"
+        }
+      ]
+    },
+    {
+      "name": "known-model-effort-field-removal-required",
+      "passed": false,
+      "failure": "Error: {\"error\":{\"message\":\"Unsupported parameter: reasoning.effort\",\"type\":\"invalid_request_error\",\"code\":\"unsupported_parameter\",\"param\":\"reasoning.effort\"}}",
+      "wire": [
+        {
+          "effort": "high",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 400,
+          "historySentinelPresent": false
+        },
+        {
+          "effort": "medium",
+          "hasReasoning": true,
+          "model": "gpt-5.5",
+          "status": 400,
+          "historySentinelPresent": false
+        }
+      ],
+      "system": [
+        {
+          "summary": "本会话向 Codex SDK 请求的思考等级：high；服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-configuration",
+            "state": "configured"
+          },
+          "turnId": "known-model-effort-field-removal-required"
+        },
+        {
+          "summary": "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "reasoning-compatibility",
+            "state": "trying"
+          },
+          "turnId": "known-model-effort-field-removal-required"
+        }
+      ],
+      "outcomes": [
+        {
+          "outcome": "failed",
+          "error": "{\"error\":{\"message\":\"Unsupported parameter: reasoning.effort\",\"type\":\"invalid_request_error\",\"code\":\"unsupported_parameter\",\"param\":\"reasoning.effort\"}}"
+        }
+      ]
+    }
+  ]
+}

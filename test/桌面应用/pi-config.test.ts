@@ -18,7 +18,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   PI_PANEL_KEYS,
@@ -360,21 +360,53 @@ test('packaged settings save and a fresh startup environment share the injected 
 });
 
 test('packaged smoke requires explicit isolated absolute paths, while ordinary startup has no smoke request',async()=>{
- const {parsePackagedSmokeArguments}=await import('../../app/desktop/packaged-smoke.ts');const t=makeTempEnv();
+ const {parsePackagedSmokeArguments,validateSmokeRendererEntry}=await import('../../app/desktop/packaged-smoke.ts');const t=makeTempEnv();
  try{
   assert.equal(parsePackagedSmokeArguments(['app','--user-data-dir='+t.dir]),undefined);
   assert.deepEqual(parsePackagedSmokeArguments(['app','--ans-packaged-smoke',path.join(t.dir,'result.json'),'--user-data-dir='+t.dir]),{resultPath:path.join(t.dir,'result.json'),userDataPath:t.dir});
   assert.deepEqual(parsePackagedSmokeArguments(['app','--ans-packaged-smoke',path.join(t.dir,'result.json'),'--user-data-dir',t.dir]),{resultPath:path.join(t.dir,'result.json'),userDataPath:t.dir});
   assert.throws(()=>parsePackagedSmokeArguments(['--ans-packaged-smoke','relative.json','--user-data-dir='+t.dir]),/absolute/);
   assert.throws(()=>parsePackagedSmokeArguments(['--ans-packaged-smoke',path.join(t.dir,'result.json')]),/isolated/);
+  // Phase 5A（PM §17.3）：smoke-only 入口覆盖必须是绝对 .html；相对/非 .html 一律解析失败。
+  const entry=path.join(t.dir,'dist','index.html');
+  assert.deepEqual(parsePackagedSmokeArguments(['app','--ans-packaged-smoke',path.join(t.dir,'result.json'),'--user-data-dir='+t.dir,'--ans-renderer-entry='+entry]),{resultPath:path.join(t.dir,'result.json'),userDataPath:t.dir,rendererEntryPath:entry});
+  assert.deepEqual(parsePackagedSmokeArguments(['app','--ans-packaged-smoke',path.join(t.dir,'result.json'),'--user-data-dir='+t.dir,'--ans-renderer-entry',entry]),{resultPath:path.join(t.dir,'result.json'),userDataPath:t.dir,rendererEntryPath:entry});
+  assert.throws(()=>parsePackagedSmokeArguments(['app','--ans-packaged-smoke',path.join(t.dir,'result.json'),'--user-data-dir='+t.dir,'--ans-renderer-entry=relative.html']),/absolute \.html/);
+  assert.throws(()=>parsePackagedSmokeArguments(['app','--ans-packaged-smoke',path.join(t.dir,'result.json'),'--user-data-dir='+t.dir,'--ans-renderer-entry='+path.join(t.dir,'entry.txt')]),/absolute \.html/);
+  assert.throws(()=>parsePackagedSmokeArguments(['app','--ans-packaged-smoke',path.join(t.dir,'result.json'),'--user-data-dir='+t.dir,'--ans-renderer-entry']),/requires a value/);
+  assert.throws(()=>parsePackagedSmokeArguments(['app','--ans-packaged-smoke',path.join(t.dir,'result.json'),'--user-data-dir='+t.dir,'--ans-renderer-entry','--other']),/requires a value/);
+  // 入口必须位于包内 app/renderer/dist/（防任意本地文件）。
+  const appRoot=path.join(t.dir,'pkg');
+  const inside=path.join(appRoot,'app','renderer','dist','src','index.html');
+  assert.equal(validateSmokeRendererEntry(inside,appRoot),inside);
+  assert.throws(()=>validateSmokeRendererEntry(path.join(appRoot,'app','renderer','index.html'),appRoot),/inside app\/renderer\/dist/);
+  assert.throws(()=>validateSmokeRendererEntry(path.join(appRoot,'app','renderer','dist','entry.txt'),appRoot),/\.html/);
+  assert.throws(()=>validateSmokeRendererEntry(path.join(appRoot,'app','renderer','dist','..','..','evil.html'),appRoot),/inside app\/renderer\/dist/);
  }finally{t.cleanup();}
 });
 
-test('packaged smoke script reads existing IPC and exercises settings without publishing configuration values or calling save/model APIs',async()=>{
+test('packaged smoke script checks entry/root/driver/CSP plus existing IPC without publishing configuration values or calling save/model APIs',async()=>{
  const {packagedSmokeScript}=await import('../../app/desktop/packaged-smoke.ts');const vm=await import('node:vm');const expected=path.join(os.tmpdir(),'quoted "fixture"','.env');
- const invoked:string[]=[];let open=false;
- const nodes:Record<string,unknown>={'runtime-select':{disabled:true},'tab-pi':{click(){open=true;}},'right-drawer':{getAttribute:()=>open?'false':'true'},'drawer-close':{click(){open=false;}}};
+ const entry=path.join(os.tmpdir(),'pkg 包','app','renderer','dist','src','index.html');
+ const entryUrl=pathToFileURL(entry).href;
+ const csp="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;";
+ const invoked:string[]=[];
+ const root={firstElementChild:{}};
+ const nodes:Record<string,unknown>={'root':root,'runtime-select':{disabled:true},'tab-pi':{disabled:true},'right-drawer':{getAttribute:()=>'true'}};
  const bridge=new Proxy({getRecoveryState:async()=>({projectRoot:null}),getRuntimeConfig:async(runtime:string)=>{invoked.push(runtime);return {runtime,path:expected,missingKeys:['FAKE_REQUIRED_KEY'],fields:[{key:'FAKE_SECRET',value:SENTINEL_TOKEN}]};}},{get(target,key){if(!(key in target))throw new Error('unexpected privileged smoke API');return Reflect.get(target,key);}});
- const observed=await vm.runInNewContext(packagedSmokeScript(expected),{window:{desktop:bridge},document:{querySelector:(selector:string)=>selector==='.app'?{}:null,getElementById:(id:string)=>nodes[id]}});
- assert.deepEqual(invoked,['pi','codex','claude']);assert.ok(Object.values(observed.checks).every(value=>value===true));assert.equal(open,false);assert.equal(JSON.stringify(observed).includes(SENTINEL_TOKEN),false);
+ const documentMock={
+  querySelector:(selector:string)=>selector==='.app'?{}:selector.startsWith('meta[http-equiv=')?{getAttribute:()=>csp}:null,
+  getElementById:(id:string)=>nodes[id]??null,
+ };
+ const observed=await vm.runInNewContext(packagedSmokeScript(expected,entryUrl),{
+  window:{desktop:bridge,__ansRenderer:{loadProject:()=>{},selectRole:()=>{},state:{}},__ansCspViolations:[]},
+  document:documentMock,
+  location:{href:entryUrl},
+  URL,
+  setTimeout:(callback:()=>void)=>setTimeout(callback,0),
+ });
+ assert.deepEqual(invoked,['pi','codex','claude']);
+ assert.ok(Object.values(observed.checks).every(value=>value===true));
+ assert.equal(observed.entryUrl,entryUrl);
+ assert.equal(JSON.stringify(observed).includes(SENTINEL_TOKEN),false);
 });

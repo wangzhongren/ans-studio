@@ -1,0 +1,101 @@
+# Phase 5A 门禁与证据汇总（桌面UI）
+
+- 日期：2026-10-21（Asia/Shanghai）
+- 5A 显式新入口：`app/renderer/dist/src/index.html`
+- 5A 生产默认（未切换）：`app/renderer/index.html`
+- 旧渲染器 / vendor / 旧测试：**未删除**
+- 新增依赖 / DOM 例外：**无**
+
+## 1. 静态门
+
+| 项 | 命令 | 结果 |
+| --- | --- | --- |
+| 全仓类型检查 | `npm run typecheck` | **0 错** |
+| 渲染器类型检查 | `npm run typecheck:renderer` | **0 错** |
+| 构建 | `npm run build:renderer` | **成功** |
+| CSP | 构建入口 meta | `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;` |
+| gzip9 | JS+CSS+入口 | **288,552B**（268,650 + 19,501 + 401）≤300KiB |
+| 产物 | `dist/src/index.html` + assets | JS `index-T1im4gOp.js`、CSS `index-DbPZU_Oj.css`；SHA256：index.html `f372e111d49665578029083991bd4a02b10d535707d6a642184ba2f267a5b5cc`、JS `f568e2aae8866996b7dabc22b69cdb4675fa8e2e8b8d020eb812a8aba08e4095`、CSS `b52cfca1d79b90cb622caea83cb46e6f2be8f6d89c753eea7f8e317fe74271fe`；5B 目标 `dist/index.html` 未切 |
+
+## 2. 单测
+
+| 套件 | 结果 |
+| --- | --- |
+| 新 `test/桌面UI/*.test.ts` | **142/142** |
+| 旧基线 `node --test test/桌面应用/*.test.ts` | **683/683**（原 679 + 桌面窗口 Phase 5A 新增 4 项：入口接线、dev 回退 hook、导航兜底、导航守卫；桌面UI 未改这些文件） |
+
+## 3. 三项缺口官方检查（新入口）
+
+| 检查 | 结果 | 证据 |
+| --- | --- | --- |
+| DELIVERY_NOTE `builtin identity stays data and accessible without duplicate third visible line` | **官方 pass；段 9/9** | `uiux-v2/GHOST/` |
+| COMPLETE_FLOW `P7 choice pending separated from empty queue` | **官方 pass；整段 41/41 pass**（含 role reading 真滚动） | `uiux-v2/FLOW/` |
+| 默认段 `full replay preserves content identity` | **官方 pass**（offset −610→−610，差 0） | `uiux-v2/DEFAULT/` |
+
+默认段 `full replay preserves content identity` 官方 pass 后曾止于旧 toggleDrift `anchor paragraph materialized 960`（旧断言要求 `.msg` 直接挂 `.chat-pane`，新渲染器为 `.chat-row` 包裹）。PM §十九批准等价重锚后，**重锚已由桌面UI 落地于 `uiux-v2.mjs`**（`parented: n.closest('.chat-pane')`），默认段 **110/110 checks 全过**，含 denied anchor/decided card；MERGE 段同轮按语义身份重锚后 **12/12**。证据 `uiux-v2/DEFAULT/`、`uiux-v2/MERGE/`。
+
+## 4. A 组 8 项
+
+| 项 | 结果 |
+| --- | --- |
+| TERMINAL_MERGE | **12/12 PASS** |
+| PROJECT_RESET | **7/7 PASS** |
+| DUP | **32/32 PASS** |
+| MERGE | **12/12 PASS**（已落地 PM §十九语义重锚：同 request id + `data-state=open/decided` + confirm/anchors，不再要求同一 DOM 节点） |
+| NOTICE | **6/6 PASS** |
+| BLANK | **6/6 PASS** |
+| DEFAULT toggleDrift | **整段 110 checks PASS**（已落地 `closest(.chat-pane)` 重锚） |
+| COMPLETE_FLOW role reading | **整段 41/41 PASS**（含 must really scroll） |
+
+## 5. 其他段（最终构建）
+
+MIRROR 8/8、QUEUE 4/4、GOV 7 项报表、JUDGE 33/33、G2 5/5、SELECTOR 27/27、CONFIG 21/21、ROLE 11/11、SEND 8/8、TERMINAL 22/22、RUNTIME 17/17、FRESH 4/4、VISUAL 54/54、TOOLFOLD 19/19（C1 Δ=20）。SEND 在 sessionCurrent 语义修正后 8/8。原始报告见 `segments/`、`uiux-v2/`。
+
+## 6. main.mjs 新端（桌面窗口套件）
+
+- **exit 0，`E2E_FAILURES=` 空**（365 名逐项无失败）。
+- SESSION_REPAIR×5、PENDING、RECOVERY_SAME/OLD/ENDED、DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS **全 true**。
+- `RESTORE_NO_SUCCESS_DIVIDER=true`、`RESTORE_SU_REPLAY_ROWS=1`（成功回放不渲染 `sys-replay-divider`，错误分支保留）；`BOOTSTRAP_MENTION_COUNT=1`、`BOOTSTRAP_CENTER_CTA_PRESENT=true`；`P1_*` 到达/点击/切回 true。
+- `DRAWER_ESC_CLOSES=true`、`TAB_CARD_ACTIVE/TAB_WORK_ACTIVE=true`、`ANCHOR_TABLE_REGISTERED=true`、`ANCHOR_*`/`OPEN_CARD_STABLE_AT_ANCHOR/CHIP_VISIBLE=true`、`DENIED_OPEN_COUNT=0`、`HAS_DENIED_INLINE=0`、`INJECTED_CHIP_LABEL=回交投递 · 来自 规划者`。
+- 证据 `main/report.txt`。
+
+## 7. Phase 5A 冒烟（真实 Electron 离线）
+
+`test/桌面UI/phase5a-electron-smoke.mjs` **36/36**，21 张截图，零 console/CSP：
+- Sidebar 身份、P7 待选择、阅读锚点（1360/960、贴底、200%）、Markdown 外链不导航/openExternal。
+- **S0 空态**：`hasRoles=false` 标题「项目尚未 bootstrap」/说明/CTA 各一、无治理 CTA、composer hint 空；点击与键盘均可起主入口会话。
+- **200% P0**：长历史 `#chat` client=240 / scroll=19472 / overflow auto；composer sticky **h=95**、bottom=430=innerHeight。
+- **200% P1**：空项目 `.col-mid` scrollWidth=clientWidth=422；`.chat-empty` 在列内；composer h=95、bottom=430。
+- **200% 镜像/交付（5B-F7）**：镜像卡徽标「镜像 · 主入口」/来源「来自 报告员」/动作 2 钮在 chat 内可见且无横溢；交付批次标题「回交投递 · 本批 1 份（不表示全部收齐）」+ 3 项事实在 200% 内可见且无横溢；截图 `07-operator-mirror-200pct.png`、`08-delivery-200pct.png`。
+- **200% 遮挡门（本轮 P1）**：680 CSS 与 480 CSS 两档，report/details/preview/mirror/delivery/S0 共 **12 项**「目标 bottom ≤ composer.top」断言全过；composer 95 CSS（≤96）、chat client 240/200；治理预览打开时 composer static。截图 `10-15-*680css/480css`（12 张）。
+
+| 目标 | 680 bottom / composer.top | 480 bottom / composer.top |
+| --- | --- | --- |
+| 报告完整摘要 | 320.4 / 335 | 205.8 / 215 |
+| 报告证据 | 320.7 / 335 | 205.9 / 215 |
+| 治理预览（static） | 326.2 / 587.0 | 205.9 / 426.7 |
+| 镜像动作 | 320.8 / 335 | 206.2 / 215 |
+| 交付事实 | 320.8 / 335 | 206.2 / 215 |
+| S0 CTA | 332.6 / 335 | 209.7 / 215 |
+
+## 8. IME / 懒挂载 / bench
+
+| 项 | 结果 |
+| --- | --- |
+| IME | **26 true / 0 false / E2E_DONE=1** |
+| 延迟挂载 | **10/10** |
+| bench（旧/新交替 4 轮，首轮预热，3 有效中位） | stormA **18.3**（旧 26.0）、stormB **17.7**（旧 17.7）、handler A **0.6**（旧 11.8）、B **0.6**（旧 1.0）、replay **6.2**（旧 16.6）、scroll **11.9**（旧 14.3）；全部阈值 pass；单轮 maxGap 最大 26.9ms（≤35 观察/≤50 单轮护栏） |
+
+## 9. design audit（C 组，已重锚通过）
+
+`uiux-design-audit.mjs` 已重锚并 **exit 0 / AUDIT_DONE**：旧 `.tool-records` 前先 loadProject/selectRuntime('pi')/selectRole；12 条 v3 检查全部通过（31 项 v3 results、0 bad）。规范化密度夹具 **1360 无提示条 9 行**、**960 顶部 6 行（≥4）**；1-W1 改测 `.chat-row` 15px（16±1）、S3 改「chip hidden + tool-current 正在工作 + 转轮」、W6 改 `.mi-body` 19.2/12=1.6、S2 改右缘 diff=0、S1 长目标截断、9/10/11 改 Motion `data-spin-duration=0.9` + `status-spinner svg`、12 reduced-motion 用 `data-reduced-motion`。证据 `design-audit-current/report.json`。
+
+## 10. e2e 目标切换 fail-fast
+
+四套件显式 `ANS_RENDERER_ENTRY` 不存在：exit 2，消息 `ANS_RENDERER_ENTRY does not exist: …`。覆盖 uiux-v2 / ime-enter / bench-storm / uiux-design-audit。
+
+## 11. 边界
+
+- 5A 未删除旧渲染器/vendor/旧测试，未切生产入口；未改 `App.tsx`/`app/main.ts`/preload/package/vite/根配置。
+- 未新增依赖/DOM 例外，未弱化断言；A 组两项旧断言按 PM §十九批准等价重锚已落地（MERGE 语义身份、DEFAULT `closest('.chat-pane')`），C/D 映射见 `2026-10-21_phase5a-independent-verification-response.md`。
+- 本文不是最终验收；最终由独立验收角色按 AC1–AC8 判断。

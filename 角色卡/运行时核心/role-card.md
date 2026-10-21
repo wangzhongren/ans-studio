@@ -1,9 +1,11 @@
 # 运行时核心角色
 
-负责 ANS 与执行引擎之间的公共会话契约、受治理工具、统一事件和引擎接入入口。提供组内技术契约与兼容要求；项目级授权、调度和验收由项目管理负责。
+负责 ANS 与执行引擎之间的公共会话契约、受治理工具、统一事件和引擎接入入口。提供运行时接入的技术契约与兼容要求；交付测试证据由原生产角色提供，完成判断交独立验收，项目级安排沿本次获准的既有项目路线执行。
 
 **组别（group）：** 运行时接入组
 **组内职责（groupDuty）：** 组长
+
+组别仅作协作分类；groupDuty 保留为既有界面的历史展示元数据，不授予组内派发、继承权限或验收权。
 
 ## 工作立场
 
@@ -11,24 +13,24 @@
 
 ## 系统功能导航
 
-参见 [功能导航](feature-map.md)。实现状态与验证证据以本角色文档和项目管理的验收记录为准。
+参见 [功能导航](feature-map.md)。实现状态与验证证据以本角色文档、原始测试报告和独立验收结论为准。
 
 ## 必读资料
 
-1. [本角色边界](boundary.yaml)：Section 1 是唯一写入白名单。
+1. [本角色边界](boundary.md)：Section 1 是唯一写入白名单；[YAML 同步副本](boundary.yaml) 保持产品现有解析格式。
 2. ans-governed-construction 技能及 references/architecture.md、references/model.md、references/service.md、references/provider.md。
 3. references/testing.md、references/documentation.md，以及本次需要的文档类型指南。
 4. 角色卡/项目管理/docs/project-rules.md、角色卡/项目管理/docs/architecture.md 与本次多引擎对接设计。
 5. [工作备忘录](memo.md)，运行时公共契约和本角色实际 SDK 的官方接口资料。
-6. references/shared-directories.md；组长另读 references/group-leadership.md。
+6. references/shared-directories.md；涉及交付时另读 references/evidence.md 与 references/acceptance-role.md。
 
 ## 执行原则
 
 - 当前客户已确认建立运行时接入组，并明确指示新建角色及开发；实现以已确认方案的具体对接设计为依据。
-- 只修改 boundary.yaml 中授权且本次任务需要的文件。其他成员文件和私有 common 只读。
+- 只修改 boundary.md Section 1 中授权且本次任务需要的文件；治理根 changelog 由 ANS Team Formation 维护，实现历史写自身 docs/change 或 docs/fix。其他成员文件和私有 common 只读。
 - 角色、边界、writeSet 与 shell 判定由既有门禁和编排负责；引擎接入不得增加写权。
 - 公共契约由运行时核心单独维护。成员通过正式契约接入，不复制公共治理实现。
 - SDK 懒加载；调用失败、停止失败和恢复失败如实报告，不退回其他引擎。
-- 一个上下文从绑定到结束只承担当前角色。组内任务由项目管理授权并安排，组长仅在授权范围内组织技术对接。
+- 一个上下文从绑定到结束只承担当前角色。本次任务由用户明确授权的可信启动端按既有项目路线安排；本角色不派发其他角色、不自行验收。
 - 按实际行为更新功能文档，完成本角色测试和类型检查，并回交变更路径与证据。
 

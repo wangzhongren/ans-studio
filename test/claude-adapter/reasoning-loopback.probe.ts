@@ -5,9 +5,10 @@
 // Run separately: node test/claude-adapter/reasoning-loopback.probe.ts.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import * as SDK from "@anthropic-ai/claude-agent-sdk";
 import type { ResolvedRole } from "../../src/model/role.ts";
 import type { SessionEvent } from "../../src/model/runtime.ts";
@@ -30,6 +31,11 @@ const phases: PhaseConfig[] = [
   { name: "effort-high", effort: "high" },
   { name: "effort-xhigh", effort: "xhigh" },
   { name: "effort-xhigh-sonnet", effort: "xhigh", model: "claude-sonnet-4-6" },
+  { name: "effort-xhigh-opus46", effort: "xhigh", model: "claude-opus-4-6" },
+  { name: "effort-low-sonnet45", effort: "low", model: "claude-sonnet-4-5-20250929" },
+  { name: "effort-xhigh-sonnet45", effort: "xhigh", model: "claude-sonnet-4-5-20250929" },
+  { name: "effort-low-haiku45", effort: "low", model: "claude-haiku-4-5-20251001" },
+  { name: "effort-xhigh-haiku45", effort: "xhigh", model: "claude-haiku-4-5-20251001" },
   { name: "capture-empty-thinking", emptyThinking: true },
   { name: "reject-thinking-400", thinking: { type: "enabled", budgetTokens: 8000 }, reject: "thinking", timeoutMs: 30000 },
   { name: "reject-effort-400", effort: "high", reject: "effort", timeoutMs: 30000 },
@@ -41,6 +47,9 @@ let rejectMode: "none" | "thinking" | "effort" = "none";
 let rejections = 0;
 let gatewayIndex = 0;
 let gatewayFailure: unknown;
+let compatibilityMode: "success" | "failure" | "cancel" | "timeout" | "tool-started" | undefined;
+let compatibilityRound = 0;
+let onCompatibilityRequest: (() => void) | undefined;
 const requests: Array<Record<string, unknown>> = [];
 const sse = (res: import("node:http").ServerResponse, name: string, data: unknown) => res.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
 const limit = setTimeout(() => { gatewayFailure = new Error("reasoning loopback probe exceeded 180s"); server.closeAllConnections(); server.close(); }, 180000);
@@ -55,7 +64,7 @@ const server = createServer(async (req, res) => {
     if (!req.url?.startsWith("/v1/messages")) { res.writeHead(404); res.end(); return; }
     const index = gatewayIndex++;
     requests.push({
-      phase, index, arrivedAt: Date.now(),
+      phase, index, round: compatibilityRound, arrivedAt: Date.now(),
       thinking: body.thinking ?? null,
       outputConfig: body.output_config ?? null,
       effortFlat: body.effort ?? null,
@@ -63,20 +72,50 @@ const server = createServer(async (req, res) => {
       bodyKeys: Object.keys(body).sort(),
       beta: typeof req.headers["anthropic-beta"] === "string" ? req.headers["anthropic-beta"] : null,
       model: body.model ?? null,
+      userMessages: Array.isArray(body.messages) ? body.messages.filter((message: {role?:string}) => message.role === "user").length : 0,
+      toolResults: Array.isArray(body.messages) ? body.messages.flatMap((message: {content?:unknown}) => Array.isArray(message.content) ? message.content : []).filter((block: {type?:string}) => block.type === "tool_result").length : 0,
     });
     // Wall-clock release valve: never let a 400 loop run away (bounded diagnostics, not a fixture hang).
     const rejectThisCall = (rejectMode === "thinking" && body.thinking !== undefined)
       || (rejectMode === "effort" && ((body.output_config as { effort?: unknown } | null)?.effort !== undefined || body.effort !== undefined));
-    if (rejectThisCall && rejections < 5) {
+    if (rejectThisCall && (compatibilityMode !== "tool-started" || index > 0) && (compatibilityMode !== undefined || rejections < 5)) {
       rejections++;
       res.writeHead(400, { "content-type": "application/json" });
       res.end(JSON.stringify({ type: "error", error: { type: "invalid_request_error", message: `fixture gateway rejects ${rejectMode === "thinking" ? "thinking" : "effort"} on this endpoint` } }));
       return;
     }
+    if (compatibilityMode && compatibilityRound === 0 && body.thinking === undefined && body.output_config === undefined) {
+      onCompatibilityRequest?.();
+      if (compatibilityMode === "failure") {
+        res.writeHead(400, {"content-type":"application/json"});
+        res.end(JSON.stringify({type:"error",error:{type:"invalid_request_error",param:"messages",message:"fixture baseline request unavailable"}}));
+        return;
+      }
+      if (compatibilityMode === "cancel" || compatibilityMode === "timeout") return; // caller abort/last-resort closes this socket
+    }
     const id = `msg_reasoning_loopback_${requests.length}`;
     const model = String(body.model ?? "claude-sonnet-4-6");
     res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
     sse(res, "message_start", { type: "message_start", message: { id, type: "message", role: "assistant", model, content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 100, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } } });
+    if (compatibilityMode === "tool-started" && compatibilityRound === 0 && index === 0) {
+      const name = (body.tools as Array<{name:string}>).find(tool => tool.name.endsWith("__probe_tool"))!.name;
+      sse(res, "content_block_start",{type:"content_block_start",index:0,content_block:{type:"tool_use",id:"fixture_side_effect",name,input:{}}});
+      sse(res, "content_block_delta",{type:"content_block_delta",index:0,delta:{type:"input_json_delta",partial_json:"{}"}});
+      sse(res, "content_block_stop",{type:"content_block_stop",index:0});
+      sse(res, "message_delta",{type:"message_delta",delta:{stop_reason:"tool_use",stop_sequence:null},usage:{output_tokens:10}});
+      sse(res, "message_stop", { type: "message_stop" });
+      res.end();
+      return;
+    }
+    if (compatibilityMode) {
+      sse(res, "content_block_start",{type:"content_block_start",index:0,content_block:{type:"text",text:""}});
+      sse(res, "content_block_delta",{type:"content_block_delta",index:0,delta:{type:"text_delta",text:"compatibility fixture completed"}});
+      sse(res, "content_block_stop",{type:"content_block_stop",index:0});
+      sse(res, "message_delta",{type:"message_delta",delta:{stop_reason:"end_turn",stop_sequence:null},usage:{output_tokens:10}});
+      sse(res, "message_stop", { type: "message_stop" });
+      res.end();
+      return;
+    }
     // Mixed blocks: one signed thinking block, one redacted_thinking block, then text.
     // capture-empty-thinking: the thinking block stays empty (a display-omitted-like shape).
     sse(res, "content_block_start", { type: "content_block_start", index: 0, content_block: { type: "thinking", thinking: "" } });
@@ -171,6 +210,130 @@ const runAdapterPhase = async () => {
   }
 };
 
+// Production adapter + unmodified SDK. The wrapper adds only nonessential-traffic flags and
+// records options, never the compatibility env itself; those must come from production code.
+const runCompatibilityPhase = async (mode: NonNullable<typeof compatibilityMode>, rejection: "thinking" | "effort" = "effort") => {
+  compatibilityMode = mode;
+  compatibilityRound = 0;
+  phase = `compatibility-${mode}-${rejection}`;
+  rejectMode = rejection;
+  rejections = 0;
+  gatewayIndex = 0;
+  const name = phase;
+  const envBefore = { effort: process.env.CLAUDE_CODE_EFFORT_LEVEL, thinking: process.env.CLAUDE_CODE_DISABLE_THINKING };
+  const role: ResolvedRole = {
+    id: "reasoning-compatibility", kind: "project", cardText: "# Fixture",
+    boundary: { entries: [], boundarySource: "fixture", acceptance: { accepted: true, source: "fixture" } },
+    boundarySource: "fixture", location: { card: "fixture", boundary: "fixture" },
+  };
+  const configurations: Array<Record<string, unknown>> = [];
+  let toolCalls = 0;
+  let requestStarted!: () => void;
+  const started = new Promise<void>(resolve => { requestStarted = resolve; });
+  onCompatibilityRequest = requestStarted;
+  const providerOptions = {
+    runtime: "claude" as const, projectRoot: root, skillRoot: root,
+    reasoningEffort: "low" as const, modelId: "claude-sonnet-4-6", baseUrl: endpoint,
+    currentTurnId: () => undefined,
+    interactionGate: { begin() {}, end() {}, isWaiting: () => false, onChange: () => () => {} },
+    constructTimeoutMs: 15000, turnLastResortMs: mode === "timeout" ? 1500 : 20000,
+    tools: [{
+      name: "probe_tool", description: "Fixture only", inputSchema: { type: "object" as const, properties: {} },
+      handler: async () => {
+        toolCalls++;
+        return { ok: true, message: "fixture tool executed once" };
+      },
+    }],
+  };
+  const adapter = createClaudeRuntimeAdapter(providerOptions, {
+    env: { PATH: process.env.PATH, HOME: root, TMPDIR: root, ANTHROPIC_API_KEY: FAKE_KEY },
+    loadSdk: async () => ({
+      createSdkMcpServer: SDK.createSdkMcpServer,
+      query: params => {
+        const raw = params.options!;
+        configurations.push({
+          effort: raw.effort ?? null, thinking: raw.thinking ?? null,
+          effortEnv: raw.env?.CLAUDE_CODE_EFFORT_LEVEL ?? null,
+          thinkingEnv: raw.env?.CLAUDE_CODE_DISABLE_THINKING ?? null, model: raw.model,
+        });
+        return SDK.query({ prompt: params.prompt, options: {
+          ...raw,
+          env: { ...raw.env, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1", DISABLE_TELEMETRY: "1", DISABLE_ERROR_REPORTING: "1", DISABLE_AUTOUPDATER: "1" },
+        } });
+      },
+    }),
+  });
+  const session = await adapter.bindRole(role);
+  const rows: SessionEvent[] = [];
+  const errors: string[] = [];
+  const reading = (async () => { for await (const row of session.events()) rows.push(row); })();
+  try {
+    const first = session.prompt("fixture compatibility task").catch(error => {
+      errors.push(error instanceof Error ? error.name : String(error));
+    });
+    if (mode === "cancel") {
+      await Promise.race([started, first.then(() => { throw new Error("compatibility request was not observed before the turn ended"); })]);
+      await session.abort!();
+    }
+    await first;
+    compatibilityRound = 1;
+    // Failed/cancelled compatibility must return to low on an otherwise available endpoint.
+    if (mode !== "success") rejectMode = "none";
+    if (mode !== "tool-started") await session.prompt("fixture next task");
+    await session.dispose();
+    await reading;
+    const wire = requests.filter(record => record.phase === name);
+    const outcomes = rows.filter(row => row.kind === "settled").map(row => (row.detail as { outcome: string }).outcome);
+    const states = rows.filter(row => (row.detail as { source?: string })?.source === "system").map(row => (row.detail as { state?: string }).state);
+    const firstWire = wire.filter(record => record.round === 0);
+    assert.equal((firstWire[0]!.outputConfig as { effort: string }).effort, "low");
+    if (mode === "tool-started") {
+      assert.equal(toolCalls, 1);
+      assert.equal(configurations.length, 1);
+      assert.deepEqual(outcomes, ["failed"]);
+      assert.equal(states.includes("trying"), false);
+      assert.ok(firstWire.some(record => Number(record.toolResults) > 0));
+    } else {
+      const bare = firstWire.find(record => record.thinking === null && record.outputConfig === null);
+      assert.ok(bare, `${mode} must really send a parameterless compatibility request`);
+      assert.equal(configurations[1]!.effortEnv, "unset");
+      assert.equal(configurations[1]!.thinkingEnv, "1");
+      assert.equal(configurations[1]!.effort, null);
+      assert.equal(configurations[1]!.thinking, null);
+      assert.equal(states.filter(state => state === "trying").length, 1);
+      const next = wire.find(record => record.round === 1)!;
+      if (mode === "success") {
+        assert.deepEqual(outcomes, ["completed", "completed"]);
+        assert.equal(next.thinking, null);
+        assert.equal(next.outputConfig, null);
+        assert.equal(states.filter(state => state === "compatible").length, 1);
+        assert.equal(configurations.length, 2);
+        assert.deepEqual(errors, []);
+      } else {
+        const expectedOutcome = { failure: "failed", cancel: "aborted", timeout: "timed_out" }[mode];
+        assert.deepEqual(outcomes, [expectedOutcome, "completed"]);
+        assert.equal((next.outputConfig as { effort: string }).effort, "low");
+        assert.notEqual(next.thinking, null);
+        assert.equal(states.includes("compatible"), false);
+        assert.equal(configurations.length, 3);
+        assert.equal(configurations[2]!.effortEnv, null);
+      }
+    }
+    assert.equal(providerOptions.reasoningEffort, "low");
+    assert.deepEqual({ effort: process.env.CLAUDE_CODE_EFFORT_LEVEL, thinking: process.env.CLAUDE_CODE_DISABLE_THINKING }, envBefore);
+    assert.equal(rows.some(row => row.summary.includes("API Error")), false);
+    return { name, configurations, requests: wire, outcomes, states, toolCalls, errors,
+      rows: rows.map(row => ({ kind: row.kind, summary: row.summary, detail: row.detail })),
+    };
+  } finally {
+    await session.dispose();
+    await reading;
+    compatibilityMode = undefined;
+    compatibilityRound = 0;
+    onCompatibilityRequest = undefined;
+  }
+};
+
 try {
   await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
   const address = server.address();
@@ -180,6 +343,9 @@ try {
   const reports: Awaited<ReturnType<typeof runPhase>>[] = [];
   for (const config of phases) reports.push(await runPhase(config));
   const adapterReport = await runAdapterPhase();
+  const compatibilityReports = [];
+  for (const mode of ["success", "failure", "cancel", "timeout", "tool-started"] as const) compatibilityReports.push(await runCompatibilityPhase(mode));
+  compatibilityReports.push(await runCompatibilityPhase("success", "thinking"));
   if (gatewayFailure) throw gatewayFailure;
 
   // Frozen wire facts (deterministic fixture; see doc §A1/A2). These pin the empirical baseline the
@@ -200,6 +366,15 @@ try {
   for (const value of ["low", "medium", "high", "xhigh"]) assert.equal(outputEffort(wire(`effort-${value}`)), value);
   // Model caps clamp on the wire: claude-sonnet-4-6 caps xhigh at high (CLI 2.1.299 catalog).
   assert.equal(outputEffort(wire("effort-xhigh-sonnet")), "high");
+  assert.equal(outputEffort(wire("effort-xhigh-opus46")), "high");
+  for (const model of ["sonnet45", "haiku45"]) {
+    const low = wire(`effort-low-${model}`);
+    const xhigh = wire(`effort-xhigh-${model}`);
+    assert.equal(low.outputConfig, null);
+    assert.equal(xhigh.outputConfig, null);
+    assert.deepEqual(low.thinking, xhigh.thinking);
+    assert.equal((low.thinking as { budget_tokens: number }).budget_tokens, 31999);
+  }
   for (const record of reports.flatMap((report) => report.requests)) assert.equal(record.effortFlat, null);
   // 400 behavior: the CLI retries (3 attempts observed) but NEVER drops the reasoning parameters
   // (it only strips the adaptive display hint after the first rejection), then surfaces the API error.
@@ -228,7 +403,8 @@ try {
   assert.match((reasoningRows[0]!.detail as { reasoning: { text: { text: string } } }).reasoning.text.text, /fixture chain of thought/);
   for (const row of reasoningRows) assert.equal(row.summary, "已思考");
 
-  const report = { fixture: { node: process.version, sdk: "0.3.299", bundledCli: "2.1.299", loopbackOnly: true, externalApiCalls: 0 }, reports, adapterReport };
+  const hashes = Object.fromEntries(await Promise.all(["src/provider/claude/session.ts", "test/claude-adapter/session.test.ts", "test/claude-adapter/reasoning-loopback.probe.ts"].map(async path => [path,createHash("sha256").update(await readFile(path)).digest("hex")])));
+  const report = { fixture: { node: process.version, platform:process.platform, arch:process.arch, sdk: "0.3.299", bundledCli: "2.1.299", loopbackOnly: true, externalApiCalls: 0, hashes }, reports, adapterReport, compatibilityReports };
   assert.equal(JSON.stringify(report).includes(FAKE_KEY), false);
   console.log(JSON.stringify(report, null, 2));
 } finally {

@@ -1,0 +1,89 @@
+{
+  "reports": [
+    {
+      "name": "runtime groups lead first and unknown metadata escaped",
+      "value": true
+    },
+    {
+      "name": "new engine no Pi history queue confirmation or draft",
+      "value": true
+    },
+    {
+      "name": "old engine envelopes cache only and stale project ignored",
+      "value": true
+    },
+    {
+      "name": "actual Codex call/result target correlation and completion",
+      "value": true
+    },
+    {
+      "name": "Codex secret fallback and optional official Responses settings",
+      "value": true
+    },
+    {
+      "name": "failed save keeps draft and honest error",
+      "value": true
+    },
+    {
+      "name": "saved secret cleared and busy apply timing truthful",
+      "value": true
+    },
+    {
+      "name": "runtime settings geometry 1360",
+      "value": true
+    },
+    {
+      "name": "runtime settings geometry 960",
+      "value": true
+    },
+    {
+      "name": "Claude required key and optional SDK model endpoint",
+      "value": true
+    },
+    {
+      "name": "failed outcome remains error",
+      "value": true
+    },
+    {
+      "name": "failed native restore honest rebuilding notice",
+      "value": true
+    },
+    {
+      "name": "foreign runtime shell caches without showing in current engine",
+      "value": true
+    },
+    {
+      "name": "Pi own history background queue draft and expired card restored",
+      "value": true
+    },
+    {
+      "name": "expired old shell shown disabled in its own runtime",
+      "value": false
+    },
+    {
+      "name": "expired old shell shown disabled in its own runtime observed",
+      "value": {
+        "chat": "Pi专属历史\nPi旧轮确认确认不同意请求已失效，未获同意。原因：原轮次已中止后台Pi消息\n【队列】1 条待办：Pi后台队列——等它完成当前任务后依次处理。正在工作",
+        "assistant": [
+          "Pi专属历史\n",
+          "后台Pi消息\n"
+        ],
+        "denied": [],
+        "model": {
+          "count": 3,
+          "lastIndex": 2,
+          "operators": [
+            {
+              "index": 1,
+              "requestId": "pi-old-confirm"
+            }
+          ],
+          "rowGap": 16
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: expired old shell shown disabled in its own runtime\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: expired old shell shown disabled in its own runtime\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:60:474)\n    at async runtimeChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:952:3)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1351:45"
+}

@@ -1,0 +1,603 @@
+{
+  "entry": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/dist/index.html",
+  "checks": [
+    {
+      "name": "Sidebar identity is data/aria only; no visible ti-badge third line",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "primary row does not grow a duplicate third visible identity line",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "ti-count is the sole numeric badge",
+      "value": true,
+      "detail": {
+        "count": 1,
+        "text": "1",
+        "busy": true,
+        "allText": "主主理 / Lead1客户沟通 · 不拥有最终批准权Pi工作中内置角色：随应用发布，无角色目录"
+      }
+    },
+    {
+      "name": "P7 role tree shows 待选择 without a count suffix",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "P7 work overview separates choice from empty queue",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "P7 answered choice returns to real status",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "P7 answer posted exactly once",
+      "value": true,
+      "detail": [
+        {
+          "id": "phase5a-choice",
+          "decision": {
+            "kind": "choice",
+            "selected": [
+              "one"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "busy tail uses the same 12px status spinner at 0.9s",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "markdown external link opens externally without navigating window",
+      "value": true,
+      "detail": {
+        "linkInfo": {
+          "href": "https://example.com/x",
+          "rel": "noopener noreferrer",
+          "className": "md-link"
+        },
+        "before": "file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/dist/index.html",
+        "after": "file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/dist/index.html",
+        "navigations": [],
+        "openExternalCalls": [
+          {
+            "url": "https://example.com/x"
+          }
+        ]
+      }
+    },
+    {
+      "name": "markdown external link reports opened state without changing page",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "virtual long history is windowed before full replay",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "full replay preserves content identity 1360",
+      "value": true,
+      "detail": {
+        "before": {
+          "text": "row-125 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+          "offset": 12
+        },
+        "after": {
+          "text": "row-125 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+          "offset": 12
+        }
+      }
+    },
+    {
+      "name": "full replay preserves content identity 960",
+      "value": true,
+      "detail": {
+        "before": {
+          "text": "row-122 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+          "offset": -16
+        },
+        "after": {
+          "text": "row-122 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+          "offset": -16
+        }
+      }
+    },
+    {
+      "name": "sticky reader stays at bottom after full replay",
+      "value": true,
+      "detail": {
+        "before": {
+          "text": "row-219 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+          "offset": -22
+        },
+        "distance": 0
+      }
+    },
+    {
+      "name": "200% identity/P7 visible without horizontal overflow",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "200% long history keeps composer reachable and chat internally scrollable",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "chatClient": 240,
+        "chatScroll": 19472,
+        "overflowY": "auto",
+        "composer": {
+          "top": 335,
+          "bottom": 430,
+          "height": 95
+        },
+        "innerHeight": 430,
+        "bodyScrollW": 680,
+        "innerWidth": 680
+      }
+    },
+    {
+      "name": "200% empty/error state has no horizontal overflow and composer reachable",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "mid": {
+          "left": 248,
+          "right": 680,
+          "scrollW": 422,
+          "clientW": 422
+        },
+        "empty": {
+          "left": 309,
+          "right": 609
+        },
+        "composer": {
+          "top": 335,
+          "bottom": 430
+        },
+        "innerHeight": 430
+      }
+    },
+    {
+      "name": "S0 hasRoles=false shows bootstrap title/sub/CTA once and no governance CTA",
+      "value": true,
+      "detail": {
+        "title": "项目尚未 bootstrap",
+        "sub": "与 主理 / Lead 对话，让它把角色建出来；左树会随之长出。",
+        "cta": "开始与 主理 / Lead 对话",
+        "gov": false,
+        "mentions": 1,
+        "treeText": "主入口主主理 / Lead客户沟通 · 不拥有最终批准权Pi未开启内置角色：随应用发布，无角色目录治理职能（内置）报报告员 / Rapporteur提案权 · 不拥有最终批准权Pi未开启内置角色：随应用发布，无角色目录提提名官 / Nominator提名权 · 不拥有最终批准权Pi未开启内置角色：随应用发布，无角色目录召召集人 / Convener排期权 · 不拥有最终批准权Pi未开启内置角色：随应用发布，无角色目录验验收 / Proof验收权 · 不拥有最终批准权Pi未开启内置角色：随应用发布，无角色目录工作角色AAPi未开启BBPi未开启CCPi未开启",
+        "hint": "",
+        "roleCount": 8,
+        "hasRoles": false
+      }
+    },
+    {
+      "name": "S0 CTA starts the primary session on explicit click",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "S0 CTA starts the primary session from keyboard",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "200% mirror card target visible with badge/source/actions",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "badgeText": "镜像 · 主入口",
+        "sourceText": "来自 报告员 / Rapporteur 的治理决定 · 客户最终批准",
+        "card": {
+          "top": 161.0859375,
+          "bottom": 342.25,
+          "right": 658
+        },
+        "chat": {
+          "top": 141.0859375,
+          "bottom": 381.0859375
+        }
+      }
+    },
+    {
+      "name": "200% delivery batch target facts visible without horizontal overflow",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "title": {
+          "top": 100.0859375,
+          "bottom": 122.5859375,
+          "text": "回交投递 · 本批 1 份（不表示全部收齐）"
+        },
+        "facts": {
+          "top": 140.5859375,
+          "bottom": 315.7578125,
+          "dt": 3
+        },
+        "safe": {
+          "top": 769.328125,
+          "bottom": 804.0234375
+        },
+        "chat": {
+          "top": 95.0859375,
+          "bottom": 335.0859375
+        }
+      }
+    },
+    {
+      "name": "200% 680css report complete summary bottom above composer",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "target": {
+          "top": 148.3984375,
+          "bottom": 320.3984375,
+          "h": 172,
+          "left": 286,
+          "right": 632
+        },
+        "composer": {
+          "top": 335,
+          "bottom": 430,
+          "h": 95,
+          "position": "sticky"
+        },
+        "chat": {
+          "top": 184.5859375,
+          "bottom": 424.5859375,
+          "client": 240
+        },
+        "innerHeight": 430,
+        "innerWidth": 680
+      }
+    },
+    {
+      "name": "200% 680css report evidence bottom above composer",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "target": {
+          "top": 301.171875,
+          "bottom": 320.71875,
+          "h": 19.546875,
+          "left": 286,
+          "right": 632
+        },
+        "composer": {
+          "top": 335,
+          "bottom": 430,
+          "h": 95,
+          "position": "sticky"
+        },
+        "chat": {
+          "top": 184.5859375,
+          "bottom": 424.5859375,
+          "client": 240
+        },
+        "innerHeight": 430,
+        "innerWidth": 680
+      }
+    },
+    {
+      "name": "200% 680css governance preview bottom above composer",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "target": {
+          "top": 111.1875,
+          "bottom": 326.1875,
+          "h": 215,
+          "left": 260,
+          "right": 658
+        },
+        "composer": {
+          "top": 586.984375,
+          "bottom": 681.984375,
+          "h": 95,
+          "position": "static"
+        },
+        "chat": {
+          "top": 346.984375,
+          "bottom": 586.984375,
+          "client": 240
+        },
+        "innerHeight": 430,
+        "innerWidth": 680
+      }
+    },
+    {
+      "name": "200% 680css mirror actions bottom above composer",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "target": {
+          "top": 292.75,
+          "bottom": 320.75,
+          "h": 28,
+          "left": 274,
+          "right": 645
+        },
+        "composer": {
+          "top": 335,
+          "bottom": 430,
+          "h": 95,
+          "position": "sticky"
+        },
+        "chat": {
+          "top": 184.5859375,
+          "bottom": 424.5859375,
+          "client": 240
+        },
+        "innerHeight": 430,
+        "innerWidth": 680
+      }
+    },
+    {
+      "name": "200% 680css delivery facts bottom above composer",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "target": {
+          "top": 145.5859375,
+          "bottom": 320.7578125,
+          "h": 175.171875,
+          "left": 272,
+          "right": 647
+        },
+        "composer": {
+          "top": 335,
+          "bottom": 430,
+          "h": 95,
+          "position": "sticky"
+        },
+        "chat": {
+          "top": 184.5859375,
+          "bottom": 424.5859375,
+          "client": 240
+        },
+        "innerHeight": 430,
+        "innerWidth": 680
+      }
+    },
+    {
+      "name": "200% 680css S0 CTA bottom above composer",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "target": {
+          "top": 300.5859375,
+          "bottom": 332.5859375,
+          "h": 32,
+          "left": 367.2734375,
+          "right": 550.71875
+        },
+        "composer": {
+          "top": 335,
+          "bottom": 430,
+          "h": 95,
+          "position": "sticky"
+        },
+        "chat": {
+          "top": 184.5859375,
+          "bottom": 424.5859375,
+          "client": 240
+        },
+        "innerHeight": 430,
+        "innerWidth": 680
+      }
+    },
+    {
+      "name": "200% 480css report complete summary bottom above composer",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "target": {
+          "top": 81.7578125,
+          "bottom": 205.7578125,
+          "h": 124,
+          "left": 286,
+          "right": 432
+        },
+        "composer": {
+          "top": 215,
+          "bottom": 310,
+          "h": 95,
+          "position": "sticky"
+        },
+        "chat": {
+          "top": 109.6875,
+          "bottom": 309.6875,
+          "client": 200
+        },
+        "innerHeight": 310,
+        "innerWidth": 480
+      }
+    },
+    {
+      "name": "200% 480css report evidence bottom above composer",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "target": {
+          "top": 186.3046875,
+          "bottom": 205.8515625,
+          "h": 19.546875,
+          "left": 286,
+          "right": 432
+        },
+        "composer": {
+          "top": 215,
+          "bottom": 310,
+          "h": 95,
+          "position": "sticky"
+        },
+        "chat": {
+          "top": 109.6875,
+          "bottom": 309.6875,
+          "client": 200
+        },
+        "innerHeight": 310,
+        "innerWidth": 480
+      }
+    },
+    {
+      "name": "200% 480css governance preview bottom above composer",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "target": {
+          "top": 50.890625,
+          "bottom": 205.890625,
+          "h": 155,
+          "left": 260,
+          "right": 458
+        },
+        "composer": {
+          "top": 426.6875,
+          "bottom": 521.6875,
+          "h": 95,
+          "position": "static"
+        },
+        "chat": {
+          "top": 226.6875,
+          "bottom": 426.6875,
+          "client": 200
+        },
+        "innerHeight": 310,
+        "innerWidth": 480
+      }
+    },
+    {
+      "name": "200% 480css mirror actions bottom above composer",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "target": {
+          "top": 178.171875,
+          "bottom": 206.171875,
+          "h": 28,
+          "left": 274,
+          "right": 445
+        },
+        "composer": {
+          "top": 215,
+          "bottom": 310,
+          "h": 95,
+          "position": "sticky"
+        },
+        "chat": {
+          "top": 110.1875,
+          "bottom": 310.1875,
+          "client": 200
+        },
+        "innerHeight": 310,
+        "innerWidth": 480
+      }
+    },
+    {
+      "name": "200% 480css delivery facts bottom above composer",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "target": {
+          "top": 10.1875,
+          "bottom": 206.15625,
+          "h": 195.96875,
+          "left": 272,
+          "right": 447
+        },
+        "composer": {
+          "top": 215,
+          "bottom": 310,
+          "h": 95,
+          "position": "sticky"
+        },
+        "chat": {
+          "top": 110.1875,
+          "bottom": 310.1875,
+          "client": 200
+        },
+        "innerHeight": 310,
+        "innerWidth": 480
+      }
+    },
+    {
+      "name": "200% 480css S0 CTA bottom above composer",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "target": {
+          "top": 177.7265625,
+          "bottom": 209.7265625,
+          "h": 32,
+          "left": 267.2734375,
+          "right": 450.71875
+        },
+        "composer": {
+          "top": 215,
+          "bottom": 310,
+          "h": 95,
+          "position": "sticky"
+        },
+        "chat": {
+          "top": 110.1875,
+          "bottom": 310.1875,
+          "client": 200
+        },
+        "innerHeight": 310,
+        "innerWidth": 480
+      }
+    },
+    {
+      "name": "no console errors",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "no CSP violations",
+      "value": true,
+      "detail": []
+    }
+  ],
+  "console": [],
+  "csp": [],
+  "screenshots": [
+    "01-sidebar-identity-1360.png",
+    "02-p7-pending-choice-1360.png",
+    "03-full-replay-1360.png",
+    "03-full-replay-960.png",
+    "04-full-replay-sticky-960.png",
+    "05-sidebar-p7-200pct.png",
+    "06-empty-state-200pct.png",
+    "07-operator-mirror-200pct.png",
+    "08-delivery-200pct.png",
+    "10-report-680css.png",
+    "11-details-680css.png",
+    "12-preview-680css.png",
+    "13-mirror-680css.png",
+    "14-delivery-680css.png",
+    "15-s0-680css.png",
+    "10-report-480css.png",
+    "11-details-480css.png",
+    "12-preview-480css.png",
+    "13-mirror-480css.png",
+    "14-delivery-480css.png",
+    "15-s0-480css.png"
+  ],
+  "failures": 0,
+  "finished": true,
+  "at": "2026-10-21T13:07:01.544Z"
+}

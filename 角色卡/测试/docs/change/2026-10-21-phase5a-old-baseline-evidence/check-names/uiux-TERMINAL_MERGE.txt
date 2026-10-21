@@ -1,0 +1,12 @@
+same actual turn and outcome denied plus settled has one readable terminal=true
+reverse arrival keeps actual failure and full diagnostic in same terminal row=true
+different actual turns retain two independent terminal records=true
+legacy without actual turn never merged by equal text=true
+different structured outcomes in same turn remain separate facts=true
+tool denial keeps independent tool lifecycle and terminal=true
+actual matching denied replay reuses terminal fact and retains distinct diagnostics=true
+late settled after matching history does not append another terminal=true
+additional same-turn diagnosis remains reachable in the existing terminal=true
+same turn ID in other runtime remains independent=true
+history-first exact replay identity is promoted only by trusted matching live outcome=true
+offscreen terminal update keeps virtual reading position=true

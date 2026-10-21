@@ -65,3 +65,12 @@ Pi唯一tool_call事件源为SDK tool_execution_start，detail带真实turnId/to
 - 未注入任何判断能力 ⇒ 普通角色会话路径逐字不变（受治理工具、ShellGate、交互/回交/派发、持久化与既有行为一致）。
 
 **测试**：`test/pi-adapter/governance-judge.test.ts`（8 例，离线）：工具集常量（治理恰三、shell 恰三、并集恰四）；假适配器治理模式工具面/未知工具/report 原样/文件未变；两能力互斥；普通路径不回归；真实 faux 适配器 judgeMode 工具面 + 服务端/MCP/持久化关闭；非 judge 工具构造期拒绝；legacy `governanceJudge` 直连分支与构造期互斥。专项 305 项 302 pass / 2 既有 Windows symlink EPERM / 1 skip。
+
+
+## 2026-10-21 D1 思考等级与请求级兼容
+
+公开 RuntimeProviderOptions/RoleSession 形状不变。reasoningEffort 显式值优先；未设按 SDK 公开模型级/全局设置及版本绑定 PI_1_1_0_DEFAULT_THINKING_LEVEL=medium，统一 setThinkingLevel，覆盖恢复转录旧档位但保留原身份/历史，不写全局偏好。
+
+内部 buildExplicitRuntime 的可选 compatibility 状态只为本角色 bindRole 装配使用。原 ReasoningDegradeOptions/REASONING_DEGRADED_SUMMARY 与 makeRolePrompt.reasoningDegrade 已删除；外部生产消费者不依赖这些测试接缝。替换为 SDK 公开 ProviderStreams + fetch 的当前请求兼容，不能再调用两次 native.prompt。同一 provider 调用去参后 SDK transport retry 也沿用去参；正常助手结果才确认当前 model/provider/baseUrl 的活会话兼容。拒绝识别仅 400/422 的明确 thinking 参数/值拒绝，保存设置不变。
+
+system 消息只在活动 prompt 中发出，reasonCode=PI_REASONING，state=configured/compatibility-attempt/compatibility-confirmed/budget-clamped/thinking-disabled。普通消息正文仍为 summary，无公共新字段协议要求。默认预算保护与显式相同，high/xhigh 不增加预算或 maxTokens。实现、真实 SDK 测试与边界见[修复记录](docs/fix/2026-10-21_fix_reasoning-compatibility-and-default.md)。

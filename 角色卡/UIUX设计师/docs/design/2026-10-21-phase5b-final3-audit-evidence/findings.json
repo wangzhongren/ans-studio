@@ -1,0 +1,60 @@
+{
+ "phase": "5B-final3",
+ "candidate": "4a0dd26c/f568e2aa/5e85a9fc",
+ "summary": {
+  "conclusion": "pass",
+  "P0": 0,
+  "P1": 0,
+  "P2": 3,
+  "notes": 1,
+  "occlusion": "cleared (gate 680/480)"
+ },
+ "items": [
+  {
+   "id": "5B-FINAL3-P2-1",
+   "severity": "P2",
+   "status": "registered",
+   "scene": "480 CSS initial scroll",
+   "finding": "At scrollTop=0, S0 title/sub/CTA and lower config notice sit behind the sticky 95px composer; the occlusion gate scrolls targets above composer and passes.",
+   "evidence": [
+    "s0-200/report.json",
+    "s0-200/09-s0-200pct.png",
+    "phase4b-smoke/phase4b-200pct.png"
+   ],
+   "expected": "Compact S0/notice or auto-scroll so initial 480 first screen shows CTA/config action.",
+   "actual": "S0 title 208-226, sub 230-264, CTA 275.7-307.7; composer top 215. Config notice button 275 behind composer.",
+   "owner": "桌面UI",
+   "retest": "480 initial-screen screenshot + target top>=0/CTA visible; optional Phase 5 polish."
+  },
+  {
+   "id": "5B-FINAL3-P2-2",
+   "severity": "P2",
+   "status": "evidence",
+   "scene": "main 3x 200 capture",
+   "finding": "Main 3x 200% screenshots often stop at bottom scroll; 04-profile content is chat.",
+   "evidence": [
+    "main-al-3x/02-chat-200.png",
+    "main-al-3x/04-profile.png"
+   ],
+   "expected": "Use targeted smoke/design-audit shots; future harness scrolls to target.",
+   "actual": "Bottom-scroll/label mismatch.",
+   "owner": "UIUX",
+   "retest": "Manifest note."
+  },
+  {
+   "id": "5B-FINAL3-P2-3",
+   "severity": "P2",
+   "status": "evidence",
+   "scene": "harness marker",
+   "finding": "Smoke/4B screenshots contain 窗口控制不可用 harness marker; not product.",
+   "evidence": [
+    "smoke/06-empty-state-200pct.png",
+    "phase4b-smoke/phase4b-200pct.png"
+   ],
+   "expected": "Do not use as production L pass.",
+   "actual": "Marker only in smoke.",
+   "owner": "测试/UIUX",
+   "retest": "Manifest note."
+  }
+ ]
+}

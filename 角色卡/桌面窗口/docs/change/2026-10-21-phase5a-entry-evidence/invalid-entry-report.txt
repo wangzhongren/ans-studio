@@ -1,0 +1,1 @@
+RENDERER_ENTRY_ERROR={"value":"relative.html","reason":"absolute .html required"}

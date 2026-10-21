@@ -1,0 +1,79 @@
+{
+  "reports": [
+    {
+      "name": "one canonical lifecycle read_file",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle write_file",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle edit_file",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle run_shell",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle request_confirmation",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle request_choice",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle dispatch_task",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle submit_report",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle report_shell_verdict",
+      "value": true
+    },
+    {
+      "name": "typed input repeated live is single injected row",
+      "value": true
+    },
+    {
+      "name": "live then history input remains one",
+      "value": true
+    },
+    {
+      "name": "different actual turn retained and real assistant prefix not converted",
+      "value": true
+    },
+    {
+      "name": "full rebuild preserves uncovered second input and assistant",
+      "value": true
+    },
+    {
+      "name": "history first then typed live still one",
+      "value": false
+    },
+    {
+      "name": "history first then typed live still one observed",
+      "value": {
+        "chat": "回交投递 · 来自 维护报告（任务关联未知）\n结论：completed\n摘要：原报告\n回交投递 · 来自 维护报告（任务关联未知）\n结论：completed\n摘要：原报告\n用户指令：[回交] 来自 维护 的报告（任务关联未知）\n结论：completed\n摘要：原报告\n",
+        "assistant": [
+          "用户指令：[回交] 来自 维护 的报告（任务关联未知）\n结论：completed\n摘要：原报告\n"
+        ],
+        "denied": [],
+        "model": {
+          "count": 3,
+          "lastIndex": 2,
+          "operators": [],
+          "rowGap": 16
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: history first then typed live still one\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: history first then typed live still one\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:66:474)\n    at async duplicateChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:732:3)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1352:16"
+}

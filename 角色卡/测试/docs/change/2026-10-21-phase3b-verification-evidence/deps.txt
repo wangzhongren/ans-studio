@@ -1,0 +1,5 @@
+=== dependencies unchanged since 3A ===
+forbidden direct: []
+markdown-it: 15.0.3 @types/markdown-it: 14.2.0 typescript: 7.0.2
+lock removed 0 changed 0 added 107
+(3B 未改 package.json/lock；107 新增为 3A 已记录的 markdown-it 15.0.3 工具链)

@@ -11,6 +11,7 @@
 | 单文件 | `.github/workflows/release.yml` | v1.0.0 来源可审计的跨平台构建、包测试和 Release 流水线 |
 | 单文件 | `electron-builder.yml` | Electron 分发构建配置与产物资源白名单 |
 | 单文件 | `tsconfig.json` | TypeScript 编译配置 |
+| 单文件 | `vite.config.ts` | 渲染层 Vite 构建配置（仅构建 app/renderer；主进程与 preload 保持无构建） |
 | 单文件 | `README.md` | 安装与使用说明 |
 | 单文件 | `LICENSE` | 客户指定的项目开源许可证 |
 | 单文件 | `.env` | 本地环境配置，含 Pi 凭据；不入库 |

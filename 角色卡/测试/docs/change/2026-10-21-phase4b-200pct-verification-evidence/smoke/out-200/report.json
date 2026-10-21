@@ -1,0 +1,318 @@
+{
+  "checks": [
+    {
+      "name": "200PCT_TREE_VISIBLE_SCROLLABLE_NO_OVERLAP",
+      "value": true,
+      "detail": {
+        "treeCH": 595,
+        "treeSH": 595,
+        "leftSH": 875,
+        "leftCH": 378,
+        "count": 6,
+        "overlap": 0,
+        "firstVisible": true,
+        "lastVisible": true,
+        "visibleRows": 4,
+        "rows": [
+          {
+            "sel": "#chat",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": ".chat-head",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": ".head-inner",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": "#right-body",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": ".runtime-config-notice",
+            "exists": true,
+            "overflow": 0,
+            "hidden": true
+          },
+          {
+            "sel": ".governance-status",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": "#role-tree",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": ".col-mid",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": ".session-notice",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": ".composer",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          }
+        ],
+        "docOverflow": 0,
+        "wrap": "wrap"
+      }
+    },
+    {
+      "name": "200PCT_CONTAINERS_NO_H_OVERFLOW",
+      "value": true,
+      "detail": {
+        "treeCH": 595,
+        "treeSH": 595,
+        "leftSH": 875,
+        "leftCH": 378,
+        "count": 6,
+        "overlap": 0,
+        "firstVisible": true,
+        "lastVisible": true,
+        "visibleRows": 4,
+        "rows": [
+          {
+            "sel": "#chat",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": ".chat-head",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": ".head-inner",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": "#right-body",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": ".runtime-config-notice",
+            "exists": true,
+            "overflow": 0,
+            "hidden": true
+          },
+          {
+            "sel": ".governance-status",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": "#role-tree",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": ".col-mid",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": ".session-notice",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          },
+          {
+            "sel": ".composer",
+            "exists": true,
+            "overflow": 0,
+            "hidden": false
+          }
+        ],
+        "docOverflow": 0,
+        "wrap": "wrap"
+      }
+    },
+    {
+      "name": "200PCT_CONFIG_NOTICE_FULL_TEXT_AND_BUTTON",
+      "value": true,
+      "detail": {
+        "visible": true,
+        "msgSW": 398,
+        "msgCW": 398,
+        "msgSH": 18,
+        "msgCH": 18,
+        "wrap": "wrap",
+        "buttonBottom": 274.5859375,
+        "innerHeight": 414,
+        "buttonRight": 658,
+        "noticeOverflow": 0,
+        "text": "Pi 配置不完整，缺：ANS_PI_BASE_URL。请补齐后保存。"
+      }
+    },
+    {
+      "name": "200PCT_GOVERNANCE_PREVIEW_INTERNAL_NO_OVERFLOW",
+      "value": true,
+      "detail": {
+        "open": true,
+        "sels": [
+          {
+            "sel": ".gp-title",
+            "exists": true,
+            "overflow": 0,
+            "rect": {
+              "x": 275,
+              "y": 49.1875,
+              "width": 130,
+              "height": 22.09375,
+              "top": 49.1875,
+              "right": 405,
+              "bottom": 71.28125,
+              "left": 275
+            }
+          },
+          {
+            "sel": ".gp-body",
+            "exists": true,
+            "overflow": 0,
+            "rect": {
+              "x": 275,
+              "y": 79.1875,
+              "width": 358,
+              "height": 327.5703125,
+              "top": 79.1875,
+              "right": 633,
+              "bottom": 406.7578125,
+              "left": 275
+            }
+          },
+          {
+            "sel": ".gp-actions",
+            "exists": true,
+            "overflow": 0,
+            "rect": {
+              "x": 275,
+              "y": 376.7578125,
+              "width": 358,
+              "height": 30,
+              "top": 376.7578125,
+              "right": 633,
+              "bottom": 406.7578125,
+              "left": 275
+            }
+          },
+          {
+            "sel": ".gp-file",
+            "exists": true,
+            "overflow": 0,
+            "rect": {
+              "x": 275,
+              "y": 204.78125,
+              "width": 358,
+              "height": 18.6953125,
+              "top": 204.78125,
+              "right": 633,
+              "bottom": 223.4765625,
+              "left": 275
+            }
+          },
+          {
+            "sel": ".gp-declare",
+            "exists": true,
+            "overflow": 0,
+            "rect": {
+              "x": 275,
+              "y": 344.359375,
+              "width": 358,
+              "height": 20.3984375,
+              "top": 344.359375,
+              "right": 633,
+              "bottom": 364.7578125,
+              "left": 275
+            }
+          }
+        ],
+        "panelRight": 658,
+        "panelLeft": 260,
+        "innerWidth": 680,
+        "scrollWidth": 386,
+        "clientWidth": 386,
+        "active": "gp-title"
+      }
+    },
+    {
+      "name": "200PCT_GOVERNANCE_CANCEL_FOCUS_BACK",
+      "value": true,
+      "detail": {
+        "open": false,
+        "focusBack": true
+      }
+    },
+    {
+      "name": "200PCT_REPORT_DETAILS_INTERNAL_NO_OVERFLOW_VISIBLE",
+      "value": true,
+      "detail": {
+        "card": true,
+        "sels": [
+          {
+            "sel": ".msg-handback",
+            "exists": true,
+            "overflow": 0
+          },
+          {
+            "sel": ".report-complete-body",
+            "exists": true,
+            "overflow": 0
+          },
+          {
+            "sel": ".hb-complete-summary",
+            "exists": true,
+            "overflow": 0
+          },
+          {
+            "sel": ".hb-evidence",
+            "exists": true,
+            "overflow": 0
+          }
+        ],
+        "visible": true,
+        "innerWidth": 680
+      }
+    },
+    {
+      "name": "200PCT_ZERO_CONSOLE_ERRORS",
+      "value": true,
+      "detail": {
+        "errs": [],
+        "didFail": []
+      }
+    }
+  ],
+  "console": [],
+  "didFail": []
+}

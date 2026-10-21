@@ -14,6 +14,9 @@ app/
   preload.cjs                 受限 IPC 桥（CJS，contextBridge 白名单）
   desktop/
     interface.ts              桌面 Interface：IPC 处理器（纯逻辑，可单测）
+    renderer-entry.ts         渲染入口唯一路径事实源（Phase 5B：唯一 renderer/dist/index.html）
+    navigation-policy.ts      导航兜底纯策略（同 URL/允许入口、http(s) 外开、恶意协议阻止、外开去重闸；PM §17.12）
+    navigation-guard.ts       will-navigate/setWindowOpenHandler 接线（真实主进程窗口安装；可假件测试）
     session.ts                会话管理器（点角色即开、多轮 send、投递机/队列、边界重建、shell 闸两档分发）
     project.ts                由枚举构造 ProjectConfig（含创世态判定）；读变更记录/docs 索引（展示用）
     session-history.ts        旧 Pi 展示兼容：只读解析 JSONL → 界面行；不推断原生上下文

@@ -197,7 +197,8 @@ test("无声明零变化：未注入 installedMcpServers ⇒ 不加载 MCP 扩�
     try {
       assert.deepEqual(sdk.native.getActiveToolNames(), [], "tools=[] ⇒ 活动面为空（既有行为）");
       const paths = sdk.extensionsResult.extensions.map((x) => String(x.path));
-      assert.deepEqual(paths, ["<inline:ans-governance>"], "仅治理扩展（MCP 扩展不加载）");
+      // D1：未设等级也必须保护默认思考预算；这不授予或加载 MCP。
+      assert.deepEqual(paths, ["<inline:ans-governance>", "<inline:ans-reasoning>"], "治理与默认预算保护在场，MCP 扩展不加载");
       sdk.faux.setResponses([sdk.ai.fauxAssistantMessage("ok")] as never);
       await session.prompt("no mcp");
     } finally {

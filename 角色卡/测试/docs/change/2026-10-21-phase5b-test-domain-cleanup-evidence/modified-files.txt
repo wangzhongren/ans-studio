@@ -1,0 +1,7 @@
+Modified (test/测试 only):
+test/测试/uiux-v2-replay-regression.test.ts          rewritten: old tool-rows.js/ui-labels.js -> app/renderer/src/chat/events.ts + replay.ts; 6/6 pass
+test/测试/shell-judge-verify/fixture.ts              loadUiLabels -> app/renderer/src/chat/judge.ts; suite 38/38
+test/测试/governance-pin-recovery-verify/fixture.ts  loadUiLabels -> governanceActionFor (governance-view.ts); suite 11/11
+test/测试/existing-project-compat-verify/a-state-preview.test.ts  canEstablishGovernance -> governanceActionFor; 14/14
+test/测试/existing-project-compat-verify/b-establish.test.ts      governanceActionFor/governanceFailureView; B4 source guard -> new GovernancePanel/governance-store; 13/13
+test/测试/governance-judge-cards-verify/fixture.ts   old loadUiLabels removed (throws; f-ui retired); other suites unaffected

@@ -31,12 +31,11 @@ import { createWatchdogService, type WatchdogObservation } from "../../app/deskt
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.resolve(HERE, "..", "..", "app");
-const RENDERER = fs.readFileSync(path.join(APP_DIR, "renderer", "renderer.js"), "utf8");
 const PRELOAD = fs.readFileSync(path.join(APP_DIR, "preload.cjs"), "utf8");
+const NEW_RENDERER_IPC = fs.readFileSync(path.join(APP_DIR, "renderer", "src", "chat", "ipc.ts"), "utf8");
 const MAIN = fs.readFileSync(path.join(APP_DIR, "main.ts"), "utf8");
 const IFACE = fs.readFileSync(path.join(APP_DIR, "desktop", "interface.ts"), "utf8");
 const SESSION = fs.readFileSync(path.join(APP_DIR, "desktop", "session.ts"), "utf8");
-const STYLES = fs.readFileSync(path.join(APP_DIR, "renderer", "styles.css"), "utf8");
 
 const tick = (ms = 80) => new Promise((r) => setTimeout(r, ms));
 
@@ -294,14 +293,9 @@ test("L-1 传输失败仍如实回错：空闲路径的 send 失败 = {ok:false,
   await h.mgr.stop(null);
 });
 
-test("状态准确性（复现 vs 修后）：投递开跑的后台轮次——旧事实组合派生「空闲」（复现），真实快照 busy 派生「工作中」（修后）", async () => {
-  const href = new URL("../../app/renderer/role-status.js", import.meta.url).href;
-  await import(href);
-  const St = (globalThis as Record<string, unknown>).ANSRoleStatus as {
-    deriveRoleStatus: (f: Record<string, unknown>) => string;
-    statusBadge: (s: string, n?: number) => { label: string };
-  };
-
+test("状态准确性（主进程）：投递开跑的后台轮次 — 真实快照 busy 如实外推；状态派生/徽标纯逻辑见 test/桌面UI/status.test.ts", async () => {
+  // 旧 renderer 的 deriveRoleStatus/statusBadge 源钉随 5B 下线；状态派生纯逻辑由桌面UI
+  // test/桌面UI/status.test.ts 覆盖，本文件保留主进程快照语义。
   const h = makeHarness();
   // 「真跑一轮」：只开 A；A 的回交到达 ⇒ 投递机**自动开启 su**并把回交投递进去 ⇒ su 会话真开跑一轮。
   // 这一轮**不是界面发的**（客户从没在 su 会话里点过发送）——正是旧实现「其实在跑却显示空闲」的现场。
@@ -333,19 +327,8 @@ test("状态准确性（复现 vs 修后）：投递开跑的后台轮次——�
   assert.ok(h.sent.A.includes("给 A 的消息（不得错投 su）"), "用户消息应落到活动角色 A");
   assert.ok(!h.sent.su.includes("给 A 的消息（不得错投 su）"), "不得错投 su（旧缺陷：自动开 su 抢活动角色）");
 
-  // ——复现（旧）——：界面侧唯一「working」来源是**本端自己 send 成功**；投递开跑的一轮，界面上什么忙态信号
-  // 都没有（live 只说明会话保活着）——旧派生结果 = 「空闲」＝「其实在跑却显示空闲」。
-  assert.equal(
-    St.deriveRoleStatus({ live: true, hadSession: true }),
-    "idle",
-    "复现：旧事实组合（无真实 busy 信号）派生「空闲」——正是客户报的错标"
-  );
-  // ——修后——：同一时刻，主进程真实快照（busy:true）如实驱动派生 = 「工作中」。
-  assert.equal(
-    St.deriveRoleStatus({ live: true, hadSession: true, busy: snap!.busy }),
-    "working",
-    "修后：真实快照驱动 ⇒ 「工作中」（不再由界面推测）"
-  );
+  // 旧「界面侧推测」派生已退役；主进程真实快照 busy:true 是唯一忙态事实
+  // （状态派生/徽标由 test/桌面UI/status.test.ts 覆盖）。
 
   // 后台在跑（B-2 下切走/无任何界面动作）：静置后快照仍是 busy:true；轮次结束（settled）转 false。
   await tick(150);
@@ -353,22 +336,11 @@ test("状态准确性（复现 vs 修后）：投递开跑的后台轮次——�
   h.streams.su.push({ kind: "settled", summary: "su 一轮结束" });
   await tick(150);
   assert.equal(h.latest("su")?.busy, false, "settled ⇒ 快照转 busy:false");
-  assert.equal(
-    St.deriveRoleStatus({ live: true, hadSession: true, busy: h.latest("su")!.busy }),
-    "idle",
-    "轮次结束、无待办 ⇒ 「空闲」（如实）"
-  );
+  assert.equal(h.latest("su")!.busy, false, "轮次结束 ⇒ 快照 busy:false（如实）");
   await h.mgr.stop(null);
 });
 
-test("状态准确性：队列待办的角色不得显示「空闲」——快照(queueDepth) + 徽标「工作中 · N 待办」", async () => {
-  const href = new URL("../../app/renderer/role-status.js", import.meta.url).href;
-  await import(href);
-  const St = (globalThis as Record<string, unknown>).ANSRoleStatus as {
-    deriveRoleStatus: (f: Record<string, unknown>) => string;
-    statusBadge: (s: string, n?: number) => { label: string; icon: string; title: string };
-  };
-
+test("状态准确性（主进程）：队列待办快照如实（queueDepth）；徽标/派生纯逻辑见 test/桌面UI/status.test.ts", async () => {
   const h = makeHarness();
   await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
   await tick(30);
@@ -377,12 +349,8 @@ test("状态准确性：队列待办的角色不得显示「空闲」——快�
   await h.mgr.send("排队 2");
   const snap = h.latest("A");
   assert.ok(snap && snap.summaries.length === 2, "快照带 2 条待办（真实队列深度）");
-  assert.equal(
-    St.deriveRoleStatus({ live: true, busy: snap!.busy, queueDepth: snap!.summaries.length }),
-    "working",
-    "有排队待办 ⇒ 「工作中」（不得显示「空闲」）"
-  );
-  assert.equal(St.statusBadge("working", 2).label, "工作中 · 2 待办", "徽标如实带待办数");
+  assert.equal(snap!.busy, true, "有排队待办 ⇒ 主进程快照 busy:true（唯一忙态事实）");
+  // 状态派生/徽标（状态-only、单计数）由桌面UI `test/桌面UI/status.test.ts` 与 main.mjs 单计数检查覆盖。
   await h.mgr.stop(null);
 });
 
@@ -407,16 +375,10 @@ test("接线钉子：role-state 通道两端齐备；忙态判据只在主进程
       SESSION.indexOf("entry.busy = true;") < SESSION.indexOf("await this.sendDelivery(entry, origin, text, opts);"),
     "直接 send 应先置忙再 await（与投递机同款）"
   );
-  // 渲染侧：只如实转述快照；队列行与徽标由它驱动。
-  assert.ok(RENDERER.includes("d.onRoleState") && RENDERER.includes("function onRoleState("), "渲染侧应订阅并处理真实快照");
-  assert.ok(RENDERER.includes("state.roleBusy") && RENDERER.includes("state.queueByRole"), "快照落两表（busy/队列摘要）");
-  assert.ok(RENDERER.includes("【队列】") && RENDERER.includes("条待办"), "聊天流应有队列行");
-  assert.ok(RENDERER.includes("已入队：等它完成当前任务后处理（第 "), "入队后有如实位次提示");
-  assert.ok(STYLES.includes(".sys-queue"), "样式钩子 .sys-queue");
-  // **反向断言**：界面侧不再自设忙态（旧 `working` 推测已退役——它正是错标根因）。
-  assert.ok(!RENDERER.includes("metaFor(role.roleId).working"), "渲染侧不得由本端发送自设忙态");
-  assert.ok(!RENDERER.includes(".working = true"), "渲染侧不得有任何 working=true 的界面推测");
-  assert.ok(!RENDERER.includes("working: m.working"), "派生事实里不得再喂界面自设的 working");
+  // 新渲染器（5B）：经 preload 白名单订阅真实快照并落入投影；队列行/单计数由 main.mjs 与
+  // test/桌面UI 覆盖。旧 renderer.js/styles.css 源钉随旧渲染器下线退役。
+  assert.ok(NEW_RENDERER_IPC.includes("session:role-state"), "新渲染器应订阅 session:role-state");
+  assert.ok(NEW_RENDERER_IPC.includes("applyRoleState"), "新渲染器应把快照应用到投影");
 });
 
 // ————— F-2-T4（2026-10-16 客户批准）：长轮不阻塞客户消息投递 —————

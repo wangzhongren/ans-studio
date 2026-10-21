@@ -1,0 +1,53 @@
+{
+  "status": "D1 incomplete: known-model effort field removal remains failing; no product catalog override",
+  "platform": "darwin/arm64",
+  "node": "v24.14.0",
+  "cli": "0.162.1",
+  "designSha256": "30eb803b2482eea9a308ca2bf51507bb2a8d9c56dc2137fdc5749d85a4dcda09",
+  "commands": [
+    {
+      "command": "node --test test/codex-adapter/*.test.ts",
+      "exitCode": 0,
+      "passed": 74,
+      "failed": 0
+    },
+    {
+      "command": "node test/codex-adapter/reasoning-loopback.probe.ts",
+      "exitCode": 1,
+      "passed": 15,
+      "failed": 1
+    },
+    {
+      "command": "./node_modules/.bin/tsc --noEmit",
+      "exitCode": 0,
+      "notes": "Final refresh after independent Pi consumer update: no diagnostics"
+    },
+    {
+      "command": "git diff --check -- owned changed paths",
+      "exitCode": 0
+    }
+  ],
+  "sourceHashes": {
+    "src/provider/codex/session.ts": "89ae8e37085876fe655767b7214314d7accfa6bfc514f75c7ffd90d78a22050b",
+    "src/common/codex-adapter/protocol.ts": "31ab8a1b65a0cf5623931730225ed813f23c06b5184b23a3f04122ef611fa468",
+    "src/common/codex-adapter/config.ts": "4194d3f430e0563c99befa70f887c785994554a5b6651980076b3a712f2347e7",
+    "test/codex-adapter/reasoning.test.ts": "06d41e7c9d11f50a17835a508f728e5809681699f1733ca2ae606b70ab053488",
+    "test/codex-adapter/fixtures.ts": "8b2154ab224526ce71273dfa4815b285c1fe506e04403b383dcb03fa71b8a1b2",
+    "test/codex-adapter/session.test.ts": "20f59acd1d1470737ab9e69a45e09eaf4782b6ac5a5b8a0f2247e5f57eaf3ce4",
+    "test/codex-adapter/web-search.test.ts": "8cde8e8d5f7fa6d52feaa625ee0a0786e89ae7d435a4380b2d02950ef0d446b6",
+    "test/codex-adapter/reasoning-loopback.probe.ts": "8e4225de75f899acf9e5ba67d3e059c6e626c8d7f2f9ba05ee215a5c09318ab9"
+  },
+  "evidenceHashes": {
+    "native-loopback.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "typecheck.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "temporary-catalog-feasibility.json": "736f14c85ca7c7017d6523c3381e7c569f170361e4ea1283c2b07c386cdc77b4",
+    "unit-tests.txt": "fcfb7919488acbfd102ad1562fe18fc54dd4d8dc979185bade4b4db340bf9e74",
+    "native-loopback.json": "95821dd23b44f800bbb62e7162058d4f46061a611ef4a073495604bf06afa171"
+  },
+  "feasibilityOnly": {
+    "source": "exact gpt-5.5 model object from JSON embedded in installed codex-darwin-arm64 native binary; not a stable public API",
+    "originalMetadata": "/tmp/ans-codex-gpt55-catalog-original.json",
+    "probe": "/tmp/ans-codex-single-model-catalog.probe.mjs",
+    "productIncluded": false
+  }
+}

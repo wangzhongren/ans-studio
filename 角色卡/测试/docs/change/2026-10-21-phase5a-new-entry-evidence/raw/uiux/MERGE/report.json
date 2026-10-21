@@ -1,0 +1,45 @@
+{
+  "reports": [
+    {
+      "name": "same-turn live then history only one response rejection and old history",
+      "value": true
+    },
+    {
+      "name": "real project-changed refresh does not repeat current turn",
+      "value": true
+    },
+    {
+      "name": "full rebuild retains unpersisted live report settled and original pending card",
+      "value": false
+    },
+    {
+      "name": "full rebuild retains unpersisted live report settled and original pending card observed",
+      "value": {
+        "chat": "inserted past history\nold input\nold history retained\n任务请求原文current input\n本轮 1 个调用：read_file未记录read_filecurrent.md调用发起current rejection本轮角色回复原文（展开）current answer\nmerge pending card确认拒绝current rejectioncurrent.mdcurrent rejectioncurrent settlednot stored yet\n有 1 条待确认 · 定位",
+        "assistant": [
+          "inserted past history\n",
+          "old history retained\n",
+          "current answer\n",
+          "not stored yet\n"
+        ],
+        "denied": [
+          "current rejectioncurrent.mdcurrent rejection"
+        ],
+        "model": {
+          "count": 11,
+          "lastIndex": 10,
+          "operators": [
+            {
+              "index": 7,
+              "requestId": "merge-confirm"
+            }
+          ],
+          "rowGap": 16
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: full rebuild retains unpersisted live report settled and original pending card\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: full rebuild retains unpersisted live report settled and original pending card\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:66:474)\n    at async mergeChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1023:3)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1360:43"
+}

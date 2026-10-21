@@ -1,0 +1,211 @@
+{
+  "kind": "local-smoke",
+  "note": "本地验证证据；非发布 manifest，不得用于发布/上传。",
+  "createdAt": "2026-10-21T11:36:24.004Z",
+  "archive": {
+    "file": "ANS-Studio-1.4.0-mac-arm64.zip",
+    "size": 406749099,
+    "sha256": "b6c179b9866d8ab86eab3ea952e6458f3dabcc1a6fa8a0ba334f6552690a0a94"
+  },
+  "packagedHashes": {
+    "app/main.ts": "9e7cef7691324d493a4da2f24b9d04125b4fe487ed091d0e535a3a9f3d04f1c7",
+    "app/preload.cjs": "98dde83a4930c7f586a4dd5bee8d7697cffc6fd95c3771149dea2fcf3cbc3e5b",
+    "app/renderer/dist/src/index.html": "8d202c2d4f28440daa58b8fc6a6bc00f5d5364e2a3e4681e1f5b5bdf1010d3dd",
+    "app/renderer/index.html": "03f493e36d9a74e76676c19c478208912b74eb3c5c4bd87dc73f9114f1968a92"
+  },
+  "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "v24.14.0",
+    "npm": "11.9.0",
+    "electronBuilder": "26.15.3",
+    "packageVersion": "1.4.0"
+  },
+  "content": {
+    "mustExist": {
+      "app/main.ts": true,
+      "app/preload.cjs": true,
+      "package.json": true,
+      "LICENSE": true,
+      "app/renderer/dist/src/index.html": true,
+      "app/renderer/index.html": true,
+      "app/renderer/renderer.js": true,
+      "app/renderer/styles.css": true,
+      "app/renderer/vendor/markdown-it.umd.min.js": true,
+      "app/renderer/dist/assets": true
+    },
+    "mustNotExist": {
+      "私有数据与构建噪声(.env*/.ans/.git/settings.local.json/*.log/*.map)": true,
+      "test/tests 目录": true
+    },
+    "devDependenciesNotPackaged": [
+      {
+        "dep": "@base-ui/react",
+        "present": false
+      },
+      {
+        "dep": "@tailwindcss/vite",
+        "present": false
+      },
+      {
+        "dep": "@types/markdown-it",
+        "present": false
+      },
+      {
+        "dep": "@types/react",
+        "present": false
+      },
+      {
+        "dep": "@types/react-dom",
+        "present": false
+      },
+      {
+        "dep": "@vitejs/plugin-react",
+        "present": false
+      },
+      {
+        "dep": "class-variance-authority",
+        "present": false
+      },
+      {
+        "dep": "clsx",
+        "present": false
+      },
+      {
+        "dep": "electron",
+        "present": false
+      },
+      {
+        "dep": "electron-builder",
+        "present": false
+      },
+      {
+        "dep": "lucide-react",
+        "present": false
+      },
+      {
+        "dep": "markdown-it",
+        "present": false
+      },
+      {
+        "dep": "motion",
+        "present": false
+      },
+      {
+        "dep": "react",
+        "present": false
+      },
+      {
+        "dep": "react-dom",
+        "present": false
+      },
+      {
+        "dep": "react-resizable-panels",
+        "present": false
+      },
+      {
+        "dep": "tailwind-merge",
+        "present": false
+      },
+      {
+        "dep": "tailwindcss",
+        "present": false
+      },
+      {
+        "dep": "typescript",
+        "present": false
+      },
+      {
+        "dep": "vite",
+        "present": false
+      },
+      {
+        "dep": "zustand",
+        "present": false
+      }
+    ],
+    "productionDependenciesPresent": [
+      {
+        "dep": "@anthropic-ai/claude-agent-sdk",
+        "present": true
+      },
+      {
+        "dep": "@anthropic-ai/sdk",
+        "present": true
+      },
+      {
+        "dep": "@earendil-works/pi-coding-agent",
+        "present": true
+      },
+      {
+        "dep": "@earendil-works/pi-mcp",
+        "present": true
+      },
+      {
+        "dep": "@modelcontextprotocol/sdk",
+        "present": true
+      },
+      {
+        "dep": "@openai/codex",
+        "present": true
+      },
+      {
+        "dep": "yaml",
+        "present": true
+      },
+      {
+        "dep": "zod",
+        "present": true
+      }
+    ]
+  },
+  "smoke": {
+    "ok": true,
+    "isPackaged": true,
+    "arch": "arm64",
+    "platform": "darwin",
+    "version": "1.4.0",
+    "envPath": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-local-smoke-RWYIF8/home/userdata/.env",
+    "expectedEntry": "file:///private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-local-smoke-RWYIF8/extracted/ANS%20Studio.app/Contents/Resources/app/app/renderer/dist/src/index.html",
+    "checks": {
+      "entry": true,
+      "rootMounted": true,
+      "driver": true,
+      "csp": true,
+      "cspViolations": true,
+      "dom": true,
+      "preload": true,
+      "ipc": true,
+      "importDisabled": true,
+      "missingConfiguration": true,
+      "settingsEntryDisabled": true,
+      "envPathMatches": true,
+      "console": true,
+      "load": true
+    },
+    "missingKeys": {
+      "pi": [
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANS_PI_BASE_URL",
+        "ANS_PI_MODEL"
+      ],
+      "codex": [
+        "CODEX_API_KEY",
+        "ANS_CODEX_MODEL"
+      ],
+      "claude": [
+        "ANTHROPIC_API_KEY"
+      ]
+    },
+    "entryUrl": "file:///private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-local-smoke-RWYIF8/extracted/ANS%20Studio.app/Contents/Resources/app/app/renderer/dist/src/index.html",
+    "consoleErrors": [],
+    "loadFailures": []
+  },
+  "smokeProcess": {
+    "code": 0,
+    "signal": null,
+    "stdout": "",
+    "stderr": ""
+  },
+  "failures": []
+}

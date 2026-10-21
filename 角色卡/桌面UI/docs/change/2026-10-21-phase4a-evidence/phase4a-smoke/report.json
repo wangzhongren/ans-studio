@@ -1,0 +1,1049 @@
+{
+  "entry": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/dist/src/index.html",
+  "checks": [
+    {
+      "name": "DEFAULT_RUNTIME_IS_CLAUDE_WITHOUT_RECOVERY",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RECOVERY_EXPLICIT_RUNTIME_WINS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RECOVERY_OPEN_USES_EXPLICIT_RUNTIME",
+      "value": true,
+      "detail": [
+        {
+          "projectRoot": "/phase4a-project",
+          "roleId": "A",
+          "runtime": "pi"
+        }
+      ]
+    },
+    {
+      "name": "PI_HISTORY_REAL_FROM_SESSION",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SWITCH_CODEX_REAL_SESSION_TARGET",
+      "value": true,
+      "detail": {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      }
+    },
+    {
+      "name": "SWITCH_CODEX_SHOWS_ONLY_CODEX_VIEW",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SWITCH_DOES_NOT_STOP_BACKGROUND",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "FOREIGN_RUNTIME_CACHE_ONLY_AND_STALE_PROJECT_DROPPED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SWITCH_CLAUDE_REAL_HISTORY_AND_DRAFT_ISOLATED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SWITCH_BACK_PI_RESTORES_HISTORY_EVENT_QUEUE_AND_DRAFT",
+      "value": true,
+      "detail": {
+        "chat": "会话记录已恢复pi 引擎历史行\nPi 实时消息\nPi 后台消息\n进行中正在处理当前请求客户消息第 1 位客户排队消息客户消息撤回第 2 位派发任务派发 · 来自 B第 3 位回交报告回交 · 来自 B正在工作…",
+        "draft": "Pi 草稿",
+        "busy": true
+      }
+    },
+    {
+      "name": "CROSS_ENGINE_DRAFT_CODEX_RETAINED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "CROSS_ENGINE_DRAFT_CLAUDE_RETAINED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SWITCHING_STATE_ARIA_BUSY_AND_SINGLE_SUBMIT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SWITCHING_IGNORES_REPEAT_MENU",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SWITCH_BACK_CLAUDE_AFTER_DEFERRED_OPEN",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "OWN_ENGINE_SHELL_CARD_VISIBLE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "C2_SAME_CAUSE_EXPIRED_SHELL_CLOSES_WITH_REASON",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "OPERATOR_CARD_OPEN_SHOWS_ACTIONS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "EXPIRED_OPERATOR_CARD_HIDES_ALL_ACTIONS_KEEPS_REASON",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SEND_TARGET_CURRENT_RUNTIME_AND_CLEARS_ONLY_OWN_DRAFT",
+      "value": true,
+      "detail": {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      }
+    },
+    {
+      "name": "SEND_DOES_NOT_CLEAR_OTHER_ENGINE_DRAFT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "PROJECT_SWITCH_CLEARS_CROSS_ENGINE_DRAFTS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "MISSING_CONFIG_NOTICE_ACTIONABLE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "MISSING_ENTRY_OPENS_CURRENT_ENGINE_SETTINGS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SETTINGS_CLOSE_RETURNS_TO_NOTICE_INVOKER",
+      "value": true,
+      "detail": {
+        "active": "runtime-config-settings",
+        "tag": "BUTTON",
+        "hidden": false,
+        "inert": false
+      }
+    },
+    {
+      "name": "PI_SETTINGS_METADATA_DRIVEN_FIELDS",
+      "value": true,
+      "detail": {
+        "title": "Pi 配置",
+        "token": {
+          "type": "password",
+          "value": "",
+          "placeholder": "已设置，留空则不修改"
+        },
+        "base": "fixture",
+        "model": "fixture",
+        "reasoning": {
+          "tag": "SELECT",
+          "options": [
+            "留空（平台默认）",
+            "关",
+            "低",
+            "中",
+            "高",
+            "极高"
+          ]
+        },
+        "advanced": {
+          "hidden": false,
+          "open": false,
+          "cw": true,
+          "timeout": true
+        },
+        "thumb": {
+          "tag": "INPUT",
+          "min": "0",
+          "max": "6",
+          "now": "2",
+          "text": "64k"
+        },
+        "path": "/phase4a-project/a-very-long-path/a-very-long-path/a-very-long-path/a-very-long-path/a-very-long-path/a-very-long-path/a-very-long-path/a-very-long-path/a-very-long-path/a-very-long-path/a-very-long-path/a-very-long-path/.env",
+        "hint": true
+      }
+    },
+    {
+      "name": "SETTINGS_TABS_ARROW_RIGHT_ROVING_AND_ARIA",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SETTINGS_TABS_END_SELECTS_LAST",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SETTINGS_TABS_HOME_SELECTS_FIRST",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SETTINGS_TABS_ARROW_LEFT_WRAPS_TO_LAST",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "PI_SLIDER_ACCESSIBLE_VALUE_AND_KEYBOARD",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SLIDER_VISUAL_THUMB_AND_OUTPUT_IN_VIEW",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SLIDER_KEYBOARD_UPDATES_HIDDEN_CANONICAL_VALUE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SLIDER_HOME_SETS_DEFAULT_TIER",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SLIDER_END_SETS_LAST_TIER",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SECRET_REVEAL_ONLY_LOCAL_INPUT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SECRET_HIDE_RESTORES_PASSWORD",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RANGE_VALUE_OUTSIDE_CHOICES_FALLS_BACK_TO_TEXT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SAVE_FAILURE_KEEPS_DRAFT_AND_HONEST_ERROR",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SAVE_SUCCESS_CLEARS_SECRET_AND_REPORTS_APPLICATION",
+      "value": true,
+      "detail": "已保存到 .env（改动键 4 个）。必填配置已齐备。当前轮次继续使用原配置；下一次输入应用。"
+    },
+    {
+      "name": "SAVE_STATUS_VISUALLY_COMPLETE_IN_64PX_BAR",
+      "value": true,
+      "detail": {
+        "text": "已保存到 .env（改动键 4 个）。必填配置已齐备。当前轮次继续使用原配置；下一次输入应用。",
+        "scrollHeight": 28,
+        "clientHeight": 28,
+        "title": "已保存到 .env（改动键：ANTHROPIC_AUTH_TOKEN、ANS_PI_BASE_URL、ANS_PI_MODEL、ANS_PI_CONTEXT_WINDOW）。必填配置已齐备。当前轮次继续使用原配置；结束后下一次输入应用新配置。"
+      }
+    },
+    {
+      "name": "SAVE_DOES_NOT_REOPEN_SESSION",
+      "value": true,
+      "detail": 0
+    },
+    {
+      "name": "LATE_OLD_SAVE_CANNOT_OVERWRITE_CURRENT_STATUS",
+      "value": true,
+      "detail": "Pi 必填配置已齐备。下一次开启会话时应用。"
+    },
+    {
+      "name": "CODEX_FIELDS_SECRET_FALLBACK_AND_HELP",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SETTINGS_TABS_CHANGE_VIEW_NOT_SESSION_ENGINE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SETTINGS_MISSING_ALERT_AND_STATUS",
+      "value": true,
+      "detail": "Codex 配置不完整，缺：CODEX_API_KEY、ANS_CODEX_MODEL。请补齐后保存。"
+    },
+    {
+      "name": "PROFILE_HEADER_AND_FOUR_SECTIONS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "PROFILE_LONG_SECTIONS_SCROLL_INDEPENDENTLY",
+      "value": true,
+      "detail": {
+        "card": 1814,
+        "docs": 1889,
+        "changes": 2309
+      }
+    },
+    {
+      "name": "DOCUMENT_LIST_OPAQUE_REFS_ONLY",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DOCUMENT_READ_MARKDOWN_SAFE_NO_SCRIPT_OR_IMAGE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DOCUMENT_EXTERNAL_LINK_USES_OPEN_EXTERNAL",
+      "value": true,
+      "detail": [
+        "https://example.com/doc"
+      ]
+    },
+    {
+      "name": "DOCUMENT_INTERNAL_LINK_OPENS_LISTED_REF",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DOCUMENT_BACK_LIST_RESTORES_READ_BUTTON_FOCUS",
+      "value": true,
+      "detail": "doc-two"
+    },
+    {
+      "name": "DOCUMENT_TOO_LARGE_EXPLICIT_ERROR",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DOCUMENT_IO_ERROR_RETRYABLE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DOCUMENT_RETRY_SUCCEEDS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DOCUMENT_BACK_ROLE_RESTORES_ENTRY_FOCUS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "LATE_DOCUMENT_READ_INVALIDATED_BY_CLOSE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "ROLE_SWITCH_INVALIDATES_DOCUMENT_VIEW",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "WORK_OVERVIEW_ONE_QUEUE_BODY_NO_ROLE_DOCUMENTS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "WORK_OVERVIEW_PENDING_CURRENT_QUEUE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "WORK_BADGE_AND_ROLE_BADGE_COUNTS",
+      "value": true,
+      "detail": {
+        "work": "1",
+        "card": "4"
+      }
+    },
+    {
+      "name": "SIDEBAR_SINGLE_COUNT_BADGE_ONLY_AND_QUEUE_IN_TITLE",
+      "value": true,
+      "detail": {
+        "status": "等待你确认",
+        "count": "4",
+        "title": "当前工作 1 项，排队 3 项"
+      }
+    },
+    {
+      "name": "WORK_OVERVIEW_QUEUE_PREVIEW_AND_VIEW_ALL_ENTRY",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "QUEUE_SUBVIEW_TITLE_BACK_UNIQUE_BODY",
+      "value": true,
+      "detail": {
+        "title": "A · 队列",
+        "back": "工作概览",
+        "body": 1,
+        "items": 4
+      }
+    },
+    {
+      "name": "QUEUE_SUBVIEW_ESC_RETURNS_WORK_AND_FOCUS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "QUEUE_SUBVIEW_BACK_RETURNS_WORK_AND_FOCUS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "PENDING_LOCATE_CLOSES_DRAWER_AND_FOCUSES_CARD",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RECENT_HANDBACKS_DEDUP_BY_REAL_REPORT_IDENTITY",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RECENT_HANDBACKS_SECOND_REPORT_AND_DECLARATION",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "QUEUE_POSITIONS_SOURCES_AND_WITHDRAW_ELIGIBILITY",
+      "value": true,
+      "detail": {
+        "count": 4,
+        "items": [
+          {
+            "cls": "q-item is-running",
+            "pos": null,
+            "src": "客户消息"
+          },
+          {
+            "cls": "q-item",
+            "pos": "1",
+            "src": "客户消息"
+          },
+          {
+            "cls": "q-item",
+            "pos": "2",
+            "src": "派发 · 来自 B"
+          },
+          {
+            "cls": "q-item",
+            "pos": "3",
+            "src": "回交 · 来自 B"
+          }
+        ],
+        "withdraw": 1,
+        "toggle": true
+      }
+    },
+    {
+      "name": "QUEUE_FULL_TOGGLES_IN_PLACE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "WITHDRAW_PENDING_DISABLES_SAME_ACTION",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "WITHDRAW_FAILURE_INLINE_AND_RETAINED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "WITHDRAW_THROW_INLINE_AND_FOCUS_RETAINED",
+      "value": true,
+      "detail": {
+        "active": "q-withdraw",
+        "feedback": "撤回失败：Error: Error invoking remote method 'session:withdraw': Error: 离线受控网络不可用",
+        "chat": "终态记录，不等于独立验收通过。查看完整报告摘要与证据第二份摘要\n（未提供证据）撤回无效：离线受控拒绝撤回失败：Error: Error invoking remote method 'session:withdraw': Error: 离线受控网络不可用进行中正在处理当前请求客户消息第 1 位客户排队消息客户消息撤回第 2 位派发任务派发 · 来自 B第 3 位回交报告回交 · 来自 B正在工作…"
+      }
+    },
+    {
+      "name": "WITHDRAW_SUCCESS_USES_REAL_SNAPSHOT",
+      "value": true,
+      "detail": {
+        "items": 3,
+        "withdraw": 0,
+        "feedback": null,
+        "queue": 2,
+        "busy": true,
+        "runtime": "pi",
+        "project": "/phase4a-project",
+        "chatQueue": [
+          "进行中正在处理当前请求客户消息",
+          "第 1 位派发任务派发 · 来自 B",
+          "第 2 位回交报告回交 · 来自 B"
+        ]
+      }
+    },
+    {
+      "name": "WIDTH_960_NO_HORIZONTAL_OVERFLOW_WORK",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RUNTIME_960_WORK_FOCUS_AND_INERT",
+      "value": true,
+      "detail": {
+        "active": "drawer-close",
+        "leftInert": true,
+        "midInert": true,
+        "tab": "work"
+      }
+    },
+    {
+      "name": "RUNTIME_960_WORK_TAB_STAYS_IN_DRAWER",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "WIDTH_960_WORK_QUEUE_VIEW_ALL_ENTRY",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "WIDTH_960_QUEUE_SUBVIEW_READABLE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RUNTIME_960_QUEUE_ESC_BACK_AND_FOCUS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RUNTIME_960_CLOSE_RESTORES_INERT_AND_FOCUS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RUNTIME_960_PROFILE_FOCUS_AND_INERT",
+      "value": true,
+      "detail": {
+        "active": "drawer-close",
+        "left": true,
+        "mid": true,
+        "tab": "card",
+        "open": true
+      }
+    },
+    {
+      "name": "RUNTIME_960_PROFILE_TAB_STAYS_IN_DRAWER",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "PROFILE_STATUS_ONLY_NO_PENDING_COUNT",
+      "value": true,
+      "detail": "等待你确认"
+    },
+    {
+      "name": "QUEUE_SUBVIEW_FROM_PROFILE_BACK_TO_ROLE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "QUEUE_SUBVIEW_FROM_PROFILE_ESC_RESTORES_ROLE_FOCUS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "WIDTH_960_PROFILE_NO_OVERFLOW",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RUNTIME_960_PROFILE_ESC_RETURNS_FOCUS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RUNTIME_960_SETTINGS_FOCUS_AND_INERT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "WIDTH_960_SETTINGS_NO_OVERFLOW",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "WIDTH_960_SAVE_STATUS_NOT_CLIPPED",
+      "value": true,
+      "detail": {
+        "text": "Pi 必填配置已齐备。下一次开启会话时应用。",
+        "scrollHeight": 14,
+        "clientHeight": 14
+      }
+    },
+    {
+      "name": "RUNTIME_960_SETTINGS_TAB_STAYS_IN_DRAWER",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "WIDTH_960_SLIDER_VISUAL_IN_DRAWER",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RUNTIME_960_SETTINGS_ESC_RETURNS_FOCUS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "ZOOM_200_SETTINGS_READABLE_AND_NO_OVERFLOW",
+      "value": true,
+      "detail": {
+        "zoom": 2,
+        "innerWidth": 480,
+        "text": "已保存到 .env（改动键 3 个）。必填配置已齐备。下一次开启会话时应用。",
+        "scrollHeight": 28,
+        "clientHeight": 28,
+        "bar": {
+          "x": 57,
+          "y": 246,
+          "width": 423,
+          "height": 64,
+          "top": 246,
+          "right": 480,
+          "bottom": 310,
+          "left": 57
+        }
+      }
+    },
+    {
+      "name": "ZOOM_200_PROFILE_NO_OVERFLOW",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "NO_CONSOLE_ERRORS_OR_CSP_VIOLATIONS",
+      "value": true,
+      "detail": {
+        "errors": [],
+        "csp": []
+      }
+    }
+  ],
+  "calls": {
+    "opens": [
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "B",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      }
+    ],
+    "histories": [
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "B",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      }
+    ],
+    "stops": [],
+    "configReads": [
+      "pi",
+      "codex",
+      "claude",
+      "pi",
+      "codex",
+      "claude",
+      "codex",
+      "claude",
+      "pi",
+      "claude",
+      "pi",
+      "pi",
+      "pi",
+      "claude",
+      "claude",
+      "pi",
+      "pi",
+      "codex",
+      "claude",
+      "pi",
+      "claude",
+      "pi",
+      "pi",
+      "pi",
+      "pi",
+      "codex",
+      "pi",
+      "codex",
+      "codex",
+      "claude",
+      "codex",
+      "codex",
+      "codex",
+      "pi",
+      "pi",
+      "pi",
+      "pi"
+    ],
+    "configSaves": [
+      {
+        "runtime": "pi",
+        "updates": {
+          "ANTHROPIC_AUTH_TOKEN": "FAKE-DRAFT-SECRET",
+          "ANS_PI_BASE_URL": "fixture",
+          "ANS_PI_MODEL": "draft-model",
+          "ANS_PI_CONTEXT_WINDOW": "65536"
+        }
+      },
+      {
+        "runtime": "pi",
+        "updates": {
+          "ANTHROPIC_AUTH_TOKEN": "FAKE-DRAFT-SECRET",
+          "ANS_PI_BASE_URL": "fixture",
+          "ANS_PI_MODEL": "draft-model",
+          "ANS_PI_CONTEXT_WINDOW": "65536"
+        }
+      },
+      {
+        "runtime": "pi",
+        "updates": {
+          "ANS_PI_BASE_URL": "fixture",
+          "ANS_PI_MODEL": "fixture",
+          "ANS_PI_CONTEXT_WINDOW": "65536"
+        }
+      },
+      {
+        "runtime": "pi",
+        "updates": {
+          "ANS_PI_BASE_URL": "fixture",
+          "ANS_PI_MODEL": "fixture",
+          "ANS_PI_CONTEXT_WINDOW": "65536"
+        }
+      }
+    ],
+    "docReads": [
+      {
+        "version": 1,
+        "projectViewId": "epoch-one",
+        "documentId": "doc-one"
+      },
+      {
+        "version": 1,
+        "projectViewId": "epoch-one",
+        "documentId": "doc-two"
+      },
+      {
+        "version": 1,
+        "projectViewId": "epoch-one",
+        "documentId": "doc-one"
+      },
+      {
+        "version": 1,
+        "projectViewId": "epoch-one",
+        "documentId": "doc-one"
+      },
+      {
+        "version": 1,
+        "projectViewId": "epoch-one",
+        "documentId": "doc-one"
+      },
+      {
+        "version": 1,
+        "projectViewId": "epoch-one",
+        "documentId": "doc-one"
+      }
+    ],
+    "external": [
+      "https://example.com/doc"
+    ],
+    "withdraws": [
+      {
+        "target": {
+          "projectRoot": "/phase4a-project",
+          "roleId": "A",
+          "runtime": "pi"
+        },
+        "id": "q-msg"
+      },
+      {
+        "target": {
+          "projectRoot": "/phase4a-project",
+          "roleId": "A",
+          "runtime": "pi"
+        },
+        "id": "q-msg"
+      },
+      {
+        "target": {
+          "projectRoot": "/phase4a-project",
+          "roleId": "A",
+          "runtime": "pi"
+        },
+        "id": "q-msg"
+      }
+    ],
+    "sends": [
+      {
+        "text": "Claude 草稿",
+        "images": [],
+        "target": {
+          "projectRoot": "/phase4a-project",
+          "roleId": "A",
+          "runtime": "claude"
+        },
+        "metadata": {
+          "clientMessageId": "a99ab6eb-3d20-40f1-ab3c-ec49385808e8"
+        }
+      }
+    ],
+    "windows": []
+  },
+  "console": [],
+  "csp": [],
+  "screenshots": [
+    "1360-engine-claude.png",
+    "1360-switching.png",
+    "1360-operator-expired.png",
+    "960-operator-expired.png",
+    "960-sidebar-badge.png",
+    "1360-settings-missing.png",
+    "1360-tabs-keyboard.png",
+    "1360-settings-slider.png",
+    "1360-settings-error.png",
+    "1360-settings-saved.png",
+    "1360-settings-codex.png",
+    "1360-settings-claude.png",
+    "1360-profile.png",
+    "1360-document-read.png",
+    "1360-queue.png",
+    "1360-work.png",
+    "1360-withdraw-failure.png",
+    "1360-withdraw-success.png",
+    "960-work.png",
+    "960-queue.png",
+    "960-profile-focus.png",
+    "960-profile.png",
+    "960-settings-focus.png",
+    "960-settings-slider.png",
+    "960-settings.png",
+    "1360-200-settings.png",
+    "1360-200-profile.png",
+    "1360-sidebar-badge.png"
+  ],
+  "failures": 0
+}

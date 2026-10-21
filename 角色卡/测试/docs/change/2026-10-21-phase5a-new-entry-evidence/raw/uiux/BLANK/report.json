@@ -1,0 +1,25 @@
+{
+  "reports": [
+    {
+      "name": "fixture: background pane has queue/status rows but no transcript",
+      "value": false
+    },
+    {
+      "name": "fixture: background pane has queue/status rows but no transcript observed",
+      "value": {
+        "chat": "会话已开启，可直接输入消息发送第一条消息后，这里会显示对话与工具记录。写入由治理引擎把关，越界操作会在对话中直接提示。",
+        "assistant": [],
+        "denied": [],
+        "model": {
+          "count": 0,
+          "lastIndex": -1,
+          "operators": [],
+          "rowGap": 16
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: fixture: background pane has queue/status rows but no transcript\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: fixture: background pane has queue/status rows but no transcript\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:66:474)\n    at async blankPaneChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1285:3)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1357:18"
+}

@@ -1,0 +1,91 @@
+{
+ "phase": "5B-reanchor",
+ "candidate": "current candidate d1f76147 (moving)",
+ "summary": {
+  "reanchor_conclusion": "needs-work",
+  "bootstrap": "P1 restore S0 title/CTA; action bar removal intentional",
+  "spinner": "P1 CSS keyframes instead of Motion; duration 0.9s and reduced-motion behavior correct",
+  "density": "not landed; normalized fixture pending",
+  "s2_right_edge": "design approved; measurement/audit pending",
+  "full_visual_audit": "pending on frozen candidate hash"
+ },
+ "items": [
+  {
+   "id": "5B-R1",
+   "severity": "P1",
+   "status": "needs-work",
+   "scene": "BOOTSTRAP S0 empty state",
+   "finding": "New renderer removes the single S0 mention 项目尚未 bootstrap and the center CTA 开始与 <primary> 对话, replacing them with 该项目下未枚举到角色 / 重新导入. The old 完成 bootstrap action bar removal was intentional, but this S0 removal is not approved.",
+   "evidence": [
+    "../../../docs/design/2026-10-21-phase5b-new-visual-evidence/raw-main/05-bootstrap.png",
+    "../../../docs/design/2026-10-21-phase5b-new-visual-evidence/raw-main/report.txt",
+    "app/renderer/src/chat/ChatStream.tsx"
+   ],
+   "expected": "hasRoles===false -> S0 title 项目尚未 bootstrap + sub 与 <primary> 对话，让它把角色建出来；左树会随之长出。+ #btn-start-primary 开始与 <primary> 对话; one mention only; no left notice; no governance CTA.",
+   "actual": "No S0 mention (count 0), no #btn-start-primary, copy points to re-import.",
+   "owner": "桌面UI",
+   "retest": "BOOTSTRAP_CENTER_CTA_PRESENT / MENTION_COUNT=1 / MENTION_IN_CENTER_EMPTY + new S0 assertions at 1360/960/200."
+  },
+  {
+   "id": "5B-R2",
+   "severity": "P1",
+   "status": "needs-work",
+   "scene": "W9/W10/W11 spinner mechanism",
+   "finding": "DesktopUI replaced Motion with CSS @keyframes v3spin for the shared spinner. Duration 0.9s and reduced-motion behavior are correct, but Nova 7.1 and PM §十九 require .status-spinner + Lucide + Motion; CSS keyframes are explicitly forbidden.",
+   "evidence": [
+    "app/renderer/src/chat/ChatStream.tsx",
+    "app/renderer/src/shell/Sidebar.tsx",
+    "app/renderer/src/shell/phase4b.css",
+    "角色卡/桌面UI/docs/change/2026-10-21_phase5a-independent-verification-response.md"
+   ],
+   "expected": "Shared motion/react BusySpinner (useReducedMotion, rotate 360, duration 0.9 linear infinite) used by Sidebar/loading/tail; audit samples transform or source guard.",
+   "actual": ".status-spinner.spin-arc + @keyframes v3spin 0.9s; Sidebar also CSS; no Motion spinner.",
+   "owner": "桌面UI",
+   "retest": "Motion shared component + runtime/reduced-motion; remove production v3spin."
+  },
+  {
+   "id": "5B-R3",
+   "severity": "P1",
+   "status": "pending",
+   "scene": "6-visible-row density",
+   "finding": "Normalized fixture and thresholds >=9/>=8/>=4 not landed; old audit still uses ad-hoc fixture and >=9.",
+   "evidence": [
+    "test/桌面应用/e2e/uiux-design-audit.mjs",
+    "角色卡/桌面UI/docs/change/2026-10-21_phase5a-independent-verification-response.md"
+   ],
+   "expected": "Normalized fixture; 1360 no-notice >=9 / notice >=8; 960 notice >=4.",
+   "actual": "DesktopUI accepted mapping but did not implement; current 6 not re-measured.",
+   "owner": "测试/UIUX",
+   "retest": "Normalized fixture at three viewports."
+  },
+  {
+   "id": "5B-R4",
+   "severity": "P2",
+   "status": "pending",
+   "scene": "S2 chip right edge",
+   "finding": "Right-edge design mapping approved but not measured; old audit still measures left edge (diff 734).",
+   "evidence": [
+    "app/renderer/src/shell/phase4b.css",
+    "test/桌面应用/e2e/uiux-design-audit.mjs"
+   ],
+   "expected": "|chip.right - pane.right| <= 8.",
+   "actual": "No right-edge measurement; CSS align-self:flex-end.",
+   "owner": "测试/桌面UI",
+   "retest": "Runtime rect measurement; adjust margin if >8."
+  },
+  {
+   "id": "5B-R5",
+   "severity": "P2",
+   "status": "pending",
+   "scene": "audit anchors",
+   "finding": "Old audit script still uses .spin-arc, paneGap, 24px, >=9, left-edge chip and 等待你确认; new anchors are not executable.",
+   "evidence": [
+    "test/桌面应用/e2e/uiux-design-audit.mjs"
+   ],
+   "expected": "Selectors/fixtures updated per the 12-item ledger.",
+   "actual": "Old script unchanged (17:22); desktopUI says Test/UIUX to land.",
+   "owner": "测试/UIUX",
+   "retest": "Run updated audit on frozen candidate."
+  }
+ ]
+}

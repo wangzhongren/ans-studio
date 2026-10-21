@@ -1,0 +1,10 @@
+=== 4A fix 有效轮（预热排除）===
+stormA.maxGap: old=[25.6,17.8,17.6] med=17.8; new=[17.3,18.2,17.5] med=17.5; PASS=true
+stormB.maxGap: old=[17.5,17.6,17.5] med=17.5; new=[17.4,18,17.7] med=17.7; PASS=true
+stormA_handler.maxMs: old=[9.5,5.3,11.8] med=9.5; new=[0.3,0.6,0.5] med=0.5; PASS=true
+stormB_handler.maxBatchMs: old=[1.4,0.3,0.6] med=0.6; new=[0.8,0.8,0.4] med=0.8; PASS=true
+replay.replayMs: old=[19.5,19,20.7] med=19.5; new=[6.8,3.7,6.2] med=6.2; PASS=true
+scrollToBottom.ms: old=[13.6,15.6,18.4] med=15.6; new=[6.3,12.8,14.7] med=12.8; PASS=true
+new maxGap: [17.3,17.4,18.2,18,17.5,17.7] p95= 18.2 max= 18.2 p95<=35: true max<=50: true
+ALL_PRIMARY_PASS=true
+warmups: old 18.9 new 21.1

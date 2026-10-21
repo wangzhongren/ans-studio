@@ -1,0 +1,9 @@
+selector: entries=27 booleans=27 pass=27 fail=0 
+config: entries=21 booleans=21 pass=21 fail=0 
+rolefocus: entries=11 booleans=9 pass=9 fail=0 
+sendfacts: entries=8 booleans=8 pass=8 fail=0 
+runtime: entries=16 booleans=15 pass=14 fail=1 ["expired old shell shown disabled in its own runtime"]
+default: entries=48 booleans=45 pass=44 fail=1 ["historical own-template failures direct"]
+visual: entries=5 booleans=4 pass=3 fail=1 ["V2 source report uses separate layered top and facts before primary source and full copy"]
+toolfold: entries=19 booleans=17 pass=17 fail=0 
+C1 offsets: {"before":150,"after":166,"later":166,"delta":16}

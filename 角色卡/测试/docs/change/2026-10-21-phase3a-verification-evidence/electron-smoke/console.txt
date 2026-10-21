@@ -1,0 +1,32 @@
+CHECK MOUNT_AND_BRIDGE=true {"bridge":"object","smoke":"object","driver":"object","dark":true,"ansi":"object","counts":{"event":1,"roleState":1,"history":1,"projectChanged":1,"operatorRequest":1,"operatorExpired":1,"operatorQueued":1}}
+CHECK ANSMARKDOWN_PRESENT=true
+CHECK SUBSCRIPTIONS_INSTALLED=true {"event":1,"roleState":1,"history":1,"projectChanged":1,"operatorRequest":1,"operatorExpired":1,"operatorQueued":1}
+CHECK LOAD_PROJECT=true {"projectRoot":"/fixture","roles":["su","A","B"],"primary":"A"}
+CHECK SELECT_ROLE_OPENS_SESSION=true {"ok":true,"open":"A","selected":"A","pane":true}
+CHECK VIRTUAL_220_ROWS=true {"count":220,"lastIndex":219,"rowGap":16}
+CHECK VIRTUAL_WINDOWED_MOUNT=true {"mounted":61,"spacers":[12084,0]}
+CHECK VIRTUAL_TAIL_AT_BOTTOM=true {"scrollTop":14139,"scrollHeight":14751,"clientHeight":612}
+CHECK OPERATOR_TOOLCALLID_ANCHOR=true {"count":223,"opIndex":{"index":221,"requestId":"op-anchor"},"prevKind":"activities","prevText":"本轮 1 个调用：run_shell未记录run_shell/fixture/scripts/run.sh调用发起","nextKind":"assistant","nextText":"after-tool 标记行\n"}
+CHECK OPERATOR_CHOICE_RENDER=true [{"label":"选项 A","height":40},{"label":"选项 B","height":40}]
+CHECK STATUS_AWAITING_OVER_BUSY=true {"text":"等待你确认","className":"ti-status st-confirm","chatState":"run"}
+CHECK STATUS_WORKING_AFTER_EXPIRE=true {"text":"工作中","opState":"expired","chatState":"run"}
+CHECK STATUS_IDLE=true {"text":"空闲","chatState":"idle"}
+CHECK STATUS_ERROR_AND_SYS_CONFIG_DANGER=true {"text":"错误","state":"err","sys":[{"text":"开启会话失败：测试桩：B 的会话开启失败","color":"rgb(201, 122, 109)"}]}
+CHECK STATUS_WORKING_OVER_PREV_ERROR=true {"text":"工作中","state":"run"}
+CHECK MARKDOWN_XSS_NEGATIVES=true {"found":true,"scriptCount":0,"imgCount":0,"iframeCount":0,"xssFlag":"undefined","jsHrefs":[],"okLink":[{"href":"https://example.com","rel":"noopener noreferrer"}],"hasStrong":true,"mdHasScript":false,"mdHasImg":false,"mdHasJsHref":true}
+CHECK MARKDOWN_SAFE_LINK_AND_FORMAT=true [{"href":"https://example.com","rel":"noopener noreferrer"}]
+CHECK VIRTUAL_UNMOUNT_REMOUNT_STATE=true {"before":{"groupFound":true,"groupOpen":true,"opFound":true,"selectedB":true},"gone":{"group":false,"op":false,"mounted":39},"after":{"groupOpen":true,"selectedB":true,"opOpen":"open"}}
+CHECK IME_COMPOSITION_NO_SEND=true {"prevented":false,"calls":0,"text":"你好"}
+CHECK IME_SEND_ONCE_WITH_PAYLOAD=true {"args":["你好",[],{"projectRoot":"/fixture","roleId":"A","runtime":"claude"},{"clientMessageId":"191ccc4f-53bc-4b33-b4e2-d15b21cad248"}],"text":""}
+CHECK ATTACHMENT_CHIP_AND_PAYLOAD=true {"chipBeforeSend":true,"calls":2,"args":["带图消息",[{"type":"image","data":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","mimeType":"image/png"}],{"projectRoot":"/fixture","roleId":"A","runtime":"claude"},{"clientMessageId":"a1533efd-94ea-40da-8c09-db145e49da15"}],"chipAfter":false,"rowHidden":true}
+CHECK IME_GUARD_229_ISCOMPOSING_SHIFT=true {"k229":false,"isComposing":false,"shift":false}
+CHECK ROW_MODEL_DEBUG=true {"count":227,"lastIndex":226,"operators":[{"index":221,"requestId":"op-anchor"},{"index":224,"requestId":"op-preserve"}],"rowGap":16}
+CHECK PANE_DEBUG=true {"inChat":true,"empty":false,"assistant":222,"currentWork":false,"note":false,"textLength":3402}
+CHECK PAGE_CSP_VIOLATIONS_ZERO=true 0
+CHECK NO_CONSOLE_ERRORS=true []
+CHECK NO_DID_FAIL_LOAD=true
+CHECK NO_PRELOAD_ERRORS=true
+CHECK NO_RENDER_GONE=true
+CHECK SCREENSHOT=true {"path":"/tmp/ans-p3a-smoke-output/phase3a-chat.png","bytes":94118}
+SMOKE_SUMMARY {"total":30,"passed":30,"failed":0}
+SMOKE_DONE=1

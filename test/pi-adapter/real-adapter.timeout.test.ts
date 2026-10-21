@@ -67,6 +67,8 @@ test("整轮最后兜底：检查时限到点不中止；last-resort 到点才�
     assert.ok(elapsed < 30000, `应在有限时间内中止，实际 ${elapsed}ms`);
     await session.dispose();
   } finally {
-    server.close();
+    // Node/undici 在取消后可能留下无请求的预连接；夹具负责关闭，不改变超时断言。
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });

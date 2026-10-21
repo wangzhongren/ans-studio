@@ -1,0 +1,11 @@
+nested reading fixture has visible real opener and positive inner and outer scroll=true
+nested role reading actual before={"nested": {"card": 2086, "docs": 2047, "changes": 2659}, "outer": 746}
+P3 return preserves actual role scroll and expansion=true
+P6 return role restores equivalent visible document entry focus=true
+nested role reading actual after={"outer": 746, "inner": {"card": 2086, "docs": 2047, "changes": 2659}}
+P3 independent card docs changes inner scroll survives alongside outer expansion focus=true
+nested role reading does not leak into another role=true
+returning original role restores only its own nested reading=true
+nested role reading does not leak into another runtime=true
+returning original runtime restores only its own nested reading=true
+nested role reading is reset for a genuinely different project=true

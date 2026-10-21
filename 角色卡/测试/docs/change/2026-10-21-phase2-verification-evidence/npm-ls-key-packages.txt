@@ -1,0 +1,32 @@
+npm warn Unknown user config "ELECTRON_MIRROR". This will stop working in the next major version of npm.
+npm warn Unknown user config "ELECTRON_BUILDER_BINARIES_MIRROR". This will stop working in the next major version of npm.
+ans-cli@1.4.0 /Users/wangzhongren/code/vibeingcode/解压/ans-runtime
++-- @base-ui/react@1.9.0
+| +-- @base-ui/utils@0.5.0
+| | +-- react-dom@19.3.1 deduped
+| | `-- react@19.3.1 deduped
+| +-- @floating-ui/react-dom@2.1.9
+| | +-- react-dom@19.3.1 deduped
+| | `-- react@19.3.1 deduped
+| +-- react-dom@19.3.1 deduped
+| +-- react@19.3.1 deduped
+| `-- use-sync-external-store@1.7.0
+|   `-- react@19.3.1 deduped
++-- lucide-react@1.60.0
+| `-- react@19.3.1 deduped
++-- motion@14.4.0
+| +-- framer-motion@14.4.0
+| | +-- react-dom@19.3.1 deduped
+| | `-- react@19.3.1 deduped
+| +-- react-dom@19.3.1 deduped
+| `-- react@19.3.1 deduped
++-- react-dom@19.3.1
+| `-- react@19.3.1 deduped
++-- react-resizable-panels@4.14.8
+| +-- react-dom@19.3.1 deduped
+| `-- react@19.3.1 deduped
++-- react@19.3.1
+`-- zustand@5.0.15
+  `-- react@19.3.1 deduped
+
+npm ls exit=0

@@ -1,0 +1,8 @@
+P7 structured aborted reply keeps current handle and cleared accepted draft=true
+P7 accepted unknown result does not restore prompt or clear current handle=true
+P7 wrong actual turn cannot overwrite original send outcome=true
+P7 delayed actual aborted terminal resolves unknown without changing new draft=true
+P7 actual aborted stream before failed promise remains usable=true
+P7 true accepted failed outcome remains error without requeueing accepted prompt=true
+P7 genuine unaccepted rejection restores draft and retains known current handle=true
+P7 old runtime rejected result cannot disable current runtime or overwrite draft=true

@@ -309,6 +309,7 @@ function rejectInvalidBoundaryWrite(
 
 /** 落盘前守卫 + mkdir + 二次复核 + 原子写；任一步失败返回可读错误（可能已建目录但未写文件）。 */
 async function writeGuarded(
+  gate: WriteGate,
   name: string,
   path: string,
   abs: string,
@@ -334,8 +335,13 @@ async function writeGuarded(
     }
   }
 
-  // 3) 紧邻写入前的二次复核（TOCTOU：弥补 mkdir 与 rename 之间的时间窗）。
-  const recheck = await recheckParentInsideWriteRoot(writeRoot, guarded.target.parentAbs);
+  // 3) mkdir 后复用同一个门禁重新判定（角色/真实目标授权仍由 gate 负责）。
+  const reauthorized = govern(gate, name, abs, writeRoot);
+  if (!reauthorized.proceed) {
+    return { ok: false, message: `${name} 写入前复核未通过：${reauthorized.result.message}（未写入目标文件；可能已创建父目录）` };
+  }
+  // 再复核真实父目录与先前一致，仅缩小并发替换窗口，不声称消除全部 TOCTOU。
+  const recheck = await recheckParentInsideWriteRoot(writeRoot, guarded.target.parentAbs, guarded.target.parentReal);
   if (!recheck.ok) {
     return { ok: false, message: `${name} 拒绝写入：${recheck.reason}` };
   }
@@ -371,7 +377,7 @@ function makeWriteFileTool(gate: WriteGate, writeRoot: string | undefined): Exec
         return { ok: true, message: `${name} 已获准（写入）：${path}（本次构造未配置 writeRoot，已判定但未落盘）` };
       }
       if (call.signal?.aborted) return { ok: false, message: `${name}：会话已中止，未写入` };
-      return writeGuarded(name, path, pre.abs, writeRoot, Buffer.from(content, "utf8"), { createParent: true }, call.signal);
+      return writeGuarded(gate, name, path, pre.abs, writeRoot, Buffer.from(content, "utf8"), { createParent: true }, call.signal);
     },
   };
 }
@@ -437,7 +443,7 @@ function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined): Execu
       if (invalidBoundary !== undefined) return invalidBoundary;
       const data = Buffer.from((decoded.bom ? "\uFEFF" : "") + next, "utf8");
 
-      return writeGuarded(name, path, pre.abs, writeRoot, data, { createParent: false }, call.signal);
+      return writeGuarded(gate, name, path, pre.abs, writeRoot, data, { createParent: false }, call.signal);
     },
   };
 }

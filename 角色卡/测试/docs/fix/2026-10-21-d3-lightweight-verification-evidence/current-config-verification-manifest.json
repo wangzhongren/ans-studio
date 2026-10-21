@@ -1,0 +1,49 @@
+{
+  "at": "2026-10-21T01:43:57.853979+00:00",
+  "candidate_reference": "candidate-current-config-before.json",
+  "checked_files": 558,
+  "changed_source_test_config_files": [],
+  "new_source_test_config_files": [],
+  "installed_dependency_changes": [],
+  "tsc_stable": true,
+  "full_suite": {
+    "command": "node --test \"test/**/*.test.ts\"",
+    "exit": 0,
+    "tests": 3398,
+    "pass": 3396,
+    "fail": 0,
+    "skipped": 2,
+    "log": "full-current-config.log",
+    "sha256": "5f23f6838991993bed22c9c790f28c7b36a815c314618f818d8dc1c6e9f64edb"
+  },
+  "typecheck": {
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "typecheck-current-config.log",
+    "sha256": "6540d00ab4c2c686b6351a1ac075f5272c5b7f7ea191645a2e091dc6962c08d8"
+  },
+  "skip_reasons": [
+    {
+      "file": "test/runtime-core/boundary-write-guard.test.ts",
+      "name": "Windows 反斜杠路径也识别为角色边界文件（平台条件）",
+      "reason": "win32-only"
+    },
+    {
+      "file": "test/门禁引擎/resolve-write.test.ts",
+      "name": "规范化：Windows 大小写不敏感（仅 win32）",
+      "reason": "win32-only"
+    }
+  ],
+  "evidence_scope": "D3 non-UI macOS verification. UI platformization dependency behavior and Windows native evidence are excluded/missing, not passed.",
+  "report": {
+    "path": "角色卡/测试/docs/fix/2026-10-21_fix_d3-lightweight-verification.md",
+    "sha256": "b594123ae836e433a03dd5c607b653afd94e5a456aa56402a830376caf39bd91"
+  },
+  "own_mutations": [
+    "test/测试/lightweight-permission-repairs.test.ts",
+    "test/测试/t9-block2-write-landing.test.ts",
+    "角色卡/测试/docs/fix/2026-10-21_fix_d3-lightweight-verification.md",
+    "角色卡/测试/docs/fix/2026-10-21-d3-lightweight-verification-evidence/"
+  ],
+  "remaining_platform_evidence": "Windows native junction/execution/replacement unavailable; not passed."
+}

@@ -1,0 +1,5 @@
+=== no-preload degradation probe ===
+NOBRIDGE {"mounted":true,"bridge":"undefined","winMinDisabled":true,"winMaxDisabled":true,"winCloseDisabled":true,"note":"窗口控制不可用","csp":0} consoleErrors=[]
+=== narrow 960x620 probe ===
+NARROW {"inner":[960,620],"docScrollW":960,"docClientW":960,"noHorizontalOverflow":true,"capsuleW":664,"headW":664,"titlebarH":36,"chatHeadH":60,"keyboardHintVisible":false,"titlebarSubVisible":false}
+NARROW_SHOT /tmp/ans-p2-smoke-output/smoke-960x620.png 88338

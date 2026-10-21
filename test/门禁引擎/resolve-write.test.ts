@@ -1,9 +1,9 @@
 // 门禁引擎单元测试：resolveWrite（本版心脏）——覆盖契约 §3 列出的每条
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, symlinkSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, symlinkSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 import { resolveWrite } from "../../src/service/gate/resolve-write.ts";
 
@@ -17,6 +17,24 @@ mkdirSync(join(SKILL, "src"), { recursive: true });
 mkdirSync(OUT, { recursive: true });
 
 const ctx = { skillRoot: SKILL, projectRoot: PROJ };
+
+function insideLink(root: "project" | "skill") {
+  const rootAbs = root === "project" ? PROJ : SKILL;
+  const base = mkdtempSync(join(rootAbs, "d3-"));
+  const allowed = join(base, "allowed");
+  const actual = join(base, "private");
+  mkdirSync(allowed);
+  mkdirSync(actual);
+  writeFileSync(join(actual, "existing.ts"), "original");
+  symlinkSync(actual, join(allowed, "link"), process.platform === "win32" ? "junction" : "dir");
+  const rel = (path: string) => relative(rootAbs, path).replace(/\\/g, "/");
+  return {
+    allowed: rel(allowed), actual: rel(actual),
+    target: (tail: string) => join(allowed, "link", tail),
+    alias: (tail: string) => rel(join(allowed, "link", tail)),
+    real: (tail: string) => rel(join(actual, tail)),
+  };
+}
 
 after(() => {
   try {
@@ -43,6 +61,58 @@ function cdir(root: string, path: string, condition: string): any {
 function scope(writeSet: string[], conditions: string[] = []): any {
   return { writeSet, conditions };
 }
+
+for (const root of ["project", "skill"] as const) {
+  test(`D3 ${root}：根内链接不能把目录授权扩到真实目标（已有文件及不存在尾部）`, () => {
+    const f = insideLink(root);
+    for (const tail of ["existing.ts", "new/deep.ts"]) {
+      const d = resolveWrite(f.target(tail), bnd([dir(root, f.allowed)]), undefined, ctx);
+      assert.equal(d.allowed, false);
+      assert.match(d.reason, /真实目标.*未获授权/);
+      assert.ok(d.reason.includes(f.alias(tail)));
+      assert.ok(d.reason.includes(f.real(tail)));
+    }
+  });
+
+  test(`D3 ${root}：输入和真实路径分别匹配角色边界及任务精确写集`, () => {
+    const f = insideLink(root);
+    const tail = "existing.ts";
+    const both = bnd([dir(root, f.allowed), dir(root, f.actual)]);
+    const aliasOnly = resolveWrite(f.target(tail), both, scope([f.alias(tail)]), ctx);
+    assert.equal(aliasOnly.allowed, false);
+    assert.match(aliasOnly.reason, /真实目标.*F4/);
+    const actualOnly = resolveWrite(f.target(tail), both, scope([f.real(tail)]), ctx);
+    assert.equal(actualOnly.allowed, false);
+    assert.match(actualOnly.reason, /F4/);
+    assert.equal(resolveWrite(f.target(tail), both, scope([f.alias(tail), f.real(tail)]), ctx).allowed, true);
+    assert.equal(resolveWrite(f.target(tail), both, undefined, ctx).allowed, true);
+    assert.equal(resolveWrite(f.target(tail), bnd([dir(root, f.actual)]), undefined, ctx).allowed, false);
+  });
+
+  test(`D3 ${root}：真实路径的条件目录仍须激活，另一根的同名授权不能替代`, () => {
+    const f = insideLink(root);
+    const tail = "new.ts";
+    const set = [f.alias(tail), f.real(tail)];
+    const conditional = bnd([dir(root, f.allowed), cdir(root, f.actual, "docs-bootstrap")]);
+    const d = resolveWrite(f.target(tail), conditional, scope(set), ctx);
+    assert.equal(d.allowed, false);
+    assert.match(d.reason, /真实目标.*缺少条件.*docs-bootstrap/);
+    assert.equal(resolveWrite(f.target(tail), conditional, scope(set, ["docs-bootstrap"]), ctx).allowed, true);
+    const cross = bnd([dir(root, f.allowed), dir(root === "project" ? "skill" : "project", f.actual)]);
+    assert.equal(resolveWrite(f.target(tail), cross, scope(set), ctx).allowed, false);
+  });
+}
+
+test("D3：合法链接项目根与技能根以真实根计算相对授权", () => {
+  const projectLink = join(ROOT, "project-root-link");
+  const skillLink = join(ROOT, "skill-root-link");
+  symlinkSync(PROJ, projectLink, process.platform === "win32" ? "junction" : "dir");
+  symlinkSync(SKILL, skillLink, process.platform === "win32" ? "junction" : "dir");
+  const linkedCtx = { projectRoot: projectLink, skillRoot: skillLink };
+  const b = bnd([dir("project", "src"), dir("skill", "src")]);
+  assert.equal(resolveWrite("src/new.ts", b, scope(["src/new.ts"]), linkedCtx).allowed, true);
+  assert.equal(resolveWrite(join(skillLink, "src", "new.ts"), b, scope(["src/new.ts"]), linkedCtx).allowed, true);
+});
 
 // ---- F6：未接受边界 ----
 test("F6：acceptance.accepted 非 true → 拒绝", () => {

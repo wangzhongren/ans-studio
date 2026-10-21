@@ -3,11 +3,14 @@ id: pi-runtime
 type: feature
 title: 使用 Pi 执行受治理角色任务
 created: "2026-10-14"
-updated: "2026-10-14"
+updated: "2026-10-21"
 timezone: Asia/Shanghai
 status: verified
-related: [pi-injected-runtime-p1]
+related: [pi-injected-runtime-p1, pi-reasoning-compatibility-and-default]
 events:
+  - date: "2026-10-21"
+    kind: implemented
+    summary: 思考明确拒绝改为单请求兼容，恢复时重施默认，默认预算保护补齐
   - date: "2026-10-14"
     kind: implemented
     summary: Pi 改为消费核心注入能力并独立恢复 native 会话
@@ -70,3 +73,31 @@ flowchart TD
 工具事件只有 SDK execution_start 一个开始出口，带实际turnId/toolCallId和phase=start。它表示模型请求，并不表示已获授权；治理hook拒绝phase=blocked、SDK结束phase=result均保留真实事实。Core生产路径统一typed prompt-input输入，Pi不再另发旧输入回显；direct helper默认保留兼容typed回显。见2026-10-15 [重复事件修复与SDK验证](../fix/2026-10-15_fix_canonical-tool-events.md)。
 
 批准A/r4后的Core生产接线固定required-v1：Pi在SDK加载前验证注入函数并登记本次实际凭据profile；全部工具事件经同一注入projector取得显示target/result/process，身份和模型原content保真。execution由私有同call事实传递，不混入SDK详情。旧独立入口可legacy兼容但没有A保护保证，投影失败仅固定diagnostic，不造工具失败。历史与C持久化仍由Core/编排/窗口负责。实现与实测见[PI-A-1](../change/2026-10-15_change_tool-display-projection.md)。
+
+## 思考等级与接口兼容
+
+选择的等级随会话构造进入 Pi。每次新建或恢复依次取显式档位、SDK 模型级设置、全局设置及固定 Pi 1.1.0 默认 medium，并通过公开 setThinkingLevel 应用。清空等级后恢复旧会话仍保留历史和身份，但不再继承旧 high。high/xhigh 的实际预算都可能为 16384，界面配置不能证明网关已经采纳。
+
+```mermaid
+flowchart TD
+  settings[显式或默认等级] --> restore[新建或恢复后重施等级]
+  restore --> prompt[活动轮次说明请求配置]
+  prompt --> guard[默认与显式均校验思考预算]
+  guard --> http[发送当前请求]
+  http --> normal{正常结果?}
+  normal -->|是| continue[继续原任务]
+  normal -->|否| rejection{400或422明确拒绝thinking?}
+  rejection -->|否| failure[SDK原故障处理 设置不变]
+  rejection -->|是| retry[提示正在兼容 只删除thinking重发同一HTTP请求]
+  retry --> transport[SDK传输重试继续沿用去参请求]
+  transport --> accepted{正常助手结果?}
+  accepted -->|是| remember[确认本活会话兼容 后续用接口默认方式]
+  remember --> continue
+  accepted -->|失败或取消| failure
+```
+
+兼容只改变当前请求方式，不改保存设置，不重复提交用户输入，原工具结果和图片留在同一请求中。每个 provider 调用只切换一次；一次兼容请求遇到暂时性网络错误时，SDK 的传输重试也不恢复已被拒字段。仅正常助手结果确认活会话兼容，失败/取消不粘连下一轮；改变设置、模型或端点并重建后重试原配置。401/403、408/429、5xx、未知模型等不触发兼容。
+
+输出空间不足时，预算合法性守卫仅调整当前请求并发系统提示，不增加 maxTokens；它不宣称发现了全部 SDK 内部钳位。配置、兼容尝试、成功及修正提示使用活动轮内 system 消息，模型思考正文仍走原 reasoning 事实通道。
+
+本轮已实现，所有者本地 SDK 验证与已知边界见[2026-10-21 修复记录](../fix/2026-10-21_fix_reasoning-compatibility-and-default.md)。兼容只覆盖进入成功响应流前的明确 HTTP 参数拒绝；不宣称所有第三方网关均接受该协议，未调用真实模型。跨角色集成与独立验收另行判定。

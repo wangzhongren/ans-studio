@@ -1,0 +1,28 @@
+npm warn Unknown user config "ELECTRON_MIRROR". This will stop working in the next major version of npm.
+npm warn Unknown user config "ELECTRON_BUILDER_BINARIES_MIRROR". This will stop working in the next major version of npm.
+
+> ans-cli@1.4.0 verify:local
+> node test/装配/verify-local-package.mjs
+
+npm warn Unknown env config "electron-builder-binaries-mirror". This will stop working in the next major version of npm.
+npm warn Unknown env config "electron-mirror". This will stop working in the next major version of npm.
+npm warn Unknown user config "ELECTRON_MIRROR". This will stop working in the next major version of npm.
+npm warn Unknown user config "ELECTRON_BUILDER_BINARIES_MIRROR". This will stop working in the next major version of npm.
+{
+  "ok": true,
+  "archive": {
+    "file": "ANS-Studio-1.4.0-mac-arm64.zip",
+    "size": 406507281,
+    "sha256": "edeeef1949d51ee471f5c922f18cb17fdd0e97ddd33e58b5264a8411a7d8f13f"
+  },
+  "distEntry": "app/renderer/dist/index.html",
+  "devDependenciesPackaged": [],
+  "productionDependenciesPresent": 8,
+  "smoke": {
+    "ok": true,
+    "isPackaged": true,
+    "arch": "arm64",
+    "platform": "darwin"
+  },
+  "evidence": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/release-output/local/local-smoke.json"
+}

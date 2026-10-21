@@ -1,0 +1,161 @@
+{
+  "QUEUE_VIEW": {
+    "entries": 4,
+    "booleans": 4,
+    "true": 4,
+    "false": [],
+    "reportObjects": []
+  },
+  "MIRROR": {
+    "entries": 8,
+    "booleans": 8,
+    "true": 8,
+    "false": [],
+    "reportObjects": []
+  },
+  "GOV": {
+    "entries": 7,
+    "booleans": 7,
+    "true": 7,
+    "false": [],
+    "reportObjects": []
+  },
+  "JUDGE": {
+    "entries": 33,
+    "booleans": 33,
+    "true": 33,
+    "false": [],
+    "reportObjects": []
+  },
+  "G2": {
+    "entries": 5,
+    "booleans": 5,
+    "true": 5,
+    "false": [],
+    "reportObjects": []
+  },
+  "SELECTOR": {
+    "entries": 27,
+    "booleans": 27,
+    "true": 27,
+    "false": [],
+    "reportObjects": []
+  },
+  "CONFIG": {
+    "entries": 21,
+    "booleans": 21,
+    "true": 21,
+    "false": [],
+    "reportObjects": []
+  },
+  "ROLE": {
+    "entries": 11,
+    "booleans": 9,
+    "true": 9,
+    "false": [],
+    "reportObjects": [
+      "nested role reading actual before",
+      "nested role reading actual after"
+    ]
+  },
+  "SEND": {
+    "entries": 8,
+    "booleans": 8,
+    "true": 8,
+    "false": [],
+    "reportObjects": []
+  },
+  "TERMINAL": {
+    "entries": 22,
+    "booleans": 22,
+    "true": 22,
+    "false": [],
+    "reportObjects": []
+  },
+  "TOOLFOLD": {
+    "entries": 19,
+    "booleans": 17,
+    "true": 17,
+    "false": [],
+    "reportObjects": [
+      "fold anchor offsets",
+      "mid document fold anchor"
+    ]
+  },
+  "RUNTIME": {
+    "entries": 16,
+    "booleans": 15,
+    "true": 14,
+    "false": [
+      "expired old shell collapses with reason visible in its own runtime"
+    ],
+    "reportObjects": [
+      "expired old shell collapses with reason visible in its own runtime observed"
+    ]
+  },
+  "RUNTIME2": {
+    "entries": 16,
+    "booleans": 15,
+    "true": 14,
+    "false": [
+      "expired old shell collapses with reason visible in its own runtime"
+    ],
+    "reportObjects": [
+      "expired old shell collapses with reason visible in its own runtime observed"
+    ]
+  },
+  "VISUAL": {
+    "entries": 52,
+    "booleans": 49,
+    "true": 48,
+    "false": [
+      "V2 import selects primary su and keeps it inside tree viewport"
+    ],
+    "reportObjects": [
+      "V2 measured geometry 1360",
+      "V2 measured geometry 960",
+      "V2 import selects primary su and keeps it inside tree viewport observed"
+    ]
+  },
+  "GHOST": {
+    "entries": 9,
+    "booleans": 8,
+    "true": 7,
+    "false": [
+      "builtin identity stays data and accessible without duplicate third visible line"
+    ],
+    "reportObjects": [
+      "builtin identity stays data and accessible without duplicate third visible line observed"
+    ]
+  },
+  "FLOW": {
+    "entries": 20,
+    "booleans": 19,
+    "true": 18,
+    "false": [
+      "P7 choice pending separated from empty queue"
+    ],
+    "reportObjects": [
+      "P7 choice pending separated from empty queue observed"
+    ]
+  },
+  "FLOW_REACH": {
+    "entries": 35,
+    "booleans": 35,
+    "true": 35,
+    "false": [],
+    "reportObjects": []
+  },
+  "DEFAULT": {
+    "entries": 54,
+    "booleans": 50,
+    "true": 50,
+    "false": [],
+    "reportObjects": [
+      "queue geometry 1360",
+      "queue geometry 960",
+      "incremental reader anchor",
+      "full replay preserves content identity"
+    ]
+  }
+}

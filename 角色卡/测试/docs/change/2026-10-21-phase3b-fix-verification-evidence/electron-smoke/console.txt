@@ -1,0 +1,47 @@
+CHECK BRIDGE_AND_SUBSCRIPTIONS=true {"projectRoot":"/fixture3b","counts":{"event":1,"roleState":1,"history":1,"projectChanged":1,"operatorRequest":1,"operatorExpired":1,"operatorQueued":1,"shellConfirm":1,"recoveryConfirm":1,"shellJudgeState":1,"shellJudgeResult":1,"decisionJudgeState":1,"operatorJudgeResult":1},"driver":"object","governanceModel":"trio"}
+CHECK JUDGE_SWITCHES_INITIAL_OFF=true {"approval":{"checked":false,"disabled":false,"label":"替我审批"},"decision":{"checked":false,"disabled":false,"label":"替我决策"},"warningHidden":true}
+CHECK SHELL_CARD_VERBATIM_DENY_FOCUS=true {"visible":true,"title":"shell 命令请求","command":"rm -rf build && echo '逐字 <&> 命令'","summary":"风险命令摘要","focus":"sc-deny","stateId":"sc-1"}
+CHECK SHELL_ESC_ALLOW_FALSE=true {"hidden":true,"calls":[{"id":"sc-1","allow":false}]}
+CHECK SHELL_EXPLICIT_ALLOW_TRUE=true {"id":"sc-2","allow":true}
+CHECK SHELL_EXPLICIT_DENY_FALSE=true {"id":"sc-3","allow":false}
+CHECK SHELL_SETTLED_CLOSES_WITHOUT_ANSWER=true {"hidden":true,"callsDelta":0}
+CHECK SHELL_EXPIRY_CLOSES_HONEST=true {"hidden":true,"hint":"确认已超时","callsDelta":0}
+CHECK SHELL_CHANNEL_FAIL_CLOSED=true {"hidden":true,"hint":"未能回传你的决定（通道未接或异常）——按 fail-closed 不放行；请让角色重新发起。"}
+CHECK SHELL_DETAILS_LUCIDE_CHEVRON_VISIBLE_AND_ROTATED=true {"before":{"open":false,"icon":true,"transformClosed":"matrix(1, 0, 0, 1, 0, 0)","beforeContent":"none"},"after":{"open":true,"transformOpen":"matrix(0, 1, -1, 0, 0, 0)"},"closed":true}
+CHECK SU_TIERS_TITLE_REASON_WARNING=true [{"tier":"risky","title":"命令审批 · Proof / 验收","summary":"风险命令（risky） · 写入 risky","reason":"命中审批规则\n命中原因：tier:risky","hint":"批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界；请逐字核对命令原文。 点「拒绝」、按 Esc 或关闭本框 = 不放行（不会执行）。","focus":"sc-deny","visible":true,"summaryWeight":"600","warnColor":"rgb(196, 161, 95)","hintColor":"rgb(148, 155, 164)"},{"tier":"review","title":"命令审批 · Proof / 验收","summary":"未自动判定（review） · 写入 review","reason":"命中审批规则\n命中原因：tier:review","hint":"批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界；请逐字核对命令原文。 点「拒绝」、按 Esc 或关闭本框 = 不放行（不会执行）。","focus":"sc-deny","visible":true,"summaryWeight":"600","warnColor":"rgb(196, 161, 95)","hintColor":"rgb(148, 155, 164)"},{"tier":"deny","title":"命令审批 · Proof / 验收","summary":"硬拒类（deny） · 写入 deny","reason":"命中审批规则\n命中原因：tier:deny","hint":"批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界；请逐字核对命令原文。 点「拒绝」、按 Esc 或关闭本框 = 不放行（不会执行）。","focus":"sc-deny","visible":true,"summaryWeight":"600","warnColor":"rgb(196, 161, 95)","hintColor":"rgb(148, 155, 164)"}]
+CHECK SU_WARNING_AMBER_SUMMARY_BOLD=true {"weight":"600","warn":"rgb(196, 161, 95)","hintColor":"rgb(148, 155, 164)"}
+CHECK RECOVERY_CARD_VERBATIM_CANCEL_FOCUS=true {"visible":true,"action":"动作：重建会话（rebuild-session）","note":"重建该角色会话（保留 ANS 回放）；目标正忙时不会执行。","role":"目标角色：A","reason":"原因（提议方提供）：恢复原因 X","evidence":"证据逐字 <&> 保留","focus":"rc-deny","hiddenAfterEsc":true,"calls":[{"id":"rc-1","allow":false}]}
+CHECK RECOVERY_EXPLICIT_EXECUTE_TRUE=true {"hidden":true,"last":{"id":"rc-2","allow":true}}
+CHECK RECOVERY_EXPIRED_STAYS_DISABLED_HONEST=true {"visible":true,"allowDisabled":true,"denyDisabled":true,"hint":"此确认已失效（应用重启或请求已结束），未获执行——请让提议方重新发起。","dismissed":true}
+CHECK RECOVERY_CHANNEL_FAIL_CLOSED=true {"visible":true,"hint":"未能回传你的决定（通道未接或异常）——按 fail-closed 不执行；请让提议方重新发起。","allowDisabled":true,"dismissed":true}
+CHECK JUDGE_ALLOW_ROW_ANCHORED=true "已替你放行（判断 agent · 代审批）node -v档位：risky · 判断引擎：Claude · operator:judge:claude · 12:00详情（命令原文 / 理由 / 证据）toolCallId：call-j1"
+CHECK JUDGE_DENY_ROW_AND_MANUAL_NO_ROW=true {"deny":"未放行（判断 agent · 代审批）无法概括命令；展开查看原文判断引擎：Claude · operator:judge:claude判断理由：系统风险请调整命令可关闭「替我审批」后重试（改为手动确认），或按替代方案调整命令。详情（命令原文","afterDeny":1,"afterManual":2,"afterDup":2}
+CHECK JUDGE_GOVERNANCE_ROW=true "judge 代批 · 代审批代审批确认写入 1 个路径（docs/a.md） · 流程 flow-9判断引擎：Claude · operator:judge:claude · 流程：flow-9判断理由：路径在边界内详情（判断理由 / 选中项 / 证据）流程：flow-9判断理由：路径在边界内路径：docs/a.mdt"
+CHECK JUDGE_APPROVAL_TURN_ON_WARNING_ONCE=true {"afterOn":{"checked":true,"label":"替我审批中 · 判断 agent","warningHidden":false,"warningText":"替我审批中：shell 命令与写盘/写卡确认（write / appointment-write / schedule-write）将由判断 agent 代批。判断 agent 只读项目内代码/文档/角色卡（不含 .env、密钥/凭据、.ans 账本/会话、审计日志与项目外），不写文件、不执行命令；只代你「接受/任命/确认/验收」，不会代你拒绝、要求修改或勾选证据不足的候选；不确定、缺证据、读取失败、引擎不可用、超时或解析失败会按所属开关回落逐张卡，由你决定。提案快捷路径（accept-quick）默认不代批；旧治理模型（single/su）的治理方向卡仍逐张确认；single 下写盘确认仍逐张手动。每次代批会产生一次模型调用（token/延迟）；结果行与审计会标明「judge 代批 · 代审批/代决策」；可能误判，可随时关闭。","setCalls":[true]},"afterAck":{"hidden":true},"afterRepush":{"hidden":true},"decision":{"checked":true,"label":"替我决策中 · 判断 agent","setCalls":[true],"warningHidden":false,"warningText":"替我审批中：shell 命令与写盘/写卡确认（write / appointment-write / schedule-write）将由判断 agent 代批。替我决策中：提案接受、任命、验收将由判断 agent 代批。判断 agent 只读项目内代码/文档/角色卡（不含 .env、密钥/凭据、.ans 账本/会话、审计日志与项目外），不写文件、不执行命令；只代你「接受/任命/确认/验收」，不会代你拒绝、要求修改或勾选证据不足的候选；不确定、缺证据、读取失败、引擎不可用、超时或解析失败会按所属开关回落逐张卡，由你决定。提案快捷路径（accept-quick）默认不代批；旧治理模型（single/su）的治理方向卡仍逐张确认；single 下写盘确认仍逐张手动。每次代批会产生一次模型调用（token/延迟）；结果行与审计会标明「judge 代批 · 代审批/代决策」；可能误判，可随时关闭。"}}
+CHECK JUDGE_DECISION_TURN_ON_WARNING=true {"checked":true,"label":"替我决策中 · 判断 agent","setCalls":[true],"warningHidden":false,"warningText":"替我审批中：shell 命令与写盘/写卡确认（write / appointment-write / schedule-write）将由判断 agent 代批。替我决策中：提案接受、任命、验收将由判断 agent 代批。判断 agent 只读项目内代码/文档/角色卡（不含 .env、密钥/凭据、.ans 账本/会话、审计日志与项目外），不写文件、不执行命令；只代你「接受/任命/确认/验收」，不会代你拒绝、要求修改或勾选证据不足的候选；不确定、缺证据、读取失败、引擎不可用、超时或解析失败会按所属开关回落逐张卡，由你决定。提案快捷路径（accept-quick）默认不代批；旧治理模型（single/su）的治理方向卡仍逐张确认；single 下写盘确认仍逐张手动。每次代批会产生一次模型调用（token/延迟）；结果行与审计会标明「judge 代批 · 代审批/代决策」；可能误判，可随时关闭。"}
+CHECK SEND_ACK_TARGET_AND_CLIENT_ID=true {"args":["正常发送",[],{"projectRoot":"/fixture3b","roleId":"A","runtime":"claude"},{"clientMessageId":"f0ea2321-67eb-4396-b422-d1502cf87989"}],"text":""}
+CHECK SEND_QUEUED_POSITION=true "已入队：等它完成当前任务后处理（第 2 位）。"
+CHECK SEND_REJECT_RESTORES_DRAFT=true {"text":"保留草稿","hint":"发送失败：测试拒绝","sys":"本轮完成 | 发送失败：测试拒绝","accepted":true}
+CHECK SEND_ACCEPTED_FAILURE_NO_FALSE_FAILURE=true {"text":"","hint":"","sysDelta":0,"error":true}
+CHECK DRAFT_PER_ROLE=true {"atB":"","backA":"A 草稿","backB":"B 草稿","finalA":"A 草稿"}
+CHECK HALT_VISIBILITY_BY_BUSY=true {"hiddenBefore":true,"visibleBusy":true,"hiddenIdle":true}
+CHECK HALT_ABORT_EXACT_TARGET=true {"projectRoot":"/fixture3b","roleId":"A","runtime":"claude"}
+CHECK HALT_UNSUPPORTED_AND_FAIL_HONEST=true {"unsupported":"本轮完成 | 发送失败：测试拒绝 | 已请求停止当前轮次——轮次仍会以收尾事件结束。 | 当前运行时不支持停止。","failed":"本轮完成 | 发送失败：测试拒绝 | 已请求停止当前轮次——轮次仍会以收尾事件结束。 | 当前运行时不支持停止。 | 停止失败：停止失败原因"}
+CHECK ATTACH_PICK_THUMBNAIL_DATA_URL=true {"chips":1,"imgSrc":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","title":"picked.png（1KB）","rowHidden":false,"chipRadius":"8px","rmRadius":"4px","rmSvgW":"12px","rmSvgH":"12px","rmSvgStroke":"1.5"}
+CHECK ATTACH_PASTE_AND_DROP=true {"picked":{"chips":1,"imgSrc":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","title":"picked.png（1KB）","rowHidden":false,"chipRadius":"8px","rmRadius":"4px","rmSvgW":"12px","rmSvgH":"12px","rmSvgStroke":"1.5"},"pasted":{"chips":2,"attachCalls":1,"lastName":"paste.png"},"dropped":{"chips":3,"attachCalls":2},"afterRemove":{"chips":2},"dropOn":{"cls":true,"border":"rgb(148, 155, 164)","bg":"rgb(37, 42, 48)"},"dropOff":{"cls":false}}
+CHECK ATTACH_REMOVE=true {"chips":2}
+CHECK ATTACH_CHIP_RADIUS_AND_REMOVE_ICON=true {"chips":1,"imgSrc":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","title":"picked.png（1KB）","rowHidden":false,"chipRadius":"8px","rmRadius":"4px","rmSvgW":"12px","rmSvgH":"12px","rmSvgStroke":"1.5"}
+CHECK DROP_FEEDBACK_VISIBLE_TOKENS=true {"cls":true,"border":"rgb(148, 155, 164)","bg":"rgb(37, 42, 48)"}
+CHECK DROP_FEEDBACK_CLEARED_ON_LEAVE=true {"cls":false}
+CHECK QUEUE_POSITIONS_AND_WITHDRAW_GATING=true [{"text":"进行中正在执行的任务客户消息","hasWithdraw":false,"qid":"run-1"},{"text":"第 1 位第一条排队消息客户消息撤回","hasWithdraw":true,"qid":"q-1"},{"text":"第 2 位系统排队项系统","hasWithdraw":false,"qid":"q-2"}]
+CHECK QUEUE_WITHDRAW_INLINE_RECEIPT=true {"call":[{"projectRoot":"/fixture3b","roleId":"A","runtime":"claude"},"q-1"],"feedback":"已撤回排队消息：被撤回的排队消息"}
+CHECK QUEUE_WITHDRAW_HIT_TARGET_AND_INPUT_BORDER=true {"height":28,"fontSize":"11px","border":"rgb(107, 117, 126)","radius":"6px"}
+CHECK SYSTEM_ALERT_ROW=true {"exists":true,"chip":"系统消息 · 看护","body":"系统消息 · 看护巡检开始\n"}
+CHECK JUDGE_DECISION_SINGLE_DISABLED=true {"governanceModel":"single","disabled":true,"checked":false,"note":"旧治理模型（single）不支持代决策","noteHidden":false}
+CHECK NO_CSP_VIOLATIONS=true 0
+CHECK NO_CONSOLE_ERRORS=true []
+CHECK NO_DID_FAIL_LOAD=true
+CHECK SCREENSHOT=true {"path":"/tmp/ans-p3b-smoke-output/phase3b.png","bytes":132549}
+CHECK JUDGE_BRIDGE_MISSING_DISABLED=true {"approval":{"disabled":true,"label":"当前版本不支持自动判断，保持手动","status":"","statusHidden":true},"decision":{"disabled":true,"label":"当前版本不支持自动判断，保持手动","status":"","statusHidden":true}}
+SMOKE_SUMMARY {"total":45,"passed":45,"failed":0}
+SMOKE_DONE=1

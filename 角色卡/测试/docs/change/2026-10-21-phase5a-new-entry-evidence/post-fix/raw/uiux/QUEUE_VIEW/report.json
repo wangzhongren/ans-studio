@@ -1,0 +1,23 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "queued baseline shows two",
+      "value": true
+    },
+    {
+      "name": "runtime view restore does not revive old queued requests or aggregate",
+      "value": true
+    },
+    {
+      "name": "main-process repush rebuilds aggregate with new count only",
+      "value": true
+    },
+    {
+      "name": "clearing queue removes aggregate",
+      "value": true
+    }
+  ],
+  "errors": []
+}

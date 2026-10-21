@@ -6,3 +6,15 @@ node_modules/
 *.log
 .release/
 release-output/
+app/renderer/dist/
+# Electron 测试证据中的用户数据/缓存（夹具产物，不入库）
+**/user-data/
+# 证据夹具里的嵌套会话记录（夹具产物，不入库）
+**/.ans/sessions/
+**/.ans/runtime/
+# 治理证据截图不入库（本地保留）
+角色卡/**/docs/**/*.png
+角色卡/**/docs/**/*.jpg
+角色卡/**/docs/**/*.jpeg
+角色卡/**/docs/**/*.webp
+角色卡/**/docs/**/*.gif

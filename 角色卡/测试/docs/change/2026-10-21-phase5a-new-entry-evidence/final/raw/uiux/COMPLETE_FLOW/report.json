@@ -1,0 +1,106 @@
+{
+  "reports": [
+    {
+      "name": "fresh empty context never mistakes loader for history",
+      "value": true
+    },
+    {
+      "name": "empty fresh session has no above-history warning",
+      "value": true
+    },
+    {
+      "name": "A same call one accessible lifecycle with true target and nonzero exit completion",
+      "value": true
+    },
+    {
+      "name": "A safe detail streams exit error and flags readable",
+      "value": true
+    },
+    {
+      "name": "A different same-text actual call remains separate",
+      "value": true
+    },
+    {
+      "name": "A unknown display never falls to raw args",
+      "value": true
+    },
+    {
+      "name": "C source declared result not independent acceptance and failed save button",
+      "value": true
+    },
+    {
+      "name": "B source list requires explicit file pick without chat switch or opening model",
+      "value": true
+    },
+    {
+      "name": "B static markdown no scripts automatic image or unsafe link",
+      "value": true
+    },
+    {
+      "name": "B back list restores explicit file focus",
+      "value": true
+    },
+    {
+      "name": "B actual too-large result remains explicit error not partial success",
+      "value": true
+    },
+    {
+      "name": "B close invalidates late document and returns actual report invoker",
+      "value": true
+    },
+    {
+      "name": "C source same card once save success with promise event race",
+      "value": true
+    },
+    {
+      "name": "C target safe display copy flags not complete model input",
+      "value": true
+    },
+    {
+      "name": "C target only save updates same original card no re-prompt",
+      "value": true
+    },
+    {
+      "name": "C expired original report removes unsafe retry",
+      "value": true
+    },
+    {
+      "name": "P6 config save retains existing conversation draft",
+      "value": true
+    },
+    {
+      "name": "P6 missing setting closes back to actual notice invoker",
+      "value": true
+    },
+    {
+      "name": "P7 choice pending separated from empty queue",
+      "value": true
+    },
+    {
+      "name": "P7 locate uses original request no default decision",
+      "value": false
+    },
+    {
+      "name": "P7 locate uses original request no default decision observed",
+      "value": {
+        "chat": "run_shellnode -v调用发起 → 已执行完成（退出码 2）安全结果调用发起实际命令node -v已执行完成（退出码 2）实际命令node -v消息ENOENT 原始安全错误结果结果预览退出码：2标准输出已净化安全输出 [REDACTED]标准错误已截断安全stderr耗时：32 ms部分展示内容因预算省略run_shellnode -v已执行完成（退出码 2）安全结果已执行完成（退出码 2）实际命令node -v消息ENOENT 原始安全错误结果结果预览退出码：2标准输出已净化安全输出 [REDACTED]标准错误已截断安全stderr耗时：32 ms部分展示内容因预算省略run_shell无文件目标执行失败安全结果执行失败不支持此详情版本。来源 A · 正式回交任务报告报告声明：已完成Pi · 任务关联未知 · 轮次 source-one报告原文摘录已完成的安全摘要\n另有 1 条证据因预算省略报告存储报告已保存独立验收尚未确认以上为报告或终态记录，不等于独立验收通过。查看来源角色文档查看完整报告摘要与证据已完成的安全摘要\n另有 1 条证据因预算省略并非授权路径 /hidden.env回交投递 · 本批 1 份（不表示全部收齐）接收历史已保存目标输入记录已保存目标轮次结果已完成来源 A · 正式回交任务报告报告声明：已完成Pi · 任务关联未知 · 轮次 source-one报告原文摘录已完成的安全摘要\n另有 1 条证据因预算省略独立验收尚未确认以上为报告或终态记录，不等于独立验收通过。查看来源角色文档查看完整报告摘要与证据已完成的安全摘要\n另有 1 条证据因预算省略并非授权路径 /hidden.env交接内容（安全显示副本）此处未记录完整模型输入 · 已净化 · 显示副本已截断 · 摘要已截断安全交接 [REDACTED]来源 A · 正式回交任务报告报告声明：已完成Pi · 任务关联未知 · 轮次 source-expired报告原文摘录已完成的安全摘要\n另有 1 条证据因预算省略报告存储报告尚未保存，暂未继续回交。可补存原报告，无需重新运行任务。重试保存报告独立验收尚未确认以上为报告或终态记录，不等于独立验收通过。查看来源角色文档查看完整报告摘要与证据已完成的安全摘要\n另有 1 条证据因预算省略并非授权路径 /hidden.env选择查看方式摘要完整提交取消有 1 条待确认 · 定位",
+        "assistant": [],
+        "denied": [],
+        "model": {
+          "count": 7,
+          "lastIndex": 6,
+          "operators": [
+            {
+              "index": 6,
+              "requestId": "flow-choice"
+            }
+          ],
+          "rowGap": 16
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: P7 locate uses original request no default decision\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: P7 locate uses original request no default decision\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:66:474)\n    at async completeFlowChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:636:5)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1350:17"
+}

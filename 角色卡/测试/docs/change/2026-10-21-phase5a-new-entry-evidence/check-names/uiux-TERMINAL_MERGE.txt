@@ -1,0 +1,2 @@
+same actual turn and outcome denied plus settled has one readable terminal=false
+same actual turn and outcome denied plus settled has one readable terminal observed={"chat": "本轮已中止本轮已中止", "assistant": [], "denied": [], "model": {"count": 2, "lastIndex": 1, "operators": [], "rowGap": 16}}

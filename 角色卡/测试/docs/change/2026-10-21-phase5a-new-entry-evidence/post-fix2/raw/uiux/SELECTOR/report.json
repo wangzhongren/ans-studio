@@ -1,0 +1,123 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "disabled combobox before import",
+      "value": true
+    },
+    {
+      "name": "disabled cannot open",
+      "value": true
+    },
+    {
+      "name": "empty folder enables custom selector with Claude default",
+      "value": true
+    },
+    {
+      "name": "Home browses first Pi without commit",
+      "value": true
+    },
+    {
+      "name": "Space commits Pi once with live missing entry",
+      "value": true
+    },
+    {
+      "name": "current Enter only closes",
+      "value": true
+    },
+    {
+      "name": "Home opens first and stops at top",
+      "value": true
+    },
+    {
+      "name": "Escape cancels and retains trigger focus",
+      "value": true
+    },
+    {
+      "name": "closed arrow opens current selected",
+      "value": true
+    },
+    {
+      "name": "End browses last Claude and stops at bottom without commit",
+      "value": true
+    },
+    {
+      "name": "Tab cancels naturally to accepted work overview without committing",
+      "value": true
+    },
+    {
+      "name": "missing settings remains naturally keyboard reachable after work and role actions",
+      "value": true
+    },
+    {
+      "name": "ShiftTab cancellation leaves natural previous target",
+      "value": true
+    },
+    {
+      "name": "outside pointer cancels without focus stealing",
+      "value": true
+    },
+    {
+      "name": "window blur closes without commit",
+      "value": true
+    },
+    {
+      "name": "hover moves temporary only and keeps selected check",
+      "value": true
+    },
+    {
+      "name": "option click commits Codex once",
+      "value": true
+    },
+    {
+      "name": "current click no business reread",
+      "value": true
+    },
+    {
+      "name": "programmatic runtime sync selected and label",
+      "value": true
+    },
+    {
+      "name": "selector dimensions and viewport 1360",
+      "value": true
+    },
+    {
+      "name": "selector dimensions and viewport 960",
+      "value": true
+    },
+    {
+      "name": "long label ellipsis retains accessible full name",
+      "value": true
+    },
+    {
+      "name": "low viewport flips upward and clamps horizontally",
+      "value": true
+    },
+    {
+      "name": "tiny viewport internal scroll keeps active visible",
+      "value": true
+    },
+    {
+      "name": "tiny viewport Home active becomes visible",
+      "value": true
+    },
+    {
+      "name": "project application closes pending menu",
+      "value": true
+    },
+    {
+      "name": "missing entry still opens existing Claude drawer",
+      "value": true
+    }
+  ],
+  "configReads": [
+    "claude",
+    "pi",
+    "codex",
+    "pi",
+    "codex",
+    "claude",
+    "claude"
+  ]
+}

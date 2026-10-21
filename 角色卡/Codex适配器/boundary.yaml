@@ -1,4 +1,5 @@
-# Section 1：唯一写入白名单。组别不合并权限；未列路径默认只读。
+# boundary.md Section 1 的兼容同步副本；保留产品 role/entries schema。
+# Markdown 为授权来源；二者须一致，组别不合并权限，未列路径默认只读。
 role: Codex适配器
 entries:
   - kind: file
@@ -15,9 +16,6 @@ entries:
     purpose: 本角色实现与功能资料
   - kind: file
     path: 角色卡/Codex适配器/memo.md
-    purpose: 本角色实现与功能资料
-  - kind: file
-    path: 角色卡/Codex适配器/changelog.md
     purpose: 本角色实现与功能资料
   - kind: file
     path: 角色卡/Codex适配器/functional-description.md

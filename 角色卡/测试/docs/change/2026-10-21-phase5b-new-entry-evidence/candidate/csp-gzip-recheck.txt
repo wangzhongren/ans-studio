@@ -1,0 +1,23 @@
+# CSP/gzip 静态扫描补跑（2026-10-21 验收补正）
+
+**原因**：`probes/dist-static-scan-5b.cjs` 原按 5A `dist/src/index.html` 的 `../assets/` 判断相对资源；5B 入口为 `app/renderer/dist/index.html`，Vite 产物引用 `./assets/`，旧口径输出 `RELATIVE_ASSET_REFS=false`。这是探针口径过期，不是 CSP 失败。
+
+**修正**：`RELATIVE_ASSET_REFS` 改为接受 `./assets/` 并兼容 `../assets/`；其余断言未改。命令：
+
+```
+node 角色卡/测试/docs/change/2026-10-21-phase5b-new-entry-evidence/probes/dist-static-scan-5b.cjs
+```
+
+**输出（exit 0）**：
+
+```
+ENTRY=/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/dist/index.html
+HTML_BYTES=581
+ASSET ./assets/index-BVLfGR_D.js raw=825985 gzip9=269240
+ASSET ./assets/index-DUBNk8-R.css raw=108501 gzip9=19468
+ASSET index.html raw=581 gzip9=387
+TOTAL_GZIP9=289095 <=307200?true
+CSP_STATIC_SCAN {"INLINE_SCRIPT_PRESENT":false,"STYLE_TAG_PRESENT":false,"STYLE_ATTR_PRESENT":false,"UNSAFE_INLINE":false,"UNSAFE_EVAL":false,"STRICT_CSP_META_PRESENT":true,"MODULEPRELOAD_LINK":false,"SCRIPT_COUNT":1,"SCRIPT_WITH_SRC_COUNT":1,"RELATIVE_ASSET_REFS":true}
+```
+
+**结论**：严格 CSP 元标记存在，无 inline script/style/style attr/unsafe-inline/unsafe-eval；单外链脚本/样式；相对资源引用成立；gzip9 总量 289,095B ≤307,200B。候选哈希与 `dist-sha256.txt` 一致（HTML `3c4da2a2…`、JS `f568e2aa…`、CSS `76fad7ce…`）。

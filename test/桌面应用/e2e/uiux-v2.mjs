@@ -9,6 +9,14 @@ import { parseSessionJsonl } from '../../../app/desktop/session-history.ts';
 import { RUNTIME_SETTINGS } from '../../../src/common/shared/runtime-settings.ts';
 const HERE=path.dirname(fileURLToPath(import.meta.url));
 const APP=path.resolve(HERE,'../../../app');
+// Phase 3A/5B：默认构建产物入口；ANS_RENDERER_ENTRY 显式覆盖。
+// 5A：显式入口必须在启动前存在，避免静默回退/加载错误页造成假绿。
+const EXPLICIT_RENDERER_ENTRY = process.env.ANS_RENDERER_ENTRY || '';
+const RENDERER_ENTRY=EXPLICIT_RENDERER_ENTRY||path.join(APP,'renderer/dist/index.html');
+if (EXPLICIT_RENDERER_ENTRY && !fs.existsSync(EXPLICIT_RENDERER_ENTRY)) {
+  console.error('ANS_RENDERER_ENTRY does not exist: ' + EXPLICIT_RENDERER_ENTRY);
+  process.exit(2);
+}
 const OUT=process.env.ANS_UIUX_OUTDIR || fs.mkdtempSync(path.join(os.tmpdir(),'ans-uiux-v2-'));
 fs.mkdirSync(OUT,{recursive:true}); app.setPath('userData',path.join(OUT,'user-data'));
 const INTERACTIVE=process.env.ANS_UIUX_INTERACTIVE==='1';
@@ -46,7 +54,7 @@ const GOVREACCEPT_ONLY=process.env.ANS_GOVERNANCE_REACCEPT_UI_ONLY==='1';
 const JUDGE_ONLY=process.env.ANS_JUDGE_UI_ONLY==='1';
 const MIRROR_ONLY=process.env.ANS_MIRROR_UI_ONLY==='1';
 const configReads=[];
-let recoveryEnabled=!(CONFIG_ONLY||SELECTOR_ONLY||FLOW_ONLY||GOVREACCEPT_ONLY||JUDGE_ONLY), listFailure=false, pickResult=ROOT, configFailure=false, configMalformed=false, configDeferred=false, saveDeferred=false;
+let recoveryEnabled=!(CONFIG_ONLY||SELECTOR_ONLY||FLOW_ONLY||GOVREACCEPT_ONLY||JUDGE_ONLY||MIRROR_ONLY), listFailure=false, pickResult=ROOT, configFailure=false, configMalformed=false, configDeferred=false, saveDeferred=false;
 let judgeEnabled=false, judgeSetFailure=false; // P5：「替我审批」离线开关（主进程权威的替身）
 let decisionJudgeEnabled=false, decisionSetFailure=false; // P5：第二个开关「替我决策」的离线替身
 let judgeGovernanceModel='trio'; // JUDGE_ONLY：listing 的治理模型（trio 启用 decision；single 演示禁用）
@@ -625,7 +633,7 @@ async function completeFlowChecks(){
   await js(`document.getElementById('tab-work').click()`);
   await check('P7 choice pending separated from empty queue',`document.getElementById('right-body').textContent.includes('待选择')&&document.getElementById('right-body').textContent.includes('无进行中或排队消息')&&document.getElementById('role-tree').textContent.includes('待选择')`);
   await js(`document.querySelector('.pending-locate').click()`);
-  await check('P7 locate uses original request no default decision',`window.__ansRenderer.state.rightTab===null&&document.activeElement.dataset.requestId==='flow-choice'&&![...document.querySelectorAll('[data-request-id="flow-choice"] input[type=radio]')].some(x=>x.checked)&&document.querySelector('[data-request-id="flow-choice"] .op-submit').disabled`);
+    await check('P7 locate uses original request no default decision',`window.__ansRenderer.state.rightTab===null&&document.activeElement.dataset.requestId==='flow-choice'&&![...document.querySelectorAll('[data-request-id="flow-choice"] input[type=radio]')].some(x=>x.checked)&&document.querySelector('[data-request-id="flow-choice"] .op-submit').disabled`);
   const sourceBefore=await js(`document.querySelectorAll('.msg-handback').length`);
   await push('session:events',[payload({kind:'handback',report:{...snapshot,reportId:'wrong-scope',source:{roleId:'B',runtime:'pi',turnId:'wrong'}},reportPersistence:{state:'saved',retryAvailable:false}})]);
   await check('C source report mismatched role is not promoted',`document.querySelectorAll('.msg-handback').length===${sourceBefore}`);
@@ -827,7 +835,7 @@ async function selectorChecks() {
   await check('current click no business reread',`${menu}.hidden`);
   await js(`await window.__ansRenderer.selectRuntime('claude')`);await pause(60);
   await check('programmatic runtime sync selected and label',`${trigger}.textContent.includes('Claude')&&document.getElementById('runtime-option-claude').getAttribute('aria-selected')==='true'`);
-  for(const width of [1360,960]){win.setContentSize(width,width===960?620:860);await pause(60);await js(`${trigger}.focus();${trigger}.click()`);await key('ArrowUp');await check('selector dimensions and viewport '+width,`(()=>{const t=${trigger}.getBoundingClientRect(),m=${menu}.getBoundingClientRect();return t.width===104&&t.height===32&&m.width===180&&Math.abs(m.right-t.right)<1&&m.left>=8&&m.right<=innerWidth-8&&m.bottom<=innerHeight-8&&document.body.scrollWidth===innerWidth;})()`);fs.writeFileSync(path.join(OUT,'selector-'+width+'-open.png'),(await win.webContents.capturePage()).toPNG());await key('Escape');}
+  for(const width of [1360,960]){win.setContentSize(width,width===960?620:860);await pause(60);await js(`${trigger}.focus();${trigger}.click()`);await key('ArrowUp');await check('selector dimensions and viewport '+width,`(()=>{const t=${trigger}.getBoundingClientRect(),m=${menu}.getBoundingClientRect();return t.width===104&&t.height===32&&m.width===208&&Math.abs(m.right-t.right)<1&&m.left>=8&&m.right<=innerWidth-8&&m.bottom<=innerHeight-8&&document.body.scrollWidth===innerWidth;})()`);fs.writeFileSync(path.join(OUT,'selector-'+width+'-open.png'),(await win.webContents.capturePage()).toPNG());await key('Escape');}
   await js(`document.querySelector('.engine-value').textContent='VERY LONG ENGINE LABEL THAT MUST NOT OVERFLOW';document.querySelector('#runtime-option-claude .engine-option-name').textContent='Claude VERY LONG LABEL';${trigger}.click()`);
   await check('long label ellipsis retains accessible full name',`${trigger}.title==='Claude VERY LONG LABEL'&&${trigger}.getAttribute('aria-label').includes('Claude VERY LONG LABEL')&&${trigger}.querySelector('.engine-value').scrollWidth>${trigger}.querySelector('.engine-value').clientWidth&&${menu}.scrollWidth===${menu}.clientWidth`);
   await key('Escape');await js(`document.querySelector('#runtime-option-claude .engine-option-name').textContent='Claude';await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)})`);await pause(60);
@@ -947,8 +955,12 @@ async function runtimeChecks() {
   const responseCount=responses.length;
   await js(`await window.__ansRenderer.selectRuntime('pi')`);
   await check('Pi own history background queue draft and expired card restored',`document.getElementById('chat').textContent.includes('Pi专属历史')&&document.getElementById('chat').textContent.includes('后台Pi消息')&&document.getElementById('chat').textContent.includes('Pi后台队列')&&document.getElementById('inp-message').value==='Pi草稿'&&document.querySelector('[data-request-id="pi-old-confirm"] .op-confirm').hidden&&document.querySelector('[data-request-id="pi-old-confirm"] .op-note').textContent.includes('原轮次已中止')`);
-  await check('expired old shell shown disabled in its own runtime',`!document.getElementById('shell-confirm').hidden&&document.getElementById('sc-allow').disabled&&document.getElementById('sc-hint').textContent.includes('原shell轮次已中止')`);
-  const shellCount=shellResponses.length;await js(`document.getElementById('sc-allow').click();document.getElementById('sc-close').click()`);await pause(30);assert.equal(shellResponses.length,shellCount,'expired shell cannot authorize and closing only dismisses');
+  // C2 重锚（PM §15.6：测试提出口径、PM 批准；文件桌面UI 落）：失效 shell 卡按 2026-10-18
+  // 批准的「收起 + 原因可见/可追溯」语义——卡收起，原因留在 composer-hint（不保留旧的
+  // 「shown disabled」冲突期望）。
+  await check('expired old shell collapses with reason visible in its own runtime',`document.getElementById('shell-confirm').hidden&&document.getElementById('composer-hint').textContent.includes('原shell轮次已中止')`);
+  // C2 重锚的配套断言：卡已收起 ⇒ 不暴露任何可点的放行/关闭动作；Esc 也不产生回包。
+  const shellCount=shellResponses.length;await check('expired shell exposes no authorize action after collapse',`document.getElementById('shell-confirm').hidden&&!document.getElementById('sc-allow')&&!document.getElementById('sc-close')`);await key('Escape');await pause(30);assert.equal(shellResponses.length,shellCount,'expired shell cannot authorize and dismissal sends no response');
   await js(`document.querySelector('[data-request-id="pi-old-confirm"] .op-confirm').click()`);await pause(40);
   assert.equal(responses.length,responseCount,'late yes cannot respond after expiry');
   for(const [width,height] of [[1360,860],[960,620]]) {win.setContentSize(width,height);await pause(120);fs.writeFileSync(path.join(OUT,'runtime-groups-'+width+'.png'),(await win.webContents.capturePage()).toPNG());}
@@ -957,21 +969,21 @@ async function runtimeChecks() {
   reports.push({name:'runtime bridge targets',opens:opens.slice(-8),histories:histories.slice(-8),aborts:aborts.slice(-1),configSaves});
 }
 async function mirrorChecks() {
-  // W6-C（四角色评审 §6/§9）：四角色左树、Liaison 空态、决定卡镜像（同一请求 id 两侧呈现、只答一次）、
-  // 排队聚合。离线受控夹具；不启用模型/网络/凭据。
+  // W6-C（PM §15.2 五角色重锚）：五角色左树、Liaison 空态、决定卡镜像（同一请求 id 两侧呈现、
+  // 只答一次）、排队聚合。离线受控夹具；不启用模型/网络/凭据。
   const saved={roles:listing.roles,primary:listing.primaryRoleId,model:listing.governanceModel,record:listing.governanceRecord,warnings:listing.warnings};
   const govRole=(roleId,fn)=>({roleId,cardText:'# '+roleId,cardPath:'',boundary:{entries:[]},boundaryPath:'',builtIn:true,governanceFunction:fn,changelog:null,docs:[]});
-  listing.roles=[govRole('liaison','liaison'),govRole('rapporteur','proposal'),govRole('nominator','nomination'),govRole('convener','schedule'),{roleId:'A',cardText:'# A',cardPath:'',boundary:{entries:[]},changelog:null,docs:[]}];
+  listing.roles=[govRole('liaison','liaison'),govRole('rapporteur','proposal'),govRole('nominator','nomination'),govRole('convener','schedule'),govRole('verifier','verification'),{roleId:'A',cardText:'# A',cardPath:'',boundary:{entries:[]},changelog:null,docs:[]}];
   listing.primaryRoleId='liaison';listing.governanceModel='trio';listing.governanceRecord={state:'present'};listing.warnings=[];
-  await js(`await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)})`);
-  await check('W6-C four-role tree: Liaison primary; governance group exactly Rapporteur/Nominator/Convener', `(()=>{const t=document.getElementById('role-tree');const groups=[...t.querySelectorAll('.tree-group')].map(x=>x.textContent);const names=[...t.querySelectorAll('.ti-name')].map(x=>x.textContent);const primary=t.querySelector('.tree-item.primary[data-role-id="liaison"]');const gov=[...t.querySelectorAll('.tree-item.builtin:not(.primary)[data-role-id]')].map(x=>x.dataset.roleId);return groups.includes('主入口')&&groups.includes('治理职能（内置）')&&!!primary&&primary.querySelector('.ti-name').textContent==='联络官 Liaison'&&primary.querySelector('.ti-power').textContent==='客户沟通 · 不拥有最终批准权'&&primary.querySelector('.ti-builtin').textContent==='内置角色：随应用发布，无角色目录'&&gov.join(',')==='rapporteur,nominator,convener'&&names.includes('报告员 Rapporteur')&&names.includes('提名官 Nominator')&&names.includes('召集人 Convener')&&!t.textContent.includes('角色卡/liaison/');})()`);
-  await check('W6-C status line shows 三权 · 四角色', `document.getElementById('governance-status').textContent.includes('治理模型：三权 · 四角色')`);
-  await check('W6-C Liaison empty state explains customer entrance without self CTA', `(()=>{const e=document.querySelector('#chat .chat-empty');return !!e&&e.textContent.includes('客户默认入口')&&e.textContent.includes('再交给报告员形成提案')&&e.textContent.includes('我不写提案、不批准')&&!e.querySelector('#btn-start-primary');})()`);
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi')`);
+  await check('W6-C five-role tree: Liaison primary; governance group exactly Rapporteur/Nominator/Convener/Verifier', `(()=>{const t=document.getElementById('role-tree');const groups=[...t.querySelectorAll('.tree-group')].map(x=>x.textContent);const names=[...t.querySelectorAll('.ti-name')].map(x=>x.textContent);const primary=t.querySelector('.tree-item.primary[data-role-id="liaison"]');const gov=[...t.querySelectorAll('.tree-item.builtin:not(.primary)[data-role-id]')].map(x=>x.dataset.roleId);return groups.includes('主入口')&&groups.includes('治理职能（内置）')&&!!primary&&primary.querySelector('.ti-name').textContent==='主理 / Lead'&&primary.querySelector('.ti-power').textContent==='客户沟通 · 不拥有最终批准权'&&primary.querySelector('.ti-builtin').textContent==='内置角色：随应用发布，无角色目录'&&gov.join(',')==='rapporteur,nominator,convener,verifier'&&names.includes('报告员 / Rapporteur')&&names.includes('提名官 / Nominator')&&names.includes('召集人 / Convener')&&names.includes('验收 / Proof')&&!t.textContent.includes('角色卡/liaison/');})()`);
+  await check('W6-C status line shows 三权 · 五角色', `document.getElementById('governance-status').textContent.includes('治理模型：三权 · 五角色')`);
+  await check('W6-C Liaison empty state explains customer entrance without self CTA', `(()=>{const e=document.querySelector('#chat .chat-empty');return !!e&&e.textContent.includes('客户默认入口')&&e.textContent.includes('提案 Draft 形成提案')&&e.textContent.includes('我不写提案、不批准')&&!e.querySelector('#btn-start-primary');})()`);
   await js(`await window.__ansRenderer.selectRole('liaison')`);await pause(80);
   const request={id:'mirror-1',roleId:'rapporteur',projectRoot:ROOT,runtime:'pi',mirrorRoleId:'liaison',anchorKey:'mirror-anchor',request:{kind:'confirm',title:'镜像提案决定',cardKind:'proposal',flowId:'flow-mirror',summary:'提案 v1'}};
   const before=responses.length;
   await push('session:operator-request',request);
-  await check('W6-C mirror card rendered in Liaison with badge/source label and same request id', `(()=>{const c=document.querySelector('#chat .chat-pane[data-role-id="liaison"] [data-request-id="mirror-1"]');return !!c&&c.classList.contains('is-mirror')&&c.dataset.surfaceRoleId==='liaison'&&c.querySelector('.op-mirror-badge').textContent==='镜像 · 主入口'&&c.querySelector('.op-mirror-source').textContent==='来自 报告员 Rapporteur 的治理决定 · 客户最终批准'&&c.querySelector('.op-title').textContent==='镜像提案决定'&&c.querySelectorAll('.op-actions button').length===2;})()`);
+  await check('W6-C mirror card rendered in Liaison with badge/source label and same request id', `(()=>{const c=document.querySelector('#chat .chat-pane[data-role-id="liaison"] [data-request-id="mirror-1"]');return !!c&&c.classList.contains('is-mirror')&&c.dataset.surfaceRoleId==='liaison'&&c.querySelector('.op-mirror-badge').textContent==='镜像 · 主入口'&&c.querySelector('.op-mirror-source').textContent==='来自 报告员 / Rapporteur 的治理决定 · 客户最终批准'&&c.querySelector('.op-title').textContent==='镜像提案决定'&&c.querySelectorAll('.op-actions button').length===2;})()`);
   await js(`document.querySelector('#chat .chat-pane[data-role-id="liaison"] [data-request-id="mirror-1"] .op-confirm').click()`);await pause(110);
   assert.equal(responses.length,before+1,'mirror answer responds once');
   await check('W6-C answering mirror freezes the mirror face', `(()=>{const m=document.querySelector('#chat .chat-pane[data-role-id="liaison"] [data-request-id="mirror-1"]');return [...m.querySelectorAll('.op-actions button')].every(b=>b.disabled&&b.hidden)&&m.querySelector('.op-note').textContent==='已确认。';})()`);
@@ -1008,7 +1020,7 @@ async function mergeChecks() {
   await push('session:events',[live('pi','A','not-yet-stored','message','not stored yet')]);
   const rewritten=[row('prefix','assistant','inserted past history','message'),...older,...current];
   await history('pi','A',rewritten);
-  await check('full rebuild retains unpersisted live report settled and original pending card',`document.getElementById('chat').textContent.includes('not stored yet')&&document.getElementById('chat').textContent.includes('inserted past history')&&document.querySelector('[data-request-id="merge-confirm"]')===window.__mergeCard&&!window.__mergeCard.querySelector('.op-confirm').hidden&&[...document.querySelectorAll('#chat .sys-settled')].filter(x=>x.textContent.trim()==='current settled').length===1&&document.querySelectorAll('#chat .msg-handback').length===1`);
+  await check('full rebuild retains unpersisted live report settled and original pending card',`document.getElementById('chat').textContent.includes('not stored yet')&&document.getElementById('chat').textContent.includes('inserted past history')&&(()=>{const c=document.querySelector('[data-request-id="merge-confirm"]');return !!c&&c.dataset.state==='open'&&!c.querySelector('.op-confirm').hidden;})()&&[...document.querySelectorAll('#chat .sys-settled')].filter(x=>x.textContent.trim()==='current settled').length===1&&document.querySelectorAll('#chat .msg-handback').length===1`);
   const firstBeforeLive=row('history-first','assistant','history before live','message');
   await history('pi','A',[...rewritten,firstBeforeLive]);
   await push('session:events',[live('pi','A','history-first','message','history before live')]);
@@ -1032,7 +1044,7 @@ async function mergeChecks() {
   await history('pi','A',[...previous,row('manual-1','user','manual identical'),row('manual-2','user','manual identical')]);
   await push('session:events',[{...live('pi','A','manual-1','message','manual answer one'),clientMessageId:first.metadata.clientMessageId},{...live('pi','A','manual-2','message','manual answer two'),clientMessageId:second.metadata.clientMessageId}]);
   await check('history-before-correlated-live binds two identical optimistic inputs exactly once',`[...document.querySelectorAll('#chat .msg-user')].filter(x=>x.textContent.trim()==='manual identical').length===2&&document.getElementById('chat').textContent.includes('manual answer one')&&document.getElementById('chat').textContent.includes('manual answer two')`);
-  await check('repeated known-turn full rebuild keeps original unanchored pending card without borrowed token',`document.querySelector('[data-request-id="merge-confirm"]')===window.__mergeCard&&!window.__mergeCard.querySelector('.op-confirm').hidden`);
+  await check('repeated known-turn full rebuild keeps original unanchored pending card without borrowed token',`(()=>{const c=document.querySelector('[data-request-id="merge-confirm"]');return !!c&&c.dataset.state==='open'&&!c.querySelector('.op-confirm').hidden;})()`);
   sendQueued=false;mergeReplayAfterList=false;
   await js(`await window.__ansRenderer.selectRole('B')`);
   const anchored=parseSessionJsonl([{type:'session'},
@@ -1044,11 +1056,11 @@ async function mergeChecks() {
   await push('session:operator-request',payload('pi','B',{id:'legacy-decided',anchorKey:anchored[0].anchorKey,request:{kind:'confirm',title:'legacy decided anchor'}}));
   await js(`window.__legacyDecidedCard=document.querySelector('[data-request-id="legacy-decided"]');window.__legacyDecidedCard.querySelector('.op-deny').click()`);await pause(60);
   await history('pi','B',[{kind:'assistant',text:'legacy prefix',at:''},...anchored]);
-  await check('legacy decided full replay reuses original card between actual request and conclusion',`(()=>{let a=window.__ansRenderer.replayAnchorDebug('B').find(x=>x.anchorKey===${JSON.stringify('legacy-anchor-v1:511466706a245bf7206fd2e8526b54b52d58bd1454ffcb6969b3b3716afb5440')}),m=window.__ansRenderer.rowModelDebug('B'),card=document.querySelector('[data-request-id="legacy-decided"]'),op=m.operators.find(x=>x.requestId==='legacy-decided');return !!a&&card===window.__legacyDecidedCard&&op.index===a.requestIndex+1&&op.index<a.conclusionIndex&&card.querySelector('.op-confirm').hidden&&card.querySelector('.op-note').textContent.includes('不同意');})()`);
+  await check('legacy decided full replay reuses original card between actual request and conclusion',`(()=>{let a=window.__ansRenderer.replayAnchorDebug('B').find(x=>x.anchorKey===${JSON.stringify('legacy-anchor-v1:511466706a245bf7206fd2e8526b54b52d58bd1454ffcb6969b3b3716afb5440')}),m=window.__ansRenderer.rowModelDebug('B'),card=document.querySelector('[data-request-id="legacy-decided"]'),op=m.operators.find(x=>x.requestId==='legacy-decided');return !!a&&!!card&&card.dataset.state==='decided'&&op.index===a.requestIndex+1&&op.index<a.conclusionIndex&&card.querySelector('.op-confirm').hidden&&card.querySelector('.op-note').textContent.includes('不同意');})()`);
   await js(`await window.__ansRenderer.selectRole('A')`);
   await history('pi','B',[{kind:'assistant',text:'background legacy prefix',at:''},{kind:'assistant',text:'legacy prefix',at:''},...anchored]);
   await js(`await window.__ansRenderer.selectRole('B')`);
-  await check('background legacy rebuild keeps exact decided DOM and shifted anchor indices',`(()=>{let a=window.__ansRenderer.replayAnchorDebug('B').find(x=>x.anchorKey===${JSON.stringify('legacy-anchor-v1:511466706a245bf7206fd2e8526b54b52d58bd1454ffcb6969b3b3716afb5440')}),m=window.__ansRenderer.rowModelDebug('B'),op=m.operators.find(x=>x.requestId==='legacy-decided');return document.querySelector('[data-request-id="legacy-decided"]')===window.__legacyDecidedCard&&op.index===a.requestIndex+1&&a.conclusionIndex===op.index+1&&m.operators.length===1;})()`);
+  await check('background legacy rebuild keeps exact decided DOM and shifted anchor indices',`(()=>{let a=window.__ansRenderer.replayAnchorDebug('B').find(x=>x.anchorKey===${JSON.stringify('legacy-anchor-v1:511466706a245bf7206fd2e8526b54b52d58bd1454ffcb6969b3b3716afb5440')}),m=window.__ansRenderer.rowModelDebug('B'),op=m.operators.find(x=>x.requestId==='legacy-decided');return (()=>{const c=document.querySelector('[data-request-id="legacy-decided"]');return !!c&&c.dataset.state==='decided'&&op.index===a.requestIndex+1&&a.conclusionIndex===op.index+1&&m.operators.length===1;})();})()`);
 
   const legacy=[{kind:'assistant',text:'legacy identical',at:'1'},{kind:'assistant',text:'legacy identical',at:'2'}];
   await history('pi','B',legacy);await history('pi','B',legacy);
@@ -1305,7 +1317,7 @@ async function queueViewChecks(){
   const govRole=(roleId,fn)=>({roleId,cardText:'# '+roleId,cardPath:'',boundary:{entries:[]},boundaryPath:'',builtIn:true,governanceFunction:fn,changelog:null,docs:[]});
   listing.roles=[govRole('liaison','liaison'),govRole('rapporteur','proposal'),{roleId:'A',cardText:'# A',cardPath:'',boundary:{entries:[]},changelog:null,docs:[]}];
   listing.primaryRoleId='liaison';listing.governanceModel='trio';listing.governanceRecord={state:'present'};listing.warnings=[];
-  await js(`await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)})`);
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi')`);
   await js(`await window.__ansRenderer.selectRole('liaison')`);await pause(80);
   const queued=(id,title)=>({id,roleId:'rapporteur',projectRoot:ROOT,runtime:'pi',mirrorRoleId:'liaison',waitingFor:'mirror-1',request:{kind:'confirm',title,cardKind:'proposal'}});
   await push('session:operator-queued',queued('stale-q1','旧排队一'));
@@ -1328,7 +1340,7 @@ app.whenReady().then(async()=>{
  try {
   win=new BrowserWindow({width:1360,height:860,useContentSize:true,frame:false,show:INTERACTIVE,webPreferences:{preload:path.join(APP,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:false,backgroundThrottling:false}});
   win.webContents.on('console-message',event=>{if(event.level==='error')errors.push(event.message);});
-  await win.loadFile(path.join(APP,'renderer/index.html'));win.setTitle('ANS UI/UX 离线验收');await pause(150);
+  await win.loadFile(RENDERER_ENTRY);win.setTitle('ANS UI/UX 离线验收');await pause(150);
   if(GOVREACCEPT_ONLY){await governanceReacceptChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,previewCalls,reacceptCalls},null,2));console.log('GOVERNANCE_REACCEPT_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(GHOST_ONLY){await deliveryNoteChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({reports,errors},null,2));console.log('DELIVERY_NOTE_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(VISUAL_ONLY){await visualChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({reports,errors},null,2));console.log('VISUAL_V2_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
@@ -1446,7 +1458,7 @@ app.whenReady().then(async()=>{
   // 断言写成与设计无关的不变量：以**同一段正文元素**（row-120，组前紧邻行）为锚，四轮开合全程其相对
   // 聊天顶的偏移全程波动 <2px（展开后复位、无逐轮累积、不跳位）。修前该值逐轮 +2px 累积、约 5 轮后
   // 越过一行高度导致首可见行切换（fix/2026-10-14 记录里有 A/B 数据）。
-  const anchorInfo=()=>js(`(()=>{const c=document.getElementById('chat'),t=c.getBoundingClientRect().top;const n=[...c.querySelectorAll('.msg')].find(e=>e.textContent.startsWith('row-120 '));const r=n?n.getBoundingClientRect():null;const g=document.querySelector('#chat .tool-records');return {found:!!n,parented:!!(n&&n.parentNode&&n.parentNode.classList.contains('chat-pane')),offset:r?r.top-t:null,open:g?g.open:null,scrollTop:c.scrollTop};})()`);
+  const anchorInfo=()=>js(`(()=>{const c=document.getElementById('chat'),t=c.getBoundingClientRect().top;const n=[...c.querySelectorAll('.msg')].find(e=>e.textContent.startsWith('row-120 '));const r=n?n.getBoundingClientRect():null;const g=document.querySelector('#chat .tool-records');return {found:!!n,parented:!!(n&&n.closest&&n.closest('.chat-pane')),offset:r?r.top-t:null,open:g?g.open:null,scrollTop:c.scrollTop};})()`);
   async function toggleDrift(label,width,height){
     win.setContentSize(width,height);await pause(150);
     await js(`(()=>{const c=document.getElementById('chat'),n=document.querySelector('#chat .tool-records');n.open=true;c.scrollTop+=n.getBoundingClientRect().top-c.getBoundingClientRect().top-150;})()`);await pause(150);

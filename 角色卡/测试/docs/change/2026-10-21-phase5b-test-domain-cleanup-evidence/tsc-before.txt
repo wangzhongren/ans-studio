@@ -1,0 +1,4 @@
+npm warn Unknown user config "ELECTRON_MIRROR". This will stop working in the next major version of npm.
+npm warn Unknown user config "ELECTRON_BUILDER_BINARIES_MIRROR". This will stop working in the next major version of npm.
+test/测试/uiux-v2-replay-regression.test.ts(7,8): error TS2882: Cannot find module or type declarations for side-effect import of '../../app/renderer/tool-rows.js'.
+test/测试/uiux-v2-replay-regression.test.ts(8,8): error TS2882: Cannot find module or type declarations for side-effect import of '../../app/renderer/ui-labels.js'.

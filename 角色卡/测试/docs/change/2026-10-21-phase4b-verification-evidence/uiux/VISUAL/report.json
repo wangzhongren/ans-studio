@@ -1,0 +1,272 @@
+{
+  "reports": [
+    {
+      "name": "V2 ordinary chat stays ordinary before any structured report",
+      "value": true
+    },
+    {
+      "name": "V2 accepted structural positions and real window controls",
+      "value": true
+    },
+    {
+      "name": "V2 ordinary chat work overview has no invented report",
+      "value": true
+    },
+    {
+      "name": "V2 source report uses separate layered top and facts before primary source and full copy",
+      "value": true
+    },
+    {
+      "name": "V2 preview is deterministic real summary while complete safe copy is independently reachable",
+      "value": true
+    },
+    {
+      "name": "V2 report status unknown association redaction truncation omission and save facts remain visible",
+      "value": true
+    },
+    {
+      "name": "V2 report declaration alone cannot fold an active assistant message",
+      "value": true
+    },
+    {
+      "name": "V2 true settled folds only the exact report turn assistant original in place",
+      "value": true
+    },
+    {
+      "name": "V2 late exact turn reply follows settled rule and other turns remain ordinary",
+      "value": true
+    },
+    {
+      "name": "V2 task request folds only by exact structured report actual turn without reordering ordinary chat",
+      "value": true
+    },
+    {
+      "name": "V2 local state refresh preserves full report and original task expansion",
+      "value": true
+    },
+    {
+      "name": "V2 modal declares dialog and makes whole background inert",
+      "value": true
+    },
+    {
+      "name": "V2 document drawer matches 18px heading source block and outlined right reading action",
+      "value": true
+    },
+    {
+      "name": "V2 native window controls retain visible icons and real IPC while business background is inert",
+      "value": true
+    },
+    {
+      "name": "V2 Shift Tab wraps from first to last actual drawer control",
+      "value": true
+    },
+    {
+      "name": "V2 Tab wraps last to first without escaping modal",
+      "value": true
+    },
+    {
+      "name": "V2 background focus cannot escape into composer",
+      "value": true
+    },
+    {
+      "name": "V2 Escape restores actual visible report invoker draft and same chat reading",
+      "value": true
+    },
+    {
+      "name": "V2 measured geometry 1360",
+      "value": {
+        "nav": 248,
+        "pane": 900,
+        "capsule": 900,
+        "button": {
+          "x": 369,
+          "y": 449.640625,
+          "width": 114,
+          "height": 32,
+          "top": 449.640625,
+          "right": 483,
+          "bottom": 481.640625,
+          "left": 369
+        },
+        "composer": {
+          "x": 248,
+          "y": 734.203125,
+          "width": 1112,
+          "height": 125.796875,
+          "top": 734.203125,
+          "right": 1360,
+          "bottom": 860,
+          "left": 248
+        },
+        "root": 1360,
+        "innerWidth": 1360
+      }
+    },
+    {
+      "name": "V2 real geometry 1360",
+      "value": true
+    },
+    {
+      "name": "V2 dark theme: no visible light surfaces 1360",
+      "value": true
+    },
+    {
+      "name": "V2 modal width is 424 at 1360",
+      "value": true
+    },
+    {
+      "name": "V2 dark theme: no visible light surfaces in drawer 1360",
+      "value": true
+    },
+    {
+      "name": "V2 measured geometry 960",
+      "value": {
+        "nav": 248,
+        "pane": 664,
+        "capsule": 664,
+        "button": {
+          "x": 287,
+          "y": 458.234375,
+          "width": 114,
+          "height": 32,
+          "top": 458.234375,
+          "right": 401,
+          "bottom": 490.234375,
+          "left": 287
+        },
+        "composer": {
+          "x": 248,
+          "y": 738.203125,
+          "width": 712,
+          "height": 121.796875,
+          "top": 738.203125,
+          "right": 960,
+          "bottom": 860,
+          "left": 248
+        },
+        "root": 960,
+        "innerWidth": 960
+      }
+    },
+    {
+      "name": "V2 real geometry 960",
+      "value": true
+    },
+    {
+      "name": "V2 dark theme: no visible light surfaces 960",
+      "value": true
+    },
+    {
+      "name": "V2 modal width is 424 at 960",
+      "value": true
+    },
+    {
+      "name": "V2 dark theme: no visible light surfaces in drawer 960",
+      "value": true
+    },
+    {
+      "name": "V2 sidebar default width 248 and resizer aria",
+      "value": true
+    },
+    {
+      "name": "V2 sidebar double click resets 248",
+      "value": true
+    },
+    {
+      "name": "V2 sidebar keyboard shift right +24",
+      "value": true
+    },
+    {
+      "name": "V2 sidebar collapse preserves custom width",
+      "value": true
+    },
+    {
+      "name": "V2 sidebar collapsed geometry 1362",
+      "value": true
+    },
+    {
+      "name": "V2 sidebar expanded restored 1362",
+      "value": true
+    },
+    {
+      "name": "V2 sidebar collapsed geometry 1280",
+      "value": true
+    },
+    {
+      "name": "V2 sidebar expanded restored 1280",
+      "value": true
+    },
+    {
+      "name": "V2 sidebar collapsed geometry 960",
+      "value": true
+    },
+    {
+      "name": "V2 sidebar expanded restored 960",
+      "value": true
+    },
+    {
+      "name": "V2 cold exact report turn folds neutral original only and preserves explicit expansion",
+      "value": true
+    },
+    {
+      "name": "V2 received report shares layered safe report ordering with one separate batch receipt",
+      "value": true
+    },
+    {
+      "name": "V2 target batch facts use actual compact component typography spacing and boundaries",
+      "value": true
+    },
+    {
+      "name": "V2 independent work overview includes own and actual received structured reports",
+      "value": true
+    },
+    {
+      "name": "V2 work de-duplicates only real report identity while separate delivery attempts stay visible",
+      "value": true
+    },
+    {
+      "name": "SV13 distinct receiver turn streaming stays expanded",
+      "value": true
+    },
+    {
+      "name": "SV13 true settled receiver folds only exact assistant original",
+      "value": true
+    },
+    {
+      "name": "SV13 later receiver text folds preserving explicit expansion",
+      "value": true
+    },
+    {
+      "name": "SV13 cold receiver keeps neutral label flags expansion and unrelated legacy text",
+      "value": true
+    },
+    {
+      "name": "cold reports reverse hash wire becomes actual time old to new while tool row order remains",
+      "value": true
+    },
+    {
+      "name": "cold sorted report identities still deduplicate on repeated history snapshot",
+      "value": true
+    },
+    {
+      "name": "cold unknown report time preserves wire ordering without guessing",
+      "value": true
+    },
+    {
+      "name": "V2 import selects primary su and keeps it inside tree viewport",
+      "value": false
+    },
+    {
+      "name": "V2 import selects primary su and keeps it inside tree viewport observed",
+      "value": {
+        "chat": "开始与 su 对话点下方按钮开启会话；发送消息后，这里会显示对话与工具记录。开始与 su 对话",
+        "assistant": [],
+        "denied": [],
+        "model": null
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: V2 import selects primary su and keeps it inside tree viewport\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: V2 import selects primary su and keeps it inside tree viewport\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:60:474)\n    at async visualChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:528:2)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1339:19"
+}

@@ -1,0 +1,96 @@
+{
+  "reports": [
+    {
+      "name": "disabled combobox before import",
+      "value": true
+    },
+    {
+      "name": "disabled cannot open",
+      "value": true
+    },
+    {
+      "name": "empty folder enables custom selector with Claude default",
+      "value": true
+    },
+    {
+      "name": "Home browses first Pi without commit",
+      "value": true
+    },
+    {
+      "name": "Space commits Pi once with live missing entry",
+      "value": true
+    },
+    {
+      "name": "current Enter only closes",
+      "value": true
+    },
+    {
+      "name": "Home opens first and stops at top",
+      "value": true
+    },
+    {
+      "name": "Escape cancels and retains trigger focus",
+      "value": true
+    },
+    {
+      "name": "closed arrow opens current selected",
+      "value": true
+    },
+    {
+      "name": "End browses last Claude and stops at bottom without commit",
+      "value": true
+    },
+    {
+      "name": "Tab cancels naturally to accepted work overview without committing",
+      "value": true
+    },
+    {
+      "name": "missing settings remains naturally keyboard reachable after work and role actions",
+      "value": true
+    },
+    {
+      "name": "ShiftTab cancellation leaves natural previous target",
+      "value": true
+    },
+    {
+      "name": "outside pointer cancels without focus stealing",
+      "value": true
+    },
+    {
+      "name": "window blur closes without commit",
+      "value": true
+    },
+    {
+      "name": "hover moves temporary only and keeps selected check",
+      "value": true
+    },
+    {
+      "name": "option click commits Codex once",
+      "value": true
+    },
+    {
+      "name": "current click no business reread",
+      "value": true
+    },
+    {
+      "name": "programmatic runtime sync selected and label",
+      "value": true
+    },
+    {
+      "name": "selector dimensions and viewport 1360",
+      "value": false
+    },
+    {
+      "name": "selector dimensions and viewport 1360 observed",
+      "value": {
+        "chat": "项目尚未 bootstrap与  对话，让它把角色建出来；左树会随之长出。",
+        "assistant": [],
+        "denied": [],
+        "model": null
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: selector dimensions and viewport 1360\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: selector dimensions and viewport 1360\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:66:474)\n    at async selectorChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:838:167)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1353:21"
+}

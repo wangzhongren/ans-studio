@@ -1,0 +1,82 @@
+{
+  "stage": "final-after-checks",
+  "at": "2026-10-21T01:41:37.579430+00:00",
+  "head": "fc1a39c14e119faccf442fc8e22bbbbd978d1a04",
+  "candidate_reference": "candidate-final-before.json",
+  "checked_files": 558,
+  "changed_source_test_config_files": [
+    {
+      "path": "package-lock.json",
+      "before": "4a6713761db3ef8fdd29c73e952cb36827dce82824f80a0c7efa1072c4d1d669",
+      "after": "0fec87d759cc1571eb12bcfff2eec2a74784d0e0aeba5dd0be9c87535e12a9bf"
+    },
+    {
+      "path": "package.json",
+      "before": "3762e45ff897cf460fb1d7b5d5a93fd947e54f57ee7a8b72048c9242c57843e7",
+      "after": "3df6780bc901abab1d1ff54c892be42493159fcc20b8268c544e6c9cb6016d40"
+    },
+    {
+      "path": "tsconfig.json",
+      "before": "0a73fe1a9b9b98bc55e6801e8f8a386447c4bc61e6ae307341c70a93da459a73",
+      "after": "1515196e91ab505d8ba4144316e8ef90ec25f4427c53010ab9e3f95216ff5a7e"
+    }
+  ],
+  "new_source_test_config_files": [],
+  "commands": [
+    {
+      "command": "node --test test/测试/lightweight-permission-repairs.test.ts",
+      "log": "targeted-candidate.log",
+      "exit": 0,
+      "tests": 10,
+      "pass": 10,
+      "fail": 0,
+      "skip": 0
+    },
+    {
+      "command": "npm run typecheck",
+      "log": "typecheck-final-after-consumer.log",
+      "exit": 0
+    },
+    {
+      "command": "node --test \"test/**/*.test.ts\"",
+      "log": "full-sandbox.log",
+      "exit": 1,
+      "tests": 3398,
+      "pass": 3369,
+      "fail": 27,
+      "skip": 2,
+      "limitations": "26 listen EPERM + 1 old single-gate assertion, preserved before correction"
+    },
+    {
+      "command": "node --test \"test/**/*.test.ts\"",
+      "log": "full-loopback-enabled.log",
+      "exit": 0,
+      "tests": 3398,
+      "pass": 3396,
+      "fail": 0,
+      "skip": 2,
+      "environment": "local loopback allowed via reviewed escalation"
+    }
+  ],
+  "logs_sha256": {
+    "targeted-initial.log": "da0e0a890b9ef5796ae8ca493cb6cfe868b042eed0d1ce4cee64bdafcfc06da1",
+    "typecheck-final.log": "6540d00ab4c2c686b6351a1ac075f5272c5b7f7ea191645a2e091dc6962c08d8",
+    "full-sandbox.log": "5dea784902e06116b9391888c2e270886a51f191d264effddfdc9058435d176e",
+    "targeted-preparation.log": "daba61ab35e522951ff4f3ee66ba9c77f8f07587f980e8106b578dcc66999e89",
+    "typecheck-final-after-consumer.log": "6540d00ab4c2c686b6351a1ac075f5272c5b7f7ea191645a2e091dc6962c08d8",
+    "full-loopback-enabled.log": "f5c7b36b69f2b32b3c59cd35560e572f144511bc4f90fea57a5628f460104b86",
+    "targeted-candidate.log": "27bd20370fbbfcb2f77f24415ebde3e34ceb0d3b015e93a0f5b8d2bab15937a1",
+    "targeted-second.log": "2a6cef13d82af0fd98a9b22e7d5bc2635e21a4e43f5f1fa9468ae77bfab22d3d"
+  },
+  "platform_scope": "macOS Darwin arm64, Node v24.14.0, npm 11.9.0, rg 15.2.0",
+  "remaining_missing_evidence": [
+    "Windows native junction/execution/replacement; POSIX mode not asserted equivalent to Windows",
+    "No online-model execution or Electron/UI validation claimed"
+  ],
+  "own_mutations": [
+    "test/测试/lightweight-permission-repairs.test.ts",
+    "test/测试/t9-block2-write-landing.test.ts",
+    "角色卡/测试/docs/fix/2026-10-21_fix_d3-lightweight-verification.md",
+    "角色卡/测试/docs/fix/2026-10-21-d3-lightweight-verification-evidence/"
+  ]
+}

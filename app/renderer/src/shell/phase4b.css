@@ -1,0 +1,934 @@
+/*
+ * Phase 4B 新增样式（治理状态/预览、镜像/排队聚合、报告/交付回执、菜单状态、待确认 chip）。
+ * 由 ChatHeader.tsx 导入；不改 shell.css / phase4a.css。颜色/圆角/间距只引用 index.css 令牌，
+ * 不写裸色值；聊天热路径零动画。
+ */
+
+/* —— 治理状态行 / 迁移条 —— */
+.governance-status {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px var(--gutter);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+.governance-status[data-governance-state="pin-mismatch"] .gov-text,
+.governance-status[data-governance-state="invalid"] .gov-text {
+  color: var(--danger);
+}
+.gov-shield {
+  display: inline-flex;
+  color: var(--text-3);
+  flex: 0 0 auto;
+}
+.gov-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.gov-action {
+  flex: 0 0 auto;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--warning);
+  font-size: 11.5px;
+}
+.gov-action:hover:not(:disabled) {
+  background: var(--hover);
+}
+.gov-action:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.gov-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.governance-migration {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+  padding: 4px var(--gutter);
+  background: var(--warning-bg);
+  border-bottom: 1px solid var(--warning-border);
+  color: var(--warning);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+.gov-migration-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* —— 非模态治理预览面板（无 backdrop/无焦点陷阱）—— */
+.governance-preview {
+  flex: 0 0 auto;
+  margin: 6px var(--gutter) 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.7;
+  max-height: min(60vh, 520px);
+  overflow: auto;
+}
+.governance-preview[hidden] {
+  display: none;
+}
+.gp-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.gp-title {
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+}
+.gp-title:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.gp-mini {
+  flex: 0 0 auto;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 11px;
+}
+.gp-mini:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--foreground);
+}
+.gp-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+.gp-body p {
+  margin: 0;
+}
+.gp-label {
+  color: var(--text-2);
+}
+.gp-file {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.gp-warning {
+  color: var(--warning);
+}
+.gp-success {
+  color: var(--primary);
+}
+.gp-blocker {
+  color: var(--danger);
+}
+.gp-declare {
+  color: var(--text-2);
+}
+.gp-muted {
+  color: var(--text-3);
+}
+.gp-radios {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.gp-radios label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.gp-radios label.is-selected {
+  background: var(--selected);
+  border-color: var(--border-strong);
+  color: var(--foreground);
+}
+.gp-radios input {
+  margin: 0;
+  accent-color: var(--primary);
+}
+.gp-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.gp-primary {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-control);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 12px;
+}
+.gp-primary:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* —— 引擎菜单：208px 两行（名称 13 + 状态 10.5）—— */
+#runtime-options.engine-menu {
+  width: 208px;
+}
+.engine-menu .engine-option {
+  height: auto;
+  min-height: 40px;
+  padding: 5px 8px;
+  align-items: center;
+}
+.engine-option-main {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+.engine-option-status {
+  color: var(--text-3);
+  font-size: 10.5px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.engine-option-status.is-missing {
+  color: var(--warning);
+}
+.engine-option-status.is-configured {
+  color: var(--text-3);
+}
+.engine-option-status.is-unknown {
+  color: var(--text-3);
+}
+.engine-option-status.is-checking {
+  color: var(--text-3);
+}
+
+/* —— operator 卡：治理徽标 / 镜像 / 元信息 / 预览 / 排队 —— */
+.op-request.is-mirror {
+  border-color: var(--ring);
+  border-left: 2px solid var(--ring);
+  background: var(--card);
+}
+.op-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.op-gov-badge,
+.op-mirror-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-micro);
+  color: var(--warning);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.op-mirror-badge {
+  border-color: var(--ring);
+  color: var(--ring);
+}
+.op-mirror-source {
+  margin: 2px 0 4px;
+  color: var(--text-2);
+  font-size: 11.5px;
+}
+.op-meta {
+  margin: 2px 0 4px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+.op-meta p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.op-preview {
+  margin: 6px 0 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--background);
+}
+.op-preview > summary {
+  min-height: 32px;
+  padding: 6px 10px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.op-preview > summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.op-preview-body {
+  padding: 8px 10px;
+  max-width: 100%;
+  overflow-x: auto;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.op-preview-body table {
+  border-collapse: collapse;
+  max-width: 100%;
+}
+.op-preview-body th,
+.op-preview-body td {
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+}
+.op-queued {
+  margin: 6px 0 0;
+  color: var(--warning);
+  font-size: 11.5px;
+}
+.op-request[inert] .op-actions,
+.op-request[inert] .op-options {
+  visibility: hidden;
+}
+
+/* —— 主入口排队聚合行（不可聚焦/无按钮/无请求内容）—— */
+.op-queue-aggregate {
+  color: var(--warning);
+  font-size: 11.5px;
+}
+.op-queue-aggregate .sys-ico {
+  color: var(--warning);
+}
+
+/* —— 待确认 chip（sticky 尾部；同状态源）—— */
+#chat .op-chip {
+  position: sticky;
+  bottom: 8px;
+  align-self: flex-end;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--warning-border);
+  border-radius: 999px;
+  background: var(--popover);
+  color: var(--warning);
+  font-size: 11.5px;
+  box-shadow: var(--shadow-popover);
+  cursor: pointer;
+}
+#chat .op-chip[hidden] {
+  display: none;
+}
+#chat .op-chip:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.op-chip-text {
+  white-space: nowrap;
+}
+
+/* 关闭态抽屉：aria-hidden 的内容不可见（滑出动画结束后生效；深色主题扫描不留假亮面）。 */
+#right-drawer[aria-hidden="true"] {
+  visibility: hidden;
+  transition: visibility 0s linear 140ms;
+}
+/* 抽屉内 hidden 子树（如非当前 tab 的设置面板）：后代不参与可见性（UA 已 display:none）。 */
+.drawer [hidden] {
+  visibility: hidden;
+}
+
+/* —— 左树：五角色行不收缩（960 下由树自身滚动，行与行不重叠）—— */
+/* 5A：身份徽标从第三行移入 data/aria 后，9 角色在 1362 高恰好铺满；
+   保留 16px 底部呼吸位，使「树自身可滚动 + 最后一行不贴边」的既有交互仍成立。 */
+#role-tree {
+  padding-bottom: 16px;
+}
+#role-tree > .tree-group-block,
+#role-tree .tree-item {
+  flex: 0 0 auto;
+}
+#role-tree .ti-power,
+#role-tree .ti-builtin {
+  overflow-wrap: anywhere;
+}
+
+/* 5A：系统通知独立行（旧 styles.css 同款语义）；标记由徽标承载，正文用正文色。 */
+.sys-notice {
+  align-items: center;
+  padding: 2px 0;
+}
+.sys-notice .sys-ico {
+  color: var(--text-2);
+}
+.sys-notice .sys-notice-badge {
+  flex: 0 0 auto;
+  padding: 0 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.sys-notice .sys-text {
+  font-family: var(--sans);
+  color: var(--text);
+}
+
+/* 5A：统一工作转轮（Sidebar/loading/尾行共用 BusySpinner；Motion 0.9s，reduced-motion 静止）。
+   生产不使用 CSS keyframes；这里只锁 12px 图标盒。 */
+.status-spinner {
+  display: inline-flex;
+}
+.status-spinner svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+.sys-loading,
+.tool-current {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* —— 报告 facts：标签与值不粘连（冒号由伪元素提供，textContent 保持逐字）—— */
+.report-facts > div {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 4px;
+  row-gap: 2px;
+  min-width: 0;
+}
+.report-facts dt::after {
+  content: "：";
+}
+.report-facts dd {
+  overflow-wrap: anywhere;
+}
+/* 报告完整摘要/证据在卡内纵向滚动；横向不溢出（表格按局部横向滚动明确允许）。 */
+.report-complete-body,
+.hb-complete-summary,
+.hb-summary,
+.hb-evidence,
+.hb-evidence li {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.hb-complete-summary table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* —— 报告持久化 / 交付回执 —— */
+/* 来源文档子视图沿用 UIUX 18px 标题规格（4A 源文档基线；VISUAL 段检查钉住 18px）。 */
+#right-drawer #drawer-title {
+  font-size: 18px;
+}
+.persistence-state {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.report-facts .persistence-state {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.persistence-message:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.persistence-retry {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 11px;
+}
+.persistence-retry:hover {
+  background: var(--hover);
+  color: var(--foreground);
+}
+.persistence-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 11px;
+}
+.report-source-button {
+  flex: 0 0 auto;
+  height: 32px;
+  margin-right: auto;
+  padding: 0 10px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 11.5px;
+}
+.report-source-button:hover {
+  background: var(--hover);
+  color: var(--foreground);
+}
+.report-source-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.msg-delivery {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 12px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--background);
+  color: var(--text-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.msg-delivery > p {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.msg-delivery > .persistence-state {
+  padding: 0;
+}
+.report-facts.delivery-batch-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 24px;
+  margin: 0;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.delivery-batch-facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.delivery-batch-facts dt {
+  color: var(--text-3);
+  font-size: 11px;
+}
+.delivery-batch-facts dd {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.delivery-report {
+  min-width: 0;
+}
+.delivery-report .msg-handback,
+.delivery-report .msg-handback .report-top {
+  border-radius: var(--radius-control);
+}
+.safe-input-copy {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card);
+}
+.safe-input-copy > summary {
+  min-height: 32px;
+  padding: 6px 10px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.safe-input-copy pre {
+  margin: 0;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text-2);
+}
+.safe-input-copy .projection-flags {
+  padding: 0 10px;
+}
+
+/* —— task-request / reply-original 折叠 —— */
+.task-request,
+.reply-original {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card);
+}
+.task-request > summary,
+.reply-original > summary {
+  min-height: 32px;
+  padding: 6px 10px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.task-request > summary:focus-visible,
+.reply-original > summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.original-flags {
+  margin-left: 8px;
+}
+.task-request-body {
+  padding: 2px 10px 10px;
+}
+.task-request-body .msg,
+.task-request-body .msg-user,
+.task-request-body .msg-assistant {
+  max-width: 100%;
+  margin: 0;
+}
+
+/* —— 960 / 200%：facts 单列、菜单视口内收缩、无横向溢出 —— */
+@media (max-width: 1100px) {
+  .report-facts.delivery-batch-facts {
+    grid-template-columns: 1fr;
+  }
+  #runtime-options.engine-menu {
+    width: min(208px, calc(100vw - 16px));
+  }
+  .governance-preview {
+    max-height: min(50vh, 420px);
+  }
+}
+@media (max-width: 720px) {
+  .governance-status,
+  .governance-migration {
+    flex-wrap: wrap;
+  }
+  .report-facts {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .report-facts > div {
+    width: 100%;
+  }
+}
+
+/* —— 200%（窄 CSS 视口）：头部换行、内容列/抽屉不横溢 —— */
+@media (max-width: 680px) {
+  /* 左栏整体可滚动 + 树有可见高度：200% 下角色行不被 flex 压成 0。 */
+  .col-left {
+    overflow-y: auto;
+    overflow-x: hidden;
+    gap: 10px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  #role-tree {
+    flex: 0 0 auto;
+    min-height: 140px;
+  }
+  /* 缺配条/治理状态行换行：消息独占一行、动作另起一行，不出现窄条横滚。 */
+  .runtime-config-notice,
+  .governance-status,
+  .governance-migration {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    row-gap: 4px;
+  }
+  #runtime-config-message,
+  .gov-text,
+  .gov-migration-text {
+    flex: 1 1 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .runtime-config-settings,
+  .gov-action {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+  /* 200%：更窄的 gutter 使内容列可读；头部/提示条压缩垂直占用，提示全文与按钮在首屏内。 */
+  .col-mid.col-mid {
+    --gutter: 12px;
+    /* 200%：整列可纵向滚动；聊天保持可读高度，内容（报告/预览）可滚动到达。 */
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-padding-bottom: 104px;
+  }
+  /* 治理预览打开时输入区不粘底：预览是待决策内容，优先完整可读。 */
+  .col-mid:has(#governance-preview:not([hidden])) .composer {
+    position: static;
+  }
+  #chat.chat {
+    /* 200%：聊天自身滚动，composer 固定在首屏；长历史不得把输入区推出视口。 */
+    flex: 1 1 auto;
+    min-height: 240px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .col-mid .session-head {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  /* 200%：紧凑输入区（≤96 CSS）：底栏单行、折叠滚动范围/键盘提示；内容可滚到转轮上方。 */
+  .col-mid .composer {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    padding: 8px var(--gutter) 6px;
+  }
+  .col-mid .composer .composer-bottom {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .col-mid .composer .composer-scope,
+  .col-mid .composer .composer-scope-demo {
+    display: none;
+  }
+  /* 200%：底部说明与演示状态折叠（与键盘提示同属辅助文案），保证输入区 ≤96 CSS。 */
+  .col-mid .composer .compose-note {
+    display: none;
+  }
+  .col-mid .composer .composer-judge-status {
+    flex: 0 1 auto;
+    max-width: 96px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #chat.chat {
+    scroll-padding-bottom: 104px;
+    padding-bottom: 104px;
+  }
+  .col-mid .runtime-config-notice,
+  .col-mid .governance-status,
+  .col-mid .governance-migration {
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+  .chat-head .head-inner {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 6px;
+  }
+  .chat-head .session-identity {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .chat-head .session-actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+  .chat-head .engine-trigger {
+    max-width: 100%;
+  }
+  /* 200%：底栏保持单行（紧凑输入区）；滚动范围/键盘提示已折叠。 */
+  .composer-keyboard {
+    display: none;
+  }
+  .composer-actions {
+    margin-left: auto;
+  }
+  #right-drawer.drawer {
+    width: min(424px, 100vw);
+  }
+  .governance-preview {
+    margin-left: 12px;
+    margin-right: 12px;
+    max-width: calc(100vw - 24px);
+    overflow-wrap: anywhere;
+  }
+  #chat,
+  .chat-head,
+  .head-inner,
+  #right-body {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .msg-handback,
+  .msg-delivery,
+  .op-request,
+  .task-request,
+  .reply-original {
+    max-width: 100%;
+  }
+  /* 200%：工具行摘要可换行（时间/工具/目标/状态/错误不 nowrap 撑破 pane）。 */
+  .chat .tool-call-record > summary,
+  .chat .tool-records > summary,
+  .chat .tool-activity {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+  .chat .tool-call-record .tool-call-target,
+  .chat .tool-call-record .tool-call-status,
+  .chat .tool-call-record .tool-call-error,
+  .chat .tool-activity .activity-target {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .report-complete-body,
+  .hb-complete-summary,
+  .hb-summary,
+  .hb-evidence {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  /* 200%：报告动作纵向排列，来源按钮与完整摘要各占整行（不挤成竖排单字）。 */
+  .report-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .report-source-button {
+    width: 100%;
+    margin-right: 0;
+  }
+  .report-complete {
+    width: 100%;
+  }
+}
+
+/* 200% 更窄档（960×620 物理 / 480×310 CSS）：压缩头部与提示条，给内容列留可读高度。 */
+@media (max-width: 480px) {
+  .col-mid .session-head {
+    min-height: 44px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+  .chat-head .head-inner {
+    row-gap: 2px;
+  }
+  .chat-head .session-actions {
+    gap: 4px;
+  }
+  .chat-head .session-actions button {
+    padding-inline: 5px;
+    font-size: 11px;
+  }
+  .chat-role-sub {
+    display: none;
+  }
+  .chat-head .context-state {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .governance-status {
+    flex-wrap: nowrap;
+  }
+  .governance-status .gov-text {
+    flex: 1 1 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .governance-status .gov-action {
+    flex: 0 0 auto;
+  }
+  .chat-role {
+    font-size: 16px;
+  }
+  .col-mid .runtime-config-notice,
+  .col-mid .governance-status,
+  .col-mid .governance-migration {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  #chat.chat {
+    min-height: 200px;
+    padding-top: 8px;
+    scroll-padding-bottom: 104px;
+    padding-bottom: 104px;
+  }
+  .chat-empty {
+    gap: 0;
+  }
+  .chat-empty .empty-title {
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .chat-empty .empty-sub {
+    font-size: 11.5px;
+    line-height: 1.45;
+  }
+  .chat-empty .empty-icon {
+    display: none;
+  }
+  /* 480 CSS：审批/决策开关收成「复选框 + 单字」，完整文案保留在 title/aria-label，底栏不横溢。 */
+  .col-mid .composer .composer-bottom {
+    gap: 4px;
+  }
+  .col-mid .composer .composer-auto-approve span {
+    font-size: 0;
+  }
+  .col-mid .composer #auto-approve-label::after {
+    content: "审";
+    font-size: 10px;
+  }
+  .col-mid .composer #judge-decision-label::after {
+    content: "决";
+    font-size: 10px;
+  }
+}
+
+/* 5A 视觉审计 P2：注入盒固定 1.6 行高；错误/空态长文案不撑出中栏。 */
+.msg-injected .mi-body {
+  line-height: 1.6;
+}
+.chat-empty {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}

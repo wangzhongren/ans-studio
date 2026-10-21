@@ -1,0 +1,4 @@
+same-turn live then history only one response rejection and old history=true
+real project-changed refresh does not repeat current turn=true
+full rebuild retains unpersisted live report settled and original pending card=false
+full rebuild retains unpersisted live report settled and original pending card observed={"chat": "inserted past history\nold input\nold history retained\n任务请求原文current input\n本轮 1 个调用：read_file未记录read_filecurrent.md调用发起current rejection本轮角色回复原文（展开）current answer\nmerge pending card确认拒绝current rejectioncurrent.mdcurrent rejectioncurrent settlednot stored yet\n有 1 条待确认 · 定位", "assistant": ["inserted past history\n", "old history retained\n", "current answer\n", "not stored yet\n"], "denied": ["current rejectioncurrent.mdcurrent rejection"], "model": {"count": 11, "lastIndex": 10, "operators": [{"index": 7, "requestId": "merge-confirm"}], "rowGap": 16}}

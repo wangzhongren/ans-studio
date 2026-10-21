@@ -1,0 +1,531 @@
+{
+  "startedAt": "2026-10-21T02:12:35.590Z",
+  "versions": {
+    "electron": "44.7.0",
+    "chrome": "152.0.7977.130",
+    "node": "24.21.0",
+    "platform": "darwin"
+  },
+  "checks": [
+    {
+      "name": "ROOT_MOUNTED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "TITLEBAR_HEIGHT_36",
+      "value": true,
+      "detail": 36
+    },
+    {
+      "name": "CHAT_HEAD_HEIGHT_64",
+      "value": true,
+      "detail": 64
+    },
+    {
+      "name": "SIDEBAR_WIDTH_248",
+      "value": true,
+      "detail": 248
+    },
+    {
+      "name": "CONTENT_COLUMN_900",
+      "value": true,
+      "detail": {
+        "capsuleW": 900,
+        "headInnerW": 900
+      }
+    },
+    {
+      "name": "ROLE_TREE_5_DEMO_ROLES",
+      "value": true,
+      "detail": [
+        "demo-su",
+        "demo-product",
+        "demo-desktop-ui",
+        "demo-project",
+        "demo-test"
+      ]
+    },
+    {
+      "name": "SKELETON_HEADER_PARTS",
+      "value": true,
+      "detail": "产品"
+    },
+    {
+      "name": "CHAT_EMPTY_AND_PANE",
+      "value": true,
+      "detail": {
+        "paneRole": "demo-product"
+      }
+    },
+    {
+      "name": "COMPOSER_INPUT_PRESENT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SEND_DISABLED_HONESTLY",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "HALT_ATTACH_PLACEHOLDERS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SIDEBAR_FOOT_ENTRIES_DISABLED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DRIVER_PRESENT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DRIVER_UNIMPLEMENTED_DECLARED",
+      "value": true,
+      "detail": 20
+    },
+    {
+      "name": "DEMO_STATE_FLAGGED",
+      "value": true,
+      "detail": {
+        "demo": true,
+        "roleBusy": {
+          "demo-su": true,
+          "demo-product": false,
+          "demo-desktop-ui": false,
+          "demo-project": false,
+          "demo-test": false
+        },
+        "selectedRoleId": "demo-product",
+        "runtime": "claude"
+      }
+    },
+    {
+      "name": "PRELOAD_BRIDGE_AVAILABLE",
+      "value": true,
+      "detail": [
+        "function",
+        "function",
+        "function",
+        "function",
+        "function"
+      ]
+    },
+    {
+      "name": "WINDOW_BUTTONS_ENABLED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DARK_GRAPHITE_BG",
+      "value": true,
+      "detail": "rgb(20, 23, 26)"
+    },
+    {
+      "name": "CSP_NO_STYLE_TAGS_AT_RUNTIME",
+      "value": true,
+      "detail": 0
+    },
+    {
+      "name": "TITLEBAR_DRAG_REGION",
+      "value": true,
+      "detail": "drag"
+    },
+    {
+      "name": "RESIZER_ARIA_CONTRACT",
+      "value": true,
+      "detail": {
+        "role": "separator",
+        "now": "248",
+        "min": "208",
+        "max": "360"
+      }
+    },
+    {
+      "name": "SIDEBAR_DRAG_248_TO_328",
+      "value": true,
+      "detail": {
+        "before": 248,
+        "after": 328,
+        "aria": "328",
+        "stored": "328",
+        "settled": 328
+      }
+    },
+    {
+      "name": "SIDEBAR_DRAG_ARIA_AND_STORAGE",
+      "value": true,
+      "detail": {
+        "aria": "328",
+        "stored": "328"
+      }
+    },
+    {
+      "name": "SIDEBAR_DOUBLE_CLICK_RESET_248",
+      "value": true,
+      "detail": {
+        "width": 248,
+        "aria": "248",
+        "stored": "248"
+      }
+    },
+    {
+      "name": "SIDEBAR_KEYBOARD_STEP_24_AND_8",
+      "value": true,
+      "detail": {
+        "shifted": {
+          "width": 272,
+          "aria": "272"
+        },
+        "plain": 264,
+        "back": 272,
+        "stored": "272"
+      }
+    },
+    {
+      "name": "SIDEBAR_COLLAPSE",
+      "value": true,
+      "detail": {
+        "collapsedClass": true,
+        "sideWidth": 0,
+        "expandHidden": false,
+        "ariaExpand": "false",
+        "stored": "1"
+      }
+    },
+    {
+      "name": "SIDEBAR_EXPAND_KEEPS_WIDTH_272",
+      "value": true,
+      "detail": {
+        "collapsedClass": false,
+        "sideWidth": 272,
+        "stored": "0",
+        "widthStored": "272"
+      }
+    },
+    {
+      "name": "IME_COMPOSITION_ENTER_NOT_SENT",
+      "value": true,
+      "detail": {
+        "text": "你好",
+        "status": "演示骨架：发送、附件与自动判断均未接入业务。",
+        "prevented": false
+      }
+    },
+    {
+      "name": "IME_AFTER_COMPOSITION_ENTER_INTERCEPTED_HONEST",
+      "value": true,
+      "detail": {
+        "prevented": true,
+        "status": "演示：发送未接入业务，本条未发送。"
+      }
+    },
+    {
+      "name": "IME_KEYCODE_229_GUARD",
+      "value": true,
+      "detail": false
+    },
+    {
+      "name": "IME_ISCOMPOSING_GUARD",
+      "value": true,
+      "detail": false
+    },
+    {
+      "name": "SHIFT_ENTER_NOT_INTERCEPTED",
+      "value": true,
+      "detail": false
+    },
+    {
+      "name": "SEND_STILL_DISABLED_WITH_TEXT",
+      "value": true,
+      "detail": {
+        "text": "你好",
+        "sendDisabled": true
+      }
+    },
+    {
+      "name": "DRAWER_424_DIALOG_FOCUS",
+      "value": true,
+      "detail": {
+        "width": 424,
+        "role": "dialog",
+        "ariaModal": "true",
+        "ariaLabelledby": "drawer-title",
+        "drawerTitle": "角色资料",
+        "focusId": "drawer-close",
+        "body": true,
+        "isOpen": true
+      }
+    },
+    {
+      "name": "DRAWER_ESC_CLOSES_AND_RETURNS_FOCUS",
+      "value": true,
+      "detail": {
+        "removed": true,
+        "isOpen": false,
+        "focusId": "tab-card"
+      }
+    },
+    {
+      "name": "CONFIRM_CARD_640",
+      "value": true,
+      "detail": 640
+    },
+    {
+      "name": "CONFIRM_DEFAULT_FOCUS_DENY",
+      "value": true,
+      "detail": "sc-deny"
+    },
+    {
+      "name": "CONFIRM_COMMAND_VERBATIM",
+      "value": true,
+      "detail": "echo \"hello world\""
+    },
+    {
+      "name": "CONFIRM_OPEN_STATE_DEMO",
+      "value": true,
+      "detail": "demo-shell-confirm-1"
+    },
+    {
+      "name": "CONFIRM_ESC_CLOSES_AS_DENY",
+      "value": true,
+      "detail": {
+        "open": false,
+        "payload": {
+          "id": "demo-shell-confirm-1",
+          "command": "echo \"hello world\"",
+          "summary": "演示：发布验证需要读取构建产物，并写入校验记录。",
+          "reasonPlain": "演示：命中写盘规则——写入 release/verify.json。",
+          "reasonRaw": "写盘规则（demo）：release/verify.json",
+          "argvLines": [
+            "[\"node\",\"scripts/release-verify.mjs\",\"--source\",\"v1.4.0\"]"
+          ],
+          "cwd": "/demo/ans-runtime"
+        },
+        "lastDecision": "deny"
+      }
+    },
+    {
+      "name": "CONFIRM_ALLOW_IS_SEPARATE_PATH",
+      "value": true,
+      "detail": {
+        "open": false,
+        "payload": {
+          "id": "demo-shell-confirm-1",
+          "command": "node scripts/release-verify.mjs --source v1.4.0",
+          "summary": "演示：发布验证需要读取构建产物，并写入校验记录。",
+          "reasonPlain": "演示：命中写盘规则——写入 release/verify.json。",
+          "reasonRaw": "写盘规则（demo）：release/verify.json",
+          "argvLines": [
+            "[\"node\",\"scripts/release-verify.mjs\",\"--source\",\"v1.4.0\"]"
+          ],
+          "cwd": "/demo/ans-runtime"
+        },
+        "lastDecision": "allow"
+      }
+    },
+    {
+      "name": "PAGE_CSP_VIOLATIONS_ZERO",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "NO_CONSOLE_ERRORS",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "NO_CSP_OR_MODULE_CONSOLE_ERRORS",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "NO_DID_FAIL_LOAD",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "NO_PRELOAD_ERRORS",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "NO_RENDER_PROCESS_GONE",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "SCREENSHOT_CAPTURED",
+      "value": true,
+      "detail": {
+        "path": "/tmp/ans-p2-smoke-output/smoke-default.png",
+        "bytes": 93976
+      }
+    }
+  ],
+  "consoleMessages": [],
+  "didFailLoad": [],
+  "preloadErrors": [],
+  "renderGone": [],
+  "pageCspViolations": [],
+  "screenshot": {
+    "path": "/tmp/ans-p2-smoke-output/smoke-default.png",
+    "bytes": 93976
+  },
+  "skeleton": {
+    "titlebarH": 36,
+    "chatHeadH": 64,
+    "sidebarW": 248,
+    "capsuleW": 900,
+    "headInnerW": 900,
+    "roleCount": 5,
+    "roleIds": [
+      "demo-su",
+      "demo-product",
+      "demo-desktop-ui",
+      "demo-project",
+      "demo-test"
+    ],
+    "hasChatRole": true,
+    "chatRoleText": "产品",
+    "hasChatRoleSub": true,
+    "hasContextState": true,
+    "hasChat": true,
+    "chatState": "idle",
+    "hasEmpty": true,
+    "hasPane": true,
+    "paneRole": "demo-product",
+    "hasComposer": true,
+    "hasInput": true,
+    "sendDisabled": true,
+    "haltHidden": true,
+    "attachDisabled": true,
+    "projectName": "示例项目（演示数据）",
+    "projectPath": "/demo/ans-runtime",
+    "importDisabled": true,
+    "piDisabled": true,
+    "driver": "object",
+    "driverMethods": [
+      "composer",
+      "confirmDemo",
+      "drawer",
+      "openConfirmDemo",
+      "selectRole",
+      "selectRuntime",
+      "send",
+      "sidebar",
+      "state",
+      "unimplemented"
+    ],
+    "unimplementedCount": 20,
+    "sendDisabledFn": true,
+    "composerState": {
+      "text": "",
+      "sendDisabled": true
+    },
+    "demoState": {
+      "demo": true,
+      "roleBusy": {
+        "demo-su": true,
+        "demo-product": false,
+        "demo-desktop-ui": false,
+        "demo-project": false,
+        "demo-test": false
+      },
+      "selectedRoleId": "demo-product",
+      "runtime": "claude"
+    },
+    "desktopBridge": "object",
+    "bridgeMethods": [
+      "function",
+      "function",
+      "function",
+      "function",
+      "function"
+    ],
+    "winMinDisabled": false,
+    "winMaxDisabled": false,
+    "winCloseDisabled": false,
+    "titlebarNote": null,
+    "bodyBg": "rgb(20, 23, 26)",
+    "styleTagCount": 0,
+    "styleSheetCount": 1,
+    "dragRegion": "drag",
+    "ariaResizer": {
+      "role": "separator",
+      "now": "248",
+      "min": "208",
+      "max": "360"
+    },
+    "storage": {
+      "width": null,
+      "collapsed": null
+    }
+  },
+  "drag": {
+    "before": 248,
+    "after": 328,
+    "aria": "328",
+    "stored": "328",
+    "settled": 328
+  },
+  "ime": {
+    "initialStatus": "演示骨架：发送、附件与自动判断均未接入业务。",
+    "beforeComposition": {
+      "text": "你好",
+      "status": "演示骨架：发送、附件与自动判断均未接入业务。"
+    },
+    "duringComposition": {
+      "text": "你好",
+      "status": "演示骨架：发送、附件与自动判断均未接入业务。",
+      "prevented": false
+    },
+    "afterComposition": {
+      "text": "你好",
+      "status": "演示：发送未接入业务，本条未发送。"
+    },
+    "afterPrevented": true,
+    "k229Prevented": false,
+    "isComposingPrevented": false,
+    "shiftPrevented": false,
+    "driverState": {
+      "text": "你好",
+      "sendDisabled": true
+    },
+    "sendDisabled": true
+  },
+  "confirm": {
+    "width": 640,
+    "focusId": "sc-deny",
+    "commandText": "echo \"hello world\"",
+    "allowId": true,
+    "denyId": true,
+    "allowOutline": "group/button inline-flex shrink-0 items-center justify-center rounded-md border bg-clip-padding text-sm font-medium whitespace-nowrap transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 min-w-[88px]",
+    "state": {
+      "open": true,
+      "payload": {
+        "id": "demo-shell-confirm-1",
+        "command": "echo \"hello world\"",
+        "summary": "演示：发布验证需要读取构建产物，并写入校验记录。",
+        "reasonPlain": "演示：命中写盘规则——写入 release/verify.json。",
+        "reasonRaw": "写盘规则（demo）：release/verify.json",
+        "argvLines": [
+          "[\"node\",\"scripts/release-verify.mjs\",\"--source\",\"v1.4.0\"]"
+        ],
+        "cwd": "/demo/ans-runtime"
+      },
+      "lastDecision": null
+    },
+    "hasAlertDialog": true
+  },
+  "finishedAt": "2026-10-21T02:12:37.792Z",
+  "summary": {
+    "total": 48,
+    "passed": 48,
+    "failed": 0
+  }
+}

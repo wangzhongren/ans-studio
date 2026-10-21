@@ -1,0 +1,41 @@
+diff --git a/package.json b/package.json
+index 5ca88fc..8a6d898 100644
+--- a/package.json
++++ b/package.json
+@@ -19,6 +19,10 @@
+     "app": "electron app/main.ts",
+     "test:assembly": "node --test \"test/装配/**/*.test.ts\"",
+     "typecheck": "tsc --noEmit",
++    "typecheck:renderer": "tsc -p app/renderer/tsconfig.json",
++    "dev:renderer": "vite --config vite.config.ts",
++    "build:renderer": "vite build --config vite.config.ts",
++    "preview:renderer": "vite preview --config vite.config.ts",
+     "package": "electron-builder --config electron-builder.yml",
+     "release:prepare": "node src/common/装配/release-prepare.mjs",
+     "release:verify": "node src/common/装配/release-verify.mjs"
+@@ -34,8 +38,24 @@
+     "zod": "4.6.7"
+   },
+   "devDependencies": {
++    "@base-ui/react": "1.9.0",
++    "@tailwindcss/vite": "4.3.3",
++    "@types/react": "19.3.0",
++    "@types/react-dom": "19.3.0",
++    "@vitejs/plugin-react": "6.1.2",
++    "class-variance-authority": "0.7.1",
++    "clsx": "2.1.1",
+     "electron": "44.7.0",
+     "electron-builder": "26.15.3",
+-    "typescript": "^7.0.2"
++    "lucide-react": "1.60.0",
++    "motion": "14.4.0",
++    "react": "19.3.1",
++    "react-dom": "19.3.1",
++    "react-resizable-panels": "4.14.8",
++    "tailwind-merge": "3.7.0",
++    "tailwindcss": "4.3.3",
++    "typescript": "^7.0.2",
++    "vite": "8.3.4",
++    "zustand": "5.0.15"
+   }
+ }

@@ -1,0 +1,15 @@
+=== contract surface · engine row (row 8) ===
+| 8 | 引擎触发器 `#runtime-select/#runtime-options/#runtime-option-*` | 已满足（Phase 2b） | 自绘 `EngineSelect`：`role=combobox` / `aria-haspopup=listbox` / `aria-controls=runtime-options` / `aria-expanded` / `aria-activedescendant`；弹层 `role=listbox`；选项 `role=option` + `aria-selected` + `id=runtime-option-*` + `data-runtime`；↑↓/Home/End/Enter/Space/Esc/Tab；选择仅本地演示 | — |
+| 9 | 输入区 `#composer-capsule/#inp-message/#btn-send/#btn-halt/#btn-attach-image/#composer-scope/#composer-keyboard` | 部分 | id/布局/Enter/Shift+Enter/IME 组合保护已实现；发送禁用并如实标注；附件/停止/双开关禁用占位 | 3（发送/附件/停止）/4（双开关） |
+
+=== contract surface · Phase 2b note ===
+  - Phase 2b：`html.dark` 生效；`#sc-allow` 边界 `rgb(107,117,126)`（--input）；焦点环 2px solid `rgb(111,160,139)` + 3px offset；primary hover `rgb(127,178,155)` / active `rgb(94,143,122)`；Checkbox 选中 `rgb(196,161,95)`；引擎选择器 combobox/listbox/option ARIA 与键盘选择；49 项断言全 true、零 console/CSP/did-fail-load；
+
+=== implementation ARIA (from independent smoke) ===
+ENGINE_CLOSED_ARIA {"role":"combobox","haspopup":"listbox","controls":"runtime-options","expanded":"false","activedesc":null,"value":"claude","label":"会话引擎，当前 Claude","menuRole":"listbox","menuHidden":true}
+ENGINE_OPEN_LISTBOX_OPTIONS {"expanded":"true","activedesc":"runtime-option-claude","hidden":false,"menuRole":"listbox","optionCount":3,"options":[{"id":"runtime-option-pi","role":"option","selected":"false","runtime":"pi"},{"id":"runtime-option-codex","role":"option","selected":"false","runtime":"codex"},{"id":"runtime-option-claude","role":"option","selected":"true","runtime":"claude"}],"width":180,"direction":"down"}
+ENGINE_OPEN_ARIA_ACTIVEDESC "runtime-option-claude"
+ENGINE_KEYBOARD_BROWSE {"up":"runtime-option-codex","home":"runtime-option-pi","end":"runtime-option-claude"}
+ENGINE_KEYBOARD_SELECT {"runtime":"claude","value":"claude","label":"会话引擎，当前 Claude","expanded":"false","hidden":true,"active":"runtime-select","selectedClaude":"true"}
+ENGINE_ESC_CLOSES_AND_FOCUS_RETURNS {"expanded":"false","hidden":true,"active":"runtime-select","prevented":true}
+ENGINE_TAB_LEAVES_NATURALLY {"expanded":"false","hidden":true,"notPrevented":true}

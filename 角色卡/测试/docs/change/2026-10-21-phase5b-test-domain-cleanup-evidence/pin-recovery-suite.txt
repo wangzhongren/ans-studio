@@ -1,0 +1,19 @@
+✔ a 全部一致：inspect ok / listProject present / 无动作 / 预览 not-needed；零写入 (17.733958ms)
+✔ b 修改 1 个边界：mismatch 明细 1 条 modified；预览 ok/canConfirm/changed；预览前后零变化 (7.740208ms)
+✔ c 确认写入：completed；仅 .ans 与 manifest 变化；pin 路径/顺序/条数/roles/source 不变；留痕完整 (8.508917ms)
+✔ d 写入后重新加载：present；su accepted 且 parseError 空；确定性桩会话入口不再因 pin 抛错 (13.205291ms)
+✔ e 删除 1 个被 pin 文件：预览 canConfirm:false + missing blocker；写入 missing-file/precheck、零写入 (6.556042ms)
+✔ e2 AC3：2 个修改 + 1 个删除 → changed 3 条（2 modified + 1 missing）、canConfirm:false；写入 missing-file/precheck 零写入 (5.805542ms)
+✔ f 预览后再次修改文件：preview-stale / precheck、零写入 (5.761333ms)
+✔ g 预览后取消（不调用写入口）：零写入；状态仍 pin-mismatch (7.308542ms)
+✔ h .ans 缺失 → missing 且预览 no-record；.ans 不可解析 → invalid + invalid-record；均零写入 (6.430125ms)
+✔ i 坏 YAML / 空 Section 1 → unparseable-boundary、canConfirm:false、写入零副作用 (13.230208ms)
+✔ 公共出口：Pipeline 再导出与 Service 入口可调用（不依赖桌面进程） (5.411167ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 239.206625

@@ -1,0 +1,31 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "fixture: background pane has queue/status rows but no transcript",
+      "value": true
+    },
+    {
+      "name": "selecting background role shows history loading instead of blank",
+      "value": true
+    },
+    {
+      "name": "empty history removes loading and shows neutral busy placeholder",
+      "value": true
+    },
+    {
+      "name": "history replay removes placeholder and renders content",
+      "value": true
+    },
+    {
+      "name": "role with transcript shows neither loading nor placeholder",
+      "value": true
+    },
+    {
+      "name": "idle no-history role shows neutral placeholder instead of blank",
+      "value": true
+    }
+  ],
+  "errors": []
+}

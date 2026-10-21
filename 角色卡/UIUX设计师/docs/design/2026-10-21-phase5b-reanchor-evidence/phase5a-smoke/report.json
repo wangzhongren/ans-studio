@@ -1,0 +1,197 @@
+{
+  "entry": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/dist/src/index.html",
+  "checks": [
+    {
+      "name": "Sidebar identity is data/aria only; no visible ti-badge third line",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "primary row does not grow a duplicate third visible identity line",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "ti-count is the sole numeric badge",
+      "value": true,
+      "detail": {
+        "count": 1,
+        "text": "1",
+        "busy": true,
+        "allText": "主主理 / Lead1客户沟通 · 不拥有最终批准权Pi工作中内置角色：随应用发布，无角色目录"
+      }
+    },
+    {
+      "name": "P7 role tree shows 待选择 without a count suffix",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "P7 work overview separates choice from empty queue",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "P7 answered choice returns to real status",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "P7 answer posted exactly once",
+      "value": true,
+      "detail": [
+        {
+          "id": "phase5a-choice",
+          "decision": {
+            "kind": "choice",
+            "selected": [
+              "one"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "busy tail uses the same 12px status spinner at 0.9s",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "markdown external link opens externally without navigating window",
+      "value": true,
+      "detail": {
+        "linkInfo": {
+          "href": "https://example.com/x",
+          "rel": "noopener noreferrer",
+          "className": "md-link"
+        },
+        "before": "file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/dist/src/index.html",
+        "after": "file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/dist/src/index.html",
+        "navigations": [],
+        "openExternalCalls": [
+          {
+            "url": "https://example.com/x"
+          }
+        ]
+      }
+    },
+    {
+      "name": "markdown external link reports opened state without changing page",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "virtual long history is windowed before full replay",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "full replay preserves content identity 1360",
+      "value": true,
+      "detail": {
+        "before": {
+          "text": "row-125 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+          "offset": 15
+        },
+        "after": {
+          "text": "row-125 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+          "offset": 15
+        }
+      }
+    },
+    {
+      "name": "full replay preserves content identity 960",
+      "value": true,
+      "detail": {
+        "before": {
+          "text": "row-122 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+          "offset": -21
+        },
+        "after": {
+          "text": "row-122 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+          "offset": -21
+        }
+      }
+    },
+    {
+      "name": "sticky reader stays at bottom after full replay",
+      "value": true,
+      "detail": {
+        "before": {
+          "text": "row-219 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+          "offset": -25
+        },
+        "distance": 0
+      }
+    },
+    {
+      "name": "200% identity/P7 visible without horizontal overflow",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "200% long history keeps composer reachable and chat internally scrollable",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "chatClient": 240,
+        "chatScroll": 19396,
+        "overflowY": "auto",
+        "composer": {
+          "top": 255.40625,
+          "bottom": 430,
+          "height": 174.59375
+        },
+        "innerHeight": 430,
+        "bodyScrollW": 680,
+        "innerWidth": 680
+      }
+    },
+    {
+      "name": "200% empty/error state has no horizontal overflow and composer reachable",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "mid": {
+          "left": 248,
+          "right": 680,
+          "scrollW": 422,
+          "clientW": 422
+        },
+        "empty": {
+          "left": 284,
+          "right": 634
+        },
+        "composer": {
+          "top": 291.40625,
+          "bottom": 430
+        },
+        "innerHeight": 430
+      }
+    },
+    {
+      "name": "no console errors",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "no CSP violations",
+      "value": true,
+      "detail": []
+    }
+  ],
+  "console": [],
+  "csp": [],
+  "screenshots": [
+    "01-sidebar-identity-1360.png",
+    "02-p7-pending-choice-1360.png",
+    "03-full-replay-1360.png",
+    "03-full-replay-960.png",
+    "04-full-replay-sticky-960.png",
+    "05-sidebar-p7-200pct.png",
+    "06-empty-state-200pct.png"
+  ],
+  "failures": 0,
+  "finished": true,
+  "at": "2026-10-21T11:23:14.050Z"
+}

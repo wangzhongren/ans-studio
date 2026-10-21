@@ -1,0 +1,37 @@
+=== old renderer core / main / preload vs HEAD ===
+UNCHANGED app/renderer/index.html
+UNCHANGED app/renderer/renderer.js
+UNCHANGED app/renderer/styles.css
+UNCHANGED app/renderer/tool-rows.js
+UNCHANGED app/renderer/role-status.js
+UNCHANGED app/renderer/runtime-ui.js
+UNCHANGED app/renderer/ui-labels.js
+UNCHANGED app/renderer/engine-selector.js
+UNCHANGED app/main.ts
+UNCHANGED app/preload.cjs
+
+=== e2e diffs (should be target switch only, 4 lines each) ===
+--- test/桌面应用/e2e/uiux-v2.mjs
++// Phase 3A：目标切换（默认旧入口；新入口用 ANS_RENDERER_ENTRY 指向构建产物）。
++const RENDERER_ENTRY=process.env.ANS_RENDERER_ENTRY||path.join(APP,'renderer/index.html');
+-  await win.loadFile(path.join(APP,'renderer/index.html'));win.setTitle('ANS UI/UX 离线验收');await pause(150);
++  await win.loadFile(RENDERER_ENTRY);win.setTitle('ANS UI/UX 离线验收');await pause(150);
+--- test/桌面应用/e2e/ime-enter.mjs
++// Phase 3A：目标切换（默认旧入口；新入口用 ANS_RENDERER_ENTRY 指向构建产物）。
++const RENDERER_ENTRY = process.env.ANS_RENDERER_ENTRY || path.join(APP_DIR, "renderer", "index.html");
+-    await win.loadFile(path.join(APP_DIR, "renderer", "index.html"));
++    await win.loadFile(RENDERER_ENTRY);
+--- test/桌面应用/e2e/bench-storm.mjs
++// Phase 3A：目标切换（默认旧入口；新入口用 ANS_RENDERER_ENTRY 指向构建产物）。
++const RENDERER_ENTRY = process.env.ANS_RENDERER_ENTRY || path.join(RENDERER_DIR, "index.html");
+-  await win.loadFile(path.join(RENDERER_DIR, "index.html"));
++  await win.loadFile(RENDERER_ENTRY);
+
+=== app/ and test/桌面UI status ===
+ M app/renderer/markdown.js
+ M app/renderer/vendor/README.md
+ M app/renderer/vendor/markdown-it.umd.min.js
+?? app/renderer/components.json
+?? app/renderer/src/
+?? app/renderer/tsconfig.json
+?? "test/\346\241\214\351\235\242UI/"

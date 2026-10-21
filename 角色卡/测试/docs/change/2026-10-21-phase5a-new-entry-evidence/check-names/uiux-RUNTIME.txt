@@ -1,0 +1,17 @@
+runtime groups lead first and unknown metadata escaped=true
+new engine no Pi history queue confirmation or draft=true
+old engine envelopes cache only and stale project ignored=true
+actual Codex call/result target correlation and completion=true
+Codex secret fallback and optional official Responses settings=true
+failed save keeps draft and honest error=true
+saved secret cleared and busy apply timing truthful=true
+runtime settings geometry 1360=true
+runtime settings geometry 960=true
+Claude required key and optional SDK model endpoint=true
+failed outcome remains error=true
+failed native restore honest rebuilding notice=true
+foreign runtime shell caches without showing in current engine=true
+Pi own history background queue draft and expired card restored=true
+expired old shell collapses with reason visible in its own runtime=true
+expired shell exposes no authorize action after collapse=true
+runtime bridge targets=null

@@ -23,6 +23,55 @@ const rules = defaultShellRules();
 // 用于验证 §7.10 的耦合——一旦执行层改回 shell 字符串/shell:true，元字符规则**必须恢复**。
 const shellStringRules: ShellRules = { ...defaultShellRules(), executionModel: "shell-string" };
 
+test("D3：显式程序路径和脚本后缀只将原只读 allow 降为 review", () => {
+  for (const token of ["./cat", "tools/cat", "/tmp/cat", "/bin/cat", "'.\\cat'", '"./cat"',
+    "C:\\tools\\cat.exe", "C:/tools/cat.exe", "C:cat.exe", "\\\\server\\share\\cat.exe",
+    "cat.cmd", "cat.bat", "cat.ps1", "CAT.PS1"]) {
+    assert.equal(classifyShell([token, "data.txt"], rules), "review", token);
+  }
+  assert.equal(classifyShellDetailed(["./cat", "data.txt"], rules).ruleId, "review:explicit-program");
+  assert.equal(classifyShell(["powershell.ps1", "-NoProfile", "-Command", "Test-Path 'x'"], rules), "review");
+  assert.equal(classifyShell(["cmd.bat", "/c", "dir"], rules), "review");
+});
+
+test("D3：保留裸读取命令、exe、既有窄re-shell及原deny/risky", () => {
+  for (const argv of [["cat", "data.txt"], ["cat.exe", "data.txt"], ["ls", "-la"],
+    ["rg", "pattern", "src"], ["rg.exe", "pattern", "src"], ["git", "status"], ["git", "log", "-1"],
+    ["cmd.exe", "/c", "dir"]]) {
+    assert.equal(classifyShell(argv, rules), "allow", argv.join(" "));
+  }
+  for (const argv of [["./sh", "-c", "anything"], ["node.ps1", "-e", "anything"],
+    ["C:\\Windows\\System32\\cmd.exe", "/c", "dir"]]) {
+    assert.equal(classifyShell(argv, rules), "deny", argv.join(" "));
+  }
+  for (const argv of [["./rm", "file"], ["rm.cmd", "file"], ["./git", "checkout", "main"]]) {
+    assert.equal(classifyShell(argv, rules), "risky", argv.join(" "));
+  }
+});
+
+test("D3：rg显式预处理选项在位置参数前后均为review", () => {
+  for (const args of [["--pre", "helper", "pattern", "file"], ["--pre=helper", "pattern", "file"],
+    ["pattern", "--pre", "helper", "file"], ["--regexp", "--pre", "--pre=helper", "file"],
+    ["-ne", "--pre", "--pre", "helper", "file"], ["--glob=*.ts", "--pre=helper", "pattern"],
+    ["--pre"], ["--pre="]]) {
+    const detail = classifyShellDetailed(["rg", ...args], rules);
+    assert.equal(detail.decision, "review", args.join(" "));
+    assert.equal(detail.ruleId, "review:rg-preprocessor");
+  }
+});
+
+test("D3：rg模式、选项值及--后的文件名不是预处理选项", () => {
+  for (const args of [["--", "--pre", "file"], ["pattern", "--", "--pre=helper"],
+    ["-e", "--pre", "file"], ["--regexp", "--pre=helper", "file"], ["--regexp=--pre", "file"],
+    ["-e--pre", "file"], ["-ne", "--pre", "file"], ["-ne--pre", "file"],
+    ["--glob", "--pre", "pattern", "file"], ["-g--pre", "pattern", "file"],
+    ["--pre-glob", "--pre", "pattern", "file"], ["-r", "--pre", "pattern", "file"],
+    ["--regexp", "--", "--", "--pre"], ["text--pre=text", "file"],
+    ["--glob", "*.ts", "--regexp", "a--pre", "--", "--pre"]]) {
+    assert.equal(classifyShell(["rg", ...args], rules), "allow", args.join(" "));
+  }
+});
+
 // 缺省执行模型（省略 executionModel）：应走**最保守**处理——假定 shell 会解释 ⇒ 元字符生效。
 const { executionModel: _omitModel, ...legacyRules } = defaultShellRules();
 const noModelRules = legacyRules as ShellRules;

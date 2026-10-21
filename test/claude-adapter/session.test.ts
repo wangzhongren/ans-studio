@@ -922,8 +922,10 @@ test("web search capability bit off (default/explicit): tools/allowedTools keep 
     const reading = collect(session, 1);
     await session.prompt(`off ${String(value)}`);
     const rows = await reading;
-    assert.deepEqual(rows.map((row) => row.kind), ["denied", "settled"]);
-    assert.equal((rows[0]!.detail as { toolName?: string }).toolName, "WebSearch");
+    assert.deepEqual(rows.map((row) => row.kind), ["message", "denied", "settled"]);
+    assert.equal((rows[0]!.detail as { source?: string; state?: string }).source, "system");
+    assert.equal((rows[0]!.detail as { state?: string }).state, "configured");
+    assert.equal((rows[1]!.detail as { toolName?: string }).toolName, "WebSearch");
     await session.dispose();
   }
 }));
@@ -1284,39 +1286,151 @@ test("thinking frames produce raw reasoning facts (complete/omitted), never adap
   await session.dispose();
 }));
 
-test("reasoning rejection degrades exactly once: engine rebuilds without reasoning options, same input repushed, later turns stay paramless", async () => fixture(async (root) => {
-  const engine = fake(async (_client, _config, _user, queryIndex) => {
-    if (queryIndex === 0) return { fail: true, resultText: "API Error: 400 fixture gateway rejects effort on this endpoint" };
-    return undefined;
-  });
-  const session = await createClaudeRuntimeAdapter({ ...options(root, [probeTool()]), reasoningEffort: "high" }, engine.dependencies).bindRole(role);
-  const reading = collect(session, 2);
-  await session.prompt("first with reasoning");
-  await session.prompt("second turn");
-  const rows = await reading;
-  assert.equal(engine.configurations.length, 2);
-  assert.equal(engine.configurations[0]!.effort, "high");
-  assert.equal("effort" in engine.configurations[1]!, false);
-  assert.equal("thinking" in engine.configurations[1]!, false);
-  assert.equal(rows.some((row) => row.kind === "message" && row.summary.includes("网关不支持推理参数")), true);
-  assert.deepEqual(rows.filter((row) => row.kind === "settled").map((row) => (row.detail as { outcome: string }).outcome), ["completed", "completed"]);
-  // The failed attempt and the retry pushed the same input byte-identically (same wire uuid).
-  assert.equal(engine.users.length, 3);
-  assert.equal(JSON.stringify(engine.users[0]!.message), JSON.stringify(engine.users[1]!.message));
-  assert.equal(engine.users[0]!.uuid, engine.users[1]!.uuid);
-  await session.dispose();
+const reasoningState = (row: SessionEvent) => (row.detail as { source?: string; state?: string } | undefined)?.source === "system" ? (row.detail as { state?: string }).state : undefined;
+const reasoningRejected = "API Error: 400 fixture gateway rejects effort on this endpoint";
+
+test("reasoning compatibility completes the task, uses child-only env, and is confirmed only after success", async () => fixture(async (root) => {
+  const originalEnv = { effort: process.env.CLAUDE_CODE_EFFORT_LEVEL, thinking: process.env.CLAUDE_CODE_DISABLE_THINKING };
+  for (const configured of [undefined, "off", "low"] as const) {
+    const engine = fake(async (_client, _config, _user, queryIndex) => queryIndex === 0 ? {
+      fail: true, resultText: reasoningRejected,
+      frames: [{ type: "assistant", error: "invalid_request", message: { content: [{type: "text", text: reasoningRejected}] } } as SDKMessage],
+    } : undefined);
+    const providerOptions = { ...options(root, [probeTool()]), reasoningEffort: configured };
+    const session = await createClaudeRuntimeAdapter(providerOptions, engine.dependencies).bindRole(role);
+    const reading = collect(session, 2);
+    await session.prompt("first with reasoning");
+    await session.prompt("second turn");
+    const rows = await reading;
+    assert.equal(engine.configurations.length, 2);
+    const compatible = engine.configurations[1]!;
+    assert.equal("effort" in compatible, false);
+    assert.equal("thinking" in compatible, false);
+    assert.equal(compatible.env!.CLAUDE_CODE_EFFORT_LEVEL, "unset");
+    assert.equal(compatible.env!.CLAUDE_CODE_DISABLE_THINKING, "1");
+    assert.equal(engine.configurations[0]!.env!.CLAUDE_CODE_EFFORT_LEVEL, undefined);
+    assert.equal(providerOptions.reasoningEffort, configured);
+    assert.deepEqual(rows.map(reasoningState).filter(Boolean), ["configured", "request-error", "trying", "compatible"]);
+    assert.ok(rows.findIndex(row => reasoningState(row) === "compatible") < rows.findIndex(row => row.kind === "settled"));
+    assert.deepEqual(rows.filter(row => row.kind === "settled").map(row => (row.detail as {outcome:string}).outcome), ["completed", "completed"]);
+    assert.equal(rows.some(row => row.summary.includes("API Error")), false);
+    assert.equal(engine.users.length, 3);
+    assert.deepEqual(engine.users[0]!.message, engine.users[1]!.message);
+    assert.equal(engine.users[0]!.uuid, engine.users[1]!.uuid);
+    await session.dispose();
+    // Rebuilding the adapter re-applies the saved choice rather than inheriting compatibility.
+    const fresh = fake(async () => undefined);
+    const freshSession = await createClaudeRuntimeAdapter(providerOptions, fresh.dependencies).bindRole(role);
+    await freshSession.prompt("new session");
+    assert.equal(fresh.configurations[0]!.env!.CLAUDE_CODE_EFFORT_LEVEL, undefined);
+    if (configured === "low") assert.equal(fresh.configurations[0]!.effort, "low");
+    if (configured === "off") assert.deepEqual(fresh.configurations[0]!.thinking, {type: "disabled"});
+    await freshSession.dispose();
+  }
+  assert.deepEqual({effort: process.env.CLAUDE_CODE_EFFORT_LEVEL, thinking: process.env.CLAUDE_CODE_DISABLE_THINKING}, originalEnv);
 }));
 
-test("unrecognized failures never trigger the reasoning retry (5xx, and 4xx without a reasoning token)", async () => fixture(async (root) => {
-  for (const resultText of ["API Error: 500 fixture gateway rejects thinking on this endpoint", "API Error: 400 plain rate limit exceeded"]) {
-    const engine = fake(async () => ({ fail: true, resultText }));
+test("only explicit parameter rejections enable reasoning compatibility", async () => fixture(async (root) => {
+  const cases: Array<[string, boolean]> = [
+    [reasoningRejected, true],
+    ['API Error: 422 {"error":{"type":"invalid_request_error","param":"output_config.effort","message":"invalid value"}}', true],
+    ['API Error: 400 {"error":{"type":"invalid_request_error","message":"thinking is not supported"}}', true],
+    ['API Error: 400 {"error":{"type":"invalid_request_error","param":null,"message":"unsupported parameter: thinking"}}', true],
+    ['API Error: 400 {"error":{"type":"invalid_request_error","param":"model","message":"unsupported effort for model"}}', false],
+    ['API Error: 400 {"error":{"type":"authentication_error","param":"effort","message":"unsupported effort"}}', false],
+    ["API Error: 400 unknown model named effort", false],
+    ["API Error: 400 model is not supported for effort", false],
+    ["API Error: 400 invalid request while processing effort", false],
+    ["API Error: 400 unsupported output_config.format", false],
+    ["API Error: 400 plain rate limit exceeded", false],
+    ...[401, 403, 408, 429, 500, 503].map(status => [`API Error: ${status} unsupported effort`, false] as [string, boolean]),
+    ["network connection reset: unsupported thinking", false],
+  ];
+  for (const [resultText, expected] of cases) {
+    const engine = fake(async (_client, _config, _user, index) => index === 0 ? { fail: true, resultText } : undefined);
     const session = await createClaudeRuntimeAdapter({ ...options(root, [probeTool()]), reasoningEffort: "low" }, engine.dependencies).bindRole(role);
     const reading = collect(session, 1);
-    await assert.rejects(session.prompt("boom"), /失败/);
+    if (expected) await session.prompt("one input");
+    else await assert.rejects(session.prompt("one input"), /失败/);
     const rows = await reading;
-    assert.equal(engine.configurations.length, 1, resultText);
-    assert.equal(rows.some((row) => row.kind === "message" && row.summary.includes("网关不支持推理参数")), false, resultText);
-    assert.equal((rows.filter((row) => row.kind === "settled").at(-1)!.detail as { outcome: string }).outcome, "failed");
+    assert.equal(engine.configurations.length, expected ? 2 : 1, resultText);
+    assert.equal(rows.some(row => reasoningState(row) === "trying"), expected, resultText);
+    assert.equal((rows.find(row => row.kind === "settled")!.detail as {outcome:string}).outcome, expected ? "completed" : "failed");
+    await session.dispose();
+  }
+}));
+
+test("failed or cancelled compatibility does not change the next turn's original request", async () => fixture(async (root) => {
+  for (const mode of ["failure", "cancel", "timeout"] as const) {
+    let compatibilityStarted!: () => void;
+    const started = new Promise<void>(resolve => { compatibilityStarted = resolve; });
+    const engine = fake(async (_client, config, _user, index) => {
+      if (index === 0) return { fail: true, resultText: reasoningRejected };
+      if (index === 1) {
+        compatibilityStarted();
+        if (mode === "failure") return {fail: true, resultText: "API Error: 500 fixture ordinary outage"};
+        await new Promise<void>(resolve => config.abortController!.signal.addEventListener("abort", () => resolve(), {once:true}));
+      }
+      return undefined;
+    });
+    const session = await createClaudeRuntimeAdapter({ ...options(root, [probeTool()]), reasoningEffort: "low", turnLastResortMs: mode === "timeout" ? 80 : 1000 }, engine.dependencies).bindRole(role);
+    const reading = collect(session, 2);
+    const first = session.prompt("first input");
+    const firstRejected = assert.rejects(first);
+    await started;
+    if (mode === "cancel") await session.abort!();
+    await firstRejected;
+    await session.prompt("next input");
+    const rows = await reading;
+    assert.equal(engine.configurations.length, 3, mode);
+    assert.equal(engine.configurations[2]!.effort, "low", mode);
+    assert.equal(engine.configurations[2]!.env!.CLAUDE_CODE_EFFORT_LEVEL, undefined, mode);
+    assert.equal(engine.configurations[2]!.env!.CLAUDE_CODE_DISABLE_THINKING, undefined, mode);
+    assert.equal(rows.some(row => reasoningState(row) === "compatible"), false, mode);
+    const expectedOutcome = { failure: "failed", cancel: "aborted", timeout: "timed_out" }[mode];
+    assert.deepEqual(rows.filter(row => row.kind === "settled").map(row => (row.detail as { outcome: string }).outcome), [expectedOutcome, "completed"]);
+    await session.dispose();
+  }
+}));
+
+test("normal output and tool start forbid whole-turn reasoning replay", async () => fixture(async (root) => {
+  for (const progress of ["text", "thinking", "ans", "ans-allowed", "mcp-started", "websearch-started"] as const) {
+    let calls = 0;
+    const engine = fake(async (client, config, user) => {
+      let frames: SDKMessage[] | undefined;
+      if (progress === "text" || progress === "thinking") {
+        const block = progress === "text"
+          ? { type: "text", text: "real partial answer" }
+          : { type: "thinking", thinking: "real partial reasoning", signature: "fixture" };
+        frames = [{ type: "assistant", message: { content: [block] } } as SDKMessage];
+      } else if (progress === "ans") {
+        await client.callTool({ name: "probe", arguments: {} });
+      } else {
+        const toolNames = { "ans-allowed": "mcp__ans__probe", "mcp-started": "mcp__external__probe", "websearch-started": "WebSearch" };
+        const servers = { "ans-allowed": { name: "ans", source: "sdk" }, "mcp-started": { name: "external", source: "dynamic" }, "websearch-started": undefined };
+        const hook = config.hooks!.PreToolUse![0]!.hooks[0]!;
+        const result = await hook({
+          hook_event_name: "PreToolUse", prompt_id: user.uuid, tool_name: toolNames[progress],
+          tool_input: {}, tool_use_id: "started", session_id: "fixture", transcript_path: "fixture", cwd: root,
+          ...(servers[progress] ? { mcp_server: servers[progress] } : {}),
+        }, undefined, { signal: config.abortController!.signal });
+        assert.equal((result as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision, "allow");
+      }
+      return {fail:true,resultText:reasoningRejected,frames};
+    });
+    const tool = probeTool();
+    tool.handler = async () => {
+      calls++;
+      return { ok: true, message: "called" };
+    };
+    const session = await createClaudeRuntimeAdapter({...options(root,[tool]),reasoningEffort:"low",installedMcpServers:[{name:"external",command:"fixture",args:[]}]},{...engine.dependencies,env:{...environment,ANS_CLAUDE_WEB_SEARCH:"1"}}).bindRole(role);
+    const reading = collect(session,1);
+    await assert.rejects(session.prompt("do work"),/失败/);
+    const rows = await reading;
+    assert.equal(engine.configurations.length,1,progress);
+    assert.equal(engine.users.length,1,progress);
+    assert.equal(calls,progress === "ans" ? 1 : 0,progress);
+    assert.equal(rows.some(row => reasoningState(row) === "trying"),false,progress);
     await session.dispose();
   }
 }));

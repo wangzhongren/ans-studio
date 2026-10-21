@@ -1,0 +1,3305 @@
+[
+  {
+    "name": "ACCEPTED_ROWS",
+    "status": "MATCH",
+    "old": "0",
+    "new": "0",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "ANCHOR_CARD_ANSWERED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "ANCHOR_CARD_AT_ARRIVAL",
+    "status": "MATCH（值差异）",
+    "old": "6",
+    "new": "-1",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "ANCHOR_NO_DUPLICATE_ROW",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "ANCHOR_ROW_AFTER_SWITCHBACK",
+    "status": "MATCH（值差异）",
+    "old": "{\"count\":207,\"last\":206,\"ops\":[{\"index\":6,\"requestId\":\"op-6\"}]}",
+    "new": "{\"count\":205,\"last\":204,\"ops\":[]}",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "ANCHOR_STABLE_NOT_TAIL_ONCE",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "ANCHOR_STABLE_NOT_TAIL_TWICE",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "ANCHOR_TABLE_REGISTERED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "ASSISTANT_BUBBLES",
+    "status": "MATCH",
+    "old": "4",
+    "new": "4",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "BADGES_CLEAR_ON_EMPTY",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "BADGE_ON_WORK_WHILE_COLLAPSED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "BOOTSTRAP_ACTION_REMOVED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "BOOTSTRAP_CENTER_CTA_PRESENT",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "BOOTSTRAP_DEFAULT_SELECTED",
+    "status": "MATCH",
+    "old": "liaison",
+    "new": "liaison",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "BOOTSTRAP_HAS_ROLES",
+    "status": "MATCH",
+    "old": "false",
+    "new": "false",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "BOOTSTRAP_HINT_EMPTY",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "BOOTSTRAP_LEFT_NOTICE_ABSENT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "BOOTSTRAP_MENTION_COUNT",
+    "status": "MATCH（值差异）",
+    "old": "1",
+    "new": "0",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "BOOTSTRAP_MENTION_IN_CENTER_EMPTY",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "BOOTSTRAP_NO_LEFT_NOTICE_ELEMENT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "BOOTSTRAP_PRIMARY",
+    "status": "MATCH",
+    "old": "liaison",
+    "new": "liaison",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "BOOTSTRAP_ROLE_COUNT",
+    "status": "MATCH",
+    "old": "5",
+    "new": "5",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "BOOTSTRAP_SU_NO_READONLY_BADGE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "CHAT_CTA_PRESENT",
+    "status": "MATCH",
+    "old": "false",
+    "new": "false",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "CHAT_CTA_TEXT",
+    "status": "MATCH",
+    "old": "",
+    "new": "",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "CHAT_HEADER_ROLE",
+    "status": "MATCH",
+    "old": "桌面窗口",
+    "new": "桌面窗口",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "CHAT_HEAD_ONLY_APPROVED_BUTTONS",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "CLICKED_DESKTOP_ROLE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "COMPOSER_ATTACH_BTN",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "COMPOSER_CHILD_ROWS",
+    "status": "MATCH",
+    "old": "4",
+    "new": "4",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "COMPOSER_CLEAN",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "COMPOSER_HAS_TEXTAREA_SEND",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "COMPOSER_ROWS_ARE_ATTACH_CAPSULE_NOTE",
+    "status": "MATCH",
+    "old": "false",
+    "new": "false",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "COMPOSER_SEND_INSIDE_CAPSULE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "CUSTOM_TITLEBAR_PRESENT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "DATA_STATE_IDLE_AFTER_ROUND",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "DATA_STATE_RUN_WHILE_BUSY",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "DEFAULT_SELECTED_ROLE",
+    "status": "MATCH",
+    "old": "su",
+    "new": "su",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "DENIED_OPEN_COUNT",
+    "status": "MATCH（值差异）",
+    "old": "2",
+    "new": "0",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "DESKTOP_ROLE_NO_READONLY_BADGE",
+    "status": "MATCH",
+    "old": "true DESKTOP_ROLE_NO_READONLY_ROWS=true",
+    "new": "true DESKTOP_ROLE_NO_READONLY_ROWS=true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "DISPATCH_ROW_NO_WITHDRAW",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "DRAWER_CLOSED_AFTER_N3",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "DRAWER_CLOSED_AFTER_PI",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "DRAWER_DEFAULT_CLOSED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "DRAWER_ESC_CLOSES",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "DRAWER_OPENS_ON_TAB",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "DRAWER_TITLE_CARD",
+    "status": "MATCH",
+    "old": "桌面窗口 · 角色资料",
+    "new": "桌面窗口 · 角色资料",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "DRAWER_TITLE_WORK",
+    "status": "MATCH",
+    "old": "桌面窗口 · 工作概览",
+    "new": "桌面窗口 · 工作概览",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "DRAWER_TOGGLES_CLOSED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "E2E_DONE",
+    "status": "MATCH",
+    "old": "1",
+    "new": "1",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "E2E_FAILURES",
+    "status": "MATCH（值差异）",
+    "old": "RECOVERY_SAME_PENDING_CARD_ONCE",
+    "new": "SESSION_REPAIR_SAME_ROLE_CONFIRMS_BACKEND, SESSION_REPAIR_EXPLICIT_RECOVERY_DELIVERS_ONCE, SESSION_REPAIR_FAILED_OPEN_DOES_NOT_SEND, SESSION…",
+    "basis": "失败汇总派生值（同因见 RECOVERY_SAME_PENDING_CARD_ONCE）",
+    "coverage": "按底层检查逐项裁定",
+    "pm": "proposed"
+  },
+  {
+    "name": "E2E_PASS",
+    "status": "MATCH",
+    "old": "false",
+    "new": "false",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "ELECTRON",
+    "status": "MATCH",
+    "old": "44.7.0",
+    "new": "44.7.0",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "EVENT_BATCH_CONTINUES_AFTER_ERROR",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "FIRST_ROLE_ID",
+    "status": "MATCH",
+    "old": "su",
+    "new": "su",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "HANDBACK_CARD_PRESENT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "HANDBACK_EVIDENCE_ROWS",
+    "status": "MATCH",
+    "old": "1",
+    "new": "1",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "HANDBACK_NOT_MIRROR",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "HANDBACK_STATUS_OK",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "HANDBACK_TITLE",
+    "status": "MATCH",
+    "old": "报告声明：已完成",
+    "new": "报告声明：已完成",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "HAS_DENIED_GROUPED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "HAS_DENIED_INLINE",
+    "status": "MATCH（值差异）",
+    "old": "2",
+    "new": "0",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "HAS_OTHER_GROUP",
+    "status": "MATCH",
+    "old": "false",
+    "new": "false",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "HAS_ROUND2",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "HISTORY_KEPT_ON_SWITCHBACK",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "IMG_LEGACY_NOTE_ABSENT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "IMG_PASSTHROUGH_QUEUED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "IMG_QUEUE_FROZEN",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "IMG_REJECT_BAD_MIME",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "IMG_REJECT_OVERSIZE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "IMG_SEND_OK",
+    "status": "MATCH",
+    "old": "true IMG_PASSTHROUGH_DIRECT=true",
+    "new": "true IMG_PASSTHROUGH_DIRECT=true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "IMG_SLOW_ROUND_OK",
+    "status": "MATCH",
+    "old": "true IMG_DEMO_LOG=[{\"t\":\"队列慢轮\",\"img\":false},{\"t\":\"队一\",\"img\":false},{\"t\":\"队三\",\"img\":false},{\"t\":\"排队带图\",\"img\":true}]",
+    "new": "true IMG_DEMO_LOG=[{\"t\":\"队列慢轮\",\"img\":false},{\"t\":\"队一\",\"img\":false},{\"t\":\"队三\",\"img\":false},{\"t\":\"排队带图\",\"img\":true}]",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "INJECTED_CHIP_LABEL",
+    "status": "MATCH（值差异）",
+    "old": "原始交接内容 · 来源未确认",
+    "new": "回交投递 · 来自 规划者",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "INJECTED_NOT_USER_BUBBLE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "INJECTED_STYLE_PRESENT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "LINK_OPEN_EXTERNAL_CALLED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "MAC_CLOSE_REOPEN_LOADS_WITHOUT_DUPLICATE_HANDLERS",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "MAC_CLOSE_REOPEN_NO_AUTO_SEND",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "MANUAL_NOT_INJECTED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "MANUAL_PREFIX_BUBBLE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "MD_STRONG_RENDERED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "MD_TAG_TEXT_ESCAPED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "NAVIGATION_BLOCKED",
+    "status": "NEW-ONLY",
+    "old": "",
+    "new": "https://example.com/x",
+    "basis": "新端 Markdown 链接导航拦截记录；旧端无此 key",
+    "coverage": "待 PM 裁定：可能是 5A 新端缺口，不是自动豁免",
+    "pm": "proposed"
+  },
+  {
+    "name": "NODE",
+    "status": "MATCH",
+    "old": "24.21.0",
+    "new": "24.21.0",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "NORMAL_PROJECT_NO_BOOTSTRAP_MENTION",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "NO_DEFAULT_MENU_BAR",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "NO_MODAL_AFTER_IMPORT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "NO_MODAL_AFTER_MESSAGES",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "NO_MODAL_AFTER_RESUME",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "NO_MODAL_AFTER_ROLE_CLICK",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "NO_PI_BUTTON_IN_HEADER",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "NO_RETIRED_TABS",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "NO_RIGHT_COLUMN",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "NO_RT_SELECT_CLASS",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "NO_RUNTIME_SELECTOR",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "NO_SELECT_ELEMENTS",
+    "status": "MATCH",
+    "old": "false",
+    "new": "false",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "NO_WELCOME_AFTER_OPEN",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "OPEN_CARD_AT_ARRIVAL",
+    "status": "MATCH（值差异）",
+    "old": "207",
+    "new": "-1",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OPEN_CARD_CHIP_VISIBLE",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OPEN_CARD_CLEANED_CHIP_HIDDEN",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "OPEN_CARD_ROWS_AFTER_SWITCHBACK",
+    "status": "MATCH（值差异）",
+    "old": "{\"count\":208,\"last\":207,\"ops\":[{\"index\":6,\"requestId\":\"op-6\"},{\"index\":207,\"requestId\":\"op-7\"}]}",
+    "new": "{\"count\":205,\"last\":204,\"ops\":[]}",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OPEN_CARD_STABLE_AT_ANCHOR",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OPX_ANSWERED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OPX_BADGE_CLEARED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OPX_BADGE_LIT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "OPX_CARD_ON_RETURN",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "OPX_DUP_SINGLE_CARD",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "OPX_EXPIRED_FROZEN",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "OPX_NOT_IN_VIEWED_PANE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "OPX_POINTER_IN_VIEWED_PANE",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OP_B3_AWAITING_CLEARED",
+    "status": "MATCH",
+    "old": "false",
+    "new": "false",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "OP_B3_AWAITING_CONFIRM",
+    "status": "MATCH",
+    "old": "false",
+    "new": "false",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "OP_CANCEL_DECLINED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OP_CARD_FROZEN",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OP_CARD_PRESENT",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OP_CARD_TITLE_SHOWS",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OP_CONFIRM_ANSWERED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OP_FORGED_ID_REJECTED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "OP_MULTI_ANSWERED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OP_MULTI_HAS_CHECKBOX",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OP_NO_CARD_BEFORE_REQUEST",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "OP_OLD_CARD_REMOVED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "OP_OLD_ENTRY_REMOVED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "OP_OUT_OF_SET_REJECTED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "OP_PREVIEW_COLLAPSED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OP_SELECT_ANSWERED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OP_SELECT_HAS_RADIO",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OP_SUBMIT_DISABLED_INITIALLY",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "OUTDIR",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg",
+    "new": "/tmp/ans-p5a-new.78nIuC",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "P13_CONTINUE_AFTER_RETURN",
+    "status": "NEW-ONLY",
+    "old": "",
+    "new": "true RESULT={\"ok\":true,\"sessionCurrent\":true}",
+    "basis": "新端 P1-3 新语义拆分（忙时切项目/旧会话/排队/返回）",
+    "coverage": "替代旧 P13_NEW_SEMANTICS",
+    "pm": "proposed"
+  },
+  {
+    "name": "P13_NEW_SEMANTICS",
+    "status": "OLD-ONLY/REMOVED",
+    "old": "not-applicable-old-confirm-bar",
+    "new": "",
+    "basis": "旧端专属（P1-3 旧占位检查）",
+    "coverage": "新端 P13_* 8 项拆分替代（待核）",
+    "pm": "proposed"
+  },
+  {
+    "name": "P13_OLD_PROJECT_BUSY",
+    "status": "NEW-ONLY",
+    "old": "",
+    "new": "true",
+    "basis": "新端 P1-3 新语义拆分（忙时切项目/旧会话/排队/返回）",
+    "coverage": "替代旧 P13_NEW_SEMANTICS",
+    "pm": "proposed"
+  },
+  {
+    "name": "P13_OLD_SESSION_LIVE_AFTER_SWITCH",
+    "status": "NEW-ONLY",
+    "old": "",
+    "new": "true",
+    "basis": "新端 P1-3 新语义拆分（忙时切项目/旧会话/排队/返回）",
+    "coverage": "替代旧 P13_NEW_SEMANTICS",
+    "pm": "proposed"
+  },
+  {
+    "name": "P13_QUEUED_BEFORE_SWITCH",
+    "status": "NEW-ONLY",
+    "old": "",
+    "new": "true RESULT={\"ok\":true,\"queued\":true,\"position\":1}",
+    "basis": "新端 P1-3 新语义拆分（忙时切项目/旧会话/排队/返回）",
+    "coverage": "替代旧 P13_NEW_SEMANTICS",
+    "pm": "proposed"
+  },
+  {
+    "name": "P13_QUEUE_SURVIVES_SWITCH",
+    "status": "NEW-ONLY",
+    "old": "",
+    "new": "true",
+    "basis": "新端 P1-3 新语义拆分（忙时切项目/旧会话/排队/返回）",
+    "coverage": "替代旧 P13_NEW_SEMANTICS",
+    "pm": "proposed"
+  },
+  {
+    "name": "P13_RETURN_RESUMES_SESSION",
+    "status": "NEW-ONLY",
+    "old": "",
+    "new": "true",
+    "basis": "新端 P1-3 新语义拆分（忙时切项目/旧会话/排队/返回）",
+    "coverage": "替代旧 P13_NEW_SEMANTICS",
+    "pm": "proposed"
+  },
+  {
+    "name": "P13_SWITCH_IMMEDIATE",
+    "status": "NEW-ONLY",
+    "old": "",
+    "new": "true",
+    "basis": "新端 P1-3 新语义拆分（忙时切项目/旧会话/排队/返回）",
+    "coverage": "替代旧 P13_NEW_SEMANTICS",
+    "pm": "proposed"
+  },
+  {
+    "name": "P1_ARRIVAL_DEBUG",
+    "status": "MATCH（值差异）",
+    "old": "{\"hasCard\":true,\"dist\":46,\"st\":3011,\"sh\":3491,\"ch\":434,\"crTop\":517,\"crBottom\":640,\"ccTop\":287,\"ccBottom\":721,\"chipHidden\":false}",
+    "new": "{\"hasCard\":false,\"dist\":0,\"st\":3138,\"sh\":3639,\"ch\":501,\"crTop\":null,\"crBottom\":null,\"ccTop\":233,\"ccBottom\":734,\"chipHidden\":false}",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "P1_ARRIVAL_SCROLLED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "P1_CHIP_CLICK_LOCATES",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "P1_CHIP_COUNT1_AFTER_TERMINAL",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "P1_CHIP_COUNT2",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "P1_CHIP_HIDDEN_AFTER_ALL_TERMINAL",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "P1_CHIP_SECOND_CARD",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "P1_CHIP_VISIBLE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "P1_CLEANUP_CHIP_HIDDEN",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "P1_NO_INTERRUPT_TOP",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "P1_SWITCHBACK_SCROLLS_TO_CARD",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "PENDING_EXPLICIT_SAME_ROLE_CARD_AND_BUTTON_VISIBLE",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "PI_ADVANCED_COLLAPSED_BY_DEFAULT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_ADVANCED_HINT_LEAVE_BLANK",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_ADVANCED_PRESENT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_CONTEXT_WINDOW_IN_ADVANCED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_ENTRY_IN_SIDEBAR_FOOT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_ENV_NOT_REPO_ROOT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_FIELDS_MATCH_REGISTRY",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "PI_FIELD_COUNT",
+    "status": "MATCH（值差异）",
+    "old": "5",
+    "new": "6",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "PI_HAS_SAVE_BTN",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_KEYS_ARE_FIVE",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "PI_NARROW_NO_OVERFLOW",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_NARROW_STACKED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_NARROW_WINDOW",
+    "status": "MATCH",
+    "old": "900",
+    "new": "900",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_NO_MODAL",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_NO_OVERFLOW",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_NO_PROVIDER_FIELD",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_PANEL_IN_DRAWER",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_PANEL_OPEN",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_PANEL_PATH_IS_TEMP",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_PROMPT_TIMEOUT_IN_ADVANCED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_SAVE_STATUS",
+    "status": "MATCH（值差异）",
+    "old": "已保存到 .env（改动键：ANTHROPIC_AUTH_TOKEN、ANS_PI_BASE_URL、ANS_PI_MODEL）。必填配置已齐备。下一次开启会话时应用。",
+    "new": "已保存到 .env（改动键 3 个）。必填配置已齐备。下一次开启会话时应用。",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "PI_STACKED_FIELDS",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_TEMP_ENV_HAS_BASE_URL",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_TEMP_ENV_HAS_TOKEN",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_TEMP_ENV_NO_PROVIDER",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_TEMP_ENV_OMITS_EMPTY_CONTEXT_WINDOW",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_TEMP_ENV_WRITTEN",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_TOKEN_MASKED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_TOKEN_PLACEHOLDER_SET",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_TOKEN_STILL_MASKED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PI_TOKEN_VALUE_CLEARED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PRIMARY_ROLE_ID",
+    "status": "MATCH",
+    "old": "su",
+    "new": "su",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PROJECT",
+    "status": "MATCH",
+    "old": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime",
+    "new": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PROJECT_BTN_INITIAL_IMPORT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PROJECT_BTN_SWITCHED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PROJECT_PATH_SHOWN",
+    "status": "MATCH",
+    "old": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime",
+    "new": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "PROMISE_TIMEOUT",
+    "status": "NEW-ONLY",
+    "old": "",
+    "new": "anchor",
+    "basis": "新端等待/承诺超时记录；旧端无此 key",
+    "coverage": "待 PM 裁定：可能是新端卡片未呈现/等待超时，不是自动豁免",
+    "pm": "proposed"
+  },
+  {
+    "name": "QUEUED_EXECUTION_ORDER_1_3",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "QUEUE_EXPAND_EVIDENCE",
+    "status": "MATCH",
+    "old": "{\"bText\":\"收起\",\"fHidden\":false,\"hasLong\":true}",
+    "new": "{\"bText\":\"收起\",\"fHidden\":false,\"hasLong\":true}",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "QUEUE_EXPAND_FULL",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "QUEUE_POSITION_IN_CARD",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "QUEUE_POSITION_ROWS",
+    "status": "MATCH",
+    "old": "2",
+    "new": "2",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "QUEUE_ROWS_AFTER_WITHDRAW",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "QUEUE_ROWS_THREE",
+    "status": "MATCH",
+    "old": "true QUEUE_WITHDRAW_ON_MESSAGES=true QUEUE_FULL_TOGGLE_ON_LONG=true",
+    "new": "true QUEUE_WITHDRAW_ON_MESSAGES=true QUEUE_FULL_TOGGLE_ON_LONG=true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "Q_WITHDRAW_LINE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RECOVERY_ENDED_REQUEST_NOT_REPLAYED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "RECOVERY_NO_AUTO_REPLY_OR_SEND",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RECOVERY_OLD_REQUEST_STILL_ANSWERABLE",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "RECOVERY_PROJECT_AND_ROLE_RESTORED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RECOVERY_SAME_PENDING_CARD_ONCE",
+    "status": "MATCH",
+    "old": "false",
+    "new": "false",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RECOVERY_VISIBLE_FAILURE_BUTTON",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "REFRESH_BOOTSTRAP_MENTION_AT_MOST_ONE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "REFRESH_HAS_EXAMPLE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "REFRESH_HAS_ROLES",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "REFRESH_LEFT_NOTICE_STAYS_ABSENT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "REFRESH_OTHER_GROUP_SHOWN",
+    "status": "MATCH",
+    "old": "false",
+    "new": "false",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "REFRESH_ROLE_COUNT",
+    "status": "MATCH",
+    "old": "2",
+    "new": "2",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "REFRESH_SU_NO_READONLY_BADGE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "REFRESH_TREE_HAS_EXAMPLE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RENDERER_ENTRY",
+    "status": "MATCH（值差异）",
+    "old": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/index.html",
+    "new": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/dist/src/index.html",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "REPLAY_DEDUP_APPEND",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "REPLAY_DEDUP_IDEMPOTENT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "REPLAY_DEDUP_REBUILD",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "REPLAY_NO_DOUBLE_ON_REFRESH",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "REPORT_DELIVERY_DETAILS_COLLAPSED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "REPORT_NO_PREMATURE_SU_MIRROR",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "REPORT_STATUS_ABORTED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "REPORT_STATUS_FAILED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "REPORT_STATUS_UNREPORTED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RESTORE_BADGE_IS_RESTORED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RESTORE_MD_RENDERED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RESTORE_NO_CROSSTALK",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RESTORE_NO_STALE_RESTART_NOTE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RESTORE_NO_SUCCESS_DIVIDER",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "RESTORE_ROWS_PRESENT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RESTORE_SU_CHAT_SNIPPET",
+    "status": "MATCH（值差异）",
+    "old": "SU 的历史问题",
+    "new": "会话记录已恢复SU 的历史问题",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "RESTORE_SU_OWN_TEXT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RESTORE_SU_REPLAY_ROWS",
+    "status": "MATCH（值差异）",
+    "old": "1",
+    "new": "2",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "RESTORE_SU_RESTORED_FLAG",
+    "status": "MATCH（值差异）",
+    "old": "{\"hadSession\":true,\"error\":false,\"awaitingConfirm\":false,\"restored\":true,\"lastSummary\":\"\",\"lastAt\":\"\",\"historyNotice\":\"\",\"contextText\":\"新会话；…",
+    "new": "{\"error\":false,\"hadSession\":true,\"restored\":true,\"contextText\":\"新会话；可读历史保留，模型未恢复\",\"live\":true}",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "RESUME_HINT",
+    "status": "MATCH（值差异）",
+    "old": "已在该角色的会话中，续接当前会话。",
+    "new": "",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "RIGHT_CARD_MD_NO_SCRIPT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RIGHT_CARD_MD_RENDERED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RIGHT_HAS_BOUNDARY",
+    "status": "MATCH",
+    "old": "true RIGHT_BOUNDARY_ROWS=46",
+    "new": "true RIGHT_BOUNDARY_ROWS=46",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RIGHT_HAS_CARD",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RIGHT_HAS_CHANGELOG",
+    "status": "MATCH",
+    "old": "true RIGHT_HAS_DOCS=true",
+    "new": "true RIGHT_HAS_DOCS=true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RIGHT_HAS_TODO_SECTION",
+    "status": "MATCH",
+    "old": "true RIGHT_QUEUE_SINGLE_LIST=true",
+    "new": "true RIGHT_QUEUE_SINGLE_LIST=true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RIGHT_QUEUE_EMPTY_PLACEHOLDER",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RIGHT_QUEUE_ROWS",
+    "status": "MATCH",
+    "old": "3",
+    "new": "3",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RIGHT_QUEUE_RUNNING_FIRST",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "RIGHT_QUEUE_SECTION",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RIGHT_QUEUE_SOURCES",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "ROLE_COUNT",
+    "status": "MATCH",
+    "old": "16",
+    "new": "16",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "ROLE_IDS",
+    "status": "MATCH",
+    "old": "su, 编排, 测试, 产品, 独立验收, 门禁引擎, 项目管理, 宣传, 运行时核心, 装配, 桌面窗口, 桌面UI, Claude适配器, Codex适配器, Pi适配器, UIUX设计师",
+    "new": "su, 编排, 测试, 产品, 独立验收, 门禁引擎, 项目管理, 宣传, 运行时核心, 装配, 桌面窗口, 桌面UI, Claude适配器, Codex适配器, Pi适配器, UIUX设计师",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "ROLE_STATE_BADGE_HAS_ICON",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "ROLE_STATE_BADGE_HOVER_FULL",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "ROLE_STATE_BADGE_WORKING_PENDING",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "ROLE_STATE_CLEARED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "ROLE_STATE_QUEUE_ROW",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "RUNTIME_NOTE_IN_COMPOSE_NOTE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RUNTIME_NOTE_ONE_LINE_GATED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "RUNTIME_NOTE_WRITES_IMPORTED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "S1_NOT_YANKED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "S1_SMALL_PANE_NOT_YANKED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "S1_SMALL_PANE_STICK",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "S1_SMALL_PANE_STICK_DIST",
+    "status": "MATCH",
+    "old": "0",
+    "new": "0",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "S1_STAYED_AWAY_FROM_BOTTOM",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "S1_STICK_AGAIN",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "S1_STICK_AGAIN_DIST",
+    "status": "MATCH",
+    "old": "0",
+    "new": "0",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "S1_STICK_AT_BOTTOM",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "S1_STICK_AT_BOTTOM_DIST",
+    "status": "MATCH",
+    "old": "0",
+    "new": "0",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "S1_WINDOWED_ACTIVE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SEND_ENABLED_WHILE_BUSY",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SEND_QUEUES_WHILE_BUSY",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SESSION_NOT_AUTO_OPENED",
+    "status": "MATCH",
+    "old": "false",
+    "new": "false",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SESSION_REPAIR_CONFIRM_PRESERVES_HISTORY",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SESSION_REPAIR_EXPLICIT_RECOVERY_DELIVERS_ONCE",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "SESSION_REPAIR_FAILED_OPEN_DOES_NOT_SEND",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "SESSION_REPAIR_FAILED_OPEN_EXPLICIT_RECOVERY",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SESSION_REPAIR_FAILED_OPEN_NO_REPLAY",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "SESSION_REPAIR_FAILED_OPEN_NO_USER_BUBBLE",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "SESSION_REPAIR_FAILED_OPEN_PRESERVES_INPUT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SESSION_REPAIR_NO_AUTOMATIC_RESEND",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SESSION_REPAIR_SAME_ROLE_CONFIRMS_BACKEND",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "SESSION_REPAIR_SEND_EXCEPTION_INVALIDATES",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SESSION_REPAIR_SEND_FAILURE_INVALIDATES",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SESSION_STATE",
+    "status": "MATCH",
+    "old": "idle",
+    "new": "idle",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SESSION_STATE_AFTER",
+    "status": "MATCH",
+    "old": "idle",
+    "new": "idle",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SESSION_STATE_AFTER_RESUME",
+    "status": "MATCH",
+    "old": "idle",
+    "new": "idle",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SETTLED_ROW_PRESENT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SHELL_CONFIRM_COMMAND_VERBATIM",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SHELL_CONFIRM_DENY_DEFAULT_FOCUS",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SHELL_CONFIRM_DETAILS_COLLAPSED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SHELL_CONFIRM_ESC_NOT_ALLOWED",
+    "status": "MATCH",
+    "old": "false",
+    "new": "false",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SHELL_CONFIRM_REASON_PLAIN",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SHELL_CONFIRM_SUMMARY_PLAIN",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SHELL_CONFIRM_VISIBLE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SHOT_00_TITLEBAR",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/00-titlebar.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/00-titlebar.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_01B_SU",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/01b-su.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/01b-su.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_01_IMPORT",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/01-import.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/01-import.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_02_CHAT",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/02-chat.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/02-chat.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_03_DENIED",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/03-denied.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/03-denied.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_04_PROFILE",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/04-profile.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/04-profile.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_05_BOOTSTRAP",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/05-bootstrap.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/05-bootstrap.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_06_REFRESH",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/06-refresh.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/06-refresh.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_07_HANDBACK",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/07-handback.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/07-handback.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_08_SU_PANE",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/08-su-pane.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/08-su-pane.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_09_PI_PANEL",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/09-pi-panel.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/09-pi-panel.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_10_PI_SAVED",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/10-pi-saved.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/10-pi-saved.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_11_OPERATOR",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/11-operator-card.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/11-operator-card.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_12_COMPOSER",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/12-composer.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/12-composer.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_12_RESTORE",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/12-restore.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/12-restore.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_14_OP_CROSSPANE",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/14-operator-crosspane.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/14-operator-crosspane.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SHOT_15_ANCHOR",
+    "status": "MATCH（值差异）",
+    "old": "/tmp/ans-p5a-old.6MXYfg/15-anchor-reanchor.png",
+    "new": "/tmp/ans-p5a-new.78nIuC/15-anchor-reanchor.png",
+    "basis": "环境/路径/截图输出差异，非行为语义",
+    "coverage": "环境归一后复跑；不作为允许差异",
+    "pm": "proposed"
+  },
+  {
+    "name": "SOURCE_REPORT_BLOCKED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SOURCE_REPORT_EVIDENCE_PLACEHOLDER",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "STATUS_BADGE_IS_IDLE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "STATUS_BADGE_TEXT",
+    "status": "MATCH（值差异）",
+    "old": "●空闲",
+    "new": "空闲",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "STATUS_LAST_EVENT_RECORDED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "STOP_HIDDEN_AFTER_SNAPSHOT_RESET",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "STOP_HIDDEN_WHEN_IDLE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "STOP_IN_COMPOSER",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "STOP_LINE_UNSUPPORTED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "STOP_VISIBLE_WHEN_BUSY",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "STOP_VISIBLE_WITH_REAL_BUSY",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SU_BADGE_LABELS",
+    "status": "MATCH",
+    "old": "主入口：默认入口与主路径；内置角色：定义在 SKILL.md，无角色目录",
+    "new": "主入口：默认入口与主路径；内置角色：定义在 SKILL.md，无角色目录",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SU_CHAT_HEADER",
+    "status": "MATCH",
+    "old": "su",
+    "new": "su",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SU_CLICKED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SU_DEFAULT_ACTIVE",
+    "status": "MATCH",
+    "old": "true SU_PRIMARY_BADGE=true SU_IN_MAIN_GROUP=true",
+    "new": "true SU_PRIMARY_BADGE=true SU_IN_MAIN_GROUP=true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SU_DELIVERY_CARD_PRESENT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SU_IS_FIRST",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SU_NO_INLINE_WRITE_ROWS",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SU_NO_MODAL",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SU_NO_READONLY_BADGE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SU_NO_READONLY_NOTE",
+    "status": "MATCH",
+    "old": "true SU_NO_READONLY_ROWS=true",
+    "new": "true SU_NO_READONLY_ROWS=true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SU_NO_WELCOME",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SU_SESSION_STATE",
+    "status": "MATCH",
+    "old": "idle",
+    "new": "idle",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SU_TREE_CLASS",
+    "status": "MATCH",
+    "old": "true SU_TREE_BADGE=true SU_TREE_NAME=su",
+    "new": "true SU_TREE_BADGE=true SU_TREE_NAME=su",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SU_WRITE_NOTE_IN_COMPOSE_NOTE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SU_WRITE_NOTE_WRITES_IMPORTED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SWITCH_BAR_NOT_IN_CHAT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SWITCH_CANCEL_NOOP",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SWITCH_CONFIRM_ON_BUSY",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "SWITCH_CONFIRM_RELOADED",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "SWITCH_IDLE_HINT",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "SWITCH_NO_CONFIRM_WHEN_IDLE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SWITCH_SETUP_BUSY",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "SYS_ROWS",
+    "status": "MATCH（值差异）",
+    "old": "sys sys-context-event | sys sys-settled | sys sys-settled",
+    "new": "sys sys-call sys-unknown-tool-event | sys sys-call | sys sys-settled | sys sys-call sys-unknown-tool-event | sys sys-call | sys sys-settled",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "TABS_PRESENT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "TAB_CARD_ACTIVE",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "TAB_WORK_ACTIVE",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "TAB_WORK_ACTIVE_STILL",
+    "status": "MATCH（值差异）",
+    "old": "true",
+    "new": "false",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "TITLEBAR_HAS_THREE_BUTTONS",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "TITLEBAR_IS_DRAG_REGION",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "TOOLROW_HAS_PATH",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "TOOLROW_NO_CONTENT",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "U1_NORMAL_TO_BOTTOM",
+    "status": "MATCH（值差异）",
+    "old": "false",
+    "new": "true",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "U1_NORMAL_TO_BOTTOM_DIST",
+    "status": "MATCH（值差异）",
+    "old": "10",
+    "new": "0",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "U1_PANE_HEIGHT",
+    "status": "MATCH（值差异）",
+    "old": "12683",
+    "new": "12580",
+    "basis": "待分类：旧端基线 vs 新端载体/夹具/交互差异候选",
+    "coverage": "待新端逐名复验 + PM 批准",
+    "pm": "proposed"
+  },
+  {
+    "name": "U1_REPEAT_TO_BOTTOM",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "U1_REPEAT_TO_BOTTOM_DIST",
+    "status": "MATCH",
+    "old": "0",
+    "new": "0",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "U1_WINDOWED_TO_BOTTOM",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "U1_WINDOWED_TO_BOTTOM_DIST",
+    "status": "MATCH",
+    "old": "0",
+    "new": "0",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "USER_BUBBLES",
+    "status": "MATCH",
+    "old": "2",
+    "new": "2",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "USER_BUBBLES_BEFORE",
+    "status": "MATCH",
+    "old": "0",
+    "new": "0",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "VIEWPORT_MIDDLE_HAS_VISIBLE_ROWS",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "VIEWPORT_TOP_BATCH_SETTLED_HAS_VISIBLE_ROWS",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "VIEWPORT_TOP_SINGLE_HAS_VISIBLE_ROWS",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "WAIT_TIMEOUT",
+    "status": "NEW-ONLY",
+    "old": "",
+    "new": "document.getElementById('chat').textContent.includes('补开失败原文')",
+    "basis": "新端等待/承诺超时记录；旧端无此 key",
+    "coverage": "待 PM 裁定：可能是新端卡片未呈现/等待超时，不是自动豁免",
+    "pm": "proposed"
+  },
+  {
+    "name": "WINDOW_ALIVE_AFTER_GUARDS",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "WINDOW_BUTTON_NO_DRAG",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "WIN_BRIDGE_FUNCTIONS",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "WIN_BUTTON_CLOSE_WIRED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "WIN_BUTTON_MAX_WIRED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "WIN_BUTTON_MIN_WIRED",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "WIN_IS_MAXIMIZED_IPC",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "WRITE_MODE_NO_DEMO_NOTE",
+    "status": "MATCH",
+    "old": "true WRITE_MODE_NO_INLINE_ROWS=true OLD_GENERAL_CLAIM_PRESENT=false",
+    "new": "true WRITE_MODE_NO_INLINE_ROWS=true OLD_GENERAL_CLAIM_PRESENT=false",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  },
+  {
+    "name": "WRITE_NOTE_REMAINS_IN_COMPOSE_NOTE",
+    "status": "MATCH",
+    "old": "true",
+    "new": "true",
+    "basis": "同名同值",
+    "coverage": "—",
+    "pm": "—"
+  }
+]

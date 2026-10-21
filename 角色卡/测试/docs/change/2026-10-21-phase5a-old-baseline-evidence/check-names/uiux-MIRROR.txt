@@ -1,0 +1,2 @@
+W6-C five-role tree: Liaison primary; governance group exactly Rapporteur/Nominator/Convener/Verifier=false
+W6-C five-role tree: Liaison primary; governance group exactly Rapporteur/Nominator/Convener/Verifier observed={"chat": "会话已开启，可直接输入消息", "assistant": [], "denied": [], "model": {"count": 1, "lastIndex": 0, "operators": [], "rowGap": 16}}

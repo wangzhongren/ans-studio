@@ -1,0 +1,21 @@
+{
+  "baseline": "fc1a39c14e119faccf442fc8e22bbbbd978d1a04",
+  "design": "D3",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "node": "v24.14.0",
+  "commands": [
+    "node --test test/项目管理/shared/atomic-write.test.ts test/项目管理/shared/env-file.test.ts",
+    "npm run typecheck"
+  ],
+  "tests": {
+    "total": 53,
+    "passed": 53,
+    "failed": 0,
+    "skipped": 0
+  },
+  "scope": "PM shared only; merged candidate and Windows native not verified by this evidence",
+  "files": {
+    "src/common/shared/atomic-write.ts": "8d750702a2bf66e82974c0b2e987d7ed07e9d14d2cf834d2d497e1c9f4ddadd2",
+    "test/项目管理/shared/atomic-write.test.ts": "801e90054c2c13e2c2a8cf1774e3efe56320c62ff3b3682c783df2bf76e5d965"
+  }
+}

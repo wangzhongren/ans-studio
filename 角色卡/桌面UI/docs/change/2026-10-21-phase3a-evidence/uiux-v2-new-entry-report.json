@@ -1,0 +1,29 @@
+{
+  "reports": [
+    {
+      "name": "routine collapsed; failure direct; assistant untouched",
+      "value": false
+    },
+    {
+      "name": "routine collapsed; failure direct; assistant untouched observed",
+      "value": {
+        "chat": "执行记录3 个调用read_filea.md）已记录read_file无文件目标已记录legacy无文件目标已记录文件不存在目标未记录文件不存在执行记录1 个调用read_file无文件目标已记录真实助手答复保持原文。\n客户长消息：超过80字的队列摘要用于核对换行、时间与操作归属。超过80字的队列摘要用于核对换行、时间与操作归属。超过80字的队列摘要用于核对换行、时间与操作归属。超过80字的队列摘要用于核对换行、时间与操作归属。超过80字的队列摘要用于核对换行、时间与操作归属。超过80字的队列摘要用于核对换行、时间与操作归属。客户消息派发任务来自 B回交报告来自 B正在工作…",
+        "assistant": [
+          "真实助手答复保持原文。\n"
+        ],
+        "denied": [
+          "文件不存在目标未记录文件不存在"
+        ],
+        "model": {
+          "count": 4,
+          "lastIndex": 3,
+          "operators": [],
+          "rowGap": 16
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: routine collapsed; failure direct; assistant untouched\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: routine collapsed; failure direct; assistant untouched\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:60:474)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1354:3"
+}

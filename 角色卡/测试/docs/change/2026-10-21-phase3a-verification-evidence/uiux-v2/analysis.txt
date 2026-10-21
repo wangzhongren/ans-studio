@@ -1,0 +1,8 @@
+new-default: entries=10 booleans=9 pass=8 fail=1 observations=1
+  fail names: ["one independent work list without duplicated role documents"]
+old-default: entries=101 booleans=91 pass=90 fail=1 observations=10
+  fail names: ["expired old shell shown disabled in its own runtime"]
+new-toolfold: entries=15 booleans=13 pass=12 fail=1 observations=2
+  fail names: ["tail fold movement bounded and non accumulating with the reading row still in view"]
+old-toolfold: entries=15 booleans=13 pass=12 fail=1 observations=2
+  fail names: ["tail fold movement bounded and non accumulating with the reading row still in view"]

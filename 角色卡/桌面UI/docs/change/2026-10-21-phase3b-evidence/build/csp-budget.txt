@@ -1,0 +1,8 @@
+== dist index.html scripts ==
+<script type="module" crossorigin src="../assets/index-Dsxg4vh5.js">
+unsafe-inline/eval count: 0
+== gzip budget ==
+HTML gzip 389
+app/renderer/dist/assets/index-Dsxg4vh5.js 680330 gzip 225029
+app/renderer/dist/assets/index-DlQQvHNk.css 80491 gzip 14715
+TOTAL gzip 240133 limit 307200 PASS

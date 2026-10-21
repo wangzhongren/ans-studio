@@ -1,0 +1,140 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "P5 judge starts authoritative off",
+      "value": true
+    },
+    {
+      "name": "P5 first enable shows amber marker and one-time warning",
+      "value": true
+    },
+    {
+      "name": "P5 acknowledged warning hides but compact amber marker stays",
+      "value": true
+    },
+    {
+      "name": "P5 repeated enabled push does not re-show acknowledged warning",
+      "value": true
+    },
+    {
+      "name": "P5 role switch/redraw does not re-show acknowledged warning",
+      "value": true
+    },
+    {
+      "name": "P5 disable hides warning and returns to manual label",
+      "value": true
+    },
+    {
+      "name": "P5 re-enable after toggle off shows the warning once again",
+      "value": true
+    },
+    {
+      "name": "P5 warning auto-dismisses after about 9 seconds without touching the switch",
+      "value": true
+    },
+    {
+      "name": "P5 disable after auto-dismiss clears prompt state",
+      "value": true
+    },
+    {
+      "name": "P5 failed toggle keeps actual state and shows error",
+      "value": true
+    },
+    {
+      "name": "P5 pushed judge state turns toggle on with one-time warning",
+      "value": true
+    },
+    {
+      "name": "P5 repeated pushed state does not re-show warning",
+      "value": true
+    },
+    {
+      "name": "P5 pushed judge state turns toggle off",
+      "value": true
+    },
+    {
+      "name": "P5 deny-tier allow row is prominent and anchored after its tool call",
+      "value": true
+    },
+    {
+      "name": "P5 deny row shows reason/alternative/customer message and retry exit",
+      "value": true
+    },
+    {
+      "name": "P5 manual result produces no result row",
+      "value": true
+    },
+    {
+      "name": "P5 manual fallback card shows judgeNotice verbatim",
+      "value": true
+    },
+    {
+      "name": "P5 pending card survives judge toggle",
+      "value": true
+    },
+    {
+      "name": "P5 pending card still present after turning judge off",
+      "value": true
+    },
+    {
+      "name": "P5 result for another role does not switch the current view",
+      "value": true
+    },
+    {
+      "name": "P5 background role result is visible when that role is selected",
+      "value": true
+    },
+    {
+      "name": "P5 decision starts authoritative off in trio",
+      "value": true
+    },
+    {
+      "name": "P5 decision first enable shows amber marker and the same one warning block",
+      "value": true
+    },
+    {
+      "name": "P5 decision disable hides warning and returns to manual label",
+      "value": true
+    },
+    {
+      "name": "P5 failed decision toggle keeps actual state and shows error",
+      "value": true
+    },
+    {
+      "name": "P5 pushed decision state turns switch on with one-time warning",
+      "value": true
+    },
+    {
+      "name": "P5 repeated decision state does not re-show warning",
+      "value": true
+    },
+    {
+      "name": "P5 decision result row says judge 代批 · 代决策 and anchors after its tool call",
+      "value": true
+    },
+    {
+      "name": "P5 approval write result row says judge 代批 · 代审批 with path count",
+      "value": true
+    },
+    {
+      "name": "P5 manual fallback card shows judgeNotice verbatim and stays actionable",
+      "value": true
+    },
+    {
+      "name": "P5 single project disables decision with explicit note",
+      "value": true
+    },
+    {
+      "name": "P5 trio project restores decision availability",
+      "value": true
+    },
+    {
+      "name": "P5 decision off after checks",
+      "value": true
+    }
+  ],
+  "judgeEnabled": false,
+  "judgeSetFailure": false
+}

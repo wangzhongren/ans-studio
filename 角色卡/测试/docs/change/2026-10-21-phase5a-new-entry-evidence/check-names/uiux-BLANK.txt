@@ -1,0 +1,2 @@
+fixture: background pane has queue/status rows but no transcript=false
+fixture: background pane has queue/status rows but no transcript observed={"chat": "会话已开启，可直接输入消息发送第一条消息后，这里会显示对话与工具记录。写入由治理引擎把关，越界操作会在对话中直接提示。", "assistant": [], "denied": [], "model": {"count": 0, "lastIndex": -1, "operators": [], "rowGap": 16}}

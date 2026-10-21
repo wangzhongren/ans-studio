@@ -1,0 +1,7 @@
+old project status fixture is visible=true
+new project first DOM clears old badges before events=true
+old project late status is ignored=true
+new actual status immediately displayed=true
+ordinary fresh false refresh preserves actual state=true
+old project cached foreign runtime does not appear=true
+new pending history applied before first tree render=true

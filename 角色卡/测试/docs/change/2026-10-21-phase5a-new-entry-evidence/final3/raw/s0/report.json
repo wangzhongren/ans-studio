@@ -1,0 +1,162 @@
+{
+  "checks": [
+    {
+      "name": "BOOTSTRAP_S0_TITLE",
+      "value": true,
+      "detail": {
+        "hasTitle": true,
+        "title": "项目尚未 bootstrap",
+        "sub": "与 A 对话，让它把角色建出来；左树会随之长出。",
+        "cta": true,
+        "ctaText": "开始与 A 对话",
+        "ctaTag": "BUTTON",
+        "disabled": false,
+        "gov": false,
+        "notice": false,
+        "hint": "",
+        "role": "A",
+        "selected": "A",
+        "session": null,
+        "mentions": 1,
+        "opens": 0
+      }
+    },
+    {
+      "name": "BOOTSTRAP_S0_SUB",
+      "value": true,
+      "detail": "与 A 对话，让它把角色建出来；左树会随之长出。"
+    },
+    {
+      "name": "BOOTSTRAP_S0_CTA_TEXT",
+      "value": true,
+      "detail": {
+        "hasTitle": true,
+        "title": "项目尚未 bootstrap",
+        "sub": "与 A 对话，让它把角色建出来；左树会随之长出。",
+        "cta": true,
+        "ctaText": "开始与 A 对话",
+        "ctaTag": "BUTTON",
+        "disabled": false,
+        "gov": false,
+        "notice": false,
+        "hint": "",
+        "role": "A",
+        "selected": "A",
+        "session": null,
+        "mentions": 1,
+        "opens": 0
+      }
+    },
+    {
+      "name": "BOOTSTRAP_S0_NO_GOVERNANCE_CTA",
+      "value": true,
+      "detail": {
+        "hasTitle": true,
+        "title": "项目尚未 bootstrap",
+        "sub": "与 A 对话，让它把角色建出来；左树会随之长出。",
+        "cta": true,
+        "ctaText": "开始与 A 对话",
+        "ctaTag": "BUTTON",
+        "disabled": false,
+        "gov": false,
+        "notice": false,
+        "hint": "",
+        "role": "A",
+        "selected": "A",
+        "session": null,
+        "mentions": 1,
+        "opens": 0
+      }
+    },
+    {
+      "name": "BOOTSTRAP_S0_SINGLE_MENTION_NO_LEFT_NOTICE",
+      "value": true,
+      "detail": {
+        "hasTitle": true,
+        "title": "项目尚未 bootstrap",
+        "sub": "与 A 对话，让它把角色建出来；左树会随之长出。",
+        "cta": true,
+        "ctaText": "开始与 A 对话",
+        "ctaTag": "BUTTON",
+        "disabled": false,
+        "gov": false,
+        "notice": false,
+        "hint": "",
+        "role": "A",
+        "selected": "A",
+        "session": null,
+        "mentions": 1,
+        "opens": 0
+      }
+    },
+    {
+      "name": "BOOTSTRAP_S0_CTA_STARTS_SESSION",
+      "value": true,
+      "detail": {
+        "session": "A",
+        "opens": 1,
+        "title": "项目尚未 bootstrap"
+      }
+    },
+    {
+      "name": "BOOTSTRAP_S0_CTA_KEYBOARD",
+      "value": true,
+      "detail": {
+        "focus": {
+          "active": true,
+          "outlineW": "2px",
+          "outlineColor": "rgb(111, 160, 139)"
+        },
+        "keyed": {
+          "session": "A",
+          "opens": 2
+        },
+        "baseOpens": 0
+      }
+    },
+    {
+      "name": "BOOTSTRAP_S0_SIZES_1360_960_200",
+      "value": true,
+      "detail": {
+        "sizes": [
+          {
+            "w": 1360,
+            "h": 860,
+            "empty": true,
+            "title": "项目尚未 bootstrap",
+            "ctaVisible": true,
+            "bodyOverflow": 0,
+            "emptyRight": true
+          },
+          {
+            "w": 960,
+            "h": 620,
+            "empty": true,
+            "title": "项目尚未 bootstrap",
+            "ctaVisible": true,
+            "bodyOverflow": 0,
+            "emptyRight": true
+          }
+        ],
+        "z": {
+          "w": 680,
+          "h": 430,
+          "empty": true,
+          "ctaVisible": true,
+          "overflow": 0,
+          "emptyRight": true
+        }
+      }
+    },
+    {
+      "name": "BOOTSTRAP_S0_ZERO_CONSOLE",
+      "value": true,
+      "detail": {
+        "errs": [],
+        "didFail": []
+      }
+    }
+  ],
+  "console": [],
+  "didFail": []
+}

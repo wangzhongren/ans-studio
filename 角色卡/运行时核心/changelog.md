@@ -1,5 +1,15 @@
 # 运行时核心变更记录
 
+## 2026-10-21 D3 最小边界对齐（ANS Team Formation）
+
+显示兼容补正：保留原 `groupDuty=组长` 字段，明确仅为历史展示元数据，不授予派发或验收权。D3 不迁移既有界面角色展示；恢复该字段，避免改变实际角色枚举/解析的既有契约。边界对齐与独立验收规则保持不变。
+
+依据用户对 ANS-PERMISSION-REPAIR D3 的实施指令及必要治理前置授权，将原 YAML 已登记的生产、私有 common、测试与工作文档范围逐条落实到 `boundary.md` Section 1，不新增产品路径或目录。唯一范围收窄：移除运行时核心对根 `changelog.md` 的旧执行授权，治理历史由 ANS Team Formation 维护，实现历史留在自身 docs。同步 YAML 保持现有 `role/entries/kind/path/purpose` schema，不引入产品解析器不支持的 `source/section1` 格式。角色卡改为读取 Markdown 授权源，组别仅分类，完成判断交独立验收。历史条目保留。
+
+本轮仅修运行时核心定义与新独立验收定义；不迁移其他角色、应用治理流程或 `.ans`。本仓未配置 `.ans/project.json`；真实只读 `task_ops preflight-role` 以该路径调用，返回 exit 2 / rejected（文件不存在），未通过机器预检，也未生成替代配置、机器调度记录或凭据。本次沿用户明确授权的可信启动端、固定角色、精确写集和独立测试/验收交接执行；task_ops 全角色登记、凭据与自动门禁接入仍为后续显式迁移事项。
+
+验证：使用本项目真实 `parseBoundaryYaml` 与 `parseBoundarySection1` 核对两角色，运行时核心 15 条、独立验收 6 条逐项全等；核心与 HEAD YAML 比较仅移除根 changelog 旧授权。对全部其他实际角色 YAML 做文件/目录交集核对，无新增交集。`node --test test/门禁引擎/boundary-yaml.test.ts test/门禁引擎/model-and-service.test.ts`：21/21 通过、0 跳过；`git diff --check` 通过。这是治理兼容检查，不是 D3 产品修复或独立验收通过。
+
 ## 2026-10-20 `intent-confirm` 纳入 decision 组：同步运行时核心旧假设（已实施待验证）
 
 客户 2026-10-20「勾了替我决策就不用我管」：编排已把 `intent-confirm` 加入 `GOVERNANCE_CARD_GROUP` 的 decision 组。本角色同步边界内旧假设（纯文案与测试）：①`test/runtime-core/governance-judge.test.ts` 映射用例由「六卡种」改为「七卡种」，键集合加 `intent-confirm`，`governanceCardGroup("intent-confirm")` 由 `undefined` 改为 **`"decision"`**、hasOwnProperty 改为 true，注释明确 confirm 可代批、revise 仍交回客户/发起角色；②`test/runtime-core/governance-flow-metadata.test.ts` intent-confirm 透传用例名改为「判断分组为 decision」并新增映射断言；③`src/provider/runtime/tools.ts` 旧注释「不进入 GOVERNANCE_CARD_GROUP / 永不代批」改为新口径；④`src/provider/runtime/schema.ts` 的 `request_choice` 描述同步（客户本人或判断 agent 代批 confirm；revise 仍交回，不替客户修改）；⑤`src/model/runtime.ts` 的 `GovernanceChoiceCardKind` JSDoc 同步。映射本身由编排更新，本角色未重复改。既有 approve/manual 断言未放宽。验证：受影响两文件 **21/21**；`node --test "test/runtime-core/**/*.test.ts"` **240 计 / 239 过 / 0 红 / 1 跳过**；`npm run typecheck` **exit 0**；只读复跑 `test/编排/governance-judge.test.ts` **68/68**、`test/测试/governance-e2e-auto/j-intent-confirm.test.ts` **4/4**（decision 开代批/关手答/revise 拒/缺 confirm 自动 manual）。**跨角色待办（旧注释）**：`src/pipeline/orchestration/run-role.ts:1931`、`src/common/编排/governance-ledger.ts:58`、`test/测试/governance-e2e-auto/j-intent-confirm.test.ts:3` 仍写「判断 agent 永不介入/永不代批」，需各属主同步（行为测试已新口径）。未跑真实模型/凭据/网络；未 git 提交。记录见 [docs/change/2026-10-20_change_intent-confirm-decision-group.md](docs/change/2026-10-20_change_intent-confirm-decision-group.md)。

@@ -218,7 +218,7 @@ test("全链（开）：env on 与 options 显式两路都使三钉同翻 live�
     await session.dispose();
     await events.done;
 
-    const rows = events.entries.filter((event) => event.kind === "message");
+    const rows = events.entries.filter((event) => event.kind === "message" && (event.detail as { source?: string } | undefined)?.source === "web-search");
     assert.deepEqual(rows.map((row) => row.summary), ["联网搜索：独立验证搜索", "联网搜索：第二轮-A", "联网搜索：第二轮-B"]);
     assert.deepEqual(rows[0]!.detail, { version: 1, source: "web-search", itemId: "ws_1", query: "独立验证搜索", action: { type: "search" } });
     assert.equal(rows[1]!.turnId, rows[2]!.turnId, "同轮两行同 turnId");
@@ -242,7 +242,7 @@ test("全链：零搜索轮 settled 不携带 searchCalls；item/started 不接�
     await turn.done;
     await session.dispose();
     await events.done;
-    assert.equal(events.entries.filter((event) => event.kind === "message").length, 0, "item/started 零映射");
+    assert.equal(events.entries.filter((event) => event.kind === "message" && (event.detail as { source?: string } | undefined)?.source === "web-search").length, 0, "item/started 零搜索映射（system 配置提示单独计）");
     assert.deepEqual(events.entries.filter((event) => event.kind === "settled").map((event) => event.detail), [{ outcome: "completed" }], "零搜索轮不带 searchCalls 键");
   }
   {
@@ -279,7 +279,7 @@ test("全链：网关拒声明（error 通知）⇒ 本轮如实 failed 且 sett
   assert.equal(allText.includes("g3-fake-key"), false, "凭据被既有脱敏管线剥除");
   assert.equal(allText.includes("q=private-topic"), false, "URL query 被既有保守裁剪");
   assert.equal(allText.includes("id=42"), false);
-  const row = events.entries.find((event) => event.kind === "message")!;
+  const row = events.entries.find((event) => event.kind === "message" && (event.detail as { source?: string } | undefined)?.source === "web-search")!;
   assert.equal(row.summary.includes("[REDACTED]"), true);
   assert.equal((row.detail as { results: Array<{ url: string }> }).results[0]!.url, "https://x.test/page");
   const settled = events.entries.filter((event) => event.kind === "settled");

@@ -1,0 +1,664 @@
+{
+  "reports": [
+    {
+      "name": "routine collapsed; failure direct; assistant untouched",
+      "value": true
+    },
+    {
+      "name": "single brief real write fact",
+      "value": true
+    },
+    {
+      "name": "default failure shows known path",
+      "value": true
+    },
+    {
+      "name": "known shell exit survives literal semicolon",
+      "value": true
+    },
+    {
+      "name": "full target plus unknown target honest",
+      "value": true
+    },
+    {
+      "name": "live failed reason visible in summary",
+      "value": true
+    },
+    {
+      "name": "before-execution rejection keeps visible reason",
+      "value": true
+    },
+    {
+      "name": "unknown is honest count",
+      "value": true
+    },
+    {
+      "name": "one independent work list without duplicated role documents",
+      "value": true
+    },
+    {
+      "name": "snapshot keeps independent role document open",
+      "value": true
+    },
+    {
+      "name": "snapshot keeps full after independent role document and back",
+      "value": true
+    },
+    {
+      "name": "keyboard tabs to full",
+      "value": true
+    },
+    {
+      "name": "keyboard collapses full",
+      "value": true
+    },
+    {
+      "name": "keyboard expands full",
+      "value": true
+    },
+    {
+      "name": "keyboard tabs to withdraw",
+      "value": true
+    },
+    {
+      "name": "role geometry 1360",
+      "value": true
+    },
+    {
+      "name": "queue full/grid/action rect 1360",
+      "value": true
+    },
+    {
+      "name": "queue geometry 1360",
+      "value": {
+        "clientWidth": 413,
+        "scrollWidth": 413,
+        "full": {
+          "x": 993,
+          "y": 452.78125,
+          "width": 333,
+          "height": 1684.0625,
+          "top": 452.78125,
+          "right": 1326,
+          "bottom": 2136.84375,
+          "left": 993
+        },
+        "actions": [
+          {
+            "label": "收起",
+            "rect": {
+              "x": 993,
+              "y": 414.78125,
+              "width": 46,
+              "height": 28,
+              "top": 414.78125,
+              "right": 1039,
+              "bottom": 442.78125,
+              "left": 993
+            }
+          },
+          {
+            "label": "撤回",
+            "rect": {
+              "x": 1047,
+              "y": 414.78125,
+              "width": 46,
+              "height": 28,
+              "top": 414.78125,
+              "right": 1093,
+              "bottom": 442.78125,
+              "left": 1047
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "pi geometry 1360",
+      "value": true
+    },
+    {
+      "name": "Pi only one title/close 1360",
+      "value": true
+    },
+    {
+      "name": "growing composer avoids drawer 1360",
+      "value": true
+    },
+    {
+      "name": "closed no horizontal overflow 1360",
+      "value": true
+    },
+    {
+      "name": "role geometry 960",
+      "value": true
+    },
+    {
+      "name": "queue full/grid/action rect 960",
+      "value": true
+    },
+    {
+      "name": "queue geometry 960",
+      "value": {
+        "clientWidth": 413,
+        "scrollWidth": 413,
+        "full": {
+          "x": 593,
+          "y": 452.78125,
+          "width": 333,
+          "height": 1684.0625,
+          "top": 452.78125,
+          "right": 926,
+          "bottom": 2136.84375,
+          "left": 593
+        },
+        "actions": [
+          {
+            "label": "收起",
+            "rect": {
+              "x": 593,
+              "y": 414.78125,
+              "width": 46,
+              "height": 28,
+              "top": 414.78125,
+              "right": 639,
+              "bottom": 442.78125,
+              "left": 593
+            }
+          },
+          {
+            "label": "撤回",
+            "rect": {
+              "x": 647,
+              "y": 414.78125,
+              "width": 46,
+              "height": 28,
+              "top": 414.78125,
+              "right": 693,
+              "bottom": 442.78125,
+              "left": 647
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "pi geometry 960",
+      "value": true
+    },
+    {
+      "name": "Pi only one title/close 960",
+      "value": true
+    },
+    {
+      "name": "growing composer avoids drawer 960",
+      "value": true
+    },
+    {
+      "name": "closed no horizontal overflow 960",
+      "value": true
+    },
+    {
+      "name": "B independent no A image",
+      "value": true
+    },
+    {
+      "name": "A draft image resources full restored",
+      "value": true
+    },
+    {
+      "name": "late pick does not touch B",
+      "value": true
+    },
+    {
+      "name": "late pick stored in A",
+      "value": true
+    },
+    {
+      "name": "late send leaves B untouched",
+      "value": true
+    },
+    {
+      "name": "success clears original A sent items",
+      "value": true
+    },
+    {
+      "name": "halt preserves queued 3/full",
+      "value": true
+    },
+    {
+      "name": "withdraw pending retains item",
+      "value": true
+    },
+    {
+      "name": "failed withdraw full retained",
+      "value": true
+    },
+    {
+      "name": "withdraw failure inline next to action",
+      "value": true
+    },
+    {
+      "name": "withdraw failure keeps draft image resources",
+      "value": true
+    },
+    {
+      "name": "thrown withdrawal error inline and retryable",
+      "value": true
+    },
+    {
+      "name": "keyboard withdrawal response retains same action",
+      "value": true
+    },
+    {
+      "name": "snapshot preserves failure inline",
+      "value": true
+    },
+    {
+      "name": "late withdraw not B feedback",
+      "value": true
+    },
+    {
+      "name": "late withdraw belongs A item",
+      "value": true
+    },
+    {
+      "name": "success uses real returned snapshot",
+      "value": true
+    },
+    {
+      "name": "historical own-template failures direct",
+      "value": true
+    },
+    {
+      "name": "historical failure reasons visible without expand",
+      "value": true
+    },
+    {
+      "name": "virtual visible nonempty",
+      "value": true
+    },
+    {
+      "name": "incremental reader anchor",
+      "before": {
+        "text": "row-117 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+        "offset": 0.234375
+      },
+      "after": {
+        "text": "row-117 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+        "offset": 0.234375
+      }
+    },
+    {
+      "name": "group materialized and open",
+      "value": true
+    },
+    {
+      "name": "user-open group survives unrelated incremental",
+      "value": true
+    },
+    {
+      "name": "stable group restored after full prefix insertion",
+      "value": true
+    },
+    {
+      "name": "full replay preserves content identity",
+      "before": {
+        "text": "row-117 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+        "offset": 0.234375
+      },
+      "after": {
+        "text": "row-117 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+        "offset": 0.234375
+      }
+    },
+    {
+      "name": "activity group toggle reader anchor 960",
+      "offsets": [
+        80.234375,
+        80.234375,
+        80.234375,
+        80.234375,
+        80.234375,
+        80.234375,
+        80.234375,
+        80.234375,
+        80.234375
+      ],
+      "spread": 0
+    },
+    {
+      "name": "activity group toggle reader anchor 1360",
+      "offsets": [
+        80.234375,
+        80.234375,
+        80.234375,
+        80.234375,
+        80.234375,
+        80.234375,
+        80.234375,
+        80.234375,
+        80.234375
+      ],
+      "spread": 0
+    },
+    {
+      "name": "detached-pane role rowlist built before mount",
+      "value": true
+    },
+    {
+      "name": "detached-history role mounted windowed",
+      "value": true
+    },
+    {
+      "name": "detached-history pane reads same row gap as attached pane",
+      "value": true
+    },
+    {
+      "name": "activity group toggle reader anchor detached-history",
+      "offsets": [
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80
+      ],
+      "spread": 0
+    },
+    {
+      "name": "denied conclusion anchor and decided card retained",
+      "value": true
+    },
+    {
+      "name": "pending locator visible after role click",
+      "value": true
+    },
+    {
+      "name": "open pending supersedes true busy",
+      "value": true
+    },
+    {
+      "name": "pending entry fully reachable with card 960",
+      "value": true
+    },
+    {
+      "name": "covered pending actions unavailable card",
+      "value": true
+    },
+    {
+      "name": "pending geometry card",
+      "value": {
+        "chat": {
+          "x": 248,
+          "y": 108,
+          "width": 712,
+          "height": 313.40625,
+          "top": 108,
+          "right": 960,
+          "bottom": 421.40625,
+          "left": 248
+        },
+        "card": {
+          "x": 272,
+          "y": 196.296875,
+          "width": 664,
+          "height": 136.40625,
+          "top": 196.296875,
+          "right": 936,
+          "bottom": 332.703125,
+          "left": 272
+        },
+        "buttons": [
+          {
+            "hidden": false,
+            "inert": false,
+            "rect": {
+              "x": 290,
+              "y": 284.703125,
+              "width": 52,
+              "height": 32,
+              "top": 284.703125,
+              "right": 342,
+              "bottom": 316.703125,
+              "left": 290
+            }
+          },
+          {
+            "hidden": false,
+            "inert": false,
+            "rect": {
+              "x": 350,
+              "y": 284.703125,
+              "width": 65,
+              "height": 32,
+              "top": 284.703125,
+              "right": 415,
+              "bottom": 316.703125,
+              "left": 350
+            }
+          }
+        ],
+        "active": "op-request op-kind-preview is-flash",
+        "drawer": ""
+      }
+    },
+    {
+      "name": "keyboard locate closes card and exposes all actions",
+      "value": true
+    },
+    {
+      "name": "pending entry fully reachable with pi 960",
+      "value": true
+    },
+    {
+      "name": "covered pending actions unavailable pi",
+      "value": true
+    },
+    {
+      "name": "pending geometry pi",
+      "value": {
+        "chat": {
+          "x": 248,
+          "y": 108,
+          "width": 712,
+          "height": 313.40625,
+          "top": 108,
+          "right": 960,
+          "bottom": 421.40625,
+          "left": 248
+        },
+        "card": {
+          "x": 272,
+          "y": 196.296875,
+          "width": 664,
+          "height": 136.40625,
+          "top": 196.296875,
+          "right": 936,
+          "bottom": 332.703125,
+          "left": 272
+        },
+        "buttons": [
+          {
+            "hidden": false,
+            "inert": false,
+            "rect": {
+              "x": 290,
+              "y": 284.703125,
+              "width": 52,
+              "height": 32,
+              "top": 284.703125,
+              "right": 342,
+              "bottom": 316.703125,
+              "left": 290
+            }
+          },
+          {
+            "hidden": false,
+            "inert": false,
+            "rect": {
+              "x": 350,
+              "y": 284.703125,
+              "width": 65,
+              "height": 32,
+              "top": 284.703125,
+              "right": 415,
+              "bottom": 316.703125,
+              "left": 350
+            }
+          }
+        ],
+        "active": "op-request op-kind-preview is-flash",
+        "drawer": ""
+      }
+    },
+    {
+      "name": "keyboard locate closes pi and exposes all actions",
+      "value": true
+    },
+    {
+      "name": "keyboard reaches original preview",
+      "value": true
+    },
+    {
+      "name": "keyboard expands original preview",
+      "value": true
+    },
+    {
+      "name": "expanded preview renders controlled markdown",
+      "value": true
+    },
+    {
+      "name": "expanded preview stays inside card width",
+      "value": true
+    },
+    {
+      "name": "keyboard enters original confirm action",
+      "value": true
+    },
+    {
+      "name": "keyboard reaches deny action",
+      "value": true
+    },
+    {
+      "name": "answered pending returns to true busy",
+      "value": true
+    },
+    {
+      "name": "idle after answered removes work",
+      "value": true
+    },
+    {
+      "name": "keyboard reaches retained image removal",
+      "value": true
+    },
+    {
+      "name": "keyboard returns to input above toolbar",
+      "value": true
+    },
+    {
+      "name": "keyboard returns to composer image toolbar",
+      "value": true
+    },
+    {
+      "name": "pending arrival preserves drawer",
+      "value": true
+    },
+    {
+      "name": "expired request restores actual true busy",
+      "value": true
+    },
+    {
+      "name": "ordinary question creates no pending",
+      "value": true
+    },
+    {
+      "name": "runtime groups lead first and unknown metadata escaped",
+      "value": true
+    },
+    {
+      "name": "new engine no Pi history queue confirmation or draft",
+      "value": true
+    },
+    {
+      "name": "old engine envelopes cache only and stale project ignored",
+      "value": true
+    },
+    {
+      "name": "actual Codex call/result target correlation and completion",
+      "value": true
+    },
+    {
+      "name": "Codex secret fallback and optional official Responses settings",
+      "value": true
+    },
+    {
+      "name": "failed save keeps draft and honest error",
+      "value": true
+    },
+    {
+      "name": "saved secret cleared and busy apply timing truthful",
+      "value": true
+    },
+    {
+      "name": "runtime settings geometry 1360",
+      "value": true
+    },
+    {
+      "name": "runtime settings geometry 960",
+      "value": true
+    },
+    {
+      "name": "Claude required key and optional SDK model endpoint",
+      "value": true
+    },
+    {
+      "name": "failed outcome remains error",
+      "value": true
+    },
+    {
+      "name": "failed native restore honest rebuilding notice",
+      "value": true
+    },
+    {
+      "name": "foreign runtime shell caches without showing in current engine",
+      "value": true
+    },
+    {
+      "name": "Pi own history background queue draft and expired card restored",
+      "value": true
+    },
+    {
+      "name": "expired old shell collapses with reason visible in its own runtime",
+      "value": false
+    },
+    {
+      "name": "expired old shell collapses with reason visible in its own runtime observed",
+      "value": {
+        "chat": "Pi专属历史\nPi旧轮确认确认不同意请求已失效，未获同意。原因：原轮次已中止后台Pi消息\n【队列】1 条待办：Pi后台队列——等它完成当前任务后依次处理。正在工作",
+        "assistant": [
+          "Pi专属历史\n",
+          "后台Pi消息\n"
+        ],
+        "denied": [],
+        "model": {
+          "count": 3,
+          "lastIndex": 2,
+          "operators": [
+            {
+              "index": 1,
+              "requestId": "pi-old-confirm"
+            }
+          ],
+          "rowGap": 16
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: expired old shell collapses with reason visible in its own runtime\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: expired old shell collapses with reason visible in its own runtime\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:66:474)\n    at async runtimeChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:961:3)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1540:3"
+}

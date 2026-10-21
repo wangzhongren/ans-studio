@@ -20,6 +20,14 @@ import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const RENDERER_DIR = process.env.BENCH_RENDERER_DIR || path.resolve(HERE, "..", "..", "..", "app", "renderer");
 const OUT = process.env.BENCH_OUT || path.join(os.tmpdir(), "ans-bench-result.json");
+// Phase 3A/5B：默认构建产物入口；ANS_RENDERER_ENTRY 显式覆盖。
+// 5A：显式入口必须存在（fail-fast，不静默回退）。
+const EXPLICIT_RENDERER_ENTRY = process.env.ANS_RENDERER_ENTRY || "";
+const RENDERER_ENTRY = EXPLICIT_RENDERER_ENTRY || path.join(RENDERER_DIR, "dist", "index.html");
+if (EXPLICIT_RENDERER_ENTRY && !fs.existsSync(EXPLICIT_RENDERER_ENTRY)) {
+  console.error("ANS_RENDERER_ENTRY does not exist: " + EXPLICIT_RENDERER_ENTRY);
+  process.exit(2);
+}
 const result = { rendererDir: RENDERER_DIR, node: process.versions.node, electron: process.versions.electron, at: new Date().toISOString() };
 const write = () => fs.writeFileSync(OUT, JSON.stringify(result, null, 2));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -72,7 +80,7 @@ async function run() {
     if (result.console.length < 40) result.console.push(String(level) + ": " + String(message).slice(0, 300));
   });
   stage = "loadFile";
-  await win.loadFile(path.join(RENDERER_DIR, "index.html"));
+  await win.loadFile(RENDERER_ENTRY);
   const wc = () => win.webContents;
   await sleep(600);
 

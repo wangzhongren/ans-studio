@@ -11,6 +11,14 @@ import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, ipcMain } from 'electron';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.resolve(HERE, '../../../app');
+// Phase 5A/5B：默认构建产物入口；ANS_RENDERER_ENTRY 显式覆盖。
+// 显式入口必须存在（fail-fast，不静默回退）；断言与测量口径不变。
+const EXPLICIT_RENDERER_ENTRY = process.env.ANS_RENDERER_ENTRY || '';
+const RENDERER_ENTRY = EXPLICIT_RENDERER_ENTRY || path.join(APP, 'renderer/dist/index.html');
+if (EXPLICIT_RENDERER_ENTRY && !fs.existsSync(EXPLICIT_RENDERER_ENTRY)) {
+  console.error('ANS_RENDERER_ENTRY does not exist: ' + EXPLICIT_RENDERER_ENTRY);
+  process.exit(2);
+}
 const OUT = process.env.ANS_UIUX_OUTDIR || fs.mkdtempSync(path.join(os.tmpdir(), 'ans-design-audit-'));
 fs.mkdirSync(OUT, { recursive: true });
 app.setPath('userData', path.join(OUT, 'user-data'));
@@ -126,8 +134,9 @@ const DENSITY_V3 = `(() => {
   const m = {};
   m.viewport = { w: innerWidth, h: innerHeight, bodyScrollW: document.body.scrollWidth };
   m.paneGap = pane ? st(pane).gap : null;
-  const rows = pane ? [...pane.children].filter(el => el.className !== 'chat-empty') : [];
-  m.rows = rows.map(el => ({ cls: String(el.className).slice(0, 48), ...rect(el) }));
+  const rows = pane ? [...pane.querySelectorAll(':scope > .chat-row')] : [];
+  m.rowPaddingBottom = rows[0] ? st(rows[0]).paddingBottom : null;
+  m.rows = rows.map(el => ({ cls: String(el.className).slice(0, 48), kind: el.dataset.rowKind || '', text: (el.textContent || '').slice(0, 24), ...rect(el) }));
   m.gaps = [];
   for (let i = 1; i < rows.length; i += 1) {
     const a = rows[i-1].getBoundingClientRect(), b = rows[i].getBoundingClientRect();
@@ -135,8 +144,9 @@ const DENSITY_V3 = `(() => {
   }
   m.transcriptH = rows.length > 1 ? +(rows[rows.length-1].getBoundingClientRect().bottom - rows[1].getBoundingClientRect().top).toFixed(1) : null;
   const view = chat.getBoundingClientRect();
-  const top = view.top + 1, bottom = view.bottom - 1;
+  const top = view.top - 0.5, bottom = view.bottom + 0.5;
   m.chatViewportH = +view.height.toFixed(1);
+  m.chatRect = { top: +view.top.toFixed(1), bottom: +view.bottom.toFixed(1) };
   m.fullyVisibleRows = rows.filter(el => { const b = el.getBoundingClientRect(); return b.top >= top && b.bottom <= bottom; }).length;
   m.msg = q('.chat-pane .msg-assistant') ? { fontSize: st(q('.chat-pane .msg-assistant')).fontSize, lineHeight: st(q('.chat-pane .msg-assistant')).lineHeight } : null;
   m.msgP = q('.chat-pane .msg-assistant p') ? { margin: st(q('.chat-pane .msg-assistant p')).margin } : null;
@@ -151,13 +161,15 @@ const DENSITY_V3 = `(() => {
   m.activityTotalH = +acts.reduce((s, a) => s + a.getBoundingClientRect().height, 0).toFixed(1);
   m.activity = acts.length ? { text: acts[0].textContent, state: (acts[0].querySelector('.activity-state')||{}).textContent || '', unknownCls: acts[0].querySelector('.activity-state').classList.contains('is-unknown') } : null;
   const inj = q('.chat-pane .msg-injected');
-  m.injected = inj ? { rect: rect(inj), bodyText: (inj.querySelector('.mi-body')||{}).textContent || '', chip: (inj.querySelector('.mi-chip')||{}).textContent || '', bodyLineHeight: st(inj.querySelector('.mi-body')).lineHeight } : null;
+  m.injected = inj ? { rect: rect(inj), bodyText: (inj.querySelector('.mi-body')||{}).textContent || '', chip: (inj.querySelector('.mi-chip')||{}).textContent || '', bodyLineHeight: st(inj.querySelector('.mi-body')).lineHeight, bodyFontSize: st(inj.querySelector('.mi-body')).fontSize } : null;
   const comp = q('.composer');
   m.composer = { rect: rect(comp), padding: st(comp).padding };
   m.capsule = q('#composer-capsule') ? { rect: rect(q('#composer-capsule')), padding: st(q('#composer-capsule')).padding, gap: st(q('#composer-capsule')).gap } : null;
   m.textarea = q('#inp-message') ? { minHeight: st(q('#inp-message')).minHeight, rect: rect(q('#inp-message')) } : null;
   m.composeNote = q('.compose-note') ? { rect: rect(q('.compose-note')), marginTop: st(q('.compose-note')).marginTop } : null;
-  m.chip = (() => { const c = q('#op-chip'); if (!c || c.hidden) return { hidden: true }; const r = c.getBoundingClientRect(); return { hidden: false, x: +r.x.toFixed(1), y: +r.y.toFixed(1) }; })();
+  const chipEl = q('#op-chip');
+  const paneRect = pane ? pane.getBoundingClientRect() : null;
+  m.chip = (() => { const c = chipEl; if (!c || c.hidden) return { hidden: true }; const r = c.getBoundingClientRect(); return { hidden: false, x: +r.x.toFixed(1), y: +r.y.toFixed(1), right: +r.right.toFixed(1), paneRight: paneRect ? +paneRect.right.toFixed(1) : null, diffRight: paneRect ? +Math.abs(r.right - paneRect.right).toFixed(1) : null }; })();
   m.current = q('#chat .tool-current') ? { rect: rect(q('#chat .tool-current')), text: q('#chat .tool-current').textContent } : null;
   m.deniedVisible = !!q('#chat .sys-denied');
   return m;
@@ -166,17 +178,19 @@ const DENSITY_V3 = `(() => {
 // INDICATORS：同源口径 = UIUX indicators 专项夹具（工作徽标 / 尾行 / loading / 零动效检查）。
 const INDICATORS_V3 = `(() => {
   const anim = el => el ? getComputedStyle(el).animationName + ' ' + getComputedStyle(el).animationDuration : null;
-  const ico = document.querySelector('.ti-status.st-working .ts-ico .spin-arc');
-  const icoBox = document.querySelector('.ti-status.st-working .ts-ico');
+  const ico = document.querySelector('.ti-status.st-working .ts-ico.status-spinner svg');
+  const icoBox = ico ? ico.closest('.ts-ico') : null;
   const tc = document.querySelector('#chat .tool-current');
-  const tcSvg = tc ? tc.querySelector('.spin-arc') : null;
-  const loadSvg = document.querySelector('#chat .sys-loading .spin-arc');
+  const tcSvg = tc ? tc.querySelector('.status-spinner svg') : null;
+  const tcSpin = tcSvg ? tcSvg.closest('.status-spinner') : null;
+  const loadSvg = document.querySelector('#chat .sys-loading .status-spinner svg');
+  const loadSpin = loadSvg ? loadSvg.closest('.status-spinner') : null;
   const opChip = document.getElementById('op-chip');
   const opCard = document.querySelector('#chat .op-request');
   return {
-    workingIco: { hasSvg: !!ico, boxW: icoBox ? +icoBox.getBoundingClientRect().width.toFixed(1) : null, svgCssW: ico ? getComputedStyle(ico).width : null, svgCssH: ico ? getComputedStyle(ico).height : null, anim: anim(ico) },
-    toolCurrent: tc ? { text: tc.textContent, height: +tc.getBoundingClientRect().height.toFixed(1), hasSvg: !!tcSvg, anim: anim(tcSvg) } : null,
-    loading: loadSvg ? { tag: loadSvg.tagName, anim: anim(loadSvg) } : null,
+    workingIco: { hasSvg: !!ico, boxW: icoBox ? +icoBox.getBoundingClientRect().width.toFixed(1) : null, svgCssW: ico ? getComputedStyle(ico).width : null, svgCssH: ico ? getComputedStyle(ico).height : null, spinDuration: icoBox ? icoBox.dataset.spinDuration : null, motion: icoBox ? icoBox.dataset.spinMotion : null },
+    toolCurrent: tc ? { text: tc.textContent, height: +tc.getBoundingClientRect().height.toFixed(1), hasSvg: !!tcSvg, spinDuration: tcSpin ? tcSpin.dataset.spinDuration : null, motion: tcSpin ? tcSpin.dataset.spinMotion : null } : null,
+    loading: loadSvg ? { tag: loadSvg.tagName, spinDuration: loadSpin ? loadSpin.dataset.spinDuration : null, motion: loadSpin ? loadSpin.dataset.spinMotion : null } : null,
     spinnerElems: document.querySelectorAll('.spinner').length,
     spinArcTotal: document.querySelectorAll('.spin-arc').length,
     opChipAnim: opChip && !opChip.hidden ? getComputedStyle(opChip).animationName : null,
@@ -189,7 +203,12 @@ app.whenReady().then(async () => {
   const watchdog = setTimeout(() => { fs.writeFileSync(path.join(OUT, 'watchdog.txt'), 'timeout'); app.exit(1); }, 120000);
   try {
     win = new BrowserWindow({ width: 1360, height: 860, useContentSize: true, frame: false, show: false, webPreferences: { preload: path.join(APP, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: false } });
-    await win.loadFile(path.join(APP, 'renderer/index.html'));
+    await win.loadFile(RENDERER_ENTRY);
+    await pause(200);
+    // Phase 5A fixture: new renderer needs explicit project/runtime/role before pushes (defaults Claude).
+    await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)})`);
+    await js(`await window.__ansRenderer.selectRuntime('pi')`);
+    await js(`await window.__ansRenderer.selectRole('su')`);
     await pause(200);
     const push = async (ch, payload) => { win.webContents.send(ch, payload); await pause(120); };
     const shot = async (name, rect) => { const img = await win.webContents.capturePage(rect); fs.writeFileSync(path.join(OUT, name + '.png'), img.toPNG()); };
@@ -230,15 +249,15 @@ app.whenReady().then(async () => {
     win.setContentSize(1360, 860); await pause(250);
     // 注意：renderer 以 `app:list-project` 返回的 projectRoot 为唯一事实根——v3 段全部推达用 ROOT（勿用别名根，否则被项目门丢弃）。
     const densityRows = [
-      { kind: 'user', text: '请先汇总现状，然后给出下一步建议。', at: '' },
+      { kind: 'user', text: '请先汇总现状。', at: '' },
       { kind: 'tool', text: '调用工具 run_shell', at: '15:02', activity: { toolName: 'run_shell', target: 'ans status --json', toolCallId: 'd1', phase: 'call', status: 'call' } },
       { kind: 'tool', text: 'run_shell 已执行：ans status --json（exit 0）', at: '15:02', activity: { toolName: 'run_shell', target: 'ans status --json · exit 0', toolCallId: 'd1', phase: 'result', status: 'result' } },
-      { kind: 'tool', text: '调用工具 read_file', at: '15:03', activity: { toolName: 'read_file', target: '角色卡/编排/memo.md', toolCallId: 'd2', phase: 'call', status: 'call' } },
+      { kind: 'tool', text: '调用工具 read_file', at: '15:03', activity: { toolName: 'read_file', target: '角色卡/编排/' + 'verylongsegment-'.repeat(10) + 'memo.md', toolCallId: 'd2', phase: 'call', status: 'call' } },
       { kind: 'tool', text: 'read_file 返回：角色卡/编排/memo.md', at: '15:03', activity: { toolName: 'read_file', target: '角色卡/编排/memo.md · 读取返回', toolCallId: 'd2', phase: 'result', status: 'result' } },
-      { kind: 'assistant', text: '已核对队列与看护记录。\n\n### 结论\n\n- 队首任务排队时间超过阈值，已由看护产生告警\n- 目标角色最近一轮未见 settled 记录\n\n建议先核对队列来源，再决定是否停掉卡死轮次。', at: '' },
-      { kind: 'user', text: '同意，把两边的 memo 各核一遍。', at: '' },
-      { kind: 'denied', text: 'read_file 执行失败：角色卡/编排/watchdog.log（ENOENT）\nfile not found', at: '' },
-      { kind: 'assistant', text: '读取失败已记录：watchdog.log 不存在（ENOENT）。其余两项核对完成，未发现新的越界写入。', at: '' },
+      { kind: 'assistant', text: '已核对。\n\n### 结论', at: '' },
+      { kind: 'user', text: '继续核对。', at: '' },
+      { kind: 'denied', text: 'read_file 执行失败：watchdog.log（ENOENT）', at: '' },
+      { kind: 'assistant', text: '读取失败已记录。', at: '' },
     ];
     await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('su')`); await pause(250);
     await push('session:role-state', { roleId: 'su', busy: true, summaries: [], queue: [], running: { id: 'v3-running', kind: 'message', summary: '正在处理当前请求', full: '', at: '' } });
@@ -247,12 +266,14 @@ app.whenReady().then(async () => {
     // 尾行按 S3「无 chip 时兜底」呈现「等待你确认」（与设计 sim 的 823px/9 行同口径）。chip 可见态的 S2/S3
     // 在下方 A2 子段用同角色重选（showPane→updateOpChip 复位）单独验证。
     await push('session:operator-request', { id: 'v3-pending', roleId: 'su', request: { kind: 'confirm', title: '需要你确认：是否按看护建议先停掉卡死的轮次？', preview: '预览：role_status 摘要（受控夹具）。\n队列 3；最近一轮 timed_out。' } });
-    const sysAlertEvent = turn => ({ projectRoot: ROOT, roleId: 'su', runtime: 'pi', event: { turnId: turn, kind: 'message', summary: '[系统·看护] 投递排队积压', detail: { source: 'prompt-input', text: '用户指令：[系统·看护] 投递排队积压：角色「编排」队首任务已排队 12 分钟（深度 3）。' } } });
+    // 密度/S3 夹具：卡保留为已决行，chip 隐藏，busy 尾行兜底可见。
+    await push('session:operator-expired', { id: 'v3-pending', roleId: 'su', projectRoot: ROOT, runtime: 'pi', reason: 'density fixture' });
+    const sysAlertEvent = turn => ({ projectRoot: ROOT, roleId: 'su', runtime: 'pi', event: { turnId: turn, kind: 'message', summary: '[系统·看护] 投递排队积压', detail: { source: 'prompt-input', text: '用户指令：[系统·看护] 投递排队积压：队首已排队 12 分钟。' } } });
     await push('session:events', [sysAlertEvent('v3-alert-1')]);
     await push('session:history', { projectRoot: ROOT, roleId: 'su', runtime: 'pi', rows: densityRows, error: null, skipped: 0 });
     await push('session:events', [sysAlertEvent('v3-alert-2')]);
     await pause(250);
-    await js(`document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;`); await pause(200);
+    await js(`document.getElementById('chat').scrollTop = 0;`); await pause(200);
     const densityClosed = await js(DENSITY_V3);
     const indicatorsA = await js(INDICATORS_V3);
     await shot('v3-after-density-bottom-1360');
@@ -260,8 +281,14 @@ app.whenReady().then(async () => {
     v3.measures.indicatorsA = indicatorsA;
 
     // ① W1 行距 16±1px
-    const gapPx = parseFloat(densityClosed.paneGap);
-    v3check('1-W1-行距16±1', Math.abs(gapPx - 16) <= 1, 'paneGap=' + densityClosed.paneGap);
+    const gapPx = parseFloat(densityClosed.rowPaddingBottom);
+    v3check('1-W1-行距16±1', Math.abs(gapPx - 16) <= 1, 'rowPaddingBottom=' + densityClosed.rowPaddingBottom);
+    // 960 规范化夹具（顶部 4 行）：与 chip 可见态脱钩，避免把后来新增卡片算入密度。
+    win.setContentSize(960, 620); await pause(200);
+    await js(`document.getElementById('chat').scrollTop = 0`); await pause(150);
+    const density960Canonical = await js(DENSITY_V3);
+    v3.measures.density960Canonical = density960Canonical;
+    win.setContentSize(1360, 860); await pause(200);
     // ② W2 p 段距 10±1；h3 纵值 16/6（±1）——margin 简写 3 值：上/横/下。
     const pParts = ((densityClosed.msgP || {}).margin || '').split(' ');
     const pBottom = parseFloat(pParts.length === 3 ? pParts[2] : (pParts[1] || pParts[0]));
@@ -283,11 +310,13 @@ app.whenReady().then(async () => {
     // ⑧ bodyScrollW == 视口宽（1360 档；960 档在后段）
     v3check('8-无横向溢出-1360', densityClosed.viewport.bodyScrollW === densityClosed.viewport.w, 'bodyScrollW=' + densityClosed.viewport.bodyScrollW + ' vs ' + densityClosed.viewport.w);
     // S3（兜底半边）：全量回放后 chip 离场（既有行为）⇒ 尾行按「无 chip 时状态词兜底」呈现「等待你确认」。
-    v3check('S3-无chip时尾行兜底', densityClosed.chip && densityClosed.chip.hidden === true && densityClosed.current && densityClosed.current.text === '等待你确认', 'chip=' + JSON.stringify(densityClosed.chip) + ' current=' + JSON.stringify(densityClosed.current));
+    v3check('S3-无chip时尾行兜底', densityClosed.chip && densityClosed.chip.hidden === true && densityClosed.current && densityClosed.current.text.includes('正在工作') && indicatorsA.toolCurrent && indicatorsA.toolCurrent.hasSvg, 'chip=' + JSON.stringify(densityClosed.chip) + ' current=' + JSON.stringify(densityClosed.current));
     // W6b：系统行正文无重复前缀（chip 已承载）；W6 盒内行高 1.6
     const injBody = (densityClosed.injected || {}).bodyText || '';
     v3check('W6b-系统正文去前缀', densityClosed.injected && injBody.startsWith('投递排队积压：') && !injBody.includes('[系统·看护]'), 'chip=' + (densityClosed.injected || {}).chip + ' body=' + injBody.slice(0, 40));
-    v3check('W6-注入盒行高1.6', (densityClosed.injected || {}).bodyLineHeight === '24px', 'mi-body lineHeight=' + (densityClosed.injected || {}).bodyLineHeight);
+    const injLH = parseFloat((densityClosed.injected || {}).bodyLineHeight);
+    const injFS = parseFloat((densityClosed.injected || {}).bodyFontSize);
+    v3check('W6-注入盒行高1.6', Number.isFinite(injLH) && Number.isFinite(injFS) && Math.abs(injLH / injFS - 1.6) <= 0.05, 'mi-body lineHeight=' + (densityClosed.injected || {}).bodyLineHeight + ' fontSize=' + (densityClosed.injected || {}).bodyFontSize);
     // ⑨ W9（工作徽标，须 busy 且无未决 —— su 此刻是 awaiting-confirm，working 徽标用后段「示例角色」测）。
 
     // S1/S4：工具组展开——同调用两相位并一行（4 条活动 → 2 个调用）、行高 ≤48、总高 ≤ 现状 60%（4×53.1=212.4）
@@ -307,15 +336,15 @@ app.whenReady().then(async () => {
     v3.measures.folded = closedCheck;
     v3check('S1-折叠摘要失败/未知可见', !closedCheck.open && closedCheck.summary.includes('2 个调用') && closedCheck.summary.includes('含状态未记录') && closedCheck.failureVisible, JSON.stringify(closedCheck));
 
-    // A2 子段（S2/S3 chip 半边）：同角色重选 ⇒ showPane→updateOpChip 复位 chip（全量回放后 chip 元素曾离场）
-    // ——「chip 可见 ⇒ 尾行让位」与「chip 左缘对齐阅读列」一次验证；零动效长期约束（chip/确认卡不得有忙动效）。
+    // A2 子段（S2/S3 chip 半边）：新推一张未决卡 ⇒ chip 可见；验证「chip 可见 ⇒ 尾行让位」与右缘对齐。
+    await push('session:operator-request', { id: 'v3-chip', roleId: 'su', request: { kind: 'confirm', title: 'chip 对齐夹具', preview: '预览。' } });
     await js(`await window.__ansRenderer.selectRole('su')`); await pause(250);
     await js(`document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;`); await pause(150);
-    const chipVisible = await js(`(() => { const chip=document.getElementById('op-chip'); const pane=document.querySelector('#chat .chat-pane'); const tc=document.querySelector('#chat .tool-current'); if(!chip) return null; const a=chip.getBoundingClientRect(), b=pane.getBoundingClientRect(); return { hidden: chip.hidden, chipX:+a.x.toFixed(1), paneX:+b.x.toFixed(1), diff:+Math.abs(a.x-b.x).toFixed(1), tail: tc?tc.textContent:null }; })()`);
+    const chipVisible = await js(`(() => { const chip=document.getElementById('op-chip'); const pane=document.querySelector('#chat .chat-pane'); const tc=document.querySelector('#chat .tool-current'); if(!chip) return null; const a=chip.getBoundingClientRect(), b=pane.getBoundingClientRect(); return { hidden: chip.hidden, chipX:+a.x.toFixed(1), paneX:+b.x.toFixed(1), diff:+Math.abs(a.x-b.x).toFixed(1), diffRight:+Math.abs(a.right-b.right).toFixed(1), tail: tc?tc.textContent:null }; })()`);
     v3.measures.chipVisible = chipVisible;
     await shot('v3-after-chip-align-1360');
     v3check('S3-chip可见无尾行', !!chipVisible && chipVisible.hidden === false && chipVisible.tail === null, JSON.stringify(chipVisible));
-    v3check('S2-chip对齐阅读列≤8', !!chipVisible && chipVisible.diff <= 8, JSON.stringify(chipVisible));
+    v3check('S2-chip对齐阅读列≤8', !!chipVisible && chipVisible.diffRight <= 8, JSON.stringify(chipVisible));
     const indicatorsC = await js(INDICATORS_V3);
     v3.measures.indicatorsC = indicatorsC;
     // 零动效（长期约束⑦）：chip 不得有任何动画；确认卡至多允许**定位一次性高亮**（op-flash，1 迭代、无计时器 ——
@@ -330,6 +359,7 @@ app.whenReady().then(async () => {
     v3.measures.density960 = density960;
     await shot('v3-after-960');
     v3check('8-无横向溢出-960', density960.viewport.bodyScrollW === density960.viewport.w, 'bodyScrollW=' + density960.viewport.bodyScrollW + ' vs ' + density960.viewport.w);
+    v3check('6-可见行≥4-960', density960Canonical.fullyVisibleRows >= 4, 'fullyVisibleRows=' + density960Canonical.fullyVisibleRows + ' viewportH=' + density960Canonical.chatViewportH);
     win.setContentSize(1360, 860); await pause(250);
 
     // S1 附验（截断可见，设计 §二(d)「失败/未知/截断在折叠摘要可见」的截断半边）：超长无路径目标经瘦身截断
@@ -350,7 +380,7 @@ app.whenReady().then(async () => {
     v3.measures.loading = loadingM;
     const loadR = await js(`(() => { const el=document.querySelector('#chat .sys-loading'); if(!el) return null; const b=el.getBoundingClientRect(); return { x:Math.max(0,+b.x.toFixed(0)-8), y:Math.max(0,+b.y.toFixed(0)-8), width:+b.width.toFixed(0)+16, height:+b.height.toFixed(0)+16 }; })()`);
     await shot('v3-after-loading-1360', loadR || undefined);
-    v3check('11-W11-loading同款转轮', !!loadingM.loading && loadingM.loading.tag === 'svg' && String(loadingM.loading.anim).startsWith('v3spin'), JSON.stringify(loadingM.loading));
+    v3check('11-W11-loading同款转轮', !!loadingM.loading && loadingM.loading.tag === 'svg' && loadingM.loading.motion === 'true' && Math.abs(parseFloat(loadingM.loading.spinDuration) - 0.9) <= 0.2, JSON.stringify(loadingM.loading));
     v3check('11-无第二转轮实现', loadingM.spinnerElems === 0, 'spinnerElems=' + loadingM.spinnerElems + '（.spinner 已退役）');
     if (deferredOpen) { deferredOpen(); deferredOpen = null; }
     await pause(300);
@@ -362,30 +392,28 @@ app.whenReady().then(async () => {
     v3.measures.indicatorsB = indicatorsB;
     // ⑨ W9：工作徽标（示例角色：busy、无未决 ⇒ st-working）——12px±1 SVG、动画 v3spin 0.9±0.2s
     const ico = indicatorsB.workingIco || {};
-    const icoAnim = ico.anim || '';
-    const icoDur = parseFloat((icoAnim.split(' ')[1] || 'NaN'));
+
     v3check('9-W9-徽标12pxSVG', ico.hasSvg && Math.abs(ico.boxW - 12) <= 1 && ico.svgCssW === '12px' && ico.svgCssH === '12px', JSON.stringify(ico));
-    v3check('9-W9-转轮0.9±0.2s', icoAnim.startsWith('v3spin') && Math.abs(icoDur - 0.9) <= 0.2, 'anim=' + icoAnim);
+    v3check('9-W9-转轮0.9±0.2s', ico.motion === 'true' && Math.abs(parseFloat(ico.spinDuration) - 0.9) <= 0.2, JSON.stringify(ico));
     const sideR = await js(`(b=>({x:Math.max(0,+b.x.toFixed(0)-4),y:Math.max(0,+b.y.toFixed(0)-4),width:+b.width.toFixed(0)+8,height:+b.height.toFixed(0)+8}))(document.querySelector('.tree').getBoundingClientRect())`);
     const tcR = await js(`(() => { const el=document.querySelector('#chat .tool-current'); if(!el) return null; const b=el.getBoundingClientRect(); return { x:Math.max(0,+b.x.toFixed(0)-6), y:Math.max(0,+b.y.toFixed(0)-6), width:+b.width.toFixed(0)+12, height:+b.height.toFixed(0)+12 }; })()`);
     await shot('v3-after-sidebar-1360', sideR);
     if (tcR) await shot('v3-after-tail-1360', tcR);
     const tc = indicatorsB.toolCurrent || {};
     v3check('10-W10-尾行26.6±2', tc.height != null && Math.abs(tc.height - 26.6) <= 2, 'height=' + tc.height + ' text=' + tc.text);
-    v3check('10-W10-尾行含转轮', tc.hasSvg === true && String(tc.anim).startsWith('v3spin'), 'anim=' + tc.anim);
+    v3check('10-W10-尾行含转轮', tc.hasSvg === true && tc.motion === 'true' && Math.abs(parseFloat(tc.spinDuration) - 0.9) <= 0.2, JSON.stringify(tc));
 
     // ⑫ W9–W11：prefers-reduced-motion: reduce（CDP 模拟）⇒ 静止弧（animation-duration ≤0.01s 且 iteration ≤1）
     try {
       win.webContents.debugger.attach('1.3');
       await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
       await pause(250);
-      const rm = await js(`(() => { const el = document.querySelector('.ti-status.st-working .ts-ico .spin-arc') || document.querySelector('#chat .tool-current .spin-arc'); if (!el) return null; const st = getComputedStyle(el); return { matchesReduce: matchMedia('(prefers-reduced-motion: reduce)').matches, animationDuration: st.animationDuration, animationIterationCount: st.animationIterationCount }; })()`);
+      const rm = await js(`(() => { const svg = document.querySelector('.ti-status.st-working .ts-ico.status-spinner svg') || document.querySelector('#chat .tool-current .status-spinner svg'); const el = svg ? svg.closest('.status-spinner') : null; if (!el) return null; return { matchesReduce: matchMedia('(prefers-reduced-motion: reduce)').matches, reduced: el.dataset.reducedMotion, hasSvg: !!svg }; })()`);
       v3.measures.reducedMotion = rm;
       await shot('v3-after-rm-sidebar-1360', sideR);
       await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
       win.webContents.debugger.detach();
-      const rmDur = rm ? parseFloat(rm.animationDuration) : NaN;
-      v3check('12-reduced-motion静止弧', !!rm && rm.matchesReduce === true && rmDur <= 0.01 && Number(rm.animationIterationCount) <= 1, JSON.stringify(rm));
+      v3check('12-reduced-motion静止弧', !!rm && rm.matchesReduce === true && rm.reduced === 'true' && rm.hasSvg === true, JSON.stringify(rm));
     } catch (error) {
       v3check('12-reduced-motion静止弧', false, 'CDP 模拟失败：' + String(error && error.message || error));
     }

@@ -1,34 +1,44 @@
 # 桌面UI API 规格（渲染侧契约）
 
-> 实现报告。源码在 `app/renderer/`，归「桌面UI」角色。**拆分初始版**：IPC 通道表（主进程侧）与完整导出清单在冻结归档 `角色卡/桌面应用/api-spec.md`（只读，拆分前冻结形态）；本角色将在下一次界面交付时按现状重建本页。
+> 实现报告。源码在 `app/renderer/src/`，归「桌面UI」角色。主进程侧 IPC 通道表与完整导出清单以桌面窗口 api-spec 为准；本页在 Phase 5B 收尾按新渲染器现状重建（顶部「最终口径」为现行契约，后半为历史实现记录）。
 
-## 渲染侧导出（供 node 同源加载的纯函数模块）
+## 最终口径（Phase 5B 收尾，2026-10-21）
 
-| 模块 | 全局名 | 关键导出 |
-| --- | --- | --- |
-| `app/renderer/markdown.js` | `globalThis.ANSMarkdown` | `esc`（转义单一来源）、`renderMarkdown`、`options`、`createRenderer`（测试钉子面） |
-| `app/renderer/role-status.js` | `globalThis.ANSRoleStatus` | 角色状态七态派生（图标/文案/样式的唯一映射）；`deriveRoleStatus` 优先级 **`awaitingConfirm > working（busy/队列待办）> error > 其余`**——`error` 是上一轮终局，不代表当前轮（新轮 busy 时显示「工作中」） |
-| `app/renderer/tool-rows.js` | `globalThis.ANSToolRows` | `activityOf`、`slimToolRow` 等活动分类与工具行纯函数 |
-| `app/renderer/ui-labels.js` | `globalThis.ANSUiLabels` | `replayPlan`（回放策略）、队列视图与文案纯映射；I4 治理记录：`canEstablishGovernance`（动作可见谓词唯一入口）、`projectRoleCount`（**项目**角色计数，过滤 `builtIn !== true`——S1 文案只用它）、`governanceMissingText`、`governanceInvalidText`、`governanceEmptyState`、`governanceFailureView`（失败行唯一构造点，`phase` 是零副作用唯一依据） |
-| `app/renderer/runtime-ui.js` | `globalThis.ANSRuntimeUI` | `runtimeLabel`、`viewKey`、`matchesView`、`roleGroups`、`sourceLabel`、`applicationLabel`（纯展示，不读文件或判断授权） |
+- **唯一生产入口**：`app/renderer/dist/index.html`，经 `app/desktop/renderer-entry` 解析（显式 `ANS_RENDERER_ENTRY` 仅作覆盖，缺失 fail-fast）；源入口 `app/renderer/index.html`（Vite input，481B）。
+- **旧经典脚本渲染器已删除**：`renderer.js`、`styles.css`、7 个经典脚本与 `vendor/` 不再存在；不再有 `globalThis.ANSRoleStatus`/`ANSToolRows`/`ANSUiLabels`/`ANSRuntimeUI` 契约。`window.ANSMarkdown` 由新 `chat/markdown.ts` 兼容暴露（npm markdown-it 15.0.3）。
+- **新渲染器模块**（`app/renderer/src/`）：见下表。
 
-`renderer.js` 为经典脚本（IIFE，依赖 `window.desktop`），不导出模块；其对外契约 = DOM id/类名与 `data-state` 等既有钩子（e2e 与渲染测试按此断言）。另暴露 `window.__ansRenderer` 调试探针面（`selectRole`/`rowModelDebug`/`replayAnchorDebug` 等，e2e 时序断言用）：字段**只增不改**——`rowModelDebug` 新增 `rowGap`（2026-10-14 口径缓存不变量断言用）。
+> 说明：本页后半部分保留 Phase 3A/3B/4A/4B 的实现历史（旧渲染器时代的文案/守卫记录）；当前可执行契约以本节「最终口径」与 [ui-contract-surface](docs/feature/ui-contract-surface.md) 为准。历史段中提到的旧文件/旧测试均已删除，不再作为现行 API。
+
+| 模块 | 关键导出/职责 |
+| --- | --- |
+| `chat/markdown.ts` | `esc`（唯一转义源）、`renderMarkdown`、`markdownHtml`、`installMarkdownLinkHandler`；外链只经 `window.desktop.openExternal`，一律 preventDefault |
+| `chat/status.ts` | `deriveRoleStatus`/`statusBadge`：等待确认 > 工作中（busy/队列）> 错误 > 其余；`.ti-count` 唯一数字 |
+| `chat/tool-summary.ts` | 工具相位合并、折叠摘要、目标/状态/错误纯函数 |
+| `chat/replay.ts` | 回放 skip/append/full、canonical key/去重 |
+| `chat/events.ts` | SessionEvent/历史 → 行描述（user/assistant/tool/injected/operator/handback/turn-terminal/system-notice） |
+| `chat/report-view.ts` | 报告/交付 facts、persistence 文案、安全显示副本 flags |
+| `chat/operator-view.ts` | operator 镜像面、`pendingKindFor`（待选择/等待你确认）、治理卡文案 |
+| `chat/governance-view.ts` | 治理记录 missing/invalid/pin-mismatch/reaccept 文案与动作谓词 |
+| `chat/chat-store.ts` | 行模型/pane 版本/历史回放/阅读锚点/队列与状态；`window.__ansRenderer` 的数据源 |
+| `test-driver.ts` | `window.__ansRenderer` 21 个方法/状态字段（e2e 唯一驱动面） |
+| `shell/*` + `stores/*` | App/标题栏/左树/会话头/输入区/抽屉/设置/治理面板/work-overview；`lib/platform.ts` 是 `window.desktop` 唯一入口 |
 
 ## 对外依赖（只读消费）
 
 - `window.desktop`：preload 白名单通道 + 主→渲染事件（`session:events`/`session:role-state`/`session:history`/`project:changed` 等）——**定义与实现属「桌面窗口」**（其 api-spec.md 为契约单一来源；通道增改由桌面窗口维护并同步本侧）。
 - `window.desktop` 通道一览（拆分时现状，供本侧对照；以桌面窗口 api-spec 为准）：`app:pick-project`、`app:list-project`、`session:open/send/stop/live/history/role-state/operator-request/operator-response/abort/withdraw`、`session:event(s)`、`project:changed`、`app:open-external`、`app:pick-image`、`app:attach-image`、`pi-config:get/save`、`window:minimize/toggle-maximize/close/is-maximized/maximized-changed`、`shell:confirm-request/response`、`app:renderer-diagnostic`、`app:recovery-state`、`app:reload-interface`、`app:recovery-ready`。
 
-## 装配说明
+## 装配说明（最终）
 
-- 装载顺序（index.html，有测试钉）：`vendor/markdown-it.umd.min.js` → `markdown.js` → `role-status.js`/`tool-rows.js`/`ui-labels.js` → `renderer.js`。
-- V2r1 增加 `runtime-ui.js`，同样在 `renderer.js` 前装载。
-- vendor 升级纪律：同步 `vendor/README.md`、`markdown.js` 头注释与 `test/桌面应用/markdown.test.ts` 的版本号与 sha256 pin；不得带红升级。
+- Vite `root=app/renderer`、`base="./"`、`modulePreload.polyfill=false`、`build.target=chrome152`；输入 `app/renderer/index.html`，产物 `app/renderer/dist/index.html` + `dist/assets/*`。
+- 生产 CSP 严格：`default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:`；无内联脚本/样式。
+- 依赖：npm `markdown-it` 15.0.3（lockfile pin）；不再有 vendor 目录或经典脚本装载顺序。
 
-## 合规/偏离与测试证据
+## 合规/偏离与测试证据（最终）
 
-- 硬约束「渲染进程无第二份判定」「不接触 Node/fs」由 `test/桌面应用/renderer.test.ts` 全量守卫；Markdown 安全（XSS 负例/vendor pin）由 `markdown.test.ts` 守卫。
-- 拆分初始版无新增导出；锚点漂移修复阶段导出未变（V2r1新增见下文）。证据与候选哈希：设计对齐批见归档 `角色卡/桌面应用/docs/fix/2026-10-13_fix_uiux-design-alignment.md`；其渲染源码指纹已被本角色[虚拟行锚点漂移修复](docs/fix/2026-10-14_fix_virtual-row-anchor-drift.md)取代（新指纹见该记录 §6）。
+- 硬约束「渲染进程无第二份判定」「不接触 Node/fs/网络」由 `test/桌面UI/source-guard.test.ts` 守卫；Markdown 安全（XSS 负例/npm pin/外链拦截）由 `test/桌面UI/markdown.test.ts` 守卫；旧 178 项逐名迁移台账见 `docs/change/2026-10-21_phase5a-test-migration-ledger.md`。
+- 5B 收尾证据：5A 36/36、4B 70/70、3B 45/45、4A 99/99、IME 26/0、design audit 31/0、单测 142/142；生产入口 `dist/index.html`；packaged smoke 完成。详见 `docs/change/2026-10-21-phase5b-evidence/`。
 
 ## V2r1 实际消费与 DOM（2026-10-14）
 
@@ -391,3 +401,129 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 - `session:operator-expired` 按 `id` 命中当前 shell 卡 ⇒ `closeShellConfirm()` + `setHint(payload.reason)`（旧 id 不误收、不回建）。
 - `respondShellConfirm` 的 `ok:true`、`expired:true`、通道失败三条路径都收起；过期/失败以 `setHint` 如实说明「未获放行」。删除 shell 卡 `markShellConfirmExpired`/`is-expired` 终态；卡移除后迟到/非法回包在 `if (!cur) return;` 直接返回。
 - 测试：`renderer.test.ts` +1 源码守卫；`ANS_TERMINAL_UI_ONLY=1` +7 DOM 断言 → **TERMINAL_PASS 22**；JUDGE 33 不回归。`test/桌面应用/e2e/main.mjs`（桌面窗口属主）仍断言 Esc 后保留 `is-expired` 可见卡，需按新 UX 更新。
+
+
+## React 渲染器（UI 平台化 Phase 2，2026-10-21）
+
+**入口与构建（Phase 2 历史记录）**：Phase 2 当时源码入口 `app/renderer/src/index.html`；Vite `root=app/renderer`、`base="./"`、`modulePreload.polyfill=false`、`build.target=chrome152`。5B 收尾后源入口为 `app/renderer/index.html`、唯一生产入口 `app/renderer/dist/index.html`（见本页顶部「最终口径」）。生产 CSP 严格：`default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;`。
+
+**模块与导出**：
+
+| 位置 | 职责 |
+| --- | --- |
+| `src/main.tsx` | `createRoot(#root)`；CSP 违规诊断（`window.__ansCspViolations`，只读记录，不改行为） |
+| `src/App.tsx` | 骨架布局：TitleBar + shadcn resizable Group/Panel + ChatHeader/空态/Composer + Drawer + ConfirmCard；`CSPProvider disableStyleElements` |
+| `src/shell/TitleBar.tsx` | 36px 自绘标题栏；`minimizeWindow/toggleMaximize/closeWindow/isMaximized/onMaximizedChanged` 经 `window.desktop`，缺失逐方法禁用并可见标注 |
+| `src/shell/Sidebar.tsx` | 品牌/项目 demo/角色树 demo/底部入口；`#sidebar-resizer` 自绘交互（pointer/dblclick/键盘 ±8/Shift±24；`aria-valuenow` px） |
+| `src/shell/ChatHeader.tsx` | 会话头（角色/状态/引擎选择器/工作概览/角色资料） |
+| `src/shell/EngineSelect.tsx` | 自绘引擎选择器：`role=combobox`/`aria-haspopup=listbox`/`aria-activedescendant` + `role=listbox` + `role=option`；↑↓/Home/End/Enter/Space/Esc/Tab、视口 placement；仅本地演示选择 |
+| `src/shell/Composer.tsx` | `#inp-message` + IME 组合保护 + 禁用发送/附件/停止/双开关占位 |
+| `src/shell/Drawer.tsx` | Motion 424px 右抽屉；`#right-drawer/#right-body/#drawer-*`；Esc/焦点返回/Tab 循环 |
+| `src/shell/ConfirmCard.tsx` | AlertDialog 演示卡；`#shell-confirm/#sc-*`；命令逐字、拒绝默认焦点、Esc/关闭=不放行 |
+| `src/stores/ui-store.ts` | zustand 视图状态：`sidebarWidth/sidebarCollapsed/drawerOpen/runtime/selectedRoleId`；localStorage 键 `ans.sidebar.width`/`ans.sidebar.collapsed` |
+| `src/stores/confirm-demo-store.ts` | 演示确认卡 `open/payload/lastDecision` |
+| `src/lib/platform.ts` | `window.desktop` 安全守卫（`getDesktopBridge/getWindowControlAvailability/callWindowControl/queryMaximized/subscribeMaximized`） |
+| `src/test-driver.ts` | `window.__ansRenderer` 骨架子集 + `unimplemented` |
+| `src/components/ui/` | shadcn base-nova copy-in 16 组件；台账见该目录 `README.md` |
+
+**对外契约**：
+
+- 消费 `window.desktop` 的**窗口控制子集**（通道名以 `app/preload.cjs` 与桌面窗口 api-spec 为准）：`minimizeWindow`、`toggleMaximize`、`closeWindow`、`isMaximized`、`onMaximizedChanged`。其余通道（会话/历史/确认/判断/设置）未消费，Phase 3/4 按名接入。
+- `window.__ansRenderer`（Phase 2 子集）：`state`（getter 快照；`demo:true`）、`selectRole(roleId)`、`selectRuntime(runtime)`、`openConfirmDemo(payload?)`、`sidebar.{collapsed,toggle,set,width,setWidth}`、`drawer.{open,close,toggle,isOpen}`、`confirmDemo.{open,close,state}`、`send.disabled()`、`composer.state()`、`unimplemented`。
+- 未实现（列名，不提供假实现）：`loadProject`、`refreshProject`、`refreshLiveRoles`、`openPiPanel`、`loadPiConfig`、`savePiConfigFromForm`、`appendOperatorRequest`、`piKeys`、`governance`、`onRoleState`、`onOperatorExpired`、`onOperatorQueued`、`onShellConfirm`、`shellJudge`、`decisionJudge`、`onRecoveryConfirm`、`rowModelDebug`、`queuedDebug`、`paneDebug`、`replayAnchorDebug`。
+- DOM id/class/data/aria 的逐项三态与双端 e2e 执行方式见 [ui-contract-surface](docs/feature/ui-contract-surface.md)。
+
+**已满足的既有 DOM 契约（Phase 2）**：`#titlebar/#win-min/#win-max/#win-close`、`#sidebar-collapse/#sidebar-expand/#sidebar-resizer`、`.app.is-sidebar-collapsed`、`.col-left/.col-mid`、`#role-tree/.tree-item[data-role-id]/.ti-*`、`#chat/.chat-pane/.chat-empty`、`#chat-role/#chat-role-sub/#context-state`、`#right-tabs/#tab-work/#tab-card/#tab-pi/#btn-import`、`#project-name/#project-path/#sidebar-role-count`、`#runtime-select/#runtime-options/#runtime-option-*`、`#composer-capsule/#inp-message/#btn-send/#btn-halt/#btn-attach-image/#composer-scope/#composer-hint/#history-projection-note/#runtime-note`、`#auto-approve-toggle/-label/-status`、`#judge-decision-toggle/-label/-status`、`#attach-row`、`#right-drawer/#right-body/#drawer-title/#drawer-close/#drawer-backdrop`、`#shell-confirm/#sc-title/#sc-close/#sc-command/#sc-summary/#sc-reason/#sc-details/#sc-allow/#sc-deny/#sc-hint`、`data-role-id/data-runtime/data-demo/data-state`、`aria-label/expanded/haspopup/modal/orientation/valuenow/valuemin/valuemax/current/live`。
+
+**Phase 2b 修正（2026-10-21）**：`<html class="dark">` 使深色变体生效（`#sc-allow` 边界 `--input`）；Button/Input/Textarea/Checkbox/Switch/菜单项焦点环统一 2px solid `--ring` + 3px offset；Button primary hover `--success-hover` / active `--primary-active`、默认字号 13、disabled 0.45；Checkbox 选中 `--warning`；引擎选择器改为自绘 `EngineSelect`（旧 combobox/listbox/option 契约）；960 窄档隐藏「· 演示」后缀；ScrollArea thumb/图标描边/禁用发送中性底按 §8.3 打磨。
+
+**已知偏离（Phase 2b 历史，均已由 3A–5B 关闭）**：当时 `#btn-send` 禁用、附件/停止/双开关占位；聊天行/虚拟窗口/`rowModelDebug` 未实现；确认卡为演示；抽屉内容占位；构建路径为当时的 src 子目录产物。5B 后上述项全部实现并迁移，生产入口唯一 `dist/index.html`。详见变更记录与 5B 证据。
+
+**验证（Phase 2b 最终）**：`typecheck:renderer` 0 错；`build:renderer` 通过；入口引用资产 gzip（level 9）**188,883B**（JS 176,510 + CSS 11,984 + HTML 389）；Chrome 两档截图（默认/引擎菜单/确认卡放行 hover+焦点）；真实 Electron 44.7.0 `file://` 冒烟 **49 项断言全 true**、零 console/CSP/did-fail-load。证据：`docs/change/2026-10-21-phase2b-evidence/`。
+
+
+## React 渲染器聊天流（Phase 3A，2026-10-21）
+
+**模块**：
+
+| 位置 | 职责 |
+| --- | --- |
+| `src/chat/row-model.ts` | 虚拟窗口纯模型：`VIRT_MIN_ROWS=150`、`VIRT_BUFFER=30`、prefix/spacer、`preferTail/preferIndex`、`debug()` |
+| `src/chat/replay.ts` | 回放 `skip/append/full`、`rowSignature`、`eventKey`、`classifyLiveDuplicate` |
+| `src/chat/status.ts` | `deriveRoleStatus`（等待确认 > 工作中 > 错误 > 空闲/已停止/已恢复/未开启）与徽标 |
+| `src/chat/events.ts` | `normalizeEnvelopes`/`envelopeMatches`（project/runtime/role）、`describeEvent`、`activityFromEvent`/`toolStatus`、注入分类、历史行映射 |
+| `src/chat/markdown.ts` | npm markdown-it **15.0.3** 受控封装（html:false、链接白名单、图片原文、表格、`.md-pre`/`.md-lang`、唯一 `esc`）；`window.ANSMarkdown` |
+| `src/chat/role-view.ts` | 角色显示名/副标题/主入口/治理职能/工作角色分组 |
+| `src/chat/chat-store.ts` | listing/会话/历史/事件/角色状态投影；每角色 RowModel；pending history；operator 最小卡/锚点；本地用户气泡 |
+| `src/chat/ipc.ts` | 订阅 `session:event(s)`/`session:role-state`/`session:history`/`project:changed`/`session:operator-request|expired|queued`；`app:recovery-state`/`app:recovery-ready` |
+| `src/chat/ChatStream.tsx`/`VirtualPane.tsx`/`ChatRow.tsx` | 中栏容器、虚拟 pane、行渲染 |
+| `src/shell/Sidebar.tsx` | 真实 listing/角色树/分组/状态/roving tabindex/导入切换 |
+| `src/shell/Composer.tsx` | 非受控 textarea、Enter/Shift+Enter/IME、`sendSession`、`pickImage` 最小附件 |
+
+**消费的 preload 通道**：`pickProject`、`listProject`、`openSession`、`getSessionHistory`、`listLiveSessionViews`、`sendSession`、`pickImage`、`onSessionEvent`、`onRoleState`、`onSessionHistory`、`onProjectChanged`、`onOperatorRequest`、`onOperatorExpired`、`onOperatorQueued`、`operatorRespond`、`getRecoveryState`、`recoveryReady`（全部按 `app/preload.cjs` 实际方法名；缺方法时界面如实降级）。
+
+**驱动**：新增 `loadProject/refreshProject/refreshLiveRoles/selectRole/selectRuntime/rowModelDebug/paneDebug/onRoleState/onOperatorExpired/onOperatorQueued/appendOperatorRequest/queuedDebug`；`state` 为真实快照（`demo:false`）。未实现：`openPiPanel/loadPiConfig/savePiConfigFromForm/piKeys/governance/onShellConfirm/shellJudge/decisionJudge/onRecoveryConfirm/replayAnchorDebug`。
+
+**DOM/行为**：`#role-tree` 分组 `.tree-group`/`.tree-item[data-role-id]` + `.ti-status.st-*`；`#chat[data-state]`（busy→run、error→err、否则 idle）；`.chat-pane[data-role-id]` + `.virt-spacer` + `.chat-row`；user/assistant/activities/tool-lifecycle/tool-call-record/injected/handback/operator/sys-denied/turn-terminal/system 行；`.sys-loading`/`.sys-replay-divider`/`.queue-row`/`.tool-current`；`#attach-row .attach-chip`；`#btn-start-primary`。
+
+**验证（3A）**：typecheck/build；CSP 0 内联/0 unsafe；gzip 246,608B；`ime-enter` 新入口 24/24；`bench-storm` 新入口 BENCH_DONE=1；`test/桌面UI` 15/15；旧基线 679/679；Electron 冒烟 16/16。证据：`docs/change/2026-10-21-phase3a-evidence/`。uiux-v2 目标切换已接但全量等价未达（默认段首个失败），不宣称通过。
+
+## Phase 3B 渲染侧契约（2026-10-21）
+
+### 新增纯逻辑模块（node 同源加载，无 DOM/存储依赖）
+
+| 模块 | 关键导出 | 用途 |
+| --- | --- | --- |
+| `app/renderer/src/chat/judge.ts` | `shellConfirmTitle`、`suApprovalTierLabel`、`governanceRoleDisplayNameById`、`judgeToggleView`、`judgeWarningStep`、`judgeWarningLines`、`shellJudgeToggleResult`、`judgeBridgeAvailable`、`shellJudgeResultView`、`governanceJudgeResultView`、`recoveryActionView`、`recoveryTimeText` | 双开关/一次性警告/结果行/卡标题与档位的单一文案与映射来源（对齐旧 `ui-labels.js`） |
+| `app/renderer/src/chat/confirm-logic.ts` | `receiveCard`、`startResponding`、`shellResponseOutcome`、`recoveryResponseOutcome`、`staleShellOnSettled`、`expiryHitsCard`、`payloadMatchesView`、`queueItemViews`、`withdrawOutcome`、`withdrawExceptionOutcome`、`clientImageProblem`、`attachmentTitle` | 卡状态机/失效收起、队列位次与撤回、附件快速筛 —— 纯函数，`test/桌面UI/{judge,confirm-logic}.test.ts` 覆盖 |
+
+### store 与驱动面
+
+- `stores/confirm-store.ts`：`shellConfirm/recoveryConfirm`（`{id,payload,busy,expiredReason}`）、`judge.approval/decision`（`available/enabled/busy/error/promptShown`）、`warning`；动作 `receiveShell/respondShell/expireShell/closeStaleShell/dismissShell`、`receiveRecovery/respondRecovery/dismissRecovery`、`initJudgeSwitches/setJudgeEnabled/acknowledgeWarning`。主进程是唯一权威；卡回包恰 `allow:true` 才放行/执行。
+- `window.__ansRenderer` 3B 增补：`state.shellConfirm/recoveryConfirm`（真实卡记录）、`onShellConfirm/shellConfirmRespond`、`onRecoveryConfirm/recoveryConfirmRespond`、`shellJudge.state()/onResult()`、`decisionJudge.state()/onResult()`；`unimplemented` 仅余 `openPiPanel/loadPiConfig/savePiConfigFromForm/piKeys/governance/replayAnchorDebug`。
+
+### DOM 契约（3B 保持/新增）
+
+- 保持：`#shell-confirm/#sc-title/#sc-close/#sc-command/#sc-summary/#sc-reason/#sc-details/#sc-allow/#sc-deny/#sc-hint/#sc-judge-notice`；`#recovery-confirm/#rc-title/#rc-action/#rc-role/#rc-note/#rc-reason/#rc-evidence/#rc-details/#rc-allow/#rc-deny/#rc-close/#rc-hint`；`#auto-approve-toggle/-label/-status`、`#judge-decision-toggle/-label/-status`、`#shell-judge-warning/-text/-close`、`#attach-row .attach-chip`、`.attach-rm`、`#btn-halt`、`.sys-queue`、`.queue-row`。
+- 常量：`SHELL_JUDGE_WARNING_AUTO_DISMISS_MS=9000`（一次性警告自动收起；全应用唯一业务计时器）。
+- 判断结果行：行包裹元素同时带 `.chat-row .sys.shell-judge-row`（治理行另加 `.governance-judge-row`），并带 `data-tool-call-id`；`manual` 不产生行。`#chat` 直接子元素查询与 `rowModelDebug` 均可用。
+- 3B 评审修正：SU 档位摘要 `.sc-overlay.is-su-approval .sc-summary`（600）；`#sc-hint .sc-su-warning`（`--warning`）；`#sc-details > summary .disclosure-chevron`；`.capsule.is-dropping`；`.queue-withdraw` 28px/11px/`--input`；`.attach-chip` 8px、`.attach-rm` 4px、X 12/1.5。
+- 失效形态：恢复卡 overlay/card 带 `.is-expired`，`rc-allow/rc-deny` 禁用、`rc-close` 可关、`rc-hint` 如实文案；shell 卡失效即卸载（`hidden`），不保留全禁用卡。
+- 附件缩略图 `<img src="data:…;base64,…">`（不使用 `blob:`，遵守生产 CSP `img-src 'self' data:`）。
+- `#composer-hint` 只由真实提示驱动（无提示时为空串；旧 e2e 依赖）。
+
+### 消费的 preload 通道（只读；定义属桌面窗口）
+
+`onShellConfirm`/`shellConfirmRespond`、`onRecoveryConfirm`/`recoveryConfirmRespond`、`getShellJudgeState`/`setShellJudgeEnabled`/`onShellJudgeState`/`onShellJudgeResult`、`getDecisionJudgeState`/`setDecisionJudgeEnabled`/`onDecisionJudgeState`/`onOperatorJudgeResult`、`abortSession`、`withdrawQueued`、`pickImage`/`attachImage`、`sendSession`（含 `clientMessageId`）。通道名与载荷以 `app/preload.cjs` 与桌面窗口 api-spec 为准。
+
+### 证据
+
+`docs/change/2026-10-21-phase3b-evidence/`：Electron 离线 IPC 冒烟 45/45 + 18 张截图；uiux-v2 JUDGE/G2/TERMINAL/TOOLFOLD 全绿；新纯逻辑 33/33；旧基线 679/679；IME 24/24；延迟挂载 10/10；bench 8 轮全阈值；gzip 240,133B；C1 Δ=16px。
+
+## Phase 4A 渲染侧驱动与 DOM 契约增量（2026-10-21）
+
+- 驱动：`selectRuntime`（真实切换、Promise<boolean>、无项目/非法/同引擎/切换中=false）；`openPiPanel(tab?)`、`loadPiConfig()`、`savePiConfigFromForm()`、`piKeys`（getter）；`state.rightTab` 扩为 `card|work|pi|document|null`；`drawer.open/close` 走抽屉 store（关闭还原触发焦点）；`driver-extensions/*.ts` 合并进驱动（4B）。
+- DOM：`#runtime-config-notice/#runtime-config-message/#runtime-config-settings`；`#pi-panel`（常驻挂载，`hidden` 由 tab 驱动）、`.pi-engine-tabs/.pi-engine-tab[data-engine]`、`#pi-panel-path`、`.pi-field/.pi-field-label/.pi-input/.pi-select/.pi-secret-tag/.pi-secret-toggle-*`、`.pi-range-wrap/.pi-range-out/.pi-range-note`、`.slider/.slider-control/.slider-track/.slider-indicator/.slider-thumb`（thumb 内隐藏 input 带 slider 语义与 aria 三值/valuetext）、`.pi-advanced/.pi-advanced-body/.pi-advanced-hint`、`#pi-save/#pi-status`、`.pi-save-bar`；`details[data-section=card|boundary|changes|docs]`、`.card-text`、`.role-document-entry`、`.document-list/.document-list-meta/.document-source-note/[data-doc-id]/[data-doc-action=back-list|back-role|refresh|retry]/#document-read-status/#document-read-text`；`#right-queue-body`、`.q-item/.q-pos/.q-src/.q-time/.q-text/.q-actions/.q-toggle/.q-withdraw/.q-feedback/.q-full`、`.pending-requests/.pending-locate[data-request-id]`、`.recent-reports/.recent-report`、`.work-heading`；`.ti-count`（左树当前+排队）。
+- 无新增 DOM 例外；大工具组延迟挂载例外 `DEFER_TOOL_ROWS_WHEN_CLOSED=40` 仍唯一。
+
+### PM §十三 增量（2026-10-21）
+
+- 左树：`.ti-status` 只表达状态（无「N 待办」）；`.ti-count` 唯一可见数字（当前+排队），`title/aria-label` 为「当前工作 X 项，排队 Y 项」。
+- operator 卡：`closed` 时 `.op-actions` 与 `op-confirm/op-deny/op-submit/op-cancel` 带 `hidden`（保留 `disabled`/`finalNote`/`aria`/卡片容器）；属 PM §十三 唯一冻结写集例外。
+- judge 跨引擎重放属 4B；C2 同因既有红待 4B/5。
+
+### UIUX M1–M6 增量（2026-10-21）
+
+- 队列子视图：同一 424 抽屉；`.queue-subview`、`.queue-back`、唯一 `#right-queue-body`；标题 `<角色> · 队列`，返回来源视图；工作概览/角色资料仅预览当前 + 前 3 条排队，`groups.total>3` 显示 `.queue-view-all`；Esc 先返回来源；`state.rightTab` 仍为 `work|card`（不新增值）。
+- 撤回：成功聊天流 `.sys-call`「已撤回排队消息：〈摘要〉」；失败/异常 `.q-feedback` + 同名 system 行。
+- 设置 Tabs：`#pi-engine-tab-<engine>`、roving tabindex、`aria-controls="pi-engine-panel"`、`#pi-engine-panel[role=tabpanel]`；←/→/Home/End。
+- 保存条：`.pi-status` 两行完整状态；完整逐键/完整 application 在 `title`（`savedStatusTitle`）。
+- 角色头：`.role-status` 只表达状态（`statusBadge(status,0)`），数量只在 `.ti-count`/队列预览。
+- 证据：960 工作/资料/设置三面焦点/Esc/inert 断言；200%（Electron zoom 2）设置/资料无溢出与保存条完整状态。
+
+## Phase 4B 渲染侧驱动与 DOM 契约增量（2026-10-21）
+
+- 驱动：`replayAnchorDebug(roleId)` → `[{anchorKey,requestIndex,conclusionIndex,rowsAtReplay}]`（无表 `[]`）；`governance` → `{state(),open(mode?),selectModel(model),confirm(),cancel()}`（接真实 governance-store）；`state.governancePreview:{open,mode,loading,busy,previewDigest,canConfirm,nextStep}`；`queuedDebug()` 保持插入序；judge 结果行跨引擎缓存/重放（同 id 幂等）。扩展经 `driver-extensions/*.ts`（`extend`）合并，4A 驱动方法保持。
+- DOM：`#governance-status`（`[data-governance-state]`）、`#governance-preview`（class 精确 `governance-preview`；`[data-governance-reaccept]`/`[data-governance-cancel]`/`[data-governance-close]`/`[data-governance-establish]`/`[data-governance-migrate]`、`data-mode`）、`#governance-migration`；治理卡 `.op-gov-badge/.op-meta/.op-mirror-badge/.op-mirror-source/.op-queued/.op-preview/.op-preview-body/.is-mirror[data-surface-role-id]`；聚合 `.op-queue-aggregate`；`#op-chip/.op-chip-text`；报告 `.msg-handback .report-*/.persistence-state/.persistence-message/.persistence-retry/.persistence-error`；交付 `.msg-delivery > .persistence-state`、`.delivery-batch-facts`、`.delivery-report`、`.safe-input-copy`；折叠 `.task-request/.reply-original/.task-request-body/.original-flags`；菜单 `.engine-option-main/.engine-option-status[data-menu-status]`。
+- 状态/焦点：治理预览非模态、标题聚焦、Esc 回触发、无陷阱；聚合行不可聚焦；镜像不抢焦点；报告重试 pending 保留同按钮（disabled）；`#op-chip` 点击先 close 抽屉再滚到原卡并聚焦；`.op-request[inert] .op-actions{visibility:hidden}`（抽屉覆盖）。
+- 无新增 DOM 例外；既有 `DEFER_TOOL_ROWS_WHEN_CLOSED=40` 与失效 operator 动作 `hidden` 保持唯一。C2 检查重锚为「收起 + 原因可见」。

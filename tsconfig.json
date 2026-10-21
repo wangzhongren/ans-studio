@@ -18,5 +18,6 @@
 
     "types": ["node"]
   },
-  "include": ["src", "test", "app"]
+  "include": ["src", "test", "app"],
+  "exclude": ["app/renderer"]
 }

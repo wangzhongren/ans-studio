@@ -1,0 +1,6 @@
+# Phase 3B independent verification environment
+date: 2026-10-21T12:35:10+08:00
+HEAD: f87eb134ea441683d15cc85d4d855789d8ec7e59
+node: v24.14.0
+electron: v44.7.0
+platform: Darwin wangzhongrendeMacBook-Pro.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:16:20 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T8142 arm64

@@ -1,0 +1,220 @@
+{
+  "kind": "local-smoke",
+  "note": "本地验证证据；非发布 manifest，不得用于发布/上传。",
+  "createdAt": "2026-10-21T13:02:49.777Z",
+  "archive": {
+    "file": "ANS-Studio-1.4.0-mac-arm64.zip",
+    "size": 406507281,
+    "sha256": "fd4b76bb82be5922096ed206d1d87c08d8a393bf404fd6900bcac5412f8af40c"
+  },
+  "packagedHashes": {
+    "app/main.ts": "64a56c33647bed252415fdd5601e38531a64c43a4acc6ddb3b9660d1e8fe0671",
+    "app/preload.cjs": "98dde83a4930c7f586a4dd5bee8d7697cffc6fd95c3771149dea2fcf3cbc3e5b",
+    "app/renderer/dist/index.html": "3c4da2a2a4f99f6ffffdb737ccf854b3320bf2605a8d2b53190e5017ad33b301"
+  },
+  "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "v24.14.0",
+    "npm": "11.9.0",
+    "electronBuilder": "26.15.3",
+    "packageVersion": "1.4.0"
+  },
+  "content": {
+    "mustExist": {
+      "app/main.ts": true,
+      "app/preload.cjs": true,
+      "package.json": true,
+      "LICENSE": true,
+      "app/renderer/dist/index.html": true,
+      "app/renderer/dist/assets": true
+    },
+    "mustNotExist": {
+      "私有数据与构建噪声(.env*/.ans/.git/settings.local.json/*.log/*.map)": true,
+      "test/tests 目录": true
+    },
+    "devDependenciesNotPackaged": [
+      {
+        "dep": "@base-ui/react",
+        "present": false
+      },
+      {
+        "dep": "@tailwindcss/vite",
+        "present": false
+      },
+      {
+        "dep": "@types/markdown-it",
+        "present": false
+      },
+      {
+        "dep": "@types/react",
+        "present": false
+      },
+      {
+        "dep": "@types/react-dom",
+        "present": false
+      },
+      {
+        "dep": "@vitejs/plugin-react",
+        "present": false
+      },
+      {
+        "dep": "class-variance-authority",
+        "present": false
+      },
+      {
+        "dep": "clsx",
+        "present": false
+      },
+      {
+        "dep": "electron",
+        "present": false
+      },
+      {
+        "dep": "electron-builder",
+        "present": false
+      },
+      {
+        "dep": "lucide-react",
+        "present": false
+      },
+      {
+        "dep": "markdown-it",
+        "present": false
+      },
+      {
+        "dep": "motion",
+        "present": false
+      },
+      {
+        "dep": "react",
+        "present": false
+      },
+      {
+        "dep": "react-dom",
+        "present": false
+      },
+      {
+        "dep": "react-resizable-panels",
+        "present": false
+      },
+      {
+        "dep": "tailwind-merge",
+        "present": false
+      },
+      {
+        "dep": "tailwindcss",
+        "present": false
+      },
+      {
+        "dep": "typescript",
+        "present": false
+      },
+      {
+        "dep": "vite",
+        "present": false
+      },
+      {
+        "dep": "zustand",
+        "present": false
+      }
+    ],
+    "productionDependenciesPresent": [
+      {
+        "dep": "@anthropic-ai/claude-agent-sdk",
+        "present": true
+      },
+      {
+        "dep": "@anthropic-ai/sdk",
+        "present": true
+      },
+      {
+        "dep": "@earendil-works/pi-coding-agent",
+        "present": true
+      },
+      {
+        "dep": "@earendil-works/pi-mcp",
+        "present": true
+      },
+      {
+        "dep": "@modelcontextprotocol/sdk",
+        "present": true
+      },
+      {
+        "dep": "@openai/codex",
+        "present": true
+      },
+      {
+        "dep": "yaml",
+        "present": true
+      },
+      {
+        "dep": "zod",
+        "present": true
+      }
+    ],
+    "removedRendererAbsent": {
+      "app/renderer/renderer.js": true,
+      "app/renderer/styles.css": true,
+      "app/renderer/markdown.js": true,
+      "app/renderer/engine-selector.js": true,
+      "app/renderer/role-status.js": true,
+      "app/renderer/runtime-ui.js": true,
+      "app/renderer/tool-rows.js": true,
+      "app/renderer/ui-labels.js": true
+    },
+    "removedLegacyDirsAbsent": {
+      "app/renderer/vendor": true,
+      "app/renderer/dist/src": true
+    }
+  },
+  "smoke": {
+    "ok": true,
+    "isPackaged": true,
+    "arch": "arm64",
+    "platform": "darwin",
+    "version": "1.4.0",
+    "envPath": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-local-smoke-CNZH3n/home/userdata/.env",
+    "expectedEntry": "file:///private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-local-smoke-CNZH3n/extracted/ANS%20Studio.app/Contents/Resources/app/app/renderer/dist/index.html",
+    "checks": {
+      "entry": true,
+      "rootMounted": true,
+      "driver": true,
+      "csp": true,
+      "cspViolations": true,
+      "dom": true,
+      "preload": true,
+      "ipc": true,
+      "importDisabled": true,
+      "missingConfiguration": true,
+      "settingsEntryDisabled": true,
+      "envPathMatches": true,
+      "console": true,
+      "load": true
+    },
+    "missingKeys": {
+      "pi": [
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANS_PI_BASE_URL",
+        "ANS_PI_MODEL"
+      ],
+      "codex": [
+        "CODEX_API_KEY",
+        "ANS_CODEX_MODEL"
+      ],
+      "claude": [
+        "ANTHROPIC_API_KEY"
+      ]
+    },
+    "entryUrl": "file:///private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-local-smoke-CNZH3n/extracted/ANS%20Studio.app/Contents/Resources/app/app/renderer/dist/index.html",
+    "consoleErrors": [],
+    "loadFailures": []
+  },
+  "smokeProcess": {
+    "code": 0,
+    "signal": null,
+    "stdout": "",
+    "stderr": ""
+  },
+  "failures": []
+}

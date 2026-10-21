@@ -1,0 +1,11 @@
+=== 有效轮（预热已排除，3 轮交替）===
+stormA.maxGap: old=[21.3,22,19.3] med=21.3; new=[25.6,24.4,21.1] med=24.4; PASS=true
+stormB.maxGap: old=[18.7,18.7,18.7] med=18.7; new=[18.6,18.6,18.7] med=18.6; PASS=true
+stormA_handler.maxMs: old=[13.1,11.7,14.6] med=13.1; new=[0.7,0.6,0.7] med=0.7; PASS=true
+stormB_handler.maxBatchMs: old=[2.1,1.6,1.7] med=1.7; new=[0.9,1,1] med=1; PASS=true
+replay.replayMs: old=[20.9,20,20.8] med=20.8; new=[5.3,5.7,5.8] med=5.7; PASS=true
+scrollToBottom.ms: old=[24.6,22.8,24.8] med=24.6; new=[5.1,8,8.9] med=8; PASS=true
+new 有效轮 maxGap 全部: [25.6,18.6,24.4,18.6,21.1,18.7]
+p95= 25.6 (<=35?) true  单轮最大= 25.6 (<=50?) true
+ALL_PRIMARY_PASS=true
+warmups: old stormA 26.8 new stormA 22.7

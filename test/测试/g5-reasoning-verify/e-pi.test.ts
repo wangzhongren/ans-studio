@@ -1,8 +1,8 @@
 // test/测试/g5-reasoning-verify/e-pi.test.ts —— E 域：Pi 适配器接线（独立验证）。
 //
 // 验证对象：`src/common/pi-adapter/{real-adapter,lifecycle}.ts`——off 前置修复（克隆模型 thinkingLevelMap.off
-// 收窄；假关闭消除）、未设＝零调用（逐字现状路径）、R1 请求前修复（自证网关三窗放行；未设路径逐字现状）、
-// 思考捕获（事实进事件面、text 行零改动）、降级（终态前消费、settled 单点、恰一次不二次）。
+// 收窄；假关闭消除）、未设重施默认、D1 默认和显式预算保护、自证网关三窗、
+// 思考事实与请求级兼容（prompt 不重放、失败策略不粘连、单终态）。
 // 全离线：127.0.0.1 loopback 假网关（零外网）；用例独立构造（429 排除窗/中断守卫/三窗/自证网关均为
 // 实施方用例未覆盖类别）。
 
@@ -18,8 +18,8 @@ import {
   createRealPiRuntimeAdapter,
   extractReasoningFacts,
   makeRolePrompt,
-  REASONING_DEGRADED_SUMMARY,
-  type ReasoningDegradeOptions,
+  REASONING_COMPATIBILITY_ATTEMPT,
+  REASONING_COMPATIBILITY_SUCCESS,
   type PromptCapableSession,
 } from "../../../src/common/pi-adapter/real-adapter.ts";
 import { createTurnLifecycle } from "../../../src/common/pi-adapter/lifecycle.ts";
@@ -28,7 +28,10 @@ import { configureDiagnostics, disposeDiagnostics, flushDiagnostics } from "../.
 import type { ReasoningEffortV1, SessionEvent } from "../../../src/model/runtime.ts";
 import { makeRole } from "./helpers.ts";
 
-if (!process.env.ANTHROPIC_AUTH_TOKEN) process.env.ANTHROPIC_AUTH_TOKEN = "g5-verify-placeholder";
+// Installed Pi provider template reads this variable; always use a local placeholder and restore it.
+const AUTH_ENV = "ANTHROPIC_AUTH_TOKEN";
+const previousAuth = process.env[AUTH_ENV];
+process.env[AUTH_ENV] = "g5-verify-placeholder";
 const MODEL_ID = "g5-verify-model";
 
 const silentLogger = { stage() {}, trace() {}, traceEnabled: false };
@@ -66,7 +69,7 @@ async function startLoopback(respond: (body: Record<string, unknown>, index: num
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
   const address = server.address();
   const port = address !== null && typeof address === "object" ? address.port : 0;
-  return { baseUrl: `http://127.0.0.1:${port}/`, captures, close: () => new Promise((resolve) => server.close(() => resolve())) };
+  return { baseUrl: `http://127.0.0.1:${port}/`, captures, close: () => new Promise((resolve) => { server.closeAllConnections(); server.close(() => resolve()); }) };
 }
 
 const messageStart = (): unknown => ({ type: "message_start", message: { id: "msg-g5", type: "message", role: "assistant", model: MODEL_ID, content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 9, output_tokens: 1 } } });
@@ -116,6 +119,7 @@ async function harness() {
   const pi = await import("@earendil-works/pi-coding-agent");
   let native: { thinkingLevel?: string; setThinkingLevel(level: string): void } | undefined;
   const setThinkingCalls: string[] = [];
+  const promptCalls: string[] = [];
   let extensionPaths: string[] = [];
   const dependencies = {
     loadPi: async () => ({
@@ -123,6 +127,8 @@ async function harness() {
       async createAgentSession(input: Parameters<typeof pi.createAgentSession>[0]) {
         const out = await pi.createAgentSession(input);
         native = out.session as never;
+        const originalPrompt = out.session.prompt.bind(out.session);
+        out.session.prompt = async (text, options) => { promptCalls.push(text); return originalPrompt(text, options); };
         extensionPaths = (out.extensionsResult?.extensions ?? []).map((x) => String(x.path));
         const original = out.session.setThinkingLevel.bind(out.session);
         (out.session as { setThinkingLevel(level: string): void }).setThinkingLevel = (level: string) => { setThinkingCalls.push(level); original(level as never); };
@@ -130,14 +136,14 @@ async function harness() {
       },
     } as typeof pi),
   };
-  return { dependencies, get native() { return native!; }, setThinkingCalls, get extensionPaths() { return extensionPaths; } };
+  return { dependencies, get native() { return native!; }, setThinkingCalls, promptCalls, get extensionPaths() { return extensionPaths; } };
 }
 
 function adapterOptions(loopback: Loopback, projectRoot: string, extra: Record<string, unknown> = {}) {
   return {
     runtime: "pi", projectRoot, skillRoot: projectRoot, tools: [],
     interactionGate: createInteractionGate(), currentTurnId: () => undefined,
-    config: { providerId: "ans-gateway", baseUrl: loopback.baseUrl, modelId: MODEL_ID, apiKeyEnvVar: "ANTHROPIC_AUTH_TOKEN", contextWindow: 131072, contextWindowSource: "explicit" },
+    config: { providerId: "ans-gateway", baseUrl: loopback.baseUrl, modelId: MODEL_ID, apiKeyEnvVar: AUTH_ENV, contextWindow: 131072, contextWindowSource: "explicit" },
     logger: silentLogger, promptTimeoutMs: 30000, constructTimeoutMs: 60000,
     ...extra,
   } as never;
@@ -161,14 +167,17 @@ async function withDiagnostics<T>(run: (rows: () => Promise<Array<Record<string,
   } finally { await disposeDiagnostics(); rmSync(dir, { recursive: true, force: true }); }
 }
 
-test.after(() => { for (const root of projectRoots) rmSync(root, { recursive: true, force: true }); });
+test.after(() => {
+  for (const root of projectRoots) rmSync(root, { recursive: true, force: true });
+  if (previousAuth === undefined) delete process.env[AUTH_ENV]; else process.env[AUTH_ENV] = previousAuth;
+});
 
 // —————————————————————— ① off 前置修复（单元） ——————————————————————
 
 test("E1 off 前置修复：克隆模型 thinkingLevelMap.off 由 null 收窄为 undefined（clamp 真返回 off）；修复前对照＝minimal 假关闭；xhigh 原样", async (t) => {
   if (!(await piInstalled())) { t.skip("未安装 @earendil-works/pi-coding-agent"); return; }
   const ai = await import("@earendil-works/pi-ai");
-  const { model } = await buildExplicitRuntime({ providerId: "ans-gateway", baseUrl: "http://127.0.0.1:9/", modelId: MODEL_ID, apiKeyEnvVar: "ANTHROPIC_AUTH_TOKEN", contextWindow: 131072, contextWindowSource: "explicit" });
+  const { model } = await buildExplicitRuntime({ providerId: "ans-gateway", baseUrl: "http://127.0.0.1:9/", modelId: MODEL_ID, apiKeyEnvVar: AUTH_ENV, contextWindow: 131072, contextWindowSource: "explicit" });
   assert.equal(model.thinkingLevelMap?.off, undefined, "收窄后 off 不再是 null（undefined＝该档可用）");
   assert.equal(model.thinkingLevelMap?.xhigh, "xhigh", "xhigh 映射原样保留（只动 off）");
   assert.equal(ai.clampThinkingLevel(model as never, "off"), "off", "修复后 off 直达（真关闭）");
@@ -178,12 +187,12 @@ test("E1 off 前置修复：克隆模型 thinkingLevelMap.off 由 null 收窄为
   assert.deepEqual(model.thinkingLevelMap, { ...model.thinkingLevelMap, off: undefined }, "除 off 外逐键原样");
 });
 
-// —————————————————————— ② 请求接线：未设零调用 / 显式五档 / off 真关闭 ——————————————————————
+// —————————————————————— ② 请求接线：默认重置 / 显式五档 / off 真关闭 ——————————————————————
 
-test("E2 请求接线：未设＝不调用 setThinkingLevel（medium 隐式原样）；显式档⇒恰一次调用且生效；off⇒wire disabled＋interleaved 头消失", async (t) => {
+test("E2 请求接线：未设重施 SDK 默认 medium；显式档映射保留；off 真关闭，所有档均有请求保护", async (t) => {
   if (!(await piInstalled())) { t.skip("未安装"); return; }
   const cells: Array<{ effort?: ReasoningEffortV1; calls: string[]; effective: string; wireType: string; budget?: number; beta: boolean }> = [
-    { effort: undefined, calls: [], effective: "medium", wireType: "enabled", budget: 8192, beta: true },
+    { effort: undefined, calls: ["medium"], effective: "medium", wireType: "enabled", budget: 8192, beta: true },
     { effort: "medium", calls: ["medium"], effective: "medium", wireType: "enabled", budget: 8192, beta: true },
     { effort: "low", calls: ["low"], effective: "low", wireType: "enabled", budget: 2048, beta: true },
     { effort: "high", calls: ["high"], effective: "high", wireType: "enabled", budget: 16384, beta: true },
@@ -204,8 +213,7 @@ test("E2 请求接线：未设＝不调用 setThinkingLevel（medium 隐式原�
         assert.equal(thinkingOf(capture)?.type, cell.wireType, `wire thinking.type（${String(cell.effort)}）`);
         if (cell.budget !== undefined) assert.equal(thinkingOf(capture)?.budget_tokens, cell.budget, `budget（${String(cell.effort)}）`);
         assert.equal(betaOf(capture).includes("interleaved-thinking"), cell.beta, `interleaved beta 头（${String(cell.effort)}）`);
-        if (cell.effort === undefined) assert.deepEqual(sdk.extensionPaths, ["<inline:ans-governance>"], "未设 ⇒ 零 ans-reasoning 装配（逐字现状）");
-        else assert.ok(sdk.extensionPaths.includes("<inline:ans-reasoning>"), "设档 ⇒ ans-reasoning 装配");
+        assert.ok(sdk.extensionPaths.includes("<inline:ans-reasoning>"), "默认和显式均装配思考请求保护");
       } finally { await drain(session); }
     } finally { await loopback.close(); }
   }
@@ -222,7 +230,7 @@ test("E3 R1 修复（自证网关）：两修复窗（cw=5000 转 disabled / 570
       const sdk = await harness();
       const root = tempProject();
       try {
-        const session = await createRealPiRuntimeAdapter(adapterOptions(loopback, root, { reasoningEffort: "high", config: { providerId: "ans-gateway", baseUrl: loopback.baseUrl, modelId: MODEL_ID, apiKeyEnvVar: "ANTHROPIC_AUTH_TOKEN", contextWindow: cw, contextWindowSource: "explicit" } }), sdk.dependencies as never).bindRole(makeRole("R-E"));
+        const session = await createRealPiRuntimeAdapter(adapterOptions(loopback, root, { reasoningEffort: "high", config: { providerId: "ans-gateway", baseUrl: loopback.baseUrl, modelId: MODEL_ID, apiKeyEnvVar: AUTH_ENV, contextWindow: cw, contextWindowSource: "explicit" } }), sdk.dependencies as never).bindRole(makeRole("R-E"));
         let events: SessionEvent[] = [];
         try { await session.prompt(`r1-${cw}`); } finally { events = await drain(session); }
         assert.deepEqual(register, [200], `cw=${cw}：自证网关全程放行（非法组合必被 400）`);
@@ -244,27 +252,24 @@ test("E3 R1 修复（自证网关）：两修复窗（cw=5000 转 disabled / 570
   });
 });
 
-test("E4 未设路径逐字现状（对照）：不注册修复扩展——同一 cw=5000 严格网关下 wire 原样（enabled）、如实失败；零修复诊断", async (t) => {
+test("E4 默认预算保护：未设 cw=5000 在 HTTP 前关闭非法 thinking，提示且同轮完成", async (t) => {
   if (!(await piInstalled())) { t.skip("未安装"); return; }
   await withDiagnostics(async (rows) => {
     const register: number[] = [];
     const loopback = await startLoopback(strictGateway(register));
     const sdk = await harness();
     const root = tempProject();
+    const session = await createRealPiRuntimeAdapter(adapterOptions(loopback, root, { config: { providerId: "ans-gateway", baseUrl: loopback.baseUrl, modelId: MODEL_ID, apiKeyEnvVar: AUTH_ENV, contextWindow: 5000, contextWindowSource: "explicit" } }), sdk.dependencies as never).bindRole(makeRole("R-E"));
     try {
-      const session = await createRealPiRuntimeAdapter(adapterOptions(loopback, root, { config: { providerId: "ans-gateway", baseUrl: loopback.baseUrl, modelId: MODEL_ID, apiKeyEnvVar: "ANTHROPIC_AUTH_TOKEN", contextWindow: 5000, contextWindowSource: "explicit" } }), sdk.dependencies as never).bindRole(makeRole("R-E"));
-      let events: SessionEvent[] = [];
-      try { await session.prompt("unset-cw5000"); } catch { /* 现状失败如实上抛 */ }
-      events = await drain(session);
-      assert.deepEqual(sdk.setThinkingCalls, [], "未设：零档位调用");
-      assert.equal(loopback.captures.length, 1, "未设：恰一请求（无降级链、无重发）");
-      assert.equal(thinkingOf(loopback.captures[0]!)?.type, "enabled", "未设路径 wire 原样（不修复、不越界——即便隐式组合非法，R1 原风险按注册件处置）");
-      assert.ok(register.includes(400), "自证网关对隐式非法组合 400（现状如实）");
-      assert.equal((events.at(-1)!.detail as { outcome?: string }).outcome, "failed", "未设失败如实收场（无降级行）");
-      assert.equal(events.some((event) => String(event.summary) === REASONING_DEGRADED_SUMMARY), false);
-      const repaired = (await rows()).filter((row) => row["event"] === "reasoning.repaired");
-      assert.equal(repaired.length, 0, "未设会话零修复（修复只属显式设档会话）");
-    } finally { await loopback.close(); }
+      await session.prompt("unset-cw5000");
+      const events = await drain(session);
+      assert.deepEqual(sdk.setThinkingCalls, ["medium"]);
+      assert.deepEqual(register, [200], "默认保护阻止非法预算到达网关");
+      assert.equal(thinkingOf(loopback.captures[0]!)?.type, "disabled");
+      assert.equal((events.at(-1)!.detail as { outcome?: string }).outcome, "completed");
+      assert.ok(events.some(event => (event.detail as { source?: string; state?: string })?.source === "system" && (event.detail as { state?: string }).state === "thinking-disabled"));
+      assert.deepEqual((await rows()).filter(row => row["event"] === "reasoning.repaired").map(row => row["state"]), ["thinking-disabled"]);
+    } finally { await session.dispose(); await loopback.close(); }
   });
 });
 
@@ -333,7 +338,7 @@ test("E5b extractReasoningFacts 对抗单元：坏形状/非串正文/非对象�
 
 // —————————————————————— ⑤ 降级链（终态前消费 / settled 单点 / 恰一次不二次；429 排除；中断守卫） ——————————————————————
 
-test("E6 降级：思考参数 400 ⇒ 恰一次去参数重发成功（通知行在 settled 前；后续轮次零参数）；诊断恰一", async (t) => {
+test("E6 请求级兼容：思考参数 400 后同输入重发，正常结果后提示成功；prompt 不重放", async (t) => {
   if (!(await piInstalled())) { t.skip("未安装"); return; }
   await withDiagnostics(async (rows) => {
     const loopback = await startLoopback((body) => body["thinking"] !== undefined
@@ -358,36 +363,51 @@ test("E6 降级：思考参数 400 ⇒ 恰一次去参数重发成功（通知�
     const settled = events.filter((event) => event.kind === "settled");
     assert.equal(settled.length, 2, "settled 单点（每轮恰一——重发不新增终端）");
     assert.deepEqual(settled.map((event) => (event.detail as { outcome?: string }).outcome), ["completed", "completed"]);
-    const notices = events.filter((event) => String(event.summary) === REASONING_DEGRADED_SUMMARY);
+    const notices = events.filter((event) => String(event.summary) === REASONING_COMPATIBILITY_SUCCESS);
     assert.equal(notices.length, 1, "如实一行恰一");
-    assert.equal((notices[0]!.detail as { source?: string }).source, "reasoning-degrade");
+    assert.equal((notices[0]!.detail as { source?: string }).source, "system");
+    assert.equal(events.filter(event => event.summary === REASONING_COMPATIBILITY_ATTEMPT).length, 1);
+    assert.deepEqual(sdk.promptCalls, ["degrade-1", "degrade-2"], "HTTP 兼容不得第二次提交整条用户 prompt");
+    assert.deepEqual(loopback.captures[0]!.body.messages, loopback.captures[1]!.body.messages, "同一请求的 user/history 原样保留");
+    const answer = events.findIndex(event => event.summary === "degraded-ok");
+    assert.ok(answer >= 0 && answer < events.indexOf(notices[0]!), "成功提示晚于正常结果");
     assert.ok(events.indexOf(notices[0]!) < events.indexOf(settled[0]!), "终态前消费：通知行先于 settled");
     assert.ok(events.some((event) => event.kind === "message" && String(event.summary).includes("degraded-ok")), "重发结果进事件面");
-    const degraded = (await rows()).filter((row) => row["event"] === "reasoning.degraded");
-    assert.equal(degraded.length, 1, "诊断恰一");
-    assert.equal(degraded[0]!["errorCode"], "GATEWAY_REJECTED_HTTP_400");
-    assert.equal(degraded[0]!["state"], "retry-once");
+    assert.equal((await rows()).filter(row => row["event"] === "reasoning.degraded").length, 0, "旧整轮降级诊断已撤销，兼容事实由 system 消息承载");
   });
 });
 
-test("E6b 不二次：带/不带思考均 400 ⇒ 首轮恰 2 请求后如实失败；次轮 1 请求直失败；通知与诊断各一", async (t) => {
+test("E6b 兼容失败不记忆：每轮最多一次请求切换，次轮恢复保存的 low", async (t) => {
   if (!(await piInstalled())) { t.skip("未安装"); return; }
-  await withDiagnostics(async (rows) => {
-    const loopback = await startLoopback(() => ({ status: 400, json: { type: "error", error: { type: "invalid_request_error", message: "upstream invalid" } } }));
-    const sdk = await harness();
-    const root = tempProject();
-    const session = await createRealPiRuntimeAdapter(adapterOptions(loopback, root, { reasoningEffort: "low" }), sdk.dependencies as never).bindRole(makeRole("R-E"));
-    try {
-      await session.prompt("n1");
-      await session.prompt("n2");
-      assert.equal(loopback.captures.length, 3, "首轮恰 2（原发＋一次重发）、次轮 1（不再重发）");
-      assert.deepEqual(loopback.captures.map((capture) => "thinking" in capture.body), [true, false, false]);
-      const events = await drain(session);
-      assert.deepEqual(events.filter((event) => event.kind === "settled").map((event) => (event.detail as { outcome?: string }).outcome), ["failed", "failed"]);
-      assert.equal(events.filter((event) => String(event.summary) === REASONING_DEGRADED_SUMMARY).length, 1, "通知恰一");
-    } finally { await loopback.close(); }
-    assert.equal((await rows()).filter((row) => row["event"] === "reasoning.degraded").length, 1, "诊断恰一（不二次）");
-  });
+  const loopback = await startLoopback(() => ({ status: 400, json: { type: "error", error: { type: "invalid_request_error", param: "thinking", message: "Unsupported parameter: thinking" } } }));
+  const sdk = await harness();
+  const session = await createRealPiRuntimeAdapter(adapterOptions(loopback, tempProject(), { reasoningEffort: "low" }), sdk.dependencies as never).bindRole(makeRole("R-E"));
+  try {
+    await session.prompt("n1");
+    await session.prompt("n2");
+    assert.equal(loopback.captures.length, 4, "每轮原发＋一次去参；没有无限重试");
+    assert.deepEqual(loopback.captures.map(capture => "thinking" in capture.body), [true, false, true, false]);
+    assert.deepEqual(sdk.promptCalls, ["n1", "n2"], "失败也不重放 prompt");
+    const events = await drain(session);
+    assert.deepEqual(events.filter(event => event.kind === "settled").map(event => (event.detail as { outcome?: string }).outcome), ["failed", "failed"]);
+    assert.equal(events.filter(event => event.summary === REASONING_COMPATIBILITY_SUCCESS).length, 0, "失败不伪称兼容成功");
+    assert.equal(events.filter(event => event.summary === REASONING_COMPATIBILITY_ATTEMPT).length, 2, "每轮尝试一次");
+  } finally { await session.dispose(); await loopback.close(); }
+});
+
+test("E6b-negative 普通 400 不去参，不污染下一轮保存策略", async (t) => {
+  if (!(await piInstalled())) { t.skip("未安装"); return; }
+  const loopback = await startLoopback(() => ({ status: 400, json: { type: "error", error: { type: "invalid_request_error", param: "model", message: "Unknown model" } } }));
+  const sdk = await harness();
+  const session = await createRealPiRuntimeAdapter(adapterOptions(loopback, tempProject(), { reasoningEffort: "low" }), sdk.dependencies as never).bindRole(makeRole("R-E"));
+  try {
+    await session.prompt("ordinary-1"); await session.prompt("ordinary-2");
+    assert.equal(loopback.captures.length, 2);
+    assert.ok(loopback.captures.every(capture => thinkingOf(capture)?.budget_tokens === 2048));
+    const events = await drain(session);
+    assert.equal(events.some(event => event.summary === REASONING_COMPATIBILITY_ATTEMPT), false);
+    assert.deepEqual(events.filter(event => event.kind === "settled").map(event => (event.detail as { outcome?: string }).outcome), ["failed", "failed"]);
+  } finally { await session.dispose(); await loopback.close(); }
 });
 
 test("E6c 429 排除窗：瞬时态不归拒绝类 ⇒ 零降级（SDK 层重试原样携带思考；ANS 不发去参数重发、无通知、无诊断）", async (t) => {
@@ -406,28 +426,25 @@ test("E6c 429 排除窗：瞬时态不归拒绝类 ⇒ 零降级（SDK 层重试
       assert.ok(loopback.captures.length >= 1, "有请求发生");
       assert.ok(loopback.captures.every((capture) => "thinking" in capture.body), `ANS 不得发去参数重发（各捕获：${loopback.captures.map((capture) => "thinking" in capture.body).join(",")}）`);
       const events = await drain(session);
-      assert.equal(events.filter((event) => String(event.summary) === REASONING_DEGRADED_SUMMARY).length, 0, "无通知行");
+      assert.equal(events.filter((event) => String(event.summary) === REASONING_COMPATIBILITY_SUCCESS).length, 0, "无通知行");
       assert.equal((events.at(-1)!.detail as { outcome?: string }).outcome, "failed");
     } finally { await loopback.close(); }
     assert.equal((await rows()).filter((row) => row["event"] === "reasoning.degraded").length, 0, "无降级诊断");
   });
 });
 
-test("E6d 中断守卫（stub 接缝）：轮次被显式锁定 ⇒ 即使检测位置位也不重发（终态前不越权）", async () => {
-  // 自建 stub：一轮的 prompt 期间把 lifecycle 强制为 aborted（模拟逐字中止），检测位同时置位。
+test("E6d 中断守卫：prompt 包装层不重放已中止用户输入", async () => {
   const calls: string[] = [];
   const events: SessionEvent[] = [];
-  const lifecycle = createTurnLifecycle((event) => events.push(event));
-  let consumed = 0;
+  const lifecycle = createTurnLifecycle(event => events.push(event));
   const session: PromptCapableSession = {
     async prompt(text: string) { calls.push(text); lifecycle.fail("aborted", "ABORTED"); },
     async abort() {},
     dispose() {},
   };
-  const degrade: ReasoningDegradeOptions = { consumeRetry: () => { consumed += 1; return true; }, suppress: () => { throw new Error("中断轮不得 suppress"); }, noticeText: REASONING_DEGRADED_SUMMARY };
-  const prompt = makeRolePrompt({ session, promptMs: 5000, gate: createInteractionGate(), emit: (event) => events.push(event), log: silentLogger, finishOnReturn: true, lifecycle, reasoningDegrade: degrade });
+  const prompt = makeRolePrompt({ session, promptMs: 5000, gate: createInteractionGate(), emit: event => events.push(event), log: silentLogger, finishOnReturn: true, lifecycle });
   await prompt("aborted-mid-turn");
-  assert.deepEqual(calls, ["aborted-mid-turn"], "恰一次（被锁定的轮次不重发）");
-  assert.equal(consumed, 0, "守卫先行：被锁定 ⇒ 连消费询问都不发生（短路）");
-  assert.equal(events.some((event) => String(event.summary) === REASONING_DEGRADED_SUMMARY), false, "零重发通知");
+  assert.deepEqual(calls, ["aborted-mid-turn"]);
+  assert.equal(events.some(event => event.summary === REASONING_COMPATIBILITY_ATTEMPT || event.summary === REASONING_COMPATIBILITY_SUCCESS), false);
+  assert.deepEqual(events.filter(event => event.kind === "settled").map(event => (event.detail as { outcome?: string }).outcome), ["aborted"]);
 });

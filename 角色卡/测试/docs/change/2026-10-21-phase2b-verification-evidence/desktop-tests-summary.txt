@@ -1,0 +1,10 @@
+# desktop baseline: node --test test/桌面应用/*.test.ts (Phase 2b re-run)
+ℹ tests 679
+ℹ suites 0
+ℹ pass 679
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16910.061625
+EXIT=0

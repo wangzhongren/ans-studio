@@ -106,6 +106,8 @@ export interface AtomicWriteOptions {
    * **Pi适配器**若需更严权限（如 `0o600`）可显式传入。
    */
   mode?: number;
+  /** POSIX 提交前准确应用的普通权限位（0–0777），不受 umask 收窄；Windows 保持原行为。 */
+  finalMode?: number;
   /** 临时文件名的前缀（同目录）；缺省 `.{目标名}.tmp`。 */
   tmpPrefix?: string;
   /** 当前工具轮次的中止信号；已中止时不提交目标替换，清理已创建的 temp。 */
@@ -125,6 +127,10 @@ export async function atomicWrite(
   data: string | Buffer,
   options: AtomicWriteOptions = {},
 ): Promise<void> {
+  if (options.finalMode !== undefined &&
+      (!Number.isInteger(options.finalMode) || options.finalMode < 0 || options.finalMode > 0o777)) {
+    throw new RangeError("atomicWrite finalMode 必须是 0–0777 的普通权限位整数");
+  }
   const dir = path.dirname(filePath);
   const base = path.basename(filePath);
   const prefix = options.tmpPrefix ?? `.${base}.tmp`;
@@ -136,6 +142,10 @@ export async function atomicWrite(
     options.signal?.throwIfAborted();
     await handle.writeFile(data);
     options.signal?.throwIfAborted();
+    if (options.finalMode !== undefined && process.platform !== "win32") {
+      await handle.chmod(options.finalMode);
+      options.signal?.throwIfAborted();
+    }
     await handle.sync();
     await handle.close();
     handle = undefined;

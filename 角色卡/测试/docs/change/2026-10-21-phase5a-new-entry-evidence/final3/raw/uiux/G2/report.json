@@ -1,0 +1,26 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "G2 system alert renders as own injected style with system source chip",
+      "value": true
+    },
+    {
+      "name": "G2 closure notice replay classified by the same single source",
+      "value": true
+    },
+    {
+      "name": "G2 recovery card shows action role and verbatim evidence with cancel default focus",
+      "value": true
+    },
+    {
+      "name": "G2 recovery Esc is deny and channel-absent terminal never claims execution",
+      "value": true
+    },
+    {
+      "name": "G2 expired recovery card dismisses without execution illusion",
+      "value": true
+    }
+  ]
+}

@@ -77,6 +77,8 @@
 
 ## 组件 6：共享原子写原语（`atomic-write`）—— 可靠性相关，单一来源
 
+2026-10-21 D3：现行 `AtomicWriteOptions` 包含可选 `finalMode`（0–0777 普通权限位）。POSIX 在提交前通过临时句柄 chmod 应用后再 fsync/rename，避免 umask 丢失执行位；Windows 和未传此选项的调用方保持原语义。核心负责选择已有文件权限，共享层不做角色授权或自动继承权限。接口与本次 53/53 自测见 [实现报告](../../api-spec.md#d3-轻量修复原子写普通权限位)及[实施记录](../fix/2026-10-21_fix_d3-lightweight-permission-repairs.md)。以下表中最初迁移过程与测试数量为历史信息。
+
 | 字段 | 说明 |
 | --- | --- |
 | **名称与用途** | 跨角色共享**原子写**原语：同目录临时文件 → 写 → `fsync` → `rename` **覆盖目标**（`atomicWrite`），并对其中的 rename 做 Windows **瞬时 `EPERM`** 的**有界重试**（`renameReplacingExisting` / 重试核心 `retryOnTransient`）。解决的问题：本项目多处需要原子落盘（本仓至少 `env-file` 与 **Pi适配器** `fs-write.ts` 两处），而 Windows 上「rename **覆盖已存在**目标」会因**实时防护/索引器/杀软微过滤驱动短暂持有目标句柄（不含 `FILE_SHARE_DELETE`）**而**瞬时**返回 `ERROR_ACCESS_DENIED`（Node 报 `EPERM`）；若各处各自处置，这段**非平凡且可靠性强相关**的重试即成为 §6 逼出的**第二份镜像**（工程法案 §一.5「不得复制第二份」）。度量（Pi适配器实测）：覆盖**已存在**目标 → 单进程 ~3/20000、并发 ~7/20000；覆盖**不存在**目标 → **0/48000**（对照组干净 ⇒ 非逻辑 bug，是 OS 层瞬时占用）。 |

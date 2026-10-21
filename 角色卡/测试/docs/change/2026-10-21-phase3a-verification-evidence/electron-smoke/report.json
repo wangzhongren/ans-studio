@@ -1,0 +1,540 @@
+{
+  "checks": [
+    {
+      "name": "MOUNT_AND_BRIDGE",
+      "value": true,
+      "detail": {
+        "bridge": "object",
+        "smoke": "object",
+        "driver": "object",
+        "dark": true,
+        "ansi": "object",
+        "counts": {
+          "event": 1,
+          "roleState": 1,
+          "history": 1,
+          "projectChanged": 1,
+          "operatorRequest": 1,
+          "operatorExpired": 1,
+          "operatorQueued": 1
+        }
+      }
+    },
+    {
+      "name": "ANSMARKDOWN_PRESENT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SUBSCRIPTIONS_INSTALLED",
+      "value": true,
+      "detail": {
+        "event": 1,
+        "roleState": 1,
+        "history": 1,
+        "projectChanged": 1,
+        "operatorRequest": 1,
+        "operatorExpired": 1,
+        "operatorQueued": 1
+      }
+    },
+    {
+      "name": "LOAD_PROJECT",
+      "value": true,
+      "detail": {
+        "projectRoot": "/fixture",
+        "roles": [
+          "su",
+          "A",
+          "B"
+        ],
+        "primary": "A"
+      }
+    },
+    {
+      "name": "SELECT_ROLE_OPENS_SESSION",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "open": "A",
+        "selected": "A",
+        "pane": true
+      }
+    },
+    {
+      "name": "VIRTUAL_220_ROWS",
+      "value": true,
+      "detail": {
+        "count": 220,
+        "lastIndex": 219,
+        "rowGap": 16
+      }
+    },
+    {
+      "name": "VIRTUAL_WINDOWED_MOUNT",
+      "value": true,
+      "detail": {
+        "mounted": 61,
+        "spacers": [
+          12084,
+          0
+        ]
+      }
+    },
+    {
+      "name": "VIRTUAL_TAIL_AT_BOTTOM",
+      "value": true,
+      "detail": {
+        "scrollTop": 14139,
+        "scrollHeight": 14751,
+        "clientHeight": 612
+      }
+    },
+    {
+      "name": "OPERATOR_TOOLCALLID_ANCHOR",
+      "value": true,
+      "detail": {
+        "count": 223,
+        "opIndex": {
+          "index": 221,
+          "requestId": "op-anchor"
+        },
+        "prevKind": "activities",
+        "prevText": "本轮 1 个调用：run_shell未记录run_shell/fixture/scripts/run.sh调用发起",
+        "nextKind": "assistant",
+        "nextText": "after-tool 标记行\n"
+      }
+    },
+    {
+      "name": "OPERATOR_CHOICE_RENDER",
+      "value": true,
+      "detail": [
+        {
+          "label": "选项 A",
+          "height": 40
+        },
+        {
+          "label": "选项 B",
+          "height": 40
+        }
+      ]
+    },
+    {
+      "name": "STATUS_AWAITING_OVER_BUSY",
+      "value": true,
+      "detail": {
+        "text": "等待你确认",
+        "className": "ti-status st-confirm",
+        "chatState": "run"
+      }
+    },
+    {
+      "name": "STATUS_WORKING_AFTER_EXPIRE",
+      "value": true,
+      "detail": {
+        "text": "工作中",
+        "opState": "expired",
+        "chatState": "run"
+      }
+    },
+    {
+      "name": "STATUS_IDLE",
+      "value": true,
+      "detail": {
+        "text": "空闲",
+        "chatState": "idle"
+      }
+    },
+    {
+      "name": "STATUS_ERROR_AND_SYS_CONFIG_DANGER",
+      "value": true,
+      "detail": {
+        "text": "错误",
+        "state": "err",
+        "sys": [
+          {
+            "text": "开启会话失败：测试桩：B 的会话开启失败",
+            "color": "rgb(201, 122, 109)"
+          }
+        ]
+      }
+    },
+    {
+      "name": "STATUS_WORKING_OVER_PREV_ERROR",
+      "value": true,
+      "detail": {
+        "text": "工作中",
+        "state": "run"
+      }
+    },
+    {
+      "name": "MARKDOWN_XSS_NEGATIVES",
+      "value": true,
+      "detail": {
+        "found": true,
+        "scriptCount": 0,
+        "imgCount": 0,
+        "iframeCount": 0,
+        "xssFlag": "undefined",
+        "jsHrefs": [],
+        "okLink": [
+          {
+            "href": "https://example.com",
+            "rel": "noopener noreferrer"
+          }
+        ],
+        "hasStrong": true,
+        "mdHasScript": false,
+        "mdHasImg": false,
+        "mdHasJsHref": true
+      }
+    },
+    {
+      "name": "MARKDOWN_SAFE_LINK_AND_FORMAT",
+      "value": true,
+      "detail": [
+        {
+          "href": "https://example.com",
+          "rel": "noopener noreferrer"
+        }
+      ]
+    },
+    {
+      "name": "VIRTUAL_UNMOUNT_REMOUNT_STATE",
+      "value": true,
+      "detail": {
+        "before": {
+          "groupFound": true,
+          "groupOpen": true,
+          "opFound": true,
+          "selectedB": true
+        },
+        "gone": {
+          "group": false,
+          "op": false,
+          "mounted": 39
+        },
+        "after": {
+          "groupOpen": true,
+          "selectedB": true,
+          "opOpen": "open"
+        }
+      }
+    },
+    {
+      "name": "IME_COMPOSITION_NO_SEND",
+      "value": true,
+      "detail": {
+        "prevented": false,
+        "calls": 0,
+        "text": "你好"
+      }
+    },
+    {
+      "name": "IME_SEND_ONCE_WITH_PAYLOAD",
+      "value": true,
+      "detail": {
+        "args": [
+          "你好",
+          [],
+          {
+            "projectRoot": "/fixture",
+            "roleId": "A",
+            "runtime": "claude"
+          },
+          {
+            "clientMessageId": "191ccc4f-53bc-4b33-b4e2-d15b21cad248"
+          }
+        ],
+        "text": ""
+      }
+    },
+    {
+      "name": "ATTACHMENT_CHIP_AND_PAYLOAD",
+      "value": true,
+      "detail": {
+        "chipBeforeSend": true,
+        "calls": 2,
+        "args": [
+          "带图消息",
+          [
+            {
+              "type": "image",
+              "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+              "mimeType": "image/png"
+            }
+          ],
+          {
+            "projectRoot": "/fixture",
+            "roleId": "A",
+            "runtime": "claude"
+          },
+          {
+            "clientMessageId": "a1533efd-94ea-40da-8c09-db145e49da15"
+          }
+        ],
+        "chipAfter": false,
+        "rowHidden": true
+      }
+    },
+    {
+      "name": "IME_GUARD_229_ISCOMPOSING_SHIFT",
+      "value": true,
+      "detail": {
+        "k229": false,
+        "isComposing": false,
+        "shift": false
+      }
+    },
+    {
+      "name": "ROW_MODEL_DEBUG",
+      "value": true,
+      "detail": {
+        "count": 227,
+        "lastIndex": 226,
+        "operators": [
+          {
+            "index": 221,
+            "requestId": "op-anchor"
+          },
+          {
+            "index": 224,
+            "requestId": "op-preserve"
+          }
+        ],
+        "rowGap": 16
+      }
+    },
+    {
+      "name": "PANE_DEBUG",
+      "value": true,
+      "detail": {
+        "inChat": true,
+        "empty": false,
+        "assistant": 222,
+        "currentWork": false,
+        "note": false,
+        "textLength": 3402
+      }
+    },
+    {
+      "name": "PAGE_CSP_VIOLATIONS_ZERO",
+      "value": true,
+      "detail": 0
+    },
+    {
+      "name": "NO_CONSOLE_ERRORS",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "NO_DID_FAIL_LOAD",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "NO_PRELOAD_ERRORS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "NO_RENDER_GONE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SCREENSHOT",
+      "value": true,
+      "detail": {
+        "path": "/tmp/ans-p3a-smoke-output/phase3a-chat.png",
+        "bytes": 94118
+      }
+    }
+  ],
+  "consoleMessages": [],
+  "didFailLoad": [],
+  "preloadErrors": [],
+  "renderGone": [],
+  "csp": [],
+  "virtual": {
+    "count": 220,
+    "lastIndex": 219,
+    "rowGap": 16,
+    "mounted": 61,
+    "spacerCount": 2,
+    "spacerHeights": [
+      12084,
+      0
+    ],
+    "paneHeight": 14707,
+    "chat": {
+      "scrollTop": 14139,
+      "scrollHeight": 14751,
+      "clientHeight": 612
+    },
+    "rowKinds": [
+      "assistant"
+    ]
+  },
+  "anchor": {
+    "count": 223,
+    "operators": [
+      {
+        "index": 221,
+        "requestId": "op-anchor"
+      }
+    ],
+    "opExists": true,
+    "state": "open",
+    "prevKind": "activities",
+    "prevText": "本轮 1 个调用：run_shell未记录run_shell/fixture/scripts/run.sh调用发起",
+    "nextKind": "assistant",
+    "nextText": "after-tool 标记行\n",
+    "options": [
+      {
+        "label": "选项 A",
+        "height": 40
+      },
+      {
+        "label": "选项 B",
+        "height": 40
+      }
+    ]
+  },
+  "statusB": {
+    "text": "错误",
+    "sys": [
+      {
+        "text": "开启会话失败：测试桩：B 的会话开启失败",
+        "color": "rgb(201, 122, 109)"
+      }
+    ],
+    "state": "err",
+    "textBusy": "工作中",
+    "stateBusy": "run"
+  },
+  "xss": {
+    "found": true,
+    "scriptCount": 0,
+    "imgCount": 0,
+    "iframeCount": 0,
+    "xssFlag": "undefined",
+    "jsHrefs": [],
+    "okLink": [
+      {
+        "href": "https://example.com",
+        "rel": "noopener noreferrer"
+      }
+    ],
+    "hasStrong": true,
+    "mdHasScript": false,
+    "mdHasImg": false,
+    "mdHasJsHref": true
+  },
+  "preserved": {
+    "before": {
+      "groupFound": true,
+      "groupOpen": true,
+      "opFound": true,
+      "selectedB": true
+    },
+    "gone": {
+      "group": false,
+      "op": false,
+      "mounted": 39
+    },
+    "after": {
+      "groupOpen": true,
+      "selectedB": true,
+      "opOpen": "open"
+    }
+  },
+  "ime": {
+    "during": {
+      "prevented": false,
+      "calls": 0,
+      "text": "你好"
+    },
+    "after": {
+      "prevented": true,
+      "calls": 1,
+      "args": [
+        "你好",
+        [],
+        {
+          "projectRoot": "/fixture",
+          "roleId": "A",
+          "runtime": "claude"
+        },
+        {
+          "clientMessageId": "191ccc4f-53bc-4b33-b4e2-d15b21cad248"
+        }
+      ],
+      "text": "",
+      "userBubble": true
+    },
+    "attach": {
+      "chipBeforeSend": true,
+      "calls": 2,
+      "args": [
+        "带图消息",
+        [
+          {
+            "type": "image",
+            "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+            "mimeType": "image/png"
+          }
+        ],
+        {
+          "projectRoot": "/fixture",
+          "roleId": "A",
+          "runtime": "claude"
+        },
+        {
+          "clientMessageId": "a1533efd-94ea-40da-8c09-db145e49da15"
+        }
+      ],
+      "chipAfter": false,
+      "rowHidden": true
+    },
+    "k229Prevented": false,
+    "isCompPrevented": false,
+    "shiftPrevented": false
+  },
+  "debug": {
+    "rm": {
+      "count": 227,
+      "lastIndex": 226,
+      "operators": [
+        {
+          "index": 221,
+          "requestId": "op-anchor"
+        },
+        {
+          "index": 224,
+          "requestId": "op-preserve"
+        }
+      ],
+      "rowGap": 16
+    },
+    "pd": {
+      "inChat": true,
+      "empty": false,
+      "assistant": 222,
+      "currentWork": false,
+      "note": false,
+      "textLength": 3402
+    }
+  },
+  "screenshot": {
+    "path": "/tmp/ans-p3a-smoke-output/phase3a-chat.png",
+    "bytes": 94118
+  },
+  "headCommit": "fc1a39c14e119faccf442fc8e22bbbbd978d1a04",
+  "finishedAt": "2026-10-21T03:42:33.664Z",
+  "summary": {
+    "total": 30,
+    "passed": 30,
+    "failed": 0
+  }
+}

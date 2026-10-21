@@ -1,0 +1,5 @@
+role: B
+entries:
+  - kind: file
+    path: src/b.ts
+    purpose: P1-3 fixture

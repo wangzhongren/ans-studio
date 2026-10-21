@@ -1,0 +1,326 @@
+{
+  "oldCount": 391,
+  "newCount": 397,
+  "onlyOld": [
+    "P13_NEW_SEMANTICS"
+  ],
+  "onlyNew": [
+    "P13_CONTINUE_AFTER_RETURN",
+    "P13_OLD_PROJECT_BUSY",
+    "P13_OLD_SESSION_LIVE_AFTER_SWITCH",
+    "P13_QUEUED_BEFORE_SWITCH",
+    "P13_QUEUE_SURVIVES_SWITCH",
+    "P13_RETURN_RESUMES_SESSION",
+    "P13_SWITCH_IMMEDIATE"
+  ],
+  "valueDiff": {
+    "ANCHOR_CARD_AT_ARRIVAL": {
+      "old": "6",
+      "new": "4"
+    },
+    "ANCHOR_ROW_AFTER_SWITCHBACK": {
+      "old": "{\"count\":207,\"last\":206,\"ops\":[{\"index\":6,\"requestId\":\"op-6\"}]}",
+      "new": "{\"count\":206,\"last\":206,\"ops\":[{\"index\":4,\"requestId\":\"op-6\"}]}"
+    },
+    "BADGES_CLEAR_ON_EMPTY": {
+      "old": "true",
+      "new": "false"
+    },
+    "BADGE_ON_WORK_WHILE_COLLAPSED": {
+      "old": "true",
+      "new": "false"
+    },
+    "BADGE_ROLE_SINGLE_COUNT_WHILE_COLLAPSED": {
+      "old": "false",
+      "new": "true"
+    },
+    "DENIED_OPEN_COUNT": {
+      "old": "3",
+      "new": "1"
+    },
+    "DIAGNOSTIC_EVENT_NAMES": {
+      "old": "window.load.start,ipc.start,ipc.end,window.load.end,session.stop,session.open.start,session.open.ready,session.open.end,session.send.start,session.send.end,handback.chat.skipped,governance.feedback.skip,session.abort.requested,session.send.queued,delivery.claim.start,delivery.start,delivery.claim.end,delivery.blocked,delivery.end,session.dispose,renderer.replay,interaction.presented,interaction.response,interaction.response.end,session.open.failed,renderer.viewport,renderer.event-error,session.rebuild.start,session.rebuild.end,ipc.failed,interaction.closed,window.renderer.gone,interaction.replayed,renderer.recovery",
+      "new": "window.load.start,window.load.end,ipc.start,ipc.end,session.open.start,session.open.ready,renderer.viewport,session.open.end,session.send.start,session.send.end,handback.chat.skipped,governance.feedback.skip,session.abort.requested,session.send.queued,delivery.claim.start,delivery.start,delivery.claim.end,delivery.blocked,delivery.end,renderer.replay,session.dispose,interaction.presented,interaction.response,interaction.response.end,session.open.failed,session.stop,session.rebuild.start,session.rebuild.end,ipc.failed,renderer.event-error,interaction.closed,window.renderer.gone,interaction.replayed,renderer.recovery"
+    },
+    "DISPATCH_ROW_NO_WITHDRAW": {
+      "old": "true",
+      "new": "false"
+    },
+    "DRAWER_CLOSED_AFTER_PI": {
+      "old": "true",
+      "new": "false"
+    },
+    "E2E_FAILURES": {
+      "old": "RECOVERY_SAME_PENDING_CARD_ONCE",
+      "new": ""
+    },
+    "E2E_PASS": {
+      "old": "false",
+      "new": "true"
+    },
+    "HAS_DENIED_INLINE": {
+      "old": "3",
+      "new": "1"
+    },
+    "HAS_DENIED_INLINE_ANY": {
+      "old": "3",
+      "new": "1"
+    },
+    "INJECTED_CHIP_DELIVERY_LABEL": {
+      "old": "false",
+      "new": "true"
+    },
+    "INJECTED_CHIP_LABEL": {
+      "old": "原始交接内容 · 来源未确认",
+      "new": "回交投递 · 来自 规划者"
+    },
+    "OPEN_CARD_ROWS_AFTER_SWITCHBACK": {
+      "old": "{\"count\":208,\"last\":207,\"ops\":[{\"index\":6,\"requestId\":\"op-6\"},{\"index\":207,\"requestId\":\"op-7\"}]}",
+      "new": "{\"count\":207,\"last\":207,\"ops\":[{\"index\":4,\"requestId\":\"op-6\"},{\"index\":207,\"requestId\":\"op-7\"}]}"
+    },
+    "OPX_POINTER_IN_VIEWED_PANE": {
+      "old": "true",
+      "new": "false"
+    },
+    "OP_CARD_FROZEN": {
+      "old": "true",
+      "new": "false"
+    },
+    "OP_CARD_PRESENT": {
+      "old": "true",
+      "new": "false"
+    },
+    "OP_MULTI_HAS_CHECKBOX": {
+      "old": "true",
+      "new": "false"
+    },
+    "OP_SELECT_HAS_RADIO": {
+      "old": "true",
+      "new": "false"
+    },
+    "OUTDIR": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p",
+      "new": "/tmp/ans-p5a-final-new.lIlikI"
+    },
+    "P1_ARRIVAL_DEBUG": {
+      "old": "{\"hasCard\":true,\"dist\":46,\"st\":3011,\"sh\":3491,\"ch\":434,\"crTop\":517,\"crBottom\":640,\"ccTop\":287,\"ccBottom\":721,\"chipHidden\":false}",
+      "new": "{\"hasCard\":true,\"dist\":0,\"st\":3131,\"sh\":3632,\"ch\":501,\"crTop\":472,\"crBottom\":572,\"ccTop\":233,\"ccBottom\":734,\"chipHidden\":false}"
+    },
+    "P1_CHIP_SECOND_CARD": {
+      "old": "true",
+      "new": "false"
+    },
+    "PENDING_DIAG": {
+      "old": "{\"count\":1,\"confirmButtons\":1,\"scrollTop\":21856,\"chatRect\":{\"top\":239.1875,\"bottom\":657.40625},\"selectedRoleId\":\"桌面窗口\",\"pendingKeys\":[],\"rowCount\":473,\"anyCards\":1,\"paneRoleIds\":[\"桌面窗口\"],\"cards\":[{\"top\":469.390625,\"bottom\":562.828125,\"text\":\"重载后仍需客户明确作答确认不同意\"}]}",
+      "new": "{\"count\":1,\"confirmButtons\":1,\"scrollTop\":25571,\"chatRect\":{\"top\":196.390625,\"bottom\":670.203125},\"selectedRoleId\":\"桌面窗口\",\"pendingKeys\":[],\"rowCount\":488,\"anyCards\":1,\"paneRoleIds\":[\"桌面窗口\"],\"cards\":[{\"top\":492.21875,\"bottom\":570.359375,\"text\":\"重载后仍需客户明确作答确认拒绝\"}]}"
+    },
+    "PI_FIELDS_MATCH_REGISTRY": {
+      "old": "true",
+      "new": "false"
+    },
+    "PI_FIELD_COUNT": {
+      "old": "5",
+      "new": "6"
+    },
+    "PI_KEYS_ARE_FIVE": {
+      "old": "true",
+      "new": "false"
+    },
+    "PI_SAVE_STATUS": {
+      "old": "已保存到 .env（改动键：ANTHROPIC_AUTH_TOKEN、ANS_PI_BASE_URL、ANS_PI_MODEL）。必填配置已齐备。下一次开启会话时应用。",
+      "new": "已保存到 .env（改动键 3 个）。必填配置已齐备。下一次开启会话时应用。"
+    },
+    "RECOVERY_CARD_DIAG": {
+      "old": "{\"count\":0,\"confirmButtons\":0,\"scrollTop\":8394,\"chatRect\":{\"top\":258.59375,\"bottom\":721.40625},\"cards\":[]}",
+      "new": "{\"count\":1,\"confirmButtons\":1,\"scrollTop\":7774,\"chatRect\":{\"top\":231.796875,\"bottom\":734.203125},\"cards\":[{\"top\":556.453125,\"bottom\":634.59375,\"text\":\"重载后仍需客户明确作答确认拒绝\"}]}"
+    },
+    "RECOVERY_SAME_PENDING_CARD_ONCE": {
+      "old": "false",
+      "new": "true"
+    },
+    "RENDERER_ENTRY": {
+      "old": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/index.html",
+      "new": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/dist/src/index.html"
+    },
+    "REPAIR_AFTER_STOP_OPEN_CALLS": {
+      "old": "34",
+      "new": "36"
+    },
+    "REPAIR_OPEN_CALLS_AFTER_SAME_ROLE": {
+      "old": "33",
+      "new": "35"
+    },
+    "REPAIR_OPEN_CALLS_BEFORE_SAME_ROLE": {
+      "old": "32",
+      "new": "34"
+    },
+    "REPLAY_DEDUP_REBUILD": {
+      "old": "true",
+      "new": "false"
+    },
+    "REPLAY_DEDUP_REBUILD_UNIQUE_TEXT": {
+      "old": "false",
+      "new": "true"
+    },
+    "REPORT_DELIVERY_DETAILS_COLLAPSED": {
+      "old": "true",
+      "new": "false"
+    },
+    "RESTORE_NO_SUCCESS_DIVIDER": {
+      "old": "true",
+      "new": "false"
+    },
+    "RESTORE_SU_CHAT_SNIPPET": {
+      "old": "SU 的历史问题",
+      "new": "会话记录已恢复SU 的历史问题"
+    },
+    "RESTORE_SU_REPLAY_ROWS": {
+      "old": "1",
+      "new": "2"
+    },
+    "RESTORE_SU_RESTORED_FLAG": {
+      "old": "{\"hadSession\":true,\"error\":false,\"awaitingConfirm\":false,\"restored\":true,\"lastSummary\":\"\",\"lastAt\":\"\",\"historyNotice\":\"\",\"contextText\":\"新会话；可读历史保留，模型未恢复\",\"contextWarning\":\"\",\"readableHistoryAtOpen\":true}",
+      "new": "{\"error\":false,\"hadSession\":true,\"restored\":true,\"contextText\":\"新会话；可读历史保留，模型未恢复\",\"live\":true}"
+    },
+    "RESUME_HINT": {
+      "old": "已在该角色的会话中，续接当前会话。",
+      "new": ""
+    },
+    "RIGHT_QUEUE_RUNNING_FIRST": {
+      "old": "true",
+      "new": "false"
+    },
+    "RIGHT_QUEUE_SOURCES": {
+      "old": "true",
+      "new": "false"
+    },
+    "ROLE_STATE_BADGE_HAS_ICON": {
+      "old": "true",
+      "new": "false"
+    },
+    "ROLE_STATE_BADGE_HOVER_FULL": {
+      "old": "true",
+      "new": "false"
+    },
+    "ROLE_STATE_BADGE_SINGLE_COUNT_WORKING": {
+      "old": "false",
+      "new": "true"
+    },
+    "ROLE_STATE_BADGE_WORKING_PENDING": {
+      "old": "true",
+      "new": "false"
+    },
+    "ROLE_STATE_QUEUE_ROW": {
+      "old": "true",
+      "new": "false"
+    },
+    "SHOT_00_TITLEBAR": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/00-titlebar.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/00-titlebar.png"
+    },
+    "SHOT_01B_SU": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/01b-su.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/01b-su.png"
+    },
+    "SHOT_01_IMPORT": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/01-import.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/01-import.png"
+    },
+    "SHOT_02_CHAT": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/02-chat.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/02-chat.png"
+    },
+    "SHOT_03_DENIED": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/03-denied.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/03-denied.png"
+    },
+    "SHOT_04_PROFILE": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/04-profile.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/04-profile.png"
+    },
+    "SHOT_05_BOOTSTRAP": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/05-bootstrap.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/05-bootstrap.png"
+    },
+    "SHOT_06_REFRESH": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/06-refresh.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/06-refresh.png"
+    },
+    "SHOT_07_HANDBACK": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/07-handback.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/07-handback.png"
+    },
+    "SHOT_08_SU_PANE": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/08-su-pane.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/08-su-pane.png"
+    },
+    "SHOT_09_PI_PANEL": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/09-pi-panel.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/09-pi-panel.png"
+    },
+    "SHOT_10_PI_SAVED": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/10-pi-saved.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/10-pi-saved.png"
+    },
+    "SHOT_11_OPERATOR": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/11-operator-card.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/11-operator-card.png"
+    },
+    "SHOT_12_COMPOSER": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/12-composer.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/12-composer.png"
+    },
+    "SHOT_12_RESTORE": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/12-restore.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/12-restore.png"
+    },
+    "SHOT_14_OP_CROSSPANE": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/14-operator-crosspane.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/14-operator-crosspane.png"
+    },
+    "SHOT_15_ANCHOR": {
+      "old": "/tmp/ans-p5a-final-old.J1Sg1p/15-anchor-reanchor.png",
+      "new": "/tmp/ans-p5a-final-new.lIlikI/15-anchor-reanchor.png"
+    },
+    "STATUS_BADGE_TEXT": {
+      "old": "●空闲",
+      "new": "空闲"
+    },
+    "STATUS_LAST_EVENT_FIELD_NEW": {
+      "old": "false",
+      "new": "true"
+    },
+    "STATUS_LAST_EVENT_RECORDED": {
+      "old": "true",
+      "new": "false"
+    },
+    "SWITCH_CONFIRM_ON_BUSY": {
+      "old": "true",
+      "new": "false"
+    },
+    "SWITCH_CONFIRM_RELOADED": {
+      "old": "true",
+      "new": "false"
+    },
+    "SWITCH_IDLE_HINT": {
+      "old": "true",
+      "new": "false"
+    },
+    "SYS_ROWS": {
+      "old": "sys sys-context-event | sys sys-settled | sys sys-settled",
+      "new": "sys sys-call sys-unknown-tool-event | sys sys-call | sys sys-settled | sys sys-call sys-unknown-tool-event | sys sys-call | sys sys-settled"
+    },
+    "U1_NORMAL_TO_BOTTOM": {
+      "old": "false",
+      "new": "true"
+    },
+    "U1_NORMAL_TO_BOTTOM_DIST": {
+      "old": "10",
+      "new": "0"
+    },
+    "U1_PANE_HEIGHT": {
+      "old": "12683",
+      "new": "12580"
+    }
+  }
+}

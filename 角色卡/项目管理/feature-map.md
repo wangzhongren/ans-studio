@@ -9,6 +9,7 @@
 | 共享组件（`src/common/shared/`） | 跨角色共享原语与设置目录：config-loader、path-primitives、runtime-shared、argv-primitives、env-file、atomic-write、diagnostics、runtime-settings | 8 个实现；多运行时消费方接线与合并验收进行中 | [共享组件登记](docs/architecture/shared-components.md)、[实际接口与验证](api-spec.md)、[单元测试](../../test/项目管理/shared/) |
 | 多运行时对接 | 已批准的运行时接入组、公共契约迁移与 Pi/Codex/Claude 实施/验收范围 | 核心阶段通过，其余接线进行中 | [ANS-RUNTIME-V2](docs/design/2026-10-14_design_multi-runtime-integration.md) |
 | 设计与跨角色对接设计 | 各轮设计稿、评审记录与对接设计 | 持续更新 | [docs/design/](docs/design/) |
+| UI 平台化评审（2026-10-21） | 产品「UI 平台化」提案的技术评审、阶段门裁定与派发口径 | **Phase 5 完成（AC1–AC8 pass，macOS 本地离线/本地打包范围）**；5B 门关闭；发布/签名未授权；六类 missing-evidence 另列 | [评审与实施口径](docs/design/2026-10-21_review_ui-platform-round.md) |
 | 变更与修复记录 | 各轮任务回执、返工与收口记录（含客户验收证据目录） | 持续更新 | [docs/change/](docs/change/)、[docs/fix/](docs/fix/) |
 | 会议纪要 | 跨角色联合评审的议程与纪要 | 已建立 | [docs/meetings/](docs/meetings/) |
 | 调度记录约定 | 任务调度记录的归属、唯一写入者与格式样例（调度「执行」路径不在 V1） | 约定已立；仓库根 `docs/scheduling/` 尚未建立、暂无实际记录 | [使用约定](docs/design/2026-10-11_design_scheduling-record-convention.md) |

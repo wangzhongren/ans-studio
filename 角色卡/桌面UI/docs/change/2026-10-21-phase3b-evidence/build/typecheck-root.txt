@@ -1,0 +1,7 @@
+npm warn Unknown user config "ELECTRON_MIRROR". This will stop working in the next major version of npm.
+npm warn Unknown user config "ELECTRON_BUILDER_BINARIES_MIRROR". This will stop working in the next major version of npm.
+
+> ans-cli@1.4.0 typecheck
+> tsc --noEmit
+
+exit=0

@@ -1,0 +1,74 @@
+{
+ "phase": "5B-final4",
+ "candidate": "f372e111/f568e2aa/b52cfca1",
+ "summary": {
+  "conclusion": "pass",
+  "P0": 0,
+  "P1": 0,
+  "P2": 4,
+  "notes": 1,
+  "occlusion": "cleared (680/480 gates)"
+ },
+ "items": [
+  {
+   "id": "5B-FINAL4-P2-1",
+   "severity": "P2",
+   "status": "registered",
+   "scene": "480 CSS mirror target",
+   "finding": "Mirror confirm/deny actions are bottom<=composer.top, but the sticky 定位 chip overlaps them in the 480 target capture; scrolling clears it.",
+   "evidence": [
+    "smoke/13-mirror-480css.png",
+    "smoke/report.json"
+   ],
+   "expected": "Chip above/below actions without overlap at 480; actions fully visible.",
+   "actual": "Chip overlays action band; actions behind chip in capture.",
+   "owner": "桌面UI",
+   "retest": "480 mirror screenshot + chip/actions rect non-overlap (optional Phase 5 polish)."
+  },
+  {
+   "id": "5B-FINAL4-P2-2",
+   "severity": "P2",
+   "status": "registered",
+   "scene": "480 CSS report/delivery target",
+   "finding": "Target summary/facts bottom<=composer.top, but full card title/batch title sits above the viewport edge in the target capture.",
+   "evidence": [
+    "smoke/10-report-480css.png",
+    "smoke/14-delivery-480css.png"
+   ],
+   "expected": "If full card context is required, scroll to show title+target; gate target-specific is satisfied.",
+   "actual": "Target visible; title above fold.",
+   "owner": "UIUX/桌面UI",
+   "retest": "Optional full-card 480 screenshot."
+  },
+  {
+   "id": "5B-FINAL4-P2-3",
+   "severity": "P2",
+   "status": "evidence",
+   "scene": "main 3x 200 capture",
+   "finding": "Main 3x 200 screenshots often stop at bottom scroll; 04-profile content is chat.",
+   "evidence": [
+    "main-al-3x/02-chat-200.png",
+    "main-al-3x/04-profile.png"
+   ],
+   "expected": "Use targeted smoke shots; future harness scrolls to target.",
+   "actual": "Bottom-scroll/label mismatch.",
+   "owner": "UIUX",
+   "retest": "Manifest note."
+  },
+  {
+   "id": "5B-FINAL4-P2-4",
+   "severity": "P2",
+   "status": "evidence",
+   "scene": "harness marker",
+   "finding": "Smoke/4B screenshots contain 窗口控制不可用 harness marker; not product.",
+   "evidence": [
+    "smoke/06-empty-state-200pct.png",
+    "phase4b-smoke/phase4b-200pct.png"
+   ],
+   "expected": "Do not use as production L pass.",
+   "actual": "Marker only in smoke.",
+   "owner": "测试/UIUX",
+   "retest": "Manifest note."
+  }
+ ]
+}

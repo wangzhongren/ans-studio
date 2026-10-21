@@ -255,6 +255,58 @@ function matchReadOnly(args: string[], program: string, rules: ShellReadOnlyRule
   return null;
 }
 
+// rg 的带值选项仅用于跳过参数值（例如 -e --pre 是模式），不是新的安全白名单。
+// D3 只识别显式 --pre；隐藏配置、其他间接执行能力沿用已接受的风险取舍。
+const RG_VALUE_OPTIONS = new Set([
+  "--regexp", "--file", "--pre-glob", "--dfa-size-limit", "--encoding", "--engine",
+  "--max-count", "--regex-size-limit", "--threads", "--glob", "--iglob", "--ignore-file",
+  "--max-depth", "--max-filesize", "--type", "--type-not", "--type-add", "--type-clear",
+  "--after-context", "--before-context", "--color", "--colors", "--context",
+  "--context-separator", "--field-context-separator", "--field-match-separator",
+  "--hostname-bin", "--hyperlink-format", "--max-columns", "--path-separator", "--replace",
+  "--sort", "--sortr", "--generate",
+]);
+const RG_SHORT_VALUE_OPTIONS = new Set("efEmjgdtTABCMr".split(""));
+
+/** 只看选项位置；选项可出现在位置参数后，直到 --。短选项组合的首个带值项吃掉余部或下一项。 */
+function hasRgPreprocessor(args: string[]): boolean {
+  for (let i = 1; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--") break;
+    if (arg === "--pre" || arg.startsWith("--pre=")) return true;
+    if (RG_VALUE_OPTIONS.has(arg)) {
+      i += 1;
+    } else if (arg.startsWith("-") && !arg.startsWith("--")) {
+      for (let j = 1; j < arg.length; j++) {
+        if (!RG_SHORT_VALUE_OPTIONS.has(arg[j])) continue;
+        if (j === arg.length - 1) i += 1;
+        break;
+      }
+    }
+  }
+  return false;
+}
+
+/** 只在原 allow 出口调用：不改变既有 deny/risky，也不引入文件系统身份核验。 */
+function reviewExplicitExecution(args: string[], program: string): ShellVerdict | null {
+  const token = stripQuotes(args[0].trim());
+  if (/[\\/]/.test(token) || /^[a-z]:/i.test(token) || /\.(cmd|bat|ps1)$/i.test(token)) {
+    return {
+      decision: "review",
+      reason: "显式程序路径或脚本包装不能仅凭 basename 获得只读免审批资格，交既有审批",
+      ruleId: "review:explicit-program",
+    };
+  }
+  if (program === "rg" && hasRgPreprocessor(args)) {
+    return {
+      decision: "review",
+      reason: "rg --pre 预处理参数可启动外部程序，交既有审批",
+      ruleId: "review:rg-preprocessor",
+    };
+  }
+  return null;
+}
+
 /**
  * 带原因的判定。参数取 unknown 是为了**强制走运行时校验**——任何调用方传错形状都得到 deny，
  * 而不会因为 TS 类型擦除而静默退化。classifyShell（冻结契约）只是它的四态封装。
@@ -311,6 +363,8 @@ export function classifyShellDetailed(argv: unknown, rules: unknown): ShellVerdi
   //   其余 re-shell 形态（sh -c/pwsh/cmd /c del/绝对路径可执行文件…）仍在第 5 步 deny。
   const roReshell = matchReadonlyReshell(args, program);
   if (roReshell !== null) {
+    const review = reviewExplicitExecution(args, program);
+    if (review !== null) return review;
     return {
       decision: "allow",
       reason: `命中窄只读 re-shell 白名单：${roReshell}`,
@@ -357,6 +411,8 @@ export function classifyShellDetailed(argv: unknown, rules: unknown): ShellVerdi
   // 8) 白名单（只读命令）→ allow（唯一通向 allow 的分支）
   const ro = matchReadOnly(args, program, R.readOnly);
   if (ro !== null) {
+    const review = reviewExplicitExecution(args, program);
+    if (review !== null) return review;
     return { decision: "allow", reason: `命中只读白名单：${ro}`, ruleId: `allow:readonly:${ro}` };
   }
 

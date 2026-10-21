@@ -1,0 +1,17 @@
+DRIVER_AND_MARKDOWN=true {"driver":true,"markdown":true,"html":"dark"}
+HTML_DARK=true "dark"
+PROJECT_LOADED=true {"projectRoot":"/phase3a-smoke","primaryRoleId":"A","selectedRoleId":"A","hasRoles":true,"roles":["A","B"],"selectedText":"A","treeItems":2}
+HISTORY_REPLAY=true {"sessionOpen":"A","count":5,"gap":16,"user":1,"assistant":1,"tool":1,"denied":1,"divider":1,"pane":true,"mdLink":true,"paneDebug":{"inChat":true,"empty":false,"queue":false,"currentWork":false,"loading":false,"loadingText":"","note":false,"noteText":"","assistant":1,"text":"会话记录已恢复\n历史用户消息 **粗体**\n历史助手回复 [链接](https://example.com)\nread_file  已记录\n越界写入被拒绝"}}
+ROW_GAP_16=true 16
+VIRTUAL_WINDOW=true {"count":225,"mounted":61,"spacers":2,"scrollHeight":14990,"clientHeight":580}
+VIRTUAL_SCROLL_TOP=true {"mounted":61,"scrollTop":0,"firstRow":"assistant"}
+OPERATOR_ANCHOR=true {"operators":[{"index":226,"requestId":"op-smoke"}],"op":true,"title":"请确认执行","tool":true,"opAfterTool":true,"operatorsInDebug":true}
+STATUS_AWAITING_PRIORITY=true {"className":"ti-status st-confirm","text":"等待你确认"}
+STATUS_WORKING_PRIORITY=true {"text":"工作中","className":"ti-status st-working","chatState":"run"}
+STATUS_ERROR_BEHIND_BUSY=true {"className":"ti-status st-working","chatState":"run"}
+STATUS_ERROR_WHEN_IDLE=true {"className":"ti-status st-error","text":"错误","chatState":"err"}
+MARKDOWN_SAFE=true "<p>&lt;script&gt;alert(1)&lt;/script&gt; [x](javascript:alert(1)) ![i](https://x/i.png)</p>\n"
+NO_DID_FAIL_LOAD=true []
+NO_CONSOLE_CSP_ERRORS=true []
+PANE_DEBUG=true {"inChat":true,"empty":false,"queue":false,"currentWork":false,"loading":false,"loadingText":"","note":false,"noteText":"","assistant":1,"text":"会话记录已恢复\n历史用户消息 **粗体**\n历史助手回复 [链接](https://example.com)\nread_file  已记录\n越界写入被拒绝"}
+SMOKE_DONE=1

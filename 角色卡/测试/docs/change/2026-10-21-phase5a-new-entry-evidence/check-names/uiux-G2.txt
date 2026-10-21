@@ -1,0 +1,5 @@
+G2 system alert renders as own injected style with system source chip=true
+G2 closure notice replay classified by the same single source=true
+G2 recovery card shows action role and verbatim evidence with cancel default focus=true
+G2 recovery Esc is deny and channel-absent terminal never claims execution=true
+G2 expired recovery card dismisses without execution illusion=true

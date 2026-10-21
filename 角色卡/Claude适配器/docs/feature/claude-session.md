@@ -3,7 +3,7 @@ id: claude-session
 type: feature
 title: 选择 Claude 后继续受治理的角色对话
 created: "2026-10-14"
-updated: "2026-10-16"
+updated: "2026-10-21"
 timezone: Asia/Shanghai
 status: verified
 related: [multi-runtime-integration-v2, claude-governed-session-v2-a1]
@@ -56,6 +56,31 @@ flowchart TD
 客户等待期间可以停止：旧轮次的工具保留旧 signal，迟到回答不能恢复授权或提交报告，下一条输入可以继续。SDK MCP 有约 24.8 天硬超时上限，适配器禁用自动后台化并暂停 ANS prompt timer，但不承诺原生无限等待。完成一轮只表示该次 prompt 已终止；提交报告/派发是否成功看其真实回执。
 
 开启 persistence 时，原生配置根位于注入的 `.ans/sessions/<role>/claude/native`。核心回放在同 runtime 隔离目录；回放能阅读旧对话，不证明原生上下文恢复。首次拿到旧 ID 时只待确认；实际成功 result 才显示 resumed。恢复未确认且本轮失败时清除 ID，下一条明确输入重新开始并保留 warning。没有 storage 时使用临时配置、不创建项目 `.ans`，关闭时清理。
+
+## 思考参数不支持时继续
+
+用户保存的档位交给 SDK：未设沿用 SDK 默认，off 请求关闭，low/medium/high/xhigh 传 effort；SDK 仍可能忽略或限制档位，不能把保存成功当成服务端已采用。第一条活动输入会显示 system 配置消息。
+
+```mermaid
+flowchart TD
+  configured[按保存配置提交] --> response{SDK 结果}
+  response -->|正常| done[完成当前轮]
+  response -->|明确的400或422思考参数拒绝| safe{本轮尚无正常输出或工具启动?}
+  response -->|鉴权 限流 其他故障| failure[按原故障处理 保留原配置]
+  safe -->|否| failure
+  safe -->|是| trying[提示正在兼容 重建子进程一次]
+  trying --> bare[局部双env 真正省略thinking与effort]
+  bare -->|正常完成| remember[提示兼容完成 后续本活会话沿用]
+  bare -->|失败 取消 超时| reset[不记兼容 下一轮仍按原配置]
+  remember --> done
+  reset --> failure
+```
+
+仅在明确参数拒绝时采用兼容请求，普通接口可用时自动完成同一任务。`CLAUDE_CODE_EFFORT_LEVEL=unset` 与 `CLAUDE_CODE_DISABLE_THINKING=1` 只写兼容 SDK 子进程环境；不改主进程环境或保存设置。空 SDK 选项本身不能去参，因此不可用默认 high 冒充 low。只有正常完成才记住兼容方式，设置改变并重建后重新采用用户配置。SDK 自身运输重试保持。
+
+正常文本/思考输出、任何 tool_use，或 ANS/外来 MCP/WebSearch 放行时即禁止整轮重放；SDK 标记的合成 API 错误帧不算正常输出。尝试、完成及配置说明都属于普通 system message，不作为模型思考正文或助手反馈。原有失败、停止与原生会话恢复语义保持；不承诺中途失败后无损续接。
+
+真实 SDK 验证请求体字段与生命周期，不证明所有第三方网关会采用档位或接受 beta headers。旧 Sonnet/Haiku 可能不消费 effort，4.6 模型可能将 xhigh 钳到 high，本次不增加预算映射。当前修复与验证见 [2026-10-21 记录](../fix/2026-10-21_fix_reasoning-compatibility.md)。
 
 API 最短使用方式是由核心 `createRuntimeAdapter({runtime:'claude', gate, projectRoot, skillRoot})` 选择本工厂；provider 直接调用只用于已注入完整能力的调用方和测试，详见[公开接口](../../api-spec.md)。配置 `ANTHROPIC_API_KEY` 为必需；模型 `ANS_CLAUDE_MODEL` 和 endpoint `ANTHROPIC_BASE_URL` 可选。只接受 API key，不尝试订阅登录。
 

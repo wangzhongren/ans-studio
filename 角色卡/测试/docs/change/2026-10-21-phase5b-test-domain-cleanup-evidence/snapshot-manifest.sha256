@@ -1,0 +1,13 @@
+4f229e995e29500e29b1f5653c1219e54718113c303736a550fa2a3f3224abba  角色卡/测试/docs/change/2026-10-21-phase5b-test-domain-cleanup-evidence/existing-a.txt
+e4737d4909af34428c1b9278aafc945005535a98bd8c060409b11d013c4a59fb  角色卡/测试/docs/change/2026-10-21-phase5b-test-domain-cleanup-evidence/existing-b.txt
+7ebedd6b58b9348fb94829538c21930f288f94867b90c31f5f203e92b1d58a7f  角色卡/测试/docs/change/2026-10-21-phase5b-test-domain-cleanup-evidence/modified-files.txt
+25c5b6ec8fe15dccb97d46100a3b81aa465eb79b8abf005c19a3d3aba10a03a2  角色卡/测试/docs/change/2026-10-21-phase5b-test-domain-cleanup-evidence/modified-sha256.txt
+222194452f0848bbea6c37f6ac98381562efd84cfc45f87ff05fd8b7b1575855  角色卡/测试/docs/change/2026-10-21-phase5b-test-domain-cleanup-evidence/pin-recovery-suite.txt
+ce6df9762f0e7411e6476b297c7f9eecc6432e6807530959fc15e0a614eb4955  角色卡/测试/docs/change/2026-10-21-phase5b-test-domain-cleanup-evidence/replay-regression.txt
+6dd18f12ca98a8e3f1867bd52b4ea15e320ff0a1e328fe87c6dfbc370c5acada  角色卡/测试/docs/change/2026-10-21-phase5b-test-domain-cleanup-evidence/retired-checks.md
+436eeb1ef7fabcf63d317cfa9707c9438cdc7b0627b3b28600fdc469a37a0a30  角色卡/测试/docs/change/2026-10-21-phase5b-test-domain-cleanup-evidence/retired-files.md
+321bb666077c15684a7f16a03b0b6eb2ad7477bca32dc1212dcaeedd17d40b0f  角色卡/测试/docs/change/2026-10-21-phase5b-test-domain-cleanup-evidence/retired-sha256.txt
+d9112424b224a236a4abeaac1191d7e5ea7f097cde06e8562b2933d4cbecbbec  角色卡/测试/docs/change/2026-10-21-phase5b-test-domain-cleanup-evidence/shell-judge-suite.txt
+76cc640c9829ca5686e2ae47b436feccb09c19a2b397b5bc36cbc4a6ee346f51  角色卡/测试/docs/change/2026-10-21-phase5b-test-domain-cleanup-evidence/tests-final.txt
+1052406932ab50de2b46fc69cff78c63e81efbf02c91026a7e3aae6022902d10  角色卡/测试/docs/change/2026-10-21-phase5b-test-domain-cleanup-evidence/tsc-before.txt
+f62e07342ffced7ecda71df1f41f5b4c89d450da80931c5046c0ed6602718e1c  角色卡/测试/docs/change/2026-10-21-phase5b-test-domain-cleanup-evidence/tsc-final.txt
