@@ -18,6 +18,7 @@
 | `chat/replay.ts` | 回放 skip/append/full、canonical key/去重 |
 | `chat/events.ts` | SessionEvent/历史 → 行描述（user/assistant/tool/injected/operator/handback/turn-terminal/system-notice） |
 | `chat/report-view.ts` | 报告/交付 facts、persistence 文案、安全显示副本 flags |
+| `chat/role-view.ts` | 治理职能显示名：`proposal → Draft / 提案`、`nomination → Crew / 组队`、`schedule → Steward / 统筹`；`liaison → 主理 / Lead`、`verification → 验收 / Proof` 不变 |
 | `chat/operator-view.ts` | operator 镜像面、`pendingKindFor`（待选择/等待你确认）、治理卡文案 |
 | `chat/governance-view.ts` | 治理记录 missing/invalid/pin-mismatch/reaccept 文案与动作谓词 |
 | `chat/chat-store.ts` | 行模型/pane 版本/历史回放/阅读锚点/队列与状态；`window.__ansRenderer` 的数据源 |

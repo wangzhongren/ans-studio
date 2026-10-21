@@ -196,8 +196,8 @@ test("治理卡元信息/镜像来源/聚合文案逐字；未知 cardKind 无�
   assert.equal(governanceCardMetaView({ cardKind: "intent-confirm" }).badge, "需求确认 · 客户");
   assert.equal(governanceCardMetaView({}).badge, "");
   assert.equal(
-    governanceMirrorSourceLabel("报告员 / Rapporteur"),
-    "来自 报告员 / Rapporteur 的治理决定 · 客户最终批准",
+    governanceMirrorSourceLabel("Draft / 提案"),
+    "来自 Draft / 提案 的治理决定 · 客户最终批准",
   );
   assert.equal(governanceMirrorSourceLabel(""), "来自 发起角色 的治理决定 · 客户最终批准");
   assert.equal(governanceQueueAggregateText(2), "还有 2 个决定等待前一个决定");

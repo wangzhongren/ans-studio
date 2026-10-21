@@ -20,17 +20,17 @@ const GOVERNANCE: Record<string, GovernanceView> = {
     builtinNote: "内置角色：随应用发布，无角色目录",
   },
   proposal: {
-    name: "报告员 / Rapporteur",
+    name: "Draft / 提案",
     power: "提案权 · 不拥有最终批准权",
     builtinNote: "内置角色：随应用发布，无角色目录",
   },
   nomination: {
-    name: "提名官 / Nominator",
+    name: "Crew / 组队",
     power: "提名权 · 不拥有最终批准权",
     builtinNote: "内置角色：随应用发布，无角色目录",
   },
   schedule: {
-    name: "召集人 / Convener",
+    name: "Steward / 统筹",
     power: "排期权 · 不拥有最终批准权",
     builtinNote: "内置角色：随应用发布，无角色目录",
   },

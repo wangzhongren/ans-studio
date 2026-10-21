@@ -108,3 +108,9 @@
 - DOM 例外保持：`DEFER_TOOL_ROWS_WHEN_CLOSED=40` 与失效 operator 卡动作隐藏（PM §10.4/§十三），未新增。
 - 死 CSS：检查确认 `app/renderer/src/shell/shell.css` 的 `.ti-badge` 无 TSX/DOM 引用；为保持 UIUX 已审计的冻结候选 hash（`3c4da2a2…/f568e2aa…/76fad7ce…`）不重建，**本批不删除**，留待下一构建批次清理（契约面选择器附录已移除该历史项）。
 - 未改 main/preload/package/vite/根配置；生产入口仍由装配已切换为 `dist/index.html`。
+
+## 十、后续候选（角色显示名修复，2026-10-21）
+
+- 真机发现治理职能显示名回退：`role-view.ts` 的 proposal/nomination/schedule 旧称改为 **Draft / 提案、Crew / 组队、Steward / 统筹**；liaison/verification 不变。详见 [role-display-names 记录](2026-10-21_change_ui-platform-role-display-names.md)。
+- 新候选：`dist/index.html` `c8ad0e82…79cd`、JS `050776ec…f97b`、CSS `76fad7ce…c0f6`；gzip **288,514B**。本文件 §七 的 `3c4da2a2…/288,530B` 为步骤 b 时点记录，已被本候选取代。
+- 复跑：单测 142/142、role/governance 15/15、4B 70/70、5A 36/36、MIRROR 8/8、typecheck 0/0、build 成功。

@@ -529,3 +529,10 @@
 - `ui-contract-surface.md`：状态 implemented；生产入口唯一 `app/renderer/dist/index.html`（renderer-entry 解析）；删除 `dist/src`/旧入口/旧守卫作为现行契约的表述；三态表 #1、#22、#24–#28 更新，新增 #34–#39（入口切换、旧渲染器删除、vendor 删除、e2e/冒烟默认翻转、DOM 例外保持、驱动面最终）；套件总表与 3.x 入口全部改 dist/index.html；清理旧文件/旧模块引用。
 - `api-spec.md`：顶部新增「最终口径」新渲染器模块表；装配说明改 Vite 输入/产物与 CSP；合规守卫改 `test/桌面UI`；Phase 2 历史段标注，旧入口表述改为历史。
 - 死 CSS：确认 `.ti-badge` 无引用；为保持已审计冻结候选 hash 不重建，本批不删除（契约面选择器附录已移除）。DOM 例外保持两条（延迟挂载 40、失效 operator 卡动作隐藏）；未新增。
+
+### 角色显示名回退修复：治理职能新称（2026-10-21）
+
+- `role-view.ts`：proposal `报告员 / Rapporteur`→**Draft / 提案**；nomination `提名官 / Nominator`→**Crew / 组队**；schedule `召集人 / Convener`→**Steward / 统筹**；liaison「主理 / Lead」、verification「验收 / Proof」不变。
+- 同步 `role-view.test.ts`、`governance-view.test.ts`、`phase4b-electron-smoke.mjs`（来自 Draft / 提案）、`uiux-v2.mjs` W6-C names/mirror source；role id 不变。
+- 复跑：role/governance **15/15**、`test/桌面UI` **142/142**、4B **70/70**、5A **36/36**、MIRROR **8/8**、typecheck 0/0、build 成功。
+- 新 dist：html `c8ad0e82…`、js `050776ec…`、css `76fad7ce…`；gzip **288,514B**。记录 [role-display-names](docs/change/2026-10-21_change_ui-platform-role-display-names.md)。

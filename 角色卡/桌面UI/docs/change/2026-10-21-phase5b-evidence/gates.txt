@@ -73,3 +73,8 @@
 - `hot-path.test.ts`/`message-queue.test.ts`、`test/测试/**`、`test/装配/verify-local-package.mjs` 仍引用已删旧文件（属桌面窗口/各测试属主），需在 5B 收尾前退役/替换；桌面UI 未改。
 - `test/桌面应用/diagnostics.test.ts` 的 `dist/src/index.html` 字符串夹具待其属主按新入口口径复核。
 - 本证据不是最终验收；UIUX 最终 A–L 复跑与打包 dry run 仍待执行。
+
+## 7. 后续候选：角色显示名修复（2026-10-21）
+
+- `role-view.ts` 治理显示名改为 Draft / 提案、Crew / 组队、Steward / 统筹（liaison/verification 不变）；单测 142/142、4B 70/70、5A 36/36、MIRROR 8/8、typecheck 0/0、build 成功。
+- 新候选：`dist/index.html` `c8ad0e82…79cd`、JS `index-Oqlp-kNL.js` `050776ec…f97b`、CSS `index-DUBNk8-R.css` `76fad7ce…c0f6`；gzip9 **288,514B**。详见 `../2026-10-21_change_ui-platform-role-display-names.md`。
