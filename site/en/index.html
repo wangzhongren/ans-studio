@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ANS Studio — An Autonomous Organization Runtime for AI Agents</title>
+  <meta name="description" content="ANS Studio organizes multiple AI agents into a team with roles, boundaries, dispatch, and independent acceptance. Role-first governance: write authority comes only from role boundaries. Claude, Pi, and Codex supported, plus a CLI.">
+  <link rel="canonical" href="https://wangzhongren.github.io/ans-studio/en/">
+  <link rel="alternate" hreflang="zh-CN" href="https://wangzhongren.github.io/ans-studio/">
+  <link rel="alternate" hreflang="en" href="https://wangzhongren.github.io/ans-studio/en/">
+  <link rel="alternate" hreflang="x-default" href="https://wangzhongren.github.io/ans-studio/">
+  <meta name="theme-color" content="#151512">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ANS Studio">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="zh_CN">
+  <meta property="og:title" content="ANS Studio — An Autonomous Organization Runtime for AI Agents">
+  <meta property="og:description" content="Organize multiple AI agents into a team with roles, boundaries, dispatch, and independent acceptance. Role-first: write authority comes only from role boundaries.">
+  <meta property="og:url" content="https://wangzhongren.github.io/ans-studio/en/">
+  <meta property="og:image" content="https://wangzhongren.github.io/ans-studio/assets/desktop-intent-confirm.png">
+  <meta property="og:image:width" content="1360">
+  <meta property="og:image:height" content="980">
+  <meta property="og:image:alt" content="ANS Studio desktop app: graphite theme, five-role navigation, and an intent confirmation card">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ANS Studio — An Autonomous Organization Runtime for AI Agents">
+  <meta name="twitter:description" content="Organize multiple AI agents into a team with roles, boundaries, dispatch, and independent acceptance. Role-first: write authority comes only from role boundaries.">
+  <meta name="twitter:image" content="https://wangzhongren.github.io/ans-studio/assets/desktop-intent-confirm.png">
+
+  <link rel="icon" type="image/png" href="../assets/favicon.png">
+  <link rel="apple-touch-icon" href="../assets/ans-seal.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+  <link rel="stylesheet" href="../styles.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "ANS Studio",
+    "alternateName": "An Autonomous Organization Runtime for AI Agents",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "macOS 13+, Windows 10/11",
+    "description": "An autonomous organization runtime for AI agents: organize multiple agents into a team with roles, boundaries, dispatch, and independent acceptance. Role-first governance.",
+    "softwareVersion": "1.4.0",
+    "inLanguage": "en",
+    "url": "https://wangzhongren.github.io/ans-studio/en/",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "license": "https://opensource.org/license/mit",
+    "sameAs": "https://github.com/wangzhongren/ans-studio",
+    "downloadUrl": "https://github.com/wangzhongren/ans-studio/releases/tag/v1.4.0"
+  }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="rail">
+    <a class="brand" href="#top" aria-label="ANS Studio, back to top">
+      <img src="../assets/ans-seal.png" alt="" width="256" height="256">
+      <span class="brand-word">ans</span>
+    </a>
+    <nav class="rail-nav" aria-label="Page navigation">
+      <ul>
+        <li><a href="#roles">Roles</a></li>
+        <li><a href="#flow">Flow</a></li>
+        <li><a href="#gates">Boundaries</a></li>
+        <li><a href="#engines">Engines</a></li>
+        <li><a href="#download">Download</a></li>
+        <li><a href="#source">Source</a></li>
+      </ul>
+    </nav>
+    <div class="rail-foot">
+      <nav class="lang-switch" aria-label="Language">
+        <span class="lang-current" aria-current="true" lang="en">English</span>
+        <span class="lang-sep" aria-hidden="true">/</span>
+        <a href="../" hreflang="zh-CN" lang="zh-CN">中文</a>
+      </nav>
+      <span class="rail-version mono">v1.4.0</span>
+      <a href="https://github.com/wangzhongren/ans-studio" rel="noopener">GitHub ↗</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap">
+        <p class="positioning mono">Role-first governance for AI agents</p>
+        <p class="seal">
+          <svg class="seal-mark" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true" focusable="false">
+            <path d="M5.5 1.5H1.5v13h4M20.5 1.5h4v13h-4M10 8h6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
+          </svg>
+          <span class="seal-word">Role-first</span>
+          <span class="seal-label">organizing principle</span>
+        </p>
+        <h1>An autonomous organization runtime for AI&nbsp;agents.</h1>
+        <p class="lead">ANS Studio organizes multiple AI agents into a team with roles, boundaries, dispatch, and independent acceptance—not a single assistant working alone.</p>
+        <p class="lead lead-sub">The organizing principle is Role-first: define business responsibility and roles before modules and code ownership. Write authority comes only from role boundaries. Claude is the default engine; Pi and Codex are also available. The CLI supports demo, Pi, Codex, and Claude.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#download">Download v1.4.0</a>
+          <a class="btn btn-secondary" href="https://github.com/wangzhongren/ans-studio" rel="noopener">View source on GitHub ↗</a>
+        </div>
+        <p class="facts">
+          <span>macOS 13+ / Windows 10/11</span>
+          <span>MIT License</span>
+          <span>Native builds for three platforms</span>
+        </p>
+        <figure class="shot">
+          <div class="shot-frame">
+            <img src="../assets/desktop-intent-confirm.png" alt="ANS Studio desktop app screenshot: graphite theme, five-role navigation on the left, and an intent confirmation card in the main area." width="1360" height="980">
+            <span class="corner tl" aria-hidden="true"></span>
+            <span class="corner tr" aria-hidden="true"></span>
+            <span class="corner bl" aria-hidden="true"></span>
+            <span class="corner br" aria-hidden="true"></span>
+          </div>
+          <figcaption>Real desktop app (Chinese UI): graphite theme, five-role navigation, and an intent confirmation card.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="why">
+      <div class="wrap">
+        <h2>A smarter assistant is not the same as an organization that can take responsibility.</h2>
+        <p class="section-lead">A model can write code, but it does not know who should own the result. Role-first puts the organization before the code: roles before modules, boundaries before writes, evidence before acceptance.</p>
+        <ul class="ledger why-list">
+          <li>
+            <h3>Responsibility before modules</h3>
+            <p>Define business responsibility and roles first, then modules and code ownership; the role card states duties, and Section 1 of <code class="mono">boundary.yaml</code> lists the paths a role may change.</p>
+          </li>
+          <li>
+            <h3>Boundaries are part of the runtime</h3>
+            <p>Write authority comes only from role boundaries. Out-of-bound writes are rejected before side effects and pointed back to the correct owner. Shell commands go through the approval chain like everything else.</p>
+          </li>
+          <li>
+            <h3>Acceptance is an independent role, not a self-declaration</h3>
+            <p>A report saying “done” is only a statement; Proof independently checks delivery and hand-back evidence before issuing an acceptance card.</p>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section" id="roles">
+      <div class="wrap">
+        <h2>Three powers · five roles</h2>
+        <p class="section-lead">Role-first lands as five built-in governance roles in new or empty projects. The three powers are proposal, team formation, and orchestration; communication and acceptance are not decision powers. None of the five holds final approval.</p>
+        <ul class="ledger role-list">
+          <li class="role role-lead">
+            <span class="tile mono" aria-hidden="true">l</span>
+            <div class="role-name">
+              <h3>Lead</h3>
+              <span class="role-id mono">liaison</span>
+              <span class="tag">Default entry</span>
+            </div>
+            <p class="role-desc">Customer communication and the default entry point; writes intent to <code class="mono">docs/intents/</code>; also acts as workflow manager.</p>
+            <div class="role-power"><span class="power-label">Power</span>Customer communication · Workflow management</div>
+          </li>
+          <li class="role">
+            <span class="tile mono" aria-hidden="true">r</span>
+            <div class="role-name">
+              <h3>Draft</h3>
+              <span class="role-id mono">rapporteur</span>
+            </div>
+            <p class="role-desc">Forms proposals and cross-role contracts.</p>
+            <div class="role-power"><span class="power-label">Power</span>Proposal</div>
+          </li>
+          <li class="role">
+            <span class="tile mono" aria-hidden="true">n</span>
+            <div class="role-name">
+              <h3>Crew</h3>
+              <span class="role-id mono">nominator</span>
+            </div>
+            <p class="role-desc">Nominates project roles and writes role cards and boundaries.</p>
+            <div class="role-power"><span class="power-label">Power</span>Team formation</div>
+          </li>
+          <li class="role">
+            <span class="tile mono" aria-hidden="true">c</span>
+            <div class="role-name">
+              <h3>Steward</h3>
+              <span class="role-id mono">convener</span>
+            </div>
+            <p class="role-desc">Orchestrates the flow and dispatches tasks.</p>
+            <div class="role-power"><span class="power-label">Power</span>Orchestration</div>
+          </li>
+          <li class="role">
+            <span class="tile mono" aria-hidden="true">v</span>
+            <div class="role-name">
+              <h3>Proof</h3>
+              <span class="role-id mono">verifier</span>
+            </div>
+            <p class="role-desc">Independently checks evidence and issues acceptance cards.</p>
+            <div class="role-power"><span class="power-label">Power</span>Acceptance</div>
+          </li>
+        </ul>
+        <p class="fineprint">None of the five holds final approval; final approval stays with you. Built-in roles ship with the app and have no role directories; their file writes are limited to governance files and evidence, and they do not implement or test.</p>
+      </div>
+    </section>
+
+    <section class="section" id="flow">
+      <div class="wrap">
+        <h2>From intent to acceptance, a checkable process</h2>
+        <p class="section-lead">An autonomous organization runs on process: each formal task moves in a fixed order, and every output lands in files or the ledger, ready to review and verify.</p>
+        <div class="flow-grid">
+          <ol class="ledger step-list">
+            <li>
+              <span class="step-num mono">01</span>
+              <div>
+                <h3>Intent confirmation <span class="step-owner mono">Lead</span></h3>
+                <p>State goals, scope, and acceptance criteria to Lead; the intent is written to <code class="mono">docs/intents/</code>, and only passes to Draft after confirmation.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-num mono">02</span>
+              <div>
+                <h3>Proposal and contracts <span class="step-owner mono">Draft</span></h3>
+                <p>Draft forms a proposal and cross-role contracts from the intent; you choose accept, accept-quick, revise, or reject.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-num mono">03</span>
+              <div>
+                <h3>Team formation and appointment <span class="step-owner mono">Crew</span></h3>
+                <p>Nominates project roles and writes role cards and boundaries; appointments and each path write pass through confirmation.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-num mono">04</span>
+              <div>
+                <h3>Flow and dispatch <span class="step-owner mono">Steward</span></h3>
+                <p>Writes the flow record, orchestrates the flow, and dispatches formal tasks to project roles; tasks queue while a role is busy.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-num mono">05</span>
+              <div>
+                <h3>Implementation and hand-back <span class="step-owner mono">Project roles</span></h3>
+                <p>Project roles implement and test within their own boundaries, then hand back reports and evidence.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-num mono">06</span>
+              <div>
+                <h3>Independent acceptance <span class="step-owner mono">Proof</span></h3>
+                <p>Independently checks delivery and hand-back evidence and issues an acceptance card; you decide accept or reject.</p>
+              </div>
+            </li>
+          </ol>
+          <aside class="flow-panel" aria-label="Example flow state file">
+            <div class="code-head">
+              <span class="mono">docs/flows/todo-list-v1.yaml</span>
+              <span class="code-lang mono">YAML</span>
+            </div>
+            <pre><code><span class="y-key">flowId</span>: todo-list-v1
+<span class="y-key">version</span>: 1
+<span class="y-key">qualityTier</span>: production
+<span class="y-key">steps</span>:
+  - <span class="y-key">id</span>: delivery-server
+    <span class="y-key">title</span>: Server delivery
+    <span class="y-key">owner</span>: <span class="y-ph">&lt;project role id&gt;</span>
+    <span class="y-key">kind</span>: dispatch
+    <span class="y-key">status</span>: done
+    <span class="y-key">evidence</span>:
+      <span class="y-key">kind</span>: dispatch
+      <span class="y-key">ref</span>: delivery-server</code></pre>
+            <p class="panel-note"><code class="mono">docs/flows/&lt;flowId&gt;.yaml</code> is the single machine state; <code class="mono">done</code> needs ledger-matched evidence; advancing the flow is not approval.</p>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="gates">
+      <div class="wrap">
+        <h2>Boundaries are gates, not prompts</h2>
+        <p class="section-lead">Role-first does not rely on the model's good behavior: writes, shell, and automatic judgment each have a gate on the execution path.</p>
+        <ul class="ledger gate-list">
+          <li>
+            <h3>Write gate</h3>
+            <div>
+              <p>Role cards, boundaries, proposals, flows, acceptance, and file writes get a preview or confirmation card before writing; out-of-bound writes are rejected and pointed back to the correct owner.</p>
+              <p class="example mono">write_file 角色卡/提案/… <span class="dim">→</span> <span class="st-deny">rejected</span> · owner: Draft / proposal</p>
+              <p class="path-note">The example keeps the real repository path; role directories in this project are named in Chinese.</p>
+            </div>
+          </li>
+          <li>
+            <h3>shell approval</h3>
+            <div>
+              <p>Every role has shell capability, and all of it goes through approval; a read-only allowlist runs directly; risky, review, and deny each require approval from you or the judge agent.</p>
+              <p class="example mono">rm -rf build/ <span class="dim">→</span> <span class="st-wait">approval card</span> · runs only if approved</p>
+            </div>
+          </li>
+          <li>
+            <h3>judge agent</h3>
+            <div>
+              <p>Read-only and fail-closed. Insufficient budget, insufficient evidence, unclear risk, or a missing intent all block automatic approval. A successful auto-approval is labeled “judge-approved” and never impersonates your click.</p>
+              <p class="example mono">Auto-approve: on <span class="dim">→</span> <span class="st-ok">judge-approved</span></p>
+            </div>
+          </li>
+        </ul>
+        <div class="callout">
+          <p><strong>Honest caveat:</strong> shell has no OS sandbox; file side effects of an approved command are not covered by the write gate; the approval chain is the only control. Open only projects you trust. See <a href="https://github.com/wangzhongren/ans-studio/blob/main/README.md#%E5%BD%93%E5%89%8D%E9%99%90%E5%88%B6" rel="noopener">README current limitations</a>.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="engines">
+      <div class="wrap">
+        <h2>Three engines, one governance chain</h2>
+        <p class="section-lead">Engines are the execution layer: switching engines does not switch the organization; role boundaries and gates stay on the same governance chain. Each engine uses its own configuration and never falls back to another engine when configuration is missing.</p>
+        <div class="engines">
+          <article class="engine">
+            <h3>Claude <span class="tag">Default</span></h3>
+            <dl>
+              <dt>Required</dt>
+              <dd><code class="mono">ANTHROPIC_API_KEY</code></dd>
+              <dt>Optional</dt>
+              <dd><code class="mono">ANS_CLAUDE_MODEL</code>, <code class="mono">ANTHROPIC_BASE_URL</code></dd>
+            </dl>
+          </article>
+          <article class="engine">
+            <h3>Pi</h3>
+            <dl>
+              <dt>Required</dt>
+              <dd><code class="mono">ANTHROPIC_AUTH_TOKEN</code>, <code class="mono">ANS_PI_BASE_URL</code>, <code class="mono">ANS_PI_MODEL</code></dd>
+            </dl>
+          </article>
+          <article class="engine">
+            <h3>Codex</h3>
+            <dl>
+              <dt>Required</dt>
+              <dd><code class="mono">CODEX_API_KEY</code> or <code class="mono">OPENAI_API_KEY</code>, <code class="mono">ANS_CODEX_MODEL</code></dd>
+              <dt>Note</dt>
+              <dd>Custom endpoints must be compatible with the Responses API.</dd>
+            </dl>
+          </article>
+        </div>
+        <p class="more"><a href="https://github.com/wangzhongren/ans-studio/blob/main/README.md#%E5%BC%95%E6%93%8E%E9%85%8D%E7%BD%AE" rel="noopener">Engine configuration in the README</a></p>
+      </div>
+    </section>
+
+    <section class="section" id="download">
+      <div class="wrap">
+        <h2>Download v1.4.0</h2>
+        <p class="section-lead">Released 2026-10-20. The app bundle includes its own runtime, so launching the app needs no separate Node.js install; running project commands still requires the project's own development toolchain.</p>
+        <ul class="ledger download-list">
+          <li>
+            <div class="dl-name">
+              <h3>macOS 13+ · Apple Silicon</h3>
+              <span class="mono">ANS-Studio-1.4.0-mac-arm64.zip</span>
+            </div>
+            <div class="dl-actions">
+              <a class="btn btn-primary btn-small" rel="noopener" href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-mac-arm64.zip">Download</a>
+              <a class="dl-check" href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-darwin-arm64.txt" rel="noopener">Verify SHA256</a>
+            </div>
+          </li>
+          <li>
+            <div class="dl-name">
+              <h3>macOS 13+ · Intel</h3>
+              <span class="mono">ANS-Studio-1.4.0-mac-x64.zip</span>
+            </div>
+            <div class="dl-actions">
+              <a class="btn btn-primary btn-small" rel="noopener" href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-mac-x64.zip">Download</a>
+              <a class="dl-check" href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-darwin-x64.txt" rel="noopener">Verify SHA256</a>
+            </div>
+          </li>
+          <li>
+            <div class="dl-name">
+              <h3>Windows 10/11 · x64</h3>
+              <span class="mono">ANS-Studio-1.4.0-win-x64.zip</span>
+            </div>
+            <div class="dl-actions">
+              <a class="btn btn-primary btn-small" rel="noopener" href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-win-x64.zip">Download</a>
+              <a class="dl-check" href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-win32-x64.txt" rel="noopener">Verify SHA256</a>
+            </div>
+          </li>
+        </ul>
+        <p class="secondary-links">
+          <span>More release materials</span>
+          <a href="https://github.com/wangzhongren/ans-studio/releases/tag/v1.4.0" rel="noopener">Release notes</a>
+          <a href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/release-provenance.json" rel="noopener">release-provenance.json</a>
+          <a href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/overlay.patch" rel="noopener">overlay.patch</a>
+          <a href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-overlay.txt" rel="noopener">SHA256SUMS-overlay.txt</a>
+        </p>
+        <div class="callout">
+          <p><strong>Not signed or notarized:</strong> macOS Gatekeeper or Windows SmartScreen may warn that the source is unverified. Download from the GitHub Release and verify SHA256 before running.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="source">
+      <div class="wrap">
+        <h2>From a paper to a runnable governance system</h2>
+        <p class="section-lead">ANS Skill is a role-first AI development skill inspired by the Role-First Software Governance (RFSG) paper; ANS is a name, not an acronym. Role-first comes from this paper, and ANS Studio turns it into a runnable desktop app and CLI: role cards, boundaries, and gates are implementations of its principles.</p>
+        <blockquote class="citation">
+          <p>Wang, Zhongren. 2026. <cite>Role-First Software Governance: Asymmetric Authority Boundaries for AI-Native Agent Systems</cite>. DOI: <a class="mono" href="https://zenodo.org/records/22824700" rel="noopener">10.5281/zenodo.22824700</a></p>
+          <p class="more"><a href="https://zenodo.org/records/22824700" rel="noopener">Read the paper ↗</a></p>
+        </blockquote>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div class="footer-brand">
+        <img src="../assets/ans-seal.png" alt="" width="256" height="256">
+        <div>
+          <p class="footer-name">ANS Studio · <a href="https://github.com/wangzhongren/ans-studio/blob/main/LICENSE" rel="noopener">MIT License</a></p>
+          <p class="footer-en">An Autonomous Organization Runtime for AI Agents.</p>
+        </div>
+      </div>
+      <nav aria-label="Footer links">
+        <ul>
+          <li><a href="https://github.com/wangzhongren/ans-studio" rel="noopener">GitHub</a></li>
+          <li><a href="https://github.com/wangzhongren/ans-studio/releases" rel="noopener">Releases</a></li>
+          <li><a href="https://github.com/wangzhongren/ans-studio/blob/main/README.md#%E5%BD%93%E5%89%8D%E9%99%90%E5%88%B6" rel="noopener">Current limitations</a></li>
+          <li><a href="#source">Academic source</a></li>
+          <li class="footer-lang">
+            <span class="lang-current" aria-current="true" lang="en">English</span>
+            <span class="lang-sep" aria-hidden="true">/</span>
+            <a href="../" hreflang="zh-CN" lang="zh-CN">中文</a>
+          </li>
+        </ul>
+      </nav>
+    </div>
+    <div class="wrap footer-copy">
+      <p>© 2026 ANS Studio contributors</p>
+    </div>
+  </footer>
+
+  <script src="../app.js" defer></script>
+</body>
+</html>

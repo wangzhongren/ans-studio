@@ -205,6 +205,41 @@ img {
   text-underline-offset: 3px;
 }
 
+/* 语言切换：与账本栏的小号数据标签同一尺寸，当前语言用薄荷绿。 */
+.lang-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.lang-current {
+  color: var(--mint);
+}
+
+.lang-sep {
+  color: var(--line);
+}
+
+.rail-foot .lang-switch a {
+  font-size: 12px;
+}
+
+.footer-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.footer-lang .lang-current {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 14px;
+}
+
 /* ---- 主内容框架 ---- */
 
 main {
@@ -765,6 +800,12 @@ h3 {
   color: var(--muted);
 }
 
+.path-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
 .st-deny {
   color: var(--danger);
 }
@@ -1251,6 +1292,28 @@ h3 {
 
   .seal {
     margin-bottom: 22px;
+  }
+}
+
+/* 英文页排版微调：更紧的拉丁字距与行高，正文行高约 1.65。 */
+html[lang="en"] body {
+  line-height: 1.65;
+}
+
+html[lang="en"] .hero h1 {
+  max-width: 15em;
+  letter-spacing: -0.03em;
+  line-height: 1.06;
+}
+
+html[lang="en"] .section h2 {
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+@media (min-width: 1024px) {
+  html[lang="en"] .role-list > li {
+    grid-template-columns: 44px minmax(150px, 190px) minmax(0, 1fr) 230px;
   }
 }
 
