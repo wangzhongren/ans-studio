@@ -1,0 +1,110 @@
+# main.mjs 5A 双端报告差异摘要（自动生成）
+
+- old names: 357; new names: 366; common: 356; only-old: 1; only-new: 10; value-diff: 103
+- only-old: P13_NEW_SEMANTICS
+- only-new: NAVIGATION_BLOCKED, P13_CONTINUE_AFTER_RETURN, P13_OLD_PROJECT_BUSY, P13_OLD_SESSION_LIVE_AFTER_SWITCH, P13_QUEUED_BEFORE_SWITCH, P13_QUEUE_SURVIVES_SWITCH, P13_RETURN_RESUMES_SESSION, P13_SWITCH_IMMEDIATE, PROMISE_TIMEOUT, WAIT_TIMEOUT
+
+## 值差异（逐名）
+- `ANCHOR_CARD_ANSWERED`: OLD=`true` NEW=`false`
+- `ANCHOR_CARD_AT_ARRIVAL`: OLD=`6` NEW=`-1`
+- `ANCHOR_NO_DUPLICATE_ROW`: OLD=`true` NEW=`false`
+- `ANCHOR_ROW_AFTER_SWITCHBACK`: OLD=`{"count":207,"last":206,"ops":[{"index":6,"requestId":"op-6"}]}` NEW=`{"count":205,"last":204,"ops":[]}`
+- `ANCHOR_STABLE_NOT_TAIL_ONCE`: OLD=`true` NEW=`false`
+- `ANCHOR_STABLE_NOT_TAIL_TWICE`: OLD=`true` NEW=`false`
+- `ANCHOR_TABLE_REGISTERED`: OLD=`true` NEW=`false`
+- `BADGES_CLEAR_ON_EMPTY`: OLD=`true` NEW=`false`
+- `BADGE_ON_WORK_WHILE_COLLAPSED`: OLD=`true` NEW=`false`
+- `BOOTSTRAP_CENTER_CTA_PRESENT`: OLD=`true` NEW=`false`
+- `BOOTSTRAP_MENTION_COUNT`: OLD=`1` NEW=`0`
+- `BOOTSTRAP_MENTION_IN_CENTER_EMPTY`: OLD=`true` NEW=`false`
+- `DENIED_OPEN_COUNT`: OLD=`2` NEW=`0`
+- `DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS`: OLD=`true` NEW=`false`
+- `DISPATCH_ROW_NO_WITHDRAW`: OLD=`true` NEW=`false`
+- `DRAWER_CLOSED_AFTER_PI`: OLD=`true` NEW=`false`
+- `DRAWER_ESC_CLOSES`: OLD=`true` NEW=`false`
+- `E2E_FAILURES`: OLD=`RECOVERY_SAME_PENDING_CARD_ONCE` NEW=`SESSION_REPAIR_SAME_ROLE_CONFIRMS_BACKEND, SESSION_REPAIR_EXPLICIT_RECOVERY_DELIVERS_ONCE, SESSION_REPAIR_FAILED_OPEN_DOES_NOT_SEND, SESSION_REPAIR_FAILED_OPEN_NO_USER_BUBBLE, SESSION_REPAIR_FAILED_OPEN_NO_REPLAY, PENDING_EXPLICIT_SAME_ROLE_CARD_AND_BUTTON_VISIBLE, RECOVERY_SAME_PENDING_CARD_ONCE, RECOVERY_OLD_REQUEST_STILL_ANSWERABLE, RECOVERY_ENDED_REQUEST_NOT_REPLAYED, DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS`
+- `HAS_DENIED_INLINE`: OLD=`2` NEW=`0`
+- `INJECTED_CHIP_LABEL`: OLD=`原始交接内容 · 来源未确认` NEW=`回交投递 · 来自 规划者`
+- `LINK_OPEN_EXTERNAL_CALLED`: OLD=`true` NEW=`false`
+- `OPEN_CARD_AT_ARRIVAL`: OLD=`207` NEW=`-1`
+- `OPEN_CARD_CHIP_VISIBLE`: OLD=`true` NEW=`false`
+- `OPEN_CARD_ROWS_AFTER_SWITCHBACK`: OLD=`{"count":208,"last":207,"ops":[{"index":6,"requestId":"op-6"},{"index":207,"requestId":"op-7"}]}` NEW=`{"count":205,"last":204,"ops":[]}`
+- `OPEN_CARD_STABLE_AT_ANCHOR`: OLD=`true` NEW=`false`
+- `OPX_ANSWERED`: OLD=`true` NEW=`false`
+- `OPX_BADGE_CLEARED`: OLD=`true` NEW=`false`
+- `OPX_POINTER_IN_VIEWED_PANE`: OLD=`true` NEW=`false`
+- `OP_CANCEL_DECLINED`: OLD=`true` NEW=`false`
+- `OP_CARD_FROZEN`: OLD=`true` NEW=`false`
+- `OP_CARD_PRESENT`: OLD=`true` NEW=`false`
+- `OP_CARD_TITLE_SHOWS`: OLD=`true` NEW=`false`
+- `OP_CONFIRM_ANSWERED`: OLD=`true` NEW=`false`
+- `OP_MULTI_ANSWERED`: OLD=`true` NEW=`false`
+- `OP_MULTI_HAS_CHECKBOX`: OLD=`true` NEW=`false`
+- `OP_PREVIEW_COLLAPSED`: OLD=`true` NEW=`false`
+- `OP_SELECT_ANSWERED`: OLD=`true` NEW=`false`
+- `OP_SELECT_HAS_RADIO`: OLD=`true` NEW=`false`
+- `OP_SUBMIT_DISABLED_INITIALLY`: OLD=`true` NEW=`false`
+- `OUTDIR`: OLD=`/tmp/ans-p5a-old.6MXYfg` NEW=`/tmp/ans-p5a-new.78nIuC`
+- `P1_ARRIVAL_DEBUG`: OLD=`{"hasCard":true,"dist":46,"st":3011,"sh":3491,"ch":434,"crTop":517,"crBottom":640,"ccTop":287,"ccBottom":721,"chipHidden":false}` NEW=`{"hasCard":false,"dist":0,"st":3138,"sh":3639,"ch":501,"crTop":null,"crBottom":null,"ccTop":233,"ccBottom":734,"chipHidden":false}`
+- `P1_ARRIVAL_SCROLLED`: OLD=`true` NEW=`false`
+- `P1_CHIP_CLICK_LOCATES`: OLD=`true` NEW=`false`
+- `P1_CHIP_COUNT1_AFTER_TERMINAL`: OLD=`true` NEW=`false`
+- `P1_CHIP_HIDDEN_AFTER_ALL_TERMINAL`: OLD=`true` NEW=`false`
+- `P1_CHIP_SECOND_CARD`: OLD=`true` NEW=`false`
+- `P1_CLEANUP_CHIP_HIDDEN`: OLD=`true` NEW=`false`
+- `P1_SWITCHBACK_SCROLLS_TO_CARD`: OLD=`true` NEW=`false`
+- `PENDING_EXPLICIT_SAME_ROLE_CARD_AND_BUTTON_VISIBLE`: OLD=`true` NEW=`false`
+- `PI_FIELDS_MATCH_REGISTRY`: OLD=`true` NEW=`false`
+- `PI_FIELD_COUNT`: OLD=`5` NEW=`6`
+- `PI_KEYS_ARE_FIVE`: OLD=`true` NEW=`false`
+- `PI_SAVE_STATUS`: OLD=`已保存到 .env（改动键：ANTHROPIC_AUTH_TOKEN、ANS_PI_BASE_URL、ANS_PI_MODEL）。必填配置已齐备。下一次开启会话时应用。` NEW=`已保存到 .env（改动键 3 个）。必填配置已齐备。下一次开启会话时应用。`
+- `RECOVERY_ENDED_REQUEST_NOT_REPLAYED`: OLD=`true` NEW=`false`
+- `RECOVERY_OLD_REQUEST_STILL_ANSWERABLE`: OLD=`true` NEW=`false`
+- `RENDERER_ENTRY`: OLD=`/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/index.html` NEW=`/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/dist/src/index.html`
+- `REPLAY_DEDUP_REBUILD`: OLD=`true` NEW=`false`
+- `REPORT_DELIVERY_DETAILS_COLLAPSED`: OLD=`true` NEW=`false`
+- `RESTORE_NO_SUCCESS_DIVIDER`: OLD=`true` NEW=`false`
+- `RESTORE_SU_CHAT_SNIPPET`: OLD=`SU 的历史问题` NEW=`会话记录已恢复SU 的历史问题`
+- `RESTORE_SU_REPLAY_ROWS`: OLD=`1` NEW=`2`
+- `RESTORE_SU_RESTORED_FLAG`: OLD=`{"hadSession":true,"error":false,"awaitingConfirm":false,"restored":true,"lastSummary":"","lastAt":"","historyNotice":"","contextText":"新会话；可读历史保留，模型未恢复","contextWarning":"","readableHistoryAtOpen":true}` NEW=`{"error":false,"hadSession":true,"restored":true,"contextText":"新会话；可读历史保留，模型未恢复","live":true}`
+- `RESUME_HINT`: OLD=`已在该角色的会话中，续接当前会话。` NEW=``
+- `RIGHT_QUEUE_RUNNING_FIRST`: OLD=`true` NEW=`false`
+- `RIGHT_QUEUE_SOURCES`: OLD=`true` NEW=`false`
+- `ROLE_STATE_BADGE_HAS_ICON`: OLD=`true` NEW=`false`
+- `ROLE_STATE_BADGE_HOVER_FULL`: OLD=`true` NEW=`false`
+- `ROLE_STATE_BADGE_WORKING_PENDING`: OLD=`true` NEW=`false`
+- `ROLE_STATE_QUEUE_ROW`: OLD=`true` NEW=`false`
+- `SESSION_REPAIR_EXPLICIT_RECOVERY_DELIVERS_ONCE`: OLD=`true` NEW=`false`
+- `SESSION_REPAIR_FAILED_OPEN_DOES_NOT_SEND`: OLD=`true` NEW=`false`
+- `SESSION_REPAIR_FAILED_OPEN_NO_REPLAY`: OLD=`true` NEW=`false`
+- `SESSION_REPAIR_FAILED_OPEN_NO_USER_BUBBLE`: OLD=`true` NEW=`false`
+- `SESSION_REPAIR_SAME_ROLE_CONFIRMS_BACKEND`: OLD=`true` NEW=`false`
+- `SHOT_00_TITLEBAR`: OLD=`/tmp/ans-p5a-old.6MXYfg/00-titlebar.png` NEW=`/tmp/ans-p5a-new.78nIuC/00-titlebar.png`
+- `SHOT_01B_SU`: OLD=`/tmp/ans-p5a-old.6MXYfg/01b-su.png` NEW=`/tmp/ans-p5a-new.78nIuC/01b-su.png`
+- `SHOT_01_IMPORT`: OLD=`/tmp/ans-p5a-old.6MXYfg/01-import.png` NEW=`/tmp/ans-p5a-new.78nIuC/01-import.png`
+- `SHOT_02_CHAT`: OLD=`/tmp/ans-p5a-old.6MXYfg/02-chat.png` NEW=`/tmp/ans-p5a-new.78nIuC/02-chat.png`
+- `SHOT_03_DENIED`: OLD=`/tmp/ans-p5a-old.6MXYfg/03-denied.png` NEW=`/tmp/ans-p5a-new.78nIuC/03-denied.png`
+- `SHOT_04_PROFILE`: OLD=`/tmp/ans-p5a-old.6MXYfg/04-profile.png` NEW=`/tmp/ans-p5a-new.78nIuC/04-profile.png`
+- `SHOT_05_BOOTSTRAP`: OLD=`/tmp/ans-p5a-old.6MXYfg/05-bootstrap.png` NEW=`/tmp/ans-p5a-new.78nIuC/05-bootstrap.png`
+- `SHOT_06_REFRESH`: OLD=`/tmp/ans-p5a-old.6MXYfg/06-refresh.png` NEW=`/tmp/ans-p5a-new.78nIuC/06-refresh.png`
+- `SHOT_07_HANDBACK`: OLD=`/tmp/ans-p5a-old.6MXYfg/07-handback.png` NEW=`/tmp/ans-p5a-new.78nIuC/07-handback.png`
+- `SHOT_08_SU_PANE`: OLD=`/tmp/ans-p5a-old.6MXYfg/08-su-pane.png` NEW=`/tmp/ans-p5a-new.78nIuC/08-su-pane.png`
+- `SHOT_09_PI_PANEL`: OLD=`/tmp/ans-p5a-old.6MXYfg/09-pi-panel.png` NEW=`/tmp/ans-p5a-new.78nIuC/09-pi-panel.png`
+- `SHOT_10_PI_SAVED`: OLD=`/tmp/ans-p5a-old.6MXYfg/10-pi-saved.png` NEW=`/tmp/ans-p5a-new.78nIuC/10-pi-saved.png`
+- `SHOT_11_OPERATOR`: OLD=`/tmp/ans-p5a-old.6MXYfg/11-operator-card.png` NEW=`/tmp/ans-p5a-new.78nIuC/11-operator-card.png`
+- `SHOT_12_COMPOSER`: OLD=`/tmp/ans-p5a-old.6MXYfg/12-composer.png` NEW=`/tmp/ans-p5a-new.78nIuC/12-composer.png`
+- `SHOT_12_RESTORE`: OLD=`/tmp/ans-p5a-old.6MXYfg/12-restore.png` NEW=`/tmp/ans-p5a-new.78nIuC/12-restore.png`
+- `SHOT_14_OP_CROSSPANE`: OLD=`/tmp/ans-p5a-old.6MXYfg/14-operator-crosspane.png` NEW=`/tmp/ans-p5a-new.78nIuC/14-operator-crosspane.png`
+- `SHOT_15_ANCHOR`: OLD=`/tmp/ans-p5a-old.6MXYfg/15-anchor-reanchor.png` NEW=`/tmp/ans-p5a-new.78nIuC/15-anchor-reanchor.png`
+- `STATUS_BADGE_TEXT`: OLD=`●空闲` NEW=`空闲`
+- `STATUS_LAST_EVENT_RECORDED`: OLD=`true` NEW=`false`
+- `SWITCH_CONFIRM_ON_BUSY`: OLD=`true` NEW=`false`
+- `SWITCH_CONFIRM_RELOADED`: OLD=`true` NEW=`false`
+- `SWITCH_IDLE_HINT`: OLD=`true` NEW=`false`
+- `SYS_ROWS`: OLD=`sys sys-context-event | sys sys-settled | sys sys-settled` NEW=`sys sys-call sys-unknown-tool-event | sys sys-call | sys sys-settled | sys sys-call sys-unknown-tool-event | sys sys-call | sys sys-settled`
+- `TAB_CARD_ACTIVE`: OLD=`true` NEW=`false`
+- `TAB_WORK_ACTIVE`: OLD=`true` NEW=`false`
+- `TAB_WORK_ACTIVE_STILL`: OLD=`true` NEW=`false`
+- `U1_NORMAL_TO_BOTTOM`: OLD=`false` NEW=`true`
+- `U1_NORMAL_TO_BOTTOM_DIST`: OLD=`10` NEW=`0`
+- `U1_PANE_HEIGHT`: OLD=`12683` NEW=`12580`

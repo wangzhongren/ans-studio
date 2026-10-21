@@ -1,0 +1,90 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "before import disabled and no notice",
+      "value": true
+    },
+    {
+      "name": "programmatic no-project guard",
+      "value": true
+    },
+    {
+      "name": "cancel initial import remains disabled",
+      "value": true
+    },
+    {
+      "name": "failed initial import remains disabled",
+      "value": true
+    },
+    {
+      "name": "empty imported folder enables and checks Claude without role",
+      "value": true
+    },
+    {
+      "name": "empty imported folder switch checks Pi live",
+      "value": true
+    },
+    {
+      "name": "closed drawer Claude missing key actionable outside chat",
+      "value": true
+    },
+    {
+      "name": "keyboard opens existing Claude settings",
+      "value": true
+    },
+    {
+      "name": "notice fits 1360",
+      "value": true
+    },
+    {
+      "name": "notice fits 960",
+      "value": true
+    },
+    {
+      "name": "late engine response cannot replace Codex notice",
+      "value": true
+    },
+    {
+      "name": "late old project error ignored",
+      "value": true
+    },
+    {
+      "name": "older request on same engine cannot replace latest complete result",
+      "value": true
+    },
+    {
+      "name": "missing summary treated as read failure",
+      "value": true
+    },
+    {
+      "name": "existing project survives cancel and failed switch",
+      "value": true
+    },
+    {
+      "name": "read failure offers settings and never complete",
+      "value": true
+    },
+    {
+      "name": "successful save retains missing result",
+      "value": true
+    },
+    {
+      "name": "save failure keeps draft and missing notice",
+      "value": true
+    },
+    {
+      "name": "save success read failure not overwritten",
+      "value": true
+    },
+    {
+      "name": "save complete hides missing and clears secret input",
+      "value": true
+    },
+    {
+      "name": "save from prior visit cannot overwrite current status",
+      "value": true
+    }
+  ]
+}

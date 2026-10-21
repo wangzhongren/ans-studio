@@ -1,0 +1,8 @@
+--- 角色卡/测试/docs/change/2026-10-21-phase5a-old-baseline-evidence/manifest-before.sha256	2026-10-21 18:04:36
++++ 角色卡/测试/docs/change/2026-10-21-phase5a-old-baseline-evidence/manifest-after.sha256	2026-10-21 18:09:32
+@@ -1,4 +1,4 @@
+-2fdb2173bd281ee347489a3d7fc3ac3c3479c5b6f73fd1b6b173e419b9c808a1  app/main.ts
++9e7cef7691324d493a4da2f24b9d04125b4fe487ed091d0e535a3a9f3d04f1c7  app/main.ts
+ 98dde83a4930c7f586a4dd5bee8d7697cffc6fd95c3771149dea2fcf3cbc3e5b  app/preload.cjs
+ db7d14973461e96663a34ec9f3b0bf6332e65e587d2d7e3c196cbee497dad855  app/renderer/engine-selector.js
+ 03f493e36d9a74e76676c19c478208912b74eb3c5c4bd87dc73f9114f1968a92  app/renderer/index.html

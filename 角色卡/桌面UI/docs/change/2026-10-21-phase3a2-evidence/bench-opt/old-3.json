@@ -1,0 +1,42 @@
+{
+  "rendererDir": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer",
+  "node": "24.21.0",
+  "electron": "44.7.0",
+  "at": "2026-10-21T03:33:23.625Z",
+  "console": [],
+  "stormA": {
+    "maxGap": 17.5,
+    "frames": 98
+  },
+  "stormA_handler": {
+    "maxMs": 5.2,
+    "totalMs": 9.9
+  },
+  "stormB": {
+    "maxGap": 17.6,
+    "frames": 97
+  },
+  "stormB_handler": {
+    "maxBatchMs": 0.4,
+    "totalBatchMs": 1.2
+  },
+  "naive": {
+    "storm300Ms": 72.7,
+    "perEventAvgMs": 0.242,
+    "replay2000Ms": 15.2
+  },
+  "replay": {
+    "replayMs": 20.9,
+    "mounted": 1,
+    "rows": 1
+  },
+  "scrollToBottom": {
+    "ms": 12.8,
+    "mounted": 1
+  },
+  "histPending": {
+    "r1": false,
+    "r2": false
+  },
+  "histDirect": false
+}

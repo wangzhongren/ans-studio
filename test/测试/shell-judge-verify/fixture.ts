@@ -41,6 +41,13 @@ import {
 } from "../../../app/desktop/operator-channel.ts";
 import { createShellJudgeSwitch, type ShellJudgeSwitch } from "../../../app/desktop/interface.ts";
 import { buildShellJudgeTools } from "../../../src/common/runtime-core/shell-judge/tools.ts";
+import {
+  judgeToggleView,
+  judgeWarningLines,
+  shellJudgeToggleResult,
+  shellJudgeResultView,
+  JUDGE_GROUP_APPROVAL,
+} from "../../../app/renderer/src/chat/judge.ts";
 
 /** 空规则集：分类器由测试注入（判定面与规则数据解耦）。 */
 export const EMPTY_RULES: ShellRules = { version: "1", readOnly: [], hardDenyPrograms: [], denyTokens: [] };
@@ -358,12 +365,26 @@ export interface UiLabelsApi {
   shellJudgeNoticeText(reasonCode: unknown): string;
 }
 
-/** 与 renderer 同序装载真 `ui-labels.js`（经典脚本挂 globalThis.ANSUiLabels）。 */
+/** 5B：旧 ui-labels.js 已删除；映射到新渲染器 judge.ts 的同语义纯逻辑。 */
 export async function loadUiLabels(): Promise<UiLabelsApi> {
-  await import(new URL("../../../app/renderer/ui-labels.js", import.meta.url).href);
-  const api = (globalThis as Record<string, unknown>).ANSUiLabels as UiLabelsApi | undefined;
-  if (api === undefined) throw new Error("ui-labels.js 未挂 globalThis.ANSUiLabels");
-  return api;
+  return {
+    shellJudgeToggleView(available, enabled, busy) {
+      const view = judgeToggleView(JUDGE_GROUP_APPROVAL, available, enabled, busy);
+      return {
+        available: view.available,
+        enabled: view.enabled,
+        checked: view.checked,
+        disabled: view.disabled,
+        label: view.label,
+        title: view.title,
+        warningVisible: available === true && enabled === true,
+      };
+    },
+    shellJudgeToggleResult: (previousEnabled, res) => shellJudgeToggleResult(previousEnabled, res),
+    shellJudgeWarningLines: () => judgeWarningLines([JUDGE_GROUP_APPROVAL]).map((line) => line.text),
+    shellJudgeResultView: (payload) => shellJudgeResultView(payload) as unknown as UiLabelsView | null,
+    shellJudgeNoticeText: () => "",
+  };
 }
 
 // —————————————————————— Service 装配捕获（三引擎工具面） ——————————————————————

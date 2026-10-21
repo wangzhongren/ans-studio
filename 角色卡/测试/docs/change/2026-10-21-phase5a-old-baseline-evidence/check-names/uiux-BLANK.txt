@@ -1,0 +1,6 @@
+fixture: background pane has queue/status rows but no transcript=true
+selecting background role shows history loading instead of blank=true
+empty history removes loading and shows neutral busy placeholder=true
+history replay removes placeholder and renders content=true
+role with transcript shows neither loading nor placeholder=true
+idle no-history role shows neutral placeholder instead of blank=true

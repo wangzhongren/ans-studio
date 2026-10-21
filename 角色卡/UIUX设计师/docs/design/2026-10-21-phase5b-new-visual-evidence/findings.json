@@ -1,0 +1,166 @@
+{
+ "phase": "5B",
+ "candidate": "new entry build candidate (audited hash; later dist rebuild not covered)",
+ "summary": {
+  "design_alignment": "needs-work",
+  "P0": 1,
+  "P1": 3,
+  "P2": 4,
+  "missing_evidence": 1,
+  "rulings": {
+   "visible_rows": "not retired; normalized fixture >=9 without notice stack / >=8 with 57.8px notice stack @1360; >=4 @960; current 6 fails equivalent 8",
+   "spinner_duration": "retain 0.9s +/-0.2s linear infinite; static only under prefers-reduced-motion; reanchor to .status-spinner + Lucide LoaderCircle + Motion"
+  },
+  "evidence_notes": 1
+ },
+ "items": [
+  {
+   "id": "5B-F1",
+   "severity": "P0",
+   "status": "needs-work",
+   "scene": "C/F/I/J/K 200% chat/composer",
+   "finding": "#chat expands to the full virtual transcript height at 200%, pushing .composer to 5,075-1,341,790px; the primary input is effectively unreachable with long history.",
+   "evidence": [
+    "raw-main/metrics-audit-00-main-200.json",
+    "raw-main/metrics-02-chat-200.json",
+    "raw-main/metrics-04-profile-200.json",
+    "raw-main/metrics-15-anchor-reanchor-200.json",
+    "raw-main/audit-00-main-200.png"
+   ],
+   "expected": "200% keeps chat scrolling internally and the composer docked/visible; virtual total height must not expand the flex item.",
+   "actual": "#chat h=1,341,310.3 and composer y=1,341,790 in audit-00-main; 4,577/5,075 in 02-chat; 15,994/16,492 in 04-profile; 11,067/11,603 in 15-anchor.",
+   "owner": "桌面UI",
+   "retest": "200% real long history: composer visible or sticky; #chat clientHeight <= available height; screenshot with input area."
+  },
+  {
+   "id": "5B-F2",
+   "severity": "P1",
+   "status": "needs-work",
+   "scene": "K 200% no-role/session-failure",
+   "finding": "Horizontal scrollbar appears in the mid column in the no-role/session-failure state; normal-state 200% container checks did not cover this state.",
+   "evidence": [
+    "raw-main/11-operator-card-200.png",
+    "raw-main/metrics-11-operator-card-200.json"
+   ],
+   "expected": "No horizontal overflow at 200% in any state; long error/path text wraps; composer reachable.",
+   "actual": "Bottom horizontal scrollbar visible in 11-operator-card-200.png; #chat/.chat-head/.composer report sw=cw, so the offending node is outside the normal 200% container set (first suspect: .session-notice long error text with nowrap).",
+   "owner": "桌面UI",
+   "retest": "200% no-role/session-failure: no horizontal bar; per-container sw<=cw+1; composer reachable."
+  },
+  {
+   "id": "5B-F3",
+   "severity": "P1",
+   "status": "needs-work",
+   "scene": "D W10/W11 loading/tail",
+   "finding": ".sys-loading and .tool-current contain text only; the approved 12px working spinner is missing from both.",
+   "evidence": [
+    "raw-main/v3-after-loading-1360.png",
+    "raw-main/v3-after-tail-1360.png",
+    "角色卡/测试/docs/change/2026-10-21-phase5a-new-entry-evidence/raw/design-audit/report.json"
+   ],
+   "expected": "Nova busy/loading: 12px spinner + text; same single implementation; tool-current height 26.6+/-2; reduced-motion static arc.",
+   "actual": "Loading row shows 正在开启... text only; tail row shows 正在工作 text only; audit loading=null, toolCurrent.hasSvg=false.",
+   "owner": "桌面UI",
+   "retest": "Both rows include .status-spinner svg (12px), 0.9s linear, reduced-motion static; screenshots."
+  },
+  {
+   "id": "5B-F4",
+   "severity": "P1",
+   "status": "needs-work",
+   "scene": "C 1360 density",
+   "finding": "fullyVisibleRows=6 is measured on a non-equivalent fixture (2 operator cards vs old 1; sys rows 57.2/54 vs 17.8; viewport 576.4 vs 614.4). The fixture was not isolated: it carries the previous scene's audit-pending card plus the new v3-pending card, so it is not comparable to the old 9-row baseline. Whether the leftover is fixture isolation or a history-replay/session-reset defect is for Test/desktopUI to decide via the PENDING_* assertions.",
+   "evidence": [
+    "raw-main/report.txt",
+    "角色卡/测试/docs/change/2026-10-21-phase5a-new-entry-evidence/raw/design-audit/report.json"
+   ],
+   "expected": "Normalized fixture: >=9 without notice stack / >=8 with 57.8px notice stack @1360; >=4 @960; keep row pitch 16, activity <=48, transcript <=850, composer <=140.",
+   "actual": "6 fully visible rows at 576.4px; ad-hoc fixture includes the previous audit-pending card plus the new v3-pending card, and multi-line sys rows.",
+   "owner": "桌面UI+测试",
+   "retest": "Isolate/normalize the fixture (single pending), then run three viewports; no body-text compression."
+  },
+  {
+   "id": "5B-F5",
+   "severity": "P2",
+   "status": "needs-work",
+   "scene": "C injected message",
+   "finding": ".msg-injected/.mi-body do not lock line-height 1.6; the body currently inherits about 1.68.",
+   "evidence": [
+    "app/renderer/src/shell/shell.css:1655-1682",
+    "角色卡/测试/docs/change/2026-10-21-phase5a-new-entry-evidence/raw/design-audit/report.json"
+   ],
+   "expected": "Computed .mi-body line-height 19.2px (1.6 at 12px).",
+   "actual": "Fixture has no .mi-body; CSS has no explicit line-height.",
+   "owner": "桌面UI",
+   "retest": "Computed line-height ratio 1.6."
+  },
+  {
+   "id": "5B-F6",
+   "severity": "P2",
+   "status": "observation",
+   "scene": "C 1360/960 status chrome",
+   "finding": "Governance status + migration + missing-config + context notices stack, shrinking chat viewport to 576.4/344.4px.",
+   "evidence": [
+    "raw-main/audit-00-main.png",
+    "raw-main/audit-00-main-960.png",
+    "角色卡/测试/docs/change/2026-10-21-phase5a-new-entry-evidence/raw/design-audit/report.json"
+   ],
+   "expected": "Compact/merge/collapse status chrome; do not shrink body text.",
+   "actual": "Three to four stacked bars; legitimate facts but visually heavy.",
+   "owner": "桌面UI",
+   "retest": "1360/960 screenshot; viewport budget."
+  },
+  {
+   "id": "5B-F7",
+   "severity": "P2",
+   "status": "missing-evidence",
+   "scene": "J 200% mirror/delivery",
+   "finding": "200% mirror and delivery target cards are below the captured fold; only header/notices are shown.",
+   "evidence": [
+    "raw-phase4b/phase4b-mirror-200.png",
+    "raw-phase4b/phase4b-delivery-200.png"
+   ],
+   "expected": "Scroll to the target card before capture; or add targeted 200% smoke screenshots.",
+   "actual": "Header-only images; 1360/960 mirror/delivery are visible.",
+   "owner": "桌面UI/UIUX",
+   "retest": "200% target card visible."
+  },
+  {
+   "id": "5B-F8",
+   "severity": "P2",
+   "status": "evidence",
+   "scene": "evidence labels",
+   "finding": "04-profile* and 12-composer* actually show Pi settings, not profile/composer.",
+   "evidence": [
+    "raw-main/04-profile.png",
+    "raw-main/12-composer.png"
+   ],
+   "expected": "Use audit-02-profile* for profile; use audit-00-main/phase4b for composer; rename in future harness.",
+   "actual": "Mislabeled scenes.",
+   "owner": "UIUX",
+   "retest": "Manifest note; no product claim from mislabeled images."
+  },
+  {
+   "id": "5B-F9",
+   "severity": "note",
+   "status": "evidence",
+   "scene": "L global discipline",
+   "finding": "phase4b smoke screenshots contain the harness marker 窗口控制不可用; fixture-injected 演示运行时 text appears in some raw-main scenes.",
+   "evidence": [
+    "raw-phase4b/phase4b-200pct.png",
+    "raw-main/04-profile.png",
+    "raw-main/12-composer.png",
+    "raw-main/audit-00-main.png"
+   ],
+   "expected": "Product screenshots (raw-main with real preload) have no such markers; smoke images are layout supplements only.",
+   "actual": "raw-main audit-00-main has no 窗口控制不可用; demo text is fixture content.",
+   "owner": "UIUX/测试",
+   "retest": "Manifest notes; L pass based on raw-main only."
+  }
+ ],
+ "addendum": {
+  "date": "2026-10-21",
+  "reanchor_review": "../2026-10-21_design_ui-platform-phase5b-reanchor-review.md",
+  "bootstrap_ruling": "../2026-10-21_design_ui-platform-phase5b-bootstrap-empty-state.md",
+  "note": "PM §十九 adds P1 BOOTSTRAP S0 and P1 spinner CSS-vs-Motion findings; see reanchor review. This file remains the audit-hash findings."
+ }
+}

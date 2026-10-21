@@ -1,0 +1,76 @@
+{
+  "checks": [
+    {
+      "name": "DENSITY_1360_NO_HINT_GE9",
+      "value": true,
+      "detail": {
+        "total": 12,
+        "fullyVisible": 12,
+        "fontSize": "15px",
+        "lineHeight": "27px",
+        "chatH": 576.40625,
+        "chipHidden": true,
+        "chipH": null,
+        "chipBottom": null
+      }
+    },
+    {
+      "name": "DENSITY_BODY_15_27",
+      "value": true,
+      "detail": {
+        "total": 12,
+        "fullyVisible": 12,
+        "fontSize": "15px",
+        "lineHeight": "27px",
+        "chatH": 576.40625,
+        "chipHidden": true,
+        "chipH": null,
+        "chipBottom": null
+      }
+    },
+    {
+      "name": "DENSITY_960_GE4",
+      "value": true,
+      "detail": {
+        "total": 12,
+        "fullyVisible": 8,
+        "fontSize": "15px",
+        "lineHeight": "27px",
+        "chatH": 335.625,
+        "chipHidden": true,
+        "chipH": null,
+        "chipBottom": null
+      }
+    },
+    {
+      "name": "DENSITY_1360_WITH_HINT_GE8",
+      "value": true,
+      "detail": {
+        "mHint": {
+          "total": 12,
+          "fullyVisible": 11,
+          "fontSize": "15px",
+          "lineHeight": "27px",
+          "chatH": 539.40625,
+          "chipHidden": true,
+          "chipH": null,
+          "chipBottom": null
+        },
+        "notice": {
+          "h": 37,
+          "text": "Pi 配置不完整，缺：ANS_PI_BASE_URL。请补齐后保存。打开 Pi 设置"
+        }
+      }
+    },
+    {
+      "name": "DENSITY_ZERO_CONSOLE",
+      "value": true,
+      "detail": {
+        "errs": [],
+        "didFail": []
+      }
+    }
+  ],
+  "console": [],
+  "didFail": []
+}

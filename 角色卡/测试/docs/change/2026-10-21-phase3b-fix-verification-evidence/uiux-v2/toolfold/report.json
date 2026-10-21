@@ -1,0 +1,96 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "fold running stays expanded with live rows",
+      "value": true
+    },
+    {
+      "name": "fold running summary carries calls breakdown and not-released mark",
+      "value": true
+    },
+    {
+      "name": "denied phase merges into its own call row and group is not cut",
+      "value": true
+    },
+    {
+      "name": "settled folds the turn group with summary intact and denied row still direct",
+      "value": true
+    },
+    {
+      "name": "manual expand after fold restores every row identity zero loss",
+      "value": true
+    },
+    {
+      "name": "second turn opens its own group while running",
+      "value": true
+    },
+    {
+      "name": "manual collapse during running survives later appends",
+      "value": true
+    },
+    {
+      "name": "manual collapse survives settle auto fold",
+      "value": true
+    },
+    {
+      "name": "failed phase marks the fold summary with failure count",
+      "value": true
+    },
+    {
+      "name": "failed turn folds with failure mark retained",
+      "value": true
+    },
+    {
+      "name": "windowed tail group open while its turn runs",
+      "value": true
+    },
+    {
+      "name": "reader anchor row is real and visible before fold",
+      "value": true
+    },
+    {
+      "name": "fold anchor offsets",
+      "anchorBefore": 150,
+      "anchorAfter": 166,
+      "anchorLater": 166,
+      "readingBefore": {
+        "text": "brow-198 长聊天折叠验证。 长聊天折叠验",
+        "offset": 10,
+        "scrollTop": 14910
+      },
+      "readingAfter": {
+        "text": "brow-197 长聊天折叠验证。 长聊天折叠验",
+        "offset": -44,
+        "scrollTop": 14894
+      }
+    },
+    {
+      "name": "tail fold movement bounded and non accumulating with the reading row still in view",
+      "value": true
+    },
+    {
+      "name": "mid document fold anchor",
+      "midBefore": 150,
+      "midAfter": 150,
+      "midLater": 150
+    },
+    {
+      "name": "mid document fold keeps the reading anchor within two pixels and stable",
+      "value": true
+    },
+    {
+      "name": "scrolled away the group is windowed out (no attached group rows)",
+      "value": true
+    },
+    {
+      "name": "live group created off screen stays unmounted until scrolled back",
+      "value": true
+    },
+    {
+      "name": "off screen settled group attaches already folded with summary",
+      "value": true
+    }
+  ]
+}

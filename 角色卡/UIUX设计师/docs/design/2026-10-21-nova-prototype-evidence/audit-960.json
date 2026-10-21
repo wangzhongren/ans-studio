@@ -1,0 +1,301 @@
+{
+  "ok": true,
+  "stateChecks": {
+    "chat": true,
+    "empty": true,
+    "drawer": true,
+    "sidebar": true,
+    "shell": true,
+    "typography": true,
+    "column": true
+  },
+  "mode": "prototype-audit",
+  "capture": true,
+  "state": {
+    "w": 960,
+    "scene": "chat",
+    "drawer": true,
+    "sidebar": true
+  },
+  "tokens": {
+    "--background": "#14171A",
+    "--foreground": "#F2F4F6",
+    "--card": "#1E2328",
+    "--card-foreground": "#F2F4F6",
+    "--popover": "#14171A",
+    "--popover-foreground": "#F2F4F6",
+    "--primary": "#6FA08B",
+    "--primary-foreground": "#14171A",
+    "--secondary": "#252A30",
+    "--secondary-foreground": "#F2F4F6",
+    "--muted": "#1E2328",
+    "--muted-foreground": "#949BA4",
+    "--accent": "#252A30",
+    "--accent-foreground": "#F2F4F6",
+    "--destructive": "#C97A6D",
+    "--destructive-foreground": "#14171A",
+    "--border": "#2C3238",
+    "--input": "#6B757E",
+    "--ring": "#6FA08B",
+    "--sidebar": "#1A1E22",
+    "--sidebar-foreground": "#F2F4F6",
+    "--sidebar-primary": "#6FA08B",
+    "--sidebar-primary-foreground": "#14171A",
+    "--sidebar-accent": "#252A30",
+    "--sidebar-accent-foreground": "#F2F4F6",
+    "--sidebar-border": "#2C3238",
+    "--sidebar-ring": "#6FA08B",
+    "--warning": "#C4A15F",
+    "--warning-bg": "#24211A",
+    "--warning-border": "#4E422A",
+    "--success-bg": "#22302B",
+    "--success-hover": "#7FB29B",
+    "--danger": "#C97A6D",
+    "--danger-bg": "#2E2220",
+    "--danger-border": "#5C3832",
+    "--text-2": "#A7ADB5",
+    "--text-3": "#949BA4",
+    "--selected": "#2A3037",
+    "--drawer-surface": "#171B1F",
+    "--radius": "8px",
+    "--radius-control": "6px",
+    "--content-max": "900px",
+    "--sidebar-width": "248px",
+    "--font-mono": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+    "--shadow-card": "0 1px 2px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.32)",
+    "--shadow-dock": "0 -6px 18px rgba(0,0,0,.35)"
+  },
+  "contrast": [
+    {
+      "pair": "foreground / background",
+      "fg": "#F2F4F6",
+      "bg": "#14171A",
+      "ratio": 16.32,
+      "min": 7,
+      "pass": true
+    },
+    {
+      "pair": "foreground / card",
+      "fg": "#F2F4F6",
+      "bg": "#1E2328",
+      "ratio": 14.36,
+      "min": 7,
+      "pass": true
+    },
+    {
+      "pair": "text-2 / background",
+      "fg": "#A7ADB5",
+      "bg": "#14171A",
+      "ratio": 7.96,
+      "min": 4.5,
+      "pass": true
+    },
+    {
+      "pair": "text-2 / card",
+      "fg": "#A7ADB5",
+      "bg": "#1E2328",
+      "ratio": 7,
+      "min": 4.5,
+      "pass": true
+    },
+    {
+      "pair": "text-3 / card",
+      "fg": "#949BA4",
+      "bg": "#1E2328",
+      "ratio": 5.64,
+      "min": 4.5,
+      "pass": true
+    },
+    {
+      "pair": "text-3 / selected",
+      "fg": "#949BA4",
+      "bg": "#2A3037",
+      "ratio": 4.75,
+      "min": 4.5,
+      "pass": true
+    },
+    {
+      "pair": "primary-foreground / primary",
+      "fg": "#14171A",
+      "bg": "#6FA08B",
+      "ratio": 6.06,
+      "min": 4.5,
+      "pass": true
+    },
+    {
+      "pair": "primary / background",
+      "fg": "#6FA08B",
+      "bg": "#14171A",
+      "ratio": 6.06,
+      "min": 4.5,
+      "pass": true
+    },
+    {
+      "pair": "danger / background",
+      "fg": "#C97A6D",
+      "bg": "#14171A",
+      "ratio": 5.56,
+      "min": 4.5,
+      "pass": true
+    },
+    {
+      "pair": "danger / danger-bg",
+      "fg": "#C97A6D",
+      "bg": "#2E2220",
+      "ratio": 4.75,
+      "min": 4.5,
+      "pass": true
+    },
+    {
+      "pair": "warning / background",
+      "fg": "#C4A15F",
+      "bg": "#14171A",
+      "ratio": 7.38,
+      "min": 4.5,
+      "pass": true
+    },
+    {
+      "pair": "warning / warning-bg",
+      "fg": "#C4A15F",
+      "bg": "#24211A",
+      "ratio": 6.59,
+      "min": 4.5,
+      "pass": true
+    },
+    {
+      "pair": "input / card",
+      "fg": "#6B757E",
+      "bg": "#1E2328",
+      "ratio": 3.37,
+      "min": 3,
+      "pass": true
+    },
+    {
+      "pair": "ring / card",
+      "fg": "#6FA08B",
+      "bg": "#1E2328",
+      "ratio": 5.34,
+      "min": 3,
+      "pass": true
+    },
+    {
+      "pair": "sidebar-foreground / sidebar",
+      "fg": "#F2F4F6",
+      "bg": "#1A1E22",
+      "ratio": 15.2,
+      "min": 7,
+      "pass": true
+    },
+    {
+      "pair": "text-3 / sidebar",
+      "fg": "#949BA4",
+      "bg": "#1A1E22",
+      "ratio": 5.97,
+      "min": 4.5,
+      "pass": true
+    }
+  ],
+  "geometry": {
+    "window": {
+      "x": 0,
+      "y": 0,
+      "w": 960,
+      "h": 620
+    },
+    "viewport": {
+      "w": 960,
+      "h": 533
+    },
+    "titlebarH": 36,
+    "sessionHeadH": 60,
+    "drawerW": 424,
+    "cardW": null,
+    "chatPaneW": 664,
+    "capsuleW": 664,
+    "msgFont": "15px / 27px",
+    "bodyFont": "13px / 20.15px",
+    "bodyFontFamily": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+    "treeRowH": 49.83,
+    "toolRowH": 46.09,
+    "pageScrollW": 960,
+    "pageClientW": 960,
+    "overflowX": false,
+    "alignment": {
+      "head": {
+        "x": 272,
+        "y": 44.53,
+        "w": 664,
+        "h": 41.94
+      },
+      "pane": {
+        "x": 272,
+        "y": 134.39,
+        "w": 664,
+        "h": 196.09
+      },
+      "capsule": {
+        "x": 272,
+        "y": 509.2,
+        "w": 664,
+        "h": 80
+      },
+      "note": {
+        "x": 272,
+        "y": 595.2,
+        "w": 664,
+        "h": 16.8
+      }
+    },
+    "maxLeftDelta": 0
+  },
+  "states": {
+    "chat": {
+      "user": 1,
+      "assistant": 1,
+      "toolRows": 1
+    },
+    "empty": {
+      "emptyVisible": true,
+      "paneVisible": false
+    },
+    "drawerClosed": {
+      "classOpen": false
+    },
+    "drawerOpen": {
+      "classOpen": true,
+      "width": 424
+    },
+    "sidebarCollapsed": {
+      "classCollapsed": true,
+      "sidebarWidth": 0,
+      "expandVisible": true,
+      "gridCols": "0px 960px",
+      "cssWidth": "0px",
+      "appVar": "248px"
+    },
+    "sidebarExpanded": {
+      "sidebarWidth": 248,
+      "resizerAria": "248",
+      "gridCols": "248px 712px"
+    },
+    "sidebarDrag": {
+      "width": 320,
+      "gridCols": "320px 640px",
+      "appVar": "320px"
+    },
+    "shell": {
+      "open": true,
+      "activeElement": "sc-deny",
+      "activeElementTag": "BUTTON",
+      "hasFocus": true,
+      "denyHasDefaultRing": true,
+      "cardWidth": 640
+    }
+  },
+  "reducedMotion": false,
+  "notes": [
+    "静态原型自检；不是真实 Electron、真实业务或屏读验收。",
+    "对比度为 WCAG 2.x 相对亮度计算值；--foreground 已按当前令牌 #F2F4F6 实算。",
+    "图标为内联 SVG 示意；生产统一 Lucide。动效仅 CSS 示意；生产由 Motion 实现。"
+  ]
+}

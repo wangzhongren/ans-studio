@@ -1,0 +1,29 @@
+{
+  "reports": [
+    {
+      "closedBig": {
+        "groups": 1,
+        "rows": 0,
+        "open": false,
+        "summary": "本轮 60 个调用：read_file ×60"
+      },
+      "openedBig": {
+        "open": true,
+        "rows": 60,
+        "first": "未记录read_filedocs/f0.md调用发起",
+        "last": "未记录read_filedocs/f59.md调用发起"
+      },
+      "closedAgain": {
+        "open": false,
+        "rows": 0
+      },
+      "smallGroup": {
+        "groups": 1,
+        "rows": 10,
+        "open": false,
+        "summary": "本轮 10 个调用：read_file ×10"
+      }
+    }
+  ],
+  "ok": true
+}

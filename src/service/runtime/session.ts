@@ -147,8 +147,8 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           } }));
       // G-5：推理强度（wave 1 接线）——按运行时读 env（`ANS_CLAUDE/CODEX/PI_REASONING_EFFORT`）并
       // 归一（**纯读**，providerFor 每次重建即重读＝「改设置 ⇒ 下次开会话生效」沿既有语义）。非法值＝
-      // **按未设处理**（零参数、零行为变化）＋诊断如实；**绝不因偏好值坏件拒开会话/毁轮次**（偏好不是
-      // 承载件）。未设＝不注入字段（逐字现状；三平台原生消费属适配器批次＝wave 2）。
+      // **按未设处理**（本层不注入字段）＋诊断如实；**绝不因偏好值坏件拒开会话/毁轮次**（偏好不是
+      // 承载件）。字段缺席交平台默认策略，不保证原生请求零参数；恢复默认与兼容由各适配器负责。
       const reasoningEffort = resolveReasoningEffort(options.runtime);
       if (reasoningEffort.state === "invalid") {
         try { options.diagnostics?.record("reasoning.effort.invalid", { mode: options.runtime, supported: false, reasonCode: "invalid-value" }); } catch { /* 诊断绝不能改变执行 */ }
@@ -167,7 +167,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         ...(judgeTools !== undefined
           ? { judgeMode: true as const, installedMcpServers: [] as const }
           : { installedMcpServers: listInstalledMcpServers(options.projectRoot, role.id) }),
-        // G-5：仅 `set` 态注入字段；`unset`/`invalid` 保持**字段缺席**（逐字现状的机读形态）。
+        // G-5：仅 `set` 态注入字段；`unset`/`invalid` 保持字段缺席，交各平台默认策略。
         ...(reasoningEffort.state === "set" ? { reasoningEffort: reasoningEffort.effort } : {}),
         ...resolveRuntimeTimeouts(options.runtime, options),
       };

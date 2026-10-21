@@ -1,0 +1,38 @@
+{
+  "baselineHead": "fc1a39c14e119faccf442fc8e22bbbbd978d1a04",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "node": "v24.14.0",
+  "sdk": "0.3.299",
+  "bundledCli": "2.1.299",
+  "commands": [
+    {
+      "command": "node --test 'test/claude-adapter/*.test.ts'",
+      "exitCode": 0,
+      "result": "57 passed; no skips"
+    },
+    {
+      "command": "env -i PATH=\"$PATH\" HOME=/tmp TMPDIR=/tmp node test/claude-adapter/reasoning-loopback.probe.ts",
+      "exitCode": 0,
+      "result": "19 direct phases, 1 service/adapter phase, 6 compatibility phases passed; loopback-only fake credentials"
+    },
+    {
+      "command": "npx tsc --noEmit",
+      "exitCode": 1,
+      "result": "Only 3 in-flight QA e-pi.test.ts legacy API errors; no Claude diagnostics"
+    }
+  ],
+  "hashes": {
+    "src/provider/claude/session.ts": "d5b4a252e8d51f0ed9ce58c6e9a25b1ac7c5cac23974c9069c0ffd996da45a2f",
+    "test/claude-adapter/session.test.ts": "3a40d4c3a4e0143bc2ed49b4e03321990db5e4820f064f3142470a1daf8faf6c",
+    "test/claude-adapter/reasoning-loopback.probe.ts": "269d68bd04fced72ee9319b72d252681be16b17cefe49ab5665ff88669adc8dc",
+    "src/model/runtime.ts": "616b1e6b3722da8d11d4f41c85192c170440b39b92048a4a50ae387c0586d59f",
+    "src/service/runtime/session.ts": "90eec283f03f6728363e3dd8b5f952ad6d62445696d98fc65db0db9f9982ed0b",
+    "node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs": "47c7ec6c045d41190e1286b39f46e2adcc1c40e790ca3363a4844e43ce22421e"
+  },
+  "artifacts": {
+    "typecheck.log": "30f04e0e6df588c30a005196a77f3b897b42debbd0cfd3779d4fa977e7471f91",
+    "probe.json": "7e5d4d6ce099f809191d5b7095d35935ee0cf53497907dd7c814a74e5aee4318",
+    "unit.log": "6f45868ecb2720bf8a0c9b35758c150fec09b27b4960405d24c49424d79eb80e",
+    "probe.stderr": "454f44a22b6264f54c7a1112b7e7146f6a5d329d25398add98f463a41c1b12d3"
+  }
+}

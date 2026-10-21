@@ -298,7 +298,7 @@ test("J7 治理回归（MCP 激活下）：server-tools 声明照常启用（启
         const connected = await until(() => mcpNamesOf(sdk.native).length >= 1, 8000);
         assert.ok(connected, "MCP 照常接通（server-tools 同开不互斥）");
         const extensions = sdk.extensionsResult.extensions.map((x) => String(x.path));
-        assert.ok(extensions.includes("<inline:ans-governance>") && extensions.length === 2, `扩展＝治理＋MCP 恰两件：${JSON.stringify(extensions)}`);
+        assert.ok(extensions.includes("<inline:ans-governance>") && extensions.includes("<inline:ans-reasoning>") && extensions.length === 3, `扩展＝治理＋默认思考保护＋MCP 恰三件：${JSON.stringify(extensions)}`);
         sdk.faux.setResponses([
           sdk.ai.fauxAssistantMessage([sdk.ai.fauxToolCall("mcp__srv_g__echo", { text: "G-MARK" })]),
           sdk.ai.fauxAssistantMessage("done"),
@@ -318,14 +318,14 @@ test("J7 治理回归（MCP 激活下）：server-tools 声明照常启用（启
 
 // —————————————————————— 零声明逐字旧行为 ——————————————————————
 
-test("J6 零声明：扩展仅治理一件、活动面为空、不调 bindExtensions、轮次照常（settled 恰 1）", async () => {
+test("J6 零声明：仅治理和默认思考保护、活动面为空、不调 MCP bindExtensions、轮次照常（settled 恰 1）", async () => {
   await temp(async (dir) => {
     const sdk = await engine();
     await writeFile(join(dir, "mcp.json"), JSON.stringify({ servers: { rogue: { command: "node", args: [] } } }));
     const session = await createRealPiRuntimeAdapter(adapterOptions(dir), sdk.dependencies).bindRole(role);
     try {
       assert.deepEqual(sdk.native.getActiveToolNames(), [], "活动面为空（零声明）");
-      assert.deepEqual(sdk.extensionsResult.extensions.map((x) => String(x.path)), ["<inline:ans-governance>"], "扩展仅治理一件（MCP 扩展不加载；rogue mcp.json 零搭车）");
+      assert.deepEqual(sdk.extensionsResult.extensions.map((x) => String(x.path)), ["<inline:ans-governance>", "<inline:ans-reasoning>"], "仅治理和默认思考保护（MCP 扩展不加载；rogue mcp.json 零搭车）");
       sdk.faux.setResponses([sdk.ai.fauxAssistantMessage("plain")] as never);
       await session.prompt("no mcp");
     } finally {

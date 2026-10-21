@@ -1,0 +1,15 @@
+=== renderer semantics scans (3B) ===
+node:/require( hits: 0
+fs import hits: 0
+ipcRenderer direct hits: 0
+resolveWrite/classifyShell/evaluateGate/resolveBoundary hits: 0
+hand-drawn svg hits: 0
+raw hex in tsx/ts: 0
+--- allow:true 仅显式点击路径 ---
+app/renderer/src/shell/ConfirmCard.tsx:208:              onClick={() => void respond(true)}
+app/renderer/src/shell/ConfirmCard.tsx:363:              onClick={() => void respond(true)}
+app/renderer/src/stores/confirm-store.ts:199:        res = await bridge.shellConfirmRespond({ id: cur.id, allow: allow === true });
+app/renderer/src/stores/confirm-store.ts:258:          allow: allow === true,
+--- 唯一 DOM 例外常量 ---
+app/renderer/src/chat/ChatRow.tsx:128:const DEFER_TOOL_ROWS_WHEN_CLOSED = 40;
+app/renderer/src/chat/ChatRow.tsx:136:  const deferClosed = !open && summary.calls > DEFER_TOOL_ROWS_WHEN_CLOSED;

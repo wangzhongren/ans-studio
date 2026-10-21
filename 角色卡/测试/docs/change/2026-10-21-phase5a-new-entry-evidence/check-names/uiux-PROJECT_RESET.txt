@@ -1,0 +1,3 @@
+old project status fixture is visible=true
+new project first DOM clears old badges before events=false
+new project first DOM clears old badges before events observed={"chat": "开始与 A 对话点下方按钮开启会话；发送消息后，这里会显示对话与工具记录。开始与 A 对话", "assistant": [], "denied": [], "model": null}

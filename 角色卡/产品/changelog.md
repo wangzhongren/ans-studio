@@ -1,5 +1,43 @@
 # 产品 变更记录
 
+## 2026-10-21 — UI 平台 Phase 5 产品面最终轻量复核；提案 status→implemented（revision 3）
+
+**来源**：独立验收 [AC1–AC8 报告](../独立验收/docs/change/2026-10-21_change_ui-platform-phase5-acceptance.md) 的 AC8/F3——产品最终产品面轻量复核记录缺失、提案仍为 `status: proposed` 且未写最终入口；PM §16.4 亦要求「产品：最终产品面复核（轻量）；不新增功能」。
+
+**做了什么**：①新增[产品面最终轻量复核](docs/change/2026-10-21_change_ui-platform-final-review.md)（status: reviewed）：只读复算 5B 唯一生产入口 `app/renderer/dist/index.html` 的三个产物哈希（与冻结值一致）、核对 `renderer-entry.ts`/`main.ts` 入口唯一接线与严格 CSP，并基于测试 5B 最终验证、UIUX 生产入口终审 revision 4、装配 5B 记录与独立验收报告判断——**「让治理可见 / 一眼三问」作为呈现契约在本轮证据范围内保持**（谁在干活＝左树五角色/状态/队列；什么在等我决定＝确认/恢复/治理卡/P7「待选择」/judge 开关；为什么被拦住＝门禁拒绝/缺配/F6/恢复空态）；**生产方式升级完成，IA/深色石墨/整页等宽/900 列/交互语义未变**；用户可感知变化集中在 200% 旧缺陷关闭（左树可见、头部/输入区无横溢、治理预览 900+Esc、报告/预览/镜像/交付遮挡门）、密度 ≥9/≥8/≥4、Motion 转轮 0.9s、身份 aria、阅读锚点、Markdown 外开、忙时切换安全语义（确认条留 Phase 6 产品待办）。②[提案](docs/design/2026-10-21_design_ui-platform-round.md) status 由 `proposed` 改为 **`implemented`**、revision 3：新增 §十四「实施与验证状态」（Phase 0–5 状态表、最终入口与产物哈希/gzip/本地包、5A/5B 门与独立验收结论、未覆盖项），更新文首状态段与附录状态声明，并给 §六过渡期入口加「已实施」注记。③feature-map 更新 UI 平台行并新增「产品面最终复核」行；memo 追加同日实施/复核记录。
+
+**验证状态口径**：5A 门 pass、5B 门 pass（测试 5B 最终验证 status: verified；UIUX 终审 pass，P0 0/P1 0/P2 5）；独立验收已重判 **AC1–AC8 全部 pass**（status: verified；AC3/AC8 补正已收口：`OPEN_CARD_AT_ARRIVAL` 补列 G3、旧 uiux 424 名 0 回归、契约面/产品复核收口、无关改动分离、378 文件候选清单），范围限 macOS 本机离线夹具/本地构建/本地打包。**验收通过不授予发布**：发布流水线未接（M1），公开版本仍 v1.4.0，发布决定属客户。
+
+**未覆盖（按验收 missing-evidence 原样保留）**：真实模型/网络/`.env`、Windows 原生/DPI/屏读、签名/公证/安装器/自动更新、发布流水线/CI、Linux/其他平台、真实主进程卡通道/真实引擎会话；zoom factor 200% ≠ OS/DPI 200%。UIUX P2 ×5 与 `test/测试` 环境红（缺真实 `rg`）如实登记。
+
+**边界与状态**：仅改本角色文件（新复核记录、提案 revision 3、feature-map、memo、本文件）；未改 `app/`、`src/`、`test/`、`package.json`、仓库根 `docs/`、其他角色文件与 `.ans`；未读 `.env`；未重跑测试/e2e/打包、未连接真实模型/网络；未 git 提交。README 对已发布 v1.4.0 的产品描述经复核仍准确，本轮无需修订。
+
+## 2026-10-21 — UI 平台化提案 revision 2：按 PM 评审落实 M1（发布冻结）/ M2（切换判据）
+
+**来源**：项目管理评审结论（2026-10-21，经协调方转达）：**需修订**——方向与六个默认值成立，无需重议；两处「实施前必须修订」：M1 发布冻结冲突、M2 切换判据不可执行。
+
+**修改点**（详见[提案](docs/design/2026-10-21_design_ui-platform-round.md) §十三）：
+
+- **M1 发布冻结**：**删除 Phase 1 中任何 release 流水线接入**。依据：`release.yml` 绑定 `SOURCE_REF=v1.4.0` / `SOURCE_SHA=83eec7ed1966b215d81035cac33d7dda80013f05`；`src/common/装配/release-policy.mjs` 的 overlay 白名单对未列名 `app/` 变更直接抛错；且 v1.4.0 冻结源没有 Vite——接 release 会让发布 CI 直接失败。改为：Phase 1 只做**本地**工具链与构建；Phase 5 只做**本地**打包/真实 Electron 冒烟；发布流水线接入留到**下一次冻结源/新发布轮，由客户决定**（§六、§八 R15、Q2、Q14）。
+- **M2 切换判据**：现有 e2e 依赖 `window.__ansRenderer` 测试驱动（`uiux-v2.mjs` 约 180 行、`main.mjs` 约 94 行、`bench-storm.mjs` 8 处）、class/data 属性与写死入口路径（除 `bench-storm` 的 `BENCH_RENDERER_DIR`）。§五 A5 扩为**契约面清单**：Phase 2 产出 id/class/data/aria/驱动方法清单；新渲染器提供**同名驱动**接真实 store/动作；各套件可切换目标；Phase 3/5 双端**逐 check 名对照**（§六、§八 R1、Q5、Q12）。
+- **同步 PM 技术结论**：①React 等渲染库放 `devDependencies`（Vite 打包进 `dist/`，安装包不重复携带 `node_modules`），但预算仍按渲染运行时库计入 ≤12（现有 10 个、dnd-kit 后 11）；②markdown-it 在 Phase 3 改 npm 精确同版本 15.0.2（devDependency，+ `@types/markdown-it`）并删除 `vendor/` 单文件，安全与可复现性不降；③不引 vitest——单元测试只测纯逻辑（`.ts`，无 JSX、无 DOM），DOM 行为交 Electron e2e，jsdom + testing-library 保留为已批准备选（逐项 PM 批准才启用）；④桌面UI 新测试目录 `test/桌面UI/`（待 ANS Team Formation 更新边界后生效），组件落 `app/renderer/src/components/ui/`、台账 `docs/feature/ui-components.md`；⑤Phase 1 首件包含真实 Electron `loadFile(dist)` 验证 file:// 下 ES 模块/分块加载，失败回退经典脚本单包或自定义协议（回 PM 评审）；⑥Phase 1 不做 `node --test` 的 JSX 转译，后续确有需要按准入四问与逐项 PM 批准另议；⑦tsconfig 拆分（根排除 `app/renderer`、渲染侧 `tsconfig.json` 与 `typecheck:renderer`）、过渡期独立 HTML 入口与 Phase 5 切换 `index.html`、zustand 切片清单、图标守卫（含窗口控制全部 lucide、品牌字标为文字、豁免初始为空）均按 PM 口径回填。
+
+**边界与状态**：仅改本角色四件（提案 revision 2、feature-map、memo、本文件）；**未实施/未测试/未部署**；未改 `app/`、`src/`、`test/`、`package.json`、仓库根 `docs/`、其他角色文件与 `.ans`；未跑应用/模型/网络；未 git 提交。下一步＝PM 复审。
+
+## 2026-10-21 — UI 平台化：客户确认方向并「开干」，正式提案交项目管理评审
+
+**来源**：客户（用户）审阅主上下文给出的「UI 平台化」方向后，明确指示「开干」——等于确认方向并接受全部推荐默认值。新增[正式提案](docs/design/2026-10-21_design_ui-platform-round.md)（status: proposed，revision 1）。
+
+**做了什么**：只读核对现状并成文——`wc -l`：`renderer.js` 6833 行、`styles.css` 2086 行、`index.html` 326 行；`package.json` 无前端框架（Electron 44.7.0 直接运行 `app/main.ts`）；唯一 vendor 库 markdown-it 15.0.2（MIT，sha256 已钉）；图标全部内联手绘 SVG（index.html 14 处、renderer.js 21 处、role-status.js 1 处）；动画只有 CSS（styles.css 28 处）；左栏拖拽手写（`#sidebar-resizer`，宽度存 localStorage）；styles.css 文件头自述「文末 V2 覆盖」且全文 4 个 `:root` 块（第 8/1513/1742/1778 行）；渲染单测为源码子串守卫（文件头明说因 IIFE 不可 import）；生产 CSP 为 `script-src 'self'; style-src 'self'`；深色石墨对比度实测（正文 14.78:1 等）与 900 列/8-6 圆角/15-27 正文基线分别有属主记录。
+
+**提案核心结论**：①**产品行为不变，界面生产方式换一套**——shadcn/ui Nova × 深色石墨重建渲染层；②产品方向「让治理可见」：每个界面一眼回答三个问题（现在谁在干活／什么在等我决定／为什么被拦住），配合口味五条作验收裁判；③设计语言：Nova 管密度与组件比例、不换颜色字体，base-nova（Base UI）为基底；`components.json` style 初始化后不可改，Phase 0 先原型确认观感；深色石墨、整页等宽、900 列、8/6 圆角、15/27 正文、极轻浮层阴影全部保留；④依赖宪法：唯一选择表、禁入清单（第二套 UI/图标/动画/状态/拖拽/Markdown、CSS-in-JS、路由、日期库、lodash、Storybook、Radix/React Aria 混源）、准入四问与 PM 批准、精确锁版、`npm ls` 重复检查；预算运行时新增直接依赖 ≤12、首屏 ≤300KB gzip；⑤架构红线：Vite 只构建渲染层（`base './'`、产物 `app/renderer/dist/`、`modulePreload.polyfill=false`）、主进程/preload 无构建、IPC 零变更、不出现第二份边界判定、虚拟滚动移植不引第三方库、测试从子串守卫翻译为行为断言且同一套 e2e 双端等价为切换判据、生产 CSP 不放宽、`vite.config.ts` 需 Team Formation 更新装配 Section 1、过渡窗口有界（新需求只进新渲染器、旧渲染器只修阻断缺陷）；⑥六阶段路线（0 设计门／1 工具链／2 骨架／3 聊天流／4 资料与设置／5 切换与审计），每阶段以证据门收口、不写日历工期；⑦One-shot 施工契约：五个单一事实源（tokens.css／ui-labels／lucide-react／motion/react／store）、组件白名单+台账、状态矩阵 DoD、机器守卫（依赖白名单、令牌外无裸色值、无手绘 SVG、无第二套库）、黄金样板＝会话头+输入区。
+
+**客户已确认（2026-10-21「开干」）**：六个拍板点逐条记录为已确认——Vite 只构建渲染层；分阶段替换+最后切换；虚拟滚动移植；不引 vitest 沿 `node --test`（组件级用 jsdom+testing-library）；dnd-kit 白名单按需安装；base-nova（Base UI）。同批接受客户原则（逐字）、产品方向、设计语言、依赖宪法、架构红线、阶段路线与 One-shot 契约。**确认不等于逐文件实施授权**，实施以 PM 评审结论和派发为准。
+
+**交 PM 评审**：14 项问题清单（§十一），分归属与边界／工程与验证／设计与视觉三组。两个已识别的机制缺口如实入档：①`node --test` 原生 TS 擦除不能处理 JSX，组件级测试的落地方式需 Phase 1 由装配给出最小方案（不新增测试框架）；②方向所称「IME 26 项」与写作时点现有 `e2e/ime-enter.mjs` 的项数不一致，切换前须按套件版本重锚，不把未核对数字写成已验证。
+
+**边界与状态**：提案完成，**未实施/未测试/未部署**；写集仅本角色四件（提案、feature-map、memo、本文件）；未改 `app/`、`src/`、`test/`、`package.json`、仓库根 `docs/`、其他角色文件与 `.ans`；未读 `.env`；未运行应用/真实模型/网络/凭据；未 git 提交。下一步＝项目管理评审、按阶段拆发属主角色（UIUX设计师／装配／桌面UI／桌面窗口／测试）。
+
 ## 2026-10-18 — 治理四角色（新增 Liaison 联络官）：客户沟通与提案分权设计提案
 
 **来源**：客户需求逐字——「感觉报告员可以在拆分一下，把客户沟通，和编写提案，拆分出来。客户沟通的作为主入口。」已拍板：新角色 **Liaison 联络官（liaison）**；提案接受/修改决定卡**镜像到主入口**；**现在就改四权**。新增[设计提案](docs/design/2026-10-18_design_governance-liaison.md)（status: proposed，零代码改动）。

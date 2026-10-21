@@ -1,0 +1,75 @@
+{
+  "reports": [
+    {
+      "name": "same-turn live then history only one response rejection and old history",
+      "value": true
+    },
+    {
+      "name": "real project-changed refresh does not repeat current turn",
+      "value": true
+    },
+    {
+      "name": "full rebuild retains unpersisted live report settled and original pending card",
+      "value": true
+    },
+    {
+      "name": "history first then exact live event does not duplicate",
+      "value": true
+    },
+    {
+      "name": "two legitimate same-turn identical events remain two occurrences",
+      "value": true
+    },
+    {
+      "name": "distinct turns with identical input and output remain two",
+      "value": true
+    },
+    {
+      "name": "background engine merges in own cache without old engine rows",
+      "value": true
+    },
+    {
+      "name": "history-before-correlated-live binds two identical optimistic inputs exactly once",
+      "value": true
+    },
+    {
+      "name": "repeated known-turn full rebuild keeps original unanchored pending card without borrowed token",
+      "value": false
+    },
+    {
+      "name": "repeated known-turn full rebuild keeps original unanchored pending card without borrowed token observed",
+      "value": {
+        "chat": "会话记录已恢复inserted past history\nold input\nold history retained\n任务请求原文current input\n本轮 1 个调用：read_file未记录read_filecurrent.md调用发起current rejection本轮角色回复原文（展开）current answer\nhistory before live\nhistory before live\ntwo identical inputs\ntwo identical answers\ntwo identical inputs\ntwo identical answers\n本轮 1 个调用：read_file · 含 1 条未放行未记录read_filecurrent.md调用发起 → 已拒绝current rejectioncurrent.mdcurrent rejectioncurrent settled来源 A · 终态记录任务报告系统按终态记录：未报告Pi · 任务关联未知 · 轮次 current报告原文摘录current report remains\n报告存储报告保存状态未确认。独立验收尚未确认以上为报告或终态记录，不等于独立验收通过。查看来源角色文档查看完整报告摘要与证据current report remains\n（未提供证据）not stored yet\nmerge pending card确认拒绝manual identical\n已入队：等它完成当前任务后处理（第 1 位）。manual identical\n已入队：等它完成当前任务后处理（第 1 位）。manual answer one\nmanual answer two\n有 1 条待确认 · 定位",
+        "assistant": [
+          "inserted past history\n",
+          "old history retained\n",
+          "current answer\n",
+          "history before live\n",
+          "history before live\n",
+          "two identical answers\n",
+          "two identical answers\n",
+          "not stored yet\n",
+          "manual answer one\n",
+          "manual answer two\n"
+        ],
+        "denied": [
+          "current rejectioncurrent.mdcurrent rejection"
+        ],
+        "model": {
+          "count": 25,
+          "lastIndex": 25,
+          "operators": [
+            {
+              "index": 19,
+              "requestId": "merge-confirm"
+            }
+          ],
+          "rowGap": 16
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: repeated known-turn full rebuild keeps original unanchored pending card without borrowed token\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: repeated known-turn full rebuild keeps original unanchored pending card without borrowed token\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:66:474)\n    at async mergeChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1047:3)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1360:43"
+}

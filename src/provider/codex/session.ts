@@ -7,16 +7,16 @@ import os from "node:os";
 import { randomUUID } from "node:crypto";
 import type { ResolvedRole } from "../../model/role.ts";
 import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, ToolDefinition, ToolResult, RuntimeTurnOutcome, RuntimeToolEventFactsV1, RuntimeToolErrorFactsV1, InstalledMcpServerV1 } from "../../model/runtime.ts";
-import { object, deferred, eventQueue, pausedDeadline, bounded, webSearchRow, mcpToolName, mcpToolCallNative, isReasoningParamRejection } from "../../common/codex-adapter/protocol.ts";
+import { object, deferred, eventQueue, pausedDeadline, bounded, webSearchRow, mcpToolName, mcpToolCallNative, reasoningRejection } from "../../common/codex-adapter/protocol.ts";
 import type { CodexRpcConnection, CodexEngineInput, CodexEngineFactory } from "../../common/codex-adapter/protocol.ts";
 import { settings, safetyConfig, safetyOverrides, effectiveConfig, verifyThread, reasoningEffortOverride } from "../../common/codex-adapter/config.ts";
-// G-5：推理事实通道（适配器只产事实；投影单点在 Service）+ 降级链诊断（沿 installed-skills 先例）。事件 summary
+import { prepareReasoningCatalog, type TemporaryReasoningCatalog } from "../../common/codex-adapter/reasoning-catalog.ts";
+// G-5：推理事实通道（适配器只产事实；投影单点在 Service）。事件 summary
 // 用核心定格常量（Service 在投影单点强制覆盖——适配器不随载荷携带自由文本上 summary 位）。
 import { REASONING_EVENT_SUMMARY } from "../../common/runtime-core/reasoning.ts";
 // 整轮时限（客户裁定 2026-10-17）：`promptTimeoutMs` 只是看护到点检查时限，**不中止整轮**；
 // 适配器自己的整轮上限只认「最后兜底」（缺省 1 小时、固定无 env；测试/宿主可经 `turnLastResortMs` 注入小值）。
 import { DEFAULT_TURN_LAST_RESORT_MS } from "../../common/runtime-core/timeout.ts";
-import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 // Windows 瞬时句柄占用（`EBUSY`/`EPERM`/`EACCES`）的**有界重试**单一来源（§一.5 不得第二份实现）：
 // 收尾删除 workRoot 时，刚退出的原生进程/在途句柄可能短暂未释放——沿原子写原语同一口径处置。
 import { retryOnTransient } from "../../common/shared/atomic-write.ts";
@@ -308,8 +308,10 @@ interface TurnState {
   controller: AbortController;
   ready: ReturnType<typeof deferred<string>>;
   done: ReturnType<typeof deferred<RuntimeTurnOutcome>>;
+  terminal: ReturnType<typeof deferred<void>>;
   reason?: RuntimeTurnOutcome;
   failure?: string;
+  failureFacts?: unknown;
   completed: boolean;
   stopping?: Promise<void>;
   calls: Set<string>;
@@ -376,10 +378,13 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
       // 判断模式：外来 MCP 一律不装配（即使上游误传声明也置空——PM 评审 §6.1/A35）。
       const installedServers = prepareInstalledMcpServers(judgeMode ? [] : options.installedMcpServers ?? [], environmentSnapshot);
       const allowedServers = new Set(installedServers.map(server => server.name));
-      // G-5：推理强度接线面（注入判定＝会话级；off＝无该档不注入另有如实行）+ 降级闸（会话级恰一次）+ 降级诊断。
-      const reasoningInjected = reasoningEffortOverride(config.reasoningEffort) !== undefined;
-      let reasoningDegraded = false;
-      const diagnosticLog = createDiagnosticLogger({ component: "codex-adapter", projectRoot: options.projectRoot, roleId: role.id });
+      // Only completed compatibility turns commit a new strategy. Every ordinary turn explicitly
+      // reapplies a confirmed effort, undoing native turn/start settings left by a failed attempt.
+      let confirmedEffort: string | undefined = config.reasoningEffort === "off" ? undefined : config.reasoningEffort;
+      let compatibilityConfirmed = false;
+      let configurationShown = false;
+      let promptCount = 0;
+      let defaultEffortPromise: Promise<string | undefined> | undefined;
       await storage?.validateNativeDirectory?.();
       const previous = await storage?.readLatest();
       if (previous && (previous.runtime !== "codex" || previous.roleId !== role.id)) throw new Error("Codex native session record role/runtime mismatch");
@@ -387,6 +392,8 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
       const workRoot = await mkdtemp(path.join(os.tmpdir(), "ans-codex-"));
       const cwd = path.join(workRoot, "work");
       const nativeHome = storage?.nativeDirectory ?? path.join(workRoot, "native");
+      let activeReasoningCatalog: TemporaryReasoningCatalog | undefined;
+      let restoreOriginalCatalog = false;
       let engine: CodexRpcConnection | undefined;
       let server: McpServer | undefined;
       let client: McpClient | undefined;
@@ -459,11 +466,11 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
         const providerDefinition = `model_providers.${provider}={name="ANS Codex",base_url=${JSON.stringify(config.baseUrl)},env_key="CODEX_API_KEY",wire_api="responses",requires_openai_auth=false}`;
         const environment = { PATH: environmentSnapshot.PATH ?? path.dirname(process.execPath), CODEX_HOME: nativeHome, CODEX_API_KEY: config.key };
         const engineFactory = options.engineFactory ?? ((input: CodexEngineInput) => nativeEngine(input, options.cliPath));
-        const connect = async (disabled: readonly string[], injectReasoning = true) => {
+        const connect = async (disabled: readonly string[], injectReasoning = true, reasoningCatalog?: TemporaryReasoningCatalog) => {
           // G-4 V2：白名单定义＋禁用集编入**同一条** `-c mcp_servers={…}`（P0 探针铁律：连续 -c 同根键覆盖不合并）。
           // G-5：`model_reasoning_effort` 为顶层标量键、独立一条（探针实证叠加无冲突）；去参数重发＝该条缺席。
           const reasoningOverride = injectReasoning ? reasoningEffortOverride(config.reasoningEffort) : undefined;
-          const connected = await engineFactory({ cwd, nativeHome, env: environment, configOverrides: [...safetyOverrides(cwd, disabled, config.webSearch, installedServers), ...(reasoningOverride !== undefined ? [reasoningOverride] : []), providerDefinition, `model_provider=${JSON.stringify(provider)}`], timeoutMs: options.constructTimeoutMs ?? 30000 });
+          const connected = await engineFactory({ cwd, nativeHome, env: environment, configOverrides: [...safetyOverrides(cwd, disabled, config.webSearch, installedServers), ...(reasoningOverride !== undefined ? [reasoningOverride] : []), ...(reasoningCatalog ? [`model_catalog_json=${JSON.stringify(reasoningCatalog.path)}`] : []), providerDefinition, `model_provider=${JSON.stringify(provider)}`], timeoutMs: options.constructTimeoutMs ?? 30000 });
           // Preflight has no model, thread, MCP connections, or native approval handlers.
           try {
             await connected.request("initialize", { clientInfo: { name: "ans_codex_adapter", version: "2.0.0" }, capabilities: { experimentalApi: true, explicitGatewayOauth: true } });
@@ -615,8 +622,9 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
             }
             if (params.threadId !== nativeId) return;
             const notifyId = method === "turn/completed" ? object(params.turn, "completed native turn").id : params.turnId;
-            void turn.ready.promise.then(expected => {
-              if (typeof notifyId !== "string" || notifyId !== expected || active !== turn || turn.completed) return;
+            const ready = turn.ready;
+            void ready.promise.then(expected => {
+              if (ready !== turn.ready || typeof notifyId !== "string" || notifyId !== expected || active !== turn || turn.completed) return;
               if (method === "item/completed") {
                 const item = object(params.item, "native item");
                 if (item.type === "agentMessage") { turn.outputSeen = true; emit(turn, "message", String(item.text ?? ""), { text: item.text }); }
@@ -673,21 +681,24 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
               } else if (method === "item/started") {
                 // G-5：reasoning item 的真实起点（durationMs 信号面）；其余 item/started 不映射（沿既有先例）。
                 const item = object(params.item, "native item");
+                if (["mcpToolCall", "webSearch", "dynamicToolCall", "agentMessage", "commandExecution", "fileChange"].includes(String(item.type))) turn.outputSeen = true;
                 if (item.type === "reasoning") {
                   turn.outputSeen = true;
                   if (typeof item.id === "string" && typeof params.startedAtMs === "number" && Number.isFinite(params.startedAtMs)) turn.reasoningStarted.set(item.id, params.startedAtMs);
                 }
-              } else if (method === "item/reasoning/summaryPartAdded" || method === "item/reasoning/summaryTextDelta" || method === "item/reasoning/textDelta") {
+              } else if (method === "item/reasoning/summaryPartAdded" || method === "item/reasoning/summaryTextDelta" || method === "item/reasoning/textDelta" || method === "item/agentMessage/delta") {
                 // G-5 增量帧＝消费（「已产出内容」证据——降级闸依赖）但不产行：行由完成态 item 给（完成态先行）。
                 turn.outputSeen = true;
               } else if (method === "turn/completed") {
                 const completed = object(params.turn);
                 const outcome = turn.reason ?? (completed.status === "completed" ? "completed" : completed.status === "interrupted" ? "aborted" : "failed");
                 turn.reason = outcome;
-                if (completed.error) turn.failure = config.redact(object(completed.error).message ?? "Codex turn failed");
+                if (completed.error) { turn.failureFacts = completed.error; turn.failure = config.redact(object(completed.error).message ?? "Codex turn failed"); }
+                turn.terminal.resolve();
                 turn.done.resolve(outcome);
               } else if (method === "error" && params.willRetry !== true) {
-                turn.reason = "failed"; turn.failure = config.redact(object(params.error ?? {}).message ?? "Codex turn failed"); turn.done.resolve("failed");
+                turn.reason = "failed"; turn.failureFacts = params.error;
+                turn.failure = config.redact(object(params.error ?? {}).message ?? "Codex turn failed"); turn.done.resolve("failed");
               }
             }).catch(error => { turn.failure = config.redact(error); turn.reason = "failed"; turn.done.resolve("failed"); });
           });
@@ -714,20 +725,24 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
         await establishThread(engine, previous?.nativeSessionId);
         subscribeNotifications(engine);
         await inspectCatalog(engine);
-        // G-5：Codex 无「off」档——显式「关」不注入任何参数（`reasoningEffortOverride` 对 off 返回 undefined）
-        // 并如实一行说明（不假装关闭；会话级恰一次，在构造期）。
-        if (config.reasoningEffort === "off") {
-          emit(undefined, "message", "Codex 平台无「关」档：未注入推理强度参数（维持平台默认，推理未关闭）", { version: 1, source: "reasoning-effort", reason: "off-unsupported" });
-        }
         const session: RoleSession = {
-          runtime: "codex", roleId: role.id, contextSource, nativeSessionId: nativeId,
+          runtime: "codex", roleId: role.id, get contextSource() { return contextSource; }, get nativeSessionId() { return nativeId; },
           ...(contextWarning ? { contextWarning } : {}),
           async prompt(text, promptOptions) {
             if (disposed || quarantined) throw new Error("Codex session is disposed or quarantined; create a new session");
             if (active) throw new Error("Codex session already has an active turn");
-            const turn: TurnState = { ansId: options.currentTurnId() ?? randomUUID(), controller: new AbortController(), ready: deferred<string>(), done: deferred<RuntimeTurnOutcome>(), completed: false, calls: new Set(), searchCalls: 0, outputSeen: false, reasoningStarted: new Map() };
+            const turn: TurnState = { ansId: options.currentTurnId() ?? randomUUID(), controller: new AbortController(), ready: deferred<string>(), done: deferred<RuntimeTurnOutcome>(), terminal: deferred<void>(), completed: false, calls: new Set(), searchCalls: 0, outputSeen: false, reasoningStarted: new Map() };
             // Abort can resolve ready before turn/start so early tool requests fail closed.
             active = turn;
+            promptCount += 1;
+            if (!configurationShown) {
+              configurationShown = true;
+              const summary = config.reasoningEffort === "off"
+                ? "Codex 未覆盖思考等级：不表示关闭推理，实际推理强度未验证。"
+                : config.reasoningEffort === undefined ? "本会话未覆盖 Codex 思考等级；服务端实际推理强度未验证。"
+                  : `本会话向 Codex SDK 请求的思考等级：${config.reasoningEffort}；服务端实际采纳未验证。`;
+              emit(turn, "message", summary, { source: "system", reasonCode: "reasoning-configuration", state: "configured" });
+            }
             // 整轮**最后兜底**（唯一自动整轮上限；缺省 1 小时）：`promptTimeoutMs` 只看护到点检查，绝不在这里 abort。
             // 计时沿 InteractionGate 可暂停＝按有效运行时间计（确认卡等待不触发兜底）。文案与「到点检查」明确区分；
             // outcome 仍走既有 `timed_out` 枚举（契约不变），诊断由 failure 文本承载。
@@ -738,6 +753,10 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
               void stop(turn, "timed_out").catch(error => { turn.failure = config.redact(error); });
             });
             try {
+              // A failed/cancelled E1 attempt changed process-level model metadata. Restore the
+              // original catalog before the next request; an effort scalar alone is insufficient.
+              if (restoreOriginalCatalog) await reconnectNative(turn, true);
+              if (turn.controller.signal.aborted) return;
               await storage?.validateNativeDirectory?.();
               const input: Record<string, unknown>[] = [{ type: "text", text, text_elements: [] }];
               for (const [index, image] of (promptOptions?.images ?? []).entries()) {
@@ -749,27 +768,53 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
                 input.push({ type: "localImage", path: imagePath });
               }
               if (turn.controller.signal.aborted) return;
-              const started = object(await engine!.request("turn/start", { threadId: nativeId, input, approvalPolicy: "never", approvalsReviewer: "user", sandboxPolicy: { type: "readOnly", networkAccess: false }, model: config.model }), "turn/start");
-              const id = object(started.turn, "native turn").id;
-              if (typeof id !== "string" || !id) throw new Error("Codex native turn has no ID");
-              turn.nativeId = id; turn.ready.resolve(id);
-              if (turn.controller.signal.aborted) await stop(turn, turn.reason ?? "aborted");
+              let attemptedEffort = confirmedEffort;
+              await startNativeTurn(turn, input, attemptedEffort);
               let outcome = await turn.done.promise;
-              // G-5 降级链闸（保守＋有界恰一次）：首请求即失败（产出任何内容前）＋本会话曾注入推理强度＋
-              // 错误命中推理参数拒绝判据 ⇒ 恰一次去参数重发（degradeReasoning 内部重建引擎/线程并以同一输入重发）。
-              if (outcome === "failed" && !reasoningDegraded && reasoningInjected && !turn.outputSeen && !turn.controller.signal.aborted
-                  && isReasoningParamRejection(turn.failure)) {
-                await degradeReasoning(turn, input);
+              const attempted = new Set<string | undefined>([attemptedEffort]);
+              let compatibilityAttempted = false;
+              while (outcome === "failed" && !compatibilityConfirmed && attemptedEffort !== undefined
+                  && !turn.outputSeen && !turn.controller.signal.aborted && attempted.size <= 2) {
+                const rejection = reasoningRejection(turn.failureFacts ?? turn.failure);
+                if (!rejection) break;
+                let candidate: string | undefined;
+                if (rejection === "value") candidate = await catalogDefaultEffort();
+                if (candidate === undefined || attempted.has(candidate)) {
+                  candidate = undefined;
+                  if (attempted.has(undefined)) break;
+                  if (!storage && promptCount > 1) {
+                    emit(turn, "message", "本会话无法在保留已有历史的同时重建默认请求；未重放当前任务。", { source: "system", reasonCode: "reasoning-compatibility", state: "unavailable" });
+                    break;
+                  }
+                }
+                // An error notification may precede the terminal turn notification. Never start
+                // a second turn while the rejected native turn is still running.
+                await bounded(turn.terminal.promise, options.constructTimeoutMs ?? 30000, "rejected native turn completion");
+                if (turn.controller.signal.aborted || turn.outputSeen) break;
+                attempted.add(candidate);
+                compatibilityAttempted = true;
+                emit(turn, "message", "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。", { source: "system", reasonCode: "reasoning-compatibility", state: "trying" });
+                if (candidate === undefined) await reconnectNative(turn, false, true);
+                if (turn.controller.signal.aborted) break;
+                attemptedEffort = candidate;
+                await startNativeTurn(turn, input, attemptedEffort, true);
                 outcome = await turn.done.promise;
               }
+              if (outcome === "completed" && !turn.controller.signal.aborted && compatibilityAttempted) {
+                confirmedEffort = attemptedEffort;
+                compatibilityConfirmed = true;
+                emit(turn, "message", "本会话已使用兼容请求完成，后续沿用该方式；已保存设置不变。", { source: "system", reasonCode: "reasoning-compatibility", state: "completed" });
+              }
+              if (turn.controller.signal.aborted) outcome = turn.reason ?? "aborted";
               if (outcome === "failed" || outcome === "timed_out") throw new Error(turn.failure ?? `Codex turn ${outcome}`);
             } catch (error) {
               turn.reason ??= "failed";
-              turn.failure ??= config.redact(error);
+              turn.failure = config.redact(error);
               turn.controller.abort();
               turn.ready.resolve("");
               if (turn.reason !== "aborted") throw new Error(turn.failure);
             } finally {
+              if (activeReasoningCatalog && !compatibilityConfirmed) restoreOriginalCatalog = true;
               stopTimer(); turn.completed = true; turn.controller.abort(); turn.ready.resolve("");
               emit(turn, "settled", `Codex turn ${turn.reason ?? "completed"}`, { outcome: turn.reason ?? "completed", ...(turn.failure ? { error: turn.failure } : {}), ...(turn.searchCalls ? { searchCalls: turn.searchCalls } : {}) });
               if (active === turn) active = undefined;
@@ -807,36 +852,91 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
           })();
           return turn.stopping;
         }
-        // G-5 降级链核心（有界恰一次；会话级）：网关因推理参数拒绝首请求 ⇒ 去掉该参数、其余覆盖逐字不变
-        // （连进程重建——0.162.1 探针：thread config 置 null/空被拒、轮级 effort=null 不生效，无轻量取消路径）、
-        // 重建线程（有 storage 先试续接当前线程，失败或非持久会话走新线程）并以同一输入重发；成功后本轮继续。
-        // 中途中止：清 nativeId 转既有 early-abort 语义（quarantine——沿既有纪律，不拿死引擎发 interrupt）。
-        async function degradeReasoning(turn: TurnState, input: readonly Record<string, unknown>[]): Promise<void> {
-          reasoningDegraded = true; // 恰一次（会话级：此后本会话引擎不再携带该参数，也不会再次重发）
-          const resumableThreadId = storage ? nativeId : "";
+        // Model metadata is read only after a precise effort rejection, from this CLI instance
+        // (value-default selection or E1's field-removal candidate), never on the normal path.
+        // Exact model identity and a declared default are required; no alias or guessed default.
+        function catalogDefaultEffort(): Promise<string | undefined> {
+          return defaultEffortPromise ??= (async () => {
+            let cursor: string | undefined;
+            const seen = new Set<string>();
+            try {
+              do {
+                const page = object(await engine!.request("model/list", { includeHidden: true, limit: 100, ...(cursor ? { cursor } : {}) }), "model catalog");
+                if (!Array.isArray(page.data)) return undefined;
+                for (const value of page.data) {
+                  const model = object(value, "catalog model");
+                  if (model.model !== config.model) continue;
+                  const effort = model.defaultReasoningEffort;
+                  return typeof effort === "string" && /^[a-z]{1,16}$/.test(effort)
+                    && Array.isArray(model.supportedReasoningEfforts)
+                    && model.supportedReasoningEfforts.some(option => object(option).reasoningEffort === effort) ? effort : undefined;
+                }
+                cursor = typeof page.nextCursor === "string" && page.nextCursor ? page.nextCursor : undefined;
+                if (cursor && seen.has(cursor)) return undefined;
+                if (cursor) seen.add(cursor);
+              } while (cursor && seen.size < 10);
+            } catch { /* Missing/unavailable directory is not a guessed model capability. */ }
+            return undefined;
+          })();
+        }
+        async function startNativeTurn(turn: TurnState, input: readonly Record<string, unknown>[], effort: string | undefined, retry = false): Promise<void> {
+          turn.reason = undefined; turn.failure = undefined; turn.failureFacts = undefined;
           turn.nativeId = undefined;
-          emit(turn, "message", "本网关不支持所设推理强度，本轮已按默认执行", { version: 1, source: "reasoning-effort", reason: "gateway-rejected" });
-          try { diagnosticLog.record("reasoning.effort.degraded", { runtime: "codex", retried: true }); } catch { /* 诊断绝不改变执行 */ }
-          unsubscribe?.();
-          await engine!.close();
-          if (turn.controller.signal.aborted) return;
-          const reconnected = await connect(foreignServers, false);
-          engine = reconnected.connected;
-          engine.onServerRequest(nativeToolHandler);
-          subscribeNotifications(engine);
-          if (turn.controller.signal.aborted) return;
-          await establishThread(engine, resumableThreadId !== "" ? resumableThreadId : undefined);
-          await inspectCatalog(engine);
-          if (turn.controller.signal.aborted) return;
-          // 重臂轮状态并以同一输入重发（reason/failure 清空——首次失败不再算数；ready/done 重挂到重发轮）。
-          turn.reason = undefined; turn.failure = undefined;
-          turn.calls.clear(); turn.reasoningStarted.clear();
-          turn.ready = deferred<string>(); turn.done = deferred<RuntimeTurnOutcome>();
-          const restarted = object(await engine.request("turn/start", { threadId: nativeId, input, approvalPolicy: "never", approvalsReviewer: "user", sandboxPolicy: { type: "readOnly", networkAccess: false }, model: config.model }), "turn/start");
-          const retried = object(restarted.turn, "native turn").id;
-          if (typeof retried !== "string" || !retried) throw new Error("Codex native turn has no ID");
-          turn.nativeId = retried; turn.ready.resolve(retried);
+          // The first ready promise may already be captured by an early native tool request.
+          // Keep its identity until it resolves; only a completed/rejected attempt is rearmed.
+          if (retry) { turn.ready = deferred<string>(); turn.done = deferred<RuntimeTurnOutcome>(); turn.terminal = deferred<void>(); }
+          const started = object(await engine!.request("turn/start", { threadId: nativeId, input, approvalPolicy: "never", approvalsReviewer: "user", sandboxPolicy: { type: "readOnly", networkAccess: false }, model: config.model, ...(effort !== undefined ? { effort } : {}) }), "turn/start");
+          const id = object(started.turn, "native turn").id;
+          if (typeof id !== "string" || !id) throw new Error("Codex native turn has no ID");
+          turn.nativeId = id; turn.ready.resolve(id);
           if (turn.controller.signal.aborted) await stop(turn, turn.reason ?? "aborted");
+        }
+        async function reconnectNative(turn: TurnState, originalStrategy: boolean, effortRejected = false): Promise<void> {
+          const needsCatalog = !originalStrategy && effortRejected && !options.cliPath && await catalogDefaultEffort() !== undefined;
+          if (turn.controller.signal.aborted) return;
+          const resumableThreadId = storage ? nativeId : undefined;
+          const previousCatalog = activeReasoningCatalog;
+          let replacement: TemporaryReasoningCatalog | undefined;
+          turn.nativeId = undefined;
+          nativeId = "";
+          unsubscribe?.();
+          try {
+            await engine!.close();
+            if (turn.controller.signal.aborted) return;
+            // This replaces the existing absent-effort candidate; it is not a third retry.
+            // Custom CLI paths are not asserted to share the installed package's metadata format.
+            if (needsCatalog) {
+              replacement = await prepareReasoningCatalog(workRoot, config.model);
+            }
+            if (turn.controller.signal.aborted) {
+              if (replacement) await rm(replacement.directory, { recursive: true, force: true });
+              return;
+            }
+            const reconnected = await connect(foreignServers, originalStrategy, replacement);
+            engine = reconnected.connected;
+            activeReasoningCatalog = replacement;
+            engine.onServerRequest(nativeToolHandler);
+            subscribeNotifications(engine);
+            if (turn.controller.signal.aborted) {
+              quarantined = true;
+              await engine.close();
+              if (replacement) await rm(replacement.directory, { recursive: true, force: true });
+              activeReasoningCatalog = undefined;
+              return;
+            }
+            await establishThread(engine, resumableThreadId);
+            await inspectCatalog(engine);
+            if (previousCatalog) await rm(previousCatalog.directory, { recursive: true, force: true });
+            restoreOriginalCatalog = false;
+          } catch (error) {
+            // No next turn may reuse an engine whose reconstruction was not confirmed.
+            quarantined = true;
+            await engine?.close().catch(() => {});
+            if (replacement) await rm(replacement.directory, { recursive: true, force: true });
+            if (previousCatalog) await rm(previousCatalog.directory, { recursive: true, force: true });
+            activeReasoningCatalog = undefined;
+            throw error;
+          }
         }
         return session;
       } catch (error) {

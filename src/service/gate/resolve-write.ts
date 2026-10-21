@@ -1,7 +1,7 @@
 // Service：写入路径判定（本版心脏）
 // 冻结契约 §3：resolveWrite(targetPath, boundary, scope, ctx): WriteDecision
 // 覆盖：F6 未接受、F5 条件目录（固定 slug）、F4 任务收窄、跨根混淆、规范化、F7 符号链接逃逸、F10 按根分组。
-// 判定顺序：F6 接受门 → 根归属与 F7 逃逸 → 匹配条目（含条件 slug）→ F4 writeSet 收窄（仅当给了 scope）。
+// 判定顺序：F6 接受门 → 根归属与 F7 逃逸 → 输入/真实路径分别匹配条目（含条件 slug）与 F4 writeSet。
 //
 // 关于 scope 可选（客户端裁决）：scope === undefined 表示 chat / standalone 这类"没有预先存在的任务"的
 // 会话——任务是在对话里产生的，不该要求先声明范围。此时不做任务收窄，授权上界 = 角色边界本身。
@@ -180,7 +180,8 @@ export function resolveWrite(
   const rootAbs = root === "skill" ? skillRootAbs : projectRootAbs;
   const realRoot = realResolve(rootAbs);
   const realTarget = realResolve(absCandidate);
-  if (absRel(realTarget, realRoot) === null) {
+  const realRel = absRel(realTarget, realRoot);
+  if (realRel === null) {
     return deny(
       `目标路径经真实路径解析（符号链接/junction）逃逸出 ${root} 根之外（F7）：${realTarget}`,
       boundary,
@@ -188,6 +189,29 @@ export function resolveWrite(
     );
   }
 
+  const lexical = resolveRelativeWrite(rel, root, boundary, scope, projectRootAbs, skillRootAbs);
+  if (!lexical.allowed || compareKey(rel) === compareKey(realRel)) return lexical;
+
+  // D3：根内链接也不得扩大角色边界或任务写集。边界条目仍按原路径解释，不能跟随链接扩权。
+  const actual = resolveRelativeWrite(realRel, root, boundary, scope, projectRootAbs, skillRootAbs);
+  if (!actual.allowed) {
+    return {
+      ...actual,
+      reason: `输入路径 ${rel} 的真实目标 ${realRel} 未获授权（根：${root}）：${actual.reason}`,
+    };
+  }
+  return lexical;
+}
+
+/** 同一根内的授权规则：词法路径与真实路径共用，避免条件/任务收窄语义分叉。 */
+function resolveRelativeWrite(
+  rel: string,
+  root: Root,
+  boundary: BoundarySection1,
+  scope: TaskScope | undefined,
+  projectRootAbs: string,
+  skillRootAbs: string,
+): WriteDecision {
   const sameRoot = boundary.entries.filter((e) => e.root === root);
   // 被条件激活且路径覆盖的条目
   const active = sameRoot.filter((e) => pathCovers(e, rel) && isActive(e, scope));

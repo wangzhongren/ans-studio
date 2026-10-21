@@ -1,0 +1,131 @@
+{
+  "ok": true,
+  "state": {
+    "w": 960,
+    "scene": "role",
+    "settings": "error"
+  },
+  "tokens": {
+    "--background": "#14171A",
+    "--foreground": "#F2F4F6",
+    "--card": "#1E2328",
+    "--primary": "#6FA08B",
+    "--primary-foreground": "#14171A",
+    "--input": "#6B757E",
+    "--ring": "#6FA08B",
+    "--warning": "#C4A15F",
+    "--warning-bg": "#24211A",
+    "--danger": "#C97A6D",
+    "--drawer-surface": "#171B1F",
+    "--text-2": "#A7ADB5",
+    "--text-3": "#949BA4",
+    "--border": "#2C3238",
+    "--border-strong": "#3A4148",
+    "--success": "#6FA08B",
+    "--radius": "8px",
+    "--radius-control": "6px",
+    "--radius-micro": "4px",
+    "--font-mono": "ui-monospace,\"Cascadia Mono\",\"Cascadia Code\",\"SF Mono\",Consolas,\"Liberation Mono\",\"Microsoft YaHei\",monospace",
+    "--drawer-w": "424px"
+  },
+  "contrast": [
+    {
+      "pair": "foreground/background",
+      "ratio": 16.32,
+      "min": 7,
+      "pass": true
+    },
+    {
+      "pair": "text-2/background",
+      "ratio": 7.96,
+      "min": 4.5,
+      "pass": true
+    },
+    {
+      "pair": "warning/warning-bg",
+      "ratio": 6.59,
+      "min": 4.5,
+      "pass": true
+    },
+    {
+      "pair": "input/card",
+      "ratio": 3.37,
+      "min": 3,
+      "pass": true
+    },
+    {
+      "pair": "ring/card",
+      "ratio": 5.34,
+      "min": 3,
+      "pass": true
+    }
+  ],
+  "geometry": {
+    "window": {
+      "x": 0,
+      "y": 0,
+      "w": 960,
+      "h": 620
+    },
+    "titlebarH": 36,
+    "sessionHeadH": 64,
+    "drawer": {
+      "x": 536,
+      "y": 36,
+      "w": 424,
+      "h": 584
+    },
+    "drawerHead": 64,
+    "settingsTabs": 34,
+    "settingsTabH": 32,
+    "inputH": 32,
+    "saveFooter": 64,
+    "pageScrollW": 960,
+    "pageClientW": 960,
+    "overflowX": false,
+    "settingsMissing": true
+  },
+  "work": {
+    "pending": 1,
+    "qRows": 3,
+    "withdraw": 1,
+    "report": 1
+  },
+  "queue": {
+    "rows": 3,
+    "withdrawH": 28,
+    "withdrawBorder": "rgb(107, 117, 126)"
+  },
+  "role": {
+    "head": true,
+    "collapsibles": 4,
+    "docButton": true
+  },
+  "scenes": {
+    "settings": {
+      "title": "引擎设置"
+    },
+    "work": {
+      "title": "产品 · 工作概览"
+    },
+    "role": {
+      "title": "产品 · 角色资料"
+    },
+    "queue": {
+      "title": "产品 · 队列"
+    },
+    "settingsSaved": {
+      "alertHidden": true,
+      "status": "已保存到 .env（改动键：ANS_PI",
+      "tokenPlaceholder": "已设置，留空则不修改"
+    },
+    "settingsError": {
+      "alertHidden": true,
+      "status": "保存失败：.env 只读，无法写入。请检"
+    }
+  },
+  "notes": [
+    "静态原型自检；不是真实 Electron/真实 IPC/屏读验收。",
+    "图标为内联 SVG 示意；生产用 Lucide。动效为 CSS 示意；生产由 Motion 实现。"
+  ]
+}

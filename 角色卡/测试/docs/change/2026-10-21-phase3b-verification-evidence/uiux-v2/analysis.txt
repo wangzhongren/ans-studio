@@ -1,0 +1,12 @@
+default: entries=10 booleans=9 pass=8 fail=1 failNames=["one independent work list without duplicated role documents"]
+judge: entries=33 booleans=33 pass=33 fail=0
+g2: entries=5 booleans=5 pass=5 fail=0
+terminal: entries=22 booleans=22 pass=22 fail=0
+toolfold: entries=19 booleans=17 pass=17 fail=0
+sendfacts: entries=9 booleans=8 pass=7 fail=1 failNames=["P7 old runtime rejected result cannot disable current runtime or overwrite draft"]
+queueview: entries=2 booleans=1 pass=0 fail=1 failNames=["queued baseline shows two"]
+toolfold-old: entries=15 booleans=13 pass=12 fail=1 failNames=["tail fold movement bounded and non accumulating with the reading row still in view"]
+
+C1 new: before=150 after=166 later=166 delta=16 afterEqLater=true
+C1 old: before=150 after=182 later=182 delta=32 afterEqLater=true
+C1 Phase 5 criterion new<=old(32): true; target<=20: true

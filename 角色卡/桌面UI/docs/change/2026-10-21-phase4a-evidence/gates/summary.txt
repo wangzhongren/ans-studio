@@ -1,0 +1,20 @@
+# Phase 4A 门禁（UIUX M1–M6 修正后重跑，2026-10-21，本机）
+# 类型/构建
+npm run typecheck:renderer => 0；npm run typecheck => 0；npm run build:renderer => 成功
+# CSP / gzip(level 9)
+严格 CSP（无 inline/unsafe）；HTML 390B + JS 246,420B + CSS 17,094B = 263,904B <= 300KiB
+# 测试
+test/桌面UI/*.test.ts => 67/67；test/桌面应用/*.test.ts => 679/679
+IME 新入口 => 24/24 true（0 false）+ E2E_DONE=1；延迟挂载 => 10/10
+4A 冒烟 => checks=99 failures=0；28 张截图（含队列子视图、撤回成功/失败 system 行、Tabs 键盘、保存条两行、资料状态-only、960 焦点/Esc/inert、200%）
+3B 冒烟回归 => 45/45
+# uiux-v2 新入口
+SELECTOR 26/26（27）；CONFIG 20/20（21）；ROLE_RETURN_FOCUS 9/9（11）；SEND_FACTS 8/8
+RUNTIME => 13/14（唯一 C2 `expired old shell shown disabled in its own runtime`，PM §十三 同因既有红，不阻塞 4A）
+默认段 4A 项全过，止于 Phase 5 `historical own-template failures direct`；VISUAL 止于 4B 报告卡项；TOOLFOLD 19/19
+# 相邻回归
+JUDGE 33/33；G2 5/5；TERMINAL 22/22（UIUX 修正后）
+# bench（旧/新交替 4 轮，首轮预热，2-4 中位）
+A/B maxGap 新 17.8/17.7（旧 18.8/17.7）；handler 0.4/0.7ms（旧 12.1/1.5）；replay 3.3ms（旧 21.3）；scroll 5.1ms（旧 14.7）；全部阈值通过；见 ../bench/summary.json
+# C1
+TOOLFOLD `fold anchor offsets`: before 150 -> after 166 -> later 166，Δ=16（≤32，目标≤20），不累积

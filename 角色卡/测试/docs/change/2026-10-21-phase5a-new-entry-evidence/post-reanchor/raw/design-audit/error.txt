@@ -1,0 +1,6 @@
+lastJs=(()=>{const g=document.querySelector('#chat .tool-records');return {open:g.open,summary:g.querySelector('summary').textContent,failureVisible:document.getElemen
+Error: Script failed to execute, this normally means an error was thrown. Check the renderer console for the error.
+    at node:electron/js2c/renderer_init:1:16535
+    at IpcRendererInternal.<anonymous> (node:electron/js2c/renderer_init:1:11407)
+    at IpcRendererInternal.emit (node:events:514:28)
+    at Object.onMessage (node:electron/js2c/renderer_init:1:10648)

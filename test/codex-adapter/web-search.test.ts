@@ -85,7 +85,7 @@ test("webSearch item becomes one message row (real 0.162.1 payload shape) and se
   engines.engine.webSearch({ id: "ws_probe_1", query: "controlled probe query", action: { type: "search", query: "controlled probe query", queries: null }, results: null });
   await tick();
   engines.engine.finish(); await turn.completion; await session.dispose(); await events.done;
-  const rows = events.entries.filter(event => event.kind === "message");
+  const rows = events.entries.filter(event => event.kind === "message" && (event.detail as { source?: string } | undefined)?.source === "web-search");
   assert.equal(rows.length, 1);
   assert.equal(rows[0].summary, "联网搜索：controlled probe query");
   assert.equal(rows[0].turnId, "ans-turn");
@@ -112,7 +112,7 @@ test("webSearch tolerance: missing or malformed fields keep the fallback row, ne
   engines.engine.finish(); await turn.completion;
   const next = await start(session, engines.engine, "next");
   engines.engine.finish(); await next.completion; await session.dispose(); await events.done;
-  const rows = events.entries.filter(event => event.kind === "message");
+  const rows = events.entries.filter(event => event.kind === "message" && (event.detail as { source?: string } | undefined)?.source === "web-search");
   assert.deepEqual(rows.map(row => row.summary), ["联网搜索", "联网搜索", "联网搜索：q2", "联网搜索：q3", "联网搜索：q4", "联网搜索：q5", "联网搜索：q6", "联网搜索：q7"]);
   const details = rows.map(row => row.detail as Record<string, unknown>);
   assert.deepEqual(details[0], { version: 1, source: "web-search", itemId: "ws_no_query" });
@@ -137,7 +137,7 @@ test("item/started webSearch is not mapped; settled without searches has no sear
   engines.engine.event("item/started", { type: "webSearch", id: "ws_started", query: "q" });
   await tick();
   engines.engine.finish(); await turn.completion; await session.dispose(); await events.done;
-  assert.equal(events.entries.filter(event => event.kind === "message").length, 0);
+  assert.equal(events.entries.filter(event => event.kind === "message" && (event.detail as { source?: string } | undefined)?.source === "web-search").length, 0);
   assert.deepEqual(events.entries.at(-1)!.detail, { outcome: "completed" });
 });
 
@@ -153,7 +153,7 @@ test("search text and result URLs stay redacted and conservatively stripped in r
   assert.equal(serialized.includes("fake-codex-key"), false);
   assert.equal(serialized.includes("q=private-topic"), false);
   assert.equal(serialized.includes("id=42"), false);
-  const row = events.entries.find(event => event.kind === "message")!;
+  const row = events.entries.find(event => event.kind === "message" && (event.detail as { source?: string } | undefined)?.source === "web-search")!;
   // config.redact strips the query string but keeps the path: https://example.test/search?… -> https://example.test/search
   assert.equal(row.summary, "联网搜索：token [REDACTED] https://example.test/search");
   assert.equal((row.detail as { query: string }).query, "token [REDACTED] https://example.test/search");

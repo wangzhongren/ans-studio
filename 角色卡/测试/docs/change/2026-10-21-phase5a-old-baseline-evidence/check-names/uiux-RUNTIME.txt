@@ -1,0 +1,16 @@
+runtime groups lead first and unknown metadata escaped=true
+new engine no Pi history queue confirmation or draft=true
+old engine envelopes cache only and stale project ignored=true
+actual Codex call/result target correlation and completion=true
+Codex secret fallback and optional official Responses settings=true
+failed save keeps draft and honest error=true
+saved secret cleared and busy apply timing truthful=true
+runtime settings geometry 1360=true
+runtime settings geometry 960=true
+Claude required key and optional SDK model endpoint=true
+failed outcome remains error=true
+failed native restore honest rebuilding notice=true
+foreign runtime shell caches without showing in current engine=true
+Pi own history background queue draft and expired card restored=true
+expired old shell collapses with reason visible in its own runtime=false
+expired old shell collapses with reason visible in its own runtime observed={"chat": "Pi专属历史\nPi旧轮确认确认不同意请求已失效，未获同意。原因：原轮次已中止后台Pi消息\n【队列】1 条待办：Pi后台队列——等它完成当前任务后依次处理。正在工作", "assistant": ["Pi专属历史\n", "后台Pi消息\n"], "denied": [], "model": {"count": 3, "lastIndex": 2, "operators": [{"index": 1, "requestId": "pi-old-confirm"}], "rowGap": 16}}

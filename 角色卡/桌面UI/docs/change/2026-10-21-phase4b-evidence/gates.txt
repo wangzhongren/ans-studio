@@ -1,0 +1,60 @@
+Phase 4B gates — 2026-10-21 (repo root; after UIUX revision-2 rework)
+
+npm run typecheck                     -> exit 0
+npm run typecheck:renderer            -> exit 0
+npm run build:renderer                -> success; dist/src/index.html + assets
+CSP scan (dist/src/index.html)        -> meta default-src 'none'; script-src 'self'; no unsafe-*; no inline <script>
+gzip9 entry assets                    -> JS 265,774B + CSS 19,040B = 284,814B <= 300KiB
+node --test "test/桌面UI/*.test.ts"   -> 96 tests / 96 pass / 0 fail
+node --test test/桌面应用/*.test.ts    -> 679 tests / 679 pass / 0 fail
+ime-enter.mjs (new entry)             -> 26 true / 0 false / E2E_DONE=1 (24-check baseline maintained)
+phase3a-lazy-toolgroup-check.mjs      -> 10/10, LAZY_TOOLGROUP_DONE=1
+phase4b-electron-smoke.mjs            -> PHASE4B_SMOKE PASS 70 checks / 0 failures
+  includes: C2 collapse+reason; decided-card full-rebuild anchor minimal repro;
+  960/200% five-role tree non-overlap + tree clientHeight>0 + first/last role reachable on screen;
+  200% per-container overflow (#chat/.chat-head/.head-inner/#right-body/.runtime-config-notice/
+  .governance-status/#role-tree/.col-mid/.session-notice/.composer); config notice full text
+  (msgSH<=msgCH) + settings button bottom inside first screen; header wrap;
+  200% report card visible + full-summary details open with internal width checks;
+  200% governance preview visible + internal width checks + cancel focus return;
+  report facts label/value separation at 1360/960 + 960 facts inside chat viewport.
+uiux-v2 RUNTIME                       -> RUNTIME_UI_PASS 17 (C2 re-anchored check pass)
+uiux-v2 QUEUE_VIEW                    -> QUEUE_VIEW_UI_PASS 4
+uiux-v2 MIRROR                        -> MIRROR_UI_PASS 8
+uiux-v2 GOVERNANCE_REACCEPT           -> GOVERNANCE_REACCEPT_UI_PASS 7 reports
+uiux-v2 JUDGE                         -> JUDGE_UI_PASS 33
+uiux-v2 G2_RECOVERY                   -> G2_RECOVERY_UI_PASS 5
+uiux-v2 SELECTOR                      -> SELECTOR_UI_PASS 27
+uiux-v2 CONFIG                        -> CONFIG_UI_PASS 21
+uiux-v2 ROLE_RETURN_FOCUS             -> ROLE_FOCUS_PASS 11
+uiux-v2 SEND_FACTS                    -> SEND_FACTS_PASS 8
+uiux-v2 TERMINAL                      -> TERMINAL_PASS 22
+uiux-v2 TOOLFOLD                      -> TOOLFOLD_UI_PASS 19; C1 delta = 16px
+uiux-v2 FRESH_CONTEXT                 -> FRESH_CONTEXT_PASS 4
+uiux-v2 VISUAL                        -> VISUAL_V2_PASS 54 (full segment green)
+uiux-v2 DELIVERY_NOTE                 -> 7 checks pass (4B delivery-note/tool-history items), then stops at
+                                         Phase 5 "builtin identity stays data and accessible without duplicate third visible line" (Sidebar, not 4B write set)
+uiux-v2 COMPLETE_FLOW (official)      -> stops at Phase 5 "P7 choice pending separated from empty queue";
+                                         official 4B C/P3 subset reached 5/12
+uiux-v2 COMPLETE_FLOW (read-only supplement)
+                                       -> skips only the two P7 Phase-5 checks; all 12 4B C/P3 names pass;
+                                          behavior verified but not reached in the official segment
+uiux-v2 default (official)            -> 4B-preceding checks pass (historical own-template fixed), stops at
+                                         Phase 5 "full replay preserves content identity" (virtual-window reading anchor)
+uiux-v2 default (read-only supplement) -> skips only Phase-5 virtual-window reading/toggle anchors;
+                                          100 checks PASS including "denied conclusion anchor and decided card retained"
+                                          and the B1/B2/B3 default 4B items; behavior verified but not reached officially
+bench-storm (same machine/day, old/new alternating 3 rounds):
+  stormA.maxGap new 17.8/17.6/17.9 median 17.8 vs old 25.5 (threshold 25.5) pass
+  stormB.maxGap new 19.5/17.6/17.6 median 17.6 vs old 17.7 (threshold 25) pass
+  stormA_handler.maxMs median 0.5 vs old 11.1 pass
+  stormB_handler.maxBatchMs median 0.5 vs old 1.1 pass
+  replay.replayMs median 11.0 vs old 20.6 pass
+  scrollToBottom.ms median 2.3 vs old 12.7 pass
+  p95 <= 19.5ms; single max <= 19.5ms (<=35 / <=50 guards)
+screenshots (evidence/smoke): phase4b-1360.png, phase4b-960.png, phase4b-960-five-role-tree.png,
+  phase4b-1360-report.png, phase4b-960-report.png, phase4b-200pct.png,
+  phase4b-200pct-five-role-tree.png, phase4b-200pct-report.png,
+  phase4b-200pct-report-details.png, phase4b-200pct-governance-preview.png
+old renderer / app/main.ts / app/preload.cjs / app/desktop -> zero diff
+new dependencies: none; new DOM exceptions: none

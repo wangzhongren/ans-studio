@@ -1,0 +1,627 @@
+diff --git a/README.md b/README.md
+index 39f5c0a..acfc1b3 100644
+--- a/README.md
++++ b/README.md
+@@ -63,9 +63,9 @@ v1.4.0 要点：流程文件方法化（`flow_get` / `flow_step_update` / `flow_
+ ## 第一次使用
+ 
+ 1. **导入项目并选择引擎。** 点击左下角「导入项目」。导入前引擎选择不可用；也可以选择一个空文件夹，按默认的五角色开始。在会话顶部选择引擎：默认 Claude，也可切换 Pi、Codex。缺少配置时，点击提示中的「打开设置」按钮；日后也可从左下角「设置」进入。保存成功只表示配置已保存，连接是否可用仍需实际请求验证。
+-2. **与 Lead 说明需求。** Lead 是默认主入口，负责确认目标、范围与验收标准，并把客户意图写入 `docs/intents/`。写完意图后，Lead 会弹出**需求确认卡**（`confirm` / `revise`）；只有你确认后，意图才会交给 Draft。
+-3. **确认提案与任命。** Draft 依据意图形成提案，提案卡提供 `accept` / `accept-quick` / `revise` / `reject`。接受后，Steward 写流程单，Crew 提名项目角色并弹出任命卡；任命后 Crew 再经写盘确认卡逐路径写角色卡与边界。
+-4. **实施、回交与验收。** 项目角色按各自边界实施、测试并回交；Steward 处理流程与派发。Proof 独立核对交付与回交证据，出验收卡（`accept` / `reject`），由你决定是否验收。
++2. **与 Lead 说明需求。** Lead 是默认主入口，负责确认目标、范围与验收标准，并把客户意图写入 `docs/intents/`。写完意图后，Lead 会发起**需求确认**（`confirm` / `revise`）。开启「替我决策」且适用自动判断时，判断 agent 可代选 `confirm`，不能代选 `revise`；其余情况由你回答需求确认卡。确认通过后，意图才会交给 Draft。
++3. **确认提案与任命。** Draft 依据意图形成提案，提案卡提供 `accept` / `accept-quick` / `revise` / `reject`。接受后，Steward 写流程单，Crew 提名项目角色并发起任命确认；任命后 Crew 再经写盘确认逐路径写角色卡与边界。提案、任命和写盘确认按下文的代批开关处理。
++4. **实施、回交与验收。** 项目角色按各自边界实施、测试并回交；Steward 处理流程与派发。Proof 独立核对交付与回交证据，出验收卡（`accept` / `reject`）。开启「替我决策」且适用自动判断时，判断 agent 可代为接受；其余情况由你决定是否验收。
+ 5. **验收通过即结束。** 没有看护的「收束」提示。内部角色的反馈由 Lead 汇总后告知你，不直接转述原文。
+ 
+ 正式任务由 Steward 派发到项目角色，忙碌时进入队列；普通聊天不会自动产生「未报告」回交。「工作概览」可查看待确认项、排队消息与最近回交。输入区使用 **Enter 发送，Shift + Enter 换行**；忙碌时可停止本轮或撤回尚未执行的排队消息，角色和引擎各自保留草稿。详情抽屉支持 Esc 关闭并回到原入口。
+@@ -90,9 +90,9 @@ Codex 与 Claude 使用 API key，不使用订阅或 OAuth 登录回退。更多
+ - **主理 Lead 是工作流管理者。** Lead 可用 `flow_get` / `flow_step_update` / `flow_step_supersede` 推进或返工流程，也可用 `dispatch_task` 向 Steward 与项目角色派发协调任务。协调与推进不等于客户批准：客户决定仍走判断 agent / 客户卡，Lead 仍不拥有最终批准权。
+ - **治理写入门禁。** 角色卡/`boundary.yaml`、提案、流程、验收与写盘等在写入前有预览或确认卡；越界写入在产生副作用前被拒绝，并指回正确归属：提案→Draft / 提案，角色卡与提名→Crew / 组队，流程→Steward / 统筹，验收→Proof / 验收，应用治理记录→应用。
+ - **所有角色都具备 shell 能力。** 五个治理角色与项目角色一样可执行读写与任意 shell 命令，全部走既有审批流程：只读白名单直接执行；risky/review/deny 逐条由客户或判断 agent 审批；拒绝、超时、通道不可用一律不放行。shell 的副作用不受文件写入门禁约束，审批链是唯一控制；文件写入仍优先 `write_file` 并经写盘确认。shell 裁决审计仍落 `docs/audit/shell-gate.jsonl`。
+-- **需求确认卡是客户专属。** 桌面「替我审批」只代批 shell 命令与写盘/写卡确认；「替我决策」只代批提案接受、任命与验收。需求确认卡不代批。代批会标明「judge 代批」，不冒充你本人点击，也不改变任何门槛；证据不足、读取被拒或判断失败时回落手动确认。
++- **按开关代审批与代决策。** 桌面「替我审批」处理 shell 命令与写盘/写卡确认；「替我决策」处理需求确认、提案接受、任命与验收。需求确认仅可代选 `confirm`，不能代选 `revise`。成功代批会标明「judge 代批」，不冒充你本人点击。对适用自动判断且开关开启的请求，证据不足、读取失败、判断不可用、超时或解析失败都按未通过处理：shell 不执行，写入与决策请求退回发起角色修正，不因此自动弹出手动卡。开关关闭、未接入自动判断或不适用的请求仍走原手动路径；治理判断期间关闭开关，原卡可恢复；轮次中止按取消处理。
+ - **两类判断 agent 各审各的。** 「替我审批」的 shell 判断 agent 只审系统风险——卡死、越界、破坏、资源、敏感外发，不判断业务必要性；项目内非破坏性命令由发起角色自行决定。「替我决策」的决策判断 agent 只审意图漂移——目标、范围、非目标、验收标准与客户已接受的决定，不重复审工程质量、架构与测试；这些由 Proof 在验收阶段核对。
+-- **判断 agent 只读。** 它只读项目内允许的文本：`.ans/project.json` 与 `.ans/governance/ledger.jsonl` 只读开放，`.ans/sessions/**` 及其他敏感内容仍被拒绝，并给出具体路径与原因。它不写文件、不执行命令、不派发任务。读取预算仍 fail-closed（硬上限可经环境变量调整）；预算不足、证据不足、风险不明或意图缺失时一律转手动确认，不猜测。
++- **判断 agent 只读。** 它只读项目内允许的文本：`.ans/project.json` 与 `.ans/governance/ledger.jsonl` 只读开放，`.ans/sessions/**` 及其他敏感内容仍被拒绝，并给出具体路径与原因。它不写文件、不执行命令、不派发任务。读取预算仍 fail-closed（硬上限可经环境变量调整）；预算不足、证据不足、风险不明或意图缺失时不自动放行，按上述失败处置处理，不猜测。
+ - **派发与验收分开。** 派发任务不会增加目标角色的写权限。任务报告、历史保存、回交投递和接收方处理分别显示实际状态；报告声明「已完成」不等于独立验收通过。
+ 
+ 技术结构与跨角色接口见[项目架构](角色卡/项目管理/docs/architecture.md)。
+diff --git a/src/common/runtime-core/fs-write.ts b/src/common/runtime-core/fs-write.ts
+index 13c3353..4fd9f28 100644
+--- a/src/common/runtime-core/fs-write.ts
++++ b/src/common/runtime-core/fs-write.ts
+@@ -27,7 +27,7 @@ import { atomicWrite } from "../../common/shared/atomic-write.ts";
+ // 词法规范化与真实路径解析**整体搬迁**至 `src/common/shared/path-primitives.ts`（T23）；本层只读导入。
+ // 安全要害：`absRel`/`isWithinReal`/`realResolveAsync` 必须与门禁引擎**同一份**，否则「gate 认为在根内」
+ // 与「写入层认为在根内」可能漂移（设计 §6 风险 2–3）。
+-import { IS_WINDOWS, toPosix, absRel, isWithinReal, realResolveAsync } from "../../common/shared/path-primitives.ts";
++import { IS_WINDOWS, toPosix, absRel, compareKey, isWithinReal, realResolveAsync } from "../../common/shared/path-primitives.ts";
+ 
+ // —— 向后兼容再导出（供 `test/项目管理/shared/` 收敛窗口期的「两处旧实现同答案」用例；非第二份实现）——
+ // 旧名 `absRelLexical` 现直接指向共享 `absRel`；`isWithinReal` / `realResolveAsync` 同名转出。
+@@ -69,6 +69,18 @@ export interface GuardedTarget {
+   rel: string;
+   /** 目标父目录（词法绝对），供 mkdir 使用。 */
+   parentAbs: string;
++  /** 首次守卫解析出的真实父目录，写前复核不能偏离（并非无竞态的 OS 隔离）。 */
++  parentReal: string;
++}
++
++/** 只有不存在才是新文件；权限、非目录等状态读取错误必须交给调用方拒绝。 */
++async function existingTarget(abs: string) {
++  try {
++    return await lstat(abs);
++  } catch (err) {
++    if ((err as NodeJS.ErrnoException)?.code === "ENOENT") return null;
++    throw err;
++  }
+ }
+ 
+ /**
+@@ -100,12 +112,22 @@ export async function guardWriteTarget(
+   }
+ 
+   // 目标本身若已是符号链接/junction，拒绝——避免写到链接指向的别处或静默替换链接。
+-  const existing = await lstat(abs).catch(() => null);
++  let existing;
++  try {
++    existing = await existingTarget(abs);
++  } catch (err) {
++    let message = String(err);
++    if (err instanceof Error) message = err.message;
++    return { ok: false, reason: `无法读取目标状态：${abs}（${message}）` };
++  }
+   if (existing !== null && existing.isSymbolicLink()) {
+     return { ok: false, reason: `目标为符号链接，拒绝写入以免写到链接之外：${abs}` };
+   }
++  if (existing !== null && !existing.isFile()) {
++    return { ok: false, reason: `目标不是普通文件，拒绝替换：${abs}` };
++  }
+ 
+-  return { ok: true, target: { abs, rel, parentAbs: dirname(abs) } };
++  return { ok: true, target: { abs, rel, parentAbs: dirname(abs), parentReal: dirname(realTarget) } };
+ }
+ 
+ /**
+@@ -115,12 +137,16 @@ export async function guardWriteTarget(
+ export async function recheckParentInsideWriteRoot(
+   writeRoot: string,
+   parentAbs: string,
++  expectedParentReal?: string,
+ ): Promise<{ ok: true } | { ok: false; reason: string }> {
+   const realRoot = await realResolveAsync(writeRoot);
+   const realParent = await realResolveAsync(parentAbs);
+   if (!isWithinReal(realRoot, realParent)) {
+     return { ok: false, reason: `写入前复核：真实父目录逃逸出写根：${realParent}` };
+   }
++  if (expectedParentReal !== undefined && compareKey(realParent) !== compareKey(expectedParentReal)) {
++    return { ok: false, reason: `写入前复核：真实父目录已变化（原：${expectedParentReal}，现：${realParent}），未写入` };
++  }
+   return { ok: true };
+ }
+ 
+@@ -132,15 +158,21 @@ export async function ensureParentDir(parentAbs: string): Promise<void> {
+ /**
+  * 原子写：委托**跨角色共享**原语 {@link atomicWrite}（`src/common/shared/atomic-write.ts`，共享组件 6）。
+  *
+- * **逐字保持既有行为**：同目录 temp（`wx` 独占）→ 写 → `fsync` → `rename` 覆盖目标；失败清理 temp 并抛错。
+- * 传 `{ mode: 0o600 }` 以**保持本写工具原有的更严权限位**（共享原语缺省 `0o666`，即 `env-file` 既有行为）。
++ * 同目录 temp（`wx` 独占、初始 0600）→ 写 → POSIX 恢复已有普通权限位 → fsync → rename。
++ * 已有普通文件只保留 mode & 0777，不复制特殊位；新文件不传 finalMode，保留 0600 经 umask 的旧策略。
++ * chmod 在共享原语提交前完成，失败不会先替换目标。Windows 不承诺 POSIX 权限位等价。
+  * rename 的**瞬时 `EPERM`**（Windows 实时防护等）由共享原语的**有界重试**处置——其算法与本层原私有实现
+  * **同源**（仅瞬时码、只 `setImmediate` 让出、非瞬时立即抛）；上界为共享常量 `RENAME_MAX_ATTEMPTS`＝**200**
+  * （本层原私有实现为 20，共享侧已依实测尾部上调至 200）；本层**不再自持**该实现。
+  */
+ export async function atomicWriteFile(abs: string, data: Buffer, signal?: AbortSignal): Promise<void> {
+   signal?.throwIfAborted();
+-  return atomicWrite(abs, data, { mode: 0o600, signal });
++  const existing = await existingTarget(abs);
++  if (existing !== null && !existing.isFile()) throw new Error(`目标不是普通文件，拒绝替换：${abs}`);
++  let finalMode: number | undefined;
++  if (!IS_WINDOWS && existing !== null) finalMode = existing.mode & 0o777;
++  signal?.throwIfAborted();
++  return atomicWrite(abs, data, { mode: 0o600, finalMode, signal });
+ }
+ 
+ /** 把工具参数里的目标路径解析为绝对路径（写根基准）——纯词法，不碰文件系统。 */
+diff --git a/src/common/shared/atomic-write.ts b/src/common/shared/atomic-write.ts
+index 5c4f7e6..65775ba 100644
+--- a/src/common/shared/atomic-write.ts
++++ b/src/common/shared/atomic-write.ts
+@@ -106,6 +106,8 @@ export interface AtomicWriteOptions {
+    * **Pi适配器**若需更严权限（如 `0o600`）可显式传入。
+    */
+   mode?: number;
++  /** POSIX 提交前准确应用的普通权限位（0–0777），不受 umask 收窄；Windows 保持原行为。 */
++  finalMode?: number;
+   /** 临时文件名的前缀（同目录）；缺省 `.{目标名}.tmp`。 */
+   tmpPrefix?: string;
+   /** 当前工具轮次的中止信号；已中止时不提交目标替换，清理已创建的 temp。 */
+@@ -125,6 +127,10 @@ export async function atomicWrite(
+   data: string | Buffer,
+   options: AtomicWriteOptions = {},
+ ): Promise<void> {
++  if (options.finalMode !== undefined &&
++      (!Number.isInteger(options.finalMode) || options.finalMode < 0 || options.finalMode > 0o777)) {
++    throw new RangeError("atomicWrite finalMode 必须是 0–0777 的普通权限位整数");
++  }
+   const dir = path.dirname(filePath);
+   const base = path.basename(filePath);
+   const prefix = options.tmpPrefix ?? `.${base}.tmp`;
+@@ -136,6 +142,10 @@ export async function atomicWrite(
+     options.signal?.throwIfAborted();
+     await handle.writeFile(data);
+     options.signal?.throwIfAborted();
++    if (options.finalMode !== undefined && process.platform !== "win32") {
++      await handle.chmod(options.finalMode);
++      options.signal?.throwIfAborted();
++    }
+     await handle.sync();
+     await handle.close();
+     handle = undefined;
+diff --git "a/src/common/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.ts" "b/src/common/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.ts"
+index f238063..ccdc0af 100644
+--- "a/src/common/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.ts"
++++ "b/src/common/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.ts"
+@@ -255,6 +255,58 @@ function matchReadOnly(args: string[], program: string, rules: ShellReadOnlyRule
+   return null;
+ }
+ 
++// rg 的带值选项仅用于跳过参数值（例如 -e --pre 是模式），不是新的安全白名单。
++// D3 只识别显式 --pre；隐藏配置、其他间接执行能力沿用已接受的风险取舍。
++const RG_VALUE_OPTIONS = new Set([
++  "--regexp", "--file", "--pre-glob", "--dfa-size-limit", "--encoding", "--engine",
++  "--max-count", "--regex-size-limit", "--threads", "--glob", "--iglob", "--ignore-file",
++  "--max-depth", "--max-filesize", "--type", "--type-not", "--type-add", "--type-clear",
++  "--after-context", "--before-context", "--color", "--colors", "--context",
++  "--context-separator", "--field-context-separator", "--field-match-separator",
++  "--hostname-bin", "--hyperlink-format", "--max-columns", "--path-separator", "--replace",
++  "--sort", "--sortr", "--generate",
++]);
++const RG_SHORT_VALUE_OPTIONS = new Set("efEmjgdtTABCMr".split(""));
++
++/** 只看选项位置；选项可出现在位置参数后，直到 --。短选项组合的首个带值项吃掉余部或下一项。 */
++function hasRgPreprocessor(args: string[]): boolean {
++  for (let i = 1; i < args.length; i++) {
++    const arg = args[i];
++    if (arg === "--") break;
++    if (arg === "--pre" || arg.startsWith("--pre=")) return true;
++    if (RG_VALUE_OPTIONS.has(arg)) {
++      i += 1;
++    } else if (arg.startsWith("-") && !arg.startsWith("--")) {
++      for (let j = 1; j < arg.length; j++) {
++        if (!RG_SHORT_VALUE_OPTIONS.has(arg[j])) continue;
++        if (j === arg.length - 1) i += 1;
++        break;
++      }
++    }
++  }
++  return false;
++}
++
++/** 只在原 allow 出口调用：不改变既有 deny/risky，也不引入文件系统身份核验。 */
++function reviewExplicitExecution(args: string[], program: string): ShellVerdict | null {
++  const token = stripQuotes(args[0].trim());
++  if (/[\\/]/.test(token) || /^[a-z]:/i.test(token) || /\.(cmd|bat|ps1)$/i.test(token)) {
++    return {
++      decision: "review",
++      reason: "显式程序路径或脚本包装不能仅凭 basename 获得只读免审批资格，交既有审批",
++      ruleId: "review:explicit-program",
++    };
++  }
++  if (program === "rg" && hasRgPreprocessor(args)) {
++    return {
++      decision: "review",
++      reason: "rg --pre 预处理参数可启动外部程序，交既有审批",
++      ruleId: "review:rg-preprocessor",
++    };
++  }
++  return null;
++}
++
+ /**
+  * 带原因的判定。参数取 unknown 是为了**强制走运行时校验**——任何调用方传错形状都得到 deny，
+  * 而不会因为 TS 类型擦除而静默退化。classifyShell（冻结契约）只是它的四态封装。
+@@ -311,6 +363,8 @@ export function classifyShellDetailed(argv: unknown, rules: unknown): ShellVerdi
+   //   其余 re-shell 形态（sh -c/pwsh/cmd /c del/绝对路径可执行文件…）仍在第 5 步 deny。
+   const roReshell = matchReadonlyReshell(args, program);
+   if (roReshell !== null) {
++    const review = reviewExplicitExecution(args, program);
++    if (review !== null) return review;
+     return {
+       decision: "allow",
+       reason: `命中窄只读 re-shell 白名单：${roReshell}`,
+@@ -357,6 +411,8 @@ export function classifyShellDetailed(argv: unknown, rules: unknown): ShellVerdi
+   // 8) 白名单（只读命令）→ allow（唯一通向 allow 的分支）
+   const ro = matchReadOnly(args, program, R.readOnly);
+   if (ro !== null) {
++    const review = reviewExplicitExecution(args, program);
++    if (review !== null) return review;
+     return { decision: "allow", reason: `命中只读白名单：${ro}`, ruleId: `allow:readonly:${ro}` };
+   }
+ 
+diff --git a/src/provider/runtime/tools.ts b/src/provider/runtime/tools.ts
+index b6c2a63..81ec239 100644
+--- a/src/provider/runtime/tools.ts
++++ b/src/provider/runtime/tools.ts
+@@ -309,6 +309,7 @@ function rejectInvalidBoundaryWrite(
+ 
+ /** 落盘前守卫 + mkdir + 二次复核 + 原子写；任一步失败返回可读错误（可能已建目录但未写文件）。 */
+ async function writeGuarded(
++  gate: WriteGate,
+   name: string,
+   path: string,
+   abs: string,
+@@ -334,8 +335,13 @@ async function writeGuarded(
+     }
+   }
+ 
+-  // 3) 紧邻写入前的二次复核（TOCTOU：弥补 mkdir 与 rename 之间的时间窗）。
+-  const recheck = await recheckParentInsideWriteRoot(writeRoot, guarded.target.parentAbs);
++  // 3) mkdir 后复用同一个门禁重新判定（角色/真实目标授权仍由 gate 负责）。
++  const reauthorized = govern(gate, name, abs, writeRoot);
++  if (!reauthorized.proceed) {
++    return { ok: false, message: `${name} 写入前复核未通过：${reauthorized.result.message}（未写入目标文件；可能已创建父目录）` };
++  }
++  // 再复核真实父目录与先前一致，仅缩小并发替换窗口，不声称消除全部 TOCTOU。
++  const recheck = await recheckParentInsideWriteRoot(writeRoot, guarded.target.parentAbs, guarded.target.parentReal);
+   if (!recheck.ok) {
+     return { ok: false, message: `${name} 拒绝写入：${recheck.reason}` };
+   }
+@@ -371,7 +377,7 @@ function makeWriteFileTool(gate: WriteGate, writeRoot: string | undefined): Exec
+         return { ok: true, message: `${name} 已获准（写入）：${path}（本次构造未配置 writeRoot，已判定但未落盘）` };
+       }
+       if (call.signal?.aborted) return { ok: false, message: `${name}：会话已中止，未写入` };
+-      return writeGuarded(name, path, pre.abs, writeRoot, Buffer.from(content, "utf8"), { createParent: true }, call.signal);
++      return writeGuarded(gate, name, path, pre.abs, writeRoot, Buffer.from(content, "utf8"), { createParent: true }, call.signal);
+     },
+   };
+ }
+@@ -437,7 +443,7 @@ function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined): Execu
+       if (invalidBoundary !== undefined) return invalidBoundary;
+       const data = Buffer.from((decoded.bom ? "\uFEFF" : "") + next, "utf8");
+ 
+-      return writeGuarded(name, path, pre.abs, writeRoot, data, { createParent: false }, call.signal);
++      return writeGuarded(gate, name, path, pre.abs, writeRoot, data, { createParent: false }, call.signal);
+     },
+   };
+ }
+diff --git a/src/service/gate/resolve-write.ts b/src/service/gate/resolve-write.ts
+index 3035c5e..5de515b 100644
+--- a/src/service/gate/resolve-write.ts
++++ b/src/service/gate/resolve-write.ts
+@@ -1,7 +1,7 @@
+ // Service：写入路径判定（本版心脏）
+ // 冻结契约 §3：resolveWrite(targetPath, boundary, scope, ctx): WriteDecision
+ // 覆盖：F6 未接受、F5 条件目录（固定 slug）、F4 任务收窄、跨根混淆、规范化、F7 符号链接逃逸、F10 按根分组。
+-// 判定顺序：F6 接受门 → 根归属与 F7 逃逸 → 匹配条目（含条件 slug）→ F4 writeSet 收窄（仅当给了 scope）。
++// 判定顺序：F6 接受门 → 根归属与 F7 逃逸 → 输入/真实路径分别匹配条目（含条件 slug）与 F4 writeSet。
+ //
+ // 关于 scope 可选（客户端裁决）：scope === undefined 表示 chat / standalone 这类"没有预先存在的任务"的
+ // 会话——任务是在对话里产生的，不该要求先声明范围。此时不做任务收窄，授权上界 = 角色边界本身。
+@@ -180,7 +180,8 @@ export function resolveWrite(
+   const rootAbs = root === "skill" ? skillRootAbs : projectRootAbs;
+   const realRoot = realResolve(rootAbs);
+   const realTarget = realResolve(absCandidate);
+-  if (absRel(realTarget, realRoot) === null) {
++  const realRel = absRel(realTarget, realRoot);
++  if (realRel === null) {
+     return deny(
+       `目标路径经真实路径解析（符号链接/junction）逃逸出 ${root} 根之外（F7）：${realTarget}`,
+       boundary,
+@@ -188,6 +189,29 @@ export function resolveWrite(
+     );
+   }
+ 
++  const lexical = resolveRelativeWrite(rel, root, boundary, scope, projectRootAbs, skillRootAbs);
++  if (!lexical.allowed || compareKey(rel) === compareKey(realRel)) return lexical;
++
++  // D3：根内链接也不得扩大角色边界或任务写集。边界条目仍按原路径解释，不能跟随链接扩权。
++  const actual = resolveRelativeWrite(realRel, root, boundary, scope, projectRootAbs, skillRootAbs);
++  if (!actual.allowed) {
++    return {
++      ...actual,
++      reason: `输入路径 ${rel} 的真实目标 ${realRel} 未获授权（根：${root}）：${actual.reason}`,
++    };
++  }
++  return lexical;
++}
++
++/** 同一根内的授权规则：词法路径与真实路径共用，避免条件/任务收窄语义分叉。 */
++function resolveRelativeWrite(
++  rel: string,
++  root: Root,
++  boundary: BoundarySection1,
++  scope: TaskScope | undefined,
++  projectRootAbs: string,
++  skillRootAbs: string,
++): WriteDecision {
+   const sameRoot = boundary.entries.filter((e) => e.root === root);
+   // 被条件激活且路径覆盖的条目
+   const active = sameRoot.filter((e) => pathCovers(e, rel) && isActive(e, scope));
+diff --git "a/test/\346\265\213\350\257\225/t9-block2-write-landing.test.ts" "b/test/\346\265\213\350\257\225/t9-block2-write-landing.test.ts"
+index e0ace9b..a716cb8 100644
+--- "a/test/\346\265\213\350\257\225/t9-block2-write-landing.test.ts"
++++ "b/test/\346\265\213\350\257\225/t9-block2-write-landing.test.ts"
+@@ -261,7 +261,7 @@ test("块2/同源（行为）：gate 收到的绝对路径 === 文件落盘的
+     args: { path: "src/allowed.ts", content: "ok\n" },
+   });
+   assert.equal(r.ok, true, r.message);
+-  assert.deepEqual(seen, [targetAbs], "gate 收到的 abs 须恰为按写根解析的落盘路径");
++  assert.deepEqual(seen, [targetAbs, targetAbs], "D3 预判与写前复判须各收到同一按写根解析的落盘路径");
+   assert.ok(existsSync(targetAbs), "文件须落盘在 gate 判定的同一路径");
+ });
+ 
+diff --git "a/test/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.test.ts" "b/test/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.test.ts"
+index 80cfa4d..ceba78d 100644
+--- "a/test/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.test.ts"
++++ "b/test/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.test.ts"
+@@ -23,6 +23,55 @@ const rules = defaultShellRules();
+ // 用于验证 §7.10 的耦合——一旦执行层改回 shell 字符串/shell:true，元字符规则**必须恢复**。
+ const shellStringRules: ShellRules = { ...defaultShellRules(), executionModel: "shell-string" };
+ 
++test("D3：显式程序路径和脚本后缀只将原只读 allow 降为 review", () => {
++  for (const token of ["./cat", "tools/cat", "/tmp/cat", "/bin/cat", "'.\\cat'", '"./cat"',
++    "C:\\tools\\cat.exe", "C:/tools/cat.exe", "C:cat.exe", "\\\\server\\share\\cat.exe",
++    "cat.cmd", "cat.bat", "cat.ps1", "CAT.PS1"]) {
++    assert.equal(classifyShell([token, "data.txt"], rules), "review", token);
++  }
++  assert.equal(classifyShellDetailed(["./cat", "data.txt"], rules).ruleId, "review:explicit-program");
++  assert.equal(classifyShell(["powershell.ps1", "-NoProfile", "-Command", "Test-Path 'x'"], rules), "review");
++  assert.equal(classifyShell(["cmd.bat", "/c", "dir"], rules), "review");
++});
++
++test("D3：保留裸读取命令、exe、既有窄re-shell及原deny/risky", () => {
++  for (const argv of [["cat", "data.txt"], ["cat.exe", "data.txt"], ["ls", "-la"],
++    ["rg", "pattern", "src"], ["rg.exe", "pattern", "src"], ["git", "status"], ["git", "log", "-1"],
++    ["cmd.exe", "/c", "dir"]]) {
++    assert.equal(classifyShell(argv, rules), "allow", argv.join(" "));
++  }
++  for (const argv of [["./sh", "-c", "anything"], ["node.ps1", "-e", "anything"],
++    ["C:\\Windows\\System32\\cmd.exe", "/c", "dir"]]) {
++    assert.equal(classifyShell(argv, rules), "deny", argv.join(" "));
++  }
++  for (const argv of [["./rm", "file"], ["rm.cmd", "file"], ["./git", "checkout", "main"]]) {
++    assert.equal(classifyShell(argv, rules), "risky", argv.join(" "));
++  }
++});
++
++test("D3：rg显式预处理选项在位置参数前后均为review", () => {
++  for (const args of [["--pre", "helper", "pattern", "file"], ["--pre=helper", "pattern", "file"],
++    ["pattern", "--pre", "helper", "file"], ["--regexp", "--pre", "--pre=helper", "file"],
++    ["-ne", "--pre", "--pre", "helper", "file"], ["--glob=*.ts", "--pre=helper", "pattern"],
++    ["--pre"], ["--pre="]]) {
++    const detail = classifyShellDetailed(["rg", ...args], rules);
++    assert.equal(detail.decision, "review", args.join(" "));
++    assert.equal(detail.ruleId, "review:rg-preprocessor");
++  }
++});
++
++test("D3：rg模式、选项值及--后的文件名不是预处理选项", () => {
++  for (const args of [["--", "--pre", "file"], ["pattern", "--", "--pre=helper"],
++    ["-e", "--pre", "file"], ["--regexp", "--pre=helper", "file"], ["--regexp=--pre", "file"],
++    ["-e--pre", "file"], ["-ne", "--pre", "file"], ["-ne--pre", "file"],
++    ["--glob", "--pre", "pattern", "file"], ["-g--pre", "pattern", "file"],
++    ["--pre-glob", "--pre", "pattern", "file"], ["-r", "--pre", "pattern", "file"],
++    ["--regexp", "--", "--", "--pre"], ["text--pre=text", "file"],
++    ["--glob", "*.ts", "--regexp", "a--pre", "--", "--pre"]]) {
++    assert.equal(classifyShell(["rg", ...args], rules), "allow", args.join(" "));
++  }
++});
++
+ // 缺省执行模型（省略 executionModel）：应走**最保守**处理——假定 shell 会解释 ⇒ 元字符生效。
+ const { executionModel: _omitModel, ...legacyRules } = defaultShellRules();
+ const noModelRules = legacyRules as ShellRules;
+diff --git "a/test/\351\227\250\347\246\201\345\274\225\346\223\216/resolve-write.test.ts" "b/test/\351\227\250\347\246\201\345\274\225\346\223\216/resolve-write.test.ts"
+index 92a2cb8..a84ee65 100644
+--- "a/test/\351\227\250\347\246\201\345\274\225\346\223\216/resolve-write.test.ts"
++++ "b/test/\351\227\250\347\246\201\345\274\225\346\223\216/resolve-write.test.ts"
+@@ -1,9 +1,9 @@
+ // 门禁引擎单元测试：resolveWrite（本版心脏）——覆盖契约 §3 列出的每条
+ import { test, after } from "node:test";
+ import assert from "node:assert/strict";
+-import { mkdtempSync, mkdirSync, symlinkSync, rmSync } from "node:fs";
++import { mkdtempSync, mkdirSync, symlinkSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+-import { join } from "node:path";
++import { join, relative } from "node:path";
+ 
+ import { resolveWrite } from "../../src/service/gate/resolve-write.ts";
+ 
+@@ -18,6 +18,24 @@ mkdirSync(OUT, { recursive: true });
+ 
+ const ctx = { skillRoot: SKILL, projectRoot: PROJ };
+ 
++function insideLink(root: "project" | "skill") {
++  const rootAbs = root === "project" ? PROJ : SKILL;
++  const base = mkdtempSync(join(rootAbs, "d3-"));
++  const allowed = join(base, "allowed");
++  const actual = join(base, "private");
++  mkdirSync(allowed);
++  mkdirSync(actual);
++  writeFileSync(join(actual, "existing.ts"), "original");
++  symlinkSync(actual, join(allowed, "link"), process.platform === "win32" ? "junction" : "dir");
++  const rel = (path: string) => relative(rootAbs, path).replace(/\\/g, "/");
++  return {
++    allowed: rel(allowed), actual: rel(actual),
++    target: (tail: string) => join(allowed, "link", tail),
++    alias: (tail: string) => rel(join(allowed, "link", tail)),
++    real: (tail: string) => rel(join(actual, tail)),
++  };
++}
++
+ after(() => {
+   try {
+     rmSync(ROOT, { recursive: true, force: true });
+@@ -44,6 +62,58 @@ function scope(writeSet: string[], conditions: string[] = []): any {
+   return { writeSet, conditions };
+ }
+ 
++for (const root of ["project", "skill"] as const) {
++  test(`D3 ${root}：根内链接不能把目录授权扩到真实目标（已有文件及不存在尾部）`, () => {
++    const f = insideLink(root);
++    for (const tail of ["existing.ts", "new/deep.ts"]) {
++      const d = resolveWrite(f.target(tail), bnd([dir(root, f.allowed)]), undefined, ctx);
++      assert.equal(d.allowed, false);
++      assert.match(d.reason, /真实目标.*未获授权/);
++      assert.ok(d.reason.includes(f.alias(tail)));
++      assert.ok(d.reason.includes(f.real(tail)));
++    }
++  });
++
++  test(`D3 ${root}：输入和真实路径分别匹配角色边界及任务精确写集`, () => {
++    const f = insideLink(root);
++    const tail = "existing.ts";
++    const both = bnd([dir(root, f.allowed), dir(root, f.actual)]);
++    const aliasOnly = resolveWrite(f.target(tail), both, scope([f.alias(tail)]), ctx);
++    assert.equal(aliasOnly.allowed, false);
++    assert.match(aliasOnly.reason, /真实目标.*F4/);
++    const actualOnly = resolveWrite(f.target(tail), both, scope([f.real(tail)]), ctx);
++    assert.equal(actualOnly.allowed, false);
++    assert.match(actualOnly.reason, /F4/);
++    assert.equal(resolveWrite(f.target(tail), both, scope([f.alias(tail), f.real(tail)]), ctx).allowed, true);
++    assert.equal(resolveWrite(f.target(tail), both, undefined, ctx).allowed, true);
++    assert.equal(resolveWrite(f.target(tail), bnd([dir(root, f.actual)]), undefined, ctx).allowed, false);
++  });
++
++  test(`D3 ${root}：真实路径的条件目录仍须激活，另一根的同名授权不能替代`, () => {
++    const f = insideLink(root);
++    const tail = "new.ts";
++    const set = [f.alias(tail), f.real(tail)];
++    const conditional = bnd([dir(root, f.allowed), cdir(root, f.actual, "docs-bootstrap")]);
++    const d = resolveWrite(f.target(tail), conditional, scope(set), ctx);
++    assert.equal(d.allowed, false);
++    assert.match(d.reason, /真实目标.*缺少条件.*docs-bootstrap/);
++    assert.equal(resolveWrite(f.target(tail), conditional, scope(set, ["docs-bootstrap"]), ctx).allowed, true);
++    const cross = bnd([dir(root, f.allowed), dir(root === "project" ? "skill" : "project", f.actual)]);
++    assert.equal(resolveWrite(f.target(tail), cross, scope(set), ctx).allowed, false);
++  });
++}
++
++test("D3：合法链接项目根与技能根以真实根计算相对授权", () => {
++  const projectLink = join(ROOT, "project-root-link");
++  const skillLink = join(ROOT, "skill-root-link");
++  symlinkSync(PROJ, projectLink, process.platform === "win32" ? "junction" : "dir");
++  symlinkSync(SKILL, skillLink, process.platform === "win32" ? "junction" : "dir");
++  const linkedCtx = { projectRoot: projectLink, skillRoot: skillLink };
++  const b = bnd([dir("project", "src"), dir("skill", "src")]);
++  assert.equal(resolveWrite("src/new.ts", b, scope(["src/new.ts"]), linkedCtx).allowed, true);
++  assert.equal(resolveWrite(join(skillLink, "src", "new.ts"), b, scope(["src/new.ts"]), linkedCtx).allowed, true);
++});
++
+ // ---- F6：未接受边界 ----
+ test("F6：acceptance.accepted 非 true → 拒绝", () => {
+   const b = bnd([dir("project", "src")], { accepted: false, source: "x" });
+diff --git "a/test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/atomic-write.test.ts" "b/test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/atomic-write.test.ts"
+index 9abd385..cb5097a 100644
+--- "a/test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/atomic-write.test.ts"
++++ "b/test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/atomic-write.test.ts"
+@@ -16,7 +16,8 @@
+ // 全部使用系统临时目录，**不留文件于仓库**，用完递归清理；不指向仓库根真实 `.env`。
+ 
+ import assert from "node:assert/strict";
+-import { mkdir, mkdtemp, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
++import { chmod, mkdir, mkdtemp, open, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
++import { execFileSync } from "node:child_process";
+ import os from "node:os";
+ import path from "node:path";
+ import { test } from "node:test";
+@@ -282,3 +283,96 @@ test("③ 失败路径安全：目标不可被替换时 atomicWrite 显式抛出
+ test("③ 上界常量与实测一致（RENAME_MAX_ATTEMPTS=200，由实测尾部≈63 留 ~3x 余量）", () => {
+   assert.equal(RENAME_MAX_ATTEMPTS, 200);
+ });
++
++test("D3 finalMode 非法时不创建临时文件或替换目标", async () => {
++  await withTmpDir(async (directory) => {
++    const target = path.join(directory, "original.txt");
++    await writeFile(target, "original");
++    for (const finalMode of [-1, 0o1000, 0o4755, 1.5, NaN, Infinity]) {
++      await assert.rejects(() => atomicWrite(target, "replacement", { finalMode }), RangeError);
++      assert.equal(await readFile(target, "utf8"), "original");
++      assert.deepEqual(await readdir(directory), ["original.txt"]);
++    }
++  });
++});
++
++test("D3 finalMode 应用普通权限位，未传时保持既有安全创建行为", { skip: process.platform === "win32" }, async () => {
++  await withTmpDir(async (directory) => {
++    const target = path.join(directory, "run.sh");
++    for (const finalMode of [0o755, 0o644, 0o600]) {
++      await atomicWrite(target, "#!/bin/sh\necho ready\n", { mode: 0o600, finalMode });
++      assert.equal((await stat(target)).mode & 0o7777, finalMode);
++      assert.equal(await readFile(target, "utf8"), "#!/bin/sh\necho ready\n");
++    }
++    await atomicWrite(target, "legacy", { mode: 0o600 });
++    assert.equal((await stat(target)).mode & 0o777, 0o600 & ~process.umask());
++    assert.deepEqual(await readdir(directory), ["run.sh"]);
++  });
++});
++
++test("D3 严格 umask 下 finalMode 不丢执行位（独立子进程）", { skip: process.platform === "win32" }, async () => {
++  await withTmpDir(async (directory) => {
++    const target = path.join(directory, "run.sh");
++    const moduleUrl = new URL("../../../src/common/shared/atomic-write.ts", import.meta.url).href;
++    const childScript = `
++      const { atomicWrite } = await import(process.argv[1]);
++      process.umask(0o077);
++      await atomicWrite(process.argv[2], 'updated', { mode: 0o600, finalMode: 0o755 });
++    `;
++    execFileSync(process.execPath, ["--input-type=module", "-e", childScript, moduleUrl, target], { timeout: 10000 });
++    assert.equal((await stat(target)).mode & 0o777, 0o755);
++    assert.equal(await readFile(target, "utf8"), "updated");
++    assert.deepEqual(await readdir(directory), ["run.sh"]);
++  });
++});
++
++for (const operation of ["chmod", "sync"] as const) {
++  test(`D3 ${operation} 失败不提交内容或权限，并清理临时文件`, { skip: process.platform === "win32" }, async (context) => {
++    await withTmpDir(async (directory) => {
++      const target = path.join(directory, "run.sh");
++      await writeFile(target, "original");
++      await chmod(target, 0o755);
++      const probe = await open(path.join(directory, "probe"), "wx");
++      const prototype = Object.getPrototypeOf(probe);
++      await probe.close();
++      await rm(path.join(directory, "probe"));
++      const failure = context.mock.method(prototype, operation, async () => { throw injected("EIO"); });
++      try {
++        await assert.rejects(() => atomicWrite(target, "replacement", { mode: 0o600, finalMode: 0o644 }),
++          (error: unknown) => (error as NodeJS.ErrnoException).code === "EIO");
++      } finally {
++        failure.mock.restore();
++      }
++      assert.equal(await readFile(target, "utf8"), "original");
++      assert.equal((await stat(target)).mode & 0o777, 0o755);
++      assert.deepEqual(await readdir(directory), ["run.sh"]);
++    });
++  });
++}
++
++test("D3 chmod 完成后中止仍保留原文件及权限", { skip: process.platform === "win32" }, async (context) => {
++  await withTmpDir(async (directory) => {
++    const target = path.join(directory, "run.sh");
++    await writeFile(target, "original");
++    await chmod(target, 0o755);
++    const probe = await open(path.join(directory, "probe"), "wx");
++    const prototype = Object.getPrototypeOf(probe) as { chmod(mode: number): Promise<void> };
++    const originalChmod = prototype.chmod;
++    await probe.close();
++    await rm(path.join(directory, "probe"));
++    const controller = new AbortController();
++    const observed = context.mock.method(prototype, "chmod", async function(this: { chmod(mode: number): Promise<void> }, mode: number) {
++      await originalChmod.call(this, mode);
++      controller.abort();
++    });
++    try {
++      await assert.rejects(() => atomicWrite(target, "replacement", { mode: 0o600, finalMode: 0o644, signal: controller.signal }),
++        { name: "AbortError" });
++    } finally {
++      observed.mock.restore();
++    }
++    assert.equal(await readFile(target, "utf8"), "original");
++    assert.equal((await stat(target)).mode & 0o777, 0o755);
++    assert.deepEqual(await readdir(directory), ["run.sh"]);
++  });
++});

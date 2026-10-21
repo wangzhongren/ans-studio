@@ -1,0 +1,4 @@
+cb8c093fab318ad113c6db8fe9dda14c98507e1e48315115813eae9a770ad942  app/renderer/src/chat/chat-store.ts
+8be4e79d943a45dfc406308ba777607dcedcabcf4242de44c7e927f817cbd6bc  app/renderer/src/chat/ipc.ts
+5b4e7720ca990ae102db0ce1e90e23275a313fd542eed5ca7c80dfb90f06d7c2  app/renderer/src/shell/phase4b.css
+8b9d54fd2c8af6818cb02dd13c675795790700ffe440f3bf061f23370e982445  test/桌面应用/e2e/main.mjs

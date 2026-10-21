@@ -1,0 +1,25 @@
+ENTRY=/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/dist/src/index.html
+HTML_BYTES=570
+ASSET ../assets/index-BWBazLK6.js raw=638808 gzip9=204662
+ASSET ../assets/index-DJnGQDXW.css raw=62742 gzip9=11741
+ASSET index.html raw=570 gzip9=381
+TOTAL_GZIP9=216784 <=307200?true
+CSP_STATIC_SCAN {"INLINE_SCRIPT_PRESENT":false,"STYLE_TAG_PRESENT":false,"STYLE_ATTR_PRESENT":false,"UNSAFE_INLINE":false,"UNSAFE_EVAL":false,"STRICT_CSP_META_PRESENT":true,"MODULEPRELOAD_LINK":false,"SCRIPT_COUNT":1,"SCRIPT_WITH_SRC_COUNT":1,"RELATIVE_ASSET_REFS":true}
+--- dist/src/index.html ---
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ANS 治理会话工作台</title>
+    <script type="module" crossorigin src="../assets/index-BWBazLK6.js"></script>
+    <link rel="stylesheet" crossorigin href="../assets/index-DJnGQDXW.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

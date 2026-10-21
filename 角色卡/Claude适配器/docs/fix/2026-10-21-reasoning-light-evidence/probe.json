@@ -1,0 +1,3526 @@
+{
+  "fixture": {
+    "node": "v24.14.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "sdk": "0.3.299",
+    "bundledCli": "2.1.299",
+    "loopbackOnly": true,
+    "externalApiCalls": 0,
+    "hashes": {
+      "src/provider/claude/session.ts": "d5b4a252e8d51f0ed9ce58c6e9a25b1ac7c5cac23974c9069c0ffd996da45a2f",
+      "test/claude-adapter/session.test.ts": "3a40d4c3a4e0143bc2ed49b4e03321990db5e4820f064f3142470a1daf8faf6c",
+      "test/claude-adapter/reasoning-loopback.probe.ts": "269d68bd04fced72ee9319b72d252681be16b17cefe49ab5665ff88669adc8dc"
+    }
+  },
+  "reports": [
+    {
+      "name": "control-unset",
+      "requests": [
+        {
+          "phase": "control-unset",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550128600,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"82f4ce32-71e6-4be5-9353-ae1334f7fda0\",\"session_id\":\"2aee8cc2-351b-44e6-aac9-f9f40eed2c84\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"2aee8cc2-351b-44e6-aac9-f9f40eed2c84\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5\",\"permissionMode\":\"auto\",\"slash_commands\":["
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"2aee8cc2-351b-44e6-aac9-f9f40eed2c84\",\"uuid\":\"efe1fd0d-1c57-4391-ac23-a7b9bf4858bb\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "control-unset loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:56831, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "control-unset loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "thinking-disabled",
+      "requests": [
+        {
+          "phase": "thinking-disabled",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550128792,
+          "thinking": null,
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"4fcd592d-411e-4aa5-b5b9-0f3f3b3a076d\",\"session_id\":\"a3663b57-75cc-4220-970e-7a0774b93aeb\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"a3663b57-75cc-4220-970e-7a0774b93aeb\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5\",\"permissionMode\":\"auto\",\"slash_commands\":["
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"a3663b57-75cc-4220-970e-7a0774b93aeb\",\"uuid\":\"1eed2bf9-7862-4475-889b-8eea96d243af\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "thinking-disabled loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:56831, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "thinking-disabled loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "thinking-enabled-budget",
+      "requests": [
+        {
+          "phase": "thinking-enabled-budget",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550128972,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"0530697e-10f8-4168-b314-e184d5288411\",\"session_id\":\"4c46c15e-678c-4571-a347-b7850ebf0734\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"4c46c15e-678c-4571-a347-b7850ebf0734\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5\",\"permissionMode\":\"auto\",\"slash_commands\":["
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"4c46c15e-678c-4571-a347-b7850ebf0734\",\"uuid\":\"dc55407c-f8b2-4807-ba23-9c50ca554596\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "thinking-enabled-budget loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:56831, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "thinking-enabled-budget loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "thinking-enabled-budget-sonnet",
+      "requests": [
+        {
+          "phase": "thinking-enabled-budget-sonnet",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550129148,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "high"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"b39b44b2-793f-4fda-a5f3-4eded0b400ec\",\"session_id\":\"6566c15e-aa41-4dec-ab5b-6b68949ef877\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"6566c15e-aa41-4dec-ab5b-6b68949ef877\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-sonnet-4-6\",\"permissionMode\":\"auto\",\"slash_commands\""
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"6566c15e-aa41-4dec-ab5b-6b68949ef877\",\"uuid\":\"3c8c2c2b-f18a-49d7-8c1e-cccae6c8f095\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "thinking-enabled-budget-sonnet loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:56831, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "thinking-enabled-budget-sonnet loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "thinking-adaptive",
+      "requests": [
+        {
+          "phase": "thinking-adaptive",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550129319,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"ebf983b3-5b9d-4315-b10b-f7ce0a463e44\",\"session_id\":\"93ae3379-5942-473f-9be4-7ef22efe16c0\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"93ae3379-5942-473f-9be4-7ef22efe16c0\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5\",\"permissionMode\":\"auto\",\"slash_commands\":["
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"93ae3379-5942-473f-9be4-7ef22efe16c0\",\"uuid\":\"17f0c3cc-0822-4ca8-a671-1dc021a2390d\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "thinking-adaptive loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:56831, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "thinking-adaptive loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "thinking-adaptive-display-omitted",
+      "requests": [
+        {
+          "phase": "thinking-adaptive-display-omitted",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550129493,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"efc96605-2a3e-4536-9261-d4c30ca6efda\",\"session_id\":\"4f46c755-136e-4b49-a7bd-842f9790bf83\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"4f46c755-136e-4b49-a7bd-842f9790bf83\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5\",\"permissionMode\":\"auto\",\"slash_commands\":["
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"4f46c755-136e-4b49-a7bd-842f9790bf83\",\"uuid\":\"bb070c49-6329-43d8-93c5-89701c9e99b6\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "thinking-adaptive-display-omitted loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:56831, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "thinking-adaptive-display-omitted loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "effort-low",
+      "requests": [
+        {
+          "phase": "effort-low",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550129653,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"18630398-106d-43b8-b6ae-0e0a873f73f3\",\"session_id\":\"3e436ea8-33a6-42f4-9722-73b7a0688f86\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"3e436ea8-33a6-42f4-9722-73b7a0688f86\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5\",\"permissionMode\":\"auto\",\"slash_commands\":["
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"3e436ea8-33a6-42f4-9722-73b7a0688f86\",\"uuid\":\"3b51bcf0-9dd3-4df5-b398-02e4eb8f0c1e\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "effort-low loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:56831, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "effort-low loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "effort-medium",
+      "requests": [
+        {
+          "phase": "effort-medium",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550129820,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"0737af8b-c445-4149-b9da-72b8d42385be\",\"session_id\":\"b12a4ffe-8787-42f6-bcfc-c3f8fc52898c\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"b12a4ffe-8787-42f6-bcfc-c3f8fc52898c\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5\",\"permissionMode\":\"auto\",\"slash_commands\":["
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"b12a4ffe-8787-42f6-bcfc-c3f8fc52898c\",\"uuid\":\"3208dfbb-662a-4fae-9b98-00ed1b9d5ed6\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "effort-medium loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:56831, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "effort-medium loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "effort-high",
+      "requests": [
+        {
+          "phase": "effort-high",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550129999,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "high"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"b5ca4104-30de-400f-85f1-a076c9e284e4\",\"session_id\":\"c375cad2-f4f8-44f8-ad1e-471b29ce1015\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"c375cad2-f4f8-44f8-ad1e-471b29ce1015\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5\",\"permissionMode\":\"auto\",\"slash_commands\":["
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"c375cad2-f4f8-44f8-ad1e-471b29ce1015\",\"uuid\":\"04892d75-12c5-4f5a-8e5b-96f0a6cc6d21\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "effort-high loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:56831, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "effort-high loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "effort-xhigh",
+      "requests": [
+        {
+          "phase": "effort-xhigh",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550130177,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "xhigh"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"c36347cd-4679-48d1-9090-51341c6102b4\",\"session_id\":\"0d1f9536-c209-48ea-ba9e-6e4357c75bce\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"0d1f9536-c209-48ea-ba9e-6e4357c75bce\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5\",\"permissionMode\":\"auto\",\"slash_commands\":["
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"0d1f9536-c209-48ea-ba9e-6e4357c75bce\",\"uuid\":\"4e4a2a9b-ba44-4f3f-a65b-ea25c9da32e4\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "effort-xhigh loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:56831, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "effort-xhigh loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "effort-xhigh-sonnet",
+      "requests": [
+        {
+          "phase": "effort-xhigh-sonnet",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550130347,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "high"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"036cffa6-b7d8-43e7-8f97-84573c06a87d\",\"session_id\":\"c076bcde-a643-4b7a-9fb7-8af3f4ac55ed\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"c076bcde-a643-4b7a-9fb7-8af3f4ac55ed\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-sonnet-4-6\",\"permissionMode\":\"auto\",\"slash_commands\""
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"c076bcde-a643-4b7a-9fb7-8af3f4ac55ed\",\"uuid\":\"5d343393-df89-4bfd-a4c5-df3e22730a84\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "effort-xhigh-sonnet loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:56831, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "effort-xhigh-sonnet loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "effort-xhigh-opus46",
+      "requests": [
+        {
+          "phase": "effort-xhigh-opus46",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550130526,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "high"
+          },
+          "effortFlat": null,
+          "maxTokens": 64000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"a8b3b776-a2c7-4676-9e84-dfcb0ab77c05\",\"session_id\":\"8092b693-3d66-4a41-96bd-3d83d1605486\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"8092b693-3d66-4a41-96bd-3d83d1605486\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-4-6\",\"permissionMode\":\"auto\",\"slash_commands\":["
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"8092b693-3d66-4a41-96bd-3d83d1605486\",\"uuid\":\"842bb036-9a0c-4982-8ca4-2bb4cb338ab4\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "effort-xhigh-opus46 loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:56831, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "effort-xhigh-opus46 loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "effort-low-sonnet45",
+      "requests": [
+        {
+          "phase": "effort-low-sonnet45",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550130683,
+          "thinking": {
+            "budget_tokens": 31999,
+            "type": "enabled",
+            "display": "updates"
+          },
+          "outputConfig": null,
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,thinking-display-updates-2026-08-18",
+          "model": "claude-sonnet-4-5-20250929",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"75a2ccb9-c5ac-4c72-9f08-f8fefa698254\",\"session_id\":\"00c5bb96-4341-4294-b949-5f4bc3534f0c\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"00c5bb96-4341-4294-b949-5f4bc3534f0c\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-sonnet-4-5-20250929\",\"permissionMode\":\"default\",\"sla"
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"00c5bb96-4341-4294-b949-5f4bc3534f0c\",\"uuid\":\"6d80e15a-8d8d-49c8-849e-29726434570c\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "effort-low-sonnet45 loopback completed"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "effort-low-sonnet45 loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "effort-xhigh-sonnet45",
+      "requests": [
+        {
+          "phase": "effort-xhigh-sonnet45",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550130836,
+          "thinking": {
+            "budget_tokens": 31999,
+            "type": "enabled",
+            "display": "updates"
+          },
+          "outputConfig": null,
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,thinking-display-updates-2026-08-18",
+          "model": "claude-sonnet-4-5-20250929",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"1b5a8153-1fb8-4cec-b00a-1fa54e4d77e3\",\"session_id\":\"aef4d389-da21-4cf8-9940-d11798c51025\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"aef4d389-da21-4cf8-9940-d11798c51025\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-sonnet-4-5-20250929\",\"permissionMode\":\"default\",\"sla"
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"aef4d389-da21-4cf8-9940-d11798c51025\",\"uuid\":\"30fe2954-9d42-45d2-8608-856983aa6087\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "effort-xhigh-sonnet45 loopback completed"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "effort-xhigh-sonnet45 loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "effort-low-haiku45",
+      "requests": [
+        {
+          "phase": "effort-low-haiku45",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550131002,
+          "thinking": {
+            "budget_tokens": 31999,
+            "type": "enabled",
+            "display": "updates"
+          },
+          "outputConfig": null,
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,claude-code-20250219,thinking-display-updates-2026-08-18",
+          "model": "claude-haiku-4-5-20251001",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"c39d7459-a2db-4703-a980-8abecbee6904\",\"session_id\":\"07b360c2-343b-493c-93ef-d6d6891af929\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"07b360c2-343b-493c-93ef-d6d6891af929\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-haiku-4-5-20251001\",\"permissionMode\":\"default\",\"slas"
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"07b360c2-343b-493c-93ef-d6d6891af929\",\"uuid\":\"f305e2df-3b11-4a74-96d0-49e5953028f5\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "effort-low-haiku45 loopback completed"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "effort-low-haiku45 loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "effort-xhigh-haiku45",
+      "requests": [
+        {
+          "phase": "effort-xhigh-haiku45",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550131163,
+          "thinking": {
+            "budget_tokens": 31999,
+            "type": "enabled",
+            "display": "updates"
+          },
+          "outputConfig": null,
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,claude-code-20250219,thinking-display-updates-2026-08-18",
+          "model": "claude-haiku-4-5-20251001",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"5f95b1be-eba0-4a34-a60f-68dc09bbcb2d\",\"session_id\":\"a7e676be-7fa8-469c-be06-00ab7890bdfe\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"a7e676be-7fa8-469c-be06-00ab7890bdfe\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-haiku-4-5-20251001\",\"permissionMode\":\"default\",\"slas"
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"a7e676be-7fa8-469c-be06-00ab7890bdfe\",\"uuid\":\"e17a2303-38eb-4449-a26c-f728cde1a7e6\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "effort-xhigh-haiku45 loopback completed"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "effort-xhigh-haiku45 loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "capture-empty-thinking",
+      "requests": [
+        {
+          "phase": "capture-empty-thinking",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550131355,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"86e7df59-0b6c-45ed-84bd-66ee47abd8fc\",\"session_id\":\"ddab9041-2878-42a5-9ee0-9f582f8ea9a6\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"ddab9041-2878-42a5-9ee0-9f582f8ea9a6\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5\",\"permissionMode\":\"auto\",\"slash_commands\":["
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 0,
+              "thinking": "",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "capture-empty-thinking loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:56831, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "capture-empty-thinking loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "reject-thinking-400",
+      "requests": [
+        {
+          "phase": "reject-thinking-400",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550131549,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "reject-thinking-400",
+          "index": 1,
+          "round": 0,
+          "arrivedAt": 1792550131552,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "reject-thinking-400",
+          "index": 2,
+          "round": 0,
+          "arrivedAt": 1792550131553,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"054f94dd-130a-4432-9ba6-3710e5e977be\",\"session_id\":\"55d06f2a-b689-42a2-8393-e0d386c4212d\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"55d06f2a-b689-42a2-8393-e0d386c4212d\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5\",\"permissionMode\":\"auto\",\"slash_commands\":["
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "API Error: 400 fixture gateway rejects thinking on this endpoint"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": true,
+        "textHead": "API Error: 400 fixture gateway rejects thinking on this endpoint",
+        "numTurns": 1
+      },
+      "streamError": "Claude Code returned an error result: API Error: 400 fixture gateway rejects thinking on this endpoint"
+    },
+    {
+      "name": "reject-effort-400",
+      "requests": [
+        {
+          "phase": "reject-effort-400",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550131724,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "high"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "reject-effort-400",
+          "index": 1,
+          "round": 0,
+          "arrivedAt": 1792550131726,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "high"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "reject-effort-400",
+          "index": 2,
+          "round": 0,
+          "arrivedAt": 1792550131727,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "high"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"a5b06b4f-414b-4c0d-8140-bb09f827a615\",\"session_id\":\"b2a560f9-0231-41b7-a580-75dad54e6872\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/tmp/ans-claude-reasoning-loopback-7xvORA\",\"session_id\":\"b2a560f9-0231-41b7-a580-75dad54e6872\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5\",\"permissionMode\":\"auto\",\"slash_commands\":["
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "API Error: 400 fixture gateway rejects effort on this endpoint"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": true,
+        "textHead": "API Error: 400 fixture gateway rejects effort on this endpoint",
+        "numTurns": 1
+      },
+      "streamError": "Claude Code returned an error result: API Error: 400 fixture gateway rejects effort on this endpoint"
+    }
+  ],
+  "adapterReport": {
+    "name": "adapter-wiring-high",
+    "requests": [
+      {
+        "phase": "adapter-wiring-high",
+        "index": 0,
+        "round": 0,
+        "arrivedAt": 1792550131961,
+        "thinking": {
+          "type": "adaptive",
+          "display": "updates"
+        },
+        "outputConfig": {
+          "effort": "high"
+        },
+        "effortFlat": null,
+        "maxTokens": 32000,
+        "bodyKeys": [
+          "context_management",
+          "max_tokens",
+          "messages",
+          "metadata",
+          "model",
+          "output_config",
+          "safeguards",
+          "stream",
+          "system",
+          "thinking",
+          "tools"
+        ],
+        "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+        "model": "claude-sonnet-4-6",
+        "userMessages": 1,
+        "toolResults": 0
+      }
+    ],
+    "rows": [
+      {
+        "kind": "message",
+        "summary": "用户指令：adapter wiring turn",
+        "detail": {
+          "source": "prompt-input",
+          "text": "adapter wiring turn",
+          "turnId": "74733bd0-fad1-494e-937c-c2b75869b4e9"
+        }
+      },
+      {
+        "kind": "message",
+        "summary": "本会话向 Claude SDK 请求的思考配置：high；模型可能忽略或限制档位，服务端实际采纳未验证。",
+        "detail": {
+          "source": "system",
+          "reasonCode": "claude-reasoning",
+          "state": "configured",
+          "turnId": "74733bd0-fad1-494e-937c-c2b75869b4e9"
+        }
+      },
+      {
+        "kind": "message",
+        "summary": "已思考",
+        "detail": {
+          "version": 1,
+          "source": "reasoning",
+          "reasoning": {
+            "text": {
+              "text": "fixture chain of thought",
+              "truncated": false,
+              "redacted": false
+            },
+            "status": "complete"
+          },
+          "turnId": "74733bd0-fad1-494e-937c-c2b75869b4e9"
+        }
+      },
+      {
+        "kind": "message",
+        "summary": "已思考",
+        "detail": {
+          "version": 1,
+          "source": "reasoning",
+          "reasoning": {
+            "text": {
+              "text": "",
+              "truncated": false,
+              "redacted": false
+            },
+            "status": "omitted"
+          },
+          "turnId": "74733bd0-fad1-494e-937c-c2b75869b4e9"
+        }
+      },
+      {
+        "kind": "message",
+        "summary": "adapter-wiring-high loopback completed",
+        "detail": {
+          "turnId": "74733bd0-fad1-494e-937c-c2b75869b4e9"
+        }
+      },
+      {
+        "kind": "settled",
+        "summary": "会话结束",
+        "detail": {
+          "turnId": "74733bd0-fad1-494e-937c-c2b75869b4e9",
+          "outcome": "completed"
+        }
+      }
+    ],
+    "settled": "completed"
+  },
+  "compatibilityReports": [
+    {
+      "name": "compatibility-success-effort",
+      "configurations": [
+        {
+          "effort": "low",
+          "thinking": null,
+          "effortEnv": null,
+          "thinkingEnv": null,
+          "model": "claude-sonnet-4-6"
+        },
+        {
+          "effort": null,
+          "thinking": null,
+          "effortEnv": "unset",
+          "thinkingEnv": "1",
+          "model": "claude-sonnet-4-6"
+        }
+      ],
+      "requests": [
+        {
+          "phase": "compatibility-success-effort",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550132151,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-success-effort",
+          "index": 1,
+          "round": 0,
+          "arrivedAt": 1792550132153,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-success-effort",
+          "index": 2,
+          "round": 0,
+          "arrivedAt": 1792550132153,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-success-effort",
+          "index": 3,
+          "round": 0,
+          "arrivedAt": 1792550132331,
+          "thinking": null,
+          "outputConfig": null,
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "safeguards",
+            "stream",
+            "system",
+            "temperature",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-success-effort",
+          "index": 4,
+          "round": 1,
+          "arrivedAt": 1792550132345,
+          "thinking": null,
+          "outputConfig": null,
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "stream",
+            "system",
+            "temperature",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 2,
+          "toolResults": 0
+        }
+      ],
+      "outcomes": [
+        "completed",
+        "completed"
+      ],
+      "states": [
+        "configured",
+        "request-error",
+        "trying",
+        "compatible"
+      ],
+      "toolCalls": 0,
+      "errors": [],
+      "rows": [
+        {
+          "kind": "message",
+          "summary": "本会话向 Claude SDK 请求的思考配置：low；模型可能忽略或限制档位，服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "configured"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "Claude 接口请求未成功。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "request-error"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "trying"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "compatibility fixture completed"
+        },
+        {
+          "kind": "message",
+          "summary": "本会话已使用兼容请求完成，后续沿用该方式；已保存设置不变，修改设置并重建会话后重新尝试。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "compatible"
+          }
+        },
+        {
+          "kind": "settled",
+          "summary": "Claude 本轮completed",
+          "detail": {
+            "outcome": "completed",
+            "turnId": "06533cb5-26ac-4f97-831c-b6eb6b6e6df0"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "compatibility fixture completed"
+        },
+        {
+          "kind": "settled",
+          "summary": "Claude 本轮completed",
+          "detail": {
+            "outcome": "completed",
+            "turnId": "32d7f840-c8f4-4803-8b94-c0deada8d368"
+          }
+        }
+      ]
+    },
+    {
+      "name": "compatibility-failure-effort",
+      "configurations": [
+        {
+          "effort": "low",
+          "thinking": null,
+          "effortEnv": null,
+          "thinkingEnv": null,
+          "model": "claude-sonnet-4-6"
+        },
+        {
+          "effort": null,
+          "thinking": null,
+          "effortEnv": "unset",
+          "thinkingEnv": "1",
+          "model": "claude-sonnet-4-6"
+        },
+        {
+          "effort": "low",
+          "thinking": null,
+          "effortEnv": null,
+          "thinkingEnv": null,
+          "model": "claude-sonnet-4-6"
+        }
+      ],
+      "requests": [
+        {
+          "phase": "compatibility-failure-effort",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550132508,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-failure-effort",
+          "index": 1,
+          "round": 0,
+          "arrivedAt": 1792550132511,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-failure-effort",
+          "index": 2,
+          "round": 0,
+          "arrivedAt": 1792550132512,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-failure-effort",
+          "index": 3,
+          "round": 0,
+          "arrivedAt": 1792550132689,
+          "thinking": null,
+          "outputConfig": null,
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "safeguards",
+            "stream",
+            "system",
+            "temperature",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-failure-effort",
+          "index": 4,
+          "round": 0,
+          "arrivedAt": 1792550132691,
+          "thinking": null,
+          "outputConfig": null,
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "stream",
+            "system",
+            "temperature",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-failure-effort",
+          "index": 5,
+          "round": 1,
+          "arrivedAt": 1792550132862,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "outcomes": [
+        "failed",
+        "completed"
+      ],
+      "states": [
+        "configured",
+        "request-error",
+        "trying",
+        "request-error"
+      ],
+      "toolCalls": 0,
+      "errors": [
+        "Error"
+      ],
+      "rows": [
+        {
+          "kind": "message",
+          "summary": "本会话向 Claude SDK 请求的思考配置：low；模型可能忽略或限制档位，服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "configured"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "Claude 接口请求未成功。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "request-error"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "trying"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "Claude 接口请求未成功。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "request-error"
+          }
+        },
+        {
+          "kind": "settled",
+          "summary": "Claude 本轮failed",
+          "detail": {
+            "outcome": "failed",
+            "turnId": "9cd6daaa-9948-4e2e-8627-2dfbce934862"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "compatibility fixture completed"
+        },
+        {
+          "kind": "settled",
+          "summary": "Claude 本轮completed",
+          "detail": {
+            "outcome": "completed",
+            "turnId": "3ceb06f3-29be-4c01-9406-fcfb6126c080"
+          }
+        }
+      ]
+    },
+    {
+      "name": "compatibility-cancel-effort",
+      "configurations": [
+        {
+          "effort": "low",
+          "thinking": null,
+          "effortEnv": null,
+          "thinkingEnv": null,
+          "model": "claude-sonnet-4-6"
+        },
+        {
+          "effort": null,
+          "thinking": null,
+          "effortEnv": "unset",
+          "thinkingEnv": "1",
+          "model": "claude-sonnet-4-6"
+        },
+        {
+          "effort": "low",
+          "thinking": null,
+          "effortEnv": null,
+          "thinkingEnv": null,
+          "model": "claude-sonnet-4-6"
+        }
+      ],
+      "requests": [
+        {
+          "phase": "compatibility-cancel-effort",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550133035,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-cancel-effort",
+          "index": 1,
+          "round": 0,
+          "arrivedAt": 1792550133038,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-cancel-effort",
+          "index": 2,
+          "round": 0,
+          "arrivedAt": 1792550133038,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-cancel-effort",
+          "index": 3,
+          "round": 0,
+          "arrivedAt": 1792550133194,
+          "thinking": null,
+          "outputConfig": null,
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "safeguards",
+            "stream",
+            "system",
+            "temperature",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-cancel-effort",
+          "index": 4,
+          "round": 1,
+          "arrivedAt": 1792550133344,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "outcomes": [
+        "aborted",
+        "completed"
+      ],
+      "states": [
+        "configured",
+        "request-error",
+        "trying"
+      ],
+      "toolCalls": 0,
+      "errors": [
+        "AbortError"
+      ],
+      "rows": [
+        {
+          "kind": "message",
+          "summary": "本会话向 Claude SDK 请求的思考配置：low；模型可能忽略或限制档位，服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "configured"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "Claude 接口请求未成功。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "request-error"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "trying"
+          }
+        },
+        {
+          "kind": "settled",
+          "summary": "Claude 本轮aborted",
+          "detail": {
+            "outcome": "aborted",
+            "turnId": "d42f30b1-c4cd-46b7-b0a6-48d8dc623d33"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "compatibility fixture completed"
+        },
+        {
+          "kind": "settled",
+          "summary": "Claude 本轮completed",
+          "detail": {
+            "outcome": "completed",
+            "turnId": "57456218-c264-4798-b139-62c57338c4c1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "compatibility-timeout-effort",
+      "configurations": [
+        {
+          "effort": "low",
+          "thinking": null,
+          "effortEnv": null,
+          "thinkingEnv": null,
+          "model": "claude-sonnet-4-6"
+        },
+        {
+          "effort": null,
+          "thinking": null,
+          "effortEnv": "unset",
+          "thinkingEnv": "1",
+          "model": "claude-sonnet-4-6"
+        },
+        {
+          "effort": "low",
+          "thinking": null,
+          "effortEnv": null,
+          "thinkingEnv": null,
+          "model": "claude-sonnet-4-6"
+        }
+      ],
+      "requests": [
+        {
+          "phase": "compatibility-timeout-effort",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550133508,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-timeout-effort",
+          "index": 1,
+          "round": 0,
+          "arrivedAt": 1792550133510,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-timeout-effort",
+          "index": 2,
+          "round": 0,
+          "arrivedAt": 1792550133510,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-timeout-effort",
+          "index": 3,
+          "round": 0,
+          "arrivedAt": 1792550133669,
+          "thinking": null,
+          "outputConfig": null,
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "safeguards",
+            "stream",
+            "system",
+            "temperature",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-timeout-effort",
+          "index": 4,
+          "round": 1,
+          "arrivedAt": 1792550135219,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        }
+      ],
+      "outcomes": [
+        "timed_out",
+        "completed"
+      ],
+      "states": [
+        "configured",
+        "request-error",
+        "trying"
+      ],
+      "toolCalls": 0,
+      "errors": [
+        "TimeoutError"
+      ],
+      "rows": [
+        {
+          "kind": "message",
+          "summary": "本会话向 Claude SDK 请求的思考配置：low；模型可能忽略或限制档位，服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "configured"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "Claude 接口请求未成功。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "request-error"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "trying"
+          }
+        },
+        {
+          "kind": "settled",
+          "summary": "Claude 本轮超过最后兜底（1500ms），已中止",
+          "detail": {
+            "outcome": "timed_out",
+            "turnId": "f180ce3d-075b-466c-b178-78c3ae3ce056"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "compatibility fixture completed"
+        },
+        {
+          "kind": "settled",
+          "summary": "Claude 本轮completed",
+          "detail": {
+            "outcome": "completed",
+            "turnId": "bd9d5987-1c4c-4fc6-b294-50465c9b4757"
+          }
+        }
+      ]
+    },
+    {
+      "name": "compatibility-tool-started-effort",
+      "configurations": [
+        {
+          "effort": "low",
+          "thinking": null,
+          "effortEnv": null,
+          "thinkingEnv": null,
+          "model": "claude-sonnet-4-6"
+        }
+      ],
+      "requests": [
+        {
+          "phase": "compatibility-tool-started-effort",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550135391,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-tool-started-effort",
+          "index": 1,
+          "round": 0,
+          "arrivedAt": 1792550135409,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 2,
+          "toolResults": 1
+        },
+        {
+          "phase": "compatibility-tool-started-effort",
+          "index": 2,
+          "round": 0,
+          "arrivedAt": 1792550135410,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 2,
+          "toolResults": 1
+        },
+        {
+          "phase": "compatibility-tool-started-effort",
+          "index": 3,
+          "round": 0,
+          "arrivedAt": 1792550135411,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 2,
+          "toolResults": 1
+        }
+      ],
+      "outcomes": [
+        "failed"
+      ],
+      "states": [
+        "configured",
+        "request-error"
+      ],
+      "toolCalls": 1,
+      "errors": [
+        "Error"
+      ],
+      "rows": [
+        {
+          "kind": "message",
+          "summary": "本会话向 Claude SDK 请求的思考配置：low；模型可能忽略或限制档位，服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "configured"
+          }
+        },
+        {
+          "kind": "tool_call",
+          "summary": "probe_tool",
+          "detail": {
+            "toolCallId": "6c6650fe-570a-4502-9282-64a65837c54f:fixture_side_effect",
+            "toolName": "probe_tool"
+          }
+        },
+        {
+          "kind": "accepted",
+          "summary": "fixture tool executed once",
+          "detail": {
+            "toolCallId": "6c6650fe-570a-4502-9282-64a65837c54f:fixture_side_effect",
+            "toolName": "probe_tool"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "Claude 接口请求未成功。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "request-error"
+          }
+        },
+        {
+          "kind": "settled",
+          "summary": "Claude 本轮failed",
+          "detail": {
+            "outcome": "failed",
+            "turnId": "6c6650fe-570a-4502-9282-64a65837c54f"
+          }
+        }
+      ]
+    },
+    {
+      "name": "compatibility-success-thinking",
+      "configurations": [
+        {
+          "effort": "low",
+          "thinking": null,
+          "effortEnv": null,
+          "thinkingEnv": null,
+          "model": "claude-sonnet-4-6"
+        },
+        {
+          "effort": null,
+          "thinking": null,
+          "effortEnv": "unset",
+          "thinkingEnv": "1",
+          "model": "claude-sonnet-4-6"
+        }
+      ],
+      "requests": [
+        {
+          "phase": "compatibility-success-thinking",
+          "index": 0,
+          "round": 0,
+          "arrivedAt": 1792550135595,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-success-thinking",
+          "index": 1,
+          "round": 0,
+          "arrivedAt": 1792550135598,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-success-thinking",
+          "index": 2,
+          "round": 0,
+          "arrivedAt": 1792550135600,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-success-thinking",
+          "index": 3,
+          "round": 0,
+          "arrivedAt": 1792550135767,
+          "thinking": null,
+          "outputConfig": null,
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "safeguards",
+            "stream",
+            "system",
+            "temperature",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 1,
+          "toolResults": 0
+        },
+        {
+          "phase": "compatibility-success-thinking",
+          "index": 4,
+          "round": 1,
+          "arrivedAt": 1792550135779,
+          "thinking": null,
+          "outputConfig": null,
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "stream",
+            "system",
+            "temperature",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6",
+          "userMessages": 2,
+          "toolResults": 0
+        }
+      ],
+      "outcomes": [
+        "completed",
+        "completed"
+      ],
+      "states": [
+        "configured",
+        "request-error",
+        "trying",
+        "compatible"
+      ],
+      "toolCalls": 0,
+      "errors": [],
+      "rows": [
+        {
+          "kind": "message",
+          "summary": "本会话向 Claude SDK 请求的思考配置：low；模型可能忽略或限制档位，服务端实际采纳未验证。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "configured"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "Claude 接口请求未成功。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "request-error"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "trying"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "compatibility fixture completed"
+        },
+        {
+          "kind": "message",
+          "summary": "本会话已使用兼容请求完成，后续沿用该方式；已保存设置不变，修改设置并重建会话后重新尝试。",
+          "detail": {
+            "source": "system",
+            "reasonCode": "claude-reasoning",
+            "state": "compatible"
+          }
+        },
+        {
+          "kind": "settled",
+          "summary": "Claude 本轮completed",
+          "detail": {
+            "outcome": "completed",
+            "turnId": "2012d079-713a-4ce5-9438-fa0d4550e632"
+          }
+        },
+        {
+          "kind": "message",
+          "summary": "compatibility fixture completed"
+        },
+        {
+          "kind": "settled",
+          "summary": "Claude 本轮completed",
+          "detail": {
+            "outcome": "completed",
+            "turnId": "8cb9ceba-1353-411d-acbe-8e1475a1fff0"
+          }
+        }
+      ]
+    }
+  ]
+}

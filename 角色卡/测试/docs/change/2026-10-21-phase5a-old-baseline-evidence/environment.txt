@@ -1,0 +1,15 @@
+Phase 5A old-end snapshot environment
+date: 2026-10-21T18:04:35+08:00
+HEAD: 224cf831f7a26fd2fac8af7155790a75fa31f6b5
+branch: main
+node: v24.14.0
+npm: 11.9.0
+electron: v44.7.0
+platform: Darwin wangzhongrendeMacBook-Pro.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:16:20 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T8142 arm64
+arch: arm64
+renderer_entry: /Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/index.html
+old_entry_sha256: 03f493e36d9a74e76676c19c478208912b74eb3c5c4bd87dc73f9114f1968a92
+offline: yes (suites use controlled IPC/no model/network)
+uiux_interactive: 0
+node_unit_expect: 96/96
+desktop_baseline_expect: 679/679

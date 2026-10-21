@@ -1,0 +1,6 @@
+cb8c093fab318ad113c6db8fe9dda14c98507e1e48315115813eae9a770ad942  app/renderer/src/chat/chat-store.ts
+8be4e79d943a45dfc406308ba777607dcedcabcf4242de44c7e927f817cbd6bc  app/renderer/src/chat/ipc.ts
+11f4c812eb215552665947d2e7969c297896b8c5a10d7be1cb55156721f3a282  app/renderer/src/chat/VirtualPane.tsx
+6c953095eb3eecb28cd9b6cc9fbae8b26a151c967106efce90df8d5ffd7f648e  app/renderer/src/shell/phase4b.css
+8b9d54fd2c8af6818cb02dd13c675795790700ffe440f3bf061f23370e982445  test/桌面应用/e2e/main.mjs
+9e7cef7691324d493a4da2f24b9d04125b4fe487ed091d0e535a3a9f3d04f1c7  app/main.ts

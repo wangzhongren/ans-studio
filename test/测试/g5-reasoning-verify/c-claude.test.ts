@@ -1,7 +1,7 @@
 // test/测试/g5-reasoning-verify/c-claude.test.ts —— C 域：Claude 适配器接线（独立验证，自建假 SDK）。
 //
 // 验证对象：`src/provider/claude/session.ts`（映射表未设/off/四档；thinking/redacted 捕获⇒事实；
-// 降级判据＋会话级恰一次＋同输入原地重推＋此后零参数；负例双向）。
+// D1 精确兼容判据、子进程双 env 去参、成功后沿用/失败恢复、同输入安全重推与负例）。
 // 自建最小假 query（真 createSdkMcpServer/zod 保装配面真实；transport 假化），全部断言独立构造。
 
 import test from "node:test";
@@ -29,6 +29,12 @@ function fakeGate(): InteractionGate {
 }
 
 const API_SECRET = "claude-g5-secret-317";
+function systemRows(events: SessionEvent[], state: string) {
+  return events.filter(event => {
+    const detail = event.detail as { source?: string; state?: string } | undefined;
+    return detail?.source === "system" && detail.state === state;
+  });
+}
 
 type Frame = Record<string, unknown>;
 type Script = (queryIndex: number, userIndex: number, options: SDK.Options) => { frames?: Frame[]; fail?: string } | undefined;
@@ -89,7 +95,7 @@ function fakeClaude(script: Script): FakeClaude {
 }
 
 function options(root: string, extra: Partial<RuntimeProviderOptions> = {}): RuntimeProviderOptions {
-  return { runtime: "claude", projectRoot: root, skillRoot: root, tools: [], modelId: "fixture-model", currentTurnId: () => undefined, interactionGate: fakeGate(), ...extra };
+  return { runtime: "claude", projectRoot: root, skillRoot: root, tools: [], modelId: "fixture-model", currentTurnId: () => "g5-claude-turn", interactionGate: fakeGate(), ...extra };
 }
 
 function assistantFrame(content: unknown[]): Frame {
@@ -177,6 +183,10 @@ test("C3 降级正向：4xx＋参数词元 ⇒ 恰一次去参数重发（新引
     assert.equal(fake.configurations[0]!.effort, "high", "首引擎带 effort");
     assert.equal("thinking" in fake.configurations[1]!, false);
     assert.equal("effort" in fake.configurations[1]!, false, "重发引擎零推理参数");
+    const compatibleEnv = fake.configurations[1]!.env as Record<string, string>;
+    assert.equal(compatibleEnv.CLAUDE_CODE_EFFORT_LEVEL, "unset");
+    assert.equal(compatibleEnv.CLAUDE_CODE_DISABLE_THINKING, "1");
+    assert.equal(fake.dependencies.env.CLAUDE_CODE_EFFORT_LEVEL, undefined, "主进程/输入环境不修改");
     // 同输入原地重推：同 uuid、同 message 逐字（含 [ANS_INPUT_CONTEXT] 前缀）。
     assert.equal(fake.users.length, 2, "同轮恰两次投递（原发＋重发）");
     assert.equal(fake.users[0]!.uuid, fake.users[1]!.uuid, "同 uuid");
@@ -187,19 +197,23 @@ test("C3 降级正向：4xx＋参数词元 ⇒ 恰一次去参数重发（新引
     assert.equal(fake.users.length, 3);
     await session.dispose();
     const rows = await rowsPromise;
-    const notices = rows.filter((row) => row.kind === "message" && String(row.summary).includes("网关不支持推理参数"));
-    assert.equal(notices.length, 1, "如实一行恰一次");
+    const notices = systemRows(rows, "compatible");
+    assert.equal(notices.length, 1, "只有完成后才宣布兼容成功");
+    assert.equal(systemRows(rows, "trying").length, 1);
+    assert.equal(systemRows(rows, "configured").length, 1);
+    assert.ok([...notices, ...systemRows(rows, "trying"), ...systemRows(rows, "configured")].every(row => row.turnId === "g5-claude-turn"));
     const settled = rows.filter((row) => row.kind === "settled");
     assert.equal(settled.length, 2, "settled 单点（每轮恰一；失败尝试不产 settled）");
     assert.deepEqual(settled.map((row) => (row.detail as { outcome: string }).outcome), ["completed", "completed"], "降级后本轮按成功收场");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("C3b 降级负例双向：5xx 带词元不识别；4xx 无词元不识别；未设会话同文案不降级（不重建、失败如实上抛）", async () => {
+test("C3b 负例：5xx/无参数词元/错误模型/鉴权/运输错误不误触发兼容", async () => {
   const negatives: Array<{ fail: string; effort?: RuntimeProviderOptions["reasoningEffort"]; label: string }> = [
     { fail: "API Error: 500 upstream unstable while handling thinking", effort: "low", label: "5xx 带词元" },
     { fail: "API Error: 400 plain rate limit exceeded", effort: "low", label: "4xx 无词元" },
-    { fail: "API Error: 400 rejects effort", label: "未设会话（无参数可去）" },
+    { fail: 'API Error: 400 {"error":{"type":"invalid_request_error","param":"model","message":"Unknown model, effort unavailable"}}', effort: "high", label: "错误模型即使提及 effort 也不误触发" },
+    { fail: "API Error: 403 authentication denied thinking", effort: "high", label: "鉴权错误" },
     { fail: "network reset while streaming thinking", effort: "low", label: "非 API Error 形态" },
   ];
   for (const cell of negatives) {
@@ -213,27 +227,55 @@ test("C3b 降级负例双向：5xx 带词元不识别；4xx 无词元不识别�
       assert.equal(fake.users.length, 1, cell.label + "：不重发");
       await session.dispose();
       const rows = await rowsPromise;
-      assert.equal(rows.some((row) => String(row.summary).includes("网关不支持推理参数")), false, cell.label + "：无降级行");
+      assert.equal(systemRows(rows, "trying").length, 0, cell.label + "：无兼容尝试");
+      assert.equal(systemRows(rows, "compatible").length, 0, cell.label + "：无伪成功");
       assert.equal((rows.filter((row) => row.kind === "settled").at(-1)!.detail as { outcome: string }).outcome, "failed", cell.label + "：失败终态");
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });
 
-test("C3c 降级闸会话级恰一次：重发仍被拒 ⇒ 无第二次重发；本会话后续轮次不再触发（引擎已零参数）", async () => {
+test("C3c 兼容失败恢复配置：每轮最多一次尝试，下一轮重施原 off，绝不记忆未成功候选", async () => {
   const root = tempRoot();
   try {
-    const fake = fakeClaude((index) => ({ fail: `API Error: 403 thinking rejected (attempt ${index})` }));
-    const session = await createClaudeRuntimeAdapter(options(root, { reasoningEffort: "off" }), fake.dependencies as never).bindRole(makeRole("R-C"));
-    const rowsPromise = (async () => { const out: SessionEvent[] = []; for await (const event of session.events()) out.push(event); return out; })();
-    await assert.rejects(session.prompt("首轮"), /Claude/);
-    assert.equal(fake.configurations.length, 2, "首失败 + 恰一次重发（重发再拒不再重建）");
-    // 次轮：引擎已零参数（重发引擎），失败仍如实（不再产降级行——闸已关）。
-    await assert.rejects(session.prompt("次轮"), /Claude/);
-    assert.equal(fake.configurations.length, 3, "次轮换新引擎重建（上轮失败关引擎），但声称零参数");
-    assert.equal("thinking" in fake.configurations[2]!, false, "此后零参数（含 off 档）");
-    assert.equal("effort" in fake.configurations[2]!, false);
-    await session.dispose();
-    const rows = await rowsPromise;
-    assert.equal(rows.filter((row) => String(row.summary).includes("网关不支持推理参数")).length, 1, "降级行会话级恰一次");
+    const fake = fakeClaude(() => ({ fail: "API Error: 400 unsupported parameter: thinking" }));
+    const configured = options(root, { reasoningEffort: "off" });
+    const session = await createClaudeRuntimeAdapter(configured, fake.dependencies as never).bindRole(makeRole("R-C"));
+    const events: SessionEvent[] = [];
+    const collected = (async () => { for await (const event of session.events()) events.push(event); })();
+    try {
+      await assert.rejects(session.prompt("首轮"), /Claude/);
+      assert.equal(fake.configurations.length, 2, "首轮原配置加一次兼容尝试");
+      await assert.rejects(session.prompt("次轮"), /Claude/);
+      assert.equal(fake.configurations.length, 4, "下一轮恢复原配置，再至多尝试一次");
+      assert.deepEqual(fake.configurations[2]!.thinking, { type: "disabled" });
+      assert.equal((fake.configurations[2]!.env as Record<string, string>).CLAUDE_CODE_EFFORT_LEVEL, undefined);
+      assert.equal(configured.reasoningEffort, "off", "保存设置不变");
+    } finally { await session.dispose(); await collected; }
+    assert.equal(systemRows(events, "trying").length, 2);
+    assert.equal(systemRows(events, "compatible").length, 0);
+    assert.deepEqual(events.filter(event => event.kind === "settled").map(event => (event.detail as { outcome: string }).outcome), ["failed", "failed"]);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("C4 默认也能兼容；已有真实输出时不重放用户任务", async () => {
+  for (const alreadyOutput of [false, true]) {
+    const root = tempRoot();
+    try {
+      const fake = fakeClaude(index => index === 0 ? {
+        fail: "API Error: 400 unsupported parameter: thinking",
+        frames: alreadyOutput ? [assistantFrame([{ type: "text", text: "already delivered" }])] : [],
+      } : undefined);
+      const session = await createClaudeRuntimeAdapter(options(root), fake.dependencies as never).bindRole(makeRole("R-C"));
+      const events: SessionEvent[] = [];
+      const collected = (async () => { for await (const event of session.events()) events.push(event); })();
+      try {
+        if (alreadyOutput) await assert.rejects(session.prompt("default-output"), /Claude/);
+        else await session.prompt("default-compatible");
+        assert.equal(fake.configurations.length, alreadyOutput ? 1 : 2);
+        assert.equal(fake.users.length, alreadyOutput ? 1 : 2);
+      } finally { await session.dispose(); await collected; }
+      assert.equal(systemRows(events, "compatible").length, alreadyOutput ? 0 : 1);
+      assert.equal(events.filter(event => event.kind === "settled").length, 1);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
 });

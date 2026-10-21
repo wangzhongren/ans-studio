@@ -1,0 +1,151 @@
+{
+  "phase": "5A",
+  "candidate": "old entry (historical baseline; not new candidate)",
+  "summary": {
+    "snapshot": "pass (A-L coverage; 92 PNG / 75 metrics / 10 keyboard records)",
+    "old_design": "1360/960 pass; 200% needs-work; old entry retired, not to fix",
+    "old_functional": "E2E_PASS=false; RECOVERY_SAME_PENDING_CARD_ONCE (pre-existing; not visual pass)"
+  },
+  "items": [
+    {
+      "id": "5A-F1",
+      "severity": "P1",
+      "status": "old-baseline needs-work",
+      "scene": "B/K 200% left tree",
+      "finding": "role-tree clientHeight=0 at 200% CSS 480x310; roles invisible, cannot navigate.",
+      "evidence": [
+        "raw/05-bootstrap-200.png",
+        "raw/01-import-200.png",
+        "raw/metrics-audit-00-main-200.json"
+      ],
+      "expected": "tree visible with six role rows or scrollable to last row",
+      "actual": "role-tree rect h=0; screenshots show blank below 工作空间",
+      "owner": "old entry (historical); new candidate must pass plan B",
+      "retest": "new entry 200% tree visible/scrollable"
+    },
+    {
+      "id": "5A-F2",
+      "severity": "P1",
+      "status": "old-baseline needs-work",
+      "scene": "A/C/L 200% header/composer",
+      "finding": "chat-head scrollWidth 312 > clientWidth 232; composer 496 > 232; title/context vertical; internal horizontal overflow.",
+      "evidence": [
+        "raw/05-bootstrap-200.png",
+        "raw/audit-00-main-200.png",
+        "raw/metrics-audit-00-main-200.json"
+      ],
+      "expected": "header wraps; no horizontal overflow; content reflows",
+      "actual": "overflow and vertical single-character text",
+      "owner": "old entry (historical); new candidate must pass plan A/C/L",
+      "retest": "new entry 200% header/composer"
+    },
+    {
+      "id": "5A-F3",
+      "severity": "P2",
+      "status": "old-baseline observation",
+      "scene": "B 1360/960 left column",
+      "finding": ".col-left scrollWidth 251 > clientWidth 247 (4px).",
+      "evidence": [
+        "raw/metrics-audit-00-main.json",
+        "raw/metrics-audit-00-main-960.json"
+      ],
+      "expected": "no internal horizontal overflow",
+      "actual": "4px internal overflow; no visible page horizontal scroll",
+      "owner": "old entry (historical)",
+      "retest": "new entry check col-left"
+    },
+    {
+      "id": "5A-F4",
+      "severity": "P2",
+      "status": "old-baseline observation",
+      "scene": "I 1360 governance preview",
+      "finding": "governance-preview width 1048 / right 1328, wider than 900 content column (right 1254).",
+      "evidence": [
+        "raw/audit-05-governance.png",
+        "raw/metrics-audit-05-governance.json"
+      ],
+      "expected": "preview aligns to content column (new design 900)",
+      "actual": "extends 74px beyond content",
+      "owner": "old entry; new design changes preview to content width",
+      "retest": "new entry governance preview width"
+    },
+    {
+      "id": "5A-F5",
+      "severity": "P1",
+      "status": "old-baseline needs-work",
+      "scene": "I governance preview keyboard",
+      "finding": "After opening preview, Esc leaves preview open and focus on #runtime-select; old entry lacks the new Esc-close path.",
+      "evidence": [
+        "raw/audit-05-governance.png",
+        "raw/keyboard-governance-open.json",
+        "raw/keyboard-governance-esc.json"
+      ],
+      "expected": "Esc closes preview and returns trigger (new design)",
+      "actual": "preview=true after Esc; focus not moved",
+      "owner": "old entry (historical); new 4B design requires Esc",
+      "retest": "new entry preview Esc/focus"
+    },
+    {
+      "id": "5A-F6",
+      "severity": "P1",
+      "status": "old-function needs-work (not visual)",
+      "scene": "old e2e behavior",
+      "finding": "E2E_PASS=false; RECOVERY_SAME_PENDING_CARD_ONCE. Unmodified old e2e reproduces; not caused by visual instrumentation.",
+      "evidence": [
+        "raw/report.txt",
+        "raw-standard/report.txt"
+      ],
+      "expected": "old baseline pass for functional comparison",
+      "actual": "one pre-existing failure",
+      "owner": "test/acceptance (old baseline); not UIUX design",
+      "retest": "test 5A independent verification"
+    },
+    {
+      "id": "5A-F7",
+      "severity": "P2",
+      "status": "missing-evidence",
+      "scene": "J/I 200% target screenshots",
+      "finding": "old 200% report and governance-preview screenshots stop at header/status; target cards/preview not visible. 04-profile.png shows chat not profile.",
+      "evidence": [
+        "raw/07-handback-200.png",
+        "raw/audit-05-governance-200.png",
+        "raw/04-profile.png"
+      ],
+      "expected": "old 200% report/preview/profile target visible",
+      "actual": "not captured; old tree/header issue blocks",
+      "owner": "UIUX 5A evidence (old); new candidate must capture target",
+      "retest": "new entry 200% report/details/preview/profile"
+    },
+    {
+      "id": "5A-F8",
+      "severity": "P2",
+      "status": "old-baseline observation",
+      "scene": "G 200% settings",
+      "finding": "old Pi drawer 424px wide in 480px CSS viewport; left tree blank behind; settings remains navigable only via drawer.",
+      "evidence": [
+        "raw/audit-03-settings-200.png",
+        "raw/metrics-audit-03-settings-200.json"
+      ],
+      "expected": "new design drawer min(424,100vw) and reflow",
+      "actual": "drawer nearly full width; old background unusable",
+      "owner": "old entry (historical)",
+      "retest": "new entry settings 200"
+    },
+    {
+      "id": "5A-F9",
+      "severity": "P2",
+      "status": "old-baseline observation",
+      "scene": "old demo markers",
+      "finding": "Old chat screenshots include “演示运行时·第 N 轮” markers; old entry had demo fixtures. New candidate must be checked for no demo marker.",
+      "evidence": [
+        "raw/04-profile.png",
+        "raw/12-composer.png",
+        "raw/15-anchor-reanchor.png"
+      ],
+      "expected": "production new entry no 演示/demo marker",
+      "actual": "old fixture markers",
+      "owner": "old entry (historical); new audit L",
+      "retest": "new entry grep/screenshot"
+    }
+  ]
+}

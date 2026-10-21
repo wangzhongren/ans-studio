@@ -1,0 +1,43 @@
+=== 旧渲染器核心与主进程/preload 是否零 diff（vs HEAD）===
+UNCHANGED app/renderer/index.html
+UNCHANGED app/renderer/renderer.js
+UNCHANGED app/renderer/styles.css
+UNCHANGED app/renderer/tool-rows.js
+UNCHANGED app/renderer/role-status.js
+UNCHANGED app/renderer/runtime-ui.js
+UNCHANGED app/renderer/ui-labels.js
+UNCHANGED app/renderer/engine-selector.js
+UNCHANGED app/main.ts
+UNCHANGED app/preload.cjs
+
+=== 旧渲染器非核心（已批准的 markdown 安全升级）===
+CHANGED app/renderer/markdown.js（记录：2026-10-21_change_markdown-it-vendor-15-0-3.md）
+CHANGED app/renderer/vendor/README.md（记录：2026-10-21_change_markdown-it-vendor-15-0-3.md）
+CHANGED app/renderer/vendor/markdown-it.umd.min.js（记录：2026-10-21_change_markdown-it-vendor-15-0-3.md）
+CHANGED test/桌面应用/markdown.test.ts（记录：2026-10-21_change_markdown-it-vendor-15-0-3.md）
+
+=== e2e 目标切换 diff 摘要（仅 loadFile 目标 + 注释）===
+--- test/桌面应用/e2e/uiux-v2.mjs
++// Phase 3A：目标切换（默认旧入口；新入口用 ANS_RENDERER_ENTRY 指向构建产物）。
++const RENDERER_ENTRY=process.env.ANS_RENDERER_ENTRY||path.join(APP,'renderer/index.html');
+-  await win.loadFile(path.join(APP,'renderer/index.html'));win.setTitle('ANS UI/UX 离线验收');await pause(150);
++  await win.loadFile(RENDERER_ENTRY);win.setTitle('ANS UI/UX 离线验收');await pause(150);
+--- test/桌面应用/e2e/ime-enter.mjs
++// Phase 3A：目标切换（默认旧入口；新入口用 ANS_RENDERER_ENTRY 指向构建产物）。
++const RENDERER_ENTRY = process.env.ANS_RENDERER_ENTRY || path.join(APP_DIR, "renderer", "index.html");
+-    await win.loadFile(path.join(APP_DIR, "renderer", "index.html"));
++    await win.loadFile(RENDERER_ENTRY);
+--- test/桌面应用/e2e/bench-storm.mjs
++// Phase 3A：目标切换（默认旧入口；新入口用 ANS_RENDERER_ENTRY 指向构建产物）。
++const RENDERER_ENTRY = process.env.ANS_RENDERER_ENTRY || path.join(RENDERER_DIR, "index.html");
+-  await win.loadFile(path.join(RENDERER_DIR, "index.html"));
++  await win.loadFile(RENDERER_ENTRY);
+
+=== 工作树新增（app/ 与 test/桌面UI）===
+ M app/renderer/markdown.js
+ M app/renderer/vendor/README.md
+ M app/renderer/vendor/markdown-it.umd.min.js
+?? app/renderer/components.json
+?? app/renderer/src/
+?? app/renderer/tsconfig.json
+?? "test/\346\241\214\351\235\242UI/"

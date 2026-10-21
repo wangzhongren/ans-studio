@@ -3,7 +3,7 @@ id: codex-governed-session
 type: feature
 title: 使用 Codex 执行受治理角色会话
 created: "2026-10-14"
-updated: "2026-10-15"
+updated: "2026-10-21"
 timezone: Asia/Shanghai
 status: implemented-unverified
 related: [codex-governed-transport-design, codex-governed-session-implementation, multi-runtime-integration-v2]
@@ -74,3 +74,40 @@ flowchart TD
 2026-10-15 安装包兼容：默认 JavaScript Codex CLI 在 Electron 宿主中，仅给严格隔离的子进程环境增加 `ELECTRON_RUN_AS_NODE=1`；普通 Node 和显式原生 `cliPath` 保持原样。25/25 自有回归、类型检查和实际 Electron+真实 CLI 无模型线程初始化/清理通过，最终发行安装包和 Windows 由装配/测试验收。见[修复与证据](../fix/2026-10-15_fix_packaged-electron-node-launch.md)。
 
 2026-10-15 Windows CI发现POSIX脚本夹具不能直接spawn：仅该真实JSON-RPC测试的启动接缝改用Node加载脚本，保留实际子进程与全部协议/取消/清理断言，无生产改动。本地25/25和tsc通过；Windows CI待复跑。见[夹具修复](../fix/2026-10-15_fix_windows-native-wire-fixture.md)。
+
+## 思考等级被拒时的兼容路径（2026-10-21 D1 + 已批准 E1）
+
+用户选择的四档原样请求；off/未设不覆盖，并不保证推理关闭。配置说明在当前任务开始后作为 system 消息发送。以下流程只处理明确 effort 参数/档位拒绝，不把模型不存在、认证、限流或服务器故障当作改档理由。
+
+```mermaid
+flowchart TD
+  configured[按最近确认的请求策略开始本轮] --> result{结果}
+  result -->|正常完成| settled[单次最终结算]
+  result -->|普通故障| failure[报告真实错误]
+  result -->|明确 effort 拒绝| safe{本轮无输出或工具启动?}
+  safe -->|否| failure
+  safe -->|是| kind{仅档位被拒且目录精确匹配?}
+  kind -->|是| nativeDefault[同线程显式请求SDK目录默认档]
+  kind -->|否| resumable{首轮或可持久恢复?}
+  nativeDefault --> retryResult{兼容结果}
+  retryResult -->|默认仍被明确拒绝| resumable
+  resumable -->|否| failure
+  resumable -->|是| implicit{SDK目录会自动补effort?}
+  implicit -->|否| reconnect[清旧ID并去显式覆盖重建/恢复]
+  implicit -->|是| metadata[固定SDK来源 精确生成临时单模型副本]
+  metadata --> format{版本和格式可确认?}
+  format -->|否| failure
+  format -->|是| reconnect
+  reconnect --> retryResult
+  retryResult -->|completed| commit[提交当前会话兼容策略并提示完成]
+  retryResult -->|故障/取消/超时或候选耗尽| restore[不提交策略 下一轮恢复原目录和请求策略]
+  commit --> settled
+  restore --> failure
+  failure --> settled
+```
+
+最多两个不同候选，成功前只说“正在兼容”。对外线程ID跟随原生新线程；重建未确认则隔离，不复用状态不明引擎。工具执行前/原生工具 started 即禁止整轮回放。保存设置与其他会话均不变。
+
+原 D1 回归发现 CLI 对目录内模型自动补默认 effort，保留了 gpt-5.5 的真实红日志。用户批准 E1 后，无 effort 候选会在确有必要时使用当前模型的临时 SDK 元数据副本；只改变默认 level、默认 summary 和两个 summary 能力标志，其他工具能力、上下文和模型说明保持。文件位于会话 workRoot、权限0600，恢复原目录或dispose时清理，普通路径不生成。元数据来源绑定已安装 CLI 0.162.1 二进制内嵌格式，有界读取，不接受项目目录或用户文本作为模型定义；这不是稳定公共 API。目录默认也被值拒绝时，同一无 effort 候选亦走 E1，不增加第三候选。
+
+整个reasoning对象拒绝、非持久后续轮历史恢复及已有工具副作用边界仍未被此实现绕过。最终实际验证与历史红转绿记录见[修复及验证记录](../fix/2026-10-21_fix_reasoning-compatibility.md)。

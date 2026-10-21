@@ -1,0 +1,163 @@
+68b5d5689b498f7df6c6aabc77cc173368842a90c73871125ed082521195857c  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/environment.txt
+cbd5da39e4462c6f357f725d5a35085ae86e8c498d9b2551d1c2152975ea2550  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/icon/dock-icon-crop.png
+68f9e50d7e29d90d36bc11fcaa0e7ce37c1f9a25bb89e59692198e68c74ef185  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/icon/dock-screen.png
+2803048400aac4278a6f4f7d56ca1e22a2c31ef65d2d828170340e410d16ee73  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/icon/icns-paths.txt
+c596bdcb11b1adaf209773f3ca6d84df1d7dbc71bbc17bcf1da319d24b0b7c0d  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/icon/icon-1024.png
+58daeba50994221b04f27ec8bb536d7687116ed22aead1bc99ba35787b1503b5  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/icon/icon-info.txt
+c20d4e964576cc00d659befab6374962f0b8af0338684c14db4c7b07a0438ba9  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/index.md
+10d69688d5d31bce64a4c70ea06d04ea804e02cd0bb9f69f6923dad53d4b5fea  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/logs/model-dev-stdout.log
+1471917d18432bb87006d85c64224c8e74d74996e7a6b979e46e8b7652ae73c7  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/logs/model-fix-dev-stdout.log
+7e4e552bfb3e76e33c13a15bc29549db2775d5e6db11897bfc5c1bd4600c3a57  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/logs/model-fix-send-cdp.log
+4e90ada29b14627e964fd74a082fde253c51f2dde9260f453072a5069619752f  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/logs/model-send-cdp.log
+bce14854c372857dbd1f37d796babcb6e1462095b62b7c00671e5bc09c198615  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/logs/packaged-empty-cdp.log
+197bc18189f540e8cf0a25847ff593521c3610375f5661b6ec41f008e38c88ef  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/logs/packaged-stdout.log
+351a32412cb630b8dcd071b6c9d6bd406e70dd6052d842cef546f33082a72d8c  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/00-titlebar.png
+9739e6fa463b6f7223343525161f7bd2c39e74ff6481ea897970f70bc3e8a9a3  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/01-import.png
+9800669d78971863f46ac49f069ddf0981ce340ca62b0283794441f461ee4b1b  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/01b-su.png
+2f059e0b9e231b1d60ad005572cb453a41109fe523f6756e8bf6477cd8a19ae2  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/02-chat.png
+7dacb4679cf56808c321f6c3fe8141d173e4843ce178c10c3160e7a619cd125f  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/03-denied.png
+aca2ede1a61ce4a0114459c307a8fb80c506b2d1a9e4839d2c8080066d614b24  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/04-profile.png
+9a59c17d97055e577e5cd2cb5fcb58ae46dc177701a00464ff9cbd22674d6068  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/05-bootstrap.png
+85c32ba6e248fa82027755eb7abbfcf07fd643ec20c72f95204aefc4ba3bd3b5  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/06-refresh.png
+f53dd8848221d36ea3d14620bfefa6937269b894aeaaa477f8bac4cc255e8e3c  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/07-handback.png
+0545371e8395b60cefe34544ca36922e579868237ff08a67f6fcc62af3b4c71c  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/08-su-pane.png
+994043b6afffb3dc14e435450fdcd7c03ce0bdb6a36125667300ff91c5e83b12  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/09-pi-panel.png
+b7697853bb6bc1bbe1642f788e5ed0cd10c6d64efacf8887a8bbde2e5ae5285c  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/10-pi-saved.png
+76e57a7aee7072e4846269790c08ea71a4a2e71a4fd4b54963bebc0b69b4d926  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/11-operator-card.png
+aca2ede1a61ce4a0114459c307a8fb80c506b2d1a9e4839d2c8080066d614b24  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/12-composer.png
+e65434affc7ea4166d1c4ac71377d60c1f80081a26e485f62cbda8c0cabfc17d  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/12-restore.png
+cdd59c381e3b687ee007f6376a6b7a10bfcf00fb511ea638d322f62f54df4941  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/14-operator-crosspane.png
+1ea2bad3efa0262df8385c182a5cda58dfa0f4f57bc7c381c80c0605074c5298  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/15-anchor-reanchor.png
+d0c560889b1303ff68cd7b11a06288bea3675656b92772e081cf3d84bc7a20b3  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/report.txt
+59b35bb1fbbdac6ddd0a5344067ea28ae77d6dd3ace0eb40758d53159713b7de  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/run-header.txt
+b41dae44e6d75b233a05026eee43e32bac16147cb99309b8451a8ce63dec68db  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/main-e2e/stdout.log
+0bae9c58ec142c83b6217c532290b08f3447eecc3b4b5a4de8caa438df640bfc  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/csp-gzip.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/dist-meta.txt
+d24911b9402b67b797eaf3920db53b78b4bb2053bac7c152ceaa60b4ea5c1e1c  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/engine-menu-pi.png
+351a32412cb630b8dcd071b6c9d6bd406e70dd6052d842cef546f33082a72d8c  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/00-titlebar.png
+9739e6fa463b6f7223343525161f7bd2c39e74ff6481ea897970f70bc3e8a9a3  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/01-import.png
+9739e6fa463b6f7223343525161f7bd2c39e74ff6481ea897970f70bc3e8a9a3  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/01b-su.png
+8e75e0918abb79fb0bc25cabb70177281f562bd0c442b8908f54c04c0f28838c  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/02-chat.png
+9d10eaa7e890422703ae64df2ff3e15b97b506033889b74c115feace4ce3bb93  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/03-denied.png
+2542abe1dfe58e17c459387d8c874bdbf98e144f953b37cba8df9c0a32398e6b  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/04-profile.png
+ac7dbab2eca396261fb5ffec358e24e7904fcb4554da59a78e6dd7a27b44246e  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/05-bootstrap.png
+38d5ea1967b8ee1b2cc21c56fd830bae1e58df96bf848966829d31f086b5ddb3  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/06-refresh.png
+1b5fe6eb587c5c7d04605fe31518b44b66f6257f02123b43b38dc08c00166468  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/07-handback.png
+158d5f8640971d41ff8f081cfb6da80017445fcdf6c40ec6f3eb2da9870b8ab6  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/08-su-pane.png
+11d985c9e7f09205fa40ea40fc091de6ea5acdea58583582b718b4d51ff19d60  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/09-pi-panel.png
+92143f464a7e9ccef1d8db91d2c7a60e06792ddd010667235099d046e7e2831c  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/10-pi-saved.png
+daccf309eaaab5564d55a994cd2be725a5ede67debc1363fb0f71c03cf0f1537  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/11-operator-card.png
+2542abe1dfe58e17c459387d8c874bdbf98e144f953b37cba8df9c0a32398e6b  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/12-composer.png
+7410c691ffb8f39e6303dfc66854cb662b42f55938db47246accdc05574e34fe  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/12-restore.png
+c95d52c74e742d8eb183f59000e18b29b6af966f1988b76b4323e31c4245f788  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/14-operator-crosspane.png
+6e879b948d8db92cfe31325d018c6cb7e3f7278bf5d2f7cb56f9844f82522045  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/15-anchor-reanchor.png
+e814f4ceb1b16a49efd0c3de728ffbaac4524c077a6f408b7355f2bcb85dee65  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/report.txt
+b41dae44e6d75b233a05026eee43e32bac16147cb99309b8451a8ce63dec68db  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/main-e2e/stdout.log
+d24911b9402b67b797eaf3920db53b78b4bb2053bac7c152ceaa60b4ea5c1e1c  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/model-final-1360.png
+ab51661862e352558cad123644048a02866824a58d6436566e1d69541369dcf9  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/model-final-960.png
+d1810d8b5b65f1c4b9c83ae354b342e58393e2a922c2dc492699c19278362929  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/model-run.json
+bd512d93a3d42bb5c6b64f71d09bfb22f5a373542eb889f98b3dff609d59d7dc  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/model-working-1360.png
+3d4ae608863b318cc4bd3d9397ffeea16b566a6190061c21c3640441fdfb7463  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/timings.txt
+18fb133f7d76948d9446b5b124a24b9e7cfedf554c73e7728ea1cece84896d93  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/tree-1360-restored.png
+f0b1fe59e5b2c05aa0e2f3292e4c13c76b5b6df8082689b64cb01e4f8b49af33  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/tree-1360.png
+df4f0540af599b37a0267cd0baae67dce30077867ecb84b267306c2c33b1272e  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/tree-960.png
+2b46e0423d08d484a38f54576b8cd90df55a281e876e40ad8bd86a629eb24d46  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/report.json
+521a902ea05dffd91854fb57900436616f1dd8c12cd024f01322b6d76392ac39  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/stdout.log
+fbcfe23a2ecb82b7100c50811691dde0a33aa3da8d176be9882a9db485dc0f2d  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Code Cache/js/index
+a64b83ed9c91db1c99db89f333185da1276e7f5685bca130b4f0c6bd665a39a9  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Code Cache/js/index-dir/the-real-index
+fbcfe23a2ecb82b7100c50811691dde0a33aa3da8d176be9882a9db485dc0f2d  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Code Cache/wasm/index
+62cd4e56419736c3a4dc42d7a708671f311bac8e4192529edeb20995d164cdaf  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Code Cache/wasm/index-dir/the-real-index
+a4e110634a2978db7d1cfc10cd31cafa3a291b5f62a6fc40adbbe65c5b1f0ef9  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/DIPS
+d6a5fe39cd672781b256e0e3102f7022635f1d4bb7cfcc90a80fffe4d0f3877e  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/DawnGraphiteCache/data_0
+b1e963d702392fb7224786e7d56d43973e9b9efd1b89c17814d7c558ffc0cdec  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/DawnGraphiteCache/data_1
+ec1702806f4cc7c42a82fc2b38e89835fde7c64bb32060e0823c9077ca92efb7  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/DawnGraphiteCache/data_2
+e09f42c398d688dce168570291f1f92d079987deda3099a34adb9e8c0522b30c  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/DawnGraphiteCache/data_3
+49e92cefafebe107a7f831831e6c58111676fc6e2d7ac890f66b67ea2a24ac3b  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/DawnGraphiteCache/index
+d6a5fe39cd672781b256e0e3102f7022635f1d4bb7cfcc90a80fffe4d0f3877e  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/DawnWebGPUCache/data_0
+b1e963d702392fb7224786e7d56d43973e9b9efd1b89c17814d7c558ffc0cdec  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/DawnWebGPUCache/data_1
+ec1702806f4cc7c42a82fc2b38e89835fde7c64bb32060e0823c9077ca92efb7  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/DawnWebGPUCache/data_2
+e09f42c398d688dce168570291f1f92d079987deda3099a34adb9e8c0522b30c  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/DawnWebGPUCache/data_3
+7b6c56bd62a99697fc3583129513ee93275104835da4c029343760635c7099fe  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/DawnWebGPUCache/index
+d6a5fe39cd672781b256e0e3102f7022635f1d4bb7cfcc90a80fffe4d0f3877e  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/GPUCache/data_0
+b1e963d702392fb7224786e7d56d43973e9b9efd1b89c17814d7c558ffc0cdec  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/GPUCache/data_1
+ec1702806f4cc7c42a82fc2b38e89835fde7c64bb32060e0823c9077ca92efb7  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/GPUCache/data_2
+e09f42c398d688dce168570291f1f92d079987deda3099a34adb9e8c0522b30c  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/GPUCache/data_3
+6cdaea3db8b283144c829fd27ee316a77db7bfc198394871d7dec7ecbda43b4c  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/GPUCache/index
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/GPUPersistentCache/GPUCache/ZBVFTVEKBSX72Y7WF25TMOWFX3JUICO4/cache.db
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/GPUPersistentCache/GPUCache/ZBVFTVEKBSX72Y7WF25TMOWFX3JUICO4/cache.db-wal
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/GPUPersistentCache/GPUCache/ZBVFTVEKBSX72Y7WF25TMOWFX3JUICO4/cache.journal
+f6acff61127217b93b2a4cbc02e7d639335ffa029adf05341cd8b8cd5970a803  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/GraphiteDawnCache/data_0
+9b4683de6df1d724efb27e9ed1a26562efbb06f796b24e02a5874f58a47a9e4b  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/GraphiteDawnCache/data_1
+0a90364d8287e40e0be565bdbbac84115e9599f6ad95f7fd72c01dd7f136abfe  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/GraphiteDawnCache/data_2
+f7615b8c191d00191e25141ba6a72bdeaf2028367a5255785ddc209f1f70f538  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/GraphiteDawnCache/data_3
+ce7e4cd5ca62d065b354cfbcedad730f19423bb5852cb1f9295da060f2424445  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/GraphiteDawnCache/f_000001
+de47fff87cdf0e40d95eb5b962bdf3a33c0828bc6be274c5e90e234ba8b5b277  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/GraphiteDawnCache/index
+c4ddc5af78f6072610470665b3f79d01f84019c989af922537e91dfd79eac2f2  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Local State
+8bd2ea70a0b70c91de138a5b87c7936c6a6fa7c4275c54b97f4ef0ccc5b79bb4  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Local Storage/leveldb/000003.log
+0f1bad70c7bd1e0a69562853ec529355462fcd0423263a3d39d6d0d70b780443  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Local Storage/leveldb/CURRENT
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Local Storage/leveldb/LOCK
+4e421067c540b04ab1032dac99436d8d3fa57b25ebf88de53085872089ebd905  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Local Storage/leveldb/LOG
+f9d31b278e215eb0d0e9cd709edfa037e828f36214ab7906f612160fead4b2b4  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Local Storage/leveldb/MANIFEST-000001
+88c9590388d22bb0bd8da3f7d50389311957024ee5c2dfe562e2649ad427fd7d  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Network Persistent State
+b583e3a395f6bc29019a01994cadf43da0c25a617d7817b9d25d4c0a564ae861  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Preferences
+ffd700cf04be6fe8d51e2ffb8a2e37bc3fa95a6679a4102fa35e8494c2350eae  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Session Storage/000003.log
+0f1bad70c7bd1e0a69562853ec529355462fcd0423263a3d39d6d0d70b780443  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Session Storage/CURRENT
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Session Storage/LOCK
+60d7f7f750d94b5ac411ede18dceedcde5c8ccf195d78ab6d2ca1a06722b1e9e  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Session Storage/LOG
+f9d31b278e215eb0d0e9cd709edfa037e828f36214ab7906f612160fead4b2b4  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Session Storage/MANIFEST-000001
+fbcfe23a2ecb82b7100c50811691dde0a33aa3da8d176be9882a9db485dc0f2d  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Shared Dictionary/cache/index
+a38c78e2c1fa87e3193336829f68845762cd069f54ad0c3263205af9c3ac8558  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Shared Dictionary/cache/index-dir/the-real-index
+db9734c1e3001f7abd08bcc472a7b4f5daf8076eaee708f04ba98b11bd70131d  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Shared Dictionary/db
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Shared Dictionary/db-journal
+48dc8b9acbedb0b7de6579f89e873e9434ca389b8c6ed986f705c86fd2819599  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Trust Tokens
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/Trust Tokens-journal
+6b77b54313df8d759334819fdad7d879f15dce045017bd11bb557dd94ce52f66  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/declarative_performance_observer.db
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model-fix/uiux-mirror/user-data/declarative_performance_observer.db-journal
+11c47f21e657ae718b2fea789aaca75f8834950adaef13eb6d627adf34509707  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model/engine-menu-pi.png
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model/launch.txt
+ba6e962793c1c3924257ee191f865afabf1dd717b016d82bca25e27d07241bf1  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model/model-final-1360.png
+b04c9f085e6eeb6e0db55d7edaec833f277395da2db22b2c35f56af45e1e7dc6  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model/model-final-960.png
+c4a663ef52205f31e3e79e95fa6aa579d5bbf4c369cdc233b43440c3778a6f32  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model/model-run.json
+8d6e156f3b6c24a06a11d3190aa279e35eacce24f91e63f72dccc747e583a3d6  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model/model-working-1360.png
+67b85a6223a771c2cde4079b5ee7036ad38ba48d80ec7dcd8eb8a9a130e1eae3  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/model/timings.txt
+63feda4f60776c3c502b27aeecceb85e3cc1b6ef76c8a8682cc94cb345766484  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/embedded-dist-sha256.txt
+25a6e99f4a4676880e27c7eda58048c450026c72b3260d9248df0a06f30603ad  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/empty-1360.png
+cfef8e3716445b3149028253b6edceb4af0a505d2b1726fbbd4528d5f4798c31  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/empty-960.png
+f44df8f78833293dd6f4dc700772506fdbd7d8e303cd4c55c20ff25f7dfac220  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/empty-project.json
+10502316c7f42722e8a18db6bd0dbfeb135efc69eed9a8a7deb894865e44e065  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/extract.txt
+25a6e99f4a4676880e27c7eda58048c450026c72b3260d9248df0a06f30603ad  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/lead-chat.png
+f0e3c981c33a7a5b884a5f16e9c8db99e05c1d8e098644d9b779c089f16afd13  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/lead-open-1360-restored.png
+f0e3c981c33a7a5b884a5f16e9c8db99e05c1d8e098644d9b779c089f16afd13  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/lead-open-1360.png
+532592d394cb2dc6eca90035778522b3b8ea221c05b23d45f1b0ec77d3783e83  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/lead-open-960.png
+fb72196d6fb8929cfae3c83c1f6d79eb39a6d3b2cca7a08a51e5d1e97abdd9f5  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/package-meta.json
+f0e3c981c33a7a5b884a5f16e9c8db99e05c1d8e098644d9b779c089f16afd13  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/reopen-1360-restored.png
+f0e3c981c33a7a5b884a5f16e9c8db99e05c1d8e098644d9b779c089f16afd13  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/reopen-1360.png
+532592d394cb2dc6eca90035778522b3b8ea221c05b23d45f1b0ec77d3783e83  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/reopen-960.png
+ea1029d47e830cf1aa3cc66348583a0d02471895b8a8db550ebc23e816ecab87  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/role-profile.png
+200dd41a5071364e1b1b2c9d3cae2d9f367ea23edfda1cca014b74cba32fdcde  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/settings.png
+6c2bb6462609b84fb013e6bb8f56aff1a7083380afd1c3f6150281ce3b848b69  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/packaged/work-overview.png
+857182df732573cbe5c141f6da6e2b60a080cb7fc1d64e9d3cd53fcd7312271b  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/post-state/model-demo-files.stat
+dc1f134583603f20766cdd06c3b601ad08f9c248741122bca2ac9065b1ddca84  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/post-state/model-demo-git-status.txt
+513607744f57e23625550c19a962b4cb7b4fbad1e6b1586c00c314eda5d30e80  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/post-state/model-demo-head.txt
+608b40606e967bfbdb9d94f6075db5d0c19a37ea55edd79efe01599b58ba180c  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/post-state/model-fix-demo-files.stat
+dc1f134583603f20766cdd06c3b601ad08f9c248741122bca2ac9065b1ddca84  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/post-state/model-fix-demo-git-status.txt
+b514e79c9e0147c2280dad2b03f9e347b0910bef5f38cdaeefdab02a385f4265  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/post-state/new-demo-files.stat
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/post-state/new-demo-git-status.txt
+513607744f57e23625550c19a962b4cb7b4fbad1e6b1586c00c314eda5d30e80  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/post-state/new-demo-head.txt
+5f2848a91f2665e65581433f411f4539f83089fe876bdc94232405a80eea5029  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/pre-state/ans-files.stat
+4bbbb5713f67644ed2a91fb37e79b504013c4f51204cfdd67439440ed0f6d2c1  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/pre-state/git-status.txt
+b514e79c9e0147c2280dad2b03f9e347b0910bef5f38cdaeefdab02a385f4265  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/pre-state/model-demo-files.stat
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/pre-state/model-demo-git-status.txt
+513607744f57e23625550c19a962b4cb7b4fbad1e6b1586c00c314eda5d30e80  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/pre-state/model-demo-head.txt
+b514e79c9e0147c2280dad2b03f9e347b0910bef5f38cdaeefdab02a385f4265  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/pre-state/model-fix-demo-files.stat
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/pre-state/model-fix-demo-git-status.txt
+513607744f57e23625550c19a962b4cb7b4fbad1e6b1586c00c314eda5d30e80  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/pre-state/model-fix-demo-head.txt
+b514e79c9e0147c2280dad2b03f9e347b0910bef5f38cdaeefdab02a385f4265  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/pre-state/new-demo-files.stat
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/pre-state/new-demo-git-status.txt
+513607744f57e23625550c19a962b4cb7b4fbad1e6b1586c00c314eda5d30e80  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/pre-state/new-demo-head.txt
+995322827bf8f0521acedc1284b5d3828165c80f107cbb0b0b06d1dff753ed94  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/pre-state/project-files.stat
+dd3f5887e1b2d34456e5a886f513d9baffd0e86daa4969f1c4f3a47f43047c39  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/probes/cdp-eval.mjs
+69dc4e7dcc4920327a160da9506d7727819e1d5aaf8ed19749b2d73b927f9d07  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/probes/cdp-shot.mjs
+eb573a89da82f527e6c2cab034fe20ca9e549f1cff9854dd21dbbb85780f4e26  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/probes/model-send-cdp.mjs
+9cbbf2fabd6ca289e2283bfbd9d15798dea3a9037ce5b07b72e347ccbffb055b  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/probes/packaged-empty-cdp.mjs
+3307bf43d4da1d965dc20b8e016d48f36bd52f120ec2e247390374a5e5d8987d  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/summary.json

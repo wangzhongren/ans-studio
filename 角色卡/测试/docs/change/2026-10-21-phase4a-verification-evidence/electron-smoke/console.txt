@@ -1,0 +1,28 @@
+CHECK INIT_DEFAULT_CLAUDE_SESSION=true {"runtime":"claude","openSession":{"projectRoot":"/fixture4a","roleId":"A","runtime":"claude"}}
+CHECK ENGINE_SWITCH_PI_HISTORY=true {"runtime":"pi","open":"A","hist":"pi"}
+CHECK ENGINE_SWITCH_CODEX_HISTORY=true {"runtime":"codex"}
+CHECK ENGINE_SWITCH_BACK_RESTORES_OWN_HISTORY=true {"runtime":"pi"}
+CHECK CROSS_ENGINE_DRAFT=true {"atClaude":"","backPi":"PI 草稿","backClaude":"CLAUDE 草稿"}
+CHECK LATE_OTHER_ENGINE_EVENT_CACHED_NOT_OVERWRITE=true {"claudeHasLate":false,"piHasLate":true}
+CHECK SETTINGS_TABS_AND_PI_FIELDS=true [{"engine":"pi","selected":"true"},{"engine":"codex","selected":"false"},{"engine":"claude","selected":"false"}]
+CHECK SETTINGS_SECRET_MASKED_NO_ECHO=true {"type":"password","value":"","placeholder":"已设置，留空则不修改"}
+CHECK SETTINGS_SLIDER_ARIA_AND_HIDDEN=true {"min":"0","max":"4","now":"2","valueText":"500000","hiddenValue":"500000"}
+CHECK SETTINGS_NON_PRESET_FALLBACK=true {"type":"text","value":"custom-tier","noteVisible":true}
+CHECK SETTINGS_SLIDER_KEYBOARD=true {"now":"3","hiddenValue":"1000000","out":"1000000"}
+CHECK SETTINGS_SAVE_LOADING_SAVED_ERROR=true {"loading":{"status":"正在保存…","disabled":true},"saved":{"status":"已保存到 .env（改动键：ANS_PI_BASE_URL、ANS_PI_MODEL、ANS_PI_REASONING_EFFORT、ANS_PI_CONTEXT_WINDOW）。必填配置已齐备。下一次开启会话时应用。"},"failed":{"status":"保存失败：保存失败测试"}}
+CHECK SETTINGS_MISSING_NOTICE_AND_ENTRY=true {"visible":true,"message":"Codex 配置不完整，缺：CODEX_API_KEY。请补齐后保存。","active":"codex","hasKey":true}
+CHECK SETTINGS_READ_FAIL_RETRY=true {"status":"读取配置失败：配置摘要未就绪","retryVisible":true,"recovered":true}
+CHECK SETTINGS_LATE_READ_GUARD=true {"active":"claude","hasClaude":true,"hasPiBase":false}
+CHECK PROFILE_DRAWER_REAL_SECTIONS=true {"sections":["card","boundary","changes","docs"],"title":"A · 来源文档"}
+CHECK DOCUMENT_LIST_READ_ONLY_SAFE=true {"list":1,"status":"只读文档 · 24 字节","docCalls":1}
+CHECK DOCUMENT_FOCUS_RETURN_AND_ERROR_RETRY=true {"inList":true,"inProfile":true,"focusInside":true,"err":{"status":"文档不存在。重试读取","retry":true},"retried":{"content":"文档正文\n只读内容 <script>window.__docx=1</script>\n"}}
+CHECK WORK_OVERVIEW_PENDING_LOCATE=true {"badge":"1","pendingTitle":"待定位卡","hasLocate":true,"noRoleDocs":true,"drawerClosed":true,"focusOnCard":true,"workTitle":"work"}
+CHECK QUEUE_DRAWER_POSITIONS_WITHDRAW=true {"items":[{"text":"客户消息正在执行","hasWithdraw":false},{"text":"1客户消息第一条撤回","hasWithdraw":true},{"text":"2系统第二条","hasWithdraw":false}],"withdraw":[{"projectRoot":"/fixture4a","roleId":"A","runtime":"claude"},"q-a"],"afterSuccess":["客户消息正在执行","1系统第二条"],"feedback":"撤回无效：消息已投递","hasBtn2":true,"allWithdraws":[[{"projectRoot":"/fixture4a","roleId":"A","runtime":"claude"},"q-a"],[{"projectRoot":"/fixture4a","roleId":"A","runtime":"claude"},"q-c"]],"body":"待处理 1待选择待定位卡定位当前工作客户消息正在执行排队1客户消息第三条撤回撤回无效：消息已投递"}
+CHECK EXPIRED_OPERATOR_ACTIONS_HIDDEN_REASON_VISIBLE=true {"state":"expired","actionsHidden":true,"buttons":[{"hidden":true,"disabled":true},{"hidden":true,"disabled":true}],"note":"请求已失效原因","container":true}
+CHECK TREE_SINGLE_BADGE=true {"count":"3","title":"当前工作 1 项，排队 2 项","aria":"当前工作 1 项，排队 2 项","status":"工作中","statusTitle":"有轮次在跑（切走后仍在后台跑的轮次同样计入）或队列有待办"}
+CHECK NO_CSP_VIOLATIONS=true 0
+CHECK NO_CONSOLE_ERRORS=true []
+CHECK NO_DID_FAIL_LOAD=true
+CHECK SCREENSHOT=true {"path":"/tmp/ans-p4a-smoke-output/phase4a.png","bytes":64150}
+SMOKE_SUMMARY {"total":26,"passed":26,"failed":0}
+SMOKE_DONE=1

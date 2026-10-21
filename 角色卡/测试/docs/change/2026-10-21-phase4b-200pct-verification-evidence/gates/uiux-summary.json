@@ -1,0 +1,42 @@
+{
+  "RUNTIME": {
+    "entries": 17,
+    "true": 16,
+    "false": []
+  },
+  "VISUAL": {
+    "entries": 54,
+    "true": 52,
+    "false": []
+  },
+  "QUEUE_VIEW": {
+    "entries": 4,
+    "true": 4,
+    "false": []
+  },
+  "MIRROR": {
+    "entries": 8,
+    "true": 8,
+    "false": []
+  },
+  "GOV": {
+    "entries": 7,
+    "true": 7,
+    "false": []
+  },
+  "JUDGE": {
+    "entries": 33,
+    "true": 33,
+    "false": []
+  },
+  "G2": {
+    "entries": 5,
+    "true": 5,
+    "false": []
+  },
+  "TOOLFOLD": {
+    "entries": 19,
+    "true": 17,
+    "false": []
+  }
+}

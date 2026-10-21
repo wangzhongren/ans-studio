@@ -1,5 +1,13 @@
 # 门禁引擎公开接口：角色协作组摘要
 
+## D3 轻量权限修复增量（2026-10-21）
+
+`resolveWrite(targetPath, boundary, scope, ctx): WriteDecision` 签名及公共类型不变。输入和真实目标按同一 project/skill 根的边界、条件与任务写集分别授权；真实目标拒绝附输入路径与真实相对路径，不自动补发写权。输入命中的 `matchedEntry` 保持返回；正常无链接路径及既有 F4/F6 首句保持。
+
+`classifyShell(argv, rules)` 仍返回四态，`classifyShellDetailed` 不增加字段。两个原 allow 出口按 D3 资格收窄，新增 `ruleId` 为 `review:explicit-program` 和 `review:rg-preprocessor`。既有 deny/risky 不改判；其余只读名称及裸 `.exe` 保留。规则版本仍为 3，数据形状不变；调用方按原四态与 reason 记录/审批，不应把新的 ruleId 误当未知分类。
+
+实现不新增环境、身份或可信程序事实，不修改 Model。使用流程见[文件写入授权](docs/feature/write-authorization.md)、[命令分类](docs/feature/shell-classification.md)，测试与范围见[本轮修复记录](docs/fix/2026-10-21_fix_lightweight-permission-repairs.md)。
+
 本报告记录 G1 已实现的增量契约，供桌面窗口与桌面UI消费。组别来自角色卡，属于展示信息；它不改变角色身份、文件权限、接受状态或门禁判定。现有角色/边界/写权接口继续使用已有入口，本次没有重定义它们。
 
 ## 唯一共享类型

@@ -1,0 +1,411 @@
+{
+  "entry": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/dist/index.html",
+  "checks": [
+    {
+      "name": "MOUNT_AND_BRIDGE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "LOAD_PROJECT_AND_SESSION",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SHELL_CARD_VERBATIM_AND_DENY_FOCUS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SHELL_DETAILS_LUCIDE_CHEVRON_VISIBLE_AND_ROTATED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SHELL_ESC_DENIES_AND_CLOSES",
+      "value": true,
+      "detail": {
+        "id": "sc-1",
+        "allow": false
+      }
+    },
+    {
+      "name": "SHELL_EXPLICIT_ALLOW_ONLY",
+      "value": true,
+      "detail": {
+        "id": "sc-2",
+        "allow": true
+      }
+    },
+    {
+      "name": "SHELL_SETTLED_CLOSES_STALE_CARD",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SHELL_EXPIRY_CLOSES_AND_REPORTS_REASON",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SU_DENY_TIER_DISCLOSURE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SU_WARNING_AMBER_SUMMARY_BOLD",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SU_RISKY_TIER_LABEL",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SU_REVIEW_TIER_LABEL",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "JUDGE_MANUAL_NOTICE_VERBATIM_ON_CARD",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "JUDGE_SWITCH_STARTS_AUTHORITATIVE_OFF",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "JUDGE_ENABLE_SHOWS_AMBER_MARKER_AND_WARNING",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "JUDGE_ACKNOWLEDGED_WARNING_DOES_NOT_REAPPEAR",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DECISION_ENABLE_SHOWS_GROUP_WARNING",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DECISION_DISABLED_IN_SINGLE_WITH_NOTE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SHELL_JUDGE_ALLOW_ROW_ANCHORED_AND_PROMINENT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SHELL_JUDGE_MANUAL_PRODUCES_NO_ROW",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "GOVERNANCE_JUDGE_ROW_SAYS_JUDGE_DELEGATED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RECOVERY_CARD_VERBATIM_CANCEL_FOCUS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RECOVERY_EXPLICIT_EXECUTE_ONLY",
+      "value": true,
+      "detail": {
+        "id": "rp-1",
+        "allow": true
+      }
+    },
+    {
+      "name": "RECOVERY_EXPIRED_STAYS_DISABLED_HONEST",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RECOVERY_EXPIRED_DISMISSES_WITHOUT_EXECUTION_ILLUSION",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RECOVERY_CHANNEL_CARD_ARRIVED",
+      "value": true,
+      "detail": {
+        "hidden": false,
+        "state": {
+          "id": "rp-3",
+          "payload": {
+            "projectRoot": "/phase3b-project",
+            "runtime": "claude",
+            "id": "rp-3",
+            "roleId": "A",
+            "action": "abort-turn",
+            "evidence": "ev-3"
+          }
+        }
+      }
+    },
+    {
+      "name": "RECOVERY_CHANNEL_ERROR_FAIL_CLOSED",
+      "value": true,
+      "detail": {
+        "hidden": false,
+        "cls": "sc-overlay is-expired",
+        "allow": true,
+        "hint": "未能回传你的决定（通道未接或异常）——按 fail-closed 不执行；请让提议方重新发起。",
+        "state": {
+          "id": "rp-3",
+          "payload": {
+            "projectRoot": "/phase3b-project",
+            "runtime": "claude",
+            "id": "rp-3",
+            "roleId": "A",
+            "action": "abort-turn",
+            "evidence": "ev-3"
+          }
+        }
+      }
+    },
+    {
+      "name": "SEND_ACK_CLIENT_MESSAGE_ID_TARGET",
+      "value": true,
+      "detail": {
+        "target": {
+          "projectRoot": "/phase3b-project",
+          "roleId": "A",
+          "runtime": "claude"
+        },
+        "clientMessageId": "d765e78d-482f-4df6-9e2e-c7e66f279673"
+      }
+    },
+    {
+      "name": "SEND_FAILURE_RESTORES_DRAFT_AND_SAYS_SO",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DROP_FEEDBACK_VISIBLE_TOKENS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DROP_FEEDBACK_CLEARED_ON_LEAVE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "ATTACH_PICK_THUMBNAIL",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "ATTACH_CHIP_RADIUS_AND_REMOVE_ICON",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "ATTACH_PASTE_VIA_MAIN_VALIDATION",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "ATTACH_DROP_THUMBNAIL",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "ATTACH_REMOVE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "QUEUE_POSITIONS_AND_WITHDRAW_ONLY_FOR_MESSAGES",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "QUEUE_WITHDRAW_HIT_TARGET_AND_INPUT_BORDER",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "QUEUE_WITHDRAW_INLINE_RECEIPT",
+      "value": true,
+      "detail": {
+        "target": {
+          "projectRoot": "/phase3b-project",
+          "roleId": "A",
+          "runtime": "claude"
+        },
+        "id": "q-msg"
+      }
+    },
+    {
+      "name": "HALT_VISIBLE_WHEN_BUSY",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "HALT_ABORTS_EXACT_TARGET_AND_SAYS_REQUESTED",
+      "value": true,
+      "detail": {
+        "projectRoot": "/phase3b-project",
+        "roleId": "A",
+        "runtime": "claude"
+      }
+    },
+    {
+      "name": "HALT_HIDDEN_WHEN_IDLE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SYSTEM_ALERT_INJECTED_STYLE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "NO_CSP_VIOLATIONS",
+      "value": true,
+      "detail": 0
+    },
+    {
+      "name": "NO_CONSOLE_ERRORS",
+      "value": true,
+      "detail": []
+    }
+  ],
+  "calls": {
+    "sends": [
+      {
+        "text": "冒烟发送",
+        "images": [],
+        "target": {
+          "projectRoot": "/phase3b-project",
+          "roleId": "A",
+          "runtime": "claude"
+        },
+        "metadata": {
+          "clientMessageId": "d765e78d-482f-4df6-9e2e-c7e66f279673"
+        }
+      },
+      {
+        "text": "拒发保留",
+        "images": [],
+        "target": {
+          "projectRoot": "/phase3b-project",
+          "roleId": "A",
+          "runtime": "claude"
+        },
+        "metadata": {
+          "clientMessageId": "4c786366-50c7-41ba-bbe8-cf00eb965c1b"
+        }
+      }
+    ],
+    "aborts": [
+      {
+        "projectRoot": "/phase3b-project",
+        "roleId": "A",
+        "runtime": "claude"
+      }
+    ],
+    "withdraws": [
+      {
+        "target": {
+          "projectRoot": "/phase3b-project",
+          "roleId": "A",
+          "runtime": "claude"
+        },
+        "id": "q-msg"
+      }
+    ],
+    "shellResponses": [
+      {
+        "id": "sc-1",
+        "allow": false
+      },
+      {
+        "id": "sc-2",
+        "allow": true
+      },
+      {
+        "id": "su-review",
+        "allow": false
+      },
+      {
+        "id": "sc-manual",
+        "allow": false
+      },
+      {
+        "id": "sc-960",
+        "allow": false
+      },
+      {
+        "id": "su-960",
+        "allow": false
+      }
+    ],
+    "recoveryResponses": [
+      {
+        "id": "rp-1",
+        "allow": true
+      },
+      {
+        "id": "rp-2",
+        "allow": false
+      },
+      {
+        "id": "rp-3",
+        "allow": false
+      },
+      {
+        "id": "rp-960",
+        "allow": false
+      }
+    ],
+    "attachChecks": [
+      {
+        "name": "paste.png",
+        "mime": "image/png",
+        "dataBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+      },
+      {
+        "name": "drop.png",
+        "mime": "image/png",
+        "dataBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+      }
+    ]
+  },
+  "console": [],
+  "csp": 0,
+  "screenshots": [
+    "1360-shell-card.png",
+    "1360-shell-details-open.png",
+    "1360-su-approval-card.png",
+    "1360-judge-toggles-warning.png",
+    "1360-judge-result-row.png",
+    "1360-recovery-card.png",
+    "1360-drop-state.png",
+    "1360-attachments.png",
+    "1360-queue-withdraw.png",
+    "960-shell-card.png",
+    "960-shell-details-open.png",
+    "960-recovery-card.png",
+    "960-su-approval-card.png",
+    "960-judge-toggles-warning.png",
+    "960-drop-state.png",
+    "960-attachments.png",
+    "960-queue-withdraw.png",
+    "960-judge-result-row.png"
+  ],
+  "ok": true,
+  "failures": []
+}

@@ -1,0 +1,55 @@
+VERSIONS {"electron":"44.7.0","chrome":"152.0.7977.130","node":"24.21.0","platform":"darwin"}
+Error occurred in handler for 'window:is-maximized': Error: No handler registered for 'window:is-maximized'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+CHECK CDP_PSEUDO_STATE_AVAILABLE=true
+CHECK ROOT_MOUNTED=true
+CHECK HTML_DARK_CLASS=true {"htmlClass":"dark","colorScheme":"dark"}
+CHECK DARK_SURFACE=true "rgb(20, 23, 26)"
+CHECK LAYOUT_BASELINE=true {"titlebarH":36,"sidebarW":248,"capsuleW":900,"roleCount":5}
+CHECK SEND_DISABLED_NEUTRAL=true {"bg":"rgb(37, 42, 48)","color":"rgb(167, 173, 181)","opacity":"1","fontSize":"13px"}
+CHECK DRIVER_AND_BRIDGE=true
+CHECK NO_STYLE_TAGS_AT_RUNTIME=true 0
+CHECK ENGINE_CLOSED_ARIA=true {"role":"combobox","haspopup":"listbox","controls":"runtime-options","expanded":"false","activedesc":null,"value":"claude","label":"会话引擎，当前 Claude","menuRole":"listbox","menuHidden":true}
+CHECK ENGINE_OPEN_LISTBOX_OPTIONS=true {"expanded":"true","activedesc":"runtime-option-claude","hidden":false,"menuRole":"listbox","optionCount":3,"options":[{"id":"runtime-option-pi","role":"option","selected":"false","runtime":"pi"},{"id":"runtime-option-codex","role":"option","selected":"false","runtime":"codex"},{"id":"runtime-option-claude","role":"option","selected":"true","runtime":"claude"}],"width":180,"direction":"down"}
+CHECK ENGINE_OPEN_ARIA_ACTIVEDESC=true "runtime-option-claude"
+CHECK ENGINE_KEYBOARD_BROWSE=true {"up":"runtime-option-codex","home":"runtime-option-pi","end":"runtime-option-claude"}
+CHECK ENGINE_KEYBOARD_SELECT=true {"runtime":"claude","value":"claude","label":"会话引擎，当前 Claude","expanded":"false","hidden":true,"active":"runtime-select","selectedClaude":"true"}
+CHECK ENGINE_ESC_CLOSES_AND_FOCUS_RETURNS=true {"expanded":"false","hidden":true,"active":"runtime-select","prevented":true}
+CHECK ENGINE_TAB_LEAVES_NATURALLY=true {"expanded":"false","hidden":true,"notPrevented":true}
+CHECK SIDEBAR_DRAG_328=true {"before":248,"after":328,"aria":"328","stored":"328","settled":328}
+CHECK SIDEBAR_DBLCLICK_248=true {"w":248,"aria":"248"}
+CHECK SIDEBAR_KEYBOARD_STEPS=true {"shifted":272,"plain":264,"back":272}
+CHECK SIDEBAR_COLLAPSE=true {"collapsed":true,"width":0,"expandHidden":false,"stored":"1"}
+CHECK SIDEBAR_EXPAND_KEEPS_272=true {"collapsed":false,"width":272,"stored":"0"}
+CHECK DRAWER_424_ESC_FOCUS=true {"opened":{"width":424,"role":"dialog","modal":"true","focus":"drawer-close"},"closed":true,"focusAfter":"tab-card"}
+CHECK CONFIRM_640_DEFAULT_FOCUS_DENY=true {"width":640,"focus":"sc-deny"}
+CHECK CONFIRM_COMMAND_VERBATIM=true "echo \"phase2b\""
+CHECK CONFIRM_ALLOW_BORDER_INPUT=true {"border":"rgb(107, 117, 126)","width":"1px"}
+CHECK CONFIRM_DENY_PRIMARY_BG=true "rgb(111, 160, 139)"
+CHECK BUTTON_FONT_13=true "13px"
+CHECK FOCUS_RING_BUTTON_OUTLINE=true {"forced":true,"outline-width":"2px","outline-style":"solid","outline-color":"rgb(111, 160, 139)","outline-offset":"3px"}
+CHECK FOCUS_RING_BUTTON_DEFAULT=true {"forced":true,"outline-width":"2px","outline-style":"solid","outline-color":"rgb(111, 160, 139)","outline-offset":"3px"}
+CHECK FOCUS_RING_TEXTAREA=true {"forced":true,"outline-width":"2px","outline-style":"solid","outline-color":"rgb(111, 160, 139)","outline-offset":"3px"}
+CHECK FOCUS_RING_ENGINE_TRIGGER=true {"forced":true,"outline-width":"2px","outline-style":"solid","outline-color":"rgb(111, 160, 139)","outline-offset":"3px"}
+CHECK CONFIRM_DENY_STATIC_RING=true {"outline-width":"2px","outline-style":"solid","outline-color":"rgb(111, 160, 139)","outline-offset":"3px"}
+CHECK PRIMARY_HOVER_SUCCESS_HOVER=true {"hover":true,"bg":"rgb(127, 178, 155)"}
+CHECK PRIMARY_ACTIVE_TOKEN=true {"active":true,"bg":"rgb(94, 143, 122)"}
+CHECK CONFIRM_MOUSE_DENY_CLOSED=true
+CHECK CHECKBOX_CHECKED_WARNING=true {"bg":"rgb(196, 161, 95)","border":"rgb(196, 161, 95)","matched":true}
+CHECK CONFIRM_ESC_DENY=true "deny"
+CHECK IME_COMPOSITION_ENTER_NOT_SENT=true {"prevented":false,"text":"中文候选","status":"演示骨架：发送、附件与自动判断均未接入业务。"}
+CHECK IME_AFTER_COMMIT_ENTER_INTERCEPTED=true {"prevented":true,"text":"中文候选","status":"演示：发送未接入业务，本条未发送。"}
+CHECK IME_GUARDS_229_ISCOMPOSING=true {"k229":false,"isComposing":false,"shift":false}
+CHECK SEND_STILL_DISABLED=true
+CHECK NARROW_960_NO_OVERFLOW=true {"inner":[960,620],"noOverflow":true,"paneW":664,"capsuleW":664,"demoDisplay":"none","scopeDisplay":"block","scopeText":"产品 / Claude · 演示","scopeFits":true,"headH":60}
+CHECK NARROW_SCOPE_DEMO_HIDDEN=true {"demoDisplay":"none","scope":"产品 / Claude · 演示","fits":true}
+CHECK PAGE_CSP_VIOLATIONS_ZERO=true 0
+CHECK NO_CONSOLE_ERRORS=true []
+CHECK NO_CSP_OR_MODULE_CONSOLE_ERRORS=true []
+CHECK NO_DID_FAIL_LOAD=true []
+CHECK NO_PRELOAD_ERRORS=true []
+CHECK NO_RENDER_GONE=true []
+CHECK SCREENSHOT_CAPTURED=true {"path":"/tmp/ans-p2b-smoke-output/smoke-1360-default.png","bytes":94137}
+SMOKE_SUMMARY {"total":49,"passed":49,"failed":0}
+SMOKE_DONE=1

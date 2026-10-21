@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phase 4A 设计原型 · 引擎设置 / 工作概览 / 角色资料 / 队列</title>
+<!--
+  静态原型 · 演示数据 · 未接入业务。
+  设计依据：2026-10-21_design_ui-platform-phase4a-design.md
+  自包含：内联 CSS/JS，无外部字体/图标/库；图标为内联 SVG 示意，生产用 Lucide。
+  控制条不属于正式应用；生产动效由 Motion 实现，聊天热路径不挂动画。
+  查询参数：?w=1360|960&scene=settings|work|role|queue&capture=1&audit=1&state=missing|saved|error
+-->
+<style>
+  :root {
+    color-scheme: dark;
+    --background:#14171A; --foreground:#F2F4F6;
+    --card:#1E2328; --card-foreground:#F2F4F6;
+    --popover:#14171A; --popover-foreground:#F2F4F6;
+    --primary:#6FA08B; --primary-foreground:#14171A;
+    --secondary:#252A30; --secondary-foreground:#F2F4F6;
+    --muted:#1E2328; --muted-foreground:#949BA4;
+    --accent:#252A30; --accent-foreground:#F2F4F6;
+    --destructive:#C97A6D; --destructive-foreground:#14171A;
+    --border:#2C3238; --border-strong:#3A4148; --input:#6B757E; --ring:#6FA08B;
+    --sidebar:#1A1E22; --sidebar-foreground:#F2F4F6;
+    --sidebar-primary:#6FA08B; --sidebar-primary-foreground:#14171A;
+    --sidebar-accent:#252A30; --sidebar-accent-foreground:#F2F4F6;
+    --sidebar-border:#2C3238; --sidebar-ring:#6FA08B;
+    --warning:#C4A15F; --warning-foreground:#14171A;
+    --warning-bg:#24211A; --warning-border:#4E422A;
+    --success:#6FA08B; --success-foreground:#14171A;
+    --success-bg:#22302B; --success-hover:#7FB29B; --primary-active:#5E8F7A;
+    --danger:#C97A6D; --danger-bg:#2E2220; --danger-border:#5C3832;
+    --text-2:#A7ADB5; --text-3:#949BA4;
+    --selected:#2A3037; --selected-foreground:#F2F4F6;
+    --drawer-surface:#171B1F; --hover:#252A30;
+    --radius:8px; --radius-control:6px; --radius-micro:4px;
+    --content-max:900px; --sidebar-width:248px; --titlebar-h:36px;
+    --session-head-h:64px; --drawer-w:424px;
+    --shadow-card:0 1px 2px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.32);
+    --shadow-dock:0 -6px 18px rgba(0,0,0,.35);
+    --shadow-drawer:-12px 0 42px rgba(0,0,0,.55);
+    --backdrop:rgba(0,0,0,.45); --backdrop-strong:rgba(0,0,0,.55);
+    --scrollbar-thumb:#4A525A; --scrollbar-thumb-hover:#5F6870; --selection-bg:#3A4A44;
+    --font-mono:ui-monospace,"Cascadia Mono","Cascadia Code","SF Mono",Consolas,"Liberation Mono","Microsoft YaHei",monospace;
+    --font-sans:var(--font-mono);
+    --motion-fast:120ms; --motion-base:160ms;
+    --ease-standard:cubic-bezier(.2,0,0,1);
+  }
+  * { box-sizing:border-box; }
+  html,body { height:100%; }
+  body { margin:0; display:flex; flex-direction:column; background:var(--background); color:var(--foreground); font:13px/1.55 var(--font-sans); -webkit-font-smoothing:antialiased; }
+  button,input,select,textarea { font:inherit; color:inherit; }
+  button { cursor:pointer; }
+  [hidden] { display:none !important; }
+  ::selection { background:var(--selection-bg); color:var(--foreground); }
+  ::-webkit-scrollbar { width:10px; height:10px; }
+  ::-webkit-scrollbar-thumb { background:var(--scrollbar-thumb); border:3px solid transparent; border-radius:6px; background-clip:content-box; }
+  ::-webkit-scrollbar-thumb:hover { background:var(--scrollbar-thumb-hover); background-clip:content-box; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  :focus-visible { outline:2px solid var(--ring); outline-offset:3px; }
+
+  .sprite { position:absolute; width:0; height:0; overflow:hidden; }
+  .ico { width:16px; height:16px; flex:0 0 auto; display:block; }
+  .ico-12 { width:12px; height:12px; } .ico-14 { width:14px; height:14px; }
+  .ico-18 { width:18px; height:18px; } .ico-36 { width:36px; height:36px; }
+
+  /* ——— 原型控制条 ——— */
+  .harness { flex:0 0 auto; display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; padding:8px 14px; background:var(--sidebar); border-bottom:1px solid var(--border); }
+  .harness-title { display:flex; align-items:center; gap:8px; }
+  .harness-title strong { font-size:12px; font-weight:650; white-space:nowrap; }
+  .harness-badge { font-size:10px; color:var(--warning); border:1px solid var(--warning-border); background:var(--warning-bg); border-radius:4px; padding:0 6px; white-space:nowrap; }
+  .harness-controls { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+  .seg { display:inline-flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  .seg button { height:26px; padding:0 9px; border:0; background:transparent; color:var(--text-2); font-size:11px; }
+  .seg button + button { border-left:1px solid var(--border); }
+  .seg button:hover { background:var(--hover); color:var(--foreground); }
+  .seg button.is-on { background:var(--selected); color:var(--foreground); }
+  .hbtn { height:26px; padding:0 9px; border:1px solid var(--border); border-radius:6px; background:var(--background); color:var(--text-2); font-size:11px; }
+  .hbtn:hover { background:var(--hover); color:var(--foreground); border-color:var(--border-strong); }
+  .harness-meta { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:10.5px; color:var(--text-3); }
+  .harness-meta #scale { color:var(--text-2); }
+  .stage { flex:1 1 auto; min-height:0; display:flex; align-items:flex-start; justify-content:center; padding:16px; overflow:hidden; }
+  .window { width:1360px; height:860px; flex:0 0 auto; display:flex; flex-direction:column; position:relative; background:var(--background); border:1px solid var(--border-strong); box-shadow:0 24px 80px rgba(0,0,0,.55); overflow:hidden; transform-origin:top center; }
+  body.capture .harness { display:none; }
+  body.capture .stage { padding:0; display:block; height:100vh; overflow:hidden; }
+  body.capture .window { border:0; box-shadow:none; transform:none !important; margin:0; }
+
+  /* ——— 应用骨架 ——— */
+  .titlebar { flex:0 0 auto; height:36px; display:flex; align-items:center; position:relative; background:var(--sidebar); border-bottom:1px solid var(--border-strong); user-select:none; }
+  .titlebar-brand { position:absolute; left:50%; transform:translateX(-50%); font-size:12px; font-weight:600; letter-spacing:.08em; }
+  .titlebar-controls { margin-left:auto; display:flex; height:100%; }
+  .win-btn { width:46px; height:100%; display:inline-flex; align-items:center; justify-content:center; border:0; background:transparent; color:var(--text-2); }
+  .win-btn:hover { background:var(--hover); color:var(--foreground); }
+  .app { flex:1 1 auto; min-height:0; position:relative; display:grid; grid-template-columns:var(--sidebar-width) minmax(0,1fr); overflow:hidden; }
+  .col-left { background:var(--sidebar); border-right:1px solid var(--border); padding:18px 16px 12px; display:flex; flex-direction:column; gap:14px; min-width:0; }
+  .workspace-brand { font-size:21px; font-weight:750; letter-spacing:-.05em; line-height:1.2; }
+  .workspace-brand span { display:block; font-size:10.5px; letter-spacing:.12em; color:var(--text-3); font-weight:500; margin-top:2px; }
+  .project-summary { display:flex; align-items:center; gap:10px; }
+  .project-icon { width:30px; height:30px; display:grid; place-items:center; background:var(--card); border:1px solid var(--border-strong); border-radius:6px; color:var(--text-2); }
+  .project-name { font-size:13.5px; font-weight:600; line-height:1.5; }
+  .project-path { font-size:11px; color:var(--text-2); line-height:1.5; }
+  .tree-label { font-size:10.5px; letter-spacing:.08em; color:var(--text-3); }
+  .tree { flex:1 1 auto; display:flex; flex-direction:column; gap:2px; min-height:0; overflow:auto; }
+  .tree-item { width:100%; display:grid; grid-template-columns:28px minmax(0,1fr); gap:3px 10px; align-items:center; padding:7px 8px; min-height:48px; border:0; border-radius:8px; background:transparent; color:var(--foreground); text-align:left; }
+  .tree-item:hover { background:var(--hover); }
+  .tree-item.active { background:var(--selected); box-shadow:inset 2px 0 0 var(--primary); }
+  .ti-avatar { width:28px; height:28px; display:grid; place-items:center; border-radius:8px; border:1px solid var(--border-strong); background:var(--card); color:var(--text-2); font-size:11.5px; font-weight:600; }
+  .ti-name { font-size:13px; line-height:1.4; }
+  .ti-sub { font-size:10.5px; color:var(--text-3); line-height:1.4; }
+  .tree-item.active .ti-name { font-weight:600; }
+  .status { color:var(--text-3); }
+  .status.waiting { color:var(--warning); }
+  .status.working { color:var(--text-2); }
+  .status.error { color:var(--danger); }
+  .sidebar-foot { margin-top:auto; padding-top:10px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:2px; }
+  .btn { height:32px; padding:0 12px; display:inline-flex; align-items:center; justify-content:center; gap:6px; border:1px solid var(--border-strong); border-radius:6px; background:var(--background); color:var(--foreground); font:13px/1 var(--font-sans); white-space:nowrap; }
+  .btn:hover { background:var(--hover); }
+  .btn.primary { background:var(--primary); border-color:var(--primary); color:var(--primary-foreground); font-weight:600; }
+  .btn.primary:hover { background:var(--success-hover); border-color:var(--success-hover); }
+  .btn.ghost { background:transparent; border-color:transparent; color:var(--text-2); }
+  .btn.ghost:hover { background:var(--hover); color:var(--foreground); }
+  .btn.block { width:100%; justify-content:flex-start; font-weight:400; }
+  .btn.sm { height:28px; padding:0 10px; font-size:12px; }
+  .btn.xs { height:24px; padding:0 8px; font-size:11px; }
+  .sidebar-foot .btn { border:0; background:transparent; font-weight:400; }
+  .sidebar-role-count { font-size:10.5px; color:var(--text-3); padding:6px 4px 0; }
+
+  .col-mid { position:relative; display:flex; flex-direction:column; min-width:0; min-height:0; background:var(--background); --gutter:max(32px,calc((100% - var(--content-max)) / 2)); }
+  .session-head { flex:0 0 auto; min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px var(--gutter); border-bottom:1px solid var(--border); }
+  .session-identity { display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .chat-role { font-size:18px; font-weight:650; line-height:1.2; }
+  .chat-role-sub { font-size:11px; color:var(--text-3); }
+  .context-state { font-size:12px; color:var(--text-2); }
+  .session-actions { display:flex; align-items:center; gap:6px; }
+  .engine-trigger { height:32px; padding:0 10px; display:inline-flex; align-items:center; gap:6px; border:1px solid var(--input); border-radius:6px; background:var(--background); color:var(--foreground); font-size:12.5px; }
+  .engine-trigger:hover { background:var(--hover); }
+  .engine-chevron { color:var(--text-3); }
+  .tab-badge { display:inline-flex; align-items:center; margin-left:4px; padding:0 5px; border:1px solid var(--warning-border); border-radius:4px; background:var(--warning-bg); color:var(--warning); font-size:10px; line-height:1.6; }
+  .tab-badge.neutral { border-color:var(--border-strong); background:var(--selected); color:var(--text-2); }
+  .session-notice { flex:0 0 auto; display:flex; justify-content:space-between; gap:16px; padding:4px var(--gutter) 0; font-size:11.5px; color:var(--text-3); }
+  .session-notice .notice-right { color:var(--text-2); white-space:nowrap; }
+  .notice-action { border:0; background:transparent; color:var(--warning); font-size:11.5px; text-decoration:underline; text-underline-offset:2px; padding:0; }
+  .chat { flex:1 1 auto; min-height:0; overflow-y:auto; padding:20px var(--gutter) 24px; padding-right:calc(var(--gutter) - 10px); scrollbar-gutter:stable; }
+  .chat-pane { max-width:900px; margin:0 auto; display:flex; flex-direction:column; gap:16px; }
+  .msg { font-size:15px; line-height:1.8; color:var(--foreground); }
+  .msg-user { align-self:flex-end; max-width:88%; padding:8px 14px; background:var(--card); border-radius:8px 8px 3px 8px; font-size:14px; line-height:22px; }
+  .msg p { margin:0 0 8px; } .msg p:last-child { margin-bottom:0; }
+  .composer { flex:0 0 auto; padding:12px var(--gutter) 10px; background:var(--card); border-top:1px solid var(--border); box-shadow:var(--shadow-dock); }
+  .capsule { max-width:900px; margin:0 auto; padding:8px 12px; border:1px solid var(--input); border-radius:8px; background:var(--card); color:var(--text-3); font-size:14px; line-height:22px; }
+  .compose-note { max-width:900px; margin:6px auto 0; display:flex; justify-content:space-between; gap:16px; font-size:10.5px; color:var(--text-3); }
+
+  /* ——— 抽屉 ——— */
+  .drawer-backdrop { position:absolute; inset:0; z-index:29; background:var(--backdrop); }
+  .drawer { position:absolute; top:0; right:0; bottom:0; z-index:30; width:var(--drawer-w); max-width:100%; display:flex; flex-direction:column; background:var(--drawer-surface); border-left:1px solid var(--border-strong); box-shadow:var(--shadow-drawer); overflow:hidden; }
+  .drawer-head { flex:0 0 auto; height:64px; padding:0 20px; display:flex; align-items:center; justify-content:space-between; gap:8px; border-bottom:1px solid var(--border); }
+  .drawer-title { font-size:18px; line-height:1.4; font-weight:650; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .drawer-close { width:28px; height:28px; border:0; border-radius:6px; background:transparent; color:var(--text-2); font-size:15px; line-height:1; }
+  .drawer-close:hover { background:var(--hover); color:var(--foreground); }
+  .drawer-body { flex:1 1 auto; min-height:0; overflow-y:auto; }
+  .scene { display:none; }
+  .window[data-scene="settings"] .scene-settings,
+  .window[data-scene="work"] .scene-work,
+  .window[data-scene="role"] .scene-role,
+  .window[data-scene="queue"] .scene-queue { display:flex; }
+  .scene-pad { padding:20px 24px 24px; display:flex; flex-direction:column; gap:16px; }
+  .scene-settings { flex-direction:column; min-height:100%; }
+  .settings-scroll { padding:20px 24px 16px; display:flex; flex-direction:column; gap:14px; }
+
+  /* ——— 设置 ——— */
+  .settings-tabs { display:flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  .settings-tab { flex:1 1 0; height:32px; border:0; background:transparent; color:var(--text-2); font-size:12px; display:inline-flex; align-items:center; justify-content:center; gap:5px; }
+  .settings-tab + .settings-tab { border-left:1px solid var(--border); }
+  .settings-tab:hover { background:var(--hover); color:var(--foreground); }
+  .settings-tab.is-active { background:var(--selected); color:var(--foreground); font-weight:600; }
+  .dot { width:6px; height:6px; border-radius:50%; background:var(--text-3); flex:0 0 auto; }
+  .dot.ok { background:var(--primary); } .dot.missing { background:var(--warning); } .dot.unknown { background:var(--text-3); }
+  .settings-current { font-size:10.5px; color:var(--text-3); line-height:1.5; }
+  .path-card { background:var(--background); border:1px solid var(--border); border-radius:4px; padding:8px; font:10px/1.7 var(--font-mono); color:var(--text-3); overflow-wrap:anywhere; }
+  .hint { margin:0; font-size:11px; line-height:1.7; color:var(--text-2); }
+  .alert { display:flex; gap:8px; align-items:flex-start; padding:8px 10px; border:1px solid var(--warning-border); border-left:2px solid var(--warning); border-radius:6px; background:var(--warning-bg); color:var(--warning); font-size:11.5px; line-height:1.6; }
+  .alert.danger { border-color:var(--danger-border); border-left-color:var(--danger); background:var(--danger-bg); color:var(--danger); }
+  .field { display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .field-label { font-size:11px; line-height:1.4; color:var(--text-2); }
+  .req { color:var(--text-3); }
+  .secret-tag { margin-left:4px; padding:0 4px; border-radius:4px; background:var(--selected); color:var(--text-2); font-size:9px; }
+  .input-row { display:flex; gap:6px; align-items:center; }
+  .input { width:100%; height:32px; min-width:0; padding:0 10px; border:1px solid var(--input); border-radius:6px; background:var(--background); color:var(--foreground); font:12.5px/1.5 var(--font-mono); }
+  .input:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
+  .input::placeholder { color:var(--text-3); }
+  .help { font-size:10.5px; line-height:1.5; color:var(--text-3); overflow-wrap:anywhere; }
+  .advanced { border-top:1px solid var(--border); padding-top:12px; }
+  .advanced > summary { display:flex; align-items:center; gap:6px; height:32px; list-style:none; cursor:pointer; font-size:12px; font-weight:600; }
+  .advanced > summary::-webkit-details-marker { display:none; }
+  .advanced .chev { color:var(--text-3); transform:rotate(0); }
+  .advanced[open] .chev { transform:rotate(90deg); }
+  .advanced-body { display:flex; flex-direction:column; gap:14px; padding-top:6px; }
+  .range-row { display:flex; align-items:center; gap:10px; }
+  .range-row input[type=range] { flex:1 1 auto; min-width:0; height:20px; accent-color:var(--primary); }
+  .range-out { flex:0 0 auto; min-width:96px; text-align:right; font-size:11px; color:var(--text-2); font-variant-numeric:tabular-nums; }
+  .range-note { font-size:10.5px; color:var(--text-3); line-height:1.5; }
+  .settings-save { position:sticky; bottom:0; min-height:64px; margin-top:auto; padding:12px 24px; display:flex; align-items:center; gap:12px; background:var(--card); border-top:1px solid var(--border); }
+  .save-status { flex:1 1 auto; min-width:0; font-size:11px; line-height:1.55; color:var(--text-2); overflow-wrap:anywhere; }
+  .save-status.ok { color:var(--primary); } .save-status.warn { color:var(--warning); } .save-status.err { color:var(--danger); }
+
+  /* ——— 工作概览 / 角色 / 队列 ——— */
+  .section { display:flex; flex-direction:column; gap:8px; }
+  .section-head { display:flex; align-items:center; gap:8px; }
+  .section-title { font-size:12px; font-weight:600; }
+  .count { font-size:10.5px; color:var(--text-3); }
+  .sep { height:1px; background:var(--border); }
+  .pending-row { display:flex; align-items:center; gap:8px; min-height:32px; padding:4px 0; border-bottom:1px solid var(--border); font-size:12.5px; }
+  .type-badge { flex:0 0 auto; padding:0 5px; border:1px solid var(--warning-border); border-radius:4px; background:var(--warning-bg); color:var(--warning); font-size:10px; line-height:1.6; }
+  .pending-title { flex:1 1 auto; min-width:0; color:var(--foreground); }
+  .q-row { display:grid; grid-template-columns:auto minmax(0,1fr) auto auto; gap:8px; align-items:baseline; padding:7px 0; border-top:1px solid var(--border); font-size:11px; color:var(--text-3); }
+  .q-row.running { color:var(--text-2); }
+  .q-pos { color:var(--text-2); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .q-main { min-width:0; }
+  .q-meta { display:flex; gap:8px; font-size:10.5px; color:var(--text-3); }
+  .q-text { margin-top:2px; font-size:12.5px; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .q-actions { display:flex; gap:4px; align-items:center; }
+  .q-feedback { grid-column:2 / -1; font-size:10.5px; color:var(--text-2); }
+  .queue-withdraw { height:28px; padding:0 10px; border:1px solid var(--input); border-radius:6px; background:transparent; color:var(--text-2); font-size:11px; }
+  .queue-withdraw:hover { background:var(--hover); color:var(--foreground); }
+  .queue-withdraw:disabled { opacity:.55; cursor:default; }
+  .report-card { border:1px solid var(--border-strong); border-radius:8px; background:var(--card); padding:10px 12px; display:flex; flex-direction:column; gap:4px; }
+  .report-title { font-size:12.5px; font-weight:600; color:var(--foreground); }
+  .report-sub { font-size:11px; color:var(--text-2); line-height:1.6; }
+  .muted { color:var(--text-3); font-size:11px; line-height:1.6; }
+  .role-head { display:flex; align-items:center; gap:10px; }
+  .role-avatar { width:36px; height:36px; display:grid; place-items:center; border-radius:8px; border:1px solid var(--border-strong); background:var(--card); color:var(--text-2); font-size:13px; font-weight:600; }
+  .role-name { font-size:18px; font-weight:650; line-height:1.3; }
+  .role-sub { font-size:12px; color:var(--text-3); }
+  .role-status { margin-left:auto; }
+  .collapsible { border:1px solid var(--border); border-radius:8px; background:var(--card); overflow:hidden; }
+  .collapsible + .collapsible { margin-top:8px; }
+  .collapsible-head { display:flex; align-items:center; gap:8px; min-height:32px; padding:0 10px; font-size:12px; color:var(--text-2); list-style:none; cursor:pointer; }
+  .collapsible-head::-webkit-details-marker { display:none; }
+  .collapsible-head .chev { margin-left:auto; color:var(--text-3); }
+  .collapsible-body { padding:8px 10px 10px; border-top:1px solid var(--border); font-size:12px; line-height:1.7; color:var(--text-2); }
+  .collapsible[open] .chev { transform:rotate(90deg); }
+  .doc-index { font:11px/1.7 var(--font-mono); color:var(--text-2); }
+  .back-link { display:inline-flex; align-items:center; gap:4px; height:28px; border:0; background:transparent; color:var(--text-2); font-size:11px; padding:0; }
+  .back-link:hover { color:var(--foreground); }
+  .queue-toolbar { display:flex; align-items:center; gap:8px; justify-content:space-between; }
+  .queue-title { font-size:14px; font-weight:650; }
+  .drawer-note { font-size:11px; color:var(--text-3); line-height:1.6; }
+
+  .window[data-w="960"] .col-mid { --gutter:24px; }
+  .window[data-w="960"] .chat { padding-top:16px; padding-bottom:20px; }
+  .window[data-w="960"] .composer { padding:10px 24px 8px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,*::before,*::after { animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
+  }
+  body.capture *, body.capture *::before, body.capture *::after, body.no-motion *, body.no-motion *::before, body.no-motion *::after { transition:none !important; animation-duration:.001ms !important; animation-iteration-count:1 !important; }
+  .audit { position:fixed; inset:0; z-index:999; margin:0; padding:16px; overflow:auto; background:#000; color:#9fe8b8; font:12px/1.5 ui-monospace,monospace; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <symbol id="i-x"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-chevron-right"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-chevron-left"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-folder"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-message"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-check"><path d="m5 12 4 4L19 6"/></symbol>
+  <symbol id="i-clock"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-file"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></symbol>
+  <symbol id="i-minus"><path d="M5 12h14"/></symbol>
+  <symbol id="i-square"><rect x="5" y="5" width="14" height="14" rx="2"/></symbol>
+</svg>
+
+<header class="harness" id="harness">
+  <div class="harness-title"><strong>Phase 4A · 引擎设置 / 工作概览</strong><span class="harness-badge">静态原型 · 演示数据 · 未接入业务</span></div>
+  <div class="harness-controls">
+    <div class="seg" role="group" aria-label="窗口档位">
+      <button data-act="w1360" class="is-on">1360×860</button><button data-act="w960">960×620</button>
+    </div>
+    <div class="seg" role="group" aria-label="场景">
+      <button data-act="settings" class="is-on">引擎设置</button><button data-act="work">工作概览</button><button data-act="role">角色资料</button><button data-act="queue">队列</button>
+    </div>
+    <div class="seg" id="state-controls" role="group" aria-label="设置状态">
+      <button data-state="missing" class="is-on">缺配</button><button data-state="saved">已保存</button><button data-state="error">保存失败</button>
+    </div>
+    <button class="hbtn" data-act="reset">复位</button>
+  </div>
+  <div class="harness-meta">
+    <span id="scale">缩放 100%</span><span>动效：CSS transition 示意 / 生产由 Motion 实现</span><span>图标：内联 SVG 示意 / 生产用 Lucide</span><span id="status">演示交互不影响任何业务</span>
+  </div>
+</header>
+
+<main class="stage" id="stage">
+  <div class="window" id="window" data-w="1360" data-scene="settings">
+    <div class="titlebar">
+      <div class="titlebar-brand">ANS</div>
+      <div class="titlebar-controls">
+        <button class="win-btn" title="最小化" aria-label="最小化"><svg class="ico ico-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><use href="#i-minus"/></svg></button>
+        <button class="win-btn" title="最大化" aria-label="最大化"><svg class="ico ico-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><use href="#i-square"/></svg></button>
+        <button class="win-btn" title="关闭" aria-label="关闭"><svg class="ico ico-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><use href="#i-x"/></svg></button>
+      </div>
+    </div>
+    <div class="app" id="app">
+      <aside class="col-left">
+        <div class="workspace-brand">ans<span>AGENT WORKSPACE</span></div>
+        <div class="project-summary"><div class="project-icon"><svg class="ico ico-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><use href="#i-folder"/></svg></div><div><div class="project-name">ans-runtime</div><div class="project-path">/Users/w/…/ans-runtime</div></div></div>
+        <div class="tree-label">工作空间</div>
+        <nav class="tree" aria-label="角色列表">
+          <button class="tree-item"><span class="ti-avatar">su</span><span><span class="ti-name">su</span><span class="ti-sub">主入口 · <span class="status working">工作中</span></span></span></button>
+          <button class="tree-item active" aria-current="true"><span class="ti-avatar">产</span><span><span class="ti-name">产品</span><span class="ti-sub">产品目标 · <span class="status waiting">1 待办</span></span></span></button>
+          <button class="tree-item"><span class="ti-avatar">桌</span><span><span class="ti-name">桌面UI</span><span class="ti-sub">渲染层实现 · <span class="status">空闲</span></span></span></button>
+          <button class="tree-item"><span class="ti-avatar">项</span><span><span class="ti-name">项目管理</span><span class="ti-sub">评审与口径 · <span class="status error">错误</span></span></span></button>
+        </nav>
+        <div class="sidebar-foot">
+          <button class="btn ghost block">切换项目</button>
+          <button class="btn ghost block" id="sidebar-settings">设置</button>
+          <div class="sidebar-role-count">4 个角色 · 3 个治理职能</div>
+        </div>
+      </aside>
+
+      <main class="col-mid">
+        <header class="session-head">
+          <div class="session-identity">
+            <div><span class="chat-role">产品</span> <span class="chat-role-sub">产品目标 · 验收口径</span></div>
+            <span class="context-state" role="status">上下文已恢复 · 就绪</span>
+          </div>
+          <div class="session-actions">
+            <button class="engine-trigger" type="button" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="会话引擎，当前 Pi" id="engine-trigger"><span id="engine-label">Pi</span><svg class="ico ico-12 engine-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+            <button class="btn ghost sm" type="button" aria-label="工作概览，1 项待处理">工作概览 <span class="tab-badge" id="work-badge">1</span></button>
+            <button class="btn ghost sm" type="button" id="role-open" aria-label="角色资料，3 项进行中或排队">角色资料 <span class="tab-badge neutral" id="role-badge">3</span></button>
+          </div>
+        </header>
+        <div class="session-notice" id="session-notice">
+          <span id="notice-left">Pi 配置不完整，缺：ANTHROPIC_AUTH_TOKEN。 <button class="notice-action" type="button">打开 Pi 设置</button></span>
+          <span class="notice-right" id="notice-right">引擎 Pi · 已导入项目</span>
+        </div>
+        <div class="chat" id="chat">
+          <div class="chat-pane">
+            <div class="msg msg-user">发布包已上传，帮我核对校验和，并把结论整理成一页。</div>
+            <div class="msg"><p>已核对三个产物的 <code>sha256</code>：与发布记录一致。发布验证结论仍在等待你的确认。</p></div>
+            <div class="msg"><p>当前角色有 1 项待确认、2 条排队消息；工作概览会分开呈现，不与报告混计。</p></div>
+          </div>
+        </div>
+        <div class="composer"><div class="capsule">给产品发送消息…</div><div class="compose-note"><span>Enter 发送，Shift+Enter 换行</span><span>实际写入导入项目，角色边界外的写入会被拒绝。</span></div></div>
+      </main>
+
+      <div class="drawer-backdrop" id="drawer-backdrop"></div>
+      <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+        <div class="drawer-head"><span class="drawer-title" id="drawer-title">引擎设置</span><button class="drawer-close" type="button" aria-label="关闭抽屉"><svg class="ico ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><use href="#i-x"/></svg></button></div>
+        <div class="drawer-body" id="drawer-body">
+
+          <section class="scene scene-settings">
+            <div class="settings-scroll">
+              <div class="settings-tabs" role="tablist" aria-label="配置引擎">
+                <button class="settings-tab is-active" role="tab" aria-selected="true"><span class="dot missing" id="pi-dot"></span>Pi</button>
+                <button class="settings-tab" role="tab" aria-selected="false"><span class="dot ok"></span>Codex</button>
+                <button class="settings-tab" role="tab" aria-selected="false"><span class="dot unknown"></span>Claude</button>
+              </div>
+              <div class="settings-current">配置只影响所选引擎，不会切换当前会话。当前状态：<strong id="settings-current-state">Pi · 缺配置</strong></div>
+              <div class="path-card">保存位置<br>/Users/w/…/ans-runtime/.env</div>
+              <p class="hint">保存到仓库根 .env，只修改本引擎字段。当前轮次继续使用原配置；结束后下一次输入应用新配置。</p>
+              <div class="alert" id="settings-alert">Pi 配置不完整，缺：ANTHROPIC_AUTH_TOKEN。请补齐后保存。</div>
+              <label class="field"><span class="field-label">访问令牌 · <span class="req">必填</span><span class="secret-tag">机密</span></span><span class="input-row"><input class="input" type="password" id="pi-token" placeholder="未设置" autocomplete="off"><button class="btn ghost sm" type="button" id="toggle-secret">显示</button></span><span class="help" id="pi-token-help">ANTHROPIC_AUTH_TOKEN · 未设置</span></label>
+              <label class="field"><span class="field-label">API 地址 · <span class="req">必填</span></span><input class="input" type="text" value="https://api.anthropic.com" autocomplete="off"><span class="help">ANS_PI_BASE_URL · 文件</span></label>
+              <label class="field"><span class="field-label">模型 · <span class="req">必填</span></span><input class="input" type="text" value="claude-sonnet-4-5" autocomplete="off"><span class="help">ANS_PI_MODEL · 环境</span></label>
+              <label class="field"><span class="field-label">推理强度 · <span class="req">可选</span></span><select class="input" aria-label="推理强度"><option>留空（平台默认）</option><option selected>中</option><option>高</option><option>极高</option></select><span class="help">ANS_PI_REASONING_EFFORT · 文件。留空＝维持平台默认；思考计入输出 tokens。</span></label>
+              <details class="advanced" open>
+                <summary><svg class="ico ico-12 chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-right"/></svg><span>高级</span></summary>
+                <div class="advanced-body">
+                  <div class="field"><span class="field-label">上下文窗口 · <span class="req">可选</span></span><div class="range-row"><input type="range" min="0" max="6" step="1" value="4" aria-label="上下文窗口" aria-valuetext="256k"><output class="range-out">256k</output></div><span class="range-note">留空＝系统默认（500k）；下一次开启会话时应用。</span></div>
+                  <div class="field"><span class="field-label">看护检查时限 · <span class="req">可选</span></span><div class="range-row"><input type="range" min="0" max="6" step="1" value="4" aria-label="看护检查时限" aria-valuetext="10 分钟"><output class="range-out">10 分钟</output></div><span class="range-note">到点只通知治理角色检查是否卡死，不中止本轮；1 小时为最后兜底。</span></div>
+                </div>
+              </details>
+            </div>
+            <div class="settings-save"><button class="btn primary" type="button" id="save-btn">保存到 .env</button><span class="save-status warn" id="save-status" role="status">必填配置仍缺：ANTHROPIC_AUTH_TOKEN。请补齐后保存。</span></div>
+          </section>
+
+          <section class="scene scene-work">
+            <div class="scene-pad">
+              <div class="section">
+                <div class="section-head"><span class="section-title">待处理</span><span class="count">1</span></div>
+                <div class="pending-row"><span class="type-badge">待确认</span><span class="pending-title">发布验证结论待确认</span><button class="btn ghost xs" type="button">定位</button></div>
+              </div>
+              <div class="sep"></div>
+              <div class="section">
+                <div class="section-head"><span class="section-title">当前工作</span><span class="count">1</span></div>
+                <div class="q-row running"><span class="q-pos">进行中</span><div class="q-main"><div class="q-meta"><span>客户消息</span><span>14:32</span></div><div class="q-text">正在处理发布验证请求</div></div><div class="q-actions"><button class="btn ghost xs" type="button">全文</button></div></div>
+              </div>
+              <div class="sep"></div>
+              <div class="section">
+                <div class="section-head"><span class="section-title">排队</span><span class="count">2</span><button class="btn ghost xs" style="margin-left:auto" type="button">查看全部队列（2）</button></div>
+                <div class="q-row"><span class="q-pos">第 1 位</span><div class="q-main"><div class="q-meta"><span>客户消息</span><span>14:34</span></div><div class="q-text">补充发布校验记录</div></div><div class="q-actions"><button class="btn ghost xs" type="button">全文</button><button class="queue-withdraw" type="button">撤回</button></div></div>
+                <div class="q-row"><span class="q-pos">第 2 位</span><div class="q-main"><div class="q-meta"><span>派发 · 来自 B</span><span>14:36</span></div><div class="q-text">核对 v1.4.0 发布产物清单</div></div><div class="q-actions"><button class="btn ghost xs" type="button">全文</button></div></div>
+              </div>
+              <div class="sep"></div>
+              <div class="section">
+                <div class="section-head"><span class="section-title">最近回交</span></div>
+                <div class="report-card"><div class="report-title">报告声明：已完成</div><div class="report-sub">发布验证结论已整理为一页，证据与校验和附在报告摘要中。独立验收尚未确认。</div><button class="btn ghost xs" style="align-self:flex-start" type="button">查看来源角色文档</button></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="scene scene-role">
+            <div class="scene-pad">
+              <div class="role-head"><div class="role-avatar">产</div><div><div class="role-name">产品</div><div class="role-sub">产品目标 · 验收口径</div></div><span class="type-badge role-status">等待你确认 1</span></div>
+              <div class="section">
+                <div class="section-head"><span class="section-title">资料</span><span class="count">4 节</span></div>
+                <details class="collapsible"><summary class="collapsible-head"><svg class="ico ico-12 chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-right"/></svg><span>角色卡</span><span class="help" style="margin-left:auto">role-card.md</span></summary><div class="collapsible-body">角色卡正文走受控 Markdown；此处为演示占位。</div></details>
+                <details class="collapsible"><summary class="collapsible-head"><svg class="ico ico-12 chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-right"/></svg><span>边界条目</span><span class="help" style="margin-left:auto">3 条</span></summary><div class="collapsible-body">只读边界表：目录/条件目录/文件的线型说明，不改变权限。</div></details>
+                <details class="collapsible"><summary class="collapsible-head"><svg class="ico ico-12 chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-right"/></svg><span>变更记录</span><span class="help" style="margin-left:auto">changelog.md</span></summary><div class="collapsible-body">变更记录 Markdown，演示占位。</div></details>
+                <details class="collapsible"><summary class="collapsible-head"><svg class="ico ico-12 chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-right"/></svg><span>文档</span><span class="help" style="margin-left:auto">2 份</span></summary><div class="collapsible-body doc-index">feature-map.md<br>docs/design/2026-10-21_design_ui-platform-round.md</div></details>
+                <button class="btn ghost sm" type="button" style="align-self:flex-start">查看已列文档</button>
+              </div>
+              <div class="sep"></div>
+              <div class="section">
+                <div class="section-head"><span class="section-title">待办 / 队列</span><span class="count">1 待办 · 2 排队</span><button class="btn ghost xs" style="margin-left:auto" type="button">查看全部队列（2）</button></div>
+                <div class="pending-row"><span class="type-badge">待确认</span><span class="pending-title">发布验证结论待确认</span><button class="btn ghost xs" type="button">定位</button></div>
+                <div class="q-row"><span class="q-pos">第 1 位</span><div class="q-main"><div class="q-meta"><span>客户消息</span><span>14:34</span></div><div class="q-text">补充发布校验记录</div></div><div class="q-actions"><button class="queue-withdraw" type="button">撤回</button></div></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="scene scene-queue">
+            <div class="scene-pad">
+              <button class="back-link" type="button"><svg class="ico ico-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-left"/></svg>返回工作概览</button>
+              <div class="queue-toolbar"><span class="queue-title">全部队列</span><span class="count">进行中 1 · 排队 2</span></div>
+              <div class="drawer-note">仅客户消息且未投递可撤回；派发/回交/系统只读。位次由真实快照刷新。</div>
+              <div class="section">
+                <div class="section-head"><span class="section-title">当前工作</span></div>
+                <div class="q-row running"><span class="q-pos">进行中</span><div class="q-main"><div class="q-meta"><span>客户消息</span><span>14:32</span></div><div class="q-text">正在处理发布验证请求</div></div><div class="q-actions"><button class="btn ghost xs" type="button">全文</button></div></div>
+              </div>
+              <div class="sep"></div>
+              <div class="section">
+                <div class="section-head"><span class="section-title">排队</span><span class="count">2</span></div>
+                <div class="q-row"><span class="q-pos">第 1 位</span><div class="q-main"><div class="q-meta"><span>客户消息</span><span>14:34</span></div><div class="q-text">补充发布校验记录</div></div><div class="q-actions"><button class="btn ghost xs" type="button">全文</button><button class="queue-withdraw" type="button" disabled>已撤回</button></div><div class="q-feedback">已撤回排队消息：补充发布校验记录</div></div>
+                <div class="q-row"><span class="q-pos">第 2 位</span><div class="q-main"><div class="q-meta"><span>派发 · 来自 B</span><span>14:36</span></div><div class="q-text">核对 v1.4.0 发布产物清单</div></div><div class="q-actions"><button class="btn ghost xs" type="button">全文</button></div></div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </aside>
+    </div>
+  </div>
+</main>
+<pre class="audit" id="audit" hidden></pre>
+<script>
+(function(){
+  "use strict";
+  var $=function(s,r){return (r||document).querySelector(s);};
+  var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
+  var win=$("#window"), app=$("#app"), stage=$("#stage"), auditEl=$("#audit");
+  var state={w:1360,scene:"settings",settings:"missing",capture:false};
+  var titles={settings:"引擎设置",work:"产品 · 工作概览",role:"产品 · 角色资料",queue:"产品 · 队列"};
+  var engines={settings:"Pi",work:"Claude",role:"Claude",queue:"Claude"};
+  function setScene(scene){
+    state.scene=scene; win.setAttribute("data-scene",scene);
+    $("#drawer-title").textContent=titles[scene]||"引擎设置";
+    var engine=engines[scene]||"Claude"; $("#engine-label").textContent=engine;
+    $("#engine-trigger").setAttribute("aria-label","会话引擎，当前 "+engine);
+    if(scene==="settings"){
+      setSettings(state.settings);
+    } else {
+      $("#notice-left").textContent="写入由治理引擎把关 · 越界操作会在对话中直接提示。";
+      $("#notice-right").textContent="引擎 "+engine+" · 上下文已恢复";
+    }
+    $$("[data-act='settings'],[data-act='work'],[data-act='role'],[data-act='queue']").forEach(function(b){b.classList.toggle("is-on",b.getAttribute("data-act")===scene);});
+    $("#state-controls").hidden=scene!=="settings";
+    setStatus("场景："+titles[scene]+" · "+state.w+"×"+(state.w===960?620:860));
+  }
+  function setSettings(mode){
+    state.settings=mode;
+    var alert=$("#settings-alert"), status=$("#save-status"), token=$("#pi-token");
+    var help=$("#pi-token-help"), current=$("#settings-current-state"), dot=$("#pi-dot");
+    alert.className="alert"; status.className="save-status";
+    if(mode==="missing"){
+      alert.hidden=false; alert.textContent="Pi 配置不完整，缺：ANTHROPIC_AUTH_TOKEN。请补齐后保存。";
+      token.placeholder="未设置"; token.value=""; help.textContent="ANTHROPIC_AUTH_TOKEN · 未设置";
+      current.textContent="Pi · 缺配置"; dot.className="dot missing";
+      status.classList.add("warn"); status.textContent="必填配置仍缺：ANTHROPIC_AUTH_TOKEN。请补齐后保存。";
+      if(state.scene==="settings"){
+        $("#notice-left").innerHTML='Pi 配置不完整，缺：ANTHROPIC_AUTH_TOKEN。 <button class="notice-action" type="button">打开 Pi 设置</button>';
+        $("#notice-right").textContent="引擎 Pi · 已导入项目";
+      }
+    } else if(mode==="saved"){
+      alert.hidden=true;
+      token.value=""; token.placeholder="已设置，留空则不修改"; help.textContent="ANTHROPIC_AUTH_TOKEN · 已设置（不回显）";
+      current.textContent="Pi · 已配置"; dot.className="dot ok";
+      status.classList.add("ok"); status.textContent="已保存到 .env（改动键：ANS_PI_MODEL）。必填配置已齐备。当前轮次继续使用原配置；结束后下一次输入应用新配置。";
+      if(state.scene==="settings"){
+        $("#notice-left").textContent="写入由治理引擎把关 · 越界操作会在对话中直接提示。";
+        $("#notice-right").textContent="引擎 Pi · 配置已齐备";
+      }
+    } else {
+      alert.hidden=true;
+      token.value=""; token.placeholder="已设置，留空则不修改"; help.textContent="ANTHROPIC_AUTH_TOKEN · 已设置（不回显）";
+      current.textContent="Pi · 缺配置"; dot.className="dot missing";
+      status.classList.add("err"); status.textContent="保存失败：.env 只读，无法写入。请检查文件权限后重试。";
+      if(state.scene==="settings"){
+        $("#notice-left").innerHTML='Pi 配置不完整，缺：ANTHROPIC_AUTH_TOKEN。 <button class="notice-action" type="button">打开 Pi 设置</button>';
+        $("#notice-right").textContent="引擎 Pi · 已导入项目";
+      }
+    }
+    $$("#state-controls [data-state]").forEach(function(b){b.classList.toggle("is-on",b.getAttribute("data-state")===mode);});
+    setStatus("设置状态："+({missing:"缺配",saved:"已保存",error:"保存失败"}[mode]));
+  }
+  function setWidth(w){
+    state.w=w; win.setAttribute("data-w",String(w)); win.style.width=w+"px"; win.style.height=(w===960?620:860)+"px";
+    $$("[data-act='w1360'],[data-act='w960']").forEach(function(b){b.classList.toggle("is-on",b.getAttribute("data-act")==="w"+w);});
+    fit(); setStatus("窗口："+w+"×"+(w===960?620:860));
+  }
+  function setStatus(text){ var el=$("#status"); if(el) el.textContent=text||"演示交互不影响任何业务"; }
+  function fit(){
+    if(document.body.classList.contains("capture")) return;
+    var aw=Math.max(320,stage.clientWidth-24), ah=Math.max(320,stage.clientHeight-24);
+    var h=state.w===960?620:860, scale=Math.min(1,aw/state.w,ah/h);
+    win.style.transform="scale("+scale+")";
+    $("#scale").textContent="缩放 "+Math.round(scale*100)+"%"+(scale===1?"（1:1）":"");
+  }
+  $$("[data-act]").forEach(function(b){b.addEventListener("click",function(){var a=b.getAttribute("data-act"); if(a==="w1360"||a==="w960") setWidth(a==="w960"?960:1360); else setScene(a);});});
+  $$("#state-controls [data-state]").forEach(function(b){b.addEventListener("click",function(){setSettings(b.getAttribute("data-state"));});});
+  $("#toggle-secret").addEventListener("click",function(){var i=$("#pi-token");var showing=i.type==="text";i.type=showing?"password":"text";this.textContent=showing?"显示":"隐藏";setStatus(showing?"已隐藏本次输入":"仅显示你本次输入的值");});
+  $("#save-btn").addEventListener("click",function(){setSettings(state.settings==="error"?"error":"saved");});
+  $("#drawer-body").addEventListener("click",function(e){var b=e.target.closest(".queue-withdraw");if(b){var row=b.closest(".q-row");var f=row&&row.querySelector(".q-feedback");if(f){f.hidden=false;f.textContent="已撤回排队消息：演示条目不真实提交";b.disabled=true;b.textContent="已撤回";}setStatus("演示：撤回仅本地示意，不发 IPC");}});
+  $("#sidebar-settings").addEventListener("click",function(){setScene("settings");});
+  $("#role-open").addEventListener("click",function(){setScene("role");});
+  $(".drawer-close").addEventListener("click",function(){setStatus("演示：抽屉关闭（原型保持打开以便查看）");});
+  var q=new URLSearchParams(location.search); state.capture=q.get("capture")==="1";
+  if(state.capture) document.body.classList.add("capture");
+  setWidth(q.get("w")==="960"?960:1360);
+  setScene(q.get("scene")||"settings");
+  setSettings(q.get("state")||"missing");
+  fit(); window.addEventListener("resize",fit);
+
+  function rect(el){var r=el.getBoundingClientRect();return {x:+r.x.toFixed(2),y:+r.y.toFixed(2),w:+r.width.toFixed(2),h:+r.height.toFixed(2)};}
+  function lum(hex){var h=hex.replace("#","");var a=[0,2,4].map(function(i){return parseInt(h.slice(i,i+2),16)/255;});var c=a.map(function(v){return v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4);});return .2126*c[0]+.7152*c[1]+.0722*c[2];}
+  function contrast(a,b){var la=lum(a),lb=lum(b),hi=Math.max(la,lb),lo=Math.min(la,lb);return +((hi+.05)/(lo+.05)).toFixed(2);}
+  function wait(ms){return new Promise(function(r){setTimeout(r,ms);});}
+  async function runAudit(){
+    document.body.classList.add("no-motion");
+    var cs=getComputedStyle(document.documentElement);
+    var names=["--background","--foreground","--card","--primary","--primary-foreground","--input","--ring","--warning","--warning-bg","--danger","--drawer-surface","--text-2","--text-3","--border","--border-strong","--success","--radius","--radius-control","--radius-micro","--font-mono","--drawer-w"];
+    var tokens={};names.forEach(function(n){tokens[n]=cs.getPropertyValue(n).trim();});
+    var pairs=[["foreground/background","--foreground","--background",7],["text-2/background","--text-2","--background",4.5],["warning/warning-bg","--warning","--warning-bg",4.5],["input/card","--input","--card",3],["ring/card","--ring","--card",3]];
+    var contrastResults=pairs.map(function(p){var ratio=contrast(tokens[p[1]],tokens[p[2]]);return {pair:p[0],ratio:ratio,min:p[3],pass:ratio>=p[3]};});
+    var scenes={};
+    for(var s of ["settings","work","role","queue"]){
+      setScene(s); await wait(20);
+      scenes[s]={title:$("#drawer-title").textContent};
+    }
+    setScene("settings"); setSettings("missing"); await wait(20);
+    var g={window:rect(win),titlebarH:rect($(".titlebar")).h,sessionHeadH:rect($(".session-head")).h,drawer:rect($(".drawer")),drawerHead:rect($(".drawer-head")).h,settingsTabs:rect($(".settings-tabs")).h,settingsTabH:rect($(".settings-tab")).h,inputH:rect($(".input")).h,saveFooter:rect($(".settings-save")).h,pageScrollW:document.documentElement.scrollWidth,pageClientW:document.documentElement.clientWidth,overflowX:document.documentElement.scrollWidth>document.documentElement.clientWidth,settingsMissing:!!$("#settings-alert")&&!$("#settings-alert").hidden};
+    setSettings("saved"); await wait(20); scenes.settingsSaved={alertHidden:$("#settings-alert").hidden,status:$("#save-status").textContent.slice(0,20),tokenPlaceholder:$("#pi-token").placeholder};
+    setSettings("error"); await wait(20); scenes.settingsError={alertHidden:$("#settings-alert").hidden,status:$("#save-status").textContent.slice(0,20)};
+    setScene("work"); await wait(20);
+    var work={pending:$$(".scene-work .pending-row").length,qRows:$$(".scene-work .q-row").length,withdraw:$$(".scene-work .queue-withdraw").length,report:$$(".scene-work .report-card").length};
+    setScene("queue"); await wait(20);
+    var queue={rows:$$(".scene-queue .q-row").length,withdrawH:rect($(".scene-queue .queue-withdraw")).h,withdrawBorder:getComputedStyle($(".scene-queue .queue-withdraw")).borderColor};
+    setScene("role"); await wait(20);
+    var role={head:!!$(".role-head"),collapsibles:$$(".scene-role .collapsible").length,docButton:!!$(".scene-role .btn.ghost.sm")};
+    return {ok:contrastResults.every(function(x){return x.pass;})&&!g.overflowX&&Math.abs(g.drawer.w-424)<=1&&g.drawerHead===64&&g.settingsTabH===32&&g.inputH===32&&g.saveFooter===64&&queue.withdrawH===28,state:{w:state.w,scene:state.scene,settings:state.settings},tokens:tokens,contrast:contrastResults,geometry:g,work:work,queue:queue,role:role,scenes:scenes,notes:["静态原型自检；不是真实 Electron/真实 IPC/屏读验收。","图标为内联 SVG 示意；生产用 Lucide。动效为 CSS 示意；生产由 Motion 实现。"]};
+  }
+  if(q.get("audit")==="1"){
+    setTimeout(function(){runAudit().then(function(d){auditEl.hidden=false;auditEl.textContent=JSON.stringify(d,null,2);document.title="AUDIT_READY";}).catch(function(e){auditEl.hidden=false;auditEl.textContent=String(e&&e.stack||e);document.title="AUDIT_ERROR";});},250);
+  }
+})();
+</script>
+</body>
+</html>

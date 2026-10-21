@@ -1,0 +1,194 @@
+{
+  "at": "2026-10-21T11:48:43.234Z",
+  "rounds": {
+    "old": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "new": [
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "validRounds": [
+    2,
+    3,
+    4
+  ],
+  "warmup": "round 1 excluded",
+  "metrics": {
+    "stormA_maxGap": {
+      "old": [
+        26.9,
+        26,
+        18.7
+      ],
+      "new": [
+        19.7,
+        18.3,
+        17.7
+      ],
+      "oldMedian": 26,
+      "newMedian": 18.3,
+      "threshold": 26,
+      "pass": true
+    },
+    "stormB_maxGap": {
+      "old": [
+        17.9,
+        17.6,
+        17.7
+      ],
+      "new": [
+        17.7,
+        17.7,
+        17.6
+      ],
+      "oldMedian": 17.7,
+      "newMedian": 17.7,
+      "threshold": 25,
+      "pass": true
+    },
+    "handlerA_maxMs": {
+      "old": [
+        12,
+        11.8,
+        6.7
+      ],
+      "new": [
+        1.3,
+        0.6,
+        0.6
+      ],
+      "oldMedian": 11.8,
+      "newMedian": 0.6,
+      "threshold": 16.8,
+      "pass": true
+    },
+    "handlerB_maxBatchMs": {
+      "old": [
+        1,
+        1,
+        0.4
+      ],
+      "new": [
+        0.6,
+        0.6,
+        0.8
+      ],
+      "oldMedian": 1,
+      "newMedian": 0.6,
+      "threshold": 6,
+      "pass": true
+    },
+    "replayMs": {
+      "old": [
+        20.9,
+        7.4,
+        16.6
+      ],
+      "new": [
+        12.4,
+        4.3,
+        6.2
+      ],
+      "oldMedian": 16.6,
+      "newMedian": 6.2,
+      "threshold": 21.6,
+      "pass": true
+    },
+    "scrollToBottomMs": {
+      "old": [
+        14.3,
+        13.1,
+        25.8
+      ],
+      "new": [
+        0.8,
+        14.7,
+        11.9
+      ],
+      "oldMedian": 14.3,
+      "newMedian": 11.9,
+      "threshold": 19.3,
+      "pass": true
+    }
+  },
+  "singleRoundMax": {
+    "maxGap": 26.9,
+    "threshold": 50
+  },
+  "allRounds": [
+    {
+      "side": "old",
+      "round": 2,
+      "maxGapA": 26.9,
+      "maxGapB": 17.9,
+      "handlerA": 12,
+      "handlerB": 1,
+      "replay": 20.9,
+      "scroll": 14.3,
+      "console": 0
+    },
+    {
+      "side": "old",
+      "round": 3,
+      "maxGapA": 26,
+      "maxGapB": 17.6,
+      "handlerA": 11.8,
+      "handlerB": 1,
+      "replay": 7.4,
+      "scroll": 13.1,
+      "console": 0
+    },
+    {
+      "side": "old",
+      "round": 4,
+      "maxGapA": 18.7,
+      "maxGapB": 17.7,
+      "handlerA": 6.7,
+      "handlerB": 0.4,
+      "replay": 16.6,
+      "scroll": 25.8,
+      "console": 0
+    },
+    {
+      "side": "new",
+      "round": 2,
+      "maxGapA": 19.7,
+      "maxGapB": 17.7,
+      "handlerA": 1.3,
+      "handlerB": 0.6,
+      "replay": 12.4,
+      "scroll": 0.8,
+      "console": 0
+    },
+    {
+      "side": "new",
+      "round": 3,
+      "maxGapA": 18.3,
+      "maxGapB": 17.7,
+      "handlerA": 0.6,
+      "handlerB": 0.6,
+      "replay": 4.3,
+      "scroll": 14.7,
+      "console": 0
+    },
+    {
+      "side": "new",
+      "round": 4,
+      "maxGapA": 17.7,
+      "maxGapB": 17.6,
+      "handlerA": 0.6,
+      "handlerB": 0.8,
+      "replay": 6.2,
+      "scroll": 11.9,
+      "console": 0
+    }
+  ],
+  "p95": "bench-storm 当前输出未单独暴露 p95；每轮 storm maxGap 最大值=26.9ms"
+}

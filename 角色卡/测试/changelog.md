@@ -1,5 +1,362 @@
 # 测试 变更记录
 
+## 2026-10-21（修复后构建 34484f3 真机复核）— 需求卡/角色名/品牌图标/派发去重全过；genesis 加载自动恢复 verifier 待办
+
+**触发**：PR 分支修复 `34484f3`（dedupe replayed dispatch rows、黑底绿 ANS 图标、watchdog 默认不再 15min 自动中止），用修复后构建做真机复核。
+
+**构建**：HEAD `34484f3`；新 dist HTML `f779ac60…`（CDP 取载入原文哈希一致，581 B）、JS `index-CFjc0h-3.js`、CSS `index-BYYh-X8f.css`、图标 `ans-studio-ans-icon-DOpmqMAU.png`。开发版独立 userData `/tmp/ans-fixed-userdata`、端口 9340；Pi 菜单「已配置」（Codex/Claude 缺配）；模型 `ans-gateway / deepseek-v4-flash[1m] / medium`。
+
+**需求卡**：空 intent-card demo 发送需求后 **22.62s** 卡片可见（`request_choice cardKind=intent-confirm flowId=todo-web-app`）。Lead pane、徽标「需求确认 · 客户」、`权力类型：需求确认`、confirm/revise 与提交/取消均可见未遮挡；卡片落尾（row 7/8，lifecycle「调用发起」）。计时：UI busy 0.46s、首模型活动 4.75s、写意图 17.58s、intent 调用 22.66s、卡片 22.62s、停止 27.30s、总计 29.32s。未回答，卡片 expired。**未出现写盘卡**（docs/intents 预授权，write_file 直接「已获准并落盘」5370 B）；README 哈希不变，仅 demo 内意图文件（`d819ea6f…` 与 ledger 一致）+ app 自动 `.ans/sessions`。
+
+**角色名/图标**：角色树 `主理 / Lead、Draft / 提案、Crew / 组队、Steward / 统筹、验收 / Proof`，旧称不存在；标题栏 `img[alt=ANS]` 20×20、左栏 `img[alt=ANS]` 30×30（自然 1024，黑底绿 ANS），旧 `span.titlebar-mark` 为 null，无文字 mark；1360/960 截图通过。
+
+**派发去重（genesis 只读回放）**：convener replay 355 行、去重前 8 个派发投影（4 user + 4 event）→ **UI 4 条**（行数 229），无重复；todo-app-dev 473 行、去重前 10（5+5）→ **UI 5 条**（行数 322），stepId 各一次：delivery-store、delivery-tests-docs、delivery-ui、integration-e2e、verification-evidence。任务预期 todo-app-dev 2 条为旧快照；点名两条各一次，另三条不同步骤也保留、无误删。零 console/CSP。
+
+**风险发现**：加载 genesis 项目会自动恢复一条 verifier 待办并启动真实模型回合（14:55:02 提示、14:55:13 `request_confirmation` 调用发起），向 verifier replay/native **追加 12,324 B / 10,770 B**；未发消息、未点卡。已停止并按原哈希前缀截断恢复（383,859 B / 443,904 B），genesis **61 文件 SHA-256 与事前完全一致**，追加副本留在 `genesis-post/changed/`。建议产品/PM 确认「加载即恢复待办」是否符合只读/静默预期。watchdog 15min 默认关闭仅按提交 diff 静态核对，未做 15min 实跑。
+
+**结论**：本复核范围内**可合并**（需求卡/角色名/图标/去重全过）；genesis 自动恢复为风险项待产品确认。**边界**：只写 `角色卡/测试/`；未改产品/构建/配置/断言；未读/打印 `.env`；未 commit/push。报告 [2026-10-21_change_fixed-build-real-machine.md](docs/change/2026-10-21_change_fixed-build-real-machine.md)，证据 [2026-10-21-fixed-build-real-machine-evidence/index.md](docs/change/2026-10-21-fixed-build-real-machine-evidence/index.md)。
+
+## 2026-10-21（需求确认卡 intent-confirm 真机 e2e）— 卡片弹出、断言全过、未作答
+
+**触发**：验证 Lead 在真实 Pi 模型流程中是否发出「需求确认卡」（intent-confirm），只验弹出、不点确认/修改。
+
+**环境**：macOS 26.6.2 arm64、Electron 44.7.0、HEAD `a18e9ef`、dist HTML `c8ad0e82…`/JS `index-Oqlp-kNL.js`；新空 demo `ans-testbed/ui-platform-intent-card-e2e`（git init、README 提交 `49df32d`）；开发版独立 userData `/tmp/ans-intent-card-userdata-run2`、端口 9338；Pi 菜单「已配置」（Codex/Claude 缺配）；模型 `ans-gateway / deepseek-v4-flash[1m] / medium`。
+
+**结果**：发送「我想做一个最简单的待办清单网页应用，请先确认需求。」后 **23.80s** 需求确认卡可见（`request_choice` `cardKind=intent-confirm` `flowId=todo-list-web`）。卡片在 Lead pane（`surfaceRoleId=liaison`、选中/会话均 liaison、状态「待选择」），徽标「需求确认 · 客户」、`权力类型：需求确认`、confirm/revise 两个选项与「提交/取消」均可见且 `unobstructed=true`；1360×860 与 960×620 截图完整（截图像素即两档尺寸；960 为视口级窄档、外层窗口保持 1360×860，卡片完整位于 composer 上方）。首个模型活动 5.46s、写意图 20.12s、卡片 23.80s、停止本轮 28.36s，驱动总耗时 30.43s。截图后仅点「停止本轮」，**未回答需求卡**；卡片转 `expired`（未获同意）。
+
+**写盘/项目**：本轮**未出现写盘确认卡**——trio 下 Lead 的 `docs/intents/**` 为预授权目录，`write_file` 直接回执「已获准并落盘」。demo README SHA-256 前后一致；仅 demo 内新增 `docs/intents/todo-list-web.md`（sha256 与 `.ans/governance/ledger.jsonl` 的 artifactSha256 一致）与 app 自动写的 `.ans/sessions`/账本；无 ANS 仓库或 demo 外写入；`git status` 仅 `?? .ans/`、`?? docs/`；console/CSP **0**。
+
+**观察**：① 模型先发过一张非治理 `request_choice`（质量档位三选一，无 cardKind），被编排结构性拒绝、未弹卡后自行定档并继续（符合 Liaison 只发 intent-confirm 的隔离）；② 需求卡实际工具是 `request_choice`（Lead 契约不用 `request_confirmation`），落尾锚定其自身尚未完成的调用（lifecycle「调用发起」）；③ 960 下「1 条待确认 · 定位」浮标与卡片动作区右下缘轻微视觉重叠，按钮中心未遮挡。run1 与 run2 均弹出，run1 因 960 未重滚仅作交叉印证（归档 `run1/`）。
+
+**边界**：只写 `角色卡/测试/`；未改产品代码/构建/配置/测试断言；未读取/打印 `.env`；未 commit/push。报告 [2026-10-21_change_intent-confirm-card-e2e.md](docs/change/2026-10-21_change_intent-confirm-card-e2e.md)，证据 [2026-10-21-intent-confirm-card-e2e-evidence/index.md](docs/change/2026-10-21-intent-confirm-card-e2e-evidence/index.md)。
+
+## 2026-10-21（角色显示名修复后真机重跑）— 新 dist / 新角色名 / MIRROR 8/8 / 真实 Pi 模型
+
+**触发**：客户补充——角色显示名修复（proposal→Draft/提案、nomination→Crew/组队、schedule→Steward/统筹）已落盘并由桌面UI `build:renderer` 重建 dist；要求重启开发版再完成真机模型测试。
+
+**dist**：HTML `c8ad0e82…`、JS `index-Oqlp-kNL.js` `050776ec…`、CSS `76fad7ce…`（22:11:42）；gzip9 289,080B、CSP 严格。旧 Electron 进程杀掉，新临时 userData `/tmp/ans-model-userdata-fix` 重启。
+
+**角色名**：角色树实测 主理/Lead、Draft/提案、Crew/组队、Steward/统筹、验收/Proof；旧称“报告员/提名官/召集人”均不存在。MIRROR 真机 **8/8**，含 `W6-C five-role tree: ...Draft/Crew/Steward/Proof`、`status line shows 三权 · 五角色`、`mirror card rendered...` 全 true。
+
+**真实模型**：Pi 菜单“已配置”（Codex/Claude 缺配）；`deepseek-v4-flash[1m]`（ans-gateway，context 262144）回复 563 字；working 467ms→idle 4,574ms，首模型活动 1.375s、最终正文 4.195s；工具仅 `list_dir`，无写盘/确认卡，无 console/CSP，960/1360 无横溢。
+
+**只读**：README 哈希不变；无源码/治理写入；app 自动写 `.ans/sessions/liaison/pi` 3 文件 42,249 B（git `?? .ans/`）。打包 zip 仍是修复前构建（旧称），若包内需新称须重新打包/冻结。main.mjs 新 dist 重跑 `E2E_PASS=true`/397 名/17 截图。
+
+**边界**：只写 `角色卡/测试/`；未改产品/测试/构建；未读/打印 `.env`；未 commit/push。详见[真机报告](docs/change/2026-10-21_change_real-machine-test.md)与[证据](docs/change/2026-10-21-real-machine-evidence/index.md)。
+
+## 2026-10-21（macOS 真机）— 整机 e2e、打包应用空项目、开发版 Pi 真实模型
+
+**环境**：macOS 26.6.2（25G83）arm64；Electron 44.7.0；Node 24.14.0；候选 HEAD `224cf83`，dist HTML `3c4da2a2…`/JS `f568e2aa…`/CSS `76fad7ce…`；包 `ANS-Studio-1.4.0-mac-arm64.zip` `8e760887…`/405,227,230 B（与既有验收 `edeeef…` 不同，待 PM 确认）。
+
+**整机 e2e**：`main.mjs` 真机 exit 0，`E2E_PASS=true`、`E2E_FAILURES=` 空，入口 repo `dist/index.html`，397 名、17 截图；stdout 的 repair 探针异常为夹具故意触发。
+
+**打包应用**：临时 userData 启动；入口包内 `dist/index.html`；preload 桥正常、console/CSP 0；空项目 5 内置角色（主理/报告员/提名官/召集人/验收）、`governanceModel=trio`、`governanceRecord=missing`、S0 标题/说明/CTA 正确且仅一次提及、无治理 CTA；设置如实缺 `ANTHROPIC_API_KEY`；工作概览/资料/队列空态；Esc/焦点正常；关闭重开保持；项目前后文件清单/git 完全一致（打包未写）；包内 `.icns` 与 Dock 均为黑底绿字 ANS。
+
+**真实模型**：开发版 + Pi（菜单“已配置”，Codex/Claude 缺配）；空项目点击 Lead 发送一条不写文件消息，真实 `deepseek-v4-flash[1m]`（provider ans-gateway）回复 510 字；working 464ms→idle 5376ms，首模型活动 1.713s、最终正文 5.163s；工具仅 `list_dir`/`read_file`，无写盘工具/确认卡；Markdown 正常、无 console/CSP、无白屏。**app 自动写项目 `.ans/sessions/liaison/pi` 3 文件 46,117 B**；README 未变、无源码/治理写入。
+
+**发现/待确认**：空项目状态行未显示「三权 · 五角色」（实际“尚无治理记录…”）；会话历史自动写 `.ans/sessions`；包哈希与既有验收不同。
+
+**边界**：只写 `角色卡/测试/`；未改产品/测试/构建；未读/打印 `.env`；未 commit/push。详见[真机报告](docs/change/2026-10-21_change_real-machine-test.md)与[证据](docs/change/2026-10-21-real-machine-evidence/summary.json)。
+
+## 2026-10-21（独立验收 AC3/AC8 补正）— OPEN_CARD 台账、计数、探针、套件版本限制与候选分离
+
+**触发**：独立验收报告 `角色卡/独立验收/docs/change/2026-10-21_change_ui-platform-phase5-acceptance.md` 判 AC3/AC8 needs-work；产品门不重跑。
+
+**补正**：
+- `OPEN_CARD_AT_ARRIVAL` final3 旧 207→新 206：补列 G3（索引归一化，PM §19.3；`OPEN_CARD_STABLE_AT_ANCHOR=true`），G3 25→26；post-fix3 `final-allowed-diff-ledger.json` 由 G0-MATCH 207/207 改为 G3 207/206，MD 台账同步；final3 75 条值差异全部登记，MATCH-FAIL=0，无未批准行。
+- 计数统一：679（5A 前）→**683**（+4 桌面窗口 5A 检查，raw `baseline.txt`）→**504**（5B 删 178 项旧四测试 + 1 hot-path ④ 段；683−178−1）。修正 `old-red-status.md` 与 5A 旧基线报告的 679 文字。
+- 探针：`dist-static-scan-5b.cjs` 的 `RELATIVE_ASSET_REFS` 改为接受 5B `./assets/`（兼容 5A `../assets/`），重跑为 true；证据 `candidate/csp-gzip-recheck.txt`。原 false 是口径过期，不是 CSP 失败。
+- 旧 uiux 套件版本限制：旧端 `d568bf82…`（18:04–18:05）vs 最终 `fa3f74d4…`（20:44）；旧端 main 已用最终套件复跑（391 名），旧端 uiux 未复跑且旧端已删不可补；旧通过名 424 个在新端全 true（0 旧通过→新失败）。不再声称「同套件源码」。
+- 候选分离：新增 `2026-10-21-phase5b-new-entry-evidence/candidate/candidate-separation.md`，单列 `src/common|provider|model|service` 与 adapter 测试等同期无关改动，说明不进入 Phase 5 判定、未改构建/共享配置、不进 renderer dist；共享持久化风险作为边界交 PM/属主。
+
+**边界**：只写 `角色卡/测试/`；未改产品/测试断言/构建配置；未读 `.env`；未 commit/push。详见[5B 最终报告](docs/change/2026-10-21_change_phase5b-final-verification.md)。
+
+## 2026-10-21（Phase 5B 最终）— 新入口全量/打包 smoke/双端台账通过；5B 门 pass
+
+**候选**：入口 `dist/index.html`；HTML `3c4da2a2…`、JS `f568e2aa…`、CSS `76fad7ce…`，clean rebuild 哈希一致；gzip **289,095B**、CSP 严格。旧渲染器/vendor/旧测试已删，旧端不可复跑。
+
+**全量**：uiux 23/23 段 exit 0（DEFAULT 110、MERGE 12、COMPLETE_FLOW 41、VISUAL 54、TOOLFOLD 19/C1 **Δ=20**，其余全绿）；main **E2E_PASS=true/E2E_FAILURES 空**（397 名）；ime **26 true**；design audit **31/31**；test/桌面UI **142/142**、test/桌面应用 **504/504**、test/测试 **715/714/1**（唯一 D3 AC4 环境缺真实 rg，如实）；懒挂载 **10/10**；bench 3 轮全过（stormA 20.5/B 18.2/handler 1.2/replay 10.5/scroll 3.4）；packaged smoke **14/14**（entry/rootMounted/driver/csp/cspViolations/dom/preload/ipc/importDisabled/missingConfiguration/settingsEntryDisabled/envPathMatches/console/load，isPackaged=true/arm64）。
+
+**双端**：5A 新入口 397 vs 5B 397，only 0/0，值差异仅 20 环境/诊断（OUTDIR/RENDERER_ENTRY/17 SHOT/PENDING_DIAG），行为 check 名与值逐名一致；uiux 23 段 0 差异。G1–G5/G4-RESOLVED/G5/NEW/OLD 无未批准、MATCH-FAIL=0；5A 快照 `shasum -c` 0。S0 `BOOTSTRAP_S0_*` 命名说明按 5A 记录待 PM 等价或补名。
+
+**结论：5B 门 pass。** 详见[最终报告](docs/change/2026-10-21_change_phase5b-final-verification.md)与[5B 证据](docs/change/2026-10-21-phase5b-new-entry-evidence/index.md)。未 commit/push。
+
+## 2026-10-21（Phase 5B 步骤 a/b 后）— 测试域旧渲染器引用清理：tsc 0；22 文件退役、6 文件等价重写
+
+**背景**：旧 renderer/vendor/旧守卫测试删除后，`test/测试/**` 仍引用 `renderer.js`/`tool-rows.js`/`ui-labels.js`/`styles.css`，阻断根 tsc。
+
+**修改**：`uiux-v2-replay-regression.test.ts` 重写为 `events.ts`/`replay.ts` 新纯逻辑（6/6）；`shell-judge` fixture→`judge.ts`（38/38）；`governance-pin-recovery` fixture→`governanceActionFor`（11/11）；`existing-project-compat a/b`→`governance-view.ts`（14/14、13/13）；`governance-judge-cards` fixture 删除旧 loadUiLabels（f-ui 退役）。
+
+**退役**：22 文件 / 95 test 声明移至 `test/测试/retired-5b/*.retired`，逐文件哈希登记；替代覆盖指向新自渲染器纯逻辑与 5A e2e（RUNTIME/VISUAL/TOOLFOLD/JUDGE/GOV/MIRROR/IME 等），不静默丢弃。
+
+**门禁**：根 `npx tsc --noEmit` **0 错**；`node --test "test/测试/**/*.test.ts"` **715/714/1/0**；唯一红 `lightweight-permission-repairs` D3 AC4 因本机无真实 `rg` 二进制（spawnSync status null），属环境红，未改断言/未跳过。5B 全量待步骤 c。详见[报告](docs/change/2026-10-21_change_5b-test-domain-cleanup.md)与[证据](docs/change/2026-10-21-phase5b-test-domain-cleanup-evidence/)。未 commit/push。
+
+## 2026-10-21（Phase 5A 最终冻结 · 遮挡复验）— 12/12 遮挡断言、36/36 smoke、5A 门 pass
+
+**候选**：JS `index-T1im4gOp.js`=`f568e2aa…`、CSS `index-DbPZU_Oj.css`=`b52cfca1…`、HTML=`f372e111…`；clean build gzip 289,120B（冻结摘要 288,552B）；CSP 严格。
+
+**遮挡**：480/680 两档 report card/details、governance preview（`position=static`）、mirror actions、delivery facts、S0 CTA 共 **12/12** 目标 `bottom ≤ composer.top`；composer 95≤96；内容列 232≥200；`scroll-padding-bottom=104px`；截图齐。
+
+**复跑**：5A smoke **36/36**、design audit **31/31** exit0、DEFAULT 110/110、MERGE 12/12、COMPLETE_FLOW 41/41、VISUAL 54/54、TOOLFOLD 19/19（C1 **Δ=20**）、其余 uiux 全绿；main 旧 391/新 397，新 E2E_PASS=true/0 失败，旧仅 C；单测 142、旧基线 683、IME 24、lazy 10；bench 3 轮全过（stormA 17.7/B 18.7/replay 10.4/scroll 1.8，max 23.7）；密度 12/11/8，正文 15/27；S0 独立 9/9。G1–G5/NEW/OLD 无未批准、MATCH-FAIL=0；唯一命名说明：main 缺 `BOOTSTRAP_S0_*` 六名，行为由 smoke/独立 S0 覆盖，待 PM 接受等价或 5B 前补名。
+
+**结论：5A 门 pass。** 详见[最终报告](docs/change/2026-10-21_change_phase5a-final-verification.md)与[final3 证据](docs/change/2026-10-21-phase5a-new-entry-evidence/final3/index.md)。未 commit/push。
+
+## 2026-10-21（Phase 5A 冻结最终）— 全量双端/密度/S0/重锚通过；5A 门 pass
+
+**候选**：JS `index-sSLXHl7e.js`=`f568e2aa…`、CSS `index-CM2A97v3.css`=`57d9575c…`、HTML `c9d13918…`；clean rebuild，gzip 288,827B（冻结摘要 288,262B），CSP 严格。单测 142/142、旧基线 683/683、IME 24、懒挂载 10/10、5A smoke **24/24**、bench 3 轮全过、C1 **Δ=20**。
+
+**main**：旧 391/新 397/common 390/only-old 1/only-new 7/值差异 75；旧端仅 C 类 `RECOVERY_SAME_PENDING_CARD_ONCE`，新端 **E2E_PASS=true、E2E_FAILURES 空**；SESSION_REPAIR×5/PENDING/RECOVERY/DIAGNOSTICS/RESTORE/P1/REPLAY/ANCHOR/OPEN_CARD/DENIED/INJECTED 等价检查均 true。G1–G5：G1 19/G2 12/G3 25/G4 21/G4-RESOLVED 1/G5 2，NEW 7/OLD 1，全部关闭/批准，MATCH-FAIL=0。唯一命名说明：main 无 `BOOTSTRAP_S0_*` 六名，行为由 5A smoke S0 3 项 + 独立 S0 9/9 覆盖。
+
+**uiux**：全 23 段 pass（DEFAULT 110/110、MERGE 12/12、COMPLETE 41/41、VISUAL 54/54、TOOLFOLD 19/19、其余全绿）；design audit exit 0/31 项全 true（12 条重锚、S2 右缘、S1 超长目标、Motion 0.9s/reduced-motion）。密度：1360 无提示条 12≥9、有提示条 11≥8、960 8≥4，正文 15/27。200% operator 长失败 + mirror/delivery 3/3。
+
+**结论**：**5A 门 pass**（S0 官方 main 名缺失作为命名说明/等价；建议 PM 接受或 5B 前补名）。详见[最终报告](docs/change/2026-10-21_change_phase5a-final-verification.md)与[final2 证据](docs/change/2026-10-21-phase5a-new-entry-evidence/final2/index.md)。未 commit/push。
+
+## 2026-10-21（Phase 5A post-fix3 最终）— main E2E_PASS=true；uiux 仅 MERGE/DEFAULT 旧 DOM 重锚；G1–G5 最终分组
+
+**候选**：修复落盘后 clean build；gzip **289,797B**、CSP 严格；单测 142/142、旧基线 683/683、IME 24、懒挂载 10/10、bench 3 轮全过（stormA 20.8/B 18.7/replay 10.0/scroll 3.4，max 26.7）、C1 Δ=16。
+
+**main**：旧 373/新 379/common 372/only-old 1/only-new 7/值差异 **80**；**E2E_PASS=true、E2E_FAILURES 空**；10 项 repair 全 true。最终 G1 19/G2 12/G3 25/G4 21/G4-RESOLVED 1/G5 2/G0 292/NEW 7/OLD 1；G4 不得列差异，待 PM 修/重锚。
+
+**uiux**：COMPLETE_FLOW 41/41（P7 + role reading）、SEND_FACTS 8/8、TERMINAL_MERGE/PROJECT_RESET/DUP/NOTICE/BLANK 转绿、VISUAL 54/54、RUNTIME 17/17、DELIVERY 9/9 等全过；仅 MERGE `window.__mergeCard` 同一 DOM 节点断言、DEFAULT toggleDrift `parentNode` 直挂断言失败（产品行为由 main ANCHOR/OPEN_CARD 与重锚副本覆盖，待 PM 批准）；design audit 旧 `.tool-records` 选择器 abort，需重锚/退役。
+
+**结论**：5A 仍 needs-work，原因是 G4/旧 DOM 重锚未获 PM 批准，不是产品行为全红；未批准前 5A 门不通过。详见[最终分组报告](docs/change/2026-10-21_change_phase5a-ledger-regroup-final.md)与[post-fix3 证据](docs/change/2026-10-21-phase5a-new-entry-evidence/post-fix3/index.md)。未 commit/push。
+
+## 2026-10-21（Phase 5A 独立验证）— 新端全量 + 逐名台账：needs-work，5A 门不通过
+
+**候选**：HEAD `224cf83`，冻结后 clean build；gzip **287,465B**、CSP 严格；单测 **142/142**、旧基线 **683/683**（679+4）、IME 24、懒挂载 10/10、bench 3 轮全过（新 stormA 18.6/B 18.6/handler 0.6/replay 9.5/scroll 7.0；max 18.7）、C1 **Δ=16**；候选 build 前后 core diff 空、无代码变更、无新增依赖/DOM 例外。
+
+**新端 uiux**：15 模式 pass；8 失败——TERMINAL_MERGE（同轮两条终端）、PROJECT_RESET（首 DOM 重置）、DUP（history-first+live 重复）、MERGE（full rebuild 卡/报告保留）、NOTICE（系统通知非 sys 行）、BLANK（后台 pane 无队列状态）、DEFAULT（toggleDrift `anchor paragraph materialized 960`，full replay 已过）、COMPLETE_FLOW（报告 37 全 true，P7/C/P3 全过，随后 `role reading fixture must really scroll`）。三项缺口：Sidebar 9/9 pass **关闭**、P7 两项 pass **关闭**、虚拟锚点仅部分（full replay 过、toggleDrift 红）。
+
+**main**：365 名，10 项 repair 失败；9 项真实行为候选（5 SESSION_REPAIR、PENDING、RECOVERY_SAME/OLD/ENDED）＋1 诊断字段候选 `DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS`；`PROMISE_TIMEOUT`/`WAIT_TIMEOUT` 待 PM；`NAVIGATION_BLOCKED` 已消失。旧端 C 类 `RECOVERY_SAME_PENDING_CARD_ONCE` 已核实同因，但新端另有恢复失败不能按旧 C 豁免。
+
+**台账**：main `allowed-diff-ledger.md` 366 行（254 MATCH、102 值差异、9 NEW-ONLY、1 OLD-ONLY/REMOVED）；uiux `uiux-allowed-diff-ledger.md` 旧 5 失败 OLD-ONLY/REMOVED、新 6 NEW-FAIL + 两截断 + design audit 12 条旧 DOM 失配（含建议）；均 PM proposed，未静默豁免。**结论 needs-work，5A 门不通过，停止 5B**。详见[报告](docs/change/2026-10-21_change_phase5a-independent-verification.md)与[新端证据](docs/change/2026-10-21-phase5a-new-entry-evidence/index.md)。未 commit/push。
+
+## 2026-10-21（Phase 5A 旧端快照）— 旧端全量/逐名/哈希落盘；main 允许差异台账 367 名；RECOVERY 旧端 C 类
+
+**执行**：按 Phase 5 计划跑旧入口 `app/renderer/index.html` 全量：uiux-v2 默认+22 模式、main.mjs、ime-enter、bench-storm 3 轮、uiux-design-audit、Node 单测/旧基线/懒挂载；逐命令/exit/报告/check 名/环境/hash 落 `2026-10-21-phase5a-old-baseline-evidence/`。
+
+**结果**：uiux 17 模式 exit 0、5 模式 exit 1（DEFAULT/RUNTIME C2 旧端无载体、SELECTOR 旧 180px、MIRROR 四角色、TOOLFOLD 旧 C1）；main exit 0/`E2E_DONE=1`，357 名与桌面窗口旧报告逐名一致，唯一 `RECOVERY_SAME_PENDING_CARD_ONCE=false`（旧端相邻恢复检查全 true，单点同 id 回放去重，判 C 类同因）；ime 24 基线；bench 旧 3 轮；design audit 旧端 S1 夹具 `#chat .tool-records` null（old-only/C）；单测 96、旧基线 679；懒挂载旧端 N/A。旧入口/套件 manifest 前后 diff 空；`app/main.ts` 快照期被桌面窗口在途修改，已在 manifest-note 单列，旧端不读取。用桌面窗口 report-diff（357/366/356/1/10/103）建 367 行允许差异台账（253 MATCH、103 值差异、10 NEW-ONLY、1 OLD-ONLY），逐名含旧→新/依据/替代覆盖/PM proposed。新端全量与最终差异待候选冻结；旧端结果不代替新端。详见[报告](docs/change/2026-10-21_change_phase5a-old-baseline.md)与[证据索引](docs/change/2026-10-21-phase5a-old-baseline-evidence/index.md)。未 commit/push。
+
+## 2026-10-21（Phase 5 计划）— 全量双端对照与 5A/5B 验证计划；套件 check 名清单
+
+**交付**：[Phase 5 测试计划](docs/design/2026-10-21_design_ui-platform-phase5-test-plan.md) + [套件 check 名清单](docs/design/2026-10-21_phase5-suite-inventory.md)。只写计划，未跑实现。
+
+**要点**：①uiux-v2 全量 23 段（默认 + 22 模式）、main.mjs、ime-enter、bench-storm、uiux-design-audit、Node 单测/旧基线/懒挂载的 5A 旧端快照与 5A 新端同套件目标切换；逐 check 名对照（MATCH/RENAME/NEW-ONLY/OLD-ONLY/REMOVED），允许差异模板含旧→新/依据/PM 批准/到期，禁止用计数或补证代替。②5A-0：main/design audit 加统一 `ANS_RENDERER_ENTRY`；Sidebar 身份徽标、P7 待选择、虚拟窗口阅读锚点三项 Phase 5 缺口先在 5A 关闭，官方段必须自然跑完。③5B：入口切换、旧端不可复跑声明、删除前 SHA256 快照双向核对、新端全量、packaged smoke（8 项命名）、最终回归。④证据目录/候选哈希/raw 输出/台账索引与 5A/5B 门清单；任何未批准差异或断言弱化即门失败。
+
+未 commit/push。
+
+## 2026-10-21（4B 200% 收口）— 轻量重验 pass：左树可见/可滚、逐容器与报告/预览内部节点无横溢
+
+**范围**：桌面UI [4B 变更记录 UIUX 5/6 收口节](../桌面UI/docs/change/2026-10-21_change_ui-platform-phase4b-governance-receipts.md)（CSS/断言/截图，行为未改）；候选 clean rebuild。
+
+**结果**：typecheck/build/CSP 通过，gzip9 **286,348B**；单测 **96/96**、旧基线 **679/679**、IME 24、懒挂载 **10/10**；旧渲染器/main/preload/desktop 零 diff、无新增依赖/DOM 例外。桌面UI 4B 冒烟独立复跑 **70/70**；自写 200% 补充 **7/7**：左树 6 行零重叠且首末行可见/左栏可滚、10 容器（含 `.runtime-config-notice/.governance-status/#role-tree/.col-mid/.session-notice/.composer`）零横溢、头部 wrap、缺配提示全文 398/398 且按钮首屏内、报告展开 4 节点零横溢且卡可见、治理预览内部零横溢且取消回焦、零 console/CSP。uiux：RUNTIME **17/17**、VISUAL **54/54**、QUEUE 4/4、MIRROR 8/8、GOV 7/7、JUDGE 33/33、G2 5/5、TOOLFOLD 19/19；bench 3 轮全过（stormA 23.8/B 17.6/handler 0.6/replay 10.3/scroll 8.1，单轮最大 24.7）；C1 Δ=16。检查名单与返工重验一致，仅新增 200% 检查，无弱化。
+
+**结论**：**pass**；4B 门保持关闭、Phase 4 维持完成；Phase 5 仍留。详见[报告](docs/change/2026-10-21_change_phase4b-200pct-reverification.md)与[证据](docs/change/2026-10-21-phase4b-200pct-verification-evidence/)。未 commit/push。
+
+## 2026-10-21（4B 返工）— 聚焦重验 pass：C2/锚点两项真红修复、UIUX 四项通过；4B 门关闭，Phase 4 完成
+
+**范围**：桌面UI [4B 变更记录 §一之二 返工](../桌面UI/docs/change/2026-10-21_change_ui-platform-phase4b-governance-receipts.md) 与更新证据；测试 4B 报告/台账 §8.7；候选 clean rebuild。
+
+**结果**：typecheck/build/CSP 通过，gzip9 **286,105B**；单测 **96/96**、旧基线 **679/679**、IME **24**、懒挂载 **10/10**；自写 smoke **42/42**（新增 C2 异引擎失效→切回卡收起+原因可见+无 authorize+Esc 零回包；已答卡 prefix full rebuild 锚点 request+1/conclusion+1/DOM 复用/冻结；960 五角色行零重叠；200% 逐容器零横溢；facts 4px+冒号；治理取消回焦）。uiux：RUNTIME **17/17**（C2 pass）、QUEUE 4/4、MIRROR 8/8 五角色、GOV 7/7、JUDGE 33、G2 5、SELECTOR 27、CONFIG 21、ROLE 11 条、SEND 8、TERMINAL 22、TOOLFOLD 19 条、FRESH 4/4、VISUAL **54/54**；DELIVERY_NOTE 4B 5/5（官方止 Phase 5 builtin identity）；FLOW 官方 5/12（止 P7），补证副本 **12/12**；默认段补证 **100 布尔全过**（含原红）。bench 3 轮全过（stormA 17.5/B 20.0/handler 0.7/replay 10.2/scroll 10.6，单轮最大 21.2）；C1 Δ=16。共同检查名单逐字一致，新增 2+3 项，原两项红 false→true，无弱化。
+
+**结论**：**4B pass；Phase 4 门关闭（Phase 4 完成）**。全量双端/main.mjs/入口切换/打包/真机仍 Phase 5。详见[报告](docs/change/2026-10-21_change_phase4b-fix-reverification.md)与[证据](docs/change/2026-10-21-phase4b-fix-verification-evidence/)。未 commit/push。
+
+## 2026-10-21（Phase 4B）— 4B 独立验证：大部分通过，C2 重锚与默认段锚点两项真红；结论 needs-work，Phase 4 门不关闭
+
+**范围**：桌面UI [Phase 4B 变更记录](../桌面UI/docs/change/2026-10-21_change_ui-platform-phase4b-governance-receipts.md) 与 4B 证据；PM §十五/§15.7/§15.10；台账 §八。候选 clean rebuild，按 Invariant #6 重验。
+
+**通过**：构建/typecheck/CSP；gzip9 **285,702B**；单测 **96/96**、旧基线 **679/679**、IME **24/24**、懒挂载 **10/10**；自写 Electron smoke **38/38**（聚合/镜像/治理记录/报告持久化/交付回执/菜单/queueView/single/judge 重放/replayAnchorDebug）；uiux QUEUE_VIEW **4/4**、MIRROR **8/8 五角色**、GOV **7/7**（PM 记 5/5）、JUDGE **33/33**、G2 **5/5**、4A 六段 27/21/11 条/8/22/19 条全绿；DELIVERY_NOTE 4B 5/5、VISUAL 报告面 20/20；COMPLETE_FLOW 官方 5/12 后止于 P7，只读补证副本（仅跳过 P7 两个 Phase 5 检查）到达 12/12；bench 3 轮中位全过（stormA 17.7、B 19.3、handler 0.3、replay 6.1、scroll 7.3），单轮最大帧 20.7；C1 **Δ=16**；旧渲染器/main/preload/desktop 零 diff、无新增依赖/DOM 例外。
+
+**真红/缺口**：①RUNTIME `expired old shell collapses with reason visible in its own runtime` 连续 2 次 false——卡收起但 `composer-hint` 为空，原因「原shell轮次已中止」不可见/不可追溯（缓存 expired 先清 shellConfirm，replay 时 expireShell 无卡可写 hint）；交付记录「C2 pass」不成立。②默认段 B1 `denied conclusion anchor and decided card retained` false——已答卡 full rebuild 后落尾；最小复现 operator index 3 / requestIndex 1 / conclusionIndex 2；根因指向 operator 行未保存 `anchorKey`，full rebuild 只能尾插；其余 B1/B2 19 项通过。③交付记录 §五 FLOW 声称的 `C outer ok`/不可读报告/P3 等 7 名在官方 P7 之后未到达，表述需更正；行为经补证副本 12/12 通过。
+
+**结论**：4B **needs-work**；Phase 4 门不关闭。修复两项产品红、更正证据表述并按 Invariant #6 重跑 RUNTIME/默认段/FLOW/VISUAL 与热路径门后重判。详见[报告](docs/change/2026-10-21_change_phase4b-independent-verification.md)与[证据](docs/change/2026-10-21-phase4b-verification-evidence/)。未 commit/push。
+
+## 2026-10-21（PM §15.7）— 4B 台账定稿：三类精确必过名单、C2 重锚提案、计数差异登记
+
+**依据**：PM §十五（4B 放行）与 §15.7 定稿要求；协调者派发。只写 `角色卡/测试/`，未跑实现测试。
+
+**定稿内容**（[台账](docs/change/2026-10-21_check-ledger-phase3a.md) §8.4–8.6）：①**DELIVERY_NOTE** 4B 必过 5 名（十调用历史/旧匿名事件/新实际 wire 交付/历史重建保序/同进度不提升），另 4 名按 4A/5 回归，其中 `builtin identity…` 当前红；②**COMPLETE_FLOW** 4B 必过 C/P3 12 名（来源声明/同卡保存/安全展示/过期撤重试/错角色不提升/fallback abort/禁用报告/外层 ok 内层失败/不可读记录/过期材料/文档浏览不改聊天），A/B/A4/P6/P7 留 Phase 5；③**VISUAL** 4B 必过报告面 20 名（source/preview/status/declaration/settled/late/task/local refresh/cold exact/received/target batch/overview/de-dup + SV13 4 + cold reports 3），非报告 29 名留 Phase 5；④确认 QUEUE_VIEW 4、MIRROR 8（五角色）、JUDGE 33、G2 5、4A 六段基线不重开；GOV 证据实际 7/7 与 PM 记 5/5 差异如实登记；⑤C2 重锚提案：`expired old shell…` 改「收起+原因可见/可追溯」或退役，桌面UI 落 uiux-v2、测试独立复验（PM 已批准责任分离）。
+
+**关键风险**：COMPLETE_FLOW 套件顺序在 P7（Phase 5 红）中止，C/P3 段不可达，4B 子集当前无法直接取证；已写入 §8.5/§8.6，4B 验证须复核或由属主提供可达模式。未 commit/push。
+
+## 2026-10-21（4B 授权）— 4B check 台账与验证口径更新；4A 基线保持不重开
+
+**依据**：PM §十一.2（4A 通过后进入 4B）与协调者派发。只更新台账与验证口径，**未跑实现测试**。
+
+**更新位置**：[check 台账](docs/change/2026-10-21_check-ledger-phase3a.md) 新增 §八（frontmatter 追加 revised 事件）。
+
+**4B 必过 check 名**：
+- **QUEUE_VIEW 四项**：`queued baseline shows two`、`runtime view restore does not revive old queued requests or aggregate`、`main-process repush rebuilds aggregate with new count only`、`clearing queue removes aggregate`（`#chat .op-queue-aggregate`/`queuedDebug`）。
+- **默认段剩余 21 项**（按功能面）：待处理/决定卡生命周期 **14**（`denied conclusion anchor…`、`pending locator visible after role click`、`open pending supersedes true busy`、`pending entry fully reachable with card/pi 960`、`covered pending actions unavailable card/pi`、`keyboard locate closes card/pi…`、`answered pending returns to true busy`、`idle after answered removes work`、`pending arrival preserves drawer`、`expired request restores actual true busy`、`ordinary question creates no pending`）；预览/确认 **6**（`keyboard reaches original preview`、`keyboard expands original preview`、`expanded preview renders controlled markdown`、`expanded preview stays inside card width`、`keyboard enters original confirm action`、`keyboard reaches deny action`）；队列聚合 **1**（`queued baseline shows two`，与 QUEUE_VIEW 同项）。
+- **VISUAL**：`V2 source report uses separate layered top and facts before primary source and full copy`。
+- **JUDGE/G2 回归**：JUDGE 33 名、G2 5 名保持全绿，只增不改。
+- **4B 新增建议名**：治理三权卡 4 名、`MIRROR_CARD_SAME_ID_ANSWERED_ONCE`、`OP_QUEUE_AGGREGATE_MIRROR_AND_POSITION`、`OPERATOR_MIRROR_AND_QUEUE_AGGREGATION`、`GOVERNANCE_RECORD_ESTABLISH_AND_REACCEPT`、`GOVERNANCE_MIGRATION_PREVIEW_AND_APPLY`、`REPORT_FULL_TEXT_PERSISTENCE_DELIVERY`、`REPLAY_ANCHOR_DEBUG_SAME_FIELDS`、`JUDGE_RESULT_ROWS_REPLAY_PER_RUNTIME`、`SINGLE_SWITCH_WARNING_REFRESH_ON_MODEL_CHANGE`、`QUEUE_SUBVIEW_CLEARED_BY_TAB_SWITCH`、`ENGINE_MENU_CONFIG_STATUS_TEXT`、`C2_EXPIRED_SHELL_REANCHORED_TO_COLLAPSED_WITH_REASON`（或退役）。
+
+**归属/边界**：以上均 4B；全量双端逐 check 名、`main.mjs`、入口切换、打包/发布仍 **Phase 5**；4A 基线（A 45+门禁 7、4A 50 默认段 check、C1 Δ=16、C2 同因记录）**保持有效、不重开**。4B 通过后 **Phase 4 完成**，全量等价仍 Phase 5。
+
+**4B 验证方式**：UIUX 复核 + 测试独立；构建/CSP/gzip、单测全绿、旧基线 679、无新依赖/DOM 例外；若触碰 `chat-store`/`ChatStream`/`confirm-store`/`ChatRow` → PM §10.3 bench 重基线（预热排除、≥3 有效轮、p95≤35、单轮≤50）+ 懒挂载 10/10 + C1 新 Δ≤32（目标≤20）+ IME 24/24；uiux-v2 QUEUE_VIEW 必过、JUDGE/G2 回归、默认 21 项逐名、VISUAL 报告卡；契约面 #12/#13/#17 等三态对表；不弱化断言。未 commit。
+
+## 2026-10-21（Phase 4A M1–M6）— UIUX 修正聚焦重验：pass；4A 门保持通过
+
+**范围**：桌面UI [4A 变更记录 §三·五](../桌面UI/docs/change/2026-10-21_change_ui-platform-phase4a-engine-settings-drawers.md)（队列子视图、撤回 system 行、Tabs 键盘、保存条两行、资料状态-only、960/200%）。
+
+**门禁**：typecheck/build exit 0；gzip9 JS 247,478 + CSS 17,116 + HTML 389 = **264,983B ≤300KB**；CSP 零内联/严格 meta。单测 **67/67**、旧基线 **679/679**、IME **24/24**、懒挂载 **10/10**；旧渲染器核心/main/preload 零 diff；依赖未新增；DOM 例外仍 2 处。
+
+**自写冒烟 32/32（exit 0）**：原 4A 26 项零回退；M1 预览 4 项（当前 1+排队 3）+「查看全部队列（6）」、子视图标题「A · 队列」、`#right-queue-body` 唯一、6 项、返回焦点回 `.queue-view-all`、Esc 回工作概览且抽屉不关；M2 成功撤回新增 system「已撤回排队消息：」、失败内联「撤回无效：」+ system 同文；M3 Tabs roving 0/-1、aria-controls/tabpanel/labelledby、ArrowRight→codex 聚焦、End→claude、Home→pi；M4 保存条 64px、状态 28/28 三档（1360/960/200%）不截断、200% 无横向溢出、应用时点保留；M5 角色头状态-only（无待办/计数）；失效卡 hidden+原因、左树 `.ti-count`「3」+title/aria 保持；零 console/CSP。
+
+**bench（PM §10.3）**：预热 old 18.9/new 21.1 不计；3 有效轮 stormA 17.8→17.5、stormB 17.5→17.7、handler 9.5→0.5、batch 0.6→0.8、replay 19.5→6.2、scroll 15.6→12.8；p95 **18.2≤35**、单轮最大 18.2≤50——通过；C1 Δ=**16**。
+
+**uiux 八段**：SELECTOR 27/27、CONFIG 21/21、ROLE_RETURN_FOCUS 9/9、SEND_FACTS 8/8、RUNTIME 14/15（C2 同因）、默认 44/45（Phase 5 历史项）、VISUAL 3/4（4B 报告卡）、TOOLFOLD 17/17——无新增失败名/无回退；失败均为台账 B/C 类。
+
+**观察（非阻断）**：队列子视图打开时点击「角色资料」仍显示队列子视图（`queueView` 未清）；建议 UIUX/桌面UI 确认预期或 tab 切换时清空。
+
+**结论**：**pass；needs-work 无；4A 门保持通过**。未验证：真实模型/.env/主进程文档读取、打包、Windows/DPI、main.mjs/全量（Phase 5）、4B。只写本角色文档与证据；未改产品代码/测试/构建配置；未 commit。详见[报告](docs/change/2026-10-21_change_phase4a-fix-reverification.md)与[证据](docs/change/2026-10-21-phase4a-fix-verification-evidence/)。
+
+## 2026-10-21（Phase 4A）— 4A 独立验证：pass；4A 门通过可进 4B；唯一失败为 C2 同因既有红
+
+**范围**：桌面UI [Phase 4A 变更记录](../桌面UI/docs/change/2026-10-21_change_ui-platform-phase4a-engine-settings-drawers.md) 与 4A 证据；PM §十二/§十三；台账 §七。独立执行。
+
+**门禁**：typecheck/build exit 0；gzip9 JS 246,740 + CSS 17,054 + HTML 386 = **264,180B ≤300KB**；CSP 零内联/严格 meta。单测 **67/67**、旧基线 **679/679**、IME **24/24**、懒挂载 **10/10**；旧渲染器核心/main/preload 零 diff；依赖未新增（Slider copy-in 复用 @base-ui/react）；DOM 例外仅已批准的 2 处。
+
+**自写离线 IPC 冒烟 26/26（exit 0）**：默认 Claude；pi/codex/pi 切引擎历史隔离与恢复；跨引擎草稿；异引擎迟到事件缓存不覆盖；设置三 tabs、secret 掩码不回显、Slider aria-valuemin/max/now + ArrowRight、非预设文本回退、保存 loading/已保存/失败、缺配条与设置入口、读取失败重试、晚到读取守卫；资料四节、文档只读/无 script/返回焦点/错误重试；工作概览待处理定位与角标、无角色文档重复；抽屉队列位次/仅 message 可撤/成功由真实快照刷新/失败就地回执；失效 operator 卡 `.op-actions` hidden + 原因可见；左树 `.ti-count` 唯一数字「3」+ title/aria、状态不含「待办」；零 console/CSP。
+
+**bench（PM §10.3）**：预热 old 17.6/new 23.1 不计；3 有效轮 stormA old 中位 25.0 → new **17.6**、stormB 17.6→18.7、handler 11.5→0.6、batch 1.2→0.8、replay 20.5→6.5、scroll 18.4→14.6；p95 **20.6≤35**、单轮最大 20.6≤50——通过；C1 Δ=**16**。
+
+**uiux-v2 八段**：SELECTOR 27/27、CONFIG 21/21、ROLE_RETURN_FOCUS 9/9、SEND_FACTS 8/8、RUNTIME 14/15（唯一失败 `expired old shell shown disabled in its own runtime` = **C2 同因既有红**，旧入口同段亦失败）、默认 44/45（`historical own-template failures direct` = Phase 5；4A 项全过）、VISUAL 3/4（report source = 4B）、TOOLFOLD 17/17；QUEUE_VIEW 属 4B 未跑。**失败均为台账 B/C 类，不是 4A 缺口；断言未弱化。**
+
+**契约**：#7/#9/#10/#15/#16/#18/#19/#20 已满足且与实现一致；行 8 仍写「选择仅本地演示」，文档滞后，建议 4B 同步。C2 按 §13.3 记录待重锚；judge 跨引擎重放归 4B（§13.2）。
+
+**结论**：**4A 门 pass，可进 4B**；needs-work 无、missing-evidence 无。未验证：真实模型/.env/主进程文档读取（替身）、打包、Windows/DPI/屏读、main.mjs/全量（Phase 5）、4B 面。只写本角色文档与证据；未改产品代码/测试/构建配置；未 commit。详见[报告](docs/change/2026-10-21_change_phase4a-independent-verification.md)与[证据](docs/change/2026-10-21-phase4a-verification-evidence/)。
+
+## 2026-10-21（Phase 3 关闭 / Phase 4 授权）— 台账更新：C1 收敛 Δ=16；B 类映射 4A/4B；4A check 建议与验证口径
+
+**依据**：PM 评审 revision 5 §十一（Phase 3 整体门完成、Phase 4 授权 4A→4B、§11.4 派发前置第 3 项）。只更新台账与测试映射，**未跑实现测试**。
+
+**更新位置**：[Phase 3A check 台账](docs/change/2026-10-21_check-ledger-phase3a.md) §三（C1 行）与新增 §七。
+
+**C1**：标注「已收敛 Δ=16（150→166），旧 32，目标 ≤20，Phase 5 判据新 Δ≤32」（3A 时 51 仅作历史）。
+
+**B 类映射**：
+- **4A**：B1 + B2/B5——`one independent work list without duplicated role documents`、`P7 old runtime rejected result cannot disable current runtime or overwrite draft`、抽屉队列 VISUAL 子集；另 50 个默认段 check 按功能面分组：工作概览/抽屉队列 **14**（含 `queue full/grid/action rect 1360/960`、`halt preserves queued 3/full`、撤回族）、资料抽屉 **9**（含 `role geometry 1360/960`、`growing composer avoids drawer *`）、设置/Pi/引擎 **18**（含 `runtime settings geometry *`、`Claude required key…`、`Pi own history…`）、输入区草稿/附件 **9**（含 `late pick…`、`keyboard returns to composer image toolbar`）。
+- **4B**：B4（治理三权卡/镜像/排队聚合、治理记录建立/重新接受/迁移预览、报告全文/persistence/delivery、operator 镜像、`replayAnchorDebug`、single 切换刷新一次性警告）＋ **21** 个交互卡/待办/预览/决定 check（含 `queued baseline shows two`、`pending locator visible after role click`、`keyboard reaches original preview`、`answered pending returns to true busy`）；**QUEUE_VIEW 四项全部留 4B**（PM §12.1：`queued baseline shows two`、`runtime view restore does not revive old queued requests or aggregate`、`main-process repush rebuilds aggregate with new count only`、`clearing queue removes aggregate`，断言 `.op-queue-aggregate`/`queuedDebug`；4A 验收不含 QUEUE_VIEW）。
+- **Phase 5**：**11** 个聊天核心/虚拟窗口/历史 check（含 `virtual visible nonempty`、`group materialized and open`、`detached-history role mounted windowed`、`historical own-template failures direct`）。
+- 分母核对：50 + 21 + 11 = **82**；4B 名单块另含 QUEUE_VIEW 另外 3 名（共 24 行），不改变 82 分母。
+
+**4A 新增 check 名建议**：引擎切换/每引擎历史与草稿 4 名、设置字段/掩码/保存/缺配 6 名、资料抽屉/文档阅读 4 名、工作概览 3 名、队列抽屉/撤回 3 名（详见台账 §7.3）。
+
+**4A 独立验证口径**：UIUX 复核 + 测试独立；构建/CSP/gzip、单测、旧基线 679、IME 24；uiux-v2 `SELECTOR/CONFIG/SEND_FACTS/默认段` 逐段（QUEUE_VIEW 属 4B）；若动聊天热路径则按 PM §10.3 重基线（预热排除、≥3 有效轮、p95≤35、单轮≤50）+ 懒挂载 10/10 + C1 ≤32/≤20；契约行 #7/#9/#10/#15/#16/#18/#19/#20 三态对表；不新增依赖/DOM 例外、不弱化断言；4A 完成不等于全量双端等价。未 commit。
+
+## 2026-10-21（Phase 3B 修正）— UIUX 五项 CSS/图标修正聚焦重验：pass；原 39 项零回退 + 6 项新样式 45/45
+
+**范围**：UIUX Phase 3B 评审 5 项修正（SU 摘要 600/警告琥珀、shell 详情 Lucide chevron、拖入反馈、队列撤回 28px、附件 chip 8/rm 4/icon 12×1.5）；纯 CSS/图标/夹具，行为逻辑未改。
+
+**重建/门禁**：typecheck/build exit 0；gzip9 **241,273B ≤300KB**；CSP 零内联/严格 meta。单测 **33/33**、旧基线 **679/679**、IME **24/24**、懒挂载 **10/10**；旧渲染器核心/main/preload/desktop 零 diff。
+
+**自写冒烟 45/45（exit 0）**：原 39 项行为断言全部保持 true；新增 6 项实测——SU 摘要 `600`、`.sc-su-warning` `rgb(196,161,95)`、`#sc-hint` `rgb(148,155,164)` 且默认提示逐字；`#sc-details` Lucide chevron 存在、闭合恒等、展开 `matrix(0,1,-1,0,0,0)`、无 `::before` 字形；拖入 `is-dropping` 边框 `--text-3`/背景 `--hover` 且 leave 清除；撤回按钮高 28/字号 11/边框 `--input`/圆角 6；chip 8px、移除钮 4px、X 12×12/1.5。零 console/CSP/did-fail-load。
+
+**bench（PM §10.3）**：预热 old 20.4/new 17.4 不计；3 有效轮 stormA 23.1→18.9、stormB 17.5→19.9、handler 10.3→0.3、batch 0.5→0.3、replay 14.0→5.2、scroll 17.1→10.4；p95 **33.3≤35**、单轮最大 33.3≤50——通过（stormB 单轮 33.3 接近上限，属抖动）。
+
+**uiux-v2 受影响段**：JUDGE 33/33、G2 5/5、TERMINAL 22/22、TOOLFOLD 17/17；C1 仍 Δ=**16px**；无新失败名、无回退。
+
+**结论**：pass；needs-work 无。差异：gzip +1,140B（实例）；桌面UI「单测新增 16」仍为笔误（实为 15，累计 33）。未验证：真实模型/主进程卡通道、打包、Windows/DPI/屏读、main.mjs/全量（Phase 5）、Phase 4。只写本角色文档与证据；未改产品代码/测试/构建配置；未 commit。详见[报告](docs/change/2026-10-21_change_phase3b-fix-reverification.md)与[证据](docs/change/2026-10-21-phase3b-fix-verification-evidence/)。
+
+## 2026-10-21（Phase 3B）— Phase 3B 独立验证：3B 通过、Phase 3 整体门可判完成；C1 收敛 Δ=16；uiux 失败均为台账 B 类
+
+**范围**：桌面UI [Phase 3B 变更记录](../桌面UI/docs/change/2026-10-21_change_ui-platform-phase3b-cards-composer.md) 与 3B 证据；门规 PM §10.3/§10.4/§10.6；台账 [Phase 3A check 台账](docs/change/2026-10-21_check-ledger-phase3a.md)。候选变化，按 Invariant #6 覆盖受影响旧结论。
+
+**框架检查**：typecheck/build exit 0；gzip9 JS 226,166 + CSS 14,706 + HTML 384 = **241,256B ≤300KB**；CSP 静态扫描零内联/严格 meta。单测 **33/33**、旧基线 **679/679**、IME 新入口 **24/24**、懒挂载正向 **10/10**；旧渲染器核心与 main/preload/desktop 零 diff；三 e2e 仅目标切换（各 4 行，断言未改）；3B 零新增依赖、禁入零命中。
+
+**bench（PM §10.3）**：预热 old 26.8/new 22.7 不计；3 有效轮交替——stormA old 中位 21.3 vs new **24.4（≤25）**、stormB 18.7→18.6、handler 13.1→0.7、batch 1.7→1.0、replay 20.8→5.7、scroll 24.6→8.0；p95 25.6≤35、单轮最大 25.6≤50——**通过**（新 stormA 余量 0.6ms；与自报 18.6 属同机波动，按规则 5 后续热路径变更须重跑）。
+
+**自写 Electron 离线 IPC 冒烟 39/39（exit 0）**：shell 卡逐字+默认拒绝焦点+Esc=allow:false+显式 allow:true+settled/失效收起+通道 fail-closed；su 三档（标题/档位/命中原因/绕过写边界警告）；恢复卡逐字+取消焦点+显式执行+失效/通道异常定格可关；judge allow/deny/manual 无行/幂等/治理代批行；双开关初始关/一次性警告/重推不现/single 禁用/桥缺失禁用；发送 ack 载荷+queued 位次+未接受恢复草稿+已接受失败不假报；停止三态精确目标；附件选/粘/拖（data URL 缩略图）/移除；队列位次/仅消息可撤/就地回执；system 行；零 CSP/console/did-fail-load。
+
+**uiux-v2 七段（新入口）**：默认 8/9（`one independent work list…`=B1 Phase 4）、JUDGE 33/33、G2 5/5、TERMINAL 22/22、TOOLFOLD 17/17、SEND_FACTS 7/8（`P7 old runtime rejected…`=Phase 4 每引擎会话）、QUEUE_VIEW 0/1（`queued baseline shows two`=Phase 4 operator 排队聚合）——**失败均台账 B 类，非 3B 缺口**；与自述计数差异仅为条目/布尔口径。
+
+**C1/C2**：C1 新入口 Δ=**16px**（150→166，非累积）≤旧同日 32px（150→182）、≤20 目标；断言未改；满足 Phase 5 判据。C2 旧入口既有红随 Phase 5 下线。**观察（非阻断）**：切 single 后旧「替我决策中」警告行可能残留到自动收起，建议 Phase 4 刷新。
+
+**结论**：**3B 范围 pass；needs-work 无；missing-evidence 无；Phase 3 整体门可判完成**（全量双端与 main.mjs 仍 Phase 5）。未验证：真实模型/主进程卡通道、打包、Windows/DPI/屏读、Phase 4 功能面、3A2 视觉组逐项。只写本角色文档与证据；未改产品代码/测试/构建配置；未 commit。详见[报告](docs/change/2026-10-21_change_phase3b-independent-verification.md)与[证据](docs/change/2026-10-21-phase3b-verification-evidence/)。
+
+## 2026-10-21（Phase 3A 裁定后 / 3B 前置）— 四类 check 名台账完成；延迟挂载正向检查 10/10；C 类既有红登记
+
+**依据**：PM [Phase 3 门裁定](../项目管理/docs/design/2026-10-21_review_ui-platform-round.md) §10.1/§10.3/§10.4/§10.5（接受狭义 Phase 3 门、双端全量对照后移 Phase 5；bench 预注册口径批准并补预热/p95≤35ms/单轮≤50ms 红线；懒挂载为唯一限定例外；3B 派发前置）。
+
+**交付 1：四类 check 名台账**（[2026-10-21_check-ledger-phase3a.md](docs/change/2026-10-21_check-ledger-phase3a.md)），名单来自实际报告/已实跑脚本，不计数代替：
+- **A（3A 范围内双端通过）**：45 个具名 check——ime 24 名、uiux-v2 默认段前 8 名、toolfold 前 12 个布尔名、operator `toolCallId` 锚点（`OPERATOR_TOOLCALLID_ANCHOR`）；另列 7 项门禁级检查（bench/单测/旧基线/typecheck/build/CSP/预算/3A2+UIUX）。
+- **B（未实现按阶段延期）**：82 个 uiux-v2 具名 check（工作概览/队列 1 + 其余 81；Phase 4 逐步扩段、Phase 5 全量）+ `main.mjs` 套件（Phase 5，属主桌面窗口）+ 11 个功能面（3B 6：shell/恢复/审批卡、双开关、停止、完整附件、delivery/persistence/report 与镜像聚合；Phase 4 5：设置/Pi、治理记录、资料抽屉、引擎真实会话、工作概览）。
+- **C（既有基线红）**：2——toolfold `tail fold movement bounded…`（旧 Δ=32px、新 Δ=51px、阈值 20；属主桌面UI；Phase 5 判据新 Δ≤32、目标≤20，当前 51 不得进切换）；旧入口 `expired old shell shown disabled in its own runtime`（旧渲染器，随 Phase 5 下线退役）。
+- **D（新端独有/旧端不适用）**：30 项 Phase 3A 离线冒烟 + 10 项延迟挂载正向检查（operator 锚点跨列 A/D 不重复计，唯一新增 39）。
+
+**交付 2：延迟挂载正向覆盖**（`test/测试/`，属本角色边界）：新增 `phase3a-lazy-toolgroup-check.mjs` + `phase3a-lazy-toolgroup-preload.cjs`。新入口实跑：
+
+```
+./node_modules/.bin/electron test/测试/phase3a-lazy-toolgroup-check.mjs
+→ LAZY_TOOLGROUP_SUMMARY {"total":10,"passed":10,"failed":0}，exit 0
+```
+
+覆盖：同一轮 45 调用/91 相位闭合组内部活动行 **0**、摘要「本轮 45 个调用…含 1 条未放行」、`.sys-denied` 直显 outside.md；展开 **45** 行（file-1/file-45/已拒绝相位）；再折叠回 0；160 行前置正文离屏后回窗仍闭合、摘要完整、再展开 45；≤40 三调用小组闭合仍挂载 3 行；零 console 错误。阈值：>40 闭合内部恰 0、展开恰 45、小组恰 3。旧入口不适用（不构建同结构，不作失败判据）。证据 `phase3a-verification-evidence/lazy-toolgroup/`。
+
+**C 类登记**：两条既有红已写入台账与 memo，不计 3A 新红；toolfold 锚点差值（新 51 vs 旧 32）进入 3B/5 收敛清单。
+
+**更新**：Phase 3A 报告追加「裁定后更新」与 §七.3 正向覆盖；feature-map/memo/changelog 同步。只写 `角色卡/测试/` 与 `test/测试/`；未改产品代码/构建配置/他角色文件；未 commit。
+
+## 2026-10-21（Phase 3A）— UI 平台化 Phase 3A 聊天流核心独立验证：框架项通过；阶段门双端对照未达成交 PM；toolfold 锚点为旧基线既有红
+
+**范围**：桌面UI [Phase 3A 变更记录](../桌面UI/docs/change/2026-10-21_change_ui-platform-phase3a-chat.md)（含 3A2、bench 优化）、[3A2 证据](../桌面UI/docs/change/2026-10-21-phase3a2-evidence/)、契约面清单、UIUX 3A 评审（needs-work→3A2 pass）；口径＝产品提案 §六 Phase 3 门与 PM Q5/Q10。候选已变化，按 Invariant #6 覆盖受影响旧结论。
+
+**干净重建**：`typecheck:renderer`/`build:renderer` exit 0；gzip9 JS 235,863B + CSS 13,958B + HTML 388B = **250,209B ≤ 300KB**；CSP 静态扫描零内联脚本/`<style>`/`style=`/`unsafe-*`，严格 meta 在位；dist 仅 3 文件。
+
+**测试/基线**：`test/桌面UI/*.test.ts` **18/18**、`test/桌面应用/*.test.ts` **679/679** 全绿 exit 0；旧渲染器核心 8 文件 + `app/main.ts`/`app/preload.cjs`/`app/desktop` 与 HEAD 逐字节相同；三个 e2e 仅加 `ANS_RENDERER_ENTRY` 目标切换（断言零改动）；`markdown.js`/vendor/markdown.test 的变化属已单独记录的 vendor 15.0.3 安全升级。
+
+**ime 新入口**：**24/24 全 true、E2E_DONE=1、exit 0**（组合/229/isComposing/Shift/附件）。
+
+**bench（先预注册阈值后执行，待 PM 批准）**：3 轮新旧交替，old stormA 20.2/17.8/21.9（中位 20.2）vs new **43.2/18.0/18.0（中位 18.0 ≤ max(20.2,25)）**；stormB 17.6→17.7；handlerA 9.9→0.1；batchB 1.1→1.1；replay 21.0→5.7；scroll 15.5→4.9——六项主阈值按中位全部 PASS。补充 3 轮 new stormA 25.1/18.6/22.8（6 轮中位 20.7）。**保留**：单轮 43.2ms 尖峰、2/6 轮 >25ms；预注册 mounted 相等护栏跨渲染器不适用（旧 1 vs 新 361，已声明口径偏差；新多挂 360 行仍更快）。
+
+**自写 Electron 冒烟（离线 IPC 替身，30/30，exit 0）**：220 事件 count 220/挂载 61/上 spacer 12,084/贴底；operator `toolCallId` 锚点 index=count−2（前 activities、后 assistant）；状态优先级（等待确认>工作中>错误>空闲，B 失败 sys-config `rgb(201,122,109)`）；Markdown XSS 负例零 script/img/javascript: href、安全链接 `rel=noopener noreferrer`；虚拟卸载重挂 details/choice 保持；IME 组合不发送、提交后恰一次、附件载荷与清空；`rowModelDebug`/`paneDebug` 字段齐备；零 console/CSP/did-fail-load。
+
+**uiux-v2 / toolfold 分类**：新入口默认段 9 布尔 8 过，第 9 项「one independent work list without duplicated role documents」为**工作概览/队列抽屉（3B/4）**；旧入口同段 91 布尔 90 过 + 1 条既有红（`expired old shell shown disabled in its own runtime`）。toolfold 新入口 13 布尔 12 过；失败项 `tail fold movement bounded…` 观测 Δ=**51px**（阈值 20），**旧入口同检查也失败 Δ=32px** → 旧基线既有红、非 3A 新引入，新 Δ 更大留 3B/5。**阶段门「同一套 e2e 双端逐 check 名对照」按提案文字未达成**（新入口第 9 项中止；旧入口 101 项）→ 交 PM 裁定 3A 是否以缩小口径过门。
+
+**DOM 契约变更评估**：bench 优化引入「>40 行且闭合的大工具组延迟挂载」。现有 e2e 无任何断言查询闭合大组内部行（最大夹具 12 调用，bench 不查 DOM）→ 不破坏套件；但属有意行为差，建议契约面登记「查询闭合大组前先展开」并由 PM/测试确认该例外。
+
+**依赖**：3A 零新增；相对 HEAD 新增 107 包中 +10 为已批准 markdown-it 15.0.3 + @types 工具链；`typescript` 收紧 `7.0.2`（Q1 收口）；禁入清单零命中。
+
+**结论**：框架项 **pass**；阶段门判定 **needs-work**（双端对照未达成、toolfold 锚点与 bench 单轮尖峰、懒挂载例外均待 PM 裁定）；**missing-evidence 无**。未验证：真实模型/网络、打包、Windows/DPI/屏读、其余 90+ 项、长转录手感、3B/4 业务面、3A2 视觉组逐项（由 UIUX 复核，本次仅覆盖子集）。只写本角色文档与证据；未改产品代码/测试/构建配置；未 commit。详见[报告](docs/change/2026-10-21_change_phase3a-independent-verification.md)与[证据](docs/change/2026-10-21-phase3a-verification-evidence/)。
+
+## 2026-10-21（Phase 2b）— UI 平台化 Phase 2b 修正独立复验：通过（冒烟 49/49、旧基线 679/679、依赖零漂移；无失败项）
+
+**背景**：候选已变化（UIUX Phase 2 评审 needs-work 后桌面UI 完成 Phase 2b），原 Phase 2 结论对受影响部分失效，按证据溯源重新执行。
+
+**变更面**：旧渲染器 9 文件 + `app/main.ts`/`app/preload.cjs`/`app/desktop/` 与 HEAD 逐字节相同；修正全部在 `app/renderer/src/`（`html class="dark"`、自绘 `EngineSelect`、焦点环/primary hover-active/checkbox warning/960 scope 后缀/禁用发送中性底）。依赖零新增：`package.json` 与 HEAD 的 diff 与 Phase 2 证据逐字相同、锁 0 删除/0 既有变更/97 新增、禁入清单零命中；`dist` 仅 3 个文件。
+
+**干净重建**：`typecheck:renderer` exit 0、`build:renderer` exit 0；gzip9 合计 **189,355B ≤ 300KB**（JS 176,970 + CSS 11,998 + HTML 387）；静态扫描零内联脚本/`<style>`/`style=`/`unsafe-*`，严格 CSP meta 在位；JS raw 556.3kB（引擎选择器自绘后 tree-shake）。
+
+**自写 Electron 冒烟 49/49（exit 0）**：`html.dark`/`color-scheme:dark`；`#sc-allow` border `rgb(107,117,126)`（--input）；focus-visible 2px solid `rgb(111,160,139)` + offset 3px（主冒烟 CDP 强制伪类 + 过渡等待；补充可见窗口真实 Tab 探针 4 类目标全过）；primary hover `rgb(127,178,155)` / active `rgb(94,143,122)`（真实鼠标事件）；Checkbox 选中 `rgb(196,161,95)`；引擎 combobox/listbox/option + ↑↓/Home/End/Enter/Esc/Tab + 焦点返回逐项通过；960 scope 664、无溢出、演示后缀隐藏且不截断；IME 组合期不发送/提交后拦截/229+isComposing+Shift 守护；确认卡 640/默认焦点 `sc-deny`/Esc=deny；侧栏 248→328/双击 248/Shift+→272/收起 0/展开 272；零 console/CSP/did-fail-load/preload-error/render-gone。
+
+**测量坑（已存档，供 Phase 3 e2e）**：`show:false` 隐藏窗口 `document.hasFocus()=false`，**`:focus-visible` 不匹配**（Tab 与 `focus({focusVisible:true})` 均无效），需 CDP 强制或可见窗口；`transition-colors` 120ms 含 outline-color/background-color，瞬时读数会落在中间值，须等 ≥200ms。
+
+**旧基线**：`node --test test/桌面应用/*.test.ts` → **679/679 pass / 0 fail / exit 0**。完整 e2e 双端对照按计划留 Phase 5。
+
+**契约面**：引擎行 8 已更新为「已满足（Phase 2b）」，与实测 ARIA/键盘逐项一致；行 6（树键盘）仍按 Phase 3 延后；未发现虚报。
+
+**结论**：**通过**；未验证项（完整 e2e 双端、打包、Windows/DPI/屏读/reduced-motion、确认卡退场/菜单入场 Motion、树键盘、真实会话引擎行为）与原因见报告。与桌面UI 自述无实质不一致（gzip +472B、focus-visible 测量方式、过渡读数时点三处口径差异）。只写本角色文档与证据目录；未 commit/push。详见[报告](docs/change/2026-10-21_change_phase2b-independent-reverification.md)与[证据](docs/change/2026-10-21-phase2b-verification-evidence/)。
+
+## 2026-10-21 — UI 平台化 Phase 2 独立验证：通过（冒烟 48/48、旧基线 679/679、契约面零虚报；无失败项）
+
+**范围**：产品提案 revision 2 §六 Phase 2 阶段门、PM 评审 M2/A5；受验对象为桌面UI 的 [React 渲染器骨架](../桌面UI/docs/change/2026-10-21_change_ui-platform-phase2-shell.md)、[契约面清单](../桌面UI/docs/feature/ui-contract-surface.md) 与装配 [Phase 1 工具链](../装配/docs/change/2026-10-21_change_ui-platform-toolchain.md)。本角色从当前工作树重新执行，不复用对方脚本/结论。
+
+**变更面**：旧渲染器 9 文件 + `app/main.ts`/`app/preload.cjs`/`app/desktop/` 与 HEAD 逐字节相同（sha256 存档）；`app/` 新增仅 `app/renderer/{components.json,src/,tsconfig.json}`；16 个依赖精确版本、全在 devDependencies、无额外包；锁文件 0 删除/0 既有变更/97 新增；`motion→framer-motion` 同版本属其自身结构；禁入清单零命中；`electron-builder.yml`/`release.yml` 未动；`typescript ^7.0.2` 为既有 PM「实施中确认」开放项。
+
+**干净重建**：删除 `app/renderer/dist` 后 `npm run typecheck:renderer`（exit 0）、`npm run build:renderer`（exit 0，2748 modules）；产物 `dist/src/index.html` 570B + JS 638,808B + CSS 62,742B；入口引用资产 gzip9 合计 **216,784B ≤ 300KB**；静态扫描零内联脚本/`<style>`/`style=`/`unsafe-*`，严格 CSP meta 逐字在位；运行时零 `<style>`。
+
+**真实 Electron `file://` 冒烟（自写脚本，48/48）**：标题栏 36、会话头 64、侧栏 248、内容列/胶囊 900、5 demo 角色；侧栏拖拽 248→328（同轮 aria/storage）、双击 248、Shift+→272、±8、收起 0（160ms 过渡结束后）/展开保留 272；抽屉 424/Esc/焦点返回；确认卡 640/默认焦点 `sc-deny`/Esc=deny/放行单独路径；IME 组合期 Enter 不发送、组合后 Enter 拦截并如实标注、keyCode 229 与 isComposing 守护；页面 CSP 违规 0、console 错误 0、did-fail-load/preload-error/render-gone 0。附加：无 preload 时窗口按钮禁用并标注「窗口控制不可用」；960×620 无横向溢出、内容列 664、会话头 60。
+
+**旧基线**：`node --test test/桌面应用/*.test.ts`（shell glob，未改任何测试）→ **679 tests / 679 pass / 0 fail / 0 skip，exit 0**。完整 e2e 双端对照按阶段计划留 Phase 5（套件目标切换尚未实现，未覆盖项已列明）。
+
+**契约面抽查**：计数类声明全部精确吻合（uiux-v2 `check(` 394/唯一名 384、11 方法出现次数逐项相同、82 id 全在源码；main 323 log/51 id；ime 9 调用点→24 名逐项相等；renderer.test 108；入口行号与 4 类 env 全命中；附录 199 选择器全可寻）；新驱动同名子集接真实 store、20 项 `unimplemented` 且无假实现。判定清单可执行、无遗漏或虚报。
+
+**依赖/供应链**：`npm audit` 8 moderate 全为既有 `electron-builder@26.15.3` 传递链（节点均在 HEAD 锁中），`npm audit --omit=dev` 为 0；无 radix/react-aria/vitest/dnd-kit/tw-animate-css/第二套动画或图标库。
+
+**结论**：**通过**；未发现失败项；未验证项（完整 e2e 双端、引擎菜单交互、窗口按钮真实效果、打包安装包、Windows/DPI/屏读/reduced-motion、Phase 2 范围外业务面）与原因见报告。与桌面UI 自述无实质不一致（gzip 精确值差 383B、收起宽度读数时点、裸夹具主进程 stderr 三处口径差异已登记）。只写本角色文档与证据目录，未碰产品代码/构建配置/测试/他角色文件；未 commit/push。详见[报告](docs/change/2026-10-21_change_phase2-independent-verification.md)与[证据](docs/change/2026-10-21-phase2-verification-evidence/)。
+
 ## 2026-10-18 — 四角色治理全自动链路独立端到端验收：新增 26/26；全量 2938/2919/16/3（新增红 0）；typecheck 0
 
 **任务**：客户要求「不要让客户手测，把四角色全自动链路跑到绿」——用桩适配器/假模型跑真实桌面接口与真实项目目录，复现并验证 8 个真机失败场景。

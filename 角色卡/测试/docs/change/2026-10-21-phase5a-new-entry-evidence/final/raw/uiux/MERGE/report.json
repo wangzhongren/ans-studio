@@ -1,0 +1,74 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "same-turn live then history only one response rejection and old history",
+      "value": true
+    },
+    {
+      "name": "real project-changed refresh does not repeat current turn",
+      "value": true
+    },
+    {
+      "name": "full rebuild retains unpersisted live report settled and original pending card",
+      "value": true
+    },
+    {
+      "name": "history first then exact live event does not duplicate",
+      "value": true
+    },
+    {
+      "name": "two legitimate same-turn identical events remain two occurrences",
+      "value": true
+    },
+    {
+      "name": "distinct turns with identical input and output remain two",
+      "value": true
+    },
+    {
+      "name": "background engine merges in own cache without old engine rows",
+      "value": true
+    },
+    {
+      "name": "history-before-correlated-live binds two identical optimistic inputs exactly once",
+      "value": true
+    },
+    {
+      "name": "repeated known-turn full rebuild keeps original unanchored pending card without borrowed token",
+      "value": true
+    },
+    {
+      "name": "legacy decided full replay reuses original card between actual request and conclusion",
+      "value": true
+    },
+    {
+      "name": "background legacy rebuild keeps exact decided DOM and shifted anchor indices",
+      "value": true
+    },
+    {
+      "name": "unknown legacy no false text-set dedup and old replay stays idempotent",
+      "value": true
+    }
+  ],
+  "sends": [
+    {
+      "text": "manual identical",
+      "target": {
+        "projectRoot": "/offline-uiux-fixture",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      "clientMessageId": "e830098e-f09c-4984-8e18-d92777fc7492"
+    },
+    {
+      "text": "manual identical",
+      "target": {
+        "projectRoot": "/offline-uiux-fixture",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      "clientMessageId": "09e87aee-3433-4255-a025-6e8533cad641"
+    }
+  ]
+}

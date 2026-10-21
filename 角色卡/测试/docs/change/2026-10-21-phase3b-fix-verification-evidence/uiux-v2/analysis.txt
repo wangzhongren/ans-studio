@@ -1,0 +1,5 @@
+judge: entries=33 booleans=33 pass=33 fail=0 
+g2: entries=5 booleans=5 pass=5 fail=0 
+terminal: entries=22 booleans=22 pass=22 fail=0 
+toolfold: entries=19 booleans=17 pass=17 fail=0 
+C1 offsets: {"before":150,"after":166,"later":166,"delta":16}

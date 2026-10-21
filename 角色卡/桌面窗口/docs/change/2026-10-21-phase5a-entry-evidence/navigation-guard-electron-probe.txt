@@ -1,0 +1,12 @@
+[probe] ready
+[probe] guard-imported
+[probe] loaded file:///tmp/ans-nav-probe-dir/page.html
+[probe] click https
+[probe] open https://example.com/x
+[probe] click file
+[probe] blocked blocked-protocol
+[probe] click data
+[probe] click js
+[probe] window.open
+[probe] open https://example.com/y
+NAV_PROBE={"before":"file:///tmp/ans-nav-probe-dir/page.html","after":"file:///tmp/ans-nav-probe-dir/page.html","afterOpen":"file:///tmp/ans-nav-probe-dir/page.html","opened":["https://example.com/x","https://example.com/y"],"blocked":["blocked-protocol"],"pwned":""}

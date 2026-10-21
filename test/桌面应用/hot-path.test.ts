@@ -4,8 +4,10 @@
 // 覆盖：
 //  ① `push-batcher`（纯逻辑，主进程用）：事件窗口合并（N 推 → 1 次 send）、角色状态去抖（同角色只推最新）；
 //  ② **确定性事件风暴**（假适配器 300 事件）经真实 SessionManager：外推次数/耗时（护栏断言，阈值保守）；
-//  ③ O-1 边界快照的 **mtime+size 缓存**：未变文件不重复读哈希（200 次检查的耗时护栏 + 源钉）；
-//  ④ Markdown 解析成本的护栏（Q-2 的惰性化把「每事件解析」变成「挂载窗口内 + 一轮一次批量」）。
+//  ③ O-1 边界快照的 **mtime+size 缓存**：未变文件不重复读哈希（200 次检查的耗时护栏 + 源钉）。
+//
+// 5B：原 ④（旧 renderer.js/vendor markdown.js 的解析成本与源钉）随旧渲染器下线退役；
+// Markdown 受控渲染与成本覆盖迁至 test/桌面UI（npm markdown-it 封装 + e2e）。
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -24,7 +26,6 @@ import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SESSION_SRC = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
-const RENDERER = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "renderer", "renderer.js"), "utf8");
 const MAIN_SRC = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "main.ts"), "utf8");
 const PRELOAD = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "preload.cjs"), "utf8");
 
@@ -107,7 +108,6 @@ test("Q-1 push-batcher：事件窗口合并（N 推 → 1 次 send、顺序不�
   assert.ok(MAIN_SRC.includes("createRoleStateDebouncer<"), "main 应用角色状态去抖器");
   assert.ok(MAIN_SRC.includes("eventBatcher.dispose();") && MAIN_SRC.includes("roleStateDebouncer.dispose();"), "关窗清挂起计时器");
   assert.ok(PRELOAD.includes('"session:events"') && PRELOAD.includes('"session:event"'), "preload 双通道（批量 + 单发兼容探针）");
-  assert.ok(RENDERER.includes("Array.isArray(envOrBatch)"), "渲染侧同解单发/批量");
 });
 
 // ————————————————— ② 确定性事件风暴：300 事件经真实 SessionManager —————————————————
@@ -243,30 +243,4 @@ test("Q-1 O-1 哈希缓存：未变文件只 stat（mtime+size 命中）；内�
   // 源钉：缓存键 = mtime+size；读盘只看变化文件。
   assert.ok(SESSION_SRC.includes("hit.mtimeMs === st.mtimeMs && hit.size === st.size"), "缓存判据 = mtime+size（Q-1 派工的指定口径）");
   await mgr.stop(null);
-});
-
-// ————————————————— ④ Markdown 解析成本护栏（Q-2 惰性化的依据） —————————————————
-
-test("Q-2 Markdown 成本护栏：典型 200 行 < 1200ms（惰性化后每轮解析次数=挂载窗口 + 一轮一次批量，而非每事件）", async () => {
-  // 与 index.html 同序：先装 vendored 库（UMD 在 node ESM 下走 globalThis），再装封装。
-  await import(new URL("../../app/renderer/vendor/markdown-it.umd.min.js", import.meta.url).href);
-  const href = new URL("../../app/renderer/markdown.js", import.meta.url).href;
-  await import(href);
-  const Md = (globalThis as Record<string, unknown>).ANSMarkdown as { renderMarkdown: (t: string) => string };
-  const sample = "（模型行）**加粗** 与 `code` 与 [链接](https://example.com)\n\n- 一\n- 二\n\n> 引用";
-  const t0 = performance.now();
-  for (let i = 0; i < 200; i += 1) Md.renderMarkdown(sample + " #" + i);
-  const elapsed = performance.now() - t0;
-  assert.ok(elapsed < 1200, "解析成本护栏（宽松）：200 次典型行 < 1200ms（本机实测远低于此）");
-  // 源钉（2026-10-17 修订）：三种适配器只发**完整消息** ⇒ 助手行**即时 Markdown**——
-  // `appendAssistant` 新建行恒 `mdReady: true`，不依赖 `roleBusy`/`settledTurns` 退化；
-  // `upgradeStreamingMarkdown` 仅作旧行/异常行安全网（正常新行不经过它），纯文本形态只服务该安全网。
-  const appendAssistantSrc = /function appendAssistant\([\s\S]*?\n  \}/.exec(RENDERER)?.[0] ?? "";
-  assert.ok(appendAssistantSrc.includes("buildAssistantRow"), "appendAssistant 经唯一行构造点建行");
-  assert.ok(appendAssistantSrc.includes("mdReady: true"), "appendAssistant 新建行恒 mdReady:true（即时 Markdown）");
-  assert.equal(appendAssistantSrc.includes("state.roleBusy"), false, "appendAssistant 不依赖 roleBusy（不再退化为纯文本）");
-  assert.equal(appendAssistantSrc.includes("state.settledTurns"), false, "appendAssistant 不依赖 settledTurns");
-  assert.ok(/if \(rec\.mdReady\)[\s\S]{0,80}Md\.renderMarkdown\(rec\.data\)/.test(RENDERER), "buildAssistantRow 的 mdReady 分支即时渲染 Markdown");
-  assert.ok(/rec\.kind !== "assistant" \|\| rec\.mdReady\) continue/.test(RENDERER), "upgradeStreamingMarkdown 仅升级 mdReady:false 的旧行（安全网）");
-  assert.ok(RENDERER.includes("is-streaming"), "纯文本形态保留（仅旧行/安全网分支）");
 });

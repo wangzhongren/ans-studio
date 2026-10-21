@@ -1,0 +1,1606 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nova × 深色石墨 · UI 平台化静态原型（ANS Studio）</title>
+<!--
+  静态原型 · 演示数据 · 未接入业务。
+  设计依据：角色卡/UIUX设计师/docs/design/2026-10-21_design_ui-platform-nova.md
+  说明：
+  1. 本文件自包含：内联 CSS/JS，不引外部字体、图标、库；图标为简单内联 SVG 示意，生产统一用 Lucide。
+  2. 动效仅用 CSS transition/keyframes 示意；生产由 motion/react 实现，聊天热路径禁止挂动效。
+  3. 所有应用颜色均来自 :root 令牌；harness 控制条不属于正式应用界面。
+  4. 可用查询参数：?w=960|1360&scene=chat|empty&drawer=0|1&shell=0|1&sidebar=collapsed&capture=1&audit=1
+-->
+<style>
+  /* ——————————————————————————————————————————————————————————————
+     设计令牌（与规范第 2 节一一对应；tokens.css 在生产中为唯一来源）
+     —————————————————————————————————————————————————————————————— */
+  :root {
+    color-scheme: dark;
+
+    /* shadcn/ui 标准位 */
+    --background: #14171A;
+    --foreground: #F2F4F6;
+    --card: #1E2328;
+    --card-foreground: #F2F4F6;
+    --popover: #14171A;
+    --popover-foreground: #F2F4F6;
+    --primary: #6FA08B;
+    --primary-foreground: #14171A;
+    --secondary: #252A30;
+    --secondary-foreground: #F2F4F6;
+    --muted: #1E2328;
+    --muted-foreground: #949BA4;
+    --accent: #252A30;
+    --accent-foreground: #F2F4F6;
+    --destructive: #C97A6D;
+    --destructive-foreground: #14171A;
+    --border: #2C3238;
+    --input: #6B757E;
+    --ring: #6FA08B;
+
+    /* sidebar 位 */
+    --sidebar: #1A1E22;
+    --sidebar-foreground: #F2F4F6;
+    --sidebar-primary: #6FA08B;
+    --sidebar-primary-foreground: #14171A;
+    --sidebar-accent: #252A30;
+    --sidebar-accent-foreground: #F2F4F6;
+    --sidebar-border: #2C3238;
+    --sidebar-ring: #6FA08B;
+
+    /* 项目扩展位（无 shadcn 标准位） */
+    --warning: #C4A15F;
+    --warning-foreground: #14171A;
+    --warning-bg: #24211A;
+    --warning-border: #4E422A;
+    --success-bg: #22302B;
+    --success-hover: #7FB29B;
+    --primary-active: #5E8F7A;
+    --danger: #C97A6D;
+    --danger-bg: #2E2220;
+    --danger-border: #5C3832;
+    --danger-line: #C97A6D;
+    --text-2: #A7ADB5;
+    --text-3: #949BA4;
+    --selected: #2A3037;
+    --selected-foreground: #F2F4F6;
+    --drawer-surface: #171B1F;
+    --hover: #252A30;
+
+    /* 形状 / 布局 / 字体 */
+    --radius: 8px;
+    --radius-control: 6px;
+    --radius-micro: 4px;
+    --content-max: 900px;
+    --sidebar-width: 248px;
+    --titlebar-h: 36px;
+    --session-head-h: 64px;
+    --drawer-w: 424px;
+
+    /* 浮层阴影（深色主题低透明黑） */
+    --shadow-card: 0 1px 2px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.32);
+    --shadow-dock: 0 -6px 18px rgba(0,0,0,.35);
+    --shadow-drawer: -12px 0 42px rgba(0,0,0,.55);
+    --shadow-popover: 0 6px 24px rgba(0,0,0,.55);
+    --shadow-window: 0 24px 80px rgba(0,0,0,.55);
+    --backdrop: rgba(0,0,0,.45);
+    --backdrop-strong: rgba(0,0,0,.55);
+
+    /* 滚动条 / 选中文本 */
+    --scrollbar-thumb: #4A525A;
+    --scrollbar-thumb-hover: #5F6870;
+    --selection-bg: #3A4A44;
+
+    /* 整页等宽（单一来源） */
+    --font-mono: ui-monospace, "Cascadia Mono", "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", "Microsoft YaHei", monospace;
+    --font-sans: var(--font-mono);
+
+    /* 动效令牌（原型 CSS 示意；生产 motion/react） */
+    --motion-fast: 120ms;
+    --motion-base: 160ms;
+    --motion-overlay: 180ms;
+    --ease-standard: cubic-bezier(.2, 0, 0, 1);
+    --ease-exit: cubic-bezier(.4, 0, 1, 1);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--background);
+    color: var(--foreground);
+    font: 13px/1.55 var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  [hidden] { display: none !important; }
+  ::selection { background: var(--selection-bg); color: var(--foreground); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border: 3px solid transparent; border-radius: 6px; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); background-clip: content-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+
+  .icon-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+  .ico { width: 16px; height: 16px; flex: 0 0 auto; display: block; }
+  .ico-12 { width: 12px; height: 12px; }
+  .ico-14 { width: 14px; height: 14px; }
+  .ico-18 { width: 18px; height: 18px; }
+  .ico-20 { width: 20px; height: 20px; }
+  .ico-36 { width: 36px; height: 36px; }
+
+  /* ——————————————————————————————————————————————————————————————
+     原型控制条（不属于应用界面）
+     —————————————————————————————————————————————————————————————— */
+  .harness {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 8px 14px;
+    background: var(--sidebar);
+    border-bottom: 1px solid var(--border);
+  }
+  .harness-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .harness-title strong { font-size: 12px; font-weight: 650; white-space: nowrap; }
+  .harness-badge {
+    font-size: 10px;
+    line-height: 1.5;
+    color: var(--warning);
+    border: 1px solid var(--warning-border);
+    background: var(--warning-bg);
+    border-radius: var(--radius-micro);
+    padding: 0 6px;
+    white-space: nowrap;
+  }
+  .harness-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .harness-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 10.5px; color: var(--text-3); }
+  .harness-meta #scale-readout { color: var(--text-2); }
+  .harness-meta #demo-status { color: var(--text-2); }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-control); overflow: hidden; }
+  .seg button {
+    height: 26px;
+    padding: 0 9px;
+    border: 0;
+    background: transparent;
+    color: var(--text-2);
+    font-size: 11px;
+    transition: background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
+  }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button:hover { background: var(--hover); color: var(--foreground); }
+  .seg button.is-on { background: var(--selected); color: var(--foreground); }
+  .hbtn {
+    height: 26px;
+    padding: 0 9px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--background);
+    color: var(--text-2);
+    font-size: 11px;
+    transition: background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
+  }
+  .hbtn:hover { background: var(--hover); color: var(--foreground); border-color: var(--border-strong); }
+  .hbtn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); font-weight: 600; }
+  .hbtn.primary:hover { background: var(--success-hover); border-color: var(--success-hover); }
+
+  /* ——————————————————————————————————————————————————————————————
+     模拟窗口与骨架
+     —————————————————————————————————————————————————————————————— */
+  .stage {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 16px;
+    overflow: hidden;
+  }
+  .window {
+    width: 1360px;
+    height: 860px;
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: var(--background);
+    border: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-window);
+    overflow: hidden;
+    transform-origin: top center;
+  }
+  .stage-scale { position: absolute; bottom: 4px; right: 12px; font-size: 10.5px; color: var(--text-3); }
+  body.capture .harness, body.capture .stage-scale { display: none; }
+  body.capture .stage { padding: 0; display: block; height: 100vh; overflow: hidden; }
+  body.capture .window { border: 0; box-shadow: none; transform: none !important; margin: 0; }
+
+  /* 自绘标题栏（生产继续自绘：拖动区 + 原生双击最大化） */
+  .titlebar {
+    flex: 0 0 auto;
+    height: var(--titlebar-h);
+    display: flex;
+    align-items: center;
+    position: relative;
+    background: var(--sidebar);
+    border-bottom: 1px solid var(--border-strong);
+    user-select: none;
+    -webkit-app-region: drag;
+  }
+  .titlebar-left { position: absolute; left: 12px; display: flex; align-items: center; gap: 8px; }
+  .proto-badge {
+    font-size: 10px;
+    line-height: 1.5;
+    color: var(--warning);
+    background: var(--warning-bg);
+    border: 1px solid var(--warning-border);
+    border-radius: var(--radius-micro);
+    padding: 0 5px;
+    letter-spacing: .02em;
+  }
+  .titlebar-brand {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .titlebar-mark { font-size: 12px; font-weight: 600; letter-spacing: .08em; color: var(--foreground); }
+  .titlebar-sub { display: none; font-size: 12px; color: var(--text-2); }
+  .titlebar-controls { margin-left: auto; display: flex; align-items: stretch; height: 100%; -webkit-app-region: no-drag; }
+  .win-btn {
+    width: 46px;
+    height: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    color: var(--text-2);
+    -webkit-app-region: no-drag;
+    transition: background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
+  }
+  .win-btn:hover { background: var(--hover); color: var(--foreground); }
+  .win-btn:active { background: var(--selected); }
+  .win-btn:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+  .win-btn-close:hover { background: var(--danger-bg); color: var(--danger); }
+  .win-btn-close:active { background: var(--danger-border); }
+
+  .app {
+    flex: 1 1 auto;
+    min-height: 0;
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    overflow: hidden;
+    transition: grid-template-columns var(--motion-base) var(--ease-standard);
+  }
+  .col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .col-left {
+    position: relative;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    padding: 18px 16px 12px;
+    gap: 14px;
+    transition: opacity var(--motion-base) var(--ease-standard), padding var(--motion-base) var(--ease-standard), border-color var(--motion-base) var(--ease-standard);
+  }
+  .col-mid {
+    position: relative;
+    background: var(--background);
+    --gutter: max(32px, calc((100% - var(--content-max)) / 2));
+    --sbw: 10px;
+  }
+  .app.is-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
+  .app.is-collapsed .col-left { opacity: 0; visibility: hidden; overflow: hidden; padding-left: 0; padding-right: 0; border-right-width: 0; }
+
+  .workspace-brand { font-size: 21px; font-weight: 750; letter-spacing: -.05em; line-height: 1.2; }
+  .workspace-brand span { display: block; font-size: 10.5px; letter-spacing: .12em; font-weight: 500; color: var(--text-3); margin-top: 2px; }
+  .sidebar-toggle {
+    position: absolute;
+    z-index: 8;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--background);
+    color: var(--text-2);
+    transition: background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
+  }
+  .sidebar-toggle:hover { background: var(--hover); color: var(--foreground); }
+  .sidebar-toggle:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .sidebar-collapse { top: 14px; right: 10px; }
+  .sidebar-expand { top: 16px; left: 6px; z-index: 9; }
+  .sidebar-resizer {
+    position: absolute;
+    top: 0;
+    right: -4px;
+    width: 9px;
+    height: 100%;
+    z-index: 7;
+    cursor: col-resize;
+    background: transparent;
+  }
+  .sidebar-resizer::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 4px;
+    width: 1px;
+    background: var(--border-strong);
+  }
+  .sidebar-resizer:hover::after, .app.is-resizing .sidebar-resizer::after { background: var(--primary); }
+  .sidebar-resizer:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+  .app.is-resizing { cursor: col-resize; user-select: none; }
+  .app.is-resizing, .app.is-resizing .col-left, .app.is-resizing .sidebar-toggle { transition: none; }
+
+  .project-summary { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .project-icon {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    background: var(--card);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    color: var(--text-2);
+  }
+  .project-identity { min-width: 0; }
+  .project-name { font-size: 13.5px; font-weight: 600; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .project-path { font-size: 11px; line-height: 1.5; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tree-label { font-size: 10.5px; letter-spacing: .08em; color: var(--text-3); }
+  .tree { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin: 0 -6px; padding: 0 6px 4px; }
+  .tree-item {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 3px 10px;
+    align-items: center;
+    padding: 7px 8px;
+    min-height: 48px;
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--foreground);
+    text-align: left;
+    transition: background var(--motion-fast) var(--ease-standard);
+  }
+  .tree-item:hover { background: var(--hover); }
+  .tree-item:active { background: var(--selected); }
+  .tree-item.active { background: var(--selected); box-shadow: inset 2px 0 0 var(--primary); }
+  .tree-item.active .ti-name { font-weight: 600; }
+  .ti-avatar {
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-strong);
+    background: var(--card);
+    color: var(--text-2);
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+  .ti-avatar.is-primary { background: var(--success-bg); color: var(--primary); border-color: var(--success-bg); }
+  .ti-main { min-width: 0; }
+  .ti-name { font-size: 13px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ti-sub { display: flex; align-items: center; gap: 5px; margin-top: 1px; font-size: 10.5px; line-height: 1.4; color: var(--text-3); min-width: 0; }
+  .ti-sub span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .status.idle { color: var(--text-3); }
+  .status.working { color: var(--text-2); }
+  .status.waiting { color: var(--warning); }
+  .status.error { color: var(--danger); }
+  .spin { width: 12px; height: 12px; flex: 0 0 auto; animation: nova-spin .9s linear infinite; transform-origin: 50% 50%; }
+  @keyframes nova-spin { to { transform: rotate(360deg); } }
+  .sidebar-foot { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+  .sidebar-role-count { font-size: 10.5px; color: var(--text-3); padding: 6px 4px 0; }
+
+  /* ——————————————————————————————————————————————————————————————
+     通用控件（Nova 紧凑档）
+     —————————————————————————————————————————————————————————————— */
+  .btn {
+    height: 32px;
+    padding: 0 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    background: var(--background);
+    color: var(--foreground);
+    font: 13px/1 var(--font-sans);
+    white-space: nowrap;
+    transition: background var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
+  }
+  .btn:hover:not(:disabled) { background: var(--hover); }
+  .btn:active:not(:disabled) { background: var(--selected); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
+  .btn.xs { height: 24px; padding: 0 8px; font-size: 11px; }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); font-weight: 600; }
+  .btn.primary:hover:not(:disabled) { background: var(--success-hover); border-color: var(--success-hover); }
+  .btn.primary:active:not(:disabled) { background: var(--primary-active); }
+  .btn.outline { background: transparent; border-color: var(--input); color: var(--foreground); }
+  .btn.outline:hover:not(:disabled) { background: var(--hover); border-color: var(--input); }
+  .btn.ghost { background: transparent; border-color: transparent; color: var(--text-2); }
+  .btn.ghost:hover:not(:disabled) { background: var(--hover); color: var(--foreground); }
+  .btn.danger-ghost { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+  .btn.block { width: 100%; justify-content: flex-start; font-weight: 400; }
+  .icon-btn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--text-2);
+    transition: background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
+  }
+  .icon-btn:hover { background: var(--hover); color: var(--foreground); }
+
+  /* ——————————————————————————————————————————————————————————————
+     会话头
+     —————————————————————————————————————————————————————————————— */
+  .session-head {
+    flex: 0 0 auto;
+    min-height: var(--session-head-h);
+    display: flex;
+    align-items: center;
+    padding: 8px var(--gutter);
+    border-bottom: 1px solid var(--border);
+    background: var(--background);
+  }
+  .head-inner { width: 100%; max-width: var(--content-max); margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+  .session-identity { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .chat-role { font-size: 18px; line-height: 1.2; font-weight: 650; white-space: nowrap; }
+  .chat-role-sub { font-size: 11px; line-height: 1.4; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .context-state { font-size: 12px; line-height: 1.4; color: var(--text-2); }
+  .session-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .session-actions .btn { font-size: 12.5px; padding: 0 10px; }
+  .engine-trigger {
+    height: 32px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--input);
+    border-radius: var(--radius-control);
+    background: var(--background);
+    color: var(--foreground);
+    font-size: 12.5px;
+    transition: background var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
+  }
+  .engine-trigger:hover { background: var(--hover); }
+  .engine-chevron { color: var(--text-3); }
+  .tab-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+    padding: 0 5px;
+    border: 1px solid var(--warning-border);
+    border-radius: var(--radius-micro);
+    background: var(--warning-bg);
+    color: var(--warning);
+    font-size: 10px;
+    line-height: 1.6;
+  }
+  .session-notice {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 4px var(--gutter) 0;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--text-3);
+  }
+  .session-notice .notice-right { color: var(--text-2); white-space: nowrap; }
+
+  /* ——————————————————————————————————————————————————————————————
+     聊天区（唯一滚动容器；虚拟行示意）
+     —————————————————————————————————————————————————————————————— */
+  .chat {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
+    padding: 20px var(--gutter) 24px;
+    padding-right: calc(var(--gutter) - var(--sbw));
+    background: var(--background);
+  }
+  .chat-pane { width: 100%; max-width: var(--content-max); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+  .chat-empty { margin: auto; max-width: 420px; text-align: center; color: var(--text-2); display: flex; flex-direction: column; align-items: center; }
+  .chat-empty .empty-icon { color: var(--text-3); margin-bottom: 12px; }
+  .empty-title { margin: 0 0 4px; font-size: 15px; line-height: 1.6; color: var(--foreground); }
+  .empty-sub { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-2); }
+  .window[data-scene="chat"] .chat-empty { display: none; }
+  .window[data-scene="empty"] .chat-pane { display: none; }
+  .window[data-scene="empty"] .chat { display: flex; flex-direction: column; }
+
+  .msg { font-size: 15px; line-height: 1.8; color: var(--foreground); word-break: break-word; }
+  .msg p { margin: 0 0 8px; }
+  .msg p:last-child { margin-bottom: 0; }
+  .msg code { font-family: var(--font-mono); font-size: 12px; background: var(--card); border-radius: var(--radius-micro); padding: 1px 4px; }
+  .msg-user {
+    align-self: flex-end;
+    max-width: 88%;
+    padding: 8px 14px;
+    background: var(--card);
+    border-radius: var(--radius) var(--radius) 3px var(--radius);
+    font-size: 14px;
+    line-height: 22px;
+  }
+  .msg-assistant { align-self: stretch; }
+
+  .tool-group { max-width: 760px; border-left: 2px solid var(--border-strong); padding: 2px 0 2px 12px; color: var(--text-2); font-size: 12px; }
+  .tool-summary { display: flex; align-items: center; gap: 8px; min-height: 22px; color: var(--text-3); font-size: 11px; }
+  .tool-summary .tool-title { color: var(--text-2); }
+  .tool-count { color: var(--text-3); }
+  .tool-chevron { margin-left: auto; color: var(--text-3); font-size: 16px; line-height: 1; }
+  .tool-activity {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: start;
+    padding: 5px 0;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+  }
+  .activity-time { color: var(--text-3); }
+  .activity-op { color: var(--text-2); }
+  .activity-target { display: block; margin-top: 1px; font-size: 11px; line-height: 1.55; color: var(--text-3); overflow-wrap: anywhere; }
+  .activity-state { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-3); white-space: nowrap; }
+  .activity-state.running { color: var(--text-2); }
+
+  /* ——————————————————————————————————————————————————————————————
+     贴底输入区（Nova 紧凑档）
+     —————————————————————————————————————————————————————————————— */
+  .composer {
+    flex: 0 0 auto;
+    position: relative;
+    padding: 12px var(--gutter) 10px;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    box-shadow: var(--shadow-dock);
+  }
+  .capsule {
+    width: 100%;
+    max-width: var(--content-max);
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px;
+    border: 1px solid var(--input);
+    border-radius: var(--radius);
+    background: var(--card);
+  }
+  .capsule:focus-within { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+  .capsule textarea {
+    display: block;
+    width: 100%;
+    min-height: 28px;
+    max-height: 160px;
+    padding: 0;
+    border: 0;
+    outline: none;
+    resize: none;
+    background: transparent;
+    color: var(--foreground);
+    font: 14px/22px var(--font-sans);
+  }
+  .capsule textarea::placeholder { color: var(--text-3); }
+  .composer-bottom { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 11px; color: var(--text-3); }
+  .cap-icon { width: 28px; height: 28px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-2); display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .cap-icon:hover { background: var(--hover); color: var(--foreground); }
+  .auto-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex: 0 0 auto;
+    color: var(--text-2);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+  .auto-toggle input { width: 13px; height: 13px; margin: 0; accent-color: var(--warning); cursor: pointer; }
+  .auto-toggle:hover { color: var(--foreground); }
+  .auto-toggle.is-on { color: var(--warning); }
+  .auto-toggle.is-on::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--warning); flex: 0 0 auto; }
+  .composer-scope { min-width: 0; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .composer-keyboard { margin-left: auto; color: var(--text-3); white-space: nowrap; }
+  .composer-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+  .composer-actions .btn { gap: 4px; }
+  .compose-note {
+    width: 100%;
+    max-width: var(--content-max);
+    margin: 6px auto 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 10.5px;
+    line-height: 1.6;
+    color: var(--text-3);
+  }
+  .judge-warning {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 6px);
+    transform: translateX(-50%);
+    z-index: 40;
+    width: min(var(--content-max), calc(100% - 2 * var(--gutter)));
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--warning);
+    border-radius: var(--radius-control);
+    background: var(--background);
+    color: var(--warning);
+    font-size: 11.5px;
+    line-height: 1.6;
+    box-shadow: var(--shadow-card);
+  }
+  .judge-warning-text { flex: 1 1 auto; min-width: 0; }
+  .judge-warning strong { color: var(--warning); }
+
+  /* ——————————————————————————————————————————————————————————————
+     右抽屉（424px 覆盖层；模态遮罩；不改变聊天列宽）
+     —————————————————————————————————————————————————————————————— */
+  .drawer-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 29;
+    background: var(--backdrop);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--motion-base) var(--ease-standard);
+  }
+  .app.drawer-open .drawer-backdrop { opacity: 1; pointer-events: auto; }
+  .drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    width: var(--drawer-w);
+    display: flex;
+    flex-direction: column;
+    background: var(--drawer-surface);
+    border-left: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-drawer);
+    clip-path: inset(0 0 0 100%);
+    visibility: hidden;
+    transition: clip-path var(--motion-base) var(--ease-standard), visibility 0s linear var(--motion-base);
+    overflow: hidden;
+  }
+  .app.drawer-open .drawer { clip-path: inset(0); visibility: visible; transition: clip-path var(--motion-base) var(--ease-standard); }
+  .drawer-head {
+    flex: 0 0 auto;
+    height: 64px;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--drawer-surface);
+  }
+  .drawer-title { font-size: 16px; line-height: 1.4; font-weight: 650; }
+  .drawer-close { width: 28px; height: 28px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-2); font-size: 15px; line-height: 1; }
+  .drawer-close:hover { background: var(--hover); color: var(--foreground); }
+  .drawer-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 16px; }
+  .role-block { display: flex; align-items: center; gap: 10px; }
+  .role-avatar { width: 36px; height: 36px; flex: 0 0 auto; display: grid; place-items: center; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--card); color: var(--text-2); font-size: 13px; font-weight: 600; }
+  .role-name { font-size: 15px; line-height: 1.4; font-weight: 650; }
+  .role-sub { font-size: 11px; line-height: 1.5; color: var(--text-3); }
+  .drawer-section { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .section-head { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; }
+  .badge { display: inline-flex; align-items: center; padding: 0 5px; border: 1px solid var(--border); border-radius: var(--radius-micro); font-size: 10px; line-height: 1.6; font-weight: 600; }
+  .badge.warning { color: var(--warning); border-color: var(--warning-border); background: var(--warning-bg); }
+  .badge.neutral { color: var(--text-2); background: var(--background); }
+  .pending-card { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--warning-border); border-left: 2px solid var(--warning); border-radius: var(--radius-control); background: var(--warning-bg); font-size: 12px; line-height: 1.6; }
+  .pending-title { color: var(--foreground); font-weight: 600; }
+  .pending-sub { color: var(--warning); font-size: 11.5px; }
+  .pending-actions { display: flex; justify-content: flex-end; }
+  .queue-row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12px; line-height: 1.6; }
+  .queue-row:last-child { border-bottom: 0; }
+  .queue-title { min-width: 0; color: var(--foreground); }
+  .queue-src { display: block; color: var(--text-3); font-size: 10.5px; }
+  .queue-meta { color: var(--text-2); font-size: 11px; white-space: nowrap; }
+  .doc-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+  .doc-row:last-child { border-bottom: 0; }
+  .doc-icon { color: var(--text-3); }
+  .doc-main { flex: 1 1 auto; min-width: 0; }
+  .doc-name { font-size: 12px; color: var(--foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .doc-meta { font-size: 10.5px; color: var(--text-3); }
+  .doc-row .btn { flex: 0 0 auto; }
+
+  /* ——————————————————————————————————————————————————————————————
+     shell 确认卡（fail-closed：拒绝默认焦点；Esc/关闭 = 不放行）
+     —————————————————————————————————————————————————————————————— */
+  .sc-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--backdrop-strong);
+    opacity: 0;
+    transition: opacity var(--motion-base) var(--ease-standard);
+  }
+  .sc-overlay.is-open { opacity: 1; }
+  .sc-card {
+    width: min(640px, 100%);
+    max-height: calc(100% - 32px);
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px 18px 14px;
+    background: var(--background);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+    opacity: 0;
+    transform: translateY(4px) scale(.99);
+    transition: opacity var(--motion-base) var(--ease-standard), transform var(--motion-base) var(--ease-standard);
+  }
+  .sc-overlay.is-open .sc-card { opacity: 1; transform: none; }
+  .sc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .sc-title { font-size: 13px; line-height: 1.5; font-weight: 600; }
+  .sc-close { width: 24px; height: 24px; border: 0; border-radius: var(--radius-micro); background: transparent; color: var(--text-2); font-size: 14px; line-height: 1; }
+  .sc-close:hover { background: var(--hover); color: var(--foreground); }
+  .sc-command {
+    margin: 0;
+    padding: 10px 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    color: var(--foreground);
+    font: 12.5px/1.5 var(--font-mono);
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .sc-summary { margin: 0; font-size: 13px; line-height: 1.6; color: var(--foreground); }
+  .sc-reason { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-2); }
+  .sc-reason code { background: var(--card); border-radius: var(--radius-micro); padding: 1px 4px; }
+  .sc-details { border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--card); }
+  .sc-details summary { cursor: pointer; padding: 7px 10px; font-size: 12.5px; color: var(--text-2); }
+  .sc-details-body { padding: 0 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .sc-kv { margin: 0; font-size: 11.5px; color: var(--text-3); }
+  .sc-mono { margin: 0; font: 12px/1.5 var(--font-mono); color: var(--text-2); white-space: pre; overflow-x: auto; }
+  .sc-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 2px; }
+  .sc-actions .btn { min-width: 88px; }
+  .sc-hint { margin: 0; font-size: 11.5px; line-height: 1.6; color: var(--text-3); }
+  .is-default-focus { outline: 2px solid var(--ring); outline-offset: 3px; }
+
+  /* 窄档（960×620）：内容随容器流式收缩，不产生页面横向滚动 */
+  .window[data-w="960"] .col-mid { --gutter: 24px; }
+  .window[data-w="960"] .session-head { min-height: 60px; }
+  .window[data-w="960"] .session-actions .btn { padding: 0 8px; }
+  .window[data-w="960"] .chat { padding-top: 16px; padding-bottom: 20px; }
+  .window[data-w="960"] .composer { padding: 10px 24px 8px; }
+  .window[data-w="960"] .composer-keyboard { display: none; }
+  .window[data-w="960"] .composer-scope { max-width: 120px; }
+  .window[data-w="960"] .drawer { width: 424px; }
+  .window[data-w="960"] .titlebar-sub { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important;
+    }
+  }
+
+  /* 截图/自检模式：跳转过渡，直接呈现终态（不影响正常浏览时的动效演示） */
+  body.capture *, body.capture *::before, body.capture *::after,
+  body.no-motion *, body.no-motion *::before, body.no-motion *::after {
+    transition: none !important;
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  /* 审计输出（只在 ?audit=1 时显示） */
+  .audit {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    margin: 0;
+    padding: 16px;
+    overflow: auto;
+    background: #000;
+    color: #9fe8b8;
+    font: 12px/1.5 ui-monospace, monospace;
+    white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+<svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <symbol id="i-minus"><path d="M5 12h14"/></symbol>
+  <symbol id="i-square"><rect x="5" y="5" width="14" height="14" rx="2"/></symbol>
+  <symbol id="i-copy"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+  <symbol id="i-x"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-chevron-down"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-chevron-right"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-panel-left-close"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="m16 9-3 3 3 3"/></symbol>
+  <symbol id="i-panel-left-open"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="m13 9 3 3-3 3"/></symbol>
+  <symbol id="i-image-plus"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/><path d="M19 3v4M17 5h4"/></symbol>
+  <symbol id="i-arrow-up"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></symbol>
+  <symbol id="i-message-square"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-file-text"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></symbol>
+  <symbol id="i-folder"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-clipboard-list"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></symbol>
+  <symbol id="i-list-ordered"><path d="M10 6h11M10 12h11M10 18h11"/><path d="M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></symbol>
+  <symbol id="i-clock"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-circle-alert"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
+  <symbol id="i-circle-check"><circle cx="12" cy="12" r="10"/><path d="m8 12 2.5 2.5L16 9"/></symbol>
+  <symbol id="i-terminal"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></symbol>
+  <symbol id="i-shield"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+  <symbol id="i-loader"><path d="M12 3a9 9 0 1 0 9 9"/></symbol>
+</svg>
+
+<header class="harness" id="harness">
+  <div class="harness-title">
+    <strong>Nova × 深色石墨 · UI 平台化原型</strong>
+    <span class="harness-badge">静态原型 · 演示数据 · 未接入业务</span>
+  </div>
+  <div class="harness-controls">
+    <div class="seg" role="group" aria-label="窗口档位">
+      <button type="button" data-act="w1360" class="is-on">1360×860</button>
+      <button type="button" data-act="w960">960×620</button>
+    </div>
+    <div class="seg" role="group" aria-label="聊天场景">
+      <button type="button" data-act="scene-chat" class="is-on">会话</button>
+      <button type="button" data-act="scene-empty">空态</button>
+    </div>
+    <button type="button" class="hbtn" data-act="sidebar">收起左栏</button>
+    <button type="button" class="hbtn" data-act="drawer">关闭抽屉</button>
+    <button type="button" class="hbtn primary" data-act="shell">打开 shell 确认卡</button>
+    <button type="button" class="hbtn" data-act="reset">复位</button>
+  </div>
+  <div class="harness-meta">
+    <span id="scale-readout">缩放 100%</span>
+    <span>动效：CSS transition 示意 / 生产由 Motion 实现</span>
+    <span>图标：内联 SVG 示意 / 生产用 Lucide</span>
+    <span id="demo-status" role="status">演示交互不影响任何业务</span>
+  </div>
+</header>
+
+<main class="stage" id="stage">
+  <div class="window" id="window" data-w="1360" data-scene="chat">
+    <!-- 自绘标题栏：中＝品牌，右＝窗口控制（拖动区 + no-drag 按钮） -->
+    <div class="titlebar" id="titlebar">
+      <div class="titlebar-left"><span class="proto-badge">原型 · 演示数据</span></div>
+      <div class="titlebar-brand">
+        <span class="titlebar-mark">ANS</span>
+        <span class="titlebar-sub">治理会话工作台</span>
+      </div>
+      <div class="titlebar-controls">
+        <button class="win-btn" type="button" title="最小化" aria-label="最小化"><svg class="ico ico-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-minus"/></svg></button>
+        <button class="win-btn" type="button" title="最大化" aria-label="最大化"><svg class="ico ico-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-square"/></svg></button>
+        <button class="win-btn win-btn-close" type="button" title="关闭" aria-label="关闭"><svg class="ico ico-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-x"/></svg></button>
+      </div>
+    </div>
+
+    <div class="app" id="app">
+      <!-- 左栏：品牌 / 项目 / 角色树 / 底部入口；可拖宽、可收起 -->
+      <aside class="col col-left" id="sidebar">
+        <div class="workspace-brand">ans<span>AGENT WORKSPACE</span></div>
+        <button class="sidebar-toggle sidebar-collapse" id="sidebar-collapse" type="button" aria-label="收起左侧栏" title="收起左侧栏" aria-expanded="true">
+          <svg class="ico ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-panel-left-close"/></svg>
+        </button>
+        <div class="sidebar-resizer" id="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="调整左侧栏宽度" aria-valuenow="248" aria-valuemin="208" aria-valuemax="360" tabindex="0" title="拖动调整左栏宽度；双击复位 248px"></div>
+
+        <div class="project-summary">
+          <div class="project-icon" aria-hidden="true"><svg class="ico ico-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-folder"/></svg></div>
+          <div class="project-identity">
+            <div class="project-name">ans-runtime</div>
+            <div class="project-path">/Users/w/…/ans-runtime</div>
+          </div>
+        </div>
+
+        <div class="tree-label">工作空间</div>
+        <nav class="tree" id="role-tree" aria-label="角色列表">
+          <button class="tree-item" type="button">
+            <span class="ti-avatar is-primary">su</span>
+            <span class="ti-main">
+              <span class="ti-name">su</span>
+              <span class="ti-sub"><span>主入口</span><span class="status working"><svg class="spin" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4.6" stroke-dasharray="21.7 7.2"/></svg>工作中</span></span>
+            </span>
+          </button>
+          <button class="tree-item active" type="button" aria-current="true">
+            <span class="ti-avatar">产</span>
+            <span class="ti-main">
+              <span class="ti-name">产品</span>
+              <span class="ti-sub"><span>产品目标 · 验收口径</span><span class="status waiting">1 待办</span></span>
+            </span>
+          </button>
+          <button class="tree-item" type="button">
+            <span class="ti-avatar">桌</span>
+            <span class="ti-main">
+              <span class="ti-name">桌面UI</span>
+              <span class="ti-sub"><span>渲染层实现</span><span class="status idle">空闲</span></span>
+            </span>
+          </button>
+          <button class="tree-item" type="button">
+            <span class="ti-avatar">项</span>
+            <span class="ti-main">
+              <span class="ti-name">项目管理</span>
+              <span class="ti-sub"><span>评审与口径</span><span class="status error"><svg class="ico ico-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-circle-alert"/></svg>错误</span></span>
+            </span>
+          </button>
+          <button class="tree-item" type="button">
+            <span class="ti-avatar">测</span>
+            <span class="ti-main">
+              <span class="ti-name">测试</span>
+              <span class="ti-sub"><span>独立复核</span><span class="status idle">空闲</span></span>
+            </span>
+          </button>
+        </nav>
+        <div class="sidebar-foot">
+          <button class="btn ghost block" type="button">切换项目</button>
+          <button class="btn ghost block" type="button">设置</button>
+          <div class="sidebar-role-count">5 个角色 · 3 个治理职能</div>
+        </div>
+      </aside>
+
+      <!-- 中栏：会话头 / 聊天流 / 贴底输入区 -->
+      <main class="col col-mid">
+        <button class="sidebar-toggle sidebar-expand" id="sidebar-expand" type="button" aria-label="展开左侧栏" title="展开左侧栏" aria-expanded="false" hidden>
+          <svg class="ico ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-panel-left-open"/></svg>
+        </button>
+
+        <header class="session-head">
+          <div class="head-inner">
+            <div class="session-identity">
+              <div><span class="chat-role">产品</span> <span class="chat-role-sub">产品目标 · 验收口径</span></div>
+              <span class="context-state" role="status" aria-live="polite">上下文已恢复 · 就绪</span>
+            </div>
+            <div class="session-actions" id="right-tabs">
+              <button class="engine-trigger" type="button" role="combobox" aria-label="会话引擎，当前 Claude" aria-haspopup="listbox" aria-expanded="false">Claude <svg class="ico ico-12 engine-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-down"/></svg></button>
+              <button class="btn ghost" type="button" title="工作概览" aria-label="工作概览">工作概览 <span class="tab-badge">1</span></button>
+              <button class="btn ghost" id="drawer-open" type="button" title="角色资料" aria-label="角色资料" aria-expanded="true">角色资料</button>
+            </div>
+          </div>
+        </header>
+        <div class="session-notice">
+          <span>写入由治理引擎把关 · 越界操作会在对话中直接提示</span>
+          <span class="notice-right">Claude · 默认引擎</span>
+        </div>
+
+        <div class="chat" id="chat">
+          <div class="chat-empty">
+            <svg class="ico ico-36 empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-message-square"/></svg>
+            <p class="empty-title">会话已开启，可直接输入消息</p>
+            <p class="empty-sub">发送第一条消息后，这里会显示对话与工具记录。写入由治理引擎把关，越界操作会在对话中直接提示。</p>
+          </div>
+
+          <div class="chat-pane" id="chat-pane">
+            <div class="msg msg-user">发布包我已经上传，帮我核对校验和，然后把验证结论整理成一页。</div>
+            <div class="msg msg-assistant">
+              <p>已核对三个产物的 <code>sha256</code>：与发布记录一致。当前有一条 <strong>shell 命令请求</strong>在等待你的确认，确认前不会写入 <code>release/verify.json</code>。</p>
+            </div>
+            <div class="tool-group">
+              <div class="tool-summary">
+                <svg class="ico ico-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-terminal"/></svg>
+                <span class="tool-title">执行记录</span>
+                <span class="tool-count">2 个调用</span>
+                <span class="tool-chevron">›</span>
+              </div>
+              <div class="tool-activity">
+                <span class="activity-time">14:32</span>
+                <div><span class="activity-op">run_shell</span><span class="activity-target">sha256sum release/*.dmg</span></div>
+                <span class="activity-state running"><svg class="spin" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4.6" stroke-dasharray="21.7 7.2"/></svg>运行中</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="composer">
+          <div class="judge-warning" id="judge-warning" role="status" aria-live="polite" hidden>
+            <div class="judge-warning-text"><strong>替我审批已开启：</strong>判断 agent 只会按当前规则替你放行；命中硬拒与请复核档仍会停下等你。此提示在正式应用中约 9 秒自动收起。</div>
+            <button class="btn xs" type="button" id="judge-warning-close">知道了</button>
+          </div>
+          <div class="capsule" id="capsule">
+            <textarea id="inp-message" rows="1" placeholder="给产品发送消息…" aria-label="发送给当前角色的消息" spellcheck="false">请把发布验证的结论整理成一页。</textarea>
+            <div class="composer-bottom">
+              <button class="cap-icon" type="button" title="添加图片（png / jpeg / webp / gif，≤5MB）" aria-label="添加图片"><svg class="ico ico-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><use href="#i-image-plus"/></svg></button>
+              <label class="auto-toggle" id="auto-approve-label"><input type="checkbox" id="auto-approve"> 替我审批</label>
+              <label class="auto-toggle"><input type="checkbox" id="judge-decision"> 替我决策</label>
+              <span class="composer-scope">产品 / Claude</span>
+              <span class="composer-keyboard">Enter 发送，Shift + Enter 换行</span>
+              <div class="composer-actions">
+                <button class="btn danger-ghost sm" id="btn-halt" type="button" hidden>停止本轮</button>
+                <button class="btn primary sm" id="btn-send" type="button">发送 <svg class="ico ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><use href="#i-arrow-up"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <div class="compose-note"><span>普通聊天不会自动产生任务报告</span><span>Claude · 上下文 12%</span></div>
+        </div>
+      </main>
+
+      <!-- 右抽屉（覆盖层；打开态默认演示） -->
+      <div class="drawer-backdrop" id="drawer-backdrop"></div>
+      <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" tabindex="-1">
+        <div class="drawer-head">
+          <span class="drawer-title" id="drawer-title">角色资料</span>
+          <button class="drawer-close" id="drawer-close" type="button" title="收起（Esc）" aria-label="收起">×</button>
+        </div>
+        <div class="drawer-body">
+          <div class="role-block">
+            <div class="role-avatar" aria-hidden="true">产</div>
+            <div><div class="role-name">产品</div><div class="role-sub">产品目标 · 验收口径</div></div>
+          </div>
+          <div class="drawer-section">
+            <div class="section-head">待办 <span class="badge warning">1</span></div>
+            <div class="pending-card">
+              <div class="pending-title">发布验证结论待确认</div>
+              <div class="pending-sub">等待你决定 · 不会自动继续</div>
+              <div class="pending-actions"><button class="btn xs" type="button" data-demo="定位">定位</button></div>
+            </div>
+          </div>
+          <div class="drawer-section">
+            <div class="section-head">队列 <span class="badge neutral">2</span></div>
+            <div class="queue-row"><span class="queue-title">发布验证结果整理<span class="queue-src">客户消息</span></span><span class="queue-meta">1 / 2</span></div>
+            <div class="queue-row"><span class="queue-title">回交投递确认<span class="queue-src">系统 · 看护</span></span><span class="queue-meta">2 / 2</span></div>
+          </div>
+          <div class="drawer-section">
+            <div class="section-head">资料</div>
+            <div class="doc-row"><svg class="ico ico-16 doc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-file-text"/></svg><div class="doc-main"><div class="doc-name">feature-map.md</div><div class="doc-meta">产品 · 11 KB</div></div><button class="btn xs" type="button" data-demo="查看">查看</button></div>
+            <div class="doc-row"><svg class="ico ico-16 doc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-file-text"/></svg><div class="doc-main"><div class="doc-name">2026-10-21_design_ui-platform-round.md</div><div class="doc-meta">设计 · 42 KB</div></div><button class="btn xs" type="button" data-demo="查看">查看</button></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- shell 命令确认卡（fail-closed；拒绝为默认焦点） -->
+    <div class="sc-overlay" id="shell-confirm" hidden>
+      <div class="sc-card" role="dialog" aria-modal="true" aria-labelledby="sc-title" aria-describedby="sc-hint">
+        <div class="sc-head">
+          <span class="sc-title" id="sc-title">shell 命令请求</span>
+          <button class="sc-close" id="sc-close" type="button" title="关闭（不放行）" aria-label="关闭（不放行）">×</button>
+        </div>
+        <pre class="sc-command">node scripts/release-verify.mjs --source v1.4.0</pre>
+        <p class="sc-summary">发布验证需要读取构建产物，并写入校验记录。</p>
+        <p class="sc-reason">命中写盘规则：写入 <code>release/verify.json</code>。</p>
+        <details class="sc-details">
+          <summary>详情（argv / cwd）</summary>
+          <div class="sc-details-body">
+            <p class="sc-kv">工作目录（cwd）</p>
+            <p class="sc-mono">/Users/w/…/ans-runtime</p>
+            <p class="sc-kv">规范化参数 argv</p>
+            <pre class="sc-mono">["node","scripts/release-verify.mjs","--source","v1.4.0"]</pre>
+          </div>
+        </details>
+        <div class="sc-actions">
+          <button class="btn outline" id="sc-allow" type="button">放行执行</button>
+          <button class="btn primary is-default-focus" id="sc-deny" type="button">拒绝</button>
+        </div>
+        <p class="sc-hint" id="sc-hint">点「拒绝」、按 Esc 或关闭本框 = 不放行（不会执行）。</p>
+      </div>
+    </div>
+  </div>
+  <div class="stage-scale" id="scale-readout-fixed" aria-hidden="true"></div>
+</main>
+
+<pre class="audit" id="audit" hidden></pre>
+
+<script>
+(function () {
+  "use strict";
+
+  var $ = function (sel, root) { return (root || document).querySelector(sel); };
+  var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
+  var win = $("#window");
+  var app = $("#app");
+  var chat = $("#chat");
+  var sidebar = $("#sidebar");
+  var drawer = $("#drawer");
+  var drawerOpenBtn = $("#drawer-open");
+  var drawerCloseBtn = $("#drawer-close");
+  var shell = $("#shell-confirm");
+  var shellDeny = $("#sc-deny");
+  var shellAllow = $("#sc-allow");
+  var shellClose = $("#sc-close");
+  var statusEl = $("#demo-status");
+  var scaleReadout = $("#scale-readout");
+  var fixedReadout = $("#scale-readout-fixed");
+  var resizer = $("#sidebar-resizer");
+  var collapseBtn = $("#sidebar-collapse");
+  var expandBtn = $("#sidebar-expand");
+  var autoApprove = $("#auto-approve");
+  var warning = $("#judge-warning");
+  var warningClose = $("#judge-warning-close");
+  var textarea = $("#inp-message");
+
+  var state = {
+    w: 1360,
+    scene: "chat",
+    drawer: true,
+    sidebar: true,
+    shell: false,
+    sidebarWidth: 248
+  };
+  var lastShellFocus = null;
+  var warningTimer = null;
+
+  function setStatus(text) {
+    if (statusEl) statusEl.textContent = text;
+  }
+
+  function setWindow(w) {
+    state.w = w;
+    win.setAttribute("data-w", String(w));
+    win.style.width = w + "px";
+    win.style.height = (w === 960 ? 620 : 860) + "px";
+    $$("[data-act='w1360'], [data-act='w960']").forEach(function (b) {
+      b.classList.toggle("is-on", b.getAttribute("data-act") === "w" + w);
+    });
+    fit();
+  }
+
+  function setScene(scene) {
+    state.scene = scene;
+    win.setAttribute("data-scene", scene);
+    $$("[data-act='scene-chat'], [data-act='scene-empty']").forEach(function (b) {
+      b.classList.toggle("is-on", b.getAttribute("data-act") === "scene-" + scene);
+    });
+  }
+
+  function setSidebar(expanded) {
+    state.sidebar = expanded;
+    app.classList.toggle("is-collapsed", !expanded);
+    collapseBtn.setAttribute("aria-expanded", String(expanded));
+    expandBtn.hidden = expanded;
+    var hb = $("[data-act='sidebar']");
+    if (hb) hb.textContent = expanded ? "收起左栏" : "展开左栏";
+    statusEl.textContent = expanded ? "左栏展开 · 宽度 " + state.sidebarWidth + "px" : "左栏收起 · 点击左上按钮展开";
+  }
+
+  function setSidebarWidth(w) {
+    w = Math.max(208, Math.min(360, Math.round(w)));
+    state.sidebarWidth = w;
+    app.style.setProperty("--sidebar-width", w + "px");
+    resizer.setAttribute("aria-valuenow", String(w));
+    statusEl.textContent = "左栏宽度 " + w + "px（拖动 / 方向键 ±8、Shift ±24、双击复位 248）";
+  }
+
+  function setDrawer(open) {
+    state.drawer = open;
+    app.classList.toggle("drawer-open", open);
+    drawerOpenBtn.setAttribute("aria-expanded", String(open));
+    var hb = $("[data-act='drawer']");
+    if (hb) hb.textContent = open ? "关闭抽屉" : "打开抽屉";
+    statusEl.textContent = open ? "右抽屉打开 · 覆盖层不改变聊天列宽" : "右抽屉关闭 · Esc 再次打开需点按钮";
+  }
+
+  function openShell(origin) {
+    if (state.shell) return;
+    state.shell = true;
+    lastShellFocus = origin || document.activeElement;
+    shell.hidden = false;
+    void shell.offsetHeight;
+    shell.classList.add("is-open");
+    shellDeny.focus({ preventScroll: true });
+    shellDeny.classList.add("is-default-focus");
+    var hb = $("[data-act='shell']");
+    if (hb) hb.textContent = "关闭 shell 确认卡";
+    setStatus("shell 确认卡打开 · 默认焦点在「拒绝」（不放行）");
+  }
+
+  function closeShell(decision) {
+    if (!state.shell) return;
+    state.shell = false;
+    shell.classList.remove("is-open");
+    shellDeny.classList.remove("is-default-focus");
+    var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var wait = reduced ? 0 : 180;
+    window.setTimeout(function () {
+      shell.hidden = true;
+      if (lastShellFocus && typeof lastShellFocus.focus === "function") lastShellFocus.focus();
+    }, wait);
+    var hb = $("[data-act='shell']");
+    if (hb) hb.textContent = "打开 shell 确认卡";
+    if (decision === "allow") setStatus("演示：已放行（未执行真实命令，未接入业务）");
+    else setStatus("演示：已拒绝 / Esc / 关闭 = 不放行（未执行任何命令）");
+  }
+
+  function fit() {
+    if (document.body.classList.contains("capture")) return;
+    var stage = $("#stage");
+    var aw = Math.max(320, stage.clientWidth - 24);
+    var ah = Math.max(320, stage.clientHeight - 24);
+    var w = state.w;
+    var h = w === 960 ? 620 : 860;
+    var scale = Math.min(1, aw / w, ah / h);
+    win.style.transform = "scale(" + scale + ")";
+    var pct = Math.round(scale * 100) + "%";
+    if (scaleReadout) scaleReadout.textContent = "缩放 " + pct + (scale === 1 ? "（1:1）" : "");
+    if (fixedReadout) fixedReadout.textContent = "缩放 " + pct;
+  }
+
+  function measureScrollbar() {
+    var sbw = Math.max(0, chat.offsetWidth - chat.clientWidth);
+    document.querySelector(".col-mid").style.setProperty("--sbw", sbw + "px");
+  }
+
+  function reset() {
+    setWindow(1360);
+    setScene("chat");
+    setSidebarWidth(248);
+    setSidebar(true);
+    setDrawer(true);
+    closeShell("deny");
+    autoApprove.checked = false;
+    autoApprove.closest(".auto-toggle").classList.remove("is-on");
+    warning.hidden = true;
+    if (warningTimer) window.clearTimeout(warningTimer);
+    textarea.value = "请把发布验证的结论整理成一页。";
+    autoGrow();
+    setStatus("已复位 · 演示交互不影响任何业务");
+  }
+
+  function autoGrow() {
+    textarea.style.height = "auto";
+    textarea.style.height = Math.min(160, Math.max(28, textarea.scrollHeight)) + "px";
+  }
+
+  // —— harness 控件 ——
+  $$("[data-act]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var act = btn.getAttribute("data-act");
+      if (act === "w1360") setWindow(1360);
+      else if (act === "w960") setWindow(960);
+      else if (act === "scene-chat") setScene("chat");
+      else if (act === "scene-empty") setScene("empty");
+      else if (act === "sidebar") setSidebar(!state.sidebar);
+      else if (act === "drawer") setDrawer(!state.drawer);
+      else if (act === "shell") { if (state.shell) closeShell("deny"); else openShell(btn); }
+      else if (act === "reset") reset();
+    });
+  });
+
+  // —— 左栏拖宽 / 收起 ——
+  var dragging = false;
+  resizer.addEventListener("pointerdown", function (e) {
+    dragging = true;
+    app.classList.add("is-resizing");
+    try { resizer.setPointerCapture(e.pointerId); } catch (err) {}
+    e.preventDefault();
+  });
+  window.addEventListener("pointermove", function (e) {
+    if (!dragging) return;
+    var left = app.getBoundingClientRect().left;
+    var scale = win.getBoundingClientRect().width / win.offsetWidth || 1;
+    setSidebarWidth((e.clientX - left) / scale);
+  });
+  window.addEventListener("pointerup", function () {
+    if (!dragging) return;
+    dragging = false;
+    app.classList.remove("is-resizing");
+  });
+  resizer.addEventListener("dblclick", function () { setSidebarWidth(248); });
+  resizer.addEventListener("keydown", function (e) {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    var step = e.shiftKey ? 24 : 8;
+    setSidebarWidth(state.sidebarWidth + (e.key === "ArrowRight" ? step : -step));
+  });
+  collapseBtn.addEventListener("click", function () { setSidebar(false); expandBtn.focus(); });
+  expandBtn.addEventListener("click", function () { setSidebar(true); collapseBtn.focus(); });
+
+  // —— 抽屉 ——
+  drawerOpenBtn.addEventListener("click", function () {
+    setDrawer(true);
+    drawer.focus();
+  });
+  drawerCloseBtn.addEventListener("click", function () {
+    setDrawer(false);
+    drawerOpenBtn.focus();
+  });
+
+  // —— shell 确认卡 ——
+  shellClose.addEventListener("click", function () { closeShell("deny"); });
+  shellDeny.addEventListener("click", function () { closeShell("deny"); });
+  shellAllow.addEventListener("click", function () { closeShell("allow"); });
+  shell.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeShell("deny");
+      return;
+    }
+    if (e.key !== "Tab") return;
+    var focusables = $$("button, [href], input, select, textarea, summary, [tabindex]:not([tabindex='-1'])", shell)
+      .filter(function (el) { return !el.disabled && el.offsetParent !== null; });
+    if (!focusables.length) return;
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+
+  // —— 输入区：自动增高 / 开关 / 一次性提示 ——
+  textarea.addEventListener("input", autoGrow);
+  textarea.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      setStatus("演示：不发送真实消息（未接入业务）");
+    }
+  });
+  function syncToggles() {
+    $$(".auto-toggle").forEach(function (label) {
+      var input = label.querySelector("input");
+      label.classList.toggle("is-on", !!(input && input.checked));
+    });
+  }
+  autoApprove.addEventListener("change", function () {
+    syncToggles();
+    if (autoApprove.checked) {
+      warning.hidden = false;
+      if (warningTimer) window.clearTimeout(warningTimer);
+      warningTimer = window.setTimeout(function () { warning.hidden = true; }, 9000);
+      setStatus("替我审批开启 · 一次性提示出现（约 9 秒自动收起）");
+    } else {
+      warning.hidden = true;
+      if (warningTimer) window.clearTimeout(warningTimer);
+      setStatus("替我审批关闭");
+    }
+  });
+  $("#judge-decision").addEventListener("change", syncToggles);
+  warningClose.addEventListener("click", function () { warning.hidden = true; });
+  $("#btn-send").addEventListener("click", function () { setStatus("演示：不发送真实消息（未接入业务）"); });
+  $("#btn-halt").addEventListener("click", function () { setStatus("演示：停止按钮（未接入业务）"); });
+
+  // —— 窗口按钮 / 演示按钮 ——
+  $$(".win-btn").forEach(function (b) { b.addEventListener("click", function () { setStatus("演示：窗口控制未接入（不会关闭窗口）"); }); });
+  $$("[data-demo]").forEach(function (b) { b.addEventListener("click", function () { setStatus("演示：" + b.getAttribute("data-demo") + "（未接入业务）"); }); });
+
+  // —— 全局 Esc：先关确认卡，再关抽屉 ——
+  window.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (state.shell) { closeShell("deny"); return; }
+    if (state.drawer) { setDrawer(false); drawerOpenBtn.focus(); }
+  });
+
+  // —— 查询参数 ——
+  var q = new URLSearchParams(window.location.search);
+  var capture = q.get("capture") === "1";
+  if (capture) document.body.classList.add("capture");
+  setWindow(q.get("w") === "960" ? 960 : 1360);
+  setScene(q.get("scene") === "empty" ? "empty" : "chat");
+  if (q.get("drawer") === "0") setDrawer(false); else setDrawer(true);
+  if (q.get("sidebar") === "collapsed") setSidebar(false); else setSidebar(true);
+  if (q.get("shell") === "1") openShell(null);
+  if (q.get("warning") === "1") {
+    autoApprove.checked = true;
+    autoApprove.dispatchEvent(new Event("change"));
+  }
+  autoGrow();
+  window.addEventListener("resize", fit);
+  requestAnimationFrame(function () { measureScrollbar(); fit(); });
+  window.setTimeout(measureScrollbar, 120);
+
+  // —— ?audit=1：输出可机读自检 JSON（不用于生产） ——
+  var auditEl = $("#audit");
+  if (q.get("audit") === "1") {
+    window.setTimeout(function () {
+      runAudit().then(function (result) {
+        auditEl.hidden = false;
+        auditEl.textContent = JSON.stringify(result, null, 2);
+        document.title = "AUDIT_READY";
+      }).catch(function (err) {
+        auditEl.hidden = false;
+        auditEl.textContent = JSON.stringify({ ok: false, error: String(err && err.stack || err) }, null, 2);
+        document.title = "AUDIT_ERROR";
+      });
+    }, 220);
+  }
+
+  function wait(ms) { return new Promise(function (resolve) { window.setTimeout(resolve, ms); }); }
+
+  function rectOf(el) {
+    if (!el) return null;
+    var r = el.getBoundingClientRect();
+    return { x: +r.x.toFixed(2), y: +r.y.toFixed(2), w: +r.width.toFixed(2), h: +r.height.toFixed(2) };
+  }
+
+  function luminance(hex) {
+    var h = hex.replace("#", "");
+    var rgb = [0, 2, 4].map(function (i) { return parseInt(h.slice(i, i + 2), 16) / 255; });
+    var c = rgb.map(function (v) { return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  }
+  function contrast(a, b) {
+    var la = luminance(a), lb = luminance(b);
+    var hi = Math.max(la, lb), lo = Math.min(la, lb);
+    return +( (hi + 0.05) / (lo + 0.05) ).toFixed(2);
+  }
+
+  async function runAudit() {
+    document.body.classList.add("no-motion");
+    var cs = getComputedStyle(document.documentElement);
+    var names = [
+      "--background", "--foreground", "--card", "--card-foreground", "--popover", "--popover-foreground",
+      "--primary", "--primary-foreground", "--secondary", "--secondary-foreground", "--muted", "--muted-foreground",
+      "--accent", "--accent-foreground", "--destructive", "--destructive-foreground", "--border", "--input", "--ring",
+      "--sidebar", "--sidebar-foreground", "--sidebar-primary", "--sidebar-primary-foreground", "--sidebar-accent",
+      "--sidebar-accent-foreground", "--sidebar-border", "--sidebar-ring", "--warning", "--warning-bg", "--warning-border",
+      "--success-bg", "--success-hover", "--danger", "--danger-bg", "--danger-border", "--text-2", "--text-3",
+      "--selected", "--drawer-surface", "--radius", "--radius-control", "--content-max", "--sidebar-width",
+      "--font-mono", "--shadow-card", "--shadow-dock"
+    ];
+    var tokens = {};
+    names.forEach(function (n) { tokens[n] = cs.getPropertyValue(n).trim(); });
+
+    var pairs = [
+      ["foreground / background", "--foreground", "--background", 7],
+      ["foreground / card", "--foreground", "--card", 7],
+      ["text-2 / background", "--text-2", "--background", 4.5],
+      ["text-2 / card", "--text-2", "--card", 4.5],
+      ["text-3 / card", "--text-3", "--card", 4.5],
+      ["text-3 / selected", "--text-3", "--selected", 4.5],
+      ["primary-foreground / primary", "--primary-foreground", "--primary", 4.5],
+      ["primary / background", "--primary", "--background", 4.5],
+      ["danger / background", "--danger", "--background", 4.5],
+      ["danger / danger-bg", "--danger", "--danger-bg", 4.5],
+      ["warning / background", "--warning", "--background", 4.5],
+      ["warning / warning-bg", "--warning", "--warning-bg", 4.5],
+      ["input / card", "--input", "--card", 3],
+      ["ring / card", "--ring", "--card", 3],
+      ["sidebar-foreground / sidebar", "--sidebar-foreground", "--sidebar", 7],
+      ["text-3 / sidebar", "--text-3", "--sidebar", 4.5]
+    ];
+    var contrastResults = pairs.map(function (p) {
+      var ratio = contrast(tokens[p[1]], tokens[p[2]]);
+      return { pair: p[0], fg: tokens[p[1]], bg: tokens[p[2]], ratio: ratio, min: p[3], pass: ratio >= p[3] };
+    });
+
+    // 先量当前档位
+    measureScrollbar();
+    await wait(30);
+    var headInner = $(".head-inner");
+    var chatPane = $(".chat-pane");
+    var capsule = $(".capsule");
+    var note = $(".compose-note");
+    var align = {
+      head: rectOf(headInner),
+      pane: rectOf(chatPane),
+      capsule: rectOf(capsule),
+      note: rectOf(note)
+    };
+    var lefts = [align.head, align.pane, align.capsule, align.note].filter(Boolean).map(function (r) { return r.x; });
+    var maxDelta = lefts.length ? +(Math.max.apply(null, lefts) - Math.min.apply(null, lefts)).toFixed(2) : null;
+
+    var geometry = {
+      window: rectOf(win),
+      viewport: { w: window.innerWidth, h: window.innerHeight },
+      titlebarH: rectOf($(".titlebar")).h,
+      sessionHeadH: rectOf($(".session-head")).h,
+      drawerW: rectOf(drawer).w,
+      cardW: null,
+      chatPaneW: rectOf(chatPane).w,
+      capsuleW: rectOf(capsule).w,
+      msgFont: getComputedStyle($(".msg-assistant")).fontSize + " / " + getComputedStyle($(".msg-assistant")).lineHeight,
+      bodyFont: getComputedStyle(document.body).fontSize + " / " + getComputedStyle(document.body).lineHeight,
+      bodyFontFamily: getComputedStyle(document.body).fontFamily,
+      treeRowH: rectOf($(".tree-item")).h,
+      toolRowH: rectOf($(".tool-activity")).h,
+      pageScrollW: document.documentElement.scrollWidth,
+      pageClientW: document.documentElement.clientWidth,
+      overflowX: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      alignment: align,
+      maxLeftDelta: maxDelta
+    };
+
+    // 状态自检（结束后复位到入参状态）
+    var states = {};
+    setScene("chat");
+    await wait(10);
+    states.chat = { user: $$(".msg-user").length, assistant: $$(".msg-assistant").length, toolRows: $$(".tool-activity").length };
+    setScene("empty");
+    await wait(10);
+    states.empty = { emptyVisible: $(".chat-empty").offsetParent !== null, paneVisible: $(".chat-pane").offsetParent !== null };
+    setScene("chat");
+
+    var drawerWas = state.drawer;
+    setDrawer(false);
+    await wait(240);
+    states.drawerClosed = { classOpen: app.classList.contains("drawer-open") };
+    setDrawer(true);
+    await wait(240);
+    states.drawerOpen = { classOpen: app.classList.contains("drawer-open"), width: rectOf(drawer).w };
+
+    var sidebarWas = state.sidebar;
+    setSidebar(false);
+    await wait(240);
+    states.sidebarCollapsed = {
+      classCollapsed: app.classList.contains("is-collapsed"),
+      sidebarWidth: rectOf(sidebar).w,
+      expandVisible: expandBtn.offsetParent !== null,
+      gridCols: getComputedStyle(app).gridTemplateColumns,
+      cssWidth: getComputedStyle(sidebar).width,
+      appVar: getComputedStyle(app).getPropertyValue("--sidebar-width").trim()
+    };
+    setSidebar(true);
+    await wait(240);
+    states.sidebarExpanded = { sidebarWidth: rectOf(sidebar).w, resizerAria: resizer.getAttribute("aria-valuenow"), gridCols: getComputedStyle(app).gridTemplateColumns };
+    setSidebarWidth(320);
+    await wait(240);
+    states.sidebarDrag = { width: rectOf(sidebar).w, gridCols: getComputedStyle(app).gridTemplateColumns, appVar: getComputedStyle(app).getPropertyValue("--sidebar-width").trim() };
+    setSidebarWidth(248);
+    await wait(240);
+
+    openShell(null);
+    await wait(240);
+    states.shell = {
+      open: state.shell,
+      activeElement: document.activeElement && document.activeElement.id,
+      activeElementTag: document.activeElement && document.activeElement.tagName,
+      hasFocus: document.hasFocus(),
+      denyHasDefaultRing: shellDeny.classList.contains("is-default-focus"),
+      cardWidth: rectOf($(".sc-card")).w
+    };
+    closeShell("deny");
+    await wait(240);
+
+    if (!drawerWas) setDrawer(false); else setDrawer(true);
+    if (!sidebarWas) setSidebar(false); else setSidebar(true);
+
+    var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var stateChecks = {
+      chat: states.chat.user === 1 && states.chat.assistant === 1 && states.chat.toolRows === 1,
+      empty: states.empty.emptyVisible === true && states.empty.paneVisible === false,
+      drawer: states.drawerClosed.classOpen === false && states.drawerOpen.classOpen === true && Math.abs(states.drawerOpen.width - 424) <= 1,
+      sidebar: states.sidebarCollapsed.classCollapsed === true && states.sidebarCollapsed.sidebarWidth <= 1 && states.sidebarCollapsed.expandVisible === true,
+      shell: states.shell.open === true && states.shell.denyHasDefaultRing === true && states.shell.cardWidth >= 600,
+      typography: geometry.msgFont === "15px / 27px" && geometry.bodyFont === "13px / 20.15px",
+      column: Math.abs(geometry.chatPaneW - (state.w === 960 ? 664 : 900)) <= 1
+    };
+    return {
+      ok: contrastResults.every(function (r) { return r.pass; }) && !geometry.overflowX && maxDelta !== null && maxDelta <= 1 && Object.keys(stateChecks).every(function (k) { return stateChecks[k]; }),
+      stateChecks: stateChecks,
+      mode: "prototype-audit",
+      capture: capture,
+      state: { w: state.w, scene: state.scene, drawer: state.drawer, sidebar: state.sidebar },
+      tokens: tokens,
+      contrast: contrastResults,
+      geometry: geometry,
+      states: states,
+      reducedMotion: reduced,
+      notes: [
+        "静态原型自检；不是真实 Electron、真实业务或屏读验收。",
+        "对比度为 WCAG 2.x 相对亮度计算值；--foreground 已按当前令牌 #F2F4F6 实算。",
+        "图标为内联 SVG 示意；生产统一 Lucide。动效仅 CSS 示意；生产由 Motion 实现。"
+      ]
+    };
+  }
+})();
+</script>
+</body>
+</html>

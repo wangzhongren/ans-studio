@@ -1,0 +1,74 @@
+{
+  "before": {
+    "anchors": [
+      {
+        "anchorKey": "legacy-anchor-v1:x",
+        "requestIndex": 1,
+        "conclusionIndex": 2,
+        "rowsAtReplay": 3
+      }
+    ],
+    "model": {
+      "count": 3,
+      "lastIndex": 2,
+      "operators": [],
+      "rowGap": 16
+    }
+  },
+  "inserted": {
+    "card": true,
+    "confirmHidden": false,
+    "anchors": [
+      {
+        "anchorKey": "legacy-anchor-v1:x",
+        "requestIndex": 1,
+        "conclusionIndex": 3,
+        "rowsAtReplay": 3
+      }
+    ],
+    "model": {
+      "count": 4,
+      "lastIndex": 3,
+      "operators": [
+        {
+          "index": 2,
+          "requestId": "decided-fixture"
+        }
+      ],
+      "rowGap": 16
+    },
+    "text": "会话记录已恢复request_confirmation无文件目标调用发起调用发起这条历史没有保存更多目标和错误详情。拒绝后原位确认拒绝request_confirmation：未获同意目标未记录request_confirmation：未获同意有 1 条待确认 · 定位"
+  },
+  "denied": {
+    "state": "decided",
+    "confirmHidden": true,
+    "actionsHidden": true,
+    "text": "会话记录已恢复request_confirmation无文件目标调用发起调用发起这条历史没有保存更多目标和错误详情。拒绝后原位确认拒绝已回『不同意』（未获同意）。request_confirmation：未获同意目标未记录request_confirmation：未获同意"
+  },
+  "after": {
+    "card": true,
+    "state": "decided",
+    "confirmHidden": true,
+    "actionsHidden": true,
+    "anchors": [
+      {
+        "anchorKey": "legacy-anchor-v1:x",
+        "requestIndex": 1,
+        "conclusionIndex": 2,
+        "rowsAtReplay": 3
+      }
+    ],
+    "model": {
+      "count": 4,
+      "lastIndex": 3,
+      "operators": [
+        {
+          "index": 3,
+          "requestId": "decided-fixture"
+        }
+      ],
+      "rowGap": 16
+    },
+    "text": "前插说明\nrequest_confirmation无文件目标调用发起调用发起这条历史没有保存更多目标和错误详情。request_confirmation：未获同意目标未记录request_confirmation：未获同意拒绝后原位确认拒绝已回『不同意』（未获同意）。"
+  }
+}

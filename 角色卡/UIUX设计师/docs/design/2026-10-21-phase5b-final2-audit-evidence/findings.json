@@ -1,0 +1,74 @@
+{
+ "phase": "5B-final2",
+ "candidate": "dbe8dc0a/f568e2aa/d364ee3e",
+ "summary": {
+  "conclusion": "needs-work",
+  "P0": 0,
+  "P1": 1,
+  "P2": 3,
+  "notes": 1,
+  "original_occlusion": "largely closed"
+ },
+ "items": [
+  {
+   "id": "5B-FINAL2-P1",
+   "severity": "P1",
+   "status": "needs-work",
+   "scene": "480 CSS 200% composer",
+   "finding": "Compact composer overflows horizontally: .composer sw=261/cw=222; .composer-actions right=509 > .col-mid right=470; send button clipped.",
+   "evidence": [
+    "phase4b-smoke/report.json",
+    "phase4b-smoke/phase4b-200pct.png"
+   ],
+   "expected": ".composer sw<=cw+1; every child right<=mid.right+1; send button fully visible.",
+   "actual": "composer-bottom nowrap + judge/actions exceed 222 CSS.",
+   "owner": "桌面UI",
+   "retest": "480 CSS composer sw/cw + screenshot; 4B 200 containers check."
+  },
+  {
+   "id": "5B-FINAL2-P2-1",
+   "severity": "P2",
+   "status": "registered",
+   "scene": "480 CSS S0",
+   "finding": "S0 CTA below first screen (bottom 392.6 > innerHeight 310); empty state requires scrolling.",
+   "evidence": [
+    "s0-200/report.json",
+    "s0-200/09-s0-200pct.png"
+   ],
+   "expected": "Compact empty state so title/sub/CTA fit first screen at 480 CSS.",
+   "actual": "Title 268.6, sub 302.6-342.6, CTA 360.6-392.6; viewport 310.",
+   "owner": "桌面UI",
+   "retest": "480 S0 first-screen CTA."
+  },
+  {
+   "id": "5B-FINAL2-P2-2",
+   "severity": "P2",
+   "status": "evidence",
+   "scene": "main 3x 200 capture",
+   "finding": "Main 3x 200% screenshots often stop at bottom scroll; 04-profile content is chat.",
+   "evidence": [
+    "main-al-3x/02-chat-200.png",
+    "main-al-3x/04-profile.png"
+   ],
+   "expected": "Use targeted smoke/design-audit shots; future harness scrolls to target.",
+   "actual": "Bottom-scroll captures/label mismatch.",
+   "owner": "UIUX",
+   "retest": "Manifest note."
+  },
+  {
+   "id": "5B-FINAL2-P2-3",
+   "severity": "P2",
+   "status": "evidence",
+   "scene": "harness marker",
+   "finding": "Smoke/4B screenshots contain 窗口控制不可用 test harness marker; not product.",
+   "evidence": [
+    "smoke/06-empty-state-200pct.png",
+    "phase4b-smoke/phase4b-200pct.png"
+   ],
+   "expected": "Do not use as production L pass.",
+   "actual": "Marker only in smoke.",
+   "owner": "测试/UIUX",
+   "retest": "Manifest note."
+  }
+ ]
+}

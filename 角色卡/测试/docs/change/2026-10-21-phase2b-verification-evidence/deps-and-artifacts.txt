@@ -1,0 +1,11 @@
+=== 16 deps exact in devDependencies (re-run) ===
+all exact in devDependencies: true
+dev count: 19 deps count: 8
+package.json diff vs HEAD identical to Phase 2 evidence: YES
+lock diff vs HEAD: REMOVED(0) CHANGED(0) ADDED(97)
+forbidden direct/transitive: none (checked direct + lock closure)
+
+=== dist artifacts (no new artifact categories) ===
+app/renderer/dist/assets/index-BFI8-SVa.css
+app/renderer/dist/assets/index-Bzf05pFB.js
+app/renderer/dist/src/index.html

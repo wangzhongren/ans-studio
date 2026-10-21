@@ -1,0 +1,23 @@
+# npm audit summary (independent run)
+## full audit (exit 1 expected: 8 moderate)
+{"info":0,"low":0,"moderate":8,"high":0,"critical":0,"total":8}
+@electron/get: severity=moderate direct=false range=1.6.0 - 4.0.3
+app-builder-lib: severity=moderate direct=false range=26.6.0 - 27.0.0-alpha.2
+dmg-builder: severity=moderate direct=false range=26.6.0 - 27.0.0-alpha.2
+electron-builder: severity=moderate direct=true range=19.25.0 || 26.6.0 - 27.0.0-alpha.2
+electron-builder-squirrel-windows: severity=moderate direct=false range=26.6.0 - 27.0.0-alpha.2
+global-agent: severity=moderate direct=false range=<=3.0.0
+roarr: severity=moderate direct=false range=<=2.15.4
+sprintf-js: severity=moderate direct=false range=*
+
+## production audit --omit=dev (exit 0)
+{"info":0,"low":0,"moderate":0,"high":0,"critical":0,"total":0}
+
+## 归属核对：8 条 moderate 的链节点均存在于 HEAD 锁文件（electron-builder 26.15.3 传递链，本轮前已存在）
+node_modules/sprintf-js HEAD@1.1.3
+node_modules/roarr HEAD@2.15.4
+node_modules/global-agent HEAD@3.0.0
+node_modules/app-builder-lib/node_modules/@electron/get HEAD@3.1.0
+node_modules/app-builder-lib HEAD@26.15.3
+node_modules/dmg-builder HEAD@26.15.3
+node_modules/electron-builder HEAD@26.15.3

@@ -1,0 +1,18 @@
+# 旧端 uiux 通过名 vs final3 新端（2026-10-21 补记）
+
+**旧端快照**：`角色卡/测试/docs/change/2026-10-21-phase5a-old-baseline-evidence/raw/uiux/*/report.json`（18:04–18:05，套件 `d568bf82…`）。
+**新端 final3**：`角色卡/测试/docs/change/2026-10-21-phase5a-new-entry-evidence/final3/raw/uiux/*/report.json`（20:44，套件 `fa3f74d4…`）。
+
+**方法**：对 23 个模式逐名比较；仅统计旧端值为 `true` 的检查。若同名在新端存在且不为 `true`，记「旧通过→新失败」；若同名缺失，单列。
+
+```
+old uiux suite: d568bf82424f4065def41fc9b04f194cd7e1711c0bfafd8dcd6ae4d84460300f
+final uiux suite: fa3f74d483a6486efe5cb091cc2eeb096e78bc58c4c0ea753af3facb7713e9e8
+modes compared: 23
+old true names compared in new: 424
+old pass -> new non-true: 0
+old true names absent from new: 0
+conclusion: PASS (0 old-pass->new-fail)
+```
+
+**结论**：旧端通过名 424 个在新端全部存在且仍为 true；未发现旧通过→新失败。该结论用于「旧套件版本限制 + 已证实质等价」记录，不把旧端快照当作同套件严格对照。

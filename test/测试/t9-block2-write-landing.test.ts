@@ -261,7 +261,7 @@ test("块2/同源（行为）：gate 收到的绝对路径 === 文件落盘的�
     args: { path: "src/allowed.ts", content: "ok\n" },
   });
   assert.equal(r.ok, true, r.message);
-  assert.deepEqual(seen, [targetAbs], "gate 收到的 abs 须恰为按写根解析的落盘路径");
+  assert.deepEqual(seen, [targetAbs, targetAbs], "D3 预判与写前复判须各收到同一按写根解析的落盘路径");
   assert.ok(existsSync(targetAbs), "文件须落盘在 gate 判定的同一路径");
 });
 

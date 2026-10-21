@@ -42,6 +42,112 @@ test("窄诊断桥：关键节点落入统一sink，拒任意事件/路径，凭
   }
 });
 
+test("dev 回退 hook：被接管的主帧加载失败不显示恢复页，未接管/-3/子帧仍按既有语义", () => {  const logger = createDiagnosticLogger({ component: "desktop.test.hook" });
+  const window = new EventEmitter() as EventEmitter & { webContents: EventEmitter };
+  window.webContents = new EventEmitter();
+  let takeOver = true;
+  let failures = 0;
+  const seen: number[] = [];
+  observeWindowDiagnostics(window as unknown as BrowserWindow, logger, () => { failures += 1; }, {
+    onMainFrameLoadFailure: (errorCode) => { seen.push(errorCode); return takeOver; },
+  });
+  window.webContents.emit("did-fail-load", {}, -102, "refused", "http://localhost:5199/", true);
+  assert.deepEqual(seen, [-102]);
+  assert.equal(failures, 0);
+  takeOver = false;
+  window.webContents.emit("did-fail-load", {}, -6, "missing", "file:///x", true);
+  assert.equal(failures, 1);
+  window.webContents.emit("did-fail-load", {}, -3, "aborted", "file:///x", true);
+  assert.equal(failures, 1);
+  window.webContents.emit("did-fail-load", {}, -6, "subframe", "file:///x", false);
+  assert.equal(failures, 1);
+});
+
+test("导航兜底策略：只放行同 URL/允许入口，http(s) 外开，file/data/javascript 阻止且不执行", async () => {
+  const { classifyNavigation, classifyWindowOpen, createExternalOpenGate } = await import("../../app/desktop/navigation-policy.ts");
+  const prod = "file:///app/renderer/dist/index.html";
+  const built = "file:///app/renderer/dist/other.html";
+  const dev = "http://localhost:5199/index.html";
+  const context = { currentUrl: prod, allowedUrls: [prod, built, dev] };
+  assert.deepEqual(classifyNavigation(prod, context), { allow: true, reason: "same-url" });
+  assert.deepEqual(classifyNavigation("file:///app/renderer/dist/index.html#same-doc", context), { allow: true, reason: "same-url" });
+  assert.deepEqual(classifyNavigation(built, { currentUrl: "", allowedUrls: [prod, built] }), { allow: true, reason: "allowed-entry" });
+  assert.deepEqual(classifyNavigation("https://example.com/x", context), { allow: false, reason: "http-external", openExternal: "https://example.com/x" });
+  assert.deepEqual(classifyNavigation("http://127.0.0.1:5199/other", context), { allow: false, reason: "http-external", openExternal: "http://127.0.0.1:5199/other" });
+  for (const blocked of ["file:///etc/passwd", "data:text/html,<script>alert(1)</script>", "javascript:alert(1)", "blob:https://example.com/x", "not a url"]) {
+    const decision = classifyNavigation(blocked, context);
+    assert.equal(decision.allow, false, blocked);
+    assert.equal("openExternal" in decision ? decision.openExternal : undefined, undefined, blocked);
+  }
+  assert.deepEqual(classifyWindowOpen("https://example.com/x"), { action: "deny", reason: "http-external", openExternal: "https://example.com/x" });
+  assert.deepEqual(classifyWindowOpen("file:///etc/passwd"), { action: "deny", reason: "blocked-protocol" });
+  assert.deepEqual(classifyWindowOpen("javascript:alert(1)"), { action: "deny", reason: "blocked-protocol" });
+  assert.deepEqual(classifyWindowOpen("data:text/html,x"), { action: "deny", reason: "blocked-protocol" });
+  assert.deepEqual(classifyWindowOpen("not a url"), { action: "deny", reason: "invalid-url" });
+
+  let clock = 1_000;
+  const gate = createExternalOpenGate(1500, () => clock);
+  assert.equal(gate.shouldOpen("https://example.com/x"), true);
+  gate.mark("https://example.com/x");
+  assert.equal(gate.shouldOpen("https://example.com/x"), false, "同一窗口内已外开的 URL 不重复外开");
+  assert.equal(gate.shouldOpen("https://example.com/y"), true, "不同 URL 不受影响");
+  clock += 1500;
+  assert.equal(gate.shouldOpen("https://example.com/x"), true, "窗口时间后允许再次外开");
+});
+
+test("主进程导航守卫接线：https 外开一次、窗口 URL 不变；恶意协议不导航/不外开；window.open 一律拒绝", async () => {
+  const { installNavigationGuard } = await import("../../app/desktop/navigation-guard.ts");
+  class FakeWebContents {
+    url = "file:///app/renderer/dist/index.html";
+    private nav: ((event: { preventDefault: () => void }, url: string) => void) | undefined;
+    private openHandler: ((details: { url: string }) => { action: "deny" }) | undefined;
+    getURL(): string { return this.url; }
+    on(event: string, listener: (event: { preventDefault: () => void }, url: string) => void): this {
+      if (event === "will-navigate") this.nav = listener;
+      return this;
+    }
+    setWindowOpenHandler(handler: (details: { url: string }) => { action: "deny" }): void { this.openHandler = handler; }
+    navigate(target: string): boolean {
+      let prevented = false;
+      this.nav?.({ preventDefault: () => { prevented = true; } }, target);
+      return prevented;
+    }
+    windowOpen(target: string): { action: "deny" } | undefined { return this.openHandler?.({ url: target }); }
+  }
+  const wc = new FakeWebContents();
+  const opened: string[] = [];
+  const blocked: string[] = [];
+  const guard = installNavigationGuard(wc as never, {
+    allowedUrls: () => ["file:///app/renderer/dist/index.html"],
+    openExternal: (url) => opened.push(url),
+    onBlocked: (reason) => blocked.push(reason),
+  });
+  // 同 URL reload：放行、不外开、窗口 URL 不变。
+  assert.equal(wc.navigate(wc.url), false);
+  assert.deepEqual(opened, []);
+  // https：阻止导航并外开恰一次，窗口 URL 不变。
+  assert.equal(wc.navigate("https://example.com/x"), true);
+  assert.deepEqual(opened, ["https://example.com/x"]);
+  assert.equal(wc.url, "file:///app/renderer/dist/index.html");
+  // 渲染侧先经 IPC 外开（mark）后漏网导航：不重复外开。
+  guard.markExternalOpen("https://example.com/y");
+  assert.equal(wc.navigate("https://example.com/y"), true);
+  assert.deepEqual(opened, ["https://example.com/x"], "同一窗口内已外开的 URL 不重复外开");
+  // 恶意/非 http(s) 协议：阻止、不外开、不执行。
+  for (const bad of ["file:///etc/passwd", "data:text/html,<script>x</script>", "javascript:alert(1)"]) {
+    const before: number = opened.length;
+    assert.equal(wc.navigate(bad), true, bad);
+    assert.equal(opened.length, before, bad);
+  }
+  assert.ok(blocked.includes("blocked-protocol"));
+  // window.open：一律 deny；https 外开一次；file/data/javascript 不外开。
+  assert.deepEqual(wc.windowOpen("https://example.com/z"), { action: "deny" });
+  assert.deepEqual(opened, ["https://example.com/x", "https://example.com/z"]);
+  assert.deepEqual(wc.windowOpen("file:///etc/passwd"), { action: "deny" });
+  assert.deepEqual(wc.windowOpen("javascript:alert(1)"), { action: "deny" });
+  assert.equal(opened.length, 2);
+});
+
 test("窗口关闭只释放自有IPC，再建窗可注册同名handler，不删其他通道", () => {
   const handlers = new Map<string, unknown>([["foreign:channel", "foreign"]]);
   const ipc = {

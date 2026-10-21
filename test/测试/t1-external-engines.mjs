@@ -104,6 +104,11 @@ export async function piAgentSession(options) {
   const emit = event => { for (const listener of listeners) listener(event); };
   trace({ kind: 'bound', runtime: 'pi', tools: [...tools.keys()], nativeId: options.sessionManager.getSessionId() });
   const session = {
+    thinkingLevel: 'medium',
+    setThinkingLevel(level) {
+      assert.ok(['off', 'minimal', 'low', 'medium', 'high', 'xhigh'].includes(level), 'Pi SDK thinking level must be valid');
+      this.thinkingLevel = level;
+    },
     getActiveToolNames: () => [...tools.keys()],
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     async prompt(text) {

@@ -1,0 +1,35 @@
+=== old renderer core / main / preload vs HEAD ===
+UNCHANGED app/renderer/index.html
+UNCHANGED app/renderer/renderer.js
+UNCHANGED app/renderer/styles.css
+UNCHANGED app/renderer/tool-rows.js
+UNCHANGED app/renderer/role-status.js
+UNCHANGED app/renderer/runtime-ui.js
+UNCHANGED app/renderer/ui-labels.js
+UNCHANGED app/renderer/engine-selector.js
+UNCHANGED app/main.ts
+UNCHANGED app/preload.cjs
+
+=== fix surface (diff since 3B base = CSS/icon only) ===
+649:.capsule.is-dropping {
+1015:.sc-su-warning {
+1495:.queue-withdraw {
+1505:.queue-withdraw:hover:not(:disabled) {
+1509:.queue-withdraw:disabled {
+1556:.disclosure-chevron {
+1561:details[open] > summary > .disclosure-chevron {
+1564:.sys-denied .disclosure-chevron {
+2094:.attach-chip {
+2104:.attach-chip img {
+2110:.attach-chip .attach-rm {
+2126:.attach-chip .attach-rm:hover {
+app/renderer/src/shell/ConfirmCard.tsx:189:                size={12}
+app/renderer/src/shell/ConfirmCard.tsx:192:                className="disclosure-chevron"
+app/renderer/src/shell/ConfirmCard.tsx:233:              <span className="sc-su-warning">{SU_APPROVAL_WARNING}</span>
+app/renderer/src/shell/ConfirmCard.tsx:349:                size={12}
+app/renderer/src/shell/ConfirmCard.tsx:352:                className="disclosure-chevron"
+app/renderer/src/shell/Composer.tsx:569:              <X size={12} strokeWidth={1.5} aria-hidden="true" />
+app/renderer/src/shell/Composer.tsx:713:              <Square size={12} strokeWidth={1.5} aria-hidden="true" />
+
+=== deps unchanged ===
+markdown-it 15.0.3 typescript 7.0.2

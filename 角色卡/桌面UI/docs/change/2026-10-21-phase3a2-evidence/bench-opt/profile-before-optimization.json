@@ -1,0 +1,47 @@
+{
+  "rendererDir": "/app/renderer",
+  "node": "24.21.0",
+  "electron": "44.7.0",
+  "at": "2026-10-21T03:28:28.519Z",
+  "console": [],
+  "stormA": {
+    "maxGap": 18.2,
+    "frames": 98
+  },
+  "profile": {
+    "longTasks": [],
+    "gbrCount": 6,
+    "createCount": 1805
+  },
+  "stormA_handler": {
+    "maxMs": 0.4,
+    "totalMs": 0.5
+  },
+  "stormB": {
+    "maxGap": 29.2,
+    "frames": 97
+  },
+  "stormB_handler": {
+    "maxBatchMs": 0.6,
+    "totalBatchMs": 1.2
+  },
+  "naive": {
+    "storm300Ms": 75.4,
+    "perEventAvgMs": 0.251,
+    "replay2000Ms": 15.7
+  },
+  "replay": {
+    "replayMs": 2.9,
+    "mounted": 361,
+    "rows": 361
+  },
+  "scrollToBottom": {
+    "ms": 2.6,
+    "mounted": 361
+  },
+  "histPending": {
+    "r1": true,
+    "r2": true
+  },
+  "histDirect": true
+}

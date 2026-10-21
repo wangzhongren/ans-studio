@@ -1,0 +1,53 @@
+{
+  "reports": [
+    {
+      "name": "same actual turn and outcome denied plus settled has one readable terminal",
+      "value": true
+    },
+    {
+      "name": "reverse arrival keeps actual failure and full diagnostic in same terminal row",
+      "value": true
+    },
+    {
+      "name": "different actual turns retain two independent terminal records",
+      "value": true
+    },
+    {
+      "name": "legacy without actual turn never merged by equal text",
+      "value": true
+    },
+    {
+      "name": "different structured outcomes in same turn remain separate facts",
+      "value": true
+    },
+    {
+      "name": "tool denial keeps independent tool lifecycle and terminal",
+      "value": true
+    },
+    {
+      "name": "actual matching denied replay reuses terminal fact and retains distinct diagnostics",
+      "value": true
+    },
+    {
+      "name": "late settled after matching history does not append another terminal",
+      "value": true
+    },
+    {
+      "name": "additional same-turn diagnosis remains reachable in the existing terminal",
+      "value": true
+    },
+    {
+      "name": "same turn ID in other runtime remains independent",
+      "value": true
+    },
+    {
+      "name": "history-first exact replay identity is promoted only by trusted matching live outcome",
+      "value": true
+    },
+    {
+      "name": "offscreen terminal update keeps virtual reading position",
+      "value": true
+    }
+  ],
+  "errors": []
+}

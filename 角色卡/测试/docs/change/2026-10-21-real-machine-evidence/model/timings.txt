@@ -1,0 +1,11 @@
+session_file /Users/wangzhongren/code/vibeingcode/ans-testbed/ui-platform-new-demo/.ans/sessions/liaison/pi/native/2026-10-21T14-06-24-439Z_01a15ec8-dcb6-73f2-b560-feb709c3a114.jsonl
+provider ans-gateway modelId deepseek-v4-flash[1m]
+thinkingLevel medium
+user_message_at 2026-10-21T14:06:52.258Z
+first_model_activity_at 2026-10-21T14:06:53.971Z delta_s 1.713
+final_assistant_text_at 2026-10-21T14:06:57.421Z delta_s 5.163
+assistant_message_count 3
+final_text_length 510
+tool_calls
+  list_dir 2026-10-21T14:06:53.971Z
+  read_file 2026-10-21T14:06:54.645Z

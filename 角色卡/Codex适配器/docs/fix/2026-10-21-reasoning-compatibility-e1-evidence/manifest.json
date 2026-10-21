@@ -1,0 +1,60 @@
+{
+  "status": "owner verification passed; independent QA and acceptance pending",
+  "platform": "darwin/arm64",
+  "node": "v24.14.0",
+  "cli": "0.162.1",
+  "D1": "30eb803b2482eea9a308ca2bf51507bb2a8d9c56dc2137fdc5749d85a4dcda09",
+  "E1": "817870bec7474f61fcf61ba4e6bcd56fd2ea744450e6626d18e26731deb3a5d9",
+  "R2": "5369945208196cf36a643ce859f5ea58095316d909c284dad3f03bb74b6e8730",
+  "commands": [
+    {
+      "command": "node --test test/codex-adapter/*.test.ts",
+      "exitCode": 0,
+      "passed": 80,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "command": "node test/codex-adapter/reasoning-loopback.probe.ts",
+      "exitCode": 0,
+      "passed": 20,
+      "failed": 0
+    },
+    {
+      "command": "./node_modules/.bin/tsc --noEmit",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check -- owned changed paths",
+      "exitCode": 0
+    }
+  ],
+  "sourceHashes": {
+    "src/provider/codex/session.ts": "3cb3db0fb36fac81926926bc9b80c6ed4987782db07637374545ccef858dcbdd",
+    "src/common/codex-adapter/protocol.ts": "31ab8a1b65a0cf5623931730225ed813f23c06b5184b23a3f04122ef611fa468",
+    "src/common/codex-adapter/reasoning-catalog.ts": "5a94e74264ec67bac1e3f06f3e89752106ab9103d1759ce8aa8114cb084a3e49",
+    "src/common/codex-adapter/config.ts": "4194d3f430e0563c99befa70f887c785994554a5b6651980076b3a712f2347e7",
+    "test/codex-adapter/reasoning.test.ts": "06d41e7c9d11f50a17835a508f728e5809681699f1733ca2ae606b70ab053488",
+    "test/codex-adapter/reasoning-catalog.test.ts": "3080b25f54c2bd57c59a18440fe4a5e1a99ec5cb6a7b33c8293b93c07e153c49",
+    "test/codex-adapter/fixtures.ts": "8b2154ab224526ce71273dfa4815b285c1fe506e04403b383dcb03fa71b8a1b2",
+    "test/codex-adapter/session.test.ts": "20f59acd1d1470737ab9e69a45e09eaf4782b6ac5a5b8a0f2247e5f57eaf3ce4",
+    "test/codex-adapter/web-search.test.ts": "8cde8e8d5f7fa6d52feaa625ee0a0786e89ae7d435a4380b2d02950ef0d446b6",
+    "test/codex-adapter/reasoning-loopback.probe.ts": "fa8fa95d25900cb37aafacd1fba7bf4752b26f733a51ca4d71558ad5156a2c54"
+  },
+  "evidenceHashes": {
+    "native-loopback.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "typecheck.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "unit-tests.txt": "de7bb4c1f29a5ca464b2a1cd9360ae0406b60ff09aa9ef5f1af92174ab3f31df",
+    "native-loopback.json": "80608e78db49656fa5456ed9526ec1c8cfc9871da343e44e7d91de6ff0bbed8a"
+  },
+  "historicalRed": "../2026-10-21-reasoning-compatibility-evidence/native-loopback.json",
+  "metadataSource": "installed @openai/codex@0.162.1 and exact matching native platform package; bounded extraction of embedded full JSON; not public model/list or project-provided data",
+  "unchanged": [
+    "SDK/dependencies",
+    "UI",
+    "saved configuration",
+    "model/endpoint choices",
+    "public runtime schema",
+    "governance changelog"
+  ]
+}

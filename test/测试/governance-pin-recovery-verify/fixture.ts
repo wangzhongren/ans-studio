@@ -312,13 +312,13 @@ export function settledAdapter(): RuntimeAdapter {
   };
 }
 
+import { governanceActionFor } from "../../../app/renderer/src/chat/governance-view.ts";
+
 export interface UiLabelsApi {
   governanceActionFor: (hasProject: boolean, hasRoles: boolean, recordState: string) => string | null;
 }
 
-/** 经典脚本在 Node 下装载：与既有测试同款（`globalThis.ANSUiLabels`）。 */
+/** 5B：旧 ui-labels.js 已删除；映射到新渲染器 governance-view 纯逻辑。 */
 export async function loadUiLabels(): Promise<UiLabelsApi> {
-  const href = new URL("../../../app/renderer/ui-labels.js", import.meta.url).href;
-  await import(href);
-  return (globalThis as unknown as { ANSUiLabels: UiLabelsApi }).ANSUiLabels;
+  return { governanceActionFor };
 }

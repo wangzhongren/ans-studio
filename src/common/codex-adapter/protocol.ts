@@ -141,14 +141,52 @@ export function mcpToolCallNative(item: Record<string, unknown>): { isError: boo
   return { isError: item.status === "failed" || errorText !== undefined, content, ...(errorText !== undefined ? { errorText } : {}) };
 }
 
-/**
- * G-5 降级链保守识别：网关因推理参数拒绝的判据（0.162.1 A4 探针：上游 400 体逐字进
- * `error.message`/`turn.error.message`，例 `{"error":{"message":"Unsupported parameter: reasoning",…}}`）。
- * **保守优先**（设计 §七：不确定就不识别）：须同时命中「推理锚」与「拒绝词」两类——宁可少见降级、
- * 不多发一次请求；真实网关文案未定格（B3），未命中即按既有失败口径如实收场。
- */
-export function isReasoningParamRejection(message: unknown): boolean {
-  const text = typeof message === "string" ? message : "";
-  if (text === "") return false;
-  return /reasoning|effort/i.test(text) && /unsupported|not supported|unrecognized|unknown|invalid/i.test(text);
+/** Internal compatibility decision; an entire reasoning-object rejection is not an effort rejection. */
+export function reasoningRejection(error: unknown): "field" | "value" | undefined {
+  const records: Record<string, unknown>[] = [];
+  const texts: string[] = [];
+  const visit = (value: unknown, depth = 0): void => {
+    if (depth > 5) return;
+    if (typeof value === "string") {
+      texts.push(value);
+      try { visit(JSON.parse(value), depth + 1); } catch { /* Only exact JSON envelopes are decoded. */ }
+    } else if (value && typeof value === "object" && !Array.isArray(value)) {
+      const record = value as Record<string, unknown>;
+      records.push(record);
+      for (const [key, child] of Object.entries(record)) {
+        if (key === "message" || key === "error" || key === "codexErrorInfo" || (child && typeof child === "object")) visit(child, depth + 1);
+      }
+    }
+  };
+  visit(error);
+  // Preserve native HTTP/error metadata: a parameter-looking body must not disguise a transport failure.
+  for (const record of records) {
+    for (const key of ["status", "statusCode", "httpStatusCode", "http_status", "status_code"]) {
+      const status = Number(record[key]);
+      if (Number.isFinite(status) && status >= 400 && status !== 400 && status !== 422) return undefined;
+    }
+    const kind = `${String(record.type ?? "")} ${String(record.code ?? "")}`;
+    if (/auth|rate_limit|server_error|timeout|connection|model_not_found/i.test(kind)) return undefined;
+  }
+  if (texts.some(text => /\b(?:HTTP|status(?: code)?)\s*[:=]?\s*(?:401|403|408|429|5\d\d)\b/i.test(text)
+      || /unknown model|model[^\n]*not found/i.test(text))) return undefined;
+  const effortFields = new Set(["effort", "reasoning.effort", "reasoning_effort", "model_reasoning_effort"]);
+  const parameter = records.find(record => typeof record.param === "string");
+  if (parameter) {
+    if (!effortFields.has(String(parameter.param))) return undefined;
+    const message = String(parameter.message ?? "");
+    const code = String(parameter.code ?? "");
+    const type = String(parameter.type ?? "");
+    if (type && !["invalid_request_error", "invalid_parameter", "validation_error"].includes(type)) return undefined;
+    if (/^(unsupported_parameter|unknown_parameter|unrecognized_parameter)$/.test(code)
+        || /\b(?:unsupported|unknown|unrecognized)\s+(?:parameter|field)\b/i.test(message)) return "field";
+    if (/^(unsupported_value|invalid_value|value_not_supported)$/.test(code)
+        || /\b(?:unsupported|invalid)\s+value\b|\bsupported values\b|\b(?:effort|value)\b[^\n]*\bnot supported\b/i.test(message)) return "value";
+    return undefined;
+  }
+  // Narrow, previously observed plain-text form. Do not match a model name or a whole reasoning object.
+  if (texts.some(text => /^(?:Unsupported parameter|Unknown field):\s*["']?(?:reasoning\.effort|model_reasoning_effort|reasoning_effort|effort)["']?\.?$/i.test(text.trim()))) return "field";
+  return undefined;
 }
+
+export function isReasoningParamRejection(error: unknown): boolean { return reasoningRejection(error) !== undefined; }

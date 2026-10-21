@@ -1,0 +1,155 @@
+{
+  "RUNTIME": {
+    "entries": 17,
+    "booleans": 16,
+    "true": 16,
+    "false": [],
+    "reports": [
+      "runtime bridge targets"
+    ]
+  },
+  "QUEUE_VIEW": {
+    "entries": 4,
+    "booleans": 4,
+    "true": 4,
+    "false": [],
+    "reports": []
+  },
+  "MIRROR": {
+    "entries": 8,
+    "booleans": 8,
+    "true": 8,
+    "false": [],
+    "reports": []
+  },
+  "GOV": {
+    "entries": 7,
+    "booleans": 7,
+    "true": 7,
+    "false": [],
+    "reports": []
+  },
+  "JUDGE": {
+    "entries": 33,
+    "booleans": 33,
+    "true": 33,
+    "false": [],
+    "reports": []
+  },
+  "G2": {
+    "entries": 5,
+    "booleans": 5,
+    "true": 5,
+    "false": [],
+    "reports": []
+  },
+  "SELECTOR": {
+    "entries": 27,
+    "booleans": 27,
+    "true": 27,
+    "false": [],
+    "reports": []
+  },
+  "CONFIG": {
+    "entries": 21,
+    "booleans": 21,
+    "true": 21,
+    "false": [],
+    "reports": []
+  },
+  "ROLE": {
+    "entries": 11,
+    "booleans": 9,
+    "true": 9,
+    "false": [],
+    "reports": [
+      "nested role reading actual before",
+      "nested role reading actual after"
+    ]
+  },
+  "SEND": {
+    "entries": 8,
+    "booleans": 8,
+    "true": 8,
+    "false": [],
+    "reports": []
+  },
+  "TERMINAL": {
+    "entries": 22,
+    "booleans": 22,
+    "true": 22,
+    "false": [],
+    "reports": []
+  },
+  "TOOLFOLD": {
+    "entries": 19,
+    "booleans": 17,
+    "true": 17,
+    "false": [],
+    "reports": [
+      "fold anchor offsets",
+      "mid document fold anchor"
+    ]
+  },
+  "FRESH": {
+    "entries": 4,
+    "booleans": 4,
+    "true": 4,
+    "false": [],
+    "reports": []
+  },
+  "VISUAL": {
+    "entries": 54,
+    "booleans": 52,
+    "true": 52,
+    "false": [],
+    "reports": [
+      "V2 measured geometry 1360",
+      "V2 measured geometry 960"
+    ]
+  },
+  "GHOST": {
+    "entries": 9,
+    "booleans": 8,
+    "true": 7,
+    "false": [
+      "builtin identity stays data and accessible without duplicate third visible line"
+    ],
+    "reports": [
+      "builtin identity stays data and accessible without duplicate third visible line observed"
+    ]
+  },
+  "FLOW": {
+    "entries": 20,
+    "booleans": 19,
+    "true": 18,
+    "false": [
+      "P7 choice pending separated from empty queue"
+    ],
+    "reports": [
+      "P7 choice pending separated from empty queue observed"
+    ]
+  },
+  "FLOW_REACH": {
+    "entries": 35,
+    "booleans": 35,
+    "true": 35,
+    "false": [],
+    "reports": []
+  },
+  "DEFAULT_REACH": {
+    "entries": 107,
+    "booleans": 100,
+    "true": 100,
+    "false": [],
+    "reports": [
+      "queue geometry 1360",
+      "queue geometry 960",
+      "incremental reader anchor",
+      "full replay preserves content identity",
+      "pending geometry card",
+      "pending geometry pi",
+      "runtime bridge targets"
+    ]
+  }
+}

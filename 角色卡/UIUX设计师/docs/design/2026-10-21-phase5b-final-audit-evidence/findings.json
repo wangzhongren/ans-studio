@@ -1,0 +1,78 @@
+{
+ "phase": "5B-final",
+ "candidate": "frozen final candidate c9d13918/f568e2aa/57d9575c",
+ "summary": {
+  "conclusion": "needs-work",
+  "P0": 0,
+  "P1": 1,
+  "P2": 3,
+  "notes": 1
+ },
+ "items": [
+  {
+   "id": "5B-FINAL-P1",
+   "severity": "P1",
+   "status": "needs-work",
+   "scene": "C/E/F/I/J/K 200% (480/680 CSS)",
+   "finding": "Sticky composer covers report card/details, governance preview, mirror card actions and S0 CTA at 200% narrow viewport; target screenshots show only top slivers while computed checks pass on width/existence.",
+   "evidence": [
+    "phase4b-smoke/phase4b-200pct-report.png",
+    "phase4b-smoke/phase4b-200pct-report-details.png",
+    "phase4b-smoke/phase4b-200pct-governance-preview.png",
+    "smoke/07-operator-mirror-200pct.png",
+    "smoke/08-delivery-200pct.png",
+    "s0-200/report.json",
+    "s0-200/09-s0-200pct.png"
+   ],
+   "expected": "At 200% the composer is compact/non-sticky when a card/report/preview is open, or content scrolls above it with >=200 CSS readable height; target bottom <= composer.top; CTA/actions visible without slit-scrolling.",
+   "actual": "480 CSS: header 121 + notices ~127 + composer ~185 > 310; report/details/preview mostly covered; S0 CTA bottom 398.6 > 310. 680 CSS: mirror actions covered.",
+   "owner": "桌面UI",
+   "retest": "480/680 target screenshots + occlusion assertion; then affected A-L rerun."
+  },
+  {
+   "id": "5B-FINAL-P2-1",
+   "severity": "P2",
+   "status": "registered",
+   "scene": "K 200% 480 S0",
+   "finding": "S0 CTA is below first screen at 480 CSS (same root as P1); reachable by scrolling.",
+   "evidence": [
+    "s0-200/report.json"
+   ],
+   "expected": "Compact empty state/composer at <=560 CSS so title/sub/CTA fit first screen.",
+   "actual": "title 286.6-310.6, sub 314.6-354.6, CTA 366.6-398.6; innerHeight 310.",
+   "owner": "桌面UI",
+   "retest": "480 S0 first-screen CTA."
+  },
+  {
+   "id": "5B-FINAL-P2-2",
+   "severity": "P2",
+   "status": "evidence",
+   "scene": "main-al-3x 200% capture",
+   "finding": "Main 3x 200% screenshots often stop at the bottom scroll position (chat/operator-card), and 04-profile content is chat; they cannot alone prove first-screen 200% content.",
+   "evidence": [
+    "main-al-3x/02-chat-200.png",
+    "main-al-3x/11-operator-card-200.png",
+    "main-al-3x/04-profile.png"
+   ],
+   "expected": "Use targeted smoke/design-audit screenshots for 200% targets; future harness scrolls to target before capture.",
+   "actual": "Bottom-scroll captures; label mismatch.",
+   "owner": "UIUX",
+   "retest": "Manifest note; targeted screenshots."
+  },
+  {
+   "id": "5B-FINAL-P2-3",
+   "severity": "P2",
+   "status": "evidence",
+   "scene": "smoke harness",
+   "finding": "Smoke/4B screenshots contain the 窗口控制不可用 harness marker; raw-main/main real-preload screenshots do not.",
+   "evidence": [
+    "smoke/06-empty-state-200pct.png",
+    "phase4b-smoke/phase4b-200pct.png"
+   ],
+   "expected": "Do not use harness screenshots as production L pass.",
+   "actual": "Marker present in smoke only.",
+   "owner": "测试/UIUX",
+   "retest": "Manifest note."
+  }
+ ]
+}

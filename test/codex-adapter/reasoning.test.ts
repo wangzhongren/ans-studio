@@ -1,40 +1,36 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createCodexRuntimeAdapter } from "../../src/provider/codex/session.ts";
-import { isReasoningParamRejection } from "../../src/common/codex-adapter/protocol.ts";
+import { reasoningRejection } from "../../src/common/codex-adapter/protocol.ts";
 import { REASONING_EVENT_SUMMARY } from "../../src/common/runtime-core/reasoning.ts";
 import type { ReasoningEffortV1, SessionEvent } from "../../src/model/runtime.ts";
 import { harness, options, role, collect, start, tick, until } from "./fixtures.ts";
 
-// G-5 wave 2（Codex）：请求接线（四档 -c、off 零注入＋如实行）、推理事件面（A3 探针形状转正）、
-// 降级链（保守识别＋恰一次去参数重发）。形状依据＝docs/change/2026-10-16-reasoning-surface-evidence。
-
-const REJECTION = '{"error":{"message":"Unsupported parameter: reasoning","type":"invalid_request_error","param":"reasoning"}}';
+const FIELD = JSON.stringify({ error: { message: "Unsupported parameter: reasoning.effort", type: "invalid_request_error", code: "unsupported_parameter", param: "reasoning.effort" } });
+const VALUE = JSON.stringify({ error: { message: "Invalid value: high", type: "invalid_request_error", code: "unsupported_value", param: "reasoning.effort" } });
+const models = [{ model: "fixture-model", defaultReasoningEffort: "low", supportedReasoningEfforts: [{ reasoningEffort: "low" }, { reasoningEffort: "high" }] }];
 const reasoningRows = (entries: SessionEvent[]) => entries.filter(entry => (entry.detail as { source?: string } | undefined)?.source === "reasoning");
-const effortRows = (entries: SessionEvent[]) => entries.filter(entry => (entry.detail as { source?: string } | undefined)?.source === "reasoning-effort");
+const systemRows = (entries: SessionEvent[], state?: string) => entries.filter(entry => { const detail = entry.detail as { source?: string; state?: string } | undefined; return detail?.source === "system" && (state === undefined || detail.state === state); });
+const turnRequests = (engine: ReturnType<typeof harness>["engine"]) => engine.requests.filter(request => request.method === "turn/start");
 
-test("request wiring: unset injects nothing; four tiers inject one scalar override; off injects nothing with an honest row", async () => {
-  const baseline = harness();
-  const base = await createCodexRuntimeAdapter(options("/fixture", baseline)).bindRole(role);
-  assert.equal(baseline.engine.input.configOverrides.some(value => value.startsWith("model_reasoning_effort")), false, "未设 ⇒ 零参数（逐字现状）");
-  await base.dispose();
-  for (const effort of ["low", "medium", "high", "xhigh"] as const) {
-    const engines = harness();
-    const session = await createCodexRuntimeAdapter(options("/fixture", engines, { reasoningEffort: effort })).bindRole(role);
-    const hits = engines.engine.input.configOverrides.filter(value => value.startsWith("model_reasoning_effort"));
-    assert.deepEqual(hits, [`model_reasoning_effort=${JSON.stringify(effort)}`], `${effort} ⇒ 恰一条顶层标量覆盖`);
-    await session.dispose();
+test("four efforts retain process and turn settings; off/unset stay absent and all configuration messages belong to active prompts", async () => {
+  for (const effort of [undefined, "off", "low", "medium", "high", "xhigh"] as const) {
+    const engines = harness({ mcpServers: [] });
+    const session = await createCodexRuntimeAdapter(options("/tmp", engines, { reasoningEffort: effort })).bindRole(role);
+    const events = collect(session);
+    await tick(); assert.equal(events.entries.length, 0, "construction emits no configuration event");
+    const expected = effort === "off" ? undefined : effort;
+    assert.deepEqual(engines.engine.input.configOverrides.filter(value => value.startsWith("model_reasoning_effort")), expected ? [`model_reasoning_effort=${JSON.stringify(expected)}`] : []);
+    const first = await start(session, engines.engine);
+    assert.equal(turnRequests(engines.engine)[0].params.effort, expected);
+    engines.engine.finish(); await first.completion;
+    const second = await start(session, engines.engine); engines.engine.finish(); await second.completion;
+    await session.dispose(); await events.done;
+    assert.equal(systemRows(events.entries, "configured").length, 1);
+    assert.equal(systemRows(events.entries)[0].turnId, "ans-turn");
+    assert.match(systemRows(events.entries)[0].summary, /未验证/);
+    if (effort === "off") assert.match(systemRows(events.entries)[0].summary, /不表示关闭/);
   }
-  const offEngines = harness();
-  const offSession = await createCodexRuntimeAdapter(options("/fixture", offEngines, { reasoningEffort: "off" })).bindRole(role);
-  const offEvents = collect(offSession);
-  assert.equal(offEngines.engine.input.configOverrides.some(value => value.startsWith("model_reasoning_effort")), false, "off＝无该档 ⇒ 零注入");
-  await offSession.dispose(); await offEvents.done;
-  const rows = effortRows(offEvents.entries);
-  assert.equal(rows.length, 1, "会话级恰一条如实说明");
-  assert.equal(rows[0].summary, "Codex 平台无「关」档：未注入推理强度参数（维持平台默认，推理未关闭）");
-  assert.equal(rows[0].turnId, undefined);
-  assert.deepEqual(rows[0].detail, { version: 1, source: "reasoning-effort", reason: "off-unsupported" });
 });
 
 test("invalid reasoning effort is rejected before any effect", async () => {
@@ -82,100 +78,100 @@ test("reasoning delta frames are consumed without rows and never mis-mapped", as
   engines.engine.finish(); await turn.completion; await session.dispose(); await events.done;
   assert.equal(reasoningRows(events.entries).length, 0, "增量帧不产行（完成态先行）");
   assert.equal(events.entries.filter(entry => entry.kind === "tool_call" || entry.kind === "denied" || entry.kind === "accepted").length, 0, "不误报为工具行");
-  assert.equal(events.entries.length, 1, "唯一事件＝settled");
+  assert.equal(events.entries.filter(entry => (entry.detail as { source?: string } | undefined)?.source !== "system").length, 1, "推理增量仅消费，配置消息另计");
 });
 
-test("rejection matcher is conservative: both anchors required", () => {
-  assert.equal(isReasoningParamRejection(REJECTION), true);
-  assert.equal(isReasoningParamRejection("Unknown field: effort"), true);
-  assert.equal(isReasoningParamRejection("model unavailable"), false);
-  assert.equal(isReasoningParamRejection("unsupported operation"), false);
-  assert.equal(isReasoningParamRejection("reasoning timed out"), false, "无拒绝词 ⇒ 不识别（宁可少见降级）");
-  assert.equal(isReasoningParamRejection(undefined), false);
+test("only precise effort rejections qualify; status/type/model and whole reasoning negatives win", () => {
+  assert.equal(reasoningRejection(FIELD), "field"); assert.equal(reasoningRejection(VALUE), "value");
+  assert.equal(reasoningRejection("Unknown field: effort"), "field");
+  for (const error of ["Unknown model: reasoning-model", "reasoning unavailable", "Unsupported parameter: reasoning", { error: { message: "Unsupported parameter: reasoning.effort", param: "model", type: "invalid_request_error" } }, { error: { message: "Unsupported parameter: reasoning", param: "reasoning", type: "invalid_request_error" } }, { message: FIELD, codexErrorInfo: { httpConnectionFailed: { httpStatusCode: 500 } } }]) assert.equal(reasoningRejection(error), undefined);
+  for (const status of [401, 403, 408, 429, 500, 502, 503]) assert.equal(reasoningRejection({ status, message: FIELD }), undefined);
+  assert.equal(reasoningRejection({ error: { param: "effort", type: "authentication_error", code: "unsupported_parameter" } }), undefined);
 });
 
-test("gateway rejection degrades exactly once: reconnect without the param, same input, honest row; turn continues", async () => {
-  const engines = harness({ mcpServers: [] });
-  const session = await createCodexRuntimeAdapter(options("/fixture", engines, { reasoningEffort: "high" })).bindRole(role);
-  const events = collect(session);
-  const first = await start(session, engines.engine);
-  assert.deepEqual(engines.engine.input.configOverrides.filter(value => value.startsWith("model_reasoning_effort")), ['model_reasoning_effort="high"']);
-  engines.engine.failTurn(REJECTION);
-  await until(() => engines.engines.length === 2);
-  const retried = engines.engine;
-  assert.equal(retried.input.configOverrides.some(value => value.startsWith("model_reasoning_effort")), false, "去参数重发：新引擎零 effort 覆盖（其余逐字不变）");
-  assert.deepEqual(retried.input.configOverrides.filter(value => value.startsWith("mcp_servers=")), engines.engines[0].input.configOverrides.filter(value => value.startsWith("mcp_servers=")), "其余覆盖逐字不变");
-  await until(() => retried.requests.some(request => request.method === "turn/start"));
-  const turnStart = retried.requests.find(request => request.method === "turn/start")!;
-  assert.deepEqual((turnStart.params.input as Array<Record<string, unknown>>)[0], { type: "text", text: "fixture", text_elements: [] }, "同一输入重发");
-  retried.finish();
-  await first.completion; // 本轮继续（正常 resolve，不抛）
-  await session.dispose(); await events.done;
-  const rows = effortRows(events.entries);
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].summary, "本网关不支持所设推理强度，本轮已按默认执行");
-  assert.equal(rows[0].turnId, "ans-turn");
-  assert.equal(events.entries.filter(entry => entry.kind === "settled").length, 1, "settled 恰一次");
-  assert.equal((events.entries.at(-1)!.detail as { outcome: string }).outcome, "completed");
+test("value rejection uses exact catalog default in same thread, commits only completed, and subsequent turns retain it", async () => {
+  const h = harness({ mcpServers: [], models });
+  const s = await createCodexRuntimeAdapter(options("/tmp", h, { reasoningEffort: "high" })).bindRole(role); const events = collect(s);
+  const first = await start(s, h.engine); const native = s.nativeSessionId;
+  h.engine.failTurn(VALUE); await until(() => h.engine.turns === 2);
+  assert.equal(h.engines.length, 1); assert.equal(s.nativeSessionId, native);
+  assert.equal(turnRequests(h.engine)[1].params.effort, "low");
+  assert.equal(systemRows(events.entries, "completed").length, 0);
+  h.engine.finish(); await first.completion;
+  const next = await start(s, h.engine); assert.equal(turnRequests(h.engine).at(-1)!.params.effort, "low"); h.engine.finish(); await next.completion;
+  await s.dispose(); await events.done;
+  assert.equal(systemRows(events.entries, "completed").length, 1);
+  assert.deepEqual(events.entries.filter(e => e.kind === "settled").map(e => (e.detail as { outcome: string }).outcome), ["completed", "completed"]);
 });
 
-test("degrade is bounded and conservative: rejected retry, unrelated failure, content-bearing turn and no-effort sessions never retry", async () => {
-  // (a) 重发再被拒 ⇒ 如实失败、不再重连
-  {
-    const engines = harness({ mcpServers: [] });
-    const session = await createCodexRuntimeAdapter(options("/fixture", engines, { reasoningEffort: "high" })).bindRole(role);
-    const events = collect(session);
-    const first = await start(session, engines.engine);
-    engines.engine.failTurn(REJECTION);
-    await until(() => engines.engines.length === 2);
-    await until(() => engines.engine.requests.some(request => request.method === "turn/start"));
-    engines.engine.failTurn(REJECTION);
-    await assert.rejects(first.completion, /Unsupported parameter: reasoning/);
-    await tick(50);
-    assert.equal(engines.engines.length, 2, "恰一次：无第三次连接");
-    await session.dispose(); await events.done;
-    assert.equal(effortRows(events.entries).length, 1, "降级行仍恰一条");
-    assert.equal((events.entries.at(-1)!.detail as { outcome: string }).outcome, "failed");
+test("field rejection rebuilds safe first turn, starts new thread, exposes new ID and sends no effort", async () => {
+  const h = harness({ mcpServers: [] }); const originalFactory = h.factory;
+  const s = await createCodexRuntimeAdapter(options("/tmp", h, { reasoningEffort: "high", engineFactory: async input => { const engine = await originalFactory(input); engine.nativeId = `thread-${h.engines.length}`; return engine; } })).bindRole(role); const events = collect(s);
+  const first = await start(s, h.engine); h.engine.failTurn(FIELD);
+  await until(() => h.engines.length === 2 && h.engine.turns === 1);
+  assert.equal(s.nativeSessionId, "thread-2"); assert.ok(h.engine.requests.some(r => r.method === "thread/start"));
+  assert.equal(turnRequests(h.engine)[0].params.threadId, "thread-2"); assert.equal(turnRequests(h.engine)[0].params.effort, undefined);
+  h.engine.finish(); await first.completion;
+  const next = await start(s, h.engine); assert.equal(turnRequests(h.engine).at(-1)!.params.effort, undefined); h.engine.finish(); await next.completion;
+  await s.dispose(); await events.done;
+  assert.equal(systemRows(events.entries, "completed").length, 1);
+});
+
+test("at most two distinct compatibility candidates: catalog default then absent effort, never a third", async () => {
+  const h = harness({ mcpServers: [], models }); const s = await createCodexRuntimeAdapter(options("/tmp", h, { reasoningEffort: "high" })).bindRole(role); const events = collect(s);
+  const first = await start(s, h.engine); h.engine.failTurn(VALUE); await until(() => h.engine.turns === 2);
+  h.engine.failTurn(FIELD); await until(() => h.engines.length === 2 && h.engine.turns === 1);
+  h.engine.failTurn(FIELD); await assert.rejects(first.completion, /Unsupported parameter/);
+  assert.equal(h.engines.length, 2); assert.equal(h.engines.flatMap(turnRequests).length, 3);
+  const next = await start(s, h.engine); assert.equal(turnRequests(h.engine).at(-1)!.params.effort, "high", "failed no-effort attempt restores original strategy explicitly"); h.engine.finish(); await next.completion;
+  await s.dispose(); await events.done; assert.equal(systemRows(events.entries, "completed").length, 0);
+});
+
+test("failed, cancelled and timed-out default attempts do not stick to subsequent native requests", async () => {
+  for (const failure of ["500", "cancel", "timeout"]) {
+    const h = harness({ mcpServers: [], models }); const s = await createCodexRuntimeAdapter(options("/tmp", h, { reasoningEffort: "high", turnLastResortMs: failure === "timeout" ? 100 : 10000 })).bindRole(role); const events = collect(s);
+    const first = await start(s, h.engine); h.engine.failTurn(VALUE); await until(() => h.engine.turns === 2);
+    if (failure === "500") { h.engine.failTurn("unexpected status 500: upstream unavailable"); await assert.rejects(first.completion, /500/); }
+    else if (failure === "cancel") { await s.abort!(); await first.completion; }
+    else await assert.rejects(first.completion, /最后兜底/);
+    const next = await start(s, h.engine); assert.equal(turnRequests(h.engine).at(-1)!.params.effort, "high", failure); h.engine.finish(); await next.completion;
+    await s.dispose(); await events.done; assert.equal(systemRows(events.entries, "completed").length, 0);
   }
-  // (b) 无推理锚的失败 ⇒ 不识别、不重发
-  {
-    const engines = harness({ mcpServers: [] });
-    const session = await createCodexRuntimeAdapter(options("/fixture", engines, { reasoningEffort: "high" })).bindRole(role);
-    const events = collect(session);
-    const first = await start(session, engines.engine);
-    engines.engine.failTurn("model unavailable");
-    await assert.rejects(first.completion, /model unavailable/);
-    await tick(50);
-    assert.equal(engines.engines.length, 1, "保守：不识别不重发");
-    await session.dispose(); await events.done;
-    assert.equal(effortRows(events.entries).length, 0);
+});
+
+test("ordinary failures, whole-object rejection and nonpersistent later turns never rebuild", async () => {
+  for (const error of ["Unknown model: reasoning-model", "unexpected status 500: " + FIELD, JSON.stringify({ error: { param: "model", code: "unsupported_parameter", message: "Unsupported parameter: reasoning.effort" } }), "Unsupported parameter: reasoning"]) {
+    const h = harness({ mcpServers: [], models }); const s = await createCodexRuntimeAdapter(options("/tmp", h, { reasoningEffort: "high" })).bindRole(role);
+    const first = await start(s, h.engine); h.engine.failTurn(error); await assert.rejects(first.completion); assert.equal(h.engines.length, 1); assert.equal(h.engine.turns, 1); await s.dispose();
   }
-  // (c) 已产出内容（agentMessage）后的拒绝 ⇒ 不降级（首请求闸）
-  {
-    const engines = harness({ mcpServers: [] });
-    const session = await createCodexRuntimeAdapter(options("/fixture", engines, { reasoningEffort: "high" })).bindRole(role);
-    const events = collect(session);
-    const first = await start(session, engines.engine);
-    engines.engine.message("partial output already delivered");
-    await tick();
-    engines.engine.failTurn(REJECTION);
-    await assert.rejects(first.completion, /Unsupported parameter: reasoning/);
-    await tick(50);
-    assert.equal(engines.engines.length, 1);
-    await session.dispose(); await events.done;
-    assert.equal(effortRows(events.entries).length, 0);
+  const h = harness({ mcpServers: [] }); const s = await createCodexRuntimeAdapter(options("/tmp", h, { reasoningEffort: "high" })).bindRole(role);
+  const first = await start(s, h.engine); h.engine.finish(); await first.completion;
+  const second = await start(s, h.engine); h.engine.failTurn(FIELD); await assert.rejects(second.completion); assert.equal(h.engines.length, 1); await s.dispose();
+});
+
+test("native tool starts and normal output forbid whole-turn replay", async () => {
+  for (const type of ["mcpToolCall", "webSearch", "dynamicToolCall", "reasoning", "agentMessage"]) {
+    const h = harness({ mcpServers: [], models }); const s = await createCodexRuntimeAdapter(options("/tmp", h, { reasoningEffort: "high" })).bindRole(role);
+    const first = await start(s, h.engine); h.engine.event("item/started", { type, id: "started" }); await tick(); h.engine.failTurn(VALUE);
+    await assert.rejects(first.completion); assert.equal(h.engine.turns, 1, type); assert.equal(h.engines.length, 1); await s.dispose();
   }
-  // (d) 未注入推理强度的会话 ⇒ 闸不开（同文案也不重发）
-  {
-    const engines = harness({ mcpServers: [] });
-    const session = await createCodexRuntimeAdapter(options("/fixture", engines)).bindRole(role);
-    const events = collect(session);
-    const first = await start(session, engines.engine);
-    engines.engine.failTurn(REJECTION);
-    await assert.rejects(first.completion, /Unsupported parameter: reasoning/);
-    await tick(50);
-    assert.equal(engines.engines.length, 1);
-    await session.dispose(); await events.done;
-    assert.equal(effortRows(events.entries).length, 0);
-  }
+});
+
+test("SDK retry notification does not trigger ANS compatibility", async () => {
+  const h = harness({ mcpServers: [], models }); const s = await createCodexRuntimeAdapter(options("/tmp", h, { reasoningEffort: "high" })).bindRole(role);
+  const first = await start(s, h.engine); h.engine.failTurn(VALUE, true); await tick(); assert.equal(h.engine.turns, 1); h.engine.finish(); await first.completion; await s.dispose();
+});
+
+test("failed compatibility reconstruction reports its real error and quarantines the unconfirmed engine", async () => {
+  const h = harness({ mcpServers: [] }); const factory = h.factory;
+  const s = await createCodexRuntimeAdapter(options("/tmp", h, { reasoningEffort: "high", engineFactory: async input => {
+    const engine = await factory(input);
+    if (h.engines.length === 2) engine.behavior = { ...engine.behavior, configFails: true };
+    return engine;
+  } })).bindRole(role);
+  const events = collect(s); const first = await start(s, h.engine); h.engine.failTurn(FIELD);
+  await assert.rejects(first.completion, /config read failure/);
+  await assert.rejects(s.prompt("cannot reuse ambiguous native state"), /quarantined/);
+  assert.equal(h.engine.closed, true); await s.dispose(); await events.done;
+  assert.equal(systemRows(events.entries, "completed").length, 0);
 });

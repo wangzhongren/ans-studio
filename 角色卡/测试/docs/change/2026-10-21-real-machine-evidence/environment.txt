@@ -1,0 +1,14 @@
+date=2026-10-21T22:01:36+08:00
+host=wangzhongrendeMacBook-Pro.local
+sw_vers=26.6.2 (25G83)
+uname=Darwin wangzhongrendeMacBook-Pro.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:16:20 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T8142 arm64
+node=v24.14.0
+electron_dev=v44.7.0
+zip=release-output/local/ANS-Studio-1.4.0-mac-arm64.zip
+zip_sha256=8e760887879c7f25dc926ce670b2b0e28ea862ef1fcedeb66383a085a868e441
+zip_bytes=405227230
+dist_index_sha256=3c4da2a2a4f99f6ffffdb737ccf854b3320bf2605a8d2b53190e5017ad33b301
+dist_js_sha256=f568e2aae8866996b7dabc22b69cdb4675fa8e2e8b8d020eb812a8aba08e4095
+dist_css_sha256=76fad7ce7c7b449d7e3b5f61517555f7f5c9d97e169a81d504289131d6ffc0f6
+real_project=/Users/wangzhongren/code/vibeingcode/dkai/dake-ai-kefu
+real_project_roles=13

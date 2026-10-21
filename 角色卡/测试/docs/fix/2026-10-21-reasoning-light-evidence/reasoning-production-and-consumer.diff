@@ -1,0 +1,2276 @@
+diff --git a/src/common/codex-adapter/protocol.ts b/src/common/codex-adapter/protocol.ts
+index 9e3093a..621abc4 100644
+--- a/src/common/codex-adapter/protocol.ts
++++ b/src/common/codex-adapter/protocol.ts
+@@ -141,14 +141,52 @@ export function mcpToolCallNative(item: Record<string, unknown>): { isError: boo
+   return { isError: item.status === "failed" || errorText !== undefined, content, ...(errorText !== undefined ? { errorText } : {}) };
+ }
+ 
+-/**
+- * G-5 降级链保守识别：网关因推理参数拒绝的判据（0.162.1 A4 探针：上游 400 体逐字进
+- * `error.message`/`turn.error.message`，例 `{"error":{"message":"Unsupported parameter: reasoning",…}}`）。
+- * **保守优先**（设计 §七：不确定就不识别）：须同时命中「推理锚」与「拒绝词」两类——宁可少见降级、
+- * 不多发一次请求；真实网关文案未定格（B3），未命中即按既有失败口径如实收场。
+- */
+-export function isReasoningParamRejection(message: unknown): boolean {
+-  const text = typeof message === "string" ? message : "";
+-  if (text === "") return false;
+-  return /reasoning|effort/i.test(text) && /unsupported|not supported|unrecognized|unknown|invalid/i.test(text);
++/** Internal compatibility decision; an entire reasoning-object rejection is not an effort rejection. */
++export function reasoningRejection(error: unknown): "field" | "value" | undefined {
++  const records: Record<string, unknown>[] = [];
++  const texts: string[] = [];
++  const visit = (value: unknown, depth = 0): void => {
++    if (depth > 5) return;
++    if (typeof value === "string") {
++      texts.push(value);
++      try { visit(JSON.parse(value), depth + 1); } catch { /* Only exact JSON envelopes are decoded. */ }
++    } else if (value && typeof value === "object" && !Array.isArray(value)) {
++      const record = value as Record<string, unknown>;
++      records.push(record);
++      for (const [key, child] of Object.entries(record)) {
++        if (key === "message" || key === "error" || key === "codexErrorInfo" || (child && typeof child === "object")) visit(child, depth + 1);
++      }
++    }
++  };
++  visit(error);
++  // Preserve native HTTP/error metadata: a parameter-looking body must not disguise a transport failure.
++  for (const record of records) {
++    for (const key of ["status", "statusCode", "httpStatusCode", "http_status", "status_code"]) {
++      const status = Number(record[key]);
++      if (Number.isFinite(status) && status >= 400 && status !== 400 && status !== 422) return undefined;
++    }
++    const kind = `${String(record.type ?? "")} ${String(record.code ?? "")}`;
++    if (/auth|rate_limit|server_error|timeout|connection|model_not_found/i.test(kind)) return undefined;
++  }
++  if (texts.some(text => /\b(?:HTTP|status(?: code)?)\s*[:=]?\s*(?:401|403|408|429|5\d\d)\b/i.test(text)
++      || /unknown model|model[^\n]*not found/i.test(text))) return undefined;
++  const effortFields = new Set(["effort", "reasoning.effort", "reasoning_effort", "model_reasoning_effort"]);
++  const parameter = records.find(record => typeof record.param === "string");
++  if (parameter) {
++    if (!effortFields.has(String(parameter.param))) return undefined;
++    const message = String(parameter.message ?? "");
++    const code = String(parameter.code ?? "");
++    const type = String(parameter.type ?? "");
++    if (type && !["invalid_request_error", "invalid_parameter", "validation_error"].includes(type)) return undefined;
++    if (/^(unsupported_parameter|unknown_parameter|unrecognized_parameter)$/.test(code)
++        || /\b(?:unsupported|unknown|unrecognized)\s+(?:parameter|field)\b/i.test(message)) return "field";
++    if (/^(unsupported_value|invalid_value|value_not_supported)$/.test(code)
++        || /\b(?:unsupported|invalid)\s+value\b|\bsupported values\b|\b(?:effort|value)\b[^\n]*\bnot supported\b/i.test(message)) return "value";
++    return undefined;
++  }
++  // Narrow, previously observed plain-text form. Do not match a model name or a whole reasoning object.
++  if (texts.some(text => /^(?:Unsupported parameter|Unknown field):\s*["']?(?:reasoning\.effort|model_reasoning_effort|reasoning_effort|effort)["']?\.?$/i.test(text.trim()))) return "field";
++  return undefined;
+ }
++
++export function isReasoningParamRejection(error: unknown): boolean { return reasoningRejection(error) !== undefined; }
+diff --git a/src/common/pi-adapter/real-adapter.ts b/src/common/pi-adapter/real-adapter.ts
+index c6fc275..b9afaca 100644
+--- a/src/common/pi-adapter/real-adapter.ts
++++ b/src/common/pi-adapter/real-adapter.ts
+@@ -78,7 +78,7 @@ import {
+   withPausableTimeout,
+   withTimeout,
+ } from "./timeout.ts";
+-import type { Api, Model } from "@earendil-works/pi-ai";
++import type { Api, Model, ProviderStreams } from "@earendil-works/pi-ai";
+ import type {
+   ExtensionAPI,
+   McpServerEntry,
+@@ -117,6 +117,7 @@ async function loadPiMcp(): Promise<typeof import("@earendil-works/pi-mcp")> {
+  */
+ export async function buildExplicitRuntime(
+   cfg: PiProviderConfig,
++  reasoning?: PiReasoningCompatibility,
+ ): Promise<{ runtime: ModelRuntime; model: Model<Api> }> {
+   const piAi = await import("@earendil-works/pi-ai");
+   const { anthropicProvider } = await import("@earendil-works/pi-ai/providers/anthropic");
+@@ -180,7 +181,7 @@ export async function buildExplicitRuntime(
+     baseUrl: cfg.baseUrl,
+     auth: templateProvider.auth,
+     models: [model],
+-    api: anthropicMessagesApi(),
++    api: reasoning === undefined ? anthropicMessagesApi() : withReasoningCompatibility(anthropicMessagesApi(), reasoning),
+   });
+ 
+   const runtime = await ModelRuntime.create({
+@@ -836,19 +837,20 @@ export function buildGovernanceExtension(
+ // 来源：客户 2026-10-16 批准 G-5。契约面＝`src/model/runtime.ts` 的 `ReasoningEffortV1`／
+ // `RuntimeProviderOptions.reasoningEffort`／`RuntimeReasoningFactsV1`／`RuntimeReasoningEventDetailV1`
+ // （形状一律以契约为准，Service 做投影单点）。P0 探针定格（`docs/fix/2026-10-16_probe_reasoning-wire.md`）：
+-// · 请求映射：**未设＝不调用 `setThinkingLevel`**（现状 medium 隐式路径原样）；off/low/medium/high 直映射；
++// · D1：未设按模型设置/全局设置/Pi 1.1.0 默认重置，恢复旧会话不沿用旧档位；显式档直映射。
+ //   xhigh ⇒ `setThinkingLevel("xhigh")`（预算钳到 high=16384，档位语义保留——探针实测）；
+ //   off 前置修复＝`buildExplicitRuntime` 把 `thinkingLevelMap.off` 收窄为 undefined（否则钳到 minimal＝假关闭）；
+ // · R1（**实锤可达**）：预算抬升 × contextWindow 钳到极小 ⇒ wire 出现 `budget_tokens=1024 ≥ max_tokens`（≤1024）
+ //   或 `budget_tokens < 1024` 两种**非法组合**（API 规则：1024 ≤ budget < max_tokens）⇒ 请求前修复（见下）。
+-// · 降级（A7 定格：400 ⇒ SDK 恰 1 请求、prompt 正常 resolve、事件面 failed 终态）⇒ **恰一次**去参数重发。
++// · D1：明确 thinking 参数拒绝在 HTTP 请求层兼容，绝不重新提交整条用户 prompt。
+ 
+ /** 思考事实行的回退 summary（Service 投影单点以定格文案覆盖；此处只作无投影路径的如实标签）。 */
+ export const REASONING_SUMMARY = "已思考";
+ 
+-/** G-5 降级（网关拒绝思考参数）如实行文案（恰一次去参数重发；沿 server-tools 降级行先例）。 */
+-export const REASONING_DEGRADED_SUMMARY =
+-  "网关拒绝了含思考参数的请求——本会话已停用思考参数并按原样重发本轮（恰一次）；后续轮次不再附带思考参数。";
++/** 当前固定 SDK 的新会话默认；升级由真实无历史 SDK 对照测试检测，不导入私有常量。 */
++export const PI_1_1_0_DEFAULT_THINKING_LEVEL = "medium";
++export const REASONING_COMPATIBILITY_ATTEMPT = "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。";
++export const REASONING_COMPATIBILITY_SUCCESS = "本会话已使用兼容请求得到正常结果，后续沿用接口默认方式；已保存设置不变。";
+ 
+ /**
+  * 从助手消息抽取思考事实（纯函数；导出供单测）。规则（契约逐字）：
+@@ -875,40 +877,95 @@ export function extractReasoningFacts(message: unknown): { text: string; status:
+   return { text: visible.map((b) => b.text).join("\n\n"), status: "complete" };
+ }
+ 
+-/** G-5 降级共享态（ans-reasoning 扩展 ↔ prompt 包装层；仅装配 reasoningEffort 时启用）。 */
+-export interface ReasoningDegradeState {
+-  /** 本轮（turnId）已检测到「思考参数被拒」请求降级重发（恰一次；consume 后清）。 */
+-  retryRequested: boolean;
+-  retryTurnId: string | undefined;
+-  /** 会话级：思考参数已停用（请求前剥离生效；检测随之停用）。 */
+-  suppressed: boolean;
++/** 请求内状态不持久化；只有正常助手结果才确认当前活会话的兼容策略。 */
++interface PiReasoningCompatibility {
++  confirmedProfile?: string;
++  request?: { profile: string; compatible: boolean; signal?: AbortSignal };
++  notice?: (summary: string, state: string) => void;
++  canConfirm?: () => boolean;
+ }
+ 
+-/** prompt 包装层的降级接缝（形状沿 `LengthFollowupOptions` 先例；缺省不传＝逐字旧行为）。 */
+-export interface ReasoningDegradeOptions {
+-  /** 是否消费一次重发（恰一次；turnId 匹配防跨轮误触发）。 */
+-  consumeRetry(turnId: string | undefined): boolean;
+-  /** 重发前停用思考参数（后续请求不再附带）。 */
+-  suppress(): void;
+-  /** 如实一行文案。 */
+-  noticeText: string;
++/** 只识别实际 thinking 字段的明确拒绝；普通故障和模型错误不推断为能力不足。 */
++export function isThinkingParameterRejection(status: number, value: unknown): boolean {
++  if (status !== 400 && status !== 422) return false;
++  if (value === null || typeof value !== "object") return false;
++  const envelope = value as Record<string, unknown>;
++  const error = envelope["error"] !== null && typeof envelope["error"] === "object"
++    ? envelope["error"] as Record<string, unknown> : envelope;
++  const param = error["param"];
++  const code = error["code"] ?? error["type"];
++  const message = typeof error["message"] === "string" ? error["message"] : "";
++  if (/unknown.?model|model.?not.?found|model does not exist/i.test(String(code) + " " + message)) return false;
++  if (param !== undefined && param !== null && (typeof param !== "string" || !/^thinking(?:\.[a-z_]+)?$/.test(param))) return false;
++  const explicitCode = typeof code === "string" && ["unsupported_parameter", "unsupported_value", "unsupported_enum_value", "unknown_parameter", "unrecognized_parameter"].includes(code);
++  if (typeof param === "string" && explicitCode) return true;
++  // 已验证的 API 错误格式，锚定拒绝对象；不因正文仅提及 thinking/effort 就触发。
++  return /^thinking(?:\.[a-z_]+)?(?::| is)\s+(?:not supported|unsupported)(?:[ .:]|$)/i.test(message)
++    || /^(?:unsupported|unknown|unrecognized) (?:parameter|field):?\s+['"]?thinking(?:\.[a-z_]+)?['"]?(?:[ .:]|$)/i.test(message);
+ }
+ 
+-/**
+- * ans-reasoning 扩展（**仅在 `reasoningEffort` 显式设置时装配**——未设＝零注册、逐字现状）：
+- * · `before_provider_request`：①降级剥离（suppressed ⇒ 删 `thinking`）；②**R1 请求前修复**——enabled 形态
+- *   且 `budget`/`max_tokens` 不满足 `1024 ≤ budget < max_tokens` 时：`max_tokens > 1024` ⇒ 钳预算到
+- *   `[1024, max_tokens-1]`；`max_tokens ≤ 1024`（无合法 enabled 组合）⇒ 改 `{type:"disabled"}`（诊断如实）。
+- *   并逐请求记录「本请求是否携带思考参数」（降级识别的保守前提）。
+- * · `message_end`：降级识别——本轮请求带思考参数 ∧ `stopReason=error` ∧ 错误前缀为拒绝类状态（同
+- *   server-tools 的 `requestRejectionStatus` 口径：≥400 排除 408/429）∧ 未降级过 ⇒ 置位恰一次重发请求。
+- */
++/** 有界读取错误副本，不消费 SDK 的原响应，不输出原始错误或请求。 */
++async function readReasoningError(response: Response): Promise<unknown> {
++  const reader = response.clone().body?.getReader();
++  if (!reader) return undefined;
++  let text = "";
++  let bytes = 0;
++  const decoder = new TextDecoder();
++  try {
++    while (true) {
++      const part = await reader.read();
++      if (part.done) break;
++      bytes += part.value.byteLength;
++      if (bytes > 32768) return undefined;
++      text += decoder.decode(part.value, { stream: true });
++    }
++    const body = text + decoder.decode();
++    try { return JSON.parse(body); }
++    catch { return { message: body }; } // 非 JSON 仍只接受下游锚定的明确拒绝格式。
++  } catch { return undefined; }
++  finally { void reader.cancel().catch(() => {}); }
++}
++
++/** SDK 公开请求接缝：同一次 provider 调用中的传输重试始终沿用已切换的请求。 */
++function withReasoningCompatibility(api: ProviderStreams, state: PiReasoningCompatibility): ProviderStreams {
++  const wrap = (method: "stream" | "streamSimple"): ProviderStreams["streamSimple"] => (model, context, options = {}) => {
++    const profile = JSON.stringify([model.provider, model.id, model.baseUrl]);
++    if (state.confirmedProfile !== undefined && state.confirmedProfile !== profile) state.confirmedProfile = undefined;
++    const requestState = { profile, compatible: state.confirmedProfile === profile, signal: options.signal };
++    state.request = requestState;
++    const nativeFetch = options.fetch ?? globalThis.fetch;
++    const fetch: typeof globalThis.fetch = async (input, init) => {
++      const original = new Request(input, init);
++      // 原 Request 留给本次请求的兼容副本；正文只在需要删参数时解析。
++      const withoutThinking = async (): Promise<Request> => {
++        const body = await original.clone().json() as Record<string, unknown>;
++        delete body["thinking"];
++        const headers = new Headers(original.headers);
++        headers.delete("content-length"); // 正文变化后交 fetch 重算，其他认证/请求头原样。
++        return new Request(original, { headers, body: JSON.stringify(body) });
++      };
++      const sent = requestState.compatible ? await withoutThinking() : original.clone();
++      const response = await nativeFetch(sent);
++      if (requestState.compatible || original.signal.aborted || (response.status !== 400 && response.status !== 422)) return response;
++      const body = await original.clone().json() as Record<string, unknown>;
++      if (body["thinking"] === undefined || !isThinkingParameterRejection(response.status, await readReasoningError(response))) return response;
++      if (original.signal.aborted) return response;
++      requestState.compatible = true; // 本 provider 调用只切换一次；失败也不恢复本次已拒字段。
++      state.notice?.(REASONING_COMPATIBILITY_ATTEMPT, "compatibility-attempt");
++      void response.body?.cancel().catch(() => {});
++      return nativeFetch(await withoutThinking());
++    };
++    return api[method](model, context, { ...options, fetch });
++  };
++  return { ...api, stream: wrap("stream"), streamSimple: wrap("streamSimple") };
++}
++
++/** 默认和显式档位共用预算保护；兼容确认与消息均在真实 SDK 事件内完成。 */
+ export function buildReasoningExtension(opts: {
+-  state: ReasoningDegradeState;
++  state: PiReasoningCompatibility;
+   diagnostics?: DiagnosticLog;
+   currentTurnId?: () => string | undefined;
+ }): { name: string; factory: (pi: ExtensionAPI) => void } {
+-  let lastRequestHadReasoning = false;
+   return {
+     name: "ans-reasoning",
+     factory: (pi: ExtensionAPI): void => {
+@@ -916,7 +973,7 @@ export function buildReasoningExtension(opts: {
+         const payload = event.payload as Record<string, unknown> | undefined;
+         if (payload === null || typeof payload !== "object") return undefined;
+         let changed = false;
+-        if (opts.state.suppressed && "thinking" in payload) {
++        if (opts.state.confirmedProfile !== undefined && opts.state.confirmedProfile === opts.state.request?.profile && "thinking" in payload) {
+           delete payload["thinking"];
+           changed = true;
+         }
+@@ -929,31 +986,26 @@ export function buildReasoningExtension(opts: {
+             if (maxTokens > 1024) {
+               thinking["budget_tokens"] = Math.min(Math.max(typeof budget === "number" && Number.isFinite(budget) ? budget : 1024, 1024), maxTokens - 1);
+               opts.diagnostics?.record("reasoning.repaired", { turnId: opts.currentTurnId?.(), state: "budget-clamped" });
++              opts.state.notice?.(`本次请求的可用输出空间不足，思考预算已调整为 ${String(thinking["budget_tokens"])} tokens；已保存等级不变。`, "budget-clamped");
+             } else {
+               payload["thinking"] = { type: "disabled" };
+               opts.diagnostics?.record("reasoning.repaired", { turnId: opts.currentTurnId?.(), state: "thinking-disabled" });
++              opts.state.notice?.("本次请求的可用输出空间不足，无法容纳合法思考预算，已仅对此请求关闭思考参数；已保存等级不变。", "thinking-disabled");
+             }
+             changed = true;
+           }
+         }
+-        lastRequestHadReasoning = payload["thinking"] !== undefined;
+         return changed ? payload : undefined;
+       });
+       pi.on("message_end", (event): void => {
+-        if (opts.state.suppressed || opts.state.retryRequested) return;
+-        const record = event.message !== null && typeof event.message === "object" ? (event.message as Record<string, unknown>) : undefined;
+-        if (record === undefined || record["stopReason"] !== "error") return;
+-        if (!lastRequestHadReasoning) return; // 本请求未带思考参数 ⇒ 与本降级无关（保守不触发）
+-        const errorMessage = typeof record["errorMessage"] === "string" ? record["errorMessage"] : "";
+-        const status = requestRejectionStatus(errorMessage);
+-        if (status === undefined) return;
+-        opts.state.retryRequested = true;
+-        opts.state.retryTurnId = opts.currentTurnId?.();
+-        opts.diagnostics?.record("reasoning.degraded", {
+-          turnId: opts.currentTurnId?.(),
+-          errorCode: `GATEWAY_REJECTED_HTTP_${String(status)}`,
+-          state: "retry-once",
+-        });
++        const message = event.message as { role?: string; stopReason?: string };
++        if (message.role !== "assistant") return;
++        const request = opts.state.request;
++        opts.state.request = undefined;
++        if (!request?.compatible || request.signal?.aborted || opts.state.canConfirm?.() === false || !["stop", "length", "toolUse"].includes(message.stopReason ?? "")) return;
++        if (opts.state.confirmedProfile === request.profile) return;
++        opts.state.confirmedProfile = request.profile;
++        opts.state.notice?.(REASONING_COMPATIBILITY_SUCCESS, "compatibility-confirmed");
+       });
+     },
+   };
+@@ -1057,8 +1109,8 @@ export function makeRolePrompt(deps: {
+   emitPromptInput?: boolean;
+   /** F-3-a：截断收尾补发配置；**缺省不传 ⇒ 行为与旧版逐字一致**（见 LengthFollowupOptions）。 */
+   lengthFollowup?: LengthFollowupOptions;
+-  /** G-5：降级重发配置（仅装配 reasoningEffort 时传入；**缺省不传 ⇒ 逐字旧行为**，见 ReasoningDegradeOptions）。 */
+-  reasoningDegrade?: ReasoningDegradeOptions;
++  /** 在 lifecycle.begin 之后发配置事实，不在构造阶段发易丢失的消息。 */
++  onPromptStart?: () => void;
+ }): (text: string, opts?: PromptOptions) => Promise<void> {
+   const { session, promptMs, gate, emit, log } = deps;
+   const turnLastResortMs = deps.turnLastResortMs ?? DEFAULT_TURN_LAST_RESORT_MS;
+@@ -1076,24 +1128,12 @@ export function makeRolePrompt(deps: {
+     });
+     log.stage("prompt 发出");
+     try {
++      deps.onPromptStart?.();
+       // 主 prompt 只用**最后兜底**（客户裁定 2026-10-17）：`promptMs` 属看护到点检查，**不再**用于
+       // 中止整轮；到检查时限后轮次继续，只有 1 小时兜底（或注入值）才中止。可暂停语义不变。
+       const startCall = (): Promise<void> => (images !== undefined ? session.prompt(text, { images }) : session.prompt(text));
+       await withPausableTimeout(startCall(), turnLastResortMs, "本轮最后兜底", gate);
+ 
+-      // G-5 降级（**恰一次**去参数重发；A7 定格：思考参数被拒 ⇒ prompt 正常 resolve、失败终态在下方
+-      // finish 才发——故在终态发射前收口，settled 仍恰一次）：检测位由 ans-reasoning 扩展在 message_end
+-      // 置位（保守：本轮请求带思考参数 ∧ 拒绝类状态 ∧ 未降级过）；consume 即消费；suppress 先于重发
+-      // （重发的请求不再携带思考参数）。重发为 best-effort 的如实重试：失败则走既有失败路径（不二次重发）。
+-      const degrade = deps.reasoningDegrade;
+-      if (degrade !== undefined && !lifecycle.isInterrupted() && degrade.consumeRetry(lifecycle.currentTurnId())) {
+-        degrade.suppress();
+-        emit({ kind: "message", summary: degrade.noticeText, detail: { turnId: lifecycle.currentTurnId(), source: "reasoning-degrade" } });
+-        log.stage(degrade.noticeText);
+-        // 重发直调底层 session.prompt：不递归本包装、不新增 settled/终态发射点（沿 F-3-a 补发先例）。
+-        // 时限同为**最后兜底**（重发属于主轮，不该被检查时限掐断）。
+-        await withPausableTimeout(startCall(), turnLastResortMs, "本轮最后兜底", gate);
+-      }
+       // F-3-a（截断收尾补发）：仅在首个 prompt **正常返回后**考虑——「开关开启 ∧ 末条消息截断 ∧
+       // 本轮无成功 submit_report ∧ 生命周期未被强制锁定（abort/超时）」时，用**独立的**
+       // withPausableTimeout 段补发**恰一次**收尾提示。限一次是**结构性保证**：本分支每次 prompt()
+@@ -1179,8 +1219,7 @@ export interface RoleSessionDeps {
+   emitPromptInput?: boolean;
+   /** F-3-a：截断收尾补发配置（缺省不传 ⇒ 逐字旧行为）；形状见 makeRolePrompt deps / LengthFollowupOptions。 */
+   lengthFollowup?: LengthFollowupOptions;
+-  /** G-5：降级重发配置（缺省不传 ⇒ 逐字旧行为）；形状见 makeRolePrompt deps / ReasoningDegradeOptions。 */
+-  reasoningDegrade?: ReasoningDegradeOptions;
++  onPromptStart?: () => void;
+   /**
+    * G-4 V2 dispose 收口（**仅装配 MCP 时提供**；缺省不传 ⇒ dispose 逐字旧行为）：在 SDK
+    * `session.dispose()` **之前**执行——补发 `session_shutdown` 让 MCP 扩展关闭全部连接/子进程
+@@ -1348,8 +1387,9 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
+         // 分段进度：构造显式 provider（baseUrl/model，内存凭据）。绝不打印凭据。
+         diagnostics.record("session.construct.step", { state: "provider" });
+         log.stage("构造显式 provider…");
++        const reasoningState: PiReasoningCompatibility = {};
+         const { runtime, model } = await withTimeout(
+-          (dependencies.buildRuntime ?? buildExplicitRuntime)(cfg),
++          (dependencies.buildRuntime ?? buildExplicitRuntime)(cfg, reasoningState),
+           constructMs,
+           "构造显式 provider",
+         );
+@@ -1369,6 +1409,11 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
+           queue.push({ ...event, runtime: "pi", roleId: role.id, turnId, detail: { turnId, ...detail } });
+         };
+         lifecycle = createTurnLifecycle(emit, diagnostics, opts.currentTurnId);
++        reasoningState.canConfirm = () => lifecycle.isActive() && !lifecycle.isInterrupted();
++        reasoningState.notice = (summary, state) => {
++          if (!lifecycle.isActive() || lifecycle.isInterrupted()) return;
++          emit({ kind: "message", summary, detail: { source: "system", reasonCode: "PI_REASONING", state } });
++        };
+         const callFacts = new Map<string, PiCallFacts>();
+         // F-3-a：成功 submit_report 的 turnId 记账（「本轮已交报告」判据；同轮 = 同一 turnId）。
+         let reportTurnId: string | undefined;
+@@ -1444,16 +1489,13 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
+           },
+         );
+ 
+-        // G-5 降级共享态与扩展（**仅显式设置 reasoningEffort 时装配**；未设 ⇒ 零注册、逐字现状）。
+-        const reasoningState: ReasoningDegradeState = { retryRequested: false, retryTurnId: undefined, suppressed: false };
+-        const reasoningExtension = opts.reasoningEffort !== undefined
+-          ? buildReasoningExtension({ state: reasoningState, diagnostics, currentTurnId: lifecycle.currentTurnId })
+-          : undefined;
++        // D1：默认档也必须经过预算保护与明确拒绝兼容。
++        const reasoningExtension = buildReasoningExtension({ state: reasoningState, diagnostics, currentTurnId: lifecycle.currentTurnId });
+ 
+         const resourceLoader = new DefaultResourceLoader({
+           cwd: opts.projectRoot,
+           agentDir: opts.projectRoot,
+-          extensionFactories: [extension, ...(reasoningExtension !== undefined ? [reasoningExtension] : []), ...(mcpExtension !== undefined ? [mcpExtension] : [])],
++          extensionFactories: [extension, reasoningExtension, ...(mcpExtension !== undefined ? [mcpExtension] : [])],
+           noExtensions: true,
+           systemPrompt: renderSystemPrompt(role, opts.projectRoot),
+           noSkills: true,
+@@ -1524,15 +1566,20 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
+           "createAgentSession",
+         );
+ 
+-        // G-5 请求面（映射见 model/runtime.ts 冻结表）：**未设＝不调用**（现状 medium 隐式路径原样）；
+-        // off/low/medium/high 直映射；xhigh 直映射（预算由 SDK 钳到 high=16384，档位语义保留——P0 探针实测）。
+-        // off 可用性由 buildExplicitRuntime 的 thinkingLevelMap.off 收窄前置保证（否则钳到 minimal＝假关闭）。
+-        // 如实注记：setThinkingLevel 是 SDK 会话级 API——档位变化会进转录（thinking_level_change），
+-        // 恢复会话时按 SDK 原生恢复面沿用该档（与模型选择恢复同族语义）。
+-        if (opts.reasoningEffort !== undefined) {
+-          session.setThinkingLevel(opts.reasoningEffort);
+-          diagnostics.record("session.thinking_level", { state: opts.reasoningEffort });
+-        }
++        // Pi 1.1.0 新会话选择顺序；显式重施使清空配置能覆盖恢复转录中的旧 high。
++        const requestedThinking = opts.reasoningEffort
++          ?? settingsManager.getModelThinkingLevel(model.provider, model.id)
++          ?? settingsManager.getDefaultThinkingLevel()
++          ?? PI_1_1_0_DEFAULT_THINKING_LEVEL;
++        session.setThinkingLevel(requestedThinking);
++        diagnostics.record("session.thinking_level", { state: session.thinkingLevel });
++        let configurationAnnounced = false;
++        const onPromptStart = (): void => {
++          if (configurationAnnounced) return;
++          configurationAnnounced = true;
++          const origin = opts.reasoningEffort === undefined ? "默认" : "已配置";
++          reasoningState.notice?.(`本会话请求的思考等级：${session.thinkingLevel}（${origin}）；Pi 当前 high 与 xhigh 预算相同，服务端实际采纳未验证。`, "configured");
++        };
+ 
+         // G-4 V2：硬校验按放行面判（前缀面参数化）。置于 bindExtensions **之前**⇒构造期快照只可能看到
+         // 注入名（MCP 尚未建连）——确定性安全；前缀面为「未来把 bindExtensions 挪到校验前」留防。
+@@ -1586,20 +1633,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
+         const sessionShutdown = mcpExtension !== undefined
+           ? (): Promise<unknown> => session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" })
+           : undefined;
+-        // G-5 降级接缝（仅装配 reasoningEffort 时提供；缺省不传 ⇒ 逐字旧行为）。
+-        const reasoningDegrade: ReasoningDegradeOptions | undefined = reasoningExtension !== undefined
+-          ? {
+-              consumeRetry: (turnId: string | undefined): boolean => {
+-                const hit = reasoningState.retryRequested && (reasoningState.retryTurnId === undefined || reasoningState.retryTurnId === turnId);
+-                reasoningState.retryRequested = false;
+-                reasoningState.retryTurnId = undefined;
+-                return hit;
+-              },
+-              suppress: (): void => { reasoningState.suppressed = true; },
+-              noticeText: REASONING_DEGRADED_SUMMARY,
+-            }
+-          : undefined;
+-        const roleSession = makeRoleSession({ session, promptMs, turnLastResortMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false, lengthFollowup, sessionShutdown, reasoningDegrade });
++        const roleSession = makeRoleSession({ session, promptMs, turnLastResortMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false, lengthFollowup, sessionShutdown, onPromptStart });
+         roleSession.runtime = "pi";
+         roleSession.roleId = role.id;
+         roleSession.contextSource = sessionSelection.contextSource ?? (sessionSelection.mode === "in-memory" ? "in-memory" : sessionSelection.mode === "resumed" ? "resumed" : sessionSelection.note ? "recovered" : "fresh");
+diff --git a/src/model/runtime.ts b/src/model/runtime.ts
+index 9f9441d..cb1392b 100644
+--- a/src/model/runtime.ts
++++ b/src/model/runtime.ts
+@@ -836,8 +836,8 @@ export type FlowStepSupersedeFn = (input: {
+ // ①请求面＝中立档位 `ReasoningEffortV1`（PM 冻结恰五值）＋`RuntimeProviderOptions.reasoningEffort`。
+ // Service 在 providerFor 按运行时读 env（`ANS_CLAUDE_REASONING_EFFORT`/`ANS_CODEX_REASONING_EFFORT`
+ // /`ANS_PI_REASONING_EFFORT`）、归一（合法五值，trim＋忽略大小写；未设/空串＝未设；其余＝按未设处理
+-// ＋诊断，**绝不毁会话**）后注入。**未设（字段缺席）＝逐字现状**——适配器不得因字段缺席改变任何既有
+-// 行为；适配器**纯消费**（三平台原生接线属各适配器批次＝wave 2；各平台落点见
++// ＋诊断，**绝不毁会话**）后注入。**未设（字段缺席）＝交给平台默认策略**，不等于原生请求零参数，
++// 也不允许恢复时无意沿用旧显式档位；适配器消费中立配置（各平台默认与兼容落点见
+ // `RuntimeProviderOptions.reasoningEffort` 注释）。
+ //
+ // ②呈现面＝推理事实通道（三段式，沿工具事件"事实→核心投影→呈现"纪律）：
+@@ -1464,8 +1464,13 @@ export interface RuntimeProviderOptions {
+    */
+   installedMcpServers?: readonly InstalledMcpServerV1[];
+   /**
+-   * G-5：会话级推理强度（Service 在 providerFor 按运行时读 env 并归一后注入；**未设＝字段缺席＝
+-   * 逐字现状**——适配器不得因字段缺席改变任何既有行为；**纯消费面**，三平台原生接线属各适配器批次）。
++   * G-5：会话级推理强度（Service 在 providerFor 按运行时读 env 并归一后注入）。
++   * ANS-REASONING-LIGHT D1：未设/清空时字段缺席，交给各平台默认策略，不保证原生请求零参数。
++   * Pi 新建/恢复均重新选择：显式值 → 模型设置 → 全局设置 → Pi 1.1.0 命名默认 medium；
++   * 经 SDK 能力钳位后应用，不继承转录中的旧显式等级、不改保存偏好。默认与显式档都须预算保护。
++   * 各适配器只在明确参数拒绝时按获准兼容路径继续；成功兼容状态只属当前活会话，重建后重置。
++   * 普通网络/鉴权/限流错误不改变请求策略。配置/兼容提示在活动 prompt 内用普通 message 与
++   * detail.source="system"，不得冒充 source="reasoning" 的思考事实或声称服务端实际采纳。
+    *
+    * 冻结映射（中立值 → 各平台原生落点；依据＝评估 `2026-10-16_assess_reasoning-and-effort.md`
+    * §五 与 sdk.d.ts 实据）：
+diff --git a/src/provider/claude/session.ts b/src/provider/claude/session.ts
+index d433af9..761f92c 100644
+--- a/src/provider/claude/session.ts
++++ b/src/provider/claude/session.ts
+@@ -30,6 +30,8 @@ type Turn = {
+   done: Promise<void>;
+   resolve(): void;
+   reject(error: Error): void;
++  /** Normal output or a tool allowed to start makes whole-input replay unsafe. */
++  replayUnsafe: boolean;
+ };
+ type Engine = {
+   query: SDK.Query;
+@@ -72,12 +74,30 @@ const turnLastResortError = (timeoutMs: number): Error => {
+ };
+ const isTurnLastResortError = (error: unknown): boolean =>
+   error instanceof Error && error.name === "TimeoutError" && (error as TaggedTimeout).code === TURN_LAST_RESORT_CODE;
+-// G-5 wave 2 degradation identification (probe A2, docs/fix/2026-10-16_probe_reasoning-wire.md): a
+-// gateway rejecting the reasoning parameters surfaces the API failure as text ("API Error: 4xx …")
+-// after the CLI's own retries (which never drop the parameters). Deliberately conservative: only an
+-// API 4xx that names a reasoning parameter is identified; anything unrecognized stays a plain failure.
+-const isReasoningRejection = (text: string | undefined): boolean =>
+-  typeof text === "string" && /API Error: 4\d\d/.test(text) && /\b(thinking|effort|output_config)\b/i.test(text);
++// The CLI serializes API errors into result/error frames. Incidental reasoning words in
++// auth/model/server failures must not change the request strategy.
++const isReasoningRejection = (text: string | undefined): boolean => {
++  const match = typeof text === "string" ? /API Error:\s*(400|422)\s+([\s\S]+)$/.exec(text) : null;
++  if (!match) return false;
++  let message = match[2]!.trim();
++  const parameter = /^(?:thinking(?:\.(?:type|budget_tokens))?|effort|output_config(?:\.effort)?)$/i;
++  if (message.startsWith("{")) {
++    try {
++      const body = JSON.parse(message);
++      const error = body?.error ?? body;
++      if (!error || typeof error !== "object") return false;
++      const codes = [error.type, error.code].filter((value): value is string => typeof value === "string");
++      if (codes.some((code) => !/^(?:invalid_request(?:_error)?|unsupported_parameter|unsupported_value|invalid_parameter|invalid_value|unknown_parameter|unrecognized_parameter)$/.test(code))) return false;
++      if (error.param !== undefined && error.param !== null) return typeof error.param === "string" && parameter.test(error.param) && codes.length > 0;
++      if (typeof error.message !== "string") return false;
++      message = error.message;
++    } catch { return false; }
++  }
++  // Narrow text-only fallbacks, including the installed CLI's observed "rejects effort".
++  if (/\b(?:unknown|invalid|unsupported|unrecognized)\s+model\b|\bmodel\s+(?:is\s+)?(?:not found|unsupported|not supported)\b/i.test(message)) return false;
++  return /\b(?:rejects?|unsupported|unrecognized|unknown)\s+(?:(?:parameter|field|argument)\s*[:=]?\s*)?["']?(?:thinking|effort|output_config(?:\.effort)?)(?![\w.])/i.test(message)
++    || /\b(?:thinking|effort|output_config(?:\.effort)?)\b["']?\s*(?:(?:parameter|field|value|level)\s*)?(?:(?:is|are)\s+)?(?:not supported|unsupported|not allowed|unrecognized|unknown|must be one of)\b/i.test(message);
++};
+ 
+ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, dependencies: ClaudeAdapterDependencies = {}): RuntimeAdapter {
+   if (options.runtime !== "claude") throw new Error("Claude 适配器只接受 runtime=claude");
+@@ -179,10 +199,9 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
+       let engine: Engine | undefined;
+       let temporaryDirectory: string | undefined;
+       let teardownError: Error | undefined;
+-      // G-5 wave 2 reasoning state (session-scoped): once a gateway rejects the reasoning parameters
+-      // every later engine of this session is built without them (degrade-once, exactly one retry);
+-      // `lastFailureText` carries the failed-result text from the pump to the prompt catch.
+-      let reasoningDegraded = false;
++      // A failed/cancelled compatibility attempt stays local to its prompt.
++      let reasoningCompatible = false;
++      let reasoningConfigReported = false;
+       let lastFailureText: string | undefined;
+       const diagnostics = createDiagnosticLogger({ component: "provider.claude", projectRoot: options.projectRoot, roleId: role.id });
+       const events = createQueue<SessionEvent>();
+@@ -190,6 +209,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
+         if (turn.controller.signal.aborted && kind !== "settled") return;
+         events.push({ runtime: "claude", roleId: role.id, turnId: turn.id, kind, summary: redact(summary), detail });
+       };
++      const emitReasoningSystem = (turn: Turn, state: "configured" | "trying" | "compatible" | "request-error", summary: string) =>
++        emit(turn, "message", summary, { source: "system", reasonCode: "claude-reasoning", state });
+       // G-5 reasoning facts: raw only — the Service's single projection point (projectReasoningDetail)
+       // does redaction/budgeting; the adapter never pre-redacts and never renders. The bundled CLI
+       // 2.1.299 frames carry no real per-segment duration signal (probe A1), so durationMs is never set.
+@@ -261,17 +282,15 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
+         warning = "Claude 原生会话恢复未确认，当前轮失败；当前输入未自动重试，下一条输入将新建上下文。ANS 历史仅为可读回放。";
+         current.resumeId = undefined;
+       };
+-      // G-5 wave 2 frozen mapping (src/model/runtime.ts:728-738): unset ⇒ zero parameters (verbatim
+-      // status quo); `off` ⇒ ThinkingDisabled; low/medium/high/xhigh ⇒ EffortLevel passthrough
+-      // (`max` is not in ReasoningEffortV1). After a gateway rejection the session builds paramless.
+-      const reasoningOptions = (): Pick<SDK.Options, "thinking" | "effort"> => {
+-        if (reasoningDegraded) return {};
++      // Empty options alone restore CLI defaults. Compatibility also needs the child env below.
++      const reasoningOptions = (compatible: boolean): Pick<SDK.Options, "thinking" | "effort"> => {
++        if (compatible) return {};
+         const configured = options.reasoningEffort;
+         if (configured === "off") return { thinking: { type: "disabled" } };
+         if (configured === "low" || configured === "medium" || configured === "high" || configured === "xhigh") return { effort: configured };
+         return {};
+       };
+-      const startEngine = async (turn: Turn): Promise<Engine> => {
++      const startEngine = async (turn: Turn, compatible: boolean): Promise<Engine> => {
+         if (engine && !engine.closed) return engine;
+         teardownError = undefined;
+         if (!storage && nativeId) { nativeId = undefined; warning = "Claude 活会话已中断；下一条输入将新建上下文。"; }
+@@ -304,6 +323,10 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
+         childEnv.ANTHROPIC_API_KEY = apiKey;
+         childEnv.CLAUDE_CONFIG_DIR = configDirectory;
+         childEnv.CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS = "0";
++        if (compatible) {
++          childEnv.CLAUDE_CODE_EFFORT_LEVEL = "unset";
++          childEnv.CLAUDE_CODE_DISABLE_THINKING = "1";
++        }
+         const baseUrl = options.baseUrl?.trim() || env.ANTHROPIC_BASE_URL?.trim();
+         if (baseUrl) {
+           let url: URL;
+@@ -344,6 +367,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
+             const { [CALL_CONTEXT_ARG]: _privateContext, ...publicArgs } = inputArgs;
+             const run = current.toolTail.then(async () => {
+               if (!callTurn || callTurn !== active || signal.aborted || current.closed) return { content: [{ type: "text" as const, text: "原始工具请求上下文无效或已结束，工具未执行" }], isError: true };
++              callTurn.replayUnsafe = true;
+               const facts = { toolCallId, toolName: tool.name, input: { rule: tool.displayInputRule, args: publicArgs } };
+               emitTool(callTurn, { ...facts, phase: "start", origin: "handler-start" }, "tool_call", tool.name);
+               try {
+@@ -384,7 +408,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
+           mcpServers: { ans: server, ...installedMcpConfigs }, env: childEnv, abortController: controller,
+           persistSession: !!storage, ...(nativeId ? { resume: nativeId } : {}),
+           ...(options.modelId?.trim() || env.ANS_CLAUDE_MODEL?.trim() ? { model: options.modelId?.trim() || env.ANS_CLAUDE_MODEL?.trim() } : {}),
+-          ...reasoningOptions(),
++          ...reasoningOptions(compatible),
+           canUseTool: async () => ({ behavior: "deny", message: judgeMode
+             ? "判断会话仅允许已注册的只读 judge 工具"
+             : "仅允许已注册且预批准的 ANS MCP 工具" }),
+@@ -409,6 +433,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
+             // 判断模式：只放行冻结的 judge 三件套之一（shell 或治理；名字还必须确实已注册，
+             // 因此混合/缺失集合在入口已被拒绝）。这是结构性最后一道闸，兜底文案在下方 deny 分支。
+             if (names.has(hook.tool_name) && (!judgeMode || judgeToolNames.has(hook.tool_name.slice("mcp__ans__".length))) && hook.mcp_server?.name === "ans" && hook.mcp_server.source === "sdk" && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted && hook.tool_input && typeof hook.tool_input === "object" && !Array.isArray(hook.tool_input)) {
++              originalTurn.replayUnsafe = true;
+               const token = randomUUID();
+               current.contexts.set(token, { turn: originalTurn, toolName: hook.tool_name.slice("mcp__ans__".length), toolUseId: hook.tool_use_id, signal: AbortSignal.any([original!.signal, hookOptions.signal]) });
+               return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: { ...hook.tool_input as Record<string, unknown>, [CALL_CONTEXT_ARG]: token } } };
+@@ -420,6 +445,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
+             // unchanged and the ANS call-context token must never leak outside mcp__ans__ (WebSearch
+             // branch precedent). allowedTools only carries the server-level auto-allow fallback.
+             if (hook.mcp_server && installedNames.has(hook.mcp_server.name) && hook.mcp_server.source === "dynamic" && hook.tool_name.startsWith(`mcp__${hook.mcp_server.name}__`) && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted) {
++              originalTurn.replayUnsafe = true;
+               emitTool(originalTurn, { origin: "native-start", phase: "start", toolName: hook.tool_name,
+                 toolCallId: `${originalTurn.id}:${hook.tool_use_id}`,
+                 input: { rule: "none", args: hook.tool_input !== null && typeof hook.tool_input === "object" && !Array.isArray(hook.tool_input) ? hook.tool_input as Record<string, unknown> : {} } }, "tool_call", hook.tool_name);
+@@ -430,6 +456,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
+             // without it the fallback below would kill every search. No updatedInput — the model's
+             // query must reach the tool unchanged.
+             if (webSearchEnabled && hook.tool_name === "WebSearch" && !hook.mcp_server && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted) {
++              originalTurn.replayUnsafe = true;
+               return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } };
+             }
+             if (originalTurn) {
+@@ -453,7 +480,13 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
+               const callTurn = active;
+               if (current.closed || !callTurn || callTurn.controller.signal.aborted) continue;
+               if (message.type === "assistant") {
++                if (message.error) {
++                  lastFailureText = message.message.content.filter((block) => block.type === "text").map((block) => block.text).join("\n");
++                  emitReasoningSystem(callTurn, "request-error", "Claude 接口请求未成功。");
++                  continue;
++                }
+                 for (const block of message.message.content) {
++                  if (block.type === "tool_use" || block.type === "redacted_thinking" || block.type === "text" && block.text !== "" || block.type === "thinking" && block.thinking !== "") callTurn.replayUnsafe = true;
+                   if (block.type === "text") emit(callTurn, "message", block.text);
+                   else if (block.type === "thinking") emitReasoning(callTurn, block.thinking === "" ? { text: "", status: "omitted" } : { text: block.thinking, status: "complete" });
+                   else if (block.type === "redacted_thinking") emitReasoning(callTurn, { text: "", status: "omitted" });
+@@ -486,9 +519,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
+               } else if (message.type === "result") {
+                 if (message.user_message_uuid && message.user_message_uuid !== callTurn.sdkUuid && !message.user_message_uuids?.includes(callTurn.sdkUuid)) continue;
+                 if (message.subtype !== "success" || message.is_error) {
+-                  // G-5: carry the failed-result text (probe A2: "API Error: 4xx …") for the conservative
+-                  // degradation identification in prompt(); closed after closeEngine so no late writers.
+-                  lastFailureText = typeof (message as { result?: unknown }).result === "string" ? (message as { result: string }).result : undefined;
++                  // Preserve the synthetic API error if this result omits its text.
++                  lastFailureText = typeof (message as { result?: unknown }).result === "string" ? (message as { result: string }).result : lastFailureText;
+                   resumeFailed(current);
+                   callTurn.reject(new Error("Claude SDK 本轮返回失败结果"));
+                   closeEngine(current);
+@@ -531,17 +563,21 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
+           const done = new Promise<void>((pass, fail) => { resolve = pass; reject = fail; });
+           // Observe rejection even if construction/abort fails before waitForTurn starts.
+           void done.catch(() => {});
+-          const turn: Turn = { id: options.currentTurnId() ?? randomUUID(), sdkUuid: randomUUID(), controller: new AbortController(), done, resolve, reject };
++          const turn: Turn = { id: options.currentTurnId() ?? randomUUID(), sdkUuid: randomUUID(), controller: new AbortController(), done, resolve, reject, replayUnsafe: false };
+           active = turn;
+           lastFailureText = undefined;
+           let outcome: RuntimeTurnOutcome = "completed";
+           let failure: Error | undefined;
++          let compatibleAttempt = reasoningCompatible;
+           try {
+             const images = promptOptions?.images ?? [];
+             if (images.some((image) => !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(image.mimeType))) throw new Error("Claude 不支持此输入图片类型");
+-            // G-5 degradation loop: at most one reasoning-parameter-drop retry per session (probe A2 —
+-            // the CLI's own 400 retries never drop the parameters). Each attempt gets a fresh
+-            // done/resolve/reject triple because the pump rejects the previous one when it fails.
++            if (!reasoningConfigReported) {
++              emitReasoningSystem(turn, "configured", `本会话向 Claude SDK 请求的思考配置：${options.reasoningEffort ?? "SDK 默认"}；模型可能忽略或限制档位，服务端实际采纳未验证。`);
++              reasoningConfigReported = true;
++            }
++            // One compatibility attempt per prompt, before output/tool work. SDK retries remain
++            // its own responsibility. Each attempt has a separate completion promise.
+             for (;;) {
+               let attemptResolve!: () => void;
+               let attemptReject!: (error: Error) => void;
+@@ -550,7 +586,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
+               turn.done = attemptDone; turn.resolve = attemptResolve; turn.reject = attemptReject;
+               lastFailureText = undefined;
+               try {
+-                const start = startEngine(turn);
++                const start = startEngine(turn, compatibleAttempt);
+                 const current = await waitForTurn(start, turn.controller.signal, options.constructTimeoutMs ?? 30000, options.interactionGate);
+                 if (!current.statusReported) { current.statusReported = true; await reportInstalledServerStatus(current, turn); }
+                 current.pendingInputs.set(turn.sdkUuid, turn);
+@@ -565,14 +601,17 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
+                   // the error/terminal text names the last resort (inspect deadlines never abort).
+                   throw isTurnLastResortError(error) ? error : error instanceof Error && error.name === "TimeoutError" ? turnLastResortError(turnLastResortMs) : error;
+                 }
++                if (turn.controller.signal.aborted) throw abortError();
++                if (compatibleAttempt && !reasoningCompatible) {
++                  reasoningCompatible = true;
++                  emitReasoningSystem(turn, "compatible", "本会话已使用兼容请求完成，后续沿用该方式；已保存设置不变，修改设置并重建会话后重新尝试。");
++                }
+                 break;
+               } catch (error) {
+-                // Conservative identification (probe A2 facts); unrecognized failures stay plain failures.
+-                if (!isTurnLastResortError(error) && !reasoningDegraded && options.reasoningEffort !== undefined && isReasoningRejection(lastFailureText)) {
+-                  reasoningDegraded = true;
++                if (!turn.controller.signal.aborted && !(error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name)) && !teardownError && !compatibleAttempt && !turn.replayUnsafe && isReasoningRejection(lastFailureText)) {
++                  compatibleAttempt = true;
+                   if (engine) closeEngine(engine);
+-                  emit(turn, "message", "网关不支持推理参数，已去掉参数重试一次（本会话之后不再携带）");
+-                  diagnostics.record("reasoning.degraded", { mode: "claude", reasonCode: "gateway-rejected-parameters", decision: "retry-without-reasoning", attempt: 1 });
++                  emitReasoningSystem(turn, "trying", "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。");
+                   continue;
+                 }
+                 throw error;
+diff --git a/src/provider/codex/session.ts b/src/provider/codex/session.ts
+index e4ef094..0420851 100644
+--- a/src/provider/codex/session.ts
++++ b/src/provider/codex/session.ts
+@@ -7,16 +7,16 @@ import os from "node:os";
+ import { randomUUID } from "node:crypto";
+ import type { ResolvedRole } from "../../model/role.ts";
+ import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, ToolDefinition, ToolResult, RuntimeTurnOutcome, RuntimeToolEventFactsV1, RuntimeToolErrorFactsV1, InstalledMcpServerV1 } from "../../model/runtime.ts";
+-import { object, deferred, eventQueue, pausedDeadline, bounded, webSearchRow, mcpToolName, mcpToolCallNative, isReasoningParamRejection } from "../../common/codex-adapter/protocol.ts";
++import { object, deferred, eventQueue, pausedDeadline, bounded, webSearchRow, mcpToolName, mcpToolCallNative, reasoningRejection } from "../../common/codex-adapter/protocol.ts";
+ import type { CodexRpcConnection, CodexEngineInput, CodexEngineFactory } from "../../common/codex-adapter/protocol.ts";
+ import { settings, safetyConfig, safetyOverrides, effectiveConfig, verifyThread, reasoningEffortOverride } from "../../common/codex-adapter/config.ts";
+-// G-5：推理事实通道（适配器只产事实；投影单点在 Service）+ 降级链诊断（沿 installed-skills 先例）。事件 summary
++import { prepareReasoningCatalog, type TemporaryReasoningCatalog } from "../../common/codex-adapter/reasoning-catalog.ts";
++// G-5：推理事实通道（适配器只产事实；投影单点在 Service）。事件 summary
+ // 用核心定格常量（Service 在投影单点强制覆盖——适配器不随载荷携带自由文本上 summary 位）。
+ import { REASONING_EVENT_SUMMARY } from "../../common/runtime-core/reasoning.ts";
+ // 整轮时限（客户裁定 2026-10-17）：`promptTimeoutMs` 只是看护到点检查时限，**不中止整轮**；
+ // 适配器自己的整轮上限只认「最后兜底」（缺省 1 小时、固定无 env；测试/宿主可经 `turnLastResortMs` 注入小值）。
+ import { DEFAULT_TURN_LAST_RESORT_MS } from "../../common/runtime-core/timeout.ts";
+-import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
+ // Windows 瞬时句柄占用（`EBUSY`/`EPERM`/`EACCES`）的**有界重试**单一来源（§一.5 不得第二份实现）：
+ // 收尾删除 workRoot 时，刚退出的原生进程/在途句柄可能短暂未释放——沿原子写原语同一口径处置。
+ import { retryOnTransient } from "../../common/shared/atomic-write.ts";
+@@ -308,8 +308,10 @@ interface TurnState {
+   controller: AbortController;
+   ready: ReturnType<typeof deferred<string>>;
+   done: ReturnType<typeof deferred<RuntimeTurnOutcome>>;
++  terminal: ReturnType<typeof deferred<void>>;
+   reason?: RuntimeTurnOutcome;
+   failure?: string;
++  failureFacts?: unknown;
+   completed: boolean;
+   stopping?: Promise<void>;
+   calls: Set<string>;
+@@ -376,10 +378,13 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions):
+       // 判断模式：外来 MCP 一律不装配（即使上游误传声明也置空——PM 评审 §6.1/A35）。
+       const installedServers = prepareInstalledMcpServers(judgeMode ? [] : options.installedMcpServers ?? [], environmentSnapshot);
+       const allowedServers = new Set(installedServers.map(server => server.name));
+-      // G-5：推理强度接线面（注入判定＝会话级；off＝无该档不注入另有如实行）+ 降级闸（会话级恰一次）+ 降级诊断。
+-      const reasoningInjected = reasoningEffortOverride(config.reasoningEffort) !== undefined;
+-      let reasoningDegraded = false;
+-      const diagnosticLog = createDiagnosticLogger({ component: "codex-adapter", projectRoot: options.projectRoot, roleId: role.id });
++      // Only completed compatibility turns commit a new strategy. Every ordinary turn explicitly
++      // reapplies a confirmed effort, undoing native turn/start settings left by a failed attempt.
++      let confirmedEffort: string | undefined = config.reasoningEffort === "off" ? undefined : config.reasoningEffort;
++      let compatibilityConfirmed = false;
++      let configurationShown = false;
++      let promptCount = 0;
++      let defaultEffortPromise: Promise<string | undefined> | undefined;
+       await storage?.validateNativeDirectory?.();
+       const previous = await storage?.readLatest();
+       if (previous && (previous.runtime !== "codex" || previous.roleId !== role.id)) throw new Error("Codex native session record role/runtime mismatch");
+@@ -387,6 +392,8 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions):
+       const workRoot = await mkdtemp(path.join(os.tmpdir(), "ans-codex-"));
+       const cwd = path.join(workRoot, "work");
+       const nativeHome = storage?.nativeDirectory ?? path.join(workRoot, "native");
++      let activeReasoningCatalog: TemporaryReasoningCatalog | undefined;
++      let restoreOriginalCatalog = false;
+       let engine: CodexRpcConnection | undefined;
+       let server: McpServer | undefined;
+       let client: McpClient | undefined;
+@@ -459,11 +466,11 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions):
+         const providerDefinition = `model_providers.${provider}={name="ANS Codex",base_url=${JSON.stringify(config.baseUrl)},env_key="CODEX_API_KEY",wire_api="responses",requires_openai_auth=false}`;
+         const environment = { PATH: environmentSnapshot.PATH ?? path.dirname(process.execPath), CODEX_HOME: nativeHome, CODEX_API_KEY: config.key };
+         const engineFactory = options.engineFactory ?? ((input: CodexEngineInput) => nativeEngine(input, options.cliPath));
+-        const connect = async (disabled: readonly string[], injectReasoning = true) => {
++        const connect = async (disabled: readonly string[], injectReasoning = true, reasoningCatalog?: TemporaryReasoningCatalog) => {
+           // G-4 V2：白名单定义＋禁用集编入**同一条** `-c mcp_servers={…}`（P0 探针铁律：连续 -c 同根键覆盖不合并）。
+           // G-5：`model_reasoning_effort` 为顶层标量键、独立一条（探针实证叠加无冲突）；去参数重发＝该条缺席。
+           const reasoningOverride = injectReasoning ? reasoningEffortOverride(config.reasoningEffort) : undefined;
+-          const connected = await engineFactory({ cwd, nativeHome, env: environment, configOverrides: [...safetyOverrides(cwd, disabled, config.webSearch, installedServers), ...(reasoningOverride !== undefined ? [reasoningOverride] : []), providerDefinition, `model_provider=${JSON.stringify(provider)}`], timeoutMs: options.constructTimeoutMs ?? 30000 });
++          const connected = await engineFactory({ cwd, nativeHome, env: environment, configOverrides: [...safetyOverrides(cwd, disabled, config.webSearch, installedServers), ...(reasoningOverride !== undefined ? [reasoningOverride] : []), ...(reasoningCatalog ? [`model_catalog_json=${JSON.stringify(reasoningCatalog.path)}`] : []), providerDefinition, `model_provider=${JSON.stringify(provider)}`], timeoutMs: options.constructTimeoutMs ?? 30000 });
+           // Preflight has no model, thread, MCP connections, or native approval handlers.
+           try {
+             await connected.request("initialize", { clientInfo: { name: "ans_codex_adapter", version: "2.0.0" }, capabilities: { experimentalApi: true, explicitGatewayOauth: true } });
+@@ -615,8 +622,9 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions):
+             }
+             if (params.threadId !== nativeId) return;
+             const notifyId = method === "turn/completed" ? object(params.turn, "completed native turn").id : params.turnId;
+-            void turn.ready.promise.then(expected => {
+-              if (typeof notifyId !== "string" || notifyId !== expected || active !== turn || turn.completed) return;
++            const ready = turn.ready;
++            void ready.promise.then(expected => {
++              if (ready !== turn.ready || typeof notifyId !== "string" || notifyId !== expected || active !== turn || turn.completed) return;
+               if (method === "item/completed") {
+                 const item = object(params.item, "native item");
+                 if (item.type === "agentMessage") { turn.outputSeen = true; emit(turn, "message", String(item.text ?? ""), { text: item.text }); }
+@@ -673,21 +681,24 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions):
+               } else if (method === "item/started") {
+                 // G-5：reasoning item 的真实起点（durationMs 信号面）；其余 item/started 不映射（沿既有先例）。
+                 const item = object(params.item, "native item");
++                if (["mcpToolCall", "webSearch", "dynamicToolCall", "agentMessage", "commandExecution", "fileChange"].includes(String(item.type))) turn.outputSeen = true;
+                 if (item.type === "reasoning") {
+                   turn.outputSeen = true;
+                   if (typeof item.id === "string" && typeof params.startedAtMs === "number" && Number.isFinite(params.startedAtMs)) turn.reasoningStarted.set(item.id, params.startedAtMs);
+                 }
+-              } else if (method === "item/reasoning/summaryPartAdded" || method === "item/reasoning/summaryTextDelta" || method === "item/reasoning/textDelta") {
++              } else if (method === "item/reasoning/summaryPartAdded" || method === "item/reasoning/summaryTextDelta" || method === "item/reasoning/textDelta" || method === "item/agentMessage/delta") {
+                 // G-5 增量帧＝消费（「已产出内容」证据——降级闸依赖）但不产行：行由完成态 item 给（完成态先行）。
+                 turn.outputSeen = true;
+               } else if (method === "turn/completed") {
+                 const completed = object(params.turn);
+                 const outcome = turn.reason ?? (completed.status === "completed" ? "completed" : completed.status === "interrupted" ? "aborted" : "failed");
+                 turn.reason = outcome;
+-                if (completed.error) turn.failure = config.redact(object(completed.error).message ?? "Codex turn failed");
++                if (completed.error) { turn.failureFacts = completed.error; turn.failure = config.redact(object(completed.error).message ?? "Codex turn failed"); }
++                turn.terminal.resolve();
+                 turn.done.resolve(outcome);
+               } else if (method === "error" && params.willRetry !== true) {
+-                turn.reason = "failed"; turn.failure = config.redact(object(params.error ?? {}).message ?? "Codex turn failed"); turn.done.resolve("failed");
++                turn.reason = "failed"; turn.failureFacts = params.error;
++                turn.failure = config.redact(object(params.error ?? {}).message ?? "Codex turn failed"); turn.done.resolve("failed");
+               }
+             }).catch(error => { turn.failure = config.redact(error); turn.reason = "failed"; turn.done.resolve("failed"); });
+           });
+@@ -714,20 +725,24 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions):
+         await establishThread(engine, previous?.nativeSessionId);
+         subscribeNotifications(engine);
+         await inspectCatalog(engine);
+-        // G-5：Codex 无「off」档——显式「关」不注入任何参数（`reasoningEffortOverride` 对 off 返回 undefined）
+-        // 并如实一行说明（不假装关闭；会话级恰一次，在构造期）。
+-        if (config.reasoningEffort === "off") {
+-          emit(undefined, "message", "Codex 平台无「关」档：未注入推理强度参数（维持平台默认，推理未关闭）", { version: 1, source: "reasoning-effort", reason: "off-unsupported" });
+-        }
+         const session: RoleSession = {
+-          runtime: "codex", roleId: role.id, contextSource, nativeSessionId: nativeId,
++          runtime: "codex", roleId: role.id, get contextSource() { return contextSource; }, get nativeSessionId() { return nativeId; },
+           ...(contextWarning ? { contextWarning } : {}),
+           async prompt(text, promptOptions) {
+             if (disposed || quarantined) throw new Error("Codex session is disposed or quarantined; create a new session");
+             if (active) throw new Error("Codex session already has an active turn");
+-            const turn: TurnState = { ansId: options.currentTurnId() ?? randomUUID(), controller: new AbortController(), ready: deferred<string>(), done: deferred<RuntimeTurnOutcome>(), completed: false, calls: new Set(), searchCalls: 0, outputSeen: false, reasoningStarted: new Map() };
++            const turn: TurnState = { ansId: options.currentTurnId() ?? randomUUID(), controller: new AbortController(), ready: deferred<string>(), done: deferred<RuntimeTurnOutcome>(), terminal: deferred<void>(), completed: false, calls: new Set(), searchCalls: 0, outputSeen: false, reasoningStarted: new Map() };
+             // Abort can resolve ready before turn/start so early tool requests fail closed.
+             active = turn;
++            promptCount += 1;
++            if (!configurationShown) {
++              configurationShown = true;
++              const summary = config.reasoningEffort === "off"
++                ? "Codex 未覆盖思考等级：不表示关闭推理，实际推理强度未验证。"
++                : config.reasoningEffort === undefined ? "本会话未覆盖 Codex 思考等级；服务端实际推理强度未验证。"
++                  : `本会话向 Codex SDK 请求的思考等级：${config.reasoningEffort}；服务端实际采纳未验证。`;
++              emit(turn, "message", summary, { source: "system", reasonCode: "reasoning-configuration", state: "configured" });
++            }
+             // 整轮**最后兜底**（唯一自动整轮上限；缺省 1 小时）：`promptTimeoutMs` 只看护到点检查，绝不在这里 abort。
+             // 计时沿 InteractionGate 可暂停＝按有效运行时间计（确认卡等待不触发兜底）。文案与「到点检查」明确区分；
+             // outcome 仍走既有 `timed_out` 枚举（契约不变），诊断由 failure 文本承载。
+@@ -738,6 +753,10 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions):
+               void stop(turn, "timed_out").catch(error => { turn.failure = config.redact(error); });
+             });
+             try {
++              // A failed/cancelled E1 attempt changed process-level model metadata. Restore the
++              // original catalog before the next request; an effort scalar alone is insufficient.
++              if (restoreOriginalCatalog) await reconnectNative(turn, true);
++              if (turn.controller.signal.aborted) return;
+               await storage?.validateNativeDirectory?.();
+               const input: Record<string, unknown>[] = [{ type: "text", text, text_elements: [] }];
+               for (const [index, image] of (promptOptions?.images ?? []).entries()) {
+@@ -749,27 +768,53 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions):
+                 input.push({ type: "localImage", path: imagePath });
+               }
+               if (turn.controller.signal.aborted) return;
+-              const started = object(await engine!.request("turn/start", { threadId: nativeId, input, approvalPolicy: "never", approvalsReviewer: "user", sandboxPolicy: { type: "readOnly", networkAccess: false }, model: config.model }), "turn/start");
+-              const id = object(started.turn, "native turn").id;
+-              if (typeof id !== "string" || !id) throw new Error("Codex native turn has no ID");
+-              turn.nativeId = id; turn.ready.resolve(id);
+-              if (turn.controller.signal.aborted) await stop(turn, turn.reason ?? "aborted");
++              let attemptedEffort = confirmedEffort;
++              await startNativeTurn(turn, input, attemptedEffort);
+               let outcome = await turn.done.promise;
+-              // G-5 降级链闸（保守＋有界恰一次）：首请求即失败（产出任何内容前）＋本会话曾注入推理强度＋
+-              // 错误命中推理参数拒绝判据 ⇒ 恰一次去参数重发（degradeReasoning 内部重建引擎/线程并以同一输入重发）。
+-              if (outcome === "failed" && !reasoningDegraded && reasoningInjected && !turn.outputSeen && !turn.controller.signal.aborted
+-                  && isReasoningParamRejection(turn.failure)) {
+-                await degradeReasoning(turn, input);
++              const attempted = new Set<string | undefined>([attemptedEffort]);
++              let compatibilityAttempted = false;
++              while (outcome === "failed" && !compatibilityConfirmed && attemptedEffort !== undefined
++                  && !turn.outputSeen && !turn.controller.signal.aborted && attempted.size <= 2) {
++                const rejection = reasoningRejection(turn.failureFacts ?? turn.failure);
++                if (!rejection) break;
++                let candidate: string | undefined;
++                if (rejection === "value") candidate = await catalogDefaultEffort();
++                if (candidate === undefined || attempted.has(candidate)) {
++                  candidate = undefined;
++                  if (attempted.has(undefined)) break;
++                  if (!storage && promptCount > 1) {
++                    emit(turn, "message", "本会话无法在保留已有历史的同时重建默认请求；未重放当前任务。", { source: "system", reasonCode: "reasoning-compatibility", state: "unavailable" });
++                    break;
++                  }
++                }
++                // An error notification may precede the terminal turn notification. Never start
++                // a second turn while the rejected native turn is still running.
++                await bounded(turn.terminal.promise, options.constructTimeoutMs ?? 30000, "rejected native turn completion");
++                if (turn.controller.signal.aborted || turn.outputSeen) break;
++                attempted.add(candidate);
++                compatibilityAttempted = true;
++                emit(turn, "message", "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。", { source: "system", reasonCode: "reasoning-compatibility", state: "trying" });
++                if (candidate === undefined) await reconnectNative(turn, false, true);
++                if (turn.controller.signal.aborted) break;
++                attemptedEffort = candidate;
++                await startNativeTurn(turn, input, attemptedEffort, true);
+                 outcome = await turn.done.promise;
+               }
++              if (outcome === "completed" && !turn.controller.signal.aborted && compatibilityAttempted) {
++                confirmedEffort = attemptedEffort;
++                compatibilityConfirmed = true;
++                emit(turn, "message", "本会话已使用兼容请求完成，后续沿用该方式；已保存设置不变。", { source: "system", reasonCode: "reasoning-compatibility", state: "completed" });
++              }
++              if (turn.controller.signal.aborted) outcome = turn.reason ?? "aborted";
+               if (outcome === "failed" || outcome === "timed_out") throw new Error(turn.failure ?? `Codex turn ${outcome}`);
+             } catch (error) {
+               turn.reason ??= "failed";
+-              turn.failure ??= config.redact(error);
++              turn.failure = config.redact(error);
+               turn.controller.abort();
+               turn.ready.resolve("");
+               if (turn.reason !== "aborted") throw new Error(turn.failure);
+             } finally {
++              if (activeReasoningCatalog && !compatibilityConfirmed) restoreOriginalCatalog = true;
+               stopTimer(); turn.completed = true; turn.controller.abort(); turn.ready.resolve("");
+               emit(turn, "settled", `Codex turn ${turn.reason ?? "completed"}`, { outcome: turn.reason ?? "completed", ...(turn.failure ? { error: turn.failure } : {}), ...(turn.searchCalls ? { searchCalls: turn.searchCalls } : {}) });
+               if (active === turn) active = undefined;
+@@ -807,37 +852,92 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions):
+           })();
+           return turn.stopping;
+         }
+-        // G-5 降级链核心（有界恰一次；会话级）：网关因推理参数拒绝首请求 ⇒ 去掉该参数、其余覆盖逐字不变
+-        // （连进程重建——0.162.1 探针：thread config 置 null/空被拒、轮级 effort=null 不生效，无轻量取消路径）、
+-        // 重建线程（有 storage 先试续接当前线程，失败或非持久会话走新线程）并以同一输入重发；成功后本轮继续。
+-        // 中途中止：清 nativeId 转既有 early-abort 语义（quarantine——沿既有纪律，不拿死引擎发 interrupt）。
+-        async function degradeReasoning(turn: TurnState, input: readonly Record<string, unknown>[]): Promise<void> {
+-          reasoningDegraded = true; // 恰一次（会话级：此后本会话引擎不再携带该参数，也不会再次重发）
+-          const resumableThreadId = storage ? nativeId : "";
++        // Model metadata is read only after a precise effort rejection, from this CLI instance
++        // (value-default selection or E1's field-removal candidate), never on the normal path.
++        // Exact model identity and a declared default are required; no alias or guessed default.
++        function catalogDefaultEffort(): Promise<string | undefined> {
++          return defaultEffortPromise ??= (async () => {
++            let cursor: string | undefined;
++            const seen = new Set<string>();
++            try {
++              do {
++                const page = object(await engine!.request("model/list", { includeHidden: true, limit: 100, ...(cursor ? { cursor } : {}) }), "model catalog");
++                if (!Array.isArray(page.data)) return undefined;
++                for (const value of page.data) {
++                  const model = object(value, "catalog model");
++                  if (model.model !== config.model) continue;
++                  const effort = model.defaultReasoningEffort;
++                  return typeof effort === "string" && /^[a-z]{1,16}$/.test(effort)
++                    && Array.isArray(model.supportedReasoningEfforts)
++                    && model.supportedReasoningEfforts.some(option => object(option).reasoningEffort === effort) ? effort : undefined;
++                }
++                cursor = typeof page.nextCursor === "string" && page.nextCursor ? page.nextCursor : undefined;
++                if (cursor && seen.has(cursor)) return undefined;
++                if (cursor) seen.add(cursor);
++              } while (cursor && seen.size < 10);
++            } catch { /* Missing/unavailable directory is not a guessed model capability. */ }
++            return undefined;
++          })();
++        }
++        async function startNativeTurn(turn: TurnState, input: readonly Record<string, unknown>[], effort: string | undefined, retry = false): Promise<void> {
++          turn.reason = undefined; turn.failure = undefined; turn.failureFacts = undefined;
+           turn.nativeId = undefined;
+-          emit(turn, "message", "本网关不支持所设推理强度，本轮已按默认执行", { version: 1, source: "reasoning-effort", reason: "gateway-rejected" });
+-          try { diagnosticLog.record("reasoning.effort.degraded", { runtime: "codex", retried: true }); } catch { /* 诊断绝不改变执行 */ }
+-          unsubscribe?.();
+-          await engine!.close();
+-          if (turn.controller.signal.aborted) return;
+-          const reconnected = await connect(foreignServers, false);
+-          engine = reconnected.connected;
+-          engine.onServerRequest(nativeToolHandler);
+-          subscribeNotifications(engine);
+-          if (turn.controller.signal.aborted) return;
+-          await establishThread(engine, resumableThreadId !== "" ? resumableThreadId : undefined);
+-          await inspectCatalog(engine);
+-          if (turn.controller.signal.aborted) return;
+-          // 重臂轮状态并以同一输入重发（reason/failure 清空——首次失败不再算数；ready/done 重挂到重发轮）。
+-          turn.reason = undefined; turn.failure = undefined;
+-          turn.calls.clear(); turn.reasoningStarted.clear();
+-          turn.ready = deferred<string>(); turn.done = deferred<RuntimeTurnOutcome>();
+-          const restarted = object(await engine.request("turn/start", { threadId: nativeId, input, approvalPolicy: "never", approvalsReviewer: "user", sandboxPolicy: { type: "readOnly", networkAccess: false }, model: config.model }), "turn/start");
+-          const retried = object(restarted.turn, "native turn").id;
+-          if (typeof retried !== "string" || !retried) throw new Error("Codex native turn has no ID");
+-          turn.nativeId = retried; turn.ready.resolve(retried);
++          // The first ready promise may already be captured by an early native tool request.
++          // Keep its identity until it resolves; only a completed/rejected attempt is rearmed.
++          if (retry) { turn.ready = deferred<string>(); turn.done = deferred<RuntimeTurnOutcome>(); turn.terminal = deferred<void>(); }
++          const started = object(await engine!.request("turn/start", { threadId: nativeId, input, approvalPolicy: "never", approvalsReviewer: "user", sandboxPolicy: { type: "readOnly", networkAccess: false }, model: config.model, ...(effort !== undefined ? { effort } : {}) }), "turn/start");
++          const id = object(started.turn, "native turn").id;
++          if (typeof id !== "string" || !id) throw new Error("Codex native turn has no ID");
++          turn.nativeId = id; turn.ready.resolve(id);
+           if (turn.controller.signal.aborted) await stop(turn, turn.reason ?? "aborted");
+         }
++        async function reconnectNative(turn: TurnState, originalStrategy: boolean, effortRejected = false): Promise<void> {
++          const needsCatalog = !originalStrategy && effortRejected && !options.cliPath && await catalogDefaultEffort() !== undefined;
++          if (turn.controller.signal.aborted) return;
++          const resumableThreadId = storage ? nativeId : undefined;
++          const previousCatalog = activeReasoningCatalog;
++          let replacement: TemporaryReasoningCatalog | undefined;
++          turn.nativeId = undefined;
++          nativeId = "";
++          unsubscribe?.();
++          try {
++            await engine!.close();
++            if (turn.controller.signal.aborted) return;
++            // This replaces the existing absent-effort candidate; it is not a third retry.
++            // Custom CLI paths are not asserted to share the installed package's metadata format.
++            if (needsCatalog) {
++              replacement = await prepareReasoningCatalog(workRoot, config.model);
++            }
++            if (turn.controller.signal.aborted) {
++              if (replacement) await rm(replacement.directory, { recursive: true, force: true });
++              return;
++            }
++            const reconnected = await connect(foreignServers, originalStrategy, replacement);
++            engine = reconnected.connected;
++            activeReasoningCatalog = replacement;
++            engine.onServerRequest(nativeToolHandler);
++            subscribeNotifications(engine);
++            if (turn.controller.signal.aborted) {
++              quarantined = true;
++              await engine.close();
++              if (replacement) await rm(replacement.directory, { recursive: true, force: true });
++              activeReasoningCatalog = undefined;
++              return;
++            }
++            await establishThread(engine, resumableThreadId);
++            await inspectCatalog(engine);
++            if (previousCatalog) await rm(previousCatalog.directory, { recursive: true, force: true });
++            restoreOriginalCatalog = false;
++          } catch (error) {
++            // No next turn may reuse an engine whose reconstruction was not confirmed.
++            quarantined = true;
++            await engine?.close().catch(() => {});
++            if (replacement) await rm(replacement.directory, { recursive: true, force: true });
++            if (previousCatalog) await rm(previousCatalog.directory, { recursive: true, force: true });
++            activeReasoningCatalog = undefined;
++            throw error;
++          }
++        }
+         return session;
+       } catch (error) {
+         try { await cleanup(); } catch (cleanupError) { throw new Error(`${config.redact(error)}; cleanup: ${config.redact(cleanupError)}`); }
+diff --git a/src/service/runtime/session.ts b/src/service/runtime/session.ts
+index 2f2ee9a..b350419 100644
+--- a/src/service/runtime/session.ts
++++ b/src/service/runtime/session.ts
+@@ -147,8 +147,8 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
+           } }));
+       // G-5：推理强度（wave 1 接线）——按运行时读 env（`ANS_CLAUDE/CODEX/PI_REASONING_EFFORT`）并
+       // 归一（**纯读**，providerFor 每次重建即重读＝「改设置 ⇒ 下次开会话生效」沿既有语义）。非法值＝
+-      // **按未设处理**（零参数、零行为变化）＋诊断如实；**绝不因偏好值坏件拒开会话/毁轮次**（偏好不是
+-      // 承载件）。未设＝不注入字段（逐字现状；三平台原生消费属适配器批次＝wave 2）。
++      // **按未设处理**（本层不注入字段）＋诊断如实；**绝不因偏好值坏件拒开会话/毁轮次**（偏好不是
++      // 承载件）。字段缺席交平台默认策略，不保证原生请求零参数；恢复默认与兼容由各适配器负责。
+       const reasoningEffort = resolveReasoningEffort(options.runtime);
+       if (reasoningEffort.state === "invalid") {
+         try { options.diagnostics?.record("reasoning.effort.invalid", { mode: options.runtime, supported: false, reasonCode: "invalid-value" }); } catch { /* 诊断绝不能改变执行 */ }
+@@ -167,7 +167,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
+         ...(judgeTools !== undefined
+           ? { judgeMode: true as const, installedMcpServers: [] as const }
+           : { installedMcpServers: listInstalledMcpServers(options.projectRoot, role.id) }),
+-        // G-5：仅 `set` 态注入字段；`unset`/`invalid` 保持**字段缺席**（逐字现状的机读形态）。
++        // G-5：仅 `set` 态注入字段；`unset`/`invalid` 保持字段缺席，交各平台默认策略。
+         ...(reasoningEffort.state === "set" ? { reasoningEffort: reasoningEffort.effort } : {}),
+         ...resolveRuntimeTimeouts(options.runtime, options),
+       };
+diff --git "a/test/\346\265\213\350\257\225/g3-search-verify/codex-websearch-verify.test.ts" "b/test/\346\265\213\350\257\225/g3-search-verify/codex-websearch-verify.test.ts"
+index 64e8fcb..c53c0e2 100644
+--- "a/test/\346\265\213\350\257\225/g3-search-verify/codex-websearch-verify.test.ts"
++++ "b/test/\346\265\213\350\257\225/g3-search-verify/codex-websearch-verify.test.ts"
+@@ -218,7 +218,7 @@ test("全链（开）：env on 与 options 显式两路都使三钉同翻 live
+     await session.dispose();
+     await events.done;
+ 
+-    const rows = events.entries.filter((event) => event.kind === "message");
++    const rows = events.entries.filter((event) => event.kind === "message" && (event.detail as { source?: string } | undefined)?.source === "web-search");
+     assert.deepEqual(rows.map((row) => row.summary), ["联网搜索：独立验证搜索", "联网搜索：第二轮-A", "联网搜索：第二轮-B"]);
+     assert.deepEqual(rows[0]!.detail, { version: 1, source: "web-search", itemId: "ws_1", query: "独立验证搜索", action: { type: "search" } });
+     assert.equal(rows[1]!.turnId, rows[2]!.turnId, "同轮两行同 turnId");
+@@ -242,7 +242,7 @@ test("全链：零搜索轮 settled 不携带 searchCalls；item/started 不接
+     await turn.done;
+     await session.dispose();
+     await events.done;
+-    assert.equal(events.entries.filter((event) => event.kind === "message").length, 0, "item/started 零映射");
++    assert.equal(events.entries.filter((event) => event.kind === "message" && (event.detail as { source?: string } | undefined)?.source === "web-search").length, 0, "item/started 零搜索映射（system 配置提示单独计）");
+     assert.deepEqual(events.entries.filter((event) => event.kind === "settled").map((event) => event.detail), [{ outcome: "completed" }], "零搜索轮不带 searchCalls 键");
+   }
+   {
+@@ -279,7 +279,7 @@ test("全链：网关拒声明（error 通知）⇒ 本轮如实 failed 且 sett
+   assert.equal(allText.includes("g3-fake-key"), false, "凭据被既有脱敏管线剥除");
+   assert.equal(allText.includes("q=private-topic"), false, "URL query 被既有保守裁剪");
+   assert.equal(allText.includes("id=42"), false);
+-  const row = events.entries.find((event) => event.kind === "message")!;
++  const row = events.entries.find((event) => event.kind === "message" && (event.detail as { source?: string } | undefined)?.source === "web-search")!;
+   assert.equal(row.summary.includes("[REDACTED]"), true);
+   assert.equal((row.detail as { results: Array<{ url: string }> }).results[0]!.url, "https://x.test/page");
+   const settled = events.entries.filter((event) => event.kind === "settled");
+diff --git "a/test/\346\265\213\350\257\225/g4v2-mcp-verify/j-pi.test.ts" "b/test/\346\265\213\350\257\225/g4v2-mcp-verify/j-pi.test.ts"
+index 3c2e7a0..021524f 100644
+--- "a/test/\346\265\213\350\257\225/g4v2-mcp-verify/j-pi.test.ts"
++++ "b/test/\346\265\213\350\257\225/g4v2-mcp-verify/j-pi.test.ts"
+@@ -298,7 +298,7 @@ test("J7 治理回归（MCP 激活下）：server-tools 声明照常启用（启
+         const connected = await until(() => mcpNamesOf(sdk.native).length >= 1, 8000);
+         assert.ok(connected, "MCP 照常接通（server-tools 同开不互斥）");
+         const extensions = sdk.extensionsResult.extensions.map((x) => String(x.path));
+-        assert.ok(extensions.includes("<inline:ans-governance>") && extensions.length === 2, `扩展＝治理＋MCP 恰两件：${JSON.stringify(extensions)}`);
++        assert.ok(extensions.includes("<inline:ans-governance>") && extensions.includes("<inline:ans-reasoning>") && extensions.length === 3, `扩展＝治理＋默认思考保护＋MCP 恰三件：${JSON.stringify(extensions)}`);
+         sdk.faux.setResponses([
+           sdk.ai.fauxAssistantMessage([sdk.ai.fauxToolCall("mcp__srv_g__echo", { text: "G-MARK" })]),
+           sdk.ai.fauxAssistantMessage("done"),
+@@ -318,14 +318,14 @@ test("J7 治理回归（MCP 激活下）：server-tools 声明照常启用（启
+ 
+ // —————————————————————— 零声明逐字旧行为 ——————————————————————
+ 
+-test("J6 零声明：扩展仅治理一件、活动面为空、不调 bindExtensions、轮次照常（settled 恰 1）", async () => {
++test("J6 零声明：仅治理和默认思考保护、活动面为空、不调 MCP bindExtensions、轮次照常（settled 恰 1）", async () => {
+   await temp(async (dir) => {
+     const sdk = await engine();
+     await writeFile(join(dir, "mcp.json"), JSON.stringify({ servers: { rogue: { command: "node", args: [] } } }));
+     const session = await createRealPiRuntimeAdapter(adapterOptions(dir), sdk.dependencies).bindRole(role);
+     try {
+       assert.deepEqual(sdk.native.getActiveToolNames(), [], "活动面为空（零声明）");
+-      assert.deepEqual(sdk.extensionsResult.extensions.map((x) => String(x.path)), ["<inline:ans-governance>"], "扩展仅治理一件（MCP 扩展不加载；rogue mcp.json 零搭车）");
++      assert.deepEqual(sdk.extensionsResult.extensions.map((x) => String(x.path)), ["<inline:ans-governance>", "<inline:ans-reasoning>"], "仅治理和默认思考保护（MCP 扩展不加载；rogue mcp.json 零搭车）");
+       sdk.faux.setResponses([sdk.ai.fauxAssistantMessage("plain")] as never);
+       await session.prompt("no mcp");
+     } finally {
+diff --git "a/test/\346\265\213\350\257\225/g5-reasoning-verify/c-claude.test.ts" "b/test/\346\265\213\350\257\225/g5-reasoning-verify/c-claude.test.ts"
+index 84cc6c3..67ae09f 100644
+--- "a/test/\346\265\213\350\257\225/g5-reasoning-verify/c-claude.test.ts"
++++ "b/test/\346\265\213\350\257\225/g5-reasoning-verify/c-claude.test.ts"
+@@ -1,7 +1,7 @@
+ // test/测试/g5-reasoning-verify/c-claude.test.ts —— C 域：Claude 适配器接线（独立验证，自建假 SDK）。
+ //
+ // 验证对象：`src/provider/claude/session.ts`（映射表未设/off/四档；thinking/redacted 捕获⇒事实；
+-// 降级判据＋会话级恰一次＋同输入原地重推＋此后零参数；负例双向）。
++// D1 精确兼容判据、子进程双 env 去参、成功后沿用/失败恢复、同输入安全重推与负例）。
+ // 自建最小假 query（真 createSdkMcpServer/zod 保装配面真实；transport 假化），全部断言独立构造。
+ 
+ import test from "node:test";
+@@ -29,6 +29,12 @@ function fakeGate(): InteractionGate {
+ }
+ 
+ const API_SECRET = "claude-g5-secret-317";
++function systemRows(events: SessionEvent[], state: string) {
++  return events.filter(event => {
++    const detail = event.detail as { source?: string; state?: string } | undefined;
++    return detail?.source === "system" && detail.state === state;
++  });
++}
+ 
+ type Frame = Record<string, unknown>;
+ type Script = (queryIndex: number, userIndex: number, options: SDK.Options) => { frames?: Frame[]; fail?: string } | undefined;
+@@ -89,7 +95,7 @@ function fakeClaude(script: Script): FakeClaude {
+ }
+ 
+ function options(root: string, extra: Partial<RuntimeProviderOptions> = {}): RuntimeProviderOptions {
+-  return { runtime: "claude", projectRoot: root, skillRoot: root, tools: [], modelId: "fixture-model", currentTurnId: () => undefined, interactionGate: fakeGate(), ...extra };
++  return { runtime: "claude", projectRoot: root, skillRoot: root, tools: [], modelId: "fixture-model", currentTurnId: () => "g5-claude-turn", interactionGate: fakeGate(), ...extra };
+ }
+ 
+ function assistantFrame(content: unknown[]): Frame {
+@@ -177,6 +183,10 @@ test("C3 降级正向：4xx＋参数词元 ⇒ 恰一次去参数重发（新引
+     assert.equal(fake.configurations[0]!.effort, "high", "首引擎带 effort");
+     assert.equal("thinking" in fake.configurations[1]!, false);
+     assert.equal("effort" in fake.configurations[1]!, false, "重发引擎零推理参数");
++    const compatibleEnv = fake.configurations[1]!.env as Record<string, string>;
++    assert.equal(compatibleEnv.CLAUDE_CODE_EFFORT_LEVEL, "unset");
++    assert.equal(compatibleEnv.CLAUDE_CODE_DISABLE_THINKING, "1");
++    assert.equal(fake.dependencies.env.CLAUDE_CODE_EFFORT_LEVEL, undefined, "主进程/输入环境不修改");
+     // 同输入原地重推：同 uuid、同 message 逐字（含 [ANS_INPUT_CONTEXT] 前缀）。
+     assert.equal(fake.users.length, 2, "同轮恰两次投递（原发＋重发）");
+     assert.equal(fake.users[0]!.uuid, fake.users[1]!.uuid, "同 uuid");
+@@ -187,19 +197,23 @@ test("C3 降级正向：4xx＋参数词元 ⇒ 恰一次去参数重发（新引
+     assert.equal(fake.users.length, 3);
+     await session.dispose();
+     const rows = await rowsPromise;
+-    const notices = rows.filter((row) => row.kind === "message" && String(row.summary).includes("网关不支持推理参数"));
+-    assert.equal(notices.length, 1, "如实一行恰一次");
++    const notices = systemRows(rows, "compatible");
++    assert.equal(notices.length, 1, "只有完成后才宣布兼容成功");
++    assert.equal(systemRows(rows, "trying").length, 1);
++    assert.equal(systemRows(rows, "configured").length, 1);
++    assert.ok([...notices, ...systemRows(rows, "trying"), ...systemRows(rows, "configured")].every(row => row.turnId === "g5-claude-turn"));
+     const settled = rows.filter((row) => row.kind === "settled");
+     assert.equal(settled.length, 2, "settled 单点（每轮恰一；失败尝试不产 settled）");
+     assert.deepEqual(settled.map((row) => (row.detail as { outcome: string }).outcome), ["completed", "completed"], "降级后本轮按成功收场");
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
+-test("C3b 降级负例双向：5xx 带词元不识别；4xx 无词元不识别；未设会话同文案不降级（不重建、失败如实上抛）", async () => {
++test("C3b 负例：5xx/无参数词元/错误模型/鉴权/运输错误不误触发兼容", async () => {
+   const negatives: Array<{ fail: string; effort?: RuntimeProviderOptions["reasoningEffort"]; label: string }> = [
+     { fail: "API Error: 500 upstream unstable while handling thinking", effort: "low", label: "5xx 带词元" },
+     { fail: "API Error: 400 plain rate limit exceeded", effort: "low", label: "4xx 无词元" },
+-    { fail: "API Error: 400 rejects effort", label: "未设会话（无参数可去）" },
++    { fail: 'API Error: 400 {"error":{"type":"invalid_request_error","param":"model","message":"Unknown model, effort unavailable"}}', effort: "high", label: "错误模型即使提及 effort 也不误触发" },
++    { fail: "API Error: 403 authentication denied thinking", effort: "high", label: "鉴权错误" },
+     { fail: "network reset while streaming thinking", effort: "low", label: "非 API Error 形态" },
+   ];
+   for (const cell of negatives) {
+@@ -213,27 +227,55 @@ test("C3b 降级负例双向：5xx 带词元不识别；4xx 无词元不识别
+       assert.equal(fake.users.length, 1, cell.label + "：不重发");
+       await session.dispose();
+       const rows = await rowsPromise;
+-      assert.equal(rows.some((row) => String(row.summary).includes("网关不支持推理参数")), false, cell.label + "：无降级行");
++      assert.equal(systemRows(rows, "trying").length, 0, cell.label + "：无兼容尝试");
++      assert.equal(systemRows(rows, "compatible").length, 0, cell.label + "：无伪成功");
+       assert.equal((rows.filter((row) => row.kind === "settled").at(-1)!.detail as { outcome: string }).outcome, "failed", cell.label + "：失败终态");
+     } finally { rmSync(root, { recursive: true, force: true }); }
+   }
+ });
+ 
+-test("C3c 降级闸会话级恰一次：重发仍被拒 ⇒ 无第二次重发；本会话后续轮次不再触发（引擎已零参数）", async () => {
++test("C3c 兼容失败恢复配置：每轮最多一次尝试，下一轮重施原 off，绝不记忆未成功候选", async () => {
+   const root = tempRoot();
+   try {
+-    const fake = fakeClaude((index) => ({ fail: `API Error: 403 thinking rejected (attempt ${index})` }));
+-    const session = await createClaudeRuntimeAdapter(options(root, { reasoningEffort: "off" }), fake.dependencies as never).bindRole(makeRole("R-C"));
+-    const rowsPromise = (async () => { const out: SessionEvent[] = []; for await (const event of session.events()) out.push(event); return out; })();
+-    await assert.rejects(session.prompt("首轮"), /Claude/);
+-    assert.equal(fake.configurations.length, 2, "首失败 + 恰一次重发（重发再拒不再重建）");
+-    // 次轮：引擎已零参数（重发引擎），失败仍如实（不再产降级行——闸已关）。
+-    await assert.rejects(session.prompt("次轮"), /Claude/);
+-    assert.equal(fake.configurations.length, 3, "次轮换新引擎重建（上轮失败关引擎），但声称零参数");
+-    assert.equal("thinking" in fake.configurations[2]!, false, "此后零参数（含 off 档）");
+-    assert.equal("effort" in fake.configurations[2]!, false);
+-    await session.dispose();
+-    const rows = await rowsPromise;
+-    assert.equal(rows.filter((row) => String(row.summary).includes("网关不支持推理参数")).length, 1, "降级行会话级恰一次");
++    const fake = fakeClaude(() => ({ fail: "API Error: 400 unsupported parameter: thinking" }));
++    const configured = options(root, { reasoningEffort: "off" });
++    const session = await createClaudeRuntimeAdapter(configured, fake.dependencies as never).bindRole(makeRole("R-C"));
++    const events: SessionEvent[] = [];
++    const collected = (async () => { for await (const event of session.events()) events.push(event); })();
++    try {
++      await assert.rejects(session.prompt("首轮"), /Claude/);
++      assert.equal(fake.configurations.length, 2, "首轮原配置加一次兼容尝试");
++      await assert.rejects(session.prompt("次轮"), /Claude/);
++      assert.equal(fake.configurations.length, 4, "下一轮恢复原配置，再至多尝试一次");
++      assert.deepEqual(fake.configurations[2]!.thinking, { type: "disabled" });
++      assert.equal((fake.configurations[2]!.env as Record<string, string>).CLAUDE_CODE_EFFORT_LEVEL, undefined);
++      assert.equal(configured.reasoningEffort, "off", "保存设置不变");
++    } finally { await session.dispose(); await collected; }
++    assert.equal(systemRows(events, "trying").length, 2);
++    assert.equal(systemRows(events, "compatible").length, 0);
++    assert.deepEqual(events.filter(event => event.kind === "settled").map(event => (event.detail as { outcome: string }).outcome), ["failed", "failed"]);
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
++
++test("C4 默认也能兼容；已有真实输出时不重放用户任务", async () => {
++  for (const alreadyOutput of [false, true]) {
++    const root = tempRoot();
++    try {
++      const fake = fakeClaude(index => index === 0 ? {
++        fail: "API Error: 400 unsupported parameter: thinking",
++        frames: alreadyOutput ? [assistantFrame([{ type: "text", text: "already delivered" }])] : [],
++      } : undefined);
++      const session = await createClaudeRuntimeAdapter(options(root), fake.dependencies as never).bindRole(makeRole("R-C"));
++      const events: SessionEvent[] = [];
++      const collected = (async () => { for await (const event of session.events()) events.push(event); })();
++      try {
++        if (alreadyOutput) await assert.rejects(session.prompt("default-output"), /Claude/);
++        else await session.prompt("default-compatible");
++        assert.equal(fake.configurations.length, alreadyOutput ? 1 : 2);
++        assert.equal(fake.users.length, alreadyOutput ? 1 : 2);
++      } finally { await session.dispose(); await collected; }
++      assert.equal(systemRows(events, "compatible").length, alreadyOutput ? 0 : 1);
++      assert.equal(events.filter(event => event.kind === "settled").length, 1);
++    } finally { rmSync(root, { recursive: true, force: true }); }
++  }
++});
+diff --git "a/test/\346\265\213\350\257\225/g5-reasoning-verify/d-codex.test.ts" "b/test/\346\265\213\350\257\225/g5-reasoning-verify/d-codex.test.ts"
+index f90a92d..771b62f 100644
+--- "a/test/\346\265\213\350\257\225/g5-reasoning-verify/d-codex.test.ts"
++++ "b/test/\346\265\213\350\257\225/g5-reasoning-verify/d-codex.test.ts"
+@@ -2,7 +2,7 @@
+ //
+ // 验证对象：`src/provider/codex/{session,config,protocol}.ts`——settings 五值校验（越界装配前抛）、
+ // 单条 `-c` 注入（未设/off 零注入）、off 如实文案、reasoning 事件（完成态恰一行/文本优先级/双信号时长/
+-// 增量零行）、降级闸（恰一次＋重建＋同输入；负例四格＋跨轮不再）。
++// 增量零行）、D1 精确拒绝后的默认/去覆盖候选、真实 terminal 时序和失败后策略恢复。
+ // **自建独立 engine 假**（不复用实施方 fixtures 的 FakeEngine）：逐帧原始控制（错轮帧/单信号/非字符串
+ // 摘要等对抗件均为实施方用例未覆盖类别）。
+ 
+@@ -15,7 +15,8 @@ import { DISABLED_NATIVE_FEATURES } from "../../../src/common/codex-adapter/conf
+ import type { InteractionGate, ReasoningEffortV1, RoleSession, SessionEvent } from "../../../src/model/runtime.ts";
+ import { makeRole } from "./helpers.ts";
+ 
+-const REJECTION = '{"error":{"message":"Unsupported parameter: reasoning","type":"invalid_request_error"}}';
++const REJECTION = JSON.stringify({ error: { message: "Unsupported parameter: reasoning.effort", type: "invalid_request_error", code: "unsupported_parameter", param: "reasoning.effort" } });
++const VALUE_REJECTION = JSON.stringify({ error: { message: "Unsupported value: high", type: "invalid_request_error", code: "unsupported_value", param: "reasoning.effort" } });
+ 
+ function fakeGate(): InteractionGate {
+   return { begin() {}, end() {}, isWaiting: () => false, onChange: () => () => {} };
+@@ -35,10 +36,12 @@ class Engine implements CodexRpcConnection {
+   turn = 0;
+   turnId = "";
+   closed = false;
+-  constructor(input: CodexEngineInput) { this.input = input; }
++  readonly models: unknown[];
++  constructor(input: CodexEngineInput, models: unknown[] = [], id = "thread-g5") { this.input = input; this.models = models; this.threadId = id; }
+   async request(method: string, params: Record<string, unknown>): Promise<unknown> {
+     this.requests.push({ method, params });
+     if (method === "initialize") return {};
++    if (method === "model/list") return { data: this.models, nextCursor: null };
+     if (method === "config/read") {
+       const override = this.input.configOverrides.find((value) => value.startsWith("web_search="));
+       const mode = /^web_search="([^"]*)"$/.exec(override ?? "")?.[1] ?? "disabled";
+@@ -58,13 +61,16 @@ class Engine implements CodexRpcConnection {
+   /** item/started 与 item/completed 分开（原始帧控制——单信号/错序/错轮均由测试构造）。 */
+   itemStarted(item: Record<string, unknown>, startedAtMs?: unknown) { this.frame("item/started", { threadId: this.threadId, turnId: this.turnId, item, ...(startedAtMs !== undefined ? { startedAtMs } : {}) }); }
+   itemCompleted(item: Record<string, unknown>, completedAtMs?: unknown) { this.frame("item/completed", { threadId: this.threadId, turnId: this.turnId, item: { id: "rs-1", ...item }, ...(completedAtMs !== undefined ? { completedAtMs } : {}) }); }
+-  failTurn(message: string, willRetry = false) { this.frame("error", { threadId: this.threadId, turnId: this.turnId, error: { message }, willRetry }); }
++  failTurn(message: string, willRetry = false) {
++    this.frame("error", { threadId: this.threadId, turnId: this.turnId, error: { message }, willRetry });
++    if (!willRetry) this.frame("turn/completed", { threadId: this.threadId, turn: { id: this.turnId, status: "failed", error: { message } } });
++  }
+   finish(status = "completed") { this.frame("turn/completed", { threadId: this.threadId, turn: { id: this.turnId, status } }); }
+ }
+ 
+-function harness() {
++function harness(models: unknown[] = []) {
+   const engines: Engine[] = [];
+-  return { engines, get engine() { return engines.at(-1)!; }, factory: async (input: CodexEngineInput): Promise<CodexRpcConnection> => { const engine = new Engine(input); engines.push(engine); return engine; } };
++  return { engines, get engine() { return engines.at(-1)!; }, factory: async (input: CodexEngineInput): Promise<CodexRpcConnection> => { const engine = new Engine(input, models, `thread-g5-${engines.length + 1}`); engines.push(engine); return engine; } };
+ }
+ 
+ function options(root: string, engines: ReturnType<typeof harness>, extra: Record<string, unknown> = {}) {
+@@ -98,7 +104,11 @@ async function beginTurn(session: RoleSession, engine: Engine, text = "fixture")
+ 
+ const effortOverrides = (engine: Engine) => engine.input.configOverrides.filter((value) => value.startsWith("model_reasoning_effort"));
+ const reasoningRows = (entries: SessionEvent[]) => entries.filter((entry) => (entry.detail as { source?: string } | undefined)?.source === "reasoning");
+-const effortRows = (entries: SessionEvent[]) => entries.filter((entry) => (entry.detail as { source?: string } | undefined)?.source === "reasoning-effort");
++const systemRows = (entries: SessionEvent[], state?: string) => entries.filter(entry => {
++  const detail = entry.detail as { source?: string; state?: string } | undefined;
++  return detail?.source === "system" && (state === undefined || detail.state === state);
++});
++const turnRequests = (engine: Engine) => engine.requests.filter(request => request.method === "turn/start");
+ 
+ // —————————————————————— ① settings 五值校验（越界装配前抛、零副作用） ——————————————————————
+ 
+@@ -144,25 +154,23 @@ test("D2 注入：四档恰一条独立顶层标量 `-c model_reasoning_effort=\
+   }
+ });
+ 
+-test("D2b off：无该档——零注入＋会话级恰一行如实（不假装关闭）；未设会话零如实行", async () => {
+-  const engines = harness();
+-  const session = await createCodexRuntimeAdapter(options("/fixture", engines, { reasoningEffort: "off" })).bindRole(makeRole("R-D"));
+-  const events = collect(session);
+-  assert.deepEqual(effortOverrides(engines.engine), [], "off ⇒ 零注入");
+-  await session.dispose();
+-  await events.done;
+-  const rows = effortRows(events.entries);
+-  assert.equal(rows.length, 1, "会话级恰一行");
+-  assert.equal(rows[0]!.summary, "Codex 平台无「关」档：未注入推理强度参数（维持平台默认，推理未关闭）", "如实文案（不假装关闭）");
+-  assert.deepEqual(rows[0]!.detail, { version: 1, source: "reasoning-effort", reason: "off-unsupported" });
+-  assert.equal(rows[0]!.turnId, undefined, "构造期行无轮次身份");
+-  // 未设对照：零如实行（逐字现状）。
+-  const baseline = harness();
+-  const baseSession = await createCodexRuntimeAdapter(options("/fixture", baseline)).bindRole(makeRole("R-D"));
+-  const baseEvents = collect(baseSession);
+-  await baseSession.dispose();
+-  await baseEvents.done;
+-  assert.equal(effortRows(baseEvents.entries).length, 0);
++test("D2b off 与未设不注入参数；配置提示只在 active prompt 内，不声称推理已关闭", async () => {
++  for (const effort of ["off", undefined]) {
++    const engines = harness();
++    const session = await createCodexRuntimeAdapter(options("/fixture", engines, { reasoningEffort: effort })).bindRole(makeRole("R-D"));
++    const events = collect(session);
++    assert.deepEqual(effortOverrides(engines.engine), []);
++    assert.equal(events.entries.length, 0, "构造期不得发无轮次提示");
++    const { completion } = await beginTurn(session, engines.engine);
++    assert.equal(turnRequests(engines.engine)[0]!.params.effort, undefined);
++    engines.engine.finish(); await completion;
++    await session.dispose(); await events.done;
++    const rows = systemRows(events.entries, "configured");
++    assert.equal(rows.length, 1);
++    assert.equal(rows[0]!.turnId, "ans-turn");
++    assert.match(rows[0]!.summary, /未验证/);
++    if (effort === "off") assert.match(rows[0]!.summary, /不表示关闭/);
++  }
+ });
+ 
+ // —————————————————————— ③ reasoning 事件面（完成态恰一行 / 文本优先级 / 双信号时长 / 增量零行 / 错轮丢弃） ——————————————————————
+@@ -224,137 +232,111 @@ test("D3b 增量帧零行：三个 reasoning 增量方法只消费不产行、
+   await events.done;
+   assert.equal(reasoningRows(events.entries).length, 0, "增量帧不产行（完成态先行）");
+   assert.equal(events.entries.filter((entry) => ["tool_call", "denied", "accepted"].includes(entry.kind)).length, 0, "不误报工具行");
+-  assert.equal(events.entries.length, 1, "唯一事件＝settled");
++  assert.equal(events.entries.filter(entry => (entry.detail as { source?: string } | undefined)?.source !== "system").length, 1, "除配置提示外唯一事件＝settled");
+ });
+ 
+-// —————————————————————— ④ 降级链 ——————————————————————
+-
+-test("D4 降级正向：首请求被拒（产出前）⇒ 恰一次去参数重建重发（同输入、其余覆盖逐字不变）、本轮继续；降级行恰一", async () => {
++// D1: fake 只代替 RPC 传输；error 后真实 terminal 到达才可启动兼容 turn。
++test("D4 字段拒绝后去覆盖重建：新 native ID、同输入、completed 后才提示成功", async () => {
+   const engines = harness();
+   const session = await createCodexRuntimeAdapter(options("/fixture", engines, { reasoningEffort: "high" })).bindRole(makeRole("R-D"));
+   const events = collect(session);
+-  const { completion } = await beginTurn(session, engines.engine, "同输入文本");
+-  const first = engines.engine;
+-  assert.deepEqual(effortOverrides(first), ['model_reasoning_effort="high"']);
+-  first.failTurn(REJECTION);
+-  await until(() => engines.engines.length === 2, "重连");
+-  const retried = engines.engine;
+-  assert.deepEqual(effortOverrides(retried), [], "去参数：新引擎零 effort 覆盖");
+-  // 其余覆盖逐字不变（同实例差一：provider 定义含随机 instanceId——逐条对齐除 effort 外的覆盖面）。
+-  const nonEffort = (engine: Engine) => engine.input.configOverrides.filter((value) => !value.startsWith("model_reasoning_effort") && !value.startsWith("model_providers."));
+-  assert.deepEqual(nonEffort(retried), nonEffort(first), "其余 -c 覆盖逐字不变（接口字段面）");
+-  await until(() => retried.requests.some((entry) => entry.method === "turn/start"), "重发 turn/start");
+-  const restarted = retried.requests.find((entry) => entry.method === "turn/start")!;
+-  assert.deepEqual(restarted.params.input, [{ type: "text", text: "同输入文本", text_elements: [] }], "同一输入重发");
+-  retried.finish();
+-  await completion; // 本轮继续（正常 resolve）
+-  await session.dispose();
+-  await events.done;
+-  const rows = effortRows(events.entries);
+-  assert.equal(rows.length, 1, "降级如实行恰一");
+-  assert.equal(rows[0]!.summary, "本网关不支持所设推理强度，本轮已按默认执行");
+-  assert.equal(rows[0]!.turnId, "ans-turn");
+-  assert.deepEqual((rows[0]!.detail as { reason?: string; source?: string }), { version: 1, source: "reasoning-effort", reason: "gateway-rejected" });
+-  assert.equal(events.entries.filter((entry) => entry.kind === "settled").length, 1, "settled 单点");
+-  assert.equal((events.entries.at(-1)!.detail as { outcome: string }).outcome, "completed");
++  try {
++    const { completion } = await beginTurn(session, engines.engine, "同输入文本");
++    const first = engines.engine;
++    first.failTurn(REJECTION);
++    await until(() => engines.engines.length === 2 && engines.engine.turn === 1, "新引擎兼容 turn/start");
++    const retried = engines.engine;
++    assert.deepEqual(effortOverrides(retried), []);
++    const nonEffort = (engine: Engine) => engine.input.configOverrides.filter(value => !value.startsWith("model_reasoning_effort") && !value.startsWith("model_providers."));
++    assert.deepEqual(nonEffort(retried), nonEffort(first));
++    const restarted = turnRequests(retried)[0]!;
++    assert.deepEqual(restarted.params.input, [{ type: "text", text: "同输入文本", text_elements: [] }]);
++    assert.equal(restarted.params.threadId, retried.threadId);
++    assert.notEqual(retried.threadId, first.threadId, "非持久首轮重建必须采用新 native ID");
++    assert.equal(restarted.params.effort, undefined);
++    assert.equal(systemRows(events.entries, "completed").length, 0, "尝试阶段不伪成功");
++    retried.itemCompleted({ type: "agentMessage", text: "compatible answer" });
++    retried.finish(); await completion;
++  } finally { await session.dispose(); await events.done; }
++  assert.equal(systemRows(events.entries, "trying").length, 1);
++  assert.equal(systemRows(events.entries, "completed").length, 1);
++  const answer = events.entries.findIndex(event => event.summary === "compatible answer");
++  assert.ok(answer >= 0 && answer < events.entries.indexOf(systemRows(events.entries, "completed")[0]!));
++  assert.deepEqual(events.entries.filter(event => event.kind === "settled").map(event => (event.detail as { outcome: string }).outcome), ["completed"]);
+ });
+ 
+-test("D4b 负例四格：重发再拒不再重建；无锚不识别；已产出（含仅增量帧）不降级；未注入不降级", async () => {
+-  // 格 a：重发再拒 ⇒ 如实失败、engine 恰两台。
+-  {
+-    const engines = harness();
+-    const session = await createCodexRuntimeAdapter(options("/fixture", engines, { reasoningEffort: "high" })).bindRole(makeRole("R-D"));
+-    const events = collect(session);
+-    const { completion } = await beginTurn(session, engines.engine);
+-    engines.engine.failTurn(REJECTION);
+-    await until(() => engines.engines.length === 2, "重连");
+-    await until(() => engines.engine.requests.some((entry) => entry.method === "turn/start"), "重发");
+-    engines.engine.failTurn(REJECTION);
+-    await assert.rejects(completion, /Unsupported parameter: reasoning/);
+-    await new Promise((resolve) => setTimeout(resolve, 30));
+-    assert.equal(engines.engines.length, 2, "恰一次：无第三台");
+-    await session.dispose(); await events.done;
+-    assert.equal(effortRows(events.entries).length, 1, "降级行仍恰一");
+-    assert.equal((events.entries.at(-1)!.detail as { outcome: string }).outcome, "failed");
+-  }
+-  // 格 b：无锚（普通失败）⇒ 不识别不重发。
+-  {
+-    const engines = harness();
+-    const session = await createCodexRuntimeAdapter(options("/fixture", engines, { reasoningEffort: "high" })).bindRole(makeRole("R-D"));
+-    const events = collect(session);
+-    const { completion } = await beginTurn(session, engines.engine);
+-    engines.engine.failTurn("model unavailable");
+-    await assert.rejects(completion, /model unavailable/);
+-    await new Promise((resolve) => setTimeout(resolve, 30));
+-    assert.equal(engines.engines.length, 1, "不识别不重发");
+-    await session.dispose(); await events.done;
+-    assert.equal(effortRows(events.entries).length, 0);
+-  }
+-  // 格 c1：已产出（agentMessage）后拒绝 ⇒ 闸关。
+-  {
+-    const engines = harness();
++test("D4b 精确默认档同线程继续；兼容失败/取消后下一轮仍用 high", async () => {
++  const models = [{ model: "fixture-model", defaultReasoningEffort: "low", supportedReasoningEfforts: [{ reasoningEffort: "low" }, { reasoningEffort: "high" }] }];
++  for (const result of ["completed", "failed", "cancelled"] as const) {
++    const engines = harness(models);
+     const session = await createCodexRuntimeAdapter(options("/fixture", engines, { reasoningEffort: "high" })).bindRole(makeRole("R-D"));
+     const events = collect(session);
+-    const { completion } = await beginTurn(session, engines.engine);
+-    engines.engine.itemCompleted({ type: "agentMessage", text: "先出了一段" });
+-    await new Promise((resolve) => setTimeout(resolve, 5));
+-    engines.engine.failTurn(REJECTION);
+-    await assert.rejects(completion, /Unsupported parameter: reasoning/);
+-    await new Promise((resolve) => setTimeout(resolve, 30));
+-    assert.equal(engines.engines.length, 1, "已产出 ⇒ 不重发");
+-    await session.dispose(); await events.done;
+-    assert.equal(effortRows(events.entries).length, 0);
++    try {
++      const { completion } = await beginTurn(session, engines.engine, "first task");
++      engines.engine.failTurn(VALUE_REJECTION);
++      await until(() => engines.engine.turn === 2, "同线程默认档兼容");
++      assert.equal(engines.engines.length, 1);
++      assert.equal(turnRequests(engines.engine)[1]!.params.effort, "low");
++      assert.deepEqual(turnRequests(engines.engine)[1]!.params.input, turnRequests(engines.engine)[0]!.params.input);
++      if (result === "completed") { engines.engine.finish(); await completion; }
++      else if (result === "failed") { engines.engine.failTurn("unexpected status 500"); await assert.rejects(completion, /500/); }
++      else { await session.abort!(); await completion; }
++      const next = await beginTurn(session, engines.engine, "next task");
++      assert.equal(turnRequests(engines.engine).at(-1)!.params.effort, result === "completed" ? "low" : "high");
++      engines.engine.finish(); await next.completion;
++    } finally { await session.dispose(); await events.done; }
++    assert.equal(systemRows(events.entries, "completed").length, result === "completed" ? 1 : 0);
++    assert.deepEqual(events.entries.filter(event => event.kind === "settled").map(event => (event.detail as { outcome: string }).outcome), [result === "cancelled" ? "aborted" : result, "completed"]);
+   }
+-  // 格 c2（对抗增强，实施方未覆盖）：仅 reasoning **增量帧**也算「已产出」⇒ 不降级。
+-  {
+-    const engines = harness();
+-    const session = await createCodexRuntimeAdapter(options("/fixture", engines, { reasoningEffort: "high" })).bindRole(makeRole("R-D"));
+-    const events = collect(session);
+-    const { completion } = await beginTurn(session, engines.engine);
+-    const engine = engines.engine;
+-    engine.frame("item/reasoning/textDelta", { threadId: engine.threadId, turnId: engine.turnId, itemId: "rd", delta: "半句", contentIndex: 0 });
+-    await new Promise((resolve) => setTimeout(resolve, 5));
+-    engine.failTurn(REJECTION);
+-    await assert.rejects(completion, /Unsupported parameter: reasoning/);
+-    await new Promise((resolve) => setTimeout(resolve, 30));
+-    assert.equal(engines.engines.length, 1, "增量帧已产出 ⇒ 不重发（保守）");
+-    await session.dispose(); await events.done;
+-    assert.equal(effortRows(events.entries).length, 0);
+-  }
+-  // 格 d：未注入 ⇒ 同文案也不重发。
+-  {
++});
++
++test("D4c 精确字段也不得重放已有输出或已开始工具；普通错误与错误模型不兼容", async () => {
++  const cases = [
++    { error: "model unavailable" },
++    { error: JSON.stringify({ error: { code: "unsupported_parameter", param: "model", message: "Unsupported parameter: reasoning.effort" } }) },
++    { error: "Unsupported parameter: reasoning" },
++    { error: REJECTION, output: "message" },
++    { error: REJECTION, output: "delta" },
++    { error: REJECTION, output: "mcpToolCall" },
++    { error: REJECTION, output: "webSearch" },
++    { error: REJECTION, output: "dynamicToolCall" },
++    { error: REJECTION, unset: true },
++  ];
++  for (const cell of cases) {
+     const engines = harness();
+-    const session = await createCodexRuntimeAdapter(options("/fixture", engines)).bindRole(makeRole("R-D"));
++    const session = await createCodexRuntimeAdapter(options("/fixture", engines, cell.unset ? {} : { reasoningEffort: "high" })).bindRole(makeRole("R-D"));
+     const events = collect(session);
+-    const { completion } = await beginTurn(session, engines.engine);
+-    engines.engine.failTurn(REJECTION);
+-    await assert.rejects(completion, /Unsupported parameter: reasoning/);
+-    await new Promise((resolve) => setTimeout(resolve, 30));
+-    assert.equal(engines.engines.length, 1);
+-    await session.dispose(); await events.done;
+-    assert.equal(effortRows(events.entries).length, 0);
++    try {
++      const { completion } = await beginTurn(session, engines.engine);
++      if (cell.output === "message") engines.engine.itemCompleted({ type: "agentMessage", text: "already visible" });
++      else if (cell.output === "delta") engines.engine.frame("item/reasoning/textDelta", { threadId: engines.engine.threadId, turnId: engines.engine.turnId, itemId: "delta", delta: "visible", contentIndex: 0 });
++      else if (cell.output) engines.engine.itemStarted({ type: cell.output, id: "started" });
++      engines.engine.failTurn(cell.error);
++      await assert.rejects(completion);
++      assert.equal(engines.engines.length, 1, JSON.stringify(cell));
++      assert.equal(engines.engine.turn, 1, "不得整轮重放");
++    } finally { await session.dispose(); await events.done; }
++    assert.equal(systemRows(events.entries, "trying").length, 0);
++    assert.equal(systemRows(events.entries, "completed").length, 0);
+   }
+ });
+ 
+-test("D4c 降级后跨轮：次轮同文案再拒 ⇒ 闸已关（会话级恰一次，不再重发）；引擎沿用（零参数）", async () => {
++test("D4d 去覆盖仍失败：不伪成功、不无界重试，下一轮恢复原 high", async () => {
+   const engines = harness();
+-  const session = await createCodexRuntimeAdapter(options("/fixture", engines, { reasoningEffort: "medium" })).bindRole(makeRole("R-D"));
++  const session = await createCodexRuntimeAdapter(options("/fixture", engines, { reasoningEffort: "high" })).bindRole(makeRole("R-D"));
+   const events = collect(session);
+-  const { completion: first } = await beginTurn(session, engines.engine, "第一轮");
+-  engines.engine.failTurn(REJECTION);
+-  await until(() => engines.engines.length === 2, "重连");
+-  await until(() => engines.engine.requests.some((entry) => entry.method === "turn/start"), "重发");
+-  engines.engine.finish();
+-  await first;
+-  assert.equal(engines.engines.length, 2);
+-  // 次轮：同一（重发）引擎；注入面已零参数，且闸关。
+-  const { completion: second } = await beginTurn(session, engines.engine, "第二轮");
+-  engines.engine.failTurn(REJECTION);
+-  await assert.rejects(second, /Unsupported parameter: reasoning/);
+-  await new Promise((resolve) => setTimeout(resolve, 30));
+-  assert.equal(engines.engines.length, 2, "次轮不再重发（恰一次＝会话级）");
+-  await session.dispose();
+-  await events.done;
+-  assert.equal(effortRows(events.entries).length, 1, "降级行会话级恰一");
+-  assert.deepEqual(events.entries.filter((entry) => entry.kind === "settled").map((entry) => (entry.detail as { outcome: string }).outcome), ["completed", "failed"]);
++  try {
++    const { completion } = await beginTurn(session, engines.engine);
++    engines.engine.failTurn(REJECTION);
++    await until(() => engines.engines.length === 2 && engines.engine.turn === 1, "去覆盖尝试");
++    engines.engine.failTurn(REJECTION);
++    await assert.rejects(completion, /reasoning/);
++    assert.equal(engines.engines.length, 2);
++    const next = await beginTurn(session, engines.engine, "retry original policy");
++    assert.equal(turnRequests(engines.engine).at(-1)!.params.effort, "high");
++    engines.engine.finish(); await next.completion;
++  } finally { await session.dispose(); await events.done; }
++  assert.equal(systemRows(events.entries, "trying").length, 1);
++  assert.equal(systemRows(events.entries, "completed").length, 0);
++  assert.deepEqual(events.entries.filter(event => event.kind === "settled").map(event => (event.detail as { outcome: string }).outcome), ["failed", "completed"]);
+ });
+diff --git "a/test/\346\265\213\350\257\225/g5-reasoning-verify/e-pi.test.ts" "b/test/\346\265\213\350\257\225/g5-reasoning-verify/e-pi.test.ts"
+index 1402c30..34d40d8 100644
+--- "a/test/\346\265\213\350\257\225/g5-reasoning-verify/e-pi.test.ts"
++++ "b/test/\346\265\213\350\257\225/g5-reasoning-verify/e-pi.test.ts"
+@@ -1,8 +1,8 @@
+ // test/测试/g5-reasoning-verify/e-pi.test.ts —— E 域：Pi 适配器接线（独立验证）。
+ //
+ // 验证对象：`src/common/pi-adapter/{real-adapter,lifecycle}.ts`——off 前置修复（克隆模型 thinkingLevelMap.off
+-// 收窄；假关闭消除）、未设＝零调用（逐字现状路径）、R1 请求前修复（自证网关三窗放行；未设路径逐字现状）、
+-// 思考捕获（事实进事件面、text 行零改动）、降级（终态前消费、settled 单点、恰一次不二次）。
++// 收窄；假关闭消除）、未设重施默认、D1 默认和显式预算保护、自证网关三窗、
++// 思考事实与请求级兼容（prompt 不重放、失败策略不粘连、单终态）。
+ // 全离线：127.0.0.1 loopback 假网关（零外网）；用例独立构造（429 排除窗/中断守卫/三窗/自证网关均为
+ // 实施方用例未覆盖类别）。
+ 
+@@ -18,8 +18,8 @@ import {
+   createRealPiRuntimeAdapter,
+   extractReasoningFacts,
+   makeRolePrompt,
+-  REASONING_DEGRADED_SUMMARY,
+-  type ReasoningDegradeOptions,
++  REASONING_COMPATIBILITY_ATTEMPT,
++  REASONING_COMPATIBILITY_SUCCESS,
+   type PromptCapableSession,
+ } from "../../../src/common/pi-adapter/real-adapter.ts";
+ import { createTurnLifecycle } from "../../../src/common/pi-adapter/lifecycle.ts";
+@@ -28,7 +28,10 @@ import { configureDiagnostics, disposeDiagnostics, flushDiagnostics } from "../.
+ import type { ReasoningEffortV1, SessionEvent } from "../../../src/model/runtime.ts";
+ import { makeRole } from "./helpers.ts";
+ 
+-if (!process.env.ANTHROPIC_AUTH_TOKEN) process.env.ANTHROPIC_AUTH_TOKEN = "g5-verify-placeholder";
++// Installed Pi provider template reads this variable; always use a local placeholder and restore it.
++const AUTH_ENV = "ANTHROPIC_AUTH_TOKEN";
++const previousAuth = process.env[AUTH_ENV];
++process.env[AUTH_ENV] = "g5-verify-placeholder";
+ const MODEL_ID = "g5-verify-model";
+ 
+ const silentLogger = { stage() {}, trace() {}, traceEnabled: false };
+@@ -66,7 +69,7 @@ async function startLoopback(respond: (body: Record<string, unknown>, index: num
+   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+   const address = server.address();
+   const port = address !== null && typeof address === "object" ? address.port : 0;
+-  return { baseUrl: `http://127.0.0.1:${port}/`, captures, close: () => new Promise((resolve) => server.close(() => resolve())) };
++  return { baseUrl: `http://127.0.0.1:${port}/`, captures, close: () => new Promise((resolve) => { server.closeAllConnections(); server.close(() => resolve()); }) };
+ }
+ 
+ const messageStart = (): unknown => ({ type: "message_start", message: { id: "msg-g5", type: "message", role: "assistant", model: MODEL_ID, content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 9, output_tokens: 1 } } });
+@@ -116,6 +119,7 @@ async function harness() {
+   const pi = await import("@earendil-works/pi-coding-agent");
+   let native: { thinkingLevel?: string; setThinkingLevel(level: string): void } | undefined;
+   const setThinkingCalls: string[] = [];
++  const promptCalls: string[] = [];
+   let extensionPaths: string[] = [];
+   const dependencies = {
+     loadPi: async () => ({
+@@ -123,6 +127,8 @@ async function harness() {
+       async createAgentSession(input: Parameters<typeof pi.createAgentSession>[0]) {
+         const out = await pi.createAgentSession(input);
+         native = out.session as never;
++        const originalPrompt = out.session.prompt.bind(out.session);
++        out.session.prompt = async (text, options) => { promptCalls.push(text); return originalPrompt(text, options); };
+         extensionPaths = (out.extensionsResult?.extensions ?? []).map((x) => String(x.path));
+         const original = out.session.setThinkingLevel.bind(out.session);
+         (out.session as { setThinkingLevel(level: string): void }).setThinkingLevel = (level: string) => { setThinkingCalls.push(level); original(level as never); };
+@@ -130,14 +136,14 @@ async function harness() {
+       },
+     } as typeof pi),
+   };
+-  return { dependencies, get native() { return native!; }, setThinkingCalls, get extensionPaths() { return extensionPaths; } };
++  return { dependencies, get native() { return native!; }, setThinkingCalls, promptCalls, get extensionPaths() { return extensionPaths; } };
+ }
+ 
+ function adapterOptions(loopback: Loopback, projectRoot: string, extra: Record<string, unknown> = {}) {
+   return {
+     runtime: "pi", projectRoot, skillRoot: projectRoot, tools: [],
+     interactionGate: createInteractionGate(), currentTurnId: () => undefined,
+-    config: { providerId: "ans-gateway", baseUrl: loopback.baseUrl, modelId: MODEL_ID, apiKeyEnvVar: "ANTHROPIC_AUTH_TOKEN", contextWindow: 131072, contextWindowSource: "explicit" },
++    config: { providerId: "ans-gateway", baseUrl: loopback.baseUrl, modelId: MODEL_ID, apiKeyEnvVar: AUTH_ENV, contextWindow: 131072, contextWindowSource: "explicit" },
+     logger: silentLogger, promptTimeoutMs: 30000, constructTimeoutMs: 60000,
+     ...extra,
+   } as never;
+@@ -161,14 +167,17 @@ async function withDiagnostics<T>(run: (rows: () => Promise<Array<Record<string,
+   } finally { await disposeDiagnostics(); rmSync(dir, { recursive: true, force: true }); }
+ }
+ 
+-test.after(() => { for (const root of projectRoots) rmSync(root, { recursive: true, force: true }); });
++test.after(() => {
++  for (const root of projectRoots) rmSync(root, { recursive: true, force: true });
++  if (previousAuth === undefined) delete process.env[AUTH_ENV]; else process.env[AUTH_ENV] = previousAuth;
++});
+ 
+ // —————————————————————— ① off 前置修复（单元） ——————————————————————
+ 
+ test("E1 off 前置修复：克隆模型 thinkingLevelMap.off 由 null 收窄为 undefined（clamp 真返回 off）；修复前对照＝minimal 假关闭；xhigh 原样", async (t) => {
+   if (!(await piInstalled())) { t.skip("未安装 @earendil-works/pi-coding-agent"); return; }
+   const ai = await import("@earendil-works/pi-ai");
+-  const { model } = await buildExplicitRuntime({ providerId: "ans-gateway", baseUrl: "http://127.0.0.1:9/", modelId: MODEL_ID, apiKeyEnvVar: "ANTHROPIC_AUTH_TOKEN", contextWindow: 131072, contextWindowSource: "explicit" });
++  const { model } = await buildExplicitRuntime({ providerId: "ans-gateway", baseUrl: "http://127.0.0.1:9/", modelId: MODEL_ID, apiKeyEnvVar: AUTH_ENV, contextWindow: 131072, contextWindowSource: "explicit" });
+   assert.equal(model.thinkingLevelMap?.off, undefined, "收窄后 off 不再是 null（undefined＝该档可用）");
+   assert.equal(model.thinkingLevelMap?.xhigh, "xhigh", "xhigh 映射原样保留（只动 off）");
+   assert.equal(ai.clampThinkingLevel(model as never, "off"), "off", "修复后 off 直达（真关闭）");
+@@ -178,12 +187,12 @@ test("E1 off 前置修复：克隆模型 thinkingLevelMap.off 由 null 收窄为
+   assert.deepEqual(model.thinkingLevelMap, { ...model.thinkingLevelMap, off: undefined }, "除 off 外逐键原样");
+ });
+ 
+-// —————————————————————— ② 请求接线：未设零调用 / 显式五档 / off 真关闭 ——————————————————————
++// —————————————————————— ② 请求接线：默认重置 / 显式五档 / off 真关闭 ——————————————————————
+ 
+-test("E2 请求接线：未设＝不调用 setThinkingLevel（medium 隐式原样）；显式档⇒恰一次调用且生效；off⇒wire disabled＋interleaved 头消失", async (t) => {
++test("E2 请求接线：未设重施 SDK 默认 medium；显式档映射保留；off 真关闭，所有档均有请求保护", async (t) => {
+   if (!(await piInstalled())) { t.skip("未安装"); return; }
+   const cells: Array<{ effort?: ReasoningEffortV1; calls: string[]; effective: string; wireType: string; budget?: number; beta: boolean }> = [
+-    { effort: undefined, calls: [], effective: "medium", wireType: "enabled", budget: 8192, beta: true },
++    { effort: undefined, calls: ["medium"], effective: "medium", wireType: "enabled", budget: 8192, beta: true },
+     { effort: "medium", calls: ["medium"], effective: "medium", wireType: "enabled", budget: 8192, beta: true },
+     { effort: "low", calls: ["low"], effective: "low", wireType: "enabled", budget: 2048, beta: true },
+     { effort: "high", calls: ["high"], effective: "high", wireType: "enabled", budget: 16384, beta: true },
+@@ -204,8 +213,7 @@ test("E2 请求接线：未设＝不调用 setThinkingLevel（medium 隐式原
+         assert.equal(thinkingOf(capture)?.type, cell.wireType, `wire thinking.type（${String(cell.effort)}）`);
+         if (cell.budget !== undefined) assert.equal(thinkingOf(capture)?.budget_tokens, cell.budget, `budget（${String(cell.effort)}）`);
+         assert.equal(betaOf(capture).includes("interleaved-thinking"), cell.beta, `interleaved beta 头（${String(cell.effort)}）`);
+-        if (cell.effort === undefined) assert.deepEqual(sdk.extensionPaths, ["<inline:ans-governance>"], "未设 ⇒ 零 ans-reasoning 装配（逐字现状）");
+-        else assert.ok(sdk.extensionPaths.includes("<inline:ans-reasoning>"), "设档 ⇒ ans-reasoning 装配");
++        assert.ok(sdk.extensionPaths.includes("<inline:ans-reasoning>"), "默认和显式均装配思考请求保护");
+       } finally { await drain(session); }
+     } finally { await loopback.close(); }
+   }
+@@ -222,7 +230,7 @@ test("E3 R1 修复（自证网关）：两修复窗（cw=5000 转 disabled / 570
+       const sdk = await harness();
+       const root = tempProject();
+       try {
+-        const session = await createRealPiRuntimeAdapter(adapterOptions(loopback, root, { reasoningEffort: "high", config: { providerId: "ans-gateway", baseUrl: loopback.baseUrl, modelId: MODEL_ID, apiKeyEnvVar: "ANTHROPIC_AUTH_TOKEN", contextWindow: cw, contextWindowSource: "explicit" } }), sdk.dependencies as never).bindRole(makeRole("R-E"));
++        const session = await createRealPiRuntimeAdapter(adapterOptions(loopback, root, { reasoningEffort: "high", config: { providerId: "ans-gateway", baseUrl: loopback.baseUrl, modelId: MODEL_ID, apiKeyEnvVar: AUTH_ENV, contextWindow: cw, contextWindowSource: "explicit" } }), sdk.dependencies as never).bindRole(makeRole("R-E"));
+         let events: SessionEvent[] = [];
+         try { await session.prompt(`r1-${cw}`); } finally { events = await drain(session); }
+         assert.deepEqual(register, [200], `cw=${cw}：自证网关全程放行（非法组合必被 400）`);
+@@ -244,27 +252,24 @@ test("E3 R1 修复（自证网关）：两修复窗（cw=5000 转 disabled / 570
+   });
+ });
+ 
+-test("E4 未设路径逐字现状（对照）：不注册修复扩展——同一 cw=5000 严格网关下 wire 原样（enabled）、如实失败；零修复诊断", async (t) => {
++test("E4 默认预算保护：未设 cw=5000 在 HTTP 前关闭非法 thinking，提示且同轮完成", async (t) => {
+   if (!(await piInstalled())) { t.skip("未安装"); return; }
+   await withDiagnostics(async (rows) => {
+     const register: number[] = [];
+     const loopback = await startLoopback(strictGateway(register));
+     const sdk = await harness();
+     const root = tempProject();
++    const session = await createRealPiRuntimeAdapter(adapterOptions(loopback, root, { config: { providerId: "ans-gateway", baseUrl: loopback.baseUrl, modelId: MODEL_ID, apiKeyEnvVar: AUTH_ENV, contextWindow: 5000, contextWindowSource: "explicit" } }), sdk.dependencies as never).bindRole(makeRole("R-E"));
+     try {
+-      const session = await createRealPiRuntimeAdapter(adapterOptions(loopback, root, { config: { providerId: "ans-gateway", baseUrl: loopback.baseUrl, modelId: MODEL_ID, apiKeyEnvVar: "ANTHROPIC_AUTH_TOKEN", contextWindow: 5000, contextWindowSource: "explicit" } }), sdk.dependencies as never).bindRole(makeRole("R-E"));
+-      let events: SessionEvent[] = [];
+-      try { await session.prompt("unset-cw5000"); } catch { /* 现状失败如实上抛 */ }
+-      events = await drain(session);
+-      assert.deepEqual(sdk.setThinkingCalls, [], "未设：零档位调用");
+-      assert.equal(loopback.captures.length, 1, "未设：恰一请求（无降级链、无重发）");
+-      assert.equal(thinkingOf(loopback.captures[0]!)?.type, "enabled", "未设路径 wire 原样（不修复、不越界——即便隐式组合非法，R1 原风险按注册件处置）");
+-      assert.ok(register.includes(400), "自证网关对隐式非法组合 400（现状如实）");
+-      assert.equal((events.at(-1)!.detail as { outcome?: string }).outcome, "failed", "未设失败如实收场（无降级行）");
+-      assert.equal(events.some((event) => String(event.summary) === REASONING_DEGRADED_SUMMARY), false);
+-      const repaired = (await rows()).filter((row) => row["event"] === "reasoning.repaired");
+-      assert.equal(repaired.length, 0, "未设会话零修复（修复只属显式设档会话）");
+-    } finally { await loopback.close(); }
++      await session.prompt("unset-cw5000");
++      const events = await drain(session);
++      assert.deepEqual(sdk.setThinkingCalls, ["medium"]);
++      assert.deepEqual(register, [200], "默认保护阻止非法预算到达网关");
++      assert.equal(thinkingOf(loopback.captures[0]!)?.type, "disabled");
++      assert.equal((events.at(-1)!.detail as { outcome?: string }).outcome, "completed");
++      assert.ok(events.some(event => (event.detail as { source?: string; state?: string })?.source === "system" && (event.detail as { state?: string }).state === "thinking-disabled"));
++      assert.deepEqual((await rows()).filter(row => row["event"] === "reasoning.repaired").map(row => row["state"]), ["thinking-disabled"]);
++    } finally { await session.dispose(); await loopback.close(); }
+   });
+ });
+ 
+@@ -333,7 +338,7 @@ test("E5b extractReasoningFacts 对抗单元：坏形状/非串正文/非对象
+ 
+ // —————————————————————— ⑤ 降级链（终态前消费 / settled 单点 / 恰一次不二次；429 排除；中断守卫） ——————————————————————
+ 
+-test("E6 降级：思考参数 400 ⇒ 恰一次去参数重发成功（通知行在 settled 前；后续轮次零参数）；诊断恰一", async (t) => {
++test("E6 请求级兼容：思考参数 400 后同输入重发，正常结果后提示成功；prompt 不重放", async (t) => {
+   if (!(await piInstalled())) { t.skip("未安装"); return; }
+   await withDiagnostics(async (rows) => {
+     const loopback = await startLoopback((body) => body["thinking"] !== undefined
+@@ -358,36 +363,51 @@ test("E6 降级：思考参数 400 ⇒ 恰一次去参数重发成功（通知
+     const settled = events.filter((event) => event.kind === "settled");
+     assert.equal(settled.length, 2, "settled 单点（每轮恰一——重发不新增终端）");
+     assert.deepEqual(settled.map((event) => (event.detail as { outcome?: string }).outcome), ["completed", "completed"]);
+-    const notices = events.filter((event) => String(event.summary) === REASONING_DEGRADED_SUMMARY);
++    const notices = events.filter((event) => String(event.summary) === REASONING_COMPATIBILITY_SUCCESS);
+     assert.equal(notices.length, 1, "如实一行恰一");
+-    assert.equal((notices[0]!.detail as { source?: string }).source, "reasoning-degrade");
++    assert.equal((notices[0]!.detail as { source?: string }).source, "system");
++    assert.equal(events.filter(event => event.summary === REASONING_COMPATIBILITY_ATTEMPT).length, 1);
++    assert.deepEqual(sdk.promptCalls, ["degrade-1", "degrade-2"], "HTTP 兼容不得第二次提交整条用户 prompt");
++    assert.deepEqual(loopback.captures[0]!.body.messages, loopback.captures[1]!.body.messages, "同一请求的 user/history 原样保留");
++    const answer = events.findIndex(event => event.summary === "degraded-ok");
++    assert.ok(answer >= 0 && answer < events.indexOf(notices[0]!), "成功提示晚于正常结果");
+     assert.ok(events.indexOf(notices[0]!) < events.indexOf(settled[0]!), "终态前消费：通知行先于 settled");
+     assert.ok(events.some((event) => event.kind === "message" && String(event.summary).includes("degraded-ok")), "重发结果进事件面");
+-    const degraded = (await rows()).filter((row) => row["event"] === "reasoning.degraded");
+-    assert.equal(degraded.length, 1, "诊断恰一");
+-    assert.equal(degraded[0]!["errorCode"], "GATEWAY_REJECTED_HTTP_400");
+-    assert.equal(degraded[0]!["state"], "retry-once");
++    assert.equal((await rows()).filter(row => row["event"] === "reasoning.degraded").length, 0, "旧整轮降级诊断已撤销，兼容事实由 system 消息承载");
+   });
+ });
+ 
+-test("E6b 不二次：带/不带思考均 400 ⇒ 首轮恰 2 请求后如实失败；次轮 1 请求直失败；通知与诊断各一", async (t) => {
++test("E6b 兼容失败不记忆：每轮最多一次请求切换，次轮恢复保存的 low", async (t) => {
+   if (!(await piInstalled())) { t.skip("未安装"); return; }
+-  await withDiagnostics(async (rows) => {
+-    const loopback = await startLoopback(() => ({ status: 400, json: { type: "error", error: { type: "invalid_request_error", message: "upstream invalid" } } }));
+-    const sdk = await harness();
+-    const root = tempProject();
+-    const session = await createRealPiRuntimeAdapter(adapterOptions(loopback, root, { reasoningEffort: "low" }), sdk.dependencies as never).bindRole(makeRole("R-E"));
+-    try {
+-      await session.prompt("n1");
+-      await session.prompt("n2");
+-      assert.equal(loopback.captures.length, 3, "首轮恰 2（原发＋一次重发）、次轮 1（不再重发）");
+-      assert.deepEqual(loopback.captures.map((capture) => "thinking" in capture.body), [true, false, false]);
+-      const events = await drain(session);
+-      assert.deepEqual(events.filter((event) => event.kind === "settled").map((event) => (event.detail as { outcome?: string }).outcome), ["failed", "failed"]);
+-      assert.equal(events.filter((event) => String(event.summary) === REASONING_DEGRADED_SUMMARY).length, 1, "通知恰一");
+-    } finally { await loopback.close(); }
+-    assert.equal((await rows()).filter((row) => row["event"] === "reasoning.degraded").length, 1, "诊断恰一（不二次）");
+-  });
++  const loopback = await startLoopback(() => ({ status: 400, json: { type: "error", error: { type: "invalid_request_error", param: "thinking", message: "Unsupported parameter: thinking" } } }));
++  const sdk = await harness();
++  const session = await createRealPiRuntimeAdapter(adapterOptions(loopback, tempProject(), { reasoningEffort: "low" }), sdk.dependencies as never).bindRole(makeRole("R-E"));
++  try {
++    await session.prompt("n1");
++    await session.prompt("n2");
++    assert.equal(loopback.captures.length, 4, "每轮原发＋一次去参；没有无限重试");
++    assert.deepEqual(loopback.captures.map(capture => "thinking" in capture.body), [true, false, true, false]);
++    assert.deepEqual(sdk.promptCalls, ["n1", "n2"], "失败也不重放 prompt");
++    const events = await drain(session);
++    assert.deepEqual(events.filter(event => event.kind === "settled").map(event => (event.detail as { outcome?: string }).outcome), ["failed", "failed"]);
++    assert.equal(events.filter(event => event.summary === REASONING_COMPATIBILITY_SUCCESS).length, 0, "失败不伪称兼容成功");
++    assert.equal(events.filter(event => event.summary === REASONING_COMPATIBILITY_ATTEMPT).length, 2, "每轮尝试一次");
++  } finally { await session.dispose(); await loopback.close(); }
++});
++
++test("E6b-negative 普通 400 不去参，不污染下一轮保存策略", async (t) => {
++  if (!(await piInstalled())) { t.skip("未安装"); return; }
++  const loopback = await startLoopback(() => ({ status: 400, json: { type: "error", error: { type: "invalid_request_error", param: "model", message: "Unknown model" } } }));
++  const sdk = await harness();
++  const session = await createRealPiRuntimeAdapter(adapterOptions(loopback, tempProject(), { reasoningEffort: "low" }), sdk.dependencies as never).bindRole(makeRole("R-E"));
++  try {
++    await session.prompt("ordinary-1"); await session.prompt("ordinary-2");
++    assert.equal(loopback.captures.length, 2);
++    assert.ok(loopback.captures.every(capture => thinkingOf(capture)?.budget_tokens === 2048));
++    const events = await drain(session);
++    assert.equal(events.some(event => event.summary === REASONING_COMPATIBILITY_ATTEMPT), false);
++    assert.deepEqual(events.filter(event => event.kind === "settled").map(event => (event.detail as { outcome?: string }).outcome), ["failed", "failed"]);
++  } finally { await session.dispose(); await loopback.close(); }
+ });
+ 
+ test("E6c 429 排除窗：瞬时态不归拒绝类 ⇒ 零降级（SDK 层重试原样携带思考；ANS 不发去参数重发、无通知、无诊断）", async (t) => {
+@@ -406,28 +426,25 @@ test("E6c 429 排除窗：瞬时态不归拒绝类 ⇒ 零降级（SDK 层重试
+       assert.ok(loopback.captures.length >= 1, "有请求发生");
+       assert.ok(loopback.captures.every((capture) => "thinking" in capture.body), `ANS 不得发去参数重发（各捕获：${loopback.captures.map((capture) => "thinking" in capture.body).join(",")}）`);
+       const events = await drain(session);
+-      assert.equal(events.filter((event) => String(event.summary) === REASONING_DEGRADED_SUMMARY).length, 0, "无通知行");
++      assert.equal(events.filter((event) => String(event.summary) === REASONING_COMPATIBILITY_SUCCESS).length, 0, "无通知行");
+       assert.equal((events.at(-1)!.detail as { outcome?: string }).outcome, "failed");
+     } finally { await loopback.close(); }
+     assert.equal((await rows()).filter((row) => row["event"] === "reasoning.degraded").length, 0, "无降级诊断");
+   });
+ });
+ 
+-test("E6d 中断守卫（stub 接缝）：轮次被显式锁定 ⇒ 即使检测位置位也不重发（终态前不越权）", async () => {
+-  // 自建 stub：一轮的 prompt 期间把 lifecycle 强制为 aborted（模拟逐字中止），检测位同时置位。
++test("E6d 中断守卫：prompt 包装层不重放已中止用户输入", async () => {
+   const calls: string[] = [];
+   const events: SessionEvent[] = [];
+-  const lifecycle = createTurnLifecycle((event) => events.push(event));
+-  let consumed = 0;
++  const lifecycle = createTurnLifecycle(event => events.push(event));
+   const session: PromptCapableSession = {
+     async prompt(text: string) { calls.push(text); lifecycle.fail("aborted", "ABORTED"); },
+     async abort() {},
+     dispose() {},
+   };
+-  const degrade: ReasoningDegradeOptions = { consumeRetry: () => { consumed += 1; return true; }, suppress: () => { throw new Error("中断轮不得 suppress"); }, noticeText: REASONING_DEGRADED_SUMMARY };
+-  const prompt = makeRolePrompt({ session, promptMs: 5000, gate: createInteractionGate(), emit: (event) => events.push(event), log: silentLogger, finishOnReturn: true, lifecycle, reasoningDegrade: degrade });
++  const prompt = makeRolePrompt({ session, promptMs: 5000, gate: createInteractionGate(), emit: event => events.push(event), log: silentLogger, finishOnReturn: true, lifecycle });
+   await prompt("aborted-mid-turn");
+-  assert.deepEqual(calls, ["aborted-mid-turn"], "恰一次（被锁定的轮次不重发）");
+-  assert.equal(consumed, 0, "守卫先行：被锁定 ⇒ 连消费询问都不发生（短路）");
+-  assert.equal(events.some((event) => String(event.summary) === REASONING_DEGRADED_SUMMARY), false, "零重发通知");
++  assert.deepEqual(calls, ["aborted-mid-turn"]);
++  assert.equal(events.some(event => event.summary === REASONING_COMPATIBILITY_ATTEMPT || event.summary === REASONING_COMPATIBILITY_SUCCESS), false);
++  assert.deepEqual(events.filter(event => event.kind === "settled").map(event => (event.detail as { outcome?: string }).outcome), ["aborted"]);
+ });
+diff --git "a/test/\346\265\213\350\257\225/t1-external-engines.mjs" "b/test/\346\265\213\350\257\225/t1-external-engines.mjs"
+index 26ab443..5c4ecf3 100644
+--- "a/test/\346\265\213\350\257\225/t1-external-engines.mjs"
++++ "b/test/\346\265\213\350\257\225/t1-external-engines.mjs"
+@@ -104,6 +104,11 @@ export async function piAgentSession(options) {
+   const emit = event => { for (const listener of listeners) listener(event); };
+   trace({ kind: 'bound', runtime: 'pi', tools: [...tools.keys()], nativeId: options.sessionManager.getSessionId() });
+   const session = {
++    thinkingLevel: 'medium',
++    setThinkingLevel(level) {
++      assert.ok(['off', 'minimal', 'low', 'medium', 'high', 'xhigh'].includes(level), 'Pi SDK thinking level must be valid');
++      this.thinkingLevel = level;
++    },
+     getActiveToolNames: () => [...tools.keys()],
+     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
+     async prompt(text) {
+diff --git a/src/common/codex-adapter/reasoning-catalog.ts b/src/common/codex-adapter/reasoning-catalog.ts
+new file mode 100644
+index 0000000..69679e3
+--- /dev/null
++++ b/src/common/codex-adapter/reasoning-catalog.ts
+@@ -0,0 +1,123 @@
++import { createRequire } from "node:module";
++import { open, readFile, realpath, mkdtemp, writeFile, rm, stat } from "node:fs/promises";
++import path from "node:path";
++
++// This is a version-bound reader of the installed CLI's embedded metadata, not a model database.
++export const REASONING_CATALOG_VERSION = "0.162.1";
++export const MAX_REASONING_CATALOG_BYTES = 4 * 1024 * 1024;
++const MAX_NATIVE_BYTES = 512 * 1024 * 1024;
++const CHUNK_BYTES = 256 * 1024;
++const MARKER = Buffer.from('{\n  "models": [');
++const fail = () => new Error("Codex installed model metadata version/format is not supported for effort compatibility");
++const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
++
++/** Pure bounded decoder, shared with tests. Production bytes come only from the installed binary. */
++export function decodeEmbeddedReasoningCatalog(bytes: Uint8Array): unknown {
++  if (bytes.length > MAX_REASONING_CATALOG_BYTES || !Buffer.from(bytes.subarray(0, MARKER.length)).equals(MARKER)) throw fail();
++  let depth = 0;
++  let quoted = false;
++  let escaped = false;
++  for (let index = 0; index < bytes.length; index++) {
++    const byte = bytes[index];
++    if (quoted) {
++      if (escaped) escaped = false;
++      else if (byte === 92) escaped = true;
++      else if (byte === 34) quoted = false;
++    } else if (byte === 34) quoted = true;
++    else if (byte === 123 || byte === 91) depth++;
++    else if (byte === 125 || byte === 93) {
++      depth--;
++      if (depth === 0) {
++        try { return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, index + 1))); }
++        catch { throw fail(); }
++      }
++      if (depth < 0) throw fail();
++    }
++  }
++  throw fail();
++}
++
++/** Select exactly one current model, changing only the four approved native metadata fields. */
++export function compatibilityReasoningCatalog(catalog: unknown, model: string, version: string): Record<string, unknown> | undefined {
++  if (version !== REASONING_CATALOG_VERSION || !record(catalog) || !Array.isArray(catalog.models)) throw fail();
++  if (catalog.models.some(item => !record(item) || typeof item.slug !== "string")) throw fail();
++  const matches = catalog.models.filter(item => (item as Record<string, unknown>).slug === model) as Record<string, unknown>[];
++  if (matches.length === 0) return undefined;
++  if (matches.length !== 1) throw fail();
++  const original = matches[0];
++  if ((original.default_reasoning_level !== null && typeof original.default_reasoning_level !== "string")
++      || typeof original.default_reasoning_summary !== "string"
++      || typeof original.supports_reasoning_summary_parameter !== "boolean" || typeof original.supports_reasoning_summaries !== "boolean"
++      || !Array.isArray(original.supported_reasoning_levels) || !record(original.model_messages)
++      || typeof original.context_window !== "number" || typeof original.display_name !== "string") throw fail();
++  if (original.default_reasoning_level === null) return undefined;
++  return { ...catalog, models: [{ ...original, default_reasoning_level: null, default_reasoning_summary: "none", supports_reasoning_summary_parameter: false, supports_reasoning_summaries: false }] };
++}
++
++const targets: Record<string, string> = {
++  "darwin-arm64": "aarch64-apple-darwin", "darwin-x64": "x86_64-apple-darwin",
++  "linux-arm64": "aarch64-unknown-linux-musl", "linux-x64": "x86_64-unknown-linux-musl",
++  "win32-arm64": "aarch64-pc-windows-msvc", "win32-x64": "x86_64-pc-windows-msvc",
++};
++async function manifest(file: string): Promise<Record<string, unknown>> {
++  if ((await stat(file)).size > 65536) throw fail();
++  const value: unknown = JSON.parse(await readFile(file, "utf8"));
++  if (!record(value)) throw fail();
++  return value;
++}
++
++/** No caller-provided source path: neither project files nor config/env can supply trusted metadata. */
++export async function readInstalledReasoningCatalog(): Promise<unknown> {
++  const require = createRequire(import.meta.url);
++  const cli = await manifest(require.resolve("@openai/codex/package.json"));
++  const platform = `${process.platform}-${process.arch}`;
++  const target = targets[platform];
++  if (cli.name !== "@openai/codex" || cli.version !== REASONING_CATALOG_VERSION || !target) throw fail();
++  const platformManifest = require.resolve(`@openai/codex-${platform}/package.json`);
++  const native = await manifest(platformManifest);
++  if (native.name !== "@openai/codex" || native.version !== `${REASONING_CATALOG_VERSION}-${platform}`) throw fail();
++  const root = await realpath(path.dirname(platformManifest));
++  const binary = await realpath(path.join(root, "vendor", target, "bin", process.platform === "win32" ? "codex.exe" : "codex"));
++  const relative = path.relative(root, binary);
++  if (relative.startsWith(`..${path.sep}`) || relative === ".." || path.isAbsolute(relative)) throw fail();
++  const file = await open(binary, "r");
++  try {
++    const info = await file.stat();
++    if (!info.isFile() || info.size < MARKER.length || info.size > MAX_NATIVE_BYTES) throw fail();
++    const buffer = Buffer.alloc(CHUNK_BYTES);
++    let overlap = Buffer.alloc(0);
++    for (let offset = 0; offset < info.size;) {
++      const { bytesRead } = await file.read(buffer, 0, Math.min(CHUNK_BYTES, info.size - offset), offset);
++      if (!bytesRead) throw fail();
++      const scan = Buffer.concat([overlap, buffer.subarray(0, bytesRead)]);
++      const marker = scan.indexOf(MARKER);
++      if (marker !== -1) {
++        const start = offset - overlap.length + marker;
++        const bytes = Buffer.alloc(Math.min(MAX_REASONING_CATALOG_BYTES, info.size - start));
++        let read = 0;
++        while (read < bytes.length) {
++          const part = await file.read(bytes, read, bytes.length - read, start + read);
++          if (!part.bytesRead) break;
++          read += part.bytesRead;
++        }
++        return decodeEmbeddedReasoningCatalog(bytes.subarray(0, read));
++      }
++      overlap = Buffer.from(scan.subarray(Math.max(0, scan.length - MARKER.length + 1)));
++      offset += bytesRead;
++    }
++    throw fail();
++  } finally { await file.close(); }
++}
++
++export interface TemporaryReasoningCatalog { path: string; directory: string; }
++/** The caller supplies its owned disposable workRoot, never a catalog source. */
++export async function prepareReasoningCatalog(workRoot: string, model: string): Promise<TemporaryReasoningCatalog | undefined> {
++  const compatible = compatibilityReasoningCatalog(await readInstalledReasoningCatalog(), model, REASONING_CATALOG_VERSION);
++  if (!compatible) return undefined;
++  const directory = await mkdtemp(path.join(workRoot, "reasoning-catalog-"));
++  const file = path.join(directory, "model.json");
++  try {
++    await writeFile(file, JSON.stringify(compatible), { encoding: "utf8", mode: 0o600, flag: "wx" });
++    return { path: file, directory };
++  } catch (error) { await rm(directory, { recursive: true, force: true }); throw error; }
++}
+diff --git "a/test/\346\265\213\350\257\225/g5-reasoning-verify/compatibility-loopback.test.ts" "b/test/\346\265\213\350\257\225/g5-reasoning-verify/compatibility-loopback.test.ts"
+new file mode 100644
+index 0000000..dab533d
+--- /dev/null
++++ "b/test/\346\265\213\350\257\225/g5-reasoning-verify/compatibility-loopback.test.ts"
+@@ -0,0 +1,214 @@
++// 独立真实 SDK/CLI 验证：仅 localhost、临时目录和假 key，不注入兼容实现或修改模型目录。
++import { test } from "node:test";
++import assert from "node:assert/strict";
++import { createServer, type ServerResponse } from "node:http";
++import { mkdtemp, rm } from "node:fs/promises";
++import os from "node:os";
++import path from "node:path";
++import * as claudeSdk from "@anthropic-ai/claude-agent-sdk";
++import { createClaudeRuntimeAdapter } from "../../../src/provider/claude/session.ts";
++import { createCodexRuntimeAdapter } from "../../../src/provider/codex/session.ts";
++import { createRealPiRuntimeAdapter } from "../../../src/common/pi-adapter/real-adapter.ts";
++import { createInteractionGate } from "../../../src/common/runtime-core/timeout.ts";
++import type { RoleSession, SessionEvent } from "../../../src/model/runtime.ts";
++import { makeRole } from "./helpers.ts";
++
++type Body = Record<string, unknown>;
++const FAKE_KEY = "ans-independent-localhost-placeholder";
++async function gateway(reply: (body: Body, response: ServerResponse, index: number) => void) {
++  const bodies: Body[] = [];
++  const errors: string[] = [];
++  const server = createServer(async (request, response) => {
++    try {
++      assert.equal(request.socket.remoteAddress, "127.0.0.1");
++      let raw = "";
++      for await (const part of request) raw += part;
++      if (request.url?.includes("count_tokens")) {
++        response.writeHead(200, { "content-type": "application/json" });
++        response.end(JSON.stringify({ input_tokens: 10 }));
++        return;
++      }
++      const body = JSON.parse(raw) as Body;
++      bodies.push(body);
++      reply(body, response, bodies.length - 1);
++    } catch (error) {
++      errors.push(String(error));
++      response.writeHead(500);
++      response.end("independent fixture failed");
++    }
++  });
++  await new Promise<void>((resolve, reject) => {
++    server.once("error", reject);
++    server.listen(0, "127.0.0.1", resolve);
++  });
++  const address = server.address();
++  assert.ok(address && typeof address !== "string");
++  return {
++    bodies, errors, baseUrl: `http://127.0.0.1:${address.port}`,
++    async close() {
++      server.closeAllConnections();
++      await new Promise<void>(resolve => server.close(() => resolve()));
++    },
++  };
++}
++function rejectField(response: ServerResponse, param: string) {
++  response.writeHead(400, { "content-type": "application/json" });
++  response.end(JSON.stringify({ type: "error", error: { type: "invalid_request_error", code: "unsupported_parameter", param, message: `Unsupported parameter: ${param}` } }));
++}
++function event(response: ServerResponse, type: string, data: Body) {
++  response.write(`event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`);
++}
++function anthropicAnswer(response: ServerResponse, model: string, tool = false) {
++  response.writeHead(200, { "content-type": "text/event-stream" });
++  event(response, "message_start", { message: { id: "msg-independent", type: "message", role: "assistant", model, content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 1 } } });
++  event(response, "content_block_start", { index: 0, content_block: tool ? { type: "tool_use", id: "call-once", name: "probe_once", input: {} } : { type: "text", text: "" } });
++  event(response, "content_block_delta", { index: 0, delta: tool ? { type: "input_json_delta", partial_json: "{}" } : { type: "text_delta", text: "independent local completed" } });
++  event(response, "content_block_stop", { index: 0 });
++  event(response, "message_delta", { delta: { stop_reason: tool ? "tool_use" : "end_turn", stop_sequence: null }, usage: { output_tokens: 5 } });
++  event(response, "message_stop", {});
++  response.end();
++}
++function responsesAnswer(response: ServerResponse, model: string) {
++  response.writeHead(200, { "content-type": "text/event-stream" });
++  const initial = { id: "resp-independent", object: "response", created_at: 1, status: "in_progress", model, output: [] };
++  const item = { type: "message", id: "msg-independent", role: "assistant", status: "completed", content: [{ type: "output_text", text: "independent local completed", annotations: [] }] };
++  event(response, "response.created", { response: initial });
++  event(response, "response.output_item.added", { output_index: 0, item: { ...item, content: [] } });
++  event(response, "response.output_item.done", { output_index: 0, item });
++  event(response, "response.completed", { response: { ...initial, status: "completed", output: [item], usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } } });
++  response.end();
++}
++function collect(session: RoleSession) {
++  const events: SessionEvent[] = [];
++  const done = (async () => { for await (const value of session.events()) events.push(value); })();
++  return { events, done };
++}
++function outcomes(events: SessionEvent[]) {
++  return events.filter(value => value.kind === "settled").map(value => (value.detail as { outcome: string }).outcome);
++}
++function states(events: SessionEvent[], state: string) {
++  return events.filter(value => {
++    const detail = value.detail as { source?: string; state?: string } | undefined;
++    return detail?.source === "system" && detail.state === state;
++  });
++}
++
++test("独立真实 Claude：low 被拒后 HTTP 真正无 thinking/output_config，同任务及下一轮 completed", { timeout: 60000 }, async context => {
++  const root = await mkdtemp(path.join(os.tmpdir(), "ans-independent-claude-"));
++  const server = await gateway((body, response) => {
++    if (body.thinking !== undefined || body.output_config !== undefined) rejectField(response, body.output_config !== undefined ? "output_config.effort" : "thinking");
++    else anthropicAnswer(response, String(body.model));
++  });
++  const savedEnvironment = { PATH: process.env.PATH, HOME: root, TMPDIR: root, ANTHROPIC_API_KEY: FAKE_KEY };
++  const snapshot = JSON.stringify(savedEnvironment);
++  const configurations: claudeSdk.Options[] = [];
++  const options = { runtime: "claude" as const, projectRoot: root, skillRoot: root, modelId: "claude-sonnet-4-6", baseUrl: server.baseUrl, reasoningEffort: "low" as const, tools: [], interactionGate: createInteractionGate(), currentTurnId: () => "independent-claude", turnLastResortMs: 45000 };
++  const session = await createClaudeRuntimeAdapter(options, {
++    env: savedEnvironment,
++    loadSdk: async () => ({
++      createSdkMcpServer: claudeSdk.createSdkMcpServer,
++      query(input) {
++        configurations.push(input.options!);
++        return claudeSdk.query({ ...input, options: { ...input.options, env: { ...input.options?.env, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1", DISABLE_TELEMETRY: "1", DISABLE_ERROR_REPORTING: "1", DISABLE_AUTOUPDATER: "1" } } });
++      },
++    }),
++  }).bindRole(makeRole("independent-claude"));
++  const observed = collect(session);
++  try {
++    await session.prompt("independent first task");
++    const afterFirst = server.bodies.length;
++    await session.prompt("independent second task");
++    assert.equal(configurations.length, 2);
++    assert.equal(configurations[0]!.effort, "low");
++    assert.equal(configurations[1]!.effort, undefined);
++    assert.equal(configurations[1]!.thinking, undefined);
++    assert.equal(configurations[1]!.env?.CLAUDE_CODE_EFFORT_LEVEL, "unset");
++    assert.equal(configurations[1]!.env?.CLAUDE_CODE_DISABLE_THINKING, "1");
++    assert.ok(server.bodies.some(body => (body.output_config as { effort?: string })?.effort === "low"));
++    const compatible = server.bodies.slice(afterFirst - 1);
++    assert.ok(compatible.length >= 2);
++    assert.ok(compatible.every(body => body.thinking === undefined && body.output_config === undefined));
++    assert.ok(server.bodies.every(body => body.model === options.modelId));
++    assert.equal(options.reasoningEffort, "low");
++    assert.equal(JSON.stringify(savedEnvironment), snapshot);
++    assert.deepEqual(server.errors, []);
++    context.diagnostic(JSON.stringify({ runtime: "claude", wire: server.bodies.map(body => ({ model: body.model, thinking: body.thinking ?? null, outputConfig: body.output_config ?? null })), configurations: configurations.map(config => ({ effort: config.effort ?? null, effortEnv: config.env?.CLAUDE_CODE_EFFORT_LEVEL ?? null, thinkingEnv: config.env?.CLAUDE_CODE_DISABLE_THINKING ?? null })) }));
++  } finally {
++    await session.dispose(); await observed.done;
++    await server.close(); await rm(root, { recursive: true, force: true });
++  }
++  assert.deepEqual(outcomes(observed.events), ["completed", "completed"]);
++  assert.equal(states(observed.events, "trying").length, 1);
++  assert.equal(states(observed.events, "compatible").length, 1);
++});
++
++test("独立真实 Codex：目录内 gpt-5.5 仅拒 effort 字段必须真正去参，同任务及下一轮完成", { timeout: 60000 }, async context => {
++  const root = await mkdtemp(path.join(os.tmpdir(), "ans-independent-codex-"));
++  const server = await gateway((body, response) => {
++    if ((body.reasoning as { effort?: unknown })?.effort !== undefined) rejectField(response, "reasoning.effort");
++    else responsesAnswer(response, String(body.model));
++  });
++  const options = { runtime: "codex" as const, projectRoot: root, skillRoot: root, modelId: "gpt-5.5", baseUrl: `${server.baseUrl}/v1`, reasoningEffort: "high" as const, tools: [], interactionGate: createInteractionGate(), currentTurnId: () => "independent-codex", turnLastResortMs: 45000, constructTimeoutMs: 15000, env: { PATH: process.env.PATH, CODEX_API_KEY: FAKE_KEY } };
++  const session = await createCodexRuntimeAdapter(options).bindRole(makeRole("independent-codex"));
++  const observed = collect(session);
++  try {
++    await session.prompt("ordinary endpoint accepts a request without effort");
++    await session.prompt("same configuration next task");
++    assert.deepEqual(server.bodies.map(body => (body.reasoning as { effort?: string })?.effort), ["high", undefined, undefined]);
++    assert.ok(server.bodies.every(body => body.model === "gpt-5.5"));
++    assert.equal(options.reasoningEffort, "high");
++    assert.deepEqual(server.errors, []);
++  } finally {
++    await session.dispose(); await observed.done;
++    context.diagnostic(JSON.stringify({ runtime: "codex", wire: server.bodies.map(body => ({ model: body.model, reasoning: body.reasoning ?? null })), outcomes: outcomes(observed.events) }));
++    await server.close(); await rm(root, { recursive: true, force: true });
++  }
++  assert.deepEqual(outcomes(observed.events), ["completed", "completed"]);
++  assert.equal(states(observed.events, "trying").length, 1);
++  assert.equal(states(observed.events, "completed").length, 1);
++});
++
++test("独立真实 Pi：工具完成后下一请求兼容保留 tool_result，工具与原生 prompt 各执行一次", { timeout: 30000 }, async context => {
++  const pi = await import("@earendil-works/pi-coding-agent");
++  const root = await mkdtemp(path.join(os.tmpdir(), "ans-independent-pi-"));
++  let toolCalls = 0;
++  let promptCalls = 0;
++  const server = await gateway((body, response, index) => {
++    if (index === 0) anthropicAnswer(response, String(body.model), true);
++    else if (body.thinking !== undefined) rejectField(response, "thinking");
++    else anthropicAnswer(response, String(body.model));
++  });
++  const authName = "ANTHROPIC_AUTH_TOKEN";
++  const previous = process.env[authName];
++  process.env[authName] = FAKE_KEY;
++  const session = await createRealPiRuntimeAdapter({
++    runtime: "pi", projectRoot: root, skillRoot: root, reasoningEffort: "high", interactionGate: createInteractionGate(), currentTurnId: () => "independent-pi",
++    config: { providerId: "independent-local", baseUrl: server.baseUrl, modelId: "independent-model", apiKeyEnvVar: authName, contextWindow: 131072, contextWindowSource: "explicit" },
++    logger: { stage() {}, trace() {}, traceEnabled: false },
++    tools: [{ name: "probe_once", description: "Only increments a local counter", inputSchema: { type: "object", properties: {} }, async handler() { toolCalls++; return { ok: true, message: "independent tool result sentinel" }; } }],
++  }, { loadPi: async () => ({ ...pi, async createAgentSession(input) {
++    const created = await pi.createAgentSession(input);
++    const original = created.session.prompt.bind(created.session);
++    created.session.prompt = async (...args) => { promptCalls++; return original(...args); };
++    return created;
++  } }) }).bindRole(makeRole("independent-pi"));
++  const observed = collect(session);
++  try {
++    await session.prompt("call the local counter once then answer");
++    assert.equal(toolCalls, 1);
++    assert.equal(promptCalls, 1);
++    assert.equal(server.bodies.length, 3);
++    assert.deepEqual(server.bodies[1]!.messages, server.bodies[2]!.messages, "兼容请求保留相同 user/history/tool_result");
++    assert.match(JSON.stringify(server.bodies[2]!.messages), /independent tool result sentinel/);
++    assert.equal(server.bodies[2]!.thinking, undefined);
++    assert.deepEqual(server.errors, []);
++    context.diagnostic(JSON.stringify({ runtime: "pi", promptCalls, toolCalls, wire: server.bodies.map(body => ({ model: body.model, thinking: body.thinking ?? null, toolResultPresent: JSON.stringify(body.messages).includes("independent tool result sentinel") })) }));
++  } finally {
++    await session.dispose(); await observed.done;
++    if (previous === undefined) delete process.env[authName]; else process.env[authName] = previous;
++    await server.close(); await rm(root, { recursive: true, force: true });
++  }
++  assert.deepEqual(outcomes(observed.events), ["completed"]);
++  assert.equal(states(observed.events, "compatibility-attempt").length, 1);
++  assert.equal(states(observed.events, "compatibility-confirmed").length, 1);
++});

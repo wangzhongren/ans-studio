@@ -313,13 +313,38 @@ A4 legacy provenance窄修：protected工具t.statusSource/target.source分别�
 
 `busy=true` 时「当前轮」与「上一轮终局」**分行呈现、语义互斥**：
 
-- `  当前轮：进行中（已耗 X / 看护检查时限 Y；turnId=…；1 小时最后兜底）`——仅在快照有 `turnStartedAt` 时给出；X/Y 经 `formatDurationMs`，时限求值与看护/会话运行时同一来源 `resolveRuntimeTimeouts`（`promptTimeoutMs`＝**到点检查时限、不中止本轮**，缺省 **300000ms（5 分钟）**；`turnLastResortMs`＝1 小时最后兜底）；turnId 缺失时显示 `—`；**不再使用「硬超时」**。
+- `  当前轮：进行中（已耗 X / 看护检查时限 Y；turnId=…；1 小时最后兜底）`——仅在快照有 `turnStartedAt` 时给出；X/Y 经 `formatDurationMs`，时限求值与看护/会话运行时同一来源 `resolveRuntimeTimeouts`（`promptTimeoutMs`＝**到点检查时限、不中止本轮**，缺省 **300000ms（5 分钟）**；`turnLastResortMs`＝运行时 1 小时最后兜底。2026-10-21 起看护**默认不自动中止**：仅显式 `ANS_PI_PROMPT_TIMEOUT_MS` 正整数且自动开关开启时，该值同时作为看护自动中止时限）；turnId 缺失时显示 `—`；**不再使用「硬超时」**。
 - `  上一轮终局：<outcome> @ <at>（不表示当前轮；该角色近 15 分钟 failed/timed_out 计 N）`——历史终局显式标注，不得读成当前轮。
 - `busy=false` 时保持原样 `  最近一轮：<outcome> @ <at>（该角色近 15 分钟 failed/timed_out 计 N）`。
 - 历史统计（近 15 分钟 failed/timed_out 计数）保留，语义仍是历史统计。
 
-看护 #1 `turn-deadline`（客户裁定 2026-10-17）：阈值为 `TURN_DEADLINE_RATIO = 1.0`（**到点检查**，非 90% 预警）；事实行给出「看护检查时限 Yms；到点仅检查、不中止本轮」＋「用 role_status / session_tail 核对是否卡死；仍在推进则不动作；卡死才 propose_recovery」＋「整轮最后兜底 1 小时（到点才自动中止）」；summary 与文首为「轮次到点检查」。**不得**再出现「逼近超时/已超时/尚未超时/硬超时/剩余约」等旧话术；挂起确认卡/su 忙排除、每轮一次不变。**解除（轮次结束）时不投「看护恢复」行**（到点检查不是故障，恢复行会误导）——只复位活跃期并留 `watchdog.recovery` 诊断；正常完成/空闲不再产生任何会话消息。
+看护 #1 `turn-deadline`（客户裁定 2026-10-17）：阈值为 `TURN_DEADLINE_RATIO = 1.0`（**到点检查**，非 90% 预警）；事实行给出「看护检查时限 Yms；到点仅检查、不中止本轮」＋「用 role_status / session_tail 核对是否卡死；仍在推进则不动作；卡死才 propose_recovery」＋「整轮最后兜底 1 小时（运行时硬上限，不是看护自动中止）」；看护自动中止**默认禁用**，仅显式配置时限且开关开启时出现；summary 与文首为「轮次到点检查」。**不得**再出现「逼近超时/已超时/尚未超时/硬超时/剩余约」等旧话术；挂起确认卡/su 忙排除、每轮一次不变。**解除（轮次结束）时不投「看护恢复」行**（到点检查不是故障，恢复行会误导）——只复位活跃期并留 `watchdog.recovery` 诊断；正常完成/空闲不再产生任何会话消息。
 
 `system` 第四类投递：`DeliveryItem.kind` 增 `"system"`（看护告警/收束/恢复回执）；来源标注恒空、正文文首定格 `[系统·<子类>] `（U1 tool-rows.js 归类判据）；**不可撤回**；去重键看护自持命名空间（`watchdog\0…`）；失败保留待重试＋如实系统行。队列快照 `queue` 条目类型补 `id/full`（如实对齐运行时输出）。
 
-看护器：tick 默认 30s（`ANS_DESKTOP_WATCHDOG_TICK_MS`）、静默默认 30s（`ANS_DESKTOP_WATCHDOG_SILENCE_MS`）——**仅 env 可调**；信号 #1-#4（#1 `turn-deadline`＝**到点检查** `TURN_DEADLINE_RATIO=1.0`，只提示不中止；整轮最后兜底 1 小时；其余阈值＝设计 §3.2 默认）；去重/冷却/风暴护栏（15min≤5＋通告＋`watchdog.suppressed`）；`watchdog.failed`／`watchdog.alert`／`watchdog.recovery`／`watchdog.closure` 诊断；`DesktopInterface.startWatchdog()/stopWatchdog()`（窗口注册后启动、窗关停止；看护缺席 ⇒ 一切照旧）。新增 deps：`recoveryConfirm`、`watchdogObserver`、`watchdogPendingConfirmations`、`watchdogStats`、`now`（注入时钟）。
+看护器：tick 默认 30s（`ANS_DESKTOP_WATCHDOG_TICK_MS`）、静默默认 30s（`ANS_DESKTOP_WATCHDOG_SILENCE_MS`）——**仅 env 可调**；信号 #1-#4（#1 `turn-deadline`＝**到点检查** `TURN_DEADLINE_RATIO=1.0`，**默认只提示不中止**（`DEFAULT_TURN_ABORT_MS=0`；仅显式 `ANS_PI_PROMPT_TIMEOUT_MS`/测试覆盖且开关开启时自动中止）；整轮最后兜底 1 小时为运行时硬上限；其余阈值＝设计 §3.2 默认）；去重/冷却/风暴护栏（15min≤5＋通告＋`watchdog.suppressed`）；`watchdog.failed`／`watchdog.alert`／`watchdog.recovery`／`watchdog.closure` 诊断；`DesktopInterface.startWatchdog()/stopWatchdog()`（窗口注册后启动、窗关停止；看护缺席 ⇒ 一切照旧）。新增 deps：`recoveryConfirm`、`watchdogObserver`、`watchdogPendingConfirmations`、`watchdogStats`、`now`（注入时钟）。
+
+### Phase 5A 渲染入口、dev/prod 与导航兜底（2026-10-21）
+
+- **入口唯一事实源** `app/desktop/renderer-entry.ts`（5B）：唯一 `RENDERER_RELATIVE=["renderer","dist","index.html"]` 与 `resolveRendererEntry(appDir)`；旧 `renderer/index.html`/`dist/src` 常量已删除；`app/main.ts`、`test/桌面应用/e2e/main.mjs` 与 packaged smoke 共用。无 preload/IPC 变更。
+- **加载策略**：生产 `loadFile`；dev 默认文件入口，仅 `!app.isPackaged` + `ANS_DEV_SERVER_URL`（http/https、localhost/127.0.0.1/[::1]、无凭据）时 `loadURL`，8s 限时，`did-fail-load`/rejection 同一守卫一次性回退已构建入口；回退后本窗口重载直接文件入口；未构建 ⇒ 恢复页。诊断 `window.renderer.target`（`mode:"file"|"dev-url"` + `path`/`url`）、`window.dev-server.fallback`（`reasonCode`/`errorCode`）、`window.dev-server.rejected`（非法 dev URL，仅一次）。生产 CSP/webPreferences 未改。
+- **packaged smoke**：`--ans-packaged-smoke <abs.json> --user-data-dir=<abs> [--ans-renderer-entry=<abs .html>]`；入口覆盖仅随冒烟生效、必须位于包内 `app/renderer/dist/`；检查项 `entry/rootMounted/driver/csp/cspViolations/dom/preload/ipc/importDisabled/missingConfiguration/settingsEntryDisabled/envPathMatches/console/load`（无项目时 `#tab-pi` 禁用替代旧「打开设置」）。
+- **导航兜底（PM §17.12）**：`installNavigationGuard`（`app/desktop/navigation-guard.ts` + `navigation-policy.ts`）在每窗口安装 `will-navigate`/`setWindowOpenHandler`：同 URL/允许入口放行；http(s) 经 `shell.openExternal` 外开；file/data/javascript 等阻止且不执行；`window.open` 恒 deny；与渲染侧 `app:open-external` 共用 1.5s 去重闸（防双重外开）。行为与真实 Electron 探针见 [Phase 5A 变更记录 §五之二](docs/change/2026-10-21_change_ui-platform-phase5a-entry.md)。
+
+## Phase 5A main.mjs G4/G3 重锚与新检查（2026-10-21，PM §19）
+
+`test/桌面应用/e2e/main.mjs`（桌面窗口属主）在既有 323 log + 22 repairCheck 名之外，新增/重锚以下等价检查，均不改判据：
+
+- 单计数/状态：`ROLE_STATE_BADGE_SINGLE_COUNT_WORKING`（`.ti-count`=当前+排队、状态-only）、`ROLE_STATE_QUEUE_ROW_WORK_OVERVIEW`、`RIGHT_QUEUE_SOURCES_WORK_OVERVIEW`、`BADGE_ROLE_SINGLE_COUNT_WHILE_COLLAPSED`、`BADGES_CLEAR_ON_EMPTY_NEW`。
+- P1/定位：`P1_ARRIVAL_DEBUG_NEW`、`P1_SECOND_CARD_LOCATE_VIA_WORK_OVERVIEW`；既有 P1 到达/滚动/chip 定位/计数/清理/切回检查改为按 `[data-request-id]` 查询新 `.chat-row` 嵌套（同名保留）。
+- 回交/报告/抽屉：`INJECTED_CHIP_DELIVERY_LABEL`、`REPORT_DELIVERY_INLINE_BODY_NEW`、`DRAWER_CLOSED_AFTER_PI_NEW`、`DISPATCH_ROW_NO_WITHDRAW_NEW`。
+- denied/replay：`HAS_DENIED_INLINE_ANY`、`DENIED_REASON_VISIBLE`、`REPLAY_DEDUP_REBUILD_UNIQUE_TEXT`。
+- 空态/状态字段：`BOOTSTRAP_EMPTY_STATE_SINGLE_TITLE`、`BOOTSTRAP_EMPTY_STATE_ACTION_OR_REASON`、`STATUS_LAST_EVENT_FIELD_NEW`。
+- 诊断：`DIAGNOSTIC_EVENTS_COVER_OLD`（`renderer.event-error/viewport/replay/recovery` + `window.renderer.gone`）。
+- SWITCH_CONFIRM_ON_BUSY/SWITCH_CONFIRM_RELOADED/SWITCH_IDLE_HINT 为 OLD-ONLY/REMOVED，由 P13 7 项覆盖；`P13_NEW_SEMANTICS` 退役。
+
+最终：new `E2E_PASS=true`/`E2E_FAILURES` 空；old 仅 `RECOVERY_SAME_PENDING_CARD_ONCE`（C/G4-RESOLVED）。逐名映射见 [Phase 5A 变更记录 §十](docs/change/2026-10-21_change_ui-platform-phase5a-entry.md)。
+
+## 5B 步骤 c（2026-10-21）
+
+生产入口切换为包内 `app/renderer/dist/index.html`；main.mjs 默认同入口并保留 `ANS_RENDERER_ENTRY` 覆盖；packaged smoke 期望包内 dist 入口（smoke-only 覆盖仍限 `app/renderer/dist/`）。旧段退役：`hot-path.test.ts` 保留 push-batcher/事件风暴/哈希缓存 3 项（旧 renderer/vendor Markdown 段删除）；`message-queue.test.ts` 保留主进程队列 14 项（旧 renderer/styles/role-status 源钉删除，新增新渲染器 `chat/ipc.ts` `session:role-state`/`applyRoleState` 源钉）。详见 [变更记录 §十一](docs/change/2026-10-21_change_ui-platform-phase5a-entry.md)。

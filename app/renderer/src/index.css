@@ -1,0 +1,249 @@
+@import "tailwindcss";
+
+/*
+ * ANS Studio 渲染层设计令牌（单一来源）
+ *
+ * 唯一依据：角色卡/UIUX设计师/docs/design/2026-10-21_design_ui-platform-nova.md §二/§三/§七
+ * 与原型 2026-10-21_design_ui-platform-nova-prototype.html 的 :root。
+ * 组件源码只允许引用变量，不得写裸色值；新增/修改颜色必须先改这里。
+ * 主题固定深色石墨（color-scheme: dark），不提供浅色分支。
+ */
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  color-scheme: dark;
+
+  /* —— shadcn/ui 标准位（UIUX 规范 §2.2）—— */
+  --background: #14171a;
+  --foreground: #f2f4f6;
+  --card: #1e2328;
+  --card-foreground: #f2f4f6;
+  --popover: #14171a;
+  --popover-foreground: #f2f4f6;
+  --primary: #6fa08b;
+  --primary-foreground: #14171a;
+  --secondary: #252a30;
+  --secondary-foreground: #f2f4f6;
+  --muted: #1e2328;
+  --muted-foreground: #949ba4;
+  --accent: #252a30;
+  --accent-foreground: #f2f4f6;
+  --destructive: #c97a6d;
+  --destructive-foreground: #14171a;
+  --border: #2c3238;
+  --border-strong: #3a4148;
+  --input: #6b757e;
+  --ring: #6fa08b;
+
+  /* —— 左栏位（UIUX 规范 §2.2）—— */
+  --sidebar: #1a1e22;
+  --sidebar-foreground: #f2f4f6;
+  --sidebar-primary: #6fa08b;
+  --sidebar-primary-foreground: #14171a;
+  --sidebar-accent: #252a30;
+  --sidebar-accent-foreground: #f2f4f6;
+  --sidebar-border: #2c3238;
+  --sidebar-ring: #6fa08b;
+
+  /* —— 项目扩展位（UIUX 规范 §2.3）—— */
+  --warning: #c4a15f;
+  --warning-foreground: #14171a;
+  --warning-bg: #24211a;
+  --warning-border: #4e422a;
+  --success-bg: #22302b;
+  --success-hover: #7fb29b;
+  --primary-active: #5e8f7a;
+  --danger: #c97a6d;
+  --danger-bg: #2e2220;
+  --danger-border: #5c3832;
+  --danger-line: #c97a6d;
+  --text-2: #a7adb5;
+  --text-3: #949ba4;
+  --selected: #2a3037;
+  --selected-foreground: #f2f4f6;
+  --drawer-surface: #171b1f;
+  --hover: #252a30;
+
+  /* —— 形状 / 布局（UIUX 规范 §2.3、§3.1）—— */
+  --radius: 8px;
+  --radius-control: 6px;
+  --radius-micro: 4px;
+  --content-max: 900px;
+  --sidebar-width: 248px;
+  --titlebar-h: 36px;
+  --session-head-h: 64px;
+  --drawer-w: 424px;
+
+  /* —— 浮层阴影 / 遮罩（UIUX 规范 §2.3、§3.4）—— */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.32);
+  --shadow-dock: 0 -6px 18px rgba(0, 0, 0, 0.35);
+  --shadow-drawer: -12px 0 42px rgba(0, 0, 0, 0.55);
+  --shadow-popover: 0 6px 24px rgba(0, 0, 0, 0.55);
+  --backdrop: rgba(0, 0, 0, 0.45);
+  --backdrop-strong: rgba(0, 0, 0, 0.55);
+
+  /* —— 滚动条 / 选中文本（原型 :root）—— */
+  --scrollbar-thumb: #4a525a;
+  --scrollbar-thumb-hover: #5f6870;
+  --selection-bg: #3a4a44;
+
+  /* —— 字体：整页等宽（UIUX 规范 §4.1）—— */
+  --font-mono: ui-monospace, "Cascadia Mono", "Cascadia Code", "SF Mono", Consolas,
+    "Liberation Mono", "Microsoft YaHei", monospace;
+  --font-sans: var(--font-mono);
+
+  /* —— 动效令牌（UIUX 规范 §7.2）—— */
+  --motion-fast: 120ms;
+  --motion-base: 160ms;
+  --motion-overlay: 180ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* Tailwind v4：把令牌映射成工具类名（值仍引用 :root，单一来源）。 */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-border: var(--warning-border);
+  --color-success-bg: var(--success-bg);
+  --color-success-hover: var(--success-hover);
+  --color-primary-active: var(--primary-active);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-border: var(--danger-border);
+  --color-danger-line: var(--danger-line);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-selected: var(--selected);
+  --color-selected-foreground: var(--selected-foreground);
+  --color-drawer-surface: var(--drawer-surface);
+  --color-hover: var(--hover);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-mono);
+  --font-mono: var(--font-mono);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    font: 13px/1.55 var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  ::selection {
+    background: var(--selection-bg);
+    color: var(--foreground);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border: 3px solid transparent;
+    border-radius: 6px;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+
+  /* UIUX 规范 §7.3：减少动效——非必要动效近似关闭，状态文字与焦点不丢失。 */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+/* 规范焦点环（UIUX §2.5/§3.3）：2px solid --ring + 3px offset。
+ * Tailwind v4 的 outline-none 会把 --tw-outline-style 置为 none；这里在
+ * 未分层规则中把它复原为 solid，并固定颜色。组件统一使用
+ * focus-visible:outline-2 / outline-offset-3 / outline-ring。 */
+.focus-visible\:outline-2:focus-visible {
+  --tw-outline-style: solid;
+  outline-style: solid;
+  outline-color: var(--ring);
+}

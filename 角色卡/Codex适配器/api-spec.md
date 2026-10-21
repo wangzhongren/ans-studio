@@ -60,3 +60,19 @@ required-v1 缺注入 projector/register 时在任何外部初始化前拒绝；
 - **普通会话**：`judgeMode` 未设时逐字不变（不做 judge 名单限制）。
 
 验证：新 `test/codex-adapter/judge-governance.test.ts` 6 例；`test/codex-adapter/**` 66 过/1 既有 Windows symlink EPERM 环境红/1 skip；typecheck 0 错。全量三层 glob 与残余见[实施记录](docs/change/2026-10-18_change_codex-governance-judge.md)。
+
+## 2026-10-21 D1：思考等级兼容候选（未完成整体验收）
+
+公共输入与档位枚举不变。严格区分 effort 值/字段拒绝与普通 API 故障，保留原生错误元数据供内部判断；整个 reasoning 对象拒绝不算可自动处理的 effort 字段拒绝。值拒绝后只从本 CLI 的 `model/list` 精确 model 匹配取得声明的默认档，同线程 `turn/start.effort`；字段拒绝或没有合适默认时仅安全首轮/持久恢复允许去覆盖重建。最多两个不同候选，原生 MCP/搜索开始与 ANS handler 放行前即阻止整轮重放。
+
+只有兼容轮最终 completed 才提交会话策略；失败/取消/超时的下一普通轮显式恢复最近确认档位，重建状态未确认则隔离。对外 `nativeSessionId`/`contextSource` 动态读取实际当前线程。配置与兼容消息只在 active prompt 使用普通 `message`、`detail.source:"system"`，没有新增公共 schema；保存设置不改。
+
+当前真实请求发现新增未解决边界：目录内模型（实测 gpt-5.5）去覆盖仍由 CLI 补默认 medium，网关若拒 effort 整个字段则兼容仍失败；这个 D1 用例保持红，未将其改成预期成功或已解决限制。详见[修复与当前证据](docs/fix/2026-10-21_fix_reasoning-compatibility.md)。UI、SDK、依赖和真实配置未改。
+
+## 2026-10-21 E1：已批准的目录内模型无 effort 兼容
+
+用户随后批准 E1，原 D1 红例仍保留作历史对照。对已经决定采用无 effort 候选、但当前固定 SDK 的精确模型目录会自动补默认的情形，通过私有 `reasoning-catalog.ts` 读取已安装 CLI 0.162.1 二进制内嵌元数据。包括原档位和目录默认均被值拒绝的第二候选；不增加第三候选或改变公共输入。仅当前模型临时副本改变四个获批字段，其他字段逐项保持；原SDK和用户项目模型文件不写、不读入可信定义。
+
+读取上界为原生文件512MiB、单目录JSON4MiB，版本/平台包来源及嵌入格式不确认则拒绝误套。只在必要兼容重建时传 `model_catalog_json`；文件位于当前workRoot，0600，随恢复原目录/会话销毁清理。兼容失败/取消/超时后，下一轮先重建原目录再显式恢复最近确认档位；恢复未确认则隔离。正常路径不产生目录覆盖。此方式依赖固定SDK内部格式，不宣称公共稳定模型API；升级必须重新回归。原整个reasoning对象拒绝等D1限制保持。最终测试与候选哈希见[修复记录](docs/fix/2026-10-21_fix_reasoning-compatibility.md)。
+
+E1最终所有者验证：自有80/80，真实CLI localhost完整20/20，全仓typecheck退出0；目录内gpt-5.5字段拒绝和原档/默认档均值拒绝都真实completed，后续无effort；E1后500/取消/超时下一轮恢复high及原目录。候选已冻结交独立QA，原D1红日志未覆盖，命令及精确哈希见修复记录的E1 evidence/manifest。

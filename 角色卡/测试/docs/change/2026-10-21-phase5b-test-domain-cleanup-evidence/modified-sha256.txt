@@ -1,0 +1,5 @@
+0451456f6d8b98d1883c85dc619defef1d1942fda23cab4edf546ea41282ae83  test/测试/uiux-v2-replay-regression.test.ts
+98bb7e5eb8e9ce00ddbcba26c9dec2252d5606f8647eebeed26ecb1085db7de4  test/测试/shell-judge-verify/fixture.ts
+56f5f17c35e6e6815191191015e253d41c9298f635f31cbf5546e1d5e12840a2  test/测试/governance-pin-recovery-verify/fixture.ts
+e7d89f768da1077eaa147fdaeaf299a94c48ff4ccfd23625fd76e1c603e7f09e  test/测试/existing-project-compat-verify/a-state-preview.test.ts
+4ae4a86be6ef3492a01400a6e60a60988b9816908f78692d28aad70a1b7cc659  test/测试/existing-project-compat-verify/b-establish.test.ts

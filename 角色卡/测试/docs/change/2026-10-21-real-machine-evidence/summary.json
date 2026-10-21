@@ -1,0 +1,151 @@
+{
+  "date": "2026-10-21",
+  "role": "测试",
+  "environment": {
+    "os": "macOS 26.6.2 (25G83)",
+    "arch": "arm64 (Darwin 25.6.0, Apple M-series)",
+    "node": "24.14.0",
+    "electron": "44.7.0",
+    "chromium": "152.0.7977.130",
+    "packagedAppVersion": "1.4.0"
+  },
+  "candidate": {
+    "head": "224cf831f7a26fd2fac8af7155790a75fa31f6b5",
+    "entry": "app/renderer/dist/index.html",
+    "packagedPreFix": {
+      "note": "21:53 构建；角色显示名修复前，包内仍是报告员/提名官/召集人",
+      "htmlSha256": "3c4da2a2a4f99f6ffffdb737ccf854b3320bf2605a8d2b53190e5017ad33b301",
+      "jsSha256": "f568e2aae8866996b7dabc22b69cdb4675fa8e2e8b8d020eb812a8aba08e4095",
+      "cssSha256": "76fad7ce7c7b449d7e3b5f61517555f7f5c9d97e169a81d504289131d6ffc0f6",
+      "zip": "release-output/local/ANS-Studio-1.4.0-mac-arm64.zip",
+      "zipBytes": 405227230,
+      "zipSha256": "8e760887879c7f25dc926ce670b2b0e28ea862ef1fcedeb66383a085a868e441"
+    },
+    "devFinal": {
+      "note": "22:11:42 重建；角色显示名修复后",
+      "htmlSha256": "c8ad0e82b2740ef59329c77834f8e583a34f402654f238e073e8a35cc4fd79cd",
+      "js": "index-Oqlp-kNL.js",
+      "jsSha256": "050776ece38dcd700fe34b6eee8499a2247610a90c88df96e49a2ce4b609f97b",
+      "cssSha256": "76fad7ce7c7b449d7e3b5f61517555f7f5c9d97e169a81d504289131d6ffc0f6",
+      "gzip9Bytes": 289080,
+      "cspStrict": true,
+      "roleViewSha256": "83608a7e308c92fc7c002a9d3302dccda08d2104b4f4b7fe90a36b9ab283f8e6"
+    }
+  },
+  "mainE2E": {
+    "command": "node_modules/.bin/electron test/桌面应用/e2e/main.mjs",
+    "preFix": { "exitCode": 0, "e2ePass": true, "e2eFailures": "", "checkNames": 397, "screenshots": 17 },
+    "postFix": { "exitCode": 0, "e2ePass": true, "e2eFailures": "", "checkNames": 397, "screenshots": 17 },
+    "rendererEntry": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/dist/index.html",
+    "note": "stdout 中 Error: 修复探针：发送异常原文 为 e2e 故意触发的 repair 夹具异常，非产品错误。"
+  },
+  "packagedEmptyProject": {
+    "note": "修复前包；角色树旧称",
+    "project": "/Users/wangzhongren/code/vibeingcode/ans-testbed/ui-platform-new-demo",
+    "launch": "ANS Studio.app/Contents/MacOS/ANS Studio --user-data-dir=/tmp/ans-real-userdata --remote-debugging-port=9333",
+    "windowTitle": "ANS 治理会话工作台",
+    "entryURL": "file:///private/tmp/ans-studio-real-20261021-220141/ANS%20Studio.app/Contents/Resources/app/app/renderer/dist/index.html",
+    "preload": { "desktop": "object", "listProject": "function", "pickProject": "function" },
+    "cspMeta": true,
+    "cspViolations": 0,
+    "consoleErrors": 0,
+    "projectRoot": "/Users/wangzhongren/code/vibeingcode/ans-testbed/ui-platform-new-demo",
+    "projectName": "ui-platform-new-demo",
+    "hasRoles": false,
+    "roleCount": 5,
+    "roles": ["主理 / Lead", "报告员 / Rapporteur", "提名官 / Nominator", "召集人 / Convener", "验收 / Proof"],
+    "roleGroups": ["主入口", "治理职能（内置）"],
+    "governanceModel": "trio",
+    "governanceRecord": { "state": "missing" },
+    "governanceStatusText": "本项目有 0 个项目角色，但尚无治理记录（.ans/project.json）。项目角色可按各自边界工作；治理角色暂时无法写入。",
+    "governanceModelStatusLineObserved": false,
+    "s0": {
+      "title": "项目尚未 bootstrap",
+      "sub": "与 主理 / Lead 对话，让它把角色建出来；左树会随之长出。",
+      "cta": "开始与 主理 / Lead 对话",
+      "mentionCount": 1,
+      "governanceCTA": false
+    },
+    "clickLead": { "openedSession": true, "sessionOpenRoleId": "liaison", "chatEmpty": true, "sendDisabled": false },
+    "missingConfigNotice": "Claude 配置不完整，缺：ANTHROPIC_API_KEY。请补齐后保存。",
+    "settings": { "drawerOpen": true, "title": "Claude 配置", "missing": "ANTHROPIC_API_KEY" },
+    "workOverview": { "title": "主理 / Lead · 工作概览", "pending": "无待处理请求", "queue": "无进行中或排队消息" },
+    "profile": { "title": "主理 / Lead · 角色资料", "queue": "无进行中或排队消息" },
+    "escapeClosesDrawer": true,
+    "focusReturn": { "settingsClose": "tab-pi", "escape": "tab-card" },
+    "closeReopen": { "processStayedAlive": true, "projectPersisted": true, "emptyStatePersisted": true },
+    "loadMs": 18,
+    "readOnly": { "projectFilesChanged": false, "gitStatusChanged": false, "ansDirCreated": false }
+  },
+  "packagedIcon": {
+    "icns": "ANS Studio.app/Contents/Resources/icon.icns",
+    "icnsSha256": "843d9526c526de1b063599f4b4e75ae333905d0d9316cf2d84b98b3c3befb43e",
+    "visual": "黑底圆角方形 + 浅绿 ANS lettermark",
+    "dockObserved": true
+  },
+  "roleDisplayFix": {
+    "source": "app/renderer/src/chat/role-view.ts",
+    "mapping": { "proposal": "Draft / 提案", "nomination": "Crew / 组队", "schedule": "Steward / 统筹", "liaison": "主理 / Lead", "verification": "验收 / Proof" },
+    "devAppRoleTree": ["主理 / Lead", "Draft / 提案", "Crew / 组队", "Steward / 统筹", "验收 / Proof"],
+    "oldNamesPresent": false,
+    "mirror": { "suite": "ANS_MIRROR_UI_ONLY=1", "pass": "8/8", "report": "model-fix/uiux-mirror/report.json", "statusLineCheck": true, "mirrorCardCheck": true }
+  },
+  "realModel": {
+    "app": "dev (electron app/main.ts)",
+    "command": "./node_modules/.bin/electron app/main.ts --user-data-dir=/tmp/ans-model-userdata-fix --remote-debugging-port=9335",
+    "envSource": "仓库 .env（测试角色未读取/打印值）",
+    "engine": "Pi",
+    "engineMenu": { "pi": "已配置", "codex": "缺配置", "claude": "缺配置" },
+    "project": "/Users/wangzhongren/code/vibeingcode/ans-testbed/ui-platform-new-demo",
+    "projectState": { "hasRoles": false, "roleCount": 5, "governanceModel": "trio", "governanceRecord": "missing" },
+    "message": "先用一段话说明你在这次空项目 bootstrap 中的计划与需要我确认的事项，不要写任何文件。",
+    "provider": "ans-gateway",
+    "model": "deepseek-v4-flash[1m]",
+    "contextWindow": 262144,
+    "thinkingLevel": "medium",
+    "statusFlow": ["空闲", "工作中", "空闲"],
+    "timings": {
+      "uiFirstBusyMs": 467,
+      "firstModelActivityMs": 1375,
+      "finalAssistantTextMs": 4195,
+      "uiSettledMs": 4574
+    },
+    "assistantTextLength": 563,
+    "assistantTextLengthUi": 543,
+    "assistantMessageCount": 2,
+    "toolCalls": ["list_dir"],
+    "writeToolCalls": 0,
+    "confirmationCards": 0,
+    "markdownRendered": true,
+    "consoleErrors": 0,
+    "cspViolations": 0,
+    "whiteScreen": false,
+    "readOnly": {
+      "readmeSha256Unchanged": "84388030a97a4a662f5090b1439c83a6a865a6b87dc8f1827fdc594736d42649",
+      "sourceFilesChanged": false,
+      "newFiles": [
+        ".ans/sessions/liaison/pi/ans/index.json",
+        ".ans/sessions/liaison/pi/ans/replay.jsonl",
+        ".ans/sessions/liaison/pi/native/2026-10-21T14-12-29-313Z_01a15ece-6e01-7792-b7dd-1b102ff0c40d.jsonl"
+      ],
+      "newFilesBytes": 42249,
+      "gitStatusAfter": "?? .ans/",
+      "note": "app 自动写入会话历史（非模型写项目；无 .ans/project.json、无治理记录、无源码写入）。"
+    }
+  },
+  "findings": [
+    "角色显示名修复已在开发版 dist 验证：角色树为 Draft / 提案、Crew / 组队、Steward / 统筹，旧称不再出现；MIRROR 8/8（含镜像卡/状态行）。打包 zip 仍是修复前构建，包内旧称；若交付包需新称必须重新打包/冻结。",
+    "空项目治理状态行未显示「治理模型：三权 · 五角色」；实际显示「尚无治理记录…」。MIRROR 种子项目同名检查为 true，说明有治理记录时状态行成立；空项目是缺失记录文案优先。空态是否也要模型行需 PM/UIUX 确认。",
+    "真实模型会话自动在项目下写入 .ans/sessions（3 文件 42,249 B）；README 未变、无源码/治理写入。若要求项目目录绝对零写入，此行为需产品决策。",
+    "本轮 release zip 哈希 8e7608…（405,227,230 B）与既有独立验收报告记录的 edeeef…（406,507,281 B）不同；包内 dist 为修复前候选。需 PM 确认包身份/重新冻结。",
+    "main e2e stdout 的修复探针异常为夹具故意触发，E2E_PASS=true。"
+  ],
+  "missingEvidence": [
+    "Windows 真机（含 DPI 125%/150%/200% 以外档位）",
+    "屏幕阅读器/辅助技术",
+    "打包应用内真实模型链路（本轮真实模型仅在开发版验证）",
+    "打包应用内新角色名（包为修复前构建）",
+    "长时间稳定性/多窗口/多显示器",
+    "最终发布/签名/公证"
+  ]
+}

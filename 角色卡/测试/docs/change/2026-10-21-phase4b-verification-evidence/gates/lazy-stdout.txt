@@ -1,0 +1,12 @@
+CHECK LAZY_GROUP_CLOSED_GT40=true {"groupCount":1,"open":false}
+CHECK LAZY_CLOSED_INTERNAL_ZERO=true {"activities":0,"records":0}
+CHECK LAZY_SUMMARY_CALLS_AND_EXCEPTION=true "本轮 45 个调用：read_file ×44 / write_file · 含 1 条未放行"
+CHECK LAZY_DENIED_DIRECT_VISIBLE=true "拒绝写入：目标不在角色允许范围outside.md拒绝写入：目标不在角色允许范围"
+CHECK LAZY_EXPAND_MOUNTS_ALL=true {"open":true,"activities":45}
+CHECK LAZY_EXPAND_CONTENT_CORRECT=true {"hasFile1":true,"hasFile45":true,"hasDeniedPhase":true}
+CHECK LAZY_RECOLLAPSE_INTERNAL_ZERO=true {"open":false,"internal":0,"summary":"本轮 45 个调用：read_file ×44 / write_file · 含 1 条未放行"}
+CHECK LAZY_VIRTUAL_STABILITY=true {"gone":{"group":false,"mounted":37},"back":{"group":true,"open":false,"internal":0,"summary":"本轮 45 个调用：read_file ×44 / write_file · 含 1 条未放行"},"expandAgain":{"open":true,"internal":45}}
+CHECK SMALL_GROUP_CLOSED_STILL_MOUNTED=true {"open":false,"internal":3,"summary":"本轮 3 个调用：read_file ×3"}
+CHECK NO_CONSOLE_ERRORS=true []
+LAZY_TOOLGROUP_SUMMARY {"total":10,"passed":10,"failed":0}
+LAZY_TOOLGROUP_DONE=1

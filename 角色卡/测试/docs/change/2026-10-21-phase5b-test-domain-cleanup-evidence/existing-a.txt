@@ -1,0 +1,22 @@
+✔ A1 S1：N 个角色（role-card.md + 仅 boundary.md）、无 .ans → missing + hasRoles=true；列举零写入 (11.868833ms)
+✔ A2 .ans 有效（真实 pin 全部一致）→ present；pin 逐文件校验通过且列举零写入 (4.894166ms)
+✔ A3 N1：.ans 非法 JSON → invalid + reason（载入器降级原文，不含凭据） (3.257292ms)
+✔ A4 N2：.ans 合法但 accepted:true 无 pin → invalid + reason（终态规则降级） (3.289375ms)
+✔ A5 preview（S1）：三写路径 / pin 列表 / roleIds / adopt=false / legacy 提示；零写入 (5.604334ms)
+✔ A6 preview（S1b）：既有治理边界文档 → adopt=true，不覆盖；写路径不含治理文档 (3.432583ms)
+✔ A7 N4：坏治理边界文档（entries: []）→ unparseable-governance-doc 且零写入 (3.690292ms)
+✔ A7b N4：治理边界文档 YAML 语法错误 → unparseable-governance-doc 且零写入 (2.919667ms)
+✔ A8 无角色 → no-roles（零写入） (0.459875ms)
+✔ A9 V7：.ans 已存在 → preview 拒绝 already-established（有效）/ invalid-record（无效）且零写入 (3.540417ms)
+✔ A10 桌面守卫：projectRoot 非当前导入项目 → invalid-request（不进入机制、零写入） (2.631167ms)
+✔ A11 F6 首句在拒绝回执中逐字保留且只出现一次（本套件锚点；完整 I5 断言见 c-invariants） (0.033917ms)
+✔ A12 空项目（S0）：governanceRecord=missing 与 hasRoles=false 相互独立；动作谓词仍为 false (0.49825ms)
+✔ A13 pin 不符 → pin-mismatch（不再是 present）；su 边界仍退回未接受、写入被拒 (4.866875ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 214.62275

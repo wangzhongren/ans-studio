@@ -2,6 +2,14 @@
 
 本角色只维护 `src/common/shared/`；业务实现由各属主交付。现行复用目录见 [共享组件目录](docs/architecture/shared-components.md)。
 
+## D3 轻量修复：原子写普通权限位
+
+依据已获客户实施确认的 [D3](docs/design/2026-10-21_design_permission-boundary-repairs.md)。`AtomicWriteOptions.finalMode?: number` 已实现：只接受 0–0777 整数，非法值在创建临时文件前抛错。POSIX 在临时文件写完后用句柄 chmod 准确应用权限，再 fsync、关闭并 rename；中止或 chmod/fsync 失败不提交。Windows 不调用该 POSIX 权限操作；缺省 finalMode 的其他消费者行为保持。
+
+运行时核心负责对已有普通文件读取 `mode & 0777` 并选择传入；共享原语不自行读取目标权限、不做角色判断，不复制特殊位、owner、ACL 或 xattr。原 `mode` 仍决定临时文件创建权限并受 umask 影响，`finalMode` 是显式的提交前权限。
+
+2026-10-21 本机 Node v24.14.0 / Darwin arm64：atomic-write 与 env-file 合计 **53/53**，其中新增 6 项覆盖非法输入零副作用、真实 mode、严格 umask 子进程、chmod/fsync 失败及 chmod 后中止；初次类型检查通过。实际核心接入、合并候选与 Windows 原生验证分别记录，不以共享单测代替。详见 [实施记录](docs/fix/2026-10-21_fix_d3-lightweight-permission-repairs.md)。
+
 ## ANS-RUNTIME-V2 revision 1
 
 依据 [已批准的多运行时对接设计](docs/design/2026-10-14_design_multi-runtime-integration.md)。

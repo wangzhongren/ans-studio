@@ -1,5 +1,13 @@
 # Codex适配器变更记录
 
+## 2026-10-21 ANS-REASONING-LIGHT D1 最小边界对齐（ANS Team Formation）
+
+依据用户对 [D1 方案](../项目管理/docs/design/2026-10-21_design_reasoning-effort-lightweight-repairs.md) 的实施授权，将原 YAML 已登记范围逐条落实到 Markdown Section 1，未新增产品文件或目录权限。唯一收窄为移除本角色对根 `changelog.md` 的旧执行授权；治理记录由 ANS Team Formation 维护，实现历史写自身 docs。同步 YAML 保持现有 `role/entries/kind/path/purpose` schema，不引入产品解析器不支持的格式。`group` / `groupDuty` 原字段和值原样保留，明确仅展示、不授予派发或验收权。复用既有独立验收角色，不新增角色、不迁移其他角色或修改 `.ans`。
+
+确认方案 SHA-256：`30eb803b2482eea9a308ca2bf51507bb2a8d9c56dc2137fdc5749d85a4dcda09`。本次沿用户明确授权的可信启动端和固定角色精确写集交接；没有创建 task_ops 配置、凭据或机器记录，不将文档对齐称作 task_ops 迁移完成。
+
+治理兼容验证：真实 `parseBoundaryYaml` 与 `parseBoundarySection1` 的 11 条结果全等；与修改前 YAML 比较仅移除根 changelog 条目；对全部其他实际角色 YAML 检查文件/目录交集为零。`parseRoleGroupMetadata` 仍读出运行时接入组/组员。`node --test test/门禁引擎/boundary-yaml.test.ts test/门禁引擎/model-and-service.test.ts test/门禁引擎/role-group-metadata.test.ts`：30/30 通过、0 跳过。这是角色定义兼容证据，不是思考等级修复或独立验收通过。
+
 - 2026-10-14：依据客户“可以的，你新建角色吧，然后开发吧”，建立角色与独立边界，加入运行时接入组，组内职责为组员。角色定义已按会话授权落盘；应用开发和测试尚未完成。
 
 - 2026-10-14 X1：实现 Codex app-server 动态 ANS 代理与内存 MCP、有效配置/目录隔离、原轮信号、中止/超时、恢复与共享凭据脱敏；自有 14 项测试和自有严格类型检查通过。真实 alpha 无模型配置/schema 探针通过；稳定 0.162.1 和全仓依赖联调待装配。详见 [实施记录](docs/change/2026-10-14_change_codex-governed-session.md)。

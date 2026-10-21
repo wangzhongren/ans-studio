@@ -46,12 +46,23 @@ export function recordRendererDiagnostic(logger: DiagnosticLogger, input: unknow
   return { ok: true };
 }
 
-export function observeWindowDiagnostics(win: BrowserWindow, logger: DiagnosticLogger, showFailure: () => void): void {
+export interface WindowDiagnosticsOptions {
+  /**
+   * 主帧加载失败（errorCode !== -3）时先询问调用方是否接管。
+   * 返回 true = 已接管（例如 Phase 5A 的 dev server 一次性回退），不显示恢复页。
+   * 缺省/返回 false ⇒ 沿用既有恢复页行为。
+   */
+  onMainFrameLoadFailure?: (errorCode: number) => boolean;
+}
+
+export function observeWindowDiagnostics(win: BrowserWindow, logger: DiagnosticLogger, showFailure: () => void, options?: WindowDiagnosticsOptions): void {
   win.webContents.on("did-start-loading", () => logger.record("window.load.start"));
   win.webContents.on("did-finish-load", () => logger.record("window.load.end", { ok: true }));
   win.webContents.on("did-fail-load", (_event, errorCode, errorDescription, _url, isMainFrame) => {
     logger.error("window.load.failed", new Error(errorDescription), { errorCode });
-    if (isMainFrame && errorCode !== -3) showFailure();
+    if (!isMainFrame || errorCode === -3) return;
+    if (options?.onMainFrameLoadFailure?.(errorCode) === true) return;
+    showFailure();
   });
   win.webContents.on("preload-error", (_event, _preloadPath, error) => {
     logger.error("window.preload.failed", error);

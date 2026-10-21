@@ -1,0 +1,6 @@
+lastJs=(() => { const svg = document.querySelector('.ti-status.st-working .ts-ico.status-spinner svg') || document.querySelector('#chat .tool-current .status-spinner s
+AssertionError [ERR_ASSERTION]: v3 验收断言未过（1 条）：6-可见行≥9 ⇒ fullyVisibleRows=8 viewportH=576.4
+
+1 !== 0
+
+    at file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/%E8%A7%92%E8%89%B2%E5%8D%A1/UIUX%E8%AE%BE%E8%AE%A1%E5%B8%88/docs/design/2026-10-21-phase5b-final-audit-evidence/notice-density-probe.mjs:424:12

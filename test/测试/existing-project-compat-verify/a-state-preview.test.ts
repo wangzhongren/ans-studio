@@ -16,6 +16,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { governanceActionFor } from "../../../app/renderer/src/chat/governance-view.ts";
 
 import {
   makeS1Project,
@@ -296,14 +297,9 @@ test("A12 空项目（S0）：governanceRecord=missing 与 hasRoles=false 相互
     const listing = await iface.listProject({ projectRoot: empty.root });
     assert.equal(listing.hasRoles, false);
     assert.equal(listing.governanceRecord.state, "missing", "无 .ans ⇒ missing（与是否有角色无关）");
-    const href = new URL("../../../app/renderer/ui-labels.js", import.meta.url).href;
-    await import(href);
-    const UL = (globalThis as Record<string, unknown>).ANSUiLabels as {
-      canEstablishGovernance: (h: boolean, r: boolean, s: string) => boolean;
-    };
     assert.equal(
-      UL.canEstablishGovernance(true, listing.hasRoles, listing.governanceRecord.state),
-      false,
+      governanceActionFor(true, listing.hasRoles, listing.governanceRecord.state),
+      null,
       "S0 不显示「建立治理记录」（S1 判据＝hasRoles && missing）",
     );
   } finally {

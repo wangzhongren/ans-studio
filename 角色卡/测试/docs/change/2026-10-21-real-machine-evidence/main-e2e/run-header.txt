@@ -1,0 +1,8 @@
+OUTDIR=/tmp/ans-real-machine-e2e-20261021-220003
+command=node_modules/.bin/electron test/桌面应用/e2e/main.mjs
+ANS_E2E_PROJECT=/Users/wangzhongren/code/vibeingcode/解压/ans-runtime
+ANS_E2E_OUTDIR=/tmp/ans-real-machine-e2e-20261021-220003
+ANS_RENDERER_ENTRY=/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/dist/index.html
+date=2026-10-21T22:00:03+08:00
+node=v24.14.0
+electron=v44.7.0

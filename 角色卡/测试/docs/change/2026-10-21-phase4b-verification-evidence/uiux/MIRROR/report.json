@@ -1,0 +1,47 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "W6-C five-role tree: Liaison primary; governance group exactly Rapporteur/Nominator/Convener/Verifier",
+      "value": true
+    },
+    {
+      "name": "W6-C status line shows 三权 · 五角色",
+      "value": true
+    },
+    {
+      "name": "W6-C Liaison empty state explains customer entrance without self CTA",
+      "value": true
+    },
+    {
+      "name": "W6-C mirror card rendered in Liaison with badge/source label and same request id",
+      "value": true
+    },
+    {
+      "name": "W6-C answering mirror freezes the mirror face",
+      "value": true
+    },
+    {
+      "name": "W6-C source face kept and also frozen; no mirror label there",
+      "value": true
+    },
+    {
+      "name": "W6-C queued aggregate on primary; no operable queued card on either side",
+      "value": true
+    },
+    {
+      "name": "W6-C presented queue removes one aggregate and mirrors on both faces",
+      "value": true
+    }
+  ],
+  "responses": [
+    {
+      "id": "mirror-1",
+      "decision": {
+        "kind": "confirm",
+        "confirmed": true
+      }
+    }
+  ]
+}

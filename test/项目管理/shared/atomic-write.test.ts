@@ -16,7 +16,8 @@
 // 全部使用系统临时目录，**不留文件于仓库**，用完递归清理；不指向仓库根真实 `.env`。
 
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, open, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -281,4 +282,97 @@ test("③ 失败路径安全：目标不可被替换时 atomicWrite 显式抛出
 
 test("③ 上界常量与实测一致（RENAME_MAX_ATTEMPTS=200，由实测尾部≈63 留 ~3x 余量）", () => {
   assert.equal(RENAME_MAX_ATTEMPTS, 200);
+});
+
+test("D3 finalMode 非法时不创建临时文件或替换目标", async () => {
+  await withTmpDir(async (directory) => {
+    const target = path.join(directory, "original.txt");
+    await writeFile(target, "original");
+    for (const finalMode of [-1, 0o1000, 0o4755, 1.5, NaN, Infinity]) {
+      await assert.rejects(() => atomicWrite(target, "replacement", { finalMode }), RangeError);
+      assert.equal(await readFile(target, "utf8"), "original");
+      assert.deepEqual(await readdir(directory), ["original.txt"]);
+    }
+  });
+});
+
+test("D3 finalMode 应用普通权限位，未传时保持既有安全创建行为", { skip: process.platform === "win32" }, async () => {
+  await withTmpDir(async (directory) => {
+    const target = path.join(directory, "run.sh");
+    for (const finalMode of [0o755, 0o644, 0o600]) {
+      await atomicWrite(target, "#!/bin/sh\necho ready\n", { mode: 0o600, finalMode });
+      assert.equal((await stat(target)).mode & 0o7777, finalMode);
+      assert.equal(await readFile(target, "utf8"), "#!/bin/sh\necho ready\n");
+    }
+    await atomicWrite(target, "legacy", { mode: 0o600 });
+    assert.equal((await stat(target)).mode & 0o777, 0o600 & ~process.umask());
+    assert.deepEqual(await readdir(directory), ["run.sh"]);
+  });
+});
+
+test("D3 严格 umask 下 finalMode 不丢执行位（独立子进程）", { skip: process.platform === "win32" }, async () => {
+  await withTmpDir(async (directory) => {
+    const target = path.join(directory, "run.sh");
+    const moduleUrl = new URL("../../../src/common/shared/atomic-write.ts", import.meta.url).href;
+    const childScript = `
+      const { atomicWrite } = await import(process.argv[1]);
+      process.umask(0o077);
+      await atomicWrite(process.argv[2], 'updated', { mode: 0o600, finalMode: 0o755 });
+    `;
+    execFileSync(process.execPath, ["--input-type=module", "-e", childScript, moduleUrl, target], { timeout: 10000 });
+    assert.equal((await stat(target)).mode & 0o777, 0o755);
+    assert.equal(await readFile(target, "utf8"), "updated");
+    assert.deepEqual(await readdir(directory), ["run.sh"]);
+  });
+});
+
+for (const operation of ["chmod", "sync"] as const) {
+  test(`D3 ${operation} 失败不提交内容或权限，并清理临时文件`, { skip: process.platform === "win32" }, async (context) => {
+    await withTmpDir(async (directory) => {
+      const target = path.join(directory, "run.sh");
+      await writeFile(target, "original");
+      await chmod(target, 0o755);
+      const probe = await open(path.join(directory, "probe"), "wx");
+      const prototype = Object.getPrototypeOf(probe);
+      await probe.close();
+      await rm(path.join(directory, "probe"));
+      const failure = context.mock.method(prototype, operation, async () => { throw injected("EIO"); });
+      try {
+        await assert.rejects(() => atomicWrite(target, "replacement", { mode: 0o600, finalMode: 0o644 }),
+          (error: unknown) => (error as NodeJS.ErrnoException).code === "EIO");
+      } finally {
+        failure.mock.restore();
+      }
+      assert.equal(await readFile(target, "utf8"), "original");
+      assert.equal((await stat(target)).mode & 0o777, 0o755);
+      assert.deepEqual(await readdir(directory), ["run.sh"]);
+    });
+  });
+}
+
+test("D3 chmod 完成后中止仍保留原文件及权限", { skip: process.platform === "win32" }, async (context) => {
+  await withTmpDir(async (directory) => {
+    const target = path.join(directory, "run.sh");
+    await writeFile(target, "original");
+    await chmod(target, 0o755);
+    const probe = await open(path.join(directory, "probe"), "wx");
+    const prototype = Object.getPrototypeOf(probe) as { chmod(mode: number): Promise<void> };
+    const originalChmod = prototype.chmod;
+    await probe.close();
+    await rm(path.join(directory, "probe"));
+    const controller = new AbortController();
+    const observed = context.mock.method(prototype, "chmod", async function(this: { chmod(mode: number): Promise<void> }, mode: number) {
+      await originalChmod.call(this, mode);
+      controller.abort();
+    });
+    try {
+      await assert.rejects(() => atomicWrite(target, "replacement", { mode: 0o600, finalMode: 0o644, signal: controller.signal }),
+        { name: "AbortError" });
+    } finally {
+      observed.mock.restore();
+    }
+    assert.equal(await readFile(target, "utf8"), "original");
+    assert.equal((await stat(target)).mode & 0o777, 0o755);
+    assert.deepEqual(await readdir(directory), ["run.sh"]);
+  });
 });

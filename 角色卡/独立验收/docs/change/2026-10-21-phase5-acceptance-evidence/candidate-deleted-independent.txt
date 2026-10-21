@@ -1,0 +1,18 @@
+DELETED	03f493e36d9a74e76676c19c478208912b74eb3c5c4bd87dc73f9114f1968a92	app/renderer/index.html（旧经典 326 行）
+DELETED	1ca3837e64c8de268059e32bc5170f7dd60e33b0734198b5f777951958ef2c38	app/renderer/renderer.js
+DELETED	f71f4783c9715ae9d398497fb1a4d8b228db6138ab41778efe185405a08a15b6	app/renderer/styles.css
+DELETED	db7d14973461e96663a34ec9f3b0bf6332e65e587d2d7e3c196cbee497dad855	app/renderer/engine-selector.js
+DELETED	0c6e4729786efb770d78f1e573e0920b17f4ff74f178818ef0520d2c79de8921	app/renderer/markdown.js
+DELETED	b1d086a2edc87dc89f4177cd48db59a05c17c195fbaa59c064e1065481ce0b1c	app/renderer/role-status.js
+DELETED	1a0ca51a1a12a21e0c103165c5e8d365801a8e187cb83132f8573e11c8d33f35	app/renderer/runtime-ui.js
+DELETED	66fc2915bc5f04fe13e524048debae1ac26bb5b6dfaeaa64b3963205977cb794	app/renderer/tool-rows.js
+DELETED	6e2a67fda48bd756d0de759ca5184e72622ad72503898d0fd7556e0187d4b31d	app/renderer/ui-labels.js
+DELETED	6e014a3f60c664812bdf7210adef687742a028c534e3575cd634a198d229a43b	app/renderer/vendor/README.md
+DELETED	792c48c5a849a15fdf9e37e8bcf9e6d1dd13b32b46c642a748a0a46a9919d473	app/renderer/vendor/markdown-it.LICENSE
+DELETED	391f2aa638e75e6c7859d0a5c5650ef0956722a45998f17e05b83bc655778e1e	app/renderer/vendor/markdown-it.umd.min.js（15.0.3）
+DELETED	40ee24156efd537b8a44fc6f9c339393d29500e848a3ceb44fb93207fff554a8	test/桌面应用/renderer.test.ts
+DELETED	f84ba99300ba88d0a62a069b3e4b3d6b1a8a70a717f841152d9d41b706649b2a	test/桌面应用/markdown.test.ts
+DELETED	af00ba575154d92e97e2f3854839cfac49ebeadba8e4e1d4096a451310153c40	test/桌面应用/tool-rows.test.ts
+DELETED	e127f8565141ae649df1a7b56885dce4a65857f9b6f5e3b18afd3bb4018149cb	test/桌面应用/runtime-ui.test.ts
+NOTE	—	test/桌面应用/hot-path.test.ts ④ 段删除（文件保留 ①②③，3/3）；message-queue.test.ts 3 测试改写为主进程语义（14/14）
+NOTE	—	test/测试/retired-5b/* 22 文件退役，逐文件哈希见 2026-10-21-phase5b-test-domain-cleanup-evidence/retired-sha256.txt

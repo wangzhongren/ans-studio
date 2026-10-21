@@ -1,0 +1,110 @@
+{
+  "protocol": "UIUX M1–M6 修正后；PM §10.3 同机同日旧/新交替 4 轮（首轮预热，2–4 为 3 有效轮取中位）",
+  "rounds": {
+    "old": {
+      "stormA.maxGap": [
+        17.8,
+        19.2,
+        17.6,
+        18.8
+      ],
+      "stormB.maxGap": [
+        17.6,
+        17.7,
+        17.7,
+        17.7
+      ],
+      "stormA_handler.maxMs": [
+        6.1,
+        6.6,
+        12.3,
+        12.1
+      ],
+      "stormB_handler.maxBatchMs": [
+        1.6,
+        1.5,
+        1.5,
+        0.4
+      ],
+      "replay.replayMs": [
+        22.2,
+        21.6,
+        21.3,
+        18.8
+      ],
+      "scrollToBottom.ms": [
+        11.8,
+        14.7,
+        14.8,
+        12
+      ]
+    },
+    "new": {
+      "stormA.maxGap": [
+        17.6,
+        22,
+        17.8,
+        17.7
+      ],
+      "stormB.maxGap": [
+        20.1,
+        17.7,
+        18.3,
+        17.6
+      ],
+      "stormA_handler.maxMs": [
+        0.9,
+        0.9,
+        0.4,
+        0.4
+      ],
+      "stormB_handler.maxBatchMs": [
+        1,
+        0.7,
+        1.3,
+        0.3
+      ],
+      "replay.replayMs": [
+        5.1,
+        6.7,
+        2.5,
+        3.3
+      ],
+      "scrollToBottom.ms": [
+        4.6,
+        5.1,
+        15.1,
+        2.9
+      ]
+    }
+  },
+  "mediansValidRounds2to4": {
+    "old": {
+      "stormA.maxGap": 18.8,
+      "stormB.maxGap": 17.7,
+      "stormA_handler.maxMs": 12.1,
+      "stormB_handler.maxBatchMs": 1.5,
+      "replay.replayMs": 21.3,
+      "scrollToBottom.ms": 14.7
+    },
+    "new": {
+      "stormA.maxGap": 17.8,
+      "stormB.maxGap": 17.7,
+      "stormA_handler.maxMs": 0.4,
+      "stormB_handler.maxBatchMs": 0.7,
+      "replay.replayMs": 3.3,
+      "scrollToBottom.ms": 5.1
+    }
+  },
+  "thresholds": {
+    "stormA.maxGap.median<=max(old,25)": true,
+    "stormB.maxGap.median<=max(old,25)": true,
+    "stormA_handler.median<=max(old*1.2,old+5)": true,
+    "stormB_handler.median<=max(old*1.2,old+5)": true,
+    "replay.median<=max(old*1.2,old+5)": true,
+    "scroll.median<=max(old*1.2,old+5)": true,
+    "p95<=35": true,
+    "single<=50": true
+  },
+  "allPass": true
+}

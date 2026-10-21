@@ -1,0 +1,7 @@
+6a4b6d03a69a801f51f15d953759306f793a6d024bd1e5be55450f16b68c7b82  app/renderer/src/chat/chat-store.ts
+898d6c6625225bd4bae7646ee7950e45c547d6fa8e8e340e93892fec46efcbf9  app/renderer/src/chat/ChatStream.tsx
+bb974d1d690745da52caee2ba1082e1cc1e983df1d94b310e5c4c7f2f0058613  app/renderer/src/shell/Sidebar.tsx
+cfa2f911d897f80ebd20bbd26ab7c0abdb4a05f266ee51d48ed2771a5ca34aaf  app/renderer/src/shell/phase4b.css
+fa3f74d483a6486efe5cb091cc2eeb096e78bc58c4c0ea753af3facb7713e9e8  test/桌面应用/e2e/uiux-v2.mjs
+ce3ae547c7275e1ece9c15c24417a3a52a12c811b32c185011e0aa324badf405  test/桌面应用/e2e/main.mjs
+b53084e7d06082223342773b84d1f4945615f61dd90798db758da3acfa1fe8aa  test/桌面应用/e2e/uiux-design-audit.mjs

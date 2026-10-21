@@ -1,0 +1,64 @@
+# 契约面清单抽查（独立执行，2026-10-21，HEAD fc1a39c）
+
+## 驱动方法（uiux-v2）：清单值 vs 实际出现次数（occurrences）
+loadProject            39
+selectRole             59
+selectRuntime          43
+rowModelDebug          17
+paneDebug              6
+queuedDebug            4
+replayAnchorDebug      3
+refreshProject         3
+loadPiConfig           6
+openPiPanel            1
+onRecoveryConfirm      1
+
+## 计数声明
+uiux-v2 check(（含函数定义）: 394 （清单 394）
+uiux-v2 唯一字面 check 名: 384 （清单 384）
+ime-enter check( 调用点: 9 （清单 9）→ 运行时名字 24（4 个 assertIgnored×3 + 4 个 assertSent×2 + 4 个直接 check）；按源码推导的 24 个名字与清单逐项相等（缺失 0 / 多出 0）
+main.mjs log(" 行: 323 （清单 323）
+renderer.test.ts test() 运行时数: tests 108 （清单 108）
+
+## 入口/环境变量
+1331:  await win.loadFile(path.join(APP,'renderer/index.html'));win.setTitle('ANS UI/UX 离线验收');await pause(150);
+83:    await win.loadFile(path.join(APP_DIR, "renderer", "index.html"));
+80:    await win.loadFile(path.join(APP_DIR, "renderer", "index.html"));
+1614:  await win.loadFile(path.join(APP_DIR, "renderer", "index.html"));
+1661:  win.loadFile(path.join(APP_DIR, "renderer", "index.html"));
+21:const RENDERER_DIR = process.env.BENCH_RENDERER_DIR || path.resolve(HERE, "..", "..", "..", "app", "renderer");
+
+## DOM id 块逐项核对（docs 代码块 → 对应套件源码）
+test/桌面应用/e2e/uiux-v2.mjs: id 数=82（清单声明 82），源码中缺失=0
+test/桌面应用/e2e/main.mjs: id 数=51（清单声明 51），源码中缺失=0
+uiux-v2 附录选择器数=199（清单声明 199），源码中未找到=0
+
+## 新渲染器驱动同名子集 + unimplemented（不造假）
+94:const UNIMPLEMENTED = [
+95-  "loadProject",
+96-  "refreshProject",
+97-  "refreshLiveRoles",
+98-  "openPiPanel",
+99-  "loadPiConfig",
+100-  "savePiConfigFromForm",
+101-  "appendOperatorRequest",
+102-  "piKeys",
+103-  "governance",
+104-  "onRoleState",
+105-  "onOperatorExpired",
+106-  "onOperatorQueued",
+107-  "onShellConfirm",
+108-  "shellJudge",
+109-  "decisionJudge",
+110-  "onRecoveryConfirm",
+111-  "rowModelDebug",
+112-  "queuedDebug",
+113-  "paneDebug",
+114-  "replayAnchorDebug",
+115-] as const;
+116-
+
+## uiux-v2 *_UI_ONLY 模式开关：清单 vs 源码
+清单（docs）: 22 个
+源码（uiux-v2.mjs）: 22 个
+SETS_EQUAL=true

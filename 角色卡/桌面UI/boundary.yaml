@@ -7,7 +7,7 @@ role: 桌面UI
 entries:
   - kind: directory
     path: app/renderer/
-    purpose: 渲染进程前端（index.html / styles.css / renderer.js / markdown.js / role-status.js / tool-rows.js / ui-labels.js 及 vendor 第三方库）
+    purpose: 渲染进程前端（index.html / styles.css / renderer.js / markdown.js / role-status.js / tool-rows.js / ui-labels.js 及 vendor 第三方库）；包含渲染层 React 源码（src/）、样式、组件、渲染层 tsconfig/components.json 与构建产物（dist/）
   - kind: file
     path: test/桌面应用/markdown.test.ts
     purpose: 渲染侧单测——Markdown 渲染与 vendor pin（被测对象 app/renderer/markdown.js）
@@ -35,6 +35,9 @@ entries:
   - kind: file
     path: test/桌面应用/runtime-ui.test.ts
     purpose: 本次多引擎选择、运行时组及设置展示的渲染契约测试
+  - kind: directory
+    path: test/桌面UI/
+    purpose: 渲染层 React 组件与设计系统守卫测试（独立目录，与桌面窗口的 test/桌面应用/ 精确文件授权互不重叠）
   - kind: file
     path: 角色卡/桌面UI/feature-map.md
     purpose: 功能导航

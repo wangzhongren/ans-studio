@@ -1,0 +1,33 @@
+{
+  "reports": [
+    {
+      "name": "role tree flat: all roles visible without details/fold",
+      "value": true
+    },
+    {
+      "name": "role status badges remain visible for every role",
+      "value": true
+    },
+    {
+      "name": "live system notice is its own sys row with 系统 badge, not a user bubble",
+      "value": false
+    },
+    {
+      "name": "live system notice is its own sys row with 系统 badge, not a user bubble observed",
+      "value": {
+        "chat": "【系统通知·会话重建】此前经确认发行的写权不会自动保留，如需写入请重新经 request_confirmation 确认。\n请继续处理任务。\n",
+        "assistant": [],
+        "denied": [],
+        "model": {
+          "count": 1,
+          "lastIndex": 0,
+          "operators": [],
+          "rowGap": 16
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: live system notice is its own sys row with 系统 badge, not a user bubble\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: live system notice is its own sys row with 系统 badge, not a user bubble\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:66:474)\n    at async noticeChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1261:3)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1356:19"
+}

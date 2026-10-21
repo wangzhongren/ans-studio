@@ -1,0 +1,12 @@
+same-turn live then history only one response rejection and old history=true
+real project-changed refresh does not repeat current turn=true
+full rebuild retains unpersisted live report settled and original pending card=true
+history first then exact live event does not duplicate=true
+two legitimate same-turn identical events remain two occurrences=true
+distinct turns with identical input and output remain two=true
+background engine merges in own cache without old engine rows=true
+history-before-correlated-live binds two identical optimistic inputs exactly once=true
+repeated known-turn full rebuild keeps original unanchored pending card without borrowed token=true
+legacy decided full replay reuses original card between actual request and conclusion=true
+background legacy rebuild keeps exact decided DOM and shifted anchor indices=true
+unknown legacy no false text-set dedup and old replay stays idempotent=true

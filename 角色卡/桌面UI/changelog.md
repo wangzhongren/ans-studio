@@ -1,5 +1,23 @@
 # 桌面UI 变更记录
 
+## 2026-10-21：Phase 4A UIUX M1–M6 修正（needs-work → 修正）
+
+**UIUX Phase 4A 评审修正（needs-work，M1–M6，2026-10-21）**：①队列子视图（同一 424 抽屉，标题「<角色> · 队列」/返回来源/当前+排队全量；工作概览与资料仅预览前 3 条排队，>3 显示「查看全部队列」；`#right-queue-body` 唯一、`state.rightTab` 不新增值）；②撤回回执——成功聊天流「已撤回排队消息：…」，失败/异常保留就地回执并追加 system 行；③设置 Tabs ←/→/Home/End + roving tabindex + aria-controls/tabpanel；④保存条 `.pi-status` 64px 内两行完整（键数/缺项数+应用时点，完整逐键文案在 title）；⑤角色头 `statusBadge(status,0)` 状态-only；⑥补 960 焦点/Esc/inert 独立断言与 200% 实测。门禁重跑：冒烟 99/99 + 28 截图；CONFIG 20/20、ROLE_FOCUS 9/9、默认段 4A 项全过；gzip 263,904B；bench 3 有效轮全过；C1 Δ=16；3B 冒烟 45/45。详见 [4A 变更记录](docs/change/2026-10-21_change_ui-platform-phase4a-engine-settings-drawers.md) §三·五。
+
+## 2026-10-21：Phase 4B 范围/写集规划（仅规划，未写实现）
+
+- 按 PM §十四 4B 授权产出[4B 范围与写集清单](docs/design/2026-10-21_design_ui-platform-phase4b-scope.md)：功能面（QUEUE_VIEW/operator 聚合、治理三权/镜像/记录动作、报告全文/persistence/delivery、operator 镜像、replayAnchorDebug、single 警告刷新、judge 跨引擎重放、菜单配置状态、queueView tab 切换、C2 重锚）、写集与解冻清单（chat-store/ChatRow/ChatStream/confirm-store/events.ts 最小解冻理由；App 不动）、扩展点、驱动/契约 #12/#13/#17/#19、测试计划（纯逻辑/4B 冒烟/uiux 段/QUEUE_VIEW/MIRROR/治理 reaccept/报告卡）、零新增依赖、热路径重基线/C1/IME、风险与待 PM 复核点。**仅规划，未写实现代码**。
+
+## 2026-10-21：Phase 4A 实施——引擎真实切换/三引擎设置/角色资料与文档/工作概览/队列抽屉
+
+实施——按 PM §十二放行与 UIUX 4A 设计：①`selectRuntime` 真实切换（每项目×引擎视图缓存、三元身份 open/history、切回重放、后台只缓存、旧项目丢弃、迟到结果不覆盖）；②每引擎草稿/附件（runtime×role 内存，成功发送/显式移除/切项目清除）；③三引擎设置面板（metadata 驱动、Pi 3 必填+推理选择+高级两 Slider、Codex/Claude 字段、秘密掩码/显示、固定 64px 保存条、保存 loading/saved/missing/error/晚到、缺配条 + 打开设置）；④角色资料四节 + 待办/队列预览 + 文档只读（opaque ID、错误码/重试/链接/焦点/迟到失效）；⑤工作概览（待处理定位/当前工作/排队/最近回交、角标拆分、唯一 `#right-queue-body`）；⑥队列区注入地回执/撤回；⑦新 `components/ui/slider.tsx`（Base UI copy-in，零新增依赖）；⑧Sidebar 最小修改（`#tab-pi` 启用、角色「当前+排队」计数、树分组扁平化/组长在前）；⑨`chat/extensions/`、`driver-extensions/` 扩展点；⑩契约面/组件台账/证据。
+
+**PM §十三 裁定落地（2026-10-21）**：①批准并实施 `chat/ChatRow.tsx` 唯一最小冻结例外——失效/已答 operator 卡 `closed` 时隐藏 confirm/deny/submit/cancel（保留 disabled/finalNote/aria/卡片容器，旧 freezeOperatorCard 同义）；②左树单计数——`.ti-count` 唯一可见数字（当前+排队），状态标签 `statusBadge(status,0)` 只表达状态，队列深度进 title/aria 与工作概览；③judge 跨引擎重放归 4B（契约面注明）；④C2 按同因既有基线红待 4B/5 重锚，不阻塞 4A。
+
+门禁（§十三 后重跑）：typecheck 0 错、build 成功、CSP 严格、gzip 263,098B ≤300KiB；旧基线 679/679；新纯逻辑 67/67；IME 24/24；懒挂载 10/10；4A 冒烟 70/70 + 20 截图；bench（旧/新交替 4 轮，首轮预热，3 有效轮中位）全部阈值通过；C1 Δ=16。uiux-v2：SELECTOR 26/26、CONFIG 20/20、ROLE_FOCUS 9/9、SEND_FACTS 8/8；RUNTIME 13/14 通过（此前阻塞项已通关，余 C2 同因旧红）；默认段 4A 项全过、止于 Phase 5 项；VISUAL 止于 4B 报告卡项。详见 [4A 变更记录](docs/change/2026-10-21_change_ui-platform-phase4a-engine-settings-drawers.md) 与[证据](docs/change/2026-10-21-phase4a-evidence/)。
+
+- 2026-10-21（治理边界·UI 平台化）：ANS Team Formation 依据客户 2026-10-21 审阅「UI 平台化」方向后的「开干」指示与已接受的默认值「Vite 只构建渲染层、主进程保持无构建」，按项目管理评审 §四边界缺口清单，在本角色 Section 1：①新增目录条目 `test/桌面UI/`（渲染层 React 组件与设计系统守卫测试；独立目录，与桌面窗口的 `test/桌面应用/` 精确文件授权互不重叠）；②在既有目录条目 `app/renderer/` 的用途说明中补充「包含渲染层 React 源码（src/）、样式、组件、渲染层 tsconfig/components.json 与构建产物（dist/）」——权限范围仍是目录整体授权，未新增逐文件条目。`boundary.md` 与 `boundary.yaml` 同步逐条对应（各 20 条）。未改应用代码或测试、未改角色卡。见[治理记录](docs/change/2026-10-21_change_ui-platform-boundary.md）。
+
 - 2026-10-14：创建——按客户「桌面拆分成两个角色吧，一个UI，一个window相关的」从「桌面应用」拆分：本角色承接渲染前端（`app/renderer/` 与渲染侧测试）。**客户 2026-10-14 确认原话「桌面UI/桌面窗口 这个可以」——已确认生效**；旧角色目录原位冻结为归档。Doc: docs/design/2026-10-14_design_role-split-ui.md
 - 2026-10-14：修复——测试角色独立回归上报的「开合执行记录组 → 组前正文阅读锚点逐轮漂移」（确定性、1360/960 两档一致、修前 +2px/轮累积）。根因：行模型 `rec.h` 取 `offsetHeight`（取整、且不含 `.chat-pane` 的 16px flex 行距），spacer 记账与真实布局口径不一致，窗口构成变化按行距量级位移正文、被滚动锚定补偿后剩恒向残差。修法：`rec.h` 口径改为「真实行高（rect，小数）+ pane 行距」（`paneRowGap`/`rowFootprint` 六处统一，估算同口径）。设计对齐成果零回退（CSS/HTML 未动，双档实测 66/100/52/760/14px·26.6 等一致；uiux-v2 78 项含新增两档开合漂移断言全过，A/B 自证该断言修前必红）。Doc: docs/fix/2026-10-14_fix_virtual-row-anchor-drift.md
 - 2026-10-14：修复（同日追加）——① PM 转来 `U1_WINDOWED_TO_BOTTOM`（点角色到底）偶发定性：main.mjs 真自检台两侧各 17 轮全 true、直接 A/B 0/16 vs 0/16（合并 PM 观测 1/30 vs 0/21）——无法复现，判既有偶发/夹具时序，未改该行为代码；② 排查中修掉本修复第一版的行距缓存缺陷：脱离文档的 pane 读不到样式表，原实现把「读不到」当 0 落缓存（后台事件/恢复数据先于挂载建行表即中招、该 pane 退回错口径）——改为 `isConnected` 才读、命中才缓存；e2e 新增口径不变量断言（缺陷副本实测必红：C.rowGap=0 vs A=16）+ 源码守卫。新候选指纹：renderer.js `47703d0b…`、uiux-v2.mjs `156b73ca…`、renderer.test.ts `df1c195c…`。Doc: 同上 §9
@@ -218,7 +236,7 @@
 - **renderer.js**：`initShellJudge()` 判四方法齐备 → 订阅 `shell:judge-state`/`shell:judge-result` → 启动 `getShellJudgeState()`；复选框 change 只调 `setShellJudgeEnabled`，落 `shellJudgeToggleResult` 的实际值（失败回退并显示错误，无乐观改状态）；开启后显示常驻警告与琥珀「判断 agent」标记（`.is-on`，非错误红）。`onShellJudgeResult` 按 `roleId` 落 pane、按 `toolCallId`（工具组/生命周期/operator/裸 data）锚定插入，定位不到追加流尾；`payload.id` 幂等；仅在底部附近贴底；**不自动切角色/开会话、不写 localStorage/.env/项目文件、不动已挂起卡**。确认卡 `judgeNotice` 原样 `textContent` 呈现、无值隐藏。探针新增 `window.__ansRenderer.shellJudge = { state(), onState, onResult }`。
 - **结果行**：`.sys.shell-judge-row` 显示标题/命令摘要/档位/判断引擎/operator/时间/理由/替代方案/客户说明/出路，详情折叠含命令原文、cwd、证据、`hardDenyOverride`、toolCallId。deny 档放行标题带「deny 档」、琥珀徽标「deny 档 · judge 放行」、正文「该命令属于硬拒类…请复核」。
 - **styles.css 最小增量**：`.composer-auto-approve(.is-on/.is-unsupported)`、`.composer-judge-status`、`.judge-warning`、`.shell-judge-row`/`.sj-*`、`.sc-judge-notice`；开启态与警告一律 `--amber`，警告随 900 内容列、继承整页等宽字体。
-- **测试**：`tool-rows.test.ts` 新增 8 例（三态/失败不改状态/警告逐字/allow/deny 档/deny/manual/notice）→ 39/39；`renderer.test.ts` 新增 5 例（DOM 与样式钩子、开关三态与失败回退、结果行锚定与 deny 徽标、judgeNotice、边界）→ **85 计 /81 过 /4 红**（4 红仍为先于本批的 CRLF 基线 N-1、data-state、P1-3、G-5）；全仓 `node --test "test/**/*.test.ts"` **2454 计 /2431 过 /20 红 /3 skip**——20 红与改动前基线红集逐条一致（无新增红）；`npx tsc --noEmit` 0 错。`uiux-v2.mjs` 新增独立模式 `ANS_JUDGE_UI_ONLY=1`（受控 IPC 替身＋真实 Electron，**JUDGE_UI_PASS 14**）：启动权威关闭态、勾选开启（琥珀标记+常驻警告）、取消关闭、失败保持实际状态并显示错误、`shell:judge-state` 推送同步、deny 档 allow 结果行（标题/徽标/硬拒说明）按 toolCallId 锚在工具调用之后、普通 deny（理由/替代方案/客户说明/关闭开关重试）、manual 不产生结果行、`#sc-judge-notice` 原样呈现、已挂起卡在开关切换前后保持可作答、后台角色结果不切当前视图且切回可见。既有 `ANS_TERMINAL_UI_ONLY=1` 同步新增启动态断言 → **TERMINAL_PASS 15**。
+- **测试**：`tool-rows.test.ts` 新增 8 例（三态/失败不改状态/警告逐字/allow/deny 档/deny/manual/notice）→ 45/45；`renderer.test.ts` 新增 5 例（DOM 与样式钩子、开关三态与失败回退、结果行锚定与 deny 徽标、judgeNotice、边界）→ **85 计 /81 过 /4 红**（4 红仍为先于本批的 CRLF 基线 N-1、data-state、P1-3、G-5）；全仓 `node --test "test/**/*.test.ts"` **2454 计 /2431 过 /20 红 /3 skip**——20 红与改动前基线红集逐条一致（无新增红）；`npx tsc --noEmit` 0 错。`uiux-v2.mjs` 新增独立模式 `ANS_JUDGE_UI_ONLY=1`（受控 IPC 替身＋真实 Electron，**JUDGE_UI_PASS 14**）：启动权威关闭态、勾选开启（琥珀标记+常驻警告）、取消关闭、失败保持实际状态并显示错误、`shell:judge-state` 推送同步、deny 档 allow 结果行（标题/徽标/硬拒说明）按 toolCallId 锚在工具调用之后、普通 deny（理由/替代方案/客户说明/关闭开关重试）、manual 不产生结果行、`#sc-judge-notice` 原样呈现、已挂起卡在开关切换前后保持可作答、后台角色结果不切当前视图且切回可见。既有 `ANS_TERMINAL_UI_ONLY=1` 同步新增启动态断言 → **TERMINAL_PASS 15**。
 - **未验边界**：结果行未持久化（V1 界面会话内，重启不保证重现——持久来源为审计 JSONL+诊断）；`alternatives/evidence` 的展示为上界文本，未做长文折叠（证据按设计有界）。
 
 ## 2026-10-17 W4 治理三权界面（左树/空态/状态行/决定卡；评审 §8）
@@ -378,3 +396,150 @@
 - **证据**：`docs/change/2026-10-20-queued-view-evidence/report.json`（运行目录 `/tmp/ans-queue-view-final`，隔离 user-data）。
 - Doc: [docs/change/2026-10-20_change_queued-view-restore.md](docs/change/2026-10-20_change_queued-view-restore.md)
 - 指纹：工作树未提交，以 `git diff` 为准（`app/renderer/renderer.js`、`test/桌面应用/renderer.test.ts`、`test/桌面应用/e2e/uiux-v2.mjs`、本文件 + Doc + 证据）。
+
+
+## 2026-10-21：UI 平台化 Phase 2——React 新渲染器骨架（与旧渲染器并存）
+
+- **改动**：在 `app/renderer/` 内新建 Vite/React/shadcn base-nova 渲染器：`src/index.html`（严格 CSP）、`src/index.css`（深色石墨令牌唯一来源 + Tailwind v4 `@theme inline`）、`src/shell/{TitleBar,Sidebar,ChatHeader,Composer,Drawer,ConfirmCard}.tsx`、`src/stores/{ui-store,confirm-demo-store}.ts`、`src/lib/{utils,platform}.ts`、`src/test-driver.ts`、`src/components/ui/`（16 个 copy-in 组件 + 台账）。旧入口与 7 个经典脚本**零改动**，仍为生产入口。
+- **行为**：骨架演示，不接业务。标题栏 36px（窗口三按钮在真实 Electron 接 preload 通道，浏览器缺失即禁用并标注）；左栏 248/208–360、pointer 拖动/双击复位/←→±8、Shift±24/`aria-valuenow` px/localStorage 两键/收起 `.app.is-sidebar-collapsed`（用 shadcn resizable 的 Group/Panel，手柄按 Q4 自绘 + `flushSync`）；会话头/空态/贴底输入区（Enter/Shift+Enter/IME 组合保护；发送禁用如实标注）；右抽屉 Motion 424/Esc/焦点返回；shell 确认卡 AlertDialog 640/命令逐字/拒绝默认焦点/Esc=不放行，仅 `__ansRenderer.openConfirmDemo` 打开演示载荷。
+- **组件取件**：shadcn CLI 4.22.1、base-nova、16 组件全部可用。CLI 需目标目录 `package.json`（用临时存根后删除）、把 `@/lib/utils` 误装成 npm 包 `cn`（重复 `node_modules`/`package-lock` 已删，15 处导入改回）；根清单零改动。圆角/过渡/遮罩/阴影按规范收敛；`tw-animate-css` 未装，registry 动画类惰性。
+- **CSP**：生产 meta 严格；Base UI `ScrollArea` 内联 `<style>` 由 `CSPProvider disableStyleElements` 关闭；产物 0 内联脚本/`<style>`/`style=`/`unsafe-*`；真实 Electron `file://` 冒烟 `CONSOLE_MESSAGES=0`。
+- **契约面**：新增 [ui-contract-surface](docs/feature/ui-contract-surface.md)：四套件 + `renderer.test.ts` 的入口/env/驱动方法/DOM id/class/data/aria/写死路径；新渲染器三态表；Phase 3/5 双端逐 check 名执行方式。IME 实际 **24 个运行时 check 名**（重锚，非 26）；`uiux-v2` 394 个 `check(` 调用点；`main` 323 条 `NAME=` 报告行；`bench` 无 check。
+- **验证**：`npm run typecheck:renderer` 通过；`npm run build:renderer` 通过；入口引用资产 gzip（level 9）**216,401B**（JS 204,292 + CSS 11,725 + HTML 384）≤300KB；两档截图 `docs/change/2026-10-21-phase2-evidence/`；真实 Electron 44.7.0 `file://` 冒烟全绿（`#root`/模块/样式、标题栏 36、侧栏 248、内容列 900、引擎菜单 3 radio/aria-expanded/零 CSP、抽屉 424/Esc/焦点返回、确认卡 640/默认焦点/Esc、拖宽 328/双击 248/Shift+→272/收起、IME 组合保护、零 did-fail-load/零 CSP 错误）；`git diff --check` exit 0。
+- **未验证**：真实聊天流/发送/附件/停止/双开关/确认卡 IPC/恢复卡/治理卡/设置/Pi 面板/打包安装包/bench/200% 文字/屏读/Windows。偏差（其中引擎 DropdownMenu 契约已在 Phase 2b 修正；其余如 ScrollArea 滚动条隐藏、菜单无 Motion 入场、空态演示文案、`dist/src/index.html` 路径等）逐项见变更记录。
+- **证据**：`docs/change/2026-10-21-phase2-evidence/`（两档截图 + `electron-smoke/report.{json,txt}` + 默认/抽屉/确认卡截图）；冒烟脚本在 `/tmp/ans-phase2-file-smoke.cjs`（不入库），证据已删 `user-data`。
+- Doc: [docs/change/2026-10-21_change_ui-platform-phase2-shell.md](docs/change/2026-10-21_change_ui-platform-phase2-shell.md)
+- 指纹：工作树未提交，以 `git diff`/`git status` 为准（`app/renderer/src/**`、`components.json`、`app/renderer/tsconfig.json` 新增；旧渲染器文件零改动）。
+
+
+## 2026-10-21 Phase 2b：UIUX 设计对齐评审 needs-work 修正
+
+- **触发**：UIUX Phase 2 评审 needs-work（三项 Phase 3 前必须 + 引擎契约决定 + 廉价项）。只改 `app/renderer/` 与 `角色卡/桌面UI/`。
+- **修正**：① `<html class="dark">`，深色变体生效；`#sc-allow` 边界回 `--input`（rgb(107,117,126)）。② Button/Input/Textarea/Checkbox/Switch/菜单项焦点环统一 2px solid `--ring` + 3px offset；修掉 Tailwind v4 `outline-none` 的 `--tw-outline-style:none` 与基础 `outline-ring/50` 压色（未分层规则）。③ Button primary hover `--success-hover`（rgb(127,178,155)）/ active `--primary-active`（rgb(94,143,122)）；outline/ghost/secondary hover/active 收敛；字号 13、disabled 0.45；发送禁用中性底。④ 引擎选择器改为自绘 `EngineSelect`，恢复旧 `combobox/listbox/option` ARIA 与 ↑↓/Home/End/Enter/Space/Esc/Tab/视口 placement；`DropdownMenu` 保留但不再用于引擎。⑤ Checkbox 选中 `--warning`（rgb(196,161,95)）。⑥ 960 scope 后缀隐藏、ScrollArea thumb 令牌、图标描边/尺寸、Button 字号等廉价项。
+- **验证**：`typecheck:renderer` 0 错；`build:renderer` 通过；Electron `file://` 冒烟 **49 项全 true**（含 dark、outline 边界、焦点环、primary hover/active、checkbox warning、引擎 ARIA/键盘、960 scope），零 console/CSP/did-fail-load；gzip（level 9）**188,883B**（JS 176,510 + CSS 11,984 + HTML 389）；CSP 扫描 0 内联/0 unsafe；`git diff --check` exit 0。证据：`docs/change/2026-10-21-phase2b-evidence/`（1360/960 默认/引擎菜单/确认卡放行 hover+焦点 + `cdp-styles.json` + Electron report）。
+- **未做**：角色树 roving tabindex/↑↓/Home/End（Phase 3）；确认卡退场/菜单入场 Motion、空态文案、Phase 5 演示标记与 dist 入口（按阶段）。
+- Doc: [docs/change/2026-10-21_change_ui-platform-phase2-shell.md](docs/change/2026-10-21_change_ui-platform-phase2-shell.md)（Phase 2b 节）
+
+
+## 2026-10-21：vendored markdown-it 安全升级 15.0.2 → 15.0.3
+
+- **安全依据**：15.0.2 命中 GHSA-gfr2-rv44-r23c（high，CVSS 7.5，默认配置下多行 link reference definition 二次方渲染，聊天渲染路径可达）与 GHSA-vfgh-jcmw-g37q（low），均修于 15.0.3；装配已把 npm 依赖升到 15.0.3，本轮把 vendor UMD 同步到同版本。
+- **来源/哈希**：`npm pack markdown-it@15.0.3`（临时目录 `/tmp/ans-md-it-1503`），tarball sha256 `98a7453983ab0e268c17dbd5260bf7190ba46b4cca912327fc1c1a2578e4b56d`、integrity `sha512-+Az7Ojz3iRGu8KYMvJ6xVhvrxP3eE+vEtJX75Ow88XBpcQNV/0lGX5ZynIIBftREo4DC2jsveAMDaeltmm8QvQ==`（与根 lock 一致）。vendor UMD sha256：`635972b9…`→`391f2aa6…`；LICENSE 内容不变（`792c48c5…`）。
+- **改动**：替换 vendor UMD/LICENSE；`vendor/README.md` 版本/URL/sha/安全说明；`markdown.js` **仅头注释版本号**；`test/桌面应用/markdown.test.ts` pin 版本+sha+README 断言。`html:false`、链接白名单、图片禁用、表格启用、代码块类与装载顺序**逐字未动**。
+- **测试**：`node --test test/桌面应用/markdown.test.ts` **5/5 / exit 0**；`node --test test/桌面应用/*.test.ts` **679/679 / 0 败 / exit 0**（XSS 负例与 html:false 钉子全绿）；`git diff --check` exit 0。
+- **未验证**：真实 Electron 聊天流渲染（Phase 3 迁移后复验）；未跑全仓其他角色测试。
+- Doc: [docs/change/2026-10-21_change_markdown-it-vendor-15-0-3.md](docs/change/2026-10-21_change_markdown-it-vendor-15-0-3.md)
+
+
+## 2026-10-21 Phase 3A：聊天流核心迁移（真实 IPC；旧渲染器不动）
+
+- **范围**：新渲染器接真实 listing/会话/历史/事件；旧 `index.html`/`renderer.js`/`styles.css` 与 7 个经典脚本零改动；只写 `app/renderer/`、`test/桌面UI/`、三个 e2e 目标切换、角色资料。
+- **实现**：`src/chat/` 纯逻辑（行模型 150/30、回放 skip/append/full+去重、状态优先级、事件路由/工具事实、markdown-it 15.0.3 封装、角色视图）+ `chat-store`/`ipc`；`Sidebar` 真实项目/角色树（分组/状态/roving tabindex/导入）；`ChatStream`/`VirtualPane`/`ChatRow`（历史回放/实时事件/虚拟窗口/空/加载/队列/tool-current/行类型）；`Composer` 非受控 textarea + IME + sendSession + pickImage 最小附件；`ChatHeader`/`Drawer` 真实角色；驱动扩展 `loadProject/selectRole/rowModelDebug/paneDebug/onRoleState/appendOperatorRequest/...`。
+- **门禁**：typecheck 0 错；build 通过；gzip **246,608B**（JS 232,745 + CSS 13,475 + HTML 388）≤300KB；CSP 0 内联/0 unsafe；`ime-enter` 新入口 **24/24**；`bench-storm` 新入口 **BENCH_DONE=1**；新单测 **15/15**；旧基线 **679/679**；真实 Electron 冒烟 **16/16**（历史/虚拟/operator 锚点/状态/Markdown）；`git diff --check` 0。
+- **未达/未实现**：uiux-v2 新入口默认段首个 check 未过（工具组/拒绝行细节），**不宣称双端等价**；shell/恢复/双开关/停止/队列抽屉/设置/治理卡/delivery/persistence/report 全文/operator 镜像留 3B/4；无新增依赖、未改根清单/主进程/preload/desktop。
+- Doc: [docs/change/2026-10-21_change_ui-platform-phase3a-chat.md](docs/change/2026-10-21_change_ui-platform-phase3a-chat.md)
+- 证据：`docs/change/2026-10-21-phase3a-evidence/`（Electron report/截图、ime 报告、bench JSON、uiux-v2 失败报告）
+
+
+## 2026-10-21 Phase 3A2：UIUX 3A 评审 7 项必须修正
+
+- **触发**：UIUX Phase 3A 评审 needs-work（7 项 Phase 3B 前必须）+ 工具组折叠 check。只改 `app/renderer/`、`test/桌面UI/`、`角色卡/桌面UI/`；旧渲染器零 diff、断言未改。
+- **修正**：① Markdown 标题 15/15/14 + 16/6、列表 4/18/20、引用、表格 `--card` 表头/6×10/强底线/外框、p 10。② `.is-replay .88`、`.msg-handback.is-blocked` 3px danger。③ 工具行真实时间（旧 `shortTime`）、timed-out 危险色、折叠摘要异常计数危险色、`›` chevron、未放行直显 + 前相位目标补全；工具组相位合并/连续组/运行中展开/轮末折叠/手动保持。④ choice 选项 40px 可点区/选中底/`accent-color`/中性 `--input` 边。⑤ 删除未消费 `keepEl`；details 开合与 choice 选中提升到 store；`preferTail` 仅贴底时生效。⑥ 空态 CTA 改 shadcn Button。⑦ `sys-config` danger。
+- **门禁**：typecheck 0；build 通过；gzip **250,017B**（JS 235,651 + CSS 13,964 + HTML 402）；CSP 0 内联/0 unsafe；新单测 **18/18**；IME **24/24**；bench `BENCH_DONE=1`（两次 stormA 36.9/29.9ms、stormB 31.6/28.2ms，handler ≤1.0ms；阈值未定）；Phase 3A2 Electron 冒烟 12 组行为断言全 true、0 console/0 did-fail；`git diff --check` 0。
+- **uiux-v2 新入口**：默认段前 8 项 true，第 9 项「one independent work list without duplicated role documents」未过（工作概览 3B/4）；工具折叠段前 12 项 true，第 13 项尾部折叠阅读锚点未过（3B/5）。**不宣称双端等价**。
+- 证据：`docs/change/2026-10-21-phase3a2-evidence/`（smoke report + 1360/960 聊天流与 choice 截图、ime、bench、uiux/toolfold 报告）。
+- Doc: [docs/change/2026-10-21_change_ui-platform-phase3a-chat.md](docs/change/2026-10-21_change_ui-platform-phase3a-chat.md)（3A2 节）
+
+## 2026-10-21 Phase 3A2 性能：bench-storm 热路径回归修复
+
+- **归因**：Chrome tracing + DOM 计数显示 300 事件风暴把 300 个无 callId 工具事件放进同一个默认折叠组，React 仍每批重建 300 个 `.tool-activity`（`createElement` 1,805 次；最长 `TimerFire` 12.36ms，其中 React `FunctionCall` 10.36ms）。`getBoundingClientRect` 仅 6 次、Layout 0.34ms、Paint 0.06ms，布局/时间格式化/选择器不是主因。
+- **优化**：>40 行且折叠的工具组延迟挂载明细（小工具组保持旧 DOM 契约）；`ChatRowView` 按 row + data 引用 memo；活动项原地 push 追加（行数据换新引用）；保留 16ms 合帧与实时性，不做滚动降频。
+- **结果**：同机交替 3 轮，新 stormA 17.7/21.3/17.6ms（旧 26/23.3/17.5，中位 23.3→17.7），新 stormB 19.8/18.9/17.2ms（旧 17.6/17.7/17.6）；handler max ≤0.3ms；replay 2.1–5.9ms、scroll 0.5–7.3ms。优化后 tracing 最长任务 5.58ms、createElement 4、无 longtask。目标 ≤25ms 达成。
+- 证据：`docs/change/2026-10-21-phase3a2-evidence/bench-opt/`（3 轮 old/new JSON、profile-final、trace-final、profiling-summary、优化前 profile）。其余门禁：typecheck/build、新单测 18/18、旧基线 679/679、IME 24/24、Phase 3A2 冒烟 12 组全 true、uiux-v2 前 8 项与 toolfold 前 12 项不回退。
+
+## 2026-10-21 PM §10.4：登记大工具组延迟挂载为唯一 DOM 例外
+
+- **登记**：契约面 `docs/feature/ui-contract-surface.md` §七；常量 `DEFER_TOOL_ROWS_WHEN_CLOSED=40`，仅同一连续工具组闭合且调用数 >40 时延迟内部 `.tool-activity-list`；摘要、失败/未放行计数与直显保持；展开立即挂载；≤40 调用小组保持旧契约。
+- **依据**：PM [2026-10-21_review_ui-platform-round.md §10.4](../项目管理/docs/design/2026-10-21_review_ui-platform-round.md) 批准为唯一、限定范围例外；其他 DOM 差异须另行报 PM。
+- **验证**：`docs/change/2026-10-21-phase3a2-evidence/defer-tool-rows-verify.json`：60 调用闭合组内部行 0、摘要可见；点击展开后 60 行挂载（首/末路径正确）；再次折叠回 0；10 调用小组闭合仍挂载 10 行。
+
+## 2026-10-21 Phase 3B：真实确认卡族、judge 双开关与输入区完整接线
+
+- **范围**：按 PM §10.6 放行，完成 Phase 3 Phase 剩余项——真实 shell/su/恢复确认卡（fail-closed）、judge 结果行与双开关、发送/停止/队列位次与撤回/角色草稿/完整附件 UX、`[系统·看护/收束]` 注入行；外加 UIUX 3A2 非阻塞项（Lucide chevron、表格 13px、status glyph 清理、C1）。未扩围到 Phase 4。
+- **实现**：新增 `chat/judge.ts`（文案/结果映射纯逻辑）、`chat/confirm-logic.ts`（卡状态机/失效/队列/附件纯逻辑）、`stores/confirm-store.ts`（卡 + 双开关 + 一次性警告）；`ConfirmCard` 改为真实 IPC 双卡（`#shell-confirm/#recovery-confirm` 常驻 DOM、`hidden` 切换、拒绝/取消默认焦点、Esc/×、失效定格）；`Composer` 发送三态/停止/附件（选/粘/拖/data URL 缩略图/移除）/双开关；`ChatStream` 队列位次 + 撤回就地回执；`ChatRow` judge 结果行 + operator `judgeNotice`；`chat-store` 判断结果行锚定/幂等、提示来源收口、空历史不覆盖实时行、`append(from 0)` 全量重建、aborted 清除错误；`events.ts` 注入分类补 `用户指令：`/`[系统·]` 严格闭合/`[派发]/[回交]`、非工具 denied 只作系统事实；`test-driver` 补齐 3B 驱动面。
+- **门禁**：typecheck 0；build 通过；CSP 0 内联/0 unsafe；gzip **240,133B** ≤300KB；新纯逻辑 **33/33**；旧基线 **679/679**；旧渲染器核心零 diff；IME **24/24**；延迟挂载 **10/10**；真实 Electron 离线 IPC 冒烟 **45/45** + 18 张 1360/960 截图，零 console/CSP；bench 旧/新交替各 4 轮（首轮预热）全阈值通过（stormA 中位 17.6ms、stormB 19.2ms、p95/单轮 19.5ms）；uiux-v2 JUDGE 33/33、G2 5/5、TERMINAL 22/22、TOOLFOLD 17/17、默认 9/10、SEND_FACTS 8/9、QUEUE_VIEW 1/2。
+- **C1**：尾部折叠 Δ 由 51→**16px**（旧 32px），中段 0；未放宽断言。
+- **UIUX 3B 评审修正（同日，5 项 Phase 4 前必须）**：SU 档位摘要 600 + 绕过写边界警告 `--warning`（默认提示仍 `--text-3`）；`#sc-details` 加 Lucide ChevronRight；`.capsule.is-dropping` 拖入反馈（`--text-3`/`--hover`）；`.queue-withdraw` 20→28px/11px；`.attach-chip` 10→8px、`.attach-rm` 圆形→4px、X→12/1.5。冒烟扩至 **45 项 + 17 张截图**（新增 6 项样式断言与 shell 详情/拖入态截图），复验 JUDGE 33/33、G2 5/5、TERMINAL 22/22、TOOLFOLD 17/17；gzip **240,133B**。评审记录：`角色卡/UIUX设计师/docs/design/2026-10-21_design_ui-platform-phase3b-review.md`。
+- **未实现**：Phase 4 项（引擎真实切换/每引擎会话、工作概览/队列抽屉、治理三权/镜像/治理记录动作、资料/文档、delivery/persistence/报告全文、operator 镜像、`replayAnchorDebug`）；全量双端等价仍 Phase 5。
+- Doc: [docs/change/2026-10-21_change_ui-platform-phase3b-cards-composer.md](docs/change/2026-10-21_change_ui-platform-phase3b-cards-composer.md)
+- 证据：`docs/change/2026-10-21-phase3b-evidence/`（smoke 45 项 + 截图、uiux 各段报告、ime、bench 8 轮、lazy、单测、构建/CSP/预算、C1 归因）。
+
+## 2026-10-21 Phase 4A 范围与写集清单（仅规划）
+
+- **依据**：PM 评审 revision 5 §11.2–§11.4（Phase 4 已授权，拆 4A→4B；4A 派发前置 1 要求桌面UI 先产出范围与写集清单）。
+- **交付**：[docs/design/2026-10-21_design_ui-platform-phase4a-scope.md](docs/design/2026-10-21_design_ui-platform-phase4a-scope.md)：4A 五个功能面（引擎真实切换与每引擎会话/历史/草稿、三引擎设置、角色资料/待办/队列/文档只读、工作概览、队列抽屉）逐项行为与验收面；新增/修改文件写集（全部在 `app/renderer/`、`test/桌面UI/`、`角色卡/桌面UI/`）；4A 驱动方法与契约面 #7/#9/#10/#15/#16/#18/#19/#20 三态目标；纯逻辑单测 + Electron 冒烟 + uiux-v2 预期关闭 check 名；零新增依赖；热路径影响（不改聊天行/工具组，仅 ipc 入口缓存 + Composer 草稿键，计划 bench 重基线与懒挂载 10/10）；风险/未决项与 4A/4B 文件级互斥。
+- **待 PM 复核**：QUEUE_VIEW 口径（该段实际断言 operator 排队聚合，PM §11.2 列 4B）、runtime 是否持久化、工作概览最近回交深度、`chat/extensions`/`driver-extensions` 扩展点机制、组件台账、C2 基线红处理。
+- **边界**：本轮只写 `角色卡/桌面UI/`（本文件 + memo/changelog + 3B 记录笔误更正），未改 `app/`、`test/`、依赖、主进程/preload/desktop、旧渲染器或根配置；未运行应用/测试/构建。
+
+## 2026-10-21 Phase 4B：治理三权/镜像/聚合、治理记录、报告全文与回执
+
+- **范围**：PM §十五放行；QUEUE_VIEW 4 项、治理三权卡/镜像/排队聚合、治理记录建立/重新接受/迁移预览、报告全文/persistence/delivery 回执、judge 跨引擎重放、`replayAnchorDebug`、single 警告刷新、菜单配置状态、queueView 顶层 tab 切换、C2 重锚、MIRROR 五角色重锚。**不做 Phase 5**（main.mjs/全量双端/入口切换/打包/真实模型）。
+- **实现**：新增 `chat/governance-view.ts`/`operator-view.ts`/`report-view.ts`/`anchor-view.ts`、`stores/governance-store.ts`/`report-store.ts`、`shell/GovernancePanel.tsx`/`ReportCard.tsx`/`phase4b.css`、`chat/extensions/{reports,governance}.ts`、`driver-extensions/{replay-anchor,governance}.ts`；解冻 `chat-store/ChatRow/ChatStream/confirm-store/events`（最小）并改 `ipc/runtime-view/drawer-store/settings-store/ChatHeader/EngineSelect/lib-platform/types/work-view/test-driver`。聚合行唯一、镜像同 id 双面只答一次/双冻结、排队不入 runtime 快照、预览零写入/确认才写、报告/交付按 scope 定点更新、菜单 208 两行按需缓存。
+- **重锚**：uiux-v2 MIRROR 五角色（verifier、`治理模型：三权 · 五角色`、five-role 名、显示名对齐 role-view/README v1.4.0）；C2 改名 `expired old shell collapses with reason visible in its own runtime`（收起+原因可见）；SELECTOR 菜单宽度 180→208（4B 设计 §6.1，读取次数断言保持）。
+- **门禁**：typecheck/typecheck:renderer 0 错；build 成功；CSP 严格；gzip9 **284,814B ≤300KiB**；旧基线 **679/679**；`test/桌面UI` **96/96**；IME 26 true/0 false；懒挂载 **10/10**；4B 冒烟 **70/70**；QUEUE 4/4、MIRROR 8/8、GOV 5/5（7 reports）、JUDGE 33/33、G2 5/5、SELECTOR 27/27、CONFIG 21/21、ROLE 11/11、SEND 8/8、TERMINAL 22/22、TOOLFOLD 19/19、RUNTIME 17/17（C2 重锚）、VISUAL 54/54；bench 同机同日 3 轮全阈值（A 17.8/B 17.6，p95≤19.5）；C1 Δ=16；旧渲染器/main/preload/desktop 零 diff；零新增依赖/例外。
+- **返工复核（needs-work→pass）**：C2 原因可见（knownShellIds + 重放 hint，RUNTIME 17/17）、已答卡 full rebuild 锚点（建行保存 anchorKey）、960 树行不收缩、200% 左栏可滚动+树可见+缺配提示全文首屏+逐容器（含 notice/status/tree/col-mid/composer）无横溢、200% 报告卡/完整摘要/治理预览可见且内部无横溢、facts 冒号分离、取消回焦；冒烟 70/70，VISUAL 54/54，补证副本（COMPLETE_FLOW 12/12、默认段 100 checks）记录于证据。
+- **边界与已知**：见 [4B 变更记录](docs/change/2026-10-21_change_ui-platform-phase4b-governance-receipts.md) 与[证据](docs/change/2026-10-21-phase4b-evidence/)。DELIVERY_NOTE/COMPLETE_FLOW 官方段止于 Phase 5 Sidebar 项；默认段官方止于 Phase 5 虚拟窗口阅读锚点；全量双端仍留 Phase 5。
+
+## 2026-10-21 Phase 5A：范围、删除清单与测试迁移计划（仅规划）
+
+- **交付**：[docs/design/2026-10-21_design_ui-platform-phase5a-scope.md](docs/design/2026-10-21_design_ui-platform-phase5a-scope.md)。5A 三项缺口（Sidebar 身份 data/aria 无第三行、P7「待选择」文案、虚拟窗口 full replay 阅读锚点）实现计划；旧渲染器/vendor/旧测试删除清单（index.html、renderer.js、styles.css、7 经典脚本、vendor 3 文件；renderer/markdown/tool-rows/runtime-ui 四测试 178 项先迁后删；hot-path/message-queue 旧段交接桌面窗口）；测试迁移分组与新源码守卫；e2e（uiux-v2/ime/bench/design-audit）目标切换与双端快照；5B 最终入口路径（推荐 dist/index.html，回退 dist/src/index.html）与切换前置；5A/5B 写集/不写、契约面最终更新、1360/960/200% 证据、热路径重基线；风险与 8 个待 PM 复核点。
+- **边界**：本轮只写 `角色卡/桌面UI/docs/design/` 与 memo/changelog；未改 `app/`、`test/`、依赖、主进程/preload/desktop、旧渲染器或根配置；未运行应用/测试/构建。
+
+## 2026-10-21 Phase 5A：Sidebar 身份、P7 待选择、阅读锚点与测试迁移
+
+- **范围**：PM §十七放行；三项缺口 + 178 项旧测试逐名迁移 + 四 e2e 目标切换/fail-fast。**不删旧渲染器/vendor/旧测试、不切生产入口、不打包/接真实模型**。
+- **实现**：Sidebar 删除可见 `.ti-badge`，身份保留 `.primary/.builtin` + `data-primary/data-builtin` + `aria-description`/title；`.ti-count` 唯一数字。`operator-view.pendingKindFor` 按 `operatorSurfaces` 聚合：任一 choice ⇒「待选择」，否则「等待你确认」，无 pending ⇒ null；状态标签只换文案。新增 `chat/reading-anchor.ts`（60 字前缀/offset/贴底/delta/一次性登记），`chat-store.applyHistory` 在 `model.clear()` 前只读捕获，`VirtualPane` 行高测量后按同一文本行 delta 校正 scrollTop（找不到/贴底不动，无动画/计时器）。四套件 `ANS_RENDERER_ENTRY` 显式缺失 exit 2。
+- **链接回归修复**：`chat/markdown.ts` 在 document 捕获 `a.md-link`，一律 preventDefault+stopPropagation 不导航；仅 http/https 经 `getDesktopBridge().openExternal` → preload `app:open-external`（主进程白名单 http/https）外开；相对/锚点/mailto/file/data 不导航；通道缺失/失败写 `data-open-result`/title 如实标记；DocumentView `#document-read-text` 保留自身内部链接解析；rel=noopener noreferrer 不变。
+- **测试迁移**：[178 项逐名台账](docs/change/2026-10-21_phase5a-test-migration-ledger.md)；新增 `markdown`（XSS/配置/npm pin/外链拦截）、`tool-summary`、`role-view`、`source-guard`、`ui-store`、`reading-anchor`，`operator-view` 扩充。
+- **门禁**：typecheck/typecheck:renderer 0；build 成功；CSP 严格；gzip9 **288,552B**；新单测 **142/142**；旧基线 **683/683**（原 679 + 桌面窗口 Phase 5A 新增 4 项（入口接线/dev 回退/导航兜底/导航守卫））；5A 冒烟 **36/36** + 21 截图（含 Markdown 外链、200% composer/错误态、200% 镜像卡/交付批次目标、680/480 六类目标遮挡断言）；DELIVERY_NOTE **9/9**（identity 官方 pass）；COMPLETE_FLOW P7 **官方 pass**；默认段阅读锚点 **官方 pass**（offset 差 0）；MIRROR 8/8、QUEUE 4/4、GOV 7 报表、JUDGE 33/33、G2 5/5、SELECTOR 27/27、CONFIG 21/21、ROLE 11/11、SEND 8/8、TERMINAL 22/22、RUNTIME 17/17、FRESH 4/4、VISUAL 54/54、TOOLFOLD 19/19（C1 Δ=20）、4B 冒烟回归 70/70；IME 26/0；懒挂载 10/10；bench 旧/新交替 4 轮（3 有效中位）全阈值（A 18.3、B 17.7、replay 6.2、scroll 11.9）；main 新端 E2E_FAILURES 空；COMPLETE_FLOW 41/41。
+- **UIUX 最终审计 P1（同日第三轮）**：200%（680/480 CSS）sticky composer 遮挡报告/完整摘要/治理预览/镜像动作/交付事实/S0 CTA。≤680 CSS composer 压缩到 **95px**（底栏单行、折叠 scope/compose-note/键盘提示；480 审/决单字），`#chat`/`.col-mid` `scroll-padding-bottom:104`、`#chat` padding-bottom 104；治理预览打开时 composer static；480 头部/空态收紧（chat client 200）。冒烟新增 **12 项目标 bottom ≤ composer.top**（report/details/preview/mirror/delivery/S0 × 680/480），**36/36**、21 截图；4B 70/70、design audit 31 项 0 bad、main E2E_PASS。新 hash：JS `f568e2aa…`、CSS `b52cfca1…`、HTML `f372e111…`；gzip **288,552B**。
+- **已知边界**：toggleDrift/MERGE 重锚已落地（默认段 110/110、MERGE 12/12）；COMPLETE_FLOW 41/41；design audit 已按 §十九重锚 exit 0；剩余交 UIUX 的重跑/带提示条密度与 P2 观察。旧渲染器/vendor/旧测试未删除，生产入口未切换。
+- Doc: [docs/change/2026-10-21_change_ui-platform-phase5a-gaps.md](docs/change/2026-10-21_change_ui-platform-phase5a-gaps.md)
+- 证据：`docs/change/2026-10-21-phase5a-evidence/`（gates、smoke 21 图、GHOST/FLOW/DEFAULT/VISUAL/TOOLFOLD、各段、IME、lazy、bench 原始+summary）。
+
+## 2026-10-21 Phase 5B 原子批次 a：旧渲染器删除与新源入口迁移（桌面UI）
+
+- **前置**：5A 门关闭；178 项迁移台账关闭；XSS 负例已迁 `test/桌面UI/` 全绿。
+- **删除旧渲染器**：`app/renderer/index.html`（旧 326 行）、`renderer.js`、`styles.css`、`engine-selector.js`、`markdown.js`、`role-status.js`、`runtime-ui.js`、`tool-rows.js`、`ui-labels.js`、`vendor/`（README/LICENSE/markdown-it.umd.min.js）；逐文件哈希见 [5B 变更记录](docs/change/2026-10-21_change_ui-platform-phase5b-cutover.md)。
+- **移动**：`app/renderer/src/index.html` → `app/renderer/index.html`（481B，SHA256 `0785…311d`，逐字一致；CSP meta 与 `/src/main.tsx` 保留）。
+- **删除旧守卫测试**：`test/桌面应用/{renderer,markdown,tool-rows,runtime-ui}.test.ts`（178 项台账覆盖）。
+- **e2e 默认目标**：`uiux-v2`/`ime-enter`/`bench-storm`/`uiux-design-audit` 默认 `app/renderer/dist/index.html`；`ANS_RENDERER_ENTRY` 覆盖与 fail-fast 保留，断言未改。
+- **核验**：`app/renderer/` 顶层只剩 `index.html`/`src/`/`dist/`/`tsconfig.json`/`components.json`；`app/renderer/src` 无代码 import 已删文件（仅历史注释）。非本步骤范围的 `hot-path.test.ts`/`message-queue.test.ts`/`test/测试/**`/`test/装配/verify-local-package.mjs` 仍引用旧文件，已在变更记录列明，交步骤 b/各属主。
+- **未执行**：按步骤 a 约定不构建/不测试（Vite input 待步骤 b，构建暂时失败）；生产入口未切换。
+
+### 5B 步骤 b：默认新入口复跑（2026-10-21）
+
+- 装配产出 `app/renderer/dist/index.html` 后，桌面UI 四个冒烟默认（3B/4A/4B/5A）与四个 e2e 默认均切 `dist/index.html`；`ANS_RENDERER_ENTRY` 覆盖/fail-fast/断言保留。
+- `source-guard` 静态入口路径改 `app/renderer/index.html`；3B `session:send` 夹具补 `sessionCurrent:true`（5A 拒发不失效语义）。
+- 复跑：5A **36/36**（21 图）、4B **70/70**、3B **45/45**、4A **99/99**、IME **26/0**、design audit **31 项 0 bad**、`test/桌面UI` **142/142**。bench 4 次中位 stormA 19.1/B 18.6/handler 0.65/0.7/replay 11.05/scroll 15.15，均低于阈值。
+- 产物 `dist/index.html` SHA256 `3c4da2a2…33b301`；JS `f568e2aa…`、CSS `76fad7ce…`；gzip **288,530B**。证据 `docs/change/2026-10-21-phase5b-evidence/`。
+
+### 5B 收尾：AC8 文档最终化（2026-10-21）
+
+- `ui-contract-surface.md`：状态 implemented；生产入口唯一 `app/renderer/dist/index.html`（renderer-entry 解析）；删除 `dist/src`/旧入口/旧守卫作为现行契约的表述；三态表 #1、#22、#24–#28 更新，新增 #34–#39（入口切换、旧渲染器删除、vendor 删除、e2e/冒烟默认翻转、DOM 例外保持、驱动面最终）；套件总表与 3.x 入口全部改 dist/index.html；清理旧文件/旧模块引用。
+- `api-spec.md`：顶部新增「最终口径」新渲染器模块表；装配说明改 Vite 输入/产物与 CSP；合规守卫改 `test/桌面UI`；Phase 2 历史段标注，旧入口表述改为历史。
+- 死 CSS：确认 `.ti-badge` 无引用；为保持已审计冻结候选 hash 不重建，本批不删除（契约面选择器附录已移除）。DOM 例外保持两条（延迟挂载 40、失效 operator 卡动作隐藏）；未新增。
+
+### 角色显示名回退修复：治理职能新称（2026-10-21）
+
+- `role-view.ts`：proposal `报告员 / Rapporteur`→**Draft / 提案**；nomination `提名官 / Nominator`→**Crew / 组队**；schedule `召集人 / Convener`→**Steward / 统筹**；liaison「主理 / Lead」、verification「验收 / Proof」不变。
+- 同步 `role-view.test.ts`、`governance-view.test.ts`、`phase4b-electron-smoke.mjs`（来自 Draft / 提案）、`uiux-v2.mjs` W6-C names/mirror source；role id 不变。
+- 复跑：role/governance **15/15**、`test/桌面UI` **142/142**、4B **70/70**、5A **36/36**、MIRROR **8/8**、typecheck 0/0、build 成功。
+- 新 dist：html `c8ad0e82…`、js `050776ec…`、css `76fad7ce…`；gzip **288,514B**。记录 [role-display-names](docs/change/2026-10-21_change_ui-platform-role-display-names.md)。
+
+### 历史派发去重 + 品牌图标（2026-10-21）
+
+- `events.ts` 新增 `historyProjectionKey`/`dedupeHistoryDescriptors`/`dedupeHistoryRows`；`applyHistory` 对 user/injected/system/delivery 按 (turnId + 分组 + 首行文本) 去重，优先保留带 anchor/request 身份的一条；assistant 同轮多行、不同 callId 工具行不误删。新增 `test/桌面UI/history-dedupe.test.ts` 4 项。
+- 品牌图标：复制 `ans-studio-ans-icon.png` 到 `src/assets/`；TitleBar `.titlebar-mark` 20px、Sidebar `.workspace-brand-mark` 30px，`img alt="ANS"`；保留「治理会话工作台」「AGENT WORKSPACE」；source-guard 与 5A 冒烟新增断言，1360/960/200% 截图更新。
+- 复跑：单测 **147/147**、5A **37/37**、4B **70/70**、uiux 默认 **110/110**、MERGE **12/12**、MIRROR **8/8**、TOOLFOLD **19/19**（C1 Δ=20）、design audit **31 项 0 bad**、main **E2E_PASS=true**、bench 4 次全阈值。
+- 新 dist：html `f779ac60…`、js `007c60aa…`、css `531d8035…`、icon `ff88e313…`；gzip **288,931B**。记录 [history-dedupe-brand-icon](docs/change/2026-10-21_change_ui-platform-history-dedupe-and-brand-icon.md)。

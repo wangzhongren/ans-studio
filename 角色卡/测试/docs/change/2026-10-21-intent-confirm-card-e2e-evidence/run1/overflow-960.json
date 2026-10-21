@@ -1,0 +1,40 @@
+{
+  "viewport": {
+    "w": 960,
+    "h": 620
+  },
+  "docScroll": {
+    "scrollWidth": 960,
+    "clientWidth": 960
+  },
+  "bodyScroll": {
+    "scrollWidth": 960,
+    "clientWidth": 960
+  },
+  "chatPane": {
+    "x": 272,
+    "y": -86,
+    "w": 664,
+    "h": 792
+  },
+  "card": {
+    "x": 272,
+    "y": 331,
+    "w": 664,
+    "h": 278
+  },
+  "roleTree": {
+    "x": 10,
+    "y": 189,
+    "w": 227,
+    "h": 304
+  },
+  "composer": {
+    "x": 285,
+    "y": 518,
+    "w": 638,
+    "h": 28
+  },
+  "cardState": "expired",
+  "horizontalOverflow": false
+}

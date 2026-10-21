@@ -1,0 +1,46 @@
+=== old renderer core / main / preload vs HEAD ===
+UNCHANGED app/renderer/index.html
+UNCHANGED app/renderer/renderer.js
+UNCHANGED app/renderer/styles.css
+UNCHANGED app/renderer/tool-rows.js
+UNCHANGED app/renderer/role-status.js
+UNCHANGED app/renderer/runtime-ui.js
+UNCHANGED app/renderer/ui-labels.js
+UNCHANGED app/renderer/engine-selector.js
+UNCHANGED app/main.ts
+UNCHANGED app/preload.cjs
+
+=== app/desktop tracked diff ===
+(empty = no tracked modifications)
+untracked assets (parallel role, not 4A):
+  ?? app/desktop/assets/ans-geometric-a-graphite.png
+  ?? app/desktop/assets/ans-geometric-a-mint.png
+  ?? app/desktop/assets/ans-lettermark-graphite.png
+  ?? app/desktop/assets/ans-lettermark-mint.png
+  ?? app/desktop/assets/ans-lettermark-white.png
+  ?? app/desktop/assets/ans-studio-lettermark-graphite.png
+  ?? app/desktop/assets/ans-studio-lettermark-mint.png
+  ?? app/desktop/assets/ans-studio-lettermark-white.png
+
+=== deps ===
+markdown-it 15.0.3 typescript 7.0.2
+lock removed 0 changed 0 added 107
+
+=== DOM exceptions（仅已批准的延迟挂载与失效卡动作隐藏）===
+128:const DEFER_TOOL_ROWS_WHEN_CLOSED = 40;
+136:  const deferClosed = !open && summary.calls > DEFER_TOOL_ROWS_WHEN_CLOSED;
+380:      <div className="op-actions" hidden={closed}>
+386:              hidden={closed}
+392:            <button className="op-cancel" type="button" hidden={closed} disabled={closed} onClick={() => respond({ kind: "choice", cancelled: true })}>
+398:            <button className="op-confirm" type="button" hidden={closed} disabled={closed} onClick={() => respond({ kind: "confirm", confirmed: true })}>
+401:            <button className="op-deny" type="button" hidden={closed} disabled={closed} onClick={() => respond({ kind: "confirm", confirmed: false })}>
+
+=== renderer semantics ===
+node:/require(: 0
+fs import: 0
+ipcRenderer: 0
+resolveWrite/classifyShell: 0
+
+=== contract row 8 stale note ===
+| 8 | 引擎触发器 `#runtime-select/#runtime-options/#runtime-option-*` | 已满足（Phase 2b） | 自绘 `EngineSelect`：`role=combobox` / `aria-haspopup=listbox` / `aria-controls=runtime-options` / `aria-expanded` / `aria-activedescendant`；弹层 `role=listbox`；选项 `role=option` + `aria-selected` + `id=runtime-option-*` + `data-runtime`；↑↓/Home/End/Enter/Space/Esc/Tab；选择仅本地演示 | — |
+| 9 | 输入区 `#composer-capsule/#inp-message/#btn-send/#btn-halt/#btn-attach-image/#composer-scope/#composer-keyboard` | **已满足（4A 增补）** | 发送（clientMessageId/ack/失败如实/拒发恢复草稿）、停止本轮三态；**草稿与附件按 runtime×role 保持**（成功发送/显式移除/切项目清除；迟到旧引擎拒发只回旧视图）；双开关真实 IPC；IME 24/24 | — |

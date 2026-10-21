@@ -1,0 +1,6 @@
+role tree flat: all roles visible without details/fold=true
+role status badges remain visible for every role=true
+live system notice is its own sys row with 系统 badge, not a user bubble=true
+tool row without file target is neutral in summary and details=true
+replay system notice same rule: sys row + user body=true
+notice view no horizontal overflow at 960=true

@@ -47,14 +47,15 @@ import {
   buildGovernanceSeedBoundary as buildSeedFromService,
 } from "../../../src/service/boundary/resolve-boundary.ts";
 import type { BoundarySection1 } from "../../../src/model/boundary.ts";
+import { governanceActionFor, governanceFailureView } from "../../../app/renderer/src/chat/governance-view.ts";
 
-/** 加载渲染侧纯文案模块（经典脚本挂 globalThis.ANSUiLabels；与既有桌面测试同款动态 import）。 */
+/** 5B：旧 ui-labels.js 已删除；映射到新渲染器 governance-view 纯逻辑。 */
 async function loadUiLabels(): Promise<Record<string, Function>> {
-  const href = new URL("../../../app/renderer/ui-labels.js", import.meta.url).href;
-  await import(href);
-  const UL = (globalThis as Record<string, unknown>).ANSUiLabels as Record<string, Function> | undefined;
-  assert.ok(UL, "ui-labels.js 应挂 globalThis.ANSUiLabels");
-  return UL;
+  return {
+    canEstablishGovernance: (hasProject: boolean, hasRoles: boolean, state: string) =>
+      governanceActionFor(hasProject, hasRoles, state) === "establish",
+    governanceFailureView,
+  };
 }
 
 function roleRel(root: string, id: string): string {
@@ -184,12 +185,12 @@ test("B4 V5：预览零写入；取消不调 IPC（渲染源码级守卫）；pr
     assert.equal(UL.canEstablishGovernance(true, false, "missing"), false);
     assert.equal(UL.canEstablishGovernance(false, true, "missing"), false);
 
-    // 取消：渲染侧只关面板、不调用任何 IPC（源码级：函数体内无 `d.` 通道调用）。
-    const source = fs.readFileSync(new URL("../../../app/renderer/renderer.js", import.meta.url), "utf8");
-    const cancelBody = /function cancelGovernancePreview\(\) \{([\s\S]*?)\n  \}/.exec(source);
-    assert.ok(cancelBody, "找得到 cancelGovernancePreview");
-    assert.equal(/\bd\./.test(cancelBody![1]), false, "取消函数体内不得调用 IPC（d.*）");
-    assert.match(cancelBody![1], /已取消，未写入任何文件/);
+    // 取消：新渲染器只经 governance-store cancel（不直接调 IPC），提示文案保留。
+    const panel = fs.readFileSync(new URL("../../../app/renderer/src/shell/GovernancePanel.tsx", import.meta.url), "utf8");
+    assert.match(panel, /cancelPreview/);
+    const store = fs.readFileSync(new URL("../../../app/renderer/src/stores/governance-store.ts", import.meta.url), "utf8");
+    assert.match(store, /已取消，未写入任何文件/);
+    assert.equal(/cancel:[\s\S]{0,200}?bridge\./.test(store), false, "cancel 不直接调用 IPC");
   } finally {
     fx.cleanup();
   }

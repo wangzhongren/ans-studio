@@ -1,0 +1,8 @@
+{"at":"2026-10-21T09:52:42.445Z","level":"info","pid":76126,"component":"desktop.main","event":"window.renderer.target","mode":"dev-url","url":"127.0.0.1:59999/index.html"}
+{"at":"2026-10-21T09:52:42.551Z","level":"error","pid":76126,"component":"desktop.main","event":"window.load.failed","errorType":"Error","errorCode":-102,"errorMessage":"ERR_CONNECTION_REFUSED"}
+{"at":"2026-10-21T09:52:42.552Z","level":"info","pid":76126,"component":"desktop.main","event":"window.dev-server.fallback","errorCode":-102,"reasonCode":"load-failed"}
+{"at":"2026-10-21T09:52:42.552Z","level":"info","pid":76126,"component":"desktop.main","event":"window.renderer.target","path":"renderer/dist/src/index.html","mode":"file"}
+{"at":"2026-10-21T09:52:42.564Z","level":"info","pid":76126,"component":"desktop.main","event":"window.load.end","ok":true}
+{"at":"2026-10-21T09:52:42.624Z","level":"info","pid":76126,"component":"desktop.main","event":"window.load.end","ok":true}
+{"at":"2026-10-21T09:53:09.192Z","level":"info","pid":76202,"component":"desktop.main","event":"window.renderer.target","path":"renderer/index.html","mode":"file"}
+{"at":"2026-10-21T09:53:09.317Z","level":"info","pid":76202,"component":"desktop.main","event":"window.load.end","ok":true}

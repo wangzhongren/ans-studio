@@ -1,0 +1,21 @@
+{
+  "reports": [
+    {
+      "name": "P5 truly fresh open says new context without old history",
+      "value": true
+    },
+    {
+      "name": "P5 fresh first prompt tool and snapshot do not invent old lost context",
+      "value": true
+    },
+    {
+      "name": "P5 current-handle replay update remains fresh without false old-history warning",
+      "value": true
+    },
+    {
+      "name": "P5 actual at-open old history retains truthful failed-restore notice",
+      "value": true
+    }
+  ],
+  "errors": []
+}

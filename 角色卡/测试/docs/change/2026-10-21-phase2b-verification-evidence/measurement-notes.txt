@@ -1,0 +1,20 @@
+# 测量口径说明（Phase 2b 独立验证中确认的两个坑）
+
+1. 隐藏窗口（show:false）下 document.hasFocus()=false，Chromium 不匹配 :focus-visible。
+   - 实测：show:false 时 `document.hasFocus()` => false；程序化 focus({focusVisible:true}) 与
+     真实 Tab 均不产生 :focus-visible（matches(':focus-visible')=false）。
+   - 因此主冒烟（show:false，按派发要求）用 CDP `CSS.forcePseudoState` 强制 focus-visible，
+     并等待 300ms 后读数（结果与可见窗口真实键盘一致：2px solid rgb(111,160,139) offset 3px）。
+   - 补充探针 `probes/focus-visible-keyboard.cjs` 用 show:true + 真实 Tab 复核：
+     `document.hasFocus()=true`；首个 Tab 焦点 sc-close、sc-allow、#inp-message、#runtime-select
+     全部 matchesFocusVisible=true、outline 2px solid rgb(111,160,139)、offset 3px（FOCUS_ALL_PASS=true）。
+
+2. `transition-colors`（120ms）包含 outline-color 与 background-color；瞬时读数会落在过渡中间值。
+   - 例：隐藏窗口强制 focus-visible 后立即读 outline-color 得到 rgb(242,244,246)（过渡起点）；
+     300ms 后为 rgb(111,160,139)（终值）。程序化 focus 后 100ms 曾读得中间色 rgb(119,165,146)。
+   - 例：Checkbox 置 data-checked 后立即读 background-color 仍为 dark:bg-input/30 的过渡起点；
+     250ms 后为 rgb(196,161,95)（--warning）。
+   - 例：真实鼠标 hover #sc-deny 后立即读 background-color 仍是 primary；200ms 后为
+     rgb(127,178,155)（--success-hover）；mouseDown 后 200ms 为 rgb(94,143,122)（--primary-active）。
+   - hover/active 不能用 CDP forcePseudoState 在页面 getComputedStyle 中复现；改用真实鼠标事件
+     （webContents.sendInputEvent mouseMove/mouseDown），隐藏窗口下有效。

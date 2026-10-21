@@ -78,7 +78,7 @@ import {
   withPausableTimeout,
   withTimeout,
 } from "./timeout.ts";
-import type { Api, Model } from "@earendil-works/pi-ai";
+import type { Api, Model, ProviderStreams } from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
   McpServerEntry,
@@ -117,6 +117,7 @@ async function loadPiMcp(): Promise<typeof import("@earendil-works/pi-mcp")> {
  */
 export async function buildExplicitRuntime(
   cfg: PiProviderConfig,
+  reasoning?: PiReasoningCompatibility,
 ): Promise<{ runtime: ModelRuntime; model: Model<Api> }> {
   const piAi = await import("@earendil-works/pi-ai");
   const { anthropicProvider } = await import("@earendil-works/pi-ai/providers/anthropic");
@@ -180,7 +181,7 @@ export async function buildExplicitRuntime(
     baseUrl: cfg.baseUrl,
     auth: templateProvider.auth,
     models: [model],
-    api: anthropicMessagesApi(),
+    api: reasoning === undefined ? anthropicMessagesApi() : withReasoningCompatibility(anthropicMessagesApi(), reasoning),
   });
 
   const runtime = await ModelRuntime.create({
@@ -836,19 +837,20 @@ export function buildGovernanceExtension(
 // 来源：客户 2026-10-16 批准 G-5。契约面＝`src/model/runtime.ts` 的 `ReasoningEffortV1`／
 // `RuntimeProviderOptions.reasoningEffort`／`RuntimeReasoningFactsV1`／`RuntimeReasoningEventDetailV1`
 // （形状一律以契约为准，Service 做投影单点）。P0 探针定格（`docs/fix/2026-10-16_probe_reasoning-wire.md`）：
-// · 请求映射：**未设＝不调用 `setThinkingLevel`**（现状 medium 隐式路径原样）；off/low/medium/high 直映射；
+// · D1：未设按模型设置/全局设置/Pi 1.1.0 默认重置，恢复旧会话不沿用旧档位；显式档直映射。
 //   xhigh ⇒ `setThinkingLevel("xhigh")`（预算钳到 high=16384，档位语义保留——探针实测）；
 //   off 前置修复＝`buildExplicitRuntime` 把 `thinkingLevelMap.off` 收窄为 undefined（否则钳到 minimal＝假关闭）；
 // · R1（**实锤可达**）：预算抬升 × contextWindow 钳到极小 ⇒ wire 出现 `budget_tokens=1024 ≥ max_tokens`（≤1024）
 //   或 `budget_tokens < 1024` 两种**非法组合**（API 规则：1024 ≤ budget < max_tokens）⇒ 请求前修复（见下）。
-// · 降级（A7 定格：400 ⇒ SDK 恰 1 请求、prompt 正常 resolve、事件面 failed 终态）⇒ **恰一次**去参数重发。
+// · D1：明确 thinking 参数拒绝在 HTTP 请求层兼容，绝不重新提交整条用户 prompt。
 
 /** 思考事实行的回退 summary（Service 投影单点以定格文案覆盖；此处只作无投影路径的如实标签）。 */
 export const REASONING_SUMMARY = "已思考";
 
-/** G-5 降级（网关拒绝思考参数）如实行文案（恰一次去参数重发；沿 server-tools 降级行先例）。 */
-export const REASONING_DEGRADED_SUMMARY =
-  "网关拒绝了含思考参数的请求——本会话已停用思考参数并按原样重发本轮（恰一次）；后续轮次不再附带思考参数。";
+/** 当前固定 SDK 的新会话默认；升级由真实无历史 SDK 对照测试检测，不导入私有常量。 */
+export const PI_1_1_0_DEFAULT_THINKING_LEVEL = "medium";
+export const REASONING_COMPATIBILITY_ATTEMPT = "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。";
+export const REASONING_COMPATIBILITY_SUCCESS = "本会话已使用兼容请求得到正常结果，后续沿用接口默认方式；已保存设置不变。";
 
 /**
  * 从助手消息抽取思考事实（纯函数；导出供单测）。规则（契约逐字）：
@@ -875,40 +877,95 @@ export function extractReasoningFacts(message: unknown): { text: string; status:
   return { text: visible.map((b) => b.text).join("\n\n"), status: "complete" };
 }
 
-/** G-5 降级共享态（ans-reasoning 扩展 ↔ prompt 包装层；仅装配 reasoningEffort 时启用）。 */
-export interface ReasoningDegradeState {
-  /** 本轮（turnId）已检测到「思考参数被拒」请求降级重发（恰一次；consume 后清）。 */
-  retryRequested: boolean;
-  retryTurnId: string | undefined;
-  /** 会话级：思考参数已停用（请求前剥离生效；检测随之停用）。 */
-  suppressed: boolean;
+/** 请求内状态不持久化；只有正常助手结果才确认当前活会话的兼容策略。 */
+interface PiReasoningCompatibility {
+  confirmedProfile?: string;
+  request?: { profile: string; compatible: boolean; signal?: AbortSignal };
+  notice?: (summary: string, state: string) => void;
+  canConfirm?: () => boolean;
 }
 
-/** prompt 包装层的降级接缝（形状沿 `LengthFollowupOptions` 先例；缺省不传＝逐字旧行为）。 */
-export interface ReasoningDegradeOptions {
-  /** 是否消费一次重发（恰一次；turnId 匹配防跨轮误触发）。 */
-  consumeRetry(turnId: string | undefined): boolean;
-  /** 重发前停用思考参数（后续请求不再附带）。 */
-  suppress(): void;
-  /** 如实一行文案。 */
-  noticeText: string;
+/** 只识别实际 thinking 字段的明确拒绝；普通故障和模型错误不推断为能力不足。 */
+export function isThinkingParameterRejection(status: number, value: unknown): boolean {
+  if (status !== 400 && status !== 422) return false;
+  if (value === null || typeof value !== "object") return false;
+  const envelope = value as Record<string, unknown>;
+  const error = envelope["error"] !== null && typeof envelope["error"] === "object"
+    ? envelope["error"] as Record<string, unknown> : envelope;
+  const param = error["param"];
+  const code = error["code"] ?? error["type"];
+  const message = typeof error["message"] === "string" ? error["message"] : "";
+  if (/unknown.?model|model.?not.?found|model does not exist/i.test(String(code) + " " + message)) return false;
+  if (param !== undefined && param !== null && (typeof param !== "string" || !/^thinking(?:\.[a-z_]+)?$/.test(param))) return false;
+  const explicitCode = typeof code === "string" && ["unsupported_parameter", "unsupported_value", "unsupported_enum_value", "unknown_parameter", "unrecognized_parameter"].includes(code);
+  if (typeof param === "string" && explicitCode) return true;
+  // 已验证的 API 错误格式，锚定拒绝对象；不因正文仅提及 thinking/effort 就触发。
+  return /^thinking(?:\.[a-z_]+)?(?::| is)\s+(?:not supported|unsupported)(?:[ .:]|$)/i.test(message)
+    || /^(?:unsupported|unknown|unrecognized) (?:parameter|field):?\s+['"]?thinking(?:\.[a-z_]+)?['"]?(?:[ .:]|$)/i.test(message);
 }
 
-/**
- * ans-reasoning 扩展（**仅在 `reasoningEffort` 显式设置时装配**——未设＝零注册、逐字现状）：
- * · `before_provider_request`：①降级剥离（suppressed ⇒ 删 `thinking`）；②**R1 请求前修复**——enabled 形态
- *   且 `budget`/`max_tokens` 不满足 `1024 ≤ budget < max_tokens` 时：`max_tokens > 1024` ⇒ 钳预算到
- *   `[1024, max_tokens-1]`；`max_tokens ≤ 1024`（无合法 enabled 组合）⇒ 改 `{type:"disabled"}`（诊断如实）。
- *   并逐请求记录「本请求是否携带思考参数」（降级识别的保守前提）。
- * · `message_end`：降级识别——本轮请求带思考参数 ∧ `stopReason=error` ∧ 错误前缀为拒绝类状态（同
- *   server-tools 的 `requestRejectionStatus` 口径：≥400 排除 408/429）∧ 未降级过 ⇒ 置位恰一次重发请求。
- */
+/** 有界读取错误副本，不消费 SDK 的原响应，不输出原始错误或请求。 */
+async function readReasoningError(response: Response): Promise<unknown> {
+  const reader = response.clone().body?.getReader();
+  if (!reader) return undefined;
+  let text = "";
+  let bytes = 0;
+  const decoder = new TextDecoder();
+  try {
+    while (true) {
+      const part = await reader.read();
+      if (part.done) break;
+      bytes += part.value.byteLength;
+      if (bytes > 32768) return undefined;
+      text += decoder.decode(part.value, { stream: true });
+    }
+    const body = text + decoder.decode();
+    try { return JSON.parse(body); }
+    catch { return { message: body }; } // 非 JSON 仍只接受下游锚定的明确拒绝格式。
+  } catch { return undefined; }
+  finally { void reader.cancel().catch(() => {}); }
+}
+
+/** SDK 公开请求接缝：同一次 provider 调用中的传输重试始终沿用已切换的请求。 */
+function withReasoningCompatibility(api: ProviderStreams, state: PiReasoningCompatibility): ProviderStreams {
+  const wrap = (method: "stream" | "streamSimple"): ProviderStreams["streamSimple"] => (model, context, options = {}) => {
+    const profile = JSON.stringify([model.provider, model.id, model.baseUrl]);
+    if (state.confirmedProfile !== undefined && state.confirmedProfile !== profile) state.confirmedProfile = undefined;
+    const requestState = { profile, compatible: state.confirmedProfile === profile, signal: options.signal };
+    state.request = requestState;
+    const nativeFetch = options.fetch ?? globalThis.fetch;
+    const fetch: typeof globalThis.fetch = async (input, init) => {
+      const original = new Request(input, init);
+      // 原 Request 留给本次请求的兼容副本；正文只在需要删参数时解析。
+      const withoutThinking = async (): Promise<Request> => {
+        const body = await original.clone().json() as Record<string, unknown>;
+        delete body["thinking"];
+        const headers = new Headers(original.headers);
+        headers.delete("content-length"); // 正文变化后交 fetch 重算，其他认证/请求头原样。
+        return new Request(original, { headers, body: JSON.stringify(body) });
+      };
+      const sent = requestState.compatible ? await withoutThinking() : original.clone();
+      const response = await nativeFetch(sent);
+      if (requestState.compatible || original.signal.aborted || (response.status !== 400 && response.status !== 422)) return response;
+      const body = await original.clone().json() as Record<string, unknown>;
+      if (body["thinking"] === undefined || !isThinkingParameterRejection(response.status, await readReasoningError(response))) return response;
+      if (original.signal.aborted) return response;
+      requestState.compatible = true; // 本 provider 调用只切换一次；失败也不恢复本次已拒字段。
+      state.notice?.(REASONING_COMPATIBILITY_ATTEMPT, "compatibility-attempt");
+      void response.body?.cancel().catch(() => {});
+      return nativeFetch(await withoutThinking());
+    };
+    return api[method](model, context, { ...options, fetch });
+  };
+  return { ...api, stream: wrap("stream"), streamSimple: wrap("streamSimple") };
+}
+
+/** 默认和显式档位共用预算保护；兼容确认与消息均在真实 SDK 事件内完成。 */
 export function buildReasoningExtension(opts: {
-  state: ReasoningDegradeState;
+  state: PiReasoningCompatibility;
   diagnostics?: DiagnosticLog;
   currentTurnId?: () => string | undefined;
 }): { name: string; factory: (pi: ExtensionAPI) => void } {
-  let lastRequestHadReasoning = false;
   return {
     name: "ans-reasoning",
     factory: (pi: ExtensionAPI): void => {
@@ -916,7 +973,7 @@ export function buildReasoningExtension(opts: {
         const payload = event.payload as Record<string, unknown> | undefined;
         if (payload === null || typeof payload !== "object") return undefined;
         let changed = false;
-        if (opts.state.suppressed && "thinking" in payload) {
+        if (opts.state.confirmedProfile !== undefined && opts.state.confirmedProfile === opts.state.request?.profile && "thinking" in payload) {
           delete payload["thinking"];
           changed = true;
         }
@@ -929,31 +986,26 @@ export function buildReasoningExtension(opts: {
             if (maxTokens > 1024) {
               thinking["budget_tokens"] = Math.min(Math.max(typeof budget === "number" && Number.isFinite(budget) ? budget : 1024, 1024), maxTokens - 1);
               opts.diagnostics?.record("reasoning.repaired", { turnId: opts.currentTurnId?.(), state: "budget-clamped" });
+              opts.state.notice?.(`本次请求的可用输出空间不足，思考预算已调整为 ${String(thinking["budget_tokens"])} tokens；已保存等级不变。`, "budget-clamped");
             } else {
               payload["thinking"] = { type: "disabled" };
               opts.diagnostics?.record("reasoning.repaired", { turnId: opts.currentTurnId?.(), state: "thinking-disabled" });
+              opts.state.notice?.("本次请求的可用输出空间不足，无法容纳合法思考预算，已仅对此请求关闭思考参数；已保存等级不变。", "thinking-disabled");
             }
             changed = true;
           }
         }
-        lastRequestHadReasoning = payload["thinking"] !== undefined;
         return changed ? payload : undefined;
       });
       pi.on("message_end", (event): void => {
-        if (opts.state.suppressed || opts.state.retryRequested) return;
-        const record = event.message !== null && typeof event.message === "object" ? (event.message as Record<string, unknown>) : undefined;
-        if (record === undefined || record["stopReason"] !== "error") return;
-        if (!lastRequestHadReasoning) return; // 本请求未带思考参数 ⇒ 与本降级无关（保守不触发）
-        const errorMessage = typeof record["errorMessage"] === "string" ? record["errorMessage"] : "";
-        const status = requestRejectionStatus(errorMessage);
-        if (status === undefined) return;
-        opts.state.retryRequested = true;
-        opts.state.retryTurnId = opts.currentTurnId?.();
-        opts.diagnostics?.record("reasoning.degraded", {
-          turnId: opts.currentTurnId?.(),
-          errorCode: `GATEWAY_REJECTED_HTTP_${String(status)}`,
-          state: "retry-once",
-        });
+        const message = event.message as { role?: string; stopReason?: string };
+        if (message.role !== "assistant") return;
+        const request = opts.state.request;
+        opts.state.request = undefined;
+        if (!request?.compatible || request.signal?.aborted || opts.state.canConfirm?.() === false || !["stop", "length", "toolUse"].includes(message.stopReason ?? "")) return;
+        if (opts.state.confirmedProfile === request.profile) return;
+        opts.state.confirmedProfile = request.profile;
+        opts.state.notice?.(REASONING_COMPATIBILITY_SUCCESS, "compatibility-confirmed");
       });
     },
   };
@@ -1057,8 +1109,8 @@ export function makeRolePrompt(deps: {
   emitPromptInput?: boolean;
   /** F-3-a：截断收尾补发配置；**缺省不传 ⇒ 行为与旧版逐字一致**（见 LengthFollowupOptions）。 */
   lengthFollowup?: LengthFollowupOptions;
-  /** G-5：降级重发配置（仅装配 reasoningEffort 时传入；**缺省不传 ⇒ 逐字旧行为**，见 ReasoningDegradeOptions）。 */
-  reasoningDegrade?: ReasoningDegradeOptions;
+  /** 在 lifecycle.begin 之后发配置事实，不在构造阶段发易丢失的消息。 */
+  onPromptStart?: () => void;
 }): (text: string, opts?: PromptOptions) => Promise<void> {
   const { session, promptMs, gate, emit, log } = deps;
   const turnLastResortMs = deps.turnLastResortMs ?? DEFAULT_TURN_LAST_RESORT_MS;
@@ -1076,24 +1128,12 @@ export function makeRolePrompt(deps: {
     });
     log.stage("prompt 发出");
     try {
+      deps.onPromptStart?.();
       // 主 prompt 只用**最后兜底**（客户裁定 2026-10-17）：`promptMs` 属看护到点检查，**不再**用于
       // 中止整轮；到检查时限后轮次继续，只有 1 小时兜底（或注入值）才中止。可暂停语义不变。
       const startCall = (): Promise<void> => (images !== undefined ? session.prompt(text, { images }) : session.prompt(text));
       await withPausableTimeout(startCall(), turnLastResortMs, "本轮最后兜底", gate);
 
-      // G-5 降级（**恰一次**去参数重发；A7 定格：思考参数被拒 ⇒ prompt 正常 resolve、失败终态在下方
-      // finish 才发——故在终态发射前收口，settled 仍恰一次）：检测位由 ans-reasoning 扩展在 message_end
-      // 置位（保守：本轮请求带思考参数 ∧ 拒绝类状态 ∧ 未降级过）；consume 即消费；suppress 先于重发
-      // （重发的请求不再携带思考参数）。重发为 best-effort 的如实重试：失败则走既有失败路径（不二次重发）。
-      const degrade = deps.reasoningDegrade;
-      if (degrade !== undefined && !lifecycle.isInterrupted() && degrade.consumeRetry(lifecycle.currentTurnId())) {
-        degrade.suppress();
-        emit({ kind: "message", summary: degrade.noticeText, detail: { turnId: lifecycle.currentTurnId(), source: "reasoning-degrade" } });
-        log.stage(degrade.noticeText);
-        // 重发直调底层 session.prompt：不递归本包装、不新增 settled/终态发射点（沿 F-3-a 补发先例）。
-        // 时限同为**最后兜底**（重发属于主轮，不该被检查时限掐断）。
-        await withPausableTimeout(startCall(), turnLastResortMs, "本轮最后兜底", gate);
-      }
       // F-3-a（截断收尾补发）：仅在首个 prompt **正常返回后**考虑——「开关开启 ∧ 末条消息截断 ∧
       // 本轮无成功 submit_report ∧ 生命周期未被强制锁定（abort/超时）」时，用**独立的**
       // withPausableTimeout 段补发**恰一次**收尾提示。限一次是**结构性保证**：本分支每次 prompt()
@@ -1179,8 +1219,7 @@ export interface RoleSessionDeps {
   emitPromptInput?: boolean;
   /** F-3-a：截断收尾补发配置（缺省不传 ⇒ 逐字旧行为）；形状见 makeRolePrompt deps / LengthFollowupOptions。 */
   lengthFollowup?: LengthFollowupOptions;
-  /** G-5：降级重发配置（缺省不传 ⇒ 逐字旧行为）；形状见 makeRolePrompt deps / ReasoningDegradeOptions。 */
-  reasoningDegrade?: ReasoningDegradeOptions;
+  onPromptStart?: () => void;
   /**
    * G-4 V2 dispose 收口（**仅装配 MCP 时提供**；缺省不传 ⇒ dispose 逐字旧行为）：在 SDK
    * `session.dispose()` **之前**执行——补发 `session_shutdown` 让 MCP 扩展关闭全部连接/子进程
@@ -1348,8 +1387,9 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         // 分段进度：构造显式 provider（baseUrl/model，内存凭据）。绝不打印凭据。
         diagnostics.record("session.construct.step", { state: "provider" });
         log.stage("构造显式 provider…");
+        const reasoningState: PiReasoningCompatibility = {};
         const { runtime, model } = await withTimeout(
-          (dependencies.buildRuntime ?? buildExplicitRuntime)(cfg),
+          (dependencies.buildRuntime ?? buildExplicitRuntime)(cfg, reasoningState),
           constructMs,
           "构造显式 provider",
         );
@@ -1369,6 +1409,11 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
           queue.push({ ...event, runtime: "pi", roleId: role.id, turnId, detail: { turnId, ...detail } });
         };
         lifecycle = createTurnLifecycle(emit, diagnostics, opts.currentTurnId);
+        reasoningState.canConfirm = () => lifecycle.isActive() && !lifecycle.isInterrupted();
+        reasoningState.notice = (summary, state) => {
+          if (!lifecycle.isActive() || lifecycle.isInterrupted()) return;
+          emit({ kind: "message", summary, detail: { source: "system", reasonCode: "PI_REASONING", state } });
+        };
         const callFacts = new Map<string, PiCallFacts>();
         // F-3-a：成功 submit_report 的 turnId 记账（「本轮已交报告」判据；同轮 = 同一 turnId）。
         let reportTurnId: string | undefined;
@@ -1444,16 +1489,13 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
           },
         );
 
-        // G-5 降级共享态与扩展（**仅显式设置 reasoningEffort 时装配**；未设 ⇒ 零注册、逐字现状）。
-        const reasoningState: ReasoningDegradeState = { retryRequested: false, retryTurnId: undefined, suppressed: false };
-        const reasoningExtension = opts.reasoningEffort !== undefined
-          ? buildReasoningExtension({ state: reasoningState, diagnostics, currentTurnId: lifecycle.currentTurnId })
-          : undefined;
+        // D1：默认档也必须经过预算保护与明确拒绝兼容。
+        const reasoningExtension = buildReasoningExtension({ state: reasoningState, diagnostics, currentTurnId: lifecycle.currentTurnId });
 
         const resourceLoader = new DefaultResourceLoader({
           cwd: opts.projectRoot,
           agentDir: opts.projectRoot,
-          extensionFactories: [extension, ...(reasoningExtension !== undefined ? [reasoningExtension] : []), ...(mcpExtension !== undefined ? [mcpExtension] : [])],
+          extensionFactories: [extension, reasoningExtension, ...(mcpExtension !== undefined ? [mcpExtension] : [])],
           noExtensions: true,
           systemPrompt: renderSystemPrompt(role, opts.projectRoot),
           noSkills: true,
@@ -1524,15 +1566,20 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
           "createAgentSession",
         );
 
-        // G-5 请求面（映射见 model/runtime.ts 冻结表）：**未设＝不调用**（现状 medium 隐式路径原样）；
-        // off/low/medium/high 直映射；xhigh 直映射（预算由 SDK 钳到 high=16384，档位语义保留——P0 探针实测）。
-        // off 可用性由 buildExplicitRuntime 的 thinkingLevelMap.off 收窄前置保证（否则钳到 minimal＝假关闭）。
-        // 如实注记：setThinkingLevel 是 SDK 会话级 API——档位变化会进转录（thinking_level_change），
-        // 恢复会话时按 SDK 原生恢复面沿用该档（与模型选择恢复同族语义）。
-        if (opts.reasoningEffort !== undefined) {
-          session.setThinkingLevel(opts.reasoningEffort);
-          diagnostics.record("session.thinking_level", { state: opts.reasoningEffort });
-        }
+        // Pi 1.1.0 新会话选择顺序；显式重施使清空配置能覆盖恢复转录中的旧 high。
+        const requestedThinking = opts.reasoningEffort
+          ?? settingsManager.getModelThinkingLevel(model.provider, model.id)
+          ?? settingsManager.getDefaultThinkingLevel()
+          ?? PI_1_1_0_DEFAULT_THINKING_LEVEL;
+        session.setThinkingLevel(requestedThinking);
+        diagnostics.record("session.thinking_level", { state: session.thinkingLevel });
+        let configurationAnnounced = false;
+        const onPromptStart = (): void => {
+          if (configurationAnnounced) return;
+          configurationAnnounced = true;
+          const origin = opts.reasoningEffort === undefined ? "默认" : "已配置";
+          reasoningState.notice?.(`本会话请求的思考等级：${session.thinkingLevel}（${origin}）；Pi 当前 high 与 xhigh 预算相同，服务端实际采纳未验证。`, "configured");
+        };
 
         // G-4 V2：硬校验按放行面判（前缀面参数化）。置于 bindExtensions **之前**⇒构造期快照只可能看到
         // 注入名（MCP 尚未建连）——确定性安全；前缀面为「未来把 bindExtensions 挪到校验前」留防。
@@ -1586,20 +1633,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         const sessionShutdown = mcpExtension !== undefined
           ? (): Promise<unknown> => session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" })
           : undefined;
-        // G-5 降级接缝（仅装配 reasoningEffort 时提供；缺省不传 ⇒ 逐字旧行为）。
-        const reasoningDegrade: ReasoningDegradeOptions | undefined = reasoningExtension !== undefined
-          ? {
-              consumeRetry: (turnId: string | undefined): boolean => {
-                const hit = reasoningState.retryRequested && (reasoningState.retryTurnId === undefined || reasoningState.retryTurnId === turnId);
-                reasoningState.retryRequested = false;
-                reasoningState.retryTurnId = undefined;
-                return hit;
-              },
-              suppress: (): void => { reasoningState.suppressed = true; },
-              noticeText: REASONING_DEGRADED_SUMMARY,
-            }
-          : undefined;
-        const roleSession = makeRoleSession({ session, promptMs, turnLastResortMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false, lengthFollowup, sessionShutdown, reasoningDegrade });
+        const roleSession = makeRoleSession({ session, promptMs, turnLastResortMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false, lengthFollowup, sessionShutdown, onPromptStart });
         roleSession.runtime = "pi";
         roleSession.roleId = role.id;
         roleSession.contextSource = sessionSelection.contextSource ?? (sessionSelection.mode === "in-memory" ? "in-memory" : sessionSelection.mode === "resumed" ? "resumed" : sessionSelection.note ? "recovered" : "fresh");

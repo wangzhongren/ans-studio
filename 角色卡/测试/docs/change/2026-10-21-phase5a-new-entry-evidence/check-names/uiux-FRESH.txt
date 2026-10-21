@@ -1,0 +1,4 @@
+P5 truly fresh open says new context without old history=true
+P5 fresh first prompt tool and snapshot do not invent old lost context=true
+P5 current-handle replay update remains fresh without false old-history warning=true
+P5 actual at-open old history retains truthful failed-restore notice=true

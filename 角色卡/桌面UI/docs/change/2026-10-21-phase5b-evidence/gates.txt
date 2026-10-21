@@ -1,0 +1,87 @@
+# Phase 5B 步骤 b 证据：默认目标切新入口与复跑
+
+- 日期：2026-10-21
+- 角色：桌面UI
+- 范围：`test/桌面UI/` 四个冒烟默认从 `dist/src/index.html` 切到 `dist/index.html`；复跑 5A/4B/3B/4A/IME/bench/design audit；`test/桌面UI` 旧文件引用清理/登记。
+- 产物入口：`app/renderer/dist/index.html`（step b 装配构建）
+  - SHA256 `3c4da2a2a4f99f6ffffdb737ccf854b3320bf2605a8d2b53190e5017ad33b301`
+  - JS `assets/index-BVLfGR_D.js` SHA256 `f568e2aae8866996b7dabc22b69cdb4675fa8e2e8b8d020eb812a8aba08e4095`
+  - CSS `assets/index-DUBNk8-R.css` SHA256 `76fad7ce7c7b449d7e3b5f61517555f7f5c9d97e169a81d504289131d6ffc0f6`
+  - gzip9 **288,530B**（JS 268,650 + CSS 19,480 + HTML 400）≤300KiB；CSP meta 严格保留；无内联脚本。
+
+## 1. 默认目标
+
+| 套件 | 默认入口 |
+| --- | --- |
+| `test/桌面UI/phase5a-electron-smoke.mjs` | `app/renderer/dist/index.html` |
+| `test/桌面UI/phase4b-electron-smoke.mjs` | `app/renderer/dist/index.html` |
+| `test/桌面UI/phase3b-electron-smoke.mjs` | `app/renderer/dist/index.html` |
+| `test/桌面UI/phase4a-electron-smoke.mjs` | `app/renderer/dist/index.html` |
+| `test/桌面应用/e2e/uiux-v2.mjs` | `app/renderer/dist/index.html` |
+| `test/桌面应用/e2e/ime-enter.mjs` | `app/renderer/dist/index.html` |
+| `test/桌面应用/e2e/bench-storm.mjs` | `${BENCH_RENDERER_DIR|app/renderer}/dist/index.html` |
+| `test/桌面应用/e2e/uiux-design-audit.mjs` | `app/renderer/dist/index.html` |
+
+`ANS_RENDERER_ENTRY` 显式覆盖与 fail-fast exit 2 保留；所有断言未改。
+
+## 2. 复跑结果（默认目标，无显式 ANS_RENDERER_ENTRY）
+
+| 套件 | 结果 |
+| --- | --- |
+| 5A 冒烟 | **36/36**，21 截图，零 console/CSP |
+| 4B 冒烟 | **70/70**，零 console/CSP |
+| 3B 冒烟 | **45/45**（夹具补 `sessionCurrent:true`，见 §3） |
+| 4A 冒烟 | **99/99** |
+| IME | **26 true / 0 false / E2E_DONE=1** |
+| design audit | **AUDIT_DONE**，31 项 v3 **0 bad** |
+| `test/桌面UI/*.test.ts` | **142/142**（source-guard 入口路径更新到 `app/renderer/index.html`） |
+
+## 3. test/桌面UI 旧文件引用清理
+
+- `source-guard.test.ts`：静态入口从 `app/renderer/src/index.html` 改为 `app/renderer/index.html`（源入口已移动）。
+- `phase3b-electron-smoke.mjs`：`session:send` 夹具补 `sessionCurrent:true`——5A 语义下显式 true 表示拒发不失效会话；否则发送失败后附件按钮因会话失效而禁用，3B 附件段误报。产品断言未改。
+- 其余对 `renderer.js/styles.css/tool-rows.js/...` 的命中均为**守卫测试/历史注释**（source-guard 明确禁止新渲染器 import 旧模块；markdown pin 测试断言不读旧 vendor），不是运行引用。
+- 无需要退役的 `test/桌面UI` 文件。
+
+## 4. bench（默认 `dist/index.html`，单机同日 4 次）
+
+| 指标 | 4 次 | 中位 | 阈值 | 结果 |
+| --- | --- | --- | --- | --- |
+| stormA maxGap | 18.5 / 19.8 / 19.7 / 18.6 | **19.1** | ≤26 | pass |
+| stormB maxGap | 18.5 / 18.6 / 18.5 / 18.6 | **18.6** | ≤25 | pass |
+| handler A max | 0.6 / 1.2 / 0.7 / 0.6 | **0.65** | ≤16.8 | pass |
+| handler B maxBatch | 0.7 / 0.7 / 0.4 / 0.8 | **0.7** | ≤6 | pass |
+| replayMs | 11.2 / 10.9 / 6.2 / 11.3 | **11.05** | ≤21.6 | pass |
+| scrollToBottomMs | 17.0 / 13.3 / 4.2 / 17.8 | **15.15** | ≤19.3 | pass |
+
+- 旧渲染器已删除，无法再跑 old/new 交替；以上阈值沿用 5A 记录的旧基线（A 26.0、B 17.7、handler 11.8/1.0、replay 16.6、scroll 14.3）。单次噪声较大（replay/scroll），中位仍低于阈值；无功能性回退。
+- 原始 JSON：`bench/ans-bench-dist.json`、`-1..3.json`。
+
+## 5. 证据文件
+
+- `5a-smoke/`：report.json + 21 PNG
+- `4b-smoke/`：report.json + PNG
+- `3b-smoke/`：report.json + PNG
+- `4a-smoke/`：report.json + PNG
+- `ime/report.txt`
+- `bench/*.json`
+- `design-audit/report.json`
+
+## 6. 剩余项
+
+- 生产入口/主进程入口解析、packaged smoke 仍由装配步骤执行；本次未改 `app/main.ts`/preload/package/vite/根配置。
+- `hot-path.test.ts`/`message-queue.test.ts`、`test/测试/**`、`test/装配/verify-local-package.mjs` 仍引用已删旧文件（属桌面窗口/各测试属主），需在 5B 收尾前退役/替换；桌面UI 未改。
+- `test/桌面应用/diagnostics.test.ts` 的 `dist/src/index.html` 字符串夹具待其属主按新入口口径复核。
+- 本证据不是最终验收；UIUX 最终 A–L 复跑与打包 dry run 仍待执行。
+
+## 7. 后续候选：角色显示名修复（2026-10-21）
+
+- `role-view.ts` 治理显示名改为 Draft / 提案、Crew / 组队、Steward / 统筹（liaison/verification 不变）；单测 142/142、4B 70/70、5A 36/36、MIRROR 8/8、typecheck 0/0、build 成功。
+- 新候选：`dist/index.html` `c8ad0e82…79cd`、JS `index-Oqlp-kNL.js` `050776ec…f97b`、CSS `index-DUBNk8-R.css` `76fad7ce…c0f6`；gzip9 **288,514B**。详见 `../2026-10-21_change_ui-platform-role-display-names.md`。
+
+## 8. 后续候选：历史派发去重 + 品牌图标（2026-10-21）
+
+- `events.ts` historyProjectionKey/dedupeHistoryRows；`applyHistory` 对 user/injected/system/delivery 去重（turnId+首行文本，优先 anchor/request）；新增 4 项单测。
+- TitleBar/Sidebar 品牌图标 `img alt=ANS`（20/30px）；source-guard + 5A 冒烟断言/截图。
+- 复跑：单测 147/147、5A 37/37、4B 70/70、3B 45/45、4A 99/99、uiux 默认 110/110、MERGE 12/12、TOOLFOLD 19/19（C1 Δ20）、design audit 31/0、main E2E_PASS；bench 4 次全阈值。
+- 新候选：`dist/index.html` `f779ac60…c88b`、JS `index-CFjc0h-3.js` `007c60aa…b6aa`、CSS `index-BYYh-X8f.css` `531d8035…04b3`、icon `ans-studio-ans-icon-DOpmqMAU.png` `ff88e313…8d32c`；gzip9 **288,931B**。详见 `../2026-10-21_change_ui-platform-history-dedupe-and-brand-icon.md`。

@@ -1,0 +1,238 @@
+ M .gitignore
+ M README.md
+ M app/desktop/diagnostics.ts
+ M app/desktop/packaged-smoke.ts
+ M app/main.ts
+ M app/renderer/markdown.js
+ M app/renderer/vendor/README.md
+ M app/renderer/vendor/markdown-it.umd.min.js
+ M package-lock.json
+ M package.json
+ M src/common/codex-adapter/protocol.ts
+ M src/common/pi-adapter/real-adapter.ts
+ M src/common/runtime-core/fs-write.ts
+ M src/common/shared/atomic-write.ts
+ M "src/common/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.ts"
+ M src/model/runtime.ts
+ M src/provider/claude/session.ts
+ M src/provider/codex/session.ts
+ M src/provider/runtime/tools.ts
+ M src/service/gate/resolve-write.ts
+ M src/service/runtime/session.ts
+ M test/claude-adapter/reasoning-loopback.probe.ts
+ M test/claude-adapter/session.test.ts
+ M test/codex-adapter/fixtures.ts
+ M test/codex-adapter/reasoning.test.ts
+ M test/codex-adapter/session.test.ts
+ M test/codex-adapter/web-search.test.ts
+ M test/pi-adapter/installed-mcp-servers.test.ts
+ M test/pi-adapter/real-adapter.timeout.test.ts
+ M test/pi-adapter/reasoning-effort.test.ts
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/ans-wiring.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/diagnostics.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/e2e/bench-storm.mjs"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/e2e/ime-enter.mjs"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/e2e/main.mjs"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/e2e/uiux-design-audit.mjs"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/e2e/uiux-v2.mjs"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/markdown.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/pi-config.test.ts"
+ M "test/\346\265\213\350\257\225/g3-search-verify/codex-websearch-verify.test.ts"
+ M "test/\346\265\213\350\257\225/g4v2-mcp-verify/j-pi.test.ts"
+ M "test/\346\265\213\350\257\225/g5-reasoning-verify/c-claude.test.ts"
+ M "test/\346\265\213\350\257\225/g5-reasoning-verify/d-codex.test.ts"
+ M "test/\346\265\213\350\257\225/g5-reasoning-verify/e-pi.test.ts"
+ M "test/\346\265\213\350\257\225/t1-external-engines.mjs"
+ M "test/\346\265\213\350\257\225/t9-block2-write-landing.test.ts"
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.test.ts"
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/resolve-write.test.ts"
+ M "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/atomic-write.test.ts"
+ M tsconfig.json
+ M "\350\247\222\350\211\262\345\215\241/Claude\351\200\202\351\205\215\345\231\250/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/Claude\351\200\202\351\205\215\345\231\250/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/Claude\351\200\202\351\205\215\345\231\250/boundary.yaml"
+ M "\350\247\222\350\211\262\345\215\241/Claude\351\200\202\351\205\215\345\231\250/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/Claude\351\200\202\351\205\215\345\231\250/docs/feature/claude-session.md"
+ M "\350\247\222\350\211\262\345\215\241/Claude\351\200\202\351\205\215\345\231\250/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/Claude\351\200\202\351\205\215\345\231\250/role-card.md"
+ M "\350\247\222\350\211\262\345\215\241/Codex\351\200\202\351\205\215\345\231\250/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/Codex\351\200\202\351\205\215\345\231\250/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/Codex\351\200\202\351\205\215\345\231\250/boundary.yaml"
+ M "\350\247\222\350\211\262\345\215\241/Codex\351\200\202\351\205\215\345\231\250/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/Codex\351\200\202\351\205\215\345\231\250/docs/feature/codex-governed-session.md"
+ M "\350\247\222\350\211\262\345\215\241/Codex\351\200\202\351\205\215\345\231\250/feature-map.md"
+ M "\350\247\222\350\211\262\345\215\241/Codex\351\200\202\351\205\215\345\231\250/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/Codex\351\200\202\351\205\215\345\231\250/role-card.md"
+ M "\350\247\222\350\211\262\345\215\241/Pi\351\200\202\351\205\215\345\231\250/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/Pi\351\200\202\351\205\215\345\231\250/docs/feature/pi-runtime.md"
+ M "\350\247\222\350\211\262\345\215\241/Pi\351\200\202\351\205\215\345\231\250/feature-map.md"
+ M "\350\247\222\350\211\262\345\215\241/Pi\351\200\202\351\205\215\345\231\250/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/feature-map.md"
+ M "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\344\272\247\345\223\201/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\344\272\247\345\223\201/feature-map.md"
+ M "\350\247\222\350\211\262\345\215\241/\344\272\247\345\223\201/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/boundary.yaml"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/feature-map.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/functional-description.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/feature-map.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/functional-description.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/feature-map.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\213\254\347\253\213\351\252\214\346\224\266/feature-map.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\213\254\347\253\213\351\252\214\346\224\266/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\243\205\351\205\215/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\243\205\351\205\215/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\243\205\351\205\215/boundary.yaml"
+ M "\350\247\222\350\211\262\345\215\241/\350\243\205\351\205\215/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\243\205\351\205\215/feature-map.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\243\205\351\205\215/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/boundary.yaml"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/docs/feature/runtime-core.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/role-card.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/feature-map.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/architecture/shared-components.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/project-rules.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/feature-map.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/memo.md"
+?? app/desktop/assets/ans-geometric-a-graphite.png
+?? app/desktop/assets/ans-geometric-a-mint.png
+?? app/desktop/assets/ans-lettermark-graphite.png
+?? app/desktop/assets/ans-lettermark-mint.png
+?? app/desktop/assets/ans-lettermark-white.png
+?? app/desktop/assets/ans-studio-lettermark-graphite.png
+?? app/desktop/assets/ans-studio-lettermark-mint.png
+?? app/desktop/assets/ans-studio-lettermark-white.png
+?? app/desktop/navigation-guard.ts
+?? app/desktop/navigation-policy.ts
+?? app/desktop/renderer-entry.ts
+?? app/renderer/components.json
+?? app/renderer/src/
+?? app/renderer/tsconfig.json
+?? output/
+?? src/common/codex-adapter/reasoning-catalog.ts
+?? test/codex-adapter/reasoning-catalog.test.ts
+?? test/codex-adapter/reasoning-loopback.probe.ts
+?? test/pi-adapter/compatibility-loopback.test.ts
+?? test/runtime-core/file-write-safety.test.ts
+?? "test/\346\241\214\351\235\242UI/"
+?? "test/\346\265\213\350\257\225/g5-reasoning-verify/compatibility-loopback.test.ts"
+?? "test/\346\265\213\350\257\225/lightweight-permission-repairs.test.ts"
+?? "test/\346\265\213\350\257\225/phase3a-lazy-toolgroup-check.mjs"
+?? "test/\346\265\213\350\257\225/phase3a-lazy-toolgroup-preload.cjs"
+?? "test/\350\243\205\351\205\215/verify-local-package.mjs"
+?? vite.config.ts
+?? "\350\247\222\350\211\262\345\215\241/Claude\351\200\202\351\205\215\345\231\250/docs/fix/2026-10-21-reasoning-light-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/Claude\351\200\202\351\205\215\345\231\250/docs/fix/2026-10-21_fix_reasoning-compatibility.md"
+?? "\350\247\222\350\211\262\345\215\241/Codex\351\200\202\351\205\215\345\231\250/docs/fix/2026-10-21-reasoning-compatibility-e1-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/Codex\351\200\202\351\205\215\345\231\250/docs/fix/2026-10-21-reasoning-compatibility-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/Codex\351\200\202\351\205\215\345\231\250/docs/fix/2026-10-21_fix_reasoning-compatibility.md"
+?? "\350\247\222\350\211\262\345\215\241/Pi\351\200\202\351\205\215\345\231\250/docs/fix/2026-10-21_fix_reasoning-compatibility-and-default.md"
+?? "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/docs/design/2026-10-21-nova-prototype-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/docs/design/2026-10-21-phase4a-prototype-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/docs/design/2026-10-21-phase5a-old-visual-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/docs/design/2026-10-21_design_ui-platform-nova-prototype.html"
+?? "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/docs/design/2026-10-21_design_ui-platform-nova.md"
+?? "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/docs/design/2026-10-21_design_ui-platform-phase2-review.md"
+?? "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/docs/design/2026-10-21_design_ui-platform-phase3a-review.md"
+?? "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/docs/design/2026-10-21_design_ui-platform-phase3b-review.md"
+?? "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/docs/design/2026-10-21_design_ui-platform-phase4a-design.md"
+?? "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/docs/design/2026-10-21_design_ui-platform-phase4a-prototype.html"
+?? "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/docs/design/2026-10-21_design_ui-platform-phase4a-review.md"
+?? "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/docs/design/2026-10-21_design_ui-platform-phase4b-design.md"
+?? "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/docs/design/2026-10-21_design_ui-platform-phase4b-review.md"
+?? "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/docs/design/2026-10-21_design_ui-platform-phase5-visual-audit-plan.md"
+?? "\350\247\222\350\211\262\345\215\241/UIUX\350\256\276\350\256\241\345\270\210/docs/design/2026-10-21_design_ui-platform-phase5a-old-visual-audit.md"
+?? "\350\247\222\350\211\262\345\215\241/\344\272\247\345\223\201/docs/design/2026-10-21_design_ui-platform-round.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21-phase2-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21-phase2b-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21-phase3a-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21-phase3a2-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21-phase3b-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21-phase4a-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21-phase4b-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21-phase5a-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21_change_markdown-it-vendor-15-0-3.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21_change_ui-platform-boundary.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21_change_ui-platform-phase2-shell.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21_change_ui-platform-phase3a-chat.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21_change_ui-platform-phase3b-cards-composer.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21_change_ui-platform-phase4a-engine-settings-drawers.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21_change_ui-platform-phase4b-governance-receipts.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21_change_ui-platform-phase5a-gaps.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-21_phase5a-test-migration-ledger.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/design/2026-10-21_design_ui-platform-phase4a-scope.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/design/2026-10-21_design_ui-platform-phase4b-scope.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/design/2026-10-21_design_ui-platform-phase5a-scope.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/feature/ui-components.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/feature/ui-contract-surface.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/fix/2026-10-21_fix_d3-approval-copy.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-21-phase5a-entry-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-21_change_ui-platform-phase5a-entry.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/design/2026-10-21_design_ui-platform-phase5a-entry-scope.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21-phase2-verification-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21-phase2b-verification-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21-phase3a-verification-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21-phase3b-fix-verification-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21-phase3b-verification-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21-phase4a-fix-verification-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21-phase4a-verification-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21-phase4b-200pct-verification-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21-phase4b-fix-verification-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21-phase4b-verification-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21-phase5a-new-entry-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21-phase5a-old-baseline-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21_change_phase2-independent-verification.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21_change_phase2b-independent-reverification.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21_change_phase3a-independent-verification.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21_change_phase3b-fix-reverification.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21_change_phase3b-independent-verification.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21_change_phase4a-fix-reverification.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21_change_phase4a-independent-verification.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21_change_phase4b-200pct-reverification.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21_change_phase4b-fix-reverification.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21_change_phase4b-independent-verification.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21_change_phase5a-old-baseline.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-21_check-ledger-phase3a.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/design/2026-10-21_design_ui-platform-phase5-test-plan.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/design/2026-10-21_phase5-suite-inventory.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/fix/2026-10-21-d3-lightweight-verification-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/fix/2026-10-21-reasoning-light-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/fix/2026-10-21_fix_d3-lightweight-verification.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/fix/2026-10-21_fix_reasoning-light-verification.md"
+?? "\350\247\222\350\211\262\345\215\241/\347\213\254\347\253\213\351\252\214\346\224\266/docs/design/2026-10-21_design_ui-platform-phase5-acceptance.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\243\205\351\205\215/docs/change/2026-10-21_change_markdown-it-npm-devdep.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\243\205\351\205\215/docs/change/2026-10-21_change_ui-platform-boundary.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\243\205\351\205\215/docs/change/2026-10-21_change_ui-platform-phase5a-local-package.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\243\205\351\205\215/docs/change/2026-10-21_change_ui-platform-toolchain.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\243\205\351\205\215/docs/design/2026-10-21_design_ui-platform-phase5a-build.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\243\205\351\205\215/docs/fix/2026-10-21_fix_d3-approval-copy.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/docs/fix/2026-10-21_fix_d3-file-write.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/docs/fix/2026-10-21_fix_reasoning-default-contract.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/docs/feature/shell-classification.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/docs/feature/write-authorization.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/docs/fix/2026-10-21_fix_lightweight-permission-repairs.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/design/2026-10-21_design_permission-boundary-repairs.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/design/2026-10-21_design_reasoning-effort-lightweight-repairs.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/design/2026-10-21_design_reasoning-light-codex-addendum.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/design/2026-10-21_review_ui-platform-round.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/fix/2026-10-21-d3-shared-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/fix/2026-10-21_fix_d3-lightweight-permission-repairs.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/fix/2026-10-21_fix_reasoning-light-delivery.md"

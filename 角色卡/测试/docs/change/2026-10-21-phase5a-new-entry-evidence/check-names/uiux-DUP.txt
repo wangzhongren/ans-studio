@@ -1,0 +1,15 @@
+one canonical lifecycle read_file=true
+one canonical lifecycle write_file=true
+one canonical lifecycle edit_file=true
+one canonical lifecycle run_shell=true
+one canonical lifecycle request_confirmation=true
+one canonical lifecycle request_choice=true
+one canonical lifecycle dispatch_task=true
+one canonical lifecycle submit_report=true
+one canonical lifecycle report_shell_verdict=true
+typed input repeated live is single injected row=true
+live then history input remains one=true
+different actual turn retained and real assistant prefix not converted=true
+full rebuild preserves uncovered second input and assistant=true
+history first then typed live still one=false
+history first then typed live still one observed={"chat": "回交投递 · 来自 维护报告（任务关联未知）\n结论：completed\n摘要：原报告\n回交投递 · 来自 维护报告（任务关联未知）\n结论：completed\n摘要：原报告\n用户指令：[回交] 来自 维护 的报告（任务关联未知）\n结论：completed\n摘要：原报告\n", "assistant": ["用户指令：[回交] 来自 维护 的报告（任务关联未知）\n结论：completed\n摘要：原报告\n"], "denied": [], "model": {"count": 3, "lastIndex": 2, "operators": [], "rowGap": 16}}

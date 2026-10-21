@@ -1,0 +1,7 @@
+GOV pin-mismatch status row=true
+GOV pin-mismatch empty state reuses su empty host=true
+GOV preview reuses non-modal #governance-preview=true
+GOV preview file/write/pin/warning lines=true
+GOV preview adds no modal or fourth entry=true
+GOV cancel keeps mismatch state and hides preview=true
+GOV success text after completed=true

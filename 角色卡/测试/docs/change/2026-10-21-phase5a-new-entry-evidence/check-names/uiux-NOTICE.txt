@@ -1,0 +1,4 @@
+role tree flat: all roles visible without details/fold=true
+role status badges remain visible for every role=true
+live system notice is its own sys row with 系统 badge, not a user bubble=false
+live system notice is its own sys row with 系统 badge, not a user bubble observed={"chat": "【系统通知·会话重建】此前经确认发行的写权不会自动保留，如需写入请重新经 request_confirmation 确认。\n请继续处理任务。\n", "assistant": [], "denied": [], "model": {"count": 1, "lastIndex": 0, "operators": [], "rowGap": 16}}

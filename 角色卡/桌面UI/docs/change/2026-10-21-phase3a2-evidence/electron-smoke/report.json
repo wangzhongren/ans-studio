@@ -1,0 +1,392 @@
+{
+  "reports": [
+    {
+      "name": "CTA_STYLED",
+      "value": {
+        "tag": "BUTTON",
+        "className": "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-[13px] font-medium whitespace-nowrap transition-colors duration-[120ms] outline-none select-none focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-ring active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-[0.45] aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-success-hover active:bg-primary-active h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 chat-cta",
+        "bg": "rgb(111, 160, 139)",
+        "color": "rgb(20, 23, 26)",
+        "height": 32,
+        "font": "13px",
+        "border": "rgba(0, 0, 0, 0)"
+      }
+    },
+    {
+      "name": "SYS_CONFIG_DANGER",
+      "value": {
+        "text": "开启会话失败：离线受控拒绝：会话未开启",
+        "color": "rgb(201, 122, 109)"
+      }
+    },
+    {
+      "name": "HEADER_DEBUG",
+      "value": {
+        "selected": "A",
+        "role": "A",
+        "context": "新会话",
+        "sysConfigs": [],
+        "matches": [
+          {
+            "tag": "SPAN",
+            "cls": "composer-hint",
+            "id": "composer-hint",
+            "parent": "session-notice"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MD_DEBUG",
+      "value": {
+        "selected": "A",
+        "assistants": [
+          "历史行 167 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 168 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 169 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 170 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 171 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 172 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 173 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 174 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 175 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 176 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 177 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 178 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 179 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 180 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 181 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 182 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 183 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 184 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 185 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 186 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 187 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 188 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 189 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 190 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 191 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 192 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 193 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 194 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 195 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 196 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 197 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 198 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 199 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 200 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 201 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 202 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 203 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 204 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 205 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 206 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 207 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 208 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 209 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 210 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 211 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 212 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 213 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 214 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 215 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 216 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 217 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 218 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "历史行 219 长聊天验证。 长聊天验证。 长聊天验证。 长",
+          "replay-tail\n",
+          "段落前文。\n标题一\n标题二\n标题三\n\n列表一\n列表二\n\n\n引"
+        ],
+        "count": 55,
+        "rows": {
+          "count": 228,
+          "lastIndex": 227,
+          "operators": [
+            {
+              "index": 227,
+              "requestId": "smoke-choice"
+            }
+          ],
+          "rowGap": 16
+        }
+      }
+    },
+    {
+      "name": "MARKDOWN_TYPOGRAPHY",
+      "value": {
+        "h1": {
+          "fontSize": "15px",
+          "marginTop": "16px",
+          "marginBottom": "6px",
+          "lineHeight": "21px"
+        },
+        "h2": {
+          "fontSize": "15px",
+          "marginTop": "16px",
+          "marginBottom": "6px"
+        },
+        "h3": {
+          "fontSize": "14px",
+          "marginTop": "16px",
+          "marginBottom": "6px"
+        },
+        "ul": {
+          "marginTop": "4px",
+          "marginBottom": "18px",
+          "paddingLeft": "20px"
+        },
+        "blockquote": {
+          "marginBottom": "8px",
+          "paddingLeft": "10px",
+          "borderLeftWidth": "2px",
+          "borderLeftColor": "rgb(58, 65, 72)"
+        },
+        "p": {
+          "marginBottom": "10px"
+        },
+        "table": {
+          "outlineWidth": "1px",
+          "outlineColor": "rgb(58, 65, 72)",
+          "fontSize": "12.5px"
+        },
+        "th": {
+          "backgroundColor": "rgb(30, 35, 40)",
+          "paddingTop": "6px",
+          "paddingRight": "10px",
+          "paddingBottom": "6px",
+          "paddingLeft": "10px",
+          "borderBottomColor": "rgb(58, 65, 72)"
+        },
+        "td": {
+          "paddingTop": "6px",
+          "paddingRight": "10px",
+          "paddingBottom": "6px",
+          "paddingLeft": "10px"
+        }
+      }
+    },
+    {
+      "name": "REPLAY_AND_BLOCKED",
+      "value": {
+        "replayOpacity": "0.88",
+        "blocked": {
+          "opacity": "1",
+          "borderLeftWidth": "3px",
+          "borderLeftColor": "rgb(201, 122, 109)"
+        }
+      }
+    },
+    {
+      "name": "TOOL_DEBUG",
+      "value": {
+        "states": [
+          {
+            "cls": "activity-state completed",
+            "text": "调用发起 → 执行完成"
+          },
+          {
+            "cls": "activity-state timed-out",
+            "text": "调用发起 → 超时终止"
+          }
+        ],
+        "groups": [
+          {
+            "summary": "本轮 1 个调用：read_file",
+            "open": false
+          },
+          {
+            "summary": "本轮 1 个调用：run_shell · 含 1 条失败",
+            "open": false
+          }
+        ],
+        "kinds": [
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "assistant",
+          "handback",
+          "reasoning",
+          "activities",
+          "activities",
+          "denied",
+          "operator"
+        ]
+      }
+    },
+    {
+      "name": "TOOL_FACTS",
+      "value": {
+        "time": "18:00",
+        "timeTitle": "2026-10-21T10:00:01Z",
+        "timeoutColor": "rgb(201, 122, 109)",
+        "summary": "本轮 1 个调用：run_shell · 含 1 条失败",
+        "summaryColor": "rgb(201, 122, 109)"
+      }
+    },
+    {
+      "name": "EXPAND_CHEVRONS",
+      "value": {
+        "records": {
+          "content": "\"›\"",
+          "transform": "matrix(1, 0, 0, 1, 0, 0)"
+        },
+        "denied": {
+          "content": "\"›\"",
+          "transform": "matrix(1, 0, 0, 1, 0, 0)"
+        }
+      }
+    },
+    {
+      "name": "OPERATOR_CHOICE",
+      "value": {
+        "labelHeight": 40,
+        "labelPadding": "8px",
+        "accent": "rgb(242, 244, 246)",
+        "cancelBorder": "rgb(107, 117, 126)",
+        "submitBg": "rgb(111, 160, 139)",
+        "selectedState": {
+          "selected": true,
+          "checked": true,
+          "bg": "rgb(42, 48, 55)"
+        }
+      }
+    },
+    {
+      "name": "OFFSCREEN_DEBUG",
+      "value": {
+        "scrollTop": 0,
+        "scrollHeight": 14526,
+        "clientHeight": 612,
+        "mounted": 39,
+        "operatorIndex": -1,
+        "model": {
+          "count": 228,
+          "lastIndex": 227,
+          "operators": [
+            {
+              "index": 227,
+              "requestId": "smoke-choice"
+            }
+          ],
+          "rowGap": 16
+        },
+        "firstRows": [
+          "row-2",
+          "row-3",
+          "row-4"
+        ],
+        "lastRows": [
+          {
+            "id": "row-38",
+            "kind": "assistant"
+          },
+          {
+            "id": "row-39",
+            "kind": "assistant"
+          },
+          {
+            "id": "row-40",
+            "kind": "assistant"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VIRTUAL_STATE_RESTORED",
+      "value": {
+        "beforeState": {
+          "group": true,
+          "reason": true,
+          "handback": true,
+          "selected": true,
+          "checked": true
+        },
+        "offscreen": {
+          "operator": 0,
+          "group": 0
+        },
+        "afterState": {
+          "group": true,
+          "reason": true,
+          "handback": true,
+          "selected": true,
+          "checked": true
+        }
+      }
+    },
+    {
+      "name": "SCREENSHOTS",
+      "value": [
+        "chat-1360.png",
+        "choice-1360.png",
+        "choice-960.png",
+        "chat-960.png"
+      ]
+    },
+    {
+      "name": "NO_DID_FAIL_LOAD",
+      "value": []
+    },
+    {
+      "name": "NO_CONSOLE_ERRORS",
+      "value": []
+    },
+    {
+      "name": "SMOKE_DONE",
+      "value": true
+    }
+  ],
+  "consoleErrors": [],
+  "didFail": []
+}

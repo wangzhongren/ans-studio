@@ -836,8 +836,8 @@ export type FlowStepSupersedeFn = (input: {
 // ①请求面＝中立档位 `ReasoningEffortV1`（PM 冻结恰五值）＋`RuntimeProviderOptions.reasoningEffort`。
 // Service 在 providerFor 按运行时读 env（`ANS_CLAUDE_REASONING_EFFORT`/`ANS_CODEX_REASONING_EFFORT`
 // /`ANS_PI_REASONING_EFFORT`）、归一（合法五值，trim＋忽略大小写；未设/空串＝未设；其余＝按未设处理
-// ＋诊断，**绝不毁会话**）后注入。**未设（字段缺席）＝逐字现状**——适配器不得因字段缺席改变任何既有
-// 行为；适配器**纯消费**（三平台原生接线属各适配器批次＝wave 2；各平台落点见
+// ＋诊断，**绝不毁会话**）后注入。**未设（字段缺席）＝交给平台默认策略**，不等于原生请求零参数，
+// 也不允许恢复时无意沿用旧显式档位；适配器消费中立配置（各平台默认与兼容落点见
 // `RuntimeProviderOptions.reasoningEffort` 注释）。
 //
 // ②呈现面＝推理事实通道（三段式，沿工具事件"事实→核心投影→呈现"纪律）：
@@ -1464,8 +1464,13 @@ export interface RuntimeProviderOptions {
    */
   installedMcpServers?: readonly InstalledMcpServerV1[];
   /**
-   * G-5：会话级推理强度（Service 在 providerFor 按运行时读 env 并归一后注入；**未设＝字段缺席＝
-   * 逐字现状**——适配器不得因字段缺席改变任何既有行为；**纯消费面**，三平台原生接线属各适配器批次）。
+   * G-5：会话级推理强度（Service 在 providerFor 按运行时读 env 并归一后注入）。
+   * ANS-REASONING-LIGHT D1：未设/清空时字段缺席，交给各平台默认策略，不保证原生请求零参数。
+   * Pi 新建/恢复均重新选择：显式值 → 模型设置 → 全局设置 → Pi 1.1.0 命名默认 medium；
+   * 经 SDK 能力钳位后应用，不继承转录中的旧显式等级、不改保存偏好。默认与显式档都须预算保护。
+   * 各适配器只在明确参数拒绝时按获准兼容路径继续；成功兼容状态只属当前活会话，重建后重置。
+   * 普通网络/鉴权/限流错误不改变请求策略。配置/兼容提示在活动 prompt 内用普通 message 与
+   * detail.source="system"，不得冒充 source="reasoning" 的思考事实或声称服务端实际采纳。
    *
    * 冻结映射（中立值 → 各平台原生落点；依据＝评估 `2026-10-16_assess_reasoning-and-effort.md`
    * §五 与 sdk.d.ts 实据）：

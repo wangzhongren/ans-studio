@@ -1,0 +1,373 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "fresh empty context never mistakes loader for history",
+      "value": true
+    },
+    {
+      "name": "empty fresh session has no above-history warning",
+      "value": true
+    },
+    {
+      "name": "A same call one accessible lifecycle with true target and nonzero exit completion",
+      "value": true
+    },
+    {
+      "name": "A safe detail streams exit error and flags readable",
+      "value": true
+    },
+    {
+      "name": "A different same-text actual call remains separate",
+      "value": true
+    },
+    {
+      "name": "A unknown display never falls to raw args",
+      "value": true
+    },
+    {
+      "name": "C source declared result not independent acceptance and failed save button",
+      "value": true
+    },
+    {
+      "name": "B source list requires explicit file pick without chat switch or opening model",
+      "value": true
+    },
+    {
+      "name": "B static markdown no scripts automatic image or unsafe link",
+      "value": true
+    },
+    {
+      "name": "B back list restores explicit file focus",
+      "value": true
+    },
+    {
+      "name": "B actual too-large result remains explicit error not partial success",
+      "value": true
+    },
+    {
+      "name": "B close invalidates late document and returns actual report invoker",
+      "value": true
+    },
+    {
+      "name": "C source same card once save success with promise event race",
+      "value": true
+    },
+    {
+      "name": "C target safe display copy flags not complete model input",
+      "value": true
+    },
+    {
+      "name": "C target only save updates same original card no re-prompt",
+      "value": true
+    },
+    {
+      "name": "C expired original report removes unsafe retry",
+      "value": true
+    },
+    {
+      "name": "P6 config save retains existing conversation draft",
+      "value": true
+    },
+    {
+      "name": "P6 missing setting closes back to actual notice invoker",
+      "value": true
+    },
+    {
+      "name": "P7 choice pending separated from empty queue",
+      "value": true
+    },
+    {
+      "name": "P7 locate uses original request no default decision",
+      "value": true
+    },
+    {
+      "name": "C source report mismatched role is not promoted",
+      "value": true
+    },
+    {
+      "name": "C fallback abort is system outcome not submitted success",
+      "value": true
+    },
+    {
+      "name": "C disabled live report remains visible without fake persisted ID",
+      "value": true
+    },
+    {
+      "name": "C outer ok inner failed never announced saved",
+      "value": true
+    },
+    {
+      "name": "C unreadable report record is explicit without new outcome card",
+      "value": true
+    },
+    {
+      "name": "A4 history omission invalid and parser counts are separate",
+      "value": true
+    },
+    {
+      "name": "P3 source B documents browsing never changes chatting A or engine",
+      "value": true
+    },
+    {
+      "name": "B structured PROJECT_NOT_GRANTED error not hidden",
+      "value": true
+    },
+    {
+      "name": "B structured STALE_SCOPE error not hidden",
+      "value": true
+    },
+    {
+      "name": "B structured NOT_LISTED error not hidden",
+      "value": true
+    },
+    {
+      "name": "B structured SYMLINK_NOT_ALLOWED error not hidden",
+      "value": true
+    },
+    {
+      "name": "B structured INVALID_UTF8 error not hidden",
+      "value": true
+    },
+    {
+      "name": "B structured BINARY_CONTENT error not hidden",
+      "value": true
+    },
+    {
+      "name": "B structured PERMISSION_DENIED error not hidden",
+      "value": true
+    },
+    {
+      "name": "B structured UNSUPPORTED_ENVIRONMENT error not hidden",
+      "value": true
+    },
+    {
+      "name": "C expired material cannot keep old receipt retry enabled",
+      "value": true
+    },
+    {
+      "name": "A4 actual legacy status and omissions shown without invented exit or identity",
+      "value": true
+    },
+    {
+      "name": "P3 role documents back restores role reading and expanded section",
+      "value": true
+    },
+    {
+      "name": "complete flow layout fits 1360",
+      "value": true
+    },
+    {
+      "name": "complete flow layout fits 960",
+      "value": true
+    },
+    {
+      "name": "read/save/query actual controlled operations",
+      "docCalls": [
+        {
+          "version": 1,
+          "projectViewId": "epoch-one",
+          "documentId": "doc-one"
+        },
+        {
+          "version": 1,
+          "projectViewId": "epoch-one",
+          "documentId": "doc-two"
+        },
+        {
+          "version": 1,
+          "projectViewId": "epoch-one",
+          "documentId": "doc-one"
+        },
+        {
+          "version": 1,
+          "projectViewId": "epoch-one",
+          "documentId": "doc-one-b"
+        },
+        {
+          "version": 1,
+          "projectViewId": "epoch-one",
+          "documentId": "doc-one-b"
+        },
+        {
+          "version": 1,
+          "projectViewId": "epoch-one",
+          "documentId": "doc-one-b"
+        },
+        {
+          "version": 1,
+          "projectViewId": "epoch-one",
+          "documentId": "doc-one-b"
+        },
+        {
+          "version": 1,
+          "projectViewId": "epoch-one",
+          "documentId": "doc-one-b"
+        },
+        {
+          "version": 1,
+          "projectViewId": "epoch-one",
+          "documentId": "doc-one-b"
+        },
+        {
+          "version": 1,
+          "projectViewId": "epoch-one",
+          "documentId": "doc-one-b"
+        },
+        {
+          "version": 1,
+          "projectViewId": "epoch-one",
+          "documentId": "doc-one-b"
+        }
+      ],
+      "persistenceCalls": [
+        {
+          "operation": "capabilities",
+          "input": {
+            "version": 1,
+            "projectRoot": "/offline-uiux-fixture",
+            "roleId": "A",
+            "runtime": "pi"
+          }
+        },
+        {
+          "operation": "report-query",
+          "input": {
+            "version": 1,
+            "projectRoot": "/offline-uiux-fixture",
+            "roleId": "A",
+            "runtime": "pi",
+            "reportId": "report-one"
+          }
+        },
+        {
+          "operation": "report-save",
+          "input": {
+            "version": 1,
+            "projectRoot": "/offline-uiux-fixture",
+            "roleId": "A",
+            "runtime": "pi",
+            "reportId": "report-one"
+          }
+        },
+        {
+          "operation": "capabilities",
+          "input": {
+            "version": 1,
+            "projectRoot": "/offline-uiux-fixture",
+            "roleId": "A",
+            "runtime": "pi"
+          }
+        },
+        {
+          "operation": "receipt-query",
+          "input": {
+            "version": 1,
+            "projectRoot": "/offline-uiux-fixture",
+            "roleId": "A",
+            "runtime": "pi",
+            "attemptId": "attempt-one"
+          }
+        },
+        {
+          "operation": "history-save",
+          "input": {
+            "version": 1,
+            "projectRoot": "/offline-uiux-fixture",
+            "roleId": "A",
+            "runtime": "pi",
+            "attemptId": "attempt-one"
+          }
+        },
+        {
+          "operation": "capabilities",
+          "input": {
+            "version": 1,
+            "projectRoot": "/offline-uiux-fixture",
+            "roleId": "A",
+            "runtime": "pi"
+          }
+        },
+        {
+          "operation": "report-query",
+          "input": {
+            "version": 1,
+            "projectRoot": "/offline-uiux-fixture",
+            "roleId": "A",
+            "runtime": "pi",
+            "reportId": "report-expired"
+          }
+        },
+        {
+          "operation": "capabilities",
+          "input": {
+            "version": 1,
+            "projectRoot": "/offline-uiux-fixture",
+            "roleId": "A",
+            "runtime": "pi"
+          }
+        },
+        {
+          "operation": "report-query",
+          "input": {
+            "version": 1,
+            "projectRoot": "/offline-uiux-fixture",
+            "roleId": "A",
+            "runtime": "pi",
+            "reportId": "fallback-report"
+          }
+        },
+        {
+          "operation": "capabilities",
+          "input": {
+            "version": 1,
+            "projectRoot": "/offline-uiux-fixture",
+            "roleId": "A",
+            "runtime": "pi"
+          }
+        },
+        {
+          "operation": "report-query",
+          "input": {
+            "version": 1,
+            "projectRoot": "/offline-uiux-fixture",
+            "roleId": "A",
+            "runtime": "pi",
+            "reportId": "outer-success-inner-fail"
+          }
+        },
+        {
+          "operation": "report-save",
+          "input": {
+            "version": 1,
+            "projectRoot": "/offline-uiux-fixture",
+            "roleId": "A",
+            "runtime": "pi",
+            "reportId": "outer-success-inner-fail"
+          }
+        },
+        {
+          "operation": "capabilities",
+          "input": {
+            "version": 1,
+            "projectRoot": "/offline-uiux-fixture",
+            "roleId": "A",
+            "runtime": "pi"
+          }
+        },
+        {
+          "operation": "receipt-query",
+          "input": {
+            "version": 1,
+            "projectRoot": "/offline-uiux-fixture",
+            "roleId": "A",
+            "runtime": "pi",
+            "attemptId": "attempt-two"
+          }
+        }
+      ],
+      "modelSends": 0
+    }
+  ]
+}

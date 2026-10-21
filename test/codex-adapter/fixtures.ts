@@ -26,6 +26,7 @@ export async function realMcp(): Promise<CodexMcpModules> {
 }
 
 interface Behavior {
+  models?: Array<Record<string, unknown>>;
   foreignRemains?: boolean;
   configFails?: boolean;
   unsafeSandbox?: boolean;
@@ -55,6 +56,7 @@ export class FakeEngine implements CodexRpcConnection {
   async request(method: string, params: Record<string, unknown>): Promise<unknown> {
     this.requests.push({ method, params });
     if (method === "initialize") return {};
+    if (method === "model/list") return { data: this.behavior.models ?? [], nextCursor: null };
     if (method === "config/read") {
       if (this.behavior.configFails) throw new Error("fake config read failure");
       const override = this.input.configOverrides.find(value => value.startsWith("web_search="));
@@ -124,7 +126,10 @@ export class FakeEngine implements CodexRpcConnection {
   /** G-5：推理增量帧（三个方法名之一；增量不产行——仅消费）。 */
   reasoningDelta(method: string, params: Record<string, unknown> = {}) { for (const listener of this.listeners) listener(method, { threadId: this.nativeId, turnId: this.turnId, itemId: "rs-fixture-1", ...params }); }
   /** G-5：轮失败（error 通知，willRetry=false——与 A4 探针拒绝面同形）。 */
-  failTurn(message: string, willRetry = false) { for (const listener of this.listeners) listener("error", { threadId: this.nativeId, turnId: this.turnId, error: { message }, willRetry }); }
+  failTurn(message: string, willRetry = false) {
+    for (const listener of this.listeners) listener("error", { threadId: this.nativeId, turnId: this.turnId, error: { message }, willRetry });
+    if (!willRetry) this.finish("failed", message);
+  }
   async call(name: string, args: Record<string, unknown>, override: Record<string, unknown> = {}, requestController = new AbortController()) {
     if (!this.handler) throw new Error("fixture handler missing");
     return this.handler("item/tool/call", { threadId: this.nativeId, turnId: this.turnId, callId: `call-${Math.random()}`, namespace: null, tool: `ans_${name}`, arguments: args, ...override }, { signal: requestController.signal });

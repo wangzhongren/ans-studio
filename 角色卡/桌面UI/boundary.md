@@ -6,7 +6,7 @@
 
 | 类型 | 可操作路径 | 用途 |
 | --- | --- | --- |
-| 目录 | `app/renderer/` | 渲染进程前端（HTML/CSS/renderer.js 与 markdown/role-status/tool-rows/ui-labels 纯函数模块及 vendor 库） |
+| 目录 | `app/renderer/` | 渲染进程前端（HTML/CSS/renderer.js 与 markdown/role-status/tool-rows/ui-labels 纯函数模块及 vendor 库）；包含渲染层 React 源码（src/）、样式、组件、渲染层 tsconfig/components.json 与构建产物（dist/） |
 | 单文件 | `test/桌面应用/markdown.test.ts` | 渲染侧单测：Markdown 渲染与 vendor pin |
 | 单文件 | `test/桌面应用/renderer.test.ts` | 渲染侧单测：渲染源码不变式守卫 |
 | 单文件 | `test/桌面应用/tool-rows.test.ts` | 渲染侧单测：工具行/回放纯函数 |
@@ -16,6 +16,7 @@
 | 单文件 | `test/桌面应用/e2e/uiux-design-audit.mjs` | 设计对齐测量夹具（renderer 两档实测，只读） |
 | 单文件 | `test/桌面应用/e2e/uiux-prototype-measure.mjs` | 设计原型测量夹具（只读载入 UIUX 原型） |
 | 单文件 | `test/桌面应用/runtime-ui.test.ts` | 多引擎选择、运行时组及设置展示的渲染契约测试 |
+| 目录 | `test/桌面UI/` | 渲染层 React 组件与设计系统守卫测试（独立目录，与桌面窗口的 test/桌面应用/ 精确文件授权互不重叠） |
 | 单文件 | `角色卡/桌面UI/feature-map.md` | 功能导航 |
 | 单文件 | `角色卡/桌面UI/memo.md` | 本角色工作备忘录 |
 | 单文件 | `角色卡/桌面UI/changelog.md` | 本角色治理变更记录 |

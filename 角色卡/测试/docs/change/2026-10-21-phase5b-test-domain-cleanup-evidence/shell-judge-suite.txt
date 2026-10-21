@@ -1,0 +1,46 @@
+✔ 开关默认关：请求走原确认卡，判断 agent 0 次调用，审计人工且无 judge 字段 (10.740375ms)
+✔ 开启后 judge allow：0 卡、1 行、审计 operator:judge:<引擎> + judge 字段、诊断 allow 一条 (17.03025ms)
+✔ 项目角色链路（policy=project、tier=null）：judge allow 同样 0 卡并正确归因 (8.863ms)
+✔ 关闭开关后恢复手动：后续请求重新弹卡，判断 agent 不再调用 (4.823375ms)
+✔ judge deny + 替代方案：0 卡、结果行、请求角色收到原因+替代方案、审计 deny + judge (10.258875ms)
+✔ judge deny 无替代方案：0 卡、合成 customerMessage + 标准出路、仍 deny (6.889167ms)
+✔ deny 结果行投达失败：仍 deny、0 卡、审计仍归判断 agent (5.351834ms)
+✔ deny 后应用不自动重试：一次 gate 调用只产生一次判断与一条结论 (6.34725ms)
+✔ 判断会话不可用：按拒绝处理、presenter 零调用、理由「判断服务不可用」、审计保留 manual (11.909916ms)
+✔ 判断超时：按拒绝处理、presenter 零调用、理由「判断超时」，底层会话被 abort/dispose (33.384458ms)
+✔ 输出无法解析：模型散文不猜结论 ⇒ 按拒绝处理、理由「判断结果无法解析」 (4.818333ms)
+✔ allow + 读取被拒：真实驱动按「allow 必须无损」降级 manual/read-denied ⇒ 拒绝并带具体路径 (6.702792ms)
+✔ allow + 读取预算耗尽：真实驱动降级 manual/budget ⇒ 拒绝、理由「读取预算已用尽」 (6.284166ms)
+✔ allow + 读取截断：真实驱动降级 manual/read-truncated ⇒ 拒绝、理由「读取内容被截断」 (7.482125ms)
+✔ 防循环：同一命令连续 deny 达上限后不再调用模型 ⇒ 按拒绝处理、理由「已达重试上限」 (7.111042ms)
+✔ 引擎不支持（demo）：manual/unsupported-engine ⇒ 拒绝、不调用任何适配器、不跨引擎 (4.698ms)
+✔ allow 结果行投达失败：按拒绝处理（不自动放行、不弹卡），审计保留 row-failed 与模型 allow 事实 (3.312959ms)
+✔ 判断请求超上限：命令 >16KB 直接 manual/context-too-large ⇒ 拒绝（不截断后猜） (6.092375ms)
+✔ 模型自报 manual：按拒绝处理、理由「判断 agent 自报无法判断」 (2.913417ms)
+✔ 对照：judge allow/deny 正常路径不变（manual 改造未波及模型主动结论） (6.802375ms)
+✔ 开关关闭：presenter 仍被调用（旧手动确认卡保留），判断 agent 0 次调用、审计归人工 (2.215417ms)
+✔ 已挂起卡：勾选开关不影响该卡，判断 agent 0 次调用；随后新请求才走判断 (23.704917ms)
+✔ 判断进行中关闭开关：以通道调用时点为准，本次结果仍生效；之后恢复手动 (12.228541ms)
+✔ deny 档 + judge allow：放行、0 卡、审计/诊断/结果行三处可辨识 (10.113833ms)
+✔ deny 档 + judge deny：仍 deny、0 卡、审计 tier:deny 但不带 hardDenyOverride (3.930375ms)
+✔ 普通 risky/review 放行不带 deny 档标记（防止标记泛化） (5.05275ms)
+✔ 敏感文件/目录读取全部被拒且不泄露内容；列表不列敏感项 (129.695291ms)
+✔ 项目外绝对路径 / `..` / 符号链接逃逸被拒，不回显项目外绝对路径 (5.553167ms)
+✔ 二进制拒绝、单文件超限截断标记、读取调用预算耗尽 (7.483417ms)
+✔ Prompt injection 文件只是不可信数据：系统提示禁止遵循，驱动不因文件内容改变裁决 (3.779125ms)
+✔ 运行时核心只读工具集：恰三项，无写/编辑/shell/交互/回交/派发/网络 (5.151042ms)
+✔ 判断驱动：适配器收到 deny-all 写门禁（判断会话结构性无写权限） (4.575708ms)
+✔ Service 装配：三引擎都只拿到三只 judge 工具、judgeMode:true、MCP 置空、不持久化 (5.695834ms)
+✔ Pi 假适配器判断模式：写/编辑/shell/交互/回交/派发不存在；judge 读取与 report 正常 (5.282875ms)
+✔ Pi 真实适配器 judgeMode：只注册三只 judge 工具、原生/服务端/MCP 关闭、不持久化 (647.89475ms)
+✔ Claude 判断模式：原生工具面清空、allowedTools 恰三只、WebSearch/写/shell 显式禁用 (12.399209ms)
+✔ Claude 判断模式：误注入写/编辑工具在 SDK 加载前抛错（零副作用） (0.592042ms)
+✔ Codex 判断模式：仅注册三只 ans_ 判断工具、只读沙箱、网络关闭、写/shell 不存在 (13.392ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1180.648416

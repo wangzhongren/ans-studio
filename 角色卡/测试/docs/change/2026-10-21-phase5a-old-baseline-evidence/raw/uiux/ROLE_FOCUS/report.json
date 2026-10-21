@@ -1,0 +1,63 @@
+{
+  "reports": [
+    {
+      "name": "nested reading fixture has visible real opener and positive inner and outer scroll",
+      "value": true
+    },
+    {
+      "name": "nested role reading actual before",
+      "value": {
+        "nested": {
+          "card": 2086,
+          "docs": 2047,
+          "changes": 2659
+        },
+        "outer": 746
+      }
+    },
+    {
+      "name": "P3 return preserves actual role scroll and expansion",
+      "value": true
+    },
+    {
+      "name": "P6 return role restores equivalent visible document entry focus",
+      "value": true
+    },
+    {
+      "name": "nested role reading actual after",
+      "value": {
+        "outer": 746,
+        "inner": {
+          "card": 2086,
+          "docs": 2047,
+          "changes": 2659
+        }
+      }
+    },
+    {
+      "name": "P3 independent card docs changes inner scroll survives alongside outer expansion focus",
+      "value": true
+    },
+    {
+      "name": "nested role reading does not leak into another role",
+      "value": true
+    },
+    {
+      "name": "returning original role restores only its own nested reading",
+      "value": true
+    },
+    {
+      "name": "nested role reading does not leak into another runtime",
+      "value": true
+    },
+    {
+      "name": "returning original runtime restores only its own nested reading",
+      "value": true
+    },
+    {
+      "name": "nested role reading is reset for a genuinely different project",
+      "value": true
+    }
+  ],
+  "errors": []
+}

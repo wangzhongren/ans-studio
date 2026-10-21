@@ -1,0 +1,75 @@
+{
+  "workload": "300 single session events, 1100x760, new renderer (final registered build)",
+  "stormA": {
+    "maxGap": 17.6,
+    "frames": 98
+  },
+  "stormA_handler": {
+    "maxMs": 0.1,
+    "totalMs": 0.2
+  },
+  "stormB": {
+    "maxGap": 18.1,
+    "frames": 97
+  },
+  "stormB_handler": {
+    "maxBatchMs": 0.2,
+    "totalBatchMs": 0.6
+  },
+  "profile": {
+    "longTasks": [],
+    "gbrCount": 6,
+    "createCount": 4
+  },
+  "preOptimizationProfile": {
+    "longTasks": [],
+    "gbrCount": 6,
+    "createCount": 1805
+  },
+  "trace": {
+    "events": 3952,
+    "runTask": {
+      "count": 1217,
+      "totalMs": 42.102,
+      "maxMs": 5.58
+    },
+    "functionCall": {
+      "count": 359,
+      "totalMs": 8.709,
+      "maxMs": 3.681
+    },
+    "layout": {
+      "count": 1,
+      "totalMs": 0.4,
+      "maxMs": 0.4
+    },
+    "updateLayoutTree": {
+      "count": 1,
+      "totalMs": 0.353,
+      "maxMs": 0.353
+    },
+    "paint": {
+      "count": 3,
+      "totalMs": 0.192,
+      "maxMs": 0.106
+    },
+    "commit": {
+      "count": 86,
+      "totalMs": 3.19,
+      "maxMs": 0.085
+    },
+    "minorGC": {
+      "count": 1,
+      "totalMs": 0.383,
+      "maxMs": 0.383
+    },
+    "maxTaskMs": 5.58,
+    "maxFunctionMs": 3.681
+  },
+  "notes": [
+    "Pre-optimization profile: createCount=1805, gbrCount=6, longest TimerFire=12.36ms / FunctionCall=10.36ms (closed 300-row activities group still built React/DOM).",
+    "Post-optimization (final build): createCount=4, gbrCount=6, longest task=5.58ms, no >50ms long tasks.",
+    "Optimizations: defer >40-call closed tool group body; memo ChatRowView by row+data reference; in-place activity item append; remove per-render useMemo recompute on scroll.",
+    "PM §10.4 exception registered; deferral threshold uses call count (mergePhases rows), not phase item count."
+  ]
+}

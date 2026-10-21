@@ -25,6 +25,9 @@ entries:
     path: tsconfig.json
     purpose: TypeScript 编译配置
   - kind: file
+    path: vite.config.ts
+    purpose: 渲染层 Vite 构建配置（仅构建 app/renderer；主进程与 preload 保持无构建）
+  - kind: file
     path: README.md
     purpose: 安装与使用说明
   - kind: file

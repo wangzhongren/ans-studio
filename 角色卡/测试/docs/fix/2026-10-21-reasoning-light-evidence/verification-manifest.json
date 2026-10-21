@@ -1,0 +1,116 @@
+{
+  "at": "2026-10-21T02:59:57.056121+00:00",
+  "candidate": "candidate-final-before.json",
+  "head": "fc1a39c14e119faccf442fc8e22bbbbd978d1a04",
+  "checked_files": 617,
+  "changed_files": [
+    {
+      "path": "app/renderer/src/chat/ChatStream.tsx",
+      "before": "aa7638513777f6c5c53665fb5031098a2ce64fadbf99ecca1f1c99a431fdb27c",
+      "after": "f0e94d8c2878252437d3d6affdcf8123f7abb4eab54fa7d48c8c6e691c912b63"
+    }
+  ],
+  "added_files": [],
+  "installed_entry_changes": [],
+  "installed_package_changes": [],
+  "full": {
+    "command": "node --test \"test/**/*.test.ts\"",
+    "exit": 0,
+    "tests": 3455,
+    "pass": 3453,
+    "fail": 0,
+    "skip": 2,
+    "log": "full-final-self-contained.log",
+    "external_fake_token_injection": false
+  },
+  "typecheck": {
+    "command": "npm run typecheck",
+    "exit": 0,
+    "log": "typecheck-final-self-contained.log"
+  },
+  "independent_native": {
+    "command": "node --test test/测试/g5-reasoning-verify/compatibility-loopback.test.ts",
+    "exit": 0,
+    "pass": 3,
+    "fail": 0,
+    "log": "independent-native-final.log",
+    "repeated_in_full": true
+  },
+  "consumer_repair": {
+    "command": "node --test test/测试/g3-search-verify/codex-websearch-verify.test.ts test/测试/g4v2-mcp-verify/j-pi.test.ts test/测试/t1-real-cli.test.ts",
+    "pass": 20,
+    "fail": 0,
+    "log": "consumer-regression-fixes.log"
+  },
+  "initial_full": {
+    "tests": 3435,
+    "pass": 3408,
+    "fail": 25,
+    "skip": 2,
+    "interrupted": true,
+    "log": "full-loopback-enabled.log",
+    "reason": "Pi owner fixture had missing real-template auth and unbounded arrived wait; 7 old consumer-contract failures separately repaired within authorized scope."
+  },
+  "owner_codex_final_manifest": {
+    "path": "角色卡/Codex适配器/docs/fix/2026-10-21-reasoning-compatibility-e1-evidence/manifest.json",
+    "sha256": "87928db6418073ec21bb3a62e2de9304d4a535bde22b61efc1934239a8203ea2",
+    "source_match": {
+      "src/provider/codex/session.ts": true,
+      "src/common/codex-adapter/protocol.ts": true,
+      "src/common/codex-adapter/reasoning-catalog.ts": true,
+      "src/common/codex-adapter/config.ts": true,
+      "test/codex-adapter/reasoning.test.ts": true,
+      "test/codex-adapter/reasoning-catalog.test.ts": true,
+      "test/codex-adapter/fixtures.ts": true,
+      "test/codex-adapter/session.test.ts": true,
+      "test/codex-adapter/web-search.test.ts": true,
+      "test/codex-adapter/reasoning-loopback.probe.ts": true
+    },
+    "producer": "Codex owner; independently read and compared, not claimed as QA execution"
+  },
+  "own_tests": [
+    "test/测试/g5-reasoning-verify/c-claude.test.ts",
+    "test/测试/g5-reasoning-verify/d-codex.test.ts",
+    "test/测试/g5-reasoning-verify/e-pi.test.ts",
+    "test/测试/g5-reasoning-verify/compatibility-loopback.test.ts",
+    "test/测试/g3-search-verify/codex-websearch-verify.test.ts",
+    "test/测试/g4v2-mcp-verify/j-pi.test.ts",
+    "test/测试/t1-external-engines.mjs"
+  ],
+  "logs_sha256": {
+    "claude-codex-consumers-initial.log": "c9fe439659df1f332b3c0e3b3eebd5c515fb2e96a678cc40f75f9ee7bd6e9f72",
+    "pi-consumer-initial.log": "ed1e572c1fa693975b2ab754038cacbdcbee2d098fbfcb3d0ab912c4fb0d792d",
+    "typecheck-final.log": "6540d00ab4c2c686b6351a1ac075f5272c5b7f7ea191645a2e091dc6962c08d8",
+    "consumer-regression-fixes.log": "505a6d0b3456954a19e8abeaee2e2361e3d3d31402139730bd38ef23501c8350",
+    "typecheck-final-self-contained.log": "6540d00ab4c2c686b6351a1ac075f5272c5b7f7ea191645a2e091dc6962c08d8",
+    "typecheck-consumers-second.log": "6540d00ab4c2c686b6351a1ac075f5272c5b7f7ea191645a2e091dc6962c08d8",
+    "independent-native-initial.log": "68f9b2654e51cd33b663b28267970745a9c768addf53880abe4f7303f90a3c39",
+    "independent-claude-pi.log": "9a3cd210c50c9ff28ebbaed9aba86351f4164921b9030201b837f4e3930a0ee2",
+    "full-final-self-contained.log": "d29395eb45d14d6b845b18ba369fe26ff543477eee2b10bb3e474e405c41860f",
+    "full-loopback-enabled.log": "fb0c43d7e108fce59dced39bc6a6c27fa38a9cbf372fbb5c8562d571652064be",
+    "typecheck-full-candidate.log": "6540d00ab4c2c686b6351a1ac075f5272c5b7f7ea191645a2e091dc6962c08d8",
+    "typecheck-consumers.log": "ae187d926eac51be46a24856dc9b9c2b7d9d0b5301b7505a14c04718bbc2dfca",
+    "independent-native-final.log": "9c62d6b3371423bc4211054d862742c68a79b182254c5738b5b2b4d418be25e5",
+    "g5-existing-consumers.log": "d7ab28c22e1a465947abe771dc0732f6d419157efc6c2f5b4649580740b238c7",
+    "claude-codex-consumers.log": "86a4560731b052ded212295423c1b3d770d81b935d6734f3deaf6f2661bc6535"
+  },
+  "scope": "macOS darwin arm64 real installed SDK/CLI localhost fake key tests; no online model calls, no Electron, no UI mutation by this test role; concurrent UI/D3 files separate in pre-snapshot.",
+  "report": {
+    "path": "角色卡/测试/docs/fix/2026-10-21_fix_reasoning-light-verification.md",
+    "sha256": "e2531cb0ff760eef8e0a2638ac3a87ca789bbee048a5325e60a2c804e1aedfc0"
+  },
+  "diff": {
+    "path": "reasoning-production-and-consumer.diff",
+    "sha256": "d3492666e4444f0e0aa9ab91615d192dc5bc0a6e23a2bf288ee29baf6fe8a813",
+    "new_files_included": [
+      "src/common/codex-adapter/reasoning-catalog.ts",
+      "test/测试/g5-reasoning-verify/compatibility-loopback.test.ts"
+    ]
+  },
+  "unchanged_reasoning_scope": true,
+  "ui_component_observation": "Only concurrent ChatStream.tsx changed during final run; no src/test references found; excluded from root tsc. This is not D1 ownership or UI verification.",
+  "skip_reasons": [
+    "test/runtime-core/boundary-write-guard.test.ts Windows-only backslash role boundary",
+    "test/门禁引擎/resolve-write.test.ts Windows-only case insensitive normalization"
+  ]
+}

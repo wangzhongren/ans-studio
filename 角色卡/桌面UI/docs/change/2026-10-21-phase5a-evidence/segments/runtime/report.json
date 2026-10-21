@@ -1,0 +1,164 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "runtime groups lead first and unknown metadata escaped",
+      "value": true
+    },
+    {
+      "name": "new engine no Pi history queue confirmation or draft",
+      "value": true
+    },
+    {
+      "name": "old engine envelopes cache only and stale project ignored",
+      "value": true
+    },
+    {
+      "name": "actual Codex call/result target correlation and completion",
+      "value": true
+    },
+    {
+      "name": "Codex secret fallback and optional official Responses settings",
+      "value": true
+    },
+    {
+      "name": "failed save keeps draft and honest error",
+      "value": true
+    },
+    {
+      "name": "saved secret cleared and busy apply timing truthful",
+      "value": true
+    },
+    {
+      "name": "runtime settings geometry 1360",
+      "value": true
+    },
+    {
+      "name": "runtime settings geometry 960",
+      "value": true
+    },
+    {
+      "name": "Claude required key and optional SDK model endpoint",
+      "value": true
+    },
+    {
+      "name": "failed outcome remains error",
+      "value": true
+    },
+    {
+      "name": "failed native restore honest rebuilding notice",
+      "value": true
+    },
+    {
+      "name": "foreign runtime shell caches without showing in current engine",
+      "value": true
+    },
+    {
+      "name": "Pi own history background queue draft and expired card restored",
+      "value": true
+    },
+    {
+      "name": "expired old shell collapses with reason visible in its own runtime",
+      "value": true
+    },
+    {
+      "name": "expired shell exposes no authorize action after collapse",
+      "value": true
+    },
+    {
+      "name": "runtime bridge targets",
+      "opens": [
+        {
+          "projectRoot": "/offline-uiux-fixture",
+          "roleId": "A",
+          "runtime": "pi"
+        },
+        {
+          "projectRoot": "/offline-uiux-fixture",
+          "roleId": "运行时核心",
+          "runtime": "pi"
+        },
+        {
+          "projectRoot": "/offline-uiux-fixture",
+          "roleId": "运行时核心",
+          "runtime": "codex"
+        },
+        {
+          "projectRoot": "/offline-uiux-fixture",
+          "roleId": "运行时核心",
+          "runtime": "claude"
+        },
+        {
+          "projectRoot": "/offline-uiux-fixture",
+          "roleId": "运行时核心",
+          "runtime": "pi"
+        }
+      ],
+      "histories": [
+        {
+          "projectRoot": "/offline-uiux-fixture",
+          "roleId": "A",
+          "runtime": "pi"
+        },
+        {
+          "projectRoot": "/offline-uiux-fixture",
+          "roleId": "运行时核心",
+          "runtime": "pi"
+        },
+        {
+          "projectRoot": "/offline-uiux-fixture",
+          "roleId": "运行时核心",
+          "runtime": "codex"
+        },
+        {
+          "projectRoot": "/offline-uiux-fixture",
+          "roleId": "运行时核心",
+          "runtime": "claude"
+        },
+        {
+          "projectRoot": "/offline-uiux-fixture",
+          "roleId": "运行时核心",
+          "runtime": "pi"
+        }
+      ],
+      "aborts": [
+        {
+          "projectRoot": "/offline-uiux-fixture",
+          "roleId": "运行时核心",
+          "runtime": "claude"
+        }
+      ],
+      "configSaves": [
+        {
+          "runtime": "codex",
+          "keys": [
+            "CODEX_API_KEY",
+            "ANS_CODEX_MODEL"
+          ]
+        },
+        {
+          "runtime": "codex",
+          "keys": [
+            "CODEX_API_KEY",
+            "ANS_CODEX_MODEL"
+          ]
+        }
+      ]
+    }
+  ],
+  "sends": [
+    {
+      "text": "Codex请求",
+      "images": [],
+      "target": {
+        "projectRoot": "/offline-uiux-fixture",
+        "roleId": "运行时核心",
+        "runtime": "codex"
+      },
+      "metadata": {
+        "clientMessageId": "364714b4-6411-46cb-a42c-86d692478944"
+      }
+    }
+  ]
+}

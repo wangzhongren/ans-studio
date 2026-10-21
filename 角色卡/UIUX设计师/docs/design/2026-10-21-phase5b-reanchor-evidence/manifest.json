@@ -1,0 +1,85 @@
+{
+ "phase": "5B-reanchor",
+ "candidate": "app/renderer/dist/src/index.html",
+ "entry": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/dist/src/index.html",
+ "commit": "224cf831f7a26fd2fac8af7155790a75fa31f6b5",
+ "electron": "44.7.0",
+ "os": "macOS 26.6.2 arm64",
+ "entry_hashes": {
+  "index.html": "d1f76147ce70b0a89dc1a3567faaaafa8e91f562909173d227a9cc2e6d8b9aed",
+  "js": "d16a48336220142860158099c468c94d57a4cbd6d260ebfbc7c78a54f21a678c",
+  "css": "e278df817feb006c758a23eea1782c87f9702cff3953ff2d170f9cf330f8511f"
+ },
+ "smoke": {
+  "command": "./node_modules/.bin/electron test/桌面UI/phase5a-electron-smoke.mjs app/renderer/dist/src/index.html <out>",
+  "checks": 19,
+  "failures": 0,
+  "console": 0,
+  "csp": 0
+ },
+ "screenshots": [
+  {
+   "file": "phase5a-smoke/01-sidebar-identity-1360.png",
+   "sha256": "c945572648a79d74a44f87e5bc8a54d44a22f8ba14c1991abce177c66c90b41c",
+   "bytes": 123708,
+   "width": 1360,
+   "height": 860
+  },
+  {
+   "file": "phase5a-smoke/02-p7-pending-choice-1360.png",
+   "sha256": "bed51e32ba5fa7b9d53905f8cad81b10d4751b0fc6bebc50da62660016b146e4",
+   "bytes": 104820,
+   "width": 1360,
+   "height": 860
+  },
+  {
+   "file": "phase5a-smoke/03-full-replay-1360.png",
+   "sha256": "38cbf42fa2b29cdfbfc49edc9816ac841bac3c1765a7c13f2c52b5363aef8969",
+   "bytes": 146573,
+   "width": 1360,
+   "height": 860
+  },
+  {
+   "file": "phase5a-smoke/03-full-replay-960.png",
+   "sha256": "45bde891a90e8c81d0bcf27fe093acd537d9cc0d71904877ee5b60e4dde86995",
+   "bytes": 108498,
+   "width": 960,
+   "height": 620
+  },
+  {
+   "file": "phase5a-smoke/04-full-replay-sticky-960.png",
+   "sha256": "c6b7efceb3a4b3f194cb1abf939bfada75a1e6c8fbeb984ad04191c9b468edc3",
+   "bytes": 82353,
+   "width": 960,
+   "height": 620
+  },
+  {
+   "file": "phase5a-smoke/05-sidebar-p7-200pct.png",
+   "sha256": "5eeb37fad3fc548e5fc5f68e75c3890d6d71442065a9483347911fc3e0d59bf7",
+   "bytes": 102050,
+   "width": 1360,
+   "height": 860
+  },
+  {
+   "file": "phase5a-smoke/06-empty-state-200pct.png",
+   "sha256": "b25b14cdd24d14f62614e494383993953c7d4c8637ee07d22f15223247fdd7c8",
+   "bytes": 107520,
+   "width": 1360,
+   "height": 860
+  }
+ ],
+ "report": {
+  "file": "phase5a-smoke/report.json",
+  "sha256": "0f8b7c26cd80080d5310d70b171b95346ec644ea262452c98a61720b95ce5bfd",
+  "bytes": 5549
+ },
+ "notes": [
+  "Read-only run of the Test-owned 5A smoke on the current candidate; no model/network/.env, no product edits.",
+  "19/19 checks, 0 failures; confirms 200% long-history composer reachable and 200% empty/error no horizontal overflow.",
+  "Smoke does not cover full A-L, 6-visible-row density, S2 right-edge measurement, or BOOTSTRAP S0.",
+  "Candidate is moving; this manifest is valid only for the recorded hash. Full A-L must be re-run after freeze.",
+  "user-data directory removed after capture.",
+  "Smoke screenshots contain the harness marker 窗口控制不可用 (no window bridge); not product evidence.",
+  "The empty/error smoke fixture is /phase5a-empty with hasRoles:false, roles:[]; it does not reproduce the long session-failure copy from 11-operator-card."
+ ]
+}

@@ -13,7 +13,7 @@
 import path from "node:path";
 import os from "node:os";
 import fs from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 
@@ -23,7 +23,7 @@ import { createDesktopInterface, createShellJudgeSwitch, isShellJudgeIpcSender, 
 // （pm 属主）——此处**只读导入，不复制**；路径由 `./desktop/pi-config.ts` 解析（可注入，测试/e2e 用临时路径）。
 import { loadEnvFileInto } from "../src/common/shared/env-file.ts";
 import { resolveDesktopEnvPath } from "./desktop/pi-config.ts";
-import { parsePackagedSmokeArguments, packagedSmokeScript } from "./desktop/packaged-smoke.ts";
+import { parsePackagedSmokeArguments, packagedSmokeScript, validateSmokeRendererEntry } from "./desktop/packaged-smoke.ts";
 // 会话事件外推的类型（B-2）：`SessionEventEnvelope` = `{projectRoot,roleId,runtime,event}` 信封（按三元身份分发）；
 // `event` 为编排导出的 `OrchestrationEvent`（既有 `SessionEvent` + `settled` 时的 `handback`，设计 §10.8）。
 // **类型从本角色 session.ts 只读导入、不复制形状**——IPC 外推原样透传。
@@ -53,6 +53,10 @@ import { RUNTIME_KINDS, type RuntimeKind } from "../src/common/shared/runtime-sh
 import { createEventBatcher, createRoleStateDebouncer } from "./desktop/push-batcher.ts";
 import { configureDiagnostics, createDiagnosticLogger, flushDiagnostics, disposeDiagnostics } from "../src/common/shared/diagnostics.ts";
 import { observeWindowDiagnostics, recordRendererDiagnostic, createWindowIpcRegistrar, RECOVERY_PAGE } from "./desktop/diagnostics.ts";
+// Phase 5A（PM §17.12）：产品侧导航兜底——只允许初始加载/同 URL reload，http(s) 外开，其余协议阻止。
+import { installNavigationGuard } from "./desktop/navigation-guard.ts";
+// Phase 5A（PM §17.2）：渲染入口的唯一路径事实源——不得在本文件再写死 renderer 入口字符串。
+import { resolveRendererEntry } from "./desktop/renderer-entry.ts";
 
 const smokeRequest = parsePackagedSmokeArguments(process.argv);
 if (smokeRequest) {
@@ -63,7 +67,11 @@ if (smokeRequest) {
 let desktopEnvPath: string | undefined;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const APP_ICON_PATH = path.join(HERE, "desktop", "assets", "ans-bracket-seal.png");
+// 5B：唯一生产入口 = Vite 构建产物 `renderer/dist/index.html`（PM §17.1）。
+const PRODUCTION_RENDERER_ENTRY = resolveRendererEntry(HERE);
+// 仅 packaged smoke 可显式指定入口（见 packaged-smoke.ts 的校验）；普通启动/渲染进程不可达。
+let activeProductionRendererEntry = PRODUCTION_RENDERER_ENTRY;
+const APP_ICON_PATH = path.join(HERE, "desktop", "assets", "ans-studio-ans-icon.png");
 
 let mainWindow: BrowserWindow | null = null;
 let iface: DesktopInterface | null = null;
@@ -114,6 +122,58 @@ function createWindow(): BrowserWindow {
     },
   });
   return win;
+}
+
+// —————— Phase 5A（PM §17.3）：dev/prod 渲染入口与 dev server 失败回退 ——————
+// 生产：app.isPackaged ⇒ loadFile 唯一构建入口 `renderer/dist/index.html`。
+// 开发：默认与生产同一文件入口；仅非打包且显式 ANS_DEV_SERVER_URL（回环）时 loadURL。
+// 任何 dev 放宽都只属于 Vite dev server（apply:'serve'），主进程不注入 CSP、不改 webPreferences。
+const DEV_SERVER_TIMEOUT_MS = 8_000;
+
+/** 仅接受回环 http(s) URL：无凭据、主机限 localhost/127.0.0.1/[::1]；其它一律按文件入口启动。 */
+function resolveDevServerUrl(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    if (url.username !== "" || url.password !== "") return undefined;
+    const host = url.hostname.toLowerCase();
+    if (host !== "localhost" && host !== "127.0.0.1" && host !== "::1" && host !== "[::1]") return undefined;
+    return url.href;
+  } catch {
+    return undefined;
+  }
+}
+
+type RendererLoadTarget = { kind: "file"; file: string } | { kind: "dev-url"; url: string };
+
+/** 日志只记相对 app 目录的入口，避免把用户主目录写进诊断。 */
+function rendererEntryLabel(appDir: string, file: string): string {
+  return path.relative(appDir, file).split(path.sep).join("/");
+}
+
+function errorCodeOf(error: unknown): number | string | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const value = error as { errno?: unknown; code?: unknown };
+  if (typeof value.errno === "number") return value.errno;
+  if (typeof value.code === "string" || typeof value.code === "number") return value.code;
+  return undefined;
+}
+
+/** 8s 限时加载 dev URL；超时主动 stop，避免挂死的 dev server 让窗口无限白屏。 */
+async function loadUrlWithTimeout(win: BrowserWindow, url: string, timeoutMs: number): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      try { win.webContents.stop(); } catch { /* 窗口可能已销毁 */ }
+      reject(new Error(`dev server 加载超时（>${timeoutMs}ms）`));
+    }, timeoutMs);
+  });
+  try {
+    await Promise.race([win.loadURL(url), timeout]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }
 
 // —————————————————————— 操作者确认通道 (a)：**已 arm**（I-1；M-1 起为**应用内确认卡**）——————————————————————
@@ -188,6 +248,25 @@ function registerIpc(win: BrowserWindow): void {
     void win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(RECOVERY_PAGE)).catch((error) => mainDiagnostic.error("window.recovery-page.failed", error));
   };
   showMainFailure = showFailure;
+  // —————— Phase 5A（PM §17.12）：真实主进程窗口的导航兜底 ——————
+  // 渲染侧（桌面UI）应 preventDefault 并只对 http/https 调 openExternal 桥；本处兜住漏网导航：
+  // 初始入口/同 URL reload 放行；http(s) 外开；file:/data:/javascript: 等一律阻止、不执行。
+  // 不外开重复：渲染侧先经 IPC 外开时 mark，兜底在同一窗口内不再重复开。
+  const navigationAllowedUrls = (): string[] => {
+    const urls = [pathToFileURL(activeProductionRendererEntry).href];
+    const devUrl = app.isPackaged ? undefined : resolveDevServerUrl(process.env.ANS_DEV_SERVER_URL);
+    if (devUrl !== undefined) urls.push(devUrl);
+    return urls;
+  };
+  const navigationGuard = installNavigationGuard(win.webContents, {
+    allowedUrls: navigationAllowedUrls,
+    openExternal: (url) => {
+      void shell.openExternal(url).catch((error) => mainDiagnostic.error("window.navigation.open-external.failed", error));
+    },
+    onExternal: (url) => mainDiagnostic.record("window.navigation.external", { url }),
+    // 不记录原始 file:/data:/javascript: URL（可能含内容）；只记原因。
+    onBlocked: (reasonCode) => mainDiagnostic.record("window.navigation.blocked", { reasonCode }),
+  });
   // —————— 「替我审批」（approval）与「替我决策」（decision）开关（2026-10-17 / 2026-10-18 评审 §3.3） ——————
   // 两个**独立**状态机：默认 false、启动/重载复位、不持久化、互不影响；只在主进程内存。
   // 同一实例交给通道（调用当刻读 `isEnabled()`）与 Interface（`shell:judge-*` / `decision:judge-*`），
@@ -196,28 +275,123 @@ function registerIpc(win: BrowserWindow): void {
   const decisionJudgeSwitch = createShellJudgeSwitch();
   const shellJudgeLog = createDiagnosticLogger({ component: "desktop.shell-judge" });
   const decisionJudgeLog = createDiagnosticLogger({ component: "desktop.decision-judge" });
+  // —————— Phase 5A（PM §17.3）：入口解析 + dev server 一次性回退 ——————
+  // 每窗口状态：dev 失败一次后本窗口不再等待 dev server；重启应用重新允许。
   const pushShellJudgeState = (): void => {
     if (!win.isDestroyed()) win.webContents.send("shell:judge-state", { ...shellJudgeSwitch.get(), available: true });
   };
   const pushDecisionJudgeState = (): void => {
     if (!win.isDestroyed()) win.webContents.send("decision:judge-state", { ...decisionJudgeSwitch.get(), available: true });
   };
+  let devServerUnavailable = false;
+  let devProbeActive = false;
+  let devFallbackPromise: Promise<boolean> | undefined;
+  let devUrlRejectedLogged = false;
+  let statesPushedForAttempt = false;
+
+  const pushLoadedStates = (): void => {
+    if (statesPushedForAttempt) return;
+    statesPushedForAttempt = true;
+    // 初次加载后推送真实状态，渲染侧据此同步两个复选框（不显示假开启态）。
+    pushShellJudgeState();
+    pushDecisionJudgeState();
+  };
+
+  const resolveRendererTarget = (): RendererLoadTarget => {
+    const rawDevUrl = app.isPackaged ? undefined : process.env.ANS_DEV_SERVER_URL;
+    const devUrl = resolveDevServerUrl(rawDevUrl);
+    // 设置了但非法（非回环/带凭据/坏 URL）：忽略并按文件入口启动；只记一次，避免每次重载刷日志。
+    if (!app.isPackaged && rawDevUrl && devUrl === undefined && !devUrlRejectedLogged) {
+      devUrlRejectedLogged = true;
+      mainDiagnostic.record("window.dev-server.rejected", { state: "invalid-url" });
+    }
+    if (devUrl !== undefined && !devServerUnavailable) return { kind: "dev-url", url: devUrl };
+    // dev server 已失败过一次：本窗口直接加载构建产物（唯一生产入口）。
+    if (devUrl !== undefined) return { kind: "file", file: activeProductionRendererEntry };
+    return { kind: "file", file: activeProductionRendererEntry };
+  };
+
+  /** dev 失败后的一次性回退：共用一个 Promise，`loadURL` rejection 与 did-fail-load 不会双跳。 */
+  const runDevFallback = (reason: "load-failed" | "timeout", errorCode?: number | string): Promise<boolean> => {
+    if (devFallbackPromise !== undefined) return devFallbackPromise;
+    devServerUnavailable = true;
+    mainDiagnostic.record("window.dev-server.fallback", {
+      reasonCode: reason,
+      ...(errorCode !== undefined ? { errorCode } : {}),
+    });
+    devFallbackPromise = (async () => {
+      if (!fs.existsSync(activeProductionRendererEntry)) {
+        // 未构建：如实进恢复页（不自动构建、不回退旧入口）。
+        mainDiagnostic.record("window.dev-server.fallback.unavailable", {
+          state: "missing",
+          path: rendererEntryLabel(HERE, activeProductionRendererEntry),
+        });
+        return false;
+      }
+      mainDiagnostic.record("window.renderer.target", {
+        mode: "file",
+        path: rendererEntryLabel(HERE, activeProductionRendererEntry),
+      });
+      await win.loadFile(activeProductionRendererEntry);
+      return true;
+    })().catch((error) => {
+      mainDiagnostic.error("window.dev-server.fallback.failed", error);
+      return false;
+    });
+    return devFallbackPromise;
+  };
+
   const loadInterface = async (): Promise<void> => {
     showingFailure = false;
+    statesPushedForAttempt = false;
+    devProbeActive = false;
+    devFallbackPromise = undefined;
     // §10.3：渲染重载/初次加载前**两个开关各自**复位为手动（不持久化）；已挂起卡不受影响。
     shellJudgeSwitch.reset();
     decisionJudgeSwitch.reset();
+    const target = resolveRendererTarget();
     try {
-      await win.loadFile(path.join(HERE, "renderer", "index.html"));
-      // 初次加载后推送真实状态，渲染侧据此同步两个复选框（不显示假开启态）。
-      pushShellJudgeState();
-      pushDecisionJudgeState();
+      if (target.kind === "dev-url") {
+        const url = new URL(target.url);
+        devProbeActive = true;
+        mainDiagnostic.record("window.renderer.target", { mode: "dev-url", url: url.host + url.pathname });
+        try {
+          await loadUrlWithTimeout(win, target.url, DEV_SERVER_TIMEOUT_MS);
+        } finally {
+          devProbeActive = false;
+        }
+      } else {
+        mainDiagnostic.record("window.renderer.target", { mode: "file", path: rendererEntryLabel(HERE, target.file) });
+        await win.loadFile(target.file);
+      }
+      pushLoadedStates();
     } catch (error) {
+      devProbeActive = false;
+      if (target.kind === "dev-url") {
+        const reason = error instanceof Error && /超时/.test(error.message) ? "timeout" : "load-failed";
+        const ok = await runDevFallback(reason, errorCodeOf(error));
+        if (ok) {
+          pushLoadedStates();
+          return;
+        }
+      }
       mainDiagnostic.error("window.interface.failed", error);
       showFailure();
     }
   };
-  observeWindowDiagnostics(win, mainDiagnostic, showFailure);
+  // 主帧加载失败先交给 dev 回退（仅 dev 探测期间）；其余失败（preload/崩溃）仍走恢复页。
+  observeWindowDiagnostics(win, mainDiagnostic, showFailure, {
+    onMainFrameLoadFailure: (errorCode) => {
+      if (!devProbeActive) return false;
+      devProbeActive = false;
+      const reason = errorCode === -7 ? "timeout" : "load-failed";
+      void runDevFallback(reason, errorCode).then((ok) => {
+        if (ok) pushLoadedStates();
+        else showFailure();
+      });
+      return true;
+    },
+  });
   registerHandler("app:renderer-diagnostic", (event, input) => {
     if (event.sender !== win.webContents) return { ok: false };
     const logger = createDiagnosticLogger({ component: "desktop.renderer", projectRoot: recoveryProjectRoot ?? undefined, roleId: recoveryRoleId ?? undefined });
@@ -481,7 +655,12 @@ function registerIpc(win: BrowserWindow): void {
       return { total: customerChannel.pendingCount() + shellConfirm.pendingCount() + recoveryConfirm.pendingCount(), byRole };
     },
     // B-1：Markdown 链接外开——**校验在 Interface 层**（仅 http/https），此处只接系统浏览器（表现层）。
-    openExternalFn: (url) => shell.openExternal(url),
+    // §17.12：同一窗口内与导航兜底共用去重闸，避免渲染侧与主进程双重外开。
+    openExternalFn: (url) => {
+      if (!navigationGuard.shouldOpenExternal(url)) return Promise.resolve();
+      navigationGuard.markExternalOpen(url);
+      return shell.openExternal(url);
+    },
     // I-1：arm 的 (a) 层（项目角色经三层链、全部内置治理角色经审批档——见 session.ts）。未 arm 时为 undefined（等同不注入）。
     shellOperatorChannel,
     // 「替我审」（2026-10-17）：**同一实例**的开关状态机——通道读它、Interface 的 get/set 改它。
@@ -642,16 +821,48 @@ app.whenReady().then(async () => {
   if (app.isPackaged) await fs.promises.mkdir(userDataPath, { recursive: true, mode: 0o700 });
   desktopEnvPath = resolveDesktopEnvPath({ isPackaged: app.isPackaged, userDataPath });
   await loadDesktopEnv(desktopEnvPath);
-  mainWindow = createWindow();
-  registerIpc(mainWindow);
+  // Phase 5A（PM §17.3）：smoke-only 入口覆盖——必须位于包内 app/renderer/dist/ 且为 .html。
+  if (smokeRequest?.rendererEntryPath !== undefined) {
+    try {
+      activeProductionRendererEntry = validateSmokeRendererEntry(smokeRequest.rendererEntryPath, app.getAppPath());
+    } catch (error) {
+      mainDiagnostic.error("app.smoke.entry.invalid", error);
+      app.exit(1);
+      return;
+    }
+  }
+  const firstWindow = createWindow();
+  mainWindow = firstWindow;
+  // 冒烟证据：在首屏加载前挂监听，记录 error 级控制台与主帧加载失败（只读，不改变窗口行为）。
+  const smokeConsoleErrors: string[] = [];
+  const smokeLoadFailures: Array<{ errorCode: number; url: string }> = [];
   if (smokeRequest) {
-    const smokeWindow = mainWindow;
+    firstWindow.webContents.on("console-message", (_event, detailsOrLevel: unknown, legacyMessage?: unknown) => {
+      let level: unknown = detailsOrLevel;
+      let message: unknown = legacyMessage;
+      if (detailsOrLevel && typeof detailsOrLevel === "object") {
+        const details = detailsOrLevel as { level?: unknown; message?: unknown };
+        level = details.level;
+        message = details.message;
+      }
+      const isError = level === "error" || level === 3;
+      if (isError) smokeConsoleErrors.push(typeof message === "string" ? message.slice(0, 1024) : String(message));
+    });
+    firstWindow.webContents.on("did-fail-load", (_event, errorCode, _description, url, isMainFrame) => {
+      if (isMainFrame && errorCode !== -3) smokeLoadFailures.push({ errorCode, url });
+    });
+  }
+  registerIpc(firstWindow);
+  if (smokeRequest) {
+    const smokeWindow = firstWindow;
+    const expectedEntryUrl = pathToFileURL(activeProductionRendererEntry).href;
     smokeWindow.webContents.once("did-finish-load", () => {
       void (async () => {
-        let result: Record<string, unknown> = { ok: false, isPackaged: app.isPackaged, arch: process.arch, platform: process.platform, version: app.getVersion(), envPath: desktopEnvPath };
+        let result: Record<string, unknown> = { ok: false, isPackaged: app.isPackaged, arch: process.arch, platform: process.platform, version: app.getVersion(), envPath: desktopEnvPath, expectedEntry: expectedEntryUrl };
         try {
-          const observed = await smokeWindow.webContents.executeJavaScript(packagedSmokeScript(desktopEnvPath!)) as { checks: Record<string, boolean>; missingKeys: Record<string, string[]> };
-          result = { ...result, ...observed, ok: app.isPackaged && Object.values(observed.checks).every(value => value === true) };
+          const observed = await smokeWindow.webContents.executeJavaScript(packagedSmokeScript(desktopEnvPath!, expectedEntryUrl)) as { checks: Record<string, boolean>; missingKeys: Record<string, string[]>; entryUrl?: string };
+          const checks = { ...observed.checks, console: smokeConsoleErrors.length === 0, load: smokeLoadFailures.length === 0 };
+          result = { ...result, ...observed, checks, consoleErrors: smokeConsoleErrors, loadFailures: smokeLoadFailures, ok: app.isPackaged && Object.values(checks).every(value => value === true) };
         } catch { result = { ...result, error: "Packaged window/preload/IPC verification failed." }; }
         try { await fs.promises.writeFile(smokeRequest.resultPath, JSON.stringify(result, null, 2) + "\n", { mode: 0o600 }); }
         catch { app.exit(1); return; }

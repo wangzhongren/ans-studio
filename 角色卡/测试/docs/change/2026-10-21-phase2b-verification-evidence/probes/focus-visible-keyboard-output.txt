@@ -1,0 +1,6 @@
+FOCUS first-tab {"id":"sc-close","tag":"BUTTON","matchesFocusVisible":true,"outlineWidth":"2px","outlineStyle":"solid","outlineColor":"rgb(111, 160, 139)","outlineOffset":"3px"}
+FOCUS allow-focus {"id":"sc-allow","matchesFocusVisible":true,"outlineWidth":"2px","outlineStyle":"solid","outlineColor":"rgb(111, 160, 139)","outlineOffset":"3px"}
+FOCUS textarea-focus {"id":"inp-message","matchesFocusVisible":true,"outlineWidth":"2px","outlineStyle":"solid","outlineColor":"rgb(111, 160, 139)","outlineOffset":"3px"}
+FOCUS engine-trigger-focus {"id":"runtime-select","matchesFocusVisible":true,"outlineWidth":"2px","outlineStyle":"solid","outlineColor":"rgb(111, 160, 139)","outlineOffset":"3px"}
+FOCUS_ALL_PASS=true
+FOCUS_PROBE_EXIT=0

@@ -1,0 +1,390 @@
+{
+  "nativeCLI": "0.162.1",
+  "model": "gpt-5.5",
+  "metadataSource": "installed native binary embedded catalog, exact single model",
+  "modifiedFields": [
+    "default_reasoning_level",
+    "default_reasoning_summary",
+    "supports_reasoning_summary_parameter",
+    "supports_reasoning_summaries"
+  ],
+  "externalModelCalls": 0,
+  "cells": [
+    {
+      "name": "single-model-native-catalog-compat",
+      "overrides": [
+        "features.shell_tool=false",
+        "features.hooks=false",
+        "features.apps=false",
+        "features.plugins=false",
+        "features.remote_plugin=false",
+        "features.browser_use=false",
+        "features.browser_use_external=false",
+        "features.browser_use_full_cdp_access=false",
+        "features.in_app_browser=false",
+        "features.computer_use=false",
+        "features.code_mode=false",
+        "features.code_mode_host=false",
+        "features.multi_agent=false",
+        "features.multi_agent_v2=false",
+        "features.request_permissions_tool=false",
+        "features.skill_mcp_dependency_install=false",
+        "sandbox_mode=\"read-only\"",
+        "approval_policy=\"never\"",
+        "approvals_reviewer=\"user\"",
+        "web_search=\"disabled\"",
+        "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-mE3Pzq\"={trust_level=\"untrusted\"}}",
+        "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:56937/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+        "model_provider=\"ans_probe\"",
+        "model=\"probe-model\"",
+        "model_catalog_json=\"/tmp/ans-codex-gpt55-catalog-compat.json\""
+      ],
+      "notices": [
+        {
+          "at": 1792550146532,
+          "method": "remoteControl/status/changed",
+          "params": {
+            "status": "disabled",
+            "serverName": "wangzhongrendeMacBook-Pro.local",
+            "installationId": "62e4e2fc-9894-477f-88b6-775354d097c2",
+            "environmentId": null
+          }
+        },
+        {
+          "at": 1792550146576,
+          "method": "thread/started",
+          "params": {
+            "thread": {
+              "id": "01a15c50-91e8-7ef2-8262-91eda40a46b5",
+              "environments": [
+                {
+                  "environmentId": "local",
+                  "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-mE3Pzq",
+                  "runtimeWorkspaceRoots": [
+                    "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-mE3Pzq"
+                  ]
+                }
+              ],
+              "extra": null,
+              "sessionId": "01a15c50-91e8-7ef2-8262-91eda40a46b5",
+              "forkedFromId": null,
+              "parentThreadId": null,
+              "preview": "",
+              "ephemeral": true,
+              "section": null,
+              "sectionEnteredAt": null,
+              "projectId": null,
+              "historyMode": "paginated",
+              "modelProvider": "ans_probe",
+              "model": "gpt-5.5",
+              "reasoningEffort": null,
+              "createdAt": 1792550146,
+              "updatedAt": 1792550146,
+              "recencyAt": 1792550146,
+              "status": {
+                "type": "idle"
+              },
+              "path": null,
+              "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-mE3Pzq",
+              "cliVersion": "0.162.1",
+              "originator": "ans_reasoning_probe",
+              "source": "vscode",
+              "canAcceptDirectInput": true,
+              "threadSource": null,
+              "agentNickname": null,
+              "agentRole": null,
+              "gitInfo": null,
+              "name": null,
+              "daybreakEnabled": null,
+              "turns": []
+            }
+          }
+        },
+        {
+          "at": 1792550146586,
+          "method": "thread/status/changed",
+          "params": {
+            "threadId": "01a15c50-91e8-7ef2-8262-91eda40a46b5",
+            "status": {
+              "type": "active",
+              "activeFlags": []
+            }
+          }
+        },
+        {
+          "at": 1792550146587,
+          "method": "turn/started",
+          "params": {
+            "threadId": "01a15c50-91e8-7ef2-8262-91eda40a46b5",
+            "turn": {
+              "id": "01a15c50-9212-7131-95ad-8c40445a6354",
+              "rootTurnId": "01a15c50-9212-7131-95ad-8c40445a6354",
+              "items": [],
+              "itemsView": "notLoaded",
+              "status": "inProgress",
+              "error": null,
+              "startedAt": 1792550146,
+              "completedAt": null,
+              "durationMs": null
+            }
+          }
+        },
+        {
+          "at": 1792550146591,
+          "method": "item/started",
+          "params": {
+            "item": {
+              "type": "userMessage",
+              "id": "01a15c50-921e-75e1-ab52-4e40eb8db277",
+              "clientId": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "complete without reasoning parameters",
+                  "text_elements": []
+                }
+              ]
+            },
+            "threadId": "01a15c50-91e8-7ef2-8262-91eda40a46b5",
+            "turnId": "01a15c50-9212-7131-95ad-8c40445a6354",
+            "startedAtMs": 1792550146591
+          }
+        },
+        {
+          "at": 1792550146591,
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "userMessage",
+              "id": "01a15c50-921e-75e1-ab52-4e40eb8db277",
+              "clientId": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "complete without reasoning parameters",
+                  "text_elements": []
+                }
+              ]
+            },
+            "threadId": "01a15c50-91e8-7ef2-8262-91eda40a46b5",
+            "turnId": "01a15c50-9212-7131-95ad-8c40445a6354",
+            "completedAtMs": 1792550146591
+          }
+        },
+        {
+          "at": 1792550146605,
+          "method": "item/started",
+          "params": {
+            "item": {
+              "type": "agentMessage",
+              "id": "msg_probe_1",
+              "text": "",
+              "phase": null,
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            },
+            "threadId": "01a15c50-91e8-7ef2-8262-91eda40a46b5",
+            "turnId": "01a15c50-9212-7131-95ad-8c40445a6354",
+            "startedAtMs": 1792550146605
+          }
+        },
+        {
+          "at": 1792550146606,
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "agentMessage",
+              "id": "msg_probe_1",
+              "text": "probe final message",
+              "phase": null,
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            },
+            "threadId": "01a15c50-91e8-7ef2-8262-91eda40a46b5",
+            "turnId": "01a15c50-9212-7131-95ad-8c40445a6354",
+            "completedAtMs": 1792550146605
+          }
+        },
+        {
+          "at": 1792550146606,
+          "method": "thread/tokenUsage/updated",
+          "params": {
+            "threadId": "01a15c50-91e8-7ef2-8262-91eda40a46b5",
+            "turnId": "01a15c50-9212-7131-95ad-8c40445a6354",
+            "tokenUsage": {
+              "total": {
+                "totalTokens": 2,
+                "inputTokens": 1,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 1,
+                "reasoningOutputTokens": 0
+              },
+              "last": {
+                "totalTokens": 2,
+                "inputTokens": 1,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 1,
+                "reasoningOutputTokens": 0
+              },
+              "modelContextWindow": 258400
+            }
+          }
+        },
+        {
+          "at": 1792550146606,
+          "method": "account/rateLimits/updated",
+          "params": {
+            "rateLimits": {
+              "limitId": "codex",
+              "limitName": null,
+              "normalModelSlug": null,
+              "primary": null,
+              "secondary": null,
+              "credits": null,
+              "individualLimit": null,
+              "spendControlReached": null,
+              "planType": null,
+              "rateLimitReachedType": null
+            }
+          }
+        },
+        {
+          "at": 1792550146606,
+          "method": "thread/status/changed",
+          "params": {
+            "threadId": "01a15c50-91e8-7ef2-8262-91eda40a46b5",
+            "status": {
+              "type": "idle"
+            }
+          }
+        },
+        {
+          "at": 1792550146606,
+          "method": "turn/completed",
+          "params": {
+            "threadId": "01a15c50-91e8-7ef2-8262-91eda40a46b5",
+            "turn": {
+              "id": "01a15c50-9212-7131-95ad-8c40445a6354",
+              "rootTurnId": "01a15c50-9212-7131-95ad-8c40445a6354",
+              "items": [
+                {
+                  "type": "agentMessage",
+                  "id": "msg_probe_1",
+                  "text": "probe final message",
+                  "phase": null,
+                  "memoryCitation": null,
+                  "delivery": null,
+                  "questions": null
+                }
+              ],
+              "itemsView": "summary",
+              "status": "completed",
+              "error": null,
+              "startedAt": 1792550146,
+              "completedAt": 1792550146,
+              "durationMs": 24
+            }
+          }
+        }
+      ],
+      "serverRequests": [],
+      "requests": [
+        {
+          "method": "initialize",
+          "params": {
+            "clientInfo": {
+              "name": "ans_reasoning_probe",
+              "version": "0.0.0"
+            },
+            "capabilities": {
+              "experimentalApi": true,
+              "explicitGatewayOauth": true
+            }
+          }
+        },
+        {
+          "method": "thread/start",
+          "params": {
+            "model": "gpt-5.5",
+            "modelProvider": "ans_probe",
+            "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-mE3Pzq",
+            "sandbox": "read-only",
+            "approvalPolicy": "never",
+            "approvalsReviewer": "user",
+            "config": {
+              "features": {
+                "shell_tool": false,
+                "hooks": false,
+                "apps": false,
+                "plugins": false,
+                "remote_plugin": false,
+                "browser_use": false,
+                "browser_use_external": false,
+                "browser_use_full_cdp_access": false,
+                "in_app_browser": false,
+                "computer_use": false,
+                "code_mode": false,
+                "code_mode_host": false,
+                "multi_agent": false,
+                "multi_agent_v2": false,
+                "request_permissions_tool": false,
+                "skill_mcp_dependency_install": false
+              },
+              "sandbox_mode": "read-only",
+              "approval_policy": "never",
+              "approvals_reviewer": "user",
+              "web_search": "disabled",
+              "projects": {
+                "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-mE3Pzq": {
+                  "trust_level": "untrusted"
+                }
+              }
+            },
+            "developerInstructions": "local catalog compatibility probe",
+            "ephemeral": true
+          }
+        },
+        {
+          "method": "turn/start",
+          "params": {
+            "threadId": "01a15c50-91e8-7ef2-8262-91eda40a46b5",
+            "input": [
+              {
+                "type": "text",
+                "text": "complete without reasoning parameters",
+                "text_elements": []
+              }
+            ],
+            "approvalPolicy": "never",
+            "approvalsReviewer": "user",
+            "sandboxPolicy": {
+              "type": "readOnly",
+              "networkAccess": false
+            },
+            "model": "gpt-5.5"
+          }
+        }
+      ],
+      "turnCompleted": true,
+      "outcome": "completed",
+      "stderrTail": "",
+      "modelRequests": 1,
+      "rejections": 0,
+      "requestBodies": [
+        {
+          "model": "gpt-5.5",
+          "reasoning": {},
+          "hasReasoningKey": true,
+          "streamKeys": {
+            "stream": true
+          }
+        }
+      ],
+      "childExit": 0
+    }
+  ]
+}

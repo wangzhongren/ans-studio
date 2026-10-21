@@ -1,0 +1,34 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "old project status fixture is visible",
+      "value": true
+    },
+    {
+      "name": "new project first DOM clears old badges before events",
+      "value": true
+    },
+    {
+      "name": "old project late status is ignored",
+      "value": true
+    },
+    {
+      "name": "new actual status immediately displayed",
+      "value": true
+    },
+    {
+      "name": "ordinary fresh false refresh preserves actual state",
+      "value": true
+    },
+    {
+      "name": "old project cached foreign runtime does not appear",
+      "value": true
+    },
+    {
+      "name": "new pending history applied before first tree render",
+      "value": true
+    }
+  ]
+}

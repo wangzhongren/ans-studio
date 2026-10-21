@@ -1,0 +1,48 @@
+{
+  "checks": [
+    {
+      "name": "ZOOM200_OPERATOR_LONG_FAILURE_NO_H_OVERFLOW",
+      "value": true,
+      "detail": {
+        "chatOv": 0,
+        "midOv": 0,
+        "docOv": 0,
+        "card": true,
+        "cardVisible": true,
+        "cardOv": 0,
+        "mirror": true,
+        "delivery": true,
+        "deliveryOv": 0,
+        "innerWidth": 680,
+        "innerHeight": 430
+      }
+    },
+    {
+      "name": "ZOOM200_MIRROR_AND_DELIVERY_PRESENT",
+      "value": true,
+      "detail": {
+        "chatOv": 0,
+        "midOv": 0,
+        "docOv": 0,
+        "card": true,
+        "cardVisible": true,
+        "cardOv": 0,
+        "mirror": true,
+        "delivery": true,
+        "deliveryOv": 0,
+        "innerWidth": 680,
+        "innerHeight": 430
+      }
+    },
+    {
+      "name": "ZOOM200_ZERO_CONSOLE",
+      "value": true,
+      "detail": {
+        "errs": [],
+        "didFail": []
+      }
+    }
+  ],
+  "console": [],
+  "didFail": []
+}

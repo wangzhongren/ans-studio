@@ -1,0 +1,24 @@
+=== 3 轮交替（预注册口径）===
+stormA.maxGap: old=[20.2,17.8,21.9] median=20.2; new=[43.2,18,18] median=18; PASS=true
+stormB.maxGap: old=[21,17.6,17.6] median=17.6; new=[18.4,17.7,17.7] median=17.7; PASS=true
+stormA_handler.maxMs: old=[9.9,4.4,12.1] median=9.9; new=[0.1,0.1,0.5] median=0.1; PASS=true
+stormB_handler.maxBatchMs: old=[1.3,1,1.1] median=1.1; new=[1.1,1.1,1.1] median=1.1; PASS=true
+replay.replayMs: old=[21,21,11.9] median=21; new=[5.7,6.4,3.4] median=5.7; PASS=true
+scrollToBottom.ms: old=[22.6,10.6,15.5] median=15.5; new=[4.9,13.4,4.3] median=4.9; PASS=true
+ALL_PRIMARY_PASS(3轮中位)=true
+
+=== 新入口 6 轮（3 主 + 3 额外表征）===
+stormA.maxGap 6轮: 43.2, 18, 18, 25.1, 18.6, 22.8
+stormA.maxGap 6轮中位: 20.700000000000003  old 3轮中位: 20.2  阈值 max(old,25)= 25
+stormB.maxGap 6轮: 18.4, 17.7, 17.7, 17.9, 19.1, 17.7 中位: 17.799999999999997
+replay 6轮: 5.7, 6.4, 3.4, 5.5, 5.4, 5.8 中位: 5.6
+scroll 6轮: 4.9, 13.4, 4.3, 6, 5.6, 9.2 中位: 5.8
+
+=== 有效性护栏 ===
+frames stormA old/new: 98/98/98 vs 97/98/98
+frames stormB old/new: 96/97/97 vs 97/97/97
+mounted replay old/new: 1/1/1 vs 361/361/361
+mounted scroll old/new: 1/1/1 vs 361/361/361
+histPending/HISTDIrect old: {"r1":false,"r2":false}/false  new: {"r1":true,"r2":true}/true
+
+naive storm300Ms old: 60.7, 73.9, 73  new: 75, 73.7, 77

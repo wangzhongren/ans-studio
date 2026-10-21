@@ -1,0 +1,6402 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "widths": {
+    "960": {
+      "main": {
+        "viewport": {
+          "w": 960,
+          "h": 620,
+          "bodyScrollW": 960,
+          "bodyClientW": 960,
+          "appScrollW": 960,
+          "appClientW": 960,
+          "rootScrollW": 960,
+          "rootClientW": 960
+        },
+        "titlebar": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 960,
+            "h": 36,
+            "right": 960,
+            "bottom": 36
+          },
+          "style": {
+            "background-color": "rgb(26, 30, 34)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "0px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "1px solid rgb(58, 65, 72)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "mark": {
+            "font-size": "12px",
+            "font-weight": "600"
+          },
+          "sub": {
+            "font-size": "12px",
+            "color": "rgb(167, 173, 181)"
+          }
+        },
+        "shell": {
+          "grid": {
+            "grid-template-columns": "none",
+            "grid-template-rows": "none"
+          },
+          "left": {
+            "x": 0,
+            "y": 36,
+            "w": 248,
+            "h": 584,
+            "right": 248,
+            "bottom": 620
+          },
+          "mid": {
+            "x": 248,
+            "y": 36,
+            "w": 712,
+            "h": 584,
+            "right": 960,
+            "bottom": 620
+          }
+        },
+        "side": {
+          "head": null,
+          "title": null,
+          "import": {
+            "rect": {
+              "x": 16,
+              "y": 517.73,
+              "w": 215,
+              "h": 32,
+              "right": 231,
+              "bottom": 549.73
+            },
+            "style": {
+              "background-color": "rgba(0, 0, 0, 0)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "6px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "path": {
+            "rect": {
+              "x": 56,
+              "y": 128.03,
+              "w": 162.56,
+              "h": 16.5,
+              "right": 218.56,
+              "bottom": 144.53
+            },
+            "style": {
+              "font-size": "11px",
+              "line-height": "16.5px",
+              "color": "rgb(167, 173, 181)",
+              "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace"
+            }
+          },
+          "treeLabel": {
+            "font-size": "10.5px",
+            "font-weight": "400",
+            "color": "rgb(148, 155, 164)",
+            "padding": "0px"
+          },
+          "group": {
+            "font-size": "10.5px",
+            "font-weight": "400",
+            "color": "rgb(148, 155, 164)",
+            "padding": "8px 4px 2px"
+          },
+          "item": {
+            "rect": {
+              "x": 16,
+              "y": 217.06,
+              "w": 215,
+              "h": 68.02,
+              "right": 231,
+              "bottom": 285.08
+            },
+            "style": {
+              "background-color": "rgb(42, 48, 55)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "8px",
+              "padding": "7px 8px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "0px none rgb(242, 244, 246)",
+              "border-left": "0px none rgb(242, 244, 246)",
+              "border-bottom": "0px none rgb(242, 244, 246)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "grid",
+              "align-items": "center",
+              "gap": "3px 10px",
+              "grid-template-columns": "28px 161px",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "itemActive": {
+            "background-color": "rgb(42, 48, 55)",
+            "border-radius": "8px"
+          },
+          "name": {
+            "font-size": "13px",
+            "font-weight": "600"
+          },
+          "sub": {
+            "font-size": "10.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "status": {
+            "font-size": "10.5px",
+            "color": "rgb(196, 161, 95)"
+          },
+          "badge": null
+        },
+        "chatHead": {
+          "rect": {
+            "x": 248,
+            "y": 36,
+            "w": 712,
+            "h": 60,
+            "right": 960,
+            "bottom": 96
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "8px 24px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "1px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "top": null,
+          "role": {
+            "font-size": "18px",
+            "font-weight": "650",
+            "color": "rgb(242, 244, 246)"
+          },
+          "sub": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "font-size": "11px",
+              "color": "rgb(148, 155, 164)"
+            }
+          },
+          "notes": null,
+          "hint": {
+            "font-size": "11.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "note": {
+            "rect": {
+              "x": 705,
+              "y": 595.2,
+              "w": 231,
+              "h": 16.8,
+              "right": 936,
+              "bottom": 612
+            },
+            "style": {
+              "font-size": "10.5px",
+              "color": "rgb(148, 155, 164)",
+              "display": "block"
+            },
+            "ico": null
+          }
+        },
+        "chat": {
+          "rect": {
+            "x": 248,
+            "y": 116.8,
+            "w": 712,
+            "h": 381.41,
+            "right": 960,
+            "bottom": 498.2
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "16px 14px 20px 24px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "0px solid rgb(44, 50, 56)",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "pane": {
+            "x": 272,
+            "y": 132.8,
+            "w": 664,
+            "h": 728.48,
+            "right": 936,
+            "bottom": 861.28
+          }
+        },
+        "userMsg": {
+          "rect": {
+            "x": 571.84,
+            "y": 188.98,
+            "w": 364.16,
+            "h": 38,
+            "right": 936
+          },
+          "bg": "rgb(30, 35, 40)",
+          "radius": "8px 8px 3px",
+          "padding": "8px 14px",
+          "fontSize": "14px",
+          "lineHeight": "22px",
+          "maxWidth": "88%",
+          "alignSelf": "flex-end"
+        },
+        "assistantCount": 2,
+        "assistantMsg": {
+          "rect": {
+            "x": 272,
+            "y": 375.17,
+            "w": 664,
+            "h": 167.59
+          },
+          "fontSize": "15px",
+          "lineHeight": "27px",
+          "color": "rgb(242, 244, 246)",
+          "maxWidth": "none"
+        },
+        "assistantP": {
+          "rect": {
+            "x": 272,
+            "w": 664,
+            "h": 27
+          },
+          "margin": "0px 0px 10px"
+        },
+        "assistantH3": null,
+        "records": {
+          "rect": {
+            "x": 272,
+            "y": 241.98,
+            "w": 664,
+            "h": 118.19,
+            "right": 936,
+            "bottom": 360.17
+          },
+          "style": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "0px",
+            "padding": "2px 0px 2px 12px",
+            "font-size": "12px",
+            "line-height": "18.6px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "2px solid rgb(58, 65, 72)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "760px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "summary": {
+            "font-size": "11px",
+            "color": "rgb(148, 155, 164)",
+            "line-height": "17.05px",
+            "padding": "0px"
+          },
+          "count": {
+            "font-size": "11px",
+            "color": "rgb(148, 155, 164)",
+            "margin": "0px"
+          },
+          "row": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "0px",
+            "padding": "5px 0px",
+            "font-size": "11px",
+            "line-height": "17.05px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "grid",
+            "align-items": "start",
+            "gap": "10px",
+            "grid-template-columns": "42px 479.938px 108.062px",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "target": {
+            "font-size": "11px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(148, 155, 164)"
+          },
+          "state": {
+            "font-size": "10px",
+            "color": "rgb(148, 155, 164)"
+          }
+        },
+        "denied": {
+          "rect": {
+            "x": 272,
+            "y": 557.77,
+            "w": 664,
+            "h": 27.19,
+            "right": 936,
+            "bottom": 584.95
+          },
+          "style": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(201, 122, 109)",
+            "border-radius": "0px",
+            "padding": "4px 0px",
+            "font-size": "12px",
+            "line-height": "19.2px",
+            "font-weight": "400",
+            "border": "0px solid rgb(44, 50, 56)",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "900px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(201, 122, 109)"
+          },
+          "summary": {
+            "font-size": "12px",
+            "color": "rgb(201, 122, 109)",
+            "line-height": "19.2px"
+          },
+          "target": {
+            "font-size": "12px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(148, 155, 164)"
+          },
+          "chev": false
+        },
+        "composer": {
+          "area": {
+            "rect": {
+              "x": 248,
+              "y": 498.2,
+              "w": 712,
+              "h": 121.8,
+              "right": 960,
+              "bottom": 620
+            },
+            "style": {
+              "background-color": "rgb(30, 35, 40)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "0px",
+              "padding": "10px 24px 8px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "",
+              "border-left": "0px solid rgb(44, 50, 56)",
+              "border-bottom": "0px solid rgb(44, 50, 56)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "capsule": {
+            "rect": {
+              "x": 272,
+              "y": 509.2,
+              "w": 664,
+              "h": 80,
+              "right": 936,
+              "bottom": 589.2
+            },
+            "style": {
+              "background-color": "rgb(30, 35, 40)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "8px",
+              "padding": "8px 12px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-left": "1px solid rgb(107, 117, 126)",
+              "border-bottom": "1px solid rgb(107, 117, 126)",
+              "margin": "0px",
+              "max-width": "900px",
+              "display": "flex",
+              "align-items": "normal",
+              "gap": "6px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "input": {
+            "font-size": "14px",
+            "line-height": "22px",
+            "padding": "0px",
+            "color": "rgb(242, 244, 246)",
+            "background-color": "rgba(0, 0, 0, 0)"
+          },
+          "send": {
+            "rect": {
+              "x": 857,
+              "y": 552.2,
+              "w": 66,
+              "h": 28,
+              "right": 923,
+              "bottom": 580.2
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "500",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "4px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "halt": {
+            "rect": {
+              "x": 759,
+              "y": 552.2,
+              "w": 92,
+              "h": 28,
+              "right": 851,
+              "bottom": 580.2
+            },
+            "hidden": false,
+            "style": {
+              "border": "1px solid rgb(92, 56, 50)",
+              "background-color": "rgb(46, 34, 32)",
+              "color": "rgb(201, 122, 109)",
+              "border-radius": "6px"
+            }
+          },
+          "attach": {
+            "rect": {
+              "x": 285,
+              "y": 552.2,
+              "w": 28,
+              "h": 28,
+              "right": 313,
+              "bottom": 580.2
+            },
+            "style": {
+              "color": "rgb(167, 173, 181)",
+              "border-radius": "6px"
+            }
+          }
+        },
+        "drawer": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "style": {
+            "background-color": "rgb(23, 27, 31)",
+            "border-left": "1px solid rgb(58, 65, 72)"
+          },
+          "open": false,
+          "head": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "height": "64px",
+              "padding": "0px 20px",
+              "border-bottom": "1px solid rgb(44, 50, 56)"
+            }
+          },
+          "title": {
+            "font-size": "18px",
+            "font-weight": "650"
+          },
+          "body": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "padding": "16px 16px 24px"
+            }
+          }
+        },
+        "sections": [
+          {
+            "summary": {
+              "style": {
+                "fontSize": "12px",
+                "padding": "0px 10px",
+                "color": "rgb(167, 173, 181)"
+              },
+              "rect": {
+                "x": 0,
+                "h": 0
+              }
+            },
+            "borderBottom": "1px solid rgb(44, 50, 56)"
+          },
+          {
+            "summary": {
+              "style": {
+                "fontSize": "12px",
+                "padding": "0px 10px",
+                "color": "rgb(167, 173, 181)"
+              },
+              "rect": {
+                "x": 0,
+                "h": 0
+              }
+            },
+            "borderBottom": "1px solid rgb(44, 50, 56)"
+          }
+        ],
+        "work": {
+          "body": {
+            "rect": null,
+            "style": null
+          },
+          "heading": null,
+          "running": null,
+          "item": null,
+          "pos": null,
+          "src": null,
+          "meta": null,
+          "text": null,
+          "toggleBtn": {
+            "rect": null,
+            "style": null
+          },
+          "withdrawBtn": {
+            "rect": null,
+            "style": null
+          },
+          "full": {
+            "rect": null,
+            "style": null
+          }
+        },
+        "pi": {
+          "hidden": true,
+          "panel": {
+            "rect": null,
+            "style": {
+              "padding": "0px",
+              "margin": "0px",
+              "background-color": "rgba(0, 0, 0, 0)",
+              "border": "0px solid rgb(44, 50, 56)"
+            }
+          },
+          "label": {
+            "font-size": "11.5px",
+            "color": "rgb(167, 173, 181)",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace"
+          },
+          "input": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "height": "32px",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-radius": "6px",
+              "font-size": "12.5px",
+              "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+              "background-color": "rgb(20, 23, 26)",
+              "padding": "0px 10px"
+            }
+          },
+          "pathEl": {
+            "font-size": "11px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(167, 173, 181)"
+          },
+          "hint": {
+            "font-size": "10.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "save": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "500",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "4px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "secretTag": {
+            "font-size": "10px",
+            "background-color": "rgb(36, 33, 26)",
+            "border-radius": "4px",
+            "padding": "0px 4px"
+          },
+          "advanced": true
+        },
+        "pending": {
+          "rect": {
+            "x": 272,
+            "w": 664,
+            "h": 118.14
+          },
+          "style": {
+            "background-color": "rgb(36, 33, 26)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "8px",
+            "padding": "10px 12px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "2px solid rgb(196, 161, 95)",
+            "border-bottom": "1px solid rgb(78, 66, 42)",
+            "margin": "4px 0px",
+            "max-width": "900px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "title": {
+            "font-size": "13px",
+            "font-weight": "600"
+          },
+          "question": null,
+          "confirm": {
+            "rect": {
+              "x": 823,
+              "y": 767.28,
+              "w": 46,
+              "h": 28,
+              "right": 869,
+              "bottom": 795.28
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "12px",
+              "line-height": "18.6px",
+              "font-weight": "400",
+              "border": "1px solid rgb(111, 160, 139)",
+              "border-left": "1px solid rgb(111, 160, 139)",
+              "border-bottom": "1px solid rgb(111, 160, 139)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "deny": {
+            "rect": {
+              "x": 877,
+              "y": 767.28,
+              "w": 46,
+              "h": 28,
+              "right": 923,
+              "bottom": 795.28
+            },
+            "style": {
+              "background-color": "rgb(20, 23, 26)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "12px",
+              "line-height": "18.6px",
+              "font-weight": "400",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-left": "1px solid rgb(107, 117, 126)",
+              "border-bottom": "1px solid rgb(107, 117, 126)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          }
+        },
+        "chip": {
+          "rect": {
+            "x": 769.95,
+            "y": 450.39,
+            "w": 166.05,
+            "h": 19.81,
+            "right": 936,
+            "bottom": 470.2
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(196, 161, 95)",
+            "border-radius": "999px",
+            "padding": "0px 12px",
+            "font-size": "11.5px",
+            "line-height": "17.825px",
+            "font-weight": "400",
+            "border": "1px solid rgb(78, 66, 42)",
+            "border-left": "1px solid rgb(78, 66, 42)",
+            "border-bottom": "1px solid rgb(78, 66, 42)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "6px",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(196, 161, 95)"
+          }
+        },
+        "current": {
+          "rect": null,
+          "style": null
+        }
+      },
+      "roleDrawer": {
+        "viewport": {
+          "w": 960,
+          "h": 620,
+          "bodyScrollW": 960,
+          "bodyClientW": 960,
+          "appScrollW": 960,
+          "appClientW": 960,
+          "rootScrollW": 960,
+          "rootClientW": 960
+        },
+        "titlebar": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 960,
+            "h": 36,
+            "right": 960,
+            "bottom": 36
+          },
+          "style": {
+            "background-color": "rgb(26, 30, 34)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "0px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "1px solid rgb(58, 65, 72)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "mark": {
+            "font-size": "12px",
+            "font-weight": "600"
+          },
+          "sub": {
+            "font-size": "12px",
+            "color": "rgb(167, 173, 181)"
+          }
+        },
+        "shell": {
+          "grid": {
+            "grid-template-columns": "none",
+            "grid-template-rows": "none"
+          },
+          "left": {
+            "x": 0,
+            "y": 36,
+            "w": 248,
+            "h": 584,
+            "right": 248,
+            "bottom": 620
+          },
+          "mid": {
+            "x": 248,
+            "y": 36,
+            "w": 712,
+            "h": 584,
+            "right": 960,
+            "bottom": 620
+          }
+        },
+        "side": {
+          "head": null,
+          "title": null,
+          "import": {
+            "rect": {
+              "x": 16,
+              "y": 517.73,
+              "w": 215,
+              "h": 32,
+              "right": 231,
+              "bottom": 549.73
+            },
+            "style": {
+              "background-color": "rgba(0, 0, 0, 0)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "6px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "path": {
+            "rect": {
+              "x": 56,
+              "y": 128.03,
+              "w": 162.56,
+              "h": 16.5,
+              "right": 218.56,
+              "bottom": 144.53
+            },
+            "style": {
+              "font-size": "11px",
+              "line-height": "16.5px",
+              "color": "rgb(167, 173, 181)",
+              "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace"
+            }
+          },
+          "treeLabel": {
+            "font-size": "10.5px",
+            "font-weight": "400",
+            "color": "rgb(148, 155, 164)",
+            "padding": "0px"
+          },
+          "group": {
+            "font-size": "10.5px",
+            "font-weight": "400",
+            "color": "rgb(148, 155, 164)",
+            "padding": "8px 4px 2px"
+          },
+          "item": {
+            "rect": {
+              "x": 16,
+              "y": 217.06,
+              "w": 215,
+              "h": 68.02,
+              "right": 231,
+              "bottom": 285.08
+            },
+            "style": {
+              "background-color": "rgb(42, 48, 55)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "8px",
+              "padding": "7px 8px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "0px none rgb(242, 244, 246)",
+              "border-left": "0px none rgb(242, 244, 246)",
+              "border-bottom": "0px none rgb(242, 244, 246)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "grid",
+              "align-items": "center",
+              "gap": "3px 10px",
+              "grid-template-columns": "28px 161px",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "itemActive": {
+            "background-color": "rgb(42, 48, 55)",
+            "border-radius": "8px"
+          },
+          "name": {
+            "font-size": "13px",
+            "font-weight": "600"
+          },
+          "sub": {
+            "font-size": "10.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "status": {
+            "font-size": "10.5px",
+            "color": "rgb(196, 161, 95)"
+          },
+          "badge": null
+        },
+        "chatHead": {
+          "rect": {
+            "x": 248,
+            "y": 36,
+            "w": 712,
+            "h": 60,
+            "right": 960,
+            "bottom": 96
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "8px 24px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "1px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "top": null,
+          "role": {
+            "font-size": "18px",
+            "font-weight": "650",
+            "color": "rgb(242, 244, 246)"
+          },
+          "sub": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "font-size": "11px",
+              "color": "rgb(148, 155, 164)"
+            }
+          },
+          "notes": null,
+          "hint": {
+            "font-size": "11.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "note": {
+            "rect": {
+              "x": 705,
+              "y": 595.2,
+              "w": 231,
+              "h": 16.8,
+              "right": 936,
+              "bottom": 612
+            },
+            "style": {
+              "font-size": "10.5px",
+              "color": "rgb(148, 155, 164)",
+              "display": "block"
+            },
+            "ico": null
+          }
+        },
+        "chat": {
+          "rect": {
+            "x": 248,
+            "y": 116.8,
+            "w": 712,
+            "h": 381.41,
+            "right": 960,
+            "bottom": 498.2
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "16px 14px 20px 24px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "0px solid rgb(44, 50, 56)",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "pane": {
+            "x": 272,
+            "y": 132.8,
+            "w": 664,
+            "h": 728.48,
+            "right": 936,
+            "bottom": 861.28
+          }
+        },
+        "userMsg": {
+          "rect": {
+            "x": 571.84,
+            "y": 188.98,
+            "w": 364.16,
+            "h": 38,
+            "right": 936
+          },
+          "bg": "rgb(30, 35, 40)",
+          "radius": "8px 8px 3px",
+          "padding": "8px 14px",
+          "fontSize": "14px",
+          "lineHeight": "22px",
+          "maxWidth": "88%",
+          "alignSelf": "flex-end"
+        },
+        "assistantCount": 2,
+        "assistantMsg": {
+          "rect": {
+            "x": 272,
+            "y": 375.17,
+            "w": 664,
+            "h": 167.59
+          },
+          "fontSize": "15px",
+          "lineHeight": "27px",
+          "color": "rgb(242, 244, 246)",
+          "maxWidth": "none"
+        },
+        "assistantP": {
+          "rect": {
+            "x": 272,
+            "w": 664,
+            "h": 27
+          },
+          "margin": "0px 0px 10px"
+        },
+        "assistantH3": null,
+        "records": {
+          "rect": {
+            "x": 272,
+            "y": 241.98,
+            "w": 664,
+            "h": 118.19,
+            "right": 936,
+            "bottom": 360.17
+          },
+          "style": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "0px",
+            "padding": "2px 0px 2px 12px",
+            "font-size": "12px",
+            "line-height": "18.6px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "2px solid rgb(58, 65, 72)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "760px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "summary": {
+            "font-size": "11px",
+            "color": "rgb(148, 155, 164)",
+            "line-height": "17.05px",
+            "padding": "0px"
+          },
+          "count": {
+            "font-size": "11px",
+            "color": "rgb(148, 155, 164)",
+            "margin": "0px"
+          },
+          "row": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "0px",
+            "padding": "5px 0px",
+            "font-size": "11px",
+            "line-height": "17.05px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "grid",
+            "align-items": "start",
+            "gap": "10px",
+            "grid-template-columns": "42px 479.938px 108.062px",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "target": {
+            "font-size": "11px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(148, 155, 164)"
+          },
+          "state": {
+            "font-size": "10px",
+            "color": "rgb(148, 155, 164)"
+          }
+        },
+        "denied": {
+          "rect": {
+            "x": 272,
+            "y": 557.77,
+            "w": 664,
+            "h": 27.19,
+            "right": 936,
+            "bottom": 584.95
+          },
+          "style": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(201, 122, 109)",
+            "border-radius": "0px",
+            "padding": "4px 0px",
+            "font-size": "12px",
+            "line-height": "19.2px",
+            "font-weight": "400",
+            "border": "0px solid rgb(44, 50, 56)",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "900px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(201, 122, 109)"
+          },
+          "summary": {
+            "font-size": "12px",
+            "color": "rgb(201, 122, 109)",
+            "line-height": "19.2px"
+          },
+          "target": {
+            "font-size": "12px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(148, 155, 164)"
+          },
+          "chev": false
+        },
+        "composer": {
+          "area": {
+            "rect": {
+              "x": 248,
+              "y": 498.2,
+              "w": 712,
+              "h": 121.8,
+              "right": 960,
+              "bottom": 620
+            },
+            "style": {
+              "background-color": "rgb(30, 35, 40)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "0px",
+              "padding": "10px 24px 8px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "",
+              "border-left": "0px solid rgb(44, 50, 56)",
+              "border-bottom": "0px solid rgb(44, 50, 56)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "capsule": {
+            "rect": {
+              "x": 272,
+              "y": 509.2,
+              "w": 664,
+              "h": 80,
+              "right": 936,
+              "bottom": 589.2
+            },
+            "style": {
+              "background-color": "rgb(30, 35, 40)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "8px",
+              "padding": "8px 12px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-left": "1px solid rgb(107, 117, 126)",
+              "border-bottom": "1px solid rgb(107, 117, 126)",
+              "margin": "0px",
+              "max-width": "900px",
+              "display": "flex",
+              "align-items": "normal",
+              "gap": "6px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "input": {
+            "font-size": "14px",
+            "line-height": "22px",
+            "padding": "0px",
+            "color": "rgb(242, 244, 246)",
+            "background-color": "rgba(0, 0, 0, 0)"
+          },
+          "send": {
+            "rect": {
+              "x": 857,
+              "y": 552.2,
+              "w": 66,
+              "h": 28,
+              "right": 923,
+              "bottom": 580.2
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "500",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "4px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "halt": {
+            "rect": {
+              "x": 759,
+              "y": 552.2,
+              "w": 92,
+              "h": 28,
+              "right": 851,
+              "bottom": 580.2
+            },
+            "hidden": false,
+            "style": {
+              "border": "1px solid rgb(92, 56, 50)",
+              "background-color": "rgb(46, 34, 32)",
+              "color": "rgb(201, 122, 109)",
+              "border-radius": "6px"
+            }
+          },
+          "attach": {
+            "rect": {
+              "x": 285,
+              "y": 552.2,
+              "w": 28,
+              "h": 28,
+              "right": 313,
+              "bottom": 580.2
+            },
+            "style": {
+              "color": "rgb(167, 173, 181)",
+              "border-radius": "6px"
+            }
+          }
+        },
+        "drawer": {
+          "rect": {
+            "x": 536,
+            "y": 36,
+            "w": 424,
+            "h": 584,
+            "right": 960,
+            "bottom": 620
+          },
+          "style": {
+            "background-color": "rgb(23, 27, 31)",
+            "border-left": "1px solid rgb(58, 65, 72)"
+          },
+          "open": true,
+          "head": {
+            "rect": {
+              "x": 537,
+              "y": 36,
+              "w": 423,
+              "h": 64,
+              "right": 960,
+              "bottom": 100
+            },
+            "style": {
+              "height": "64px",
+              "padding": "0px 20px",
+              "border-bottom": "1px solid rgb(44, 50, 56)"
+            }
+          },
+          "title": {
+            "font-size": "18px",
+            "font-weight": "650"
+          },
+          "body": {
+            "rect": {
+              "x": 537,
+              "y": 100,
+              "w": 423,
+              "h": 520,
+              "right": 960,
+              "bottom": 620
+            },
+            "style": {
+              "padding": "16px 16px 24px"
+            }
+          }
+        },
+        "sections": [
+          {
+            "summary": {
+              "style": {
+                "fontSize": "12px",
+                "padding": "0px 10px",
+                "color": "rgb(167, 173, 181)"
+              },
+              "rect": {
+                "x": 554,
+                "h": 32
+              }
+            },
+            "borderBottom": "1px solid rgb(44, 50, 56)"
+          },
+          {
+            "summary": {
+              "style": {
+                "fontSize": "12px",
+                "padding": "0px 10px",
+                "color": "rgb(167, 173, 181)"
+              },
+              "rect": {
+                "x": 554,
+                "h": 32
+              }
+            },
+            "borderBottom": "1px solid rgb(44, 50, 56)"
+          }
+        ],
+        "work": {
+          "body": {
+            "rect": null,
+            "style": null
+          },
+          "heading": null,
+          "running": null,
+          "item": null,
+          "pos": null,
+          "src": null,
+          "meta": null,
+          "text": null,
+          "toggleBtn": {
+            "rect": null,
+            "style": null
+          },
+          "withdrawBtn": {
+            "rect": null,
+            "style": null
+          },
+          "full": {
+            "rect": null,
+            "style": null
+          }
+        },
+        "pi": {
+          "hidden": true,
+          "panel": {
+            "rect": null,
+            "style": {
+              "padding": "0px",
+              "margin": "0px",
+              "background-color": "rgba(0, 0, 0, 0)",
+              "border": "0px solid rgb(44, 50, 56)"
+            }
+          },
+          "label": {
+            "font-size": "11.5px",
+            "color": "rgb(167, 173, 181)",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace"
+          },
+          "input": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "height": "32px",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-radius": "6px",
+              "font-size": "12.5px",
+              "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+              "background-color": "rgb(20, 23, 26)",
+              "padding": "0px 10px"
+            }
+          },
+          "pathEl": {
+            "font-size": "11px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(167, 173, 181)"
+          },
+          "hint": {
+            "font-size": "10.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "save": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "500",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "4px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "secretTag": {
+            "font-size": "10px",
+            "background-color": "rgb(36, 33, 26)",
+            "border-radius": "4px",
+            "padding": "0px 4px"
+          },
+          "advanced": true
+        },
+        "pending": {
+          "rect": {
+            "x": 272,
+            "w": 664,
+            "h": 118.14
+          },
+          "style": {
+            "background-color": "rgb(36, 33, 26)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "8px",
+            "padding": "10px 12px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "2px solid rgb(196, 161, 95)",
+            "border-bottom": "1px solid rgb(78, 66, 42)",
+            "margin": "4px 0px",
+            "max-width": "900px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "title": {
+            "font-size": "13px",
+            "font-weight": "600"
+          },
+          "question": null,
+          "confirm": {
+            "rect": {
+              "x": 823,
+              "y": 767.28,
+              "w": 46,
+              "h": 28,
+              "right": 869,
+              "bottom": 795.28
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "12px",
+              "line-height": "18.6px",
+              "font-weight": "400",
+              "border": "1px solid rgb(111, 160, 139)",
+              "border-left": "1px solid rgb(111, 160, 139)",
+              "border-bottom": "1px solid rgb(111, 160, 139)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "deny": {
+            "rect": {
+              "x": 877,
+              "y": 767.28,
+              "w": 46,
+              "h": 28,
+              "right": 923,
+              "bottom": 795.28
+            },
+            "style": {
+              "background-color": "rgb(20, 23, 26)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "12px",
+              "line-height": "18.6px",
+              "font-weight": "400",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-left": "1px solid rgb(107, 117, 126)",
+              "border-bottom": "1px solid rgb(107, 117, 126)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          }
+        },
+        "chip": {
+          "rect": {
+            "x": 769.95,
+            "y": 450.39,
+            "w": 166.05,
+            "h": 19.81,
+            "right": 936,
+            "bottom": 470.2
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(196, 161, 95)",
+            "border-radius": "999px",
+            "padding": "0px 12px",
+            "font-size": "11.5px",
+            "line-height": "17.825px",
+            "font-weight": "400",
+            "border": "1px solid rgb(78, 66, 42)",
+            "border-left": "1px solid rgb(78, 66, 42)",
+            "border-bottom": "1px solid rgb(78, 66, 42)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "6px",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(196, 161, 95)"
+          }
+        },
+        "current": {
+          "rect": null,
+          "style": null
+        }
+      },
+      "piDrawer": {
+        "viewport": {
+          "w": 960,
+          "h": 620,
+          "bodyScrollW": 960,
+          "bodyClientW": 960,
+          "appScrollW": 960,
+          "appClientW": 960,
+          "rootScrollW": 960,
+          "rootClientW": 960
+        },
+        "titlebar": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 960,
+            "h": 36,
+            "right": 960,
+            "bottom": 36
+          },
+          "style": {
+            "background-color": "rgb(26, 30, 34)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "0px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "1px solid rgb(58, 65, 72)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "mark": {
+            "font-size": "12px",
+            "font-weight": "600"
+          },
+          "sub": {
+            "font-size": "12px",
+            "color": "rgb(167, 173, 181)"
+          }
+        },
+        "shell": {
+          "grid": {
+            "grid-template-columns": "none",
+            "grid-template-rows": "none"
+          },
+          "left": {
+            "x": 0,
+            "y": 36,
+            "w": 248,
+            "h": 584,
+            "right": 248,
+            "bottom": 620
+          },
+          "mid": {
+            "x": 248,
+            "y": 36,
+            "w": 712,
+            "h": 584,
+            "right": 960,
+            "bottom": 620
+          }
+        },
+        "side": {
+          "head": null,
+          "title": null,
+          "import": {
+            "rect": {
+              "x": 16,
+              "y": 517.73,
+              "w": 215,
+              "h": 32,
+              "right": 231,
+              "bottom": 549.73
+            },
+            "style": {
+              "background-color": "rgba(0, 0, 0, 0)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "6px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "path": {
+            "rect": {
+              "x": 56,
+              "y": 128.03,
+              "w": 162.56,
+              "h": 16.5,
+              "right": 218.56,
+              "bottom": 144.53
+            },
+            "style": {
+              "font-size": "11px",
+              "line-height": "16.5px",
+              "color": "rgb(167, 173, 181)",
+              "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace"
+            }
+          },
+          "treeLabel": {
+            "font-size": "10.5px",
+            "font-weight": "400",
+            "color": "rgb(148, 155, 164)",
+            "padding": "0px"
+          },
+          "group": {
+            "font-size": "10.5px",
+            "font-weight": "400",
+            "color": "rgb(148, 155, 164)",
+            "padding": "8px 4px 2px"
+          },
+          "item": {
+            "rect": {
+              "x": 16,
+              "y": 217.06,
+              "w": 215,
+              "h": 68.02,
+              "right": 231,
+              "bottom": 285.08
+            },
+            "style": {
+              "background-color": "rgb(42, 48, 55)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "8px",
+              "padding": "7px 8px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "0px none rgb(242, 244, 246)",
+              "border-left": "0px none rgb(242, 244, 246)",
+              "border-bottom": "0px none rgb(242, 244, 246)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "grid",
+              "align-items": "center",
+              "gap": "3px 10px",
+              "grid-template-columns": "28px 161px",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "itemActive": {
+            "background-color": "rgb(42, 48, 55)",
+            "border-radius": "8px"
+          },
+          "name": {
+            "font-size": "13px",
+            "font-weight": "600"
+          },
+          "sub": {
+            "font-size": "10.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "status": {
+            "font-size": "10.5px",
+            "color": "rgb(196, 161, 95)"
+          },
+          "badge": null
+        },
+        "chatHead": {
+          "rect": {
+            "x": 248,
+            "y": 36,
+            "w": 712,
+            "h": 60,
+            "right": 960,
+            "bottom": 96
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "8px 24px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "1px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "top": null,
+          "role": {
+            "font-size": "18px",
+            "font-weight": "650",
+            "color": "rgb(242, 244, 246)"
+          },
+          "sub": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "font-size": "11px",
+              "color": "rgb(148, 155, 164)"
+            }
+          },
+          "notes": null,
+          "hint": {
+            "font-size": "11.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "note": {
+            "rect": {
+              "x": 705,
+              "y": 595.2,
+              "w": 231,
+              "h": 16.8,
+              "right": 936,
+              "bottom": 612
+            },
+            "style": {
+              "font-size": "10.5px",
+              "color": "rgb(148, 155, 164)",
+              "display": "block"
+            },
+            "ico": null
+          }
+        },
+        "chat": {
+          "rect": {
+            "x": 248,
+            "y": 116.8,
+            "w": 712,
+            "h": 381.41,
+            "right": 960,
+            "bottom": 498.2
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "16px 14px 20px 24px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "0px solid rgb(44, 50, 56)",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "pane": {
+            "x": 272,
+            "y": 132.8,
+            "w": 664,
+            "h": 728.48,
+            "right": 936,
+            "bottom": 861.28
+          }
+        },
+        "userMsg": {
+          "rect": {
+            "x": 571.84,
+            "y": 188.98,
+            "w": 364.16,
+            "h": 38,
+            "right": 936
+          },
+          "bg": "rgb(30, 35, 40)",
+          "radius": "8px 8px 3px",
+          "padding": "8px 14px",
+          "fontSize": "14px",
+          "lineHeight": "22px",
+          "maxWidth": "88%",
+          "alignSelf": "flex-end"
+        },
+        "assistantCount": 2,
+        "assistantMsg": {
+          "rect": {
+            "x": 272,
+            "y": 375.17,
+            "w": 664,
+            "h": 167.59
+          },
+          "fontSize": "15px",
+          "lineHeight": "27px",
+          "color": "rgb(242, 244, 246)",
+          "maxWidth": "none"
+        },
+        "assistantP": {
+          "rect": {
+            "x": 272,
+            "w": 664,
+            "h": 27
+          },
+          "margin": "0px 0px 10px"
+        },
+        "assistantH3": null,
+        "records": {
+          "rect": {
+            "x": 272,
+            "y": 241.98,
+            "w": 664,
+            "h": 118.19,
+            "right": 936,
+            "bottom": 360.17
+          },
+          "style": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "0px",
+            "padding": "2px 0px 2px 12px",
+            "font-size": "12px",
+            "line-height": "18.6px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "2px solid rgb(58, 65, 72)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "760px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "summary": {
+            "font-size": "11px",
+            "color": "rgb(148, 155, 164)",
+            "line-height": "17.05px",
+            "padding": "0px"
+          },
+          "count": {
+            "font-size": "11px",
+            "color": "rgb(148, 155, 164)",
+            "margin": "0px"
+          },
+          "row": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "0px",
+            "padding": "5px 0px",
+            "font-size": "11px",
+            "line-height": "17.05px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "grid",
+            "align-items": "start",
+            "gap": "10px",
+            "grid-template-columns": "42px 479.938px 108.062px",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "target": {
+            "font-size": "11px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(148, 155, 164)"
+          },
+          "state": {
+            "font-size": "10px",
+            "color": "rgb(148, 155, 164)"
+          }
+        },
+        "denied": {
+          "rect": {
+            "x": 272,
+            "y": 557.77,
+            "w": 664,
+            "h": 27.19,
+            "right": 936,
+            "bottom": 584.95
+          },
+          "style": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(201, 122, 109)",
+            "border-radius": "0px",
+            "padding": "4px 0px",
+            "font-size": "12px",
+            "line-height": "19.2px",
+            "font-weight": "400",
+            "border": "0px solid rgb(44, 50, 56)",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "900px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(201, 122, 109)"
+          },
+          "summary": {
+            "font-size": "12px",
+            "color": "rgb(201, 122, 109)",
+            "line-height": "19.2px"
+          },
+          "target": {
+            "font-size": "12px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(148, 155, 164)"
+          },
+          "chev": false
+        },
+        "composer": {
+          "area": {
+            "rect": {
+              "x": 248,
+              "y": 498.2,
+              "w": 712,
+              "h": 121.8,
+              "right": 960,
+              "bottom": 620
+            },
+            "style": {
+              "background-color": "rgb(30, 35, 40)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "0px",
+              "padding": "10px 24px 8px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "",
+              "border-left": "0px solid rgb(44, 50, 56)",
+              "border-bottom": "0px solid rgb(44, 50, 56)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "capsule": {
+            "rect": {
+              "x": 272,
+              "y": 509.2,
+              "w": 664,
+              "h": 80,
+              "right": 936,
+              "bottom": 589.2
+            },
+            "style": {
+              "background-color": "rgb(30, 35, 40)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "8px",
+              "padding": "8px 12px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-left": "1px solid rgb(107, 117, 126)",
+              "border-bottom": "1px solid rgb(107, 117, 126)",
+              "margin": "0px",
+              "max-width": "900px",
+              "display": "flex",
+              "align-items": "normal",
+              "gap": "6px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "input": {
+            "font-size": "14px",
+            "line-height": "22px",
+            "padding": "0px",
+            "color": "rgb(242, 244, 246)",
+            "background-color": "rgba(0, 0, 0, 0)"
+          },
+          "send": {
+            "rect": {
+              "x": 857,
+              "y": 552.2,
+              "w": 66,
+              "h": 28,
+              "right": 923,
+              "bottom": 580.2
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "500",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "4px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "halt": {
+            "rect": {
+              "x": 759,
+              "y": 552.2,
+              "w": 92,
+              "h": 28,
+              "right": 851,
+              "bottom": 580.2
+            },
+            "hidden": false,
+            "style": {
+              "border": "1px solid rgb(92, 56, 50)",
+              "background-color": "rgb(46, 34, 32)",
+              "color": "rgb(201, 122, 109)",
+              "border-radius": "6px"
+            }
+          },
+          "attach": {
+            "rect": {
+              "x": 285,
+              "y": 552.2,
+              "w": 28,
+              "h": 28,
+              "right": 313,
+              "bottom": 580.2
+            },
+            "style": {
+              "color": "rgb(167, 173, 181)",
+              "border-radius": "6px"
+            }
+          }
+        },
+        "drawer": {
+          "rect": {
+            "x": 536,
+            "y": 36,
+            "w": 424,
+            "h": 584,
+            "right": 960,
+            "bottom": 620
+          },
+          "style": {
+            "background-color": "rgb(23, 27, 31)",
+            "border-left": "1px solid rgb(58, 65, 72)"
+          },
+          "open": true,
+          "head": {
+            "rect": {
+              "x": 537,
+              "y": 36,
+              "w": 423,
+              "h": 64,
+              "right": 960,
+              "bottom": 100
+            },
+            "style": {
+              "height": "64px",
+              "padding": "0px 20px",
+              "border-bottom": "1px solid rgb(44, 50, 56)"
+            }
+          },
+          "title": {
+            "font-size": "18px",
+            "font-weight": "650"
+          },
+          "body": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "padding": "16px 16px 24px"
+            }
+          }
+        },
+        "sections": [],
+        "work": {
+          "body": {
+            "rect": null,
+            "style": null
+          },
+          "heading": null,
+          "running": null,
+          "item": null,
+          "pos": null,
+          "src": null,
+          "meta": null,
+          "text": null,
+          "toggleBtn": {
+            "rect": null,
+            "style": null
+          },
+          "withdrawBtn": {
+            "rect": null,
+            "style": null
+          },
+          "full": {
+            "rect": null,
+            "style": null
+          }
+        },
+        "pi": {
+          "hidden": false,
+          "panel": {
+            "rect": {
+              "x": 537,
+              "y": 100,
+              "w": 423,
+              "h": 520,
+              "right": 960,
+              "bottom": 620
+            },
+            "style": {
+              "padding": "0px",
+              "margin": "0px",
+              "background-color": "rgba(0, 0, 0, 0)",
+              "border": "0px solid rgb(44, 50, 56)"
+            }
+          },
+          "label": {
+            "font-size": "11.5px",
+            "color": "rgb(167, 173, 181)",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace"
+          },
+          "input": {
+            "rect": {
+              "x": 553,
+              "y": 331.05,
+              "w": 333,
+              "h": 32,
+              "right": 886,
+              "bottom": 363.05
+            },
+            "style": {
+              "height": "32px",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-radius": "6px",
+              "font-size": "12.5px",
+              "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+              "background-color": "rgb(20, 23, 26)",
+              "padding": "0px 10px"
+            }
+          },
+          "pathEl": {
+            "font-size": "11px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(167, 173, 181)"
+          },
+          "hint": {
+            "font-size": "10.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "save": {
+            "rect": {
+              "x": 553,
+              "y": 574.5,
+              "w": 100.14,
+              "h": 28,
+              "right": 653.14,
+              "bottom": 602.5
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "500",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "4px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "secretTag": {
+            "font-size": "10px",
+            "background-color": "rgb(36, 33, 26)",
+            "border-radius": "4px",
+            "padding": "0px 4px"
+          },
+          "advanced": true
+        },
+        "pending": {
+          "rect": {
+            "x": 272,
+            "w": 664,
+            "h": 118.14
+          },
+          "style": {
+            "background-color": "rgb(36, 33, 26)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "8px",
+            "padding": "10px 12px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "2px solid rgb(196, 161, 95)",
+            "border-bottom": "1px solid rgb(78, 66, 42)",
+            "margin": "4px 0px",
+            "max-width": "900px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "title": {
+            "font-size": "13px",
+            "font-weight": "600"
+          },
+          "question": null,
+          "confirm": {
+            "rect": {
+              "x": 823,
+              "y": 767.28,
+              "w": 46,
+              "h": 28,
+              "right": 869,
+              "bottom": 795.28
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "12px",
+              "line-height": "18.6px",
+              "font-weight": "400",
+              "border": "1px solid rgb(111, 160, 139)",
+              "border-left": "1px solid rgb(111, 160, 139)",
+              "border-bottom": "1px solid rgb(111, 160, 139)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "deny": {
+            "rect": {
+              "x": 877,
+              "y": 767.28,
+              "w": 46,
+              "h": 28,
+              "right": 923,
+              "bottom": 795.28
+            },
+            "style": {
+              "background-color": "rgb(20, 23, 26)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "12px",
+              "line-height": "18.6px",
+              "font-weight": "400",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-left": "1px solid rgb(107, 117, 126)",
+              "border-bottom": "1px solid rgb(107, 117, 126)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          }
+        },
+        "chip": {
+          "rect": {
+            "x": 769.95,
+            "y": 450.39,
+            "w": 166.05,
+            "h": 19.81,
+            "right": 936,
+            "bottom": 470.2
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(196, 161, 95)",
+            "border-radius": "999px",
+            "padding": "0px 12px",
+            "font-size": "11.5px",
+            "line-height": "17.825px",
+            "font-weight": "400",
+            "border": "1px solid rgb(78, 66, 42)",
+            "border-left": "1px solid rgb(78, 66, 42)",
+            "border-bottom": "1px solid rgb(78, 66, 42)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "6px",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(196, 161, 95)"
+          }
+        },
+        "current": {
+          "rect": null,
+          "style": null
+        }
+      },
+      "piOverflow": {
+        "bodyClientW": 0,
+        "bodyScrollW": 0,
+        "panelClientW": 423,
+        "panelScrollW": 423,
+        "inputRights": [
+          886,
+          934,
+          934,
+          934
+        ],
+        "drawerRight": 960
+      }
+    },
+    "1360": {
+      "main": {
+        "viewport": {
+          "w": 1360,
+          "h": 860,
+          "bodyScrollW": 1360,
+          "bodyClientW": 1360,
+          "appScrollW": 1360,
+          "appClientW": 1360,
+          "rootScrollW": 1360,
+          "rootClientW": 1360
+        },
+        "titlebar": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 1360,
+            "h": 36,
+            "right": 1360,
+            "bottom": 36
+          },
+          "style": {
+            "background-color": "rgb(26, 30, 34)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "0px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "1px solid rgb(58, 65, 72)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "mark": {
+            "font-size": "12px",
+            "font-weight": "600"
+          },
+          "sub": {
+            "font-size": "12px",
+            "color": "rgb(167, 173, 181)"
+          }
+        },
+        "shell": {
+          "grid": {
+            "grid-template-columns": "none",
+            "grid-template-rows": "none"
+          },
+          "left": {
+            "x": 0,
+            "y": 36,
+            "w": 248,
+            "h": 824,
+            "right": 248,
+            "bottom": 860
+          },
+          "mid": {
+            "x": 248,
+            "y": 36,
+            "w": 1112,
+            "h": 824,
+            "right": 1360,
+            "bottom": 860
+          }
+        },
+        "side": {
+          "head": null,
+          "title": null,
+          "import": {
+            "rect": {
+              "x": 16,
+              "y": 757.73,
+              "w": 215,
+              "h": 32,
+              "right": 231,
+              "bottom": 789.73
+            },
+            "style": {
+              "background-color": "rgba(0, 0, 0, 0)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "6px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "path": {
+            "rect": {
+              "x": 56,
+              "y": 128.03,
+              "w": 162.56,
+              "h": 16.5,
+              "right": 218.56,
+              "bottom": 144.53
+            },
+            "style": {
+              "font-size": "11px",
+              "line-height": "16.5px",
+              "color": "rgb(167, 173, 181)",
+              "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace"
+            }
+          },
+          "treeLabel": {
+            "font-size": "10.5px",
+            "font-weight": "400",
+            "color": "rgb(148, 155, 164)",
+            "padding": "0px"
+          },
+          "group": {
+            "font-size": "10.5px",
+            "font-weight": "400",
+            "color": "rgb(148, 155, 164)",
+            "padding": "8px 4px 2px"
+          },
+          "item": {
+            "rect": {
+              "x": 16,
+              "y": 217.06,
+              "w": 215,
+              "h": 68.02,
+              "right": 231,
+              "bottom": 285.08
+            },
+            "style": {
+              "background-color": "rgb(42, 48, 55)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "8px",
+              "padding": "7px 8px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "0px none rgb(242, 244, 246)",
+              "border-left": "0px none rgb(242, 244, 246)",
+              "border-bottom": "0px none rgb(242, 244, 246)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "grid",
+              "align-items": "center",
+              "gap": "3px 10px",
+              "grid-template-columns": "28px 161px",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "itemActive": {
+            "background-color": "rgb(42, 48, 55)",
+            "border-radius": "8px"
+          },
+          "name": {
+            "font-size": "13px",
+            "font-weight": "600"
+          },
+          "sub": {
+            "font-size": "10.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "status": {
+            "font-size": "10.5px",
+            "color": "rgb(196, 161, 95)"
+          },
+          "badge": null
+        },
+        "chatHead": {
+          "rect": {
+            "x": 248,
+            "y": 36,
+            "w": 1112,
+            "h": 64,
+            "right": 1360,
+            "bottom": 100
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "8px 106px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "1px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "top": null,
+          "role": {
+            "font-size": "18px",
+            "font-weight": "650",
+            "color": "rgb(242, 244, 246)"
+          },
+          "sub": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "font-size": "11px",
+              "color": "rgb(148, 155, 164)"
+            }
+          },
+          "notes": null,
+          "hint": {
+            "font-size": "11.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "note": {
+            "rect": {
+              "x": 1023,
+              "y": 833.2,
+              "w": 231,
+              "h": 16.8,
+              "right": 1254,
+              "bottom": 850
+            },
+            "style": {
+              "font-size": "10.5px",
+              "color": "rgb(148, 155, 164)",
+              "display": "block"
+            },
+            "ico": null
+          }
+        },
+        "chat": {
+          "rect": {
+            "x": 248,
+            "y": 120.8,
+            "w": 1112,
+            "h": 613.41,
+            "right": 1360,
+            "bottom": 734.2
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "16px 96px 24px 106px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "0px solid rgb(44, 50, 56)",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "pane": {
+            "x": 354,
+            "y": -76.2,
+            "w": 900,
+            "h": 636.3,
+            "right": 1254,
+            "bottom": 560.09
+          }
+        },
+        "userMsg": {
+          "rect": {
+            "x": 889.84,
+            "y": -20.02,
+            "w": 364.16,
+            "h": 38,
+            "right": 1254
+          },
+          "bg": "rgb(30, 35, 40)",
+          "radius": "8px 8px 3px",
+          "padding": "8px 14px",
+          "fontSize": "14px",
+          "lineHeight": "22px",
+          "maxWidth": "88%",
+          "alignSelf": "flex-end"
+        },
+        "assistantCount": 2,
+        "assistantMsg": {
+          "rect": {
+            "x": 354,
+            "y": 73.98,
+            "w": 900,
+            "h": 167.59
+          },
+          "fontSize": "15px",
+          "lineHeight": "27px",
+          "color": "rgb(242, 244, 246)",
+          "maxWidth": "none"
+        },
+        "assistantP": {
+          "rect": {
+            "x": 354,
+            "w": 900,
+            "h": 27
+          },
+          "margin": "0px 0px 10px"
+        },
+        "assistantH3": null,
+        "records": {
+          "rect": {
+            "x": 354,
+            "y": 32.98,
+            "w": 760,
+            "h": 26,
+            "right": 1114,
+            "bottom": 58.98
+          },
+          "style": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "0px",
+            "padding": "2px 0px 2px 12px",
+            "font-size": "12px",
+            "line-height": "18.6px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "2px solid rgb(58, 65, 72)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "760px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "summary": {
+            "font-size": "11px",
+            "color": "rgb(148, 155, 164)",
+            "line-height": "17.05px",
+            "padding": "0px"
+          },
+          "count": {
+            "font-size": "11px",
+            "color": "rgb(148, 155, 164)",
+            "margin": "0px"
+          },
+          "row": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "0px",
+            "padding": "5px 0px",
+            "font-size": "11px",
+            "line-height": "17.05px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "grid",
+            "align-items": "start",
+            "gap": "10px",
+            "grid-template-columns": "42px 575.938px 108.062px",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "target": {
+            "font-size": "11px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(148, 155, 164)"
+          },
+          "state": {
+            "font-size": "10px",
+            "color": "rgb(148, 155, 164)"
+          }
+        },
+        "denied": {
+          "rect": {
+            "x": 354,
+            "y": 256.58,
+            "w": 900,
+            "h": 27.19,
+            "right": 1254,
+            "bottom": 283.77
+          },
+          "style": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(201, 122, 109)",
+            "border-radius": "0px",
+            "padding": "4px 0px",
+            "font-size": "12px",
+            "line-height": "19.2px",
+            "font-weight": "400",
+            "border": "0px solid rgb(44, 50, 56)",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "900px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(201, 122, 109)"
+          },
+          "summary": {
+            "font-size": "12px",
+            "color": "rgb(201, 122, 109)",
+            "line-height": "19.2px"
+          },
+          "target": {
+            "font-size": "12px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(148, 155, 164)"
+          },
+          "chev": false
+        },
+        "composer": {
+          "area": {
+            "rect": {
+              "x": 248,
+              "y": 734.2,
+              "w": 1112,
+              "h": 125.8,
+              "right": 1360,
+              "bottom": 860
+            },
+            "style": {
+              "background-color": "rgb(30, 35, 40)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "0px",
+              "padding": "12px 106px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "",
+              "border-left": "0px solid rgb(44, 50, 56)",
+              "border-bottom": "0px solid rgb(44, 50, 56)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "capsule": {
+            "rect": {
+              "x": 354,
+              "y": 747.2,
+              "w": 900,
+              "h": 80,
+              "right": 1254,
+              "bottom": 827.2
+            },
+            "style": {
+              "background-color": "rgb(30, 35, 40)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "8px",
+              "padding": "8px 12px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-left": "1px solid rgb(107, 117, 126)",
+              "border-bottom": "1px solid rgb(107, 117, 126)",
+              "margin": "0px",
+              "max-width": "900px",
+              "display": "flex",
+              "align-items": "normal",
+              "gap": "6px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "input": {
+            "font-size": "14px",
+            "line-height": "22px",
+            "padding": "0px",
+            "color": "rgb(242, 244, 246)",
+            "background-color": "rgba(0, 0, 0, 0)"
+          },
+          "send": {
+            "rect": {
+              "x": 1175,
+              "y": 790.2,
+              "w": 66,
+              "h": 28,
+              "right": 1241,
+              "bottom": 818.2
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "500",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "4px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "halt": {
+            "rect": {
+              "x": 1077,
+              "y": 790.2,
+              "w": 92,
+              "h": 28,
+              "right": 1169,
+              "bottom": 818.2
+            },
+            "hidden": false,
+            "style": {
+              "border": "1px solid rgb(92, 56, 50)",
+              "background-color": "rgb(46, 34, 32)",
+              "color": "rgb(201, 122, 109)",
+              "border-radius": "6px"
+            }
+          },
+          "attach": {
+            "rect": {
+              "x": 367,
+              "y": 790.2,
+              "w": 28,
+              "h": 28,
+              "right": 395,
+              "bottom": 818.2
+            },
+            "style": {
+              "color": "rgb(167, 173, 181)",
+              "border-radius": "6px"
+            }
+          }
+        },
+        "drawer": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "style": {
+            "background-color": "rgb(23, 27, 31)",
+            "border-left": "1px solid rgb(58, 65, 72)"
+          },
+          "open": false,
+          "head": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "height": "64px",
+              "padding": "0px 20px",
+              "border-bottom": "1px solid rgb(44, 50, 56)"
+            }
+          },
+          "title": {
+            "font-size": "18px",
+            "font-weight": "650"
+          },
+          "body": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "padding": "16px 20px 24px"
+            }
+          }
+        },
+        "sections": [
+          {
+            "summary": {
+              "style": {
+                "fontSize": "12px",
+                "padding": "0px 10px",
+                "color": "rgb(167, 173, 181)"
+              },
+              "rect": {
+                "x": 0,
+                "h": 0
+              }
+            },
+            "borderBottom": "1px solid rgb(44, 50, 56)"
+          },
+          {
+            "summary": {
+              "style": {
+                "fontSize": "12px",
+                "padding": "0px 10px",
+                "color": "rgb(167, 173, 181)"
+              },
+              "rect": {
+                "x": 0,
+                "h": 0
+              }
+            },
+            "borderBottom": "1px solid rgb(44, 50, 56)"
+          }
+        ],
+        "work": {
+          "body": {
+            "rect": null,
+            "style": null
+          },
+          "heading": null,
+          "running": null,
+          "item": null,
+          "pos": null,
+          "src": null,
+          "meta": null,
+          "text": null,
+          "toggleBtn": {
+            "rect": null,
+            "style": null
+          },
+          "withdrawBtn": {
+            "rect": null,
+            "style": null
+          },
+          "full": {
+            "rect": null,
+            "style": null
+          }
+        },
+        "pi": {
+          "hidden": true,
+          "panel": {
+            "rect": null,
+            "style": {
+              "padding": "0px",
+              "margin": "0px",
+              "background-color": "rgba(0, 0, 0, 0)",
+              "border": "0px solid rgb(44, 50, 56)"
+            }
+          },
+          "label": {
+            "font-size": "11.5px",
+            "color": "rgb(167, 173, 181)",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace"
+          },
+          "input": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "height": "32px",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-radius": "6px",
+              "font-size": "12.5px",
+              "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+              "background-color": "rgb(20, 23, 26)",
+              "padding": "0px 10px"
+            }
+          },
+          "pathEl": {
+            "font-size": "11px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(167, 173, 181)"
+          },
+          "hint": {
+            "font-size": "10.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "save": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "500",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "4px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "secretTag": {
+            "font-size": "10px",
+            "background-color": "rgb(36, 33, 26)",
+            "border-radius": "4px",
+            "padding": "0px 4px"
+          },
+          "advanced": true
+        },
+        "pending": {
+          "rect": {
+            "x": 354,
+            "w": 900,
+            "h": 118.14
+          },
+          "style": {
+            "background-color": "rgb(36, 33, 26)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "8px",
+            "padding": "10px 12px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "2px solid rgb(196, 161, 95)",
+            "border-bottom": "1px solid rgb(78, 66, 42)",
+            "margin": "4px 0px",
+            "max-width": "900px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "title": {
+            "font-size": "13px",
+            "font-weight": "600"
+          },
+          "question": null,
+          "confirm": {
+            "rect": {
+              "x": 1141,
+              "y": 466.09,
+              "w": 46,
+              "h": 28,
+              "right": 1187,
+              "bottom": 494.09
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "12px",
+              "line-height": "18.6px",
+              "font-weight": "400",
+              "border": "1px solid rgb(111, 160, 139)",
+              "border-left": "1px solid rgb(111, 160, 139)",
+              "border-bottom": "1px solid rgb(111, 160, 139)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "deny": {
+            "rect": {
+              "x": 1195,
+              "y": 466.09,
+              "w": 46,
+              "h": 28,
+              "right": 1241,
+              "bottom": 494.09
+            },
+            "style": {
+              "background-color": "rgb(20, 23, 26)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "12px",
+              "line-height": "18.6px",
+              "font-weight": "400",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-left": "1px solid rgb(107, 117, 126)",
+              "border-bottom": "1px solid rgb(107, 117, 126)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          }
+        },
+        "chip": {
+          "rect": {
+            "x": 1087.95,
+            "y": 682.39,
+            "w": 166.05,
+            "h": 19.81,
+            "right": 1254,
+            "bottom": 702.2
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(196, 161, 95)",
+            "border-radius": "999px",
+            "padding": "0px 12px",
+            "font-size": "11.5px",
+            "line-height": "17.825px",
+            "font-weight": "400",
+            "border": "1px solid rgb(78, 66, 42)",
+            "border-left": "1px solid rgb(78, 66, 42)",
+            "border-bottom": "1px solid rgb(78, 66, 42)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "6px",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(196, 161, 95)"
+          }
+        },
+        "current": {
+          "rect": null,
+          "style": null
+        }
+      },
+      "roleDrawer": {
+        "viewport": {
+          "w": 1360,
+          "h": 860,
+          "bodyScrollW": 1360,
+          "bodyClientW": 1360,
+          "appScrollW": 1360,
+          "appClientW": 1360,
+          "rootScrollW": 1360,
+          "rootClientW": 1360
+        },
+        "titlebar": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 1360,
+            "h": 36,
+            "right": 1360,
+            "bottom": 36
+          },
+          "style": {
+            "background-color": "rgb(26, 30, 34)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "0px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "1px solid rgb(58, 65, 72)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "mark": {
+            "font-size": "12px",
+            "font-weight": "600"
+          },
+          "sub": {
+            "font-size": "12px",
+            "color": "rgb(167, 173, 181)"
+          }
+        },
+        "shell": {
+          "grid": {
+            "grid-template-columns": "none",
+            "grid-template-rows": "none"
+          },
+          "left": {
+            "x": 0,
+            "y": 36,
+            "w": 248,
+            "h": 824,
+            "right": 248,
+            "bottom": 860
+          },
+          "mid": {
+            "x": 248,
+            "y": 36,
+            "w": 1112,
+            "h": 824,
+            "right": 1360,
+            "bottom": 860
+          }
+        },
+        "side": {
+          "head": null,
+          "title": null,
+          "import": {
+            "rect": {
+              "x": 16,
+              "y": 757.73,
+              "w": 215,
+              "h": 32,
+              "right": 231,
+              "bottom": 789.73
+            },
+            "style": {
+              "background-color": "rgba(0, 0, 0, 0)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "6px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "path": {
+            "rect": {
+              "x": 56,
+              "y": 128.03,
+              "w": 162.56,
+              "h": 16.5,
+              "right": 218.56,
+              "bottom": 144.53
+            },
+            "style": {
+              "font-size": "11px",
+              "line-height": "16.5px",
+              "color": "rgb(167, 173, 181)",
+              "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace"
+            }
+          },
+          "treeLabel": {
+            "font-size": "10.5px",
+            "font-weight": "400",
+            "color": "rgb(148, 155, 164)",
+            "padding": "0px"
+          },
+          "group": {
+            "font-size": "10.5px",
+            "font-weight": "400",
+            "color": "rgb(148, 155, 164)",
+            "padding": "8px 4px 2px"
+          },
+          "item": {
+            "rect": {
+              "x": 16,
+              "y": 217.06,
+              "w": 215,
+              "h": 68.02,
+              "right": 231,
+              "bottom": 285.08
+            },
+            "style": {
+              "background-color": "rgb(42, 48, 55)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "8px",
+              "padding": "7px 8px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "0px none rgb(242, 244, 246)",
+              "border-left": "0px none rgb(242, 244, 246)",
+              "border-bottom": "0px none rgb(242, 244, 246)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "grid",
+              "align-items": "center",
+              "gap": "3px 10px",
+              "grid-template-columns": "28px 161px",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "itemActive": {
+            "background-color": "rgb(42, 48, 55)",
+            "border-radius": "8px"
+          },
+          "name": {
+            "font-size": "13px",
+            "font-weight": "600"
+          },
+          "sub": {
+            "font-size": "10.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "status": {
+            "font-size": "10.5px",
+            "color": "rgb(196, 161, 95)"
+          },
+          "badge": null
+        },
+        "chatHead": {
+          "rect": {
+            "x": 248,
+            "y": 36,
+            "w": 1112,
+            "h": 64,
+            "right": 1360,
+            "bottom": 100
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "8px 106px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "1px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "top": null,
+          "role": {
+            "font-size": "18px",
+            "font-weight": "650",
+            "color": "rgb(242, 244, 246)"
+          },
+          "sub": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "font-size": "11px",
+              "color": "rgb(148, 155, 164)"
+            }
+          },
+          "notes": null,
+          "hint": {
+            "font-size": "11.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "note": {
+            "rect": {
+              "x": 1023,
+              "y": 833.2,
+              "w": 231,
+              "h": 16.8,
+              "right": 1254,
+              "bottom": 850
+            },
+            "style": {
+              "font-size": "10.5px",
+              "color": "rgb(148, 155, 164)",
+              "display": "block"
+            },
+            "ico": null
+          }
+        },
+        "chat": {
+          "rect": {
+            "x": 248,
+            "y": 120.8,
+            "w": 1112,
+            "h": 613.41,
+            "right": 1360,
+            "bottom": 734.2
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "16px 96px 24px 106px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "0px solid rgb(44, 50, 56)",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "pane": {
+            "x": 354,
+            "y": 136.8,
+            "w": 900,
+            "h": 728.48,
+            "right": 1254,
+            "bottom": 865.28
+          }
+        },
+        "userMsg": {
+          "rect": {
+            "x": 889.84,
+            "y": 192.98,
+            "w": 364.16,
+            "h": 38,
+            "right": 1254
+          },
+          "bg": "rgb(30, 35, 40)",
+          "radius": "8px 8px 3px",
+          "padding": "8px 14px",
+          "fontSize": "14px",
+          "lineHeight": "22px",
+          "maxWidth": "88%",
+          "alignSelf": "flex-end"
+        },
+        "assistantCount": 2,
+        "assistantMsg": {
+          "rect": {
+            "x": 354,
+            "y": 379.17,
+            "w": 900,
+            "h": 167.59
+          },
+          "fontSize": "15px",
+          "lineHeight": "27px",
+          "color": "rgb(242, 244, 246)",
+          "maxWidth": "none"
+        },
+        "assistantP": {
+          "rect": {
+            "x": 354,
+            "w": 900,
+            "h": 27
+          },
+          "margin": "0px 0px 10px"
+        },
+        "assistantH3": null,
+        "records": {
+          "rect": {
+            "x": 354,
+            "y": 245.98,
+            "w": 760,
+            "h": 118.19,
+            "right": 1114,
+            "bottom": 364.17
+          },
+          "style": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "0px",
+            "padding": "2px 0px 2px 12px",
+            "font-size": "12px",
+            "line-height": "18.6px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "2px solid rgb(58, 65, 72)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "760px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "summary": {
+            "font-size": "11px",
+            "color": "rgb(148, 155, 164)",
+            "line-height": "17.05px",
+            "padding": "0px"
+          },
+          "count": {
+            "font-size": "11px",
+            "color": "rgb(148, 155, 164)",
+            "margin": "0px"
+          },
+          "row": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "0px",
+            "padding": "5px 0px",
+            "font-size": "11px",
+            "line-height": "17.05px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "grid",
+            "align-items": "start",
+            "gap": "10px",
+            "grid-template-columns": "42px 575.938px 108.062px",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "target": {
+            "font-size": "11px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(148, 155, 164)"
+          },
+          "state": {
+            "font-size": "10px",
+            "color": "rgb(148, 155, 164)"
+          }
+        },
+        "denied": {
+          "rect": {
+            "x": 354,
+            "y": 561.77,
+            "w": 900,
+            "h": 27.19,
+            "right": 1254,
+            "bottom": 588.95
+          },
+          "style": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(201, 122, 109)",
+            "border-radius": "0px",
+            "padding": "4px 0px",
+            "font-size": "12px",
+            "line-height": "19.2px",
+            "font-weight": "400",
+            "border": "0px solid rgb(44, 50, 56)",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "900px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(201, 122, 109)"
+          },
+          "summary": {
+            "font-size": "12px",
+            "color": "rgb(201, 122, 109)",
+            "line-height": "19.2px"
+          },
+          "target": {
+            "font-size": "12px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(148, 155, 164)"
+          },
+          "chev": false
+        },
+        "composer": {
+          "area": {
+            "rect": {
+              "x": 248,
+              "y": 734.2,
+              "w": 1112,
+              "h": 125.8,
+              "right": 1360,
+              "bottom": 860
+            },
+            "style": {
+              "background-color": "rgb(30, 35, 40)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "0px",
+              "padding": "12px 106px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "",
+              "border-left": "0px solid rgb(44, 50, 56)",
+              "border-bottom": "0px solid rgb(44, 50, 56)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "capsule": {
+            "rect": {
+              "x": 354,
+              "y": 747.2,
+              "w": 900,
+              "h": 80,
+              "right": 1254,
+              "bottom": 827.2
+            },
+            "style": {
+              "background-color": "rgb(30, 35, 40)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "8px",
+              "padding": "8px 12px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-left": "1px solid rgb(107, 117, 126)",
+              "border-bottom": "1px solid rgb(107, 117, 126)",
+              "margin": "0px",
+              "max-width": "900px",
+              "display": "flex",
+              "align-items": "normal",
+              "gap": "6px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "input": {
+            "font-size": "14px",
+            "line-height": "22px",
+            "padding": "0px",
+            "color": "rgb(242, 244, 246)",
+            "background-color": "rgba(0, 0, 0, 0)"
+          },
+          "send": {
+            "rect": {
+              "x": 1175,
+              "y": 790.2,
+              "w": 66,
+              "h": 28,
+              "right": 1241,
+              "bottom": 818.2
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "500",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "4px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "halt": {
+            "rect": {
+              "x": 1077,
+              "y": 790.2,
+              "w": 92,
+              "h": 28,
+              "right": 1169,
+              "bottom": 818.2
+            },
+            "hidden": false,
+            "style": {
+              "border": "1px solid rgb(92, 56, 50)",
+              "background-color": "rgb(46, 34, 32)",
+              "color": "rgb(201, 122, 109)",
+              "border-radius": "6px"
+            }
+          },
+          "attach": {
+            "rect": {
+              "x": 367,
+              "y": 790.2,
+              "w": 28,
+              "h": 28,
+              "right": 395,
+              "bottom": 818.2
+            },
+            "style": {
+              "color": "rgb(167, 173, 181)",
+              "border-radius": "6px"
+            }
+          }
+        },
+        "drawer": {
+          "rect": {
+            "x": 936,
+            "y": 36,
+            "w": 424,
+            "h": 824,
+            "right": 1360,
+            "bottom": 860
+          },
+          "style": {
+            "background-color": "rgb(23, 27, 31)",
+            "border-left": "1px solid rgb(58, 65, 72)"
+          },
+          "open": true,
+          "head": {
+            "rect": {
+              "x": 937,
+              "y": 36,
+              "w": 423,
+              "h": 64,
+              "right": 1360,
+              "bottom": 100
+            },
+            "style": {
+              "height": "64px",
+              "padding": "0px 20px",
+              "border-bottom": "1px solid rgb(44, 50, 56)"
+            }
+          },
+          "title": {
+            "font-size": "18px",
+            "font-weight": "650"
+          },
+          "body": {
+            "rect": {
+              "x": 937,
+              "y": 100,
+              "w": 423,
+              "h": 760,
+              "right": 1360,
+              "bottom": 860
+            },
+            "style": {
+              "padding": "16px 20px 24px"
+            }
+          }
+        },
+        "sections": [
+          {
+            "summary": {
+              "style": {
+                "fontSize": "12px",
+                "padding": "0px 10px",
+                "color": "rgb(167, 173, 181)"
+              },
+              "rect": {
+                "x": 958,
+                "h": 32
+              }
+            },
+            "borderBottom": "1px solid rgb(44, 50, 56)"
+          },
+          {
+            "summary": {
+              "style": {
+                "fontSize": "12px",
+                "padding": "0px 10px",
+                "color": "rgb(167, 173, 181)"
+              },
+              "rect": {
+                "x": 958,
+                "h": 32
+              }
+            },
+            "borderBottom": "1px solid rgb(44, 50, 56)"
+          }
+        ],
+        "work": {
+          "body": {
+            "rect": null,
+            "style": null
+          },
+          "heading": null,
+          "running": null,
+          "item": null,
+          "pos": null,
+          "src": null,
+          "meta": null,
+          "text": null,
+          "toggleBtn": {
+            "rect": null,
+            "style": null
+          },
+          "withdrawBtn": {
+            "rect": null,
+            "style": null
+          },
+          "full": {
+            "rect": null,
+            "style": null
+          }
+        },
+        "pi": {
+          "hidden": true,
+          "panel": {
+            "rect": null,
+            "style": {
+              "padding": "0px",
+              "margin": "0px",
+              "background-color": "rgba(0, 0, 0, 0)",
+              "border": "0px solid rgb(44, 50, 56)"
+            }
+          },
+          "label": {
+            "font-size": "11.5px",
+            "color": "rgb(167, 173, 181)",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace"
+          },
+          "input": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "height": "32px",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-radius": "6px",
+              "font-size": "12.5px",
+              "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+              "background-color": "rgb(20, 23, 26)",
+              "padding": "0px 10px"
+            }
+          },
+          "pathEl": {
+            "font-size": "11px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(167, 173, 181)"
+          },
+          "hint": {
+            "font-size": "10.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "save": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "500",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "4px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "secretTag": {
+            "font-size": "10px",
+            "background-color": "rgb(36, 33, 26)",
+            "border-radius": "4px",
+            "padding": "0px 4px"
+          },
+          "advanced": true
+        },
+        "pending": {
+          "rect": {
+            "x": 354,
+            "w": 900,
+            "h": 118.14
+          },
+          "style": {
+            "background-color": "rgb(36, 33, 26)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "8px",
+            "padding": "10px 12px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "2px solid rgb(196, 161, 95)",
+            "border-bottom": "1px solid rgb(78, 66, 42)",
+            "margin": "4px 0px",
+            "max-width": "900px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "title": {
+            "font-size": "13px",
+            "font-weight": "600"
+          },
+          "question": null,
+          "confirm": {
+            "rect": {
+              "x": 1141,
+              "y": 771.28,
+              "w": 46,
+              "h": 28,
+              "right": 1187,
+              "bottom": 799.28
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "12px",
+              "line-height": "18.6px",
+              "font-weight": "400",
+              "border": "1px solid rgb(111, 160, 139)",
+              "border-left": "1px solid rgb(111, 160, 139)",
+              "border-bottom": "1px solid rgb(111, 160, 139)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "deny": {
+            "rect": {
+              "x": 1195,
+              "y": 771.28,
+              "w": 46,
+              "h": 28,
+              "right": 1241,
+              "bottom": 799.28
+            },
+            "style": {
+              "background-color": "rgb(20, 23, 26)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "12px",
+              "line-height": "18.6px",
+              "font-weight": "400",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-left": "1px solid rgb(107, 117, 126)",
+              "border-bottom": "1px solid rgb(107, 117, 126)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          }
+        },
+        "chip": {
+          "rect": {
+            "x": 1087.95,
+            "y": 682.39,
+            "w": 166.05,
+            "h": 19.81,
+            "right": 1254,
+            "bottom": 702.2
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(196, 161, 95)",
+            "border-radius": "999px",
+            "padding": "0px 12px",
+            "font-size": "11.5px",
+            "line-height": "17.825px",
+            "font-weight": "400",
+            "border": "1px solid rgb(78, 66, 42)",
+            "border-left": "1px solid rgb(78, 66, 42)",
+            "border-bottom": "1px solid rgb(78, 66, 42)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "6px",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(196, 161, 95)"
+          }
+        },
+        "current": {
+          "rect": null,
+          "style": null
+        }
+      },
+      "piDrawer": {
+        "viewport": {
+          "w": 1360,
+          "h": 860,
+          "bodyScrollW": 1360,
+          "bodyClientW": 1360,
+          "appScrollW": 1360,
+          "appClientW": 1360,
+          "rootScrollW": 1360,
+          "rootClientW": 1360
+        },
+        "titlebar": {
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 1360,
+            "h": 36,
+            "right": 1360,
+            "bottom": 36
+          },
+          "style": {
+            "background-color": "rgb(26, 30, 34)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "0px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "1px solid rgb(58, 65, 72)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "mark": {
+            "font-size": "12px",
+            "font-weight": "600"
+          },
+          "sub": {
+            "font-size": "12px",
+            "color": "rgb(167, 173, 181)"
+          }
+        },
+        "shell": {
+          "grid": {
+            "grid-template-columns": "none",
+            "grid-template-rows": "none"
+          },
+          "left": {
+            "x": 0,
+            "y": 36,
+            "w": 248,
+            "h": 824,
+            "right": 248,
+            "bottom": 860
+          },
+          "mid": {
+            "x": 248,
+            "y": 36,
+            "w": 1112,
+            "h": 824,
+            "right": 1360,
+            "bottom": 860
+          }
+        },
+        "side": {
+          "head": null,
+          "title": null,
+          "import": {
+            "rect": {
+              "x": 16,
+              "y": 757.73,
+              "w": 215,
+              "h": 32,
+              "right": 231,
+              "bottom": 789.73
+            },
+            "style": {
+              "background-color": "rgba(0, 0, 0, 0)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "6px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "path": {
+            "rect": {
+              "x": 56,
+              "y": 128.03,
+              "w": 162.56,
+              "h": 16.5,
+              "right": 218.56,
+              "bottom": 144.53
+            },
+            "style": {
+              "font-size": "11px",
+              "line-height": "16.5px",
+              "color": "rgb(167, 173, 181)",
+              "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace"
+            }
+          },
+          "treeLabel": {
+            "font-size": "10.5px",
+            "font-weight": "400",
+            "color": "rgb(148, 155, 164)",
+            "padding": "0px"
+          },
+          "group": {
+            "font-size": "10.5px",
+            "font-weight": "400",
+            "color": "rgb(148, 155, 164)",
+            "padding": "8px 4px 2px"
+          },
+          "item": {
+            "rect": {
+              "x": 16,
+              "y": 217.06,
+              "w": 215,
+              "h": 68.02,
+              "right": 231,
+              "bottom": 285.08
+            },
+            "style": {
+              "background-color": "rgb(42, 48, 55)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "8px",
+              "padding": "7px 8px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "0px none rgb(242, 244, 246)",
+              "border-left": "0px none rgb(242, 244, 246)",
+              "border-bottom": "0px none rgb(242, 244, 246)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "grid",
+              "align-items": "center",
+              "gap": "3px 10px",
+              "grid-template-columns": "28px 161px",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "itemActive": {
+            "background-color": "rgb(42, 48, 55)",
+            "border-radius": "8px"
+          },
+          "name": {
+            "font-size": "13px",
+            "font-weight": "600"
+          },
+          "sub": {
+            "font-size": "10.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "status": {
+            "font-size": "10.5px",
+            "color": "rgb(196, 161, 95)"
+          },
+          "badge": null
+        },
+        "chatHead": {
+          "rect": {
+            "x": 248,
+            "y": 36,
+            "w": 1112,
+            "h": 64,
+            "right": 1360,
+            "bottom": 100
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "8px 106px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "1px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "top": null,
+          "role": {
+            "font-size": "18px",
+            "font-weight": "650",
+            "color": "rgb(242, 244, 246)"
+          },
+          "sub": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "font-size": "11px",
+              "color": "rgb(148, 155, 164)"
+            }
+          },
+          "notes": null,
+          "hint": {
+            "font-size": "11.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "note": {
+            "rect": {
+              "x": 1023,
+              "y": 833.2,
+              "w": 231,
+              "h": 16.8,
+              "right": 1254,
+              "bottom": 850
+            },
+            "style": {
+              "font-size": "10.5px",
+              "color": "rgb(148, 155, 164)",
+              "display": "block"
+            },
+            "ico": null
+          }
+        },
+        "chat": {
+          "rect": {
+            "x": 248,
+            "y": 120.8,
+            "w": 1112,
+            "h": 613.41,
+            "right": 1360,
+            "bottom": 734.2
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(242, 244, 246)",
+            "border-radius": "0px",
+            "padding": "16px 96px 24px 106px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "0px solid rgb(44, 50, 56)",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(242, 244, 246)"
+          },
+          "pane": {
+            "x": 354,
+            "y": 136.8,
+            "w": 900,
+            "h": 728.48,
+            "right": 1254,
+            "bottom": 865.28
+          }
+        },
+        "userMsg": {
+          "rect": {
+            "x": 889.84,
+            "y": 192.98,
+            "w": 364.16,
+            "h": 38,
+            "right": 1254
+          },
+          "bg": "rgb(30, 35, 40)",
+          "radius": "8px 8px 3px",
+          "padding": "8px 14px",
+          "fontSize": "14px",
+          "lineHeight": "22px",
+          "maxWidth": "88%",
+          "alignSelf": "flex-end"
+        },
+        "assistantCount": 2,
+        "assistantMsg": {
+          "rect": {
+            "x": 354,
+            "y": 379.17,
+            "w": 900,
+            "h": 167.59
+          },
+          "fontSize": "15px",
+          "lineHeight": "27px",
+          "color": "rgb(242, 244, 246)",
+          "maxWidth": "none"
+        },
+        "assistantP": {
+          "rect": {
+            "x": 354,
+            "w": 900,
+            "h": 27
+          },
+          "margin": "0px 0px 10px"
+        },
+        "assistantH3": null,
+        "records": {
+          "rect": {
+            "x": 354,
+            "y": 245.98,
+            "w": 760,
+            "h": 118.19,
+            "right": 1114,
+            "bottom": 364.17
+          },
+          "style": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "0px",
+            "padding": "2px 0px 2px 12px",
+            "font-size": "12px",
+            "line-height": "18.6px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "2px solid rgb(58, 65, 72)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "760px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "summary": {
+            "font-size": "11px",
+            "color": "rgb(148, 155, 164)",
+            "line-height": "17.05px",
+            "padding": "0px"
+          },
+          "count": {
+            "font-size": "11px",
+            "color": "rgb(148, 155, 164)",
+            "margin": "0px"
+          },
+          "row": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "0px",
+            "padding": "5px 0px",
+            "font-size": "11px",
+            "line-height": "17.05px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "grid",
+            "align-items": "start",
+            "gap": "10px",
+            "grid-template-columns": "42px 575.938px 108.062px",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "target": {
+            "font-size": "11px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(148, 155, 164)"
+          },
+          "state": {
+            "font-size": "10px",
+            "color": "rgb(148, 155, 164)"
+          }
+        },
+        "denied": {
+          "rect": {
+            "x": 354,
+            "y": 561.77,
+            "w": 900,
+            "h": 27.19,
+            "right": 1254,
+            "bottom": 588.95
+          },
+          "style": {
+            "background-color": "rgba(0, 0, 0, 0)",
+            "color": "rgb(201, 122, 109)",
+            "border-radius": "0px",
+            "padding": "4px 0px",
+            "font-size": "12px",
+            "line-height": "19.2px",
+            "font-weight": "400",
+            "border": "0px solid rgb(44, 50, 56)",
+            "border-left": "0px solid rgb(44, 50, 56)",
+            "border-bottom": "0px solid rgb(44, 50, 56)",
+            "margin": "0px",
+            "max-width": "900px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(201, 122, 109)"
+          },
+          "summary": {
+            "font-size": "12px",
+            "color": "rgb(201, 122, 109)",
+            "line-height": "19.2px"
+          },
+          "target": {
+            "font-size": "12px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(148, 155, 164)"
+          },
+          "chev": false
+        },
+        "composer": {
+          "area": {
+            "rect": {
+              "x": 248,
+              "y": 734.2,
+              "w": 1112,
+              "h": 125.8,
+              "right": 1360,
+              "bottom": 860
+            },
+            "style": {
+              "background-color": "rgb(30, 35, 40)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "0px",
+              "padding": "12px 106px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "",
+              "border-left": "0px solid rgb(44, 50, 56)",
+              "border-bottom": "0px solid rgb(44, 50, 56)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "capsule": {
+            "rect": {
+              "x": 354,
+              "y": 747.2,
+              "w": 900,
+              "h": 80,
+              "right": 1254,
+              "bottom": 827.2
+            },
+            "style": {
+              "background-color": "rgb(30, 35, 40)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "8px",
+              "padding": "8px 12px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "400",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-left": "1px solid rgb(107, 117, 126)",
+              "border-bottom": "1px solid rgb(107, 117, 126)",
+              "margin": "0px",
+              "max-width": "900px",
+              "display": "flex",
+              "align-items": "normal",
+              "gap": "6px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          },
+          "input": {
+            "font-size": "14px",
+            "line-height": "22px",
+            "padding": "0px",
+            "color": "rgb(242, 244, 246)",
+            "background-color": "rgba(0, 0, 0, 0)"
+          },
+          "send": {
+            "rect": {
+              "x": 1175,
+              "y": 790.2,
+              "w": 66,
+              "h": 28,
+              "right": 1241,
+              "bottom": 818.2
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "500",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "4px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "halt": {
+            "rect": {
+              "x": 1077,
+              "y": 790.2,
+              "w": 92,
+              "h": 28,
+              "right": 1169,
+              "bottom": 818.2
+            },
+            "hidden": false,
+            "style": {
+              "border": "1px solid rgb(92, 56, 50)",
+              "background-color": "rgb(46, 34, 32)",
+              "color": "rgb(201, 122, 109)",
+              "border-radius": "6px"
+            }
+          },
+          "attach": {
+            "rect": {
+              "x": 367,
+              "y": 790.2,
+              "w": 28,
+              "h": 28,
+              "right": 395,
+              "bottom": 818.2
+            },
+            "style": {
+              "color": "rgb(167, 173, 181)",
+              "border-radius": "6px"
+            }
+          }
+        },
+        "drawer": {
+          "rect": {
+            "x": 936,
+            "y": 36,
+            "w": 424,
+            "h": 824,
+            "right": 1360,
+            "bottom": 860
+          },
+          "style": {
+            "background-color": "rgb(23, 27, 31)",
+            "border-left": "1px solid rgb(58, 65, 72)"
+          },
+          "open": true,
+          "head": {
+            "rect": {
+              "x": 937,
+              "y": 36,
+              "w": 423,
+              "h": 64,
+              "right": 1360,
+              "bottom": 100
+            },
+            "style": {
+              "height": "64px",
+              "padding": "0px 20px",
+              "border-bottom": "1px solid rgb(44, 50, 56)"
+            }
+          },
+          "title": {
+            "font-size": "18px",
+            "font-weight": "650"
+          },
+          "body": {
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            },
+            "style": {
+              "padding": "16px 20px 24px"
+            }
+          }
+        },
+        "sections": [],
+        "work": {
+          "body": {
+            "rect": null,
+            "style": null
+          },
+          "heading": null,
+          "running": null,
+          "item": null,
+          "pos": null,
+          "src": null,
+          "meta": null,
+          "text": null,
+          "toggleBtn": {
+            "rect": null,
+            "style": null
+          },
+          "withdrawBtn": {
+            "rect": null,
+            "style": null
+          },
+          "full": {
+            "rect": null,
+            "style": null
+          }
+        },
+        "pi": {
+          "hidden": false,
+          "panel": {
+            "rect": {
+              "x": 937,
+              "y": 100,
+              "w": 423,
+              "h": 760,
+              "right": 1360,
+              "bottom": 860
+            },
+            "style": {
+              "padding": "0px",
+              "margin": "0px",
+              "background-color": "rgba(0, 0, 0, 0)",
+              "border": "0px solid rgb(44, 50, 56)"
+            }
+          },
+          "label": {
+            "font-size": "11.5px",
+            "color": "rgb(167, 173, 181)",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace"
+          },
+          "input": {
+            "rect": {
+              "x": 957,
+              "y": 331.05,
+              "w": 335,
+              "h": 32,
+              "right": 1292,
+              "bottom": 363.05
+            },
+            "style": {
+              "height": "32px",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-radius": "6px",
+              "font-size": "12.5px",
+              "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+              "background-color": "rgb(20, 23, 26)",
+              "padding": "0px 10px"
+            }
+          },
+          "pathEl": {
+            "font-size": "11px",
+            "font-family": "ui-monospace, \"Cascadia Mono\", \"Cascadia Code\", \"SF Mono\", Consolas, \"Liberation Mono\", \"Microsoft YaHei\", monospace",
+            "color": "rgb(167, 173, 181)"
+          },
+          "hint": {
+            "font-size": "10.5px",
+            "color": "rgb(148, 155, 164)"
+          },
+          "save": {
+            "rect": {
+              "x": 957,
+              "y": 814.5,
+              "w": 100.14,
+              "h": 28,
+              "right": 1057.14,
+              "bottom": 842.5
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "13px",
+              "line-height": "20.15px",
+              "font-weight": "500",
+              "border": "1px solid rgba(0, 0, 0, 0)",
+              "border-left": "1px solid rgba(0, 0, 0, 0)",
+              "border-bottom": "1px solid rgba(0, 0, 0, 0)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "flex",
+              "align-items": "center",
+              "gap": "4px",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "secretTag": {
+            "font-size": "10px",
+            "background-color": "rgb(36, 33, 26)",
+            "border-radius": "4px",
+            "padding": "0px 4px"
+          },
+          "advanced": true
+        },
+        "pending": {
+          "rect": {
+            "x": 354,
+            "w": 900,
+            "h": 118.14
+          },
+          "style": {
+            "background-color": "rgb(36, 33, 26)",
+            "color": "rgb(167, 173, 181)",
+            "border-radius": "8px",
+            "padding": "10px 12px",
+            "font-size": "13px",
+            "line-height": "20.15px",
+            "font-weight": "400",
+            "border": "",
+            "border-left": "2px solid rgb(196, 161, 95)",
+            "border-bottom": "1px solid rgb(78, 66, 42)",
+            "margin": "4px 0px",
+            "max-width": "900px",
+            "display": "block",
+            "align-items": "normal",
+            "gap": "normal",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(167, 173, 181)"
+          },
+          "title": {
+            "font-size": "13px",
+            "font-weight": "600"
+          },
+          "question": null,
+          "confirm": {
+            "rect": {
+              "x": 1141,
+              "y": 771.28,
+              "w": 46,
+              "h": 28,
+              "right": 1187,
+              "bottom": 799.28
+            },
+            "style": {
+              "background-color": "rgb(111, 160, 139)",
+              "color": "rgb(20, 23, 26)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "12px",
+              "line-height": "18.6px",
+              "font-weight": "400",
+              "border": "1px solid rgb(111, 160, 139)",
+              "border-left": "1px solid rgb(111, 160, 139)",
+              "border-bottom": "1px solid rgb(111, 160, 139)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(20, 23, 26)"
+            }
+          },
+          "deny": {
+            "rect": {
+              "x": 1195,
+              "y": 771.28,
+              "w": 46,
+              "h": 28,
+              "right": 1241,
+              "bottom": 799.28
+            },
+            "style": {
+              "background-color": "rgb(20, 23, 26)",
+              "color": "rgb(242, 244, 246)",
+              "border-radius": "6px",
+              "padding": "0px 10px",
+              "font-size": "12px",
+              "line-height": "18.6px",
+              "font-weight": "400",
+              "border": "1px solid rgb(107, 117, 126)",
+              "border-left": "1px solid rgb(107, 117, 126)",
+              "border-bottom": "1px solid rgb(107, 117, 126)",
+              "margin": "0px",
+              "max-width": "none",
+              "display": "block",
+              "align-items": "normal",
+              "gap": "normal",
+              "grid-template-columns": "none",
+              "text-decoration-line": "none",
+              "outline-color": "rgb(242, 244, 246)"
+            }
+          }
+        },
+        "chip": {
+          "rect": {
+            "x": 1087.95,
+            "y": 682.39,
+            "w": 166.05,
+            "h": 19.81,
+            "right": 1254,
+            "bottom": 702.2
+          },
+          "style": {
+            "background-color": "rgb(20, 23, 26)",
+            "color": "rgb(196, 161, 95)",
+            "border-radius": "999px",
+            "padding": "0px 12px",
+            "font-size": "11.5px",
+            "line-height": "17.825px",
+            "font-weight": "400",
+            "border": "1px solid rgb(78, 66, 42)",
+            "border-left": "1px solid rgb(78, 66, 42)",
+            "border-bottom": "1px solid rgb(78, 66, 42)",
+            "margin": "0px",
+            "max-width": "none",
+            "display": "flex",
+            "align-items": "center",
+            "gap": "6px",
+            "grid-template-columns": "none",
+            "text-decoration-line": "none",
+            "outline-color": "rgb(196, 161, 95)"
+          }
+        },
+        "current": {
+          "rect": null,
+          "style": null
+        }
+      },
+      "piOverflow": {
+        "bodyClientW": 0,
+        "bodyScrollW": 0,
+        "panelClientW": 423,
+        "panelScrollW": 423,
+        "inputRights": [
+          1292,
+          1340,
+          1340,
+          1340
+        ],
+        "drawerRight": 1360
+      }
+    }
+  },
+  "v3": {
+    "results": {
+      "1-W1-行距16±1": {
+        "ok": true,
+        "detail": "rowPaddingBottom=15px"
+      },
+      "2-W2-p10±1": {
+        "ok": true,
+        "detail": "p margin=0px 0px 10px"
+      },
+      "2-W2-h3-16/6±1": {
+        "ok": true,
+        "detail": "h3 margin=16px 0px 6px"
+      },
+      "3-W3-气泡≤44": {
+        "ok": true,
+        "detail": "bubble h=38 pad=8px 14px lh=22px"
+      },
+      "4-W4-输入区≤140": {
+        "ok": true,
+        "detail": "composer h=125.8 pad=12px 106px 10px"
+      },
+      "4-W4-空框≤30": {
+        "ok": true,
+        "detail": "textarea h=28 minHeight=28px"
+      },
+      "5-转录总高≤850": {
+        "ok": true,
+        "detail": "transcriptH=515.7（基线 945）"
+      },
+      "6-可见行≥9": {
+        "ok": true,
+        "detail": "fullyVisibleRows=9 viewportH=613.4"
+      },
+      "8-无横向溢出-1360": {
+        "ok": true,
+        "detail": "bodyScrollW=1360 vs 1360"
+      },
+      "S3-无chip时尾行兜底": {
+        "ok": true,
+        "detail": "chip={\"hidden\":true} current={\"rect\":{\"y\":772.5,\"h\":26.6,\"x\":354,\"w\":900,\"bottom\":799.1},\"text\":\"正在工作\"}"
+      },
+      "W6b-系统正文去前缀": {
+        "ok": true,
+        "detail": "chip=系统消息 · 看护 body=投递排队积压：队首已排队 12 分钟。\n"
+      },
+      "W6-注入盒行高1.6": {
+        "ok": true,
+        "detail": "mi-body lineHeight=19.2px fontSize=12px"
+      },
+      "S1-合并为2个调用": {
+        "ok": true,
+        "detail": "activityCount=2（现状 4）"
+      },
+      "S1-合并行高≤48": {
+        "ok": true,
+        "detail": "maxH=46.1 avgH=46.1（现状 53.1）"
+      },
+      "S1-展开组≤60%现状": {
+        "ok": true,
+        "detail": "totalH=92.2 vs 0.6×212.4=127.44"
+      },
+      "S1-相位链保留": {
+        "ok": true,
+        "detail": "state=调用发起 → 状态未记录"
+      },
+      "S4-口径「N个调用」": {
+        "ok": true,
+        "detail": "summary=本轮 2 个调用：run_shell / read_file · 含状态未记录"
+      },
+      "S1-折叠摘要失败/未知可见": {
+        "ok": true,
+        "detail": "{\"open\":false,\"summary\":\"本轮 2 个调用：run_shell / read_file · 含状态未记录\",\"failureVisible\":true}"
+      },
+      "S3-chip可见无尾行": {
+        "ok": true,
+        "detail": "{\"hidden\":false,\"chipX\":1088,\"paneX\":354,\"diff\":734,\"diffRight\":0,\"tail\":null}"
+      },
+      "S2-chip对齐阅读列≤8": {
+        "ok": true,
+        "detail": "{\"hidden\":false,\"chipX\":1088,\"paneX\":354,\"diff\":734,\"diffRight\":0,\"tail\":null}"
+      },
+      "零动效-chip/确认卡": {
+        "ok": true,
+        "detail": "chipAnim=none cardAnim=none cardIter=1"
+      },
+      "8-无横向溢出-960": {
+        "ok": true,
+        "detail": "bodyScrollW=960 vs 960"
+      },
+      "6-可见行≥4-960": {
+        "ok": true,
+        "detail": "fullyVisibleRows=6 viewportH=381.4"
+      },
+      "S1-截断目标仍可见": {
+        "ok": true,
+        "detail": "{\"rows\":1,\"truncated\":true,\"summary\":\"本轮 1 个调用：run_shell · 含状态未记录\"}"
+      },
+      "11-W11-loading同款转轮": {
+        "ok": true,
+        "detail": "{\"tag\":\"svg\",\"spinDuration\":\"0.9\",\"motion\":\"true\"}"
+      },
+      "11-无第二转轮实现": {
+        "ok": true,
+        "detail": "spinnerElems=0（.spinner 已退役）"
+      },
+      "9-W9-徽标12pxSVG": {
+        "ok": true,
+        "detail": "{\"hasSvg\":true,\"boxW\":12,\"svgCssW\":\"12px\",\"svgCssH\":\"12px\",\"spinDuration\":\"0.9\",\"motion\":\"true\"}"
+      },
+      "9-W9-转轮0.9±0.2s": {
+        "ok": true,
+        "detail": "{\"hasSvg\":true,\"boxW\":12,\"svgCssW\":\"12px\",\"svgCssH\":\"12px\",\"spinDuration\":\"0.9\",\"motion\":\"true\"}"
+      },
+      "10-W10-尾行26.6±2": {
+        "ok": true,
+        "detail": "height=26.6 text=正在工作"
+      },
+      "10-W10-尾行含转轮": {
+        "ok": true,
+        "detail": "{\"text\":\"正在工作\",\"height\":26.6,\"hasSvg\":true,\"spinDuration\":\"0.9\",\"motion\":\"true\"}"
+      },
+      "12-reduced-motion静止弧": {
+        "ok": true,
+        "detail": "{\"matchesReduce\":true,\"reduced\":\"true\",\"hasSvg\":true}"
+      }
+    },
+    "measures": {
+      "densityClosed": {
+        "viewport": {
+          "w": 1360,
+          "h": 860,
+          "bodyScrollW": 1360
+        },
+        "paneGap": "0px",
+        "rowPaddingBottom": "15px",
+        "rows": [
+          {
+            "cls": "chat-row",
+            "kind": "user",
+            "text": "请先汇总现状。\n",
+            "y": 136.8,
+            "h": 53,
+            "x": 354,
+            "w": 900,
+            "bottom": 189.8
+          },
+          {
+            "cls": "chat-row",
+            "kind": "activities",
+            "text": "本轮 2 个调用：run_shell / rea",
+            "y": 189.8,
+            "h": 41,
+            "x": 354,
+            "w": 900,
+            "bottom": 230.8
+          },
+          {
+            "cls": "chat-row",
+            "kind": "assistant",
+            "text": "已核对。\n结论\n",
+            "y": 230.8,
+            "h": 83.6,
+            "x": 354,
+            "w": 900,
+            "bottom": 314.4
+          },
+          {
+            "cls": "chat-row",
+            "kind": "user",
+            "text": "继续核对。\n",
+            "y": 314.4,
+            "h": 53,
+            "x": 354,
+            "w": 900,
+            "bottom": 367.4
+          },
+          {
+            "cls": "chat-row",
+            "kind": "denied",
+            "text": "read_file 执行失败：watchdog.",
+            "y": 367.4,
+            "h": 42.2,
+            "x": 354,
+            "w": 900,
+            "bottom": 409.6
+          },
+          {
+            "cls": "chat-row",
+            "kind": "assistant",
+            "text": "读取失败已记录。\n",
+            "y": 409.6,
+            "h": 42,
+            "x": 354,
+            "w": 900,
+            "bottom": 451.6
+          },
+          {
+            "cls": "chat-row",
+            "kind": "operator",
+            "text": "需要你确认：是否按看护建议先停掉卡死的轮次？预览",
+            "y": 451.6,
+            "h": 127.7,
+            "x": 354,
+            "w": 900,
+            "bottom": 579.3
+          },
+          {
+            "cls": "chat-row",
+            "kind": "injected",
+            "text": "系统消息 · 看护投递排队积压：队首已排队 12",
+            "y": 579.3,
+            "h": 63.1,
+            "x": 354,
+            "w": 900,
+            "bottom": 642.4
+          },
+          {
+            "cls": "chat-row",
+            "kind": "injected",
+            "text": "系统消息 · 看护投递排队积压：队首已排队 12",
+            "y": 642.4,
+            "h": 63.1,
+            "x": 354,
+            "w": 900,
+            "bottom": 705.5
+          }
+        ],
+        "gaps": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "transcriptH": 515.7,
+        "chatViewportH": 613.4,
+        "chatRect": {
+          "top": 120.8,
+          "bottom": 734.2
+        },
+        "fullyVisibleRows": 9,
+        "msg": {
+          "fontSize": "15px",
+          "lineHeight": "27px"
+        },
+        "msgP": {
+          "margin": "0px 0px 10px"
+        },
+        "msgH3": {
+          "fontSize": "14px",
+          "margin": "16px 0px 6px"
+        },
+        "userBubble": {
+          "rect": {
+            "y": 136.8,
+            "h": 38,
+            "x": 1128,
+            "w": 126,
+            "bottom": 174.8
+          },
+          "padding": "8px 14px",
+          "lineHeight": "22px"
+        },
+        "records": {
+          "summaryH": 22,
+          "summaryLineHeight": "17.05px",
+          "open": false,
+          "summary": "本轮 2 个调用：run_shell / read_file · 含状态未记录"
+        },
+        "activityCount": 2,
+        "activityAvgH": 46.1,
+        "activityMaxH": 46.1,
+        "activityTotalH": 92.2,
+        "activity": {
+          "text": "未记录run_shellans status --json · exit 0调用发起 → 状态未记录",
+          "state": "调用发起 → 状态未记录",
+          "unknownCls": false
+        },
+        "injected": {
+          "rect": {
+            "y": 579.3,
+            "h": 48.1,
+            "x": 354,
+            "w": 900,
+            "bottom": 627.4
+          },
+          "bodyText": "投递排队积压：队首已排队 12 分钟。\n",
+          "chip": "系统消息 · 看护",
+          "bodyLineHeight": "19.2px",
+          "bodyFontSize": "12px"
+        },
+        "composer": {
+          "rect": {
+            "y": 734.2,
+            "h": 125.8,
+            "x": 248,
+            "w": 1112,
+            "bottom": 860
+          },
+          "padding": "12px 106px 10px"
+        },
+        "capsule": {
+          "rect": {
+            "y": 747.2,
+            "h": 80,
+            "x": 354,
+            "w": 900,
+            "bottom": 827.2
+          },
+          "padding": "8px 12px",
+          "gap": "6px"
+        },
+        "textarea": {
+          "minHeight": "28px",
+          "rect": {
+            "y": 756.2,
+            "h": 28,
+            "x": 367,
+            "w": 874,
+            "bottom": 784.2
+          }
+        },
+        "composeNote": {
+          "rect": {
+            "y": 833.2,
+            "h": 16.8,
+            "x": 354,
+            "w": 900,
+            "bottom": 850
+          },
+          "marginTop": "6px"
+        },
+        "chip": {
+          "hidden": true
+        },
+        "current": {
+          "rect": {
+            "y": 772.5,
+            "h": 26.6,
+            "x": 354,
+            "w": 900,
+            "bottom": 799.1
+          },
+          "text": "正在工作"
+        },
+        "deniedVisible": true
+      },
+      "indicatorsA": {
+        "workingIco": {
+          "hasSvg": true,
+          "boxW": 12,
+          "svgCssW": "12px",
+          "svgCssH": "12px",
+          "spinDuration": "0.9",
+          "motion": "true"
+        },
+        "toolCurrent": {
+          "text": "正在工作",
+          "height": 26.6,
+          "hasSvg": true,
+          "spinDuration": "0.9",
+          "motion": "true"
+        },
+        "loading": null,
+        "spinnerElems": 0,
+        "spinArcTotal": 0,
+        "opChipAnim": null,
+        "opCardAnim": "none",
+        "opCardIter": "1"
+      },
+      "density960Canonical": {
+        "viewport": {
+          "w": 960,
+          "h": 620,
+          "bodyScrollW": 960
+        },
+        "paneGap": "0px",
+        "rowPaddingBottom": "15px",
+        "rows": [
+          {
+            "cls": "chat-row",
+            "kind": "user",
+            "text": "请先汇总现状。\n",
+            "y": 132.8,
+            "h": 53,
+            "x": 272,
+            "w": 664,
+            "bottom": 185.8
+          },
+          {
+            "cls": "chat-row",
+            "kind": "activities",
+            "text": "本轮 2 个调用：run_shell / rea",
+            "y": 185.8,
+            "h": 41,
+            "x": 272,
+            "w": 664,
+            "bottom": 226.8
+          },
+          {
+            "cls": "chat-row",
+            "kind": "assistant",
+            "text": "已核对。\n结论\n",
+            "y": 226.8,
+            "h": 83.6,
+            "x": 272,
+            "w": 664,
+            "bottom": 310.4
+          },
+          {
+            "cls": "chat-row",
+            "kind": "user",
+            "text": "继续核对。\n",
+            "y": 310.4,
+            "h": 53,
+            "x": 272,
+            "w": 664,
+            "bottom": 363.4
+          },
+          {
+            "cls": "chat-row",
+            "kind": "denied",
+            "text": "read_file 执行失败：watchdog.",
+            "y": 363.4,
+            "h": 42.2,
+            "x": 272,
+            "w": 664,
+            "bottom": 405.6
+          },
+          {
+            "cls": "chat-row",
+            "kind": "assistant",
+            "text": "读取失败已记录。\n",
+            "y": 405.6,
+            "h": 42,
+            "x": 272,
+            "w": 664,
+            "bottom": 447.6
+          },
+          {
+            "cls": "chat-row",
+            "kind": "operator",
+            "text": "需要你确认：是否按看护建议先停掉卡死的轮次？预览",
+            "y": 447.6,
+            "h": 127.7,
+            "x": 272,
+            "w": 664,
+            "bottom": 575.3
+          },
+          {
+            "cls": "chat-row",
+            "kind": "injected",
+            "text": "系统消息 · 看护投递排队积压：队首已排队 12",
+            "y": 575.3,
+            "h": 63.1,
+            "x": 272,
+            "w": 664,
+            "bottom": 638.4
+          },
+          {
+            "cls": "chat-row",
+            "kind": "injected",
+            "text": "系统消息 · 看护投递排队积压：队首已排队 12",
+            "y": 638.4,
+            "h": 63.1,
+            "x": 272,
+            "w": 664,
+            "bottom": 701.5
+          }
+        ],
+        "gaps": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "transcriptH": 515.7,
+        "chatViewportH": 381.4,
+        "chatRect": {
+          "top": 116.8,
+          "bottom": 498.2
+        },
+        "fullyVisibleRows": 6,
+        "msg": {
+          "fontSize": "15px",
+          "lineHeight": "27px"
+        },
+        "msgP": {
+          "margin": "0px 0px 10px"
+        },
+        "msgH3": {
+          "fontSize": "14px",
+          "margin": "16px 0px 6px"
+        },
+        "userBubble": {
+          "rect": {
+            "y": 132.8,
+            "h": 38,
+            "x": 810,
+            "w": 126,
+            "bottom": 170.8
+          },
+          "padding": "8px 14px",
+          "lineHeight": "22px"
+        },
+        "records": {
+          "summaryH": 22,
+          "summaryLineHeight": "17.05px",
+          "open": false,
+          "summary": "本轮 2 个调用：run_shell / read_file · 含状态未记录"
+        },
+        "activityCount": 2,
+        "activityAvgH": 46.1,
+        "activityMaxH": 46.1,
+        "activityTotalH": 92.2,
+        "activity": {
+          "text": "未记录run_shellans status --json · exit 0调用发起 → 状态未记录",
+          "state": "调用发起 → 状态未记录",
+          "unknownCls": false
+        },
+        "injected": {
+          "rect": {
+            "y": 575.3,
+            "h": 48.1,
+            "x": 272,
+            "w": 664,
+            "bottom": 623.4
+          },
+          "bodyText": "投递排队积压：队首已排队 12 分钟。\n",
+          "chip": "系统消息 · 看护",
+          "bodyLineHeight": "19.2px",
+          "bodyFontSize": "12px"
+        },
+        "composer": {
+          "rect": {
+            "y": 498.2,
+            "h": 121.8,
+            "x": 248,
+            "w": 712,
+            "bottom": 620
+          },
+          "padding": "10px 24px 8px"
+        },
+        "capsule": {
+          "rect": {
+            "y": 509.2,
+            "h": 80,
+            "x": 272,
+            "w": 664,
+            "bottom": 589.2
+          },
+          "padding": "8px 12px",
+          "gap": "6px"
+        },
+        "textarea": {
+          "minHeight": "28px",
+          "rect": {
+            "y": 518.2,
+            "h": 28,
+            "x": 285,
+            "w": 638,
+            "bottom": 546.2
+          }
+        },
+        "composeNote": {
+          "rect": {
+            "y": 595.2,
+            "h": 16.8,
+            "x": 272,
+            "w": 664,
+            "bottom": 612
+          },
+          "marginTop": "6px"
+        },
+        "chip": {
+          "hidden": true
+        },
+        "current": {
+          "rect": {
+            "y": 768.5,
+            "h": 26.6,
+            "x": 272,
+            "w": 664,
+            "bottom": 795.1
+          },
+          "text": "正在工作"
+        },
+        "deniedVisible": true
+      },
+      "densityOpen": {
+        "viewport": {
+          "w": 1360,
+          "h": 860,
+          "bodyScrollW": 1360
+        },
+        "paneGap": "0px",
+        "rowPaddingBottom": "15px",
+        "rows": [
+          {
+            "cls": "chat-row",
+            "kind": "user",
+            "text": "请先汇总现状。\n",
+            "y": -44.2,
+            "h": 53,
+            "x": 354,
+            "w": 900,
+            "bottom": 8.8
+          },
+          {
+            "cls": "chat-row",
+            "kind": "activities",
+            "text": "本轮 2 个调用：run_shell / rea",
+            "y": 8.8,
+            "h": 133.2,
+            "x": 354,
+            "w": 900,
+            "bottom": 142
+          },
+          {
+            "cls": "chat-row",
+            "kind": "assistant",
+            "text": "已核对。\n结论\n",
+            "y": 142,
+            "h": 83.6,
+            "x": 354,
+            "w": 900,
+            "bottom": 225.6
+          },
+          {
+            "cls": "chat-row",
+            "kind": "user",
+            "text": "继续核对。\n",
+            "y": 225.6,
+            "h": 53,
+            "x": 354,
+            "w": 900,
+            "bottom": 278.6
+          },
+          {
+            "cls": "chat-row",
+            "kind": "denied",
+            "text": "read_file 执行失败：watchdog.",
+            "y": 278.6,
+            "h": 42.2,
+            "x": 354,
+            "w": 900,
+            "bottom": 320.8
+          },
+          {
+            "cls": "chat-row",
+            "kind": "assistant",
+            "text": "读取失败已记录。\n",
+            "y": 320.8,
+            "h": 42,
+            "x": 354,
+            "w": 900,
+            "bottom": 362.8
+          },
+          {
+            "cls": "chat-row",
+            "kind": "operator",
+            "text": "需要你确认：是否按看护建议先停掉卡死的轮次？预览",
+            "y": 362.8,
+            "h": 127.7,
+            "x": 354,
+            "w": 900,
+            "bottom": 490.5
+          },
+          {
+            "cls": "chat-row",
+            "kind": "injected",
+            "text": "系统消息 · 看护投递排队积压：队首已排队 12",
+            "y": 490.5,
+            "h": 63.1,
+            "x": 354,
+            "w": 900,
+            "bottom": 553.6
+          },
+          {
+            "cls": "chat-row",
+            "kind": "injected",
+            "text": "系统消息 · 看护投递排队积压：队首已排队 12",
+            "y": 553.6,
+            "h": 63.1,
+            "x": 354,
+            "w": 900,
+            "bottom": 616.7
+          }
+        ],
+        "gaps": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "transcriptH": 607.9,
+        "chatViewportH": 613.4,
+        "chatRect": {
+          "top": 120.8,
+          "bottom": 734.2
+        },
+        "fullyVisibleRows": 7,
+        "msg": {
+          "fontSize": "15px",
+          "lineHeight": "27px"
+        },
+        "msgP": {
+          "margin": "0px 0px 10px"
+        },
+        "msgH3": {
+          "fontSize": "14px",
+          "margin": "16px 0px 6px"
+        },
+        "userBubble": {
+          "rect": {
+            "y": -44.2,
+            "h": 38,
+            "x": 1128,
+            "w": 126,
+            "bottom": -6.2
+          },
+          "padding": "8px 14px",
+          "lineHeight": "22px"
+        },
+        "records": {
+          "summaryH": 22,
+          "summaryLineHeight": "17.05px",
+          "open": true,
+          "summary": "本轮 2 个调用：run_shell / read_file · 含状态未记录"
+        },
+        "activityCount": 2,
+        "activityAvgH": 46.1,
+        "activityMaxH": 46.1,
+        "activityTotalH": 92.2,
+        "activity": {
+          "text": "未记录run_shellans status --json · exit 0调用发起 → 状态未记录",
+          "state": "调用发起 → 状态未记录",
+          "unknownCls": false
+        },
+        "injected": {
+          "rect": {
+            "y": 490.5,
+            "h": 48.1,
+            "x": 354,
+            "w": 900,
+            "bottom": 538.6
+          },
+          "bodyText": "投递排队积压：队首已排队 12 分钟。\n",
+          "chip": "系统消息 · 看护",
+          "bodyLineHeight": "19.2px",
+          "bodyFontSize": "12px"
+        },
+        "composer": {
+          "rect": {
+            "y": 734.2,
+            "h": 125.8,
+            "x": 248,
+            "w": 1112,
+            "bottom": 860
+          },
+          "padding": "12px 106px 10px"
+        },
+        "capsule": {
+          "rect": {
+            "y": 747.2,
+            "h": 80,
+            "x": 354,
+            "w": 900,
+            "bottom": 827.2
+          },
+          "padding": "8px 12px",
+          "gap": "6px"
+        },
+        "textarea": {
+          "minHeight": "28px",
+          "rect": {
+            "y": 756.2,
+            "h": 28,
+            "x": 367,
+            "w": 874,
+            "bottom": 784.2
+          }
+        },
+        "composeNote": {
+          "rect": {
+            "y": 833.2,
+            "h": 16.8,
+            "x": 354,
+            "w": 900,
+            "bottom": 850
+          },
+          "marginTop": "6px"
+        },
+        "chip": {
+          "hidden": true
+        },
+        "current": {
+          "rect": {
+            "y": 683.7,
+            "h": 26.6,
+            "x": 354,
+            "w": 900,
+            "bottom": 710.3
+          },
+          "text": "正在工作"
+        },
+        "deniedVisible": true
+      },
+      "folded": {
+        "open": false,
+        "summary": "本轮 2 个调用：run_shell / read_file · 含状态未记录",
+        "failureVisible": true
+      },
+      "chipVisible": {
+        "hidden": false,
+        "chipX": 1088,
+        "paneX": 354,
+        "diff": 734,
+        "diffRight": 0,
+        "tail": null
+      },
+      "indicatorsC": {
+        "workingIco": {
+          "hasSvg": false,
+          "boxW": null,
+          "svgCssW": null,
+          "svgCssH": null,
+          "spinDuration": null,
+          "motion": null
+        },
+        "toolCurrent": null,
+        "loading": null,
+        "spinnerElems": 0,
+        "spinArcTotal": 0,
+        "opChipAnim": "none",
+        "opCardAnim": "none",
+        "opCardIter": "1"
+      },
+      "density960": {
+        "viewport": {
+          "w": 960,
+          "h": 620,
+          "bodyScrollW": 960
+        },
+        "paneGap": "0px",
+        "rowPaddingBottom": "15px",
+        "rows": [
+          {
+            "cls": "chat-row",
+            "kind": "user",
+            "text": "请先汇总现状。\n",
+            "y": -319.2,
+            "h": 53,
+            "x": 272,
+            "w": 664,
+            "bottom": -266.2
+          },
+          {
+            "cls": "chat-row",
+            "kind": "activities",
+            "text": "本轮 2 个调用：run_shell / rea",
+            "y": -266.2,
+            "h": 41,
+            "x": 272,
+            "w": 664,
+            "bottom": -225.2
+          },
+          {
+            "cls": "chat-row",
+            "kind": "assistant",
+            "text": "已核对。\n结论\n",
+            "y": -225.2,
+            "h": 83.6,
+            "x": 272,
+            "w": 664,
+            "bottom": -141.6
+          },
+          {
+            "cls": "chat-row",
+            "kind": "user",
+            "text": "继续核对。\n",
+            "y": -141.6,
+            "h": 53,
+            "x": 272,
+            "w": 664,
+            "bottom": -88.6
+          },
+          {
+            "cls": "chat-row",
+            "kind": "denied",
+            "text": "read_file 执行失败：watchdog.",
+            "y": -88.6,
+            "h": 42.2,
+            "x": 272,
+            "w": 664,
+            "bottom": -46.4
+          },
+          {
+            "cls": "chat-row",
+            "kind": "assistant",
+            "text": "读取失败已记录。\n",
+            "y": -46.4,
+            "h": 42,
+            "x": 272,
+            "w": 664,
+            "bottom": -4.4
+          },
+          {
+            "cls": "chat-row",
+            "kind": "operator",
+            "text": "需要你确认：是否按看护建议先停掉卡死的轮次？预览",
+            "y": -4.4,
+            "h": 127.7,
+            "x": 272,
+            "w": 664,
+            "bottom": 123.3
+          },
+          {
+            "cls": "chat-row",
+            "kind": "injected",
+            "text": "系统消息 · 看护投递排队积压：队首已排队 12",
+            "y": 123.3,
+            "h": 63.1,
+            "x": 272,
+            "w": 664,
+            "bottom": 186.4
+          },
+          {
+            "cls": "chat-row",
+            "kind": "injected",
+            "text": "系统消息 · 看护投递排队积压：队首已排队 12",
+            "y": 186.4,
+            "h": 63.1,
+            "x": 272,
+            "w": 664,
+            "bottom": 249.5
+          },
+          {
+            "cls": "chat-row",
+            "kind": "operator",
+            "text": "chip 对齐夹具预览内容预览。\n确认拒绝",
+            "y": 249.5,
+            "h": 141.1,
+            "x": 272,
+            "w": 664,
+            "bottom": 390.6
+          }
+        ],
+        "gaps": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "transcriptH": 656.8,
+        "chatViewportH": 381.4,
+        "chatRect": {
+          "top": 116.8,
+          "bottom": 498.2
+        },
+        "fullyVisibleRows": 3,
+        "msg": {
+          "fontSize": "15px",
+          "lineHeight": "27px"
+        },
+        "msgP": {
+          "margin": "0px 0px 10px"
+        },
+        "msgH3": {
+          "fontSize": "14px",
+          "margin": "16px 0px 6px"
+        },
+        "userBubble": {
+          "rect": {
+            "y": -319.2,
+            "h": 38,
+            "x": 810,
+            "w": 126,
+            "bottom": -281.2
+          },
+          "padding": "8px 14px",
+          "lineHeight": "22px"
+        },
+        "records": {
+          "summaryH": 22,
+          "summaryLineHeight": "17.05px",
+          "open": false,
+          "summary": "本轮 2 个调用：run_shell / read_file · 含状态未记录"
+        },
+        "activityCount": 2,
+        "activityAvgH": 46.1,
+        "activityMaxH": 46.1,
+        "activityTotalH": 92.2,
+        "activity": {
+          "text": "未记录run_shellans status --json · exit 0调用发起 → 状态未记录",
+          "state": "调用发起 → 状态未记录",
+          "unknownCls": false
+        },
+        "injected": {
+          "rect": {
+            "y": 123.3,
+            "h": 48.1,
+            "x": 272,
+            "w": 664,
+            "bottom": 171.4
+          },
+          "bodyText": "投递排队积压：队首已排队 12 分钟。\n",
+          "chip": "系统消息 · 看护",
+          "bodyLineHeight": "19.2px",
+          "bodyFontSize": "12px"
+        },
+        "composer": {
+          "rect": {
+            "y": 498.2,
+            "h": 121.8,
+            "x": 248,
+            "w": 712,
+            "bottom": 620
+          },
+          "padding": "10px 24px 8px"
+        },
+        "capsule": {
+          "rect": {
+            "y": 509.2,
+            "h": 80,
+            "x": 272,
+            "w": 664,
+            "bottom": 589.2
+          },
+          "padding": "8px 12px",
+          "gap": "6px"
+        },
+        "textarea": {
+          "minHeight": "28px",
+          "rect": {
+            "y": 518.2,
+            "h": 28,
+            "x": 285,
+            "w": 638,
+            "bottom": 546.2
+          }
+        },
+        "composeNote": {
+          "rect": {
+            "y": 595.2,
+            "h": 16.8,
+            "x": 272,
+            "w": 664,
+            "bottom": 612
+          },
+          "marginTop": "6px"
+        },
+        "chip": {
+          "hidden": false,
+          "x": 770,
+          "y": 450.4,
+          "right": 936,
+          "paneRight": 936,
+          "diffRight": 0
+        },
+        "current": null,
+        "deniedVisible": true
+      },
+      "truncatedTarget": {
+        "rows": 1,
+        "truncated": true,
+        "summary": "本轮 1 个调用：run_shell · 含状态未记录"
+      },
+      "loading": {
+        "workingIco": {
+          "hasSvg": false,
+          "boxW": null,
+          "svgCssW": null,
+          "svgCssH": null,
+          "spinDuration": null,
+          "motion": null
+        },
+        "toolCurrent": null,
+        "loading": {
+          "tag": "svg",
+          "spinDuration": "0.9",
+          "motion": "true"
+        },
+        "spinnerElems": 0,
+        "spinArcTotal": 0,
+        "opChipAnim": null,
+        "opCardAnim": null,
+        "opCardIter": null
+      },
+      "indicatorsB": {
+        "workingIco": {
+          "hasSvg": true,
+          "boxW": 12,
+          "svgCssW": "12px",
+          "svgCssH": "12px",
+          "spinDuration": "0.9",
+          "motion": "true"
+        },
+        "toolCurrent": {
+          "text": "正在工作",
+          "height": 26.6,
+          "hasSvg": true,
+          "spinDuration": "0.9",
+          "motion": "true"
+        },
+        "loading": null,
+        "spinnerElems": 0,
+        "spinArcTotal": 0,
+        "opChipAnim": null,
+        "opCardAnim": null,
+        "opCardIter": null
+      },
+      "reducedMotion": {
+        "matchesReduce": true,
+        "reduced": "true",
+        "hasSvg": true
+      }
+    }
+  }
+}

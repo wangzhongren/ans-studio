@@ -1,0 +1,22 @@
+# final3 台账机器核对（2026-10-21 验收补正）
+
+**输入**：final3 `main-diff/old-report.txt`、`main-diff/new-report.txt`、`main-diff/final-allowed-diff-ledger.json`、`main-diff/FINAL-G1-G5.md`。
+
+```
+old_names 391 new_names 397 common 390 old_only 1 new_only 7 value_diffs 75
+ledger_entries 380 value_mismatches 0
+g0_value_diffs 0
+group_counts {'G0-MATCH': 291, 'G3': 26, 'G4': 21, 'G5': 2, 'G1': 19, 'NEW-ONLY': 7, 'OLD-ONLY': 1, 'G2': 12, 'G4-RESOLVED': 1}
+pm_counts {'—': 291, 'approved（PM §19.3 条件批准生效）': 26, 'closed（修复/重锚；见 FINAL-G1-G5）': 21, 'follows-bottom（派生）': 2, 'group-approve（PM §19.1）': 19, 'approved（替代 P13_NEW_SEMANTICS）': 7, 'approved（退役）': 1, 'approved（PM §19.2）': 12, 'closed': 1}
+diff_names_not_ledger_rows 6 ['BADGE_ROLE_SINGLE_COUNT_WHILE_COLLAPSED', 'HAS_DENIED_INLINE_ANY', 'INJECTED_CHIP_DELIVERY_LABEL', 'REPLAY_DEDUP_REBUILD_UNIQUE_TEXT', 'ROLE_STATE_BADGE_SINGLE_COUNT_WORKING', 'STATUS_LAST_EVENT_FIELD_NEW']
+open_card {'group': 'G3', 'status': 'MATCH（值差异）', 'old': '207', 'new': '206', 'basis': '索引归一化（PM §19.3；旧载体/调试字段，行为必须仍 true）', 'coverage': 'main OPEN_CARD_STABLE_AT_ANCHOR=true', 'pm': 'approved（PM §19.3 条件批准生效）'}
+```
+
+**解释**：
+
+1. `value_mismatches 0`：final3 台账 380 行的 old/new 值与 final3 报告逐名一致；G0 组无值差异。
+2. `value_diffs 75` 全部有归属：69 条是台账内 G1–G5 行；6 条是新等价检查名（`BADGE_ROLE_SINGLE_COUNT_WHILE_COLLAPSED`、`HAS_DENIED_INLINE_ANY`、`INJECTED_CHIP_DELIVERY_LABEL`、`REPLAY_DEDUP_REBUILD_UNIQUE_TEXT`、`ROLE_STATE_BADGE_SINGLE_COUNT_WORKING`、`STATUS_LAST_EVENT_FIELD_NEW`），已在 `FINAL-G1-G5.md` 的 G3/G4 表作为替代检查列出，不重复计为旧名行。
+3. `pm_counts` 无 `proposed`/`not-approved`：G1 group-approve、G2 approved、G3 approved（PM §19.3 条件批准生效）、G4 closed（修复/重锚）、G4-RESOLVED closed、G5 follows-bottom、NEW/OLD approved。
+4. `OPEN_CARD_AT_ARRIVAL` 已为 G3，旧 207 / 新 206；补正前 post-fix3 台账误记 G0-MATCH 207/207。
+
+**结论**：final3 的 75 条值差异全部登记，无未批准行，`MATCH-FAIL=0`。

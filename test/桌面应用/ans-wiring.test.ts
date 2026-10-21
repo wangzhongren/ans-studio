@@ -256,3 +256,31 @@ test("I2 治理记录接线：main.ts 注册两条通道，preload 白名单两�
     assert.ok(mainSrc.includes(`desktop.${method}(input)`), `main.ts 的 ${channel} 应委托 desktop.${method}`);
   }
 });
+
+test("Phase 5A 入口接线：main.ts/main.mjs 经唯一路径事实源，未写死渲染入口", async () => {
+  const entry = await import("../../app/desktop/renderer-entry.ts");
+  assert.equal(entry.resolveRendererEntry("/app"), join("/app", "renderer", "dist", "index.html"));
+  const entrySrc = readFileSync(new URL("../../app/desktop/renderer-entry.ts", import.meta.url), "utf8");
+  assert.ok(entrySrc.includes("node:path"));
+  assert.ok(!/from\s+["']electron["']/.test(entrySrc), "renderer-entry 不得依赖 Electron");
+  const mainSrc = readFileSync(new URL("../../app/main.ts", import.meta.url), "utf8");
+  assert.ok(mainSrc.includes("resolveRendererEntry"));
+  assert.ok(!mainSrc.includes("resolveBuiltRendererEntry"), "5B 后不再保留 dist/src 过渡入口");
+  assert.ok(!mainSrc.includes('path.join(HERE, "renderer"'), "main.ts 不得写死渲染入口");
+  assert.ok(mainSrc.includes("ANS_DEV_SERVER_URL"));
+  assert.ok(mainSrc.includes("validateSmokeRendererEntry"));
+  // PM §17.12：产品侧导航兜底（will-navigate + setWindowOpenHandler + 去重闸）。
+  assert.ok(mainSrc.includes("installNavigationGuard"));
+  const guardSrc = readFileSync(new URL("../../app/desktop/navigation-guard.ts", import.meta.url), "utf8");
+  assert.ok(guardSrc.includes("will-navigate"));
+  assert.ok(guardSrc.includes("setWindowOpenHandler"));
+  assert.ok(guardSrc.includes("classifyNavigation"));
+  assert.ok(guardSrc.includes("classifyWindowOpen"));
+  assert.ok(guardSrc.includes("createExternalOpenGate"));
+  const e2eSrc = readFileSync(new URL("./e2e/main.mjs", import.meta.url), "utf8");
+  assert.ok(e2eSrc.includes("renderer-entry.ts"));
+  assert.ok(e2eSrc.includes("ANS_RENDERER_ENTRY"));
+  assert.ok(!e2eSrc.includes('path.join(APP_DIR, "renderer", "index.html")'), "main.mjs 不得写死渲染入口");
+  assert.ok(e2eSrc.includes('log("RENDERER_ENTRY="'));
+  assert.ok(e2eSrc.includes('log("E2E_PASS="'));
+});
