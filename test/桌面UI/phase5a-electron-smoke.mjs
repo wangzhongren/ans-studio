@@ -297,6 +297,33 @@ app.whenReady().then(async () => {
     await js(`await window.__ansRenderer.selectRole('liaison')`);
     await js(`await window.__ansRenderer.selectRuntime('pi')`);
     await sleep(180);
+    const brandIcons = await js(`(() => {
+      const title = document.querySelector('.titlebar .titlebar-mark');
+      const side = document.querySelector('.workspace-brand .workspace-brand-mark');
+      const rect = (n) => n ? { w: n.getBoundingClientRect().width, h: n.getBoundingClientRect().height } : null;
+      return {
+        title: title ? { tag: title.tagName, alt: title.alt, src: title.getAttribute('src'), complete: title.complete, w: title.naturalWidth, h: title.naturalHeight, box: rect(title) } : null,
+        side: side ? { tag: side.tagName, alt: side.alt, src: side.getAttribute('src'), complete: side.complete, w: side.naturalWidth, h: side.naturalHeight, box: rect(side) } : null,
+        subtitle: document.querySelector('.workspace-brand span')?.textContent || '',
+        titleText: document.querySelector('.titlebar-mark')?.textContent || '',
+      };
+    })()`);
+    check(
+      "brand icons are bundled img alt=ANS in titlebar and sidebar",
+      brandIcons.title?.tag === "IMG"
+        && brandIcons.title.alt === "ANS"
+        && brandIcons.title.complete === true
+        && brandIcons.title.w >= 16
+        && Math.round(brandIcons.title.box?.w || 0) === 20
+        && brandIcons.side?.tag === "IMG"
+        && brandIcons.side.alt === "ANS"
+        && brandIcons.side.complete === true
+        && brandIcons.side.w >= 16
+        && Math.round(brandIcons.side.box?.w || 0) === 30
+        && brandIcons.subtitle === "AGENT WORKSPACE"
+        && brandIcons.titleText === "",
+      brandIcons,
+    );
 
     // ————— 1. Sidebar 身份（1360） —————
     check(

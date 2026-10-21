@@ -41,15 +41,17 @@
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   white-space: nowrap;
 }
 .titlebar-mark {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  color: var(--foreground);
+  width: 20px;
+  height: 20px;
+  display: block;
+  flex: 0 0 auto;
+  border-radius: 4px;
+  object-fit: contain;
 }
 .titlebar-sub {
   font-size: 12px;
@@ -155,14 +157,25 @@
   gap: 8px;
 }
 .workspace-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   font-size: 21px;
   font-weight: 750;
   letter-spacing: -0.05em;
   line-height: 1.2;
 }
+.workspace-brand-mark {
+  width: 30px;
+  height: 30px;
+  display: block;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  object-fit: contain;
+}
 .workspace-brand span {
   display: block;
-  margin-top: 2px;
+  margin-top: 4px;
   font-size: 10.5px;
   letter-spacing: 0.12em;
   font-weight: 500;

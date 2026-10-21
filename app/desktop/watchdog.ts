@@ -71,12 +71,13 @@ export const REPEAT_FAIL_COOLDOWN_MS = 30 * 60 * 1000;
 export const STORM_WINDOW_MS = 15 * 60 * 1000;
 export const STORM_LIMIT = 5;
 /**
- * **回合自动中止时限**（2026-10-20 真机：Convener 卡 1h、队列 24）。
- * 优先级：显式覆盖（测试）→ `ANS_PI_PROMPT_TIMEOUT_MS` → **默认 15 分钟**；再与运行时的
- * `turnLastResortMs` 取较小值（不得晚于最后兜底）。决策开关开启时，看护到点即自动中止该回合；
- * 关闭时只告警、不中止（既有语义）。诊断里写入实际时限与来源。
+ * **回合自动中止时限**（2026-10-21 客户要求：去掉默认 15 分钟自动关闭）。
+ * 默认 **0 = 禁用**（看护只到点提示，不自动中止）；仅显式覆盖（测试）或
+ * `ANS_PI_PROMPT_TIMEOUT_MS` 正整数时开启，再与运行时 `turnLastResortMs` 取较小值
+ * （不得晚于最后兜底）。决策开关开启且配置了正时限时才自动中止；否则只告警。
+ * 1 小时最后兜底属运行时适配器硬上限，不由此值控制。
  */
-export const DEFAULT_TURN_ABORT_MS = 15 * 60 * 1000;
+export const DEFAULT_TURN_ABORT_MS = 0;
 export const TURN_ABORT_ENV = PROMPT_TIMEOUT_ENV;
 
 // —————————————————————— 同源快照的形状（由 SessionManager 提供；看护只读，不造第二数据源） ——————————————————————
@@ -349,15 +350,17 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
   /** 到点检查时限（历史字段名 `promptTimeoutMs`；**不中止本轮**）。 */
   const turnTimeoutMs = (runtime: RuntimeKind): number => turnTimeouts(runtime).promptTimeoutMs;
   /**
-   * **自动中止时限**（2026-10-20）：显式覆盖 → env `ANS_PI_PROMPT_TIMEOUT_MS` → 默认 15 分钟；
-   * 再与运行时 `turnLastResortMs` 取较小值（不得晚于最后兜底）。开关关闭时不消费本值（旧语义不变）。
+   * **自动中止时限**（2026-10-21 客户要求）：显式覆盖（测试）或 env `ANS_PI_PROMPT_TIMEOUT_MS`
+   * 正整数才开启；**默认 0 = 禁用**（只到点提示，不自动中止）。正时限再与运行时
+   * `turnLastResortMs` 取较小值（不得晚于最后兜底）。开关关闭时不消费本值。
    */
   const turnAbortMs = (runtime: RuntimeKind): number => {
     const envRaw = (config.env ?? process.env)[TURN_ABORT_ENV];
     const envValue = envRaw !== undefined && envRaw.trim() !== "" ? Number(envRaw) : Number.NaN;
-    const base = config.promptTimeoutOverrideMs
-      ?? (Number.isFinite(envValue) && envValue > 0 ? Math.floor(envValue) : DEFAULT_TURN_ABORT_MS);
-    return Math.min(base, turnTimeouts(runtime).turnLastResortMs);
+    const explicit = config.promptTimeoutOverrideMs
+      ?? (Number.isFinite(envValue) && envValue > 0 ? Math.floor(envValue) : 0);
+    if (!(explicit > 0)) return 0;
+    return Math.min(explicit, turnTimeouts(runtime).turnLastResortMs);
   };
   /** 整轮最后兜底（固定 1 小时、无 env）：整小时用「N 小时」，否则按既有毫秒格式化。 */
   const lastResortText = (runtime: RuntimeKind): string => {
@@ -512,6 +515,8 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
       let positive = false;
       let identity: string | undefined;
       let startedAt = 0;
+      // 自动中止时限在 busy 分支外求值：buildAlert 闭包在 evaluateEpisode 内也要读（0=禁用）。
+      const abortLimit = turnAbortMs(role.runtime);
       if (role.busy && typeof role.turnStartedAt === "number") {
         const limit = turnTimeoutMs(role.runtime);
         const elapsed = at - role.turnStartedAt;
@@ -520,13 +525,13 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
           positive = true;
           startedAt = role.turnStartedAt;
         }
-        // —— 自动中止（2026-10-20）：看护覆盖**所有角色**（含内置治理角色，尤其 Convener）——不按
-        // builtIn/governanceFunction 排除。开关开启时，回合超过中止时限（同源 env、缺省 15 min）⇒ 恰一次
-        // 调用注入回调；开关关闭（缺省）⇒ 零变化（只告警、1h 最后兜底——既有语义）。正确等待（有挂起
-        // 确认卡）不中止。同一 role+turnId 只触发一次：abort 生效前的后续 tick 与「abort→立即重开→再
-        // abort」的循环由 `autoAbortFired` 的轮次身份去重挡住。
-        const abortLimit = turnAbortMs(role.runtime);
+        // —— 自动中止（2026-10-21 客户要求：默认禁用）：看护覆盖**所有角色**（含内置治理角色，
+        // 尤其 Convener）——不按 builtIn/governanceFunction 排除。仅显式配置正时限（测试覆盖或
+        // `ANS_PI_PROMPT_TIMEOUT_MS`）且开关开启、回合超限 ⇒ 恰一次调用注入回调；默认 0 ⇒ 只到点提示，
+        // 不自动中止（1h 为运行时最后兜底）。正确等待（有挂起确认卡）不中止。同一 role+turnId 只触发
+        // 一次：abort 生效前的后续 tick 与「abort→立即重开→再 abort」的循环由 `autoAbortFired` 去重挡住。
         if (
+          abortLimit > 0 &&
           elapsed >= abortLimit &&
           pendingFor(role.roleId) === 0 &&
           deps.onTurnDeadline !== undefined &&
@@ -543,7 +548,7 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
             loggerFor(projectRoot).record("watchdog.auto-abort", { roleId: role.roleId, turnId: identity, elapsedMs: elapsed, limitMs: abortLimit });
             // Lead 系统行：自动中止 ≠ 客户批准（经既有投递机；一条/轮）。
             outbound(projectRoot, {
-              text: `${WATCHDOG_ALERT_PREFIX} 回合自动中止：角色「${role.roleId}」本轮已耗 ${formatDurationMs(elapsed)}（自动中止时限 ${formatDurationMs(abortLimit)}）。自动中止 ≠ 客户批准：这是看护按「替我决策/替我审批」开关执行的停止动作，只停止本回合、不代表客户逐项审批；轮次收尾后队列中的回交/派发按既有顺序继续投递。`,
+              text: `${WATCHDOG_ALERT_PREFIX} 回合自动中止：角色「${role.roleId}」本轮已耗 ${formatDurationMs(elapsed)}（显式配置的自动中止时限 ${formatDurationMs(abortLimit)}）。自动中止 ≠ 客户批准：这是看护按「替我决策/替我审批」开关执行的停止动作，只停止本回合、不代表客户逐项审批；轮次收尾后队列中的回交/派发按既有顺序继续投递。`,
               summary: `系统·看护 · 回合自动中止 · 角色 ${role.roleId}`,
             }, `auto-abort-${role.roleId}`);
           }
@@ -557,9 +562,11 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
             signal: "turn-deadline",
             roleId: role.roleId,
             facts: [
-              `本轮有效已耗约 ${formatDurationMs(at - startedAt)}（看护检查时限 ${turnTimeoutMs(role.runtime)}ms；到点仅检查、不中止本轮——仅限开关关闭；开关开启且超过自动中止时限 ⇒ 看护自动中止本轮）`,
+              abortLimit > 0
+                ? `本轮有效已耗约 ${formatDurationMs(at - startedAt)}（看护检查时限 ${turnTimeoutMs(role.runtime)}ms；到点仅检查；显式配置的自动中止时限 ${formatDurationMs(abortLimit)}，开关开启时看护到点自动中止）`
+                : `本轮有效已耗约 ${formatDurationMs(at - startedAt)}（看护检查时限 ${turnTimeoutMs(role.runtime)}ms；到点仅检查、不中止本轮；未配置看护自动中止）`,
               `请用 role_status / session_tail 核对该角色是否卡死；仍在推进则不动作；确认卡死可 propose_recovery（开关开启时由桌面自动执行；关闭时仍需客户确认后应用执行）`,
-              `整轮最后兜底 ${lastResortText(role.runtime)}（开关关闭时到点才自动中止本轮；开关开启时看护在中止时限先行中止）`,
+              `整轮最后兜底 ${lastResortText(role.runtime)}（运行时硬上限，不是看护自动中止）`,
               `本轮自 ${formatClock(startedAt)} 开始、至今仍在进行`,
               `该角色有挂起确认卡时不触发本信号（正确等待不报）`,
             ],

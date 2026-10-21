@@ -237,6 +237,25 @@ P13_CONTINUE_AFTER_RETURN=true RESULT={"ok":true,"sessionCurrent":true}
 
 **旧入口不可复跑**：旧 `renderer.js`/`styles.css`/vendor 已由桌面UI 删除；5A 旧/新快照仍保留在证据 `old/`、`new/`，5B 结果见 `5b/`。
 
+
+## 十二、看护自动中止默认关闭（2026-10-21 客户要求）
+
+**行为**：
+
+- `DEFAULT_TURN_ABORT_MS = 0`（默认禁用）；`turnAbortMs(runtime)` 仅显式覆盖（测试 `promptTimeoutOverrideMs`）或 `ANS_PI_PROMPT_TIMEOUT_MS` 正整数时返回正时限，否则 **0**；正时限仍与运行时 `turnLastResortMs` 取较小值（不得晚于最后兜底）。
+- 自动中止分支增加 `abortLimit > 0` 守卫：默认 0 ⇒ 看护**只到点提示**，绝不调用 `onTurnDeadline`；开关关闭/未配置同样不中止。1 小时最后兜底保留为运行时适配器硬上限（不是看护自动中止）。
+- 显式配置且开关开启时行为不变：到点恰一次 `onTurnDeadline`（同 role+turnId 去重）＋ Lead 系统行「回合自动中止 ≠ 客户批准」，系统行改为「显式配置的自动中止时限 …」。
+- 到点检查告警文案按配置分支：未配置 ⇒「到点仅检查、不中止本轮；未配置看护自动中止」；已配置 ⇒「显式配置的自动中止时限 …，开关开启时看护到点自动中止」；最后兜底行统一「运行时硬上限，不是看护自动中止」。不再出现「15 分钟自动中止」表述。
+- `interface.ts` 相关注释同步：15min 仅内部等待上限，非回合自动中止时限；开关关闭或未配置 ⇒ 只告警。
+
+**测试**：
+
+- `session.test.ts` 新增 2 例：默认（无时限）＋开关开 ⇒ 15 分钟/1 小时后均不 abort，告警含「未配置看护自动中止」且不含「15 分钟自动中止」；显式 `ANS_PI_PROMPT_TIMEOUT_MS=120000`＋开关开 ⇒ 到点恰一次、系统行注明显式配置；同配置开关关 ⇒ 只告警零 abort。
+- 既有 explicit-override / switch-off 用例保留并通过；`interface.test.ts`、`session.test.ts`、`dispatch-delivery.test.ts` 合跑 **158/158**；`test/桌面应用/**/*.test.ts` **506/506**；`npm run typecheck` 0。
+- main.mjs 默认：`E2E_PASS=true`、`E2E_FAILURES` 空（证据 `5b/watchdog-main-report.txt`）；`verify:local` ok、packaged smoke 14 项全 true（zip sha256 `c9145adc…`，证据 `5b/watchdog-local-smoke.json`）。
+
+**待交接（文案）**：`src/common/shared/runtime-settings.ts` 中 `ANS_PI_PROMPT_TIMEOUT_MS` 的 help 仍写「到点只通知…不中止本轮」；显式设置该 env 现在同时开启看护自动中止（开关开启时）。该文件属共享/PM 边界，本角色未改；请共享属主/PM 更新为「默认只检查；显式设置且自动开关开启时可在该时限自动中止（1 小时为运行时最后兜底）」。UI 标签「看护检查时限」本身无需改。
+
 ## 附：证据
 
 `角色卡/桌面窗口/docs/change/2026-10-21-phase5a-entry-evidence/`：

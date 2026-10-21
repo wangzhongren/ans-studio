@@ -596,7 +596,8 @@ test("G-2/W1 #1：轮次**到点检查**（demo 检查时限 120s → 120s 边�
   assert.ok(h.delivered[0].text.startsWith("[系统·看护]") && h.delivered[0].text.includes("轮次到点检查") && h.delivered[0].text.includes("A"), "文案＝编排单一来源（文首/信号/角色）");
   // 客户裁定 2026-10-17：到点**只提示、不中止本轮**——事实行给出核对/恢复指引与 1 小时最后兜底；
   // 不得再出现「逼近超时/已超时/硬超时/剩余约」等旧硬超时话术。
-  assert.match(h.delivered[0].text, /看护检查时限 120000ms；到点仅检查、不中止本轮/, "到点检查语义（100% 检查时限，不中止）");
+  assert.match(h.delivered[0].text, /看护检查时限 120000ms；到点仅检查/, "到点检查语义（100% 检查时限）");
+  assert.ok(h.delivered[0].text.includes("显式配置的自动中止时限 2 分 0 秒"), "夹具显式覆盖时限时如实标注（默认禁用见专门用例）");
   assert.ok(h.delivered[0].text.includes("role_status / session_tail") && h.delivered[0].text.includes("仍在推进则不动作"), "核对指引：仍在推进不动作");
   assert.ok(h.delivered[0].text.includes("propose_recovery"), "卡死才 propose_recovery");
   assert.ok(h.delivered[0].text.includes("整轮最后兜底 1 小时"), "1 小时最后兜底说明");
@@ -624,8 +625,9 @@ test("G-2/W1 #1：轮次**到点检查**（demo 检查时限 120s → 120s 边�
 
 // ——————————————————————————————————————————————————————————————————————————————————————
 // 2026-10-20 真机（Convener 卡 1h、24 条回交被 target-busy 堵住）：**回合自动中止**——
-// 看护覆盖所有角色（含内置治理角色），开关开启时到点调用注入回调（同一 role+turnId 恰一次），
-// 并投 Lead 系统行（自动中止 ≠ 客户批准）；开关关闭 ⇒ 旧语义（只告警、1h 最后兜底）零变化。
+// 看护覆盖所有角色（含内置治理角色），**仅显式配置正时限**且开关开启时到点调用注入回调
+// （同一 role+turnId 恰一次），并投 Lead 系统行（自动中止 ≠ 客户批准）。
+// 2026-10-21 客户要求：默认不再自动中止（0/禁用），只到点提示；显式 env/测试覆盖才开启。
 // ——————————————————————————————————————————————————————————————————————————————————————
 
 test("2026-10-20 看护自动中止：内置 Convener 超时 + 开关开 ⇒ onTurnDeadline 恰一次（同一 role+turnId 去重）＋ Lead 系统行", () => {
@@ -671,6 +673,58 @@ test("2026-10-20 看护自动中止：开关关闭 ⇒ 不调用 onTurnDeadline�
   h.advance(60 * 60 * 1000);
   h.service.tick();
   assert.equal(calls.length, 0, "开关关：到 1h 也不由看护中止（旧语义由运行时最后兜底）");
+});
+
+test("2026-10-21 看护自动中止默认禁用：未配置时限 + 开关开 ⇒ 只到点提示，不调用 onTurnDeadline", () => {
+  const calls: string[] = [];
+  const h = makeWatchdogHarness({
+    autoRecoveryEnabled: () => true,
+    onTurnDeadline: (_root, roleId) => { calls.push(roleId); },
+    config: { env: {}, tickMs: 30 * 1000, turnLastResortOverrideMs: 3_600_000 },
+  });
+  const started = h.nowMs();
+  h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A", { busy: true, turnStartedAt: started, turnId: "t-default" })] }));
+  h.advance(15 * 60 * 1000); // 旧默认 15 分钟已过
+  h.service.tick();
+  assert.equal(calls.length, 0, "默认 0/禁用：开关开也不自动中止");
+  const alert = h.delivered.find((d) => d.text.includes("轮次到点检查"))?.text || "";
+  assert.ok(alert.includes("未配置看护自动中止"), "告警如实说明未配置自动中止");
+  assert.ok(!alert.includes("15 分钟自动中止"), "不得声称 15 分钟自动中止");
+  assert.ok(alert.includes("整轮最后兜底 1 小时（运行时硬上限，不是看护自动中止）"), "1 小时最后兜底保留并如实标注");
+  h.advance(2 * 60 * 60 * 1000);
+  h.service.tick();
+  assert.equal(calls.length, 0, "即使超过 1 小时，看护也不自动中止（运行时最后兜底另算）");
+});
+
+test("2026-10-21 看护自动中止显式 env：ANS_PI_PROMPT_TIMEOUT_MS 配置时开关开 ⇒ 到点恰一次，开关关 ⇒ 只告警", () => {
+  const calls: string[] = [];
+  const h = makeWatchdogHarness({
+    autoRecoveryEnabled: () => true,
+    onTurnDeadline: (_root, roleId) => { calls.push(roleId); },
+    config: { env: { ANS_PI_PROMPT_TIMEOUT_MS: "120000" }, tickMs: 30 * 1000, turnLastResortOverrideMs: 3_600_000 },
+  });
+  const started = h.nowMs();
+  h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A", { busy: true, turnStartedAt: started, turnId: "t-env" })] }));
+  h.advance(119_999);
+  h.service.tick();
+  assert.equal(calls.length, 0, "未到显式时限不中止");
+  h.advance(1);
+  h.service.tick();
+  assert.equal(calls.length, 1, "显式 env 时限到点 ⇒ onTurnDeadline 恰一次");
+  assert.ok(h.delivered.some((d) => d.text.includes("回合自动中止") && d.text.includes("显式配置的自动中止时限")), "系统行注明显式配置");
+
+  const offCalls: string[] = [];
+  const off = makeWatchdogHarness({
+    autoRecoveryEnabled: () => false,
+    onTurnDeadline: (_root, roleId) => { offCalls.push(roleId); },
+    config: { env: { ANS_PI_PROMPT_TIMEOUT_MS: "120000" }, tickMs: 30 * 1000, turnLastResortOverrideMs: 3_600_000 },
+  });
+  const offStarted = off.nowMs();
+  off.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A", { busy: true, turnStartedAt: offStarted, turnId: "t-env-off" })] }));
+  off.advance(15 * 60 * 1000);
+  off.service.tick();
+  assert.equal(offCalls.length, 0, "开关关：即使显式配置也绝不自动中止（只告警）");
+  assert.ok(off.delivered.some((d) => d.text.includes("轮次到点检查")), "只告警");
 });
 
 test("G-2/W1 「正确等待不报」：#1 对带挂起确认卡的角色排除；su 自身忙不触发任何告警", () => {

@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { Copy, Minus, Square, X } from "lucide-react";
+import ansIcon from "@/assets/ans-studio-ans-icon.png";
 import {
   callWindowControl,
   getWindowControlAvailability,
@@ -51,7 +52,7 @@ export function TitleBar() {
         ) : null}
       </div>
       <div className="titlebar-brand">
-        <span className="titlebar-mark">ANS</span>
+        <img className="titlebar-mark" src={ansIcon} alt="ANS" width={20} height={20} />
         <span className="titlebar-sub">治理会话工作台</span>
       </div>
       <div className="titlebar-controls">

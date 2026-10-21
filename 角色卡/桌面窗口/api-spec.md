@@ -313,16 +313,16 @@ A4 legacy provenance窄修：protected工具t.statusSource/target.source分别�
 
 `busy=true` 时「当前轮」与「上一轮终局」**分行呈现、语义互斥**：
 
-- `  当前轮：进行中（已耗 X / 看护检查时限 Y；turnId=…；1 小时最后兜底）`——仅在快照有 `turnStartedAt` 时给出；X/Y 经 `formatDurationMs`，时限求值与看护/会话运行时同一来源 `resolveRuntimeTimeouts`（`promptTimeoutMs`＝**到点检查时限、不中止本轮**，缺省 **300000ms（5 分钟）**；`turnLastResortMs`＝1 小时最后兜底）；turnId 缺失时显示 `—`；**不再使用「硬超时」**。
+- `  当前轮：进行中（已耗 X / 看护检查时限 Y；turnId=…；1 小时最后兜底）`——仅在快照有 `turnStartedAt` 时给出；X/Y 经 `formatDurationMs`，时限求值与看护/会话运行时同一来源 `resolveRuntimeTimeouts`（`promptTimeoutMs`＝**到点检查时限、不中止本轮**，缺省 **300000ms（5 分钟）**；`turnLastResortMs`＝运行时 1 小时最后兜底。2026-10-21 起看护**默认不自动中止**：仅显式 `ANS_PI_PROMPT_TIMEOUT_MS` 正整数且自动开关开启时，该值同时作为看护自动中止时限）；turnId 缺失时显示 `—`；**不再使用「硬超时」**。
 - `  上一轮终局：<outcome> @ <at>（不表示当前轮；该角色近 15 分钟 failed/timed_out 计 N）`——历史终局显式标注，不得读成当前轮。
 - `busy=false` 时保持原样 `  最近一轮：<outcome> @ <at>（该角色近 15 分钟 failed/timed_out 计 N）`。
 - 历史统计（近 15 分钟 failed/timed_out 计数）保留，语义仍是历史统计。
 
-看护 #1 `turn-deadline`（客户裁定 2026-10-17）：阈值为 `TURN_DEADLINE_RATIO = 1.0`（**到点检查**，非 90% 预警）；事实行给出「看护检查时限 Yms；到点仅检查、不中止本轮」＋「用 role_status / session_tail 核对是否卡死；仍在推进则不动作；卡死才 propose_recovery」＋「整轮最后兜底 1 小时（到点才自动中止）」；summary 与文首为「轮次到点检查」。**不得**再出现「逼近超时/已超时/尚未超时/硬超时/剩余约」等旧话术；挂起确认卡/su 忙排除、每轮一次不变。**解除（轮次结束）时不投「看护恢复」行**（到点检查不是故障，恢复行会误导）——只复位活跃期并留 `watchdog.recovery` 诊断；正常完成/空闲不再产生任何会话消息。
+看护 #1 `turn-deadline`（客户裁定 2026-10-17）：阈值为 `TURN_DEADLINE_RATIO = 1.0`（**到点检查**，非 90% 预警）；事实行给出「看护检查时限 Yms；到点仅检查、不中止本轮」＋「用 role_status / session_tail 核对是否卡死；仍在推进则不动作；卡死才 propose_recovery」＋「整轮最后兜底 1 小时（运行时硬上限，不是看护自动中止）」；看护自动中止**默认禁用**，仅显式配置时限且开关开启时出现；summary 与文首为「轮次到点检查」。**不得**再出现「逼近超时/已超时/尚未超时/硬超时/剩余约」等旧话术；挂起确认卡/su 忙排除、每轮一次不变。**解除（轮次结束）时不投「看护恢复」行**（到点检查不是故障，恢复行会误导）——只复位活跃期并留 `watchdog.recovery` 诊断；正常完成/空闲不再产生任何会话消息。
 
 `system` 第四类投递：`DeliveryItem.kind` 增 `"system"`（看护告警/收束/恢复回执）；来源标注恒空、正文文首定格 `[系统·<子类>] `（U1 tool-rows.js 归类判据）；**不可撤回**；去重键看护自持命名空间（`watchdog\0…`）；失败保留待重试＋如实系统行。队列快照 `queue` 条目类型补 `id/full`（如实对齐运行时输出）。
 
-看护器：tick 默认 30s（`ANS_DESKTOP_WATCHDOG_TICK_MS`）、静默默认 30s（`ANS_DESKTOP_WATCHDOG_SILENCE_MS`）——**仅 env 可调**；信号 #1-#4（#1 `turn-deadline`＝**到点检查** `TURN_DEADLINE_RATIO=1.0`，只提示不中止；整轮最后兜底 1 小时；其余阈值＝设计 §3.2 默认）；去重/冷却/风暴护栏（15min≤5＋通告＋`watchdog.suppressed`）；`watchdog.failed`／`watchdog.alert`／`watchdog.recovery`／`watchdog.closure` 诊断；`DesktopInterface.startWatchdog()/stopWatchdog()`（窗口注册后启动、窗关停止；看护缺席 ⇒ 一切照旧）。新增 deps：`recoveryConfirm`、`watchdogObserver`、`watchdogPendingConfirmations`、`watchdogStats`、`now`（注入时钟）。
+看护器：tick 默认 30s（`ANS_DESKTOP_WATCHDOG_TICK_MS`）、静默默认 30s（`ANS_DESKTOP_WATCHDOG_SILENCE_MS`）——**仅 env 可调**；信号 #1-#4（#1 `turn-deadline`＝**到点检查** `TURN_DEADLINE_RATIO=1.0`，**默认只提示不中止**（`DEFAULT_TURN_ABORT_MS=0`；仅显式 `ANS_PI_PROMPT_TIMEOUT_MS`/测试覆盖且开关开启时自动中止）；整轮最后兜底 1 小时为运行时硬上限；其余阈值＝设计 §3.2 默认）；去重/冷却/风暴护栏（15min≤5＋通告＋`watchdog.suppressed`）；`watchdog.failed`／`watchdog.alert`／`watchdog.recovery`／`watchdog.closure` 诊断；`DesktopInterface.startWatchdog()/stopWatchdog()`（窗口注册后启动、窗关停止；看护缺席 ⇒ 一切照旧）。新增 deps：`recoveryConfirm`、`watchdogObserver`、`watchdogPendingConfirmations`、`watchdogStats`、`now`（注入时钟）。
 
 ### Phase 5A 渲染入口、dev/prod 与导航兜底（2026-10-21）
 

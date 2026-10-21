@@ -600,6 +600,110 @@ export function describeEvent(event: SessionEvent | null | undefined): NewRowDes
   return { kind: "system", data: { cls: "sys-settled", text: summary }, turnId };
 }
 
+const HISTORY_PROJECTION_GROUP: Record<string, string> = {
+  user: "user",
+  injected: "user",
+  system: "system",
+  delivery: "delivery",
+};
+
+/**
+ * 历史内部投影去重键（5B 真机回归）：
+ * 同一 turn 的 user 行与 prompt-input message 事件都会被映射为 user/injected；
+ * 仅对 user/injected/system/delivery 这类「同一投递的投影」按首行文本去重，
+ * 不碰 assistant/reasoning/tool（同轮多条助手消息/不同 callId 工具行是合法事实）。
+ */
+export function historyProjectionKey(
+  descriptor: NewRowDescriptor,
+): string | null {
+  const group = HISTORY_PROJECTION_GROUP[descriptor.kind];
+  if (!group) return null;
+  // 无轮次身份的历史行不猜「同一条投递」；只对带 turnId 的投影去重。
+  if (!descriptor.turnId) return null;
+  const data =
+    descriptor.data && typeof descriptor.data === "object"
+      ? (descriptor.data as Record<string, unknown>)
+      : {};
+  const text =
+    typeof data.body === "string"
+      ? data.body
+      : typeof data.text === "string"
+        ? data.text
+        : "";
+  const first = text.split(/\r?\n/)[0].trim();
+  if (!first) return null;
+  return group + "|" + (descriptor.turnId || "") + "|" + first;
+}
+
+function historyDescriptorHasIdentity(descriptor: NewRowDescriptor): boolean {
+  return !!(descriptor.anchorKey || descriptor.anchor || descriptor.requestId);
+}
+
+/**
+ * 历史行内部的投影去重：保留一条；若后续条目带 anchor/request 身份而先前没有，
+ * 在原位置替换为带身份的一条（不改变其余行顺序）。
+ */
+export function dedupeHistoryDescriptors(
+  descriptors: NewRowDescriptor[],
+): NewRowDescriptor[] {
+  const kept: NewRowDescriptor[] = [];
+  const byKey = new Map<string, number>();
+  for (const descriptor of descriptors) {
+    const key = historyProjectionKey(descriptor);
+    if (!key) {
+      kept.push(descriptor);
+      continue;
+    }
+    const at = byKey.get(key);
+    if (at === undefined) {
+      byKey.set(key, kept.length);
+      kept.push(descriptor);
+      continue;
+    }
+    if (
+      historyDescriptorHasIdentity(descriptor) &&
+      !historyDescriptorHasIdentity(kept[at])
+    ) {
+      kept[at] = descriptor;
+    }
+  }
+  return kept;
+}
+
+/**
+ * 历史行版本：返回按投影键去重后的原始行（保留带 anchor/request 身份的条目）。
+ * 供 applyHistory 在重放前统一去重；不改变行内字段。
+ */
+export function dedupeHistoryRows(
+  rows: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const descriptors = rows.map(historyRowToDescriptor);
+  const keptRows: Record<string, unknown>[] = [];
+  const byKey = new Map<string, number>();
+  for (let index = 0; index < descriptors.length; index += 1) {
+    const descriptor = descriptors[index];
+    const key = historyProjectionKey(descriptor);
+    if (!key) {
+      keptRows.push(rows[index]);
+      continue;
+    }
+    const at = byKey.get(key);
+    if (at === undefined) {
+      byKey.set(key, keptRows.length);
+      keptRows.push(rows[index]);
+      continue;
+    }
+    const keptDescriptor = historyRowToDescriptor(keptRows[at]);
+    if (
+      historyDescriptorHasIdentity(descriptor) &&
+      !historyDescriptorHasIdentity(keptDescriptor)
+    ) {
+      keptRows[at] = rows[index];
+    }
+  }
+  return keptRows;
+}
+
 export function historyRowToDescriptor(row: Record<string, unknown>): NewRowDescriptor {
   const kind = typeof row.kind === "string" ? row.kind : "";
   const text = typeof row.text === "string" ? row.text : "";

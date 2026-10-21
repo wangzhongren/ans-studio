@@ -554,7 +554,7 @@ export interface DesktopDeps {
    * **链式治理推进的目标事实轮询（2026-10-20 真机假错误修复；测试可缩短）**：
    * `advanceGovernanceFlow` 的 followUp 链不再用「角色当前是否 idle」判完成（刚投递/会话被释放时会立即
    * 假失败——真机 5ms 误报），改为**有界轮询目标事实**：流程状态 YAML 落盘且可解析 / 任命目标角色卡出现。
-   * 缺省 500ms 轮询、最长 15min（与看护回合自动中止时限同量级）；`settledGraceMs` 是「角色已 settled」
+   * 缺省 500ms 轮询、最长 15min（内部等待上限，不是回合自动中止时限）；`settledGraceMs` 是「角色已 settled」
    * 的短宽限（会话活着、不忙、无后续投递、未被中止——期间仍持续探测事实；会话被释放或被中止不算 settled，
    * 继续等下一次投递/重试）。生产不传，走默认常量。
    */
@@ -756,7 +756,7 @@ const PREVIEW_DIGEST_HEX_64 = /^[0-9a-fA-F]{64}$/;
  * （`docs/flows/<flowId>.yaml` 落盘且通过 `parseFlowStateYaml`），不是角色的瞬时忙闲。
  */
 const GOVERNANCE_CHAIN_POLL_INTERVAL_MS = 500;
-/** 目标事实的最长等待：15min（与看护回合自动中止时限同量级，留出一次重试/修复落盘的时间）。 */
+/** 目标事实的最长等待：15min（内部等待上限，留出一次重试/修复落盘的时间；不是回合自动中止时限）。 */
 const GOVERNANCE_CHAIN_TIMEOUT_MS = 15 * 60 * 1000;
 /** 角色 settled（会话仍活着、不忙、无排队投递、未被中止）后的短宽限：期间继续探测事实，仍不落定才如实失败。 */
 const GOVERNANCE_CHAIN_SETTLED_GRACE_MS = 2_000;
@@ -1204,15 +1204,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       snapshot: (root) => manager.watchdogSnapshot(root),
       deliver: (root, message) => manager.watchdogDeliver(root, message),
       // 2026-10-20 真机（Convener 卡 1h、队列 24）：看护覆盖**所有角色**（含内置治理角色）——
-      // 自动开关按角色映射：内置治理角色 ↑「替我决策」、项目角色 ↑「替我审批」；关闭 ⇒ 旧语义（只告警、1h 兜底）。
+      // 自动开关按角色映射：内置治理角色 ↑「替我决策」、项目角色 ↑「替我审批」；关闭或未配置自动中止时限 ⇒ 只告警。
       autoRecoveryEnabled: (root, roleId) => {
         const builtIn =
           listingCache.get(root)?.roles.find((role) => role.roleId === roleId)?.builtIn === true ||
           isBuiltInGovernanceRoleId(roleId);
         return builtIn ? decisionJudgeSwitch.isEnabled() : shellJudgeSwitch.isEnabled();
       },
-      // 自动中止：请求停止该回合，成功后按既有投递机再 drain 一次（settled 前 drain 自判忙并保留；
-      // settled 后由既有路径放行）。失败只记诊断、不循环（同一 role+turnId 已由看护去重）。
+      // 自动中止（**默认禁用**，仅显式配置正时限时由看护调用）：请求停止该回合，成功后按既有投递机再
+      // drain 一次（settled 前 drain 自判忙并保留；settled 后由既有路径放行）。失败只记诊断、不循环。
       onTurnDeadline: (root, roleId, runtime) => {
         const diagnostic = createDiagnosticLogger({ component: "desktop.watchdog", projectRoot: root, roleId });
         void manager

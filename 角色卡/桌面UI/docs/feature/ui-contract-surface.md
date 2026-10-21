@@ -28,7 +28,7 @@ events:
     summary: Phase 5A 更新 #6/#12 与套件目标表：Sidebar 身份 data/aria（无 ti-badge）、P7 待选择、full replay 阅读锚点；四套件 ANS_RENDERER_ENTRY fail-fast；5A 冒烟 36/36（含 Markdown 外链不导航、200% composer 可达/错误态无横溢、200% 镜像卡/交付批次目标入镜）、迁移台账 178/178、官方三项检查通过（当时旧渲染器/vendor/旧测试未删除；已在 5B 删除）
   - date: "2026-10-21"
     kind: verified
-    summary: Phase 5B 收尾：生产入口唯一 `app/renderer/dist/index.html`（renderer-entry 解析，packaged smoke 完成）；旧 `index.html`/renderer.js/styles.css/7 经典脚本/vendor 与四个旧守卫测试已删除；四个 e2e 与四个冒烟默认翻转 dist/index.html；5A 36/36、4B 70/70、3B 45/45、4A 99/99、IME 26/0、design audit 31 项 0 bad、单测 142/142
+    summary: Phase 5B 收尾：生产入口唯一 `app/renderer/dist/index.html`（renderer-entry 解析，packaged smoke 完成）；旧 `index.html`/renderer.js/styles.css/7 经典脚本/vendor 与四个旧守卫测试已删除；四个 e2e 与四个冒烟默认翻转 dist/index.html；后续图标/历史去重后 5A 37/37、4B 70/70、3B 45/45、4A 99/99、IME 26/0、design audit 31 项 0 bad、单测 147/147
 ---
 
 # 渲染层测试契约面清单（最终，Phase 5B 收尾）
@@ -303,7 +303,7 @@ tab-todo tab-work titlebar win-close win-max win-min
 ### 3.5 旧守卫测试（已退役）
 
 - 5B 步骤 a 已删除 `test/桌面应用/{renderer,markdown,tool-rows,runtime-ui}.test.ts`；178 项逐名迁移到 `test/桌面UI/`（台账 `docs/change/2026-10-21_phase5a-test-migration-ledger.md`）。
-- 最终源码/行为守卫在 `test/桌面UI/*.test.ts`：`source-guard`（无旧 vendor/旧脚本 import、无 Node/fs、无第二套 UI/图标/动画库、CSP/静态入口）、`markdown`（XSS/外链拦截/npm pin）、`tool-summary`、`role-view`、`reading-anchor`、`operator-view`、`ui-store` 等，共 **142/142**。
+- 最终源码/行为守卫在 `test/桌面UI/*.test.ts`：`source-guard`（无旧 vendor/旧脚本 import、无 Node/fs、无第二套 UI/图标/动画库、CSP/静态入口）、`markdown`（XSS/外链拦截/npm pin）、`tool-summary`、`role-view`、`reading-anchor`、`operator-view`、`ui-store` 等，共 **147/147**。
 - 旧守卫读取的旧渲染器源码/样式/入口/vendor 已全部删除，不再有运行引用；`test/桌面UI/source-guard.test.ts` 的静态入口改为 `app/renderer/index.html`（新源入口）。
 
 ## 四、新渲染器三态表
@@ -335,8 +335,8 @@ tab-todo tab-work titlebar win-close win-max win-min
 | 21 | bench `.virt-spacer`、`window.ANSMarkdown` | 已满足（3A/3A2） | bench 新入口 `BENCH_DONE=1`；`.virt-spacer`/`ANSMarkdown` 就位；3A2 优化后 3 轮 stormA 17.7/21.3/17.6ms、stormB 19.8/18.9/17.2ms | 3B/5（阈值定义） |
 | 22 | 严格 CSP / 零内联 / file:// ES 模块 | 已满足（5B） | `app/renderer/dist/index.html` 无内联脚本/unsafe，CSP `default-src 'none'`；Electron 冒烟零 console 错误、零 did-fail-load；Base UI `CSPProvider` 关内联样式元素 | — |
 | 23 | 令牌/圆角/图标/无裸色值 | 已满足 | `index.css` 单一来源；组件台账；扫描零裸色值/零手绘 SVG/零 Node import | — |
-| 24 | 首屏预算 ≤300KB gzip | 已满足（5B 复核） | 当前 `dist/index.html` 入口引用资产 gzip level 9：JS 268,636B + CSS 19,480B + HTML 398B = **288,514B**（≤300KiB；角色显示名修复后候选） | — |
-| 25 | 源码/边界守卫 | **已满足（5B）** | 旧 `renderer.test.ts` 已退役；`test/桌面UI/*.test.ts` **142/142**（source-guard：无旧 vendor/旧脚本 import、无 Node/fs/网络、无第二套 UI/图标/动画、CSP/静态入口；纯逻辑：行模型/回放/状态/事件/工具/阅读锚点）；旧 178 项逐名台账关闭 | — |
+| 24 | 首屏预算 ≤300KB gzip | 已满足（5B 复核） | 当前 `dist/index.html` 入口引用资产 gzip level 9：JS 269,033B + CSS 19,500B + HTML 398B = **288,931B**（≤300KiB；历史去重+品牌图标后候选） | — |
+| 25 | 源码/边界守卫 | **已满足（5B）** | 旧 `renderer.test.ts` 已退役；`test/桌面UI/*.test.ts` **147/147**（source-guard：无旧 vendor/旧脚本 import、无 Node/fs/网络、无第二套 UI/图标/动画、CSP/静态入口；纯逻辑：行模型/回放/状态/事件/工具/阅读锚点）；旧 178 项逐名台账关闭 | — |
 | 26 | 套件目标切换 | **已满足（5B 翻转）** | `uiux-v2`/`ime-enter`/`bench-storm`/`uiux-design-audit` 默认 `app/renderer/dist/index.html`；`ANS_RENDERER_ENTRY` 覆盖/fail-fast/断言保留；四个桌面UI 冒烟默认同步 `dist/index.html` | — |
 | 27 | IME 默认新入口 | **已满足（5B）** | `ime-enter.mjs` 默认 `dist/index.html`；**26 true / 0 false / E2E_DONE=1**（组合/229/Shift+Enter/附件载荷） | — |
 | 28 | uiux-v2 全量等价 | **已满足（5A/5B 收尾）** | 默认 `dist/index.html`；DELIVERY_NOTE **9/9**、COMPLETE_FLOW **41/41**（P7 官方 pass）、默认段 **110/110**（阅读锚点/重锚后）；JUDGE 33/33、G2 5/5、TERMINAL 22/22、TOOLFOLD 19/19、SEND_FACTS 8/8、QUEUE_VIEW 4/4、MIRROR 8/8、RUNTIME 17/17、FRESH 4/4、VISUAL 54/54；MERGE 12/12 | — |
@@ -348,7 +348,7 @@ tab-todo tab-work titlebar win-close win-max win-min
 | 34 | **5B 生产入口切换** | **已满足** | 唯一生产入口 `app/renderer/dist/index.html`；`app/desktop/renderer-entry` 解析（显式 `ANS_RENDERER_ENTRY` 覆盖/fail-fast）；packaged smoke 已完成；旧生产入口（326 行）已删除 | — |
 | 35 | **5B 旧渲染器删除** | **已满足** | 删除旧 `renderer.js`、`styles.css`、`engine-selector.js`、`markdown.js`、`role-status.js`、`runtime-ui.js`、`tool-rows.js`、`ui-labels.js`；逐文件哈希见 [5B 变更记录](../change/2026-10-21_change_ui-platform-phase5b-cutover.md) | — |
 | 36 | **5B vendor 删除** | **已满足** | `app/renderer/vendor/`（README/LICENSE/markdown-it.umd.min.js）已删除；新管线只用 npm markdown-it 15.0.3；source-guard/markdown pin 测试禁止回读旧 vendor | — |
-| 37 | **5B e2e/冒烟默认翻转** | **已满足** | `uiux-v2`/`ime-enter`/`bench-storm`/`uiux-design-audit` 与桌面UI 3B/4A/4B/5A 冒烟默认均为 `dist/index.html`；显式覆盖/fail-fast/断言不变；默认复跑 5A 36/36、4B 70/70、3B 45/45、4A 99/99、IME 26/0、design audit 31/0 | — |
+| 37 | **5B e2e/冒烟默认翻转** | **已满足** | `uiux-v2`/`ime-enter`/`bench-storm`/`uiux-design-audit` 与桌面UI 3B/4A/4B/5A 冒烟默认均为 `dist/index.html`；显式覆盖/fail-fast/断言不变；默认复跑 5A 37/37、4B 70/70、3B 45/45、4A 99/99、IME 26/0、design audit 31/0 | — |
 | 38 | **5B DOM 例外保持** | **保持** | 仍仅有两条：大工具组闭合延迟挂载 `DEFER_TOOL_ROWS_WHEN_CLOSED=40`（PM §10.4）；失效 operator 卡动作隐藏（PM §十三）。未新增 DOM 例外 | — |
 | 39 | **驱动面最终** | **已满足** | `window.__ansRenderer` 21 个方法/状态字段；`test-driver` 快照 `state/queueByRole/paneDebug/rowModelDebug/replayAnchorDebug/queuedDebug/governance`；`window.desktop` 白名单桥；旧驱动导出段已随旧渲染器删除 | — |
 
@@ -374,7 +374,8 @@ tab-todo tab-work titlebar win-close win-max win-min
 - **5A 迁移台账**：[178 项逐名台账](../change/2026-10-21_phase5a-test-migration-ledger.md)，`renderer 108 + markdown 5 + tool-rows 53 + runtime-ui 12`；新 `test/桌面UI` 142/142；旧基线 683/683（原 679 + 桌面窗口 Phase 5A 新增 4 项：入口接线、dev 回退 hook、导航兜底策略、主进程导航守卫接线；桌面UI 未改这些文件）。
 - **5A 门禁**：typecheck 0；build 成功；CSP 严格；gzip9 **288,552B ≤300KiB**；IME 26 true/0 false；懒挂载 10/10；TOOLFOLD 19/19（C1 150→170 Δ=20）；各段 QUEUE 4/4、MIRROR 8/8、GOV 7/7、JUDGE 33/33、G2 5/5、SELECTOR 27/27、CONFIG 21/21、ROLE 11/11、SEND 8/8、TERMINAL 22/22、RUNTIME 17/17、FRESH 4/4、VISUAL 54/54；bench 旧/新交替 4 轮（首轮预热，3 有效轮中位；A 18.3、B 17.7、replay 6.2、scroll 11.9）见证据。
 - **已知边界（非 5A 红，交 5B/测试/UIUX）**：默认段 toggleDrift 与 MERGE 语义身份重锚已按 PM §十九落地并通过；COMPLETE_FLOW role reading 已官方通过；`uiux-design-audit` 已按 §十九重锚并 exit 0（12 条 v3 全过、密度 9/6）；剩余待 UIUX 书面依据：带提示条密度等价、200% 其余 A–L 场景 P2 叠加/命名观察；旧渲染器/vendor/旧测试已在 5B 删除。详见 [5A 变更记录](../change/2026-10-21_change_ui-platform-phase5a-gaps.md) 与 [证据](../change/2026-10-21-phase5a-evidence/)。
-- **5B 步骤 a/b（2026-10-21）**：删除旧 `index.html`/`renderer.js`/`styles.css`/7 经典脚本/vendor 与四个旧守卫测试；`src/index.html` 逐字移到 `app/renderer/index.html`（CSP/`/src/main.tsx` 保留）；桌面UI 四个冒烟与四个 e2e 默认目标切 `app/renderer/dist/index.html`（`ANS_RENDERER_ENTRY` 覆盖/fail-fast/断言不变；3B 夹具补 `sessionCurrent:true`）。默认新入口复跑：5A **36/36**、4B **70/70**、3B **45/45**、4A **99/99**、IME **26/0**、design audit **31 项 0 bad**、单测 **142/142**；产物 `dist/index.html` SHA256 `3c4da2a2…`，gzip9 **288,530B**。详见 [5B 变更记录](../change/2026-10-21_change_ui-platform-phase5b-cutover.md) 与 [5B 证据](../change/2026-10-21-phase5b-evidence/)。角色显示名修复后新候选：`dist/index.html` `c8ad0e82…`、JS `050776ec…`、CSS `76fad7ce…`，gzip9 **288,514B**；见 [role-display-names 记录](../change/2026-10-21_change_ui-platform-role-display-names.md)。
+- **5B 收尾补充（2026-10-21）**：TitleBar `.titlebar-mark` 与 Sidebar `.workspace-brand-mark` 改为打包 `img`（`alt="ANS"`，20/30px），保留「治理会话工作台」「AGENT WORKSPACE」；历史内部派发去重（user/injected/system/delivery 按 turnId+首行文本，保留 anchor/request 身份）已在 `applyHistory` 接入，新增 `test/桌面UI/history-dedupe.test.ts`。当前候选 `f779ac60…`，gzip 288,931B；详见 [history-dedupe-brand-icon 记录](../change/2026-10-21_change_ui-platform-history-dedupe-and-brand-icon.md)。
+- **5B 步骤 a/b（2026-10-21）**：删除旧 `index.html`/`renderer.js`/`styles.css`/7 经典脚本/vendor 与四个旧守卫测试；`src/index.html` 逐字移到 `app/renderer/index.html`（CSP/`/src/main.tsx` 保留）；桌面UI 四个冒烟与四个 e2e 默认目标切 `app/renderer/dist/index.html`（`ANS_RENDERER_ENTRY` 覆盖/fail-fast/断言不变；3B 夹具补 `sessionCurrent:true`）。默认新入口复跑（步骤 b 当时）：5A **36/36**、4B **70/70**、3B **45/45**、4A **99/99**、IME **26/0**、design audit **31 项 0 bad**、单测 **142/142**；后续品牌图标/历史去重后为 5A 37/37、单测 147/147。产物 `dist/index.html` SHA256 `3c4da2a2…`，gzip9 **288,530B**。详见 [5B 变更记录](../change/2026-10-21_change_ui-platform-phase5b-cutover.md) 与 [5B 证据](../change/2026-10-21-phase5b-evidence/)。角色显示名修复后新候选：`dist/index.html` `c8ad0e82…`、JS `050776ec…`、CSS `76fad7ce…`，gzip9 **288,514B**；见 [role-display-names 记录](../change/2026-10-21_change_ui-platform-role-display-names.md)。历史去重+品牌图标后当前候选：`dist/index.html` `f779ac60…`、JS `007c60aa…`、CSS `531d8035…`，gzip9 **288,931B**；见 [history-dedupe-brand-icon 记录](../change/2026-10-21_change_ui-platform-history-dedupe-and-brand-icon.md)。
 
 ### 4.1 Phase 2 已验证证据（摘要）
 
@@ -418,7 +419,7 @@ tab-todo tab-work titlebar win-close win-max win-min
 
 - **Phase 3**：`uiux-v2` 的聊天流/工具行/确认卡/恢复卡/治理卡段、`ime-enter` 24 名、`bench-storm` 同指标不劣化；逐 check 名对照通过。
 - **Phase 4**：设置/抽屉/资料/引擎选择段（`CONFIG_ONLY`、`SELECTOR_ONLY`、`PROFILE` 等）逐 check 名对照。
-- **Phase 5（已完成）**：`main.mjs` 整机自检 `E2E_PASS=true`；全部套件默认新入口复跑（5A 36/36、4B 70/70、3B 45/45、4A 99/99、IME 26/0、design audit 31/0）；旧渲染器/vendor/旧守卫测试已删除；生产入口唯一 `dist/index.html`；packaged smoke 完成。
+- **Phase 5（已完成）**：`main.mjs` 整机自检 `E2E_PASS=true`；全部套件默认新入口复跑（5A 37/37、4B 70/70、3B 45/45、4A 99/99、IME 26/0、design audit 31/0）；旧渲染器/vendor/旧守卫测试已删除；生产入口唯一 `dist/index.html`；packaged smoke 完成。
 
 ## 六、风险与待办
 

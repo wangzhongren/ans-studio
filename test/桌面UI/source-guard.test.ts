@@ -101,6 +101,17 @@ test("Markdown 单一管线：只有 markdown.ts 定义 esc / 依赖 markdown-it
   }
 });
 
+test("品牌图标：标题栏与左栏使用 ans-studio 图标 img alt=ANS，保留 AGENT WORKSPACE", () => {
+  const title = read(join(RENDERER, "shell", "TitleBar.tsx"));
+  const sidebar = read(join(RENDERER, "shell", "Sidebar.tsx"));
+  assert.match(title, /from\s+"@\/assets\/ans-studio-ans-icon\.png"/);
+  assert.match(title, /<img\s+className="titlebar-mark"[^>]*alt="ANS"/);
+  assert.equal(/<span className="titlebar-mark">ANS<\/span>/.test(title), false);
+  assert.match(sidebar, /from\s+"@\/assets\/ans-studio-ans-icon\.png"/);
+  assert.match(sidebar, /<img[\s\S]*className="workspace-brand-mark"[\s\S]*alt="ANS"/);
+  assert.match(sidebar, /AGENT WORKSPACE/);
+});
+
 test("Sidebar 身份：主入口/内置只在 class/data/aria/title；不渲染 ti-badge 第三行；ti-count 唯一数字徽标", () => {
   const sidebar = read(join(RENDERER, "shell", "Sidebar.tsx"));
   assert.equal(sidebar.includes('"ti-badge"'), false);

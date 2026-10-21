@@ -78,3 +78,10 @@
 
 - `role-view.ts` 治理显示名改为 Draft / 提案、Crew / 组队、Steward / 统筹（liaison/verification 不变）；单测 142/142、4B 70/70、5A 36/36、MIRROR 8/8、typecheck 0/0、build 成功。
 - 新候选：`dist/index.html` `c8ad0e82…79cd`、JS `index-Oqlp-kNL.js` `050776ec…f97b`、CSS `index-DUBNk8-R.css` `76fad7ce…c0f6`；gzip9 **288,514B**。详见 `../2026-10-21_change_ui-platform-role-display-names.md`。
+
+## 8. 后续候选：历史派发去重 + 品牌图标（2026-10-21）
+
+- `events.ts` historyProjectionKey/dedupeHistoryRows；`applyHistory` 对 user/injected/system/delivery 去重（turnId+首行文本，优先 anchor/request）；新增 4 项单测。
+- TitleBar/Sidebar 品牌图标 `img alt=ANS`（20/30px）；source-guard + 5A 冒烟断言/截图。
+- 复跑：单测 147/147、5A 37/37、4B 70/70、3B 45/45、4A 99/99、uiux 默认 110/110、MERGE 12/12、TOOLFOLD 19/19（C1 Δ20）、design audit 31/0、main E2E_PASS；bench 4 次全阈值。
+- 新候选：`dist/index.html` `f779ac60…c88b`、JS `index-CFjc0h-3.js` `007c60aa…b6aa`、CSS `index-BYYh-X8f.css` `531d8035…04b3`、icon `ans-studio-ans-icon-DOpmqMAU.png` `ff88e313…8d32c`；gzip9 **288,931B**。详见 `../2026-10-21_change_ui-platform-history-dedupe-and-brand-icon.md`。

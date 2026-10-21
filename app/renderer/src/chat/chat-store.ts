@@ -17,6 +17,8 @@ import {
   rowSignature,
 } from "@/chat/replay";
 import {
+  dedupeHistoryDescriptors,
+  dedupeHistoryRows,
   describeEvent,
   envelopeMatches,
   historyRowToDescriptor,
@@ -1321,6 +1323,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
     if (payloadRuntime && payloadRuntime !== useUiStore.getState().runtime) return;
     const rows = asArray<Record<string, unknown>>(record.rows);
+    const historyRows = dedupeHistoryRows(rows);
     const signatures = rows.map(rowSignature);
     const previous = historySignatures.get(roleId) || null;
     const planned = planReplay(previous, signatures);
@@ -1337,8 +1340,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       runtime: payloadRuntime || useUiStore.getState().runtime,
     };
     const reports = asArray<unknown>(record.reports);
-    const appendHistoryRow = (row: Record<string, unknown>): ChatRow => {
-      const descriptor = historyRowToDescriptor(row);
+    const appendHistoryDescriptor = (descriptor: NewRowDescriptor): ChatRow => {
       const appended = appendDescriptor(model, descriptor, roleId);
       noteRowAnchor(roleId, appended, Math.max(0, model.rows.indexOf(appended)));
       if (descriptor.kind === "delivery" && descriptor.turnId) {
@@ -1346,6 +1348,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       }
       return appended;
     };
+    const appendHistoryRow = (row: Record<string, unknown>): ChatRow =>
+      appendHistoryDescriptor(historyRowToDescriptor(row));
     /** 增量回放：同一轮同一文本的实时行已存在时，不再追加第二条（实时回显不是新事实）。 */
     const liveCoversHistoryRow = (row: Record<string, unknown>): boolean => {
       const descriptor = historyRowToDescriptor(row);
@@ -1406,7 +1410,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           "delivery",
           "reasoning",
         ]);
-        const historyDescriptors = rows.map((row) => historyRowToDescriptor(row));
+        const historyDescriptors = dedupeHistoryDescriptors(
+          historyRows.map((row) => historyRowToDescriptor(row)),
+        );
         const groupOf = (kind: string): string =>
           kind === "injected" || kind === "user"
             ? "user"
@@ -1477,8 +1483,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         // 整段回放按同一序列重建组 id；手动开合状态（activityManualOpen）因此可恢复。
         activityGroupCounts.delete(roleId);
         // 客户 2026-10-13 裁定：成功回放不显示分隔行；错误分支才保留。
-        rows.forEach((row) => {
-          appendHistoryRow(row);
+        historyDescriptors.forEach((descriptor) => {
+          appendHistoryDescriptor(descriptor);
           added += 1;
         });
         // 交互卡按锚点回插（请求行之后/结论行之前）；无锚落尾（绝不丢卡）。
@@ -1551,18 +1557,19 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         }
       }
       historySignatures.set(roleId, signatures);
-      historyKeyCounts.set(roleId, countHistoryEventKeys(rows));
+      historyKeyCounts.set(roleId, countHistoryEventKeys(historyRows));
       liveKeyCounts.delete(roleId);
     } else if (plan.mode === "append") {
-      for (let index = plan.from; index < rows.length; index += 1) {
-        if (claimOptimisticUserRow(model, rows[index])) continue;
-        if (liveCoversHistoryRow(rows[index])) continue;
-        appendHistoryRow(rows[index]);
+      const appendRows = dedupeHistoryRows(rows.slice(plan.from));
+      for (const row of appendRows) {
+        if (claimOptimisticUserRow(model, row)) continue;
+        if (liveCoversHistoryRow(row)) continue;
+        appendHistoryRow(row);
         added += 1;
       }
       added += appendHistoryReports(roleId, reports, scope, false);
       historySignatures.set(roleId, signatures);
-      historyKeyCounts.set(roleId, countHistoryEventKeys(rows));
+      historyKeyCounts.set(roleId, countHistoryEventKeys(historyRows));
     } else if (plan.mode === "skip" && reports.length > 0) {
       // 行签名相同但携带新的报告快照（同角色历史重推）：只补报告，不重放行。
       added += appendHistoryReports(roleId, reports, scope, false);

@@ -536,3 +536,10 @@
 - 同步 `role-view.test.ts`、`governance-view.test.ts`、`phase4b-electron-smoke.mjs`（来自 Draft / 提案）、`uiux-v2.mjs` W6-C names/mirror source；role id 不变。
 - 复跑：role/governance **15/15**、`test/桌面UI` **142/142**、4B **70/70**、5A **36/36**、MIRROR **8/8**、typecheck 0/0、build 成功。
 - 新 dist：html `c8ad0e82…`、js `050776ec…`、css `76fad7ce…`；gzip **288,514B**。记录 [role-display-names](docs/change/2026-10-21_change_ui-platform-role-display-names.md)。
+
+### 历史派发去重 + 品牌图标（2026-10-21）
+
+- `events.ts` 新增 `historyProjectionKey`/`dedupeHistoryDescriptors`/`dedupeHistoryRows`；`applyHistory` 对 user/injected/system/delivery 按 (turnId + 分组 + 首行文本) 去重，优先保留带 anchor/request 身份的一条；assistant 同轮多行、不同 callId 工具行不误删。新增 `test/桌面UI/history-dedupe.test.ts` 4 项。
+- 品牌图标：复制 `ans-studio-ans-icon.png` 到 `src/assets/`；TitleBar `.titlebar-mark` 20px、Sidebar `.workspace-brand-mark` 30px，`img alt="ANS"`；保留「治理会话工作台」「AGENT WORKSPACE」；source-guard 与 5A 冒烟新增断言，1360/960/200% 截图更新。
+- 复跑：单测 **147/147**、5A **37/37**、4B **70/70**、uiux 默认 **110/110**、MERGE **12/12**、MIRROR **8/8**、TOOLFOLD **19/19**（C1 Δ=20）、design audit **31 项 0 bad**、main **E2E_PASS=true**、bench 4 次全阈值。
+- 新 dist：html `f779ac60…`、js `007c60aa…`、css `531d8035…`、icon `ff88e313…`；gzip **288,931B**。记录 [history-dedupe-brand-icon](docs/change/2026-10-21_change_ui-platform-history-dedupe-and-brand-icon.md)。

@@ -15,6 +15,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ansIcon from "@/assets/ans-studio-ans-icon.png";
 import { getDesktopBridge } from "@/lib/platform";
 import { useChatStore } from "@/chat/chat-store";
 import {
@@ -315,7 +316,13 @@ export function Sidebar() {
     <aside className="col-left">
       <div className="sidebar-brand-row">
         <div className="workspace-brand">
-          ANS
+          <img
+            className="workspace-brand-mark"
+            src={ansIcon}
+            alt="ANS"
+            width={30}
+            height={30}
+          />
           <span>AGENT WORKSPACE</span>
         </div>
         <button
