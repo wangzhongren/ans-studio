@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ANS Studio — AI Agent 的自主组织运行时</title>
+  <meta name="description" content="ANS Studio 是一个 AI Agent 的自主组织运行时：把多个 AI Agent 组织成有角色、有边界、有派发、有验收的团队。组织原则是 Role-first——先明确业务责任与角色，写权限只来自角色边界。支持 Claude、Pi、Codex 与 CLI。">
+  <link rel="canonical" href="https://wangzhongren.github.io/ans-studio/">
+  <meta name="theme-color" content="#151512">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ANS Studio">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:title" content="ANS Studio — AI Agent 的自主组织运行时">
+  <meta property="og:description" content="把多个 AI Agent 组织成有角色、有边界、有派发、有验收的团队。组织原则是 Role-first：先明确业务责任与角色，写权限只来自角色边界。">
+  <meta property="og:url" content="https://wangzhongren.github.io/ans-studio/">
+  <meta property="og:image" content="https://wangzhongren.github.io/ans-studio/assets/desktop-intent-confirm.png">
+  <meta property="og:image:width" content="1360">
+  <meta property="og:image:height" content="980">
+  <meta property="og:image:alt" content="ANS Studio 真实桌面：石墨主题、五角色导航与需求确认卡">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ANS Studio — AI Agent 的自主组织运行时">
+  <meta name="twitter:description" content="把多个 AI Agent 组织成有角色、有边界、有派发、有验收的团队。组织原则是 Role-first：写权限只来自角色边界。">
+  <meta name="twitter:image" content="https://wangzhongren.github.io/ans-studio/assets/desktop-intent-confirm.png">
+
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/ans-seal.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+  <link rel="stylesheet" href="styles.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "ANS Studio",
+    "alternateName": "An Autonomous Organization Runtime for AI Agents",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "macOS 13+, Windows 10/11",
+    "description": "AI Agent 的自主组织运行时：把多个 AI Agent 组织成有角色、有边界、有派发、有验收的团队。组织原则是 Role-first，写权限只来自角色边界。",
+    "softwareVersion": "1.4.0",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "license": "https://opensource.org/license/mit",
+    "sameAs": "https://github.com/wangzhongren/ans-studio",
+    "downloadUrl": "https://github.com/wangzhongren/ans-studio/releases/tag/v1.4.0"
+  }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳至主要内容</a>
+
+  <header class="rail">
+    <a class="brand" href="#top" aria-label="ANS Studio，回到页面顶部">
+      <img src="assets/ans-seal.png" alt="" width="256" height="256">
+      <span class="brand-word">ans</span>
+    </a>
+    <nav class="rail-nav" aria-label="页面导航">
+      <ul>
+        <li><a href="#roles">角色</a></li>
+        <li><a href="#flow">流程</a></li>
+        <li><a href="#gates">边界</a></li>
+        <li><a href="#engines">引擎</a></li>
+        <li><a href="#download">下载</a></li>
+        <li><a href="#source">来源</a></li>
+      </ul>
+    </nav>
+    <div class="rail-foot">
+      <span class="rail-version mono">v1.4.0</span>
+      <a href="https://github.com/wangzhongren/ans-studio" rel="noopener">GitHub ↗</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap">
+        <p class="positioning mono">An Autonomous Organization Runtime for AI Agents.</p>
+        <p class="seal">
+          <svg class="seal-mark" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true" focusable="false">
+            <path d="M5.5 1.5H1.5v13h4M20.5 1.5h4v13h-4M10 8h6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
+          </svg>
+          <span class="seal-word">Role-first</span>
+          <span class="seal-label">组织原则</span>
+        </p>
+        <h1><span class="nowrap">AI Agent 的</span><span class="nowrap">自主组织运行时。</span></h1>
+        <p class="lead">ANS Studio 把多个 AI Agent 组织成有角色、有边界、有派发、有验收的团队，而不是让一个助手单打独斗。</p>
+        <p class="lead lead-sub">组织的底层原则是 Role-first：先明确业务责任与角色，再确定模块和代码归属；写权限只来自角色边界。桌面默认使用 Claude，也可切换 Pi 与 Codex；CLI 提供 demo、Pi、Codex 与 Claude。</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#download">下载 v1.4.0</a>
+          <a class="btn btn-secondary" href="https://github.com/wangzhongren/ans-studio" rel="noopener">在 GitHub 查看源码 ↗</a>
+        </div>
+        <p class="facts">
+          <span>macOS 13+ / Windows 10/11</span>
+          <span>MIT 许可证</span>
+          <span>三平台原生构建</span>
+        </p>
+        <figure class="shot">
+          <div class="shot-frame">
+            <img src="assets/desktop-intent-confirm.png" alt="ANS Studio 真实桌面截图：石墨主题界面，左侧是五个治理角色导航，主区显示一张需求确认卡。" width="1360" height="980">
+            <span class="corner tl" aria-hidden="true"></span>
+            <span class="corner tr" aria-hidden="true"></span>
+            <span class="corner bl" aria-hidden="true"></span>
+            <span class="corner br" aria-hidden="true"></span>
+          </div>
+          <figcaption>真实桌面：石墨主题、五角色导航与需求确认卡。</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="why">
+      <div class="wrap">
+        <h2>不是更聪明的助手，是一个能承担责任的<span class="nowrap">自主组织</span>。</h2>
+        <p class="section-lead">模型能写代码，但不会自己知道责任该落在谁身上。Role-first 把组织写在代码之前：角色先于模块，边界先于写入，证据先于验收。</p>
+        <ul class="ledger why-list">
+          <li>
+            <h3>责任先于模块</h3>
+            <p>先明确业务责任与角色，再确定模块和代码归属；角色卡说明职责，<code class="mono">boundary.yaml</code> 的 Section 1 列出可修改路径。</p>
+          </li>
+          <li>
+            <h3>边界是运行时的一部分</h3>
+            <p>写权限只来自角色边界；越界写入在产生副作用前被拒绝，并指回正确归属。shell 命令与其他操作一样，逐条走审批链。</p>
+          </li>
+          <li>
+            <h3>验收是独立角色，而非自我声明</h3>
+            <p>报告声明“已完成”只是一条声明；Proof 独立核对交付与回交证据，再出验收卡。</p>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section" id="roles">
+      <div class="wrap">
+        <h2>三权 · 五角色</h2>
+        <p class="section-lead">Role-first 在新建项目里落成五个内置治理角色。三权指提案、组队、统筹三类决定权；沟通与验收不是决定权。五个角色都不拥有最终批准权。</p>
+        <ul class="ledger role-list">
+          <li class="role role-lead">
+            <span class="tile mono" aria-hidden="true">l</span>
+            <div class="role-name">
+              <h3>主理 Lead</h3>
+              <span class="role-id mono">liaison</span>
+              <span class="tag">默认主入口</span>
+            </div>
+            <p class="role-desc">客户沟通与默认主入口；把意图写入 <code class="mono">docs/intents/</code>；兼任工作流管理者。</p>
+            <div class="role-power"><span class="power-label">权力</span>客户沟通 · 工作流管理</div>
+          </li>
+          <li class="role">
+            <span class="tile mono" aria-hidden="true">r</span>
+            <div class="role-name">
+              <h3>提案 Draft</h3>
+              <span class="role-id mono">rapporteur</span>
+            </div>
+            <p class="role-desc">形成提案与跨角色契约。</p>
+            <div class="role-power"><span class="power-label">权力</span>提案权</div>
+          </li>
+          <li class="role">
+            <span class="tile mono" aria-hidden="true">n</span>
+            <div class="role-name">
+              <h3>组队 Crew</h3>
+              <span class="role-id mono">nominator</span>
+            </div>
+            <p class="role-desc">提名项目角色、写角色卡与边界。</p>
+            <div class="role-power"><span class="power-label">权力</span>组队权</div>
+          </li>
+          <li class="role">
+            <span class="tile mono" aria-hidden="true">c</span>
+            <div class="role-name">
+              <h3>统筹 Steward</h3>
+              <span class="role-id mono">convener</span>
+            </div>
+            <p class="role-desc">编排流程、派发任务。</p>
+            <div class="role-power"><span class="power-label">权力</span>统筹权</div>
+          </li>
+          <li class="role">
+            <span class="tile mono" aria-hidden="true">v</span>
+            <div class="role-name">
+              <h3>验收 Proof</h3>
+              <span class="role-id mono">verifier</span>
+            </div>
+            <p class="role-desc">独立核对证据、出验收卡。</p>
+            <div class="role-power"><span class="power-label">权力</span>验收权</div>
+          </li>
+        </ul>
+        <p class="fineprint">五个角色都不拥有最终批准权；批准权留在客户。内置角色随应用发布，没有角色目录；文件写入限于治理文件与证据，不承担实现与测试。</p>
+      </div>
+    </section>
+
+    <section class="section" id="flow">
+      <div class="wrap">
+        <h2>从意图到验收，<span class="nowrap">一条可核对的流程</span></h2>
+        <p class="section-lead">自主组织靠流程运转：一条正式任务按固定顺序推进，每一步的产出都落在文件或账本上，可以回看、可以核对。</p>
+        <div class="flow-grid">
+          <ol class="ledger step-list">
+            <li>
+              <span class="step-num mono">01</span>
+              <div>
+                <h3>意图确认 <span class="step-owner mono">Lead</span></h3>
+                <p>与 Lead 说明目标、范围与验收标准；意图写入 <code class="mono">docs/intents/</code>，需求确认通过后才交给 Draft。</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-num mono">02</span>
+              <div>
+                <h3>提案与契约 <span class="step-owner mono">Draft</span></h3>
+                <p>依据意图形成提案与跨角色契约；提案卡由你选择 accept、accept-quick、revise 或 reject。</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-num mono">03</span>
+              <div>
+                <h3>组队与任命 <span class="step-owner mono">Crew</span></h3>
+                <p>提名项目角色并写角色卡与边界；任命与逐路径写盘都经过确认。</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-num mono">04</span>
+              <div>
+                <h3>流程与派发 <span class="step-owner mono">Steward</span></h3>
+                <p>编写流程单、编排流程，把正式任务派发给项目角色；忙碌时任务进入队列。</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-num mono">05</span>
+              <div>
+                <h3>实施与回交 <span class="step-owner mono">项目角色</span></h3>
+                <p>项目角色在各自边界内实施与测试，以报告和证据回交。</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-num mono">06</span>
+              <div>
+                <h3>独立验收 <span class="step-owner mono">Proof</span></h3>
+                <p>独立核对交付与回交证据，出验收卡；由你决定 accept 或 reject。</p>
+              </div>
+            </li>
+          </ol>
+          <aside class="flow-panel" aria-label="流程状态文件示例">
+            <div class="code-head">
+              <span class="mono">docs/flows/todo-list-v1.yaml</span>
+              <span class="code-lang mono">YAML</span>
+            </div>
+            <pre><code><span class="y-key">flowId</span>: todo-list-v1
+<span class="y-key">version</span>: 1
+<span class="y-key">qualityTier</span>: production
+<span class="y-key">steps</span>:
+  - <span class="y-key">id</span>: delivery-server
+    <span class="y-key">title</span>: 服务端交付
+    <span class="y-key">owner</span>: <span class="y-ph">&lt;项目角色 id&gt;</span>
+    <span class="y-key">kind</span>: dispatch
+    <span class="y-key">status</span>: done
+    <span class="y-key">evidence</span>:
+      <span class="y-key">kind</span>: dispatch
+      <span class="y-key">ref</span>: delivery-server</code></pre>
+            <p class="panel-note">流程状态以 <code class="mono">docs/flows/&lt;flowId&gt;.yaml</code> 为唯一机器状态；<code class="mono">done</code> 必须有账本可对账的证据。推进流程不等于获得批准。</p>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="gates">
+      <div class="wrap">
+        <h2>边界不是提示词，是门禁</h2>
+        <p class="section-lead">Role-first 不靠模型自觉：写盘、shell 与自动判断，各自在执行的路径上设有门禁。</p>
+        <ul class="ledger gate-list">
+          <li>
+            <h3>写盘门禁</h3>
+            <div>
+              <p>角色卡、边界、提案、流程、验收与写盘在写入前有预览或确认卡；越界写入被拒绝，并指回正确归属。</p>
+              <p class="example mono">write_file 角色卡/提案/… <span class="dim">→</span> <span class="st-deny">拒绝</span> · 归属 Draft / 提案</p>
+            </div>
+          </li>
+          <li>
+            <h3>shell 审批</h3>
+            <div>
+              <p>所有角色都具备 shell 能力，全部走审批；只读白名单直接执行；risky、review、deny 逐条由你或判断 agent 审批。</p>
+              <p class="example mono">rm -rf build/ <span class="dim">→</span> <span class="st-wait">审批卡</span> · 批准才执行</p>
+            </div>
+          </li>
+          <li>
+            <h3>判断 agent</h3>
+            <div>
+              <p>只读、fail-closed；预算不足、证据不足、风险不明或意图缺失都不放行。成功代批会标明「judge 代批」，不冒充你本人点击。</p>
+              <p class="example mono">替我审批：开启 <span class="dim">→</span> <span class="st-ok">judge 代批</span></p>
+            </div>
+          </li>
+        </ul>
+        <div class="callout">
+          <p><strong>诚实说明：</strong>shell 没有操作系统沙箱，获准命令的文件副作用不受写入门禁约束；审批链是唯一控制。请仅打开可信项目。详见 <a href="https://github.com/wangzhongren/ans-studio/blob/main/README.md#%E5%BD%93%E5%89%8D%E9%99%90%E5%88%B6" rel="noopener">README 当前限制</a>。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="engines">
+      <div class="wrap">
+        <h2>三种引擎，一条治理链</h2>
+        <p class="section-lead">引擎是执行层：换引擎不换组织，角色边界与门禁始终在同一条治理链上。每个引擎使用独立配置，不会在缺配置时自动切换到其他引擎。</p>
+        <div class="engines">
+          <article class="engine">
+            <h3>Claude <span class="tag">默认</span></h3>
+            <dl>
+              <dt>必填</dt>
+              <dd><code class="mono">ANTHROPIC_API_KEY</code></dd>
+              <dt>可选</dt>
+              <dd><code class="mono">ANS_CLAUDE_MODEL</code>、<code class="mono">ANTHROPIC_BASE_URL</code></dd>
+            </dl>
+          </article>
+          <article class="engine">
+            <h3>Pi</h3>
+            <dl>
+              <dt>必填</dt>
+              <dd><code class="mono">ANTHROPIC_AUTH_TOKEN</code>、<code class="mono">ANS_PI_BASE_URL</code>、<code class="mono">ANS_PI_MODEL</code></dd>
+            </dl>
+          </article>
+          <article class="engine">
+            <h3>Codex</h3>
+            <dl>
+              <dt>必填</dt>
+              <dd><code class="mono">CODEX_API_KEY</code> 或 <code class="mono">OPENAI_API_KEY</code>、<code class="mono">ANS_CODEX_MODEL</code></dd>
+              <dt>说明</dt>
+              <dd>自定义端点须兼容 Responses API</dd>
+            </dl>
+          </article>
+        </div>
+        <p class="more"><a href="https://github.com/wangzhongren/ans-studio/blob/main/README.md#%E5%BC%95%E6%93%8E%E9%85%8D%E7%BD%AE" rel="noopener">引擎配置见 README</a></p>
+      </div>
+    </section>
+
+    <section class="section" id="download">
+      <div class="wrap">
+        <h2>下载 v1.4.0</h2>
+        <p class="section-lead">2026-10-20 发布。运行包自带运行环境，启动应用无需另装 Node.js；执行项目命令仍需项目自己的开发工具链。</p>
+        <ul class="ledger download-list">
+          <li>
+            <div class="dl-name">
+              <h3>macOS 13+ · Apple Silicon</h3>
+              <span class="mono">ANS-Studio-1.4.0-mac-arm64.zip</span>
+            </div>
+            <div class="dl-actions">
+              <a class="btn btn-primary btn-small" rel="noopener" href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-mac-arm64.zip">下载</a>
+              <a class="dl-check" href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-darwin-arm64.txt" rel="noopener">校验 SHA256</a>
+            </div>
+          </li>
+          <li>
+            <div class="dl-name">
+              <h3>macOS 13+ · Intel</h3>
+              <span class="mono">ANS-Studio-1.4.0-mac-x64.zip</span>
+            </div>
+            <div class="dl-actions">
+              <a class="btn btn-primary btn-small" rel="noopener" href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-mac-x64.zip">下载</a>
+              <a class="dl-check" href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-darwin-x64.txt" rel="noopener">校验 SHA256</a>
+            </div>
+          </li>
+          <li>
+            <div class="dl-name">
+              <h3>Windows 10/11 · x64</h3>
+              <span class="mono">ANS-Studio-1.4.0-win-x64.zip</span>
+            </div>
+            <div class="dl-actions">
+              <a class="btn btn-primary btn-small" rel="noopener" href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-win-x64.zip">下载</a>
+              <a class="dl-check" href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-win32-x64.txt" rel="noopener">校验 SHA256</a>
+            </div>
+          </li>
+        </ul>
+        <p class="secondary-links">
+          <span>其他发布材料</span>
+          <a href="https://github.com/wangzhongren/ans-studio/releases/tag/v1.4.0" rel="noopener">Release 说明</a>
+          <a href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/release-provenance.json" rel="noopener">release-provenance.json</a>
+          <a href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/overlay.patch" rel="noopener">overlay.patch</a>
+          <a href="https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-overlay.txt" rel="noopener">SHA256SUMS-overlay.txt</a>
+        </p>
+        <div class="callout">
+          <p><strong>运行包尚未签名或公证：</strong>macOS Gatekeeper 或 Windows SmartScreen 可能提示来源未验证。请从 GitHub Release 下载，先核对 SHA256 再运行。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="source">
+      <div class="wrap">
+        <h2>从一篇论文，到<span class="nowrap">一套可运行的治理</span></h2>
+        <p class="section-lead">ANS Skill 是一套受 Role-First Software Governance（RFSG）论文启发的角色优先 AI 开发技能；ANS 是名称，不作缩写展开。Role-first 来自这篇论文，ANS Studio 把它落成可运行的桌面应用与 CLI：角色卡、边界与门禁都是论文原则的实现。</p>
+        <blockquote class="citation">
+          <p>Wang, Zhongren. 2026. <cite>Role-First Software Governance: Asymmetric Authority Boundaries for AI-Native Agent Systems</cite>. DOI: <a class="mono" href="https://zenodo.org/records/22824700" rel="noopener">10.5281/zenodo.22824700</a></p>
+          <p class="more"><a href="https://zenodo.org/records/22824700" rel="noopener">阅读论文 ↗</a></p>
+        </blockquote>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div class="footer-brand">
+        <img src="assets/ans-seal.png" alt="" width="256" height="256">
+        <div>
+          <p class="footer-name">ANS Studio · <a href="https://github.com/wangzhongren/ans-studio/blob/main/LICENSE" rel="noopener">MIT 许可证</a></p>
+          <p class="footer-en">An Autonomous Organization Runtime for AI Agents.</p>
+        </div>
+      </div>
+      <nav aria-label="页脚链接">
+        <ul>
+          <li><a href="https://github.com/wangzhongren/ans-studio" rel="noopener">GitHub</a></li>
+          <li><a href="https://github.com/wangzhongren/ans-studio/releases" rel="noopener">Releases</a></li>
+          <li><a href="https://github.com/wangzhongren/ans-studio/blob/main/README.md#%E5%BD%93%E5%89%8D%E9%99%90%E5%88%B6" rel="noopener">当前限制</a></li>
+          <li><a href="#source">学术来源</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="wrap footer-copy">
+      <p>© 2026 ANS Studio contributors</p>
+    </div>
+  </footer>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
