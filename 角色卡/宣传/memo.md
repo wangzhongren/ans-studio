@@ -1,0 +1,13 @@
+# 宣传工作线索
+
+- 2026-10-21：角色由 ANS Team Formation 建立；边界只含 `site/`、`.github/workflows/pages.yml`、本角色文档面与 `temp/宣传/`；不改产品源码与 README。
+- 首轮任务：GitHub Pages 官网；仓库 wangzhongren/ans-studio，目标地址 https://wangzhongren.github.io/ans-studio/。
+- 事实来源：README v1.4.0（2026-10-20）、Release v1.4.0、角色卡/测试/docs/change/2026-10-20_change_v1.4-release-verification.md、DOI 10.5281/zenodo.22824700。
+- 视觉基线：石墨主题（深色底、薄荷绿强调、琥珀色待确认）、应用图标 app/desktop/assets/ans-bracket-seal.png、真实截图 角色卡/桌面UI/docs/change/2026-10-20_readme-v1.4-screenshot/desktop-intent-confirm.png。
+- 未建立：feature-map.md、functional-description.md 由首轮建立；api-spec.md 预计不适用（静态站点，无导出能力）。
+- 2026-10-21 首轮交付：建立 site/（index.html、styles.css、app.js、assets/、robots.txt、sitemap.xml、.nojekyll）与 .github/workflows/pages.yml；中文单页官网覆盖定位、五角色、流程、YAML 状态示例、门禁、引擎、下载、学术来源；桌面/移动截图、链接、响应式与对比度检查通过。首轮完成时未推送、未部署；随后由协调方提交发布（见下方发布记录）。
+- 2026-10-21 客户定位追加（经协调方转达）：顶层定位改为「AI Agent 的自主组织运行时（Autonomous Organization Runtime for AI Agents）」，其下以 Role-first 为组织原则；英文原句 `An Autonomous Organization Runtime for AI Agents.` 作为 Hero 可见定位行（Role-first 印章上方，mono 小号 muted）与页脚英文行；H1 保持「AI Agent 的自主组织运行时。」。设计、功能说明与变更记录已同步。
+- 续接线索：首轮验证证据见 docs/change/2026-10-21_project-site-evidence/；版本与下载链接更新点见 docs/feature/project-site.md「如何更新版本与下载链接」；部署前需客户/协调方 push 并在仓库 Settings → Pages 选择 GitHub Actions。`changelog.md` 由 Team Formation 维护，本角色不改。
+- 2026-10-21 发布（协调方执行）：提交 `f87eb134`（main，`feat(site): add ANS Studio GitHub Pages site`，仅 site/** 与 pages.yml）并部署成功——run `39541758607` / job `119030858968`，success，19 秒（12:01 Asia/Shanghai）；线上 https://wangzhongren.github.io/ans-studio/ 的 index.html 与本地 SHA-256 一致（`a6aaa5d3…`），全部资源 200；Pages `build_type=workflow`、`https_enforced=true`，仓库 homepage 已指向该地址。角色文档仍在工作树未提交。
+- 2026-10-21 英文版：新增 site/en/index.html（`/en/`）、双语切换（账本栏 / 移动顶栏 / 页脚）、hreflang 三条、英文 SEO/JSON-LD 与双语 sitemap；英文 H1 断行经 14 个宽度实测（1440 两行、390/360 三行，无孤行），两页 1440/390/360 无横向溢出，英文页 aria-current 生效。证据见 docs/change/2026-10-21_english-site-evidence/。
+- 2026-10-21 英文版发布（协调方执行）：提交 `b00bc74`（main，`feat(site): add English site and bilingual navigation`，仅 4 个站点文件）并部署成功——run `39545903589` / job `119043890223`，success，34 秒（12:46 Asia/Shanghai）；线上 `/`（`dfd7786b…`）与 `/en/`（`bc6739fa…`）的 HTML SHA-256 均与本地一致，共享资源 200，线上 hreflang 与中文页 English 切换已生效。角色文档仍在工作树未提交。

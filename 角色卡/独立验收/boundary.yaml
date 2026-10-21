@@ -1,0 +1,21 @@
+# boundary.md Section 1 的兼容同步副本；Markdown 为授权来源。
+role: 独立验收
+entries:
+  - kind: file
+    path: 角色卡/独立验收/feature-map.md
+    purpose: 本角色验收职责与标准报告导航，无产品功能实现
+  - kind: file
+    path: 角色卡/独立验收/memo.md
+    purpose: 本角色验收工作线索与待补证据
+  - kind: file
+    path: 角色卡/独立验收/functional-description.md
+    purpose: 本角色职责、交接输入输出与文档位置
+  - kind: directory
+    path: 角色卡/独立验收/docs/design/
+    purpose: 实施前验收标准与方案核对记录
+  - kind: directory
+    path: 角色卡/独立验收/docs/change/
+    purpose: 当前候选的独立验收报告与证据索引
+  - kind: directory
+    path: 角色卡/独立验收/docs/fix/
+    purpose: 返工复核与补证结论

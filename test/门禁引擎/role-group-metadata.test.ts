@@ -44,9 +44,9 @@ const EXPECTED_RUNTIME_GROUP = new Map([
   ["Claude适配器", "组员"],
 ]);
 
-test("listProject：实际已接受的四份运行时组卡返回组别，13 个活项目角色和归档约定保留", async () => {
+test("listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留", async () => {
   const listing = await listProject(REPO_ROOT);
-  assert.equal(listing.roles.filter((item) => item.builtIn !== true).length, 13);
+  assert.equal(listing.roles.filter((item) => item.builtIn !== true).length, 15);
   assert.equal(listing.roles[0].roleId, listing.primaryRoleId);
   assert.equal(listing.hasRoles, true);
   assert.deepEqual(listing.warnings, []);
@@ -66,6 +66,44 @@ test("listProject：实际已接受的四份运行时组卡返回组别，13 个
   const legacy = listing.roles.find((item) => item.roleId === "门禁引擎");
   assert.ok(legacy);
   assertAbsent(legacy);
+});
+
+test("listProject：新增独立验收角色仅声明自身工作文档，不获得产品或同伴写权", async () => {
+  const listing = await listProject(REPO_ROOT);
+  const acceptance = listing.roles.find((item) => item.roleId === "独立验收");
+  assert.ok(acceptance, "独立验收必须实际被枚举");
+  assert.notEqual(acceptance.builtIn, true);
+  assert.equal(acceptance.boundary.acceptance.accepted, false);
+  assert.deepEqual(acceptance.boundary.entries.map(({ root, kind, path }) => ({ root, kind, path })), [
+    { root: "project", kind: "file", path: "角色卡/独立验收/feature-map.md" },
+    { root: "project", kind: "file", path: "角色卡/独立验收/memo.md" },
+    { root: "project", kind: "file", path: "角色卡/独立验收/functional-description.md" },
+    { root: "project", kind: "directory", path: "角色卡/独立验收/docs/design" },
+    { root: "project", kind: "directory", path: "角色卡/独立验收/docs/change" },
+    { root: "project", kind: "directory", path: "角色卡/独立验收/docs/fix" },
+  ]);
+});
+
+test("listProject：新增宣传角色仅声明官网与自身文档，不获得产品或同伴写权", async () => {
+  const listing = await listProject(REPO_ROOT);
+  const publicity = listing.roles.find((item) => item.roleId === "宣传");
+  assert.ok(publicity, "宣传必须实际被枚举");
+  assert.notEqual(publicity.builtIn, true);
+  assert.equal(publicity.boundary.acceptance.accepted, false);
+  assert.deepEqual(publicity.boundary.entries.map(({ root, kind, path }) => ({ root, kind, path })), [
+    { root: "project", kind: "directory", path: "site" },
+    { root: "project", kind: "file", path: ".github/workflows/pages.yml" },
+    { root: "project", kind: "file", path: "角色卡/宣传/feature-map.md" },
+    { root: "project", kind: "file", path: "角色卡/宣传/memo.md" },
+    { root: "project", kind: "file", path: "角色卡/宣传/changelog.md" },
+    { root: "project", kind: "file", path: "角色卡/宣传/functional-description.md" },
+    { root: "project", kind: "file", path: "角色卡/宣传/api-spec.md" },
+    { root: "project", kind: "directory", path: "角色卡/宣传/docs/design" },
+    { root: "project", kind: "directory", path: "角色卡/宣传/docs/feature" },
+    { root: "project", kind: "directory", path: "角色卡/宣传/docs/change" },
+    { root: "project", kind: "directory", path: "角色卡/宣传/docs/fix" },
+    { root: "project", kind: "directory", path: "temp/宣传" },
+  ]);
 });
 
 test("resolveRole：实际四份角色卡与枚举字段同源，既有 kind / location / boundarySource 保留", async () => {

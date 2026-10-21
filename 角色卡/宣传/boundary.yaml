@@ -1,0 +1,41 @@
+# 宣传边界 —— Section 1 唯一写入白名单
+# 未列路径默认只读。新增目录、改动归属或增删逐条列出的路径，须先由 ANS Governance 更新本文件并经客户确认。
+# 本角色只负责官网静态站点与发布工作流，不授予任何产品源码或测试路径。
+role: 宣传
+entries:
+  - kind: directory
+    path: site/
+    purpose: 项目官网静态站点源码、样式与素材
+  - kind: file
+    path: .github/workflows/pages.yml
+    purpose: 官网构建与 GitHub Pages 发布工作流
+  - kind: file
+    path: 角色卡/宣传/feature-map.md
+    purpose: 本角色对外交付面导航
+  - kind: file
+    path: 角色卡/宣传/memo.md
+    purpose: 本角色工作备忘录
+  - kind: file
+    path: 角色卡/宣传/changelog.md
+    purpose: 本角色治理变更记录
+  - kind: file
+    path: 角色卡/宣传/functional-description.md
+    purpose: 本角色职责、交接输入输出与文档位置
+  - kind: file
+    path: 角色卡/宣传/api-spec.md
+    purpose: 本角色接口说明（静态站点，预计 not-applicable）
+  - kind: directory
+    path: 角色卡/宣传/docs/design/
+    purpose: 站点设计与内容方案记录
+  - kind: directory
+    path: 角色卡/宣传/docs/feature/
+    purpose: 官网稳定说明与维护文档
+  - kind: directory
+    path: 角色卡/宣传/docs/change/
+    purpose: 站点与发布变更记录
+  - kind: directory
+    path: 角色卡/宣传/docs/fix/
+    purpose: 站点问题与修复记录
+  - kind: directory
+    path: temp/宣传/
+    purpose: 未通过/返工产物暂存，供审核对照
