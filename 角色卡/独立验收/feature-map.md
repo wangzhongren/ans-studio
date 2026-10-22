@@ -14,5 +14,6 @@
 - [共享治理 slug 收紧（禁止尾连字符）验收标准 A1](docs/design/2026-10-22_design_governance-slug-no-trailing-hyphen-acceptance.md)：按客户确认的 S1–S5 固定新正则 `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`、单一来源、旧值显式拒绝、N1–N5 零回归与 E1–E8；O1–O4 均不选；只定标准，未验收任何候选。
 - [共享治理 slug 收紧（禁止尾连字符）独立验收报告](docs/change/2026-10-22_change_governance-slug-no-trailing-hyphen-acceptance.md)：对冻结候选 HEAD `4d944e75` + 工作树按 A1 逐条判定；**总体 pass（受限）**——S1–S5、S1–S12、F1–F12、E1–E8 满足；独立复跑 typecheck 0、七组定向全过；全量 3398 计/3371 过/9 既有 EPERM/18 skip，write-sequencing 按客户决定排除；根 changelog 未追加、E7 多段/穿越路径模式级证据为非阻断残差；真实项目审计/真机/真实模型/UI/非 Windows/重启/O1–O4 未判。
 - [思考行显示修复 R1–R5 验收标准 A1](docs/design/2026-10-22_design_reasoning-display-fix-acceptance.md)：按设计 accepted/revision 1 固定 R1–R5（展开见投影正文、按 turnId 归组、时长/四态文案、省略如实、实时/回放同解）的成功/失败/边界、E1–E8 与三态判断；O1–O7 均不选；只定标准，未判定实现。
+- [思考行显示修复 R1–R5 独立验收报告](docs/change/2026-10-22_change_reasoning-display-fix-acceptance.md)：对判定候选 HEAD `4d944e75` + 工作树（期间快照提交为 `6e51589`，内容一致）按 A1 逐条判定；**总体 pass（受限）**——R1–R5、S1–S12、F1–F12、E1–E8 满足；独立复跑 15/15、162/162、506/506、双 typecheck 0、Electron e2e 14/14（截图逐字节一致）、Phase3B/4B 通过；真实 Pi 样本 3 个 complete 正文 335/1403/1153；Phase4A/5A 焦点/时序冒烟为离屏环境限制（不计通过）；真机重建/重启 UI、持久化、其他引擎、O1–O7 未判。
 
 [D3 最终分项审验报告](docs/fix/2026-10-21_verify_d3-lightweight-repairs.md)：macOS 非 UI C2 范围通过，Windows 原生证据不足。`api-spec.md` 不适用：无导出软件能力或装配契约。

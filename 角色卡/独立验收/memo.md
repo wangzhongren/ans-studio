@@ -1,5 +1,7 @@
 # 独立验收工作线索
 
+- 2026-10-22 桌面UI「思考行显示修复 R1–R5」独立验收完成：对判定候选 HEAD `4d944e75` + 工作树（期间快照提交为 `6e51589`，内容一致）判定 **pass（受限）**；独立复跑 reasoning-view 15/15、桌面UI 162/162、桌面应用 506/506、双 typecheck 0、Electron e2e 14/14（截图与角色证据 SHA-256 一致）、Phase3B/4B 通过；真实 Pi 样本 3 个 complete 正文 335/1403/1153。Phase4A/5A 焦点/时序冒烟在离屏环境失败（非本变更路径，不计通过）；真机重建/重启 UI、持久化、其他引擎、O1–O7 未判。报告：[docs/change/2026-10-22_change_reasoning-display-fix-acceptance.md](docs/change/2026-10-22_change_reasoning-display-fix-acceptance.md)。
+
 - 2026-10-22 桌面UI「思考行显示修复 R1–R5」：[验收标准 A1](docs/design/2026-10-22_design_reasoning-display-fix-acceptance.md) 已就绪；设计现为 accepted/revision 1、文末状态已收尾（当前 SHA-256 `e02c9594…`），实施刚并行启动、候选未冻结。关键判据：正文取自 `detail.reasoning.text.text` 非 summary、按 turnId 一回合一行且在终态之前、实时/回放同解、omitted 明确「平台省略了思考正文」、坏件 fail-closed、默认折叠；E7 需真实 Pi wire 样本区分「有正文」/「平台省略」。待实现变更记录、单测、Electron e2e、typecheck/build 证据后按 A1 判定。
 
 - 2026-10-22 共享治理 slug 收紧（禁止尾连字符，S1–S5）独立验收完成：对冻结候选 HEAD `4d944e75` + 工作树判定 **pass（受限）**；独立复跑 typecheck 0、runtime-core 34/34、编排 78/78+87/87+32/32、门禁 49/49、e2e 60/60、装配 11/11；全量 3398 计/3371 过/9 既有 EPERM/18 skip，write-sequencing 按客户决定排除。报告：[docs/change/2026-10-22_change_governance-slug-no-trailing-hyphen-acceptance.md](docs/change/2026-10-22_change_governance-slug-no-trailing-hyphen-acceptance.md)。非阻断残差：根 changelog 未追加、E7 多段/穿越路径模式级证据、candidate.txt 缺产品哈希（报告补算）、设计 §4.1 `f` errata。真实项目审计/真机/真实模型/UI/非 Windows/重启/O1–O4 未判。
