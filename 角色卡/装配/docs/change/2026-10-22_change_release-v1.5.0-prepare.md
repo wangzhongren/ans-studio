@@ -1,7 +1,7 @@
 ---
 id: v1.5-release-prepare-20261022
 type: change
-title: v1.5.0 发布准备：冻结源 35cca0b、Windows/renderer overlay 与 CI run 39705028954
+title: v1.5.0 发布准备：冻结源 35cca0b、Windows/renderer/smoke overlay 与 CI run 39706385498
 created: "2026-10-22"
 updated: "2026-10-22"
 timezone: Asia/Shanghai
@@ -38,6 +38,12 @@ events:
   - date: "2026-10-22"
     kind: triggered
     summary: 重新触发三平台 CI run 39705028954（headSha 31e70c1，publish=false/draft）
+  - date: "2026-10-22"
+    kind: implemented
+    summary: run 39705028954 三平台 build 全 success、release job 因旧 settings 键在 release-assets 失败；release-assets.mjs 改为 14 键全要求（settingsEntryDisabled 取代 settings）、测试夹具同步；装配 84/84、typecheck 0；prepare selected 12、actualTree db9d82ee…；提交 e507b4a
+  - date: "2026-10-22"
+    kind: triggered
+    summary: 重新触发三平台 CI run 39706385498（headSha e507b4a，publish=false/draft）
 ---
 
 # v1.5.0 发布准备
@@ -118,10 +124,20 @@ run `39703920167`（headSha `1685f19`）三平台均进入 packaged smoke 后失
 
 新跑 run **`39705028954`**：<https://github.com/wangzhongren/ans-studio/actions/runs/39705028954>，headSha `31e70c1dfad64af02a33fa71449b1c27869a6fb4`，`publish=false`（draft），创建时间 2026-10-22T01:19:42Z；单次快照 `in_progress`。未轮询，run id 交协调方。
 
+### 第三轮 release job 失败与 packaged smoke 校验键对齐（提交 `e507b4a`）
+
+run `39705028954`（headSha `31e70c1`）**三平台 build 全部 success**；release job 在 `Verify full native artifact set and source bindings` 失败：`Error: Incomplete UI checks: darwin-arm64`。根因：`src/common/装配/release-assets.mjs` 仍要求旧渲染器的 `settings` 键；新 React 渲染器 packaged smoke 实际输出 14 键——`entry` / `rootMounted` / `driver` / `csp` / `cspViolations` / `dom` / `preload` / `ipc` / `importDisabled` / `missingConfiguration` / `settingsEntryDisabled` / `envPathMatches` / `console` / `load`，其中 `console`/`load` 由主进程在脚本结果上补齐（`app/main.ts`）。
+
+修复：`release-assets.mjs` 的必需 UI checks 改为**全 14 键必须 true**（`settingsEntryDisabled` 取代 `settings`，并新增 entry/rootMounted/driver/csp/cspViolations/console/load）；与主进程 `ok = Object.values(checks).every(value === true)` 语义一致，fail-closed、校验强度只增不减。`test/装配/release-packaging.test.ts` 的 manifest 夹具同步 14 键；负例新增 `settingsEntryDisabled:false` 与 `console:false` 两种篡改，均必须被拒绝。
+
+验证：装配 **84/84**、typecheck **0**；预演树内 packaging **8/8**。预演（提交 `e507b4a`）：`overlayPaths` 恰 **12**——上一轮 11 项之外新增 `src/common/装配/release-assets.mjs`（修复本体；该脚本在 release job 从 main 检出运行，进入 overlay 仅保持来源一致）；`actualTree='db9d82eea3128053c57559b03f3a1fdca33390d9'`；`overlayPatchSha256='114ec91c19040aafb7e4641c273ca26e39279dc95dd73b22f417e01047d0672b'`；`excludedChanges` 仍为 19 个角色卡文档。
+
+新跑 run **`39706385498`**：<https://github.com/wangzhongren/ans-studio/actions/runs/39706385498>，headSha `e507b4ae4c285eff4c74eec57573a89fca1db57d`，`publish=false`（draft），创建时间 2026-10-22T01:33:36Z；单次快照 `in_progress`。未轮询，run id 交协调方。
+
 ## 未验证项 / 残余
 
 - 三平台原生构建、解压启动与 smoke **未由本角色实测**（由 CI 原生 runner 执行；本机只做 typecheck、装配测试、全量测试、renderer build 与 prepare 预演，未打包、未下载或启动任何 ZIP）。
 - README SHA256 表按指示暂写「发布后由 Release 的 SHA256SUMS 校验文件提供」并明确未签名；真实 SHA256 待 CI 产物。
 - draft Release 尚未创建；公开发布仍待 CI 全绿后的独立验收与客户/协调方决定。
 - 未做 `package:local`/`verify:local`（本轮派发未要求）。
-- 首跑 run `39701856151` 已取消（未等其自然失败）；run `39702128045` 三平台 build 已 failure、release skipped，由四处修复与 overlay 追加取代；run `39703920167` 三平台 packaged smoke 因缺 renderer 构建产物 failure，由 `build:renderer` 步骤修复；最新 run `39705028954` 的最终结论待协调方观察。
+- 首跑 run `39701856151` 已取消（未等其自然失败）；run `39702128045` 三平台 build 已 failure、release skipped，由四处修复与 overlay 追加取代；run `39703920167` 三平台 packaged smoke 因缺 renderer 构建产物 failure，由 `build:renderer` 步骤修复；run `39705028954` 三平台 build success、release job 因旧 smoke 键 failure，由 14 键对齐修复；最新 run `39706385498` 的最终结论待协调方观察。
