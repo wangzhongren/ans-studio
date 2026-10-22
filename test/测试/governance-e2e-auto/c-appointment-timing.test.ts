@@ -41,7 +41,30 @@ test("场景3：任命后角色未写出 ⇒ 先派 Nominator 写卡；写卡后
   // 前置：客户已确认意图（decision 组判断的意图基准）。
   await seedConfirmedIntent(temp.root);
 
-  const convenerSnapshots: Array<{ filesExist: boolean; listed: boolean }> = [];
+  const convenerSnapshots: Array<{
+    phase: "first" | "poll" | "final";
+    filesExist: boolean;
+    listed: boolean;
+    roleIds: string[];
+    warnings: string[];
+    waitedMs: number;
+  }> = [];
+  const snapshotConvener = async (phase: "first" | "poll" | "final", startedAt: number) => {
+    const listing = await listProject(temp.root);
+    return {
+      phase,
+      filesExist: exists(temp.root, ROLE_CARD_REL) && exists(temp.root, ROLE_BOUNDARY_REL),
+      listed: listing.roles.some((role) => role.roleId === "executor"),
+      roleIds: listing.roles.map((role) => role.roleId),
+      warnings: listing.warnings,
+      waitedMs: Date.now() - startedAt,
+    };
+  };
+  const convenerDiagnostic = () =>
+    `convenerSnapshots=${JSON.stringify(convenerSnapshots)} lastListing=${JSON.stringify({
+      roleIds: convenerSnapshots.at(-1)?.roleIds ?? [],
+      warnings: convenerSnapshots.at(-1)?.warnings ?? [],
+    })}`;
   const h = await makeHarness({
     tag: "appointment-timing",
     root: temp.root,
@@ -93,11 +116,15 @@ test("场景3：任命后角色未写出 ⇒ 先派 Nominator 写卡；写卡后
     },
     onPrompt: async (ctx) => {
       if (ctx.roleId === "convener") {
-        const listing = await listProject(temp.root);
-        convenerSnapshots.push({
-          filesExist: exists(temp.root, ROLE_CARD_REL) && exists(temp.root, ROLE_BOUNDARY_REL),
-          listed: listing.roles.some((role) => role.roleId === "executor"),
-        });
+        // Windows 文件落盘后目录枚举可见性可能短暂滞后：filesExist 首次必须为 true，
+        // listed 允许在 ≤2s 内有界变为 true；保留首次/最终快照供 CI 诊断。
+        const startedAt = Date.now();
+        convenerSnapshots.push(await snapshotConvener("first", startedAt));
+        while (!convenerSnapshots.at(-1)!.listed && Date.now() - startedAt <= 2000) {
+          await new Promise((resolve) => setTimeout(resolve, 25));
+          convenerSnapshots.push(await snapshotConvener("poll", startedAt));
+        }
+        convenerSnapshots.push(await snapshotConvener("final", startedAt));
       }
     },
   });
@@ -116,9 +143,31 @@ test("场景3：任命后角色未写出 ⇒ 先派 Nominator 写卡；写卡后
     // 写卡期间绝不派 Convener：Convener 第一次收到任务时角色卡已存在且已可枚举。
     // 2026-10-19 疑似产品去重 bug（如实红、未放宽）：既有 appointment followUp 与新增「写卡后推进检查」
     // 各派一次 Convener（实测 2 条 prompt、账本 2 条 app dispatch.accepted{targetRoleId:"convener"}）。
-    assert.equal(h.prompts.get("convener")?.length, 1, "Convener 最终恰收到一条排程任务");
+    assert.equal(h.prompts.get("convener")?.length, 1, `Convener 最终恰收到一条排程任务；${convenerDiagnostic()}`);
     assert.match(h.prompts.get("convener")![0]!, /客户已完成任命 executor/);
-    assert.deepEqual(convenerSnapshots, [{ filesExist: true, listed: true }], "派 Convener 时 executor 必须已写出且已枚举");
+    const firstConvener = convenerSnapshots.find((snapshot) => snapshot.phase === "first");
+    const finalConvener = convenerSnapshots.find((snapshot) => snapshot.phase === "final");
+    assert.ok(firstConvener, `缺少首次快照；${convenerDiagnostic()}`);
+    assert.equal(
+      firstConvener!.filesExist,
+      true,
+      `派 Convener 时 executor 角色卡/边界首次必须已落盘；${convenerDiagnostic()}`,
+    );
+    assert.ok(finalConvener, `缺少最终快照；${convenerDiagnostic()}`);
+    assert.equal(
+      finalConvener!.listed,
+      true,
+      `派 Convener 时 executor 最终必须已枚举；${convenerDiagnostic()}`,
+    );
+    assert.ok(
+      finalConvener!.waitedMs <= 2000,
+      `executor 枚举等待必须在 2s 内；${convenerDiagnostic()}`,
+    );
+    assert.equal(
+      convenerSnapshots.filter((snapshot) => snapshot.phase === "first").length,
+      1,
+      `Convener 只应检查一次；${convenerDiagnostic()}`,
+    );
 
     // 写卡任务先于 Convener：任务文案带 appointment-write，且文件真实落盘。
     const nominatorPrompts = h.prompts.get("nominator") ?? [];
