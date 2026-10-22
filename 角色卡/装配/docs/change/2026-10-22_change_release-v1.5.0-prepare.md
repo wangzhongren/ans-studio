@@ -1,7 +1,7 @@
 ---
 id: v1.5-release-prepare-20261022
 type: change
-title: v1.5.0 发布准备：冻结源 35cca0b、基础 overlay 与三平台 CI run 39702128045
+title: v1.5.0 发布准备：冻结源 35cca0b、Windows 修复 overlay 与三平台 CI run 39703920167
 created: "2026-10-22"
 updated: "2026-10-22"
 timezone: Asia/Shanghai
@@ -26,6 +26,12 @@ events:
   - date: "2026-10-22"
     kind: triggered
     summary: 新三平台 CI run 39702128045 已触发（headSha c166914，publish=false/draft）
+  - date: "2026-10-22"
+    kind: implemented
+    summary: 协调方四修复合入 main（8784b45/7884979/1b62023/0d7f5fb）；overlay 精确增列 7 文件；release.yml 增跨平台 ripgrep 安装；装配 84/84、typecheck 0；prepare selected 11、actualTree ca3e8ba…；提交 1685f19
+  - date: "2026-10-22"
+    kind: triggered
+    summary: 重新触发三平台 CI run 39703920167（headSha 1685f19，publish=false/draft）
 ---
 
 # v1.5.0 发布准备
@@ -72,10 +78,34 @@ events:
 
 冻结 tag 内 `test/装配/release-packaging.test.ts` 仍断言 `SOURCE_REF='v1.4.0'`/`SOURCE_SHA='83eec7e…'`，并断言 v1.4.0 overlay-2 的 5 条精确条目入选；策略重置为基础白名单后，预演树实测 2 条失败（`'v1.5.0' !== 'v1.4.0'`、`Unreviewed production overlay: src/common/编排/shell-command-guard.ts`）。该文件与 `release-policy.d.mts` 均属装配边界，经协调方确认后已按上节对齐并提交 `c166914`，首跑取消、改由新跑验证。
 
+## Windows 修复批次与跨平台 ripgrep（overlay 追加）
+
+对齐后的 run `39702128045`（headSha `c166914`）最终**三平台 build 全部 failure、release skipped**。协调方随后把四处经评审修复推到 main：
+
+- `8784b45` test(ui): normalize source-guard paths for windows（`test/桌面UI/source-guard.test.ts`）；
+- `7884979` test(runtime-core): make ENOTDIR assertion windows-aware（`test/runtime-core/file-write-safety.test.ts`）；
+- `1b62023` test: stabilize reasoning loopback fixtures on windows（`test/测试/g5-reasoning-verify/helpers.ts`、`compatibility-loopback.test.ts`）；
+- `0d7f5fb` fix(codex): read CRLF embedded model catalogs on windows（产品修复 `src/common/codex-adapter/reasoning-catalog.ts` ＋ `test/codex-adapter/reasoning-catalog.test.ts`、`fixtures.ts`）。
+
+### overlay 精确增列（提交 `1685f19`）
+
+按协调方清单、单文件不开目录、断言不放宽，`release-policy.mjs` 的 files 精确增加 7 条：`src/common/codex-adapter/reasoning-catalog.ts`、`test/codex-adapter/reasoning-catalog.test.ts`、`test/codex-adapter/fixtures.ts`、`test/桌面UI/source-guard.test.ts`、`test/runtime-core/file-write-safety.test.ts`、`test/测试/g5-reasoning-verify/helpers.ts`、`test/测试/g5-reasoning-verify/compatibility-loopback.test.ts`。`git diff v1.5.0..1685f19` 中的 `src/` 变更**仅** `reasoning-catalog.ts`、无 `app/` 变更、无其它未列出的测试改动（`reasoning.test.ts` 未变，未列入）。
+
+### 跨平台 ripgrep
+
+`.github/workflows/release.yml` 在 **Typecheck 之后、Regression tests 之前**新增一步：`Ensure cross-platform ripgrep for POSIX integration tests`（`shell: bash`）——先 `command -v rg`，已有则直接 `rg --version` 验证；macOS 用 `brew install ripgrep`；Windows 用 `choco install ripgrep -y --no-progress` 并把 `/c/ProgramData/chocolatey/bin` 加入 PATH；其他平台 apt 兜底；安装后统一 `rg --version` 验证。矩阵、超时与其他步骤未改；YAML 经 `yaml.parse` 校验通过。
+
+### 夹具与预演
+
+- `test/装配/release-packaging.test.ts` 新增「v1.5.0 修复批次按精确路径入选」用例：7 文件入选、同目录未列名测试（`judge-mode.test.ts`、`anchor-view.test.ts`、`abort-quarantine.test.ts`、`d-codex.test.ts`）excluded、未列名 `src/common/codex-adapter/config.ts` 仍 fail-closed。
+- 验证：`node --test "test/装配/**/*.test.ts"` → **84/84 通过、0 失败、0 跳过**；`npm run typecheck` → **exit 0**。
+- 预演（提交 `1685f19`，真实仓库未污染）：`overlayPaths` 恰 **11**——`.github/workflows/release.yml`、`src/common/codex-adapter/reasoning-catalog.ts`、`src/common/装配/release-policy.d.mts`、`src/common/装配/release-policy.mjs`、`test/codex-adapter/fixtures.ts`、`test/codex-adapter/reasoning-catalog.test.ts`、`test/runtime-core/file-write-safety.test.ts`、`test/桌面UI/source-guard.test.ts`、`test/测试/g5-reasoning-verify/compatibility-loopback.test.ts`、`test/测试/g5-reasoning-verify/helpers.ts`、`test/装配/release-packaging.test.ts`；`actualTree='ca3e8ba27a9b08246a3f7c5fe4b873df6e02282b'`；`overlayPatchSha256='734e6feebe812841e9301387bbee0d8fa8a2a3d3758d594910e64f451a017684'`；`excludedChanges` 为 19 个角色卡文档；预演树内 `release-packaging.test.ts` **8/8 通过**；worktree 已清理。
+- 新跑 run **`39703920167`**：<https://github.com/wangzhongren/ans-studio/actions/runs/39703920167>，headSha `1685f194c790a9cd48aa6194fb14ef88484a5787`，`publish=false`（draft），创建时间 2026-10-22T01:08:16Z；单次快照为 queued。未轮询，run id 交协调方。
+
 ## 未验证项 / 残余
 
 - 三平台原生构建、解压启动与 smoke **未由本角色实测**（由 CI 原生 runner 执行；本机只做 typecheck、装配测试、全量测试、renderer build 与 prepare 预演，未打包、未下载或启动任何 ZIP）。
 - README SHA256 表按指示暂写「发布后由 Release 的 SHA256SUMS 校验文件提供」并明确未签名；真实 SHA256 待 CI 产物。
 - draft Release 尚未创建；公开发布仍待 CI 全绿后的独立验收与客户/协调方决定。
 - 未做 `package:local`/`verify:local`（本轮派发未要求）。
-- 首跑 run `39701856151` 已取消（未等其自然失败）；新跑 `39702128045` 的最终结论待协调方观察。
+- 首跑 run `39701856151` 已取消（未等其自然失败）；run `39702128045` 三平台 build 已 failure、release skipped，由四处修复与 overlay 追加取代；新跑 `39703920167` 的最终结论待协调方观察。
