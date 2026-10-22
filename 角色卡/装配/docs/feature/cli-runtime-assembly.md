@@ -38,3 +38,4 @@ Codex 的实际运输是固定 CLI app-server 的实验动态 ANS 代理，原�
 | --- | --- | --- | --- | --- |
 | 2026-10-14 | 设计 | 已实施 | 固定依赖，入口选择交给 Interface | [设计](../design/2026-10-14_design_multi-runtime-assembly.md) |
 | 2026-10-14 | 修改 | 自有冒烟已验证 | 两个命令支持四运行时，保留命令默认与 demo | [原始结果](../change/2026-10-14_change_multi-runtime-assembly.md) |
+| 2026-10-22 | 修改 | 目标测试与 typecheck 已验证 | `ans govern` 测试夹具按治理卡严格口径补 flowId/cardKind，并断言合法卡与 judgeContext | [变更](../change/2026-10-22_change_govern-target-strict-card-fixture.md) |

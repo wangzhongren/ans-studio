@@ -128,7 +128,10 @@ test("request_confirmation：合法 appointment-write 透传；非法 slug/种�
 
   const invalid: [string, Record<string, unknown>, RegExp][] = [
     ["flowId", { title: "x", flowId: "Bad Slug" }, /flowId/],
+    ["flowId-trailing-hyphen", { title: "x", flowId: "flow-" }, /flowId/],
+    ["flowId-short-trailing-hyphen", { title: "x", flowId: "a-" }, /flowId/],
     ["stepId", { title: "x", stepId: "a_b" }, /stepId/],
+    ["stepId-trailing-hyphen", { title: "x", stepId: "impl-" }, /stepId/],
     ["flowId-nonstring", { title: "x", flowId: 7 }, /flowId/],
     ["cardKind-choice", { title: "x", cardKind: "proposal" }, /cardKind/],
     ["cardKind-unknown", { title: "x", cardKind: "approve" }, /cardKind/],
@@ -147,6 +150,48 @@ test("request_confirmation：合法 appointment-write 透传；非法 slug/种�
   assert.equal(calls, 1);
 });
 
+test("T12 request_confirmation：declined + notPresented:true 返回「卡片未发出」回执；常规 declined 文案逐字不变", async () => {
+  let mode: "not-presented" | "customer-declined" = "not-presented";
+  const byName = tools({
+    customerInput: () => mode === "not-presented"
+      ? {
+          outcome: "declined" as const,
+          notPresented: true as const,
+          reason: "缺少 cardKind。治理角色的 request_confirmation 必须同时携带 flowId 与 cardKind（本角色允许：write）；本次未发行任何写入路径、未写入账本。",
+        }
+      : { outcome: "declined" as const, operatorId: "customer-1", reason: "客户不同意" },
+  });
+  const confirm = byName.get("request_confirmation")!;
+
+  const notPresented = await confirm.handler(toolArgs("request_confirmation", { title: "写工作记录" }));
+  assert.equal(notPresented.ok, false, "未发卡仍是 ok:false（fail-closed）");
+  assert.match(notPresented.message, /治理确认卡未发出/);
+  assert.match(notPresented.message, /未向客户呈现/);
+  assert.match(notPresented.message, /缺少 cardKind/, "回执须带编排给出的具体缺项");
+  assert.match(notPresented.message, /请补齐后重新调用/);
+  assert.match(notPresented.message, /不要写盘/);
+  assert.match(notPresented.message, /不要向客户声称其拒绝或同意/);
+  assert.doesNotMatch(notPresented.message, /^request_confirmation：未获客户同意/);
+  assert.doesNotMatch(notPresented.message, /未获客户同意/, "不得把「卡片未发出」说成客户拒绝");
+
+  // 其他工具不受影响：request_choice 的 declined 分支（即使带 notPresented）文案逐字不变（O1 未授权）。
+  const choiceWithFlag = await byName.get("request_choice")!.handler(toolArgs("request_choice", { title: "选择", options: [{ id: "a", label: "A" }] }));
+  assert.equal(choiceWithFlag.ok, false);
+  assert.equal(
+    choiceWithFlag.message,
+    "request_choice：未获客户同意（原因：客户拒绝（缺少 cardKind。治理角色的 request_confirmation 必须同时携带 flowId 与 cardKind（本角色允许：write）；本次未发行任何写入路径、未写入账本。））→ 不要写盘；如实告知客户，不得假设同意。",
+  );
+
+  mode = "customer-declined";
+  const declined = await confirm.handler(toolArgs("request_confirmation", { title: "写工作记录" }));
+  assert.equal(declined.ok, false);
+  assert.equal(
+    declined.message,
+    "request_confirmation：未获客户同意（原因：客户拒绝（客户不同意））→ 不要写盘；如实告知客户，不得假设同意。",
+    "常规 declined（客户拒绝）文案必须逐字不变",
+  );
+});
+
 test("dispatch_task：flowId/stepId 进入派发载荷；非法值拒发；缺席保持旧载荷形状", async () => {
   const payloads: DispatchTaskPayload[] = [];
   const dispatch = tools({ dispatchTask: (payload) => { payloads.push(payload); return { ok: true }; } }).get("dispatch_task")!;
@@ -157,7 +202,14 @@ test("dispatch_task：flowId/stepId 进入派发载荷；非法值拒发；缺�
   const invalid = await dispatch.handler(toolArgs("dispatch_task", { roleId: "role-a", task: "执行", flowId: "FLOW" }));
   assert.equal(invalid.ok, false);
   assert.match(invalid.message, /flowId/);
-  assert.equal(payloads.length, 1, "非法 flowId 不得触达派发能力");
+  const trailing = await dispatch.handler(toolArgs("dispatch_task", { roleId: "role-a", task: "执行", flowId: "flow-" }));
+  assert.equal(trailing.ok, false);
+  assert.match(trailing.message, /flowId/);
+  assert.ok(trailing.message.includes(GOVERNANCE_SLUG_PATTERN), "尾连字符拒绝文案须展示收紧后的正则");
+  const trailingStep = await dispatch.handler(toolArgs("dispatch_task", { roleId: "role-a", task: "执行", stepId: "impl-" }));
+  assert.equal(trailingStep.ok, false);
+  assert.match(trailingStep.message, /stepId/);
+  assert.equal(payloads.length, 1, "非法 flowId/stepId 不得触达派发能力");
 
   await dispatch.handler(toolArgs("dispatch_task", { roleId: "role-a", task: "旧调用" }));
   const legacy = payloads.at(-1)!;
@@ -180,6 +232,45 @@ test("schema：三个治理元数据字段可选、slug pattern 单点、cardKin
   for (const name of ["request_confirmation", "request_choice", "dispatch_task"]) {
     const required = (describeTool(name).parameters as { required?: string[] }).required ?? [];
     for (const field of ["flowId", "stepId", "cardKind"]) assert.equal(required.includes(field), false, `${name}.${field} 必须可选`);
+  }
+});
+
+test("T13 schema：request_confirmation 描述明确内置治理角色必须同时携带 flowId + cardKind；缺失不发卡，旧调用仍被接受", async () => {
+  const described = describeTool("request_confirmation");
+  const properties = (described.parameters as { properties: Record<string, { description?: string }> }).properties;
+  for (const field of ["flowId", "cardKind"] as const) {
+    const description = properties[field].description ?? "";
+    assert.match(description, /five built-in governance roles/, `${field} 描述须点名五个内置治理角色`);
+    assert.match(description, /flowId \+ cardKind/, `${field} 描述须写明两者必须同时携带`);
+    assert.match(description, /rejected by the application/, `${field} 描述须写明会被应用拒绝`);
+    assert.match(description, /NO card is shown to the customer/, `${field} 描述须写明不会向客户发卡`);
+    assert.match(description, /Optional for ordinary project roles and single\/su/, `${field} 对普通角色/single/su 仍为可选`);
+  }
+  assert.match(described.description, /五个内置治理角色（liaison \/ rapporteur \/ nominator \/ convener \/ verifier）必须始终同时携带 `flowId` \+ `cardKind`/);
+  assert.match(described.description, /缺失任一项会被应用拒绝且\*\*不会向客户发卡\*\*/);
+  assert.match(described.description, /普通项目角色与 single\/su 的 `flowId`\/`stepId`\/`cardKind` 仍为可选/);
+  const guidelines = (described.promptGuidelines ?? []).join("\n");
+  assert.match(guidelines, /每次调用 request_confirmation 都必须同时携带 `flowId` 与 `cardKind`/);
+  assert.match(guidelines, /不会向客户发卡/);
+
+  // 形状校验不变：Provider 仍接受不带任何治理字段的旧调用，请求与 metadata 不凭空出现字段。
+  let request!: CustomerInputRequest;
+  let metadata!: CustomerInputMetadata;
+  let calls = 0;
+  const confirm = tools({
+    customerInput: (req, meta) => {
+      calls++;
+      request = req;
+      metadata = meta!;
+      return { outcome: "answered", value: { confirmed: true } };
+    },
+  }).get("request_confirmation")!;
+  const legacy = await confirm.handler(toolArgs("request_confirmation", { title: "旧卡" }));
+  assert.equal(legacy.ok, true, "无 flowId/cardKind 的旧调用仍被 Provider 接受（角色级守卫在编排）");
+  assert.equal(calls, 1);
+  for (const key of ["flowId", "stepId", "cardKind"]) {
+    assert.equal(Object.hasOwn(request, key), false, `旧调用请求不得凭空出现 ${key}`);
+    assert.equal(Object.hasOwn(metadata, key), false, `旧调用 metadata 不得凭空出现 ${key}`);
   }
 });
 

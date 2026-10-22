@@ -1,0 +1,58 @@
+=== checkout/HEAD ===
+4d944e7587f10be29b6356c42539e06219ed88fc
+=== status ===
+ M src/model/runtime.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+ M src/service/runtime/session.ts
+ M test/runtime-core/tools.test.ts
+ M 角色卡/独立验收/feature-map.md
+ M 角色卡/运行时核心/feature-map.md
+ M 角色卡/运行时核心/memo.md
+?? src/common/runtime-core/background-tasks.ts
+?? src/common/runtime-core/process-tree.ts
+?? test/runtime-core/background-contract.test.ts
+?? test/runtime-core/background-engines.test.ts
+?? test/runtime-core/background-fixtures.ts
+?? test/runtime-core/background-review.test.ts
+?? test/runtime-core/background-tasks.test.ts
+?? test/测试/background-tasks-entry/
+?? 角色卡/测试/docs/change/2026-10-22-background-tasks-verify-evidence/
+?? 角色卡/独立验收/docs/design/2026-10-22_design_background-tasks-acceptance.md
+?? 角色卡/运行时核心/docs/change/2026-10-22_change_background-tasks.md
+?? 角色卡/运行时核心/docs/feature/background-tasks.md
+?? 角色卡/项目管理/docs/design/2026-10-22_design_background-tasks.md
+=== adapter/shared/app diff-stat (empty=zero) ===
+=== modified product/test diff-stat ===
+ src/model/runtime.ts            | 123 ++++++++++++++-
+ src/provider/runtime/schema.ts  | 102 ++++++++++++
+ src/provider/runtime/tools.ts   | 333 ++++++++++++++++++++++++++++++++++++----
+ src/service/runtime/session.ts  | 151 ++++++++++--------
+ test/runtime-core/tools.test.ts |   6 +-
+ 5 files changed, 623 insertions(+), 92 deletions(-)
+=== ShellReviewRequest diff (empty=unchanged) ===
+0
+
+=== final status after test-role additions ===
+ M src/model/runtime.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+ M src/service/runtime/session.ts
+ M test/runtime-core/tools.test.ts
+ M 角色卡/独立验收/feature-map.md
+ M 角色卡/运行时核心/feature-map.md
+ M 角色卡/运行时核心/memo.md
+?? src/common/runtime-core/background-tasks.ts
+?? src/common/runtime-core/process-tree.ts
+?? test/runtime-core/background-contract.test.ts
+?? test/runtime-core/background-engines.test.ts
+?? test/runtime-core/background-fixtures.ts
+?? test/runtime-core/background-review.test.ts
+?? test/runtime-core/background-tasks.test.ts
+?? test/测试/background-tasks-entry/
+?? 角色卡/测试/docs/change/2026-10-22-background-tasks-verify-evidence/
+?? 角色卡/测试/docs/change/2026-10-22_change_background-tasks-verify.md
+?? 角色卡/独立验收/docs/design/2026-10-22_design_background-tasks-acceptance.md
+?? 角色卡/运行时核心/docs/change/2026-10-22_change_background-tasks.md
+?? 角色卡/运行时核心/docs/feature/background-tasks.md
+?? 角色卡/项目管理/docs/design/2026-10-22_design_background-tasks.md

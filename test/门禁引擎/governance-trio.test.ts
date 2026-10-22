@@ -430,13 +430,21 @@ test("卡文本：五人均写明职能/不拥有最终批准权/可写与禁写
     assert.match(t, /judge 代批/, `${spec.id} 须写明回执标 judge 代批`);
     assert.match(t, /不得声称是客户本人点击或亲自批准/, `${spec.id} 须禁止声称客户本人点击/批准`);
     assert.match(t, /不得把代批当作扩权/, `${spec.id} 须禁止把代批当作扩权`);
-    // 真机 2026-10-18：治理卡缺 flowId/cardKind 会被当旧卡、判断 agent 不介入 ⇒ 每张卡写死参数纪律。
-    // 各卡的 cardKind 白名单按真实权限逐卡收窄（下方 role 专属断言），此处只钉共同口令。
+    // 2026-10-22 客户确认严格口径（设计 invalid-governance-card-guard §4.5/§4.6/§6.1 N5）：
+    // 治理卡缺 flowId/cardKind 不再被当旧卡回落手动——应用拒绝本次发卡、不生成客户卡、不向客户呈现，
+    // 直接退回发起角色并提示补齐重发。各卡的 cardKind 白名单按真实权限逐卡收窄（下方 role 专属断言），
+    // 此处只钉共同口令。
     assert.match(t, /必须带 `flowId` \+ `cardKind`/, `${spec.id} 须写死确认/选择卡参数`);
     assert.match(t, /无效治理调用/, `${spec.id} 须点名无效治理调用`);
-    assert.match(t, /当作旧卡/, `${spec.id} 须说明缺项被当旧卡`);
-    assert.match(t, /回落手动/, `${spec.id} 须说明缺项回落手动`);
+    assert.match(t, /本次不发卡/, `${spec.id} 须说明缺项本次不发卡`);
+    assert.match(t, /不生成客户卡/, `${spec.id} 须说明缺项不生成客户卡`);
+    assert.match(t, /未向客户呈现/, `${spec.id} 须说明缺项未向客户呈现`);
+    assert.match(t, /直接退回并提示补齐重发/, `${spec.id} 须说明缺项直接退回并提示补齐重发`);
     assert.match(t, /补齐两项重发/, `${spec.id} 须要求补齐两项重发`);
+    // 旧「缺项被当旧卡、判断 agent 不介入并回落手动」口径必须消失。注意 nominator 卡另有一处
+    // 「物证缺失回落手动」（任命卡物证门槛，见下方顺序用例），属不同语义，不能被本反向断言误伤。
+    assert.doesNotMatch(t, /会被当作旧卡/, `${spec.id} 不得再称缺项被当旧卡`);
+    assert.doesNotMatch(t, /判断 agent 不介入并回落手动/, `${spec.id} 不得再称缺项回落手动`);
     // 真机 2026-10-18：文件名去 `-v1` 推导 flowId；多写 `-nomination` 会被当独立流程拒绝。
     assert.match(t, /`docs\/proposals\/<flowId>-v1\.md`/, `${spec.id} 须写死提案命名`);
     assert.match(t, /`docs\/nominations\/<flowId>-v1\.md`/, `${spec.id} 须写死提名命名`);
@@ -574,6 +582,24 @@ test("卡文本：五人均写明职能/不拥有最终批准权/可写与禁写
     /客户点击入口打开 Nominator/,
     "2026-10-18 客户修正：提名步骤由应用后台派发",
   );
+});
+
+test("治理卡参数纪律（2026-10-22 客户严格口径，N5/T14）：五卡统一新文案，缺项不发卡、未向客户呈现", () => {
+  // 设计 `角色卡/项目管理/docs/design/2026-10-22_design_invalid-governance-card-guard.md`
+  // §4.5/§4.6/§6.1 N5/§7.3 T14（客户 2026-10-22 确认 N1–N5 严格口径，O1–O7 未授权）：
+  // 应用侧守卫（N1，编排实施）对治理角色缺 flowId/cardKind 的 request_confirmation 直接拒绝；
+  // 卡文本必须与错误回执同口径——应用拒绝、不生成客户卡，不再把缺项当旧卡交给客户手动审批。
+  const NEW_DISCIPLINE =
+    "缺任何一项＝无效治理调用：本次不发卡、不生成客户卡、未向客户呈现，应用直接退回并提示补齐重发。必须补齐两项重发。";
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    const t = spec.cardText;
+    assert.ok(t.includes(NEW_DISCIPLINE), `${spec.id} 卡须逐字包含新参数纪律文案`);
+    assert.equal(t.split(NEW_DISCIPLINE).length - 1, 1, `${spec.id} 新参数纪律文案须恰出现一次`);
+    assert.doesNotMatch(t, /会被当作旧卡/, `${spec.id} 卡不得再出现「当作旧卡」`);
+    assert.doesNotMatch(t, /判断 agent 不介入并回落手动/, `${spec.id} 卡不得再出现旧「回落手动」口径`);
+    // flowId + cardKind 必须同时携带的纪律保留（N5 只改后果表述，不改要求本身）。
+    assert.match(t, /必须带 `flowId` \+ `cardKind`/, `${spec.id} 须保留 flowId + cardKind 同时携带纪律`);
+  }
 });
 
 test("卡文本：Nominator 机器可读 `recommended:` 推荐集（judge 代决策唯一可选集合，P2b）", () => {

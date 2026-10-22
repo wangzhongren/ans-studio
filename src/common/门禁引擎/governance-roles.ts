@@ -31,6 +31,11 @@
 // 工作流改为写 YAML 并使用显式 `kind` / `evidence` / `supersedes`；保留 id `verification` /
 // `acceptance` 归应用自动派 Proof / 验收；被 retake 取代的旧步骤标 `superseded` / `supersededBy`，
 // 不再用 Markdown 表撞收尾门。权力、Section 1、预授权、禁写、能力位与判定逻辑零变化。
+// 2026-10-22 客户确认按设计 `2026-10-22_design_invalid-governance-card-guard.md` 的 N1–N5 严格口径
+// 实施（O1–O7 均未授权）：五张卡的「治理卡参数纪律」把「缺任何一项＝会被当作旧卡、判断 agent 不介入
+// 并回落手动」改为「本次不发卡、直接退回并提示补齐重发；未向客户呈现」——应用侧呈现前守卫（拒绝本次
+// 发卡、不生成客户卡/不镜像/不判断/不记账）由编排实施（N1），本文件只改卡文本；权力、Section 1、
+// 预授权、禁写、能力位与判定逻辑零变化。
 //
 // 本文件是 **trio 五人**（liaison / rapporteur / nominator / convener / verifier）角色卡文本、Section 1、
 // 预授权目录、禁写路径与能力的**唯一数据来源**；`su` 的旧常量从 `boundary-core.ts`
@@ -201,8 +206,7 @@ const LIAISON_CARD_TEXT = [
   "- 仍**不得直接写 `docs/flows/**`**、不得写角色卡/提案/契约/验收；`dispatch_task` 不改变任何角色的写边界，收到任务的角色仍按其 Section 1 与确认门工作。",
   "",
   "治理卡参数纪律：每次 `request_choice` 必须带 `flowId` + `cardKind`（只用 `intent-confirm`）；",
-  "Lead 不使用 `request_confirmation` 做治理写盘。缺任何一项＝无效治理调用：会被当作旧卡、",
-  "判断 agent 不介入并回落手动，必须补齐两项重发。",
+  "Lead 不使用 `request_confirmation` 做治理写盘。缺任何一项＝无效治理调用：本次不发卡、不生成客户卡、未向客户呈现，应用直接退回并提示补齐重发。必须补齐两项重发。",
   "",
   "**内部决策纪律（必须）**：契约措辞、实现细节、排期等内部工程/协调选择**不得发 `request_choice` 问客户**——",
   "Lead 只能发 `intent-confirm` 需求确认卡；内部决策由你自行决定，或用 `dispatch_task` 派给 Steward / 项目角色，",
@@ -281,7 +285,7 @@ const RAPPORTEUR_CARD_TEXT = [
   "",
   "治理卡参数纪律：每次 `request_choice` 必须带 `flowId` + `cardKind`（只用 `proposal`）；",
   "每次 `request_confirmation` 必须带 `flowId` + `cardKind`（只用 `write`）。",
-  "缺任何一项＝无效治理调用：会被当作旧卡、判断 agent 不介入并回落手动，必须补齐两项重发。",
+  "缺任何一项＝无效治理调用：本次不发卡、不生成客户卡、未向客户呈现，应用直接退回并提示补齐重发。必须补齐两项重发。",
   "",
   "治理文件命名（必须照抄）：提案 `docs/proposals/<flowId>-v1.md`（v2…）；",
   "提名 `docs/nominations/<flowId>-v1.md`（不得在文件名里加 `-nomination` 等额外后缀）；",
@@ -385,7 +389,7 @@ const NOMINATOR_CARD_TEXT = [
   "",
   "治理卡参数纪律：每次 `request_choice` 必须带 `flowId` + `cardKind`（只用 `appointment`）；",
   "每次 `request_confirmation` 必须带 `flowId` + `cardKind`（`appointment-write` / `write`）。",
-  "缺任何一项＝无效治理调用：会被当作旧卡、判断 agent 不介入并回落手动，必须补齐两项重发。",
+  "缺任何一项＝无效治理调用：本次不发卡、不生成客户卡、未向客户呈现，应用直接退回并提示补齐重发。必须补齐两项重发。",
   "",
   "治理文件命名（必须照抄）：提案 `docs/proposals/<flowId>-v1.md`（v2…）；",
   "提名 `docs/nominations/<flowId>-v1.md`（不得在文件名里加 `-nomination` 等额外后缀）；",
@@ -459,7 +463,7 @@ const CONVENER_CARD_TEXT = [
   "",
   "治理卡参数纪律：每次 `request_confirmation` 必须带 `flowId` + `cardKind`",
   "（`schedule-write` / `write`）；Steward 不用 `request_choice` 出治理卡。",
-  "缺任何一项＝无效治理调用：会被当作旧卡、判断 agent 不介入并回落手动，必须补齐两项重发。",
+  "缺任何一项＝无效治理调用：本次不发卡、不生成客户卡、未向客户呈现，应用直接退回并提示补齐重发。必须补齐两项重发。",
   "",
   "治理文件命名（必须照抄）：提案 `docs/proposals/<flowId>-v1.md`（v2…）；",
   "提名 `docs/nominations/<flowId>-v1.md`（不得在文件名里加 `-nomination` 等额外后缀）；",
@@ -569,7 +573,7 @@ const VERIFIER_CARD_TEXT = [
   "",
   "治理卡参数纪律：每次 `request_choice` 必须带 `flowId` + `cardKind`（只用 `acceptance`）；",
   "每次 `request_confirmation` 必须带 `flowId` + `cardKind`（只用 `write`）。",
-  "缺任何一项＝无效治理调用：会被当作旧卡、判断 agent 不介入并回落手动，必须补齐两项重发。",
+  "缺任何一项＝无效治理调用：本次不发卡、不生成客户卡、未向客户呈现，应用直接退回并提示补齐重发。必须补齐两项重发。",
   "",
   "治理文件命名（必须照抄）：提案 `docs/proposals/<flowId>-v1.md`（v2…）；",
   "提名 `docs/nominations/<flowId>-v1.md`（不得在文件名里加 `-nomination` 等额外后缀）；",

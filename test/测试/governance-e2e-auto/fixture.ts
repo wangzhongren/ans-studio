@@ -53,6 +53,7 @@ import type { SessionEventEnvelope } from "../../../app/desktop/session.ts";
 import {
   createCustomerInputChannel,
   type CustomerInputChannel,
+  type DesktopCustomerInputFn,
   type OperatorDecisionPayload,
   type OperatorJudgeResultPayload,
   type OperatorRequestPayload,
@@ -620,6 +621,16 @@ export interface Harness {
   decisionSwitch: ShellJudgeSwitch;
   presented: OperatorRequestPayload[];
   judgeRows: OperatorJudgeResultPayload[];
+  /**
+   * 到达**原始客户通道**（编排 `guardedInput` 的 `raw`：桌面 session 包装后 → `channel.customerInput`）
+   * 的请求记录（2026-10-22 无效治理卡守卫验证用；只读观测，不改任何行为）。
+   * 守卫在调用 `raw` 之前拒绝时，本数组保持为空。
+   */
+  rawCustomerInputs: Array<{ roleId: string; kind: CustomerInputRequest["kind"] }>;
+  /** 判断驱动函数被调用的次数（通道 `runJudge` 记录 `governance-judge.started` 后立即调用）。 */
+  readonly judgeInvocations: number;
+  /** 通道 request id 生成器的累计调用次数（守卫拒绝发生在通道之前 ⇒ 0）。 */
+  readonly nextIdCalls: number;
   events: SessionEventEnvelope[];
   openRoles: string[];
   userOpened: string[];
@@ -693,12 +704,18 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
   };
 
   let opSeq = 0;
+  let nextIdCalls = 0;
+  let judgeInvocations = 0;
+  const rawCustomerInputs: Array<{ roleId: string; kind: CustomerInputRequest["kind"] }> = [];
   const channel = createCustomerInputChannel({
     operatorId: "test:客户",
     presenter: (payload) => {
       presented.push(payload);
     },
-    nextId: () => `op-${++opSeq}`,
+    nextId: () => {
+      nextIdCalls += 1;
+      return `op-${++opSeq}`;
+    },
     onNextStep: (payload, context) => {
       const advancing = iface!.advanceGovernanceFlow({ payload, context });
       advanceResults.push(advancing);
@@ -726,6 +743,13 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
     ...(options.scriptForRole !== undefined ? { scriptForRole: options.scriptForRole } : {}),
   });
 
+  // 观测「编排 guardedInput → 原始客户通道」的调用（2026-10-22 守卫验证）：
+  // 守卫拒绝的卡不会到达这里；桌面 session 的镜像包装在本函数之上，因此计数与 presenter 无关。
+  const observedCustomerInput: DesktopCustomerInputFn = (req, ctx, metadata) => {
+    rawCustomerInputs.push({ roleId: ctx?.roleId ?? "", kind: req.kind });
+    return channel.customerInput(req, ctx, metadata);
+  };
+
   iface = createDesktopInterface({
     pickDirectory: async () => root,
     emitEvent: (envelope) => events.push(envelope),
@@ -751,8 +775,14 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
       throw new Error("端到端验收不得构造 demo 适配器");
     },
     runtimeOptions: { modelId: "fixture-model" },
-    customerInput: channel.customerInput,
-    createGovernanceJudgeFn: judgeFactory(options.judge ?? {}, options.judgeTimeoutMs),
+    customerInput: observedCustomerInput,
+    createGovernanceJudgeFn: (judgeOptions) => {
+      const invoke = judgeFactory(options.judge ?? {}, options.judgeTimeoutMs)(judgeOptions);
+      return (request, signal) => {
+        judgeInvocations += 1;
+        return invoke(request, signal);
+      };
+    },
     // 2026-10-20：链式推进改为有界轮询目标事实；测试注入短轮询，避免 15min 默认定时器拖住测试文件。
     governanceChainOptions: options.governanceChain ?? { pollIntervalMs: 10, timeoutMs: 3000, settledGraceMs: 10 },
   });
@@ -768,6 +798,7 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
     decisionSwitch,
     presented,
     judgeRows,
+    rawCustomerInputs,
     events,
     openRoles,
     userOpened,
@@ -778,6 +809,8 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
     advanceResults,
     capsByRole,
     projectChanged: 0,
+    nextIdCalls: 0,
+    judgeInvocations: 0,
     async open(roleId: string): Promise<void> {
       userOpened.push(roleId);
       const opened = await iface!.openSession({ projectRoot: root, roleId, runtime });
@@ -819,6 +852,8 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
   };
   // projectChanged 以 getter 形式暴露实时值（对象字面量不便；改用 defineProperty）。
   Object.defineProperty(harness, "projectChanged", { get: () => projectChanged });
+  Object.defineProperty(harness, "nextIdCalls", { get: () => nextIdCalls });
+  Object.defineProperty(harness, "judgeInvocations", { get: () => judgeInvocations });
   return harness;
 }
 

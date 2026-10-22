@@ -30,6 +30,11 @@ import {
   shellJudgeResultView,
 } from "@/chat/judge";
 import {
+  mergeReasoningRowData,
+  reasoningInsertIndex,
+  reasoningPiecesFromData,
+} from "@/chat/reasoning";
+import {
   CHAT_ROW_GAP,
   RowModel,
 } from "@/chat/row-model";
@@ -1395,6 +1400,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       } else {
         // 行表整体重建：保留交互卡行（同一行对象 ⇒ React 复用原 DOM，卡不闪、不重答）。
         const operatorRows = model.rows.filter((row) => row.kind === "operator");
+        // 实时 reasoning 行不参与首行文本去重；重建后按 turnId 归并（见下方）。
+        const liveReasoningRows = model.rows.filter(
+          (row) => row.kind === "reasoning" && !row.replay,
+        );
         // 首次恢复才显示「会话记录已恢复」分隔（已有实时/历史行时重建不重复插入）。
         const hadRows = model.rows.some((row) => row.kind !== "operator");
         // 保留「未被历史覆盖」的实时行（旧 preserveUncoveredRows 同口径）：系统注记/未入库的
@@ -1554,6 +1563,49 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             if (promoted) continue;
           }
           model.append(row);
+        }
+        // 全量重建后实时 reasoning 行按 turnId 归并（R3）：有历史行 ⇒ piece 指纹幂等合并
+        // （正文不重复、时长不重复累计）；无对应历史行 ⇒ 按确定性规则插到该回合终态行之前，
+        // 绝不统一追加到表尾（否则又会出现在「会话结束」之后）。无 turnId 的坏件保持到达序追加。
+        for (const row of liveReasoningRows) {
+          const turnId = asString(row.turnId);
+          const existing = turnId
+            ? model.rows.find(
+                (candidate) =>
+                  candidate.kind === "reasoning" &&
+                  asString(candidate.turnId) === turnId,
+              )
+            : undefined;
+          if (existing) {
+            let merged = asDict(existing.data);
+            let changed = false;
+            for (const piece of reasoningPiecesFromData(asDict(row.data))) {
+              const result = mergeReasoningRowData(merged, piece);
+              if (result.changed) {
+                merged = result.data;
+                changed = true;
+              }
+            }
+            if (changed) {
+              existing.data = merged;
+              existing.height = Math.max(
+                existing.height || 0,
+                estimateHeight("reasoning"),
+              );
+            }
+            continue;
+          }
+          if (!turnId) {
+            model.append(row);
+            continue;
+          }
+          const at = reasoningInsertIndex(model.rows, turnId);
+          if (at >= model.rows.length) {
+            model.append(row);
+          } else {
+            model.insertAt(at, row);
+            anchorsFor(roleId).shiftAfterInsert(at);
+          }
         }
       }
       historySignatures.set(roleId, signatures);
@@ -2126,12 +2178,68 @@ function appendExceptionalActivity(
   return row;
 }
 
+/**
+ * 推理行：同一 turnId 只保留一行（后续 piece 原地合并，不移动位置）；
+ * 首段按 `reasoningInsertIndex` 确定性落位（本回合首个 assistant/tool/终态行之前，
+ * 绝不落在「会话结束」之后）；无 turnId 的坏件不合并/不重排，按到达序追加。
+ * 幂等由 piece 指纹保证（实时重推/实时＋历史各来一次不会重复拼接或计时）。
+ */
+function appendReasoningDescriptor(
+  model: RowModel<ChatRow>,
+  roleId: string,
+  descriptor: NewRowDescriptor,
+): ChatRow {
+  const data = asDict(descriptor.data);
+  const turnId = asString(descriptor.turnId);
+  if (turnId) {
+    const existing = model.rows.find(
+      (candidate) =>
+        candidate.kind === "reasoning" && asString(candidate.turnId) === turnId,
+    );
+    if (existing) {
+      let merged = asDict(existing.data);
+      let changed = false;
+      for (const piece of reasoningPiecesFromData(data)) {
+        const result = mergeReasoningRowData(merged, piece);
+        if (result.changed) {
+          merged = result.data;
+          changed = true;
+        }
+      }
+      if (changed) {
+        existing.data = merged;
+        existing.height = Math.max(existing.height || 0, estimateHeight("reasoning"));
+      }
+      return existing;
+    }
+  }
+  const row = makeRow({
+    ...descriptor,
+    data: { ...data, pieces: reasoningPiecesFromData(data) },
+  });
+  if (turnId) {
+    const at = reasoningInsertIndex(model.rows, turnId);
+    if (at >= model.rows.length) {
+      model.append(row);
+    } else {
+      model.insertAt(at, row);
+      if (roleId) anchorsFor(roleId).shiftAfterInsert(at);
+    }
+  } else {
+    model.append(row);
+  }
+  return row;
+}
+
 /** 描述符 → 行追加（工具相位合并、工具组连续分组；operator 由单独入口插入）。 */
 function appendDescriptor(
   model: RowModel<ChatRow>,
   descriptor: NewRowDescriptor,
   roleId = "",
 ): ChatRow {
+  if (descriptor.kind === "reasoning" && descriptor.data) {
+    return appendReasoningDescriptor(model, roleId, descriptor);
+  }
   if (descriptor.kind === "turn-terminal") {
     const data = asDict(descriptor.data);
     const turnId = asString(data.turnId) || asString(descriptor.turnId);

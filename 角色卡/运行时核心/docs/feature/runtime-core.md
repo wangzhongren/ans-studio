@@ -66,6 +66,8 @@ store 构造、读取和原生目录校验都不建目录。真正持久化时�
 
 公共工具的停止失败保持各自含义：确认/选项“未获客户同意”、报告/审读“未能交回”、派发“未能派发”、执行前shell“未执行”。统一取消包装不再覆盖 handler 已经返回的真实失败；迟到成功仍返回失败。实际运行后被中止的shell保留自己的运行失败信息。当前兼容验证见 [C1P](../fix/2026-10-14_fix_tool-abort-failure-messages.md)。
 
+2026-10-22 治理确认卡未发出回执：当编排在**呈现前**拒绝一张治理确认卡时，客户通道以 `declined + notPresented:true` 表示「卡片从未呈现」，`request_confirmation` 回执改为「治理确认卡未发出（未向客户呈现；原因：…）→ 未获任何同意；请补齐后重新调用。不要写盘，也不要向客户声称其拒绝或同意。」，不再说成客户拒绝；常规 `declined` 文案逐字不变，`request_choice` 不受影响。schema 同时写明五个内置治理角色必须始终同时携带 `flowId` + `cardKind`（缺失会被应用拒绝且不会向客户发卡），普通项目角色与 single/su 仍为可选。呈现前守卫本身在编排（N1），本层只负责回执与 schema 纪律；端到端行为待 N1 接线。见 [变更记录](../change/2026-10-22_change_invalid-governance-card-receipt.md)。
+
 Service 外层已经确定的失败、中止或超时结果具有优先级；随后 inner abort 清理发出的 terminal 或事件流错误不能改写该结果。清理错误仍单独报告，清理失败仍隔离会话。正常未由外层强制的轮次照实采用 inner outcome，最终每轮一个 settled；当前竞态验证见 [C1O](../fix/2026-10-14_fix_outer-terminal-outcome.md)。
 
 主要源码入口为 `src/service/runtime/session.ts::createRuntimeAdapter` 与同文件 `readRuntimeSessionHistory`。后者是编排的公共历史读取 operation，Service 委托现有 Provider 只返回 Model 记录/回放；桌面经 Pipeline 再到该 Service，不能直读 Provider。工具执行位于 `src/provider/runtime/tools.ts::buildGovernedTools`，实际存储位于 `src/provider/runtime/session-store.ts`。自测覆盖真实临时文件写/edit、越界与停止零副作用、实际 shell 中止、自定义凭据剥离、隔离回放及单轮结束身份；历史入口当前验证见 [C1H](../fix/2026-10-14_fix_service-history-entry.md)，原始环境与候选见 [C1 记录](../change/2026-10-14_change_runtime-core.md)。未运行真实在线模型轮次，也未完成其他角色的迁移测试。

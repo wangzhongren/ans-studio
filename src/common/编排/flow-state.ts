@@ -14,6 +14,7 @@
 // 不跨角色直接 import 私有 common。只读复用仓库既有 `yaml` 依赖（package.json `yaml@2.9.0`）。
 
 import { parse as parseYaml } from "yaml";
+import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 import type { GovernanceLedgerEntry } from "./governance-ledger.ts";
 
 // —————————————————————— 枚举与形状 ——————————————————————
@@ -57,7 +58,11 @@ export type FlowEvidenceKind = (typeof FLOW_EVIDENCE_KINDS)[number];
 export const RESERVED_ACCEPTANCE_STEP_IDS = ["verification", "acceptance"] as const;
 export type ReservedAcceptanceStepId = (typeof RESERVED_ACCEPTANCE_STEP_IDS)[number];
 
-const FLOW_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
+/**
+ * flowId / 步骤 id 形状（**单一来源**：运行时核心 `src/model/runtime.ts` 的 `GOVERNANCE_SLUG_PATTERN`；
+ * 2026-10-22 收紧为禁止首/尾连字符）。错误文案经 `${FLOW_ID_RE}` 自动展示现行正则。
+ */
+const FLOW_ID_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
 
 /** 可作 `customer-decision` 证据的账本决定类型（`unclassified` 不是证据）。 */
 const CUSTOMER_DECISION_KIND_REFS: ReadonlySet<string> = new Set([

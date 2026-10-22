@@ -30,6 +30,108 @@ export function describeTool(name: string): ToolDescription {
       description: "受治理的程序执行工具。每次调用只执行一个程序及其参数，按 argv 直接启动，不经 shell。`&&`、`;`、`|`、重定向、变量展开和命令替换不会按 shell 语法执行；多条命令请分开调用。执行前必须过 ShellGate 审核；未获明确 allow 绝不执行。",
     };
   }
+  if (name === "start_background_task") {
+    // 2026-10-22 客户确认设计 B1/B2/B4：会话级后台任务启动。复用 run_shell 同一条审核链；
+    // 只在 ShellGate + 管理器注入时注册（注册条件在 tools.ts，结构保证）。显示规则 core-command-v1。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          command: {
+            type: "string",
+            description:
+              "One program and its arguments, reviewed before execution as argv without a shell. Shell operators (&&, ;, |, redirection), variable expansion and command substitution are not interpreted. Use separate tool calls for multiple commands.",
+          },
+        },
+        required: ["command"],
+        additionalProperties: true,
+      },
+      description:
+        "启动一个**会话级后台任务**并**立即返回**任务号与 pid，不等待进程结束（开发服务器等长进程用本工具）。" +
+        "命令口径与 run_shell 相同：一次一个程序及其参数，按 argv 直接启动、不经 shell；" +
+        "`&&`、`;`、`|`、重定向、变量展开与命令替换不会按 shell 语法执行，多条命令请分开调用。" +
+        "启动前必须通过**同一个 ShellGate 审核**：只有明确 allow 才真正启动；拒绝/超时/通道异常 ⇒ 未执行、零进程。" +
+        "当前会话同时最多运行 8 个后台任务（超限在审核前直接拒绝），最多保留 32 个（运行中的任务永不淘汰）。" +
+        "**任务只属于当前会话、不跨重启**：任务表与日志只在内存，日志不落盘；会话关闭或应用重启后旧任务号只会返回「未知任务」。" +
+        "**轮次结束或停止本轮不会终止后台任务**——只有 stop_background_task 或关闭会话才会清理；应用崩溃/被强杀时进程可能残留。" +
+        "启动后会返回任务号（如 bg-1）；用 list_background_tasks / read_background_task / stop_background_task 管理它。",
+      promptGuidelines: [
+        "启动开发服务器/长进程用 start_background_task，不要用 run_shell 占住整个回合；工具会立即返回任务号与 pid。",
+        "后台任务只属于当前会话、不跨重启、日志不落盘；轮次结束或停止本轮不会终止它——需要结束时显式调用 stop_background_task（会话关闭也会清理）。",
+        "命令口径与 run_shell 相同（一个程序 + 参数、不经 shell）；管道/重定向/变量展开会被守卫拒绝，请拆分为多条命令或写成脚本文件。",
+      ],
+    };
+  }
+  if (name === "list_background_tasks") {
+    // 2026-10-22 B1：只读列出当前会话保留的任务摘要；不猜测已过期任务。显示规则 none。
+    return {
+      parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
+      description:
+        "列出**当前会话**保留的后台任务摘要：任务号、状态（running / exited / stopped / failed / kill-timeout）、pid、" +
+        "启动时间、命令摘要与退出码。空列表会如实说明「没有后台任务」；任务只属于当前会话、不跨重启，不猜测已过期任务。",
+      promptGuidelines: ["需要确认有哪些后台任务或查看状态时用 list_background_tasks；不要假设已过期的任务号仍然有效。"],
+    };
+  }
+  if (name === "read_background_task") {
+    // 2026-10-22 B1：读取任务状态与 stdout/stderr 尾部；默认 both/40 行、上限 200；超 256 KiB 标 truncated。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: { type: "string", description: "Background task id returned by start_background_task (e.g. bg-1)" },
+          stream: {
+            type: "string",
+            enum: ["stdout", "stderr", "both"],
+            description: "Which stream to read; default both",
+          },
+          tailLines: {
+            type: "integer",
+            minimum: 1,
+            maximum: 200,
+            description: "Number of tail lines to return; default 40, maximum 200",
+          },
+        },
+        required: ["taskId"],
+        additionalProperties: false,
+      },
+      description:
+        "读取**当前会话**某个后台任务的状态快照与 stdout/stderr **尾部**（默认 `stream:\"both\"`、默认 40 行、上限 200 行）。" +
+        "每路输出使用 256 KiB 环形缓冲：超出时结果明确标注 `truncated`（只保留尾部，更早内容已丢弃），不假装日志完整；" +
+        "截断按 UTF-8 安全处理，不返回损坏的多字节字符。未知/已过期任务号会明确返回「未知任务」，不猜测状态、不伪造日志。" +
+        "日志只存在内存、不落盘；轮次结束不会清除它，只有会话关闭或应用重启后消失。",
+      promptGuidelines: [
+        "确认服务器是否正常时用 read_background_task 读最近几十行；默认 40 行通常够用，需要更多再调 tailLines（上限 200）。",
+        "标了 truncated 表示更早输出已被环形缓冲丢弃——不要假装看到了完整日志；未知任务号不要猜测它运行过。",
+      ],
+    };
+  }
+  if (name === "stop_background_task") {
+    // 2026-10-22 B1：按终止预算停止任务；已结束任务如实返回原状态；kill-timeout 明确可能仍在运行。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: { type: "string", description: "Background task id returned by start_background_task (e.g. bg-1)" },
+          force: {
+            type: "boolean",
+            description: "true = skip SIGTERM and send SIGKILL immediately; default false = SIGTERM then SIGKILL after 250ms",
+          },
+        },
+        required: ["taskId"],
+        additionalProperties: false,
+      },
+      description:
+        "停止**当前会话**的一个后台任务：默认先 SIGTERM，250ms 后升级 SIGKILL，并在 1s 内等待观察到底层进程退出（close）才算 `stopped`；" +
+        "`force:true` 跳过 SIGTERM 直接 SIGKILL。终止预算内未观察到退出 ⇒ 状态 `kill-timeout`，工具会明确说" +
+        "**「可能仍在运行，请如实告知客户」**，绝不谎称已停止。对已自然退出或已停止的任务再次调用，会如实返回原状态与退出码，不声称「刚刚停止」。" +
+        "未知/已过期任务号明确返回「未知任务」。停止只影响该任务，不改变任何权限或写权。",
+      promptGuidelines: [
+        "需要结束开发服务器等后台任务时用 stop_background_task；只有观察到进程退出才会返回 stopped。",
+        "返回 kill-timeout 时进程可能仍在运行——必须如实告知客户，不要声称已停止；可稍后重试或检查进程。",
+        "对已结束任务 stop 会如实返回原状态（exited/stopped + 退出码），不会谎报「刚刚停止」。",
+      ],
+    };
+  }
   if (name === "request_confirmation") {
     // 交互工具族（设计 A-1/A-2）：请求客户确认（可带预览——如角色卡 + 边界摘要）。
     // 已授权项目任务可推进；扩张治理边界仍须客户确认。
@@ -69,7 +171,9 @@ export function describeTool(name: string): ToolDescription {
             type: "string",
             pattern: GOVERNANCE_SLUG_PATTERN,
             description:
-              "Optional governance flow id (slug) recorded with this confirmation; missing = legacy call and cannot unlock any governance gate",
+              "Optional for ordinary project roles and single/su (legacy calls). The five built-in governance roles " +
+              "(liaison / rapporteur / nominator / convener / verifier) MUST always provide flowId + cardKind together; " +
+              "the call is rejected by the application if either is missing, and NO card is shown to the customer — fix and resend",
           },
           stepId: {
             type: "string",
@@ -80,7 +184,9 @@ export function describeTool(name: string): ToolDescription {
             type: "string",
             enum: ["write", "appointment-write", "schedule-write"],
             description:
-              "Optional governance card kind for this confirmation; a missing or foreign kind cannot unlock any governance gate",
+              "Optional for ordinary project roles and single/su (legacy calls). The five built-in governance roles " +
+              "(liaison / rapporteur / nominator / convener / verifier) MUST always provide flowId + cardKind together; " +
+              "a missing or out-of-role kind is rejected by the application and NO card is shown to the customer — fix and resend",
           },
         },
         required: ["title"],
@@ -99,13 +205,18 @@ export function describeTool(name: string): ToolDescription {
         "路径作为 Markdown 标题（如 `### <路径>`）或代码围栏说明（如 ```md <路径>```）出现，锚点后紧跟该路径的非空正文/代码。" +
         "**缺失任一路径正文时，系统会在呈现前拒绝该卡并要求补全——不会先给客户看半张卡。**" +
         "注意：列出路径**不等于**获准——获准的唯一凭据是 `confirmed:true`。" +
-        "治理会话可附可选 `flowId`/`stepId`/`cardKind`（cardKind 仅 `write` / `appointment-write` / `schedule-write`）；" +
+        "**五个内置治理角色（liaison / rapporteur / nominator / convener / verifier）必须始终同时携带 `flowId` + `cardKind`**" +
+        "（cardKind 仅 `write` / `appointment-write` / `schedule-write`，且须属于该角色允许的卡种）；" +
+        "缺失任一项会被应用拒绝且**不会向客户发卡**——工具回执为「卡片未发出」，请补齐后重新调用。" +
+        "普通项目角色与 single/su 的 `flowId`/`stepId`/`cardKind` 仍为可选；" +
         "这些字段只用于卡片显示与账本分类，**字段本身不构成任何授权**——治理门禁只认应用签发的客户决定。",
       promptGuidelines: [
         "已接受项目边界内、已授权任务的**读取与检查**无需逐次确认；**写盘（write_file / edit_file 等）一律先经本工具确认**——" +
           "把将写出的路径逐条列入 preview，客户返回 `confirmed:true` 后系统才会为这些路径发行写盘许可；对话里的口头同意不是凭据。" +
           "**唯一例外（仅内置治理角色 su）**：`docs/su/**`、`docs/contracts/**`、`docs/skills/**` 与 `docs/mcp/**` 的写盘许可已预置——写这四棵目录树无需逐次确认、直接写即可（开会话与重建后均生效）；四棵树之外的一切写盘仍须逐条确认。" +
           "新建或扩张角色边界、治理写集须由 su 经 request_confirmation 取得客户的**明确同意**。未获该变更同意 → 不执行治理变更，不得假设同意。",
+        "**内置治理角色**（liaison / rapporteur / nominator / convener / verifier）每次调用 request_confirmation 都必须同时携带 `flowId` 与 `cardKind`；" +
+          "缺失任一项会被应用拒绝且不会向客户发卡——不要省略、不要猜测；收到「卡片未发出」回执时补齐后重新调用。",
         "新建角色或扩张角色边界时：先把**角色卡全文 + 边界摘要**放进 request_confirmation 的 preview 请客户预览，同意后才写入治理变更。",
         "request_confirmation 的 preview **必须列出将要写出的具体路径**（每个待写文件一行，相对项目根、含目录，如 " +
           "`角色卡/示例/role-card.md`）——系统只对 preview 中**列出过**的路径发行写盘许可；**未列出的路径会被门禁拒绝**。" +

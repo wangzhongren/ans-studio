@@ -34,6 +34,7 @@ import {
   type FlowStateStep,
 } from "./flow-state.ts";
 import { appendGovernanceLedger, readGovernanceLedger, type GovernanceLedgerEntry, type GovernancePower } from "./governance-ledger.ts";
+import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 import type {
   FlowGetFn,
   FlowStepSupersedeFn,
@@ -97,7 +98,11 @@ export interface CreateFlowServiceOptions {
 
 // —————————————————————— 基础 ——————————————————————
 
-const FLOW_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
+/**
+ * flowId / stepId 形状（**单一来源**：运行时核心 `src/model/runtime.ts` 的 `GOVERNANCE_SLUG_PATTERN`；
+ * 2026-10-22 收紧为禁止首/尾连字符）。
+ */
+const FLOW_ID_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
 const TERMINAL_STATUSES: ReadonlySet<FlowToolStatus> = new Set(["done", "superseded"]);
 
 function sha256(data: string | Buffer): string {

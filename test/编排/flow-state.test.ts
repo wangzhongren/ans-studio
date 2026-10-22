@@ -186,6 +186,76 @@ test("flowId 与文件名不一致 ⇒ 校验失败且路径为 flowId", () => {
   }
 });
 
+test("slug 收紧（S2/T9）：文件名/步骤 id/证据 ref/supersede 引用尾连字符 ⇒ 具体路径报错并展示新正则", () => {
+  // 文件名 flowId 尾连字符。
+  const badName = parseFlowStateYaml(TODO_FLOW_YAML, "flow-");
+  assert.equal(badName.ok, false);
+  if (!badName.ok) {
+    const error = badName.errors.find((item) => item.path === "flowId");
+    assert.ok(error);
+    assert.match(error.message, /0,62/, "错误文案经 ${FLOW_ID_RE} 自动展示现行正则");
+    assert.match(error.message, /flow-/);
+  }
+
+  // 顶层 flowId 与合法文件名不一致（YAML 写旧值 flow-）⇒ flowId 路径报错。
+  const badTop = parseFlowStateYaml(TODO_FLOW_YAML.replace("flowId: todo-list-v1", "flowId: flow-"), "todo-list-v1");
+  assert.equal(badTop.ok, false);
+  if (!badTop.ok) assert.ok(badTop.errors.some((item) => item.path === "flowId"));
+
+  // 步骤 id 尾连字符。
+  const badStep = TODO_FLOW_YAML.replace("  - id: verification-evidence", "  - id: verification-");
+  const stepParsed = parseFlowStateYaml(badStep, "todo-list-v1");
+  assert.equal(stepParsed.ok, false);
+  if (!stepParsed.ok) {
+    assert.ok(stepParsed.errors.some((item) => item.path === "steps[4].id" && /0,62/.test(item.message)));
+  }
+
+  // dispatch 证据 ref 尾连字符。
+  const badRef = TODO_FLOW_YAML.replace(
+    "evidence: { kind: dispatch, ref: delivery-backend }",
+    "evidence: { kind: dispatch, ref: delivery-backend- }",
+  );
+  const refParsed = parseFlowStateYaml(badRef, "todo-list-v1");
+  assert.equal(refParsed.ok, false);
+  if (!refParsed.ok) {
+    assert.ok(refParsed.errors.some((item) => item.path === "steps[2].evidence.ref" && /0,62/.test(item.message)));
+  }
+
+  // supersedes / supersededBy 引用尾连字符。
+  const badSupersede = `flowId: slug-strict-v1
+version: 1
+qualityTier: production
+steps:
+  - id: impl-
+    title: 旧实现
+    owner: A
+    kind: dispatch
+    status: superseded
+    supersededBy: impl-
+  - id: impl
+    title: 新实现
+    owner: A
+    kind: dispatch
+    status: pending
+    supersedes: [impl-]
+  - id: acceptance
+    title: 验收
+    owner: verifier
+    kind: acceptance
+    status: pending
+`;
+  const supersedeParsed = parseFlowStateYaml(badSupersede, "slug-strict-v1");
+  assert.equal(supersedeParsed.ok, false);
+  if (!supersedeParsed.ok) {
+    assert.ok(supersedeParsed.errors.some((item) => item.path === "steps[0].id" && /0,62/.test(item.message)));
+    assert.ok(supersedeParsed.errors.some((item) => item.path === "steps[1].supersedes[0]"));
+  }
+
+  // 旧合法值零回归：连续连字符仍可作步骤 id。
+  const legal = parseFlowStateYaml(GATE_FLOW_YAML.replace("  - id: impl\n", "  - id: a--b\n"), "flow-a");
+  assert.equal(legal.ok, true);
+});
+
 test("version 非正整数 / qualityTier 非法 / steps 空 ⇒ 具体路径报错", () => {
   const badVersion = TODO_FLOW_YAML.replace("version: 1", "version: 0");
   assert.ok(errorPaths(badVersion, "todo-list-v1").includes("version"));
@@ -1158,6 +1228,67 @@ test("写前校验：确认卡声明 docs/flows/<flowId>.yaml 且 YAML 非法 �
       assert.equal(rawCalls2, 1);
     } finally {
       await handle2.dispose();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("写前校验（S3/T11）：声明 docs/flows/flow-.yaml ⇒ 宽捕获后显式拒绝该卡，不静默跳过 YAML 校验", async () => {
+  const root = mkdtempSync(join(tmpdir(), "ans-flow-card-slug-"));
+  try {
+    const project = roleFixture(root);
+    const captured = capturingAdapter();
+    let rawCalls = 0;
+    const raw: CustomerInputFn = () => {
+      rawCalls += 1;
+      return { outcome: "answered", value: { confirmed: true }, operatorId: "test" };
+    };
+    const handle = await openRoleSession(
+      { roleId: "X", project, customerInput: raw },
+      {
+        createAdapter: (_gate, injected) => {
+          captured.holder.caps = injected;
+          return captured.adapter;
+        },
+      },
+    );
+    try {
+      // preview 完整且内容「自洽」（flowId: flow-），旧路径正则会把该卡当作非 Flow YAML 目标而跳过；
+      // 宽捕获后必须显式拒绝并点名候选值，而不是静默放行/忽略。
+      const selfConsistent = [
+        "flowId: flow-",
+        "version: 1",
+        "qualityTier: production",
+        "steps:",
+        "  - id: impl",
+        "    title: 实现",
+        "    owner: A",
+        "    kind: dispatch",
+        "    status: pending",
+        "  - id: acceptance",
+        "    title: 验收",
+        "    owner: verifier",
+        "    kind: acceptance",
+        "    status: pending",
+        "",
+      ].join("\n");
+      const invalid = await captured.holder.caps!.customerInput!({
+        kind: "confirm",
+        title: "写流程 flow-",
+        preview: `## docs/flows/flow-.yaml\n${selfConsistent}`,
+        paths: ["docs/flows/flow-.yaml"],
+      });
+      assert.ok(invalid);
+      assert.equal(invalid.outcome, "declined");
+      const reason = (invalid as { reason?: string }).reason ?? "";
+      assert.match(reason, /流程 YAML 未通过校验/);
+      assert.match(reason, /docs\/flows\/flow-\.yaml/);
+      assert.match(reason, /不是合法 slug/);
+      assert.match(reason, /0,62/, "拒绝文案须展示现行正则");
+      assert.equal(rawCalls, 0, "被拒的卡不得触达原始客户通道");
+    } finally {
+      await handle.dispose();
     }
   } finally {
     rmSync(root, { recursive: true, force: true });

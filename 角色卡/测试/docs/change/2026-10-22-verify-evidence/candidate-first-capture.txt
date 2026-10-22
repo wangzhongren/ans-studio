@@ -1,0 +1,16 @@
+candidate_HEAD=4d944e7587f10be29b6356c42539e06219ed88fc
+captured_at=2026-10-22T13:53:04+08:00
+node=v24.22.1
+npm=11.19.1
+---product files under test (working tree modified)---
+ M src/common/门禁引擎/governance-roles.ts
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+---role files changed by this task---
+6b4a90f702720014c1330b8c49aa5e6716a1feb053c61842d075b4c0a37b66a8 *test/测试/governance-e2e-auto/fixture.ts
+8b0dcfda41e8de5dbefd5f7358da31824546d99eeeeae3312846255f49344035 *test/测试/governance-e2e-auto/n-invalid-governance-card.test.ts
+a8b964eac3f075e7e1b432254b45fd1edc102691999b06428ad107edfd55cab9 *test/测试/background-tasks-e2e-real-model/e2e-background-real-model.ts
+d3e2c6e37e7fb5ba634d92e655248036bc29241939c33f32a8f84c0a9f7e46bf *test/测试/background-tasks-e2e-real-model/pi-smoke.ts
+ad99cace161bfeaf5e19df8769c7955199ec244dca10e43e05d092a4fcab3d8f *test/测试/background-tasks-e2e-real-model/run-shell-comparison.ts

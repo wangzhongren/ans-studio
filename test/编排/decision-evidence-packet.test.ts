@@ -728,6 +728,47 @@ test("意图定位兼容：提案 frontmatter intentId / docs/intents/<flowId>.m
   });
 });
 
+test("旧意图值（S2/T15）：账本/提案中非空非法 intentId 显式 fail-closed，不静默跳过或回落", async () => {
+  // ① 账本 intent.handed-off 的 intentId 尾连字符（旧值）⇒ intent-unconfirmed，detail 点名旧值与现行规则。
+  await withRoot(async (root) => {
+    writeFile(root, "docs/proposals/flow-a-v1.md", PROPOSAL_MARKDOWN);
+    seedIntent(root);
+    seedIntentLedger(root, { intentId: "intent-" });
+    const built = await buildDecisionEvidencePacket({ request: proposalRequest(root), projectRoot: root });
+    assert.equal(built.ok, false);
+    if (built.ok) return;
+    assert.equal(built.reasonCode, "intent-unconfirmed");
+    assert.match(built.reason, /账本 intent\.handed-off 的 intentId（intent-）/);
+    assert.match(built.reason, /0,62/, "detail 须展示现行正则");
+  });
+
+  // ② 提案 frontmatter 的 intentId 尾连字符（无交接账本）⇒ 不得静默回落 `docs/intents/<flowId>.md`。
+  await withRoot(async (root) => {
+    writeFile(
+      root,
+      "docs/proposals/flow-a-v1.md",
+      `---\nflowId: flow-a\nintentId: intent-\n---\n\n${PROPOSAL_MARKDOWN}`,
+    );
+    seedIntent(root);
+    writeFile(root, ".ans/governance/ledger.jsonl", `${JSON.stringify({
+      at: "2026-10-19T00:00:00.000Z",
+      kind: "customer.decision",
+      flowId: "flow-a",
+      actorRoleId: "liaison",
+      power: "liaison",
+      decisionKind: "intent-confirm",
+      customerDecision: "accepted",
+      decisionEvidence: { kind: "customer-input" },
+    })}\n`);
+    const built = await buildDecisionEvidencePacket({ request: proposalRequest(root), projectRoot: root });
+    assert.equal(built.ok, false);
+    if (built.ok) return;
+    assert.equal(built.reasonCode, "intent-unconfirmed");
+    assert.match(built.reason, /提案 frontmatter 的 intentId「intent-」/);
+    assert.match(built.reason, /不得静默回落/);
+  });
+});
+
 // —————————————————————— ③ 冲突 / fail-closed ——————————————————————
 
 test("请求方陈述与系统事实冲突：卡片 flowId 与请求 flowId 不一致 ⇒ evidence-conflict", async () => {

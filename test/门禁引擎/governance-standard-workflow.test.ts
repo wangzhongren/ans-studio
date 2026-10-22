@@ -16,10 +16,14 @@ import {
   ENGINEERING_QUALITY_BASELINE,
   governanceRoleOf,
 } from "../../src/common/门禁引擎/governance-roles.ts";
+import { GOVERNANCE_SLUG_PATTERN } from "../../src/model/runtime.ts";
 
 /** 逐字取自 `governance-roles.ts` 的单一来源常量（本测试钉住五卡保留原文）。 */
 const SHELL_APPROVAL_CARD_LINE =
   "shell 审批档——只读白名单直接执行，其余（含读写与任意命令）逐条提交客户/判断 agent 审批；审批不改变你的职责与写边界，写文件仍优先用 write_file 并经写盘确认。拒绝、超时、通道不可用一律不放行。";
+
+/** 治理 slug 正则：唯一来源为 Model 常量（2026-10-22 收紧，禁止尾连字符；设计 S4）。 */
+const GOVERNANCE_SLUG_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
 
 function cardTextOf(id: string): string {
   const spec = governanceRoleOf(id);
@@ -227,7 +231,7 @@ test("标准工作流：Steward 卡中的 YAML 模板可被 yaml 解析，顶层
     assert.equal(typeof step.title, "string", "步骤须有 title");
     assert.equal(typeof step.owner, "string", "步骤须有 owner");
     const id = String(step.id);
-    assert.match(id, /^[a-z0-9][a-z0-9-]{1,63}$/, `步骤 id 须为小写 slug：${id}`);
+    assert.match(id, GOVERNANCE_SLUG_RE, `步骤 id 须为小写 slug：${id}`);
     assert.equal(ids.has(id), false, `步骤 id 不得重复：${id}`);
     ids.add(id);
     assert.ok(kinds.has(String(step.kind)), `kind 非法：${String(step.kind)}`);
@@ -258,6 +262,21 @@ test("标准工作流：Steward 卡中的 YAML 模板可被 yaml 解析，顶层
     "模板须给出非保留的执行/证据步骤示例（verification-evidence）",
   );
   assert.ok(doc.steps!.some((step) => step.kind === "dispatch"), "模板须给出 dispatch 步骤示例");
+});
+
+test("标准工作流：slug 校验引用 Model 常量（单一来源）——合法正例通过、尾连字符负例被拒绝", () => {
+  // 2026-10-22 客户确认按设计 S4 收紧共享 slug 契约：测试侧删除旧正则副本，
+  // 统一从 Model 常量编译（设计 §2.1/§3.3 S4、§五 T12）。尾连字符形状必须被显式拒绝。
+  assert.equal(
+    GOVERNANCE_SLUG_RE.source,
+    GOVERNANCE_SLUG_PATTERN,
+    "测试侧正则须由 Model 常量构造（单一来源）",
+  );
+  assert.match("flow-a", GOVERNANCE_SLUG_RE, "合法正例 flow-a 须通过");
+  assert.match("impl", GOVERNANCE_SLUG_RE, "模板执行步骤 id impl 须通过");
+  assert.doesNotMatch("flow-", GOVERNANCE_SLUG_RE, "尾连字符 flow- 须被拒绝");
+  assert.doesNotMatch("a-", GOVERNANCE_SLUG_RE, "尾连字符 a- 须被拒绝");
+  assert.doesNotMatch("impl-", GOVERNANCE_SLUG_RE, "尾连字符 impl- 须被拒绝");
 });
 
 test("标准工作流：五卡流程状态引用统一为 YAML（唯一机器状态），Markdown 仅人读视图；Crew/Proof 按 YAML 读取", () => {

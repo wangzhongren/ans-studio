@@ -97,7 +97,7 @@ import type {
   GovernanceJudgeContext,
   GovernanceJudgeToolOptions,
 } from "../../model/runtime.ts";
-import { governanceCardGroup } from "../../model/runtime.ts";
+import { GOVERNANCE_SLUG_PATTERN, governanceCardGroup } from "../../model/runtime.ts";
 import { createRuntimeAdapter, projectRuntimeLiveHandback, projectRuntimeLegacyHistory, type RuntimeSessionOptions } from "../../service/runtime/session.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import {
@@ -114,7 +114,7 @@ import { withHandback, type OrchestrationEvent, type TaskReport, type HandbackIn
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
-import { conditionSlugsOf, declaredConfirmPaths, declaredPathBodies, createConfirmedWriteIssuer, explicitConfirmPaths, validateConfirmPreviewCompleteness } from "../../common/编排/confirmed-writes.ts";
+import { conditionSlugsOf, declaredPathBodies, createConfirmedWriteIssuer, explicitConfirmPaths, validateConfirmPreviewCompleteness } from "../../common/编排/confirmed-writes.ts";
 import { parseFlowStateYaml } from "../../common/编排/flow-state.ts";
 import {
   appendGovernanceLedger,
@@ -739,24 +739,11 @@ export async function openRoleSession(
           let cardKind = req.cardKind ?? originalMetadata?.cardKind;
           let effectiveReq = req;
           let effectiveMetadata = originalMetadata;
-          // 2026-10-20 真机：写卡确认漏带 cardKind ⇒ judgeContext 不计算、客户被要求手批。
-          // 只对 trio 的 **confirm** 卡、且声明路径可由 preview/req.paths 核对时，按角色保守兜底；
-          // 显式 cardKind 优先，choice 卡与无路径卡零变化。
-          if (isTrio && cardKind === undefined && req.kind === "confirm") {
-            const declaredPaths = declaredConfirmPaths(req);
-            const defaulted = defaultGovernanceConfirmCardKind(trioSpec!.id, declaredPaths);
-            if (defaulted !== undefined) {
-              cardKind = defaulted;
-              effectiveReq = { ...req, cardKind: defaulted };
-              effectiveMetadata = { ...(originalMetadata ?? {}), cardKind: defaulted };
-              log.record("governance.cardKind.defaulted", {
-                roleId: setup.role.id,
-                cardKind: defaulted,
-                kind: "confirm",
-                declaredPaths,
-              });
-            }
-          }
+          // 2026-10-22 无效治理卡守卫（设计 §4.5/§4.6，N1 严格口径）：五个内置治理角色的 confirm 卡
+          // 必须在**触达客户通道之前**带齐 `cardKind`（且属于该角色白名单）与合法 `flowId`。
+          // 缺任何一项 ⇒ fail-closed 拒绝本次发卡：不调 raw、不计算 judgeContext、不镜像、不写账本、
+          // 不发行写集/不占 pending-queued；工具回执据 `notPresented` 如实说明「卡片未发出」。
+          // 2026-10-20 的 confirm `cardKind` 机械兜底已由本严格口径取代并删除（choice 兜底保持不变）。
           // 2026-10-20：choice 卡同样按内置治理角色默认（Lead 的 intent-confirm 等）；显式 cardKind 优先。
           if (isTrio && cardKind === undefined && req.kind === "choice") {
             const defaulted = defaultGovernanceChoiceCardKind(
@@ -793,21 +780,76 @@ export async function openRoleSession(
           }
           if (isTrio) {
             const allowed = TRIO_CARD_KINDS[trioSpec!.id];
-            if (cardKind !== undefined && !allowed.includes(cardKind)) {
-              log.record("governance.cardKind.rejected", {
-                roleId: setup.role.id,
-                cardKind,
-                allowed: [...allowed],
-              });
-              return {
-                outcome: "declined",
-                reason:
-                  `治理角色 ${setup.role.id} 不允许 cardKind=${cardKind}；` +
-                  `允许：${allowed.join(" / ")}。本次未向客户发卡。`,
-              };
-            }
             const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
-            if (isGovernanceFlowId(flowId)) currentFlowId = flowId;
+            if (req.kind === "confirm") {
+              // 严格口径（设计 §4.5 顺序）：1) 缺 cardKind → 拒；2) 显式 cardKind 越权 → 拒（既有文案）；
+              // 3) flowId 缺失/格式非法 → 拒；此后才进入既有 preview/YAML 闸与 judgeContext 计算。
+              const rejectNotPresented = (reason: string, reasonCode: string): CustomerInputOutcome => {
+                // 诊断只用共享白名单字段（state/reasonCode/ok）；flowId/cardKind 不在白名单，不记录。
+                log.record("governance.card.rejected", { state: "not-presented", reasonCode, ok: false });
+                return { outcome: "declined", reason, notPresented: true };
+              };
+              const flowIdOk = isGovernanceFlowId(flowId);
+              const allowedConfirmKinds = confirmCardKindsOf(trioSpec!.id);
+              const allowedText = allowedConfirmKinds.length > 0 ? allowedConfirmKinds.join(" / ") : "无";
+              const bothHint =
+                `治理角色的 request_confirmation 必须同时携带 flowId 与 cardKind（本角色允许：${allowedText}）；` +
+                "本次未发行任何写入路径、未写入账本。";
+              if (cardKind === undefined) {
+                const missing = ["缺少 cardKind"];
+                if (!flowIdOk) {
+                  missing.push(`缺少合法的 flowId（须为非空小写 slug，匹配 ${GOVERNANCE_SLUG_PATTERN}）`);
+                }
+                return rejectNotPresented(
+                  `${missing.join("；")}。${bothHint}`,
+                  flowIdOk ? "missing-card-kind" : "missing-card-kind-and-flow-id",
+                );
+              }
+              if (!allowed.includes(cardKind)) {
+                log.record("governance.cardKind.rejected", {
+                  roleId: setup.role.id,
+                  cardKind,
+                  allowed: [...allowed],
+                });
+                return {
+                  outcome: "declined",
+                  reason:
+                    `治理角色 ${setup.role.id} 不允许 cardKind=${cardKind}；` +
+                    `允许：${allowed.join(" / ")}。本次未向客户发卡。`,
+                };
+              }
+              if (!flowIdOk) {
+                return rejectNotPresented(
+                  `缺少合法的 flowId（须为非空小写 slug，匹配 ${GOVERNANCE_SLUG_PATTERN}）。${bothHint}`,
+                  "missing-flow-id",
+                );
+              }
+              // 设计 §4.2：liaison 的确认卡一律拒绝（其确认卡允许集为空；需求确认只走 request_choice 的
+              // intent-confirm）。即便直接调用包装器给出白名单内的 choice 类 cardKind 也不放行。
+              if (trioSpec!.id === "liaison") {
+                return rejectNotPresented(
+                  "治理角色 liaison 不使用 request_confirmation 做治理写盘；确认卡一律不发送" +
+                    "（需求确认请用 request_choice 的 intent-confirm）。本次未发行任何写入路径、未写入账本。",
+                  "role-not-allowed",
+                );
+              }
+              currentFlowId = flowId;
+            } else {
+              if (cardKind !== undefined && !allowed.includes(cardKind)) {
+                log.record("governance.cardKind.rejected", {
+                  roleId: setup.role.id,
+                  cardKind,
+                  allowed: [...allowed],
+                });
+                return {
+                  outcome: "declined",
+                  reason:
+                    `治理角色 ${setup.role.id} 不允许 cardKind=${cardKind}；` +
+                    `允许：${allowed.join(" / ")}。本次未向客户发卡。`,
+                };
+              }
+              if (isGovernanceFlowId(flowId)) currentFlowId = flowId;
+            }
           }
           // 2026-10-19 真机 op-2 修复（呈现前 fail-closed）：写盘类确认卡声明了写入路径时，preview
           // 必须对**每一条**路径给出可核对正文/结构。不完整 ⇒ **不发卡**、不发行任何写入路径，直接
@@ -1770,8 +1812,13 @@ export function governanceDispatchActionFor(roleId: string, targetRoleId: string
   return roleId === "liaison" && targetRoleId === "convener" ? "coordinate" : "dispatch";
 }
 
-/** 治理 flowId 形状（与运行时核心 `GOVERNANCE_SLUG_PATTERN` 同值；本地再判一次，不导入运行时实现）。 */
-const GOVERNANCE_FLOW_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
+/**
+ * 治理 flowId 形状（**单一来源**：运行时核心 `src/model/runtime.ts` 的 `GOVERNANCE_SLUG_PATTERN`；
+ * 2026-10-22 收紧为禁止首/尾连字符——设计
+ * `角色卡/项目管理/docs/design/2026-10-22_design_governance-slug-no-trailing-hyphen.md` §3.3/§3.4）。
+ * 本地保留谓词 `isGovernanceFlowId`（仅本文件使用），正则不再有第二份副本。
+ */
+const GOVERNANCE_FLOW_ID_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
 
 function isGovernanceFlowId(value: unknown): value is string {
   return typeof value === "string" && GOVERNANCE_FLOW_ID_RE.test(value);
@@ -1779,9 +1826,15 @@ function isGovernanceFlowId(value: unknown): value is string {
 
 // —————————————————————— Flow YAML 写前校验（2026-10-19） ——————————————————————
 
-/** 确认卡声明的 Flow YAML 路径形状（唯一机器状态）。 */
-const FLOW_YAML_PATH_RE = /^docs\/flows\/([a-z0-9][a-z0-9-]{1,63})\.(?:yaml|yml)$/;
+/**
+ * 确认卡声明的 Flow YAML 路径形状（唯一机器状态）：**宽捕获**单段候选文件名
+ * `docs/flows/<候选>.yaml|yml`。候选是否为合法 flowId **不在本正则判定**，由
+ * `validateFlowYamlCard` 先用 `isGovernanceFlowId` 显式校验——非法候选（如 `docs/flows/flow-.yaml`）
+ * 必须被拒绝该卡，不得因路径不匹配而被静默跳过、绕过 YAML 校验。
+ */
+const FLOW_YAML_PATH_RE = /^docs\/flows\/([^/\\]+)\.(?:yaml|yml)$/;
 
+/** 从声明路径中宽捕获 Flow YAML 候选（合法性由 `validateFlowYamlCard` 显式校验，不在此过滤）。 */
 function flowYamlTargetsOf(paths: readonly string[]): Array<{ rel: string; flowId: string }> {
   const targets: Array<{ rel: string; flowId: string }> = [];
   const seen = new Set<string>();
@@ -1792,33 +1845,6 @@ function flowYamlTargetsOf(paths: readonly string[]): Array<{ rel: string; flowI
     targets.push({ rel, flowId: match[1]! });
   }
   return targets;
-}
-
-/**
- * 2026-10-20 真机：治理角色的写卡确认可能漏带 `cardKind`（Convener 写治理记录卡），导致
- * `judgeContext` 不计算、桌面直接呈现客户卡。这里按角色 + **已声明路径**做保守兜底：
- *   · Convener：**全部**声明路径都是 `docs/flows/<flowId>.yaml|yml` ⇒ `schedule-write`；否则 `write`；
- *   · Rapporteur / Verifier ⇒ `write`；
- *   · Nominator：**全部**声明路径都在 `角色卡/<id>/` 下 ⇒ `appointment-write`；否则 `write`；
- *   · 其他内置角色（Liaison 等）不猜；choice 卡不兜底。
- * 显式 `cardKind` 永远优先；无声明路径（preview/req.paths 都提取不到）也不兜底。
- */
-function defaultGovernanceConfirmCardKind(
-  roleId: BuiltInGovernanceRoleSpec["id"],
-  declaredPaths: readonly string[],
-): GovernanceCardKind | undefined {
-  if (declaredPaths.length === 0) return undefined;
-  switch (roleId) {
-    case "convener":
-      return declaredPaths.every((rel) => FLOW_YAML_PATH_RE.test(rel)) ? "schedule-write" : "write";
-    case "rapporteur":
-    case "verifier":
-      return "write";
-    case "nominator":
-      return declaredPaths.every((rel) => /^角色卡\/[^/]+\//.test(rel)) ? "appointment-write" : "write";
-    default:
-      return undefined;
-  }
 }
 
 /**
@@ -1891,6 +1917,8 @@ function flowYamlBodyFromPreview(preview: string | undefined, rel: string): stri
 /**
  * 确认卡的 Flow YAML 写前校验（**确定性**，不调用模型）：
  *   · 仅当声明路径含 `docs/flows/<flowId>.yaml`（或 `.yml`）时生效；
+ *   · 文件名候选先按 `isGovernanceFlowId` 校验：**非空但不合法 ⇒ 拒绝该卡**（明确写出候选值与
+ *     现行规则），不得因路径正则不匹配而静默跳过 YAML 校验（2026-10-22 slug 收紧，设计 §3.4）；
  *   · 卡片 flowId（若有）必须与文件名一致；
  *   · preview 必须能提取出 YAML 正文，且 `parseFlowStateYaml` 全部通过。
  * 返回 `undefined` = 通过；否则返回给模型/Steward 的具体错误文案（含每条 path + reason）。
@@ -1906,6 +1934,14 @@ function validateFlowYamlCard(
 
   const failures: string[] = [];
   for (const target of targets) {
+    if (!isGovernanceFlowId(target.flowId)) {
+      failures.push(
+        `${target.rel}: 文件名 flowId「${target.flowId}」不是合法 slug` +
+          `（须匹配 ${GOVERNANCE_SLUG_PATTERN}；2–64 位、首尾小写字母/数字、禁止首尾连字符）；` +
+          "拒绝该卡（不得跳过 YAML 校验）",
+      );
+      continue;
+    }
     if (cardFlowId !== undefined && cardFlowId !== target.flowId) {
       failures.push(`${target.rel}: 卡片 flowId="${cardFlowId}" 与文件名 flowId="${target.flowId}" 不一致`);
       continue;
@@ -1959,6 +1995,22 @@ const TRIO_CARD_KINDS: Record<BuiltInGovernanceRoleSpec["id"], readonly Governan
   // 验收权归 Proof / 验收（verifier）；Draft / 提案不再发 acceptance。
   verifier: ["acceptance", "write"],
 };
+
+/**
+ * `request_confirmation` 的**工具级** cardKind 枚举（与运行时核心 `CONFIRM_CARD_KINDS` 同值）。
+ * 本地只用于在拒绝文案里给出「本角色允许的确认卡 kind」——TRIO_CARD_KINDS 同时混有 choice 类，
+ * 直接列出会把 `proposal`/`acceptance` 等误报成可确认卡种。
+ */
+const GOVERNANCE_CONFIRM_CARD_KINDS: readonly GovernanceCardKind[] = [
+  "write",
+  "appointment-write",
+  "schedule-write",
+];
+
+/** 某内置治理角色允许的**确认卡** kinds（工具枚举 ∩ `TRIO_CARD_KINDS`，按设计 §4.2 表序；liaison 为空）。 */
+function confirmCardKindsOf(roleId: BuiltInGovernanceRoleSpec["id"]): readonly GovernanceCardKind[] {
+  return GOVERNANCE_CONFIRM_CARD_KINDS.filter((kind) => TRIO_CARD_KINDS[roleId].includes(kind));
+}
 
 /** 账本条目签名（本会话内存合并去重用；只比较能唯一识别一次决定/事件的字段）。 */
 function ledgerEntrySignature(entry: GovernanceLedgerEntry): string {

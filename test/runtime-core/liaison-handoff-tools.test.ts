@@ -104,6 +104,8 @@ test("hand_off_intent：非法参数在触达能力前拒绝（slug/枚举/空�
   const invalid: [string, Record<string, unknown>, RegExp][] = [
     ["missing-intentId", { handoffKind: "initial", goal: "g", scope: "s", acceptance: "a", summary: "x" }, /intentId/],
     ["bad-slug", { ...validHandOff, intentId: "Bad Slug" }, /intentId/],
+    ["bad-intentId-trailing-hyphen", { ...validHandOff, intentId: "intent-" }, /intentId/],
+    ["bad-flowId-trailing-hyphen", { ...validHandOff, flowId: "flow-" }, /flowId/],
     ["nonstring-intentId", { ...validHandOff, intentId: 7 }, /intentId/],
     ["bad-kind", { ...validHandOff, handoffKind: "update" }, /handoffKind/],
     ["nonstring-kind", { ...validHandOff, handoffKind: 1 }, /handoffKind/],
@@ -189,7 +191,9 @@ test("request_clarification：非法参数在触达能力前拒绝（无归属/�
   const invalid: [string, Record<string, unknown>, RegExp][] = [
     ["no-owner", { question: "问什么？" }, /flowId\/intentId/],
     ["bad-flowId", { ...validClarification, flowId: "FLOW" }, /flowId/],
+    ["bad-flowId-trailing-hyphen", { ...validClarification, flowId: "a-" }, /flowId/],
     ["bad-intentId", { ...validClarification, intentId: "a_b" }, /intentId/],
+    ["bad-intentId-trailing-hyphen", { ...validClarification, intentId: "intent-" }, /intentId/],
     ["missing-question", { flowId: "flow-alpha" }, /question/],
     ["blank-question", { flowId: "flow-alpha", question: "  " }, /question/],
     ["nonstring-question", { flowId: "flow-alpha", question: 3 }, /question/],

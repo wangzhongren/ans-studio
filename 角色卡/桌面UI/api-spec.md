@@ -15,8 +15,9 @@
 | `chat/markdown.ts` | `esc`（唯一转义源）、`renderMarkdown`、`markdownHtml`、`installMarkdownLinkHandler`；外链只经 `window.desktop.openExternal`，一律 preventDefault |
 | `chat/status.ts` | `deriveRoleStatus`/`statusBadge`：等待确认 > 工作中（busy/队列）> 错误 > 其余；`.ti-count` 唯一数字 |
 | `chat/tool-summary.ts` | 工具相位合并、折叠摘要、目标/状态/错误纯函数 |
-| `chat/replay.ts` | 回放 skip/append/full、canonical key/去重 |
-| `chat/events.ts` | SessionEvent/历史 → 行描述（user/assistant/tool/injected/operator/handback/turn-terminal/system-notice） |
+| `chat/replay.ts` | 回放 skip/append/full、canonical key/去重；reasoning 事件豁免实时文本去重（幂等交给合并层 piece 指纹） |
+| `chat/events.ts` | SessionEvent/历史 → 行描述（user/assistant/tool/injected/operator/handback/turn-terminal/system-notice/reasoning）；reasoning 只读投影形 `detail.reasoning`，坏件 fail-closed |
+| `chat/reasoning.ts` | 推理折叠行纯逻辑：投影载体提取、R2 文案（`reasoningLabel`）与固定说明常量、piece 指纹/合并、确定性插入位置；`ChatRow` 只消费行数据与常量 |
 | `chat/report-view.ts` | 报告/交付 facts、persistence 文案、安全显示副本 flags |
 | `chat/role-view.ts` | 治理职能显示名：`proposal → Draft / 提案`、`nomination → Crew / 组队`、`schedule → Steward / 统筹`；`liaison → 主理 / Lead`、`verification → 验收 / Proof` 不变 |
 | `chat/operator-view.ts` | operator 镜像面、`pendingKindFor`（待选择/等待你确认）、治理卡文案 |

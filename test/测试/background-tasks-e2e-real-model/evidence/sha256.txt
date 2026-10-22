@@ -1,0 +1,7 @@
+41613d22ed6f613700ec11550e4fcf8cbe867ae04eb5256d639a8b7d0d9effb3 *角色卡/测试/docs/change/2026-10-22_change_background-tasks-e2e-real-model.md
+14d88ba97847e8e92d1d312883f81b5580d900994e488dd4ee05990563c56297 *test/测试/background-tasks-e2e-real-model/evidence/e2e.log
+1d7779054025a0ef13f59d9137bd2faee5bcdc737d4c338c310c3ff6ac96a76a *test/测试/background-tasks-e2e-real-model/evidence/run-shell-comparison.log
+ebc028ac1f94e7c134d58a6523d454300553a025effc6534b3769008320ec55b *test/测试/background-tasks-e2e-real-model/evidence/smoke.log
+605ab24a93c0940de2d444f5db79bfa164b48ad748b3f7d7484cb4ff6d65a2f1 *test/测试/background-tasks-e2e-real-model/e2e-background-real-model.ts
+d0ab4f504d6b8ea40166d6b88d0d81b7fd0d68bbe9aa8ae3bb9ebb348ccd2431 *test/测试/background-tasks-e2e-real-model/pi-smoke.ts
+2ce34de756ff20c78f3f89bea143eb6b5f7b6bf1b61f9d5167592f32f8815855 *test/测试/background-tasks-e2e-real-model/run-shell-comparison.ts

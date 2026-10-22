@@ -132,8 +132,13 @@ export interface FinalizeResult {
 // **缺席＝旧形状**：下列字段全部可选；旧调用不带 flow 元数据时零行为变化，且缺席的
 // flowId/stepId/cardKind **不能**解锁任何治理门禁（门禁只认账本中应用签发的客户决定）。
 
-/** 治理流程/步骤标识的 slug 形状（评审 §5.8）：`^[a-z0-9][a-z0-9-]{1,63}$`。工具层按此校验，不猜测、不截断。 */
-export const GOVERNANCE_SLUG_PATTERN = "^[a-z0-9][a-z0-9-]{1,63}$";
+/**
+ * 治理流程/步骤标识的 slug 形状（评审 §5.8；2026-10-22 客户确认收紧，设计
+ * `角色卡/项目管理/docs/design/2026-10-22_design_governance-slug-no-trailing-hyphen.md` §2.1）：
+ * `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` —— 2–64 位，首尾均为小写字母/数字，内部可含连字符
+ * （连续连字符仍允许），禁止首/尾连字符。工具层按此校验，不猜测、不截断。
+ */
+export const GOVERNANCE_SLUG_PATTERN = "^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$";
 
 /** 治理流程 id（slug；只作标识，不表达权限）。 */
 export type GovernanceFlowId = string;
@@ -309,7 +314,18 @@ export type CustomerInputOutcome =
        */
       judge?: GovernanceJudgeAudit;
     }
-  | { outcome: "declined"; operatorId?: string; reason?: string }
+  | {
+      outcome: "declined";
+      operatorId?: string;
+      reason?: string;
+      /**
+       * 卡片**从未呈现给客户**（2026-10-22 无效治理卡守卫设计 §4.6）：应用在触达客户通道之前
+       * 拒绝发卡（如治理角色缺 `flowId`/`cardKind`）时置位。可选、向后兼容——既有 `declined`
+       * 生产者（客户拒绝、判断 manual 退回、通道故障等）不设置，下游文案逐字不变。
+       * 工具处理器据此区分「系统拒绝发卡」与「客户拒绝」：不得回报「未获客户同意」。
+       */
+      notPresented?: true;
+    }
   | { outcome: "unavailable"; reason?: string };
 
 /** Captured at invocation. Issuers must reject late consent when this original signal is aborted. */
@@ -1266,6 +1282,110 @@ export interface GovernanceJudgeFacts {
   latestDecisionKinds: string[];
 }
 
+// —————————————— 会话级后台任务（2026-10-22 客户确认设计 B1–B4） ——————————————
+//
+// 依据：`角色卡/项目管理/docs/design/2026-10-22_design_background-tasks.md`（客户 2026-10-22 确认必需项
+// B1–B4）。后台任务**只属于当前角色会话**：任务表、日志、pid 只在内存，不跨重启；会话关闭（dispose）
+// 或模型显式 `stop_background_task` 才终止；轮次结束/停止本轮**不终止**后台任务。
+// 管理器实现＝`src/common/runtime-core/background-tasks.ts`（唯一 spawn 入口）；Service 在
+// `providerFor` 创建并注入，Provider 四工具只消费注入能力。判断会话（shellJudge/governanceJudge）
+// 结构性不经过 `buildGovernedTools`，因此看不到四工具。
+
+/** 后台任务状态（只由真实事件驱动）：运行中 / 自然退出 / 被停止 / 启动后运行错误 / 终止预算内未收口。 */
+export type BackgroundTaskState = "running" | "exited" | "stopped" | "failed" | "kill-timeout";
+
+/** 后台任务快照（`list` 与各工具回执共用；`command` 为原始命令文本，展示截断由工具层负责）。 */
+export interface BackgroundTaskSnapshot {
+  taskId: string;
+  state: BackgroundTaskState;
+  pid?: number;
+  command: string;
+  /** 实际 spawn 成功的时间（ISO 8601）。 */
+  startedAt: string;
+  exitCode?: number;
+  signal?: string;
+  /** 启动后运行错误（如底层 error 事件）的如实文本；启动失败不产生任务。 */
+  error?: string;
+  /** 已运行时长（运行中为至今，已结束为启动到 close）。 */
+  durationMs: number;
+}
+
+/** 单路日志尾部读取结果；`truncated` 表示 256 KiB 环形缓冲曾丢弃更早内容（不假装日志完整）。 */
+export interface BackgroundTaskStreamRead {
+  text: string;
+  truncated: boolean;
+}
+
+/** `read_background_task` 可选流与尾部行数（默认 both / 40；上限 200，由工具层与本接口共同钳制）。 */
+export interface BackgroundTaskReadOptions {
+  stream?: "stdout" | "stderr" | "both";
+  tailLines?: number;
+}
+
+/** 后台任务读取结果（未知任务由管理器返回 `undefined`，由工具层如实报「未知任务」）。 */
+export interface BackgroundTaskReadResult {
+  task: BackgroundTaskSnapshot;
+  /** 实际返回的尾部行数（已按上限钳制）。 */
+  tailLines: number;
+  /** 请求行数超过上限（200）时为 true——如实标注，不静默改变请求。 */
+  tailClamped: boolean;
+  stdout?: BackgroundTaskStreamRead;
+  stderr?: BackgroundTaskStreamRead;
+}
+
+/** 管理器 `start` 入参：审核通过后由启动工具传入；cwd/env 由工具层按 run_shell 同源规则构造。 */
+export interface BackgroundTaskStartInput {
+  command: string;
+  argv: string[];
+  cwd: string;
+  env: Record<string, string>;
+}
+
+/** 启动结果：只有实际拿到 spawn 成功（pid）才返回任务号；失败不保留半成品任务。 */
+export type BackgroundTaskStartResult =
+  | { ok: true; task: BackgroundTaskSnapshot }
+  | { ok: false; reason: "limit" | "closed" | "spawn-failed"; message: string };
+
+export interface BackgroundTaskStopOptions {
+  /** true＝跳过 SIGTERM 直接 SIGKILL；默认 false＝SIGTERM→250ms→SIGKILL→1s 收口。 */
+  force?: boolean;
+}
+
+/**
+ * 停止结果：
+ * - `ok:true`：底层 `close` 已观察到（`alreadyEnded` 表示调用前任务早已结束，本次未发送终止信号）；
+ * - `ok:false`：未知任务/会话已关闭，或终止预算内未收口（`reason:"timeout"`，快照 state=`kill-timeout`，
+ *   **可能仍在运行**）。
+ */
+export type BackgroundTaskStopResult =
+  | { ok: true; task: BackgroundTaskSnapshot; alreadyEnded: boolean }
+  | { ok: false; reason: "unknown-task" | "closed" | "timeout"; message: string; task?: BackgroundTaskSnapshot };
+
+/**
+ * 会话级后台任务管理器（中立能力接口；实现＝`common/runtime-core/background-tasks.ts`）。
+ * Service 创建并注入 `GovernedToolsOptions.backgroundTasks`；四个工具只在同时注入 `ShellGate` 与
+ * 本能力时注册。`start` 是**唯一 spawn 入口**：工具层只有在审核结果恰为 `allow:true` 时才调用它。
+ */
+export interface BackgroundTaskCapability {
+  /** 当前占用名额的任务数（含正在等待 spawn 确认的启动，防止并行调用一起突破上限）。 */
+  readonly runningCount: number;
+  start(input: BackgroundTaskStartInput): Promise<BackgroundTaskStartResult>;
+  list(): BackgroundTaskSnapshot[];
+  read(taskId: string, options?: BackgroundTaskReadOptions): BackgroundTaskReadResult | undefined;
+  stop(taskId: string, options?: BackgroundTaskStopOptions): Promise<BackgroundTaskStopResult>;
+  /** 幂等：标记管理器失效、并行终止全部任务并清空任务/日志。 */
+  dispose(): Promise<void>;
+}
+
+/** 后台任务工具的向后兼容结构化事实（`ToolResult.backgroundTask`；旧读者忽略）。 */
+export interface BackgroundTaskToolFactsV1 {
+  taskId: string;
+  state: BackgroundTaskState;
+  pid?: number;
+  exitCode?: number;
+  signal?: string;
+}
+
 export interface RuntimeAdapter {
   composeContext(role: ResolvedRole): Promise<{ systemPrompt: string }>;
   bindRole(role: ResolvedRole): Promise<RoleSession>;
@@ -1287,7 +1407,16 @@ export interface ToolExecutionCall extends ToolCall {
   toolCallId?: string;
   signal?: AbortSignal;
 }
-export interface ToolResult { ok: boolean; message: string; execution?: RuntimeToolExecutionFactsV1 }
+export interface ToolResult {
+  ok: boolean;
+  message: string;
+  execution?: RuntimeToolExecutionFactsV1;
+  /**
+   * 后台任务结构化事实（2026-10-22 B4；可选、向后兼容）：任务号/状态/pid/退出码。
+   * 只用于工具结果与聊天行；诊断不落 taskId（共享白名单不含该字段）。
+   */
+  backgroundTask?: BackgroundTaskToolFactsV1;
+}
 
 export interface ToolDefinition {
   displayInputRule?: ToolDisplayInputRuleV1;
@@ -1382,6 +1511,14 @@ export interface GovernedToolsOptions {
    * 同样 `judgeMode:true` 且 `installedMcpServers:[]`。未注入 ⇒ 判断路径不进入（逐字现状）。
    */
   governanceJudge?: GovernanceJudgeToolOptions;
+  /**
+   * 会话级后台任务管理器（2026-10-22 客户确认设计 B1/B3）：Service 在 `providerFor` 中、走
+   * `buildGovernedTools` 且注入了 `ShellGate` 时创建并注入；`RuntimeSessionOptions` 以 `Omit` 排除本字段，
+   * 外部调用方不能自行注入。**只有 `ShellGate` 与本能力同时存在时**，`start_background_task` /
+   * `list_background_tasks` / `read_background_task` / `stop_background_task` 才一起注册（注入才注册）。
+   * 判断会话不经过 `buildGovernedTools`，天然看不到这四个工具。未注入 ⇒ 工具不存在（fail-closed）。
+   */
+  backgroundTasks?: BackgroundTaskCapability;
 }
 
 export interface RuntimeSessionRecord {

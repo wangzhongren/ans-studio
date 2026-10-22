@@ -353,3 +353,58 @@ test("parseFlowStepIds：表格首格 / 列表首词；表头/分隔行/正文 t
   );
   assert.deepEqual(ids, ["impl", "review-1", "dispatch-1", "acceptance"]);
 });
+
+// —————————————————————— ⑥ slug 收紧（2026-10-22，S2/T7/T8） ——————————————————————
+
+test("slug 收紧：尾连字符在 coordinate/dispatch 被拒，文案展示新正则；旧合法值零回归", () => {
+  withRoot((root) => {
+    writeFlow(root);
+
+    const coordinate = (over: Partial<GovernanceGateInput> = {}): GovernanceGateInput =>
+      input({
+        projectRoot: root,
+        action: "coordinate",
+        roleId: "liaison",
+        targetRoleId: "convener",
+        flowId: "flow-a",
+        ...over,
+      });
+
+    const badCoordinateFlow = evaluateGovernanceGate(coordinate({ flowId: "flow-" }), snapshot([]));
+    assert.equal(blocked(badCoordinateFlow), "missing-flow-id");
+    assert.match((badCoordinateFlow as { message: string }).message, /0,62/, "文案必须插值现行正则");
+    const badCoordinateStep = evaluateGovernanceGate(coordinate({ stepId: "impl-" }), snapshot([]));
+    assert.equal(blocked(badCoordinateStep), "missing-step-id");
+
+    const badDispatchFlow = evaluateGovernanceGate(
+      input({ projectRoot: root, action: "dispatch", flowId: "flow-", stepId: "impl", targetRoleId: "A" }),
+      snapshot([ACCEPT, APPOINT_A]),
+    );
+    assert.equal(blocked(badDispatchFlow), "missing-flow-id");
+    assert.match((badDispatchFlow as { message: string }).message, /0,62/);
+    const badDispatchStep = evaluateGovernanceGate(
+      input({ projectRoot: root, action: "dispatch", flowId: "flow-a", stepId: "impl-", targetRoleId: "A" }),
+      snapshot([ACCEPT, APPOINT_A]),
+    );
+    assert.equal(blocked(badDispatchStep), "missing-step-id");
+
+    // 旧合法值仍放行：含连续连字符（coordinate 不要求流程步骤存在）。
+    assert.deepEqual(evaluateGovernanceGate(coordinate({ flowId: "a--b" }), snapshot([])), { allowed: true });
+    assert.deepEqual(evaluateGovernanceGate(coordinate({ stepId: "a--b" }), snapshot([])), { allowed: true });
+  });
+});
+
+test("parseFlowStepIds：尾连字符步骤行不再被识别（fail-closed），连续连字符仍合法", () => {
+  const ids = parseFlowStepIds(
+    [
+      "| stepId | 步骤 | 状态 |",
+      "| --- | --- | --- |",
+      "| impl- | 尾连字符 | pending |",
+      "| impl | 合法 | pending |",
+      "- a-：尾连字符列表行",
+      "- a--b：连续连字符合法",
+      "",
+    ].join("\n"),
+  );
+  assert.deepEqual(ids, ["impl", "a--b"]);
+});

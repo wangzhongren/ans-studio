@@ -841,3 +841,61 @@ test("observeFlowArtifacts：`..`/绝对路径在 flow YAML 校验阶段 fail-cl
     assert.deepEqual(result.observed, []);
   });
 });
+
+test("slug 收紧（S2/T10）：get/update/supersede/completeAcceptanceStep/observeFlowArtifacts 对尾连字符 id 显式拒绝，不写盘", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, flowYaml());
+    const service = steward(root);
+    const original = readFileSync(join(root, ...FLOW_REL.split("/")), "utf8");
+
+    const get = await service.get({ flowId: "flow-" });
+    assert.equal(get.ok, false);
+    assert.equal(get.code, "missing-flow-id");
+
+    const update = await service.update({
+      flowId: "flow-a",
+      stepId: "impl-",
+      status: "dispatched",
+      expectedRevision: sha256(original),
+    });
+    assert.equal(update.ok, false);
+    assert.equal(update.code, "missing-step-id");
+
+    const supersedeOld = await service.supersede({
+      flowId: "flow-a",
+      oldStepId: "impl-",
+      newStepId: "impl2",
+      title: "重做",
+      owner: "backend",
+      kind: "dispatch",
+      expectedRevision: sha256(original),
+    });
+    assert.equal(supersedeOld.ok, false);
+    assert.equal(supersedeOld.code, "missing-step-id");
+
+    const supersedeNew = await service.supersede({
+      flowId: "flow-a",
+      oldStepId: "impl",
+      newStepId: "impl-",
+      title: "重做",
+      owner: "backend",
+      kind: "dispatch",
+      expectedRevision: sha256(original),
+    });
+    assert.equal(supersedeNew.ok, false);
+    assert.equal(supersedeNew.code, "missing-step-id");
+
+    const complete = await completeAcceptanceStep({ projectRoot: root, flowId: "flow-" });
+    assert.equal(complete.ok, false);
+    assert.equal(complete.code, "missing-flow-id");
+
+    const observe = await observeFlowArtifacts({ projectRoot: root, flowId: "flow-" });
+    assert.equal(observe.ok, false);
+    assert.match(observe.error ?? "", /合法 flowId/);
+
+    // 合法值零回归：flow-a/impl 照常可读；文件未被上述拒绝写坏。
+    const legal = await service.get({ flowId: "flow-a" });
+    assert.equal(legal.ok, true);
+    assert.equal(readFileSync(join(root, ...FLOW_REL.split("/")), "utf8"), original, "拒绝路径不得写盘");
+  });
+});

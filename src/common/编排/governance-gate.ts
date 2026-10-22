@@ -26,6 +26,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { GovernanceModel } from "../../model/role.ts";
+import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 import { isBuiltInGovernanceRoleId } from "../../service/boundary/resolve-boundary.ts";
 import { parseFlowStateYaml } from "./flow-state.ts";
 import type {
@@ -55,8 +56,11 @@ export type GovernanceGateDecision =
   | { allowed: true }
   | { allowed: false; code: string; message: string };
 
-/** 治理 slug 形状（与运行时核心 `GOVERNANCE_SLUG_PATTERN` 同值；此处只做本地判定，不导运行时实现）。 */
-const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
+/**
+ * 治理 slug 形状（**单一来源**：运行时核心 `src/model/runtime.ts` 的 `GOVERNANCE_SLUG_PATTERN`；
+ * 2026-10-22 收紧为禁止首/尾连字符）。此处只编译本地判定用 RegExp，不保留同值副本。
+ */
+const SLUG_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
 
 /**
  * 提案类决定集合（顺序即「最新决定」的候选集合；普通写盘确认没有 decisionKind，不参与）。
@@ -140,10 +144,10 @@ export function evaluateCoordinateGate(input: GovernanceGateInput): GovernanceGa
     return deny("forbidden", "治理门禁：Lead 的协调消息目标只能是 Steward/Convener。");
   }
   if (!isSlug(input.flowId)) {
-    return deny("missing-flow-id", "治理门禁：协调消息必须带合法 flowId（`^[a-z0-9][a-z0-9-]{1,63}$`）。");
+    return deny("missing-flow-id", `治理门禁：协调消息必须带合法 flowId（\`${GOVERNANCE_SLUG_PATTERN}\`）。`);
   }
   if (input.stepId !== undefined && !isSlug(input.stepId)) {
-    return deny("missing-step-id", "治理门禁：协调消息给出 stepId 时必须是合法 slug（`^[a-z0-9][a-z0-9-]{1,63}$`）。");
+    return deny("missing-step-id", `治理门禁：协调消息给出 stepId 时必须是合法 slug（\`${GOVERNANCE_SLUG_PATTERN}\`）。`);
   }
   return { allowed: true };
 }
@@ -154,7 +158,8 @@ export function evaluateCoordinateGate(input: GovernanceGateInput): GovernanceGa
  * 约定形状（V1 最小面）：
  *   · Markdown 表格行：**第一格**为步骤 id（可带反引号），如 `| 实现 | 实现者 | pending |`；
  *   · 列表行：`- 实现 …` / `* 实现：…` / `- [ ] 实现` —— 第一个词为步骤 id；
- *   · 步骤 id 必须匹配 `^[a-z0-9][a-z0-9-]{1,63}$`；表头/分隔行/其他文本不参与。
+ *   · 步骤 id 必须匹配 Model 常量 `GOVERNANCE_SLUG_PATTERN`（2–64 位、首尾字母/数字、禁止首/尾连字符）；
+ *     表头/分隔行/其他文本不参与。
  * 解析是**保守**的：只有上面两种结构行的首格/首词被采信；正文里出现同名 token 不算步骤。
  */
 export function parseFlowStepIds(text: string): string[] {
@@ -200,7 +205,7 @@ function evaluateProposalGate(
   snapshot: GovernanceLedgerSnapshot,
 ): GovernanceGateDecision {
   if (!isSlug(input.flowId)) {
-    return deny("missing-flow-id", "治理门禁：写流程/提名必须带合法 flowId（`^[a-z0-9][a-z0-9-]{1,63}$`）。");
+    return deny("missing-flow-id", `治理门禁：写流程/提名必须带合法 flowId（\`${GOVERNANCE_SLUG_PATTERN}\`）。`);
   }
   const latest = latestDecision(snapshot, input.flowId, (entry) =>
     PROPOSAL_DECISION_KINDS.has(entry.decisionKind as GovernanceDecisionKind),
@@ -248,10 +253,10 @@ function evaluateDispatchGate(
 ): GovernanceGateDecision {
   // 0) flowId/stepId 必填（规则 4 的前置；缺失无法判定接受范围与去重）。
   if (!isSlug(input.flowId)) {
-    return deny("missing-flow-id", "治理门禁：Convener 派发必须带合法 flowId（`^[a-z0-9][a-z0-9-]{1,63}$`）。");
+    return deny("missing-flow-id", `治理门禁：Convener 派发必须带合法 flowId（\`${GOVERNANCE_SLUG_PATTERN}\`）。`);
   }
   if (!isSlug(input.stepId)) {
-    return deny("missing-step-id", "治理门禁：Convener 派发必须带合法 stepId（`^[a-z0-9][a-z0-9-]{1,63}$`）。");
+    return deny("missing-step-id", `治理门禁：Convener 派发必须带合法 stepId（\`${GOVERNANCE_SLUG_PATTERN}\`）。`);
   }
 
   // 1) 目标不是内置治理角色（三人与 su 一律拒绝）。

@@ -13,7 +13,7 @@
 // 本模块只做事实提炼/物证路径计算/提名推荐集解析；**不做裁决**（裁决规范化/机械复核在
 // `governance-judge-verdict.ts`）。
 
-import type { GovernanceJudgeFacts, GovernanceJudgeRequest } from "../../model/runtime.ts";
+import { GOVERNANCE_SLUG_PATTERN, type GovernanceJudgeFacts, type GovernanceJudgeRequest } from "../../model/runtime.ts";
 import { isAbsoluteAny, normalizeLexical } from "../shared/path-primitives.ts";
 import type { GovernanceLedgerEntry, GovernanceLedgerSnapshot } from "./governance-ledger.ts";
 
@@ -25,8 +25,11 @@ export const GOVERNANCE_JUDGE_FACT_STRING_BYTES = 128;
 export const GOVERNANCE_JUDGE_FACT_ARRAY_LIMIT = 50;
 export const GOVERNANCE_JUDGE_LATEST_DECISIONS_LIMIT = 20;
 
-/** 治理 flowId 形状（与运行时核心/编排其他处同值；本地再判一次，不导入运行时实现）。 */
-const GOVERNANCE_FLOW_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
+/**
+ * 治理 flowId 形状（**单一来源**：运行时核心 `src/model/runtime.ts` 的 `GOVERNANCE_SLUG_PATTERN`；
+ * 2026-10-22 收紧为禁止首/尾连字符）。本地只编译判定用 RegExp，不保留同值副本。
+ */
+const GOVERNANCE_FLOW_ID_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
 
 export function isGovernanceJudgeFlowId(value: unknown): value is string {
   return typeof value === "string" && GOVERNANCE_FLOW_ID_RE.test(value);

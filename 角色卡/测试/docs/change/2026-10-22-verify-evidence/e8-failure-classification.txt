@@ -1,0 +1,35 @@
+# E8 排除 write-sequencing 全量基线 — 最终失败归类（2026-10-22）
+
+候选：HEAD 4d944e7587f10be29b6356c42539e06219ed88fc + 工作树（含装配角色的 `govern-target` 夹具适配）
+命令：`node --test --test-timeout=120000 <342 个文件>`（`find test -name '*.test.ts' ! -path '*/pi-adapter/write-sequencing.test.ts'`）
+
+- **最终运行（装配适配后）**：exit 1；tests 3377 / pass 3350 / **fail 9** / skipped 18；duration 22080ms；
+  原始输出 `e8-excluded-suite-final.log`。9 个失败全部为下表 A 的既有环境红；T16 与 `govern-target` 均通过。
+- **中间运行（装配适配前，历史保留）**：tests 3377 / pass 3349 / fail 10 / skipped 18；
+  原始输出 `e8-excluded-suite.log`。多出的 1 个失败为下表 B；装配角色已适配并在最终运行通过。
+
+## A. 既有环境红（Windows 无符号链接权限，EPERM；与本次守卫无逻辑关系）— 9 个
+
+| # | 文件:行 | 测试名 | 证据 |
+| --- | --- | --- | --- |
+| 1 | test/claude-adapter/session.test.ts:637 | native symlink and storage runtime mismatch fail before SDK query | `Error: EPERM: operation not permitted, symlink` |
+| 2 | test/codex-adapter/session.test.ts:351 | native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary | `EPERM … symlink` |
+| 3 | test/pi-adapter/injected-runtime.test.ts:185 | store validate callback rejects directory symlink before Pi parse or new native write | `EPERM … symlink` |
+| 4 | test/pi-adapter/injected-runtime.test.ts:193 | Pi storage refuses file symlink and role/runtime mismatch without touching other storage | `EPERM … symlink` |
+| 5 | test/runtime-core/file-write-safety.test.ts:97 | D3 linked workspace root remains usable; linked target itself is not replaced | `EPERM … symlink` |
+| 6 | test/runtime-core/session-store.test.ts:46 | store: traversal, mismatched scope and symlinked runtime directories rejected | `EPERM … symlink` |
+| 7 | test/runtime-core/session-store.test.ts:58 | store: native validation stays lazy and native symlink is rejected before effects | `EPERM … symlink` |
+| 8 | test/测试/g4-skill-verify/b-render-double-check.test.ts:182 | 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛 | `EPERM … symlink` |
+| 9 | test/编排/shell-authorized-routine.test.ts:103 | node test外指符号链接路径不获委托；项目内测试路径获委托 | `EPERM … symlink` |
+
+说明：以上文件均未被本次改动触碰；「编排」角色变更记录已登记 `shell-authorized-routine.test.ts:103` 为既有 Windows symlink 环境红；最终运行逐一读取失败详情确认均为同一 `EPERM: operation not permitted, symlink`。**不作为通过计入。**
+
+## B. 预期测试适配（适配前中间运行的失败；装配已修复，最终运行通过，不计为失败/基线红/产品失败）
+
+| # | 文件:行 | 测试名 | 失败（中间运行） | 结论 |
+| --- | --- | --- | --- | --- |
+| 1 | test/装配/govern-target.test.ts:223 | ans govern <空目录>（经 governCommand + 假适配器）→ … | `客户确认通道应被请求恰好一次`：0 !== 1 | 旧夹具仅给 `title/preview`、缺 `flowId`/`cardKind`；N1 严格口径正确拒绝。装配角色已只改测试夹具（补 `flowId: "demo"` + `cardKind: "write"`），不改产品。**最终运行 ✔ 通过**；本角色未修改 `test/装配/`。 |
+
+## C. 本角色新用例的测试缺陷（已修复，最终通过）
+
+T16 在首轮排除基线（`e8-excluded-suite-run1-with-test-defect.log`）失败：`desktop.customer-input` 的 `governance-judge.started` 计数 0 !== 1。根因：诊断写入屏障只等待任意 `test.barrier` 行，T15 留下的旧屏障行使轮询提前返回，读取发生在 T16 通道诊断行落盘之前（诊断文件显示通道行确实已写入，且位于 T16 屏障行之前）。属**测试同步缺陷**，非产品缺陷。修复：每次屏障使用唯一标记 `test.barrier.<seq>` 并等待该精确事件。修复后单跑 9/9、中间与最终排除基线中 T16 均 ✔ 通过。

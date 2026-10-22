@@ -1,0 +1,5 @@
+2026-10-22 background-tasks real-model E2E commands (all run from repo root;
+Node PATH exported and /c/Users/51054/AppData/Local/Temp/ans-e2e-model.env sourced before each):
+1. node "test/测试/background-tasks-e2e-real-model/pi-smoke.ts" -> exit 0 (1487ms, model replied OK)
+2. node "test/测试/background-tasks-e2e-real-model/e2e-background-real-model.ts" -> exit 0 (12/12 assertions passed, 13930ms)
+3. node "test/测试/background-tasks-e2e-real-model/run-shell-comparison.ts" -> exit 0 (run_shell blocked 3107ms then timeout-killed)

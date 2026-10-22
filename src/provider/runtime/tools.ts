@@ -1,5 +1,5 @@
 // Shared ANS tool execution. Owner: 运行时核心. SDK adapters receive handlers by injection.
-import { coreToolTarget } from "../../common/runtime-core/tool-display.ts";
+import { coreToolTarget, utf8Prefix } from "../../common/runtime-core/tool-display.ts";
 import { createEventQueue } from "../../common/runtime-core/event-queue.ts";
 import { resolveProjectList } from "../../common/runtime-core/list-dir.ts";
 import { spawn } from "node:child_process";
@@ -51,6 +51,7 @@ import type {
   PromptInputEventDetail, RuntimeAdapter, RuntimeProviderOptions, SessionEvent, ToolCall,
   ToolDefinition, ToolResult, GovernedToolsOptions,
   GovernanceCardKind, GovernanceCardMetadata, GovernanceChoiceCardKind, GovernanceConfirmCardKind, GovernanceFlowMetadata,
+  BackgroundTaskCapability, BackgroundTaskSnapshot,
 } from "../../model/runtime.ts";
 import { GOVERNANCE_SLUG_PATTERN, FLOW_TOOL_STATUSES, FLOW_TOOL_STEP_KINDS } from "../../model/runtime.ts";
 import type { WriteDecision } from "../../model/decision.ts";
@@ -72,6 +73,12 @@ import {
   readTimeoutMs,
   withTimeout,
 } from "../../common/runtime-core/timeout.ts";
+import {
+  BACKGROUND_TASK_DEFAULT_TAIL_LINES,
+  BACKGROUND_TASK_MAX_RUNNING,
+  BACKGROUND_TASK_MAX_TAIL_LINES,
+} from "../../common/runtime-core/background-tasks.ts";
+import { killProcessTree } from "../../common/runtime-core/process-tree.ts";
 import { PI_CREDENTIAL_ENV_VARS, RUNTIME_CREDENTIAL_ENV_VARS } from "../../common/shared/runtime-shared.ts";
 import {
   atomicWriteFile,
@@ -83,6 +90,15 @@ import {
 
 /** run_shell 工具名（唯一 shell 入口）。扩展层据此设能力级 kill-switch，工具集据此注册。 */
 export const SHELL_TOOL_NAME = "run_shell";
+
+/** start_background_task 工具名（2026-10-22 后台任务 B1；会话级后台启动，复用 run_shell 审核链）。 */
+export const START_BACKGROUND_TASK_TOOL_NAME = "start_background_task";
+/** list_background_tasks 工具名（B1；只读列出当前会话保留的后台任务）。 */
+export const LIST_BACKGROUND_TASKS_TOOL_NAME = "list_background_tasks";
+/** read_background_task 工具名（B1；读取任务状态与 stdout/stderr 尾部）。 */
+export const READ_BACKGROUND_TASK_TOOL_NAME = "read_background_task";
+/** stop_background_task 工具名（B1；按终止预算停止任务）。 */
+export const STOP_BACKGROUND_TASK_TOOL_NAME = "stop_background_task";
 
 /** request_confirmation 工具名（设计 A-1；交互工具族之一：请求客户确认，可带预览）。 */
 export const REQUEST_CONFIRMATION_TOOL_NAME = "request_confirmation";
@@ -693,32 +709,6 @@ interface ShellExecOutcome {
 }
 
 /**
- * 平台分支的**进程树终止**（F-1-opt1）。
- * - POSIX：spawn 时 `detached:true` 使子进程成为**进程组组长**，按 `-pid` 向整组发信号
- *   （`npm test` 等派生的孙进程一并收掉，不留占端口/CPU 的孤儿）；组不可达（已退出/竞态）回退 `child.kill`。
- * - Windows：`taskkill /pid <pid> /T /F` 终止整棵树；taskkill 不可用时回退 `child.kill`。
- * 任何失败都不抛出——收口交由 close / 清理计时器（既有两条路径语义不变）。
- */
-function killProcessTree(child: ReturnType<typeof spawn>, signal: NodeJS.Signals, useProcessGroup: boolean, env: Record<string, string>): void {
-  if (process.platform === "win32") {
-    const pid = child.pid;
-    if (pid !== undefined) {
-      try {
-        const killer = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore", env });
-        killer.on("error", () => { try { child.kill(signal); } catch { /* 已退出 */ } });
-        return;
-      } catch { /* 回退直接子进程 */ }
-    }
-    try { child.kill(signal); } catch { /* 已退出 */ }
-    return;
-  }
-  if (useProcessGroup && child.pid !== undefined) {
-    try { process.kill(-child.pid, signal); return; } catch { /* 组不可达 → 回退 */ }
-  }
-  try { child.kill(signal); } catch { /* 已退出 */ }
-}
-
-/**
  * 直接以 argv 启动子进程（**shell: false**，不经 shell 再解析）。
  * cwd **固定**为传入值（= projectRoot），不接受调用方指定（爆炸半径限制，§7.2）。
  * env **必须**是剥离凭据后的过滤环境（§7.9，见 buildShellEnv），**绝不**直接传 process.env。
@@ -910,11 +900,287 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
   };
 }
 
+// —————————————— 会话级后台任务（2026-10-22 客户确认设计 B1–B4） ——————————————
+//
+// 四个工具只在「注入 ShellGate（与 run_shell 同判据）＋ Service 注入管理器」时一起注册（注入才注册）。
+// 启动工具**复用 run_shell 同一条审核链**：空命令 → `splitCommand` → F-7 守卫 → **并发检查**
+// （su 核对点 CC1：F-7 之后、ShellGate 之前）→ `ShellGate`（同一 reviewTimeout/raceAbort/活动闸）→
+// `buildShellEnv` 剥离凭据 → cwd=会话 `shellCwd` → 管理器 `start`（唯一 spawn 入口）。
+// 审核拒绝/超时/异常/非明确 allow ⇒ **零 spawn**。判断会话不经过 `buildGovernedTools`，结构上看不到四工具。
+
+/** 命令摘要（list/read 展示用；UTF-8 安全截断，不切坏多字节字符）。 */
+function backgroundCommandSummary(command: string): string {
+  const normalized = command.replace(/\s+/g, " ").trim();
+  const capped = utf8Prefix(normalized, 160);
+  return capped === normalized ? capped : `${capped}…`;
+}
+
+/** 工具结果里的向后兼容结构化事实（不用于诊断落盘——taskId 不在共享白名单）。 */
+function backgroundTaskFactsOf(task: BackgroundTaskSnapshot) {
+  return {
+    taskId: task.taskId,
+    state: task.state,
+    ...(task.pid !== undefined ? { pid: task.pid } : {}),
+    ...(task.exitCode !== undefined ? { exitCode: task.exitCode } : {}),
+    ...(task.signal !== undefined ? { signal: task.signal } : {}),
+  };
+}
+
+/** 单任务摘要行（list 用）。 */
+function backgroundSnapshotLine(task: BackgroundTaskSnapshot): string {
+  const parts = [
+    `- ${task.taskId}`,
+    task.state,
+    task.pid !== undefined ? `pid ${task.pid}` : "pid 未知",
+    `启动于 ${task.startedAt}`,
+    `命令：${backgroundCommandSummary(task.command)}`,
+  ];
+  if (task.exitCode !== undefined) parts.push(`exitCode ${task.exitCode}`);
+  if (task.signal !== undefined) parts.push(`signal ${task.signal}`);
+  if (task.error !== undefined) parts.push(`error：${truncateUtf8(task.error, 240).text}`);
+  return parts.join("  ");
+}
+
+/**
+ * start_background_task：启动一个**会话级后台任务**并立即返回任务号与 pid。
+ * 审核与 spawn 同址：只有 `shellGate` 恰返回 `allow:true` 才调用管理器 `start`；并发上限检查在审核**之前**。
+ */
+function makeStartBackgroundTaskTool(
+  shellGate: ShellGate,
+  shellCwd: string,
+  reviewTimeoutMs: number,
+  manager: BackgroundTaskCapability,
+  gate?: InteractionGate,
+  diagnostics?: DiagnosticLog,
+  currentTurnId?: () => string | undefined,
+  extraCredentialEnvVars?: readonly string[],
+): ExecutableTool {
+  const name = START_BACKGROUND_TASK_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const command = coreToolTarget("core-command-v1", call.args);
+      if (command === undefined || command.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 command 参数，无命令可执行（未启动）` };
+      }
+      const split = splitCommand(command);
+      if (split.argv.length === 0) return { ok: false, message: `${name}: command 为空，无命令可执行（未启动）` };
+      const argv = split.argv;
+      const cwd = shellCwd;
+      const toolCallId = typeof call.toolCallId === "string" ? call.toolCallId : "";
+      const turnId = currentTurnId?.();
+
+      // —— F-7 执行层守卫（在审核与并发检查之前）：命中 ⇒ 不调 gate、不 spawn、不建任务。——
+      const guardHit = detectUnsupportedShellSyntax(split);
+      if (guardHit !== undefined) {
+        diagnostics?.record("shell.guard.blocked", { turnId, toolCallId, toolName: name, reasonCode: guardHit.token });
+        return { ok: false, message: shellGuardMessage(name, guardHit) };
+      }
+
+      // —— 并发上限（su 核对点 CC1）：F-7 之后、ShellGate 之前；超限零 spawn、无审核请求。——
+      if (manager.runningCount >= BACKGROUND_TASK_MAX_RUNNING) {
+        diagnostics?.record("background.limit", { reasonCode: "concurrency-limit", count: manager.runningCount });
+        return {
+          ok: false,
+          message:
+            `${name} 未启动：当前会话运行中的后台任务已达上限（${BACKGROUND_TASK_MAX_RUNNING} 个）。` +
+            `请先用 stop_background_task 停止不需要的任务后重试；本次未调用审核、未启动任何进程。`,
+        };
+      }
+
+      // —— 唯一的命令级闸：与 run_shell 同一审核时限/raceAbort/交互挂起闸；只有恰好 allow:true 才继续。——
+      let review: ShellReviewResult | undefined;
+      const began = Date.now();
+      gate?.begin();
+      diagnostics?.record("shell.review.start", { turnId, toolCallId, toolName: name });
+      try {
+        review = await withTimeout(raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return shellGate({ command, argv, cwd, toolCallId }); }), call.signal, `${name} 审核`), reviewTimeoutMs, `${name} 审核`);
+      } catch (err) {
+        diagnostics?.error("shell.review.failed", err, { turnId, toolCallId, toolName: name });
+        return { ok: false, message: `${name} 未启动：审核未通过（${reasonOf(err)}）——未执行任何进程` };
+      } finally {
+        gate?.end();
+        diagnostics?.record("shell.review.end", { turnId, toolCallId, toolName: name, durationMs: Date.now() - began, decision: review?.allow === true ? "allow" : "deny" });
+      }
+      if (call.signal?.aborted) return { ok: false, message: `${name} 未启动：会话已中止` };
+      if (review === undefined || review === null || review.allow !== true) {
+        const denied = review !== undefined && review !== null && review.allow === false ? review : undefined;
+        const why = denied !== undefined ? denied.reason : "审核未返回明确的允许（缺 allow:true）";
+        const by = denied !== undefined ? `，审者：${denied.by}` : "";
+        return { ok: false, message: `${name} 未启动：审核拒绝（${why}${by}）——未执行任何进程` };
+      }
+
+      // —— 恰好 allow:true：与 run_shell 同源的凭据剥离环境 + 会话 shellCwd；管理器的 start 是唯一 spawn 入口。——
+      const env = buildShellEnv(process.env, extraCredentialEnvVars);
+      const started = await manager.start({ command, argv, cwd, env });
+      if (!started.ok) {
+        // 审核通过后才发现并发已满（并行竞态）：同样零 spawn，并如实记录 limit。
+        if (started.reason === "limit") diagnostics?.record("background.limit", { reasonCode: "concurrency-limit", count: manager.runningCount });
+        return { ok: false, message: `${name} 未启动：${started.message}` };
+      }
+      const task = started.task;
+      diagnostics?.record("background.start", { turnId, toolCallId, toolName: name, pid: task.pid, state: task.state });
+      const stateText = task.state === "running"
+        ? "运行中"
+        : `已结束（${task.state}${task.exitCode !== undefined ? `，exitCode ${task.exitCode}` : ""}）`;
+      return {
+        ok: true,
+        backgroundTask: backgroundTaskFactsOf(task),
+        message:
+          `${name}：已启动任务 ${task.taskId}（pid ${task.pid ?? "?"}，${stateText}）。` +
+          `任务只属于当前会话、不跨重启，日志只在内存；可用 list_background_tasks / read_background_task / stop_background_task 管理。` +
+          `轮次结束或停止本轮**不会**终止它；只有 stop_background_task 或关闭会话才会清理。`,
+      };
+    },
+  };
+}
+
+/** list_background_tasks：列出当前会话保留的任务摘要（不猜测已过期任务）。 */
+function makeListBackgroundTasksTool(manager: BackgroundTaskCapability): ExecutableTool {
+  const name = LIST_BACKGROUND_TASKS_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      if (call.signal?.aborted) return { ok: false, message: `${name}：本轮已中止，未读取` };
+      const tasks = manager.list();
+      if (tasks.length === 0) {
+        return { ok: true, message: `${name}：当前会话没有后台任务。任务只属于当前会话、不跨重启，会话关闭后列表会清空。` };
+      }
+      return {
+        ok: true,
+        message:
+          `${name}：当前会话共 ${tasks.length} 个后台任务（运行中 ${manager.runningCount} 个；最多保留 32 个，运行中不淘汰）：\n` +
+          `${tasks.map(backgroundSnapshotLine).join("\n")}\n` +
+          `任务只属于当前会话、不跨重启；轮次结束或停止本轮不会终止任务。`,
+      };
+    },
+  };
+}
+
+/** read_background_task：读取任务状态与 stdout/stderr 尾部（默认 both / 40 行；上限 200 行）。 */
+function makeReadBackgroundTaskTool(manager: BackgroundTaskCapability): ExecutableTool {
+  const name = READ_BACKGROUND_TASK_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const taskId = readStringArg(call.args, ["taskId", "task_id"]);
+      if (taskId === undefined || taskId.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 taskId 参数（任务号，如 bg-1），无法读取` };
+      }
+      const streamRaw = call.args["stream"];
+      if (streamRaw !== undefined && streamRaw !== null && streamRaw !== "stdout" && streamRaw !== "stderr" && streamRaw !== "both") {
+        return { ok: false, message: `${name}: stream 参数非法（应为 "stdout" / "stderr" / "both"；缺省 both）` };
+      }
+      const stream = streamRaw === "stdout" || streamRaw === "stderr" ? streamRaw : "both";
+      const tailRaw = call.args["tailLines"];
+      if (tailRaw !== undefined && tailRaw !== null && (typeof tailRaw !== "number" || !Number.isInteger(tailRaw) || tailRaw < 1)) {
+        return { ok: false, message: `${name}: tailLines 参数非法（应为 ≥1 的整数；缺省 ${BACKGROUND_TASK_DEFAULT_TAIL_LINES}，上限 ${BACKGROUND_TASK_MAX_TAIL_LINES}）` };
+      }
+      const requested = typeof tailRaw === "number" ? tailRaw : BACKGROUND_TASK_DEFAULT_TAIL_LINES;
+      const result = manager.read(taskId, { stream, tailLines: Math.min(requested, BACKGROUND_TASK_MAX_TAIL_LINES) });
+      if (result === undefined) {
+        return { ok: false, message: `${name}：未知任务「${taskId}」（可能来自其他会话或已过期）——不要假设它运行过。` };
+      }
+      const task = result.task;
+      const status = [
+        `${name}：任务 ${task.taskId} 当前状态 ${task.state}`,
+        task.pid !== undefined ? `pid ${task.pid}` : "pid 未知",
+        `启动于 ${task.startedAt}`,
+        `已运行 ${task.durationMs} ms`,
+        ...(task.exitCode !== undefined ? [`exitCode ${task.exitCode}`] : []),
+        ...(task.signal !== undefined ? [`signal ${task.signal}`] : []),
+        ...(requested > BACKGROUND_TASK_MAX_TAIL_LINES ? [`请求 ${requested} 行已按上限 ${BACKGROUND_TASK_MAX_TAIL_LINES} 行返回`] : []),
+      ].join("，");
+      const parts = [status];
+      const sections: Array<[string, { text: string; truncated: boolean } | undefined]> = [
+        ["stdout", result.stdout],
+        ["stderr", result.stderr],
+      ];
+      for (const [label, value] of sections) {
+        if (value === undefined) continue;
+        const note = value.truncated ? `，truncated：输出超过 256 KiB 缓冲，仅保留尾部，更早内容已丢弃` : "";
+        parts.push(`${label}（尾部 ${result.tailLines} 行${note}）：\n${value.text === "" ? "（无输出）" : value.text}`);
+      }
+      return { ok: true, backgroundTask: backgroundTaskFactsOf(task), message: parts.join("\n") };
+    },
+  };
+}
+
+/** stop_background_task：按终止预算停止任务；对已结束任务如实返回原状态（不谎报「刚刚停止」）。 */
+function makeStopBackgroundTaskTool(manager: BackgroundTaskCapability): ExecutableTool {
+  const name = STOP_BACKGROUND_TASK_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const taskId = readStringArg(call.args, ["taskId", "task_id"]);
+      if (taskId === undefined || taskId.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 taskId 参数（任务号，如 bg-1），无法停止` };
+      }
+      const forceRaw = call.args["force"];
+      if (forceRaw !== undefined && forceRaw !== null && typeof forceRaw !== "boolean") {
+        return { ok: false, message: `${name}: force 参数非法（应为布尔值；缺省 false）` };
+      }
+      const result = await manager.stop(taskId, { force: forceRaw === true });
+      if (!result.ok) {
+        if (result.reason === "unknown-task") {
+          return { ok: false, message: `${name}：未知任务「${taskId}」（可能来自其他会话或已过期）——不要假设它运行过。` };
+        }
+        if (result.reason === "closed") {
+          return { ok: false, message: `${name}：会话已关闭，未执行停止（未知任务）——不要假设它运行过。` };
+        }
+        return {
+          ok: false,
+          ...(result.task !== undefined ? { backgroundTask: backgroundTaskFactsOf(result.task) } : {}),
+          message:
+            `${name}：停止任务 ${taskId} **未完成**——终止预算（SIGTERM→250ms→SIGKILL→1s）内未观察到进程退出，` +
+            `状态 kill-timeout；**进程可能仍在运行，请如实告知客户**，不要声称已停止。`,
+        };
+      }
+      const task = result.task;
+      if (result.alreadyEnded) {
+        return {
+          ok: true,
+          backgroundTask: backgroundTaskFactsOf(task),
+          message:
+            `${name}：任务 ${task.taskId} 早已结束（state: ${task.state}` +
+            `${task.exitCode !== undefined ? `，exitCode ${task.exitCode}` : ""}` +
+            `${task.signal !== undefined ? `，signal ${task.signal}` : ""}）——本次未发送终止信号，不声称刚刚停止。`,
+        };
+      }
+      return {
+        ok: true,
+        backgroundTask: backgroundTaskFactsOf(task),
+        message:
+          `${name}：已停止任务 ${task.taskId}（state: ${task.state}` +
+          `${task.pid !== undefined ? `，pid ${task.pid}` : ""}` +
+          `${task.exitCode !== undefined ? `，exitCode ${task.exitCode}` : ""}` +
+          `${task.signal !== undefined ? `，signal ${task.signal}` : ""}；已在终止预算内观察到进程退出）。`,
+      };
+    },
+  };
+}
+
 // —————————————— 交互工具族（设计 A-1；请求确认 / 请求勾选） ——————————————
 
 /** 失败文案（设计 A-1 **逐字**规定；核心纪律：**绝不说成已同意**）。 */
 function notConsented(name: string, reason: string): ToolResult {
   return { ok: false, message: `${name}：未获客户同意（原因：${reason}）→ 不要写盘；如实告知客户，不得假设同意。` };
+}
+
+/**
+ * 治理确认卡**未发出**回执（2026-10-22 无效治理卡守卫设计 §4.6）：`declined + notPresented:true`
+ * 表示应用**在触达客户通道之前**拒绝了本次发卡——卡片从未呈现给客户。此时**不得**套用
+ * `notConsented` 的「未获客户同意」，否则模型容易误报「客户拒绝/客户不同意」。
+ * `reason` 为具体缺项（编排侧给出，可为空）；回执仍为 `ok:false`，并明确要求补齐后重新调用。
+ */
+function cardNotPresented(name: string, reason: string | undefined): ToolResult {
+  const detail = reason !== undefined && reason.trim() !== "" ? reason : "未提供";
+  return {
+    ok: false,
+    message:
+      `${name}：治理确认卡未发出（未向客户呈现；原因：${detail}）→ 未获任何同意；` +
+      `请补齐后重新调用。不要写盘，也不要向客户声称其拒绝或同意。`,
+  };
 }
 
 function abortedToolResult(name: string): ToolResult {
@@ -937,6 +1203,16 @@ function abortedToolResult(name: string): ToolResult {
   if (name === FLOW_GET_TOOL_NAME) return { ok: false, message: `${name}：流程读取**未完成**（原因：会话已中止）——不要据此推断流程状态。` };
   if (name === FLOW_STEP_UPDATE_TOOL_NAME || name === FLOW_STEP_SUPERSEDE_TOOL_NAME) {
     return { ok: false, message: `${name}：变更**未完成**（原因：会话已中止）——**不要当它已生效**；如确需，先 flow_get 看最新 revision 再重试。` };
+  }
+  // 2026-10-22 后台任务（B1）：中止时**不假设已启动/已停止**（零副作用面如实）。
+  if (name === START_BACKGROUND_TASK_TOOL_NAME) {
+    return { ok: false, message: `${name}：任务**未能启动**（原因：本轮已中止）——**不要当它已启动**；如实告知客户。` };
+  }
+  if (name === LIST_BACKGROUND_TASKS_TOOL_NAME || name === READ_BACKGROUND_TASK_TOOL_NAME) {
+    return { ok: false, message: `${name}：后台任务读取**未完成**（原因：本轮已中止）——不要据此推断任务状态或日志。` };
+  }
+  if (name === STOP_BACKGROUND_TASK_TOOL_NAME) {
+    return { ok: false, message: `${name}：停止**未获明确结果**（原因：本轮已中止）——**不要当它已停止**；请重试或用 list_background_tasks 查看当前状态。` };
   }
   return { ok: false, message: `${name}：会话已中止，未执行` };
 }
@@ -1009,7 +1285,10 @@ async function askCustomer(
  *
  * 返回给模型的语义（关键，同 `run_shell` 如实转达审核结果的纪律——**绝不谎报**）：
  * - `ok:true` 且措辞「客户已确认」＝**拿到明确同意**（`confirmed:true`）——模型此时才可据此继续（如落盘）；
- * - `ok:false` 且措辞「未获客户同意」＝ 拒绝 / 明确选「否」/ 超时 / 通道不可用 / 出错——**不要写盘**。
+ * - `ok:false` 且措辞「未获客户同意」＝ 拒绝 / 明确选「否」/ 超时 / 通道不可用 / 出错——**不要写盘**；
+ * - `ok:false` 且措辞「治理确认卡未发出」＝ 应用在**呈现前**拒绝发卡（`declined + notPresented:true`，
+ *   如治理角色缺 `flowId`/`cardKind`）——客户**从未看到**卡片：不要写盘，也不要声称客户拒绝或同意；
+ *   按回执补齐参数后重新调用（2026-10-22 无效治理卡守卫设计 §4.6）。
  */
 function makeRequestConfirmationTool(
   fn: CustomerInputFn,
@@ -1050,6 +1329,8 @@ function makeRequestConfirmationTool(
       });
       if ("ok" in out) return out; // 通道故障 / 超时 / 中止 → 未获同意
       if (out.outcome === "declined") {
+        // 应用在触达客户通道之前拒绝发卡（治理字段不齐等）：卡片**未呈现**，不得说成客户拒绝。
+        if (out.notPresented === true) return cardNotPresented(name, out.reason);
         return notConsented(name, `客户拒绝${out.reason !== undefined ? `（${out.reason}）` : ""}`);
       }
       if (out.outcome === "unavailable") {
@@ -2304,6 +2585,19 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     const execMs =
       options?.shellExecTimeoutMs ?? readTimeoutMs(process.env, SHELL_EXEC_TIMEOUT_ENV, DEFAULT_SHELL_EXEC_TIMEOUT_MS);
     tools.push(makeRunShellTool(shellGate, shellCwd, reviewMs, execMs, options?.interactionGate, options?.diagnostics, options?.currentTurnId, options?.extraCredentialEnvVars));
+
+    // 结构性保证（B1，同 run_shell 判据）：**只有 ShellGate 与后台任务管理器同时注入时**四工具才一起注册。
+    // 判断会话不经过本函数（走 buildShellJudgeTools / buildGovernanceJudgeTools），因此天然不可见。
+    // 未注入管理器 ⇒ 四工具不存在（fail-closed）；未注入 ShellGate ⇒ 连 run_shell 都不存在。
+    const backgroundTasks = options?.backgroundTasks;
+    if (backgroundTasks !== undefined) {
+      tools.push(
+        makeStartBackgroundTaskTool(shellGate, shellCwd, reviewMs, backgroundTasks, options?.interactionGate, options?.diagnostics, options?.currentTurnId, options?.extraCredentialEnvVars),
+        makeListBackgroundTasksTool(backgroundTasks),
+        makeReadBackgroundTaskTool(backgroundTasks),
+        makeStopBackgroundTaskTool(backgroundTasks),
+      );
+    }
   }
 
   // 结构性保证（设计 A-1，同 run_shell 先例）：**未注入客户通道时两交互工具根本不存在**。
@@ -2398,10 +2692,12 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   // Observe customer waits without storing titles, previews or selected values.
   return tools.map((tool) => {
     const { parameters, ...description } = describeTool(tool.name);
-    const defined: ToolDefinition = { ...tool, ...description, displayInputRule: ["read_file","write_file","edit_file"].includes(tool.name) ? "core-path-v1" : tool.name === "run_shell" ? "core-command-v1" : "none", inputSchema: parameters, async handler(call) {
+    const defined: ToolDefinition = { ...tool, ...description, displayInputRule: ["read_file","write_file","edit_file"].includes(tool.name) ? "core-path-v1" : tool.name === "run_shell" || tool.name === START_BACKGROUND_TASK_TOOL_NAME ? "core-command-v1" : "none", inputSchema: parameters, async handler(call) {
       if (call.signal?.aborted) return abortedToolResult(tool.name);
       const result = await tool.handler(call);
-      return call.signal?.aborted && result.ok ? abortedToolResult(tool.name) : result;
+      // 后台任务成功结果带结构化事实（任务已启动/已停止是已发生的真实事件）：即使信号在 handler 返回前
+      // 恰好中止，也不能把它改写成「未启动/未停止」的谎言（B4 诚实面）。
+      return call.signal?.aborted && result.ok && result.backgroundTask === undefined ? abortedToolResult(tool.name) : result;
     } };
     if (tool.name !== REQUEST_CONFIRMATION_TOOL_NAME && tool.name !== REQUEST_CHOICE_TOOL_NAME) return defined;
     return { ...defined, async handler(call) {

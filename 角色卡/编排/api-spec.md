@@ -445,7 +445,7 @@ preview: {
 
 ### 意图交接机械校验（`src/common/编排/governance-handoff.ts`）
 
-- `validateIntentHandoff(input, context?) => Promise<IntentHandoffValidation>`：模型/角色防御性校验（trio + liaison）→ slug（`^[a-z0-9][a-z0-9-]{1,63}$`）→ 四要素非空、`summary` 1..200 字（超长拒绝不截断）→ `docs/intents/<intentId>.md` 存在可读、frontmatter 以 `---` 开头并闭合、顶层 `key: value` 可解析、文件 `intentId` 与入参一致、`goal/scope/acceptance` **入参与文件逐项相等**（文件是权威）、文件 `handoffKind`/`flowId` 若给出须一致 → 账本可读（坏行/不可读 fail-closed）→ 去重（`intentId+handoffKind+sha256(原始字节)`）→ `initial` 每个 `intentId` 仅一次 → `clarification`/`revision` 必须已有同 `intentId` 成功交接 → 每轮一次（账本同 `turnId`；缺 `turnId` 降级并返回 `warnings`）。
+- `validateIntentHandoff(input, context?) => Promise<IntentHandoffValidation>`：模型/角色防御性校验（trio + liaison）→ slug（**2026-10-22 收紧**：`^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`——2–64 位、首尾小写字母/数字、禁止首/尾连字符；正则由 Model `GOVERNANCE_SLUG_PATTERN` 构造，导出形状仍是 `RegExp`；文件 frontmatter 的**非空非法** `flowId` 显式返回 `invalid-flow-id`，不得静默当作缺席）→ 四要素非空、`summary` 1..200 字（超长拒绝不截断）→ `docs/intents/<intentId>.md` 存在可读、frontmatter 以 `---` 开头并闭合、顶层 `key: value` 可解析、文件 `intentId` 与入参一致、`goal/scope/acceptance` **入参与文件逐项相等**（文件是权威）、文件 `handoffKind`/`flowId` 若给出须一致 → 账本可读（坏行/不可读 fail-closed）→ 去重（`intentId+handoffKind+sha256(原始字节)`）→ `initial` 每个 `intentId` 仅一次 → `clarification`/`revision` 必须已有同 `intentId` 成功交接 → 每轮一次（账本同 `turnId`；缺 `turnId` 降级并返回 `warnings`）。
 - `intentHandoffDedupeKey({intentId,handoffKind,sha256})`：去重键单一来源。
 - `countClarificationRounds(projectRoot, {flowId?, intentId?})`：账本坏 → `ok:false`；`CLARIFICATION_MAX_ROUNDS = 2`。
 - 以上三件 + 常量/类型经 `govern-session.ts` 薄再导出（桌面不直接导入私有 `common/`）。

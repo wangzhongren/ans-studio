@@ -1,0 +1,28 @@
+=== killProcessTree definitions in src ===
+src/common/runtime-core/process-tree.ts:12:export function killProcessTree(child: ReturnType<typeof spawn>, signal: NodeJS.Signals, useProcessGroup: boolean, env: Record<string, string>): void {
+=== tools.ts imports process-tree ===
+81:import { killProcessTree } from "../../common/runtime-core/process-tree.ts";
+=== manager fs/disk IO (empty=none) ===
+=== process exit hooks (empty=none) ===
+=== O3: read_background_task schema keys ===
+=== Omit backgroundTasks ===
+29:export interface RuntimeSessionOptions extends Omit<GovernedToolsOptions, "currentTurnId" | "roleId" | "runtime" | "interactionGate" | "backgroundTasks"> {
+=== diagnostics whitelist fields ===
+const FIELD_NAMES = new Set([
+  "turnId", "toolCallId", "toolName", "path", "outcome", "durationMs", "timeoutMs", "ok",
+  "errorType", "errorCode", "errorMessage", "requestId", "decision", "reasonCode",
+  "state", "count", "queueDepth", "reportSource", "pid", "sourceRoleId", "targetRoleId",
+  "sessionId", "phase", "mode", "replayPlan", "rowCount", "firstRow", "lastRow",
+  "visibleCount", "pendingCount", "exitCode", "signal", "authorizationSource",
+  "attempt", "supported", "busy", "resumed", "contextSource", "eventKind", "url",
+]);
+=== background diagnostics calls ===
+src/provider/runtime/tools.ts:982:        diagnostics?.record("background.limit", { reasonCode: "concurrency-limit", count: manager.runningCount });
+src/provider/runtime/tools.ts:1018:        if (started.reason === "limit") diagnostics?.record("background.limit", { reasonCode: "concurrency-limit", count: manager.runningCount });
+src/provider/runtime/tools.ts:1022:      diagnostics?.record("background.start", { turnId, toolCallId, toolName: name, pid: task.pid, state: task.state });
+src/common/runtime-core/background-tasks.ts:227:    diagnostics?.record("background.stop.timeout", { pid: task.pid, state: task.state, durationMs: Date.now() - began });
+src/common/runtime-core/background-tasks.ts:255:    diagnostics?.record("background.stop", { pid: task.pid, state: task.state, durationMs: Date.now() - began });
+src/common/runtime-core/background-tasks.ts:318:      diagnostics?.record("background.exit", {
+=== O3 cursor/wait occurrences in schema.ts (empty=none) ===
+=== O5 app/ and runtime-core process exit hooks (empty=none) ===
+=== O2 background log files / .ans writes in manager (empty=none) ===

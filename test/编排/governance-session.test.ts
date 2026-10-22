@@ -970,32 +970,39 @@ test("intent-confirm 结算：customerInput 返回时账本已落盘（hand_off_
   });
 });
 
-test("无 cardKind 的普通客户选择/确认不写治理账本（真机账本污染回归）", async () => {
+test("无 cardKind 的 Lead 选择/确认卡在呈现前被拒，不写治理账本（账本污染回归）", async () => {
   await withRoot(async (root) => {
     const captured = {} as Captured;
-    const customerInput: CustomerInputFn = (req) =>
-      req.kind === "confirm"
+    let rawCalls = 0;
+    const customerInput: CustomerInputFn = (req) => {
+      rawCalls += 1;
+      return req.kind === "confirm"
         ? { outcome: "answered", value: { confirmed: true }, operatorId: "客户" }
         : { outcome: "answered", value: { selected: ["A"] }, operatorId: "客户" };
+    };
     const handle = await openRoleSession(
       { roleId: "liaison", project: withBuiltIn(trioProject(root), "liaison"), customerInput, autoRepin: false },
       { createAdapter: capturingFactory(captured) },
     );
     try {
-      // 普通选择卡（无 cardKind）：Lead 问「怎么调整」。
-      await captured.caps!.customerInput!({
+      // 普通选择卡（无 cardKind）：Lead 的内部协调问题 ⇒ 拒绝，不呈现客户。
+      const choice = await captured.caps!.customerInput!({
         kind: "choice",
         title: "怎么调整",
         options: [{ id: "A", label: "方案 A" }],
         flowId: "flow-a",
       });
-      // 普通确认卡（无 cardKind）：写意图文件前的确认。
-      await captured.caps!.customerInput!({
+      assert.equal(choice?.outcome, "declined");
+      // 确认卡（无 cardKind）：2026-10-22 严格守卫 ⇒ 缺 cardKind，卡片未发出。
+      const confirm = await captured.caps!.customerInput!({
         kind: "confirm",
         title: "写意图文件",
         preview: "docs/intents/intent-a.md",
         flowId: "flow-a",
       });
+      assert.equal(confirm?.outcome, "declined");
+      assert.equal((confirm as { notPresented?: unknown }).notPresented, true);
+      assert.equal(rawCalls, 0, "两张无 cardKind 的卡都不得呈现给客户");
     } finally {
       await handle.dispose();
     }

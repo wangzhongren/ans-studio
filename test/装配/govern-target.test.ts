@@ -24,7 +24,8 @@
 //  7) 目录存在 → 目录校验放行；治理链路走通（经 `governCommand` + 假适配器：EXIT_OK、
 //     边界解析不再失败；新空项目按 trio 默认开 rapporteur，客户确认制下提案写入真落盘——脚本先
 //     `request_confirmation` 把将写出的路径摆给放行桩 `GovernDeps.customerInput`，并断言确认通道
-//     被请求恰好一次）；
+//     被请求恰好一次；2026-10-22 起该治理卡按严格口径带齐 `flowId` + `cardKind`（rapporteur 允许
+//     `write`），否则会在触达客户前被编排守卫拒绝）；
 //  8) `main` 入口（环境已清空 Pi 配置）：目录校验放行、不再报治理边界解析失败，
 //     如实以非 0 报缺 provider 配置。
 //
@@ -46,7 +47,7 @@ import { loadInjection, resolveProjectRoot, main } from "../../src/index.ts";
 // §4 冻结契约家，只读导入，不复制实现。
 import { governCommand } from "../../src/interface/cli/govern.ts";
 import { createFakeRuntimeAdapter } from "../../src/provider/pi/session.ts";
-import type { CustomerInputFn, CustomerInputRequest, ToolCall } from "../../src/provider/pi/session.ts";
+import type { CustomerInputFn, CustomerInputMetadata, CustomerInputRequest, ToolCall } from "../../src/provider/pi/session.ts";
 import { PI_CREDENTIAL_ENV_VARS } from "../../src/common/装配/runtime.ts";
 
 const ROOT = mkdtempSync(join(tmpdir(), "ans-govern-target-"));
@@ -220,7 +221,7 @@ test("ans govern <非目录（文件）> → 明确报错、非 0", async () => 
 
 // ---- 7) 目录存在 → 目录校验放行；治理链路走通（2026-10-12 修复后：不再报边界解析失败） ----
 
-test("ans govern <空目录>（经 governCommand + 假适配器）→ EXIT_OK，不再报 single 不可用；新空项目按 trio 开启 rapporteur 并可写提案", async () => {
+test("ans govern <空目录>（经 governCommand + 假适配器）→ EXIT_OK，不再报 single 不可用；新空项目按 trio 开启 rapporteur，合法治理卡（flowId+cardKind）经确认可写提案", async () => {
   const dir = newDir("ok-");
   const inj = await loadInjection(dir);
   // 新空项目默认治理模型 trio（评审 §5.4「CLI 同步」）：默认治理角色是 rapporteur（提案权），
@@ -243,13 +244,27 @@ test("ans govern <空目录>（经 governCommand + 假适配器）→ EXIT_OK，
     proposalContent.trimEnd(),
   ].join("\n");
   const script: ToolCall[] = [
-    { name: "request_confirmation", args: { title: "确认写出提案", preview } },
+    {
+      name: "request_confirmation",
+      args: {
+        title: "确认写出提案",
+        preview,
+        // 2026-10-22 无效治理卡守卫（设计 N1 严格口径）：本脚本模拟 trio 治理角色 rapporteur，
+        // confirm 卡必须同时携带合法 flowId（slug）与角色白名单内的 cardKind（rapporteur 允许
+        // write）。此前只传 title/preview，严格口径会按设计在触达客户前拒绝（确认通道 0 次）——
+        // 属预期的测试夹具适配，不是产品缺陷。
+        flowId: "demo",
+        cardKind: "write",
+      },
+    },
     { name: "write_file", args: { path: proposalPath, content: proposalContent } },
   ];
   // 放行桩：确定性同意；同时计次——断言确认通道被请求**恰好一次**（加强，非放宽）。
   const confirmRequests: CustomerInputRequest[] = [];
-  const allowCustomer: CustomerInputFn = (req) => {
+  const confirmMetadata: Array<CustomerInputMetadata | undefined> = [];
+  const allowCustomer: CustomerInputFn = (req, metadata) => {
     confirmRequests.push(req);
+    confirmMetadata.push(metadata);
     return { outcome: "answered", value: { confirmed: true }, operatorId: "test:装配放行桩" };
   };
   const cap = capture();
@@ -272,6 +287,15 @@ test("ans govern <空目录>（经 governCommand + 假适配器）→ EXIT_OK，
   assert.equal(readFileSync(join(dir, proposalPath), "utf8"), "# 提案\n");
   assert.equal(confirmRequests.length, 1, "客户确认通道应被请求恰好一次（放行桩同意）");
   assert.equal(confirmRequests[0]?.kind, "confirm", "确认请求的形状应为 confirm（可带预览）");
+  // 2026-10-22 严格口径（设计 §4.5）：到达客户通道的必须是**合法治理卡**——flowId/cardKind 齐备，
+  // 且编排已计算 judgeContext（判断链的唯一入口事实）。被守卫拒绝的卡既不会到达这里，也没有 judgeContext。
+  assert.equal(confirmRequests[0]?.flowId, "demo", "治理卡应携带合法 flowId");
+  assert.equal(confirmRequests[0]?.cardKind, "write", "rapporteur 合法确认卡的 cardKind 应为 write");
+  assert.equal(
+    confirmMetadata[0]?.judgeContext?.flowId,
+    "demo",
+    "合法治理卡应计算 judgeContext（判断链入口事实），且 flowId 与卡片一致",
+  );
   // 注：本会话没有写出角色 boundary.yaml，也无既存治理边界文档 ⇒ 自动收尾按既有守卫
   // `nothing-to-pin` 零副作用（不凭空写 `.ans`）。这是 finalize 的既有语义，不属于本次模型注入。
   assert.equal(existsSync(join(dir, ".ans", "project.json")), false, "无可 pin 之物时不得凭空收口");

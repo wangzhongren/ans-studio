@@ -1,0 +1,84 @@
+candidate_HEAD=4d944e7587f10be29b6356c42539e06219ed88fc
+captured_at=2026-10-22T14:43:44+08:00
+node=v24.22.1
+npm=11.19.1
+
+=== working tree (porcelain, core.quotepath=false) ===
+ M src/common/门禁引擎/governance-roles.ts
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+ M src/service/runtime/session.ts
+ M test/runtime-core/governance-flow-metadata.test.ts
+ M test/runtime-core/tools.test.ts
+ M test/测试/governance-e2e-auto/fixture.ts
+ M test/编排/governance-judge.test.ts
+ M test/编排/governance-session.test.ts
+ M test/装配/govern-target.test.ts
+ M test/门禁引擎/governance-trio.test.ts
+ M 角色卡/独立验收/feature-map.md
+ M 角色卡/独立验收/memo.md
+ M 角色卡/编排/feature-map.md
+ M 角色卡/编排/memo.md
+ M 角色卡/装配/docs/feature/cli-runtime-assembly.md
+ M 角色卡/装配/feature-map.md
+ M 角色卡/装配/memo.md
+ M 角色卡/运行时核心/docs/feature/runtime-core.md
+ M 角色卡/运行时核心/feature-map.md
+ M 角色卡/运行时核心/memo.md
+ M 角色卡/门禁引擎/changelog.md
+ M 角色卡/门禁引擎/memo.md
+?? src/common/runtime-core/background-tasks.ts
+?? src/common/runtime-core/process-tree.ts
+?? test/runtime-core/background-contract.test.ts
+?? test/runtime-core/background-engines.test.ts
+?? test/runtime-core/background-fixtures.ts
+?? test/runtime-core/background-review.test.ts
+?? test/runtime-core/background-tasks.test.ts
+?? test/测试/background-tasks-e2e-real-model/
+?? test/测试/background-tasks-entry/
+?? test/测试/governance-e2e-auto/n-invalid-governance-card.test.ts
+?? 角色卡/测试/docs/change/2026-10-22-background-tasks-verify-evidence/
+?? 角色卡/测试/docs/change/2026-10-22-verify-evidence/
+?? 角色卡/测试/docs/change/2026-10-22_change_background-tasks-e2e-real-model.md
+?? 角色卡/测试/docs/change/2026-10-22_change_background-tasks-verify.md
+?? 角色卡/测试/docs/change/2026-10-22_change_invalid-governance-card-verify.md
+?? 角色卡/独立验收/docs/change/2026-10-22_change_background-tasks-acceptance.md
+?? 角色卡/独立验收/docs/design/2026-10-22_design_background-tasks-acceptance.md
+?? 角色卡/独立验收/docs/design/2026-10-22_design_invalid-governance-card-acceptance.md
+?? 角色卡/编排/docs/change/2026-10-22_change_invalid-governance-card-guard.md
+?? 角色卡/装配/docs/change/2026-10-22_change_govern-target-strict-card-fixture.md
+?? 角色卡/运行时核心/docs/change/2026-10-22_change_background-tasks.md
+?? 角色卡/运行时核心/docs/change/2026-10-22_change_invalid-governance-card-receipt.md
+?? 角色卡/运行时核心/docs/feature/background-tasks.md
+?? 角色卡/门禁引擎/docs/change/2026-10-22_change_invalid-governance-card-copy.md
+?? 角色卡/项目管理/docs/design/2026-10-22_design_background-tasks.md
+?? 角色卡/项目管理/docs/design/2026-10-22_design_invalid-governance-card-guard.md
+
+=== product files under test (modified in working tree; not modified by 测试 role) ===
+ M src/common/门禁引擎/governance-roles.ts
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+ M src/service/runtime/session.ts
+
+=== files changed/created by 测试 role (sha256) ===
+ed8155833f51beca3cf4a9bc56c33328b766c5cb2e8df9d85978baeaf0c1eb89 *test/测试/governance-e2e-auto/fixture.ts
+82f1cde53ae9c4b9f0bfec451acaf42f9da7cc039c35191a320945317d2922f1 *test/测试/governance-e2e-auto/n-invalid-governance-card.test.ts
+a8b964eac3f075e7e1b432254b45fd1edc102691999b06428ad107edfd55cab9 *test/测试/background-tasks-e2e-real-model/e2e-background-real-model.ts
+d3e2c6e37e7fb5ba634d92e655248036bc29241939c33f32a8f84c0a9f7e46bf *test/测试/background-tasks-e2e-real-model/pi-smoke.ts
+ad99cace161bfeaf5e19df8769c7955199ec244dca10e43e05d092a4fcab3d8f *test/测试/background-tasks-e2e-real-model/run-shell-comparison.ts
+
+=== assembly fixture adapted by 装配 role (verified in final E8-B; 测试 role did not modify) ===
+7258f7429df583675cc224ad2c9cc32cd3dea15e18d0a8eba65651a65d48ab61 *test/装配/govern-target.test.ts
+
+=== product diff stat (working tree) ===
+ .../governance-roles.ts"                           |  16 +-
+ src/model/runtime.ts                               | 136 +++++++-
+ src/pipeline/orchestration/run-role.ts             | 149 +++++----
+ src/provider/runtime/schema.ts                     | 117 ++++++-
+ src/provider/runtime/tools.ts                      | 356 +++++++++++++++++++--
+ src/service/runtime/session.ts                     | 151 +++++----
+ 6 files changed, 764 insertions(+), 161 deletions(-)
