@@ -748,7 +748,12 @@ function looksBinaryObserve(data: Buffer, rel: string): boolean {
   return data.subarray(0, Math.min(data.length, 8192)).includes(0);
 }
 
-/** 步骤 owner → 账本 power：内置治理角色按 function；其他（项目角色/未知）记 `project`。 */
+/**
+ * 步骤 owner → 账本 power：内置治理角色按 function；其他（项目角色/未知）记 `project`。
+ * 2026-10-22：映射**不变**——团队计划/readiness/变更包由 Convener 写 → `schedule`；验收标准/报告由
+ * Verifier 写 → `verification`；这些都是普通项目相对路径的 artifact，可被 `observeFlowArtifacts` 观察。
+ * `角色卡/` 仍在 `OBSERVE_SKIP_SEGMENTS` 内，不被观察。
+ */
 function artifactPowerOf(owner: string): GovernancePower {
   switch (owner) {
     case "liaison":

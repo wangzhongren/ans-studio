@@ -43,6 +43,51 @@ import {
 const FLOW = "flow-a";
 const STEP = "impl";
 
+/**
+ * 实施前验收标准（2026-10-22 第 3 项/O2）：已有 appointment 决定的 flow 在派发项目角色前，
+ * 门禁要求 `docs/acceptance/<flowId>-criteria-v1.md` 存在且结构合格。派发门禁用例按新门槛
+ * 先写出标准，才能测到「步骤缺失/重复派发」等后续判定（不删除门槛、不放宽断言）。
+ */
+const ACCEPTANCE_CRITERIA_DOC = [
+  "---",
+  `flowId: ${FLOW}`,
+  "version: 1",
+  "---",
+  "",
+  `# 验收完成标准 ${FLOW}`,
+  "",
+  "| ID | 标准 | 需要的证据 | 实际证据路径/哈希 | 候选版本 | 产出角色 | 结果 | 验收判断 |",
+  "| --- | --- | --- | --- | --- | --- | --- | --- |",
+  "| P1 | 交付满足提案 | 测试输出 | 待提交 | 候选哈希 | 测试 | 待判定 | 待判定 |",
+  "",
+  "风险档位：T3。",
+  "",
+  "判定规则：pass / fail / insufficient evidence。",
+  "",
+  "证据计划：测试命令输出与候选哈希。",
+  "",
+  "版本与冻结：写盘后冻结。",
+  "",
+].join("\n");
+
+/** 团队计划（2026-10-22 第 1 项）：Convener 唯一作者；卡前守卫的确定性形状。 */
+const TEAM_PLAN_REL = `docs/scheduling/${FLOW}-team-v1.md`;
+const TEAM_PLAN_DOC = [
+  "---",
+  `flowId: ${FLOW}`,
+  "version: 1",
+  "riskTier: T3",
+  "recommended: [A]",
+  "---",
+  "",
+  `# 团队计划 ${FLOW} v1`,
+  "",
+  "| roleId | 类型 | 职责目标 | 能力要求 | 唯一写集 | 依赖 | 组别 | apiSpec |",
+  "| --- | --- | --- | --- | --- | --- | --- | --- |",
+  "| A | new | 实现流程步骤 | 能写代码 | src/owned-A/ | 无 | 开发 | not-applicable |",
+  "",
+].join("\n");
+
 async function seed(root: string, entries: GovernanceLedgerEntry[]): Promise<void> {
   for (const entry of entries) {
     const r = await appendGovernanceLedger(root, entry);
@@ -234,6 +279,9 @@ test("派发门禁（run-role）：目标内置 / 无接受 / 不在任命名单
       writeProjectRole(root, "A");
       writeProjectRole(root, "B");
       write(root, `docs/flows/${FLOW}.md`, flowDoc(FLOW, s.flowSteps ?? []));
+      // O2 门槛（2026-10-22）：已有 appointment 的 flow 派发前须先有结构合格的标准；先写标准，
+      // 让各子场景仍测到其目标判定（步骤缺失/重复派发等），不改变门禁本身。
+      write(root, `docs/acceptance/${FLOW}-criteria-v1.md`, ACCEPTANCE_CRITERIA_DOC);
       await seed(root, s.seed);
       const captured = capture();
       let called = 0;
@@ -356,7 +404,7 @@ test("账本坏 fail-closed：坏行 ⇒ 门禁拒一切（含派发）；append
 
 // —————————————————————— 3) 账本字段/顺序 + 完整 flow 还原 ——————————————————————
 
-test("账本契约：customer.decision / artifact.observed / dispatch.accepted 字段与顺序；完整 flow 可还原谁提案/提名/排程/客户批了什么", async () => {
+test("账本契约：customer.decision / artifact.observed / dispatch.accepted 字段与顺序；完整 flow 可还原谁提案/组队/排程/客户批了什么", async () => {
   const { root, cleanup } = makeRoot("ledger-e2e");
   try {
     writeProjectRole(root, "A");
@@ -448,15 +496,14 @@ test("账本契约：customer.decision / artifact.observed / dispatch.accepted �
     assert.equal(flowSeen!.power, "schedule");
     assert.equal(flowSeen!.flowId, FLOW);
 
-    // ③ Nominator：写提名 → 客户任命 A → 写盘确认 → 写角色卡。
-    const nomChannel = customerChannel({ selected: ["A"], confirmed: true, record: [] });
-    const nHandle = await openGovernanceSession(
-      { taskId: "T-n", project, governanceFunction: "nomination", customerInput: nomChannel },
+    // ③ Convener：写团队计划 + 发起任命卡 → 客户任命 A（2026-10-22 第 1 项：任命卡归 Convener）。
+    const c2Handle = await openGovernanceSession(
+      { taskId: "T-c2", project, governanceFunction: "schedule", customerInput: customerChannel({ selected: ["A"], record: [] }) },
       {
         createAdapter: capturingFactory(capture(), {
           root,
           script: [
-            { name: "write_file", args: { path: `docs/nominations/${FLOW}-v1.md`, content: `# 提名 ${FLOW}\n\n候选：A、B。\n` } },
+            { name: "write_file", args: { path: TEAM_PLAN_REL, content: TEAM_PLAN_DOC } },
             {
               name: "request_choice",
               args: {
@@ -465,51 +512,76 @@ test("账本契约：customer.decision / artifact.observed / dispatch.accepted �
                 flowId: FLOW,
                 cardKind: "appointment",
                 multiple: true,
-                options: [
-                  { id: "A", label: "A" },
-                  { id: "B", label: "B" },
-                ],
+                options: [{ id: "A", label: "A" }],
               },
             },
+          ],
+        }),
+      },
+    );
+    await consume(c2Handle, "请依团队计划请客户任命");
+    await c2Handle.dispose();
+    const afterAppointment = await waitForLedger(
+      root,
+      (entries) =>
+        entries.some((e) => e.decisionKind === "appointment") &&
+        entries.some((e) => e.kind === "artifact.observed" && e.artifactPath === TEAM_PLAN_REL),
+    );
+    const appointment = afterAppointment.entries.find((e) => e.decisionKind === "appointment");
+    assert.ok(appointment, "应有任命 customer.decision");
+    assert.equal(appointment!.actorRoleId, "convener", "任命卡由 Convener 发起（第 1 项）");
+    assert.equal(appointment!.power, "schedule", "appointment 的 power 由 Convener 职能决定（schedule）");
+    assert.deepEqual(appointment!.targetRoleIds, ["A"]);
+    assert.equal(appointment!.artifactPath, TEAM_PLAN_REL, "appointment 决定绑定团队计划路径");
+    assert.equal(appointment!.artifactVersion, 1);
+    assert.equal(typeof appointment!.artifactSha256, "string");
+    const planSeen = afterAppointment.entries.find(
+      (e) => e.kind === "artifact.observed" && e.artifactPath === TEAM_PLAN_REL,
+    );
+    assert.ok(planSeen, "应有团队计划 artifact.observed");
+    assert.equal(planSeen!.actorRoleId, "convener", "谁组队/写团队计划 = Convener");
+    assert.equal(planSeen!.power, "schedule");
+    // 团队计划不在 `docs/proposals|nominations` 的 `-vN` 观察口径内：artifact.observed 只带路径/哈希。
+
+    // 2026-10-22 第 3 项/O2：派发前先有结构合格的标准（由 Proof / 验收写；此处只作为派发前置）。
+    write(root, `docs/acceptance/${FLOW}-criteria-v1.md`, ACCEPTANCE_CRITERIA_DOC);
+
+    // ④ Crew（Nominator）：按任命名单写卡（appointment-write → role-card）。
+    const nChannel = customerChannel({ selected: ["A"], confirmed: true, record: [] });
+    const nHandle = await openGovernanceSession(
+      { taskId: "T-n", project, governanceFunction: "nomination", customerInput: nChannel },
+      {
+        createAdapter: capturingFactory(capture(), {
+          root,
+          script: [
             {
               name: "request_confirmation",
               args: {
                 title: `写盘确认 ${FLOW}`,
                 // 2026-10-19 呈现前完整性闸：每条声明路径后都给出可核对正文。
-                preview: "角色卡/A/role-card.md\n\n角色卡正文：角色名 A、职责与工作立场。\n\n角色卡/A/boundary.yaml\n\n边界正文：可写目录与目的条目。\n",
+                preview: "## 角色卡/A/role-card.md\n\n角色卡正文：角色名 A、职责与工作立场。\n",
                 flowId: FLOW,
                 cardKind: "appointment-write",
               },
             },
-            { name: "write_file", args: { path: "角色卡/A/role-card.md", content: "# 角色：A\n\n由 Nominator 写出。\n" } },
+            { name: "write_file", args: { path: "角色卡/A/role-card.md", content: "# 角色：A\n\n由 Crew 写出。\n" } },
           ],
         }),
       },
     );
-    await consume(nHandle, "请提名并取得任命");
+    await consume(nHandle, "请按任命名单写卡");
     await nHandle.dispose();
-    const afterNom = await waitForLedger(
+    const afterCrew = await waitForLedger(
       root,
-      (entries) =>
-        entries.some((e) => e.decisionKind === "appointment") &&
-        entries.some((e) => e.kind === "artifact.observed" && e.artifactPath === `docs/nominations/${FLOW}-v1.md`),
+      (entries) => entries.some((e) => e.decisionKind === "appointment-write"),
     );
-    const appointment = afterNom.entries.find((e) => e.decisionKind === "appointment");
-    assert.ok(appointment, "应有任命 customer.decision");
-    assert.equal(appointment!.actorRoleId, "nominator");
-    assert.equal(appointment!.power, "nomination");
-    assert.deepEqual(appointment!.targetRoleIds, ["A"]);
-    const writeConfirm = afterNom.entries.find((e) => e.decisionKind === "appointment-write");
+    const writeConfirm = afterCrew.entries.find((e) => e.decisionKind === "appointment-write");
     assert.ok(writeConfirm, "应有写盘确认 customer.decision");
+    assert.equal(writeConfirm!.actorRoleId, "nominator");
+    assert.equal(writeConfirm!.power, "nomination");
     assert.ok((writeConfirm!.paths ?? []).includes("角色卡/A/role-card.md"), "写盘确认应逐条记路径");
-    const nomSeen = afterNom.entries.find(
-      (e) => e.kind === "artifact.observed" && e.artifactPath === `docs/nominations/${FLOW}-v1.md`,
-    );
-    assert.ok(nomSeen, "应有提名 artifact.observed");
-    assert.equal(nomSeen!.actorRoleId, "nominator");
-    assert.equal(nomSeen!.artifactVersion, 1);
 
-    // ④ Convener 派发（真实桌面 routeDispatch）→ dispatch.accepted。
+    // ⑤ Convener 派发（真实桌面 routeDispatch）→ dispatch.accepted。
     const listing = await listProject(root);
     assert.equal(listing.governanceModel, "trio");
     const captured = new Map<string, ReturnType<typeof capture>>();
@@ -572,12 +644,13 @@ test("账本契约：customer.decision / artifact.observed / dispatch.accepted �
     assert.equal(dispatched!.runtime, "demo");
     assert.ok((dispatched!.messageSummary ?? "").length <= 200, "messageSummary ≤200 字");
 
-    // ⑤ 可还原性：谁提案 / 谁提名 / 谁排程 / 客户批了什么。
+    // ⑥ 可还原性：谁提案 / 谁组队（团队计划） / 谁排程 / 客户批了什么。
     const entries = final.entries;
     const proposer = entries.find((e) => e.kind === "artifact.observed" && e.artifactPath === `docs/proposals/${FLOW}-v1.md`);
     assert.equal(proposer?.actorRoleId, "rapporteur");
-    const nominator = entries.find((e) => e.kind === "artifact.observed" && e.artifactPath === `docs/nominations/${FLOW}-v1.md`);
-    assert.equal(nominator?.actorRoleId, "nominator");
+    // 2026-10-22 第 1 项：团队判断/团队计划归 Convener（原「谁提名 = Nominator」改为「谁组队/写团队计划」）。
+    const teamPlanner = entries.find((e) => e.kind === "artifact.observed" && e.artifactPath === TEAM_PLAN_REL);
+    assert.equal(teamPlanner?.actorRoleId, "convener", "谁组队/写团队计划 = Convener");
     const scheduler = entries.find((e) => e.kind === "artifact.observed" && e.artifactPath === `docs/flows/${FLOW}.md`);
     assert.equal(scheduler?.actorRoleId, "convener");
     assert.ok(entries.some((e) => e.kind === "dispatch.accepted" && e.actorRoleId === "convener"));

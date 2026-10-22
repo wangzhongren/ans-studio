@@ -1,5 +1,18 @@
 # 门禁引擎公开接口：角色协作组摘要
 
+## 治理分工第 1/3/5 项（2026-10-22）：内置角色写权与卡文本增量
+
+客户确认治理分工第 1/3/5 项（闸门 2 + 实施授权）后，本角色在 `governance-roles.ts` 调整内置治理角色的卡文本与注册表数据面（导出函数名、类型与签名不变）：
+
+- `nominator`（Crew / 组队）：不再提名、不再发 appointment 卡、不写 `docs/nominations/`；改为读取客户确认后的团队计划，按任命名单写 `角色卡/**` 与工作文档。`entries` 与 `preauthorizedDirs` 移除 `docs/nominations/`，`forbiddenWritePaths` 增加 `docs/scheduling/`；第 5 项内容清单写入卡文本。
+- `convener`（Steward / 统筹）：`entries` 与 `preauthorizedDirs` 增加 `docs/scheduling/`（团队计划 / readiness / 变更包）；卡文本允许 `request_choice(cardKind=appointment)`（仅此一种治理选择卡），保留 `角色卡/**` 禁写。
+- `verifier`（Proof / 验收）：`entries` 与 `preauthorizedDirs` 增加 `docs/acceptance/`（实施前标准与验收报告）；`docs/verification/` 仍为详细证据附件。
+- `liaison` / `rapporteur`：写权与能力不变；五张卡的治理文件命名段增加团队计划路径，`docs/nominations/` 标为 legacy（只读历史/过渡）。
+- `LIAISON_WRITE_OWNER_HINTS`：增加 `docs/scheduling/`→Steward / 统筹、`docs/acceptance/`→Proof / 验收；Crew 提示移除 nominations；legacy nominations 不再指引 Crew。
+- 不变：内部 id / 显示名 / `GovernanceFunction` 值、能力位、`ENGINEERING_QUALITY_BASELINE` 文本、导出函数签名、`appGovernanceBoundary` 四项。
+
+写权前后对照、测试命令与候选哈希见[变更记录](docs/change/2026-10-22_change_governance-split-1-3-5-roles.md)；状态 `implemented-unverified`。
+
 ## D3 轻量权限修复增量（2026-10-21）
 
 `resolveWrite(targetPath, boundary, scope, ctx): WriteDecision` 签名及公共类型不变。输入和真实目标按同一 project/skill 根的边界、条件与任务写集分别授权；真实目标拒绝附输入路径与真实相对路径，不自动补发写权。输入命中的 `matchedEntry` 保持返回；正常无链接路径及既有 F4/F6 首句保持。

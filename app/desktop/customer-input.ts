@@ -401,6 +401,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     }
     if (payload === null) return; // 无治理元数据 / 未知卡片种类：旧行为零变化。
     const selected = outcome.value?.selected;
+    // 2026-10-22 第 1 项：appointment 的团队计划上下文**按结构**透传（请求对象显式携带才带；缺席不猜，
+      // Interface 会优先账本 artifactPath、再按 flowId 派生最新团队计划）。冻结契约当前无该字段。
+    const teamPlanPathRaw = (entry.request as { teamPlanPath?: unknown }).teamPlanPath;
     const context: GovernanceNextStepContext = {
       ...(entry.payload.roleId !== "" ? { sourceRoleId: entry.payload.roleId } : {}),
       ...(entry.payload.projectRoot !== undefined ? { projectRoot: entry.payload.projectRoot } : {}),
@@ -408,6 +411,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       ...(payload.cardKind === "appointment" && Array.isArray(selected) ? { targetRoleIds: selected } : {}),
       // W6-B 审计（四角色评审 AC19）：仅当请求显式带 stepId 时透传；缺席不猜、不伪造。
       ...(typeof entry.request.stepId === "string" && entry.request.stepId !== "" ? { stepId: entry.request.stepId } : {}),
+      ...(payload.cardKind === "appointment" && typeof teamPlanPathRaw === "string" && teamPlanPathRaw.trim() !== ""
+        ? { teamPlanPath: teamPlanPathRaw }
+        : {}),
     };
     try {
       opts.onNextStep(payload, context);

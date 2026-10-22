@@ -186,7 +186,11 @@ export function describeTool(name: string): ToolDescription {
             description:
               "Optional for ordinary project roles and single/su (legacy calls). The five built-in governance roles " +
               "(liaison / rapporteur / nominator / convener / verifier) MUST always provide flowId + cardKind together; " +
-              "a missing or out-of-role kind is rejected by the application and NO card is shown to the customer — fix and resend",
+              "a missing or out-of-role kind is rejected by the application and NO card is shown to the customer — fix and resend. " +
+              "Kind semantics: `write` = ordinary write confirmation; `appointment-write` = write confirmation for role cards / " +
+              "boundaries after the customer's appointment (sent by Crew, per appointed role; the old post-nomination flow is legacy); " +
+              "`schedule-write` = scheduling / flow write confirmation sent by Convener. " +
+              "Which kinds a role may send is decided by the application — this field alone grants nothing",
           },
         },
         required: ["title"],
@@ -207,6 +211,7 @@ export function describeTool(name: string): ToolDescription {
         "注意：列出路径**不等于**获准——获准的唯一凭据是 `confirmed:true`。" +
         "**五个内置治理角色（liaison / rapporteur / nominator / convener / verifier）必须始终同时携带 `flowId` + `cardKind`**" +
         "（cardKind 仅 `write` / `appointment-write` / `schedule-write`，且须属于该角色允许的卡种）；" +
+        "`appointment-write` 指客户**任命**（appointment）后的角色卡/边界写入确认——由 Crew 按任命名单逐路径发起；旧流程的「提名后写卡」为 legacy。" +
         "缺失任一项会被应用拒绝且**不会向客户发卡**——工具回执为「卡片未发出」，请补齐后重新调用。" +
         "普通项目角色与 single/su 的 `flowId`/`stepId`/`cardKind` 仍为可选；" +
         "这些字段只用于卡片显示与账本分类，**字段本身不构成任何授权**——治理门禁只认应用签发的客户决定。",
@@ -274,7 +279,11 @@ export function describeTool(name: string): ToolDescription {
             type: "string",
             enum: ["proposal", "appointment", "acceptance", "intent-confirm"],
             description:
-              "Optional governance card kind for this choice; a missing or foreign kind cannot unlock any governance gate",
+              "Optional governance card kind for this choice; a missing or foreign kind cannot unlock any governance gate. " +
+              "Kinds: `proposal` = accept a proposal; `appointment` = appoint the recommended team (sent by Convener from the " +
+              "customer-confirmed team plan; the old `nomination` flow is legacy); `acceptance` = accept a delivery; " +
+              "`intent-confirm` = customer requirement confirmation (Lead/liaison, before hand_off_intent only). " +
+              "Which kinds a role may send is decided by the application — this field alone grants nothing",
           },
         },
         required: ["title", "options"],
@@ -285,12 +294,15 @@ export function describeTool(name: string): ToolDescription {
         "返回客户已选中的选项 id。**未获明确选择（拒绝/超时/通道不可用）→ 不要据此写盘，也不得擅自代选**；如实告知客户。" +
         "若 preview 里展示将要写出的内容，**必须列出具体路径**（相对项目根、含目录）——但注意：" +
         "**选择≠写盘同意**或扩张写权。已接受项目边界内的已授权任务无需重复确认；真正新建或扩张角色边界、治理写集仍由 su 请求客户确认，仅 confirmed:true 才执行该治理变更。" +
-        "治理会话可附可选 `flowId`/`stepId`/`cardKind`（cardKind 仅 `proposal` / `appointment` / `acceptance` / `intent-confirm`）；" +
+        "治理会话可附可选 `flowId`/`stepId`/`cardKind`（cardKind 仅 `proposal` / `appointment` / `acceptance` / `intent-confirm`；" +
+        "`appointment` 为**任命**卡——由 Convener 依客户确认的团队计划发起、任命 Crew，旧流程的「提名」卡为 legacy；" +
+        "卡种须属于该角色允许的卡种，由应用校验）；" +
         "这些字段只用于卡片显示与账本分类，**字段本身不构成任何授权**——治理门禁只认应用签发的客户决定。" +
         "`intent-confirm`（需求确认）**仅主理（Lead/liaison）在 `hand_off_intent` 前发出**：选项 id 固定 `confirm` / `revise`；" +
         "由客户本人回答，或在其开启「替我决策」时由判断 agent 代批 `confirm`（`revise` 仍交回客户/发起角色，判断 agent 不替客户修改）。",
       promptGuidelines: [
         "需要客户在若干选项中做选择时用 request_choice；未获明确回答 → 不要据此写盘，也不得假设客户的选择。",
+        "`cardKind=appointment` 是**任命**卡：由 Convener 依客户确认的团队计划发起；Crew 收到客户任命后才按名单写卡（appointment-write），不自行任命、不自行选角色。",
         "request_choice 的回答**不构成写盘同意**或扩张写权；已接受边界内的已授权任务无需重复确认，新建或扩张角色边界、治理写集仍由 su 经 request_confirmation 请求确认。",
       ],
       executionMode: "sequential",

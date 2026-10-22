@@ -180,9 +180,10 @@ test("代批后 onNextStep 恰一次；结算后 respond/再次 replay 不产生
     assert.equal(h.nextSteps.length, 1);
     const payload = h.nextSteps[0]!.payload as { cardKind?: string; nextFunction?: string | null; roleId?: string | null; followUp?: string };
     assert.equal(payload.cardKind, "proposal");
-    assert.equal(payload.nextFunction, "schedule", "接受提案先派 Convener 写流程单");
+    assert.equal(payload.nextFunction, "schedule", "接受提案先派 Convener 写流程单+团队计划并直接发任命卡");
     assert.equal(payload.roleId, "convener");
-    assert.equal(payload.followUp, "nomination-after-flow", "流程单落盘后才派 Nominator");
+    // 2026-10-22 第 1 项（客户确认方案）：accept 不再产生 nomination-after-flow 两段式；旧形状仅迁移兼容。
+    assert.equal(payload.followUp, undefined, "新流程不再产生 nomination-after-flow followUp");
     h.channel.replayPending();
     assert.equal(h.nextSteps.length, 1, "replay 不得触发第二次 next-step");
     assert.equal(h.channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["accept"] } }).expired, true);

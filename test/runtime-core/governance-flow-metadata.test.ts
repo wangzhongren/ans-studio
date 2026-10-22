@@ -13,7 +13,11 @@ import type {
   DispatchTaskPayload,
   GovernanceAppointmentStepPayload,
   GovernanceFlowStep,
+  GovernanceJudgeContext,
+  GovernanceJudgeFacts,
+  GovernanceJudgeRequest,
   GovernanceProposalStepPayload,
+  GovernanceStepKind,
   SessionEvent,
 } from "../../src/model/runtime.ts";
 import { allow, role } from "./fixtures.ts";
@@ -38,6 +42,57 @@ test("中立形状：流程步骤状态与提案/任命载荷可构造且字段�
     version: 1,
   } satisfies GovernanceAppointmentStepPayload;
   assert.deepEqual([step.status, proposal.version, appointment.targetRoleIds], ["in-progress", 1, ["role-a"]]);
+});
+
+test("2026-10-22 契约冻结：团队计划/验收物证与风险档位为可选新增字段；StepKind 保留原值", () => {
+  // 第 1 项：任命载荷提供团队计划路径；nominationPath 保留为 legacy（可并存、可缺席）。
+  const appointmentWithTeamPlan = {
+    flowId: "flow-alpha",
+    stepId: "appointment",
+    cardKind: "appointment",
+    teamPlanPath: "docs/scheduling/flow-alpha-team-v1.md",
+    nominationPath: "docs/nominations/flow-alpha-v1.md",
+    targetRoleIds: ["role-a"],
+    version: 1,
+  } satisfies GovernanceAppointmentStepPayload;
+  // 第 1/3 项：判断请求与上下文 artifacts 新增物证路径；同名同形、全部可选。
+  const artifacts = {
+    proposalPath: "docs/proposals/flow-alpha-v1.md",
+    nominationPath: "docs/nominations/flow-alpha-v1.md",
+    teamPlanPath: "docs/scheduling/flow-alpha-team-v1.md",
+    flowPath: "docs/flows/flow-alpha.md",
+    acceptanceCriteriaPath: "docs/acceptance/flow-alpha-criteria-v1.md",
+    acceptanceReportPath: "docs/acceptance/flow-alpha-report-v1.md",
+    changePackagePath: "docs/scheduling/flow-alpha-change-v1.md",
+  } satisfies NonNullable<GovernanceJudgeRequest["artifacts"]>;
+  const contextArtifacts = { ...artifacts } satisfies NonNullable<GovernanceJudgeContext["artifacts"]>;
+  // 第 3 项：风险档位与团队计划确认事实为可选新增；旧 facts 形状仍合法。
+  const facts = {
+    governanceModel: "trio",
+    flowId: "flow-alpha",
+    ledgerErrors: 0,
+    unresolvedClarificationCount: 0,
+    latestDecisionKinds: [],
+    riskTier: "T3",
+    teamPlanConfirmed: true,
+  } satisfies GovernanceJudgeFacts;
+  const legacyFacts = {
+    governanceModel: "trio",
+    flowId: "flow-alpha",
+    ledgerErrors: 0,
+    unresolvedClarificationCount: 0,
+    latestDecisionKinds: [],
+  } satisfies GovernanceJudgeFacts;
+  // Q4 A：保留现有值、不新增 team-plan；编排的 FlowStepKind 不属本层契约、本用例不涉及、也不得改。
+  const stepKinds = ["proposal", "nomination", "dispatch", "acceptance"] as const satisfies readonly GovernanceStepKind[];
+  assert.deepEqual([...stepKinds], ["proposal", "nomination", "dispatch", "acceptance"], "StepKind 保留现有值，不新增 team-plan");
+  assert.equal(appointmentWithTeamPlan.teamPlanPath, "docs/scheduling/flow-alpha-team-v1.md");
+  assert.equal(appointmentWithTeamPlan.nominationPath, "docs/nominations/flow-alpha-v1.md");
+  assert.deepEqual(artifacts, contextArtifacts, "Request/Context artifacts 同形");
+  assert.equal(facts.riskTier, "T3");
+  assert.equal(facts.teamPlanConfirmed, true);
+  assert.equal(Object.hasOwn(legacyFacts, "riskTier"), false, "缺失＝未提供，不凭空造值");
+  assert.equal(Object.hasOwn(legacyFacts, "teamPlanConfirmed"), false, "缺失＝未提供，不凭空造值");
 });
 
 test("request_choice：flowId/stepId/cardKind 原样进入卡片请求与回调 metadata；缺席时保持旧形状", async () => {
@@ -233,6 +288,27 @@ test("schema：三个治理元数据字段可选、slug pattern 单点、cardKin
     const required = (describeTool(name).parameters as { required?: string[] }).required ?? [];
     for (const field of ["flowId", "stepId", "cardKind"]) assert.equal(required.includes(field), false, `${name}.${field} 必须可选`);
   }
+});
+
+test("schema 文案（2026-10-22）：任命/提名语义与角色允许卡种写明；不新增 cardKind、形状不变", () => {
+  const propertiesOf = (name: string) => (describeTool(name).parameters as { properties: Record<string, { enum?: string[]; description?: string }> }).properties;
+
+  const choice = describeTool("request_choice");
+  const choiceText = [choice.description, ...(choice.promptGuidelines ?? [])].join("\n");
+  assert.match(choiceText, /`appointment` 为\*\*任命\*\*卡/, "request_choice 必须写任命语义");
+  assert.match(choiceText, /由 Convener 依客户确认的团队计划发起/, "任命卡由 Convener 依团队计划发起");
+  assert.match(choiceText, /旧流程的「提名」卡为 legacy/, "旧提名语义标注 legacy");
+  assert.match(choiceText, /Crew 收到客户任命后才按名单写卡/, "Crew 任命后才写卡（不自行任命）");
+  assert.deepEqual(propertiesOf("request_choice").cardKind.enum, ["proposal", "appointment", "acceptance", "intent-confirm"], "不新增 cardKind");
+  assert.match(propertiesOf("request_choice").cardKind.description ?? "", /appointment.*appoint the recommended team/, "字段说明写明任命语义");
+
+  const confirm = describeTool("request_confirmation");
+  const confirmText = [confirm.description, ...(confirm.promptGuidelines ?? [])].join("\n");
+  assert.match(confirmText, /`appointment-write` 指客户\*\*任命\*\*（appointment）后的角色卡\/边界写入确认/, "appointment-write 写任命后写卡语义");
+  assert.deepEqual(propertiesOf("request_confirmation").cardKind.enum, ["write", "appointment-write", "schedule-write"], "不新增 cardKind");
+  const confirmKindDescription = propertiesOf("request_confirmation").cardKind.description ?? "";
+  assert.match(confirmKindDescription, /appointment-write.*after the customer's appointment/, "字段说明写明任命后写卡语义");
+  assert.match(confirmKindDescription, /Which kinds a role may send is decided by the application/, "角色允许卡种由应用判定");
 });
 
 test("T13 schema：request_confirmation 描述明确内置治理角色必须同时携带 flowId + cardKind；缺失不发卡，旧调用仍被接受", async () => {

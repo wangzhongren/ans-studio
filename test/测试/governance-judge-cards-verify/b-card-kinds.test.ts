@@ -7,9 +7,17 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { rmSync } from "node:fs";
+import path from "node:path";
 
 import {
+  CHANGE_PACKAGE_REL,
+  CRITERIA_REL,
+  REPORT_REL,
+  acceptanceCriteriaDoc,
+  acceptanceReportDoc,
   approveOutcome,
+  changePackageDoc,
   clearLedger,
   makeJudge,
   makeRoot,
@@ -19,6 +27,7 @@ import {
   seedProject,
   write,
   writeLedger,
+  FLOW,
   FLOW_REL,
   INTENT_REL,
   NOMINATION_REL,
@@ -486,6 +495,55 @@ test("acceptance 机械门槛（P6 补强）：流程未完成/缺 dispatch/阻�
     assert.equal(unsettled.outcome.verdict, "manual");
     assert.equal(unsettled.outcome.reasonCode, "insufficient-evidence");
     assert.match(unsettled.outcome.reason ?? "", /未结算/);
+  } finally {
+    cleanup();
+  }
+});
+
+test("acceptance 第 3 项：标准/报告/变更包缺失、报告首行五项缺失、报告档位低于变更包 ⇒ manual；升档可批", async () => {
+  const { root, cleanup } = makeRoot("acceptance-artifacts");
+  try {
+    seedProject(root);
+    const proposalAccept = {
+      kind: "customer.decision",
+      decisionKind: "proposal-accept",
+      customerDecision: "accepted",
+    };
+    const dispatchImpl = { kind: "dispatch.accepted", actorRoleId: "app", power: "app", stepId: "impl" };
+    writeLedger(root, [proposalAccept, dispatchImpl]);
+    const script: JudgeScript = {
+      reads: [INTENT_REL, PROPOSAL_REL, FLOW_REL],
+      report: report({ group: "decision", cardKind: "acceptance", selected: ["accept"] }),
+    };
+
+    // 标准文件不可读 ⇒ 证据包规范物证缺失（artifact-missing，manual），不进入模型判断。
+    rmSync(path.join(root, CRITERIA_REL));
+    const missingCriteria = await run(root, requestFor("acceptance"), script);
+    assert.equal(missingCriteria.outcome.verdict, "manual");
+    assert.equal(missingCriteria.outcome.reasonCode, "artifact-missing");
+    assert.match(missingCriteria.outcome.reason ?? "", /物证不可读.*criteria-v1\.md/);
+    write(root, CRITERIA_REL, acceptanceCriteriaDoc());
+
+    // 报告首行缺五项标签 ⇒ manual。
+    write(root, REPORT_REL, "# 验收报告\n\n风险档位：T2\n");
+    const missingLabels = await run(root, requestFor("acceptance"), script);
+    assert.equal(missingLabels.outcome.verdict, "manual");
+    assert.equal(missingLabels.outcome.reasonCode, "insufficient-evidence");
+    assert.match(missingLabels.outcome.reason ?? "", /首行缺少五项/);
+
+    // 报告档位 T2 低于变更包 T3 ⇒ 降档被拒（Verifier 只能升档）。
+    write(root, REPORT_REL, acceptanceReportDoc(FLOW, "T2"));
+    write(root, CHANGE_PACKAGE_REL, changePackageDoc(FLOW, "T3"));
+    const downgraded = await run(root, requestFor("acceptance"), script);
+    assert.equal(downgraded.outcome.verdict, "manual");
+    assert.equal(downgraded.outcome.reasonCode, "insufficient-evidence");
+    assert.match(downgraded.outcome.reason ?? "", /低于变更包档位/);
+
+    // 报告档位 T3 ≥ 变更包 T2 ⇒ 可代批（升档允许）。
+    write(root, REPORT_REL, acceptanceReportDoc(FLOW, "T3"));
+    write(root, CHANGE_PACKAGE_REL, changePackageDoc(FLOW, "T2"));
+    const upgraded = await run(root, requestFor("acceptance"), script);
+    assert.equal(upgraded.outcome.verdict, "approve", upgraded.outcome.reason ?? "");
   } finally {
     cleanup();
   }

@@ -134,6 +134,64 @@ function seedAcceptanceLedger(root: string, stepIds: readonly string[] = ["impl"
   });
 }
 
+/** 第 3 项三件套：验收标准/报告（首行五项）/变更包（frontmatter riskTier）。 */
+function seedAcceptanceArtifacts(root: string, flowId = "flow-a"): void {
+  writeFile(
+    root,
+    `docs/acceptance/${flowId}-criteria-v1.md`,
+    [
+      `# 验收完成标准：${flowId}`,
+      "",
+      "| ID | 标准 | 需要的证据 | 结果 |",
+      "| --- | --- | --- | --- |",
+      "| P1 | 示例标准 | 测试输出 | 待判定 |",
+      "",
+      "风险档位：T3（治理/权限变更）。",
+      "",
+      "判定规则：pass / fail / insufficient evidence / not applicable。",
+      "",
+      "证据计划：单测原始输出与全量回归记录。",
+      "",
+      "版本冻结：v1 写盘后冻结。",
+      "",
+    ].join("\n"),
+  );
+  writeFile(
+    root,
+    `docs/acceptance/${flowId}-report-v1.md`,
+    "风险档位：T3｜判定依据：治理/权限变更｜选定检查：定向测试｜复用证据：无｜全量回归：已执行\n\n## 结论\n通过。\n",
+  );
+  writeFile(
+    root,
+    `docs/scheduling/${flowId}-change-v1.md`,
+    ["---", `flowId: ${flowId}`, "version: 1", "riskTier: T3", "candidate: abc123", "changedPaths: [src/a.ts]", "evidence: [test/a.test.ts]", "---", "", "# 变更包", ""].join("\n"),
+  );
+}
+
+/** 团队计划（2026-10-22 第 1 项）：frontmatter 推荐集 + 角色行。 */
+function seedTeamPlan(root: string, recommended: readonly string[], flowId = "flow-a"): void {
+  writeFile(
+    root,
+    `docs/scheduling/${flowId}-team-v1.md`,
+    [
+      "---",
+      `flowId: ${flowId}`,
+      "version: 1",
+      "status: draft",
+      "riskTier: T3",
+      `recommended: [${recommended.join(", ")}]`,
+      "---",
+      "",
+      `# 团队计划：${flowId}`,
+      "",
+      "| roleId | 类型 | 职责目标 | 能力要求 | 唯一写集 | 依赖 | 组别 | apiSpec |",
+      "| --- | --- | --- | --- | --- | --- | --- | --- |",
+      ...recommended.map((id) => `| ${id} | existing | 实现 ${id} | 具备 ${id} 能力 | src/${id}/ | 无 | 组 A | not-applicable |`),
+      "",
+    ].join("\n"),
+  );
+}
+
 /** 验收卡判断请求（flow 物证路径可切换 YAML / legacy Markdown）。 */
 function acceptanceRequest(root: string, flowPath: string): GovernanceJudgeRequest {
   return {
@@ -151,7 +209,13 @@ function acceptanceRequest(root: string, flowPath: string): GovernanceJudgeReque
       cardKind: "acceptance",
       flowId: "flow-a",
     },
-    artifacts: { proposalPath: "docs/proposals/flow-a-v1.md", flowPath },
+    artifacts: {
+      proposalPath: "docs/proposals/flow-a-v1.md",
+      flowPath,
+      acceptanceCriteriaPath: "docs/acceptance/flow-a-criteria-v1.md",
+      acceptanceReportPath: "docs/acceptance/flow-a-report-v1.md",
+      changePackagePath: "docs/scheduling/flow-a-change-v1.md",
+    },
     facts: facts({ proposalDecision: "accepted", dispatchedStepIds: ["impl"] }),
     at: new Date().toISOString(),
   };
@@ -365,19 +429,15 @@ test("提案证据：意图摘要 + 提案范围/验收片段；requiredRead 为
   });
 });
 
-test("任命证据：提名推荐集进入角色枚举；与应用推荐集不一致 ⇒ evidence-conflict", async () => {
+test("任命证据：团队计划推荐集进入角色枚举；与应用推荐集不一致 ⇒ evidence-conflict", async () => {
   await withRoot(async (root) => {
-    writeFile(
-      root,
-      "docs/nominations/flow-a-v1.md",
-      "# 提名\n\n推荐：alpha、beta\n\n## 候选角色\n\n| 角色 | 理由 |\n| --- | --- |\n| alpha | A |\n| beta | B |\n",
-    );
+    seedTeamPlan(root, ["alpha", "beta"]);
     seedIntent(root);
     seedIntentLedger(root);
     const base: GovernanceJudgeRequest = {
       group: "decision",
       cardKind: "appointment",
-      roleId: "nominator",
+      roleId: "convener",
       projectRoot: root,
       runtime: "claude",
       governanceModel: "trio",
@@ -391,19 +451,19 @@ test("任命证据：提名推荐集进入角色枚举；与应用推荐集不�
         flowId: "flow-a",
       },
       recommendedRoleIds: ["alpha", "beta"],
-      artifacts: { nominationPath: "docs/nominations/flow-a-v1.md" },
+      artifacts: { teamPlanPath: "docs/scheduling/flow-a-team-v1.md" },
       facts: facts(),
       at: new Date().toISOString(),
     };
     const ok = await buildDecisionEvidencePacket({ request: base, projectRoot: root });
     assert.equal(ok.ok, true);
     if (!ok.ok) return;
-    const nomination = ok.packet.evidence.find((entry) => entry.kind === "nomination")!;
-    assert.deepEqual(nomination.recommendedRoleIds, ["alpha", "beta"]);
+    const teamPlan = ok.packet.evidence.find((entry) => entry.kind === "team-plan")!;
+    assert.deepEqual(teamPlan.recommendedRoleIds, ["alpha", "beta"]);
     assert.deepEqual(ok.packet.mechanicalFacts.roles.recommendedRoleIds, ["alpha", "beta"]);
     assert.deepEqual(ok.packet.mechanicalFacts.roles.cardOptionIds, ["alpha", "beta"]);
     assert.equal(ok.packet.intent?.intentId, "intent-a");
-    assert.deepEqual(ok.requiredReadPaths, [INTENT_REL, "docs/nominations/flow-a-v1.md"], "意图 + 提名摘要");
+    assert.deepEqual(ok.requiredReadPaths, [INTENT_REL, "docs/scheduling/flow-a-team-v1.md"], "意图 + 团队计划摘要");
 
     const drift = await buildDecisionEvidencePacket({
       request: { ...base, recommendedRoleIds: ["alpha"] },
@@ -412,7 +472,7 @@ test("任命证据：提名推荐集进入角色枚举；与应用推荐集不�
     assert.equal(drift.ok, false);
     if (drift.ok) return;
     assert.equal(drift.reasonCode, "evidence-conflict");
-    assert.match(drift.reason, /提名文件重解析/);
+    assert.match(drift.reason, /团队计划重解析/);
   });
 });
 
@@ -421,6 +481,7 @@ test("验收证据：流程步骤 + 账本记录；facts 与重读账本不一�
     writeFile(root, "docs/proposals/flow-a-v1.md", PROPOSAL_MARKDOWN);
     writeFile(root, "docs/flows/flow-a.md", "# 流程\n\n| stepId | 步骤 | 状态 |\n| --- | --- | --- |\n| s1 | 实现 | done |\n");
     seedIntent(root);
+    seedAcceptanceArtifacts(root);
     writeFile(root, ".ans/governance/ledger.jsonl", `${JSON.stringify({
       at: "2026-10-19T00:00:00.000Z",
       kind: "customer.decision",
@@ -470,7 +531,13 @@ test("验收证据：流程步骤 + 账本记录；facts 与重读账本不一�
         cardKind: "acceptance",
         flowId: "flow-a",
       },
-      artifacts: { proposalPath: "docs/proposals/flow-a-v1.md", flowPath: "docs/flows/flow-a.md" },
+      artifacts: {
+        proposalPath: "docs/proposals/flow-a-v1.md",
+        flowPath: "docs/flows/flow-a.md",
+        acceptanceCriteriaPath: "docs/acceptance/flow-a-criteria-v1.md",
+        acceptanceReportPath: "docs/acceptance/flow-a-report-v1.md",
+        changePackagePath: "docs/scheduling/flow-a-change-v1.md",
+      },
       facts: facts({ proposalDecision: "accepted", dispatchedStepIds: ["s1"] }),
       at: new Date().toISOString(),
     };
@@ -502,6 +569,7 @@ test("验收证据（YAML-only）：流程状态解析出步骤，不报『缺�
     writeFile(root, "docs/proposals/flow-a-v1.md", PROPOSAL_MARKDOWN);
     writeFile(root, "docs/flows/flow-a.yaml", FLOW_STATE_YAML);
     seedIntent(root);
+    seedAcceptanceArtifacts(root);
     seedAcceptanceLedger(root, ["impl"]);
 
     const built = await buildDecisionEvidencePacket({
@@ -537,6 +605,7 @@ test("验收证据（YAML 非法）：flow-state-invalid 带具体 path/message�
       FLOW_STATE_YAML.replace("    status: done", "    status: in-progress"),
     );
     seedIntent(root);
+    seedAcceptanceArtifacts(root);
     seedAcceptanceLedger(root, ["impl"]);
 
     const built = await buildDecisionEvidencePacket({
@@ -557,6 +626,7 @@ test("验收证据（legacy Markdown）：仍走原步骤表解析与旧失败�
     writeFile(root, "docs/proposals/flow-a-v1.md", PROPOSAL_MARKDOWN);
     writeFile(root, "docs/flows/flow-a.md", "# 流程\n\n| stepId | 步骤 | 状态 |\n| --- | --- | --- |\n| impl | 实现 | done |\n");
     seedIntent(root);
+    seedAcceptanceArtifacts(root);
     seedAcceptanceLedger(root, ["impl"]);
 
     const built = await buildDecisionEvidencePacket({
@@ -916,11 +986,12 @@ test("定点抽查是最小集：6 个已存在目标 + 1 个提案 ⇒ 仍只�
       at: "2026-10-19T00:00:00.000Z",
       kind: "customer.decision",
       flowId: "flow-a",
-      actorRoleId: "nominator",
-      power: "nomination",
+      actorRoleId: "convener",
+      power: "schedule",
       decisionKind: "appointment",
       customerDecision: "appointed",
       targetRoleIds: ["a"],
+      artifactPath: "docs/scheduling/flow-a-team-v1.md",
       decisionEvidence: { kind: "customer-input" },
     })}\n`);
     const targets = [
@@ -939,23 +1010,23 @@ test("定点抽查是最小集：6 个已存在目标 + 1 个提案 ⇒ 仍只�
         roleId: "nominator",
         allowedPathRoots: ["角色卡/"],
         forbiddenPaths: [".ans/", "角色卡/governance-boundary.yaml", "角色卡/rapporteur/", "角色卡/su/"],
-        artifacts: { nominationPath: "docs/nominations/flow-a-v1.md" },
+        artifacts: { teamPlanPath: "docs/scheduling/flow-a-team-v1.md" },
         facts: facts({ appointmentTargetRoleIds: ["a"] }),
       }),
       projectRoot: root,
     });
-    assert.equal(built.ok, false, "缺少提名物证 ⇒ artifact-missing（没有提名文件）");
+    assert.equal(built.ok, false, "缺少团队计划物证 ⇒ artifact-missing（没有团队计划文件）");
     if (!built.ok) assert.equal(built.reasonCode, "artifact-missing");
 
-    // 补上提名文件后：证据包含 6 条目标哈希，但 requiredRead 只有 ≤2 条。
-    writeFile(root, "docs/nominations/flow-a-v1.md", "# 提名\n\n推荐：a\n");
+    // 补上团队计划后：证据包含 6 条目标哈希，但 requiredRead 只有 ≤2 条。
+    seedTeamPlan(root, ["a"]);
     const built2 = await buildDecisionEvidencePacket({
       request: writeRequest(root, targets, preview, {
         cardKind: "appointment-write",
         roleId: "nominator",
         allowedPathRoots: ["角色卡/"],
         forbiddenPaths: [".ans/", "角色卡/governance-boundary.yaml", "角色卡/rapporteur/", "角色卡/su/"],
-        artifacts: { nominationPath: "docs/nominations/flow-a-v1.md" },
+        artifacts: { teamPlanPath: "docs/scheduling/flow-a-team-v1.md" },
         facts: facts({ appointmentTargetRoleIds: ["a"] }),
       }),
       projectRoot: root,
@@ -969,7 +1040,7 @@ test("定点抽查是最小集：6 个已存在目标 + 1 个提案 ⇒ 仍只�
     );
     assert.ok(built2.requiredReadPaths.length <= DECISION_EVIDENCE_SPOT_CHECK_LIMIT, "定点抽查 ≤2");
     assert.ok(
-      built2.requiredReadPaths.every((path) => path === "docs/nominations/flow-a-v1.md" || targets.includes(path)),
+      built2.requiredReadPaths.every((path) => path === "docs/scheduling/flow-a-team-v1.md" || targets.includes(path)),
       "抽查只取已存在物证/目标",
     );
     assert.ok(built2.packet.integrity.packetBytes <= DECISION_EVIDENCE_PACKET_MAX_BYTES);

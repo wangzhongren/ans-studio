@@ -1,0 +1,7 @@
+# 策划工作线索
+
+- 2026-10-22：客户确认意图「1，5 优化，其他的暂时不改」并追加「3 也加一下」；闸门 0 记录在 `docs/communication/2026-10-22_intent_governance-split-1-3-5.md`。范围只含第 1、3、5 项，第 2、4 项及其余差异不改。
+- 2026-10-22：已写[方案草案 v1](2026-10-22_design_governance-split-1-3-5.md)；客户方案确认记录以 `docs/communication/` 为准，本文件未据此声称已确认。核心设计：团队计划 `docs/scheduling/<flowId>-team-v1.md` 由 Convener 写并据此发 appointment 卡；Crew 只写 `角色卡/<id>/**` 和配套工作文档；客户决定后应用必须显式把「团队计划+任命名单」派给 Crew，Crew 写完校验后再派 Convener；Verifier 实施前写 `docs/acceptance/<flowId>-criteria-v1.md`，实施后按 T0–T3 和同候选证据复用判定，变更包 `docs/scheduling/<flowId>-change-v1.md` 标档位。
+- 已核事实（2026-10-22 只读）：Crew 卡在 `src/common/门禁引擎/governance-roles.ts:325-428` 仍含「提名权——选择角色、组建团队」；Convener 卡 `:430-544` 明确不写卡、不用 `request_choice`；Verifier 卡 `:546-609` 仍要求自己跑测试/真实启动，写区只有 `docs/verification/`。应用侧 appointment→Convener 与写卡补救在 `app/desktop/governance-advance.ts:673-677`/`:810-816`、`app/desktop/interface.ts:2941-3036`；写卡确定性校验只查存在/标题/boundary schema（`interface.ts:1784-1858`）。流程步骤 kind 是证据种类（`src/common/编排/flow-state.ts:26-34`），旧 `GovernanceStepKind`（`src/model/runtime.ts:221`）未被运行时代码消费。
+- 方案自身按 T3 标注；实施前不得改代码/测试/角色卡/边界。开放问题见方案 §13（团队计划路径、Crew 的 nominations 写权、appointment 发起人、步骤种类、档位载体、标准派发门槛、Verifier 自跑范围、acceptance/verification 分工、角色卡硬校验范围、readiness 载体、旧流程迁移、UI 文案）。
+- 下一步：交沟通走闸门 1；客户确认后由统筹写团队计划并走闸门 2；独立验收在实施前基于确认版本写正式标准。方案实质变更递增版本并重开闸门 1。

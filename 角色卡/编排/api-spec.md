@@ -521,3 +521,43 @@ export type { CreateGovernanceJudgeOptions } from "../../common/编排/governanc
 - **write 新文件（P6 真机修复）**：`write` 卡 artifacts/required-read 只收**已存在**的相关物证；新建目标文件不进入 required-read，改由 `preview` 正文核对；`preview` 为空 ⇒ `manual/insufficient-evidence`。`appointment-write`/`schedule-write` 的 nomination/flow 要求不变。
 - 新增 `test/编排/governance-judge.test.ts` **32/32**：六卡种正反例、required-read/物证缺失、逐路径复核（probes/写根/禁写/来源/pathDecisions 覆盖）、accept-quick 不代批、任命推荐集、读取损伤、支持矩阵/超时/中止/busy、事实/推荐集解析、trio judgeContext 与 single/su/项目角色对照、账本 judge 字段与 group 交叉校验、两工具回执、审计有界、**acceptance 流程完成度机械门槛**、**write 新文件 preview/旧版物证**。
 - 相关既有套件 74/74、P6 套件 42/42；`npm run typecheck` 0 错；全量三层 glob `node --test "test/**/*.test.ts"` 2900 计/2881 过/16 红/3 skipped，16 红均他域/环境既有（明细见 changelog）。
+
+## 2026-10-22 治理分工第 1/3/5 项（governance-split-1-3-5，编排阶段 C）
+
+依据：客户确认的策划方案 v1 `docs/planning/2026-10-22_design_governance-split-1-3-5.md` §5.3/§5.4/§7/§8.2/§8.6/§10.1、实施前标准 `docs/acceptance/governance-split-1-3-5-criteria-v1.md`（P2/P3/P5/P9/P10/P11/P12/P15）、团队计划 §4.2（编排）与 §11.7。阶段 B 冻结契约（`src/model/runtime.ts` 的 `teamPlanPath`/`acceptanceCriteriaPath`/`acceptanceReportPath`/`changePackagePath`/`riskTier`/`teamPlanConfirmed`）只读消费。状态：**implemented-unverified**。
+
+### 门禁与写路径路由
+
+- `governance-gate.ts::GovernanceGateAction` 新增 `"write-team-plan"`（`ACTION_ROLE` → `convener`，复用提案接受门）；旧 `"write-nomination"` → `nominator` 保留为 legacy。`write-role-card` 仍 → `nominator`。
+- **O2 实施派发前置门槛**：`evaluateDispatchGate` 对已有 appointment 决定的 flow，要求 `docs/acceptance/<flowId>-criteria-v1.md` 存在且结构合格（`validateAcceptanceCriteriaText`：flowId 可核对、验收表含 ID 列、风险档位 T0–T3、pass/fail/insufficient evidence、证据计划、版本/冻结）；缺失 → `acceptance-criteria-missing`，不合格 → `acceptance-criteria-invalid`。最新提案为 `proposal-accept-quick` 或旧流程（无 appointment）显式豁免。
+- `run-role.ts::governanceActionForPath`：`docs/scheduling/<flowId>-team-vN.md` → `write-team-plan`（flowId 非法时不带 flowId，门禁 fail-closed）；`docs/nominations/**` 保留 legacy 路由。`governanceWriteOwnerHint` 文案同步为 Steward/Crew/Proof 分工。
+- `governance-ledger.ts`：**不新增** `GovernancePower`/`GovernanceDecisionKind`；appointment 决定的 `power` 由发起角色职能决定（Convener → `schedule`，legacy Nominator 存量 → `nomination`），团队计划/readiness/标准/报告/变更包走 `artifact.observed`。
+
+### 卡前守卫与卡种
+
+- `TRIO_CARD_KINDS`：`nominator` 移除 `appointment`（保留 `appointment-write`/`write`）；`convener` 增加 `appointment`。
+- `defaultGovernanceChoiceCardKind`：Convener 对 appointment 形状（非空选项且不含 accept/accept-quick/revise/reject/confirm）默认 `appointment`；Nominator 不再默认 appointment。
+- **Convener appointment 卡前守卫**（`validateConvenerAppointmentCard`，触达客户前）：flowId 合法；最新团队计划 `docs/scheduling/<flowId>-team-vN.md` 存在可读；frontmatter `flowId` 一致；`recommended` 非空/无重复/不含内置治理角色（复用 `parseRecommendedRoleIds`，空集不静默接受）；卡选项覆盖推荐集且不含内置角色；计划角色表含每个推荐角色的职责目标/能力要求/写集/依赖且非空。失败 → `declined + notPresented:true`，不调客户通道、不计算 judgeContext、不镜像、不写账本、不占 pending。
+- `judgeArtifactsForCard`：appointment → `teamPlanPath`（legacy 提名回落）；appointment-write → teamPlan+flow；acceptance → proposal+flow+criteria/report/change package；Convener/Verifier 的 `write` 可选带 teamPlan/标准/变更包。`latestVersionedArtifact` 扩展 `-team-vN.md`/`-criteria-vN.md`/`-report-vN.md`/`-change-vN.md` 版本扫描。
+- `findDecisionArtifact`：appointment 绑定最新 `docs/scheduling/<flowId>-team-vN.md`（无则 legacy 提名，O4）；`recordCustomerDecision` 的 appointment `power` 由 Convener 职能为 `schedule`。
+- `computeJudgeContext`：推荐集从团队计划解析（legacy 提名回落）；acceptance 读取变更包 frontmatter 并写入 `facts.riskTier`。
+
+### 判断物证 / verdict / prompt
+
+- `governance-judge-facts.ts::requiredArtifactPaths`：appointment 用 `teamPlanPath`；appointment-write 用 teamPlan+flow；acceptance 增加 criteria/report/change package；缺省约定路径分别为 `docs/scheduling/<flowId>-team-v1.md`、`docs/acceptance/<flowId>-criteria-v1.md`、`docs/acceptance/<flowId>-report-v1.md`、`docs/scheduling/<flowId>-change-v1.md`。`buildGovernanceJudgeFacts` 增 `teamPlanConfirmed`（最新 appointment 决定是否绑定 `-team-vN.md`）。
+- `governance-judge-evidence.ts`：新增物证种类 `team-plan`/`acceptance-criteria`/`acceptance-report`/`change-package` 及确定性摘录；推荐集解析来源改为团队计划（legacy 提名回落）；错误文案「提名文件」→「团队计划」。
+- `governance-judge.ts::verifyAcceptanceMechanics`：在流程收尾门之外要求标准存在/flowId 一致、报告存在且**首行五项**（风险档位/判定依据/选定检查/复用证据/全量回归）、变更包 frontmatter `riskTier` 存在、报告档位不低于变更包档位；缺失/不一致 → `insufficient-evidence`/manual，不 auto-approve。
+- `governance-judge-verdict.ts::SOURCE_WRITE_ROOTS`：convener +`docs/scheduling/`；verifier +`docs/acceptance/`；nominator −`docs/nominations/`。appointment 文案改团队计划。
+- `governance-judge-prompt.ts`：更新 convener/verifier 写区、团队计划/验收标准/档位提示与 appointment 推荐集来源。
+
+### 流程/服务与会话提示
+
+- `flow-state.ts`：`FLOW_STEP_KINDS` 枚举不变；注释登记新 step id 约定（`team-plan`/`appointment`/`role-cards`/`role-readiness`/`acceptance-criteria`/`change-package`）。旧版 Markdown 词形映射的**实件**在 `app/desktop/governance-advance.ts::flowStepEvidenceKind`（阶段 D/桌面窗口），本阶段只登记约定：`team-plan*`→artifact、旧 `nomination*`→decision 保留。
+- `flow-service.ts`：`artifactPowerOf`/`observeFlowArtifacts` 行为不变；团队计划/readiness/标准/变更包作为普通项目相对路径可观察，`角色卡/` 仍不观察（新增专项测试）。
+- `govern-session.ts`：标准工作流提示改为「意图确认 → 提案与契约 → 团队计划与客户任命 → Crew 写卡与就绪 → 流程与派发 → 独立验收」；Crew 纪律改为只读团队计划按名单写卡；Steward 纪律增加团队计划/readiness/变更包；Proof 纪律增加实施前标准、首行五项报告路径 `docs/acceptance/<flowId>-report-v1.md`、T0–T3 档位与证据复用。
+
+### 验收证据
+
+- 定向测试：`governance-gate` **20/20**、`governance-judge` **81/81**、`flow-state` **35/35**、`flow-service` **22/22**、`governance-session` **30/30**、`governance-ledger`+`decision-evidence-packet`+`decision-intent-drift` **32/32**；`node --test "test/编排/**/*.test.ts"` **735 计/734 过/1 红**（唯一红＝既有 Windows symlink EPERM `shell-authorized-routine.test.ts:103`，基线与任务书一致）；`npm run typecheck` **exit 0**。环境：Node v24.22.1 / npm 11.19.1 / Windows 11 / Git Bash。
+- 新增/更新负例：团队计划卡前守卫六类失败（缺失/flowId 不符/推荐集空/含内置角色/选项不一致/角色行缺项）、推荐集内联数组解析与团队计划优先/legacy 回落、`latestVersionedArtifact` 扫描 `-team-vN.md`、`write-team-plan` 门禁正反例、appointment `power=schedule`、acceptance 标准/报告/首行五项/档位门槛、`team-plan` 步骤模板与枚举不变、`observeFlowArtifacts` 新 artifact 观察。
+- **契约偏差/未做**：旧版 Markdown 映射 `team-plan*`→artifact 的可执行实件属桌面窗口（阶段 D），本阶段未改 `app/**`；`test/测试/` 跨角色 e2e 与全量 T3 回归归阶段 E 测试角色；appointment→Crew 桌面派发回路属阶段 D。文档状态 `implemented-unverified`，未提交/暂存/推送。

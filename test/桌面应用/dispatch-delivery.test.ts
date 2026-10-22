@@ -1595,8 +1595,60 @@ const trioEntry = (over: Record<string, unknown>) => ({
   ...over,
 });
 
-/** 造一个可过派发门禁的 trio 项目根：流程单含步骤 `impl`；账本按用例写入。 */
-async function makeTrioRoot(ledgerEntries: Record<string, unknown>[] = []): Promise<string> {
+/**
+ * 2026-10-22 第 3 项（阶段 C O2 门）：结构合格的实施前验收标准。
+ * 门槛（`validateAcceptanceCriteriaText`）：frontmatter flowId 与流程一致、正文含 flowId、验收表（ID 列+分隔行）、
+ * 风险档位（T0–T3）、判定规则（pass / fail / insufficient evidence）、证据计划、版本/冻结。
+ */
+async function writeAcceptanceCriteria(dir: string, flowId = "flow-a", riskTier = "T2"): Promise<string> {
+  await fs.mkdir(path.join(dir, "docs", "acceptance"), { recursive: true });
+  const rel = `docs/acceptance/${flowId}-criteria-v1.md`;
+  await fs.writeFile(
+    path.join(dir, "docs", "acceptance", `${flowId}-criteria-v1.md`),
+    [
+      "---",
+      `flowId: ${flowId}`,
+      "version: 1",
+      `riskTier: ${riskTier}`,
+      "---",
+      "",
+      `# 验收标准：${flowId}`,
+      "",
+      "| ID | 标准 | 需要的证据 | 判定 |",
+      "| --- | --- | --- | --- |",
+      "| P1 | 交付实现（impl） | 单元测试与真实启动演示 | pass |",
+      "",
+      `风险档位：${riskTier}（流程 ${flowId}；依据：跨角色集成变更）。`,
+      "判定规则：pass / fail / insufficient evidence / not applicable。",
+      "证据计划：受影响单测 + 真实启动演示日志与截图。",
+      "版本：v1；实施开始后冻结，变更须递增版本。",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  return rel;
+}
+
+/** 结构**不合格**的标准（存在、可读，但缺验收表/档位/判定规则/证据计划/版本冻结）。 */
+async function writeInvalidAcceptanceCriteria(dir: string, flowId = "flow-a"): Promise<string> {
+  await fs.mkdir(path.join(dir, "docs", "acceptance"), { recursive: true });
+  const rel = `docs/acceptance/${flowId}-criteria-v1.md`;
+  await fs.writeFile(
+    path.join(dir, "docs", "acceptance", `${flowId}-criteria-v1.md`),
+    ["---", `flowId: ${flowId}`, "---", "", `# 验收标准：${flowId}`, "", "待补（本夹具故意缺少验收表/档位/判定规则/证据计划/版本）。", ""].join("\n"),
+    "utf8",
+  );
+  return rel;
+}
+
+/**
+ * 造一个可过派发门禁的 trio 项目根：流程单含步骤 `impl`；账本按用例写入。
+ * 2026-10-22：默认写入结构合格的实施前验收标准（O2 门要求）；缺失/不合格用 `acceptanceCriteria` 显式指定。
+ */
+async function makeTrioRoot(
+  ledgerEntries: Record<string, unknown>[] = [],
+  options: { acceptanceCriteria?: "valid" | "missing" | "invalid" } = {},
+): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-trio-dispatch-"));
   await fs.mkdir(path.join(dir, "docs", "flows"), { recursive: true });
   await fs.writeFile(
@@ -1612,6 +1664,9 @@ async function makeTrioRoot(ledgerEntries: Record<string, unknown>[] = []): Prom
       "utf8",
     );
   }
+  const criteria = options.acceptanceCriteria ?? "valid";
+  if (criteria === "valid") await writeAcceptanceCriteria(dir, "flow-a");
+  else if (criteria === "invalid") await writeInvalidAcceptanceCriteria(dir, "flow-a");
   return dir;
 }
 
@@ -1735,11 +1790,15 @@ test("2026-10-19 新规则：trio 五个内置治理角色全部经 shellOperato
   await h.mgr.stop(null);
 });
 
-test("routeDispatch 正例（trio）：提案接受 + 任命 + 流程步骤 → 入队 + 写 dispatch.accepted 账本", async () => {
-  const dir = await makeTrioRoot([
-    trioEntry({ decisionKind: "proposal-accept" }),
-    trioEntry({ decisionKind: "appointment", power: "nomination", actorRoleId: "nominator", targetRoleIds: ["A"] }),
-  ]);
+test("routeDispatch 正例（trio）：提案接受 + 任命 + 流程步骤 + 实施前标准 → 入队 + 写 dispatch.accepted 账本", async () => {
+  const dir = await makeTrioRoot(
+    [
+      trioEntry({ decisionKind: "proposal-accept" }),
+      trioEntry({ decisionKind: "appointment", power: "nomination", actorRoleId: "nominator", targetRoleIds: ["A"] }),
+    ],
+    // 2026-10-22 第 3 项（O2）：已有 appointment 的 flow 必须先有结构合格的实施前标准。
+    { acceptanceCriteria: "valid" },
+  );
   const h = makeHarness({ projectRoot: dir, customListing: trioListing(dir) });
   await h.mgr.open({ projectRoot: dir, roleId: "convener", runtime: "demo" });
   await tick(30);
@@ -1822,6 +1881,52 @@ test("routeDispatch 反例（trio）：无客户接受/无任命/目标内置/�
   const ledger4 = await readGovernanceLedger(dupRoot);
   assert.equal(ledger4.entries.filter((entry) => entry.kind === "dispatch.accepted").length, 1, "被拒的重复派发不新增账本");
   await h4.mgr.stop(null);
+
+  // ⑤ 任命已记录但**实施前验收标准缺失**：O2 门拒（不派、不写账本）。
+  const missingCriteriaRoot = await makeTrioRoot(
+    [
+      trioEntry({ decisionKind: "proposal-accept" }),
+      trioEntry({ decisionKind: "appointment", power: "nomination", actorRoleId: "nominator", targetRoleIds: ["A"] }),
+    ],
+    { acceptanceCriteria: "missing" },
+  );
+  const h5 = makeHarness({ projectRoot: missingCriteriaRoot, customListing: trioListing(missingCriteriaRoot) });
+  await h5.mgr.open({ projectRoot: missingCriteriaRoot, roleId: "convener", runtime: "demo" });
+  await tick(30);
+  const r5 = (await h5.capabilitiesOf("convener")!.dispatchTask!({ roleId: "A", task: "缺标准", flowId: "flow-a", stepId: "impl" }))!;
+  assert.equal(r5.ok, false, "实施前标准缺失 ⇒ 拒投（O2）");
+  assert.match(r5.message ?? "", /验收标准/, "回执点明验收标准");
+  assert.match(r5.message ?? "", /不存在或不可读/, "如实原因：标准文件缺失");
+  assert.equal(h5.sent.A.length, 0, "拒投不投递");
+  assert.equal(
+    (await readGovernanceLedger(missingCriteriaRoot)).entries.filter((entry) => entry.kind === "dispatch.accepted").length,
+    0,
+    "标准缺失被拒：不写 dispatch.accepted",
+  );
+  await h5.mgr.stop(null);
+
+  // ⑥ 标准存在但**结构不合格**（缺验收表/档位/判定规则/证据计划/版本冻结）：同样拒，提示补齐。
+  const invalidCriteriaRoot = await makeTrioRoot(
+    [
+      trioEntry({ decisionKind: "proposal-accept" }),
+      trioEntry({ decisionKind: "appointment", power: "nomination", actorRoleId: "nominator", targetRoleIds: ["A"] }),
+    ],
+    { acceptanceCriteria: "invalid" },
+  );
+  const h6 = makeHarness({ projectRoot: invalidCriteriaRoot, customListing: trioListing(invalidCriteriaRoot) });
+  await h6.mgr.open({ projectRoot: invalidCriteriaRoot, roleId: "convener", runtime: "demo" });
+  await tick(30);
+  const r6 = (await h6.capabilitiesOf("convener")!.dispatchTask!({ roleId: "A", task: "坏标准", flowId: "flow-a", stepId: "impl" }))!;
+  assert.equal(r6.ok, false, "实施前标准结构不合格 ⇒ 拒投（O2）");
+  assert.match(r6.message ?? "", /结构不合格/, "如实原因：结构不合格");
+  assert.match(r6.message ?? "", /补齐/, "可操作建议：补齐后重新派发");
+  assert.equal(h6.sent.A.length, 0, "拒投不投递");
+  assert.equal(
+    (await readGovernanceLedger(invalidCriteriaRoot)).entries.filter((entry) => entry.kind === "dispatch.accepted").length,
+    0,
+    "标准不合格被拒：不写 dispatch.accepted",
+  );
+  await h6.mgr.stop(null);
 });
 
 // ——————————————————————————————————————————————————————————————————————————————————————

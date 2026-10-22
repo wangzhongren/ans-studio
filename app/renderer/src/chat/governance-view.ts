@@ -1,7 +1,8 @@
 /**
  * 治理状态 / 动作 / 预览 / 空态的纯映射（Phase 4B）。
  *
- * 文案逐字沿用旧 `ui-labels.js`（单一来源），只做「主进程事实 → 文案」的转写：
+ * 文案以旧 `ui-labels.js` 为基线（单一来源），只做「主进程事实 → 文案」的转写；
+ * appointment 相关文案按 2026-10-22 治理拆分方案 §5.4 更新（「提名」→「任命」）。
  * 不判边界、不读文件、不猜模型；缺省/未知一律不显示、不编辑语义。
  * `phase === "write"` 是「是否零副作用」的唯一依据（非 write 才可声明未写入任何文件）。
  */
@@ -120,13 +121,14 @@ export function governanceEmptyState(
   };
 }
 
-// —————— 治理角色说明（旧 ui-labels 逐字；按 governanceFunction）——————
+// —————— 治理角色说明（按 governanceFunction；appointment 相关文案按 2026-10-22 治理拆分更新）——————
 
 const GOVERNANCE_ROLE_HINT: Record<string, string> = {
   liaison:
     "客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给提案 Draft 形成提案。我不写提案、不批准。本版起默认入口为主理 Lead；提案 Draft 与历史提案不变。",
   proposal: "通常由主理 Lead 交接打开；客户也可以直接找我。我只写提案，不批准。",
-  nomination: "通常由流程单提名步骤打开；仅在客户明确要求时直接使用",
+  nomination:
+    "客户任命后打开写卡；只按团队计划与任命名单写角色卡与边界，不选择角色、不批准。",
   schedule: "通常由已接受提案开启流程；只负责排步骤与派发，不批准方案",
   verification: "通常由交付回交后的验收步骤打开；只核对证据、出验收卡，不批准。",
 };
@@ -590,8 +592,8 @@ export const GOVERNANCE_MIRROR_BADGE = "镜像 · 主入口";
 
 const GOVERNANCE_CARD_POWER: Record<string, string> = {
   proposal: "提案",
-  appointment: "提名",
-  "appointment-write": "提名",
+  appointment: "任命",
+  "appointment-write": "任命写卡",
   "schedule-write": "编排",
   acceptance: "验收",
   "intent-confirm": "需求确认",
@@ -606,7 +608,7 @@ export interface GovernanceCardMeta {
   lines: string[];
 }
 
-/** 治理卡元信息（旧 `governanceCardMetaView` 逐字；缺省不显示、不猜）。 */
+/** 治理卡元信息（缺省不显示、不猜；appointment 权力标签按 2026-10-22 治理拆分更新为「任命」）。 */
 export function governanceCardMetaView(request: unknown): GovernanceCardMeta {
   const req = request && typeof request === "object" ? (request as Record<string, unknown>) : {};
   const cardKind = typeof req.cardKind === "string" ? req.cardKind : "";

@@ -18,6 +18,7 @@ import {
   flowStatePath,
   parseFlowStateYaml,
   validateFlowEvidence,
+  FLOW_STEP_KINDS,
   type FlowState,
 } from "../../src/common/编排/flow-state.ts";
 import { evaluateGovernanceGate } from "../../src/common/编排/governance-gate.ts";
@@ -152,6 +153,101 @@ function errorPaths(text: string, flowId: string): string[] {
 }
 
 // —————————————————————— 合法形状 ——————————————————————
+
+test("2026-10-22 新流程步骤模板：team-plan/appointment/role-cards/role-readiness/acceptance-criteria/change-package 用现有 kind", () => {
+  // 枚举不变（Q4 A：不新增 FlowStepKind）。
+  assert.deepEqual([...FLOW_STEP_KINDS], ["dispatch", "customer-decision", "artifact", "acceptance"]);
+
+  const yaml = [
+    "flowId: governance-split-demo",
+    "version: 1",
+    "qualityTier: production",
+    "steps:",
+    "  - id: team-plan",
+    "    title: 团队计划",
+    "    owner: convener",
+    "    kind: artifact",
+    "    status: pending",
+    "  - id: appointment",
+    "    title: 客户任命（闸门 2）",
+    "    owner: convener",
+    "    kind: customer-decision",
+    "    status: pending",
+    "  - id: role-cards",
+    "    title: Crew 写角色卡与边界",
+    "    owner: nominator",
+    "    kind: dispatch",
+    "    status: pending",
+    "  - id: role-readiness",
+    "    title: 角色就绪复核",
+    "    owner: convener",
+    "    kind: artifact",
+    "    status: pending",
+    "  - id: acceptance-criteria",
+    "    title: 实施前完成标准",
+    "    owner: verifier",
+    "    kind: artifact",
+    "    status: pending",
+    "  - id: delivery-backend",
+    "    title: 服务端交付",
+    "    owner: backend",
+    "    kind: dispatch",
+    "    status: pending",
+    "  - id: verification-evidence",
+    "    title: 真实启动应用并演示",
+    "    owner: backend",
+    "    kind: artifact",
+    "    status: pending",
+    "  - id: change-package",
+    "    title: 变更包",
+    "    owner: convener",
+    "    kind: artifact",
+    "    status: pending",
+    "  - id: verification",
+    "    title: 验收",
+    "    owner: verifier",
+    "    kind: acceptance",
+    "    status: pending",
+    "",
+  ].join("\n");
+  const parsed = parseFlowStateYaml(yaml, "governance-split-demo");
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.error);
+  if (!parsed.ok) return;
+  assert.deepEqual(
+    parsed.flow.steps.map((step) => [step.id, step.kind]),
+    [
+      ["team-plan", "artifact"],
+      ["appointment", "customer-decision"],
+      ["role-cards", "dispatch"],
+      ["role-readiness", "artifact"],
+      ["acceptance-criteria", "artifact"],
+      ["delivery-backend", "dispatch"],
+      ["verification-evidence", "artifact"],
+      ["change-package", "artifact"],
+      ["verification", "acceptance"],
+    ],
+  );
+  // 旧 nomination 步骤 id 仍可解析（legacy 流程不被破坏）。
+  const legacyYaml = [
+    "flowId: governance-split-demo",
+    "version: 1",
+    "qualityTier: production",
+    "steps:",
+    "  - id: nomination",
+    "    title: 提名（legacy）",
+    "    owner: nominator",
+    "    kind: customer-decision",
+    "    status: pending",
+    "  - id: verification",
+    "    title: 验收",
+    "    owner: verifier",
+    "    kind: acceptance",
+    "    status: pending",
+    "",
+  ].join("\n");
+  const legacy = parseFlowStateYaml(legacyYaml, "governance-split-demo");
+  assert.equal(legacy.ok, true, "旧 nomination 步骤 id 不应被新约定破坏");
+});
 
 test("合法 YAML：真实 todo-list-v1 流程形状解析通过", () => {
   const flow = parseOk(TODO_FLOW_YAML, "todo-list-v1");
@@ -1061,10 +1157,36 @@ steps:
     status: pending
 `;
 
+/** O2 派发门槛所需的实施前验收标准（结构合格）。 */
+function writeGateCriteria(root: string): void {
+  mkdirSync(join(root, "docs", "acceptance"), { recursive: true });
+  writeFileSync(
+    join(root, "docs", "acceptance", "flow-a-criteria-v1.md"),
+    [
+      "# 验收完成标准：flow-a",
+      "",
+      "| ID | 标准 | 需要的证据 | 结果 |",
+      "| --- | --- | --- | --- |",
+      "| P1 | 示例标准 | 测试输出 | 待判定 |",
+      "",
+      "风险档位：T3（治理/权限变更）。",
+      "",
+      "判定规则：pass / fail / insufficient evidence / not applicable。",
+      "",
+      "证据计划：单测原始输出与全量回归记录。",
+      "",
+      "版本冻结：v1 写盘后冻结。",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+}
+
 test("派发门禁：docs/flows/<flowId>.yaml 存在时以 YAML 为唯一机器状态", () => {
   withRoot((root) => {
     mkdirSync(join(root, "docs", "flows"), { recursive: true });
     writeFileSync(join(root, "docs", "flows", "flow-a.yaml"), GATE_FLOW_YAML, "utf8");
+    writeGateCriteria(root);
     const input = {
       projectRoot: root,
       model: "trio" as const,
@@ -1093,6 +1215,7 @@ test("派发门禁：YAML 不存在时回落旧版 .md（迁移兼容）", () =>
       "| stepId | 步骤 | 状态 |\n| --- | --- | --- |\n| impl | 实现 | pending |\n",
       "utf8",
     );
+    writeGateCriteria(root);
     const input = {
       projectRoot: root,
       model: "trio" as const,

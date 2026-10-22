@@ -107,3 +107,13 @@ Service 为每轮提供一个 ID，归一事件的顶层和 `detail.turnId`，�
 **客户需求确认卡 `intent-confirm`（2026-10-18 客户拍板）：** `GovernanceChoiceCardKind` 增 `"intent-confirm"`（`GovernanceCardKind` 随之包含）。`GOVERNANCE_CARD_GROUP` 的键类型改为 `Readonly<Partial<Record<GovernanceCardKind, GovernanceJudgeGroup>>>`，**故意不包含 `intent-confirm` 键**：该卡是主理（Lead/liaison）在 `hand_off_intent` 前发给客户的**需求确认卡**，选项 id 固定 `confirm`/`revise`，属客户本人专属；`governanceCardGroup("intent-confirm") === undefined` ⇒ 即使两个开关都开，判断 agent 也永不介入/不代批。`request_choice` 的 `cardKind` enum 增 `intent-confirm`，描述注明仅主理在 `hand_off_intent` 前发出、客户本人确认、判断 agent 不代批；工具 handler 的 choice 白名单同步放行。既有六个卡种映射不变。
 
 **思考默认策略同步（ANS-REASONING-LIGHT D1，2026-10-21）：** 值域、字段形状、env 归一和 Service 注入行为不变。Pi 新建/恢复按显式值→模型设置→全局设置→Pi 1.1.0 默认 medium 重新应用，默认与显式档均做预算保护，避免清空后继承旧 high；具体实现归 Pi。适配器明确参数拒绝时有限兼容继续，成功状态只在当前活会话保留，不修改已保存设置；普通接口故障不据此改档。配置/尝试/成功提示使用活动 prompt 内的普通 `message`、`detail.source:"system"`，正文放 summary，reasonCode/state 仅附加事实；不扩展 schema、不冒充模型思考、不承诺服务端实际采纳。现有窗口路径支持显示/回放并排除助手反馈；未改 UI。核心候选及窄测见 [契约修复记录](docs/fix/2026-10-21_fix_reasoning-default-contract.md)。
+
+**治理分工第 1/3/5 项 Model/Provider 契约冻结（2026-10-22，阶段 B，`implemented-unverified`）：** 依据客户确认的策划方案 `docs/planning/2026-10-22_design_governance-split-1-3-5.md` §8.2/§10.1 与团队计划 N4，本层只做**可选加法**（旧调用零变化），不新增第二份类型/枚举、不改现有字段含义：
+
+- `GovernanceAppointmentStepPayload` 增可选 `teamPlanPath?: string`（团队计划 `docs/scheduling/<flowId>-team-v<n>.md`，第 1 项）；`nominationPath?` 保留为 **legacy**（旧提名文件）。
+- `GovernanceJudgeRequest.artifacts` 与 `GovernanceJudgeContext.artifacts` 增可选 `teamPlanPath?`、`acceptanceCriteriaPath?`、`acceptanceReportPath?`、`changePackagePath?`（第 1/3 项）；两处保持同形（单一字段集，不另建第二份类型）；`nominationPath?` 保留为 **legacy**。
+- `GovernanceJudgeFacts` 增可选 `riskTier?: "T0" | "T1" | "T2" | "T3"`（定义以 `references/testing.md` 为唯一口径；**不是** `qualityTier`）与 `teamPlanConfirmed?: boolean`（最新 appointment 决定是否绑定团队计划物证）。缺失＝应用未提供，不得据此解锁任何门禁。
+- `GovernanceStepKind` 保留现有值（`proposal` / `nomination` / `dispatch` / `acceptance`）；`nomination` 标注 `@deprecated`/legacy；**不新增** `team-plan`，**不改** `FlowStepKind`（Q4 A）。
+- Provider `request_choice` / `request_confirmation` 只更新描述文案：写明 `appointment` 为**任命**卡（由 Convener 依客户确认的团队计划发起；Crew 收到任命后才按名单写卡，旧「提名」流程为 legacy）与 `appointment-write` 为任命后写卡确认；角色允许卡种由应用校验。**不新增 `cardKind`**，参数形状、校验逻辑与 handler 行为不变。
+
+下游消费（编排的物证/推荐集/风险档位、桌面 appointment→Crew 回路）属阶段 C/D；本阶段未接线，字段存在不等于门禁已实现。字段清单、检查命令、候选哈希与契约偏差见 [本次 change 记录](docs/change/2026-10-22_change_governance-split-1-3-5-model-provider.md)。

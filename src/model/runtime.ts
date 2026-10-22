@@ -217,8 +217,19 @@ export type GovernanceAcceptanceOptionId = "accept" | "reject";
 /** 提案版本（评审 §6.3-3：一个提案最多 v2）。 */
 export type GovernanceProposalVersion = 1 | 2;
 
-/** 流程步骤种类（评审 §6.1 闭环：提案 → 流程/提名 → 派发 → 验收）。 */
-export type GovernanceStepKind = "proposal" | "nomination" | "dispatch" | "acceptance";
+/**
+ * 流程步骤种类（评审 §6.1 闭环：提案 → 流程/团队计划 → 派发 → 验收）。
+ *
+ * **2026-10-22 治理分工第 1/3/5 项（§9.3 Q4 A）契约冻结**：保留现有值与形状，本层**不新增**
+ * `team-plan`（也不得改 `FlowStepKind`）——新流程用 step id 表达角色/阶段（如 `team-plan`、
+ * `role-cards`），`kind` 仍取现有值；旧 flow 继续可解析。
+ */
+export type GovernanceStepKind =
+  | "proposal"
+  /** @deprecated legacy：旧流程的「提名」步骤；新流程用团队计划 + 现有 kind，不再新增 nomination 步骤。 */
+  | "nomination"
+  | "dispatch"
+  | "acceptance";
 
 /**
  * 流程步骤状态（评审 §6.3 机械规则的中立形状；判定在编排，不在本层）：
@@ -254,11 +265,19 @@ export interface GovernanceProposalStepPayload {
   version: GovernanceProposalVersion;
 }
 
-/** 任命步骤载荷（`docs/nominations/<flowId>-v<n>.md`；快捷路径 `accept-quick` 可没有提名文件）。 */
+/**
+ * 任命步骤载荷（2026-10-22 治理分工第 1 项）。
+ * 团队计划（`docs/scheduling/<flowId>-team-v<n>.md`）是任命与推荐集的权威物证；
+ * `nominationPath` 保留为 **legacy**（旧提名文件时代；新流程不再产生）。
+ * 快捷路径 `accept-quick` 可没有物证文件（按既有快捷语义处理）。
+ */
 export interface GovernanceAppointmentStepPayload {
   flowId: GovernanceFlowId;
   stepId?: GovernanceStepId;
   cardKind: "appointment";
+  /** 团队计划文件的项目相对路径（`docs/scheduling/<flowId>-team-v<n>.md`；第 1 项）。 */
+  teamPlanPath?: string;
+  /** @deprecated legacy：旧提名文件路径（`docs/nominations/<flowId>-v<n>.md`）；新流程用 `teamPlanPath`。 */
   nominationPath?: string;
   /** 客户任命的项目角色 id（任命决定的 `targetRoleIds`）。 */
   targetRoleIds: readonly string[];
@@ -1177,9 +1196,28 @@ export interface GovernanceJudgeRequest {
   allowedPathRoots?: string[];
   /** 只读事实：禁写路径。 */
   forbiddenPaths?: string[];
-  /** 规范物证路径（由编排按 cardKind 计算；缺失 ⇒ manual）。 */
-  artifacts?: { proposalPath?: string; nominationPath?: string; flowPath?: string };
-  /** appointment：应用解析提名文件得到的机器可读推荐集（模型只能选恰该集合）。 */
+  /**
+   * 规范物证路径（由编排按 cardKind 计算；缺失 ⇒ manual）。
+   * 2026-10-22 治理分工第 1/3/5 项（方案 §8.2）可选新增：`teamPlanPath`（第 1 项，团队计划）、
+   * `acceptanceCriteriaPath`/`acceptanceReportPath`/`changePackagePath`（第 3 项）；
+   * `nominationPath` 保留为 **legacy**。与 `GovernanceJudgeContext.artifacts` 同形（单一字段集，
+   * 不另建第二份类型）；全部新增字段可选，旧调用零变化。
+   */
+  artifacts?: {
+    proposalPath?: string;
+    /** @deprecated legacy：旧提名文件路径；新流程用 `teamPlanPath`。 */
+    nominationPath?: string;
+    /** 团队计划路径（`docs/scheduling/<flowId>-team-v<n>.md`；第 1 项）。 */
+    teamPlanPath?: string;
+    flowPath?: string;
+    /** 实施前验收标准路径（`docs/acceptance/<flowId>-criteria-v1.md`；第 3 项）。 */
+    acceptanceCriteriaPath?: string;
+    /** 验收报告路径（`docs/acceptance/<flowId>-report-v1.md`；第 3 项）。 */
+    acceptanceReportPath?: string;
+    /** 变更包路径（`docs/scheduling/<flowId>-change-v1.md`；第 3 项）。 */
+    changePackagePath?: string;
+  };
+  /** appointment：应用解析团队计划（legacy：提名文件）得到的机器可读推荐集（模型只能选恰该集合）。 */
   recommendedRoleIds?: string[];
   /** 有界治理事实快照（账本不可读/错误 ⇒ 禁止 approve）。 */
   facts: GovernanceJudgeFacts;
@@ -1258,7 +1296,25 @@ export interface GovernanceJudgeContext {
   pathProbes?: Array<{ path: string; allowed: boolean; reason?: string }>;
   allowedPathRoots?: string[];
   forbiddenPaths?: string[];
-  artifacts?: { proposalPath?: string; nominationPath?: string; flowPath?: string };
+  /**
+   * 规范物证路径（与 `GovernanceJudgeRequest.artifacts` 同形；单一字段集，不另建第二份类型）。
+   * 新增字段全部可选：`teamPlanPath`（第 1 项）、`acceptanceCriteriaPath`/`acceptanceReportPath`/
+   * `changePackagePath`（第 3 项）；`nominationPath` 保留为 **legacy**。
+   */
+  artifacts?: {
+    proposalPath?: string;
+    /** @deprecated legacy：旧提名文件路径；新流程用 `teamPlanPath`。 */
+    nominationPath?: string;
+    /** 团队计划路径（`docs/scheduling/<flowId>-team-v<n>.md`；第 1 项）。 */
+    teamPlanPath?: string;
+    flowPath?: string;
+    /** 实施前验收标准路径（`docs/acceptance/<flowId>-criteria-v1.md`；第 3 项）。 */
+    acceptanceCriteriaPath?: string;
+    /** 验收报告路径（`docs/acceptance/<flowId>-report-v1.md`；第 3 项）。 */
+    acceptanceReportPath?: string;
+    /** 变更包路径（`docs/scheduling/<flowId>-change-v1.md`；第 3 项）。 */
+    changePackagePath?: string;
+  };
   recommendedRoleIds?: string[];
   facts: GovernanceJudgeFacts;
   /** 事实计算失败/账本不可读；出现即禁止 approve。 */
@@ -1280,6 +1336,16 @@ export interface GovernanceJudgeFacts {
   unresolvedClarificationCount: number;
   /** 有界（≤20），供 prompt/审计。 */
   latestDecisionKinds: string[];
+  /**
+   * 风险档位（2026-10-22 治理分工第 3 项；方案 §8.2）：T0–T3，定义以 `references/testing.md` 为
+   * 唯一口径；**不是** `qualityTier`（prototype/production）。可选；缺失＝应用未提供（判定回落规则在编排）。
+   */
+  riskTier?: "T0" | "T1" | "T2" | "T3";
+  /**
+   * 最新 appointment 决定是否绑定了团队计划物证（第 1 项；方案 §8.2）。
+   * 可选；缺失＝未知（旧账本/旧调用），不得据此解锁任何门禁。
+   */
+  teamPlanConfirmed?: boolean;
 }
 
 // —————————————— 会话级后台任务（2026-10-22 客户确认设计 B1–B4） ——————————————

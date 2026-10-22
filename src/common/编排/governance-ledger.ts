@@ -51,6 +51,11 @@ export type GovernanceDecisionKind =
   | "proposal-accept-quick"
   | "proposal-revise"
   | "proposal-reject"
+  /**
+   * 客户任命（闸门 2）。2026-10-22 治理分工第 1 项起由 Convener 发起，故条目 `power`
+   * 由发起角色职能决定（Convener → `schedule`；旧 Nominator 发起的存量条目仍为 `nomination`）。
+   * 不新增 power/decision kind：团队计划/标准/报告/变更包一律走 `artifact.observed`。
+   */
   | "appointment"
   | "appointment-write"
   | "schedule-write"

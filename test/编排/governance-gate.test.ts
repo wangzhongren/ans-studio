@@ -21,6 +21,8 @@ import { join } from "node:path";
 import {
   evaluateGovernanceGate,
   parseFlowStepIds,
+  validateAcceptanceCriteriaText,
+  acceptanceCriteriaRelPath,
   type GovernanceGateInput,
 } from "../../src/common/编排/governance-gate.ts";
 import type { GovernanceLedgerEntry, GovernanceLedgerSnapshot } from "../../src/common/编排/governance-ledger.ts";
@@ -74,8 +76,9 @@ function blocked(result: ReturnType<typeof evaluateGovernanceGate>): string {
 const ACCEPT = decision({ decisionKind: "proposal-accept", customerDecision: "accepted" });
 const ACCEPT_QUICK = decision({ decisionKind: "proposal-accept-quick", customerDecision: "accepted-quick" });
 const APPOINT_A = decision({
-  actorRoleId: "nominator",
-  power: "nomination",
+  // 2026-10-22 第 1 项：任命由 Convener 发起（power=schedule）；旧 Nominator 存量条目仍可读。
+  actorRoleId: "convener",
+  power: "schedule",
   decisionKind: "appointment",
   customerDecision: "appointed",
   targetRoleIds: ["A"],
@@ -140,8 +143,8 @@ test("write-role-card：最新任命含目标才放行；未含/无任命拒；�
   assert.equal(blocked(other), "appointment-required");
 
   const newerOnlyB = decision({
-    actorRoleId: "nominator",
-    power: "nomination",
+    actorRoleId: "convener",
+    power: "schedule",
     decisionKind: "appointment",
     customerDecision: "appointed",
     targetRoleIds: ["B"],
@@ -188,9 +191,57 @@ function dispatchInput(root: string, over: Partial<GovernanceGateInput> = {}): G
   });
 }
 
-test("dispatch 正例：提案接受 + 任命名单 + 流程步骤 + 未派发 → 放行", () => {
+/** 结构合格的实施前验收标准（O2 派发门槛用）。 */
+function acceptanceCriteriaText(flowId = "flow-a"): string {
+  return [
+    `# 验收完成标准：${flowId}`,
+    "",
+    "| ID | 标准 | 需要的证据 | 结果 |",
+    "| --- | --- | --- | --- |",
+    "| P1 | 示例标准 | 测试输出 | 待判定 |",
+    "",
+    "风险档位：T3（治理/权限变更）。",
+    "",
+    "判定规则：pass / fail / insufficient evidence / not applicable。",
+    "",
+    "证据计划：单测原始输出与全量回归记录。",
+    "",
+    "版本冻结：v1 写盘后冻结。",
+    "",
+  ].join("\n");
+}
+
+function writeAcceptanceCriteria(root: string, flowId = "flow-a", text = acceptanceCriteriaText(flowId)): void {
+  mkdirSync(join(root, "docs", "acceptance"), { recursive: true });
+  writeFileSync(join(root, "docs", "acceptance", `${flowId}-criteria-v1.md`), text, "utf8");
+}
+
+test("write-team-plan：Convener 在提案接受后放行；其他角色/缺 flowId 拒；旧 write-nomination 仍 legacy", () => {
+  const teamPlan = input({ roleId: "convener", action: "write-team-plan", flowId: "flow-a" });
+  assert.deepEqual(evaluateGovernanceGate(teamPlan, snapshot([ACCEPT])), { allowed: true });
+  assert.deepEqual(evaluateGovernanceGate(teamPlan, snapshot([ACCEPT_QUICK])), { allowed: true });
+  assert.equal(blocked(evaluateGovernanceGate(teamPlan, snapshot([]))), "proposal-not-accepted");
+  assert.equal(
+    blocked(evaluateGovernanceGate({ ...teamPlan, roleId: "nominator" }, snapshot([ACCEPT]))),
+    "wrong-role",
+  );
+  assert.equal(
+    blocked(evaluateGovernanceGate({ ...teamPlan, roleId: "rapporteur" }, snapshot([ACCEPT]))),
+    "wrong-role",
+  );
+  assert.equal(
+    blocked(evaluateGovernanceGate({ ...teamPlan, flowId: undefined }, snapshot([ACCEPT]))),
+    "missing-flow-id",
+  );
+  // legacy：提名文件仍由 Nominator 在提案接受后写（迁移兼容）。
+  const legacy = input({ roleId: "nominator", action: "write-nomination", flowId: "flow-a" });
+  assert.deepEqual(evaluateGovernanceGate(legacy, snapshot([ACCEPT])), { allowed: true });
+});
+
+test("dispatch 正例：提案接受 + 任命名单 + 标准存在 + 流程步骤 + 未派发 → 放行", () => {
   withRoot((root) => {
     writeFlow(root);
+    writeAcceptanceCriteria(root);
     const result = evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A]));
     assert.deepEqual(result, { allowed: true });
   });
@@ -233,6 +284,72 @@ test("dispatch：flowId/stepId 必填；提案未接受拒；目标不在任命�
   });
 });
 
+test("dispatch O2 门槛：已有 appointment 的 flow 缺标准/标准不合格拒；accept-quick 与旧流程显式豁免", () => {
+  withRoot((root) => {
+    writeFlow(root);
+    assert.equal(
+      blocked(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A]))),
+      "acceptance-criteria-missing",
+    );
+    writeAcceptanceCriteria(root, "flow-a", "# 只有标题\n");
+    assert.equal(
+      blocked(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A]))),
+      "acceptance-criteria-invalid",
+    );
+    writeAcceptanceCriteria(root);
+    assert.deepEqual(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A])), { allowed: true });
+  });
+
+  // accept-quick 快捷路径显式豁免（即便账本存在 appointment 决定）。
+  withRoot((root) => {
+    writeFlow(root);
+    mkdirSync(join(root, "角色卡", "A"), { recursive: true });
+    writeFileSync(join(root, "角色卡", "A", "role-card.md"), "# A\n");
+    assert.deepEqual(
+      evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT_QUICK, APPOINT_A])),
+      { allowed: true },
+    );
+  });
+
+  // 旧流程（无 appointment 决定）：标准门槛不适用；仍按既有任命门拒非快捷派发。
+  withRoot((root) => {
+    writeFlow(root);
+    mkdirSync(join(root, "角色卡", "A"), { recursive: true });
+    writeFileSync(join(root, "角色卡", "A", "role-card.md"), "# A\n");
+    assert.equal(
+      blocked(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT]))),
+      "appointment-required",
+      "无 appointment 的旧流程不得先报标准缺失（显式豁免）",
+    );
+  });
+});
+
+test("validateAcceptanceCriteriaText：flowId/验收表/档位/判定/证据计划/冻结缺一即不合格", () => {
+  const valid = acceptanceCriteriaText("flow-a");
+  assert.deepEqual(validateAcceptanceCriteriaText(valid, "flow-a"), { ok: true, issues: [] });
+  assert.equal(validateAcceptanceCriteriaText("", "flow-a").ok, false);
+  assert.deepEqual(validateAcceptanceCriteriaText(valid, "flow-b").ok, false, "flowId 不一致");
+
+  const withoutTable = valid.replace("| ID | 标准 | 需要的证据 | 结果 |", "| 编号 | 标准 | 需要的证据 | 结果 |");
+  assert.ok(validateAcceptanceCriteriaText(withoutTable, "flow-a").issues.some((issue) => issue.includes("验收表")));
+
+  const withoutTier = valid.replace("风险档位：T3", "档位：高");
+  assert.ok(validateAcceptanceCriteriaText(withoutTier, "flow-a").issues.some((issue) => issue.includes("风险档位")));
+
+  const withoutRules = valid.replace("判定规则：pass / fail / insufficient evidence / not applicable。", "判定规则：看情况。");
+  assert.ok(validateAcceptanceCriteriaText(withoutRules, "flow-a").issues.some((issue) => issue.includes("判定规则")));
+
+  const withoutEvidencePlan = valid
+    .replace("| ID | 标准 | 需要的证据 | 结果 |", "| ID | 标准 | 说明 | 结果 |")
+    .replace("证据计划：单测原始输出与全量回归记录。", "证据：略。");
+  assert.ok(validateAcceptanceCriteriaText(withoutEvidencePlan, "flow-a").issues.some((issue) => issue.includes("证据计划")));
+
+  const withoutFreeze = valid.replace("版本冻结：v1 写盘后冻结。", "后续可改。");
+  assert.ok(validateAcceptanceCriteriaText(withoutFreeze, "flow-a").issues.some((issue) => issue.includes("版本")));
+
+  assert.equal(acceptanceCriteriaRelPath("flow-a"), "docs/acceptance/flow-a-criteria-v1.md");
+});
+
 test("dispatch：快捷路径（accept-quick）可跳过任命复用既有项目角色；非既有角色仍拒", () => {
   withRoot((root) => {
     writeFlow(root);
@@ -252,6 +369,7 @@ test("dispatch：快捷路径（accept-quick）可跳过任命复用既有项目
 
 test("dispatch：流程文件/步骤缺失拒；同一 flowId+stepId 重复派发去重", () => {
   withRoot((root) => {
+    writeAcceptanceCriteria(root);
     // 没有 docs/flows/flow-a.md
     assert.equal(
       blocked(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A]))),

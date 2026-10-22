@@ -107,39 +107,108 @@ test("标准工作流：Draft / 提案——读意图→提案（架构/质量�
   );
 });
 
-test("标准工作流：Crew / 组队——读提案与流程→提名→任命卡→appointment-write 逐路径写卡→角色就绪；不自行任命", () => {
+test("标准工作流：Crew / 组队——读客户确认后的团队计划→appointment-write 逐路径写卡→应用结构校验→角色就绪；不提名/不发 appointment", () => {
   const t = cardTextOf("nominator");
   assertIncludesAll(
     t,
     [
-      "读提案与流程",
-      "提名",
-      "`recommended:` 推荐集",
-      "推荐集只列项目角色",
-      "模块—写区一一对应",
-      "禁止重叠",
-      "任命卡",
+      "读团队计划（客户确认后）",
+      "docs/scheduling/<flowId>-team-v1.md",
+      "你只读，不修改、不自行增删角色/边界/写集",
+      "任命名单内每个角色的职责目标、能力要求、唯一写集、依赖",
+      "计划缺能力细节时**停止写卡并报告 Steward / 统筹 补充**",
+      "只对任命名单内的角色发 `request_confirmation`",
       "appointment-write 逐路径写卡",
-      "不自行任命",
+      "第 5 项内容清单",
+      "写卡后交应用校验",
       "角色就绪",
-      "写卡全部完成后角色才就绪",
+      "写卡全部完成且应用结构校验通过后",
+      "不再选择角色、不再组建团队、不再写 `docs/nominations/**`、不再发 appointment 卡",
+      "不自行扩大职责",
     ],
     "Crew 标准工作流",
   );
+  // 2026-10-22 治理分工：旧「读提案→提名→任命卡」流程与推荐集口径必须从 Crew 卡消失。
+  assert.doesNotMatch(t, /1\. 读提案与流程/, "Crew 不再以提名流程起步");
+  assert.doesNotMatch(t, /2\. 提名：/, "Crew 不再写提名文件");
+  assert.doesNotMatch(t, /推荐集只列项目角色/, "推荐集口径已移交 Steward / 统筹");
 });
 
-test("标准工作流：Steward / 统筹——流程单→派发项目角色→收齐回交→登记完成→应用自动派 Proof；不派治理角色/不代替验收/不催办", () => {
+test("第 5 项内容清单（P7）：Crew 卡逐项列出 role-card 章节、boundary、工作文档与 api-spec not-applicable", () => {
+  const t = cardTextOf("nominator");
+  assertIncludesAll(
+    t,
+    [
+      "## 第 5 项内容清单（必须，按团队计划逐角色写齐）",
+      "角色名/组别/工作立场",
+      "能力描述",
+      "职责与功能导航",
+      "必读资料",
+      "交接输入输出",
+      "执行原则",
+      "质量职责",
+      "标准工作流（按序：输入→动作→交付→回交）",
+      "交付物清单",
+      "boundary.yaml",
+      "角色根工作文档条目",
+      "实际写集",
+      "feature-map.md",
+      "functional-description.md",
+      "memo.md",
+      "api-spec.md",
+      "not-applicable",
+      "非空、可核对理由",
+      "docs/feature/<feature-id>.md",
+      "docs/design/",
+      "docs/change/",
+      "docs/fix/",
+      "不创建空目录/空文件冒充交付",
+      "内容以团队计划的职责目标/能力要求/唯一写集/依赖为准",
+    ],
+    "Crew 第 5 项内容清单",
+  );
+  // 不得把「模板存在」当「能力描述已完成」：写卡完成仍须应用结构校验 + Steward readiness。
+  assert.doesNotMatch(t, /能力描述已完成/, "Crew 不得宣称能力描述已完成");
+});
+
+test("第 5 项 readiness（P8）：Steward 写 pass/gaps 记录，gap 退回 Crew，计划缺细节由 Steward 补充；不做成验收结论", () => {
+  const t = cardTextOf("convener");
+  assertIncludesAll(
+    t,
+    [
+      "role-readiness",
+      "status: pass|gaps",
+      "职责目标、能力要求、写集/边界、依赖/交接、质量责任",
+      "gap 报告应用退回 Crew 修正",
+      "团队计划缺能力细节时由你补充计划",
+      "readiness 不是验收标准、不是客户确认",
+      "pass 后才按 flow 步骤派发项目角色",
+    ],
+    "Steward readiness 纪律",
+  );
+});
+
+test("标准工作流：Steward / 统筹——写团队计划→发 appointment 卡→readiness→派发项目角色→收齐回交→登记完成→组变更包；应用自动派 Proof", () => {
   const t = cardTextOf("convener");
   assertIncludesAll(
     t,
     [
       "写流程单",
+      "判断团队",
+      "docs/scheduling/<flowId>-team-v1.md",
+      "`recommended: [role-a, role-b]`",
+      "`cardKind=appointment`",
+      "role-readiness",
+      "docs/scheduling/<flowId>-readiness-v1.md",
+      "变更包",
+      "docs/scheduling/<flowId>-change-v1.md",
+      "团队计划档位是下限",
       "派发项目角色",
       "收齐回交",
       "登记完成",
       "应用自动派 Proof",
       "Steward 不派发治理角色、不代替验收、不催办",
-      "只向已任命且已写卡的项目角色发起 `dispatch_task`",
+      "只向已任命、已写卡且 readiness pass 的项目角色发起 `dispatch_task`",
       "不把「已派发」写成「已完成」",
       "全部步骤齐备后",
     ],
@@ -451,7 +520,7 @@ test("标准工作流：流程工具——Steward 初始创建例外 + flow_get/
   }
   // 交付/回交后由步骤 owner 或 Steward 记录状态；三张卡各有落点。
   assert.match(cardTextOf("rapporteur"), /contract-freeze[\s\S]{0,160}flow_step_update/, "Draft 契约冻结后须用工具记录");
-  assert.match(cardTextOf("nominator"), /nomination \/ role-readiness[\s\S]{0,160}flow_step_update/, "Crew 角色就绪后须用工具记录");
+  assert.match(cardTextOf("nominator"), /role-cards[\s\S]{0,160}flow_step_update/, "Crew 完成写卡步骤后须用工具记录");
   assert.match(cardTextOf("verifier"), /不用 `flow_step_update` 代替客户验收决定/, "Proof 不得用工具代替验收决定");
 });
 
@@ -523,14 +592,22 @@ test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/f
   }
 });
 
-test("标准工作流：Proof / 验收——标准复核（真实跑测试/真实启动/演示/逐条核对）→验收卡；不依赖客户催办", () => {
+test("标准工作流：Proof / 验收——实施前写标准→核对档位/复用证据→核对真实启动演示→逐条核对→报告+验收卡；不依赖客户催办", () => {
   const t = cardTextOf("verifier");
   assertIncludesAll(
     t,
     [
       "标准复核不依赖客户催办",
       "读流程单/提案/契约/架构影响分析",
-      "用审批档 shell 真实跑测试",
+      "docs/acceptance/<flowId>-criteria-v1.md",
+      "风险档位 T0–T3",
+      "版本冻结规则",
+      "docs/scheduling/<flowId>-change-v1.md",
+      "同候选、同输入/依赖、同命令的证据可复用",
+      "只补缺失/失效/高风险检查",
+      "你只能升档、不能降档",
+      "用审批档 shell 亲自复跑",
+      "按团队计划产出的真实启动/演示证据",
       "真实启动应用并演示",
       "启动命令",
       "访问地址",
@@ -538,7 +615,11 @@ test("标准工作流：Proof / 验收——标准复核（真实跑测试/真�
       "逐条核对",
       "质量基线",
       "架构声明",
-      "发验收卡",
+      "docs/acceptance/<flowId>-report-v1.md",
+      "首行五项",
+      "报告档位不得低于变更包档位",
+      "insufficient evidence",
+      "写报告并发验收卡",
       "`cardKind=acceptance`",
       "`accept` / `reject`",
       "未真实运行、未演示时不得建议 accept",
@@ -548,6 +629,13 @@ test("标准工作流：Proof / 验收——标准复核（真实跑测试/真�
     ],
     "Proof 标准工作流",
   );
+  // 2026-10-22：证据来源改为实施/装配/测试角色产出、Verifier 核对并可复跑；不得弱化为只看报告。
+  assertIncludesAll(
+    t,
+    ["核对实施/装配/测试角色按团队计划产出的真实启动/演示证据", "缺失、失效或高风险时用审批档 shell 亲自复跑或要求补做"],
+    "Proof 证据来源与复跑",
+  );
+  assert.doesNotMatch(t, /不核对原始证据/, "Proof 不得放弃证据核对");
 });
 
 test("标准工作流：五卡保留既有 shell 审批档、质量基线、写区/禁写、判断代批与治理卡参数原文", () => {
@@ -577,27 +665,33 @@ test("标准工作流：五卡保留既有 shell 审批档、质量基线、写�
   }
 });
 
-test("标准工作流：不改变注册表权力/边界数据（Section 1、预授权、禁写与 shell 档保持原值）", () => {
+test("注册表：按 2026-10-22 治理分工只调整 Convener/Crew/Verifier 写权，其他角色与 shell 档不变", () => {
   const expectedEntries: Record<string, string[]> = {
     liaison: ["docs/intents/"],
     rapporteur: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
-    nominator: ["角色卡/", "docs/nominations/", "docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
-    convener: ["docs/flows/", "docs/workflow.md", "docs/governance/convener/"],
-    verifier: ["docs/verification/", "docs/governance/verifier/"],
+    nominator: ["角色卡/", "docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
+    convener: ["docs/flows/", "docs/workflow.md", "docs/scheduling/", "docs/governance/convener/"],
+    verifier: ["docs/acceptance/", "docs/verification/", "docs/governance/verifier/"],
   };
   const expectedPreauthorized: Record<string, string[]> = {
     liaison: ["docs/intents/"],
     rapporteur: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
-    nominator: ["docs/nominations/", "docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
-    convener: ["docs/flows/", "docs/governance/convener/"],
-    verifier: ["docs/verification/", "docs/governance/verifier/"],
+    nominator: ["docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
+    convener: ["docs/flows/", "docs/scheduling/", "docs/governance/convener/"],
+    verifier: ["docs/acceptance/", "docs/verification/", "docs/governance/verifier/"],
   };
   for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
-    assert.deepEqual(spec.entries.map((e) => e.path), expectedEntries[spec.id], `${spec.id} Section 1 不得变化`);
-    assert.deepEqual(spec.preauthorizedDirs, expectedPreauthorized[spec.id], `${spec.id} 预授权不得变化`);
+    assert.deepEqual(spec.entries.map((e) => e.path), expectedEntries[spec.id], `${spec.id} Section 1 须按本项调整`);
+    assert.deepEqual(spec.preauthorizedDirs, expectedPreauthorized[spec.id], `${spec.id} 预授权须按本项调整`);
     assert.equal(spec.capabilities.shell, "operator-approve", `${spec.id} shell 档不得变化`);
     for (const p of [".ans/", "docs/bootstrap-manifest.md", "角色卡/governance-boundary.yaml"]) {
       assert.ok(spec.forbiddenWritePaths.includes(p), `${spec.id} 禁写 ${p} 不得变化`);
     }
   }
+  // 关键禁区：不授予 Convener 角色卡写权；不授予 Crew docs/scheduling/ 写权。
+  assert.equal(BUILT_IN_GOVERNANCE_ROLES.find((s) => s.id === "convener")!.entries.some((e) => e.path === "角色卡/"), false);
+  assert.equal(BUILT_IN_GOVERNANCE_ROLES.find((s) => s.id === "nominator")!.entries.some((e) => e.path === "docs/scheduling/"), false);
+  assert.ok(BUILT_IN_GOVERNANCE_ROLES.find((s) => s.id === "nominator")!.forbiddenWritePaths.includes("docs/scheduling/"));
+  assert.equal(BUILT_IN_GOVERNANCE_ROLES.find((s) => s.id === "nominator")!.entries.some((e) => e.path === "docs/nominations/"), false);
+  assert.equal(BUILT_IN_GOVERNANCE_ROLES.find((s) => s.id === "nominator")!.preauthorizedDirs.includes("docs/nominations/"), false);
 });

@@ -119,6 +119,58 @@ function withBuiltIn(project: ProjectConfig, roleId: string): ProjectConfig {
   return { ...project, builtInRoles: [roleId] };
 }
 
+/** 团队计划（2026-10-22 第 1 项）：frontmatter 推荐集 + 角色行（Convener 任命卡守卫用）。 */
+function seedTeamPlan(root: string, recommended: readonly string[], flowId = "flow-a"): void {
+  const abs = join(root, "docs", "scheduling", `${flowId}-team-v1.md`);
+  mkdirSync(join(abs, ".."), { recursive: true });
+  writeFileSync(
+    abs,
+    [
+      "---",
+      `flowId: ${flowId}`,
+      "version: 1",
+      "status: draft",
+      "riskTier: T3",
+      `recommended: [${recommended.join(", ")}]`,
+      "---",
+      "",
+      `# 团队计划：${flowId}`,
+      "",
+      "| roleId | 类型 | 职责目标 | 能力要求 | 唯一写集 | 依赖 | 组别 | apiSpec |",
+      "| --- | --- | --- | --- | --- | --- | --- | --- |",
+      ...recommended.map((id) => `| ${id} | existing | 实现 ${id} | 具备 ${id} 能力 | src/${id}/ | 无 | 组 A | not-applicable |`),
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+}
+
+/** 结构合格的实施前验收标准（O2 派发门槛）。 */
+function seedAcceptanceCriteria(root: string, flowId = "flow-a"): void {
+  const abs = join(root, "docs", "acceptance", `${flowId}-criteria-v1.md`);
+  mkdirSync(join(abs, ".."), { recursive: true });
+  writeFileSync(
+    abs,
+    [
+      `# 验收完成标准：${flowId}`,
+      "",
+      "| ID | 标准 | 需要的证据 | 结果 |",
+      "| --- | --- | --- | --- |",
+      "| P1 | 示例标准 | 测试输出 | 待判定 |",
+      "",
+      "风险档位：T3（治理/权限变更）。",
+      "",
+      "判定规则：pass / fail / insufficient evidence / not applicable。",
+      "",
+      "证据计划：单测原始输出与全量回归记录。",
+      "",
+      "版本冻结：v1 写盘后冻结。",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+}
+
 /** 桩适配器：记录绑定的角色；立即 settled。 */
 function okAdapter(bound?: { roleId?: string }): RuntimeAdapter {
   return {
@@ -302,9 +354,9 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
     const expectations: Array<["liaison" | "proposal" | "nomination" | "schedule" | "verification", RegExp[]]> = [
       ["liaison", [/沟通权纪律（Lead \/ 主理/, /docs\/intents\//, /hand_off_intent/, /交接 ≠ 客户批准/, /intent-confirm/, /质量档位/, /原型档/]],
       ["proposal", [/提案权纪律（Draft \/ 提案/, /docs\/proposals\//, /cardKind=proposal/, /不拥有最终批准权/, /证据计划/, /工程质量基线/, /架构方案/, /架构影响分析/, /扩展点/, /模块分解与职责/]],
-      ["nomination", [/提名权纪律（Crew \/ 组队/, /docs\/nominations\//, /appointment/, /提名 ≠ 任命/]],
-      ["schedule", [/编排权纪律（Steward \/ 统筹/, /docs\/flows\//, /dispatch_task/, /flowId.*stepId/, /真实启动/, /演示/, /架构与边界/, /契约冻结/, /扩展点必须有覆盖步骤/]],
-      ["verification", [/验收权纪律（Proof \/ 验收/, /docs\/verification\//, /cardKind=acceptance/, /验收 ≠ 批准/, /未被真实启动.*不得建议 accept/, /架构核对/, /模块边界与依赖方向未被破坏/, /schema\/API 版本与/]],
+      ["nomination", [/组队\/写卡纪律（Crew \/ 组队/, /docs\/scheduling\//, /appointment-write/, /不再发任命卡/, /团队计划/]],
+      ["schedule", [/编排权纪律（Steward \/ 统筹/, /docs\/flows\//, /docs\/scheduling\//, /cardKind=appointment/, /dispatch_task/, /flowId.*stepId/, /真实启动/, /演示/, /架构与边界/, /契约冻结/, /扩展点必须有覆盖步骤/]],
+      ["verification", [/验收权纪律（Proof \/ 验收/, /docs\/acceptance\//, /docs\/verification\//, /cardKind=acceptance/, /验收 ≠ 批准/, /未被真实启动.*不得建议 accept/, /架构核对/, /模块边界与依赖方向未被破坏/, /schema\/API 版本与/, /风险档位/, /T0–T3/]],
     ];
     for (const [fn, patterns] of expectations) {
       const { captured, factory } = promptCapturing();
@@ -661,7 +713,7 @@ test("禁写：三人写 .ans/**、其他治理角色资料 → 拒绝且文案�
     try {
       const forbidden = captured.gate!("角色卡/rapporteur/role-card.md");
       assert.equal(forbidden.allowed, false);
-      assert.match((forbidden as { reason: string }).reason, /提名官 Nominator/);
+      assert.match((forbidden as { reason: string }).reason, /Crew（Nominator）/);
 
       const noAppointment = captured.gate!("角色卡/A/role-card.md");
       assert.equal(noAppointment.allowed, false);
@@ -745,9 +797,10 @@ test("customer.decision：提案卡 accept → 账本字段/证据齐全（Rappo
   });
 });
 
-test("customer.decision：任命卡多选 → targetRoleIds（Nominator）", async () => {
+test("customer.decision：任命卡多选 → targetRoleIds（Convener；power=schedule）", async () => {
   await withRoot(async (root) => {
-    const project = withBuiltIn(trioProject(root), "nominator");
+    seedTeamPlan(root, ["A", "B"]);
+    const project = withBuiltIn(trioProject(root), "convener");
     const script: ToolCall[] = [
       {
         name: "request_choice",
@@ -769,7 +822,7 @@ test("customer.decision：任命卡多选 → targetRoleIds（Nominator）", asy
       operatorId: "客户",
     });
     const handle = await openRoleSession(
-      { roleId: "nominator", project, customerInput, autoRepin: false },
+      { roleId: "convener", project, customerInput, autoRepin: false },
       {
         createAdapter: (gate, caps) =>
           createFakeRuntimeAdapter({ gate, script, projectRoot: root, customerInput: caps?.customerInput }),
@@ -788,7 +841,8 @@ test("customer.decision：任命卡多选 → targetRoleIds（Nominator）", asy
     assert.equal(entries[0].decisionKind, "appointment");
     assert.equal(entries[0].customerDecision, "appointed");
     assert.deepEqual(entries[0].targetRoleIds, ["A", "B"]);
-    assert.equal(entries[0].power, "nomination");
+    assert.equal(entries[0].actorRoleId, "convener");
+    assert.equal(entries[0].power, "schedule", "2026-10-22 第 1 项：appointment power=schedule");
   });
 });
 
@@ -822,6 +876,47 @@ test("customerInput 白名单：Rapporteur 发 appointment 卡 → 不弹卡、�
       await handle.dispose();
     }
     assert.equal(called, 0, "越权 cardKind 不得弹卡");
+    await flushGovernanceLedger(root);
+    const { entries } = await readGovernanceLedger(root);
+    assert.equal(entries.length, 0, "未向客户发卡 → 无客户决定");
+  });
+});
+
+test("customerInput 白名单（2026-10-22）：Crew（nominator）发 appointment 卡 → 不弹卡、不写账本", async () => {
+  await withRoot(async (root) => {
+    let called = 0;
+    const customerInput: CustomerInputFn = () => {
+      called += 1;
+      return { outcome: "answered", value: { selected: ["A"] } };
+    };
+    const captured = {} as Captured;
+    const handle = await openRoleSession(
+      {
+        roleId: "nominator",
+        project: withBuiltIn(trioProject(root), "nominator"),
+        customerInput,
+        autoRepin: false,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!(
+        {
+          kind: "choice",
+          title: "任命决定",
+          flowId: "flow-a",
+          cardKind: "appointment",
+          multiple: true,
+          options: [{ id: "A", label: "角色 A" }],
+        },
+        { toolCallId: "call-crew-appointment" },
+      );
+      assert.equal(out?.outcome, "declined");
+      assert.match((out as { reason?: string }).reason ?? "", /不允许 cardKind=appointment/);
+      assert.equal(called, 0, "Crew 发 appointment 不得弹卡");
+    } finally {
+      await handle.dispose();
+    }
     await flushGovernanceLedger(root);
     const { entries } = await readGovernanceLedger(root);
     assert.equal(entries.length, 0, "未向客户发卡 → 无客户决定");
@@ -1166,12 +1261,13 @@ test("派发门禁：提案接受 + 任命 + 步骤 + 未派发 → 放行到前
     );
     mkdirSync(join(root, "角色卡", "A"), { recursive: true });
     writeFileSync(join(root, "角色卡", "A", "role-card.md"), "# A\n");
+    seedAcceptanceCriteria(root);
     await appendGovernanceLedger(root, entry({ decisionKind: "proposal-accept", customerDecision: "accepted" }));
     await appendGovernanceLedger(
       root,
       entry({
-        actorRoleId: "nominator",
-        power: "nomination",
+        actorRoleId: "convener",
+        power: "schedule",
         decisionKind: "appointment",
         customerDecision: "appointed",
         targetRoleIds: ["A"],
@@ -1227,6 +1323,56 @@ test("派发门禁：提案接受 + 任命 + 步骤 + 未派发 → 放行到前
       await second.dispose();
     }
     assert.equal(dispatched, 1, "同一 flowId+stepId 重复派发应被门禁去重");
+  });
+});
+
+test("write-team-plan 路由（2026-10-22 第 1 项）：Convener 写团队计划需提案接受；其他角色被拒", async () => {
+  await withRoot(async (root) => {
+    const teamPlan = "docs/scheduling/flow-a-team-v1.md";
+
+    // 未接受提案 ⇒ 门禁拒（提案接受门）。
+    const before = {} as Captured;
+    const ch1 = await openRoleSession(
+      { roleId: "convener", project: withBuiltIn(trioProject(root), "convener"), customerInput: confirmAllow, autoRepin: false },
+      { createAdapter: capturingFactory(before) },
+    );
+    try {
+      const denied = before.gate!(teamPlan);
+      assert.equal(denied.allowed, false);
+      assert.match((denied as { reason: string }).reason, /提案/);
+    } finally {
+      await ch1.dispose();
+    }
+
+    await appendGovernanceLedger(root, entry({ decisionKind: "proposal-accept", customerDecision: "accepted" }));
+    await flushGovernanceLedger(root);
+
+    // Convener：路由 write-team-plan + 预授权写区 ⇒ 放行。
+    const after = {} as Captured;
+    const ch2 = await openRoleSession(
+      { roleId: "convener", project: withBuiltIn(trioProject(root), "convener"), customerInput: confirmAllow, autoRepin: false },
+      { createAdapter: capturingFactory(after) },
+    );
+    try {
+      assert.equal(after.gate!(teamPlan).allowed, true);
+      // 非团队计划命名的 scheduling 文件不路由 write-team-plan（普通 artifact 写，仍受边界约束）。
+      assert.equal(after.gate!("docs/scheduling/flow-a-readiness-v1.md").allowed, true);
+    } finally {
+      await ch2.dispose();
+    }
+
+    // Crew（nominator）：同一路径不是它的写区/动作 ⇒ 拒。
+    const crew = {} as Captured;
+    const ch3 = await openRoleSession(
+      { roleId: "nominator", project: withBuiltIn(trioProject(root), "nominator"), customerInput: confirmAllow, autoRepin: false },
+      { createAdapter: capturingFactory(crew) },
+    );
+    try {
+      const denied = crew.gate!(teamPlan);
+      assert.equal(denied.allowed, false);
+    } finally {
+      await ch3.dispose();
+    }
   });
 });
 

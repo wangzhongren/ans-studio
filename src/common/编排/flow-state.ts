@@ -26,9 +26,23 @@ export type FlowQualityTier = (typeof FLOW_QUALITY_TIERS)[number];
 /**
  * 步骤类型（决定完成证据种类；**不再按 stepId 前缀猜**）：
  *   · `dispatch`          应用派发给项目角色的执行步骤 → 账本 `dispatch.accepted`；
- *   · `customer-decision` 客户决定步骤（提名/任命/提案接受等） → 账本 `customer.decision`；
- *   · `artifact`          产物步骤（契约冻结/流程写入等） → 账本 `artifact.observed`；
+ *   · `customer-decision` 客户决定步骤（提案接受/任命等） → 账本 `customer.decision`；
+ *   · `artifact`          产物步骤（团队计划/契约冻结/流程写入/readiness/标准/报告/变更包等） → 账本 `artifact.observed`；
  *   · `acceptance`        验收步骤（保留 id `verification`/`acceptance`） → 账本 `customer.decision{decisionKind:"acceptance"}`。
+ *
+ * 2026-10-22 治理分工第 1/3/5 项（方案 §5.4）：**枚举不变**，新流程用 step id + 现有 kind 表达：
+ *   · `team-plan`（Convener，artifact；evidence.ref = `docs/scheduling/<flowId>-team-v1.md`）
+ *   · `appointment`（Convener，customer-decision；evidence.ref = `appointment`）
+ *   · `role-cards`（Crew/Nominator，dispatch；应用派发时写 `dispatch.accepted`）
+ *   · `role-readiness`（Convener，artifact；ref = `docs/scheduling/<flowId>-readiness-v1.md`）
+ *   · `acceptance-criteria`（Verifier，artifact；ref = `docs/acceptance/<flowId>-criteria-v1.md`）
+ *   · `change-package`（Convener，artifact；ref = `docs/scheduling/<flowId>-change-v1.md`）
+ *   · `verification-evidence`（产出角色，artifact；真实启动/演示证据路径）
+ *   · `verification`（保留验收步骤，kind acceptance）
+ *   · `delivery-*`（项目角色，dispatch）
+ * 旧版 Markdown 流程单的**词形映射**（桌面 `app/desktop/governance-advance.ts::flowStepEvidenceKind`）须同步：
+ * `team-plan*` → artifact（新增）；旧 `nomination*` → decision 保留（legacy）。readiness 在新约定下是 artifact；
+ * 该映射的实件属桌面窗口（阶段 D），本模块只登记约定，不复制第二份映射。
  */
 export const FLOW_STEP_KINDS = ["dispatch", "customer-decision", "artifact", "acceptance"] as const;
 export type FlowStepKind = (typeof FLOW_STEP_KINDS)[number];

@@ -2,12 +2,17 @@
 // 三道治理门禁（三权治理 V1，评审 §6.2）：**应用侧纯判定**，只读账本快照，不读 Markdown `status`。
 //
 // 三道门（逐条对应评审 §6.2）：
-//   1. 提案接受门：`write-flow` / `write-nomination` —— 该 flow 的最新提案类决定必须是
-//      `proposal-accept` / `proposal-accept-quick`；否则拒，文案指回「先在 Rapporteur 会话完成提案接受」。
+//   1. 提案接受门：`write-flow` / `write-team-plan` / legacy `write-nomination` —— 该 flow 的最新提案类
+//      决定必须是 `proposal-accept` / `proposal-accept-quick`；否则拒，文案指回「先在 Rapporteur 会话
+//      完成提案接受」。2026-10-22 治理分工第 1 项：团队计划（`docs/scheduling/<flowId>-team-vN.md`）
+//      由 Convener 写，走 `write-team-plan`；旧 `write-nomination`（Nominator）保留为 legacy。
 //   2. 任命写入门：`write-role-card` —— 该 flow 的最新任命决定（`decisionKind="appointment"`）的
 //      `targetRoleIds` 必须含目标角色；否则拒（「请先取得客户任命」）。
 //   3. 派发范围门：`dispatch` —— 目标不是内置治理角色、提案已接受、目标在任命名单内**或**快捷路径
 //      复用既有项目角色、`flowId`/`stepId` 必填且流程文件存在对应步骤、同一 `flowId+stepId` 未派发过。
+//      2026-10-22 验收第 3 项（O2，客户按推荐项）：已有 appointment 决定的 flow，派发项目角色前
+//      还要求 `docs/acceptance/<flowId>-criteria-v1.md` 存在且结构合格；`proposal-accept-quick`
+//      （快捷复用既有角色）与无 appointment 决定的旧流程显式豁免（见 `evaluateDispatchGate`）。
 //   4. 协调消息门：`coordinate`（2026-10-20 客户拍板「把主理 Lead 设为工作流管理者，可和所有职能角色
 //      沟通」）——仅 Liaison（Lead）→ Convener（Steward）；`flowId` 必填、`stepId` 可选；
 //      **不是**项目步骤派发，不要求提案接受/任命名单/流程步骤存在/未派发去重。
@@ -35,8 +40,14 @@ import type {
   GovernanceLedgerSnapshot,
 } from "./governance-ledger.ts";
 
-/** 门禁动作（评审 §6.2 + 2026-10-20 `coordinate`）。 */
-export type GovernanceGateAction = "write-flow" | "write-nomination" | "write-role-card" | "dispatch" | "coordinate";
+/** 门禁动作（评审 §6.2 + 2026-10-20 `coordinate` + 2026-10-22 `write-team-plan`）。 */
+export type GovernanceGateAction =
+  | "write-flow"
+  | "write-team-plan"
+  | "write-nomination"
+  | "write-role-card"
+  | "dispatch"
+  | "coordinate";
 
 /** 门禁输入（评审 §6.2 逐字形状）。 */
 export interface GovernanceGateInput {
@@ -83,6 +94,9 @@ const ACCEPTED_DECISION_KINDS: ReadonlySet<GovernanceDecisionKind> = new Set([
 /** 每个动作只允许的治理来源角色（防御性再校验；写入权限本身已由注册表边界收窄）。 */
 const ACTION_ROLE: Record<GovernanceGateAction, string> = {
   "write-flow": "convener",
+  // 2026-10-22 治理分工第 1 项：团队计划由 Convener（Steward/统筹）唯一撰写。
+  "write-team-plan": "convener",
+  // legacy：旧提名文件（`docs/nominations/**`）仍由 Crew（Nominator）写，迁移期兼容。
   "write-nomination": "nominator",
   "write-role-card": "nominator",
   dispatch: "convener",
@@ -119,6 +133,7 @@ export function evaluateGovernanceGate(
 
   switch (input.action) {
     case "write-flow":
+    case "write-team-plan":
     case "write-nomination":
       return evaluateProposalGate(input, snapshot);
     case "write-role-card":
@@ -197,6 +212,97 @@ export function parseFlowStepIds(text: string): string[] {
   return ids;
 }
 
+// —————————————————————— 验收标准前置门槛（O2，2026-10-22） ——————————————————————
+
+/** 实施前验收标准的约定路径（`docs/acceptance/<flowId>-criteria-v1.md`；方案 §7.1）。 */
+export function acceptanceCriteriaRelPath(flowId: string): string {
+  return `docs/acceptance/${flowId}-criteria-v1.md`;
+}
+
+export interface AcceptanceCriteriaCheck {
+  ok: boolean;
+  issues: string[];
+}
+
+/**
+ * 验收标准**结构门槛**（确定性；只看文本，不调模型）：
+ *   · flowId 可核对：frontmatter 给出 `flowId` 时必须与 flow 一致；正文必须出现该 flowId；
+ *   · 验收表：表头含 `ID` 列且有分隔行；
+ *   · 风险档位：提到「风险档位/riskTier」且出现 T0–T3 之一；
+ *   · 判定规则：同时出现 pass / fail / insufficient evidence（大小写不敏感）；
+ *   · 证据计划：出现「证据计划」或「需要的证据」；
+ *   · 版本/冻结：出现「版本」或「冻结」。
+ * 任一不满足 ⇒ 不合格（派发门禁拒，文案列出原因；不把「待补」当通过）。
+ */
+export function validateAcceptanceCriteriaText(text: string, flowId: string): AcceptanceCriteriaCheck {
+  const issues: string[] = [];
+  if (typeof text !== "string" || text.trim() === "") {
+    return { ok: false, issues: ["标准文件为空"] };
+  }
+  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
+  if (frontmatter !== null) {
+    const match = /^\s*flowId\s*:\s*(.+?)\s*$/m.exec(frontmatter[1]!);
+    if (match !== null) {
+      const value = match[1]!.trim().replace(/^["'`]|["'`]$/g, "");
+      if (value !== flowId) issues.push(`frontmatter flowId="${value}" 与流程 ${flowId} 不一致`);
+    }
+  }
+  if (!text.includes(flowId)) issues.push(`正文未出现 flowId「${flowId}」`);
+  if (!/\|\s*ID\s*\|/i.test(text) || !/^\s*\|?\s*:?-{2,}/m.test(text)) {
+    issues.push("缺少验收表（表头含 ID 列 + 分隔行）");
+  }
+  if (!/(风险档位|riskTier)/i.test(text) || !/\bT[0-3]\b/.test(text)) {
+    issues.push("缺少风险档位（T0–T3）");
+  }
+  if (!/insufficient\s+evidence/i.test(text) || !/\bpass\b/i.test(text) || !/\bfail\b/i.test(text)) {
+    issues.push("缺少判定规则（pass / fail / insufficient evidence）");
+  }
+  if (!/(证据计划|需要的证据)/.test(text)) issues.push("缺少证据计划");
+  if (!/(版本|冻结)/.test(text)) issues.push("缺少版本/冻结规则");
+  return issues.length === 0 ? { ok: true, issues: [] } : { ok: false, issues };
+}
+
+/**
+ * 实施派发前的验收标准门槛（O2）：
+ *   · 仅对**已有 appointment 决定**的 flow 生效（旧流程/无任命流程显式豁免）；
+ *   · 最新提案决定是 `proposal-accept-quick`（快捷复用既有角色）时显式豁免；
+ *   · 标准文件缺失/不可读 ⇒ `acceptance-criteria-missing`；结构不合格 ⇒ `acceptance-criteria-invalid`。
+ * 该门槛不改变派发权归属，只增加「先写标准」的机械前置。
+ */
+function evaluateAcceptanceCriteriaGate(
+  input: GovernanceGateInput,
+  snapshot: GovernanceLedgerSnapshot,
+): GovernanceGateDecision {
+  const flowId = input.flowId as string;
+  const appointment = latestDecision(snapshot, flowId, (entry) => entry.decisionKind === "appointment");
+  if (appointment === undefined) return { allowed: true };
+  const latestProposal = latestDecision(snapshot, flowId, (entry) =>
+    PROPOSAL_DECISION_KINDS.has(entry.decisionKind as GovernanceDecisionKind),
+  );
+  if (latestProposal?.decisionKind === "proposal-accept-quick") return { allowed: true };
+
+  const rel = acceptanceCriteriaRelPath(flowId);
+  let text: string;
+  try {
+    text = readFileSync(path.join(input.projectRoot, ...rel.split("/")), "utf8");
+  } catch {
+    return deny(
+      "acceptance-criteria-missing",
+      `治理门禁：流程 ${flowId} 已有客户任命，但实施前验收标准 ${rel} 不存在或不可读；` +
+        "请先由 Proof / 验收在实施派发前写出完成标准（含验收表、风险档位、判定规则、证据计划）。",
+    );
+  }
+  const check = validateAcceptanceCriteriaText(text, flowId);
+  if (!check.ok) {
+    return deny(
+      "acceptance-criteria-invalid",
+      `治理门禁：实施前验收标准 ${rel} 结构不合格（${check.issues.join("；")}）；` +
+        "请补齐后重新派发（不把「标准待补」当通过）。",
+    );
+  }
+  return { allowed: true };
+}
+
 // —————————————————————— 各门 ——————————————————————
 
 /** 提案接受门：最新提案类决定必须为 accept / accept-quick。 */
@@ -205,7 +311,7 @@ function evaluateProposalGate(
   snapshot: GovernanceLedgerSnapshot,
 ): GovernanceGateDecision {
   if (!isSlug(input.flowId)) {
-    return deny("missing-flow-id", `治理门禁：写流程/提名必须带合法 flowId（\`${GOVERNANCE_SLUG_PATTERN}\`）。`);
+    return deny("missing-flow-id", `治理门禁：写流程/团队计划必须带合法 flowId（\`${GOVERNANCE_SLUG_PATTERN}\`）。`);
   }
   const latest = latestDecision(snapshot, input.flowId, (entry) =>
     PROPOSAL_DECISION_KINDS.has(entry.decisionKind as GovernanceDecisionKind),
@@ -240,7 +346,7 @@ function evaluateRoleCardGate(
     return deny(
       "appointment-required",
       `治理门禁：角色 ${target} 尚未取得客户任命${input.flowId ? `（流程 ${input.flowId}）` : ""}；` +
-        "请先由 Nominator 发起任命卡并把该角色列入客户选择。",
+        "请先由 Convener（Steward/统筹）依团队计划发起任命卡并把该角色列入客户选择。",
     );
   }
   return { allowed: true };
@@ -286,7 +392,7 @@ function evaluateDispatchGate(
       return deny(
         "appointment-required",
         `治理门禁：目标 ${target} 不在流程 ${input.flowId} 的客户任命名单内；` +
-          "请先由 Nominator 取得任命（或由客户选择 accept-quick 复用既有角色）。",
+          "请先由 Convener（Steward/统筹）依团队计划取得客户任命（或由客户选择 accept-quick 复用既有角色）。",
       );
     }
     if (!isExistingProjectRole(input.projectRoot, target)) {
@@ -298,7 +404,12 @@ function evaluateDispatchGate(
     }
   }
 
-  // 4) 流程文件中存在对应步骤（只判存在，不读 status）。
+  // 4) 实施前验收标准门槛（O2，2026-10-22）：已有 appointment 决定的 flow 必须先写标准；
+  //    最新提案为 accept-quick（快捷复用既有角色）或旧流程（无 appointment）显式豁免。
+  const criteria = evaluateAcceptanceCriteriaGate(input, snapshot);
+  if (!criteria.allowed) return criteria;
+
+  // 5) 流程文件中存在对应步骤（只判存在，不读 status）。
   if (!flowStepExists(input.projectRoot, input.flowId, input.stepId)) {
     return deny(
       "flow-step-missing",
@@ -307,7 +418,7 @@ function evaluateDispatchGate(
     );
   }
 
-  // 5) 同一 flowId+stepId 未被派发过。
+  // 6) 同一 flowId+stepId 未被派发过。
   const dispatched = snapshot.entries.some(
     (entry) =>
       entry.kind === "dispatch.accepted" &&

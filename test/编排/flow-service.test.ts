@@ -738,6 +738,73 @@ test("observeFlowArtifacts：.js/README/契约补记 artifact.observed；owner/p
   });
 });
 
+test("observeFlowArtifacts（2026-10-22）：团队计划/标准/变更包作为普通 artifact 可观察；不观察 角色卡/", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, [
+      "flowId: flow-a",
+      "version: 1",
+      "qualityTier: production",
+      "steps:",
+      "  - id: team-plan",
+      "    title: 团队计划",
+      "    owner: convener",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: docs/scheduling/flow-a-team-v1.md }",
+      "  - id: role-readiness",
+      "    title: 角色就绪复核",
+      "    owner: convener",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: docs/scheduling/flow-a-readiness-v1.md }",
+      "  - id: acceptance-criteria",
+      "    title: 实施前完成标准",
+      "    owner: verifier",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: docs/acceptance/flow-a-criteria-v1.md }",
+      "  - id: change-package",
+      "    title: 变更包",
+      "    owner: convener",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: docs/scheduling/flow-a-change-v1.md }",
+      "  - id: verification",
+      "    title: 验收",
+      "    owner: verifier",
+      "    kind: acceptance",
+      "    status: pending",
+      "",
+    ].join("\n"));
+    writeFile(root, "docs/scheduling/flow-a-team-v1.md", "# 团队计划\n");
+    writeFile(root, "docs/scheduling/flow-a-readiness-v1.md", "# readiness\n");
+    writeFile(root, "docs/acceptance/flow-a-criteria-v1.md", "# 标准\n");
+    writeFile(root, "docs/scheduling/flow-a-change-v1.md", "# 变更包\n");
+    // 角色卡/ 永不观察（即使 flow 步骤指向它）。
+    writeFile(root, "角色卡/A/role-card.md", "# A\n");
+
+    const result = await observeFlowArtifacts({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(result.ok, true, result.error ?? "");
+    assert.deepEqual(result.observed.sort(), [
+      "docs/acceptance/flow-a-criteria-v1.md",
+      "docs/scheduling/flow-a-change-v1.md",
+      "docs/scheduling/flow-a-readiness-v1.md",
+      "docs/scheduling/flow-a-team-v1.md",
+    ]);
+    const ledger = await readGovernanceLedger(root);
+    const byPath = new Map(
+      ledger.entries
+        .filter((entry) => entry.kind === "artifact.observed")
+        .map((entry) => [entry.artifactPath, entry]),
+    );
+    assert.equal(byPath.get("docs/scheduling/flow-a-team-v1.md")?.power, "schedule");
+    assert.equal(byPath.get("docs/scheduling/flow-a-readiness-v1.md")?.power, "schedule");
+    assert.equal(byPath.get("docs/acceptance/flow-a-criteria-v1.md")?.power, "verification");
+    assert.equal(byPath.get("docs/scheduling/flow-a-change-v1.md")?.power, "schedule");
+    assert.equal(byPath.has("角色卡/A/role-card.md"), false, "不观察 角色卡/");
+  });
+});
+
 test("observeFlowArtifacts：缺失/超限/二进制/路径越界 ⇒ skipped；不写客户决定", async () => {
   await withRoot(async (root) => {
     writeFile(root, FLOW_REL, [

@@ -26,6 +26,12 @@
 | `test-driver.ts` | `window.__ansRenderer` 21 个方法/状态字段（e2e 唯一驱动面） |
 | `shell/*` + `stores/*` | App/标题栏/左树/会话头/输入区/抽屉/设置/治理面板/work-overview；`lib/platform.ts` 是 `window.desktop` 唯一入口 |
 
+### appointment 文案（2026-10-22 治理拆分，现行）
+
+- `chat/governance-view.ts`：`GOVERNANCE_CARD_POWER.appointment = "任命"`、`GOVERNANCE_CARD_POWER["appointment-write"] = "任命写卡"`（旧值「提名」）；`GOVERNANCE_ROLE_HINT.nomination = "客户任命后打开写卡；只按团队计划与任命名单写角色卡与边界，不选择角色、不批准。"`（旧值以「通常由流程单提名步骤打开」开头）。
+- `chat/role-view.ts`：`governanceFunction="nomination"` 副标题为 `写卡权（客户任命后） · 不拥有最终批准权`（旧「提名权」）；显示名 `Crew / 组队` 与内部 id/`GovernanceFunction` 值不变。
+- 仅文案变化：渲染逻辑、DOM 结构与交互行为未变；下文历史段中的旧文案记录不再现行。
+
 ## 对外依赖（只读消费）
 
 - `window.desktop`：preload 白名单通道 + 主→渲染事件（`session:events`/`session:role-state`/`session:history`/`project:changed` 等）——**定义与实现属「桌面窗口」**（其 api-spec.md 为契约单一来源；通道增改由桌面窗口维护并同步本侧）。

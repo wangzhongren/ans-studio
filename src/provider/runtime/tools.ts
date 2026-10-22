@@ -215,6 +215,8 @@ const GOVERNANCE_SLUG = new RegExp(GOVERNANCE_SLUG_PATTERN);
 // 2026-10-18：`intent-confirm`（客户需求确认卡，主理在 hand_off_intent 前发出）加入 choice 白名单。
 // 2026-10-20 客户拍板「勾了替我决策就不用我管」：它进入 `GOVERNANCE_CARD_GROUP` 的 decision 组——
 // 判断 agent 可代批 `confirm`；`revise` 仍交回客户/发起角色（不替客户修改）。
+// 2026-10-22 治理分工第 1 项：`appointment` 语义改为「任命」（由 Convener 依客户确认的团队计划发起；
+// Crew 收到任命后才写卡）。角色→允许卡种的映射由编排判定（本层不硬编码角色 id）；白名单形状不变、不新增卡种。
 const CHOICE_CARD_KINDS: readonly GovernanceChoiceCardKind[] = ["proposal", "appointment", "acceptance", "intent-confirm"];
 const CONFIRM_CARD_KINDS: readonly GovernanceConfirmCardKind[] = ["write", "appointment-write", "schedule-write"];
 

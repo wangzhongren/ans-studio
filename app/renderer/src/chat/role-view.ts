@@ -26,7 +26,7 @@ const GOVERNANCE: Record<string, GovernanceView> = {
   },
   nomination: {
     name: "Crew / 组队",
-    power: "提名权 · 不拥有最终批准权",
+    power: "写卡权（客户任命后） · 不拥有最终批准权",
     builtinNote: "内置角色：随应用发布，无角色目录",
   },
   schedule: {

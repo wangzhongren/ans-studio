@@ -274,6 +274,10 @@ test("验收证据模型：步骤类型映射表显式可测（产物 / 客户�
   for (const id of ["contract-freeze", "contract-freeze-v2", "proposal-v1", "flow-write", "schedule-update"]) {
     assert.equal(flowStepEvidenceKind(id), "artifact", `${id} 应为产物型`);
   }
+  // 2026-10-22 第 1 项（方案 §5.6）：团队计划是产物型。
+  for (const id of ["team-plan", "team-plan-v1"]) {
+    assert.equal(flowStepEvidenceKind(id), "artifact", `${id} 应为产物型`);
+  }
   for (const id of ["nomination", "nominations-v1", "role-readiness", "roles-ready", "role-ready"]) {
     assert.equal(flowStepEvidenceKind(id), "decision", `${id} 应为客户决定型`);
   }
@@ -509,7 +513,10 @@ test("自动验收（导入补齐）：门通过 ⇒ 自动派 Proof 一条复�
       assert.match(sends[0]!, /模块边界/);
       assert.match(sends[0]!, /依赖方向/);
       assert.match(sends[0]!, /扩展点/);
-      assert.match(sends[0]!, new RegExp(`docs/verification/${flowId}-v1\\.md`));
+      // 2026-10-22 第 3 项：报告进 docs/acceptance/，详细证据附件留在 docs/verification/。
+      assert.match(sends[0]!, new RegExp(`docs/acceptance/${flowId}-report-v1\\.md`));
+      assert.match(sends[0]!, /docs\/verification\//);
+      assert.match(sends[0]!, /首行五项/);
 
       // 可见性：Lead（主入口）系统行说明「自动派发」，不冒充客户批准；客户决定不再发 Convener。
       const notes = deliveryNotes(harness.events, "liaison");
@@ -1272,7 +1279,8 @@ test("2026-10-20 verifier settle ⇒ Lead 系统行含报告路径（同 flow+�
     const harness = await makeHarness(root, listing);
     try {
       await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0);
-      const reportRel = `docs/verification/${flowId}-v1.md`;
+      // 2026-10-22 第 3 项：验收报告在 docs/acceptance/<flow>-report-v1.md（附件仍在 docs/verification/）。
+      const reportRel = `docs/acceptance/${flowId}-report-v1.md`;
       const reportAbs = path.join(root, reportRel);
       mkdirSync(path.dirname(reportAbs), { recursive: true });
       writeFileSync(reportAbs, "# 验收复核\n\n结论：未给出（示例报告）。\n", "utf8");
@@ -1281,7 +1289,8 @@ test("2026-10-20 verifier settle ⇒ Lead 系统行含报告路径（同 flow+�
       harness.controls.get("verifier")!.settle();
       await waitFor(() => proofNotes().length > 0);
       assert.equal(proofNotes().length, 1, "verifier settle ⇒ Lead 恰一条复核结束系统行");
-      assert.ok(proofNotes()[0]!.includes(reportRel), "含报告路径 docs/verification/<flow>-v1.md");
+      assert.ok(proofNotes()[0]!.includes(reportRel), "含报告路径 docs/acceptance/<flow>-report-v1.md");
+      assert.ok(proofNotes()[0]!.includes("docs/verification/"), "附件提示指向 docs/verification/");
       assert.ok(proofNotes()[0]!.includes(`docs/governance/verifier/${flowId}.md`), "含治理工作记录路径");
       assert.ok(!/通过|不通过|已批准|客户同意/.test(proofNotes()[0]!), "不伪造结论、不把报告当客户批准");
       // 同 flow+报告版本：再 settle 不刷屏。
@@ -1909,6 +1918,239 @@ test("2026-10-20 artifact 补登（真实编排出口）：文件存在但账本
         1,
         "同 path+sha 幂等跳过（不重复追加）",
       );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————— 2026-10-22 第 3 项：新契约流程的实施前标准 / 变更包门槛（方案 §7.2/§7.3/§7.6） ——————
+//
+// 新流程（flow YAML 含 team-plan/role-cards/role-readiness/acceptance-criteria/change-package）在派验收判定前
+// 必须有结构合格的实施前标准与变更包（riskTier）；标准缺失时应用先派 Verifier 写标准（stepId=acceptance-criteria），
+// 不把「待补」当通过；legacy 流程（无新 step id）保持原行为。
+
+function writeNewContractEvidenceFiles(
+  root: string,
+  flowId: string,
+  options: { criteria?: boolean; change?: "none" | "no-risk" | "T2" | "T3" } = {},
+): void {
+  const scheduling = path.join(root, "docs", "scheduling");
+  mkdirSync(scheduling, { recursive: true });
+  writeFileSync(
+    path.join(scheduling, `${flowId}-team-v1.md`),
+    [`---`, `flowId: ${flowId}`, `version: 1`, `riskTier: T1`, `recommended: [executor]`, `---`, ``, `# 团队计划`, ``].join("\n"),
+  );
+  writeFileSync(path.join(scheduling, `${flowId}-readiness-v1.md`), `---\nflowId: ${flowId}\nversion: 1\nstatus: pass\n---\n# 就绪\n`);
+  if (options.criteria === true) {
+    const acceptance = path.join(root, "docs", "acceptance");
+    mkdirSync(acceptance, { recursive: true });
+    writeFileSync(
+      path.join(acceptance, `${flowId}-criteria-v1.md`),
+      [
+        "---",
+        `flowId: ${flowId}`,
+        "version: 1",
+        "riskTier: T2",
+        "---",
+        `# 验收标准：${flowId}`,
+        "| ID | 标准 | 需要的证据 |",
+        "| --- | --- | --- |",
+        "| P1 | 交付 | 测试输出 |",
+        `风险档位：T2（${flowId}）。判定规则：pass / fail / insufficient evidence。证据计划：单测。版本：v1 冻结。`,
+        "",
+      ].join("\n"),
+    );
+  }
+  if (options.change !== undefined && options.change !== "none") {
+    writeFileSync(
+      path.join(scheduling, `${flowId}-change-v1.md`),
+      [
+        "---",
+        `flowId: ${flowId}`,
+        "version: 1",
+        ...(options.change === "no-risk" ? [] : [`riskTier: ${options.change}`]),
+        "candidate: abc123",
+        "---",
+        `# 变更包：${flowId}`,
+        "",
+      ].join("\n"),
+    );
+  }
+}
+
+function newContractSteps(flowId: string, options: { criteria: boolean; change: boolean }): FlowYamlStepInput[] {
+  return [
+    {
+      id: "team-plan",
+      kind: "artifact",
+      status: "done",
+      owner: "convener",
+      evidence: { kind: "artifact", ref: `docs/scheduling/${flowId}-team-v1.md` },
+    },
+    {
+      id: "appointment",
+      kind: "customer-decision",
+      status: "done",
+      owner: "convener",
+      evidence: { kind: "customer-decision", ref: "appointment" },
+    },
+    { id: "role-cards", kind: "dispatch", status: "done", owner: "nominator", evidence: { kind: "dispatch", ref: "role-cards" } },
+    {
+      id: "role-readiness",
+      kind: "artifact",
+      status: "done",
+      owner: "convener",
+      evidence: { kind: "artifact", ref: `docs/scheduling/${flowId}-readiness-v1.md` },
+    },
+    ...(options.criteria
+      ? [{
+          id: "acceptance-criteria",
+          kind: "artifact",
+          status: "done",
+          owner: "verifier",
+          evidence: { kind: "artifact" as const, ref: `docs/acceptance/${flowId}-criteria-v1.md` },
+        }]
+      : []),
+    { id: "delivery-server", kind: "dispatch", status: "done", owner: "executor", evidence: { kind: "dispatch", ref: "delivery-server" } },
+    ...(options.change
+      ? [{
+          id: "change-package",
+          kind: "artifact",
+          status: "done",
+          owner: "convener",
+          evidence: { kind: "artifact" as const, ref: `docs/scheduling/${flowId}-change-v1.md` },
+        }]
+      : []),
+    { id: "verification", kind: "acceptance", status: "pending", owner: "app" },
+  ];
+}
+
+async function appendNewContractLedger(
+  root: string,
+  flowId: string,
+  options: { criteria: boolean; change: boolean },
+): Promise<void> {
+  await appendLedger(root, [
+    {
+      kind: "customer.decision",
+      flowId,
+      stepId: "appointment",
+      decisionKind: "appointment",
+      customerDecision: "appointed",
+      actorRoleId: "convener",
+      power: "schedule",
+      targetRoleIds: ["executor"],
+    },
+    { kind: "artifact.observed", artifactPath: `docs/scheduling/${flowId}-team-v1.md`, actorRoleId: "convener", power: "schedule" },
+    { kind: "dispatch.accepted", flowId, stepId: "role-cards", actorRoleId: "app", power: "app", targetRoleId: "nominator" },
+    { kind: "artifact.observed", artifactPath: `docs/scheduling/${flowId}-readiness-v1.md`, actorRoleId: "convener", power: "schedule" },
+    { kind: "dispatch.accepted", flowId, stepId: "delivery-server", actorRoleId: "convener", power: "schedule", targetRoleId: "executor" },
+    ...(options.criteria
+      ? [{ kind: "artifact.observed" as const, artifactPath: `docs/acceptance/${flowId}-criteria-v1.md`, actorRoleId: "verifier", power: "verification" as const }]
+      : []),
+    ...(options.change
+      ? [{ kind: "artifact.observed" as const, artifactPath: `docs/scheduling/${flowId}-change-v1.md`, actorRoleId: "convener", power: "schedule" as const }]
+      : []),
+  ]);
+}
+
+async function criteriaDispatches(projectRoot: string, flowId: string): Promise<GovernanceLedgerEntry[]> {
+  const ledger = await readGovernanceLedger(projectRoot);
+  return ledger.entries.filter(
+    (entry) =>
+      entry.kind === "dispatch.accepted" &&
+      entry.flowId === flowId &&
+      entry.targetRoleId === "verifier" &&
+      entry.stepId === "acceptance-criteria",
+  );
+}
+
+test("2026-10-22 第 3 项：新契约流程标准缺失 ⇒ 派 Verifier 写标准（acceptance-criteria）并阻塞判定；补齐标准+变更包后放行判定（带档位/报告路径）", async () => {
+  const root = makeTempProjectRoot("ans-new-contract-criteria-");
+  const flowId = "flow-new-gate";
+  try {
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractSteps(flowId, { criteria: false, change: false })));
+    writeNewContractEvidenceFiles(root, flowId, { criteria: false, change: "none" });
+    await appendNewContractLedger(root, flowId, { criteria: false, change: false });
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0);
+      const criteriaMessage = harness.sendsByRole.get("verifier")![0]!;
+      assert.match(criteriaMessage, /实施前完成标准/);
+      assert.match(criteriaMessage, new RegExp(`docs/acceptance/${flowId}-criteria-v1\\.md`));
+      assert.match(criteriaMessage, /不要发验收卡/);
+      await waitForAsync(async () => (await criteriaDispatches(root, flowId)).length > 0);
+      assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "判定未派（只有写标准任务）");
+      assert.equal((await verifierDispatches(root, flowId)).length, 0, "标准缺失：不派验收判定");
+      assert.ok(
+        deliveryNotes(harness.events, "liaison").some((note) => note.includes("实施前验收标准缺失")),
+        "Lead 可见阻塞原因",
+      );
+
+      // 重复 settle：标准任务不重复派（账本/运行期去重）。
+      await harness.iface.openSession({ projectRoot: root, roleId: "executor", runtime: "demo" });
+      harness.controls.get("executor")!.settle();
+      await sleep(300);
+      assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "同流程不重复派标准任务");
+      // Verifier 写完标准（本轮结束）：让排队中的后续任务可投出。
+      harness.controls.get("verifier")?.settle();
+      await sleep(100);
+
+      // 补齐标准 + 变更包 + 更新 flow 证据（criteria/change 步骤 done）。
+      writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "T3" });
+      writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractSteps(flowId, { criteria: true, change: true })));
+      await appendNewContractLedger(root, flowId, { criteria: true, change: true });
+      harness.controls.get("executor")!.settle();
+      // 判定派发：Verifier 会话可能已被释放后重建（sendsByRole 会被新会话数组替换）——以账本为准等判定派发。
+      await waitForAsync(async () => (await verifierDispatches(root, flowId)).length > 0, 5000);
+      harness.controls.get("verifier")?.settle();
+      await sleep(200);
+      const verifierSends = harness.sendsByRole.get("verifier") ?? [];
+      const judgeMessage = verifierSends[verifierSends.length - 1]!;
+      assert.match(judgeMessage, /当前档位：T3/, "判定任务带变更包风险档位");
+      assert.match(judgeMessage, new RegExp(`docs/acceptance/${flowId}-report-v1\\.md`), "报告路径进 docs/acceptance");
+      assert.equal((await verifierDispatches(root, flowId)).length, 1, "判定派发恰一次（stepId=verification）");
+      assert.equal((await criteriaDispatches(root, flowId)).length, 1, "标准任务恰一次（stepId=acceptance-criteria）");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-22 第 3 项：新契约流程变更包缺失/缺 riskTier ⇒ 不派判定 + Lead 系统行；补齐后判定任务带档位", async () => {
+  const root = makeTempProjectRoot("ans-new-contract-change-");
+  const flowId = "flow-new-change";
+  try {
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractSteps(flowId, { criteria: true, change: false })));
+    writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "none" });
+    await appendNewContractLedger(root, flowId, { criteria: true, change: false });
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes("变更包缺失")));
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "变更包缺失：不派验收判定");
+      assert.equal((await verifierDispatches(root, flowId)).length, 0);
+
+      // 无 riskTier 的变更包：仍不派，原因如实更新。
+      writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "no-risk" });
+      await harness.iface.openSession({ projectRoot: root, roleId: "executor", runtime: "demo" });
+      harness.controls.get("executor")!.settle();
+      await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes("缺少 riskTier")));
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "缺 riskTier：不派判定");
+
+      // 补齐 riskTier=T2：放行判定，任务带档位。
+      writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "T2" });
+      harness.controls.get("executor")!.settle();
+      await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0, 5000);
+      assert.match(harness.sendsByRole.get("verifier")![0]!, /当前档位：T2/);
+      await waitForAsync(async () => (await verifierDispatches(root, flowId)).length > 0);
+      assert.equal((await verifierDispatches(root, flowId)).length, 1);
     } finally {
       await harness.iface.stopSession();
     }

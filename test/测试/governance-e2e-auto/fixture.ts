@@ -63,6 +63,12 @@ import type { GovernanceAdvanceResult } from "../../../app/desktop/governance-ad
 export const FLOW = "flow-a";
 export const PROPOSAL_REL = `docs/proposals/${FLOW}-v1.md`;
 export const NOMINATION_REL = `docs/nominations/${FLOW}-v1.md`;
+// 2026-10-22 治理分工第 1/3 项：团队计划（Convener 写）、验收标准/报告、变更包、readiness。
+export const TEAM_PLAN_REL = `docs/scheduling/${FLOW}-team-v1.md`;
+export const READINESS_REL = `docs/scheduling/${FLOW}-readiness-v1.md`;
+export const CHANGE_PACKAGE_REL = `docs/scheduling/${FLOW}-change-v1.md`;
+export const CRITERIA_REL = `docs/acceptance/${FLOW}-criteria-v1.md`;
+export const REPORT_REL = `docs/acceptance/${FLOW}-report-v1.md`;
 // 2026-10-19 Flow YAML 契约（客户「这些全部改成yaml」）：`docs/flows/<flowId>.yaml` 是唯一机器状态；
 // 同名 `.md` 仅人读视图，产品门禁不再解析它做判定。
 export const FLOW_REL = `docs/flows/${FLOW}.yaml`;
@@ -233,6 +239,216 @@ export function flowDoc(flowId = FLOW, steps: FlowDocStep[] = [{ id: "impl", sta
     }
   }
   return lines.join("\n") + "\n";
+}
+
+/**
+ * 团队计划（2026-10-22 第 1 项；Convener 唯一作者）：frontmatter flowId/version/riskTier +
+ * 内联 `recommended` 数组 + 角色表（roleId / 类型 / 职责目标 / 能力要求 / 唯一写集 / 依赖 / 组别 / apiSpec）。
+ * 卡前守卫与桌面写卡校验都按此确定性形状解析。
+ */
+export function teamPlanDoc(
+  flowId = FLOW,
+  recommended: readonly string[] = ["executor"],
+  options: {
+    version?: number;
+    riskTier?: string;
+    frontmatterFlowId?: string;
+    /** 省略 recommended（空推荐集负例）。 */
+    omitRecommended?: boolean;
+    /** 覆盖某个推荐角色的「职责目标」等单元格（缺项负例）。 */
+    rowOverrides?: Record<string, Partial<Record<"type" | "duty" | "ability" | "writes" | "deps", string>>>;
+    /** 额外角色行（如内置角色负例）。 */
+    extraRows?: Array<{ roleId: string; type?: string; duty?: string; ability?: string; writes?: string; deps?: string }>;
+  } = {},
+): string {
+  const version = options.version ?? 1;
+  const riskTier = options.riskTier ?? "T1";
+  const lines = [
+    "---",
+    `flowId: ${options.frontmatterFlowId ?? flowId}`,
+    `version: ${version}`,
+    `riskTier: ${riskTier}`,
+    ...(options.omitRecommended === true ? [] : [`recommended: [${recommended.join(", ")}]`]),
+    "---",
+    "",
+    `# 团队计划 ${flowId} v${version}`,
+    "",
+    "| roleId | 类型 | 职责目标 | 能力要求 | 唯一写集 | 依赖 | 组别 | apiSpec |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+  ];
+  for (const roleId of recommended) {
+    const over = options.rowOverrides?.[roleId] ?? {};
+    lines.push(
+      `| ${roleId} | ${over.type ?? "new"} | ${over.duty ?? "实现本角色的系统功能"} | ${over.ability ?? "能读写代码并交付测试"} | ${over.writes ?? `src/owned-${roleId}/`} | ${over.deps ?? "无"} | 开发 | not-applicable |`,
+    );
+  }
+  for (const row of options.extraRows ?? []) {
+    lines.push(
+      `| ${row.roleId} | ${row.type ?? "new"} | ${row.duty ?? "实现"} | ${row.ability ?? "能力"} | ${row.writes ?? "src/"} | ${row.deps ?? "无"} | 开发 | not-applicable |`,
+    );
+  }
+  return lines.join("\n") + "\n";
+}
+
+/** 新流程 role-card：第 5 项必填章节（等价标题即可）齐全。 */
+export function roleCardDoc(roleId = "executor"): string {
+  return [
+    `# 角色：${roleId}`,
+    "",
+    "## 组别",
+    "开发。",
+    "",
+    "## 能力描述",
+    "按团队计划实现并验证本角色负责的功能。",
+    "",
+    "## 工作立场",
+    "对本角色交付长期负责。",
+    "",
+    "## 系统功能导航",
+    "见 feature-map.md。",
+    "",
+    "## 必读资料",
+    "团队计划、提案与边界。",
+    "",
+    "## 交接输入输出",
+    "输入：团队计划与任命名单；输出：实现与测试证据。",
+    "",
+    "## 执行原则",
+    "只写计划内写集。",
+    "",
+    "## 质量职责",
+    "交付需可复现验证。",
+    "",
+    "## 标准工作流",
+    "读计划 → 实现 → 测试 → 报告。",
+    "",
+    "## 交付物清单",
+    "代码、测试与报告。",
+    "",
+  ].join("\n");
+}
+
+/** 新流程 boundary.yaml：角色根工作文档条目 + 实际写集（与团队计划一致）。 */
+export function roleBoundaryDoc(roleId = "executor"): string {
+  const files = ["feature-map.md", "functional-description.md", "memo.md", "api-spec.md"];
+  return [
+    `role: ${roleId}`,
+    "entries:",
+    ...files.flatMap((file) => [
+      "  - kind: file",
+      `    path: 角色卡/${roleId}/${file}`,
+      "    purpose: 角色根工作文档",
+    ]),
+    "  - kind: directory",
+    `    path: src/owned-${roleId}/`,
+    "    purpose: 角色代码",
+    "",
+  ].join("\n");
+}
+
+/** 角色根工作文档（feature-map/functional-description/memo/api-spec）。 */
+export function roleWorkDocs(): Record<string, string> {
+  return {
+    "feature-map.md": "# 功能导航\n\n| 功能 | 入口 |\n| --- | --- |\n| 实现 | src/owned-executor/ |\n",
+    "functional-description.md": "# 功能说明\n\n职责：实现与测试。交接：向 Lead 报告。代码位置：src/owned-executor/。\n",
+    "memo.md": "# 备忘\n\n- 2026-10-22 由 Crew 按团队计划写卡。\n",
+    "api-spec.md": "# API 说明\n\nnot-applicable：本角色无导出/共享/装配接口。\n",
+  };
+}
+
+/** 一次性写出新流程要求的全部角色产物（role-card/boundary/工作文档）。 */
+export function writeRoleArtifacts(root: string, roleId = "executor"): void {
+  write(root, `角色卡/${roleId}/role-card.md`, roleCardDoc(roleId));
+  write(root, `角色卡/${roleId}/boundary.yaml`, roleBoundaryDoc(roleId));
+  for (const [file, content] of Object.entries(roleWorkDocs())) {
+    write(root, `角色卡/${roleId}/${file}`, content);
+  }
+}
+
+/** 实施前验收标准（结构门槛：flowId、验收表 ID 列、T0–T3、判定规则、证据计划、版本/冻结）。 */
+export function acceptanceCriteriaDoc(flowId = FLOW): string {
+  return [
+    "---",
+    `flowId: ${flowId}`,
+    "version: 1",
+    "---",
+    "",
+    `# 验收完成标准 ${flowId}`,
+    "",
+    "## 范围与非目标",
+    "范围：本流程交付；非目标：无关治理差异。",
+    "",
+    "## 验收表",
+    "| ID | 标准 | 需要的证据 | 实际证据路径/哈希 | 候选版本 | 产出角色 | 结果 | 验收判断 |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| P1 | 交付满足提案 | 测试输出 | 待提交 | 候选哈希 | 测试 | 待判定 | 待判定 |",
+    "",
+    "## 风险档位与判定依据",
+    "风险档位：T1（实现变更）。",
+    "",
+    "## 判定规则",
+    "pass：证据齐全且满足标准；fail：有证据表明不满足；insufficient evidence：证据缺失或候选不符。",
+    "",
+    "## 证据计划",
+    "需要的证据：测试命令输出、候选哈希、diff/status。",
+    "",
+    "## 版本与冻结",
+    "标准写盘后冻结；变更需递增版本并记录理由。",
+    "",
+  ].join("\n");
+}
+
+/** 验收报告：首行五项 + 档位；报告档位不得低于变更包。 */
+export function acceptanceReportDoc(flowId = FLOW, riskTier = "T1"): string {
+  return [
+    `风险档位：${riskTier}｜判定依据：实现变更按测试证据判定｜选定检查：受影响测试与全量回归｜复用证据：无｜全量回归：已执行`,
+    "",
+    `# 验收报告 ${flowId}`,
+    "",
+    "## 结论",
+    "通过。",
+    "",
+    "## 逐行判定",
+    "| ID | 结果 |",
+    "| --- | --- |",
+    "| P1 | pass |",
+    "",
+  ].join("\n");
+}
+
+/** 变更包（frontmatter riskTier/candidate/changedPaths + 正文档位依据）。 */
+export function changePackageDoc(flowId = FLOW, riskTier = "T1"): string {
+  return [
+    "---",
+    `flowId: ${flowId}`,
+    "version: 1",
+    `riskTier: ${riskTier}`,
+    "candidate: fixture-candidate",
+    "changedPaths:",
+    "  - src/owned-executor/",
+    "evidence:",
+    `  - ${REPORT_REL}`,
+    "---",
+    "",
+    `# 变更包 ${flowId}`,
+    "",
+    "## 候选与范围",
+    "候选：fixture；范围：本流程授权写集。",
+    "",
+    "## 档位依据",
+    `风险档位 ${riskTier}：实现变更，按受影响测试与全量回归验证。`,
+    "",
+    "## 复用证据与失效说明",
+    "无。",
+    "",
+  ].join("\n");
+}
+
+/** 写入验收/变更包三件套（验收判定门槛）。 */
+export function seedAcceptanceArtifacts(root: string, flowId = FLOW, riskTier = "T1"): void {
+  write(root, `docs/acceptance/${flowId}-criteria-v1.md`, acceptanceCriteriaDoc(flowId));
+  write(root, `docs/acceptance/${flowId}-report-v1.md`, acceptanceReportDoc(flowId, riskTier));
+  write(root, `docs/scheduling/${flowId}-change-v1.md`, changePackageDoc(flowId, riskTier));
 }
 
 export function intentDoc(intentId = "intent-a", flowId = FLOW): string {

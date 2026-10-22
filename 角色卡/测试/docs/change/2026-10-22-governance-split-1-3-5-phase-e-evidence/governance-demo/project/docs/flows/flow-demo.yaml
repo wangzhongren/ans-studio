@@ -1,0 +1,53 @@
+flowId: flow-demo
+version: 1
+qualityTier: production
+steps:
+  - id: team-plan
+    title: team-plan
+    owner: executor
+    kind: artifact
+    status: done
+    evidence:
+      kind: artifact
+      ref: docs/scheduling/flow-demo-team-v1.md
+  - id: appointment
+    title: appointment
+    owner: executor
+    kind: customer-decision
+    status: done
+    evidence:
+      kind: customer-decision
+      ref: appointment
+  - id: role-cards
+    title: role-cards
+    owner: executor
+    kind: dispatch
+    status: pending
+  - id: role-readiness
+    title: role-readiness
+    owner: executor
+    kind: dispatch
+    status: pending
+  - id: acceptance-criteria
+    title: acceptance-criteria
+    owner: executor
+    kind: artifact
+    status: pending
+  - id: change-package
+    title: change-package
+    owner: executor
+    kind: artifact
+    status: pending
+  - id: impl
+    title: impl
+    owner: executor
+    kind: dispatch
+    status: pending
+  - id: verification
+    title: verification
+    owner: verifier
+    kind: acceptance
+    status: done
+    evidence:
+      kind: acceptance
+      ref: acceptance
