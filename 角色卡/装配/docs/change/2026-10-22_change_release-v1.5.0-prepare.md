@@ -1,7 +1,7 @@
 ---
 id: v1.5-release-prepare-20261022
 type: change
-title: v1.5.0 发布准备：冻结源 35cca0b、Windows/renderer/smoke overlay 与 CI run 39706385498
+title: v1.5.0 发布准备：冻结源 35cca0b、Windows/renderer/smoke/timing overlay 与 CI run 39709141335
 created: "2026-10-22"
 updated: "2026-10-22"
 timezone: Asia/Shanghai
@@ -44,6 +44,12 @@ events:
   - date: "2026-10-22"
     kind: triggered
     summary: 重新触发三平台 CI run 39706385498（headSha e507b4a，publish=false/draft）
+  - date: "2026-10-22"
+    kind: implemented
+    summary: run 39706385498 mac 两平台 success、Windows 因时序夹具失败；协调方 5cc91d6 修复 appointment timing；overlay 增列该文件（13 文件）；装配 84/84、typecheck 0；prepare selected 13、actualTree d506ea75…；提交 d886771
+  - date: "2026-10-22"
+    kind: triggered
+    summary: 重新触发三平台 CI run 39709141335（headSha d886771，publish=false/draft）
 ---
 
 # v1.5.0 发布准备
@@ -134,10 +140,20 @@ run `39705028954`（headSha `31e70c1`）**三平台 build 全部 success**；rel
 
 新跑 run **`39706385498`**：<https://github.com/wangzhongren/ans-studio/actions/runs/39706385498>，headSha `e507b4ae4c285eff4c74eec57573a89fca1db57d`，`publish=false`（draft），创建时间 2026-10-22T01:33:36Z；单次快照 `in_progress`。未轮询，run id 交协调方。
 
+### 第四轮 Windows 时序夹具与 overlay 追加（提交 `d886771`）
+
+run `39706385498`（headSha `e507b4a`）：**macOS arm64 与 x64 两个 build job success**，Windows build job failure（`test/测试/governance-e2e-auto/c-appointment-timing.test.ts` 时序可见性），release skipped。协调方随后 push `5cc91d6`（`test: make appointment timing fixture windows-visible`，仅该测试文件；有界枚举等待＋完整快照诊断，无放宽）。
+
+`release-policy.mjs` 按精确路径增列 `test/测试/governance-e2e-auto/c-appointment-timing.test.ts`；`test/装配/release-packaging.test.ts` 的修复批次用例同步为 7 条测试/夹具（含该文件），并新增同目录未列名 `d-dispatch-listing.test.ts` 必须 excluded 的断言。
+
+验证：装配 **84/84**、typecheck **0**；预演（提交 `d886771`）：`overlayPaths` 恰 **13**（上轮 12＋该文件），`actualTree='d506ea759d179a7a3ef078e184396f0bbb2c0fb4'`，`overlayPatchSha256='380e0edff94fd760595a4b0699c6dfec8edcdf8b62811155056e6bc4fe3a7863'`，`excludedChanges` 仍为 19 个角色卡文档；预演树内 packaging **8/8 通过**。
+
+新跑 run **`39709141335`**：<https://github.com/wangzhongren/ans-studio/actions/runs/39709141335>，headSha `d886771714824c596485fdd41649af3c9d13fc2c`，`publish=false`（draft），创建时间 2026-10-22T02:02:27Z；单次快照 `in_progress`。未轮询，run id 交协调方。
+
 ## 未验证项 / 残余
 
 - 三平台原生构建、解压启动与 smoke **未由本角色实测**（由 CI 原生 runner 执行；本机只做 typecheck、装配测试、全量测试、renderer build 与 prepare 预演，未打包、未下载或启动任何 ZIP）。
 - README SHA256 表按指示暂写「发布后由 Release 的 SHA256SUMS 校验文件提供」并明确未签名；真实 SHA256 待 CI 产物。
 - draft Release 尚未创建；公开发布仍待 CI 全绿后的独立验收与客户/协调方决定。
 - 未做 `package:local`/`verify:local`（本轮派发未要求）。
-- 首跑 run `39701856151` 已取消（未等其自然失败）；run `39702128045` 三平台 build 已 failure、release skipped，由四处修复与 overlay 追加取代；run `39703920167` 三平台 packaged smoke 因缺 renderer 构建产物 failure，由 `build:renderer` 步骤修复；run `39705028954` 三平台 build success、release job 因旧 smoke 键 failure，由 14 键对齐修复；最新 run `39706385498` 的最终结论待协调方观察。
+- 首跑 run `39701856151` 已取消（未等其自然失败）；run `39702128045` 三平台 build 已 failure、release skipped，由四处修复与 overlay 追加取代；run `39703920167` 三平台 packaged smoke 因缺 renderer 构建产物 failure，由 `build:renderer` 步骤修复；run `39705028954` 三平台 build success、release job 因旧 smoke 键 failure，由 14 键对齐修复；run `39706385498` mac 两平台 build success、Windows 因时序夹具 failure，由 `5cc91d6`＋overlay 追加修复；最新 run `39709141335` 的最终结论待协调方观察。
