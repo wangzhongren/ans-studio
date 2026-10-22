@@ -1,7 +1,7 @@
 ---
 id: v1.5-release-prepare-20261022
 type: change
-title: v1.5.0 发布准备：冻结源 35cca0b、基础 overlay 与三平台 CI run 39701856151
+title: v1.5.0 发布准备：冻结源 35cca0b、基础 overlay 与三平台 CI run 39702128045
 created: "2026-10-22"
 updated: "2026-10-22"
 timezone: Asia/Shanghai
@@ -19,7 +19,13 @@ events:
     summary: annotated tag v1.5.0 → 35cca0b（SOURCE_SHA）已推送；release-policy 指 v1.5.0 并重置基础白名单；release.yml 默认/并发/发布段/标题/notes → v1.5.0；提交 5513209；prepare 预演 exit 0（selected 2、actualTree 1ae3b77b…）
   - date: "2026-10-22"
     kind: triggered
-    summary: 三平台 CI run 39701856151 已触发（headSha 5513209，publish=false/draft）
+    summary: 三平台 CI run 39701856151 已触发（headSha 5513209，publish=false/draft）；随后因测试夹具仍钉 v1.4.0 取消
+  - date: "2026-10-22"
+    kind: implemented
+    summary: 测试夹具对齐 v1.5.0（release-packaging.test.ts + release-policy.d.mts）；装配 83/83、typecheck 0；prepare 预演 selected 4、actualTree 53441757…；提交 c166914
+  - date: "2026-10-22"
+    kind: triggered
+    summary: 新三平台 CI run 39702128045 已触发（headSha c166914，publish=false/draft）
 ---
 
 # v1.5.0 发布准备
@@ -50,23 +56,26 @@ events:
 - 配方提交 **`5513209`**（`chore(release): point pipeline at v1.5.0`），已推送 main。
 - **prepare 预演（本机，真实仓库未污染）**：`node src/common/装配/release-prepare.mjs` 退出 0；`sourceRef='v1.5.0'`、`sourceSha=35cca0b…`、`overlayPaths` 恰 **2**（`.github/workflows/release.yml`、`src/common/装配/release-policy.mjs`）、`actualTree='1ae3b77b22f55b630743eb5ecde98a7ad1889912'`、`overlayPatchSha256='5f8cfd2e411ff7c8c2590f44d211a8901e82886e654e11b443106d43879c8792'`、`excludedChanges=[]`；预演 worktree 已清理。
 
+- **`src/common/装配/release-policy.d.mts`**：字面量同步 `SOURCE_REF: 'v1.5.0'`、`SOURCE_SHA: '35cca0bd…'`。
+
 ## 三平台 CI
 
-- run **`39701856151`**：<https://github.com/wangzhongren/ans-studio/actions/runs/39701856151>，headSha `551320962a7d0a5959b01e8d914515f8bae70988`，`publish=false`（draft 语义），触发时间 2026-10-22T00:47:59Z。未反复轮询，run id 交协调方。
+- 首跑 run **`39701856151`**（headSha `5513209`，2026-10-22T00:47:59Z 触发，`publish=false`）：因测试夹具仍钉 v1.4.0/overlay-2（见下），按协调方指示 **`gh run cancel 39701856151` 取消**，未等待其自然失败。
+- **测试夹具对齐（提交 `c166914`，`test(release): align packaging fixtures with v1.5.0`）**：
+  - `test/装配/release-packaging.test.ts`：`SOURCE_REF='v1.5.0'`、`SOURCE_SHA='35cca0bd…'`；新增 v1.5.0 打包面选中项用例（release.yml、release-policy.mjs/.d.mts、test/装配/、package.json/package-lock.json 入选，README excluded）；v1.4.0 overlay-2 的 5 条精确条目改为「回到 fail-closed/excluded」用例（生产修复 `src/common/编排/shell-command-guard.ts` 抛 `Unreviewed production overlay`，4 个测试文件 excluded）；fail-closed 与既有排除面断言未放宽。
+  - `src/common/装配/release-policy.d.mts`：字面量同步 v1.5.0（与 `.mjs` 一致）。
+  - 验证：`node --test "test/装配/**/*.test.ts"` → **83/83 通过、0 失败、0 跳过**；`npm run typecheck` → **exit 0**。
+- **对齐后 prepare 预演**（本机，真实仓库未污染）：exit 0；`overlayPaths` 恰 **4**（`.github/workflows/release.yml`、`src/common/装配/release-policy.d.mts`、`src/common/装配/release-policy.mjs`、`test/装配/release-packaging.test.ts`）；`actualTree='534417570e33b4fe612b1042cbafc60a4d26b3cf'`；`overlayPatchSha256='ebf25945e6f3b90a181efea8399013a26db670a9836d10c7d2105d0053ec50d8'`；`excludedChanges` 为 5 个角色卡文档。预演树内 `node --test test/装配/release-packaging.test.ts` **7/7 通过**；预演 worktree 已清理。
+- 新跑 run **`39702128045`**：<https://github.com/wangzhongren/ans-studio/actions/runs/39702128045>，headSha `c1669143af61c0182781e11704590f1739b6fb40`，`publish=false`（draft 语义），触发时间 2026-10-22T00:50:41Z；单次快照为 pending。未反复轮询，run id 交协调方。
 
-### 已知预期红（重要，待测试角色处置）
+### 首跑红灯的处置记录（保留，不抹掉）
 
-`test/装配/release-packaging.test.ts` 的**冻结 tag 版本**仍断言 `SOURCE_REF='v1.4.0'` / `SOURCE_SHA='83eec7e…'`，并断言 v1.4.0 overlay-2 的 5 条精确条目入选。策略重置为基础白名单后：
-
-1. `release overlay preserves Chinese build paths and excludes private data and documentation` → `'v1.5.0' !== 'v1.4.0'`；
-2. `release overlay includes exactly the reviewed overlay-2 fix batch by exact path` → `Unreviewed production overlay: src/common/编排/shell-command-guard.ts`。
-
-已在预演构建树中**实测复现这 2 条失败**。该文件属**测试角色**，本角色边界禁止改 `test/`；因此预计三平台 build job 会在 **Regression tests** 阶段同红、release job 不会执行（不会创建 draft）。处置：由测试角色把断言同步到 v1.5.0（SOURCE_REF/SHA、白名单基础集语义）并提交 main；`test/装配/` 在 overlay 目录白名单内，其提交会自动随下一次运行纳入，无需改 policy。修复后重跑同一命令即可。
+冻结 tag 内 `test/装配/release-packaging.test.ts` 仍断言 `SOURCE_REF='v1.4.0'`/`SOURCE_SHA='83eec7e…'`，并断言 v1.4.0 overlay-2 的 5 条精确条目入选；策略重置为基础白名单后，预演树实测 2 条失败（`'v1.5.0' !== 'v1.4.0'`、`Unreviewed production overlay: src/common/编排/shell-command-guard.ts`）。该文件与 `release-policy.d.mts` 均属装配边界，经协调方确认后已按上节对齐并提交 `c166914`，首跑取消、改由新跑验证。
 
 ## 未验证项 / 残余
 
-- 三平台原生构建、解压启动与 smoke **未由本角色实测**（由 CI 原生 runner 执行；本机只做 typecheck、全量测试与 renderer build，未打包、未下载或启动任何 ZIP）。
+- 三平台原生构建、解压启动与 smoke **未由本角色实测**（由 CI 原生 runner 执行；本机只做 typecheck、装配测试、全量测试、renderer build 与 prepare 预演，未打包、未下载或启动任何 ZIP）。
 - README SHA256 表按指示暂写「发布后由 Release 的 SHA256SUMS 校验文件提供」并明确未签名；真实 SHA256 待 CI 产物。
-- `src/common/装配/release-policy.d.mts` 仍声明旧字面量 `'v1.4.0'` 与旧 SHA（本角色边界仅列 `release-policy.mjs`，未改）；不影响 `tsc`（`.mjs` 不参与类型检查），但类型层面已过期，建议下一轮或属主同步。
 - draft Release 尚未创建；公开发布仍待 CI 全绿后的独立验收与客户/协调方决定。
 - 未做 `package:local`/`verify:local`（本轮派发未要求）。
+- 首跑 run `39701856151` 已取消（未等其自然失败）；新跑 `39702128045` 的最终结论待协调方观察。
