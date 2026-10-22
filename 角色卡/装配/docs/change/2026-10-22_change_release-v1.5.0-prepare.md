@@ -1,11 +1,11 @@
 ---
 id: v1.5-release-prepare-20261022
 type: change
-title: v1.5.0 发布准备：冻结源 35cca0b、Windows/renderer/smoke/timing/unzip overlay 与 CI run 39710450596
+title: v1.5.0 发布：冻结源 35cca0b、14 文件 overlay 与三平台公开产物
 created: "2026-10-22"
 updated: "2026-10-22"
 timezone: Asia/Shanghai
-status: in-progress
+status: verified-published
 related: []
 events:
   - date: "2026-10-22"
@@ -56,11 +56,27 @@ events:
   - date: "2026-10-22"
     kind: triggered
     summary: 重新触发三平台 CI run 39710450596（headSha ac404e4，publish=false/draft）
+  - date: "2026-10-22"
+    kind: published
+    summary: 最终 CI run 39710450596 四 job 全绿；v1.5.0 公开发布（draft=false，publishedAt 2026-10-22T02:42:41Z）；README 填入真实 SHA256，公开资产 HEAD 全部 200
 ---
 
 # v1.5.0 发布准备
 
 客户决定发布 **1.5.0**、**未签名 ZIP**（同 v1.4.0 形态）：先创建 draft Release，三平台原生 CI 通过后由客户/协调方决定公开。发布范围＝当前 main（含 UI 平台化与并行工作流）。
+
+## 发布结果（2026-10-22）
+
+- 最终 CI：run **`39710450596`**（headSha `ac404e4027e7cb7672f1d738424903fcdb0a08da`），**mac arm64 / mac x64 / Windows x64 三个 build job 与 release job 全部 success**。
+- 发布：**draft=false**，publishedAt **2026-10-22T02:42:41Z**，URL <https://github.com/wangzhongren/ans-studio/releases/tag/v1.5.0>。
+- **公开资产只读核对**（本角色 `curl -sIL`，9 项全部 **HTTP 200**）：三个 ZIP、三个平台 `SHA256SUMS-*.txt`、`SHA256SUMS-overlay.txt`、`release-provenance.json`、`overlay.patch`；Release 页面 200。
+- 校验文件内容与 README 逐字一致：
+  - `ANS-Studio-1.5.0-mac-arm64.zip`：`af5a80e80ea6df31bae1bd9ceb419ebbab249edcfc3deb7c583f698ae9b5ffa1`
+  - `ANS-Studio-1.5.0-mac-x64.zip`：`4f41524476d58acb72890e37d1db613e161546a760dc98fa98951e0d3f59f4ea`
+  - `ANS-Studio-1.5.0-win-x64.zip`：`cb2941b676483e866a0f3b1bd2e660ff8f9b9110869d5551f9bc9b829a55fe5c`
+  - `overlay.patch`：`7dc4c614b148494eef1724ebfb3180ffff131ef58e2347bca5ea90b3e3c1d9f0`
+  - `release-provenance.json`：`d17b6ebd8bb1abb22546a0c5578b496086da26f357561a5b6fac5cb8a710c80d`
+- **证据边界**：三平台构建/解压/启动 smoke 由 CI 原生 runner 执行；本角色只做 typecheck、装配测试、prepare 预演与公开 URL/校验文件的只读核对，**未独立下载或启动 ZIP**。
 
 ## 版本与冻结源
 
@@ -169,10 +185,9 @@ macOS `ditto` 分支未动；后续包内容、依赖、SDK/CLI 与 packaged smo
 
 新跑 run **`39710450596`**：<https://github.com/wangzhongren/ans-studio/actions/runs/39710450596>，headSha `ac404e4027e7cb7672f1d738424903fcdb0a08da`，`publish=false`（draft），创建时间 2026-10-22T02:16:16Z；单次快照 `in_progress`。未轮询，run id 交协调方。
 
-## 未验证项 / 残余
+## 发布后状态与证据边界
 
-- 三平台原生构建、解压启动与 smoke **未由本角色实测**（由 CI 原生 runner 执行；本机只做 typecheck、装配测试、全量测试、renderer build 与 prepare 预演，未打包、未下载或启动任何 ZIP）。
-- README SHA256 表按指示暂写「发布后由 Release 的 SHA256SUMS 校验文件提供」并明确未签名；真实 SHA256 待 CI 产物。
-- draft Release 尚未创建；公开发布仍待 CI 全绿后的独立验收与客户/协调方决定。
-- 未做 `package:local`/`verify:local`（本轮派发未要求）。
-- 首跑 run `39701856151` 已取消（未等其自然失败）；run `39702128045` 三平台 build 已 failure、release skipped，由四处修复与 overlay 追加取代；run `39703920167` 三平台 packaged smoke 因缺 renderer 构建产物 failure，由 `build:renderer` 步骤修复；run `39705028954` 三平台 build success、release job 因旧 smoke 键 failure，由 14 键对齐修复；run `39706385498` mac 两平台 build success、Windows 因时序夹具 failure，由 `5cc91d6`＋overlay 追加修复；run `39709141335` mac 两平台 success、Windows 因 tar 解压 failure，由 7-Zip/Expand-Archive 回退修复；最新 run `39710450596` 的最终结论待协调方观察。
+- **已是公开状态**：v1.5.0 于 **2026-10-22T02:42:41Z** 公开发布（draft=false），最终 CI run `39710450596`（headSha `ac404e4`）四 job 全绿；README SHA256 表已填入真实值，公开资产 9 项 HEAD 全部 200，Release 校验文件与 README 逐字一致。
+- **本机证据边界**：本角色只做 typecheck、`typecheck:renderer`、`build:renderer`、装配测试、全量测试、prepare 预演与只读 URL/校验文件核对；**未独立下载或启动 ZIP**，未做 `package:local`/`verify:local`。三平台构建/解压/启动 smoke 由 CI 原生 runner 执行。
+- **run 历史（保留，不抹掉）**：首跑 `39701856151` 取消（测试夹具钉 v1.4.0）；`39702128045` 三平台 build failure（Windows 修复批次前）；`39703920167` packaged smoke 缺 renderer 构建产物；`39705028954` release job 旧 smoke 键；`39706385498` Windows 时序夹具；`39709141335` Windows tar 解压；最终 `39710450596` 全绿并生成 draft，随后公开。
+- **Windows 限制与未签名保留**：内置受限来源文档阅读不支持（与 README 一致）；运行包未签名、未公证；均未随本版改变。

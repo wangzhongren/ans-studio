@@ -47,7 +47,15 @@ ANS Studio 面向希望在真实项目中使用多个 AI 角色协作的开发�
 <details>
 <summary>v1.5.0 SHA256</summary>
 
-发布后由 Release 的 SHA256SUMS 校验文件（`SHA256SUMS-darwin-arm64.txt` / `SHA256SUMS-darwin-x64.txt` / `SHA256SUMS-win32-x64.txt`）提供。运行包**未签名**：macOS 未公证、Windows 未做代码签名，首次启动可能提示来源未验证。
+| 产物 | SHA256 |
+| --- | --- |
+| `ANS-Studio-1.5.0-mac-arm64.zip` | `af5a80e80ea6df31bae1bd9ceb419ebbab249edcfc3deb7c583f698ae9b5ffa1` |
+| `ANS-Studio-1.5.0-mac-x64.zip` | `4f41524476d58acb72890e37d1db613e161546a760dc98fa98951e0d3f59f4ea` |
+| `ANS-Studio-1.5.0-win-x64.zip` | `cb2941b676483e866a0f3b1bd2e660ff8f9b9110869d5551f9bc9b829a55fe5c` |
+| `overlay.patch` | `7dc4c614b148494eef1724ebfb3180ffff131ef58e2347bca5ea90b3e3c1d9f0` |
+| `release-provenance.json` | `d17b6ebd8bb1abb22546a0c5578b496086da26f357561a5b6fac5cb8a710c80d` |
+
+运行包**未签名、未公证**：macOS 未公证、Windows 未做代码签名，首次启动可能提示来源未验证。
 
 </details>
 
