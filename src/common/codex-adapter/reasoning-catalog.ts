@@ -7,13 +7,31 @@ export const REASONING_CATALOG_VERSION = "0.162.1";
 export const MAX_REASONING_CATALOG_BYTES = 4 * 1024 * 1024;
 const MAX_NATIVE_BYTES = 512 * 1024 * 1024;
 const CHUNK_BYTES = 256 * 1024;
-const MARKER = Buffer.from('{\n  "models": [');
+// The pinned CLI pretty-prints this metadata. 0.162.1 embeds LF on darwin/linux and CRLF on
+// win32-x64 (verified: same 11-model catalog, gpt-5.5 deep-equal after line-ending normalization).
+// Accept exactly these two verified embeddings; any other format stays refused.
+const MARKERS: readonly Buffer[] = [Buffer.from('{\n  "models": ['), Buffer.from('{\r\n  "models": [')];
+/** Longest verified marker minus one: the tail every scan window must carry. Shared with tests. */
+export const REASONING_CATALOG_MARKER_OVERLAP = Math.max(...MARKERS.map(marker => marker.length)) - 1;
+const MIN_MARKER_BYTES = Math.min(...MARKERS.map(marker => marker.length));
 const fail = () => new Error("Codex installed model metadata version/format is not supported for effort compatibility");
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
+const startsWithMarker = (bytes: Uint8Array): boolean => MARKERS.some(marker => Buffer.from(bytes.subarray(0, marker.length)).equals(marker));
+
+/** Earliest verified embedded-catalog marker in a window, or -1. Shared with tests. */
+export function findReasoningCatalogMarker(bytes: Uint8Array): number {
+  const buffer = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let found = -1;
+  for (const marker of MARKERS) {
+    const at = buffer.indexOf(marker);
+    if (at !== -1 && (found === -1 || at < found)) found = at;
+  }
+  return found;
+}
 
 /** Pure bounded decoder, shared with tests. Production bytes come only from the installed binary. */
 export function decodeEmbeddedReasoningCatalog(bytes: Uint8Array): unknown {
-  if (bytes.length > MAX_REASONING_CATALOG_BYTES || !Buffer.from(bytes.subarray(0, MARKER.length)).equals(MARKER)) throw fail();
+  if (bytes.length > MAX_REASONING_CATALOG_BYTES || !startsWithMarker(bytes)) throw fail();
   let depth = 0;
   let quoted = false;
   let escaped = false;
@@ -83,14 +101,14 @@ export async function readInstalledReasoningCatalog(): Promise<unknown> {
   const file = await open(binary, "r");
   try {
     const info = await file.stat();
-    if (!info.isFile() || info.size < MARKER.length || info.size > MAX_NATIVE_BYTES) throw fail();
+    if (!info.isFile() || info.size < MIN_MARKER_BYTES || info.size > MAX_NATIVE_BYTES) throw fail();
     const buffer = Buffer.alloc(CHUNK_BYTES);
     let overlap = Buffer.alloc(0);
     for (let offset = 0; offset < info.size;) {
       const { bytesRead } = await file.read(buffer, 0, Math.min(CHUNK_BYTES, info.size - offset), offset);
       if (!bytesRead) throw fail();
       const scan = Buffer.concat([overlap, buffer.subarray(0, bytesRead)]);
-      const marker = scan.indexOf(MARKER);
+      const marker = findReasoningCatalogMarker(scan);
       if (marker !== -1) {
         const start = offset - overlap.length + marker;
         const bytes = Buffer.alloc(Math.min(MAX_REASONING_CATALOG_BYTES, info.size - start));
@@ -102,7 +120,7 @@ export async function readInstalledReasoningCatalog(): Promise<unknown> {
         }
         return decodeEmbeddedReasoningCatalog(bytes.subarray(0, read));
       }
-      overlap = Buffer.from(scan.subarray(Math.max(0, scan.length - MARKER.length + 1)));
+      overlap = Buffer.from(scan.subarray(Math.max(0, scan.length - REASONING_CATALOG_MARKER_OVERLAP)));
       offset += bytesRead;
     }
     throw fail();

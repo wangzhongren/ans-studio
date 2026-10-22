@@ -15,7 +15,9 @@ export function interactionGate(): InteractionGate {
 }
 export const tick = (milliseconds = 0) => new Promise<void>(resolve => setTimeout(resolve, milliseconds));
 export async function until(condition: () => boolean) {
-  const deadline = Date.now() + 2000;
+  // Windows CI may scan the 318 MiB installed binary before the reconnect completes; the
+  // deadline only bounds how long a condition may stay false, never what is asserted.
+  const deadline = Date.now() + 10_000;
   while (!condition()) { if (Date.now() >= deadline) throw new Error("Codex fixture wait timed out"); await tick(2); }
 }
 export async function realMcp(): Promise<CodexMcpModules> {

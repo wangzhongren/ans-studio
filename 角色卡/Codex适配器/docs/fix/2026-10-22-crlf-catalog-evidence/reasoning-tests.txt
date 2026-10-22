@@ -1,0 +1,28 @@
+✔ installed fixed-version metadata selects exact current model and changes only four approved fields (0.996625ms)
+✔ unknown version, ambiguous model, malformed record and oversized/truncated embedded format are refused (1.542208ms)
+✔ embedded catalog marker search accepts exactly the LF and CRLF formats, including across chunk splits (0.173916ms)
+✔ temporary catalog is private, exact, and unknown model creates no files (194.221708ms)
+✔ normal engine has no catalog overlay; confirmed E1 overlay is cleaned on dispose (163.108917ms)
+✔ failed or cancelled E1 overlay is removed before next original-policy engine request (232.40775ms)
+✔ default value also rejected uses E1 in the same second no-effort candidate (110.689792ms)
+✔ four efforts retain process and turn settings; off/unset stay absent and all configuration messages belong to active prompts (114.88575ms)
+✔ invalid reasoning effort is rejected before any effect (0.256375ms)
+✔ reasoning item projects facts: content preferred, summary-only fallback, omitted when empty; durationMs only from real signals (9.994917ms)
+✔ reasoning delta frames are consumed without rows and never mis-mapped (6.136083ms)
+✔ only precise effort rejections qualify; status/type/model and whole reasoning negatives win (0.672833ms)
+✔ value rejection uses exact catalog default in same thread, commits only completed, and subsequent turns retain it (11.18475ms)
+✔ field rejection rebuilds safe first turn, starts new thread, exposes new ID and sends no effort (9.921917ms)
+✔ at most two distinct compatibility candidates: catalog default then absent effort, never a third (119.209375ms)
+✔ failed, cancelled and timed-out default attempts do not stick to subsequent native requests (126.569125ms)
+✔ ordinary failures, whole-object rejection and nonpersistent later turns never rebuild (27.713ms)
+✔ native tool starts and normal output forbid whole-turn replay (29.725334ms)
+✔ SDK retry notification does not trigger ANS compatibility (5.639459ms)
+✔ failed compatibility reconstruction reports its real error and quarantines the unconfirmed engine (5.394125ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 880.984

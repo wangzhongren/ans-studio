@@ -1,0 +1,4 @@
+marker found at 264312440 bytes read 4194304 overlap 15
+decoded models: 11
+gpt-5.5 compatible: true models: 1
+overrides: {"slug":"gpt-5.5","default_reasoning_level":null,"default_reasoning_summary":"none","supports_reasoning_summary_parameter":false,"supports_reasoning_summaries":false}
