@@ -1,0 +1,10 @@
+warning: in the working copy of 'docs/communication/memo.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/planning/memo.md', LF will be replaced by CRLF the next time Git touches it
+docs/communication/memo.md
+docs/planning/memo.md
+"src/common/\351\227\250\347\246\201\345\274\225\346\223\216/governance-roles.ts"
+src/model/runtime.ts
+test/runtime-core/governance-flow-metadata.test.ts
+"test/\351\227\250\347\246\201\345\274\225\346\223\216/governance-trio.test.ts"
+"\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/api-spec.md"
+"\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/memo.md"

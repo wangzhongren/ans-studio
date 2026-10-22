@@ -28,6 +28,16 @@ import {
   openRoleSession as realOpenRoleSession,
   createPiAdapterFactory as realCreatePiAdapterFactory,
   createRuntimeAdapterFactory as realCreateRuntimeAdapterFactory,
+  // 2026-10-22 角色粒度/MapReduce（方案 Q9 A）：团队计划 v2 **唯一**解析/校验实现由编排私有
+  // `common/编排/team-plan.ts` 提供，桌面**只经** pipeline 公共出口 `run-role.ts` 消费；
+  // 不直接 import 私有 common，也不保留第二份 v2 解析。
+  parseTeamPlan,
+  teamPlanIssueMessages,
+  writesetsOverlap,
+  type TeamPlanModule,
+  type TeamPlanParseResult,
+  type TeamPlanRoleRow as OrchestrationTeamPlanRoleRow,
+  type WritesetEntry,
   type RuntimeAdapterFactoryBuilder, type RuntimeAdapterFactoryOptions,
 } from "../../src/pipeline/orchestration/run-role.ts";
 // I2/C1（2026-10-17 PM 评审 §四.2/§4.6）：建立治理记录的预览/建立机制。**只**经编排的 Pipeline 公共出口
@@ -837,7 +847,12 @@ async function findLatestVersionedArtifact(
   return best === undefined ? undefined : { relPath: `${dirRel}/${best.name}`, version: best.version };
 }
 
-/** 团队计划角色行的可机械读取部分（类型 + 四列最低内容；语义覆盖由 Convener readiness 判定）。 */
+/**
+ * 团队计划角色行的可机械读取部分。
+ * · v2（`teamPlanSchema: 2`）：全部字段来自编排单一解析器（经 pipeline 公共出口），含模块/契约/测试面/
+ *   dependsOn/并行组/粒度理由/写集条目；桌面只做读取与 V12 覆盖核对，不重解析 v2 语法。
+ * · legacy（缺省/`teamPlanSchema: 1`）：只保留 v1 旧行为所需的类型 + 四列；不强制模块/契约/测试面字段。
+ */
 interface TeamPlanRoleRow {
   roleId: string;
   roleType?: "new" | "changed" | "existing";
@@ -845,6 +860,18 @@ interface TeamPlanRoleRow {
   ability: string;
   writes: string;
   deps: string;
+  /** v2：module 原始单元格（可能是 `a+b` 或 `reduce`）。 */
+  module?: string;
+  modules: string[];
+  primaryModule?: string;
+  writesets: WritesetEntry[];
+  contracts: string[];
+  testSurface: string[];
+  dependsOn: string[];
+  parallelGroup: string;
+  granularityRationale?: string;
+  isMap: boolean;
+  isReduce: boolean;
 }
 
 interface TeamPlanInfo {
@@ -854,8 +881,14 @@ interface TeamPlanInfo {
   riskTier?: GovernanceRiskTier;
   recommended?: string[];
   rows: Map<string, TeamPlanRoleRow>;
-  /** 计划级结构问题（frontmatter flowId 不一致/角色表缺列等）——来源＝Convener。 */
+  /** 计划级结构问题（frontmatter/角色表/V1–V10 等）——来源＝Convener。 */
   planIssues: string[];
+  /** 非阻断提醒（legacy 迁移、v2 warning/exception-review）；只记诊断，不派任务。 */
+  warnings: string[];
+  legacy: boolean;
+  teamPlanSchema: 1 | 2;
+  modules: string[];
+  moduleList: TeamPlanModule[];
 }
 
 function cleanTeamPlanCell(cell: string): string {
@@ -868,67 +901,21 @@ function splitTeamPlanRow(line: string): string[] | undefined {
   return trimmed.slice(1, -1).split("|").map((cell) => cell.trim());
 }
 
-function parseTeamPlanRecommended(text: string): string[] | undefined {
-  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
-  const raw: string[] = [];
-  if (frontmatter !== null) {
-    for (const line of frontmatter[1]!.replace(/\r\n/g, "\n").split("\n")) {
-      const match = /^\s*recommended\s*:\s*(.*)$/i.exec(line);
-      if (match !== null) raw.push(match[1]!.trim());
-    }
-  }
-  for (const line of text.replace(/\r\n/g, "\n").split("\n")) {
-    const match = /^\s*推荐\s*[:：]\s*(.*)$/.exec(line);
-    if (match !== null) raw.push(match[1]!.trim());
-  }
-  const parsed: string[][] = [];
-  for (const value of raw) {
-    const cleaned = value.trim().replace(/^\[/, "").replace(/\]$/, "");
-    if (cleaned === "") return undefined;
-    const ids: string[] = [];
-    for (const part of cleaned.split(/[,、，]/)) {
-      const token = part.trim().replace(/^[`'"]+/, "").replace(/[`'"]+$/, "").trim();
-      if (token === "" || /\s|\//.test(token)) return undefined;
-      if (ids.includes(token)) return undefined;
-      ids.push(token);
-    }
-    if (ids.length === 0) return undefined;
-    parsed.push(ids);
-  }
-  if (parsed.length === 0) return undefined;
-  const first = parsed[0]!;
-  for (const other of parsed.slice(1)) {
-    if (other.length !== first.length || other.some((id, index) => id !== first[index])) return undefined;
-  }
-  return first;
+function teamPlanRoleType(raw: string): "new" | "changed" | "existing" | undefined {
+  const value = raw.toLowerCase();
+  if (value === "new" || value === "新增") return "new";
+  if (value === "changed" || value === "修改") return "changed";
+  if (value === "existing" || value === "既有") return "existing";
+  return undefined;
 }
 
-/** 解析团队计划（frontmatter + 角色表）；只做确定性表格读取，不判断语义、不写文件。 */
-function parseTeamPlanInfo(relPath: string, version: number, text: string): TeamPlanInfo {
-  const planIssues: string[] = [];
-  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
-  let frontmatterFlowId: string | undefined;
-  if (frontmatter === null) {
-    planIssues.push("团队计划缺少 frontmatter（须含 flowId/version/riskTier/recommended）");
-  } else {
-    let doc: unknown;
-    try {
-      doc = parseYaml(frontmatter[1]!);
-    } catch {
-      planIssues.push("团队计划 frontmatter 不是合法 YAML");
-    }
-    if (doc !== null && typeof doc === "object" && !Array.isArray(doc)) {
-      const value = (doc as Record<string, unknown>).flowId;
-      if (typeof value === "string" && value.trim() !== "") frontmatterFlowId = value.trim().replace(/^["'`]|["'`]$/g, "");
-    }
-    if (frontmatterFlowId === undefined) planIssues.push("团队计划 frontmatter 缺少 flowId");
-  }
-  const recommended = parseTeamPlanRecommended(text);
-  if (recommended === undefined) {
-    planIssues.push("团队计划缺少唯一的机器可读推荐集（recommended 内联数组或「推荐：」行；空集/重复/歧义不接受）");
-  }
-  const riskTier = parseRiskTierFromText(text);
-
+/**
+ * legacy v1 角色行读取（**仅为桌面旧门控保留类型 + 四列**；v1 的表格语法检查仍由编排单一实现
+ * `legacyTeamPlanRoleRowIssues` 负责，本函数不重复其结论，也不解析任何 v2 字段）。
+ */
+function parseLegacyTeamPlanRows(text: string): { rows: Map<string, TeamPlanRoleRow>; issues: string[] } {
+  const rows = new Map<string, TeamPlanRoleRow>();
+  const issues: string[] = [];
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   let headerIndex = -1;
   let header: string[] | undefined;
@@ -941,19 +928,7 @@ function parseTeamPlanInfo(relPath: string, version: number, text: string): Team
       break;
     }
   }
-  const rows = new Map<string, TeamPlanRoleRow>();
-  if (headerIndex === -1 || header === undefined) {
-    planIssues.push("团队计划缺少角色表（表头须含 roleId、类型与职责目标/能力要求/写集/依赖 列）");
-    return {
-      relPath,
-      version,
-      ...(frontmatterFlowId !== undefined ? { frontmatterFlowId } : {}),
-      ...(riskTier !== undefined ? { riskTier } : {}),
-      ...(recommended !== undefined ? { recommended } : {}),
-      rows,
-      planIssues,
-    };
-  }
+  if (headerIndex === -1 || header === undefined) return { rows, issues };
   const columnOf = (pattern: RegExp): number => header!.findIndex((cell) => pattern.test(cell));
   const roleColumn = columnOf(/^(roleId|role-id|角色id|角色 id)$/i);
   const typeColumn = columnOf(/类型|type/i);
@@ -962,9 +937,11 @@ function parseTeamPlanInfo(relPath: string, version: number, text: string): Team
   const writesColumn = columnOf(/写集|边界/);
   const depsColumn = columnOf(/依赖/);
   if (dutyColumn === -1 || abilityColumn === -1 || writesColumn === -1 || depsColumn === -1) {
-    planIssues.push("团队计划角色表缺少必需列（职责目标/能力要求/写集/依赖）");
-  } else if (typeColumn === -1) {
-    planIssues.push("团队计划角色表缺少「类型」列（须标 new / changed / existing）");
+    // 缺四列由共享 legacy 校验报出（单一实现），这里不再重复。
+    return { rows, issues };
+  }
+  if (typeColumn === -1) {
+    issues.push("团队计划角色表缺少「类型」列（须标 new / changed / existing）");
   }
   for (let index = headerIndex + 1; index < lines.length; index += 1) {
     const cells = splitTeamPlanRow(lines[index]!);
@@ -972,33 +949,121 @@ function parseTeamPlanInfo(relPath: string, version: number, text: string): Team
     if (cells.every((cell) => /^:?-{2,}:?$/.test(cell.trim()))) continue;
     const roleId = cleanTeamPlanCell(cells[roleColumn] ?? "");
     if (roleId === "" || rows.has(roleId)) continue;
-    const rawType = typeColumn === -1 ? "" : cleanTeamPlanCell(cells[typeColumn] ?? "").toLowerCase();
-    const roleType =
-      rawType === "new" || rawType === "新增"
-        ? "new" as const
-        : rawType === "changed" || rawType === "修改"
-          ? "changed" as const
-          : rawType === "existing" || rawType === "既有"
-            ? "existing" as const
-            : undefined;
+    const roleType = typeColumn === -1 ? undefined : teamPlanRoleType(cleanTeamPlanCell(cells[typeColumn] ?? ""));
     rows.set(roleId, {
       roleId,
       ...(roleType !== undefined ? { roleType } : {}),
-      duty: dutyColumn === -1 ? "" : cleanTeamPlanCell(cells[dutyColumn] ?? ""),
-      ability: abilityColumn === -1 ? "" : cleanTeamPlanCell(cells[abilityColumn] ?? ""),
-      writes: writesColumn === -1 ? "" : cleanTeamPlanCell(cells[writesColumn] ?? ""),
-      deps: depsColumn === -1 ? "" : cleanTeamPlanCell(cells[depsColumn] ?? ""),
+      duty: cleanTeamPlanCell(cells[dutyColumn] ?? ""),
+      ability: cleanTeamPlanCell(cells[abilityColumn] ?? ""),
+      writes: cleanTeamPlanCell(cells[writesColumn] ?? ""),
+      deps: cleanTeamPlanCell(cells[depsColumn] ?? ""),
+      modules: [],
+      writesets: [],
+      contracts: [],
+      testSurface: [],
+      dependsOn: [],
+      parallelGroup: "",
+      isMap: false,
+      isReduce: false,
     });
   }
+  return { rows, issues };
+}
+
+function governanceRiskTierOf(value: string | undefined): GovernanceRiskTier | undefined {
+  return value === "T0" || value === "T1" || value === "T2" || value === "T3" ? value : undefined;
+}
+
+function teamPlanRoleRowOf(row: OrchestrationTeamPlanRoleRow): TeamPlanRoleRow {
+  const roleType = teamPlanRoleType(row.roleType);
+  return {
+    roleId: row.roleId,
+    ...(roleType !== undefined ? { roleType } : {}),
+    duty: row.duty,
+    ability: row.ability,
+    writes: row.writeset,
+    deps: row.deps,
+    module: row.module,
+    modules: row.modules,
+    ...(row.primaryModule !== undefined ? { primaryModule: row.primaryModule } : {}),
+    writesets: row.writesets,
+    contracts: row.contracts,
+    testSurface: row.testSurface,
+    dependsOn: row.dependsOn,
+    parallelGroup: row.parallelGroup,
+    ...(row.granularityRationale !== undefined ? { granularityRationale: row.granularityRationale } : {}),
+    isMap: row.isMap,
+    isReduce: row.isReduce,
+  };
+}
+
+/**
+ * 解析团队计划（frontmatter + 模块清单 + 角色表）；只做确定性读取，不判断语义、不写文件。
+ * v2 解析/校验的**唯一实现**在编排 `team-plan.ts`（经 pipeline 公共出口）；本函数只把结果适配成桌面
+ * 消费形状。legacy 分支保持 v1 旧行为（表头/推荐集/四列非空），只记一条迁移 warning、不阻塞旧流程。
+ */
+function parseTeamPlanInfo(relPath: string, version: number, text: string): TeamPlanInfo {
+  const parsed: TeamPlanParseResult = parseTeamPlan(text);
+  const planIssues = new Set<string>(teamPlanIssueMessages(parsed));
+  const warnings = new Set<string>();
+  const rows = new Map<string, TeamPlanRoleRow>();
+  if (parsed.legacy) {
+    warnings.add("团队计划未声明 teamPlanSchema: 2：按 v1 兼容校验（不强制模块/公开契约/测试面等 v2 字段；建议迁移团队计划 v2）");
+    const legacy = parseLegacyTeamPlanRows(text);
+    for (const [roleId, row] of legacy.rows) rows.set(roleId, row);
+    for (const issue of legacy.issues) planIssues.add(issue);
+    // 桌面 v1 旧门槛中共享 legacy 校验未覆盖的部分（frontmatter/推荐集）——保持旧行为。
+    if (!/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.test(text)) {
+      planIssues.add("团队计划缺少 frontmatter（须含 flowId/version/riskTier/recommended）");
+    }
+    if (parsed.flowId === undefined || parsed.flowId === "") {
+      planIssues.add("团队计划 frontmatter 缺少 flowId");
+    }
+    if (parsed.recommended.length === 0) {
+      planIssues.add("团队计划缺少唯一的机器可读推荐集（recommended 内联数组或「推荐：」行；空集/重复/歧义不接受）");
+    }
+  } else {
+    for (const issue of parsed.issues) {
+      if (issue.severity !== "error") warnings.add(issue.message);
+    }
+    for (const row of parsed.roleRows) rows.set(row.roleId, teamPlanRoleRowOf(row));
+  }
+  const riskTier = governanceRiskTierOf(parsed.riskTier) ?? parseRiskTierFromText(text);
   return {
     relPath,
     version,
-    ...(frontmatterFlowId !== undefined ? { frontmatterFlowId } : {}),
+    ...(parsed.flowId !== undefined && parsed.flowId !== "" ? { frontmatterFlowId: parsed.flowId } : {}),
     ...(riskTier !== undefined ? { riskTier } : {}),
-    ...(recommended !== undefined ? { recommended } : {}),
+    ...(parsed.recommended.length > 0 ? { recommended: parsed.recommended } : {}),
     rows,
-    planIssues,
+    planIssues: [...planIssues],
+    warnings: [...warnings],
+    legacy: parsed.legacy,
+    teamPlanSchema: parsed.teamPlanSchema,
+    modules: parsed.modules,
+    moduleList: parsed.moduleList,
   };
+}
+
+/** V12 覆盖判定：计划写集（精确文件或目录）是否被角色 boundary.yaml 的 project 条目覆盖。 */
+function boundaryCoversPlanWriteset(
+  writeset: WritesetEntry,
+  entries: readonly { path: string; kind: string; root?: string }[],
+): boolean {
+  for (const entry of entries) {
+    if (entry.root !== undefined && entry.root !== "project") continue;
+    const boundaryPath = entry.path.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+$/, "");
+    if (boundaryPath === "") continue;
+    if (entry.kind === "file") {
+      // 文件边界只能覆盖精确同路径的**文件**计划写集；不覆盖同名目录（目录需逐文件授权）。
+      if (writeset.directory) continue;
+      if (writesetsOverlap(writeset, { raw: boundaryPath, path: boundaryPath, directory: false })) return true;
+      continue;
+    }
+    // directory / conditional-directory：覆盖目录本身及其中任何计划写集（复用共享重叠函数）。
+    if (writesetsOverlap(writeset, { raw: boundaryPath, path: `${boundaryPath}/`, directory: true })) return true;
+  }
+  return false;
 }
 
 /**
@@ -2299,9 +2364,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       typeof options.appointmentArtifactPath === "string" &&
       options.appointmentArtifactPath.startsWith("docs/scheduling/");
     if (plan !== undefined) {
-      // 计划级问题（frontmatter/角色表）来源＝Convener：Crew 不自行补计划。
+      // 计划级问题（frontmatter/角色表/V1–V10）来源＝Convener：Crew 不自行补计划。
       for (const issue of plan.planIssues) {
         push("团队计划", plan.relPath, issue, { source: "convener" });
+      }
+      // 非阻断提醒（legacy 迁移 / v2 warning/exception-review）：只记诊断，不派任务、不阻塞推进。
+      for (const warning of plan.warnings) {
+        push("团队计划", plan.relPath, warning, { source: "convener", warning: true });
       }
       if (flowId !== undefined && plan.frontmatterFlowId !== undefined && plan.frontmatterFlowId !== flowId) {
         push("团队计划", plan.relPath, `frontmatter flowId="${plan.frontmatterFlowId}" 与流程 ${flowId} 不一致`, {
@@ -2329,11 +2398,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       const cardRel = `${dir}/role-card.md`;
       const boundaryRel = `${dir}/boundary.yaml`;
       const row = plan?.rows.get(roleId);
-      // 计划角色行问题（来源 Convener）：缺行/类型不可识别/四列内容为空。
+      // 计划角色行问题（来源 Convener）：缺行；legacy 额外保留 v1 的类型/四列检查。
+      // v2 的类型/module/职责/能力/写集/契约/测试面/dependsOn/并行组等已由编排单一解析器报入 planIssues，
+      // 此处不重复。V12（计划写集 vs boundary）在 boundary 解析后单独核对。
       if (plan !== undefined) {
         if (row === undefined) {
           push("团队计划", plan.relPath, `团队计划缺少推荐/任命角色 ${roleId} 的角色行`, { source: "convener" });
-        } else {
+        } else if (plan.legacy) {
           if (row.roleType === undefined) {
             push("团队计划", plan.relPath, `团队计划角色 ${roleId} 的类型缺失或不可识别（须为 new / changed / existing）`, {
               source: "convener",
@@ -2369,7 +2440,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         }
       }
       // ② boundary.yaml：存在、可读、非空；与 listProject 同一解析器；顶层 role 与目录 id 一致；entries 非空。
-      let boundaryEntries: readonly { path: string; kind: string }[] | undefined;
+      let boundaryEntries: readonly { path: string; kind: string; root?: string }[] | undefined;
       const boundary = await readDoc(boundaryRel);
       if (boundary.error !== undefined) push(roleId, boundaryRel, boundary.error);
       if (boundary.text !== undefined) {
@@ -2417,6 +2488,31 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           push(roleId, boundaryRel, "entries 仅含角色根工作文档条目，未见团队计划的实际写集条目（请核对计划写集）", {
             warning: true,
           });
+        }
+      }
+      // ②c V12（团队计划 v2；写卡后校验）：计划写集必须被该角色 boundary.yaml entries 覆盖。
+      // 覆盖判定用编排单一解析器给出的写集条目（不复制 v2 写集语法）。问题来源＝Crew 文件；
+      // existing 角色只 warning（迁移策略：不强制重写历史边界），new/changed 阻塞并退回 Crew，
+      // 并在文案中提示「若计划写集本身有误则报告 Convener 修正计划」。
+      if (
+        plan !== undefined &&
+        !plan.legacy &&
+        row !== undefined &&
+        row.writesets.length > 0 &&
+        boundaryEntries !== undefined &&
+        boundaryEntries.length > 0
+      ) {
+        const existing = row.roleType === "existing";
+        for (const writeset of row.writesets) {
+          if (boundaryCoversPlanWriteset(writeset, boundaryEntries)) continue;
+          push(
+            roleId,
+            boundaryRel,
+            existing
+              ? `计划写集「${writeset.path}」未被 boundary.yaml entries 覆盖（existing：仅提醒，不阻塞；下次实质变更时补齐）`
+              : `计划写集「${writeset.path}」未被 boundary.yaml entries 覆盖（Crew：按团队计划把该路径加入 Section 1；若计划写集本身有误，报告 Convener 修正计划）`,
+            existing ? { source: "crew", warning: true } : { source: "crew" },
+          );
         }
       }
       // ③ 角色根工作文档（feature-map/functional-description/memo/api-spec）。
@@ -2907,7 +3003,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         const readinessStepId = plan !== undefined ? "role-readiness" : undefined;
         const message =
           plan !== undefined
-            ? buildRoleReadinessTaskMessage(flowId, targets, plan.relPath, plan.version)
+            ? buildRoleReadinessTaskMessage(flowId, targets, plan.relPath, plan.version, {
+                teamPlanSchema: plan.teamPlanSchema,
+                modules: plan.modules,
+              })
             : buildGovernanceAdvanceMessage(payload, targets, {
                 flowStateExists: existsSync(path.join(projectRoot, governanceFlowStatePath(flowId))),
               });
@@ -3705,7 +3804,14 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           roleId: "nominator",
         };
         const crewMessage = buildGovernanceAdvanceMessage(crewPayload, targets, {
-          ...(plan !== undefined ? { teamPlanPath: plan.relPath, teamPlanVersion: plan.version } : {}),
+          ...(plan !== undefined
+            ? {
+                teamPlanPath: plan.relPath,
+                teamPlanVersion: plan.version,
+                teamPlanSchema: plan.teamPlanSchema,
+                teamPlanModules: plan.modules,
+              }
+            : {}),
           ...(legacyNomination !== undefined ? { nominationPath: legacyNomination.relPath } : {}),
         });
         if (crewMessage === null) {

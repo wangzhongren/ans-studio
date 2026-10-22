@@ -144,6 +144,38 @@ import {
   type FlowStepSupersedeFn,
   type FlowStepUpdateFn,
 } from "../../common/编排/flow-service.ts";
+// 2026-10-22 角色粒度/MapReduce（方案 Q9 A）：团队计划 v2 的**单一**解析/校验实现。
+// 桌面不直接 import 本私有 common；经本文件（pipeline 公共出口）再导出消费。
+import {
+  legacyTeamPlanRoleRowIssues,
+  parseTeamPlan,
+  teamPlanIssueMessages,
+  validateTeamPlanFlowConsistency,
+  type TeamPlanParseResult,
+} from "../../common/编排/team-plan.ts";
+// 公共出口（Map C 桌面经 `src/pipeline/orchestration/run-role.ts` 消费；不直接 import 编排私有 common）。
+export {
+  TEAM_PLAN_SCHEMA_LEGACY,
+  TEAM_PLAN_SCHEMA_V2,
+  parseTeamPlan,
+  parseTeamPlanModuleIds,
+  parseWritesetCell,
+  writesetsOverlap,
+  isGovernanceWritesetPath,
+  legacyTeamPlanRoleRowIssues,
+  teamPlanIssueMessages,
+  validateTeamPlanFlowConsistency,
+} from "../../common/编排/team-plan.ts";
+export type {
+  ModuleIdParse,
+  ParseTeamPlanOptions,
+  TeamPlanIssue,
+  TeamPlanIssueSeverity,
+  TeamPlanModule,
+  TeamPlanParseResult,
+  TeamPlanRoleRow,
+  WritesetEntry,
+} from "../../common/编排/team-plan.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 // 跨角色共享路径原语（**单一来源** = pm 属主 `src/common/shared/path-primitives.ts`；工程法案 §一.5
 // 消费方名单已含编排；同 `confirmed-writes.ts` 先例）——用于 su 预授权目录的**词法**归属判定：
@@ -2037,73 +2069,15 @@ function validateFlowYamlCard(
 }
 
 /**
- * 团队计划角色表校验（2026-10-22 第 1 项，方案 §5.3 第 6 条）：
- * 表头须含 roleId 与 职责目标/能力要求/写集/依赖 列；每个推荐角色必须有一行且四列非空。
- * 只做确定性表格解析，不做语义判断（语义由 Convener readiness 复核）。
+ * 团队计划角色表校验（单一实现 = `common/编排/team-plan.ts`）：
+ *   · legacy（缺省/`teamPlanSchema: 1`）⇒ 只跑既有 v1 表格检查（推荐角色职责/能力/写集/依赖非空）；
+ *   · v2 ⇒ V1–V10 的 error 条目（warning/exception-review 不阻断发卡）。
+ * 只做确定性表格/结构解析，不做语义判断（语义由 Convener readiness 复核）。
  */
 function teamPlanRoleRowIssues(text: string, recommended: readonly string[]): string[] {
-  const issues: string[] = [];
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
-  const splitRow = (line: string): string[] | undefined => {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("|") || !trimmed.endsWith("|")) return undefined;
-    return trimmed.slice(1, -1).split("|").map((cell) => cell.trim());
-  };
-  const clean = (cell: string): string => cell.replace(/^[`*_]+/, "").replace(/[`*_]+$/, "").trim();
-
-  let headerIndex = -1;
-  let header: string[] | undefined;
-  for (let index = 0; index < lines.length; index += 1) {
-    const cells = splitRow(lines[index]!);
-    if (cells === undefined) continue;
-    if (cells.some((cell) => /^(roleId|role-id|角色id|角色 id)$/i.test(clean(cell)))) {
-      headerIndex = index;
-      header = cells.map(clean);
-      break;
-    }
-  }
-  if (headerIndex === -1 || header === undefined) {
-    return ["团队计划缺少角色表（表头须含 roleId 与 职责目标/能力要求/写集/依赖 列）"];
-  }
-  const columnOf = (pattern: RegExp): number =>
-    header!.findIndex((cell) => pattern.test(cell));
-  const roleColumn = columnOf(/^(roleId|role-id|角色id|角色 id)$/i);
-  const dutyColumn = columnOf(/职责/);
-  const abilityColumn = columnOf(/能力/);
-  const writesColumn = columnOf(/写集|边界/);
-  const depsColumn = columnOf(/依赖/);
-  if (dutyColumn === -1 || abilityColumn === -1 || writesColumn === -1 || depsColumn === -1) {
-    return ["团队计划角色表缺少必需列（职责目标/能力要求/写集/依赖）"];
-  }
-
-  const rows = new Map<string, string[]>();
-  for (let index = headerIndex + 1; index < lines.length; index += 1) {
-    const cells = splitRow(lines[index]!);
-    if (cells === undefined) break; // 表格结束
-    if (cells.every((cell) => /^:?-{2,}:?$/.test(cell.trim()))) continue; // 分隔行
-    const roleId = clean(cells[roleColumn] ?? "");
-    if (roleId === "") continue;
-    if (!rows.has(roleId)) rows.set(roleId, cells);
-  }
-
-  const columns: Array<[string, number]> = [
-    ["职责目标", dutyColumn],
-    ["能力要求", abilityColumn],
-    ["写集", writesColumn],
-    ["依赖", depsColumn],
-  ];
-  for (const roleId of recommended) {
-    const row = rows.get(roleId);
-    if (row === undefined) {
-      issues.push(`团队计划缺少推荐角色 ${roleId} 的角色行`);
-      continue;
-    }
-    for (const [label, column] of columns) {
-      const value = clean(row[column] ?? "");
-      if (value === "" || value === "-" || value === "—") issues.push(`团队计划角色 ${roleId} 的「${label}」为空`);
-    }
-  }
-  return issues;
+  const plan = parseTeamPlan(text);
+  if (plan.legacy) return legacyTeamPlanRoleRowIssues(text, recommended);
+  return teamPlanIssueMessages(plan);
 }
 
 /**
@@ -2122,7 +2096,10 @@ async function validateConvenerAppointmentCard(args: {
   projectRoot: string;
   flowId: string;
   req: CustomerInputRequest;
-}): Promise<{ ok: true; teamPlanPath: string } | { ok: false; reason: string }> {
+}): Promise<
+  | { ok: true; teamPlanPath: string; teamPlanSchema: 1 | 2; modules: string[] }
+  | { ok: false; reason: string }
+> {
   if (args.req.kind !== "choice") {
     return { ok: false, reason: "任命卡必须是 request_choice（choice）卡；本次未向客户发卡。" };
   }
@@ -2209,7 +2186,57 @@ async function validateConvenerAppointmentCard(args: {
       reason: `团队计划 ${plan.relPath} 不完整：${rowIssues.join("；")}。本次未向客户发卡、未写账本。`,
     };
   }
-  return { ok: true, teamPlanPath: plan.relPath };
+
+  // 2026-10-22 角色粒度/MapReduce（Q9 A）：v2 计划同时做 V11（flow 已写时）的一致性核对。
+  const planParse = parseTeamPlan(text, { flowId: args.flowId });
+  if (!planParse.legacy) {
+    if (!planParse.ok) {
+      return {
+        ok: false,
+        reason:
+          `团队计划 ${plan.relPath} 不完整：${teamPlanIssueMessages(planParse).join("；")}。` +
+          "本次未向客户发卡、未写账本。",
+      };
+    }
+    const flowIssues = await teamPlanFlowConsistencyIssues(args.projectRoot, args.flowId, planParse);
+    if (flowIssues.length > 0) {
+      return {
+        ok: false,
+        reason:
+          `团队计划 ${plan.relPath} 与流程不一致：${flowIssues.join("；")}。` +
+          "本次未向客户发卡、未写账本。",
+      };
+    }
+  }
+  return {
+    ok: true,
+    teamPlanPath: plan.relPath,
+    teamPlanSchema: planParse.teamPlanSchema,
+    modules: planParse.modules,
+  };
+}
+
+/**
+ * V11（flow-plan 一致性）：**仅在 `docs/flows/<flowId>.yaml` 已写时**执行。
+ * YAML 不可读（非 ENOENT）或校验失败 ⇒ fail-closed（不弹卡）；仅旧 `.md` 视图 ⇒ 跳过（迁移兼容）。
+ * 返回可读问题列表（空 = 一致/无需检查）。
+ */
+async function teamPlanFlowConsistencyIssues(
+  projectRoot: string,
+  flowId: string,
+  plan: TeamPlanParseResult,
+): Promise<string[]> {
+  const rel = `docs/flows/${flowId}.yaml`;
+  let text: string;
+  try {
+    text = await readFile(path.join(projectRoot, ...rel.split("/")), "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    return [`流程状态 ${rel} 不可读`];
+  }
+  const parsed = parseFlowStateYaml(text, flowId);
+  if (!parsed.ok) return [`流程 YAML 校验失败：${parsed.error}`];
+  return validateTeamPlanFlowConsistency(plan, parsed.flow).map((issue) => issue.message);
 }
 
 
@@ -2731,6 +2758,15 @@ async function computeJudgeContext(args: {
         const text = await readFile(path.join(args.projectRoot, ...planPath.split("/")), "utf8");
         const recommended = parseRecommendedRoleIds(text);
         if (recommended !== undefined) context.recommendedRoleIds = recommended;
+        // 2026-10-22 角色粒度/MapReduce：把团队计划 schema/模块摘要放进 facts（可选；不新增 artifact kind）。
+        // 只是机器摘要，**不**代表应用已做粒度语义判断（语义复核仍在 Convener readiness）。
+        const parsedPlan = parseTeamPlan(text);
+        const boundedModules = parsedPlan.modules.slice(0, 20).map((module) => module.slice(0, 64));
+        context.facts = {
+          ...context.facts,
+          teamPlanSchema: parsedPlan.teamPlanSchema,
+          ...(boundedModules.length > 0 ? { teamPlanModules: boundedModules } : {}),
+        };
       } catch {
         // 团队计划不可读 ⇒ 不提供推荐集（driver 回落 manual/insufficient-evidence）。
       }

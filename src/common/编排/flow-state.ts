@@ -140,6 +140,16 @@ export interface FlowStateStep {
    * 与 `supersedes` 成对：旧步骤写 `supersededBy: 新id`、新步骤写 `supersedes: [旧id]` 是推荐写法。
    */
   supersededBy?: string;
+  /**
+   * 并行组（可选；2026-10-22 角色粒度/MapReduce 方案 A）：`map-<slug>` 或 `reduce`。
+   * 旧 flow 不填 ⇒ 字段缺席，解析/序列化/门禁行为逐字不变；不是新的 `FlowStepKind`。
+   */
+  parallelGroup?: string;
+  /**
+   * 前置 step id 列表（可选；仅承载/静态校验/派发前置 `done`）。
+   * 目标必须存在、不得自依赖/重复/成环；旧 flow 不填 ⇒ 不新增任何检查。
+   */
+  dependsOn?: string[];
 }
 
 /**
@@ -212,8 +222,22 @@ export type EvaluateFlowCompletionResult =
 // —————————————————————— 解析与校验 ——————————————————————
 
 const TOP_LEVEL_KEYS = new Set(["flowId", "version", "qualityTier", "status", "steps"]);
-const STEP_KEYS = new Set(["id", "title", "owner", "kind", "status", "evidence", "supersedes", "supersededBy"]);
+const STEP_KEYS = new Set([
+  "id",
+  "title",
+  "owner",
+  "kind",
+  "status",
+  "evidence",
+  "supersedes",
+  "supersededBy",
+  "parallelGroup",
+  "dependsOn",
+]);
 const EVIDENCE_KEYS = new Set(["kind", "ref"]);
+
+/** 并行组语法（MapReduce 方案 A）：`map-<slug>` 或 `reduce`。 */
+const PARALLEL_GROUP_RE = /^(?:map-[a-z][a-z0-9-]*|reduce)$/;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -471,6 +495,48 @@ export function parseFlowStateYaml(text: string, flowId: string): ParseFlowState
       }
     }
 
+    // —— parallelGroup / dependsOn（可选；MapReduce 方案 A） ——
+    let parallelGroup: string | undefined;
+    if (rawStep.parallelGroup !== undefined) {
+      const value = trimString(rawStep.parallelGroup);
+      if (value === undefined || !PARALLEL_GROUP_RE.test(value)) {
+        push(
+          `${base}.parallelGroup`,
+          `parallelGroup 必须是 map-<slug> 或 reduce（当前 ${JSON.stringify(rawStep.parallelGroup)}）`,
+        );
+      } else {
+        parallelGroup = value;
+      }
+    }
+
+    let dependsOn: string[] | undefined;
+    if (rawStep.dependsOn !== undefined) {
+      if (!Array.isArray(rawStep.dependsOn)) {
+        push(`${base}.dependsOn`, "dependsOn 必须是步骤 id 数组");
+      } else {
+        const list: string[] = [];
+        const seen = new Set<string>();
+        rawStep.dependsOn.forEach((item, itemIndex) => {
+          const value = trimString(item);
+          if (value === undefined || !isSlug(value)) {
+            push(`${base}.dependsOn[${itemIndex}]`, `dependsOn 项必须是合法步骤 id（当前 ${JSON.stringify(item)}）`);
+            return;
+          }
+          if (seen.has(value)) {
+            push(`${base}.dependsOn[${itemIndex}]`, `dependsOn 重复列出步骤 "${value}"`);
+            return;
+          }
+          if (id !== undefined && value === id) {
+            push(`${base}.dependsOn[${itemIndex}]`, `步骤不能依赖自己（"${id}"）`);
+            return;
+          }
+          seen.add(value);
+          list.push(value);
+        });
+        dependsOn = list;
+      }
+    }
+
     steps.push({
       id: id ?? "",
       title: title ?? "",
@@ -480,6 +546,8 @@ export function parseFlowStateYaml(text: string, flowId: string): ParseFlowState
       ...(evidence !== undefined ? { evidence } : {}),
       ...(supersedes !== undefined ? { supersedes } : {}),
       ...(supersededBy !== undefined ? { supersededBy } : {}),
+      ...(parallelGroup !== undefined ? { parallelGroup } : {}),
+      ...(dependsOn !== undefined ? { dependsOn } : {}),
     });
   });
 
@@ -527,6 +595,9 @@ export function parseFlowStateYaml(text: string, flowId: string): ParseFlowState
   steps.forEach((step, index) => {
     if (step.id !== "" && !idToIndex.has(step.id)) idToIndex.set(step.id, index);
   });
+
+  // —— 依赖图（parallelGroup/dependsOn 静态校验；旧 flow 不填 ⇒ 零检查） ——
+  validateDependencyGraph(steps, idToIndex, push);
 
   /** 新步骤 → 显式列出的旧步骤 → 该列表项下标（用于错误路径）。 */
   const explicitSupersedes = new Map<string, Map<string, number>>();
@@ -629,6 +700,169 @@ export function parseFlowStateYaml(text: string, flowId: string): ParseFlowState
     },
   };
 }
+
+/**
+ * `dependsOn` / `parallelGroup` 静态校验（MapReduce 方案 A；仅对有声明字段的步骤/flow 生效）：
+ *   · dependsOn 目标存在（自依赖/重复在解析时已报）、无环；
+ *   · 同一 `map-*` 组内步骤之间不得有依赖路径；
+ *   · 每个 reduce 步骤（dispatch/artifact，验收除外）直接/传递依赖全部 `map-*` dispatch 步骤；
+ *   · Map 步骤不得依赖 Reduce 步骤；
+ *   · 含 Map dispatch 步骤的新契约 flow 必须有 `contract-freeze`，且每个 Map dispatch 步骤都（直接/传递）依赖它。
+ * 旧 flow（无 parallelGroup/dependsOn）不触发任何检查。
+ */
+function validateDependencyGraph(
+  steps: readonly FlowStateStep[],
+  idToIndex: ReadonlyMap<string, number>,
+  push: (path: string, message: string) => void,
+): void {
+  if (!steps.some((step) => step.parallelGroup !== undefined || step.dependsOn !== undefined)) return;
+
+  const byId = new Map<string, FlowStateStep>();
+  for (const step of steps) {
+    if (step.id !== "" && !byId.has(step.id)) byId.set(step.id, step);
+  }
+  const edges = new Map<string, string[]>();
+  for (const step of steps) {
+    if (step.dependsOn === undefined) continue;
+    const deps: string[] = [];
+    step.dependsOn.forEach((dep, itemIndex) => {
+      if (!byId.has(dep)) {
+        const index = idToIndex.get(step.id);
+        push(`steps[${index ?? "?"}].dependsOn[${itemIndex}]`, `dependsOn 指向不存在的步骤 "${dep}"`);
+        return;
+      }
+      deps.push(dep);
+    });
+    edges.set(step.id, deps);
+  }
+
+  // 环检测（依赖边：步骤 → 前置；DFS 三色）。
+  const state = new Map<string, 1 | 2>();
+  const stack: string[] = [];
+  const reported = new Set<string>();
+  const visit = (id: string): void => {
+    const current = state.get(id);
+    if (current === 2) return;
+    if (current === 1) {
+      const start = stack.indexOf(id);
+      const cycle = [...stack.slice(start), id];
+      const key = [...new Set(cycle)].sort().join("\u0000");
+      if (!reported.has(key)) {
+        reported.add(key);
+        push(`steps[${idToIndex.get(id) ?? "?"}].dependsOn`, `dependsOn 形成环：${cycle.join(" → ")}`);
+      }
+      return;
+    }
+    state.set(id, 1);
+    stack.push(id);
+    for (const dep of edges.get(id) ?? []) visit(dep);
+    stack.pop();
+    state.set(id, 2);
+  };
+  for (const step of steps) {
+    if (step.id !== "") visit(step.id);
+  }
+
+  /** 传递前置集合（不含自身；用 visited 防御环）。 */
+  const reachable = (id: string): Set<string> => {
+    const result = new Set<string>();
+    const walk = (current: string): void => {
+      for (const dep of edges.get(current) ?? []) {
+        if (result.has(dep)) continue;
+        result.add(dep);
+        walk(dep);
+      }
+    };
+    walk(id);
+    return result;
+  };
+  const reachableCache = new Map<string, Set<string>>();
+  const reach = (id: string): Set<string> => {
+    const cached = reachableCache.get(id);
+    if (cached !== undefined) return cached;
+    const computed = reachable(id);
+    reachableCache.set(id, computed);
+    return computed;
+  };
+
+  const mapSteps = steps.filter(
+    (step) =>
+      step.status !== "superseded" &&
+      typeof step.parallelGroup === "string" &&
+      step.parallelGroup.startsWith("map-"),
+  );
+  const reduceSteps = steps.filter(
+    (step) => step.status !== "superseded" && step.parallelGroup === "reduce",
+  );
+
+  // 同一 map-* 组内不得有依赖路径。
+  const groups = new Map<string, FlowStateStep[]>();
+  for (const step of mapSteps) {
+    const group = step.parallelGroup!;
+    const list = groups.get(group) ?? [];
+    list.push(step);
+    groups.set(group, list);
+  }
+  for (const [group, groupSteps] of groups) {
+    for (let i = 0; i < groupSteps.length; i += 1) {
+      for (let j = i + 1; j < groupSteps.length; j += 1) {
+        const a = groupSteps[i]!;
+        const b = groupSteps[j]!;
+        if (reach(a.id).has(b.id) || reach(b.id).has(a.id)) {
+          push(
+            `steps[${idToIndex.get(a.id) ?? "?"}].dependsOn`,
+            `同一 ${group} 组内的步骤 ${a.id} 与 ${b.id} 之间存在依赖路径（同组必须互相独立）`,
+          );
+        }
+      }
+    }
+  }
+
+  // Map 步骤不得依赖 Reduce 步骤（直接/传递）。
+  for (const step of mapSteps) {
+    for (const target of reach(step.id)) {
+      const targetStep = byId.get(target);
+      if (targetStep?.parallelGroup === "reduce") {
+        push(
+          `steps[${idToIndex.get(step.id) ?? "?"}].dependsOn`,
+          `Map 步骤 ${step.id} 不得依赖 Reduce 步骤 ${target}`,
+        );
+      }
+    }
+  }
+
+  // Reduce 步骤（dispatch/artifact；验收除外）必须覆盖全部 Map dispatch 步骤。
+  const mapDispatchSteps = mapSteps.filter((step) => step.kind === "dispatch");
+  const reduceWorkSteps = reduceSteps.filter((step) => step.kind === "dispatch" || step.kind === "artifact");
+  for (const step of reduceWorkSteps) {
+    const deps = reach(step.id);
+    const missing = mapDispatchSteps.filter((mapStep) => !deps.has(mapStep.id));
+    if (missing.length > 0) {
+      push(
+        `steps[${idToIndex.get(step.id) ?? "?"}].dependsOn`,
+        `Reduce 步骤 ${step.id} 必须直接或传递依赖全部 Map dispatch 步骤（缺：${missing.map((item) => item.id).join("、")}）`,
+      );
+    }
+  }
+
+  // 新契约 flow：有 Map dispatch 步骤 ⇒ contract-freeze 必须存在且被每个 Map dispatch 依赖。
+  if (mapDispatchSteps.length > 0) {
+    const contractFreeze = byId.get("contract-freeze");
+    if (contractFreeze === undefined || contractFreeze.status === "superseded") {
+      push("steps", "新契约 flow 的 Map 交付步骤必须先依赖 contract-freeze：缺少 contract-freeze 步骤");
+    } else {
+      for (const step of mapDispatchSteps) {
+        if (!reach(step.id).has("contract-freeze")) {
+          push(
+            `steps[${idToIndex.get(step.id) ?? "?"}].dependsOn`,
+            `新契约 flow 的 Map 交付步骤 ${step.id} 必须（直接或传递）依赖 contract-freeze`,
+          );
+        }
+      }
+    }
+  }
+}
+
 
 function detectSupersedeCycles(
   steps: readonly FlowStateStep[],

@@ -22,6 +22,7 @@ import {
   seedLedger,
   seedTrioProject,
   teamPlanDoc,
+  teamPlanV2Doc,
   write,
   writeProjectRole,
 } from "./fixture.ts";
@@ -147,6 +148,85 @@ test("场景4：未任命/未写卡/缺标准拒绝派发；role_status 刷新�
     assert.equal(convenerEntry!.stepId, "impl");
     assert.equal(convenerEntry!.targetRoleId, "executor");
     assert.equal(convenerEntry!.customerDecision, undefined);
+  } finally {
+    await h.stop();
+    h.cleanup();
+    temp.cleanup();
+  }
+});
+
+test("场景4b（v2）：Map 组可并行派发；listing/role_status 可见；Reduce 在全部 Map done 前被拒、done 后受理", async () => {
+  const temp = makeRoot("dispatch-listing-v2");
+  seedTrioProject(temp.root, ["executor", "reviewer", "tester"]);
+  const v2Plan = teamPlanV2Doc(FLOW, {
+    modules: ["storefront", "checkout-api"],
+    recommended: ["executor", "reviewer"],
+    rows: [
+      { roleId: "executor", type: "new", module: "storefront", writes: "src/owned-executor/; test/owned-executor/", contract: "docs/contracts/storefront-v1.md", testSurface: "test/owned-executor/", dependsOn: "无", parallelGroup: "map-a", group: "交付" },
+      { roleId: "reviewer", type: "new", module: "checkout-api", writes: "src/owned-reviewer/; test/owned-reviewer/", contract: "docs/contracts/checkout-v1.md", testSurface: "test/owned-reviewer/", dependsOn: "无", parallelGroup: "map-a", group: "交付" },
+      { roleId: "tester", type: "existing", module: "reduce", writes: "test/测试/", contract: "docs/contracts/storefront-v1.md（消费）", testSurface: "test/测试/（集成/e2e）", deps: "依赖全部 Map", dependsOn: "executor, reviewer", parallelGroup: "reduce", group: "测试", apiSpec: "not-applicable（Reduce 不导出接口）" },
+    ],
+  });
+  const flowPending = flowDoc(FLOW, [
+    { id: "contract-freeze", owner: "rapporteur", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: "docs/contracts/storefront-v1.md" } },
+    { id: "delivery-storefront", owner: "executor", kind: "dispatch", status: "pending", parallelGroup: "map-a", dependsOn: ["contract-freeze"] },
+    { id: "delivery-checkout-api", owner: "reviewer", kind: "dispatch", status: "pending", parallelGroup: "map-a", dependsOn: ["contract-freeze"] },
+    { id: "test-map-shards", owner: "tester", kind: "dispatch", status: "pending", parallelGroup: "reduce", dependsOn: ["delivery-storefront", "delivery-checkout-api"] },
+    { id: "verification", kind: "acceptance", status: "pending" },
+  ]);
+  write(temp.root, FLOW_REL, flowPending);
+  write(temp.root, TEAM_PLAN_REL, v2Plan);
+  write(temp.root, CRITERIA_REL, acceptanceCriteriaDoc(FLOW));
+  await seedLedger(temp.root, [
+    { decisionKind: "proposal-accept", customerDecision: "accepted", actorRoleId: "rapporteur", power: "proposal" },
+    {
+      decisionKind: "appointment",
+      customerDecision: "appointed",
+      actorRoleId: "convener",
+      power: "schedule",
+      targetRoleIds: ["executor", "reviewer", "tester"],
+      artifactPath: TEAM_PLAN_REL,
+    },
+  ]);
+
+  const h = await makeHarness({ tag: "dispatch-listing-v2", root: temp.root, approval: true, decision: true });
+  try {
+    await h.open("convener");
+    const caps = h.capsByRole.get("convener")!;
+    const listing = await h.iface.listProject({ projectRoot: temp.root });
+    for (const roleId of ["executor", "reviewer", "tester"]) {
+      assert.equal(listing.roles.some((role) => role.roleId === roleId), true, `listing 可见 ${roleId}`);
+      const status = (await caps.roleStatus!({ roleId })) as { ok: boolean; text: string };
+      assert.match(status.text, new RegExp(`角色 ${roleId}：busy=`));
+    }
+
+    const mapA = (await caps.dispatchTask!({ roleId: "executor", task: "Map A 交付", flowId: FLOW, stepId: "delivery-storefront" })) as { ok: boolean; message: string };
+    const mapB = (await caps.dispatchTask!({ roleId: "reviewer", task: "Map A 交付", flowId: FLOW, stepId: "delivery-checkout-api" })) as { ok: boolean; message: string };
+    assert.equal(mapA.ok, true, mapA.message);
+    assert.equal(mapB.ok, true, mapB.message);
+
+    const early = (await caps.dispatchTask!({ roleId: "tester", task: "Reduce 分片", flowId: FLOW, stepId: "test-map-shards" })) as { ok: boolean; message: string };
+    assert.equal(early.ok, false, "Map 未 done 时 Reduce 不得派发");
+    assert.match(early.message, /前置依赖尚未全部 done/);
+
+    write(
+      temp.root,
+      FLOW_REL,
+      flowDoc(FLOW, [
+        { id: "contract-freeze", owner: "rapporteur", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: "docs/contracts/storefront-v1.md" } },
+        { id: "delivery-storefront", owner: "executor", kind: "dispatch", status: "done", parallelGroup: "map-a", dependsOn: ["contract-freeze"] },
+        { id: "delivery-checkout-api", owner: "reviewer", kind: "dispatch", status: "done", parallelGroup: "map-a", dependsOn: ["contract-freeze"] },
+        { id: "test-map-shards", owner: "tester", kind: "dispatch", status: "pending", parallelGroup: "reduce", dependsOn: ["delivery-storefront", "delivery-checkout-api"] },
+        { id: "verification", kind: "acceptance", status: "pending" },
+      ]),
+    );
+    const reduce = (await caps.dispatchTask!({ roleId: "tester", task: "Reduce 分片", flowId: FLOW, stepId: "test-map-shards" })) as { ok: boolean; message: string };
+    assert.equal(reduce.ok, true, reduce.message);
+    const ledger = await h.waitForLedger(
+      (entries) => entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "test-map-shards"),
+      5000,
+    );
+    assert.ok(ledger.entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "delivery-storefront"));
   } finally {
     await h.stop();
     h.cleanup();

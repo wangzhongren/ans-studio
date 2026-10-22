@@ -3732,8 +3732,114 @@ function writeTeamPlanFile(
   return `docs/scheduling/${flowId}-team-v${version}.md`;
 }
 
+/** 2026-10-22 角色粒度/MapReduce：写 v2 团队计划（模块清单 + 14 列角色表 + 五维章节）。 */
+function writeTeamPlanV2File(
+  root: string,
+  flowId: string,
+  options: {
+    modules?: string[];
+    rows?: Array<{
+      roleId: string;
+      type?: string;
+      module?: string;
+      duty?: string;
+      ability?: string;
+      writes?: string;
+      contract?: string;
+      testSurface?: string;
+      deps?: string;
+      dependsOn?: string;
+      parallelGroup?: string;
+      group?: string;
+      apiSpec?: string;
+      rationale?: string;
+    }>;
+    riskTier?: string;
+    version?: number;
+  } = {},
+): string {
+  const version = options.version ?? 1;
+  const modules = options.modules ?? ["storefront"];
+  const rows =
+    options.rows ??
+    [
+      {
+        roleId: "executor",
+        type: "new",
+        module: modules[0]!,
+        writes: "src/delivery",
+        contract: "docs/contracts/delivery-v1.md",
+        testSurface: "test/delivery/",
+        dependsOn: "无",
+        parallelGroup: "map-a",
+        group: "交付",
+        apiSpec: "required",
+      },
+      {
+        roleId: "tester",
+        type: "existing",
+        module: "reduce",
+        writes: "test/测试/",
+        contract: "docs/contracts/delivery-v1.md（消费）",
+        testSurface: "test/测试/",
+        deps: "依赖全部 Map",
+        dependsOn: "executor",
+        parallelGroup: "reduce",
+        group: "测试",
+        apiSpec: "not-applicable（Reduce 角色不导出接口）",
+      },
+    ];
+  const recommended = rows.filter((row) => row.module !== "reduce").map((row) => row.roleId);
+  const text = [
+    "---",
+    `flowId: ${flowId}`,
+    `version: ${version}`,
+    `riskTier: ${options.riskTier ?? "T3"}`,
+    "teamPlanSchema: 2",
+    `recommended: [${recommended.join(", ")}]`,
+    `modules: [${modules.join(", ")}]`,
+    "---",
+    "",
+    `# 团队计划：${flowId}`,
+    "",
+    "## 模块清单",
+    "",
+    "| module | 职责 | 公开契约 | 架构来源 |",
+    "| --- | --- | --- | --- |",
+    ...modules.map(
+      (module) => `| ${module} | ${module} 交付模块 | docs/contracts/delivery-v1.md | docs/planning/${flowId}-v1.md §4 |`,
+    ),
+    "",
+    "## 参与角色与职责",
+    "",
+    "| roleId | 类型 | module | 职责目标 | 能力要求 | 唯一写集 | 公开契约 | 测试面 | 依赖 | dependsOn | 并行组 | 组别 | apiSpec | 粒度理由 |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...rows.map(
+      (row) =>
+        `| ${row.roleId} | ${row.type ?? "new"} | ${row.module ?? modules[0]} | ${row.duty ?? "实现交付"} | ${row.ability ?? "工程能力"} | ${row.writes ?? "src/delivery"} | ${row.contract ?? "docs/contracts/delivery-v1.md"} | ${row.testSurface ?? "test/delivery/"} | ${row.deps ?? "无"} | ${row.dependsOn ?? "无"} | ${row.parallelGroup ?? "map-a"} | ${row.group ?? "交付"} | ${row.apiSpec ?? "required"} | ${row.rationale ?? "—"} |`,
+    ),
+    "",
+    "## 五维判断与协调成本",
+    "",
+    "- 责任独立性：模块各自有独立变化原因；Reduce 角色独立承担证据合并。",
+    "- 范围归属：Map 角色写集不相交；Reduce 只写测试与证据。",
+    "- 契约影响：公开契约由 Map 角色唯一主属，其余角色只消费。",
+    "- 证据独立性：每个 Map 角色有独立测试面，Reduce 独立合并。",
+    "- 协调成本：按模块并行收益高于交接成本，未拆到函数级。",
+    "",
+  ].join("\n");
+  const dir = path.join(root, "docs", "scheduling");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, `${flowId}-team-v${version}.md`), text);
+  return `docs/scheduling/${flowId}-team-v${version}.md`;
+}
+
 /** 2026-10-22 第 5 项：写出一个 new/changed 角色的完整必填产物（章节 + boundary 条目 + 四份工作文档）。 */
-function writeFullRoleArtifacts(root: string, roleId: string): void {
+function writeFullRoleArtifacts(
+  root: string,
+  roleId: string,
+  options: { boundaryWrites?: Array<{ kind: "file" | "directory"; path: string }> } = {},
+): void {
   const dir = path.join(root, "角色卡", roleId);
   mkdirSync(dir, { recursive: true });
   writeFileSync(
@@ -3793,6 +3899,11 @@ function writeFullRoleArtifacts(root: string, roleId: string): void {
       "  - kind: file",
       "    path: src/delivery",
       "    purpose: 实施写集",
+      ...(options.boundaryWrites ?? []).flatMap((entry) => [
+        `  - kind: ${entry.kind}`,
+        `    path: ${entry.path}`,
+        "    purpose: 计划写集",
+      ]),
       "",
     ].join("\n"),
   );
@@ -4482,6 +4593,206 @@ test("2026-10-22 第 1 项：账本最新任命决定未获同意（rejected）�
       "不写派发账本",
     );
     await iface.stopSession();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————— 2026-10-22 Map C：团队计划 v2 读取 / V12 计划写集覆盖 / 来源分流 ——————
+
+test("2026-10-22 v2 团队计划：读取模块清单/v2 字段/并行组；计划写集被 boundary 覆盖 ⇒ 派 readiness 且文案含模块列/分片", async () => {
+  const root = makeTempProjectRoot("ans-v2-team-plan-");
+  try {
+    const flowId = "flow-v2-ok";
+    writeTeamPlanV2File(root, flowId);
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      // 完整 new 角色产物；boundary 的 src/delivery 文件覆盖计划写集。
+      writeFullRoleArtifacts(root, "executor");
+      await harness.iface.advanceGovernanceFlow({
+        payload: appointmentWritePayload(flowId),
+        context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+      });
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) > 0, 5000);
+      const readiness = harness.sendsByRole.get("convener")![0]!;
+      assert.match(readiness, /团队计划为 v2（teamPlanSchema: 2）/);
+      assert.match(readiness, /模块清单：storefront/, "readiness 文案带团队计划模块清单");
+      assert.match(readiness, /module\/boundedContext/);
+      assert.match(readiness, /module\/contract\/testSurface\/parallel\/dependsOn\/granularity/, "readiness 记录要求新增列");
+      assert.match(readiness, /每分片独立证据/);
+      assert.match(readiness, /等全部 Map done/);
+      assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 0, "覆盖通过：不退回 Crew");
+      const ledger = await readGovernanceLedger(root);
+      assert.ok(
+        ledger.entries.some(
+          (entry) =>
+            entry.kind === "dispatch.accepted" &&
+            entry.flowId === flowId &&
+            entry.targetRoleId === "convener" &&
+            entry.stepId === "role-readiness",
+        ),
+        "V12 通过后才派 readiness（stepId=role-readiness）",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-22 V12：new 角色计划写集未被 boundary 覆盖 ⇒ 退回 Crew（含 Convener 修正提示）、不派 readiness", async () => {
+  const root = makeTempProjectRoot("ans-v12-uncovered-");
+  try {
+    const flowId = "flow-v12-uncovered";
+    writeTeamPlanV2File(root, flowId, {
+      rows: [
+        {
+          roleId: "executor",
+          type: "new",
+          module: "storefront",
+          writes: "src/other/",
+          contract: "docs/contracts/delivery-v1.md",
+          testSurface: "test/delivery/",
+          dependsOn: "无",
+          parallelGroup: "map-a",
+        },
+        {
+          roleId: "tester",
+          type: "existing",
+          module: "reduce",
+          writes: "test/测试/",
+          contract: "docs/contracts/delivery-v1.md（消费）",
+          testSurface: "test/测试/",
+          deps: "依赖全部 Map",
+          dependsOn: "executor",
+          parallelGroup: "reduce",
+          apiSpec: "not-applicable（Reduce 角色不导出接口）",
+        },
+      ],
+    });
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      writeFullRoleArtifacts(root, "executor"); // boundary 仅覆盖 src/delivery，不含 src/other/
+      await harness.iface.advanceGovernanceFlow({
+        payload: appointmentWritePayload(flowId),
+        context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+      });
+      await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) > 0, 5000);
+      const feedback = harness.sendsByRole.get("nominator")![0]!;
+      assert.match(feedback, /计划写集「src\/other\/」未被 boundary\.yaml entries 覆盖/, "V12 指出未覆盖的计划写集");
+      assert.match(feedback, /报告 Convener 修正计划/, "Crew 文案给出计划有误时的回归路径");
+      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "不派 readiness");
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "不写 readiness 派发账本");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-22 V12：existing 角色计划写集未覆盖 boundary ⇒ 只 warning、仍派 readiness", async () => {
+  const root = makeTempProjectRoot("ans-v12-existing-");
+  try {
+    const flowId = "flow-v12-existing";
+    writeTeamPlanV2File(root, flowId, {
+      rows: [
+        {
+          roleId: "executor",
+          type: "existing",
+          module: "storefront",
+          writes: "src/other/",
+          contract: "docs/contracts/delivery-v1.md",
+          testSurface: "test/delivery/",
+          dependsOn: "无",
+          parallelGroup: "map-a",
+        },
+        {
+          roleId: "tester",
+          type: "existing",
+          module: "reduce",
+          writes: "test/测试/",
+          contract: "docs/contracts/delivery-v1.md（消费）",
+          testSurface: "test/测试/",
+          deps: "依赖全部 Map",
+          dependsOn: "executor",
+          parallelGroup: "reduce",
+          apiSpec: "not-applicable（Reduce 角色不导出接口）",
+        },
+      ],
+    });
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      // existing：最低文件检查（无完整工作文档）也只是 warning；V12 未覆盖同样只 warning。
+      writeRoleArtifactFiles(root, "executor");
+      await harness.iface.advanceGovernanceFlow({
+        payload: appointmentWritePayload(flowId),
+        context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+      });
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) > 0, 5000);
+      assert.match(harness.sendsByRole.get("convener")![0]!, /role-readiness/, "existing 未覆盖不阻塞 readiness");
+      assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 0, "warning 不退回 Crew");
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 1, "readiness 派发入账");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-22 v2 计划问题来源分流：缺公开契约 ⇒ 反馈 Convener、不退回 Crew readiness", async () => {
+  const root = makeTempProjectRoot("ans-v2-plan-source-");
+  try {
+    const flowId = "flow-v2-plan-source";
+    writeTeamPlanV2File(root, flowId, {
+      rows: [
+        {
+          roleId: "executor",
+          type: "new",
+          module: "storefront",
+          writes: "src/delivery",
+          contract: "",
+          testSurface: "test/delivery/",
+          dependsOn: "无",
+          parallelGroup: "map-a",
+        },
+        {
+          roleId: "tester",
+          type: "existing",
+          module: "reduce",
+          writes: "test/测试/",
+          contract: "docs/contracts/delivery-v1.md（消费）",
+          testSurface: "test/测试/",
+          deps: "依赖全部 Map",
+          dependsOn: "executor",
+          parallelGroup: "reduce",
+          apiSpec: "not-applicable（Reduce 角色不导出接口）",
+        },
+      ],
+    });
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      writeFullRoleArtifacts(root, "executor");
+      await harness.iface.advanceGovernanceFlow({
+        payload: appointmentWritePayload(flowId),
+        context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+      });
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) > 0, 5000);
+      const planText = harness.sendsByRole.get("convener")![0]!;
+      assert.match(planText, /团队计划未通过结构校验/, "v2 计划问题反馈 Convener");
+      assert.match(planText, /公开契约/, "具体到缺失字段");
+      assert.doesNotMatch(planText, /请对照团队计划/, "不是 readiness 任务");
+      assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 0, "计划问题不误退 Crew");
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "不写 readiness 派发账本");
+    } finally {
+      await harness.iface.stopSession();
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

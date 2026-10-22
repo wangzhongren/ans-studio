@@ -561,3 +561,40 @@ export type { CreateGovernanceJudgeOptions } from "../../common/编排/governanc
 - 定向测试：`governance-gate` **20/20**、`governance-judge` **81/81**、`flow-state` **35/35**、`flow-service` **22/22**、`governance-session` **30/30**、`governance-ledger`+`decision-evidence-packet`+`decision-intent-drift` **32/32**；`node --test "test/编排/**/*.test.ts"` **735 计/734 过/1 红**（唯一红＝既有 Windows symlink EPERM `shell-authorized-routine.test.ts:103`，基线与任务书一致）；`npm run typecheck` **exit 0**。环境：Node v24.22.1 / npm 11.19.1 / Windows 11 / Git Bash。
 - 新增/更新负例：团队计划卡前守卫六类失败（缺失/flowId 不符/推荐集空/含内置角色/选项不一致/角色行缺项）、推荐集内联数组解析与团队计划优先/legacy 回落、`latestVersionedArtifact` 扫描 `-team-vN.md`、`write-team-plan` 门禁正反例、appointment `power=schedule`、acceptance 标准/报告/首行五项/档位门槛、`team-plan` 步骤模板与枚举不变、`observeFlowArtifacts` 新 artifact 观察。
 - **契约偏差/未做**：旧版 Markdown 映射 `team-plan*`→artifact 的可执行实件属桌面窗口（阶段 D），本阶段未改 `app/**`；`test/测试/` 跨角色 e2e 与全量 T3 回归归阶段 E 测试角色；appointment→Crew 桌面派发回路属阶段 D。文档状态 `implemented-unverified`，未提交/暂存/推送。
+
+## 2026-10-22 角色粒度（bounded context）与 MapReduce 并行（Map B）
+
+状态：**implemented-unverified**（定向检查通过，未经独立验收）。
+
+### 单一团队计划解析器（`src/common/编排/team-plan.ts`，Q9 A）
+
+Pipeline 公共出口 `src/pipeline/orchestration/run-role.ts` 再导出（桌面 Map C 经此消费，不直接 import 私有 common）：
+
+- `parseTeamPlan(text, {flowId?}) => TeamPlanParseResult`：v2（`teamPlanSchema: 2`）跑 V1–V10；缺省/`teamPlanSchema: 1` 走 legacy（既有 v1 表格检查，不强制新字段）。
+- `TeamPlanParseResult = { ok; legacy; teamPlanSchema: 1|2; flowId?; version?; riskTier?; recommended: string[]; modules: string[]; moduleList: TeamPlanModule[]; roleRows: TeamPlanRoleRow[]; issues: TeamPlanIssue[] }`。
+- `TeamPlanIssue = { code: "V1".."V11"; severity: "error"|"warning"|"exception-review"; message; path?; roleId?; module? }`；`teamPlanIssueMessages(result, severity="error")` 取可读消息。
+- `TeamPlanRoleRow`：`roleId/roleType/module/modules/primaryModule/duty/ability/writeset/writesets/contracts/testSurface/deps/dependsOnRaw/dependsOn/parallelGroup/group/apiSpec/apiSpecStatus/apiSpecReason/granularityRationale/isMap/isReduce`。
+- 写集原语（V12 复用）：`parseWritesetCell(raw) => {entries, issues}`、`writesetsOverlap(a,b)`、`isGovernanceWritesetPath(value)`；`WritesetEntry = {raw,path,directory}`。
+- `validateTeamPlanFlowConsistency(plan, flow) => TeamPlanIssue[]`：V11（Map 交付 `delivery-<主模块>`、owner、parallelGroup、dependsOn 精确 `{contract-freeze} ∪ 依赖角色 delivery-*`、Reduce 覆盖全部 Map、contract-freeze 存在）。
+- `legacyTeamPlanRoleRowIssues(text, recommended)`：v1 表格检查（保留既有文案）。
+- 不新增 cardKind / FlowStepKind / artifact kind；不调用 LLM 做粒度语义判断（语义仍归 Convener readiness）。
+
+### flow 可选字段（方案 A）
+
+- `FlowStateStep` 新增可选 `parallelGroup?: string`（`map-<slug>`/`reduce`）与 `dependsOn?: string[]`；`STEP_KEYS` 严格（未知字段仍拒绝）；`FLOW_STEP_KINDS` 不变。
+- `parseFlowStateYaml` 静态校验：parallelGroup 语法、dependsOn 目标存在/无自依赖/重复/环、同 `map-*` 组无依赖路径、每个 reduce 步骤（dispatch/artifact，验收除外）覆盖全部 `map-*` dispatch、Map 不依赖 Reduce、Map dispatch 依赖 `contract-freeze`；`superseded` 步骤不参与 Map/Reduce 调度语义。旧 flow 无字段 ⇒ 零新增检查。
+- `flow-service`：`viewOf`/`serializeFlow`/`supersede` 携带字段；旧 flow 序列化逐字不变；supersede 幂等比较含两字段。
+- `governance-gate::evaluateDispatchGate`：步骤声明 `dependsOn` 时全部前置必须 `status: done`，否则 `dependencies-not-done`；不改变派发权，旧步骤无 `dependsOn` 不新增检查。
+
+### 卡前守卫 / facts / 提示
+
+- `run-role.ts::validateConvenerAppointmentCard`：v2 调 `parseTeamPlan` 跑 V1–V10；`docs/flows/<flowId>.yaml` 已写时跑 V11；失败不弹卡、不写账本。
+- `computeJudgeContext`（appointment）：`facts.teamPlanSchema` + 有界 `facts.teamPlanModules`（≤20 项、每项 ≤64B）；`artifacts.teamPlanPath` 不变，不新增 artifact kind。
+- `govern-session.ts`：标准工作流/Convener/Crew 提示同步 v2 字段、模块清单、Map/Reduce flow 可选字段、readiness 例外、测试分片与 manifest；不改变派发权/客户入口。
+
+### 验收证据（Map B）
+
+- `node --test "test/编排/**/*.test.ts"`：**769 tests / 768 pass / 1 fail / 0 skip**（唯一红＝既有 Windows symlink EPERM `shell-authorized-routine.test.ts:103`；基线 735/734/1，零新增红）；`npm run typecheck` exit 0。
+- 定向：`team-plan` 17/17、`flow-state` 44/44、`flow-service` 24/24、`governance-gate` 22/22、`governance-session` 34/34；只读 `test/测试/governance-e2e-auto/**` 68/68（legacy 团队计划不回退）。
+- **已知限制**：`flow_step_supersede` 工具不转发两字段、`flow_get` 文本投影不渲染（§11.6 已接受；服务层已支持，初始 YAML 可携带）；未改 `src/model/runtime.ts`、`src/provider/runtime/**`、`src/common/门禁引擎/**`、`app/**`、`test/测试/**`。
+- 未做：Map C（桌面 v2 解析/V12）、Reduce 终验/全量 T3 回归、提交/推送/合并/发布。

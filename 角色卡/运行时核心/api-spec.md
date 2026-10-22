@@ -117,3 +117,11 @@ Service 为每轮提供一个 ID，归一事件的顶层和 `detail.turnId`，�
 - Provider `request_choice` / `request_confirmation` 只更新描述文案：写明 `appointment` 为**任命**卡（由 Convener 依客户确认的团队计划发起；Crew 收到任命后才按名单写卡，旧「提名」流程为 legacy）与 `appointment-write` 为任命后写卡确认；角色允许卡种由应用校验。**不新增 `cardKind`**，参数形状、校验逻辑与 handler 行为不变。
 
 下游消费（编排的物证/推荐集/风险档位、桌面 appointment→Crew 回路）属阶段 C/D；本阶段未接线，字段存在不等于门禁已实现。字段清单、检查命令、候选哈希与契约偏差见 [本次 change 记录](docs/change/2026-10-22_change_governance-split-1-3-5-model-provider.md)。
+
+**角色粒度与 MapReduce 方案 A 契约冻结（2026-10-22，Map A/N4，`implemented-unverified`）：** 依据客户确认的策划方案 `docs/planning/2026-10-22_design_role-granularity-parallel-testing.md` §6.2/§8.2/§13 Q3 A、团队计划 `docs/scheduling/2026-10-22-role-granularity-parallel-testing-team-plan.md` §4.3/§5.4 N4 与实施前验收标准 `docs/acceptance/role-granularity-parallel-testing-criteria-v1.md` P6，本层只做**可选加法**（旧 flow/旧调用零变化）：
+
+- `FlowToolStepView` 增可选 `parallelGroup?: string`（`map-<slug>` 或 `reduce`）与 `dependsOn?: string[]`（前置 step id）；`FlowToolView.steps` 经该类型承载。当前代码没有独立的 `FlowToolStep` 符号（实际为步骤视图 `FlowToolStepView` 与流程视图 `FlowToolView`，以符号名为准）。
+- `FlowStepSupersedeFn` 输入增同名可选 `parallelGroup?`/`dependsOn?`（新步骤可声明；服务端校验）。
+- `GovernanceJudgeFacts` 可选增 `teamPlanSchema?: 1 | 2`（1=legacy 缺省、2=v2）与 `teamPlanModules?: string[]`（有界模块 id 摘要）；物证仍沿用 `artifacts.teamPlanPath`，**不新增** evidence artifact kind。
+- **不变**：`FlowToolStepKind`/`FLOW_TOOL_STEP_KINDS` 仍恰四值（`dispatch`/`customer-decision`/`artifact`/`acceptance`），不新增 `map`/`reduce`；`GovernanceStepKind`/`cardKind`/`GovernancePower`/`GovernanceDecisionKind` 值不变；Provider `tools.ts`/`schema.ts` 未改（参数/schema/校验形状不动）。
+- 本层只承载字段：并行组语法、依赖存在性/环、同 Map 组无依赖、Reduce 覆盖、dispatch 前置 `done` 的静态校验/裁决在编排（Map B），本阶段未接线；字段存在不等于门禁已实现。证据见 [本次 change 记录](docs/change/2026-10-22_change_role-granularity-parallel-testing.md)。

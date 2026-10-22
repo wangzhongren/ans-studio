@@ -205,6 +205,10 @@ export interface FlowDocStep {
   title?: string;
   /** done 步骤的证据；缺省时 dispatch→{kind:"dispatch",ref:id}、acceptance→{kind:"acceptance",ref:"acceptance"}。 */
   evidence?: { kind: string; ref: string };
+  /** 2026-10-22 MapReduce 方案 A：可选并行组（map-<slug> | reduce）；旧 flow 不填。 */
+  parallelGroup?: string;
+  /** 2026-10-22 MapReduce 方案 A：可选前置步骤 id 列表；旧 flow 不填。 */
+  dependsOn?: readonly string[];
 }
 
 /**
@@ -226,6 +230,8 @@ export function flowDoc(flowId = FLOW, steps: FlowDocStep[] = [{ id: "impl", sta
       `    kind: ${kind}`,
       `    status: ${status}`,
     );
+    if (step.parallelGroup !== undefined) lines.push(`    parallelGroup: ${step.parallelGroup}`);
+    if (step.dependsOn !== undefined) lines.push(`    dependsOn: [${step.dependsOn.join(", ")}]`);
     if (status === "done") {
       const evidence =
         step.evidence ??
@@ -290,7 +296,132 @@ export function teamPlanDoc(
   return lines.join("\n") + "\n";
 }
 
-/** 新流程 role-card：第 5 项必填章节（等价标题即可）齐全。 */
+/**
+ * 团队计划 v2 角色行（2026-10-22 角色粒度/MapReduce；策划方案 §5.3 的 14 列）。
+ * 只用于生成夹具文本；校验由产品 `src/common/编排/team-plan.ts` 执行。
+ */
+export interface TeamPlanV2RoleInput {
+  roleId: string;
+  type?: string;
+  module: string;
+  duty?: string;
+  ability?: string;
+  writes?: string;
+  contract?: string;
+  testSurface?: string;
+  deps?: string;
+  dependsOn?: string;
+  parallelGroup?: string;
+  group?: string;
+  apiSpec?: string;
+  rationale?: string;
+}
+
+export interface TeamPlanV2ModuleInput {
+  module: string;
+  responsibility?: string;
+  contract?: string;
+  architectureSource?: string;
+}
+
+export interface TeamPlanV2Options {
+  version?: number;
+  riskTier?: string;
+  /** frontmatter flowId 覆盖（flowId 不一致负例）。 */
+  frontmatterFlowId?: string;
+  /** frontmatter `modules` 覆盖（重复/未声明/块数组等负例）。 */
+  modules?: readonly string[];
+  /** 角色行；必填，便于正/负例精确控制。 */
+  rows: readonly TeamPlanV2RoleInput[];
+  /** frontmatter `recommended` 覆盖；缺省 = rows 中非 reduce 角色。 */
+  recommended?: readonly string[];
+  /** 省略 frontmatter modules（缺模块清单负例）。 */
+  omitModulesFrontmatter?: boolean;
+  /** 用 YAML 块数组写 modules（解析负例）。 */
+  blockModules?: boolean;
+  /** 省略正文「模块清单」表。 */
+  omitModuleSection?: boolean;
+  /** 模块清单行覆盖（字符串原样使用，或结构化生成）。 */
+  moduleRows?: readonly (TeamPlanV2ModuleInput | string)[];
+  /** 省略「五维判断/协调成本」章节。 */
+  omitCoordinationSection?: boolean;
+}
+
+/**
+ * 生成团队计划 v2（frontmatter `teamPlanSchema: 2`/`modules` + 模块清单 + 14 列角色表 + 五维章节）。
+ * **不替换 v1 `teamPlanDoc`**：旧流程/legacy 覆盖继续使用 v1 夹具（不得批量迁移）。
+ */
+export function teamPlanV2Doc(flowId = FLOW, options: TeamPlanV2Options): string {
+  const rows = options.rows;
+  const modules =
+    options.modules ??
+    [...new Set(rows.map((row) => row.module).filter((module) => module !== "" && !module.split(/[+＋]/).includes("reduce")))];
+  const recommended = options.recommended ?? rows.filter((row) => !row.module.split(/[+＋]/).includes("reduce")).map((row) => row.roleId);
+  const version = options.version ?? 1;
+  const riskTier = options.riskTier ?? "T3";
+  const moduleRows =
+    options.moduleRows ??
+    modules.map((module) => ({
+      module,
+      responsibility: `${module} 模块交付`,
+      contract: `docs/contracts/${module}-v1.md`,
+      architectureSource: `docs/planning/${flowId}-v1.md §4`,
+    }));
+  const moduleRowText = moduleRows.map((row) =>
+    typeof row === "string"
+      ? row
+      : `| ${row.module} | ${row.responsibility ?? "模块交付"} | ${row.contract ?? `docs/contracts/${row.module}-v1.md`} | ${row.architectureSource ?? `docs/planning/${flowId}-v1.md §4`} |`,
+  );
+  const lines = [
+    "---",
+    `flowId: ${options.frontmatterFlowId ?? flowId}`,
+    `version: ${version}`,
+    "teamPlanSchema: 2",
+    `riskTier: ${riskTier}`,
+    `recommended: [${recommended.join(", ")}]`,
+    ...(options.omitModulesFrontmatter === true
+      ? []
+      : options.blockModules === true
+        ? ["modules:", ...modules.map((module) => `  - ${module}`)]
+        : [`modules: [${modules.join(", ")}]`]),
+    "---",
+    "",
+    `# 团队计划 ${flowId} v${version}`,
+    "",
+    ...(options.omitModuleSection === true
+      ? []
+      : [
+          "## 模块清单",
+          "",
+          "| module | 职责 | 公开契约 | 架构来源 |",
+          "| --- | --- | --- | --- |",
+          ...moduleRowText,
+          "",
+        ]),
+    "## 参与角色与职责",
+    "",
+    "| roleId | 类型 | module | 职责目标 | 能力要求 | 唯一写集 | 公开契约 | 测试面 | 依赖 | dependsOn | 并行组 | 组别 | apiSpec | 粒度理由 |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...rows.map(
+      (row) =>
+        `| ${row.roleId} | ${row.type ?? "new"} | ${row.module} | ${row.duty ?? "实现本模块的交付"} | ${row.ability ?? "能读写代码并交付测试"} | ${row.writes ?? `src/owned-${row.roleId}/; test/owned-${row.roleId}/`} | ${row.contract ?? "internal（夹具模块无跨角色公开契约）"} | ${row.testSurface ?? `test/owned-${row.roleId}/`} | ${row.deps ?? "无"} | ${row.dependsOn ?? "无"} | ${row.parallelGroup ?? "map-a"} | ${row.group ?? "交付"} | ${row.apiSpec ?? "required"} | ${row.rationale ?? "—"} |`,
+    ),
+    "",
+    ...(options.omitCoordinationSection === true
+      ? []
+      : [
+          "## 五维判断与协调成本",
+          "",
+          "- 责任独立性：各模块有独立变化原因；Reduce 角色独立承担证据合并。",
+          "- 范围归属：Map 角色写集互不相交；Reduce 只写测试与证据根。",
+          "- 契约影响：公开契约由对应 Map 角色唯一主属，消费方只读。",
+          "- 证据独立性：每个 Map 角色有独立测试面；Reduce 独立合并 manifest。",
+          "- 协调成本：按模块并行收益高于交接成本，未拆到函数级。",
+          "",
+        ]),
+  ];
+  return lines.join("\n") + "\n";
+}
 export function roleCardDoc(roleId = "executor"): string {
   return [
     `# 角色：${roleId}`,
@@ -328,9 +459,13 @@ export function roleCardDoc(roleId = "executor"): string {
   ].join("\n");
 }
 
-/** 新流程 boundary.yaml：角色根工作文档条目 + 实际写集（与团队计划一致）。 */
-export function roleBoundaryDoc(roleId = "executor"): string {
-  const files = ["feature-map.md", "functional-description.md", "memo.md", "api-spec.md"];
+/** 新流程 boundary.yaml：角色根工作文档条目 + 实际写集（与团队计划一致；可传额外写集目录）。 */
+export function roleBoundaryDoc(
+  roleId = "executor",
+  options: { writes?: readonly string[]; files?: readonly string[] } = {},
+): string {
+  const files = options.files ?? ["feature-map.md", "functional-description.md", "memo.md", "api-spec.md"];
+  const writes = options.writes ?? [`src/owned-${roleId}/`];
   return [
     `role: ${roleId}`,
     "entries:",
@@ -339,28 +474,34 @@ export function roleBoundaryDoc(roleId = "executor"): string {
       `    path: 角色卡/${roleId}/${file}`,
       "    purpose: 角色根工作文档",
     ]),
-    "  - kind: directory",
-    `    path: src/owned-${roleId}/`,
-    "    purpose: 角色代码",
+    ...writes.flatMap((path) => [
+      "  - kind: directory",
+      `    path: ${path}`,
+      "    purpose: 角色代码/测试写集",
+    ]),
     "",
   ].join("\n");
 }
 
 /** 角色根工作文档（feature-map/functional-description/memo/api-spec）。 */
-export function roleWorkDocs(): Record<string, string> {
+export function roleWorkDocs(roleId = "executor"): Record<string, string> {
   return {
-    "feature-map.md": "# 功能导航\n\n| 功能 | 入口 |\n| --- | --- |\n| 实现 | src/owned-executor/ |\n",
-    "functional-description.md": "# 功能说明\n\n职责：实现与测试。交接：向 Lead 报告。代码位置：src/owned-executor/。\n",
+    "feature-map.md": `# 功能导航\n\n| 功能 | 入口 |\n| --- | --- |\n| 实现 | src/owned-${roleId}/ |\n`,
+    "functional-description.md": `# 功能说明\n\n职责：实现与测试。交接：向 Lead 报告。代码位置：src/owned-${roleId}/。\n`,
     "memo.md": "# 备忘\n\n- 2026-10-22 由 Crew 按团队计划写卡。\n",
     "api-spec.md": "# API 说明\n\nnot-applicable：本角色无导出/共享/装配接口。\n",
   };
 }
 
 /** 一次性写出新流程要求的全部角色产物（role-card/boundary/工作文档）。 */
-export function writeRoleArtifacts(root: string, roleId = "executor"): void {
+export function writeRoleArtifacts(
+  root: string,
+  roleId = "executor",
+  options: { writes?: readonly string[] } = {},
+): void {
   write(root, `角色卡/${roleId}/role-card.md`, roleCardDoc(roleId));
-  write(root, `角色卡/${roleId}/boundary.yaml`, roleBoundaryDoc(roleId));
-  for (const [file, content] of Object.entries(roleWorkDocs())) {
+  write(root, `角色卡/${roleId}/boundary.yaml`, roleBoundaryDoc(roleId, options));
+  for (const [file, content] of Object.entries(roleWorkDocs(roleId))) {
     write(root, `角色卡/${roleId}/${file}`, content);
   }
 }

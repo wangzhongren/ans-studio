@@ -6,11 +6,15 @@ import path from "node:path";
 import { buildGovernedTools } from "../../src/provider/runtime/tools.ts";
 import { describeTool } from "../../src/provider/runtime/schema.ts";
 import { createRuntimeAdapter } from "../../src/service/runtime/session.ts";
-import { GOVERNANCE_SLUG_PATTERN, governanceCardGroup } from "../../src/model/runtime.ts";
+import { FLOW_TOOL_STEP_KINDS, GOVERNANCE_SLUG_PATTERN, governanceCardGroup } from "../../src/model/runtime.ts";
 import type {
   CustomerInputMetadata,
   CustomerInputRequest,
   DispatchTaskPayload,
+  FlowStepSupersedeFn,
+  FlowToolStepKind,
+  FlowToolStepView,
+  FlowToolView,
   GovernanceAppointmentStepPayload,
   GovernanceFlowStep,
   GovernanceJudgeContext,
@@ -93,6 +97,103 @@ test("2026-10-22 契约冻结：团队计划/验收物证与风险档位为可�
   assert.equal(facts.teamPlanConfirmed, true);
   assert.equal(Object.hasOwn(legacyFacts, "riskTier"), false, "缺失＝未提供，不凭空造值");
   assert.equal(Object.hasOwn(legacyFacts, "teamPlanConfirmed"), false, "缺失＝未提供，不凭空造值");
+});
+
+test("2026-10-22 角色粒度/MapReduce 方案 A：flow step 视图与替代输入可携带可选 parallelGroup/dependsOn；旧形状与枚举不变", () => {
+  // 视图：Map/Reduce 步骤可携带并行组与前置；旧步骤不填时字段缺席（不凭空造值）。
+  const steps = [
+    {
+      id: "delivery-checkout-api",
+      title: "Map A｜checkout-api 交付",
+      owner: "checkout-api",
+      kind: "dispatch",
+      status: "pending",
+      parallelGroup: "map-a",
+      dependsOn: ["contract-freeze"],
+    },
+    {
+      id: "test-map-shards",
+      title: "Reduce｜测试分片",
+      owner: "integration-test",
+      kind: "dispatch",
+      status: "pending",
+      parallelGroup: "reduce",
+      dependsOn: ["delivery-checkout-api"],
+    },
+    { id: "team-plan", title: "团队计划", owner: "convener", kind: "artifact", status: "done" },
+  ] satisfies FlowToolStepView[];
+  const view = {
+    flowId: "flow-alpha",
+    revision: "rev-1",
+    qualityTier: "production",
+    steps,
+    canUpdate: [],
+  } satisfies FlowToolView;
+  assert.deepEqual(view.steps.map((step) => step.parallelGroup), ["map-a", "reduce", undefined]);
+  assert.deepEqual(view.steps[0].dependsOn, ["contract-freeze"]);
+  assert.equal(Object.hasOwn(view.steps[2], "parallelGroup"), false, "旧步骤不得凭空出现 parallelGroup");
+  assert.equal(Object.hasOwn(view.steps[2], "dependsOn"), false, "旧步骤不得凭空出现 dependsOn");
+
+  // 替代输入：新步骤可带字段；旧调用（不填）形状逐字不变。
+  const supersedeInput = {
+    flowId: "flow-alpha",
+    oldStepId: "delivery-old",
+    newStepId: "delivery-checkout-api",
+    title: "Map A｜checkout-api 交付",
+    owner: "checkout-api",
+    kind: "dispatch",
+    expectedRevision: "rev-1",
+    parallelGroup: "map-a",
+    dependsOn: ["contract-freeze"],
+  } satisfies Parameters<FlowStepSupersedeFn>[0];
+  const legacySupersedeInput = {
+    flowId: "flow-alpha",
+    oldStepId: "impl-old",
+    newStepId: "impl-new",
+    title: "旧替代",
+    owner: "role-a",
+    kind: "dispatch",
+    expectedRevision: "rev-1",
+  } satisfies Parameters<FlowStepSupersedeFn>[0];
+  assert.equal(supersedeInput.parallelGroup, "map-a");
+  assert.deepEqual(supersedeInput.dependsOn, ["contract-freeze"]);
+  assert.equal(Object.hasOwn(legacySupersedeInput, "parallelGroup"), false);
+  assert.equal(Object.hasOwn(legacySupersedeInput, "dependsOn"), false);
+
+  // Q3 A：不新增 FlowStepKind——证据种类仍恰为四个现有值。
+  const kinds = ["dispatch", "customer-decision", "artifact", "acceptance"] as const satisfies readonly FlowToolStepKind[];
+  assert.deepEqual([...FLOW_TOOL_STEP_KINDS], [...kinds], "FlowStepKind 保留现有值，不新增 map/reduce");
+});
+
+test("2026-10-22：judge facts 可选团队计划 schema/模块摘要；物证沿用 teamPlanPath，不新增 artifact kind", () => {
+  const factsV2 = {
+    governanceModel: "trio",
+    flowId: "flow-alpha",
+    ledgerErrors: 0,
+    unresolvedClarificationCount: 0,
+    latestDecisionKinds: [],
+    teamPlanConfirmed: true,
+    teamPlanSchema: 2,
+    teamPlanModules: ["checkout-api", "checkout-web"],
+  } satisfies GovernanceJudgeFacts;
+  const legacyFacts = {
+    governanceModel: "trio",
+    flowId: "flow-alpha",
+    ledgerErrors: 0,
+    unresolvedClarificationCount: 0,
+    latestDecisionKinds: [],
+  } satisfies GovernanceJudgeFacts;
+  // 物证单一字段集：团队计划仍走 teamPlanPath；不新增模块/并行 evidence artifact kind。
+  const artifacts = {
+    teamPlanPath: "docs/scheduling/flow-alpha-team-v2.md",
+  } satisfies NonNullable<GovernanceJudgeRequest["artifacts"]>;
+  const contextArtifacts = { ...artifacts } satisfies NonNullable<GovernanceJudgeContext["artifacts"]>;
+  assert.equal(factsV2.teamPlanSchema, 2);
+  assert.deepEqual(factsV2.teamPlanModules, ["checkout-api", "checkout-web"]);
+  assert.equal(Object.hasOwn(legacyFacts, "teamPlanSchema"), false, "缺失＝未提供，不凭空造值");
+  assert.equal(Object.hasOwn(legacyFacts, "teamPlanModules"), false, "缺失＝未提供，不凭空造值");
+  assert.deepEqual(artifacts, contextArtifacts, "Request/Context artifacts 同形");
+  assert.deepEqual(Object.keys(artifacts), ["teamPlanPath"], "团队计划沿用 teamPlanPath，不新增 artifact kind");
 });
 
 test("request_choice：flowId/stepId/cardKind 原样进入卡片请求与回调 metadata；缺席时保持旧形状", async () => {

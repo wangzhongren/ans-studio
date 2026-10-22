@@ -24,6 +24,8 @@ import {
 } from "../../app/desktop/customer-input.ts";
 import {
   buildAcceptanceTaskMessage,
+  buildGovernanceAdvanceMessage,
+  buildRoleReadinessTaskMessage,
   flowCompletionIssue,
   normalizeFlowStepStatus,
   parseFlowStepStatuses,
@@ -2115,6 +2117,70 @@ test("收尾任务消息（客户批评）：按架构方案/架构影响分析�
   assert.match(message, /证据失效/);
   // 无回交路径时架构核对要求同样保留（固定硬要求，不依赖 evidence）。
   assert.match(buildAcceptanceTaskMessage("ticket-desk-r2", []), /架构方案或架构影响分析/);
+});
+
+test("2026-10-22 v2/MapReduce 任务文案：团队计划 v2 字段、模块清单、Crew 写卡读 v2 列、readiness 模块列/分片、验收 manifest", () => {
+  const accept = buildGovernanceAdvanceMessage(
+    {
+      version: 1,
+      flowId: "flow-v2",
+      cardKind: "proposal",
+      nextFunction: "schedule",
+      roleId: "convener",
+    },
+    undefined,
+    { proposalDecision: "accept", teamPlanPath: "docs/scheduling/flow-v2-team-v1.md" },
+  )!;
+  assert.match(accept, /teamPlanSchema: 2/);
+  assert.match(accept, /modules: \[模块id/);
+  assert.match(accept, /模块清单/);
+  assert.match(accept, /parallelGroup/);
+  assert.match(accept, /dependsOn/);
+  assert.match(accept, /直接发任命卡/, "既有主路径文案保留");
+
+  const crew = buildGovernanceAdvanceMessage(
+    {
+      version: 1,
+      flowId: "flow-v2",
+      cardKind: "appointment",
+      nextFunction: "role-card-write",
+      roleId: "nominator",
+    },
+    ["executor"],
+    {
+      teamPlanPath: "docs/scheduling/flow-v2-team-v1.md",
+      teamPlanVersion: 1,
+      teamPlanSchema: 2,
+      teamPlanModules: ["storefront"],
+    },
+  )!;
+  assert.match(crew, /团队计划 docs\/scheduling\/flow-v2-team-v1\.md/);
+  assert.match(crew, /模块清单：storefront/);
+  assert.match(crew, /bounded context/);
+  assert.match(crew, /公开契约/);
+  assert.match(crew, /测试面/);
+  assert.match(crew, /dependsOn/);
+  assert.match(crew, /并行组/);
+  assert.match(crew, /V12/);
+
+  const readiness = buildRoleReadinessTaskMessage(
+    "flow-v2",
+    ["executor"],
+    "docs/scheduling/flow-v2-team-v1.md",
+    1,
+    { teamPlanSchema: 2, modules: ["storefront"] },
+  );
+  assert.match(readiness, /模块清单：storefront/);
+  assert.match(readiness, /module\/contract\/testSurface\/parallel\/dependsOn\/granularity/);
+  assert.match(readiness, /每分片独立证据/);
+  assert.match(readiness, /manifest/);
+  assert.match(readiness, /粒度理由/);
+
+  const acceptance = buildAcceptanceTaskMessage("flow-v2", []);
+  assert.match(acceptance, /MapReduce/);
+  assert.match(acceptance, /manifest/);
+  assert.match(acceptance, /分片原始证据/);
+  assert.match(acceptance, /insufficient evidence/);
 });
 
 // ————— 2026-10-19 客户要求：判断 agent 拒绝（deny）+ 退回发起角色重做 —————

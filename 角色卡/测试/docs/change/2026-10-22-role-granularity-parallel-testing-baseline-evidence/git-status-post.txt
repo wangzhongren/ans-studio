@@ -1,0 +1,7 @@
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+?? docs/acceptance/role-granularity-parallel-testing-criteria-v1.md
+?? docs/communication/2026-10-22_intent-role-granularity-parallel-testing.md
+?? docs/planning/2026-10-22_design_role-granularity-parallel-testing.md
+?? docs/scheduling/2026-10-22-role-granularity-parallel-testing-team-plan.md
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-22-role-granularity-parallel-testing-baseline-evidence/"

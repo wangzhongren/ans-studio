@@ -559,16 +559,41 @@ test("卡文本：五人均写明职能/不拥有最终批准权/可写与禁写
     "    evidence:",
     "      kind: artifact",
     "      ref: docs/contracts/<name>-v1.md",
-    "  - id: delivery-server",
-    "    title: 服务端交付",
+    "  - id: delivery-checkout-api",
+    "    title: Map A｜checkout-api 交付",
     "    owner: <项目角色 id>",
     "    kind: dispatch",
-    "    status: dispatched",
+    "    status: pending",
+    "    parallelGroup: map-a",
+    "    dependsOn: [contract-freeze]",
+    "  - id: delivery-checkout-web",
+    "    title: Map A｜checkout-web 交付",
+    "    owner: <项目角色 id>",
+    "    kind: dispatch",
+    "    status: pending",
+    "    parallelGroup: map-a",
+    "    dependsOn: [contract-freeze]",
+    "  - id: test-map-shards",
+    "    title: Map 测试分片（按模块并行）",
+    "    owner: <测试角色 id>",
+    "    kind: dispatch",
+    "    status: pending",
+    "    parallelGroup: reduce",
+    "    dependsOn: [delivery-checkout-api, delivery-checkout-web]",
+    "  - id: integration-e2e",
+    "    title: Reduce｜契约/集成/端到端",
+    "    owner: <测试角色 id>",
+    "    kind: dispatch",
+    "    status: pending",
+    "    parallelGroup: reduce",
+    "    dependsOn: [test-map-shards]",
     "  - id: verification-evidence",
     "    title: 真实启动应用并演示",
     "    owner: <项目角色 id>",
     "    kind: artifact",
     "    status: pending",
+    "    parallelGroup: reduce",
+    "    dependsOn: [integration-e2e]",
     "  - id: verification",
     "    title: 验收",
     "    owner: app",
@@ -1220,4 +1245,184 @@ test("resolveGovernanceRole：single 只认 su；trio 缺省仍 rapporteur/propo
     /liaison\/rapporteur\/nominator\/convener\/verifier/,
     "未知角色文案列五人",
   );
+});
+
+// —————————————————————— 7) 2026-10-22 角色粒度/MapReduce（P1/P4/P5/P6/P10/P13） ——————————————————————
+
+test("2026-10-22 角色粒度/MapReduce：注册表 entries/预授权/禁写/能力位零变化（不扩张写权、不改 id/显示名）", () => {
+  // 本批只改 Convener/Crew/Verifier 卡文本（产品数据）；注册表写权、能力位、内部 id/显示名必须逐字不变。
+  const appOnly = [".ans/", "docs/bootstrap-manifest.md", "角色卡/governance-boundary.yaml"];
+  const builtInDirs = [
+    "角色卡/liaison/",
+    "角色卡/rapporteur/",
+    "角色卡/nominator/",
+    "角色卡/convener/",
+    "角色卡/verifier/",
+    "角色卡/su/",
+  ];
+  const expectedEntries: Record<string, string[]> = {
+    liaison: ["docs/intents/"],
+    rapporteur: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
+    nominator: ["角色卡/", "docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
+    convener: ["docs/flows/", "docs/workflow.md", "docs/scheduling/", "docs/governance/convener/"],
+    verifier: ["docs/acceptance/", "docs/verification/", "docs/governance/verifier/"],
+  };
+  const expectedPreauthorized: Record<string, string[]> = {
+    liaison: ["docs/intents/"],
+    rapporteur: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
+    nominator: ["docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
+    convener: ["docs/flows/", "docs/scheduling/", "docs/governance/convener/"],
+    verifier: ["docs/acceptance/", "docs/verification/", "docs/governance/verifier/"],
+  };
+  const expectedForbidden: Record<string, string[]> = {
+    liaison: [
+      ...appOnly,
+      "角色卡/",
+      "docs/proposals/",
+      "docs/contracts/",
+      "docs/nominations/",
+      "docs/skills/",
+      "docs/mcp/",
+      "docs/flows/",
+      "docs/governance/",
+      "docs/workflow.md",
+    ],
+    rapporteur: [...appOnly, ...builtInDirs, "docs/nominations/", "docs/flows/"],
+    nominator: [...appOnly, ...builtInDirs, "docs/proposals/", "docs/flows/", "docs/scheduling/"],
+    convener: [...appOnly, "角色卡/", "docs/proposals/", "docs/nominations/", "docs/skills/", "docs/mcp/"],
+    verifier: [
+      ...appOnly,
+      ...builtInDirs,
+      "docs/intents/",
+      "docs/proposals/",
+      "docs/contracts/",
+      "docs/nominations/",
+      "docs/skills/",
+      "docs/mcp/",
+      "docs/flows/",
+      "docs/workflow.md",
+    ],
+  };
+  const caps = (over: Partial<Record<string, boolean>> = {}): Record<string, boolean | string> => ({
+    customerInput: true,
+    handOffIntent: false,
+    requestClarification: false,
+    dispatchTask: false,
+    roleStatus: false,
+    sessionTail: false,
+    proposeRecovery: false,
+    installSkill: false,
+    installMcp: false,
+    shell: "operator-approve",
+    ...over,
+  });
+  const expectedCapabilities: Record<string, Record<string, boolean | string>> = {
+    liaison: caps({ handOffIntent: true, dispatchTask: true }),
+    rapporteur: caps({ requestClarification: true }),
+    nominator: caps({ installSkill: true, installMcp: true }),
+    convener: caps({
+      dispatchTask: true,
+      roleStatus: true,
+      sessionTail: true,
+      proposeRecovery: true,
+    }),
+    verifier: caps(),
+  };
+
+  assert.deepEqual(
+    BUILT_IN_GOVERNANCE_ROLES.map((s) => s.id),
+    ["liaison", "rapporteur", "nominator", "convener", "verifier"],
+    "内置角色 id/顺序不得变化",
+  );
+  assert.deepEqual(
+    BUILT_IN_GOVERNANCE_ROLES.map((s) => s.displayName),
+    ["Lead / 主理", "Draft / 提案", "Crew / 组队", "Steward / 统筹", "Proof / 验收"],
+    "显示名不得变化",
+  );
+  assert.deepEqual(
+    BUILT_IN_GOVERNANCE_ROLES.map((s) => s.function),
+    ["liaison", "proposal", "nomination", "schedule", "verification"],
+    "GovernanceFunction 值不得变化",
+  );
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    assert.deepEqual(spec.entries.map((e) => e.path), expectedEntries[spec.id], `${spec.id} Section 1 不得变化`);
+    assert.deepEqual(spec.preauthorizedDirs, expectedPreauthorized[spec.id], `${spec.id} 预授权不得变化`);
+    assert.deepEqual(spec.forbiddenWritePaths, expectedForbidden[spec.id], `${spec.id} 禁写路径不得变化`);
+    assert.deepEqual(spec.capabilities, expectedCapabilities[spec.id], `${spec.id} 能力位不得变化`);
+  }
+});
+
+test("2026-10-22 角色粒度/MapReduce：ENGINEERING_QUALITY_BASELINE 文本逐字不变（P10/P12）", () => {
+  // 工程基线是客户 2026-10-19 批准的单一来源文本；本批不得改动（真实启动/演示要求不降）。
+  const expected = [
+    "工程质量基线（默认生产级；客户明确选原型档才可放宽）：",
+    "- 正确性：验收标准逐条可演示；无 TODO/占位/假数据；边界与非法输入有明确行为。",
+    "- 健壮性：输入校验与上限、错误码一致、失败不破坏已有数据；持久化原子写与重启恢复；并发/重入有明确策略。",
+    "- 安全：认证/授权即使简化也要写清边界；防注入/XSS/路径穿越/CSRF；不记录密钥与敏感数据；零第三方依赖时说明理由。",
+    "- 可维护性：模块边界清晰、命名一致、只在约束处注释；README 含启动、架构、API、权限、状态机、已知限制与权衡。",
+    "- 架构与可扩展性：模块分解与职责、依赖方向（无环）、数据流清晰；扩展点明确（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）；数据 schema 与 API 契约有版本/迁移/兼容/弃用策略；横切关注点（配置/错误/日志/鉴权/测试缝）有归属；变更类提案必须附架构影响分析（模块/边界/兼容/回滚）。",
+    "- 可观测性：关键失败可诊断（结构化日志/错误信息），不静默吞错。",
+    "- 性能与容量：分页/上限/超时明确；不无限增长；给出已知容量边界。",
+    "- 前端：加载/空/错误态齐备；键盘可用、标签与对比度等基本可访问性；窄屏可用。",
+    "- 测试：单元+集成+端到端矩阵；权限与非法路径必须有负例；测试独立于实现；不得为保绿弱化断言。",
+    "- 交付：验收前必须真实启动应用并演示（启动命令、访问地址或截图/录屏）；未真实运行不得建议验收通过。",
+  ].join("\n");
+  assert.equal(ENGINEERING_QUALITY_BASELINE, expected, "工程质量基线文本必须逐字不变");
+});
+
+test("2026-10-22 角色粒度/MapReduce 卡文本（P1/P4/P5/P13）：Convener/Crew 要求 v2 计划/模块覆盖/依赖/粒度/readiness/flow 字段", () => {
+  const c = governanceRoleOf("convener")!.cardText;
+  for (const needle of [
+    "teamPlanSchema: 2",
+    "modules: [<module-a>, <module-b>]",
+    "`module` / 职责 / 公开契约 / 架构来源四列",
+    "恰好覆盖 `modules` 集合",
+    "roleId | 类型 | module | 职责目标 | 能力要求 | 唯一写集 | 公开契约 | 测试面 | 依赖 | dependsOn | 并行组 | 组别 | apiSpec | 粒度理由",
+    "一个模块一个 Map 角色、一个角色一个模块",
+    "`module: reduce`",
+    "无重复/孤儿/未声明模块",
+    "跨角色两两不相交",
+    "同一 `map-*` 组内角色之间不得有依赖路径",
+    "Map 角色不得依赖 Reduce",
+    "每个 Reduce 角色的 dependsOn 必须直接或传递覆盖全部 Map 角色",
+    "`exception-review`",
+    "不得把「字段齐全」当成「粒度正确」",
+    "`docs/scheduling/<flowId>-readiness-v1.md`",
+    "`module`/`contract`/`testSurface`/`parallel`/`dependsOn`/`granularity`",
+    "`status: pass|gaps`",
+    "delivery-<module>",
+    "`parallelGroup`",
+    "`dependsOn`",
+    "contract-freeze",
+    "Map 测试分片",
+    "Reduce 前置未全部 `done` 必须硬拦",
+    "旧 flow 不填这两个字段，解析/派发行为逐字不变",
+    "旧步骤无 `dependsOn` 不新增检查",
+    "不新增 `FlowStepKind`",
+  ]) {
+    assert.ok(c.includes(needle), `Convener 卡须含 v2 要求「${needle}」`);
+  }
+  assert.doesNotMatch(c, /cardKind=(map|reduce|parallel)/, "不得用 cardKind 表达 Map/Reduce");
+
+  const n = governanceRoleOf("nominator")!.cardText;
+  for (const needle of [
+    "读 `module` / 公开契约 / 测试面 / `dependsOn` / 并行组 / `粒度理由`",
+    "bounded context（module）",
+    "公开契约",
+    "测试面",
+    "**上下游依赖**（`dependsOn` 与交接输入输出）",
+    "粒度理由",
+    "boundary 按计划的唯一写集逐条写（精确路径/目录，不多不少）",
+    "不得写整层角色",
+    "纳米角色",
+    "不自行补计划、不自行增删模块/角色/写集",
+    "计划缺 module/公开契约/测试面/`dependsOn`/粒度理由/写集",
+  ]) {
+    assert.ok(n.includes(needle), `Crew 卡须含 v2 要求「${needle}」`);
+  }
+  // 沿用上轮已落地边界：Crew 不选角色、不发 appointment、不写 nominations。
+  assert.doesNotMatch(n, /提名权/);
+  assert.doesNotMatch(n, /只用 `appointment`/);
+  assert.doesNotMatch(n, /只写 `docs\/nominations/);
+  assert.match(n, /不再写 `docs\/nominations\/\*\*`、不再发 appointment 卡/);
 });

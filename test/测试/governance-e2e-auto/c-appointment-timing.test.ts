@@ -26,6 +26,7 @@ import {
   seedLedger,
   seedTrioProject,
   teamPlanDoc,
+  teamPlanV2Doc,
   write,
   type ScriptContext,
 } from "./fixture.ts";
@@ -370,6 +371,101 @@ test("场景3c：客户拒绝/取消任命 ⇒ 不派 Crew 写卡、无 appointm
       false,
       "取消任命不得写 Crew 派发账本",
     );
+  } finally {
+    await h.stop();
+    h.cleanup();
+    temp.cleanup();
+  }
+});
+
+test("场景3d（v2）：计划写集未被 Crew boundary 覆盖 ⇒ V12 退回 Crew、不派 Convener readiness", async () => {
+  const temp = makeRoot("appointment-v12-uncovered");
+  const v2Plan = teamPlanV2Doc(FLOW, {
+    modules: ["storefront"],
+    recommended: [ROLE_ID],
+    rows: [
+      {
+        roleId: ROLE_ID,
+        type: "new",
+        module: "storefront",
+        // 计划写集故意指向 Crew 未写入 boundary 的目录。
+        writes: "src/owned-other/",
+        contract: "docs/contracts/storefront-v1.md",
+        testSurface: "test/owned-executor/",
+        dependsOn: "无",
+        parallelGroup: "map-a",
+        group: "交付",
+      },
+      {
+        roleId: "tester",
+        type: "existing",
+        module: "reduce",
+        writes: "test/测试/",
+        contract: "docs/contracts/storefront-v1.md（消费）",
+        testSurface: "test/测试/（集成/e2e）",
+        deps: "依赖全部 Map",
+        dependsOn: ROLE_ID,
+        parallelGroup: "reduce",
+        group: "测试",
+        apiSpec: "not-applicable（Reduce 角色不导出接口）",
+      },
+    ],
+  });
+  const v2Flow = flowDoc(FLOW, [
+    { id: "contract-freeze", owner: "rapporteur", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: "docs/contracts/storefront-v1.md" } },
+    { id: "appointment", kind: "customer-decision", status: "pending" },
+    { id: "role-cards", kind: "dispatch", status: "pending" },
+    { id: "role-readiness", kind: "dispatch", status: "pending" },
+    { id: "delivery-storefront", owner: ROLE_ID, kind: "dispatch", status: "pending", parallelGroup: "map-a", dependsOn: ["contract-freeze"] },
+    { id: "test-map-shards", owner: "tester", kind: "dispatch", status: "pending", parallelGroup: "reduce", dependsOn: ["delivery-storefront"] },
+    { id: "verification", kind: "acceptance", status: "pending" },
+  ]);
+  seedTrioProject(temp.root);
+  write(temp.root, FLOW_REL, v2Flow);
+  write(temp.root, TEAM_PLAN_REL, v2Plan);
+  await seedLedger(temp.root, [
+    { decisionKind: "proposal-accept", customerDecision: "accepted", actorRoleId: "rapporteur", power: "proposal" },
+  ]);
+  await seedConfirmedIntent(temp.root);
+
+  const h = await makeHarness({
+    tag: "appointment-v12-uncovered",
+    root: temp.root,
+    approval: true,
+    decision: true,
+    scriptForRole: (ctx) => {
+      if (ctx.roleId === "convener" && /直接发任命卡|请客户任命|任命卡/.test(ctx.prompt)) return [APPOINTMENT_CARD];
+      if (ctx.roleId === "nominator") return crewWriteScript(ctx); // boundary 只覆盖 src/owned-executor/
+      return [];
+    },
+  });
+  try {
+    await h.open("convener");
+    const sent = await h.send("convener", "请依团队计划请客户任命 executor。");
+    assert.equal(sent.ok, true, sent.error ?? "");
+
+    // Crew 写卡后应用做 V12：计划写集 src/owned-other/ 未被 boundary 覆盖 ⇒ 反馈 Crew、不派 readiness。
+    await h.waitFor(
+      () => (h.prompts.get("nominator") ?? []).some((prompt) => /计划写集.*未被 boundary\.yaml entries 覆盖/.test(prompt)),
+      10000,
+    );
+    const feedback = (h.prompts.get("nominator") ?? []).find((prompt) => /计划写集.*未被 boundary\.yaml entries 覆盖/.test(prompt))!;
+    assert.match(feedback, /计划写集「src\/owned-other\/」未被 boundary\.yaml entries 覆盖/);
+    assert.match(feedback, /报告 Convener 修正计划/);
+    assert.equal(
+      (h.prompts.get("convener") ?? []).filter((prompt) => /角色就绪复核|role-readiness/.test(prompt)).length,
+      0,
+      "V12 不通过不得派 Convener readiness",
+    );
+    const ledger = await h.waitForLedger(() => true);
+    assert.equal(
+      ledger.entries.some(
+        (entry) => entry.kind === "dispatch.accepted" && entry.targetRoleId === "convener" && entry.stepId === "role-readiness",
+      ),
+      false,
+      "不得写 role-readiness 派发账本",
+    );
+    assert.equal(exists(temp.root, ROLE_CARD_REL), true, "Crew 文件已写出（问题是计划写集与 boundary 不一致）");
   } finally {
     await h.stop();
     h.cleanup();

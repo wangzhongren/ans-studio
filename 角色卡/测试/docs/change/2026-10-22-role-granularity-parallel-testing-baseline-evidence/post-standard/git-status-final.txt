@@ -1,0 +1,10 @@
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+ M "src/common/\351\227\250\347\246\201\345\274\225\346\223\216/governance-roles.ts"
+ M src/model/runtime.ts
+?? docs/acceptance/role-granularity-parallel-testing-criteria-v1.md
+?? docs/communication/2026-10-22_intent-role-granularity-parallel-testing.md
+?? docs/planning/2026-10-22_design_role-granularity-parallel-testing.md
+?? docs/scheduling/2026-10-22-role-granularity-parallel-testing-team-plan.md
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-22-role-granularity-parallel-testing-baseline-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-22_change_role-granularity-parallel-testing-baseline.md"

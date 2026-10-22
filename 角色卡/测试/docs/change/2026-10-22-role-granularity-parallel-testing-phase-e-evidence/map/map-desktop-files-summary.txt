@@ -1,0 +1,21 @@
+shard=desktop-files
+command=node --test test/桌面应用/**/*.test.ts
+started=2026-10-22T21:32:02+08:00
+ended=2026-10-22T21:32:23+08:00
+exit=1
+temp=角色卡\测试\docs\change\2026-10-22-role-granularity-parallel-testing-phase-e-evidence\map\tmp-desktop-files
+cwd=/c/Users/51054/Desktop/work/ans-studio
+node=v24.22.1
+✖ E-1 去重：同一条回交重复到达（重放）→ **只投递一次** (329.412ms)
+ℹ tests 518
+ℹ pass 517
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20461.3614
+✖ failing tests:
+✖ E-1 去重：同一条回交重复到达（重放）→ **只投递一次** (329.412ms)
+candidate_head=64ed44a0ac6e75d647eadbeb3f35ae9f84625845
+candidate_tracked_diff_sha256=267194bf55246e586cda3f6bfee17a5de3e1e9b4b093321d96dcb54a788f5573
+candidate_untracked_sha256=621ec300f17dc87656e50bc7198caf369b4aa398fdcf0eb8417934b089c61eef

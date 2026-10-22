@@ -695,3 +695,162 @@ test("注册表：按 2026-10-22 治理分工只调整 Convener/Crew/Verifier �
   assert.equal(BUILT_IN_GOVERNANCE_ROLES.find((s) => s.id === "nominator")!.entries.some((e) => e.path === "docs/nominations/"), false);
   assert.equal(BUILT_IN_GOVERNANCE_ROLES.find((s) => s.id === "nominator")!.preauthorizedDirs.includes("docs/nominations/"), false);
 });
+
+// —————————————————————— 2026-10-22 角色粒度（bounded context）与 MapReduce（P1/P4/P5/P6/P7/P13） ——————————————————————
+
+test("标准工作流：团队计划 v2（P1/P2/P4/P5）——Convener 卡要求 schema/模块清单/v2 角色表/模块覆盖/写集/DAG/并行组/粒度", () => {
+  const t = cardTextOf("convener");
+  assertIncludesAll(
+    t,
+    [
+      "## 团队判断与团队计划（v2，必须）",
+      "`teamPlanSchema: 2`",
+      "`modules: [<module-a>, <module-b>]`",
+      "`module` / 职责 / 公开契约 / 架构来源四列",
+      "恰好覆盖 `modules` 集合",
+      "roleId | 类型 | module | 职责目标 | 能力要求 | 唯一写集 | 公开契约 | 测试面 | 依赖 | dependsOn | 并行组 | 组别 | apiSpec | 粒度理由",
+      "一个模块一个 Map 角色、一个角色一个模块",
+      "每个模块必须恰好被一个 Map 角色覆盖",
+      "无重复/孤儿/未声明模块",
+      "Reduce 角色写 `module: reduce`",
+      "分号分隔的精确路径/目录",
+      "不得含通配符/省略号/散文/`..`/绝对路径",
+      "跨角色两两不相交",
+      "目标必须存在、无自依赖/重复/环",
+      "同一 `map-*` 组内角色之间不得有依赖路径",
+      "Map 角色不得依赖 Reduce",
+      "每个 Reduce 角色的 dependsOn 必须直接或传递覆盖全部 Map 角色",
+      "整层名（frontend/backend/web/server/client/ui/fullstack/all/common/shared/utils 等）",
+      "`exception-review`",
+      "单文件写集/极小模块只记 warning",
+      "禁止函数级/单文件/按钮/端点级纳米角色",
+      "不得把「字段齐全」当成「粒度正确」",
+      "五维判断与协调成本",
+    ],
+    "Convener 团队计划 v2",
+  );
+  // 不得把结构字段齐全当成语义完成。
+  assert.doesNotMatch(t, /字段齐全[^。]{0,20}(即|就)(代表|说明|等于)粒度正确/);
+  assert.doesNotMatch(t, /结构校验通过[^。]{0,10}(即|就)(代表|说明)粒度正确/);
+});
+
+test("标准工作流：readiness v2（P5）——逐角色 module/contract/testSurface/parallel/dependsOn/granularity 与 pass/gaps；例外须明确批准", () => {
+  const t = cardTextOf("convener");
+  assertIncludesAll(
+    t,
+    [
+      "逐项核对 module / 公开契约 / 测试面 / 并行组 / dependsOn / 粒度理由",
+      "`exception-review` 例外必须明确批准或退回",
+      "`docs/scheduling/<flowId>-readiness-v1.md`",
+      "`status: pass|gaps`",
+      "逐角色列 `module`/`contract`/`testSurface`/`parallel`/`dependsOn`/`granularity`",
+      "每项 pass/gap + 证据",
+      "gap 报告应用退回 Crew 修正",
+      "团队计划缺能力细节时由你补充计划",
+      "readiness 不是验收标准、不是客户确认",
+      "结构校验通过不等于粒度正确",
+      "语义粒度必须由 readiness 对照客户确认的架构逐项判断",
+    ],
+    "readiness v2",
+  );
+});
+
+test("标准工作流：MapReduce flow 模板（P6）——delivery-<module>/parallelGroup/dependsOn/contract-freeze/Reduce 前置；旧 flow 不变", () => {
+  const t = cardTextOf("convener");
+  assertIncludesAll(
+    t,
+    [
+      "`delivery-<module>`",
+      "parallelGroup",
+      "dependsOn",
+      "contract-freeze",
+      "Reduce 步骤依赖全部 Map 交付",
+      "旧 flow 不填这两个字段，解析/派发行为逐字不变",
+      "未知字段仍拒绝",
+      "`pending` / `dispatched` / `delivered` / `done` / `superseded` / `failed` / `blocked`",
+      "同一 `map-*` 组内步骤之间不得有依赖路径",
+      "每个 Reduce 步骤（`dispatch`/`artifact`，验收除外）必须有到所有 `map-*` dispatch 步骤的依赖路径",
+      "Map 步骤不得依赖 Reduce 步骤",
+      "Map 交付步骤必须依赖 `contract-freeze`",
+      "所有前置步骤必须 `status: done` 才允许 `dispatch_task`",
+      "旧步骤无 `dependsOn` 不新增检查",
+      "Reduce 前置未全部 `done` 必须硬拦",
+      "不新增 `FlowStepKind`",
+    ],
+    "MapReduce flow 模板与门禁",
+  );
+
+  const match = /```yaml\n([\s\S]*?)```/.exec(t);
+  assert.ok(match, "Convener 卡须含 ```yaml 模板块");
+  const doc = parseYaml(match![1]) as { steps?: Array<Record<string, unknown>> };
+  assert.ok(Array.isArray(doc.steps), "模板须解析出 steps 数组");
+  const byId = new Map(doc.steps!.map((step) => [String(step.id), step]));
+  for (const id of ["contract-freeze", "delivery-checkout-api", "delivery-checkout-web", "test-map-shards", "integration-e2e", "verification-evidence"]) {
+    assert.ok(byId.has(id), `模板须含步骤 ${id}`);
+  }
+  assert.equal(byId.get("delivery-checkout-api")?.parallelGroup, "map-a", "Map 交付步骤须标 map 组");
+  assert.equal(byId.get("delivery-checkout-web")?.parallelGroup, "map-a", "同组 Map 步骤须标同一 map 组");
+  assert.deepEqual(byId.get("delivery-checkout-api")?.dependsOn, ["contract-freeze"], "Map 交付须依赖 contract-freeze");
+  assert.deepEqual(byId.get("delivery-checkout-web")?.dependsOn, ["contract-freeze"], "Map 交付须依赖 contract-freeze");
+  for (const id of ["test-map-shards", "integration-e2e", "verification-evidence"]) {
+    assert.equal(byId.get(id)?.parallelGroup, "reduce", `${id} 须标 reduce 组`);
+  }
+  assert.deepEqual(byId.get("test-map-shards")?.dependsOn, [
+    "delivery-checkout-api",
+    "delivery-checkout-web",
+  ], "Reduce 步骤须直接依赖全部 Map 交付");
+  assert.deepEqual(byId.get("integration-e2e")?.dependsOn, ["test-map-shards"]);
+  assert.deepEqual(byId.get("verification-evidence")?.dependsOn, ["integration-e2e"]);
+  assert.equal(byId.get("contract-freeze")?.status, "done", "contract-freeze 是 Map 入口条件");
+});
+
+test("标准工作流：Crew v2（P13）——读 module/契约/测试面/dependsOn/粒度理由；角色卡写 bounded context/契约/测试面/上下游/粒度；boundary 按计划写集", () => {
+  const t = cardTextOf("nominator");
+  assertIncludesAll(
+    t,
+    [
+      "按 v2 读 `module` / 公开契约 / 测试面 / `dependsOn` / 并行组 / `粒度理由`",
+      "bounded context（module）",
+      "公开契约",
+      "测试面",
+      "**上下游依赖**（`dependsOn` 与交接输入输出）",
+      "粒度理由",
+      "boundary 按计划的唯一写集逐条写（精确路径/目录，不多不少）",
+      "v2 粒度落卡纪律（必须）",
+      "一个角色 = 一个 bounded context/模块",
+      "不得写整层角色",
+      "纳米角色",
+      "计划缺 module/公开契约/测试面/`dependsOn`/粒度理由/写集",
+      "只报告 Steward / 统筹，不自行补计划",
+      "不自行增删模块/角色/写集",
+    ],
+    "Crew v2 写卡",
+  );
+  // 上轮边界保持：Crew 不选角色、不发 appointment、不写 nominations。
+  assertIncludesAll(
+    t,
+    ["不再选择角色、不再组建团队、不再写 `docs/nominations/**`、不再发 appointment 卡"],
+    "Crew 既有边界",
+  );
+});
+
+test("标准工作流：Verifier v2（P7/P8/P13 可选补充）——核对模块覆盖/manifest/分片原始日志；不改真实启动/演示基线", () => {
+  const t = cardTextOf("verifier");
+  assertIncludesAll(
+    t,
+    [
+      "团队计划 v2 的模块覆盖/并行组/`dependsOn`",
+      "Reduce manifest 与每个 Map 分片的原始日志",
+      "命令、环境、候选哈希、退出码、pass/fail/skip、失败原文",
+      "manifest 是索引，不是原始证据",
+      "缺失/无法对应候选时判 insufficient evidence",
+      "manifest 不能替代分片原始日志",
+      "该补充不改变真实启动/演示基线",
+    ],
+    "Verifier v2 补充",
+  );
+  // 真实启动/演示基线逐字保留，未演示仍不得建议 accept。
+  assert.match(t, /验收前必须真实启动应用并演示/, "Verifier 卡须保留真实启动/演示硬要求");
+  assert.match(t, /没有真实启动\/演示证据/, "Verifier 无证据仍不得建议 accept");
+  assert.match(t, /未真实运行、未演示时不得建议 accept/, "Verifier 未演示不得建议 accept");
+});

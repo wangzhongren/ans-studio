@@ -1,0 +1,1 @@
+{"at":"2026-10-22T13:40:44.771Z","kind":"customer.decision","flowId":"flow-a","actorRoleId":"rapporteur","power":"proposal","decisionKind":"proposal-accept","customerDecision":"accepted","decisionEvidence":{"kind":"customer-input","toolCallId":"call-choice","turnId":"turn-choice"},"messageSummary":"选择"}

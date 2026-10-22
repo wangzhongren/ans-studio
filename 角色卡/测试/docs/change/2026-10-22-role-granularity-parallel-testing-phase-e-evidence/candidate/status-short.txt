@@ -1,0 +1,54 @@
+ M app/desktop/governance-advance.ts
+ M app/desktop/interface.ts
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+ M "src/common/\347\274\226\346\216\222/flow-service.ts"
+ M "src/common/\347\274\226\346\216\222/flow-state.ts"
+ M "src/common/\347\274\226\346\216\222/governance-gate.ts"
+ M "src/common/\351\227\250\347\246\201\345\274\225\346\223\216/governance-roles.ts"
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/govern-session.ts
+ M src/pipeline/orchestration/run-role.ts
+ M test/runtime-core/governance-flow-metadata.test.ts
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/operator-wiring.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/b-proposal-accept-timing.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/c-appointment-timing.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/d-dispatch-listing.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/fixture.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/i-full-chain.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/p-team-plan-guard.test.ts"
+ M "test/\347\274\226\346\216\222/flow-service.test.ts"
+ M "test/\347\274\226\346\216\222/flow-state.test.ts"
+ M "test/\347\274\226\346\216\222/governance-gate.test.ts"
+ M "test/\347\274\226\346\216\222/governance-session.test.ts"
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/governance-standard-workflow.test.ts"
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/governance-trio.test.ts"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/memo.md"
+?? docs/acceptance/role-granularity-parallel-testing-criteria-v1.md
+?? docs/communication/2026-10-22_intent-role-granularity-parallel-testing.md
+?? docs/planning/2026-10-22_design_role-granularity-parallel-testing.md
+?? docs/scheduling/2026-10-22-role-granularity-parallel-testing-team-plan.md
+?? "src/common/\347\274\226\346\216\222/team-plan.ts"
+?? "test/\346\265\213\350\257\225/governance-e2e-auto/q-role-granularity.test.ts"
+?? "test/\346\265\213\350\257\225/governance-e2e-auto/r-mapreduce-parallel.test.ts"
+?? "test/\346\265\213\350\257\225/role-granularity-v2-demo.mjs"
+?? "test/\347\274\226\346\216\222/team-plan.test.ts"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-22_change_role-granularity-parallel-testing.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-22_change_role-granularity-parallel-testing.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-22-role-granularity-parallel-testing-baseline-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-22-role-granularity-parallel-testing-phase-e-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-22_change_role-granularity-parallel-testing-baseline.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-22_change_role-granularity-parallel-testing-phase-e.md"
+?? "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/docs/change/2026-10-22_change_role-granularity-parallel-testing.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/docs/change/2026-10-22_change_role-granularity-parallel-testing.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/docs/change/2026-10-22_change_role-granularity-parallel-testing.md"

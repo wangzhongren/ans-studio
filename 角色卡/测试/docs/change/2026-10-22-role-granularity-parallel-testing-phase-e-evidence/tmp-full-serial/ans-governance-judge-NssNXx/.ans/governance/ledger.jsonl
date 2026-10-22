@@ -1,0 +1,1 @@
+{"at":"2026-10-22T13:40:44.775Z","kind":"customer.decision","flowId":"flow-a","actorRoleId":"convener","power":"schedule","decisionKind":"appointment","targetRoleIds":["alpha"],"customerDecision":"appointed","decisionEvidence":{"kind":"customer-input","toolCallId":"call-choice","turnId":"turn-choice"},"messageSummary":"选择"}

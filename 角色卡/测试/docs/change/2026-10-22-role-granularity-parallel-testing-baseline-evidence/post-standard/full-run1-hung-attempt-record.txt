@@ -1,0 +1,6 @@
+attempt=post-standard full-run1
+test_start=2026-10-22 20:33:19
+last_log_write=2026-10-22 20:33:55
+terminated=2026-10-22 20:43:40
+duration_before_termination_ms=621000 approximately (20:33:19 -> 20:43:40)
+note=process stopped via TaskStop after >10 min; no summary counts emitted; log preserved verbatim

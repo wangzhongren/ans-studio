@@ -1,0 +1,18 @@
+shard=desktop-ui
+command=node --test test/桌面UI/**/*.test.ts
+started=2026-10-22T21:32:02+08:00
+ended=2026-10-22T21:32:05+08:00
+exit=0
+temp=角色卡\测试\docs\change\2026-10-22-role-granularity-parallel-testing-phase-e-evidence\map\tmp-desktop-ui
+cwd=/c/Users/51054/Desktop/work/ans-studio
+node=v24.22.1
+ℹ tests 163
+ℹ pass 163
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2453.623
+candidate_head=64ed44a0ac6e75d647eadbeb3f35ae9f84625845
+candidate_tracked_diff_sha256=267194bf55246e586cda3f6bfee17a5de3e1e9b4b093321d96dcb54a788f5573
+candidate_untracked_sha256=621ec300f17dc87656e50bc7198caf369b4aa398fdcf0eb8417934b089c61eef

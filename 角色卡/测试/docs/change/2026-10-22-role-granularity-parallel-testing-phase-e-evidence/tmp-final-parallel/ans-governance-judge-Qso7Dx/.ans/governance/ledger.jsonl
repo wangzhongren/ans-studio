@@ -1,0 +1,1 @@
+{"at":"2026-10-22T13:47:08.610Z","kind":"customer.decision","flowId":"flow-a","actorRoleId":"verifier","power":"verification","decisionKind":"unclassified","customerDecision":"none","decisionEvidence":{"kind":"customer-input","toolCallId":"call-legal-confirm","turnId":"turn-legal-confirm"},"messageSummary":"确认写入"}

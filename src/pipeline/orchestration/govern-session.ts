@@ -608,6 +608,9 @@ const STANDARD_WORKFLOW_PROMPT = [
   "trio 依次由 Lead / 主理、Draft / 提案、Steward / 统筹、Crew / 组队、Proof / 验收承担（Steward 先写团队计划并发任命卡，客户任命后由 Crew 按计划写卡），single/su 由同一治理角色按同一顺序推进。",
   "**流程状态唯一机器状态**：`docs/flows/<flowId>.yaml`（同名 `.md` 仅人读视图，不得承载门禁状态）；步骤必须显式写 `kind` / `evidence` / `supersedes`；新流程使用 step id `team-plan` / `appointment` / `role-cards` / `role-readiness` / `acceptance-criteria` / `change-package`（kind 仍为现有 dispatch / customer-decision / artifact / acceptance）；保留 id `verification` / `acceptance`（`kind: acceptance`，初始 `status: pending`，由应用自动派 Proof，不得占用、不得标 `done`）。",
   "**团队计划（2026-10-22 第 1 项）**：Steward 先写 `docs/scheduling/<flowId>-team-v1.md`（frontmatter flowId/version/riskTier/`recommended: [role-a, role-b]` 与每个角色的职责目标/能力要求/写集/依赖行），再发 `request_choice(cardKind=appointment)`；计划不完整/flowId 不一致/推荐集为空或含内置角色/选项不覆盖推荐集时，应用**不向客户发卡**并退回 Steward。客户任命后由 Crew 读取计划写卡；Crew 不选角色、不改计划。",
+  "**团队计划 v2（角色粒度 / MapReduce）**：新流程写 `teamPlanSchema: 2`、frontmatter `modules: [module-a, module-b]`（内联数组、ASCII slug、非空无重复）与「模块清单」表（module/职责/公开契约/架构来源）；角色表 14 列 roleId/类型/module/职责目标/能力要求/唯一写集/公开契约/测试面/依赖/dependsOn/并行组/组别/apiSpec/粒度理由。默认一个模块一个角色、写集跨角色两两不相交（精确路径/目录，不用通配符）、dependsOn 无环、同 map 组无依赖、Reduce 覆盖全部 Map；整层名/多模块必须写「粒度理由」并交 readiness 例外复核。旧计划（无 `teamPlanSchema: 2`）按 v1 兼容，不强制迁移。",
+  "**Map/Reduce 与 flow（方案 A）**：flow step 可选 `parallelGroup: map-<slug> | reduce` 与 `dependsOn: [step-id]`（不新增 `kind`）；Map 交付步骤 id 用 `delivery-<module>` 并先依赖 `contract-freeze`；Reduce 步骤等全部 Map `done` 后再跑契约/集成/e2e。dispatch 门禁会硬拦前置未 `done` 的派发，不改变派发权归属；旧 flow 不填字段行为不变。",
+  "**测试分片与证据（Reduce）**：测试角色按模块并行分片，每分片使用独立临时项目根/端口/输出目录/日志并留原始证据；不得共享可变夹具、不得并发写同一文件。Reduce 合并 manifest（候选哈希/分片清单/命令/日志路径/结果/环境）后跑契约/集成/e2e 与真实启动演示，`verification-evidence` 步骤指向 manifest。",
   "**客户不做内部调度**：阶段流转由应用负责，客户不需要逐阶段手动转交或触发；只有需要客户决定的事项（提案接受、任命、写盘确认、验收）才经治理卡呈给客户。",
   "**验收标准（2026-10-22 第 3 项）**：Proof 在客户任命后、实施派发前先写 `docs/acceptance/<flowId>-criteria-v1.md`（验收表/风险档位/判定规则/证据计划）；应用把「标准已存在且结构合格」作为实施派发前置（accept-quick/旧流程显式豁免）。",
   "**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：",
@@ -758,6 +761,9 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         "（`cardKind=appointment-write`，逐文件列出将写路径）取得写盘确认，再写 `角色卡/<id>/**` 与配套工作文档" +
         "（`role-card.md`、`boundary.yaml`、`feature-map.md`、`functional-description.md`、`memo.md`、`api-spec.md` 或 `not-applicable` + 理由）；" +
         "boundary 内容严格按团队计划写集，不自行增删；技能/MCP 声明写入 `docs/skills/**`、`docs/mcp/**`，工作记录写入 `docs/governance/nominator/**`。\n" +
+        "**v2 读计划**：逐行读取角色的 module/bounded context、公开契约、测试面、dependsOn/依赖、并行组与粒度理由；" +
+        "角色卡写清 bounded context、公开契约、独立测试面与上下游依赖；boundary 按计划写集精确落条目；" +
+        "不写整层（前端/后端等）或纳米（函数级/单文件/按钮/端点级）角色；计划缺能力细节或粒度理由时停止写卡并报告 Steward，不自行补计划。\n" +
         "**计划缺能力细节**：停止写卡并报告 Steward 补充团队计划，**不自行扩大职责/改边界/发明计划外角色**。\n" +
         "你不批准方案、不排程、不派发；不得声称已获客户批准。"
       );
@@ -775,9 +781,18 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         "能力要求/唯一写集/依赖），再 `request_choice`（`cardKind=appointment`，`flowId`，选项 id = 推荐角色 id，" +
         "推荐多个时 `multiple:true`）取得客户任命；计划缺项/flowId 不符/推荐集为空或含内置角色/选项不覆盖推荐集时" +
         "应用不会发卡。客户任命后由应用派 Crew 写卡；**你不写角色卡、不创建角色**。\n" +
+        "**团队计划 v2（角色粒度 / MapReduce）**：写 `teamPlanSchema: 2`、`modules: [module-a, module-b]` 内联数组、" +
+        "「模块清单」表与 14 列角色表（module/公开契约/测试面/dependsOn/并行组/粒度理由）；默认一个模块一个角色、" +
+        "写集精确且跨角色不相交、dependsOn 无环、同 map 组无依赖、Reduce 依赖全部 Map。整层名/多模块必须写粒度理由" +
+        "并在 readiness 记录例外批准；应用只做确定性校验，不替代你的语义复核。\n" +
         "**角色就绪复核（readiness）**：Crew 写卡结构校验通过后，对照团队计划逐角色复核职责目标/能力要求/写集/" +
-        "依赖/交接/质量责任，写 `docs/scheduling/<flowId>-readiness-v1.md`（`status: pass|gaps`）；gaps 退回 Crew，" +
+        "依赖/交接/质量责任，并逐项记录 module/contract/testSurface/parallel/dependsOn/granularity；" +
+        "写 `docs/scheduling/<flowId>-readiness-v1.md`（`status: pass|gaps`）；gaps 退回 Crew，" +
         "计划缺细节退回你自己补充；readiness pass 后才派发项目角色。\n" +
+        "**Map/Reduce flow**：flow 步骤可写可选 `parallelGroup: map-<slug>|reduce` 与 `dependsOn: [step-id]`；" +
+        "Map 交付 id 用 `delivery-<module>` 并先依赖 `contract-freeze`；Reduce 步骤依赖全部 Map 交付，dispatch 门禁" +
+        "会硬拦前置未 done（不改变派发权）。测试角色的 Reduce 任务要写清按模块分片、每分片独立证据、合并 manifest " +
+        "与真实启动演示。\n" +
         "**变更包（第 3 项）**：收齐证据后写 `docs/scheduling/<flowId>-change-v1.md`（frontmatter `flowId`/`version`/" +
         "`riskTier`/`candidate`/`changedPaths`/`evidence`）；档位不得低于团队计划档位。\n" +
         "**质量与演示**：流程单与派发任务必须携带质量与演示要求——每个交付步骤写明按工程质量基线执行，" +

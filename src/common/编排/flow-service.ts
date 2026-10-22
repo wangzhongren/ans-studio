@@ -82,6 +82,10 @@ export interface FlowService {
     expectedRevision: string;
     reason?: string;
     idempotencyKey?: string;
+    /** 新步骤并行组（可选；MapReduce 方案 A；语法/静态校验由 flow-state 执行）。 */
+    parallelGroup?: string;
+    /** 新步骤前置 step id（可选；存在性/环/前置 done 校验由 flow-state/governance-gate 执行）。 */
+    dependsOn?: string[];
   }): Promise<FlowToolResult>;
 }
 
@@ -144,6 +148,8 @@ function viewOf(flow: FlowState, revision: string, actorRoleId: string, actorPow
       ...(step.evidence !== undefined ? { evidence: { kind: step.evidence.kind, ref: step.evidence.ref } } : {}),
       ...(step.supersedes !== undefined ? { supersedes: [...step.supersedes] } : {}),
       ...(step.supersededBy !== undefined ? { supersededBy: step.supersededBy } : {}),
+      ...(step.parallelGroup !== undefined ? { parallelGroup: step.parallelGroup } : {}),
+      ...(step.dependsOn !== undefined ? { dependsOn: [...step.dependsOn] } : {}),
     })),
     canUpdate,
   };
@@ -165,6 +171,8 @@ function serializeFlow(flow: FlowState): string {
       ...(step.evidence !== undefined ? { evidence: { kind: step.evidence.kind, ref: step.evidence.ref } } : {}),
       ...(step.supersedes !== undefined ? { supersedes: [...step.supersedes] } : {}),
       ...(step.supersededBy !== undefined ? { supersededBy: step.supersededBy } : {}),
+      ...(step.parallelGroup !== undefined ? { parallelGroup: step.parallelGroup } : {}),
+      ...(step.dependsOn !== undefined ? { dependsOn: [...step.dependsOn] } : {}),
     })),
   };
   return stringifyYaml(document, { lineWidth: 0 });
@@ -174,6 +182,12 @@ function sameEvidence(left: FlowStateStep["evidence"], right: FlowToolEvidence |
   if (left === undefined && right === undefined) return true;
   if (left === undefined || right === undefined) return false;
   return left.kind === right.kind && left.ref === right.ref;
+}
+
+function sameOptionalStringList(left: readonly string[] | undefined, right: readonly string[] | undefined): boolean {
+  if (left === undefined && right === undefined) return true;
+  if (left === undefined || right === undefined) return false;
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 /**
@@ -557,6 +571,8 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
             existingNew.kind === input.kind &&
             existingNew.title === input.title.trim() &&
             existingNew.owner === input.owner.trim() &&
+            existingNew.parallelGroup === input.parallelGroup &&
+            sameOptionalStringList(existingNew.dependsOn, input.dependsOn) &&
             (existingNew.supersedes ?? []).includes(oldStep.id);
           if (idempotent) {
             return { ok: true, idempotent: true, revision, flow: flowView };
@@ -580,6 +596,8 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
           kind: input.kind,
           status: "pending",
           supersedes: [oldStep.id],
+          ...(input.parallelGroup !== undefined ? { parallelGroup: input.parallelGroup } : {}),
+          ...(input.dependsOn !== undefined ? { dependsOn: [...input.dependsOn] } : {}),
         };
         const nextSteps: FlowStateStep[] = [];
         for (const [itemIndex, item] of flow.steps.entries()) {

@@ -1417,3 +1417,212 @@ test("写前校验（S3/T11）：声明 docs/flows/flow-.yaml ⇒ 宽捕获后�
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// —————————————————————— 2026-10-22 MapReduce 方案 A：可选 parallelGroup/dependsOn ——————————————————————
+
+const MAPREDUCE_FLOW_YAML = `flowId: map-reduce-v1
+version: 1
+qualityTier: production
+steps:
+  - id: contract-freeze
+    title: 冻结契约
+    owner: convener
+    kind: artifact
+    status: done
+    evidence: { kind: artifact, ref: docs/contracts/map-reduce-v1.md }
+  - id: delivery-api
+    title: Map A｜api
+    owner: api
+    kind: dispatch
+    status: pending
+    parallelGroup: map-a
+    dependsOn: [contract-freeze]
+  - id: delivery-storefront
+    title: Map B｜storefront
+    owner: storefront
+    kind: dispatch
+    status: pending
+    parallelGroup: map-b
+    dependsOn: [contract-freeze, delivery-api]
+  - id: test-map-shards
+    title: Map 测试分片
+    owner: integration
+    kind: dispatch
+    status: pending
+    parallelGroup: reduce
+    dependsOn: [delivery-api, delivery-storefront]
+  - id: integration-e2e
+    title: Reduce｜契约/集成/端到端
+    owner: integration
+    kind: dispatch
+    status: pending
+    parallelGroup: reduce
+    dependsOn: [test-map-shards]
+  - id: verification-evidence
+    title: Reduce｜合并证据
+    owner: integration
+    kind: artifact
+    status: pending
+    parallelGroup: reduce
+    dependsOn: [integration-e2e]
+  - id: acceptance
+    title: 验收
+    owner: verifier
+    kind: acceptance
+    status: pending
+`;
+
+function parseMapReduce(text = MAPREDUCE_FLOW_YAML): ReturnType<typeof parseFlowStateYaml> {
+  return parseFlowStateYaml(text, "map-reduce-v1");
+}
+
+test("MapReduce 可选字段：parallelGroup/dependsOn 解析通过；FLOW_STEP_KINDS 不变", () => {
+  const parsed = parseMapReduce();
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.error);
+  if (!parsed.ok) return;
+  const delivery = parsed.flow.steps.find((step) => step.id === "delivery-storefront")!;
+  assert.equal(delivery.parallelGroup, "map-b");
+  assert.deepEqual(delivery.dependsOn, ["contract-freeze", "delivery-api"]);
+  const reduce = parsed.flow.steps.find((step) => step.id === "test-map-shards")!;
+  assert.equal(reduce.parallelGroup, "reduce");
+  assert.deepEqual(reduce.dependsOn, ["delivery-api", "delivery-storefront"]);
+  assert.deepEqual([...FLOW_STEP_KINDS], ["dispatch", "customer-decision", "artifact", "acceptance"]);
+});
+
+test("旧 flow 不填可选字段：解析结果不含 parallelGroup/dependsOn（逐字不变）", () => {
+  const parsed = parseFlowStateYaml(TODO_FLOW_YAML, "todo-list-v1");
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.error);
+  if (!parsed.ok) return;
+  for (const step of parsed.flow.steps) {
+    assert.equal("parallelGroup" in step, false, `${step.id} 不得凭空出现 parallelGroup`);
+    assert.equal("dependsOn" in step, false, `${step.id} 不得凭空出现 dependsOn`);
+  }
+});
+
+test("parallelGroup 语法：map-<slug>/reduce 之外一律拒绝", () => {
+  const parsed = parseMapReduce(MAPREDUCE_FLOW_YAML.replace("parallelGroup: map-b", "parallelGroup: wave-1"));
+  assert.equal(parsed.ok, false);
+  if (parsed.ok) return;
+  assert.ok(parsed.errors.some((error) => error.path === "steps[2].parallelGroup" && /map-<slug> 或 reduce/.test(error.message)));
+});
+
+test("dependsOn：目标不存在 / 重复 / 自依赖 ⇒ 具体路径拒绝", () => {
+  const missing = parseMapReduce(MAPREDUCE_FLOW_YAML.replace("dependsOn: [contract-freeze]", "dependsOn: [ghost]"));
+  assert.equal(missing.ok, false);
+  if (!missing.ok) {
+    assert.ok(missing.errors.some((error) => /不存在/.test(error.message) && /ghost/.test(error.message)));
+  }
+
+  const duplicate = parseMapReduce(
+    MAPREDUCE_FLOW_YAML.replace("dependsOn: [contract-freeze]", "dependsOn: [contract-freeze, contract-freeze]"),
+  );
+  assert.equal(duplicate.ok, false);
+  if (!duplicate.ok) assert.ok(duplicate.errors.some((error) => /重复/.test(error.message)));
+
+  const self = parseMapReduce(
+    MAPREDUCE_FLOW_YAML.replace("dependsOn: [contract-freeze]", "dependsOn: [delivery-api]"),
+  );
+  assert.equal(self.ok, false);
+  if (!self.ok) assert.ok(self.errors.some((error) => /不能依赖自己/.test(error.message)));
+});
+
+test("dependsOn 成环 ⇒ 拒绝（与 supersede 图独立）", () => {
+  let text = MAPREDUCE_FLOW_YAML.replace("dependsOn: [contract-freeze]", "dependsOn: [delivery-storefront]");
+  text = text.replace("dependsOn: [contract-freeze, delivery-api]", "dependsOn: [delivery-api]");
+  // delivery-storefront 仍依赖 delivery-api；delivery-api 改依赖 delivery-storefront ⇒ 两节点互指。
+  const parsed = parseMapReduce(text.replace("dependsOn: [delivery-api]", "dependsOn: [delivery-api]"));
+  assert.equal(parsed.ok, false);
+  assert.ok(parsed.errors.some((error) => /dependsOn 形成环/.test(error.message)));
+});
+
+test("同一 map-* 组内存在依赖路径 ⇒ 拒绝", () => {
+  const text = MAPREDUCE_FLOW_YAML.replace("parallelGroup: map-b", "parallelGroup: map-a");
+  const parsed = parseMapReduce(text);
+  assert.equal(parsed.ok, false);
+  assert.ok(parsed.errors.some((error) => /同一 map-a 组内的步骤/.test(error.message)));
+});
+
+test("Reduce 步骤未覆盖全部 Map dispatch ⇒ 拒绝", () => {
+  const text = MAPREDUCE_FLOW_YAML.replace("dependsOn: [delivery-api, delivery-storefront]", "dependsOn: [delivery-api]");
+  const parsed = parseMapReduce(text);
+  assert.equal(parsed.ok, false);
+  assert.ok(parsed.errors.some((error) => /Reduce 步骤 test-map-shards/.test(error.message) && /delivery-storefront/.test(error.message)));
+});
+
+test("Map 步骤依赖 Reduce 步骤 ⇒ 拒绝", () => {
+  const text = `flowId: map-reduce-v1
+version: 1
+qualityTier: production
+steps:
+  - id: contract-freeze
+    title: 冻结契约
+    owner: convener
+    kind: artifact
+    status: done
+    evidence: { kind: artifact, ref: docs/contracts/map-reduce-v1.md }
+  - id: delivery-api
+    title: Map A｜api
+    owner: api
+    kind: dispatch
+    status: pending
+    parallelGroup: map-a
+    dependsOn: [contract-freeze, reduce-a]
+  - id: delivery-storefront
+    title: Map B｜storefront
+    owner: storefront
+    kind: dispatch
+    status: pending
+    parallelGroup: map-b
+    dependsOn: [contract-freeze]
+  - id: reduce-a
+    title: Reduce
+    owner: integration
+    kind: dispatch
+    status: pending
+    parallelGroup: reduce
+    dependsOn: [delivery-storefront]
+  - id: acceptance
+    title: 验收
+    owner: verifier
+    kind: acceptance
+    status: pending
+`;
+  const parsed = parseMapReduce(text);
+  assert.equal(parsed.ok, false);
+  assert.ok(parsed.errors.some((error) => /Map 步骤 delivery-api 不得依赖 Reduce 步骤 reduce-a/.test(error.message)));
+});
+
+test("新契约 flow 的 Map dispatch 缺 contract-freeze（或未依赖）⇒ 拒绝", () => {
+  const noContract = `flowId: map-reduce-v1
+version: 1
+qualityTier: production
+steps:
+  - id: delivery-api
+    title: Map A｜api
+    owner: api
+    kind: dispatch
+    status: pending
+    parallelGroup: map-a
+  - id: reduce-a
+    title: Reduce
+    owner: integration
+    kind: dispatch
+    status: pending
+    parallelGroup: reduce
+    dependsOn: [delivery-api]
+  - id: acceptance
+    title: 验收
+    owner: verifier
+    kind: acceptance
+    status: pending
+`;
+  const parsed = parseMapReduce(noContract);
+  assert.equal(parsed.ok, false);
+  assert.ok(parsed.errors.some((error) => /缺少 contract-freeze 步骤/.test(error.message)));
+
+  const notDepending = parseMapReduce(MAPREDUCE_FLOW_YAML.replace("dependsOn: [contract-freeze]", "dependsOn: []"));
+  assert.equal(notDepending.ok, false);
+  if (!notDepending.ok) {
+    assert.ok(notDepending.errors.some((error) => /必须（直接或传递）依赖 contract-freeze/.test(error.message)));
+  }
+});

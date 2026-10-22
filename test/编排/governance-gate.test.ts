@@ -526,3 +526,87 @@ test("parseFlowStepIds：尾连字符步骤行不再被识别（fail-closed）�
   );
   assert.deepEqual(ids, ["impl", "a--b"]);
 });
+
+// —————————————————————— 2026-10-22 MapReduce 方案 A：dispatch dependsOn 前置 done ——————————————————————
+
+function writeYamlFlow(root: string, text: string, flowId = "flow-a"): void {
+  mkdirSync(join(root, "docs", "flows"), { recursive: true });
+  writeFileSync(join(root, "docs", "flows", `${flowId}.yaml`), text, "utf8");
+}
+
+function mapFlow(dependencyStatus: "done" | "pending"): string {
+  return [
+    "flowId: flow-a",
+    "version: 1",
+    "qualityTier: production",
+    "steps:",
+    "  - id: contract-freeze",
+    "    title: 冻结契约",
+    "    owner: convener",
+    "    kind: artifact",
+    dependencyStatus === "done" ? "    status: done" : "    status: pending",
+    ...(dependencyStatus === "done" ? ["    evidence: { kind: artifact, ref: docs/contracts/flow-a-v1.md }"] : []),
+    "  - id: delivery-api",
+    "    title: Map A｜api",
+    "    owner: A",
+    "    kind: dispatch",
+    "    status: pending",
+    "    parallelGroup: map-a",
+    "    dependsOn: [contract-freeze]",
+    "",
+  ].join("\n");
+}
+
+test("dispatch dependsOn：前置全部 done ⇒ 放行；前置未 done ⇒ 拒（不改变派发权）", () => {
+  withRoot((root) => {
+    writeAcceptanceCriteria(root);
+    writeYamlFlow(root, mapFlow("done"));
+    const allowed = evaluateGovernanceGate(
+      dispatchInput(root, { stepId: "delivery-api" }),
+      snapshot([ACCEPT, APPOINT_A]),
+    );
+    assert.deepEqual(allowed, { allowed: true });
+
+    writeYamlFlow(root, mapFlow("pending"));
+    const blockedResult = evaluateGovernanceGate(
+      dispatchInput(root, { stepId: "delivery-api" }),
+      snapshot([ACCEPT, APPOINT_A]),
+    );
+    assert.equal(blocked(blockedResult), "dependencies-not-done");
+    assert.match((blockedResult as { message: string }).message, /contract-freeze（pending）/);
+    assert.match((blockedResult as { message: string }).message, /前置依赖尚未全部 done/);
+  });
+});
+
+test("dispatch dependsOn：旧 flow（无 dependsOn）不新增检查；YAML 坏行仍 fail-closed", () => {
+  withRoot((root) => {
+    writeAcceptanceCriteria(root);
+    // 旧版 .md 流程（无 dependsOn 概念）保持既有放行行为。
+    writeFlow(root, "flow-a", ["impl"]);
+    assert.deepEqual(
+      evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A])),
+      { allowed: true },
+    );
+
+    // 无 dependsOn 的 YAML 步骤同样不新增前置检查。
+    writeYamlFlow(
+      root,
+      [
+        "flowId: flow-a",
+        "version: 1",
+        "qualityTier: production",
+        "steps:",
+        "  - id: impl",
+        "    title: 实现",
+        "    owner: A",
+        "    kind: dispatch",
+        "    status: pending",
+        "",
+      ].join("\n"),
+    );
+    assert.deepEqual(
+      evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A])),
+      { allowed: true },
+    );
+  });
+});

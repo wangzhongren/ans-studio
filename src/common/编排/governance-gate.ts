@@ -33,7 +33,7 @@ import path from "node:path";
 import type { GovernanceModel } from "../../model/role.ts";
 import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 import { isBuiltInGovernanceRoleId } from "../../service/boundary/resolve-boundary.ts";
-import { parseFlowStateYaml } from "./flow-state.ts";
+import { parseFlowStateYaml, type FlowState, type FlowStateStep } from "./flow-state.ts";
 import type {
   GovernanceDecisionKind,
   GovernanceLedgerEntry,
@@ -410,12 +410,33 @@ function evaluateDispatchGate(
   if (!criteria.allowed) return criteria;
 
   // 5) 流程文件中存在对应步骤（只判存在，不读 status）。
-  if (!flowStepExists(input.projectRoot, input.flowId, input.stepId)) {
+  const lookup = lookupFlowStep(input.projectRoot, input.flowId, input.stepId);
+  if (!lookup.found) {
     return deny(
       "flow-step-missing",
       `治理门禁：流程 docs/flows/${input.flowId}.yaml（或旧版 .md）中没有步骤 ${input.stepId}；` +
         "请先在 Convener 会话按已接受提案写出流程步骤。",
     );
+  }
+
+  // 5b) 前置依赖（2026-10-22 MapReduce 方案 A）：步骤声明 dependsOn 时，全部前置必须 done。
+  //     不改变派发权归属；旧步骤无 dependsOn ⇒ 不新增检查（旧 flow 行为逐字不变）。
+  const dependsOn = lookup.step?.dependsOn ?? [];
+  if (dependsOn.length > 0) {
+    const notDone: string[] = [];
+    for (const depId of dependsOn) {
+      const dependency = lookup.flow?.steps.find((step) => step.id === depId);
+      if (dependency === undefined || dependency.status !== "done") {
+        notDone.push(`${depId}（${dependency?.status ?? "missing"}）`);
+      }
+    }
+    if (notDone.length > 0) {
+      return deny(
+        "dependencies-not-done",
+        `治理门禁：步骤 ${input.stepId} 的前置依赖尚未全部 done（${notDone.join("、")}）；` +
+          "请先完成前置步骤，再派发本步骤（不改变派发权，只增加前置条件）。",
+      );
+    }
   }
 
   // 6) 同一 flowId+stepId 未被派发过。
@@ -500,26 +521,32 @@ function isExistingProjectRole(projectRoot: string, roleId: string): boolean {
 }
 
 /**
- * 流程步骤存在性（派发门禁第 4 条；**只看步骤是否存在，不读 status**）。
+ * 流程步骤查询（派发门禁第 4/5 条）：返回步骤是否存在及（YAML 时的）结构化步骤/flow。
  *
  * 2026-10-19 Flow YAML 契约（客户「这些全部改成yaml」）：`docs/flows/<flowId>.yaml` 是**唯一机器状态**。
- *   · YAML 存在 ⇒ 只认 YAML；YAML 校验失败 ⇒ false（fail-closed，**不回落 Markdown**，避免坏 YAML
+ *   · YAML 存在 ⇒ 只认 YAML；YAML 校验失败 ⇒ `found:false`（fail-closed，**不回落 Markdown**，避免坏 YAML
  *     被旧人读视图掩盖）；
- *   · YAML 不存在 ⇒ 回落旧版 `docs/flows/<flowId>.md`（迁移兼容；新流程应写 YAML）。
+ *   · YAML 不存在 ⇒ 回落旧版 `docs/flows/<flowId>.md`（迁移兼容；新流程应写 YAML；旧 .md 无 dependsOn）。
  */
-function flowStepExists(projectRoot: string, flowId: string, stepId: string): boolean {
+function lookupFlowStep(
+  projectRoot: string,
+  flowId: string,
+  stepId: string,
+): { found: boolean; step?: FlowStateStep; flow?: FlowState } {
   const yamlAbs = path.join(projectRoot, "docs", "flows", `${flowId}.yaml`);
   let yamlText: string | undefined;
   try {
     yamlText = readFileSync(yamlAbs, "utf8");
   } catch (err) {
     // 只有「不存在」才允许回落旧 .md；存在但不可读（权限/IO）⇒ fail-closed，不猜。
-    if ((err as NodeJS.ErrnoException).code !== "ENOENT") return false;
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") return { found: false };
     yamlText = undefined;
   }
   if (yamlText !== undefined) {
     const parsed = parseFlowStateYaml(yamlText, flowId);
-    return parsed.ok && parsed.flow.steps.some((step) => step.id === stepId);
+    if (!parsed.ok) return { found: false };
+    const step = parsed.flow.steps.find((candidate) => candidate.id === stepId);
+    return step === undefined ? { found: false, flow: parsed.flow } : { found: true, step, flow: parsed.flow };
   }
 
   // 旧版人读视图（仅迁移期兼容；应用不再把它作为新流程的判定来源）。
@@ -528,7 +555,7 @@ function flowStepExists(projectRoot: string, flowId: string, stepId: string): bo
   try {
     text = readFileSync(abs, "utf8");
   } catch {
-    return false;
+    return { found: false };
   }
-  return parseFlowStepIds(text).includes(stepId);
+  return { found: parseFlowStepIds(text).includes(stepId) };
 }

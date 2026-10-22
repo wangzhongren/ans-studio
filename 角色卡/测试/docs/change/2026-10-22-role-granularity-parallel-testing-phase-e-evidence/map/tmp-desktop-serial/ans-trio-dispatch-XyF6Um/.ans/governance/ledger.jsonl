@@ -1,0 +1,3 @@
+{"at":"2026-10-22T13:33:10.301Z","kind":"customer.decision","flowId":"flow-a","actorRoleId":"rapporteur","power":"proposal","customerDecision":"accepted","decisionKind":"proposal-accept"}
+{"at":"2026-10-22T13:33:10.301Z","kind":"customer.decision","flowId":"flow-a","actorRoleId":"nominator","power":"nomination","customerDecision":"accepted","decisionKind":"appointment","targetRoleIds":["A"]}
+{"at":"2026-10-22T13:33:10.350Z","kind":"dispatch.accepted","flowId":"flow-a","stepId":"impl","actorRoleId":"convener","power":"schedule","targetRoleId":"A","messageSummary":"实现步骤 impl","runtime":"demo"}

@@ -555,7 +555,8 @@ export function buildAcceptanceTaskMessage(
     `③ 未真实启动/演示、或质量基线某项无证据，不得建议 accept（只能建议退回或补充证据）；` +
     `④ 验收报告写入 ${reportPath}（首行五项：风险档位、判定依据、选定检查、复用证据、全量回归），详细证据附件写入 docs/verification/；报告须引用实施前标准 ${criteriaPath} 与变更包 ${changePackagePath} 的版本/哈希。` +
     `⑤ 按提案/变更的「架构方案或架构影响分析」核对实现：模块边界、依赖方向、扩展点、数据 schema/API 版本迁移与声明一致；缺失架构章节或实现偏离声明时不得建议 accept（只能建议退回或补充证据）。` +
-    `⑥ 按实施前标准 ${criteriaPath} 逐行判定（pass / fail / insufficient evidence / not applicable）；先核对变更包 ${changePackagePath} 与风险档位${riskText}（档位只能升不能降，报告不得低于变更包）；复用同候选、同输入/依赖、同命令的有效证据，候选/输入/依赖/契约/夹具/配置变化使受影响证据失效，只补缺失/失效/高风险检查。`
+    `⑥ 按实施前标准 ${criteriaPath} 逐行判定（pass / fail / insufficient evidence / not applicable）；先核对变更包 ${changePackagePath} 与风险档位${riskText}（档位只能升不能降，报告不得低于变更包）；复用同候选、同输入/依赖、同命令的有效证据，候选/输入/依赖/契约/夹具/配置变化使受影响证据失效，只补缺失/失效/高风险检查。` +
+    `⑦ 若团队计划为 v2（teamPlanSchema: 2），核对模块覆盖/写集不相交/并行组/dependsOn/粒度例外，以及 MapReduce 证据：测试须按模块分片并行（每分片独立临时根/端口/日志/结果），Reduce 合并 manifest 与分片原始日志并跑契约/集成/e2e；缺 manifest 或分片原始证据判 insufficient evidence，不得建议 accept。`
   );
 }
 
@@ -776,6 +777,10 @@ export interface BuildGovernanceAdvanceMessageOptions {
    */
   teamPlanPath?: string;
   teamPlanVersion?: number;
+  /** 团队计划 schema（1=legacy；2=v2）。用于任务文案提示要读的字段；缺省按 legacy 口径。 */
+  teamPlanSchema?: 1 | 2;
+  /** 团队计划 v2 模块清单（机器可读 modules）；非空时写进写卡任务文案。 */
+  teamPlanModules?: readonly string[];
   /** @deprecated legacy：旧提名文件路径（`docs/nominations/<flowId>-v<n>.md`）；新流程不产生。 */
   nominationPath?: string;
   /**
@@ -850,8 +855,10 @@ export function buildGovernanceAdvanceMessage(
       return (
         `流程 ${flowId}：客户已接受提案 ${proposalPath}。` +
         flowInstruction +
-        `并在 ${planRel} 写出/更新团队计划（frontmatter：flowId、version、riskTier、recommended: [角色id,...]；` +
-        `角色表逐角色含职责目标/能力要求/唯一写集/依赖/组别/apiSpec）。` +
+        `并在 ${planRel} 写出/更新**团队计划 v2**（新流程默认 v2；frontmatter：flowId、version、riskTier、teamPlanSchema: 2、recommended: [角色id,...]、modules: [模块id,...]；` +
+        `正文「模块清单」表逐模块含职责/公开契约/架构来源；角色表逐角色含 module/boundedContext、职责目标、能力要求、唯一写集、公开契约、测试面、依赖、dependsOn、并行组、组别、apiSpec、粒度理由；并写「五维判断/协调成本」章节）。` +
+        `Map 组（parallelGroup: map-<slug>）写集必须两两不相交且组内无依赖；Reduce 角色（module: reduce、并行组: reduce）依赖全部 Map 角色；整层名/多模块例外必须写粒度理由。` +
+        `legacy 旧计划可不写 teamPlanSchema: 2（按 v1 校验并记迁移提醒），但新流程请用 v2。` +
         `完成后**直接发任命卡**：request_choice(cardKind=appointment, flowId=${flowId}, stepId=role-cards)，` +
         `选项为团队计划 recommended 中的项目角色（不含内置治理角色）；不要替客户决定、不要自行任命、不要写角色卡。`
       );
@@ -874,17 +881,28 @@ export function buildGovernanceAdvanceMessage(
     const planRel = options?.teamPlanPath;
     const legacyRel = options?.nominationPath;
     if (planRel === undefined && legacyRel === undefined) return null; // 无团队计划也无 legacy 提名：不猜、不裸发。
+    const schemaNote =
+      options?.teamPlanSchema === 2
+        ? "（团队计划 v2：按 module/公开契约/测试面/dependsOn/并行组/粒度理由写卡）"
+        : options?.teamPlanSchema === 1
+          ? "（legacy v1：按旧四列写卡；建议迁移团队计划 v2）"
+          : "";
+    const moduleNote =
+      options?.teamPlanSchema === 2 && (options.teamPlanModules?.length ?? 0) > 0
+        ? `；模块清单：${options.teamPlanModules!.join("、")}`
+        : "";
     const basis =
       planRel !== undefined
-        ? `依据团队计划 ${planRel}${options?.teamPlanVersion !== undefined ? `（version=${options.teamPlanVersion}）` : ""}只读执行`
+        ? `依据团队计划 ${planRel}${options?.teamPlanVersion !== undefined ? `（version=${options.teamPlanVersion}）` : ""}${schemaNote}${moduleNote}只读执行`
         : `依据旧提名文件 ${legacyRel}（legacy；新流程应使用团队计划）只读执行`;
     return (
       `流程 ${flowId}：客户已完成任命（闸门 2）：${ids.join("、")}。${basis}；只对名单内角色写卡，不自行扩大职责、不改团队计划、不改其他角色。` +
       `逐路径写入并用 request_confirmation(cardKind=appointment-write, flowId=${flowId}, stepId=role-cards) 请客户确认（逐路径列出全部文件）：` +
-      `① role-card.md：角色名/组别/工作立场、能力描述、职责与功能导航、必读资料、交接输入输出、执行原则、质量职责、标准工作流、交付物清单；` +
-      `② boundary.yaml：现有 schema + 角色根工作文档条目（角色卡/<id>/feature-map.md、functional-description.md、memo.md、api-spec.md）+ 按团队计划的实际写集；` +
+      `① role-card.md：角色名/组别/工作立场、能力描述、职责与功能导航、必读资料、交接输入输出、执行原则、质量职责、标准工作流、交付物清单；v2 另须写明 bounded context/公开契约/测试面/上下游依赖/粒度理由；` +
+      `② boundary.yaml：现有 schema + 角色根工作文档条目（角色卡/<id>/feature-map.md、functional-description.md、memo.md、api-spec.md）+ 按团队计划的实际写集；**计划写集必须被 entries 覆盖（V12 不覆盖会退回）**；` +
       `③ feature-map.md、functional-description.md、memo.md、api-spec.md（无共享接口时写 not-applicable + 非空理由）。` +
-      `计划缺职责目标/能力要求/写集/依赖等细节时：停止写卡并报告 Steward / 统筹 补充计划，不自行补计划。写完后本轮结束；应用会做结构校验，通过后才请 Steward / 统筹 做 role-readiness。`
+      `不得写整层/纳米角色；不要写计划里没有的模块或路径。` +
+      `计划缺职责目标/能力要求/写集/依赖等细节时（v2 另含 module/公开契约/测试面/dependsOn/并行组）：停止写卡并报告 Steward / 统筹 补充计划，不自行补计划。写完后本轮结束；应用会做结构校验与计划写集覆盖核对（V12），通过后才请 Steward / 统筹 做 role-readiness。`
     );
   }
   if (payload.cardKind === "appointment" && payload.nextFunction === "schedule" && payload.roleId === "convener") {
@@ -938,19 +956,26 @@ export function governanceNominationFollowUpNote(): string {
 export function buildAppointmentWriteReminderMessage(
   flowId: string,
   targetRoleIds: readonly string[],
-  options: { teamPlanPath?: string; teamPlanVersion?: number; nominationPath?: string } = {},
+  options: {
+    teamPlanPath?: string;
+    teamPlanVersion?: number;
+    teamPlanSchema?: 1 | 2;
+    teamPlanModules?: readonly string[];
+    nominationPath?: string;
+  } = {},
 ): string {
   const ids = targetRoleIds.filter((id): id is string => nonEmptyString(id));
   const planRel = options.teamPlanPath ?? (options.nominationPath === undefined ? governanceTeamPlanPath(flowId) : undefined);
   const basis =
     planRel !== undefined
-      ? `团队计划 ${planRel}${options.teamPlanVersion !== undefined ? `（version=${options.teamPlanVersion}）` : ""}`
+      ? `团队计划 ${planRel}${options.teamPlanVersion !== undefined ? `（version=${options.teamPlanVersion}）` : ""}` +
+        (options.teamPlanSchema === 2 ? "（v2：按 module/公开契约/测试面/dependsOn/并行组/粒度理由）" : "")
       : `旧提名文件 ${options.nominationPath}（legacy）`;
   return (
     `流程 ${flowId}：客户已完成任命 ${ids.join("、")}，但角色卡/边界/工作文档尚未写出或不完整（项目中尚未枚举到这些角色）。` +
-    `请 Crew / 组队 读取${basis}，用 appointment-write 确认卡逐路径完成写卡：role-card.md（角色名/组别/工作立场、能力描述、职责与功能导航、必读资料、交接输入输出、执行原则、质量职责、标准工作流、交付物清单）、` +
-    `boundary.yaml（角色根工作文档条目 + 实际写集）、feature-map.md、functional-description.md、memo.md、api-spec.md（或 not-applicable + 非空理由）；` +
-    `只写名单内角色（${ids.join("、")}），计划缺细节报告 Steward / 统筹 补充，不自行扩大职责。写完后本轮结束，不要自行任命、不要派发。`
+    `请 Crew / 组队 读取${basis}，用 appointment-write 确认卡逐路径完成写卡：role-card.md（角色名/组别/工作立场、能力描述、职责与功能导航、必读资料、交接输入输出、执行原则、质量职责、标准工作流、交付物清单；v2 另写 bounded context/公开契约/测试面/上下游依赖/粒度理由）、` +
+    `boundary.yaml（角色根工作文档条目 + 实际写集；计划写集必须被 entries 覆盖，V12 不覆盖会退回）、feature-map.md、functional-description.md、memo.md、api-spec.md（或 not-applicable + 非空理由）；` +
+    `只写名单内角色（${ids.join("、")}），计划缺细节报告 Steward / 统筹 补充，不自行扩大职责，不写整层/纳米角色。写完后本轮结束，不要自行任命、不要派发。`
   );
 }
 
@@ -974,16 +999,28 @@ export function buildRoleReadinessTaskMessage(
   targetRoleIds: readonly string[],
   teamPlanPath?: string,
   teamPlanVersion?: number,
+  options: { teamPlanSchema?: 1 | 2; modules?: readonly string[] } = {},
 ): string {
   const ids = targetRoleIds.filter((id): id is string => nonEmptyString(id));
   const planRel = teamPlanPath ?? governanceTeamPlanPath(flowId);
   const readinessRel = governanceReadinessPath(flowId);
+  const isV2 = options.teamPlanSchema === 2;
+  const modules = (options.modules ?? []).filter((module): module is string => nonEmptyString(module));
+  const v2Scope = isV2
+    ? `团队计划为 v2（teamPlanSchema: 2）${modules.length > 0 ? `；模块清单：${modules.join("、")}` : ""}。` +
+      `逐角色核对 module/boundedContext、职责目标、能力要求、唯一写集、公开契约、测试面、依赖/dependsOn、并行组与粒度理由；` +
+      `核对模块覆盖（每模块恰一个 Map 角色、无孤儿/重复）、写集两两不相交、依赖无环、同一 Map 组内无依赖、Map 不依赖 Reduce、Reduce 覆盖全部 Map。`
+    : `（legacy v1：按旧职责目标/能力要求/写集/边界/依赖/交接核对；如需模块/契约/测试面/并行复核请迁移团队计划 v2。）`;
+  const readinessColumns = isV2
+    ? "（frontmatter flowId/version/status: pass|gaps；逐角色列 module/contract/testSurface/parallel/dependsOn/granularity，每项 pass/gap + 证据如 role-card 章节/行号）。"
+    : "（frontmatter flowId/version/status: pass|gaps，逐角色每项 pass/gap + 证据如 role-card 章节/行号）。";
   return (
-    `流程 ${flowId}：Crew 写卡已通过结构校验（文件/章节齐全；**能力内容尚未判定**）。` +
-    `请对照团队计划 ${planRel}${teamPlanVersion !== undefined ? `（version=${teamPlanVersion}）` : ""} 逐角色做角色就绪复核（stepId=role-readiness）：` +
-    `核对职责目标/能力要求/写集/边界/依赖/交接/质量责任；复核记录写入 ${readinessRel}` +
-    `（frontmatter flowId/version/status: pass|gaps，逐角色每项 pass/gap + 证据如 role-card 章节/行号）。` +
-    `有 gap ⇒ 在记录中标 gaps 并退回 Crew 修正；计划缺职责/能力/写集细节 ⇒ 补充计划；全部 pass ⇒ 用 flow_step_update 把 role-readiness 标 done，再按已批准步骤派发项目角色。` +
+    `流程 ${flowId}：Crew 写卡已通过结构校验（文件/章节齐全、计划写集已被 boundary entries 覆盖；**能力内容尚未判定**）。` +
+    `请对照团队计划 ${planRel}${teamPlanVersion !== undefined ? `（version=${teamPlanVersion}）` : ""} 逐角色做角色就绪复核（stepId=role-readiness）：${v2Scope}` +
+    `核对职责目标/能力要求/写集/边界/依赖/交接/质量责任；复核记录写入 ${readinessRel}${readinessColumns}` +
+    `Map 组任务须写明同组可并行、写集不相交、只依赖 contract-freeze/前置组、不得写对方路径；Reduce 任务须写明等全部 Map done 后跑契约/集成/e2e，测试按模块分片并行、每分片独立证据、合并 manifest。` +
+    `结构校验通过不等于判定粒度正确：语义判断须写入 readiness 记录与证据，应用不代做语义判断。` +
+    `有 gap ⇒ 在记录中标 gaps 并退回 Crew 修正；计划缺职责/能力/写集/模块细节 ⇒ 补充计划；全部 pass ⇒ 用 flow_step_update 把 role-readiness 标 done，再按已批准步骤派发项目角色。` +
     `不要写角色卡、不要代替 Crew 写卡、不要绕过客户确认。`
   );
 }
@@ -1021,6 +1058,7 @@ export function buildAcceptanceCriteriaTaskMessage(
     `④ 风险档位与判定依据、选定检查、复用证据规则、全量回归条件；⑤ 成功/失败/边界情形；` +
     `⑥ 候选身份（哈希/版本）与证据失效规则；⑦ 判定规则（pass / fail / insufficient evidence / not applicable）；` +
     `⑧ 版本冻结规则（实施开始后不得改标准适配候选；确需变更递增版本并报统筹/沟通确认）。` +
+    `⑨ 若团队计划为 v2（teamPlanSchema: 2），标准须覆盖模块覆盖/写集不相交/并行组/dependsOn/粒度例外，以及测试按模块分片并行、每分片独立证据、Reduce 合并 docs/verification/<flowId>/manifest.md 的证据规则；legacy 计划按 v1 兼容。` +
     `不要自行验收、不要代替客户决定。`
   );
 }

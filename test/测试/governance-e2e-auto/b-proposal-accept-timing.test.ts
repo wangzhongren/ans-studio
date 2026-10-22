@@ -29,6 +29,7 @@ import {
   seedConfirmedIntent,
   seedTrioProject,
   teamPlanDoc,
+  teamPlanV2Doc,
   type ScriptContext,
 } from "./fixture.ts";
 
@@ -236,6 +237,111 @@ test("场景2b：Convener 未写团队计划却发任命卡 ⇒ 卡前守卫拒�
     // 不循环：再等一拍，Convener 不再收到第二条任务。
     await new Promise((resolve) => setTimeout(resolve, 150));
     assert.equal(h.prompts.get("convener")?.length, 1, "不重试、不循环派发");
+  } finally {
+    await h.stop();
+    h.cleanup();
+    temp.cleanup();
+  }
+});
+
+test("场景2c（v2）：接受提案 ⇒ 同一轮写 v2 团队计划/MapReduce flow 并直接发任命卡；Crew 文案含模块清单", async () => {
+  const script = rapporteurProposalScript();
+  const temp = makeRoot("proposal-accept-v2");
+  seedTrioProject(temp.root);
+  await seedConfirmedIntent(temp.root);
+
+  const v2Plan = teamPlanV2Doc(FLOW, {
+    modules: ["storefront"],
+    recommended: ["executor"],
+    rows: [
+      {
+        roleId: "executor",
+        type: "new",
+        module: "storefront",
+        writes: "src/owned-executor/; test/owned-executor/",
+        contract: "docs/contracts/storefront-v1.md",
+        testSurface: "test/owned-executor/",
+        dependsOn: "无",
+        parallelGroup: "map-a",
+        group: "交付",
+      },
+      {
+        roleId: "tester",
+        type: "existing",
+        module: "reduce",
+        writes: "test/测试/",
+        contract: "docs/contracts/storefront-v1.md（消费）",
+        testSurface: "test/测试/（集成/e2e）",
+        deps: "依赖全部 Map",
+        dependsOn: "executor",
+        parallelGroup: "reduce",
+        group: "测试",
+        apiSpec: "not-applicable（Reduce 角色不导出接口）",
+      },
+    ],
+  });
+  const v2Flow = flowDoc(FLOW, [
+    { id: "contract-freeze", owner: "rapporteur", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: "docs/contracts/storefront-v1.md" } },
+    { id: "appointment", kind: "customer-decision", status: "pending" },
+    { id: "role-cards", kind: "dispatch", status: "pending" },
+    { id: "role-readiness", kind: "dispatch", status: "pending" },
+    { id: "delivery-storefront", owner: "executor", kind: "dispatch", status: "pending", parallelGroup: "map-a", dependsOn: ["contract-freeze"] },
+    { id: "test-map-shards", owner: "tester", kind: "dispatch", status: "pending", parallelGroup: "reduce", dependsOn: ["delivery-storefront"] },
+    { id: "verification", kind: "acceptance", status: "pending" },
+  ]);
+
+  const h = await makeHarness({
+    tag: "proposal-accept-v2",
+    root: temp.root,
+    approval: true,
+    decision: true,
+    scriptForRole: (ctx) => {
+      if (ctx.roleId === "convener" && /客户已接受提案/.test(ctx.prompt)) {
+        return [
+          { name: "write_file", args: { path: FLOW_REL, content: v2Flow } },
+          { name: "write_file", args: { path: TEAM_PLAN_REL, content: v2Plan } },
+          {
+            name: "request_choice",
+            args: {
+              title: `任命 ${FLOW}`,
+              question: "选择要任命的角色",
+              flowId: FLOW,
+              cardKind: "appointment",
+              multiple: true,
+              options: [{ id: "executor", label: "Executor" }],
+            },
+          },
+        ];
+      }
+      return script(ctx);
+    },
+  });
+  try {
+    await h.open("rapporteur");
+    const sent = await h.send("rapporteur", "请形成提案并请客户决定。");
+    assert.equal(sent.ok, true, sent.error ?? "");
+
+    await h.waitFor(() => (h.prompts.get("nominator")?.length ?? 0) > 0, 10000);
+    const ledger = await h.waitForLedger(
+      (entries) =>
+        entries.some((entry) => entry.decisionKind === "appointment") &&
+        entries.some((entry) => entry.kind === "dispatch.accepted" && entry.targetRoleId === "nominator"),
+      10000,
+    );
+    const appointment = ledger.entries.find((entry) => entry.decisionKind === "appointment")!;
+    assert.equal(appointment.artifactPath, TEAM_PLAN_REL);
+    assert.deepEqual(appointment.targetRoleIds, ["executor"]);
+    assert.equal(h.presented.length, 0, "v2 任命由判断代批 ⇒ 0 张手卡");
+
+    const crewTask = h.prompts.get("nominator")![0]!;
+    assert.match(crewTask, /团队计划 v2/);
+    assert.match(crewTask, /模块清单：storefront/);
+    assert.match(crewTask, /module\/公开契约\/测试面\/dependsOn\/并行组\/粒度理由/);
+    const convenerTask = h.prompts.get("convener")![0]!;
+    assert.match(convenerTask, /团队计划 v2/);
+    assert.match(convenerTask, /parallelGroup/);
+    assert.match(convenerTask, /dependsOn/);
+    assert.equal(exists(temp.root, NOMINATION_REL), false);
   } finally {
     await h.stop();
     h.cleanup();

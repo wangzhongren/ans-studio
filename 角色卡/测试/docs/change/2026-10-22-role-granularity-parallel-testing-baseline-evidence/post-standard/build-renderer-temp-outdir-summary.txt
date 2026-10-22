@@ -1,0 +1,6 @@
+exit_code=0
+duration_ms=891
+command=npm run build:renderer -- --outDir C:/Users/51054/AppData/Local/Temp/ans-renderer-build-poststandard
+started=2026-10-22 20:45:07
+finished=2026-10-22 20:45:08
+note=output redirected outside repo to respect test-role write boundary; app/renderer/dist not targeted

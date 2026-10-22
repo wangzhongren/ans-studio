@@ -1,0 +1,57 @@
+SHOT=demo-00-launch.png
+SHOT=demo-01-project-imported.png
+SHOT=demo-02-appointment-card.png
+DEMO_APPOINTMENT_CARD_VISIBLE=true
+EVENT convener accepted request_choice：客户已选择（操作者：demo-operator）：executor（Executor）。请按客户的选择继续；**未选中的项不得擅自代选**。
+DEMO_SEND role=convener runtime=claude
+EVENT convener settled 会话结束
+EVENT liaison settled 会话结束
+SHOT=demo-03-crew-write-card.png
+DEMO_CREW_WRITE_CARD_VISIBLE=true
+EVENT nominator accepted request_confirmation：客户已确认「写盘确认 flow-demo」（confirmed:true；操作者：demo-operator）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+EVENT nominator accepted write_file 已获准并落盘：角色卡/executor/role-card.md（515 字节写入 C:\Users\51054\AppData\Local\Temp\ans-legacy-demo-Zpo8kP\project\角色卡\executor\role-card.md）
+EVENT nominator accepted write_file 已获准并落盘：角色卡/executor/boundary.yaml（477 字节写入 C:\Users\51054\AppData\Local\Temp\ans-legacy-demo-Zpo8kP\project\角色卡\executor\boundary.yaml）
+EVENT nominator accepted write_file 已获准并落盘：角色卡/executor/feature-map.md（83 字节写入 C:\Users\51054\AppData\Local\Temp\ans-legacy-demo-Zpo8kP\project\角色卡\executor\feature-map.md）
+EVENT nominator accepted write_file 已获准并落盘：角色卡/executor/functional-description.md（108 字节写入 C:\Users\51054\AppData\Local\Temp\ans-legacy-demo-Zpo8kP\project\角色卡\executor\functional-descr
+EVENT nominator accepted write_file 已获准并落盘：角色卡/executor/memo.md（57 字节写入 C:\Users\51054\AppData\Local\Temp\ans-legacy-demo-Zpo8kP\project\角色卡\executor\memo.md）
+EVENT nominator accepted write_file 已获准并落盘：角色卡/executor/api-spec.md（59 字节写入 C:\Users\51054\AppData\Local\Temp\ans-legacy-demo-Zpo8kP\project\角色卡\executor\api-spec.md）
+EVENT nominator settled 会话结束
+EVENT liaison settled 会话结束
+EVENT convener settled 会话结束
+EVENT liaison settled 会话结束
+DEMO_SEND role=verifier runtime=claude
+EVENT verifier accepted write_file 已获准并落盘：docs/acceptance/flow-demo-criteria-v1.md（487 字节写入 C:\Users\51054\AppData\Local\Temp\ans-legacy-demo-Zpo8kP\project\docs\acceptance\flow-demo-c
+EVENT verifier settled 会话结束
+EVENT convener accepted write_file 已获准并落盘：docs/scheduling/flow-demo-readiness-v1.md（176 字节写入 C:\Users\51054\AppData\Local\Temp\ans-legacy-demo-Zpo8kP\project\docs\scheduling\flow-demo-
+EVENT convener accepted write_file 已获准并落盘：docs/scheduling/flow-demo-change-v1.md（119 字节写入 C:\Users\51054\AppData\Local\Temp\ans-legacy-demo-Zpo8kP\project\docs\scheduling\flow-demo-cha
+EVENT convener accepted dispatch_task：任务已派发给「executor」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 executor 的会话（其会话未开——将自动开启）；投递结果/失败会在其聊天流与 Steward / 统筹 的聊天流如实显示（受理≠已完成）。注意：**派发 ≠ 授权**——对方只在自己已接
+DEMO_SEND role=convener runtime=claude
+EVENT liaison settled 会话结束
+EVENT convener settled 会话结束
+EVENT executor settled 会话结束
+EVENT convener settled 会话结束
+EVENT liaison settled 会话结束
+EVENT liaison settled 会话结束
+SHOT=demo-04-convener-readiness.png
+DEMO_READINESS_RECORD=true
+DEMO_CHANGE_PACKAGE=true
+EVENT verifier accepted write_file 已获准并落盘：docs/acceptance/flow-demo-report-v1.md（195 字节写入 C:\Users\51054\AppData\Local\Temp\ans-legacy-demo-Zpo8kP\project\docs\acceptance\flow-demo-rep
+SHOT=demo-05-acceptance-card.png
+DEMO_ACCEPTANCE_CARD_VISIBLE=true
+EVENT verifier accepted request_choice：客户已选择（操作者：demo-operator）：accept（通过）。请按客户的选择继续；**未选中的项不得擅自代选**。
+DEMO_SEND role=verifier runtime=claude
+EVENT verifier settled 会话结束
+EVENT liaison settled 会话结束
+SHOT=demo-06-accepted.png
+DEMO_DECISIONS=proposal-accept:accepted:,appointment:appointed:executor,appointment-write:accepted:,acceptance:accepted:
+DEMO_IMPL_DISPATCH=true
+DEMO_FILE_docs/scheduling/flow-demo-team-v1.md=true
+DEMO_FILE_docs/flows/flow-demo.yaml=true
+DEMO_FILE_docs/acceptance/flow-demo-criteria-v1.md=true
+DEMO_FILE_docs/acceptance/flow-demo-report-v1.md=true
+DEMO_FILE_docs/scheduling/flow-demo-change-v1.md=true
+DEMO_FILE_docs/scheduling/flow-demo-readiness-v1.md=true
+DEMO_FILE_角色卡/executor/role-card.md=true
+DEMO_FILE_角色卡/executor/boundary.yaml=true
+DEMO_PASS=true
+DEMO_DONE=1

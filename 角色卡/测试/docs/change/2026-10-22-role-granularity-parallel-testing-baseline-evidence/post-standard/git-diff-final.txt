@@ -1,0 +1,6 @@
+warning: in the working copy of 'docs/communication/memo.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/planning/memo.md', LF will be replaced by CRLF the next time Git touches it
+docs/communication/memo.md
+docs/planning/memo.md
+"src/common/\351\227\250\347\246\201\345\274\225\346\223\216/governance-roles.ts"
+src/model/runtime.ts

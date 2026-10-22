@@ -1,0 +1,9 @@
+== ENGINEERING_QUALITY_BASELINE diff lines ==
++// `ENGINEERING_QUALITY_BASELINE` 文本、导出函数签名与所有枚举值零变化；方案：
+== BUILT_IN_GOVERNANCE_ROLES/preauthorized/forbidden diff lines ==
++// `BUILT_IN_GOVERNANCE_ROLES` 的 entries/forbidden/preauthorized、能力位、内部 id/显示名、工程基线
+== enum value diff lines (runtime.ts) ==
+(no added/removed lines)
+== FLOW_STEP_KINDS ==
+47:export const FLOW_STEP_KINDS = ["dispatch", "customer-decision", "artifact", "acceptance"] as const;
+== ACTION_ROLE dispatch ==

@@ -1,0 +1,6 @@
+exit_code=1
+duration_ms=22394
+command=timeout 300 node --test "test/**/*.test.ts"
+started=2026-10-22 20:43:53
+finished=2026-10-22 20:44:16
+note=exit 124 means 5-minute timeout

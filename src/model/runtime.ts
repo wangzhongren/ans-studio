@@ -797,7 +797,14 @@ export interface FlowToolEvidence {
   ref: string;
 }
 
-/** `flow_get` 返回的步骤视图（服务端投影；工具层原样转达，不重算）。 */
+/**
+ * `flow_get` 返回的步骤视图（服务端投影；工具层原样转达，不重算）。
+ *
+ * 2026-10-22 角色粒度/MapReduce 方案 A（`implemented-unverified`）：可选承载 `parallelGroup`/
+ * `dependsOn`。本层**只定字段**；并行组语法、依赖目标存在性/环、同 Map 组无依赖、Reduce 覆盖
+ * 全部 Map 等静态校验在编排 `flow-state`，dispatch 前置 `done` 检查在编排 `governance-gate`。
+ * 两个字段均可选：旧 flow 不填 ⇒ 字段缺席，视图形状与旧行为逐字不变（不新增 `FlowToolStepKind`）。
+ */
 export interface FlowToolStepView {
   id: string;
   title: string;
@@ -807,9 +814,13 @@ export interface FlowToolStepView {
   evidence?: FlowToolEvidence;
   supersedes?: string[];
   supersededBy?: string;
+  /** 并行组（可选）：`map-<slug>` 或 `reduce`；仅承载，校验在编排。 */
+  parallelGroup?: string;
+  /** 前置 step id 列表（可选）：仅承载，环检测与前置 `done` 检查在编排。 */
+  dependsOn?: string[];
 }
 
-/** `flow_get` 返回的流程视图。`canUpdate` 是服务端按调用角色计算的**可更新步骤 id**（权限裁决在服务端）。 */
+/** `flow_get` 返回的流程视图。`canUpdate` 是服务端按调用角色计算的**可更新步骤 id**（权限裁决在服务端）；步骤视图可携带可选 `parallelGroup`/`dependsOn`（本层只承载）。 */
 export interface FlowToolView {
   flowId: string;
   revision: string;
@@ -860,6 +871,13 @@ export type FlowStepSupersedeFn = (input: {
   expectedRevision: string;
   reason?: string;
   idempotencyKey?: string;
+  /**
+   * 新步骤的并行组（可选；2026-10-22 角色粒度/MapReduce 方案 A）：`map-<slug>` 或 `reduce`。
+   * 仅承载；语法/静态校验在编排 flow-service（本层不判）。
+   */
+  parallelGroup?: string;
+  /** 新步骤的前置 step id 列表（可选；仅承载，存在性/环/前置 `done` 校验在编排）。 */
+  dependsOn?: string[];
 }) => Promise<FlowToolResult>;
 
 // —————————————— 推理与推理强度（G-5 wave 1 契约层；冻结符号，单一来源＝本模块） ——————————————
@@ -1346,6 +1364,16 @@ export interface GovernanceJudgeFacts {
    * 可选；缺失＝未知（旧账本/旧调用），不得据此解锁任何门禁。
    */
   teamPlanConfirmed?: boolean;
+  /**
+   * 团队计划 schema 版本（2026-10-22 角色粒度/MapReduce；方案 §5.1：`1` = legacy 缺省、`2` = 本方案）。
+   * 可选；缺失＝应用未提供/未解析，不得据此假定 v2。物证仍沿用 `artifacts.teamPlanPath`，不新增 artifact kind。
+   */
+  teamPlanSchema?: 1 | 2;
+  /**
+   * 团队计划模块 id 摘要（有界、去重；供 prompt/审计）。可选；缺失＝应用未提供。
+   * 只是机器摘要，**不**代表应用已做粒度语义判断（语义复核仍在 Convener readiness）。
+   */
+  teamPlanModules?: string[];
 }
 
 // —————————————— 会话级后台任务（2026-10-22 客户确认设计 B1–B4） ——————————————
