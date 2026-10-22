@@ -25,7 +25,7 @@ const sourceFiles = walk(RENDERER).filter((file) => /\.(ts|tsx)$/.test(file));
 const read = (file: string) => readFileSync(file, "utf8");
 const codeOnly = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
-const rel = (file: string) => relative(ROOT, file);
+const rel = (file: string) => relative(ROOT, file).replaceAll("\\", "/");
 const find = (suffix: string) => sourceFiles.filter((file) => file.endsWith(suffix));
 
 test("渲染器边界：只用 window.desktop 访问层；不 import Node/Electron/fs，不 require/网络", () => {
@@ -40,7 +40,7 @@ test("渲染器边界：只用 window.desktop 访问层；不 import Node/Electr
     assert.equal(/window\.require\b/.test(source), false, rel(file) + " uses window.require");
     assert.equal(/\b(fetch|XMLHttpRequest|WebSocket)\s*\(/.test(source), false, rel(file) + " uses network");
     // window.desktop 只允许经 lib/platform 访问；其他文件不得直接触碰。
-    if (!file.endsWith("lib/platform.ts")) {
+    if (!rel(file).endsWith("lib/platform.ts")) {
       assert.equal(/window\.desktop\b/.test(source), false, rel(file) + " bypasses platform bridge");
     }
   }

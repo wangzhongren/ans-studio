@@ -543,3 +543,8 @@
 - 品牌图标：复制 `ans-studio-ans-icon.png` 到 `src/assets/`；TitleBar `.titlebar-mark` 20px、Sidebar `.workspace-brand-mark` 30px，`img alt="ANS"`；保留「治理会话工作台」「AGENT WORKSPACE」；source-guard 与 5A 冒烟新增断言，1360/960/200% 截图更新。
 - 复跑：单测 **147/147**、5A **37/37**、4B **70/70**、uiux 默认 **110/110**、MERGE **12/12**、MIRROR **8/8**、TOOLFOLD **19/19**（C1 Δ=20）、design audit **31 项 0 bad**、main **E2E_PASS=true**、bench 4 次全阈值。
 - 新 dist：html `f779ac60…`、js `007c60aa…`、css `531d8035…`、icon `ff88e313…`；gzip **288,931B**。记录 [history-dedupe-brand-icon](docs/change/2026-10-21_change_ui-platform-history-dedupe-and-brand-icon.md)。
+
+### source-guard 跨平台路径修复（Windows CI，2026-10-22）
+
+- `test/桌面UI/source-guard.test.ts`：`rel()` 统一 `relative(...).replaceAll("\\","/")`；平台桥判断改 `rel(file).endsWith("lib/platform.ts")`。修复 Windows 上 platform.ts 误报、Markdown 路径 deepEqual 差异、ui-store 持久化误报；断言未放宽。
+- macOS `node --test test/桌面UI/source-guard.test.ts` 9/9 pass；Windows 归一化后应通过（路径比较与 POSIX 字面量一致）。记录 [windows-paths](docs/change/2026-10-22_fix_source-guard-windows-paths.md)。
