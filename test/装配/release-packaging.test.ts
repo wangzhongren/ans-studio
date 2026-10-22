@@ -90,10 +90,12 @@ test('release overlay includes exactly the reviewed v1.5.0 fix batch by exact pa
     'test/runtime-core/file-write-safety.test.ts',
     'test/测试/g5-reasoning-verify/helpers.ts',
     'test/测试/g5-reasoning-verify/compatibility-loopback.test.ts',
+    'test/测试/governance-e2e-auto/c-appointment-timing.test.ts',
     'test/codex-adapter/judge-mode.test.ts',
     'test/桌面UI/anchor-view.test.ts',
     'test/runtime-core/abort-quarantine.test.ts',
-    'test/测试/g5-reasoning-verify/d-codex.test.ts']);
+    'test/测试/g5-reasoning-verify/d-codex.test.ts',
+    'test/测试/governance-e2e-auto/d-dispatch-listing.test.ts']);
   assert.deepEqual(result.selected, ['package.json',
     'src/common/codex-adapter/reasoning-catalog.ts',
     'test/codex-adapter/reasoning-catalog.test.ts',
@@ -101,11 +103,13 @@ test('release overlay includes exactly the reviewed v1.5.0 fix batch by exact pa
     'test/桌面UI/source-guard.test.ts',
     'test/runtime-core/file-write-safety.test.ts',
     'test/测试/g5-reasoning-verify/helpers.ts',
-    'test/测试/g5-reasoning-verify/compatibility-loopback.test.ts']);
+    'test/测试/g5-reasoning-verify/compatibility-loopback.test.ts',
+    'test/测试/governance-e2e-auto/c-appointment-timing.test.ts']);
   assert.deepEqual(result.excluded, ['test/codex-adapter/judge-mode.test.ts',
     'test/桌面UI/anchor-view.test.ts',
     'test/runtime-core/abort-quarantine.test.ts',
-    'test/测试/g5-reasoning-verify/d-codex.test.ts']);
+    'test/测试/g5-reasoning-verify/d-codex.test.ts',
+    'test/测试/governance-e2e-auto/d-dispatch-listing.test.ts']);
   assert.throws(() => selectOverlay(['src/common/codex-adapter/config.ts']), /Unreviewed production overlay/);
 });
 
