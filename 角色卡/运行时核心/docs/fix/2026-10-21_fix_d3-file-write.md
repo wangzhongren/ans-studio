@@ -3,7 +3,7 @@ id: d3-file-write
 type: fix
 title: D3 写前重判与普通文件权限保留
 created: "2026-10-21"
-updated: "2026-10-21"
+updated: "2026-10-22"
 status: implemented-pending-acceptance
 ---
 
@@ -53,3 +53,19 @@ status: implemented-pending-acceptance
 共享原语 rename/abort 的更底层故障证据由 PM 提供，独立测试角色还需在合并候选验证完整链路。没有运行全仓测试、UI测试或真实线上模型；没有提交、推送或发布。Windows junction、原生替换及其他平台证据不足，完整验收交独立验收角色判定。
 
 日志位于本机临时目录，不随 Git 分发；可由测试角色用已固化用例重新执行。相关依赖变化后须重新验证受影响路径。
+
+## 2026-10-22 Windows CI 平台断言修正（仅测试）
+
+v1.5.0 发布 CI（run [39702128045](https://github.com/wangzhongren/ans-studio/actions/runs/39702128045)，windows-2025 / Node 24）在本文件新增的「D3 lstat ENOTDIR is a status error, never a new-file fallback」失败，实际 handler 文案为：
+
+```text
+write_file 写入失败（建目录）：file.txt/child.txt（EEXIST: file already exists, mkdir 'C:\Users\RUNNER~1\AppData\Local\Temp\ans-core-d3-sClXM4\file.txt'）
+```
+
+根因是平台错误码映射，不是产品放行：Windows 对「中间路径段是普通文件」返回 `ERROR_PATH_NOT_FOUND`→`ENOENT`（而非 POSIX 的 `ENOTDIR`），`fs-write.existingTarget` 因此把该目标当新文件放行；随后 `ensureParentDir` 对已存在的普通文件 `file.txt` 执行 mkdir 得到 `EEXIST`，handler 在任何落盘之前拒绝。可观察语义仍是失败关闭：`ok:false`、未创建任何新文件、原文件内容不变（`edit_file` 更早停在 `readFile` 的 ENOENT）。因此不改产品，只把断言做成平台感知：
+
+- POSIX：仍严格匹配 `/无法读取目标状态.*ENOTDIR/`；
+- Windows：接受守卫拒绝文案（若 Node/Windows 将来改报 ENOTDIR），或本次实测的 `/写入失败（建目录）：file\.txt\/child\.txt.*EEXIST.*file\.txt/`；两条都要求具体状态错误，不 skip、不无条件通过。
+- `assert.equal(result.ok, false)` 与「目录仅剩 file.txt、原内容不变」的无副作用断言原样保留。
+
+证据：Darwin arm64 / Node v24.14.0，`node --test test/runtime-core/file-write-safety.test.ts` **11/11 通过、0 失败、0 跳过**；同一正则在本地对上述 CI 原文匹配为 true。Windows 侧由下一次 CI 复跑确认，不把本机结果当 Windows 验收。

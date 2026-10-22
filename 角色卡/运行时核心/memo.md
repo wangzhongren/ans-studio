@@ -80,3 +80,5 @@
 2026-10-21 D3：已按获准轻量方案完成 R1/R4（仅 tools 写入路径、fs-write、新 file-write-safety 测试及自身文档）。写前复用同 gate＋真实父目录快照；lstat 仅 ENOENT 当新文件；已有 POSIX 普通文件经共享 finalMode 保留 mode&0777，新文件仍0600经umask。没有更改Model或shell机制。核心251项250过1平台跳过，typecheck通过；当前候选摘要与日志见 [修复记录](docs/fix/2026-10-21_fix_d3-file-write.md)。Windows原生及完整跨角色验收未完成，不把本机单测当最终验收。
 
 2026-10-21 ANS-REASONING-LIGHT D1：Model/Service仅注释同步“字段缺席交平台默认”，不加字段、不改env归一。Pi恢复默认与预算归适配器；普通配置/兼容消息复用活动prompt内source:system，不改窗口/UI。原reasoning-effort/facts窄测17/17，证据见 [默认契约记录](docs/fix/2026-10-21_fix_reasoning-default-contract.md)。三平台真实请求与独立验收不由此替代；未提交。
+
+2026-10-22 D3-WINCI（仅测试）：v1.5.0 CI windows-2025 的 ENOTDIR 断言失败系平台错误码差异——Windows 对「中间段是普通文件」报 ENOENT（非 ENOTDIR），守卫按新文件放行后 mkdir 父路径 `file.txt` 得 EEXIST，在任何落盘前拒绝（ok:false、无新文件、原内容不变），判定非产品缺陷。测试改为平台感知：POSIX 仍严格 `/无法读取目标状态.*ENOTDIR/`，Windows 额外接受实测 `/写入失败（建目录）：file\.txt\/child\.txt.*EEXIST.*file\.txt/`（若将来报 ENOTDIR 也接受），不 skip、不放宽无条件通过。本机 11/11；Windows 以 CI 复跑确认。见 [D3 修复记录](docs/fix/2026-10-21_fix_d3-file-write.md)。
