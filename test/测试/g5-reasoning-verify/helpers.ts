@@ -1,8 +1,42 @@
 // test/测试/g5-reasoning-verify/helpers.ts —— G-5 独立验证共用夹具。
 // 只做「驱动真实入口」的辅助，不做判定；判定一律写入各域测试文件。
 
+import { rm } from "node:fs/promises";
 import type { RuntimeAdapter, RuntimeProviderOptions, SessionEvent, RuntimeKind } from "../../../src/model/runtime.ts";
 import type { ResolvedRole } from "../../../src/model/role.ts";
+
+/**
+ * 清理测试临时目录，带**有界**异步重试。
+ *
+ * Windows CI（v1.5.0 run 39702128045）实证：`session.dispose()`/`observed.done` 返回后，
+ * 子进程收尾、实时防护或索引器仍可能在极短时间内持有目录句柄，teardown 的 `rm` 随即抛
+ * `EBUSY: resource busy or locked, rmdir ...`。这些是操作系统层面的瞬时占用：句柄一释放，
+ * 同一删除即可成功；因此在**测试夹具**内有界重试不掩盖任何产品/断言失败：
+ * - 只重试瞬时码（EBUSY/ENOTEMPTY/EPERM/EACCES/EMFILE/ENFILE，同 Node `fs.rm` 的瞬时集合）；
+ * - 其它错误立即上抛；
+ * - 上界耗尽仍失败则带 cause 上抛，绝不把清理失败伪装成成功。
+ * 用异步 `rm` + 异步退避（不阻塞事件循环），给待收尾的句柄留出释放时间。
+ */
+export async function removeTempDirEventually(dir: string, attempts = 20, delayMs = 100): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await rm(dir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") return; // force 通常已吞掉；兜底并发删除
+      if (code !== "EBUSY" && code !== "ENOTEMPTY" && code !== "EPERM" && code !== "EACCES"
+          && code !== "EMFILE" && code !== "ENFILE") throw error;
+      lastError = error;
+      if (attempt < attempts) await new Promise<void>(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+  throw new Error(
+    `清理临时目录失败（已重试 ${attempts} 次）：${dir}${lastError instanceof Error ? `：${lastError.message}` : ""}`,
+    { cause: lastError },
+  );
+}
 
 export function makeRole(id: string): ResolvedRole {
   return {

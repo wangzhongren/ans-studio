@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type ServerResponse } from "node:http";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import * as claudeSdk from "@anthropic-ai/claude-agent-sdk";
@@ -11,7 +11,7 @@ import { createCodexRuntimeAdapter } from "../../../src/provider/codex/session.t
 import { createRealPiRuntimeAdapter } from "../../../src/common/pi-adapter/real-adapter.ts";
 import { createInteractionGate } from "../../../src/common/runtime-core/timeout.ts";
 import type { RoleSession, SessionEvent } from "../../../src/model/runtime.ts";
-import { makeRole } from "./helpers.ts";
+import { makeRole, removeTempDirEventually } from "./helpers.ts";
 
 type Body = Record<string, unknown>;
 const FAKE_KEY = "ans-independent-localhost-placeholder";
@@ -135,7 +135,7 @@ test("独立真实 Claude：low 被拒后 HTTP 真正无 thinking/output_config�
     context.diagnostic(JSON.stringify({ runtime: "claude", wire: server.bodies.map(body => ({ model: body.model, thinking: body.thinking ?? null, outputConfig: body.output_config ?? null })), configurations: configurations.map(config => ({ effort: config.effort ?? null, effortEnv: config.env?.CLAUDE_CODE_EFFORT_LEVEL ?? null, thinkingEnv: config.env?.CLAUDE_CODE_DISABLE_THINKING ?? null })) }));
   } finally {
     await session.dispose(); await observed.done;
-    await server.close(); await rm(root, { recursive: true, force: true });
+    await server.close(); await removeTempDirEventually(root);
   }
   assert.deepEqual(outcomes(observed.events), ["completed", "completed"]);
   assert.equal(states(observed.events, "trying").length, 1);
@@ -161,7 +161,7 @@ test("独立真实 Codex：目录内 gpt-5.5 仅拒 effort 字段必须真正去
   } finally {
     await session.dispose(); await observed.done;
     context.diagnostic(JSON.stringify({ runtime: "codex", wire: server.bodies.map(body => ({ model: body.model, reasoning: body.reasoning ?? null })), outcomes: outcomes(observed.events) }));
-    await server.close(); await rm(root, { recursive: true, force: true });
+    await server.close(); await removeTempDirEventually(root);
   }
   assert.deepEqual(outcomes(observed.events), ["completed", "completed"]);
   assert.equal(states(observed.events, "trying").length, 1);
@@ -206,7 +206,7 @@ test("独立真实 Pi：工具完成后下一请求兼容保留 tool_result，�
   } finally {
     await session.dispose(); await observed.done;
     if (previous === undefined) delete process.env[authName]; else process.env[authName] = previous;
-    await server.close(); await rm(root, { recursive: true, force: true });
+    await server.close(); await removeTempDirEventually(root);
   }
   assert.deepEqual(outcomes(observed.events), ["completed"]);
   assert.equal(states(observed.events, "compatibility-attempt").length, 1);
