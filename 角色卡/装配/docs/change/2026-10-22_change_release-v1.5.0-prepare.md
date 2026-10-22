@@ -1,7 +1,7 @@
 ---
 id: v1.5-release-prepare-20261022
 type: change
-title: v1.5.0 发布准备：冻结源 35cca0b、Windows 修复 overlay 与三平台 CI run 39703920167
+title: v1.5.0 发布准备：冻结源 35cca0b、Windows/renderer overlay 与 CI run 39705028954
 created: "2026-10-22"
 updated: "2026-10-22"
 timezone: Asia/Shanghai
@@ -32,6 +32,12 @@ events:
   - date: "2026-10-22"
     kind: triggered
     summary: 重新触发三平台 CI run 39703920167（headSha 1685f19，publish=false/draft）
+  - date: "2026-10-22"
+    kind: implemented
+    summary: run 39703920167 三平台 packaged smoke 因包内缺 app/renderer/dist/index.html 失败；release.yml 增 build:renderer（Regression tests 后、Package 前）；prepare selected 11、actualTree 1d1a1d7c…；提交 31e70c1
+  - date: "2026-10-22"
+    kind: triggered
+    summary: 重新触发三平台 CI run 39705028954（headSha 31e70c1，publish=false/draft）
 ---
 
 # v1.5.0 发布准备
@@ -102,10 +108,20 @@ events:
 - 预演（提交 `1685f19`，真实仓库未污染）：`overlayPaths` 恰 **11**——`.github/workflows/release.yml`、`src/common/codex-adapter/reasoning-catalog.ts`、`src/common/装配/release-policy.d.mts`、`src/common/装配/release-policy.mjs`、`test/codex-adapter/fixtures.ts`、`test/codex-adapter/reasoning-catalog.test.ts`、`test/runtime-core/file-write-safety.test.ts`、`test/桌面UI/source-guard.test.ts`、`test/测试/g5-reasoning-verify/compatibility-loopback.test.ts`、`test/测试/g5-reasoning-verify/helpers.ts`、`test/装配/release-packaging.test.ts`；`actualTree='ca3e8ba27a9b08246a3f7c5fe4b873df6e02282b'`；`overlayPatchSha256='734e6feebe812841e9301387bbee0d8fa8a2a3d3758d594910e64f451a017684'`；`excludedChanges` 为 19 个角色卡文档；预演树内 `release-packaging.test.ts` **8/8 通过**；worktree 已清理。
 - 新跑 run **`39703920167`**：<https://github.com/wangzhongren/ans-studio/actions/runs/39703920167>，headSha `1685f194c790a9cd48aa6194fb14ef88484a5787`，`publish=false`（draft），创建时间 2026-10-22T01:08:16Z；单次快照为 queued。未轮询，run id 交协调方。
 
+### 第二轮 packaged smoke 失败与 renderer 构建步骤（提交 `31e70c1`）
+
+run `39703920167`（headSha `1685f19`）三平台均进入 packaged smoke 后失败：解压包内缺 `app/renderer/dist/index.html`（`ERR_FILE_NOT_FOUND`）。根因：v1.5.0 的渲染层 `dist` 是 Vite 构建产物（v1.4.0 为静态文件），而 release workflow 在 Package 前没有运行 `npm run build:renderer`；本地 `package:local` 会先 build，故本机未暴露。
+
+修复：`.github/workflows/release.yml` 在 **Regression tests 之后、Package native executable 之前**新增 `npm run build:renderer`（working-directory `.release/source`，非零即停）；矩阵、超时与其他步骤未改。YAML 经 `yaml.parse` 校验，build 步骤顺序为 … → Typecheck → ripgrep → Regression tests → **Build renderer bundle** → Package native executable → Verify → …
+
+验证：`node --test "test/装配/**/*.test.ts"` **84/84**、`npm run typecheck` **0**（test/装配/ 无 workflow 步骤顺序断言，未新增测试）。预演（提交 `31e70c1`）：selected 仍恰 **11**；`actualTree='1d1a1d7cde910c552aa03c1e9f7627fd87afe025'`；`overlayPatchSha256='6ff11d4156152e04e331876475c41ad7e699f115642db7e69106f155aa1e5729'`。
+
+新跑 run **`39705028954`**：<https://github.com/wangzhongren/ans-studio/actions/runs/39705028954>，headSha `31e70c1dfad64af02a33fa71449b1c27869a6fb4`，`publish=false`（draft），创建时间 2026-10-22T01:19:42Z；单次快照 `in_progress`。未轮询，run id 交协调方。
+
 ## 未验证项 / 残余
 
 - 三平台原生构建、解压启动与 smoke **未由本角色实测**（由 CI 原生 runner 执行；本机只做 typecheck、装配测试、全量测试、renderer build 与 prepare 预演，未打包、未下载或启动任何 ZIP）。
 - README SHA256 表按指示暂写「发布后由 Release 的 SHA256SUMS 校验文件提供」并明确未签名；真实 SHA256 待 CI 产物。
 - draft Release 尚未创建；公开发布仍待 CI 全绿后的独立验收与客户/协调方决定。
 - 未做 `package:local`/`verify:local`（本轮派发未要求）。
-- 首跑 run `39701856151` 已取消（未等其自然失败）；run `39702128045` 三平台 build 已 failure、release skipped，由四处修复与 overlay 追加取代；新跑 `39703920167` 的最终结论待协调方观察。
+- 首跑 run `39701856151` 已取消（未等其自然失败）；run `39702128045` 三平台 build 已 failure、release skipped，由四处修复与 overlay 追加取代；run `39703920167` 三平台 packaged smoke 因缺 renderer 构建产物 failure，由 `build:renderer` 步骤修复；最新 run `39705028954` 的最终结论待协调方观察。
