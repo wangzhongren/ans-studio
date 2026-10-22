@@ -34,29 +34,24 @@ ANS Studio 面向希望在真实项目中使用多个 AI 角色协作的开发�
 
 ## 下载与运行
 
-当前版本：**v1.4.0**（2026-10-20 发布）。运行包自带运行环境，启动应用无需另装 Node.js；执行项目的 `npm test`、Git 等命令，仍需安装该项目所需的开发工具链。
+当前版本：**v1.5.0**（2026-10-22 发布）。运行包自带运行环境，启动应用无需另装 Node.js；执行项目的 `npm test`、Git 等命令，仍需安装该项目所需的开发工具链。
 
 | 系统 | 下载 | 校验文件 | 启动方式 |
 | --- | --- | --- | --- |
-| macOS 13+ · Apple Silicon | [mac-arm64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-mac-arm64.zip) | [SHA256SUMS-darwin-arm64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-darwin-arm64.txt) | 完整解压，打开 `ANS Studio.app` |
-| macOS 13+ · Intel | [mac-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-mac-x64.zip) | [SHA256SUMS-darwin-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-darwin-x64.txt) | 完整解压，打开 `ANS Studio.app` |
-| Windows 10/11 · x64 | [win-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-win-x64.zip) | [SHA256SUMS-win32-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-win32-x64.txt) | 完整解压，打开 `ANS Studio.exe`，保留同目录资源文件 |
+| macOS 13+ · Apple Silicon | [mac-arm64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.5.0/ANS-Studio-1.5.0-mac-arm64.zip) | [SHA256SUMS-darwin-arm64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.5.0/SHA256SUMS-darwin-arm64.txt) | 完整解压，打开 `ANS Studio.app` |
+| macOS 13+ · Intel | [mac-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.5.0/ANS-Studio-1.5.0-mac-x64.zip) | [SHA256SUMS-darwin-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.5.0/SHA256SUMS-darwin-x64.txt) | 完整解压，打开 `ANS Studio.app` |
+| Windows 10/11 · x64 | [win-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.5.0/ANS-Studio-1.5.0-win-x64.zip) | [SHA256SUMS-win32-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.5.0/SHA256SUMS-win32-x64.txt) | 完整解压，打开 `ANS Studio.exe`，保留同目录资源文件 |
 
-下载后先核对 SHA256：macOS 在下载目录执行 `shasum -a 256 -c SHA256SUMS-darwin-arm64.txt`（Intel 用 `SHA256SUMS-darwin-x64.txt`）；Windows PowerShell 执行 `Get-FileHash .\ANS-Studio-1.4.0-win-x64.zip -Algorithm SHA256`，与 `SHA256SUMS-win32-x64.txt` 对照。[SHA256SUMS-overlay.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-overlay.txt)、[release-provenance.json](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/release-provenance.json) 与 [overlay.patch](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/overlay.patch) 记录固定源码与打包适配，来源核验见[发布验收记录](角色卡/测试/docs/change/2026-10-20_change_v1.4-release-verification.md)。
+下载后先核对 SHA256：macOS 在下载目录执行 `shasum -a 256 -c SHA256SUMS-darwin-arm64.txt`（Intel 用 `SHA256SUMS-darwin-x64.txt`）；Windows PowerShell 执行 `Get-FileHash .\ANS-Studio-1.5.0-win-x64.zip -Algorithm SHA256`，与 `SHA256SUMS-win32-x64.txt` 对照。[SHA256SUMS-overlay.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.5.0/SHA256SUMS-overlay.txt)、[release-provenance.json](https://github.com/wangzhongren/ans-studio/releases/download/v1.5.0/release-provenance.json) 与 [overlay.patch](https://github.com/wangzhongren/ans-studio/releases/download/v1.5.0/overlay.patch) 记录固定源码与打包适配，来源核验见[本次发布记录](角色卡/装配/docs/change/2026-10-22_change_release-v1.5.0-prepare.md)。
 
 <details>
-<summary>v1.4.0 SHA256</summary>
+<summary>v1.5.0 SHA256</summary>
 
-| 产物 | SHA256 |
-| --- | --- |
-| `ANS-Studio-1.4.0-mac-arm64.zip` | `bc0c5bdd892ad24630c0040ba0d3675e70345ef18ab0f0762c52e743dc4f48e7` |
-| `ANS-Studio-1.4.0-mac-x64.zip` | `554a0ad69feabc093fdf850d9e442b331ddd6072563605d6e879cd4ea9f21df9` |
-| `ANS-Studio-1.4.0-win-x64.zip` | `cfb1f673c599f0cea89cd5f6ea3fec53cf597e6cd4dc6492b9d69e7fe33a1779` |
-| `overlay.patch` | `2f6d6f765e13c2f43aa33e038198ff691bd7e38696d4f7818a7ad80da6776c11` |
+发布后由 Release 的 SHA256SUMS 校验文件（`SHA256SUMS-darwin-arm64.txt` / `SHA256SUMS-darwin-x64.txt` / `SHA256SUMS-win32-x64.txt`）提供。运行包**未签名**：macOS 未公证、Windows 未做代码签名，首次启动可能提示来源未验证。
 
 </details>
 
-v1.4.0 要点：流程文件方法化（`flow_get` / `flow_step_update` / `flow_step_supersede`，Lead 兼任工作流管理者）；重启后自动续跑；聊天 pane 加载占位；验收重派与通过后自动收口；角色卡写后门控；artifact 补登；排队决定处理后清理 UI 聚合；若干 shell/UI 修复。
+v1.5.0 要点：桌面渲染层迁移到 React 19 + Vite + Tailwind + shadcn/ui（Nova 主题）构件，生产改为单入口 `app/renderer/dist/index.html`；新应用图标（石墨底薄荷绿 ANS 字标）；回放/重建的历史投射按消息去重，同一条派发只显示一行；默认不再在 15 分钟自动中止回合（显式设置 `ANS_PI_PROMPT_TIMEOUT_MS` 仍可启用，1 小时运行时兜底保留）；内置治理角色界面名称统一为 Lead / 主理、Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收。
 
 运行包尚未签名或公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示来源未验证。请从上述 Release 下载，先核对 SHA256 再运行。
 
@@ -221,6 +216,7 @@ npm run typecheck
 
 ## 深入了解
 
+- [v1.5.0 发布准备](角色卡/装配/docs/change/2026-10-22_change_release-v1.5.0-prepare.md)：冻结源、发布配方与本地预检结果。
 - [v1.4.0 发布验收与公开下载](角色卡/测试/docs/change/2026-10-20_change_v1.4-release-verification.md)：实际产物、来源与测试证据。
 - [v1.3.0 发布验收与公开下载](角色卡/测试/docs/change/2026-10-17_change_v1.3-release-verification.md)：实际产物、来源与测试证据。
 - [v1.2.0 发布验收与公开下载](角色卡/测试/docs/change/2026-10-16_change_v1.2-release-verification.md)：实际产物、来源与测试证据。
