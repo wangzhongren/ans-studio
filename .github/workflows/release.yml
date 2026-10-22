@@ -73,6 +73,9 @@ jobs:
       - name: Regression tests
         working-directory: .release/source
         run: node --test "test/**/*.test.ts"
+      - name: Build renderer bundle
+        working-directory: .release/source
+        run: npm run build:renderer
       - name: Package native executable
         working-directory: .release/source
         env:
