@@ -7,6 +7,30 @@ const output = path.resolve(process.argv[2] ?? 'release-output');
 const expectedArch = process.argv[3] ?? process.arch;
 if (process.arch !== expectedArch) throw new Error(`Native smoke requires ${expectedArch}; actual ${process.arch}`);
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+// Windows ZIP extraction: prefer 7-Zip (bundled on GitHub Windows runners), then PowerShell Expand-Archive.
+// The ZIP is produced by electron-builder and extracts fine with macOS ditto; GNU tar on Windows chokes on
+// some entry names emitted by the archiver, so tar is not used on win32.
+function extractWindowsZip(zip, destination) {
+  const errors = [];
+  for (const sevenZip of ['7z', 'C:\\Program Files\\7-Zip\\7z.exe', 'C:\\Program Files (x86)\\7-Zip\\7z.exe']) {
+    try {
+      execFileSync(sevenZip, ['x', '-y', `-o${destination}`, zip], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+      return;
+    } catch (error) {
+      errors.push(`${sevenZip}: ${error.code ?? error.message}`);
+    }
+  }
+  const quote = value => `'${String(value).replace(/'/g, "''")}'`;
+  try {
+    execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+      `Expand-Archive -LiteralPath ${quote(zip)} -DestinationPath ${quote(destination)} -Force`],
+      { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    return;
+  } catch (error) {
+    errors.push(`Expand-Archive: ${error.code ?? error.message}`);
+  }
+  throw new Error(`Windows ZIP extraction failed: ${errors.join(' | ')}`);
+}
 const provenance = JSON.parse(await readFile('release-provenance.json', 'utf8'));
 const files = await readdir(output);
 const archives = files.filter(name => name.endsWith('.zip'));
@@ -16,7 +40,7 @@ const temp = await mkdtemp(path.join(os.tmpdir(), 'ans-packaged-smoke-'));
 const extracted = path.join(temp, 'extracted');
 await mkdir(extracted);
 if (process.platform === 'darwin') execFileSync('ditto', ['-x', '-k', archive, extracted]);
-else if (process.platform === 'win32') execFileSync('tar', ['-xf', archive, '-C', extracted]);
+else if (process.platform === 'win32') extractWindowsZip(archive, extracted);
 else throw new Error('Run release verification on its actual target platform');
 const rootNames = await readdir(extracted);
 const appBundle = rootNames.find(name => name.endsWith('.app'));
