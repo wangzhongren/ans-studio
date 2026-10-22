@@ -18,7 +18,7 @@ for (const name of manifestNames) {
   seen.add(target);
   if (m.sourceRef !== SOURCE_REF || m.sourceSha !== SOURCE_SHA || !/^[a-f0-9]{40}$/.test(m.overlaySha) || !/^[a-f0-9]{40}$/.test(m.actualTree)) throw new Error('Invalid release source identity');
   if (process.env.GITHUB_SHA && m.overlaySha !== process.env.GITHUB_SHA) throw new Error('Build overlay differs from release workflow commit');
-  if (!m.smoke?.checks || ['dom','preload','ipc','importDisabled','missingConfiguration','settings','envPathMatches'].some(key => m.smoke.checks[key] !== true)) throw new Error(`Incomplete UI checks: ${target}`);
+  if (!m.smoke?.checks || ['entry','rootMounted','driver','csp','cspViolations','dom','preload','ipc','importDisabled','missingConfiguration','settingsEntryDisabled','envPathMatches','console','load'].some(key => m.smoke.checks[key] !== true)) throw new Error(`Incomplete UI checks: ${target}`);
   if (!m.smoke?.ok || !m.smoke.isPackaged || m.smoke.arch !== m.arch || m.smoke.platform !== m.platform || m.process?.code !== 0) throw new Error(`Packaged smoke not verified: ${target}`);
   if (!m.nativeDependencies?.sdkImports?.includes('PACKAGED_SDK_IMPORTS_OK') || !m.nativeDependencies.codexVersion?.includes('0.162.1') || !m.nativeDependencies.claudeVersion) throw new Error(`Native dependencies not verified: ${target}`);
   if (canonical && ['sourceRef','sourceSha','overlaySha','actualTree','lockSha256','overlayPatchSha256','builder'].some(key => canonical[key] !== m[key])) throw new Error('Cross-platform build provenance differs');

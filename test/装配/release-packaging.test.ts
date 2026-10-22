@@ -122,13 +122,14 @@ test('release collection accepts three bound native results and rejects tamperin
   await mkdir(assets); await mkdir(proofs);
   const hash = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
   const patch = 'reviewed packaging overlay\n';
+  const checks = {entry:true,rootMounted:true,driver:true,csp:true,cspViolations:true,dom:true,preload:true,ipc:true,importDisabled:true,missingConfiguration:true,settingsEntryDisabled:true,envPathMatches:true,console:true,load:true};
   const common = { sourceRef: SOURCE_REF, sourceSha: SOURCE_SHA, overlaySha: 'a'.repeat(40), actualTree: 'b'.repeat(40), lockSha256: 'c'.repeat(64), overlayPatchSha256: hash(patch), builder: '26.15.3' };
   const manifests: { name: string; value: any }[] = [];
   for (const target of ['darwin-arm64','darwin-x64','win32-x64']) {
     const [platform, arch] = target.split('-');
     const file = `${target}.zip`, bytes = Buffer.from(`fixture ${target}`);
     const artifact = { file, size: bytes.length, sha256: hash(bytes) };
-    const value = { ...common, platform, arch, smoke: {ok: true, isPackaged: true, platform, arch, checks: {dom:true,preload:true,ipc:true,importDisabled:true,missingConfiguration:true,settings:true,envPathMatches:true}}, process: {code: 0}, nativeDependencies: {sdkImports: 'PACKAGED_SDK_IMPORTS_OK', codexVersion: 'codex-cli 0.162.1', claudeVersion: 'native fixture'}, artifact };
+    const value = { ...common, platform, arch, smoke: {ok: true, isPackaged: true, platform, arch, checks}, process: {code: 0}, nativeDependencies: {sdkImports: 'PACKAGED_SDK_IMPORTS_OK', codexVersion: 'codex-cli 0.162.1', claudeVersion: 'native fixture'}, artifact };
     const name = `manifest-${target}.json`;
     manifests.push({name,value});
     await writeFile(path.join(assets,file),bytes);
@@ -143,7 +144,11 @@ test('release collection accepts three bound native results and rejects tamperin
   try {
     assert.equal(run().status,0);
     const original = manifests[0];
-    for (const change of [{actualTree:'f'.repeat(40)}, {smoke:{ok:true,isPackaged:false,platform:'darwin',arch:'arm64'}}, {platform:'win32',arch:'x64'}]) {
+    for (const change of [{actualTree:'f'.repeat(40)},
+      {smoke:{ok:true,isPackaged:false,platform:'darwin',arch:'arm64',checks}},
+      {platform:'win32',arch:'x64'},
+      {smoke:{ok:true,isPackaged:true,platform:'darwin',arch:'arm64',checks:{...checks,settingsEntryDisabled:false}}},
+      {smoke:{ok:true,isPackaged:true,platform:'darwin',arch:'arm64',checks:{...checks,console:false}}}]) {
       await writeFile(path.join(assets,original.name),JSON.stringify({...original.value,...change}));
       assert.notEqual(run().status,0,JSON.stringify(change));
     }
