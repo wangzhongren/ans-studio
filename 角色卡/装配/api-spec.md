@@ -81,3 +81,14 @@ B1D仅文档同步：README准确区分CLI四值和桌面正式三选项、当�
 - **口径**：**5B 最终包；发布流水线未接（M1）**——`release.yml`/release-policy/electron-builder.yml 零 diff、依赖/lock 零变化、未运行 `release:prepare`、未上传；新冻结源发布轮另行客户决定。
 - 门禁：根 `tsc` **0**、`typecheck:renderer` **0**（测试角色清理旧渲染器 import 后转绿）。
 - **未验证**：Windows/DPI/屏读、真实模型/网络、独立验收。
+
+## 2026-10-22 — v1.5.0 发布准备（冻结源 35cca0b）
+
+客户决定发布 1.5.0（未签名 ZIP，同 v1.4.0 形态）：先创建 draft Release，三平台原生 CI 通过后由客户/协调方决定公开；范围＝当前 main（UI 平台化＋并行工作流）。
+
+- **版本与冻结源**：`package.json`/`package-lock.json` 1.4.0→1.5.0（仅根两处、零依赖变动）；准备提交 `35cca0b`；annotated tag `v1.5.0`（tag 对象 `4b0b8db`）→ commit `35cca0bd2ed373c8ed5984dea45a76a608f4e502`（= `release-policy.mjs` 的 `SOURCE_SHA`），main 与 tag 已推送 origin。
+- **README**：当前版本、下载表（mac-arm64/mac-x64/win-x64，`ANS-Studio-1.5.0-*`，指向 `releases/download/v1.5.0/`）与 SHA256 说明更新；SHA256 暂写「发布后由 Release 的 SHA256SUMS 校验文件提供」并明确未签名；要点改为 UI 平台化（React/shadcn Nova、单入口 `app/renderer/dist/index.html`、新图标、派发投射去重、默认移除 15 分钟自动中止、角色显示名统一）；未签名/Windows 文档限制/最低系统要求说明保留。
+- **发布配方**：`release-policy.mjs` → `SOURCE_REF='v1.5.0'`、`SOURCE_SHA='35cca0b…'`，白名单重置基础集（files＝package.json/package-lock.json/release.yml；dirs＝src/common/装配/、test/装配/），v1.4.0 overlay-2 的 5 条精确条目整批移除；`release.yml` input 默认/concurrency `release-v1.5.0`/`gh release view|create|upload|edit` → v1.5.0、标题 `ANS Studio 1.5.0`、notes 为本轮说明、`publish` 默认 false。配方提交 `5513209` 已推送。
+- **本地预检**：`npm run typecheck` 0；`npm run typecheck:renderer` 0；`npm run build:renderer` 0（gzip 合计约 292.4KB≤300KB）；`node --test "test/**/*.test.ts"` 3315 计 / 3312 过 / 1 红 / 2 跳过——唯一红 `test/测试/lightweight-permission-repairs.test.ts:164` 为缺真实 `rg` 二进制的已知环境红（未跳过、如实记录），0 产品红。prepare 预演 exit 0（overlayPaths 2、actualTree `1ae3b77b…`）。
+- **CI**：run `39701856151`（headSha `5513209`，`publish=false`），run id 交协调方。**已知预期红**：`test/装配/release-packaging.test.ts` 冻结 tag 版本仍断言 v1.4.0 与 overlay-2 精确条目，预演树实测 2 条失败；该文件属测试角色、本角色边界禁改 `test/`，预计三平台 Regression tests 同红、release job 不执行，需测试角色同步断言后重跑（`test/装配/` 在 overlay 目录白名单内，无需改 policy）。
+- **未验证**：三平台原生构建/解压/启动 smoke、真实 SHA256、draft 创建与公开发布；`release-policy.d.mts` 仍为旧字面量（边界外，未改）。详见[变更记录](docs/change/2026-10-22_change_release-v1.5.0-prepare.md)。
