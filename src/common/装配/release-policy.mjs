@@ -7,9 +7,22 @@ export const SOURCE_SHA = '35cca0bd2ed373c8ed5984dea45a76a608f4e502';
 // v1.4.0 overlay-2 的 5 条一次性精确条目（1 项产品修复 src/common/编排/shell-command-guard.ts 与 4 项
 // 测试/夹具修复）均已随本冻结源吸收，**整批移除、不列入**；overlay-3 的 test/装配/multi-runtime.test.ts
 // 属 test/装配/ 目录白名单，同样随冻结源生效、无需单独列名。
+// v1.5.0 overlay 追加（三平台 CI 前置修复，按精确路径、单文件不开目录、断言不放宽）：
+//   · 生产（唯一）：src/common/codex-adapter/reasoning-catalog.ts——Windows CRLF 内嵌模型目录读取修复。
+//   · 测试/夹具 6 条：test/codex-adapter/reasoning-catalog.test.ts、test/codex-adapter/fixtures.ts、
+//     test/桌面UI/source-guard.test.ts（Windows 路径归一）、test/runtime-core/file-write-safety.test.ts
+//     （ENOTDIR Windows 真值）、test/测试/g5-reasoning-verify/helpers.ts 与
+//     test/测试/g5-reasoning-verify/compatibility-loopback.test.ts（Windows loopback EBUSY 稳定化）。
 // fail-closed 不变：未列名的 app//src/ 变更仍使 prepare 明确失败；
 // 未列名的 test/ 文件仍静默落 excluded、不随构建树（机制同前：经评审文件必须显式入列）。
-const files = new Set(['package.json', 'package-lock.json', '.github/workflows/release.yml']);
+const files = new Set(['package.json', 'package-lock.json', '.github/workflows/release.yml',
+  'src/common/codex-adapter/reasoning-catalog.ts',
+  'test/codex-adapter/reasoning-catalog.test.ts',
+  'test/codex-adapter/fixtures.ts',
+  'test/桌面UI/source-guard.test.ts',
+  'test/runtime-core/file-write-safety.test.ts',
+  'test/测试/g5-reasoning-verify/helpers.ts',
+  'test/测试/g5-reasoning-verify/compatibility-loopback.test.ts']);
 const directories = ['src/common/装配/', 'test/装配/'];
 export function selectOverlay(paths) {
   const selected = [], excluded = [];

@@ -79,6 +79,36 @@ test('release overlay returns v1.4.0 overlay-2 entries to fail-closed or exclude
     'test/桌面应用/runtime-resolution.test.ts']);
 });
 
+// v1.5.0 overlay 追加（三平台 CI 前置修复）：1 项产品修复 + 6 项测试/夹具，按精确路径入选、不开目录；
+// 同目录未列名 test/ 仍 excluded，未列名 src/ 仍 fail-closed。断言不放宽。
+test('release overlay includes exactly the reviewed v1.5.0 fix batch by exact path', () => {
+  const result = selectOverlay(['package.json',
+    'src/common/codex-adapter/reasoning-catalog.ts',
+    'test/codex-adapter/reasoning-catalog.test.ts',
+    'test/codex-adapter/fixtures.ts',
+    'test/桌面UI/source-guard.test.ts',
+    'test/runtime-core/file-write-safety.test.ts',
+    'test/测试/g5-reasoning-verify/helpers.ts',
+    'test/测试/g5-reasoning-verify/compatibility-loopback.test.ts',
+    'test/codex-adapter/judge-mode.test.ts',
+    'test/桌面UI/anchor-view.test.ts',
+    'test/runtime-core/abort-quarantine.test.ts',
+    'test/测试/g5-reasoning-verify/d-codex.test.ts']);
+  assert.deepEqual(result.selected, ['package.json',
+    'src/common/codex-adapter/reasoning-catalog.ts',
+    'test/codex-adapter/reasoning-catalog.test.ts',
+    'test/codex-adapter/fixtures.ts',
+    'test/桌面UI/source-guard.test.ts',
+    'test/runtime-core/file-write-safety.test.ts',
+    'test/测试/g5-reasoning-verify/helpers.ts',
+    'test/测试/g5-reasoning-verify/compatibility-loopback.test.ts']);
+  assert.deepEqual(result.excluded, ['test/codex-adapter/judge-mode.test.ts',
+    'test/桌面UI/anchor-view.test.ts',
+    'test/runtime-core/abort-quarantine.test.ts',
+    'test/测试/g5-reasoning-verify/d-codex.test.ts']);
+  assert.throws(() => selectOverlay(['src/common/codex-adapter/config.ts']), /Unreviewed production overlay/);
+});
+
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';

@@ -54,6 +54,22 @@ jobs:
       - name: Typecheck
         working-directory: .release/source
         run: npm run typecheck
+      - name: Ensure cross-platform ripgrep for POSIX integration tests
+        shell: bash
+        run: |
+          if command -v rg >/dev/null 2>&1; then
+            rg --version
+            exit 0
+          fi
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            brew install ripgrep
+          elif [ "$RUNNER_OS" = "Windows" ]; then
+            choco install ripgrep -y --no-progress
+            export PATH="/c/ProgramData/chocolatey/bin:$PATH"
+          else
+            sudo apt-get update && sudo apt-get install -y ripgrep
+          fi
+          rg --version
       - name: Regression tests
         working-directory: .release/source
         run: node --test "test/**/*.test.ts"
