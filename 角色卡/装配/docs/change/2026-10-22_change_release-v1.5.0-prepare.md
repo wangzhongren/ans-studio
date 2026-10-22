@@ -1,7 +1,7 @@
 ---
 id: v1.5-release-prepare-20261022
 type: change
-title: v1.5.0 发布准备：冻结源 35cca0b、Windows/renderer/smoke/timing overlay 与 CI run 39709141335
+title: v1.5.0 发布准备：冻结源 35cca0b、Windows/renderer/smoke/timing/unzip overlay 与 CI run 39710450596
 created: "2026-10-22"
 updated: "2026-10-22"
 timezone: Asia/Shanghai
@@ -50,6 +50,12 @@ events:
   - date: "2026-10-22"
     kind: triggered
     summary: 重新触发三平台 CI run 39709141335（headSha d886771，publish=false/draft）
+  - date: "2026-10-22"
+    kind: implemented
+    summary: run 39709141335 mac 两平台 success、Windows 在 release-verify 的 tar 解压失败；win32 解压改为 7-Zip→Expand-Archive；装配 84/84、typecheck 0；prepare selected 14（+release-verify.mjs）、actualTree 1fe754e4…；提交 ac404e4
+  - date: "2026-10-22"
+    kind: triggered
+    summary: 重新触发三平台 CI run 39710450596（headSha ac404e4，publish=false/draft）
 ---
 
 # v1.5.0 发布准备
@@ -150,10 +156,23 @@ run `39706385498`（headSha `e507b4a`）：**macOS arm64 与 x64 两个 build jo
 
 新跑 run **`39709141335`**：<https://github.com/wangzhongren/ans-studio/actions/runs/39709141335>，headSha `d886771714824c596485fdd41649af3c9d13fc2c`，`publish=false`（draft），创建时间 2026-10-22T02:02:27Z；单次快照 `in_progress`。未轮询，run id 交协调方。
 
+### 第五轮 Windows 解压失败与 7-Zip 回退（提交 `ac404e4`）
+
+run `39709141335`（headSha `d886771`）：**macOS arm64 与 x64 两个 build job success**；Windows Regression tests 已通过，失败在 `Verify extracted archive and actual packaged UI` 的 `tar -xf`——`tar: Archive entry has empty or unreadable filename ... skipping` / `Error exit delayed`。ZIP 由 electron-builder 生成、macOS ditto 解压正常；Windows 自带 bsdtar 对该 ZIP 的部分条目名不兼容。
+
+修复：`src/common/装配/release-verify.mjs` 的 win32 解压改为 `extractWindowsZip`：
+1. 优先 **7-Zip**——依次尝试 PATH 的 `7z`、`C:\Program Files\7-Zip\7z.exe`、`C:\Program Files (x86)\7-Zip\7z.exe`，参数 `x -y -o<extracted> <archive>`；
+2. 全部失败/不存在时回退 PowerShell `Expand-Archive -LiteralPath ... -DestinationPath ... -Force`；
+3. 再失败才抛错（错误信息含各候选的失败原因）。
+
+macOS `ditto` 分支未动；后续包内容、依赖、SDK/CLI 与 packaged smoke 校验未降低。`node --check` 通过；`test/装配/` 无该解压路径断言（未新增测试）。验证：装配 **84/84**、typecheck **0**；预演（提交 `ac404e4`）：`overlayPaths` 恰 **14**（上一轮 13＋修复本体 `src/common/装配/release-verify.mjs`；该脚本在 build job 的 `.release/source` 内运行，必须随 overlay 生效），`actualTree='1fe754e41260cd653a68e3239f8c5d758f4606ef'`，`overlayPatchSha256='7dc4c614b148494eef1724ebfb3180ffff131ef58e2347bca5ea90b3e3c1d9f0'`，`excludedChanges` 仍为 19 个角色卡文档；预演树内 packaging **8/8 通过**。
+
+新跑 run **`39710450596`**：<https://github.com/wangzhongren/ans-studio/actions/runs/39710450596>，headSha `ac404e4027e7cb7672f1d738424903fcdb0a08da`，`publish=false`（draft），创建时间 2026-10-22T02:16:16Z；单次快照 `in_progress`。未轮询，run id 交协调方。
+
 ## 未验证项 / 残余
 
 - 三平台原生构建、解压启动与 smoke **未由本角色实测**（由 CI 原生 runner 执行；本机只做 typecheck、装配测试、全量测试、renderer build 与 prepare 预演，未打包、未下载或启动任何 ZIP）。
 - README SHA256 表按指示暂写「发布后由 Release 的 SHA256SUMS 校验文件提供」并明确未签名；真实 SHA256 待 CI 产物。
 - draft Release 尚未创建；公开发布仍待 CI 全绿后的独立验收与客户/协调方决定。
 - 未做 `package:local`/`verify:local`（本轮派发未要求）。
-- 首跑 run `39701856151` 已取消（未等其自然失败）；run `39702128045` 三平台 build 已 failure、release skipped，由四处修复与 overlay 追加取代；run `39703920167` 三平台 packaged smoke 因缺 renderer 构建产物 failure，由 `build:renderer` 步骤修复；run `39705028954` 三平台 build success、release job 因旧 smoke 键 failure，由 14 键对齐修复；run `39706385498` mac 两平台 build success、Windows 因时序夹具 failure，由 `5cc91d6`＋overlay 追加修复；最新 run `39709141335` 的最终结论待协调方观察。
+- 首跑 run `39701856151` 已取消（未等其自然失败）；run `39702128045` 三平台 build 已 failure、release skipped，由四处修复与 overlay 追加取代；run `39703920167` 三平台 packaged smoke 因缺 renderer 构建产物 failure，由 `build:renderer` 步骤修复；run `39705028954` 三平台 build success、release job 因旧 smoke 键 failure，由 14 键对齐修复；run `39706385498` mac 两平台 build success、Windows 因时序夹具 failure，由 `5cc91d6`＋overlay 追加修复；run `39709141335` mac 两平台 success、Windows 因 tar 解压 failure，由 7-Zip/Expand-Archive 回退修复；最新 run `39710450596` 的最终结论待协调方观察。
