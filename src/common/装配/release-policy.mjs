@@ -1,5 +1,8 @@
-export const SOURCE_REF = 'v1.5.0';
-export const SOURCE_SHA = '35cca0bd2ed373c8ed5984dea45a76a608f4e502';
+export const SOURCE_REF = 'v1.6.0';
+export const SOURCE_SHA = 'f43f7a5ca09c3da437a2710141235df0c6772ee9';
+// v1.6.0 overlay：冻结源 tag v1.6.0 已含全部产品/测试代码（治理角色粒度、团队计划 v2、
+// MapReduce 测试、受治理后台任务、思考行显示修复、验收风险档位）；白名单保持基础集，
+// 未列名 app//src/ 仍 fail-closed。以下 v1.5.0 条目仅作历史保留。
 // v1.5.0 overlay：打包/版本/发布面——白名单**重置为基础集**（files＝package.json、package-lock.json、
 // .github/workflows/release.yml；dirs＝src/common/装配/、test/装配/）。冻结源 tag v1.5.0 已含**全部产品代码**
 // （UI 平台化：React/shadcn Nova 渲染层、单入口 app/renderer/dist/index.html、新应用图标、派发投射去重、

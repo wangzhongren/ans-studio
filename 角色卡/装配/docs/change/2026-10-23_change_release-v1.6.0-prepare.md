@@ -21,7 +21,7 @@ events:
 
 - 版本 1.5.0 → **1.6.0**（minor）。
 - 合并提交：`2b86f65`（`merge: governance role granularity and governed background tasks`）。
-- 发布准备提交：**待创建**；annotated tag：**`v1.6.0` 待创建**。
+- 发布准备提交：**`f43f7a5`**；annotated tag：**`v1.6.0`**（tag object `34e0c30…` → commit `f43f7a5…`）。
 - 发布范围＝main（治理角色粒度/团队计划 v2/MapReduce 测试、受治理后台任务、治理守卫、思考行显示修复、验收风险档位）。
 
 ## 本轮变化
@@ -36,14 +36,14 @@ events:
 
 | 命令 | 退出码 | 结果 |
 | --- | --- | --- |
-| `npm run typecheck` | 待运行 | — |
-| `npm run typecheck:renderer` | 待运行 | — |
-| `npm run build:renderer` | 待运行 | — |
-| `node --test "test/装配/**/*.test.ts"` | 待运行 | — |
+| `npm run typecheck` | 0 | `ans-cli@1.6.0`，无诊断 |
+| `npm run typecheck:renderer` | 0 | 无诊断 |
+| `npm run build:renderer` | 0 | 2654 modules；dist 入口/CSS/JS/图标生成（JS gzip 273.82 KB、CSS gzip 19.62 KB） |
+| `node --test "test/装配/**/*.test.ts"` | 0 | 84/84 通过、0 失败、0 跳过 |
 
 ## 发布配方
 
-- `src/common/装配/release-policy.mjs`：`SOURCE_REF='v1.6.0'`、`SOURCE_SHA=<tag target>`；overlay 保持基础集（`package.json`、`package-lock.json`、`.github/workflows/release.yml`、`src/common/装配/`、`test/装配/`）。
+- `src/common/装配/release-policy.mjs`：`SOURCE_REF='v1.6.0'`、`SOURCE_SHA='f43f7a5…'`；overlay 保持基础集（`package.json`、`package-lock.json`、`.github/workflows/release.yml`、`src/common/装配/`、`test/装配/`）。
 - `.github/workflows/release.yml`：`source_ref` 默认/并发/release 视图/创建/上传/编辑/标题/notes → v1.6.0；未签名沿用 `CSC_IDENTITY_AUTO_DISCOVERY=false`。
 - `src/common/装配/release-policy.d.mts` 与 `test/装配/release-packaging.test.ts` 同步。
 

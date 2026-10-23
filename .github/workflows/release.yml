@@ -5,7 +5,7 @@ on:
       source_ref:
         description: Frozen application source tag
         required: true
-        default: v1.5.0
+        default: v1.6.0
       publish:
         description: Publish draft after all native gates pass
         type: boolean
@@ -13,7 +13,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: release-v1.5.0
+  group: release-v1.6.0
   cancel-in-progress: false
 jobs:
   build:
@@ -127,10 +127,10 @@ jobs:
           cd release-assets
           test "$(find . -name '*.zip' | wc -l)" -eq 3
           for sums in SHA256SUMS-*.txt; do sha256sum -c "$sums"; done
-          if gh release view v1.5.0 --json isDraft --jq '.isDraft' > draft-state.txt; then
+          if gh release view v1.6.0 --json isDraft --jq '.isDraft' > draft-state.txt; then
             test "$(cat draft-state.txt)" = true
           else
-            gh release create v1.5.0 --verify-tag --draft --title 'ANS Studio 1.5.0' --notes '基于固定 v1.5.0 源码及 manifest 列明的打包适配 overlay。macOS arm64、macOS x64、Windows x64 各由原生 runner 构建并实际启动验证。本轮为 UI 平台化：React/shadcn Nova 渲染层、单入口构建、新应用图标、派发投射去重、默认不再 15 分钟自动中止回合、治理角色显示名统一。未签名、未公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示，请先核对 SHA256。最低 macOS 13；Windows 10/11 x64。Windows 暂不支持内置受限来源文档阅读；保留完整摘要与执行记录，来源文件可由系统编辑器查看。包内不含密钥，首次使用请在设置中填写。详细来源与测试见各平台 manifest。'
+            gh release create v1.6.0 --verify-tag --draft --title 'ANS Studio 1.6.0' --notes '基于固定 v1.6.0 源码及 manifest 列明的打包适配 overlay。macOS arm64、macOS x64、Windows x64 各由原生 runner 构建并实际启动验证。本轮为治理角色粒度与受治理后台任务：bounded context/团队计划 v2、MapReduce 模块分片测试、受治理后台任务与治理守卫、思考行显示修复、验收 T0–T3 风险档位。未签名、未公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示，请先核对 SHA256。最低 macOS 13；Windows 10/11 x64。Windows 暂不支持内置受限来源文档阅读；保留完整摘要与执行记录，来源文件可由系统编辑器查看。包内不含密钥，首次使用请在设置中填写。详细来源与测试见各平台 manifest。'
           fi
-          gh release upload v1.5.0 ./*.zip ./manifest-*.json ./SHA256SUMS-*.txt ./release-provenance.json ./overlay.patch
-          if test "$RELEASE_PUBLISH" = true; then gh release edit v1.5.0 --draft=false; fi
+          gh release upload v1.6.0 ./*.zip ./manifest-*.json ./SHA256SUMS-*.txt ./release-provenance.json ./overlay.patch
+          if test "$RELEASE_PUBLISH" = true; then gh release edit v1.6.0 --draft=false; fi
