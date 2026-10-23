@@ -1,0 +1,1002 @@
+diff --git a/app/renderer/src/chat/types.ts b/app/renderer/src/chat/types.ts
+index fb42aae..098f465 100644
+--- a/app/renderer/src/chat/types.ts
++++ b/app/renderer/src/chat/types.ts
+@@ -8,6 +8,19 @@
+ 
+ export type RuntimeKind = "pi" | "codex" | "claude";
+ 
++/**
++ * 角色根文档元数据（与主进程 `RoleRootDocEntry` 同形，additive）。
++ *
++ * `path` 是**项目相对**路径（如 `角色卡/A/feature-map.md`），只用于与 opaque
++ * `documents[].relativePath` 精确匹配；渲染层不按它拼文件系统路径。白名单/
++ * 顺序由后端索引给出，渲染层不复制。
++ */
++export interface RoleRootDocEntry {
++  name: string;
++  path: string;
++  kind: "file";
++}
++
+ export interface RoleView {
+   roleId: string;
+   cardText?: string;
+@@ -20,6 +33,8 @@ export interface RoleView {
+   groupDuty?: string;
+   changelog?: unknown;
+   docs?: unknown[];
++  /** 角色根文档（可选；旧 main 缺省时按 `[]` 消费，不显示根文档组）。 */
++  rootDocs?: RoleRootDocEntry[];
+ }
+ 
+ export interface Listing {
+diff --git a/app/renderer/src/shell/ProfilePanel.tsx b/app/renderer/src/shell/ProfilePanel.tsx
+index 4322579..a67c83a 100644
+--- a/app/renderer/src/shell/ProfilePanel.tsx
++++ b/app/renderer/src/shell/ProfilePanel.tsx
+@@ -10,7 +10,7 @@
+ import { useEffect, useRef } from "react";
+ import { flushSync } from "react-dom";
+ import type { ReactElement, ReactNode } from "react";
+-import { ChevronRight } from "lucide-react";
++import { ChevronRight, FileText } from "lucide-react";
+ import { useChatStore } from "@/chat/chat-store";
+ import { useUiStore } from "@/stores/ui-store";
+ import {
+@@ -18,6 +18,12 @@ import {
+   currentReadingKey,
+ } from "@/stores/drawer-store";
+ import { renderMarkdown } from "@/chat/markdown";
++import {
++  docsIndexMarkdown,
++  profileDocsView,
++  rootDocLabelKey,
++  rootDocOpenText,
++} from "@/chat/profile-docs";
+ import { findRole, roleDisplayName, roleSubtitle } from "@/chat/role-view";
+ import { deriveRoleStatus, statusBadge } from "@/chat/status";
+ import {
+@@ -97,18 +103,6 @@ function boundaryTable(
+   );
+ }
+ 
+-function docsIndex(role: RoleView): string {
+-  const docs = Array.isArray(role.docs) ? role.docs : [];
+-  if (docs.length === 0) return "";
+-  return docs
+-    .map((entry) => {
+-      const item = asRecord(entry);
+-      const path = asString(item.path);
+-      return "- " + path + (item.kind === "directory" ? "/" : "");
+-    })
+-    .join("\n");
+-}
+-
+ function Section({
+   id,
+   title,
+@@ -200,8 +194,7 @@ export function ProfilePanel({ roleId }: { roleId: string | null }) {
+   });
+   // PM §十三 / UIUX M5：状态只表达状态；数量只在角标/队列视图。
+   const badge = statusBadge(status, 0, locale);
+-  const docs = Array.isArray(role.docs) ? role.docs : [];
+-  const fileDocs = docs.filter((entry) => asRecord(entry).kind === "file");
++  const docsView = profileDocsView(role);
+   const changelog = asRecord(role.changelog);
+   const pending = pendingViews(pendingOperator, role.roleId, locale);
+   const groups = queueGroups(queue, runningByRole[role.roleId] || null, locale);
+@@ -284,15 +277,15 @@ export function ProfilePanel({ roleId }: { roleId: string | null }) {
+       <Section
+         id="docs"
+         title={t("ui.profile.docsTab")}
+-        count={fileDocs.length > 0 ? fileDocs.length : t("shared.common.none")}
++        count={docsView.count > 0 ? docsView.count : t("shared.common.none")}
+         open={sectionOpen("docs")}
+         onToggle={(open) => setSectionOpen(key, "docs", open)}
+       >
+-        {docs.length === 0 ? (
+-          <div className="muted small">{t("ui.profile.noDocs")}</div>
++        {docsView.isEmpty ? (
++          <div className="muted small">{t("ui.profile.noRoleDocs")}</div>
+         ) : (
+           <div
+-            className="card-text card-md"
++            className="card-text profile-docs"
+             onScroll={(event) => {
+               const target = event.currentTarget;
+               setSectionScroll(key, "docs", target.scrollTop, target.scrollLeft);
+@@ -300,8 +293,50 @@ export function ProfilePanel({ roleId }: { roleId: string | null }) {
+             ref={(element) => {
+               sectionRefs.current.docs = element;
+             }}
+-            dangerouslySetInnerHTML={{ __html: renderMarkdown(docsIndex(role)) }}
+-          />
++          >
++            {docsView.rootDocs.length > 0 ? (
++              <div className="profile-docs-group" data-docs-group="root">
++                <h4 className="profile-docs-heading">{t("ui.profile.docsGroupRoot")}</h4>
++                <ul className="profile-root-docs">
++                  {docsView.rootDocs.map((doc) => {
++                    const labelKey = rootDocLabelKey(doc.name);
++                    const openText = rootDocOpenText(doc.name, locale);
++                    return (
++                      <li key={doc.path}>
++                        <button
++                          type="button"
++                          className="btn-mini root-doc-entry"
++                          data-root-doc-path={doc.path}
++                          title={openText}
++                          aria-label={openText}
++                          onClick={() =>
++                            flushSync(() => {
++                              void openDocumentList(role.roleId, "card", doc.path);
++                            })
++                          }
++                        >
++                          <FileText size={12} strokeWidth={1.5} aria-hidden="true" />
++                          <span className="root-doc-name">{doc.name}</span>
++                          {labelKey ? (
++                            <span className="root-doc-purpose">{t(labelKey)}</span>
++                          ) : null}
++                        </button>
++                      </li>
++                    );
++                  })}
++                </ul>
++              </div>
++            ) : null}
++            {docsView.docsEntries.length > 0 ? (
++              <div className="profile-docs-group" data-docs-group="subdir">
++                <h4 className="profile-docs-heading">{t("ui.profile.docsGroupSubdir")}</h4>
++                <div
++                  className="card-md"
++                  dangerouslySetInnerHTML={{ __html: renderMarkdown(docsIndexMarkdown(docsView.docsEntries)) }}
++                />
++              </div>
++            ) : null}
++          </div>
+         )}
+       </Section>
+ 
+diff --git a/app/renderer/src/shell/phase4a.css b/app/renderer/src/shell/phase4a.css
+index cf877d7..bc235d7 100644
+--- a/app/renderer/src/shell/phase4a.css
++++ b/app/renderer/src/shell/phase4a.css
+@@ -866,6 +866,58 @@
+   height: 32px;
+   padding: 0 10px;
+ }
++
++/* —— 文档分组（角色根文档 / docs/；只伸缩/换行，不新增固定高度）—— */
++.profile-docs {
++  display: flex;
++  flex-direction: column;
++  gap: 10px;
++}
++.profile-docs-group {
++  min-width: 0;
++  display: flex;
++  flex-direction: column;
++  gap: 6px;
++}
++.profile-docs-heading {
++  margin: 0;
++  font-size: 10.5px;
++  font-weight: 600;
++  color: var(--text-3);
++}
++.profile-root-docs {
++  list-style: none;
++  margin: 0;
++  padding: 0;
++  display: flex;
++  flex-direction: column;
++  gap: 4px;
++}
++.profile-root-docs li {
++  min-width: 0;
++}
++.root-doc-entry {
++  width: 100%;
++  min-width: 0;
++  height: auto;
++  min-height: 28px;
++  padding: 4px 8px;
++  justify-content: flex-start;
++  flex-wrap: wrap;
++  text-align: left;
++  white-space: normal;
++}
++.root-doc-name {
++  min-width: 0;
++  overflow-wrap: anywhere;
++  color: var(--foreground);
++}
++.root-doc-purpose {
++  min-width: 0;
++  overflow-wrap: anywhere;
++  font-size: 10.5px;
++  color: var(--text-3);
++}
+ .profile-todo {
+   display: flex;
+   flex-direction: column;
+diff --git a/app/renderer/src/stores/drawer-store.ts b/app/renderer/src/stores/drawer-store.ts
+index 4f40b15..8f0b475 100644
+--- a/app/renderer/src/stores/drawer-store.ts
++++ b/app/renderer/src/stores/drawer-store.ts
+@@ -13,6 +13,7 @@ import { useChatStore } from "@/chat/chat-store";
+ import { useUiStore, type RuntimeId } from "@/stores/ui-store";
+ import {
+   documentReadRequest,
++  documentReadableRef,
+   documentStatusText,
+   documentErrorText,
+   roleDocumentRefs,
+@@ -21,6 +22,7 @@ import {
+   type DocumentRef,
+   type DocumentScope,
+ } from "@/chat/document-view";
++import { matchDocumentRefByPath } from "@/chat/profile-docs";
+ import { useSettingsStore } from "@/stores/settings-store";
+ import { useLocaleStore, translate, type Locale } from "@/i18n";
+ 
+@@ -61,6 +63,8 @@ export interface DocumentViewState {
+   errorCode: string;
+   errorText: string;
+   listScroll: number;
++  /** 根文档点击目标（项目相对）；刷新后精确匹配 opaque ref，并用于返回焦点。 */
++  targetRelativePath: string | null;
+ }
+ 
+ interface DrawerState {
+@@ -84,7 +88,11 @@ interface DrawerState {
+   setScrollTop: (roleKey: string, top: number) => void;
+   toggleFull: (roleKey: string, id: string, open: boolean) => void;
+   setDocumentScroll: (top: number) => void;
+-  openDocumentList: (roleId: string, origin: "card" | "work" | "report") => Promise<void>;
++  openDocumentList: (
++    roleId: string,
++    origin: "card" | "work" | "report",
++    targetRelativePath?: string,
++  ) => Promise<void>;
+   refreshDocumentList: () => Promise<void>;
+   readDocument: (ref: DocumentRef) => Promise<void>;
+   backToList: () => void;
+@@ -324,7 +332,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
+     set({ document: { ...document, listScroll: top } });
+   },
+ 
+-  openDocumentList: async (roleId, origin) => {
++  openDocumentList: async (roleId, origin, targetRelativePath) => {
+     const projectRoot = useChatStore.getState().projectRoot;
+     const runtime = useUiStore.getState().runtime;
+     documentReadVersion += 1;
+@@ -358,6 +366,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
+       errorCode: "",
+       errorText: "",
+       listScroll: 0,
++      targetRelativePath: targetRelativePath || null,
+     };
+     useDrawerStore.setState((state) => ({
+       tab: "document",
+@@ -399,6 +408,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
+       const refs = role ? roleDocumentRefs(role) : [];
+       const current = get().document;
+       if (!current || version !== documentReadVersion) return;
++      const target = current.targetRelativePath;
+       useDrawerStore.setState({
+         document: {
+           ...current,
+@@ -411,6 +421,16 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
+             : translate(currentLocale(), "ui.drawerStore.noSourceRole"),
+         },
+       });
++      // 根文档点击：刷新后用 `relativePath` 精确匹配 opaque 引用；命中且 scope
++      // 可读才走既有阅读态。未命中/无 scope/平台不支持停留列表态，由
++      // DocumentView 展示既有结构化错误；不构造路径、不生成 documentId、不重试。
++      if (target) {
++        const latest = get().document;
++        const matched = latest ? matchDocumentRefByPath(latest.refs, target) : null;
++        if (matched && latest?.scope && documentReadableRef(matched, latest.scope)) {
++          await get().readDocument(matched);
++        }
++      }
+     } catch {
+       if (version !== documentReadVersion) return;
+       const current = get().document;
+@@ -538,13 +558,26 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
+   backToRole: () => {
+     documentReadVersion += 1;
+     const current = get().document;
+-    queueDrawerFocus(".role-document-entry");
++    // 从根文档进入时焦点回触发按钮（data-root-doc-path 精确标记）；
++    // 按钮已不在（角色/文档刷新）则选择器回退到既有“查看已列文档”入口。
++    const target = current?.targetRelativePath;
++    const selector = target
++      ? '[data-root-doc-path="' + CSS.escape(target) + '"], .role-document-entry'
++      : ".role-document-entry";
++    queueDrawerFocus(selector);
+     set((state) => ({
+       tab: "card",
+       queueView: null,
+       document: current ? { ...current, mode: "list", ref: null } : null,
+       nonce: state.nonce + 1,
+     }));
++    // flushSync 提交后微任务即聚焦（早于 rAF 兜底；不可见窗口 rAF 可能不触发）。
++    queueMicrotask(() => {
++      const element = document.querySelector<HTMLElement>(selector);
++      if (element && element.getClientRects().length > 0) {
++        element.focus({ preventScroll: true });
++      }
++    });
+   },
+ 
+   invalidateDocumentRead: (options) => {
+diff --git "a/test/\346\241\214\351\235\242UI/phase4a-electron-smoke.mjs" "b/test/\346\241\214\351\235\242UI/phase4a-electron-smoke.mjs"
+index f311e2a..a94a5ef 100644
+--- "a/test/\346\241\214\351\235\242UI/phase4a-electron-smoke.mjs"
++++ "b/test/\346\241\214\351\235\242UI/phase4a-electron-smoke.mjs"
+@@ -81,6 +81,8 @@ const state = {
+   docMode: "success",
+   docPending: [],
+   docDeferred: false,
++  // Windows 形状：索引仍列根文档名，但无 scope/refs，读取不可用（Q9 A）。
++  docsUnavailable: false,
+   withdrawMode: "deferred",
+   withdrawPending: [],
+   withdrawThrow: false,
+@@ -121,6 +123,13 @@ const roleA = {
+   boundaryPath: "角色卡/A/boundary.yaml",
+   changelog: { path: "角色卡/A/changelog.md", text: "# 变更记录\n\n" + "保留变更阅读位置。\n\n".repeat(100) },
+   docs: Array.from({ length: 100 }, (_, index) => ({ kind: "file", path: "docs/record-" + index + ".md" })),
++  // 角色根文档（S4 夹具：主进程索引的元数据形状；顺序即展示顺序）。
++  rootDocs: [
++    { name: "feature-map.md", path: ROOT + "/角色卡/A/feature-map.md", kind: "file" },
++    { name: "functional-description.md", path: ROOT + "/角色卡/A/functional-description.md", kind: "file" },
++    { name: "api-spec.md", path: ROOT + "/角色卡/A/api-spec.md", kind: "file" },
++  ],
++  // opaque 引用：根文档追加在既有 docs 之后（不复制正文）。
+   documents: [
+     {
+       version: 1,
+@@ -140,6 +149,33 @@ const roleA = {
+       label: "报告 2",
+       format: "text",
+     },
++    {
++      version: 1,
++      projectViewId: "epoch-one",
++      documentId: "root-feature-map",
++      roleId: "A",
++      relativePath: ROOT + "/角色卡/A/feature-map.md",
++      label: "feature-map.md",
++      format: "markdown",
++    },
++    {
++      version: 1,
++      projectViewId: "epoch-one",
++      documentId: "root-functional-description",
++      roleId: "A",
++      relativePath: ROOT + "/角色卡/A/functional-description.md",
++      label: "functional-description.md",
++      format: "markdown",
++    },
++    {
++      version: 1,
++      projectViewId: "epoch-one",
++      documentId: "root-api-spec",
++      roleId: "A",
++      relativePath: ROOT + "/角色卡/A/api-spec.md",
++      label: "api-spec.md",
++      format: "markdown",
++    },
+   ],
+ };
+ const roleB = {
+@@ -154,16 +190,28 @@ const roleB = {
+ };
+ 
+ function listing(projectRoot = ROOT) {
++  const roles = [
++    { ...roleA, cardPath: projectRoot + "/角色卡/A/role-card.md" },
++    { ...roleB, cardPath: projectRoot + "/角色卡/B/role-card.md" },
++  ];
++  if (state.docsUnavailable) {
++    // 与 Windows 真实回包同形：索引元数据仍在，但 scope 缺席、无 refs、读取不可用。
++    return {
++      projectRoot,
++      primaryRoleId: "A",
++      hasRoles: true,
++      warnings: [],
++      documentReadUnavailable: "UNSUPPORTED_ENVIRONMENT",
++      roles: roles.map((role) => ({ ...role, documents: [] })),
++    };
++  }
+   return {
+     projectRoot,
+     primaryRoleId: "A",
+     hasRoles: true,
+     warnings: [],
+     documentScope: { version: 1, projectViewId: "epoch-one", projectRoot },
+-    roles: [
+-      { ...roleA, cardPath: projectRoot + "/角色卡/A/role-card.md" },
+-      { ...roleB, cardPath: projectRoot + "/角色卡/B/role-card.md" },
+-    ],
++    roles,
+   };
+ }
+ 
+@@ -283,6 +331,45 @@ ipcMain.handle("project:document-read", (_e, input) => {
+     if (state.docMode === "PROJECT_NOT_GRANTED") {
+       return { ok: false, version: 1, projectViewId: input.projectViewId, documentId: input.documentId, code: "PROJECT_NOT_GRANTED", message: "fixed" };
+     }
++    if (input.documentId === "root-feature-map") {
++      return {
++        ok: true,
++        version: 1,
++        projectViewId: input.projectViewId,
++        documentId: input.documentId,
++        roleId: "A",
++        relativePath: ROOT + "/角色卡/A/feature-map.md",
++        format: "markdown",
++        byteLength: 34,
++        text: "# 功能导航\n\n根文档正文 feature map",
++      };
++    }
++    if (input.documentId === "root-functional-description") {
++      return {
++        ok: true,
++        version: 1,
++        projectViewId: input.projectViewId,
++        documentId: input.documentId,
++        roleId: "A",
++        relativePath: ROOT + "/角色卡/A/functional-description.md",
++        format: "markdown",
++        byteLength: 46,
++        text: "# 模块视图\n\n根文档正文 functional description",
++      };
++    }
++    if (input.documentId === "root-api-spec") {
++      return {
++        ok: true,
++        version: 1,
++        projectViewId: input.projectViewId,
++        documentId: input.documentId,
++        roleId: "A",
++        relativePath: ROOT + "/角色卡/A/api-spec.md",
++        format: "markdown",
++        byteLength: 14,
++        text: "not-applicable",
++      };
++    }
+     if (input.documentId === "doc-two") {
+       return {
+         ok: true,
+@@ -893,11 +980,68 @@ app.whenReady().then(async () => {
+       (await js(`document.getElementById('right-body').scrollTop>100`)),
+     nested,
+   );
++  // S4：文档节两组（角色根文档 / docs/）；顺序、计数、memo/role-card 过滤、按钮语义。
++  check(
++    "PROFILE_DOCS_GROUPS_ROOT_AND_SUBDIR",
++    await js(`(()=>{const sec=document.querySelector('details[data-section="docs"]');const groups=[...sec.querySelectorAll('[data-docs-group]')].map(g=>g.getAttribute('data-docs-group'));const names=[...sec.querySelectorAll('[data-root-doc-path]')].map(b=>b.getAttribute('data-root-doc-path'));const rootText=sec.querySelector('[data-docs-group="root"]')?.textContent||'';const subText=sec.querySelector('[data-docs-group="subdir"]')?.textContent||'';return groups.join(',')==='root,subdir'&&names.length===3&&names[0].endsWith('/角色卡/A/feature-map.md')&&names[1].endsWith('/角色卡/A/functional-description.md')&&names[2].endsWith('/角色卡/A/api-spec.md')&&sec.querySelector('.sec-count').textContent==='103'&&rootText.includes('角色根文档')&&rootText.includes('功能导航')&&subText.includes('docs/ 目录')&&!sec.textContent.includes('memo.md')&&!sec.textContent.includes('role-card.md');})()`),
++    await js(`(()=>{const sec=document.querySelector('details[data-section="docs"]');return {groups:[...sec.querySelectorAll('[data-docs-group]')].map(g=>g.getAttribute('data-docs-group')),names:[...sec.querySelectorAll('[data-root-doc-path]')].map(b=>b.getAttribute('data-root-doc-path')),count:sec.querySelector('.sec-count')?.textContent,memo:sec.textContent.includes('memo.md')};})()`),
++  );
++  check(
++    "PROFILE_ROOT_DOC_BUTTON_TITLE_ARIA",
++    await js(`(()=>{const b=document.querySelector('[data-root-doc-path$="/feature-map.md"]');const label='只读打开 feature-map.md';return !!b&&b.tagName==='BUTTON'&&b.title===label&&b.getAttribute('aria-label')===label;})()`),
++  );
++  // 平台诚实：索引仍列名；Windows 形状（无 scope/refs）点开停留列表态 + 既有结构化错误。
++  state.docsUnavailable = true;
++  await js(`document.querySelector('[data-root-doc-path$="/feature-map.md"]').click()`);
++  await sleep(260);
++  check(
++    "ROOT_DOC_WINDOWS_UNAVAILABLE_STRUCTURED_ERROR",
++    await js(`window.__ansRenderer.state.rightTab==='document'&&!document.getElementById('document-read-text')&&!document.querySelector('.document-list')&&(document.querySelector('.document-scope-error')?.textContent||'').includes('当前环境暂不支持安全读取项目文档')&&!document.getElementById('right-body').textContent.includes('根文档正文')`),
++    await js(`({tab:window.__ansRenderer.state.rightTab,error:document.querySelector('.document-scope-error')?.textContent||'',list:!!document.querySelector('.document-list'),body:document.getElementById('right-body').textContent.slice(0,160)})`),
++  );
++  await js(`document.querySelector('[data-doc-action="back-role"]').click()`);
++  await sleep(220);
++  check(
++    "ROOT_DOC_BACK_ROLE_FOCUSES_ROOT_BUTTON",
++    await js(`window.__ansRenderer.state.rightTab==='card'&&(document.activeElement.getAttribute('data-root-doc-path')||'').endsWith('/角色卡/A/feature-map.md')`),
++    await js(`({tab:window.__ansRenderer.state.rightTab,active:document.activeElement&&(document.activeElement.tagName+'.'+document.activeElement.className),path:document.activeElement.getAttribute&&document.activeElement.getAttribute('data-root-doc-path'),docsOpen:document.querySelector('details[data-section="docs"]')?.open})`),
++  );
++  state.docsUnavailable = false;
++  // 可读分支：点击根文档 → 刷新后按 relativePath 精确匹配 ref → 既有 DocumentView 阅读态。
++  await js(`document.querySelector('[data-root-doc-path$="/feature-map.md"]').click()`);
++  await sleep(280);
++  check(
++    "ROOT_DOC_OPENS_DOCUMENT_VIEW_READONLY",
++    await js(`window.__ansRenderer.state.rightTab==='document'&&document.getElementById('document-read-text').textContent.includes('根文档正文 feature map')&&document.getElementById('document-read-status').textContent.includes('只读文档')&&(document.querySelector('.document-path')?.textContent||'').endsWith('/角色卡/A/feature-map.md')&&!document.querySelector('#document-read-text script,#document-read-text img')`),
++    await js(`({path:document.querySelector('.document-path')?.textContent,status:document.getElementById('document-read-status')?.textContent})`),
++  );
++  await js(`document.querySelector('[data-doc-action="back-list"]').click()`);
++  await sleep(140);
++  check(
++    "ROOT_DOC_LIST_APPENDS_REFS_WITHOUT_PREFIX_CHANGE",
++    await js(`document.querySelectorAll('[data-doc-id]').length===5&&!!document.querySelector('[data-doc-id="doc-one"]')&&!!document.querySelector('[data-doc-id="doc-two"]')&&!!document.querySelector('[data-doc-id="root-feature-map"]')&&!!document.querySelector('[data-doc-id="root-functional-description"]')&&!!document.querySelector('[data-doc-id="root-api-spec"]')`),
++  );
++  await js(`document.querySelector('[data-doc-action="back-role"]').click()`);
++  await sleep(220);
++  // api-spec 的 not-applicable 当普通文本：无 badge/特殊错误。
++  await js(`document.querySelector('[data-root-doc-path$="/api-spec.md"]').click()`);
++  await sleep(280);
++  check(
++    "ROOT_DOC_API_SPEC_NOT_APPLICABLE_PLAIN_TEXT",
++    await js(`(document.getElementById('document-read-text')?.textContent||'').trim()==='not-applicable'&&!document.querySelector('.document-scope-error')&&!document.querySelector('#document-read-status [class*="badge"]')`),
++    await js(`document.getElementById('document-read-text')?.textContent`),
++  );
++  await js(`document.querySelector('[data-doc-action="back-list"]').click()`);
++  await sleep(120);
++  await js(`document.querySelector('[data-doc-action="back-role"]').click()`);
++  await sleep(200);
+   await js(`[...document.querySelectorAll('#right-body button')].find(x=>x.textContent==='查看已列文档').click()`);
+   await sleep(180);
+   check(
+     "DOCUMENT_LIST_OPAQUE_REFS_ONLY",
+-    await js(`document.getElementById('drawer-title').textContent==='A · 来源文档'&&document.querySelectorAll('[data-doc-id]').length===2&&document.querySelector('.document-source-note')&&window.__ansRenderer.state.selectedRoleId==='A'`),
++    await js(`document.getElementById('drawer-title').textContent==='A · 来源文档'&&document.querySelectorAll('[data-doc-id]').length===5&&document.querySelector('.document-source-note')&&window.__ansRenderer.state.selectedRoleId==='A'`),
++    // 5 = 既有 docs 2 条 + 新增根文档 3 条（新增 refs，不是回归）。
++    await js(`document.querySelectorAll('[data-doc-id]').length`),
+   );
+   await js(`document.querySelector('[data-doc-id="doc-one"]').click()`);
+   await sleep(200);
+@@ -978,6 +1122,14 @@ app.whenReady().then(async () => {
+     "ROLE_SWITCH_INVALIDATES_DOCUMENT_VIEW",
+     await js(`window.__ansRenderer.state.rightTab===null&&!document.getElementById('document-read-text')&&!document.querySelector('.document-list')`),
+   );
++  // B 无根文档且无 docs（旧 main 形状缺 rootDocs）：整节诚实空态，不伪造。
++  await js(`document.getElementById('tab-card').click()`);
++  await sleep(180);
++  check(
++    "PROFILE_EMPTY_DOCS_HONEST_STATE",
++    await js(`(()=>{const sec=document.querySelector('details[data-section="docs"]');return !!sec&&!sec.querySelector('[data-docs-group]')&&sec.textContent.includes('（暂无角色文档）')&&sec.querySelector('.sec-count').textContent==='无';})()`),
++    await js(`document.querySelector('details[data-section="docs"]')?.textContent`),
++  );
+   await js(`await window.__ansRenderer.selectRole('A')`);
+ 
+   // —————— 4. 工作概览 ——————
+@@ -1198,9 +1350,12 @@ app.whenReady().then(async () => {
+     "QUEUE_SUBVIEW_FROM_PROFILE_ESC_RESTORES_ROLE_FOCUS",
+     await js(`document.getElementById('drawer-title').textContent==='A · 角色资料'&&document.activeElement.classList.contains('queue-view-all')`),
+   );
++  await js(`document.querySelector('details[data-section="docs"]').open=true`);
++  await sleep(100);
+   check(
+     "WIDTH_960_PROFILE_NO_OVERFLOW",
+-    await js(`document.body.scrollWidth===innerWidth&&document.getElementById('right-body').scrollWidth===document.getElementById('right-body').clientWidth`),
++    await js(`document.body.scrollWidth===innerWidth&&document.getElementById('right-body').scrollWidth===document.getElementById('right-body').clientWidth&&(()=>{const d=document.getElementById('right-body').getBoundingClientRect();return [...document.querySelectorAll('[data-root-doc-path]')].every(b=>{const r=b.getBoundingClientRect();return r.width>0&&r.left>=d.left-0.5&&r.right<=d.right+0.5&&b.title.length>0&&b.getAttribute('aria-label')===b.title;});})()`),
++    await js(`(()=>{const d=document.getElementById('right-body').getBoundingClientRect();return {drawer:{left:d.left,right:d.right},buttons:[...document.querySelectorAll('[data-root-doc-path]')].map(b=>{const r=b.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width,title:b.title};})};})()`),
+   );
+   await js(`document.getElementById('right-body').scrollTop=0`);
+   await sleep(80);
+@@ -1222,6 +1377,7 @@ app.whenReady().then(async () => {
+   check(
+     "WIDTH_960_SETTINGS_NO_OVERFLOW",
+     await js(`document.body.scrollWidth===innerWidth&&(()=>{const p=document.getElementById('pi-panel');return p.scrollWidth===p.clientWidth;})()&&[...document.querySelectorAll('#pi-panel input')].every(x=>x.getBoundingClientRect().right<=innerWidth)`),
++    await js(`(()=>{const p=document.getElementById('pi-panel');return {body:document.body.scrollWidth,inner:innerWidth,panel:{scroll:p.scrollWidth,client:p.clientWidth},inputs:[...document.querySelectorAll('#pi-panel input')].map(x=>({id:x.id,right:x.getBoundingClientRect().right}))};})()`),
+   );
+   check(
+     "WIDTH_960_SAVE_STATUS_NOT_CLIPPED",
+@@ -1271,6 +1427,14 @@ app.whenReady().then(async () => {
+   await sleep(180);
+   await js(`document.getElementById('tab-card').click()`);
+   await sleep(220);
++  await js(`document.querySelector('details[data-section="docs"]').open=true`);
++  await js(`document.querySelector('[data-root-doc-path]').scrollIntoView({block:'center'})`);
++  await sleep(140);
++  check(
++    "ZOOM_200_ROOT_DOC_BUTTON_REACHABLE",
++    await js(`(()=>{const b=document.querySelector('[data-root-doc-path]');const r=b.getBoundingClientRect();const hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.width>0&&r.height>0&&r.left>=0&&r.right<=innerWidth&&(hit===b||b.contains(hit))&&b.title.length>0&&b.getAttribute('aria-label')===b.title;})()`),
++    await js(`(()=>{const b=document.querySelector('[data-root-doc-path]');const r=b.getBoundingClientRect();return {rect:{left:r.left,right:r.right,top:r.top,bottom:r.bottom},innerWidth,title:b.title};})()`),
++  );
+   check(
+     "ZOOM_200_PROFILE_NO_OVERFLOW",
+     await js(`document.body.scrollWidth===innerWidth&&document.getElementById('right-body').scrollWidth===document.getElementById('right-body').clientWidth`),
+diff --git a/app/renderer/src/chat/profile-docs.ts b/app/renderer/src/chat/profile-docs.ts
+new file mode 100644
+index 0000000..de20311
+--- /dev/null
++++ b/app/renderer/src/chat/profile-docs.ts
+@@ -0,0 +1,165 @@
++/**
++ * 角色资料“文档”分组的纯展示逻辑（role-root-docs-display S4）。
++ *
++ * - 根文档：只按后端 `RoleView.rootDocs` 数组原顺序展示（白名单与顺序由主进程
++ *   索引给出）；`path` 是项目相对路径，只用于与 opaque `documents[].relativePath`
++ *   精确匹配，渲染层不拼文件系统路径、不生成 `documentId`。
++ * - `docs/`：内容/顺序沿用既有 `docs` 索引（角色相对），目录带尾 `/`。
++ * - 计数：根文档 file 数 + `docs` 中 file 数；目录不计。
++ * - 空态：两组都没有条目才为空（有根文档但没有 docs 时不显示“无 docs/”整节空）。
++ * - `memo.md`、`role-card.md`、`boundary.yaml`/`boundary.md` 是显示兜底排除
++ *   （安全边界在 Service/Provider：memo 不入索引、非法候选不铸造引用）。
++ * - 无 DOM/无 Node/fs/electron/网络。
++ */
++
++import { DEFAULT_LOCALE, translate, type Locale, type MessageKey } from "../i18n/index.ts";
++import type { DocumentRef } from "./document-view.ts";
++
++/** 根文档行（只保留展示所需字段；不含正文）。 */
++export interface RootDocItem {
++  /** 展示文件名（后端 `name`；缺失时取 `path` 末段，仅显示）。 */
++  name: string;
++  /** 项目相对路径（精确匹配 opaque ref 用；不拼文件系统路径）。 */
++  path: string;
++}
++
++/** `docs/` 条目（路径基准仍是角色目录；与根文档不混用）。 */
++export interface DocsGroupEntry {
++  path: string;
++  kind: "file" | "directory";
++}
++
++export interface ProfileDocsView {
++  rootDocs: RootDocItem[];
++  docsEntries: DocsGroupEntry[];
++  /** `docs` 中 file 数（目录不计）。 */
++  docsFiles: number;
++  /** 节 count：根文档数 + docs file 数。 */
++  count: number;
++  /** 两组都为空（含内置角色/无根文档且无 docs 的角色）。 */
++  isEmpty: boolean;
++}
++
++/** 可选副标签：文件名 → S5 key（文件名本身不翻译）。 */
++export const ROOT_DOC_LABEL_KEYS: Readonly<Record<string, MessageKey>> = {
++  "feature-map.md": "ui.profile.rootDoc.featureMap",
++  "functional-description.md": "ui.profile.rootDoc.functionalDescription",
++  "api-spec.md": "ui.profile.rootDoc.apiSpec",
++};
++
++/** 显示兜底排除：这几类路径已有专门栏或明确不展示（memo）。 */
++const EXCLUDED_NAMES: ReadonlySet<string> = new Set([
++  "memo.md",
++  "role-card.md",
++  "boundary.yaml",
++  "boundary.md",
++]);
++
++function asRecord(value: unknown): Record<string, unknown> {
++  return value && typeof value === "object"
++    ? (value as Record<string, unknown>)
++    : {};
++}
++
++function asString(value: unknown): string {
++  return typeof value === "string" ? value : "";
++}
++
++/** 仅显示用的文件名：优先后端 `name`，否则取 `path` 末段（不构造路径）。 */
++export function rootDocDisplayName(entry: Record<string, unknown>): string {
++  const name = asString(entry.name).trim();
++  if (name) return name;
++  const path = asString(entry.path);
++  const index = path.lastIndexOf("/");
++  return (index >= 0 ? path.slice(index + 1) : path).trim();
++}
++
++function pathTailName(path: string): string {
++  const index = path.lastIndexOf("/");
++  return index >= 0 ? path.slice(index + 1) : path;
++}
++
++/**
++ * 根文档显示列表：按后端顺序；过滤空 `path`、`kind === "directory"`、
++ * `memo.md`/role-card/boundary 显示兜底与重复路径；不排序、不补占位。
++ */
++export function roleRootDocs(role: unknown): RootDocItem[] {
++  const record = asRecord(role);
++  const list = Array.isArray(record.rootDocs) ? record.rootDocs : [];
++  const items: RootDocItem[] = [];
++  const seen = new Set<string>();
++  for (const raw of list) {
++    const entry = asRecord(raw);
++    const path = asString(entry.path);
++    if (!path.trim()) continue;
++    if (entry.kind === "directory") continue;
++    const name = rootDocDisplayName(entry);
++    if (!name) continue;
++    if (EXCLUDED_NAMES.has(name) || EXCLUDED_NAMES.has(pathTailName(path))) continue;
++    if (seen.has(path)) continue;
++    seen.add(path);
++    items.push({ name, path });
++  }
++  return items;
++}
++
++/** `docs/` 显示条目：保持后端顺序；畸形条目丢弃；路径原样（角色相对）。 */
++export function roleDocsEntries(role: unknown): DocsGroupEntry[] {
++  const record = asRecord(role);
++  const list = Array.isArray(record.docs) ? record.docs : [];
++  const entries: DocsGroupEntry[] = [];
++  for (const raw of list) {
++    const entry = asRecord(raw);
++    const path = asString(entry.path);
++    if (!path) continue;
++    entries.push({ path, kind: entry.kind === "directory" ? "directory" : "file" });
++  }
++  return entries;
++}
++
++/** “文档”节视图模型：两组、计数与空态由同一处判定。 */
++export function profileDocsView(role: unknown): ProfileDocsView {
++  const rootDocs = roleRootDocs(role);
++  const docsEntries = roleDocsEntries(role);
++  const docsFiles = docsEntries.filter((entry) => entry.kind === "file").length;
++  return {
++    rootDocs,
++    docsEntries,
++    docsFiles,
++    count: rootDocs.length + docsFiles,
++    isEmpty: rootDocs.length === 0 && docsEntries.length === 0,
++  };
++}
++
++/** `docs/` 组的既有 Markdown 列表（目录带尾 `/`；只展示，不解析路径）。 */
++export function docsIndexMarkdown(entries: readonly DocsGroupEntry[]): string {
++  if (entries.length === 0) return "";
++  return entries
++    .map((entry) => "- " + entry.path + (entry.kind === "directory" ? "/" : ""))
++    .join("\n");
++}
++
++/** 根文档副标签 key（仅三个白名单文件名有；其余返回 null）。 */
++export function rootDocLabelKey(name: string): MessageKey | null {
++  return ROOT_DOC_LABEL_KEYS[name] || null;
++}
++
++/** 根文档按钮 title/aria：`ui.profile.openRootDoc` + 原样文件名。 */
++export function rootDocOpenText(
++  name: string,
++  locale: Locale = DEFAULT_LOCALE,
++): string {
++  return translate(locale, "ui.profile.openRootDoc", { name });
++}
++
++/**
++ * 按 `relativePath` 精确匹配 opaque 引用（不构造路径、不生成 documentId）。
++ * 未命中返回 null（调用方停留列表态并展示既有结构化错误）。
++ */
++export function matchDocumentRefByPath(
++  refs: readonly DocumentRef[],
++  relativePath: string,
++): DocumentRef | null {
++  if (!relativePath) return null;
++  return refs.find((ref) => ref.relativePath === relativePath) || null;
++}
+diff --git "a/test/\346\241\214\351\235\242UI/profile-docs.test.ts" "b/test/\346\241\214\351\235\242UI/profile-docs.test.ts"
+new file mode 100644
+index 0000000..9717784
+--- /dev/null
++++ "b/test/\346\241\214\351\235\242UI/profile-docs.test.ts"
+@@ -0,0 +1,227 @@
++// test/桌面UI/profile-docs.test.ts
++// S4 纯逻辑：角色根文档 / docs/ 分组、顺序、计数、空态、显示兜底过滤、
++// S5 标签 key 消费与 relativePath 精确匹配。无 DOM/无 Electron。
++
++import test from "node:test";
++import assert from "node:assert/strict";
++import { readFileSync } from "node:fs";
++import { fileURLToPath } from "node:url";
++import {
++  ROOT_DOC_LABEL_KEYS,
++  docsIndexMarkdown,
++  matchDocumentRefByPath,
++  profileDocsView,
++  roleDocsEntries,
++  roleRootDocs,
++  rootDocDisplayName,
++  rootDocLabelKey,
++  rootDocOpenText,
++} from "../../app/renderer/src/chat/profile-docs.ts";
++import { translate } from "../../app/renderer/src/i18n/index.ts";
++import type { DocumentRef } from "../../app/renderer/src/chat/document-view.ts";
++
++const P = "角色卡/A/";
++const THREE_ROOTS = [
++  { name: "feature-map.md", path: P + "feature-map.md", kind: "file" },
++  { name: "functional-description.md", path: P + "functional-description.md", kind: "file" },
++  { name: "api-spec.md", path: P + "api-spec.md", kind: "file" },
++];
++const DOCS = [
++  { path: "docs/design", kind: "directory" },
++  { path: "docs/design/one.md", kind: "file" },
++  { path: "docs/two.md", kind: "file" },
++];
++
++function ref(relativePath: string, documentId: string): DocumentRef {
++  return {
++    version: 1,
++    projectViewId: "epoch-one",
++    documentId,
++    roleId: "A",
++    relativePath,
++    label: relativePath.split("/").pop() || relativePath,
++    format: "markdown",
++  };
++}
++
++test("3 根文档 + N docs：两组、后端顺序、count 不计目录", () => {
++  const view = profileDocsView({ roleId: "A", rootDocs: THREE_ROOTS, docs: DOCS });
++  assert.deepEqual(
++    view.rootDocs.map((doc) => doc.name),
++    ["feature-map.md", "functional-description.md", "api-spec.md"],
++  );
++  assert.deepEqual(
++    view.docsEntries.map((entry) => entry.path),
++    ["docs/design", "docs/design/one.md", "docs/two.md"],
++  );
++  assert.equal(view.docsFiles, 2);
++  assert.equal(view.count, 5);
++  assert.equal(view.isEmpty, false);
++});
++
++test("3 根文档 + 0 docs：只显示根文档组，不显示整节空", () => {
++  const view = profileDocsView({ roleId: "A", rootDocs: THREE_ROOTS, docs: [] });
++  assert.equal(view.rootDocs.length, 3);
++  assert.equal(view.docsEntries.length, 0);
++  assert.equal(view.count, 3);
++  assert.equal(view.isEmpty, false);
++});
++
++test("0 根文档 + N docs：只显示 docs 组", () => {
++  const view = profileDocsView({ roleId: "A", docs: DOCS });
++  assert.equal(view.rootDocs.length, 0);
++  assert.equal(view.docsEntries.length, 3);
++  assert.equal(view.count, 2);
++  assert.equal(view.isEmpty, false);
++});
++
++test("两组都空/内置角色/旧 main：诚实空态，不伪造", () => {
++  for (const role of [
++    { roleId: "A", rootDocs: [], docs: [] },
++    { roleId: "governance", builtIn: true },
++    { roleId: "old-main", docs: undefined },
++    null,
++    {},
++  ]) {
++    const view = profileDocsView(role);
++    assert.deepEqual(view.rootDocs, []);
++    assert.deepEqual(view.docsEntries, []);
++    assert.equal(view.count, 0);
++    assert.equal(view.isEmpty, true);
++  }
++});
++
++test("部分根文档缺失：只显示存在项，顺序保持相对", () => {
++  const partial = [THREE_ROOTS[0], THREE_ROOTS[2]];
++  const view = profileDocsView({ roleId: "A", rootDocs: partial, docs: [] });
++  assert.deepEqual(
++    view.rootDocs.map((doc) => doc.name),
++    ["feature-map.md", "api-spec.md"],
++  );
++  assert.equal(view.count, 2);
++});
++
++test("显示兜底：memo/role-card/boundary/目录/空路径/重复路径不渲染", () => {
++  const messy = [
++    { name: "memo.md", path: P + "memo.md", kind: "file" },
++    { name: "role-card.md", path: P + "role-card.md", kind: "file" },
++    { name: "boundary.yaml", path: P + "boundary.yaml", kind: "file" },
++    { name: "boundary.md", path: P + "boundary.md", kind: "file" },
++    { name: "feature-map.md", path: P + "feature-map.md", kind: "directory" },
++    { name: "feature-map.md", path: "   ", kind: "file" },
++    { name: "", path: P + "functional-description.md", kind: "file" },
++    { name: "api-spec.md", path: P + "api-spec.md", kind: "file" },
++    { name: "api-spec.md", path: P + "api-spec.md", kind: "file" },
++  ];
++  const view = roleRootDocs({ roleId: "A", rootDocs: messy });
++  assert.deepEqual(view, [
++    { name: "functional-description.md", path: P + "functional-description.md" },
++    { name: "api-spec.md", path: P + "api-spec.md" },
++  ]);
++  // 即使后端异常传入 memo，也不在两组中渲染。
++  assert.equal(
++    profileDocsView({ roleId: "A", rootDocs: messy, docs: [] }).rootDocs.some(
++      (doc) => doc.name === "memo.md",
++    ),
++    false,
++  );
++});
++
++test("展示名：优先后端 name；缺失时只取 path 末段（不构造路径）", () => {
++  assert.equal(rootDocDisplayName({ name: "api-spec.md", path: P + "api-spec.md" }), "api-spec.md");
++  assert.equal(rootDocDisplayName({ path: P + "feature-map.md" }), "feature-map.md");
++  assert.equal(rootDocDisplayName({ path: "feature-map.md" }), "feature-map.md");
++  assert.equal(rootDocDisplayName({}), "");
++});
++
++test("docs 条目：畸形项丢弃、目录/文件标记稳定、路径原样（角色相对）", () => {
++  const entries = roleDocsEntries({
++    docs: [
++      { path: "docs/a", kind: "directory" },
++      { path: "docs/a.md" },
++      { path: "", kind: "file" },
++      { path: "docs/b.md", kind: "file" },
++      null,
++    ],
++  });
++  assert.deepEqual(entries, [
++    { path: "docs/a", kind: "directory" },
++    { path: "docs/a.md", kind: "file" },
++    { path: "docs/b.md", kind: "file" },
++  ]);
++});
++
++test("docs Markdown 列表沿用既有形状：顺序不变、目录带尾斜杠", () => {
++  assert.equal(
++    docsIndexMarkdown(roleDocsEntries({ docs: DOCS })),
++    "- docs/design/\n- docs/design/one.md\n- docs/two.md",
++  );
++  assert.equal(docsIndexMarkdown([]), "");
++});
++
++test("S5 标签 key：4 必需 + 3 可选副标签 zh/en 可用；文件名不翻译", () => {
++  assert.deepEqual(ROOT_DOC_LABEL_KEYS, {
++    "feature-map.md": "ui.profile.rootDoc.featureMap",
++    "functional-description.md": "ui.profile.rootDoc.functionalDescription",
++    "api-spec.md": "ui.profile.rootDoc.apiSpec",
++  });
++  assert.equal(rootDocLabelKey("feature-map.md"), "ui.profile.rootDoc.featureMap");
++  assert.equal(rootDocLabelKey("memo.md"), null);
++  assert.equal(rootDocLabelKey("other.md"), null);
++  assert.equal(translate("zh-CN", "ui.profile.docsGroupRoot"), "角色根文档");
++  assert.equal(translate("zh-CN", "ui.profile.docsGroupSubdir"), "docs/ 目录");
++  assert.equal(translate("zh-CN", "ui.profile.noRoleDocs"), "（暂无角色文档）");
++  assert.equal(translate("en-US", "ui.profile.docsGroupRoot"), "Role root documents");
++  assert.equal(translate("en-US", "ui.profile.docsGroupSubdir"), "docs/ directory");
++  assert.equal(translate("en-US", "ui.profile.noRoleDocs"), "(no role documents)");
++  assert.equal(translate("zh-CN", "ui.profile.rootDoc.featureMap"), "功能导航");
++  assert.equal(translate("en-US", "ui.profile.rootDoc.apiSpec"), "API / implementation report");
++});
++
++test("打开文案：openRootDoc + 原样文件名（zh/en 均保留文件名）", () => {
++  assert.equal(rootDocOpenText("feature-map.md"), "只读打开 feature-map.md");
++  assert.equal(rootDocOpenText("api-spec.md", "en-US"), "Open api-spec.md read-only");
++  // 文件名是内容标识，不随语言变化。
++  assert.equal(rootDocOpenText("api-spec.md").includes("api-spec.md"), true);
++  assert.equal(rootDocOpenText("api-spec.md", "en-US").includes("api-spec.md"), true);
++});
++
++test("relativePath 精确匹配：只认完全相等的 opaque ref", () => {
++  const refs = [
++    ref(P + "feature-map.md", "root-1"),
++    ref(P + "docs/one.md", "doc-1"),
++    ref(P + "feature-map.md.bak.md", "root-x"),
++  ];
++  const matched = matchDocumentRefByPath(refs, P + "feature-map.md");
++  assert.equal(matched?.documentId, "root-1");
++  assert.equal(matchDocumentRefByPath(refs, P + "feature-map.md "), null);
++  assert.equal(matchDocumentRefByPath(refs, P + "feature-map"), null);
++  assert.equal(matchDocumentRefByPath(refs, ""), null);
++  assert.equal(matchDocumentRefByPath([], P + "feature-map.md"), null);
++});
++
++test("api-spec 的 not-applicable 不进入视图模型：条目仍按普通根文档展示", () => {
++  const view = profileDocsView({
++    roleId: "A",
++    rootDocs: [{ name: "api-spec.md", path: P + "api-spec.md", kind: "file" }],
++    docs: [],
++  });
++  assert.deepEqual(view.rootDocs, [{ name: "api-spec.md", path: P + "api-spec.md" }]);
++  assert.equal(view.count, 1);
++  assert.equal("notApplicable" in view.rootDocs[0], false);
++  assert.equal("badge" in view.rootDocs[0], false);
++});
++
++test("source-guard：纯展示模块不 import Node/fs/electron/网络，不触碰 window", () => {
++  const file = fileURLToPath(
++    new URL("../../app/renderer/src/chat/profile-docs.ts", import.meta.url),
++  );
++  const source = readFileSync(file, "utf8")
++    .replace(/\/\*[\s\S]*?\*\//g, "")
++    .replace(/(^|[^:])\/\/.*$/gm, "$1");
++  assert.equal(/from\s+["'](node:|electron["']|fs["']|path["']|child_process["']|https?["'])/.test(source), false);
++  assert.equal(/\brequire\s*\(/.test(source), false);
++  assert.equal(/\bwindow\./.test(source), false);
++  assert.equal(/\b(fetch|XMLHttpRequest|WebSocket)\s*\(/.test(source), false);
++  assert.equal(/dangerouslySetInnerHTML|document\./.test(source), false);
++});

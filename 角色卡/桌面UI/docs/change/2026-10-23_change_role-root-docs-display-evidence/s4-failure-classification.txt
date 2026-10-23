@@ -1,0 +1,44 @@
+# S4 Phase 4A 冒烟失败分类（当前候选 vs HEAD 基线）
+
+## 运行
+
+| 项 | 当前候选（S4） | HEAD 基线（6407d63，git archive 干净源码重建） |
+| --- | --- | --- |
+| 命令 | `./node_modules/.bin/electron test/桌面UI/phase4a-electron-smoke.mjs app/renderer/dist/index.html "C:/tmp/ans-phase4a-smoke9"` | `cd C:/tmp/ans-baseline && ./node_modules/.bin/electron test/桌面UI/phase4a-electron-smoke.mjs app/renderer/dist/index.html "C:/tmp/ans-baseline-smoke"` |
+| 原始日志 | `s4-phase4a-smoke-current.log`、`s4-phase4a-report-current.json` | `s4-phase4a-smoke-baseline-head.log` |
+| 检查数 | 108（基线 99 + S4 新增 9） | 99 |
+| 失败数 | 11 | 11 |
+| 退出码 | 1（既有失败） | 1（既有失败） |
+
+## S4 新增/扩展检查（当前候选全部 pass）
+
+- `PROFILE_DOCS_GROUPS_ROOT_AND_SUBDIR`（两组顺序 root→subdir、count=103=3+100、memo/role-card 不出现）
+- `PROFILE_ROOT_DOC_BUTTON_TITLE_ARIA`（`只读打开 feature-map.md` 同时用于 title/aria-label）
+- `ROOT_DOC_WINDOWS_UNAVAILABLE_STRUCTURED_ERROR`（索引列名；无 scope/refs → 列表态 + 既有 `UNSUPPORTED_ENVIRONMENT` 文案，无正文）
+- `ROOT_DOC_BACK_ROLE_FOCUSES_ROOT_BUTTON`（返回角色资料焦点回 `data-root-doc-path` 按钮）
+- `ROOT_DOC_OPENS_DOCUMENT_VIEW_READONLY`（刷新后按 relativePath 精确匹配 ref → 阅读态 + 只读字节状态）
+- `ROOT_DOC_LIST_APPENDS_REFS_WITHOUT_PREFIX_CHANGE`（5 = 既有 docs 2 + 新增根文档 3，既有 id 前缀不变）
+- `ROOT_DOC_API_SPEC_NOT_APPLICABLE_PLAIN_TEXT`（`not-applicable` 原样文本，无 badge/错误）
+- `PROFILE_EMPTY_DOCS_HONEST_STATE`（B 角色/旧 main 缺 rootDocs：`（暂无角色文档）`、count `无`）
+- `ZOOM_200_ROOT_DOC_BUTTON_REACHABLE`（200%：按钮在视口内、elementFromPoint 命中、title/aria 齐备）
+- 既有 `DOCUMENT_BACK_ROLE_RESTORES_ENTRY_FOCUS`：当前候选 pass（S4 为 `backToRole` 增加 queueMicrotask 兜底；HEAD 基线同一检查 fail，见下）。
+
+## 当前候选 11 个失败（均与 HEAD 基线同类、非 S4 回归）
+
+| # | 检查 | 分类 | 证据/原因 |
+| --- | --- | --- | --- |
+| 1 | `PI_SETTINGS_METADATA_DRIVEN_FIELDS` | 既有（基线同样 fail） | 基线日志同项 fail；详情显示 reasoning 选项为原始值 `off/low/...`（当前工作树 i18n/settings 候选上下文），不属 S4 文件 |
+| 2 | `SETTINGS_TABS_ARROW_LEFT_WRAPS_TO_LAST` | 既有（基线同项 fail） | 键盘焦点来自 rAF 打开焦点；见 #7 根因 |
+| 3 | `PI_SLIDER_ACCESSIBLE_VALUE_AND_KEYBOARD` | 既有（基线同项 fail） | 同上（焦点不在滑块上，键盘事件不达） |
+| 4 | `SLIDER_KEYBOARD_UPDATES_HIDDEN_CANONICAL_VALUE` | 既有（基线同项 fail） | 同上 |
+| 5 | `SLIDER_HOME_SETS_DEFAULT_TIER` | 既有（基线同项 fail） | 同上 |
+| 6 | `CODEX_FIELDS_SECRET_FALLBACK_AND_HELP` | 既有（基线同项 fail） | 设置面板字段/文案与当前夹具上下文差异，不属 S4 文件 |
+| 7 | `QUEUE_SUBVIEW_BACK_RETURNS_WORK_AND_FOCUS` / `QUEUE_SUBVIEW_FROM_PROFILE_ESC_RESTORES_ROLE_FOCUS` / `RUNTIME_960_PROFILE_FOCUS_AND_INERT` / `RUNTIME_960_SETTINGS_FOCUS_AND_INERT` | 既有（基线同类 fail；逐次运行集合有 ±1 浮动） | 这些焦点路径只在 `requestAnimationFrame` 中执行；诊断运行（`s4-phase4a-smoke-diagnostic-raf.log`）在隐藏窗口内 220ms 仅 1 个 rAF tick（`rafTicks:1`），rAF 被节流 → 焦点不落。S4 的 `backToRole` 增加 queueMicrotask 兜底后，两条“返回角色资料”焦点检查均 pass |
+
+- 另：`WIDTH_960_SETTINGS_NO_OVERFLOW` 在 run7/run8 失败、run9 pass（基线 pass）——设置面板布局检查的时序浮动，与 S4 无关；run9 已附详情，若 S6 复现再按设置组件归属处理。
+- `ROOT_DOC_*`/`PROFILE_*`/`ZOOM_200_ROOT_DOC_*` 均未出现在任何运行的失败列表中。
+
+## 结论（S4 自测口径）
+
+- S4 新增 9 项检查全部 pass；既有文档焦点回归 pass。
+- 其余 11 项失败在 HEAD 干净基线上同样存在（同一套件/同一隐藏窗口/同一夹具上下文），不是 S4 引入；最终平台/设置/队列焦点证据由 S6 按团队计划复跑并分类。

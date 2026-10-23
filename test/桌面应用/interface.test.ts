@@ -170,6 +170,7 @@ test("内置角色 su：RoleView 标为 builtIn，且不去读文档索引（car
   assert.equal(res.roles[0].builtIn, true);
   assert.equal(res.roles[0].changelog, null, "内置角色无 changelog");
   assert.deepEqual(res.roles[0].docs, [], "不得把项目根当角色目录去 walk");
+  assert.deepEqual(res.roles[0].rootDocs, [], "内置角色 rootDocs 诚实为空，不读项目根");
 });
 
 test("openSession 点角色即开：scope undefined、导入即授权；多轮 send 透传、stop 收口", async () => {
@@ -915,6 +916,48 @@ async function assertWindowsInterfaceClosed(iface:ReturnType<typeof createDeskto
  const refreshed=await iface.listProject({projectRoot:root});assert.equal(refreshed.documentReadUnavailable,'UNSUPPORTED_ENVIRONMENT');assert.equal(refreshed.documentScope,undefined);assert.ok(refreshed.roles.every(role=>(role.documents??[]).length===0));
  assert.deepEqual(await fs.readFile(file),before);assert.equal((await fs.stat(file)).mtimeMs,stat.mtimeMs);
 }
+
+test('B Interface listProject exposes rootDocs metadata, appends root-document refs, and never surfaces memo', async (t) => {
+ const fs=await import('node:fs/promises');const os=await import('node:os');
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'ans-doc-roots-'));
+ await fs.mkdir(path.join(root,'角色卡/A/docs'),{recursive:true});
+ await fs.writeFile(path.join(root,'角色卡/A/role-card.md'),'# card');
+ for(const [name,body] of [['feature-map.md','fm body'],['functional-description.md','fd body'],['api-spec.md','not-applicable']] as const) await fs.writeFile(path.join(root,'角色卡/A',name),body);
+ await fs.writeFile(path.join(root,'角色卡/A/memo.md'),'memo-private-marker');
+ await fs.writeFile(path.join(root,'角色卡/A/docs/report.md'),'report body');
+ const listing={...FAKE_LISTING,projectRoot:root};
+ const iface=createDesktopInterface({pickDirectory:async()=>root,emitEvent:()=>{},listProjectFn:async()=>listing,envFilePath:path.join(root,'absent-fake-env')});
+ try{
+  await iface.pickProject();
+  const view=await iface.listProject({projectRoot:root});
+  const role=view.roles[0];
+  assert.deepEqual(role.rootDocs,[
+   {name:'feature-map.md',path:'角色卡/A/feature-map.md',kind:'file'},
+   {name:'functional-description.md',path:'角色卡/A/functional-description.md',kind:'file'},
+   {name:'api-spec.md',path:'角色卡/A/api-spec.md',kind:'file'},
+  ],'RoleView.rootDocs 按白名单顺序装配项目相对路径');
+  assert.equal(JSON.stringify(view).includes('memo'),false,'memo 永不进入 listProject 载荷');
+  assert.equal(JSON.stringify(view).includes('memo-private-marker'),false,'rootDocs 只含元数据，不读正文');
+  if(process.platform==='win32'){
+   assert.equal(view.documentReadUnavailable,'UNSUPPORTED_ENVIRONMENT');
+   assert.deepEqual(role.documents,[],'Windows 不铸造根文档 refs，但 rootDocs 元数据仍可列出');
+   t.diagnostic('Windows: rootDocs metadata listed with no refs/content; POSIX read asserted on supported platforms.');
+  }else{
+   assert.ok(view.documentScope);
+   const refs=role.documents??[];
+   assert.deepEqual(refs.slice(0,2).map(r=>r.relativePath),['角色卡/A/role-card.md','角色卡/A/docs/report.md'],'既有 refs 顺序前缀不变');
+   assert.deepEqual(refs.slice(-3).map(r=>r.relativePath),['角色卡/A/feature-map.md','角色卡/A/functional-description.md','角色卡/A/api-spec.md'],'根文档 refs 追加在既有条目之后');
+   const apiRef=refs.find(r=>r.relativePath==='角色卡/A/api-spec.md')!;
+   const read=await iface.readProjectDocument({version:1,projectViewId:apiRef.projectViewId,documentId:apiRef.documentId});
+   assert.ok(read.ok);if(read.ok)assert.equal(read.text,'not-applicable','not-applicable 按普通文本读取');
+  }
+  // 无新 IPC/preload 通道：源码级断言 + Interface 面断言。
+  const preload=readFileSync(path.join(REPO_ROOT,'app','preload.cjs'),'utf8');
+  assert.equal(/rootDoc|root-doc|root_doc/i.test(preload),false,'不得新增根文档 IPC/preload 通道');
+  assert.equal('readRootDocument' in iface,false,'不得新增根文档读取方法');
+ }finally{iface.disposeProjectDocuments();await fs.rm(root,{recursive:true,force:true});}
+});
+
 
 // ———————————————— I2（existing-project-compat V1）：治理记录预览/建立的 Interface 接线 ————————————————
 

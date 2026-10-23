@@ -1,0 +1,21 @@
+# git status --short -- app/renderer test/桌面UI
+ M app/renderer/src/chat/types.ts
+ M app/renderer/src/shell/ProfilePanel.tsx
+ M app/renderer/src/shell/phase4a.css
+ M app/renderer/src/stores/drawer-store.ts
+ M "test/\346\241\214\351\235\242UI/phase4a-electron-smoke.mjs"
+?? app/renderer/src/chat/profile-docs.ts
+?? "test/\346\241\214\351\235\242UI/profile-docs.test.ts"
+
+# git diff --stat（tracked）
+ app/renderer/src/chat/types.ts                     |  15 ++
+ app/renderer/src/shell/ProfilePanel.tsx            |  77 ++++++---
+ app/renderer/src/shell/phase4a.css                 |  52 ++++++
+ app/renderer/src/stores/drawer-store.ts            |  39 ++++-
+ .../phase4a-electron-smoke.mjs"                    | 176 ++++++++++++++++++++-
+ 5 files changed, 329 insertions(+), 30 deletions(-)
+
+# new files
+  165 app/renderer/src/chat/profile-docs.ts
+  227 test/桌面UI/profile-docs.test.ts
+  392 total

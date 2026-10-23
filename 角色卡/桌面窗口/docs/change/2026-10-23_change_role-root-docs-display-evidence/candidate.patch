@@ -1,0 +1,735 @@
+diff --git a/app/desktop/interface.ts b/app/desktop/interface.ts
+index a49a84c..b28ba1a 100644
+--- a/app/desktop/interface.ts
++++ b/app/desktop/interface.ts
+@@ -86,6 +86,7 @@ import {
+   projectDocumentCandidates,
+   type DocsIndexEntry,
+   type GovernanceRecordStatus,
++  type RoleRootDocEntry,
+ } from "./project.ts";
+ // 治理记录状态类型（PM 评审 §四.1 契约）：定义在 `project.ts`（派生函数同址，避免两处漂移），
+ // 此处原样再导出供 Interface 消费方（preload/渲染侧类型）引用。
+@@ -243,6 +244,8 @@ export interface RoleView {
+   governanceFunction?: GovernanceFunction;
+   changelog: { path: string; text: string } | null;
+   docs: DocsIndexEntry[];
++  /** 角色根目录白名单文档（项目相对路径，仅元数据；不读正文）。内置角色为 `[]`。 */
++  rootDocs?: RoleRootDocEntry[];
+   documents?: ProjectDocumentRef[];
+ }
+ 
+@@ -4772,14 +4775,21 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
+       for (const r of listing.roles) {
+         let changelog: { path: string; text: string } | null = null;
+         let docs: DocsIndexEntry[] = [];
++        let rootDocs: RoleRootDocEntry[] = [];
+         // 内置角色没有角色目录：cardPath 为空串，读索引会误把项目根当角色目录递归。
+         if (!r.builtIn && r.cardPath !== "") {
+           try {
+             const idx = await readRoleDocsIndex(listing.projectRoot, r.cardPath);
+             changelog = idx.changelog;
+             docs = idx.docs;
++            rootDocs = idx.rootDocs;
+           } catch {
+-            // 文档索引失败不致命：如实留空。
++            // 文档索引失败不致命：如实留空；只记元数据诊断（不记路径/正文）。
++            createDiagnosticLogger({
++              component: "desktop.interface",
++              projectRoot: listing.projectRoot,
++              roleId: r.roleId,
++            }).record("role-docs.index.failed", { reasonCode: "exception" });
+           }
+         }
+         let roleView: RoleView = {
+@@ -4791,6 +4801,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
+           builtIn: r.builtIn === true,
+           changelog,
+           docs,
++          rootDocs,
+         };
+         if (r.group !== undefined) roleView = { ...roleView, group: r.group };
+         if (r.groupDuty !== undefined) roleView = { ...roleView, groupDuty: r.groupDuty };
+@@ -4801,6 +4812,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
+       if (generation === importSequence) importedProjectRoot = listing.projectRoot;
+       const documentListing = documentReader.updateListing(documentSequence, listing.projectRoot, roles.map(projectDocumentCandidates));
+       for (const role of roles) role.documents = documentListing.documents[role.roleId] ?? [];
++      // 根文档只作元数据装配；摘要诊断帮助定位索引/白名单问题（不记路径/正文）。
++      createDiagnosticLogger({ component: "desktop.interface", projectRoot: listing.projectRoot }).record(
++        "project.listing.root-docs",
++        { count: roles.reduce((n, role) => n + (role.rootDocs?.length ?? 0), 0), ok: true },
++      );
+       // 2026-10-19 客户反馈：导入项目 / 应用启动后做一次**补齐检查**——流程已齐备但尚未派 Proof 时自动补派。
+       // 走同一道门 + 账本持久化去重；事件驱动（40ms 合并窗口），不是轮询。
+       if (generation === importSequence && (listing.governanceModel ?? "single") === "trio") {
+diff --git a/app/desktop/project.ts b/app/desktop/project.ts
+index e5d24d2..47b41f6 100644
+--- a/app/desktop/project.ts
++++ b/app/desktop/project.ts
+@@ -8,11 +8,12 @@
+ // 边界纪律：本文件**不**做任何"路径能不能写"的判断——那永远是门禁引擎 resolveWrite 的事。
+ 
+ import path from "node:path";
+-import { readdir, readFile, stat } from "node:fs/promises";
++import { lstat, readdir, readFile, stat } from "node:fs/promises";
+ 
+ import type { Acceptance, PinEntry, PinEvidenceFile, PinEvidenceResult } from "../../src/model/boundary.ts";
+ import type { ProjectConfig, RoleLocation } from "../../src/model/role.ts";
+ import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
++import { ROLE_ROOT_DOC_FILENAMES, type RoleRootDocName } from "../../src/model/project-document.ts";
+ // 只读 pin 证据检查：**唯一实现**在门禁引擎私有 `src/common/门禁引擎/pin-evidence.ts`，跨角色只可经
+ // Service 公开出口 `src/service/boundary/resolve-boundary.ts` 消费（PM 评审 §5.1/§7）。
+ import { inspectPinnedBoundaries } from "../../src/service/boundary/resolve-boundary.ts";
+@@ -20,10 +21,14 @@ import { inspectPinnedBoundaries } from "../../src/service/boundary/resolve-boun
+ import type { LoadConfigOptions, LoadedConfig } from "../../src/common/shared/config-loader.ts";
+ // 跨角色共享运行时原语（**单一来源**，pm 属主 `src/common/shared/`）：仅取 `resolveSkillRoot`。
+ import { resolveSkillRoot } from "../../src/common/shared/runtime-shared.ts";
+-// 跨角色共享路径原语（**单一来源**，pm 属主 `src/common/shared/`）：仅取 `toPosix`。
+-import { toPosix } from "../../src/common/shared/path-primitives.ts";
++// 跨角色共享路径原语（**单一来源**，pm 属主 `src/common/shared/`）：仅取 `toPosix`/词法校验原语。
++import { isAbsoluteAny, normalizeLexical, toPosix } from "../../src/common/shared/path-primitives.ts";
++// 共享诊断 logger（**单一来源**，pm 属主 `src/common/shared/`）：未配置时为空操作；只记元数据。
++import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
+ import { mainT } from "./i18n.ts";
+ 
++const docsDiagnostic = createDiagnosticLogger({ component: "desktop.project" });
++
+ /**
+  * 技能根解析：优先 ANS_SKILL_ROOT，否则默认技能目录 `~/.claude/skills/ans-governed-construction`。
+  *
+@@ -335,11 +340,22 @@ export interface DocsIndexEntry {
+   kind: "file" | "directory";
+ }
+ 
++/** 角色根目录下的白名单文档条目（仅元数据；正文只经受限文档 Service/Provider 读取）。 */
++export interface RoleRootDocEntry {
++  /** 规范文件名，来自 Model 唯一白名单 `ROLE_ROOT_DOC_FILENAMES`。 */
++  name: RoleRootDocName;
++  /** 项目相对路径（如 `角色卡/编排/feature-map.md`），用于与 opaque ref.relativePath 精确匹配。 */
++  path: string;
++  kind: "file";
++}
++
+ export interface RoleDocsIndex {
+   /** 变更记录：changelog.md 是否存在及正文（不存在为 null）。 */
+   changelog: { path: string; text: string } | null;
+   /** docs/ 目录索引（相对角色目录的路径 + 类型）。 */
+   docs: DocsIndexEntry[];
++  /** 角色根文档：固定白名单顺序，仅实际存在的直接普通文件；永不包含 memo.md。 */
++  rootDocs: RoleRootDocEntry[];
+ }
+ 
+ const MAX_DOC_ENTRIES = 500;
+@@ -368,17 +384,74 @@ async function walkDir(absDir: string, relPrefix: string, out: DocsIndexEntry[])
+ }
+ 
+ /**
+- * 读取某角色的变更记录与 docs/ 目录索引。
++ * 读取某角色的变更记录、docs/ 目录索引与角色根文档元数据。
+  * 输入 cardPathRel 为角色卡项目相对路径（如 角色卡/编排/role-card.md）；角色目录取其父目录。
++ *
++ * 根文档只按 Model 白名单逐个 `lstat` 三个精确文件名，不扫描角色根目录、不读取正文、不触碰 memo.md；
++ * 角色目录非法/非目录/符号链接时返回空索引。`docs/` 与 `changelog` 的既有读取逻辑保持不变。
+  */
+ export async function readRoleDocsIndex(
+   projectRoot: string,
+   cardPathRel: string,
+ ): Promise<RoleDocsIndex> {
++  const empty = (): RoleDocsIndex => ({ changelog: null, docs: [], rootDocs: [] });
+   const roleDirRel = posixDirname(cardPathRel);
+-  const roleDirAbs = path.join(projectRoot, ...roleDirRel.split("/").filter(Boolean));
++  // 与 Service/设计 §5.3.1 同口径的词法校验：空、绝对路径、反斜杠、盘符/冒号、空段、`.`/`..` 一律拒绝。
++  // 注意：`posixDirname` 会先经 `toPosix` 归一化反斜杠，故原始 cardPath 的反斜杠/NUL 必须单独拒绝。
++  const roleDirValid =
++    !!roleDirRel &&
++    !cardPathRel.includes("\\") &&
++    !cardPathRel.includes("\0") &&
++    !isAbsoluteAny(roleDirRel) &&
++    !roleDirRel.includes("\\") &&
++    !roleDirRel.includes(":") &&
++    !roleDirRel.includes("\0") &&
++    normalizeLexical(roleDirRel) === roleDirRel &&
++    roleDirRel.split("/").every((part) => !!part && part !== "." && part !== "..");
++  if (!roleDirValid) {
++    docsDiagnostic.record("role-docs.index.skipped", { reasonCode: "invalid-card-path" });
++    return empty();
++  }
++  const roleDirAbs = path.join(projectRoot, ...roleDirRel.split("/"));
++
++  // 角色目录本身：只接受非符号链接的目录；否则不越界、不读取、不伪造。
++  try {
++    const s = await lstat(roleDirAbs);
++    if (!s.isDirectory() || s.isSymbolicLink()) {
++      docsDiagnostic.record("role-docs.index.skipped", {
++        reasonCode: s.isSymbolicLink() ? "role-dir-symlink" : "role-dir-not-directory",
++      });
++      return empty();
++    }
++  } catch (error) {
++    const code = (error as NodeJS.ErrnoException).code;
++    docsDiagnostic.record("role-docs.index.skipped", { reasonCode: code === "ENOENT" ? "role-dir-missing" : "role-dir-inspect-failed" });
++    return empty();
++  }
++
++  // 角色根文档：只 lstat 白名单三个精确文件名，不 readdir 根目录、不读正文、不 lstat memo.md。
++  // 三个检查与既有 changelog/docs 读取并行启动（顺序由 Promise.all 保持），避免给 listProject 增加串行延迟。
++  const rootChecks = ROLE_ROOT_DOC_FILENAMES.map(async (name): Promise<RoleRootDocEntry | null> => {
++    try {
++      const s = await lstat(path.join(roleDirAbs, name));
++      if (s.isFile() && !s.isSymbolicLink()) {
++        return { name, path: `${roleDirRel}/${name}`, kind: "file" };
++      }
++      docsDiagnostic.record("role-docs.root.skipped", {
++        reasonCode: s.isSymbolicLink() ? "symlink" : "not-regular-file",
++        path: name,
++      });
++      return null;
++    } catch (error) {
++      const code = (error as NodeJS.ErrnoException).code;
++      if (code !== "ENOENT") {
++        docsDiagnostic.record("role-docs.root.inspect-failed", { reasonCode: "inspect-failed", path: name });
++      }
++      return null;
++    }
++  });
+ 
+-  // changelog.md
++  // changelog.md（既有逻辑保持：存在则读正文）
+   let changelog: RoleDocsIndex["changelog"] = null;
+   const changelogRel = `${roleDirRel}/changelog.md`;
+   try {
+@@ -391,7 +464,7 @@ export async function readRoleDocsIndex(
+     changelog = null;
+   }
+ 
+-  // docs/ 目录索引
++  // docs/ 目录索引（既有遍历/排序/上限/隐藏文件跳过不变）
+   const docs: DocsIndexEntry[] = [];
+   const docsAbs = path.join(roleDirAbs, "docs");
+   try {
+@@ -401,7 +474,9 @@ export async function readRoleDocsIndex(
+     // 无 docs 目录：返回空索引。
+   }
+ 
+-  return { changelog, docs };
++  const rootDocs = (await Promise.all(rootChecks)).filter((d): d is RoleRootDocEntry => d !== null);
++  docsDiagnostic.record("role-docs.index", { count: rootDocs.length, ok: true });
++  return { changelog, docs, rootDocs };
+ }
+ 
+ 
+@@ -409,7 +484,9 @@ export async function readRoleDocsIndex(
+ export function projectDocumentCandidates(role: {
+   roleId: string; builtIn: boolean; cardPath: string;
+   changelog: { path: string; text: string } | null; docs: DocsIndexEntry[];
++  rootDocs?: readonly RoleRootDocEntry[];
+ }): import("../../src/model/project-document.ts").ProjectDocumentRoleCandidates {
+   return { roleId: role.roleId, builtIn: role.builtIn, cardPath: role.cardPath,
+-    ...(role.changelog ? { changelogPath: role.changelog.path } : {}), docs: role.docs };
++    ...(role.changelog ? { changelogPath: role.changelog.path } : {}), docs: role.docs,
++    ...(role.rootDocs ? { rootDocs: role.rootDocs.map((d) => ({ path: d.path, kind: d.kind })) } : {}) };
+ }
+diff --git a/src/model/project-document.ts b/src/model/project-document.ts
+index 9805048..e501ff3 100644
+--- a/src/model/project-document.ts
++++ b/src/model/project-document.ts
+@@ -1,5 +1,8 @@
+ /** Restricted document contract B/2. No IO or authority derived from display paths. */
+ export const PROJECT_DOCUMENT_MAX_BYTES = 262144;
++/** Role root documents exposed read-only; the array order is the fixed display order. */
++export const ROLE_ROOT_DOC_FILENAMES = ['feature-map.md', 'functional-description.md', 'api-spec.md'] as const;
++export type RoleRootDocName = (typeof ROLE_ROOT_DOC_FILENAMES)[number];
+ export type DocumentFormat = 'markdown' | 'text';
+ export type DocumentReadErrorCode = 'INVALID_REQUEST' | 'PROJECT_NOT_GRANTED' | 'PROJECT_NOT_ACTIVE' | 'STALE_SCOPE' | 'UNKNOWN_DOCUMENT' | 'NOT_LISTED' | 'OUTSIDE_PROJECT' | 'SYMLINK_NOT_ALLOWED' | 'NOT_FOUND' | 'NOT_FILE' | 'UNSUPPORTED_FORMAT' | 'INVALID_UTF8' | 'BINARY_CONTENT' | 'TOO_LARGE' | 'PERMISSION_DENIED' | 'CHANGED_DURING_READ' | 'UNSUPPORTED_ENVIRONMENT' | 'IO_ERROR';
+ export interface ProjectDocumentScope { version: 1; projectViewId: string; projectRoot: string }
+@@ -11,5 +14,7 @@ export type ReadProjectDocumentResult =
+ /** Trusted Interface listing, never accepted from document-read IPC. */
+ export interface ProjectDocumentRoleCandidates {
+  /** cardPath/changelogPath are project-relative; docs.path is relative to the role-card directory (docs/x.md). */
+- roleId: string; builtIn: boolean; cardPath: string; changelogPath?: string; docs: readonly { path: string; kind: 'file' | 'directory' }[] }
++ roleId: string; builtIn: boolean; cardPath: string; changelogPath?: string; docs: readonly { path: string; kind: 'file' | 'directory' }[];
++ /** Project-relative paths; only roleDir + "/" + ROLE_ROOT_DOC_FILENAMES entry is accepted. */
++ rootDocs?: readonly { path: string; kind: 'file' }[] }
+ export interface ProjectDocumentListing { documentScope?: ProjectDocumentScope; documents: Record<string, ProjectDocumentRef[]>; documentReadUnavailable?: DocumentReadErrorCode }
+diff --git a/src/service/project-document/impl/read-project-document.ts b/src/service/project-document/impl/read-project-document.ts
+index c3109f6..ef66fa6 100644
+--- a/src/service/project-document/impl/read-project-document.ts
++++ b/src/service/project-document/impl/read-project-document.ts
+@@ -1,7 +1,11 @@
+-import { PROJECT_DOCUMENT_MAX_BYTES, type DocumentReadErrorCode, type ProjectDocumentRef, type ProjectDocumentRoleCandidates, type ProjectDocumentScope, type ProjectDocumentListing, type ReadProjectDocumentResult } from '../../../model/project-document.ts';
++import { PROJECT_DOCUMENT_MAX_BYTES, ROLE_ROOT_DOC_FILENAMES, type DocumentReadErrorCode, type ProjectDocumentRef, type ProjectDocumentRoleCandidates, type ProjectDocumentScope, type ProjectDocumentListing, type ReadProjectDocumentResult } from '../../../model/project-document.ts';
+ import type { ProjectDocumentReader } from '../abstract/document-reader.ts';
+ import { DocumentFileError, type ProjectDocumentFileReader } from '../../../provider/project-document/public/file-reader.ts';
+ import { isAbsoluteAny, normalizeLexical } from '../../../common/shared/path-primitives.ts';
++// Shared diagnostics (single source): no-op unless configured; metadata-only fields (no content/paths).
++import { createDiagnosticLogger } from '../../../common/shared/diagnostics.ts';
++
++const diagnostic = createDiagnosticLogger({ component: 'project-document.service' });
+ 
+ const messages: Record<DocumentReadErrorCode,string> = {
+  INVALID_REQUEST:'文档读取请求无效。',PROJECT_NOT_GRANTED:'请先通过选择目录导入此项目。',PROJECT_NOT_ACTIVE:'当前没有可阅读的导入项目。',STALE_SCOPE:'项目已切换，请从当前资料重新打开。',UNKNOWN_DOCUMENT:'无法识别此文档引用。',NOT_LISTED:'此文档已不在当前资料清单中。',OUTSIDE_PROJECT:'文档路径不在允许的项目范围内。',SYMLINK_NOT_ALLOWED:'不支持通过符号链接阅读文档。',NOT_FOUND:'文档不存在。',NOT_FILE:'此项不是普通文档文件。',UNSUPPORTED_FORMAT:'只支持 UTF-8 Markdown 或纯文本文件。',INVALID_UTF8:'文档不是有效的 UTF-8 文本。',BINARY_CONTENT:'不支持读取二进制内容。',TOO_LARGE:'文档超过 256 KiB 阅读上限。',PERMISSION_DENIED:'没有权限读取此文档。',CHANGED_DURING_READ:'文档在读取过程中发生变化，请重新打开。',UNSUPPORTED_ENVIRONMENT:'当前平台或文件系统不支持此受限阅读方式。',IO_ERROR:'文档读取失败。',
+@@ -20,7 +24,7 @@ export function buildProjectDocumentReader(provider: ProjectDocumentFileReader):
+  let refs=new Map<string,ProjectDocumentRef>(), ids=new Map<string,string>();
+  const revoked=new Set<string>();
+  const reset=()=>{scope=undefined;refs.clear();ids.clear();revoked.clear();};
+- function failure(code:DocumentReadErrorCode, fields:{projectViewId?:string;documentId?:string}={}):ReadProjectDocumentResult { return {ok:false,version:1,...fields,code,message:messages[code]}; }
++ function failure(code:DocumentReadErrorCode, fields:{projectViewId?:string;documentId?:string}={}):ReadProjectDocumentResult { diagnostic.record('project-document.read.failed',{errorCode:code}); return {ok:false,version:1,...fields,code,message:messages[code]}; }
+  return {
+   async grantNativeSelection(root){
+    if(disposed)return;
+@@ -32,21 +36,30 @@ export function buildProjectDocumentReader(provider: ProjectDocumentFileReader):
+   beginListing(root){listingRoot=root;return ++sequence;},
+   updateListing(token,root,roles):ProjectDocumentListing {
+    const documents:Record<string,ProjectDocumentRef[]> = Object.create(null);
+-   if(disposed||token!==sequence||root!==listingRoot)return {documents,documentReadUnavailable:'STALE_SCOPE'};
++   const unavailable=(code:DocumentReadErrorCode):ProjectDocumentListing=>{diagnostic.record('project-document.listing.unavailable',{errorCode:code});return {documents,documentReadUnavailable:code};};
++   if(disposed||token!==sequence||root!==listingRoot)return unavailable('STALE_SCOPE');
+    // A successful listing is the commit point. Failed/cancelled imports never revoke the visible project.
+    const selected = matches(pendingGrant,root) ? pendingGrant : undefined;
+    const nextGrant = selected ?? (matches(grant,root) ? grant : undefined);
+    if(activeRoot!==root || nextGrant!==grant){reset();activeRoot=root;grant=nextGrant;}
+    if(selected)pendingGrant=undefined;
+-   if(!grant||(root!==grant.selectedRoot&&root!==grant.realRoot))return {documents,documentReadUnavailable:'PROJECT_NOT_GRANTED'};
+-   if(!grant.realRoot)return {documents,documentReadUnavailable:grant.error??'PROJECT_NOT_GRANTED'};
++   if(!grant||(root!==grant.selectedRoot&&root!==grant.realRoot))return unavailable('PROJECT_NOT_GRANTED');
++   if(!grant.realRoot)return unavailable(grant.error??'PROJECT_NOT_GRANTED');
+    if(!scope)scope={version:1,projectViewId:provider.newId(),projectRoot:root};
+    const next=new Map<string,ProjectDocumentRef>();
+    for(const role of roles){
+     documents[role.roleId]=[];if(role.builtIn||!eligible(role.cardPath))continue;
+     const dir=role.cardPath.slice(0,Math.max(0,role.cardPath.lastIndexOf('/')));
+     if(!dir)continue;
+-    const paths=[role.cardPath,...(role.changelogPath===dir+'/changelog.md'?[role.changelogPath]:[]),...role.docs.filter(d=>d.kind==='file'&&d.path.startsWith('docs/')).map(d=>dir+'/'+d.path)];
++    // Role-root candidates are trusted display metadata from the Interface listing, but this Service still
++    // accepts only the exact project-relative paths `roleDir + "/" + ROLE_ROOT_DOC_FILENAMES entry`.
++    // Anything else (memo.md, arbitrary root files, ../, absolute/backslash/colon/case variants,
++    // docs/feature-map.md, project-outside paths) is silently rejected without minting a ref.
++    const expectedRootPaths=new Set(ROLE_ROOT_DOC_FILENAMES.map(name=>dir+'/'+name));
++    const rootCandidates=role.rootDocs??[];
++    const rootPaths=rootCandidates.filter(d=>!!d&&d.kind==='file'&&expectedRootPaths.has(d.path)).map(d=>d.path);
++    if(rootCandidates.length>rootPaths.length)diagnostic.record('project-document.root.skipped',{count:rootCandidates.length-rootPaths.length});
++    const paths=[role.cardPath,...(role.changelogPath===dir+'/changelog.md'?[role.changelogPath]:[]),...role.docs.filter(d=>d.kind==='file'&&d.path.startsWith('docs/')).map(d=>dir+'/'+d.path),...rootPaths];
+     for(const rel of new Set(paths)){
+      const fmt=format(rel);if(!eligible(rel)||!fmt)continue;
+      const key=role.roleId+'\0'+rel;const documentId=ids.get(key)??provider.newId();ids.set(key,documentId);
+@@ -56,6 +69,7 @@ export function buildProjectDocumentReader(provider: ProjectDocumentFileReader):
+    }
+    for(const id of refs.keys())if(!next.has(id))revoked.add(id);
+    refs=next;
++   diagnostic.record('project-document.listing',{count:next.size,ok:true});
+    return {documentScope:{...scope},documents};
+   },
+   async read(request){
+@@ -74,6 +88,7 @@ export function buildProjectDocumentReader(provider: ProjectDocumentFileReader):
+     if(disposed||scope!==epoch||grant!==capturedGrant||!refs.has(ref.documentId))return failure('STALE_SCOPE',fields);
+     if(bytes.includes(0))return failure('BINARY_CONTENT',fields);
+     let text:string;try{text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{return failure('INVALID_UTF8',fields);}
++    diagnostic.record('project-document.read',{count:bytes.byteLength,ok:true});
+     return {ok:true,version:1,...fields,roleId:ref.roleId,relativePath:ref.relativePath,format:ref.format,text,byteLength:bytes.byteLength};
+    }catch(e){if(disposed||scope!==epoch||grant!==capturedGrant)return failure('STALE_SCOPE',fields);return failure(e instanceof DocumentFileError?e.code:'IO_ERROR',fields);}
+   },
+diff --git "a/test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts" "b/test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts"
+index 1e54536..5715173 100644
+--- "a/test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts"
++++ "b/test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts"
+@@ -170,6 +170,7 @@ test("内置角色 su：RoleView 标为 builtIn，且不去读文档索引（car
+   assert.equal(res.roles[0].builtIn, true);
+   assert.equal(res.roles[0].changelog, null, "内置角色无 changelog");
+   assert.deepEqual(res.roles[0].docs, [], "不得把项目根当角色目录去 walk");
++  assert.deepEqual(res.roles[0].rootDocs, [], "内置角色 rootDocs 诚实为空，不读项目根");
+ });
+ 
+ test("openSession 点角色即开：scope undefined、导入即授权；多轮 send 透传、stop 收口", async () => {
+@@ -916,6 +917,48 @@ async function assertWindowsInterfaceClosed(iface:ReturnType<typeof createDeskto
+  assert.deepEqual(await fs.readFile(file),before);assert.equal((await fs.stat(file)).mtimeMs,stat.mtimeMs);
+ }
+ 
++test('B Interface listProject exposes rootDocs metadata, appends root-document refs, and never surfaces memo', async (t) => {
++ const fs=await import('node:fs/promises');const os=await import('node:os');
++ const root=await fs.mkdtemp(path.join(os.tmpdir(),'ans-doc-roots-'));
++ await fs.mkdir(path.join(root,'角色卡/A/docs'),{recursive:true});
++ await fs.writeFile(path.join(root,'角色卡/A/role-card.md'),'# card');
++ for(const [name,body] of [['feature-map.md','fm body'],['functional-description.md','fd body'],['api-spec.md','not-applicable']] as const) await fs.writeFile(path.join(root,'角色卡/A',name),body);
++ await fs.writeFile(path.join(root,'角色卡/A/memo.md'),'memo-private-marker');
++ await fs.writeFile(path.join(root,'角色卡/A/docs/report.md'),'report body');
++ const listing={...FAKE_LISTING,projectRoot:root};
++ const iface=createDesktopInterface({pickDirectory:async()=>root,emitEvent:()=>{},listProjectFn:async()=>listing,envFilePath:path.join(root,'absent-fake-env')});
++ try{
++  await iface.pickProject();
++  const view=await iface.listProject({projectRoot:root});
++  const role=view.roles[0];
++  assert.deepEqual(role.rootDocs,[
++   {name:'feature-map.md',path:'角色卡/A/feature-map.md',kind:'file'},
++   {name:'functional-description.md',path:'角色卡/A/functional-description.md',kind:'file'},
++   {name:'api-spec.md',path:'角色卡/A/api-spec.md',kind:'file'},
++  ],'RoleView.rootDocs 按白名单顺序装配项目相对路径');
++  assert.equal(JSON.stringify(view).includes('memo'),false,'memo 永不进入 listProject 载荷');
++  assert.equal(JSON.stringify(view).includes('memo-private-marker'),false,'rootDocs 只含元数据，不读正文');
++  if(process.platform==='win32'){
++   assert.equal(view.documentReadUnavailable,'UNSUPPORTED_ENVIRONMENT');
++   assert.deepEqual(role.documents,[],'Windows 不铸造根文档 refs，但 rootDocs 元数据仍可列出');
++   t.diagnostic('Windows: rootDocs metadata listed with no refs/content; POSIX read asserted on supported platforms.');
++  }else{
++   assert.ok(view.documentScope);
++   const refs=role.documents??[];
++   assert.deepEqual(refs.slice(0,2).map(r=>r.relativePath),['角色卡/A/role-card.md','角色卡/A/docs/report.md'],'既有 refs 顺序前缀不变');
++   assert.deepEqual(refs.slice(-3).map(r=>r.relativePath),['角色卡/A/feature-map.md','角色卡/A/functional-description.md','角色卡/A/api-spec.md'],'根文档 refs 追加在既有条目之后');
++   const apiRef=refs.find(r=>r.relativePath==='角色卡/A/api-spec.md')!;
++   const read=await iface.readProjectDocument({version:1,projectViewId:apiRef.projectViewId,documentId:apiRef.documentId});
++   assert.ok(read.ok);if(read.ok)assert.equal(read.text,'not-applicable','not-applicable 按普通文本读取');
++  }
++  // 无新 IPC/preload 通道：源码级断言 + Interface 面断言。
++  const preload=readFileSync(path.join(REPO_ROOT,'app','preload.cjs'),'utf8');
++  assert.equal(/rootDoc|root-doc|root_doc/i.test(preload),false,'不得新增根文档 IPC/preload 通道');
++  assert.equal('readRootDocument' in iface,false,'不得新增根文档读取方法');
++ }finally{iface.disposeProjectDocuments();await fs.rm(root,{recursive:true,force:true});}
++});
++
++
+ // ———————————————— I2（existing-project-compat V1）：治理记录预览/建立的 Interface 接线 ————————————————
+ 
+ const EMPTY_PREVIEW: GovernancePreview = {
+diff --git "a/test/\346\241\214\351\235\242\345\272\224\347\224\250/project-document.test.ts" "b/test/\346\241\214\351\235\242\345\272\224\347\224\250/project-document.test.ts"
+index 60857a9..3699d75 100644
+--- "a/test/\346\241\214\351\235\242\345\272\224\347\224\250/project-document.test.ts"
++++ "b/test/\346\241\214\351\235\242\345\272\224\347\224\250/project-document.test.ts"
+@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
+ import fs from 'node:fs/promises';
+ import os from 'node:os';
+ import path from 'node:path';
+-import { PROJECT_DOCUMENT_MAX_BYTES } from '../../src/model/project-document.ts';
++import { PROJECT_DOCUMENT_MAX_BYTES, type ProjectDocumentRoleCandidates } from '../../src/model/project-document.ts';
+ import { createProjectDocumentFileReader, DocumentFileError } from '../../src/provider/project-document/public/file-reader.ts';
+ async function fixture() { const root = await fs.mkdtemp(path.join(os.tmpdir(),'ans-doc-')); return {root,cleanup:()=>fs.rm(root,{recursive:true,force:true})}; }
+ test('B Model budget is raw bytes; Provider reads a checked local descriptor without changing bytes',async(t)=>{
+@@ -99,9 +99,145 @@ test('B a newer native selection invalidates an older listing without revoking t
+  }finally{service.dispose();}
+ });
+ 
++// —————— 角色根文档候选（role-root-docs-display S2）：精确白名单/refs 追加/拒绝/Windows fail-closed ——————
++
++const ROOT_DOC_CANDIDATES = [
++ {path:'roles/A/feature-map.md',kind:'file' as const},
++ {path:'roles/A/functional-description.md',kind:'file' as const},
++ {path:'roles/A/api-spec.md',kind:'file' as const},
++];
++
++async function prepareWithRootDocs(){
++ const f=await prepare();
++ await fs.writeFile(path.join(f.root,'roles/A/feature-map.md'),'feature map body');
++ await fs.writeFile(path.join(f.root,'roles/A/functional-description.md'),'functional description body');
++ await fs.writeFile(path.join(f.root,'roles/A/api-spec.md'),'not-applicable');
++ return f;
++}
++
++test('B Service mints opaque refs only for exact role-root candidates and appends them after existing refs',async(t)=>{
++ const f=await prepareWithRootDocs();
++ try{
++  const candidates=[{...roles[0],rootDocs:ROOT_DOC_CANDIDATES}];
++  if(process.platform==='win32'){await assertWindowsFailClosed(f.root,process.platform,candidates);t.diagnostic('Windows B2 fail-closed asserted for role-root candidates; POSIX read assertions remain active on supported platforms.');return;}
++  const service=createProjectDocumentService();
++  try{
++   await service.grantNativeSelection(f.root);
++   const before=service.updateListing(service.beginListing(f.root),f.root,[roles[0]]);
++   const beforeRefs=before.documents.A.map(d=>({relativePath:d.relativePath,documentId:d.documentId}));
++   const view=service.updateListing(service.beginListing(f.root),f.root,candidates);
++   const refs=view.documents.A;
++   assert.deepEqual(refs.slice(0,beforeRefs.length).map(d=>d.relativePath),beforeRefs.map(r=>r.relativePath),'既有 card/changelog/docs refs 顺序前缀不变');
++   for(let i=0;i<beforeRefs.length;i++)assert.equal(refs[i].documentId,beforeRefs[i].documentId,'既有 documentId 在刷新后保持稳定');
++   assert.deepEqual(refs.slice(beforeRefs.length).map(d=>d.relativePath),ROOT_DOC_CANDIDATES.map(d=>d.path),'根文档 refs 按候选顺序追加在既有条目之后');
++   const rootRef=refs.find(d=>d.relativePath==='roles/A/api-spec.md')!;
++   assert.equal(rootRef.label,'api-spec.md');assert.equal(rootRef.format,'markdown');
++   const result=await service.read({version:1,projectViewId:rootRef.projectViewId,documentId:rootRef.documentId});
++   assert.ok(result.ok);if(result.ok){assert.equal(result.text,'not-applicable','api-spec 的 not-applicable 按普通文本读取，无特殊错误');assert.equal(result.byteLength,Buffer.byteLength('not-applicable'));}
++  }finally{service.dispose();}
++ }finally{await f.cleanup();}
++});
++
++test('B Service silently rejects non-whitelist role-root candidates, de-duplicates legal paths and rejects empty roleDir',async(t)=>{
++ const f=await prepare();
++ try{
++  const bad=[
++   {path:'roles/A/memo.md',kind:'file' as const},
++   {path:'roles/A/arbitrary.md',kind:'file' as const},
++   {path:'roles/A/feature-map.md',kind:'directory' as unknown as 'file'},
++   {path:'roles/A/../A/feature-map.md',kind:'file' as const},
++   {path:'roles/B/feature-map.md',kind:'file' as const},
++   {path:'roles/A/docs/feature-map.md',kind:'file' as const},
++   {path:'/roles/A/feature-map.md',kind:'file' as const},
++   {path:'roles/A/FEATURE-MAP.MD',kind:'file' as const},
++   {path:'roles\\A\\feature-map.md',kind:'file' as const},
++   {path:'roles/A/feature-map.md:x',kind:'file' as const},
++   {path:'roles//A/feature-map.md',kind:'file' as const},
++  ];
++  const candidates=[{...roles[0],docs:[],rootDocs:[...bad,{path:'roles/A/feature-map.md',kind:'file' as const},{path:'roles/A/feature-map.md',kind:'file' as const}]}];
++  if(process.platform==='win32'){await assertWindowsFailClosed(f.root,process.platform,candidates);t.diagnostic('Windows B2 fail-closed asserted for rejected role-root candidates; POSIX rejection assertions remain active on supported platforms.');return;}
++  const service=createProjectDocumentService();
++  try{
++   await service.grantNativeSelection(f.root);
++   const view=service.updateListing(service.beginListing(f.root),f.root,candidates);
++   assert.deepEqual(view.documents.A.map(d=>d.relativePath),['roles/A/role-card.md','roles/A/feature-map.md'],'只有精确白名单路径被铸造，重复候选去重为一条');
++  }finally{service.dispose();}
++  const noDir=createProjectDocumentService();
++  try{
++   await noDir.grantNativeSelection(f.root);
++   const view=noDir.updateListing(noDir.beginListing(f.root),f.root,[{...roles[0],roleId:'B',cardPath:'role-card.md',docs:[],rootDocs:[{path:'feature-map.md',kind:'file' as const}]}]);
++   assert.deepEqual(view.documents.B,[],'roleDir 为空时拒绝所有 rootDocs');
++  }finally{noDir.dispose();}
++ }finally{await f.cleanup();}
++});
++
++test('B Windows fail-closed: role-root candidates mint no refs and read no bytes on every host',async()=>{
++ const f=await fixture();
++ try{await assertWindowsFailClosed(f.root,'win32',[{...roles[0],rootDocs:ROOT_DOC_CANDIDATES}]);}finally{await f.cleanup();}
++});
++
++test('B Service role-root whitelist, de-duplication and ref ordering are platform-independent (injected reader)',async()=>{
++ let id=0;
++ const service=createProjectDocumentService({fileReader:{newId:()=>String(++id),resolveRoot:async root=>root,read:async()=>new Uint8Array(Buffer.from('not-applicable'))}});
++ try{
++  await service.grantNativeSelection('/proj');
++  const before=service.updateListing(service.beginListing('/proj'),'/proj',[roles[0]]);
++  const beforeIds=before.documents.A.map(d=>d.documentId);
++  const bad=[
++   {path:'roles/A/memo.md',kind:'file' as const},
++   {path:'roles/A/arbitrary.md',kind:'file' as const},
++   {path:'roles/A/../A/feature-map.md',kind:'file' as const},
++   {path:'roles/B/feature-map.md',kind:'file' as const},
++   {path:'roles/A/docs/feature-map.md',kind:'file' as const},
++   {path:'/roles/A/feature-map.md',kind:'file' as const},
++   {path:'roles/A/FEATURE-MAP.MD',kind:'file' as const},
++   {path:'roles\\A\\feature-map.md',kind:'file' as const},
++   {path:'roles/A/feature-map.md:x',kind:'file' as const},
++   {path:'roles//A/feature-map.md',kind:'file' as const},
++  ];
++  const view=service.updateListing(service.beginListing('/proj'),'/proj',[{...roles[0],rootDocs:[...bad,...ROOT_DOC_CANDIDATES,{path:'roles/A/feature-map.md',kind:'file' as const}]}]);
++  assert.deepEqual(view.documents.A.map(d=>d.relativePath),[
++   'roles/A/role-card.md','roles/A/changelog.md','roles/A/docs/report.md','roles/A/docs/plain.txt',
++   'roles/A/feature-map.md','roles/A/functional-description.md','roles/A/api-spec.md',
++  ],'非法候选被静默拒绝、重复去重、根文档追加在既有 card/changelog/docs refs 之后');
++  assert.deepEqual(view.documents.A.slice(0,beforeIds.length).map(d=>d.documentId),beforeIds,'既有 documentId 前缀保持稳定');
++  const apiRef=view.documents.A[view.documents.A.length-1];
++  assert.equal(apiRef.label,'api-spec.md');assert.equal(apiRef.format,'markdown');assert.equal(apiRef.relativePath.startsWith('roles/A/'),true);
++  const result=await service.read({version:1,projectViewId:apiRef.projectViewId,documentId:apiRef.documentId});
++  assert.ok(result.ok);if(result.ok)assert.equal(result.text,'not-applicable','not-applicable 按普通 UTF-8 文本读取');
++ }finally{service.dispose();}
++});
++
++test('B Service diagnostics record listing availability and rejected root candidates without content or paths',async()=>{
++ const {configureDiagnostics,flushDiagnostics,disposeDiagnostics}=await import('../../src/common/shared/diagnostics.ts');
++ const f=await fixture();const logsDir=await fs.mkdtemp(path.join(os.tmpdir(),'ans-doc-logs-'));
++ configureDiagnostics({directory:logsDir});
++ try{
++  let id=0;const ok=createProjectDocumentService({fileReader:{newId:()=>String(++id),resolveRoot:async root=>root,read:async()=>new Uint8Array([65])}});
++  try{
++   await ok.grantNativeSelection('/one');
++   ok.updateListing(ok.beginListing('/one'),'/one',[{...roles[0],rootDocs:[{path:'roles/A/memo.md',kind:'file' as const},{path:'roles/A/feature-map.md',kind:'file' as const}]}]);
++  }finally{ok.dispose();}
++  const unsupported=createProjectDocumentService({fileReader:{newId:()=>String(++id),resolveRoot:async()=>{throw new DocumentFileError('UNSUPPORTED_ENVIRONMENT');},read:async()=>{throw new Error('must not read');}}});
++  try{
++   await unsupported.grantNativeSelection('/one');
++   unsupported.updateListing(unsupported.beginListing('/one'),'/one',[{...roles[0],rootDocs:ROOT_DOC_CANDIDATES}]);
++  }finally{unsupported.dispose();}
++  await flushDiagnostics();
++  const files=await fs.readdir(logsDir);
++  const text=(await Promise.all(files.map(name=>fs.readFile(path.join(logsDir,name),'utf8')))).join('\n');
++  assert.match(text,/"event":"project-document\.listing\.unavailable"/);
++  assert.match(text,/"errorCode":"UNSUPPORTED_ENVIRONMENT"/);
++  assert.match(text,/"event":"project-document\.root\.skipped"/,'非法根文档候选应留数量诊断');
++  assert.equal(text.includes('roles/A'),false,'诊断不得写入候选/项目路径');
++  assert.equal(text.includes('not-applicable'),false,'诊断不得写入文档正文');
++ }finally{await disposeDiagnostics();await fs.rm(logsDir,{recursive:true,force:true});await f.cleanup();}
++});
++
++
+ 
+ /** B2 deliberately does not enable native document reads on Windows. These are assertions, not skips. */
+-async function assertWindowsFailClosed(root: string, platform = process.platform): Promise<void> {
++async function assertWindowsFailClosed(root: string, platform = process.platform, candidateRoles: readonly ProjectDocumentRoleCandidates[] = roles): Promise<void> {
+  const file=path.join(root,'roles/A/docs/report.md');await fs.mkdir(path.dirname(file),{recursive:true});await fs.writeFile(file,'private fixture must not be returned');
+  const before=await fs.readFile(file);const beforeStat=await fs.stat(file);let checkpoints=0,serviceReads=0;
+  const provider=createProjectDocumentFileReader({platform,checkpoint:()=>{checkpoints++;}});
+@@ -109,8 +245,8 @@ async function assertWindowsFailClosed(root: string, platform = process.platform
+  await assert.rejects(provider.read(root,'roles/A/docs/report.md',PROJECT_DOCUMENT_MAX_BYTES),(e:unknown)=>e instanceof DocumentFileError&&e.code==='UNSUPPORTED_ENVIRONMENT');
+  const service=createProjectDocumentService({fileReader:{...provider,async read(...args){serviceReads++;return provider.read(...args);}}});
+  try{
+-  const ungranted=service.updateListing(service.beginListing(root),root,roles);assert.equal(ungranted.documentReadUnavailable,'PROJECT_NOT_GRANTED');
+-  await service.grantNativeSelection(root);const view=service.updateListing(service.beginListing(root),root,roles);
++  const ungranted=service.updateListing(service.beginListing(root),root,candidateRoles);assert.equal(ungranted.documentReadUnavailable,'PROJECT_NOT_GRANTED');
++  await service.grantNativeSelection(root);const view=service.updateListing(service.beginListing(root),root,candidateRoles);
+   assert.equal(view.documentReadUnavailable,'UNSUPPORTED_ENVIRONMENT');assert.equal(view.documentScope,undefined);assert.ok(Object.values(view.documents).every(refs=>refs.length===0),'no refs are minted without platform support');
+   const failure=await service.read({version:1,projectViewId:'never-issued',documentId:'never-issued'});assert.ok(!failure.ok);if(!failure.ok){assert.equal(failure.code,'UNSUPPORTED_ENVIRONMENT');assert.equal(Object.hasOwn(failure,'text'),false);}
+   assert.equal(serviceReads,0,'the Service never attempts content IO without a granted readable scope');assert.equal(checkpoints,0,'Windows refuses before file-open/read checkpoints');assert.deepEqual(await fs.readFile(file),before);assert.equal((await fs.stat(file)).mtimeMs,beforeStat.mtimeMs);
+diff --git "a/test/\346\241\214\351\235\242\345\272\224\347\224\250/project.test.ts" "b/test/\346\241\214\351\235\242\345\272\224\347\224\250/project.test.ts"
+index 923f2f3..2f7bad4 100644
+--- "a/test/\346\241\214\351\235\242\345\272\224\347\224\250/project.test.ts"
++++ "b/test/\346\241\214\351\235\242\345\272\224\347\224\250/project.test.ts"
+@@ -4,9 +4,12 @@
+ import test from "node:test";
+ import assert from "node:assert/strict";
+ import path from "node:path";
++import fs from "node:fs/promises";
++import os from "node:os";
+ import { fileURLToPath } from "node:url";
+ 
+-import { applyPinEvidence, buildProjectConfig, deriveGovernanceRecord, deriveGovernanceRecordWithPins, readRoleDocsIndex, resolveSkillRoot, posixDirname } from "../../app/desktop/project.ts";
++import { applyPinEvidence, buildProjectConfig, deriveGovernanceRecord, deriveGovernanceRecordWithPins, readRoleDocsIndex, resolveSkillRoot, posixDirname, projectDocumentCandidates } from "../../app/desktop/project.ts";
++import { configureDiagnostics, disposeDiagnostics, flushDiagnostics } from "../../src/common/shared/diagnostics.ts";
+ import { listProject, resolveRole } from "../../src/service/role/resolve-role.ts";
+ import type { PinEvidenceFile, PinEvidenceResult } from "../../src/model/boundary.ts";
+ 
+@@ -311,3 +314,154 @@ test("deriveGovernanceRecordWithPins：mismatch 明细映射为 pin-mismatch；
+   });
+   assert.deepEqual(failed, { state: "invalid", reason: "pin 证据检查失败：磁盘读取爆炸" }, "异常必须归为 invalid，绝不外抛");
+ });
++
++// —————— 角色根文档索引（role-root-docs-display S2）：白名单/顺序/memo 排除/changelog 与 docs 不回归 ——————
++
++async function makeRoleProject(): Promise<{ root: string; roleDir: string; cleanup: () => Promise<void> }> {
++  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-role-docs-"));
++  const roleDir = path.join(root, "角色卡", "R");
++  await fs.mkdir(path.join(roleDir, "docs", "design"), { recursive: true });
++  return { root, roleDir, cleanup: () => fs.rm(root, { recursive: true, force: true }) };
++}
++
++test("readRoleDocsIndex：rootDocs 只含三个白名单文件（固定顺序），memo/任意根文件永不入索引；changelog 与 docs/ 不回归", async () => {
++  const { root, roleDir, cleanup } = await makeRoleProject();
++  try {
++    await fs.writeFile(path.join(roleDir, "role-card.md"), "card");
++    await fs.writeFile(path.join(roleDir, "feature-map.md"), "fm body");
++    await fs.writeFile(path.join(roleDir, "functional-description.md"), "fd body");
++    await fs.writeFile(path.join(roleDir, "api-spec.md"), "not-applicable");
++    await fs.writeFile(path.join(roleDir, "memo.md"), "memo-private-marker");
++    await fs.writeFile(path.join(roleDir, "arbitrary.md"), "arbitrary-root-marker");
++    await fs.writeFile(path.join(roleDir, "changelog.md"), "changelog body");
++    await fs.writeFile(path.join(roleDir, "docs", "z.md"), "z");
++    await fs.writeFile(path.join(roleDir, "docs", "design", "a.md"), "a");
++    await fs.writeFile(path.join(roleDir, "docs", ".hidden.md"), "hidden");
++
++    const idx = await readRoleDocsIndex(root, "角色卡/R/role-card.md");
++    assert.deepEqual(idx.rootDocs, [
++      { name: "feature-map.md", path: "角色卡/R/feature-map.md", kind: "file" },
++      { name: "functional-description.md", path: "角色卡/R/functional-description.md", kind: "file" },
++      { name: "api-spec.md", path: "角色卡/R/api-spec.md", kind: "file" },
++    ], "rootDocs 必须恰好三个白名单文件且顺序固定");
++    const serialized = JSON.stringify(idx);
++    assert.equal(serialized.includes("memo"), false, "memo.md 永不进入任何索引字段");
++    assert.equal(serialized.includes("memo-private-marker"), false, "索引不得读取 memo 正文");
++    assert.equal(serialized.includes("arbitrary"), false, "任意根文件不得被索引");
++    assert.equal(idx.changelog?.path, "角色卡/R/changelog.md", "changelog 仍保留在独立字段");
++    assert.equal(idx.changelog?.text, "changelog body");
++    assert.deepEqual(idx.docs, [
++      { path: "docs/design", kind: "directory" },
++      { path: "docs/design/a.md", kind: "file" },
++      { path: "docs/z.md", kind: "file" },
++    ], "docs/ 遍历、排序与隐藏文件跳过保持既有语义（不回归）");
++  } finally {
++    await cleanup();
++  }
++});
++
++test("readRoleDocsIndex：部分根文档缺失只返回存在的，顺序保持相对；只有 memo 时 rootDocs 为空且不抛错", async () => {
++  const { root, roleDir, cleanup } = await makeRoleProject();
++  try {
++    await fs.writeFile(path.join(roleDir, "role-card.md"), "card");
++    await fs.writeFile(path.join(roleDir, "feature-map.md"), "fm");
++    await fs.writeFile(path.join(roleDir, "api-spec.md"), "api");
++    await fs.rm(path.join(roleDir, "docs"), { recursive: true, force: true });
++    const partial = await readRoleDocsIndex(root, "角色卡/R/role-card.md");
++    assert.deepEqual(partial.rootDocs.map((d) => d.name), ["feature-map.md", "api-spec.md"], "缺失项不占位，相对顺序保持");
++    assert.equal(partial.changelog, null, "无 changelog 时为 null，不要求补写");
++    assert.deepEqual(partial.docs, [], "无 docs/ 时为空索引");
++
++    await fs.rm(path.join(roleDir, "feature-map.md"));
++    await fs.rm(path.join(roleDir, "api-spec.md"));
++    await fs.writeFile(path.join(roleDir, "memo.md"), "memo only");
++    const memoOnly = await readRoleDocsIndex(root, "角色卡/R/role-card.md");
++    assert.deepEqual(memoOnly.rootDocs, [], "只有 memo 时不得产生任何根文档条目");
++  } finally {
++    await cleanup();
++  }
++});
++
++test("readRoleDocsIndex：cardPath 为空/绝对/盘符/反斜杠/空段/`.`/`..` 一律返回空索引且不抛错", async () => {
++  const { root, roleDir, cleanup } = await makeRoleProject();
++  try {
++    await fs.writeFile(path.join(roleDir, "role-card.md"), "card");
++    await fs.writeFile(path.join(roleDir, "feature-map.md"), "fm");
++    for (const cardPath of [
++      "role-card.md", // 空角色目录
++      "/abs/角色卡/R/role-card.md",
++      "C:/abs/角色卡/R/role-card.md",
++      "角色卡\\R\\role-card.md",
++      "角色卡//R/role-card.md",
++      "角色卡/./R/role-card.md",
++      "角色卡/../R/role-card.md",
++      "../角色卡/R/role-card.md",
++    ]) {
++      const idx = await readRoleDocsIndex(root, cardPath);
++      assert.deepEqual(idx, { changelog: null, docs: [], rootDocs: [] }, `非法 cardPath ${JSON.stringify(cardPath)} 必须返回空索引`);
++    }
++    // 角色目录存在但不是目录：空索引，不越界读取。
++    await fs.writeFile(path.join(root, "角色卡", "plainfile.md"), "x");
++    const notDir = await readRoleDocsIndex(root, "角色卡/plainfile.md/role-card.md");
++    assert.deepEqual(notDir, { changelog: null, docs: [], rootDocs: [] });
++  } finally {
++    await cleanup();
++  }
++});
++
++test("readRoleDocsIndex：符号链接角色目录与根文档不列入（POSIX 实测；Windows 以非法路径/非目录用例覆盖）", async (t) => {
++  if (process.platform === "win32") {
++    t.diagnostic("Windows 创建符号链接受权限限制；索引跳过逻辑由非法路径/非目录用例覆盖，POSIX 另行实测。");
++    return;
++  }
++  const outside = await fs.mkdtemp(path.join(os.tmpdir(), "ans-role-docs-outside-"));
++  const { root, roleDir, cleanup } = await makeRoleProject();
++  try {
++    await fs.writeFile(path.join(roleDir, "role-card.md"), "card");
++    // 正常角色目录下的根文档符号链接：不列入。
++    await fs.writeFile(path.join(outside, "target.md"), "outside target");
++    await fs.symlink(path.join(outside, "target.md"), path.join(roleDir, "feature-map.md"));
++    const linkedFile = await readRoleDocsIndex(root, "角色卡/R/role-card.md");
++    assert.deepEqual(linkedFile.rootDocs, [], "符号链接根文档不得列入");
++    // 角色目录本身是符号链接：整个索引为空。
++    await fs.symlink(outside, path.join(root, "角色卡", "Linked"));
++    await fs.writeFile(path.join(outside, "role-card.md"), "outside card");
++    const linkedDir = await readRoleDocsIndex(root, "角色卡/Linked/role-card.md");
++    assert.deepEqual(linkedDir, { changelog: null, docs: [], rootDocs: [] }, "符号链接角色目录不得读取");
++  } finally {
++    await cleanup();
++    await fs.rm(outside, { recursive: true, force: true });
++  }
++});
++
++test("projectDocumentCandidates：透传 rootDocs 元数据；旧调用方（无 rootDocs）不产生字段", () => {
++  const docs = [{ path: "docs/x.md", kind: "file" as const }];
++  const base = { roleId: "A", builtIn: false, cardPath: "角色卡/A/role-card.md", changelog: null, docs };
++  assert.equal(Object.hasOwn(projectDocumentCandidates(base), "rootDocs"), false, "旧调用方缺省时行为不变");
++  const withRoots = projectDocumentCandidates({
++    ...base,
++    rootDocs: [{ name: "feature-map.md", path: "角色卡/A/feature-map.md", kind: "file" }],
++  });
++  assert.deepEqual(withRoots.rootDocs, [{ path: "角色卡/A/feature-map.md", kind: "file" }], "只透传元数据（项目相对路径）");
++});
++
++test("readRoleDocsIndex：索引跳过记录元数据诊断（含 reasonCode，不写路径/正文）", async () => {
++  const { root, cleanup } = await makeRoleProject();
++  const logsDir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-role-docs-logs-"));
++  configureDiagnostics({ directory: logsDir });
++  try {
++    await readRoleDocsIndex(root, "../outside/role-card.md");
++    await readRoleDocsIndex(path.join(root, "missing-project"), "角色卡/R/role-card.md");
++    await flushDiagnostics();
++    const files = await fs.readdir(logsDir);
++    const text = (await Promise.all(files.map((name) => fs.readFile(path.join(logsDir, name), "utf8")))).join("\n");
++    assert.match(text, /"event":"role-docs\.index\.skipped"/, "索引跳过应留元数据诊断");
++    assert.match(text, /"reasonCode":"invalid-card-path"/);
++    assert.match(text, /"reasonCode":"role-dir-missing"/);
++    assert.equal(text.includes("outside"), false, "诊断不得写入被拒绝的路径");
++  } finally {
++    await disposeDiagnostics();
++    await cleanup();
++    await fs.rm(logsDir, { recursive: true, force: true });
++  }
++});

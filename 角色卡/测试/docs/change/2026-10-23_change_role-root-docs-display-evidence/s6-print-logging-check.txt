@@ -1,0 +1,36 @@
+# S6 print/logging rule check (2026-10-23)
+
+## added/removed lines mentioning console/print/stderr/stdout in candidate diff
+(none)
+
+## new pure module profile-docs.ts mentions (console/print/fs/electron/window)
+12: * - 无 DOM/无 Node/fs/electron/网络。
+
+## diagnostic calls in new/changed product files (event + fields)
+app/desktop/project.ts:412:    docsDiagnostic.record("role-docs.index.skipped", { reasonCode: "invalid-card-path" });
+app/desktop/project.ts:421:      docsDiagnostic.record("role-docs.index.skipped", {
+app/desktop/project.ts:428:    docsDiagnostic.record("role-docs.index.skipped", { reasonCode: code === "ENOENT" ? "role-dir-missing" : "role-dir-inspect-failed" });
+app/desktop/project.ts:440:      docsDiagnostic.record("role-docs.root.skipped", {
+app/desktop/project.ts:448:        docsDiagnostic.record("role-docs.root.inspect-failed", { reasonCode: "inspect-failed", path: name });
+app/desktop/project.ts:478:  docsDiagnostic.record("role-docs.index", { count: rootDocs.length, ok: true });
+app/desktop/interface.ts:4792:            }).record("role-docs.index.failed", { reasonCode: "exception" });
+
+## root-docs diagnostic event count in e2e run1 diagnostics
+169
+
+## Field-level review of new diagnostics
+- app/desktop/project.ts: role-docs.index {count, ok}; role-docs.index.skipped {reasonCode}; role-docs.root.skipped {reasonCode, path=<whitelist filename only>}; role-docs.root.inspect-failed {reasonCode, path=<whitelist filename only>}.
+- app/desktop/interface.ts: project.listing.root-docs {count, ok}; role-docs.index.failed {reasonCode}. The shared logger adds its existing base context (component/projectRoot), not document path/content.
+- src/service/project-document/impl/read-project-document.ts: project-document.listing {count, ok}; .listing.unavailable {errorCode}; .root.skipped {count}; .read {count=bytes, ok}; .read.failed {errorCode}. No candidate path/body.
+- Renderer: no console/print in the candidate diff; app/renderer/src/chat/profile-docs.ts is pure (no Node/fs/electron/DOM).
+
+## Test-level assertions
+- test/桌面应用/project-document.test.ts 'B Service diagnostics ... without content or paths': asserts listing.unavailable/errorCode/root.skipped exist and text excludes 'roles/A' and 'not-applicable'. PASS in 164/164.
+- test/桌面应用/project.test.ts 'readRoleDocsIndex：索引跳过记录元数据诊断（含 reasonCode，不写路径/正文）': asserts reasonCodes and excludes the rejected path. PASS in 164/164.
+
+## Frequency (e2e run 1 diagnostics, ~5 min, many project loads)
+- role-docs.index: 139 events (15 roles x ~9 listProject calls); project.listing.root-docs: 15 summary events; project-document.listing.unavailable: 15. One event per role per listing; no setInterval/retry loop introduced by the new code. Not a hot-loop; no per-file/per-item emission.
+- Residual observation: role-docs.index emits one line per role per listProject in addition to the single project.listing.root-docs summary; acceptable for diagnosis but could be aggregated later if log volume matters.
+
+## Secrets / content
+- Shared logger scrubs env secrets/Bearer/API-key patterns and caps strings at 1024 chars; no new fields carry document body, document relative path, or credentials.

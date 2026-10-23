@@ -1,0 +1,8 @@
+--- git hash-object ---
+5700649eccc1255a3b616073a32f42d23ebeb6cb
+183eddea3473701315b44c6f7be9754705051051
+1b8a35c5de5771b179fd66a6f2cd3d5b5b4e6d6c
+--- sha256sum ---
+c37fc29f91b5419595e3a65171ade3cad917c389b53de456a536b6979d7d9255 *src/common/shared/i18n/messages/zh-CN.ts
+37e4ad6c08f8678b2bd3372dd44594f9040a88382f2f99194e363b3b5b4e4d0d *src/common/shared/i18n/messages/en-US.ts
+048d2be66863b1f98e147f2111934123371df27f2d363ab3cc84fac9fd7d3c72 *test/项目管理/shared/i18n.test.ts

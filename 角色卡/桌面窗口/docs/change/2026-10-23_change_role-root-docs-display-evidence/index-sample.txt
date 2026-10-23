@@ -1,0 +1,50 @@
+{
+  "card": "角色卡/桌面窗口/role-card.md",
+  "rootDocs": [
+    {
+      "name": "feature-map.md",
+      "path": "角色卡/桌面窗口/feature-map.md",
+      "kind": "file"
+    },
+    {
+      "name": "functional-description.md",
+      "path": "角色卡/桌面窗口/functional-description.md",
+      "kind": "file"
+    },
+    {
+      "name": "api-spec.md",
+      "path": "角色卡/桌面窗口/api-spec.md",
+      "kind": "file"
+    }
+  ],
+  "changelog": "角色卡/桌面窗口/changelog.md",
+  "docsCount": 358,
+  "rootMemoListed": false,
+  "docsRootMemoListed": false,
+  "rootChanglogInDocs": false
+}
+{
+  "card": "角色卡/桌面UI/role-card.md",
+  "rootDocs": [
+    {
+      "name": "feature-map.md",
+      "path": "角色卡/桌面UI/feature-map.md",
+      "kind": "file"
+    },
+    {
+      "name": "functional-description.md",
+      "path": "角色卡/桌面UI/functional-description.md",
+      "kind": "file"
+    },
+    {
+      "name": "api-spec.md",
+      "path": "角色卡/桌面UI/api-spec.md",
+      "kind": "file"
+    }
+  ],
+  "changelog": "角色卡/桌面UI/changelog.md",
+  "docsCount": 500,
+  "rootMemoListed": false,
+  "docsRootMemoListed": false,
+  "rootChanglogInDocs": false
+}

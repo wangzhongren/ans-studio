@@ -86,6 +86,7 @@ import {
   projectDocumentCandidates,
   type DocsIndexEntry,
   type GovernanceRecordStatus,
+  type RoleRootDocEntry,
 } from "./project.ts";
 // 治理记录状态类型（PM 评审 §四.1 契约）：定义在 `project.ts`（派生函数同址，避免两处漂移），
 // 此处原样再导出供 Interface 消费方（preload/渲染侧类型）引用。
@@ -243,6 +244,8 @@ export interface RoleView {
   governanceFunction?: GovernanceFunction;
   changelog: { path: string; text: string } | null;
   docs: DocsIndexEntry[];
+  /** 角色根目录白名单文档（项目相对路径，仅元数据；不读正文）。内置角色为 `[]`。 */
+  rootDocs?: RoleRootDocEntry[];
   documents?: ProjectDocumentRef[];
 }
 
@@ -4772,14 +4775,21 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       for (const r of listing.roles) {
         let changelog: { path: string; text: string } | null = null;
         let docs: DocsIndexEntry[] = [];
+        let rootDocs: RoleRootDocEntry[] = [];
         // 内置角色没有角色目录：cardPath 为空串，读索引会误把项目根当角色目录递归。
         if (!r.builtIn && r.cardPath !== "") {
           try {
             const idx = await readRoleDocsIndex(listing.projectRoot, r.cardPath);
             changelog = idx.changelog;
             docs = idx.docs;
+            rootDocs = idx.rootDocs;
           } catch {
-            // 文档索引失败不致命：如实留空。
+            // 文档索引失败不致命：如实留空；只记元数据诊断（不记路径/正文）。
+            createDiagnosticLogger({
+              component: "desktop.interface",
+              projectRoot: listing.projectRoot,
+              roleId: r.roleId,
+            }).record("role-docs.index.failed", { reasonCode: "exception" });
           }
         }
         let roleView: RoleView = {
@@ -4791,6 +4801,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           builtIn: r.builtIn === true,
           changelog,
           docs,
+          rootDocs,
         };
         if (r.group !== undefined) roleView = { ...roleView, group: r.group };
         if (r.groupDuty !== undefined) roleView = { ...roleView, groupDuty: r.groupDuty };
@@ -4801,6 +4812,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       if (generation === importSequence) importedProjectRoot = listing.projectRoot;
       const documentListing = documentReader.updateListing(documentSequence, listing.projectRoot, roles.map(projectDocumentCandidates));
       for (const role of roles) role.documents = documentListing.documents[role.roleId] ?? [];
+      // 根文档只作元数据装配；摘要诊断帮助定位索引/白名单问题（不记路径/正文）。
+      createDiagnosticLogger({ component: "desktop.interface", projectRoot: listing.projectRoot }).record(
+        "project.listing.root-docs",
+        { count: roles.reduce((n, role) => n + (role.rootDocs?.length ?? 0), 0), ok: true },
+      );
       // 2026-10-19 客户反馈：导入项目 / 应用启动后做一次**补齐检查**——流程已齐备但尚未派 Proof 时自动补派。
       // 走同一道门 + 账本持久化去重；事件驱动（40ms 合并窗口），不是轮询。
       if (generation === importSequence && (listing.governanceModel ?? "single") === "trio") {

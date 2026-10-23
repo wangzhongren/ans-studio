@@ -1,0 +1,26 @@
+# S1 record immutability check (2026-10-23)
+baseline record:
+a6aa70d53e7806baee108973692a460527995c3d041ab1a9e658abf561ccb353 *角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-baseline.md
+expected (S2/S3 record): a6aa70d53e7806baee108973692a460527995c3d041ab1a9e658abf561ccb353
+upstream refreeze record:
+9b77fef41a805f9da2897396392b40a7ca7705e7be3f7cd5e607abfc4afa52ac *角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-baseline-upstream-refreeze.md
+S1/refreeze git status (expect no M/?? for these two records):
+(end)
+
+# S6 command summary (2026-10-23)
+cwd: C:/Users/51054/Desktop/work/ans-studio
+node: C:/Users/51054/AppData/Local/Programs/nodejs/node.exe v24.22.1; npm.cmd 11.19.1; electron v44.7.0
+
+1) node --test "test/桌面UI/**/*.test.ts" -> exit 0; 209/209 pass (s6-test-desktop-ui.log)
+2) node --test --test-concurrency=1 test/桌面应用/project.test.ts test/桌面应用/project-document.test.ts test/桌面应用/interface.test.ts -> exit 0; 164/164 pass (s6-test-desktop-app-targets.log)
+3) node --test --test-concurrency=1 test/测试/p1p7-document-integration.test.ts test/测试/i18n-integration.test.ts -> exit 0; 10/10 pass (s6-test-cross-layer.log)
+4) node --test --test-concurrency=1 test/测试/p1p7-document-integration.test.ts test/桌面应用/su-effective-boundary.test.ts test/桌面应用/genesis-bootstrap.test.ts -> exit 0; 13/13 pass (s6-test-cross-layer-regression.log)
+5) node --test "test/项目管理/shared/**/*.test.ts" -> exit 0; 186 tests / 181 pass / 5 skipped / 0 fail (s6-test-i18n-unit.log)
+6) npm.cmd run typecheck -> exit 0 (s6-typecheck.log)
+7) npm.cmd run typecheck:renderer -> exit 0 (s6-typecheck-renderer.log)
+8) npm.cmd run build:renderer -> exit 0 (s6-build-renderer.log)
+9) electron test/桌面UI/phase4a-electron-smoke.mjs app/renderer/dist/index.html <temp> -> exit 1; 108 checks / 10 failures; identical run 2 (s6-phase4a-smoke-current.log, -run2.log)
+10) clean HEAD 6407d63 archive + rebuilt renderer -> electron phase4a -> exit 1; 99 checks / 12 failures (s6-phase4a-baseline-head.log)
+11) electron --user-data-dir=<fresh> test/桌面应用/e2e/main.mjs -> exit 0; E2E_PASS=true; E2E_FAILURES= (run 1, s6-e2e-run1-report.txt)
+12) same e2e run 2 -> exit 0; E2E_PASS=true; E2E_FAILURES= (s6-e2e-run2-report.txt)
+13) S6 real-app root-doc probe (patched copy outside repo) -> exit 0; E2E_PASS=true; S6 root-doc assertions all true (s6-probe-report.txt)

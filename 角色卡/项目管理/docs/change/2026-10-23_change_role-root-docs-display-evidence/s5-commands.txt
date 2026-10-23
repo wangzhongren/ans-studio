@@ -1,0 +1,39 @@
+# S5 role-root-docs-display i18n key — commands and environment
+# Date: 2026-10-23
+# cwd: C:\Users\51054\Desktop\work\ans-studio
+# branch: v1.7.0-work
+# HEAD: 6407d636b69e3f8eb12fb872e2622172bcbff583
+# OS: Windows 11 / MINGW64_NT-10.0-26300 3.6.10-710e5275.x86_64
+# Node: v24.22.1 (C:/Users/51054/AppData/Local/Programs/nodejs/node.exe)
+# npm: 11.19.1
+# PATH prepended: /c/Users/51054/AppData/Local/Programs/nodejs
+
+1. node --test "test/项目管理/shared/**/*.test.ts"
+   Result: tests 186 / pass 181 / fail 0 / cancelled 0 / skipped 5 / todo 0
+   EXIT_CODE=0
+   Log: s5-i18n-test.log
+   Skips (pre-existing, unrelated to S5): atomic-write.test.ts D3 finalMode/umask/chmod
+   platform-conditioned tests (Windows), 5 skipped.
+
+2. npm.cmd run typecheck
+   Command body: tsc --noEmit
+   Result: no diagnostics, EXIT_CODE=0
+   Log: s5-typecheck.log
+
+3. i18n hardcode guard (runs inside the same suite)
+   [i18n-guard] scanned=107 allowlisted=18 violations=0
+
+4. Candidate identity
+   git hash-object + sha256sum outputs: s5-candidate-hashes.txt
+   git status --short: s5-git-status.txt
+   git diff --stat: s5-diff-stat.txt
+   Full diff: s5-candidate.diff
+
+5. Baseline before this batch (recorded before edits)
+   HEAD 6407d636b69e3f8eb12fb872e2622172bcbff583
+   zh-CN.ts   git hash-object c0501469ed8b8631e63ba124f419aa642a034400
+              sha256 d487a8d4853004daea619a82b2d760ff3218d6fd1015f1c29623d2ae15953e4e
+   en-US.ts   git hash-object 74ab4a7d654143b20b6614d7508f48da67c211cc
+              sha256 05089d70b7b1e0ee720d619efb57aa8d305b7b8f004f4be66144476257e4b373
+   i18n.test.ts git hash-object 26501c142dbd2c03bd6db6e135a0a29da8d46a3b
+              sha256 d8e7567797d9a324e1e2f9889b84758c81ac1b6df76f98b63c2c652f3bebac97

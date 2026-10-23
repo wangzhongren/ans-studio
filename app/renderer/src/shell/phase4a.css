@@ -866,6 +866,58 @@
   height: 32px;
   padding: 0 10px;
 }
+
+/* —— 文档分组（角色根文档 / docs/；只伸缩/换行，不新增固定高度）—— */
+.profile-docs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.profile-docs-group {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.profile-docs-heading {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.profile-root-docs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.profile-root-docs li {
+  min-width: 0;
+}
+.root-doc-entry {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 28px;
+  padding: 4px 8px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  text-align: left;
+  white-space: normal;
+}
+.root-doc-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--foreground);
+}
+.root-doc-purpose {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 10.5px;
+  color: var(--text-3);
+}
 .profile-todo {
   display: flex;
   flex-direction: column;

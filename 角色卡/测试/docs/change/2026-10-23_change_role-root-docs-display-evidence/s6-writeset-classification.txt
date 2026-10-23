@@ -1,0 +1,189 @@
+# S6 write-set classification (2026-10-23)
+
+## candidate product/test files (17 expected)
+ M app/desktop/interface.ts
+ M app/desktop/project.ts
+ M app/renderer/src/chat/types.ts
+ M app/renderer/src/shell/ProfilePanel.tsx
+ M app/renderer/src/shell/phase4a.css
+ M app/renderer/src/stores/drawer-store.ts
+ M src/common/shared/i18n/messages/en-US.ts
+ M src/common/shared/i18n/messages/zh-CN.ts
+ M src/model/project-document.ts
+ M src/service/project-document/impl/read-project-document.ts
+ M test/桌面UI/phase4a-electron-smoke.mjs
+ M test/桌面应用/interface.test.ts
+ M test/桌面应用/project-document.test.ts
+ M test/桌面应用/project.test.ts
+ M test/项目管理/shared/i18n.test.ts
+?? app/renderer/src/chat/profile-docs.ts
+?? test/桌面UI/profile-docs.test.ts
+
+## non-candidate status entries (management docs / other records / demos / .claude; NOT this candidate)
+ M docs/communication/2026-10-23_intent_role-root-docs-display.md
+ M docs/communication/memo.md
+ M 角色卡/项目管理/docs/project-rules.md
+ M 角色卡/项目管理/memo.md
+?? .claude/launch.json
+?? demos/tower-defense/.ans/governance/ledger.jsonl
+?? demos/tower-defense/.ans/project.json
+?? demos/tower-defense/.claude/launch.json
+?? demos/tower-defense/README.md
+?? demos/tower-defense/docs/acceptance/tower-defense-demo-criteria-v1.md
+?? demos/tower-defense/docs/audit/shell-gate.jsonl
+?? demos/tower-defense/docs/bootstrap-manifest.md
+?? demos/tower-defense/docs/communication/2026-10-22_intent_tower-defense.md
+?? demos/tower-defense/docs/contracts/core-api-v1.md
+?? demos/tower-defense/docs/evidence/acceptance-matrix-v2.md
+?? demos/tower-defense/docs/evidence/acceptance-matrix.md
+?? demos/tower-defense/docs/evidence/demo/01-boot.png
+?? demos/tower-defense/docs/evidence/demo/02-mid.png
+?? demos/tower-defense/docs/evidence/demo/03-victory.png
+?? demos/tower-defense/docs/evidence/demo/04-gameover.png
+?? demos/tower-defense/docs/evidence/demo/05-restarted.png
+?? demos/tower-defense/docs/evidence/demo/README.md
+?? demos/tower-defense/docs/evidence/demo/engine-auto-play.json
+?? demos/tower-defense/docs/evidence/demo/event-log.txt
+?? demos/tower-defense/docs/evidence/demo/outcome.json
+?? demos/tower-defense/docs/evidence/demo/probe-shot.png
+?? demos/tower-defense/docs/evidence/gaps/README.md
+?? demos/tower-defense/docs/evidence/gaps/frame-time.json
+?? demos/tower-defense/docs/evidence/gaps/gaps-01-loading.png
+?? demos/tower-defense/docs/evidence/gaps/gaps-02-empty.png
+?? demos/tower-defense/docs/evidence/gaps/gaps-03-error-command.png
+?? demos/tower-defense/docs/evidence/gaps/gaps-04-error-boot.png
+?? demos/tower-defense/docs/evidence/gaps/gaps-05-fuzz-final.png
+?? demos/tower-defense/docs/evidence/gaps/gaps-06-viewport-375.png
+?? demos/tower-defense/docs/evidence/gaps/gaps-07-readme-selection.png
+?? demos/tower-defense/docs/evidence/gaps/gaps-08-readme-hud.png
+?? demos/tower-defense/docs/evidence/gaps/gaps-09-max-level.png
+?? demos/tower-defense/docs/evidence/gaps/gaps-09-terminal-errors.png
+?? demos/tower-defense/docs/evidence/gaps/gaps-limits.json
+?? demos/tower-defense/docs/evidence/gaps/gaps-raw.json
+?? demos/tower-defense/docs/evidence/gaps/readme-spotcheck.md
+?? demos/tower-defense/docs/evidence/gaps/stop-verify.ps1
+?? demos/tower-defense/docs/evidence/headless/01-boot.png
+?? demos/tower-defense/docs/evidence/headless/02-mid.png
+?? demos/tower-defense/docs/evidence/headless/03-victory.png
+?? demos/tower-defense/docs/evidence/headless/04-gameover.png
+?? demos/tower-defense/docs/evidence/headless/05-restarted.png
+?? demos/tower-defense/docs/evidence/headless/README.md
+?? demos/tower-defense/docs/evidence/headless/event-log.txt
+?? demos/tower-defense/docs/evidence/headless/outcome.json
+?? demos/tower-defense/docs/evidence/manifest.md
+?? demos/tower-defense/docs/evidence/tools/auto-play.mjs
+?? demos/tower-defense/docs/evidence/tools/cdp-drive.mjs
+?? demos/tower-defense/docs/evidence/tools/demo-app/drive-demo.cjs
+?? demos/tower-defense/docs/evidence/tools/demo-app/probe.cjs
+?? demos/tower-defense/docs/evidence/tools/demo-app/probe.js
+?? demos/tower-defense/docs/evidence/tools/evidence-tool.mjs
+?? demos/tower-defense/docs/evidence/tools/gaps-drive.mjs
+?? demos/tower-defense/docs/evidence/tools/gaps-limits.mjs
+?? demos/tower-defense/docs/evidence/tools/measure-frame.mjs
+?? demos/tower-defense/docs/evidence/tools/ps/cleanup-stray.ps1
+?? demos/tower-defense/docs/evidence/tools/ps/list-electron.ps1
+?? demos/tower-defense/docs/evidence/tools/start-server.mjs
+?? demos/tower-defense/docs/evidence/tools/verify-evidence.mjs
+?? demos/tower-defense/docs/evidence/tools/wait-for-demo.mjs
+?? demos/tower-defense/docs/flows/tower-defense-demo.yaml
+?? demos/tower-defense/docs/governance/convener/tower-defense-demo-contract-addendum-routing-v1.md
+?? demos/tower-defense/docs/governance/convener/tower-defense-demo-contract-addendum-routing-v2.md
+?? demos/tower-defense/docs/governance/convener/tower-defense-demo-env-node-correction-v1.md
+?? demos/tower-defense/docs/governance/convener/tower-defense-demo-gate2-closure-v1.md
+?? demos/tower-defense/docs/governance/convener/tower-defense-demo-open-items-v1.md
+?? demos/tower-defense/docs/governance/convener/tower-defense-demo-ui-feasibility-correction-v1.md
+?? demos/tower-defense/docs/governance/convener/tower-defense-demo-ui-feasibility-correction-v2.md
+?? demos/tower-defense/docs/governance/rapporteur/tower-defense-demo.md
+?? demos/tower-defense/docs/intents/tower-defense-demo.md
+?? demos/tower-defense/docs/proposals/tower-defense-demo-v1.md
+?? demos/tower-defense/docs/scheduling/tower-defense-demo-candidate-v1.sha256
+?? demos/tower-defense/docs/scheduling/tower-defense-demo-change-v1.md
+?? demos/tower-defense/docs/scheduling/tower-defense-demo-readiness-v1.md
+?? demos/tower-defense/docs/scheduling/tower-defense-demo-readiness-v2.md
+?? demos/tower-defense/docs/scheduling/tower-defense-demo-team-v1.md
+?? demos/tower-defense/docs/workflow.md
+?? demos/tower-defense/index.html
+?? demos/tower-defense/package.json
+?? demos/tower-defense/server.mjs
+?? demos/tower-defense/src/core.js
+?? demos/tower-defense/src/data.js
+?? demos/tower-defense/src/game.js
+?? demos/tower-defense/src/input.js
+?? demos/tower-defense/src/render.js
+?? demos/tower-defense/styles.css
+?? demos/tower-defense/test/browser-shell/contract.test.js
+?? demos/tower-defense/test/engine/core.test.js
+?? demos/tower-defense/test/runtime/server.test.js
+?? demos/tower-defense/tools/ans-cdp.mjs
+?? demos/tower-defense/tools/ans-file-watch.mjs
+?? demos/tower-defense/tools/ans-start.mjs
+?? demos/tower-defense/tools/ans-watch.mjs
+?? demos/tower-defense/tools/preview-server.mjs
+?? demos/tower-defense/角色卡/game-delivery/api-spec.md
+?? demos/tower-defense/角色卡/game-delivery/boundary.yaml
+?? demos/tower-defense/角色卡/game-delivery/feature-map.md
+?? demos/tower-defense/角色卡/game-delivery/functional-description.md
+?? demos/tower-defense/角色卡/game-delivery/memo.md
+?? demos/tower-defense/角色卡/game-delivery/role-card.md
+?? demos/tower-defense/角色卡/game-engine/api-spec.md
+?? demos/tower-defense/角色卡/game-engine/boundary.yaml
+?? demos/tower-defense/角色卡/game-engine/feature-map.md
+?? demos/tower-defense/角色卡/game-engine/functional-description.md
+?? demos/tower-defense/角色卡/game-engine/memo.md
+?? demos/tower-defense/角色卡/game-engine/role-card.md
+?? demos/tower-defense/角色卡/game-test/api-spec.md
+?? demos/tower-defense/角色卡/game-test/boundary.yaml
+?? demos/tower-defense/角色卡/game-test/feature-map.md
+?? demos/tower-defense/角色卡/game-test/functional-description.md
+?? demos/tower-defense/角色卡/game-test/memo.md
+?? demos/tower-defense/角色卡/game-test/role-card.md
+?? demos/tower-defense/角色卡/game-ui/api-spec.md
+?? demos/tower-defense/角色卡/game-ui/boundary.yaml
+?? demos/tower-defense/角色卡/game-ui/feature-map.md
+?? demos/tower-defense/角色卡/game-ui/functional-description.md
+?? demos/tower-defense/角色卡/game-ui/memo.md
+?? demos/tower-defense/角色卡/game-ui/role-card.md
+?? demos/tower-defense/角色卡/governance-boundary.yaml
+?? docs/communication/2026-10-23_intent-print-logging-rule.md
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_role-root-docs-display-evidence/s4-candidate-hashes.txt
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_role-root-docs-display-evidence/s4-candidate.diff
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_role-root-docs-display-evidence/s4-diff-stat.txt
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_role-root-docs-display-evidence/s4-environment.txt
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_role-root-docs-display-evidence/s4-failure-classification.txt
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_role-root-docs-display-evidence/s4-phase4a-report-current.json
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_role-root-docs-display-evidence/s4-zero-diff-check.txt
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_role-root-docs-display.md
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_role-root-docs-display-evidence/candidate.patch
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_role-root-docs-display-evidence/diff-summary.txt
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_role-root-docs-display-evidence/environment.txt
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_role-root-docs-display-evidence/external-context.txt
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_role-root-docs-display-evidence/flake-classification.txt
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_role-root-docs-display-evidence/hashes.txt
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_role-root-docs-display-evidence/index-sample.txt
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_role-root-docs-display-evidence/sha256.txt
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_role-root-docs-display-evidence/zero-diff-check.txt
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_role-root-docs-display.md
+?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-evidence/s6-boundary-hashes.txt
+?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-evidence/s6-candidate-expected.txt
+?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-evidence/s6-candidate-hashes.txt
+?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-evidence/s6-candidate-paths.txt
+?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-evidence/s6-environment.txt
+?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-evidence/s6-git-diff-cached-names.txt
+?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-evidence/s6-git-diff-stat.txt
+?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-evidence/s6-git-diff-tracked-names.txt
+?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-evidence/s6-git-status-full.txt
+?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-evidence/s6-git-status-src-app-test.txt
+?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-evidence/s6-noncandidate-status.txt
+?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-evidence/s6-writeset-classification.txt
+?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-evidence/s6-zero-diff-and-writeset.txt
+?? 角色卡/项目管理/docs/change/2026-10-23_change_print-logging-rule.md
+?? 角色卡/项目管理/docs/change/2026-10-23_change_role-root-docs-display-evidence/s5-candidate-hashes.txt
+?? 角色卡/项目管理/docs/change/2026-10-23_change_role-root-docs-display-evidence/s5-candidate.diff
+?? 角色卡/项目管理/docs/change/2026-10-23_change_role-root-docs-display-evidence/s5-commands.txt
+?? 角色卡/项目管理/docs/change/2026-10-23_change_role-root-docs-display-evidence/s5-diff-stat.txt
+?? 角色卡/项目管理/docs/change/2026-10-23_change_role-root-docs-display-evidence/s5-git-status.txt
+?? 角色卡/项目管理/docs/change/2026-10-23_change_role-root-docs-display-evidence/s5-key-values.txt
+?? 角色卡/项目管理/docs/change/2026-10-23_change_role-root-docs-display.md
+
+## product/test paths outside candidate (src app test minus candidate; expect empty)
+(end)

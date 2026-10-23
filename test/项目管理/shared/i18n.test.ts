@@ -588,14 +588,14 @@ test("B1–B4 key 分区：ui/main/shared 计数与总 key 数符合契约（漏
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
   assert.deepEqual(prefixes, {
-    ui: 691, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10
+    ui: 698, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7
     main: 486, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6
     shared: 62, // B4 元数据 + 跨层通用短词
     preferences: 3, // B0
   });
-  assert.equal(keys.length, 1242);
+  assert.equal(keys.length, 1249);
   // B1/B2 与 B3 分区（扣除 B0 的 5 个 ui.* / 5 个 main.*）。
-  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 686);
+  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 693);
   assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 481);
 });
 
@@ -719,6 +719,128 @@ test("B1/B2 key 增补：插值与复数（overflow 标题按 count 选 other/on
     }),
     "Saved to .env (no keys changed). Required configuration is complete. Applied when the next session opens.",
   );
+});
+
+/**
+ * 2026-10-23 角色根文档展示（role-root-docs-display，T2）S5：`ui.profile.*` key。
+ * 依据方案 §5.5.6 / 团队计划 §3.4：4 个必需 key（根文档分组、`docs/` 分组、整节空态、
+ * 单文件只读打开标签）+ 3 个可选副标签（功能导航/模块视图/接口报告）。
+ * 文件名、路径（`docs/`）与 `not-applicable` 是内容/路径标识，不翻译；memo 无 key/开关。
+ */
+const ROLE_ROOT_DOC_REQUIRED_KEYS = [
+  "ui.profile.docsGroupRoot",
+  "ui.profile.docsGroupSubdir",
+  "ui.profile.noRoleDocs",
+  "ui.profile.openRootDoc",
+] as const satisfies readonly MessageKey[];
+
+const ROLE_ROOT_DOC_OPTIONAL_KEYS = [
+  "ui.profile.rootDoc.featureMap",
+  "ui.profile.rootDoc.functionalDescription",
+  "ui.profile.rootDoc.apiSpec",
+] as const satisfies readonly MessageKey[];
+
+const ROLE_ROOT_DOC_KEYS = [
+  ...ROLE_ROOT_DOC_REQUIRED_KEYS,
+  ...ROLE_ROOT_DOC_OPTIONAL_KEYS,
+] as const;
+
+const ROLE_ROOT_DOC_PLACEHOLDERS: Record<(typeof ROLE_ROOT_DOC_KEYS)[number], string[]> = {
+  "ui.profile.docsGroupRoot": [],
+  "ui.profile.docsGroupSubdir": [],
+  "ui.profile.noRoleDocs": [],
+  "ui.profile.openRootDoc": ["name"],
+  "ui.profile.rootDoc.featureMap": [],
+  "ui.profile.rootDoc.functionalDescription": [],
+  "ui.profile.rootDoc.apiSpec": [],
+};
+
+const ROLE_ROOT_DOC_UNTRANSLATED_TOKENS = [
+  "feature-map.md",
+  "functional-description.md",
+  "api-spec.md",
+  "memo.md",
+  "changelog.md",
+  "not-applicable",
+] as const;
+
+test("角色根文档 key：4 个必需 + 3 个可选副标签在 zh-CN/en-US 均存在、无单边、占位符一致", () => {
+  assert.equal(ROLE_ROOT_DOC_REQUIRED_KEYS.length, 4);
+  assert.equal(ROLE_ROOT_DOC_OPTIONAL_KEYS.length, 3);
+  for (const key of ROLE_ROOT_DOC_KEYS) {
+    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
+    assert.ok(key in enUS, `en-US 缺 ${key}`);
+    assert.equal(key.startsWith("ui.profile."), true, `key 必须位于 ui.profile.*：${key}`);
+    assert.deepEqual(
+      placeholdersOf(zhCN[key]),
+      ROLE_ROOT_DOC_PLACEHOLDERS[key],
+      `zh-CN 占位符不符契约：${key}`,
+    );
+    assert.deepEqual(
+      placeholdersOf(enUS[key]),
+      ROLE_ROOT_DOC_PLACEHOLDERS[key],
+      `en-US 占位符不符契约：${key}`,
+    );
+    assert.deepEqual(placeholdersOf(enUS[key]), placeholdersOf(zhCN[key]), `占位符不一致：${key}`);
+  }
+  // memo 不得因 key/标签被展示：`ui.profile.*` 不得新增任何 memo 相关 key
+  // （显示过滤是兜底，不是安全边界；`main.interface.memoNoContinuation` 是既有的写卡校验文案，不属展示开关）。
+  assert.equal(
+    Object.keys(zhCN).some((key) => key.startsWith("ui.profile.") && /memo/i.test(key)),
+    false,
+    "不得新增 memo 显示开关/标签 key",
+  );
+});
+
+test("角色根文档 key：zh-CN/en-US 取值与分组/空态/打开标签语义；文件名/路径不翻译", () => {
+  assert.equal(zhCN["ui.profile.docsGroupRoot"], "角色根文档");
+  assert.equal(enUS["ui.profile.docsGroupRoot"], "Role root documents");
+  assert.equal(zhCN["ui.profile.docsGroupSubdir"], "docs/ 目录");
+  assert.equal(enUS["ui.profile.docsGroupSubdir"], "docs/ directory");
+  assert.equal(zhCN["ui.profile.noRoleDocs"], "（暂无角色文档）");
+  assert.equal(enUS["ui.profile.noRoleDocs"], "(no role documents)");
+  assert.equal(zhCN["ui.profile.openRootDoc"], "只读打开 {name}");
+  assert.equal(enUS["ui.profile.openRootDoc"], "Open {name} read-only");
+  assert.equal(zhCN["ui.profile.rootDoc.featureMap"], "功能导航");
+  assert.equal(enUS["ui.profile.rootDoc.featureMap"], "Feature map");
+  assert.equal(zhCN["ui.profile.rootDoc.functionalDescription"], "模块视图与代码位置");
+  assert.equal(
+    enUS["ui.profile.rootDoc.functionalDescription"],
+    "Module view and code locations",
+  );
+  assert.equal(zhCN["ui.profile.rootDoc.apiSpec"], "接口 / 实现报告");
+  assert.equal(enUS["ui.profile.rootDoc.apiSpec"], "API / implementation report");
+
+  // 路径标识 `docs/` 原样保留，不翻译（中英文分组标题都含字面量 docs/）。
+  assert.ok(zhCN["ui.profile.docsGroupSubdir"].includes("docs/"), "zh-CN 分组标题必须保留 docs/");
+  assert.ok(enUS["ui.profile.docsGroupSubdir"].includes("docs/"), "en-US 分组标题必须保留 docs/");
+
+  // 文件名/内容标识不进入标签；打开按钮经 {name} 原样拼接文件名。
+  for (const key of ROLE_ROOT_DOC_KEYS) {
+    for (const template of [zhCN[key], enUS[key]]) {
+      const text = typeof template === "string" ? template : Object.values(template).join("");
+      for (const token of ROLE_ROOT_DOC_UNTRANSLATED_TOKENS) {
+        assert.equal(text.includes(token), false, `${key} 不得翻译/内嵌内容标识 ${token}`);
+      }
+    }
+  }
+  assert.equal(
+    translate("zh-CN", "ui.profile.openRootDoc", { name: "feature-map.md" }),
+    "只读打开 feature-map.md",
+  );
+  assert.equal(
+    translate("en-US", "ui.profile.openRootDoc", { name: "feature-map.md" }),
+    "Open feature-map.md read-only",
+  );
+
+  // en-US 不混入中文；整节空态是括号文案（非路径/非文件名）。
+  for (const key of ROLE_ROOT_DOC_KEYS) {
+    const value = enUS[key];
+    const text = typeof value === "string" ? value : Object.values(value).join("");
+    assert.equal(valueContainsHan(text), false, `en-US 含中文：${key}`);
+  }
+  assert.match(zhCN["ui.profile.noRoleDocs"], /^（.+）$/u);
+  assert.match(enUS["ui.profile.noRoleDocs"], /^\(.+\)$/u);
 });
 
 /**

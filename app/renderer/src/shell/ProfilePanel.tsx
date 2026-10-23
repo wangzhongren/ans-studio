@@ -10,7 +10,7 @@
 import { useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import type { ReactElement, ReactNode } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, FileText } from "lucide-react";
 import { useChatStore } from "@/chat/chat-store";
 import { useUiStore } from "@/stores/ui-store";
 import {
@@ -18,6 +18,12 @@ import {
   currentReadingKey,
 } from "@/stores/drawer-store";
 import { renderMarkdown } from "@/chat/markdown";
+import {
+  docsIndexMarkdown,
+  profileDocsView,
+  rootDocLabelKey,
+  rootDocOpenText,
+} from "@/chat/profile-docs";
 import { findRole, roleDisplayName, roleSubtitle } from "@/chat/role-view";
 import { deriveRoleStatus, statusBadge } from "@/chat/status";
 import {
@@ -95,18 +101,6 @@ function boundaryTable(
       </tbody>
     </table>
   );
-}
-
-function docsIndex(role: RoleView): string {
-  const docs = Array.isArray(role.docs) ? role.docs : [];
-  if (docs.length === 0) return "";
-  return docs
-    .map((entry) => {
-      const item = asRecord(entry);
-      const path = asString(item.path);
-      return "- " + path + (item.kind === "directory" ? "/" : "");
-    })
-    .join("\n");
 }
 
 function Section({
@@ -200,8 +194,7 @@ export function ProfilePanel({ roleId }: { roleId: string | null }) {
   });
   // PM §十三 / UIUX M5：状态只表达状态；数量只在角标/队列视图。
   const badge = statusBadge(status, 0, locale);
-  const docs = Array.isArray(role.docs) ? role.docs : [];
-  const fileDocs = docs.filter((entry) => asRecord(entry).kind === "file");
+  const docsView = profileDocsView(role);
   const changelog = asRecord(role.changelog);
   const pending = pendingViews(pendingOperator, role.roleId, locale);
   const groups = queueGroups(queue, runningByRole[role.roleId] || null, locale);
@@ -284,15 +277,15 @@ export function ProfilePanel({ roleId }: { roleId: string | null }) {
       <Section
         id="docs"
         title={t("ui.profile.docsTab")}
-        count={fileDocs.length > 0 ? fileDocs.length : t("shared.common.none")}
+        count={docsView.count > 0 ? docsView.count : t("shared.common.none")}
         open={sectionOpen("docs")}
         onToggle={(open) => setSectionOpen(key, "docs", open)}
       >
-        {docs.length === 0 ? (
-          <div className="muted small">{t("ui.profile.noDocs")}</div>
+        {docsView.isEmpty ? (
+          <div className="muted small">{t("ui.profile.noRoleDocs")}</div>
         ) : (
           <div
-            className="card-text card-md"
+            className="card-text profile-docs"
             onScroll={(event) => {
               const target = event.currentTarget;
               setSectionScroll(key, "docs", target.scrollTop, target.scrollLeft);
@@ -300,8 +293,50 @@ export function ProfilePanel({ roleId }: { roleId: string | null }) {
             ref={(element) => {
               sectionRefs.current.docs = element;
             }}
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(docsIndex(role)) }}
-          />
+          >
+            {docsView.rootDocs.length > 0 ? (
+              <div className="profile-docs-group" data-docs-group="root">
+                <h4 className="profile-docs-heading">{t("ui.profile.docsGroupRoot")}</h4>
+                <ul className="profile-root-docs">
+                  {docsView.rootDocs.map((doc) => {
+                    const labelKey = rootDocLabelKey(doc.name);
+                    const openText = rootDocOpenText(doc.name, locale);
+                    return (
+                      <li key={doc.path}>
+                        <button
+                          type="button"
+                          className="btn-mini root-doc-entry"
+                          data-root-doc-path={doc.path}
+                          title={openText}
+                          aria-label={openText}
+                          onClick={() =>
+                            flushSync(() => {
+                              void openDocumentList(role.roleId, "card", doc.path);
+                            })
+                          }
+                        >
+                          <FileText size={12} strokeWidth={1.5} aria-hidden="true" />
+                          <span className="root-doc-name">{doc.name}</span>
+                          {labelKey ? (
+                            <span className="root-doc-purpose">{t(labelKey)}</span>
+                          ) : null}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
+            {docsView.docsEntries.length > 0 ? (
+              <div className="profile-docs-group" data-docs-group="subdir">
+                <h4 className="profile-docs-heading">{t("ui.profile.docsGroupSubdir")}</h4>
+                <div
+                  className="card-md"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(docsIndexMarkdown(docsView.docsEntries)) }}
+                />
+              </div>
+            ) : null}
+          </div>
         )}
       </Section>
 

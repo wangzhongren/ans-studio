@@ -1,7 +1,11 @@
-import { PROJECT_DOCUMENT_MAX_BYTES, type DocumentReadErrorCode, type ProjectDocumentRef, type ProjectDocumentRoleCandidates, type ProjectDocumentScope, type ProjectDocumentListing, type ReadProjectDocumentResult } from '../../../model/project-document.ts';
+import { PROJECT_DOCUMENT_MAX_BYTES, ROLE_ROOT_DOC_FILENAMES, type DocumentReadErrorCode, type ProjectDocumentRef, type ProjectDocumentRoleCandidates, type ProjectDocumentScope, type ProjectDocumentListing, type ReadProjectDocumentResult } from '../../../model/project-document.ts';
 import type { ProjectDocumentReader } from '../abstract/document-reader.ts';
 import { DocumentFileError, type ProjectDocumentFileReader } from '../../../provider/project-document/public/file-reader.ts';
 import { isAbsoluteAny, normalizeLexical } from '../../../common/shared/path-primitives.ts';
+// Shared diagnostics (single source): no-op unless configured; metadata-only fields (no content/paths).
+import { createDiagnosticLogger } from '../../../common/shared/diagnostics.ts';
+
+const diagnostic = createDiagnosticLogger({ component: 'project-document.service' });
 
 const messages: Record<DocumentReadErrorCode,string> = {
  INVALID_REQUEST:'文档读取请求无效。',PROJECT_NOT_GRANTED:'请先通过选择目录导入此项目。',PROJECT_NOT_ACTIVE:'当前没有可阅读的导入项目。',STALE_SCOPE:'项目已切换，请从当前资料重新打开。',UNKNOWN_DOCUMENT:'无法识别此文档引用。',NOT_LISTED:'此文档已不在当前资料清单中。',OUTSIDE_PROJECT:'文档路径不在允许的项目范围内。',SYMLINK_NOT_ALLOWED:'不支持通过符号链接阅读文档。',NOT_FOUND:'文档不存在。',NOT_FILE:'此项不是普通文档文件。',UNSUPPORTED_FORMAT:'只支持 UTF-8 Markdown 或纯文本文件。',INVALID_UTF8:'文档不是有效的 UTF-8 文本。',BINARY_CONTENT:'不支持读取二进制内容。',TOO_LARGE:'文档超过 256 KiB 阅读上限。',PERMISSION_DENIED:'没有权限读取此文档。',CHANGED_DURING_READ:'文档在读取过程中发生变化，请重新打开。',UNSUPPORTED_ENVIRONMENT:'当前平台或文件系统不支持此受限阅读方式。',IO_ERROR:'文档读取失败。',
@@ -20,7 +24,7 @@ export function buildProjectDocumentReader(provider: ProjectDocumentFileReader):
  let refs=new Map<string,ProjectDocumentRef>(), ids=new Map<string,string>();
  const revoked=new Set<string>();
  const reset=()=>{scope=undefined;refs.clear();ids.clear();revoked.clear();};
- function failure(code:DocumentReadErrorCode, fields:{projectViewId?:string;documentId?:string}={}):ReadProjectDocumentResult { return {ok:false,version:1,...fields,code,message:messages[code]}; }
+ function failure(code:DocumentReadErrorCode, fields:{projectViewId?:string;documentId?:string}={}):ReadProjectDocumentResult { diagnostic.record('project-document.read.failed',{errorCode:code}); return {ok:false,version:1,...fields,code,message:messages[code]}; }
  return {
   async grantNativeSelection(root){
    if(disposed)return;
@@ -32,21 +36,30 @@ export function buildProjectDocumentReader(provider: ProjectDocumentFileReader):
   beginListing(root){listingRoot=root;return ++sequence;},
   updateListing(token,root,roles):ProjectDocumentListing {
    const documents:Record<string,ProjectDocumentRef[]> = Object.create(null);
-   if(disposed||token!==sequence||root!==listingRoot)return {documents,documentReadUnavailable:'STALE_SCOPE'};
+   const unavailable=(code:DocumentReadErrorCode):ProjectDocumentListing=>{diagnostic.record('project-document.listing.unavailable',{errorCode:code});return {documents,documentReadUnavailable:code};};
+   if(disposed||token!==sequence||root!==listingRoot)return unavailable('STALE_SCOPE');
    // A successful listing is the commit point. Failed/cancelled imports never revoke the visible project.
    const selected = matches(pendingGrant,root) ? pendingGrant : undefined;
    const nextGrant = selected ?? (matches(grant,root) ? grant : undefined);
    if(activeRoot!==root || nextGrant!==grant){reset();activeRoot=root;grant=nextGrant;}
    if(selected)pendingGrant=undefined;
-   if(!grant||(root!==grant.selectedRoot&&root!==grant.realRoot))return {documents,documentReadUnavailable:'PROJECT_NOT_GRANTED'};
-   if(!grant.realRoot)return {documents,documentReadUnavailable:grant.error??'PROJECT_NOT_GRANTED'};
+   if(!grant||(root!==grant.selectedRoot&&root!==grant.realRoot))return unavailable('PROJECT_NOT_GRANTED');
+   if(!grant.realRoot)return unavailable(grant.error??'PROJECT_NOT_GRANTED');
    if(!scope)scope={version:1,projectViewId:provider.newId(),projectRoot:root};
    const next=new Map<string,ProjectDocumentRef>();
    for(const role of roles){
     documents[role.roleId]=[];if(role.builtIn||!eligible(role.cardPath))continue;
     const dir=role.cardPath.slice(0,Math.max(0,role.cardPath.lastIndexOf('/')));
     if(!dir)continue;
-    const paths=[role.cardPath,...(role.changelogPath===dir+'/changelog.md'?[role.changelogPath]:[]),...role.docs.filter(d=>d.kind==='file'&&d.path.startsWith('docs/')).map(d=>dir+'/'+d.path)];
+    // Role-root candidates are trusted display metadata from the Interface listing, but this Service still
+    // accepts only the exact project-relative paths `roleDir + "/" + ROLE_ROOT_DOC_FILENAMES entry`.
+    // Anything else (memo.md, arbitrary root files, ../, absolute/backslash/colon/case variants,
+    // docs/feature-map.md, project-outside paths) is silently rejected without minting a ref.
+    const expectedRootPaths=new Set(ROLE_ROOT_DOC_FILENAMES.map(name=>dir+'/'+name));
+    const rootCandidates=role.rootDocs??[];
+    const rootPaths=rootCandidates.filter(d=>!!d&&d.kind==='file'&&expectedRootPaths.has(d.path)).map(d=>d.path);
+    if(rootCandidates.length>rootPaths.length)diagnostic.record('project-document.root.skipped',{count:rootCandidates.length-rootPaths.length});
+    const paths=[role.cardPath,...(role.changelogPath===dir+'/changelog.md'?[role.changelogPath]:[]),...role.docs.filter(d=>d.kind==='file'&&d.path.startsWith('docs/')).map(d=>dir+'/'+d.path),...rootPaths];
     for(const rel of new Set(paths)){
      const fmt=format(rel);if(!eligible(rel)||!fmt)continue;
      const key=role.roleId+'\0'+rel;const documentId=ids.get(key)??provider.newId();ids.set(key,documentId);
@@ -56,6 +69,7 @@ export function buildProjectDocumentReader(provider: ProjectDocumentFileReader):
    }
    for(const id of refs.keys())if(!next.has(id))revoked.add(id);
    refs=next;
+   diagnostic.record('project-document.listing',{count:next.size,ok:true});
    return {documentScope:{...scope},documents};
   },
   async read(request){
@@ -74,6 +88,7 @@ export function buildProjectDocumentReader(provider: ProjectDocumentFileReader):
     if(disposed||scope!==epoch||grant!==capturedGrant||!refs.has(ref.documentId))return failure('STALE_SCOPE',fields);
     if(bytes.includes(0))return failure('BINARY_CONTENT',fields);
     let text:string;try{text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{return failure('INVALID_UTF8',fields);}
+    diagnostic.record('project-document.read',{count:bytes.byteLength,ok:true});
     return {ok:true,version:1,...fields,roleId:ref.roleId,relativePath:ref.relativePath,format:ref.format,text,byteLength:bytes.byteLength};
    }catch(e){if(disposed||scope!==epoch||grant!==capturedGrant)return failure('STALE_SCOPE',fields);return failure(e instanceof DocumentFileError?e.code:'IO_ERROR',fields);}
   },

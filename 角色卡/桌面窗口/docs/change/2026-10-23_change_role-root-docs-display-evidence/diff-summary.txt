@@ -1,0 +1,38 @@
+candidate files (this change; diff vs HEAD baseline)
+warning: in the working copy of 'app/desktop/interface.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/桌面应用/interface.test.ts', LF will be replaced by CRLF the next time Git touches it
+ app/desktop/interface.ts                           |  18 ++-
+ app/desktop/project.ts                             |  95 +++++++++++--
+ src/model/project-document.ts                      |   7 +-
+ .../project-document/impl/read-project-document.ts |  27 +++-
+ .../interface.test.ts"                             |  43 ++++++
+ .../project-document.test.ts"                      | 144 ++++++++++++++++++-
+ .../project.test.ts"                               | 156 ++++++++++++++++++++-
+ 7 files changed, 468 insertions(+), 22 deletions(-)
+
+numstat
+warning: in the working copy of 'app/desktop/interface.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/桌面应用/interface.test.ts', LF will be replaced by CRLF the next time Git touches it
+17	1	app/desktop/interface.ts
+86	9	app/desktop/project.ts
+6	1	src/model/project-document.ts
+21	6	src/service/project-document/impl/read-project-document.ts
+43	0	"test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts"
+140	4	"test/\346\241\214\351\235\242\345\272\224\347\224\250/project-document.test.ts"
+155	1	"test/\346\241\214\351\235\242\345\272\224\347\224\250/project.test.ts"
+
+git diff --check (empty means clean)
+warning: in the working copy of 'app/desktop/interface.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/桌面应用/interface.test.ts', LF will be replaced by CRLF the next time Git touches it
+
+worktree status (candidate + external context)
+ M app/desktop/interface.ts
+ M app/desktop/project.ts
+ M src/common/shared/i18n/messages/en-US.ts
+ M src/common/shared/i18n/messages/zh-CN.ts
+ M src/model/project-document.ts
+ M src/service/project-document/impl/read-project-document.ts
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/project-document.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/project.test.ts"
+ M "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"

@@ -622,6 +622,16 @@ export const zhCN = {
   "ui.profile.docsTab": "文档",
   "ui.profile.noDocs": "（无 docs/ 目录或为空）",
   "ui.profile.viewListedDocs": "查看已列文档",
+  // 角色根文档展示（2026-10-23 role-root-docs-display S5；方案 §5.5.6）：
+  // 4 个必需 key（根文档分组、docs 分组、整节空态、只读打开）+ 3 个可选副标签。
+  // 文件名（feature-map.md 等）、`docs/`、`not-applicable` 是路径/内容标识，不翻译。
+  "ui.profile.docsGroupRoot": "角色根文档",
+  "ui.profile.docsGroupSubdir": "docs/ 目录",
+  "ui.profile.noRoleDocs": "（暂无角色文档）",
+  "ui.profile.openRootDoc": "只读打开 {name}",
+  "ui.profile.rootDoc.featureMap": "功能导航",
+  "ui.profile.rootDoc.functionalDescription": "模块视图与代码位置",
+  "ui.profile.rootDoc.apiSpec": "接口 / 实现报告",
   "ui.profile.pendingQueue": "待办 / 队列",
   "ui.queue.title": "{roleName} · 队列",
 

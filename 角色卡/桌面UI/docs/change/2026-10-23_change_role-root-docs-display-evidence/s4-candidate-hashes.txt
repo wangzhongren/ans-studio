@@ -1,0 +1,21 @@
+# S4 候选哈希（S4 基线 = 开工时工作树；候选 = 完成后）
+# 命令：git rev-parse HEAD:<path> / git hash-object <path> / sha256sum <path> / wc -c
+# 基线工作树 sha256 为开工时实测（见 s4-environment / 会话记录）。
+#
+# path | baseline_blob(HEAD) | baseline_sha256(worktree) | candidate_blob | candidate_sha256 | bytes
+app/renderer/src/chat/types.ts | fb42aae9775b3342d12da3ae5668e2f7b50bd144 | 720c0663bd909e3904ad594eba8025161edd2fc5c01f12f8f0e46bb2663d27b8 | 098f4658971f59ae41f421e521dc1bf55ee29600 | a96cc9dfc0ea0931ed17bf60b9f622db5fe863cf579da5ef86bbeb463b136ecc | 5599
+app/renderer/src/shell/ProfilePanel.tsx | 43225790b26324059edc75173f63443014fe7072 | 3cc118d1c0dd7d99613811e644f72d51c23dddd27d182385f30c18a26e35a20d | a67c83a6713729109e933c9cf3314f649bf972e3 | 6b1c83d271afda2b18e4c39b6c0a29ccea8de3adf37313074bf259bdeea8d29b | 14768
+app/renderer/src/stores/drawer-store.ts | 4f40b1507b4cc5650b0c9f604ef7f9586e07830f | 4cb2431a0e658f54d225f245c98582db71e63cb543ec56e27e2d61579197fda1 | 8f0b47551af096d6542e445121141816744c9e7d | 33ad9bfd63e92ff2f6be5252575bd39407212284a7f68b423e31022640904ea0 | 24765
+app/renderer/src/shell/phase4a.css | cf877d7878b968352cc9b0c9418769e445944112 | 052ea23040804e4ab2872c2a6b6813ba816db92f0c1e90d3c7ae2c0393391100 | bc235d74c12940e60fe08e7062356a82cec1bf4c | 944dc3dddbb9cea412cf743ab839590aecea11f6bb84a8399549c5cd8e7d425f | 21960
+test/桌面UI/phase4a-electron-smoke.mjs | f311e2a2f7ba91f736e1d257247677f729bb97e0 | 7f4045274f7a0ec840342a736075923382b7aa0c9e3bcf8e3df3faa940d37421 | a94a5efcbfd4ec03990cc450fd15fdaa51f9d34d | fb32c7ab57809ddd089983ae352087516e8ed04f85e139e030449e9c1ed99479 | 80875
+#
+# 新增文件（无基线）：
+app/renderer/src/chat/profile-docs.ts | (new) | (new) | de20311a7e04139d00ebad383743576536f8115b | d4a11e865c577db8b75359f0ee2846c7812cfb11b09b7dde536d4c477dba1d3f | 6298
+test/桌面UI/profile-docs.test.ts | (new) | (new) | 971778432601f2ce758f66d818a7065a72fa34d5 | ea393edbb5ac0a3ee1c08a4918b3e2078a46f2681f2dc4063bead9f13d37f386 | 9319
+#
+# 按需评估后未改（候选 = HEAD blob，零 diff）：
+app/renderer/src/chat/document-view.ts | 902269c10bcc7b02fcefa44c80dc906dda025b71 | 4bf32a9d34f7ded97f2e1a83d7a10f3966d69142aa5178910080c608854be3ff | 902269c10bcc7b02fcefa44c80dc906dda025b71 | (unchanged) | -
+app/renderer/src/shell/DocumentView.tsx | 2305e62ca0f58754f9d2c9cd7d4a3473337dc7f1 | 55d05c5d213dfe01b4a6a78e668f8e9bc44c627325f7d839bceaebdd9bd3ced0 | 2305e62ca0f58754f9d2c9cd7d4a3473337dc7f1 | (unchanged) | -
+test/桌面UI/document-view.test.ts | a7ad14456c3ff627fe5cf86f6ec54d7b7b27abf4 | 683954c016f6604fb6ffb975572aabaca861ff2478442552f8b8abbfdf314ef4 | a7ad14456c3ff627fe5cf86f6ec54d7b7b27abf4 | (unchanged) | -
+test/桌面UI/phase4a-smoke-preload.cjs | 18ac5d7cf0dc6edaf8913e70ee2c1861696d7076 | 0ac84b5ce7fd73331c1572095622ed3b7a381cfff33ab2ac6688c28761b0457e | 18ac5d7cf0dc6edaf8913e70ee2c1861696d7076 | (unchanged) | -
+test/桌面UI/source-guard.test.ts | 7e2e654cf4596c982130b7c843645932eb5c7d82 | 6c761264753e2c4e2b2110a53fd41fdd7326a4076423d157f4e69feec90a0e5b | 7e2e654cf4596c982130b7c843645932eb5c7d82 | (unchanged) | -

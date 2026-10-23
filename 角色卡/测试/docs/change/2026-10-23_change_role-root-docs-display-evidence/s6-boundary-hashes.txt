@@ -1,0 +1,9 @@
+## boundary hashes vs S1 upstream-refreeze boundary-comparison (8/8 expected UNCHANGED)
+UNCHANGED  角色卡/桌面窗口/boundary.md  1d12d0b4aceb293ed0315986ee82b844603d75bdde71589867bb000f5230744e
+UNCHANGED  角色卡/桌面窗口/boundary.yaml  569a0a208024883709ba2ce47cbd62349856b5e82377c760bf08a764ca332c2f
+UNCHANGED  角色卡/桌面UI/boundary.md  99578261917e2bdb359828aa77dc1a0ff0cf5c31174eeb97f7d666c21cb52cf0
+UNCHANGED  角色卡/桌面UI/boundary.yaml  e1af4d93ab5e022ec447c0412743e41974d04be8ef12cc1c5a5914dd90dda093
+UNCHANGED  角色卡/项目管理/boundary.md  6f75bee458e672e8b4be78b17e4910ee13ba8f50057ce26e30cee012fba45d5c
+UNCHANGED  角色卡/项目管理/boundary.yaml  cfdc7408010bb9da1e3d5e9f723eb7a38956471d13860e8ac5588e7c3693cfff
+UNCHANGED  角色卡/测试/boundary.md  9a2eba3fc842f185eb228ef49cd30dfd66ec3933c42cca0202ff2ae26c97859f
+UNCHANGED  角色卡/测试/boundary.yaml  3c8f7e0e34d44bcdc55995f2747cd8eccaea7ad0875ad074569f6acc7beea14c

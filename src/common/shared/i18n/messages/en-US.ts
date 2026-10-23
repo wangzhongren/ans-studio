@@ -677,6 +677,17 @@ export const enUS = {
   "ui.profile.docsTab": "Documents",
   "ui.profile.noDocs": "(no docs/ directory or it is empty)",
   "ui.profile.viewListedDocs": "View listed documents",
+  // Role-root-docs display (2026-10-23 role-root-docs-display S5; design §5.5.6):
+  // 4 required keys (root group, docs group, section empty state, read-only open)
+  // + 3 optional sub-labels. File names (feature-map.md etc.), `docs/`, and
+  // `not-applicable` are path/content identifiers and stay untranslated.
+  "ui.profile.docsGroupRoot": "Role root documents",
+  "ui.profile.docsGroupSubdir": "docs/ directory",
+  "ui.profile.noRoleDocs": "(no role documents)",
+  "ui.profile.openRootDoc": "Open {name} read-only",
+  "ui.profile.rootDoc.featureMap": "Feature map",
+  "ui.profile.rootDoc.functionalDescription": "Module view and code locations",
+  "ui.profile.rootDoc.apiSpec": "API / implementation report",
   "ui.profile.pendingQueue": "Pending / queue",
   "ui.queue.title": "{roleName} · Queue",
 
