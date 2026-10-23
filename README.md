@@ -47,7 +47,13 @@ ANS Studio 面向希望在真实项目中使用多个 AI 角色协作的开发�
 <details>
 <summary>v1.6.0 SHA256</summary>
 
-发布完成后以 Release 资产中的 `SHA256SUMS-*.txt` 为准；本 README 会在三平台 CI 通过并发布后填入实际值。
+| 产物 | SHA256 |
+| --- | --- |
+| `ANS-Studio-1.6.0-mac-arm64.zip` | `4a7cc21525748e2afb03bb248d69968478281424ef2296bfd947a0245642c9ee` |
+| `ANS-Studio-1.6.0-mac-x64.zip` | `e1faedf05ab1bfdb8c2293ce17179cb8ae66ea9c4e31b348219ad19af400ffaf` |
+| `ANS-Studio-1.6.0-win-x64.zip` | `2c454cfec00c8c683cf1c42bdcd6eb8a85b2a4a4590089e08b186bc562954877` |
+| `overlay.patch` | `a279b6ab29817394c248681bcd47e774785ae909bb1ecb1b81e1559915f0f60e` |
+| `release-provenance.json` | `43ab7b3dc3a355172529df57e974210a1efab3a5dc65528bb745c619f95227d8` |
 
 运行包**未签名、未公证**：macOS 未公证、Windows 未做代码签名，首次启动可能提示来源未验证。
 

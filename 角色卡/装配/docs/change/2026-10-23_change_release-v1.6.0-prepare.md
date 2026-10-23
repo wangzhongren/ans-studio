@@ -5,12 +5,18 @@ title: v1.6.0 发布：治理角色粒度、受治理后台任务与 MapReduce �
 created: "2026-10-23"
 updated: "2026-10-23"
 timezone: Asia/Shanghai
-status: in-progress
+status: verified-published
 related: []
 events:
   - date: "2026-10-23"
     kind: implemented
     summary: main 合并 feat/background-tasks-governance-and-reasoning；package/lock 1.5.0→1.6.0；README 当前版本/下载表/要点 → v1.6.0
+  - date: "2026-10-23"
+    kind: implemented
+    summary: release CI 回归测试串行化（--test-concurrency=1）；首跑/rerun 的 interface/acceptance-dispatch 并行偶发不影响产品候选
+  - date: "2026-10-23"
+    kind: published
+    summary: CI run 39886264536 四 job 全绿；v1.6.0 已发布（publishedAt 2026-10-23T02:03:58Z）；三平台 ZIP/overlay/provenance 资产公开
 ---
 
 # v1.6.0 发布准备
@@ -50,4 +56,7 @@ events:
 ## CI 与发布
 
 - **回归测试串行执行**：首跑与 rerun 分别暴露 `test/桌面应用/interface.test.ts`（v2 团队计划 V12/readiness、existing 迁移 readiness）与 `acceptance-dispatch.test.ts`（Lead 阻塞原因可见性）的已知并行偶发；不同断言点、mac x64 全绿、mac arm64 rerun 转绿，隔离/串行通过。为稳定发布，release workflow 的 Regression tests 改为 `node --test --test-concurrency=1 "test/**/*.test.ts"`；产品候选、tag 与验收结论不变。
-- 待触发/记录 run id、三平台 build/release 结果、draft→publish、资产 SHA256 与公开 URL。
+- **最终 CI**：run **39886264536**（headSha `64edbb0`），mac arm64 / mac x64 / Windows x64 三个 build job 与 release job 全部 success。
+- **发布**：draft=false，publishedAt **2026-10-23T02:03:58Z**，URL <https://github.com/wangzhongren/ans-studio/releases/tag/v1.6.0>。
+- **资产 SHA256**：mac arm64 `4a7cc21525748e2afb03bb248d69968478281424ef2296bfd947a0245642c9ee`；mac x64 `e1faedf05ab1bfdb8c2293ce17179cb8ae66ea9c4e31b348219ad19af400ffaf`；win x64 `2c454cfec00c8c683cf1c42bdcd6eb8a85b2a4a4590089e08b186bc562954877`；overlay.patch `a279b6ab29817394c248681bcd47e774785ae909bb1ecb1b81e1559915f0f60e`；release-provenance.json `43ab7b3dc3a355172529df57e974210a1efab3a5dc65528bb745c619f95227d8`。
+- **证据边界**：三平台构建/解压/启动 smoke 由 CI 原生 runner 执行；本地只做 typecheck、build、装配测试、prepare 预演与公开资产/校验文件的只读核对。
