@@ -72,7 +72,7 @@ jobs:
           rg --version
       - name: Regression tests
         working-directory: .release/source
-        run: node --test "test/**/*.test.ts"
+        run: node --test --test-concurrency=1 "test/**/*.test.ts"
       - name: Build renderer bundle
         working-directory: .release/source
         run: npm run build:renderer

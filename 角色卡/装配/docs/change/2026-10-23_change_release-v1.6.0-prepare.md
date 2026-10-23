@@ -49,4 +49,5 @@ events:
 
 ## CI 与发布
 
-- 待触发；记录 run id、三平台 build/release 结果、draft→publish、资产 SHA256 与公开 URL。
+- **回归测试串行执行**：首跑与 rerun 分别暴露 `test/桌面应用/interface.test.ts`（v2 团队计划 V12/readiness、existing 迁移 readiness）与 `acceptance-dispatch.test.ts`（Lead 阻塞原因可见性）的已知并行偶发；不同断言点、mac x64 全绿、mac arm64 rerun 转绿，隔离/串行通过。为稳定发布，release workflow 的 Regression tests 改为 `node --test --test-concurrency=1 "test/**/*.test.ts"`；产品候选、tag 与验收结论不变。
+- 待触发/记录 run id、三平台 build/release 结果、draft→publish、资产 SHA256 与公开 URL。
