@@ -1,0 +1,22 @@
+# document identity checks 2026-10-23 22:30:44 +0800
+## design doc (expected d464fb70…d2c1, 282 lines)
+d464fb70d7022daad61f7837f1c6cd3b7ce478cbafca55a79fb747e3b85de2c1 *docs/planning/2026-10-23_design_artifact-observation-race.md
+282 docs/planning/2026-10-23_design_artifact-observation-race.md
+
+## intent doc
+d3dc7474bbac77eeeedd91dd75000df600926d14d5f3507e828d8d56a194f073 *docs/communication/2026-10-23_intent_artifact-observation-race.md
+54 docs/communication/2026-10-23_intent_artifact-observation-race.md
+
+## orchestration change record
+bda43a7b7ce3d4563a27ff144881a98dee62c05dbdec7a966dd8e95fade3d9c9 *角色卡/编排/docs/change/2026-10-23_change_artifact-observation-race.md
+103 角色卡/编排/docs/change/2026-10-23_change_artifact-observation-race.md
+
+## S1 baseline record (must be unchanged; expected a6aa70d5…b353, 271 lines)
+a6aa70d53e7806baee108973692a460527995c3d041ab1a9e658abf561ccb353 *角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-baseline.md
+271 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-baseline.md
+2026-10-23 21:56:00.974633700 +0800 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-baseline.md
+
+## orchestration evidence candidate.diff scope
+diff_headers=2
+diff --git "a/src/common/\347\274\226\346\216\222/flow-service.ts" "b/src/common/\347\274\226\346\216\222/flow-service.ts"
+diff --git "a/test/\347\274\226\346\216\222/flow-service.test.ts" "b/test/\347\274\226\346\216\222/flow-service.test.ts"

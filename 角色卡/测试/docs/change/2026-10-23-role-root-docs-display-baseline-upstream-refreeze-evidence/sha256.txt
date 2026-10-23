@@ -1,0 +1,13 @@
+118f4acabd22c4904132291a7746412917751b41c4624f4d3dd9191f874f8f55 *角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-upstream-refreeze-evidence/boundary-comparison.txt
+e397ebdb4263b3cf52cc8b9459d6bd10b99bef6ed4509385810003ac7076c733 *角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-upstream-refreeze-evidence/current-counts-and-mtimes.txt
+26d5f4d0d71c08c8db0dfe514cb9d47580b106180e3c177f70550e2118677c48 *角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-upstream-refreeze-evidence/current-src-app-test-files.txt
+36ae8c046bf61ec8d87b0c18983c2bc725db184343eacd0eea294f3297a3ec5c *角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-upstream-refreeze-evidence/current-src-app-test-hashes.txt
+30d9417386f6f685890925b0f9463fcd8b96a144ace22500da343df0d6a67f67 *角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-upstream-refreeze-evidence/current-src-app-test-snapshot.sha256
+c209dddc8a7e7cc8af2745ac70500073db8f9210ed84688b265dc33394ee2e42 *角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-upstream-refreeze-evidence/current-src-app-test-snapshot.txt
+d4b350f6844c56dd4cd951a0596cc98350ed795028b022853a925c25a74bdf38 *角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-upstream-refreeze-evidence/current-status-readable.txt
+646159ee14cdb9fd3214dcd3836cae0e70f93aa75641570847000089b46f80cd *角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-upstream-refreeze-evidence/final-status-readable.txt
+ed1d4ecbdb397cce5903dc62ad4e5797e47a0f9b2be47b5ed8f1faba395c4b50 *角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-upstream-refreeze-evidence/s1-comparison.txt
+364fc8e5b828dfdc9b8136ae116560a17ca17b2bbe35d8f710123417382e5fcd *角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-upstream-refreeze-evidence/target-files-comparison.txt
+e3259a4984953a55c315681d7ebf4811d5511f552db1e6c09f5c86c45b93f316 *角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-upstream-refreeze-evidence/tool-compare-s1.mjs
+f8a0eeea0a0fe7b912c4aacbf1b59982cfce34c9b73cd4506c0bac006e8e4bb8 *角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-upstream-refreeze-evidence/tool-snapshot.mjs
+9b77fef41a805f9da2897396392b40a7ca7705e7be3f7cd5e607abfc4afa52ac *角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-baseline-upstream-refreeze.md

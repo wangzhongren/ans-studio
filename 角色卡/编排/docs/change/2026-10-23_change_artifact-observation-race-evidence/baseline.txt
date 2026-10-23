@@ -1,0 +1,14 @@
+# 基线（本任务动手前，2026-10-23 记录）
+
+命令：`git hash-object "src/common/编排/flow-service.ts" "test/编排/flow-service.test.ts"`
+cwd：C:/Users/51054/Desktop/work/ans-studio
+
+```
+8d783e991b885c6d72b7e269c8e9f1a012c9be1a  src/common/编排/flow-service.ts
+6aa7af358bc71ad4771998eac070d98a1fdf4e56  test/编排/flow-service.test.ts
+```
+
+说明：工作树在本任务开始前已有未提交改动（见同目录 candidate.diff）；上述 blob id 锁定本任务动手前的精确字节。动手前未采集 sha256，故以 git blob id 作为基线标识。
+
+设计基线：docs/planning/2026-10-23_design_artifact-observation-race.md
+sha256: d464fb70d7022daad61f7837f1c6cd3b7ce478cbafca55a79fb747e3b85de2c1（与闸门 1 记录一致，282 行）

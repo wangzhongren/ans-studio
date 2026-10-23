@@ -1,0 +1,19 @@
+# final integrity check after writing records, 2026-10-23 22:33:54 +0800
+HEAD=ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1 branch=main cached=0
+## candidate hashes re-check
+1faff2c6ba1e46875fb977aae2f998d11b9e5a96
+61f04d009336b87f63025c2081e6ac75bab659e4
+43511d2afa5e24cdfedfb1709e75dec83eebfed24f5efa8b01243f88365ccc1f *src/common/编排/flow-service.ts
+42881027a5c9eca2a0c9008e72241dfc6c5880145c19410dbb1eaaaf38313d33 *test/编排/flow-service.test.ts
+## snapshot identity re-check
+36ae8c046bf61ec8d87b0c18983c2bc725db184343eacd0eea294f3297a3ec5c *角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-upstream-refreeze-evidence/current-src-app-test-hashes.txt
+26d5f4d0d71c08c8db0dfe514cb9d47580b106180e3c177f70550e2118677c48 *角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-upstream-refreeze-evidence/current-src-app-test-files.txt
+## src app test status counts
+status_entries=121
+uall_entries=129
+## worktree status delta vs current-status-readable.txt (22:26 capture)
+# entries_now=240 entries_then=238
+### entries now not in earlier capture
+?? 角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification.md
+?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-baseline-upstream-refreeze.md
+### entries earlier capture not in now

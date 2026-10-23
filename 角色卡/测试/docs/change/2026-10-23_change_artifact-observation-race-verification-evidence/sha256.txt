@@ -1,0 +1,14 @@
+0b834a6f72f5d5a1572ed6385250bf1e06b680a92d97fef710f3f2445d40d66c *角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification-evidence/candidate-hashes.txt
+559c269bf43c357496a3aa5608a7a510820b9913c6ef005489eff3daea18683c *角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification-evidence/desktop-artifact-backfill-targeted.log
+b8278300c47e13937b98291949415bbd343ea2dbf07419f4d277698cc6f5e809 *角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification-evidence/document-identity.txt
+ec9f41637a43584d135cce802102f9dc9cc78e71cdba7af575b588716e7b75a7 *角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification-evidence/environment.txt
+cc060925aeab4db67af388500fe33f625176d5d4e14421a6dfe02d3df0e0b794 *角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification-evidence/final-integrity-check.txt
+3a7a0fd151085fd37ec535914186d14946dc39786d3e8735301e5cca0aa5e15b *角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification-evidence/flow-service.test.log
+a3b0a4d644cbebd5cb8255a29bab30d9083a72724d1a906a4013e386a4bf672c *角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification-evidence/flow-state.test.log
+ed9b1010827d9019c8cbb18c27784cc54abd2817ead1c9370ed2967e91d4ac3c *角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification-evidence/pi-adapter-flow-tools.test.log
+2f773d7ccf659c45ec4091aaf4c560a7be76ceac67e3f2fc0b5ecb9886550c03 *角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification-evidence/runtime-core-flow-tools.test.log
+bb53e2d7162f2ff2046739ca3b422a45cccb87d65afa58b82baee4c5b0e69a20 *角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification-evidence/scenarios-independent-run.log
+05893717cb01be1c0ebbb4e11179b64e7c6c892be0a0790ec420a465dd14d03b *角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification-evidence/scenarios-independent.mjs
+e36cec9aa76f282f2b0261115582e504f5a771350328ac1096c8d9562db381fa *角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification-evidence/symlink-capability-probe.txt
+dadc22abe4db179ae7f97ced46dada98603e0b03a79b49dbdcc726605f6e9458 *角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification-evidence/typecheck.log
+ceb2ffb5784f6491af3c93466ec4b9be6b8e3bf4f2e09ce71f3a43a0c69a0ea7 *角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification.md

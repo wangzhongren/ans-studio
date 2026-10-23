@@ -1,0 +1,14 @@
+# src/app/test scope counts and file mtimes, 2026-10-23 22:31:39 +0800
+status_entries_src_app_test=121
+status_entries_src_app_test_uall=129
+all_status_entries=238
+cached_entries=0
+src_app_test_file_count=130
+
+## fix candidate mtimes
+2026-10-23 22:20:20.766104100 +0800 80212 src/common/编排/flow-service.ts
+2026-10-23 22:22:03.357703000 +0800 104698 test/编排/flow-service.test.ts
+
+## files under src app test modified after S1 freeze end (2026-10-23 21:56:30 +0800)
+2026-10-23 22:20:20.7661041000 src/common/编排/flow-service.ts
+2026-10-23 22:22:03.3577030000 test/编排/flow-service.test.ts

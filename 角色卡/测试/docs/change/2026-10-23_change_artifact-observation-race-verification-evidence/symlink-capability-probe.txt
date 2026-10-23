@@ -1,0 +1,9 @@
+# symlink capability probe 2026-10-23 22:30:14 +0800
+host: Windows 11; Git Bash ln -s emulation and cmd mklink attempted in C:\Users\51054\AppData\Local\Temp/ans-symlink-probe
+--- ln -s target.md link1 ---
+-rw-r--r-- 1 51054 197609 2 Oct 23 22:30 link1
+link1 is regular file (MSYS copy fallback), not a real symlink; ln_exit=0 but misleading
+--- cmd /c mklink link2 target.md ---
+你没有足够的权限执行此操作。
+mklink_exit=1
+conclusion: real symlink creation not permitted (Node symlinkSync would throw EPERM); A5b skip is genuine on this host

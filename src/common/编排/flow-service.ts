@@ -20,7 +20,7 @@
 // 本模块不 import 适配器/运行时核心；只读 `flow-state.ts` 与账本，写 YAML 经共享原子写原语。
 
 import { createHash } from "node:crypto";
-import { lstat, readFile } from "node:fs/promises";
+import { lstat, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { stringify as stringifyYaml } from "yaml";
 import { atomicWrite } from "../shared/atomic-write.ts";
@@ -28,6 +28,7 @@ import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 import {
   flowStatePath,
   isReservedAcceptanceStepId,
+  latestAcceptanceDecision,
   parseFlowStateYaml,
   validateFlowEvidence,
   type FlowState,
@@ -479,16 +480,46 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
           if (ledger.errors.length > 0) {
             return { ok: false, code: "ledger-unavailable", revision, flow: flowView, error: `治理账本不可读或存在坏行：${ledger.errors[0]}` };
           }
-          const evidenceResult = validateFlowEvidence(parsedCandidate.flow, ledger.entries);
+          // 2026-10-23 artifact 观测时序修复：artifact 步骤 done 时若账本尚无同路径 observation，先按
+          // 观察安全规则补一次观测再对账。update 已在 per-project 串行队列内，**不得**调用会再次
+          // serialize 的 observeFlowArtifacts（死锁）；appendGovernanceLedger 自带 append 串行链，
+          // 锁方向为「flow serialize → ledger append」，无反向等待。补观测失败只影响 error 文案，
+          // 判定仍由 validateFlowEvidence 裁决；append 失败用既有 ledger-write-failed。
+          let entries: GovernanceLedgerEntry[] = ledger.entries;
+          let observeHint: string | undefined;
+          if (
+            step.kind === "artifact" &&
+            nextEvidence !== undefined &&
+            nextEvidence.kind === "artifact" &&
+            typeof nextEvidence.ref === "string" &&
+            nextEvidence.ref.trim() !== ""
+          ) {
+            const ensured = await ensureArtifactObserved({ projectRoot, flowId, step, ref: nextEvidence.ref, entries });
+            if (ensured.status === "observed") {
+              entries = [...entries, ensured.entry];
+              log.record("flow.artifact.observed-on-done", {
+                flowId,
+                stepId: step.id,
+                artifactPath: ensured.entry.artifactPath,
+              });
+            } else if (ensured.status === "append-failed") {
+              log.error("flow.artifact.observe.failed", new Error(ensured.message), { flowId, stepId: step.id });
+              return { ok: false, code: "ledger-write-failed", revision, flow: flowView, error: ensured.message };
+            } else if (ensured.status === "skipped") {
+              observeHint = `无法安全补观测（${ensured.reason}）`;
+            }
+          }
+          const evidenceResult = validateFlowEvidence(parsedCandidate.flow, entries);
           if (!evidenceResult.ok) {
             const issues = evidenceResult.issues.filter((issue) => issue.stepId === step.id);
             if (issues.length > 0) {
+              const baseError = issues.map((issue) => issue.message).join("；");
               return {
                 ok: false,
                 code: "insufficient-evidence",
                 revision,
                 flow: flowView,
-                error: issues.map((issue) => issue.message).join("；"),
+                error: observeHint !== undefined ? `${baseError}；${observeHint}` : baseError,
                 issues: issues.map((issue) => `${issue.path}: ${issue.message}`),
               };
             }
@@ -628,15 +659,18 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
 }
 
 /**
- * **应用专用**：客户已接受验收（账本 `customer.decision{decisionKind:"acceptance",
- * customerDecision:"accepted"}`）后，把 flow YAML 的保留验收步骤置为
+ * **应用专用**：客户已接受验收（账本**最新**一条 `customer.decision{decisionKind:"acceptance"}`
+ * 为 `customerDecision:"accepted"`）后，把 flow YAML 的保留验收步骤置为
  * `status:"done"` + `evidence:{kind:"acceptance",ref:"acceptance"}`。
  *
  * - **不注册为角色工具**（不进入 AdapterCapabilities / 三 flow 工具）；桌面在 acceptance check /
  *   verifier settle 检测到 accepted 时直接调用。
+ * - **只认最新 accepted**（2026-10-23 验收返工路由方案 v1 Q1 A）：按账本 append 顺序取该 flow 最后
+ *   一条 acceptance 决定；即使更早有 accepted，最新为 rejected ⇒ `acceptance-not-accepted`，不写 flow
+ *   （rejected 是「待返工」，不是收口）。未结算/异常决定同样 fail-closed。
  * - **不写客户决定账本、不伪造客户批准**：只读账本确认已接受，只写 YAML。
  * - 幂等：验收步骤已是 `done` ⇒ `{ok:true,idempotent:true,revision,flow}`，不写盘。
- * - 账本坏行 ⇒ `ledger-unavailable`；无 accepted 决定（含 rejected）⇒ `acceptance-not-accepted`；
+ * - 账本坏行 ⇒ `ledger-unavailable`；最新决定不是 accepted ⇒ `acceptance-not-accepted`；
  *   缺保留验收步骤 ⇒ `acceptance-step-missing`。
  * - 与 `createFlowService` 共用 per-project 串行队列、候选 YAML 复核与原子写；写失败不破坏原文件。
  */
@@ -692,20 +726,22 @@ export async function completeAcceptanceStep(input: {
         error: `治理账本不可读或存在坏行：${ledger.errors[0]}`,
       };
     }
-    const accepted = ledger.entries.some(
-      (entry) =>
-        entry.kind === "customer.decision" &&
-        entry.flowId === flowId &&
-        entry.decisionKind === "acceptance" &&
-        entry.customerDecision === "accepted",
-    );
-    if (!accepted) {
+    const latest = latestAcceptanceDecision(flowId, ledger.entries);
+    if (latest.kind !== "accepted") {
+      const detail =
+        latest.kind === "rejected"
+          ? "该流程最新验收决定为 rejected（等待返工）；未完成验收步骤（rejected 不是收口）。"
+          : latest.kind === "unresolved"
+            ? "该流程最新验收决定不是 accepted（未结算/异常）；未完成验收步骤。"
+            : latest.kind === "ledger-unavailable"
+              ? "治理账本不可读或存在坏行；未完成验收步骤。"
+              : "该流程尚无客户验收接受决定（decisionKind=acceptance，customerDecision=accepted）；未完成验收步骤。";
       return {
         ok: false,
         code: "acceptance-not-accepted",
         revision: read.revision,
         flow: view,
-        error: "该流程尚无客户验收接受决定（decisionKind=acceptance，customerDecision=accepted）；未完成验收步骤。",
+        error: detail,
       };
     }
 
@@ -726,6 +762,827 @@ export async function completeAcceptanceStep(input: {
       viewActorRoleId: "app",
       viewActorPower: "app",
     });
+  }).catch(internalError);
+}
+
+// —————————————————————— 应用专用：reopenAcceptanceStepForRework ——————————————————————
+
+/** `reopenAcceptanceStepForRework` 输入（应用专用，不是角色工具参数）。 */
+export interface ReopenAcceptanceStepForReworkInput {
+  projectRoot: string;
+  flowId: string;
+  /**
+   * 调用方（桌面）声明已存在**耐久**的 auto-rework routing record
+   * （`.ans/governance/acceptance/<flowId>/rework-routing.json`，桌面 owner；judge auto-rework 不写
+   * `customer.decision`）。编排不读取、不复制桌面私有记录 schema；该标志只放行「无 rejected 决定」的
+   * 重开前提。缺省 `false` ⇒ 只认最新 acceptance 决定 rejected。
+   */
+  autoRework?: boolean;
+}
+
+/**
+ * **应用专用**：返工前把 flow YAML 的保留验收步骤安全重开为 `pending` 并清空旧证据。
+ *
+ * 2026-10-23 验收返工路由方案 v1 §5.5.4 / Q1 A（P7）：正常路径下应用从不把 verification 标
+ * dispatched；但手工/旧流程可能已是 dispatched/delivered，重派 Proof 前必须先回到 pending，
+ * 否则旧证据会冒充新复核。
+ *
+ * 契约（钉死）：
+ *   · **前提**：最新 acceptance 决定为 `rejected`，或调用方声明 `autoRework:true` 且无 acceptance
+ *     决定；最新 `accepted`/未结算/无决定且未声明 auto-rework ⇒ `acceptance-not-rejected`；
+ *   · `pending` 且无 `evidence` ⇒ `{ok:true, idempotent:true}`（不写盘、revision 不变）；
+ *   · `pending` 但带旧 `evidence` ⇒ 清空旧证据并写事件（避免旧证据冒充新复核）；
+ *   · `dispatched`/`delivered` ⇒ 置 `pending`、清空 `evidence`，保留
+ *     `supersedes`/`supersededBy`/`dependsOn`/`parallelGroup`；
+ *   · `done` ⇒ `acceptance-already-done`（不自动重开已收口流程）；
+ *   · `failed`/`blocked`/`aborted`（及不可达的 `superseded`）⇒ `acceptance-step-terminal`；
+ *   · 缺保留验收步骤 ⇒ `acceptance-step-missing`；账本不可读/坏行 ⇒ `ledger-unavailable`；
+ *   · 原子写失败 ⇒ `write-failed`，原文件不变；**不写 `customer.decision`**、不新增枚举/保留 id。
+ *   · **不注册为角色工具**（不进 AdapterCapabilities）；只经
+ *     `src/pipeline/orchestration/flow-state.ts` 公共出口供桌面消费。
+ */
+export async function reopenAcceptanceStepForRework(
+  input: ReopenAcceptanceStepForReworkInput,
+): Promise<FlowToolResult> {
+  const projectRoot = path.resolve(input.projectRoot);
+  const flowId = input.flowId;
+  if (typeof flowId !== "string" || !FLOW_ID_RE.test(flowId)) {
+    return { ok: false, code: "missing-flow-id", error: "缺少合法 flowId（应形如 todo-list-v1）。" };
+  }
+  const autoRework = input.autoRework === true;
+  const log = createDiagnosticLogger({ component: "orchestration.flow-service", projectRoot });
+  return serialize(projectRoot, async () => {
+    const read = await readFlowState(projectRoot, flowId);
+    if (!read.ok) return read.result;
+    const view = viewOf(read.flow, read.revision, "app", "app");
+    const index = read.flow.steps.findIndex(
+      (step) => isReservedAcceptanceStepId(step.id) && step.kind === "acceptance",
+    );
+    if (index === -1) {
+      return {
+        ok: false,
+        code: "acceptance-step-missing",
+        revision: read.revision,
+        flow: view,
+        error: "流程缺少保留验收步骤（verification/acceptance，kind: acceptance）。",
+      };
+    }
+    const step = read.flow.steps[index]!;
+
+    // 1) 终态护栏：不自动重开（先于账本 I/O；失败码确定）。
+    if (step.status === "done") {
+      return {
+        ok: false,
+        code: "acceptance-already-done",
+        revision: read.revision,
+        flow: view,
+        error: "验收步骤已完成（done）；不自动重开已收口流程，请人工核对。",
+      };
+    }
+    if (step.status === "failed" || step.status === "blocked" || step.status === "aborted" || step.status === "superseded") {
+      return {
+        ok: false,
+        code: "acceptance-step-terminal",
+        revision: read.revision,
+        flow: view,
+        error: `验收步骤状态为 ${step.status}（终态）；不自动重开，请人工/Convener 处理。`,
+      };
+    }
+
+    // 2) 前提：最新 acceptance 决定 rejected（或调用方声明 auto-rework routing record）。
+    let ledger;
+    try {
+      ledger = await readGovernanceLedger(projectRoot);
+    } catch (err) {
+      return {
+        ok: false,
+        code: "ledger-unavailable",
+        revision: read.revision,
+        flow: view,
+        error: `治理账本不可读：${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+    if (ledger.errors.length > 0) {
+      return {
+        ok: false,
+        code: "ledger-unavailable",
+        revision: read.revision,
+        flow: view,
+        error: `治理账本不可读或存在坏行：${ledger.errors[0]}`,
+      };
+    }
+    const latest = latestAcceptanceDecision(flowId, ledger.entries);
+    const allowed = latest.kind === "rejected" || (autoRework && latest.kind === "none");
+    if (!allowed) {
+      const detail =
+        latest.kind === "accepted"
+          ? "该流程最新验收决定为 accepted（流程已收口）；不重开验收步骤。"
+          : latest.kind === "unresolved"
+            ? "该流程最新验收决定为未结算/异常状态；不重开验收步骤（fail-closed，请人工核对）。"
+            : "该流程尚无 rejected 验收决定，也未声明 auto-rework 记录；不重开验收步骤。";
+      return {
+        ok: false,
+        code: "acceptance-not-rejected",
+        revision: read.revision,
+        flow: view,
+        error: detail,
+      };
+    }
+
+    // 3) 幂等：pending 且无旧证据 ⇒ 不写盘。
+    if (step.status === "pending" && step.evidence === undefined) {
+      return { ok: true, idempotent: true, revision: read.revision, flow: view };
+    }
+
+    // 4) 重开：置 pending 并清空该步骤 evidence（保留 supersedes/supersededBy/dependsOn/parallelGroup）。
+    const reopened: FlowStateStep = {
+      id: step.id,
+      title: step.title,
+      owner: step.owner,
+      kind: step.kind,
+      status: "pending",
+      ...(step.supersedes !== undefined ? { supersedes: [...step.supersedes] } : {}),
+      ...(step.supersededBy !== undefined ? { supersededBy: step.supersededBy } : {}),
+      ...(step.parallelGroup !== undefined ? { parallelGroup: step.parallelGroup } : {}),
+      ...(step.dependsOn !== undefined ? { dependsOn: [...step.dependsOn] } : {}),
+    };
+    const candidate: FlowState = {
+      ...read.flow,
+      steps: read.flow.steps.map((item, itemIndex) => (itemIndex === index ? reopened : item)),
+    };
+    return writeFlowState({
+      projectRoot,
+      flowId,
+      flow: candidate,
+      event: "flow.acceptance.reopened",
+      fields: {
+        flowId,
+        stepId: step.id,
+        from: step.status,
+        clearedEvidence: step.evidence !== undefined,
+        source: latest.kind === "rejected" ? "rejected" : "auto-rework",
+      },
+      writeFile: (absPath, data) => atomicWrite(absPath, data),
+      log,
+      viewActorRoleId: "app",
+      viewActorPower: "app",
+    });
+  }).catch(internalError);
+}
+
+// —————————————————————— 应用专用：completeRoleCardsStep ——————————————————————
+
+/** `role-cards` 步骤的精确 id（本函数的唯一目标；不做前缀/相似匹配）。 */
+const ROLE_CARDS_STEP_ID = "role-cards";
+/** 角色目录（项目相对路径首段；与项目语言一致）。 */
+const ROLE_CARDS_DIR = "角色卡";
+/** 每个目标角色必须齐全的六个文件（不代表解析顺序；排序只用于记录确定性）。 */
+const ROLE_CARD_FILE_NAMES = [
+  "role-card.md",
+  "boundary.yaml",
+  "feature-map.md",
+  "functional-description.md",
+  "memo.md",
+  "api-spec.md",
+] as const;
+const ROLE_CARD_FILE_SET: ReadonlySet<string> = new Set(ROLE_CARD_FILE_NAMES);
+/** 应用私有验证记录（机器状态，不是客户文档、不是 readiness/验收）。 */
+const ROLE_CARDS_RECORD_SCHEMA = "role-cards-gate/v1";
+const ROLE_CARDS_RECORD_ROOT_REL = ".ans/governance/role-cards";
+/** sha256 小写 hex（桌面传入的指纹与逐文件哈希统一口径）。 */
+const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
+/** 已是终态、应用不得覆盖的步骤状态（done 单独按幂等处理）。 */
+const ROLE_CARDS_TERMINAL_STATUSES: ReadonlySet<string> = new Set(["superseded", "failed", "blocked", "aborted"]);
+
+/** `completeRoleCardsStep` 的逐文件校验结果（桌面在结构校验后传入；函数会重读核对）。 */
+export interface CompleteRoleCardsValidatedFile {
+  /** 项目相对路径：`角色卡/<roleId>/<六文件之一>`。 */
+  path: string;
+  sha256: string;
+}
+
+/** `completeRoleCardsStep` 输入（与方案 A5 一致；应用专用，不是角色工具参数）。 */
+export interface CompleteRoleCardsStepInput {
+  projectRoot: string;
+  flowId: string;
+  /** 非空、去重、合法角色 id（允许中文；不得含路径分隔符/`.`/`..`）。 */
+  roleIds: readonly string[];
+  /** 仅目标角色目录下六个文件；每个目标角色六件齐全、无重复、无越界。 */
+  validatedFiles: readonly CompleteRoleCardsValidatedFile[];
+  /** 桌面对目标角色六文件 + 团队计划 + validator schema 计算的 64 位小写 hex 指纹。 */
+  fingerprint: string;
+  /** 任命/写卡产物路径（可选；只记录，不读取）。 */
+  appointmentArtifactPath?: string;
+}
+
+/** 完成的证据（kind 与步骤 kind 对应，不改 kind）。 */
+export interface CompleteRoleCardsEvidence {
+  kind: "artifact" | "dispatch";
+  ref: string;
+}
+
+/**
+ * `completeRoleCardsStep` 结果：复用 `FlowToolResult` 形状，并补充本次证据/记录路径。
+ *
+ * 错误码（桌面据此分流）：
+ *   · 输入：`invalid-input` / `invalid-role-ids` / `invalid-validated-files` /
+ *     `invalid-fingerprint` / `invalid-appointment-artifact-path`；
+ *   · 校验后变化：`role-cards-stale`（重读哈希不一致/缺失；flow/账本/记录零写入）；
+ *   · flow：`role-cards-step-missing` / `role-cards-step-terminal` / `role-cards-kind-unsupported`
+ *     （以及读取既有码 `missing-flow-id`/`not-found`/`read-failed`/`invalid-flow`）；
+ *   · 证据/写入：`ledger-unavailable` / `ledger-write-failed` / `insufficient-evidence` / `write-failed`。
+ */
+export interface CompleteRoleCardsStepResult extends FlowToolResult {
+  /** 成功完成时实际写入 flow 的证据。 */
+  evidence?: CompleteRoleCardsEvidence;
+  /** artifact kind 时本次使用的应用验证记录（项目相对路径）。 */
+  recordPath?: string;
+}
+
+/** 验证记录形状（`.ans/governance/role-cards/<flowId>/<fingerprint>.json`）。 */
+interface RoleCardsValidationRecord {
+  schema: typeof ROLE_CARDS_RECORD_SCHEMA;
+  flowId: string;
+  at: string;
+  roleIds: string[];
+  appointmentArtifactPath: string | null;
+  /**
+   * 输入契约不单独携带团队计划；桌面指纹已把团队计划内容计入 `fingerprint`。
+   * 字段固定 `null` 表示「未单独提供」，避免把 null 误读成「无团队计划」。
+   */
+  teamPlan: null;
+  fingerprint: string;
+  files: Array<{ path: string; sha256: string }>;
+  result: "structure-pass";
+  semantic: "pending";
+  disclaimer: string;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** 角色 id 合法性（只做路径安全与最小形状约束；不限制中文）。 */
+function roleIdProblem(roleId: unknown): string | undefined {
+  if (typeof roleId !== "string") return "角色 id 必须是字符串";
+  if (roleId.trim() === "") return "角色 id 不能为空";
+  if (roleId !== roleId.trim()) return `角色 id 不能含首尾空白（"${roleId}"）`;
+  if (roleId === "." || roleId === "..") return `角色 id 不能是 "${roleId}"`;
+  if (roleId.includes("/") || roleId.includes("\\") || roleId.includes("\u0000")) {
+    return `角色 id 不能包含路径分隔符或 NUL（"${roleId}"）`;
+  }
+  return undefined;
+}
+
+/** 角色卡文件路径归一化：只允许 `角色卡/<roleId>/<六文件之一>`（词法判定，不访问文件系统）。 */
+function normalizeRoleCardRelPath(raw: string): string | undefined {
+  const replaced = raw.replace(/\\/g, "/");
+  if (replaced === "" || replaced.includes("\u0000")) return undefined;
+  if (replaced.startsWith("/") || /^[A-Za-z]:\//.test(replaced)) return undefined;
+  let rel = replaced;
+  while (rel.startsWith("./")) rel = rel.slice(2);
+  const segments = rel.split("/");
+  if (segments.length !== 3) return undefined;
+  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) return undefined;
+  if (segments[0] !== ROLE_CARDS_DIR) return undefined;
+  if (!ROLE_CARD_FILE_SET.has(segments[2]!)) return undefined;
+  return segments.join("/");
+}
+
+/** 仅用于记录的项目相对路径（拒绝绝对路径/URL 形状/空段/`.`/`..`）。 */
+function isRecordedProjectRelPath(value: unknown): value is string {
+  if (typeof value !== "string" || value.trim() === "") return false;
+  const normalized = value.replace(/\\/g, "/");
+  if (normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized) || /^[a-z][a-z0-9+.-]*:\/\//i.test(normalized)) {
+    return false;
+  }
+  const segments = normalized.split("/");
+  return segments.every((segment) => segment !== "" && segment !== "." && segment !== "..");
+}
+
+type RoleCardsInputCheck =
+  | {
+      ok: true;
+      roleIds: string[];
+      files: Array<{ path: string; sha256: string }>;
+      appointmentArtifactPath: string | null;
+    }
+  | { ok: false; result: CompleteRoleCardsStepResult };
+
+/** 输入形状/覆盖/越界校验（全部为词法判定；任何失败都不写盘）。 */
+function validateRoleCardsStepInput(input: CompleteRoleCardsStepInput): RoleCardsInputCheck {
+  const rawRoleIds: readonly unknown[] = Array.isArray(input.roleIds) ? input.roleIds : [];
+  if (rawRoleIds.length === 0) {
+    return { ok: false, result: { ok: false, code: "invalid-role-ids", error: "roleIds 必须是非空数组。" } };
+  }
+  const roleIds: string[] = [];
+  const roleIdKeys = new Set<string>();
+  for (const rawRoleId of rawRoleIds) {
+    const problem = roleIdProblem(rawRoleId);
+    if (problem !== undefined) {
+      return { ok: false, result: { ok: false, code: "invalid-role-ids", error: problem } };
+    }
+    const roleId = rawRoleId as string;
+    const key = roleId.toLowerCase();
+    if (roleIdKeys.has(key)) {
+      return {
+        ok: false,
+        result: {
+          ok: false,
+          code: "invalid-role-ids",
+          error: `roleIds 含重复角色 id："${roleId}"（Windows 目录大小写不敏感，按不区分大小写去重）。`,
+        },
+      };
+    }
+    roleIdKeys.add(key);
+    roleIds.push(roleId);
+  }
+
+  if (typeof input.fingerprint !== "string" || !SHA256_HEX_RE.test(input.fingerprint)) {
+    return {
+      ok: false,
+      result: { ok: false, code: "invalid-fingerprint", error: "fingerprint 必须是 64 位小写十六进制（sha256）。" },
+    };
+  }
+  if (input.appointmentArtifactPath !== undefined && !isRecordedProjectRelPath(input.appointmentArtifactPath)) {
+    return {
+      ok: false,
+      result: {
+        ok: false,
+        code: "invalid-appointment-artifact-path",
+        error: "appointmentArtifactPath 必须是项目相对路径（非空、无空段/`.`/`..`、非绝对路径）。",
+      },
+    };
+  }
+
+  const rawFiles: readonly unknown[] = Array.isArray(input.validatedFiles) ? input.validatedFiles : [];
+  const files = new Map<string, string>();
+  const issues: string[] = [];
+  for (const [fileIndex, rawFile] of rawFiles.entries()) {
+    if (!isPlainRecord(rawFile)) {
+      issues.push(`validatedFiles[${fileIndex}]: 必须是 { path, sha256 } 对象`);
+      continue;
+    }
+    const rawPath = rawFile.path;
+    const rawSha = rawFile.sha256;
+    if (typeof rawPath !== "string") {
+      issues.push(`validatedFiles[${fileIndex}].path: 必须是字符串`);
+      continue;
+    }
+    if (typeof rawSha !== "string" || !SHA256_HEX_RE.test(rawSha)) {
+      issues.push(`validatedFiles[${fileIndex}].sha256: 必须是 64 位小写十六进制（sha256）`);
+      continue;
+    }
+    const rel = normalizeRoleCardRelPath(rawPath);
+    if (rel === undefined) {
+      issues.push(`validatedFiles[${fileIndex}].path: 只允许 角色卡/<roleId>/<六文件之一>（当前 "${rawPath}"）`);
+      continue;
+    }
+    const roleSegment = rel.split("/")[1]!;
+    if (!roleIdKeys.has(roleSegment.toLowerCase())) {
+      issues.push(`validatedFiles[${fileIndex}].path: 角色 "${roleSegment}" 不在 roleIds 内（越界）`);
+      continue;
+    }
+    if (files.has(rel)) {
+      issues.push(`validatedFiles[${fileIndex}].path: 重复路径 "${rel}"`);
+      continue;
+    }
+    files.set(rel, rawSha);
+  }
+  if (issues.length === 0) {
+    for (const roleId of roleIds) {
+      for (const name of ROLE_CARD_FILE_NAMES) {
+        const rel = `${ROLE_CARDS_DIR}/${roleId}/${name}`;
+        if (!files.has(rel)) issues.push(`缺少目标角色文件：${rel}`);
+      }
+    }
+  }
+  if (issues.length > 0) {
+    return {
+      ok: false,
+      result: {
+        ok: false,
+        code: "invalid-validated-files",
+        error: `validatedFiles 非法（${issues.length} 项）：${issues[0]}`,
+        issues,
+      },
+    };
+  }
+
+  const sortedFiles = [...files.entries()]
+    .map(([rel, sha]) => ({ path: rel, sha256: sha }))
+    .sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0));
+  const sortedRoleIds = [...roleIds].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+  return {
+    ok: true,
+    roleIds: sortedRoleIds,
+    files: sortedFiles,
+    appointmentArtifactPath: input.appointmentArtifactPath ?? null,
+  };
+}
+
+/** 已存在的记录与本次输入一致 ⇒ 原样复用（不重写；保证同指纹同内容的记录 sha 稳定）。 */
+async function readReusableRoleCardsRecord(
+  absPath: string,
+  expected: {
+    flowId: string;
+    fingerprint: string;
+    roleIds: readonly string[];
+    files: ReadonlyArray<{ path: string; sha256: string }>;
+  },
+): Promise<{ text: string; sha256: string } | undefined> {
+  let text: string;
+  try {
+    text = await readFile(absPath, "utf8");
+  } catch {
+    return undefined;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (!isPlainRecord(parsed)) return undefined;
+  if (parsed.schema !== ROLE_CARDS_RECORD_SCHEMA) return undefined;
+  if (parsed.flowId !== expected.flowId || parsed.fingerprint !== expected.fingerprint) return undefined;
+  if (!Array.isArray(parsed.roleIds) || parsed.roleIds.length !== expected.roleIds.length) return undefined;
+  if (!parsed.roleIds.every((value, index) => value === expected.roleIds[index])) return undefined;
+  if (!Array.isArray(parsed.files) || parsed.files.length !== expected.files.length) return undefined;
+  const filesMatch = parsed.files.every((value, index) => {
+    const file = expected.files[index]!;
+    return isPlainRecord(value) && value.path === file.path && value.sha256 === file.sha256;
+  });
+  if (!filesMatch) return undefined;
+  return { text, sha256: sha256(text) };
+}
+
+interface RoleCardsCompletionContext {
+  projectRoot: string;
+  flowId: string;
+  flow: FlowState;
+  revision: string;
+  index: number;
+  view: FlowToolView;
+  roleIds: readonly string[];
+  files: ReadonlyArray<{ path: string; sha256: string }>;
+  fingerprint: string;
+  appointmentArtifactPath: string | null;
+  log: ReturnType<typeof createDiagnosticLogger>;
+}
+
+/** artifact kind：写应用验证记录 → 幂等追加 `artifact.observed`（power=app）→ flow done。 */
+async function completeRoleCardsArtifact(context: RoleCardsCompletionContext): Promise<CompleteRoleCardsStepResult> {
+  const { projectRoot, flowId, flow, revision, index, view, roleIds, files, fingerprint, appointmentArtifactPath, log } =
+    context;
+  const recordRel = `${ROLE_CARDS_RECORD_ROOT_REL}/${flowId}/${fingerprint}.json`;
+  const recordAbs = path.join(projectRoot, ...recordRel.split("/"));
+
+  const reusable = await readReusableRoleCardsRecord(recordAbs, { flowId, fingerprint, roleIds, files });
+  let recordSha: string;
+  if (reusable !== undefined) {
+    recordSha = reusable.sha256;
+  } else {
+    const record: RoleCardsValidationRecord = {
+      schema: ROLE_CARDS_RECORD_SCHEMA,
+      flowId,
+      at: new Date().toISOString(),
+      roleIds: [...roleIds],
+      appointmentArtifactPath,
+      teamPlan: null,
+      fingerprint,
+      files: files.map((file) => ({ path: file.path, sha256: file.sha256 })),
+      result: "structure-pass",
+      semantic: "pending",
+      disclaimer: "结构校验通过，不代表 readiness/验收/客户批准；语义 readiness 仍由 Convener 复核。",
+    };
+    const text = `${JSON.stringify(record, null, 2)}\n`;
+    recordSha = sha256(text);
+    try {
+      await mkdir(path.dirname(recordAbs), { recursive: true });
+      await atomicWrite(recordAbs, text);
+    } catch (err) {
+      log.error("flow.role-cards.record.failed", err, { flowId, fingerprint, recordPath: recordRel });
+      return {
+        ok: false,
+        code: "write-failed",
+        revision,
+        flow: view,
+        error: `role-cards 验证记录写盘失败（原文件未被替换）：${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+    log.record("flow.role-cards.record.written", { flowId, fingerprint, recordPath: recordRel });
+  }
+
+  let ledger;
+  try {
+    ledger = await readGovernanceLedger(projectRoot);
+  } catch (err) {
+    return {
+      ok: false,
+      code: "ledger-unavailable",
+      revision,
+      flow: view,
+      error: `治理账本不可读：${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (ledger.errors.length > 0) {
+    return {
+      ok: false,
+      code: "ledger-unavailable",
+      revision,
+      flow: view,
+      error: `治理账本不可读或存在坏行：${ledger.errors[0]}`,
+    };
+  }
+
+  let entries: GovernanceLedgerEntry[] = ledger.entries;
+  const alreadyObserved = entries.some(
+    (entry) =>
+      entry.kind === "artifact.observed" &&
+      entry.artifactPath === recordRel &&
+      entry.artifactSha256 === recordSha,
+  );
+  if (!alreadyObserved) {
+    const observedEntry: GovernanceLedgerEntry = {
+      at: new Date().toISOString(),
+      kind: "artifact.observed",
+      actorRoleId: "app",
+      power: "app",
+      artifactPath: recordRel,
+      artifactSha256: recordSha,
+      flowId,
+    };
+    const appended = await appendGovernanceLedger(projectRoot, observedEntry);
+    if (!appended.ok) {
+      log.error("flow.role-cards.ledger.failed", new Error(appended.message), { flowId, recordPath: recordRel });
+      return { ok: false, code: "ledger-write-failed", revision, flow: view, error: appended.message };
+    }
+    entries = [...entries, observedEntry];
+  }
+
+  const candidate: FlowState = {
+    ...flow,
+    steps: flow.steps.map((item, itemIndex) =>
+      itemIndex === index
+        ? {
+            ...item,
+            status: "done" as const,
+            evidence: { kind: "artifact" as const, ref: recordRel },
+          }
+        : item,
+    ),
+  };
+  const parsedCandidate = parseFlowStateYaml(serializeFlow(candidate), flowId);
+  if (!parsedCandidate.ok) {
+    return {
+      ok: false,
+      code: "invalid-flow",
+      revision,
+      flow: view,
+      error: `候选流程 YAML 校验失败：${parsedCandidate.error}`,
+    };
+  }
+  const evidenceResult = validateFlowEvidence(parsedCandidate.flow, entries);
+  if (!evidenceResult.ok) {
+    const issues = evidenceResult.issues.filter((issue) => issue.stepId === ROLE_CARDS_STEP_ID);
+    if (issues.length > 0) {
+      return {
+        ok: false,
+        code: "insufficient-evidence",
+        revision,
+        flow: view,
+        error: issues.map((issue) => issue.message).join("；"),
+        issues: issues.map((issue) => `${issue.path}: ${issue.message}`),
+      };
+    }
+  }
+
+  const written = await writeFlowState({
+    projectRoot,
+    flowId,
+    flow: parsedCandidate.flow,
+    event: "flow.role-cards.completed",
+    fields: { flowId, stepId: ROLE_CARDS_STEP_ID, fingerprint, evidenceKind: "artifact", recordPath: recordRel },
+    writeFile: (absPath, data) => atomicWrite(absPath, data),
+    log,
+    viewActorRoleId: "app",
+    viewActorPower: "app",
+  });
+  if (!written.ok) return written;
+  return { ...written, evidence: { kind: "artifact", ref: recordRel }, recordPath: recordRel };
+}
+
+/** dispatch kind：要求账本已有 `dispatch.accepted{flowId, stepId:"role-cards"}`，再用对账写 flow done。 */
+async function completeRoleCardsDispatch(context: RoleCardsCompletionContext): Promise<CompleteRoleCardsStepResult> {
+  const { projectRoot, flowId, flow, revision, index, view, fingerprint, log } = context;
+
+  let ledger;
+  try {
+    ledger = await readGovernanceLedger(projectRoot);
+  } catch (err) {
+    return {
+      ok: false,
+      code: "ledger-unavailable",
+      revision,
+      flow: view,
+      error: `治理账本不可读：${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (ledger.errors.length > 0) {
+    return {
+      ok: false,
+      code: "ledger-unavailable",
+      revision,
+      flow: view,
+      error: `治理账本不可读或存在坏行：${ledger.errors[0]}`,
+    };
+  }
+
+  const candidate: FlowState = {
+    ...flow,
+    steps: flow.steps.map((item, itemIndex) =>
+      itemIndex === index
+        ? {
+            ...item,
+            status: "done" as const,
+            evidence: { kind: "dispatch" as const, ref: ROLE_CARDS_STEP_ID },
+          }
+        : item,
+    ),
+  };
+  const parsedCandidate = parseFlowStateYaml(serializeFlow(candidate), flowId);
+  if (!parsedCandidate.ok) {
+    return {
+      ok: false,
+      code: "invalid-flow",
+      revision,
+      flow: view,
+      error: `候选流程 YAML 校验失败：${parsedCandidate.error}`,
+    };
+  }
+  const evidenceResult = validateFlowEvidence(parsedCandidate.flow, ledger.entries);
+  if (!evidenceResult.ok) {
+    const issues = evidenceResult.issues.filter((issue) => issue.stepId === ROLE_CARDS_STEP_ID);
+    if (issues.length > 0) {
+      return {
+        ok: false,
+        code: "insufficient-evidence",
+        revision,
+        flow: view,
+        error: issues.map((issue) => issue.message).join("；"),
+        issues: issues.map((issue) => `${issue.path}: ${issue.message}`),
+      };
+    }
+  }
+
+  const written = await writeFlowState({
+    projectRoot,
+    flowId,
+    flow: parsedCandidate.flow,
+    event: "flow.role-cards.completed",
+    fields: { flowId, stepId: ROLE_CARDS_STEP_ID, fingerprint, evidenceKind: "dispatch" },
+    writeFile: (absPath, data) => atomicWrite(absPath, data),
+    log,
+    viewActorRoleId: "app",
+    viewActorPower: "app",
+  });
+  if (!written.ok) return written;
+  return { ...written, evidence: { kind: "dispatch", ref: ROLE_CARDS_STEP_ID } };
+}
+
+/**
+ * **应用专用**：结构校验通过后把 flow YAML 的 `id:"role-cards"` 步骤置 `done`。
+ *
+ * - **不注册为角色工具**（不进 `AdapterCapabilities` / 三 flow 工具）；桌面只经
+ *   `src/pipeline/orchestration/flow-state.ts` 公共出口调用。
+ * - **不复制验收门禁**：不要求 `customer.decision`、不写客户决定、不伪造 readiness/客户批准；
+ *   只记录确定性的结构校验结果（语义 readiness 仍由 Convener 复核）。
+ * - **重读核对**：逐文件重新读取并计算 sha256；缺失/不一致 ⇒ `role-cards-stale`，
+ *   flow/账本/记录零写入（校验后文件又变时不完成）。
+ * - **按步骤 kind 生成证据（不改 kind）**：
+ *   · `artifact`：写 `.ans/governance/role-cards/<flowId>/<fingerprint>.json`，并幂等追加
+ *     `artifact.observed{actorRoleId:"app", power:"app", artifactPath, artifactSha256, flowId}`；
+ *     证据 `{kind:"artifact", ref:记录相对路径}`；同 path+sha 不重复追加，重复调用不重写记录。
+ *   · `dispatch`：要求账本已有 `dispatch.accepted{flowId, stepId:"role-cards"}`（应用派 Crew 时写入），
+ *     用 `validateFlowEvidence` 对账；证据 `{kind:"dispatch", ref:"role-cards"}`；不写 `.ans` 记录。
+ *   · 其它 kind ⇒ `role-cards-kind-unsupported`。
+ * - 步骤缺失 ⇒ `role-cards-step-missing`；已 done ⇒ `{ok:true, idempotent:true}`；
+ *   `superseded/failed/blocked/aborted` ⇒ `role-cards-step-terminal`（不覆盖终态）。
+ * - 与 `completeAcceptanceStep` 共用 per-project 串行队列、候选 YAML 复核与原子写；写 flow 事件
+ *   `flow.role-cards.completed`，view actor `app/app`；写失败不破坏原文件。
+ */
+export async function completeRoleCardsStep(
+  input: CompleteRoleCardsStepInput,
+): Promise<CompleteRoleCardsStepResult> {
+  if (typeof input?.projectRoot !== "string" || input.projectRoot.trim() === "") {
+    return { ok: false, code: "invalid-input", error: "缺少 projectRoot。" };
+  }
+  const projectRoot = path.resolve(input.projectRoot);
+  const flowId = input.flowId;
+  if (typeof flowId !== "string" || !FLOW_ID_RE.test(flowId)) {
+    return { ok: false, code: "missing-flow-id", error: "缺少合法 flowId（应形如 todo-list-v1）。" };
+  }
+  const checked = validateRoleCardsStepInput(input);
+  if (!checked.ok) return checked.result;
+  const log = createDiagnosticLogger({ component: "orchestration.flow-service", projectRoot });
+
+  return serialize(projectRoot, async () => {
+    // 1. 重读核对：校验后文件又变/缺失 ⇒ stale，任何写入都不发生。
+    const staleIssues: string[] = [];
+    for (const file of checked.files) {
+      const abs = path.join(projectRoot, ...file.path.split("/"));
+      let bytes: Buffer;
+      try {
+        bytes = await readFile(abs);
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        staleIssues.push(
+          `${file.path}: ${code === "ENOENT" ? "文件不存在" : `不可读（${err instanceof Error ? err.message : String(err)}）`}`,
+        );
+        continue;
+      }
+      const actual = sha256(bytes);
+      if (actual !== file.sha256) {
+        staleIssues.push(`${file.path}: sha256 不一致（校验时 ${file.sha256}，当前 ${actual}）`);
+      }
+    }
+    if (staleIssues.length > 0) {
+      log.record("flow.role-cards.stale", {
+        flowId,
+        fingerprint: input.fingerprint,
+        mismatches: staleIssues.length,
+      });
+      return {
+        ok: false,
+        code: "role-cards-stale",
+        error: `角色卡在校验后发生变化（${staleIssues.length} 项），未完成 role-cards：${staleIssues[0]}`,
+        issues: staleIssues,
+      };
+    }
+
+    // 2. 读 flow，定位精确 id 的 role-cards 步骤。
+    const read = await readFlowState(projectRoot, flowId);
+    if (!read.ok) return read.result;
+    const view = viewOf(read.flow, read.revision, "app", "app");
+    const index = read.flow.steps.findIndex((step) => step.id === ROLE_CARDS_STEP_ID);
+    if (index === -1) {
+      return {
+        ok: false,
+        code: "role-cards-step-missing",
+        revision: read.revision,
+        flow: view,
+        error: `流程缺少 id 为 "${ROLE_CARDS_STEP_ID}" 的步骤（无法完成 role-cards）。`,
+      };
+    }
+    const step = read.flow.steps[index]!;
+    if (step.status === "done") {
+      const existingEvidence =
+        step.evidence !== undefined && (step.evidence.kind === "artifact" || step.evidence.kind === "dispatch")
+          ? { kind: step.evidence.kind, ref: step.evidence.ref }
+          : undefined;
+      return {
+        ok: true,
+        idempotent: true,
+        revision: read.revision,
+        flow: view,
+        ...(existingEvidence !== undefined ? { evidence: existingEvidence } : {}),
+        ...(existingEvidence?.kind === "artifact" ? { recordPath: existingEvidence.ref } : {}),
+      };
+    }
+    if (ROLE_CARDS_TERMINAL_STATUSES.has(step.status)) {
+      return {
+        ok: false,
+        code: "role-cards-step-terminal",
+        revision: read.revision,
+        flow: view,
+        error: `步骤 ${ROLE_CARDS_STEP_ID} 已是终态 ${step.status}，应用不覆盖终态。`,
+      };
+    }
+    if (step.kind !== "artifact" && step.kind !== "dispatch") {
+      return {
+        ok: false,
+        code: "role-cards-kind-unsupported",
+        revision: read.revision,
+        flow: view,
+        error: `步骤 ${ROLE_CARDS_STEP_ID} 的 kind=${step.kind} 不受支持（只支持 artifact / dispatch）。`,
+      };
+    }
+
+    const context: RoleCardsCompletionContext = {
+      projectRoot,
+      flowId,
+      flow: read.flow,
+      revision: read.revision,
+      index,
+      view,
+      roleIds: checked.roleIds,
+      files: checked.files,
+      fingerprint: input.fingerprint,
+      appointmentArtifactPath: checked.appointmentArtifactPath,
+      log,
+    };
+    return step.kind === "artifact" ? completeRoleCardsArtifact(context) : completeRoleCardsDispatch(context);
   }).catch(internalError);
 }
 
@@ -787,6 +1644,94 @@ function artifactPowerOf(owner: string): GovernancePower {
     default:
       return "project";
   }
+}
+
+/** 单文件观察检查结果：可观察 ⇒ 规范化相对路径 + sha256；否则给出跳过原因（path-invalid 用原 ref，其余用 rel）。 */
+type ObservableArtifactInspection =
+  | { ok: true; rel: string; sha256: string }
+  | { ok: false; path: string; reason: "path-invalid" | "missing" | "too-large" | "binary" | "read-failed" };
+
+/**
+ * 只读检查单个声明的证据路径是否可安全观察（observeFlowArtifacts 批量循环与 done 时补观测共用）：
+ * 路径规则（绝对/URL/`..`/排除段/项目外）→ lstat 常规文件且非符号链接 → ≤2MiB → 读取 →
+ * 非图片扩展的 NUL 二进制探测 → sha256。不写任何文件。
+ */
+async function inspectObservableArtifact(projectRoot: string, ref: string): Promise<ObservableArtifactInspection> {
+  const rel = observeRelPath(projectRoot, ref);
+  if (rel === undefined) return { ok: false, path: ref, reason: "path-invalid" };
+  const abs = path.join(projectRoot, ...rel.split("/"));
+  let info;
+  try {
+    info = await lstat(abs);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    return { ok: false, path: rel, reason: code === "ENOENT" ? "missing" : "read-failed" };
+  }
+  if (!info.isFile() || info.isSymbolicLink()) return { ok: false, path: rel, reason: "missing" };
+  if (info.size > OBSERVE_ARTIFACT_MAX_BYTES) return { ok: false, path: rel, reason: "too-large" };
+  let data: Buffer;
+  try {
+    data = await readFile(abs);
+  } catch {
+    return { ok: false, path: rel, reason: "read-failed" };
+  }
+  if (looksBinaryObserve(data, rel)) return { ok: false, path: rel, reason: "binary" };
+  return { ok: true, rel, sha256: sha256(data) };
+}
+
+/** 与 flow-state.ts::normalizeRelPath 同口径（`\`→`/`、去掉一个前导 `./`；不 trim）。 */
+function normalizeObservedRelPath(value: string): string {
+  return value.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+type EnsureArtifactObservedResult =
+  | { status: "already-observed" }
+  | { status: "observed"; entry: GovernanceLedgerEntry }
+  | { status: "skipped"; reason: string }
+  | { status: "append-failed"; message: string };
+
+/**
+ * done 收口前的单 ref 补观测（模块私有；**不得**调用 serialize/observeFlowArtifacts）：
+ *   · 账本已有同 path（`flowId` 缺省或相等）的 `artifact.observed` ⇒ already-observed（不读文件）；
+ *   · 否则按 inspectObservableArtifact 的安全规则检查；不可观察 ⇒ skipped（不追加、不伪造）；
+ *   · 追加条目只含 `artifact.observed{actorRoleId: step.owner, power: artifactPowerOf(owner),
+ *     artifactPath, artifactSha256, flowId}`——**不写** stepId/customer.decision；
+ *   · 追加失败 ⇒ append-failed（不抛）；追加成功后仍由调用方用 validateFlowEvidence 裁决。
+ */
+async function ensureArtifactObserved(input: {
+  projectRoot: string;
+  flowId: string;
+  step: FlowStateStep;
+  ref: string;
+  entries: readonly GovernanceLedgerEntry[];
+}): Promise<EnsureArtifactObservedResult> {
+  const target = normalizeObservedRelPath(input.ref);
+  const alreadyObserved = input.entries.some(
+    (entry) =>
+      entry.kind === "artifact.observed" &&
+      typeof entry.artifactPath === "string" &&
+      normalizeObservedRelPath(entry.artifactPath) === target &&
+      (entry.flowId === undefined || entry.flowId === input.flowId),
+  );
+  if (alreadyObserved) return { status: "already-observed" };
+
+  const inspected = await inspectObservableArtifact(input.projectRoot, input.ref);
+  if (!inspected.ok) return { status: "skipped", reason: inspected.reason };
+  // 只追加将来能被 validateFlowEvidence 匹配的记录（observeRelPath 会 trim，归一化口径不含 trim）。
+  if (normalizeObservedRelPath(input.ref) !== inspected.rel) return { status: "skipped", reason: "path-invalid" };
+
+  const entry: GovernanceLedgerEntry = {
+    at: new Date().toISOString(),
+    kind: "artifact.observed",
+    actorRoleId: input.step.owner,
+    power: artifactPowerOf(input.step.owner),
+    artifactPath: inspected.rel,
+    artifactSha256: inspected.sha256,
+    flowId: input.flowId,
+  };
+  const appended = await appendGovernanceLedger(input.projectRoot, entry);
+  if (!appended.ok) return { status: "append-failed", message: appended.message };
+  return { status: "observed", entry };
 }
 
 export interface ObserveFlowArtifactsResult {
@@ -864,40 +1809,13 @@ export async function observeFlowArtifacts(input: {
       if (step.kind !== "artifact") continue;
       const ref = step.evidence?.ref;
       if (typeof ref !== "string" || ref.trim() === "") continue;
-      const rel = observeRelPath(projectRoot, ref);
-      if (rel === undefined) {
-        skipped.push({ path: ref, reason: "path-invalid" });
+      const inspected = await inspectObservableArtifact(projectRoot, ref);
+      if (!inspected.ok) {
+        skipped.push({ path: inspected.path, reason: inspected.reason });
         continue;
       }
-      const abs = path.join(projectRoot, ...rel.split("/"));
-      let info;
-      try {
-        info = await lstat(abs);
-      } catch (err) {
-        const code = (err as NodeJS.ErrnoException).code;
-        skipped.push({ path: rel, reason: code === "ENOENT" ? "missing" : "read-failed" });
-        continue;
-      }
-      if (!info.isFile() || info.isSymbolicLink()) {
-        skipped.push({ path: rel, reason: "missing" });
-        continue;
-      }
-      if (info.size > OBSERVE_ARTIFACT_MAX_BYTES) {
-        skipped.push({ path: rel, reason: "too-large" });
-        continue;
-      }
-      let data: Buffer;
-      try {
-        data = await readFile(abs);
-      } catch {
-        skipped.push({ path: rel, reason: "read-failed" });
-        continue;
-      }
-      if (looksBinaryObserve(data, rel)) {
-        skipped.push({ path: rel, reason: "binary" });
-        continue;
-      }
-      const sha = sha256(data);
+      const rel = inspected.rel;
+      const sha = inspected.sha256;
       const key = `${rel}\u0000${sha}`;
       if (seen.has(key) || existing.has(key)) continue; // 幂等：本次/账本已有同 path+sha
       seen.add(key);
