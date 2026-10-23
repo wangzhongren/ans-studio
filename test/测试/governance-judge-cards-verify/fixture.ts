@@ -54,6 +54,10 @@ export const FLOW = "flow-a";
 export const PROPOSAL_REL = `docs/proposals/${FLOW}-v1.md`;
 export const NOMINATION_REL = `docs/nominations/${FLOW}-v1.md`;
 export const FLOW_REL = `docs/flows/${FLOW}.md`;
+// 2026-10-22 第 3 项：验收卡机械门槛（标准/报告/变更包）。
+export const CRITERIA_REL = `docs/acceptance/${FLOW}-criteria-v1.md`;
+export const REPORT_REL = `docs/acceptance/${FLOW}-report-v1.md`;
+export const CHANGE_PACKAGE_REL = `docs/scheduling/${FLOW}-change-v1.md`;
 /**
  * 意图基准路径（2026-10-19 决策判断定位修正：decision 组只判意图漂移）。
  * 与 `governance-judge-intent.ts` 的第三级回退同形（`docs/intents/<flowId>.md`）：
@@ -86,6 +90,10 @@ export function seedProject(root: string): void {
   write(root, PROPOSAL_REL, proposalDoc());
   write(root, NOMINATION_REL, nominationDoc());
   write(root, FLOW_REL, flowDoc());
+  // 2026-10-22 第 3 项：验收卡机械门槛所需的实施前标准/验收报告/变更包（档位一致 T2）。
+  write(root, CRITERIA_REL, acceptanceCriteriaDoc());
+  write(root, REPORT_REL, acceptanceReportDoc());
+  write(root, CHANGE_PACKAGE_REL, changePackageDoc());
   // 2026-10-19 决策判断定位修正：decision 组（proposal/appointment/acceptance）以客户已确认的
   // 意图为唯一基准。种子 = 意图文件（goal/scope/acceptance 齐全）+ 账本 intent-confirm accepted
   // + intent.handed-off（与真实交接同为 power:"liaison"，不是客户批准）。
@@ -131,6 +139,72 @@ export function nominationDoc(recommended: string[] = ["role-x", "role-y"]): str
 
 export function flowDoc(): string {
   return [`# 流程 ${FLOW}`, "", "| 步骤 | 角色 | 状态 |", "| --- | --- | --- |", "| impl | project-a | done |", ""].join("\n");
+}
+
+/** 实施前验收标准（结构门槛同 `validateAcceptanceCriteriaText`）。 */
+export function acceptanceCriteriaDoc(flowId = FLOW): string {
+  return [
+    "---",
+    `flowId: ${flowId}`,
+    "version: 1",
+    "---",
+    "",
+    `# 验收完成标准 ${flowId}`,
+    "",
+    "## 验收表",
+    "| ID | 标准 | 需要的证据 | 实际证据路径/哈希 | 候选版本 | 产出角色 | 结果 | 验收判断 |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| P1 | 交付满足提案 | 测试输出 | 待提交 | 候选哈希 | 测试 | 待判定 | 待判定 |",
+    "",
+    "## 风险档位与判定依据",
+    "风险档位：T2（跨角色契约变更）。",
+    "",
+    "## 判定规则",
+    "pass / fail / insufficient evidence：按证据是否齐全与候选是否匹配判定。",
+    "",
+    "## 证据计划",
+    "需要的证据：测试命令输出、候选哈希、diff/status。",
+    "",
+    "## 版本与冻结",
+    "标准写盘后冻结。",
+    "",
+  ].join("\n");
+}
+
+/** 验收报告：首行五项（风险档位/判定依据/选定检查/复用证据/全量回归）。 */
+export function acceptanceReportDoc(flowId = FLOW, riskTier = "T2"): string {
+  return [
+    `风险档位：${riskTier}｜判定依据：跨角色契约变更｜选定检查：受影响测试与全量回归｜复用证据：无｜全量回归：已执行`,
+    "",
+    `# 验收报告 ${flowId}`,
+    "",
+    "## 结论",
+    "通过。",
+    "",
+    "## 逐行判定",
+    "| ID | 结果 |",
+    "| --- | --- |",
+    "| P1 | pass |",
+    "",
+  ].join("\n");
+}
+
+/** 变更包：frontmatter riskTier（T0–T3）。 */
+export function changePackageDoc(flowId = FLOW, riskTier = "T2"): string {
+  return [
+    "---",
+    `flowId: ${flowId}`,
+    "version: 1",
+    `riskTier: ${riskTier}`,
+    "candidate: fixture-candidate",
+    "---",
+    "",
+    `# 变更包 ${flowId}`,
+    "",
+    "## 档位依据",
+    `风险档位 ${riskTier}。`,
+    "",
+  ].join("\n");
 }
 
 /**
@@ -326,7 +400,14 @@ export function requestFor(kind: GovernanceJudgeRequest["cardKind"], overrides: 
       : kind === "appointment"
         ? { nominationPath: NOMINATION_REL }
         : kind === "acceptance"
-          ? { proposalPath: PROPOSAL_REL, flowPath: FLOW_REL }
+          ? {
+              proposalPath: PROPOSAL_REL,
+              flowPath: FLOW_REL,
+              // 2026-10-22 第 3 项：验收机械门槛要求标准/报告/变更包三类物证路径。
+              acceptanceCriteriaPath: CRITERIA_REL,
+              acceptanceReportPath: REPORT_REL,
+              changePackagePath: CHANGE_PACKAGE_REL,
+            }
           : kind === "appointment-write"
             ? { nominationPath: NOMINATION_REL, flowPath: FLOW_REL }
             : kind === "schedule-write"

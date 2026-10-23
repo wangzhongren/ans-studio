@@ -18,6 +18,7 @@ import {
   flowStatePath,
   parseFlowStateYaml,
   validateFlowEvidence,
+  FLOW_STEP_KINDS,
   type FlowState,
 } from "../../src/common/编排/flow-state.ts";
 import { evaluateGovernanceGate } from "../../src/common/编排/governance-gate.ts";
@@ -153,6 +154,101 @@ function errorPaths(text: string, flowId: string): string[] {
 
 // —————————————————————— 合法形状 ——————————————————————
 
+test("2026-10-22 新流程步骤模板：team-plan/appointment/role-cards/role-readiness/acceptance-criteria/change-package 用现有 kind", () => {
+  // 枚举不变（Q4 A：不新增 FlowStepKind）。
+  assert.deepEqual([...FLOW_STEP_KINDS], ["dispatch", "customer-decision", "artifact", "acceptance"]);
+
+  const yaml = [
+    "flowId: governance-split-demo",
+    "version: 1",
+    "qualityTier: production",
+    "steps:",
+    "  - id: team-plan",
+    "    title: 团队计划",
+    "    owner: convener",
+    "    kind: artifact",
+    "    status: pending",
+    "  - id: appointment",
+    "    title: 客户任命（闸门 2）",
+    "    owner: convener",
+    "    kind: customer-decision",
+    "    status: pending",
+    "  - id: role-cards",
+    "    title: Crew 写角色卡与边界",
+    "    owner: nominator",
+    "    kind: dispatch",
+    "    status: pending",
+    "  - id: role-readiness",
+    "    title: 角色就绪复核",
+    "    owner: convener",
+    "    kind: artifact",
+    "    status: pending",
+    "  - id: acceptance-criteria",
+    "    title: 实施前完成标准",
+    "    owner: verifier",
+    "    kind: artifact",
+    "    status: pending",
+    "  - id: delivery-backend",
+    "    title: 服务端交付",
+    "    owner: backend",
+    "    kind: dispatch",
+    "    status: pending",
+    "  - id: verification-evidence",
+    "    title: 真实启动应用并演示",
+    "    owner: backend",
+    "    kind: artifact",
+    "    status: pending",
+    "  - id: change-package",
+    "    title: 变更包",
+    "    owner: convener",
+    "    kind: artifact",
+    "    status: pending",
+    "  - id: verification",
+    "    title: 验收",
+    "    owner: verifier",
+    "    kind: acceptance",
+    "    status: pending",
+    "",
+  ].join("\n");
+  const parsed = parseFlowStateYaml(yaml, "governance-split-demo");
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.error);
+  if (!parsed.ok) return;
+  assert.deepEqual(
+    parsed.flow.steps.map((step) => [step.id, step.kind]),
+    [
+      ["team-plan", "artifact"],
+      ["appointment", "customer-decision"],
+      ["role-cards", "dispatch"],
+      ["role-readiness", "artifact"],
+      ["acceptance-criteria", "artifact"],
+      ["delivery-backend", "dispatch"],
+      ["verification-evidence", "artifact"],
+      ["change-package", "artifact"],
+      ["verification", "acceptance"],
+    ],
+  );
+  // 旧 nomination 步骤 id 仍可解析（legacy 流程不被破坏）。
+  const legacyYaml = [
+    "flowId: governance-split-demo",
+    "version: 1",
+    "qualityTier: production",
+    "steps:",
+    "  - id: nomination",
+    "    title: 提名（legacy）",
+    "    owner: nominator",
+    "    kind: customer-decision",
+    "    status: pending",
+    "  - id: verification",
+    "    title: 验收",
+    "    owner: verifier",
+    "    kind: acceptance",
+    "    status: pending",
+    "",
+  ].join("\n");
+  const legacy = parseFlowStateYaml(legacyYaml, "governance-split-demo");
+  assert.equal(legacy.ok, true, "旧 nomination 步骤 id 不应被新约定破坏");
+});
+
 test("合法 YAML：真实 todo-list-v1 流程形状解析通过", () => {
   const flow = parseOk(TODO_FLOW_YAML, "todo-list-v1");
   assert.equal(flow.flowId, "todo-list-v1");
@@ -184,6 +280,76 @@ test("flowId 与文件名不一致 ⇒ 校验失败且路径为 flowId", () => {
     assert.ok(error);
     assert.match(error.message, /不一致/);
   }
+});
+
+test("slug 收紧（S2/T9）：文件名/步骤 id/证据 ref/supersede 引用尾连字符 ⇒ 具体路径报错并展示新正则", () => {
+  // 文件名 flowId 尾连字符。
+  const badName = parseFlowStateYaml(TODO_FLOW_YAML, "flow-");
+  assert.equal(badName.ok, false);
+  if (!badName.ok) {
+    const error = badName.errors.find((item) => item.path === "flowId");
+    assert.ok(error);
+    assert.match(error.message, /0,62/, "错误文案经 ${FLOW_ID_RE} 自动展示现行正则");
+    assert.match(error.message, /flow-/);
+  }
+
+  // 顶层 flowId 与合法文件名不一致（YAML 写旧值 flow-）⇒ flowId 路径报错。
+  const badTop = parseFlowStateYaml(TODO_FLOW_YAML.replace("flowId: todo-list-v1", "flowId: flow-"), "todo-list-v1");
+  assert.equal(badTop.ok, false);
+  if (!badTop.ok) assert.ok(badTop.errors.some((item) => item.path === "flowId"));
+
+  // 步骤 id 尾连字符。
+  const badStep = TODO_FLOW_YAML.replace("  - id: verification-evidence", "  - id: verification-");
+  const stepParsed = parseFlowStateYaml(badStep, "todo-list-v1");
+  assert.equal(stepParsed.ok, false);
+  if (!stepParsed.ok) {
+    assert.ok(stepParsed.errors.some((item) => item.path === "steps[4].id" && /0,62/.test(item.message)));
+  }
+
+  // dispatch 证据 ref 尾连字符。
+  const badRef = TODO_FLOW_YAML.replace(
+    "evidence: { kind: dispatch, ref: delivery-backend }",
+    "evidence: { kind: dispatch, ref: delivery-backend- }",
+  );
+  const refParsed = parseFlowStateYaml(badRef, "todo-list-v1");
+  assert.equal(refParsed.ok, false);
+  if (!refParsed.ok) {
+    assert.ok(refParsed.errors.some((item) => item.path === "steps[2].evidence.ref" && /0,62/.test(item.message)));
+  }
+
+  // supersedes / supersededBy 引用尾连字符。
+  const badSupersede = `flowId: slug-strict-v1
+version: 1
+qualityTier: production
+steps:
+  - id: impl-
+    title: 旧实现
+    owner: A
+    kind: dispatch
+    status: superseded
+    supersededBy: impl-
+  - id: impl
+    title: 新实现
+    owner: A
+    kind: dispatch
+    status: pending
+    supersedes: [impl-]
+  - id: acceptance
+    title: 验收
+    owner: verifier
+    kind: acceptance
+    status: pending
+`;
+  const supersedeParsed = parseFlowStateYaml(badSupersede, "slug-strict-v1");
+  assert.equal(supersedeParsed.ok, false);
+  if (!supersedeParsed.ok) {
+    assert.ok(supersedeParsed.errors.some((item) => item.path === "steps[0].id" && /0,62/.test(item.message)));
+    assert.ok(supersedeParsed.errors.some((item) => item.path === "steps[1].supersedes[0]"));
+  }
+
+  // 旧合法值零回归：连续连字符仍可作步骤 id。
+  const legal = parseFlowStateYaml(GATE_FLOW_YAML.replace("  - id: impl\n", "  - id: a--b\n"), "flow-a");
+  assert.equal(legal.ok, true);
 });
 
 test("version 非正整数 / qualityTier 非法 / steps 空 ⇒ 具体路径报错", () => {
@@ -991,10 +1157,36 @@ steps:
     status: pending
 `;
 
+/** O2 派发门槛所需的实施前验收标准（结构合格）。 */
+function writeGateCriteria(root: string): void {
+  mkdirSync(join(root, "docs", "acceptance"), { recursive: true });
+  writeFileSync(
+    join(root, "docs", "acceptance", "flow-a-criteria-v1.md"),
+    [
+      "# 验收完成标准：flow-a",
+      "",
+      "| ID | 标准 | 需要的证据 | 结果 |",
+      "| --- | --- | --- | --- |",
+      "| P1 | 示例标准 | 测试输出 | 待判定 |",
+      "",
+      "风险档位：T3（治理/权限变更）。",
+      "",
+      "判定规则：pass / fail / insufficient evidence / not applicable。",
+      "",
+      "证据计划：单测原始输出与全量回归记录。",
+      "",
+      "版本冻结：v1 写盘后冻结。",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+}
+
 test("派发门禁：docs/flows/<flowId>.yaml 存在时以 YAML 为唯一机器状态", () => {
   withRoot((root) => {
     mkdirSync(join(root, "docs", "flows"), { recursive: true });
     writeFileSync(join(root, "docs", "flows", "flow-a.yaml"), GATE_FLOW_YAML, "utf8");
+    writeGateCriteria(root);
     const input = {
       projectRoot: root,
       model: "trio" as const,
@@ -1023,6 +1215,7 @@ test("派发门禁：YAML 不存在时回落旧版 .md（迁移兼容）", () =>
       "| stepId | 步骤 | 状态 |\n| --- | --- | --- |\n| impl | 实现 | pending |\n",
       "utf8",
     );
+    writeGateCriteria(root);
     const input = {
       projectRoot: root,
       model: "trio" as const,
@@ -1161,5 +1354,275 @@ test("写前校验：确认卡声明 docs/flows/<flowId>.yaml 且 YAML 非法 �
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("写前校验（S3/T11）：声明 docs/flows/flow-.yaml ⇒ 宽捕获后显式拒绝该卡，不静默跳过 YAML 校验", async () => {
+  const root = mkdtempSync(join(tmpdir(), "ans-flow-card-slug-"));
+  try {
+    const project = roleFixture(root);
+    const captured = capturingAdapter();
+    let rawCalls = 0;
+    const raw: CustomerInputFn = () => {
+      rawCalls += 1;
+      return { outcome: "answered", value: { confirmed: true }, operatorId: "test" };
+    };
+    const handle = await openRoleSession(
+      { roleId: "X", project, customerInput: raw },
+      {
+        createAdapter: (_gate, injected) => {
+          captured.holder.caps = injected;
+          return captured.adapter;
+        },
+      },
+    );
+    try {
+      // preview 完整且内容「自洽」（flowId: flow-），旧路径正则会把该卡当作非 Flow YAML 目标而跳过；
+      // 宽捕获后必须显式拒绝并点名候选值，而不是静默放行/忽略。
+      const selfConsistent = [
+        "flowId: flow-",
+        "version: 1",
+        "qualityTier: production",
+        "steps:",
+        "  - id: impl",
+        "    title: 实现",
+        "    owner: A",
+        "    kind: dispatch",
+        "    status: pending",
+        "  - id: acceptance",
+        "    title: 验收",
+        "    owner: verifier",
+        "    kind: acceptance",
+        "    status: pending",
+        "",
+      ].join("\n");
+      const invalid = await captured.holder.caps!.customerInput!({
+        kind: "confirm",
+        title: "写流程 flow-",
+        preview: `## docs/flows/flow-.yaml\n${selfConsistent}`,
+        paths: ["docs/flows/flow-.yaml"],
+      });
+      assert.ok(invalid);
+      assert.equal(invalid.outcome, "declined");
+      const reason = (invalid as { reason?: string }).reason ?? "";
+      assert.match(reason, /流程 YAML 未通过校验/);
+      assert.match(reason, /docs\/flows\/flow-\.yaml/);
+      assert.match(reason, /不是合法 slug/);
+      assert.match(reason, /0,62/, "拒绝文案须展示现行正则");
+      assert.equal(rawCalls, 0, "被拒的卡不得触达原始客户通道");
+    } finally {
+      await handle.dispose();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————————————————————— 2026-10-22 MapReduce 方案 A：可选 parallelGroup/dependsOn ——————————————————————
+
+const MAPREDUCE_FLOW_YAML = `flowId: map-reduce-v1
+version: 1
+qualityTier: production
+steps:
+  - id: contract-freeze
+    title: 冻结契约
+    owner: convener
+    kind: artifact
+    status: done
+    evidence: { kind: artifact, ref: docs/contracts/map-reduce-v1.md }
+  - id: delivery-api
+    title: Map A｜api
+    owner: api
+    kind: dispatch
+    status: pending
+    parallelGroup: map-a
+    dependsOn: [contract-freeze]
+  - id: delivery-storefront
+    title: Map B｜storefront
+    owner: storefront
+    kind: dispatch
+    status: pending
+    parallelGroup: map-b
+    dependsOn: [contract-freeze, delivery-api]
+  - id: test-map-shards
+    title: Map 测试分片
+    owner: integration
+    kind: dispatch
+    status: pending
+    parallelGroup: reduce
+    dependsOn: [delivery-api, delivery-storefront]
+  - id: integration-e2e
+    title: Reduce｜契约/集成/端到端
+    owner: integration
+    kind: dispatch
+    status: pending
+    parallelGroup: reduce
+    dependsOn: [test-map-shards]
+  - id: verification-evidence
+    title: Reduce｜合并证据
+    owner: integration
+    kind: artifact
+    status: pending
+    parallelGroup: reduce
+    dependsOn: [integration-e2e]
+  - id: acceptance
+    title: 验收
+    owner: verifier
+    kind: acceptance
+    status: pending
+`;
+
+function parseMapReduce(text = MAPREDUCE_FLOW_YAML): ReturnType<typeof parseFlowStateYaml> {
+  return parseFlowStateYaml(text, "map-reduce-v1");
+}
+
+test("MapReduce 可选字段：parallelGroup/dependsOn 解析通过；FLOW_STEP_KINDS 不变", () => {
+  const parsed = parseMapReduce();
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.error);
+  if (!parsed.ok) return;
+  const delivery = parsed.flow.steps.find((step) => step.id === "delivery-storefront")!;
+  assert.equal(delivery.parallelGroup, "map-b");
+  assert.deepEqual(delivery.dependsOn, ["contract-freeze", "delivery-api"]);
+  const reduce = parsed.flow.steps.find((step) => step.id === "test-map-shards")!;
+  assert.equal(reduce.parallelGroup, "reduce");
+  assert.deepEqual(reduce.dependsOn, ["delivery-api", "delivery-storefront"]);
+  assert.deepEqual([...FLOW_STEP_KINDS], ["dispatch", "customer-decision", "artifact", "acceptance"]);
+});
+
+test("旧 flow 不填可选字段：解析结果不含 parallelGroup/dependsOn（逐字不变）", () => {
+  const parsed = parseFlowStateYaml(TODO_FLOW_YAML, "todo-list-v1");
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.error);
+  if (!parsed.ok) return;
+  for (const step of parsed.flow.steps) {
+    assert.equal("parallelGroup" in step, false, `${step.id} 不得凭空出现 parallelGroup`);
+    assert.equal("dependsOn" in step, false, `${step.id} 不得凭空出现 dependsOn`);
+  }
+});
+
+test("parallelGroup 语法：map-<slug>/reduce 之外一律拒绝", () => {
+  const parsed = parseMapReduce(MAPREDUCE_FLOW_YAML.replace("parallelGroup: map-b", "parallelGroup: wave-1"));
+  assert.equal(parsed.ok, false);
+  if (parsed.ok) return;
+  assert.ok(parsed.errors.some((error) => error.path === "steps[2].parallelGroup" && /map-<slug> 或 reduce/.test(error.message)));
+});
+
+test("dependsOn：目标不存在 / 重复 / 自依赖 ⇒ 具体路径拒绝", () => {
+  const missing = parseMapReduce(MAPREDUCE_FLOW_YAML.replace("dependsOn: [contract-freeze]", "dependsOn: [ghost]"));
+  assert.equal(missing.ok, false);
+  if (!missing.ok) {
+    assert.ok(missing.errors.some((error) => /不存在/.test(error.message) && /ghost/.test(error.message)));
+  }
+
+  const duplicate = parseMapReduce(
+    MAPREDUCE_FLOW_YAML.replace("dependsOn: [contract-freeze]", "dependsOn: [contract-freeze, contract-freeze]"),
+  );
+  assert.equal(duplicate.ok, false);
+  if (!duplicate.ok) assert.ok(duplicate.errors.some((error) => /重复/.test(error.message)));
+
+  const self = parseMapReduce(
+    MAPREDUCE_FLOW_YAML.replace("dependsOn: [contract-freeze]", "dependsOn: [delivery-api]"),
+  );
+  assert.equal(self.ok, false);
+  if (!self.ok) assert.ok(self.errors.some((error) => /不能依赖自己/.test(error.message)));
+});
+
+test("dependsOn 成环 ⇒ 拒绝（与 supersede 图独立）", () => {
+  let text = MAPREDUCE_FLOW_YAML.replace("dependsOn: [contract-freeze]", "dependsOn: [delivery-storefront]");
+  text = text.replace("dependsOn: [contract-freeze, delivery-api]", "dependsOn: [delivery-api]");
+  // delivery-storefront 仍依赖 delivery-api；delivery-api 改依赖 delivery-storefront ⇒ 两节点互指。
+  const parsed = parseMapReduce(text.replace("dependsOn: [delivery-api]", "dependsOn: [delivery-api]"));
+  assert.equal(parsed.ok, false);
+  assert.ok(parsed.errors.some((error) => /dependsOn 形成环/.test(error.message)));
+});
+
+test("同一 map-* 组内存在依赖路径 ⇒ 拒绝", () => {
+  const text = MAPREDUCE_FLOW_YAML.replace("parallelGroup: map-b", "parallelGroup: map-a");
+  const parsed = parseMapReduce(text);
+  assert.equal(parsed.ok, false);
+  assert.ok(parsed.errors.some((error) => /同一 map-a 组内的步骤/.test(error.message)));
+});
+
+test("Reduce 步骤未覆盖全部 Map dispatch ⇒ 拒绝", () => {
+  const text = MAPREDUCE_FLOW_YAML.replace("dependsOn: [delivery-api, delivery-storefront]", "dependsOn: [delivery-api]");
+  const parsed = parseMapReduce(text);
+  assert.equal(parsed.ok, false);
+  assert.ok(parsed.errors.some((error) => /Reduce 步骤 test-map-shards/.test(error.message) && /delivery-storefront/.test(error.message)));
+});
+
+test("Map 步骤依赖 Reduce 步骤 ⇒ 拒绝", () => {
+  const text = `flowId: map-reduce-v1
+version: 1
+qualityTier: production
+steps:
+  - id: contract-freeze
+    title: 冻结契约
+    owner: convener
+    kind: artifact
+    status: done
+    evidence: { kind: artifact, ref: docs/contracts/map-reduce-v1.md }
+  - id: delivery-api
+    title: Map A｜api
+    owner: api
+    kind: dispatch
+    status: pending
+    parallelGroup: map-a
+    dependsOn: [contract-freeze, reduce-a]
+  - id: delivery-storefront
+    title: Map B｜storefront
+    owner: storefront
+    kind: dispatch
+    status: pending
+    parallelGroup: map-b
+    dependsOn: [contract-freeze]
+  - id: reduce-a
+    title: Reduce
+    owner: integration
+    kind: dispatch
+    status: pending
+    parallelGroup: reduce
+    dependsOn: [delivery-storefront]
+  - id: acceptance
+    title: 验收
+    owner: verifier
+    kind: acceptance
+    status: pending
+`;
+  const parsed = parseMapReduce(text);
+  assert.equal(parsed.ok, false);
+  assert.ok(parsed.errors.some((error) => /Map 步骤 delivery-api 不得依赖 Reduce 步骤 reduce-a/.test(error.message)));
+});
+
+test("新契约 flow 的 Map dispatch 缺 contract-freeze（或未依赖）⇒ 拒绝", () => {
+  const noContract = `flowId: map-reduce-v1
+version: 1
+qualityTier: production
+steps:
+  - id: delivery-api
+    title: Map A｜api
+    owner: api
+    kind: dispatch
+    status: pending
+    parallelGroup: map-a
+  - id: reduce-a
+    title: Reduce
+    owner: integration
+    kind: dispatch
+    status: pending
+    parallelGroup: reduce
+    dependsOn: [delivery-api]
+  - id: acceptance
+    title: 验收
+    owner: verifier
+    kind: acceptance
+    status: pending
+`;
+  const parsed = parseMapReduce(noContract);
+  assert.equal(parsed.ok, false);
+  assert.ok(parsed.errors.some((error) => /缺少 contract-freeze 步骤/.test(error.message)));
+
+  const notDepending = parseMapReduce(MAPREDUCE_FLOW_YAML.replace("dependsOn: [contract-freeze]", "dependsOn: []"));
+  assert.equal(notDepending.ok, false);
+  if (!notDepending.ok) {
+    assert.ok(notDepending.errors.some((error) => /必须（直接或传递）依赖 contract-freeze/.test(error.message)));
   }
 });

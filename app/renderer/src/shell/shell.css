@@ -1663,6 +1663,15 @@ details[open] > summary > .disclosure-chevron {
   font: 12px/1.6 var(--font-mono);
   white-space: pre-wrap;
 }
+.reasoning-note {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  background: var(--card);
+  border-radius: var(--radius-control);
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.6;
+}
 
 /* 注入/回交/报告 */
 .msg-injected {

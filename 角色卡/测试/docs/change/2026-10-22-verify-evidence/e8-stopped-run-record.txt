@@ -1,0 +1,15 @@
+=== 被终止的全量运行（E8-A，blocked/挂起，不是通过）===
+command: node --test --test-timeout=120000 "test/**/*.test.ts"
+cwd: /c/Users/51054/Desktop/work/ans-studio
+log: 角色卡/测试/docs/change/2026-10-22-verify-evidence/e8-full-suite.log
+log_mtime: 2026-10-22 13:56:54.657533700 +0800
+stop_reason: 客户决定；写序测试 39+ 分钟无日志进展、CPU 约 2339s，协调方终止进程树 PID 8816/24000
+counts_at_stop: pass=463 fail=4 skip=2
+failing_at_stop:
+✖ native symlink and storage runtime mismatch fail before SDK query (13.3678ms)
+✖ native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary (67.8655ms)
+✖ store validate callback rejects directory symlink before Pi parse or new native write (31.5504ms)
+✖ Pi storage refuses file symlink and role/runtime mismatch without touching other storage (65.6741ms)
+last_log_line:
+ℹ B 主组第 3 轮：顺序执行、无丢写 {"hasWrite":true,"hasEditEffect":true}
+--- 未产生运行结束摘要（无 ℹ tests/pass/fail 行），exit=FULL_SUITE_EXIT=1

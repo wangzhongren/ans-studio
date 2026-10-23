@@ -1,0 +1,10 @@
+phase=reduce
+started_at=2026-10-22T21:24:38+08:00
+head=64ed44a0ac6e75d647eadbeb3f35ae9f84625845
+tree=a736eaac0acdf3f6d979a42ec68071ae1e79ac12
+branch=feat/background-tasks-governance-and-reasoning
+node=v24.22.1
+npm=11.19.1
+os=MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+shell=GNU bash, version 5.3.15(2)-release (x86_64-pc-cygwin)
+git=git version 2.55.0.windows.5

@@ -28,6 +28,16 @@ import {
   openRoleSession as realOpenRoleSession,
   createPiAdapterFactory as realCreatePiAdapterFactory,
   createRuntimeAdapterFactory as realCreateRuntimeAdapterFactory,
+  // 2026-10-22 角色粒度/MapReduce（方案 Q9 A）：团队计划 v2 **唯一**解析/校验实现由编排私有
+  // `common/编排/team-plan.ts` 提供，桌面**只经** pipeline 公共出口 `run-role.ts` 消费；
+  // 不直接 import 私有 common，也不保留第二份 v2 解析。
+  parseTeamPlan,
+  teamPlanIssueMessages,
+  writesetsOverlap,
+  type TeamPlanModule,
+  type TeamPlanParseResult,
+  type TeamPlanRoleRow as OrchestrationTeamPlanRoleRow,
+  type WritesetEntry,
   type RuntimeAdapterFactoryBuilder, type RuntimeAdapterFactoryOptions,
 } from "../../src/pipeline/orchestration/run-role.ts";
 // I2/C1（2026-10-17 PM 评审 §四.2/§4.6）：建立治理记录的预览/建立机制。**只**经编排的 Pipeline 公共出口
@@ -109,22 +119,29 @@ import { judgeResultSummary, type DesktopCustomerInputFn, type OperatorJudgeResu
 import {
   acceptanceDispatchRecorded,
   acceptanceLastDispatchAtMs,
+  buildAcceptanceCriteriaTaskMessage,
   buildAcceptanceTaskMessage,
-  buildAppointmentWriteReminderMessage,
   buildGovernanceAdvanceMessage,
   buildNominationAlreadyDoneMessage,
+  buildRoleReadinessTaskMessage,
   flowCompletionIssue,
   governanceAcceptanceAdvanceNote,
   governanceAcceptanceBlockedNote,
+  governanceAcceptanceCriteriaNote,
+  governanceAcceptanceCriteriaPath,
+  governanceAcceptanceReportPath,
   governanceAdvanceSuccessNote,
-  governanceAppointmentWriteNote,
+  governanceChangePackagePath,
   governanceFlowPath,
   governanceFlowStatePath,
   governanceNominationAlreadyDoneNote,
   governanceNominationFollowUpNote,
+  governanceReadinessNote,
+  governanceTeamPlanPath,
   type GovernanceAdvanceResult,
   type GovernanceNextStepContext,
   type GovernanceNextStepPayload,
+  type GovernanceRiskTier,
 } from "./governance-advance.ts";
 // 流程**机器状态**（2026-10-19 客户决定「这些全部改成yaml。」）：自动验收门读 `docs/flows/<flowId>.yaml`，
 // 用编排的 `parseFlowStateYaml` + `evaluateFlowCompletion` 判定；Markdown 仅人读视图（YAML 缺失时才
@@ -773,6 +790,356 @@ function isGovernanceModelValue(value: unknown): value is GovernanceModel {
   return value === "single" || value === "trio";
 }
 
+// —————————————— 2026-10-22 治理分工第 1/3/5 项：调度/验收产物定位与团队计划结构读取 ——————————————
+//
+// 边界纪律：**版本扫描的唯一实现**在编排（`run-role.ts::latestVersionedArtifact`）；本层只在桌面侧
+// 读取团队计划/标准/变更包做**确定性结构校验与任务文案**，不写第二套门禁判定、不复制推荐集解析器
+// （推荐集仍以编排卡前守卫为准）。这里只做目录列举 + 文件名字版本匹配（与设计方案 §5.1/§7.1 的
+// `<flowId>-<kind>-vN.md` 约定一致），读不到即返回 undefined（不猜目录、不静默回落）。
+
+/** 新流程契约的步骤 id（方案 §5.4）：出现任一 ⇒ 该 flow 按新契约校验（legacy flow 保持原行为）。 */
+const NEW_CONTRACT_FLOW_STEP_IDS: ReadonlySet<string> = new Set([
+  "team-plan",
+  "role-cards",
+  "role-readiness",
+  "acceptance-criteria",
+  "change-package",
+]);
+
+interface VersionedArtifact {
+  relPath: string;
+  version: number;
+}
+
+type VersionedArtifactVariant = "default" | "team" | "criteria" | "report" | "change";
+
+/**
+ * 在 `dirRel` 中找 `<flowId>[-<variant>]-v<N>.md` 的最高版本（只读、只按文件名）。
+ * 与编排 `latestVersionedArtifact` 同口径（`default` 还接受 `<flowId>.proposal|nomination-vN.md`）；
+ * 本层消费的是**团队计划/标准/报告/变更包**，不用于绑定账本（绑定由编排做）。
+ */
+async function findLatestVersionedArtifact(
+  projectRoot: string,
+  dirRel: string,
+  flowId: string,
+  variant: VersionedArtifactVariant = "default",
+): Promise<VersionedArtifact | undefined> {
+  if (typeof flowId !== "string" || flowId.trim() === "") return undefined;
+  let names: string[];
+  try {
+    names = await readdir(path.join(projectRoot, ...dirRel.split("/")));
+  } catch {
+    return undefined;
+  }
+  const escaped = flowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern =
+    variant === "default"
+      ? new RegExp(`^${escaped}(?:\\.(?:proposal|nomination))?-v(\\d+)\\.md$`)
+      : new RegExp(`^${escaped}-${variant}-v(\\d+)\\.md$`);
+  let best: { name: string; version: number } | undefined;
+  for (const name of names) {
+    const match = pattern.exec(name);
+    if (match === null) continue;
+    const version = Number(match[1]);
+    if (!Number.isInteger(version) || version < 1) continue;
+    if (best === undefined || version > best.version) best = { name, version };
+  }
+  return best === undefined ? undefined : { relPath: `${dirRel}/${best.name}`, version: best.version };
+}
+
+/**
+ * 团队计划角色行的可机械读取部分。
+ * · v2（`teamPlanSchema: 2`）：全部字段来自编排单一解析器（经 pipeline 公共出口），含模块/契约/测试面/
+ *   dependsOn/并行组/粒度理由/写集条目；桌面只做读取与 V12 覆盖核对，不重解析 v2 语法。
+ * · legacy（缺省/`teamPlanSchema: 1`）：只保留 v1 旧行为所需的类型 + 四列；不强制模块/契约/测试面字段。
+ */
+interface TeamPlanRoleRow {
+  roleId: string;
+  roleType?: "new" | "changed" | "existing";
+  duty: string;
+  ability: string;
+  writes: string;
+  deps: string;
+  /** v2：module 原始单元格（可能是 `a+b` 或 `reduce`）。 */
+  module?: string;
+  modules: string[];
+  primaryModule?: string;
+  writesets: WritesetEntry[];
+  contracts: string[];
+  testSurface: string[];
+  dependsOn: string[];
+  parallelGroup: string;
+  granularityRationale?: string;
+  isMap: boolean;
+  isReduce: boolean;
+}
+
+interface TeamPlanInfo {
+  relPath: string;
+  version: number;
+  frontmatterFlowId?: string;
+  riskTier?: GovernanceRiskTier;
+  recommended?: string[];
+  rows: Map<string, TeamPlanRoleRow>;
+  /** 计划级结构问题（frontmatter/角色表/V1–V10 等）——来源＝Convener。 */
+  planIssues: string[];
+  /** 非阻断提醒（legacy 迁移、v2 warning/exception-review）；只记诊断，不派任务。 */
+  warnings: string[];
+  legacy: boolean;
+  teamPlanSchema: 1 | 2;
+  modules: string[];
+  moduleList: TeamPlanModule[];
+}
+
+function cleanTeamPlanCell(cell: string): string {
+  return cell.replace(/^[`*_]+/, "").replace(/[`*_]+$/, "").trim();
+}
+
+function splitTeamPlanRow(line: string): string[] | undefined {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("|") || !trimmed.endsWith("|")) return undefined;
+  return trimmed.slice(1, -1).split("|").map((cell) => cell.trim());
+}
+
+function teamPlanRoleType(raw: string): "new" | "changed" | "existing" | undefined {
+  const value = raw.toLowerCase();
+  if (value === "new" || value === "新增") return "new";
+  if (value === "changed" || value === "修改") return "changed";
+  if (value === "existing" || value === "既有") return "existing";
+  return undefined;
+}
+
+/**
+ * legacy v1 角色行读取（**仅为桌面旧门控保留类型 + 四列**；v1 的表格语法检查仍由编排单一实现
+ * `legacyTeamPlanRoleRowIssues` 负责，本函数不重复其结论，也不解析任何 v2 字段）。
+ */
+function parseLegacyTeamPlanRows(text: string): { rows: Map<string, TeamPlanRoleRow>; issues: string[] } {
+  const rows = new Map<string, TeamPlanRoleRow>();
+  const issues: string[] = [];
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  let headerIndex = -1;
+  let header: string[] | undefined;
+  for (let index = 0; index < lines.length; index += 1) {
+    const cells = splitTeamPlanRow(lines[index]!);
+    if (cells === undefined) continue;
+    if (cells.some((cell) => /^(roleId|role-id|角色id|角色 id)$/i.test(cleanTeamPlanCell(cell)))) {
+      headerIndex = index;
+      header = cells.map(cleanTeamPlanCell);
+      break;
+    }
+  }
+  if (headerIndex === -1 || header === undefined) return { rows, issues };
+  const columnOf = (pattern: RegExp): number => header!.findIndex((cell) => pattern.test(cell));
+  const roleColumn = columnOf(/^(roleId|role-id|角色id|角色 id)$/i);
+  const typeColumn = columnOf(/类型|type/i);
+  const dutyColumn = columnOf(/职责/);
+  const abilityColumn = columnOf(/能力/);
+  const writesColumn = columnOf(/写集|边界/);
+  const depsColumn = columnOf(/依赖/);
+  if (dutyColumn === -1 || abilityColumn === -1 || writesColumn === -1 || depsColumn === -1) {
+    // 缺四列由共享 legacy 校验报出（单一实现），这里不再重复。
+    return { rows, issues };
+  }
+  if (typeColumn === -1) {
+    issues.push("团队计划角色表缺少「类型」列（须标 new / changed / existing）");
+  }
+  for (let index = headerIndex + 1; index < lines.length; index += 1) {
+    const cells = splitTeamPlanRow(lines[index]!);
+    if (cells === undefined) break; // 表格结束
+    if (cells.every((cell) => /^:?-{2,}:?$/.test(cell.trim()))) continue;
+    const roleId = cleanTeamPlanCell(cells[roleColumn] ?? "");
+    if (roleId === "" || rows.has(roleId)) continue;
+    const roleType = typeColumn === -1 ? undefined : teamPlanRoleType(cleanTeamPlanCell(cells[typeColumn] ?? ""));
+    rows.set(roleId, {
+      roleId,
+      ...(roleType !== undefined ? { roleType } : {}),
+      duty: cleanTeamPlanCell(cells[dutyColumn] ?? ""),
+      ability: cleanTeamPlanCell(cells[abilityColumn] ?? ""),
+      writes: cleanTeamPlanCell(cells[writesColumn] ?? ""),
+      deps: cleanTeamPlanCell(cells[depsColumn] ?? ""),
+      modules: [],
+      writesets: [],
+      contracts: [],
+      testSurface: [],
+      dependsOn: [],
+      parallelGroup: "",
+      isMap: false,
+      isReduce: false,
+    });
+  }
+  return { rows, issues };
+}
+
+function governanceRiskTierOf(value: string | undefined): GovernanceRiskTier | undefined {
+  return value === "T0" || value === "T1" || value === "T2" || value === "T3" ? value : undefined;
+}
+
+function teamPlanRoleRowOf(row: OrchestrationTeamPlanRoleRow): TeamPlanRoleRow {
+  const roleType = teamPlanRoleType(row.roleType);
+  return {
+    roleId: row.roleId,
+    ...(roleType !== undefined ? { roleType } : {}),
+    duty: row.duty,
+    ability: row.ability,
+    writes: row.writeset,
+    deps: row.deps,
+    module: row.module,
+    modules: row.modules,
+    ...(row.primaryModule !== undefined ? { primaryModule: row.primaryModule } : {}),
+    writesets: row.writesets,
+    contracts: row.contracts,
+    testSurface: row.testSurface,
+    dependsOn: row.dependsOn,
+    parallelGroup: row.parallelGroup,
+    ...(row.granularityRationale !== undefined ? { granularityRationale: row.granularityRationale } : {}),
+    isMap: row.isMap,
+    isReduce: row.isReduce,
+  };
+}
+
+/**
+ * 解析团队计划（frontmatter + 模块清单 + 角色表）；只做确定性读取，不判断语义、不写文件。
+ * v2 解析/校验的**唯一实现**在编排 `team-plan.ts`（经 pipeline 公共出口）；本函数只把结果适配成桌面
+ * 消费形状。legacy 分支保持 v1 旧行为（表头/推荐集/四列非空），只记一条迁移 warning、不阻塞旧流程。
+ */
+function parseTeamPlanInfo(relPath: string, version: number, text: string): TeamPlanInfo {
+  const parsed: TeamPlanParseResult = parseTeamPlan(text);
+  const planIssues = new Set<string>(teamPlanIssueMessages(parsed));
+  const warnings = new Set<string>();
+  const rows = new Map<string, TeamPlanRoleRow>();
+  if (parsed.legacy) {
+    warnings.add("团队计划未声明 teamPlanSchema: 2：按 v1 兼容校验（不强制模块/公开契约/测试面等 v2 字段；建议迁移团队计划 v2）");
+    const legacy = parseLegacyTeamPlanRows(text);
+    for (const [roleId, row] of legacy.rows) rows.set(roleId, row);
+    for (const issue of legacy.issues) planIssues.add(issue);
+    // 桌面 v1 旧门槛中共享 legacy 校验未覆盖的部分（frontmatter/推荐集）——保持旧行为。
+    if (!/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.test(text)) {
+      planIssues.add("团队计划缺少 frontmatter（须含 flowId/version/riskTier/recommended）");
+    }
+    if (parsed.flowId === undefined || parsed.flowId === "") {
+      planIssues.add("团队计划 frontmatter 缺少 flowId");
+    }
+    if (parsed.recommended.length === 0) {
+      planIssues.add("团队计划缺少唯一的机器可读推荐集（recommended 内联数组或「推荐：」行；空集/重复/歧义不接受）");
+    }
+  } else {
+    for (const issue of parsed.issues) {
+      if (issue.severity !== "error") warnings.add(issue.message);
+    }
+    for (const row of parsed.roleRows) rows.set(row.roleId, teamPlanRoleRowOf(row));
+  }
+  const riskTier = governanceRiskTierOf(parsed.riskTier) ?? parseRiskTierFromText(text);
+  return {
+    relPath,
+    version,
+    ...(parsed.flowId !== undefined && parsed.flowId !== "" ? { frontmatterFlowId: parsed.flowId } : {}),
+    ...(riskTier !== undefined ? { riskTier } : {}),
+    ...(parsed.recommended.length > 0 ? { recommended: parsed.recommended } : {}),
+    rows,
+    planIssues: [...planIssues],
+    warnings: [...warnings],
+    legacy: parsed.legacy,
+    teamPlanSchema: parsed.teamPlanSchema,
+    modules: parsed.modules,
+    moduleList: parsed.moduleList,
+  };
+}
+
+/** V12 覆盖判定：计划写集（精确文件或目录）是否被角色 boundary.yaml 的 project 条目覆盖。 */
+function boundaryCoversPlanWriteset(
+  writeset: WritesetEntry,
+  entries: readonly { path: string; kind: string; root?: string }[],
+): boolean {
+  for (const entry of entries) {
+    if (entry.root !== undefined && entry.root !== "project") continue;
+    const boundaryPath = entry.path.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+$/, "");
+    if (boundaryPath === "") continue;
+    if (entry.kind === "file") {
+      // 文件边界只能覆盖精确同路径的**文件**计划写集；不覆盖同名目录（目录需逐文件授权）。
+      if (writeset.directory) continue;
+      if (writesetsOverlap(writeset, { raw: boundaryPath, path: boundaryPath, directory: false })) return true;
+      continue;
+    }
+    // directory / conditional-directory：覆盖目录本身及其中任何计划写集（复用共享重叠函数）。
+    if (writesetsOverlap(writeset, { raw: boundaryPath, path: `${boundaryPath}/`, directory: true })) return true;
+  }
+  return false;
+}
+
+/**
+ * 定位并读取该 flow 的最新团队计划（`docs/scheduling/<flowId>-team-vN.md`）。
+ * `preferredRel`（账本 `artifactPath`）优先：若它确为团队计划文件且存在，用之；否则按版本扫描。
+ * 找不到/不可读 ⇒ undefined（调用方按 legacy/缺失分支处理，不猜）。
+ */
+async function readTeamPlanInfo(
+  projectRoot: string,
+  flowId: string,
+  preferredRel?: string,
+): Promise<TeamPlanInfo | undefined> {
+  let located: VersionedArtifact | undefined;
+  if (
+    typeof preferredRel === "string" &&
+    preferredRel.startsWith("docs/scheduling/") &&
+    new RegExp(`^docs/scheduling/${flowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-team-v(\\d+)\\.md$`).test(preferredRel)
+  ) {
+    const version = Number(/team-v(\d+)\.md$/.exec(preferredRel)![1]);
+    located = { relPath: preferredRel, version };
+  } else {
+    located = await findLatestVersionedArtifact(projectRoot, "docs/scheduling", flowId, "team");
+  }
+  if (located === undefined) return undefined;
+  let text: string;
+  try {
+    text = await readFile(path.join(projectRoot, ...located.relPath.split("/")), "utf8");
+  } catch {
+    return undefined;
+  }
+  return parseTeamPlanInfo(located.relPath, located.version, text);
+}
+
+/** 从流程/变更包/团队计划的文本中读 `riskTier: T0–T3`（frontmatter 优先，其次全文首现）。 */
+function parseRiskTierFromText(text: string): GovernanceRiskTier | undefined {
+  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
+  const scopes = frontmatter !== null ? [frontmatter[1]!, text] : [text];
+  for (const scope of scopes) {
+    const match = /(?:^|[^A-Za-z0-9])(T[0-3])(?:[^A-Za-z0-9]|$)/.exec(scope);
+    if (match !== null) return match[1] as GovernanceRiskTier;
+  }
+  return undefined;
+}
+
+/** 读变更包（`<flowId>-change-vN.md`）文本与其风险档位；缺失/不可读 ⇒ undefined。 */
+async function readChangePackageInfo(
+  projectRoot: string,
+  flowId: string,
+): Promise<{ relPath: string; version: number; text: string; riskTier?: GovernanceRiskTier } | undefined> {
+  const located = await findLatestVersionedArtifact(projectRoot, "docs/scheduling", flowId, "change");
+  if (located === undefined) return undefined;
+  let text: string;
+  try {
+    text = await readFile(path.join(projectRoot, ...located.relPath.split("/")), "utf8");
+  } catch {
+    return undefined;
+  }
+  const riskTier = parseRiskTierFromText(text);
+  return { ...located, text, ...(riskTier !== undefined ? { riskTier } : {}) };
+}
+
+/** 读实施前标准（`<flowId>-criteria-vN.md`）；缺失/不可读 ⇒ undefined。 */
+async function readAcceptanceCriteriaInfo(
+  projectRoot: string,
+  flowId: string,
+): Promise<{ relPath: string; version: number; text: string } | undefined> {
+  const located = await findLatestVersionedArtifact(projectRoot, "docs/acceptance", flowId, "criteria");
+  if (located === undefined) return undefined;
+  try {
+    const text = await readFile(path.join(projectRoot, ...located.relPath.split("/")), "utf8");
+    return { ...located, text };
+  } catch {
+    return undefined;
+  }
+}
+
 /** 账本 `messageSummary` 截断（≤200 Unicode 码点；与编排 `truncateText` 同口径，不静默改语义）。 */
 function ledgerSummary(text: string): string {
   const chars = Array.from(text);
@@ -901,6 +1268,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
    * 「已解决后再次阻塞」（即使原因文本相同）也会重新告知。运行期记忆：不写账本、不改门禁判定。
    */
   const acceptanceBlockedNotified = new Map<string, string>();
+  /** 2026-10-22 第 3 项：实施前标准派发的运行期去重（`projectRoot\0flowId`；跨重启靠账本 stepId=acceptance-criteria）。 */
+  const acceptanceCriteriaDispatched = new Set<string>();
+  /** 标准/变更包门槛的阻塞提示去重：`projectRoot\0flowId` → 原因（同原因只提示一次；原因变化再提示）。 */
+  const acceptanceArtifactBlockedNotified = new Map<string, string>();
   /** 每项目最多一条「无法确定项目引擎」系统行（后续真实事件只记诊断；不循环重试、不刷屏）。 */
   const acceptanceRuntimeUnresolvedNotified = new Set<string>();
   let runAcceptanceCheck: ((projectRoot: string, trigger: "settle" | "ledger" | "import") => Promise<void>) | undefined;
@@ -998,6 +1369,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   };
 
   const acceptanceFlowKey = (projectRoot: string, flowId: string): string => `${projectRoot}\u0000${flowId}`;
+  /** 已同意的 appointment 决定取值（`appointed` 为新流程；`accepted` 兼容旧账本）。 */
+  const RESOLVED_APPOINTMENT_DECISIONS: ReadonlySet<string> = new Set(["appointed", "accepted"]);
 
   const rememberAcceptanceEvidence = (projectRoot: string, flowId: string, evidence: readonly string[]): void => {
     const key = acceptanceFlowKey(projectRoot, flowId);
@@ -1119,7 +1492,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       ];
       for (const flowId of flowIds) {
         if (acceptanceLastDispatchAtMs(flowId, ledger) === undefined) continue; // 该 flow 没有验收派发记录
-        const reportRel = `docs/verification/${flowId}-v1.md`;
+        // 2026-10-22 第 3 项（方案 §7.1/§7.6）：验收报告在 docs/acceptance/；详细证据附件仍在 docs/verification/。
+        const reportRel = governanceAcceptanceReportPath(flowId);
         const governanceRel = `docs/governance/verifier/${flowId}.md`;
         let reportVersion = "missing";
         try {
@@ -1137,7 +1511,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             event: {
               kind: "message",
               summary:
-                `Proof / 验收复核已结束（flowId=${flowId}）；报告见 ${reportRel} 与 ${governanceRel}；` +
+                `Proof / 验收复核已结束（flowId=${flowId}）；报告见 ${reportRel}（附件见 docs/verification/）与 ${governanceRel}；` +
                 `验收卡/客户决定由应用继续（本行不构成验收结论或客户批准）。`,
               detail: { source: "delivery-note" },
             },
@@ -1511,6 +1885,136 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // 2026-10-20 真机：步骤 delivered 后唤醒 Steward 核证（无活会话/队列才投；同 revision+集合去重）。
       // 放在 verifier 去重之前——即使本次不派 verifier，也必须评估 delivered 核证。
       await wakeStewardForDeliveredSteps(info.projectRoot, info.flowId, note, diagnostic);
+      // ———— 2026-10-22 第 3 项：新流程的「实施前标准 → 变更包 → 验收判定」门槛（方案 §7.2/§7.3/§7.6） ————
+      // 只作用于**新契约流程**（flow YAML 含 team-plan/role-cards/role-readiness/acceptance-criteria/change-package
+      // 任一 step id）；legacy flow 保持原行为（G4/O4 迁移兼容）。标准缺失 ⇒ 派 Verifier 写标准
+      // （stepId=acceptance-criteria；账本+运行期去重、不循环）并阻塞验收判定；变更包缺失/缺 riskTier ⇒ 阻塞
+      // 验收判定 + Lead 系统行（去重）。判定时把标准/变更包/档位带进任务文案（不猜、不把「待补」当通过）。
+      let acceptanceTaskOptions: {
+        riskTier?: GovernanceRiskTier;
+        criteriaPath?: string;
+        changePackagePath?: string;
+      } = {};
+      let newContractFlow = false;
+      try {
+        const flowStateProbeText = await readFile(path.join(info.projectRoot, flowStatePath(info.flowId)), "utf8");
+        const parsedFlowState = parseFlowStateYaml(flowStateProbeText, info.flowId);
+        if (parsedFlowState.ok) {
+          newContractFlow = parsedFlowState.flow.steps.some((step) => NEW_CONTRACT_FLOW_STEP_IDS.has(step.id));
+        }
+      } catch {
+        newContractFlow = false; // 无 YAML：legacy 门（Markdown 回退）按原逻辑。
+      }
+      if (newContractFlow) {
+        let appointmentEntry: GovernanceLedgerEntry | undefined;
+        let latestProposalKind: string | undefined;
+        for (const entry of ledger.entries) {
+          if (entry.kind !== "customer.decision" || entry.flowId !== info.flowId) continue;
+          if (entry.decisionKind === "appointment") appointmentEntry = entry;
+          else if (entry.decisionKind === "proposal-accept" || entry.decisionKind === "proposal-accept-quick") {
+            latestProposalKind = entry.decisionKind;
+          }
+        }
+        const appointmentConfirmed =
+          appointmentEntry !== undefined &&
+          (appointmentEntry.customerDecision === undefined || RESOLVED_APPOINTMENT_DECISIONS.has(appointmentEntry.customerDecision));
+        if (appointmentConfirmed && latestProposalKind !== "proposal-accept-quick") {
+          const criteria = await readAcceptanceCriteriaInfo(info.projectRoot, info.flowId);
+          if (criteria === undefined || criteria.text.trim() === "") {
+            // 派 Verifier 写实施前标准（若尚未派过）：账本 stepId=acceptance-criteria 是跨重启去重依据。
+            const ledgerCriteriaDispatched = ledger.entries.some(
+              (entry) =>
+                entry.kind === "dispatch.accepted" &&
+                entry.flowId === info.flowId &&
+                entry.targetRoleId === "verifier" &&
+                entry.stepId === "acceptance-criteria",
+            );
+            if (!acceptanceCriteriaDispatched.has(key) && !ledgerCriteriaDispatched) {
+              const changeForRisk = await readChangePackageInfo(info.projectRoot, info.flowId);
+              const planForRisk = await readTeamPlanInfo(info.projectRoot, info.flowId);
+              const riskTier = changeForRisk?.riskTier ?? planForRisk?.riskTier;
+              const activeRuntime =
+                info.runtime ?? acceptanceRuntimeHints.get(info.projectRoot) ?? manager.activeRuntimeFor(info.projectRoot);
+              let resolution: RuntimeResolution | undefined;
+              try {
+                resolution = await resolveAcceptanceRuntime(info.projectRoot, activeRuntime);
+              } catch (error) {
+                diagnostic.error("acceptance.criteria.runtime.failed", error, { flowId: info.flowId });
+              }
+              if (resolution !== undefined && resolution.ok) {
+                noteRuntime = resolution.runtime;
+                const criteriaMessage = buildAcceptanceCriteriaTaskMessage(info.flowId, {
+                  ...(planForRisk !== undefined ? { teamPlanPath: planForRisk.relPath } : {}),
+                  ...(riskTier !== undefined ? { riskTier } : {}),
+                });
+                const opened = await manager.openBackground({ projectRoot: info.projectRoot, roleId: "verifier", runtime: resolution.runtime });
+                if (!opened.ok) {
+                  diagnostic.error("acceptance.criteria.open.failed", new Error(opened.error ?? "unknown"), { flowId: info.flowId });
+                } else {
+                  const sent = await manager.sendBackground({
+                    projectRoot: info.projectRoot,
+                    roleId: "verifier",
+                    runtime: resolution.runtime,
+                    text: criteriaMessage,
+                  });
+                  if (!sent.ok) {
+                    diagnostic.error("acceptance.criteria.send.failed", new Error(sent.error ?? "unknown"), { flowId: info.flowId });
+                  } else {
+                    acceptanceCriteriaDispatched.add(key);
+                    note(governanceAcceptanceCriteriaNote(info.flowId));
+                    const appendedCriteria = await appendGovernanceLedger(info.projectRoot, {
+                      at: new Date().toISOString(),
+                      kind: "dispatch.accepted",
+                      flowId: info.flowId,
+                      stepId: "acceptance-criteria",
+                      actorRoleId: "app",
+                      power: "app",
+                      trigger: "customer-decision",
+                      targetRoleId: "verifier",
+                      messageSummary: ledgerSummary(criteriaMessage),
+                      runtime: resolution.runtime,
+                    });
+                    if (!appendedCriteria.ok) {
+                      diagnostic.error("acceptance.criteria.ledger.failed", new Error(appendedCriteria.message), { flowId: info.flowId });
+                    }
+                    diagnostic.record("acceptance.criteria.dispatched", { flowId: info.flowId, queued: sent.queued === true });
+                  }
+                }
+              } else {
+                diagnostic.record("acceptance.criteria.runtime-unresolved", { flowId: info.flowId });
+              }
+            }
+            const criteriaReason = `实施前验收标准缺失或为空（${governanceAcceptanceCriteriaPath(info.flowId)}）；未派验收判定`;
+            if (acceptanceArtifactBlockedNotified.get(key) !== criteriaReason) {
+              acceptanceArtifactBlockedNotified.set(key, criteriaReason);
+              note(criteriaReason);
+              diagnostic.record("acceptance.criteria.blocked", { flowId: info.flowId });
+            }
+            acceptanceDispatchedFlows.delete(key);
+            return;
+          }
+          const changePackage = await readChangePackageInfo(info.projectRoot, info.flowId);
+          if (changePackage === undefined || changePackage.text.trim() === "" || changePackage.riskTier === undefined) {
+            const changeReason =
+              changePackage === undefined || changePackage.text.trim() === ""
+                ? `变更包缺失（${governanceChangePackagePath(info.flowId)}）；未派验收判定`
+                : `变更包缺少 riskTier（T0–T3）：${changePackage.relPath}；未派验收判定`;
+            if (acceptanceArtifactBlockedNotified.get(key) !== changeReason) {
+              acceptanceArtifactBlockedNotified.set(key, changeReason);
+              note(changeReason);
+              diagnostic.record("acceptance.change-package.blocked", { flowId: info.flowId });
+            }
+            acceptanceDispatchedFlows.delete(key);
+            return;
+          }
+          acceptanceTaskOptions = {
+            riskTier: changePackage.riskTier,
+            criteriaPath: criteria.relPath,
+            changePackagePath: changePackage.relPath,
+          };
+          acceptanceArtifactBlockedNotified.delete(key); // 门槛已满足：允许后续回归再报
+        }
+      }
       // 2026-10-20 真机（04:06 派过 verifier；12:11 flow YAML 更新后仍被旧去重挡住、验收结果没回 Lead）：
       // 运行期去重带 **flow YAML 版本（mtime）**——每 flow 同版本只派一次；flow 更新 ⇒ 旧占位作废、允许重派。
       // 无 YAML（legacy/不可读）维持旧「每进程一次」语义。
@@ -1643,7 +2147,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
       const runtime = resolution.runtime;
       noteRuntime = runtime; // 之后的开/发/系统行都按实际引擎路由（Pi 视图可见）
-      const message = buildAcceptanceTaskMessage(info.flowId, evidence, { flowUpdatedSinceReview });
+      const message = buildAcceptanceTaskMessage(info.flowId, evidence, {
+        flowUpdatedSinceReview,
+        ...acceptanceTaskOptions,
+        reportPath: governanceAcceptanceReportPath(info.flowId),
+      });
       const opened = await manager.openBackground({ projectRoot: info.projectRoot, roleId: "verifier", runtime });
       if (!opened.ok) {
         acceptanceDispatchedFlows.delete(key);
@@ -1776,58 +2284,178 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // 解析口径与 `listProject` 同一份：边界 YAML 走 Service 公开出口 `validateBoundaryYamlText`
   // （与运行时加载器同一个 `parseBoundaryYamlDoc`），role/entries 形状与 `listProject` 的 warnings 互证；
   // 本层**不另写第二份 boundary 解析器**（顶层 `role` 身份检查用同一 `yaml` 包的解析结果）。
-  /** 一条写卡产物问题（角色 / 项目相对路径 / 具体原因）。 */
-  type AppointmentArtifactIssue = { roleId: string; path: string; issue: string };
+  /**
+   * 一条写卡产物问题（角色 / 项目相对路径 / 具体原因 / 来源 / 是否仅提醒）。
+   * 2026-10-22 第 5 项：问题按来源分流——`crew`（角色卡/边界/工作文档）反馈 Crew 修正；
+   * `convener`（团队计划缺行/缺职责·能力·写集·依赖/类型不可识别）反馈 Convener 补充计划。
+   * `warning:true` = 不阻塞（迁移策略 Q9/Q11 A：existing 角色只做存在/格式检查并记录提醒）。
+   */
+  type AppointmentArtifactIssue = {
+    roleId: string;
+    path: string;
+    issue: string;
+    source?: "crew" | "convener";
+    warning?: boolean;
+  };
   /** 反馈去重：`projectRoot\0flowId` → 最近一次已反馈的问题哈希（同哈希不刷屏；修正后重新校验再报）。 */
   const appointmentArtifactFeedback = new Map<string, string>();
 
+  /** 新/变更角色的 role-card 必填章节（方案 §6.1 第 1–9 项；等价标题即可）。 */
+  const REQUIRED_ROLE_CARD_SECTIONS: ReadonlyArray<{ label: string; test: RegExp }> = [
+    { label: "组别", test: /组别|group/i },
+    { label: "工作立场", test: /工作立场/ },
+    { label: "能力描述", test: /能力描述|职责与能力/ },
+    { label: "职责与功能导航", test: /系统功能导航|职责与功能导航/ },
+    { label: "必读资料", test: /必读资料/ },
+    { label: "交接输入输出", test: /交接/ },
+    { label: "执行原则", test: /执行原则/ },
+    { label: "质量职责", test: /质量/ },
+    { label: "标准工作流", test: /工作流/ },
+    { label: "交付物清单", test: /交付物/ },
+  ];
+  /** 角色根工作文档（新/变更角色必填；existing 只做存在检查并记提醒）。 */
+  const ROLE_WORK_DOC_FILES = ["feature-map.md", "functional-description.md", "memo.md", "api-spec.md"] as const;
+
+  /**
+   * **写卡产物确定性校验**（2026-10-20 客户要求；2026-10-22 第 5 项扩展）。
+   *
+   * 结构最低门槛（方案 §6.1/§6.2）：role-card.md 必需章节；boundary.yaml 现有 schema + 角色根工作文档条目
+   * + 实际写集；feature-map/functional-description/memo/api-spec（或 not-applicable + 非空理由）。
+   * **强制范围**：读取团队计划，`new`/`changed` 角色应用完整清单；`existing` 只做存在/格式检查并记 warning
+   * （迁移策略 Q9/Q11 A——不一次性重写历史角色卡）。团队计划缺角色行/类型/四列内容 ⇒ 来源 Convener。
+   * 无团队计划的 legacy 流程只做最低结构检查（O4/G4 迁移兼容），并记一条 warning。
+   * 只做结构判定，**不宣称能力描述已完成**（语义由 Convener readiness 复核）。
+   */
   const validateAppointmentArtifacts = async (
     projectRoot: string,
     roleIds: readonly string[],
     listing: ProjectListing | undefined,
+    options: { flowId?: string; appointmentArtifactPath?: string } = {},
   ): Promise<AppointmentArtifactIssue[]> => {
     const issues: AppointmentArtifactIssue[] = [];
     const seen = new Set<string>();
-    const push = (roleId: string, relPath: string, issue: string): void => {
-      const key = `${roleId}\u0000${relPath}\u0000${issue}`;
+    const push = (
+      roleId: string,
+      relPath: string,
+      issue: string,
+      extra: { source?: "crew" | "convener"; warning?: boolean } = {},
+    ): void => {
+      const source = extra.source ?? "crew";
+      const warning = extra.warning === true;
+      const key = `${roleId}\u0000${relPath}\u0000${source}\u0000${warning ? "w" : "b"}\u0000${issue}`;
       if (seen.has(key)) return;
       seen.add(key);
-      issues.push({ roleId, path: relPath, issue });
+      issues.push({ roleId, path: relPath, issue, source, ...(warning ? { warning: true } : {}) });
     };
+    const readDoc = async (relPath: string): Promise<{ text?: string; error?: string }> => {
+      try {
+        return { text: await readFile(path.join(projectRoot, ...relPath.split("/")), "utf8") };
+      } catch (error) {
+        return {
+          error: (error as NodeJS.ErrnoException).code === "ENOENT" ? "文件不存在" : `读取失败：${(error as Error).message}`,
+        };
+      }
+    };
+
+    const flowId = options.flowId;
+    const plan = flowId !== undefined ? await readTeamPlanInfo(projectRoot, flowId, options.appointmentArtifactPath) : undefined;
+    const planBoundButMissing =
+      plan === undefined &&
+      typeof options.appointmentArtifactPath === "string" &&
+      options.appointmentArtifactPath.startsWith("docs/scheduling/");
+    if (plan !== undefined) {
+      // 计划级问题（frontmatter/角色表/V1–V10）来源＝Convener：Crew 不自行补计划。
+      for (const issue of plan.planIssues) {
+        push("团队计划", plan.relPath, issue, { source: "convener" });
+      }
+      // 非阻断提醒（legacy 迁移 / v2 warning/exception-review）：只记诊断，不派任务、不阻塞推进。
+      for (const warning of plan.warnings) {
+        push("团队计划", plan.relPath, warning, { source: "convener", warning: true });
+      }
+      if (flowId !== undefined && plan.frontmatterFlowId !== undefined && plan.frontmatterFlowId !== flowId) {
+        push("团队计划", plan.relPath, `frontmatter flowId="${plan.frontmatterFlowId}" 与流程 ${flowId} 不一致`, {
+          source: "convener",
+        });
+      }
+    } else if (planBoundButMissing) {
+      push(
+        "团队计划",
+        options.appointmentArtifactPath!,
+        "团队计划缺失或不可读（账本 appointment 已绑定该计划）；请 Steward / 统筹 重新写出计划后再校验",
+        { source: "convener" },
+      );
+    } else if (flowId !== undefined) {
+      push(
+        "团队计划",
+        governanceTeamPlanPath(flowId),
+        "团队计划缺失：按 legacy 流程只做最低结构检查（建议迁移 team-plan / role-cards 流程）",
+        { warning: true },
+      );
+    }
+
     for (const roleId of roleIds) {
       const dir = `角色卡/${roleId}`;
       const cardRel = `${dir}/role-card.md`;
       const boundaryRel = `${dir}/boundary.yaml`;
-      // ① role-card.md：存在、可读、非空、至少一个 Markdown 标题。
-      let cardText: string | undefined;
-      try {
-        cardText = await readFile(path.join(projectRoot, cardRel), "utf8");
-      } catch (error) {
-        push(roleId, cardRel, (error as NodeJS.ErrnoException).code === "ENOENT" ? "文件不存在" : `读取失败：${(error as Error).message}`);
+      const row = plan?.rows.get(roleId);
+      // 计划角色行问题（来源 Convener）：缺行；legacy 额外保留 v1 的类型/四列检查。
+      // v2 的类型/module/职责/能力/写集/契约/测试面/dependsOn/并行组等已由编排单一解析器报入 planIssues，
+      // 此处不重复。V12（计划写集 vs boundary）在 boundary 解析后单独核对。
+      if (plan !== undefined) {
+        if (row === undefined) {
+          push("团队计划", plan.relPath, `团队计划缺少推荐/任命角色 ${roleId} 的角色行`, { source: "convener" });
+        } else if (plan.legacy) {
+          if (row.roleType === undefined) {
+            push("团队计划", plan.relPath, `团队计划角色 ${roleId} 的类型缺失或不可识别（须为 new / changed / existing）`, {
+              source: "convener",
+            });
+          }
+          const columns: Array<[string, string]> = [
+            ["职责目标", row.duty],
+            ["能力要求", row.ability],
+            ["写集", row.writes],
+            ["依赖", row.deps],
+          ];
+          for (const [label, value] of columns) {
+            if (value === "" || value === "-" || value === "—") {
+              push("团队计划", plan.relPath, `团队计划角色 ${roleId} 的「${label}」为空（计划缺细节）`, { source: "convener" });
+            }
+          }
+        }
       }
-      if (cardText !== undefined) {
-        if (cardText.trim() === "") push(roleId, cardRel, "文件为空（需要角色卡正文）");
-        else if (!/^#{1,6}\s/m.test(cardText)) push(roleId, cardRel, "缺少 Markdown 标题（至少一行以 # 开头）");
+      // 强制范围：new/changed 应用完整清单；existing / legacy 只做存在/格式检查并记 warning。
+      const fullCheck = plan !== undefined && (row === undefined || row.roleType === undefined || row.roleType !== "existing");
+      // ① role-card.md：存在、可读、非空、至少一个 Markdown 标题。
+      const card = await readDoc(cardRel);
+      if (card.error !== undefined) push(roleId, cardRel, card.error);
+      if (card.text !== undefined) {
+        if (card.text.trim() === "") push(roleId, cardRel, "文件为空（需要角色卡正文）");
+        else if (!/^#{1,6}\s/m.test(card.text)) push(roleId, cardRel, "缺少 Markdown 标题（至少一行以 # 开头）");
+        else if (fullCheck) {
+          for (const section of REQUIRED_ROLE_CARD_SECTIONS) {
+            if (!section.test.test(card.text)) {
+              push(roleId, cardRel, `缺少「${section.label}」章节或等价内容（第 5 项必填）`);
+            }
+          }
+        }
       }
       // ② boundary.yaml：存在、可读、非空；与 listProject 同一解析器；顶层 role 与目录 id 一致；entries 非空。
-      let boundaryText: string | undefined;
-      try {
-        boundaryText = await readFile(path.join(projectRoot, boundaryRel), "utf8");
-      } catch (error) {
-        push(roleId, boundaryRel, (error as NodeJS.ErrnoException).code === "ENOENT" ? "文件不存在" : `读取失败：${(error as Error).message}`);
-      }
-      if (boundaryText !== undefined) {
-        if (boundaryText.trim() === "") {
+      let boundaryEntries: readonly { path: string; kind: string; root?: string }[] | undefined;
+      const boundary = await readDoc(boundaryRel);
+      if (boundary.error !== undefined) push(roleId, boundaryRel, boundary.error);
+      if (boundary.text !== undefined) {
+        if (boundary.text.trim() === "") {
           push(roleId, boundaryRel, "文件为空（需要 role + entries 的边界 YAML）");
         } else {
-          const validation = validateBoundaryYamlText(boundaryText); // 与运行时加载器同一实现
+          const validation = validateBoundaryYamlText(boundary.text); // 与运行时加载器同一实现
           if (!validation.ok) {
             push(roleId, boundaryRel, `边界 YAML 解析失败：${validation.message}`);
           } else {
+            boundaryEntries = validation.entries;
             if (validation.entries.length === 0) push(roleId, boundaryRel, "entries 为空（Section 1 至少需要一条条目）");
             let declaredRole: unknown;
             try {
-              const doc = parseYaml(boundaryText) as unknown;
+              const doc = parseYaml(boundary.text) as unknown;
               declaredRole =
                 doc !== null && typeof doc === "object" && !Array.isArray(doc)
                   ? (doc as Record<string, unknown>).role
@@ -1845,7 +2473,94 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           }
         }
       }
-      // ③ listProject 刷新后的 warnings 辅助定位（缺文件/解析失败/重复/冲突等）——已由直接检查覆盖的
+      // ②b boundary 必填条目（新/变更角色）：角色根工作文档 + 实际写集。
+      if (fullCheck && boundaryEntries !== undefined && boundaryEntries.length > 0) {
+        const paths = new Set(
+          boundaryEntries.filter((entry) => entry.kind === "file").map((entry) => entry.path.replace(/\\/g, "/")),
+        );
+        for (const file of ROLE_WORK_DOC_FILES) {
+          const required = `${dir}/${file}`;
+          if (!paths.has(required)) {
+            push(roleId, boundaryRel, `entries 缺少角色根工作文档条目 ${required}（第 5 项必填）`);
+          }
+        }
+        if (boundaryEntries.length === ROLE_WORK_DOC_FILES.length) {
+          push(roleId, boundaryRel, "entries 仅含角色根工作文档条目，未见团队计划的实际写集条目（请核对计划写集）", {
+            warning: true,
+          });
+        }
+      }
+      // ②c V12（团队计划 v2；写卡后校验）：计划写集必须被该角色 boundary.yaml entries 覆盖。
+      // 覆盖判定用编排单一解析器给出的写集条目（不复制 v2 写集语法）。问题来源＝Crew 文件；
+      // existing 角色只 warning（迁移策略：不强制重写历史边界），new/changed 阻塞并退回 Crew，
+      // 并在文案中提示「若计划写集本身有误则报告 Convener 修正计划」。
+      if (
+        plan !== undefined &&
+        !plan.legacy &&
+        row !== undefined &&
+        row.writesets.length > 0 &&
+        boundaryEntries !== undefined &&
+        boundaryEntries.length > 0
+      ) {
+        const existing = row.roleType === "existing";
+        for (const writeset of row.writesets) {
+          if (boundaryCoversPlanWriteset(writeset, boundaryEntries)) continue;
+          push(
+            roleId,
+            boundaryRel,
+            existing
+              ? `计划写集「${writeset.path}」未被 boundary.yaml entries 覆盖（existing：仅提醒，不阻塞；下次实质变更时补齐）`
+              : `计划写集「${writeset.path}」未被 boundary.yaml entries 覆盖（Crew：按团队计划把该路径加入 Section 1；若计划写集本身有误，报告 Convener 修正计划）`,
+            existing ? { source: "crew", warning: true } : { source: "crew" },
+          );
+        }
+      }
+      // ③ 角色根工作文档（feature-map/functional-description/memo/api-spec）。
+      for (const file of ROLE_WORK_DOC_FILES) {
+        const rel = `${dir}/${file}`;
+        const doc = await readDoc(rel);
+        const missingExtra = fullCheck ? {} : { warning: true };
+        if (doc.error !== undefined) {
+          push(roleId, rel, fullCheck ? doc.error : `${doc.error}（existing/legacy：仅提醒）`, missingExtra);
+          continue;
+        }
+        const text = doc.text ?? "";
+        if (text.trim() === "") {
+          push(roleId, rel, fullCheck ? "文件为空（需要正文）" : "文件为空（existing/legacy：仅提醒）", missingExtra);
+          continue;
+        }
+        if (!/^#{1,6}\s/m.test(text)) {
+          push(roleId, rel, fullCheck ? "缺少 Markdown 标题（至少一行以 # 开头）" : "缺少 Markdown 标题（existing/legacy：仅提醒）", missingExtra);
+        }
+        if (file === "feature-map.md") {
+          const hasRows = /^\s*\|.+\|\s*$/m.test(text) || /^\s*[-*]\s+\S/m.test(text);
+          const declaresNone = /无直接(?:负责的)?系统功能|无系统功能|不直接负责/.test(text);
+          if (!hasRows && !declaresNone) {
+            push(roleId, rel, "既无功能表/列表行，也未声明无直接负责的系统功能");
+          }
+        } else if (file === "functional-description.md") {
+          if (!/(职责|交接|代码位置|文档位置)/.test(text)) {
+            push(roleId, rel, "缺少职责/交接/代码位置或等价内容");
+          }
+        } else if (file === "memo.md") {
+          if (!/(?:^|\n)\s*(?:[-*]\s*)?\d{4}-\d{2}-\d{2}/.test(text)) {
+            push(roleId, rel, "至少需要一行 YYYY-MM-DD 的续接记录");
+          }
+        } else if (file === "api-spec.md") {
+          const notApplicable = /not-applicable/i.test(text);
+          const hasInterface = /(接口|API|导出|IPC|方法|契约|通道)/i.test(text);
+          if (!hasInterface) {
+            if (!notApplicable) {
+              push(roleId, rel, "未包含接口/导出/契约说明，也未写 not-applicable + 非空理由");
+            } else {
+              // not-applicable 必须带非空理由（去掉标记行后的正文非空）。
+              const reason = text.replace(/^.*not-applicable.*$/gim, "").trim();
+              if (reason === "") push(roleId, rel, "api-spec.md 标为 not-applicable 但未给出非空理由");
+            }
+          }
+        }
+      }
+      // ④ listProject 刷新后的 warnings 辅助定位（缺文件/解析失败/重复/冲突等）——已由直接检查覆盖的
       //    同类问题不再重复；warning 文本原样保留原因。
       for (const warning of listing?.warnings ?? []) {
         if (!warning.startsWith(`${dir}：`)) continue;
@@ -1857,17 +2572,36 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     return issues;
   };
 
-  /** Crew 修正任务文本（逐文件列出问题；要求重发 appointment-write 卡完成写卡）。 */
-  const buildAppointmentArtifactFeedback = (flowId: string, issues: readonly AppointmentArtifactIssue[]): string =>
-    [
-      `流程 ${flowId}：写卡产物未通过校验（appointment 步骤不能继续；未派 Steward / 统筹，也未把步骤标为 done）。`,
+  /** Crew 修正任务文本（逐文件列出 Crew 来源问题；要求重发 appointment-write 卡完成写卡）。 */
+  const buildAppointmentArtifactFeedback = (flowId: string, issues: readonly AppointmentArtifactIssue[]): string => {
+    const crewIssues = issues.filter((issue) => issue.source !== "convener");
+    const blocking = crewIssues.filter((issue) => issue.warning !== true);
+    const warnings = crewIssues.filter((issue) => issue.warning === true);
+    return [
+      `流程 ${flowId}：写卡产物未通过校验（appointment 步骤不能继续；未派 Steward / 统筹 做 role-readiness，也未把步骤标为 done）。`,
       "具体问题：",
-      ...issues.map((issue) => `- ${issue.path}：${issue.issue}`),
-      "请修正上述文件后**重新发 appointment-write 确认卡**完成写卡（role-card.md 需有 # 标题与正文；boundary.yaml 需为合法 YAML，顶层 role 与目录 id 一致，entries 非空）。",
+      ...blocking.map((issue) => `- ${issue.path}：${issue.issue}`),
+      ...(warnings.length > 0 ? ["提醒（不阻塞，existing/legacy 角色）：", ...warnings.map((issue) => `- ${issue.path}：${issue.issue}`)] : []),
+      "请修正上述文件后**重新发 appointment-write 确认卡**完成写卡（role-card.md 需含第 5 项必填章节；boundary.yaml 需为合法 YAML，顶层 role 与目录 id 一致，entries 含角色根工作文档与实际写集；工作文档按 feature-map/functional-description/memo/api-spec 补齐，api-spec 不适用时写 not-applicable + 非空理由）。",
     ].join("\n");
+  };
+
+  /** Convener 修正任务文本（团队计划缺细节/缺行/类型不可识别；Crew 暂停、不自行补计划）。 */
+  const buildAppointmentPlanFeedback = (flowId: string, issues: readonly AppointmentArtifactIssue[]): string => {
+    const planIssues = issues.filter((issue) => issue.source === "convener");
+    return [
+      `流程 ${flowId}：团队计划未通过结构校验（任命的写卡步骤暂停；Crew 不自行补计划，应用未派 role-readiness、未把步骤标为 done）。`,
+      "具体问题：",
+      ...planIssues.map((issue) => `- ${issue.path}：${issue.issue}`),
+      "请修正/补充团队计划（frontmatter flowId/version/riskTier/recommended；角色表逐角色含类型 new/changed/existing、职责目标、能力要求、唯一写集、依赖），必要时递增为 v2 并重发任命卡；修正后应用会重新校验。",
+    ].join("\n");
+  };
 
   /**
-   * 把写卡产物问题反馈给 Crew/Nominator（后台投递，不弹客户卡），并落一条 Lead 系统行。
+   * 把写卡产物问题**按来源分流**反馈（后台投递，不弹客户卡），并落一条 Lead 系统行：
+   *  - Crew 来源（role-card/boundary/工作文档）⇒ 反馈 Crew 修正（重发 appointment-write）；
+   *  - Convener 来源（团队计划缺行/缺职责·能力·写集·依赖/类型不可识别）⇒ 反馈 Convener 补充计划；
+   *  - 仅 warning（existing/legacy 的最低检查提醒）⇒ 只记诊断，不派任务、不发系统行（避免噪音）。
    * 去重：同 flow+问题哈希只反馈一次（修正后问题哈希变化才再次反馈；通过后清除，回归可再报）。
    * 运行时无法确定/开或发失败 ⇒ 只记诊断，下一次真实事件重试（不循环）。
    */
@@ -1879,12 +2613,22 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     options: { runtime?: RuntimeKind } = {},
   ): Promise<void> => {
     if (issues.length === 0) return;
+    const diagnostic = createDiagnosticLogger({ component: "desktop.governance-advance", projectRoot, roleId: "nominator" });
+    const blocking = issues.filter((issue) => issue.warning !== true);
+    if (blocking.length === 0) {
+      diagnostic.record("advance.appointment.artifacts-warning", { flowId, count: issues.length });
+      return; // 只有提醒：不阻塞、不派任务（迁移策略：existing/legacy 仅记录 warning）
+    }
     const hash = createHash("sha256")
-      .update(issues.map((issue) => `${issue.roleId}\u0000${issue.path}\u0000${issue.issue}`).sort().join("\n"))
+      .update(
+        issues
+          .map((issue) => `${issue.roleId}\u0000${issue.path}\u0000${issue.source ?? "crew"}\u0000${issue.warning === true ? "w" : "b"}\u0000${issue.issue}`)
+          .sort()
+          .join("\n"),
+      )
       .digest("hex");
     const dedupeKey = `${projectRoot}\u0000${flowId}`;
     if (appointmentArtifactFeedback.get(dedupeKey) === hash) return; // 同 flow+issuesHash：不刷屏
-    const diagnostic = createDiagnosticLogger({ component: "desktop.governance-advance", projectRoot, roleId: "nominator" });
     let runtime: RuntimeKind | undefined =
       options.runtime ?? acceptanceRuntimeHints.get(projectRoot) ?? manager.activeRuntimeFor(projectRoot);
     if (runtime === undefined) {
@@ -1899,22 +2643,48 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       diagnostic.record("advance.appointment.artifacts.runtime-unresolved", { flowId });
       return;
     }
-    const text = buildAppointmentArtifactFeedback(flowId, issues);
-    const opened = await manager.openBackground({ projectRoot, roleId: "nominator", runtime });
-    if (!opened.ok) {
-      diagnostic.error("advance.appointment.artifacts.open.failed", new Error(opened.error ?? "unknown"), { flowId });
-      return;
+    const crewIssues = issues.filter((issue) => issue.source !== "convener");
+    const crewBlocking = blocking.filter((issue) => issue.source !== "convener");
+    const planBlocking = blocking.filter((issue) => issue.source === "convener");
+    let dispatchedAny = false;
+    if (crewBlocking.length > 0) {
+      const text = buildAppointmentArtifactFeedback(flowId, crewIssues);
+      const opened = await manager.openBackground({ projectRoot, roleId: "nominator", runtime });
+      if (!opened.ok) {
+        diagnostic.error("advance.appointment.artifacts.open.failed", new Error(opened.error ?? "unknown"), { flowId });
+        return;
+      }
+      const sent = await manager.sendBackground({ projectRoot, roleId: "nominator", runtime, text });
+      if (!sent.ok) {
+        diagnostic.error("advance.appointment.artifacts.send.failed", new Error(sent.error ?? "unknown"), { flowId });
+        return;
+      }
+      dispatchedAny = true;
     }
-    const sent = await manager.sendBackground({ projectRoot, roleId: "nominator", runtime, text });
-    if (!sent.ok) {
-      diagnostic.error("advance.appointment.artifacts.send.failed", new Error(sent.error ?? "unknown"), { flowId });
-      return;
+    if (planBlocking.length > 0) {
+      const text = buildAppointmentPlanFeedback(flowId, issues);
+      const opened = await manager.openBackground({ projectRoot, roleId: "convener", runtime });
+      if (!opened.ok) {
+        diagnostic.error("advance.appointment.plan.open.failed", new Error(opened.error ?? "unknown"), { flowId });
+        return;
+      }
+      const sent = await manager.sendBackground({ projectRoot, roleId: "convener", runtime, text });
+      if (!sent.ok) {
+        diagnostic.error("advance.appointment.plan.send.failed", new Error(sent.error ?? "unknown"), { flowId });
+        return;
+      }
+      dispatchedAny = true;
     }
+    if (!dispatchedAny) return;
     appointmentArtifactFeedback.set(dedupeKey, hash);
-    diagnostic.record("advance.appointment.artifacts-rejected", { flowId, count: issues.length });
-    // Lead 系统行（去重随哈希）：如实说明未推进、已退回 Crew。
+    diagnostic.record("advance.appointment.artifacts-rejected", { flowId, count: blocking.length });
+    // Lead 系统行（去重随哈希）：如实说明未推进、已按来源退回。
     const primaryRoleId = listing?.primaryRoleId;
     if (typeof primaryRoleId === "string" && primaryRoleId !== "") {
+      const routed = [
+        crewBlocking.length > 0 ? `Crew / 组队 修正 ${crewBlocking.length} 个` : "",
+        planBlocking.length > 0 ? `Steward / 统筹 补充计划 ${planBlocking.length} 个` : "",
+      ].filter((part) => part !== "").join("、");
       try {
         emitSessionEvent({
           roleId: primaryRoleId,
@@ -1923,8 +2693,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           event: {
             kind: "message",
             summary:
-              `写卡产物未通过校验（流程 ${flowId}）：${issues.length} 个问题——已反馈 Crew / 组队 修正；` +
-              `未派 Steward / 统筹、未把 appointment 步骤标为 done。首个问题：${issues[0]!.path}：${issues[0]!.issue}`,
+              `写卡产物未通过校验（流程 ${flowId}）：${blocking.length} 个问题——已反馈 ${routed}；` +
+              `未派 Steward / 统筹 做 role-readiness、未把 appointment 步骤标为 done。首个问题：${blocking[0]!.path}：${blocking[0]!.issue}`,
             detail: { source: "delivery-note" },
           },
         });
@@ -2178,12 +2948,22 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         }
         // 2026-10-20 客户要求：写卡产物的**确定性门控**——目标角色已在 listing，但 role-card/boundary
         // 格式或内容不合格 ⇒ **不派 Convener、不把 appointment 步骤标 done、不弹客户卡**；把每个文件的
-        // 具体问题反馈 Crew/Nominator 修正（重发 appointment-write 卡），同 flow+问题哈希不刷屏。
-        const artifactIssues = await validateAppointmentArtifacts(projectRoot, targets, listing);
-        if (artifactIssues.length > 0) {
-          diagnostic.record("advance.appointment.artifacts-invalid", { flowId, count: artifactIssues.length });
+        // 具体问题按来源反馈 Crew/Convener 修正（重发 appointment-write 卡 / 补充团队计划），同 flow+问题哈希不刷屏。
+        // 2026-10-22 第 5 项：读取团队计划按 new/changed/existing 决定强制范围；计划问题来源＝Convener。
+        const plan = await readTeamPlanInfo(projectRoot, flowId, appointment.artifactPath);
+        const artifactIssues = await validateAppointmentArtifacts(projectRoot, targets, listing, {
+          flowId,
+          ...(typeof appointment.artifactPath === "string" ? { appointmentArtifactPath: appointment.artifactPath } : {}),
+        });
+        const artifactBlockers = artifactIssues.filter((issue) => issue.warning !== true);
+        if (artifactBlockers.length > 0) {
+          diagnostic.record("advance.appointment.artifacts-invalid", { flowId, count: artifactBlockers.length });
           await reportAppointmentArtifactIssues(projectRoot, flowId, artifactIssues, listing);
           continue;
+        }
+        // 仅 warning（existing/legacy 的最低检查提醒）：不阻塞推进；report 只记诊断、不派任务。
+        if (artifactIssues.length > 0) {
+          await reportAppointmentArtifactIssues(projectRoot, flowId, artifactIssues, listing);
         }
         appointmentArtifactFeedback.delete(`${projectRoot}\u0000${flowId}`); // 已通过：后续回归可再报
         const afterwards = ledger.entries.slice(index + 1);
@@ -2209,6 +2989,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         }
         const key = applicationConvenerDispatchKey(projectRoot, flowId);
         if (postWriteAdvanceDispatched.has(key)) continue;
+        // 2026-10-22 第 1 项：新流程（团队计划存在）⇒ 派 Convener 做 **role-readiness**；
+        // legacy 流程（无团队计划）保持旧「写流程 YAML 并派发已批准步骤」文案（迁移兼容）。
         const payload: GovernanceNextStepPayload = {
           version: 1,
           flowId,
@@ -2218,9 +3000,16 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         };
         // 2026-10-20 真机：YAML 已存在时派给 Convener 的必须是「用 flow_get / flow_step_update /
         // flow_step_supersede 推进」，不是「请先写流程状态 YAML」——否则它照旧去写文件、不调 flow 工具。
-        const message = buildGovernanceAdvanceMessage(payload, targets, {
-          flowStateExists: existsSync(path.join(projectRoot, governanceFlowStatePath(flowId))),
-        });
+        const readinessStepId = plan !== undefined ? "role-readiness" : undefined;
+        const message =
+          plan !== undefined
+            ? buildRoleReadinessTaskMessage(flowId, targets, plan.relPath, plan.version, {
+                teamPlanSchema: plan.teamPlanSchema,
+                modules: plan.modules,
+              })
+            : buildGovernanceAdvanceMessage(payload, targets, {
+                flowStateExists: existsSync(path.join(projectRoot, governanceFlowStatePath(flowId))),
+              });
         if (message === null) continue;
         // **先占位，再跨 await**（2026-10-19 全仓回归：原链路与新检查在引擎解析 await 窗口内互相
         // 看不到对方的登记，各派一次）。占位后任何失败都释放，允许下一次真实事件重试。
@@ -2264,7 +3053,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             roleId: listing.primaryRoleId,
             projectRoot,
             runtime,
-            event: { kind: "message", summary: governanceAdvanceSuccessNote(payload), detail: { source: "delivery-note" } },
+            event: {
+              kind: "message",
+              summary: plan !== undefined ? governanceReadinessNote() : governanceAdvanceSuccessNote(payload),
+              detail: { source: "delivery-note" },
+            },
           });
         } catch (error) {
           diagnostic.error("advance.post-write.note.failed", error, { flowId });
@@ -2274,6 +3067,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           flowId,
           targetRoleId: "convener",
           text: message,
+          ...(readinessStepId !== undefined ? { stepId: readinessStepId } : {}),
           runtime,
           trigger: "customer-decision",
           dedupeKey: key,
@@ -2299,7 +3093,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
               (id): id is string => typeof id === "string" && id.trim() !== "",
             );
             if (retryTargets.length === 0) continue;
-            const issues = await validateAppointmentArtifacts(projectRoot, retryTargets, listing);
+            const issues = await validateAppointmentArtifacts(projectRoot, retryTargets, listing, {
+              flowId,
+              ...(typeof appointment.artifactPath === "string" ? { appointmentArtifactPath: appointment.artifactPath } : {}),
+            });
             if (issues.length === 0) continue;
             diagnostic.record("advance.appointment.artifacts-invalid", { flowId, count: issues.length });
             await reportAppointmentArtifactIssues(projectRoot, flowId, issues, listing);
@@ -2770,15 +3567,6 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       };
       if (projectRoot === undefined) return fail("缺少项目根，无法后台派发");
       if (runtime === undefined) return fail("缺少运行时，无法后台派发");
-      /**
-       * **appointment → Convener 的共享去重键**（与「写卡后推进检查」同一 Set）：
-       * 投递前先占位、成功保留、失败释放。账本 append 是异步的，不能作为进程内唯一判据；
-       * 非 appointment / 无 flowId 时为 undefined（不参与该去重）。
-       */
-      const appointmentConvenerKey =
-        payload.cardKind === "appointment" && payload.flowId !== undefined
-          ? applicationConvenerDispatchKey(projectRoot, payload.flowId)
-          : undefined;
       /** 后台开目标会话并投递一条任务；成功/失败都如实（不重试）。 */
       const dispatchTo = async (
         target: "nominator" | "convener",
@@ -2824,6 +3612,53 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         const timer = setTimeout(resolve, Math.max(1, ms));
         (timer as { unref?: () => void }).unref?.();
       });
+      // —————— 2026-10-22 第 1/3 项：账本决定读取（派发回路的事实来源） ——————
+      // 事件（customer-input 结算 → onNextStep）与编排的账本 append 有微任务竞态：这里做**有界短轮询**
+      // （≤300ms），仍未读到就回落卡片上下文（客户实际选择），绝不猜名单、不伪造决定。
+      /** 账本最新 appointment 决定（含索引与整份账本；坏行/无记录 ⇒ undefined）。 */
+      const readLatestAppointmentLedger = async (
+        flowId: string,
+      ): Promise<{ entry: GovernanceLedgerEntry; index: number; ledger: { entries: readonly GovernanceLedgerEntry[] } } | undefined> => {
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          const ledger = await readGovernanceLedger(projectRoot);
+          if (ledger.errors.length === 0) {
+            let found: { entry: GovernanceLedgerEntry; index: number; ledger: { entries: readonly GovernanceLedgerEntry[] } } | undefined;
+            ledger.entries.forEach((entry, index) => {
+              if (entry.kind === "customer.decision" && entry.decisionKind === "appointment" && entry.flowId === flowId) {
+                found = { entry, index, ledger };
+              }
+            });
+            if (found !== undefined) return found;
+          }
+          if (attempt < 3) await chainSleep(75);
+        }
+        return undefined;
+      };
+      /** 最新提案决定类型（accept / accept-quick）；账本不可读/无记录 ⇒ undefined（文案走旧快捷分支）。 */
+      const readLatestProposalDecisionKind = async (flowId: string): Promise<"accept" | "accept-quick" | undefined> => {
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          const ledger = await readGovernanceLedger(projectRoot);
+          if (ledger.errors.length === 0) {
+            let kind: "accept" | "accept-quick" | undefined;
+            for (const entry of ledger.entries) {
+              if (entry.kind !== "customer.decision" || entry.flowId !== flowId) continue;
+              if (entry.decisionKind === "proposal-accept") kind = "accept";
+              else if (entry.decisionKind === "proposal-accept-quick") kind = "accept-quick";
+            }
+            return kind;
+          }
+          if (attempt < 3) await chainSleep(75);
+        }
+        return undefined;
+      };
+      /** 名单集合相等（顺序无关；用于「客户手选 ≠ 推荐集」提示）。 */
+      const sameRoleSet = (a: readonly string[], b: readonly string[]): boolean => {
+        const left = new Set(a);
+        const right = new Set(b);
+        if (left.size !== right.size) return false;
+        for (const id of left) if (!right.has(id)) return false;
+        return true;
+      };
       /**
        * 流程状态 YAML 的一次探测（只读；不写、不猜）：
        * `valid`（解析通过；顺带给出首步 nomination 是否 done）/ `missing` / `invalid`（带具体 path+message）/
@@ -2884,43 +3719,6 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           await chainSleep(Math.min(chainPollIntervalMs, remaining));
         }
       };
-      /**
-       * 有界轮询任命目标角色卡出现（每轮强制刷新 listing）：替代旧的 `waitForRoleIdle`——
-       * 刚投递写卡任务时会话可能立即被释放/尚未标记 busy，瞬时 idle 不能代表「角色卡已写完」。
-       * 角色 settled（且无后续投递）后给一次短宽限；仍缺 ⇒ 调用方**不派 Convener**（既有语义逐字保留）。
-       */
-      const waitForAppointmentRoles = async (): Promise<{
-        missing: string[];
-        polls: number;
-        waitedMs: number;
-        refreshFailures: number;
-      }> => {
-        const startedAt = Date.now();
-        const deadline = startedAt + chainTimeoutMs;
-        let polls = 0;
-        let refreshFailures = 0;
-        let settledSince: number | undefined;
-        const refreshAndMissing = async (): Promise<string[]> => {
-          polls += 1;
-          if (!(await manager.refreshListingNow(projectRoot))) refreshFailures += 1;
-          return appointmentTargets.filter((roleId) => !roleExists(roleId));
-        };
-        let missing = await refreshAndMissing();
-        for (;;) {
-          if (missing.length === 0) break;
-          if (settledEvidence("nominator")) {
-            settledSince ??= Date.now();
-            if (Date.now() - settledSince >= chainSettledGraceMs) break;
-          } else {
-            settledSince = undefined;
-          }
-          const remaining = deadline - Date.now();
-          if (remaining <= 0) break;
-          await chainSleep(Math.min(chainPollIntervalMs, remaining));
-          missing = await refreshAndMissing();
-        }
-        return { missing, polls, waitedMs: Date.now() - startedAt, refreshFailures };
-      };
       // W6-B 真机阻塞修复（任命后的派发时序）：客户决定卡是在来源角色本轮**中途**作答的——Nominator
       // 可能还在写角色卡。先等来源本轮 settle（`waitForRoleSettle`：只等一次、有上限；无会话/不忙立即
       // 返回；超时或会话释放只记诊断后继续），再强制刷新 listing，然后才派发。**绝不循环重试**。
@@ -2930,124 +3728,151 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
       const listingFresh = await manager.refreshListingNow(projectRoot);
       if (!listingFresh) diagnostic.record("advance.listing-refresh.failed", { projectRoot });
+      // ———— 2026-10-22 第 1 项：appointment 决定 ⇒ 应用派 Crew 写卡（主路径，**不是** Convener） ————
+      // 回路：客户 appointment 决定 → 账本 customer.decision(appointment) → 本方法派 Crew（写卡任务，
+      // stepId=role-cards）→ Crew settle/应用检查 → 结构校验通过 → 派 Convener 做 role-readiness。
+      // 去重（双重）：运行期 Set `<root>\0<flowId>\0appointment-crew`（投递前占位、成功保留、失败释放）
+      // ＋账本 `dispatch.accepted{targetRoleId:"nominator"}`（appointment 之后，跨重启）；重复事件/重启不重派。
+      if (payload.cardKind === "appointment") {
+        const flowId = payload.flowId;
+        if (flowId === undefined) return fail("缺少流程信息（flowId），未派发写卡任务");
+        const latest = await readLatestAppointmentLedger(flowId);
+        if (
+          latest !== undefined &&
+          typeof latest.entry.customerDecision === "string" &&
+          !RESOLVED_APPOINTMENT_DECISIONS.has(latest.entry.customerDecision)
+        ) {
+          // 拒绝/取消（账本 unclassified/none 等）：不派 Crew、不猜客户意图。
+          return fail(`账本最新任命决定为 ${latest.entry.customerDecision}（未获客户同意），未派发写卡任务`);
+        }
+        const ledgerTargets = (latest?.entry.targetRoleIds ?? []).filter(
+          (id): id is string => typeof id === "string" && id.trim() !== "",
+        );
+        const contextTargets = (Array.isArray(context.targetRoleIds) ? context.targetRoleIds : []).filter(
+          (id): id is string => typeof id === "string" && id.trim() !== "",
+        );
+        // 名单：账本决定优先（客户实际选择的持久记录）；竞态未读到账本时回落卡片上下文。
+        const targets = [...new Set(ledgerTargets.length > 0 ? ledgerTargets : contextTargets)];
+        if (targets.length === 0) return fail("缺少任命名单，未派发写卡任务");
+        // 团队计划：账本 artifactPath 优先 → 卡片显式 context → 按 flowId 扫描最新 -team-vN.md；
+        // 仅 legacy（无团队计划但有提名文件）才回落提名——绝不猜目录。
+        const preferredPlan = latest?.entry.artifactPath ?? context.teamPlanPath;
+        const plan = await readTeamPlanInfo(projectRoot, flowId, preferredPlan);
+        const legacyNomination =
+          plan === undefined ? await findLatestVersionedArtifact(projectRoot, "docs/nominations", flowId) : undefined;
+        if (plan === undefined && legacyNomination === undefined) {
+          const boundHint =
+            typeof preferredPlan === "string" && preferredPlan !== ""
+              ? `（账本 appointment 绑定 ${preferredPlan}）`
+              : "";
+          emitLeadDeliveryNote(
+            projectRoot,
+            runtime,
+            `流程 ${flowId}：团队计划缺失（docs/scheduling/${flowId}-team-vN.md）${boundHint}；未派 Crew 写卡、未继续推进。请 Steward / 统筹 先写团队计划。`,
+          );
+          return fail(`团队计划缺失${boundHint}；未派 Crew 写卡（不猜计划、不自行扩大职责）`);
+        }
+        const crewKey = `${canonicalProjectRoot(projectRoot)}\u0000${flowId}\u0000appointment-crew`;
+        if (postWriteAdvanceDispatched.has(crewKey)) {
+          diagnostic.record("advance.appointment.crew-dedup", { flowId });
+          return { ok: true, dispatched: false };
+        }
+        if (latest !== undefined) {
+          // 账本去重（跨重启）：appointment 决定之后已有 app→nominator 的派发（stepId=role-cards；旧版无 stepId）
+          // ⇒ 不重派；写运行期占位，同进程后续事件同样跳过。
+          const alreadyDispatched = latest.ledger.entries
+            .slice(latest.index + 1)
+            .some(
+              (entry) =>
+                entry.kind === "dispatch.accepted" &&
+                entry.flowId === flowId &&
+                entry.targetRoleId === "nominator" &&
+                entry.power !== "liaison",
+            );
+          if (alreadyDispatched) {
+            postWriteAdvanceDispatched.add(crewKey);
+            diagnostic.record("advance.appointment.crew-ledger-dedup", { flowId });
+            return { ok: true, dispatched: false };
+          }
+        }
+        postWriteAdvanceDispatched.add(crewKey); // 先占位（失败释放）
+        const crewPayload: GovernanceNextStepPayload = {
+          version: 1,
+          flowId,
+          cardKind: "appointment",
+          nextFunction: "role-card-write",
+          roleId: "nominator",
+        };
+        const crewMessage = buildGovernanceAdvanceMessage(crewPayload, targets, {
+          ...(plan !== undefined
+            ? {
+                teamPlanPath: plan.relPath,
+                teamPlanVersion: plan.version,
+                teamPlanSchema: plan.teamPlanSchema,
+                teamPlanModules: plan.modules,
+              }
+            : {}),
+          ...(legacyNomination !== undefined ? { nominationPath: legacyNomination.relPath } : {}),
+        });
+        if (crewMessage === null) {
+          postWriteAdvanceDispatched.delete(crewKey);
+          return fail("缺少团队计划/任命名单，未派发写卡任务");
+        }
+        const crewDispatch = await dispatchTo("nominator", crewMessage);
+        if (!crewDispatch.ok) {
+          postWriteAdvanceDispatched.delete(crewKey);
+          return fail(crewDispatch.error);
+        }
+        note(governanceAdvanceSuccessNote(crewPayload));
+        await appendDispatchAccepted("nominator", crewMessage, "role-cards", crewKey);
+        diagnostic.record("advance.appointment.crew-dispatched", {
+          flowId,
+          count: targets.length,
+          queued: crewDispatch.queued === true,
+          mode: plan !== undefined ? "team-plan" : "legacy-nomination",
+        });
+        // 客户手选与推荐集不同：按实际名单派 Crew；提示 Convener 修订计划 v2（避免计划与名单长期不一致）。
+        if (plan?.recommended !== undefined && !sameRoleSet(plan.recommended, targets)) {
+          note(
+            `客户实际任命名单（${targets.join("、")}）与团队计划推荐集（${plan.recommended.join("、")}）不同；` +
+              `请 Steward / 统筹 修订团队计划为 v2 以反映实际任命（Crew 只按实际名单写卡）。`,
+          );
+          diagnostic.record("advance.appointment.selection-mismatch", { flowId });
+        }
+        // 写卡后推进检查：Crew settle 也会触发；这里先排一次（会话被释放/重启也不漏派）。
+        schedulePostWriteAdvanceCheck(projectRoot, runtime);
+        return {
+          ok: true,
+          dispatched: true,
+          targetRoleId: "nominator",
+          ...(crewDispatch.queued === true ? { queued: true } : {}),
+        };
+      }
+      // —— proposal / legacy 提名链路（followUp 两段式保留迁移兼容）——
+      const proposalDecision =
+        payload.cardKind === "proposal" && payload.flowId !== undefined
+          ? await readLatestProposalDecisionKind(payload.flowId)
+          : undefined;
+      const proposalPlan =
+        payload.cardKind === "proposal" && payload.flowId !== undefined
+          ? await findLatestVersionedArtifact(projectRoot, "docs/scheduling", payload.flowId, "team")
+          : undefined;
       const message = buildGovernanceAdvanceMessage(payload, context.targetRoleIds, {
         // 2026-10-20 真机：流程状态 YAML 已存在 ⇒ Convener 任务改用 flow 工具推进（不直接写 YAML）。
         flowStateExists:
           typeof payload.flowId === "string" &&
           payload.flowId !== "" &&
           existsSync(path.join(projectRoot, governanceFlowStatePath(payload.flowId))),
+        ...(proposalDecision !== undefined ? { proposalDecision } : {}),
+        ...(proposalPlan !== undefined ? { teamPlanPath: proposalPlan.relPath } : {}),
       });
       if (message === null) return fail("缺少流程信息（flowId/任命名单），未自动派发");
-      // —— 2026-10-18 真机修正：任命后先确认目标角色**真的写出来了** ——
-      // 账本已有 appointment 决定、但目标角色不在刷新后的 listing（角色卡/边界未写）时，直接派 Convener
-      // 只会让它反复报「未枚举」。此时先派 Nominator 用 appointment-write 逐路径写卡；它本轮结束后重查，
-      // 角色出现才派 Convener，仍未出现 ⇒ 系统行如实报错、**不循环**。
-      const appointmentTargets =
-        payload.cardKind === "appointment" && Array.isArray(context.targetRoleIds)
-          ? context.targetRoleIds.filter((id): id is string => typeof id === "string" && id.trim() !== "")
-          : [];
-      const roleExists = (roleId: string): boolean =>
-        listingCache.get(projectRoot)?.roles.some((role) => role.roleId === roleId) === true;
-      const missingAppointmentRoles =
-        payload.cardKind === "appointment" ? appointmentTargets.filter((roleId) => !roleExists(roleId)) : [];
-      if (payload.cardKind === "appointment" && payload.flowId !== undefined && missingAppointmentRoles.length > 0) {
-        const reminder = buildAppointmentWriteReminderMessage(payload.flowId, appointmentTargets);
-        const writeDispatch = await dispatchTo("nominator", reminder);
-        if (!writeDispatch.ok) return fail(writeDispatch.error);
-        note(governanceAppointmentWriteNote());
-        await appendDispatchAccepted("nominator", reminder);
-        diagnostic.record("advance.appointment.awaiting-roles", {
-          flowId: payload.flowId,
-          missing: missingAppointmentRoles,
-          queued: writeDispatch.queued === true,
-        });
-        // 2026-10-20 修复：不再用 `waitForRoleIdle` 判「写卡本轮结束」（刚投递/会话被释放会立即假失败）；
-        // 改为有界轮询 listing 事实——目标角色全部出现才继续，仍缺则如实失败、**不派 Convener**。
-        const rolesWait = await waitForAppointmentRoles();
-        diagnostic.record("advance.appointment.roles-wait", {
-          flowId: payload.flowId,
-          polls: rolesWait.polls,
-          waitedMs: rolesWait.waitedMs,
-          refreshFailures: rolesWait.refreshFailures,
-          missing: rolesWait.missing,
-        });
-        const stillMissing = rolesWait.missing;
-        if (stillMissing.length > 0) {
-          const nominatorBusy = manager.isRoleBusy(projectRoot, "nominator", runtime);
-          return chainFail(
-            nominatorBusy
-              ? `Crew / 组队 本轮未在时限内结束，角色（${missingAppointmentRoles.join("、")}）未确认；未派 Steward / 统筹`
-              : `角色卡/边界仍未写出（${stillMissing.join("、")} 未枚举到）；未派 Steward / 统筹`,
-            "nominator",
-          );
-        }
-        // 2026-10-20 客户要求：写卡产物的**确定性门控**——角色虽已枚举，但 role-card/boundary 格式或
-        // 内容不合格 ⇒ 不派 Convener、不把步骤标 done；逐文件问题反馈 Crew 修正、不弹客户卡。
-        const appointmentArtifactIssues = await validateAppointmentArtifacts(
-          projectRoot,
-          appointmentTargets,
-          listingCache.get(projectRoot),
-        );
-        if (appointmentArtifactIssues.length > 0) {
-          diagnostic.record("advance.appointment.artifacts-invalid", {
-            flowId: payload.flowId,
-            count: appointmentArtifactIssues.length,
-          });
-          await reportAppointmentArtifactIssues(
-            projectRoot,
-            payload.flowId ?? "",
-            appointmentArtifactIssues,
-            listingCache.get(projectRoot),
-            { runtime },
-          );
-          return chainFail(
-            `写卡产物未通过校验（${appointmentArtifactIssues.length} 个问题：${appointmentArtifactIssues[0]!.path}：${appointmentArtifactIssues[0]!.issue}）；未派 Steward / 统筹`,
-            "nominator",
-          );
-        }
-        appointmentArtifactFeedback.delete(`${projectRoot}\u0000${payload.flowId ?? ""}`); // 已通过：后续回归可再报
-        // 共享运行期去重：写卡后检查可能已先派 Convener（或本链路已派过）⇒ 不再重复；
-        // 结果仍如实告知「写卡段已完成、后续 Convener 已派」（由共享检查完成，不是第二派）。
-        if (appointmentConvenerKey !== undefined && postWriteAdvanceDispatched.has(appointmentConvenerKey)) {
-          diagnostic.record("advance.appointment.dedup", { flowId: payload.flowId, targetRoleId: "convener" });
-          return { ok: true, dispatched: true, targetRoleId: "nominator", followUpRoleId: "convener" };
-        }
-        if (appointmentConvenerKey !== undefined) postWriteAdvanceDispatched.add(appointmentConvenerKey); // 先占位
-        const convenerDispatch = await dispatchTo("convener", message);
-        if (!convenerDispatch.ok) {
-          if (appointmentConvenerKey !== undefined) postWriteAdvanceDispatched.delete(appointmentConvenerKey);
-          return chainFail(convenerDispatch.error, "nominator");
-        }
-        note(governanceAdvanceSuccessNote(payload));
-        await appendDispatchAccepted(
-          "convener",
-          message,
-          typeof context.stepId === "string" && context.stepId !== "" ? context.stepId : undefined,
-          appointmentConvenerKey,
-        );
-        diagnostic.record("advance.appointment.dispatched", { flowId: payload.flowId, targetRoleId: "convener" });
-        return {
-          ok: true,
-          dispatched: true,
-          targetRoleId: "nominator",
-          followUpRoleId: "convener",
-          ...(convenerDispatch.queued === true ? { queued: true } : {}),
-        };
-      }
-      // 共享运行期去重：写卡后检查可能已先派 Convener ⇒ 不再重复（账本 append 异步，不能只看账本）。
-      if (appointmentConvenerKey !== undefined && postWriteAdvanceDispatched.has(appointmentConvenerKey)) {
-        diagnostic.record("advance.appointment.dedup", { flowId: payload.flowId, targetRoleId: "convener" });
-        return { ok: true, dispatched: false };
-      }
-      if (appointmentConvenerKey !== undefined) postWriteAdvanceDispatched.add(appointmentConvenerKey); // 先占位
       const opened = await manager.openBackground({ projectRoot, roleId: targetRoleId, runtime });
       if (!opened.ok) {
-        if (appointmentConvenerKey !== undefined) postWriteAdvanceDispatched.delete(appointmentConvenerKey);
         return fail(`无法开启 ${targetLabel} 会话：${opened.error ?? "未知原因"}`);
       }
       const sent = await manager.sendBackground({ projectRoot, roleId: targetRoleId, runtime, text: message });
       if (!sent.ok) {
-        if (appointmentConvenerKey !== undefined) postWriteAdvanceDispatched.delete(appointmentConvenerKey);
         return fail(`发送任务给 ${targetLabel} 失败：${sent.error ?? "未知原因"}`);
       }
       note(governanceAdvanceSuccessNote(payload));
@@ -3068,7 +3893,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // decisionEvidence**。仅 trio（single 旧项目不产生 `.ans/governance` 记录）；账本失败只记诊断，
       // 不翻转已完成的投递结果、不重试。`stepId` 不在 `governance:next-step` 契约里（payload 未携带），
       // 故不臆造。根不存在（测试/异常调用）时不创建目录：按账本失败处理（记诊断、结果不变）。
-      await appendDispatchAccepted(targetRoleId, message, stepId, appointmentConvenerKey);
+      await appendDispatchAccepted(targetRoleId, message, stepId);
       // —— 2026-10-18 真机修正；2026-10-19 客户决定「这些全部改成yaml。」 ——
       // 两段式闭环：客户接受提案后先派 Convener 写 `docs/flows/<flowId>.yaml`（唯一机器状态）。
       // **有界轮询 YAML 事实**（2026-10-20 真机假错误修复）：存在且通过 `parseFlowStateYaml` 校验 ⇒ 再派

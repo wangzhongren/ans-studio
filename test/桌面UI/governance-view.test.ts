@@ -23,6 +23,7 @@ import {
   governanceReacceptSuccessText,
   governanceQueueAggregateText,
   governanceMirrorSourceLabel,
+  governanceRoleEmptyHint,
   governanceStatusText,
   projectRoleCount,
 } from "../../app/renderer/src/chat/governance-view.ts";
@@ -193,6 +194,14 @@ test("治理卡元信息/镜像来源/聚合文案逐字；未知 cardKind 无�
   assert.equal(card.governance, true);
   assert.equal(card.badge, "治理决定 · 客户最终批准");
   assert.deepEqual(card.lines, ["流程：f1", "步骤：s1", "权力类型：提案", "将写路径：a.md", "摘要：摘要", "哈希：h"]);
+  // 2026-10-22 治理拆分：appointment 由客户任命发起，徽标「提名」→「任命」；写卡同步为「任命写卡」。
+  const appointment = governanceCardMetaView({ cardKind: "appointment" });
+  assert.equal(appointment.power, "任命");
+  assert.ok(appointment.lines.includes("权力类型：任命"));
+  assert.equal(appointment.badge, "治理决定 · 客户最终批准");
+  const appointmentWrite = governanceCardMetaView({ cardKind: "appointment-write" });
+  assert.equal(appointmentWrite.power, "任命写卡");
+  assert.ok(appointmentWrite.lines.includes("权力类型：任命写卡"));
   assert.equal(governanceCardMetaView({ cardKind: "intent-confirm" }).badge, "需求确认 · 客户");
   assert.equal(governanceCardMetaView({}).badge, "");
   assert.equal(
@@ -202,4 +211,16 @@ test("治理卡元信息/镜像来源/聚合文案逐字；未知 cardKind 无�
   assert.equal(governanceMirrorSourceLabel(""), "来自 发起角色 的治理决定 · 客户最终批准");
   assert.equal(governanceQueueAggregateText(2), "还有 2 个决定等待前一个决定");
   assert.equal(governanceQueueAggregateText(0), "");
+});
+
+test("2026-10-22 治理拆分：Crew 空态提示改为「客户任命后打开写卡」；其他角色提示不变", () => {
+  const crewHint = "客户任命后打开写卡；只按团队计划与任命名单写角色卡与边界，不选择角色、不批准。";
+  assert.equal(governanceRoleEmptyHint("nomination"), crewHint);
+  assert.ok(!governanceRoleEmptyHint("nomination").includes("提名"));
+  assert.equal(
+    governanceRoleEmptyHint("schedule"),
+    "通常由已接受提案开启流程；只负责排步骤与派发，不批准方案",
+  );
+  assert.equal(governanceRoleEmptyHint("unknown"), "");
+  assert.equal(governanceRoleEmptyHint(undefined), "");
 });

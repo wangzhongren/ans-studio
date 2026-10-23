@@ -13,7 +13,7 @@
 // 本模块只做事实提炼/物证路径计算/提名推荐集解析；**不做裁决**（裁决规范化/机械复核在
 // `governance-judge-verdict.ts`）。
 
-import type { GovernanceJudgeFacts, GovernanceJudgeRequest } from "../../model/runtime.ts";
+import { GOVERNANCE_SLUG_PATTERN, type GovernanceJudgeFacts, type GovernanceJudgeRequest } from "../../model/runtime.ts";
 import { isAbsoluteAny, normalizeLexical } from "../shared/path-primitives.ts";
 import type { GovernanceLedgerEntry, GovernanceLedgerSnapshot } from "./governance-ledger.ts";
 
@@ -25,8 +25,11 @@ export const GOVERNANCE_JUDGE_FACT_STRING_BYTES = 128;
 export const GOVERNANCE_JUDGE_FACT_ARRAY_LIMIT = 50;
 export const GOVERNANCE_JUDGE_LATEST_DECISIONS_LIMIT = 20;
 
-/** 治理 flowId 形状（与运行时核心/编排其他处同值；本地再判一次，不导入运行时实现）。 */
-const GOVERNANCE_FLOW_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
+/**
+ * 治理 flowId 形状（**单一来源**：运行时核心 `src/model/runtime.ts` 的 `GOVERNANCE_SLUG_PATTERN`；
+ * 2026-10-22 收紧为禁止首/尾连字符）。本地只编译判定用 RegExp，不保留同值副本。
+ */
+const GOVERNANCE_FLOW_ID_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
 
 export function isGovernanceJudgeFlowId(value: unknown): value is string {
   return typeof value === "string" && GOVERNANCE_FLOW_ID_RE.test(value);
@@ -142,6 +145,8 @@ export function buildGovernanceJudgeFacts(input: {
 
   let proposalDecision: GovernanceJudgeFacts["proposalDecision"];
   let appointmentTargetRoleIds: string[] | undefined;
+  /** 最新 appointment 决定是否绑定了团队计划物证（`docs/scheduling/<flowId>-team-vN.md`）。 */
+  let teamPlanConfirmed: boolean | undefined;
   const dispatched: string[] = [];
   const latestDecisionKinds: string[] = [];
   let pendingClarifications = 0;
@@ -158,9 +163,15 @@ export function buildGovernanceJudgeFacts(input: {
       if (!sameFlow) continue;
       const mapped = proposalDecisionOf(entry);
       if (mapped !== undefined) proposalDecision = mapped;
-      if (entry.decisionKind === "appointment" && Array.isArray(entry.targetRoleIds)) {
-        appointmentTargetRoleIds = boundedStringList(entry.targetRoleIds, GOVERNANCE_JUDGE_FACT_ARRAY_LIMIT);
-        if (appointmentTargetRoleIds.length === 0) appointmentTargetRoleIds = undefined;
+      if (entry.decisionKind === "appointment") {
+        // 2026-10-22：最新 appointment 决定必须能绑定团队计划（新流程）；旧提名绑定为 legacy=false。
+        teamPlanConfirmed =
+          typeof entry.artifactPath === "string" &&
+          /^docs\/scheduling\/[^/]+-team-v\d+\.md$/.test(entry.artifactPath.replace(/\\/g, "/"));
+        if (Array.isArray(entry.targetRoleIds)) {
+          appointmentTargetRoleIds = boundedStringList(entry.targetRoleIds, GOVERNANCE_JUDGE_FACT_ARRAY_LIMIT);
+          if (appointmentTargetRoleIds.length === 0) appointmentTargetRoleIds = undefined;
+        }
       }
       continue;
     }
@@ -190,17 +201,21 @@ export function buildGovernanceJudgeFacts(input: {
     latestDecisionKinds: boundedStringSequence(latestDecisionKinds, GOVERNANCE_JUDGE_LATEST_DECISIONS_LIMIT),
     ...(proposalDecision !== undefined ? { proposalDecision } : {}),
     ...(appointmentTargetRoleIds !== undefined ? { appointmentTargetRoleIds } : {}),
+    ...(teamPlanConfirmed !== undefined ? { teamPlanConfirmed } : {}),
     ...(dispatched.length > 0 ? { dispatchedStepIds: dispatched } : {}),
   };
   return boundFactsSize(facts);
 }
 
 /**
- * 规范物证要求（评审 §5.4）：
+ * 规范物证要求（评审 §5.4；2026-10-22 治理分工第 1/3/5 项）：
  * - 返回**必须可读**的物证路径与「是否有必需物证缺失」；
- * - `missingPaths` 是缺失物证的**约定路径**（客户可读；flowId 缺失时退化为「提案/提名/流程单文件」
- *   文字，不编造路径）——2026-10-18 客户反馈：只写「规范物证缺失」看不出缺哪个文件；
- * - `write` 卡的物证由 `run-role` 按来源角色收窄后放入 `artifacts`，此处取全部已给项；
+ * - `missingPaths` 是缺失物证的**约定路径**（客户可读；flowId 缺失时退化为文字，不编造路径）；
+ * - 第 1 项：appointment/appointment-write 的物证从**团队计划**读取（`docs/scheduling/<flowId>-team-v1.md`）；
+ *   `nominationPath` 保留为 **legacy**（旧流程 O4 一次性过渡回落，团队计划优先）；
+ * - 第 3 项：acceptance 增加实施前标准、验收报告、变更包三类物证；
+ * - `write` 卡的物证由 `run-role` 按来源角色收窄后放入 `artifacts`，此处取全部已给项（Convener 的
+ *   `write` 可带 teamPlan，若已存在）；
  * - `appointment-write` 的 flow 物证可选（存在才要求读，缺失不单独阻断）。
  */
 export function requiredArtifactPaths(request: GovernanceJudgeRequest): {
@@ -209,23 +224,29 @@ export function requiredArtifactPaths(request: GovernanceJudgeRequest): {
   missingPaths?: string[];
 } {
   const artifacts = request.artifacts ?? {};
-  const proposal = typeof artifacts.proposalPath === "string" && artifacts.proposalPath.trim() !== ""
-    ? artifacts.proposalPath.trim()
-    : undefined;
-  const nomination = typeof artifacts.nominationPath === "string" && artifacts.nominationPath.trim() !== ""
-    ? artifacts.nominationPath.trim()
-    : undefined;
-  const flow = typeof artifacts.flowPath === "string" && artifacts.flowPath.trim() !== ""
-    ? artifacts.flowPath.trim()
-    : undefined;
+  const pick = (value: unknown): string | undefined =>
+    typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
+  const proposal = pick(artifacts.proposalPath);
+  /** legacy：旧提名文件（新流程不再产生；仅旧流程过渡回落）。 */
+  const nomination = pick(artifacts.nominationPath);
+  const teamPlan = pick(artifacts.teamPlanPath);
+  const flow = pick(artifacts.flowPath);
+  const criteria = pick(artifacts.acceptanceCriteriaPath);
+  const report = pick(artifacts.acceptanceReportPath);
+  const changePackage = pick(artifacts.changePackagePath);
   const flowId = typeof request.flowId === "string" && request.flowId.trim() !== "" ? request.flowId.trim() : undefined;
   // 约定路径（flowId 缺失 ⇒ 文字，不编造路径）。
   const expectedProposal = flowId !== undefined ? `docs/proposals/${flowId}-v1.md` : "提案";
-  const expectedNomination = flowId !== undefined ? `docs/nominations/${flowId}-v1.md` : "提名";
+  const expectedTeamPlan = flowId !== undefined ? `docs/scheduling/${flowId}-team-v1.md` : "团队计划";
   // 2026-10-19 Flow YAML 契约：机器状态 = docs/flows/<flowId>.yaml；旧版 .md 仅人读视图。
   const expectedFlow = flowId !== undefined
     ? `docs/flows/${flowId}.yaml（旧版人读视图：docs/flows/${flowId}.md）`
     : "流程单文件";
+  const expectedCriteria = flowId !== undefined ? `docs/acceptance/${flowId}-criteria-v1.md` : "实施前验收标准";
+  const expectedReport = flowId !== undefined ? `docs/acceptance/${flowId}-report-v1.md` : "验收报告";
+  const expectedChangePackage = flowId !== undefined ? `docs/scheduling/${flowId}-change-v1.md` : "变更包";
+  // 计划物证：团队计划优先；仅当未给 teamPlan 且给了 nomination 时按 legacy 回落（O4）。
+  const planPath = teamPlan ?? nomination;
 
   switch (request.cardKind) {
     case "proposal":
@@ -233,25 +254,28 @@ export function requiredArtifactPaths(request: GovernanceJudgeRequest): {
         ? { paths: [proposal], missing: false }
         : { paths: [], missing: true, missingPaths: [expectedProposal] };
     case "appointment":
-      return nomination !== undefined
-        ? { paths: [nomination], missing: false }
-        : { paths: [], missing: true, missingPaths: [expectedNomination] };
+      return planPath !== undefined
+        ? { paths: [planPath], missing: false }
+        : { paths: [], missing: true, missingPaths: [expectedTeamPlan] };
     case "acceptance": {
       const missingPaths = [
         ...(proposal === undefined ? [expectedProposal] : []),
         ...(flow === undefined ? [expectedFlow] : []),
+        ...(criteria === undefined ? [expectedCriteria] : []),
+        ...(report === undefined ? [expectedReport] : []),
+        ...(changePackage === undefined ? [expectedChangePackage] : []),
       ];
       return {
-        paths: [proposal, flow].filter((p): p is string => p !== undefined),
+        paths: [proposal, flow, criteria, report, changePackage].filter((p): p is string => p !== undefined),
         missing: missingPaths.length > 0,
         ...(missingPaths.length > 0 ? { missingPaths } : {}),
       };
     }
     case "appointment-write":
       return {
-        paths: [nomination, flow].filter((p): p is string => p !== undefined),
-        missing: nomination === undefined,
-        ...(nomination === undefined ? { missingPaths: [expectedNomination] } : {}),
+        paths: [planPath, flow].filter((p): p is string => p !== undefined),
+        missing: planPath === undefined,
+        ...(planPath === undefined ? { missingPaths: [expectedTeamPlan] } : {}),
       };
     case "schedule-write":
       // 流程单可能是在本卡中首次创建（目标尚不存在）⇒ 不强制物证；改由 preview 正文核对。
@@ -260,7 +284,7 @@ export function requiredArtifactPaths(request: GovernanceJudgeRequest): {
     case "write": {
       // 写盘卡：只把 run-role 按来源角色收窄的**已存在**物证放进 required-read；
       // 即将新建的目标文件不在此列（评审 §5.4「新文件除外」，由 preview 正文核对）。
-      const paths = [proposal, nomination, flow].filter((p): p is string => p !== undefined);
+      const paths = [proposal, teamPlan, nomination, flow].filter((p): p is string => p !== undefined);
       return { paths, missing: false };
     }
     case "intent-confirm":

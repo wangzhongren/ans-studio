@@ -1,0 +1,4 @@
+exit_code=0
+duration_ms=611
+command=npm run typecheck:renderer
+started=2026-10-22 20:33:28

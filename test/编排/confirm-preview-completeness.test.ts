@@ -161,6 +161,54 @@ test("两条路径都给正文 → 卡片正常呈现、客户确认、两条路
   });
 });
 
+// ————————— ②b 声明 docs/flows/<id>-.yaml：完整 preview 也不得绕过 YAML 校验（S3/T11） —————————
+
+test("声明 docs/flows/ticket-desk-collab-.yaml（完整 preview）→ 卡片不呈现、显式拒绝并点名非法 flowId", async () => {
+  await withTarget(async (target) => {
+    const calls: CustomerInputRequest[] = [];
+    const flowPath = "docs/flows/ticket-desk-collab-.yaml";
+    // 内容与文件名「自洽」（flowId: ticket-desk-collab-）：若路径正则不识别该文件，YAML 校验会被静默跳过。
+    const yaml = [
+      "flowId: ticket-desk-collab-",
+      "version: 1",
+      "qualityTier: production",
+      "steps:",
+      "  - id: impl",
+      "    title: 实现",
+      "    owner: backend",
+      "    kind: dispatch",
+      "    status: pending",
+      "  - id: acceptance",
+      "    title: 验收",
+      "    owner: verifier",
+      "    kind: acceptance",
+      "    status: pending",
+      "",
+    ].join("\n");
+    const script: ToolCall[] = [
+      {
+        name: "request_confirmation",
+        args: {
+          title: "写入流程",
+          cardKind: "write",
+          flowId: "ticket-desk-collab",
+          paths: [flowPath],
+          preview: `## ${flowPath}\n${yaml}`,
+        },
+      },
+      { name: "write_file", args: { path: flowPath, content: yaml } },
+    ];
+    const result = await runScripted(target, script, recordingChannel(calls));
+    assert.equal(result.code, EXIT_OK);
+    assert.equal(calls.length, 0, "非法 flowId 文件名 ⇒ 卡片不得呈现");
+    assert.equal(existsSync(join(target, flowPath)), false, "未发卡 ⇒ 不发行 ⇒ 不得落盘");
+    const text = result.transcript.map((event) => event.summary).join("\n");
+    assert.match(text, /流程 YAML 未通过校验/, "必须进入 YAML 校验闸并拒绝（不得静默跳过）");
+    assert.match(text, /不是合法 slug/);
+    assert.match(text, /ticket-desk-collab-/);
+  });
+});
+
 // ————————— ③ 无路径确认 → 行为不变（正常呈现，不触完整性闸） —————————
 
 test("无路径确认卡 → 完整性闸不介入，卡片照常呈现（旧行为不变）", async () => {

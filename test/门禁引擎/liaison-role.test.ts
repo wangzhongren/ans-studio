@@ -124,7 +124,7 @@ test("single 项目：仍只返回 su、primaryRoleId=su；无 Liaison、无交�
 
 // —————————————————————— 3) Liaison 写权 ——————————————————————
 
-test("Liaison 写权：docs/intents/** 放行；角色卡//.ans//proposals/契约/提名/流程 拒", async () => {
+test("Liaison 写权：docs/intents/** 放行；角色卡//.ans//proposals/契约/提名/团队计划/验收/流程 拒", async () => {
   const accepted: ProjectConfig = project({
     governanceBoundary: {
       path: "角色卡/governance-boundary.yaml",
@@ -153,6 +153,8 @@ test("Liaison 写权：docs/intents/** 放行；角色卡//.ans//proposals/契�
     "docs/proposals/p-v1.md",
     "docs/contracts/c-v1.md",
     "docs/nominations/n-v1.md",
+    "docs/scheduling/f-team-v1.md",
+    "docs/acceptance/criteria-v1.md",
     "docs/flows/f.md",
     "docs/skills/s/SKILL.md",
     "docs/mcp/m.md",
@@ -165,7 +167,7 @@ test("Liaison 写权：docs/intents/** 放行；角色卡//.ans//proposals/契�
   }
 });
 
-test("Liaison 越界拒绝文案（AC3）：指回正确归属——提案找 Draft、角色卡/提名找 Crew、流程找 Steward、验收找 Proof、应用路径点名应用", async () => {
+test("Liaison 越界拒绝文案（AC3）：指回正确归属——提案找 Draft、角色卡找 Crew、团队计划找 Steward、验收找 Proof、应用路径点名应用", async () => {
   const b = await resolveBoundarySection(
     "liaison",
     project({
@@ -180,10 +182,11 @@ test("Liaison 越界拒绝文案（AC3）：指回正确归属——提案找 Dr
     ["docs/proposals/p-v1.md", /Draft \/ 提案/],
     ["docs/contracts/c-v1.md", /Draft \/ 提案/],
     ["角色卡/实现者/boundary.yaml", /Crew \/ 组队/],
-    ["docs/nominations/n-v1.md", /Crew \/ 组队/],
     ["docs/skills/s/SKILL.md", /Crew \/ 组队/],
+    ["docs/scheduling/f-team-v1.md", /Steward \/ 统筹/],
     ["docs/flows/f.md", /Steward \/ 统筹/],
     ["docs/workflow.md", /Steward \/ 统筹/],
+    ["docs/acceptance/criteria-v1.md", /Proof \/ 验收/],
     ["docs/verification/r-v1.md", /Proof \/ 验收/],
     ["docs/governance/verifier/notes.md", /Proof \/ 验收/],
     [".ans/project.json", /只能由应用写/],
@@ -198,6 +201,13 @@ test("Liaison 越界拒绝文案（AC3）：指回正确归属——提案找 Dr
       assert.match(d.reason, owner, `${p} 的拒绝文案须指回正确归属`);
       assert.deepEqual(d.allowedByRoot, { skill: [], project: ["docs/intents"] });
     }
+  }
+  // 2026-10-22：旧提名文件是 legacy（只读历史/过渡），不再归属 Crew 写区，拒绝文案不再指引 Crew。
+  const legacy = resolveWrite("docs/nominations/n-v1.md", b, undefined, ctx);
+  assert.equal(legacy.allowed, false);
+  if (!legacy.allowed) {
+    assert.match(legacy.reason, /目标路径未匹配任何边界条目/);
+    assert.doesNotMatch(legacy.reason, /Crew \/ 组队/, "legacy nominations 不再指引 Crew 写区");
   }
   // 非 Liaison 边界不追加该指引（既有角色拒绝文案不变）。
   const rapporteur = await resolveBoundarySection(

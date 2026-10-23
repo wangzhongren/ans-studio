@@ -49,13 +49,19 @@ const BUILT_IN_GOVERNANCE_ROLE_IDS: ReadonlySet<string> = new Set([
   "su",
 ]);
 
-/** 各治理角色的 `write` 来源写区（评审 §7.3；`角色卡/**` 只能走 appointment-write）。 */
+/**
+ * 各治理角色的 `write` 来源写区（评审 §7.3；`角色卡/**` 只能走 appointment-write）。
+ * 2026-10-22 治理分工第 1/3 项（方案 §5.2/§7.1）：
+ *   · Convener 增加 `docs/scheduling/`（团队计划/readiness/变更包），仍不写 `角色卡/`；
+ *   · Crew（nominator）移除 `docs/nominations/`（不再写提名文件；legacy 路由仍保留门禁侧兼容）；
+ *   · Verifier 增加 `docs/acceptance/`（实施前标准/验收报告），`docs/verification/` 保留证据附件。
+ */
 const SOURCE_WRITE_ROOTS: Readonly<Record<string, readonly string[]>> = {
   rapporteur: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
-  nominator: ["docs/nominations/", "docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
-  convener: ["docs/flows/", "docs/workflow.md", "docs/governance/convener/"],
-  // 验收角色（verification）：普通写盘只写核对报告与本角色治理记录（不是 acceptance 决定的来源假定）。
-  verifier: ["docs/verification/", "docs/governance/verifier/"],
+  nominator: ["docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
+  convener: ["docs/flows/", "docs/workflow.md", "docs/scheduling/", "docs/governance/convener/"],
+  // 验收角色（verification）：标准/报告写入 docs/acceptance/，证据附件写入 docs/verification/。
+  verifier: ["docs/acceptance/", "docs/verification/", "docs/governance/verifier/"],
 };
 
 function writeSourceMatches(roleId: string, path: string): boolean {
@@ -458,7 +464,7 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
         return manualOutcome(args, "insufficient-evidence", "任命卡形状非法；请修正后重新提交。");
       }
       if (!Array.isArray(recommended) || recommended.length === 0 || new Set(recommended).size !== recommended.length) {
-        return manualOutcome(args, "insufficient-evidence", "提名文件缺少唯一的机器可读推荐集；请补齐推荐集后重新提交。");
+        return manualOutcome(args, "insufficient-evidence", "团队计划缺少唯一的机器可读推荐集（内联数组 recommended 或固定行「推荐：」）；请补齐推荐集后重新提交。");
       }
       const optionIds = new Set(request.card.options.map((option) => option.id));
       if (!recommended.every((id) => optionIds.has(id))) {

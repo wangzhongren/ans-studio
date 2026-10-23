@@ -45,6 +45,7 @@
 6. **不得把失败伪装成成功**：不得为让测试通过而删测试、放松断言、放宽权限或隐藏错误。
 7. **业务代码需在客户确认文档并授意实施后再改**：设计文档先写拟采用方案。
 8. **文档区分"未实施 / 未测试 / 未部署"**三个状态，不把计划写成结果；未确认内容标为候选。
+9. **验收先判风险档位**：统筹调度必须在交给独立验收的变更包中标注风险档位 **T0–T3**，档位定义以技能 `references/testing.md` 的「Risk-Based Verification and Change Packages」为唯一口径，不得为省检查而压低档位。**独立验收必须先核对档位与改动是否相符并记录，再决定证据与检查**；档位与改动不符时，退回统筹，或按更高档位补证。检查强度：**T0 只查文档；T1 只跑受影响单测；T2 补受影响集成检查；全量回归只在 T3（发布、共享抽象、治理或权限变更）或证据不足时执行**；其余档位只做受影响检查，并复用未受影响且仍有效的证据。验收报告首行必须写明：**风险档位、判定依据、选定检查、复用证据、全量回归理由**（未执行全量回归时写明 N/A 理由）。**本规则不扩张任何角色的文件写权。**
 
 ## 三、方案/待确认（未生效）
 
@@ -83,3 +84,4 @@
 - 2026-10-11：**抽共享原子写原语后核对 §一.5**——补记共享组件 `atomic-write.ts`（跨角色共享**原子写**原语；对 rename 的 **Windows 瞬时 `EPERM`** 做**有界重试**；抽自 `env-file.ts` 与 **Pi适配器** `fs-write.ts` 两处同源写法，消除该处 §6 镜像），并把 §一.5「现有共享组件」清单补为现行**六个**（`config-loader` / `path-primitives` / `runtime-shared` / `argv-primitives` / `env-file` / `atomic-write`）。**atomic-write 消费方**：**`env-file.ts`**（`atomicWriteText` 已改委托 `atomicWrite`，签名/行为不变）与 **Pi适配器**（`fs-write.ts::atomicWriteFile` **待改导入**为 `atomicWrite(abs, data, { mode: 0o600 })`），完成前处**过渡性「两处并存窗口」**（两处 rename-重试语义**逐字同源**、行为不分叉）。依据：`角色卡/Pi适配器/changelog.md`（根因与量化证据）；登记见 `docs/architecture/shared-components.md` 组件 6。来源：本项目任务（pm：抽共享原子写原语）。
 - 2026-10-14：**角色拆分后核对 §一.5 消费方名单**——原「桌面应用」拆分为 **桌面UI**（渲染前端）/ **桌面窗口**（主进程、preload、桌面会话装配），客户确认名称。共享组件（`config-loader`、`argv-primitives`、`env-file`、`atomic-write` 等）的 app 侧消费方现为**桌面窗口**；§一.5 中三处「桌面应用」角色名已同步改为「桌面窗口」，引用文件与模块不变。依据：客户确认的角色拆分（`角色卡/桌面应用/归档说明.md`、`角色卡/桌面UI/`、`角色卡/桌面窗口/`）。
 - 2026-10-21：依 [UI 平台化评审](design/2026-10-21_review_ui-platform-round.md) 在 §三 记录**候选约束**：渲染层 Vite 构建归属（根 `vite.config.ts` 归装配，须先由 Team Formation 更新边界）、tsconfig 拆分与 `typecheck:renderer` 归属、渲染库放 `devDependencies`、依赖宪法（PM 批准、装配落盘、精确锁版）、markdown-it 改 npm 精确版本并删 vendor、测试机制（纯逻辑单测 + Electron e2e）。同条如实记录：v1.4.0 冻结发布配方（`SOURCE_SHA=83eec7e` + overlay 白名单）不接受 `app/` 变更，发布流水线接入属下一次冻结源/新发布轮。边界更新与实施完成前均为候选，不写成现状。
+- 2026-10-22：依客户原话「把验收必须先判断风险档位的口径固化到项目规则或验收角色卡」，在 §二「已确认要求」新增第 9 条「验收先判风险档位」；只改本工程法案，未改产品代码、测试、角色卡、边界，未改变任何角色写权。来源：`docs/communication/2026-10-22_intent_acceptance-risk-tier.md`（闸门 0 已确认；角色指派见 `docs/scheduling/2026-10-22-acceptance-risk-tier.md`）。

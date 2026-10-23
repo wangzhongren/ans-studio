@@ -78,6 +78,64 @@ function seedIntent(root: string, over: {
   );
 }
 
+/** 第 3 项三件套（标准/报告/变更包）；验收判断的机械门槛输入。 */
+function seedAcceptanceArtifacts(root: string, flowId = "flow-a"): void {
+  writeFile(
+    root,
+    `docs/acceptance/${flowId}-criteria-v1.md`,
+    [
+      `# 验收完成标准：${flowId}`,
+      "",
+      "| ID | 标准 | 需要的证据 | 结果 |",
+      "| --- | --- | --- | --- |",
+      "| P1 | 示例标准 | 测试输出 | 待判定 |",
+      "",
+      "风险档位：T3（治理/权限变更）。",
+      "",
+      "判定规则：pass / fail / insufficient evidence / not applicable。",
+      "",
+      "证据计划：单测原始输出与全量回归记录。",
+      "",
+      "版本冻结：v1 写盘后冻结。",
+      "",
+    ].join("\n"),
+  );
+  writeFile(
+    root,
+    `docs/acceptance/${flowId}-report-v1.md`,
+    "风险档位：T3｜判定依据：治理/权限变更｜选定检查：定向测试｜复用证据：无｜全量回归：已执行\n\n## 结论\n通过。\n",
+  );
+  writeFile(
+    root,
+    `docs/scheduling/${flowId}-change-v1.md`,
+    ["---", `flowId: ${flowId}`, "version: 1", "riskTier: T3", "candidate: abc", "changedPaths: [src/a.ts]", "evidence: [test/a.test.ts]", "---", "", "# 变更包", ""].join("\n"),
+  );
+}
+
+/** 团队计划（第 1 项）：推荐集（内联数组）+ 角色行。 */
+function seedTeamPlan(root: string, recommended: readonly string[]): void {
+  writeFile(
+    root,
+    "docs/scheduling/flow-a-team-v1.md",
+    [
+      "---",
+      "flowId: flow-a",
+      "version: 1",
+      "status: draft",
+      "riskTier: T3",
+      `recommended: [${recommended.join(", ")}]`,
+      "---",
+      "",
+      "# 团队计划：flow-a",
+      "",
+      "| roleId | 类型 | 职责目标 | 能力要求 | 唯一写集 | 依赖 | 组别 | apiSpec |",
+      "| --- | --- | --- | --- | --- | --- | --- | --- |",
+      ...recommended.map((id) => `| ${id} | existing | 实现 ${id} | 具备 ${id} 能力 | src/${id}/ | 无 | 组 A | not-applicable |`),
+      "",
+    ].join("\n"),
+  );
+}
+
 /** 客户确认意图 + 交接；可附提案接受/dispatch 记录（验收用）。 */
 function seedLedger(root: string, extra: readonly Record<string, unknown>[] = []): void {
   const lines: Record<string, unknown>[] = [
@@ -285,26 +343,22 @@ test("proposal：超出意图范围/引入未授权非目标/与已接受决定�
 
 test("appointment：任命名单/写区扩张未经客户意图确认 ⇒ manual/intent-drift", async () => {
   await withRoot(async (root) => {
-    writeFile(
-      root,
-      "docs/nominations/flow-a-v1.md",
-      "# 提名\n\n推荐：alpha、beta\n\n## 候选角色\n\n| 角色 | 理由 |\n| --- | --- |\n| alpha | A |\n| beta | B |\n",
-    );
+    seedTeamPlan(root, ["alpha", "beta"]);
     seedIntent(root, { scope: "只改编排模块，不新增角色" });
     seedLedger(root);
     const { judge } = makeJudge({
-      readPaths: [INTENT_REL, "docs/nominations/flow-a-v1.md"],
+      readPaths: [INTENT_REL, "docs/scheduling/flow-a-team-v1.md"],
       report: {
         verdict: "manual",
         reasonCode: "intent-drift",
         reason: "beta 是意图未授权的新角色；任命将扩写角色写区。",
-        evidence: [INTENT_REL, "docs/nominations/flow-a-v1.md"],
+        evidence: [INTENT_REL, "docs/scheduling/flow-a-team-v1.md"],
       },
     });
     const out = await judge(baseRequest({
       projectRoot: root,
       cardKind: "appointment",
-      roleId: "nominator",
+      roleId: "convener",
       card: {
         kind: "choice",
         title: "任命角色",
@@ -314,7 +368,7 @@ test("appointment：任命名单/写区扩张未经客户意图确认 ⇒ manual
         flowId: "flow-a",
       },
       recommendedRoleIds: ["alpha", "beta"],
-      artifacts: { nominationPath: "docs/nominations/flow-a-v1.md" },
+      artifacts: { teamPlanPath: "docs/scheduling/flow-a-team-v1.md" },
     }));
     assert.equal(out.verdict, "manual");
     assert.equal(out.reasonCode, "intent-drift");
@@ -328,6 +382,7 @@ test("acceptance：验收选择与意图/已接受提案冲突 ⇒ manual/intent
   await withRoot(async (root) => {
     writeFile(root, "docs/proposals/flow-a-v1.md", PROPOSAL_NO_ARCHITECTURE);
     writeFile(root, "docs/flows/flow-a.md", "# 流程\n\n| stepId | 步骤 | 状态 |\n| --- | --- | --- |\n| s1 | 实现 | done |\n");
+    seedAcceptanceArtifacts(root);
     seedIntent(root, { acceptance: "只验收编排改动" });
     seedLedger(root, [
       {
@@ -369,7 +424,13 @@ test("acceptance：验收选择与意图/已接受提案冲突 ⇒ manual/intent
         cardKind: "acceptance",
         flowId: "flow-a",
       },
-      artifacts: { proposalPath: "docs/proposals/flow-a-v1.md", flowPath: "docs/flows/flow-a.md" },
+      artifacts: {
+        proposalPath: "docs/proposals/flow-a-v1.md",
+        flowPath: "docs/flows/flow-a.md",
+        acceptanceCriteriaPath: "docs/acceptance/flow-a-criteria-v1.md",
+        acceptanceReportPath: "docs/acceptance/flow-a-report-v1.md",
+        changePackagePath: "docs/scheduling/flow-a-change-v1.md",
+      },
       facts: facts({ proposalDecision: "accepted", dispatchedStepIds: ["s1"] }),
     }));
     assert.equal(out.verdict, "manual");

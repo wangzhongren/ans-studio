@@ -50,6 +50,12 @@ import {
   type ActivityPhaseRow,
 } from "@/chat/tool-summary";
 import { useUiStore } from "@/stores/ui-store";
+import {
+  REASONING_EMPTY_NOTE,
+  REASONING_FALLBACK_LABEL,
+  REASONING_OMITTED_NOTE,
+  REASONING_PARTIAL_NOTE,
+} from "@/chat/reasoning";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object"
@@ -646,8 +652,25 @@ function TurnTerminalRow({ row }: { row: ChatRow }) {
 
 function ReasoningRow({ row, roleId }: { row: ChatRow; roleId: string }) {
   const data = asRecord(row.data);
+  const status = asString(data.status);
+  const omitted = status === "omitted";
+  // omitted 一律不呈现正文（即便载荷违规带了文本；提取层已强制为空，这里再守一道）。
+  const text = omitted ? "" : asString(data.text);
+  const hasText = text.trim() !== "";
+  const partialOmitted = !omitted && data.partialOmitted === true;
+  const note = omitted
+    ? REASONING_OMITTED_NOTE
+    : !hasText
+      ? REASONING_EMPTY_NOTE
+      : partialOmitted
+        ? REASONING_PARTIAL_NOTE
+        : "";
   return (
-    <details className="tool-records reasoning-row" {...detailProps(row, roleId, "details")}>
+    <details
+      className="tool-records reasoning-row"
+      data-turn-id={row.turnId || undefined}
+      {...detailProps(row, roleId, "details")}
+    >
       <summary>
         <ChevronRight
           className="disclosure-chevron"
@@ -655,9 +678,12 @@ function ReasoningRow({ row, roleId }: { row: ChatRow; roleId: string }) {
           strokeWidth={1.5}
           aria-hidden="true"
         />
-        <span className="tool-title">{asString(data.label) || "已思考"}</span>
+        <span className="tool-title">
+          {asString(data.label) || REASONING_FALLBACK_LABEL}
+        </span>
       </summary>
-      <pre className="reasoning-text">{asString(data.text)}</pre>
+      {hasText ? <pre className="reasoning-text">{text}</pre> : null}
+      {note ? <p className="reasoning-note">{note}</p> : null}
     </details>
   );
 }

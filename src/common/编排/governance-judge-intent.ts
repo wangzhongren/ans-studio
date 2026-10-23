@@ -92,6 +92,11 @@ function firstField(fields: Readonly<Record<string, string>>, names: readonly st
  *   2. 提案 frontmatter 的 `intentId`（旧项目/未走交接时的兼容来源）；
  *   3. `docs/intents/<flowId>.md`（角色卡口径；文件是否存在由调用方核对）。
  * `flowId` 已由 driver 校验为合法 slug。
+ *
+ * 2026-10-22 slug 收紧（设计 `2026-10-22_design_governance-slug-no-trailing-hyphen.md` §4.2）：
+ * 账本 `intent.handed-off` 或提案 frontmatter 中**非空但不符合现行 slug** 的 `intentId` 不得静默
+ * 跳过/回落其他来源，一律 `intent-unconfirmed` fail-closed（detail 点名旧值与现行规则）；空/缺席
+ * 保持既有回落语义。
  */
 export function resolveIntentReference(input: {
   flowId: string;
@@ -100,12 +105,28 @@ export function resolveIntentReference(input: {
 }): IntentResolveResult {
   const { flowId, ledgerEntries, proposalText } = input;
   const handoffIntentIds: string[] = [];
+  const invalidHandoffIntentIds: string[] = [];
   for (const entry of ledgerEntries) {
     if (entry === null || typeof entry !== "object") continue;
     if (entry.kind !== "intent.handed-off" || entry.flowId !== flowId) continue;
     const intentId = trimValue(entry.intentId);
-    if (intentId === "" || !GOVERNANCE_SLUG_PATTERN.test(intentId)) continue;
+    if (intentId === "") continue;
+    if (!GOVERNANCE_SLUG_PATTERN.test(intentId)) {
+      // 非空旧值不合现行规则：显式 fail-closed，不当作「没有意图」。
+      if (!invalidHandoffIntentIds.includes(intentId)) invalidHandoffIntentIds.push(intentId);
+      continue;
+    }
     if (!handoffIntentIds.includes(intentId)) handoffIntentIds.push(intentId);
+  }
+  if (invalidHandoffIntentIds.length > 0) {
+    return {
+      ok: false,
+      reasonCode: "intent-unconfirmed",
+      detail:
+        `账本 intent.handed-off 的 intentId（${invalidHandoffIntentIds.join("、")}）不符合现行 slug 规则` +
+        `（${GOVERNANCE_SLUG_PATTERN}；2–64 位、首尾小写字母/数字、禁止首尾连字符）；` +
+        "不得静默跳过或回落其他意图来源，请修正意图记录/账本后重试",
+    };
   }
   if (handoffIntentIds.length > 1) {
     return {
@@ -124,7 +145,18 @@ export function resolveIntentReference(input: {
     const parsed = parseIntentFrontmatter(proposalText);
     if (parsed.ok) {
       const intentId = trimValue(parsed.fields["intentId"]);
-      if (intentId !== "" && GOVERNANCE_SLUG_PATTERN.test(intentId)) {
+      if (intentId !== "") {
+        if (!GOVERNANCE_SLUG_PATTERN.test(intentId)) {
+          // 非空旧值不合现行规则：显式 fail-closed，不静默回落 `flow-id` 来源。
+          return {
+            ok: false,
+            reasonCode: "intent-unconfirmed",
+            detail:
+              `提案 frontmatter 的 intentId「${intentId}」不符合现行 slug 规则` +
+              `（${GOVERNANCE_SLUG_PATTERN}；2–64 位、首尾小写字母/数字、禁止首尾连字符）；` +
+              "不得静默回落 docs/intents/<flowId>.md，请修正提案 frontmatter 后重试",
+          };
+        }
         return { ok: true, reference: { intentId, source: "proposal" } };
       }
     }

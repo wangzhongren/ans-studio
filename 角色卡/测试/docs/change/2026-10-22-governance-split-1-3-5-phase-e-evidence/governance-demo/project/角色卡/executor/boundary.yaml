@@ -1,0 +1,17 @@
+role: executor
+entries:
+  - kind: file
+    path: 角色卡/executor/feature-map.md
+    purpose: 角色根工作文档
+  - kind: file
+    path: 角色卡/executor/functional-description.md
+    purpose: 角色根工作文档
+  - kind: file
+    path: 角色卡/executor/memo.md
+    purpose: 角色根工作文档
+  - kind: file
+    path: 角色卡/executor/api-spec.md
+    purpose: 角色根工作文档
+  - kind: directory
+    path: src/owned-executor/
+    purpose: 角色代码

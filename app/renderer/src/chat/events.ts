@@ -11,6 +11,12 @@ import type {
   SessionEnvelope,
   SessionEvent,
 } from "./types.ts";
+import {
+  REASONING_UNSAFE_NOTE,
+  reasoningPieceFromCarrier,
+  reasoningPieceFromDetail,
+  reasoningRowDataFromPiece,
+} from "./reasoning.ts";
 
 export interface NewRowDescriptor {
   kind: RowKind;
@@ -91,6 +97,14 @@ function objectDetail(
 ): Record<string, unknown> | null {
   const value = event.detail ? event.detail[key] : undefined;
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+/** 推理事件的轮次回退：event.turnId 缺省时取 detail.turnId（Service 会把 turnId 并入 detail）。 */
+function detailTurnId(event: SessionEvent): string | undefined {
+  const detail = event.detail;
+  if (!detail || typeof detail !== "object") return undefined;
+  const value = (detail as Record<string, unknown>).turnId;
+  return typeof value === "string" && value !== "" ? value : undefined;
 }
 
 function displayTarget(event: SessionEvent): string {
@@ -470,20 +484,28 @@ export function describeEvent(event: SessionEvent | null | undefined): NewRowDes
       return null;
     }
     if (source === "reasoning") {
+      // R1：正文唯一来源＝核心投影形 `detail.reasoning.text.text`（DisplayTextV1）。
+      // 不读 `detail.text`、不用 summary 当正文；坏件/旧原始事实 fail-closed。
+      const reasoningTurnId = turnId || detailTurnId(event);
+      const piece = reasoningPieceFromDetail(event.detail);
+      if (!piece) {
+        return {
+          kind: "system",
+          data: { cls: "sys-call", text: REASONING_UNSAFE_NOTE },
+          turnId: reasoningTurnId,
+        };
+      }
       return {
         kind: "reasoning",
-        data: {
-          label: "已思考",
-          text: stringDetail(event, "text") || summary,
-        },
-        turnId,
+        data: reasoningRowDataFromPiece(piece),
+        turnId: reasoningTurnId,
       };
     }
     if (source === "reasoning-diagnostic") {
       return {
         kind: "system",
-        data: { cls: "sys-call", text: summary || "推理内容无法安全显示" },
-        turnId,
+        data: { cls: "sys-call", text: summary || REASONING_UNSAFE_NOTE },
+        turnId: turnId || detailTurnId(event),
       };
     }
     if (source === "prompt-input") {
@@ -718,6 +740,23 @@ export function historyRowToDescriptor(row: Record<string, unknown>): NewRowDesc
     ...(anchor ? { anchor } : {}),
     ...(requestId ? { requestId } : {}),
   };
+  // G-5 回放载体：行有投影形 `row.reasoning` ⇒ 与实时同一提取器/同一行数据；
+  // 缺失（null/undefined，旧数据）⇒ 保持既有 assistant 文本行回落；坏载体 fail-closed 诊断行。
+  if (row.reasoning !== undefined && row.reasoning !== null) {
+    const piece = reasoningPieceFromCarrier(row.reasoning);
+    if (!piece) {
+      return {
+        ...base,
+        kind: "system",
+        data: { cls: "sys-call", text: REASONING_UNSAFE_NOTE },
+      };
+    }
+    return {
+      ...base,
+      kind: "reasoning",
+      data: reasoningRowDataFromPiece(piece),
+    };
+  }
   if (kind === "user") {
     const provenance =
       row.inputProvenance && typeof row.inputProvenance === "object"

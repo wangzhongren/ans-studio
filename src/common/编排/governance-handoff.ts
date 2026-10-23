@@ -24,14 +24,20 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { GovernanceFunction, GovernanceModel } from "../../model/role.ts";
-import type { HandOffIntentKind } from "../../model/runtime.ts";
+import { GOVERNANCE_SLUG_PATTERN as GOVERNANCE_SLUG_PATTERN_SOURCE, type HandOffIntentKind } from "../../model/runtime.ts";
 import { readGovernanceLedger } from "./governance-ledger.ts";
 
 /** 意图记录目录（项目相对；Liaison 唯一写区）。 */
 export const INTENT_DIR_REL = "docs/intents";
 
-/** 意图 id / flowId 共用的 slug 形状（与运行时核心工具 schema 同值）。 */
-export const GOVERNANCE_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{1,63}$/;
+/**
+ * 意图 id / flowId 共用的 slug 形状（**单一来源**：运行时核心 `src/model/runtime.ts` 的
+ * `GOVERNANCE_SLUG_PATTERN` 字符串常量；2026-10-22 客户确认收紧，禁止首/尾连字符——
+ * 设计 `角色卡/项目管理/docs/design/2026-10-22_design_governance-slug-no-trailing-hyphen.md` §2/§3.3）。
+ * 导出形状仍是 `RegExp`：`governance-judge-intent.ts` 直接使用、`govern-session.ts` 薄再导出，
+ * 二者自动继承本次收紧，不改语义。
+ */
+export const GOVERNANCE_SLUG_PATTERN = new RegExp(GOVERNANCE_SLUG_PATTERN_SOURCE);
 
 /** `summary` 上限（Unicode 码点；超长拒绝，不静默截断）。 */
 export const INTENT_SUMMARY_MAX_CHARS = 200;
@@ -261,7 +267,9 @@ export async function validateIntentHandoff(
     return {
       ok: false,
       code: "invalid-intent-id",
-      message: `intentId「${input.intentId}」不是合法 slug（应为小写字母/数字/连字符，2–64 字符）；未交接。`,
+      message:
+        `intentId「${input.intentId}」不是合法 slug（2–64 位小写字母/数字/连字符，首尾必须是字母/数字，` +
+        `匹配 ${GOVERNANCE_SLUG_PATTERN_SOURCE}）；未交接。`,
     };
   }
   const goal = trimValue(input.goal);
@@ -295,7 +303,9 @@ export async function validateIntentHandoff(
     return {
       ok: false,
       code: "invalid-flow-id",
-      message: `flowId「${input.flowId}」不是合法 slug；未交接。`,
+      message:
+        `flowId「${input.flowId}」不是合法 slug（2–64 位小写字母/数字/连字符，首尾必须是字母/数字，` +
+        `匹配 ${GOVERNANCE_SLUG_PATTERN_SOURCE}）；未交接。`,
     };
   }
 
@@ -365,6 +375,17 @@ export async function validateIntentHandoff(
     };
   }
   const fileFlowId = trimValue(fields["flowId"]);
+  // 2026-10-22 slug 收紧（设计 §2.4/§4.2）：文件给出**非空**但不合法的 flowId 必须显式报错，
+  // 不得静默当作缺席（否则会掩盖旧数据不兼容，或用入参/其他来源顶替文件权威）。
+  if (fileFlowId !== "" && !isSlug(fileFlowId)) {
+    return {
+      ok: false,
+      code: "invalid-flow-id",
+      message:
+        `意图文件 flowId「${fileFlowId}」不是合法 slug（2–64 位小写字母/数字/连字符，首尾必须是字母/数字，` +
+        `匹配 ${GOVERNANCE_SLUG_PATTERN_SOURCE}）；不得静默当作缺席；未交接。`,
+    };
+  }
   if (fileFlowId !== "" && input.flowId !== undefined && fileFlowId !== input.flowId) {
     return {
       ok: false,
@@ -372,7 +393,7 @@ export async function validateIntentHandoff(
       message: `意图文件 flowId「${fileFlowId}」与入参「${input.flowId}」不一致；未交接。`,
     };
   }
-  const flowId = input.flowId ?? (fileFlowId !== "" && isSlug(fileFlowId) ? fileFlowId : undefined);
+  const flowId = input.flowId ?? (fileFlowId !== "" ? fileFlowId : undefined);
   const artifactSha256 = createHash("sha256").update(bytes).digest("hex");
 
   // 5) 账本可读（dedupe / initial / 每轮一次都依赖账本；不可读 → fail-closed）。

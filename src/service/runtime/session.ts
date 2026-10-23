@@ -11,6 +11,7 @@ import type {
   RuntimeReplayCheckpoint, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1,
   DeliveryReceiptQueryV1, RuntimePersistenceErrorCode, RuntimeDeliveryProgressV1,
   RuntimeReasoningEventDetailV1,
+  BackgroundTaskCapability,
 } from "../../model/runtime.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import { buildGovernedTools, createDemoRuntimeAdapter } from "../../provider/runtime/tools.ts";
@@ -23,8 +24,9 @@ import { REPORT_LIMITS, makeReportSnapshot, canonicalJson, reportIdFor, validate
 import { createEventQueue } from "../../common/runtime-core/event-queue.ts";
 import { DEFAULT_TURN_LAST_RESORT_MS, createInteractionGate, isAbortError, isTimeoutError, raceAbort, resolveRuntimeTimeouts, withPausableTimeout, withTimeout } from "../../common/runtime-core/timeout.ts";
 import { REASONING_DIAGNOSTIC_SUMMARY, REASONING_EVENT_SUMMARY, resolveReasoningEffort } from "../../common/runtime-core/reasoning.ts";
+import { createBackgroundTaskManager } from "../../common/runtime-core/background-tasks.ts";
 
-export interface RuntimeSessionOptions extends Omit<GovernedToolsOptions, "currentTurnId" | "roleId" | "runtime" | "interactionGate"> {
+export interface RuntimeSessionOptions extends Omit<GovernedToolsOptions, "currentTurnId" | "roleId" | "runtime" | "interactionGate" | "backgroundTasks"> {
   runtime: RuntimeKind;
   gate: WriteGate;
   projectRoot: string;
@@ -108,7 +110,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
     throw new Error("shellJudge 与 governanceJudge 互斥：判断会话只能注入其中一种判断能力");
   }
   const providers = new Map<ResolvedRole, Promise<{
-    adapter: RuntimeAdapter; options: RuntimeProviderOptions; display: ReturnType<typeof createToolDisplayContext>; setTurn(id?: string, controller?: AbortController): void;
+    adapter: RuntimeAdapter; options: RuntimeProviderOptions; display: ReturnType<typeof createToolDisplayContext>; backgroundTasks?: BackgroundTaskCapability; setTurn(id?: string, controller?: AbortController): void;
   }>>();
   const providerFor = (role: ResolvedRole) => {
     let provider = providers.get(role);
@@ -122,61 +124,75 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
       const shellJudge = options.shellJudge;
       const governanceJudge = options.governanceJudge;
       const judgeTools = shellJudge ?? governanceJudge;
-      // 判断 agent：**能力注入，不是工具注入**——注入 `shellJudge` 时只走 `buildShellJudgeTools`
-      // （恰三只只读工具）；注入 `governanceJudge` 时只走 `buildGovernanceJudgeTools`
-      // （恰 `judge_read_file`/`judge_list_dir`/`report_governance_judgement`）。两者都**不得**走
-      // `buildGovernedTools`（结构性隔离：判断会话不存在 write_file/edit_file/read_file/run_shell/
-      // 客户交互/回交/派发/MCP 工具）。二者互斥在 createRuntimeAdapter 入口已检查。
-      const tools = shellJudge !== undefined
-        ? buildShellJudgeTools(shellJudge)
-        : governanceJudge !== undefined
-          ? buildGovernanceJudgeTools(governanceJudge)
-          : buildGovernedTools(options.gate, {
-            ...options,
-            readRoot: options.readRoot ?? options.projectRoot,
-            writeRoot: options.writeRoot,
-            shellCwd: options.shellCwd ?? options.projectRoot,
-            extraCredentialEnvVars: [...(options.extraCredentialEnvVars ?? []), ...(options.apiKeyEnvVar ? [options.apiKeyEnvVar] : [])],
-            roleId: role.id,
-            currentTurnId: () => turnId,
-            interactionGate,
-          }).map((tool) => ({ ...tool, async handler(call: Parameters<typeof tool.handler>[0]) {
-            const signal = controller?.signal;
-            if (turnId === undefined || signal?.aborted) return { ok: false, message: `${tool.name}：本轮未运行或已中止，未执行` };
-            return tool.handler({ ...call, signal: signal && call.signal ? AbortSignal.any([signal, call.signal]) : signal ?? call.signal });
-          } }));
-      // G-5：推理强度（wave 1 接线）——按运行时读 env（`ANS_CLAUDE/CODEX/PI_REASONING_EFFORT`）并
-      // 归一（**纯读**，providerFor 每次重建即重读＝「改设置 ⇒ 下次开会话生效」沿既有语义）。非法值＝
-      // **按未设处理**（本层不注入字段）＋诊断如实；**绝不因偏好值坏件拒开会话/毁轮次**（偏好不是
-      // 承载件）。字段缺席交平台默认策略，不保证原生请求零参数；恢复默认与兼容由各适配器负责。
-      const reasoningEffort = resolveReasoningEffort(options.runtime);
-      if (reasoningEffort.state === "invalid") {
-        try { options.diagnostics?.record("reasoning.effort.invalid", { mode: options.runtime, supported: false, reasonCode: "invalid-value" }); } catch { /* 诊断绝不能改变执行 */ }
+      // 后台任务管理器（2026-10-22 B1/B3）：只在**普通受治理会话**（走 buildGovernedTools）且注入了
+      // `ShellGate` 时创建——与四工具注册同判据；判断会话不创建管理器（结构性看不到四工具）。
+      // `RuntimeSessionOptions` 已 Omit `backgroundTasks`，外部调用方不能自行注入。
+      const backgroundTasks = judgeTools === undefined && options.shellGate !== undefined
+        ? createBackgroundTaskManager({ diagnostics: options.diagnostics })
+        : undefined;
+      try {
+        // 判断 agent：**能力注入，不是工具注入**——注入 `shellJudge` 时只走 `buildShellJudgeTools`
+        // （恰三只只读工具）；注入 `governanceJudge` 时只走 `buildGovernanceJudgeTools`
+        // （恰 `judge_read_file`/`judge_list_dir`/`report_governance_judgement`）。两者都**不得**走
+        // `buildGovernedTools`（结构性隔离：判断会话不存在 write_file/edit_file/read_file/run_shell/
+        // 客户交互/回交/派发/MCP 工具）。二者互斥在 createRuntimeAdapter 入口已检查。
+        const tools = shellJudge !== undefined
+          ? buildShellJudgeTools(shellJudge)
+          : governanceJudge !== undefined
+            ? buildGovernanceJudgeTools(governanceJudge)
+            : buildGovernedTools(options.gate, {
+              ...options,
+              // 运行时也覆盖为 Service 自己的管理器（类型已 Omit；JS 调用方即便夹带同名字段也不会被采用）。
+              backgroundTasks,
+              readRoot: options.readRoot ?? options.projectRoot,
+              writeRoot: options.writeRoot,
+              shellCwd: options.shellCwd ?? options.projectRoot,
+              extraCredentialEnvVars: [...(options.extraCredentialEnvVars ?? []), ...(options.apiKeyEnvVar ? [options.apiKeyEnvVar] : [])],
+              roleId: role.id,
+              currentTurnId: () => turnId,
+              interactionGate,
+            }).map((tool) => ({ ...tool, async handler(call: Parameters<typeof tool.handler>[0]) {
+              const signal = controller?.signal;
+              if (turnId === undefined || signal?.aborted) return { ok: false, message: `${tool.name}：本轮未运行或已中止，未执行` };
+              return tool.handler({ ...call, signal: signal && call.signal ? AbortSignal.any([signal, call.signal]) : signal ?? call.signal });
+            } }));
+        // G-5：推理强度（wave 1 接线）——按运行时读 env（`ANS_CLAUDE/CODEX/PI_REASONING_EFFORT`）并
+        // 归一（**纯读**，providerFor 每次重建即重读＝「改设置 ⇒ 下次开会话生效」沿既有语义）。非法值＝
+        // **按未设处理**（本层不注入字段）＋诊断如实；**绝不因偏好值坏件拒开会话/毁轮次**（偏好不是
+        // 承载件）。字段缺席交平台默认策略，不保证原生请求零参数；恢复默认与兼容由各适配器负责。
+        const reasoningEffort = resolveReasoningEffort(options.runtime);
+        if (reasoningEffort.state === "invalid") {
+          try { options.diagnostics?.record("reasoning.effort.invalid", { mode: options.runtime, supported: false, reasonCode: "invalid-value" }); } catch { /* 诊断绝不能改变执行 */ }
+        }
+        const providerOptions: RuntimeProviderOptions = {
+          runtime: options.runtime, projectRoot: options.projectRoot, skillRoot: options.skillRoot,
+          tools, storage, interactionGate, currentTurnId: () => turnId,
+          toolDisplayMode:"required-v1", projectToolEvent:display.projectToolEvent, registerToolDisplayProfile:display.registerToolDisplayProfile, toolDisplayCredentialEnvNames:display.credentialEnvNames,
+          modelId: options.modelId, baseUrl: options.baseUrl, providerId: options.providerId, apiKeyEnvVar: options.apiKeyEnvVar,
+          // G-4 V2（wave A）：按角色读取 `docs/mcp/**` 声明并随会话注入（**纯读**——绝不建目录；坏件由
+          // 读取器跳过＋诊断，绝不影响开会话）。适配器对 `installedMcpServers` 纯消费（装配/放行/呈现
+          // 属各平台批次 P1–P3）；providerFor 每次重建即重读——「安装/卸载 ⇒ 下次开会话生效」。
+          // 判断 agent 会话（shell judge 或治理 judge）：`judgeMode:true` ＋ `installedMcpServers:[]`——
+          // 外来 MCP 一律不装配（PM 评审 §6.1；2026-10-18 双开关评审 §6.2 对两者一致；
+          // Claude 适配器据此强制关闭 WebSearch/外来 MCP）。
+          ...(judgeTools !== undefined
+            ? { judgeMode: true as const, installedMcpServers: [] as const }
+            : { installedMcpServers: listInstalledMcpServers(options.projectRoot, role.id) }),
+          // G-5：仅 `set` 态注入字段；`unset`/`invalid` 保持字段缺席，交各平台默认策略。
+          ...(reasoningEffort.state === "set" ? { reasoningEffort: reasoningEffort.effort } : {}),
+          ...resolveRuntimeTimeouts(options.runtime, options),
+        };
+        const factory = options.providerFactories?.[options.runtime] ?? (options.runtime === "demo"
+          ? ((input: RuntimeProviderOptions) => createDemoRuntimeAdapter(input, options.script ?? [{ name: "write_file", args: { path: "src/evil.ts", content: "// 越界写入示例\n" } }]))
+          : await defaultFactory(options.runtime));
+        if (typeof providerOptions.projectToolEvent !== "function" || typeof providerOptions.registerToolDisplayProfile !== "function") throw new Error("Core tool display capability missing");
+        const adapter = await factory(providerOptions);
+        return { adapter, display, options: providerOptions, backgroundTasks, setTurn(id?: string, nextController?: AbortController) { turnId = id; controller = nextController; } };
+      } catch (error) {
+        // 构造/工厂失败也要释放管理器（生命周期与绑定会话对齐；dispose 幂等）。
+        await backgroundTasks?.dispose();
+        throw error;
       }
-      const providerOptions: RuntimeProviderOptions = {
-        runtime: options.runtime, projectRoot: options.projectRoot, skillRoot: options.skillRoot,
-        tools, storage, interactionGate, currentTurnId: () => turnId,
-        toolDisplayMode:"required-v1", projectToolEvent:display.projectToolEvent, registerToolDisplayProfile:display.registerToolDisplayProfile, toolDisplayCredentialEnvNames:display.credentialEnvNames,
-        modelId: options.modelId, baseUrl: options.baseUrl, providerId: options.providerId, apiKeyEnvVar: options.apiKeyEnvVar,
-        // G-4 V2（wave A）：按角色读取 `docs/mcp/**` 声明并随会话注入（**纯读**——绝不建目录；坏件由
-        // 读取器跳过＋诊断，绝不影响开会话）。适配器对 `installedMcpServers` 纯消费（装配/放行/呈现
-        // 属各平台批次 P1–P3）；providerFor 每次重建即重读——「安装/卸载 ⇒ 下次开会话生效」。
-        // 判断 agent 会话（shell judge 或治理 judge）：`judgeMode:true` ＋ `installedMcpServers:[]`——
-        // 外来 MCP 一律不装配（PM 评审 §6.1；2026-10-18 双开关评审 §6.2 对两者一致；
-        // Claude 适配器据此强制关闭 WebSearch/外来 MCP）。
-        ...(judgeTools !== undefined
-          ? { judgeMode: true as const, installedMcpServers: [] as const }
-          : { installedMcpServers: listInstalledMcpServers(options.projectRoot, role.id) }),
-        // G-5：仅 `set` 态注入字段；`unset`/`invalid` 保持字段缺席，交各平台默认策略。
-        ...(reasoningEffort.state === "set" ? { reasoningEffort: reasoningEffort.effort } : {}),
-        ...resolveRuntimeTimeouts(options.runtime, options),
-      };
-      const factory = options.providerFactories?.[options.runtime] ?? (options.runtime === "demo"
-        ? ((input: RuntimeProviderOptions) => createDemoRuntimeAdapter(input, options.script ?? [{ name: "write_file", args: { path: "src/evil.ts", content: "// 越界写入示例\n" } }]))
-        : await defaultFactory(options.runtime));
-      if (typeof providerOptions.projectToolEvent !== "function" || typeof providerOptions.registerToolDisplayProfile !== "function") throw new Error("Core tool display capability missing");
-      const adapter = await factory(providerOptions);
-      return { adapter, display, options: providerOptions, setTurn(id?: string, nextController?: AbortController) { turnId = id; controller = nextController; } };
     })();
     providers.set(role, provider);
     return provider;
@@ -186,9 +202,17 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
     async bindRole(role) {
       const provider = await providerFor(role);
       const storage = provider.options.storage;
-      const previous = await storage?.readLatest();
-      const inner = await withTimeout(provider.adapter.bindRole(role), provider.options.constructTimeoutMs ?? 120000, `${options.runtime} 建立角色会话`);
-      try { provider.display.assertReady(); } catch (error) { await inner.dispose(); throw error; }
+      let previous: RuntimeSessionRecord | undefined;
+      let inner: RoleSession;
+      try {
+        previous = await storage?.readLatest();
+        inner = await withTimeout(provider.adapter.bindRole(role), provider.options.constructTimeoutMs ?? 120000, `${options.runtime} 建立角色会话`);
+        try { provider.display.assertReady(); } catch (error) { await inner.dispose(); throw error; }
+      } catch (error) {
+        // bindRole / assertReady 失败也要释放管理器（后台任务生命周期与绑定会话对齐；dispose 幂等）。
+        await provider.backgroundTasks?.dispose();
+        throw error;
+      }
       providers.delete(role); // Each bound session owns its own turn/controller/tool closure.
       const queue = createEventQueue<SessionEvent>();
       const recordId = previous?.id ?? randomUUID();
@@ -364,8 +388,13 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           disposed = true;
           persistence.dispose();
           active?.controller.abort();
-          try { await withTimeout(inner.dispose(), 1000, "关闭会话"); }
-          finally { queue.close(); }
+          try {
+            try { await withTimeout(inner.dispose(), 1000, "关闭会话"); }
+            finally { queue.close(); }
+          } finally {
+            // 会话关闭是后台任务的唯一清理点之一（另一个是显式 stop）：并行终止全部运行中任务，管理器失效。
+            await provider.backgroundTasks?.dispose();
+          }
           await pendingPersist;
           void pump;
         },

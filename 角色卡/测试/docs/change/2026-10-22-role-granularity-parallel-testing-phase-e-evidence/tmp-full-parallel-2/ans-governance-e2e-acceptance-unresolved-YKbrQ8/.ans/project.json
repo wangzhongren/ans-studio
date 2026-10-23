@@ -1,0 +1,19 @@
+{
+  "projectRoot": "C:/Users/51054/Desktop/work/ans-studio/角色卡/测试/docs/change/2026-10-22-role-granularity-parallel-testing-phase-e-evidence/tmp-full-parallel-2/ans-governance-e2e-acceptance-unresolved-YKbrQ8",
+  "skillRoot": "C:/Users/51054/.claude/skills/ans-governed-construction",
+  "governanceModel": "trio",
+  "roles": {},
+  "governanceBoundary": {
+    "path": "角色卡/governance-boundary.yaml",
+    "acceptance": {
+      "accepted": true,
+      "source": "test:governance-e2e",
+      "pin": [
+        {
+          "path": "角色卡/governance-boundary.yaml",
+          "sha256": "e5f1afbce6f2cad17dee48a1031530f7e2f40b8a2925d7e5d231cdd9d946f4b7"
+        }
+      ]
+    }
+  }
+}

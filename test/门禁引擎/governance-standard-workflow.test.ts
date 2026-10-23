@@ -16,10 +16,14 @@ import {
   ENGINEERING_QUALITY_BASELINE,
   governanceRoleOf,
 } from "../../src/common/门禁引擎/governance-roles.ts";
+import { GOVERNANCE_SLUG_PATTERN } from "../../src/model/runtime.ts";
 
 /** 逐字取自 `governance-roles.ts` 的单一来源常量（本测试钉住五卡保留原文）。 */
 const SHELL_APPROVAL_CARD_LINE =
   "shell 审批档——只读白名单直接执行，其余（含读写与任意命令）逐条提交客户/判断 agent 审批；审批不改变你的职责与写边界，写文件仍优先用 write_file 并经写盘确认。拒绝、超时、通道不可用一律不放行。";
+
+/** 治理 slug 正则：唯一来源为 Model 常量（2026-10-22 收紧，禁止尾连字符；设计 S4）。 */
+const GOVERNANCE_SLUG_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
 
 function cardTextOf(id: string): string {
   const spec = governanceRoleOf(id);
@@ -103,39 +107,108 @@ test("标准工作流：Draft / 提案——读意图→提案（架构/质量�
   );
 });
 
-test("标准工作流：Crew / 组队——读提案与流程→提名→任命卡→appointment-write 逐路径写卡→角色就绪；不自行任命", () => {
+test("标准工作流：Crew / 组队——读客户确认后的团队计划→appointment-write 逐路径写卡→应用结构校验→角色就绪；不提名/不发 appointment", () => {
   const t = cardTextOf("nominator");
   assertIncludesAll(
     t,
     [
-      "读提案与流程",
-      "提名",
-      "`recommended:` 推荐集",
-      "推荐集只列项目角色",
-      "模块—写区一一对应",
-      "禁止重叠",
-      "任命卡",
+      "读团队计划（客户确认后）",
+      "docs/scheduling/<flowId>-team-v1.md",
+      "你只读，不修改、不自行增删角色/边界/写集",
+      "任命名单内每个角色的职责目标、能力要求、唯一写集、依赖",
+      "计划缺能力细节时**停止写卡并报告 Steward / 统筹 补充**",
+      "只对任命名单内的角色发 `request_confirmation`",
       "appointment-write 逐路径写卡",
-      "不自行任命",
+      "第 5 项内容清单",
+      "写卡后交应用校验",
       "角色就绪",
-      "写卡全部完成后角色才就绪",
+      "写卡全部完成且应用结构校验通过后",
+      "不再选择角色、不再组建团队、不再写 `docs/nominations/**`、不再发 appointment 卡",
+      "不自行扩大职责",
     ],
     "Crew 标准工作流",
   );
+  // 2026-10-22 治理分工：旧「读提案→提名→任命卡」流程与推荐集口径必须从 Crew 卡消失。
+  assert.doesNotMatch(t, /1\. 读提案与流程/, "Crew 不再以提名流程起步");
+  assert.doesNotMatch(t, /2\. 提名：/, "Crew 不再写提名文件");
+  assert.doesNotMatch(t, /推荐集只列项目角色/, "推荐集口径已移交 Steward / 统筹");
 });
 
-test("标准工作流：Steward / 统筹——流程单→派发项目角色→收齐回交→登记完成→应用自动派 Proof；不派治理角色/不代替验收/不催办", () => {
+test("第 5 项内容清单（P7）：Crew 卡逐项列出 role-card 章节、boundary、工作文档与 api-spec not-applicable", () => {
+  const t = cardTextOf("nominator");
+  assertIncludesAll(
+    t,
+    [
+      "## 第 5 项内容清单（必须，按团队计划逐角色写齐）",
+      "角色名/组别/工作立场",
+      "能力描述",
+      "职责与功能导航",
+      "必读资料",
+      "交接输入输出",
+      "执行原则",
+      "质量职责",
+      "标准工作流（按序：输入→动作→交付→回交）",
+      "交付物清单",
+      "boundary.yaml",
+      "角色根工作文档条目",
+      "实际写集",
+      "feature-map.md",
+      "functional-description.md",
+      "memo.md",
+      "api-spec.md",
+      "not-applicable",
+      "非空、可核对理由",
+      "docs/feature/<feature-id>.md",
+      "docs/design/",
+      "docs/change/",
+      "docs/fix/",
+      "不创建空目录/空文件冒充交付",
+      "内容以团队计划的职责目标/能力要求/唯一写集/依赖为准",
+    ],
+    "Crew 第 5 项内容清单",
+  );
+  // 不得把「模板存在」当「能力描述已完成」：写卡完成仍须应用结构校验 + Steward readiness。
+  assert.doesNotMatch(t, /能力描述已完成/, "Crew 不得宣称能力描述已完成");
+});
+
+test("第 5 项 readiness（P8）：Steward 写 pass/gaps 记录，gap 退回 Crew，计划缺细节由 Steward 补充；不做成验收结论", () => {
+  const t = cardTextOf("convener");
+  assertIncludesAll(
+    t,
+    [
+      "role-readiness",
+      "status: pass|gaps",
+      "职责目标、能力要求、写集/边界、依赖/交接、质量责任",
+      "gap 报告应用退回 Crew 修正",
+      "团队计划缺能力细节时由你补充计划",
+      "readiness 不是验收标准、不是客户确认",
+      "pass 后才按 flow 步骤派发项目角色",
+    ],
+    "Steward readiness 纪律",
+  );
+});
+
+test("标准工作流：Steward / 统筹——写团队计划→发 appointment 卡→readiness→派发项目角色→收齐回交→登记完成→组变更包；应用自动派 Proof", () => {
   const t = cardTextOf("convener");
   assertIncludesAll(
     t,
     [
       "写流程单",
+      "判断团队",
+      "docs/scheduling/<flowId>-team-v1.md",
+      "`recommended: [role-a, role-b]`",
+      "`cardKind=appointment`",
+      "role-readiness",
+      "docs/scheduling/<flowId>-readiness-v1.md",
+      "变更包",
+      "docs/scheduling/<flowId>-change-v1.md",
+      "团队计划档位是下限",
       "派发项目角色",
       "收齐回交",
       "登记完成",
       "应用自动派 Proof",
       "Steward 不派发治理角色、不代替验收、不催办",
-      "只向已任命且已写卡的项目角色发起 `dispatch_task`",
+      "只向已任命、已写卡且 readiness pass 的项目角色发起 `dispatch_task`",
       "不把「已派发」写成「已完成」",
       "全部步骤齐备后",
     ],
@@ -227,7 +300,7 @@ test("标准工作流：Steward 卡中的 YAML 模板可被 yaml 解析，顶层
     assert.equal(typeof step.title, "string", "步骤须有 title");
     assert.equal(typeof step.owner, "string", "步骤须有 owner");
     const id = String(step.id);
-    assert.match(id, /^[a-z0-9][a-z0-9-]{1,63}$/, `步骤 id 须为小写 slug：${id}`);
+    assert.match(id, GOVERNANCE_SLUG_RE, `步骤 id 须为小写 slug：${id}`);
     assert.equal(ids.has(id), false, `步骤 id 不得重复：${id}`);
     ids.add(id);
     assert.ok(kinds.has(String(step.kind)), `kind 非法：${String(step.kind)}`);
@@ -258,6 +331,21 @@ test("标准工作流：Steward 卡中的 YAML 模板可被 yaml 解析，顶层
     "模板须给出非保留的执行/证据步骤示例（verification-evidence）",
   );
   assert.ok(doc.steps!.some((step) => step.kind === "dispatch"), "模板须给出 dispatch 步骤示例");
+});
+
+test("标准工作流：slug 校验引用 Model 常量（单一来源）——合法正例通过、尾连字符负例被拒绝", () => {
+  // 2026-10-22 客户确认按设计 S4 收紧共享 slug 契约：测试侧删除旧正则副本，
+  // 统一从 Model 常量编译（设计 §2.1/§3.3 S4、§五 T12）。尾连字符形状必须被显式拒绝。
+  assert.equal(
+    GOVERNANCE_SLUG_RE.source,
+    GOVERNANCE_SLUG_PATTERN,
+    "测试侧正则须由 Model 常量构造（单一来源）",
+  );
+  assert.match("flow-a", GOVERNANCE_SLUG_RE, "合法正例 flow-a 须通过");
+  assert.match("impl", GOVERNANCE_SLUG_RE, "模板执行步骤 id impl 须通过");
+  assert.doesNotMatch("flow-", GOVERNANCE_SLUG_RE, "尾连字符 flow- 须被拒绝");
+  assert.doesNotMatch("a-", GOVERNANCE_SLUG_RE, "尾连字符 a- 须被拒绝");
+  assert.doesNotMatch("impl-", GOVERNANCE_SLUG_RE, "尾连字符 impl- 须被拒绝");
 });
 
 test("标准工作流：五卡流程状态引用统一为 YAML（唯一机器状态），Markdown 仅人读视图；Crew/Proof 按 YAML 读取", () => {
@@ -432,7 +520,7 @@ test("标准工作流：流程工具——Steward 初始创建例外 + flow_get/
   }
   // 交付/回交后由步骤 owner 或 Steward 记录状态；三张卡各有落点。
   assert.match(cardTextOf("rapporteur"), /contract-freeze[\s\S]{0,160}flow_step_update/, "Draft 契约冻结后须用工具记录");
-  assert.match(cardTextOf("nominator"), /nomination \/ role-readiness[\s\S]{0,160}flow_step_update/, "Crew 角色就绪后须用工具记录");
+  assert.match(cardTextOf("nominator"), /role-cards[\s\S]{0,160}flow_step_update/, "Crew 完成写卡步骤后须用工具记录");
   assert.match(cardTextOf("verifier"), /不用 `flow_step_update` 代替客户验收决定/, "Proof 不得用工具代替验收决定");
 });
 
@@ -504,14 +592,22 @@ test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/f
   }
 });
 
-test("标准工作流：Proof / 验收——标准复核（真实跑测试/真实启动/演示/逐条核对）→验收卡；不依赖客户催办", () => {
+test("标准工作流：Proof / 验收——实施前写标准→核对档位/复用证据→核对真实启动演示→逐条核对→报告+验收卡；不依赖客户催办", () => {
   const t = cardTextOf("verifier");
   assertIncludesAll(
     t,
     [
       "标准复核不依赖客户催办",
       "读流程单/提案/契约/架构影响分析",
-      "用审批档 shell 真实跑测试",
+      "docs/acceptance/<flowId>-criteria-v1.md",
+      "风险档位 T0–T3",
+      "版本冻结规则",
+      "docs/scheduling/<flowId>-change-v1.md",
+      "同候选、同输入/依赖、同命令的证据可复用",
+      "只补缺失/失效/高风险检查",
+      "你只能升档、不能降档",
+      "用审批档 shell 亲自复跑",
+      "按团队计划产出的真实启动/演示证据",
       "真实启动应用并演示",
       "启动命令",
       "访问地址",
@@ -519,7 +615,11 @@ test("标准工作流：Proof / 验收——标准复核（真实跑测试/真�
       "逐条核对",
       "质量基线",
       "架构声明",
-      "发验收卡",
+      "docs/acceptance/<flowId>-report-v1.md",
+      "首行五项",
+      "报告档位不得低于变更包档位",
+      "insufficient evidence",
+      "写报告并发验收卡",
       "`cardKind=acceptance`",
       "`accept` / `reject`",
       "未真实运行、未演示时不得建议 accept",
@@ -529,6 +629,13 @@ test("标准工作流：Proof / 验收——标准复核（真实跑测试/真�
     ],
     "Proof 标准工作流",
   );
+  // 2026-10-22：证据来源改为实施/装配/测试角色产出、Verifier 核对并可复跑；不得弱化为只看报告。
+  assertIncludesAll(
+    t,
+    ["核对实施/装配/测试角色按团队计划产出的真实启动/演示证据", "缺失、失效或高风险时用审批档 shell 亲自复跑或要求补做"],
+    "Proof 证据来源与复跑",
+  );
+  assert.doesNotMatch(t, /不核对原始证据/, "Proof 不得放弃证据核对");
 });
 
 test("标准工作流：五卡保留既有 shell 审批档、质量基线、写区/禁写、判断代批与治理卡参数原文", () => {
@@ -558,27 +665,192 @@ test("标准工作流：五卡保留既有 shell 审批档、质量基线、写�
   }
 });
 
-test("标准工作流：不改变注册表权力/边界数据（Section 1、预授权、禁写与 shell 档保持原值）", () => {
+test("注册表：按 2026-10-22 治理分工只调整 Convener/Crew/Verifier 写权，其他角色与 shell 档不变", () => {
   const expectedEntries: Record<string, string[]> = {
     liaison: ["docs/intents/"],
     rapporteur: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
-    nominator: ["角色卡/", "docs/nominations/", "docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
-    convener: ["docs/flows/", "docs/workflow.md", "docs/governance/convener/"],
-    verifier: ["docs/verification/", "docs/governance/verifier/"],
+    nominator: ["角色卡/", "docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
+    convener: ["docs/flows/", "docs/workflow.md", "docs/scheduling/", "docs/governance/convener/"],
+    verifier: ["docs/acceptance/", "docs/verification/", "docs/governance/verifier/"],
   };
   const expectedPreauthorized: Record<string, string[]> = {
     liaison: ["docs/intents/"],
     rapporteur: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
-    nominator: ["docs/nominations/", "docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
-    convener: ["docs/flows/", "docs/governance/convener/"],
-    verifier: ["docs/verification/", "docs/governance/verifier/"],
+    nominator: ["docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
+    convener: ["docs/flows/", "docs/scheduling/", "docs/governance/convener/"],
+    verifier: ["docs/acceptance/", "docs/verification/", "docs/governance/verifier/"],
   };
   for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
-    assert.deepEqual(spec.entries.map((e) => e.path), expectedEntries[spec.id], `${spec.id} Section 1 不得变化`);
-    assert.deepEqual(spec.preauthorizedDirs, expectedPreauthorized[spec.id], `${spec.id} 预授权不得变化`);
+    assert.deepEqual(spec.entries.map((e) => e.path), expectedEntries[spec.id], `${spec.id} Section 1 须按本项调整`);
+    assert.deepEqual(spec.preauthorizedDirs, expectedPreauthorized[spec.id], `${spec.id} 预授权须按本项调整`);
     assert.equal(spec.capabilities.shell, "operator-approve", `${spec.id} shell 档不得变化`);
     for (const p of [".ans/", "docs/bootstrap-manifest.md", "角色卡/governance-boundary.yaml"]) {
       assert.ok(spec.forbiddenWritePaths.includes(p), `${spec.id} 禁写 ${p} 不得变化`);
     }
   }
+  // 关键禁区：不授予 Convener 角色卡写权；不授予 Crew docs/scheduling/ 写权。
+  assert.equal(BUILT_IN_GOVERNANCE_ROLES.find((s) => s.id === "convener")!.entries.some((e) => e.path === "角色卡/"), false);
+  assert.equal(BUILT_IN_GOVERNANCE_ROLES.find((s) => s.id === "nominator")!.entries.some((e) => e.path === "docs/scheduling/"), false);
+  assert.ok(BUILT_IN_GOVERNANCE_ROLES.find((s) => s.id === "nominator")!.forbiddenWritePaths.includes("docs/scheduling/"));
+  assert.equal(BUILT_IN_GOVERNANCE_ROLES.find((s) => s.id === "nominator")!.entries.some((e) => e.path === "docs/nominations/"), false);
+  assert.equal(BUILT_IN_GOVERNANCE_ROLES.find((s) => s.id === "nominator")!.preauthorizedDirs.includes("docs/nominations/"), false);
+});
+
+// —————————————————————— 2026-10-22 角色粒度（bounded context）与 MapReduce（P1/P4/P5/P6/P7/P13） ——————————————————————
+
+test("标准工作流：团队计划 v2（P1/P2/P4/P5）——Convener 卡要求 schema/模块清单/v2 角色表/模块覆盖/写集/DAG/并行组/粒度", () => {
+  const t = cardTextOf("convener");
+  assertIncludesAll(
+    t,
+    [
+      "## 团队判断与团队计划（v2，必须）",
+      "`teamPlanSchema: 2`",
+      "`modules: [<module-a>, <module-b>]`",
+      "`module` / 职责 / 公开契约 / 架构来源四列",
+      "恰好覆盖 `modules` 集合",
+      "roleId | 类型 | module | 职责目标 | 能力要求 | 唯一写集 | 公开契约 | 测试面 | 依赖 | dependsOn | 并行组 | 组别 | apiSpec | 粒度理由",
+      "一个模块一个 Map 角色、一个角色一个模块",
+      "每个模块必须恰好被一个 Map 角色覆盖",
+      "无重复/孤儿/未声明模块",
+      "Reduce 角色写 `module: reduce`",
+      "分号分隔的精确路径/目录",
+      "不得含通配符/省略号/散文/`..`/绝对路径",
+      "跨角色两两不相交",
+      "目标必须存在、无自依赖/重复/环",
+      "同一 `map-*` 组内角色之间不得有依赖路径",
+      "Map 角色不得依赖 Reduce",
+      "每个 Reduce 角色的 dependsOn 必须直接或传递覆盖全部 Map 角色",
+      "整层名（frontend/backend/web/server/client/ui/fullstack/all/common/shared/utils 等）",
+      "`exception-review`",
+      "单文件写集/极小模块只记 warning",
+      "禁止函数级/单文件/按钮/端点级纳米角色",
+      "不得把「字段齐全」当成「粒度正确」",
+      "五维判断与协调成本",
+    ],
+    "Convener 团队计划 v2",
+  );
+  // 不得把结构字段齐全当成语义完成。
+  assert.doesNotMatch(t, /字段齐全[^。]{0,20}(即|就)(代表|说明|等于)粒度正确/);
+  assert.doesNotMatch(t, /结构校验通过[^。]{0,10}(即|就)(代表|说明)粒度正确/);
+});
+
+test("标准工作流：readiness v2（P5）——逐角色 module/contract/testSurface/parallel/dependsOn/granularity 与 pass/gaps；例外须明确批准", () => {
+  const t = cardTextOf("convener");
+  assertIncludesAll(
+    t,
+    [
+      "逐项核对 module / 公开契约 / 测试面 / 并行组 / dependsOn / 粒度理由",
+      "`exception-review` 例外必须明确批准或退回",
+      "`docs/scheduling/<flowId>-readiness-v1.md`",
+      "`status: pass|gaps`",
+      "逐角色列 `module`/`contract`/`testSurface`/`parallel`/`dependsOn`/`granularity`",
+      "每项 pass/gap + 证据",
+      "gap 报告应用退回 Crew 修正",
+      "团队计划缺能力细节时由你补充计划",
+      "readiness 不是验收标准、不是客户确认",
+      "结构校验通过不等于粒度正确",
+      "语义粒度必须由 readiness 对照客户确认的架构逐项判断",
+    ],
+    "readiness v2",
+  );
+});
+
+test("标准工作流：MapReduce flow 模板（P6）——delivery-<module>/parallelGroup/dependsOn/contract-freeze/Reduce 前置；旧 flow 不变", () => {
+  const t = cardTextOf("convener");
+  assertIncludesAll(
+    t,
+    [
+      "`delivery-<module>`",
+      "parallelGroup",
+      "dependsOn",
+      "contract-freeze",
+      "Reduce 步骤依赖全部 Map 交付",
+      "旧 flow 不填这两个字段，解析/派发行为逐字不变",
+      "未知字段仍拒绝",
+      "`pending` / `dispatched` / `delivered` / `done` / `superseded` / `failed` / `blocked`",
+      "同一 `map-*` 组内步骤之间不得有依赖路径",
+      "每个 Reduce 步骤（`dispatch`/`artifact`，验收除外）必须有到所有 `map-*` dispatch 步骤的依赖路径",
+      "Map 步骤不得依赖 Reduce 步骤",
+      "Map 交付步骤必须依赖 `contract-freeze`",
+      "所有前置步骤必须 `status: done` 才允许 `dispatch_task`",
+      "旧步骤无 `dependsOn` 不新增检查",
+      "Reduce 前置未全部 `done` 必须硬拦",
+      "不新增 `FlowStepKind`",
+    ],
+    "MapReduce flow 模板与门禁",
+  );
+
+  const match = /```yaml\n([\s\S]*?)```/.exec(t);
+  assert.ok(match, "Convener 卡须含 ```yaml 模板块");
+  const doc = parseYaml(match![1]) as { steps?: Array<Record<string, unknown>> };
+  assert.ok(Array.isArray(doc.steps), "模板须解析出 steps 数组");
+  const byId = new Map(doc.steps!.map((step) => [String(step.id), step]));
+  for (const id of ["contract-freeze", "delivery-checkout-api", "delivery-checkout-web", "test-map-shards", "integration-e2e", "verification-evidence"]) {
+    assert.ok(byId.has(id), `模板须含步骤 ${id}`);
+  }
+  assert.equal(byId.get("delivery-checkout-api")?.parallelGroup, "map-a", "Map 交付步骤须标 map 组");
+  assert.equal(byId.get("delivery-checkout-web")?.parallelGroup, "map-a", "同组 Map 步骤须标同一 map 组");
+  assert.deepEqual(byId.get("delivery-checkout-api")?.dependsOn, ["contract-freeze"], "Map 交付须依赖 contract-freeze");
+  assert.deepEqual(byId.get("delivery-checkout-web")?.dependsOn, ["contract-freeze"], "Map 交付须依赖 contract-freeze");
+  for (const id of ["test-map-shards", "integration-e2e", "verification-evidence"]) {
+    assert.equal(byId.get(id)?.parallelGroup, "reduce", `${id} 须标 reduce 组`);
+  }
+  assert.deepEqual(byId.get("test-map-shards")?.dependsOn, [
+    "delivery-checkout-api",
+    "delivery-checkout-web",
+  ], "Reduce 步骤须直接依赖全部 Map 交付");
+  assert.deepEqual(byId.get("integration-e2e")?.dependsOn, ["test-map-shards"]);
+  assert.deepEqual(byId.get("verification-evidence")?.dependsOn, ["integration-e2e"]);
+  assert.equal(byId.get("contract-freeze")?.status, "done", "contract-freeze 是 Map 入口条件");
+});
+
+test("标准工作流：Crew v2（P13）——读 module/契约/测试面/dependsOn/粒度理由；角色卡写 bounded context/契约/测试面/上下游/粒度；boundary 按计划写集", () => {
+  const t = cardTextOf("nominator");
+  assertIncludesAll(
+    t,
+    [
+      "按 v2 读 `module` / 公开契约 / 测试面 / `dependsOn` / 并行组 / `粒度理由`",
+      "bounded context（module）",
+      "公开契约",
+      "测试面",
+      "**上下游依赖**（`dependsOn` 与交接输入输出）",
+      "粒度理由",
+      "boundary 按计划的唯一写集逐条写（精确路径/目录，不多不少）",
+      "v2 粒度落卡纪律（必须）",
+      "一个角色 = 一个 bounded context/模块",
+      "不得写整层角色",
+      "纳米角色",
+      "计划缺 module/公开契约/测试面/`dependsOn`/粒度理由/写集",
+      "只报告 Steward / 统筹，不自行补计划",
+      "不自行增删模块/角色/写集",
+    ],
+    "Crew v2 写卡",
+  );
+  // 上轮边界保持：Crew 不选角色、不发 appointment、不写 nominations。
+  assertIncludesAll(
+    t,
+    ["不再选择角色、不再组建团队、不再写 `docs/nominations/**`、不再发 appointment 卡"],
+    "Crew 既有边界",
+  );
+});
+
+test("标准工作流：Verifier v2（P7/P8/P13 可选补充）——核对模块覆盖/manifest/分片原始日志；不改真实启动/演示基线", () => {
+  const t = cardTextOf("verifier");
+  assertIncludesAll(
+    t,
+    [
+      "团队计划 v2 的模块覆盖/并行组/`dependsOn`",
+      "Reduce manifest 与每个 Map 分片的原始日志",
+      "命令、环境、候选哈希、退出码、pass/fail/skip、失败原文",
+      "manifest 是索引，不是原始证据",
+      "缺失/无法对应候选时判 insufficient evidence",
+      "manifest 不能替代分片原始日志",
+      "该补充不改变真实启动/演示基线",
+    ],
+    "Verifier v2 补充",
+  );
+  // 真实启动/演示基线逐字保留，未演示仍不得建议 accept。
+  assert.match(t, /验收前必须真实启动应用并演示/, "Verifier 卡须保留真实启动/演示硬要求");
+  assert.match(t, /没有真实启动\/演示证据/, "Verifier 无证据仍不得建议 accept");
+  assert.match(t, /未真实运行、未演示时不得建议 accept/, "Verifier 未演示不得建议 accept");
 });

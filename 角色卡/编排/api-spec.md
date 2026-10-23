@@ -445,7 +445,7 @@ preview: {
 
 ### 意图交接机械校验（`src/common/编排/governance-handoff.ts`）
 
-- `validateIntentHandoff(input, context?) => Promise<IntentHandoffValidation>`：模型/角色防御性校验（trio + liaison）→ slug（`^[a-z0-9][a-z0-9-]{1,63}$`）→ 四要素非空、`summary` 1..200 字（超长拒绝不截断）→ `docs/intents/<intentId>.md` 存在可读、frontmatter 以 `---` 开头并闭合、顶层 `key: value` 可解析、文件 `intentId` 与入参一致、`goal/scope/acceptance` **入参与文件逐项相等**（文件是权威）、文件 `handoffKind`/`flowId` 若给出须一致 → 账本可读（坏行/不可读 fail-closed）→ 去重（`intentId+handoffKind+sha256(原始字节)`）→ `initial` 每个 `intentId` 仅一次 → `clarification`/`revision` 必须已有同 `intentId` 成功交接 → 每轮一次（账本同 `turnId`；缺 `turnId` 降级并返回 `warnings`）。
+- `validateIntentHandoff(input, context?) => Promise<IntentHandoffValidation>`：模型/角色防御性校验（trio + liaison）→ slug（**2026-10-22 收紧**：`^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`——2–64 位、首尾小写字母/数字、禁止首/尾连字符；正则由 Model `GOVERNANCE_SLUG_PATTERN` 构造，导出形状仍是 `RegExp`；文件 frontmatter 的**非空非法** `flowId` 显式返回 `invalid-flow-id`，不得静默当作缺席）→ 四要素非空、`summary` 1..200 字（超长拒绝不截断）→ `docs/intents/<intentId>.md` 存在可读、frontmatter 以 `---` 开头并闭合、顶层 `key: value` 可解析、文件 `intentId` 与入参一致、`goal/scope/acceptance` **入参与文件逐项相等**（文件是权威）、文件 `handoffKind`/`flowId` 若给出须一致 → 账本可读（坏行/不可读 fail-closed）→ 去重（`intentId+handoffKind+sha256(原始字节)`）→ `initial` 每个 `intentId` 仅一次 → `clarification`/`revision` 必须已有同 `intentId` 成功交接 → 每轮一次（账本同 `turnId`；缺 `turnId` 降级并返回 `warnings`）。
 - `intentHandoffDedupeKey({intentId,handoffKind,sha256})`：去重键单一来源。
 - `countClarificationRounds(projectRoot, {flowId?, intentId?})`：账本坏 → `ok:false`；`CLARIFICATION_MAX_ROUNDS = 2`。
 - 以上三件 + 常量/类型经 `govern-session.ts` 薄再导出（桌面不直接导入私有 `common/`）。
@@ -521,3 +521,80 @@ export type { CreateGovernanceJudgeOptions } from "../../common/编排/governanc
 - **write 新文件（P6 真机修复）**：`write` 卡 artifacts/required-read 只收**已存在**的相关物证；新建目标文件不进入 required-read，改由 `preview` 正文核对；`preview` 为空 ⇒ `manual/insufficient-evidence`。`appointment-write`/`schedule-write` 的 nomination/flow 要求不变。
 - 新增 `test/编排/governance-judge.test.ts` **32/32**：六卡种正反例、required-read/物证缺失、逐路径复核（probes/写根/禁写/来源/pathDecisions 覆盖）、accept-quick 不代批、任命推荐集、读取损伤、支持矩阵/超时/中止/busy、事实/推荐集解析、trio judgeContext 与 single/su/项目角色对照、账本 judge 字段与 group 交叉校验、两工具回执、审计有界、**acceptance 流程完成度机械门槛**、**write 新文件 preview/旧版物证**。
 - 相关既有套件 74/74、P6 套件 42/42；`npm run typecheck` 0 错；全量三层 glob `node --test "test/**/*.test.ts"` 2900 计/2881 过/16 红/3 skipped，16 红均他域/环境既有（明细见 changelog）。
+
+## 2026-10-22 治理分工第 1/3/5 项（governance-split-1-3-5，编排阶段 C）
+
+依据：客户确认的策划方案 v1 `docs/planning/2026-10-22_design_governance-split-1-3-5.md` §5.3/§5.4/§7/§8.2/§8.6/§10.1、实施前标准 `docs/acceptance/governance-split-1-3-5-criteria-v1.md`（P2/P3/P5/P9/P10/P11/P12/P15）、团队计划 §4.2（编排）与 §11.7。阶段 B 冻结契约（`src/model/runtime.ts` 的 `teamPlanPath`/`acceptanceCriteriaPath`/`acceptanceReportPath`/`changePackagePath`/`riskTier`/`teamPlanConfirmed`）只读消费。状态：**implemented-unverified**。
+
+### 门禁与写路径路由
+
+- `governance-gate.ts::GovernanceGateAction` 新增 `"write-team-plan"`（`ACTION_ROLE` → `convener`，复用提案接受门）；旧 `"write-nomination"` → `nominator` 保留为 legacy。`write-role-card` 仍 → `nominator`。
+- **O2 实施派发前置门槛**：`evaluateDispatchGate` 对已有 appointment 决定的 flow，要求 `docs/acceptance/<flowId>-criteria-v1.md` 存在且结构合格（`validateAcceptanceCriteriaText`：flowId 可核对、验收表含 ID 列、风险档位 T0–T3、pass/fail/insufficient evidence、证据计划、版本/冻结）；缺失 → `acceptance-criteria-missing`，不合格 → `acceptance-criteria-invalid`。最新提案为 `proposal-accept-quick` 或旧流程（无 appointment）显式豁免。
+- `run-role.ts::governanceActionForPath`：`docs/scheduling/<flowId>-team-vN.md` → `write-team-plan`（flowId 非法时不带 flowId，门禁 fail-closed）；`docs/nominations/**` 保留 legacy 路由。`governanceWriteOwnerHint` 文案同步为 Steward/Crew/Proof 分工。
+- `governance-ledger.ts`：**不新增** `GovernancePower`/`GovernanceDecisionKind`；appointment 决定的 `power` 由发起角色职能决定（Convener → `schedule`，legacy Nominator 存量 → `nomination`），团队计划/readiness/标准/报告/变更包走 `artifact.observed`。
+
+### 卡前守卫与卡种
+
+- `TRIO_CARD_KINDS`：`nominator` 移除 `appointment`（保留 `appointment-write`/`write`）；`convener` 增加 `appointment`。
+- `defaultGovernanceChoiceCardKind`：Convener 对 appointment 形状（非空选项且不含 accept/accept-quick/revise/reject/confirm）默认 `appointment`；Nominator 不再默认 appointment。
+- **Convener appointment 卡前守卫**（`validateConvenerAppointmentCard`，触达客户前）：flowId 合法；最新团队计划 `docs/scheduling/<flowId>-team-vN.md` 存在可读；frontmatter `flowId` 一致；`recommended` 非空/无重复/不含内置治理角色（复用 `parseRecommendedRoleIds`，空集不静默接受）；卡选项覆盖推荐集且不含内置角色；计划角色表含每个推荐角色的职责目标/能力要求/写集/依赖且非空。失败 → `declined + notPresented:true`，不调客户通道、不计算 judgeContext、不镜像、不写账本、不占 pending。
+- `judgeArtifactsForCard`：appointment → `teamPlanPath`（legacy 提名回落）；appointment-write → teamPlan+flow；acceptance → proposal+flow+criteria/report/change package；Convener/Verifier 的 `write` 可选带 teamPlan/标准/变更包。`latestVersionedArtifact` 扩展 `-team-vN.md`/`-criteria-vN.md`/`-report-vN.md`/`-change-vN.md` 版本扫描。
+- `findDecisionArtifact`：appointment 绑定最新 `docs/scheduling/<flowId>-team-vN.md`（无则 legacy 提名，O4）；`recordCustomerDecision` 的 appointment `power` 由 Convener 职能为 `schedule`。
+- `computeJudgeContext`：推荐集从团队计划解析（legacy 提名回落）；acceptance 读取变更包 frontmatter 并写入 `facts.riskTier`。
+
+### 判断物证 / verdict / prompt
+
+- `governance-judge-facts.ts::requiredArtifactPaths`：appointment 用 `teamPlanPath`；appointment-write 用 teamPlan+flow；acceptance 增加 criteria/report/change package；缺省约定路径分别为 `docs/scheduling/<flowId>-team-v1.md`、`docs/acceptance/<flowId>-criteria-v1.md`、`docs/acceptance/<flowId>-report-v1.md`、`docs/scheduling/<flowId>-change-v1.md`。`buildGovernanceJudgeFacts` 增 `teamPlanConfirmed`（最新 appointment 决定是否绑定 `-team-vN.md`）。
+- `governance-judge-evidence.ts`：新增物证种类 `team-plan`/`acceptance-criteria`/`acceptance-report`/`change-package` 及确定性摘录；推荐集解析来源改为团队计划（legacy 提名回落）；错误文案「提名文件」→「团队计划」。
+- `governance-judge.ts::verifyAcceptanceMechanics`：在流程收尾门之外要求标准存在/flowId 一致、报告存在且**首行五项**（风险档位/判定依据/选定检查/复用证据/全量回归）、变更包 frontmatter `riskTier` 存在、报告档位不低于变更包档位；缺失/不一致 → `insufficient-evidence`/manual，不 auto-approve。
+- `governance-judge-verdict.ts::SOURCE_WRITE_ROOTS`：convener +`docs/scheduling/`；verifier +`docs/acceptance/`；nominator −`docs/nominations/`。appointment 文案改团队计划。
+- `governance-judge-prompt.ts`：更新 convener/verifier 写区、团队计划/验收标准/档位提示与 appointment 推荐集来源。
+
+### 流程/服务与会话提示
+
+- `flow-state.ts`：`FLOW_STEP_KINDS` 枚举不变；注释登记新 step id 约定（`team-plan`/`appointment`/`role-cards`/`role-readiness`/`acceptance-criteria`/`change-package`）。旧版 Markdown 词形映射的**实件**在 `app/desktop/governance-advance.ts::flowStepEvidenceKind`（阶段 D/桌面窗口），本阶段只登记约定：`team-plan*`→artifact、旧 `nomination*`→decision 保留。
+- `flow-service.ts`：`artifactPowerOf`/`observeFlowArtifacts` 行为不变；团队计划/readiness/标准/变更包作为普通项目相对路径可观察，`角色卡/` 仍不观察（新增专项测试）。
+- `govern-session.ts`：标准工作流提示改为「意图确认 → 提案与契约 → 团队计划与客户任命 → Crew 写卡与就绪 → 流程与派发 → 独立验收」；Crew 纪律改为只读团队计划按名单写卡；Steward 纪律增加团队计划/readiness/变更包；Proof 纪律增加实施前标准、首行五项报告路径 `docs/acceptance/<flowId>-report-v1.md`、T0–T3 档位与证据复用。
+
+### 验收证据
+
+- 定向测试：`governance-gate` **20/20**、`governance-judge` **81/81**、`flow-state` **35/35**、`flow-service` **22/22**、`governance-session` **30/30**、`governance-ledger`+`decision-evidence-packet`+`decision-intent-drift` **32/32**；`node --test "test/编排/**/*.test.ts"` **735 计/734 过/1 红**（唯一红＝既有 Windows symlink EPERM `shell-authorized-routine.test.ts:103`，基线与任务书一致）；`npm run typecheck` **exit 0**。环境：Node v24.22.1 / npm 11.19.1 / Windows 11 / Git Bash。
+- 新增/更新负例：团队计划卡前守卫六类失败（缺失/flowId 不符/推荐集空/含内置角色/选项不一致/角色行缺项）、推荐集内联数组解析与团队计划优先/legacy 回落、`latestVersionedArtifact` 扫描 `-team-vN.md`、`write-team-plan` 门禁正反例、appointment `power=schedule`、acceptance 标准/报告/首行五项/档位门槛、`team-plan` 步骤模板与枚举不变、`observeFlowArtifacts` 新 artifact 观察。
+- **契约偏差/未做**：旧版 Markdown 映射 `team-plan*`→artifact 的可执行实件属桌面窗口（阶段 D），本阶段未改 `app/**`；`test/测试/` 跨角色 e2e 与全量 T3 回归归阶段 E 测试角色；appointment→Crew 桌面派发回路属阶段 D。文档状态 `implemented-unverified`，未提交/暂存/推送。
+
+## 2026-10-22 角色粒度（bounded context）与 MapReduce 并行（Map B）
+
+状态：**implemented-unverified**（定向检查通过，未经独立验收）。
+
+### 单一团队计划解析器（`src/common/编排/team-plan.ts`，Q9 A）
+
+Pipeline 公共出口 `src/pipeline/orchestration/run-role.ts` 再导出（桌面 Map C 经此消费，不直接 import 私有 common）：
+
+- `parseTeamPlan(text, {flowId?}) => TeamPlanParseResult`：v2（`teamPlanSchema: 2`）跑 V1–V10；缺省/`teamPlanSchema: 1` 走 legacy（既有 v1 表格检查，不强制新字段）。
+- `TeamPlanParseResult = { ok; legacy; teamPlanSchema: 1|2; flowId?; version?; riskTier?; recommended: string[]; modules: string[]; moduleList: TeamPlanModule[]; roleRows: TeamPlanRoleRow[]; issues: TeamPlanIssue[] }`。
+- `TeamPlanIssue = { code: "V1".."V11"; severity: "error"|"warning"|"exception-review"; message; path?; roleId?; module? }`；`teamPlanIssueMessages(result, severity="error")` 取可读消息。
+- `TeamPlanRoleRow`：`roleId/roleType/module/modules/primaryModule/duty/ability/writeset/writesets/contracts/testSurface/deps/dependsOnRaw/dependsOn/parallelGroup/group/apiSpec/apiSpecStatus/apiSpecReason/granularityRationale/isMap/isReduce`。
+- 写集原语（V12 复用）：`parseWritesetCell(raw) => {entries, issues}`、`writesetsOverlap(a,b)`、`isGovernanceWritesetPath(value)`；`WritesetEntry = {raw,path,directory}`。
+- `validateTeamPlanFlowConsistency(plan, flow) => TeamPlanIssue[]`：V11（Map 交付 `delivery-<主模块>`、owner、parallelGroup、dependsOn 精确 `{contract-freeze} ∪ 依赖角色 delivery-*`、Reduce 覆盖全部 Map、contract-freeze 存在）。
+- `legacyTeamPlanRoleRowIssues(text, recommended)`：v1 表格检查（保留既有文案）。
+- 不新增 cardKind / FlowStepKind / artifact kind；不调用 LLM 做粒度语义判断（语义仍归 Convener readiness）。
+
+### flow 可选字段（方案 A）
+
+- `FlowStateStep` 新增可选 `parallelGroup?: string`（`map-<slug>`/`reduce`）与 `dependsOn?: string[]`；`STEP_KEYS` 严格（未知字段仍拒绝）；`FLOW_STEP_KINDS` 不变。
+- `parseFlowStateYaml` 静态校验：parallelGroup 语法、dependsOn 目标存在/无自依赖/重复/环、同 `map-*` 组无依赖路径、每个 reduce 步骤（dispatch/artifact，验收除外）覆盖全部 `map-*` dispatch、Map 不依赖 Reduce、Map dispatch 依赖 `contract-freeze`；`superseded` 步骤不参与 Map/Reduce 调度语义。旧 flow 无字段 ⇒ 零新增检查。
+- `flow-service`：`viewOf`/`serializeFlow`/`supersede` 携带字段；旧 flow 序列化逐字不变；supersede 幂等比较含两字段。
+- `governance-gate::evaluateDispatchGate`：步骤声明 `dependsOn` 时全部前置必须 `status: done`，否则 `dependencies-not-done`；不改变派发权，旧步骤无 `dependsOn` 不新增检查。
+
+### 卡前守卫 / facts / 提示
+
+- `run-role.ts::validateConvenerAppointmentCard`：v2 调 `parseTeamPlan` 跑 V1–V10；`docs/flows/<flowId>.yaml` 已写时跑 V11；失败不弹卡、不写账本。
+- `computeJudgeContext`（appointment）：`facts.teamPlanSchema` + 有界 `facts.teamPlanModules`（≤20 项、每项 ≤64B）；`artifacts.teamPlanPath` 不变，不新增 artifact kind。
+- `govern-session.ts`：标准工作流/Convener/Crew 提示同步 v2 字段、模块清单、Map/Reduce flow 可选字段、readiness 例外、测试分片与 manifest；不改变派发权/客户入口。
+
+### 验收证据（Map B）
+
+- `node --test "test/编排/**/*.test.ts"`：**769 tests / 768 pass / 1 fail / 0 skip**（唯一红＝既有 Windows symlink EPERM `shell-authorized-routine.test.ts:103`；基线 735/734/1，零新增红）；`npm run typecheck` exit 0。
+- 定向：`team-plan` 17/17、`flow-state` 44/44、`flow-service` 24/24、`governance-gate` 22/22、`governance-session` 34/34；只读 `test/测试/governance-e2e-auto/**` 68/68（legacy 团队计划不回退）。
+- **已知限制**：`flow_step_supersede` 工具不转发两字段、`flow_get` 文本投影不渲染（§11.6 已接受；服务层已支持，初始 YAML 可携带）；未改 `src/model/runtime.ts`、`src/provider/runtime/**`、`src/common/门禁引擎/**`、`app/**`、`test/测试/**`。
+- 未做：Map C（桌面 v2 解析/V12）、Reduce 终验/全量 T3 回归、提交/推送/合并/发布。

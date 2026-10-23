@@ -50,6 +50,7 @@ import {
   appGovernanceBoundary,
   governanceCapabilitiesOf,
   governanceRoleOf,
+  isBuiltInGovernanceRoleId,
   type BuiltInGovernanceRoleSpec,
 } from "../../service/boundary/resolve-boundary.ts";
 import { resolveWrite } from "../../service/gate/resolve-write.ts";
@@ -97,7 +98,7 @@ import type {
   GovernanceJudgeContext,
   GovernanceJudgeToolOptions,
 } from "../../model/runtime.ts";
-import { governanceCardGroup } from "../../model/runtime.ts";
+import { GOVERNANCE_SLUG_PATTERN, governanceCardGroup } from "../../model/runtime.ts";
 import { createRuntimeAdapter, projectRuntimeLiveHandback, projectRuntimeLegacyHistory, type RuntimeSessionOptions } from "../../service/runtime/session.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import {
@@ -114,7 +115,7 @@ import { withHandback, type OrchestrationEvent, type TaskReport, type HandbackIn
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
-import { conditionSlugsOf, declaredConfirmPaths, declaredPathBodies, createConfirmedWriteIssuer, explicitConfirmPaths, validateConfirmPreviewCompleteness } from "../../common/编排/confirmed-writes.ts";
+import { conditionSlugsOf, declaredPathBodies, createConfirmedWriteIssuer, explicitConfirmPaths, validateConfirmPreviewCompleteness } from "../../common/编排/confirmed-writes.ts";
 import { parseFlowStateYaml } from "../../common/编排/flow-state.ts";
 import {
   appendGovernanceLedger,
@@ -143,6 +144,38 @@ import {
   type FlowStepSupersedeFn,
   type FlowStepUpdateFn,
 } from "../../common/编排/flow-service.ts";
+// 2026-10-22 角色粒度/MapReduce（方案 Q9 A）：团队计划 v2 的**单一**解析/校验实现。
+// 桌面不直接 import 本私有 common；经本文件（pipeline 公共出口）再导出消费。
+import {
+  legacyTeamPlanRoleRowIssues,
+  parseTeamPlan,
+  teamPlanIssueMessages,
+  validateTeamPlanFlowConsistency,
+  type TeamPlanParseResult,
+} from "../../common/编排/team-plan.ts";
+// 公共出口（Map C 桌面经 `src/pipeline/orchestration/run-role.ts` 消费；不直接 import 编排私有 common）。
+export {
+  TEAM_PLAN_SCHEMA_LEGACY,
+  TEAM_PLAN_SCHEMA_V2,
+  parseTeamPlan,
+  parseTeamPlanModuleIds,
+  parseWritesetCell,
+  writesetsOverlap,
+  isGovernanceWritesetPath,
+  legacyTeamPlanRoleRowIssues,
+  teamPlanIssueMessages,
+  validateTeamPlanFlowConsistency,
+} from "../../common/编排/team-plan.ts";
+export type {
+  ModuleIdParse,
+  ParseTeamPlanOptions,
+  TeamPlanIssue,
+  TeamPlanIssueSeverity,
+  TeamPlanModule,
+  TeamPlanParseResult,
+  TeamPlanRoleRow,
+  WritesetEntry,
+} from "../../common/编排/team-plan.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 // 跨角色共享路径原语（**单一来源** = pm 属主 `src/common/shared/path-primitives.ts`；工程法案 §一.5
 // 消费方名单已含编排；同 `confirmed-writes.ts` 先例）——用于 su 预授权目录的**词法**归属判定：
@@ -739,24 +772,11 @@ export async function openRoleSession(
           let cardKind = req.cardKind ?? originalMetadata?.cardKind;
           let effectiveReq = req;
           let effectiveMetadata = originalMetadata;
-          // 2026-10-20 真机：写卡确认漏带 cardKind ⇒ judgeContext 不计算、客户被要求手批。
-          // 只对 trio 的 **confirm** 卡、且声明路径可由 preview/req.paths 核对时，按角色保守兜底；
-          // 显式 cardKind 优先，choice 卡与无路径卡零变化。
-          if (isTrio && cardKind === undefined && req.kind === "confirm") {
-            const declaredPaths = declaredConfirmPaths(req);
-            const defaulted = defaultGovernanceConfirmCardKind(trioSpec!.id, declaredPaths);
-            if (defaulted !== undefined) {
-              cardKind = defaulted;
-              effectiveReq = { ...req, cardKind: defaulted };
-              effectiveMetadata = { ...(originalMetadata ?? {}), cardKind: defaulted };
-              log.record("governance.cardKind.defaulted", {
-                roleId: setup.role.id,
-                cardKind: defaulted,
-                kind: "confirm",
-                declaredPaths,
-              });
-            }
-          }
+          // 2026-10-22 无效治理卡守卫（设计 §4.5/§4.6，N1 严格口径）：五个内置治理角色的 confirm 卡
+          // 必须在**触达客户通道之前**带齐 `cardKind`（且属于该角色白名单）与合法 `flowId`。
+          // 缺任何一项 ⇒ fail-closed 拒绝本次发卡：不调 raw、不计算 judgeContext、不镜像、不写账本、
+          // 不发行写集/不占 pending-queued；工具回执据 `notPresented` 如实说明「卡片未发出」。
+          // 2026-10-20 的 confirm `cardKind` 机械兜底已由本严格口径取代并删除（choice 兜底保持不变）。
           // 2026-10-20：choice 卡同样按内置治理角色默认（Lead 的 intent-confirm 等）；显式 cardKind 优先。
           if (isTrio && cardKind === undefined && req.kind === "choice") {
             const defaulted = defaultGovernanceChoiceCardKind(
@@ -793,21 +813,115 @@ export async function openRoleSession(
           }
           if (isTrio) {
             const allowed = TRIO_CARD_KINDS[trioSpec!.id];
-            if (cardKind !== undefined && !allowed.includes(cardKind)) {
-              log.record("governance.cardKind.rejected", {
-                roleId: setup.role.id,
-                cardKind,
-                allowed: [...allowed],
+            const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
+            if (req.kind === "confirm") {
+              // 严格口径（设计 §4.5 顺序）：1) 缺 cardKind → 拒；2) 显式 cardKind 越权 → 拒（既有文案）；
+              // 3) flowId 缺失/格式非法 → 拒；此后才进入既有 preview/YAML 闸与 judgeContext 计算。
+              const rejectNotPresented = (reason: string, reasonCode: string): CustomerInputOutcome => {
+                // 诊断只用共享白名单字段（state/reasonCode/ok）；flowId/cardKind 不在白名单，不记录。
+                log.record("governance.card.rejected", { state: "not-presented", reasonCode, ok: false });
+                return { outcome: "declined", reason, notPresented: true };
+              };
+              const flowIdOk = isGovernanceFlowId(flowId);
+              const allowedConfirmKinds = confirmCardKindsOf(trioSpec!.id);
+              const allowedText = allowedConfirmKinds.length > 0 ? allowedConfirmKinds.join(" / ") : "无";
+              const bothHint =
+                `治理角色的 request_confirmation 必须同时携带 flowId 与 cardKind（本角色允许：${allowedText}）；` +
+                "本次未发行任何写入路径、未写入账本。";
+              if (cardKind === undefined) {
+                const missing = ["缺少 cardKind"];
+                if (!flowIdOk) {
+                  missing.push(`缺少合法的 flowId（须为非空小写 slug，匹配 ${GOVERNANCE_SLUG_PATTERN}）`);
+                }
+                return rejectNotPresented(
+                  `${missing.join("；")}。${bothHint}`,
+                  flowIdOk ? "missing-card-kind" : "missing-card-kind-and-flow-id",
+                );
+              }
+              if (!allowed.includes(cardKind)) {
+                log.record("governance.cardKind.rejected", {
+                  roleId: setup.role.id,
+                  cardKind,
+                  allowed: [...allowed],
+                });
+                return {
+                  outcome: "declined",
+                  reason:
+                    `治理角色 ${setup.role.id} 不允许 cardKind=${cardKind}；` +
+                    `允许：${allowed.join(" / ")}。本次未向客户发卡。`,
+                };
+              }
+              if (!flowIdOk) {
+                return rejectNotPresented(
+                  `缺少合法的 flowId（须为非空小写 slug，匹配 ${GOVERNANCE_SLUG_PATTERN}）。${bothHint}`,
+                  "missing-flow-id",
+                );
+              }
+              // 设计 §4.2：liaison 的确认卡一律拒绝（其确认卡允许集为空；需求确认只走 request_choice 的
+              // intent-confirm）。即便直接调用包装器给出白名单内的 choice 类 cardKind 也不放行。
+              if (trioSpec!.id === "liaison") {
+                return rejectNotPresented(
+                  "治理角色 liaison 不使用 request_confirmation 做治理写盘；确认卡一律不发送" +
+                    "（需求确认请用 request_choice 的 intent-confirm）。本次未发行任何写入路径、未写入账本。",
+                  "role-not-allowed",
+                );
+              }
+              currentFlowId = flowId;
+            } else {
+              if (cardKind !== undefined && !allowed.includes(cardKind)) {
+                log.record("governance.cardKind.rejected", {
+                  roleId: setup.role.id,
+                  cardKind,
+                  allowed: [...allowed],
+                });
+                return {
+                  outcome: "declined",
+                  reason:
+                    `治理角色 ${setup.role.id} 不允许 cardKind=${cardKind}；` +
+                    `允许：${allowed.join(" / ")}。本次未向客户发卡。`,
+                };
+              }
+              if (isGovernanceFlowId(flowId)) currentFlowId = flowId;
+            }
+          }
+          // 2026-10-22 治理分工第 1 项（方案 §5.3）：Convener 的 appointment choice 在**触达客户之前**
+          // 过团队计划卡前守卫（flowId 合法/计划存在可读/frontmatter flowId 一致/推荐集非空无重复不含
+          // 内置角色/卡选项覆盖推荐集且不含内置角色/每角色职责·能力·写集·依赖行齐全）。
+          // 失败：不生成客户卡、不镜像、不调判断、不写账本、不占 pending，退回 Convener。
+          if (
+            isTrio &&
+            req.kind === "choice" &&
+            trioSpec!.id === "convener" &&
+            cardKind === "appointment"
+          ) {
+            const appointmentFlowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
+            if (!isGovernanceFlowId(appointmentFlowId)) {
+              log.record("governance.card.rejected", {
+                state: "not-presented",
+                reasonCode: "appointment-missing-flow-id",
+                ok: false,
               });
               return {
                 outcome: "declined",
+                notPresented: true,
                 reason:
-                  `治理角色 ${setup.role.id} 不允许 cardKind=${cardKind}；` +
-                  `允许：${allowed.join(" / ")}。本次未向客户发卡。`,
+                  `任命卡缺少合法的 flowId（须匹配 ${GOVERNANCE_SLUG_PATTERN}）；` +
+                  "请补齐后重发。本次未向客户发卡、未写账本。",
               };
             }
-            const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
-            if (isGovernanceFlowId(flowId)) currentFlowId = flowId;
+            const appointmentGuard = await validateConvenerAppointmentCard({
+              projectRoot: input.project.projectRoot,
+              flowId: appointmentFlowId,
+              req: effectiveReq,
+            });
+            if (!appointmentGuard.ok) {
+              log.record("governance.card.rejected", {
+                state: "not-presented",
+                reasonCode: "appointment-team-plan-invalid",
+                ok: false,
+              });
+              return { outcome: "declined", notPresented: true, reason: appointmentGuard.reason };
+            }
           }
           // 2026-10-19 真机 op-2 修复（呈现前 fail-closed）：写盘类确认卡声明了写入路径时，preview
           // 必须对**每一条**路径给出可核对正文/结构。不完整 ⇒ **不发卡**、不发行任何写入路径，直接
@@ -1679,22 +1793,20 @@ function governanceWriteOwnerHint(rel: string): string {
       guidance: "该路径属报告员 Rapporteur 的写区（提案/契约）；请把客户意图交给报告员，由报告员形成提案。",
     },
     {
-      prefixes: [
-        "角色卡/",
-        "docs/nominations/",
-        "docs/skills/",
-        "docs/mcp/",
-        "docs/governance/nominator/",
-      ],
-      guidance: "该路径属提名官 Nominator 的写区（角色/提名/技能/MCP）；请交给提名官。",
+      prefixes: ["docs/nominations/"],
+      guidance: "该路径是旧提名文件（legacy）：仅旧流程由 Crew（Nominator）写；新流程的团队计划由 Steward（Convener）写 docs/scheduling/。",
     },
     {
-      prefixes: ["docs/flows/", "docs/workflow.md", "docs/governance/convener/"],
-      guidance: "该路径属召集人 Convener 的写区（流程/编排）；请交给召集人。",
+      prefixes: ["角色卡/", "docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
+      guidance: "该路径属 Crew（Nominator）的写区（角色卡/技能/MCP，按客户任命的团队计划写卡）；请交给 Crew。",
     },
     {
-      prefixes: ["docs/verification/", "docs/governance/verifier/"],
-      guidance: "该路径属 Proof / 验收（Verifier）的写区（核对报告）；请交给验收角色。",
+      prefixes: ["docs/flows/", "docs/workflow.md", "docs/scheduling/", "docs/governance/convener/"],
+      guidance: "该路径属 Steward（Convener）的写区（流程/团队计划/readiness/变更包）；请交给 Steward。",
+    },
+    {
+      prefixes: ["docs/acceptance/", "docs/verification/", "docs/governance/verifier/"],
+      guidance: "该路径属 Proof / 验收（Verifier）的写区（实施前标准/验收报告/证据附件）；请交给验收角色。",
     },
   ];
   for (const hint of hints) {
@@ -1726,7 +1838,7 @@ function forbiddenWriteDecision(
   };
 }
 
-/** 路径 → 三道门禁动作（只认固定形状；写流程/提名的非标准文件名 → 无 flowId，门禁 fail-closed）。 */
+/** 路径 → 三道门禁动作（只认固定形状；写流程/团队计划的非标准文件名 → 无 flowId，门禁 fail-closed）。 */
 interface RoutedGovernanceAction {
   action: GovernanceGateAction;
   flowId?: string;
@@ -1743,6 +1855,20 @@ function governanceActionForPath(rel: string | undefined): RoutedGovernanceActio
       return { action: "write-flow", ...(isGovernanceFlowId(flowId) ? { flowId } : {}) };
     }
     if (parts.length > 3) return { action: "write-flow" }; // 非标准子路径：无 flowId → 拒
+    return undefined;
+  }
+  if (parts[0] === "docs" && parts[1] === "scheduling") {
+    // 2026-10-22 第 1 项：团队计划 `docs/scheduling/<flowId>-team-vN.md` → write-team-plan（Convener）。
+    // readiness/变更包等同目录普通 artifact 不在此路由（走边界写 + 写盘确认）。
+    if (parts.length === 3) {
+      const match = /^(.+)-team-v\d+\.md$/.exec(parts[2]!);
+      if (match !== null) {
+        return {
+          action: "write-team-plan",
+          ...(isGovernanceFlowId(match[1]) ? { flowId: match[1] } : {}),
+        };
+      }
+    }
     return undefined;
   }
   if (parts[0] === "docs" && parts[1] === "nominations") {
@@ -1770,8 +1896,13 @@ export function governanceDispatchActionFor(roleId: string, targetRoleId: string
   return roleId === "liaison" && targetRoleId === "convener" ? "coordinate" : "dispatch";
 }
 
-/** 治理 flowId 形状（与运行时核心 `GOVERNANCE_SLUG_PATTERN` 同值；本地再判一次，不导入运行时实现）。 */
-const GOVERNANCE_FLOW_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
+/**
+ * 治理 flowId 形状（**单一来源**：运行时核心 `src/model/runtime.ts` 的 `GOVERNANCE_SLUG_PATTERN`；
+ * 2026-10-22 收紧为禁止首/尾连字符——设计
+ * `角色卡/项目管理/docs/design/2026-10-22_design_governance-slug-no-trailing-hyphen.md` §3.3/§3.4）。
+ * 本地保留谓词 `isGovernanceFlowId`（仅本文件使用），正则不再有第二份副本。
+ */
+const GOVERNANCE_FLOW_ID_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
 
 function isGovernanceFlowId(value: unknown): value is string {
   return typeof value === "string" && GOVERNANCE_FLOW_ID_RE.test(value);
@@ -1779,9 +1910,15 @@ function isGovernanceFlowId(value: unknown): value is string {
 
 // —————————————————————— Flow YAML 写前校验（2026-10-19） ——————————————————————
 
-/** 确认卡声明的 Flow YAML 路径形状（唯一机器状态）。 */
-const FLOW_YAML_PATH_RE = /^docs\/flows\/([a-z0-9][a-z0-9-]{1,63})\.(?:yaml|yml)$/;
+/**
+ * 确认卡声明的 Flow YAML 路径形状（唯一机器状态）：**宽捕获**单段候选文件名
+ * `docs/flows/<候选>.yaml|yml`。候选是否为合法 flowId **不在本正则判定**，由
+ * `validateFlowYamlCard` 先用 `isGovernanceFlowId` 显式校验——非法候选（如 `docs/flows/flow-.yaml`）
+ * 必须被拒绝该卡，不得因路径不匹配而被静默跳过、绕过 YAML 校验。
+ */
+const FLOW_YAML_PATH_RE = /^docs\/flows\/([^/\\]+)\.(?:yaml|yml)$/;
 
+/** 从声明路径中宽捕获 Flow YAML 候选（合法性由 `validateFlowYamlCard` 显式校验，不在此过滤）。 */
 function flowYamlTargetsOf(paths: readonly string[]): Array<{ rel: string; flowId: string }> {
   const targets: Array<{ rel: string; flowId: string }> = [];
   const seen = new Set<string>();
@@ -1795,40 +1932,27 @@ function flowYamlTargetsOf(paths: readonly string[]): Array<{ rel: string; flowI
 }
 
 /**
- * 2026-10-20 真机：治理角色的写卡确认可能漏带 `cardKind`（Convener 写治理记录卡），导致
- * `judgeContext` 不计算、桌面直接呈现客户卡。这里按角色 + **已声明路径**做保守兜底：
- *   · Convener：**全部**声明路径都是 `docs/flows/<flowId>.yaml|yml` ⇒ `schedule-write`；否则 `write`；
- *   · Rapporteur / Verifier ⇒ `write`；
- *   · Nominator：**全部**声明路径都在 `角色卡/<id>/` 下 ⇒ `appointment-write`；否则 `write`；
- *   · 其他内置角色（Liaison 等）不猜；choice 卡不兜底。
- * 显式 `cardKind` 永远优先；无声明路径（preview/req.paths 都提取不到）也不兜底。
- */
-function defaultGovernanceConfirmCardKind(
-  roleId: BuiltInGovernanceRoleSpec["id"],
-  declaredPaths: readonly string[],
-): GovernanceCardKind | undefined {
-  if (declaredPaths.length === 0) return undefined;
-  switch (roleId) {
-    case "convener":
-      return declaredPaths.every((rel) => FLOW_YAML_PATH_RE.test(rel)) ? "schedule-write" : "write";
-    case "rapporteur":
-    case "verifier":
-      return "write";
-    case "nominator":
-      return declaredPaths.every((rel) => /^角色卡\/[^/]+\//.test(rel)) ? "appointment-write" : "write";
-    default:
-      return undefined;
-  }
-}
-
-/**
  * 2026-10-20 真机 bookmank op-1：Lead 的 `request_choice`（intent-confirm）漏带 cardKind ⇒ 无 judge 事件。
  * choice 卡的**角色默认**（仅当该 kind 在该角色 `TRIO_CARD_KINDS` 白名单内才生效）：
  *   liaison → intent-confirm（选项须含 confirm）；rapporteur → proposal（须含 accept）；
- *   nominator → appointment（选项为角色 id，不额外限定）；verifier → acceptance（须含 accept）；
- *   convener 不默认（choice 卡类型不明确）；其他/项目角色不猜。
+ *   convener → appointment（2026-10-22 第 1 项：选项为**角色 id**、不含治理卡保留选项时视为任命形状）；
+ *   nominator → 不默认（Crew 只写卡，不再发任命卡）；verifier → acceptance（须含 accept）；
+ *   其他/项目角色不猜。
  * 选项形状守卫避免把「普通选择卡」误判为治理决定卡（沿用旧行为）。
  */
+const APPOINTMENT_RESERVED_OPTION_IDS: ReadonlySet<string> = new Set([
+  "accept",
+  "accept-quick",
+  "revise",
+  "reject",
+  "confirm",
+]);
+
+/** 任命形状：非空选项、且不含任何治理卡保留选项 id（角色 id 列表）。 */
+function looksLikeAppointmentChoice(optionIds: readonly string[]): boolean {
+  return optionIds.length > 0 && optionIds.every((id) => !APPOINTMENT_RESERVED_OPTION_IDS.has(id));
+}
+
 function defaultGovernanceChoiceCardKind(
   roleId: BuiltInGovernanceRoleSpec["id"],
   optionIds: readonly string[],
@@ -1839,8 +1963,10 @@ function defaultGovernanceChoiceCardKind(
       return has("confirm") ? "intent-confirm" : undefined;
     case "rapporteur":
       return has("accept") ? "proposal" : undefined;
+    case "convener":
+      return looksLikeAppointmentChoice(optionIds) ? "appointment" : undefined;
     case "nominator":
-      return "appointment";
+      return undefined;
     case "verifier":
       return has("accept") ? "acceptance" : undefined;
     default:
@@ -1891,6 +2017,8 @@ function flowYamlBodyFromPreview(preview: string | undefined, rel: string): stri
 /**
  * 确认卡的 Flow YAML 写前校验（**确定性**，不调用模型）：
  *   · 仅当声明路径含 `docs/flows/<flowId>.yaml`（或 `.yml`）时生效；
+ *   · 文件名候选先按 `isGovernanceFlowId` 校验：**非空但不合法 ⇒ 拒绝该卡**（明确写出候选值与
+ *     现行规则），不得因路径正则不匹配而静默跳过 YAML 校验（2026-10-22 slug 收紧，设计 §3.4）；
  *   · 卡片 flowId（若有）必须与文件名一致；
  *   · preview 必须能提取出 YAML 正文，且 `parseFlowStateYaml` 全部通过。
  * 返回 `undefined` = 通过；否则返回给模型/Steward 的具体错误文案（含每条 path + reason）。
@@ -1906,6 +2034,14 @@ function validateFlowYamlCard(
 
   const failures: string[] = [];
   for (const target of targets) {
+    if (!isGovernanceFlowId(target.flowId)) {
+      failures.push(
+        `${target.rel}: 文件名 flowId「${target.flowId}」不是合法 slug` +
+          `（须匹配 ${GOVERNANCE_SLUG_PATTERN}；2–64 位、首尾小写字母/数字、禁止首尾连字符）；` +
+          "拒绝该卡（不得跳过 YAML 校验）",
+      );
+      continue;
+    }
     if (cardFlowId !== undefined && cardFlowId !== target.flowId) {
       failures.push(`${target.rel}: 卡片 flowId="${cardFlowId}" 与文件名 flowId="${target.flowId}" 不一致`);
       continue;
@@ -1933,9 +2069,177 @@ function validateFlowYamlCard(
 }
 
 /**
- * 同一会话内的治理操作串行链（W6-A）：交接「每轮一次/去重」与澄清「两轮上限」的机械判定依赖
- * 「前一次已落账」；模型可能同轮并行发起多次工具调用，故按会话串行执行（前一条失败不影响后一条）。
+ * 团队计划角色表校验（单一实现 = `common/编排/team-plan.ts`）：
+ *   · legacy（缺省/`teamPlanSchema: 1`）⇒ 只跑既有 v1 表格检查（推荐角色职责/能力/写集/依赖非空）；
+ *   · v2 ⇒ V1–V10 的 error 条目（warning/exception-review 不阻断发卡）。
+ * 只做确定性表格/结构解析，不做语义判断（语义由 Convener readiness 复核）。
  */
+function teamPlanRoleRowIssues(text: string, recommended: readonly string[]): string[] {
+  const plan = parseTeamPlan(text);
+  if (plan.legacy) return legacyTeamPlanRoleRowIssues(text, recommended);
+  return teamPlanIssueMessages(plan);
+}
+
+/**
+ * **团队计划卡前守卫**（2026-10-22 治理分工第 1 项；方案 §5.3「应用在呈现卡之前的确定性守卫」）。
+ *
+ * 只在 Convener 发 `request_choice(cardKind=appointment)` 时生效；六项校验全部通过才允许触达客户：
+ *   1. flowId 合法（调用方已判定；此处再验）；
+ *   2. 团队计划存在且可读（`docs/scheduling/<flowId>-team-vN.md`，取最新版本）；
+ *   3. 计划 frontmatter `flowId` 与卡片一致；
+ *   4. `recommended` 非空、无重复、不含内置治理角色（复用 `parseRecommendedRoleIds`，空集不静默接受）；
+ *   5. 卡片选项覆盖 recommended 且不含内置治理角色；
+ *   6. 计划含每个推荐角色的职责目标/能力要求/写集/依赖行。
+ * 失败 ⇒ 调用方**不生成客户卡、不镜像、不调判断、不写账本、不占 pending**，把具体问题退回 Convener。
+ */
+async function validateConvenerAppointmentCard(args: {
+  projectRoot: string;
+  flowId: string;
+  req: CustomerInputRequest;
+}): Promise<
+  | { ok: true; teamPlanPath: string; teamPlanSchema: 1 | 2; modules: string[] }
+  | { ok: false; reason: string }
+> {
+  if (args.req.kind !== "choice") {
+    return { ok: false, reason: "任命卡必须是 request_choice（choice）卡；本次未向客户发卡。" };
+  }
+  const plan = await latestVersionedArtifact(args.projectRoot, "docs/scheduling", args.flowId, "team");
+  if (plan === undefined) {
+    return {
+      ok: false,
+      reason:
+        `团队计划缺失：docs/scheduling/${args.flowId}-team-vN.md 不存在；` +
+        "请先写出团队计划（含 flowId/version/riskTier/推荐集与角色行）再发任命卡。本次未向客户发卡、未写账本。",
+    };
+  }
+  let text: string;
+  try {
+    text = await readFile(path.join(args.projectRoot, ...plan.relPath.split("/")), "utf8");
+  } catch {
+    return {
+      ok: false,
+      reason: `团队计划不可读：${plan.relPath}；请修正后重发任命卡。本次未向客户发卡、未写账本。`,
+    };
+  }
+  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
+  const flowIdMatch = frontmatter === null ? null : /^\s*flowId\s*:\s*(.+?)\s*$/m.exec(frontmatter[1]!);
+  const frontmatterFlowId = flowIdMatch === null ? undefined : flowIdMatch[1]!.trim().replace(/^["'`]|["'`]$/g, "");
+  if (frontmatterFlowId === undefined) {
+    return {
+      ok: false,
+      reason: `团队计划 ${plan.relPath} 缺少 frontmatter flowId；请补齐后重发任命卡。本次未向客户发卡、未写账本。`,
+    };
+  }
+  if (frontmatterFlowId !== args.flowId) {
+    return {
+      ok: false,
+      reason:
+        `团队计划 ${plan.relPath} 的 flowId="${frontmatterFlowId}" 与卡片 flowId="${args.flowId}" 不一致；` +
+        "请修正计划或卡片后重发。本次未向客户发卡、未写账本。",
+    };
+  }
+
+  const recommended = parseRecommendedRoleIds(text);
+  if (recommended === undefined || recommended.length === 0) {
+    return {
+      ok: false,
+      reason:
+        `团队计划 ${plan.relPath} 缺少唯一的机器可读推荐集（须为 frontmatter 内联数组 ` +
+        "`recommended: [role-a, role-b]` 或固定行「推荐：role-a、role-b」；空集/重复/歧义不接受）。" +
+        "本次未向客户发卡、未写账本。",
+    };
+  }
+  const builtInRecommended = recommended.filter((id) => isBuiltInGovernanceRoleId(id));
+  if (builtInRecommended.length > 0) {
+    return {
+      ok: false,
+      reason:
+        `团队计划 ${plan.relPath} 的推荐集含内置治理角色（${builtInRecommended.join("、")}）；` +
+        "任命卡只能任命项目角色。本次未向客户发卡、未写账本。",
+    };
+  }
+
+  const optionIds = args.req.options.map((option) => option.id);
+  const missingOptions = recommended.filter((id) => !optionIds.includes(id));
+  if (missingOptions.length > 0) {
+    return {
+      ok: false,
+      reason:
+        `任命卡选项未覆盖团队计划推荐集（缺：${missingOptions.join("、")}）；` +
+        "请让卡选项与推荐集一致后重发。本次未向客户发卡、未写账本。",
+    };
+  }
+  const builtInOptions = optionIds.filter((id) => isBuiltInGovernanceRoleId(id));
+  if (builtInOptions.length > 0) {
+    return {
+      ok: false,
+      reason:
+        `任命卡选项含内置治理角色（${builtInOptions.join("、")}）；任命卡不得包含内置治理角色。` +
+        "本次未向客户发卡、未写账本。",
+    };
+  }
+
+  const rowIssues = teamPlanRoleRowIssues(text, recommended);
+  if (rowIssues.length > 0) {
+    return {
+      ok: false,
+      reason: `团队计划 ${plan.relPath} 不完整：${rowIssues.join("；")}。本次未向客户发卡、未写账本。`,
+    };
+  }
+
+  // 2026-10-22 角色粒度/MapReduce（Q9 A）：v2 计划同时做 V11（flow 已写时）的一致性核对。
+  const planParse = parseTeamPlan(text, { flowId: args.flowId });
+  if (!planParse.legacy) {
+    if (!planParse.ok) {
+      return {
+        ok: false,
+        reason:
+          `团队计划 ${plan.relPath} 不完整：${teamPlanIssueMessages(planParse).join("；")}。` +
+          "本次未向客户发卡、未写账本。",
+      };
+    }
+    const flowIssues = await teamPlanFlowConsistencyIssues(args.projectRoot, args.flowId, planParse);
+    if (flowIssues.length > 0) {
+      return {
+        ok: false,
+        reason:
+          `团队计划 ${plan.relPath} 与流程不一致：${flowIssues.join("；")}。` +
+          "本次未向客户发卡、未写账本。",
+      };
+    }
+  }
+  return {
+    ok: true,
+    teamPlanPath: plan.relPath,
+    teamPlanSchema: planParse.teamPlanSchema,
+    modules: planParse.modules,
+  };
+}
+
+/**
+ * V11（flow-plan 一致性）：**仅在 `docs/flows/<flowId>.yaml` 已写时**执行。
+ * YAML 不可读（非 ENOENT）或校验失败 ⇒ fail-closed（不弹卡）；仅旧 `.md` 视图 ⇒ 跳过（迁移兼容）。
+ * 返回可读问题列表（空 = 一致/无需检查）。
+ */
+async function teamPlanFlowConsistencyIssues(
+  projectRoot: string,
+  flowId: string,
+  plan: TeamPlanParseResult,
+): Promise<string[]> {
+  const rel = `docs/flows/${flowId}.yaml`;
+  let text: string;
+  try {
+    text = await readFile(path.join(projectRoot, ...rel.split("/")), "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    return [`流程状态 ${rel} 不可读`];
+  }
+  const parsed = parseFlowStateYaml(text, flowId);
+  if (!parsed.ok) return [`流程 YAML 校验失败：${parsed.error}`];
+  return validateTeamPlanFlowConsistency(plan, parsed.flow).map((issue) => issue.message);
+}
+
+
 function serializeGovernanceTask<T>(
   state: { chain: Promise<void> },
   task: () => Promise<T>,
@@ -1954,11 +2258,30 @@ const TRIO_CARD_KINDS: Record<BuiltInGovernanceRoleSpec["id"], readonly Governan
   // `intent-confirm` 需求确认卡（判断 agent 永不介入）；其它治理卡仍结构性拒绝。
   liaison: ["intent-confirm"],
   rapporteur: ["proposal", "write"],
-  nominator: ["appointment", "appointment-write", "write"],
-  convener: ["schedule-write", "write"],
+  // 2026-10-22 第 1 项：Crew（Nominator）只按客户任命的团队计划写卡，不再发 appointment 卡；
+  // `appointment-write`（写角色卡/边界）保留。
+  nominator: ["appointment-write", "write"],
+  // 2026-10-22 第 1 项：Convener（Steward/统筹）依团队计划发起 appointment 卡。
+  convener: ["appointment", "schedule-write", "write"],
   // 验收权归 Proof / 验收（verifier）；Draft / 提案不再发 acceptance。
   verifier: ["acceptance", "write"],
 };
+
+/**
+ * `request_confirmation` 的**工具级** cardKind 枚举（与运行时核心 `CONFIRM_CARD_KINDS` 同值）。
+ * 本地只用于在拒绝文案里给出「本角色允许的确认卡 kind」——TRIO_CARD_KINDS 同时混有 choice 类，
+ * 直接列出会把 `proposal`/`acceptance` 等误报成可确认卡种。
+ */
+const GOVERNANCE_CONFIRM_CARD_KINDS: readonly GovernanceCardKind[] = [
+  "write",
+  "appointment-write",
+  "schedule-write",
+];
+
+/** 某内置治理角色允许的**确认卡** kinds（工具枚举 ∩ `TRIO_CARD_KINDS`，按设计 §4.2 表序；liaison 为空）。 */
+function confirmCardKindsOf(roleId: BuiltInGovernanceRoleSpec["id"]): readonly GovernanceCardKind[] {
+  return GOVERNANCE_CONFIRM_CARD_KINDS.filter((kind) => TRIO_CARD_KINDS[roleId].includes(kind));
+}
 
 /** 账本条目签名（本会话内存合并去重用；只比较能唯一识别一次决定/事件的字段）。 */
 function ledgerEntrySignature(entry: GovernanceLedgerEntry): string {
@@ -2130,6 +2453,8 @@ async function recordCustomerDecision(args: {
     flowId,
     ...(isGovernanceFlowId(stepId) ? { stepId } : {}),
     actorRoleId: args.roleId,
+    // 2026-10-22 第 1 项（行为变化）：appointment 由 Convener 发起 ⇒ power=schedule（发起角色职能）；
+    // 旧 Nominator 发起的存量决定仍为 nomination。验收决定仍固定 acceptance。
     power: cardKind === "acceptance" ? "acceptance" : args.function,
     ...(classification.decisionKind !== undefined
       ? { decisionKind: classification.decisionKind }
@@ -2189,9 +2514,17 @@ async function findDecisionArtifact(
   let version: number | undefined;
 
   if (entry.decisionKind === "appointment") {
-    const latest = await latestVersionedArtifact(projectRoot, "docs/nominations", entry.flowId);
-    candidate = latest?.relPath;
-    version = latest?.version;
+    // 2026-10-22 第 1 项：appointment 决定绑定**团队计划** `docs/scheduling/<flowId>-team-vN.md`；
+    // 仅旧流程（O4）在没有团队计划时回落 legacy 提名文件（绝不猜其它目录）。
+    const teamPlan = await latestVersionedArtifact(projectRoot, "docs/scheduling", entry.flowId, "team");
+    if (teamPlan !== undefined) {
+      candidate = teamPlan.relPath;
+      version = teamPlan.version;
+    } else {
+      const legacy = await latestVersionedArtifact(projectRoot, "docs/nominations", entry.flowId);
+      candidate = legacy?.relPath;
+      version = legacy?.version;
+    }
   } else if (entry.decisionKind === "schedule-write") {
     // 2026-10-19 Flow YAML 契约：机器状态 = docs/flows/<flowId>.yaml；旧版 .md 仅迁移兼容。
     if (entry.flowId !== undefined) {
@@ -2227,11 +2560,19 @@ async function findDecisionArtifact(
   }
 }
 
-/** 在 `docs/proposals|nominations` 中找 `<flowId>-v<N>.md` 的最高版本。 */
+/**
+ * 在给定目录中找最高版本物证：
+ *   · `variant:"default"`（`docs/proposals|nominations`）：`<flowId>-v<N>.md` 与
+ *     `<flowId>.proposal-vN.md` / `<flowId>.nomination-vN.md`；
+ *   · `variant:"team"`（`docs/scheduling`）：`<flowId>-team-v<N>.md`（2026-10-22 团队计划）；
+ *   · `variant:"criteria"|"report"`（`docs/acceptance`）与 `"change"`（`docs/scheduling`）：
+ *     `<flowId>-criteria-vN.md` / `<flowId>-report-vN.md` / `<flowId>-change-vN.md`（2026-10-22 第 3 项）。
+ */
 async function latestVersionedArtifact(
   projectRoot: string,
   dirRel: string,
   flowId: string | undefined,
+  variant: "default" | "team" | "criteria" | "report" | "change" = "default",
 ): Promise<{ relPath: string; version: number } | undefined> {
   if (!isGovernanceFlowId(flowId)) return undefined;
   let names: string[];
@@ -2242,8 +2583,13 @@ async function latestVersionedArtifact(
   }
   // 容忍实际命名（2026-10-18 真机）：`<flowId>-vN.md` 与 `<flowId>.proposal-vN.md` /
   // `<flowId>.nomination-vN.md` 都按同一 flow 的最新版本解析（取最大 N）。
+  // 2026-10-22：`variant:"team"` 匹配 `docs/scheduling/<flowId>-team-vN.md`（版本扫描扩展）；
+  // criteria/report/change 分别匹配 `<flowId>-<kind>-vN.md`。
   const escaped = flowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`^${escaped}(?:\\.(?:proposal|nomination))?-v(\\d+)\\.md$`);
+  const suffix = variant === "default" ? "" : `-${variant}`;
+  const pattern = variant === "default"
+    ? new RegExp(`^${escaped}(?:\\.(?:proposal|nomination))?-v(\\d+)\\.md$`)
+    : new RegExp(`^${escaped}${suffix}-v(\\d+)\\.md$`);
   let best: { name: string; version: number } | undefined;
   for (const name of names) {
     const match = pattern.exec(name);
@@ -2275,7 +2621,14 @@ async function judgeArtifactsForCard(args: {
   governanceFunction: GovernanceFunction;
 }): Promise<NonNullable<GovernanceJudgeContext["artifacts"]>> {
   const proposal = await latestVersionedArtifact(args.projectRoot, "docs/proposals", args.flowId);
+  /** legacy：旧提名文件（仅旧流程 O4 过渡回落；新流程不再产生）。 */
   const nomination = await latestVersionedArtifact(args.projectRoot, "docs/nominations", args.flowId);
+  // 2026-10-22 第 1 项：团队计划 `docs/scheduling/<flowId>-team-vN.md`（取最新版本）。
+  const teamPlan = await latestVersionedArtifact(args.projectRoot, "docs/scheduling", args.flowId, "team");
+  // 2026-10-22 第 3 项：验收标准/报告/变更包（取最新版本）。
+  const criteria = await latestVersionedArtifact(args.projectRoot, "docs/acceptance", args.flowId, "criteria");
+  const report = await latestVersionedArtifact(args.projectRoot, "docs/acceptance", args.flowId, "report");
+  const changePackage = await latestVersionedArtifact(args.projectRoot, "docs/scheduling", args.flowId, "change");
   // 2026-10-19 Flow YAML 契约：优先机器状态 `.yaml`；旧版 `.md` 仅人读视图/迁移兼容。
   const flowYamlRel = `docs/flows/${args.flowId}.yaml`;
   const flowMdRel = `docs/flows/${args.flowId}.md`;
@@ -2287,12 +2640,15 @@ async function judgeArtifactsForCard(args: {
 
   const proposalPath = proposal?.relPath;
   const nominationPath = nomination?.relPath;
+  const teamPlanPath = teamPlan?.relPath;
   const flowPath = flowRel;
 
   const only = (pathValue: string | undefined): NonNullable<GovernanceJudgeContext["artifacts"]> =>
     pathValue !== undefined ? { proposalPath: pathValue } : {};
   const onlyNomination = (pathValue: string | undefined): NonNullable<GovernanceJudgeContext["artifacts"]> =>
     pathValue !== undefined ? { nominationPath: pathValue } : {};
+  const onlyTeamPlan = (pathValue: string | undefined): NonNullable<GovernanceJudgeContext["artifacts"]> =>
+    pathValue !== undefined ? { teamPlanPath: pathValue } : {};
   const onlyFlow = (pathValue: string | undefined): NonNullable<GovernanceJudgeContext["artifacts"]> =>
     pathValue !== undefined ? { flowPath: pathValue } : {};
 
@@ -2300,11 +2656,21 @@ async function judgeArtifactsForCard(args: {
     case "proposal":
       return only(proposalPath);
     case "appointment":
-      return onlyNomination(nominationPath);
+      // 团队计划优先；仅旧流程在没有团队计划时回落 legacy 提名文件（O4）。
+      return teamPlanPath !== undefined ? onlyTeamPlan(teamPlanPath) : onlyNomination(nominationPath);
     case "acceptance":
-      return { ...only(proposalPath), ...onlyFlow(flowPath) };
+      return {
+        ...only(proposalPath),
+        ...onlyFlow(flowPath),
+        ...(criteria?.relPath !== undefined ? { acceptanceCriteriaPath: criteria.relPath } : {}),
+        ...(report?.relPath !== undefined ? { acceptanceReportPath: report.relPath } : {}),
+        ...(changePackage?.relPath !== undefined ? { changePackagePath: changePackage.relPath } : {}),
+      };
     case "appointment-write":
-      return { ...onlyNomination(nominationPath), ...onlyFlow(flowPath) };
+      return {
+        ...(teamPlanPath !== undefined ? onlyTeamPlan(teamPlanPath) : onlyNomination(nominationPath)),
+        ...onlyFlow(flowPath),
+      };
     case "schedule-write":
       return onlyFlow(flowPath);
     case "write":
@@ -2315,23 +2681,39 @@ async function judgeArtifactsForCard(args: {
         case "nomination":
           return onlyNomination(nominationPath);
         case "schedule":
-          return onlyFlow(flowPath);
+          // Convener 的 write（团队计划/readiness/变更包/治理记录）：可选带 teamPlan（若已存在）。
+          return { ...onlyFlow(flowPath), ...onlyTeamPlan(teamPlanPath) };
+        case "verification":
+          // Verifier 的 write（标准/报告）：可选带变更包与标准（若已存在），供判断核对档位。
+          return {
+            ...(changePackage?.relPath !== undefined ? { changePackagePath: changePackage.relPath } : {}),
+            ...(criteria?.relPath !== undefined ? { acceptanceCriteriaPath: criteria.relPath } : {}),
+          };
         default:
           return {};
       }
     default:
       return {
         ...only(proposalPath),
-        ...onlyNomination(nominationPath),
+        ...(teamPlanPath !== undefined ? onlyTeamPlan(teamPlanPath) : onlyNomination(nominationPath)),
         ...onlyFlow(flowPath),
       };
   }
+}
+
+/** 变更包 frontmatter 的 riskTier（T0–T3）；缺失/非法 ⇒ undefined（不猜）。 */
+function changePackageRiskTier(text: string): "T0" | "T1" | "T2" | "T3" | undefined {
+  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
+  if (frontmatter === null) return undefined;
+  const match = /^\s*riskTier\s*:\s*(T[0-3])\s*$/m.exec(frontmatter[1]!);
+  return match === null ? undefined : (match[1] as "T0" | "T1" | "T2" | "T3");
 }
 
 /**
  * `judgeContext` 的唯一计算点（2026-10-18 双开关评审 §5.2/§5.4）：
  * paths/pathProbes（只取 preview 的**声明写入路径**；与散文无关，`resolveWrite` 机械探测）、
  * 写根/禁写、规范物证、推荐集、账本事实。桌面只消费，不重算、不读 `.ans`。
+ * 2026-10-22：推荐集从**团队计划**解析（legacy 提名回落）；acceptance 暴露变更包档位 `facts.riskTier`。
  */
 async function computeJudgeContext(args: {
   projectRoot: string;
@@ -2368,13 +2750,36 @@ async function computeJudgeContext(args: {
   });
   if (Object.keys(artifacts).length > 0) context.artifacts = artifacts;
 
-  if (cardKind === "appointment" && artifacts.nominationPath !== undefined) {
+  if (cardKind === "appointment") {
+    // 2026-10-22 第 1 项：推荐集来源改为**团队计划**（legacy 提名仅旧流程回落，O4）。
+    const planPath = artifacts.teamPlanPath ?? artifacts.nominationPath;
+    if (planPath !== undefined) {
+      try {
+        const text = await readFile(path.join(args.projectRoot, ...planPath.split("/")), "utf8");
+        const recommended = parseRecommendedRoleIds(text);
+        if (recommended !== undefined) context.recommendedRoleIds = recommended;
+        // 2026-10-22 角色粒度/MapReduce：把团队计划 schema/模块摘要放进 facts（可选；不新增 artifact kind）。
+        // 只是机器摘要，**不**代表应用已做粒度语义判断（语义复核仍在 Convener readiness）。
+        const parsedPlan = parseTeamPlan(text);
+        const boundedModules = parsedPlan.modules.slice(0, 20).map((module) => module.slice(0, 64));
+        context.facts = {
+          ...context.facts,
+          teamPlanSchema: parsedPlan.teamPlanSchema,
+          ...(boundedModules.length > 0 ? { teamPlanModules: boundedModules } : {}),
+        };
+      } catch {
+        // 团队计划不可读 ⇒ 不提供推荐集（driver 回落 manual/insufficient-evidence）。
+      }
+    }
+  }
+  if (cardKind === "acceptance" && artifacts.changePackagePath !== undefined) {
+    // 2026-10-22 第 3 项：把变更包档位放进 facts（判断/报告核对档位用；不采信模型自报）。
     try {
-      const text = await readFile(path.join(args.projectRoot, ...artifacts.nominationPath.split("/")), "utf8");
-      const recommended = parseRecommendedRoleIds(text);
-      if (recommended !== undefined) context.recommendedRoleIds = recommended;
+      const text = await readFile(path.join(args.projectRoot, ...artifacts.changePackagePath.split("/")), "utf8");
+      const tier = changePackageRiskTier(text);
+      if (tier !== undefined) context.facts = { ...context.facts, riskTier: tier };
     } catch {
-      // 提名文件不可读 ⇒ 不提供推荐集（driver 回落 manual/insufficient-evidence）。
+      // 不可读 ⇒ 不提供档位（driver 按缺失证据回落 manual）。
     }
   }
 

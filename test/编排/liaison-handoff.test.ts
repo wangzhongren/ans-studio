@@ -14,12 +14,14 @@ import { join } from "node:path";
 
 import {
   CLARIFICATION_MAX_ROUNDS,
+  GOVERNANCE_SLUG_PATTERN,
   countClarificationRounds,
   intentHandoffDedupeKey,
   parseIntentFrontmatter,
   validateIntentHandoff,
   type IntentHandoffValidationInput,
 } from "../../src/common/编排/governance-handoff.ts";
+import { GOVERNANCE_SLUG_PATTERN as GOVERNANCE_SLUG_PATTERN_SOURCE } from "../../src/model/runtime.ts";
 import {
   appendGovernanceLedger,
   flushGovernanceLedger,
@@ -515,5 +517,53 @@ test("澄清轮次：按 flowId（无则 intentId）计数；账本坏 → fail-
     const broken = await countClarificationRounds(root, { flowId: FLOW_ID });
     assert.equal(broken.ok, false);
     if (!broken.ok) assert.match(broken.message, /拒绝提交/);
+  });
+});
+
+test("slug 收紧（S2/T6）：导出仍是 RegExp 且由 Model 常量构造；尾连字符显式拒绝、文件旧值不静默", async () => {
+  // 导出形状兼容：仍是 RegExp，源文本与 Model 共享常量一致（单一来源）。
+  assert.equal(GOVERNANCE_SLUG_PATTERN instanceof RegExp, true);
+  assert.equal(String(GOVERNANCE_SLUG_PATTERN), String(new RegExp(GOVERNANCE_SLUG_PATTERN_SOURCE)));
+  assert.equal(GOVERNANCE_SLUG_PATTERN.test("flow-a"), true);
+  assert.equal(GOVERNANCE_SLUG_PATTERN.test("a--b"), true);
+  assert.equal(GOVERNANCE_SLUG_PATTERN.test("flow-"), false);
+  assert.equal(GOVERNANCE_SLUG_PATTERN.test("a-"), false);
+
+  await withRoot(async (root) => {
+    // 入参 intentId 尾连字符 ⇒ invalid-intent-id，点名字段并展示新正则。
+    const badIntent = await validateIntentHandoff(baseInput(root, { intentId: "intent-" }));
+    assert.equal(badIntent.ok, false);
+    if (!badIntent.ok) {
+      assert.equal(badIntent.code, "invalid-intent-id");
+      assert.match(badIntent.message, /intentId「intent-」/);
+      assert.match(badIntent.message, /0,62/);
+    }
+
+    // 入参 flowId 尾连字符 ⇒ invalid-flow-id。
+    const badFlow = await validateIntentHandoff(baseInput(root, { flowId: "flow-" }));
+    assert.equal(badFlow.ok, false);
+    if (!badFlow.ok) {
+      assert.equal(badFlow.code, "invalid-flow-id");
+      assert.match(badFlow.message, /flowId「flow-」/);
+      assert.match(badFlow.message, /0,62/);
+    }
+
+    // 意图文件 frontmatter 非空非法 flowId：显式 invalid-flow-id，不得静默当作缺席。
+    writeIntent(root, { flowId: "flow-" });
+    await seedIntentConfirm(root);
+    const badFileFlow = await validateIntentHandoff(baseInput(root, { flowId: undefined }));
+    assert.equal(badFileFlow.ok, false);
+    if (!badFileFlow.ok) {
+      assert.equal(badFileFlow.code, "invalid-flow-id");
+      assert.match(badFileFlow.message, /意图文件 flowId「flow-」/);
+      assert.match(badFileFlow.message, /不得静默当作缺席/);
+    }
+
+    // 旧合法值零回归（含连续连字符）：文件与入参一致 + 客户已确认 ⇒ 放行。
+    writeIntent(root, { flowId: "a--b" });
+    await seedIntentConfirm(root, { flowId: "a--b" });
+    const legal = await validateIntentHandoff(baseInput(root, { flowId: "a--b" }));
+    assert.equal(legal.ok, true);
+    if (legal.ok) assert.equal(legal.flowId, "a--b");
   });
 });

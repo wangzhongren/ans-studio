@@ -1,5 +1,30 @@
 # 门禁引擎公开接口：角色协作组摘要
 
+## 角色粒度（bounded context）与 MapReduce 卡文本增量（2026-10-22）
+
+Map A「角色粒度与 MapReduce 并行测试」中，本角色只改 `governance-roles.ts` 的三张内置治理角色卡文本（产品数据），**不改导出函数名、类型、注册表写权、能力位与工程基线文本**。
+
+- `CONVENER_CARD_TEXT`（Steward / 统筹）：要求团队计划 v2——frontmatter `teamPlanSchema: 2`、`modules` 同行内联数组（ASCII slug、不含 `reduce`）、正文「模块清单」表（module/职责/公开契约/架构来源，恰好覆盖 modules）；14 列角色表（`roleId | 类型 | module | 职责目标 | 能力要求 | 唯一写集 | 公开契约 | 测试面 | 依赖 | dependsOn | 并行组 | 组别 | apiSpec | 粒度理由`）；一个模块一个 Map 角色、Reduce 角色 `module: reduce`；写集精确且跨角色两两不相交、不写治理路径/他人角色卡；dependsOn 目标存在、无自依赖/重复/环、同 `map-*` 组无依赖路径、Map 不依赖 Reduce、Reduce 覆盖全部 Map；整层名/多模块无 `粒度理由` 拒发卡，有理由标 `exception-review` 交 readiness 批准；单文件/极小模块 warning；明确「字段齐全」≠「粒度正确」。readiness 记录 `docs/scheduling/<flowId>-readiness-v1.md` 增加 `module`/`contract`/`testSurface`/`parallel`/`dependsOn`/`granularity` 列与 `status: pass|gaps`。flow 模板增加 `delivery-<module>` Map 交付、可选 `parallelGroup`/`dependsOn`、`contract-freeze` 入口与 Reduce 分片/集成步骤；dispatch 要求前置全部 `status: done`；**不新增 `FlowStepKind`**，旧 flow 不填新字段行为逐字不变。
+- `NOMINATOR_CARD_TEXT`（Crew / 组队）：按 v2 团队计划读取 module/公开契约/测试面/`dependsOn`/并行组/粒度理由；角色卡写 bounded context、公开契约、测试面、上下游依赖与粒度理由；`boundary.yaml` 按计划唯一写集逐条精确落盘；禁止整层角色与纳米角色；计划缺 module/契约/测试面/依赖/粒度/写集时只报告 Steward / 统筹，不自行补计划。沿用 2026-10-22 已落地边界：不选角色、不发 appointment、不写 `docs/nominations/`。
+- `VERIFIER_CARD_TEXT`（Proof / 验收，可选补充）：核对团队计划 v2 的模块覆盖/并行组/`dependsOn`、Reduce manifest 与每个 Map 分片原始日志；manifest 是索引、不替代原始证据，缺失/失效判 insufficient evidence；**真实启动/应用演示基线不变**。
+
+不变项（逐项有测试钉住）：`BUILT_IN_GOVERNANCE_ROLES` 的 entries/forbidden/preauthorized、`GovernanceCapabilities` 能力位、内部 id/显示名/`GovernanceFunction`、`ENGINEERING_QUALITY_BASELINE` 文本、`appGovernanceBoundary` 四项与所有导出签名；未新增 `cardKind`/`FlowStepKind`/`GovernancePower`/`GovernanceDecisionKind`。
+
+检查证据：定向 `node --test test/门禁引擎/governance-trio.test.ts test/门禁引擎/governance-standard-workflow.test.ts` = **60 计 / 60 过 / 0 失败 / 0 skip / exit 0**；`node --test "test/门禁引擎/**/*.test.ts"` = **313 计 / 312 过 / 0 失败 / 1 Windows 既有 skip / exit 0**；`npm run typecheck` exit 0。状态 `implemented-unverified`。写权/注册表未变的前后对照与候选哈希见[变更记录](docs/change/2026-10-22_change_role-granularity-parallel-testing.md)。
+
+## 治理分工第 1/3/5 项（2026-10-22）：内置角色写权与卡文本增量
+
+客户确认治理分工第 1/3/5 项（闸门 2 + 实施授权）后，本角色在 `governance-roles.ts` 调整内置治理角色的卡文本与注册表数据面（导出函数名、类型与签名不变）：
+
+- `nominator`（Crew / 组队）：不再提名、不再发 appointment 卡、不写 `docs/nominations/`；改为读取客户确认后的团队计划，按任命名单写 `角色卡/**` 与工作文档。`entries` 与 `preauthorizedDirs` 移除 `docs/nominations/`，`forbiddenWritePaths` 增加 `docs/scheduling/`；第 5 项内容清单写入卡文本。
+- `convener`（Steward / 统筹）：`entries` 与 `preauthorizedDirs` 增加 `docs/scheduling/`（团队计划 / readiness / 变更包）；卡文本允许 `request_choice(cardKind=appointment)`（仅此一种治理选择卡），保留 `角色卡/**` 禁写。
+- `verifier`（Proof / 验收）：`entries` 与 `preauthorizedDirs` 增加 `docs/acceptance/`（实施前标准与验收报告）；`docs/verification/` 仍为详细证据附件。
+- `liaison` / `rapporteur`：写权与能力不变；五张卡的治理文件命名段增加团队计划路径，`docs/nominations/` 标为 legacy（只读历史/过渡）。
+- `LIAISON_WRITE_OWNER_HINTS`：增加 `docs/scheduling/`→Steward / 统筹、`docs/acceptance/`→Proof / 验收；Crew 提示移除 nominations；legacy nominations 不再指引 Crew。
+- 不变：内部 id / 显示名 / `GovernanceFunction` 值、能力位、`ENGINEERING_QUALITY_BASELINE` 文本、导出函数签名、`appGovernanceBoundary` 四项。
+
+写权前后对照、测试命令与候选哈希见[变更记录](docs/change/2026-10-22_change_governance-split-1-3-5-roles.md)；状态 `implemented-unverified`。
+
 ## D3 轻量权限修复增量（2026-10-21）
 
 `resolveWrite(targetPath, boundary, scope, ctx): WriteDecision` 签名及公共类型不变。输入和真实目标按同一 project/skill 根的边界、条件与任务写集分别授权；真实目标拒绝附输入路径与真实相对路径，不自动补发写权。输入命中的 `matchedEntry` 保持返回；正常无链接路径及既有 F4/F6 首句保持。

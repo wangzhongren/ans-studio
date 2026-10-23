@@ -24,6 +24,8 @@ import {
 } from "../../app/desktop/customer-input.ts";
 import {
   buildAcceptanceTaskMessage,
+  buildGovernanceAdvanceMessage,
+  buildRoleReadinessTaskMessage,
   flowCompletionIssue,
   normalizeFlowStepStatus,
   parseFlowStepStatuses,
@@ -393,7 +395,7 @@ function proposalRequest(flowId: string, extra: Record<string, unknown> = {}): C
 
 const GOVERNANCE_CTX = { roleId: "rapporteur", projectRoot: "/p", runtime: "claude" as const };
 
-test("治理下一步：proposal accept 先派 Convener 写流程单（followUp 标记），accept-quick 直接排程", async () => {
+test("治理下一步：proposal accept 派 Convener 写流程+团队计划并发任命卡（无 followUp）；accept-quick 直接排程", async () => {
   const { channel, next } = makeNextStepChannel();
 
   const p1 = channel.customerInput(proposalRequest("flow-a", { proposalPath: "docs/proposals/flow-a-v2.md" }), GOVERNANCE_CTX);
@@ -406,8 +408,7 @@ test("治理下一步：proposal accept 先派 Convener 写流程单（followUp 
     nextFunction: "schedule",
     roleId: "convener",
     proposalPath: "docs/proposals/flow-a-v2.md",
-    followUp: "nomination-after-flow",
-  }, "accept → 先 Convener 写流程单；流程单落盘后应用再派 Nominator（真机修正）");
+  }, "accept → Convener 写流程状态 YAML + 团队计划并直接发 appointment 卡（2026-10-22 第 1 项，不再产生两段式 followUp）");
   assert.deepEqual(next[0].context, {
     sourceRoleId: "rapporteur",
     projectRoot: "/p",
@@ -423,7 +424,7 @@ test("治理下一步：proposal accept 先派 Convener 写流程单（followUp 
     cardKind: "proposal",
     nextFunction: "schedule",
     roleId: "convener",
-  }, "accept-quick → Convener 写流程并排步骤（无 followUp、无提名）");
+  }, "accept-quick → Convener 写流程并排步骤（无任命）");
 });
 
 test("治理下一步：proposal revise/reject、acceptance、write 推导为 null（明确无下一步，仍回调）", async () => {
@@ -458,7 +459,7 @@ test("治理下一步：proposal revise/reject、acceptance、write 推导为 nu
   assert.deepEqual(next[3].payload, { version: 1, flowId: "flow-a", cardKind: "write", nextFunction: null, roleId: null }, "普通写盘不解锁下一步");
 });
 
-test("治理下一步：appointment 任命成功 → Convener 排程，任命名单进上下文", async () => {
+test("治理下一步：appointment 任命成功 → Crew 写卡（role-card-write），任命名单进上下文", async () => {
   const { channel, next } = makeNextStepChannel();
   const appointment: CustomerInputRequest = {
     kind: "choice",
@@ -468,18 +469,18 @@ test("治理下一步：appointment 任命成功 → Convener 排程，任命名
     multiple: true,
     options: [{ id: "role-a", label: "角色 A" }, { id: "role-b", label: "角色 B" }],
   };
-  const p = channel.customerInput(appointment, { roleId: "nominator", projectRoot: "/p", runtime: "pi" });
+  const p = channel.customerInput(appointment, { roleId: "convener", projectRoot: "/p", runtime: "pi" });
   assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["role-a", "role-b"] } }).ok, true);
   await p;
   assert.deepEqual(next[0].payload, {
     version: 1,
     flowId: "flow-c",
     cardKind: "appointment",
-    nextFunction: "schedule",
-    roleId: "convener",
-  }, "任命成功 → Convener 写流程单并派发");
+    nextFunction: "role-card-write",
+    roleId: "nominator",
+  }, "任命成功 → 应用派 Crew 写卡（不是 Convener 排程；2026-10-22 第 1 项）");
   assert.deepEqual(next[0].context.targetRoleIds, ["role-a", "role-b"], "任命名单原样透传（供任务消息使用）");
-  assert.equal(next[0].context.sourceRoleId, "nominator");
+  assert.equal(next[0].context.sourceRoleId, "convener", "任命卡由 Convener 发起");
 });
 
 test("治理下一步：取消/拒绝/expired、无 cardKind 一律不回调（绝不自动推进）", async () => {
@@ -2063,7 +2064,7 @@ test("收尾任务消息（客户批准）：工程质量基线八项逐项核�
   assert.match(message, /不得建议 accept/);
 });
 
-test("收尾任务消息（客户批准）：必须真实启动应用向客户演示，证据写入 docs/verification/<flowId>-v1.md", () => {
+test("收尾任务消息（客户批准）：必须真实启动应用向客户演示，报告写入 docs/acceptance/<flowId>-report-v1.md、附件写入 docs/verification/", () => {
   const message = buildAcceptanceTaskMessage("flow-a", ["docs/reports/impl.md"]);
   assert.match(message, /必须真实启动应用并向客户演示/);
   assert.match(message, /启动命令/);
@@ -2071,12 +2072,14 @@ test("收尾任务消息（客户批准）：必须真实启动应用向客户�
   assert.match(message, /截图或录屏/);
   assert.match(message, /审批档 shell/);
   assert.match(message, /未真实启动\/演示/);
-  assert.match(message, /docs\/verification\/flow-a-v1\.md/);
-  assert.match(message, /验收卡中引用/);
+  // 2026-10-22 第 3 项（方案 §7.1/§7.6）：报告进 docs/acceptance/，详细证据附件留在 docs/verification/。
+  assert.match(message, /docs\/acceptance\/flow-a-report-v1\.md/);
+  assert.match(message, /docs\/verification\//);
+  assert.match(message, /首行五项/);
   // 证据路径按 flowId 生成（不写死 flow-a）；无回交路径时也保留硬要求。
   const other = buildAcceptanceTaskMessage("ticket-desk-r2", []);
-  assert.match(other, /docs\/verification\/ticket-desk-r2-v1\.md/);
-  assert.doesNotMatch(other, /docs\/verification\/flow-a-v1\.md/);
+  assert.match(other, /docs\/acceptance\/ticket-desk-r2-report-v1\.md/);
+  assert.doesNotMatch(other, /docs\/acceptance\/flow-a-report-v1\.md/);
   assert.match(other, /回交\/核对报告路径：见回交报告与流程状态 YAML/);
   assert.match(other, /不得建议 accept/);
 });
@@ -2096,17 +2099,88 @@ test("收尾任务消息（客户批评）：按架构方案/架构影响分析�
   assert.match(message, /实现偏离声明/);
   assert.match(message, /不得建议 accept/);
   assert.match(message, /只能建议退回或补充证据/);
-  // 既有四条硬要求（质量基线 + 真实启动演示）逐字保留——本批只新增第⑤条，不改写前四条。
+  // 既有硬要求①–③与⑤逐字保留；④按 2026-10-22 第 3 项改为 acceptance 报告 + verification 附件。
   for (const requirement of [
     "① 按工程质量基线逐项核对并给出结论与证据：正确性、健壮性、安全、可维护性、可观测性、性能、前端可访问性、测试矩阵；",
     "② 必须真实启动应用并向客户演示：给出启动命令与访问地址，附截图或录屏（你已有审批档 shell，可执行启动命令，命令逐条提交审批）；",
     "③ 未真实启动/演示、或质量基线某项无证据，不得建议 accept（只能建议退回或补充证据）；",
-    "④ 演示证据与逐项核对结论写入 docs/verification/flow-a-v1.md，并在验收卡中引用。",
+    "④ 验收报告写入 docs/acceptance/flow-a-report-v1.md（首行五项：风险档位、判定依据、选定检查、复用证据、全量回归），详细证据附件写入 docs/verification/；报告须引用实施前标准 docs/acceptance/flow-a-criteria-v1.md 与变更包 docs/scheduling/flow-a-change-v1.md 的版本/哈希。",
+    "⑤ 按提案/变更的「架构方案或架构影响分析」核对实现：模块边界、依赖方向、扩展点、数据 schema/API 版本迁移与声明一致；缺失架构章节或实现偏离声明时不得建议 accept（只能建议退回或补充证据）。",
   ]) {
-    assert.ok(message.includes(requirement), `既有硬要求须逐字保留：${requirement}`);
+    assert.ok(message.includes(requirement), `硬要求须保留：${requirement}`);
   }
+  // 第 3 项新增：实施前标准/风险档位/证据复用（第⑥条）。
+  assert.match(message, /按实施前标准/);
+  assert.match(message, /风险档位/);
+  assert.match(message, /档位只能升不能降/);
+  assert.match(message, /复用同候选/);
+  assert.match(message, /证据失效/);
   // 无回交路径时架构核对要求同样保留（固定硬要求，不依赖 evidence）。
   assert.match(buildAcceptanceTaskMessage("ticket-desk-r2", []), /架构方案或架构影响分析/);
+});
+
+test("2026-10-22 v2/MapReduce 任务文案：团队计划 v2 字段、模块清单、Crew 写卡读 v2 列、readiness 模块列/分片、验收 manifest", () => {
+  const accept = buildGovernanceAdvanceMessage(
+    {
+      version: 1,
+      flowId: "flow-v2",
+      cardKind: "proposal",
+      nextFunction: "schedule",
+      roleId: "convener",
+    },
+    undefined,
+    { proposalDecision: "accept", teamPlanPath: "docs/scheduling/flow-v2-team-v1.md" },
+  )!;
+  assert.match(accept, /teamPlanSchema: 2/);
+  assert.match(accept, /modules: \[模块id/);
+  assert.match(accept, /模块清单/);
+  assert.match(accept, /parallelGroup/);
+  assert.match(accept, /dependsOn/);
+  assert.match(accept, /直接发任命卡/, "既有主路径文案保留");
+
+  const crew = buildGovernanceAdvanceMessage(
+    {
+      version: 1,
+      flowId: "flow-v2",
+      cardKind: "appointment",
+      nextFunction: "role-card-write",
+      roleId: "nominator",
+    },
+    ["executor"],
+    {
+      teamPlanPath: "docs/scheduling/flow-v2-team-v1.md",
+      teamPlanVersion: 1,
+      teamPlanSchema: 2,
+      teamPlanModules: ["storefront"],
+    },
+  )!;
+  assert.match(crew, /团队计划 docs\/scheduling\/flow-v2-team-v1\.md/);
+  assert.match(crew, /模块清单：storefront/);
+  assert.match(crew, /bounded context/);
+  assert.match(crew, /公开契约/);
+  assert.match(crew, /测试面/);
+  assert.match(crew, /dependsOn/);
+  assert.match(crew, /并行组/);
+  assert.match(crew, /V12/);
+
+  const readiness = buildRoleReadinessTaskMessage(
+    "flow-v2",
+    ["executor"],
+    "docs/scheduling/flow-v2-team-v1.md",
+    1,
+    { teamPlanSchema: 2, modules: ["storefront"] },
+  );
+  assert.match(readiness, /模块清单：storefront/);
+  assert.match(readiness, /module\/contract\/testSurface\/parallel\/dependsOn\/granularity/);
+  assert.match(readiness, /每分片独立证据/);
+  assert.match(readiness, /manifest/);
+  assert.match(readiness, /粒度理由/);
+
+  const acceptance = buildAcceptanceTaskMessage("flow-v2", []);
+  assert.match(acceptance, /MapReduce/);
+  assert.match(acceptance, /manifest/);
+  assert.match(acceptance, /分片原始证据/);
+  assert.match(acceptance, /insufficient evidence/);
 });
 
 // ————— 2026-10-19 客户要求：判断 agent 拒绝（deny）+ 退回发起角色重做 —————

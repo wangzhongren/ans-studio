@@ -8,7 +8,7 @@
  *   其余 → full；
  * - `rowSignature(row)`：历史行的稳定签名（kind/turnId/eventKind/text/at）；
  * - `eventKey(event)`：实时事件的去重键（turnId + kind + source + text）；
- * - `classifyLiveDuplicate(...)`：命中历史或已见实时 → skip（终态/工具身份不参与）。
+ * - `classifyLiveDuplicate(...)`：命中历史或已见实时 → skip（终态/工具身份/推理不参与）。
  */
 
 export interface ReplayRowLike {
@@ -94,6 +94,14 @@ export function isToolEvent(event: LiveEventLike | null | undefined): boolean {
   return typeof detailString(event.detail, "toolName") === "string" && detailString(event.detail, "toolName") !== "";
 }
 
+/**
+ * 推理事件豁免实时文本去重（R3）：同一回合的多条 reasoning piece 的 summary 都是
+ * 「已思考」，按 turnId+summary 去重会把后续正文吞掉；幂等改由合并层 piece 指纹保证。
+ */
+export function isReasoningEvent(event: LiveEventLike | null | undefined): boolean {
+  return !!event && detailString(event.detail, "source") === "reasoning";
+}
+
 export interface DuplicateDecision {
   skip: boolean;
   nextLiveCount: number;
@@ -101,9 +109,10 @@ export interface DuplicateDecision {
 
 /**
  * 历史/实时去重（逐 key 计数）。
- * - 历史有 N 条同 key，实时只允许 N 条「非终态/非工具身份」事件通过（之后的重复跳过）；
+ * - 历史有 N 条同 key，实时只允许 N 条「非终态/非工具身份/非推理」事件通过（之后的重复跳过）；
  * - 历史没有、实时已见过同 key 的非终态/非工具事件，再见到即跳过；
- * - 终态/工具身份事件不因文本重复被吞（它们是事实，不是回显）。
+ * - 终态/工具身份事件不因文本重复被吞（它们是事实，不是回显）；
+ * - reasoning 事件一律豁免（同回合多段正文合法；重复投递由合并层 piece 指纹幂等）。
  */
 export function classifyLiveDuplicate(input: {
   key: string | null;
@@ -114,7 +123,10 @@ export function classifyLiveDuplicate(input: {
   const key = input.key;
   const historyCount = Math.max(0, input.historyCount || 0);
   const liveCount = Math.max(0, input.liveCount || 0);
-  const exempt = isTerminalEvent(input.event) || isToolEvent(input.event);
+  const exempt =
+    isTerminalEvent(input.event) ||
+    isToolEvent(input.event) ||
+    isReasoningEvent(input.event);
   if (!key || exempt) {
     return { skip: false, nextLiveCount: liveCount + 1 };
   }

@@ -1,0 +1,100 @@
+SHOT=demo-00-launch.png
+SHOT=demo-01-project-imported.png
+DEMO_V2_PLAN=true
+DEMO_V2_FLOW_PARALLEL_GROUP=true
+SHOT=demo-02-appointment-card.png
+DEMO_APPOINTMENT_CARD_VISIBLE=true
+EVENT convener accepted request_choice：客户已选择（操作者：demo-operator）：executor（Executor）、reviewer（Reviewer）、tester（Tester）。请按客户的选择继续；**未选中的项不得擅自代选**。
+DEMO_SEND role=convener runtime=claude
+EVENT convener settled 会话结束
+EVENT liaison settled 会话结束
+SHOT=demo-03-crew-write-card.png
+DEMO_CREW_WRITE_CARD_VISIBLE=true
+EVENT nominator accepted request_confirmation：客户已确认「写盘确认 flow-demo」（confirmed:true；操作者：demo-operator）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+EVENT nominator accepted write_file 已获准并落盘：角色卡/executor/role-card.md（551 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\角色卡\executor\role-card.md）
+EVENT nominator accepted write_file 已获准并落盘：角色卡/executor/boundary.yaml（554 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\角色卡\executor\boundary.yaml）
+EVENT nominator accepted write_file 已获准并落盘：角色卡/executor/feature-map.md（89 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\角色卡\executor\feature-map.md）
+EVENT nominator accepted write_file 已获准并落盘：角色卡/executor/functional-description.md（81 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\角色卡\executor\functional-descriptio
+EVENT nominator accepted write_file 已获准并落盘：角色卡/executor/memo.md（75 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\角色卡\executor\memo.md）
+EVENT nominator accepted write_file 已获准并落盘：角色卡/executor/api-spec.md（59 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\角色卡\executor\api-spec.md）
+EVENT nominator accepted write_file 已获准并落盘：角色卡/reviewer/role-card.md（551 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\角色卡\reviewer\role-card.md）
+EVENT nominator accepted write_file 已获准并落盘：角色卡/reviewer/boundary.yaml（554 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\角色卡\reviewer\boundary.yaml）
+EVENT nominator accepted write_file 已获准并落盘：角色卡/reviewer/feature-map.md（89 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\角色卡\reviewer\feature-map.md）
+EVENT nominator accepted write_file 已获准并落盘：角色卡/reviewer/functional-description.md（81 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\角色卡\reviewer\functional-descriptio
+DEMO_CREW_TWO_ROLES_WRITTEN=true
+EVENT nominator accepted write_file 已获准并落盘：角色卡/reviewer/memo.md（75 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\角色卡\reviewer\memo.md）
+EVENT nominator accepted write_file 已获准并落盘：角色卡/reviewer/api-spec.md（59 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\角色卡\reviewer\api-spec.md）
+EVENT nominator settled 会话结束
+EVENT verifier accepted write_file 已获准并落盘：docs/acceptance/flow-demo-criteria-v1.md（542 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\docs\acceptance\flow-demo-crite
+DEMO_SEND role=verifier runtime=claude
+EVENT liaison settled 会话结束
+EVENT convener accepted write_file 已获准并落盘：docs/scheduling/flow-demo-readiness-v1.md（691 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\docs\scheduling\flow-demo-read
+EVENT verifier settled 会话结束
+EVENT convener accepted write_file 已获准并落盘：docs/scheduling/flow-demo-change-v1.md（234 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\docs\scheduling\flow-demo-change-
+EVENT convener accepted write_file 已获准并落盘：docs/flows/flow-demo.yaml（2314 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\docs\flows\flow-demo.yaml）
+EVENT convener accepted dispatch_task：任务已派发给「executor」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 executor 的会话（其会话未开——将自动开启）；投递结果/失败会在其聊天流与 Steward / 统筹 的聊天流如实显示（受理≠已完成）。注意：**派发 ≠ 授权**——对方只在自己已接
+EVENT convener accepted dispatch_task：任务已派发给「reviewer」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 reviewer 的会话（其会话未开——将自动开启）；投递结果/失败会在其聊天流与 Steward / 统筹 的聊天流如实显示（受理≠已完成）。注意：**派发 ≠ 授权**——对方只在自己已接
+EVENT executor denied 工具未注册：submit_report
+EVENT executor settled 会话结束
+DEMO_SEND role=convener runtime=claude
+EVENT liaison settled 会话结束
+EVENT convener settled 会话结束
+EVENT reviewer denied 工具未注册：submit_report
+EVENT reviewer settled 会话结束
+EVENT convener accepted write_file 已获准并落盘：docs/scheduling/flow-demo-readiness-v1.md（691 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\docs\scheduling\flow-demo-read
+EVENT convener accepted write_file 已获准并落盘：docs/scheduling/flow-demo-change-v1.md（234 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\docs\scheduling\flow-demo-change-
+EVENT liaison settled 会话结束
+EVENT convener accepted write_file 已获准并落盘：docs/flows/flow-demo.yaml（2314 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\docs\flows\flow-demo.yaml）
+EVENT convener denied dispatch_task：任务**未能派发**（回执：派发被治理门禁拒绝：治理门禁：流程 flow-demo 的步骤 delivery-storefront 已派发过；重复派发被去重。如需再派，请让流程单出新版本并更新步骤 id。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。
+EVENT convener denied dispatch_task：任务**未能派发**（回执：派发被治理门禁拒绝：治理门禁：流程 flow-demo 的步骤 delivery-checkout-api 已派发过；重复派发被去重。如需再派，请让流程单出新版本并更新步骤 id。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。
+EVENT convener settled 会话结束
+EVENT liaison settled 会话结束
+EVENT convener settled 会话结束
+EVENT liaison settled 会话结束
+SHOT=demo-04-convener-readiness-map-dispatch.png
+DEMO_READINESS_RECORD=true
+DEMO_CHANGE_PACKAGE=true
+DEMO_MAP_PARALLEL_DISPATCH=true
+EVENT convener accepted write_file 已获准并落盘：docs/flows/flow-demo.yaml（2442 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\docs\flows\flow-demo.yaml）
+EVENT convener accepted dispatch_task：任务已派发给「tester」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 tester 的会话（其会话未开——将自动开启）；投递结果/失败会在其聊天流与 Steward / 统筹 的聊天流如实显示（受理≠已完成）。注意：**派发 ≠ 授权**——对方只在自己已接受边界内
+EVENT convener accepted write_file 已获准并落盘：docs/flows/flow-demo.yaml（2501 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\docs\flows\flow-demo.yaml）
+EVENT tester settled 会话结束
+EVENT convener accepted dispatch_task：任务已派发给「tester」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 tester 的会话；投递结果/失败会在其聊天流与 Steward / 统筹 的聊天流如实显示（受理≠已完成）。注意：**派发 ≠ 授权**——对方只在自己已接受边界内执行已授权任务，普通操作无需
+EVENT convener accepted write_file 已获准并落盘：docs/flows/flow-demo.yaml（2560 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\docs\flows\flow-demo.yaml）
+EVENT tester settled 会话结束
+DEMO_SEND role=convener runtime=claude
+DEMO_REDUCE_DISPATCH=true
+EVENT convener settled 会话结束
+EVENT liaison settled 会话结束
+EVENT convener settled 会话结束
+EVENT tester accepted write_file 已获准并落盘：docs/verification/flow-demo/manifest.md（519 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\docs\verification\flow-demo\mani
+EVENT tester settled 会话结束
+EVENT liaison settled 会话结束
+DEMO_SEND role=tester runtime=claude
+SHOT=demo-05-reduce-manifest.png
+DEMO_MANIFEST=true
+DEMO_SEND role=convener runtime=claude
+EVENT convener accepted write_file 已获准并落盘：docs/flows/flow-demo.yaml（2643 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\docs\flows\flow-demo.yaml）
+EVENT convener settled 会话结束
+EVENT liaison settled 会话结束
+EVENT verifier accepted write_file 已获准并落盘：docs/acceptance/flow-demo-report-v1.md（227 字节写入 C:\Users\51054\AppData\Local\Temp\ans-v2-demo-BC9xQX\project\docs\acceptance\flow-demo-report-
+SHOT=demo-06-acceptance-card.png
+DEMO_ACCEPTANCE_CARD_VISIBLE=true
+EVENT verifier accepted request_choice：客户已选择（操作者：demo-operator）：accept（通过）。请按客户的选择继续；**未选中的项不得擅自代选**。
+DEMO_SEND role=verifier runtime=claude
+EVENT verifier settled 会话结束
+EVENT liaison settled 会话结束
+SHOT=demo-07-accepted.png
+DEMO_DECISIONS=proposal-accept:accepted:,appointment:appointed:executor+reviewer+tester,appointment-write:accepted:,acceptance:accepted:
+DEMO_DISPATCHES=role-cards,delivery-storefront,delivery-checkout-api,role-readiness,test-map-shards,integration-e2e
+DEMO_FILE_docs/scheduling/flow-demo-team-v1.md=true
+DEMO_FILE_docs/flows/flow-demo.yaml=true
+DEMO_FILE_docs/acceptance/flow-demo-criteria-v1.md=true
+DEMO_FILE_docs/acceptance/flow-demo-report-v1.md=true
+DEMO_FILE_docs/scheduling/flow-demo-change-v1.md=true
+DEMO_FILE_docs/scheduling/flow-demo-readiness-v1.md=true
+DEMO_FILE_docs/verification/flow-demo/manifest.md=true
+DEMO_FILE_角色卡/executor/role-card.md=true
+DEMO_FILE_角色卡/reviewer/role-card.md=true
+DEMO_PASS=true
+DEMO_DONE=1

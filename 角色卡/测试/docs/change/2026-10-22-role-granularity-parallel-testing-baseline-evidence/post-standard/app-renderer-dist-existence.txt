@@ -1,0 +1,1 @@
+drwxr-xr-x 1 51054 197609 0 Oct 22 19:18 app/renderer/dist

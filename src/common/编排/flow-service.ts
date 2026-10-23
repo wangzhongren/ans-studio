@@ -34,6 +34,7 @@ import {
   type FlowStateStep,
 } from "./flow-state.ts";
 import { appendGovernanceLedger, readGovernanceLedger, type GovernanceLedgerEntry, type GovernancePower } from "./governance-ledger.ts";
+import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 import type {
   FlowGetFn,
   FlowStepSupersedeFn,
@@ -81,6 +82,10 @@ export interface FlowService {
     expectedRevision: string;
     reason?: string;
     idempotencyKey?: string;
+    /** 新步骤并行组（可选；MapReduce 方案 A；语法/静态校验由 flow-state 执行）。 */
+    parallelGroup?: string;
+    /** 新步骤前置 step id（可选；存在性/环/前置 done 校验由 flow-state/governance-gate 执行）。 */
+    dependsOn?: string[];
   }): Promise<FlowToolResult>;
 }
 
@@ -97,7 +102,11 @@ export interface CreateFlowServiceOptions {
 
 // —————————————————————— 基础 ——————————————————————
 
-const FLOW_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
+/**
+ * flowId / stepId 形状（**单一来源**：运行时核心 `src/model/runtime.ts` 的 `GOVERNANCE_SLUG_PATTERN`；
+ * 2026-10-22 收紧为禁止首/尾连字符）。
+ */
+const FLOW_ID_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
 const TERMINAL_STATUSES: ReadonlySet<FlowToolStatus> = new Set(["done", "superseded"]);
 
 function sha256(data: string | Buffer): string {
@@ -139,6 +148,8 @@ function viewOf(flow: FlowState, revision: string, actorRoleId: string, actorPow
       ...(step.evidence !== undefined ? { evidence: { kind: step.evidence.kind, ref: step.evidence.ref } } : {}),
       ...(step.supersedes !== undefined ? { supersedes: [...step.supersedes] } : {}),
       ...(step.supersededBy !== undefined ? { supersededBy: step.supersededBy } : {}),
+      ...(step.parallelGroup !== undefined ? { parallelGroup: step.parallelGroup } : {}),
+      ...(step.dependsOn !== undefined ? { dependsOn: [...step.dependsOn] } : {}),
     })),
     canUpdate,
   };
@@ -160,6 +171,8 @@ function serializeFlow(flow: FlowState): string {
       ...(step.evidence !== undefined ? { evidence: { kind: step.evidence.kind, ref: step.evidence.ref } } : {}),
       ...(step.supersedes !== undefined ? { supersedes: [...step.supersedes] } : {}),
       ...(step.supersededBy !== undefined ? { supersededBy: step.supersededBy } : {}),
+      ...(step.parallelGroup !== undefined ? { parallelGroup: step.parallelGroup } : {}),
+      ...(step.dependsOn !== undefined ? { dependsOn: [...step.dependsOn] } : {}),
     })),
   };
   return stringifyYaml(document, { lineWidth: 0 });
@@ -169,6 +182,12 @@ function sameEvidence(left: FlowStateStep["evidence"], right: FlowToolEvidence |
   if (left === undefined && right === undefined) return true;
   if (left === undefined || right === undefined) return false;
   return left.kind === right.kind && left.ref === right.ref;
+}
+
+function sameOptionalStringList(left: readonly string[] | undefined, right: readonly string[] | undefined): boolean {
+  if (left === undefined && right === undefined) return true;
+  if (left === undefined || right === undefined) return false;
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 /**
@@ -552,6 +571,8 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
             existingNew.kind === input.kind &&
             existingNew.title === input.title.trim() &&
             existingNew.owner === input.owner.trim() &&
+            existingNew.parallelGroup === input.parallelGroup &&
+            sameOptionalStringList(existingNew.dependsOn, input.dependsOn) &&
             (existingNew.supersedes ?? []).includes(oldStep.id);
           if (idempotent) {
             return { ok: true, idempotent: true, revision, flow: flowView };
@@ -575,6 +596,8 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
           kind: input.kind,
           status: "pending",
           supersedes: [oldStep.id],
+          ...(input.parallelGroup !== undefined ? { parallelGroup: input.parallelGroup } : {}),
+          ...(input.dependsOn !== undefined ? { dependsOn: [...input.dependsOn] } : {}),
         };
         const nextSteps: FlowStateStep[] = [];
         for (const [itemIndex, item] of flow.steps.entries()) {
@@ -743,7 +766,12 @@ function looksBinaryObserve(data: Buffer, rel: string): boolean {
   return data.subarray(0, Math.min(data.length, 8192)).includes(0);
 }
 
-/** 步骤 owner → 账本 power：内置治理角色按 function；其他（项目角色/未知）记 `project`。 */
+/**
+ * 步骤 owner → 账本 power：内置治理角色按 function；其他（项目角色/未知）记 `project`。
+ * 2026-10-22：映射**不变**——团队计划/readiness/变更包由 Convener 写 → `schedule`；验收标准/报告由
+ * Verifier 写 → `verification`；这些都是普通项目相对路径的 artifact，可被 `observeFlowArtifacts` 观察。
+ * `角色卡/` 仍在 `OBSERVE_SKIP_SEGMENTS` 内，不被观察。
+ */
 function artifactPowerOf(owner: string): GovernancePower {
   switch (owner) {
     case "liaison":

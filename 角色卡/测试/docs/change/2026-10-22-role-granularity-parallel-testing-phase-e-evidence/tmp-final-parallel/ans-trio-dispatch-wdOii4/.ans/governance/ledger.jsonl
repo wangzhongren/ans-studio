@@ -1,0 +1,2 @@
+{"at":"2026-10-22T13:47:14.608Z","kind":"dispatch.accepted","flowId":"flow-a","actorRoleId":"liaison","power":"liaison","targetRoleId":"convener","messageSummary":"[协调] 请用 flow_get 读取 flow-a 的当前 revision，并用 flow_step_update 推进 impl；不要直接 write_file 流程 YAML。","runtime":"demo"}
+{"at":"2026-10-22T13:47:15.032Z","kind":"dispatch.accepted","flowId":"flow-a","actorRoleId":"liaison","power":"liaison","targetRoleId":"convener","messageSummary":"[协调] 请用 flow_get 读取 flow-a 的当前 revision，并用 flow_step_update 推进 impl；不要直接 write_file 流程 YAML。","runtime":"demo"}

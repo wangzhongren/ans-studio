@@ -1,0 +1,6 @@
+exit_code=124
+duration_ms=180921
+command=timeout 180 node --test test/pi-adapter/write-sequencing.test.ts
+started=2026-10-22 20:45:17
+finished=2026-10-22 20:48:18
+note=exit 124 means 3-minute timeout

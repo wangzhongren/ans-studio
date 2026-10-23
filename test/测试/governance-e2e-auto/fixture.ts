@@ -53,6 +53,7 @@ import type { SessionEventEnvelope } from "../../../app/desktop/session.ts";
 import {
   createCustomerInputChannel,
   type CustomerInputChannel,
+  type DesktopCustomerInputFn,
   type OperatorDecisionPayload,
   type OperatorJudgeResultPayload,
   type OperatorRequestPayload,
@@ -62,6 +63,12 @@ import type { GovernanceAdvanceResult } from "../../../app/desktop/governance-ad
 export const FLOW = "flow-a";
 export const PROPOSAL_REL = `docs/proposals/${FLOW}-v1.md`;
 export const NOMINATION_REL = `docs/nominations/${FLOW}-v1.md`;
+// 2026-10-22 治理分工第 1/3 项：团队计划（Convener 写）、验收标准/报告、变更包、readiness。
+export const TEAM_PLAN_REL = `docs/scheduling/${FLOW}-team-v1.md`;
+export const READINESS_REL = `docs/scheduling/${FLOW}-readiness-v1.md`;
+export const CHANGE_PACKAGE_REL = `docs/scheduling/${FLOW}-change-v1.md`;
+export const CRITERIA_REL = `docs/acceptance/${FLOW}-criteria-v1.md`;
+export const REPORT_REL = `docs/acceptance/${FLOW}-report-v1.md`;
 // 2026-10-19 Flow YAML 契约（客户「这些全部改成yaml」）：`docs/flows/<flowId>.yaml` 是唯一机器状态；
 // 同名 `.md` 仅人读视图，产品门禁不再解析它做判定。
 export const FLOW_REL = `docs/flows/${FLOW}.yaml`;
@@ -198,6 +205,10 @@ export interface FlowDocStep {
   title?: string;
   /** done 步骤的证据；缺省时 dispatch→{kind:"dispatch",ref:id}、acceptance→{kind:"acceptance",ref:"acceptance"}。 */
   evidence?: { kind: string; ref: string };
+  /** 2026-10-22 MapReduce 方案 A：可选并行组（map-<slug> | reduce）；旧 flow 不填。 */
+  parallelGroup?: string;
+  /** 2026-10-22 MapReduce 方案 A：可选前置步骤 id 列表；旧 flow 不填。 */
+  dependsOn?: readonly string[];
 }
 
 /**
@@ -219,6 +230,8 @@ export function flowDoc(flowId = FLOW, steps: FlowDocStep[] = [{ id: "impl", sta
       `    kind: ${kind}`,
       `    status: ${status}`,
     );
+    if (step.parallelGroup !== undefined) lines.push(`    parallelGroup: ${step.parallelGroup}`);
+    if (step.dependsOn !== undefined) lines.push(`    dependsOn: [${step.dependsOn.join(", ")}]`);
     if (status === "done") {
       const evidence =
         step.evidence ??
@@ -232,6 +245,351 @@ export function flowDoc(flowId = FLOW, steps: FlowDocStep[] = [{ id: "impl", sta
     }
   }
   return lines.join("\n") + "\n";
+}
+
+/**
+ * 团队计划（2026-10-22 第 1 项；Convener 唯一作者）：frontmatter flowId/version/riskTier +
+ * 内联 `recommended` 数组 + 角色表（roleId / 类型 / 职责目标 / 能力要求 / 唯一写集 / 依赖 / 组别 / apiSpec）。
+ * 卡前守卫与桌面写卡校验都按此确定性形状解析。
+ */
+export function teamPlanDoc(
+  flowId = FLOW,
+  recommended: readonly string[] = ["executor"],
+  options: {
+    version?: number;
+    riskTier?: string;
+    frontmatterFlowId?: string;
+    /** 省略 recommended（空推荐集负例）。 */
+    omitRecommended?: boolean;
+    /** 覆盖某个推荐角色的「职责目标」等单元格（缺项负例）。 */
+    rowOverrides?: Record<string, Partial<Record<"type" | "duty" | "ability" | "writes" | "deps", string>>>;
+    /** 额外角色行（如内置角色负例）。 */
+    extraRows?: Array<{ roleId: string; type?: string; duty?: string; ability?: string; writes?: string; deps?: string }>;
+  } = {},
+): string {
+  const version = options.version ?? 1;
+  const riskTier = options.riskTier ?? "T1";
+  const lines = [
+    "---",
+    `flowId: ${options.frontmatterFlowId ?? flowId}`,
+    `version: ${version}`,
+    `riskTier: ${riskTier}`,
+    ...(options.omitRecommended === true ? [] : [`recommended: [${recommended.join(", ")}]`]),
+    "---",
+    "",
+    `# 团队计划 ${flowId} v${version}`,
+    "",
+    "| roleId | 类型 | 职责目标 | 能力要求 | 唯一写集 | 依赖 | 组别 | apiSpec |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+  ];
+  for (const roleId of recommended) {
+    const over = options.rowOverrides?.[roleId] ?? {};
+    lines.push(
+      `| ${roleId} | ${over.type ?? "new"} | ${over.duty ?? "实现本角色的系统功能"} | ${over.ability ?? "能读写代码并交付测试"} | ${over.writes ?? `src/owned-${roleId}/`} | ${over.deps ?? "无"} | 开发 | not-applicable |`,
+    );
+  }
+  for (const row of options.extraRows ?? []) {
+    lines.push(
+      `| ${row.roleId} | ${row.type ?? "new"} | ${row.duty ?? "实现"} | ${row.ability ?? "能力"} | ${row.writes ?? "src/"} | ${row.deps ?? "无"} | 开发 | not-applicable |`,
+    );
+  }
+  return lines.join("\n") + "\n";
+}
+
+/**
+ * 团队计划 v2 角色行（2026-10-22 角色粒度/MapReduce；策划方案 §5.3 的 14 列）。
+ * 只用于生成夹具文本；校验由产品 `src/common/编排/team-plan.ts` 执行。
+ */
+export interface TeamPlanV2RoleInput {
+  roleId: string;
+  type?: string;
+  module: string;
+  duty?: string;
+  ability?: string;
+  writes?: string;
+  contract?: string;
+  testSurface?: string;
+  deps?: string;
+  dependsOn?: string;
+  parallelGroup?: string;
+  group?: string;
+  apiSpec?: string;
+  rationale?: string;
+}
+
+export interface TeamPlanV2ModuleInput {
+  module: string;
+  responsibility?: string;
+  contract?: string;
+  architectureSource?: string;
+}
+
+export interface TeamPlanV2Options {
+  version?: number;
+  riskTier?: string;
+  /** frontmatter flowId 覆盖（flowId 不一致负例）。 */
+  frontmatterFlowId?: string;
+  /** frontmatter `modules` 覆盖（重复/未声明/块数组等负例）。 */
+  modules?: readonly string[];
+  /** 角色行；必填，便于正/负例精确控制。 */
+  rows: readonly TeamPlanV2RoleInput[];
+  /** frontmatter `recommended` 覆盖；缺省 = rows 中非 reduce 角色。 */
+  recommended?: readonly string[];
+  /** 省略 frontmatter modules（缺模块清单负例）。 */
+  omitModulesFrontmatter?: boolean;
+  /** 用 YAML 块数组写 modules（解析负例）。 */
+  blockModules?: boolean;
+  /** 省略正文「模块清单」表。 */
+  omitModuleSection?: boolean;
+  /** 模块清单行覆盖（字符串原样使用，或结构化生成）。 */
+  moduleRows?: readonly (TeamPlanV2ModuleInput | string)[];
+  /** 省略「五维判断/协调成本」章节。 */
+  omitCoordinationSection?: boolean;
+}
+
+/**
+ * 生成团队计划 v2（frontmatter `teamPlanSchema: 2`/`modules` + 模块清单 + 14 列角色表 + 五维章节）。
+ * **不替换 v1 `teamPlanDoc`**：旧流程/legacy 覆盖继续使用 v1 夹具（不得批量迁移）。
+ */
+export function teamPlanV2Doc(flowId = FLOW, options: TeamPlanV2Options): string {
+  const rows = options.rows;
+  const modules =
+    options.modules ??
+    [...new Set(rows.map((row) => row.module).filter((module) => module !== "" && !module.split(/[+＋]/).includes("reduce")))];
+  const recommended = options.recommended ?? rows.filter((row) => !row.module.split(/[+＋]/).includes("reduce")).map((row) => row.roleId);
+  const version = options.version ?? 1;
+  const riskTier = options.riskTier ?? "T3";
+  const moduleRows =
+    options.moduleRows ??
+    modules.map((module) => ({
+      module,
+      responsibility: `${module} 模块交付`,
+      contract: `docs/contracts/${module}-v1.md`,
+      architectureSource: `docs/planning/${flowId}-v1.md §4`,
+    }));
+  const moduleRowText = moduleRows.map((row) =>
+    typeof row === "string"
+      ? row
+      : `| ${row.module} | ${row.responsibility ?? "模块交付"} | ${row.contract ?? `docs/contracts/${row.module}-v1.md`} | ${row.architectureSource ?? `docs/planning/${flowId}-v1.md §4`} |`,
+  );
+  const lines = [
+    "---",
+    `flowId: ${options.frontmatterFlowId ?? flowId}`,
+    `version: ${version}`,
+    "teamPlanSchema: 2",
+    `riskTier: ${riskTier}`,
+    `recommended: [${recommended.join(", ")}]`,
+    ...(options.omitModulesFrontmatter === true
+      ? []
+      : options.blockModules === true
+        ? ["modules:", ...modules.map((module) => `  - ${module}`)]
+        : [`modules: [${modules.join(", ")}]`]),
+    "---",
+    "",
+    `# 团队计划 ${flowId} v${version}`,
+    "",
+    ...(options.omitModuleSection === true
+      ? []
+      : [
+          "## 模块清单",
+          "",
+          "| module | 职责 | 公开契约 | 架构来源 |",
+          "| --- | --- | --- | --- |",
+          ...moduleRowText,
+          "",
+        ]),
+    "## 参与角色与职责",
+    "",
+    "| roleId | 类型 | module | 职责目标 | 能力要求 | 唯一写集 | 公开契约 | 测试面 | 依赖 | dependsOn | 并行组 | 组别 | apiSpec | 粒度理由 |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...rows.map(
+      (row) =>
+        `| ${row.roleId} | ${row.type ?? "new"} | ${row.module} | ${row.duty ?? "实现本模块的交付"} | ${row.ability ?? "能读写代码并交付测试"} | ${row.writes ?? `src/owned-${row.roleId}/; test/owned-${row.roleId}/`} | ${row.contract ?? "internal（夹具模块无跨角色公开契约）"} | ${row.testSurface ?? `test/owned-${row.roleId}/`} | ${row.deps ?? "无"} | ${row.dependsOn ?? "无"} | ${row.parallelGroup ?? "map-a"} | ${row.group ?? "交付"} | ${row.apiSpec ?? "required"} | ${row.rationale ?? "—"} |`,
+    ),
+    "",
+    ...(options.omitCoordinationSection === true
+      ? []
+      : [
+          "## 五维判断与协调成本",
+          "",
+          "- 责任独立性：各模块有独立变化原因；Reduce 角色独立承担证据合并。",
+          "- 范围归属：Map 角色写集互不相交；Reduce 只写测试与证据根。",
+          "- 契约影响：公开契约由对应 Map 角色唯一主属，消费方只读。",
+          "- 证据独立性：每个 Map 角色有独立测试面；Reduce 独立合并 manifest。",
+          "- 协调成本：按模块并行收益高于交接成本，未拆到函数级。",
+          "",
+        ]),
+  ];
+  return lines.join("\n") + "\n";
+}
+export function roleCardDoc(roleId = "executor"): string {
+  return [
+    `# 角色：${roleId}`,
+    "",
+    "## 组别",
+    "开发。",
+    "",
+    "## 能力描述",
+    "按团队计划实现并验证本角色负责的功能。",
+    "",
+    "## 工作立场",
+    "对本角色交付长期负责。",
+    "",
+    "## 系统功能导航",
+    "见 feature-map.md。",
+    "",
+    "## 必读资料",
+    "团队计划、提案与边界。",
+    "",
+    "## 交接输入输出",
+    "输入：团队计划与任命名单；输出：实现与测试证据。",
+    "",
+    "## 执行原则",
+    "只写计划内写集。",
+    "",
+    "## 质量职责",
+    "交付需可复现验证。",
+    "",
+    "## 标准工作流",
+    "读计划 → 实现 → 测试 → 报告。",
+    "",
+    "## 交付物清单",
+    "代码、测试与报告。",
+    "",
+  ].join("\n");
+}
+
+/** 新流程 boundary.yaml：角色根工作文档条目 + 实际写集（与团队计划一致；可传额外写集目录）。 */
+export function roleBoundaryDoc(
+  roleId = "executor",
+  options: { writes?: readonly string[]; files?: readonly string[] } = {},
+): string {
+  const files = options.files ?? ["feature-map.md", "functional-description.md", "memo.md", "api-spec.md"];
+  const writes = options.writes ?? [`src/owned-${roleId}/`];
+  return [
+    `role: ${roleId}`,
+    "entries:",
+    ...files.flatMap((file) => [
+      "  - kind: file",
+      `    path: 角色卡/${roleId}/${file}`,
+      "    purpose: 角色根工作文档",
+    ]),
+    ...writes.flatMap((path) => [
+      "  - kind: directory",
+      `    path: ${path}`,
+      "    purpose: 角色代码/测试写集",
+    ]),
+    "",
+  ].join("\n");
+}
+
+/** 角色根工作文档（feature-map/functional-description/memo/api-spec）。 */
+export function roleWorkDocs(roleId = "executor"): Record<string, string> {
+  return {
+    "feature-map.md": `# 功能导航\n\n| 功能 | 入口 |\n| --- | --- |\n| 实现 | src/owned-${roleId}/ |\n`,
+    "functional-description.md": `# 功能说明\n\n职责：实现与测试。交接：向 Lead 报告。代码位置：src/owned-${roleId}/。\n`,
+    "memo.md": "# 备忘\n\n- 2026-10-22 由 Crew 按团队计划写卡。\n",
+    "api-spec.md": "# API 说明\n\nnot-applicable：本角色无导出/共享/装配接口。\n",
+  };
+}
+
+/** 一次性写出新流程要求的全部角色产物（role-card/boundary/工作文档）。 */
+export function writeRoleArtifacts(
+  root: string,
+  roleId = "executor",
+  options: { writes?: readonly string[] } = {},
+): void {
+  write(root, `角色卡/${roleId}/role-card.md`, roleCardDoc(roleId));
+  write(root, `角色卡/${roleId}/boundary.yaml`, roleBoundaryDoc(roleId, options));
+  for (const [file, content] of Object.entries(roleWorkDocs(roleId))) {
+    write(root, `角色卡/${roleId}/${file}`, content);
+  }
+}
+
+/** 实施前验收标准（结构门槛：flowId、验收表 ID 列、T0–T3、判定规则、证据计划、版本/冻结）。 */
+export function acceptanceCriteriaDoc(flowId = FLOW): string {
+  return [
+    "---",
+    `flowId: ${flowId}`,
+    "version: 1",
+    "---",
+    "",
+    `# 验收完成标准 ${flowId}`,
+    "",
+    "## 范围与非目标",
+    "范围：本流程交付；非目标：无关治理差异。",
+    "",
+    "## 验收表",
+    "| ID | 标准 | 需要的证据 | 实际证据路径/哈希 | 候选版本 | 产出角色 | 结果 | 验收判断 |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| P1 | 交付满足提案 | 测试输出 | 待提交 | 候选哈希 | 测试 | 待判定 | 待判定 |",
+    "",
+    "## 风险档位与判定依据",
+    "风险档位：T1（实现变更）。",
+    "",
+    "## 判定规则",
+    "pass：证据齐全且满足标准；fail：有证据表明不满足；insufficient evidence：证据缺失或候选不符。",
+    "",
+    "## 证据计划",
+    "需要的证据：测试命令输出、候选哈希、diff/status。",
+    "",
+    "## 版本与冻结",
+    "标准写盘后冻结；变更需递增版本并记录理由。",
+    "",
+  ].join("\n");
+}
+
+/** 验收报告：首行五项 + 档位；报告档位不得低于变更包。 */
+export function acceptanceReportDoc(flowId = FLOW, riskTier = "T1"): string {
+  return [
+    `风险档位：${riskTier}｜判定依据：实现变更按测试证据判定｜选定检查：受影响测试与全量回归｜复用证据：无｜全量回归：已执行`,
+    "",
+    `# 验收报告 ${flowId}`,
+    "",
+    "## 结论",
+    "通过。",
+    "",
+    "## 逐行判定",
+    "| ID | 结果 |",
+    "| --- | --- |",
+    "| P1 | pass |",
+    "",
+  ].join("\n");
+}
+
+/** 变更包（frontmatter riskTier/candidate/changedPaths + 正文档位依据）。 */
+export function changePackageDoc(flowId = FLOW, riskTier = "T1"): string {
+  return [
+    "---",
+    `flowId: ${flowId}`,
+    "version: 1",
+    `riskTier: ${riskTier}`,
+    "candidate: fixture-candidate",
+    "changedPaths:",
+    "  - src/owned-executor/",
+    "evidence:",
+    `  - ${REPORT_REL}`,
+    "---",
+    "",
+    `# 变更包 ${flowId}`,
+    "",
+    "## 候选与范围",
+    "候选：fixture；范围：本流程授权写集。",
+    "",
+    "## 档位依据",
+    `风险档位 ${riskTier}：实现变更，按受影响测试与全量回归验证。`,
+    "",
+    "## 复用证据与失效说明",
+    "无。",
+    "",
+  ].join("\n");
+}
+
+/** 写入验收/变更包三件套（验收判定门槛）。 */
+export function seedAcceptanceArtifacts(root: string, flowId = FLOW, riskTier = "T1"): void {
+  write(root, `docs/acceptance/${flowId}-criteria-v1.md`, acceptanceCriteriaDoc(flowId));
+  write(root, `docs/acceptance/${flowId}-report-v1.md`, acceptanceReportDoc(flowId, riskTier));
+  write(root, `docs/scheduling/${flowId}-change-v1.md`, changePackageDoc(flowId, riskTier));
 }
 
 export function intentDoc(intentId = "intent-a", flowId = FLOW): string {
@@ -620,6 +978,16 @@ export interface Harness {
   decisionSwitch: ShellJudgeSwitch;
   presented: OperatorRequestPayload[];
   judgeRows: OperatorJudgeResultPayload[];
+  /**
+   * 到达**原始客户通道**（编排 `guardedInput` 的 `raw`：桌面 session 包装后 → `channel.customerInput`）
+   * 的请求记录（2026-10-22 无效治理卡守卫验证用；只读观测，不改任何行为）。
+   * 守卫在调用 `raw` 之前拒绝时，本数组保持为空。
+   */
+  rawCustomerInputs: Array<{ roleId: string; kind: CustomerInputRequest["kind"] }>;
+  /** 判断驱动函数被调用的次数（通道 `runJudge` 记录 `governance-judge.started` 后立即调用）。 */
+  readonly judgeInvocations: number;
+  /** 通道 request id 生成器的累计调用次数（守卫拒绝发生在通道之前 ⇒ 0）。 */
+  readonly nextIdCalls: number;
   events: SessionEventEnvelope[];
   openRoles: string[];
   userOpened: string[];
@@ -693,12 +1061,18 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
   };
 
   let opSeq = 0;
+  let nextIdCalls = 0;
+  let judgeInvocations = 0;
+  const rawCustomerInputs: Array<{ roleId: string; kind: CustomerInputRequest["kind"] }> = [];
   const channel = createCustomerInputChannel({
     operatorId: "test:客户",
     presenter: (payload) => {
       presented.push(payload);
     },
-    nextId: () => `op-${++opSeq}`,
+    nextId: () => {
+      nextIdCalls += 1;
+      return `op-${++opSeq}`;
+    },
     onNextStep: (payload, context) => {
       const advancing = iface!.advanceGovernanceFlow({ payload, context });
       advanceResults.push(advancing);
@@ -726,6 +1100,13 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
     ...(options.scriptForRole !== undefined ? { scriptForRole: options.scriptForRole } : {}),
   });
 
+  // 观测「编排 guardedInput → 原始客户通道」的调用（2026-10-22 守卫验证）：
+  // 守卫拒绝的卡不会到达这里；桌面 session 的镜像包装在本函数之上，因此计数与 presenter 无关。
+  const observedCustomerInput: DesktopCustomerInputFn = (req, ctx, metadata) => {
+    rawCustomerInputs.push({ roleId: ctx?.roleId ?? "", kind: req.kind });
+    return channel.customerInput(req, ctx, metadata);
+  };
+
   iface = createDesktopInterface({
     pickDirectory: async () => root,
     emitEvent: (envelope) => events.push(envelope),
@@ -751,8 +1132,14 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
       throw new Error("端到端验收不得构造 demo 适配器");
     },
     runtimeOptions: { modelId: "fixture-model" },
-    customerInput: channel.customerInput,
-    createGovernanceJudgeFn: judgeFactory(options.judge ?? {}, options.judgeTimeoutMs),
+    customerInput: observedCustomerInput,
+    createGovernanceJudgeFn: (judgeOptions) => {
+      const invoke = judgeFactory(options.judge ?? {}, options.judgeTimeoutMs)(judgeOptions);
+      return (request, signal) => {
+        judgeInvocations += 1;
+        return invoke(request, signal);
+      };
+    },
     // 2026-10-20：链式推进改为有界轮询目标事实；测试注入短轮询，避免 15min 默认定时器拖住测试文件。
     governanceChainOptions: options.governanceChain ?? { pollIntervalMs: 10, timeoutMs: 3000, settledGraceMs: 10 },
   });
@@ -768,6 +1155,7 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
     decisionSwitch,
     presented,
     judgeRows,
+    rawCustomerInputs,
     events,
     openRoles,
     userOpened,
@@ -778,6 +1166,8 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
     advanceResults,
     capsByRole,
     projectChanged: 0,
+    nextIdCalls: 0,
+    judgeInvocations: 0,
     async open(roleId: string): Promise<void> {
       userOpened.push(roleId);
       const opened = await iface!.openSession({ projectRoot: root, roleId, runtime });
@@ -819,6 +1209,8 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
   };
   // projectChanged 以 getter 形式暴露实时值（对象字面量不便；改用 defineProperty）。
   Object.defineProperty(harness, "projectChanged", { get: () => projectChanged });
+  Object.defineProperty(harness, "nextIdCalls", { get: () => nextIdCalls });
+  Object.defineProperty(harness, "judgeInvocations", { get: () => judgeInvocations });
   return harness;
 }
 

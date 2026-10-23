@@ -738,6 +738,73 @@ test("observeFlowArtifacts：.js/README/契约补记 artifact.observed；owner/p
   });
 });
 
+test("observeFlowArtifacts（2026-10-22）：团队计划/标准/变更包作为普通 artifact 可观察；不观察 角色卡/", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, [
+      "flowId: flow-a",
+      "version: 1",
+      "qualityTier: production",
+      "steps:",
+      "  - id: team-plan",
+      "    title: 团队计划",
+      "    owner: convener",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: docs/scheduling/flow-a-team-v1.md }",
+      "  - id: role-readiness",
+      "    title: 角色就绪复核",
+      "    owner: convener",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: docs/scheduling/flow-a-readiness-v1.md }",
+      "  - id: acceptance-criteria",
+      "    title: 实施前完成标准",
+      "    owner: verifier",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: docs/acceptance/flow-a-criteria-v1.md }",
+      "  - id: change-package",
+      "    title: 变更包",
+      "    owner: convener",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: docs/scheduling/flow-a-change-v1.md }",
+      "  - id: verification",
+      "    title: 验收",
+      "    owner: verifier",
+      "    kind: acceptance",
+      "    status: pending",
+      "",
+    ].join("\n"));
+    writeFile(root, "docs/scheduling/flow-a-team-v1.md", "# 团队计划\n");
+    writeFile(root, "docs/scheduling/flow-a-readiness-v1.md", "# readiness\n");
+    writeFile(root, "docs/acceptance/flow-a-criteria-v1.md", "# 标准\n");
+    writeFile(root, "docs/scheduling/flow-a-change-v1.md", "# 变更包\n");
+    // 角色卡/ 永不观察（即使 flow 步骤指向它）。
+    writeFile(root, "角色卡/A/role-card.md", "# A\n");
+
+    const result = await observeFlowArtifacts({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(result.ok, true, result.error ?? "");
+    assert.deepEqual(result.observed.sort(), [
+      "docs/acceptance/flow-a-criteria-v1.md",
+      "docs/scheduling/flow-a-change-v1.md",
+      "docs/scheduling/flow-a-readiness-v1.md",
+      "docs/scheduling/flow-a-team-v1.md",
+    ]);
+    const ledger = await readGovernanceLedger(root);
+    const byPath = new Map(
+      ledger.entries
+        .filter((entry) => entry.kind === "artifact.observed")
+        .map((entry) => [entry.artifactPath, entry]),
+    );
+    assert.equal(byPath.get("docs/scheduling/flow-a-team-v1.md")?.power, "schedule");
+    assert.equal(byPath.get("docs/scheduling/flow-a-readiness-v1.md")?.power, "schedule");
+    assert.equal(byPath.get("docs/acceptance/flow-a-criteria-v1.md")?.power, "verification");
+    assert.equal(byPath.get("docs/scheduling/flow-a-change-v1.md")?.power, "schedule");
+    assert.equal(byPath.has("角色卡/A/role-card.md"), false, "不观察 角色卡/");
+  });
+});
+
 test("observeFlowArtifacts：缺失/超限/二进制/路径越界 ⇒ skipped；不写客户决定", async () => {
   await withRoot(async (root) => {
     writeFile(root, FLOW_REL, [
@@ -839,5 +906,233 @@ test("observeFlowArtifacts：`..`/绝对路径在 flow YAML 校验阶段 fail-cl
     assert.equal(result.ok, false);
     assert.match(result.error ?? "", /evidence\.ref|项目相对路径/);
     assert.deepEqual(result.observed, []);
+  });
+});
+
+test("slug 收紧（S2/T10）：get/update/supersede/completeAcceptanceStep/observeFlowArtifacts 对尾连字符 id 显式拒绝，不写盘", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, flowYaml());
+    const service = steward(root);
+    const original = readFileSync(join(root, ...FLOW_REL.split("/")), "utf8");
+
+    const get = await service.get({ flowId: "flow-" });
+    assert.equal(get.ok, false);
+    assert.equal(get.code, "missing-flow-id");
+
+    const update = await service.update({
+      flowId: "flow-a",
+      stepId: "impl-",
+      status: "dispatched",
+      expectedRevision: sha256(original),
+    });
+    assert.equal(update.ok, false);
+    assert.equal(update.code, "missing-step-id");
+
+    const supersedeOld = await service.supersede({
+      flowId: "flow-a",
+      oldStepId: "impl-",
+      newStepId: "impl2",
+      title: "重做",
+      owner: "backend",
+      kind: "dispatch",
+      expectedRevision: sha256(original),
+    });
+    assert.equal(supersedeOld.ok, false);
+    assert.equal(supersedeOld.code, "missing-step-id");
+
+    const supersedeNew = await service.supersede({
+      flowId: "flow-a",
+      oldStepId: "impl",
+      newStepId: "impl-",
+      title: "重做",
+      owner: "backend",
+      kind: "dispatch",
+      expectedRevision: sha256(original),
+    });
+    assert.equal(supersedeNew.ok, false);
+    assert.equal(supersedeNew.code, "missing-step-id");
+
+    const complete = await completeAcceptanceStep({ projectRoot: root, flowId: "flow-" });
+    assert.equal(complete.ok, false);
+    assert.equal(complete.code, "missing-flow-id");
+
+    const observe = await observeFlowArtifacts({ projectRoot: root, flowId: "flow-" });
+    assert.equal(observe.ok, false);
+    assert.match(observe.error ?? "", /合法 flowId/);
+
+    // 合法值零回归：flow-a/impl 照常可读；文件未被上述拒绝写坏。
+    const legal = await service.get({ flowId: "flow-a" });
+    assert.equal(legal.ok, true);
+    assert.equal(readFileSync(join(root, ...FLOW_REL.split("/")), "utf8"), original, "拒绝路径不得写盘");
+  });
+});
+
+// —————————————————————— 2026-10-22 MapReduce 方案 A：可选字段视图/序列化/supersede ——————————————————————
+
+const MAP_OPTIONAL_FLOW_REL = "docs/flows/flow-a.yaml";
+
+function mapOptionalFlow(): string {
+  return [
+    "flowId: flow-a",
+    "version: 1",
+    "qualityTier: production",
+    "steps:",
+    "  - id: publish",
+    "    title: 发布",
+    "    owner: integration",
+    "    kind: artifact",
+    "    status: pending",
+    "    parallelGroup: reduce",
+    "  - id: impl",
+    "    title: 实现",
+    "    owner: backend",
+    "    kind: dispatch",
+    "    status: pending",
+    "  - id: acceptance",
+    "    title: 验收",
+    "    owner: verifier",
+    "    kind: acceptance",
+    "    status: pending",
+    "",
+  ].join("\n");
+}
+
+test("可选字段：get 视图携带 parallelGroup/dependsOn；旧 flow 视图不凭空出现字段", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, MAP_OPTIONAL_FLOW_REL, mapOptionalFlow());
+    const service = steward(root);
+    const view = await service.get({ flowId: "flow-a" });
+    assert.equal(view.ok, true, view.error ?? "");
+    const publish = view.flow!.steps.find((step) => step.id === "publish")!;
+    assert.equal(publish.parallelGroup, "reduce");
+    assert.equal("dependsOn" in publish, false);
+    const impl = view.flow!.steps.find((step) => step.id === "impl")!;
+    assert.equal("parallelGroup" in impl, false);
+    assert.equal("dependsOn" in impl, false);
+
+    // 旧 flow（无任何可选字段）：视图逐字不含新字段。
+    const legacyRoot = mkdtempSync(join(tmpdir(), "ans-flow-service-legacy-"));
+    try {
+      writeFile(legacyRoot, MAP_OPTIONAL_FLOW_REL, flowYaml());
+      const legacyView = await steward(legacyRoot).get({ flowId: "flow-a" });
+      assert.equal(legacyView.ok, true, legacyView.error ?? "");
+      for (const step of legacyView.flow!.steps) {
+        assert.equal("parallelGroup" in step, false);
+        assert.equal("dependsOn" in step, false);
+      }
+    } finally {
+      rmSync(legacyRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test("supersede 新步骤携带 parallelGroup/dependsOn；幂等比较含字段；旧 flow 序列化逐字不变", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, MAP_OPTIONAL_FLOW_REL, mapOptionalFlow());
+    const service = steward(root);
+    let revision = (await service.get({ flowId: "flow-a" })).revision!;
+
+    const superseded = await service.supersede({
+      flowId: "flow-a",
+      oldStepId: "impl",
+      newStepId: "impl-2",
+      title: "重新实现",
+      owner: "integration",
+      kind: "dispatch",
+      expectedRevision: revision,
+      parallelGroup: "reduce",
+      dependsOn: ["publish"],
+    });
+    assert.equal(superseded.ok, true, superseded.error ?? "");
+    revision = superseded.revision!;
+    const newView = superseded.flow!.steps.find((step) => step.id === "impl-2")!;
+    assert.equal(newView.parallelGroup, "reduce");
+    assert.deepEqual(newView.dependsOn, ["publish"]);
+    const written = readFileSync(join(root, ...MAP_OPTIONAL_FLOW_REL.split("/")), "utf8");
+    assert.match(written, /parallelGroup: reduce/);
+    assert.match(written, /publish/);
+
+    const repeat = await service.supersede({
+      flowId: "flow-a",
+      oldStepId: "impl",
+      newStepId: "impl-2",
+      title: "重新实现",
+      owner: "integration",
+      kind: "dispatch",
+      expectedRevision: revision,
+      parallelGroup: "reduce",
+      dependsOn: ["publish"],
+    });
+    assert.equal(repeat.ok, true);
+    assert.equal(repeat.idempotent, true);
+
+    const changed = await service.supersede({
+      flowId: "flow-a",
+      oldStepId: "impl",
+      newStepId: "impl-2",
+      title: "重新实现",
+      owner: "integration",
+      kind: "dispatch",
+      expectedRevision: revision,
+      parallelGroup: "reduce",
+      dependsOn: [],
+    });
+    assert.equal(changed.ok, false);
+    assert.equal(changed.code, "step-exists");
+  });
+
+  // 旧 flow 序列化：不因新增可选字段改变输出（逐字对照）。
+  await withRoot(async (root) => {
+    const minimal = [
+      "flowId: flow-a",
+      "version: 1",
+      "qualityTier: production",
+      "steps:",
+      "  - id: impl",
+      "    title: 实现",
+      "    owner: backend",
+      "    kind: dispatch",
+      "    status: pending",
+      "  - id: acceptance",
+      "    title: 验收",
+      "    owner: verifier",
+      "    kind: acceptance",
+      "    status: pending",
+      "",
+    ].join("\n");
+    writeFile(root, MAP_OPTIONAL_FLOW_REL, minimal);
+    let captured: string | undefined;
+    const service = createFlowService({
+      projectRoot: root,
+      actorRoleId: "convener",
+      actorPower: "schedule",
+      writeFile: async (_abs, data) => {
+        captured = data;
+      },
+    });
+    const revision = (await service.get({ flowId: "flow-a" })).revision!;
+    const updated = await service.update({ flowId: "flow-a", stepId: "impl", status: "dispatched", expectedRevision: revision });
+    assert.equal(updated.ok, true, updated.error ?? "");
+    assert.equal(
+      captured,
+      [
+        "flowId: flow-a",
+        "version: 1",
+        "qualityTier: production",
+        "steps:",
+        "  - id: impl",
+        "    title: 实现",
+        "    owner: backend",
+        "    kind: dispatch",
+        "    status: dispatched",
+        "  - id: acceptance",
+        "    title: 验收",
+        "    owner: verifier",
+        "    kind: acceptance",
+        "    status: pending",
+        "",
+      ].join("\n"),
+      "旧 flow 序列化必须逐字不变（不出现新字段/不改顺序）",
+    );
   });
 });

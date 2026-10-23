@@ -1,0 +1,14 @@
+role: 治理边界
+entries:
+  - kind: directory
+    path: 角色卡/
+    root: project
+    purpose: 角色目录
+  - kind: directory
+    path: docs/
+    root: project
+    purpose: 项目文档
+  - kind: directory
+    path: .ans/
+    root: project
+    purpose: 配置与 pin

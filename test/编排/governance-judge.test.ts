@@ -22,6 +22,7 @@ import type { ProjectConfig, ResolvedRole } from "../../src/model/role.ts";
 import type {
   CustomerInputFn,
   CustomerInputMetadata,
+  CustomerInputOutcome,
   CustomerInputRequest,
   DiagnosticLog,
   GovernanceJudgeAudit,
@@ -184,6 +185,115 @@ function seedNomination(root: string, recommended: readonly string[], rel = "doc
       "| 角色 | 理由 |",
       "| --- | --- |",
       ...recommended.map((id) => `| ${id} | 候选 |`),
+      "",
+    ].join("\n"),
+  );
+}
+
+// 2026-10-22 第 1 项：团队计划（docs/scheduling/<flowId>-team-vN.md）替代提名文件。
+const TEAM_PLAN_COLUMNS = "| roleId | 类型 | 职责目标 | 能力要求 | 唯一写集 | 依赖 | 组别 | apiSpec |";
+const TEAM_PLAN_DIVIDER = "| --- | --- | --- | --- | --- | --- | --- | --- |";
+
+function teamPlanMarkdown(
+  flowId: string,
+  recommended: readonly string[],
+  over: { recommendedLine?: string; header?: string; divider?: string; rows?: readonly string[] } = {},
+): string {
+  const rows = over.rows ?? recommended.map(
+    (id) => `| ${id} | existing | 实现 ${id} 的职责 | 具备 ${id} 的能力 | src/${id}/ | 无 | 组 A | not-applicable（无导出） |`,
+  );
+  return [
+    "---",
+    `flowId: ${flowId}`,
+    "version: 1",
+    "status: draft",
+    "riskTier: T3",
+    over.recommendedLine ?? `recommended: [${recommended.join(", ")}]`,
+    "---",
+    "",
+    `# 团队计划：${flowId}`,
+    "",
+    "## 2. 参与角色与职责",
+    "",
+    over.header ?? TEAM_PLAN_COLUMNS,
+    over.divider ?? TEAM_PLAN_DIVIDER,
+    ...rows,
+    "",
+    "## 7. 风险档位与理由",
+    "T3（治理/权限变更）。",
+    "",
+  ].join("\n");
+}
+
+function seedTeamPlan(
+  root: string,
+  recommended: readonly string[],
+  over: { flowId?: string; version?: number; recommendedLine?: string; header?: string; divider?: string; rows?: readonly string[] } = {},
+): string {
+  const flowId = over.flowId ?? "flow-a";
+  const rel = `docs/scheduling/${flowId}-team-v${over.version ?? 1}.md`;
+  writeFile(root, rel, teamPlanMarkdown(flowId, recommended, over));
+  return rel;
+}
+
+/** 结构合格的实施前验收标准（第 3 项）。 */
+function acceptanceCriteriaMarkdown(flowId: string): string {
+  return [
+    `# 验收完成标准：${flowId}`,
+    "",
+    "| ID | 标准 | 需要的证据 | 结果 |",
+    "| --- | --- | --- | --- |",
+    `| P1 | ${flowId} 示例标准 | 测试输出 | 待判定 |`,
+    "",
+    "风险档位：T3（治理/权限变更）。",
+    "",
+    "判定规则：pass / fail / insufficient evidence / not applicable。",
+    "",
+    "证据计划：单测原始输出与全量回归记录。",
+    "",
+    "版本冻结：v1 写盘后冻结。",
+    "",
+  ].join("\n");
+}
+
+const REPORT_FIVE_LABELS =
+  "风险档位：T3｜判定依据：治理/权限变更｜选定检查：定向测试｜复用证据：无｜全量回归：已执行";
+
+/** 第 3 项的三件套：验收标准、验收报告（首行五项）、变更包（frontmatter riskTier）。 */
+function seedAcceptanceArtifacts(
+  root: string,
+  over: {
+    flowId?: string;
+    reportTier?: string;
+    changeTier?: string;
+    reportFirstLine?: string;
+    criteriaFlowId?: string;
+  } = {},
+): void {
+  const flowId = over.flowId ?? "flow-a";
+  writeFile(root, `docs/acceptance/${flowId}-criteria-v1.md`, acceptanceCriteriaMarkdown(over.criteriaFlowId ?? flowId));
+  const firstLine = over.reportFirstLine ??
+    (over.reportTier !== undefined
+      ? `风险档位：${over.reportTier}｜判定依据：治理/权限变更｜选定检查：定向测试｜复用证据：无｜全量回归：已执行`
+      : REPORT_FIVE_LABELS);
+  writeFile(root, `docs/acceptance/${flowId}-report-v1.md`, `${firstLine}\n\n## 结论\n通过。\n`);
+  writeFile(
+    root,
+    `docs/scheduling/${flowId}-change-v1.md`,
+    [
+      "---",
+      `flowId: ${flowId}`,
+      "version: 1",
+      `riskTier: ${over.changeTier ?? "T3"}`,
+      "candidate: abc123",
+      "changedPaths: [src/a.ts]",
+      "evidence: [test/a.test.ts]",
+      "---",
+      "",
+      "# 变更包",
+      "",
+      "## 档位依据",
+      "治理/权限变更。",
       "",
     ].join("\n"),
   );
@@ -512,7 +622,7 @@ test("artifact-missing reason：proposal/appointment/acceptance 列出约定物�
   assert.equal(proposal.reasonCode, "artifact-missing");
   assert.match(proposal.reason ?? "", /规范物证缺失：docs\/proposals\/flow-a-v1\.md（判断无法核对）；请按上述原因修正后重新提交。/);
 
-  // appointment：无提名文件 ⇒ 明确点名 docs/nominations/<flowId>-v1.md
+  // appointment：无团队计划 ⇒ 明确点名 docs/scheduling/<flowId>-team-v1.md（不再指向提名）
   const appointmentReq = request({
     cardKind: "appointment",
     card: {
@@ -528,9 +638,9 @@ test("artifact-missing reason：proposal/appointment/acceptance 列出约定物�
   const appointment = await makeJudge({}).judge(appointmentReq);
   assert.equal(appointment.verdict, "manual");
   assert.equal(appointment.reasonCode, "artifact-missing");
-  assert.match(appointment.reason ?? "", /规范物证缺失：docs\/nominations\/flow-a-v1\.md（判断无法核对）；请按上述原因修正后重新提交。/);
+  assert.match(appointment.reason ?? "", /规范物证缺失：docs\/scheduling\/flow-a-team-v1\.md（判断无法核对）；请按上述原因修正后重新提交。/);
 
-  // acceptance：proposal 与 flow 两个物证都缺 ⇒ 两条路径都列出
+  // acceptance：proposal/流程/标准/报告/变更包都缺 ⇒ 逐条列出
   const acceptanceReq = request({
     cardKind: "acceptance",
     card: {
@@ -546,6 +656,9 @@ test("artifact-missing reason：proposal/appointment/acceptance 列出约定物�
   assert.equal(acceptance.reasonCode, "artifact-missing");
   assert.match(acceptance.reason ?? "", /docs\/proposals\/flow-a-v1\.md/);
   assert.match(acceptance.reason ?? "", /docs\/flows\/flow-a\.md/);
+  assert.match(acceptance.reason ?? "", /docs\/acceptance\/flow-a-criteria-v1\.md/);
+  assert.match(acceptance.reason ?? "", /docs\/acceptance\/flow-a-report-v1\.md/);
+  assert.match(acceptance.reason ?? "", /docs\/scheduling\/flow-a-change-v1\.md/);
 });
 
 test("requiredArtifactPaths：flowId 缺失时 missingPaths 用文字，不编造路径", () => {
@@ -564,11 +677,11 @@ test("requiredArtifactPaths：flowId 缺失时 missingPaths 用文字，不编�
       recommendedRoleIds: ["alpha"],
       artifacts: {},
     })).missingPaths,
-    ["提名"],
+    ["团队计划"],
   );
   assert.deepEqual(
     requiredArtifactPaths(request({ flowId: "", cardKind: "acceptance", card: { kind: "choice", title: "验收", options: [], cardKind: "acceptance" }, artifacts: {} })).missingPaths,
-    ["提案", "流程单文件"],
+    ["提案", "流程单文件", "实施前验收标准", "验收报告", "变更包"],
   );
 });
 
@@ -671,12 +784,31 @@ function appointmentRequest(root: string, over: Partial<GovernanceJudgeRequest> 
       flowId: "flow-a",
     },
     recommendedRoleIds: ["alpha", "beta"],
-    artifacts: { nominationPath: "docs/nominations/flow-a-v1.md" },
+    artifacts: { teamPlanPath: "docs/scheduling/flow-a-team-v1.md" },
     ...over,
   });
 }
 
-test("appointment：selected 恰等于推荐集 → approve；多选卡片允许两个", async () => {
+test("appointment：selected 恰等于团队计划推荐集 → approve；多选卡片允许两个", async () => {
+  await withRoot(async (root) => {
+    seedTeamPlan(root, ["alpha", "beta"]);
+    seedIntent(root);
+    seedIntentLedger(root);
+    const { judge } = makeJudge({
+      report: readThenReport([INTENT_REL, "docs/scheduling/flow-a-team-v1.md"], {
+        verdict: "approve",
+        reason: "候选与已接受提案一致。",
+        evidence: ["docs/scheduling/flow-a-team-v1.md"],
+        selected: ["alpha", "beta"],
+      }),
+    });
+    const out = await judge(appointmentRequest(root));
+    assert.equal(out.verdict, "approve");
+    assert.deepEqual(out.value, { selected: ["alpha", "beta"] });
+  });
+});
+
+test("appointment legacy（O4）：仅旧提名文件时回落 nominationPath 并解析推荐集", async () => {
   await withRoot(async (root) => {
     seedNomination(root, ["alpha", "beta"]);
     seedIntent(root);
@@ -684,12 +816,14 @@ test("appointment：selected 恰等于推荐集 → approve；多选卡片允许
     const { judge } = makeJudge({
       report: readThenReport([INTENT_REL, "docs/nominations/flow-a-v1.md"], {
         verdict: "approve",
-        reason: "候选与已接受提案一致。",
+        reason: "旧流程回落提名文件，候选一致。",
         evidence: ["docs/nominations/flow-a-v1.md"],
         selected: ["alpha", "beta"],
       }),
     });
-    const out = await judge(appointmentRequest(root));
+    const out = await judge(appointmentRequest(root, {
+      artifacts: { nominationPath: "docs/nominations/flow-a-v1.md" },
+    }));
     assert.equal(out.verdict, "approve");
     assert.deepEqual(out.value, { selected: ["alpha", "beta"] });
   });
@@ -732,16 +866,16 @@ test("appointment：多选推荐但卡片单选 / 选偏 / 内置 id / 推荐集
   ];
   for (const [index, scenario] of scenarios.entries()) {
     await withRoot(async (root) => {
-      seedNomination(root, scenario.recommended);
+      seedTeamPlan(root, scenario.recommended);
       seedIntent(root);
       seedIntentLedger(root);
       const { judge } = makeJudge({
         report: (seen: Seen) => {
-          seen.capabilities!.governanceJudge!.stats.readPaths = [INTENT_REL, "docs/nominations/flow-a-v1.md"];
+          seen.capabilities!.governanceJudge!.stats.readPaths = [INTENT_REL, "docs/scheduling/flow-a-team-v1.md"];
           return {
             verdict: "approve",
             reason: "按推荐集任命。",
-            evidence: ["docs/nominations/flow-a-v1.md"],
+            evidence: ["docs/scheduling/flow-a-team-v1.md"],
             selected: scenario.selected,
           };
         },
@@ -777,6 +911,9 @@ function acceptanceRequest(root: string, over: Partial<GovernanceJudgeRequest> =
     artifacts: {
       proposalPath: "docs/proposals/flow-a-v1.md",
       flowPath: "docs/flows/flow-a.md",
+      acceptanceCriteriaPath: "docs/acceptance/flow-a-criteria-v1.md",
+      acceptanceReportPath: "docs/acceptance/flow-a-report-v1.md",
+      changePackagePath: "docs/scheduling/flow-a-change-v1.md",
     },
     facts: facts({ proposalDecision: "accepted", dispatchedStepIds: ["s1"] }),
     ...over,
@@ -791,11 +928,12 @@ const APPROVE_ACCEPTANCE = {
 };
 const ACCEPTANCE_READS = [INTENT_REL, "docs/proposals/flow-a-v1.md"];
 
-test("acceptance：流程全部 done + dispatch 齐全 + 物证已读 → approve", async () => {
+test("acceptance：流程全部 done + dispatch 齐全 + 标准/报告/变更包齐备 → approve", async () => {
   await withRoot(async (root) => {
     writeFile(root, "docs/flows/flow-a.md", flowMarkdown([{ id: "s1", status: "done" }]));
     seedProposal(root);
     seedIntent(root);
+    seedAcceptanceArtifacts(root);
     seedAcceptanceLedger(root, { steps: ["s1"] });
     const { judge } = makeJudge({ report: readThenReport(ACCEPTANCE_READS, APPROVE_ACCEPTANCE) });
     const out = await judge(acceptanceRequest(root));
@@ -841,6 +979,7 @@ test("acceptance：机械门槛——未完成/阻塞/缺 dispatch/未结算决�
       if (scenario.flow !== undefined) writeFile(root, "docs/flows/flow-a.md", scenario.flow);
       seedProposal(root);
       seedIntent(root);
+      seedAcceptanceArtifacts(root);
       seedAcceptanceLedger(root, { steps: scenario.facts.dispatchedStepIds ?? [] });
       const { judge } = makeJudge({ report: readThenReport(ACCEPTANCE_READS, APPROVE_ACCEPTANCE) });
       const out = await judge(acceptanceRequest(root, { facts: scenario.facts }));
@@ -896,6 +1035,7 @@ test("acceptance：旧账本 unclassified/none 不算未结算（不挡真正的
         decisionEvidence: { kind: "customer-input" },
       }),
     ].join("\n") + "\n");
+    seedAcceptanceArtifacts(root);
     const { judge } = makeJudge({ report: readThenReport(ACCEPTANCE_READS, APPROVE_ACCEPTANCE) });
     const out = await judge(acceptanceRequest(root, {
       facts: facts({ proposalDecision: "accepted", dispatchedStepIds: ["s1"] }),
@@ -950,6 +1090,7 @@ test("acceptance：ledgerErrors / 未接受 / 未闭环澄清 → manual", async
       writeFile(root, "docs/flows/flow-a.md", flowMarkdown([{ id: "s1", status: "done" }]));
       seedProposal(root);
       seedIntent(root);
+      seedAcceptanceArtifacts(root);
       scenario.ledger(root);
       const { judge } = makeJudge({ report: readThenReport(ACCEPTANCE_READS, APPROVE_ACCEPTANCE) });
       const out = await judge(acceptanceRequest(root, { facts: scenario.facts }));
@@ -957,6 +1098,101 @@ test("acceptance：ledgerErrors / 未接受 / 未闭环澄清 → manual", async
       assert.equal(out.reasonCode, scenario.code);
     });
   }
+});
+
+test("acceptance 第 3 项门槛：标准/报告/变更包缺失或首行五项/档位不符 → manual（不调模型）", async () => {
+  const baseSeed = (root: string): void => {
+    writeFile(root, "docs/flows/flow-a.md", flowMarkdown([{ id: "s1", status: "done" }]));
+    seedProposal(root);
+    seedIntent(root);
+    seedAcceptanceArtifacts(root);
+    seedAcceptanceLedger(root, { steps: ["s1"] });
+  };
+  const cases: Array<{
+    name: string;
+    prepare: (root: string) => void;
+    over?: Partial<GovernanceJudgeRequest>;
+    code: string;
+    reason: RegExp;
+  }> = [
+    {
+      name: "标准缺失",
+      prepare: (root) => rmSync(join(root, "docs", "acceptance", "flow-a-criteria-v1.md")),
+      code: "artifact-missing",
+      reason: /flow-a-criteria-v1\.md/,
+    },
+    {
+      name: "报告缺失",
+      prepare: (root) => rmSync(join(root, "docs", "acceptance", "flow-a-report-v1.md")),
+      code: "artifact-missing",
+      reason: /flow-a-report-v1\.md/,
+    },
+    {
+      name: "变更包缺失",
+      prepare: (root) => rmSync(join(root, "docs", "scheduling", "flow-a-change-v1.md")),
+      code: "artifact-missing",
+      reason: /flow-a-change-v1\.md/,
+    },
+    {
+      name: "报告首行缺五项",
+      prepare: (root) => {
+        seedAcceptanceArtifacts(root, { reportFirstLine: "风险档位：T3｜判定依据：治理变更｜选定检查：定向测试｜全量回归：已执行" });
+      },
+      code: "insufficient-evidence",
+      reason: /首行缺少五项中的：复用证据/,
+    },
+    {
+      name: "报告档位低于变更包",
+      prepare: (root) => seedAcceptanceArtifacts(root, { reportTier: "T1", changeTier: "T3" }),
+      code: "insufficient-evidence",
+      reason: /报告档位 T1 低于变更包档位 T3/,
+    },
+    {
+      name: "变更包缺 riskTier",
+      prepare: (root) => writeFile(root, "docs/scheduling/flow-a-change-v1.md", "---\nflowId: flow-a\nversion: 1\n---\n# 变更包\n"),
+      code: "insufficient-evidence",
+      reason: /缺少 riskTier/,
+    },
+    {
+      name: "标准 flowId 不一致",
+      prepare: (root) => {
+        writeFile(root, "docs/acceptance/flow-b-criteria-v1.md", acceptanceCriteriaMarkdown("flow-b"));
+      },
+      over: {
+        artifacts: {
+          proposalPath: "docs/proposals/flow-a-v1.md",
+          flowPath: "docs/flows/flow-a.md",
+          acceptanceCriteriaPath: "docs/acceptance/flow-b-criteria-v1.md",
+          acceptanceReportPath: "docs/acceptance/flow-a-report-v1.md",
+          changePackagePath: "docs/scheduling/flow-a-change-v1.md",
+        },
+      },
+      code: "insufficient-evidence",
+      reason: /flowId 与卡片不一致/,
+    },
+  ];
+
+  for (const scenario of cases) {
+    await withRoot(async (root) => {
+      baseSeed(root);
+      scenario.prepare(root);
+      const { judge, seen } = makeJudge({ report: readThenReport(ACCEPTANCE_READS, APPROVE_ACCEPTANCE) });
+      const out = await judge(acceptanceRequest(root, { facts: facts({ proposalDecision: "accepted", dispatchedStepIds: ["s1"] }), ...scenario.over }));
+      assert.equal(out.verdict, "manual", scenario.name);
+      assert.equal(out.reasonCode, scenario.code, scenario.name);
+      assert.match(out.reason ?? "", scenario.reason, scenario.name);
+      assert.equal(seen.binds, 0, `${scenario.name}：机械门槛失败不得调用模型`);
+    });
+  }
+
+  // 报告档位高于变更包（升档）⇒ 允许。
+  await withRoot(async (root) => {
+    baseSeed(root);
+    seedAcceptanceArtifacts(root, { reportTier: "T3", changeTier: "T2" });
+    const { judge } = makeJudge({ report: readThenReport(ACCEPTANCE_READS, APPROVE_ACCEPTANCE) });
+    const out = await judge(acceptanceRequest(root));
+    assert.equal(out.verdict, "approve");
+  });
 });
 
 // ————— ③-补 2026-10-19 真机：状态「引导词 + 说明」与 canonical stepId 列（验收机械门槛） —————
@@ -1262,17 +1498,19 @@ function confirmRequest(over: Partial<GovernanceJudgeRequest> = {}): GovernanceJ
   });
 }
 
-/** 任命写卡所需的账本事实（最新 appointment 决定的目标角色）。 */
+/** 任命写卡所需的账本事实（最新 appointment 决定的目标角色；2026-10-22 起由 Convener 发起）。 */
 function seedAppointmentLedger(root: string, targetRoleIds: readonly string[], flowId = "flow-a"): void {
   writeFile(root, ".ans/governance/ledger.jsonl", `${JSON.stringify({
     at: "2026-10-19T00:00:00.000Z",
     kind: "customer.decision",
     flowId,
-    actorRoleId: "nominator",
-    power: "nomination",
+    actorRoleId: "convener",
+    power: "schedule",
     decisionKind: "appointment",
     customerDecision: "appointed",
     targetRoleIds: [...targetRoleIds],
+    artifactPath: `docs/scheduling/${flowId}-team-v1.md`,
+    artifactVersion: 1,
     decisionEvidence: { kind: "customer-input" },
   })}\n`);
 }
@@ -1445,13 +1683,13 @@ test("write：已有旧版提案 → 必须读旧版；新目标文件本身不�
 
 test("appointment-write / schedule-write：新文件 + 证据包正文仍可代批（不回归）", async () => {
   await withRoot(async (root) => {
-    seedNomination(root, ["alpha"]);
+    seedTeamPlan(root, ["alpha"]);
     seedAppointmentLedger(root, ["alpha"]);
     const { judge } = makeJudge({
-      report: readThenReport(["docs/nominations/flow-a-v1.md"], {
+      report: readThenReport(["docs/scheduling/flow-a-team-v1.md"], {
         verdict: "approve",
-        reason: "候选与提案一致。",
-        evidence: ["docs/nominations/flow-a-v1.md"],
+        reason: "候选与团队计划一致。",
+        evidence: ["docs/scheduling/flow-a-team-v1.md"],
         confirmed: true,
         pathDecisions: [
           { path: "角色卡/alpha/role-card.md", ok: true },
@@ -1478,7 +1716,7 @@ test("appointment-write / schedule-write：新文件 + 证据包正文仍可代�
       ],
       allowedPathRoots: ["角色卡/"],
       forbiddenPaths: [".ans/", "角色卡/governance-boundary.yaml", "角色卡/rapporteur/", "角色卡/su/"],
-      artifacts: { nominationPath: "docs/nominations/flow-a-v1.md" },
+      artifacts: { teamPlanPath: "docs/scheduling/flow-a-team-v1.md" },
       facts: facts({ appointmentTargetRoleIds: ["alpha"] }),
     }));
     assert.equal(out.verdict, "approve");
@@ -1599,13 +1837,13 @@ test("appointment-write：目标必须在最新任命名单且非内置 → appr
     ],
     allowedPathRoots: ["角色卡/"],
     forbiddenPaths: [".ans/", "角色卡/governance-boundary.yaml", "角色卡/rapporteur/", "角色卡/su/"],
-    artifacts: { nominationPath: "docs/nominations/flow-a-v1.md" },
+    artifacts: { teamPlanPath: "docs/scheduling/flow-a-team-v1.md" },
     facts: facts({ appointmentTargetRoleIds: ["alpha"], ...factsOver }),
   });
   const report = (target: string) => ({
     verdict: "approve",
-    reason: "候选与已接受提案一致。",
-    evidence: ["docs/nominations/flow-a-v1.md"],
+    reason: "候选与团队计划一致。",
+    evidence: ["docs/scheduling/flow-a-team-v1.md"],
     confirmed: true,
     pathDecisions: [
       { path: `角色卡/${target}/role-card.md`, ok: true },
@@ -1613,17 +1851,17 @@ test("appointment-write：目标必须在最新任命名单且非内置 → appr
     ],
   });
   await withRoot(async (root) => {
-    seedNomination(root, ["alpha"]);
+    seedTeamPlan(root, ["alpha"]);
     seedAppointmentLedger(root, ["alpha"]);
-    const { judge } = makeJudge({ report: readThenReport(["docs/nominations/flow-a-v1.md"], report("alpha")) });
+    const { judge } = makeJudge({ report: readThenReport(["docs/scheduling/flow-a-team-v1.md"], report("alpha")) });
     const out = await judge(appointmentWrite(root, "alpha", {}));
     assert.equal(out.verdict, "approve");
   });
   for (const [target, code] of [["beta", "path-outside-boundary"], ["rapporteur", "path-outside-boundary"]] as const) {
     await withRoot(async (root) => {
-      seedNomination(root, ["alpha"]);
+      seedTeamPlan(root, ["alpha"]);
       seedAppointmentLedger(root, ["alpha"]);
-      const { judge } = makeJudge({ report: readThenReport(["docs/nominations/flow-a-v1.md"], report(target)) });
+      const { judge } = makeJudge({ report: readThenReport(["docs/scheduling/flow-a-team-v1.md"], report(target)) });
       const out = await judge(appointmentWrite(root, target, {}));
       assert.equal(out.verdict, "manual");
       assert.equal(out.reasonCode, code);
@@ -1863,7 +2101,7 @@ test("模型自报任意 reasonCode 不透传；多次调用最后一次合法�
 test("facts：从账本快照提炼 proposal/appointment/dispatch/澄清，且有界", () => {
   const entries = [
     { at: "t1", kind: "customer.decision" as const, actorRoleId: "rapporteur", power: "proposal" as const, flowId: "flow-a", decisionKind: "proposal-accept" as const },
-    { at: "t2", kind: "customer.decision" as const, actorRoleId: "nominator", power: "nomination" as const, flowId: "flow-a", decisionKind: "appointment" as const, targetRoleIds: ["alpha", "beta"] },
+    { at: "t2", kind: "customer.decision" as const, actorRoleId: "convener", power: "schedule" as const, flowId: "flow-a", decisionKind: "appointment" as const, targetRoleIds: ["alpha", "beta"], artifactPath: "docs/scheduling/flow-a-team-v1.md" },
     { at: "t3", kind: "dispatch.accepted" as const, actorRoleId: "app", power: "app" as const, flowId: "flow-a", stepId: "s1" },
     { at: "t4", kind: "dispatch.accepted" as const, actorRoleId: "app", power: "app" as const, flowId: "flow-a", stepId: "s1" },
     { at: "t5", kind: "clarification.requested" as const, actorRoleId: "rapporteur", power: "proposal" as const, flowId: "flow-a" },
@@ -1874,6 +2112,7 @@ test("facts：从账本快照提炼 proposal/appointment/dispatch/澄清，且�
   assert.equal(built.ledgerErrors, 0);
   assert.equal(built.proposalDecision, "accepted");
   assert.deepEqual(built.appointmentTargetRoleIds, ["alpha", "beta"]);
+  assert.equal(built.teamPlanConfirmed, true, "最新 appointment 绑定团队计划物证");
   assert.deepEqual(built.dispatchedStepIds, ["s1"]);
   assert.equal(built.unresolvedClarificationCount, 1);
   assert.deepEqual(built.latestDecisionKinds, ["proposal-accept", "appointment"]);
@@ -1883,18 +2122,52 @@ test("facts：从账本快照提炼 proposal/appointment/dispatch/澄清，且�
   assert.equal(withError.ledgerErrors, 1);
 });
 
-test("requiredArtifactPaths：逐卡种必需物证与缺失判定", () => {
+test("requiredArtifactPaths：逐卡种必需物证与缺失判定（团队计划/标准/报告/变更包）", () => {
   assert.deepEqual(requiredArtifactPaths(request({ cardKind: "proposal", artifacts: { proposalPath: "p.md" } })), { paths: ["p.md"], missing: false });
   assert.equal(requiredArtifactPaths(request({ cardKind: "proposal" })).missing, true);
   assert.equal(requiredArtifactPaths(request({ cardKind: "accepted" as never, artifacts: { proposalPath: "p.md" } })).missing, true);
+  const acceptanceArtifacts = {
+    proposalPath: "p.md",
+    flowPath: "f.md",
+    acceptanceCriteriaPath: "docs/acceptance/flow-a-criteria-v1.md",
+    acceptanceReportPath: "docs/acceptance/flow-a-report-v1.md",
+    changePackagePath: "docs/scheduling/flow-a-change-v1.md",
+  };
   assert.deepEqual(
-    requiredArtifactPaths(request({ cardKind: "acceptance", artifacts: { proposalPath: "p.md", flowPath: "f.md" } })),
-    { paths: ["p.md", "f.md"], missing: false },
+    requiredArtifactPaths(request({ cardKind: "acceptance", artifacts: acceptanceArtifacts })),
+    {
+      paths: [
+        "p.md",
+        "f.md",
+        "docs/acceptance/flow-a-criteria-v1.md",
+        "docs/acceptance/flow-a-report-v1.md",
+        "docs/scheduling/flow-a-change-v1.md",
+      ],
+      missing: false,
+    },
   );
   assert.equal(requiredArtifactPaths(request({ cardKind: "acceptance", artifacts: { proposalPath: "p.md" } })).missing, true);
   assert.deepEqual(
-    requiredArtifactPaths(request({ cardKind: "appointment-write", artifacts: { nominationPath: "n.md", flowPath: "f.md" } })),
-    { paths: ["n.md", "f.md"], missing: false },
+    requiredArtifactPaths(request({ cardKind: "appointment", artifacts: { teamPlanPath: "docs/scheduling/flow-a-team-v1.md" } })),
+    { paths: ["docs/scheduling/flow-a-team-v1.md"], missing: false },
+  );
+  assert.equal(requiredArtifactPaths(request({ cardKind: "appointment", artifacts: {} })).missing, true);
+  // O4 legacy：团队计划缺席时回落提名文件。
+  assert.deepEqual(
+    requiredArtifactPaths(request({ cardKind: "appointment", artifacts: { nominationPath: "docs/nominations/flow-a-v1.md" } })),
+    { paths: ["docs/nominations/flow-a-v1.md"], missing: false },
+  );
+  // 团队计划优先于 legacy 提名。
+  assert.deepEqual(
+    requiredArtifactPaths(request({
+      cardKind: "appointment",
+      artifacts: { teamPlanPath: "team.md", nominationPath: "nom.md" },
+    })),
+    { paths: ["team.md"], missing: false },
+  );
+  assert.deepEqual(
+    requiredArtifactPaths(request({ cardKind: "appointment-write", artifacts: { teamPlanPath: "t.md", flowPath: "f.md" } })),
+    { paths: ["t.md", "f.md"], missing: false },
   );
 });
 
@@ -2015,6 +2288,17 @@ function trioProject(root: string, roleId = "rapporteur"): ProjectConfig {
   };
 }
 
+/** trio 项目 + 一个普通项目角色 X（T7「trio 里的项目角色零变化」用）。 */
+function trioProjectWithProjectRole(root: string): ProjectConfig {
+  const project = trioProject(root);
+  writeFile(root, "角色卡/X/role-card.md", "# X\n");
+  writeFile(root, "角色卡/X/boundary.yaml", "role: X\nentries:\n  - kind: file\n    path: src/a.ts\n    purpose: test\n");
+  return {
+    ...project,
+    roles: { X: { card: "角色卡/X/role-card.md", boundary: "角色卡/X/boundary.yaml" } },
+  };
+}
+
 const GOV_BOUNDARY_REL = "角色卡/governance-boundary.yaml";
 const GOV_BOUNDARY_YAML = [
   "role: 治理边界",
@@ -2107,6 +2391,52 @@ const approveWithJudge = (judge: GovernanceJudgeAudit): CustomerInputFn => () =>
   judge,
 });
 
+/** 合法 Flow YAML（schedule-write 确认卡通过 Flow YAML 写前校验用；shape 同 flow-state 测试）。 */
+const VALID_FLOW_YAML = [
+  "flowId: flow-a",
+  "version: 1",
+  "qualityTier: production",
+  "steps:",
+  "  - id: impl",
+  "    title: 实现",
+  "    owner: backend",
+  "    kind: dispatch",
+  "    status: pending",
+  "  - id: acceptance",
+  "    title: 验收",
+  "    owner: verifier",
+  "    kind: acceptance",
+  "    status: pending",
+  "",
+].join("\n");
+
+/**
+ * 断言一次「呈现前拒绝」（2026-10-22 无效治理卡守卫）：declined + `notPresented:true`，
+ * 原因含给定片段且不重复运行时核心统一追加的结尾句；拒绝后不写客户决定账本。
+ */
+async function assertNotPresented(
+  root: string,
+  out: CustomerInputOutcome | null | undefined,
+  patterns: readonly RegExp[],
+): Promise<void> {
+  assert.equal(out?.outcome, "declined");
+  assert.equal(
+    (out as { notPresented?: unknown }).notPresented,
+    true,
+    "必须以 notPresented:true 表示卡片从未呈现",
+  );
+  const reason = (out as { reason?: string }).reason ?? "";
+  for (const pattern of patterns) assert.match(reason, pattern);
+  assert.doesNotMatch(reason, /请补齐后重新调用/, "结尾句由运行时核心工具模板统一追加，编排 reason 不得重复");
+  await flushGovernanceLedger(root);
+  const ledger = await readGovernanceLedger(root);
+  assert.equal(
+    ledger.entries.filter((entry) => entry.kind === "customer.decision").length,
+    0,
+    "被拒绝的卡不得写客户决定账本",
+  );
+}
+
 test("run-role：trio 判断上下文（paths/pathProbes/写根/禁写/物证/事实）注入 metadata", async () => {
   await withRoot(async (root) => {
     writeFile(root, "docs/proposals/flow-a-v1.md");
@@ -2156,48 +2486,226 @@ test("run-role：trio 判断上下文（paths/pathProbes/写根/禁写/物证/�
   });
 });
 
-test("run-role：治理 confirm 卡缺 cardKind ⇒ 按角色/路径兜底并生成 judgeContext", async () => {
-  const flowYaml = [
-    "flowId: flow-a",
-    "version: 1",
-    "qualityTier: production",
-    "steps:",
-    "  - id: impl",
-    "    title: 实现",
-    "    owner: backend",
-    "    kind: dispatch",
-    "    status: pending",
-    "  - id: acceptance",
-    "    title: 验收",
-    "    owner: verifier",
-    "    kind: acceptance",
-    "    status: pending",
-    "",
-  ].join("\n");
+// —————————————— 2026-10-22 无效治理卡守卫（设计 N1 严格口径；§7.3 T1–T11） ——————————————
+
+test("run-role：治理 confirm 卡缺 cardKind ⇒ 呈现前拒绝（严格口径；不再机械兜底）", async () => {
   const cases = [
     {
       roleId: "convener" as const,
       paths: ["docs/flows/flow-a.yaml"] as const,
-      preview: `## docs/flows/flow-a.yaml\n${flowYaml}`,
-      expected: "schedule-write" as const,
+      preview: `## docs/flows/flow-a.yaml\n${VALID_FLOW_YAML}`,
     },
     {
       roleId: "convener" as const,
       paths: ["docs/governance/convener/notes.md"] as const,
       preview: "## docs/governance/convener/notes.md\n# 治理记录\n",
-      expected: "write" as const,
     },
     {
       roleId: "rapporteur" as const,
       paths: ["docs/proposals/flow-a-v2.md"] as const,
       preview: "## docs/proposals/flow-a-v2.md\n# 提案 v2\n",
-      expected: "write" as const,
     },
     {
       roleId: "nominator" as const,
       paths: ["角色卡/alpha/role-card.md"] as const,
       preview: "## 角色卡/alpha/role-card.md\n# alpha\n",
-      expected: "appointment-write" as const,
+    },
+  ];
+
+  for (const testCase of cases) {
+    await withRoot(async (root) => {
+      const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+      let rawCalls = 0;
+      const handle = await openRoleSession(
+        {
+          roleId: testCase.roleId,
+          project: trioProject(root, testCase.roleId),
+          autoRepin: false,
+          customerInput: (() => {
+            rawCalls += 1;
+            return { outcome: "declined" as const };
+          }) as CustomerInputFn,
+        },
+        { createAdapter: capturingFactory(captured) },
+      );
+      try {
+        const out = await captured.caps!.customerInput!(
+          {
+            kind: "confirm",
+            title: "确认写入",
+            preview: testCase.preview,
+            paths: [...testCase.paths],
+            flowId: "flow-a",
+          },
+          { toolCallId: "call-missing-card-kind", turnId: "turn-missing-card-kind" },
+        );
+        assert.equal(rawCalls, 0, `${testCase.roleId} 缺 cardKind 不得调用客户通道`);
+        await assertNotPresented(root, out, [
+          /缺少 cardKind/,
+          /治理角色的 request_confirmation 必须同时携带 flowId 与 cardKind/,
+          /本角色允许：/,
+          /本次未发行任何写入路径、未写入账本/,
+        ]);
+      } finally {
+        await handle.dispose();
+      }
+    });
+  }
+});
+
+test("run-role：治理 confirm 卡缺 flowId / 非法 flowId ⇒ 呈现前拒绝（T1/T3/T9）", async () => {
+  const cases: ReadonlyArray<{ label: string; cardKind?: "write"; flowId?: string }> = [
+    { label: "T1 缺 flowId", cardKind: "write" },
+    { label: "T3 两者都缺" },
+    { label: "T9 大写 flowId", cardKind: "write", flowId: "Flow-A" },
+    { label: "T9 空串 flowId", cardKind: "write", flowId: "" },
+    { label: "T9 单字符 flowId", cardKind: "write", flowId: "a" },
+    { label: "T9 尾连字符 flow-", cardKind: "write", flowId: "flow-" },
+    { label: "T9 尾连字符 a-", cardKind: "write", flowId: "a-" },
+  ];
+
+  for (const testCase of cases) {
+    await withRoot(async (root) => {
+      const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+      let rawCalls = 0;
+      const handle = await openRoleSession(
+        {
+          roleId: "convener",
+          project: trioProject(root, "convener"),
+          autoRepin: false,
+          customerInput: (() => {
+            rawCalls += 1;
+            return { outcome: "declined" as const };
+          }) as CustomerInputFn,
+        },
+        { createAdapter: capturingFactory(captured) },
+      );
+      try {
+        const out = await captured.caps!.customerInput!(
+          {
+            kind: "confirm",
+            title: "确认写入",
+            preview: "## docs/governance/convener/notes.md\n# 治理记录\n",
+            paths: ["docs/governance/convener/notes.md"],
+            ...(testCase.cardKind !== undefined ? { cardKind: testCase.cardKind } : {}),
+            ...(testCase.flowId !== undefined ? { flowId: testCase.flowId } : {}),
+          },
+          { toolCallId: `call-${testCase.label}` },
+        );
+        assert.equal(rawCalls, 0, `${testCase.label}：不得调用客户通道`);
+        const patterns: RegExp[] = [/缺少合法的 flowId/, /本角色允许：write \/ schedule-write/, /0,62/];
+        if (testCase.cardKind === undefined) patterns.push(/缺少 cardKind/);
+        await assertNotPresented(root, out, patterns);
+      } finally {
+        await handle.dispose();
+      }
+    });
+  }
+});
+
+test("run-role：确认卡声明 docs/flows/flow-.yaml ⇒ 宽捕获后显式拒绝该卡（S3/T11，不静默跳过 YAML 校验）", async () => {
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    let rawCalls = 0;
+    const handle = await openRoleSession(
+      {
+        roleId: "convener",
+        project: trioProject(root, "convener"),
+        autoRepin: false,
+        customerInput: (() => {
+          rawCalls += 1;
+          return { outcome: "declined" as const };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      // 卡片 flowId 合法（否则会先被 flowId 守卫拒绝）；非法候选只在声明路径的文件名上。
+      // YAML 内容与文件名「自洽」（flowId: flow-）——旧路径正则会把该卡当作非目标而跳过校验。
+      const yaml = VALID_FLOW_YAML.replace(/flowId: flow-a/g, "flowId: flow-");
+      const out = await captured.caps!.customerInput!(
+        {
+          kind: "confirm",
+          title: "写入流程",
+          cardKind: "schedule-write",
+          flowId: "flow-a",
+          paths: ["docs/flows/flow-.yaml"],
+          preview: `## docs/flows/flow-.yaml\n${yaml}`,
+        },
+        { toolCallId: "call-flow-yaml-invalid-name" },
+      );
+      assert.equal(rawCalls, 0, "非法 flowId 文件名不得触达客户通道");
+      assert.equal(out?.outcome, "declined");
+      assert.equal(
+        (out as { notPresented?: unknown }).notPresented,
+        undefined,
+        "YAML 写前闸沿用既有 declined 形状（notPresented 属 N1 守卫；O1 未授权，不扩张）",
+      );
+      const reason = (out as { reason?: string }).reason ?? "";
+      for (const pattern of [
+        /流程 YAML 未通过校验/,
+        /docs\/flows\/flow-\.yaml/,
+        /文件名 flowId「flow-」不是合法 slug/,
+        /0,62/,
+        /不得跳过 YAML 校验/,
+      ]) {
+        assert.match(reason, pattern);
+      }
+      await flushGovernanceLedger(root);
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(
+        ledger.entries.filter((entry) => entry.kind === "customer.decision").length,
+        0,
+        "被拒的卡不得写客户决定账本",
+      );
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("run-role：四个可发 confirm 角色的合法卡全部到达通道并生成 judgeContext（T4）", async () => {
+  const cases: ReadonlyArray<{
+    roleId: "rapporteur" | "nominator" | "convener" | "verifier";
+    cardKind: "write" | "appointment-write" | "schedule-write";
+    paths: readonly string[];
+    preview: string;
+  }> = [
+    {
+      roleId: "rapporteur",
+      cardKind: "write",
+      paths: ["docs/proposals/flow-a-v2.md"],
+      preview: "## docs/proposals/flow-a-v2.md\n# 提案 v2\n",
+    },
+    {
+      roleId: "nominator",
+      cardKind: "write",
+      paths: ["docs/nominations/flow-a-v1.md"],
+      preview: "## docs/nominations/flow-a-v1.md\n# 提名 v1\n",
+    },
+    {
+      roleId: "nominator",
+      cardKind: "appointment-write",
+      paths: ["角色卡/alpha/role-card.md"],
+      preview: "## 角色卡/alpha/role-card.md\n# alpha\n",
+    },
+    {
+      roleId: "convener",
+      cardKind: "write",
+      paths: ["docs/governance/convener/notes.md"],
+      preview: "## docs/governance/convener/notes.md\n# 治理记录\n",
+    },
+    {
+      roleId: "convener",
+      cardKind: "schedule-write",
+      paths: ["docs/flows/flow-a.yaml"],
+      preview: `## docs/flows/flow-a.yaml\n${VALID_FLOW_YAML}`,
+    },
+    {
+      roleId: "verifier",
+      cardKind: "write",
+      paths: ["docs/verification/flow-a.md"],
+      preview: "## docs/verification/flow-a.md\n# 验收记录\n",
     },
   ];
 
@@ -2227,17 +2735,22 @@ test("run-role：治理 confirm 卡缺 cardKind ⇒ 按角色/路径兜底并生
             title: "确认写入",
             preview: testCase.preview,
             paths: [...testCase.paths],
+            cardKind: testCase.cardKind,
             flowId: "flow-a",
           },
-          { toolCallId: "call-default", turnId: "turn-default" },
+          { toolCallId: "call-legal-confirm", turnId: "turn-legal-confirm", cardKind: testCase.cardKind, flowId: "flow-a" },
         );
         assert.equal(out?.outcome, "declined");
-        assert.equal(rawCalls, 1, `${testCase.roleId}/${testCase.expected} 应到达客户通道`);
-        assert.equal(seen.req?.cardKind, testCase.expected, `${testCase.roleId} 默认 cardKind`);
-        assert.equal(seen.metadata?.cardKind, testCase.expected, `${testCase.roleId} metadata cardKind`);
-        assert.ok(seen.metadata?.judgeContext, `${testCase.roleId}/${testCase.expected} 应生成 judgeContext`);
+        assert.equal(
+          (out as { notPresented?: unknown }).notPresented,
+          undefined,
+          "合法卡走既有 declined 形状（不得标 notPresented）",
+        );
+        assert.equal(rawCalls, 1, `${testCase.roleId}/${testCase.cardKind} 应到达客户通道`);
+        assert.equal(seen.req?.cardKind, testCase.cardKind);
+        assert.equal(seen.metadata?.cardKind, testCase.cardKind);
         assert.equal(seen.metadata?.judgeContext?.flowId, "flow-a");
-        assert.equal(seen.metadata?.judgeContext?.toolCallId, "call-default");
+        assert.equal(seen.metadata?.judgeContext?.toolCallId, "call-legal-confirm");
       } finally {
         await handle.dispose();
       }
@@ -2245,8 +2758,240 @@ test("run-role：治理 confirm 卡缺 cardKind ⇒ 按角色/路径兜底并生
   }
 });
 
-test("run-role：治理 choice 卡缺 cardKind ⇒ 按角色兜底并生成 judgeContext（Lead=intent-confirm）", async () => {
-  const cases = [
+test("run-role：liaison 的 confirm 一律拒绝（T5；含直接调用给出 intent-confirm）", async () => {
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    let rawCalls = 0;
+    const handle = await openRoleSession(
+      {
+        roleId: "liaison",
+        project: trioProject(root, "liaison"),
+        autoRepin: false,
+        customerInput: (() => {
+          rawCalls += 1;
+          return { outcome: "answered" as const, value: { confirmed: true } };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      // 无 cardKind：缺 cardKind 拒绝（本角色 confirm 允许集为空）。
+      const missing = await captured.caps!.customerInput!({
+        kind: "confirm",
+        title: "写意图",
+        preview: "docs/intents/intent-a.md",
+        flowId: "flow-a",
+      });
+      await assertNotPresented(root, missing, [
+        /缺少 cardKind/,
+        /本角色允许：无/,
+        /本次未发行任何写入路径、未写入账本/,
+      ]);
+
+      // 显式工具级 cardKind：沿用既有越权文案（O4 未授权 ⇒ 不标 notPresented）。
+      const offWhitelist = await captured.caps!.customerInput!({
+        kind: "confirm",
+        title: "写意图",
+        preview: "docs/intents/intent-a.md",
+        cardKind: "write",
+        flowId: "flow-a",
+      });
+      assert.equal(offWhitelist?.outcome, "declined");
+      const offReason = (offWhitelist as { reason?: string }).reason ?? "";
+      assert.match(offReason, /不允许 cardKind=write/);
+      assert.match(offReason, /本次未向客户发卡/);
+      assert.equal(
+        (offWhitelist as { notPresented?: unknown }).notPresented,
+        undefined,
+        "越权 cardKind 沿用既有 declined 形状",
+      );
+
+      // 直接调用包装器给出白名单内的 choice 类 cardKind：仍一律拒绝。
+      const choiceKind = await captured.caps!.customerInput!({
+        kind: "confirm",
+        title: "写意图",
+        preview: "docs/intents/intent-a.md",
+        cardKind: "intent-confirm",
+        flowId: "flow-a",
+      });
+      await assertNotPresented(root, choiceKind, [
+        /liaison 不使用 request_confirmation/,
+        /request_choice/,
+        /本次未发行任何写入路径、未写入账本/,
+      ]);
+
+      assert.equal(rawCalls, 0, "liaison 的任何 confirm 卡都不得调用客户通道");
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("run-role：rapporteur confirm cardKind=schedule-write ⇒ 越权拒绝（沿用既有文案；T6）", async () => {
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    let rawCalls = 0;
+    const handle = await openRoleSession(
+      {
+        roleId: "rapporteur",
+        project: trioProject(root, "rapporteur"),
+        autoRepin: false,
+        customerInput: (() => {
+          rawCalls += 1;
+          return { outcome: "declined" as const };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!({
+        kind: "confirm",
+        title: "写提案",
+        preview: "## docs/proposals/flow-a-v2.md\n# 提案 v2\n",
+        paths: ["docs/proposals/flow-a-v2.md"],
+        cardKind: "schedule-write",
+        flowId: "flow-a",
+      });
+      assert.equal(out?.outcome, "declined");
+      assert.match((out as { reason?: string }).reason ?? "", /不允许 cardKind=schedule-write/);
+      assert.equal(rawCalls, 0);
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("run-role：trio 项目里的普通角色 confirm（无治理字段）原样到达通道（T7 零变化）", async () => {
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    const seen: CapturedInput = {};
+    let rawCalls = 0;
+    const handle = await openRoleSession(
+      {
+        roleId: "X",
+        project: trioProjectWithProjectRole(root),
+        autoRepin: false,
+        customerInput: ((req, metadata) => {
+          rawCalls += 1;
+          seen.req = req;
+          seen.metadata = metadata;
+          return { outcome: "answered" as const, value: { confirmed: true } };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!(
+        { kind: "confirm", title: "写入", preview: "## src/a.ts\n// 正文\n" },
+        { toolCallId: "call-project-confirm" },
+      );
+      assert.equal(out?.outcome, "answered");
+      assert.equal(rawCalls, 1, "项目角色 confirm 不得被治理守卫拦截");
+      assert.equal(seen.req?.cardKind, undefined, "项目角色卡原样透传");
+      assert.equal(seen.req?.flowId, undefined);
+      assert.equal(seen.metadata?.judgeContext, undefined, "项目角色不注入 judgeContext");
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("run-role：无效治理卡被拒后补齐重发 ⇒ 第二张到达通道并生成 judgeContext（T10，无去重）", async () => {
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    const seen: CapturedInput = {};
+    let rawCalls = 0;
+    const handle = await openRoleSession(
+      {
+        roleId: "rapporteur",
+        project: trioProject(root, "rapporteur"),
+        autoRepin: false,
+        customerInput: ((req, metadata) => {
+          rawCalls += 1;
+          seen.req = req;
+          seen.metadata = metadata;
+          return { outcome: "declined" as const };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const first = await captured.caps!.customerInput!({
+        kind: "confirm",
+        title: "写提案",
+        preview: "## docs/proposals/flow-a-v2.md\n# 提案 v2\n",
+        paths: ["docs/proposals/flow-a-v2.md"],
+        cardKind: "write",
+      });
+      await assertNotPresented(root, first, [/缺少合法的 flowId/]);
+      assert.equal(rawCalls, 0, "第一张无效卡不得到达通道");
+
+      const second = await captured.caps!.customerInput!(
+        {
+          kind: "confirm",
+          title: "写提案",
+          preview: "## docs/proposals/flow-a-v2.md\n# 提案 v2\n",
+          paths: ["docs/proposals/flow-a-v2.md"],
+          cardKind: "write",
+          flowId: "flow-a",
+        },
+        { toolCallId: "call-retry" },
+      );
+      assert.equal(second?.outcome, "declined");
+      assert.equal((second as { notPresented?: unknown }).notPresented, undefined);
+      assert.equal(rawCalls, 1, "补齐后重发必须到达通道（无去重拦截）");
+      assert.equal(seen.req?.cardKind, "write");
+      assert.equal(seen.metadata?.judgeContext?.flowId, "flow-a");
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("run-role：无效治理卡被拒后无客户决定账本、写集未发行（T11）", async () => {
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    let rawCalls = 0;
+    const handle = await openRoleSession(
+      {
+        roleId: "convener",
+        project: trioProject(root, "convener"),
+        autoRepin: false,
+        customerInput: (() => {
+          rawCalls += 1;
+          return { outcome: "answered" as const, value: { confirmed: true } };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!({
+        kind: "confirm",
+        title: "写工作流",
+        preview: "## docs/workflow.md\n# 工作流\n",
+        paths: ["docs/workflow.md"],
+        cardKind: "write",
+      });
+      await assertNotPresented(root, out, [/缺少合法的 flowId/]);
+      assert.equal(rawCalls, 0);
+
+      // 写集未发行：docs/workflow.md 在 convener 边界内，但不在任何预授权目录 ⇒ 仍被 F4 拒。
+      const denied = captured.gate!("docs/workflow.md");
+      assert.equal(denied.allowed, false, "无效卡被拒后不得发行任何写入路径");
+      assert.match(denied.reason ?? "", /不在任务 writeSet 内（F4）/);
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("run-role：治理 choice 卡缺 cardKind ⇒ 按角色兜底并生成 judgeContext（Convener=appointment）", async () => {
+  const cases: Array<{
+    roleId: "liaison" | "rapporteur" | "convener" | "verifier";
+    expected: "intent-confirm" | "proposal" | "appointment" | "acceptance";
+    options: Array<{ id: string; label: string }>;
+    seed?: (root: string) => void;
+  }> = [
     {
       roleId: "liaison" as const,
       expected: "intent-confirm" as const,
@@ -2258,9 +3003,10 @@ test("run-role：治理 choice 卡缺 cardKind ⇒ 按角色兜底并生成 judg
       options: [{ id: "accept", label: "接受" }, { id: "revise", label: "修改" }],
     },
     {
-      roleId: "nominator" as const,
+      roleId: "convener" as const,
       expected: "appointment" as const,
       options: [{ id: "alpha", label: "Alpha" }],
+      seed: (root: string) => seedTeamPlan(root, ["alpha"]),
     },
     {
       roleId: "verifier" as const,
@@ -2270,6 +3016,7 @@ test("run-role：治理 choice 卡缺 cardKind ⇒ 按角色兜底并生成 judg
   ];
   for (const testCase of cases) {
     await withRoot(async (root) => {
+      testCase.seed?.(root);
       const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
       const seen: CapturedInput = {};
       let rawCalls = 0;
@@ -2304,9 +3051,9 @@ test("run-role：治理 choice 卡缺 cardKind ⇒ 按角色兜底并生成 judg
     });
   }
 
-  // Convener 不默认（choice 类型不明确）；项目角色不默认。
+  // Crew（nominator）不再默认 appointment；项目角色不默认。
   for (const [roleId, projectFactory] of [
-    ["convener", (root: string) => trioProject(root, "convener")],
+    ["nominator", (root: string) => trioProject(root, "nominator")],
     ["X", (root: string) => singleProject(root)],
   ] as const) {
     await withRoot(async (root) => {
@@ -2341,6 +3088,156 @@ test("run-role：治理 choice 卡缺 cardKind ⇒ 按角色兜底并生成 judg
         await handle.dispose();
       }
     });
+  }
+});
+
+test("run-role：Convener appointment 卡前守卫——六项校验失败不触达客户/不写账本；通过则记账 power=schedule", async () => {
+  const appointmentCard = (options: Array<{ id: string; label: string }>): CustomerInputRequest => ({
+    kind: "choice",
+    title: "任命角色",
+    options,
+    multiple: true,
+    cardKind: "appointment",
+    flowId: "flow-a",
+  });
+
+  const assertGuardRejected = async (
+    label: string,
+    seed: (root: string) => void,
+    expected: RegExp,
+    options?: Array<{ id: string; label: string }>,
+  ): Promise<void> => {
+    const root = mkdtempSync(join(tmpdir(), "ans-appointment-guard-"));
+    try {
+      seed(root);
+      const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+      let rawCalls = 0;
+      const handle = await openRoleSession(
+        {
+          roleId: "convener",
+          project: trioProject(root, "convener"),
+          autoRepin: false,
+          customerInput: (() => {
+            rawCalls += 1;
+            return { outcome: "answered" as const, value: { selected: ["alpha"] } };
+          }) as CustomerInputFn,
+        },
+        { createAdapter: capturingFactory(captured) },
+      );
+      try {
+        const out = await captured.caps!.customerInput!(
+          appointmentCard(options ?? [{ id: "alpha", label: "Alpha" }]),
+          { toolCallId: `call-${label}` },
+        );
+        assert.equal(out?.outcome, "declined", label);
+        assert.equal((out as { notPresented?: boolean }).notPresented, true, label);
+        assert.match((out as { reason?: string }).reason ?? "", expected, label);
+        assert.equal(rawCalls, 0, `${label}：不得触达客户通道`);
+        await flushGovernanceLedger(root);
+        const ledger = await readGovernanceLedger(root);
+        assert.equal(
+          ledger.entries.filter((entry) => entry.kind === "customer.decision").length,
+          0,
+          `${label}：不得写 customer.decision`,
+        );
+      } finally {
+        await handle.dispose();
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+
+  // ① 团队计划缺失
+  await assertGuardRejected("缺计划", () => {}, /团队计划缺失/);
+  // ② 计划 frontmatter flowId 与卡片不一致
+  await assertGuardRejected(
+    "flowId 不符",
+    (root) => writeFile(root, "docs/scheduling/flow-a-team-v1.md", teamPlanMarkdown("flow-b", ["alpha"])),
+    /flowId="flow-b".*与卡片 flowId="flow-a" 不一致/,
+  );
+  // ③ 推荐集为空（块数组/空数组都不静默接受）
+  await assertGuardRejected(
+    "推荐集为空",
+    (root) => seedTeamPlan(root, [], { recommendedLine: "recommended: []" }),
+    /缺少唯一的机器可读推荐集/,
+  );
+  // ④ 推荐集含内置治理角色
+  await assertGuardRejected(
+    "推荐集含内置角色",
+    (root) => seedTeamPlan(root, ["alpha", "convener"]),
+    /推荐集含内置治理角色/,
+    [{ id: "alpha", label: "Alpha" }, { id: "convener", label: "Convener" }],
+  );
+  // ⑤ 卡选项未覆盖推荐集
+  await assertGuardRejected(
+    "选项不一致",
+    (root) => seedTeamPlan(root, ["alpha", "beta"]),
+    /任命卡选项未覆盖团队计划推荐集（缺：beta）/,
+    [{ id: "alpha", label: "Alpha" }],
+  );
+  // ⑥a 计划缺推荐角色行
+  await assertGuardRejected(
+    "缺角色行",
+    (root) => seedTeamPlan(root, ["alpha"], {
+      rows: ["| beta | existing | 实现 beta | 能实现 | src/beta/ | 无 | 组 A | not-applicable |"],
+    }),
+    /缺少推荐角色 alpha 的角色行/,
+  );
+  // ⑥b 角色行缺项（职责目标为空）
+  await assertGuardRejected(
+    "角色行缺项",
+    (root) => seedTeamPlan(root, ["alpha"], {
+      rows: ["| alpha | existing |  | 能实现 | src/alpha/ | 无 | 组 A | not-applicable |"],
+    }),
+    /角色 alpha 的「职责目标」为空/,
+  );
+
+  // 正例：六项齐全 ⇒ 客户卡到达、判断上下文带团队计划、账本 appointment power=schedule 且绑定计划哈希。
+  const root = mkdtempSync(join(tmpdir(), "ans-appointment-guard-"));
+  try {
+    seedTeamPlan(root, ["alpha"]);
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    const seen: CapturedInput = {};
+    let rawCalls = 0;
+    const handle = await openRoleSession(
+      {
+        roleId: "convener",
+        project: trioProject(root, "convener"),
+        autoRepin: false,
+        customerInput: ((req, metadata) => {
+          rawCalls += 1;
+          seen.req = req;
+          seen.metadata = metadata;
+          return { outcome: "answered" as const, value: { selected: ["alpha"] } };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!(
+        appointmentCard([{ id: "alpha", label: "Alpha" }]),
+        { toolCallId: "call-appointment-ok", turnId: "turn-appointment-ok" },
+      );
+      assert.equal(out?.outcome, "answered");
+      assert.equal(rawCalls, 1);
+      assert.equal(seen.req?.cardKind, "appointment");
+      assert.equal(seen.metadata?.judgeContext?.artifacts?.teamPlanPath, "docs/scheduling/flow-a-team-v1.md");
+      assert.deepEqual(seen.metadata?.judgeContext?.recommendedRoleIds, ["alpha"]);
+    } finally {
+      await handle.dispose();
+    }
+    const { decision } = await waitForDecision(root);
+    assert.equal(decision.decisionKind, "appointment");
+    assert.equal(decision.actorRoleId, "convener");
+    assert.equal(decision.power, "schedule", "2026-10-22 第 1 项：appointment power=schedule");
+    assert.deepEqual(decision.targetRoleIds, ["alpha"]);
+    assert.equal(decision.artifactPath, "docs/scheduling/flow-a-team-v1.md");
+    assert.equal(decision.artifactVersion, 1);
+    assert.equal(typeof decision.artifactSha256, "string");
+    assert.match(decision.artifactSha256!, /^[0-9a-f]{64}$/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
@@ -2502,7 +3399,7 @@ test("intent-confirm：decision 组可代批 confirm；选 revise/缺 confirm �
   assert.equal(missingConfirm.reasonCode, "insufficient-evidence");
 });
 
-test("run-role：显式非法 cardKind 仍拒绝（不因兜底而放宽）", async () => {
+test("run-role：显式越权 cardKind 仍拒绝（沿用既有文案；confirm 不弹卡）", async () => {
   await withRoot(async (root) => {
     const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
     let rawCalls = 0;
@@ -2536,7 +3433,7 @@ test("run-role：显式非法 cardKind 仍拒绝（不因兜底而放宽）", as
   });
 });
 
-test("run-role：choice 卡缺 cardKind 不兜底（零变化）", async () => {
+test("run-role：Convener 任命形状兜底后卡前守卫拒绝（无团队计划；不触达客户/不写账本）", async () => {
   await withRoot(async (root) => {
     const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
     const seen: CapturedInput = {};
@@ -2562,10 +3459,18 @@ test("run-role：choice 卡缺 cardKind 不兜底（零变化）", async () => {
         options: [{ id: "a", label: "A" }],
         flowId: "flow-a",
       });
-      assert.equal(out?.outcome, "answered");
-      assert.equal(rawCalls, 1);
-      assert.equal(seen.req?.cardKind, undefined, "choice 卡不得被兜底成写卡");
-      assert.equal(seen.metadata?.judgeContext, undefined, "choice 卡不计算 judgeContext");
+      assert.equal(out?.outcome, "declined");
+      assert.equal((out as { notPresented?: boolean }).notPresented, true);
+      assert.match((out as { reason?: string }).reason ?? "", /团队计划缺失/);
+      assert.equal(rawCalls, 0, "不得触达客户通道");
+      assert.equal(seen.metadata?.judgeContext, undefined, "不得计算 judgeContext");
+      await flushGovernanceLedger(root);
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(
+        ledger.entries.filter((entry) => entry.kind === "customer.decision").length,
+        0,
+        "不得写 customer.decision",
+      );
     } finally {
       await handle.dispose();
     }
@@ -2724,16 +3629,16 @@ test("run-role：物证容忍 `<flowId>.proposal-vN` / `.nomination-vN` 并取�
     }
   });
 
-  // 3) 提名 `.nomination-vN` 同样解析，并从中读取推荐集。
+  // 3) 团队计划 `-team-vN.md` 取最新版本（版本扫描扩展），并从中读取推荐集。
   await withRoot(async (root) => {
-    writeFile(root, "docs/nominations/flow-a-v1.md");
-    writeFile(root, "docs/nominations/flow-a.nomination-v3.md", "---\nflowId: flow-a\nrecommended: [alpha]\n---\n");
+    seedTeamPlan(root, ["alpha"], { version: 1 });
+    seedTeamPlan(root, ["alpha", "beta"], { version: 3 });
     const capturedInput: CapturedInput = {};
     const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
     const handle = await openRoleSession(
       {
-        roleId: "nominator",
-        project: trioProject(root, "nominator"),
+        roleId: "convener",
+        project: trioProject(root, "convener"),
         autoRepin: false,
         customerInput: ((_req, metadata) => {
           capturedInput.metadata = metadata;
@@ -2747,7 +3652,7 @@ test("run-role：物证容忍 `<flowId>.proposal-vN` / `.nomination-vN` 并取�
         {
           kind: "choice",
           title: "任命角色",
-          options: [{ id: "alpha", label: "Alpha" }],
+          options: [{ id: "alpha", label: "Alpha" }, { id: "beta", label: "Beta" }],
           multiple: true,
           cardKind: "appointment",
           flowId: "flow-a",
@@ -2755,10 +3660,10 @@ test("run-role：物证容忍 `<flowId>.proposal-vN` / `.nomination-vN` 并取�
         { toolCallId: "call-name-3" },
       );
       assert.equal(
-        capturedInput.metadata?.judgeContext?.artifacts?.nominationPath,
-        "docs/nominations/flow-a.nomination-v3.md",
+        capturedInput.metadata?.judgeContext?.artifacts?.teamPlanPath,
+        "docs/scheduling/flow-a-team-v3.md",
       );
-      assert.deepEqual(capturedInput.metadata?.judgeContext?.recommendedRoleIds, ["alpha"]);
+      assert.deepEqual(capturedInput.metadata?.judgeContext?.recommendedRoleIds, ["alpha", "beta"]);
     } finally {
       await handle.dispose();
     }

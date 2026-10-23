@@ -1057,6 +1057,8 @@ test("W6-B 能力路由：liaison=handOffIntent+协调派发；rapporteur=提案
   assert.equal(typeof nominator.installMcp, "function");
   assert.equal(nominator.requestClarification, undefined);
   assert.equal(nominator.handOffIntent, undefined);
+  // 2026-10-22 第 1 项：Crew 写卡需 appointment-write 客户卡——customerInput 仍注入（能力不变、卡种由编排单点决定）。
+  assert.equal(typeof nominator.customerInput, "function", "Crew 注入客户通道（appointment-write）");
 
   const convener = captured.get("convener")!;
   assert.equal(typeof convener.dispatchTask, "function");
@@ -1065,6 +1067,8 @@ test("W6-B 能力路由：liaison=handOffIntent+协调派发；rapporteur=提案
   assert.equal(typeof convener.proposeRecovery, "function");
   assert.equal(convener.handOffIntent, undefined);
   assert.equal(convener.requestClarification, undefined);
+  // 2026-10-22 第 1 项：Convener 发 appointment 卡（任命）——customerInput 仍注入。
+  assert.equal(typeof convener.customerInput, "function", "Convener 注入客户通道（appointment/schedule-write）");
   // 回交主人仍是 Convener（Liaison 只作主入口/镜像面，不接管回交/看护/恢复）。
   assert.equal(
     mgr.watchdogSnapshot("/proj")?.governanceRoleId,

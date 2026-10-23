@@ -132,8 +132,13 @@ export interface FinalizeResult {
 // **缺席＝旧形状**：下列字段全部可选；旧调用不带 flow 元数据时零行为变化，且缺席的
 // flowId/stepId/cardKind **不能**解锁任何治理门禁（门禁只认账本中应用签发的客户决定）。
 
-/** 治理流程/步骤标识的 slug 形状（评审 §5.8）：`^[a-z0-9][a-z0-9-]{1,63}$`。工具层按此校验，不猜测、不截断。 */
-export const GOVERNANCE_SLUG_PATTERN = "^[a-z0-9][a-z0-9-]{1,63}$";
+/**
+ * 治理流程/步骤标识的 slug 形状（评审 §5.8；2026-10-22 客户确认收紧，设计
+ * `角色卡/项目管理/docs/design/2026-10-22_design_governance-slug-no-trailing-hyphen.md` §2.1）：
+ * `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` —— 2–64 位，首尾均为小写字母/数字，内部可含连字符
+ * （连续连字符仍允许），禁止首/尾连字符。工具层按此校验，不猜测、不截断。
+ */
+export const GOVERNANCE_SLUG_PATTERN = "^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$";
 
 /** 治理流程 id（slug；只作标识，不表达权限）。 */
 export type GovernanceFlowId = string;
@@ -212,8 +217,19 @@ export type GovernanceAcceptanceOptionId = "accept" | "reject";
 /** 提案版本（评审 §6.3-3：一个提案最多 v2）。 */
 export type GovernanceProposalVersion = 1 | 2;
 
-/** 流程步骤种类（评审 §6.1 闭环：提案 → 流程/提名 → 派发 → 验收）。 */
-export type GovernanceStepKind = "proposal" | "nomination" | "dispatch" | "acceptance";
+/**
+ * 流程步骤种类（评审 §6.1 闭环：提案 → 流程/团队计划 → 派发 → 验收）。
+ *
+ * **2026-10-22 治理分工第 1/3/5 项（§9.3 Q4 A）契约冻结**：保留现有值与形状，本层**不新增**
+ * `team-plan`（也不得改 `FlowStepKind`）——新流程用 step id 表达角色/阶段（如 `team-plan`、
+ * `role-cards`），`kind` 仍取现有值；旧 flow 继续可解析。
+ */
+export type GovernanceStepKind =
+  | "proposal"
+  /** @deprecated legacy：旧流程的「提名」步骤；新流程用团队计划 + 现有 kind，不再新增 nomination 步骤。 */
+  | "nomination"
+  | "dispatch"
+  | "acceptance";
 
 /**
  * 流程步骤状态（评审 §6.3 机械规则的中立形状；判定在编排，不在本层）：
@@ -249,11 +265,19 @@ export interface GovernanceProposalStepPayload {
   version: GovernanceProposalVersion;
 }
 
-/** 任命步骤载荷（`docs/nominations/<flowId>-v<n>.md`；快捷路径 `accept-quick` 可没有提名文件）。 */
+/**
+ * 任命步骤载荷（2026-10-22 治理分工第 1 项）。
+ * 团队计划（`docs/scheduling/<flowId>-team-v<n>.md`）是任命与推荐集的权威物证；
+ * `nominationPath` 保留为 **legacy**（旧提名文件时代；新流程不再产生）。
+ * 快捷路径 `accept-quick` 可没有物证文件（按既有快捷语义处理）。
+ */
 export interface GovernanceAppointmentStepPayload {
   flowId: GovernanceFlowId;
   stepId?: GovernanceStepId;
   cardKind: "appointment";
+  /** 团队计划文件的项目相对路径（`docs/scheduling/<flowId>-team-v<n>.md`；第 1 项）。 */
+  teamPlanPath?: string;
+  /** @deprecated legacy：旧提名文件路径（`docs/nominations/<flowId>-v<n>.md`）；新流程用 `teamPlanPath`。 */
   nominationPath?: string;
   /** 客户任命的项目角色 id（任命决定的 `targetRoleIds`）。 */
   targetRoleIds: readonly string[];
@@ -309,7 +333,18 @@ export type CustomerInputOutcome =
        */
       judge?: GovernanceJudgeAudit;
     }
-  | { outcome: "declined"; operatorId?: string; reason?: string }
+  | {
+      outcome: "declined";
+      operatorId?: string;
+      reason?: string;
+      /**
+       * 卡片**从未呈现给客户**（2026-10-22 无效治理卡守卫设计 §4.6）：应用在触达客户通道之前
+       * 拒绝发卡（如治理角色缺 `flowId`/`cardKind`）时置位。可选、向后兼容——既有 `declined`
+       * 生产者（客户拒绝、判断 manual 退回、通道故障等）不设置，下游文案逐字不变。
+       * 工具处理器据此区分「系统拒绝发卡」与「客户拒绝」：不得回报「未获客户同意」。
+       */
+      notPresented?: true;
+    }
   | { outcome: "unavailable"; reason?: string };
 
 /** Captured at invocation. Issuers must reject late consent when this original signal is aborted. */
@@ -762,7 +797,14 @@ export interface FlowToolEvidence {
   ref: string;
 }
 
-/** `flow_get` 返回的步骤视图（服务端投影；工具层原样转达，不重算）。 */
+/**
+ * `flow_get` 返回的步骤视图（服务端投影；工具层原样转达，不重算）。
+ *
+ * 2026-10-22 角色粒度/MapReduce 方案 A（`implemented-unverified`）：可选承载 `parallelGroup`/
+ * `dependsOn`。本层**只定字段**；并行组语法、依赖目标存在性/环、同 Map 组无依赖、Reduce 覆盖
+ * 全部 Map 等静态校验在编排 `flow-state`，dispatch 前置 `done` 检查在编排 `governance-gate`。
+ * 两个字段均可选：旧 flow 不填 ⇒ 字段缺席，视图形状与旧行为逐字不变（不新增 `FlowToolStepKind`）。
+ */
 export interface FlowToolStepView {
   id: string;
   title: string;
@@ -772,9 +814,13 @@ export interface FlowToolStepView {
   evidence?: FlowToolEvidence;
   supersedes?: string[];
   supersededBy?: string;
+  /** 并行组（可选）：`map-<slug>` 或 `reduce`；仅承载，校验在编排。 */
+  parallelGroup?: string;
+  /** 前置 step id 列表（可选）：仅承载，环检测与前置 `done` 检查在编排。 */
+  dependsOn?: string[];
 }
 
-/** `flow_get` 返回的流程视图。`canUpdate` 是服务端按调用角色计算的**可更新步骤 id**（权限裁决在服务端）。 */
+/** `flow_get` 返回的流程视图。`canUpdate` 是服务端按调用角色计算的**可更新步骤 id**（权限裁决在服务端）；步骤视图可携带可选 `parallelGroup`/`dependsOn`（本层只承载）。 */
 export interface FlowToolView {
   flowId: string;
   revision: string;
@@ -825,6 +871,13 @@ export type FlowStepSupersedeFn = (input: {
   expectedRevision: string;
   reason?: string;
   idempotencyKey?: string;
+  /**
+   * 新步骤的并行组（可选；2026-10-22 角色粒度/MapReduce 方案 A）：`map-<slug>` 或 `reduce`。
+   * 仅承载；语法/静态校验在编排 flow-service（本层不判）。
+   */
+  parallelGroup?: string;
+  /** 新步骤的前置 step id 列表（可选；仅承载，存在性/环/前置 `done` 校验在编排）。 */
+  dependsOn?: string[];
 }) => Promise<FlowToolResult>;
 
 // —————————————— 推理与推理强度（G-5 wave 1 契约层；冻结符号，单一来源＝本模块） ——————————————
@@ -1161,9 +1214,28 @@ export interface GovernanceJudgeRequest {
   allowedPathRoots?: string[];
   /** 只读事实：禁写路径。 */
   forbiddenPaths?: string[];
-  /** 规范物证路径（由编排按 cardKind 计算；缺失 ⇒ manual）。 */
-  artifacts?: { proposalPath?: string; nominationPath?: string; flowPath?: string };
-  /** appointment：应用解析提名文件得到的机器可读推荐集（模型只能选恰该集合）。 */
+  /**
+   * 规范物证路径（由编排按 cardKind 计算；缺失 ⇒ manual）。
+   * 2026-10-22 治理分工第 1/3/5 项（方案 §8.2）可选新增：`teamPlanPath`（第 1 项，团队计划）、
+   * `acceptanceCriteriaPath`/`acceptanceReportPath`/`changePackagePath`（第 3 项）；
+   * `nominationPath` 保留为 **legacy**。与 `GovernanceJudgeContext.artifacts` 同形（单一字段集，
+   * 不另建第二份类型）；全部新增字段可选，旧调用零变化。
+   */
+  artifacts?: {
+    proposalPath?: string;
+    /** @deprecated legacy：旧提名文件路径；新流程用 `teamPlanPath`。 */
+    nominationPath?: string;
+    /** 团队计划路径（`docs/scheduling/<flowId>-team-v<n>.md`；第 1 项）。 */
+    teamPlanPath?: string;
+    flowPath?: string;
+    /** 实施前验收标准路径（`docs/acceptance/<flowId>-criteria-v1.md`；第 3 项）。 */
+    acceptanceCriteriaPath?: string;
+    /** 验收报告路径（`docs/acceptance/<flowId>-report-v1.md`；第 3 项）。 */
+    acceptanceReportPath?: string;
+    /** 变更包路径（`docs/scheduling/<flowId>-change-v1.md`；第 3 项）。 */
+    changePackagePath?: string;
+  };
+  /** appointment：应用解析团队计划（legacy：提名文件）得到的机器可读推荐集（模型只能选恰该集合）。 */
   recommendedRoleIds?: string[];
   /** 有界治理事实快照（账本不可读/错误 ⇒ 禁止 approve）。 */
   facts: GovernanceJudgeFacts;
@@ -1242,7 +1314,25 @@ export interface GovernanceJudgeContext {
   pathProbes?: Array<{ path: string; allowed: boolean; reason?: string }>;
   allowedPathRoots?: string[];
   forbiddenPaths?: string[];
-  artifacts?: { proposalPath?: string; nominationPath?: string; flowPath?: string };
+  /**
+   * 规范物证路径（与 `GovernanceJudgeRequest.artifacts` 同形；单一字段集，不另建第二份类型）。
+   * 新增字段全部可选：`teamPlanPath`（第 1 项）、`acceptanceCriteriaPath`/`acceptanceReportPath`/
+   * `changePackagePath`（第 3 项）；`nominationPath` 保留为 **legacy**。
+   */
+  artifacts?: {
+    proposalPath?: string;
+    /** @deprecated legacy：旧提名文件路径；新流程用 `teamPlanPath`。 */
+    nominationPath?: string;
+    /** 团队计划路径（`docs/scheduling/<flowId>-team-v<n>.md`；第 1 项）。 */
+    teamPlanPath?: string;
+    flowPath?: string;
+    /** 实施前验收标准路径（`docs/acceptance/<flowId>-criteria-v1.md`；第 3 项）。 */
+    acceptanceCriteriaPath?: string;
+    /** 验收报告路径（`docs/acceptance/<flowId>-report-v1.md`；第 3 项）。 */
+    acceptanceReportPath?: string;
+    /** 变更包路径（`docs/scheduling/<flowId>-change-v1.md`；第 3 项）。 */
+    changePackagePath?: string;
+  };
   recommendedRoleIds?: string[];
   facts: GovernanceJudgeFacts;
   /** 事实计算失败/账本不可读；出现即禁止 approve。 */
@@ -1264,6 +1354,130 @@ export interface GovernanceJudgeFacts {
   unresolvedClarificationCount: number;
   /** 有界（≤20），供 prompt/审计。 */
   latestDecisionKinds: string[];
+  /**
+   * 风险档位（2026-10-22 治理分工第 3 项；方案 §8.2）：T0–T3，定义以 `references/testing.md` 为
+   * 唯一口径；**不是** `qualityTier`（prototype/production）。可选；缺失＝应用未提供（判定回落规则在编排）。
+   */
+  riskTier?: "T0" | "T1" | "T2" | "T3";
+  /**
+   * 最新 appointment 决定是否绑定了团队计划物证（第 1 项；方案 §8.2）。
+   * 可选；缺失＝未知（旧账本/旧调用），不得据此解锁任何门禁。
+   */
+  teamPlanConfirmed?: boolean;
+  /**
+   * 团队计划 schema 版本（2026-10-22 角色粒度/MapReduce；方案 §5.1：`1` = legacy 缺省、`2` = 本方案）。
+   * 可选；缺失＝应用未提供/未解析，不得据此假定 v2。物证仍沿用 `artifacts.teamPlanPath`，不新增 artifact kind。
+   */
+  teamPlanSchema?: 1 | 2;
+  /**
+   * 团队计划模块 id 摘要（有界、去重；供 prompt/审计）。可选；缺失＝应用未提供。
+   * 只是机器摘要，**不**代表应用已做粒度语义判断（语义复核仍在 Convener readiness）。
+   */
+  teamPlanModules?: string[];
+}
+
+// —————————————— 会话级后台任务（2026-10-22 客户确认设计 B1–B4） ——————————————
+//
+// 依据：`角色卡/项目管理/docs/design/2026-10-22_design_background-tasks.md`（客户 2026-10-22 确认必需项
+// B1–B4）。后台任务**只属于当前角色会话**：任务表、日志、pid 只在内存，不跨重启；会话关闭（dispose）
+// 或模型显式 `stop_background_task` 才终止；轮次结束/停止本轮**不终止**后台任务。
+// 管理器实现＝`src/common/runtime-core/background-tasks.ts`（唯一 spawn 入口）；Service 在
+// `providerFor` 创建并注入，Provider 四工具只消费注入能力。判断会话（shellJudge/governanceJudge）
+// 结构性不经过 `buildGovernedTools`，因此看不到四工具。
+
+/** 后台任务状态（只由真实事件驱动）：运行中 / 自然退出 / 被停止 / 启动后运行错误 / 终止预算内未收口。 */
+export type BackgroundTaskState = "running" | "exited" | "stopped" | "failed" | "kill-timeout";
+
+/** 后台任务快照（`list` 与各工具回执共用；`command` 为原始命令文本，展示截断由工具层负责）。 */
+export interface BackgroundTaskSnapshot {
+  taskId: string;
+  state: BackgroundTaskState;
+  pid?: number;
+  command: string;
+  /** 实际 spawn 成功的时间（ISO 8601）。 */
+  startedAt: string;
+  exitCode?: number;
+  signal?: string;
+  /** 启动后运行错误（如底层 error 事件）的如实文本；启动失败不产生任务。 */
+  error?: string;
+  /** 已运行时长（运行中为至今，已结束为启动到 close）。 */
+  durationMs: number;
+}
+
+/** 单路日志尾部读取结果；`truncated` 表示 256 KiB 环形缓冲曾丢弃更早内容（不假装日志完整）。 */
+export interface BackgroundTaskStreamRead {
+  text: string;
+  truncated: boolean;
+}
+
+/** `read_background_task` 可选流与尾部行数（默认 both / 40；上限 200，由工具层与本接口共同钳制）。 */
+export interface BackgroundTaskReadOptions {
+  stream?: "stdout" | "stderr" | "both";
+  tailLines?: number;
+}
+
+/** 后台任务读取结果（未知任务由管理器返回 `undefined`，由工具层如实报「未知任务」）。 */
+export interface BackgroundTaskReadResult {
+  task: BackgroundTaskSnapshot;
+  /** 实际返回的尾部行数（已按上限钳制）。 */
+  tailLines: number;
+  /** 请求行数超过上限（200）时为 true——如实标注，不静默改变请求。 */
+  tailClamped: boolean;
+  stdout?: BackgroundTaskStreamRead;
+  stderr?: BackgroundTaskStreamRead;
+}
+
+/** 管理器 `start` 入参：审核通过后由启动工具传入；cwd/env 由工具层按 run_shell 同源规则构造。 */
+export interface BackgroundTaskStartInput {
+  command: string;
+  argv: string[];
+  cwd: string;
+  env: Record<string, string>;
+}
+
+/** 启动结果：只有实际拿到 spawn 成功（pid）才返回任务号；失败不保留半成品任务。 */
+export type BackgroundTaskStartResult =
+  | { ok: true; task: BackgroundTaskSnapshot }
+  | { ok: false; reason: "limit" | "closed" | "spawn-failed"; message: string };
+
+export interface BackgroundTaskStopOptions {
+  /** true＝跳过 SIGTERM 直接 SIGKILL；默认 false＝SIGTERM→250ms→SIGKILL→1s 收口。 */
+  force?: boolean;
+}
+
+/**
+ * 停止结果：
+ * - `ok:true`：底层 `close` 已观察到（`alreadyEnded` 表示调用前任务早已结束，本次未发送终止信号）；
+ * - `ok:false`：未知任务/会话已关闭，或终止预算内未收口（`reason:"timeout"`，快照 state=`kill-timeout`，
+ *   **可能仍在运行**）。
+ */
+export type BackgroundTaskStopResult =
+  | { ok: true; task: BackgroundTaskSnapshot; alreadyEnded: boolean }
+  | { ok: false; reason: "unknown-task" | "closed" | "timeout"; message: string; task?: BackgroundTaskSnapshot };
+
+/**
+ * 会话级后台任务管理器（中立能力接口；实现＝`common/runtime-core/background-tasks.ts`）。
+ * Service 创建并注入 `GovernedToolsOptions.backgroundTasks`；四个工具只在同时注入 `ShellGate` 与
+ * 本能力时注册。`start` 是**唯一 spawn 入口**：工具层只有在审核结果恰为 `allow:true` 时才调用它。
+ */
+export interface BackgroundTaskCapability {
+  /** 当前占用名额的任务数（含正在等待 spawn 确认的启动，防止并行调用一起突破上限）。 */
+  readonly runningCount: number;
+  start(input: BackgroundTaskStartInput): Promise<BackgroundTaskStartResult>;
+  list(): BackgroundTaskSnapshot[];
+  read(taskId: string, options?: BackgroundTaskReadOptions): BackgroundTaskReadResult | undefined;
+  stop(taskId: string, options?: BackgroundTaskStopOptions): Promise<BackgroundTaskStopResult>;
+  /** 幂等：标记管理器失效、并行终止全部任务并清空任务/日志。 */
+  dispose(): Promise<void>;
+}
+
+/** 后台任务工具的向后兼容结构化事实（`ToolResult.backgroundTask`；旧读者忽略）。 */
+export interface BackgroundTaskToolFactsV1 {
+  taskId: string;
+  state: BackgroundTaskState;
+  pid?: number;
+  exitCode?: number;
+  signal?: string;
 }
 
 export interface RuntimeAdapter {
@@ -1287,7 +1501,16 @@ export interface ToolExecutionCall extends ToolCall {
   toolCallId?: string;
   signal?: AbortSignal;
 }
-export interface ToolResult { ok: boolean; message: string; execution?: RuntimeToolExecutionFactsV1 }
+export interface ToolResult {
+  ok: boolean;
+  message: string;
+  execution?: RuntimeToolExecutionFactsV1;
+  /**
+   * 后台任务结构化事实（2026-10-22 B4；可选、向后兼容）：任务号/状态/pid/退出码。
+   * 只用于工具结果与聊天行；诊断不落 taskId（共享白名单不含该字段）。
+   */
+  backgroundTask?: BackgroundTaskToolFactsV1;
+}
 
 export interface ToolDefinition {
   displayInputRule?: ToolDisplayInputRuleV1;
@@ -1382,6 +1605,14 @@ export interface GovernedToolsOptions {
    * 同样 `judgeMode:true` 且 `installedMcpServers:[]`。未注入 ⇒ 判断路径不进入（逐字现状）。
    */
   governanceJudge?: GovernanceJudgeToolOptions;
+  /**
+   * 会话级后台任务管理器（2026-10-22 客户确认设计 B1/B3）：Service 在 `providerFor` 中、走
+   * `buildGovernedTools` 且注入了 `ShellGate` 时创建并注入；`RuntimeSessionOptions` 以 `Omit` 排除本字段，
+   * 外部调用方不能自行注入。**只有 `ShellGate` 与本能力同时存在时**，`start_background_task` /
+   * `list_background_tasks` / `read_background_task` / `stop_background_task` 才一起注册（注入才注册）。
+   * 判断会话不经过 `buildGovernedTools`，天然看不到这四个工具。未注入 ⇒ 工具不存在（fail-closed）。
+   */
+  backgroundTasks?: BackgroundTaskCapability;
 }
 
 export interface RuntimeSessionRecord {

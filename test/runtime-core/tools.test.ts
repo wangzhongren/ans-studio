@@ -148,7 +148,11 @@ test("real write/edit preserves UTF-8 BOM/CRLF and rejects missing match or syml
     assert.equal((await byName.get("edit_file")!.handler({ name: "edit_file", args: { path: "file.txt", old_string: "two", new_string: "three" } })).ok, true);
     assert.equal(await readFile(path.join(root, "file.txt"), "utf8"), "\uFEFFone\r\nthree\r\n");
     assert.equal((await byName.get("edit_file")!.handler({ name: "edit_file", args: { path: "file.txt", old_string: "absent", new_string: "x" } })).ok, false);
-    await symlink(outside, path.join(root, "link"), "dir");
+    // Windows 未启用 Developer Mode/非管理员时 `symlink(..., "dir")` 报 EPERM；目录 junction 是同等的
+    // 重解析点（同样可指向根外），不改变逃逸断言——guardWriteTarget 的 realpath 复核仍必须拒绝。
+    // POSIX 保持原 symlink 形态。
+    if (process.platform === "win32") await symlink(outside, path.join(root, "link"), "junction");
+    else await symlink(outside, path.join(root, "link"), "dir");
     assert.equal((await byName.get("write_file")!.handler({ name: "write_file", args: { path: "link/escape.txt", content: "x" } })).ok, false);
     assert.deepEqual(await readdir(outside), []);
     assert.equal((await byName.get("write_file")!.handler({ name: "write_file", args: { path: "missing.txt" } })).ok, false);

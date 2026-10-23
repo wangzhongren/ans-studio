@@ -26,6 +26,7 @@ import {
   makeHarness,
   makeRoot,
   proposalDoc,
+  seedAcceptanceArtifacts,
   seedConfirmedIntent,
   seedLedger,
   seedTrioProject,
@@ -62,6 +63,9 @@ async function runCase(opts: {
   seedTrioProject(temp.root);
   write(temp.root, PROPOSAL_REL, proposalDoc(FLOW));
   write(temp.root, FLOW_REL, flowDoc(FLOW, opts.steps));
+  // 2026-10-22 第 3 项：验收卡机械门槛要求标准/报告/变更包存在且档位一致（T1）。
+  // 各负向子场景仍由其目标机械门槛产生 manual（缺 dispatch/阻塞/未结算/非法 YAML），未放宽。
+  seedAcceptanceArtifacts(temp.root, FLOW, "T1");
   await seedLedger(temp.root, opts.ledger.entries);
   // 前置：客户已确认意图（decision 组判断的意图基准）；否则验收卡在意图定位处 fail-closed。
   await seedConfirmedIntent(temp.root);
@@ -252,6 +256,7 @@ test("场景6f：Flow YAML 非法 ⇒ 验收自动退回，证据包给具体 pa
     ].join("\n"),
   );
   await seedLedger(temp.root, [ACCEPTED, DISPATCHED]);
+  seedAcceptanceArtifacts(temp.root, FLOW, "T1");
   await seedConfirmedIntent(temp.root);
   const h = await makeHarness({
     tag: "acceptance-invalid-flow",
@@ -282,6 +287,7 @@ test("Draft 不能发 acceptance：rapporteur 的 request_choice(acceptance) 被
   write(temp.root, PROPOSAL_REL, proposalDoc(FLOW));
   write(temp.root, FLOW_REL, flowDoc(FLOW, [{ id: "impl", status: "done" }, { id: "verification", status: "pending" }]));
   await seedLedger(temp.root, [ACCEPTED, DISPATCHED]);
+  seedAcceptanceArtifacts(temp.root, FLOW, "T1");
   await seedConfirmedIntent(temp.root);
   const h = await makeHarness({
     tag: "acceptance-wrong-role",

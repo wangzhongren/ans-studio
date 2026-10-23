@@ -1,0 +1,76 @@
+ M app/desktop/customer-input.ts
+ M app/desktop/governance-advance.ts
+ M app/desktop/interface.ts
+ M app/renderer/src/chat/governance-view.ts
+ M app/renderer/src/chat/role-view.ts
+ M docs/communication/memo.md
+ M src/common/编排/flow-service.ts
+ M src/common/编排/flow-state.ts
+ M src/common/编排/governance-gate.ts
+ M src/common/编排/governance-judge-evidence.ts
+ M src/common/编排/governance-judge-facts.ts
+ M src/common/编排/governance-judge-prompt.ts
+ M src/common/编排/governance-judge-verdict.ts
+ M src/common/编排/governance-judge.ts
+ M src/common/编排/governance-ledger.ts
+ M src/common/门禁引擎/governance-roles.ts
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/govern-session.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+ M test/runtime-core/governance-flow-metadata.test.ts
+ M test/桌面UI/governance-view.test.ts
+ M test/桌面UI/role-view.test.ts
+ M test/桌面应用/acceptance-dispatch.test.ts
+ M test/桌面应用/dispatch-delivery.test.ts
+ M test/桌面应用/interface.test.ts
+ M test/桌面应用/operator-wiring.test.ts
+ M test/桌面应用/session.test.ts
+ M test/测试/governance-e2e-auto/b-proposal-accept-timing.test.ts
+ M test/测试/governance-e2e-auto/c-appointment-timing.test.ts
+ M test/测试/governance-e2e-auto/d-dispatch-listing.test.ts
+ M test/测试/governance-e2e-auto/f-acceptance-gate.test.ts
+ M test/测试/governance-e2e-auto/fixture.ts
+ M test/测试/governance-e2e-auto/i-full-chain.test.ts
+ M test/测试/governance-judge-cards-verify/b-card-kinds.test.ts
+ M test/测试/governance-judge-cards-verify/d-audit-ledger.test.ts
+ M test/测试/governance-judge-cards-verify/e-queue-once.test.ts
+ M test/测试/governance-judge-cards-verify/fixture.ts
+ M test/测试/governance-liaison-verify/e-audit.test.ts
+ M test/测试/governance-trio-verify/b-gates-dispatch-ledger.test.ts
+ M test/测试/real-entry.test.ts
+ M test/编排/decision-evidence-packet.test.ts
+ M test/编排/decision-intent-drift.test.ts
+ M test/编排/flow-service.test.ts
+ M test/编排/flow-state.test.ts
+ M test/编排/governance-gate.test.ts
+ M test/编排/governance-judge.test.ts
+ M test/编排/governance-session.test.ts
+ M test/门禁引擎/governance-standard-workflow.test.ts
+ M test/门禁引擎/governance-trio.test.ts
+ M test/门禁引擎/liaison-role.test.ts
+ M 角色卡/桌面UI/api-spec.md
+ M 角色卡/桌面UI/memo.md
+ M 角色卡/桌面窗口/api-spec.md
+ M 角色卡/桌面窗口/memo.md
+ M 角色卡/编排/api-spec.md
+ M 角色卡/编排/memo.md
+ M 角色卡/运行时核心/api-spec.md
+ M 角色卡/运行时核心/memo.md
+ M 角色卡/门禁引擎/api-spec.md
+ M 角色卡/门禁引擎/memo.md
+?? docs/acceptance/governance-split-1-3-5-criteria-v1.md
+?? docs/communication/2026-10-22_intent_governance-split-1-3-5.md
+?? docs/planning/
+?? docs/scheduling/2026-10-22-governance-split-1-3-5-team-plan.md
+?? test/测试/governance-e2e-auto/p-team-plan-guard.test.ts
+?? test/测试/phase-e-governance-demo.mjs
+?? 角色卡/桌面UI/docs/change/2026-10-22_change_governance-split-1-3-5-ui-copy.md
+?? 角色卡/桌面窗口/docs/change/2026-10-22_change_governance-split-1-3-5-desktop.md
+?? 角色卡/测试/docs/change/2026-10-22-governance-split-1-3-5-baseline-evidence/
+?? 角色卡/测试/docs/change/2026-10-22-governance-split-1-3-5-phase-e-evidence/
+?? 角色卡/测试/docs/change/2026-10-22_change_governance-split-1-3-5-baseline.md
+?? 角色卡/编排/docs/change/2026-10-22_change_governance-split-1-3-5-flow.md
+?? 角色卡/运行时核心/docs/change/2026-10-22_change_governance-split-1-3-5-model-provider.md
+?? 角色卡/门禁引擎/docs/change/2026-10-22_change_governance-split-1-3-5-roles.md

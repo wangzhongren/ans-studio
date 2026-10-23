@@ -1,0 +1,19 @@
+{
+  "projectRoot": "C:/Users/51054/Desktop/work/ans-studio/角色卡/测试/docs/change/2026-10-22-role-granularity-parallel-testing-phase-e-evidence/tmp-full-parallel/ans-liaison-verify-clarify-desktop-qLkzyM",
+  "skillRoot": "C:/Users/51054/.claude/skills/ans-governed-construction",
+  "governanceModel": "trio",
+  "roles": {},
+  "governanceBoundary": {
+    "path": "角色卡/governance-boundary.yaml",
+    "acceptance": {
+      "accepted": true,
+      "source": "test:desktop",
+      "pin": [
+        {
+          "path": "角色卡/A/boundary.yaml",
+          "sha256": "04655373494af6c1b07d03658692deddd2fbf4d859f07b4cb73ff7f224f60999"
+        }
+      ]
+    }
+  }
+}

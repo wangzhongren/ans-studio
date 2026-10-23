@@ -3,7 +3,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -35,10 +36,50 @@ test("真实入口:演示输出含角色/边界来源、两笔写入、按根分
   assert.match(out, /\[settled\]/);
 });
 
-test("真实入口:演示**不产生** docs/scheduling 记录(F3)", () => {
-  const schedulingDir = path.join(REPO_ROOT, "docs", "scheduling");
-  runCli(["role", "run", "编排", "--task", "T-1"]);
-  assert.equal(existsSync(schedulingDir), false, "不应存在 docs/scheduling/");
+// 2026-10-22 更新（本任务 `2026-10-22-governance-split-1-3-5` 阶段 E，理由与证据见
+// `角色卡/测试/docs/change/2026-10-22_change_governance-split-1-3-5-phase-e.md`）：
+// 原断言「仓库根不存在 docs/scheduling/」在基线时已因本任务**合法新建的管理记录**
+// `docs/scheduling/2026-10-22-governance-split-1-3-5-team-plan.md`（统筹写区）而红（阶段 A 基线 A2 项）。
+// 该目录如今是既有事实（统筹团队计划/变更包/readiness 的默认写区），把它当作不存在已不成立；
+// 但 F3 要钉住的**产品行为**没变：演示不得创建新的调度记录、也不得改写既有管理记录。
+// 故改为运行前后快照 docs/scheduling/（目录不存在视为空集；逐文件记录 sha256）：
+//   · 演示后不得出现新增文件（新记录）；
+//   · 演示后既有文件内容必须逐字节不变（可捕获「覆盖写」而不只是「新增」）。
+// 这不是放宽为永远通过：新增 1 个文件或改动 1 个既有字节都会失败；也不删除 docs/scheduling/、
+// 不跳过该用例。原用例「目录不存在」的等价语义（空集 + 演示后仍空）由本快照比较覆盖。
+function snapshotSchedulingRecords(): Map<string, string> {
+  const root = path.join(REPO_ROOT, "docs", "scheduling");
+  const files = new Map<string, string>();
+  if (!existsSync(root)) return files;
+
+  const walk = (relDir: string): void => {
+    for (const entry of readdirSync(path.join(root, relDir), { withFileTypes: true })) {
+      const rel = relDir ? path.join(relDir, entry.name) : entry.name;
+      if (entry.isDirectory()) walk(rel);
+      else files.set(rel, createHash("sha256").update(readFileSync(path.join(root, rel))).digest("hex"));
+    }
+  };
+  walk("");
+  return files;
+}
+
+test("真实入口:演示**不产生新的** docs/scheduling 记录、也不改写既有管理记录(F3)", () => {
+  const before = snapshotSchedulingRecords();
+  const r = runCli(["role", "run", "编排", "--task", "T-1"]);
+  assert.equal(r.status, 0, `演示应成功；stderr=${r.stderr}`);
+  const after = snapshotSchedulingRecords();
+
+  const added = [...after.keys()].filter((name) => !before.has(name));
+  assert.deepEqual(added, [], `演示不得新建 docs/scheduling 记录；新增=${added.join(", ")}`);
+
+  const modified = [...before.keys()].filter((name) => after.get(name) !== before.get(name));
+  assert.deepEqual(modified, [], `演示不得改写既有 docs/scheduling 管理记录；被改=${modified.join(", ")}`);
+
+  // 反向守卫：若 before 非空（本仓库当前应在），确认快照确实读到了既有管理记录，
+  // 防止「路径算错导致空集恒等」把用例退化成永远通过。
+  if (existsSync(path.join(REPO_ROOT, "docs", "scheduling"))) {
+    assert.ok(before.size > 0, "docs/scheduling 存在时快照应至少读到 1 条记录（防止空集假通过）");
+  }
 });
 
 // —————————————————————— 失败路径必须非 0 ——————————————————————

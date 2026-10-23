@@ -1,0 +1,21 @@
+shard=orchestration
+command=node --test test/编排/**/*.test.ts
+started=2026-10-22T21:32:02+08:00
+ended=2026-10-22T21:32:07+08:00
+exit=1
+temp=角色卡\测试\docs\change\2026-10-22-role-granularity-parallel-testing-phase-e-evidence\map\tmp-orchestration
+cwd=/c/Users/51054/Desktop/work/ans-studio
+node=v24.22.1
+✖ node test外指符号链接路径不获委托；项目内测试路径获委托 (9.9596ms)
+ℹ tests 769
+ℹ pass 768
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4662.2382
+✖ failing tests:
+✖ node test外指符号链接路径不获委托；项目内测试路径获委托 (9.9596ms)
+candidate_head=64ed44a0ac6e75d647eadbeb3f35ae9f84625845
+candidate_tracked_diff_sha256=267194bf55246e586cda3f6bfee17a5de3e1e9b4b093321d96dcb54a788f5573
+candidate_untracked_sha256=621ec300f17dc87656e50bc7198caf369b4aa398fdcf0eb8417934b089c61eef

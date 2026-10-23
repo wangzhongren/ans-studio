@@ -1,0 +1,113 @@
+candidate_HEAD=4d944e7587f10be29b6356c42539e06219ed88fc
+captured_at=2026-10-22T15:20:27+08:00
+node=v24.22.1
+npm=11.19.1
+
+=== working tree (porcelain, core.quotepath=false) ===
+ M src/common/编排/flow-service.ts
+ M src/common/编排/flow-state.ts
+ M src/common/编排/governance-gate.ts
+ M src/common/编排/governance-handoff.ts
+ M src/common/编排/governance-judge-facts.ts
+ M src/common/编排/governance-judge-intent.ts
+ M src/common/门禁引擎/governance-roles.ts
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+ M src/service/runtime/session.ts
+ M test/runtime-core/governance-flow-metadata.test.ts
+ M test/runtime-core/liaison-handoff-tools.test.ts
+ M test/runtime-core/tools.test.ts
+ M test/测试/governance-e2e-auto/fixture.ts
+ M test/编排/confirm-preview-completeness.test.ts
+ M test/编排/decision-evidence-packet.test.ts
+ M test/编排/flow-service.test.ts
+ M test/编排/flow-state.test.ts
+ M test/编排/governance-gate.test.ts
+ M test/编排/governance-judge.test.ts
+ M test/编排/governance-session.test.ts
+ M test/编排/liaison-handoff.test.ts
+ M test/装配/govern-target.test.ts
+ M test/门禁引擎/governance-standard-workflow.test.ts
+ M test/门禁引擎/governance-trio.test.ts
+ M 角色卡/独立验收/feature-map.md
+ M 角色卡/独立验收/memo.md
+ M 角色卡/编排/api-spec.md
+ M 角色卡/编排/feature-map.md
+ M 角色卡/编排/memo.md
+ M 角色卡/装配/docs/feature/cli-runtime-assembly.md
+ M 角色卡/装配/feature-map.md
+ M 角色卡/装配/memo.md
+ M 角色卡/运行时核心/api-spec.md
+ M 角色卡/运行时核心/docs/feature/runtime-core.md
+ M 角色卡/运行时核心/feature-map.md
+ M 角色卡/运行时核心/memo.md
+ M 角色卡/门禁引擎/changelog.md
+ M 角色卡/门禁引擎/memo.md
+?? src/common/runtime-core/background-tasks.ts
+?? src/common/runtime-core/process-tree.ts
+?? test/runtime-core/background-contract.test.ts
+?? test/runtime-core/background-engines.test.ts
+?? test/runtime-core/background-fixtures.ts
+?? test/runtime-core/background-review.test.ts
+?? test/runtime-core/background-tasks.test.ts
+?? test/runtime-core/governance-slug-pattern.test.ts
+?? test/测试/background-tasks-e2e-real-model/
+?? test/测试/background-tasks-entry/
+?? test/测试/governance-e2e-auto/n-invalid-governance-card.test.ts
+?? test/测试/governance-e2e-auto/o-slug-trailing-hyphen.test.ts
+?? 角色卡/测试/docs/change/2026-10-22-background-tasks-verify-evidence/
+?? 角色卡/测试/docs/change/2026-10-22-slug-verify-evidence/
+?? 角色卡/测试/docs/change/2026-10-22-verify-evidence/
+?? 角色卡/测试/docs/change/2026-10-22_change_background-tasks-e2e-real-model.md
+?? 角色卡/测试/docs/change/2026-10-22_change_background-tasks-verify.md
+?? 角色卡/测试/docs/change/2026-10-22_change_invalid-governance-card-verify.md
+?? 角色卡/独立验收/docs/change/2026-10-22_change_background-tasks-acceptance.md
+?? 角色卡/独立验收/docs/change/2026-10-22_change_invalid-governance-card-acceptance.md
+?? 角色卡/独立验收/docs/design/2026-10-22_design_background-tasks-acceptance.md
+?? 角色卡/独立验收/docs/design/2026-10-22_design_governance-slug-no-trailing-hyphen-acceptance.md
+?? 角色卡/独立验收/docs/design/2026-10-22_design_invalid-governance-card-acceptance.md
+?? 角色卡/编排/docs/change/2026-10-22_change_governance-slug-no-trailing-hyphen-s2-s3.md
+?? 角色卡/编排/docs/change/2026-10-22_change_invalid-governance-card-guard.md
+?? 角色卡/装配/docs/change/2026-10-22_change_govern-target-strict-card-fixture.md
+?? 角色卡/运行时核心/docs/change/2026-10-22_change_background-tasks.md
+?? 角色卡/运行时核心/docs/change/2026-10-22_change_governance-slug-no-trailing-hyphen.md
+?? 角色卡/运行时核心/docs/change/2026-10-22_change_invalid-governance-card-receipt.md
+?? 角色卡/运行时核心/docs/feature/background-tasks.md
+?? 角色卡/门禁引擎/docs/change/2026-10-22_change_governance-slug-no-trailing-hyphen-s4.md
+?? 角色卡/门禁引擎/docs/change/2026-10-22_change_invalid-governance-card-copy.md
+?? 角色卡/项目管理/docs/design/2026-10-22_design_background-tasks.md
+?? 角色卡/项目管理/docs/design/2026-10-22_design_governance-slug-no-trailing-hyphen.md
+?? 角色卡/项目管理/docs/design/2026-10-22_design_invalid-governance-card-guard.md
+
+=== files created/changed by 测试 role in this task (sha256) ===
+c889e6fac788e062edd09b19082ab5b5d220e6d6169fdc2bb743e5945fa4231b *test/测试/governance-e2e-auto/o-slug-trailing-hyphen.test.ts
+ed8155833f51beca3cf4a9bc56c33328b766c5cb2e8df9d85978baeaf0c1eb89 *test/测试/governance-e2e-auto/fixture.ts
+
+=== product files changed by S1–S4 (working tree; not modified by 测试 role) ===
+ M src/common/编排/flow-service.ts
+ M src/common/编排/flow-state.ts
+ M src/common/编排/governance-gate.ts
+ M src/common/编排/governance-handoff.ts
+ M src/common/编排/governance-judge-facts.ts
+ M src/common/编排/governance-judge-intent.ts
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+
+=== product diff stat (working tree) ===
+ .../\347\274\226\346\216\222/flow-service.ts"      |   7 +-
+ .../common/\347\274\226\346\216\222/flow-state.ts" |   7 +-
+ .../\347\274\226\346\216\222/governance-gate.ts"   |  21 +-
+ .../governance-handoff.ts"                         |  33 +-
+ .../governance-judge-facts.ts"                     |   9 +-
+ .../governance-judge-intent.ts"                    |  36 ++-
+ .../governance-roles.ts"                           |  16 +-
+ src/model/runtime.ts                               | 145 ++++++++-
+ src/pipeline/orchestration/run-role.ts             | 180 +++++++----
+ src/provider/runtime/schema.ts                     | 117 ++++++-
+ src/provider/runtime/tools.ts                      | 356 +++++++++++++++++++--
+ src/service/runtime/session.ts                     | 151 +++++----
+ 12 files changed, 889 insertions(+), 189 deletions(-)

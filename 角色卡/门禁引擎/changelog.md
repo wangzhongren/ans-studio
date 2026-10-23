@@ -1,5 +1,55 @@
 # 门禁引擎 变更记录
 
+## 2026-10-22（二）— 共享治理 slug 契约收紧 S4：门禁引擎测试改引用 Model 常量并补尾连字符负例（客户确认 S4）
+
+客户 2026-10-22 确认按设计 `2026-10-22_design_governance-slug-no-trailing-hyphen.md` 的 **S1–S5**
+实施（O1–O4 均未选）；本批只做 **S4**（门禁引擎测试侧）。完整记录见
+[变更记录](docs/change/2026-10-22_change_governance-slug-no-trailing-hyphen-s4.md)。
+
+- **边界**：`test/门禁引擎/governance-standard-workflow.test.ts`、本文件、`memo.md`、
+  `docs/change/2026-10-22_change_governance-slug-no-trailing-hyphen-s4.md`（新）。未碰
+  `src/model/**`（S1 由运行时核心完成）、`src/common/编排/**`（S2/S3）、`test/测试/**`（S5）、
+  其他角色文件、`todo-demo`；不读 `.env`、不跑真实模型/凭据/网络；未 commit。
+- **测试侧**：删除 `governance-standard-workflow.test.ts:230` 硬编码旧正则
+  `/^[a-z0-9][a-z0-9-]{1,63}$/`，改为值导入 Model 的 `GOVERNANCE_SLUG_PATTERN` 并
+  `new RegExp(...)`（模块级 `GOVERNANCE_SLUG_RE`，单一来源）；YAML 模板步骤 id 断言改用该正则；
+  新增 1 例钉住正则 `source` 逐字等于 Model 常量，`flow-a`/`impl` 合法通过、`flow-`/`a-`/`impl-`
+  尾连字符拒绝。其他断言未删除、未放宽。
+- **测试**：定向 `governance-standard-workflow.test.ts` ⇒ exit 0，**16 计 / 16 过 / 0 失败 / 0 skip**；
+  本角色全套 `test/门禁引擎/*.test.ts` ⇒ exit 0，**302 计 / 301 过 / 0 失败 / 1 skip**（Windows
+  既有 skip；较上批 301/300/1 恰 +1 计 +1 过）。`npm run typecheck` ⇒ **exit 0，0 错**。
+- **跨角色依赖（只读核对、未越界）**：编排 S2/S3 尚未落地——`governance-gate.ts`、
+  `governance-handoff.ts`、`governance-judge-facts.ts`、`flow-state.ts`、`flow-service.ts` 与
+  `run-role.ts` 仍持旧正则副本；S5 端到端属测试角色。在 S2/S3 落地前端到端尾连字符拒绝仍未收紧；
+  真机端到端与独立复验未进行。来源：客户 2026-10-22 确认（经任务派发转达）。
+
+## 2026-10-22 — 治理确认卡缺 flowId/cardKind：卡文本改为「本次不发卡、退回补齐重发」（客户确认 N5）
+
+客户 2026-10-22 确认按设计 `2026-10-22_design_invalid-governance-card-guard.md` 的 **N1–N5 严格口径**
+实施（O1–O7 均未授权）；本批只做 **N5**（五张内置治理角色卡文本），N1–N4 由编排/运行时核心另行实施。
+完整记录见[变更记录](docs/change/2026-10-22_change_invalid-governance-card-copy.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`、`test/门禁引擎/governance-trio.test.ts`、
+  本文件、`memo.md`、`docs/change/2026-10-22_change_invalid-governance-card-copy.md`（新）。未碰
+  `src/pipeline/**`、`src/provider/**`、`src/model/**`、`app/**`、`test/测试/**`、其他角色文件、
+  `todo-demo`；不读 `.env`、不跑真实模型/凭据/网络；未 commit。
+- **五卡**：`LIAISON_CARD_TEXT` / `RAPPORTEUR_CARD_TEXT` / `NOMINATOR_CARD_TEXT` /
+  `CONVENER_CARD_TEXT` / `VERIFIER_CARD_TEXT` 的「治理卡参数纪律」把「缺任何一项＝会被当作旧卡、
+  判断 agent 不介入并回落手动」改为「缺任何一项＝无效治理调用：本次不发卡、不生成客户卡、
+  未向客户呈现，应用直接退回并提示补齐重发。必须补齐两项重发」——与应用拒绝、不生成客户卡的错误
+  回执语义（设计 §4.6）一致。
+- **保留**：`flowId` + `cardKind` 必须同时携带、各角色 `cardKind` 白名单、其余卡文本逐字不变；
+  `nominator` 另一处「物证缺失回落手动」（判断证据门槛）不动；旧 `su` 卡文本不动。
+- **测试**：`node --test --test-timeout=120000 test/门禁引擎/governance-trio.test.ts` ⇒ exit 0，
+  **33 计 / 33 过 / 0 失败 / 0 skip**（新增 N5/T14 用例；旧 `/当作旧卡/`、`/回落手动/` 断言改为
+  新文案 + 反向断言，其他断言未放宽）；本角色全套 `test/门禁引擎/*.test.ts` ⇒ exit 0，
+  **301 计 / 300 过 / 0 失败 / 1 skip**（Windows 既有 skip）。`npm run typecheck` ⇒ exit 1，3 条错误
+  全在 `test/测试/background-tasks-e2e-real-model/`（测试角色在飞未跟踪文件），本角色改动文件 0 错。
+- **待下游（未越界）**：编排 N1（呈现前拒绝 + `notPresented` + 诊断）、运行时核心 N2–N4
+  （Model 字段/工具回执/schema 描述）、测试角色跨角色端到端（T15–T17）。
+- **残余风险**：守卫未落地前卡文本描述的是目标口径；模型是否补齐重发取决于遵从；真机端到端与
+  独立复验未进行。来源：客户 2026-10-22 确认（经任务派发转达）。
+
 ## 2026-10-20 — Lead 内部工程/协调选择不得发 request_choice 问客户，只能发 intent-confirm（客户新要求）
 
 客户新要求：Lead 的内部工程/协调选择（契约措辞、实现细节、排期等）不许发 `request_choice` 问客户；

@@ -32,8 +32,14 @@ import type {
 } from "../../src/model/runtime.ts";
 import type { RuntimeKind } from "../../src/common/shared/runtime-shared.ts";
 
-/** 下一步治理职能（客户契约固定词）。 */
-export type GovernanceNextFunction = "nomination" | "schedule";
+/**
+ * 下一步治理职能（客户契约固定词）。
+ *
+ * 2026-10-22 治理分工第 1 项（方案 §5.3）：新增 `role-card-write`——客户 appointment 决定后
+ * 由**应用派 Crew 写角色卡/边界/工作文档**（不再派 Convener 排程）。旧 `nomination` 保留为
+ * legacy（旧提名两段式迁移兼容）。
+ */
+export type GovernanceNextFunction = "nomination" | "schedule" | "role-card-write";
 
 /** 下一步目标内置治理角色（客户契约固定词，与 `BUILT_IN_GOVERNANCE_ROLES` 的 id 一致）。 */
 export type GovernanceNextRoleId = "nominator" | "convener";
@@ -74,6 +80,40 @@ export function governanceFlowPath(flowId: string): string {
 export function governanceFlowStatePath(flowId: string): string {
   return `docs/flows/${flowId}.yaml`;
 }
+
+// —————————————— 2026-10-22 治理分工第 1/3/5 项：调度/验收产物路径（唯一文案来源） ——————————————
+//
+// 路径约定见策划方案 §5.1/§6.4/§7.1；本模块只做**字符串派生**，不读盘、不猜版本。
+// 版本扫描/结构解析在 Interface（`findLatestVersionedArtifact`）与编排（`latestVersionedArtifact`）各一处，
+// 本函数给的是任务文案里的**默认 v1 路径**（与客户给定模板同口径）。
+
+/** 团队计划默认路径（`docs/scheduling/<flowId>-team-v1.md`；v2… 由调用方带版本）。 */
+export function governanceTeamPlanPath(flowId: string, version = 1): string {
+  return `docs/scheduling/${flowId}-team-v${version}.md`;
+}
+
+/** 角色就绪复核记录默认路径（`docs/scheduling/<flowId>-readiness-v1.md`）。 */
+export function governanceReadinessPath(flowId: string, version = 1): string {
+  return `docs/scheduling/${flowId}-readiness-v${version}.md`;
+}
+
+/** 实施前验收标准默认路径（`docs/acceptance/<flowId>-criteria-v1.md`）。 */
+export function governanceAcceptanceCriteriaPath(flowId: string, version = 1): string {
+  return `docs/acceptance/${flowId}-criteria-v${version}.md`;
+}
+
+/** 验收报告默认路径（`docs/acceptance/<flowId>-report-v1.md`；详细附件仍在 `docs/verification/`）。 */
+export function governanceAcceptanceReportPath(flowId: string, version = 1): string {
+  return `docs/acceptance/${flowId}-report-v${version}.md`;
+}
+
+/** 变更包默认路径（`docs/scheduling/<flowId>-change-v1.md`）。 */
+export function governanceChangePackagePath(flowId: string, version = 1): string {
+  return `docs/scheduling/${flowId}-change-v${version}.md`;
+}
+
+/** 风险档位（与技能 `references/testing.md` 唯一口径一致；不是 `qualityTier`）。 */
+export type GovernanceRiskTier = "T0" | "T1" | "T2" | "T3";
 
 /** 流程单的步骤状态（触发「收尾推进」用的保守解析；最终验收仍由编排 driver 机械核对）。 */
 export interface FlowStepStatus {
@@ -234,13 +274,16 @@ interface FlowStepEvidenceRule {
  * 步骤 id → 证据类型的**显式映射表**（顺序即优先级；未命中 ⇒ 派发型，行为与 2026-10-18 旧口径一致）。
  * 只按 stepId 词形匹配，**绝不**从状态文本或自然语言推测；新增步骤种类只能改这张表并补测试。
  *
- * · 产物型：契约冻结（`contract-freeze*`）、提案/流程单写入（`proposal*`/`flow*`/`schedule*`）；
+ * · 产物型：契约冻结（`contract-freeze*`）、提案/流程单写入（`proposal*`/`flow*`/`schedule*`）、
+ *   团队计划（`team-plan*`；2026-10-22 第 1 项）；
  * · 客户决定型：提名/角色就绪（`nomination*`、`role-readiness`、`roles-ready`、`role-ready`）；
  * · 派发型：`delivery-*`、`*e2e*`、`cleanup*`、`rework-*`、`integration-*`、`verify-*` 及所有未知 id。
  */
 const FLOW_STEP_EVIDENCE_RULES: readonly FlowStepEvidenceRule[] = [
   { kind: "artifact", test: (id) => /^contract-freeze(?:$|[-_.])/i.test(id) },
   { kind: "artifact", test: (id) => /^(?:proposal|flow|schedule)(?:$|[-_.])/i.test(id) },
+  // 2026-10-22 第 1 项（方案 §5.6）：团队计划是产物型；旧 `nomination*` 保持客户决定型（legacy）。
+  { kind: "artifact", test: (id) => /^team-plan(?:$|[-_.])/i.test(id) },
   { kind: "decision", test: (id) => /^(?:nomination|nominations|role-readiness|roles-ready|role-ready)(?:$|[-_.])/i.test(id) },
 ];
 
@@ -470,11 +513,27 @@ export function flowCompletionIssue(
  * 建议 accept。原四条逐字不变。本函数只产出任务文本，**不是验收判定**：不改变
  * `flowCompletionIssue` 触发门、不自动批准；演示证据存在与否仍由 Proof 核对、验收卡仍由
  * 客户/判断 agent 决定。
+ *
+ * 2026-10-22 第 3 项（方案 §7.1/§7.4/§7.6）：报告路径改为 `docs/acceptance/<flowId>-report-v1.md`
+ * （详细证据附件仍在 `docs/verification/`）；追加第⑥条——先核对实施前标准与变更包/风险档位，复用同候选
+ * 有效证据，只补缺失/失效/高风险检查。`riskTier` 由调用方读变更包（或团队计划）传入，缺省不猜。
  */
+export interface BuildAcceptanceTaskMessageOptions {
+  flowUpdatedSinceReview?: boolean;
+  /** 变更包/团队计划的当前风险档位（T0–T3）；缺省不标（由 Verifier 自行核对并记录）。 */
+  riskTier?: GovernanceRiskTier;
+  /** 实施前验收标准路径（缺省 `docs/acceptance/<flowId>-criteria-v1.md`）。 */
+  criteriaPath?: string;
+  /** 变更包路径（缺省 `docs/scheduling/<flowId>-change-v1.md`）。 */
+  changePackagePath?: string;
+  /** 验收报告路径（缺省 `docs/acceptance/<flowId>-report-v1.md`）。 */
+  reportPath?: string;
+}
+
 export function buildAcceptanceTaskMessage(
   flowId: string,
   evidence: readonly string[],
-  options: { flowUpdatedSinceReview?: boolean } = {},
+  options: BuildAcceptanceTaskMessageOptions = {},
 ): string {
   const paths = [...new Set(evidence.filter((item): item is string => nonEmptyString(item)))].slice(0, 10);
   const evidenceText = paths.length > 0 ? paths.join("、") : "见回交报告与流程状态 YAML";
@@ -482,6 +541,10 @@ export function buildAcceptanceTaskMessage(
     options.flowUpdatedSinceReview === true
       ? "流程在上次验收复核后有更新，请复核最新版本。"
       : "";
+  const criteriaPath = options.criteriaPath ?? governanceAcceptanceCriteriaPath(flowId);
+  const changePackagePath = options.changePackagePath ?? governanceChangePackagePath(flowId);
+  const reportPath = options.reportPath ?? governanceAcceptanceReportPath(flowId);
+  const riskText = options.riskTier !== undefined ? `（当前档位：${options.riskTier}）` : "";
   return (
     `${stalePrefix}` +
     `流程 ${flowId} 步骤已全部完成（流程状态 YAML：${governanceFlowStatePath(flowId)}；回交/核对报告路径：${evidenceText}）。` +
@@ -490,8 +553,10 @@ export function buildAcceptanceTaskMessage(
     `① 按工程质量基线逐项核对并给出结论与证据：正确性、健壮性、安全、可维护性、可观测性、性能、前端可访问性、测试矩阵；` +
     `② 必须真实启动应用并向客户演示：给出启动命令与访问地址，附截图或录屏（你已有审批档 shell，可执行启动命令，命令逐条提交审批）；` +
     `③ 未真实启动/演示、或质量基线某项无证据，不得建议 accept（只能建议退回或补充证据）；` +
-    `④ 演示证据与逐项核对结论写入 docs/verification/${flowId}-v1.md，并在验收卡中引用。` +
-    `⑤ 按提案/变更的「架构方案或架构影响分析」核对实现：模块边界、依赖方向、扩展点、数据 schema/API 版本迁移与声明一致；缺失架构章节或实现偏离声明时不得建议 accept（只能建议退回或补充证据）。`
+    `④ 验收报告写入 ${reportPath}（首行五项：风险档位、判定依据、选定检查、复用证据、全量回归），详细证据附件写入 docs/verification/；报告须引用实施前标准 ${criteriaPath} 与变更包 ${changePackagePath} 的版本/哈希。` +
+    `⑤ 按提案/变更的「架构方案或架构影响分析」核对实现：模块边界、依赖方向、扩展点、数据 schema/API 版本迁移与声明一致；缺失架构章节或实现偏离声明时不得建议 accept（只能建议退回或补充证据）。` +
+    `⑥ 按实施前标准 ${criteriaPath} 逐行判定（pass / fail / insufficient evidence / not applicable）；先核对变更包 ${changePackagePath} 与风险档位${riskText}（档位只能升不能降，报告不得低于变更包）；复用同候选、同输入/依赖、同命令的有效证据，候选/输入/依赖/契约/夹具/配置变化使受影响证据失效，只补缺失/失效/高风险检查。` +
+    `⑦ 若团队计划为 v2（teamPlanSchema: 2），核对模块覆盖/写集不相交/并行组/dependsOn/粒度例外，以及 MapReduce 证据：测试须按模块分片并行（每分片独立临时根/端口/日志/结果），Reduce 合并 manifest 与分片原始日志并跑契约/集成/e2e；缺 manifest 或分片原始证据判 insufficient evidence，不得建议 accept。`
   );
 }
 
@@ -543,6 +608,12 @@ export interface GovernanceNextStepContext {
    * `dispatch.accepted.stepId`——**不推导、不伪造**；`governance:next-step` IPC 载荷仍不扩。
    */
   stepId?: string;
+  /**
+   * 2026-10-22 第 1 项：卡片请求对象上**显式**携带的团队计划路径（结构读取；冻结契约当前无此字段，
+   * 缺席即省略）。派 Crew 写卡时优先账本 `artifactPath`，其次本值，再按 flowId 派生最新
+   * `docs/scheduling/<flowId>-team-vN.md`——绝不猜目录。
+   */
+  teamPlanPath?: string;
 }
 
 /** 派发结果（主进程内部使用；成功/失败都如实）。 */
@@ -629,18 +700,18 @@ export function buildIntentHandoffMessage(payload: HandOffIntentPayload): string
 }
 
 /**
- * 按「卡片种类 + 客户实际选择」推导下一步（客户已定契约的推导表；2026-10-18 真机修正后）：
- * - `proposal` + `accept`       → schedule / convener，`followUp:"nomination-after-flow"`：
- *                                 **先**由 Convener 写 `docs/flows/<flowId>.yaml`（唯一机器状态，首步提名），
- *                                 YAML 落盘且可解析后应用再派 Nominator（**不再直接派 Nominator**）；
- * - `proposal` + `accept-quick` → schedule / convener（写流程状态 YAML 并排步骤，无提名）；
+ * 按「卡片种类 + 客户实际选择」推导下一步（客户已定契约的推导表；2026-10-22 第 1 项起）：
+ * - `proposal` + `accept`       → schedule / convener：Convener 写/更新流程状态 YAML **与团队计划**，
+ *                                 然后**直接发 appointment 卡**（不再产生 `followUp:"nomination-after-flow"`
+ *                                 两段式；旧事件仍可携带 followUp，`advanceGovernanceFlow` 保留迁移兼容）；
+ * - `proposal` + `accept-quick` → schedule / convener（写流程状态 YAML 并排步骤，无任命）；
  * - `proposal` + `revise|reject`→ null（无下一步，等客户改稿或放弃）；
- * - `appointment`（任命成功）    → schedule / convener（排程，既有逻辑不变）；
+ * - `appointment`（任命成功）    → **role-card-write / nominator**（应用派 Crew 写卡；不再直接派 Convener）；
  * - `acceptance`（验收成功）     → null（流程收口）；
  * - `intent-confirm`（需求确认） → null（2026-10-18 客户拍板：客户确认后由 Lead 自己调 `hand_off_intent`，
  *                                 应用不推进）；
  * - `write`/`appointment-write`/`schedule-write` → null（写盘确认不解锁任何下一步；appointment-write
- *                                 的后续由既有 appointment 链路负责：写卡 → settle → 刷新 → 角色出现后派 Convener）；
+ *                                 的后续由写卡后推进检查负责：结构校验 → 派 Convener 做 role-readiness）；
  * - 未答（declined/unavailable/取消/expired）或卡上无 `cardKind` → 不产生事件（返回 null）。
  *
  * 非标准选项 id（例如账本会记 `unclassified` 的提案选项）一律按「无下一步」处理——不猜。
@@ -659,10 +730,10 @@ export function deriveGovernanceNextStep(
   switch (cardKind) {
     case "proposal": {
       if (selected.includes("accept")) {
-        // 真机闭环：流程状态 YAML 不存在时不能直接派 Nominator（否则只能反复猜路径、大量读失败）。
+        // 2026-10-22 第 1 项：Convener 在同一轮写流程 YAML + 团队计划并直接发 appointment 卡；
+        // 不再产生两段式 followUp（旧 followUp 事件在 advanceGovernanceFlow 保留迁移兼容）。
         nextFunction = "schedule";
         roleId = "convener";
-        followUp = "nomination-after-flow";
       } else if (selected.includes("accept-quick")) {
         nextFunction = "schedule";
         roleId = "convener";
@@ -671,9 +742,9 @@ export function deriveGovernanceNextStep(
       break;
     }
     case "appointment":
-      // 任命决定成功（客户实际选中了候选角色）→ 由 Convener 写流程状态 YAML 并派发。
-      nextFunction = "schedule";
-      roleId = "convener";
+      // 2026-10-22 第 1 项：客户任命决定后由应用派 Crew 写卡（不是 Convener 排程）。
+      nextFunction = "role-card-write";
+      roleId = "nominator";
       break;
     case "acceptance":
     case "intent-confirm":
@@ -700,6 +771,24 @@ export interface BuildGovernanceAdvanceMessageOptions {
    * **不再让 Convener 直接 write_file 流程 YAML**（2026-10-20 真机：flow 工具已注册但 Steward 未被要求使用）。
    */
   flowStateExists?: boolean;
+  /**
+   * 2026-10-22 第 1 项：团队计划（`docs/scheduling/<flowId>-team-vN.md`）。派 Crew 写卡时是
+   * **唯一依据**；旧流程（O4）可缺省并回落 `nominationPath`。
+   */
+  teamPlanPath?: string;
+  teamPlanVersion?: number;
+  /** 团队计划 schema（1=legacy；2=v2）。用于任务文案提示要读的字段；缺省按 legacy 口径。 */
+  teamPlanSchema?: 1 | 2;
+  /** 团队计划 v2 模块清单（机器可读 modules）；非空时写进写卡任务文案。 */
+  teamPlanModules?: readonly string[];
+  /** @deprecated legacy：旧提名文件路径（`docs/nominations/<flowId>-v<n>.md`）；新流程不产生。 */
+  nominationPath?: string;
+  /**
+   * 2026-10-22 第 1 项：本次 proposal 决定是 `accept`（true：写流程 YAML + 团队计划后**直接发任命卡**）
+   * 还是 `accept-quick`（false/缺省：旧快捷文案，写流程并排步骤、无任命）。
+   * 由调用方按账本最新提案决定传入；直接调用本函数且缺省 ⇒ 旧文案逐字不变（迁移兼容）。
+   */
+  proposalDecision?: "accept" | "accept-quick";
 }
 
 /**
@@ -744,7 +833,7 @@ export function buildGovernanceAdvanceMessage(
     if (flowStateExists) {
       return `流程 ${flowId}：客户已接受提案 ${proposalPath}。${flowToolInstruction("步骤")}`;
     }
-    // accept 两段式第一段：先写流程状态 YAML；Nominator 由应用在 YAML 落盘且可解析后派发。
+    // accept 两段式第一段（legacy 迁移兼容）：先写流程状态 YAML；Nominator 由应用在 YAML 落盘且可解析后派发。
     return (
       `流程 ${flowId}：客户已接受提案 ${proposalPath}。` +
       `请先写流程状态 YAML ${flowStatePath}（唯一机器状态，字段/枚举按门禁卡的流程 YAML schema；` +
@@ -753,6 +842,27 @@ export function buildGovernanceAdvanceMessage(
     );
   }
   if (payload.cardKind === "proposal" && payload.nextFunction === "schedule" && payload.roleId === "convener") {
+    // 2026-10-22 第 1 项：客户接受提案 ⇒ Convener 写流程 YAML + 团队计划并**直接发 appointment 卡**
+    // （不再产生 nomination-after-flow 两段式；旧 followUp 分支见上，保留迁移兼容）。
+    if (options?.proposalDecision === "accept") {
+      const proposalPath = payload.proposalPath ?? `docs/proposals/${flowId}-v1.md`;
+      const planRel = options.teamPlanPath ?? governanceTeamPlanPath(flowId);
+      const flowInstruction = flowStateExists
+        ? `流程状态 YAML 已存在（${flowStatePath}）：请用 flow_get 读取当前 revision，再用 flow_step_update / flow_step_supersede ` +
+          `更新步骤（team-plan / appointment / role-cards / role-readiness / acceptance-criteria / change-package；保留 verification）；不要直接 write_file 流程 YAML。`
+        : `请先写流程状态 YAML ${flowStatePath}（唯一机器状态；同名 .md 仅可选人读视图，不得承载门禁状态），` +
+          `步骤使用 team-plan / appointment / role-cards / role-readiness / acceptance-criteria / change-package（kind 用现有 artifact / customer-decision / dispatch / acceptance），保留 verification 待应用派 Proof。`;
+      return (
+        `流程 ${flowId}：客户已接受提案 ${proposalPath}。` +
+        flowInstruction +
+        `并在 ${planRel} 写出/更新**团队计划 v2**（新流程默认 v2；frontmatter：flowId、version、riskTier、teamPlanSchema: 2、recommended: [角色id,...]、modules: [模块id,...]；` +
+        `正文「模块清单」表逐模块含职责/公开契约/架构来源；角色表逐角色含 module/boundedContext、职责目标、能力要求、唯一写集、公开契约、测试面、依赖、dependsOn、并行组、组别、apiSpec、粒度理由；并写「五维判断/协调成本」章节）。` +
+        `Map 组（parallelGroup: map-<slug>）写集必须两两不相交且组内无依赖；Reduce 角色（module: reduce、并行组: reduce）依赖全部 Map 角色；整层名/多模块例外必须写粒度理由。` +
+        `legacy 旧计划可不写 teamPlanSchema: 2（按 v1 校验并记迁移提醒），但新流程请用 v2。` +
+        `完成后**直接发任命卡**：request_choice(cardKind=appointment, flowId=${flowId}, stepId=role-cards)，` +
+        `选项为团队计划 recommended 中的项目角色（不含内置治理角色）；不要替客户决定、不要自行任命、不要写角色卡。`
+      );
+    }
     if (flowStateExists) {
       return (
         `流程 ${flowId}：客户已接受提案（快捷路径）。${flowToolInstruction("步骤")}` +
@@ -765,7 +875,39 @@ export function buildGovernanceAdvanceMessage(
       `涉及新建/改边界仍须任命卡与写盘确认。`
     );
   }
+  if (payload.cardKind === "appointment" && payload.nextFunction === "role-card-write" && payload.roleId === "nominator") {
+    const ids = (targetRoleIds ?? []).filter((id): id is string => nonEmptyString(id));
+    if (ids.length === 0) return null; // 任命名单缺失：不猜、不裸发。
+    const planRel = options?.teamPlanPath;
+    const legacyRel = options?.nominationPath;
+    if (planRel === undefined && legacyRel === undefined) return null; // 无团队计划也无 legacy 提名：不猜、不裸发。
+    const schemaNote =
+      options?.teamPlanSchema === 2
+        ? "（团队计划 v2：按 module/公开契约/测试面/dependsOn/并行组/粒度理由写卡）"
+        : options?.teamPlanSchema === 1
+          ? "（legacy v1：按旧四列写卡；建议迁移团队计划 v2）"
+          : "";
+    const moduleNote =
+      options?.teamPlanSchema === 2 && (options.teamPlanModules?.length ?? 0) > 0
+        ? `；模块清单：${options.teamPlanModules!.join("、")}`
+        : "";
+    const basis =
+      planRel !== undefined
+        ? `依据团队计划 ${planRel}${options?.teamPlanVersion !== undefined ? `（version=${options.teamPlanVersion}）` : ""}${schemaNote}${moduleNote}只读执行`
+        : `依据旧提名文件 ${legacyRel}（legacy；新流程应使用团队计划）只读执行`;
+    return (
+      `流程 ${flowId}：客户已完成任命（闸门 2）：${ids.join("、")}。${basis}；只对名单内角色写卡，不自行扩大职责、不改团队计划、不改其他角色。` +
+      `逐路径写入并用 request_confirmation(cardKind=appointment-write, flowId=${flowId}, stepId=role-cards) 请客户确认（逐路径列出全部文件）：` +
+      `① role-card.md：角色名/组别/工作立场、能力描述、职责与功能导航、必读资料、交接输入输出、执行原则、质量职责、标准工作流、交付物清单；v2 另须写明 bounded context/公开契约/测试面/上下游依赖/粒度理由；` +
+      `② boundary.yaml：现有 schema + 角色根工作文档条目（角色卡/<id>/feature-map.md、functional-description.md、memo.md、api-spec.md）+ 按团队计划的实际写集；**计划写集必须被 entries 覆盖（V12 不覆盖会退回）**；` +
+      `③ feature-map.md、functional-description.md、memo.md、api-spec.md（无共享接口时写 not-applicable + 非空理由）。` +
+      `不得写整层/纳米角色；不要写计划里没有的模块或路径。` +
+      `计划缺职责目标/能力要求/写集/依赖等细节时（v2 另含 module/公开契约/测试面/dependsOn/并行组）：停止写卡并报告 Steward / 统筹 补充计划，不自行补计划。写完后本轮结束；应用会做结构校验与计划写集覆盖核对（V12），通过后才请 Steward / 统筹 做 role-readiness。`
+    );
+  }
   if (payload.cardKind === "appointment" && payload.nextFunction === "schedule" && payload.roleId === "convener") {
+    // @deprecated legacy（2026-10-22 前的事件形状）：appointment 决定后直接派 Convener 排程。
+    // 新主路径为 appointment → Crew 写卡（见上）；本分支仅保留旧事件/旧测试的迁移兼容。
     const ids = (targetRoleIds ?? []).filter((id): id is string => nonEmptyString(id));
     if (ids.length === 0) return null; // 任命名单缺失：不猜、不裸发。
     if (flowStateExists) {
@@ -780,7 +922,8 @@ export function buildGovernanceAdvanceMessage(
 export function buildNominationAlreadyDoneMessage(flowId: string): string {
   const flowStatePath = governanceFlowStatePath(flowId);
   return (
-    `流程 ${flowId}：提名已完成（流程状态 YAML ${flowStatePath} 的 nomination 步骤已是 done），应用未重复派发提名任务。` +
+    `流程 ${flowId}：提名（legacy）已完成（流程状态 YAML ${flowStatePath} 的 nomination 步骤已是 done），应用未重复派发提名任务。` +
+    `新流程应为：团队计划 → 任命（appointment）→ Crew 写卡（role-cards）→ 角色就绪复核（role-readiness）；` +
     `请用 flow_get 读取当前 revision，再用 flow_step_update / flow_step_supersede 推进后续步骤；不要直接 write_file 流程 YAML；不要把步骤说成已派发。`
   );
 }
@@ -792,9 +935,9 @@ export function governanceNominationAlreadyDoneNote(): string {
 
 /** 成功派发的系统行文案（客户给定首例；其余按同一句式如实说明职能）。 */
 export function governanceAdvanceSuccessNote(payload: GovernanceNextStepPayload): string {
-  return payload.nextFunction === "nomination"
-    ? "已派发提名任务给 Crew / 组队（工作中）"
-    : "已派发流程任务给 Steward / 统筹（工作中）";
+  if (payload.nextFunction === "nomination") return "已派发提名任务给 Crew / 组队（工作中）";
+  if (payload.nextFunction === "role-card-write") return "已派发写卡任务给 Crew / 组队（工作中）";
+  return "已派发流程任务给 Steward / 统筹（工作中）";
 }
 
 /** accept 两段式第二段的系统行：流程状态 YAML 已落盘且通过校验、Crew / 组队 已派。 */
@@ -803,19 +946,124 @@ export function governanceNominationFollowUpNote(): string {
 }
 
 /**
- * **任命后角色尚未写出**时的补救任务（2026-10-18 真机修正）：账本已有 `appointment` 决定，但目标角色
- * 不在刷新后的 listing（角色卡/边界未写）。此时**不能**派 Convener（它只会反复报「未枚举」）；改派
- * Nominator 用 appointment-write 逐路径写卡，写完后本轮结束；应用随后再检查角色是否出现。
+ * **任命后角色卡/工作文档尚未写出**时的补救任务（2026-10-18 真机修正；2026-10-22 第 1/5 项更新）：
+ * 账本已有 `appointment` 决定，但目标角色未通过结构校验（角色缺失或文件不齐）。此时**不能**派 Convener
+ * 做 readiness——改派 Crew 依据团队计划用 appointment-write 逐路径写卡；写完后本轮结束，应用再校验。
+ *
+ * `options.teamPlanPath` 缺省时按 flowId 派生 v1 路径（任务文案，不是对文件系统的断言）；legacy 流程可传
+ * `nominationPath`。
  */
-export function buildAppointmentWriteReminderMessage(flowId: string, targetRoleIds: readonly string[]): string {
+export function buildAppointmentWriteReminderMessage(
+  flowId: string,
+  targetRoleIds: readonly string[],
+  options: {
+    teamPlanPath?: string;
+    teamPlanVersion?: number;
+    teamPlanSchema?: 1 | 2;
+    teamPlanModules?: readonly string[];
+    nominationPath?: string;
+  } = {},
+): string {
   const ids = targetRoleIds.filter((id): id is string => nonEmptyString(id));
+  const planRel = options.teamPlanPath ?? (options.nominationPath === undefined ? governanceTeamPlanPath(flowId) : undefined);
+  const basis =
+    planRel !== undefined
+      ? `团队计划 ${planRel}${options.teamPlanVersion !== undefined ? `（version=${options.teamPlanVersion}）` : ""}` +
+        (options.teamPlanSchema === 2 ? "（v2：按 module/公开契约/测试面/dependsOn/并行组/粒度理由）" : "")
+      : `旧提名文件 ${options.nominationPath}（legacy）`;
   return (
-    `流程 ${flowId}：客户已完成任命 ${ids.join("、")}，但角色卡/边界尚未写出（项目中尚未枚举到这些角色）。` +
-    `请 Crew / 组队 用 appointment-write 确认卡逐路径完成写卡与边界写入；写完后本轮结束，不要自行任命、不要派发。`
+    `流程 ${flowId}：客户已完成任命 ${ids.join("、")}，但角色卡/边界/工作文档尚未写出或不完整（项目中尚未枚举到这些角色）。` +
+    `请 Crew / 组队 读取${basis}，用 appointment-write 确认卡逐路径完成写卡：role-card.md（角色名/组别/工作立场、能力描述、职责与功能导航、必读资料、交接输入输出、执行原则、质量职责、标准工作流、交付物清单；v2 另写 bounded context/公开契约/测试面/上下游依赖/粒度理由）、` +
+    `boundary.yaml（角色根工作文档条目 + 实际写集；计划写集必须被 entries 覆盖，V12 不覆盖会退回）、feature-map.md、functional-description.md、memo.md、api-spec.md（或 not-applicable + 非空理由）；` +
+    `只写名单内角色（${ids.join("、")}），计划缺细节报告 Steward / 统筹 补充，不自行扩大职责，不写整层/纳米角色。写完后本轮结束，不要自行任命、不要派发。`
   );
 }
 
 /** 任命后先派写卡任务的系统行。 */
 export function governanceAppointmentWriteNote(): string {
   return "已派发写卡任务给 Crew / 组队（工作中）";
+}
+
+// —————————————— 2026-10-22 第 1/3/5 项：readiness / 实施前标准任务文案（唯一来源） ——————————————
+//
+// 方案 §5.3「Crew 写卡后的校验与派 Convener」：结构校验通过 ⇒ 派 Convener 做角色就绪复核；
+// 方案 §7.2：appointment 决定后、实施派发前 ⇒ 派 Verifier 写实施前完成标准。两个任务都只给
+// 路径/步骤/判定口径，**不预判结论、不替代客户决定**。
+
+/**
+ * Crew 写卡结构校验通过后的 **role-readiness** 任务（Convener 读团队计划逐角色复核；不写角色卡）。
+ * `teamPlanPath` 缺省按 flowId 派生 v1 路径（任务文案，不是对文件系统的断言）。
+ */
+export function buildRoleReadinessTaskMessage(
+  flowId: string,
+  targetRoleIds: readonly string[],
+  teamPlanPath?: string,
+  teamPlanVersion?: number,
+  options: { teamPlanSchema?: 1 | 2; modules?: readonly string[] } = {},
+): string {
+  const ids = targetRoleIds.filter((id): id is string => nonEmptyString(id));
+  const planRel = teamPlanPath ?? governanceTeamPlanPath(flowId);
+  const readinessRel = governanceReadinessPath(flowId);
+  const isV2 = options.teamPlanSchema === 2;
+  const modules = (options.modules ?? []).filter((module): module is string => nonEmptyString(module));
+  const v2Scope = isV2
+    ? `团队计划为 v2（teamPlanSchema: 2）${modules.length > 0 ? `；模块清单：${modules.join("、")}` : ""}。` +
+      `逐角色核对 module/boundedContext、职责目标、能力要求、唯一写集、公开契约、测试面、依赖/dependsOn、并行组与粒度理由；` +
+      `核对模块覆盖（每模块恰一个 Map 角色、无孤儿/重复）、写集两两不相交、依赖无环、同一 Map 组内无依赖、Map 不依赖 Reduce、Reduce 覆盖全部 Map。`
+    : `（legacy v1：按旧职责目标/能力要求/写集/边界/依赖/交接核对；如需模块/契约/测试面/并行复核请迁移团队计划 v2。）`;
+  const readinessColumns = isV2
+    ? "（frontmatter flowId/version/status: pass|gaps；逐角色列 module/contract/testSurface/parallel/dependsOn/granularity，每项 pass/gap + 证据如 role-card 章节/行号）。"
+    : "（frontmatter flowId/version/status: pass|gaps，逐角色每项 pass/gap + 证据如 role-card 章节/行号）。";
+  return (
+    `流程 ${flowId}：Crew 写卡已通过结构校验（文件/章节齐全、计划写集已被 boundary entries 覆盖；**能力内容尚未判定**）。` +
+    `请对照团队计划 ${planRel}${teamPlanVersion !== undefined ? `（version=${teamPlanVersion}）` : ""} 逐角色做角色就绪复核（stepId=role-readiness）：${v2Scope}` +
+    `核对职责目标/能力要求/写集/边界/依赖/交接/质量责任；复核记录写入 ${readinessRel}${readinessColumns}` +
+    `Map 组任务须写明同组可并行、写集不相交、只依赖 contract-freeze/前置组、不得写对方路径；Reduce 任务须写明等全部 Map done 后跑契约/集成/e2e，测试按模块分片并行、每分片独立证据、合并 manifest。` +
+    `结构校验通过不等于判定粒度正确：语义判断须写入 readiness 记录与证据，应用不代做语义判断。` +
+    `有 gap ⇒ 在记录中标 gaps 并退回 Crew 修正；计划缺职责/能力/写集/模块细节 ⇒ 补充计划；全部 pass ⇒ 用 flow_step_update 把 role-readiness 标 done，再按已批准步骤派发项目角色。` +
+    `不要写角色卡、不要代替 Crew 写卡、不要绕过客户确认。`
+  );
+}
+
+/** readiness 任务派发成功的系统行。 */
+export function governanceReadinessNote(): string {
+  return "写卡结构校验通过，已派发角色就绪复核给 Steward / 统筹（工作中）";
+}
+
+/**
+ * 实施前完成标准任务（Verifier；不发验收卡）。方案 §7.2：输入为客户确认的方案版本/意图/团队计划
+ * （范围依据）、风险档位；输出 `docs/acceptance/<flowId>-criteria-v1.md`。
+ */
+export interface BuildAcceptanceCriteriaTaskMessageOptions {
+  teamPlanPath?: string;
+  riskTier?: GovernanceRiskTier;
+}
+
+export function buildAcceptanceCriteriaTaskMessage(
+  flowId: string,
+  options: BuildAcceptanceCriteriaTaskMessageOptions = {},
+): string {
+  const planRel = options.teamPlanPath ?? governanceTeamPlanPath(flowId);
+  const criteriaRel = governanceAcceptanceCriteriaPath(flowId);
+  const riskText =
+    options.riskTier !== undefined
+      ? `风险档位：${options.riskTier}（变更包按当前候选复核，不得低于团队计划；你只能升档）`
+      : "风险档位：按团队计划标注（变更包按当前候选复核，不得低于团队计划；你只能升档）";
+  return (
+    `流程 ${flowId}：客户已确认任命（闸门 2）。请在实施派发前写**实施前完成标准** ${criteriaRel}，` +
+    `用 request_confirmation(cardKind=write, flowId, 逐路径) 确认写盘；本阶段只写标准，**不要发验收卡**。` +
+    `标准依据：客户确认的策划方案版本（路径 + 版本/哈希）、闸门 0 意图记录、团队计划 ${planRel}（只作范围依据，不是标准来源）；${riskText}。` +
+    `必须包含：① 基线（方案版本/意图/团队计划与 gate 2 记录）；② 范围/写集/非目标；` +
+    `③ 验收表（ID、方案条目/标准、需要的证据、实际证据路径/哈希、候选版本、产出角色、结果、验收判断）；` +
+    `④ 风险档位与判定依据、选定检查、复用证据规则、全量回归条件；⑤ 成功/失败/边界情形；` +
+    `⑥ 候选身份（哈希/版本）与证据失效规则；⑦ 判定规则（pass / fail / insufficient evidence / not applicable）；` +
+    `⑧ 版本冻结规则（实施开始后不得改标准适配候选；确需变更递增版本并报统筹/沟通确认）。` +
+    `⑨ 若团队计划为 v2（teamPlanSchema: 2），标准须覆盖模块覆盖/写集不相交/并行组/dependsOn/粒度例外，以及测试按模块分片并行、每分片独立证据、Reduce 合并 docs/verification/<flowId>/manifest.md 的证据规则；legacy 计划按 v1 兼容。` +
+    `不要自行验收、不要代替客户决定。`
+  );
+}
+
+/** 实施前标准任务派发成功的系统行（应用派发 ≠ 客户批准）。 */
+export function governanceAcceptanceCriteriaNote(flowId: string): string {
+  return `流程 ${flowId}：已派发实施前标准编写任务给 Proof / 验收（工作中）`;
 }

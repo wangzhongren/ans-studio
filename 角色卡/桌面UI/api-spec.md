@@ -15,8 +15,9 @@
 | `chat/markdown.ts` | `esc`（唯一转义源）、`renderMarkdown`、`markdownHtml`、`installMarkdownLinkHandler`；外链只经 `window.desktop.openExternal`，一律 preventDefault |
 | `chat/status.ts` | `deriveRoleStatus`/`statusBadge`：等待确认 > 工作中（busy/队列）> 错误 > 其余；`.ti-count` 唯一数字 |
 | `chat/tool-summary.ts` | 工具相位合并、折叠摘要、目标/状态/错误纯函数 |
-| `chat/replay.ts` | 回放 skip/append/full、canonical key/去重 |
-| `chat/events.ts` | SessionEvent/历史 → 行描述（user/assistant/tool/injected/operator/handback/turn-terminal/system-notice） |
+| `chat/replay.ts` | 回放 skip/append/full、canonical key/去重；reasoning 事件豁免实时文本去重（幂等交给合并层 piece 指纹） |
+| `chat/events.ts` | SessionEvent/历史 → 行描述（user/assistant/tool/injected/operator/handback/turn-terminal/system-notice/reasoning）；reasoning 只读投影形 `detail.reasoning`，坏件 fail-closed |
+| `chat/reasoning.ts` | 推理折叠行纯逻辑：投影载体提取、R2 文案（`reasoningLabel`）与固定说明常量、piece 指纹/合并、确定性插入位置；`ChatRow` 只消费行数据与常量 |
 | `chat/report-view.ts` | 报告/交付 facts、persistence 文案、安全显示副本 flags |
 | `chat/role-view.ts` | 治理职能显示名：`proposal → Draft / 提案`、`nomination → Crew / 组队`、`schedule → Steward / 统筹`；`liaison → 主理 / Lead`、`verification → 验收 / Proof` 不变 |
 | `chat/operator-view.ts` | operator 镜像面、`pendingKindFor`（待选择/等待你确认）、治理卡文案 |
@@ -24,6 +25,12 @@
 | `chat/chat-store.ts` | 行模型/pane 版本/历史回放/阅读锚点/队列与状态；`window.__ansRenderer` 的数据源 |
 | `test-driver.ts` | `window.__ansRenderer` 21 个方法/状态字段（e2e 唯一驱动面） |
 | `shell/*` + `stores/*` | App/标题栏/左树/会话头/输入区/抽屉/设置/治理面板/work-overview；`lib/platform.ts` 是 `window.desktop` 唯一入口 |
+
+### appointment 文案（2026-10-22 治理拆分，现行）
+
+- `chat/governance-view.ts`：`GOVERNANCE_CARD_POWER.appointment = "任命"`、`GOVERNANCE_CARD_POWER["appointment-write"] = "任命写卡"`（旧值「提名」）；`GOVERNANCE_ROLE_HINT.nomination = "客户任命后打开写卡；只按团队计划与任命名单写角色卡与边界，不选择角色、不批准。"`（旧值以「通常由流程单提名步骤打开」开头）。
+- `chat/role-view.ts`：`governanceFunction="nomination"` 副标题为 `写卡权（客户任命后） · 不拥有最终批准权`（旧「提名权」）；显示名 `Crew / 组队` 与内部 id/`GovernanceFunction` 值不变。
+- 仅文案变化：渲染逻辑、DOM 结构与交互行为未变；下文历史段中的旧文案记录不再现行。
 
 ## 对外依赖（只读消费）
 

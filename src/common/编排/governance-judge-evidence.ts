@@ -88,7 +88,24 @@ const REQUESTER_TURN_TEXT_MAX_BYTES = 4 * 1024;
 
 // —————————————————————— 公共类型 ——————————————————————
 
-export type EvidenceArtifactKind = "proposal" | "nomination" | "flow" | "role-card" | "boundary" | "contract";
+/**
+ * 物证种类。2026-10-22 治理分工第 1/3/5 项新增：
+ *   · `team-plan`（团队计划 `docs/scheduling/<flowId>-team-vN.md`，第 1 项）；
+ *   · `acceptance-criteria` / `acceptance-report`（验收标准/报告，第 3 项）；
+ *   · `change-package`（变更包，第 3 项）。
+ * `nomination` 保留为 legacy（旧流程 O4 一次性过渡回落）。
+ */
+export type EvidenceArtifactKind =
+  | "proposal"
+  | "nomination"
+  | "team-plan"
+  | "flow"
+  | "acceptance-criteria"
+  | "acceptance-report"
+  | "change-package"
+  | "role-card"
+  | "boundary"
+  | "contract";
 
 /** 关键片段（确定性提取；不是模型摘要）。 */
 export interface EvidenceExcerpt {
@@ -115,7 +132,7 @@ export interface EvidenceArtifact {
   sha256: string;
   bytes: number;
   excerpts: EvidenceExcerpt[];
-  /** 仅提名文件：机器可读推荐集（系统解析，不采信模型）。 */
+  /** 仅团队计划（或 legacy 提名文件）：机器可读推荐集（系统解析，不采信模型）。 */
   recommendedRoleIds?: string[];
   /** 仅流程单：解析出的步骤表。 */
   steps?: EvidenceFlowStep[];
@@ -464,6 +481,14 @@ function createExcerptCollector(maxTotalBytes: number): {
 const PROPOSAL_KEYWORDS =
   /(目标|goal|范围|scope|验收|acceptance|非目标|non[- ]?goal|约束|constraint|开放问题|open question|风险|risk|契约|contract)/i;
 const NOMINATION_KEYWORDS = /(推荐|候选|角色|candidate|role|职责|边界)/i;
+/** 团队计划：判断/角色行/写集/依赖/档位。 */
+const TEAM_PLAN_KEYWORDS = /(判断|角色|职责|能力|写集|边界|依赖|推荐|档位|risk|版本)/i;
+/** 验收标准：范围/验收表/档位/判定/证据计划/冻结。 */
+const ACCEPTANCE_CRITERIA_KEYWORDS = /(基线|范围|验收|档位|判定|证据|冻结|版本|标准)/i;
+/** 验收报告：首行五项 + 结论/逐行判定。 */
+const ACCEPTANCE_REPORT_KEYWORDS = /(结论|判定|档位|证据|复用|回归|验收)/i;
+/** 变更包：候选/改动/节点/证据/档位/复用。 */
+const CHANGE_PACKAGE_KEYWORDS = /(候选|范围|改动|节点|证据|档位|复用|失效)/i;
 const ROLE_CARD_KEYWORDS = /(工作立场|职责|纪律|边界|role|responsibilit|purpose)/i;
 
 function frontmatterExcerpt(text: string): EvidenceExcerpt | undefined {
@@ -497,6 +522,62 @@ function extractNominationExcerpts(text: string): EvidenceExcerpt[] {
   }
   for (const section of parseMarkdownSections(text)) {
     if (section.heading === "" || !NOMINATION_KEYWORDS.test(section.heading)) continue;
+    collector.push(excerptOf(section.heading, section.body, DECISION_EVIDENCE_EXCERPT_MAX_BYTES));
+  }
+  return collector.excerpts;
+}
+
+/** 团队计划（第 1 项）：frontmatter + 推荐集声明 + 判断/角色/写集/依赖/档位章节。 */
+function extractTeamPlanExcerpts(text: string): EvidenceExcerpt[] {
+  const collector = createExcerptCollector(6 * 1024);
+  const frontmatter = frontmatterExcerpt(text);
+  if (frontmatter !== undefined) collector.push(frontmatter);
+  const recommendationLines = text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .filter((line) => /^\s*(?:recommended\s*:|推荐\s*[:：])/i.test(line))
+    .join("\n");
+  if (recommendationLines !== "") collector.push(excerptOf("推荐集声明", recommendationLines, 512));
+  for (const section of parseMarkdownSections(text)) {
+    if (section.heading === "" || !TEAM_PLAN_KEYWORDS.test(section.heading)) continue;
+    collector.push(excerptOf(section.heading, section.body, DECISION_EVIDENCE_EXCERPT_MAX_BYTES));
+  }
+  return collector.excerpts;
+}
+
+/** 实施前验收标准（第 3 项）：frontmatter + 验收表/档位/判定/证据计划章节。 */
+function extractAcceptanceCriteriaExcerpts(text: string): EvidenceExcerpt[] {
+  const collector = createExcerptCollector(6 * 1024);
+  const frontmatter = frontmatterExcerpt(text);
+  if (frontmatter !== undefined) collector.push(frontmatter);
+  for (const section of parseMarkdownSections(text)) {
+    if (section.heading === "" || !ACCEPTANCE_CRITERIA_KEYWORDS.test(section.heading)) continue;
+    collector.push(excerptOf(section.heading, section.body, DECISION_EVIDENCE_EXCERPT_MAX_BYTES));
+  }
+  return collector.excerpts;
+}
+
+/** 验收报告（第 3 项）：**首行五项**原样 + 结论/判定章节。 */
+function extractAcceptanceReportExcerpts(text: string): EvidenceExcerpt[] {
+  const collector = createExcerptCollector(6 * 1024);
+  const firstLine = text.replace(/\r\n/g, "\n").split("\n").find((line) => line.trim() !== "") ?? "";
+  if (firstLine.trim() !== "") collector.push(excerptOf("报告首行（五项）", firstLine, 1024));
+  const frontmatter = frontmatterExcerpt(text);
+  if (frontmatter !== undefined) collector.push(frontmatter);
+  for (const section of parseMarkdownSections(text)) {
+    if (section.heading === "" || !ACCEPTANCE_REPORT_KEYWORDS.test(section.heading)) continue;
+    collector.push(excerptOf(section.heading, section.body, DECISION_EVIDENCE_EXCERPT_MAX_BYTES));
+  }
+  return collector.excerpts;
+}
+
+/** 变更包（第 3 项）：frontmatter（riskTier/candidate/changedPaths）+ 候选/档位/证据章节。 */
+function extractChangePackageExcerpts(text: string): EvidenceExcerpt[] {
+  const collector = createExcerptCollector(5 * 1024);
+  const frontmatter = frontmatterExcerpt(text);
+  if (frontmatter !== undefined) collector.push(frontmatter);
+  for (const section of parseMarkdownSections(text)) {
+    if (section.heading === "" || !CHANGE_PACKAGE_KEYWORDS.test(section.heading)) continue;
     collector.push(excerptOf(section.heading, section.body, DECISION_EVIDENCE_EXCERPT_MAX_BYTES));
   }
   return collector.excerpts;
@@ -695,16 +776,26 @@ function isDecisionCardKind(cardKind: string): boolean {
   return cardKind === "proposal" || cardKind === "appointment" || cardKind === "acceptance";
 }
 
-function artifactRequired(cardKind: string, kind: "proposal" | "nomination" | "flow"): boolean {
+/**
+ * 规范物证是否**必需**（缺失即 fail-closed）。计划物证有 legacy 回落（nomination），
+ * 因此计划 kind 的 required 由调用点按「teamPlan 优先、否则 nomination」单独计算；
+ * 本函数只覆盖无歧义的种类。
+ */
+function artifactRequired(
+  cardKind: string,
+  kind: "proposal" | "flow" | "acceptance-criteria" | "acceptance-report" | "change-package",
+): boolean {
   switch (cardKind) {
     case "proposal":
       return kind === "proposal";
-    case "appointment":
-      return kind === "nomination";
     case "acceptance":
-      return kind === "proposal" || kind === "flow";
-    case "appointment-write":
-      return kind === "nomination";
+      return (
+        kind === "proposal" ||
+        kind === "flow" ||
+        kind === "acceptance-criteria" ||
+        kind === "acceptance-report" ||
+        kind === "change-package"
+      );
     default:
       return false;
   }
@@ -888,7 +979,7 @@ async function buildDeclaredPaths(args: {
 
 /**
  * 选定点抽查集：只在**存在且 ≤32KiB** 的物证里选，最多 2 条（最小集合）。
- * decision 组：意图文件优先，其次提案/提名摘要（流程步骤已在证据包内）——只核对意图与决策内容；
+ * decision 组：意图文件优先，其次团队计划/提案摘要（流程步骤已在证据包内）——只核对意图与决策内容；
  * 写盘族：沿用既有规则（物证优先，其次已存在的声明目标）。
  */
 function selectSpotChecks(
@@ -928,8 +1019,16 @@ function artifactExcerpts(kind: EvidenceArtifactKind, text: string, relPath: str
       return extractProposalExcerpts(text);
     case "nomination":
       return extractNominationExcerpts(text);
+    case "team-plan":
+      return extractTeamPlanExcerpts(text);
     case "flow":
       return extractFlowExcerpts(text, relPath);
+    case "acceptance-criteria":
+      return extractAcceptanceCriteriaExcerpts(text);
+    case "acceptance-report":
+      return extractAcceptanceReportExcerpts(text);
+    case "change-package":
+      return extractChangePackageExcerpts(text);
     case "role-card":
       return extractRoleCardExcerpts(text);
     case "contract":
@@ -1020,7 +1119,7 @@ async function buildInner(input: {
     problems,
   });
 
-  // —— 规范物证（提案/提名/流程）——
+  // —— 规范物证（提案/团队计划（legacy 提名）/流程/标准/报告/变更包）——
   const required = requiredArtifactPaths(request);
   if (required.missing) {
     problems.push({
@@ -1048,9 +1147,31 @@ async function buildInner(input: {
     specs.push({ kind, path: rel, required: requiredFlag });
   };
   const artifacts = request.artifacts ?? {};
+  const pickArtifactPath = (value: unknown): string | undefined =>
+    typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
+  const teamPlanPath = pickArtifactPath(artifacts.teamPlanPath);
+  /** legacy：旧提名文件（仅旧流程过渡回落；新流程不产生）。 */
+  const nominationPath = pickArtifactPath(artifacts.nominationPath);
+  const planKind: EvidenceArtifactKind = teamPlanPath !== undefined ? "team-plan" : "nomination";
+  const planPath = teamPlanPath ?? nominationPath;
+  const planRequired =
+    (request.cardKind === "appointment" || request.cardKind === "appointment-write") && planPath !== undefined;
   addSpec("proposal", artifacts.proposalPath, artifactRequired(request.cardKind, "proposal"));
-  addSpec("nomination", artifacts.nominationPath, artifactRequired(request.cardKind, "nomination"));
+  // 计划物证（第 1 项）：团队计划优先；仅 legacy 流程回落提名文件（O4）。
+  if (planPath !== undefined) addSpec(planKind, planPath, planRequired);
   addSpec("flow", artifacts.flowPath, artifactRequired(request.cardKind, "flow"));
+  // 第 3 项：验收标准/报告/变更包。
+  addSpec(
+    "acceptance-criteria",
+    artifacts.acceptanceCriteriaPath,
+    artifactRequired(request.cardKind, "acceptance-criteria"),
+  );
+  addSpec(
+    "acceptance-report",
+    artifacts.acceptanceReportPath,
+    artifactRequired(request.cardKind, "acceptance-report"),
+  );
+  addSpec("change-package", artifacts.changePackagePath, artifactRequired(request.cardKind, "change-package"));
   // appointment-write：目标角色卡与 boundary（写区关键片段）；新卡可能尚不存在，不强制。
   const appointmentTargets = Array.isArray(request.facts?.appointmentTargetRoleIds)
     ? request.facts.appointmentTargetRoleIds.slice(0, DECISION_EVIDENCE_ROLE_LIMIT)
@@ -1099,7 +1220,9 @@ async function buildInner(input: {
       bytes: fact.bytes,
       excerpts: artifactExcerpts(spec.kind, fact.text, spec.path),
     };
-    if (spec.kind === "nomination") {
+    if (spec.kind === "nomination" || spec.kind === "team-plan") {
+      // 推荐集统一复用 `parseRecommendedRoleIds`（不写第二份 parser）；团队计划必须内联数组/固定行，
+      // 块数组解析为空 ⇒ 推荐集缺失，由 driver 回落 manual（不静默接受空集）。
       const recommended = parseRecommendedRoleIds(fact.text);
       if (recommended !== undefined) entry.recommendedRoleIds = recommended;
     }
@@ -1243,19 +1366,25 @@ async function buildInner(input: {
   const cardOptionIds = request.card.kind === "choice"
     ? request.card.options.map((option) => truncateUtf8(option.id, 128))
     : [];
-  const nominationArtifact = evidence.find((entry) => entry.kind === "nomination");
-  const parsedRecommended = nominationArtifact?.recommendedRoleIds;
+  // 推荐集来源：团队计划优先；仅旧流程回落 legacy 提名文件（O4）。
+  const planArtifact = evidence.find((entry) => entry.kind === "team-plan")
+    ?? evidence.find((entry) => entry.kind === "nomination");
+  const parsedRecommended = planArtifact?.recommendedRoleIds;
+  const planSourceLabel = planArtifact?.kind === "nomination" ? "提名文件（legacy）" : "团队计划";
   const requestRecommended = Array.isArray(request.recommendedRoleIds) ? request.recommendedRoleIds : undefined;
   if (request.cardKind === "appointment" && requestRecommended !== undefined && parsedRecommended !== undefined) {
     if (!sameStringArray(requestRecommended, parsedRecommended)) {
       conflicts.push({
         code: "recommended-roles-mismatch",
-        detail: `应用推荐集=${JSON.stringify(requestRecommended)} 与提名文件重解析=${JSON.stringify(parsedRecommended)} 不一致`,
+        detail: `应用推荐集=${JSON.stringify(requestRecommended)} 与${planSourceLabel}重解析=${JSON.stringify(parsedRecommended)} 不一致`,
       });
     }
   }
   if (request.cardKind === "appointment" && (requestRecommended === undefined || requestRecommended.length === 0)) {
-    problems.push({ code: "insufficient-evidence", detail: "提名文件缺少唯一的机器可读推荐集" });
+    problems.push({
+      code: "insufficient-evidence",
+      detail: `${planSourceLabel}缺少唯一的机器可读推荐集（frontmatter 内联数组 recommended: [id] 或固定行「推荐：id」）`,
+    });
   }
 
   // —— 关键片段的确定性底线 ——

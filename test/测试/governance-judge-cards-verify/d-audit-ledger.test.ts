@@ -122,9 +122,13 @@ test("proposal 代批：0 卡、1 行、账本 kind=judge（group/cardKind/engin
 
     assert.equal(h.presented.length, 0, "代批成功必须 0 卡");
     assert.equal(h.rows.length, 1, "代批成功必须恰 1 行结果");
-    assert.equal(h.nextSteps.length, 1, "onNextStep 恰一次（先派 Convener 写流程单）");
+    assert.equal(h.nextSteps.length, 1, "onNextStep 恰一次（先派 Convener 写流程单+团队计划并发任命卡）");
     assert.equal((h.nextSteps[0]!.payload as { roleId?: string }).roleId, "convener");
-    assert.equal((h.nextSteps[0]!.payload as { followUp?: string }).followUp, "nomination-after-flow");
+    // 2026-10-22 第 1 项（客户确认方案）：接受提案后 Convener 在同一轮写流程 YAML + 团队计划并
+    // **直接发 appointment 卡**；不再有 nomination-after-flow 两段式 followUp（旧形状仅迁移兼容）。
+    const nextPayload = h.nextSteps[0]!.payload as { nextFunction?: string | null; followUp?: string };
+    assert.equal(nextPayload.nextFunction, "schedule");
+    assert.equal(nextPayload.followUp, undefined, "新流程不再产生 nomination-after-flow followUp");
 
     // 工具回执口径（AC25）：不得说成客户本人点击。
     const receipt = capture.results.find((result) => result.name === "request_choice");

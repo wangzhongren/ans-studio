@@ -1,0 +1,1 @@
+{"at":"2026-10-22T13:34:20.142Z","kind":"customer.decision","flowId":"local-ledger-cli","actorRoleId":"rapporteur","power":"proposal","decisionKind":"unclassified","customerDecision":"none","decisionEvidence":{"kind":"customer-input","toolCallId":"call-name"},"messageSummary":"接受提案"}

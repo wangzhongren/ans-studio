@@ -1,0 +1,206 @@
+{
+  "entry": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\app\\renderer\\dist\\index.html",
+  "checks": [
+    {
+      "name": "realtime: one merged reasoning row, summed seconds, arrival-order body",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "order": [
+          "user",
+          "reasoning",
+          "assistant",
+          "terminal"
+        ],
+        "title": "已思考 4 秒",
+        "body": "甲段正文\n\n乙段正文",
+        "count": 1,
+        "userIndex": 0,
+        "reasoningIndex": 1,
+        "assistantIndex": 2,
+        "terminalIndex": 3
+      }
+    },
+    {
+      "name": "realtime: reasoning row sits after user and before assistant/turn-terminal",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "order": [
+          "user",
+          "reasoning",
+          "assistant",
+          "terminal"
+        ],
+        "title": "已思考 4 秒",
+        "body": "甲段正文\n\n乙段正文",
+        "count": 1,
+        "userIndex": 0,
+        "reasoningIndex": 1,
+        "assistantIndex": 2,
+        "terminalIndex": 3
+      }
+    },
+    {
+      "name": "omitted: title says platform omitted, body shows fixed note and no <pre>",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "title": "已思考 8 秒（内容由平台省略）",
+        "pre": false,
+        "note": "平台省略了思考正文，无法显示具体内容。",
+        "reasoningCount": 2
+      }
+    },
+    {
+      "name": "regression: delivery-note system row and tool row keep their structure",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "note": "投递状态：已保存",
+        "tools": [
+          "本轮 1 个调用：read_file未记录read_filea.md调用发起"
+        ],
+        "reasoningCount": 2
+      }
+    },
+    {
+      "name": "replay: row.reasoning renders one reasoning row with same label/body",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "order": [
+          "user",
+          "reasoning",
+          "assistant",
+          "assistant"
+        ],
+        "title": "已思考 3 秒",
+        "body": "回放正文",
+        "count": 1,
+        "fallback": true,
+        "reasoningIndex": 1,
+        "assistantIndexes": [
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "name": "replay: reasoning precedes the turn assistant text; carrier-less row falls back to assistant",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "order": [
+          "user",
+          "reasoning",
+          "assistant",
+          "assistant"
+        ],
+        "title": "已思考 3 秒",
+        "body": "回放正文",
+        "count": 1,
+        "fallback": true,
+        "reasoningIndex": 1,
+        "assistantIndexes": [
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "name": "replay: same live piece does not duplicate text or duration",
+      "value": true,
+      "detail": {
+        "count": 1,
+        "title": "已思考 3 秒",
+        "body": "回放正文"
+      }
+    },
+    {
+      "name": "incremental replay keeps one reasoning row and a single copy of the body",
+      "value": true,
+      "detail": {
+        "count": 1,
+        "body": "回放正文",
+        "hasTail": true
+      }
+    },
+    {
+      "name": "bad payload fails closed as diagnostic system row without leaking raw text",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "diagnostic": true,
+        "leaked": false,
+        "reasoningCount": 0
+      }
+    },
+    {
+      "name": "two no-turnId pieces stay separate rows in arrival order (no merge/reorder)",
+      "value": true,
+      "detail": {
+        "count": 2,
+        "titles": [
+          "已思考",
+          "已思考"
+        ],
+        "bodies": [
+          "无轮次甲",
+          "无轮次乙"
+        ],
+        "turnIds": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "name": "full replay keeps live reasoning before its turn terminal (not appended at tail)",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "order": [
+          "user",
+          "other",
+          "user",
+          "reasoning",
+          "terminal",
+          "reasoning",
+          "reasoning"
+        ],
+        "count": 1,
+        "body": "保留正文",
+        "reasoningIndex": 3,
+        "terminalIndex": 4,
+        "userIndex": 0
+      }
+    },
+    {
+      "name": "no console errors",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "no CSP violations",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "no unexpected navigation",
+      "value": true,
+      "detail": []
+    }
+  ],
+  "console": [],
+  "csp": [],
+  "screenshots": [
+    "01-realtime-reasoning.png",
+    "02-omitted-reasoning.png",
+    "03-replay-reasoning.png",
+    "04-bad-and-no-turn.png"
+  ],
+  "failures": 0,
+  "finished": true,
+  "at": "2026-10-22T07:53:50.736Z"
+}
