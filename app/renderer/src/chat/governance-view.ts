@@ -5,7 +5,12 @@
  * appointment 相关文案按 2026-10-22 治理拆分方案 §5.4 更新（「提名」→「任命」）。
  * 不判边界、不读文件、不猜模型；缺省/未知一律不显示、不编辑语义。
  * `phase === "write"` 是「是否零副作用」的唯一依据（非 write 才可声明未写入任何文件）。
+ *
+ * i18n B1：展示文案来自 shared `ui.governance.*`，纯函数接受可选 `locale`
+ * （默认 zh-CN）。flowId/stepId/path/cardKind 等机器值不翻译。
  */
+
+import { DEFAULT_LOCALE, translate, type Locale, type MessageKey } from "../i18n/index.ts";
 
 export interface GovernanceActionInput {
   hasProject: boolean;
@@ -36,35 +41,45 @@ export function projectRoleCount(roles: ReadonlyArray<unknown> | null): number {
   return count;
 }
 
-const GOVERNANCE_MODEL_STATUS_TEXT: Record<string, string> = {
-  single: "旧模型（su）",
-  trio: "三权 · 五角色",
+const GOVERNANCE_MODEL_STATUS_KEYS: Record<string, MessageKey> = {
+  single: "ui.governance.model.single",
+  trio: "ui.governance.model.trio",
 };
 
-const GOVERNANCE_FLOW_STATUS_TEXT: Record<string, string> = {
-  "awaiting-customer": "等待客户决定",
-  "in-progress": "进行中",
-  blocked: "阻塞",
-  "escalated-to-customer": "已升级客户",
+const GOVERNANCE_FLOW_STATUS_KEYS: Record<string, MessageKey> = {
+  "awaiting-customer": "ui.governance.status.awaitingCustomer",
+  "in-progress": "ui.governance.status.inProgress",
+  blocked: "ui.governance.status.blocked",
+  "escalated-to-customer": "ui.governance.status.escalated",
 };
 
 /** 治理模型展示名（未知 ⇒ 空串，不猜）。状态行专用「三权 · 五角色」。 */
-export function governanceModelStatusText(model: string | null | undefined): string {
-  const text = typeof model === "string" ? GOVERNANCE_MODEL_STATUS_TEXT[model] : "";
-  return text ? "治理模型：" + text : "";
+export function governanceModelStatusText(
+  model: string | null | undefined,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const key = typeof model === "string" ? GOVERNANCE_MODEL_STATUS_KEYS[model] : undefined;
+  if (key === undefined) return "";
+  return translate(locale, "ui.governance.modelLine", { model: translate(locale, key) });
 }
 
 /** 迁移预览里的通用模型名（旧 `governanceModelText`）。 */
-export function governanceModelText(model: unknown): string {
-  if (model === "single") return "旧模型（su）";
-  if (model === "trio") return "三权";
+export function governanceModelText(
+  model: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  if (model === "single") return translate(locale, "ui.governance.model.single");
+  if (model === "trio") return translate(locale, "ui.governance.modelShort.trio");
   return "";
 }
 
-export function governanceFlowStatusText(status: unknown): string {
-  return typeof status === "string" && GOVERNANCE_FLOW_STATUS_TEXT[status]
-    ? GOVERNANCE_FLOW_STATUS_TEXT[status]
-    : "";
+export function governanceFlowStatusText(
+  status: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const key =
+    typeof status === "string" ? GOVERNANCE_FLOW_STATUS_KEYS[status] : undefined;
+  return key === undefined ? "" : translate(locale, key);
 }
 
 /** 状态行（旧 `governanceStatusText`）：模型 + 流程 + 流程状态；未知片段不显示。 */
@@ -72,71 +87,81 @@ export function governanceStatusText(
   model: unknown,
   flowId: unknown,
   flowStatus: unknown,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
   const parts: string[] = [];
   const modelText = governanceModelStatusText(
     typeof model === "string" ? model : null,
+    locale,
   );
   if (modelText !== "") parts.push(modelText);
-  if (typeof flowId === "string" && flowId !== "") parts.push("当前流程：" + flowId);
-  const statusText = governanceFlowStatusText(flowStatus);
+  if (typeof flowId === "string" && flowId !== "") {
+    parts.push(translate(locale, "ui.governance.currentFlow", { flowId }));
+  }
+  const statusText = governanceFlowStatusText(flowStatus, locale);
   if (statusText !== "") parts.push(statusText);
   return parts.join(" · ");
 }
 
-export function governanceMissingText(roleCount: unknown): string {
+export function governanceMissingText(
+  roleCount: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   const n =
     typeof roleCount === "number" && Number.isFinite(roleCount) && roleCount >= 0
       ? Math.floor(roleCount)
       : 0;
-  return (
-    "本项目有 " +
-    n +
-    " 个项目角色，但尚无治理记录（.ans/project.json）。项目角色可按各自边界工作；治理角色暂时无法写入。"
-  );
+  return translate(locale, "ui.governance.noRecordBody", { roleCount: n });
 }
 
-export function governanceInvalidText(reason: unknown): string {
+export function governanceInvalidText(
+  reason: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   const r =
-    typeof reason === "string" && reason !== "" ? reason : "原因未提供";
-  return "治理记录不可用：" + r + "；本版不自动覆盖";
+    typeof reason === "string" && reason !== ""
+      ? reason
+      : translate(locale, "ui.governance.reasonNotProvided");
+  return translate(locale, "ui.governance.recordUnavailable", { reason: r });
 }
 
 export function governanceEmptyState(
   roleCount: unknown,
   primaryRoleId: unknown,
+  locale: Locale = DEFAULT_LOCALE,
 ): { kind: "governance"; title: string; sub: string } {
   const primary =
     typeof primaryRoleId === "string" && primaryRoleId !== ""
       ? primaryRoleId
-      : "主入口角色";
+      : translate(locale, "ui.governance.primaryRole");
   return {
     kind: "governance",
-    title: "尚无治理记录",
+    title: translate(locale, "ui.governance.noRecordTitle"),
     sub:
-      governanceMissingText(roleCount) +
-      "与 " +
-      primary +
-      " 对话前，请先建立治理记录；也可在终端运行 ans govern <项目目录>。",
+      governanceMissingText(roleCount, locale) +
+      translate(locale, "ui.governance.establishHint", { roleName: primary }),
   };
 }
 
 // —————— 治理角色说明（按 governanceFunction；appointment 相关文案按 2026-10-22 治理拆分更新）——————
 
-const GOVERNANCE_ROLE_HINT: Record<string, string> = {
-  liaison:
-    "客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给提案 Draft 形成提案。我不写提案、不批准。本版起默认入口为主理 Lead；提案 Draft 与历史提案不变。",
-  proposal: "通常由主理 Lead 交接打开；客户也可以直接找我。我只写提案，不批准。",
-  nomination:
-    "客户任命后打开写卡；只按团队计划与任命名单写角色卡与边界，不选择角色、不批准。",
-  schedule: "通常由已接受提案开启流程；只负责排步骤与派发，不批准方案",
-  verification: "通常由交付回交后的验收步骤打开；只核对证据、出验收卡，不批准。",
+const GOVERNANCE_ROLE_HINT_KEYS: Record<string, MessageKey> = {
+  liaison: "ui.governance.roleIntro.liaison",
+  proposal: "ui.governance.roleIntro.proposal",
+  nomination: "ui.governance.roleIntro.nomination",
+  schedule: "ui.governance.roleIntro.schedule",
+  verification: "ui.governance.roleIntro.verification",
 };
 
-export function governanceRoleEmptyHint(governanceFunction: unknown): string {
-  return typeof governanceFunction === "string"
-    ? GOVERNANCE_ROLE_HINT[governanceFunction] || ""
-    : "";
+export function governanceRoleEmptyHint(
+  governanceFunction: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const key =
+    typeof governanceFunction === "string"
+      ? GOVERNANCE_ROLE_HINT_KEYS[governanceFunction]
+      : undefined;
+  return key === undefined ? "" : translate(locale, key);
 }
 
 // —————— pin 不符（reaccept）——————
@@ -197,36 +222,44 @@ export function changedCounts(changed: ReadonlyArray<PinChangedEntry>): {
 export function governancePinMismatchText(
   pinCount: unknown,
   changed: ReadonlyArray<PinChangedEntry>,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
   const n = pinCountOf(pinCount);
   const counts = changedCounts(changed);
   const parts: string[] = [];
-  if (counts.modified > 0) parts.push(counts.modified + " 个内容已变更");
-  if (counts.missing > 0) parts.push(counts.missing + " 个缺失");
-  if (counts.unreadable > 0) parts.push(counts.unreadable + " 个不可读");
-  const detail = parts.length ? parts.join("、") : "存在不一致";
-  return (
-    "治理记录与盘上边界不一致：共 " +
-    n +
-    " 条 pin，其中 " +
-    changed.length +
-    " 个与记录不一致（" +
-    detail +
-    "）。未确认前，会话不能开启、写入会被拒绝。"
-  );
+  if (counts.modified > 0) {
+    parts.push(translate(locale, "ui.governance.mismatch.modified", { count: counts.modified }));
+  }
+  if (counts.missing > 0) {
+    parts.push(translate(locale, "ui.governance.mismatch.missing", { count: counts.missing }));
+  }
+  if (counts.unreadable > 0) {
+    parts.push(
+      translate(locale, "ui.governance.mismatch.unreadable", { count: counts.unreadable }),
+    );
+  }
+  const detail = parts.length
+    ? parts.join(locale === "zh-CN" ? "、" : ", ")
+    : translate(locale, "ui.governance.mismatch.someInconsistent");
+  return translate(locale, "ui.governance.mismatch.summary", {
+    pinCount: n,
+    diffCount: changed.length,
+    detail,
+  });
 }
 
 export function governancePinMismatchEmptyState(
   pinCount: unknown,
   changed: ReadonlyArray<PinChangedEntry>,
+  locale: Locale = DEFAULT_LOCALE,
 ): { kind: "governance"; title: string; sub: string; hint: string } {
   return {
     kind: "governance",
-    title: "治理记录与盘上边界不一致",
+    title: translate(locale, "ui.governance.mismatch.title"),
     sub:
-      governancePinMismatchText(pinCount, changed) +
-      "确认接受后只会刷新 SHA-256 与留痕，不会修改任何边界文件内容。",
-    hint: "也可在终端核对 git 历史后再处理。",
+      governancePinMismatchText(pinCount, changed, locale) +
+      translate(locale, "ui.governance.mismatch.note"),
+    hint: translate(locale, "ui.governance.mismatch.hint"),
   };
 }
 
@@ -244,24 +277,25 @@ export interface ReacceptPreviewView {
 }
 
 /** 重新接受预览视图（逐字沿用旧 `governanceReacceptPreviewView`）。 */
-export function governanceReacceptPreviewView(preview: unknown): ReacceptPreviewView {
+export function governanceReacceptPreviewView(
+  preview: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): ReacceptPreviewView {
   const record = preview && typeof preview === "object" ? (preview as Record<string, unknown>) : {};
   const changed = changedEntries(record);
   const fileLines: ReacceptPreviewView["fileLines"] = [];
   for (const file of changed) {
     let text = "";
     if (file.status === "modified") {
-      text =
-        file.path +
-        " — 内容已变更（pin " +
-        shortHash(file.pinned) +
-        "… → 现 " +
-        shortHash(file.actual) +
-        "…）";
+      text = translate(locale, "ui.governance.pin.changed", {
+        path: file.path,
+        pinned: shortHash(file.pinned),
+        actual: shortHash(file.actual),
+      });
     } else if (file.status === "missing") {
-      text = file.path + " — 文件缺失（无法重新 pin）";
+      text = translate(locale, "ui.governance.pin.missing", { path: file.path });
     } else if (file.status === "unreadable") {
-      text = file.path + " — 文件不可读（无法重新 pin）";
+      text = translate(locale, "ui.governance.pin.unreadable", { path: file.path });
     }
     if (text !== "") fileLines.push({ status: file.status, path: file.path, text });
   }
@@ -273,14 +307,13 @@ export function governanceReacceptPreviewView(preview: unknown): ReacceptPreview
     }
   }
   return {
-    title: "重新接受治理边界（预览）",
+    title: translate(locale, "ui.governance.reacceptPreview"),
     fileLines,
-    writeLine: "将写入：.ans/project.json、docs/bootstrap-manifest.md",
-    pinLine:
-      "将重算这 " +
-      pinCountOf(record.pinCount) +
-      " 条 pin；不新增、不删除 pin 条目，不修改任何边界文件内容。",
-    warning: "如果不认识这些改动，请先通过 git 历史或备份核对，不要直接接受。",
+    writeLine: translate(locale, "ui.governance.reacceptWriteLine"),
+    pinLine: translate(locale, "ui.governance.reacceptPinned", {
+      count: pinCountOf(record.pinCount),
+    }),
+    warning: translate(locale, "ui.governance.reacceptWarning"),
     canConfirm: record.canConfirm === true,
     blockerLines,
     previewDigest: typeof record.previewDigest === "string" ? record.previewDigest : "",
@@ -289,19 +322,22 @@ export function governanceReacceptPreviewView(preview: unknown): ReacceptPreview
   };
 }
 
-export function governanceReacceptSuccessText(pinCount: unknown, changedCount: unknown): string {
+export function governanceReacceptSuccessText(
+  pinCount: unknown,
+  changedCount: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   const n = pinCountOf(pinCount);
   const c =
     typeof changedCount === "number" && Number.isFinite(changedCount) && changedCount > 0
       ? Math.floor(changedCount)
       : 0;
-  return (
-    "已重新接受：更新 " +
-    c +
-    " 条 pin（共 " +
-    n +
-    " 条），写入 .ans/project.json 与 docs/bootstrap-manifest.md。项目已恢复可用。"
-  );
+  return translate(locale, "ui.governance.reacceptSuccess", { updated: c, total: n });
+}
+
+/** 零写入短语的唯一来源（文本判定改为按目录文案匹配，不再内嵌中文字面量）。 */
+function noFilesWrittenText(locale: Locale): string {
+  return translate(locale, "ui.governance.noFilesWritten").replace(/[.。]\s*$/, "");
 }
 
 /** 重新接受失败视图：phase 是零副作用的唯一依据。 */
@@ -309,25 +345,32 @@ export function governanceReacceptFailureView(
   phase: unknown,
   status: unknown,
   message: unknown,
+  locale: Locale = DEFAULT_LOCALE,
 ): { lines: string[]; noRetry: boolean } {
   const lines: string[] = [];
   const msg = typeof message === "string" ? message : "";
   if (msg !== "") lines.push(msg);
   if (phase !== "write") {
-    if (msg.indexOf("未写入任何文件") < 0) lines.push("本次未写入任何文件。");
-    if (status === "no-record") lines.push("没有治理记录；请先建立治理记录。");
-    else if (status === "invalid-record") lines.push("治理记录不可用；本版不提供修复。");
-    else if (status === "not-needed") lines.push("边界与记录一致，无需重新接受。");
-    else if (status === "preview-stale")
-      lines.push("预览后边界文件又有变化，已取消本次写入；请重新检查。");
-    else if (
+    const noWrite = noFilesWrittenText(locale);
+    if (msg.indexOf(noWrite) < 0) {
+      lines.push(translate(locale, "ui.governance.reacceptNotWritten"));
+    }
+    if (status === "no-record") lines.push(translate(locale, "ui.governance.reacceptNoRecord"));
+    else if (status === "invalid-record") {
+      lines.push(translate(locale, "ui.governance.reacceptInvalidRecord"));
+    } else if (status === "not-needed") {
+      lines.push(translate(locale, "ui.governance.reacceptNotNeeded"));
+    } else if (status === "preview-stale") {
+      lines.push(translate(locale, "ui.governance.reacceptPreviewStale"));
+    } else if (
       status === "missing-file" ||
       status === "unreadable-file" ||
       status === "unparseable-boundary"
     ) {
-      lines.push("请先处理上述文件后重试。");
-    } else if (status === "busy")
-      lines.push("上一次操作仍在进行中；本次未写入任何文件。");
+      lines.push(translate(locale, "ui.governance.reacceptFixFiles"));
+    } else if (status === "busy") {
+      lines.push(translate(locale, "ui.governance.reacceptBusy"));
+    }
   }
   return { lines, noRetry: phase === "write" };
 }
@@ -356,7 +399,10 @@ export interface EstablishPreviewView {
 }
 
 /** 建立预览视图：只转写预览回包字段，缺省如实「未报告」。 */
-export function governanceEstablishPreviewView(preview: unknown): EstablishPreviewView {
+export function governanceEstablishPreviewView(
+  preview: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): EstablishPreviewView {
   const record = preview && typeof preview === "object" ? (preview as Record<string, unknown>) : {};
   const writePaths = asPreviewList(record.writePaths);
   const pinPaths = asPreviewList(record.pinPaths);
@@ -371,10 +417,16 @@ export function governanceEstablishPreviewView(preview: unknown): EstablishPrevi
     }
   }
   return {
-    title: "建立治理记录（预览）",
+    title: translate(locale, "ui.governance.establishPreview"),
     writeLines: writePaths.length
-      ? writePaths.map((path) => "将写入：" + path)
-      : ["将写入：（未报告）"],
+      ? writePaths.map((path) =>
+          translate(locale, "ui.governance.establishWritePath", { path }),
+        )
+      : [
+          translate(locale, "ui.governance.establishWritePath", {
+            path: translate(locale, "shared.common.notProvided"),
+          }),
+        ],
     pinPaths,
     pinCount:
       typeof record.pinCount === "number" && Number.isFinite(record.pinCount)
@@ -385,16 +437,16 @@ export function governanceEstablishPreviewView(preview: unknown): EstablishPrevi
         ? Math.floor(record.roleCount)
         : 0,
     adoptLine: adoptExisting
-      ? "将采纳既有治理边界文档（不覆盖其内容）。"
+      ? translate(locale, "ui.governance.establishAdoptExisting")
       : boundaryPath
-        ? "将写入治理边界文档：" + boundaryPath + "。"
-        : "治理边界文档：（未报告）",
+        ? translate(locale, "ui.governance.establishWriteBoundary", { path: boundaryPath })
+        : translate(locale, "ui.governance.establishBoundaryNotReported"),
     model: typeof record.governanceModel === "string" ? record.governanceModel : "",
     suggestion: record.suggestedGovernanceModel === "trio" ? "trio" : "",
-    legacyRoleLines: legacyRolePaths.map(
-      (path) => path + "（旧版 Markdown 边界；将被原样 pin，迁移属后续版本）",
+    legacyRoleLines: legacyRolePaths.map((path) =>
+      translate(locale, "ui.governance.establishLegacyBoundary", { path }),
     ),
-    declaration: "不扩大任何角色写边界、不修改任何角色边界文件内容。",
+    declaration: translate(locale, "ui.governance.establishDeclaration"),
     canConfirm: record.canConfirm !== false,
     blockers,
   };
@@ -405,20 +457,25 @@ export function governanceFailureView(
   phase: unknown,
   code: unknown,
   message: unknown,
+  locale: Locale = DEFAULT_LOCALE,
 ): { lines: string[]; noRetry: boolean } {
   const lines: string[] = [];
   if (typeof message === "string" && message !== "") lines.push(message);
   if (phase !== "write") {
-    if (code === "already-established") lines.push("治理记录已存在；本次未写入任何文件。");
-    else if (code === "busy") lines.push("上一次建立仍在进行中；本次未写入任何文件。");
-    else if (code === "invalid-record")
-      lines.push("治理记录不可用；本版不自动覆盖，修复路径待后续版本。");
-    else {
-      if (typeof code === "string" && code !== "") lines.push("错误码：" + code);
-      lines.push("未写入任何文件。");
+    if (code === "already-established") {
+      lines.push(translate(locale, "ui.governance.establishAlreadyExists"));
+    } else if (code === "busy") {
+      lines.push(translate(locale, "ui.governance.establishBusy"));
+    } else if (code === "invalid-record") {
+      lines.push(translate(locale, "ui.governance.establishInvalidRecord"));
+    } else {
+      if (typeof code === "string" && code !== "") {
+        lines.push(translate(locale, "ui.governance.errorCode", { code }));
+      }
+      lines.push(translate(locale, "ui.governance.noFilesWritten"));
     }
   } else if (typeof code === "string" && code !== "") {
-    lines.push("错误码：" + code);
+    lines.push(translate(locale, "ui.governance.errorCode", { code }));
   }
   return {
     lines,
@@ -426,40 +483,63 @@ export function governanceFailureView(
   };
 }
 
-export function governanceModelOptionText(model: unknown): string {
-  if (model === "single") return "单模型（single）";
-  if (model === "trio") return "三权（trio）";
+export function governanceModelOptionText(
+  model: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  if (model === "single") return translate(locale, "ui.governance.modelOption.single");
+  if (model === "trio") return translate(locale, "ui.governance.modelOption.trio");
   return "";
 }
 
-export const GOVERNANCE_MODEL_UNWIRED =
-  "当前桌面窗口未接线治理模型选择；本版不能按所选模型建立，按钮已禁用。";
-export const GOVERNANCE_MODEL_SUGGEST =
-  "检测到三权产物（docs/proposals / docs/nominations / docs/flows），建议选择 trio；请由你点选。";
+export function governanceModelUnwiredText(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.governance.modelChoiceUnwired");
+}
+
+export function governanceModelSuggestText(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.governance.trioArtifactsHint");
+}
+
+/** 旧导出名保留为 zh-CN 常量，供未迁移调用方/测试逐字使用。 */
+export const GOVERNANCE_MODEL_UNWIRED = governanceModelUnwiredText(DEFAULT_LOCALE);
+export const GOVERNANCE_MODEL_SUGGEST = governanceModelSuggestText(DEFAULT_LOCALE);
 
 // —————— 迁移预览（single → trio）——————
 
-export const GOVERNANCE_MIGRATION_TEXT =
-  "本项目使用旧治理模型（su）。可升级为三权模型。";
-export const GOVERNANCE_MIGRATION_LABEL = "查看差异 / 升级";
-export const GOVERNANCE_MIGRATION_LABEL_PENDING = "升级入口待本版后续";
+export function governanceMigrationText(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.governance.legacyModelHint");
+}
 
-export function governanceMigrationButtonView(wired: boolean): {
+export function governanceMigrationLabel(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.governance.migrationLabel");
+}
+
+export function governanceMigrationLabelPending(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.governance.migrationPending");
+}
+
+export const GOVERNANCE_MIGRATION_TEXT = governanceMigrationText(DEFAULT_LOCALE);
+export const GOVERNANCE_MIGRATION_LABEL = governanceMigrationLabel(DEFAULT_LOCALE);
+export const GOVERNANCE_MIGRATION_LABEL_PENDING = governanceMigrationLabelPending(DEFAULT_LOCALE);
+
+export function governanceMigrationButtonView(
+  wired: boolean,
+  locale: Locale = DEFAULT_LOCALE,
+): {
   label: string;
   disabled: boolean;
   title: string;
 } {
   return wired
     ? {
-        label: GOVERNANCE_MIGRATION_LABEL,
+        label: governanceMigrationLabel(locale),
         disabled: false,
-        title:
-          "打开迁移预览（零写入）；确认后只改 .ans 的 governanceModel 并追加 manifest 记录。",
+        title: translate(locale, "ui.governance.migrationOpenTitle"),
       }
     : {
-        label: GOVERNANCE_MIGRATION_LABEL_PENDING,
+        label: governanceMigrationLabelPending(locale),
         disabled: true,
-        title: "迁移预览与写入尚未接线；本版不可用。",
+        title: translate(locale, "ui.governance.migrationUnwired"),
       };
 }
 
@@ -498,84 +578,113 @@ export interface MigrationPreviewView {
   digest: string;
 }
 
-export function governanceMigrationPreviewView(preview: unknown): MigrationPreviewView {
+export function governanceMigrationPreviewView(
+  preview: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): MigrationPreviewView {
   const record = preview && typeof preview === "object" ? (preview as Record<string, unknown>) : {};
   const listOf = (value: unknown): string[] =>
     Array.isArray(value) ? value.map(migrationItemText).filter((item) => item !== "") : [];
   const model =
-    governanceModelText(record.model) ||
-    (typeof record.model === "string" && record.model !== "" ? record.model : "旧模型");
+    governanceModelText(record.model, locale) ||
+    (typeof record.model === "string" && record.model !== ""
+      ? record.model
+      : translate(locale, "ui.governance.migration.legacyModel"));
   const target =
-    governanceModelText(record.targetModel) ||
+    governanceModelText(record.targetModel, locale) ||
     (typeof record.targetModel === "string" && record.targetModel !== ""
       ? record.targetModel
-      : "三权");
+      : translate(locale, "ui.governance.modelShort.trio"));
   const writePaths = listOf(record.writePaths);
   const pinChanges = listOf(record.pinChanges);
   const retainedFiles = listOf(record.retainedFiles);
   const digest = typeof record.snapshotDigest === "string" ? record.snapshotDigest : "";
+  const notProvided = translate(locale, "shared.common.notProvided");
   const modelFieldText =
     record.modelField === null
-      ? '（字段缺失，将新增 governanceModel: "trio"）'
+      ? translate(locale, "ui.governance.migration.fieldMissing")
       : record.modelField === "single" || record.modelField === "trio"
         ? record.modelField
-        : "（未报告）";
+        : notProvided;
   return {
-    title: "升级为三权治理模型（预览）",
-    modelLine: "模型：" + model + " → " + target,
+    title: translate(locale, "ui.governance.upgradePreview"),
+    modelLine: translate(locale, "ui.governance.migration.modelLine", {
+      from: model,
+      to: target,
+    }),
     writeLines: writePaths.length
-      ? writePaths.map((path) => "将写入：" + path)
-      : ["将写入：（未报告）"],
-    modelFieldLine: "将写入 .ans 字段：" + modelFieldText,
-    manifestLine:
-      "将追加 manifest 记录：" +
-      (typeof record.manifestLine === "string" && record.manifestLine !== ""
-        ? record.manifestLine
-        : "（未报告）"),
+      ? writePaths.map((path) =>
+          translate(locale, "ui.governance.establishWritePath", { path }),
+        )
+      : [translate(locale, "ui.governance.establishWritePath", { path: notProvided })],
+    modelFieldLine: translate(locale, "ui.governance.migration.modelField", {
+      field: modelFieldText,
+    }),
+    manifestLine: translate(locale, "ui.governance.migration.manifestAppend", {
+      id:
+        typeof record.manifestLine === "string" && record.manifestLine !== ""
+          ? record.manifestLine
+          : notProvided,
+    }),
     pinLines: pinChanges.length
-      ? pinChanges.map((item) => "pin 变更：" + item)
-      : ["pin 变更：无（不重算 pin）"],
+      ? pinChanges.map((item) =>
+          translate(locale, "ui.governance.migration.pinChange", { item }),
+        )
+      : [translate(locale, "ui.governance.migration.pinNoChange")],
     retainedLines: [
-      "保留文件：" + (retainedFiles.length ? retainedFiles.join("、") : "无"),
+      translate(locale, "ui.governance.migration.retained", {
+        files: retainedFiles.length
+          ? retainedFiles.join(locale === "zh-CN" ? "、" : ", ")
+          : translate(locale, "shared.common.none"),
+      }),
     ],
-    digestLine: "预览摘要（前 8 位）：" + (digest !== "" ? shortHash(digest) : "（未报告）"),
-    warning:
-      "预览零写入。确认后只改 .ans 的 governanceModel 并追加 manifest 记录；不重写角色卡/边界/pin/历史会话。",
+    digestLine: translate(locale, "ui.governance.migration.digest", {
+      digest: digest !== "" ? shortHash(digest) : notProvided,
+    }),
+    warning: translate(locale, "ui.governance.migration.zeroWrite"),
     canConfirm: digest !== "",
     digest,
   };
 }
 
-export function governanceMigrationSuccessText(): string {
-  return '已升级为三权治理模型（.ans governanceModel = "trio"）。旧角色卡/边界/pin/历史会话保留。';
+export function governanceMigrationSuccessText(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.governance.migration.success");
 }
 
 export function governanceMigrationFailureView(
   phase: unknown,
   status: unknown,
   message: unknown,
+  locale: Locale = DEFAULT_LOCALE,
 ): { lines: string[]; noRetry: boolean } {
   const lines: string[] = [];
   const msg = typeof message === "string" ? message : "";
   if (msg !== "") lines.push(msg);
   const st = typeof status === "string" ? status : "";
   if (phase !== "write") {
-    if (st === "already-trio") lines.push("已是三权治理模型，无需升级；本次未写入任何文件。");
-    else if (st === "no-record")
-      lines.push("没有治理记录（.ans/project.json）；本次未写入任何文件。");
-    else if (st === "blocked") lines.push("升级被阻止；本次未写入任何文件。");
-    else if (st === "preview-stale")
-      lines.push("预览后 .ans 又有变化，已取消本次写入；请重新检查。");
-    else if (st === "busy") lines.push("上一次升级仍在进行中；本次未写入任何文件。");
-    else if (st === "invalid-request") lines.push("升级请求无效；本次未写入任何文件。");
-    else {
-      if (st !== "") lines.push("状态：" + st);
-      lines.push("本次未写入任何文件。");
+    if (st === "already-trio") {
+      lines.push(translate(locale, "ui.governance.migration.alreadyTrio"));
+    } else if (st === "no-record") {
+      lines.push(translate(locale, "ui.governance.migration.noRecord"));
+    } else if (st === "blocked") {
+      lines.push(translate(locale, "ui.governance.migration.blocked"));
+    } else if (st === "preview-stale") {
+      lines.push(translate(locale, "ui.governance.migration.previewStale"));
+    } else if (st === "busy") {
+      lines.push(translate(locale, "ui.governance.migration.busy"));
+    } else if (st === "invalid-request") {
+      lines.push(translate(locale, "ui.governance.migration.invalidRequest"));
+    } else {
+      if (st !== "") {
+        lines.push(translate(locale, "ui.governance.migration.status", { status: st }));
+      }
+      // 同一句「本次未写入任何文件。」目录中只存在一个 key（reaccept 命名），复用为短句。
+      lines.push(translate(locale, "ui.governance.reacceptNotWritten"));
     }
   } else if (st === "write-failed") {
-    lines.push("写入阶段失败，可能已写入部分文件，请核对现场。");
+    lines.push(translate(locale, "ui.governance.migration.writeFailed"));
   } else if (st !== "") {
-    lines.push("状态：" + st);
+    lines.push(translate(locale, "ui.governance.migration.status", { status: st }));
   }
   return {
     lines,
@@ -585,18 +694,34 @@ export function governanceMigrationFailureView(
 
 // —————— 治理卡元信息 / 镜像 / 聚合 ——————
 
-export const GOVERNANCE_DECISION_BADGE = "治理决定 · 客户最终批准";
-export const GOVERNANCE_INTENT_BADGE = "需求确认 · 客户";
-export const GOVERNANCE_QUEUE_NOTE = "等待前一个决定";
-export const GOVERNANCE_MIRROR_BADGE = "镜像 · 主入口";
+export function governanceDecisionBadge(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.governance.decisionBadge");
+}
 
-const GOVERNANCE_CARD_POWER: Record<string, string> = {
-  proposal: "提案",
-  appointment: "任命",
-  "appointment-write": "任命写卡",
-  "schedule-write": "编排",
-  acceptance: "验收",
-  "intent-confirm": "需求确认",
+export function governanceIntentBadge(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.governance.intentBadge");
+}
+
+export function governanceQueueNote(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.governance.queueNote");
+}
+
+export function governanceMirrorBadge(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.governance.mirrorBadge");
+}
+
+export const GOVERNANCE_DECISION_BADGE = governanceDecisionBadge(DEFAULT_LOCALE);
+export const GOVERNANCE_INTENT_BADGE = governanceIntentBadge(DEFAULT_LOCALE);
+export const GOVERNANCE_QUEUE_NOTE = governanceQueueNote(DEFAULT_LOCALE);
+export const GOVERNANCE_MIRROR_BADGE = governanceMirrorBadge(DEFAULT_LOCALE);
+
+const GOVERNANCE_CARD_POWER_KEYS: Record<string, MessageKey> = {
+  proposal: "ui.governance.power.proposal",
+  appointment: "ui.governance.power.appointment",
+  "appointment-write": "ui.governance.power.appointmentWrite",
+  "schedule-write": "ui.governance.power.scheduleWrite",
+  acceptance: "ui.governance.power.acceptance",
+  "intent-confirm": "ui.governance.power.intentConfirm",
 };
 
 export interface GovernanceCardMeta {
@@ -609,31 +734,46 @@ export interface GovernanceCardMeta {
 }
 
 /** 治理卡元信息（缺省不显示、不猜；appointment 权力标签按 2026-10-22 治理拆分更新为「任命」）。 */
-export function governanceCardMetaView(request: unknown): GovernanceCardMeta {
+export function governanceCardMetaView(
+  request: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): GovernanceCardMeta {
   const req = request && typeof request === "object" ? (request as Record<string, unknown>) : {};
   const cardKind = typeof req.cardKind === "string" ? req.cardKind : "";
-  const power = GOVERNANCE_CARD_POWER[cardKind] || "";
+  const powerKey = GOVERNANCE_CARD_POWER_KEYS[cardKind];
+  const power = powerKey === undefined ? "" : translate(locale, powerKey);
   const flowId = typeof req.flowId === "string" ? req.flowId : "";
   const stepId = typeof req.stepId === "string" ? req.stepId : "";
   const lines: string[] = [];
-  if (flowId !== "") lines.push("流程：" + flowId);
-  if (stepId !== "") lines.push("步骤：" + stepId);
-  if (power !== "") lines.push("权力类型：" + power);
+  if (flowId !== "") {
+    lines.push(translate(locale, "ui.judge.flowText", { flowId }));
+  }
+  if (stepId !== "") {
+    lines.push(translate(locale, "ui.governance.decisionLine.step", { stepId }));
+  }
+  if (power !== "") {
+    lines.push(translate(locale, "ui.governance.decisionLine.power", { power }));
+  }
   const paths = Array.isArray(req.paths)
     ? req.paths.filter((path): path is string => typeof path === "string" && path !== "")
     : [];
-  for (const path of paths) lines.push("将写路径：" + path);
-  if (typeof req.summary === "string" && req.summary !== "") lines.push("摘要：" + req.summary);
-  if (typeof req.artifactSha256 === "string" && req.artifactSha256 !== "")
-    lines.push("哈希：" + req.artifactSha256);
+  for (const path of paths) {
+    lines.push(translate(locale, "ui.governance.decisionLine.writePath", { path }));
+  }
+  if (typeof req.summary === "string" && req.summary !== "") {
+    lines.push(translate(locale, "ui.governance.decisionLine.summary", { summary: req.summary }));
+  }
+  if (typeof req.artifactSha256 === "string" && req.artifactSha256 !== "") {
+    lines.push(translate(locale, "ui.governance.decisionLine.hash", { sha256: req.artifactSha256 }));
+  }
   return {
     governance: power !== "",
     badge:
       power === ""
         ? ""
         : cardKind === "intent-confirm"
-          ? GOVERNANCE_INTENT_BADGE
-          : GOVERNANCE_DECISION_BADGE,
+          ? governanceIntentBadge(locale)
+          : governanceDecisionBadge(locale),
     power,
     flowId,
     stepId,
@@ -641,14 +781,22 @@ export function governanceCardMetaView(request: unknown): GovernanceCardMeta {
   };
 }
 
-export function governanceMirrorSourceLabel(sourceName: unknown): string {
+export function governanceMirrorSourceLabel(
+  sourceName: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   const name =
-    typeof sourceName === "string" && sourceName !== "" ? sourceName : "发起角色";
-  return "来自 " + name + " 的治理决定 · 客户最终批准";
+    typeof sourceName === "string" && sourceName !== ""
+      ? sourceName
+      : translate(locale, "ui.governance.decisionSourceFallback");
+  return translate(locale, "ui.governance.decisionTitle", { name });
 }
 
-export function governanceQueueAggregateText(count: unknown): string {
+export function governanceQueueAggregateText(
+  count: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   const n =
     typeof count === "number" && Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
-  return n > 0 ? "还有 " + n + " 个决定等待前一个决定" : "";
+  return n > 0 ? translate(locale, "ui.governance.moreDecisions", { count: n }) : "";
 }

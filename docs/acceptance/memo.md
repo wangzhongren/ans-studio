@@ -1,0 +1,28 @@
+# 验收工作备忘录
+
+- 2026-10-23：写**实施前 T2 标准** `docs/acceptance/role-root-docs-display-criteria-v1.md`（v1；**784 行**；SHA-256 `12981ed44ee1786d4a73d9441b823075b6ed88a23ae10b95d928afb225f6efcb`；blob `c0239c051be301c96aa07df1ab33ffc12cbbad33`）。写盘即冻结；**不是验收报告/结论**，不预判通过或返工。
+  - 基线：闸门 0/1/2 均已确认（沟通记录 `016798a1…`，73 行）；方案 v1 `9b69a786…`（1023 行）；团队计划 v1 `8ec6e0d7…`（488 行）；Q1–Q12 A，Q9 A Windows 只列名；**实施授权未给**；未派发/未实施。
+  - 覆盖：P1 索引/根文档；P2 路径/候选安全；P3 Interface/RoleView；P4 渲染分组/空态/点击/不重复/布局；P5 平台诚实（Windows fail-closed/POSIX 实读分开）；P6 i18n；P7 测试/证据；P8 范围/权限；P9 证据完整性；P10 文档状态；另附 G1/G2 变更包/写集流程核对。
+  - 只报告、未改方案的歧义：任务 P1–P10 分组与方案 §8.5 编号不一致（标准 §3.0 已逐行对照，覆盖无遗漏）；方案/团队计划状态头仍写闸门 1/2 未确认（以沟通记录为准）；方案 §13 复核记录缺失；i18n 取 4 必需 key + 3 可选副标签，副标签非强制但须 S5 记录；Windows 索引列名但 Service 无 refs/scope；POSIX 无环境记未执行/证据不足；Node 不在当前 PATH；`test/桌面应用/` 逐文件授权；既有未提交上游候选需 S1 哈希隔离；`documents` 数量变化须说明为新增根文档而非回归。
+  - 结论：待判定；本文件不授权实施/提交/推送/发布；下一步等客户实施授权、S1 基线与统筹变更包，实施后另写 `docs/acceptance/role-root-docs-display-report-v1.md`。
+- 2026-10-23：完成 i18n（变更 A，T2）独立验收，报告 `docs/acceptance/i18n-report-v1.md`。
+  - 候选：HEAD `ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1` + 工作区 98 个 i18n 产品/测试候选（变更包 §三），逐路径 `git hash-object` + `sha256sum` 98/98 一致、0 mismatch；§3.5 登记文档亦一致（不计候选）。
+  - 证据：`角色卡/测试/docs/change/2026-10-23-i18n-integration-evidence/` manifest `0fd0ab69…`，304/304 校验通过；最终复跑 shared 181/176/0/5、桌面UI 195/195、桌面应用 558/558、test-domain 822/815/1/6（唯一红为既有 EPERM）、装配 84/84、编排 810/809/1、双端 typecheck 0、build==dist；真实 Electron `main.mjs` 4 次 fresh（3 次 E2E_PASS，REPORT_STATUS 4/4 true）、200% 布局 zh/en 各 4/4。
+  - 复用：上一轮真实 Electron「面板内切换→重启→项目切换→切回」时间线按同哈希文件与同内容 JS（`d5f18e39…`）复用；唯一产品差异 `phase4a.css` 仅 `@media (max-height:480px)`，不影响 960×620。边界写入报告 §三.3。
+  - 验收定向补充检查（只读，临时脚本 `C:/Users/51054/AppData/Local/Temp/ans_i18n_accept/confirm-layout-smoke.mjs`）：en-US/zh-CN 确认卡与聊天头在 960×620 与 200% 下无水平溢出，按钮可点（200% 时经卡内滚动后可达，卡为有意滚动容器），零 console error。
+  - 结论：P1–P12 全部 pass（报告 §四）；通过仅对当前候选，不授权提交/推送/合并/发布。
+- 续接线索（残余，不阻塞本结论）：§五 所列 11 项；重点是已打开设置面板不发刷新主进程字段、重复文案自动扫描未常驻、外部错误原文保留缺专门 e2e、`main.mjs` SESSION_REPAIR 与桌面 readiness 时序偶发、基线 Windows symlink EPERM。
+- 身份：`i18n-criteria-v1.md` `0d91d179…`（691 行）；`i18n-report-v1.md` SHA-256 `07aacb064e712c7740635429793061146fee8ead7bb21ccb8a0fe39af7ddd35f`、blob `c1fd4577686c64c6efb93314452b21f7231d838b`（171 行）；变更包 `c095b308…`（311 行）；I9 记录 `9cec7330…`（164 行）。候选工作区 98/98 哈希在报告写盘后复算仍一致；staged 0；status 203（含本报告与 memo）。
+- 2026-10-23：写**实施前 T3 标准** `docs/acceptance/acceptance-rework-routing-criteria-v1.md`（v1；961 行；SHA-256 `b62746e9696eb4103718c46386878d7d34a785e5481803749de930128b5de481`；blob `88d2e542cad573ba14290eff871860b2b8d25a40`）。写盘即冻结；**不是验收报告/结论**，不预判通过或返工。
+  - 基线：闸门 0/1/2 均已确认（沟通记录 `9a904f43…`，69 行）；方案 v1 `9ceea642…`（951 行）；团队计划 v1 `d95fc817…`（389 行）；Q1–Q13 A，O1–O4 不做；**实施授权未给**；未派发/未实施。
+  - 覆盖：P1 最新决定/收口；P2 报告结构化段；P3 路由+措辞；P4 重派门/循环抑制/verification 重开/`acceptanceLastDispatchAtMs` 收窄；P5 Steward/Convener 返工；P6 routing record/审计；P7 目标项目只读/恢复；P8 兼容/迁移/不扩权；P9 测试/T3/Electron/目标复算；P10 证据完整性；P11 非目标/分层权限；P12 文档状态；另附 G1/G2 流程核对行。
+  - 只报告、未改方案的歧义：任务 P1–P12 分组与方案 §8.6/团队计划 §5.2 编号不一致（标准 §3.0 已逐行对照）；团队计划状态头仍写闸门 2 未确认（以沟通记录为准）；方案 §8.6 P4 措辞/P7 重开分别并入 P3.4/P4.4；`acceptanceLastDispatchAtMs` 精确谓词待实施方在变更包声明；目标现场已漂移到 530 条账本/40 步/flow `0805213a…`（方案 A/B 数值非当前）；Q13 report-v2 登记属目标侧/客户决定；Node 不在当前 PATH；`test/桌面应用/` 逐文件授权依赖目录 v3 候选。
+  - 结论：待判定；本文件不授权实施/提交/推送/发布；下一步等实施授权、S1 基线与统筹变更包，实施后另写 `docs/acceptance/acceptance-rework-routing-report-v1.md`。
+- 2026-10-23：完成 acceptance-rework-routing（T3）独立验收，报告 `docs/acceptance/acceptance-rework-routing-report-v1.md`（**253 行；SHA-256 `5fe8c62b9263fcecb0d0b47cd45c5afe16d3030edf8c0a9c2e1b56e23d39cba9`；blob `b96d35e9d67537fd73ec8f6cf4b35ba28e859243`**）。
+  - 候选：HEAD `ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1` + 工作区 21 个产品/测试候选；逐路径 `git hash-object` + `sha256sum` **21/21 一致、0 mismatch**；稳定性快照 21 行 `30deb89e…`；6 new/15 modified（本变更新建 3、既有追加 18）；`test/桌面应用/e2e/main.mjs` 仍为 S1 `142e0f18…`、非候选；`test/桌面应用/` 无新建；staged 0。
+  - 证据复用：S7 记录 `841588b8…`（`verified-by-tests-only`）与 manifest `8d5f48cd…`（92/92 OK）；T3 全量 **3790/3763/9/18**（9 项既有 Windows EPERM，0 新增；S1 基线 3725/3697/10/18）；受影响 **2813/2793/5/15**；新增 e2e 10/10×3；Electron 2/2 `E2E_PASS`；typecheck/typecheck:renderer/build 0。本次定向复跑：编排 122/122、`acceptance-dispatch` 44/44、`tools` 13/13、`i18n` 37/37、新增 e2e 10/10。
+  - 隔离：S1 内容对账 114 路径中 **100 same / 12 diff 全为候选 / 2 目录**；相对 S1 新增 7 路径全为候选、0 非候选新增；role boundary 哈希与 S1 一致；混合文件只算本变更 hunk；不引用 i18n/目录 v3/写卡门禁/发布结论。
+  - 目标：S7 快照 flow `bd057b1d…`/59 步、ledger `bdafbf45…`/751 后**外部继续漂移**；本次只读复算快照 21:27:40Z 为 flow `f32fdfbf…`/63 步（14 done/44 superseded/1 dispatched/4 pending）、ledger `17453bb9…`/763；收尾 21:29:55Z 复核 ledger 又为 `f719795f…`/764（仅新增 `artifact.observed`，acceptance/unclassified 不变）。report v1/v2/v4 均 `missing` 结构化段；A 语义（仅 rejected 挡住、移除后 ready）、B（返工未完成不 ready）、reopen、重派门均通过；**零写入**（前后哈希一致、无 `acceptance/` 目录）。账本第 646 行 `unclassified/none`（rapporteur，12:08:21Z）为**目标侧残余/运维事项**，既有 fail-closed 会挡住升级后立即重派；report-v4 为账本外复核，Q13 属目标侧/客户决定。
+  - 本次定向补查（临时脚本 `C:/Users/51054/AppData/Local/Temp/acc-verify/`）：损坏 record fail-closed（无发送、系统行可见）、done+rejected 不重开/不重派、同内容 mtime touch 不重派、judge 代批 reject → Convener/来源 judge/无「客户拒绝」。
+  - 结论：**P1–P12 全部 pass；G1/G2 pass；通过**（仅对当前候选；不授权提交/推送/合并/发布，不声称目标项目已修复）。
+  - 证据边界：真实 Electron 无新增系统行定向断言（内容由确定性测试/e2e 覆盖）；judge 代批任务来源措辞为「自动决策未完成（自动退回）」而非「未通过（判断代批）」（残余精度，不判 fail）；queued 未单独注入；legacy 不自动重派；Q5 gap；`i-full-chain` 既有偶发。续接时以报告 §六 为准，目标现场需重新只读复算。

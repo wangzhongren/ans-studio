@@ -1,0 +1,46 @@
+date: 2026-10-23T03:14:21Z (UTC)
+cwd: /c/Users/51054/Desktop/work/ans-studio
+branch: main
+HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+node: v24.22.1
+npm: 11.19.1
+os: Windows 11 Pro 10.0.26300 (win32)
+shell: Git Bash (POSIX sh)
+
+== write-set status (candidate) ==
+ M app/desktop/interface.ts
+ M app/main.ts
+ M app/preload.cjs
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/api-spec.md"
+?? app/desktop/i18n.ts
+?? app/desktop/preferences.ts
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_i18n-b0-evidence/"
+
+== baseline hashes (recorded before edits) ==
+app/main.ts  blob=c64174f2dbff957944772973e5aaf31f69b8c687  sha256=a9aaa758b1b896f0ff47597dd4cc0052c667d5ae2a6b0f734179392e42de4e27
+app/preload.cjs  blob=f7a800fe775451d140f8028e42bf76632f34a818  sha256=fb378604b98c4651859a20049b49714f072070c29c9a569ad3eda8f5364b387f
+app/desktop/interface.ts  blob=203e36f492f4bcc07689810bdd6c861a75e5cba9  sha256=a683e5a51c88f7bef1d4b9d652ec0bcadd2de1d32f8299094e1fa2b264364c88
+test/桌面应用/interface.test.ts  blob=f3b8cae8c2bf637020c469e1874f675f6a2aef9f  sha256=e273b64156d0a24eeb6651141b02ffc05e8c881d26ad3e5f38ef3bd1e3ef5d1b
+
+== baseline test observations (this environment; before edits) ==
+run1: node --test test/桌面应用/interface.test.ts -> exit=1, tests 83 / pass 82 / fail 1 (任命→Crew 写卡主路径: readiness stepId assertion)
+run2: same -> exit=1, tests 83 / pass 82 / fail 1 (第 5 项迁移策略: readiness 派发) -> baseline-interface-run2-fail1.log
+run3: same -> exit=0, tests 83 / pass 83 / fail 0 -> baseline-interface-run3-pass.log
+I3 baseline (test role): 角色卡/测试/docs/change/2026-10-23-baseline-evidence/t2-desktop-app-interface.log = 83/83 pass, 0 fail
+classification: pre-existing timing flakiness in post-write readiness tests (different test each run), not introduced by this batch; candidate final run 95/95 pass.
+
+== concurrent context (other roles, NOT this candidate) ==
+app/renderer/**: 桌面UI concurrent B0 work (App.tsx / lib/platform.ts / shell/SettingsPanel.tsx modified; src/i18n/ untracked)
+角色卡/桌面窗口/boundary.md, changelog.md: People Operations authorized correction (闸门 2; already modified at batch start)
+
+== commands executed for this batch ==
+node --test test/桌面应用/interface.test.ts
+npm run typecheck
+node --test test/桌面应用/{multi-runtime,pi-config,runtime-resolution,acceptance-dispatch,composer-images,dispatch-fresh-enum,p0-halt-and-images,su-effective-boundary}.test.ts
+
+== 2026-10-23 真机窗口标题缺陷修复（post-fix evidence note）==
+- 统筹在临时 userData 的真实 Electron（en-US）复现：PowerShell `Get-Process electron | Where-Object MainWindowTitle` 显示「ANS 治理会话工作台」；页面 <title> 触发 page-title-updated 覆盖了 BrowserWindow 的本地化 title。
+- 修复仅 app/main.ts：`applyLocalizedWindowTitle(win)`（建窗后、加载前）监听 page-title-updated → event.preventDefault() + `win.setTitle(desktopTexts(mainI18n).windowTitle)`；did-finish-load 后补一次；既有 locale 切换后的 win.setTitle 保留。未改 app/renderer/**、index.html、src/**。
+- 本角色未操作运行中的 9222 Electron 实例；重启后的 MainWindowTitle 英文复验由统筹执行，本证据目录不声称该项已通过。
+- 修复后复跑：node --test test/桌面应用/interface.test.ts = 97/97 pass (exit 0)；npm run typecheck = exit 0；i18n B0 聚焦 14/14 pass；i18n 硬编码守卫 6/6 pass (scanned=107 allowlisted=62 violations=0)。

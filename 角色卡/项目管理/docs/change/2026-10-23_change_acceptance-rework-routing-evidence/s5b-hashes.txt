@@ -1,0 +1,19 @@
+# S5a/S5b candidate hashes (2026-10-23T19:27:40+08:00)
+# HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+
+FILE: src/common/shared/i18n/messages/zh-CN.ts
+git hash-object: c0501469ed8b8631e63ba124f419aa642a034400
+sha256sum: d487a8d4853004daea619a82b2d760ff3218d6fd1015f1c29623d2ae15953e4e *src/common/shared/i18n/messages/zh-CN.ts
+
+FILE: src/common/shared/i18n/messages/en-US.ts
+git hash-object: 74ab4a7d654143b20b6614d7508f48da67c211cc
+sha256sum: 05089d70b7b1e0ee720d619efb57aa8d305b7b8f004f4be66144476257e4b373 *src/common/shared/i18n/messages/en-US.ts
+
+FILE: test/项目管理/shared/i18n.test.ts
+git hash-object: 26501c142dbd2c03bd6db6e135a0a29da8d46a3b
+sha256sum: d8e7567797d9a324e1e2f9889b84758c81ac1b6df76f98b63c2c652f3bebac97 *test/项目管理/shared/i18n.test.ts
+
+# git status --short (target files)
+?? src/common/shared/i18n/messages/en-US.ts
+?? src/common/shared/i18n/messages/zh-CN.ts
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"

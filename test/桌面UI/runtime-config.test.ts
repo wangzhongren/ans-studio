@@ -28,6 +28,8 @@ import {
   rangeValue,
   readFailureNoticeText,
   readFailureStatusText,
+  RUNTIME_LABELS,
+  RUNTIME_LABEL_KEYS,
   runtimeLabel,
   saveFailureStatusText,
   applicationShortLabel,
@@ -151,6 +153,60 @@ test("读取结果校验：runtime/fields/missingKeys 必须齐备，畸形按�
   assert.equal(validateRuntimeConfigView({ ...good, missingKeys: undefined }, "pi").ok, false);
   assert.equal(validateRuntimeConfigView({ ...good, missingKeys: "x" }, "pi").ok, false);
   assert.equal(validateRuntimeConfigView(null, "pi").ok, false);
+});
+
+test("B4 引擎显示名：demo 走共享 key（zh/en），Pi/Codex/Claude 品牌名原样", () => {
+  // 本地映射语言中性：不保存 demo 中文；用户可见文案只来自共享 key。
+  assert.deepEqual(RUNTIME_LABELS, {
+    demo: "demo",
+    pi: "Pi",
+    codex: "Codex",
+    claude: "Claude",
+  });
+  assert.equal(/[一-鿿]/.test(Object.values(RUNTIME_LABELS).join("")), false);
+  assert.equal(RUNTIME_LABEL_KEYS.demo, "shared.runtimeSettings.runtime.demo");
+  assert.equal(RUNTIME_LABEL_KEYS.pi, null);
+  assert.equal(RUNTIME_LABEL_KEYS.codex, null);
+  assert.equal(RUNTIME_LABEL_KEYS.claude, null);
+
+  // zh-CN 逐字沿用共享目录；en-US 同 key 解析为 Demo；品牌名两种语言都不翻译。
+  assert.equal(runtimeLabel("demo"), "演示");
+  assert.equal(runtimeLabel("demo", "en-US"), "Demo");
+  const brands = ["pi", "codex", "claude"] as const;
+  for (const brand of brands) {
+    assert.equal(runtimeLabel(brand), RUNTIME_LABELS[brand]);
+    assert.equal(runtimeLabel(brand, "en-US"), RUNTIME_LABELS[brand]);
+  }
+
+  // 未知引擎：非空原样透传；空值走本地化文案（不发明标签）。
+  assert.equal(runtimeLabel("future-engine"), "future-engine");
+  assert.equal(runtimeLabel("future-engine", "en-US"), "future-engine");
+  assert.equal(runtimeLabel("", "zh-CN"), "未知引擎");
+  assert.equal(runtimeLabel("", "en-US"), "Unknown engine");
+});
+
+test("B4 读取视图：主进程未给 label 时按 locale 解析，显式 label 优先", () => {
+  const demo = validateRuntimeConfigView(
+    { runtime: "demo", missingKeys: [], fields: [] },
+    "demo",
+    "en-US",
+  );
+  assert.equal(demo.ok, true);
+  assert.equal(demo.view?.label, "Demo");
+
+  const zh = validateRuntimeConfigView(
+    { runtime: "demo", missingKeys: [], fields: [] },
+    "demo",
+    "zh-CN",
+  );
+  assert.equal(zh.view?.label, "演示");
+
+  const labelled = validateRuntimeConfigView(
+    { runtime: "demo", label: "Custom", missingKeys: [], fields: [] },
+    "demo",
+    "zh-CN",
+  );
+  assert.equal(labelled.view?.label, "Custom");
 });
 
 test("文案：缺配/齐备/application/来源/帮助/入口标题逐字基线", () => {

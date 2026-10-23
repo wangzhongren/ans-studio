@@ -34,11 +34,14 @@ import {
   projectRoleCount,
 } from "@/chat/governance-view";
 import { operatorSurfaces } from "@/chat/operator-view";
+import { translate, useLocaleState, useT } from "@/i18n";
 
 /** 稳定缺省引用：zustand selector 不得每次返回新数组（getSnapshot 缓存要求）。 */
 const EMPTY_QUEUE: Array<Record<string, unknown>> = [];
 
 function QueueRows({ roleId }: { roleId: string }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const queue = useChatStore(
     (s) => s.queueByRole[roleId] ?? EMPTY_QUEUE,
   );
@@ -48,7 +51,7 @@ function QueueRows({ roleId }: { roleId: string }) {
   const appendSystemRow = useChatStore((s) => s.appendSystemRow);
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const [feedback, setFeedback] = useState<Record<string, string>>({});
-  const views = queueItemViews(queue, running);
+  const views = queueItemViews(queue, running, locale);
 
   const withdraw = async (view: QueueItemView) => {
     if (!view.canWithdraw || pending[view.id]) return;
@@ -62,14 +65,18 @@ function QueueRows({ roleId }: { roleId: string }) {
     let outcome;
     try {
       if (!bridge?.withdrawQueued) {
-        outcome = { ok: false, text: "撤回无效：当前版本未提供撤回通道。" };
+        outcome = {
+          ok: false,
+          text: t("ui.chatStream.withdrawUnavailable"),
+        };
       } else {
         outcome = withdrawOutcome(
           await bridge.withdrawQueued({ projectRoot, roleId, runtime }, view.id),
+          locale,
         );
       }
     } catch (error) {
-      outcome = withdrawExceptionOutcome(error);
+      outcome = withdrawExceptionOutcome(error, locale);
     }
     setPending((current) => {
       const next = { ...current };
@@ -92,7 +99,11 @@ function QueueRows({ roleId }: { roleId: string }) {
           data-queue-id={view.id || undefined}
         >
           <span className="q-pos">
-            {view.running ? "进行中" : "第 " + view.position + " 位"}
+            {view.running
+              ? translate(locale, "ui.confirm.queueRunning")
+              : translate(locale, "ui.chatStream.queuePosition", {
+                  position: view.position,
+                })}
           </span>
           <span className="q-text" title={view.text}>
             {view.text}
@@ -104,10 +115,12 @@ function QueueRows({ roleId }: { roleId: string }) {
               type="button"
               data-id={view.id}
               disabled={pending[view.id] === true}
-              title="撤回该条排队消息（仅未投递者可撤）"
+              title={t("ui.queue.withdrawTitle")}
               onClick={() => void withdraw(view)}
             >
-              {pending[view.id] ? "撤回中…" : "撤回"}
+              {pending[view.id]
+                ? t("ui.queue.withdrawing")
+                : t("ui.queue.withdraw")}
             </button>
           ) : null}
           {feedback[view.id] ? (
@@ -171,6 +184,8 @@ function locatePendingCard(
 }
 
 export function ChatStream() {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const projectRoot = useChatStore((s) => s.projectRoot);
   const hasRoles = useChatStore((s) => s.hasRoles);
   const roles = useChatStore((s) => s.roles);
@@ -203,7 +218,7 @@ export function ChatStream() {
   const record = (governanceRecord || {}) as Record<string, unknown>;
   const recordState = typeof record.state === "string" ? record.state : "";
   const governanceHint = role
-    ? governanceRoleEmptyHint(role.governanceFunction)
+    ? governanceRoleEmptyHint(role.governanceFunction, locale)
     : "";
 
   let emptyTitle = "";
@@ -212,50 +227,57 @@ export function ChatStream() {
   let emptyActions: "governance" | null = null;
   let showStart = false;
   if (!projectRoot) {
-    emptyTitle = "尚未导入项目";
-    emptySub = "在左侧点击「导入项目」选择项目根目录；导入后点击任意角色开始聊天。";
+    emptyTitle = t("ui.sidebar.noProject");
+    emptySub = t("ui.chatStream.empty.noProjectSub");
   } else if (hasRoles === false) {
     // S0 真实空项目（hasRoles=false 仍返回内置角色）：与主入口对话，让它把角色建出来。
-    emptyTitle = "项目尚未 bootstrap";
+    emptyTitle = t("ui.chatStream.empty.notBootstrappedTitle");
     emptySub =
       selectedRoleId && role
-        ? "与 " + roleDisplayName(role) + " 对话，让它把角色建出来；左树会随之长出。"
-        : "与主入口对话，让它把角色建出来；左树会随之长出。";
+        ? t("ui.chatStream.empty.notBootstrappedSubWithRole", {
+            roleName: roleDisplayName(role, locale),
+          })
+        : t("ui.chatStream.empty.notBootstrappedSubPrimary");
     showStart = !!selectedRoleId;
   } else if (roles.length === 0) {
-    emptyTitle = "该项目下未枚举到角色";
-    emptySub = "请确认项目包含角色卡目录与治理边界；重新导入项目后重试。";
+    emptyTitle = t("ui.chatStream.empty.noRolesTitle");
+    emptySub = t("ui.chatStream.empty.noRolesSub");
   } else if (!selectedRoleId) {
-    emptyTitle = "选择角色开始聊天";
-    emptySub = "从左侧角色树选择角色；每个角色保留自己的会话历史。";
+    emptyTitle = t("ui.chatStream.empty.selectRoleTitle");
+    emptySub = t("ui.chatStream.empty.selectRoleSub");
   } else if (rowCount === 0 && !loading && recordState === "pin-mismatch") {
     // 治理记录与盘上边界不一致：复用 su 空态宿主（说明 + 检查入口），不自动开会话。
-    const view = governancePinMismatchEmptyState(record.pinCount, changedEntries(record));
+    const view = governancePinMismatchEmptyState(
+      record.pinCount,
+      changedEntries(record),
+      locale,
+    );
     emptyTitle = view.title;
     emptySub = view.sub;
     emptyHint = view.hint;
     emptyActions = "governance";
   } else if (rowCount === 0 && !loading && recordState === "missing") {
-    emptyTitle = "尚无治理记录";
-    emptySub = governanceMissingText(projectRoleCount(roles));
+    emptyTitle = t("ui.governance.noRecordTitle");
+    emptySub = governanceMissingText(projectRoleCount(roles), locale);
     emptyActions = "governance";
   } else if (rowCount === 0 && !loading && recordState === "invalid") {
-    emptyTitle = "治理记录不可用";
-    emptySub = governanceInvalidText(record.reason);
+    emptyTitle = t("ui.governance.recordUnavailableTitle");
+    emptySub = governanceInvalidText(record.reason, locale);
     emptyActions = "governance";
   } else if (rowCount === 0 && !loading && governanceHint !== "") {
     // 治理角色空态（主入口 Liaison 等）：说明客户入口，不自带 CTA。
-    emptyTitle = roleDisplayName(role);
+    emptyTitle = roleDisplayName(role, locale);
     emptySub = governanceHint;
   } else if (rowCount === 0 && !loading) {
     if (!sessionOpen) {
-      emptyTitle = "开始与 " + roleDisplayName(role) + " 对话";
-      emptySub = "点下方按钮开启会话；发送消息后，这里会显示对话与工具记录。";
+      emptyTitle = t("ui.chatStream.startConversation", {
+        roleName: roleDisplayName(role, locale),
+      });
+      emptySub = t("ui.chatStream.empty.startSub");
       showStart = true;
     } else {
-      emptyTitle = "会话已开启，可直接输入消息";
-      emptySub =
-        "发送第一条消息后，这里会显示对话与工具记录。写入由治理引擎把关，越界操作会在对话中直接提示。";
+      emptyTitle = t("ui.chatStream.empty.openedTitle");
+      emptySub = t("ui.chatStream.empty.openedSub");
     }
   }
 
@@ -287,8 +309,10 @@ export function ChatStream() {
           <BusySpinner />
           <span className="sys-text">
             {rowCount === 0 && !busy && queueCount === 0
-              ? "正在开启与角色 " + roleDisplayName(role) + " 的会话…"
-              : "正在载入会话历史…"}
+              ? t("ui.chatStream.openingSession", {
+                  roleName: roleDisplayName(role, locale),
+                })
+              : t("ui.chatStream.loadingHistory")}
           </span>
         </div>
       ) : null}
@@ -306,7 +330,9 @@ export function ChatStream() {
               type="button"
               onClick={openGovernancePreview}
             >
-              {recordState === "pin-mismatch" ? "检查并重新接受" : "建立治理记录"}
+              {recordState === "pin-mismatch"
+                ? t("ui.governance.checkAndReaccept")
+                : t("ui.governance.establish")}
             </Button>
           ) : null}
           {showStart && selectedRoleId ? (
@@ -316,7 +342,9 @@ export function ChatStream() {
               type="button"
               onClick={() => void selectRole(selectedRoleId)}
             >
-              开始与 {roleDisplayName(role)} 对话
+              {t("ui.chatStream.startConversation", {
+                roleName: roleDisplayName(role, locale),
+              })}
             </Button>
           ) : null}
         </div>
@@ -336,7 +364,7 @@ export function ChatStream() {
       {busy && selectedRoleId && pendingIds.length === 0 ? (
         <div className="tool-current">
           <BusySpinner />
-          <span className="sys-text">正在工作</span>
+          <span className="sys-text">{t("ui.chatStream.working")}</span>
         </div>
       ) : null}
       {selectedRoleId && pendingIds.length > 0 ? (
@@ -344,12 +372,12 @@ export function ChatStream() {
           id="op-chip"
           className="op-chip"
           type="button"
-          aria-label={"有 " + pendingIds.length + " 条待确认 · 定位"}
+          aria-label={t("ui.chatStream.pendingLocate", { count: pendingIds.length })}
           onClick={onChipClick}
         >
           <ShieldCheck size={12} strokeWidth={1.5} aria-hidden="true" />
           <span className="op-chip-text">
-            {"有 " + pendingIds.length + " 条待确认 · 定位"}
+            {t("ui.chatStream.pendingLocate", { count: pendingIds.length })}
           </span>
         </button>
       ) : (

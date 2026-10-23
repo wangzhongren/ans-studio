@@ -1185,6 +1185,28 @@ function cardNotPresented(name: string, reason: string | undefined): ToolResult 
   };
 }
 
+/** `outcome.operatorId` 是否来自判断 agent（`judge:<engine>`；与桌面结算同源）。 */
+function isJudgeOperator(operatorId: string | undefined): boolean {
+  return operatorId !== undefined && operatorId.startsWith("judge:");
+}
+
+/**
+ * 判断 agent 自动退回回执（2026-10-23 验收返工路由方案 §5.3.3 / Q7 A）：judge 的 `declined`
+ * **不是客户拒绝**，不得套用「客户拒绝」措辞。只有验收卡（`request_choice` +
+ * `cardKind:"acceptance"`）走应用返工路由，才写 Convener/重新提交验收；其余 judge 退回
+ * （写盘/任命/日程等）用通用文案，不承诺返工路由。客户/通道来源仍走 `notConsented` 既有语义。
+ */
+function judgeDeclined(name: string, reason: string | undefined, acceptanceRework: boolean): ToolResult {
+  const detail = reason !== undefined && reason.trim() !== "" ? `（原因：${reason}）` : "";
+  const handling = acceptanceRework
+    ? `应用会把本次退回交 Steward/统筹（Convener）组织返工；请等待返工后重新提交验收。`
+    : `应用会按治理规则处理本次退回。`;
+  return {
+    ok: false,
+    message: `${name}：自动决策未通过/未完成${detail}；这不是客户拒绝；${handling}`,
+  };
+}
+
 function abortedToolResult(name: string): ToolResult {
   if (name === REQUEST_CONFIRMATION_TOOL_NAME || name === REQUEST_CHOICE_TOOL_NAME) return notConsented(name, "会话已中止");
   if (name === SUBMIT_REPORT_TOOL_NAME) return { ok: false, message: `${name}：报告**未能交回**（原因：会话已中止）` };
@@ -1333,6 +1355,8 @@ function makeRequestConfirmationTool(
       if (out.outcome === "declined") {
         // 应用在触达客户通道之前拒绝发卡（治理字段不齐等）：卡片**未呈现**，不得说成客户拒绝。
         if (out.notPresented === true) return cardNotPresented(name, out.reason);
+        // 判断 agent 自动退回：不是客户拒绝；确认卡不走验收返工路由，用通用文案。
+        if (isJudgeOperator(out.operatorId)) return judgeDeclined(name, out.reason, false);
         return notConsented(name, `客户拒绝${out.reason !== undefined ? `（${out.reason}）` : ""}`);
       }
       if (out.outcome === "unavailable") {
@@ -1466,6 +1490,12 @@ function makeRequestChoiceTool(
       const out = await askCustomer(name, req, fn, timeoutMs, call.signal, gate, { ...metadata, ...governance.value });
       if ("ok" in out) return out; // 通道故障 / 超时 / 中止 → 未获同意
       if (out.outcome === "declined") {
+        // 判断 agent 自动退回：不是客户拒绝。仅验收卡（cardKind:"acceptance"）走应用返工路由
+        // （2026-10-23 验收返工路由 §5.3.3）；其他卡种/未给 cardKind 用通用文案。
+        // `notPresented` 在本工具既有行为中不改变措辞（O1 未授权）；此处分流只看 operatorId/cardKind。
+        if (isJudgeOperator(out.operatorId)) {
+          return judgeDeclined(name, out.reason, governance.value.cardKind === "acceptance");
+        }
         return notConsented(name, `客户拒绝${out.reason !== undefined ? `（${out.reason}）` : ""}`);
       }
       if (out.outcome === "unavailable") {

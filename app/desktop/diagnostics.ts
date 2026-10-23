@@ -1,5 +1,6 @@
 import type { BrowserWindow, IpcMain } from "electron";
 import type { DiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
+import { mainLocale, mainT } from "./i18n.ts";
 const RENDERER_EVENTS = new Set(["renderer.error", "renderer.unhandled-rejection", "renderer.event-error", "renderer.viewport", "renderer.replay", "renderer.recovery"]);
 const RENDERER_FIELDS = new Set(["errorType", "errorCode", "errorMessage", "state", "count", "rowCount", "firstRow", "lastRow", "visibleCount", "replayPlan", "durationMs"]);
 
@@ -77,4 +78,18 @@ export function observeWindowDiagnostics(win: BrowserWindow, logger: DiagnosticL
   win.on("closed", () => logger.record("window.closed"));
 }
 
-export const RECOVERY_PAGE = '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>界面需要恢复</title><body style="font:14px system-ui;padding:32px"><h2>界面暂时无法显示</h2><p>点击重新加载可恢复界面，已有任务不会自动重发。</p><button id="reload-interface" onclick="window.desktop.reloadInterface()">重新加载界面</button></body></html>';
+/** 恢复页 HTML：按**当前 locale** 生成（i18n B3）。文案走 `main.common.recoveryPage*` 目录 key。 */
+export function renderRecoveryPage(): string {
+  return '<!doctype html><html lang="' + mainLocale() + '"><meta charset="utf-8"><title>' + mainT("main.common.recoveryPageTitle") + '</title><body style="font:14px system-ui;padding:32px"><h2>' + mainT("main.common.recoveryPageHeading") + '</h2><p>' + mainT("main.common.recoveryPageBody") + '</p><button id="reload-interface" onclick="window.desktop.reloadInterface()">' + mainT("main.common.reloadInterface") + '</button></body></html>';
+}
+
+/**
+ * 恢复页的**实时绑定**（B3）：`main.ts` 以 ESM live binding 在失败时读取本值（该文件不在本批写集内，
+ * 行为不变）；locale 切换由 Interface 调 `refreshRecoveryPage()` 重算，下一次打开恢复页即用新语言。
+ */
+export let RECOVERY_PAGE = renderRecoveryPage();
+
+/** 按当前 locale 重算恢复页（Interface 在构造与 locale 切换后调用；纯字符串生成）。 */
+export function refreshRecoveryPage(): void {
+  RECOVERY_PAGE = renderRecoveryPage();
+}

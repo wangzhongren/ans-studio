@@ -125,3 +125,9 @@ Service 为每轮提供一个 ID，归一事件的顶层和 `detail.turnId`，�
 - `GovernanceJudgeFacts` 可选增 `teamPlanSchema?: 1 | 2`（1=legacy 缺省、2=v2）与 `teamPlanModules?: string[]`（有界模块 id 摘要）；物证仍沿用 `artifacts.teamPlanPath`，**不新增** evidence artifact kind。
 - **不变**：`FlowToolStepKind`/`FLOW_TOOL_STEP_KINDS` 仍恰四值（`dispatch`/`customer-decision`/`artifact`/`acceptance`），不新增 `map`/`reduce`；`GovernanceStepKind`/`cardKind`/`GovernancePower`/`GovernanceDecisionKind` 值不变；Provider `tools.ts`/`schema.ts` 未改（参数/schema/校验形状不动）。
 - 本层只承载字段：并行组语法、依赖存在性/环、同 Map 组无依赖、Reduce 覆盖、dispatch 前置 `done` 的静态校验/裁决在编排（Map B），本阶段未接线；字段存在不等于门禁已实现。证据见 [本次 change 记录](docs/change/2026-10-22_change_role-granularity-parallel-testing.md)。
+
+**目录级授权 v3 契约扩展（2026-10-23，`implemented-unverified`）：** 依据客户确认的策划方案 `docs/planning/2026-10-23_design_directory-ownership.md` §8.2、团队计划 `docs/scheduling/2026-10-23-directory-ownership-team-plan.md` §4.3（D4）与验收标准 `docs/acceptance/directory-ownership-criteria-v1.md` P1/P13，本层只做**可选加法**：
+
+- `GovernanceJudgeFacts.teamPlanSchema?` 由 `1 | 2` 扩展为 `1 | 2 | 3`（`1`=legacy 缺省、`2`=角色粒度/MapReduce v2、`3`=目录级授权 v3）；v3 值可原样进入 judge facts，不伪装成 v2。
+- 可选增 `teamPlanDirectories?: string[]`（v3 授权目录摘要；有界、去重；长度/内容由生产方裁剪；只作 judge 事实摘要，不构成写权、授权或语义结论）。缺失＝应用未提供，不得据此假定 v3。
+- **不变**：物证仍沿用 `artifacts.teamPlanPath`，不新增 artifact kind；`GovernanceStepKind`/`cardKind`/`GovernancePower`/`GovernanceDecisionKind`/`FlowToolStepKind` 值不变；Provider `tools.ts`/`schema.ts` 未改。v3 解析/V-D/V12/布局核对在编排/桌面/测试，本层不复制。证据见 [本次 change 记录](docs/change/2026-10-23_change_directory-ownership.md)。

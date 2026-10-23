@@ -24,13 +24,8 @@ import {
 import { governanceView } from "@/chat/role-view";
 import type { ConfirmCardRecord } from "@/chat/confirm-logic";
 import { useConfirmStore } from "@/stores/confirm-store";
-
-const SHELL_CONFIRM_DEFAULT_HINT =
-  "点「拒绝」、按 Esc 或关闭本框 = 不放行（不会执行）。";
-const SU_APPROVAL_WARNING =
-  "批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界；请逐字核对命令原文。";
-const RECOVERY_CONFIRM_DEFAULT_HINT =
-  "点「取消」、按 Esc 或关闭本框 = 不执行；仅点「执行」才会执行。";
+import { translate, useLocaleState, useT } from "@/i18n";
+import type { Locale } from "@/i18n";
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -57,17 +52,19 @@ function focusables(root: HTMLElement | null): HTMLElement[] {
   ).filter((element) => element.offsetParent !== null || element === document.activeElement);
 }
 
-function recoveryRoleName(roleId: string): string {
-  if (!roleId) return "(未标识)";
+function recoveryRoleName(roleId: string, locale: Locale): string {
+  if (!roleId) return translate(locale, "ui.confirm.unknownRole");
   const role = useChatStore
     .getState()
     .roles.find((candidate) => candidate.roleId === roleId);
   if (!role) return roleId;
-  const gov = governanceView(role.governanceFunction);
+  const gov = governanceView(role.governanceFunction, locale);
   return gov ? gov.name : role.roleId;
 }
 
 function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const respond = useConfirmStore((s) => s.respondShell);
   const denyRef = useRef<HTMLButtonElement>(null);
   const lastId = useRef<string>("");
@@ -92,10 +89,10 @@ function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
   const payload = card ? asRecord(card.payload) : {};
   const suApproval = payload.policy === "su-approval";
   const roleId = asString(payload.roleId);
-  const title = shellConfirmTitle(payload.policy, roleId);
+  const title = shellConfirmTitle(payload.policy, roleId, locale);
   const command = asString(payload.command);
   const summary = asString(payload.summary);
-  const tierLabel = suApproval ? suApprovalTierLabel(payload.tier) : "";
+  const tierLabel = suApproval ? suApprovalTierLabel(payload.tier, locale) : "";
   const summaryText = suApproval && tierLabel
     ? summary
       ? tierLabel + " · " + summary
@@ -104,16 +101,19 @@ function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
   const judgeNotice = asString(payload.judgeNotice);
   const reasonRaw = asString(payload.reasonRaw);
   const reasonPlain = asString(payload.reasonPlain);
+  const matchedReason = reasonRaw
+    ? t("ui.confirm.matchedReason", { reason: reasonRaw })
+    : "";
   const reasonText =
     suApproval && reasonRaw
       ? reasonPlain
-        ? reasonPlain + "\n命中原因：" + reasonRaw
-        : "命中原因：" + reasonRaw
+        ? reasonPlain + "\n" + matchedReason
+        : matchedReason
       : reasonPlain;
   const cwd = asString(payload.cwd);
   const argvLines = asStringArray(payload.argvLines);
   const rawNote = reasonRaw
-    ? "审核原文（内部用语，仅供核查）：" + reasonRaw
+    ? t("ui.confirm.reviewOriginal", { reason: reasonRaw })
     : "";
   const busy = card?.busy === true;
 
@@ -147,7 +147,7 @@ function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
                   variant="outline"
                   className="h-[16px] rounded-[4px] border-warning-border bg-warning-bg px-1 text-[10px] text-warning"
                 >
-                  su 审批
+                  {t("ui.confirm.suApprovalBadge")}
                 </Badge>
               ) : null}
             </div>
@@ -155,8 +155,8 @@ function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
               id="sc-close"
               type="button"
               className="sc-close"
-              title="关闭（不放行）"
-              aria-label="关闭（不放行）"
+              title={t("ui.confirm.closeNoApprove")}
+              aria-label={t("ui.confirm.closeNoApprove")}
               disabled={busy}
               onClick={() => void respond(false)}
             >
@@ -184,7 +184,7 @@ function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
 
           <details id="sc-details" className="sc-details" key={card.id}>
             <summary>
-              <span>详情（argv / cwd）</span>
+              <span>{t("ui.confirm.detailsArgv")}</span>
               <ChevronRight
                 size={12}
                 strokeWidth={1.5}
@@ -193,11 +193,11 @@ function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
               />
             </summary>
             <div className="sc-details-body">
-              <p className="sc-kv">工作目录（cwd）</p>
+              <p className="sc-kv">{t("ui.confirm.cwd")}</p>
               <p id="sc-cwd" className="sc-mono sc-wrap">
                 {cwd}
               </p>
-              <p className="sc-kv">规范化参数 argv</p>
+              <p className="sc-kv">{t("ui.confirm.argv")}</p>
               <pre id="sc-argv" className="sc-mono">
                 {argvLines.join("\n")}
               </pre>
@@ -215,7 +215,7 @@ function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
               disabled={busy}
               onClick={() => void respond(true)}
             >
-              放行执行
+              {t("ui.confirm.approve")}
             </Button>
             <Button
               id="sc-deny"
@@ -224,16 +224,16 @@ function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
               disabled={busy}
               onClick={() => void respond(false)}
             >
-              拒绝
+              {t("ui.confirm.reject")}
             </Button>
           </div>
 
           <p id="sc-hint" className="sc-hint">
             {suApproval ? (
-              <span className="sc-su-warning">{SU_APPROVAL_WARNING}</span>
+              <span className="sc-su-warning">{t("ui.confirm.shellApproveNote")}</span>
             ) : null}
             {suApproval ? " " : ""}
-            {SHELL_CONFIRM_DEFAULT_HINT}
+            {t("ui.confirm.shellDenyNote")}
           </p>
         </div>
       ) : null}
@@ -242,6 +242,8 @@ function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
 }
 
 function RecoveryConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const respond = useConfirmStore((s) => s.respondRecovery);
   const dismiss = useConfirmStore((s) => s.dismissRecovery);
   const denyRef = useRef<HTMLButtonElement>(null);
@@ -266,19 +268,19 @@ function RecoveryConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
 
   const payload = card ? asRecord(card.payload) : {};
   const action = asString(payload.action);
-  const view = recoveryActionView(action);
+  const view = recoveryActionView(action, locale);
   const actionText = view
-    ? "动作：" + view.label + "（" + action + "）"
-    : "动作：" + action;
+    ? t("ui.confirm.actionWithLabel", { label: view.label, action })
+    : t("ui.confirm.action", { action });
   const targetRoleId = asString(payload.roleId);
   const evidence = asString(payload.evidence);
   const reason = asString(payload.reason);
   const requestedBy = asString(payload.requestedBy);
   const requestedAt = recoveryTimeText(payload.requestedAt);
   const itemId = asString(payload.itemId);
-  const byText = requestedBy ? "提议方：" + requestedBy : "";
-  const atText = requestedAt ? "提议时间：" + requestedAt : "";
-  const itemText = itemId ? "目标条目：" + itemId : "";
+  const byText = requestedBy ? t("ui.confirm.proposer", { name: requestedBy }) : "";
+  const atText = requestedAt ? t("ui.confirm.proposedAt", { time: requestedAt }) : "";
+  const itemText = itemId ? t("ui.confirm.targetItem", { id: itemId }) : "";
   const detailsHidden = !byText && !atText && !itemText;
   const expired = !!card?.expiredReason;
   const inFlight = card?.busy === true && !expired;
@@ -306,15 +308,15 @@ function RecoveryConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
                 aria-hidden="true"
               />
               <span id="rc-title" className="sc-title">
-                恢复操作请求
+                {t("ui.confirm.recoveryTitle")}
               </span>
             </div>
             <button
               id="rc-close"
               type="button"
               className="sc-close"
-              title="关闭（不执行）"
-              aria-label="关闭（不执行）"
+              title={t("ui.confirm.closeNoExecute")}
+              aria-label={t("ui.confirm.closeNoExecute")}
               disabled={inFlight}
               onClick={() => {
                 if (expired) dismiss();
@@ -332,19 +334,19 @@ function RecoveryConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
             {view ? view.note : ""}
           </p>
           <p id="rc-role" className="rc-role">
-            目标角色：{recoveryRoleName(targetRoleId)}
+            {t("ui.confirm.targetRole", { role: recoveryRoleName(targetRoleId, locale) })}
           </p>
           <p id="rc-reason" className="sc-reason" hidden={reason === ""}>
-            {reason ? "原因（提议方提供）：" + reason : ""}
+            {reason ? t("ui.confirm.reasonProvided", { reason }) : ""}
           </p>
-          <p className="rc-evidence-label">证据（提议方提供，逐字）：</p>
+          <p className="rc-evidence-label">{t("ui.confirm.evidenceLabel")}</p>
           <pre id="rc-evidence" className="rc-evidence">
             {evidence}
           </pre>
 
           <details id="rc-details" className="sc-details" hidden={detailsHidden} key={card.id}>
             <summary>
-              <span>详情（提议方 / 时间 / 条目）</span>
+              <span>{t("ui.confirm.detailsRecovery")}</span>
               <ChevronRight
                 size={12}
                 strokeWidth={1.5}
@@ -373,7 +375,7 @@ function RecoveryConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
               disabled={inFlight || expired}
               onClick={() => void respond(true)}
             >
-              执行
+              {t("ui.confirm.execute")}
             </Button>
             <Button
               id="rc-deny"
@@ -385,12 +387,12 @@ function RecoveryConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
                 else void respond(false);
               }}
             >
-              取消
+              {t("shared.common.cancel")}
             </Button>
           </div>
 
           <p id="rc-hint" className="sc-hint">
-            {expired ? card?.expiredReason : RECOVERY_CONFIRM_DEFAULT_HINT}
+            {expired ? card?.expiredReason : t("ui.confirm.recoveryNote")}
           </p>
         </div>
       ) : null}

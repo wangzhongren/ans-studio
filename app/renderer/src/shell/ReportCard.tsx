@@ -25,7 +25,7 @@ import {
   reportSummaryRecord,
   reportVersionSupported,
   retryLabel,
-  RETRY_NOTE,
+  retryNoteText,
   safeCopyFlags,
   safeCopyText,
   textFlags,
@@ -36,12 +36,14 @@ import {
   useReportStore,
   type ReportScope,
 } from "@/stores/report-store";
+import { useLocaleState, useT } from "@/i18n";
 
 function markdownHtml(text: string): { __html: string } {
   return { __html: renderMarkdown(text) };
 }
 
 function SourceDocumentButton({ roleId }: { roleId: string }) {
+  const t = useT();
   return (
     <button
       type="button"
@@ -52,7 +54,7 @@ function SourceDocumentButton({ roleId }: { roleId: string }) {
         void useDrawerStore.getState().openDocumentList(roleId, "report");
       }}
     >
-      查看来源角色文档
+      {t("ui.reportCard.viewSource")}
     </button>
   );
 }
@@ -79,6 +81,8 @@ export function ReportBody({
   initialPersistence,
   scope,
 }: ReportBodyProps) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const roles = useChatStore((s) => s.roles);
   const entries = useReportStore((s) => s.entries);
   const reportRecord = asReportRecord(report);
@@ -91,21 +95,24 @@ export function ReportBody({
   const evidence = Array.isArray(reportRecord.evidence)
     ? (reportRecord.evidence as Array<Record<string, unknown>>)
     : [];
-  const flags = reportFlags({
-    summary,
-    evidence,
-    evidenceOmitted: reportRecord.evidenceOmitted,
-  });
+  const flags = reportFlags(
+    {
+      summary,
+      evidence,
+      evidenceOmitted: reportRecord.evidenceOmitted,
+    },
+    locale,
+  );
   const folded = preview.length < Array.from(full).length;
   const sourceRoleId = asReportText(source.roleId);
   const sourceName = sourceRoleId
-    ? roleDisplayName(findRole(roles, sourceRoleId)) || sourceRoleId
-    : "未知";
+    ? roleDisplayName(findRole(roles, sourceRoleId), locale) || sourceRoleId
+    : t("shared.common.unknown");
   const entry = includeSave ? reportEntryFor(entries, scope || null, "report", reportId) : null;
   const persistence = entry?.state || (includeSave ? asReportRecord(initialPersistence) : {});
-  const view = persistenceView(persistence, false);
+  const view = persistenceView(persistence, false, locale);
   const pending = entry?.pending === true;
-  const message = pending ? "正在保存报告…" : view.text;
+  const message = pending ? t("ui.reportView.savingReport") : view.text;
   const retry = view.retry && !!reportId && !!scope;
 
   useEffect(() => {
@@ -119,39 +126,48 @@ export function ReportBody({
   }, [includeSave, reportId, scope]);
 
   if (!supported) {
-    return <p>不支持此报告版本，未生成成果摘要。</p>;
+    return <p>{t("ui.reportCard.unsupportedVersion")}</p>;
   }
 
   return (
     <>
       <div className="report-top">
         <div className="report-eyebrow">
-          来源 {sourceName} · {reportOriginLabel(reportRecord.origin)}
+          {t("ui.reportCard.sourceLine", {
+            sourceName,
+            origin: reportOriginLabel(reportRecord.origin, locale),
+          })}
         </div>
-        <h2 className="report-title">任务报告</h2>
+        <h2 className="report-title">{t("ui.reportCard.title")}</h2>
         <div className="hb-head">
-          <strong>{reportDeclaration(report)}</strong>
+          <strong>{reportDeclaration(report, locale)}</strong>
         </div>
         <p className="hb-meta">
-          {asReportText(source.runtime) ? runtimeLabel(asReportText(source.runtime)) : "引擎未知"}
+          {asReportText(source.runtime)
+            ? runtimeLabel(asReportText(source.runtime), locale)
+            : t("ui.reportCard.runtimeUnknown")}
           {" · "}
-          {reportRecord.taskId ? "任务 " + asReportText(reportRecord.taskId) : "任务关联未知"}
+          {reportRecord.taskId
+            ? t("ui.reportCard.task", { taskId: asReportText(reportRecord.taskId) })
+            : t("ui.reportCard.taskUnknown")}
           {" · "}
-          {asReportText(source.turnId) ? "轮次 " + asReportText(source.turnId) : "轮次未提供"}
+          {asReportText(source.turnId)
+            ? t("ui.reportCard.turn", { turnId: asReportText(source.turnId) })
+            : t("ui.reportCard.turnNotProvided")}
         </p>
       </div>
       <div className="report-body">
-        <div className="excerpt-label">报告原文摘录</div>
+        <div className="excerpt-label">{t("ui.reportCard.excerptLabel")}</div>
         <div className="hb-summary card-md" dangerouslySetInnerHTML={markdownHtml(preview)} />
         <p className="projection-flags">
-          {[flags, folded ? "摘要已折叠，完整可用显示副本见下方" : ""]
+          {[flags, folded ? t("ui.reportCard.folded") : ""]
             .filter(Boolean)
-            .join("；")}
+            .join(locale === "zh-CN" ? "；" : "; ")}
         </p>
         <dl className="report-facts">
           {includeSave ? (
             <div>
-              <dt>报告存储</dt>
+              <dt>{t("ui.reportCard.storage")}</dt>
               <dd>
                 <div className="persistence-state" role="status" aria-live="polite">
                   <span className="persistence-message" tabIndex={-1}>
@@ -168,7 +184,7 @@ export function ReportBody({
                         }
                       }}
                     >
-                      {retryLabel(false)}
+                      {retryLabel(false, locale)}
                     </button>
                   ) : null}
                   {entry?.error ? (
@@ -179,11 +195,11 @@ export function ReportBody({
             </div>
           ) : null}
           <div>
-            <dt>独立验收</dt>
-            <dd>尚未确认</dd>
+            <dt>{t("ui.reportCard.independentAcceptance")}</dt>
+            <dd>{t("ui.reportCard.notConfirmed")}</dd>
           </div>
         </dl>
-        <p className="report-disclaimer">以上为报告或终态记录，不等于独立验收通过。</p>
+        <p className="report-disclaimer">{t("ui.reportCard.disclaimer")}</p>
         <div className="report-actions">
           {sourceRoleId ? <SourceDocumentButton roleId={sourceRoleId} /> : null}
           <details
@@ -195,7 +211,7 @@ export function ReportBody({
               onDetailsToggle?.(next);
             }}
           >
-            <summary>查看完整报告摘要与证据</summary>
+            <summary>{t("ui.reportCard.viewFull")}</summary>
             <div className="report-complete-body">
               <div
                 className="hb-complete-summary card-md"
@@ -204,12 +220,12 @@ export function ReportBody({
               <p className="projection-flags">{flags}</p>
               <ul className="hb-evidence">
                 {evidence.length === 0 ? (
-                  <li>（未提供证据）</li>
+                  <li>{t("ui.reportCard.noEvidence")}</li>
                 ) : (
                   evidence.map((item, index) => (
                     <li key={index}>
                       {asReportText(item.text)}
-                      <small className="projection-flags">{textFlags(item)}</small>
+                      <small className="projection-flags">{textFlags(item, locale)}</small>
                     </li>
                   ))
                 )}
@@ -264,6 +280,8 @@ export interface DeliveryCardProps {
 }
 
 export function DeliveryCard({ data, roleId, replay }: DeliveryCardProps) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const entries = useReportStore((s) => s.entries);
   const provenance = asReportRecord(data.provenance);
   const presentation = asReportRecord(data.presentation);
@@ -297,31 +315,35 @@ export function DeliveryCard({ data, roleId, replay }: DeliveryCardProps) {
           }
         : stateRecord;
   const pending = entry?.pending === true;
-  const facts = deliveryBatchFacts(receipt, {
-    ...effective,
-    ...(pending ? { state: "pending" } : {}),
-  });
-  const view = persistenceView(effective, true);
-  const historyLabel = pending ? "正在保存历史…" : facts.history;
+  const facts = deliveryBatchFacts(
+    receipt,
+    {
+      ...effective,
+      ...(pending ? { state: "pending" } : {}),
+    },
+    locale,
+  );
+  const view = persistenceView(effective, true, locale);
+  const historyLabel = facts.history;
   const retry = view.retry && !!attemptId && !!scope;
 
   return (
     <div className={"msg msg-injected msg-delivery" + (replay ? " is-replay" : "")}>
-      <p>{deliveryBatchTitle(reports.length)}</p>
+      <p>{deliveryBatchTitle(reports.length, locale)}</p>
       <div className="persistence-state" role="status" aria-live="polite">
         <dl className="report-facts delivery-batch-facts">
           <div>
-            <dt>接收历史</dt>
+            <dt>{t("ui.reportCard.receiptHistory")}</dt>
             <dd className="persistence-message" tabIndex={-1}>
               {historyLabel}
             </dd>
           </div>
           <div>
-            <dt>目标输入记录</dt>
+            <dt>{t("ui.reportCard.targetInput")}</dt>
             <dd>{facts.input}</dd>
           </div>
           <div>
-            <dt>目标轮次结果</dt>
+            <dt>{t("ui.reportCard.targetTurn")}</dt>
             <dd>{facts.outcome}</dd>
           </div>
         </dl>
@@ -336,11 +358,11 @@ export function DeliveryCard({ data, roleId, replay }: DeliveryCardProps) {
               }
             }}
           >
-            {retryLabel(true)}
+            {retryLabel(true, locale)}
           </button>
         ) : null}
         {effective.history === "failed" || (view.kind === "err" && retry) ? (
-          <p className="muted small">{RETRY_NOTE}</p>
+          <p className="muted small">{retryNoteText(locale)}</p>
         ) : null}
         {entry?.error ? <p className="persistence-error">{entry.error}</p> : null}
       </div>
@@ -357,9 +379,9 @@ export function DeliveryCard({ data, roleId, replay }: DeliveryCardProps) {
         </section>
       ))}
       <details className="safe-input-copy">
-        <summary>交接内容（安全显示副本）</summary>
-        <p className="projection-flags">{safeCopyFlags(projection)}</p>
-        <pre>{safeCopyText(projection, asReportText(data.text))}</pre>
+        <summary>{t("shared.common.safeCopyTitle")}</summary>
+        <p className="projection-flags">{safeCopyFlags(projection, locale)}</p>
+        <pre>{safeCopyText(projection, asReportText(data.text), locale)}</pre>
       </details>
     </div>
   );

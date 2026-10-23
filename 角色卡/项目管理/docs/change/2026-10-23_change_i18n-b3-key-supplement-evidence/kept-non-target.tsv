@@ -1,0 +1,7 @@
+item	source	classification	reason
+#7 main.session.install.actionChanged / actionReverted	app/desktop/session.ts:3803,3948	agent-facing	仅进入 rebuild-failed 工具回执（InstallSkillReceipt.message，返回给 su/Convener）；无系统行/结果行，不属客户 UI。PM 分类文档：能力安装/卸载中面向角色的说明不翻译。
+#12 main.operator.manualJudgeDenyConnector	app/desktop/operator-channel.ts:631-633	agent-facing	manual→deny 理由随 OperatorOutcome.deny.reason 进入 deny 工具结果（run_shell 未执行：审核拒绝（<reason>…））；注释明确“不产生结果行”。
+#20 main.interface.addRoleCardsStep	app/desktop/interface.ts:3112	agent-facing	仅 buildAppointmentPlanFeedback 的 flow 补步指令（发给 Convener 的任务正文）；方案 §4.11 任务文案本轮不翻译。
+#21 main.interface.flowStateValidationFailed	app/desktop/interface.ts:3107	agent-facing	仅 buildAppointmentPlanFeedback（Convener 任务抬头）；不进入 writeBlockingSummary 等客户系统行。
+（B4）runtime-config.ts 的 definition?.label ?? "演示" / RUNTIME_LABELS	app/desktop/runtime-config.ts	B4 范围	留 B4（shared.runtimeSettings.* 元数据 key 化与主进程解析），本批不补、不改形状。
+机器/协议/诊断（对照项，未新增）	session.ts `[系统·安装]`/`[系统·看护]` 前缀、roleId/cardKind/flow step id、诊断码/日志、外部 err.message	机器/协议/诊断	保持原样：方案 §4.11 与 PM 分类文档明确不翻译；系统行前缀由渲染层解析。

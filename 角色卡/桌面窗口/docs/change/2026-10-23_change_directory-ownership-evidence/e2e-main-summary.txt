@@ -1,0 +1,9 @@
+=== command: ANS_E2E_OUTDIR=... ./node_modules/electron/dist/electron.exe test/桌面应用/e2e/main.mjs
+exit: 0
+report summary:
+E2E_PASS=true
+E2E_FAILURES=
+E2E_DONE=1
+=== preferences handler errors (expect none) ===
+角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership-evidence/e2e-main-stdout.log:0
+角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership-evidence/e2e-main-report.txt:0

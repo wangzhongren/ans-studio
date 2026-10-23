@@ -196,6 +196,56 @@ test("2026-10-22：judge facts 可选团队计划 schema/模块摘要；物证�
   assert.deepEqual(Object.keys(artifacts), ["teamPlanPath"], "团队计划沿用 teamPlanPath，不新增 artifact kind");
 });
 
+test("2026-10-23 目录级授权：judge facts 接受 schema 1/2/3 与有界目录摘要；缺失不假定 v3；旧字段/枚举不变", () => {
+  const baseFacts = {
+    governanceModel: "trio" as const,
+    flowId: "flow-alpha",
+    ledgerErrors: 0,
+    unresolvedClarificationCount: 0,
+    latestDecisionKinds: [] as string[],
+  };
+  const legacyFacts: GovernanceJudgeFacts = { ...baseFacts };
+  const factsV1 = { ...baseFacts, teamPlanSchema: 1 } satisfies GovernanceJudgeFacts;
+  const factsV2 = {
+    ...baseFacts,
+    teamPlanSchema: 2,
+    teamPlanModules: ["checkout-api", "checkout-web"],
+  } satisfies GovernanceJudgeFacts;
+  const factsV3 = {
+    ...baseFacts,
+    teamPlanSchema: 3,
+    teamPlanModules: ["checkout-api"],
+    teamPlanDirectories: ["src/checkout/api/", "test/checkout/api/"],
+  } satisfies GovernanceJudgeFacts;
+  // 未知 schema 版本必须在类型层被拒绝（由 tsc 校验 @ts-expect-error；应用不会产生该值）。
+  // @ts-expect-error teamPlanSchema 仅接受 1 | 2 | 3
+  const rejectedSchema: GovernanceJudgeFacts = { ...baseFacts, teamPlanSchema: 4 };
+
+  assert.equal(factsV1.teamPlanSchema, 1);
+  assert.equal(factsV2.teamPlanSchema, 2);
+  assert.equal(factsV3.teamPlanSchema, 3, "v3 值可原样传入 judge facts（不伪装成 v2）");
+  assert.deepEqual(factsV3.teamPlanDirectories, ["src/checkout/api/", "test/checkout/api/"]);
+  assert.equal(Object.hasOwn(legacyFacts, "teamPlanSchema"), false, "缺失＝未提供，不凭空造值");
+  assert.equal(Object.hasOwn(legacyFacts, "teamPlanDirectories"), false, "缺失＝未提供，不凭空造值");
+  assert.equal(legacyFacts.teamPlanSchema, undefined, "缺失不得假定 v3");
+  assert.equal(legacyFacts.teamPlanDirectories, undefined, "缺失不得假定应用提供了目录摘要");
+  assert.equal(Object.hasOwn(factsV2, "teamPlanDirectories"), false, "v2 facts 不凭空出现目录摘要");
+  assert.equal(rejectedSchema.teamPlanSchema, 4, "运行期值仅用于证明类型拒绝；应用不构造该值");
+
+  // 物证仍沿用 teamPlanPath；v3 不新增 artifact kind。
+  const artifacts = {
+    teamPlanPath: "docs/scheduling/flow-alpha-team-v3.md",
+  } satisfies NonNullable<GovernanceJudgeRequest["artifacts"]>;
+  const contextArtifacts = { ...artifacts } satisfies NonNullable<GovernanceJudgeContext["artifacts"]>;
+  assert.deepEqual(artifacts, contextArtifacts, "Request/Context artifacts 同形");
+  assert.deepEqual(Object.keys(artifacts), ["teamPlanPath"], "v3 沿用 teamPlanPath，不新增 artifact kind");
+
+  // 旧枚举值零变化（本次只扩可选字段，不改 kind/power/decision 枚举）。
+  const stepKinds = ["proposal", "nomination", "dispatch", "acceptance"] as const satisfies readonly GovernanceStepKind[];
+  assert.deepEqual([...stepKinds], ["proposal", "nomination", "dispatch", "acceptance"]);
+  assert.deepEqual([...FLOW_TOOL_STEP_KINDS], ["dispatch", "customer-decision", "artifact", "acceptance"]);
+});
+
 test("request_choice：flowId/stepId/cardKind 原样进入卡片请求与回调 metadata；缺席时保持旧形状", async () => {
   let request!: CustomerInputRequest;
   let metadata!: CustomerInputMetadata;

@@ -207,6 +207,10 @@ async function makeHarness(
     completeAcceptanceStep?: DesktopDeps["completeAcceptanceStepFn"];
     customerInput?: DesktopDeps["customerInput"];
     observeFlowArtifacts?: DesktopDeps["observeFlowArtifactsFn"];
+    /** 2026-10-23 验收返工路由：重开验收步骤（缺省真实 Pipeline 出口）、审计账本追加、会话打开失败注入。 */
+    reopenAcceptanceStep?: DesktopDeps["reopenAcceptanceStepForReworkFn"];
+    appendGovernanceLedger?: DesktopDeps["appendGovernanceLedgerFn"];
+    failOpenRoles?: Set<string>;
   } = {},
 ): Promise<Harness> {
   const sendsByRole = new Map<string, string[]>();
@@ -219,6 +223,9 @@ async function makeHarness(
     },
     listProjectFn: async () => listing,
     openRoleSessionFn: async (input) => {
+      if (options.failOpenRoles?.has(input.roleId) === true) {
+        throw new Error(`模拟打开 ${input.roleId} 会话失败`);
+      }
       const sends: string[] = [];
       sendsByRole.set(input.roleId, sends);
       const made = scriptedHandle(sends);
@@ -236,6 +243,9 @@ async function makeHarness(
     ...(options.customerInput !== undefined ? { customerInput: options.customerInput } : {}),
     // 2026-10-20：flow artifact 证据补登（编排 observeFlowArtifacts 的桌面注入面）。
     ...(options.observeFlowArtifacts !== undefined ? { observeFlowArtifactsFn: options.observeFlowArtifacts } : {}),
+    // 2026-10-23 验收返工路由：重开验收步骤 / 审计失败 / 会话打开失败注入（只影响被测路径）。
+    ...(options.reopenAcceptanceStep !== undefined ? { reopenAcceptanceStepForReworkFn: options.reopenAcceptanceStep } : {}),
+    ...(options.appendGovernanceLedger !== undefined ? { appendGovernanceLedgerFn: options.appendGovernanceLedger } : {}),
   });
   await iface.listProject({ projectRoot });
   return { iface, sendsByRole, events, controls };
@@ -1335,6 +1345,277 @@ const acceptanceDecisionEntry = (flowId: string, decision: "accepted" | "rejecte
   customerDecision: decision,
 });
 
+// —————————————— 2026-10-23 验收返工路由（方案 v1；Q1/Q4/Q7/Q8/Q9/Q10/Q11 A） ——————————————
+
+/** 含合法 `acceptance-rework/v1` 结构化段的验收报告。 */
+function acceptanceReworkReportMarkdown(items: ReadonlyArray<{ id: string; owner: string; action: string; evidence?: string }>): string {
+  return [
+    "# 验收报告",
+    "",
+    "结论：不通过。",
+    "",
+    "```yaml",
+    "schema: acceptance-rework/v1",
+    "coordinator: convener",
+    "items:",
+    ...items.flatMap((item) => [
+      `  - id: ${item.id}`,
+      `    owner: ${item.owner}`,
+      `    action: ${item.action}`,
+      ...(item.evidence !== undefined ? [`    evidence: ${item.evidence}`] : []),
+    ]),
+    "```",
+    "",
+  ].join("\n");
+}
+
+function writeAcceptanceReportFile(projectRoot: string, flowId: string, version: number, text: string): string {
+  const dir = path.join(projectRoot, "docs", "acceptance");
+  mkdirSync(dir, { recursive: true });
+  const rel = `docs/acceptance/${flowId}-report-v${version}.md`;
+  writeFileSync(path.join(projectRoot, ...rel.split("/")), text, "utf8");
+  return rel;
+}
+
+function reworkRoutingRecordPath(projectRoot: string, flowId: string): string {
+  return path.join(projectRoot, ".ans", "governance", "acceptance", flowId, "rework-routing.json");
+}
+
+function readReworkRoutingRecord(projectRoot: string, flowId: string): Record<string, unknown> | undefined {
+  const file = reworkRoutingRecordPath(projectRoot, flowId);
+  if (!existsSync(file)) return undefined;
+  return JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+}
+
+/** 追加一条指定 `at` 的 acceptance 决定（时间线由测试控制：rejection 之前/之后的 flow 进展）。 */
+async function appendAcceptanceDecisionAt(
+  projectRoot: string,
+  flowId: string,
+  decision: "accepted" | "rejected",
+  at: string,
+): Promise<void> {
+  const appended = await appendGovernanceLedger(projectRoot, {
+    at,
+    kind: "customer.decision",
+    flowId,
+    actorRoleId: "liaison",
+    power: "app",
+    decisionKind: "acceptance",
+    customerDecision: decision,
+    decisionEvidence: { kind: "customer-input" },
+  });
+  assert.equal(appended.ok, true, appended.ok ? "" : appended.message);
+}
+
+/** 让 flow YAML 的 mtime 落到给定时间（同时可改内容，避免「同内容」抑制）。 */
+function setFlowStateVersion(projectRoot: string, flowId: string, at: Date, marker: string): void {
+  writeFlowStateFile(
+    projectRoot,
+    flowId,
+    flowStateYaml(
+      flowId,
+      yamlAcceptanceSteps(flowId).map((step) =>
+        step.id === "delivery-server" ? { ...step, title: `交付（${marker}）` } : step,
+      ),
+    ),
+  );
+  utimesSync(path.join(projectRoot, "docs", "flows", `${flowId}.yaml`), at, at);
+}
+
+function reworkNotes(events: SessionEventEnvelope[], roleId: string): string[] {
+  return deliveryNotes(events, roleId).filter((note) =>
+    /返工|acceptance-rework|自动决策|客户拒绝/.test(note),
+  );
+}
+
+test("2026-10-23 验收返工路由（客户拒绝）：最新 rejected ⇒ 路由 Convener（报告+结构化清单/客户拒绝系统行）、零 Proof 返工、不伪造客户决定；重复触发不重复路由", async () => {
+  const root = makeTempProjectRoot("ans-rework-customer-route-");
+  try {
+    const flowId = "flow-rework-customer";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    const decisionAt = new Date().toISOString();
+    await appendAcceptanceDecisionAt(root, flowId, "rejected", decisionAt);
+    const reportRel = writeAcceptanceReportFile(
+      root,
+      flowId,
+      1,
+      acceptanceReworkReportMarkdown([
+        { id: "F1", owner: "executor", action: "修复交付并补证据", evidence: "docs/verification/f1.log" },
+      ]),
+    );
+    const ledgerBefore = await readGovernanceLedger(root);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const completeCalls: string[] = [];
+    const harness = await makeHarness(root, listing, {
+      completeAcceptanceStep: async ({ flowId: id }) => { completeCalls.push(id); return { ok: true }; },
+    });
+    try {
+      await waitFor(() => (harness.sendsByRole.get("convener")?.length ?? 0) > 0);
+      await sleep(250);
+      const convenerSends = harness.sendsByRole.get("convener")!;
+      assert.equal(convenerSends.length, 1, "最新 rejected ⇒ 恰一条 Convener 返工任务");
+      const task = convenerSends[0]!;
+      assert.match(task, /验收未通过，应用把返工交 Steward \/ 统筹（Convener）组织/);
+      assert.match(task, /来源：客户拒绝（客户手拒）/);
+      assert.match(task, new RegExp(reportRel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+      assert.match(task, /id=F1 \| owner=executor \| action=修复交付并补证据 \| evidence=docs\/verification\/f1\.log/);
+      assert.match(task, /flow_step_supersede/);
+      assert.match(task, /不要.*supersede 保留验收步骤/);
+      assert.match(task, /返工完成后由应用自动重派 Proof/);
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "Proof 不接收返工派发");
+      assert.equal(completeCalls.length, 0, "rejected ⇒ 不收口");
+      // routed 系统行在 record sent 写之后发出：先等它，再断言任务/记录（避免发送可见早于系统行的竞态）。
+      await waitFor(() => reworkNotes(harness.events, "liaison").some((note) => note.includes("客户拒绝")));
+      const notes = reworkNotes(harness.events, "liaison");
+      assert.ok(notes.some((note) => note.includes("客户拒绝") && note.includes("Convener")), "Lead 系统行写客户拒绝与接收方");
+      assert.ok(notes.every((note) => !/已自动派发验收复核/.test(note)), "未重派 Proof");
+      // routing record：schema/来源/报告哈希/status。
+      const record = readReworkRoutingRecord(root, flowId);
+      assert.equal(record?.schema, "acceptance-rework-routing/v1");
+      assert.equal(record?.source, "customer");
+      assert.equal(record?.sourceDetail, "customer-input");
+      assert.equal(record?.status, "sent");
+      assert.equal(record?.reportPath, reportRel);
+      assert.match(String(record?.reportSha256), /^[0-9a-f]{64}$/);
+      assert.equal(record?.itemCount, 1);
+      assert.equal(record?.structured, true);
+      // 不伪造客户决定：账本只多一条既有 dispatch.accepted(app→convener) 审计（无 stepId）。
+      const ledgerAfter = await readGovernanceLedger(root);
+      assert.equal(
+        ledgerAfter.entries.filter((entry) => entry.kind === "customer.decision").length,
+        ledgerBefore.entries.filter((entry) => entry.kind === "customer.decision").length,
+        "桌面不写客户决定账本",
+      );
+      const audit = ledgerAfter.entries.filter(
+        (entry) => entry.kind === "dispatch.accepted" && entry.flowId === flowId && entry.targetRoleId === "convener",
+      );
+      assert.equal(audit.length, 1, "账本恰一条 app→convener 审计");
+      assert.equal(audit[0]!.actorRoleId, "app");
+      assert.equal(audit[0]!.power, "app");
+      assert.equal(audit[0]!.stepId, undefined, "审计不带 stepId（不污染验收派发时间口径）");
+      // 重复触发（settle/import）⇒ 不重复任务/系统行。
+      await harness.iface.openSession({ projectRoot: root, roleId: "executor", runtime: "demo" });
+      harness.controls.get("executor")!.settle();
+      await harness.iface.listProject({ projectRoot: root });
+      await sleep(300);
+      assert.equal(harness.sendsByRole.get("convener")!.length, 1, "同一决定/同一报告不重复路由");
+      assert.equal(reworkNotes(harness.events, "liaison").filter((note) => note.includes("客户拒绝")).length, 1, "不重复系统行");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "仍不派 verifier");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 验收返工路由（重派门）：rejection 后 flow 实质更新 + 执行全 done + verification pending ⇒ 恰好重派一次 Proof（vN+1）；同内容不再重派", async () => {
+  const root = makeTempProjectRoot("ans-rework-redispatch-");
+  try {
+    const flowId = "flow-rework-redispatch";
+    const decisionAt = new Date(Date.now() - 60_000).toISOString();
+    await appendAcceptanceDecisionAt(root, flowId, "rejected", decisionAt);
+    // rejection 之后 flow 更新（mtime 晚于决定；内容与首次不同）。
+    setFlowStateVersion(root, flowId, new Date(), "rework-v2");
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    const reportRel = writeAcceptanceReportFile(
+      root,
+      flowId,
+      1,
+      acceptanceReworkReportMarkdown([{ id: "F1", owner: "executor", action: "修复", evidence: "docs/verification/f1.log" }]),
+    );
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0);
+      await waitFor(() => (harness.sendsByRole.get("convener")?.length ?? 0) > 0);
+      const verifierSends = harness.sendsByRole.get("verifier")!;
+      assert.equal(verifierSends.length, 1, "恰好重派一次 Proof");
+      const task = verifierSends[0]!;
+      assert.match(task, /流程在上次验收复核后有更新/);
+      assert.match(task, new RegExp(`docs/acceptance/${flowId}-report-v2\\.md`), "重派要求写 vN+1");
+      assert.ok(task.includes(reportRel), "重派任务引用被拒报告路径（不覆盖）");
+      assert.match(task, /acceptance-rework\/v1/, "验收任务含结构化返工段硬要求");
+      assert.equal(harness.sendsByRole.get("convener")!.length, 1, "路由任务恰一条");
+      await waitForAsync(async () => (await verifierDispatches(root, flowId)).length === 1);
+      await sleep(300); // record 的 lastDispatched* 写在账本之后；单次读取避免 Windows rename/read 竞争
+      const recorded = readReworkRoutingRecord(root, flowId);
+      assert.match(String(recorded?.lastDispatchedFlowSha256), /^[0-9a-f]{64}$/, "record 记录已派 flow 内容");
+      assert.equal(typeof recorded?.lastDispatchedAt, "string");
+      // 再触发：同 flow 内容 + 账本新派发 ⇒ 不重派。
+      harness.controls.get("verifier")!.settle();
+      await harness.iface.listProject({ projectRoot: root });
+      await sleep(350);
+      assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "同内容不再重派");
+      assert.equal((await verifierDispatches(root, flowId)).length, 1, "账本仍恰一条 verification 派发");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 验收返工路由（重派门）：rejection 后无 flow 进展 ⇒ 不重派（等待返工去重系统行）；accepted 仍收口、不路由", async () => {
+  const noProgressRoot = makeTempProjectRoot("ans-rework-no-progress-");
+  const acceptedRoot = makeTempProjectRoot("ans-rework-accepted-");
+  try {
+    const flowId = "flow-rework-no-progress";
+    // flow 先写，rejection 决定在之后（mtime <= decisionAt）⇒ 无进展。
+    writeFlowStateFile(noProgressRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(noProgressRoot, flowId, ["delivery-server"]);
+    await appendAcceptanceDecisionAt(noProgressRoot, flowId, "rejected", new Date().toISOString());
+    writeAcceptanceReportFile(
+      noProgressRoot,
+      flowId,
+      1,
+      acceptanceReworkReportMarkdown([{ id: "F1", owner: "executor", action: "修复" }]),
+    );
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: noProgressRoot };
+    const harness = await makeHarness(noProgressRoot, listing);
+    try {
+      await waitFor(() => (harness.sendsByRole.get("convener")?.length ?? 0) > 0);
+      await waitFor(() =>
+        deliveryNotes(harness.events, "liaison").some((note) => note.includes("返工路由尚未完成") || note.includes("暂不派发验收复核")),
+      );
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "无 flow 进展：不派 Proof");
+      assert.equal((await verifierDispatches(noProgressRoot, flowId)).length, 0);
+      assert.ok(
+        deliveryNotes(harness.events, "liaison").some((note) => note.includes("返工路由尚未完成") || note.includes("暂不派发验收复核")),
+        "Lead 一条「等待返工」去重系统行",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+
+    // accepted（即使更早有 rejected）：最新 accepted ⇒ 收口、不路由、不派。
+    const closeFlowId = "flow-rework-accepted";
+    writeFlowStateFile(acceptedRoot, closeFlowId, flowStateYaml(closeFlowId, yamlAcceptanceSteps(closeFlowId)));
+    await seedGovernanceEvidence(acceptedRoot, closeFlowId, ["delivery-server"]);
+    await appendAcceptanceDecisionAt(acceptedRoot, closeFlowId, "rejected", new Date(Date.now() - 60_000).toISOString());
+    await appendAcceptanceDecisionAt(acceptedRoot, closeFlowId, "accepted", new Date().toISOString());
+    const acceptedListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: acceptedRoot };
+    const completeCalls: string[] = [];
+    const acceptedHarness = await makeHarness(acceptedRoot, acceptedListing, {
+      completeAcceptanceStep: async ({ flowId: id }) => { completeCalls.push(id); return { ok: true }; },
+    });
+    try {
+      await waitFor(() => completeCalls.length > 0);
+      await sleep(200);
+      assert.deepEqual(completeCalls, [closeFlowId], "最新 accepted ⇒ 收口");
+      assert.equal(acceptedHarness.sendsByRole.get("convener")?.length ?? 0, 0, "accepted ⇒ 不路由");
+      assert.equal(acceptedHarness.sendsByRole.get("verifier")?.length ?? 0, 0, "accepted ⇒ 不派");
+      assert.equal(readReworkRoutingRecord(acceptedRoot, closeFlowId), undefined, "accepted 不写 routing record");
+    } finally {
+      await acceptedHarness.iface.stopSession();
+    }
+  } finally {
+    rmSync(noProgressRoot, { recursive: true, force: true });
+    rmSync(acceptedRoot, { recursive: true, force: true });
+  }
+});
+
 test("2026-10-20 验收收口：accepted + verification pending ⇒ 调 completeAcceptanceStep、步骤 done、不派 verifier、Lead 恰一条；已 done ⇒ 幂等", async () => {
   const root = makeTempProjectRoot("ans-acceptance-close-");
   try {
@@ -1426,30 +1707,37 @@ test("2026-10-20 验收收口：accepted + verification 已 done ⇒ 不收口�
   }
 });
 
-test("2026-10-20 验收收口：rejected / 无验收决定 ⇒ 不收口、不误派；无决定且门通过 ⇒ 仍正常派 verifier", async () => {
-  const rejectedRoot = makeTempProjectRoot("ans-acceptance-close-rejected-");
+test("2026-10-23 兼容（Q6 A）：legacy Markdown 流程 + 历史 rejected ⇒ 保持旧行为（不路由返工/不重派），无决定且门通过 ⇒ 仍正常派 verifier", async () => {
+  const legacyRoot = makeTempProjectRoot("ans-acceptance-close-legacy-rejected-");
   const noDecisionRoot = makeTempProjectRoot("ans-acceptance-close-none-");
   try {
     const flowId = "flow-close-state";
-    // ① rejected：不收口、不派 verifier（已有验收决定 ⇒ 流程已收口，交给客户/Steward）。
-    writeFlowStateFile(rejectedRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
-    await seedGovernanceEvidence(rejectedRoot, flowId, ["delivery-server"]);
-    await appendLedger(rejectedRoot, [acceptanceDecisionEntry(flowId, "rejected")]);
-    const rejectedListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: rejectedRoot };
-    const rejectedCalls: string[] = [];
-    const rejected = await makeHarness(rejectedRoot, rejectedListing, {
-      completeAcceptanceStep: async ({ flowId: id }) => { rejectedCalls.push(id); return { ok: true }; },
+    // ① legacy（无 YAML）+ rejected：旧行为 = 任意 acceptance 决定终结；不路由 Convener、不派 verifier。
+    writeFlowFile(legacyRoot, flowId, flowMarkdown(flowId, acceptanceSteps(), [`contract: docs/contracts/${flowId}-api-v1.md`]));
+    await seedGovernanceEvidence(legacyRoot, flowId, ["delivery-server"]);
+    await appendAcceptanceDecisionAt(legacyRoot, flowId, "rejected", new Date().toISOString());
+    writeAcceptanceReportFile(legacyRoot, flowId, 1, acceptanceReworkReportMarkdown([{ id: "F1", owner: "executor", action: "修复" }]));
+    const legacyListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: legacyRoot };
+    const legacyCalls: string[] = [];
+    const legacy = await makeHarness(legacyRoot, legacyListing, {
+      completeAcceptanceStep: async ({ flowId: id }) => { legacyCalls.push(id); return { ok: true }; },
     });
     try {
-      await sleep(400);
-      assert.equal(rejectedCalls.length, 0, "rejected ⇒ 不调收口");
-      assert.equal(rejected.sendsByRole.get("verifier")?.length ?? 0, 0, "已有验收决定 ⇒ 不派 verifier");
-      assert.equal(deliveryNotes(rejected.events, "liaison").filter((note) => note.includes("验收已通过（判断代批或客户手批")).length, 0, "不冒充收口");
+      await waitFor(() => blockerNotes(legacy.events, "liaison").length > 0);
+      await sleep(250);
+      assert.equal(legacyCalls.length, 0, "rejected ⇒ 不调收口");
+      assert.equal(legacy.sendsByRole.get("verifier")?.length ?? 0, 0, "legacy rejected ⇒ 不派 verifier");
+      assert.equal(legacy.sendsByRole.get("convener")?.length ?? 0, 0, "legacy 不接返工路由（Q6 A）");
+      assert.equal(readReworkRoutingRecord(legacyRoot, flowId), undefined, "legacy 不写 routing record");
+      assert.ok(
+        deliveryNotes(legacy.events, "liaison").filter((note) => note.includes("验收已通过（判断代批或客户手批")).length === 0,
+        "不冒充收口",
+      );
     } finally {
-      await rejected.iface.stopSession();
+      await legacy.iface.stopSession();
     }
 
-    // ② 无验收决定：走既有门 ⇒ 正常派 verifier（收口不介入）。
+    // ② 无验收决定：走既有门 ⇒ 正常派 verifier（收口/返工路由不介入）。
     writeFlowStateFile(noDecisionRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
     await seedGovernanceEvidence(noDecisionRoot, flowId, ["delivery-server"]);
     const noneListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: noDecisionRoot };
@@ -1461,11 +1749,12 @@ test("2026-10-20 验收收口：rejected / 无验收决定 ⇒ 不收口、不�
       await waitFor(() => (none.sendsByRole.get("verifier")?.length ?? 0) > 0);
       assert.equal(none.sendsByRole.get("verifier")!.length, 1, "无验收决定 ⇒ 门通过照常派 verifier");
       assert.equal(noneCalls.length, 0, "无 accepted 决定 ⇒ 不调收口");
+      assert.equal(none.sendsByRole.get("convener")?.length ?? 0, 0, "无决定 ⇒ 不路由返工");
     } finally {
       await none.iface.stopSession();
     }
   } finally {
-    rmSync(rejectedRoot, { recursive: true, force: true });
+    rmSync(legacyRoot, { recursive: true, force: true });
     rmSync(noDecisionRoot, { recursive: true, force: true });
   }
 });
@@ -2104,7 +2393,9 @@ test("2026-10-22 第 3 项：新契约流程标准缺失 ⇒ 派 Verifier 写标
       writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "T3" });
       writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractSteps(flowId, { criteria: true, change: true })));
       await appendNewContractLedger(root, flowId, { criteria: true, change: true });
-      harness.controls.get("executor")!.settle();
+      // 2026-10-23 可重入门禁：刷新探针会在 listProject 时占用后台会话（LRU=3），可能回收 executor 会话；
+      // 用**既有「项目刷新/导入」触发面**（import）重新评估验收门，不依赖可能被回收的会话 settle。
+      await harness.iface.listProject({ projectRoot: root });
       // 判定派发：Verifier 会话可能已被释放后重建（sendsByRole 会被新会话数组替换）——以账本为准等判定派发。
       await waitForAsync(async () => (await verifierDispatches(root, flowId)).length > 0, 5000);
       harness.controls.get("verifier")?.settle();
@@ -2157,4 +2448,405 @@ test("2026-10-22 第 3 项：新契约流程变更包缺失/缺 riskTier ⇒ 不
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// —————————————— 2026-10-23 验收返工路由：重开 / judge auto-rework / 报告兜底 / 记录与失败 ——————————————
+
+test("2026-10-23 重派门（verification 进行中）：dispatched/delivered ⇒ 先 app-only 重开为 pending 再重派；重开失败不派并提示", async () => {
+  const dispatchedRoot = makeTempProjectRoot("ans-rework-reopen-dispatched-");
+  const failureRoot = makeTempProjectRoot("ans-rework-reopen-failed-");
+  try {
+    const flowId = "flow-rework-reopen";
+    const decisionAt = new Date(Date.now() - 60_000).toISOString();
+    // ① dispatched：先重开再重派（真实 Pipeline 出口）。
+    await appendAcceptanceDecisionAt(dispatchedRoot, flowId, "rejected", decisionAt);
+    writeFlowStateFile(
+      dispatchedRoot,
+      flowId,
+      flowStateYaml(flowId, yamlAcceptanceSteps(flowId).map((step) =>
+        step.kind === "acceptance" ? { ...step, status: "dispatched" } : step,
+      )),
+    );
+    await seedGovernanceEvidence(dispatchedRoot, flowId, ["delivery-server"]);
+    writeAcceptanceReportFile(
+      dispatchedRoot,
+      flowId,
+      1,
+      acceptanceReworkReportMarkdown([{ id: "F1", owner: "executor", action: "修复" }]),
+    );
+    const dispatchedListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: dispatchedRoot };
+    const dispatched = await makeHarness(dispatchedRoot, dispatchedListing);
+    try {
+      await waitFor(() => (dispatched.sendsByRole.get("verifier")?.length ?? 0) > 0, 5000);
+      assert.equal(dispatched.sendsByRole.get("verifier")!.length, 1, "重开成功后重派恰一次");
+      const parsed = parseFlowStateYaml(
+        readFileSync(path.join(dispatchedRoot, "docs", "flows", `${flowId}.yaml`), "utf8"),
+        flowId,
+      );
+      assert.equal(parsed.ok, true);
+      if (parsed.ok) {
+        assert.equal(parsed.flow.steps.find((step) => step.kind === "acceptance")?.status, "pending", "旧 dispatched 已重开为 pending");
+        assert.equal(parsed.flow.steps.find((step) => step.kind === "acceptance")?.evidence, undefined, "清空旧证据");
+      }
+      assert.equal((await verifierDispatches(dispatchedRoot, flowId)).length, 1);
+    } finally {
+      await dispatched.iface.stopSession();
+    }
+
+    // ② 重开失败：不派、系统行如实提示（不伪造 pending）。
+    await appendAcceptanceDecisionAt(failureRoot, flowId, "rejected", decisionAt);
+    writeFlowStateFile(
+      failureRoot,
+      flowId,
+      flowStateYaml(flowId, yamlAcceptanceSteps(flowId).map((step) =>
+        step.kind === "acceptance" ? { ...step, status: "delivered" } : step,
+      )),
+    );
+    await seedGovernanceEvidence(failureRoot, flowId, ["delivery-server"]);
+    writeAcceptanceReportFile(
+      failureRoot,
+      flowId,
+      1,
+      acceptanceReworkReportMarkdown([{ id: "F1", owner: "executor", action: "修复" }]),
+    );
+    const failureListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: failureRoot };
+    const failure = await makeHarness(failureRoot, failureListing, {
+      reopenAcceptanceStep: async () => ({ ok: false, error: "模拟重开失败：flow 不可写" }),
+    });
+    try {
+      await waitFor(() =>
+        deliveryNotes(failure.events, "liaison").some((note) => note.includes("重开为 pending 失败")),
+      );
+      assert.equal(failure.sendsByRole.get("verifier")?.length ?? 0, 0, "重开失败 ⇒ 不派");
+      assert.equal((await verifierDispatches(failureRoot, flowId)).length, 0);
+      const parsed = parseFlowStateYaml(
+        readFileSync(path.join(failureRoot, "docs", "flows", `${flowId}.yaml`), "utf8"),
+        flowId,
+      );
+      assert.equal(parsed.ok, true);
+      if (parsed.ok) {
+        assert.equal(parsed.flow.steps.find((step) => step.kind === "acceptance")?.status, "delivered", "不伪造 pending");
+      }
+    } finally {
+      await failure.iface.stopSession();
+    }
+  } finally {
+    rmSync(dispatchedRoot, { recursive: true, force: true });
+    rmSync(failureRoot, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 judge auto-rework：onAutoRework 路由 Convener + 自动决策系统行、零 customer.decision / 零 Proof 返工；flow 更新后重派恰一次", async () => {
+  const root = makeTempProjectRoot("ans-rework-judge-");
+  try {
+    const flowId = "flow-rework-judge";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    writeAcceptanceReportFile(
+      root,
+      flowId,
+      1,
+      acceptanceReworkReportMarkdown([{ id: "F2", owner: "executor", action: "修复自动退回项" }]),
+    );
+    const ledgerBefore = await readGovernanceLedger(root);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      const at = new Date().toISOString();
+      await harness.iface.routeAcceptanceAutoRework({
+        flowId,
+        cardKind: "acceptance",
+        source: "judge-deny",
+        reasonCode: "judged-denied",
+        reason: "自动判断未通过：证据不足",
+        operatorId: "judge:pi",
+        engine: "pi",
+        requestId: "op-judge-1",
+        roleId: "verifier",
+        projectRoot: root,
+        runtime: "pi",
+        at,
+      });
+      await waitFor(() => (harness.sendsByRole.get("convener")?.length ?? 0) > 0);
+      await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes("自动决策未通过/未完成")));
+      assert.equal(harness.sendsByRole.get("convener")!.length, 1, "judge auto-rework ⇒ 恰一条 Convener 任务");
+      const task = harness.sendsByRole.get("convener")![0]!;
+      assert.match(task, /来源：自动决策未通过（自动退回\/判断拒绝）/);
+      assert.ok(!/客户拒绝/.test(task), "judge 来源任务不得出现「客户拒绝」");
+      const notes = deliveryNotes(harness.events, "liaison");
+      assert.ok(notes.some((note) => note.includes("自动决策未通过/未完成")), "自动决策系统行");
+      assert.ok(notes.filter((note) => note.includes("客户拒绝")).length === 0, "judge 来源系统行不得出现「客户拒绝」");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "无 flow 更新 ⇒ 不派 Proof");
+      const record = readReworkRoutingRecord(root, flowId);
+      assert.equal(record?.source, "judge");
+      assert.equal(record?.sourceDetail, "judge-deny");
+      assert.equal(record?.status, "sent");
+      const ledgerAfter = await readGovernanceLedger(root);
+      assert.equal(
+        ledgerAfter.entries.filter((entry) => entry.kind === "customer.decision").length,
+        ledgerBefore.entries.filter((entry) => entry.kind === "customer.decision").length,
+        "judge auto-rework 不写 customer.decision",
+      );
+      const audit = ledgerAfter.entries.filter(
+        (entry) => entry.kind === "dispatch.accepted" && entry.flowId === flowId && entry.targetRoleId === "convener",
+      );
+      assert.equal(audit.length, 1, "账本恰一条 app→convener 审计");
+
+      // 路由后 flow 有实质更新（mtime > routing sentAt）⇒ 重派门重派 Proof 恰一次。
+      await sleep(1100); // 保证 mtime 晚于 sentAt（文件系统 mtime 粒度）
+      setFlowStateVersion(root, flowId, new Date(), "judge-rework");
+      await harness.iface.listProject({ projectRoot: root });
+      await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0, 5000);
+      assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "judge auto-rework 后 flow 更新 ⇒ 重派恰一次");
+      await waitForAsync(async () => (await verifierDispatches(root, flowId)).length === 1);
+      // 再触发：同内容不重派。
+      harness.controls.get("verifier")!.settle();
+      await harness.iface.listProject({ projectRoot: root });
+      await sleep(300);
+      assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "同内容不重派");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 报告兜底：缺段/坏段只发「报告不完整」任务（无 items、不解析自由文本）；未知 owner blocked、verifier/convener 特殊归属", async () => {
+  const missingRoot = makeTempProjectRoot("ans-rework-report-missing-");
+  const invalidRoot = makeTempProjectRoot("ans-rework-report-invalid-");
+  const ownersRoot = makeTempProjectRoot("ans-rework-owners-");
+  try {
+    const flowId = "flow-rework-report";
+    const past = new Date(Date.now() - 60_000).toISOString();
+
+    // ① 缺段（目标项目形态：只有人读表，无 fenced YAML）。
+    await appendAcceptanceDecisionAt(missingRoot, flowId, "rejected", past);
+    writeFlowStateFile(missingRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(missingRoot, flowId, ["delivery-server"]);
+    writeAcceptanceReportFile(missingRoot, flowId, 1, "# 验收报告\n\n结论：不通过。\n\n§8 偏差表（非机器可读）。\n");
+    const missingListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: missingRoot };
+    const missing = await makeHarness(missingRoot, missingListing);
+    try {
+      await waitFor(() => (missing.sendsByRole.get("convener")?.length ?? 0) > 0);
+      // 系统行在发送/record 之后发出：先等到它，再断言任务/记录（避免发送可见早于系统行的竞态）。
+      await waitFor(() =>
+        deliveryNotes(missing.events, "liaison").some((note) => note.includes("缺少可解析的 acceptance-rework/v1")),
+      );
+      const task = missing.sendsByRole.get("convener")![0]!;
+      assert.match(task, /结构化返工段缺失或不可解析/);
+      assert.match(task, /未生成返工项、未创建流程步骤/);
+      assert.ok(!/id=F1/.test(task), "不生成 items");
+      const record = readReworkRoutingRecord(missingRoot, flowId);
+      assert.equal(record?.structured, false);
+      assert.equal(record?.itemCount, 0);
+      assert.ok(
+        deliveryNotes(missing.events, "liaison").some((note) => note.includes("缺少可解析的 acceptance-rework/v1")),
+        "报告不完整系统行",
+      );
+    } finally {
+      await missing.iface.stopSession();
+    }
+
+    // ② 坏段（未知字段）：整段不采信、错误可见。
+    await appendAcceptanceDecisionAt(invalidRoot, flowId, "rejected", past);
+    writeFlowStateFile(invalidRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(invalidRoot, flowId, ["delivery-server"]);
+    writeAcceptanceReportFile(
+      invalidRoot,
+      flowId,
+      1,
+      ["# 验收报告", "", "```yaml", "schema: acceptance-rework/v1", "items:", "  - id: F1", "    owner: executor", "    action: 修复", "    bogus: true", "```", ""].join("\n"),
+    );
+    const invalidListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: invalidRoot };
+    const invalid = await makeHarness(invalidRoot, invalidListing);
+    try {
+      await waitFor(() => (invalid.sendsByRole.get("convener")?.length ?? 0) > 0);
+      const task = invalid.sendsByRole.get("convener")![0]!;
+      assert.match(task, /结构化返工段缺失或不可解析/);
+      assert.match(task, /bogus/, "任务带具体错误 path/字段");
+      assert.ok(!/id=F1 \| owner/.test(task), "坏段不部分采信");
+      assert.equal(readReworkRoutingRecord(invalidRoot, flowId)?.structured, false);
+    } finally {
+      await invalid.iface.stopSession();
+    }
+
+    // ③ owner 归属：未知 blocked；verifier=报告修正；convener=治理项；有效项可先行。
+    await appendAcceptanceDecisionAt(ownersRoot, flowId, "rejected", past);
+    writeFlowStateFile(ownersRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(ownersRoot, flowId, ["delivery-server"]);
+    writeAcceptanceReportFile(
+      ownersRoot,
+      flowId,
+      1,
+      acceptanceReworkReportMarkdown([
+        { id: "F1", owner: "executor", action: "有效项" },
+        { id: "F9", owner: "ghost-role", action: "未知 owner" },
+        { id: "F10", owner: "verifier", action: "修正报告结构" },
+        { id: "F11", owner: "convener", action: "更新变更包" },
+        { id: "F12", owner: "app", action: "应用自己处理" },
+      ]),
+    );
+    const ownersListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: ownersRoot };
+    const owners = await makeHarness(ownersRoot, ownersListing);
+    try {
+      await waitFor(() => (owners.sendsByRole.get("convener")?.length ?? 0) > 0);
+      const task = owners.sendsByRole.get("convener")![0]!;
+      assert.match(task, /可派发项（按 owner 分组/);
+      assert.match(task, /owner=executor：F1（有效项）/);
+      assert.match(task, /blocked 项/);
+      assert.match(task, /ghost-role/);
+      assert.match(task, /id=F12 \| owner=app/);
+      assert.match(task, /报告\/工具修正项（owner=verifier/);
+      assert.match(task, /不要向 Proof 派产品返工/);
+      assert.match(task, /治理文档\/变更包项/);
+      assert.match(task, /不要向内置治理角色 dispatch_task/);
+      assert.equal(owners.sendsByRole.get("verifier")?.length ?? 0, 0, "不向 Proof 派产品返工");
+      assert.equal(owners.sendsByRole.get("convener")!.length, 1, "Convener 恰一条（不因 verifier/convener owner 再派）");
+    } finally {
+      await owners.iface.stopSession();
+    }
+  } finally {
+    rmSync(missingRoot, { recursive: true, force: true });
+    rmSync(invalidRoot, { recursive: true, force: true });
+    rmSync(ownersRoot, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 routing record：重启去重；审计失败不阻塞但可见、不伪造账本；record 写失败不发送；发送失败重试", async () => {
+  const restartRoot = makeTempProjectRoot("ans-rework-restart-");
+  const auditRoot = makeTempProjectRoot("ans-rework-audit-");
+  const writeFailRoot = makeTempProjectRoot("ans-rework-record-fail-");
+  const sendFailRoot = makeTempProjectRoot("ans-rework-send-fail-");
+  try {
+    const flowId = "flow-rework-record";
+    const past = new Date(Date.now() - 60_000).toISOString();
+    const report = acceptanceReworkReportMarkdown([{ id: "F3", owner: "executor", action: "修复" }]);
+
+    // ① 重启去重：h1 路由（无进展）→ h2 新 Interface 不重复任务。
+    writeFlowStateFile(restartRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(restartRoot, flowId, ["delivery-server"]);
+    await appendAcceptanceDecisionAt(restartRoot, flowId, "rejected", new Date().toISOString()); // rejection 晚于 flow
+    writeAcceptanceReportFile(restartRoot, flowId, 1, report);
+    const restartListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: restartRoot };
+    const h1 = await makeHarness(restartRoot, restartListing);
+    await waitFor(() => (h1.sendsByRole.get("convener")?.length ?? 0) > 0);
+    await waitFor(() => deliveryNotes(h1.events, "liaison").some((note) => note.includes("客户拒绝")));
+    await h1.iface.stopSession();
+    const h2 = await makeHarness(restartRoot, restartListing);
+    try {
+      await sleep(350);
+      assert.equal(h2.sendsByRole.get("convener")?.length ?? 0, 0, "重启后同决定/同报告不重复路由");
+      assert.equal(readReworkRoutingRecord(restartRoot, flowId)?.status, "sent");
+    } finally {
+      await h2.iface.stopSession();
+    }
+
+    // ② 审计失败：任务已发出、record sent 保持、系统行可见、账本无伪造条目。
+    writeFlowStateFile(auditRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(auditRoot, flowId, ["delivery-server"]);
+    await appendAcceptanceDecisionAt(auditRoot, flowId, "rejected", new Date().toISOString());
+    writeAcceptanceReportFile(auditRoot, flowId, 1, report);
+    const auditListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: auditRoot };
+    const audit = await makeHarness(auditRoot, auditListing, {
+      appendGovernanceLedger: async () => ({ ok: false, message: "模拟审计写入失败" }),
+    });
+    try {
+      await waitFor(() => (audit.sendsByRole.get("convener")?.length ?? 0) > 0);
+      await waitFor(() =>
+        deliveryNotes(audit.events, "liaison").some((note) => note.includes("审计记录写入失败")),
+      );
+      assert.equal(readReworkRoutingRecord(auditRoot, flowId)?.status, "sent", "record sent 不翻转");
+      const ledger = await readGovernanceLedger(auditRoot);
+      assert.equal(
+        ledger.entries.filter((entry) => entry.kind === "dispatch.accepted" && entry.targetRoleId === "convener").length,
+        0,
+        "审计失败不伪造账本",
+      );
+      assert.ok(
+        deliveryNotes(audit.events, "liaison").some((note) => note.includes("不会伪造账本")),
+        "审计失败系统行如实",
+      );
+    } finally {
+      await audit.iface.stopSession();
+    }
+
+    // ③ record 写失败 ⇒ 不发送（没有耐久路由记录）。
+    writeFlowStateFile(writeFailRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(writeFailRoot, flowId, ["delivery-server"]);
+    await appendAcceptanceDecisionAt(writeFailRoot, flowId, "rejected", new Date().toISOString());
+    writeAcceptanceReportFile(writeFailRoot, flowId, 1, report);
+    // 让 `.ans/governance/acceptance/<flowId>` 成为普通文件 ⇒ mkdir/rename 必失败。
+    mkdirSync(path.join(writeFailRoot, ".ans", "governance", "acceptance"), { recursive: true });
+    writeFileSync(path.join(writeFailRoot, ".ans", "governance", "acceptance", flowId), "not-a-directory", "utf8");
+    const writeFailListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: writeFailRoot };
+    const writeFail = await makeHarness(writeFailRoot, writeFailListing);
+    try {
+      await waitFor(() =>
+        deliveryNotes(writeFail.events, "liaison").some((note) => note.includes("路由记录写入失败")),
+      );
+      assert.equal(writeFail.sendsByRole.get("convener")?.length ?? 0, 0, "record 写失败 ⇒ 不发送");
+      assert.equal(writeFail.sendsByRole.get("verifier")?.length ?? 0, 0, "不派 Proof");
+      assert.equal(existsSync(reworkRoutingRecordPath(writeFailRoot, flowId)), false);
+    } finally {
+      await writeFail.iface.stopSession();
+    }
+
+    // ④ 发送失败 ⇒ record failed + 系统行；下一次真实事件重试（成功）。
+    writeFlowStateFile(sendFailRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(sendFailRoot, flowId, ["delivery-server"]);
+    await appendAcceptanceDecisionAt(sendFailRoot, flowId, "rejected", new Date().toISOString());
+    writeAcceptanceReportFile(sendFailRoot, flowId, 1, report);
+    const sendFailListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: sendFailRoot };
+    const failOpenRoles = new Set(["convener"]);
+    const sendFail = await makeHarness(sendFailRoot, sendFailListing, { failOpenRoles });
+    try {
+      await waitFor(() =>
+        deliveryNotes(sendFail.events, "liaison").some((note) => note.includes("返工路由失败")),
+      );
+      assert.equal(readReworkRoutingRecord(sendFailRoot, flowId)?.status, "failed");
+      assert.equal(sendFail.sendsByRole.get("convener")?.length ?? 0, 0);
+      // 修正后下一次真实事件（项目刷新）重试成功。
+      failOpenRoles.delete("convener");
+      await sendFail.iface.listProject({ projectRoot: sendFailRoot });
+      await waitFor(() => (sendFail.sendsByRole.get("convener")?.length ?? 0) > 0, 5000);
+      await waitFor(() => deliveryNotes(sendFail.events, "liaison").some((note) => note.includes("客户拒绝")));
+      assert.equal(readReworkRoutingRecord(sendFailRoot, flowId)?.status, "sent");
+    } finally {
+      await sendFail.iface.stopSession();
+    }
+  } finally {
+    rmSync(restartRoot, { recursive: true, force: true });
+    rmSync(auditRoot, { recursive: true, force: true });
+    rmSync(writeFailRoot, { recursive: true, force: true });
+    rmSync(sendFailRoot, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 acceptanceLastDispatchAtMs / acceptanceDispatchRecorded 收窄：只认 stepId=verification 或旧无 stepId+verifier", () => {
+  const flowId = "flow-dispatch-narrow";
+  const base = { kind: "dispatch.accepted" as const, flowId, actorRoleId: "app", power: "app" as const };
+  const criteria = {
+    entries: [{ ...base, stepId: "acceptance-criteria", targetRoleId: "verifier", at: "2026-10-23T00:00:00.000Z" }],
+  };
+  assert.equal(acceptanceDispatchRecorded(flowId, criteria), false, "acceptance-criteria 不计入验收派发");
+  assert.equal(acceptanceLastDispatchAtMs(flowId, criteria), undefined, "acceptance-criteria 不参与验收派发时间口径");
+
+  const legacyVerifier = {
+    entries: [{ ...base, targetRoleId: "verifier", at: "2026-10-23T01:00:00.000Z" }],
+  };
+  assert.equal(acceptanceDispatchRecorded(flowId, legacyVerifier), true, "旧无 stepId + verifier 仍计入");
+  assert.equal(acceptanceLastDispatchAtMs(flowId, legacyVerifier), Date.parse("2026-10-23T01:00:00.000Z"));
+
+  const legacyNonVerifier = {
+    entries: [{ ...base, targetRoleId: "executor", at: "2026-10-23T02:00:00.000Z" }],
+  };
+  assert.equal(acceptanceDispatchRecorded(flowId, legacyNonVerifier), false, "旧无 stepId + 非 verifier 不计入");
+  assert.equal(acceptanceLastDispatchAtMs(flowId, legacyNonVerifier), undefined);
+
+  const verificationOnly = {
+    entries: [{ ...base, stepId: "verification", at: "2026-10-23T03:00:00.000Z" }],
+  };
+  assert.equal(acceptanceDispatchRecorded(flowId, verificationOnly), true, "stepId=verification 仍计入（含 app 记录）");
+  assert.equal(acceptanceLastDispatchAtMs(flowId, verificationOnly), Date.parse("2026-10-23T03:00:00.000Z"));
 });

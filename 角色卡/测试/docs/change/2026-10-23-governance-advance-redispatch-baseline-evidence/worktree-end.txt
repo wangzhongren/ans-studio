@@ -1,0 +1,43 @@
+captured_at: 2026-10-23 13:27:20 +0800
+git rev-parse HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+git status --short -- src app test:
+ M app/desktop/governance-advance.ts
+ M app/desktop/interface.ts
+ M app/main.ts
+ M app/preload.cjs
+ M app/renderer/src/App.tsx
+ M app/renderer/src/lib/platform.ts
+ M app/renderer/src/shell/SettingsPanel.tsx
+ M "src/common/\347\274\226\346\216\222/team-plan.ts"
+ M "src/common/\351\227\250\347\246\201\345\274\225\346\223\216/governance-roles.ts"
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/govern-session.ts
+ M src/pipeline/orchestration/run-role.ts
+ M test/runtime-core/governance-flow-metadata.test.ts
+ M "test/\346\241\214\351\235\242UI/source-guard.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/e2e/main.mjs"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/operator-wiring.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/b-proposal-accept-timing.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/fixture.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/i-full-chain.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/p-team-plan-guard.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/q-role-granularity.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/r-mapreduce-parallel.test.ts"
+ M "test/\347\274\226\346\216\222/team-plan.test.ts"
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/governance-standard-workflow.test.ts"
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/governance-trio.test.ts"
+?? app/desktop/i18n.ts
+?? app/desktop/preferences.ts
+?? app/renderer/src/i18n/
+?? src/common/shared/i18n/
+?? "src/common/\347\274\226\346\216\222/directory-conformance.ts"
+?? "test/\346\241\214\351\235\242UI/i18n-store.test.ts"
+?? "test/\346\241\214\351\235\242UI/i18n-view.test.ts"
+?? "test/\346\265\213\350\257\225/directory-layout.test.ts"
+?? "test/\347\274\226\346\216\222/directory-conformance.test.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard-allowlist.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard-scanner.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard.test.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"
+git diff --cached --name-only: 0 行（空=无暂存）

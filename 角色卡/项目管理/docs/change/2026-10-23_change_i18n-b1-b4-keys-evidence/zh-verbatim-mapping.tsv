@@ -1,0 +1,1207 @@
+kind	key	zh	first_source	chunks_matched	chunks_total
+B0-out-of-scope	ui.settings.language.title	语言	app/desktop/governance-advance.ts:275	1	1
+B0-out-of-scope	ui.settings.language.description	选择界面显示语言。切换后立即生效，已生成的记录保持原语言。		0	1
+B0-out-of-scope	ui.settings.language.zhCN	简体中文		0	1
+B0-out-of-scope	ui.settings.language.enUS	English		0	1
+B0-out-of-scope	ui.settings.language.saveFailed	语言偏好保存失败，请稍后重试。		0	1
+B0-out-of-scope	main.window.title	ANS 桌面应用（受治理会话）		0	1
+B0-out-of-scope	main.dialog.importProject.title	导入项目（选择项目根文件夹）		0	1
+B0-out-of-scope	main.dialog.pickImage.title	选择图片		0	1
+B0-out-of-scope	main.error.startup.title	应用启动失败		0	1
+B0-out-of-scope	main.error.startup.detail	界面无法启动，请查看诊断日志后重新打开。		0	1
+B0-out-of-scope	preferences.error.invalidLocale	语言偏好无效，已恢复为简体中文。		0	1
+B0-out-of-scope	preferences.error.saveFailed	无法保存语言偏好，请稍后重试。		0	1
+B0-out-of-scope	preferences.error.readInvalid	语言偏好读取失败，已使用默认语言。		0	1
+exact	shared.common.cancel	取消	app/desktop/confirm-card.ts:39	1	1
+exact	shared.common.close	关闭	app/desktop/chat-adapter.ts:6	1	1
+exact	shared.common.collapse	收起	app/renderer/src/chat/ChatRow.tsx:579	1	1
+exact	shared.common.retry	重试	app/desktop/customer-input.ts:103	1	1
+exact	shared.common.retryRead	重试读取	app/renderer/src/chat/document-view.ts:240	1	1
+exact	shared.common.unknown	未知	app/desktop/chat-adapter.ts:76	1	1
+exact	shared.common.unknownReason	未知原因	app/desktop/interface.ts:1823	1	1
+exact	shared.common.unknownStatus	未知状态	app/desktop/governance-advance.ts:218	1	1
+exact	shared.common.none	无	app/desktop/chat-adapter.ts:7	1	1
+exact	shared.common.notReported	未报告	app/renderer/src/chat/chat-store.ts:1007	1	1
+exact	shared.common.notProvided	（未报告）	app/renderer/src/chat/governance-view.ts:377	1	1
+exact	shared.common.notSet	未设置	app/renderer/src/chat/runtime-config.ts:169	1	1
+exact	shared.common.system	系统	app/desktop/composer-images.ts:4	1	1
+exact	shared.common.role	角色	app/desktop/chat-adapter.ts:15	1	1
+exact	shared.common.tool	工具	app/desktop/chat-adapter.ts:76	1	1
+exact	shared.common.failed	失败	app/desktop/composer-images.ts:81	1	1
+exact	shared.common.completed	已完成	app/desktop/customer-input.ts:181	1	1
+exact	shared.common.aborted	已中止	app/desktop/customer-input.ts:616	1	1
+exact	shared.common.redacted	已净化	app/renderer/src/chat/report-view.ts:21	1	1
+exact	shared.common.truncated	已截断	app/renderer/src/chat/report-view.ts:21	1	1
+exact	shared.common.safeCopyTitle	交接内容（安全显示副本）	app/desktop/session.ts:2944	1	1
+exact	shared.common.working	工作中	app/desktop/governance-advance.ts:573	1	1
+exact	shared.common.stopUnsupportedPeriod	当前运行时不支持停止。	app/desktop/session.ts:3575	1	1
+exact	shared.common.stopTurn	停止本轮	app/desktop/recovery-channel.ts:8	1	1
+exact	shared.common.shellConfirmationExpired	此确认已失效（超时或应用重启），未获放行——请让角色重新发起。	app/desktop/operator-channel.ts:882	1	1
+exact	shared.common.customerMessage	客户消息	app/desktop/interface.ts:762	1	1
+exact	shared.common.rebuildSession	重建会话	app/desktop/recovery-channel.ts:8	1	1
+exact	shared.common.invalidSaveRequest	保存请求无效。	app/desktop/interface.ts:3443	1	1
+exact	shared.runtimeSettings.runtime.demo	演示	app/desktop/chat-adapter.ts:2	1	1
+exact	shared.runtimeSettings.pi.token.label	访问令牌	src/common/shared/runtime-settings.ts:48	1	1
+exact	shared.runtimeSettings.field.apiBaseUrl.label	API 地址	app/desktop/runtime-config.ts:112	1	1
+exact	shared.runtimeSettings.field.apiKey.label	API 密钥	src/common/shared/runtime-settings.ts:77	1	1
+exact	shared.runtimeSettings.field.model.label	模型	app/desktop/chat-adapter.ts:74	1	1
+exact	shared.runtimeSettings.pi.contextWindow.label	上下文窗口	src/common/shared/runtime-settings.ts:52	1	1
+exact	shared.runtimeSettings.pi.contextWindow.help	拖动选择预设档位，最大 1M tokens；留空＝系统默认（500k）；下一次开启会话时应用。	src/common/shared/runtime-settings.ts:56	1	1
+exact	shared.runtimeSettings.pi.contextWindow.choice.default	系统默认（500k）	src/common/shared/runtime-settings.ts:54	1	1
+exact	shared.runtimeSettings.pi.contextWindow.choice.k32	32k	app/desktop/runtime-config.ts:122	1	1
+exact	shared.runtimeSettings.pi.contextWindow.choice.k64	64k	app/desktop/runtime-config.ts:122	1	1
+exact	shared.runtimeSettings.pi.contextWindow.choice.k128	128k	src/common/shared/runtime-settings.ts:54	1	1
+exact	shared.runtimeSettings.pi.contextWindow.choice.k256	256k	src/common/shared/runtime-settings.ts:54	1	1
+exact	shared.runtimeSettings.pi.contextWindow.choice.k500	500k	src/common/shared/runtime-settings.ts:54	1	1
+exact	shared.runtimeSettings.pi.contextWindow.choice.m1	1M	src/common/shared/runtime-settings.ts:54	1	1
+exact	shared.runtimeSettings.pi.promptTimeout.label	看护检查时限	app/desktop/session.ts:4035	1	1
+exact	shared.runtimeSettings.pi.promptTimeout.help	到点只通知治理角色检查是否卡死，不中止本轮；仍在推进则不动作；1 小时为最后兜底；留空＝系统默认（5 分钟）；单位 ms；下一次开启会话时应用。	src/common/shared/runtime-settings.ts:64	1	1
+exact	shared.runtimeSettings.pi.promptTimeout.choice.default	系统默认（5 分钟）	src/common/shared/runtime-settings.ts:62	1	1
+exact	shared.runtimeSettings.pi.promptTimeout.choice.m1	1 分钟	app/desktop/runtime-config.ts:122	1	1
+exact	shared.runtimeSettings.pi.promptTimeout.choice.m2	2 分钟	app/desktop/runtime-config.ts:122	1	1
+exact	shared.runtimeSettings.pi.promptTimeout.choice.m5	5 分钟	app/desktop/session.ts:4055	1	1
+exact	shared.runtimeSettings.pi.promptTimeout.choice.m10	10 分钟	src/common/shared/runtime-settings.ts:62	1	1
+exact	shared.runtimeSettings.pi.promptTimeout.choice.m15	15 分钟	app/desktop/session.ts:4055	1	1
+exact	shared.runtimeSettings.pi.promptTimeout.choice.m30	30 分钟	src/common/shared/runtime-settings.ts:62	1	1
+exact	shared.runtimeSettings.reasoning.label	推理强度	src/common/shared/runtime-settings.ts:67	1	1
+exact	shared.runtimeSettings.reasoning.help	留空＝维持平台默认（现状零变化）；档位依次为 关/低/中/高/极高（缺省档语义见平台）；思考计入输出 tokens。	src/common/shared/runtime-settings.ts:41	1	1
+exact	shared.runtimeSettings.reasoning.choice.off	关	app/desktop/chat-adapter.ts:6	1	1
+exact	shared.runtimeSettings.reasoning.choice.low	低	app/desktop/governance-advance.ts:565	1	1
+exact	shared.runtimeSettings.reasoning.choice.medium	中	app/desktop/confirm-card.ts:8	1	1
+exact	shared.runtimeSettings.reasoning.choice.high	高	app/desktop/governance-advance.ts:519	1	1
+exact	shared.runtimeSettings.reasoning.choice.xhigh	极高	src/common/shared/runtime-settings.ts:41	1	1
+exact	shared.runtimeSettings.codex.apiKey.help	已有 OPENAI_API_KEY 时可使用其作为凭据。	src/common/shared/runtime-settings.ts:77	1	1
+exact	shared.runtimeSettings.codex.apiBaseUrl.help	留空使用 OpenAI API；自定义地址须兼容 Responses API。	src/common/shared/runtime-settings.ts:79	1	1
+exact	shared.runtimeSettings.claude.model.help	留空使用 SDK 默认模型。	src/common/shared/runtime-settings.ts:93	1	1
+exact	shared.runtimeSettings.claude.apiBaseUrl.help	留空使用 SDK 默认服务。	src/common/shared/runtime-settings.ts:94	1	1
+exact	ui.titlebar.windowControlsUnavailable	窗口控制不可用	app/renderer/src/shell/TitleBar.tsx:50	1	1
+exact	ui.titlebar.subtitle	治理会话工作台	app/renderer/src/shell/TitleBar.tsx:56	1	1
+exact	ui.titlebar.minimize	最小化	app/renderer/src/shell/TitleBar.tsx:63	1	1
+exact	ui.titlebar.restore	还原	app/renderer/src/shell/TitleBar.tsx:77	1	1
+exact	ui.titlebar.maximize	最大化	app/renderer/src/shell/TitleBar.tsx:6	1	1
+exact	ui.titlebar.controlsUnavailableHint	当前环境未提供窗口控制	app/renderer/src/shell/TitleBar.tsx:63	1	1
+exact	ui.app.missingRoot	缺少 #root 挂载点	app/renderer/src/main.tsx:9	1	1
+exact	ui.app.expandSidebar	展开左侧栏	app/renderer/src/App.tsx:107	1	1
+exact	ui.app.emptySub	尚未导入项目或选择角色	app/renderer/src/App.tsx:134	1	1
+exact	ui.chatHeader.noSession	尚未开启会话	app/renderer/src/App.tsx:133	1	1
+exact	ui.chatHeader.selectRoleHint	从左侧选择一个角色开始聊天	app/renderer/src/shell/ChatHeader.tsx:93	1	1
+exact	ui.role.noneSelected	未选择角色	app/renderer/src/chat/role-view.ts:58	1	1
+exact	ui.role.builtinGovernance	内置治理角色（定义见 SKILL.md）	app/renderer/src/chat/role-view.ts:67	1	1
+composed-all-chunks	ui.role.boundaryCount	{count} 条边界条目	app/renderer/src/chat/role-view.ts:76	1	1
+exact	ui.role.group.primary	主入口	app/desktop/customer-input.ts:86	1	1
+exact	ui.role.group.governance	治理职能（内置）	app/renderer/src/chat/role-view.ts:5	1	1
+exact	ui.role.group.default	工作角色	app/renderer/src/chat/role-view.ts:5	1	1
+exact	ui.role.governance.builtinNote	内置角色：随应用发布，无角色目录	app/renderer/src/chat/role-view.ts:20	1	1
+exact	ui.role.governance.liaison.name	主理 / Lead	app/renderer/src/chat/role-view.ts:18	1	1
+exact	ui.role.governance.liaison.power	客户沟通 · 不拥有最终批准权	app/renderer/src/chat/role-view.ts:19	1	1
+exact	ui.role.governance.draft.name	Draft / 提案	app/renderer/src/chat/judge.ts:44	1	1
+exact	ui.role.governance.draft.power	提案权 · 不拥有最终批准权	app/renderer/src/chat/role-view.ts:24	1	1
+exact	ui.role.governance.crew.name	Crew / 组队	app/desktop/governance-advance.ts:854	1	1
+exact	ui.role.governance.crew.power	写卡权（客户任命后） · 不拥有最终批准权	app/renderer/src/chat/role-view.ts:29	1	1
+exact	ui.role.governance.steward.name	Steward / 统筹	app/desktop/governance-advance.ts:943	1	1
+exact	ui.role.governance.steward.power	排期权 · 不拥有最终批准权	app/renderer/src/chat/role-view.ts:34	1	1
+exact	ui.role.governance.verifier.name	验收 / Proof	app/renderer/src/chat/role-view.ts:38	1	1
+exact	ui.role.governance.verifier.power	验收权 · 不拥有最终批准权	app/renderer/src/chat/role-view.ts:39	1	1
+exact	ui.sidebar.primaryHint	主入口：默认入口与主路径	app/renderer/src/shell/Sidebar.tsx:102	1	1
+exact	ui.sidebar.builtinRoleNote	内置角色：定义在 SKILL.md，无角色目录	app/renderer/src/shell/Sidebar.tsx:103	1	1
+composed-all-chunks	ui.sidebar.busyAria	当前工作 {busy} 项，排队 {queued} 项	app/renderer/src/chat/work-view.ts:82	2	2
+exact	ui.sidebar.selectProjectFailed	选择项目失败，请重试。	app/renderer/src/shell/Sidebar.tsx:306	1	1
+exact	ui.sidebar.noProject	尚未导入项目	app/renderer/src/App.tsx:134	1	1
+exact	ui.sidebar.noProjectPeriod	尚未导入项目。	app/renderer/src/shell/Composer.tsx:240	1	1
+exact	ui.sidebar.collapse	收起左侧栏	app/renderer/src/shell/Sidebar.tsx:332	1	1
+exact	ui.sidebar.workspace	工作空间	app/renderer/src/shell/Sidebar.tsx:360	1	1
+exact	ui.sidebar.roleListAria	角色列表	app/renderer/src/shell/Sidebar.tsx:366	1	1
+exact	ui.sidebar.noRolesInProject	该项目下未枚举到角色。	app/renderer/src/shell/Sidebar.tsx:372	1	1
+exact	ui.sidebar.resizeAria	调整左侧栏宽度	app/renderer/src/shell/Sidebar.tsx:398	1	1
+exact	ui.sidebar.resizeTitle	拖动调整左栏宽度；双击复位 248px	app/renderer/src/shell/Sidebar.tsx:403	1	1
+exact	ui.sidebar.switchProject	切换项目	app/renderer/src/chat/chat-store.ts:811	1	1
+exact	ui.sidebar.importProject	导入项目	app/desktop/interface.ts:15	1	1
+exact	ui.sidebar.pickUnavailable	当前环境未提供项目选择通道	app/renderer/src/shell/Sidebar.tsx:418	1	1
+composed-all-chunks	ui.sidebar.runtimeSettings	{runtime} 设置	app/desktop/interface.ts:716	1	1
+exact	ui.sidebar.settingsDisabled	导入项目后可配置引擎	app/renderer/src/shell/Sidebar.tsx:431	1	1
+exact	ui.sidebar.settings	设置	app/desktop/interface.ts:716	1	1
+composed-all-chunks	ui.sidebar.roleCount	{count} 个角色	app/desktop/session.ts:8	1	1
+exact	ui.queue.expand	展开全文	app/renderer/src/shell/QueuePanel.tsx:66	1	1
+exact	ui.queue.collapse	收起全文	app/renderer/src/shell/QueuePanel.tsx:66	1	1
+exact	ui.queue.fullText	全文	app/desktop/governance-advance.ts:696	1	1
+exact	ui.queue.withdrawTitle	撤回该条排队消息（仅未投递者可撤）	app/renderer/src/chat/ChatStream.tsx:107	1	1
+exact	ui.queue.withdrawing	撤回中…	app/renderer/src/chat/ChatStream.tsx:110	1	1
+exact	ui.queue.withdraw	撤回	app/desktop/interface.ts:761	1	1
+exact	ui.queueSubview.backRole	返回角色资料	app/renderer/src/chat/document-view.ts:236	1	1
+no-literal-trace	ui.queueSubview.backWork	返回工作概览		0	1
+exact	ui.queueSubview.emptyTitle	选择角色后查看队列	app/renderer/src/shell/QueueSubview.tsx:59	1	1
+exact	ui.queueSubview.emptySub	先从左侧选择角色，再查看该角色的当前工作与排队消息。	app/renderer/src/shell/QueueSubview.tsx:60	1	1
+composed-all-chunks	ui.queueSubview.queued	排队 {count}	app/desktop/composer-images.ts:11	1	1
+composed-all-chunks	ui.queueSubview.showAll	查看更多队列（{count}）	app/renderer/src/shell/QueueSubview.tsx:110	1	1
+exact	ui.queueSubview.collapse	收起队列	app/renderer/src/shell/QueueSubview.tsx:110	1	1
+composed-all-chunks	ui.work.title	{roleName} · 工作概览	app/renderer/src/chat/work-view.ts:198	1	1
+exact	ui.work.emptyTitle	选择角色后查看工作概览	app/renderer/src/shell/WorkOverview.tsx:62	1	1
+exact	ui.work.emptySub	先在左侧选择角色，再打开工作概览；内容跟随当前角色。	app/renderer/src/shell/WorkOverview.tsx:63	1	1
+composed-all-chunks	ui.work.pending	待处理 {count}	app/renderer/src/chat/work-view.ts:2	1	1
+exact	ui.work.locateTitle	定位到原交互卡（不会自动作答）	app/renderer/src/shell/WorkOverview.tsx:95	1	1
+exact	ui.work.locate	定位	app/desktop/chat-adapter.ts:4	1	1
+exact	ui.work.currentWork	当前工作	app/renderer/src/chat/work-view.ts:82	1	1
+exact	ui.work.queued	排队	app/desktop/composer-images.ts:11	1	1
+composed-all-chunks	ui.work.viewAllQueueAria	查看全部队列（{count} 项）	app/renderer/src/shell/ProfilePanel.tsx:339	2	2
+composed-all-chunks	ui.work.viewAllQueue	查看全部队列（{count}）	app/renderer/src/shell/ProfilePanel.tsx:339	1	1
+exact	ui.work.recentReports	最近回交	app/renderer/src/chat/work-view.ts:3	1	1
+exact	ui.work.emptyPending	无待处理请求	app/renderer/src/chat/work-view.ts:195	1	1
+exact	ui.work.emptyQueue	无进行中或排队消息	app/renderer/src/chat/work-view.ts:196	1	1
+exact	ui.work.emptyReports	暂无回交报告	app/renderer/src/chat/work-view.ts:197	1	1
+composed-all-chunks	ui.work.overviewAria	工作概览，{count} 项待处理	app/renderer/src/chat/work-view.ts:215	2	2
+exact	ui.work.kind.choice	待选择	app/renderer/src/chat/operator-view.ts:110	1	1
+exact	ui.work.kind.confirm	待确认	app/desktop/session.ts:4003	1	1
+exact	ui.work.requestFallback	交互请求	app/desktop/customer-input.ts:67	1	1
+exact	ui.work.reportStatus.blocked	被拦下	app/renderer/src/chat/report-view.ts:43	1	1
+exact	ui.work.origin.report	报告声明：	app/renderer/src/chat/report-view.ts:55	1	1
+exact	ui.work.origin.system	系统按终态记录：	app/renderer/src/chat/report-view.ts:57	1	1
+exact	ui.work.origin.unconfirmed	来源未确认：	app/renderer/src/chat/report-view.ts:58	1	1
+exact	ui.drawer.collapseTitle	收起（Esc）	app/renderer/src/shell/Drawer.tsx:216	1	1
+exact	ui.engineSelect.aria	会话引擎	app/desktop/interface.ts:395	1	1
+composed-all-chunks	ui.engineSelect.ariaCurrent	会话引擎，当前 {title}	app/renderer/src/shell/EngineSelect.tsx:302	1	1
+exact	ui.composer.readFileFailed	读取文件失败	app/renderer/src/shell/Composer.tsx:74	1	1
+exact	ui.composer.currentRole	当前角色	app/desktop/session.ts:662	1	1
+exact	ui.composer.emptyMessageHint	请输入消息内容；图片会随消息一起发送。	app/renderer/src/shell/Composer.tsx:235	1	1
+exact	ui.composer.sendChannelUnavailable	发送通道不可用（当前版本未提供）。	app/renderer/src/shell/Composer.tsx:244	1	1
+composed-all-chunks	ui.composer.imageCount	（图片 ×{count}）	app/renderer/src/shell/Composer.tsx:267	1	1
+exact	ui.composer.sendFailed	发送失败	app/renderer/src/chat/chat-store.ts:346	1	1
+exact	ui.composer.sendExceptionPrefix	发送异常：	app/renderer/src/shell/Composer.tsx:322	1	1
+exact	ui.composer.sendFailedPrefix	发送失败：	app/renderer/src/shell/Composer.tsx:322	1	1
+exact	ui.composer.sendNotReturned	发送调用未正常返回，实际轮次结果尚未报告。	app/renderer/src/shell/Composer.tsx:345	1	1
+composed-all-chunks	ui.composer.queuedPosition	已入队：等它完成当前任务后处理（第 {position} 位）。	app/renderer/src/shell/Composer.tsx:368	2	2
+exact	ui.composer.stopFailedPrefix	停止失败：	app/renderer/src/shell/Composer.tsx:408	1	1
+exact	ui.composer.stopRequested	已请求停止当前轮次——轮次仍会以收尾事件结束。	app/renderer/src/shell/Composer.tsx:416	1	1
+exact	ui.composer.imageFallbackName	图片	app/desktop/chat-adapter.ts:89	1	1
+exact	ui.composer.pickChannelUnavailable	当前版本未提供选图通道。	app/renderer/src/shell/Composer.tsx:454	1	1
+exact	ui.composer.pickFailedNoData	选图失败：未收到图片数据。	app/renderer/src/shell/Composer.tsx:463	1	1
+exact	ui.composer.pickFailedPrefix	选图失败：	app/renderer/src/shell/Composer.tsx:463	1	1
+exact	ui.composer.readImageFailedPrefix	读取图片失败：	app/desktop/interface.ts:4439	1	1
+exact	ui.composer.attachValidationUnavailable	当前版本未提供附件校验通道。	app/renderer/src/shell/Composer.tsx:505	1	1
+exact	ui.composer.pastedImage	粘贴的图片	app/renderer/src/shell/Composer.tsx:512	1	1
+exact	ui.composer.imageValidationFailedPrefix	图片校验失败：	app/renderer/src/shell/Composer.tsx:518	1	1
+exact	ui.composer.imageValidationFailed	图片校验失败。	app/renderer/src/shell/Composer.tsx:525	1	1
+exact	ui.composer.imageOnly	只支持图片文件（png / jpeg / webp / gif）。	app/renderer/src/shell/Composer.tsx:566	1	1
+exact	ui.composer.removeImage	移除图片	app/renderer/src/shell/Composer.tsx:608	1	1
+composed-all-chunks	ui.composer.placeholderToRole	给{role}发送消息…	app/renderer/src/shell/Composer.tsx:641	1	1
+exact	ui.composer.placeholderSelectRole	选择角色后发送消息…	app/renderer/src/shell/Composer.tsx:641	1	1
+exact	ui.composer.ariaMessage	发送给当前角色的消息	app/renderer/src/shell/Composer.tsx:643	1	1
+exact	ui.composer.addImage	添加图片（png / jpeg / webp / gif，≤5MB）	app/renderer/src/shell/Composer.tsx:664	1	1
+exact	ui.composer.addImageUnavailable	当前版本未提供选图通道	app/renderer/src/shell/Composer.tsx:454	1	1
+exact	ui.composer.ariaAddImage	添加图片	app/renderer/src/shell/Composer.tsx:664	1	1
+exact	ui.composer.enterHint	Enter 发送，Shift + Enter 换行	app/renderer/src/shell/Composer.tsx:740	1	1
+exact	ui.composer.stopTitle	停止当前轮次	app/renderer/src/shell/Composer.tsx:416	1	1
+exact	ui.composer.sendWithEnter	发送（Enter）	app/renderer/src/shell/Composer.tsx:771	1	1
+exact	ui.composer.sessionNotOpen	会话未开启：先选择角色并开启会话	app/renderer/src/shell/Composer.tsx:772	1	1
+exact	ui.composer.ariaSend	发送	app/desktop/composer-images.ts:10	1	1
+exact	ui.composer.send	发送	app/desktop/composer-images.ts:10	1	1
+exact	ui.composer.dismissHint	关闭提示	app/renderer/src/shell/Composer.tsx:803	1	1
+exact	ui.composer.footerWorking	Enter 发送，Shift+Enter 换行；发送失败会如实提示。	app/renderer/src/shell/Composer.tsx:815	1	1
+exact	ui.composer.footerIdle	选择角色并开启会话后可发送。	app/renderer/src/shell/Composer.tsx:816	1	1
+exact	ui.composer.writeBoundaryNote	实际写入导入项目，角色边界外的写入会被拒绝。	app/renderer/src/shell/Composer.tsx:819	1	1
+exact	ui.confirm.shellDenyNote	点「拒绝」、按 Esc 或关闭本框 = 不放行（不会执行）。	app/renderer/src/shell/ConfirmCard.tsx:29	1	1
+exact	ui.confirm.shellApproveNote	批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界；请逐字核对命令原文。	app/renderer/src/shell/ConfirmCard.tsx:31	1	1
+exact	ui.confirm.recoveryNote	点「取消」、按 Esc 或关闭本框 = 不执行；仅点「执行」才会执行。	app/renderer/src/shell/ConfirmCard.tsx:33	1	1
+exact	ui.confirm.unknownRole	(未标识)	app/renderer/src/shell/ConfirmCard.tsx:61	1	1
+composed-all-chunks	ui.confirm.matchedReason	命中原因：{reason}	app/renderer/src/shell/ConfirmCard.tsx:110	1	1
+composed-all-chunks	ui.confirm.reviewOriginal	审核原文（内部用语，仅供核查）：{reason}	app/renderer/src/shell/ConfirmCard.tsx:116	1	1
+exact	ui.confirm.suApprovalBadge	su 审批	app/desktop/operator-channel.ts:727	1	1
+exact	ui.confirm.closeNoApprove	关闭（不放行）	app/renderer/src/shell/ConfirmCard.tsx:158	1	1
+exact	ui.confirm.detailsArgv	详情（argv / cwd）	app/renderer/src/shell/ConfirmCard.tsx:187	1	1
+exact	ui.confirm.cwd	工作目录（cwd）	app/renderer/src/shell/ConfirmCard.tsx:196	1	1
+exact	ui.confirm.argv	规范化参数 argv	app/desktop/operator-channel.ts:330	1	1
+exact	ui.confirm.approve	放行执行	app/desktop/operator-channel.ts:496	1	1
+exact	ui.confirm.reject	拒绝	app/desktop/chat-adapter.ts:76	1	1
+composed-all-chunks	ui.confirm.actionWithLabel	动作：{label}（{action}）	app/renderer/src/shell/ConfirmCard.tsx:271	1	1
+composed-all-chunks	ui.confirm.action	动作：{action}	app/renderer/src/shell/ConfirmCard.tsx:271	1	1
+composed-all-chunks	ui.confirm.proposer	提议方：{name}	app/renderer/src/shell/ConfirmCard.tsx:279	1	1
+composed-all-chunks	ui.confirm.proposedAt	提议时间：{time}	app/renderer/src/shell/ConfirmCard.tsx:280	1	1
+composed-all-chunks	ui.confirm.targetItem	目标条目：{id}	app/renderer/src/shell/ConfirmCard.tsx:281	1	1
+exact	ui.confirm.recoveryTitle	恢复操作请求	app/renderer/src/shell/ConfirmCard.tsx:309	1	1
+exact	ui.confirm.closeNoExecute	关闭（不执行）	app/renderer/src/shell/ConfirmCard.tsx:316	1	1
+composed-all-chunks	ui.confirm.targetRole	目标角色：{role}	app/renderer/src/shell/ConfirmCard.tsx:335	1	1
+composed-all-chunks	ui.confirm.reasonProvided	原因（提议方提供）：{reason}	app/renderer/src/shell/ConfirmCard.tsx:338	1	1
+exact	ui.confirm.evidenceLabel	证据（提议方提供，逐字）：	app/renderer/src/shell/ConfirmCard.tsx:340	1	1
+exact	ui.confirm.detailsRecovery	详情（提议方 / 时间 / 条目）	app/renderer/src/shell/ConfirmCard.tsx:347	1	1
+exact	ui.confirm.execute	执行	app/desktop/chat-adapter.ts:76	1	1
+exact	ui.confirm.failedShell	未能回传你的决定（通道未接或异常）——按 fail-closed 不放行；请让角色重新发起。	app/renderer/src/chat/confirm-logic.ts:77	1	1
+exact	ui.confirm.expiredRecovery	此确认已失效（应用重启或请求已结束），未获执行——请让提议方重新发起。	app/renderer/src/chat/confirm-logic.ts:78	1	1
+exact	ui.confirm.failedRecovery	未能回传你的决定（通道未接或异常）——按 fail-closed 不执行；请让提议方重新发起。	app/renderer/src/chat/confirm-logic.ts:80	1	1
+composed-all-chunks	ui.confirm.sourceDispatchWithRole	派发 · 来自 {roleId}	app/desktop/session.ts:3271	1	1
+exact	ui.confirm.sourceDispatch	派发	app/desktop/customer-input.ts:59	1	1
+composed-all-chunks	ui.confirm.sourceHandbackWithRole	回交 · 来自 {roleId}	app/renderer/src/chat/confirm-logic.ts:165	1	1
+exact	ui.confirm.sourceHandback	回交	app/desktop/governance-advance.ts:137	1	1
+exact	ui.confirm.queueRunning	进行中	app/desktop/interface.ts:762	1	1
+composed-all-chunks	ui.confirm.withdrawn	已撤回排队消息：{summary}	app/desktop/interface.ts:763	1	1
+composed-all-chunks	ui.confirm.withdrawInvalid	撤回无效：{detail}	app/renderer/src/chat/ChatStream.tsx:65	1	1
+composed-all-chunks	ui.confirm.withdrawFailed	撤回失败：{detail}	app/renderer/src/chat/confirm-logic.ts:241	1	1
+composed-all-chunks	ui.confirm.imageTypeUnsupported	图片类型不支持：{type}——只支持 png / jpeg / webp / gif。	app/desktop/composer-images.ts:52	2	2
+composed-all-chunks	ui.confirm.imageTooLarge	图片过大（> {mb}MB）——请压缩后再发。	app/desktop/composer-images.ts:76	2	2
+exact	ui.settings.placeholderSet	已设置，留空则不修改	app/renderer/src/shell/SettingsPanel.tsx:80	1	1
+exact	ui.settings.hide	隐藏	app/desktop/interface.ts:3617	1	1
+exact	ui.settings.show	显示	app/desktop/customer-input.ts:149	1	1
+exact	ui.settings.optionDefault	留空（平台默认）	app/renderer/src/shell/SettingsPanel.tsx:114	1	1
+exact	ui.settings.rangeOffPreset	当前值不在预设档位；改为预设档位后保存	app/renderer/src/shell/SettingsPanel.tsx:163	1	1
+exact	ui.settings.secretTag	机密	app/desktop/interface.ts:794	1	1
+exact	ui.settings.statusChecking	检查中…	app/renderer/src/shell/SettingsPanel.tsx:263	1	1
+exact	ui.settings.statusUnknown	配置未知	app/renderer/src/shell/SettingsPanel.tsx:264	1	1
+exact	ui.settings.statusMissing	缺配置	app/renderer/src/shell/SettingsPanel.tsx:265	1	1
+exact	ui.settings.statusConfigured	已配置	app/renderer/src/shell/SettingsPanel.tsx:265	1	1
+exact	ui.settings.engineSettingsAria	引擎设置	app/renderer/src/chat/runtime-config.ts:2	1	1
+composed-all-chunks	ui.settings.runtimeConfigCurrent	{runtime} 配置（当前会话引擎）	app/renderer/src/shell/SettingsPanel.tsx:458	1	1
+composed-all-chunks	ui.settings.runtimeConfig	{runtime} 配置	app/desktop/customer-input.ts:175	1	1
+exact	ui.settings.panelNote	配置只影响所选引擎；不会切换当前会话。	app/renderer/src/shell/SettingsPanel.tsx:476	1	1
+exact	ui.settings.pathNotReported	（保存位置未报告）	app/renderer/src/shell/SettingsPanel.tsx:483	1	1
+exact	ui.settings.saveNote	保存到仓库根 .env，只修改本引擎字段。	app/renderer/src/shell/SettingsPanel.tsx:486	1	1
+exact	ui.settings.readFailed	读取配置失败。	app/renderer/src/shell/SettingsPanel.tsx:492	1	1
+composed-all-chunks	ui.settings.incomplete	{label} 配置不完整，缺：{missing}。请补齐后保存。	app/renderer/src/chat/runtime-config.ts:287	2	2
+exact	ui.settings.advanced	高级	app/renderer/src/chat/runtime-config.ts:140	1	1
+exact	ui.settings.advancedHint	以下高级项均可留空；留空 = 使用默认值。	app/renderer/src/shell/SettingsPanel.tsx:536	1	1
+exact	ui.settings.saveToEnv	保存到 .env	app/renderer/src/chat/runtime-config.ts:321	1	1
+composed-all-chunks	ui.settings.saveNoteTitle	已保存到 .env（改动键：{keys}）。{tail}{application}	app/renderer/src/chat/runtime-config.ts:339	2	2
+composed-all-chunks	ui.settings.saveNoteShort	已保存到 .env（改动键 {count} 个）。{tail}{application}	app/renderer/src/chat/runtime-config.ts:321	2	2
+composed-all-chunks	ui.settings.stillMissingCount	必填配置仍缺 {count} 项（见上方）。	app/renderer/src/chat/runtime-config.ts:325	2	2
+composed-all-chunks	ui.settings.stillMissingList	必填配置仍缺：{keys}。	app/renderer/src/chat/runtime-config.ts:343	1	1
+exact	ui.settings.requiredReady	必填配置已齐备。	app/renderer/src/chat/runtime-config.ts:291	1	1
+exact	ui.settings.applicationCurrent	当前配置已应用。	app/renderer/src/chat/runtime-config.ts:251	1	1
+exact	ui.settings.applicationNextSession	下一次开启会话时应用。	app/renderer/src/chat/runtime-config.ts:252	1	1
+exact	ui.settings.applicationAfterActiveTurn	当前轮次继续使用原配置；结束后下一次输入应用新配置。	app/renderer/src/chat/runtime-config.ts:254	1	1
+exact	ui.settings.applicationAfterActiveTurnShort	当前轮次继续使用原配置；下一次输入应用。	app/renderer/src/chat/runtime-config.ts:355	1	1
+exact	ui.settings.applicationUnknown	配置应用时点未报告。	app/renderer/src/chat/runtime-config.ts:255	1	1
+exact	ui.runtimeConfig.unknownEngine	未知引擎	app/renderer/src/chat/runtime-config.ts:54	1	1
+exact	ui.runtimeConfig.summaryNotReady	配置摘要未就绪	app/renderer/src/chat/runtime-config.ts:203	1	1
+exact	ui.runtimeConfig.source.file	文件	app/desktop/chat-adapter.ts:9	1	1
+exact	ui.runtimeConfig.source.environment	环境	app/desktop/customer-input.ts:204	1	1
+exact	ui.runtimeConfig.source.fallback	回退	app/desktop/diagnostics.ts:52	1	1
+exact	ui.runtimeConfig.source.default	默认	app/desktop/customer-input.ts:16	1	1
+exact	ui.runtimeConfig.sourceUnknown	来源未报告	app/renderer/src/chat/chat-store.ts:1007	1	1
+composed-all-chunks	ui.runtimeConfig.fieldRequired	{label} · 必填	app/renderer/src/chat/runtime-config.ts:281	1	1
+no-literal-trace	ui.runtimeConfig.fieldOptional	{label} · 可选		0	1
+composed-all-chunks	ui.runtimeConfig.requiredReady	{label} 必填配置已齐备。{application}	app/renderer/src/chat/runtime-config.ts:291	1	1
+composed-all-chunks	ui.runtimeConfig.readFailedWithDetail	读取配置失败：{detail}	app/renderer/src/chat/runtime-config.ts:295	1	1
+composed-all-chunks	ui.runtimeConfig.saveFailed	保存失败：{detail}	app/renderer/src/chat/runtime-config.ts:299	1	1
+composed-all-chunks	ui.runtimeConfig.saveException	保存异常：{detail}	app/renderer/src/chat/runtime-config.ts:304	1	1
+exact	ui.runtimeConfig.saving	正在保存…	app/renderer/src/chat/runtime-config.ts:310	1	1
+composed-all-chunks	ui.runtimeConfig.readFailedForLabel	读取 {label} 配置失败，请打开设置检查或重试。	app/desktop/composer-images.ts:56	2	2
+composed-all-chunks	ui.runtimeConfig.checkingLabel	正在检查 {label} 配置…	app/renderer/src/chat/runtime-config.ts:371	2	2
+composed-all-chunks	ui.runtimeConfig.engineSettingsTitle	{label} 配置	app/desktop/customer-input.ts:175	1	1
+composed-all-chunks	ui.runtimeConfig.engineSettingsTabTitle	{label} 设置	app/desktop/interface.ts:716	1	1
+composed-all-chunks	ui.runtimeConfig.openEngineSettings	打开 {label} 设置	app/desktop/customer-input.ts:59	2	2
+exact	ui.governance.checkAndReaccept	检查并重新接受	app/renderer/src/chat/ChatStream.tsx:309	1	1
+exact	ui.governance.establish	建立治理记录	app/desktop/interface.ts:44	1	1
+exact	ui.governance.readingPreview	正在读取预览…	app/renderer/src/shell/GovernancePanel.tsx:204	1	1
+exact	ui.governance.reacceptPreview	重新接受治理边界（预览）	app/renderer/src/chat/governance-view.ts:276	1	1
+exact	ui.governance.upgradePreview	升级为三权治理模型（预览）	app/renderer/src/chat/governance-view.ts:524	1	1
+exact	ui.governance.establishPreview	建立治理记录（预览）	app/renderer/src/chat/governance-view.ts:374	1	1
+exact	ui.governance.reaccepting	正在重新接受…	app/renderer/src/shell/GovernancePanel.tsx:265	1	1
+exact	ui.governance.confirmAccept	确认接受	app/renderer/src/chat/governance-view.ts:228	1	1
+exact	ui.governance.modelLabel	治理模型（建立时写入 .ans）：	app/renderer/src/shell/GovernancePanel.tsx:273	1	1
+exact	ui.governance.modelAria	治理模型	app/desktop/customer-input.ts:262	1	1
+composed-all-chunks	ui.governance.modelToWrite	将写入的治理模型：{model}	app/renderer/src/shell/GovernancePanel.tsx:289	1	1
+composed-all-chunks	ui.governance.pinObjects	将 pin 的对象（{pinCount} 项）及角色（{roleCount} 个）：	app/renderer/src/shell/GovernancePanel.tsx:300	3	3
+exact	ui.governance.establishing	正在建立治理记录…	app/renderer/src/shell/GovernancePanel.tsx:327	1	1
+exact	ui.governance.upgrading	正在升级…	app/renderer/src/shell/GovernancePanel.tsx:359	1	1
+exact	ui.governance.confirmUpgrade	确认升级	app/renderer/src/shell/GovernancePanel.tsx:359	1	1
+exact	ui.governance.model.single	旧模型（su）	app/renderer/src/chat/governance-view.ts:40	1	1
+exact	ui.governance.model.trio	三权 · 五角色	app/renderer/src/chat/governance-view.ts:41	1	1
+exact	ui.governance.modelShort.trio	三权	app/desktop/customer-input.ts:170	1	1
+exact	ui.governance.status.awaitingCustomer	等待客户决定	app/renderer/src/chat/governance-view.ts:45	1	1
+exact	ui.governance.status.inProgress	进行中	app/desktop/interface.ts:762	1	1
+exact	ui.governance.status.blocked	阻塞	app/desktop/customer-input.ts:769	1	1
+exact	ui.governance.status.escalated	已升级客户	app/renderer/src/chat/governance-view.ts:48	1	1
+composed-all-chunks	ui.governance.modelLine	治理模型：{model}	app/renderer/src/chat/governance-view.ts:54	1	1
+composed-all-chunks	ui.governance.currentFlow	当前流程：{flowId}	app/renderer/src/chat/governance-view.ts:81	1	1
+composed-all-chunks	ui.governance.noRecordBody	本项目有 {roleCount} 个项目角色，但尚无治理记录（.ans/project.json）。项目角色可按各自边界工作；治理角色暂时无法写入。	app/renderer/src/chat/governance-view.ts:93	2	2
+exact	ui.governance.reasonNotProvided	原因未提供	app/renderer/src/chat/governance-view.ts:101	1	1
+composed-all-chunks	ui.governance.recordUnavailable	治理记录不可用：{reason}；本版不自动覆盖	app/renderer/src/chat/governance-view.ts:102	2	2
+exact	ui.governance.primaryRole	主入口角色	app/desktop/interface.ts:237	1	1
+exact	ui.governance.noRecordTitle	尚无治理记录	app/renderer/src/chat/ChatStream.tsx:239	1	1
+exact	ui.governance.recordUnavailableTitle	治理记录不可用	app/desktop/project.ts:226	1	1
+composed-all-chunks	ui.governance.establishHint	与 {roleName} 对话前，请先建立治理记录；也可在终端运行 ans govern <项目目录>。	app/renderer/src/chat/governance-view.ts:120	1	1
+exact	ui.governance.roleIntro.liaison	客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给提案 Draft 形成提案。我不写提案、不批准。本版起默认入口为主理 Lead；提案 Draft 与历史提案不变。	app/renderer/src/chat/governance-view.ts:128	1	1
+exact	ui.governance.roleIntro.proposal	通常由主理 Lead 交接打开；客户也可以直接找我。我只写提案，不批准。	app/renderer/src/chat/governance-view.ts:129	1	1
+exact	ui.governance.roleIntro.nomination	客户任命后打开写卡；只按团队计划与任命名单写角色卡与边界，不选择角色、不批准。	app/renderer/src/chat/governance-view.ts:131	1	1
+exact	ui.governance.roleIntro.schedule	通常由已接受提案开启流程；只负责排步骤与派发，不批准方案	app/renderer/src/chat/governance-view.ts:132	1	1
+exact	ui.governance.roleIntro.verification	通常由交付回交后的验收步骤打开；只核对证据、出验收卡，不批准。	app/renderer/src/chat/governance-view.ts:133	1	1
+composed-all-chunks	ui.governance.mismatch.modified	{count} 个内容已变更	app/renderer/src/chat/governance-view.ts:204	1	1
+composed-all-chunks	ui.governance.mismatch.missing	{count} 个缺失	app/renderer/src/chat/governance-view.ts:205	1	1
+composed-all-chunks	ui.governance.mismatch.unreadable	{count} 个不可读	app/renderer/src/chat/governance-view.ts:206	1	1
+exact	ui.governance.mismatch.someInconsistent	存在不一致	app/renderer/src/chat/governance-view.ts:207	1	1
+composed-all-chunks	ui.governance.mismatch.summary	治理记录与盘上边界不一致：共 {pinCount} 条 pin，其中 {diffCount} 个与记录不一致（{detail}）。未确认前，会话不能开启、写入会被拒绝。	app/renderer/src/chat/governance-view.ts:209	4	4
+exact	ui.governance.mismatch.title	治理记录与盘上边界不一致	app/renderer/src/chat/ChatStream.tsx:232	1	1
+exact	ui.governance.mismatch.note	确认接受后只会刷新 SHA-256 与留痕，不会修改任何边界文件内容。	app/renderer/src/chat/governance-view.ts:228	1	1
+exact	ui.governance.mismatch.hint	也可在终端核对 git 历史后再处理。	app/renderer/src/chat/governance-view.ts:229	1	1
+composed-all-chunks	ui.governance.pin.changed	{path} — 内容已变更（pin {pinned}… → 现 {actual}…）	app/renderer/src/chat/governance-view.ts:256	3	3
+composed-all-chunks	ui.governance.pin.missing	{path} — 文件缺失（无法重新 pin）	app/renderer/src/chat/governance-view.ts:262	1	1
+composed-all-chunks	ui.governance.pin.unreadable	{path} — 文件不可读（无法重新 pin）	app/renderer/src/chat/governance-view.ts:264	1	1
+composed-all-chunks	ui.governance.reacceptPinned	将重算这 {count} 条 pin；不新增、不删除 pin 条目，不修改任何边界文件内容。	app/renderer/src/chat/governance-view.ts:280	2	2
+exact	ui.governance.reacceptWriteLine	将写入：.ans/project.json、docs/bootstrap-manifest.md	app/renderer/src/chat/governance-view.ts:278	1	1
+exact	ui.governance.reacceptWarning	如果不认识这些改动，请先通过 git 历史或备份核对，不要直接接受。	app/renderer/src/chat/governance-view.ts:283	1	1
+composed-all-chunks	ui.governance.reacceptSuccess	已重新接受：更新 {updated} 条 pin（共 {total} 条），写入 .ans/project.json 与 docs/bootstrap-manifest.md。项目已恢复可用。	app/renderer/src/chat/governance-view.ts:299	3	3
+exact	ui.governance.reacceptNotWritten	本次未写入任何文件。	app/desktop/interface.ts:3574	1	1
+exact	ui.governance.reacceptNoRecord	没有治理记录；请先建立治理记录。	app/renderer/src/chat/governance-view.ts:318	1	1
+exact	ui.governance.reacceptInvalidRecord	治理记录不可用；本版不提供修复。	app/renderer/src/chat/governance-view.ts:319	1	1
+exact	ui.governance.reacceptNotNeeded	边界与记录一致，无需重新接受。	app/renderer/src/chat/governance-view.ts:320	1	1
+exact	ui.governance.reacceptPreviewStale	预览后边界文件又有变化，已取消本次写入；请重新检查。	app/renderer/src/chat/governance-view.ts:322	1	1
+exact	ui.governance.reacceptFixFiles	请先处理上述文件后重试。	app/renderer/src/chat/governance-view.ts:328	1	1
+exact	ui.governance.reacceptBusy	上一次操作仍在进行中；本次未写入任何文件。	app/renderer/src/chat/governance-view.ts:330	1	1
+composed-all-chunks	ui.governance.establishWritePath	将写入：{path}	app/renderer/src/chat/governance-view.ts:278	1	1
+exact	ui.governance.establishAdoptExisting	将采纳既有治理边界文档（不覆盖其内容）。	app/renderer/src/chat/governance-view.ts:388	1	1
+composed-all-chunks	ui.governance.establishWriteBoundary	将写入治理边界文档：{path}。	app/renderer/src/chat/governance-view.ts:390	1	1
+exact	ui.governance.establishBoundaryNotReported	治理边界文档：（未报告）	app/renderer/src/chat/governance-view.ts:391	1	1
+composed-all-chunks	ui.governance.establishLegacyBoundary	{path}（旧版 Markdown 边界；将被原样 pin，迁移属后续版本）	app/renderer/src/chat/governance-view.ts:395	1	1
+exact	ui.governance.establishDeclaration	不扩大任何角色写边界、不修改任何角色边界文件内容。	app/renderer/src/chat/governance-view.ts:397	1	1
+exact	ui.governance.establishAlreadyExists	治理记录已存在；本次未写入任何文件。	app/renderer/src/chat/governance-view.ts:412	1	1
+exact	ui.governance.establishBusy	上一次建立仍在进行中；本次未写入任何文件。	app/renderer/src/chat/governance-view.ts:413	1	1
+exact	ui.governance.establishInvalidRecord	治理记录不可用；本版不自动覆盖，修复路径待后续版本。	app/renderer/src/chat/governance-view.ts:415	1	1
+composed-all-chunks	ui.governance.errorCode	错误码：{code}	app/renderer/src/chat/governance-view.ts:417	1	1
+exact	ui.governance.noFilesWritten	未写入任何文件。	app/desktop/interface.ts:3574	1	1
+exact	ui.governance.modelOption.single	单模型（single）	app/renderer/src/chat/governance-view.ts:430	1	1
+exact	ui.governance.modelOption.trio	三权（trio）	app/renderer/src/chat/governance-view.ts:431	1	1
+exact	ui.governance.modelChoiceUnwired	当前桌面窗口未接线治理模型选择；本版不能按所选模型建立，按钮已禁用。	app/renderer/src/chat/governance-view.ts:436	1	1
+exact	ui.governance.trioArtifactsHint	检测到三权产物（docs/proposals / docs/nominations / docs/flows），建议选择 trio；请由你点选。	app/renderer/src/chat/governance-view.ts:438	1	1
+exact	ui.governance.legacyModelHint	本项目使用旧治理模型（su）。可升级为三权模型。	app/renderer/src/chat/governance-view.ts:443	1	1
+exact	ui.governance.migrationLabel	查看差异 / 升级	app/renderer/src/chat/governance-view.ts:444	1	1
+exact	ui.governance.migrationPending	升级入口待本版后续	app/renderer/src/chat/governance-view.ts:445	1	1
+exact	ui.governance.migrationOpenTitle	打开迁移预览（零写入）；确认后只改 .ans 的 governanceModel 并追加 manifest 记录。	app/renderer/src/chat/governance-view.ts:457	1	1
+exact	ui.governance.migrationUnwired	迁移预览与写入尚未接线；本版不可用。	app/renderer/src/chat/governance-view.ts:462	1	1
+exact	ui.governance.migration.legacyModel	旧模型	app/desktop/interface.ts:244	1	1
+exact	ui.governance.migration.fieldMissing	（字段缺失，将新增 governanceModel: "trio"）	app/renderer/src/chat/governance-view.ts:519	1	1
+composed-all-chunks	ui.governance.migration.modelLine	模型：{from} → {to}	app/desktop/session.ts:1760	1	1
+composed-all-chunks	ui.governance.migration.modelField	将写入 .ans 字段：{field}	app/renderer/src/chat/governance-view.ts:529	1	1
+composed-all-chunks	ui.governance.migration.manifestAppend	将追加 manifest 记录：{id}	app/renderer/src/chat/governance-view.ts:531	1	1
+composed-all-chunks	ui.governance.migration.pinChange	pin 变更：{item}	app/renderer/src/chat/governance-view.ts:536	1	1
+exact	ui.governance.migration.pinNoChange	pin 变更：无（不重算 pin）	app/renderer/src/chat/governance-view.ts:537	1	1
+composed-all-chunks	ui.governance.migration.retained	保留文件：{files}	app/renderer/src/chat/governance-view.ts:539	1	1
+composed-all-chunks	ui.governance.migration.digest	预览摘要（前 8 位）：{digest}	app/renderer/src/chat/governance-view.ts:541	1	1
+exact	ui.governance.migration.zeroWrite	预览零写入。确认后只改 .ans 的 governanceModel 并追加 manifest 记录；不重写角色卡/边界/pin/历史会话。	app/renderer/src/chat/governance-view.ts:543	1	1
+exact	ui.governance.migration.success	已升级为三权治理模型（.ans governanceModel = "trio"）。旧角色卡/边界/pin/历史会话保留。	app/renderer/src/chat/governance-view.ts:550	1	1
+exact	ui.governance.migration.alreadyTrio	已是三权治理模型，无需升级；本次未写入任何文件。	app/renderer/src/chat/governance-view.ts:563	1	1
+exact	ui.governance.migration.noRecord	没有治理记录（.ans/project.json）；本次未写入任何文件。	app/renderer/src/chat/governance-view.ts:565	1	1
+exact	ui.governance.migration.blocked	升级被阻止；本次未写入任何文件。	app/renderer/src/chat/governance-view.ts:566	1	1
+exact	ui.governance.migration.previewStale	预览后 .ans 又有变化，已取消本次写入；请重新检查。	app/renderer/src/chat/governance-view.ts:568	1	1
+exact	ui.governance.migration.busy	上一次升级仍在进行中；本次未写入任何文件。	app/renderer/src/chat/governance-view.ts:569	1	1
+exact	ui.governance.migration.invalidRequest	升级请求无效；本次未写入任何文件。	app/renderer/src/chat/governance-view.ts:570	1	1
+composed-all-chunks	ui.governance.migration.status	状态：{status}	app/desktop/watchdog.ts:320	1	1
+exact	ui.governance.migration.writeFailed	写入阶段失败，可能已写入部分文件，请核对现场。	app/renderer/src/chat/governance-view.ts:576	1	1
+exact	ui.governance.decisionBadge	治理决定 · 客户最终批准	app/renderer/src/chat/governance-view.ts:588	1	1
+exact	ui.governance.intentBadge	需求确认 · 客户	app/renderer/src/chat/governance-view.ts:589	1	1
+exact	ui.governance.queueNote	等待前一个决定	app/desktop/customer-input.ts:171	1	1
+exact	ui.governance.mirrorBadge	镜像 · 主入口	app/renderer/src/chat/governance-view.ts:591	1	1
+exact	ui.governance.power.proposal	提案	app/desktop/customer-input.ts:155	1	1
+exact	ui.governance.power.appointment	任命	app/desktop/customer-input.ts:159	1	1
+exact	ui.governance.power.appointmentWrite	任命写卡	app/desktop/session.ts:1743	1	1
+exact	ui.governance.power.scheduleWrite	编排	app/desktop/customer-input.ts:16	1	1
+exact	ui.governance.power.acceptance	验收	app/desktop/customer-input.ts:156	1	1
+exact	ui.governance.power.intentConfirm	需求确认	app/desktop/governance-advance.ts:719	1	1
+composed-all-chunks	ui.governance.decisionLine.step	步骤：{stepId}	app/renderer/src/chat/governance-view.ts:620	1	1
+composed-all-chunks	ui.governance.decisionLine.power	权力类型：{power}	app/renderer/src/chat/governance-view.ts:621	1	1
+composed-all-chunks	ui.governance.decisionLine.writePath	将写路径：{path}	app/renderer/src/chat/governance-view.ts:625	1	1
+composed-all-chunks	ui.governance.decisionLine.summary	摘要：{summary}	app/desktop/operator-channel.ts:716	1	1
+composed-all-chunks	ui.governance.decisionLine.hash	哈希：{sha256}	app/renderer/src/chat/governance-view.ts:628	1	1
+exact	ui.governance.decisionSourceFallback	发起角色	app/desktop/customer-input.ts:93	1	1
+composed-all-chunks	ui.governance.decisionTitle	来自 {name} 的治理决定 · 客户最终批准	app/desktop/chat-adapter.ts:9	2	2
+composed-all-chunks	ui.governance.moreDecisions	还有 {count} 个决定等待前一个决定	app/desktop/customer-input.ts:201	2	2
+exact	ui.reportCard.viewSource	查看来源角色文档	app/renderer/src/shell/ReportCard.tsx:50	1	1
+exact	ui.reportCard.unsupportedVersion	不支持此报告版本，未生成成果摘要。	app/renderer/src/shell/ReportCard.tsx:122	1	1
+composed-all-chunks	ui.reportCard.sourceLine	来源 {sourceName} · {origin}	app/desktop/confirm-card.ts:8	1	1
+exact	ui.reportCard.title	任务报告	app/renderer/src/shell/ReportCard.tsx:131	1	1
+exact	ui.reportCard.runtimeUnknown	引擎未知	app/renderer/src/shell/ReportCard.tsx:136	1	1
+composed-all-chunks	ui.reportCard.task	任务 {taskId}	app/desktop/customer-input.ts:180	1	1
+exact	ui.reportCard.taskUnknown	任务关联未知	app/renderer/src/shell/ReportCard.tsx:138	1	1
+composed-all-chunks	ui.reportCard.turn	轮次 {turnId}	app/desktop/chat-adapter.ts:99	1	1
+exact	ui.reportCard.turnNotProvided	轮次未提供	app/renderer/src/shell/ReportCard.tsx:140	1	1
+exact	ui.reportCard.excerptLabel	报告原文摘录	app/renderer/src/shell/ReportCard.tsx:144	1	1
+exact	ui.reportCard.folded	摘要已折叠，完整可用显示副本见下方	app/renderer/src/shell/ReportCard.tsx:147	1	1
+exact	ui.reportCard.storage	报告存储	app/renderer/src/shell/ReportCard.tsx:154	1	1
+exact	ui.reportCard.independentAcceptance	独立验收	app/renderer/src/chat/report-view.ts:6	1	1
+exact	ui.reportCard.notConfirmed	尚未确认	app/renderer/src/shell/ReportCard.tsx:183	1	1
+exact	ui.reportCard.disclaimer	以上为报告或终态记录，不等于独立验收通过。	app/renderer/src/shell/ReportCard.tsx:186	1	1
+exact	ui.reportCard.viewFull	查看完整报告摘要与证据	app/renderer/src/shell/ReportCard.tsx:198	1	1
+exact	ui.reportCard.noEvidence	（未提供证据）	app/renderer/src/shell/ReportCard.tsx:207	1	1
+exact	ui.reportCard.receiptHistory	接收历史	app/renderer/src/chat/report-view.ts:185	1	1
+exact	ui.reportCard.targetInput	目标输入记录	app/renderer/src/shell/ReportCard.tsx:320	1	1
+exact	ui.reportCard.targetTurn	目标轮次结果	app/renderer/src/shell/ReportCard.tsx:324	1	1
+exact	ui.reportView.provenance.timestamp	原时间未保存或不可展示	app/renderer/src/chat/report-view.ts:27	1	1
+exact	ui.reportView.provenance.anchorToken	原定位标记未提供	app/renderer/src/chat/report-view.ts:28	1	1
+exact	ui.reportView.provenance.oversize	原调用身份超出展示预算	app/renderer/src/chat/report-view.ts:29	1	1
+exact	ui.reportView.originFormal	正式回交	app/renderer/src/chat/report-view.ts:64	1	1
+exact	ui.reportView.originTerminal	终态记录	app/renderer/src/chat/report-view.ts:57	1	1
+exact	ui.reportView.originUnconfirmed	来源未确认	app/renderer/src/chat/report-view.ts:58	1	1
+exact	ui.reportView.evidenceTruncatedSome	部分证据显示已截断	app/renderer/src/chat/report-view.ts:125	1	1
+exact	ui.reportView.evidenceRedactedSome	部分证据已净化	app/renderer/src/chat/report-view.ts:126	1	1
+composed-all-chunks	ui.reportView.evidenceOmitted	另有 {count} 条证据因预算省略	app/desktop/interface.ts:1951	2	2
+exact	ui.reportView.saveError.conflict	保存内容冲突，不能自动覆盖。	app/renderer/src/chat/report-view.ts:174	1	1
+exact	ui.reportView.saveError.invalid	保存材料无效，不能自动恢复。	app/renderer/src/chat/report-view.ts:175	1	1
+exact	ui.reportView.saveError.replayDamaged	历史记录损坏，不能自动补存。	app/renderer/src/chat/report-view.ts:176	1	1
+exact	ui.reportView.saveError.replayChanged	历史记录已变化，不能自动补存。	app/renderer/src/chat/report-view.ts:177	1	1
+exact	ui.reportView.saveError.snapshotExpired	可补存的会话材料已失效，无法在此补存。	app/renderer/src/chat/report-view.ts:178	1	1
+exact	ui.reportView.saveError.provenanceTooLarge	回交记录超过展示与来源预算，尚未继续投递。	app/renderer/src/chat/report-view.ts:179	1	1
+exact	ui.reportView.saveError.textProjectionFailed	交接显示内容生成失败，尚未交给Provider。	app/renderer/src/chat/report-view.ts:180	1	1
+exact	ui.reportView.savedTargetHistory	接收历史已保存	app/renderer/src/chat/report-view.ts:208	1	1
+exact	ui.reportView.savedReport	报告已保存	app/renderer/src/chat/report-view.ts:208	1	1
+exact	ui.reportView.save.sessionOnly	仅本次会话可见，未启用历史保存。	app/renderer/src/chat/report-view.ts:214	1	1
+exact	ui.reportView.save.unsupported	当前会话无法确认或不支持此保存恢复能力。	app/renderer/src/chat/report-view.ts:217	1	1
+exact	ui.reportView.save.historyNotSaved	本次接收历史未保存；执行状态以上方实际结果为准。	app/renderer/src/chat/report-view.ts:222	1	1
+exact	ui.reportView.save.reportNotSaved	报告尚未保存，暂未继续回交。可补存原报告，无需重新运行任务。	app/renderer/src/chat/report-view.ts:223	1	1
+exact	ui.reportView.savingReport	正在保存报告…	app/renderer/src/chat/report-view.ts:230	1	1
+exact	ui.reportView.save.historyReceiptPending	尚未取得最终历史回执，处理可能已开始。	app/renderer/src/chat/report-view.ts:236	1	1
+exact	ui.reportView.save.reportUnconfirmed	报告保存状态未确认。	app/renderer/src/chat/report-view.ts:236	1	1
+exact	ui.reportView.retryHistory	重试保存历史	app/renderer/src/chat/report-view.ts:244	1	1
+exact	ui.reportView.retryReport	重试保存报告	app/renderer/src/chat/report-view.ts:244	1	1
+exact	ui.reportView.retryNote	补存已有记录，不再次执行或投递。	app/renderer/src/chat/report-view.ts:248	1	1
+exact	ui.reportView.turnStatus.timedOut	运行超时	app/renderer/src/chat/report-view.ts:274	1	1
+exact	ui.reportView.history.unconfirmed	未确认	app/desktop/interface.ts:2425	1	1
+exact	ui.reportView.history.saved	已保存	app/desktop/session.ts:1228	1	1
+exact	ui.reportView.history.disabled	未启用历史保存	app/renderer/src/chat/report-view.ts:214	1	1
+exact	ui.reportView.history.notSaved	尚未保存	app/renderer/src/chat/report-view.ts:223	1	1
+exact	ui.reportView.history.maybeStarted	可能已开始，结果未确认	app/renderer/src/chat/report-view.ts:314	1	1
+exact	ui.reportView.history.notHandedToProvider	尚未交给Provider	app/renderer/src/chat/report-view.ts:180	1	1
+composed-all-chunks	ui.reportView.batch	回交投递 · 本批 {count} 份（不表示全部收齐）	app/renderer/src/chat/report-view.ts:322	2	2
+exact	ui.reportView.modelInputMissing	此处未记录完整模型输入	app/renderer/src/chat/report-view.ts:333	1	1
+exact	ui.reportView.displayTruncated	显示副本已截断	app/renderer/src/chat/report-view.ts:335	1	1
+exact	ui.reportView.summaryTruncated	摘要已截断	app/renderer/src/chat/report-view.ts:336	1	1
+exact	ui.reportView.replicaMissing	交接内容安全显示副本未提供，不能显示完整模型输入。	app/renderer/src/chat/report-view.ts:343	1	1
+exact	ui.reportView.taskRequestLabel	任务请求原文	app/renderer/src/chat/ChatRow.tsx:120	1	1
+exact	ui.reportView.replyOriginalLabel	本轮角色回复原文（展开）	app/renderer/src/chat/ChatRow.tsx:120	1	1
+exact	ui.reportView.deliveryReplyLabel	本轮回交处理回复原文（展开）	app/renderer/src/chat/chat-store.ts:489	1	1
+composed-all-chunks	ui.reportView.projection.reportUnreadable	报告记录不可读（{count} 条）	app/renderer/src/chat/report-view.ts:373	2	2
+composed-all-chunks	ui.reportView.projection.omitted	省略前 {count} 条历史投影	app/renderer/src/chat/report-view.ts:384	2	2
+composed-all-chunks	ui.reportView.projection.invalid	无效投影条目 {count}	app/renderer/src/chat/report-view.ts:385	1	1
+exact	ui.reportView.projection.truncated	历史投影已截断	app/renderer/src/chat/report-view.ts:386	1	1
+composed-all-chunks	ui.reportView.projection.skipped	原解析跳过 {count} 条	app/renderer/src/chat/report-view.ts:391	1	1
+exact	ui.documentView.expired	文档上下文已失效。	app/renderer/src/shell/DocumentView.tsx:93	1	1
+exact	ui.documentView.reading	正在读取已列文档…	app/renderer/src/shell/DocumentView.tsx:121	1	1
+exact	ui.documentView.openReadonly	只读打开此文档	app/renderer/src/shell/DocumentView.tsx:141	1	1
+exact	ui.documentView.unreadable	当前项目/范围不可读	app/renderer/src/shell/DocumentView.tsx:141	1	1
+exact	ui.document.error.invalidRequest	文档请求无效。	app/renderer/src/chat/document-view.ts:49	1	1
+exact	ui.document.error.projectNotGranted	尚未获得当前项目的文档读取许可，请重新选择项目文件夹。	app/renderer/src/chat/document-view.ts:50	1	1
+exact	ui.document.error.projectNotActive	该项目不是当前项目。	app/renderer/src/chat/document-view.ts:51	1	1
+exact	ui.document.error.staleScope	项目文档列表已失效，请返回当前项目重新选择。	app/renderer/src/chat/document-view.ts:52	1	1
+exact	ui.document.error.unknownDocument	文档引用未知。	app/renderer/src/chat/document-view.ts:53	1	1
+exact	ui.document.error.notListed	该文档已不在可读清单中。	app/renderer/src/chat/document-view.ts:54	1	1
+exact	ui.document.error.outsideProject	该文件不在当前项目允许的阅读范围。	app/renderer/src/chat/document-view.ts:55	1	1
+exact	ui.document.error.symlinkNotAllowed	符号链接文档不可读取。	app/renderer/src/chat/document-view.ts:56	1	1
+exact	ui.document.error.notFound	文档不存在。	app/renderer/src/chat/document-view.ts:57	1	1
+exact	ui.document.error.notFile	该引用不是普通文件。	app/renderer/src/chat/document-view.ts:58	1	1
+exact	ui.document.error.unsupportedFormat	此文档格式暂不支持。	app/renderer/src/chat/document-view.ts:59	1	1
+exact	ui.document.error.invalidUtf8	文档不是有效UTF-8文本。	app/renderer/src/chat/document-view.ts:60	1	1
+exact	ui.document.error.binaryContent	文档包含二进制内容，不能预览。	app/renderer/src/chat/document-view.ts:61	1	1
+exact	ui.document.error.tooLarge	文档超过256KiB，无法在此预览。	app/renderer/src/chat/document-view.ts:62	1	1
+exact	ui.document.error.permissionDenied	没有读取此文档的权限。	app/renderer/src/chat/document-view.ts:63	1	1
+exact	ui.document.error.changedDuringRead	读取期间文档发生变化，请重新选择。	app/renderer/src/chat/document-view.ts:64	1	1
+exact	ui.document.error.unsupportedEnvironment	当前环境暂不支持安全读取项目文档。	app/renderer/src/chat/document-view.ts:65	1	1
+exact	ui.document.error.ioError	文档读取失败。	app/renderer/src/chat/document-view.ts:66	1	1
+exact	ui.document.error.fallback	无法读取此文档。	app/renderer/src/chat/document-view.ts:71	1	1
+composed-all-chunks	ui.document.readonlyMeta	只读文档 · {bytes} 字节	app/renderer/src/chat/document-view.ts:227	2	2
+exact	ui.document.reading	正在读取文档…	app/renderer/src/chat/document-view.ts:230	1	1
+exact	ui.document.unlisted	此链接尚未提供阅读入口。	app/renderer/src/chat/document-view.ts:231	1	1
+exact	ui.document.empty	该角色当前没有已列出的可读文档。	app/renderer/src/chat/document-view.ts:232	1	1
+exact	ui.document.pickHint	以下是当前项目中该角色已列出的可读文档，请选择要阅读的文件。	app/renderer/src/chat/document-view.ts:234	1	1
+composed-all-chunks	ui.document.sourceTitle	{roleName} · 来源文档	app/renderer/src/chat/document-view.ts:235	1	1
+exact	ui.document.backList	返回来源文档	app/renderer/src/chat/document-view.ts:237	1	1
+exact	ui.document.refresh	刷新已列文档	app/renderer/src/chat/document-view.ts:238	1	1
+exact	ui.document.read	阅读	app/renderer/src/chat/chat-store.ts:149	1	1
+composed-all-chunks	ui.profile.title	{roleName} · 角色资料	app/renderer/src/chat/work-view.ts:199	1	1
+composed-all-chunks	ui.profile.aria	角色资料，{count} 项进行中或排队	app/renderer/src/chat/work-view.ts:219	2	2
+no-literal-trace	ui.profile.noEntries	（无条目）		0	1
+no-literal-trace	ui.profile.noEntriesParseFailed	（无条目；解析失败：{detail}）		0	1
+exact	ui.profile.emptyTitle	选择角色后查看资料	app/renderer/src/shell/ProfilePanel.tsx:173	1	1
+exact	ui.profile.emptySub	先在左侧选择角色，再从会话头部的“角色资料”或“工作概览”打开对应面板；内容跟随当前角色。	app/renderer/src/shell/ProfilePanel.tsx:175	1	1
+exact	ui.profile.cardTab	角色卡	app/desktop/governance-advance.ts:39	1	1
+exact	ui.profile.emptyCard	（空）	app/desktop/composer-images.ts:67	1	1
+exact	ui.profile.boundaryTab	边界条目	app/desktop/session.ts:1116	1	1
+exact	ui.profile.changelogTab	变更记录	app/desktop/project.ts:6	1	1
+exact	ui.profile.noChangelog	（无 changelog.md）	app/renderer/src/shell/ProfilePanel.tsx:276	1	1
+exact	ui.profile.docsTab	文档	app/desktop/customer-input.ts:14	1	1
+exact	ui.profile.noDocs	（无 docs/ 目录或为空）	app/renderer/src/shell/ProfilePanel.tsx:288	1	1
+exact	ui.profile.viewListedDocs	查看已列文档	app/renderer/src/shell/ProfilePanel.tsx:7	1	1
+exact	ui.profile.pendingQueue	待办 / 队列	app/desktop/interface.ts:550	1	1
+composed-all-chunks	ui.queue.title	{roleName} · 队列	app/renderer/src/chat/work-view.ts:200	1	1
+exact	ui.status.label.stopped	已停止	app/desktop/confirm-card.ts:136	1	1
+exact	ui.status.label.closed	未开启	app/desktop/session.ts:2333	1	1
+exact	ui.status.label.idle	空闲	app/desktop/chat-adapter.ts:100	1	1
+exact	ui.status.label.working	工作中	app/desktop/governance-advance.ts:573	1	1
+exact	ui.status.label.waitingConfirm	等待你确认	app/desktop/customer-input.ts:71	1	1
+exact	ui.status.label.error	错误	app/desktop/governance-advance.ts:448	1	1
+exact	ui.status.label.idleRecovered	空闲（已恢复）	app/renderer/src/chat/status.ts:68	1	1
+exact	ui.status.title.closed	尚未开启会话（点它即可开启）	app/renderer/src/chat/status.ts:40	1	1
+exact	ui.status.title.idle	会话已开启，当前没有在跑的任务	app/renderer/src/chat/status.ts:45	1	1
+exact	ui.status.title.working	有轮次在跑（切走后仍在后台跑的轮次同样计入）或队列有待办	app/renderer/src/chat/status.ts:50	1	1
+exact	ui.status.title.waitingConfirm	有交互请求挂起，等你在会话流里作答	app/renderer/src/chat/status.ts:55	1	1
+exact	ui.status.title.stopped	会话已停止（历史保留在界面上；再点开为新会话）	app/renderer/src/chat/status.ts:60	1	1
+exact	ui.status.title.error	最近一次轮次或会话以错误结束	app/renderer/src/chat/status.ts:65	1	1
+exact	ui.status.title.idleRecovered	句柄未开；聊天流里是该角色恢复出来的历史记录	app/renderer/src/chat/status.ts:70	1	1
+exact	ui.status.title.unknown	未知状态（保守占位）	app/renderer/src/chat/status.ts:91	1	1
+composed-all-chunks	ui.status.pendingCount	{count} 待办	app/desktop/interface.ts:550	1	1
+composed-all-chunks	ui.status.queueNote.enqueued	另有 {count} 项已入队，当前任务完成后依次处理	app/desktop/interface.ts:1951	2	2
+composed-all-chunks	ui.status.queueNote.pending	另有 {count} 项待办在队列中（完成后依次处理）	app/desktop/interface.ts:1951	2	2
+exact	ui.chatRow.noFileTarget	无文件目标	app/renderer/src/chat/ChatRow.tsx:159	1	1
+exact	ui.chatRow.timeNotRecorded	未记录	app/desktop/judge-reason.ts:12	1	1
+exact	ui.chatRow.legacyStatusSource	状态来源：旧文本分类，不是新机器执行事实	app/renderer/src/chat/ChatRow.tsx:247	1	1
+exact	ui.chatRow.legacyClassification	旧文本分类，不是新机器执行事实	app/renderer/src/chat/ChatRow.tsx:247	1	1
+exact	ui.chatRow.unsupportedDetail	不支持此详情版本。	app/renderer/src/chat/ChatRow.tsx:259	1	1
+exact	ui.chatRow.noDetails	这条历史没有保存更多目标和错误详情。	app/renderer/src/chat/ChatRow.tsx:267	1	1
+exact	ui.chatRow.actualCommand	实际命令	app/renderer/src/chat/ChatRow.tsx:278	1	1
+exact	ui.chatRow.targetFile	目标文件	app/renderer/src/chat/ChatRow.tsx:278	1	1
+exact	ui.chatRow.noFileTargetDetail	本次调用无文件目标（交互/派发类工具）	app/renderer/src/chat/ChatRow.tsx:280	1	1
+exact	ui.chatRow.message	消息	app/desktop/chat-adapter.ts:7	1	1
+exact	ui.chatRow.error	错误	app/desktop/governance-advance.ts:448	1	1
+exact	ui.chatRow.result	结果	app/desktop/customer-input.ts:115	1	1
+composed-all-chunks	ui.chatRow.exitCode	退出码：{code}	app/renderer/src/chat/ChatRow.tsx:284	1	1
+composed-all-chunks	ui.chatRow.signal	信号：{signal}	app/desktop/interface.ts:2019	1	1
+exact	ui.chatRow.stdout	标准输出	app/renderer/src/chat/ChatRow.tsx:286	1	1
+exact	ui.chatRow.stderr	标准错误	app/renderer/src/chat/ChatRow.tsx:287	1	1
+composed-all-chunks	ui.chatRow.duration	耗时：{ms} ms	app/renderer/src/chat/ChatRow.tsx:288	2	2
+exact	ui.chatRow.budgetOmitted	部分展示内容因预算省略	app/renderer/src/chat/ChatRow.tsx:294	1	1
+exact	ui.chatRow.nonTextResult	非文本结果未展示	app/renderer/src/chat/ChatRow.tsx:296	1	1
+exact	ui.chatRow.unsupportedInput	未支持的输入未展示	app/renderer/src/chat/ChatRow.tsx:297	1	1
+exact	ui.chatRow.timeNotSaved	时间未保存	app/renderer/src/chat/ChatRow.tsx:327	1	1
+exact	ui.chatRow.operationNotApproved	操作未放行	app/renderer/src/chat/ChatRow.tsx:371	1	1
+exact	ui.chatRow.targetNotRecorded	目标未记录	app/renderer/src/chat/ChatRow.tsx:393	1	1
+exact	ui.chatRow.choose	请选择	app/renderer/src/chat/ChatRow.tsx:532	1	1
+exact	ui.chatRow.confirm	请确认	app/renderer/src/chat/ChatRow.tsx:532	1	1
+exact	ui.chatRow.preview	预览内容	app/renderer/src/chat/ChatRow.tsx:537	1	1
+exact	ui.chatRow.submit	提交	app/desktop/customer-input.ts:828	1	1
+exact	ui.chatRow.confirmAction	确认	app/desktop/confirm-card.ts:2	1	1
+exact	ui.chatRow.rejectAction	拒绝	app/desktop/chat-adapter.ts:76	1	1
+exact	ui.chatRow.turnEnded	本轮结束	app/desktop/governance-advance.ts:943	1	1
+exact	ui.chatRow.judgeDetails	详情（命令原文 / 理由 / 证据）	app/renderer/src/chat/ChatRow.tsx:732	1	1
+exact	ui.chatRow.commandOriginal	命令原文	app/desktop/interface.ts:517	1	1
+composed-all-chunks	ui.chatRow.customerMessage	客户说明：{message}	app/desktop/operator-channel.ts:698	1	1
+exact	ui.chatRow.customerMessageNote	客户说明由系统整理。	app/renderer/src/chat/ChatRow.tsx:748	1	1
+exact	ui.chatRow.evidence	证据	app/desktop/customer-input.ts:1113	1	1
+exact	ui.chatRow.hardDenyOverride	hardDenyOverride：true（deny 档被判断 agent 放行）。	app/renderer/src/chat/ChatRow.tsx:761	1	1
+composed-all-chunks	ui.chatRow.durationStat	耗时 {ms}ms	app/desktop/session.ts:4233	2	2
+composed-all-chunks	ui.chatRow.readCalls	读取 {count} 次	app/desktop/composer-images.ts:56	1	1
+composed-all-chunks	ui.chatRow.readBytes	{bytes} 字节	app/desktop/composer-images.ts:5	1	1
+exact	ui.chatRow.decisionDetails	详情（判断理由 / 选中项 / 证据）	app/renderer/src/chat/ChatRow.tsx:810	1	1
+exact	ui.chatRow.perPath	逐路径结论	app/renderer/src/chat/ChatRow.tsx:823	1	1
+no-literal-trace	ui.chatRow.pathResult	{path}：{result}		0	0
+exact	ui.chatRow.allowed	允许	app/desktop/composer-images.ts:15	1	1
+exact	ui.chatRow.denied	拒绝	app/desktop/chat-adapter.ts:76	1	1
+exact	ui.chatStore.context.opened	会话已开启	app/renderer/src/chat/ChatStream.tsx:256	1	1
+exact	ui.chatStore.context.projectLoadFailed	项目加载失败	app/renderer/src/chat/chat-store.ts:784	1	1
+exact	ui.chatStore.context.primaryNoSession	主入口 · 尚未开启会话	app/renderer/src/chat/chat-store.ts:848	1	1
+exact	ui.chatStore.context.opening	正在开启或恢复会话…	app/renderer/src/chat/chat-store.ts:906	1	1
+exact	ui.chatStore.context.notConnected	未连接主进程	app/renderer/src/chat/chat-store.ts:949	1	1
+exact	ui.chatStore.context.channelUnavailable	会话通道不可用	app/renderer/src/chat/chat-store.ts:960	1	1
+exact	ui.chatStore.error.noDesktopBridge	当前环境未提供桌面通道	app/renderer/src/chat/chat-store.ts:948	1	1
+exact	ui.chatStore.error.noSessionChannel	当前版本未提供会话通道	app/renderer/src/chat/chat-store.ts:959	1	1
+exact	ui.chatStore.openFailed	会话开启失败	app/desktop/session.ts:1304	1	1
+composed-all-chunks	ui.chatStore.openFailedWithReason	开启会话失败：{reason}	app/renderer/src/chat/chat-store.ts:985	1	1
+exact	ui.chatStore.context.continues	会话继续使用现有上下文	app/renderer/src/chat/chat-store.ts:1000	1	1
+exact	ui.chatStore.context.recovered	已从本地恢复模型上下文	app/renderer/src/chat/chat-store.ts:1002	1	1
+exact	ui.chatStore.context.recoveryFailed	恢复失败，当前为新会话	app/renderer/src/chat/chat-store.ts:1005	1	1
+exact	ui.chatStore.context.newSession	新会话	app/desktop/session.ts:1039	1	1
+exact	ui.chatStore.context.sourceUnreported	上下文来源未报告	app/renderer/src/chat/chat-store.ts:1007	1	1
+exact	ui.chatStore.context.historyFailed	历史读取失败	app/desktop/runtime-history.ts:93	1	1
+exact	ui.chatStore.context.engineSwitched	已切换引擎；点角色重新开启会话	app/renderer/src/chat/chat-store.ts:1064	1	1
+composed-all-chunks	ui.chatStore.replayFailed	会话记录读取失败，未回放：{detail}	app/renderer/src/chat/chat-store.ts:1635	1	1
+exact	ui.chatStore.historyRetainedSuffix	；可读历史保留，模型未恢复	app/renderer/src/chat/chat-store.ts:1645	1	1
+exact	ui.chatStore.context.historyRecovered	会话记录已恢复	app/renderer/src/chat/chat-store.ts:1407	1	1
+exact	ui.chatStore.error.operatorChannelMissing	operatorRespond 通道未接	app/renderer/src/chat/chat-store.ts:1857	1	1
+exact	ui.chatStore.operatorChannelNotAccepted	通道未受理	app/renderer/src/chat/chat-store.ts:1879	1	1
+exact	ui.chatStore.context.openingSession	正在开启会话…	app/renderer/src/chat/chat-store.ts:1950	1	1
+exact	ui.chatStore.context.openedBackground	会话已开启；后台正在工作，暂无可见消息	app/renderer/src/chat/chat-store.ts:1956	1	1
+composed-all-chunks	ui.chatStore.toolNotApproved	{toolName} 未放行	app/desktop/operator-channel.ts:696	1	1
+exact	ui.chatStream.withdrawUnavailable	撤回无效：当前版本未提供撤回通道。	app/renderer/src/chat/ChatStream.tsx:65	1	1
+exact	ui.chatStream.running	进行中	app/desktop/interface.ts:762	1	1
+no-literal-trace	ui.chatStream.queuePosition	第 {position} 位		0	0
+exact	ui.chatStream.empty.noProjectSub	在左侧点击「导入项目」选择项目根目录；导入后点击任意角色开始聊天。	app/renderer/src/chat/ChatStream.tsx:216	1	1
+exact	ui.chatStream.empty.notBootstrappedTitle	项目尚未 bootstrap	app/desktop/interface.ts:233	1	1
+composed-all-chunks	ui.chatStream.empty.notBootstrappedSubWithRole	与 {roleName} 对话，让它把角色建出来；左树会随之长出。	app/renderer/src/chat/ChatStream.tsx:222	1	1
+exact	ui.chatStream.empty.notBootstrappedSubPrimary	与主入口对话，让它把角色建出来；左树会随之长出。	app/renderer/src/chat/ChatStream.tsx:223	1	1
+exact	ui.chatStream.empty.noRolesTitle	该项目下未枚举到角色	app/renderer/src/chat/ChatStream.tsx:226	1	1
+exact	ui.chatStream.empty.noRolesSub	请确认项目包含角色卡目录与治理边界；重新导入项目后重试。	app/renderer/src/chat/ChatStream.tsx:227	1	1
+exact	ui.chatStream.empty.selectRoleTitle	选择角色开始聊天	app/renderer/src/chat/ChatStream.tsx:229	1	1
+exact	ui.chatStream.empty.selectRoleSub	从左侧角色树选择角色；每个角色保留自己的会话历史。	app/renderer/src/chat/ChatStream.tsx:230	1	1
+exact	ui.chatStream.empty.startSub	点下方按钮开启会话；发送消息后，这里会显示对话与工具记录。	app/renderer/src/chat/ChatStream.tsx:253	1	1
+exact	ui.chatStream.empty.openedTitle	会话已开启，可直接输入消息	app/renderer/src/chat/ChatStream.tsx:256	1	1
+exact	ui.chatStream.empty.openedSub	发送第一条消息后，这里会显示对话与工具记录。写入由治理引擎把关，越界操作会在对话中直接提示。	app/renderer/src/chat/ChatStream.tsx:258	1	1
+composed-all-chunks	ui.chatStream.openingSession	正在开启与角色 {roleName} 的会话…	app/renderer/src/chat/ChatStream.tsx:290	2	2
+exact	ui.chatStream.loadingHistory	正在载入会话历史…	app/renderer/src/chat/ChatStream.tsx:291	1	1
+composed-all-chunks	ui.chatStream.startConversation	开始与 {roleName} 对话	app/renderer/src/chat/ChatStream.tsx:252	2	2
+exact	ui.chatStream.working	正在工作	app/renderer/src/chat/ChatStream.tsx:339	1	1
+composed-all-chunks	ui.chatStream.pendingLocate	有 {count} 条待确认 · 定位	app/renderer/src/chat/ChatStream.tsx:347	1	1
+exact	ui.tool.status.called	调用发起	app/renderer/src/chat/events.ts:340	1	1
+exact	ui.tool.status.denied	已拒绝	app/desktop/customer-input.ts:828	1	1
+exact	ui.tool.status.failed	执行失败	app/desktop/session-history.ts:88	1	1
+exact	ui.tool.status.timedOut	超时终止	app/desktop/runtime-history.ts:39	1	1
+exact	ui.tool.status.completed	已执行完成	app/renderer/src/chat/events.ts:170	1	1
+composed-all-chunks	ui.tool.status.completedExit	已执行完成（退出码 {code}）	app/renderer/src/chat/events.ts:170	1	1
+exact	ui.tool.status.completedShort	执行完成	app/desktop/governance-advance.ts:459	1	1
+exact	ui.tool.status.returned	工具返回	app/desktop/session.ts:3629	1	1
+exact	ui.tool.status.unknown	状态未记录	app/renderer/src/chat/events.ts:183	1	1
+exact	ui.tool.status.recorded	已记录	app/renderer/src/chat/events.ts:186	1	1
+exact	ui.tool.status.notApproved	未放行	app/desktop/operator-channel.ts:696	1	1
+exact	ui.tool.status.running	运行中	app/desktop/interface.ts:1381	1	1
+exact	ui.tool.status.done	完成	app/desktop/customer-input.ts:181	1	1
+composed-all-chunks	ui.tool.summary	本轮 {count} 个调用	app/desktop/confirm-card.ts:136	2	2
+composed-all-chunks	ui.tool.summaryWithTools	本轮 {count} 个调用：{tools}	app/desktop/confirm-card.ts:136	2	2
+composed-all-chunks	ui.tool.containsDenied	含 {count} 条未放行	app/renderer/src/chat/chat-store.ts:2120	1	1
+composed-all-chunks	ui.tool.containsFailed	含 {count} 条失败	app/renderer/src/chat/tool-summary.ts:7	1	1
+exact	ui.tool.containsUnknown	含状态未记录	app/renderer/src/chat/tool-summary.ts:7	1	1
+composed-all-chunks	ui.events.target	目标：{target}	app/renderer/src/chat/events.ts:147	1	1
+exact	ui.events.timedOut	已超时	app/desktop/confirm-card.ts:129	1	1
+composed-all-chunks	ui.events.systemMessage	系统消息 · {label}	app/renderer/src/chat/events.ts:373	1	1
+exact	ui.events.systemNotice	系统通知	app/renderer/src/chat/ChatRow.tsx:418	1	1
+composed-all-chunks	ui.events.systemNoticeWithLabel	系统通知 · {label}	app/renderer/src/chat/events.ts:387	1	1
+exact	ui.events.dispatchTask	派发任务	app/desktop/governance-advance.ts:599	1	1
+no-literal-trace	ui.events.dispatchTaskWithRole	派发任务 · 来自 {role}		0	1
+exact	ui.events.handbackDelivery	回交投递	app/desktop/session.ts:2257	1	1
+composed-all-chunks	ui.events.handbackDeliveryWithRole	回交投递 · 来自 {role}	app/desktop/session.ts:3097	1	1
+exact	ui.events.handbackLegacy	回交已收到（旧来源，安全详情未提供）	app/desktop/session.ts:2961	1	1
+composed-all-chunks	ui.events.legacyUnknown	旧/未知系统记录：{summary}	app/renderer/src/chat/events.ts:606	1	1
+exact	ui.events.historyRecord	（历史记录）	app/renderer/src/chat/events.ts:977	1	1
+exact	ui.reasoning.fallbackLabel	已思考	app/desktop/runtime-history.ts:48	1	1
+exact	ui.reasoning.unsafe	推理内容无法安全显示	app/renderer/src/chat/reasoning.ts:38	1	1
+exact	ui.reasoning.omitted	平台省略了思考正文，无法显示具体内容。	app/renderer/src/chat/reasoning.ts:39	1	1
+exact	ui.reasoning.empty	没有可显示的思考正文。	app/renderer/src/chat/reasoning.ts:40	1	1
+exact	ui.reasoning.partial	平台省略了部分思考正文。	app/renderer/src/chat/reasoning.ts:41	1	1
+composed-all-chunks	ui.reasoning.thoughtSeconds	已思考 {seconds} 秒	app/desktop/runtime-history.ts:48	1	1
+exact	ui.reasoning.omittedSuffix	（内容由平台省略）	app/renderer/src/chat/reasoning.ts:63	1	1
+exact	ui.reasoning.partialSuffix	（部分内容由平台省略）	app/renderer/src/chat/reasoning.ts:63	1	1
+exact	ui.markdown.externalUnavailable	当前环境未提供外部打开通道	app/renderer/src/chat/markdown.ts:138	1	1
+composed-all-chunks	ui.markdown.openFailed	链接未能打开：{detail}	app/renderer/src/chat/markdown.ts:151	1	1
+exact	ui.markdown.openFailedChannel	链接未能打开：通道异常	app/renderer/src/chat/markdown.ts:158	1	1
+exact	ui.operator.kind.choice	待选择	app/renderer/src/chat/operator-view.ts:110	1	1
+exact	ui.operator.result.confirm	已确认。	app/renderer/src/chat/operator-view.ts:135	1	1
+exact	ui.operator.result.deny	已回『不同意』（未获同意）。	app/renderer/src/chat/operator-view.ts:136	1	1
+exact	ui.operator.result.cancel	已取消（未获同意）。	app/renderer/src/chat/operator-view.ts:137	1	1
+exact	ui.operator.result.submit	已提交。	app/renderer/src/chat/operator-view.ts:138	1	1
+exact	ui.operator.submitting	已提交，等待主进程受理…	app/renderer/src/chat/operator-view.ts:157	1	1
+exact	ui.operator.expired	请求已失效，未获同意。	app/renderer/src/chat/ChatRow.tsx:498	1	1
+composed-all-chunks	ui.operator.expiredWithReason	请求已失效，未获同意。原因：{reason}	app/renderer/src/chat/operator-view.ts:162	1	1
+no-literal-trace	ui.operator.expiredRetry	请求已失效，未获同意。请让角色重新发起。		0	1
+composed-all-chunks	ui.operator.retryFailed	回传失败：{detail}——请重试。	app/renderer/src/chat/operator-view.ts:168	2	2
+exact	ui.judge.mode.approval	代审批	app/desktop/customer-input.ts:164	1	1
+exact	ui.judge.mode.decision	代决策	app/desktop/customer-input.ts:155	1	1
+composed-all-chunks	ui.judge.titleWithRole	命令审批 · {roleName}	app/renderer/src/chat/judge.ts:57	1	1
+exact	ui.judge.titleSu	SU 命令审批	app/renderer/src/chat/judge.ts:58	1	1
+exact	ui.judge.titleShell	shell 命令请求	app/renderer/src/chat/judge.ts:58	1	1
+exact	ui.judge.tier.risky	风险命令（risky）	app/desktop/operator-channel.ts:762	1	1
+exact	ui.judge.tier.review	未自动判定（review）	app/desktop/operator-channel.ts:762	1	1
+exact	ui.judge.tier.deny	硬拒类（deny）	app/desktop/operator-channel.ts:762	1	1
+exact	ui.judge.shellOn	替我审批中 · 判断 agent	app/renderer/src/chat/judge.ts:79	1	1
+exact	ui.judge.shellOff	替我审批	app/desktop/interface.ts:55	1	1
+exact	ui.judge.decisionOn	替我决策中 · 判断 agent	app/renderer/src/chat/judge.ts:81	1	1
+exact	ui.judge.decisionOff	替我决策	app/desktop/customer-input.ts:732	1	1
+exact	ui.judge.bridgeMissing	当前版本不支持自动判断，保持手动	app/renderer/src/chat/judge.ts:83	1	1
+exact	ui.judge.decisionSingleNote	旧治理模型（single）不支持代决策	app/renderer/src/chat/judge.ts:84	1	1
+exact	ui.judge.shellOffTitle	手动逐条确认 shell 命令与 trio 写盘/写卡确认（默认）	app/renderer/src/chat/judge.ts:87	1	1
+exact	ui.judge.shellOnTitle	判断 agent 先评估 shell 命令与 trio 写盘/写卡确认；可随时关闭	app/renderer/src/chat/judge.ts:89	1	1
+exact	ui.judge.decisionOffTitle	手动逐张确认提案接受、任命与验收（默认）	app/renderer/src/chat/judge.ts:90	1	1
+exact	ui.judge.decisionOnTitle	判断 agent 先评估提案接受、任命与验收；可随时关闭	app/renderer/src/chat/judge.ts:92	1	1
+exact	ui.judge.warningClose	知道了	app/renderer/src/chat/judge.ts:94	1	1
+exact	ui.judge.toggleOn.shell	替我审批中：shell 命令与写盘/写卡确认（write / appointment-write / schedule-write）将由判断 agent 代批。	app/renderer/src/chat/judge.ts:177	1	1
+exact	ui.judge.toggleOn.decision	替我决策中：提案接受、任命、验收将由判断 agent 代批。	app/renderer/src/chat/judge.ts:183	1	1
+exact	ui.judge.scopeNote	判断 agent 只读项目内代码/文档/角色卡（不含 .env、密钥/凭据、.ans 账本/会话、审计日志与项目外），不写文件、不执行命令；只代你「接受/任命/确认/验收」，不会代你拒绝、要求修改或勾选证据不足的候选；不确定、缺证据、读取失败、引擎不可用、超时或解析失败会按所属开关回落逐张卡，由你决定。	app/renderer/src/chat/judge.ts:188	1	1
+exact	ui.judge.quickPathNote	提案快捷路径（accept-quick）默认不代批；旧治理模型（single/su）的治理方向卡仍逐张确认；single 下写盘确认仍逐张手动。	app/renderer/src/chat/judge.ts:192	1	1
+exact	ui.judge.costNote	每次代批会产生一次模型调用（token/延迟）；结果行与审计会标明「judge 代批 · 代审批/代决策」；可能误判，可随时关闭。	app/renderer/src/chat/judge.ts:196	1	1
+exact	ui.judge.toggleFailed	未能确认自动判断开关（通道异常）；保持原状态。	app/renderer/src/chat/judge.ts:219	1	1
+exact	ui.judge.summaryFallback	无法概括命令；展开查看原文	app/renderer/src/chat/judge.ts:293	1	1
+composed-all-chunks	ui.judge.alternative	替代方案：{value}	app/renderer/src/chat/judge.ts:302	1	1
+composed-all-chunks	ui.judge.alternativeWithRationale	替代方案：{value}（{rationale}）	app/renderer/src/chat/judge.ts:302	1	1
+composed-all-chunks	ui.judge.tierLine	档位：{tier}	app/desktop/governance-advance.ts:549	1	1
+exact	ui.judge.hardDenyNote	该命令属于硬拒类，判断 agent 判定必要后放行；请复核	app/renderer/src/chat/judge.ts:312	1	1
+composed-all-chunks	ui.judge.reasonLine	判断理由：{reason}	app/renderer/src/chat/ChatRow.tsx:742	1	1
+exact	ui.judge.approvedHardDeny	已替你放行（判断 agent · 代审批 · deny 档）	app/renderer/src/chat/judge.ts:325	1	1
+exact	ui.judge.approved	已替你放行（判断 agent · 代审批）	app/renderer/src/chat/judge.ts:326	1	1
+exact	ui.judge.notApproved	未放行（判断 agent · 代审批）	app/renderer/src/chat/judge.ts:327	1	1
+exact	ui.judge.hardDenyLabel	deny 档 · judge 放行	app/desktop/operator-channel.ts:243	1	1
+composed-all-chunks	ui.judge.engineText	判断引擎：{engine}	app/renderer/src/chat/judge.ts:330	1	1
+exact	ui.judge.closeAndRetry	可关闭「替我审批」后重试（改为手动确认），或按替代方案调整命令。	app/renderer/src/chat/judge.ts:337	1	1
+composed-all-chunks	ui.judge.headline.acceptProposal	接受提案（{selected}）	app/desktop/customer-input.ts:155	1	1
+composed-all-chunks	ui.judge.headline.acceptance	验收通过（{selected}）	app/desktop/customer-input.ts:156	1	1
+composed-all-chunks	ui.judge.headline.appointment	任命 {selected}	app/desktop/customer-input.ts:159	1	1
+exact	ui.judge.headline.appointmentNotReported	任命（未报告选中项）	app/renderer/src/chat/judge.ts:420	1	1
+composed-all-chunks	ui.judge.headline.writeConfirm	确认写入 {count} 个路径（{paths}{tail}）	app/desktop/customer-input.ts:164	2	2
+exact	ui.judge.headline.writeNotReported	确认写入（未报告路径）	app/renderer/src/chat/judge.ts:434	1	1
+exact	ui.judge.headline.autoApproved	已代批	app/renderer/src/chat/judge.ts:436	1	1
+no-literal-trace	ui.judge.headline.autoApprovedWithKind	已代批（{cardKind}）		0	1
+composed-all-chunks	ui.judge.flowSuffix	 · 流程 {flowId}	app/desktop/customer-input.ts:154	1	1
+composed-all-chunks	ui.judge.titlePrefix	judge 代批 · {label}	app/desktop/customer-input.ts:155	1	1
+composed-all-chunks	ui.judge.selectedLine	选中项：{items}	app/renderer/src/chat/ChatRow.tsx:816	1	1
+composed-all-chunks	ui.judge.pathsLine	路径：{paths}	app/desktop/chat-adapter.ts:15	1	1
+composed-all-chunks	ui.judge.flowText	流程：{flowId}	app/desktop/interface.ts:1624	1	1
+exact	ui.judge.recovery.stopNote	停该角色当前轮次；不销毁会话。	app/renderer/src/chat/judge.ts:506	1	1
+exact	ui.judge.recovery.rebuildNote	重建该角色会话（保留 ANS 回放）；目标正忙时不会执行。	app/renderer/src/chat/judge.ts:511	1	1
+exact	ui.judge.recovery.redeliver	重新投递	app/desktop/session.ts:685	1	1
+exact	ui.judge.recovery.redeliverNote	触发该角色投递队列立即重试。	app/renderer/src/chat/judge.ts:515	1	1
+exact	ui.drawerStore.noSourceRole	无法确定来源角色，暂不能列出来源文档。	app/renderer/src/stores/drawer-store.ts:399	1	1
+exact	ui.drawerStore.refreshFailed	文档清单刷新失败。	app/renderer/src/stores/drawer-store.ts:407	1	1
+exact	ui.drawerStore.withdrawUnavailable	当前版本未提供撤回通道	app/renderer/src/chat/ChatStream.tsx:65	1	1
+exact	ui.governanceStore.previewUnavailable	预览通道不可用（桌面窗口尚未接线）。	app/renderer/src/stores/governance-store.ts:142	1	1
+exact	ui.governanceStore.migrationUnavailable	迁移通道不可用（桌面窗口尚未接线）。	app/renderer/src/stores/governance-store.ts:146	1	1
+exact	ui.governanceStore.previewFailed	预览失败。	app/renderer/src/stores/governance-store.ts:170	1	1
+exact	ui.governanceStore.reacceptUnavailable	重新接受通道不可用（桌面窗口尚未接线）。	app/renderer/src/stores/governance-store.ts:270	1	1
+exact	ui.governanceStore.establishUnavailable	建立通道不可用（桌面窗口尚未接线）。	app/renderer/src/stores/governance-store.ts:284	1	1
+exact	ui.governanceStore.reacceptFailed	重新接受失败（主进程未返回 message）。	app/renderer/src/stores/governance-store.ts:310	1	1
+exact	ui.governanceStore.reacceptEffect	治理角色将在下一轮发送前按新边界重建（若正在运行，下一轮结束后生效）。	app/renderer/src/stores/governance-store.ts:338	1	1
+exact	ui.governanceStore.establishFailed	建立失败（主进程未返回 finalize.message）。	app/renderer/src/stores/governance-store.ts:350	1	1
+exact	ui.governanceStore.cancelled	已取消，未写入任何文件。	app/renderer/src/stores/governance-store.ts:358	1	1
+composed-all-chunks	ui.governanceStore.nextStep	下一步：{step}	app/renderer/src/stores/governance-store.ts:372	1	1
+composed-all-chunks	ui.governanceStore.flow	流程 {flowId}	app/desktop/customer-input.ts:154	1	1
+exact	ui.reportStore.sessionNotAvailable	当前没有原会话可供保存恢复。	app/renderer/src/stores/report-store.ts:64	1	1
+exact	ui.reportStore.unsupported	当前会话不支持此保存恢复能力。	app/renderer/src/stores/report-store.ts:65	1	1
+exact	ui.reportStore.projectNotActive	项目已失效。	app/renderer/src/stores/report-store.ts:66	1	1
+exact	ui.reportStore.scopeMismatch	保存状态范围不符。	app/renderer/src/stores/report-store.ts:95	1	1
+exact	ui.reportStore.statusUnavailable	无法取得保存状态。	app/renderer/src/stores/report-store.ts:102	1	1
+exact	ui.settingsStore.noConfigChannel	当前环境未提供配置通道	app/renderer/src/stores/settings-store.ts:231	1	1
+exact	ui.settingsStore.configChannelUnavailable	当前版本未提供配置通道	app/renderer/src/stores/settings-store.ts:238	1	1
+exact	ui.settingsStore.saveChannelUnavailable	当前版本未提供配置保存通道	app/renderer/src/stores/settings-store.ts:366	1	1
+exact	main.common.unknownRuntime	未知运行时。	app/desktop/interface.ts:4390	1	1
+exact	main.common.unknownRole	(未知角色)	app/desktop/session.ts:3062	1	1
+exact	main.common.reloadInterface	重新加载界面	app/desktop/diagnostics.ts:80	1	1
+exact	main.common.recoveryPageTitle	界面需要恢复	app/desktop/diagnostics.ts:80	1	1
+exact	main.common.recoveryPageHeading	界面暂时无法显示	app/desktop/diagnostics.ts:80	1	1
+exact	main.common.recoveryPageBody	点击重新加载可恢复界面，已有任务不会自动重发。	app/desktop/diagnostics.ts:80	1	1
+exact	main.session.contextRecoveryFailed	原生上下文恢复失败，已重建上下文。	app/desktop/session.ts:964	1	1
+composed-all-chunks	main.session.rebuiltBoundary	该角色边界已更新或运行时配置已保存（{changed}），已作废旧会话，按新边界重开；上下文恢复结果以引擎实际返回为准。	app/desktop/session.ts:1228	2	2
+composed-all-chunks	main.session.rebuiltSkills	该角色已安装技能已变更（{changed}），已作废旧会话，按新技能登记重开；上下文恢复结果以引擎实际返回为准。	app/desktop/session.ts:1227	2	2
+composed-all-chunks	main.session.rebuildFailed	按新边界重开会话失败：{detail}（请重试或点击左侧角色）。	app/desktop/session.ts:1245	2	2
+composed-all-chunks	main.session.intentHandoffFailed	应用无法把意图交给 Draft（提案）：{detail}；未重试	app/desktop/session.ts:1534	2	2
+composed-all-chunks	main.session.openProposalFailed	无法开启 Draft（提案）会话（{detail}）	app/desktop/session.ts:1540	1	1
+composed-all-chunks	main.session.sendProposalFailed	发送任务给 Draft（提案）失败（{detail}）	app/desktop/session.ts:1547	1	1
+exact	main.session.proposalQueued	Draft（提案）工作中，已排队	app/desktop/session.ts:1553	1	1
+exact	main.session.proposalWorking	已交给 Draft（提案）（工作中）	app/desktop/session.ts:1553	1	1
+composed-all-chunks	main.session.intentHandedOff	已把意图「{intentId}」交给 Draft（提案）（handoffKind={handoffKind}）——交接 ≠ 客户批准。	app/desktop/session.ts:1603	3	3
+exact	main.session.clarificationEmpty	澄清问题不能为空；未提交。	app/desktop/session.ts:1629	1	1
+exact	main.session.clarificationDisplayFailed	无法在主入口显示澄清请求；未提交。	app/desktop/session.ts:1643	1	1
+composed-all-chunks	main.session.clarificationShown	已在主入口（{roleId}）显示；客户回答后由 Lead（主理）更新意图并交接。	app/desktop/session.ts:1650	2	2
+exact	main.session.missingProjectOrRole	缺少项目根或角色 id。	app/desktop/session.ts:1681	1	1
+exact	main.session.readyContinue	会话已就绪，续接当前会话。	app/desktop/session.ts:1697	1	1
+exact	main.session.closedClickRole	会话已关闭，请重新点击角色。	app/desktop/session.ts:1711	1	1
+exact	main.session.continuing	已在该角色的会话中，续接当前会话。	app/desktop/session.ts:1716	1	1
+exact	main.session.configAfterTurn	当前轮次继续使用原配置，新配置在轮次结束后应用。	app/desktop/session.ts:1717	1	1
+composed-all-chunks	main.session.boundaryRebuildFailed	该角色边界已更新，但按新边界重开会话失败：{detail}。请重试。	app/desktop/session.ts:1728	2	2
+exact	main.session.projectNotEnumerated	尚未枚举该项目；请先导入项目（app:list-project）。	app/desktop/session.ts:1739	1	1
+composed-all-chunks	main.session.roleNotFound	项目 {projectRoot} 下未找到角色：{roleId}	app/desktop/chat-adapter.ts:15	2	2
+composed-all-chunks	main.session.eventStreamError	会话事件流异常：{detail}	app/desktop/session.ts:2318	1	1
+composed-all-chunks	main.session.rebuildFailedNoSend	该角色边界已更新，但按新边界重开会话失败：{detail}——本条消息未发送，请重试。	app/desktop/session.ts:1728	2	2
+exact	main.session.notOpen	会话尚未开启（点击左侧角色即可开启）。	app/desktop/session.ts:2355	1	1
+composed-all-chunks	main.session.youMessage	你：{text}	app/desktop/session.ts:2371	1	1
+composed-all-chunks	main.session.stopNoSession	角色 {roleId} 没有打开的会话——没有可停止的轮次。	app/desktop/chat-adapter.ts:15	2	2
+exact	main.session.stopUnsupported	当前运行时不支持停止	app/desktop/interface.ts:768	1	1
+exact	main.session.stopNoMatch	没有匹配的会话，请指定项目与运行时。	app/desktop/session.ts:2454	1	1
+composed-all-chunks	main.session.releasedRole	已关闭与角色 {roleId} 的会话（历史记录保留在界面上）。	app/desktop/session.ts:2474	2	2
+composed-all-chunks	main.session.releaseError	释放会话出错：{detail}	app/desktop/session.ts:2475	1	1
+exact	main.session.noOpenSessions	当前没有打开的会话。	app/desktop/session.ts:2478	1	1
+exact	main.session.closed	会话已关闭。	app/desktop/session.ts:2489	1	1
+composed-all-chunks	main.session.closedAll	已关闭全部会话（{count} 个）。	app/desktop/session.ts:2489	2	2
+composed-all-chunks	main.session.recoveryDelivery	恢复投递 · 来自 {role}	app/desktop/session.ts:2861	1	1
+exact	main.session.withdrawIncomplete	撤回参数不完整。	app/desktop/session.ts:2898	1	1
+exact	main.session.withdrawRunning	该条已进入「进行中」，撤回无效（它正在被执行）。	app/desktop/session.ts:2905	1	1
+exact	main.session.withdrawNotCustomer	该条不是客户消息（派发/回交属治理流）——只读，不可撤回。	app/desktop/session.ts:2922	1	1
+exact	main.session.withdrawNotQueued	该条不在排队中（可能已投递或已撤回）。	app/desktop/session.ts:2930	1	1
+exact	main.session.safeCopyPending	交接内容（安全显示副本）：等待生成	app/desktop/session.ts:2944	1	1
+exact	main.session.saveSnapshotExpired	原保存材料已失效。	app/desktop/session.ts:3001	1	1
+exact	main.session.saveUnsupported	当前会话不支持此保存操作。	app/desktop/session.ts:3001	1	1
+exact	main.session.handbackMalformed	收到一条**形状不符**的回交事件（缺 handback 载荷 / 缺 roleId）——**未投递**（如实忽略；不崩、不静默）。	app/desktop/session.ts:3063	1	1
+composed-all-chunks	main.session.handbackRenderFailed	回交载荷无法渲染（{detail}）——**未投递**（如实忽略；不崩）。	app/desktop/session.ts:3087	2	2
+composed-all-chunks	main.session.handbackException	回交处理异常已拦截（不产生未捕获拒绝）：{detail}	app/desktop/session.ts:3112	1	1
+exact	main.session.dispatchRejectedEmpty	派发未受理：roleId 与 task 都必须非空。	app/desktop/session.ts:3150	1	1
+exact	main.session.dispatchNoDispatcher	派发未受理：未枚举到本项目治理模型下的派发主人（trio=Steward（统筹） / single=主入口）——**未投递**。	app/desktop/session.ts:3161	1	1
+exact	main.session.dispatchNoDispatcherShort	派发未受理：未枚举到派发主人——**未投递**（不静默）。	app/desktop/session.ts:3162	1	1
+composed-all-chunks	main.session.dispatchWrongSource	派发未受理：来源角色 {from} 不是本项目派发主人 {dispatcher}{modelNote}。	app/desktop/session.ts:3172	2	2
+composed-all-chunks	main.session.dispatchWrongSourceShort	派发未受理：来源角色 {from} 不是派发主人 {dispatcher}——**未投递**（不静默）。	app/desktop/session.ts:3172	3	3
+composed-all-chunks	main.session.dispatchUnknownTarget	派发未受理：角色 {roleId} 不在本项目（未枚举到）。	app/desktop/session.ts:3189	2	2
+composed-all-chunks	main.session.dispatchUnknownTargetShort	派发未受理：角色 {roleId} 不在本项目——**未投递**（不静默）。	app/desktop/session.ts:3189	2	2
+composed-all-chunks	main.session.dispatchBuiltinTarget	派发未受理：{roleId} 是内置治理角色（trio 三人与 su 均不可被派发）——派发对象应是项目角色。	app/desktop/session.ts:3150	2	2
+composed-all-chunks	main.session.dispatchBuiltinTargetShort	派发未受理：{roleId} 是内置治理角色——**未投递**（不静默）。	app/desktop/session.ts:3150	2	2
+composed-all-chunks	main.session.dispatchGateDenied	派发被治理门禁拒绝：{message}	app/desktop/session.ts:3230	1	1
+composed-all-chunks	main.session.dispatchGateRejected	派发未受理（治理门禁 {code}）：{message}——**未投递**（不静默）。	app/desktop/session.ts:3231	3	3
+composed-all-chunks	main.session.dispatchDuplicateCoordinate	该协调消息（目标 {roleId}，同内容/流程）已在投递队列中——已去重，不重复投递。	app/desktop/session.ts:3255	2	2
+composed-all-chunks	main.session.dispatchDuplicate	该派发（目标 {roleId}，同任务文本/流程步骤）已在投递队列中——已去重，不重复投递。	app/desktop/session.ts:3256	2	2
+composed-all-chunks	main.session.dispatchSummaryCoordinate	协调 · 来自 {from} → {to}：{text}	app/desktop/session.ts:3270	1	1
+composed-all-chunks	main.session.dispatchSummary	派发 · 来自 {from}：{text}	app/desktop/session.ts:3271	1	1
+exact	main.session.sessionWillAutoOpen	（其会话未开——将自动开启）	app/desktop/session.ts:3312	1	1
+composed-all-chunks	main.session.acceptedCoordinate	已受理：协调消息将投递给 {to}{openNote}（来源 {from} → Steward；协调 ≠ 客户批准，不解除任何派发/验收门禁；受理≠已完成）。	app/desktop/session.ts:3316	3	3
+composed-all-chunks	main.session.acceptedTask	已受理：任务将投递给角色 {to} 的会话{openNote}；投递结果/失败会在其聊天流与 {from} 的聊天流如实显示（受理≠已完成）。	app/desktop/session.ts:3317	4	4
+exact	main.session.recoveryNoMatch	未找到匹配的会话（请指定项目与运行时）。	app/desktop/session.ts:3430	1	1
+exact	main.session.recoveryNoSession	该角色没有打开的会话——无可重建的会话（可先在界面点开该角色，或改用其他动作）。	app/desktop/session.ts:3444	1	1
+exact	main.session.recoveryBusy	该角色有轮次在跑——不打断（可先 abort-turn 停止本轮，或等其结束后重试）。	app/desktop/session.ts:3445	1	1
+exact	main.session.recoveryConcurrent	会话状态已变化（并发开启/重建）——本次重建未执行，请核对后重试。	app/desktop/session.ts:3446	1	1
+composed-all-chunks	main.session.rebuiltByRecovery	已按要求（客户确认的恢复动作）重建角色 {roleId} 的会话（保留 ANS 回放）；上下文恢复结果以引擎实际返回为准。	app/desktop/session.ts:3453	2	2
+exact	main.session.redeliverNoMatch	未找到匹配的会话/队列（请指定项目与运行时）。	app/desktop/session.ts:3478	1	1
+exact	main.session.redeliverInFlight	该条目已进入「进行中」（正在投递/执行）——无需重投（其收尾按既有 settled 语义）。	app/desktop/session.ts:3486	1	1
+exact	main.session.redeliverNotQueued	条目不在排队中（可能已投出、已撤回或 id 不符）——未触发重试。	app/desktop/session.ts:3487	1	1
+composed-all-chunks	main.session.redeliverQueued	已触发队列重试；该条目仍在队列第 {position} 位（目标忙或未开——保留待重试，下次时机自动再试）。	app/desktop/session.ts:3493	2	2
+exact	main.session.redeliverSent	已触发队列重试；该条目已出队投出（进行中）。	app/desktop/session.ts:3497	1	1
+exact	main.session.redeliverGone	已触发队列重试；该条目已不在队列（已在本次重试中投出，或已被处理/撤回）。	app/desktop/session.ts:3498	1	1
+exact	main.session.redeliverCleared	已触发队列重试；队列已清空，该角色的投递已在途（进行中）。	app/desktop/session.ts:3505	1	1
+exact	main.session.redeliverEmpty	已触发队列重试；该角色的投递队列已空。	app/desktop/session.ts:3506	1	1
+composed-all-chunks	main.session.redeliverRemaining	已触发队列重试；仍有 {count} 条在队列（目标忙或未开——保留待重试），{inflight}。	app/desktop/session.ts:3508	2	2
+exact	main.session.redeliverInFlightOne	1 条在途	app/desktop/session.ts:3508	1	1
+exact	main.session.redeliverNoInflight	无在途	app/desktop/session.ts:3508	1	1
+composed-all-chunks	main.session.recoveryProposalRejected	恢复提议未受理：{message}	app/desktop/session.ts:3534	1	1
+exact	main.session.recoveryRoleEmpty	roleId 必须非空。	app/desktop/session.ts:3543	1	1
+composed-all-chunks	main.session.recoveryBadAction	action 必须是 abort-turn / rebuild-session / redeliver（收到 {type}）。	app/desktop/session.ts:3544	2	2
+exact	main.session.recoveryMissingEvidence	evidence（证据）必须非空——恢复动作必须有事实依据。	app/desktop/session.ts:3545	1	1
+composed-all-chunks	main.session.recoveryTargetMissing	角色 {roleId} 不在本项目（未枚举到）——未推送任何确认卡。	app/desktop/chat-adapter.ts:15	2	2
+composed-all-chunks	main.session.recoveryTargetBuiltin	{roleId} 是内置治理角色——恢复动作只针对项目角色（未推送任何确认卡）。	app/desktop/session.ts:3564	1	1
+composed-all-chunks	main.session.recoveryAbortRequested	已请求停止角色「{roleId}」的当前轮次——轮次仍以既有 settled 收尾（不制造「已停止」假象）。	app/desktop/session.ts:3572	2	2
+exact	main.session.recoveryAbortFailed	停止失败（未知原因）——未假装已执行。	app/desktop/session.ts:3574	1	1
+composed-all-chunks	main.session.recoveryRebuilt	角色「{roleId}」的会话已重建（保留历史回放；上下文恢复结果以引擎实际返回为准）。	app/desktop/session.ts:1142	2	2
+exact	main.session.recoveryRebuildFailed	重建失败（未知原因）——没有任何动作发生。	app/desktop/session.ts:3581	1	1
+exact	main.session.recoveryChannelUnwired	恢复确认通道未接线——未获执行（fail-closed），没有任何动作发生。	app/desktop/session.ts:3598	1	1
+composed-all-chunks	main.session.recoveryDeclined	客户未确认（拒绝/取消，或确认通道失效）——「{action}」没有执行，也没有任何动作发生。	app/desktop/session.ts:3626	2	2
+composed-all-chunks	main.session.recoveryReceipt	恢复回执（{action} · 角色 {roleId}）：{message}	app/desktop/session.ts:3632	3	3
+composed-all-chunks	main.session.recoveryAutoText	[系统·恢复] 恢复提议由桌面**自动执行**（「替我决策」开关开启——自动执行 ≠ 客户逐项批准）：{action} · 角色 {roleId} · {executed}。	app/desktop/session.ts:3636	2	2
+composed-all-chunks	main.session.recoveryAutoSummary	系统·恢复 · 自动执行 · {action} · 角色 {roleId} · {executed}	app/desktop/session.ts:3637	2	2
+exact	main.session.executed	已执行	app/desktop/session-history.ts:221	1	1
+exact	main.session.notExecuted	未执行	app/desktop/operator-channel.ts:499	1	1
+exact	main.session.configNextSession	该角色当前没有打开的会话（并非在跑轮次）——新会话打开即生效。	app/desktop/session.ts:3688	1	1
+exact	main.session.install.notCustomerTurn	本动作仅可在客户消息发起的轮次执行——未执行。	app/desktop/session.ts:3723	1	1
+composed-all-chunks	main.session.install.roleNotFound	角色「{roleId}」不是本项目项目角色（或为内置治理角色）——未执行。	app/desktop/session.ts:1142	2	2
+composed-all-chunks	main.session.install.skillNotRegistered	技能未登记：docs/skills/{name}/install.md 不存在——先落盘再{verb}；未执行。	app/desktop/session.ts:3730	3	3
+composed-all-chunks	main.session.install.skillNotRegisteredInstall	技能未登记：docs/skills/{name}/install.md 不存在——先落盘再安装；未执行。	app/desktop/session.ts:3730	2	2
+composed-all-chunks	main.session.install.skillNotRegisteredUninstall	技能未登记：docs/skills/{name}/install.md 不存在或不可解析——没有可撤销的登记；未执行。	app/desktop/session.ts:3730	2	2
+composed-all-chunks	main.session.install.roleNotListed	登记中未包含角色「{roleId}」——未执行；如确要安装请先更新登记。	app/desktop/session.ts:3763	2	2
+composed-all-chunks	main.session.install.skillStatus	技能未登记为已安装：docs/skills/{name}/install.md 状态为「{status}」——先改登记再安装；未执行。	app/desktop/session.ts:3768	3	3
+composed-all-chunks	main.session.install.registrationUnchanged	登记仍含角色「{roleId}」——先改登记再卸载；未执行。	app/desktop/session.ts:3773	2	2
+composed-all-chunks	main.session.install.skillMissing	技能内容缺失：{path} 不存在或不可读——先落盘再安装；未执行。	app/desktop/session.ts:3784	2	2
+composed-all-chunks	main.session.install.skillMissingUninstall	技能内容缺失：{path} 不存在或不可读——无法如实回执（sha256 与「文件保留」陈述）；未执行。	app/desktop/session.ts:3784	2	2
+composed-all-chunks	main.session.install.rebuildFailed	技能登记已{action}，但按新登记重建角色「{roleId}」的会话失败：{detail}——登记仍在、会话未重建（未假装已生效；可在该角色下一次打开会话时生效，或重试）。	app/desktop/session.ts:3799	4	4
+exact	main.session.install.effectiveRebuilt	已重建该角色会话、即刻生效	app/desktop/session.ts:3809	1	1
+exact	main.session.install.effectiveNextSession	该角色当前未打开会话——新会话起生效	app/desktop/session.ts:3811	1	1
+exact	main.session.install.effectiveAfterTurn	该角色正在运行轮次（不打断）——新会话起生效	app/desktop/session.ts:3812	1	1
+composed-all-chunks	main.session.install.installedSkill	已安装技能「{name}」→ 角色「{roleId}」；{effective}；内容：{path}（sha256 {digest}）。	app/desktop/session.ts:3815	6	6
+composed-all-chunks	main.session.install.uninstalledSkill	已卸载技能「{name}」（角色「{roleId}」）；效果已撤，文件保留于 {path}（sha256 {digest}）；{effective}。	app/desktop/session.ts:3816	5	5
+composed-all-chunks	main.session.install.summarySkill	系统·安装 · 已{verb}技能「{name}」· 角色「{roleId}」· {effectiveShort}	app/desktop/session.ts:3819	4	4
+exact	main.session.install.effectiveShortRebuilt	即刻生效（已重建）	app/desktop/session.ts:3819	1	1
+exact	main.session.install.effectiveShortNextSession	新会话起生效	app/desktop/session.ts:3811	1	1
+composed-all-chunks	main.session.install.mcpNotRegistered	MCP 未登记：docs/mcp/{name}.md 不存在——先落盘再{verb}；未执行。	app/desktop/session.ts:3878	3	3
+composed-all-chunks	main.session.install.mcpNotRegisteredInstall	MCP 未登记：docs/mcp/{name}.md 不存在——先落盘再安装；未执行。	app/desktop/session.ts:3878	2	2
+composed-all-chunks	main.session.install.mcpNotRegisteredUninstall	MCP 未登记：docs/mcp/{name}.md 不存在或不可解析——没有可撤销的声明；未执行。	app/desktop/session.ts:3878	2	2
+composed-all-chunks	main.session.install.mcpStatus	MCP 未登记为已安装：docs/mcp/{name}.md 状态为「{status}」——先改声明再安装；未执行。	app/desktop/session.ts:3916	3	3
+composed-all-chunks	main.session.install.mcpDeclarationMissing	MCP 未登记：{path} 不存在——先落盘再安装；未执行。	app/desktop/session.ts:3878	2	2
+composed-all-chunks	main.session.install.mcpDeclarationMissingUninstall	MCP 声明缺失：{path} 不存在或不可读——无法如实回执（sha256 与「文件保留」陈述）；未执行。	app/desktop/session.ts:3933	2	2
+composed-all-chunks	main.session.install.mcpRebuildFailed	MCP 声明已{action}，但按新声明重建角色「{roleId}」的会话失败：{detail}——声明仍在、会话未重建（未假装已生效；可在该角色下一次打开会话时生效，或重试）。	app/desktop/session.ts:3944	4	4
+composed-all-chunks	main.session.install.installedMcp	已安装 MCP「{name}」→ 角色「{roleId}」；{effective}；声明：{path}（sha256 {digest}）；外来 MCP 工具在 ANS 门禁之外执行（能力级授予，非逐调用受审）。	app/desktop/session.ts:3961	6	6
+composed-all-chunks	main.session.install.uninstalledMcp	已卸载 MCP「{name}」（角色「{roleId}」）；效果已撤，声明文件保留于 {path}（sha256 {digest}）；已发生的副作用不可撤；{effective}。	app/desktop/session.ts:3962	5	5
+composed-all-chunks	main.session.install.summaryMcp	系统·安装 · 已{verb}MCP「{name}」· 角色「{roleId}」· {effectiveShort}	app/desktop/session.ts:3819	4	4
+exact	main.session.delivery.malformedItem	投递条目形状不符（缺正文/来源）——已丢弃该条并如实记行（不崩）。	app/desktop/session.ts:4317	1	1
+composed-all-chunks	main.session.delivery.machineryException	投递机异常已拦截（不产生未捕获拒绝）：{detail}	app/desktop/session.ts:4203	1	1
+composed-all-chunks	main.session.delivery.noTarget	有{kind}（来自 {sourceRoleId}）待投递，但当前枚举不到目标（主入口角色）——**未投递**（已保留；下次时机自动重试）。	app/desktop/project.ts:219	2	2
+composed-all-chunks	main.session.delivery.openFailedHandback	有回交（来自 {sourceRoleId}）待投递，但**开启 {target} 会话失败**：{detail}——未投递（已保留；下次时机自动重试：你打开 {target}、或下一次回交/一轮结束）。	app/desktop/session.ts:4272	5	5
+composed-all-chunks	main.session.delivery.openFailedDispatch	有派发任务（来自 {sourceRoleId}）待投递给角色 {target}，但**开启其会话失败**：{detail}——未投递（已保留；下次时机自动重试：你打开该角色、或下一次派发/一轮结束）。	app/desktop/session.ts:4273	4	4
+composed-all-chunks	main.session.delivery.handbackBatch	回交批次 · {count} 份报告 · 来自 {roles}	app/desktop/session.ts:4305	2	2
+composed-all-chunks	main.session.delivery.autoDelivered	已自动投递 {roles} 的回交给 {target}（等待验收与汇总）。	app/desktop/session.ts:4374	3	3
+composed-all-chunks	main.session.delivery.dispatchedNote	已派发任务给 {target}（已投递到其会话；其结果/回交会回到本会话）。	app/desktop/session.ts:4378	2	2
+composed-all-chunks	main.session.delivery.handbackFailed	回交投递失败（来自 {sourceRoleId}）：{detail}——未丢弃，已保留待重试（下次时机自动重试）。	app/desktop/session.ts:4414	3	3
+composed-all-chunks	main.session.delivery.dispatchFailed	派发投递失败（目标 {target}）：{detail}——**未丢弃**，已保留待重试（下次时机自动重试）。	app/desktop/session.ts:4416	3	3
+composed-all-chunks	main.session.delivery.systemFailed	系统消息投递失败（目标 {target}）：{detail}——**未丢弃**，已保留待重试（下次时机自动重试）。	app/desktop/session.ts:4418	3	3
+composed-all-chunks	main.session.delivery.queuedFailed	排队消息投递失败（角色 {target}）：{detail}——**未丢弃**，已保留待重试（下次时机自动重试）。	app/desktop/session.ts:4419	3	3
+exact	main.session.delivery.maybeProcessed	可能已经处理或保存状态未知，未自动重发；可核对历史保存状态。	app/desktop/session.ts:4409	1	1
+exact	main.session.delivery.retained	输入尚未交给模型，未丢弃，已保留同一批次待重试。	app/desktop/session.ts:4409	1	1
+composed-all-chunks	main.interface.toggleInvalid	开关请求无效（需 {enabled:boolean}）。	app/desktop/interface.ts:316	1	1
+exact	main.interface.toggleNotBoolean	enabled 必须为布尔值。	app/desktop/interface.ts:317	1	1
+exact	main.interface.toggleUnknownField	开关请求含未知字段。	app/desktop/interface.ts:318	1	1
+exact	main.interface.teamPlanMissingTypeColumn	团队计划角色表缺少「类型」列（须标 new / changed / existing）	app/desktop/interface.ts:1045	1	1
+exact	main.interface.teamPlanNoSchemaV2	团队计划未声明 teamPlanSchema: 2：按 v1 兼容校验（不强制模块/公开契约/测试面等 v2 字段；建议迁移团队计划 v2）	app/desktop/interface.ts:1119	1	1
+exact	main.interface.teamPlanNoFrontmatter	团队计划缺少 frontmatter（须含 flowId/version/riskTier/recommended）	app/desktop/interface.ts:1125	1	1
+exact	main.interface.teamPlanNoFlowId	团队计划 frontmatter 缺少 flowId	app/desktop/interface.ts:1128	1	1
+exact	main.interface.teamPlanNoRecommended	团队计划缺少唯一的机器可读推荐集（recommended 内联数组或「推荐：」行；空集/重复/歧义不接受）	app/desktop/interface.ts:1131	1	1
+composed-partial	main.interface.verifierFinished	Proof / 验收复核已结束（flowId={flowId}）；报告见 {report}（附件见 docs/verification/）与 {governance}；验收卡/客户决定由应用继续（本行不构成验收结论或客户批准）。	app/desktop/interface.ts:1685	3	4
+composed-all-chunks	main.interface.acceptanceCloseFailed	验收已通过但流程收口失败（流程 {flowId}）：{detail}；未派 verifier，流程保持待收口（请核对 flow YAML）。	app/desktop/interface.ts:1855	3	3
+composed-all-chunks	main.interface.acceptanceClosed	验收已通过（判断代批或客户手批，以账本 customer.decision 为准），流程 {flowId} 已收口（保留验收步骤已标 done）。	app/desktop/interface.ts:1866	2	2
+composed-all-chunks	main.interface.deliveredStepsHeader	流程 {flowId}：以下步骤已 delivered，等待 Steward / 统筹 核证：	app/desktop/customer-input.ts:154	2	2
+composed-all-chunks	main.interface.deliveredStepLine	- 步骤 {stepId} 已 delivered（owner={owner}），请核对账本/产物证据，用 flow_step_update 标 done 或退回修正；不要直接写 flow YAML。	app/desktop/interface.ts:1986	3	3
+exact	main.interface.deliveredVerificationNote	核证要求：先核对账本与产物证据再更新步骤状态；未达 done 条件请退回修正；不要直接 write_file 流程 YAML。	app/desktop/interface.ts:1988	1	1
+composed-all-chunks	main.interface.deliveredWaitNote	流程 {flowId}：步骤 {steps} 已 delivered，等待 Steward / 统筹 核证（已投核证任务）。	app/desktop/customer-input.ts:154	3	3
+composed-all-chunks	main.interface.criteriaMissing	实施前验收标准缺失或为空（{path}）；未派验收判定	app/desktop/interface.ts:2162	2	2
+composed-all-chunks	main.interface.changePackageMissing	变更包缺失（{path}）；未派验收判定	app/desktop/interface.ts:2175	2	2
+composed-all-chunks	main.interface.changePackageNoRisk	变更包缺少 riskTier（T0–T3）：{path}；未派验收判定	app/desktop/interface.ts:2176	2	2
+composed-all-chunks	main.interface.flowValidationFailed	流程状态 YAML 校验失败：{detail}	app/desktop/interface.ts:2259	1	1
+composed-all-chunks	main.interface.advanceOpenFailed	收尾推进失败：无法开启 Proof / 验收 会话：{detail}；未自动重试。	app/desktop/interface.ts:2336	2	2
+composed-all-chunks	main.interface.advanceSendFailed	收尾推进失败：发送验收任务给 Proof / 验收 失败：{detail}；未自动重试。	app/desktop/interface.ts:2343	2	2
+exact	main.interface.piBusy	Pi 的旧轮次仍在执行，新配置将在其结束后应用。消息可继续排队。	app/desktop/interface.ts:2389	1	1
+exact	main.interface.readFileNotFound	文件不存在	app/desktop/interface.ts:2532	1	1
+composed-all-chunks	main.interface.readFileFailed	读取失败：{detail}	app/desktop/interface.ts:2532	1	1
+exact	main.interface.teamPlanMissingUnreadable	团队计划缺失或不可读（账本 appointment 已绑定该计划）；请 Steward / 统筹 重新写出计划后再校验	app/desktop/interface.ts:2561	1	1
+exact	main.interface.teamPlanMissingLegacy	团队计划缺失：按 legacy 流程只做最低结构检查（建议迁移 team-plan / role-cards 流程）	app/desktop/interface.ts:2568	1	1
+composed-all-chunks	main.interface.teamPlanRoleMissing	团队计划缺少推荐/任命角色 {roleId} 的角色行	app/desktop/interface.ts:2583	2	2
+composed-all-chunks	main.interface.teamPlanRoleTypeInvalid	团队计划角色 {roleId} 的类型缺失或不可识别（须为 new / changed / existing）	app/desktop/interface.ts:938	2	2
+composed-all-chunks	main.interface.teamPlanRoleFieldEmpty	团队计划角色 {roleId} 的「{label}」为空（计划缺细节）	app/desktop/interface.ts:938	3	3
+composed-all-chunks	main.interface.teamPlanFlowMismatch	frontmatter flowId="{planFlowId}" 与流程 {flowId} 不一致	app/desktop/interface.ts:2553	3	3
+exact	main.interface.cardEmpty	文件为空（需要角色卡正文）	app/desktop/interface.ts:2609	1	1
+exact	main.interface.cardNoHeading	缺少 Markdown 标题（至少一行以 # 开头）	app/desktop/interface.ts:2610	1	1
+composed-all-chunks	main.interface.cardMissingSection	缺少「{label}」章节或等价内容（第 5 项必填）	app/desktop/interface.ts:1045	2	2
+exact	main.interface.boundaryEmpty	文件为空（需要 role + entries 的边界 YAML）	app/desktop/interface.ts:2625	1	1
+composed-all-chunks	main.interface.boundaryParseFailed	边界 YAML 解析失败：{detail}	app/desktop/interface.ts:2629	1	1
+exact	main.interface.boundaryNoEntries	entries 为空（Section 1 至少需要一条条目）	app/desktop/interface.ts:2632	1	1
+composed-all-chunks	main.interface.boundaryRoleMismatch	顶层 role 与目录 id 不一致（YAML role={declared}，目录={roleId}）	app/desktop/interface.ts:2647	2	2
+composed-all-chunks	main.interface.boundaryMissingRootDocs	entries 缺少角色根工作文档条目 {path}（第 5 项必填）	app/desktop/interface.ts:2661	2	2
+exact	main.interface.boundaryOnlyRootDocs	entries 仅含角色根工作文档条目，未见团队计划的实际写集条目（请核对计划写集）	app/desktop/interface.ts:2665	1	1
+composed-all-chunks	main.interface.directorySpecMissing	团队计划角色 {roleId} 的授权目录「{path}」缺少目录规范行（计划问题：请 Convener 补齐目录规范）	app/desktop/interface.ts:938	3	3
+composed-all-chunks	main.interface.moduleImplMissing	团队计划模块「{module}」缺少实现目录，无法核对边界更宽部分（计划问题：请 Convener 补充实现目录）	app/desktop/interface.ts:2702	2	2
+composed-all-chunks	main.interface.authorizedDirNotCoveredExisting	计划授权目录「{path}」未被 boundary.yaml entries 覆盖（existing：仅提醒，不阻塞；迁移提示：下次实质变更时补齐目录条目）	app/desktop/interface.ts:2724	2	2
+composed-all-chunks	main.interface.authorizedDirNotCovered	计划授权目录「{path}」未被 boundary.yaml entries 覆盖（Crew：按团队计划把该目录加入 Section 1；若计划目录本身有误，报告 Convener 修正计划）	app/desktop/interface.ts:2724	2	2
+composed-all-chunks	main.interface.precisePathNotCoveredExisting	计划精确写集「{path}」未被 boundary.yaml entries 覆盖（existing：仅提醒，不阻塞；迁移提示：下次实质变更时补齐）	app/desktop/interface.ts:2736	2	2
+composed-all-chunks	main.interface.precisePathNotCovered	计划精确写集「{path}」未被 boundary.yaml entries 覆盖（Crew：按团队计划把该文件加入 Section 1；若计划本身有误，报告 Convener 修正计划）	app/desktop/interface.ts:2736	2	2
+composed-all-chunks	main.interface.boundaryDirWider	boundary.yaml 目录条目「{path}」{wider}（new 角色边界目录必须与计划授权目录一致，不得更宽/更窄；Crew 收窄边界或报告 Convener 修正计划）	app/desktop/interface.ts:2750	2	2
+exact	main.interface.boundaryDirWiderWord	比计划授权目录更宽	app/desktop/interface.ts:2750	1	1
+exact	main.interface.boundaryDirNotInPlan	不在计划授权目录集合中	app/desktop/interface.ts:2750	1	1
+composed-all-chunks	main.interface.boundaryMissingAuthorizedDir	boundary.yaml 缺少计划授权目录「{path}」的目录条目（new 角色边界目录必须与计划授权目录一致，不得更宽/更窄；Crew 补齐目录条目）	app/desktop/interface.ts:2760	2	2
+composed-all-chunks	main.interface.boundaryDirWiderExisting	boundary.yaml 目录条目「{path}」比计划授权目录宽（existing：仅提醒，不阻塞；迁移提示：下次实质变更时按 v3 收窄/迁移{extra}）	app/desktop/interface.ts:2750	2	2
+exact	main.interface.boundaryDirWiderExistingExtra	；且不在角色模块实现目录内，交 readiness 按既有职责复核	app/desktop/interface.ts:2777	1	1
+composed-all-chunks	main.interface.boundaryDirWiderChanged	boundary.yaml 目录条目「{path}」比计划授权目录宽且不在角色模块实现目录内（changed：交 readiness 按既有职责复核，不硬拒）	app/desktop/interface.ts:2750	2	2
+composed-all-chunks	main.interface.boundaryWiderMultiModule	boundary.yaml 更宽目录覆盖多个模块实现目录（{modules}；多模块扩张，交 readiness 复核）	app/desktop/interface.ts:2794	2	2
+composed-all-chunks	main.interface.writesetNotCoveredExisting	计划写集「{path}」未被 boundary.yaml entries 覆盖（existing：仅提醒，不阻塞；下次实质变更时补齐）	app/desktop/interface.ts:2815	2	2
+composed-all-chunks	main.interface.writesetNotCovered	计划写集「{path}」未被 boundary.yaml entries 覆盖（Crew：按团队计划把该路径加入 Section 1；若计划写集本身有误，报告 Convener 修正计划）	app/desktop/interface.ts:2815	2	2
+exact	main.interface.docEmptyExisting	文件为空（existing/legacy：仅提醒）	app/desktop/interface.ts:2832	1	1
+exact	main.interface.docNoHeadingExisting	缺少 Markdown 标题（existing/legacy：仅提醒）	app/desktop/interface.ts:2836	1	1
+exact	main.interface.featureMapNoContent	既无功能表/列表行，也未声明无直接负责的系统功能	app/desktop/interface.ts:2842	1	1
+exact	main.interface.functionalDescriptionMissing	缺少职责/交接/代码位置或等价内容	app/desktop/interface.ts:2846	1	1
+exact	main.interface.memoNoContinuation	至少需要一行 YYYY-MM-DD 的续接记录	app/desktop/interface.ts:2850	1	1
+exact	main.interface.apiSpecMissing	未包含接口/导出/契约说明，也未写 not-applicable + 非空理由	app/desktop/interface.ts:2857	1	1
+exact	main.interface.apiSpecNotApplicableNoReason	api-spec.md 标为 not-applicable 但未给出非空理由	app/desktop/interface.ts:2861	1	1
+composed-all-chunks	main.interface.projectListWarning	listProject 警告：{warning}	app/desktop/interface.ts:2872	1	1
+composed-all-chunks	main.interface.writeValidationFailed	流程 {flowId}：写卡产物未通过校验（appointment 步骤不能继续；未派 Steward / 统筹 做 role-readiness，也未把步骤标为 done）。	app/desktop/customer-input.ts:154	2	2
+exact	main.interface.specificProblems	具体问题：	app/desktop/interface.ts:2885	1	1
+exact	main.interface.warningsHeader	提醒（不阻塞，existing/legacy 角色）：	app/desktop/interface.ts:2887	1	1
+exact	main.interface.fixWriteCard	请修正上述文件后**重新发 appointment-write 确认卡**完成写卡（role-card.md 需含第 5 项必填章节；boundary.yaml 需为合法 YAML，顶层 role 与目录 id 一致，entries 含角色根工作文档与实际写集；工作文档按 feature-map/functional-description/memo/api-spec 补齐，api-spec 不适用时写 not-applicable + 非空理由）。	app/desktop/interface.ts:2888	1	1
+exact	main.interface.fixTeamPlanV3	请按 v3 修正/补充团队计划（frontmatter teamPlanSchema: 3 与非空 directories；模块清单每个 module 的非空实现目录；角色表授权目录/精确写集；目录规范表 12 字段；每目录唯一 owner/不重叠/共享策略；治理关键路径只精确授权），必要时递增版本并重发任命卡；修正后应用会重新校验。	app/desktop/interface.ts:2904	1	1
+exact	main.interface.fixTeamPlanLegacy	请修正/补充团队计划（frontmatter flowId/version/riskTier/recommended；角色表逐角色含类型 new/changed/existing、职责目标、能力要求、唯一写集、依赖），必要时递增为 v2 并重发任命卡；修正后应用会重新校验。	app/desktop/interface.ts:2905	1	1
+composed-all-chunks	main.interface.teamPlanValidationFailed	流程 {flowId}：团队计划未通过结构校验（任命的写卡步骤暂停；Crew 不自行补计划，应用未派 role-readiness、未把步骤标为 done）。	app/desktop/customer-input.ts:154	2	2
+composed-all-chunks	main.interface.crewBlocking	Crew / 组队 修正 {count} 个	app/desktop/interface.ts:3001	1	1
+composed-all-chunks	main.interface.planBlocking	Steward / 统筹 补充计划 {count} 个	app/desktop/governance-advance.ts:943	1	1
+composed-partial	main.interface.writeBlockingSummary	写卡产物未通过校验（流程 {flowId}）：{count} 个问题——已反馈 {routed}；未派 Steward / 统筹 做 role-readiness、未把 appointment 步骤标为 done。首个问题：{path}：{issue}	app/desktop/interface.ts:3012	3	4
+exact	main.interface.queueKind.handback	回交	app/desktop/governance-advance.ts:137	1	1
+exact	main.interface.queueKind.dispatch	派发	app/desktop/customer-input.ts:59	1	1
+exact	main.interface.queueKind.system	系统	app/desktop/composer-images.ts:4	1	1
+exact	main.interface.queueKind.message	消息	app/desktop/chat-adapter.ts:7	1	1
+composed-all-chunks	main.interface.queueRecovered	已从上次运行恢复 {count} 条任务并重投（应用重启/崩溃后续跑；不弹客户卡、不把步骤标 done）：
+{lines}	app/desktop/interface.ts:3089	2	2
+composed-all-chunks	main.interface.staleSteps	流程 {flowId}：检测到 {count} 个步骤可能因应用重启/崩溃丢失（flow YAML 标记为已派发，但 owner 无会话/队列/在途投递）：
+{facts}
+请用 flow_get 核对当前 revision，必要时用 flow_step_supersede 换新步骤并 dispatch_task 重派；不要重复使用已派 stepId。	app/desktop/customer-input.ts:154	4	4
+exact	main.interface.saveProjectNotActive	该项目不是当前导入项目。	app/desktop/interface.ts:3443	1	1
+exact	main.interface.missingProjectRoot	缺少项目根路径。	app/desktop/interface.ts:3473	1	1
+composed-all-chunks	main.interface.pinCheckFailed	pin 证据检查失败：{detail}	app/desktop/interface.ts:3511	1	1
+exact	main.interface.projectNotCurrent	项目不是当前导入项目；本次未写入任何文件。	app/desktop/interface.ts:3574	1	1
+exact	main.interface.governanceModelInvalid	governanceModel 必须是 single 或 trio；本次未写入任何文件。	app/desktop/interface.ts:3579	1	1
+exact	main.interface.confirmMissing	缺少操作者确认（confirm:true）；本次未写入任何文件。	app/desktop/interface.ts:3597	1	1
+exact	main.interface.previewDigestInvalid	缺少有效的预览摘要（previewDigest 必须为 64 位十六进制）；本次未写入任何文件。	app/desktop/interface.ts:3661	1	1
+exact	main.interface.sessionRequestInvalid	会话请求须指定项目、角色与运行时。	app/desktop/interface.ts:3822	1	1
+composed-all-chunks	main.interface.imageNotSent	图片未发送（{detail}）——本条消息未发出，请移除该图后重试。	app/desktop/interface.ts:3845	2	2
+composed-all-chunks	main.interface.imageNotSentUnsupported	图片未发送（内容不是受支持的图片——真实格式不在 {mimes} 之内，扩展名/声明类型不作数）。本条消息未发出，请移除该图后重试。	app/desktop/interface.ts:3851	2	2
+composed-all-chunks	main.interface.autoAdvanceFailed	自动推进失败：{detail}	app/desktop/interface.ts:3916	1	1
+composed-all-chunks	main.interface.autoAdvanceStalled	自动推进停住：{detail}	app/desktop/interface.ts:3922	1	1
+exact	main.interface.dispatchNoProjectRoot	缺少项目根，无法后台派发	app/desktop/interface.ts:3925	1	1
+exact	main.interface.dispatchNoRuntime	缺少运行时，无法后台派发	app/desktop/interface.ts:3926	1	1
+composed-all-chunks	main.interface.openSessionFailed	无法开启 {label} 会话：{detail}	app/desktop/interface.ts:2336	2	2
+composed-all-chunks	main.interface.sendTaskFailed	发送任务给 {label} 失败：{detail}	app/desktop/interface.ts:3936	2	2
+exact	main.interface.missingFlowIdWrite	缺少流程信息（flowId），未派发写卡任务	app/desktop/interface.ts:4095	1	1
+composed-all-chunks	main.interface.appointmentNotApproved	账本最新任命决定为 {decision}（未获客户同意），未派发写卡任务	app/desktop/interface.ts:4103	2	2
+exact	main.interface.missingAppointmentList	缺少任命名单，未派发写卡任务	app/desktop/interface.ts:4113	1	1
+composed-all-chunks	main.interface.teamPlanMissingBound	流程 {flowId}：团队计划缺失（docs/scheduling/{flowId}-team-vN.md）{bound}；未派 Crew 写卡、未继续推进。请 Steward / 统筹 先写团队计划。	app/desktop/customer-input.ts:154	4	4
+composed-all-chunks	main.interface.teamPlanMissingShort	团队计划缺失{bound}；未派 Crew 写卡（不猜计划、不自行扩大职责）	app/desktop/interface.ts:2561	2	2
+composed-partial	main.interface.appointmentVsPlanMismatch	客户实际任命名单（{appointed}）与团队计划推荐集（{recommended}）不同；请 Steward / 统筹 修订团队计划为 {version} 以反映实际任命（Crew 只按实际名单写卡）。	app/desktop/interface.ts:4196	3	4
+exact	main.interface.missingFlowOrList	缺少流程信息（flowId/任命名单），未自动派发	app/desktop/interface.ts:4237	1	1
+exact	main.interface.missingFlowIdNomination	缺少流程信息（flowId），未派发提名任务	app/desktop/interface.ts:4274	1	1
+composed-all-chunks	main.interface.flowYamlTimeout	Steward / 统筹 本轮未在时限内结束，流程状态 YAML {path} 未确认；未派发提名任务	app/desktop/interface.ts:4289	2	2
+composed-all-chunks	main.interface.flowYamlMissing	Steward / 统筹 未写出流程状态 YAML {path}；未派发提名任务（同名 .md 人读视图不算落盘）	app/desktop/interface.ts:4290	2	2
+composed-all-chunks	main.interface.flowYamlInvalid	流程状态 YAML 校验失败（{path}）：{detail}；未派发提名任务	app/desktop/interface.ts:4294	3	3
+composed-all-chunks	main.interface.flowYamlUnreadable	流程状态 YAML {path} 不可读：{detail}；未派发提名任务	app/desktop/governance-advance.ts:15	3	3
+exact	main.interface.missingFlowInfoNomination	缺少流程信息，未派发提名任务	app/desktop/interface.ts:4326	1	1
+composed-all-chunks	main.interface.openCrewFailed	无法开启 Crew / 组队 会话：{detail}	app/desktop/interface.ts:4329	1	1
+composed-all-chunks	main.interface.sendNominationFailed	发送提名任务给 Crew / 组队 失败：{detail}	app/desktop/interface.ts:4333	1	1
+exact	main.interface.linkScheme	只允许打开 http/https 链接。	app/desktop/interface.ts:4412	1	1
+exact	main.interface.linkTooLong	链接过长，已拒绝。	app/desktop/interface.ts:4415	1	1
+exact	main.interface.externalOpenUnwired	外部打开未接线（fail-closed）。	app/desktop/interface.ts:4418	1	1
+exact	main.interface.pickImageUnwired	选图未接线（fail-closed）。	app/desktop/interface.ts:4433	1	1
+composed-all-chunks	main.interface.readImageFailed	读取图片失败：{detail}	app/desktop/interface.ts:4439	1	1
+composed-all-chunks	main.interface.imageUnsupported	内容不是受支持的图片（真实格式不在 {mimes} 之内）——扩展名不作数。	app/desktop/interface.ts:4446	2	2
+composed-all-chunks	main.interface.imageUnsupportedShort	内容不是受支持的图片（真实格式不在 {mimes} 之内）。	app/desktop/interface.ts:4446	2	2
+composed-all-chunks	main.governance.acceptanceAdvance	流程 {flowId} 步骤已全部完成，已自动派发验收复核给 Proof（工作中）	app/desktop/customer-input.ts:154	2	2
+composed-all-chunks	main.governance.acceptanceBlocked	自动验收未派发：流程 {flowId} 未通过收尾门。原因：{issue}。{advice}	app/desktop/governance-advance.ts:600	2	2
+exact	main.governance.acceptanceBlockedTerminal	无需操作：流程已收口，应用不会重复派发验收复核。	app/desktop/governance-advance.ts:598	1	1
+composed-all-chunks	main.governance.acceptanceBlockedAdvice	建议：若旧步骤已被 retake 取代，请把对应的 aborted/failed 步骤在流程状态文件 {path} 中标为 superseded（或 cancelled）；或用新的 stepId 重新派发任务并在流程状态文件中更新状态与证据。修正后下一次事件会自动重新检查；应用不会自动改写流程状态文件，也不会自动派 Proof。	app/desktop/governance-advance.ts:599	2	2
+exact	main.governance.nominationDispatched	已派发提名任务给 Crew / 组队（工作中）	app/desktop/governance-advance.ts:976	1	1
+exact	main.governance.roleCardDispatched	已派发写卡任务给 Crew / 组队（工作中）	app/desktop/governance-advance.ts:977	1	1
+exact	main.governance.flowTaskDispatched	已派发流程任务给 Steward / 统筹（工作中）	app/desktop/governance-advance.ts:978	1	1
+exact	main.governance.flowYamlAndNomination	流程状态 YAML 已落盘，已派发提名任务给 Crew / 组队（工作中）	app/desktop/governance-advance.ts:983	1	1
+exact	main.governance.roleReadinessDispatched	写卡结构校验通过，已派发角色就绪复核给 Steward / 统筹（工作中）	app/desktop/governance-advance.ts:1103	1	1
+composed-all-chunks	main.governance.criteriaDispatched	流程 {flowId}：已派发实施前标准编写任务给 Proof / 验收（工作中）	app/desktop/customer-input.ts:154	2	2
+exact	main.governance.nominationAlreadyDone	提名已完成，未重复派发；已请 Steward / 统筹 继续下一步	app/desktop/governance-advance.ts:971	1	1
+exact	main.history.invalidRequest	历史请求须指定项目、角色与运行时。	app/desktop/runtime-history.ts:13	1	1
+exact	main.history.deliveryState	投递历史状态	app/desktop/runtime-history.ts:54	1	1
+exact	main.history.deliveryMaybeStarted	投递可能已开始	app/desktop/runtime-history.ts:56	1	1
+exact	main.history.legacyReadFailed	旧历史读取失败。	app/desktop/runtime-history.ts:93	1	1
+exact	main.history.readOrProjectionFailed	历史读取或安全投影失败。	app/desktop/runtime-history.ts:106	1	1
+composed-all-chunks	main.history.callTool	调用工具 {name}	app/desktop/customer-input.ts:53	1	1
+exact	main.history.invalidSessionHeader	首行不是有效的会话头（type!=session）	app/desktop/session-history.ts:272	1	1
+exact	main.history.emptySession	会话文件为空或无有效会话头	app/desktop/session-history.ts:285	1	1
+composed-all-chunks	main.history.sessionReadFailed	会话文件读取失败：{detail}	app/desktop/session-history.ts:321	1	1
+composed-all-chunks	main.composerImages.typeUnsupported	图片类型不支持：{type}——只支持 {mimes}。	app/desktop/composer-images.ts:52	2	2
+exact	main.composerImages.emptyContent	图片内容为空或无法读取。	app/desktop/composer-images.ts:56	1	1
+composed-all-chunks	main.composerImages.tooLargeWithLimit	图片过大（{size} > 上限 {max}）——请压缩后再发。	app/desktop/composer-images.ts:59	3	3
+exact	main.composerImages.dataMissing	图片数据缺失（空）。	app/desktop/composer-images.ts:67	1	1
+exact	main.composerImages.notBase64	图片数据不是合法的 base64。	app/desktop/composer-images.ts:71	1	1
+composed-all-chunks	main.composerImages.tooLarge	图片过大（> {max}）——请压缩后再发。	app/desktop/composer-images.ts:76	2	2
+exact	main.composerImages.decodeFailed	图片数据解码失败。	app/desktop/composer-images.ts:81	1	1
+exact	main.confirm.expiredTimeout	确认已超时，旧确认失效。	app/desktop/confirm-card.ts:129	1	1
+exact	main.confirm.expiredStopped	本轮已停止或会话已重建，旧确认失效。	app/desktop/confirm-card.ts:136	1	1
+exact	main.recovery.expired	此恢复确认已失效（应用关闭或会话已重建），**未获执行**——可让 su 重新提议。	app/desktop/recovery-channel.ts:93	1	1
+exact	main.operator.channelUnavailable	操作者确认通道未配置（无 presenter），拒绝执行（fail-closed）	app/desktop/operator-channel.ts:402	1	1
+composed-all-chunks	main.operator.timeoutRejected	操作者确认超时（>{ms}ms），拒绝执行（fail-closed）	app/desktop/operator-channel.ts:411	2	2
+composed-all-chunks	main.operator.channelErrorRejected	操作者确认通道不可用，拒绝执行（fail-closed）：{detail}	app/desktop/operator-channel.ts:420	1	1
+exact	main.operator.rejected	操作者拒绝执行	app/desktop/operator-channel.ts:426	1	1
+composed-all-chunks	main.operator.judgeTimeoutManual	判断超时（>{ms}ms），已转手动确认。	app/desktop/customer-input.ts:800	2	2
+exact	main.operator.judgeAbortedManual	本轮已中止，判断结果不生效（交回既有中止路径）。	app/desktop/operator-channel.ts:484	1	1
+composed-all-chunks	main.operator.judgeErrorManual	判断异常：{detail}。已转手动确认。	app/desktop/customer-input.ts:791	2	2
+exact	main.operator.manualDenyAdvice.narrowCommand	请改用落盘脚本或拆分命令后重试。	app/desktop/operator-channel.ts:639	1	1
+exact	main.operator.manualDenyAdvice.narrowJudge	请缩小判断范围（改用落盘脚本或拆分命令）后重试。	app/desktop/operator-channel.ts:642	1	1
+exact	main.operator.manualDenyAdvice.narrowRead	请缩小读取范围或改用落盘脚本后重试。	app/desktop/operator-channel.ts:644	1	1
+exact	main.operator.manualDenyAdvice.aborted	本轮已中止，命令未执行；如仍需执行请重新发起。	app/desktop/operator-channel.ts:646	1	1
+exact	main.operator.manualDenyAdvice.switchOff	请关闭「替我审批」后手动确认。	app/desktop/operator-channel.ts:649	1	1
+exact	main.operator.manualDenyAdvice.retry	请重试，如持续失败请关闭「替我审批」后手动确认。	app/desktop/operator-channel.ts:651	1	1
+composed-all-chunks	main.operator.judgeResultDeliveryFailed	审查结果投达失败，无法在聊天中显示判断结论，已拒绝；{detail}。	app/desktop/operator-channel.ts:657	1	1
+exact	main.operator.judgeRowFailedManual	判断 agent 已完成判断，但结果无法在聊天中显示；规则判定仅作参考，本卡已转你手动确认。	app/desktop/operator-channel.ts:667	1	1
+composed-all-chunks	main.operator.judgeIncompleteManual	判断 agent 未能完成判断：{reason}。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。	app/desktop/operator-channel.ts:669	2	2
+exact	main.operator.judgeReason.retryCapped	同类命令连续被拒，已达重试上限	app/desktop/operator-channel.ts:683	1	1
+exact	main.operator.judgeReason.contextMissing	缺少当前轮任务上下文	app/desktop/operator-channel.ts:684	1	1
+exact	main.operator.judgeReason.contextTooLarge	命令或上下文过大	app/desktop/operator-channel.ts:685	1	1
+exact	main.operator.judgeReason.modelManual	判断 agent 自报无法判断	app/desktop/operator-channel.ts:686	1	1
+exact	main.operator.judgeReason.fallback	判断未完成	app/desktop/operator-channel.ts:689	1	1
+exact	main.operator.judgeDeniedHead	判断 agent 未放行该命令。	app/desktop/operator-channel.ts:696	1	1
+composed-all-chunks	main.operator.judgeExplainToCustomer	请向客户说明：{message}	app/desktop/operator-channel.ts:698	1	1
+composed-all-chunks	main.operator.judgeReasonLine	原因：{reason}	app/desktop/governance-advance.ts:600	1	1
+composed-all-chunks	main.operator.judgeAlternative	替代方案（{kind}）：{value}	app/desktop/operator-channel.ts:702	2	2
+exact	main.operator.judgeWayOut	出路：如需执行，请关闭「替我审批」后重试。	app/desktop/operator-channel.ts:704	1	1
+composed-all-chunks	main.operator.judgeWillRun	它会在项目里执行：{word}	app/desktop/operator-channel.ts:724	1	1
+exact	main.operator.shellReview.title	受治理 shell 审核 · 操作者确认（第三闸 a）	app/desktop/operator-channel.ts:316	1	1
+exact	main.operator.shellReview.intro	这是一条需要在执行前由你**亲自确认**的 shell 命令（pm 模型审读拿不准/不可用，故升级到你）。	app/desktop/operator-channel.ts:318	1	1
+exact	main.operator.shellReview.verify	请**逐字核对**下面的命令原文后再决定；点「放行」将真的在项目里启动子进程执行它。	app/desktop/operator-channel.ts:319	1	1
+exact	main.operator.shellReview.escalationHeader	── 升级原因（为何交你确认） ──	app/desktop/operator-channel.ts:323	1	1
+exact	main.operator.shellReview.argvEmpty	（argv 为空）	app/desktop/operator-channel.ts:314	1	1
+exact	main.operator.shellReview.commandHeader	── 命令原文（逐字，未加工） ──	app/desktop/operator-channel.ts:327	1	1
+exact	main.operator.shellReview.argvHeader	── 规范化参数 argv（JSON 转义显示；引号仅为界定符） ──	app/desktop/operator-channel.ts:330	1	1
+exact	main.operator.shellReview.cwdHeader	── 工作目录 cwd ──	app/desktop/operator-channel.ts:333	1	1
+exact	main.operator.shellReview.denyNote	点「拒绝」或关闭对话框 = 不放行（不会执行）。	app/desktop/operator-channel.ts:336	1	1
+composed-partial	main.operator.approvalTierLine	{role} 审批档：{tier}——须逐条客户批准才执行；批准后可能绕过 ANS 文件写边界（命令以当前 OS 用户权限运行）。拒绝/超时/通道不可用 = 拒绝；默认拒绝、无「记住」，不自动通过。	app/desktop/operator-channel.ts:764	1	2
+exact	main.operator.review.risky	自动审核判定这条命令有风险——按治理规则，有风险的命令必须由你亲自确认才能执行。	app/desktop/operator-channel.ts:778	1	1
+exact	main.operator.review.timeout	自动审核超时，未给出结论——按 fail-closed 交你确认。	app/desktop/operator-channel.ts:779	1	1
+exact	main.operator.review.parse	自动审核给出的结论无法解析，未能形成明确意见——按 fail-closed 交你确认。	app/desktop/operator-channel.ts:780	1	1
+exact	main.operator.review.error	自动审核出错了，未给出结论——按 fail-closed 交你确认。	app/desktop/operator-channel.ts:781	1	1
+exact	main.operator.review.unavailable	自动审核当前不可用（审读会话未接上）——按 fail-closed 交你确认。	app/desktop/operator-channel.ts:782	1	1
+exact	main.operator.review.unsure	自动审核拿不准——按 fail-closed 交你确认。	app/desktop/operator-channel.ts:783	1	1
+exact	main.operator.review.fallback	审核未能给出明确结论，按 fail-closed 交你确认。	app/desktop/operator-channel.ts:784	1	1
+composed-all-chunks	main.operator.expiredTimeout	操作者确认超时（>{ms}ms），未获放行——可让角色重新发起。	app/desktop/operator-channel.ts:411	2	2
+exact	main.operator.expiredTimeoutNoMs	操作者确认超时，未获放行——可让角色重新发起。	app/desktop/operator-channel.ts:921	1	1
+exact	main.operator.expiredStopped	本轮已结束、停止或会话已重建，旧 shell 确认失效。	app/desktop/operator-channel.ts:926	1	1
+composed-all-chunks	main.operator.judgeTimeoutError	判断超时（{ms}ms）：未在时限内得到判断结论。	app/desktop/customer-input.ts:800	2	2
+composed-all-chunks	main.operator.confirmTimeoutError	操作者确认超时（{ms}ms）：未在时限内得到操作者选择。	app/desktop/operator-channel.ts:411	2	2
+exact	main.customerInput.judgeDecisionHead	judge 代批 · 代决策：接受提案（accept）	app/desktop/customer-input.ts:155	1	1
+exact	main.customerInput.judgeAcceptanceHead	judge 代批 · 代决策：验收通过（accept）	app/desktop/customer-input.ts:156	1	1
+composed-all-chunks	main.customerInput.judgeAppointmentHead	judge 代批 · 代决策：任命 {ids}	app/desktop/customer-input.ts:159	1	1
+composed-all-chunks	main.customerInput.judgeWriteHead	judge 代批 · 代审批：确认写入 {count} 个路径（{paths}）	app/desktop/customer-input.ts:164	2	2
+exact	main.customerInput.expiredQueued	排队决定已自动处理（未呈现客户卡）	app/desktop/customer-input.ts:445	1	1
+composed-all-chunks	main.customerInput.deliveryFailed	客户交互请求未能送达界面：{detail}	app/desktop/customer-input.ts:470	1	1
+exact	main.customerInput.rowFailedManual	判断已完成，但结果无法在聊天中显示；已转你手动确认。	app/desktop/customer-input.ts:588	1	1
+composed-all-chunks	main.customerInput.judgeNotDelegated	判断 agent 未代批（{label}）：{reason}；已转你手动确认。	app/desktop/customer-input.ts:589	3	3
+exact	main.customerInput.rejectNotApproval	拒绝仅适用于审批组	app/desktop/customer-input.ts:608	1	1
+exact	main.customerInput.switchOff	你已关闭对应开关	app/desktop/customer-input.ts:612	1	1
+exact	main.customerInput.groupMismatch	判断结果分组与卡片不符	app/desktop/customer-input.ts:614	1	1
+exact	main.customerInput.notRecommended	判断结论与卡片选项不符	app/desktop/customer-input.ts:646	1	1
+exact	main.customerInput.emitChannelMissing	判断结果行通道未配置	app/desktop/customer-input.ts:676	1	1
+exact	main.customerInput.rowFailed	判断结果无法在聊天中显示	app/desktop/customer-input.ts:728	1	1
+exact	main.customerInput.turnAborted	本轮已中止，判断结果不生效。	app/desktop/customer-input.ts:791	1	1
+composed-all-chunks	main.customerInput.judgeException	判断异常：{detail}	app/desktop/customer-input.ts:791	1	1
+composed-all-chunks	main.customerInput.judgeTimeout	判断超时（>{ms}）	app/desktop/customer-input.ts:800	1	1
+exact	main.customerInput.parseFailed	判断结果形状非法	app/desktop/customer-input.ts:808	1	1
+composed-all-chunks	main.customerInput.ledgerUnavailable	{label}未通过：{reason}{detail}。本次自动判断未通过/未完成，已拒绝；请按上述原因修正后重新提交确认。	app/desktop/customer-input.ts:827	2	2
+composed-all-chunks	main.customerInput.ledgerUnavailableShort	{label}未通过：{reason}。本次自动判断未通过/未完成，已拒绝；请按上述原因修正后重新提交确认。	app/desktop/customer-input.ts:827	2	2
+exact	main.customerInput.presenterMissing	客户交互通道未配置（无 presenter），未获同意（fail-closed）	app/desktop/customer-input.ts:895	1	1
+exact	main.customerInput.noPendingRequest	没有待答的交互请求（轮次停止、会话重建或应用关闭会使旧请求失效）	app/desktop/customer-input.ts:975	1	1
+exact	main.customerInput.missingDecision	缺决定内容	app/desktop/customer-input.ts:979	1	1
+exact	main.customerInput.choiceMismatch	决定与请求类型不符（请求是 choice）	app/desktop/customer-input.ts:984	1	1
+exact	main.customerInput.confirmMustBeBoolean	确认决定必须是布尔值	app/desktop/customer-input.ts:987	1	1
+exact	main.customerInput.customerDeclined	客户不同意	app/desktop/customer-input.ts:981	1	1
+exact	main.customerInput.confirmMismatch	决定与请求类型不符（请求是 confirm）	app/desktop/customer-input.ts:997	1	1
+exact	main.customerInput.customerCancelled	客户取消	app/desktop/customer-input.ts:1000	1	1
+exact	main.customerInput.selectionMustBeArray	选择内容必须是字符串数组	app/desktop/customer-input.ts:1005	1	1
+exact	main.customerInput.emptySelection	未选择任何选项（空选择不受理；点「取消」才是拒绝）	app/desktop/customer-input.ts:1009	1	1
+exact	main.customerInput.selectionNotInRequest	选项不在本次请求中（按请求快照校验拒绝）	app/desktop/customer-input.ts:1013	1	1
+exact	main.customerInput.singleChoiceOnly	单选题只能选一个	app/desktop/customer-input.ts:1016	1	1
+exact	main.customerInput.unknownDecisionType	未知的决定类型	app/desktop/customer-input.ts:1021	1	1
+exact	main.customerInput.reason.timeout	判断超时	app/desktop/customer-input.ts:800	1	1
+exact	main.customerInput.reason.aborted	本轮已中止	app/desktop/customer-input.ts:736	1	1
+exact	main.customerInput.reason.unavailable	判断服务不可用	app/desktop/customer-input.ts:1105	1	1
+exact	main.customerInput.reason.unsupportedEngine	当前引擎不支持自动判断	app/desktop/customer-input.ts:1106	1	1
+exact	main.customerInput.reason.parseFailed	判断结果无法解析	app/desktop/customer-input.ts:1107	1	1
+exact	main.customerInput.reason.artifactMissing	规范物证缺失	app/desktop/customer-input.ts:1108	1	1
+exact	main.customerInput.reason.artifactNotRead	判断未读取必需的项目文件	app/desktop/customer-input.ts:1109	1	1
+exact	main.customerInput.reason.pathOutsideBoundary	写盘路径不在允许范围内	app/desktop/customer-input.ts:1110	1	1
+exact	main.customerInput.reason.pathUnverified	写盘路径无法逐项核对	app/desktop/customer-input.ts:1111	1	1
+exact	main.customerInput.reason.notRecommended	候选与推荐/选项不一致	app/desktop/customer-input.ts:1112	1	1
+exact	main.customerInput.reason.insufficientEvidence	证据不足	app/desktop/customer-input.ts:1113	1	1
+exact	main.customerInput.reason.ledgerUnavailable	治理事实不可读	app/desktop/customer-input.ts:1114	1	1
+exact	main.customerInput.reason.groupMismatch	判断结果与卡片分组不一致	app/desktop/customer-input.ts:1115	1	1
+exact	main.customerInput.reason.budget	读取预算已用尽	app/desktop/customer-input.ts:1117	1	1
+exact	main.customerInput.reason.readTruncated	读取内容被截断	app/desktop/customer-input.ts:1118	1	1
+exact	main.customerInput.reason.contextMissing	缺少判断所需的上下文	app/desktop/customer-input.ts:1119	1	1
+exact	main.customerInput.reason.fallback	判断未给出可代批结论	app/desktop/customer-input.ts:1120	1	1
+composed-all-chunks	main.customerInput.rework.head	{label}拒绝：{reason}。本次自动判断未通过/未完成，已拒绝；请按上述原因修正后重新提交确认。	app/desktop/session.ts:3230	2	2
+exact	main.judgeReason.readDeniedPrefix	判断读取被拒：	app/desktop/judge-reason.ts:9	1	1
+exact	main.judgeReason.readDeniedDetail	读取被拒：	app/desktop/judge-reason.ts:9	1	1
+exact	main.judgeReason.readDeniedFallback	所需项目文件无法读取（未记录具体路径）	app/desktop/judge-reason.ts:21	1	1
+exact	main.judgeReason.readDeniedTail	，已转手动确认。	app/desktop/judge-reason.ts:10	1	1
+exact	main.runtimeConfig.readFileFailed	无法读取运行时配置文件。	app/desktop/runtime-config.ts:40	1	1
+exact	main.runtimeConfig.invalidUrl	地址格式无效	app/desktop/runtime-config.ts:54	1	1
+exact	main.runtimeConfig.demoNoConfig	演示运行时无需配置。	app/desktop/runtime-config.ts:102	1	1
+exact	main.runtimeConfig.settingsMustBeObject	设置必须是键值对象。	app/desktop/runtime-config.ts:103	1	1
+exact	main.runtimeConfig.valueMustBeString	设置值必须是字符串。	app/desktop/runtime-config.ts:108	1	1
+exact	main.runtimeConfig.urlCredentials	API 地址须为不含用户名或密码的 http/https 地址。	app/desktop/runtime-config.ts:112	1	1
+exact	main.runtimeConfig.invalidApiUrl	API 地址格式无效。	app/desktop/runtime-config.ts:114	1	1
+composed-all-chunks	main.runtimeConfig.choiceInvalid	{label}取值无效：仅接受 {accepted}（或留空维持平台默认）。	app/desktop/runtime-config.ts:131	2	2
+composed-all-chunks	main.runtimeConfig.integerInvalid	{label}必须是{bound}正整数。	app/desktop/customer-input.ts:987	2	2
+no-literal-trace	main.runtimeConfig.integerBound	 ≥ {min} 的		0	0
+exact	main.runtimeConfig.notSaved	运行时配置未保存，无法写入配置文件。	app/desktop/runtime-config.ts:166	1	1
+exact	main.project.governanceInvalid	治理记录不可用（.ans/project.json 不可解析或结构无效）	app/desktop/project.ts:226	1	1
+exact	main.project.governanceUnaccepted	治理记录未接受（accepted 不为 true）	app/desktop/project.ts:228	1	1
+exact	main.project.governancePathEmpty	治理记录缺少治理边界路径（governanceBoundary.path 为空）	app/desktop/project.ts:230	1	1
+exact	main.project.pinCheckFailed	pin 证据检查失败	app/desktop/interface.ts:3511	1	1
+exact	main.project.pinMissing	治理记录未提供可验证 pin	app/desktop/project.ts:291	1	1
+exact	main.runtimeResolution.noRuntime	无法确定项目引擎，请先选择引擎；本次自动验收派发已跳过（不会循环重试）。	app/desktop/runtime-resolution.ts:34	1	1
+exact	main.runtimeResolution.invalidParams	持久化参数无效。	app/desktop/runtime-resolution.ts:218	1	1
+exact	main.runtimeResolution.persistFailed	引擎选择未能写入持久化文件。	app/desktop/runtime-resolution.ts:248	1	1
+exact	main.watchdog.signal.turnDeadline	轮次到点检查	app/desktop/watchdog.ts:8	1	1
+exact	main.watchdog.signal.queueStuck	投递排队积压	app/desktop/watchdog.ts:8	1	1
+exact	main.watchdog.signal.cmdTimeout	命令超时	app/desktop/interface.ts:2427	1	1
+exact	main.watchdog.signal.repeatFail	重复失败	app/desktop/watchdog.ts:8	1	1
+no-literal-trace	main.watchdog.durationSeconds	{seconds} 秒		0	0
+no-literal-trace	main.watchdog.durationMinutesSeconds	{minutes} 分 {seconds} 秒		0	0
+composed-all-chunks	main.watchdog.durationHours	{hours} 小时	app/desktop/session.ts:4036	1	1
+exact	main.watchdog.kind.handback	回交	app/desktop/governance-advance.ts:137	1	1
+exact	main.watchdog.kind.dispatch	派发	app/desktop/customer-input.ts:59	1	1
+exact	main.watchdog.kind.system	系统	app/desktop/composer-images.ts:4	1	1
+exact	main.watchdog.action.redeliver	重投任务	app/desktop/recovery-channel.ts:8	1	1
+composed-all-chunks	main.watchdog.recoveryNote	系统·恢复 · {action} · 角色 {roleId} · {executed}	app/desktop/session.ts:3637	2	2
+composed-all-chunks	main.watchdog.stormGuard	系统·看护 · 风暴护栏 · 已抑制 {count} 条	app/desktop/watchdog.ts:407	1	1
+composed-all-chunks	main.watchdog.recoverySignal	系统·看护 · 看护恢复 · {signal} · 角色 {roleId}	app/desktop/watchdog.ts:474	2	2
+composed-all-chunks	main.watchdog.turnAbortedText	{prefix} 回合自动中止：角色「{roleId}」本轮已耗 {elapsed}（显式配置的自动中止时限 {limit}）。自动中止 ≠ 客户批准：这是看护按「替我决策/替我审批」开关执行的停止动作，只停止本回合、不代表客户逐项审批；轮次收尾后队列中的回交/派发按既有顺序继续投递。	app/desktop/watchdog.ts:551	4	4
+composed-all-chunks	main.watchdog.turnAbortedSummary	系统·看护 · 回合自动中止 · 角色 {roleId}	app/desktop/watchdog.ts:552	1	1
+composed-all-chunks	main.watchdog.turnDeadlineElapsedAbort	本轮有效已耗约 {elapsed}（看护检查时限 {timeoutMs}ms；到点仅检查；显式配置的自动中止时限 {limit}，开关开启时看护到点自动中止）	app/desktop/watchdog.ts:566	4	4
+composed-all-chunks	main.watchdog.turnDeadlineElapsedNoAbort	本轮有效已耗约 {elapsed}（看护检查时限 {timeoutMs}ms；到点仅检查、不中止本轮；未配置看护自动中止）	app/desktop/watchdog.ts:566	3	3
+exact	main.watchdog.turnDeadlineAdvice	请用 role_status / session_tail 核对该角色是否卡死；仍在推进则不动作；确认卡死可 propose_recovery（开关开启时由桌面自动执行；关闭时仍需客户确认后应用执行）	app/desktop/watchdog.ts:568	1	1
+composed-all-chunks	main.watchdog.turnDeadlineLastResort	整轮最后兜底 {text}（运行时硬上限，不是看护自动中止）	app/desktop/session.ts:4036	2	2
+composed-all-chunks	main.watchdog.turnDeadlineStarted	本轮自 {time} 开始、至今仍在进行	app/desktop/watchdog.ts:570	2	2
+exact	main.watchdog.turnDeadlinePendingCard	该角色有挂起确认卡时不触发本信号（正确等待不报）	app/desktop/watchdog.ts:571	1	1
+composed-all-chunks	main.watchdog.queueStuckHead	队首已排队 {age}（队列深度 {depth}）	app/desktop/watchdog.ts:596	2	2
+composed-all-chunks	main.watchdog.queueStuckItem	- [{kind}] 来自 {source}：{summary}（入队 {time}）	app/desktop/interface.ts:3080	3	3
+composed-all-chunks	main.watchdog.repeatFailWindow	近 {minutes} 分钟窗口内已有 {count} 次轮次以 failed/timed_out 结束	app/desktop/watchdog.ts:627	2	2
+composed-all-chunks	main.watchdog.repeatFailLast	最近一次 {detail}	app/desktop/governance-advance.ts:400	1	1
+exact	main.watchdog.repeatFailUnknown	（未知）	app/desktop/composer-images.ts:52	1	1
+composed-all-chunks	main.watchdog.cmdTimeoutTimedOut	{time}（结构化事实 display.process.timedOut=true——F-1 已自动终止该命令、轮次继续）	app/desktop/watchdog.ts:702	1	1
+exact	main.watchdog.cmdTimeoutNote	命令原文与输出在该角色会话流；本告警不含命令原文	app/desktop/watchdog.ts:703	1	1
+exact	main.watchdog.systemSource	（系统）	app/desktop/session.ts:4063	1	1
+composed-all-chunks	main.demo.toolCall	模型请求调用 write_file -> {path}	app/desktop/chat-adapter.ts:74	1	1
+exact	main.demo.unknownToolDenied	未知工具，拒绝执行：write_file	app/desktop/chat-adapter.ts:76	1	1
+composed-all-chunks	main.demo.message	（演示运行时·第 {turn} 轮）收到：{text}	app/desktop/chat-adapter.ts:95	2	2
+exact	main.demo.inBoundsWrite	角色边界内的写入尝试	app/desktop/chat-adapter.ts:96	1	1
+exact	main.demo.outOfBoundsWrite	越界写入尝试	app/desktop/chat-adapter.ts:97	1	1
+composed-all-chunks	main.demo.turnEndedPrototype	第 {turn} 轮结束（原型阶段未真正落盘）。	app/desktop/chat-adapter.ts:98	1	1
+composed-all-chunks	main.demo.turnEnded	第 {turn} 轮结束（演示运行时）。	app/desktop/chat-adapter.ts:102	1	1

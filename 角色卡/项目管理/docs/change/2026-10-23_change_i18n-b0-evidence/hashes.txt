@@ -1,0 +1,67 @@
+# i18n B0 candidate hashes (workspace, uncommitted)
+# generated_at=2026-10-23 11:05:03 +0800
+# HEAD=ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+# format: == path / git hash-object / sha256sum
+== src/common/shared/i18n/format.ts
+blob=6af5507796498283cc88f582ccb1bc212523aad5
+5bcdccd09074e5539a23617d7d0caecfd5386942802c54f14a08080f4398b38a *src/common/shared/i18n/format.ts
+== src/common/shared/i18n/index.ts
+blob=adaf5e5d928d83bea9f99502cd98f2dff3540616
+70994c1df6d235563df977a77b7939929edcd149abd8e4cef04225aa6c91052e *src/common/shared/i18n/index.ts
+== src/common/shared/i18n/keys.ts
+blob=359974ff62b94b41491b89cba0248f36f4ed219a
+4346aa4e724b86bbf7e7d7c27af9ef84de85648ac463861766a206fd5c91c469 *src/common/shared/i18n/keys.ts
+== src/common/shared/i18n/locales.ts
+blob=38001c4b83181d0f3eec78342b355acffda959a0
+9431b06bb2d7119e7870c5a7ab58e502f1d82b9dbc2c81736a833bad5955c6f6 *src/common/shared/i18n/locales.ts
+== src/common/shared/i18n/messages/en-US.ts
+blob=0584e9faf8ca8d9b2089b97c35fb6596e4a34bf1
+00c232f8c571189169865e2d8f48863d617575986615401546098d9d007133ab *src/common/shared/i18n/messages/en-US.ts
+== src/common/shared/i18n/messages/zh-CN.ts
+blob=203adbecb6b760f1660b60e2f98945d59eca64db
+d56b456b2a9093dc69f3455064a7df3adce1c196d0468ab710422178e5fcdaa4 *src/common/shared/i18n/messages/zh-CN.ts
+== src/common/shared/i18n/translate.ts
+blob=b5f32940ca14e5dc40f37ec59b3067073bd26c8b
+c9967f7920b63d0f26c50e2b252ae67135c6494cee7d541fe2f8d07d6eae118f *src/common/shared/i18n/translate.ts
+== src/common/shared/i18n/types.ts
+blob=1e31eb529cb8d83d9a3a37e09262c1570026a65c
+942eb3d1933d266bb59e97f79872606ba073ea149c7a4269c39a1185c58849e6 *src/common/shared/i18n/types.ts
+== test/项目管理/shared/i18n.test.ts
+blob=af8a3807efa810fc6b6d2eb63aa3b634b55a3449
+069bb6bc28c9ec4b27a390856cf6bc539e9185aa81c3967c28b3c64e9aa0975b *test/项目管理/shared/i18n.test.ts
+== test/项目管理/shared/i18n-guard.test.ts
+blob=3358a1428f60b1d115e9a3af5aab39601938eb12
+05003446fd8973b9954dd10593f8f5df284d68b3d733b8832a83338f949cf7e9 *test/项目管理/shared/i18n-guard.test.ts
+== test/项目管理/shared/i18n-guard-scanner.ts
+blob=78f9085a776a16c801240440988c566bb62c9ef1
+132a5325f7d5d1c552ad32b31a53fe4b659f74fbfc0f46d629ce273073e1661b *test/项目管理/shared/i18n-guard-scanner.ts
+== test/项目管理/shared/i18n-guard-allowlist.ts
+blob=a9405b42b8fb4159730bae11f281088c59e4f555
+fdf9317a6fbdf0ab5f9e0b417ea97df861ae1254b067a982c67a3009bf2f0c0f *test/项目管理/shared/i18n-guard-allowlist.ts
+== 角色卡/项目管理/docs/architecture/shared-components.md
+blob=497a131b2f80f420804ba2db7cc297bd6b051abf
+bc67083b251c102deda7b13d76311c7b582a787673985af205e4c8f90b465c0f *角色卡/项目管理/docs/architecture/shared-components.md
+== 角色卡/项目管理/api-spec.md
+blob=fccf60a26ff93064b0a8dee7ab49214f85aa55d8
+8369b413064f80b2ab534d4c11561494d709726ef018c21f148e9af1ea6de4df *角色卡/项目管理/api-spec.md
+== 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0.md
+blob=a7084df7b5b1415f35e5a20336c7348c7800ce80
+af1980d9fdd6a297ac5241c6dc107af519bd3c21f059e26f117fa2cbd6768620 *角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0.md
+== 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0-evidence/environment.txt
+blob=59df725326875587db091cd2644434e23b1dbb61
+c7f6679279a99af9cfa6f11d442578631b53035c9c78d0a1efd733328cf85a63 *角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0-evidence/environment.txt
+== 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0-evidence/i18n-test.log
+blob=040c9083d5249e8454c6a07c6b17b6d87d4a3e7a
+83d5cdefbc728774e9a1a0b6f79c9e3fea636ab619fd9795fac10325ef647fd5 *角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0-evidence/i18n-test.log
+== 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0-evidence/i18n-guard-test.log
+blob=df1ed1fa133ffe2c5a662c990c70f71959dce7c7
+f3cc71b248ee3a843638ecc497837a8f062d55a2cf508641d32172630c07f250 *角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0-evidence/i18n-guard-test.log
+== 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0-evidence/shared-suite.log
+blob=1b478f0512bb0f03433ca04efe53636578343e1c
+5dba32197da83000bafa48d4d1fe197b6031ca10d11ca2f75109c657947fc175 *角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0-evidence/shared-suite.log
+== 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0-evidence/typecheck.log
+blob=8502a1d438594f6cf38aa493ff3ba91a9d29c9f2
+4824597524aeb79bd86b3fc0111d8e4f223c6d7e376d3a126575661bae2acdb6 *角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0-evidence/typecheck.log
+== 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0-evidence/guard-scan.txt
+blob=39fd9ea4520dd10bcedc9d42d23aeb6d57d392f0
+140390c8ecf08e02e6d9ded2ad35ab941cfc7b471d41ec305a967ee63d41b219 *角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0-evidence/guard-scan.txt

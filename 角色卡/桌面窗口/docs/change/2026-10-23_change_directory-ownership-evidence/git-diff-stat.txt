@@ -1,0 +1,41 @@
+warning: in the working copy of 'test/测试/governance-e2e-auto/p-team-plan-guard.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '角色卡/桌面窗口/api-spec.md', LF will be replaced by CRLF the next time Git touches it
+ app/desktop/governance-advance.ts                  |  125 +-
+ app/desktop/interface.ts                           |  402 ++++-
+ app/main.ts                                        |   79 +-
+ app/preload.cjs                                    |   19 +
+ app/renderer/src/App.tsx                           |    3 +
+ app/renderer/src/lib/platform.ts                   |   16 +
+ app/renderer/src/shell/SettingsPanel.tsx           |   57 +
+ docs/communication/memo.md                         |   13 +-
+ docs/planning/memo.md                              |    5 +
+ "src/common/\347\274\226\346\216\222/team-plan.ts" | 1816 ++++++++++++++++++--
+ .../governance-roles.ts"                           |   76 +-
+ src/model/runtime.ts                               |   14 +-
+ src/pipeline/orchestration/govern-session.ts       |   15 +-
+ src/pipeline/orchestration/run-role.ts             |   39 +-
+ test/runtime-core/governance-flow-metadata.test.ts |   50 +
+ .../source-guard.test.ts"                          |   20 +-
+ .../e2e/main.mjs"                                  |   14 +
+ .../interface.test.ts"                             |  855 ++++++++-
+ .../operator-wiring.test.ts"                       |    4 +-
+ .../governance-e2e-auto/fixture.ts"                |  463 ++++-
+ .../governance-e2e-auto/i-full-chain.test.ts"      |  563 ++++++
+ .../governance-e2e-auto/p-team-plan-guard.test.ts" |  246 +++
+ .../q-role-granularity.test.ts"                    |  261 ++-
+ .../r-mapreduce-parallel.test.ts"                  |  232 +++
+ "test/\347\274\226\346\216\222/team-plan.test.ts"  |  524 ++++++
+ .../governance-standard-workflow.test.ts"          |   99 +-
+ .../governance-trio.test.ts"                       |  124 +-
+ .../\346\241\214\351\235\242UI/api-spec.md"        |   28 +
+ .../api-spec.md"                                   |   30 +
+ .../boundary.md"                                   |    2 +
+ .../changelog.md"                                  |    2 +
+ .../\347\274\226\346\216\222/api-spec.md"          |   34 +
+ .../api-spec.md"                                   |    6 +
+ .../memo.md"                                       |    2 +
+ .../api-spec.md"                                   |   12 +
+ .../memo.md"                                       |    2 +
+ .../api-spec.md"                                   |   37 +
+ .../docs/architecture/shared-components.md"        |   17 +
+ 38 files changed, 5995 insertions(+), 311 deletions(-)

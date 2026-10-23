@@ -1,0 +1,18 @@
+== FINAL candidate full regression summary (D5 fix included; excludes write-sequencing) ==
+files: 355
+ℹ tests 3655
+ℹ pass 3628
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 18
+ℹ todo 0
+ℹ duration_ms 324202.4436
+exit_code=1 finished: 2026-10-23 12:39:31 +0800
+
+previous round (D6, before desktop fix): 3655 / 3627 / 10 / 18 / 0 (exit 1; 9 EPERM + 1 desktop timing flake)
+baseline (B0, v3 implementation):        3591 / 3563 / 10 / 18 / 0 (exit 1; 9 EPERM + 1 desktop flake)
+final delta vs baseline: tests +64, pass +65, fail -1 (baseline flake absent), skipped 0
+final delta vs previous round: tests 0, pass +1, fail -1 (flake absent), skipped 0
+fail set: 9 x Windows symlink EPERM only (historical class); 0 desktop timing flake this run; 0 new deterministic failures.
+own tests: 25 new (v3 semantics 24 + layout e2e 1) all passed in this run; b-proposal-accept-timing updated to D5 v3-default wording and passed.
+attribution of +64 tests vs baseline: own +25; D4 test/编排/directory-conformance.test.ts +15; other D4/D5 context +24.

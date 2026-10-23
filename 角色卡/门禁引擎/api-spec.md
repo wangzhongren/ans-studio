@@ -1,5 +1,17 @@
 # 门禁引擎公开接口：角色协作组摘要
 
+## 目录级授权卡文本增量（2026-10-23）
+
+目录级授权（directory-ownership，T3）中，本角色只改 `governance-roles.ts` 的三张内置治理角色卡文本（产品数据），**不改导出函数名、类型、注册表写权、能力位与工程基线文本**。
+
+- `CONVENER_CARD_TEXT`（Steward / 统筹）：团队计划升级为 v3——frontmatter `teamPlanSchema: 3`、`directories`（非空内联数组，与目录规范表/角色表一致）、`modules`；正文模块清单五列（module/职责/公开契约/架构来源/实现目录），每个 module 的 `实现目录` 必填非空（Q9 A，不得 `—`/空）；角色表 15 列，含 `授权目录`+`精确写集`（`唯一写集` 仅兼容别名带 warning，`边界` 列名不再接受）；目录规范表 12 字段（目录/owner/类型/用途/命名/允许子目录/允许文件类型/公开契约/测试面/依赖/禁写区/共享）；每目录唯一 owner、目录不重叠、`shared: none/read-only/split`、治理关键路径只能精确授权；readiness 逐角色/逐目录记录 `directories`/`spec`/`shared`/`layout` 并保留 v2 的 module/contract/testSurface/parallel/dependsOn/granularity；目录规范变更只以新计划版本写、不原地改已确认版本，角色/范围实质变化重开闸门 2。
+- `NOMINATOR_CARD_TEXT`（Crew / 组队）：按计划 `授权目录`（directory 条目）+ `精确写集`（file 条目）逐条写 boundary；`new` 角色边界目录与计划 `授权目录` 一致（不得更宽），`changed`/`existing` 计划 ⊆ 边界、更宽部分限于模块实现目录/既有职责；不得改目录规范、不得跨目录、不得把他人目录并进自己边界；计划缺目录/规范/实现目录或与边界不一致时停止写卡并交回 Convener，不自行扩权。
+- `VERIFIER_CARD_TEXT`（Proof / 验收）：核对目录布局核对报告（改动路径 → 目录规范）与原始 `git status`/diff/候选哈希，报告必须可复算、布局 fail 不得标 pass；不把「字段齐全/结构通过」当成「语义正确」——目录内聚/规范合理/共享必要/契约与测试面真实性以 readiness 记录与验收判断为准；未真实启动/演示仍不得建议 accept。
+
+不变项（逐项有测试钉住）：`BUILT_IN_GOVERNANCE_ROLES` 的 entries/forbidden/preauthorized、`GovernanceCapabilities` 能力位、内部 id/显示名/`GovernanceFunction`、`ENGINEERING_QUALITY_BASELINE` 文本、`appGovernanceBoundary` 四项与所有导出签名；未新增 `cardKind`/`FlowStepKind`/`GovernancePower`/`GovernanceDecisionKind`/artifact kind。
+
+检查证据：定向 `node --test test/门禁引擎/governance-trio.test.ts test/门禁引擎/governance-standard-workflow.test.ts` = **63 计 / 63 过 / 0 失败 / 0 skip / exit 0**；`node --test "test/门禁引擎/**/*.test.ts"` = **316 计 / 315 过 / 0 失败 / 1 Windows 既有 skip / exit 0**；`npm run typecheck` exit 1，交付时快照 4 条诊断（并行编辑中浮动；首次 7 条含 `run-role.ts`）全在并行角色文件（`app/desktop/interface.ts`、`src/common/编排/team-plan.ts` 的 v3 在飞改动），本角色文件 0 错。状态 `implemented-unverified`。详见[变更记录](docs/change/2026-10-23_change_directory-ownership.md)。
+
 ## 角色粒度（bounded context）与 MapReduce 卡文本增量（2026-10-22）
 
 Map A「角色粒度与 MapReduce 并行测试」中，本角色只改 `governance-roles.ts` 的三张内置治理角色卡文本（产品数据），**不改导出函数名、类型、注册表写权、能力位与工程基线文本**。

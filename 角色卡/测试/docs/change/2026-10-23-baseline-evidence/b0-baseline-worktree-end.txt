@@ -1,0 +1,24 @@
+captured_at: 2026-10-23 11:33:40 +0800
+git rev-parse HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+git rev-parse HEAD^{tree}: 1149238a834f31588797016d6ee2289a4ac3e97b
+--- git status --short -- src app test ---
+ M app/desktop/interface.ts
+ M app/main.ts
+ M app/preload.cjs
+ M app/renderer/src/App.tsx
+ M app/renderer/src/lib/platform.ts
+ M app/renderer/src/shell/SettingsPanel.tsx
+ M "test/\346\241\214\351\235\242UI/source-guard.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts"
+?? app/desktop/i18n.ts
+?? app/desktop/preferences.ts
+?? app/renderer/src/i18n/
+?? src/common/shared/i18n/
+?? "test/\346\241\214\351\235\242UI/i18n-store.test.ts"
+?? "test/\346\241\214\351\235\242UI/i18n-view.test.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard-allowlist.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard-scanner.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard.test.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"
+--- git diff --cached --name-only ---
+(空=无暂存)

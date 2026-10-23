@@ -1,0 +1,27 @@
+# S7 写集与候选哈希（测试角色）
+HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+BRANCH: main
+--- 本角色写盘文件（产品外） ---
+FILE test/测试/governance-e2e-auto/s-acceptance-rework-routing.test.ts
+BLOB 1cc677239100e763383a8edeb2d4d86b8774a5ba
+931001895808f889b1b3abbd2eff5e6dcce85fa7a6bfb2007ef9fb73d191d5ae *test/测试/governance-e2e-auto/s-acceptance-rework-routing.test.ts
+BYTES 51137
+STATUS ?? "test/\346\265\213\350\257\225/governance-e2e-auto/s-acceptance-rework-routing.test.ts"
+FILE test/测试/governance-e2e-auto/fixture.ts
+BLOB 336177aeca57bab33aea6741eb9df532d63bc1c9
+2e4e571aa4b8aeae9da21ab59323e45b83b23c94d6fec307a226fde019ad7e71 *test/测试/governance-e2e-auto/fixture.ts
+BYTES 76009
+STATUS  M "test/\346\265\213\350\257\225/governance-e2e-auto/fixture.ts"
+--- 本角色 docs/change 与证据（管理记录，非产品候选） ---
+DOC pending
+--- 暂存区（必须为空） ---
+STAGED_COUNT 0
+--- 目标项目/真实 flow 未被测试改写 ---
+REPO_DOCS_FLOWS_STATUS: 0 项
+REPO_ANS_STATUS: 0 项
+total 8
+drwxr-xr-x 1 51054 197609 0 Oct 22 13:54 .
+drwxr-xr-x 1 51054 197609 0 Oct 23 20:51 ..
+drwxr-xr-x 1 51054 197609 0 Oct 22 13:54 sessions
+--- 仓库根无本角色临时文件 ---
+none

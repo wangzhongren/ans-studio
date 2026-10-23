@@ -1,0 +1,39 @@
+== upstream drift observed after start snapshot ==
+observed_at=2026-10-23 21:52:37 +0800
+new_path=docs/acceptance/role-root-docs-display-criteria-v1.md
+git_hash_object=c0239c051be301c96aa07df1ab33ffc12cbbad33
+sha256=12981ed44ee1786d4a73d9441b823075b6ed88a23ae10b95d928afb225f6efcb
+bytes=91061
+lines=784
+classification=external management-doc addition by independent acceptance; not test-role write; not product/test candidate
+
+== full status diff start -> after runs ==
+132a133
+> ?? docs/acceptance/role-root-docs-display-criteria-v1.md
+
+== src/app/test snapshot stability ==
+file_list_diff_empty=yes
+hash_diff_empty=yes
+
+== criteria file observation (read-only) ==
+header says: gate 0/1/2 confirmed per docs/communication/2026-10-23_intent_role-root-docs-display.md; implementation authorization NOT given; criteria v1 implementation-before frozen; not an acceptance report.
+testing role did not write, review, or endorse this file; recorded only as external S1 artifact.
+docs/communication/2026-10-23_intent_role-root-docs-display.md | sha256=016798a1541e232a33d32ec4b3b97a7dce156fdfe580aa527bde23461da4d09a | git=06bcea2055a196e2c8d5cf4a2c4ff3dca56720dc | bytes=6895 | lines=73
+criteria_sha256=12981ed44ee1786d4a73d9441b823075b6ed88a23ae10b95d928afb225f6efcb
+
+== second external drift observed during baseline ==
+observed_at=2026-10-23 21:55:33 +0800
+new_path=docs/communication/2026-10-23_intent_artifact-observation-race.md
+git_hash_object=5c2f1d7c9698ff551d77300133b039ff6cb8c17d
+sha256=3ee1f45ad7fcb234b83b6c4b4daf83c86ee18b02c9372eb495ad8171bf13d38d
+bytes=3949
+lines=46
+classification=external Communication record for a separate T2 intent (flow_step_update artifact.observed timing); states it will be implemented after this role-root-docs S1 baseline and avoids src changes during the baseline; not test-role write; not this change candidate.
+
+== current status diff vs start ==
+132a133
+> ?? docs/acceptance/role-root-docs-display-criteria-v1.md
+133a135
+> ?? docs/communication/2026-10-23_intent_artifact-observation-race.md
+204a207
+> ?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-baseline.md

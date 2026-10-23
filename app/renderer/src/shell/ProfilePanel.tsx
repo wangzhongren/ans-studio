@@ -23,11 +23,10 @@ import { deriveRoleStatus, statusBadge } from "@/chat/status";
 import {
   pendingViews,
   queueGroups,
-  QUEUE_EMPTY_TEXT,
-  WORK_EMPTY_PENDING,
 } from "@/chat/work-view";
 import type { RoleView } from "@/chat/types";
 import { QueuePanel } from "@/shell/QueuePanel";
+import { useLocaleState, useT, type Translator } from "@/i18n";
 
 const SECTION_IDS = ["card", "boundary", "changes", "docs"] as const;
 type SectionId = (typeof SECTION_IDS)[number];
@@ -42,13 +41,18 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-function boundaryTable(boundary: RoleView["boundary"]): ReactElement {
+function boundaryTable(
+  boundary: RoleView["boundary"],
+  t: Translator,
+): ReactElement {
   const record = asRecord(boundary);
   const entries = Array.isArray(record.entries) ? record.entries : [];
   if (entries.length === 0) {
     return (
       <div className="muted small">
-        （无条目{record.parseError ? "；解析失败：" + asString(record.parseError) : ""}）
+        {record.parseError
+          ? t("ui.profile.noEntriesParseFailed", { detail: asString(record.parseError) })
+          : t("ui.profile.noEntries")}
       </div>
     );
   }
@@ -138,6 +142,8 @@ function Section({
 }
 
 export function ProfilePanel({ roleId }: { roleId: string | null }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const roles = useChatStore((s) => s.roles);
   const roleBusy = useChatStore((s) => s.roleBusy);
   const roleMeta = useChatStore((s) => s.roleMeta);
@@ -170,16 +176,14 @@ export function ProfilePanel({ roleId }: { roleId: string | null }) {
   if (!roleId || !role) {
     return (
       <div className="right-empty">
-        <p className="empty-title">选择角色后查看资料</p>
-        <p className="empty-sub">
-          先在左侧选择角色，再从会话头部的“角色资料”或“工作概览”打开对应面板；内容跟随当前角色。
-        </p>
+        <p className="empty-title">{t("ui.profile.emptyTitle")}</p>
+        <p className="empty-sub">{t("ui.profile.emptySub")}</p>
       </div>
     );
   }
 
-  const displayName = roleDisplayName(role);
-  const subtitle = roleSubtitle(role);
+  const displayName = roleDisplayName(role, locale);
+  const subtitle = roleSubtitle(role, locale);
   const initial = Array.from(displayName).slice(0, 1).join("") || "?";
   const awaiting = Object.values(pendingOperator).some(
     (payload) => asString(payload.roleId) === role.roleId,
@@ -195,12 +199,12 @@ export function ProfilePanel({ roleId }: { roleId: string | null }) {
     restored: roleMeta[role.roleId]?.restored === true,
   });
   // PM §十三 / UIUX M5：状态只表达状态；数量只在角标/队列视图。
-  const badge = statusBadge(status, 0);
+  const badge = statusBadge(status, 0, locale);
   const docs = Array.isArray(role.docs) ? role.docs : [];
   const fileDocs = docs.filter((entry) => asRecord(entry).kind === "file");
   const changelog = asRecord(role.changelog);
-  const pending = pendingViews(pendingOperator, role.roleId);
-  const groups = queueGroups(queue, runningByRole[role.roleId] || null);
+  const pending = pendingViews(pendingOperator, role.roleId, locale);
+  const groups = queueGroups(queue, runningByRole[role.roleId] || null, locale);
   const preview = [...groups.running, ...groups.queued.slice(0, 3)];
   const sectionOpen = (id: SectionId) => reading?.sections?.[id] === true;
 
@@ -221,7 +225,7 @@ export function ProfilePanel({ roleId }: { roleId: string | null }) {
 
       <Section
         id="card"
-        title="角色卡"
+        title={t("ui.profile.cardTab")}
         open={sectionOpen("card")}
         onToggle={(open) => setSectionOpen(key, "card", open)}
       >
@@ -236,24 +240,24 @@ export function ProfilePanel({ roleId }: { roleId: string | null }) {
             sectionRefs.current.card = element;
           }}
         >
-          <div dangerouslySetInnerHTML={{ __html: renderMarkdown(role.cardText || "（空）") }} />
+          <div dangerouslySetInnerHTML={{ __html: renderMarkdown(role.cardText || t("ui.profile.emptyCard")) }} />
         </div>
       </Section>
 
       <Section
         id="boundary"
-        title="边界条目"
+        title={t("ui.profile.boundaryTab")}
         count={role.boundary && Array.isArray(role.boundary.entries) ? role.boundary.entries.length : 0}
         open={sectionOpen("boundary")}
         onToggle={(open) => setSectionOpen(key, "boundary", open)}
       >
-        {boundaryTable(role.boundary)}
+        {boundaryTable(role.boundary, t)}
       </Section>
 
       <Section
         id="changes"
-        title="变更记录"
-        count={changelog.text ? null : "无"}
+        title={t("ui.profile.changelogTab")}
+        count={changelog.text ? null : t("shared.common.none")}
         open={sectionOpen("changes")}
         onToggle={(open) => setSectionOpen(key, "changes", open)}
       >
@@ -273,19 +277,19 @@ export function ProfilePanel({ roleId }: { roleId: string | null }) {
             />
           </>
         ) : (
-          <div className="muted small">（无 changelog.md）</div>
+          <div className="muted small">{t("ui.profile.noChangelog")}</div>
         )}
       </Section>
 
       <Section
         id="docs"
-        title="文档"
-        count={fileDocs.length > 0 ? fileDocs.length : "无"}
+        title={t("ui.profile.docsTab")}
+        count={fileDocs.length > 0 ? fileDocs.length : t("shared.common.none")}
         open={sectionOpen("docs")}
         onToggle={(open) => setSectionOpen(key, "docs", open)}
       >
         {docs.length === 0 ? (
-          <div className="muted small">（无 docs/ 目录或为空）</div>
+          <div className="muted small">{t("ui.profile.noDocs")}</div>
         ) : (
           <div
             className="card-text card-md"
@@ -310,13 +314,13 @@ export function ProfilePanel({ roleId }: { roleId: string | null }) {
           })
         }
       >
-        查看已列文档
+        {t("ui.profile.viewListedDocs")}
       </button>
 
       <div className="profile-todo">
-        <h3 className="work-heading">待办 / 队列</h3>
+        <h3 className="work-heading">{t("ui.profile.pendingQueue")}</h3>
         {pending.length === 0 && preview.length === 0 ? (
-          <div className="muted small">{QUEUE_EMPTY_TEXT}</div>
+          <div className="muted small">{t("ui.work.emptyQueue")}</div>
         ) : (
           <>
             {pending.length > 0 ? (
@@ -330,16 +334,16 @@ export function ProfilePanel({ roleId }: { roleId: string | null }) {
               </ul>
             ) : null}
             {preview.length > 0 ? (
-              <QueuePanel roleId={role.roleId} items={preview} emptyText={WORK_EMPTY_PENDING} />
+              <QueuePanel roleId={role.roleId} items={preview} emptyText={t("ui.work.emptyPending")} />
             ) : null}
             {groups.total > 3 ? (
               <button
                 type="button"
                 className="btn-mini queue-view-all"
-                aria-label={"查看全部队列（" + groups.total + " 项）"}
+                aria-label={t("ui.work.viewAllQueueAria", { count: groups.total })}
                 onClick={(event) => openQueue("card", event.currentTarget)}
               >
-                查看全部队列（{groups.total}）
+                {t("ui.work.viewAllQueue", { count: groups.total })}
               </button>
             ) : null}
           </>

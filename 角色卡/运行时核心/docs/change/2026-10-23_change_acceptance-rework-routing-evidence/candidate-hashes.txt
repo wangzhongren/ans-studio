@@ -1,0 +1,12 @@
+# 写后候选哈希（2026-10-23，工作区字节；边界修正后）
+
+file	src/provider/runtime/tools.ts（产品候选）
+git hash-object	2a7983459249aff27b1ba43193d07d8cf7c72658
+sha256sum	b3bc52c45042c7493b8ed9e122654513481f67f7877e4d551a6e0479e88153a1
+
+file	test/runtime-core/tools.test.ts（产品候选）
+git hash-object	467ef81cb045a805803edeb356cc0c589cb97a1b
+sha256sum	c7db7e1f5db919b2f9a61c8c15f97ab9b5c8afd54e82c3d8f960cbc005f5ad94
+
+# 边界修正前（首版，已被取代）：tools.ts 3d4b033d… / 1f61c54e…；test 467ef… 之前的 a0833a97… / 08d5ecd5…
+# 候选 diff：candidate.diff（仅上述两文件；无其他产品文件改动）

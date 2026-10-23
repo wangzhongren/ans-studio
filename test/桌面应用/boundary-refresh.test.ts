@@ -240,9 +240,10 @@ test("O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递
   assert.ok(SESSION_SRC.includes("async refreshStaleBoundaries()"), "全量扫描入口（su settle 触发）");
   assert.ok(IFACE_SRC.includes("void manager.refreshStaleBoundaries();"), "Interface：su 一轮结束（边界可能刚被改）时触发扫描");
   assert.ok(
-    SESSION_SRC.includes("上下文恢复结果以引擎实际返回为准") &&
+    SESSION_SRC.includes('mainT("main.session.rebuiltSkills"') &&
+      SESSION_SRC.includes('mainT("main.session.rebuiltBoundary"') &&
       SESSION_SRC.includes('handle.contextSource === "resumed"') && SESSION_SRC.includes('handle.contextSource === "recovered"'),
-    "上下文来源只由引擎实际返回，native resumed/recovered 显式映射，不从文件存在猜恢复"
+    "上下文来源只由引擎实际返回，native resumed/recovered 显式映射，不从文件存在猜恢复（B3：两分支文案走 main.session.rebuilt* key）"
   );
 });
 
@@ -432,7 +433,7 @@ test("G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注�
   assert.ok(SESSION_SRC.includes("private async currentSkillPaths("), "当刻重推导当前技能集合（新增/移除集合差）");
   assert.ok(SESSION_SRC.includes("!frozen.has(f)") && SESSION_SRC.includes("!currentSet.has(f)"), "集合差双向（新增＋移除）");
   assert.ok(SESSION_SRC.includes("const skillPaths = (await this.currentSkillPaths(req.projectRoot, req.roleId)) ?? [];"), "开会话定格技能文件集入快照（新建与重建同径）");
-  assert.ok(SESSION_SRC.includes("docs/skills/") && SESSION_SRC.includes("已安装技能已变更"), "陈旧重建行按技能变更如实分支（不误称「边界」）");
+  assert.ok(SESSION_SRC.includes("docs/skills/") && SESSION_SRC.includes("main.session.rebuiltSkills"), "陈旧重建行按技能变更如实分支（不误称「边界」；B3：技能分支文案走 main.session.rebuiltSkills key）");
   assert.ok(SESSION_SRC.includes("...(installSkill ? { installSkill } : {})") && SESSION_SRC.includes("...(uninstallSkill ? { uninstallSkill } : {})"), "能力注入（未注入 ⇒ 两工具不注册——最强 fail-closed）");
   assert.ok(SESSION_SRC.includes('this.applySkillChange("installed"') && SESSION_SRC.includes('this.applySkillChange("uninstalled"'), "两工具同名同形（共用 handler）");
   assert.ok(SESSION_SRC.includes("...(installMcp ? { installMcp } : {})") && SESSION_SRC.includes("...(uninstallMcp ? { uninstallMcp } : {})"), "V2 MCP 两工具同款注入才注册");

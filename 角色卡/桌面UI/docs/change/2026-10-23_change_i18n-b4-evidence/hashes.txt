@@ -1,0 +1,30 @@
+generated_at: 2026-10-23T17:16:39+08:00
+format: sha256  git-hash-object  path
+
+7bbd8b1d0c1a6bf402e19efb14c44cd323d463f618cb1ec47072beb90c21cad4  4877d82de2e65ff685be43411357f129ea453ca5  app/renderer/src/chat/runtime-config.ts
+052ea23040804e4ab2872c2a6b6813ba816db92f0c1e90d3c7ae2c0393391100  cf877d7878b968352cc9b0c9418769e445944112  app/renderer/src/shell/phase4a.css
+563e7a795f8d00dee0dd328e0ea6c46be22ca9c8bc42eb8b5c9a4854f26dfb41  bded84b35836cea821d782f6e7a7fbc7bde1bc61  test/桌面UI/runtime-config.test.ts
+6c761264753e2c4e2b2110a53fd41fdd7326a4076423d157f4e69feec90a0e5b  7e2e654cf4596c982130b7c843645932eb5c7d82  test/桌面UI/source-guard.test.ts
+b7a03765119d2a980625b45bb0a409c989ee0c804e906a2b1684cd50f270a4a5  a1356461befb3b376bc6eb6bc9825ebe1aa7d1a2  角色卡/桌面UI/api-spec.md
+022d174b757211baaf779958f30a335d43c0a30d1972b9ce9b75f1db8fb467bc  9b4985761cc9e954f80dc0e7ae051abca35f5193  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4.md
+b2342b0d6577d4e18e75200e44fcc8dee203ba701d3388f295d6dff1e194d8f1  5889cfca99dd2d2d36aa97df65f10ce6ac3e36c0  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/environment.txt
+fe974deb64f90b11db8e0433230521533907d1bcbe44e17643d5c735a0c7265d  75dcdb02fe4f794d97c963512f146ea052934d1c  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/runtime-label-proof.txt
+f827b47bc00d9e43263bf84adfd7619891ab2e91285b228c4356ae9d7f92c85c  dc2f981def8966f9d3b4702e97661ea142546015  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/scope-proof.txt
+8a8929b8e9a3ac37ac2d87fc1b6fb63d3ed4ba951cb28bf74508a7bca86ae8ec  5f5919dc14e81572cf8107ad6ad407f95fcde331  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/test-desktop-ui.log
+e50a9b50910d9ebd81449fb7b69b019e328a1f7ecff2efae5662863fe0d9c6b2  1289ec55886ad385c02c1b303ee839ac66ac45a2  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/typecheck-renderer.log
+3746e54dfe6c8898ebffde07c3a6857156795d3d46e2c1aa2eb4363d03fbf8e9  fec517484f6b3af75a8f0f4b8f294d96bdfec90e  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/typecheck-root.log
+2612c339008bb80dfb511af050c92da4c45ff813a7e11206f8da31c4f1c5a101  ee5a91162ce5fa069f5d5b9d3190cb4c663503e6  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/build-renderer.log
+6adf7c4f19bd90c7b825940665bdaeb9f636ebe7634c6937405abc19e8c4e2cb  d83794489b75b187ac713e4f21817c63b0b4dd9f  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/layout-200pct-smoke.log
+90aef5f3d5056e9ded405214c1b62907bc7166ec747e9e71cdb3f3f0fe7c3c11  9d134bcc37b550c2bd0c9feb70e8a8c12cf23f17  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/layout-200pct-electron-smoke.mjs
+7266601f5ab0f3102b2dea2494fb3aafad4da6b831837af06ef06388013198c7  be68f8e6bdfba7736bc1bbec259ff466b5317b0a  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/layout-200pct/zh/report.json
+a891256661cc60a6652937f854e240c0028806a05ba69d9ad54ef725607a8d32  107574b580fa70098bded69e6c8574698f9e3383  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/layout-200pct/zh/settings-960-zh.png
+7bd4a320f84c85c06557b36193124ff5ab89b704d9df35ba55de5ae8b8e3a670  647839cf2f2c9d9b7d630d3222aede5ad27f5254  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/layout-200pct/zh/settings-200-zh.png
+17f8ff98f2f194c6f6f2b851c9e233477dc94ce9c6e8e8445de89c72c36fc643  7b6d9f50f236cc4604e6fdf44524061de15c5a7d  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/layout-200pct/zh/settings-200-zh-bottom.png
+aa8bbb18ee1adecbe5922fe2219ac7a3a90c0744b65029cda13e0a3d783b954d  7fc3e0c764e55f81a65100e08b33a84a81ad3f52  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/layout-200pct/en/report.json
+8d5649d46b18ce5778b259eac6cb7ccf3e9272fd343b419c00793ae7c43a14b1  2aec1c00a0192406989ba65f43f6ac4c2ca23424  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/layout-200pct/en/settings-960-en.png
+6f6c8ac28a1cd8da20507a292bdc9ca40c25282dd7a47d9f5721354692152892  1314fe6486eb4149492a05b7e2734985d02057e8  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/layout-200pct/en/settings-200-en.png
+88778d3fe8641512da269213fec490fe13f5528856ec759d5e596668dd455a7f  1424c6daacb58923c9fd2962bc66ac36c5f6f3f3  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/layout-200pct/en/settings-200-en-bottom.png
+cf41584bdd080df276bd16ea1578f1559a03cbbdc1c04cd0f624637437c58e62  bcfdaad45a53c57efc4715e447be363b5a680705  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/git-diff-cached.txt
+cf395e7a7ccf476ae766ba193720e4f729689bd614d89bad3eeb4aee1ab44151  fa51632a7448945ca3c3c77ea85881d297c37f35  角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/git-status-after.txt
+
+(hashes.txt 自身不计入)

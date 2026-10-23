@@ -1,0 +1,57 @@
+# Affected suite baseline summary
+captured_local=2026-10-23 18:57:29 +0800
+HEAD=ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+
+log                                    exit     tests  pass   fail  skipped  todo   duration_ms 
+directed-orchestration                 1        810    809    1     0        0      14192.8106  
+directed-desktop-app                   0        558    558    0     0        0      102594.1654 
+directed-runtime-core                  1        293    286    3     4        0      28614.028   
+directed-project-management-shared     0        181    176    0     5        0      7389.0551   
+directed-testing-e2e                   1        822    815    1     6        0      110331.1101 
+directed-assembly                      0        84     84     0     0        0      7292.2339   
+
+## Failure details
+### directed-orchestration
+✖ failing tests:
+✖ node test外指符号链接路径不获委托；项目内测试路径获委托 (1.8305ms)
+error snippet:
+    code: 'EPERM',
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\ans-routine-outside-RWuCvZ\outside.test.ts' -> 'C:\Users\51054\AppData\Local\Temp\ans-routine-paths-jnwvM6\test\external.test.ts'
+
+### directed-runtime-core
+✖ D3 linked workspace root remains usable; linked target itself is not replaced (6.2563ms)
+✖ failing tests:
+✖ store: native validation stays lazy and native symlink is rejected before effects (2.9803ms)
+✖ store: traversal, mismatched scope and symlinked runtime directories rejected (2.1749ms)
+error snippet:
+    code: 'EPERM',
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\ans-core-d3-IOcA8O\actual\nested\file.txt' -> 'C:\Users\51054\AppData\Local\Temp\ans-core-d3-IOcA8O\actual\link.txt'
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\ans-store-53bQr9' -> 'C:\Users\51054\AppData\Local\Temp\ans-store-yfGAkA\.ans\sessions\role\codex'
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\ans-store-cl8SeS' -> 'C:\Users\51054\AppData\Local\Temp\ans-store-SpY9fb\.ans\sessions\core\codex\native'
+
+### directed-testing-e2e
+✖ failing tests:
+✖ 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛 (7.4566ms)
+error snippet:
+    code: 'EPERM',
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\g4-outside-ZqP3sK' -> 'C:\Users\51054\AppData\Local\Temp\g4-render-wiL5Ql\docs\skills\link'
+
+## Skip details
+### runtime-core
+﹣ D3 write and edit preserve existing ordinary modes and strip special bits (0.0952ms) # SKIP
+﹣ D3 handler under strict umask retains existing mode and keeps new files private (0.0482ms) # SKIP
+﹣ D3 chmod failure reaches the handler without committing file or mode (0.0616ms) # SKIP
+﹣ D3 sync failure reaches the handler without committing file or mode (0.0322ms) # SKIP
+### testing
+﹣ D3 AC3/5: explicit cat executable requires existing approval; refusal, unavailable, timeout and abort never execute (0.0594ms) # SKIP
+﹣ D3 AC4: ordinary cat/ls/rg/git reads remain fast; rg --pre forms need approval without pattern/filename false positives (0.0402ms) # SKIP
+﹣ D3 AC5: review follows ordinary/operator/advisory policy; readonly refuses without asking (0.0299ms) # SKIP
+﹣ D3 AC6: real write/edit preserve regular modes and new files use safe creation (0.0271ms) # SKIP
+﹣ D3 AC6: strict umask in isolated child cannot strip old executable mode (0.0374ms) # SKIP
+﹣ D3 AC7: chmod/fsync failure and abort do not commit or leave a temp (0.086ms) # SKIP
+### project-management-shared
+﹣ D3 finalMode 应用普通权限位，未传时保持既有安全创建行为 (0.0821ms) # SKIP
+﹣ D3 严格 umask 下 finalMode 不丢执行位（独立子进程） (0.0246ms) # SKIP
+﹣ D3 chmod 失败不提交内容或权限，并清理临时文件 (0.0153ms) # SKIP
+﹣ D3 sync 失败不提交内容或权限，并清理临时文件 (0.0142ms) # SKIP
+﹣ D3 chmod 完成后中止仍保留原文件及权限 (0.0158ms) # SKIP

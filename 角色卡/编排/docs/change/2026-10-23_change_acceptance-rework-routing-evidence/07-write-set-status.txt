@@ -1,0 +1,31 @@
+# S2 写集与提交状态（2026-10-23 19:35:12+0800）
+# 本角色本次实际改动（7 个产品/测试文件；哈希见 06-candidate-hashes.txt）：
+#   src/common/编排/flow-state.ts（修改）
+#   src/common/编排/flow-service.ts（修改）
+#   src/common/编排/acceptance-rework.ts（新增）
+#   src/pipeline/orchestration/flow-state.ts（修改，仅再导出）
+#   test/编排/flow-state.test.ts（修改，仅追加）
+#   test/编排/flow-service.test.ts（修改，仅追加）
+#   test/编排/acceptance-rework.test.ts（新增）
+
+# git status --short（编排写集与测试目录）
+ M "src/common/\347\274\226\346\216\222/flow-service.ts"
+ M "src/common/\347\274\226\346\216\222/flow-state.ts"
+ M "src/common/\347\274\226\346\216\222/team-plan.ts"
+ M src/pipeline/orchestration/flow-state.ts
+ M "test/\347\274\226\346\216\222/flow-service.test.ts"
+ M "test/\347\274\226\346\216\222/flow-state.test.ts"
+ M "test/\347\274\226\346\216\222/team-plan.test.ts"
+?? "src/common/\347\274\226\346\216\222/acceptance-rework.ts"
+?? "src/common/\347\274\226\346\216\222/directory-conformance.ts"
+?? "test/\347\274\226\346\216\222/acceptance-rework.test.ts"
+?? "test/\347\274\226\346\216\222/directory-conformance.test.ts"
+
+# 说明：src/common/编排/team-plan.ts、directory-conformance.ts、test/编排/team-plan.test.ts、
+# test/编排/directory-conformance.test.ts 是既有未提交变更（目录 v3 等），非本任务候选。
+
+# git diff --cached --name-only（应为空：未暂存/未提交）
+
+# 边界/角色卡：本任务未写入。下面两项为空即证明本角色未改它们（boundary.md 的既有未提交 diff
+# 来自此前目录 v3 候选，mtime 2026-10-23 13:18:56，早于本任务；本任务未触碰）：
+git diff --name-only -- 角色卡/编排/boundary.yaml 角色卡/编排/role-card.md:

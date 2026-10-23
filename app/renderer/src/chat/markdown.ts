@@ -22,6 +22,12 @@ import MarkdownIt, {
   type MarkdownItOptions,
 } from "markdown-it";
 import { getDesktopBridge, type DesktopBridge } from "../lib/platform.ts";
+import {
+  DEFAULT_LOCALE,
+  translate,
+  useLocaleStore,
+  type Locale,
+} from "../i18n/index.ts";
 
 export function esc(value: unknown): string {
   return String(value == null ? "" : value)
@@ -117,6 +123,7 @@ interface MarkdownLinkEventLike {
 export function handleMarkdownLinkClick(
   event: MarkdownLinkEventLike,
   getBridge: () => DesktopBridge | null = getDesktopBridge,
+  locale: Locale = DEFAULT_LOCALE,
 ): MarkdownLinkOutcome {
   const target = event.target as Element | null;
   if (!target || typeof target.closest !== "function") return "ignored";
@@ -135,7 +142,7 @@ export function handleMarkdownLinkClick(
   const bridge = getBridge();
   const openExternal = bridge?.openExternal;
   if (typeof openExternal !== "function") {
-    setState("unavailable", "当前环境未提供外部打开通道");
+    setState("unavailable", translate(locale, "ui.markdown.externalUnavailable"));
     return "unavailable";
   }
   try {
@@ -148,16 +155,22 @@ export function handleMarkdownLinkClick(
         if (record.ok === false) {
           setState(
             "failed",
-            "链接未能打开：" +
-              (typeof record.error === "string" && record.error ? record.error : "未知原因"),
+            translate(locale, "ui.markdown.openFailed", {
+              detail:
+                typeof record.error === "string" && record.error
+                  ? record.error
+                  : translate(locale, "shared.common.unknownReason"),
+            }),
           );
           return;
         }
         setState("opened");
       })
-      .catch(() => setState("failed", "链接未能打开：通道异常"));
+      .catch(() =>
+        setState("failed", translate(locale, "ui.markdown.openFailedChannel")),
+      );
   } catch {
-    setState("failed", "链接未能打开：通道异常");
+    setState("failed", translate(locale, "ui.markdown.openFailedChannel"));
   }
   return "requested";
 }
@@ -168,7 +181,11 @@ export function installMarkdownLinkHandler(
   getBridge: () => DesktopBridge | null = getDesktopBridge,
 ): () => void {
   const onClick = (event: MouseEvent) => {
-    handleMarkdownLinkClick(event, getBridge);
+    handleMarkdownLinkClick(
+      event,
+      getBridge,
+      useLocaleStore.getState().locale,
+    );
   };
   doc.addEventListener("click", onClick, true);
   return () => doc.removeEventListener("click", onClick, true);

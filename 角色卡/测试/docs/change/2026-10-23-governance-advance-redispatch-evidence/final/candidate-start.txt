@@ -1,0 +1,62 @@
+=== S5 final candidate identity ===
+captured_at: 2026-10-23 14:40:01 +0800
+git rev-parse HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+git rev-parse HEAD^{tree}: 1149238a834f31588797016d6ee2289a4ac3e97b
+--- target files ---
+app/desktop/interface.ts c3a2adcaf8774f01d2f408f820fcd0344be3b926 5f9b05dfa79d14961fdf7efcbf15ce3c2b154921b7c77d74699b1840fe125352
+app/desktop/governance-advance.ts 02fe42fd2ea18b0f305450b3027afb93306670f6 9e1b4ebf42a3a07005cf3a62583088f40d48c28cf882e41da16b4d5279bc4fe7
+src/common/编排/flow-service.ts 467d0925d4f5c687fb1f19787ef8d3dcfe9dd3a5 82049e2bf9570e23f3af43ee77654c3f5e8b9b23468518f1d0592cfd85ee514b
+src/pipeline/orchestration/flow-state.ts 729597beba576f710a28c819386215145b793f6b 78172c7a760fc5f0df8319763032a0a80175daddf7a4102507feb2850ff08a9a
+test/桌面应用/interface.test.ts 3118a35b9b4f5598f9fa7c78214a44b3bafcb9a8 a97734c3efcc9cc4cf190341bf7a50a0304407e4e483cd022e8371d868b4545a
+test/桌面应用/acceptance-dispatch.test.ts d321afd85bbae8a15ed3a9910c7c1183903e91fa 2141841bcc14650ba65d9323d16bbc1b54004a478fc80681adfcd8922257c9e9
+test/编排/flow-service.test.ts 0d28dad9cf2e2daebdb8b47fb44b32163a961e57 28d1b9b4cbe2899a0e69202983b92532d99d84af3473f72d918e1aa01f9af680
+test/测试/governance-e2e-auto/l-redispatch-reentrant-gate.test.ts cb6f483461815570ef0a18b7fbb251f5cdc0aa5d 48fb0aa8467479904a9b2a7b4498b5f6a3cf200b2782f1eee52c76813ec85e3e
+test/测试/governance-e2e-auto/i-full-chain.test.ts 76cf0dae9aea3612c35b4047dc1a848053da4d8b c14bd78bc5fc6500706f43031e2bd1a5d7c0143a0ee0e9608ec49fdb28df995f
+test/测试/redispatch-target-recompute.ts 54ec1704f19abda5bf5cd98a7ada6df14ddafa44 4bbf858785b2cc0918fedade0ef9ec654484bd3b4147b947ccd7440d9cc7e551
+--- git status --short -- src app test ---
+ M app/desktop/governance-advance.ts
+ M app/desktop/interface.ts
+ M app/main.ts
+ M app/preload.cjs
+ M app/renderer/src/App.tsx
+ M app/renderer/src/lib/platform.ts
+ M app/renderer/src/shell/SettingsPanel.tsx
+ M "src/common/\347\274\226\346\216\222/flow-service.ts"
+ M "src/common/\347\274\226\346\216\222/team-plan.ts"
+ M "src/common/\351\227\250\347\246\201\345\274\225\346\223\216/governance-roles.ts"
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/flow-state.ts
+ M src/pipeline/orchestration/govern-session.ts
+ M src/pipeline/orchestration/run-role.ts
+ M test/runtime-core/governance-flow-metadata.test.ts
+ M "test/\346\241\214\351\235\242UI/source-guard.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/acceptance-dispatch.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/e2e/main.mjs"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/operator-wiring.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/b-proposal-accept-timing.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/fixture.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/i-full-chain.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/p-team-plan-guard.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/q-role-granularity.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/r-mapreduce-parallel.test.ts"
+ M "test/\347\274\226\346\216\222/flow-service.test.ts"
+ M "test/\347\274\226\346\216\222/team-plan.test.ts"
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/governance-standard-workflow.test.ts"
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/governance-trio.test.ts"
+?? app/desktop/i18n.ts
+?? app/desktop/preferences.ts
+?? app/renderer/src/i18n/
+?? src/common/shared/i18n/
+?? "src/common/\347\274\226\346\216\222/directory-conformance.ts"
+?? "test/\346\241\214\351\235\242UI/i18n-store.test.ts"
+?? "test/\346\241\214\351\235\242UI/i18n-view.test.ts"
+?? "test/\346\265\213\350\257\225/directory-layout.test.ts"
+?? "test/\346\265\213\350\257\225/governance-e2e-auto/l-redispatch-reentrant-gate.test.ts"
+?? "test/\346\265\213\350\257\225/redispatch-target-recompute.ts"
+?? "test/\347\274\226\346\216\222/directory-conformance.test.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard-allowlist.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard-scanner.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard.test.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"
+--- git diff --cached --name-only ---

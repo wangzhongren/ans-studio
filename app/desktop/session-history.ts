@@ -20,6 +20,7 @@ import path from "node:path";
 // request_confirmation / request_choice 的「调用行」与「结论行」标上同一个键，供渲染侧把交互卡
 // 锚定回它发生的位置（详见该模块头注与 renderer.js 的锚点物化）。
 import { anchorKeyForToolCall } from "./request-anchor.ts";
+import { mainT } from "./i18n.ts";
 
 /** 会话目录相对项目根的位置（契约钉死：`<projectRoot>/.ans/sessions/<roleId>/`）。 */
 export const SESSIONS_REL_DIR = ".ans/sessions";
@@ -185,8 +186,8 @@ function rowsFromEntry(entry: unknown, interactionCalls: Map<string, string>, to
       for (const block of content) {
         const b = asRecord(block);
         if (b && b.type === "toolCall") {
-          const name = typeof b.name === "string" && b.name !== "" ? b.name : "tool";
-          const row: ReplayRow = { kind: "tool", text: `调用工具 ${name}`, at };
+          const name = typeof b.name === "string" && b.name !== "" ? b.name : mainT("shared.common.tool");
+          const row: ReplayRow = { kind: "tool", text: mainT("main.history.callTool", { name }), at };
           // 交互工具调用：带上 pi toolCallId（两行相认）与锚点键（渲染侧插卡定界）。
           const callId = typeof b.id === "string" && b.id !== "" ? b.id : "";
           const args = asRecord(b.arguments);
@@ -208,7 +209,7 @@ function rowsFromEntry(entry: unknown, interactionCalls: Map<string, string>, to
     return rows;
   }
   if (role === "toolResult") {
-    const name = typeof m.toolName === "string" && m.toolName !== "" ? m.toolName : "工具";
+    const name = typeof m.toolName === "string" && m.toolName !== "" ? m.toolName : mainT("shared.common.tool");
     const text = textOfContent(content);
     const kind: ReplayRow["kind"] = m.isError === true ? "denied" : "tool";
     const row: ReplayRow = { kind, text: text !== "" ? `${name}：${text}` : name, at };
@@ -269,7 +270,7 @@ export function parseSessionJsonl(text: string): { ok: boolean; rows: ReplayRow[
     if (!headerParsed) {
       const h = asRecord(parsed);
       if (!h || h.type !== "session") {
-        return { ok: false, rows: [], skipped, error: "首行不是有效的会话头（type!=session）" };
+        return { ok: false, rows: [], skipped, error: mainT("main.history.invalidSessionHeader") };
       }
       headerParsed = true;
       continue;
@@ -282,7 +283,7 @@ export function parseSessionJsonl(text: string): { ok: boolean; rows: ReplayRow[
     for (const r of entryRows) rows.push(r);
   }
   if (!headerParsed) {
-    return { ok: false, rows: [], skipped, error: "会话文件为空或无有效会话头" };
+    return { ok: false, rows: [], skipped, error: mainT("main.history.emptySession") };
   }
   return { ok: true, rows, skipped };
 }
@@ -318,7 +319,7 @@ export async function readRoleSessionHistory(projectRoot: string, roleId: string
   try {
     text = await fs.promises.readFile(path.join(dir, latest), "utf8");
   } catch (err) {
-    return { ok: false, rows: [], source: latest, skipped: 0, error: `会话文件读取失败：${reasonOf(err)}` };
+    return { ok: false, rows: [], source: latest, skipped: 0, error: mainT("main.history.sessionReadFailed", { detail: reasonOf(err) }) };
   }
   const parsed = parseSessionJsonl(text);
   return parsed.ok
@@ -387,7 +388,7 @@ export function toRuntimeLegacyEntries(rows: readonly ReplayRow[]): import("../.
     const a = row.activity;
     const source = row.legacyTargetSource;
     return { ...base, kind: 'tool-record' as const, text: row.text, tool: {
-      toolName: a?.toolName ?? '工具', phase: a?.phase === 'call' || a?.phase === 'start' ? 'start' as const : 'result' as const,
+      toolName: a?.toolName ?? mainT("shared.common.tool"), phase: a?.phase === 'call' || a?.phase === 'start' ? 'start' as const : 'result' as const,
       ...(a?.toolCallId ? { toolCallId: a.toolCallId } : {}), ...(a?.turnId ? { turnId: a.turnId } : {}),
       ...(typeof a?.ok === 'boolean' ? { ok: a.ok } : {}),
       ...(a && a.status !== 'call' ? { reportedStatus: a.status, statusSource: row.legacyStatusSource ?? 'legacy-classifier' as const } : {}),

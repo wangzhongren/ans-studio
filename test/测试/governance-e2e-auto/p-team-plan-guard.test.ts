@@ -14,6 +14,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { ToolCall } from "../../../src/model/runtime.ts";
+import { parseTeamPlan, teamPlanIssueMessages } from "../../../src/common/编排/team-plan.ts";
 import {
   FLOW,
   TEAM_PLAN_REL,
@@ -24,8 +25,13 @@ import {
   seedTrioProject,
   teamPlanDoc,
   teamPlanV2Doc,
+  teamPlanV3Doc,
+  v3CanonicalParts,
+  v3SharedSplitPlan,
   write,
   type TeamPlanV2RoleInput,
+  type TeamPlanV3Options,
+  type TeamPlanV3RoleInput,
 } from "./fixture.ts";
 
 interface GuardCase {
@@ -37,6 +43,11 @@ interface GuardCase {
 }
 
 const DEFAULT_OPTIONS = [{ id: "executor", label: "Executor" }];
+const V3_OPTIONS = [
+  { id: "executor", label: "Executor" },
+  { id: "reviewer", label: "Reviewer" },
+  { id: "tester", label: "Tester" },
+];
 
 /** v2 角色行基线（单个 Map 模块 + Reduce 角色；具体负例按需覆盖）。 */
 function v2Rows(overrides: {
@@ -91,6 +102,45 @@ function v2Rows(overrides: {
 }
 
 const V2_MODULES = ["storefront", "checkout-api"];
+
+// —————————————————————— 2026-10-23 v3（V-D1–V-D9）负例夹具 ——————————————————————
+//
+// v3 = v2 字段 + `directories`/模块 `实现目录`/角色 `授权目录`+`精确写集`/目录规范 12 列表。
+// 负例覆盖：缺规范、重复目录、多 owner、目录重叠/嵌套、治理路径目录、整层名、路径逃逸、
+// shared: split 违规、缺实现目录、角色目录不在模块实现目录、唯一写集别名 warning、边界列名 error。
+
+const V3 = v3CanonicalParts(FLOW);
+
+function v3Role(roleId: string, over: Partial<TeamPlanV3RoleInput> = {}): TeamPlanV3RoleInput {
+  const base = V3.rows.find((row) => row.roleId === roleId);
+  if (base === undefined) throw new Error(`v3Role：未知角色 ${roleId}`);
+  return { ...base, ...over };
+}
+
+function v3Plan(
+  over: {
+    rows?: TeamPlanV3Options["rows"];
+    moduleRows?: TeamPlanV3Options["moduleRows"];
+    moduleHeader?: string;
+    directoryRows?: TeamPlanV3Options["directoryRows"];
+    directories?: readonly string[] | null;
+    writesHeader?: string;
+    omitDirectorySection?: boolean;
+  } = {},
+): string {
+  return teamPlanV3Doc(FLOW, {
+    modules: V3.modules,
+    recommended: V3.recommended,
+    rows: over.rows ?? V3.rows,
+    moduleRows: over.moduleRows ?? V3.moduleRows,
+    directoryRows: over.directoryRows ?? V3.directoryRows,
+    ...(over.moduleHeader !== undefined ? { moduleHeader: over.moduleHeader } : {}),
+    ...(over.directories !== undefined ? { directories: over.directories } : {}),
+    ...(over.writesHeader !== undefined ? { writesHeader: over.writesHeader } : {}),
+    ...(over.omitDirectorySection === true ? { omitDirectorySection: true } : {}),
+  });
+}
+
 
 const CASES: GuardCase[] = [
   {
@@ -223,6 +273,148 @@ const CASES: GuardCase[] = [
     }),
     expected: /Reduce 角色 tester 的 dependsOn 未直接或传递覆盖全部 Map 角色（缺：reviewer）/,
   },
+  // —————— 2026-10-23 v3（V-D1–V-D9）负例 ——————
+  {
+    name: "v3 缺目录规范表",
+    plan: v3Plan({ omitDirectorySection: true }),
+    options: V3_OPTIONS,
+    expected: /缺少「目录规范」表/,
+  },
+  {
+    name: "v3 frontmatter 重复目录",
+    plan: v3Plan({ directories: [...V3.directoryRows.map((row) => row.dir), "src/storefront/"] }),
+    options: V3_OPTIONS,
+    expected: /directories 重复列出目录「src\/storefront\/」/,
+  },
+  {
+    name: "v3 目录规范重复行",
+    plan: v3Plan({ directoryRows: [...V3.directoryRows, V3.directoryRows[0]!] }),
+    options: V3_OPTIONS,
+    expected: /目录规范重复列出目录「src\/storefront\/」/,
+  },
+  {
+    name: "v3 多 owner（角色引用他人目录）",
+    plan: v3Plan({
+      rows: [
+        V3.rows[0]!,
+        V3.rows[1]!,
+        v3Role("tester", { authorizedDirs: "`test/测试/`; `src/checkout/tests/`" }),
+      ],
+    }),
+    options: V3_OPTIONS,
+    expected: /owner 不一致/,
+  },
+  {
+    name: "v3 目录嵌套/跨角色重叠",
+    plan: v3Plan({
+      rows: [
+        V3.rows[0]!,
+        v3Role("reviewer", { authorizedDirs: "`src/checkout/`; `src/checkout/tests/`; `src/storefront/tests/`" }),
+        V3.rows[2]!,
+      ],
+    }),
+    options: V3_OPTIONS,
+    expected: /目录\/写集重叠/,
+  },
+  {
+    name: "v3 治理关键路径作为授权目录",
+    plan: v3Plan({ directories: [...V3.directoryRows.map((row) => row.dir), "角色卡/"] }),
+    options: V3_OPTIONS,
+    expected: /治理关键路径/,
+  },
+  {
+    name: "v3 模块实现目录为整层名且无粒度理由",
+    plan: v3Plan({
+      moduleRows: [
+        { module: "storefront", implementationDir: "app/" },
+        { module: "checkout-api", implementationDir: "src/checkout/" },
+      ],
+    }),
+    options: V3_OPTIONS,
+    expected: /整层\/整应用目录且未写「粒度理由」/,
+  },
+  {
+    name: "v3 路径逃逸（..）",
+    plan: v3Plan({ directories: ["../src/storefront/", ...V3.directoryRows.map((row) => row.dir)] }),
+    options: V3_OPTIONS,
+    expected: /含空段\/\.\/\.\./,
+  },
+  {
+    name: "v3 shared: split 父目录被直接分配",
+    plan: v3SharedSplitPlan(FLOW, { parentAssigned: true }),
+    options: V3_OPTIONS,
+    expected: /shared: split，但父目录本身被角色 .* 直接分配/,
+  },
+  {
+    name: "v3 缺实现目录列",
+    plan: v3Plan({ moduleHeader: "| module | 职责 | 公开契约 | 架构来源 |" }),
+    options: V3_OPTIONS,
+    expected: /缺少必需列「实现目录」/,
+  },
+  {
+    name: "v3 模块实现目录为空",
+    plan: v3Plan({
+      moduleRows: [
+        "| storefront | 商店 | `docs/contracts/storefront-v1.md` | `docs/planning/flow-a-v1.md` §4 | — |",
+        "| checkout-api | 结算 | `docs/contracts/checkout-v1.md` | `docs/planning/flow-a-v1.md` §4 | `src/checkout/` |",
+      ],
+    }),
+    options: V3_OPTIONS,
+    expected: /缺少非空的「实现目录」/,
+  },
+  {
+    name: "v3 角色目录不在模块实现目录内",
+    plan: v3Plan({
+      rows: [
+        v3Role("executor", { authorizedDirs: "`src/storefront/`; `src/storefront/tests/`; `src/elsewhere/`" }),
+        V3.rows[1]!,
+        V3.rows[2]!,
+      ],
+      directoryRows: [
+        ...V3.directoryRows,
+        {
+          dir: "src/elsewhere/",
+          owner: "executor",
+          kind: "implementation",
+          purpose: "越出模块实现目录",
+          naming: "any",
+          subdirs: "*",
+          extensions: ".ts",
+          contract: "internal（负例）",
+          testSurface: "`src/elsewhere/`",
+          dependencies: "无",
+          forbidden: "—",
+          shared: "none",
+        },
+      ],
+    }),
+    options: V3_OPTIONS,
+    expected: /不在模块实现目录内/,
+  },
+  {
+    name: "v3 边界列名不再接受",
+    plan: v3Plan({ writesHeader: "边界" }),
+    options: V3_OPTIONS,
+    expected: /不再接受「边界」列名/,
+  },
+  {
+    name: "v3 依赖目标不存在",
+    plan: v3Plan({
+      directoryRows: V3.directoryRows.map((row, index) =>
+        index === 1 ? { ...row, dependencies: "`src/ghost/`" } : row,
+      ),
+    }),
+    options: V3_OPTIONS,
+    expected: /依赖目标「src\/ghost\/」不存在/,
+  },
+  {
+    name: "v3 精确文件落在他人目录",
+    plan: v3Plan({
+      rows: [V3.rows[0]!, V3.rows[1]!, v3Role("tester", { preciseWrites: "`src/storefront/precise.ts`" })],
+    }),
+    options: V3_OPTIONS,
+    expected: /目录\/写集重叠/,
+  },
 ];
 
 for (const testCase of CASES) {
@@ -322,6 +514,60 @@ test("legacy v1 团队计划：卡前守卫不强制 v2 字段，appointment 卡
       ledger.entries.some((entry) => entry.decisionKind === "appointment" && entry.artifactPath === TEAM_PLAN_REL),
       "legacy v1 任命决定绑定团队计划",
     );
+  } finally {
+    await h.stop();
+    h.cleanup();
+    temp.cleanup();
+  }
+});
+
+test("v3 唯一写集别名：warning 不阻断 ⇒ appointment 卡发出并代批；解析告警可核对", async () => {
+  const plan = v3Plan({ writesHeader: "唯一写集" });
+  const parsed = parseTeamPlan(plan, { flowId: FLOW });
+  assert.equal(parsed.ok, true, teamPlanIssueMessages(parsed).join("；"));
+  assert.equal(parsed.teamPlanSchema, 3);
+  assert.deepEqual(
+    teamPlanIssueMessages(parsed, "warning").filter((message) => /唯一写集/.test(message)),
+    ["v3 团队计划角色表使用「唯一写集」别名；已按「精确写集」处理（建议把列名改为「精确写集」）"],
+  );
+
+  const temp = makeRoot("team-plan-guard-v3-alias-pass");
+  seedTrioProject(temp.root);
+  write(temp.root, TEAM_PLAN_REL, plan);
+  await seedConfirmedIntent(temp.root);
+  const appointmentCard: ToolCall = {
+    name: "request_choice",
+    args: {
+      title: `任命 ${FLOW}`,
+      question: "选择要任命的角色",
+      flowId: FLOW,
+      cardKind: "appointment",
+      multiple: true,
+      options: V3_OPTIONS,
+    },
+  };
+  const h = await makeHarness({
+    tag: "team-plan-guard-v3-alias-pass",
+    root: temp.root,
+    approval: true,
+    decision: true,
+    scriptForRole: (ctx) => (ctx.roleId === "convener" ? [appointmentCard] : []),
+  });
+  try {
+    await h.open("convener");
+    const sent = await h.send("convener", "请依团队计划 v3 请客户任命。");
+    assert.equal(sent.ok, true, sent.error ?? "");
+    const ledger = await h.waitForLedger(
+      (entries) => entries.some((entry) => entry.decisionKind === "appointment"),
+      10000,
+    );
+    const receipt = h.results.find((result) => result.name === "request_choice")!;
+    assert.equal(receipt.ok, true, `v3 计划（唯一写集别名）应通过卡前守卫：${receipt.message}`);
+    const appointment = ledger.entries.find((entry) => entry.decisionKind === "appointment")!;
+    assert.deepEqual(appointment.targetRoleIds, ["executor", "reviewer", "tester"]);
+    assert.equal(appointment.artifactPath, TEAM_PLAN_REL);
+    assert.equal(appointment.decisionEvidence?.kind, "judge");
+    assert.equal(h.presented.length, 0, "判断代批：0 张手动卡");
   } finally {
     await h.stop();
     h.cleanup();

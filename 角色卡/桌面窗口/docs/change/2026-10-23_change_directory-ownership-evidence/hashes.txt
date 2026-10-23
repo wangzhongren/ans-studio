@@ -1,0 +1,48 @@
+# Candidate/evidence hashes (workspace, uncommitted)
+# generated: 2026-10-23T12:30:52+08:00
+
+app/desktop/interface.ts
+  git hash-object: 61e91311207c739d560d308577135c2205feffb8
+  sha256sum: 1f580f0f5ba5431461fbd451034ab95314651f47a4b9d7a4fc3e39548c305ed4
+app/desktop/governance-advance.ts
+  git hash-object: 8f90a7138a2742509c484e5c856b26497878c3e7
+  sha256sum: 90dbfbd1cb32474b8687d11e02cbe507f1c8773f57af8e1e7bd6499975e4bb90
+test/桌面应用/interface.test.ts
+  git hash-object: 3e3b9083f646aaf0d5925d1915ab9408fd6fc842
+  sha256sum: 45cec1f88f0a8fc3cca47443f45fea93898faf500d21bd0b1891dbf204711242
+test/桌面应用/operator-wiring.test.ts
+  git hash-object: 679d3ce6809beea3dac0be493b9bb535ba5cc10c
+  sha256sum: 997af101d9cd103b4945c48a05417dd8b8741d31d12cf6a8c4a98dcdd45713cb
+test/桌面应用/e2e/main.mjs
+  git hash-object: 67f0572e700fbfc9bfe65e480a37ac307909d456
+  sha256sum: ec77bf3be4ac359bb4b82b5698c49667fd251705ad182279842ca674140fbe7a
+角色卡/桌面窗口/api-spec.md
+  git hash-object: 5a959b8fb3912df2ce90c3a216d06c2fd9897081
+  sha256sum: 0000e045af6e8b5a77c1f69de1a55e9c9bf759c37851da53c6e6e811888bf95f
+角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership.md
+  git hash-object: 9fdb5e257bc65cb548511841e3cef787cb826a37
+  sha256sum: c935360135e6c3dbc58ce9205d405755abbaa1a1e8a1c268f29840e9410fb076
+
+# evidence files
+角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership-evidence/e2e-main-report.txt
+  sha256sum: d922db75b21b774be25546dc88619d57424a5bd7ca8532d4366051f2e2c43ad6
+角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership-evidence/e2e-main-stdout.log
+  sha256sum: 04c06a9023d8b65a8b2f318ac0c52def7be6f269c2f82392ffa6536303d46573
+角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership-evidence/e2e-main-summary.txt
+  sha256sum: 6a448ff7108d3dfda3cb92ae9e4d048095fc18c61accd878471e7b813feb3c75
+角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership-evidence/environment.txt
+  sha256sum: 8679982e2c906df23b52e0e20fa6f1c5be283b512769496b4185972db1ad2ccb
+角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership-evidence/git-diff-name-only.txt
+  sha256sum: 95554f55840eac9a749b9c85721485f73960b25c8455496fd021d09f154e0378
+角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership-evidence/git-diff-stat.txt
+  sha256sum: 2e2ca0ebe8cfdcb3a8ffbd0682f8dc0f28ec88814beaefcc6ef25747401cda19
+角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership-evidence/git-status.txt
+  sha256sum: 07c74802ce75e8c2b333da8bfa127195eea33c36205590ded6175af9777f47ab
+角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership-evidence/interface-test-v3-focused.log
+  sha256sum: ab126a7c01ee4039a21abe683a27455555fe5d2da7040d2703763cd8a79c1db0
+角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership-evidence/interface-test.log
+  sha256sum: cb090e0de46425d108cfce7a8e4ae8fee5451d1def06a63a6f498c43ba099597
+角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership-evidence/operator-wiring.log
+  sha256sum: b7531fcd510a30cee7cce3cbc5c26438e13968c6bfa1c9b77839a56d8904d4c5
+角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership-evidence/typecheck.log
+  sha256sum: 9981252b164f6d9c0811bcbc8635c84a897ebc03f8136ff98b262b4a72c29a33

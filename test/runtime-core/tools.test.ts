@@ -245,3 +245,136 @@ test('accepted-memory report receipt states final persistence and delivery are s
  const result=await report.handler({name:'submit_report',args:{status:'completed',summary:'candidate'}});
  assert.equal(result.ok,true);assert.match(result.message,/候选报告已收到/);assert.match(result.message,/最终保存与投递待本轮收口/);assert.ok(!result.message.includes('报告已交回'));
 });
+
+test("declined 措辞按 operatorId / cardKind 区分 judge 与客户/通道（2026-10-23 验收返工路由 §5.3.3 / Q7 A）", async () => {
+  const judgeReason = "自动审批拒绝：证据不足。本次自动判断未通过/未完成，已拒绝；请按上述原因修正后重新提交确认。";
+  const judgeCall = (name: "request_confirmation" | "request_choice", args: Record<string, unknown>) =>
+    tools(allow, { customerInput: () => ({ outcome: "declined" as const, operatorId: "judge:claude", reason: judgeReason }) })
+      .get(name)!
+      .handler({ name, args });
+  const choiceArgs = (cardKind?: string) => ({
+    title: "选择",
+    options: [{ id: "accept", label: "通过" }],
+    ...(cardKind !== undefined ? { cardKind } : {}),
+  });
+  const assertJudgeCommon = (result: { ok: boolean; message: string }, label: string) => {
+    assert.equal(result.ok, false, `${label}：judge 自动退回仍是 ok:false（fail-closed）`);
+    assert.match(result.message, /自动决策未通过\/未完成/, `${label}：须写「自动决策未通过/未完成」`);
+    assert.match(result.message, /原因：自动审批拒绝：证据不足/, `${label}：须保留 judge 给出的具体原因`);
+    assert.match(result.message, /这不是客户拒绝/, `${label}：须明确这不是客户拒绝`);
+    // 「客户拒绝」只允许作为被否定的「这不是客户拒绝」出现；不得把 judge 退回归因为客户拒绝。
+    assert.equal(
+      result.message.replaceAll("这不是客户拒绝", "").includes("客户拒绝"),
+      false,
+      `${label}：judge 来源不得出现客户拒绝归因：${result.message}`,
+    );
+    assert.doesNotMatch(result.message, /未获客户同意/, `${label}：judge 自动退回不得套用客户同意语义`);
+  };
+  const assertGeneric = (result: { message: string }, label: string) => {
+    assert.match(result.message, /应用会按治理规则处理本次退回/, `${label}：须写通用处理文案`);
+    assert.doesNotMatch(
+      result.message,
+      /Convener|组织返工|重新提交验收/,
+      `${label}：非验收卡不得承诺 Convener 返工/重新提交验收：${result.message}`,
+    );
+  };
+  const assertAcceptanceRework = (result: { message: string }, label: string) => {
+    assert.match(result.message, /应用会把本次退回交 Steward\/统筹（Convener）组织返工/, `${label}：验收卡须写退回 Convener 组织返工`);
+    assert.match(result.message, /请等待返工后重新提交验收/, `${label}：验收卡须等待返工后重新提交验收`);
+  };
+
+  // request_confirmation：所有 judge 退回（含写卡）一律通用文案，不出现返工/验收字样。
+  for (const [label, args] of [
+    ["request_confirmation(无 cardKind)", { title: "写盘" }],
+    ["request_confirmation(write)", { title: "写盘", cardKind: "write" }],
+  ] as const) {
+    const result = await judgeCall("request_confirmation", args);
+    assertJudgeCommon(result, label);
+    assertGeneric(result, label);
+  }
+
+  // request_choice + acceptance：验收返工专用文案。
+  const choiceAcceptance = await judgeCall("request_choice", choiceArgs("acceptance"));
+  assertJudgeCommon(choiceAcceptance, "request_choice(acceptance)");
+  assertAcceptanceRework(choiceAcceptance, "request_choice(acceptance)");
+
+  // request_choice + 其他/未给 cardKind：通用文案，不出现返工/验收字样。
+  for (const cardKind of ["proposal", "appointment", "intent-confirm", undefined] as const) {
+    const label = `request_choice(${cardKind ?? "无 cardKind"})`;
+    const result = await judgeCall("request_choice", choiceArgs(cardKind));
+    assertJudgeCommon(result, label);
+    assertGeneric(result, label);
+  }
+
+  // 客户/通道来源：既有「客户拒绝」语义逐字不变（断言不弱化）。
+  const customerReason = "内容还没看够";
+  const customerByTool = (name: "request_confirmation" | "request_choice", args: Record<string, unknown>) =>
+    tools(allow, { customerInput: () => ({ outcome: "declined" as const, operatorId: "customer-1", reason: customerReason }) })
+      .get(name)!
+      .handler({ name, args });
+  const confirmDeclined = await customerByTool("request_confirmation", { title: "写盘" });
+  assert.equal(confirmDeclined.ok, false);
+  assert.equal(
+    confirmDeclined.message,
+    "request_confirmation：未获客户同意（原因：客户拒绝（内容还没看够））→ 不要写盘；如实告知客户，不得假设同意。",
+    "客户 request_confirmation declined 文案逐字不变",
+  );
+  const choiceDeclined = await customerByTool("request_choice", { title: "选择", options: [{ id: "a", label: "A" }] });
+  assert.equal(choiceDeclined.ok, false);
+  assert.equal(
+    choiceDeclined.message,
+    "request_choice：未获客户同意（原因：客户拒绝（内容还没看够））→ 不要写盘；如实告知客户，不得假设同意。",
+    "客户 request_choice declined 文案逐字不变",
+  );
+  // 无 operatorId（旧通道/未知来源）仍按既有客户/通道语义，不得误判为 judge。
+  const channel = await tools(allow, { customerInput: () => ({ outcome: "declined" as const, reason: "通道返回拒绝" }) })
+    .get("request_choice")!
+    .handler({ name: "request_choice", args: { title: "选择", options: [{ id: "a", label: "A" }] } });
+  assert.equal(channel.ok, false);
+  assert.match(channel.message, /未获客户同意（原因：客户拒绝（通道返回拒绝））/);
+});
+
+test("declined 边界：notPresented/unavailable 与 judgeReceipt 代批措辞不变", async () => {
+  // request_confirmation + notPresented：即使来源是 judge 也走「卡片未发出」，不得说客户拒绝/自动退回。
+  const notPresented = await tools(allow, {
+    customerInput: () => ({ outcome: "declined" as const, operatorId: "judge:claude", notPresented: true as const, reason: "缺少 cardKind" }),
+  }).get("request_confirmation")!.handler({ name: "request_confirmation", args: { title: "写盘" } });
+  assert.equal(notPresented.ok, false);
+  assert.match(notPresented.message, /治理确认卡未发出/);
+  assert.match(notPresented.message, /未向客户呈现/);
+  assert.match(notPresented.message, /缺少 cardKind/);
+  assert.match(notPresented.message, /请补齐后重新调用/);
+  assert.doesNotMatch(notPresented.message, /客户拒绝|自动决策未通过|未获客户同意/);
+
+  // request_choice 的 notPresented 既有行为不变（O1 未授权）：仍按 declined 分支处理。
+  const choiceNotPresented = await tools(allow, {
+    customerInput: () => ({ outcome: "declined" as const, notPresented: true as const, reason: "缺少 cardKind" }),
+  }).get("request_choice")!.handler({ name: "request_choice", args: { title: "选择", options: [{ id: "a", label: "A" }] } });
+  assert.equal(
+    choiceNotPresented.message,
+    "request_choice：未获客户同意（原因：客户拒绝（缺少 cardKind））→ 不要写盘；如实告知客户，不得假设同意。",
+    "request_choice 的 notPresented 既有文案不变",
+  );
+
+  // unavailable：既有「未获客户同意（原因：…）」不变。
+  const unavailable = await tools(allow, { customerInput: () => ({ outcome: "unavailable" as const, reason: "客户通道不可用" }) })
+    .get("request_choice")!
+    .handler({ name: "request_choice", args: { title: "选择", options: [{ id: "a", label: "A" }] } });
+  assert.equal(unavailable.ok, false);
+  assert.match(unavailable.message, /未获客户同意（原因：客户通道不可用）/);
+  assert.doesNotMatch(unavailable.message, /自动决策未通过/);
+
+  // judge 代批（answered + judge audit）：既有「代批」回执不变，不得混入自动退回措辞。
+  const approved = await tools(allow, {
+    customerInput: () => ({
+      outcome: "answered" as const,
+      value: { confirmed: true as const },
+      operatorId: "judge:claude",
+      judge: { group: "approval" as const, cardKind: "write" as const, engine: "claude" as const, reasonCode: "ok" },
+    }),
+  }).get("request_confirmation")!.handler({ name: "request_confirmation", args: { title: "写盘" } });
+  assert.equal(approved.ok, true);
+  assert.match(approved.message, /客户委托的判断 agent（替我审批）已代批（代审批；operator:judge:claude）/);
+  assert.match(approved.message, /这不是客户本人点击/);
+  assert.doesNotMatch(approved.message, /自动决策未通过|客户拒绝/);
+});

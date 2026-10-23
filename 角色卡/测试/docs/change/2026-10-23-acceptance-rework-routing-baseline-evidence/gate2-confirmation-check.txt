@@ -1,0 +1,24 @@
+# Gate 2 confirmation check (read-only), requested correction 2026-10-23
+checked_local=2026-10-23 19:07:50 +0800
+communication_record=docs/communication/2026-10-23_intent_acceptance-rework-routing.md
+communication_git_hash_object=2b0fa3a0a969a6d830b14a961b4e3b288b40969f
+communication_sha256=9a904f43c2c35a6f46ba380a2fb21eb897bd3bbe948245e506780849af6e1e34
+communication_lines=68
+team_plan_sha256=d95fc81733ce824333bad86c74d984c5d045c8545e2373071f8de93c143a48ab
+team_plan_git_hash_object=2e88d2ad39b31911a4c96c8148e79be97e718b44
+team_plan_lines=389
+
+## Gate 2 confirmation excerpt (communication record lines 26-31)
+## 闸门 2 确认记录（2026-10-23）
+
+- **客户原话**：「确认团队计划 v1 的角色、写集、无新增角色/无边界变更、app/main.ts 归桌面窗口、S1–S7 与 T3 验收安排；实施授权另行取得。」
+- **确认对象**：`docs/scheduling/2026-10-23-acceptance-rework-routing-team-plan.md` **团队计划 v1**（389 行；SHA-256 `d95fc81733ce824333bad86c74d984c5d045c8545e2373071f8de93c143a48ab`；blob `2e88d2ad39b31911a4c96c8148e79be97e718b44`）。
+- **确认结论**：参与角色为编排、桌面窗口、运行时核心、项目管理、测试 5 个现有 worker + 内置独立验收 + 统筹；精确写集按团队计划 §三；**无新增角色、无边界变更**；`app/main.ts` 按权威 `角色卡/桌面窗口/boundary.md` Section 1 归桌面窗口，装配不参与（角色标签校正，非边界变更）；T3；S1–S7；独立验收标准先于实施；目标项目只读；T3 全量回归、真实 Electron、目标复算；不与 i18n/目录 v3/治理写卡门禁合并验收。
+- **确认边界**：闸门 2 只确认角色、写集、顺序与验收安排，**不等于实施授权**；不授权派发、改代码/测试/角色卡/边界/flow/账本或动 `ans-gateway`。实施授权另行取得；若角色、写集或顺序实质变化，重开闸门 2。
+
+## Fact
+- Gate 2 is CONFIRMED on 2026-10-23 per the communication record: client confirmed team plan v1 (roles, write-set, no new roles/no boundary change, app/main.ts -> desktop window, S1-S7, T3 acceptance arrangement).
+- Customer implementation authorization is NOT given (separate gate; confirmation != authorization).
+- Team plan file header and §1.5 still say gate 2 unconfirmed; that is stale state. The communication record governs.
+- Team plan sha256 matches the value quoted in the communication record (d95fc81733ce824333bad86c74d984c5d045c8545e2373071f8de93c143a48ab).
+- No product/test/role-card/boundary/plan/acceptance file was modified by this check; read-only.

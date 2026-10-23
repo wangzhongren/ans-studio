@@ -157,5 +157,7 @@ export interface RoleMeta {
   contextText: string;
   /** 主进程给的恢复失败原因（title/追溯；缺省不猜）。 */
   contextWarning?: string;
+  /** 会话 record 已恢复但模型未恢复（结构化标记；用于追加历史保留说明，不解析文案）。 */
+  readableHistoryRetained?: boolean;
   lastEvent?: string;
 }

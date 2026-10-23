@@ -609,6 +609,7 @@ const STANDARD_WORKFLOW_PROMPT = [
   "**流程状态唯一机器状态**：`docs/flows/<flowId>.yaml`（同名 `.md` 仅人读视图，不得承载门禁状态）；步骤必须显式写 `kind` / `evidence` / `supersedes`；新流程使用 step id `team-plan` / `appointment` / `role-cards` / `role-readiness` / `acceptance-criteria` / `change-package`（kind 仍为现有 dispatch / customer-decision / artifact / acceptance）；保留 id `verification` / `acceptance`（`kind: acceptance`，初始 `status: pending`，由应用自动派 Proof，不得占用、不得标 `done`）。",
   "**团队计划（2026-10-22 第 1 项）**：Steward 先写 `docs/scheduling/<flowId>-team-v1.md`（frontmatter flowId/version/riskTier/`recommended: [role-a, role-b]` 与每个角色的职责目标/能力要求/写集/依赖行），再发 `request_choice(cardKind=appointment)`；计划不完整/flowId 不一致/推荐集为空或含内置角色/选项不覆盖推荐集时，应用**不向客户发卡**并退回 Steward。客户任命后由 Crew 读取计划写卡；Crew 不选角色、不改计划。",
   "**团队计划 v2（角色粒度 / MapReduce）**：新流程写 `teamPlanSchema: 2`、frontmatter `modules: [module-a, module-b]`（内联数组、ASCII slug、非空无重复）与「模块清单」表（module/职责/公开契约/架构来源）；角色表 14 列 roleId/类型/module/职责目标/能力要求/唯一写集/公开契约/测试面/依赖/dependsOn/并行组/组别/apiSpec/粒度理由。默认一个模块一个角色、写集跨角色两两不相交（精确路径/目录，不用通配符）、dependsOn 无环、同 map 组无依赖、Reduce 覆盖全部 Map；整层名/多模块必须写「粒度理由」并交 readiness 例外复核。旧计划（无 `teamPlanSchema: 2`）按 v1 兼容，不强制迁移。",
+  "**团队计划 v3（目录级授权，2026-10-23）**：新流程优先写 `teamPlanSchema: 3`（v2 字段全部保留）与 frontmatter `directories: [dir-a/, dir-b/]`（非空内联数组；项目相对、以 `/` 结尾、无通配符/`..`/绝对路径、无重复；不得与治理关键路径重叠）。模块清单每个 module 必须写非空 `实现目录`（Q9 A；不得写 `—`），角色 implementation/tests/docs 目录必须在对应模块实现目录内或等于模块目录；角色表用 `授权目录` + `精确写集` 两列（`唯一写集` 仅作 v3 兼容别名并带 warning；`边界` 列名在 v3 不再接受）；正文必须有「目录规范」表（目录/owner/类型/用途/命名/允许子目录/允许文件类型/公开契约/测试面/依赖/禁写区/共享），每个目录恰好一个 owner、目录不得相同/互为祖先或子目录；共享目录用 none/read-only/split（split 父目录本身不分配、子目录各有 owner）；治理关键路径（`.ans/`、`角色卡/`、`docs/scheduling|acceptance|communication|flows|nominations|verification/`、`src/common/shared/`、release/packaging、`.env`/密钥、`src/model/` 根单例契约）只能精确文件授权，不得作为普通 `授权目录`。执行角色可在规范允许的命名/子目录/文件类型内自行新建文件/子目录；不得跨目录、不得改规范、不得写他人目录。应用只做 V-D1–V-D9 确定性校验；目录是否内聚、规范是否合理、共享是否必要、契约/测试面是否真实由 readiness 逐目录复核（结构通过不等于语义正确）。旧 v1/v2 计划保持原行为，不强制迁移。",
   "**Map/Reduce 与 flow（方案 A）**：flow step 可选 `parallelGroup: map-<slug> | reduce` 与 `dependsOn: [step-id]`（不新增 `kind`）；Map 交付步骤 id 用 `delivery-<module>` 并先依赖 `contract-freeze`；Reduce 步骤等全部 Map `done` 后再跑契约/集成/e2e。dispatch 门禁会硬拦前置未 `done` 的派发，不改变派发权归属；旧 flow 不填字段行为不变。",
   "**测试分片与证据（Reduce）**：测试角色按模块并行分片，每分片使用独立临时项目根/端口/输出目录/日志并留原始证据；不得共享可变夹具、不得并发写同一文件。Reduce 合并 manifest（候选哈希/分片清单/命令/日志路径/结果/环境）后跑契约/集成/e2e 与真实启动演示，`verification-evidence` 步骤指向 manifest。",
   "**客户不做内部调度**：阶段流转由应用负责，客户不需要逐阶段手动转交或触发；只有需要客户决定的事项（提案接受、任命、写盘确认、验收）才经治理卡呈给客户。",
@@ -764,6 +765,11 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         "**v2 读计划**：逐行读取角色的 module/bounded context、公开契约、测试面、dependsOn/依赖、并行组与粒度理由；" +
         "角色卡写清 bounded context、公开契约、独立测试面与上下游依赖；boundary 按计划写集精确落条目；" +
         "不写整层（前端/后端等）或纳米（函数级/单文件/按钮/端点级）角色；计划缺能力细节或粒度理由时停止写卡并报告 Steward，不自行补计划。\n" +
+        "**v3 按目录写边界（目录级授权）**：读计划的 `授权目录`/`精确写集`/「目录规范」——每个 `授权目录` 在 boundary 写为 " +
+        "`directory` 条目（或条件已声明的 `conditional-directory`），每个 `精确写集` 文件写为 `file` 条目；`new` 角色的边界目录" +
+        "（排除 `角色卡/<roleId>/` 角色根）必须与计划 `授权目录` 集合一致、不得更宽；`changed`/`existing` 计划目录必须被边界覆盖，" +
+        "更宽部分只能落在该角色模块实现目录/既有职责内；计划目录未被边界覆盖时停止并报告 Steward，不改计划、不改目录规范、不跨目录。" +
+        "V12（计划→边界覆盖）在写卡后由应用校验。\n" +
         "**计划缺能力细节**：停止写卡并报告 Steward 补充团队计划，**不自行扩大职责/改边界/发明计划外角色**。\n" +
         "你不批准方案、不排程、不派发；不得声称已获客户批准。"
       );
@@ -785,8 +791,15 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         "「模块清单」表与 14 列角色表（module/公开契约/测试面/dependsOn/并行组/粒度理由）；默认一个模块一个角色、" +
         "写集精确且跨角色不相交、dependsOn 无环、同 map 组无依赖、Reduce 依赖全部 Map。整层名/多模块必须写粒度理由" +
         "并在 readiness 记录例外批准；应用只做确定性校验，不替代你的语义复核。\n" +
+        "**团队计划 v3（目录级授权）**：新流程优先写 `teamPlanSchema: 3` 与 frontmatter `directories`（非空、以 `/` 结尾、" +
+        "项目相对、无通配符/`..`/绝对路径、无重复）；模块清单每个 module 写非空 `实现目录`（必填），角色表用 " +
+        "`授权目录` + `精确写集`（`唯一写集` 仅兼容别名；`边界` 列名不接受）；正文「目录规范」表逐目录写 " +
+        "owner/类型/用途/命名/允许子目录/允许文件类型/公开契约/测试面/依赖/禁写区/共享，每个目录唯一 owner 且互不重叠；" +
+        "共享用 none/read-only/split；治理关键路径只能精确文件。应用在发任命卡前跑 V-D1–V-D9，失败不发卡；目录是否" +
+        "内聚、规范是否合理、共享是否必要、契约/测试面是否真实必须由你逐目录在 readiness 记录（结构通过≠语义正确）。\n" +
         "**角色就绪复核（readiness）**：Crew 写卡结构校验通过后，对照团队计划逐角色复核职责目标/能力要求/写集/" +
-        "依赖/交接/质量责任，并逐项记录 module/contract/testSurface/parallel/dependsOn/granularity；" +
+        "依赖/交接/质量责任，并逐项记录 module/contract/testSurface/parallel/dependsOn/granularity；v3 计划还须逐目录记录 " +
+        "`directories`/`spec`（规范合理性）/`shared`（共享必要性）/`layout`（边界对齐与例外），并保留 v2 列；" +
         "写 `docs/scheduling/<flowId>-readiness-v1.md`（`status: pass|gaps`）；gaps 退回 Crew，" +
         "计划缺细节退回你自己补充；readiness pass 后才派发项目角色。\n" +
         "**Map/Reduce flow**：flow 步骤可写可选 `parallelGroup: map-<slug>|reduce` 与 `dependsOn: [step-id]`；" +

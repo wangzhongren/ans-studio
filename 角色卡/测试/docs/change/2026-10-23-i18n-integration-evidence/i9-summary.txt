@@ -1,0 +1,281 @@
+=== i18n I9 计数与发现摘要 ===
+captured_at: 2026-10-23 17:00:34 +0800
+HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+
+--- 套件计数 ---
+== shared ==
+ℹ tests 181
+ℹ pass 175
+ℹ fail 1
+ℹ skipped 5
+ℹ todo 0
+ℹ duration_ms 5078.1256
+exit_code=1
+== desktop-ui ==
+ℹ tests 195
+ℹ pass 195
+ℹ fail 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 303.0476
+exit_code=0
+== desktop-app-serial ==
+ℹ tests 558
+ℹ pass 558
+ℹ fail 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 101397.2578
+exit_code=0
+== test-domain-serial ==
+ℹ tests 822
+ℹ pass 814
+ℹ fail 2
+ℹ skipped 6
+ℹ todo 0
+ℹ duration_ms 102328.4771
+exit_code=1
+== assembly ==
+ℹ tests 84
+ℹ pass 84
+ℹ fail 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5409.2011
+exit_code=0
+== orchestration ==
+ℹ tests 810
+ℹ pass 809
+ℹ fail 1
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2121.8169
+exit_code=1
+== typecheck ==
+exit_code=0
+== typecheck-renderer ==
+exit_code=0
+== build-renderer ==
+exit_code=0
+
+--- 失败原文（shared / test-domain / orchestration） ---
+✖ allowlist 纪律：无重复、已排序、无陈旧条目（每条仍在范围内且仍含中文） (29.5886ms)
+✖ failing tests:
+✖ node test外指符号链接路径不获委托；项目内测试路径获委托 (19.8509ms)
+✖ 五角色全自动链路：意图→提案→团队计划→任命→Crew 写卡→readiness→实施→标准/变更包→Verifier→acceptance (196.2519ms)
+✖ 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛 (8.3677ms)
+
+--- 发现 1：allowlist 陈旧 ---
+  AssertionError [ERR_ASSERTION]: allowlist 条目已无中文，应从清单移除：app/desktop/runtime-config.ts
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/test/%E9%A1%B9%E7%9B%AE%E7%AE%A1%E7%90%86/shared/i18n-guard.test.ts:59:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+
+--- 发现 2：Electron main.mjs（两次 fresh userData + 一次默认 userData） ---
+[e2e-main-zh]
+E2E_PASS=false
+E2E_FAILURES=SESSION_REPAIR_FAILED_OPEN_NO_USER_BUBBLE, REPORT_STATUS_UNREPORTED, REPORT_STATUS_FAILED, REPORT_STATUS_ABORTED
+[e2e-main-zh-tempud]
+E2E_PASS=false
+E2E_FAILURES=REPORT_STATUS_UNREPORTED, REPORT_STATUS_FAILED, REPORT_STATUS_ABORTED
+[e2e-main-zh-tempud2]
+E2E_PASS=false
+E2E_FAILURES=REPORT_STATUS_UNREPORTED, REPORT_STATUS_FAILED, REPORT_STATUS_ABORTED
+
+--- 发现 3：200% 设置保存条 ---
+drawer overflow (from ancestors):
+
+--- Electron 时间线 ---
+default zh: lang=zh-CN mirror=null prefs-file=absent
+en switch: lang=en-US mirror=en-US prefs={version:1,locale:en-US} title='ANS Desktop (Governed Sessions)'
+restart en: lang/mirror=en-US title='ANS Desktop (Governed Sessions)'
+project switch: roles=[su,B] lang=en-US
+back zh: lang/mirror=zh-CN prefs zh title zh
+restart zh: lang/mirror=zh-CN
+
+--- 观察：面板打开时切语言 ---
+语言区立即变英文；主进程生成的字段 label/help/choices 保持切换前语言，关闭重开设置后为英文（getRuntimeConfig 每次调用按当下 locale 解析，但已加载视图不自动刷新）。
+{
+ "viewport": {
+  "vw": 480,
+  "vh": 310,
+  "dpr": 2
+ },
+ "doc": {
+  "sw": 480,
+  "cw": 480
+ },
+ "sidebarState": 208,
+ "sidebarWidth": 208,
+ "titlebar": {
+  "sel": "#titlebar",
+  "x": 0,
+  "y": 0,
+  "w": 480,
+  "h": 36,
+  "sw": 480,
+  "cw": 480,
+  "hOverflow": false,
+  "overflowX": "visible",
+  "visible": true,
+  "rBottom": 36,
+  "inViewportY": true
+ },
+ "piPanel": {
+  "sel": "#pi-panel",
+  "x": 57,
+  "y": 100,
+  "w": 423,
+  "h": 210,
+  "sw": 423,
+  "cw": 423,
+  "hOverflow": false,
+  "overflowX": "visible",
+  "visible": true,
+  "rBottom": 310,
+  "inViewportY": true
+ },
+ "piSave": {
+  "sel": "#pi-save",
+  "x": 73,
+  "y": 332,
+  "w": 113.41,
+  "h": 28,
+  "sw": 111,
+  "cw": 111,
+  "hOverflow": false,
+  "overflowX": "visible",
+  "visible": true,
+  "rBottom": 360,
+  "inViewportY": false
+ },
+ "piStatus": {
+  "sel": "#pi-status",
+  "x": 198,
+  "y": 332,
+  "w": 265.59,
+  "h": 28.34,
+  "sw": 266,
+  "cw": 266,
+  "hOverflow": false,
+  "overflowX": "hidden",
+  "visible": true,
+  "rBottom": 361,
+  "inViewportY": false
+ },
+ "clickable": [
+  {
+   "id": "#win-close",
+   "visible": true,
+   "centerInsideViewport": true,
+   "hit": true,
+   "rect": {
+    "x": 434,
+    "y": 0,
+    "w": 46,
+    "h": 35
+   }
+  },
+  {
+   "id": "#pi-save",
+   "visible": true,
+   "centerInsideViewport": false,
+   "hit": false,
+   "rect": {
+    "x": 73,
+    "y": 332,
+    "w": 113,
+    "h": 28
+   }
+  },
+  {
+   "id": "#pi-language-select",
+   "visible": true,
+   "centerInsideViewport": true,
+   "hit": true,
+   "rect": {
+    "x": 73,
+    "y": 131,
+    "w": 391,
+    "h": 32
+   }
+  }
+ ],
+ "ancestors": [
+  {
+   "id": "pi-panel",
+   "cls": "pi-panel",
+   "overflowY": "visible",
+   "sh": 278,
+   "ch": 210,
+   "top": 100,
+   "bottom": 310
+  },
+  {
+   "id": "right-drawer",
+   "cls": "drawer open",
+   "overflowY": "hidden",
+   "sh": 342,
+   "ch": 274,
+   "top": 36,
+   "bottom": 310
+  },
+  {
+   "id": "",
+   "cls": "app",
+   "overflowY": "hidden",
+   "sh": 274,
+   "ch": 274,
+   "top": 36,
+   "bottom": 310
+  },
+  {
+   "id": "",
+   "cls": "app-shell",
+   "overflowY": "hidden",
+   "sh": 310,
+   "ch": 310,
+   "top": 0,
+   "bottom": 310
+  },
+  {
+   "id": "root",
+   "cls": "",
+   "overflowY": "visible",
+   "sh": 310,
+   "ch": 310,
+   "top": 0,
+   "bottom": 310
+  },
+  {
+   "id": "",
+   "cls": "",
+   "overflowY": "hidden",
+   "sh": 310,
+   "ch": 310,
+   "top": 0,
+   "bottom": 310
+  }
+ ],
+ "truncation": [
+  {
+   "tag": "DIV",
+   "id": "project-name",
+   "cls": "project-name",
+   "title": "ans-i18n-project-qPtv5x",
+   "aria": null,
+   "sw": 182,
+   "cw": 125,
+   "text": "ans-i18n-project-qPtv5x"
+  },
+  {
+   "tag": "DIV",
+   "id": "project-path",
+   "cls": "project-path",
+   "title": "C:/Users/51054/AppData/Local/Temp/ans-i18n-project-qPtv5x",
+   "aria": null,
+   "sw": 367,
+   "cw": 125,
+   "text": "C:/Users/51054/AppData/Local/T"
+  }
+ ]
+}

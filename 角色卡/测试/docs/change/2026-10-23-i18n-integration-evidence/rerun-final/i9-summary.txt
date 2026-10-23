@@ -1,0 +1,60 @@
+=== i18n I9 final candidate rerun summary ===
+captured_at: 2026-10-23 17:40 +0800
+HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+worktree: 199 status entries (see git-status-short.txt); staged: 0
+candidate hashes: see candidate-hashes.txt
+build reproducibility: build==dist (temp outDir build, not written to app/renderer/dist)
+environment: Node v24.22.1 / npm 11.19.1 / Windows_NT MINGW64_NT-10.0-26300 / git 2.55.0.windows.5
+cwd: C:/Users/51054/Desktop/work/ans-studio
+
+--- suite counts (final accepted runs) ---
+i18n-integration.test.ts: tests 8 / pass 8 / fail 0 / skipped 0 / exit 0  (i18n-integration.log)
+shared: tests 181 / pass 176 / fail 0 / skipped 5 / exit 0  (shared.log)
+  guard i18n-guard.test.ts: 6/6 pass; console: scanned=107 allowlisted=18 violations=0; no stale entry (allowlist discipline test passes)
+desktop-ui: tests 195 / pass 195 / fail 0 / skipped 0 / exit 0  (desktop-ui.log)
+desktop-app (final serial run2): tests 558 / pass 558 / fail 0 / skipped 0 / exit 0  (desktop-app-serial-run2.log)
+  first serial run: 557 pass / 1 fail (2026-10-23 可重入门禁 test, "readiness 恰一次派发" 0 !== 1); isolated interface.test.ts 119/119; isolated failing test 1/1; rerun 558/558 => transient timing flake, not i18n regression.
+test-domain (final serial run2, PATH includes nodejs): tests 822 / pass 815 / fail 1 / skipped 6 / exit 1  (test-domain-serial-run2.log)
+  only fail: g4-skill-verify b-render-double-check "读取器入参防御（对抗）" = Windows symlink EPERM (baseline environment red).
+  i-full-chain passed in final run.
+  first serial run: 822/814/2/6; extra fail t9-block3-pin-shell "块3/run_shell..." = spawn node ENOENT because Node was not on PATH for child processes; isolated with Node on PATH 20/20 pass. Environment invocation artifact, not product.
+assembly: tests 84 / pass 84 / fail 0 / skip 0 / exit 0  (assembly.log)
+orchestration: tests 810 / pass 809 / fail 1 / skip 0 / exit 1  (orchestration.log)
+  only fail: "node test外指符号链接路径不获委托" = Windows symlink EPERM (baseline environment red).
+typecheck: exit 0 (typecheck.log)
+typecheck:renderer: exit 0 (typecheck-renderer.log)
+build:renderer (temp outDir): exit 0 (build-renderer.log); build-hashes.txt == dist-hashes.txt
+
+--- blocker 1: PM allowlist ---
+CLOSED. allowlist now 18 entries (git hash-object 58f414f696f56b8a848c32a16a946851b6927e26, sha256 29541e89cc65cfe51dfab194efc0bfd4d265d5d4293c58b3fe8b740f5363da3b);
+app/desktop/runtime-config.ts removed. shared 181/176/0/5 exit 0; guard 6/6; scanned=107 allowlisted=18 violations=0.
+
+--- blocker 2: desktop UI 200% ---
+CLOSED. desktop-ui 195/195. Real Electron smoke (layout-200pct-electron-smoke.mjs, temp userData, real dist+preload), each locale zh/en 4/4 checks:
+  - 960x620: save center hit true; sidebar 208; doc scrollWidth=clientWidth=960; panel display=flex/overflowY=visible/savebar position=static.
+  - 480x310 (200%, dpr=2): save center hit true; doc sw=cw=480; panel display=block/overflowY=auto; scrollHeight 763(zh)/846(en) > clientHeight 210; savebar position=sticky; after scroll-to-bottom save hit true.
+  - no console errors.
+Evidence: layout-200pct-zh.log, layout-200pct-en.log, layout-200pct/{zh,en}/report.json + 3 screenshots each.
+
+--- blocker 3: desktop window e2e REPORT_STATUS ---
+CLOSED for REPORT_STATUS. Four fresh-userData runs (e2e-main-fresh-1..4, real Electron):
+  run1 E2E_PASS=true E2E_FAILURES=; REPORT_STATUS_UNREPORTED/FAILED/ABORTED=true
+  run2 E2E_PASS=false E2E_FAILURES=SESSION_REPAIR_FAILED_OPEN_NO_USER_BUBBLE; REPORT_STATUS all true
+  run3 E2E_PASS=true E2E_FAILURES=; REPORT_STATUS all true
+  run4 E2E_PASS=true E2E_FAILURES=; REPORT_STATUS all true
+  => 3/4 pass; the three target REPORT_STATUS checks are true in all 4 runs.
+Run2 flake classification: single-point assertion `rowModelDebug('桌面窗口').count === rowsBefore+1` races with async row projection; later stages converge to identical row counts in all runs
+(REPORT_STATUS_UNREPORTED_BEFORE rowCount 34, FAILED 35, ABORTED 36), so no persistent extra user bubble/duplicate row; two consecutive passes after the flake. Classified as test timing, not i18n product regression.
+
+--- real Electron cross-layer ---
+main.mjs uses fresh userData and real app/preload/renderer dist; no real .env/credentials; no 9222 use.
+200% smoke uses real dist + real preload + stub IPC in a temp userData.
+i18n-integration.test.ts covers shared catalog parity, preferences file contract/atomic write/corruption, IPC shape, locale store mirror/correction/broadcast/rollback, store+real preferences service switch->file->restart, and RUNTIME_SETTINGS label/help/choiceLabels per zh/en.
+Not repeated in real Electron on final candidate: full locale switch/restart manual timeline (prior I9 timeline remains; the relevant files app/desktop/preferences.ts, i18n.ts, app/main.ts, app/preload.cjs, app/renderer/src/i18n/*, app/renderer/src/chat/runtime-config.ts have identical hashes to the prior I9 candidate except app/renderer/src/shell/phase4a.css); real online model; non-Windows; packaging; multi-window (N/A per plan).
+
+--- residual observations ---
+1. e2e SESSION_REPAIR_FAILED_OPEN_NO_USER_BUBBLE intermittent (1/4), classified test timing; not one of the three blockers; desktop-window-owned test.
+2. desktop-app "可重入门禁" readiness dispatch intermittent (1/2 full-suite runs), isolated pass; desktop-window-owned test.
+3. Baseline Windows symlink EPERM in test-domain g4 and orchestration (not i18n).
+4. Prior I9 observation still open (not rechecked): settings panel opened while switching language keeps main-process field labels in the previous language until the panel is reopened; whether "immediate effect" is required remains for acceptance.
+5. T2 does not include full regression; no real online model, non-Windows, or packaged-app verification.

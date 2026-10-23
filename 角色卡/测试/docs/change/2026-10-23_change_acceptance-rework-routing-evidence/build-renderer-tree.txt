@@ -1,0 +1,7 @@
+OUTDIR: app/renderer/dist (vite config outDir; .gitignore 第 9 行忽略)
+TRACKED_DIFF: 0 项
+--- tree ---
+ff88e313c9c6a41fa94f5e34b9e1798169ea7ffece2404e5c9fc6474f788d32c *app/renderer/dist/assets/ans-studio-ans-icon-DOpmqMAU.png
+75cae32df1d7672fd762c2fa1803191db023cc6206643d26dd8263a63f7fd625 *app/renderer/dist/assets/index-BEwoJaDj.css
+759d86fcdbf4a58c27f0c9e97ea67e30c832abc036d59a04904a8940449bb2ea *app/renderer/dist/assets/index-Bp8JeL_K.js
+e6f7a1260029e786e4a9d26c9a660447712bdea5a532ab3f170e1d5caecf2d71 *app/renderer/dist/index.html

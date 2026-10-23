@@ -35,7 +35,10 @@ import {
   seedLedger,
   seedTrioProject,
   teamPlanV2Doc,
+  teamPlanV3Doc,
+  v3CanonicalParts,
   write,
+  type TeamPlanV3RoleInput,
 } from "./fixture.ts";
 
 const ROLE_IDS = ["executor", "reviewer", "tester"] as const;
@@ -386,6 +389,235 @@ test("r5 测试分片独立根/日志/输出、失败隔离、只重跑失败分
     assert.match(manifest, /map-b/);
     assert.doesNotMatch(manifest, /fixture assertion failed/, "manifest 不替代原始日志（失败原文只在分片日志）");
     assert.match(readFileSync(logB, "utf8"), /RESULT=pass/);
+  } finally {
+    temp.cleanup();
+  }
+});
+
+// —————————————————————— 2026-10-23 v3：目录级授权下的 MapReduce 与分片隔离 ——————————————————————
+
+const V3 = v3CanonicalParts(FLOW);
+
+/** v3 计划：两个 Map 角色同 map-a 组（目录 owner 唯一、目录不重叠），Reduce 覆盖全部 Map。 */
+function v3DispatchPlan(): string {
+  const rows: TeamPlanV3RoleInput[] = V3.rows.map((row) => {
+    if (row.roleId === "reviewer") return { ...row, parallelGroup: "map-a" };
+    if (row.roleId === "tester") {
+      return {
+        ...row,
+        authorizedDirs: "`test/测试/`",
+        preciseWrites: "`docs/verification/flow-a/manifest.md`",
+      };
+    }
+    return row;
+  });
+  return teamPlanV3Doc(FLOW, {
+    modules: V3.modules,
+    recommended: V3.recommended,
+    rows,
+    moduleRows: V3.moduleRows,
+    directoryRows: V3.directoryRows,
+  });
+}
+
+async function seedV3DispatchProject(root: string): Promise<void> {
+  seedTrioProject(root, [...ROLE_IDS]);
+  write(root, FLOW_REL, MAP_FLOW_PENDING);
+  write(root, TEAM_PLAN_REL, v3DispatchPlan());
+  write(root, CRITERIA_REL, acceptanceCriteriaDoc(FLOW));
+  await seedLedger(root, [
+    { decisionKind: "proposal-accept", customerDecision: "accepted", actorRoleId: "rapporteur", power: "proposal" },
+    {
+      decisionKind: "appointment",
+      customerDecision: "appointed",
+      actorRoleId: "convener",
+      power: "schedule",
+      targetRoleIds: [...ROLE_IDS],
+      artifactPath: TEAM_PLAN_REL,
+    },
+  ]);
+}
+
+test("r6 v3 计划：Map 并行组/Reduce dependsOn 硬前置不回归（目录授权不改变 flow 行为）", async () => {
+  const planText = v3DispatchPlan();
+  const parsed = parseTeamPlan(planText, { flowId: FLOW });
+  assert.equal(parsed.ok, true, teamPlanIssueMessages(parsed).join("；"));
+  assert.equal(parsed.teamPlanSchema, 3);
+  assert.equal(parsed.directorySpecs.length, 5);
+
+  const temp = makeRoot("mapreduce-dispatch-v3");
+  await seedV3DispatchProject(temp.root);
+  const h = await makeHarness({ tag: "mapreduce-dispatch-v3", root: temp.root, approval: true, decision: true });
+  try {
+    await h.open("convener");
+    const caps = h.capsByRole.get("convener");
+    assert.ok(caps?.dispatchTask, "Convener 应注入 dispatch_task");
+
+    // ① 同 map-a 组两个 Map 角色并行派发（v3 目录唯一 owner、互不重叠）。
+    const storefront = (await caps!.dispatchTask!({ roleId: "executor", task: "Map A 交付 storefront（v3 目录）", flowId: FLOW, stepId: "delivery-storefront" })) as {
+      ok: boolean;
+      message: string;
+    };
+    assert.equal(storefront.ok, true, storefront.message);
+    const checkout = (await caps!.dispatchTask!({ roleId: "reviewer", task: "Map A 交付 checkout-api（v3 目录）", flowId: FLOW, stepId: "delivery-checkout-api" })) as {
+      ok: boolean;
+      message: string;
+    };
+    assert.equal(checkout.ok, true, checkout.message);
+
+    // ② Reduce 在全部 Map done 之前被拒（不写账本）。
+    const early = (await caps!.dispatchTask!({ roleId: "tester", task: "v3 测试分片（过早）", flowId: FLOW, stepId: "test-map-shards" })) as {
+      ok: boolean;
+      message: string;
+    };
+    assert.equal(early.ok, false, "Map 未完成时 Reduce 不得被派发");
+    assert.match(early.message, /前置依赖尚未全部 done/);
+    assert.match(early.message, /delivery-storefront/);
+    assert.match(early.message, /delivery-checkout-api/);
+    let ledger = await h.waitForLedger(() => true);
+    assert.equal(
+      ledger.entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "test-map-shards"),
+      false,
+      "被拒的 Reduce 派发不得写账本",
+    );
+
+    // ③ Map done 后 Reduce 受理，派发顺序先 Map 后 Reduce。
+    write(temp.root, FLOW_REL, MAP_FLOW_DONE);
+    const reduce = (await caps!.dispatchTask!({ roleId: "tester", task: "v3 测试分片（全部 Map done）", flowId: FLOW, stepId: "test-map-shards" })) as {
+      ok: boolean;
+      message: string;
+    };
+    assert.equal(reduce.ok, true, reduce.message);
+    ledger = await h.waitForLedger(
+      (entries) => entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "test-map-shards"),
+      5000,
+    );
+    const ids = ledger.entries.filter((entry) => entry.kind === "dispatch.accepted").map((entry) => entry.stepId);
+    assert.deepEqual(ids.slice(-3), ["delivery-storefront", "delivery-checkout-api", "test-map-shards"]);
+  } finally {
+    await h.stop();
+    h.cleanup();
+    temp.cleanup();
+  }
+});
+
+test("r7 v3 测试分片隔离：各自临时根/输出/日志；共享只读 v3 计划哈希不变；失败隔离", async () => {
+  const temp = makeRoot("mapreduce-shards-v3");
+  try {
+    const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+    const planPath = path.join(temp.root, "v3-plan.md");
+    writeFileSync(planPath, v3DispatchPlan());
+    const planHashBefore = createHash("sha256").update(readFileSync(planPath)).digest("hex");
+
+    const shardA = path.join(temp.root, "shard-a");
+    const shardB = path.join(temp.root, "shard-b");
+    for (const dir of [shardA, shardB]) mkdirSync(path.join(dir, "out"), { recursive: true });
+    const logA = path.join(shardA, "map-a.log");
+    const logB = path.join(shardB, "map-b.log");
+    const outA = path.join(shardA, "out", "result.json");
+    const outB = path.join(shardB, "out", "result.json");
+
+    const script = [
+      'import fs from "node:fs";',
+      'import path from "node:path";',
+      'import { pathToFileURL } from "node:url";',
+      "const repo = process.env.REPO_ROOT;",
+      "const { parseTeamPlan } = await import(pathToFileURL(path.join(repo, 'src/common/编排/team-plan.ts')).href);",
+      "const { checkDirectoryLayout, layoutCheckPassed } = await import(pathToFileURL(path.join(repo, 'src/common/编排/directory-conformance.ts')).href);",
+      'const plan = fs.readFileSync(process.env.PLAN_PATH, "utf8");',
+      "const parsed = parseTeamPlan(plan);",
+      "const roleDirs = new Map();",
+      "for (const row of parsed.roleRows) roleDirs.set(row.roleId, row.authorizedDirs.map((entry) => entry.path));",
+      'const changed = JSON.parse(process.env.CHANGED_PATHS);',
+      "const result = checkDirectoryLayout({ changedPaths: changed, specs: parsed.directorySpecs, roleDirs });",
+      "fs.writeFileSync(process.env.SHARD_LOG, 'SHARD=' + process.env.SHARD_NAME + ' cwd=' + process.cwd() + '\\n' + 'planOk=' + parsed.ok + '\\n' + 'rows=' + result.rows.length + '\\n' + 'RESULT=' + (layoutCheckPassed(result) ? 'pass' : 'fail') + '\\n' + (layoutCheckPassed(result) ? '' : 'REASON=' + result.rows.map((row) => row.reason ?? '').join(';') + '\\n'));",
+      "fs.writeFileSync(process.env.SHARD_OUT, JSON.stringify(result, null, 2));",
+      "process.exit(layoutCheckPassed(result) ? 0 : 1);",
+      "",
+    ].join("\n");
+    const scriptPathA = path.join(shardA, "run.mjs");
+    const scriptPathB = path.join(shardB, "run.mjs");
+    writeFileSync(scriptPathA, script);
+    writeFileSync(scriptPathB, script);
+
+    const runV3Shard = (
+      cwd: string,
+      name: string,
+      changed: string[],
+      logPath: string,
+      outPath: string,
+    ): Promise<{ exitCode: number | null }> =>
+      new Promise((resolve) => {
+        const child = spawn(process.execPath, [path.join(cwd, "run.mjs")], {
+          cwd,
+          env: {
+            ...process.env,
+            REPO_ROOT: repoRoot,
+            PLAN_PATH: planPath,
+            CHANGED_PATHS: JSON.stringify(changed),
+            SHARD_NAME: name,
+            SHARD_LOG: logPath,
+            SHARD_OUT: outPath,
+          },
+          stdio: "ignore",
+          windowsHide: true,
+        });
+        child.on("close", (code) => resolve({ exitCode: code }));
+      });
+
+    // ① 两个分片并发：A 在授权目录内新增（pass），B 命名不符（fail）；互不影响。
+    const [runA, runBFail] = await Promise.all([
+      runV3Shard(shardA, "a", ["src/storefront/handlers/create-order.ts"], logA, outA),
+      runV3Shard(shardB, "b", ["src/storefront/CreateOrder.ts"], logB, outB),
+    ]);
+    assert.equal(runA.exitCode, 0, readFileSync(logA, "utf8"));
+    assert.notEqual(runBFail.exitCode, 0, "命名不符分片应失败");
+    const textA = readFileSync(logA, "utf8");
+    const textB = readFileSync(logB, "utf8");
+    assert.match(textA, /SHARD=a/);
+    assert.match(textA, /planOk=true/);
+    assert.match(textA, /RESULT=pass/);
+    assert.doesNotMatch(textA, /REASON=/, "A 分片无失败原因");
+    assert.match(textB, /SHARD=b/);
+    assert.match(textB, /RESULT=fail/);
+    assert.match(textB, /REASON=.*命名/, "B 分片失败原因保留在原始日志");
+    const resultA = JSON.parse(readFileSync(outA, "utf8")) as { rows: Array<{ result: string }> };
+    const resultB = JSON.parse(readFileSync(outB, "utf8")) as { rows: Array<{ result: string }> };
+    assert.deepEqual(resultA.rows.map((row) => row.result), ["pass"]);
+    assert.deepEqual(resultB.rows.map((row) => row.result), ["fail"]);
+    const logAStatBefore = statSync(logA).mtimeMs;
+
+    // ② 失败隔离：只重跑 B（修复为授权目录内），A 日志/输出不重写。
+    const runBFixed = await runV3Shard(shardB, "b", ["src/storefront/handlers/create-order.ts"], logB, outB);
+    assert.equal(runBFixed.exitCode, 0, "修复后只重跑 B 应通过");
+    assert.equal(statSync(logA).mtimeMs, logAStatBefore, "只重跑失败分片：A 日志 mtime 不变");
+    assert.match(readFileSync(logB, "utf8"), /RESULT=pass/);
+
+    // ③ 共享只读计划哈希不变；manifest 是索引，原始分片日志单独保留。
+    assert.equal(createHash("sha256").update(readFileSync(planPath)).digest("hex"), planHashBefore);
+    const manifestPath = path.join(temp.root, "manifest.md");
+    writeFileSync(
+      manifestPath,
+      [
+        "---",
+        `flowId: ${FLOW}`,
+        `teamPlanSchema: 3`,
+        `sharedPlanSha256: ${planHashBefore}`,
+        "---",
+        "",
+        "# v3 MapReduce 证据",
+        "",
+        "| shard | owner | command | log | result |",
+        "| --- | --- | --- | --- | --- |",
+        `| map-a | executor | node shard-a/run.mjs | ${path.relative(temp.root, logA)} | pass |`,
+        `| map-b | reviewer | node shard-b/run.mjs | ${path.relative(temp.root, logB)} | pass（重跑后） |`,
+        "",
+      ].join("\n"),
+    );
+    const manifest = readFileSync(manifestPath, "utf8");
+    assert.match(manifest, /sharedPlanSha256: [0-9a-f]{64}/);
+    assert.match(manifest, /teamPlanSchema: 3/);
+    assert.doesNotMatch(manifest, /REASON=/, "manifest 不替代原始日志（失败原文只在分片日志）");
   } finally {
     temp.cleanup();
   }

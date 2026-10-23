@@ -154,19 +154,36 @@ import {
   type TeamPlanParseResult,
 } from "../../common/编排/team-plan.ts";
 // 公共出口（Map C 桌面经 `src/pipeline/orchestration/run-role.ts` 消费；不直接 import 编排私有 common）。
+// 2026-10-23 目录级授权 v3：目录规范类型/校验与布局核对纯函数也只经本出口给桌面/测试消费。
 export {
   TEAM_PLAN_SCHEMA_LEGACY,
   TEAM_PLAN_SCHEMA_V2,
+  TEAM_PLAN_SCHEMA_V3,
   parseTeamPlan,
   parseTeamPlanModuleIds,
   parseWritesetCell,
   writesetsOverlap,
   isGovernanceWritesetPath,
+  governanceDirectoryHit,
   legacyTeamPlanRoleRowIssues,
   teamPlanIssueMessages,
   validateTeamPlanFlowConsistency,
 } from "../../common/编排/team-plan.ts";
+export {
+  checkDirectoryLayout,
+  layoutCheckPassed,
+} from "../../common/编排/directory-conformance.ts";
 export type {
+  LayoutCheckChecks,
+  LayoutCheckInput,
+  LayoutCheckResult,
+  LayoutCheckRow,
+} from "../../common/编排/directory-conformance.ts";
+export type {
+  DirectoryKind,
+  DirectoryShared,
+  DirectorySpec,
+  DirectorySubdirs,
   ModuleIdParse,
   ParseTeamPlanOptions,
   TeamPlanIssue,
@@ -2071,11 +2088,11 @@ function validateFlowYamlCard(
 /**
  * 团队计划角色表校验（单一实现 = `common/编排/team-plan.ts`）：
  *   · legacy（缺省/`teamPlanSchema: 1`）⇒ 只跑既有 v1 表格检查（推荐角色职责/能力/写集/依赖非空）；
- *   · v2 ⇒ V1–V10 的 error 条目（warning/exception-review 不阻断发卡）。
+ *   · v2 ⇒ V1–V10 的 error 条目；v3 ⇒ V1–V10 + V-D1–V-D9 的 error 条目（warning/exception-review 不阻断发卡）。
  * 只做确定性表格/结构解析，不做语义判断（语义由 Convener readiness 复核）。
  */
-function teamPlanRoleRowIssues(text: string, recommended: readonly string[]): string[] {
-  const plan = parseTeamPlan(text);
+function teamPlanRoleRowIssues(text: string, recommended: readonly string[], projectRoot: string): string[] {
+  const plan = parseTeamPlan(text, { projectRoot });
   if (plan.legacy) return legacyTeamPlanRoleRowIssues(text, recommended);
   return teamPlanIssueMessages(plan);
 }
@@ -2083,13 +2100,15 @@ function teamPlanRoleRowIssues(text: string, recommended: readonly string[]): st
 /**
  * **团队计划卡前守卫**（2026-10-22 治理分工第 1 项；方案 §5.3「应用在呈现卡之前的确定性守卫」）。
  *
- * 只在 Convener 发 `request_choice(cardKind=appointment)` 时生效；六项校验全部通过才允许触达客户：
+ * 只在 Convener 发 `request_choice(cardKind=appointment)` 时生效；以下校验全部通过才允许触达客户：
  *   1. flowId 合法（调用方已判定；此处再验）；
  *   2. 团队计划存在且可读（`docs/scheduling/<flowId>-team-vN.md`，取最新版本）；
  *   3. 计划 frontmatter `flowId` 与卡片一致；
  *   4. `recommended` 非空、无重复、不含内置治理角色（复用 `parseRecommendedRoleIds`，空集不静默接受）；
  *   5. 卡片选项覆盖 recommended 且不含内置治理角色；
- *   6. 计划含每个推荐角色的职责目标/能力要求/写集/依赖行。
+ *   6. 计划含每个推荐角色的职责目标/能力要求/写集/依赖行；
+ *   7. v2 ⇒ V1–V11；v3 ⇒ V1–V11 + V-D1–V-D9（目录覆盖/唯一 owner/不重叠/目录规范/模块实现目录/
+ *      治理关键路径/共享/路径安全，含 realpath 逃逸）。
  * 失败 ⇒ 调用方**不生成客户卡、不镜像、不调判断、不写账本、不占 pending**，把具体问题退回 Convener。
  */
 async function validateConvenerAppointmentCard(args: {
@@ -2097,7 +2116,7 @@ async function validateConvenerAppointmentCard(args: {
   flowId: string;
   req: CustomerInputRequest;
 }): Promise<
-  | { ok: true; teamPlanPath: string; teamPlanSchema: 1 | 2; modules: string[] }
+  | { ok: true; teamPlanPath: string; teamPlanSchema: 1 | 2 | 3; modules: string[] }
   | { ok: false; reason: string }
 > {
   if (args.req.kind !== "choice") {
@@ -2179,7 +2198,7 @@ async function validateConvenerAppointmentCard(args: {
     };
   }
 
-  const rowIssues = teamPlanRoleRowIssues(text, recommended);
+  const rowIssues = teamPlanRoleRowIssues(text, recommended, args.projectRoot);
   if (rowIssues.length > 0) {
     return {
       ok: false,
@@ -2188,7 +2207,9 @@ async function validateConvenerAppointmentCard(args: {
   }
 
   // 2026-10-22 角色粒度/MapReduce（Q9 A）：v2 计划同时做 V11（flow 已写时）的一致性核对。
-  const planParse = parseTeamPlan(text, { flowId: args.flowId });
+  // 2026-10-23 目录级授权（Q1/Q9 A）：v3 计划的 V-D1–V-D9 已由上面的同一 `parseTeamPlan` 完成
+  // （含 realpath 逃逸核对）；此处只补 flow-plan 一致性（V11），语义复核仍归 Convener readiness。
+  const planParse = parseTeamPlan(text, { flowId: args.flowId, projectRoot: args.projectRoot });
   if (!planParse.legacy) {
     if (!planParse.ok) {
       return {
@@ -2762,10 +2783,12 @@ async function computeJudgeContext(args: {
         // 只是机器摘要，**不**代表应用已做粒度语义判断（语义复核仍在 Convener readiness）。
         const parsedPlan = parseTeamPlan(text);
         const boundedModules = parsedPlan.modules.slice(0, 20).map((module) => module.slice(0, 64));
+        const boundedDirectories = parsedPlan.directories.slice(0, 20).map((dir) => dir.slice(0, 96));
         context.facts = {
           ...context.facts,
           teamPlanSchema: parsedPlan.teamPlanSchema,
           ...(boundedModules.length > 0 ? { teamPlanModules: boundedModules } : {}),
+          ...(boundedDirectories.length > 0 ? { teamPlanDirectories: boundedDirectories } : {}),
         };
       } catch {
         // 团队计划不可读 ⇒ 不提供推荐集（driver 回落 manual/insufficient-evidence）。

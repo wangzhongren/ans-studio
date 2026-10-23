@@ -1,0 +1,2 @@
+userdata=/tmp/ans-e2e-userdata-UdHV3z
+outdir=角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-evidence/e2e-output

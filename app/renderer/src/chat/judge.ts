@@ -9,19 +9,24 @@
  * 纯函数、无 DOM/存储依赖；`test/桌面UI/` 的 node 单测直接 import。
  */
 
+import { DEFAULT_LOCALE, translate, type Locale, type MessageKey } from "../i18n/index.ts";
+
 export type JudgeGroup = "approval" | "decision";
 
 export const JUDGE_GROUP_APPROVAL: JudgeGroup = "approval";
 export const JUDGE_GROUP_DECISION: JudgeGroup = "decision";
 
-const JUDGE_GROUP_LABELS: Record<JudgeGroup, string> = {
-  approval: "代审批",
-  decision: "代决策",
+const JUDGE_GROUP_LABEL_KEYS: Record<JudgeGroup, MessageKey> = {
+  approval: "ui.judge.mode.approval",
+  decision: "ui.judge.mode.decision",
 };
 
-export function judgeGroupLabel(group: string): string {
+export function judgeGroupLabel(
+  group: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   return group === JUDGE_GROUP_APPROVAL || group === JUDGE_GROUP_DECISION
-    ? JUDGE_GROUP_LABELS[group]
+    ? translate(locale, JUDGE_GROUP_LABEL_KEYS[group])
     : "";
 }
 
@@ -39,59 +44,98 @@ function stringList(value: unknown): string[] {
 // 五个内置治理角色走同一审批档，但不再显示「SU」；名称顺序沿用旧 ui-labels 的
 // `governanceRoleDisplayNameById`（英文 / 中文）。非内置 id ⇒ 空串，走兜底文案。
 
-const GOVERNANCE_ROLE_NAME_BY_ID: Record<string, string> = {
-  liaison: "Lead / 主理",
-  rapporteur: "Draft / 提案",
-  nominator: "Crew / 组队",
-  convener: "Steward / 统筹",
-  verifier: "Proof / 验收",
+// judge shell 确认标题的内置治理角色名：顺序按现源码（英文在前）。
+// draft/crew/steward 与 `ui.role.governance.*.name` 逐字相同，复用；liaison/verifier
+// 的现源码顺序与目录相反，使用 judge 专用 key（不改 roleId/GovernanceFunction）。
+const GOVERNANCE_ROLE_NAME_KEYS: Record<string, MessageKey> = {
+  liaison: "ui.judge.roleName.liaison",
+  rapporteur: "ui.role.governance.draft.name",
+  nominator: "ui.role.governance.crew.name",
+  convener: "ui.role.governance.steward.name",
+  verifier: "ui.judge.roleName.verifier",
 };
 
-export function governanceRoleDisplayNameById(roleId: unknown): string {
+export function governanceRoleDisplayNameById(
+  roleId: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   if (typeof roleId !== "string" || roleId === "") return "";
-  return GOVERNANCE_ROLE_NAME_BY_ID[roleId] || "";
+  const key = GOVERNANCE_ROLE_NAME_KEYS[roleId];
+  return key === undefined ? "" : translate(locale, key);
 }
 
-export function shellConfirmTitle(policy: unknown, roleId: unknown): string {
-  const roleName = governanceRoleDisplayNameById(roleId);
-  if (roleName !== "") return "命令审批 · " + roleName;
-  return policy === "su-approval" ? "SU 命令审批" : "shell 命令请求";
+export function shellConfirmTitle(
+  policy: unknown,
+  roleId: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const roleName = governanceRoleDisplayNameById(roleId, locale);
+  if (roleName !== "") {
+    return translate(locale, "ui.judge.titleWithRole", { roleName });
+  }
+  return translate(
+    locale,
+    policy === "su-approval" ? "ui.judge.titleSu" : "ui.judge.titleShell",
+  );
 }
 
 /** su 审批档位可见标签（未知/缺省 ⇒ 空串，只显示原因与警告，不编档位）。 */
-export function suApprovalTierLabel(tier: unknown): string {
-  if (tier === "risky") return "风险命令（risky）";
-  if (tier === "review") return "未自动判定（review）";
-  if (tier === "deny") return "硬拒类（deny）";
+export function suApprovalTierLabel(
+  tier: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  if (tier === "risky") return translate(locale, "ui.judge.tier.risky");
+  if (tier === "review") return translate(locale, "ui.judge.tier.review");
+  if (tier === "deny") return translate(locale, "ui.judge.tier.deny");
   return "";
 }
 
 /** 判断引擎展示名（缺省如实「未报告」，不编引擎）。 */
-export function shellJudgeEngineLabel(engine: unknown): string {
+export function shellJudgeEngineLabel(
+  engine: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   if (engine === "claude") return "Claude";
   if (engine === "pi") return "Pi";
   if (engine === "codex") return "Codex";
-  return typeof engine === "string" && engine !== "" ? engine : "未报告";
+  return typeof engine === "string" && engine !== ""
+    ? engine
+    : translate(locale, "shared.common.notReported");
 }
 
 // —————— 双开关视图（纯映射）——————
 
-export const SHELL_JUDGE_ON_LABEL = "替我审批中 · 判断 agent";
-export const SHELL_JUDGE_OFF_LABEL = "替我审批";
-export const DECISION_JUDGE_ON_LABEL = "替我决策中 · 判断 agent";
-export const DECISION_JUDGE_OFF_LABEL = "替我决策";
-export const JUDGE_BRIDGE_MISSING = "当前版本不支持自动判断，保持手动";
-export const DECISION_JUDGE_SINGLE_NOTE = "旧治理模型（single）不支持代决策";
+export function shellJudgeOnLabel(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.judge.shellOn");
+}
+export function shellJudgeOffLabel(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.judge.shellOff");
+}
+export function decisionJudgeOnLabel(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.judge.decisionOn");
+}
+export function decisionJudgeOffLabel(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.judge.decisionOff");
+}
+export function judgeBridgeMissingLabel(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.judge.bridgeMissing");
+}
+export function decisionJudgeSingleNote(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.judge.decisionSingleNote");
+}
 
-const SHELL_JUDGE_OFF_TITLE =
-  "手动逐条确认 shell 命令与 trio 写盘/写卡确认（默认）";
-const SHELL_JUDGE_ON_TITLE =
-  "判断 agent 先评估 shell 命令与 trio 写盘/写卡确认；可随时关闭";
-const DECISION_JUDGE_OFF_TITLE = "手动逐张确认提案接受、任命与验收（默认）";
-const DECISION_JUDGE_ON_TITLE =
-  "判断 agent 先评估提案接受、任命与验收；可随时关闭";
+export function judgeWarningCloseLabel(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.judge.warningClose");
+}
 
-export const SHELL_JUDGE_WARNING_CLOSE_LABEL = "知道了";
+export const SHELL_JUDGE_ON_LABEL = shellJudgeOnLabel(DEFAULT_LOCALE);
+export const SHELL_JUDGE_OFF_LABEL = shellJudgeOffLabel(DEFAULT_LOCALE);
+export const DECISION_JUDGE_ON_LABEL = decisionJudgeOnLabel(DEFAULT_LOCALE);
+export const DECISION_JUDGE_OFF_LABEL = decisionJudgeOffLabel(DEFAULT_LOCALE);
+export const JUDGE_BRIDGE_MISSING = judgeBridgeMissingLabel(DEFAULT_LOCALE);
+export const DECISION_JUDGE_SINGLE_NOTE = decisionJudgeSingleNote(DEFAULT_LOCALE);
+
+export const SHELL_JUDGE_WARNING_CLOSE_LABEL = judgeWarningCloseLabel(DEFAULT_LOCALE);
 export const SHELL_JUDGE_WARNING_AUTO_DISMISS_MS = 9000;
 
 export interface JudgeToggleView {
@@ -120,15 +164,24 @@ export function judgeToggleView(
   enabled: boolean,
   busy: boolean,
   options?: JudgeToggleOptions | null,
+  locale: Locale = DEFAULT_LOCALE,
 ): JudgeToggleView {
   const decision = group === JUDGE_GROUP_DECISION;
   const ok = available === true;
   const singleDisabled = decision && options?.singleDisabled === true;
   const on = ok && !singleDisabled && enabled === true;
-  const onLabel = decision ? DECISION_JUDGE_ON_LABEL : SHELL_JUDGE_ON_LABEL;
-  const offLabel = decision ? DECISION_JUDGE_OFF_LABEL : SHELL_JUDGE_OFF_LABEL;
-  const offTitle = decision ? DECISION_JUDGE_OFF_TITLE : SHELL_JUDGE_OFF_TITLE;
-  const onTitle = decision ? DECISION_JUDGE_ON_TITLE : SHELL_JUDGE_ON_TITLE;
+  const onLabel = decision ? decisionJudgeOnLabel(locale) : shellJudgeOnLabel(locale);
+  const offLabel = decision ? decisionJudgeOffLabel(locale) : shellJudgeOffLabel(locale);
+  const offTitle = translate(
+    locale,
+    decision ? "ui.judge.decisionOffTitle" : "ui.judge.shellOffTitle",
+  );
+  const onTitle = translate(
+    locale,
+    decision ? "ui.judge.decisionOnTitle" : "ui.judge.shellOnTitle",
+  );
+  const missing = judgeBridgeMissingLabel(locale);
+  const singleNote = decisionJudgeSingleNote(locale);
   return {
     group,
     available: ok,
@@ -136,15 +189,15 @@ export function judgeToggleView(
     checked: on,
     singleDisabled,
     disabled: !ok || singleDisabled || busy === true,
-    label: ok ? (on ? onLabel : offLabel) : JUDGE_BRIDGE_MISSING,
+    label: ok ? (on ? onLabel : offLabel) : missing,
     title: !ok
-      ? JUDGE_BRIDGE_MISSING
+      ? missing
       : singleDisabled
-        ? DECISION_JUDGE_SINGLE_NOTE
+        ? singleNote
         : on
           ? onTitle
           : offTitle,
-    note: ok && singleDisabled ? DECISION_JUDGE_SINGLE_NOTE : "",
+    note: ok && singleDisabled ? singleNote : "",
   };
 }
 
@@ -167,33 +220,36 @@ export interface JudgeWarningLine {
 }
 
 /** 开启警告：同一块按当前开启的组列行（两个都开 ⇒ 两段 + 共享说明）。 */
-export function judgeWarningLines(groups: JudgeGroup[]): JudgeWarningLine[] {
+export function judgeWarningLines(
+  groups: JudgeGroup[],
+  locale: Locale = DEFAULT_LOCALE,
+): JudgeWarningLine[] {
   const list = Array.isArray(groups) ? groups : [];
   const approval = list.indexOf(JUDGE_GROUP_APPROVAL) >= 0;
   const decision = list.indexOf(JUDGE_GROUP_DECISION) >= 0;
   const lines: JudgeWarningLine[] = [];
   if (approval) {
     lines.push({
-      text: "替我审批中：shell 命令与写盘/写卡确认（write / appointment-write / schedule-write）将由判断 agent 代批。",
+      text: translate(locale, "ui.judge.toggleOn.shell"),
       strong: true,
     });
   }
   if (decision) {
     lines.push({
-      text: "替我决策中：提案接受、任命、验收将由判断 agent 代批。",
+      text: translate(locale, "ui.judge.toggleOn.decision"),
       strong: true,
     });
   }
   lines.push({
-    text: "判断 agent 只读项目内代码/文档/角色卡（不含 .env、密钥/凭据、.ans 账本/会话、审计日志与项目外），不写文件、不执行命令；只代你「接受/任命/确认/验收」，不会代你拒绝、要求修改或勾选证据不足的候选；不确定、缺证据、读取失败、引擎不可用、超时或解析失败会按所属开关回落逐张卡，由你决定。",
+    text: translate(locale, "ui.judge.scopeNote"),
     strong: false,
   });
   lines.push({
-    text: "提案快捷路径（accept-quick）默认不代批；旧治理模型（single/su）的治理方向卡仍逐张确认；single 下写盘确认仍逐张手动。",
+    text: translate(locale, "ui.judge.quickPathNote"),
     strong: false,
   });
   lines.push({
-    text: "每次代批会产生一次模型调用（token/延迟）；结果行与审计会标明「judge 代批 · 代审批/代决策」；可能误判，可随时关闭。",
+    text: translate(locale, "ui.judge.costNote"),
     strong: false,
   });
   return lines;
@@ -206,6 +262,7 @@ export function judgeWarningLines(groups: JudgeGroup[]): JudgeWarningLine[] {
 export function shellJudgeToggleResult(
   previousEnabled: boolean,
   res: unknown,
+  locale: Locale = DEFAULT_LOCALE,
 ): { enabled: boolean; error: string } {
   const prev = previousEnabled === true;
   const record =
@@ -216,7 +273,7 @@ export function shellJudgeToggleResult(
   const error =
     record && typeof record.error === "string" && record.error !== ""
       ? record.error
-      : "未能确认自动判断开关（通道异常）；保持原状态。";
+      : translate(locale, "ui.judge.toggleFailed");
   return { enabled: prev, error };
 }
 
@@ -281,7 +338,10 @@ export interface ShellJudgeResultView {
   };
 }
 
-export function shellJudgeResultView(payload: unknown): ShellJudgeResultView | null {
+export function shellJudgeResultView(
+  payload: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): ShellJudgeResultView | null {
   if (!payload || typeof payload !== "object") return null;
   const record = payload as Record<string, unknown>;
   const verdict = record.verdict;
@@ -290,7 +350,7 @@ export function shellJudgeResultView(payload: unknown): ShellJudgeResultView | n
   const hardDeny =
     record.hardDenyOverride === true ||
     (verdict === "allow" && record.tier === "deny");
-  const summary = str(record.summary) || "无法概括命令；展开查看原文";
+  const summary = str(record.summary) || translate(locale, "ui.judge.summaryFallback");
   const reason = str(record.reason);
   const customerMessage = str(record.customerMessage);
   const alt =
@@ -299,20 +359,25 @@ export function shellJudgeResultView(payload: unknown): ShellJudgeResultView | n
       : null;
   const altValue = alt ? str(alt.value) : "";
   const altText = altValue
-    ? "替代方案：" + altValue + (alt && str(alt.rationale) ? "（" + str(alt.rationale) + "）" : "")
+    ? alt && str(alt.rationale)
+      ? translate(locale, "ui.judge.alternativeWithRationale", {
+          value: altValue,
+          rationale: str(alt.rationale),
+        })
+      : translate(locale, "ui.judge.alternative", { value: altValue })
     : "";
   const operator = str(record.operator) || (engine ? "judge:" + engine : "judge");
   const tierText =
     record.tier === "risky" || record.tier === "review" || record.tier === "deny"
-      ? "档位：" + record.tier
+      ? translate(locale, "ui.judge.tierLine", { tier: record.tier })
       : "";
   const lines: string[] = [];
   if (verdict === "allow") {
     if (hardDeny) {
-      lines.push("该命令属于硬拒类，判断 agent 判定必要后放行；请复核");
+      lines.push(translate(locale, "ui.judge.hardDenyNote"));
     }
   } else {
-    if (reason) lines.push("判断理由：" + reason);
+    if (reason) lines.push(translate(locale, "ui.judge.reasonLine", { reason }));
     if (altText) lines.push(altText);
     if (customerMessage) lines.push(customerMessage);
   }
@@ -322,19 +387,23 @@ export function shellJudgeResultView(payload: unknown): ShellJudgeResultView | n
     title:
       verdict === "allow"
         ? hardDeny
-          ? "已替你放行（判断 agent · 代审批 · deny 档）"
-          : "已替你放行（判断 agent · 代审批）"
-        : "未放行（判断 agent · 代审批）",
-    label: hardDeny ? str(record.label) || "deny 档 · judge 放行" : "",
+          ? translate(locale, "ui.judge.approvedHardDeny")
+          : translate(locale, "ui.judge.approved")
+        : translate(locale, "ui.judge.notApproved"),
+    label: hardDeny
+      ? str(record.label) || translate(locale, "ui.judge.hardDenyLabel")
+      : "",
     summary,
-    engineText: "判断引擎：" + shellJudgeEngineLabel(engine),
+    engineText: translate(locale, "ui.judge.engineText", {
+      engine: shellJudgeEngineLabel(engine, locale),
+    }),
     operatorText: "operator:" + operator,
     tierText,
     at: str(record.at),
     lines,
     retryHint:
       verdict === "deny"
-        ? "可关闭「替我审批」后重试（改为手动确认），或按替代方案调整命令。"
+        ? translate(locale, "ui.judge.closeAndRetry")
         : "",
     toolCallId: str(record.toolCallId),
     details: {
@@ -384,6 +453,7 @@ export interface GovernanceJudgeResultView {
 
 export function governanceJudgeResultView(
   payload: unknown,
+  locale: Locale = DEFAULT_LOCALE,
 ): GovernanceJudgeResultView | null {
   if (!payload || typeof payload !== "object") return null;
   const record = payload as Record<string, unknown>;
@@ -410,42 +480,54 @@ export function governanceJudgeResultView(
           reason: str(item.reason),
         }))
     : [];
-  const groupLabel = judgeGroupLabel(group);
+  const groupLabel = judgeGroupLabel(group, locale);
+  const selection = selected.length
+    ? selected.join(locale === "zh-CN" ? "、" : ", ")
+    : "accept";
   let headline = "";
   if (cardKind === "proposal") {
-    headline = "接受提案（" + (selected.length ? selected.join("、") : "accept") + "）";
+    headline = translate(locale, "ui.judge.headline.acceptProposal", { selected: selection });
   } else if (cardKind === "acceptance") {
-    headline = "验收通过（" + (selected.length ? selected.join("、") : "accept") + "）";
+    headline = translate(locale, "ui.judge.headline.acceptance", { selected: selection });
   } else if (cardKind === "appointment") {
-    headline = selected.length ? "任命 " + selected.join("、") : "任命（未报告选中项）";
+    headline = selected.length
+      ? translate(locale, "ui.judge.headline.appointment", { selected: selection })
+      : translate(locale, "ui.judge.headline.appointmentNotReported");
   } else if (
     cardKind === "write" ||
     cardKind === "appointment-write" ||
     cardKind === "schedule-write"
   ) {
     const pathCount = paths.length;
+    const shownPaths = paths.slice(0, 3).join(locale === "zh-CN" ? "、" : ", ");
     headline = pathCount
-      ? "确认写入 " +
-        pathCount +
-        " 个路径（" +
-        paths.slice(0, 3).join("、") +
-        (pathCount > 3 ? " 等 " + pathCount + " 个" : "") +
-        "）"
-      : "确认写入（未报告路径）";
+      ? pathCount > 3
+        ? translate(locale, "ui.judge.headline.writeConfirmOverflow", {
+            count: pathCount,
+            paths: shownPaths,
+          })
+        : translate(locale, "ui.judge.headline.writeConfirm", {
+            count: pathCount,
+            paths: shownPaths,
+            tail: "",
+          })
+      : translate(locale, "ui.judge.headline.writeNotReported");
   } else {
-    headline = "已代批" + (cardKind ? "（" + cardKind + "）" : "");
+    headline = cardKind
+      ? translate(locale, "ui.judge.headline.autoApprovedWithKind", { cardKind })
+      : translate(locale, "ui.judge.headline.autoApproved");
   }
-  if (flowId) headline += " · 流程 " + flowId;
+  if (flowId) headline += translate(locale, "ui.judge.flowSuffix", { flowId });
   const lines: string[] = [];
   const reason = str(record.reason);
-  if (reason) lines.push("判断理由：" + reason);
+  if (reason) lines.push(translate(locale, "ui.judge.reasonLine", { reason }));
   if (
     selected.length &&
     cardKind !== "appointment" &&
     cardKind !== "proposal" &&
     cardKind !== "acceptance"
   ) {
-    lines.push("选中项：" + selected.join("、"));
+    lines.push(translate(locale, "ui.judge.selectedLine", { items: selection }));
   }
   if (
     paths.length &&
@@ -453,7 +535,11 @@ export function governanceJudgeResultView(
     cardKind !== "appointment-write" &&
     cardKind !== "schedule-write"
   ) {
-    lines.push("路径：" + paths.join("、"));
+    lines.push(
+      translate(locale, "ui.judge.pathsLine", {
+        paths: paths.join(locale === "zh-CN" ? "、" : ", "),
+      }),
+    );
   }
   const durationMs =
     typeof record.durationMs === "number" && Number.isFinite(record.durationMs)
@@ -471,12 +557,14 @@ export function governanceJudgeResultView(
     group,
     groupLabel,
     cardKind,
-    title: "judge 代批 · " + groupLabel,
+    title: translate(locale, "ui.judge.titlePrefix", { label: groupLabel }),
     badge: groupLabel,
     headline,
-    engineText: "判断引擎：" + shellJudgeEngineLabel(engine),
+    engineText: translate(locale, "ui.judge.engineText", {
+      engine: shellJudgeEngineLabel(engine, locale),
+    }),
     operatorText: "operator:" + (engine ? "judge:" + engine : "judge"),
-    flowText: flowId ? "流程：" + flowId : "",
+    flowText: flowId ? translate(locale, "ui.judge.flowText", { flowId }) : "",
     at: str(record.at),
     lines,
     toolCallId: str(record.toolCallId),
@@ -501,18 +589,25 @@ export function governanceJudgeResultView(
 
 export function recoveryActionView(
   action: unknown,
+  locale: Locale = DEFAULT_LOCALE,
 ): { label: string; note: string } | null {
   if (action === "abort-turn") {
-    return { label: "停止本轮", note: "停该角色当前轮次；不销毁会话。" };
+    return {
+      label: translate(locale, "shared.common.stopTurn"),
+      note: translate(locale, "ui.judge.recovery.stopNote"),
+    };
   }
   if (action === "rebuild-session") {
     return {
-      label: "重建会话",
-      note: "重建该角色会话（保留 ANS 回放）；目标正忙时不会执行。",
+      label: translate(locale, "shared.common.rebuildSession"),
+      note: translate(locale, "ui.judge.recovery.rebuildNote"),
     };
   }
   if (action === "redeliver") {
-    return { label: "重新投递", note: "触发该角色投递队列立即重试。" };
+    return {
+      label: translate(locale, "ui.judge.recovery.redeliver"),
+      note: translate(locale, "ui.judge.recovery.redeliverNote"),
+    };
   }
   return null;
 }

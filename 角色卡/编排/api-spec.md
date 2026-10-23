@@ -598,3 +598,37 @@ Pipeline 公共出口 `src/pipeline/orchestration/run-role.ts` 再导出（桌�
 - 定向：`team-plan` 17/17、`flow-state` 44/44、`flow-service` 24/24、`governance-gate` 22/22、`governance-session` 34/34；只读 `test/测试/governance-e2e-auto/**` 68/68（legacy 团队计划不回退）。
 - **已知限制**：`flow_step_supersede` 工具不转发两字段、`flow_get` 文本投影不渲染（§11.6 已接受；服务层已支持，初始 YAML 可携带）；未改 `src/model/runtime.ts`、`src/provider/runtime/**`、`src/common/门禁引擎/**`、`app/**`、`test/测试/**`。
 - 未做：Map C（桌面 v2 解析/V12）、Reduce 终验/全量 T3 回归、提交/推送/合并/发布。
+
+## 2026-10-23 目录级授权与目录规范（teamPlanSchema v3，编排 D4）
+
+状态：**implemented-unverified**（定向检查通过；未经独立验收）。
+
+### 单一解析器（`src/common/编排/team-plan.ts`）v3 公共契约
+
+Pipeline 公共出口 `src/pipeline/orchestration/run-role.ts` 再导出（桌面/测试经此消费，不复制解析）：
+
+- `TEAM_PLAN_SCHEMA_V3 = 3`；`parseTeamPlan(text, {flowId?, projectRoot?}) => TeamPlanParseResult`：缺省/`1` legacy、`2` v2（V1–V11 逐字不变）、`3` = v2 字段 + V-D1–V-D9；未知 schema V1 error。
+- `TeamPlanParseResult = { ok; legacy; teamPlanSchema: 1|2|3; flowId?; version?; riskTier?; recommended; modules; moduleList; roleRows; directories: string[]; directorySpecs: DirectorySpec[]; issues }`；v1/v2 的 `directories`/`directorySpecs` 为空数组。
+- `DirectorySpec = { dir; owner; kind: "implementation"|"tests"|"docs"|"evidence"|"shared"; purpose; naming; subdirs: string[]|"*"|"**"|"—"; extensions: string[]; contract; testSurface: string[]; dependencies: string[]; forbidden: string[]; shared: "none"|"read-only"|"split" }`。
+- `TeamPlanModule.implementationDir?: string`（v3 每个 module 必填非空）；`TeamPlanRoleRow` 新增 `authorizedDirsRaw/authorizedDirs/preciseWritesetRaw/preciseWritesets/authorizedDirIssues/preciseWritesetIssues`；v3 中 `writeset(s)` = `精确写集`。
+- v3 角色表：`授权目录` + `精确写集`；`唯一写集` 为兼容别名（warning）；`边界` 列名 error；模块清单 `实现目录` 必填；治理关键路径只能精确文件。
+- 规则 ID：V-D1 frontmatter 目录；V-D2 规范覆盖/owner/必填/枚举；V-D3 角色引用/孤儿/文件例外；V-D4 目录/写集不重叠；V-D5 规范语法/依赖 DAG/split；V-D6 模块实现目录/整层黑名单/单文件 warning；V-D7 治理关键路径；V-D8 共享策略；V-D9 路径逃逸/大小写/realpath（给出 `projectRoot` 时）。
+- V11 `validateTeamPlanFlowConsistency` 不变；v3 不改变 flow schema。
+
+### 布局核对纯函数（新增 `src/common/编排/directory-conformance.ts`）
+
+- `checkDirectoryLayout({changedPaths, specs, roleDirs, projectRoot?, roleId?}) => {rows: LayoutCheckRow[], ok}`；`layoutCheckPassed(result|rows)`。
+- `LayoutCheckRow = { path; owner?; dir?; checks: {type,subdir,naming,forbidden,pathSafe}; result: "pass"|"fail"; reason?; skipped?; deleted? }`；`LayoutCheckInput.roleId?`/`projectRoot?` 为可选扩展。
+- 跳过 `docs/communication|planning|scheduling|acceptance` 与 `角色卡/<roleId>/...`；最长前缀 owner；无/多 owner fail；扩展名/子目录/命名/禁写区/路径安全逐项；删除按原路径、重命名按新路径；复用 `path-primitives`；不读 git、不写报告。
+
+### 卡前守卫/提示
+
+- `validateConvenerAppointmentCard`：v3 发卡前跑 V-D1–V-D9（含 realpath）；error 不弹卡/不写账本/不占 pending；warning/exception-review 不阻断；返回 `teamPlanSchema: 1|2|3`。
+- `computeJudgeContext`：`facts.teamPlanSchema` 可为 3，新增有界 `teamPlanDirectories`（≤20×96B）；无新增 artifact kind。
+- `govern-session.ts`：标准工作流/Convener/Crew 提示同步 v3；v2 兼容说明保留。
+
+### 验收证据（编排）
+
+- `node --test "test/编排/**/*.test.ts"`：796 tests / 795 pass / 1 fail（既有 Windows symlink EPERM `shell-authorized-routine.test.ts:103`，基线一致）；`npm run typecheck` exit 1，唯一错误 `app/desktop/interface.ts(1125,5)`（并行桌面窗口 D5 待消费 `1|2|3`）。
+- 定向：`team-plan` 29/29、`directory-conformance` 15/15。
+- 已知限制：V12/e2e/全量 T3 回归归 D5/D6/D7；不做任务级 `writeDirs`；Reduce 豁免模块实现目录归属；单文件目录为启发式 warning；realpath 仅在给出 `projectRoot` 时核对。文档状态 `implemented-unverified`，未提交/暂存/推送。

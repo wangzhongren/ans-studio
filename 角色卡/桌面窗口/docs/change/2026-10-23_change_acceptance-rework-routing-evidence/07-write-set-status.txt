@@ -1,0 +1,30 @@
+# write set status (git status --short for S3 files)
+ M app/desktop/customer-input.ts
+ M app/desktop/governance-advance.ts
+ M app/desktop/interface.ts
+ M app/main.ts
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/acceptance-dispatch.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/operator-wiring.test.ts"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_acceptance-rework-routing-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_acceptance-rework-routing.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_directory-ownership-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_directory-ownership.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_governance-advance-redispatch.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_i18n-b0-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_i18n-b0.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_i18n-b3-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_i18n-b3.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_i18n-b4-desktop-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_i18n-b4-desktop.md"
+
+# diff stat (our files; includes pre-existing uncommitted worktree hunks, see change record)
+ app/desktop/customer-input.ts                      |  226 +-
+ app/desktop/governance-advance.ts                  |  410 +++-
+ app/desktop/interface.ts                           | 2220 ++++++++++++++++---
+ app/main.ts                                        |   98 +-
+ .../acceptance-dispatch.test.ts"                   |  728 ++++++-
+ .../interface.test.ts"                             | 2273 +++++++++++++++++++-
+ .../operator-wiring.test.ts"                       |  179 +-
+ 7 files changed, 5739 insertions(+), 395 deletions(-)

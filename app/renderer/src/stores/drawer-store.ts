@@ -22,6 +22,12 @@ import {
   type DocumentScope,
 } from "@/chat/document-view";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useLocaleStore, translate, type Locale } from "@/i18n";
+
+/** 当前界面语言（i18n B1）：抽屉内生成的提示按当前 locale 渲染。 */
+function currentLocale(): Locale {
+  return useLocaleStore.getState().locale;
+}
 
 export type DrawerTab = "card" | "work" | "pi" | "document" | null;
 
@@ -362,7 +368,11 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     useUiStore.getState().setDrawerOpen(true);
     if (!projectRoot) {
       useDrawerStore.setState({
-        document: { ...view, loadingRefs: false, listError: "尚未导入项目。" },
+        document: {
+          ...view,
+          loadingRefs: false,
+          listError: translate(currentLocale(), "ui.sidebar.noProjectPeriod"),
+        },
       });
       return;
     }
@@ -396,7 +406,9 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
           scope,
           unavailable: asString(listing.documentReadUnavailable) || null,
           loadingRefs: false,
-          listError: role ? "" : "无法确定来源角色，暂不能列出来源文档。",
+          listError: role
+            ? ""
+            : translate(currentLocale(), "ui.drawerStore.noSourceRole"),
         },
       });
     } catch {
@@ -404,7 +416,11 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       const current = get().document;
       if (!current) return;
       useDrawerStore.setState({
-        document: { ...current, loadingRefs: false, listError: "文档清单刷新失败。" },
+        document: {
+          ...current,
+          loadingRefs: false,
+          listError: translate(currentLocale(), "ui.drawerStore.refreshFailed"),
+        },
       });
     }
   },
@@ -470,7 +486,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
             ...currentDocument,
             mode: "content",
             result: validation.result,
-            statusText: documentStatusText(validation.result),
+            statusText: documentStatusText(validation.result, currentLocale()),
           },
         });
       } else {
@@ -480,7 +496,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
             mode: "error",
             result: null,
             errorCode: validation.code,
-            errorText: documentErrorText(validation.code),
+            errorText: documentErrorText(validation.code, currentLocale()),
           },
         });
       }
@@ -494,7 +510,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
           mode: "error",
           result: null,
           errorCode: "IO_ERROR",
-          errorText: documentErrorText("IO_ERROR"),
+          errorText: documentErrorText("IO_ERROR", currentLocale()),
         },
       });
     }
@@ -586,10 +602,14 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       const bridge = getDesktopBridge();
       res = bridge?.withdrawQueued
         ? asRecord(await bridge.withdrawQueued({ projectRoot, roleId, runtime }, id))
-        : { ok: false, error: "当前版本未提供撤回通道" };
+        : {
+            ok: false,
+            error: translate(currentLocale(), "ui.drawerStore.withdrawUnavailable"),
+          };
       if (res.ok === true) {
-        const okText =
-          "已撤回排队消息：" + (asString(res.summary) || "");
+        const okText = translate(currentLocale(), "ui.confirm.withdrawn", {
+          summary: asString(res.summary) || "",
+        });
         appendSystem(okText);
         set((state) => {
           const current = state.withdraw[key];
@@ -602,12 +622,16 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
         });
         return;
       }
-      const failText =
-        "撤回无效：" + (asString(res.error) || "未知原因");
+      const failText = translate(currentLocale(), "ui.confirm.withdrawInvalid", {
+        detail:
+          asString(res.error) || translate(currentLocale(), "shared.common.unknownReason"),
+      });
       writeFeedback(failText);
       appendSystem(failText);
     } catch (error) {
-      const errorText = "撤回失败：" + String(error);
+      const errorText = translate(currentLocale(), "ui.confirm.withdrawFailed", {
+        detail: String(error),
+      });
       writeFeedback(errorText);
       appendSystem(errorText);
     } finally {

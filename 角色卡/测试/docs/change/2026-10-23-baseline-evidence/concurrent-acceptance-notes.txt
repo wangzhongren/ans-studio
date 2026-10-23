@@ -1,0 +1,12 @@
+=== 并发出现的验收标准文件（非测试角色写入，观察记录） ===
+docs/acceptance/i18n-criteria-v1.md
+  mtime: 2026-10-23 10:43:29.328793200 +0800
+  size: 70804 B
+  sha256: 0d91d179a175dbdad361335a276b5f7b8319539d9dfa0a28f18b409ee204dae9
+docs/acceptance/directory-ownership-criteria-v1.md
+  mtime: 2026-10-23 10:43:20.214810000 +0800
+  size: 88806 B
+  sha256: ad0e503179898c1aa9f8225728595b6a0a9d8492f79c50224289e1b3f90546b7
+
+=== 判定 ===
+两文件位于 docs/acceptance/，为内置独立验收默认写区（I2/D2，与 I3/D3 基线并行）；不属于本角色写入，不改产品/测试代码，不影响测试计数。

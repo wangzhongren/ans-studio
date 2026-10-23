@@ -25,6 +25,7 @@ import { createCustomerInputChannel } from "../../app/desktop/customer-input.ts"
 import type { CustomerInputFn } from "../../src/model/runtime.ts";
 // W6-B（2026-10-18）：四角色能力矩阵与意图交接/澄清的桌面投递端。
 import { buildIntentHandoffMessage } from "../../app/desktop/governance-advance.ts";
+import { createMainI18n, mainT } from "../../app/desktop/i18n.ts";
 import type { HandOffIntentPayload } from "../../src/model/runtime.ts";
 import { readGovernanceLedger } from "../../src/pipeline/orchestration/govern-session.ts";
 // G-2（2026-10-16 客户批准）：看护器纯逻辑（W1 信号/去重/冷却/风暴护栏；W3 收束已于 2026-10-18 移除）
@@ -1469,5 +1470,43 @@ test("W6-B 交接审计：投递成功写 dispatch.accepted(app, trigger=intent-
     assert.equal(ledger.entries.filter((entry) => entry.kind === "intent.handed-off").length, 0);
   } finally {
     rmSync(failRoot, { recursive: true, force: true });
+  }
+});
+
+// —————————————— i18n B3（2026-10-23）：SessionManager 生成点 en-US 断言（zh-CN 默认逐字不变） ——————————————
+test("i18n B3 session：未开会话的 send 回执按 en-US 生成；切回 zh-CN 逐字不变", async () => {
+  const listing = await listProject(REPO_ROOT);
+  const mgr = makeManager(listing, []);
+  createMainI18n("en-US");
+  try {
+    const en = await mgr.send("hi", undefined, { projectRoot: listing.projectRoot, roleId: "桌面窗口", runtime: "demo" });
+    assert.equal(en.ok, false);
+    assert.equal(en.error, "The session is not started (click the role on the left to start it).");
+    // 2026-10-23 PM 补 key：session 用户可见接线点 en。
+    assert.equal(mainT("main.session.releaseNoSession", { roleId: "A" }), "Role A has no open session.");
+    assert.equal(mainT("main.session.rebuildChangedRuntimeConfig"), "runtime configuration");
+    assert.equal(mainT("main.session.install.verbInstall"), "install");
+    assert.equal(
+      mainT("main.session.delivery.receivedDispatch", { role: "Crew" }),
+      "Received a dispatched task from Crew — follow the task text and hand back a report when done.",
+    );
+    assert.equal(
+      mainT("main.session.delivery.handbackFailedShort", { sourceRoleId: "A", detail: "x" }),
+      "Handback delivery failed (from A): x",
+    );
+    assert.equal(mainT("main.session.dispatchModelNote"), " (trio: Steward or Lead)");
+    createMainI18n("zh-CN");
+    assert.equal(mainT("main.session.releaseNoSession", { roleId: "A" }), "角色 A 没有打开的会话。");
+    assert.equal(mainT("main.session.dispatchModelNote"), "（trio：Steward（统筹）或主理 Lead）");
+    assert.equal(
+      mainT("main.session.delivery.handbackFailedShort", { sourceRoleId: "A", detail: "x" }),
+      "回交投递失败（来自 A）：x",
+    );
+    createMainI18n("zh-CN");
+    const zh = await mgr.send("hi", undefined, { projectRoot: listing.projectRoot, roleId: "桌面窗口", runtime: "demo" });
+    assert.equal(zh.ok, false);
+    assert.equal(zh.error, "会话尚未开启（点击左侧角色即可开启）。");
+  } finally {
+    createMainI18n("zh-CN");
   }
 });

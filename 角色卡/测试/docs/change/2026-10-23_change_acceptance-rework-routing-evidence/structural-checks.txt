@@ -1,0 +1,22 @@
+# S7 结构性只读核对（辅助；最终判定属独立验收）
+## addFlowStep / flow_step_add 引用
+## 桌面是否深导 src/common/编排 或 src/provider/runtime 实现
+app/desktop/operator-channel.ts:94:import { SHELL_REVIEW_TIMEOUT_ENV } from "../../src/common/编排/shell-deadline.ts";
+app/desktop/session.ts:81:import type { OrchestrationEvent, HandbackEvent } from "../../src/common/编排/handback.ts";
+app/desktop/session.ts:84:import { renderHandbackPrompt, renderHandbackBatchPrompt, handbackKey, extractDispatchReadPaths, planDispatchDelivery, type TaskHandback } from "../../src/common/编排/handback.ts";
+app/desktop/session.ts:117:} from "../../src/common/编排/watchdog.ts";
+app/desktop/session.ts:144:import { readSkillRegistration } from "../../src/common/编排/installed-skills.ts";
+app/desktop/watchdog.ts:48:} from "../../src/common/编排/watchdog.ts";
+## reopenAcceptanceStepForRework 注册面（应只经 Pipeline 导出 + 桌面消费，不在工具注册表）
+  src/common/编排/flow-service.ts:738:// —————————————————————— 应用专用：reopenAcceptanceStepForRework ——————————————————————
+  src/common/编排/flow-service.ts:740:/** `reopenAcceptanceStepForRework` 输入（应用专用，不是角色工具参数）。 */
+  src/common/编排/flow-service.ts:774:export async function reopenAcceptanceStepForRework(
+  src/pipeline/orchestration/flow-state.ts:44:  reopenAcceptanceStepForRework,
+  app/desktop/interface.ts:172:  reopenAcceptanceStepForRework as realReopenAcceptanceStepForRework,
+  app/desktop/interface.ts:658:   * `flow-state.ts::reopenAcceptanceStepForRework`（app-only；测试可注入桩件）。只把
+  app/desktop/interface.ts:661:  reopenAcceptanceStepForReworkFn?: (input: ReopenAcceptanceStepForReworkInput) => Promise<{
+  app/desktop/interface.ts:2249:      const fn = deps.reopenAcceptanceStepForReworkFn ?? realReopenAcceptanceStepForRework;
+## AdapterCapabilities / FlowStepKind / GovernancePower 定义处（应无本变更新增；以 diff 由验收核对）
+src/common/编排/flow-state.ts:48:export type FlowStepKind = (typeof FLOW_STEP_KINDS)[number];
+src/common/编排/governance-ledger.ts:33:export type GovernancePower =
+src/pipeline/orchestration/run-role.ts:245:export interface AdapterCapabilities {

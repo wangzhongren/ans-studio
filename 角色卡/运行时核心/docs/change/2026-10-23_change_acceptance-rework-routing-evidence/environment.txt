@@ -1,0 +1,12 @@
+# S4 运行时措辞（acceptance-rework-routing）— 执行环境
+
+- 日期：2026-10-23（+08:00）
+- 仓库根：C:\Users\51054\Desktop\work\ans-studio
+- 分支：main
+- HEAD（写前/写后均）：ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+- OS：Windows 11 Pro 10.0.26300
+- Shell：Git Bash（MINGW64）
+- Node：v24.22.1（C:/Users/51054/AppData/Local/Programs/nodejs/node.exe）
+- npm：11.19.1（C:/Users/51054/AppData/Local/Programs/nodejs/npm.cmd）
+- 说明：npm.cmd 需先 `export PATH="/c/Users/51054/AppData/Local/Programs/nodejs:$PATH"`；仅用 node.exe 直跑 `node --test` 时无此要求。
+- 本角色写集（git status，限定）：仅 `M src/provider/runtime/tools.ts`、`M test/runtime-core/tools.test.ts`；证据/变更记录为本角色 docs 目录内新增文件。

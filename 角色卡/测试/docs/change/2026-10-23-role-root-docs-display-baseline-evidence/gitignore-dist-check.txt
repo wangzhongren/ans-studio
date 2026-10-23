@@ -1,0 +1,2 @@
+8:release-output/
+9:app/renderer/dist/

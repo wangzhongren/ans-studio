@@ -11,11 +11,12 @@ import type {
   SessionEnvelope,
   SessionEvent,
 } from "./types.ts";
+import { DEFAULT_LOCALE, translate, type Locale } from "../i18n/index.ts";
 import {
-  REASONING_UNSAFE_NOTE,
   reasoningPieceFromCarrier,
   reasoningPieceFromDetail,
   reasoningRowDataFromPiece,
+  reasoningUnsafeNote,
 } from "./reasoning.ts";
 
 export interface NewRowDescriptor {
@@ -158,35 +159,53 @@ function summaryToolName(summary: string): { toolName: string; rest: string } {
   return { toolName: text.split(/\s+/)[0] || "", rest: "" };
 }
 
-export function toolStatus(activity: Partial<ActivityItem> & { phase?: string }): {
+export function toolStatus(
+  activity: Partial<ActivityItem> & { phase?: string },
+  locale: Locale = DEFAULT_LOCALE,
+): {
   status: string;
   statusText: string;
 } {
-  if (activity.denied) return { status: "denied", statusText: "未放行" };
-  if (activity.timedOut) return { status: "timed-out", statusText: "超时终止" };
+  if (activity.denied) {
+    return { status: "denied", statusText: translate(locale, "ui.tool.status.notApproved") };
+  }
+  if (activity.timedOut) {
+    return { status: "timed-out", statusText: translate(locale, "ui.tool.status.timedOut") };
+  }
   if (typeof activity.exitCode === "number" && activity.exitCode !== 0) {
     return {
       status: "exited-nonzero",
-      statusText: "已执行完成（退出码 " + activity.exitCode + "）",
+      statusText: translate(locale, "ui.tool.status.completedExit", {
+        code: activity.exitCode,
+      }),
     };
   }
-  if (activity.failed) return { status: "failed", statusText: "失败" };
+  if (activity.failed) {
+    return { status: "failed", statusText: translate(locale, "shared.common.failed") };
+  }
   if (activity.phase === "call" || activity.phase === "start" || activity.phase === "running") {
-    return { status: "running", statusText: "运行中" };
+    return { status: "running", statusText: translate(locale, "ui.tool.status.running") };
   }
   if (activity.phase === "blocked" || activity.phase === "denied") {
-    return { status: "denied", statusText: "未放行" };
+    return { status: "denied", statusText: translate(locale, "ui.tool.status.notApproved") };
   }
   if (activity.phase === "result") {
-    if (activity.completed === true) return { status: "completed", statusText: "完成" };
-    if (activity.returned === true) return { status: "returned", statusText: "工具返回" };
+    if (activity.completed === true) {
+      return { status: "completed", statusText: translate(locale, "ui.tool.status.done") };
+    }
+    if (activity.returned === true) {
+      return { status: "returned", statusText: translate(locale, "ui.tool.status.returned") };
+    }
     // accepted 单独到达不是执行成功——没有 ok/status 事实就如实标「状态未记录」。
-    return { status: "unknown", statusText: "状态未记录" };
+    return { status: "unknown", statusText: translate(locale, "ui.tool.status.unknown") };
   }
-  return { status: "recorded", statusText: "已记录" };
+  return { status: "recorded", statusText: translate(locale, "ui.tool.status.recorded") };
 }
 
-export function activityFromEvent(event: SessionEvent): ActivityItem | null {
+export function activityFromEvent(
+  event: SessionEvent,
+  locale: Locale = DEFAULT_LOCALE,
+): ActivityItem | null {
   if (!event) return null;
   const summary = typeof event.summary === "string" ? event.summary : "";
   const parsed = summaryToolName(summary);
@@ -307,17 +326,19 @@ export function activityFromEvent(event: SessionEvent): ActivityItem | null {
     displayUnsupported: !!rawDisplay && !display,
     detailText: [
       summary,
-      target ? "目标：" + target : "",
-      exitCode !== undefined ? "退出码：" + exitCode : "",
-      timedOut ? "已超时" : "",
+      target ? translate(locale, "ui.events.target", { target }) : "",
+      exitCode !== undefined
+        ? translate(locale, "ui.chatRow.exitCode", { code: exitCode ?? "" })
+        : "",
+      timedOut ? translate(locale, "ui.events.timedOut") : "",
     ]
       .filter(Boolean)
       .join("\n"),
   };
-  const status = toolStatus(base);
+  const status = toolStatus(base, locale);
   base.status = status.status;
   base.statusText = status.statusText;
-  base.label = activityPhaseLabel(base);
+  base.label = activityPhaseLabel(base, locale);
   base.display = display || undefined;
   base.fullTarget = displayText || base.target;
   base.legacyTextProjection = detail.textProjection;
@@ -330,17 +351,26 @@ export function activityFromEvent(event: SessionEvent): ActivityItem | null {
 }
 
 /** 相位标签（旧 tool-rows `label` 同口径；结构化终态优先于文本失败推断）。 */
-export function activityPhaseLabel(activity: Partial<ActivityItem>): string {
-  if (activity.timedOut) return "超时终止";
+export function activityPhaseLabel(
+  activity: Partial<ActivityItem>,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  if (activity.timedOut) return translate(locale, "ui.tool.status.timedOut");
   if (activity.status === "exited-nonzero") {
-    return "已执行完成（退出码 " + activity.exitCode + "）";
+    return translate(locale, "ui.tool.status.completedExit", {
+      code: activity.exitCode ?? "",
+    });
   }
-  if (activity.failed) return "执行失败";
-  if (activity.denied) return "已拒绝";
-  if (activity.status === "running") return "调用发起";
-  if (activity.status === "completed") return "执行完成";
-  if (activity.status === "returned") return "工具返回";
-  return "状态未记录";
+  if (activity.failed) return translate(locale, "ui.tool.status.failed");
+  if (activity.denied) return translate(locale, "ui.tool.status.denied");
+  if (activity.status === "running") return translate(locale, "ui.tool.status.called");
+  if (activity.status === "completed") {
+    return translate(locale, "ui.tool.status.completedShort");
+  }
+  if (activity.status === "returned") {
+    return translate(locale, "ui.tool.status.returned");
+  }
+  return translate(locale, "ui.tool.status.unknown");
 }
 
 export interface InjectedMessage {
@@ -361,7 +391,10 @@ export interface InjectedMessage {
  */
 const USER_ECHO_PREFIX = "用户指令：";
 
-export function classifyInjected(text: string): InjectedMessage | null {
+export function classifyInjected(
+  text: string,
+  locale: Locale = DEFAULT_LOCALE,
+): InjectedMessage | null {
   const raw = String(text == null ? "" : text);
   const value = raw.indexOf(USER_ECHO_PREFIX) === 0
     ? raw.slice(USER_ECHO_PREFIX.length)
@@ -370,7 +403,7 @@ export function classifyInjected(text: string): InjectedMessage | null {
   if (system) {
     return {
       kind: "system",
-      label: "系统消息 · " + system[1],
+      label: translate(locale, "ui.events.systemMessage", { label: system[1] }),
       body: value.slice(system[0].length),
     };
   }
@@ -384,7 +417,9 @@ export function classifyInjected(text: string): InjectedMessage | null {
     if (noticeText !== "") {
       return {
         kind: "system-notice",
-        label: notice[1] ? "系统通知 · " + notice[1] : "系统通知",
+        label: notice[1]
+          ? translate(locale, "ui.events.systemNoticeWithLabel", { label: notice[1] })
+          : translate(locale, "ui.events.systemNotice"),
         body: value,
         displayBody: noticeText,
         remainder: split >= 0 ? rest.slice(split).replace(/^\r?\n\r?\n/, "") : "",
@@ -395,7 +430,9 @@ export function classifyInjected(text: string): InjectedMessage | null {
   if (dispatch) {
     return {
       kind: "dispatch",
-      label: "派发任务" + (dispatch[1] ? " · 来自 " + dispatch[1] : ""),
+      label: dispatch[1]
+        ? translate(locale, "ui.events.dispatchTaskWithRole", { role: dispatch[1] })
+        : translate(locale, "ui.events.dispatchTask"),
       body: value.slice(dispatch[0].length),
       sourceRoleId: dispatch[1] || undefined,
     };
@@ -404,7 +441,9 @@ export function classifyInjected(text: string): InjectedMessage | null {
   if (handback) {
     return {
       kind: "handback",
-      label: "回交投递" + (handback[1] ? " · 来自 " + handback[1] : ""),
+      label: handback[1]
+        ? translate(locale, "ui.events.handbackDeliveryWithRole", { role: handback[1] })
+        : translate(locale, "ui.events.handbackDelivery"),
       body: value.slice(handback[0].length),
       sourceRoleId: handback[1] || undefined,
     };
@@ -436,7 +475,10 @@ export function terminalOutcome(event: SessionEvent | null | undefined): string 
   return ["completed", "failed", "aborted", "timed_out"].includes(outcome) ? outcome : "";
 }
 
-export function describeEvent(event: SessionEvent | null | undefined): NewRowDescriptor | null {
+export function describeEvent(
+  event: SessionEvent | null | undefined,
+  locale: Locale = DEFAULT_LOCALE,
+): NewRowDescriptor | null {
   if (!event || typeof event !== "object") return null;
   const kind = event.kind || "message";
   const summary = typeof event.summary === "string" ? event.summary : "";
@@ -446,7 +488,10 @@ export function describeEvent(event: SessionEvent | null | undefined): NewRowDes
     if (!report || typeof report !== "object") {
       return {
         kind: "system",
-        data: { cls: "sys-call", text: "回交已收到（旧来源，安全详情未提供）" },
+        data: {
+          cls: "sys-call",
+          text: translate(locale, "ui.events.handbackLegacy"),
+        },
         turnId,
       };
     }
@@ -491,26 +536,29 @@ export function describeEvent(event: SessionEvent | null | undefined): NewRowDes
       if (!piece) {
         return {
           kind: "system",
-          data: { cls: "sys-call", text: REASONING_UNSAFE_NOTE },
+          data: { cls: "sys-call", text: reasoningUnsafeNote(locale) },
           turnId: reasoningTurnId,
         };
       }
       return {
         kind: "reasoning",
-        data: reasoningRowDataFromPiece(piece),
+        data: reasoningRowDataFromPiece(piece, locale),
         turnId: reasoningTurnId,
       };
     }
     if (source === "reasoning-diagnostic") {
       return {
         kind: "system",
-        data: { cls: "sys-call", text: summary || REASONING_UNSAFE_NOTE },
+        data: {
+          cls: "sys-call",
+          text: summary || reasoningUnsafeNote(locale),
+        },
         turnId: turnId || detailTurnId(event),
       };
     }
     if (source === "prompt-input") {
       const text = stringDetail(event, "text");
-      const injected = classifyInjected(text);
+      const injected = classifyInjected(text, locale);
       if (injected) {
         return {
           kind: "injected",
@@ -548,7 +596,7 @@ export function describeEvent(event: SessionEvent | null | undefined): NewRowDes
         };
       }
     }
-    const activity = activityFromEvent(event);
+    const activity = activityFromEvent(event, locale);
     if (kind === "denied" && activity) {
       if (isSpecialTool(activity.toolName) || activity.hasDisplay) {
         // 特殊工具/display 生命周期：denied 是同一调用的 blocked 相位，不另造 .sys-denied。
@@ -603,7 +651,10 @@ export function describeEvent(event: SessionEvent | null | undefined): NewRowDes
     }
     return {
       kind: "system",
-      data: { cls: "sys-call sys-unknown-tool-event", text: "旧/未知系统记录：" + summary },
+      data: {
+        cls: "sys-call sys-unknown-tool-event",
+        text: translate(locale, "ui.events.legacyUnknown", { summary }),
+      },
       turnId,
     };
   }
@@ -698,8 +749,9 @@ export function dedupeHistoryDescriptors(
  */
 export function dedupeHistoryRows(
   rows: Record<string, unknown>[],
+  locale: Locale = DEFAULT_LOCALE,
 ): Record<string, unknown>[] {
-  const descriptors = rows.map(historyRowToDescriptor);
+  const descriptors = rows.map((row) => historyRowToDescriptor(row, locale));
   const keptRows: Record<string, unknown>[] = [];
   const byKey = new Map<string, number>();
   for (let index = 0; index < descriptors.length; index += 1) {
@@ -715,7 +767,7 @@ export function dedupeHistoryRows(
       keptRows.push(rows[index]);
       continue;
     }
-    const keptDescriptor = historyRowToDescriptor(keptRows[at]);
+    const keptDescriptor = historyRowToDescriptor(keptRows[at], locale);
     if (
       historyDescriptorHasIdentity(descriptor) &&
       !historyDescriptorHasIdentity(keptDescriptor)
@@ -726,7 +778,15 @@ export function dedupeHistoryRows(
   return keptRows;
 }
 
-export function historyRowToDescriptor(row: Record<string, unknown>): NewRowDescriptor {
+export function historyRowToDescriptor(row: Record<string, unknown>): NewRowDescriptor;
+export function historyRowToDescriptor(
+  row: Record<string, unknown>,
+  locale: Locale,
+): NewRowDescriptor;
+export function historyRowToDescriptor(
+  row: Record<string, unknown>,
+  locale: Locale = DEFAULT_LOCALE,
+): NewRowDescriptor {
   const kind = typeof row.kind === "string" ? row.kind : "";
   const text = typeof row.text === "string" ? row.text : "";
   const turnId = typeof row.turnId === "string" ? row.turnId : undefined;
@@ -748,13 +808,13 @@ export function historyRowToDescriptor(row: Record<string, unknown>): NewRowDesc
       return {
         ...base,
         kind: "system",
-        data: { cls: "sys-call", text: REASONING_UNSAFE_NOTE },
+        data: { cls: "sys-call", text: reasoningUnsafeNote(locale) },
       };
     }
     return {
       ...base,
       kind: "reasoning",
-      data: reasoningRowDataFromPiece(piece),
+      data: reasoningRowDataFromPiece(piece, locale),
     };
   }
   if (kind === "user") {
@@ -781,7 +841,7 @@ export function historyRowToDescriptor(row: Record<string, unknown>): NewRowDesc
         },
       };
     }
-    const injected = classifyInjected(text);
+    const injected = classifyInjected(text, locale);
     if (injected) return { ...base, kind: "injected", data: injected };
     return { ...base, kind: "user", data: { text, projection: row.textProjection } };
   }
@@ -807,7 +867,7 @@ export function historyRowToDescriptor(row: Record<string, unknown>): NewRowDesc
     const toolName =
       activity && typeof activity.toolName === "string"
         ? activity.toolName
-        : summaryToolName(text).toolName || "工具";
+        : summaryToolName(text).toolName || translate(locale, "shared.common.tool");
     const target =
       activity && typeof activity.target === "string" && activity.target
         ? activity.target
@@ -921,8 +981,8 @@ export function historyRowToDescriptor(row: Record<string, unknown>): NewRowDesc
       legacyStatusSource:
         typeof row.legacyStatusSource === "string" ? row.legacyStatusSource : undefined,
     };
-    item.label = activityPhaseLabel(item);
-    const statusView = toolStatus(item);
+    item.label = activityPhaseLabel(item, locale);
+    const statusView = toolStatus(item, locale);
     item.status = statusView.status;
     item.statusText = statusView.statusText;
     if (display || isSpecialTool(item.toolName)) {
@@ -974,6 +1034,9 @@ export function historyRowToDescriptor(row: Record<string, unknown>): NewRowDesc
   return {
     ...base,
     kind: "system",
-    data: { cls: "sys-call", text: text || "（历史记录）" },
+    data: {
+      cls: "sys-call",
+      text: text || translate(locale, "ui.events.historyRecord"),
+    },
   };
 }

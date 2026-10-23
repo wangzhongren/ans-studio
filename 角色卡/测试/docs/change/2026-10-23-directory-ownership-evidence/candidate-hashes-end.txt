@@ -1,0 +1,6 @@
+test/测试/governance-e2e-auto/fixture.ts  hash-object=9ce3caed83e87f21f4444875b054d79bf4816e69  sha256=ec1b2c1dde230dc758c25b361100fcbae8802ef356c75524f2fe5c22c69f5981
+test/测试/governance-e2e-auto/p-team-plan-guard.test.ts  hash-object=da5b0c53bf3b44bdc652c15a2ee2107341ce81b6  sha256=c35da9810c995a3d556e2f406323a273024e5521dac77cb23c14d4f933296cee
+test/测试/governance-e2e-auto/q-role-granularity.test.ts  hash-object=8a1cd8a85a64250de4ff9958cc58c157adca264a  sha256=9689f5cbe1ec299921d6d92d3174a68369d482b985a6bd37d999c3e9d8148c52
+test/测试/governance-e2e-auto/r-mapreduce-parallel.test.ts  hash-object=7973d367a43fbd09a893496f1d73b67e80e022e9  sha256=305cc0ab4027e16ea25cb5730cb6324533732385810b1b5d774a5eb516726159
+test/测试/governance-e2e-auto/i-full-chain.test.ts  hash-object=a28009aeafff85fa96907f3150420d034f91d2ad  sha256=83c2c3905d1ed7be443c4847babc0a7129c47263707163ba107eac4f2a71b785
+test/测试/directory-layout.test.ts  hash-object=1eb758d1e0e4f8a1fb2141187a69dc8d714ee18f  sha256=7a4b845f4b8396a9b23ae90746197b64051a00abfea1663bee3e343af191154e

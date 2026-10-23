@@ -1,0 +1,60 @@
+=== 基线环境记录 (i18n T2 / directory-ownership T3) ===
+记录时间(本地): 2026-10-23 10:41:19 +0800
+工作目录: /c/Users/51054/Desktop/work/ans-studio
+OS: MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+Windows 版本: 
+Microsoft Windows [�汾 10.0.26300.9711]
+Shell: bash 5.3.15(2)-release (Git Bash / MINGW64)
+PATH 注记: 当前 shell 默认 PATH 不含 Node；本文件所有命令均先执行 export PATH="/c/Users/51054/AppData/Local/Programs/nodejs:$PATH"
+node 路径: /c/Users/51054/AppData/Local/Programs/nodejs/node
+node --version: v24.22.1
+npm 路径: /c/Users/51054/AppData/Local/Programs/nodejs/npm
+npm --version: 11.19.1
+git rev-parse HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+git log -1 --format='%h %s': ee59296 docs(release): record v1.6.0 published assets and checksums
+git branch --show-current: main
+
+=== git status --short ===
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"
+?? .claude/
+?? demos/
+?? docs/communication/2026-10-23_intent_i18n-and-directory-ownership.md
+?? docs/planning/2026-10-23_design_directory-ownership.md
+?? docs/planning/2026-10-23_design_i18n.md
+?? docs/scheduling/2026-10-23-directory-ownership-team-plan.md
+?? docs/scheduling/2026-10-23-i18n-team-plan.md
+?? docs/scheduling/memo.md
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-23-baseline-evidence/"
+
+=== git status --short -- src app test (产品代码/测试范围) ===
+(空 = src/ app/ test/ 下无任何改动)
+
+=== git diff --stat (已跟踪改动) ===
+ docs/communication/memo.md                                           | 4 +++-
+ docs/planning/memo.md                                                | 5 +++++
+ .../\346\241\214\351\235\242\347\252\227\345\217\243/boundary.md"    | 2 ++
+ .../\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"   | 2 ++
+ 4 files changed, 12 insertions(+), 1 deletion(-)
+
+=== git diff --name-only (已跟踪改动) ===
+docs/communication/memo.md
+docs/planning/memo.md
+"\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.md"
+"\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"
+
+=== git diff --cached --name-only (暂存区) ===
+(空 = 无暂存)
+
+=== 关键治理文件哈希（修正后的桌面窗口 boundary/changelog） ===
+角色卡/桌面窗口/boundary.md
+  git hash-object: b13881b8935309c123a6681f1f6017583f5d18da
+  sha256sum: 1d12d0b4aceb293ed0315986ee82b844603d75bdde71589867bb000f5230744e
+角色卡/桌面窗口/changelog.md
+  git hash-object: b0e7ca9a12797a52f4f35a59e7936fe87d6c46db
+  sha256sum: d41e40f1b6c14a3fc94add1672fcb42ec5f73ce9bf6ec61485275d96bedfd413
+
+=== 产品代码等于 HEAD 的核验 ===
+git diff --stat -- src app: 0 行（0 行=无差异）

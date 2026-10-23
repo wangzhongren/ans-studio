@@ -4,7 +4,12 @@
  * 优先级：等待确认 > 工作中（busy 或队列待办）> 错误 > 空闲/已停止/已恢复/未开启。
  * `error` 是上一轮终局，新轮 busy 时必须显示「工作中」；`working` 只由真实信号
  * （busy / queueDepth）派生，界面侧不自行推测。
+ *
+ * i18n B1：文案来自 shared 目录（`ui.status.*`），纯函数接受可选 `locale`
+ * （默认 zh-CN）以保持旧调用/旧测试逐字不变；组件按当前 locale 调用。
  */
+
+import { DEFAULT_LOCALE, translate, type Locale, type MessageKey } from "../i18n/index.ts";
 
 export type RoleStatus =
   | "not-opened"
@@ -25,7 +30,8 @@ export interface RoleFacts {
   restored?: boolean;
 }
 
-export const STOPPED_LABEL = "已停止";
+/** 旧导出名（值仍为 zh-CN 文案；测试以此为行为基线）。 */
+export const STOPPED_LABEL = translate(DEFAULT_LOCALE, "ui.status.label.stopped");
 
 export interface RoleBadge {
   label: string;
@@ -33,43 +39,60 @@ export interface RoleBadge {
   title: string;
 }
 
-const BADGES: Record<RoleStatus, RoleBadge> = {
+interface BadgeMeta {
+  labelKey: MessageKey;
+  className: string;
+  titleKey: MessageKey;
+}
+
+const BADGES: Record<RoleStatus, BadgeMeta> = {
   "not-opened": {
-    label: "未开启",
+    labelKey: "ui.status.label.closed",
     className: "st-off",
-    title: "尚未开启会话（点它即可开启）",
+    titleKey: "ui.status.title.closed",
   },
   idle: {
-    label: "空闲",
+    labelKey: "ui.status.label.idle",
     className: "st-idle",
-    title: "会话已开启，当前没有在跑的任务",
+    titleKey: "ui.status.title.idle",
   },
   working: {
-    label: "工作中",
+    labelKey: "ui.status.label.working",
     className: "st-working",
-    title: "有轮次在跑（切走后仍在后台跑的轮次同样计入）或队列有待办",
+    titleKey: "ui.status.title.working",
   },
   "awaiting-confirm": {
-    label: "等待你确认",
+    labelKey: "ui.status.label.waitingConfirm",
     className: "st-confirm",
-    title: "有交互请求挂起，等你在会话流里作答",
+    titleKey: "ui.status.title.waitingConfirm",
   },
   stopped: {
-    label: STOPPED_LABEL,
+    labelKey: "ui.status.label.stopped",
     className: "st-stopped",
-    title: "会话已停止（历史保留在界面上；再点开为新会话）",
+    titleKey: "ui.status.title.stopped",
   },
   error: {
-    label: "错误",
+    labelKey: "ui.status.label.error",
     className: "st-error",
-    title: "最近一次轮次或会话以错误结束",
+    titleKey: "ui.status.title.error",
   },
   "idle-restored": {
-    label: "空闲（已恢复）",
+    labelKey: "ui.status.label.idleRecovered",
     className: "st-restored",
-    title: "句柄未开；聊天流里是该角色恢复出来的历史记录",
+    titleKey: "ui.status.title.idleRecovered",
   },
 };
+
+const UNKNOWN_BADGE: BadgeMeta = {
+  labelKey: "shared.common.unknown",
+  className: "st-unknown",
+  titleKey: "ui.status.title.unknown",
+};
+
+/** 句间连接符（结构标点，不是文案；zh 保持旧逐字输出）。 */
+function clauseSeparator(locale: Locale): string {
+  return locale === "zh-CN" ? "；" : "; ";
+}
 
 export function deriveRoleStatus(facts: RoleFacts = {}): RoleStatus {
   if (facts.awaitingConfirm) return "awaiting-confirm";
@@ -84,25 +107,33 @@ export function deriveRoleStatus(facts: RoleFacts = {}): RoleStatus {
   return "not-opened";
 }
 
-export function statusBadge(status: RoleStatus, pendingCount = 0): RoleBadge {
-  const badge = BADGES[status] ?? {
-    label: "未知",
-    className: "st-unknown",
-    title: "未知状态（保守占位）",
-  };
+export function statusBadge(
+  status: RoleStatus,
+  pendingCount = 0,
+  locale: Locale = DEFAULT_LOCALE,
+): RoleBadge {
+  const badge = BADGES[status] ?? UNKNOWN_BADGE;
+  const label = translate(locale, badge.labelKey);
+  const title = translate(locale, badge.titleKey);
   const count =
     typeof pendingCount === "number" &&
     Number.isFinite(pendingCount) &&
     pendingCount > 0
       ? Math.floor(pendingCount)
       : 0;
-  const label = badge.label + (count > 0 ? " · " + count + " 待办" : "");
-  let title = badge.title;
+  const pendingLabel =
+    count > 0 ? label + " · " + translate(locale, "ui.status.pendingCount", { count }) : label;
+  let pendingTitle = title;
   if (count > 0) {
-    title +=
-      status === "working"
-        ? "；另有 " + count + " 项已入队，当前任务完成后依次处理"
-        : "；另有 " + count + " 项待办在队列中（完成后依次处理）";
+    pendingTitle +=
+      clauseSeparator(locale) +
+      translate(
+        locale,
+        status === "working"
+          ? "ui.status.queueNote.enqueued"
+          : "ui.status.queueNote.pending",
+        { count },
+      );
   }
-  return { ...badge, label, title };
+  return { label: pendingLabel, className: badge.className, title: pendingTitle };
 }

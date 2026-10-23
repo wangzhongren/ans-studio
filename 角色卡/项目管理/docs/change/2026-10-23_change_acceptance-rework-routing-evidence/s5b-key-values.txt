@@ -1,0 +1,31 @@
+KEY main.governance.acceptanceReworkRoutedCustomer
+ZH  "流程 {flowId}：验收结果为客户拒绝；应用已按路由规则把返工交 Steward / 统筹（Convener）组织。"
+EN  "Flow {flowId}: the customer rejected the acceptance result; the app routed the rework to Steward (Convener) under the routing rules."
+AUTO_HAS_CUSTOMER_REJECT_ZH=n/a
+
+KEY main.governance.acceptanceReworkRoutedAutomatic
+ZH  "流程 {flowId}：自动决策未通过/未完成（判断代批/自动退回）；应用已按路由规则把返工交 Steward / 统筹（Convener）组织。"
+EN  "Flow {flowId}: the automatic decision did not pass or did not complete (judge proxy approval / automatic return); the app routed the rework to Steward (Convener) under the routing rules."
+AUTO_HAS_CUSTOMER_REJECT_ZH=false
+
+KEY main.governance.acceptanceReworkPending
+ZH  "流程 {flowId}：返工路由尚未完成（等待发送或等待下一次事件重试）；应用暂不派发验收复核，也不会重复通知。"
+EN  "Flow {flowId}: rework routing is not complete yet (waiting to send or waiting for the next event to retry); the app is not dispatching acceptance review for now and will not notify repeatedly."
+AUTO_HAS_CUSTOMER_REJECT_ZH=n/a
+
+KEY main.governance.acceptanceReworkReportIncomplete
+ZH  "流程 {flowId}：验收报告缺少可解析的 acceptance-rework/v1 结构化返工段（{detail}）；应用已把报告路径 {reportPath} 与解析错误交 Steward / 统筹（Convener）组织人工返工，未生成返工项、未创建流程步骤。"
+EN  "Flow {flowId}: the acceptance report has no parseable acceptance-rework/v1 structured rework section ({detail}); the app passed report path {reportPath} and the parse error to Steward (Convener) for manual rework; no rework items were generated and no flow steps were created."
+AUTO_HAS_CUSTOMER_REJECT_ZH=n/a
+
+KEY main.governance.acceptanceReworkFailed
+ZH  "流程 {flowId}：返工路由失败（{detail}）；应用不声称已送达，也不会派发验收复核；修正后下一次事件会自动重试。"
+EN  "Flow {flowId}: rework routing failed ({detail}); the app does not claim delivery and will not dispatch acceptance review; the next event retries automatically after the issue is fixed."
+AUTO_HAS_CUSTOMER_REJECT_ZH=n/a
+
+KEY main.governance.acceptanceReworkAuditFailed
+ZH  "流程 {flowId}：返工任务已按路由规则转交，但审计记录写入失败（{detail}）；已发送事实不翻转，应用不会伪造账本，请检查账本与诊断。"
+EN  "Flow {flowId}: the rework task was routed, but writing the audit record failed ({detail}); the sent fact is not reversed, the app does not fabricate ledger entries; check the ledger and diagnostics."
+AUTO_HAS_CUSTOMER_REJECT_ZH=n/a
+
+zh keys=1242 en keys=1242

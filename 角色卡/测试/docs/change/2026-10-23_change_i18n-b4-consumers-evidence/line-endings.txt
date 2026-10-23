@@ -1,0 +1,16 @@
+=== 行尾策略 ===
+core.autocrlf=true（仓库惯例：blob 存 LF，工作区检出 CRLF）
+
+=== 工作区候选（字节级）===
+test/测试/g5-reasoning-verify/f-settings.test.ts: bytes=14799 CRLF=201 LF=201 loneCR=0
+test/测试/t29-pi-config-roundtrip.test.ts: bytes=21638 CRLF=388 LF=388 loneCR=0
+test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts: bytes=10174 CRLF=197 LF=197 loneCR=0
+（CRLF=LF ⇒ 全部行均为 CRLF，无混行）
+
+=== HEAD blob ===
+HEAD test/测试/g5-reasoning-verify/f-settings.test.ts: CRLF=0 LF=189
+HEAD test/测试/t29-pi-config-roundtrip.test.ts: CRLF=0 LF=372
+HEAD test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts: CRLF=0 LF=184
+
+=== git diff --check ===
+(no whitespace errors)

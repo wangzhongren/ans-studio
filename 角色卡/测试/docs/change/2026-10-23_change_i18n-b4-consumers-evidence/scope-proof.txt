@@ -1,0 +1,36 @@
+=== 本 worker 实际编辑的文件（mtime 2026-10-23 16:30–16:31）===
+test/测试/g5-reasoning-verify/f-settings.test.ts
+test/测试/t29-pi-config-roundtrip.test.ts
+test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts
+
+=== diff stat（仅这三个文件）===
+ .../g5-reasoning-verify/f-settings.test.ts"        | 28 +++++++++++++++-------
+ .../t29-pi-config-roundtrip.test.ts"               | 20 ++++++++++++++--
+ .../c-cross-runtime-settings.test.ts"              | 21 ++++++++++++----
+ 3 files changed, 55 insertions(+), 14 deletions(-)
+
+=== test/测试 内其它未提交改动：前序批次既有（非本 worker；mtime 早于本次会话）===
+2026-10-23 12:10:28.396325700 +0800 test/测试/governance-e2e-auto/fixture.ts
+2026-10-23 14:20:24.188097600 +0800 test/测试/governance-e2e-auto/i-full-chain.test.ts
+2026-10-23 12:11:05.601798300 +0800 test/测试/governance-e2e-auto/q-role-granularity.test.ts
+2026-10-23 12:10:35.443775300 +0800 test/测试/governance-e2e-auto/p-team-plan-guard.test.ts
+2026-10-23 12:11:33.946842600 +0800 test/测试/governance-e2e-auto/r-mapreduce-parallel.test.ts
+2026-10-23 12:32:16.976516000 +0800 test/测试/governance-e2e-auto/b-proposal-accept-timing.test.ts
+
+=== 写集外路径 ===
+src/**、app/**、test/桌面应用/**、test/桌面UI/**、test/项目管理/shared/**：本 worker 未编辑（并行角色负责）。
+未 commit / 未 push / 未暂存。
+=== B4 收口追加：本 worker 实际编辑文件 ===
+test/测试/existing-project-compat-verify/b-establish.test.ts（mtime 2026-10-23 16:36:44.322116100 +0800）
+
+=== diff stat ===
+ .../b-establish.test.ts"                           | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
+
+=== git diff --check ===
+(no whitespace errors)
+
+=== 行尾（字节级）===
+test/测试/existing-project-compat-verify/b-establish.test.ts: bytes=25684 CRLF=531 LF=531 loneCR=0
+=== 哈希 ===
+2cbd5e5a12bfdd4975b9e7ab1ccaa19f4ff71f6f	9505901ba077d01b43adca00ccd53e09fb542ff40d932bac665af14f84b895f2	test/测试/existing-project-compat-verify/b-establish.test.ts

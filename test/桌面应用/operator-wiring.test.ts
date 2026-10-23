@@ -19,9 +19,11 @@ import {
   GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_ENV,
   type OperatorRequestPayload,
   type OperatorJudgeResultPayload,
+  type AutoReworkCallbackInfo,
   type GovernanceNextStepContext,
   type GovernanceNextStepPayload,
 } from "../../app/desktop/customer-input.ts";
+import { createMainI18n } from "../../app/desktop/i18n.ts";
 import {
   buildAcceptanceTaskMessage,
   buildGovernanceAdvanceMessage,
@@ -821,6 +823,8 @@ function makeJudgeChannel(opts: {
   queued?: (payload: OperatorRequestPayload, waitingFor: string) => void;
   /** 2026-10-20：排队项未呈现即结算 ⇒ onExpired（渲染侧删排队行）的收集器。 */
   expired?: (payload: { id: string; roleId: string; reason: string }) => void;
+  /** 2026-10-23 验收返工路由：judge auto-rework 回调收集器。 */
+  autoRework?: (info: AutoReworkCallbackInfo) => void;
 }) {
   const pushed: OperatorRequestPayload[] = [];
   const results: OperatorJudgeResultPayload[] = [];
@@ -838,6 +842,7 @@ function makeJudgeChannel(opts: {
     },
     emitJudgeResult: opts.emit ?? ((payload) => results.push(payload)),
     onNextStep: (payload, context) => next.push({ payload, context }),
+    ...(opts.autoRework !== undefined ? { onAutoRework: opts.autoRework } : {}),
     ...(opts.queued !== undefined ? { onQueued: opts.queued } : {}),
     ...(opts.expired !== undefined ? { onExpired: opts.expired } : {}),
   });
@@ -1129,6 +1134,153 @@ test("manual 负向结果（decision/approval 两组）⇒ 自动退回重做：
   }
 });
 
+test("2026-10-23 judge auto-rework 回调：只对 acceptance 卡的 deny/manual allowlist 触发；switch-off/row-failed/ledger-unavailable/非验收卡不触发；回调抛错不影响结算", async () => {
+  const acceptanceRequest = (): CustomerInputRequest => ({
+    kind: "choice",
+    title: "验收",
+    cardKind: "acceptance",
+    flowId: "flow-rework",
+    options: [{ id: "accept", label: "通过" }, { id: "reject", label: "退回" }],
+  });
+  const acceptanceMeta = { cardKind: "acceptance" as const, flowId: "flow-rework", judgeContext: judgeContextOf("flow-rework") };
+  const ctx = { ...JUDGE_CTX, roleId: "convener" };
+
+  // ① manual timeout（allowlist）⇒ judge-manual，只传事实。
+  const seen: AutoReworkCallbackInfo[] = [];
+  const manual = makeJudgeChannel({
+    enabled: () => true,
+    autoRework: (info) => seen.push(info),
+    judge: async (request) => ({
+      verdict: "manual",
+      group: request.group,
+      cardKind: request.cardKind,
+      reasonCode: "timeout",
+      reason: "判断超时",
+      engine: "pi",
+    }),
+  });
+  const manualOutcome = (await manual.channel.customerInput(acceptanceRequest(), ctx, acceptanceMeta))!;
+  assert.equal(manualOutcome.outcome, "declined");
+  assert.equal(manualOutcome.operatorId, "judge:pi");
+  assert.equal(seen.length, 1, "manual allowlist（timeout）⇒ 恰一次回调");
+  assert.equal(seen[0]!.flowId, "flow-rework");
+  assert.equal(seen[0]!.cardKind, "acceptance");
+  assert.equal(seen[0]!.source, "judge-manual");
+  assert.equal(seen[0]!.reasonCode, "timeout");
+  assert.equal(seen[0]!.requestId, "op-1");
+  assert.equal(seen[0]!.operatorId, "judge:pi");
+  assert.match(seen[0]!.reason, /自动决策未通过/);
+  assert.equal(manual.pushed.length, 0, "自动退回不呈现客户卡");
+  assert.equal(manual.results.length, 0, "自动退回不发结果行");
+
+  // ② acceptance 属 decision 组：judge deny 被防御性回落 manual，但原始裁决是 deny ⇒ judge-deny。
+  const denySeen: AutoReworkCallbackInfo[] = [];
+  const deny = makeJudgeChannel({
+    enabled: () => true,
+    autoRework: (info) => denySeen.push(info),
+    judge: async (request) => ({
+      verdict: "deny",
+      group: request.group,
+      cardKind: request.cardKind,
+      reasonCode: "denied",
+      reason: "证据不足",
+      engine: "claude",
+    }),
+  });
+  const denyOutcome = (await deny.channel.customerInput(acceptanceRequest(), ctx, acceptanceMeta))!;
+  assert.equal(denyOutcome.outcome, "declined");
+  assert.equal(denySeen.length, 1, "verdict deny 的验收卡触发回调");
+  assert.equal(denySeen[0]!.source, "judge-deny");
+  assert.equal(denySeen[0]!.reasonCode, "deny-not-approval");
+
+  // ③ 非验收卡（proposal）的 manual ⇒ 不触发（只对 acceptance）。
+  const proposalSeen: AutoReworkCallbackInfo[] = [];
+  const proposal = makeJudgeChannel({
+    enabled: () => true,
+    autoRework: (info) => proposalSeen.push(info),
+    judge: async (request) => ({
+      verdict: "manual",
+      group: request.group,
+      cardKind: request.cardKind,
+      reasonCode: "not-recommended",
+      reason: "不推荐",
+      engine: "claude",
+    }),
+  });
+  await proposal.channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+    cardKind: "proposal",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a"),
+  });
+  assert.equal(proposalSeen.length, 0, "非 acceptance 卡零行为变化");
+
+  // ④ switch-off（判断期间关开关）：回原卡，不触发。
+  const switchSeen: AutoReworkCallbackInfo[] = [];
+  const switchOff = makeJudgeChannel({
+    enabled: () => true,
+    autoRework: (info) => switchSeen.push(info),
+    judge: async (request) => ({
+      verdict: "manual",
+      group: request.group,
+      cardKind: request.cardKind,
+      reasonCode: "switch-off",
+      engine: "claude",
+    }),
+  });
+  const switchPending = switchOff.channel.customerInput(acceptanceRequest(), ctx, acceptanceMeta);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(switchOff.pushed.length, 1, "switch-off 呈现原卡");
+  assert.equal(switchOff.channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+  await switchPending;
+  assert.equal(switchSeen.length, 0, "switch-off 不触发 auto-rework 路由");
+
+  // ⑤ row-failed（结果行投达失败）：自动退回重做，但不触发。
+  const rowSeen: AutoReworkCallbackInfo[] = [];
+  const rowFailed = makeJudgeChannel({
+    enabled: () => true,
+    autoRework: (info) => rowSeen.push(info),
+    emit: () => { throw new Error("结果行投达失败"); },
+    judge: approveJudge([]),
+  });
+  const rowOutcome = (await rowFailed.channel.customerInput(acceptanceRequest(), ctx, acceptanceMeta))!;
+  assert.equal(rowOutcome.outcome, "declined");
+  assert.equal(rowSeen.length, 0, "row-failed 不触发自动返工路由");
+
+  // ⑥ ledger-unavailable（应用事实不可用）：自动退回重做，但不触发。
+  const ledgerSeen: AutoReworkCallbackInfo[] = [];
+  const ledgerUnavailable = makeJudgeChannel({
+    enabled: () => true,
+    autoRework: (info) => ledgerSeen.push(info),
+    judge: approveJudge([]),
+  });
+  const ledgerOutcome = (await ledgerUnavailable.channel.customerInput(acceptanceRequest(), ctx, {
+    cardKind: "acceptance",
+    flowId: "flow-rework",
+    judgeContext: judgeContextOf("flow-rework", { unavailableReason: "治理账本不可读" }),
+  }))!;
+  assert.equal(ledgerOutcome.outcome, "declined");
+  assert.equal(ledgerSeen.length, 0, "ledger-unavailable 不触发自动返工路由");
+
+  // ⑦ 回调抛错：只诊断，不影响已结算的 decline / 三态 / 队列。
+  const throwing = makeJudgeChannel({
+    enabled: () => true,
+    autoRework: () => { throw new Error("下游路由故障"); },
+    judge: async (request) => ({
+      verdict: "manual",
+      group: request.group,
+      cardKind: request.cardKind,
+      reasonCode: "parse-failed",
+      reason: "解析失败",
+      engine: "claude",
+    }),
+  });
+  const throwingOutcome = (await throwing.channel.customerInput(acceptanceRequest(), ctx, acceptanceMeta))!;
+  assert.equal(throwingOutcome.outcome, "declined", "回调抛错不影响已结算的 decline");
+  assert.equal(throwingOutcome.operatorId, "judge:claude");
+  assert.equal(throwing.channel.pendingCount(), 0);
+  assert.equal(throwing.channel.judgingCount(), 0);
+});
+
 test("治理·read-denied 退回原因带出具体路径；无记录如实说明；超长仍限 200（客户反馈 2026-10-18）", async () => {
   const run = async (reason?: string): Promise<string> => {
     const { channel, pushed, results } = makeJudgeChannel({
@@ -1399,6 +1551,29 @@ test("结果行人话摘要：四类卡的代批行含「judge 代批 · 代审�
   assert.match(judgeResultSummary({ ...base, group: "decision", cardKind: "appointment", selected: ["a", "b"], flowId: "flow-a" }), /任命 a、b/);
   assert.match(judgeResultSummary({ ...base, group: "decision", cardKind: "acceptance", flowId: "flow-a" }), /验收通过/);
   assert.match(judgeResultSummary({ ...base, group: "approval", cardKind: "write", paths: ["p1", "p2", "p3", "p4"] }), /代审批：确认写入 4 个路径/);
+});
+
+// i18n B3（2026-10-23）：同一生成点的 en-US 断言（独立用例；zh 断言上一条逐字保留）。
+test("结果行人话摘要 en-US：四类卡的代批行按当前 locale 生成（切回 zh-CN 逐字不变）", () => {
+  const base = { version: 1 as const, id: "gj", requestId: "op", anchorKey: "k", toolCallId: "t", roleId: "r", at: "x", engine: "claude" as const, reasonCode: "sufficient" };
+  createMainI18n("en-US");
+  try {
+    assert.match(judgeResultSummary({ ...base, group: "decision", cardKind: "proposal", flowId: "flow-a" }), /judge delegation · decision: accept proposal \(accept\)/);
+    assert.match(judgeResultSummary({ ...base, group: "decision", cardKind: "appointment", selected: ["a", "b"], flowId: "flow-a" }), /appoint a、b/);
+    assert.match(judgeResultSummary({ ...base, group: "decision", cardKind: "acceptance", flowId: "flow-a" }), /acceptance passed/);
+    assert.match(judgeResultSummary({ ...base, group: "approval", cardKind: "write", paths: ["p1", "p2", "p3", "p4"] }), /approval: confirm writing 4 paths/);
+    assert.match(judgeResultSummary({ ...base, group: "approval", cardKind: "write", paths: ["p1", "p2", "p3", "p4"] }), /p1、p2、p3, etc\./);
+    assert.equal(judgeResultSummary({ ...base, group: "approval", cardKind: "write", paths: [] }), "judge delegation · approval: confirm writing 0 paths");
+    createMainI18n("zh-CN");
+    assert.equal(
+      judgeResultSummary({ ...base, group: "approval", cardKind: "write", paths: ["p1", "p2", "p3", "p4"] }),
+      "judge 代批 · 代审批：确认写入 4 个路径（p1、p2、p3等 4 个）",
+    );
+    assert.equal(judgeResultSummary({ ...base, group: "approval", cardKind: "write", paths: [] }), "judge 代批 · 代审批：确认写入 0 个路径");
+    assert.match(judgeResultSummary({ ...base, group: "decision", cardKind: "proposal", flowId: "flow-a" }), /judge 代批 · 代决策：接受提案（accept）/);
+  } finally {
+    createMainI18n("zh-CN");
+  }
 });
 
 test("intent-confirm（2026-10-20 纳入 decision 组）：开关开启 ⇒ 判断调用、approve confirm 自动作答（零客户卡/结果行/审计）；开关关闭 ⇒ 原卡手答（confirm/revise/取消）；manual ⇒ 自动退回不伪造同意", async () => {
@@ -2129,7 +2304,9 @@ test("2026-10-22 v2/MapReduce 任务文案：团队计划 v2 字段、模块清�
       roleId: "convener",
     },
     undefined,
-    { proposalDecision: "accept", teamPlanPath: "docs/scheduling/flow-v2-team-v1.md" },
+    // 2026-10-23 目录级授权：新流程默认 v3；本用例断言的是**已有 v2 计划续接**的 v2 文案逐字保留，
+    // 因此显式传 teamPlanSchema: 2（v3 默认文案见 interface.test.ts 的 v3 用例）。
+    { proposalDecision: "accept", teamPlanPath: "docs/scheduling/flow-v2-team-v1.md", teamPlanSchema: 2 },
   )!;
   assert.match(accept, /teamPlanSchema: 2/);
   assert.match(accept, /modules: \[模块id/);

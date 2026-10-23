@@ -1,0 +1,117 @@
+# Changed/new files under src app test (SHA-256), captured during full regression run
+captured_local=2026-10-23 18:57:17 +0800
+ M | 55830144325b073728824c6a2f9370d2fd685fc27763256b5c4992f56b0d1df4 | app/desktop/chat-adapter.ts
+ M | 5b24c0e8bb0167c6d0ac2ec98bb16461afa2a6b466b45bad3f3d135499435b9c | app/desktop/composer-images.ts
+ M | 3c09fc95db93fd7fd12785ae58cb2c649286a139f84fc9a793c7ea3a66e17d0b | app/desktop/confirm-card.ts
+ M | 2fd40074b7463fa0573dd1a1d0db0c7aa393abf5f620c3385b0797ca815209e2 | app/desktop/customer-input.ts
+ M | c5e64cd04cf5281c14fa295b7bc4ea36b9fcbbe5e61f7a8d2bfb70e8efd5aef0 | app/desktop/diagnostics.ts
+ M | c84cf85454facff4e4013f7b8ad305da49d9a4eefd4aad63dcb1d21792c32fa7 | app/desktop/governance-advance.ts
+ M | 7a02b434729689eaa83cfd622bc3dcb25ce460a1ac1ec365939c0f1bf268f158 | app/desktop/interface.ts
+ M | e02f4d40136c02aadc52c009cd6ea86207f7dd4b06ee8377c3ea2aec358878db | app/desktop/judge-reason.ts
+ M | 36055abcd562c71f8df9230990a015c55f050cbb93ba177611b3a0b9ccc33ed2 | app/desktop/operator-channel.ts
+ M | d69c79294109ebb2bafa248631be558193a5b421b4249070a9b2abc2a6dd45d2 | app/desktop/project.ts
+ M | 2fcee235fa136431545c1728ac2139c19eed12f581937dd46c68916322af1365 | app/desktop/recovery-channel.ts
+ M | 7378de73696fef47051cad872ef3a62f81b34fc4c91ffbd0a68c47d2b3860bbe | app/desktop/runtime-config.ts
+ M | 6842f960353cf53af5c7d4a08986a15041602d4289537533b71c66121727c206 | app/desktop/runtime-history.ts
+ M | a34846ae4a287adf2fec37defe8ed2e6e136b29a618b6b006ccbe6741391aa5e | app/desktop/runtime-resolution.ts
+ M | b678c0f4f3dc788a8f5673d437995ebddd1f5ac49a9d4b7845447752c22b33c1 | app/desktop/session-history.ts
+ M | da11f50e0b51648bdc7a9394796811e91ec199a4fca6d4b78e9e95e4d22045c1 | app/desktop/session.ts
+ M | 993eec2e5ad15e3254f7e9780bd0d84188e9a88a285f3af4dd0ddbeda3327eb3 | app/desktop/watchdog.ts
+ M | 89d822f88821ad9f16cd9be3862670f75a4582400d26a87781f42e26f2d8a98f | app/main.ts
+ M | e4af7435116bcca92e4aa043213194f82d1c5b9f2bd1646a0c523c0bfa89d1f1 | app/preload.cjs
+ M | d419a0cb1f061eedf775d4ab216798949307c11757e88910c2eac74c82351df0 | app/renderer/src/App.tsx
+ M | 37012bcde0202c2f460d29e85994b97d39ea871c7a4739895d41ebdd18d22f5a | app/renderer/src/chat/ChatRow.tsx
+ M | 9a27cb0b653048d8037123e6c3e0c32314072fe0053bb0c35fc038d063d20c82 | app/renderer/src/chat/ChatStream.tsx
+ M | 6c5add9700c13d663fd0a6ef15a808355b325a5948779716bb34416b20c285f8 | app/renderer/src/chat/chat-store.ts
+ M | d73add0740e49205a72b42ae7977af252cfcb9b17bcf8dfdb3c44494b69b05ad | app/renderer/src/chat/confirm-logic.ts
+ M | 4bf32a9d34f7ded97f2e1a83d7a10f3966d69142aa5178910080c608854be3ff | app/renderer/src/chat/document-view.ts
+ M | 547cd43219027d7e815d6ded4327aec2179f26f780f4add6599268a90e62a182 | app/renderer/src/chat/events.ts
+ M | c01a9d0fdb2f70ca3f89f839c94a7afee5e7808bddf988da8e804a8eaab98a58 | app/renderer/src/chat/governance-view.ts
+ M | e4135e938108caa72d4fe8e29b58953ef322ac456493ec65fb903b960ee8cf30 | app/renderer/src/chat/judge.ts
+ M | c1b8692836e7bc8ffc7a9ad0892bebfc55c72f84387520081a75bfa7e41021f9 | app/renderer/src/chat/markdown.ts
+ M | 2b90895e4cbe6f9b6fae9d9c951a3dfb564b3d395db39e7bde8e02035a27c749 | app/renderer/src/chat/operator-view.ts
+ M | cc17729bed91ae0dfc6e1df322b1e03ae7110cbdbcaac5d786f6dfe8e7630f19 | app/renderer/src/chat/reasoning.ts
+ M | 32a38a2c9501e89ec654eed4a390f6b80a9ce3cdc2e4d38757bd4790f151f21d | app/renderer/src/chat/report-view.ts
+ M | 62d6a4291131a933cfb28b9e8dc264811a7599f031697ce952657a3235351660 | app/renderer/src/chat/role-view.ts
+ M | 7bbd8b1d0c1a6bf402e19efb14c44cd323d463f618cb1ec47072beb90c21cad4 | app/renderer/src/chat/runtime-config.ts
+ M | 00960b216bd586aea0a29e7a9d184895649b3ae060c0b6f69aa035de1516faa7 | app/renderer/src/chat/status.ts
+ M | b8651b662f387d6eaadb44860f3a4d959988a843389c5b0f1b0bc6fff3aa4e87 | app/renderer/src/chat/tool-summary.ts
+ M | 720c0663bd909e3904ad594eba8025161edd2fc5c01f12f8f0e46bb2663d27b8 | app/renderer/src/chat/types.ts
+ M | d3e3cb39c61951bb38a808000545f052adea1d213b7aca7a0cec130152fde43c | app/renderer/src/chat/work-view.ts
+ M | 6866ea181edb4d1096d54fda03ab170103adfa25afaa7bb88c407e200c9e5341 | app/renderer/src/lib/platform.ts
+ M | de80128f313dcc20741ac9c157466db795189178861761da1f84964dd4cad833 | app/renderer/src/main.tsx
+ M | 73bfa960e7dbd07d68d2f3ec5fee9213e4d528718a7db5133ad75a44c795ab1a | app/renderer/src/shell/ChatHeader.tsx
+ M | c2eed0a6ab6b5dd3d179651076cf4a633e24cbe8420ec9e4e9a180f2781d5b80 | app/renderer/src/shell/Composer.tsx
+ M | dbf9d2d9ec95939f2de9d5830ed7c8bda2423d3e1191672decb2e8b98b8b9295 | app/renderer/src/shell/ConfirmCard.tsx
+ M | 55d05c5d213dfe01b4a6a78e668f8e9bc44c627325f7d839bceaebdd9bd3ced0 | app/renderer/src/shell/DocumentView.tsx
+ M | 46042e54298a21ea3c4b4475a76254aaf3e759bfee35721250d391f028405432 | app/renderer/src/shell/Drawer.tsx
+ M | 3a0d0ec72885e4d1a7c562c9fb9ca8db5b334b6f99a827fd393af24da1880ac2 | app/renderer/src/shell/EngineSelect.tsx
+ M | 899f4373713df4d2af48837bf8e5da6fff329fd2dd83c5a5faf18514a68a34c5 | app/renderer/src/shell/GovernancePanel.tsx
+ M | 3cc118d1c0dd7d99613811e644f72d51c23dddd27d182385f30c18a26e35a20d | app/renderer/src/shell/ProfilePanel.tsx
+ M | 7ba24ab5d8b28ef581369342ff0a1db74e566e603a36cb4d8e62540b618d1c38 | app/renderer/src/shell/QueuePanel.tsx
+ M | 773b35a31e396109c9b0bca14f31958f454a8ea3bcbf441f71d8487efc527d2b | app/renderer/src/shell/QueueSubview.tsx
+ M | c29a2ef7d4e59066a85ccb3b625af94c7ba15448dd2f4f7e697c83e875ec24ed | app/renderer/src/shell/ReportCard.tsx
+ M | b32d26a782a36eacb0b1d179b258660f90ee62822e732961c666875d154d900f | app/renderer/src/shell/SettingsPanel.tsx
+ M | 1468ad25023581980c5d3dfc17c22318006b313715d4acd6403e926f447e3a32 | app/renderer/src/shell/Sidebar.tsx
+ M | 6fcbf23f59275939c0f68a84062dc4cb03c0721ee4ed31f5fc9d2c8eb2612dc3 | app/renderer/src/shell/TitleBar.tsx
+ M | 37ecba1e5b67dd1d1b55912459711216a1ec7f0b0869de0a3e12fe59e210fbef | app/renderer/src/shell/WorkOverview.tsx
+ M | 052ea23040804e4ab2872c2a6b6813ba816db92f0c1e90d3c7ae2c0393391100 | app/renderer/src/shell/phase4a.css
+ M | 24ff2d49e90d239e207cb7c083fe570c46484f27a92c71e5820f3240a0d8ed1c | app/renderer/src/stores/confirm-store.ts
+ M | 4cb2431a0e658f54d225f245c98582db71e63cb543ec56e27e2d61579197fda1 | app/renderer/src/stores/drawer-store.ts
+ M | 970e165ad7902ecd07ce70fdb6129fcd1e7e1dc911e9eada89d85a65a48e0ffc | app/renderer/src/stores/governance-store.ts
+ M | 54c9c271bccdf8b11b69ca5611b2ca02fb2faaffcc40ff25891f3c32f252ce18 | app/renderer/src/stores/report-store.ts
+ M | 08d5776858253e5d20e347641e1589f5f274f062d4de59ffdea27501e3150f89 | app/renderer/src/stores/settings-store.ts
+ M | a5fedea2d6ae2fbfda9eaf03caf1a83493f0d5c76c37369342892615024ec6d2 | src/common/shared/runtime-settings.ts
+ M | 2e01eaa0d137c2e0bd84d0befdbc995d14a81d444f47225ae206d4c155167799 | src/common/shared/runtime-shared.ts
+ M | 82049e2bf9570e23f3af43ee77654c3f5e8b9b23468518f1d0592cfd85ee514b | src/common/编排/flow-service.ts
+ M | f976fd0925d7661f71f1b84cf48b04cce07bc19f8b65c696c5cceecbcdc1b5e7 | src/common/编排/team-plan.ts
+ M | 90b480fa7b43e31dac88e533cf12cd86641cdb0a176ca9d9c22531896ce94803 | src/common/门禁引擎/governance-roles.ts
+ M | ca6c0f09e65e4b1a4bdcae00144e13e0c313c025dfc0ec0f0ad102e0f57492f3 | src/model/runtime.ts
+ M | 78172c7a760fc5f0df8319763032a0a80175daddf7a4102507feb2850ff08a9a | src/pipeline/orchestration/flow-state.ts
+ M | 195b5100197486299327d038599cdf974b247aa57e79fff2dab4bafa6a3358f0 | src/pipeline/orchestration/govern-session.ts
+ M | 46204a7e6624439dcfaa4866d424186638cb33216252a9ec26ea51e8fc3e98fd | src/pipeline/orchestration/run-role.ts
+ M | 9253e55945bfdb1cc2c120ab2e8d73bb67415b6afe39e438f56e9fb0208200f1 | test/runtime-core/governance-flow-metadata.test.ts
+ M | 563e7a795f8d00dee0dd328e0ea6c46be22ca9c8bc42eb8b5c9a4854f26dfb41 | test/桌面UI/runtime-config.test.ts
+ M | 6c761264753e2c4e2b2110a53fd41fdd7326a4076423d157f4e69feec90a0e5b | test/桌面UI/source-guard.test.ts
+ M | 2141841bcc14650ba65d9323d16bbc1b54004a478fc80681adfcd8922257c9e9 | test/桌面应用/acceptance-dispatch.test.ts
+ M | d08988c94ece4b8bf3489ea9d9d208cf4ef9af120db0c2d4b445fa3527fe0bd1 | test/桌面应用/boundary-refresh.test.ts
+ M | c48f2e5a0d4a84e91cfd5daf8386bdb793d3e4ac3868d2023063dc53e0c8474b | test/桌面应用/e2e/main.mjs
+ M | 448b2586fe133badfbbc7abd36253d405aea04516091146467e96afcb149dda0 | test/桌面应用/interface.test.ts
+ M | 358e99c245df28ad25fcba6ee24e1313b5b59706a45db589e1094c2566668146 | test/桌面应用/multi-runtime.test.ts
+ M | a8c9f24617b2e03b947b2257bcff60a5c917222af279ca86d34fbf4bc11cbed7 | test/桌面应用/operator-wiring.test.ts
+ M | 8e98274a0c596ea7cffa200642d252a7d7d858e96840079159c0786979921351 | test/桌面应用/pi-config.test.ts
+ M | 8e560d11ffccfa94647a259a42bdadcb9586f0de25eec4face1daacc9fe89c65 | test/桌面应用/session.test.ts
+ M | 9505901ba077d01b43adca00ccd53e09fb542ff40d932bac665af14f84b895f2 | test/测试/existing-project-compat-verify/b-establish.test.ts
+ M | a919eee53f4a25148cbce92a2853b20f7fbbe86a98d2fa330be4f7bb63355082 | test/测试/g5-reasoning-verify/f-settings.test.ts
+ M | bc0ce9cee9bf9dcdb2d45a33f61bbbf99ceb6eac6f8487e7a4f40983772616e7 | test/测试/governance-e2e-auto/b-proposal-accept-timing.test.ts
+ M | ec1b2c1dde230dc758c25b361100fcbae8802ef356c75524f2fe5c22c69f5981 | test/测试/governance-e2e-auto/fixture.ts
+ M | c14bd78bc5fc6500706f43031e2bd1a5d7c0143a0ee0e9608ec49fdb28df995f | test/测试/governance-e2e-auto/i-full-chain.test.ts
+ M | c35da9810c995a3d556e2f406323a273024e5521dac77cb23c14d4f933296cee | test/测试/governance-e2e-auto/p-team-plan-guard.test.ts
+ M | 9689f5cbe1ec299921d6d92d3174a68369d482b985a6bd37d999c3e9d8148c52 | test/测试/governance-e2e-auto/q-role-granularity.test.ts
+ M | 305cc0ab4027e16ea25cb5730cb6324533732385810b1b5d774a5eb516726159 | test/测试/governance-e2e-auto/r-mapreduce-parallel.test.ts
+ M | 71842ced0d1ae05e551696468ad27dbcad2791239dfca003c170694d1611287e | test/测试/t29-pi-config-roundtrip.test.ts
+ M | 10765961cafc67b19485c1606347840fdce2e95008d6645da9ad76d01eaceab8 | test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts
+ M | 28d1b9b4cbe2899a0e69202983b92532d99d84af3473f72d918e1aa01f9af680 | test/编排/flow-service.test.ts
+ M | 46d657bad532fe7eabb6eb1b8dc079b7047fd96450e33b48e4ec6d5aab2c356e | test/编排/team-plan.test.ts
+ M | b16a06741dd3a5770792e3917ef5c9773d934ff169e40f72a74bfe033d6427a6 | test/门禁引擎/governance-standard-workflow.test.ts
+ M | 452f7ff134e4aced40a5e35242a01ecb947ed0ef155f120d311283de0ee988a6 | test/门禁引擎/governance-trio.test.ts
+ M | d7e77b25291d928fe47ed1f0b23ace0782b8dd577724fc5884d7615cc79ffaac | test/项目管理/shared/runtime-settings.test.ts
+ M | ce44fcb9469dd8a33c4a4870389316707516ca9685dd9084aecd3a11338a0ee8 | test/项目管理/shared/runtime-shared.test.ts
+?? | e7a55fd12d4e5f3bbd11e9670fc63509ac6f10b341970e1350518f2465883587 | app/desktop/i18n.ts
+?? | 381deae724e914a4dba0a753849eb5eee63080163cfcb6a1b90c21fecb19d66e | app/desktop/preferences.ts
+?? | (missing) | app/renderer/src/i18n/
+?? | (missing) | src/common/shared/i18n/
+?? | a8168a73033b902084465e5d76e0e37724e6de91d6a635e503d8349a6240f5db | src/common/编排/directory-conformance.ts
+?? | 6ba30a285c4ed5cd791807af4b48d606f1014be85c816757fa9d85ff5f5cbc78 | test/桌面UI/i18n-b1-b2.test.ts
+?? | 600c81540ba63c51c81b9f189e11d56853037ce9dc36360cec3e4bbb019728ee | test/桌面UI/i18n-store.test.ts
+?? | 7fb032a2ea7e30a6c9cc81cf41c590acdd23977f2758c55afce9f442b076e861 | test/桌面UI/i18n-view.test.ts
+?? | 7a4b845f4b8396a9b23ae90746197b64051a00abfea1663bee3e343af191154e | test/测试/directory-layout.test.ts
+?? | 48fb0aa8467479904a9b2a7b4498b5f6a3cf200b2782f1eee52c76813ec85e3e | test/测试/governance-e2e-auto/l-redispatch-reentrant-gate.test.ts
+?? | 57aa7ff82e18add312580b17dc2e7e10c6deae12b5f03d5c9e34b80bb68a0ba3 | test/测试/i18n-integration.test.ts
+?? | 4bbf858785b2cc0918fedade0ef9ec654484bd3b4147b947ccd7440d9cc7e551 | test/测试/redispatch-target-recompute.ts
+?? | 8028c7c694c7c00d01aa5db47488dc27648ab22173a9914cbcc7c8d91b9581dc | test/编排/directory-conformance.test.ts
+?? | 29541e89cc65cfe51dfab194efc0bfd4d265d5d4293c58b3fe8b740f5363da3b | test/项目管理/shared/i18n-guard-allowlist.ts
+?? | 132a5325f7d5d1c552ad32b31a53fe4b659f74fbfc0f46d629ce273073e1661b | test/项目管理/shared/i18n-guard-scanner.ts
+?? | 05003446fd8973b9954dd10593f8f5df284d68b3d733b8832a83338f949cf7e9 | test/项目管理/shared/i18n-guard.test.ts
+?? | af234a1b74c695bfadfa666e540534a05fc5acaad6683a760d1527ffb7c6621f | test/项目管理/shared/i18n.test.ts
+count=114

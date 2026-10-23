@@ -22,6 +22,7 @@ import type { LoadConfigOptions, LoadedConfig } from "../../src/common/shared/co
 import { resolveSkillRoot } from "../../src/common/shared/runtime-shared.ts";
 // 跨角色共享路径原语（**单一来源**，pm 属主 `src/common/shared/`）：仅取 `toPosix`。
 import { toPosix } from "../../src/common/shared/path-primitives.ts";
+import { mainT } from "./i18n.ts";
 
 /**
  * 技能根解析：优先 ANS_SKILL_ROOT，否则默认技能目录 `~/.claude/skills/ans-governed-construction`。
@@ -223,11 +224,17 @@ export interface GovernanceRecordStatus {
 }
 
 /** `ans-invalid` 且载入器未给降级原因时的等价原因（载入器实际恒给，纯函数仍显式兜底）。 */
-const GOVERNANCE_INVALID_REASON = "治理记录不可用（.ans/project.json 不可解析或结构无效）";
+function governanceInvalidReason(): string {
+  return mainT("main.project.governanceInvalid");
+}
 /** `ans` 且 accepted 不为 true、载入器未给降级原因时的等价原因。 */
-const GOVERNANCE_UNACCEPTED_REASON = "治理记录未接受（accepted 不为 true）";
+function governanceUnacceptedReason(): string {
+  return mainT("main.project.governanceUnaccepted");
+}
 /** `ans` 且 accepted 但治理边界路径为空时的等价原因。 */
-const GOVERNANCE_PATH_EMPTY_REASON = "治理记录缺少治理边界路径（governanceBoundary.path 为空）";
+function governancePathEmptyReason(): string {
+  return mainT("main.project.governancePathEmpty");
+}
 
 /**
  * 由载入器结果事实派生 `governanceRecord` 状态（纯函数，便于单测）。
@@ -249,15 +256,15 @@ export function deriveGovernanceRecord(input: {
 
   // `.ans` 存在但不可解析/不可用：invalid，原因如实取载入器降级文本。
   if (source.kind === "ans-invalid") {
-    return { state: "invalid", reason: source.downgradeReason ?? GOVERNANCE_INVALID_REASON };
+    return { state: "invalid", reason: source.downgradeReason ?? governanceInvalidReason() };
   }
 
   // kind === "ans"：记录在盘上，但结构可用性还要看 accepted 与治理边界路径。
   if (source.acceptance.accepted !== true) {
-    return { state: "invalid", reason: source.downgradeReason ?? GOVERNANCE_UNACCEPTED_REASON };
+    return { state: "invalid", reason: source.downgradeReason ?? governanceUnacceptedReason() };
   }
   if (governanceBoundaryPath.trim() === "") {
-    return { state: "invalid", reason: GOVERNANCE_PATH_EMPTY_REASON };
+    return { state: "invalid", reason: governancePathEmptyReason() };
   }
   return { state: "present" };
 }
@@ -276,7 +283,7 @@ export function applyPinEvidence(
 ): GovernanceRecordStatus {
   if (record.state !== "present") return record;
   if (evidence.state === "invalid") {
-    return { state: "invalid", reason: evidence.reason ?? "pin 证据检查失败" };
+    return { state: "invalid", reason: evidence.reason ?? mainT("main.project.pinCheckFailed") };
   }
   if (evidence.state === "mismatch") {
     return { state: "pin-mismatch", pinFiles: evidence.files, pinCount: evidence.checked };
@@ -306,7 +313,7 @@ export async function deriveGovernanceRecordWithPins(input: {
   if (input.record.state !== "present") return input.record;
   try {
     if (!Array.isArray(input.pins) || input.pins.length === 0) {
-      return { state: "invalid", reason: "治理记录未提供可验证 pin" };
+      return { state: "invalid", reason: mainT("main.project.pinMissing") };
     }
     const inspect = input.inspectPinnedBoundariesFn ?? inspectPinnedBoundaries;
     const governanceBoundaryPath = input.governanceBoundaryPath ?? "";
@@ -318,7 +325,7 @@ export async function deriveGovernanceRecordWithPins(input: {
     return applyPinEvidence(input.record, evidence);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { state: "invalid", reason: `pin 证据检查失败：${message}` };
+    return { state: "invalid", reason: mainT("main.interface.pinCheckFailed", { detail: message }) };
   }
 }
 

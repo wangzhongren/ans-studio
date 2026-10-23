@@ -1,0 +1,407 @@
+{
+  "entry": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\app\\renderer\\dist\\index.html",
+  "locale": "zh-CN",
+  "checks": [
+    {
+      "name": "960x620 zh-CN settings save reachable; layout unchanged",
+      "value": true,
+      "detail": {
+        "lang": "zh-CN",
+        "viewport": {
+          "vw": 960,
+          "vh": 620,
+          "dpr": 1
+        },
+        "sidebar": {
+          "sel": "#sidebar",
+          "rect": {
+            "x": 0,
+            "y": 36,
+            "w": 208,
+            "h": 584,
+            "top": 36,
+            "bottom": 620
+          },
+          "display": "flex",
+          "position": "static",
+          "overflowY": "visible",
+          "scrollHeight": 584,
+          "clientHeight": 584,
+          "scrollWidth": 208,
+          "clientWidth": 208
+        },
+        "titlebar": {
+          "sel": "#titlebar",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 960,
+            "h": 36,
+            "top": 0,
+            "bottom": 36
+          },
+          "display": "flex",
+          "position": "relative",
+          "overflowY": "visible",
+          "scrollHeight": 35,
+          "clientHeight": 35,
+          "scrollWidth": 960,
+          "clientWidth": 960
+        },
+        "drawer": {
+          "sel": "#right-drawer",
+          "rect": {
+            "x": 536,
+            "y": 36,
+            "w": 424,
+            "h": 584,
+            "top": 36,
+            "bottom": 620
+          },
+          "display": "flex",
+          "position": "absolute",
+          "overflowY": "hidden",
+          "scrollHeight": 584,
+          "clientHeight": 584,
+          "scrollWidth": 423,
+          "clientWidth": 423
+        },
+        "panel": {
+          "sel": "#pi-panel",
+          "rect": {
+            "x": 537,
+            "y": 100,
+            "w": 423,
+            "h": 520,
+            "top": 100,
+            "bottom": 620
+          },
+          "display": "flex",
+          "position": "static",
+          "overflowY": "visible",
+          "scrollHeight": 520,
+          "clientHeight": 520,
+          "scrollWidth": 423,
+          "clientWidth": 423
+        },
+        "language": {
+          "sel": "#pi-language-section",
+          "rect": {
+            "x": 537,
+            "y": 100,
+            "w": 423,
+            "h": 86.05,
+            "top": 100,
+            "bottom": 186.05
+          },
+          "display": "block",
+          "position": "static",
+          "overflowY": "visible",
+          "scrollHeight": 86,
+          "clientHeight": 86,
+          "scrollWidth": 423,
+          "clientWidth": 423
+        },
+        "tabs": {
+          "sel": ".pi-engine-tabs",
+          "rect": {
+            "x": 537,
+            "y": 186.05,
+            "w": 423,
+            "h": 34,
+            "top": 186.05,
+            "bottom": 220.05
+          },
+          "display": "flex",
+          "position": "static",
+          "overflowY": "visible",
+          "scrollHeight": 33,
+          "clientHeight": 33,
+          "scrollWidth": 423,
+          "clientWidth": 423
+        },
+        "tabpanel": {
+          "sel": ".pi-tabpanel",
+          "rect": {
+            "x": 537,
+            "y": 220.05,
+            "w": 423,
+            "h": 399.95,
+            "top": 220.05,
+            "bottom": 620
+          },
+          "display": "flex",
+          "position": "static",
+          "overflowY": "visible",
+          "scrollHeight": 400,
+          "clientHeight": 400,
+          "scrollWidth": 423,
+          "clientWidth": 423
+        },
+        "scroll": {
+          "sel": ".pi-scroll",
+          "rect": {
+            "x": 537,
+            "y": 244.55,
+            "w": 423,
+            "h": 311.45,
+            "top": 244.55,
+            "bottom": 556
+          },
+          "display": "flex",
+          "position": "static",
+          "overflowY": "auto",
+          "scrollHeight": 554,
+          "clientHeight": 311,
+          "scrollWidth": 413,
+          "clientWidth": 413
+        },
+        "savebar": {
+          "sel": ".pi-save-bar",
+          "rect": {
+            "x": 537,
+            "y": 556,
+            "w": 423,
+            "h": 64,
+            "top": 556,
+            "bottom": 620
+          },
+          "display": "flex",
+          "position": "static",
+          "overflowY": "visible",
+          "scrollHeight": 63,
+          "clientHeight": 63,
+          "scrollWidth": 423,
+          "clientWidth": 423
+        },
+        "save": {
+          "rect": {
+            "x": 553,
+            "y": 574.5,
+            "w": 99.09,
+            "h": 28,
+            "bottom": 602.5
+          },
+          "centerInsideViewport": true,
+          "hit": true
+        },
+        "doc": {
+          "sw": 960,
+          "cw": 960
+        }
+      }
+    },
+    {
+      "name": "200pct (480x310) zh-CN save reachable; panel scrolls; savebar sticky",
+      "value": true,
+      "detail": {
+        "lang": "zh-CN",
+        "viewport": {
+          "vw": 480,
+          "vh": 310,
+          "dpr": 2
+        },
+        "sidebar": {
+          "sel": "#sidebar",
+          "rect": {
+            "x": 0,
+            "y": 36,
+            "w": 208,
+            "h": 274,
+            "top": 36,
+            "bottom": 310
+          },
+          "display": "flex",
+          "position": "static",
+          "overflowY": "visible",
+          "scrollHeight": 274,
+          "clientHeight": 274,
+          "scrollWidth": 208,
+          "clientWidth": 208
+        },
+        "titlebar": {
+          "sel": "#titlebar",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 480,
+            "h": 36,
+            "top": 0,
+            "bottom": 36
+          },
+          "display": "flex",
+          "position": "relative",
+          "overflowY": "visible",
+          "scrollHeight": 35,
+          "clientHeight": 35,
+          "scrollWidth": 480,
+          "clientWidth": 480
+        },
+        "drawer": {
+          "sel": "#right-drawer",
+          "rect": {
+            "x": 56,
+            "y": 36,
+            "w": 424,
+            "h": 274,
+            "top": 36,
+            "bottom": 310
+          },
+          "display": "flex",
+          "position": "absolute",
+          "overflowY": "hidden",
+          "scrollHeight": 274,
+          "clientHeight": 274,
+          "scrollWidth": 423,
+          "clientWidth": 423
+        },
+        "panel": {
+          "sel": "#pi-panel",
+          "rect": {
+            "x": 57,
+            "y": 100,
+            "w": 423,
+            "h": 210,
+            "top": 100,
+            "bottom": 310
+          },
+          "display": "block",
+          "position": "static",
+          "overflowY": "auto",
+          "scrollHeight": 763,
+          "clientHeight": 210,
+          "scrollWidth": 413,
+          "clientWidth": 413
+        },
+        "language": {
+          "sel": "#pi-language-section",
+          "rect": {
+            "x": 57,
+            "y": 100,
+            "w": 413,
+            "h": 86.05,
+            "top": 100,
+            "bottom": 186.05
+          },
+          "display": "block",
+          "position": "static",
+          "overflowY": "visible",
+          "scrollHeight": 86,
+          "clientHeight": 86,
+          "scrollWidth": 413,
+          "clientWidth": 413
+        },
+        "tabs": {
+          "sel": ".pi-engine-tabs",
+          "rect": {
+            "x": 57,
+            "y": 186.05,
+            "w": 413,
+            "h": 34,
+            "top": 186.05,
+            "bottom": 220.05
+          },
+          "display": "flex",
+          "position": "static",
+          "overflowY": "visible",
+          "scrollHeight": 33,
+          "clientHeight": 33,
+          "scrollWidth": 413,
+          "clientWidth": 413
+        },
+        "tabpanel": {
+          "sel": ".pi-tabpanel",
+          "rect": {
+            "x": 57,
+            "y": 220.05,
+            "w": 413,
+            "h": 642.58,
+            "top": 220.05,
+            "bottom": 862.63
+          },
+          "display": "block",
+          "position": "static",
+          "overflowY": "visible",
+          "scrollHeight": 643,
+          "clientHeight": 643,
+          "scrollWidth": 413,
+          "clientWidth": 413
+        },
+        "scroll": {
+          "sel": ".pi-scroll",
+          "rect": {
+            "x": 57,
+            "y": 244.55,
+            "w": 413,
+            "h": 554.08,
+            "top": 244.55,
+            "bottom": 798.63
+          },
+          "display": "flex",
+          "position": "static",
+          "overflowY": "visible",
+          "scrollHeight": 554,
+          "clientHeight": 554,
+          "scrollWidth": 413,
+          "clientWidth": 413
+        },
+        "savebar": {
+          "sel": ".pi-save-bar",
+          "rect": {
+            "x": 57,
+            "y": 246,
+            "w": 413,
+            "h": 64,
+            "top": 246,
+            "bottom": 310
+          },
+          "display": "flex",
+          "position": "sticky",
+          "overflowY": "visible",
+          "scrollHeight": 63,
+          "clientHeight": 63,
+          "scrollWidth": 413,
+          "clientWidth": 413
+        },
+        "save": {
+          "rect": {
+            "x": 73,
+            "y": 264.5,
+            "w": 99.09,
+            "h": 28,
+            "bottom": 292.5
+          },
+          "centerInsideViewport": true,
+          "hit": true
+        },
+        "doc": {
+          "sw": 480,
+          "cw": 480
+        }
+      }
+    },
+    {
+      "name": "200pct zh-CN save still reachable after scrolling to bottom",
+      "value": true,
+      "detail": {
+        "panelScrollTop": 552.5,
+        "panelScrollMax": 553,
+        "saveHit": true
+      }
+    },
+    {
+      "name": "no console errors",
+      "value": true,
+      "detail": []
+    }
+  ],
+  "console": [],
+  "screenshots": [
+    "settings-960-zh.png",
+    "settings-200-zh.png",
+    "settings-200-zh-bottom.png"
+  ],
+  "failures": 0,
+  "finished": true,
+  "at": "2026-10-23T09:36:33.815Z"
+}

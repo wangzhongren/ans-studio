@@ -1,0 +1,6 @@
+keyed translate match on current store: true
+keyed translate match on old-style snippet: false
+old literal present in current store: false
+old literal present in old-style snippet: true
+zh-CN catalog: "已取消，未写入任何文件。"
+en-US catalog: "Cancelled; no files were written."

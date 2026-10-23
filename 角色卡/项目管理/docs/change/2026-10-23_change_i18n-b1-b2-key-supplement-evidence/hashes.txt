@@ -1,0 +1,34 @@
+# i18n B1/B2 key supplement candidate hashes
+# generated: 2026-10-23 (local)
+# command per file: git hash-object <path> ; sha256sum <path>
+
+FILE src/common/shared/i18n/messages/zh-CN.ts
+  blob   259f71572c141534828b825407ebec415d6ed0eb
+  sha256 0da1a8d6f09749ae218b0f952905bf6f090c2f48fe941edc737539c3d1f9b04a
+FILE src/common/shared/i18n/messages/en-US.ts
+  blob   7d89e90233de135b356a47f3f689beb43ce9884d
+  sha256 f80c5cc72353ddc1b6e677b0a541d882ab4d4ce3e2f1f816632118755ebc8aec
+FILE test/项目管理/shared/i18n.test.ts
+  blob   299510f4d39c797ecc667ef905ee569c988de1b0
+  sha256 cf093381b02d6b8383c84c913b6a0e4aff5567d9648b3db42f00724e80cb373d
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b2-key-supplement.md
+  blob   2608be7d5272f8e091c7ec1dbfddf04ff9dba828
+  sha256 9fdadd50e468f293e4c6d8c76d3067bb447ca3134d313d1847501c1af98e4e39
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b2-key-supplement-evidence/key-supplement-inventory.tsv
+  blob   8a713fba097a6b1d480d1b60e83f2d5c5300d7f9
+  sha256 b56e99a4e19813255261446904f45f7db4ecebc225e8a4c5f072fd2e13faecdf
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b2-key-supplement-evidence/test-i18n.log
+  blob   293a9fba938d37e7c4f6e218c758622c9470617c
+  sha256 d1a77d9fc05f5f57e8c9c64ef1de744bc462b61df689eef77c729071c97d8ad7
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b2-key-supplement-evidence/test-shared.log
+  blob   9ca4630c3f5cf223f7110c29bfef8f0329229e9a
+  sha256 84fa92b3081263a0fafb3c7ff90a81f2e8b0ca8fce4f12bb85b368f23a8197a0
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b2-key-supplement-evidence/typecheck.log
+  blob   038d3fbde87f82f4d44dd463412934ac3beb8101
+  sha256 806e931448e81a09b5d4c88299c8c969c41de985288a33347dbc7bcad36db880
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b2-key-supplement-evidence/typecheck-renderer.log
+  blob   f042ecb341306416ee98528ca27792cae05ced0d
+  sha256 8207c337c04a8c67a20c715a823639d2b11233ba06542c88e81b2eda12415c7e
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b2-key-supplement-evidence/env.log
+  blob   e23dd48067d4859cc41c3c2bcb241800e3254045
+  sha256 514224ef22c6dd2a1b137b43fefdfade84eec1437d739cba9e8193c47286086d

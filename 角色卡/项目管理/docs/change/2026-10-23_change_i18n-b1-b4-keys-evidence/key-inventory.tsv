@@ -1,0 +1,1210 @@
+partition	key	zh-CN	en-US
+B1/B2	ui.settings.language.title	语言	Language
+B1/B2	ui.settings.language.description	选择界面显示语言。切换后立即生效，已生成的记录保持原语言。	Choose the interface language. Changes take effect immediately; existing records keep their original language.
+B1/B2	ui.settings.language.zhCN	简体中文	Chinese (Simplified)
+B1/B2	ui.settings.language.enUS	English	English
+B1/B2	ui.settings.language.saveFailed	语言偏好保存失败，请稍后重试。	Could not save the language preference. Please try again.
+B3	main.window.title	ANS 桌面应用（受治理会话）	ANS Desktop (Governed Sessions)
+B3	main.dialog.importProject.title	导入项目（选择项目根文件夹）	Import Project (Select Project Root Folder)
+B3	main.dialog.pickImage.title	选择图片	Choose Image
+B3	main.error.startup.title	应用启动失败	Application Failed to Start
+B3	main.error.startup.detail	界面无法启动，请查看诊断日志后重新打开。	The interface could not start. Check the diagnostics log and reopen the application.
+B0	preferences.error.invalidLocale	语言偏好无效，已恢复为简体中文。	The language preference was invalid; Simplified Chinese has been restored.
+B0	preferences.error.saveFailed	无法保存语言偏好，请稍后重试。	Could not save the language preference. Please try again.
+B0	preferences.error.readInvalid	语言偏好读取失败，已使用默认语言。	The language preference could not be read; the default language is in use.
+B4/shared	shared.common.cancel	取消	Cancel
+B4/shared	shared.common.close	关闭	Close
+B4/shared	shared.common.collapse	收起	Collapse
+B4/shared	shared.common.retry	重试	Retry
+B4/shared	shared.common.retryRead	重试读取	Retry reading
+B4/shared	shared.common.unknown	未知	Unknown
+B4/shared	shared.common.unknownReason	未知原因	Unknown reason
+B4/shared	shared.common.unknownStatus	未知状态	Unknown status
+B4/shared	shared.common.none	无	None
+B4/shared	shared.common.notReported	未报告	Not reported
+B4/shared	shared.common.notProvided	（未报告）	(Not reported)
+B4/shared	shared.common.notSet	未设置	Not set
+B4/shared	shared.common.system	系统	System
+B4/shared	shared.common.role	角色	Role
+B4/shared	shared.common.tool	工具	Tool
+B4/shared	shared.common.failed	失败	Failed
+B4/shared	shared.common.completed	已完成	Completed
+B4/shared	shared.common.aborted	已中止	Aborted
+B4/shared	shared.common.redacted	已净化	Redacted
+B4/shared	shared.common.truncated	已截断	Truncated
+B4/shared	shared.common.safeCopyTitle	交接内容（安全显示副本）	Handback content (safe display copy)
+B4/shared	shared.common.working	工作中	Working
+B4/shared	shared.common.stopUnsupportedPeriod	当前运行时不支持停止。	The current runtime does not support stopping.
+B4/shared	shared.common.stopTurn	停止本轮	Stop turn
+B4/shared	shared.common.shellConfirmationExpired	此确认已失效（超时或应用重启），未获放行——请让角色重新发起。	This confirmation has expired (timeout or app restart) and was not approved — ask the role to initiate it again.
+B4/shared	shared.common.customerMessage	客户消息	Customer message
+B4/shared	shared.common.rebuildSession	重建会话	Rebuild session
+B4/shared	shared.common.invalidSaveRequest	保存请求无效。	Invalid save request.
+B4/shared	shared.runtimeSettings.runtime.demo	演示	Demo
+B4/shared	shared.runtimeSettings.pi.token.label	访问令牌	Access token
+B4/shared	shared.runtimeSettings.field.apiBaseUrl.label	API 地址	API base URL
+B4/shared	shared.runtimeSettings.field.apiKey.label	API 密钥	API key
+B4/shared	shared.runtimeSettings.field.model.label	模型	Model
+B4/shared	shared.runtimeSettings.pi.contextWindow.label	上下文窗口	Context window
+B4/shared	shared.runtimeSettings.pi.contextWindow.help	拖动选择预设档位，最大 1M tokens；留空＝系统默认（500k）；下一次开启会话时应用。	Drag to pick a preset; maximum 1M tokens. Leave empty for the system default (500k). Applied when the next session opens.
+B4/shared	shared.runtimeSettings.pi.contextWindow.choice.default	系统默认（500k）	System default (500k)
+B4/shared	shared.runtimeSettings.pi.contextWindow.choice.k32	32k	32k
+B4/shared	shared.runtimeSettings.pi.contextWindow.choice.k64	64k	64k
+B4/shared	shared.runtimeSettings.pi.contextWindow.choice.k128	128k	128k
+B4/shared	shared.runtimeSettings.pi.contextWindow.choice.k256	256k	256k
+B4/shared	shared.runtimeSettings.pi.contextWindow.choice.k500	500k	500k
+B4/shared	shared.runtimeSettings.pi.contextWindow.choice.m1	1M	1M
+B4/shared	shared.runtimeSettings.pi.promptTimeout.label	看护检查时限	Watchdog check limit
+B4/shared	shared.runtimeSettings.pi.promptTimeout.help	到点只通知治理角色检查是否卡死，不中止本轮；仍在推进则不动作；1 小时为最后兜底；留空＝系统默认（5 分钟）；单位 ms；下一次开启会话时应用。	At the limit, the governance role is only asked to check whether the turn is stuck; the turn is not aborted. If it is still progressing, no action is taken; one hour is the last-resort limit. Leave empty for the system default (5 minutes). Unit: ms. Applied when the next session opens.
+B4/shared	shared.runtimeSettings.pi.promptTimeout.choice.default	系统默认（5 分钟）	System default (5 min)
+B4/shared	shared.runtimeSettings.pi.promptTimeout.choice.m1	1 分钟	1 min
+B4/shared	shared.runtimeSettings.pi.promptTimeout.choice.m2	2 分钟	2 min
+B4/shared	shared.runtimeSettings.pi.promptTimeout.choice.m5	5 分钟	5 min
+B4/shared	shared.runtimeSettings.pi.promptTimeout.choice.m10	10 分钟	10 min
+B4/shared	shared.runtimeSettings.pi.promptTimeout.choice.m15	15 分钟	15 min
+B4/shared	shared.runtimeSettings.pi.promptTimeout.choice.m30	30 分钟	30 min
+B4/shared	shared.runtimeSettings.reasoning.label	推理强度	Reasoning effort
+B4/shared	shared.runtimeSettings.reasoning.help	留空＝维持平台默认（现状零变化）；档位依次为 关/低/中/高/极高（缺省档语义见平台）；思考计入输出 tokens。	Leave empty to keep the platform default (no change). Levels are off / low / medium / high / xhigh (see the platform for the default level's meaning). Thinking counts toward output tokens.
+B4/shared	shared.runtimeSettings.reasoning.choice.off	关	Off
+B4/shared	shared.runtimeSettings.reasoning.choice.low	低	Low
+B4/shared	shared.runtimeSettings.reasoning.choice.medium	中	Medium
+B4/shared	shared.runtimeSettings.reasoning.choice.high	高	High
+B4/shared	shared.runtimeSettings.reasoning.choice.xhigh	极高	XHigh
+B4/shared	shared.runtimeSettings.codex.apiKey.help	已有 OPENAI_API_KEY 时可使用其作为凭据。	If OPENAI_API_KEY already exists, it can be used as the credential.
+B4/shared	shared.runtimeSettings.codex.apiBaseUrl.help	留空使用 OpenAI API；自定义地址须兼容 Responses API。	Leave empty to use the OpenAI API; a custom URL must be compatible with the Responses API.
+B4/shared	shared.runtimeSettings.claude.model.help	留空使用 SDK 默认模型。	Leave empty to use the SDK default model.
+B4/shared	shared.runtimeSettings.claude.apiBaseUrl.help	留空使用 SDK 默认服务。	Leave empty to use the SDK default service.
+B1/B2	ui.titlebar.windowControlsUnavailable	窗口控制不可用	Window controls unavailable
+B1/B2	ui.titlebar.subtitle	治理会话工作台	Governed session workbench
+B1/B2	ui.titlebar.minimize	最小化	Minimize
+B1/B2	ui.titlebar.restore	还原	Restore
+B1/B2	ui.titlebar.maximize	最大化	Maximize
+B1/B2	ui.titlebar.controlsUnavailableHint	当前环境未提供窗口控制	Window controls are not available in this environment
+B1/B2	ui.app.missingRoot	缺少 #root 挂载点	Missing #root mount point
+B1/B2	ui.app.expandSidebar	展开左侧栏	Expand sidebar
+B1/B2	ui.app.emptySub	尚未导入项目或选择角色	No project imported or no role selected
+B1/B2	ui.chatHeader.noSession	尚未开启会话	Session not started
+B1/B2	ui.chatHeader.selectRoleHint	从左侧选择一个角色开始聊天	Select a role on the left to start chatting
+B1/B2	ui.role.noneSelected	未选择角色	No role selected
+B1/B2	ui.role.builtinGovernance	内置治理角色（定义见 SKILL.md）	Built-in governance role (see SKILL.md)
+B1/B2	ui.role.boundaryCount	{count} 条边界条目	{"one":"{count} boundary entry","other":"{count} boundary entries"}
+B1/B2	ui.role.group.primary	主入口	Primary
+B1/B2	ui.role.group.governance	治理职能（内置）	Governance functions (built-in)
+B1/B2	ui.role.group.default	工作角色	Work roles
+B1/B2	ui.role.governance.builtinNote	内置角色：随应用发布，无角色目录	Built-in role: shipped with the app, no role directory
+B1/B2	ui.role.governance.liaison.name	主理 / Lead	Lead
+B1/B2	ui.role.governance.liaison.power	客户沟通 · 不拥有最终批准权	Customer communication · no final approval power
+B1/B2	ui.role.governance.draft.name	Draft / 提案	Draft
+B1/B2	ui.role.governance.draft.power	提案权 · 不拥有最终批准权	Proposal power · no final approval power
+B1/B2	ui.role.governance.crew.name	Crew / 组队	Crew
+B1/B2	ui.role.governance.crew.power	写卡权（客户任命后） · 不拥有最终批准权	Card-writing power (after customer appointment) · no final approval power
+B1/B2	ui.role.governance.steward.name	Steward / 统筹	Steward
+B1/B2	ui.role.governance.steward.power	排期权 · 不拥有最终批准权	Scheduling power · no final approval power
+B1/B2	ui.role.governance.verifier.name	验收 / Proof	Proof
+B1/B2	ui.role.governance.verifier.power	验收权 · 不拥有最终批准权	Acceptance power · no final approval power
+B1/B2	ui.sidebar.primaryHint	主入口：默认入口与主路径	Primary entry: default entry point and main path
+B1/B2	ui.sidebar.builtinRoleNote	内置角色：定义在 SKILL.md，无角色目录	Built-in role: defined in SKILL.md, no role directory
+B1/B2	ui.sidebar.busyAria	当前工作 {busy} 项，排队 {queued} 项	Currently working on {busy}, queued {queued}
+B1/B2	ui.sidebar.selectProjectFailed	选择项目失败，请重试。	Could not select the project. Please try again.
+B1/B2	ui.sidebar.noProject	尚未导入项目	No project imported
+B1/B2	ui.sidebar.noProjectPeriod	尚未导入项目。	No project imported.
+B1/B2	ui.sidebar.collapse	收起左侧栏	Collapse sidebar
+B1/B2	ui.sidebar.workspace	工作空间	Workspace
+B1/B2	ui.sidebar.roleListAria	角色列表	Role list
+B1/B2	ui.sidebar.noRolesInProject	该项目下未枚举到角色。	No roles found in this project.
+B1/B2	ui.sidebar.resizeAria	调整左侧栏宽度	Resize sidebar
+B1/B2	ui.sidebar.resizeTitle	拖动调整左栏宽度；双击复位 248px	Drag to resize the sidebar; double-click to reset to 248px
+B1/B2	ui.sidebar.switchProject	切换项目	Switch project
+B1/B2	ui.sidebar.importProject	导入项目	Import project
+B1/B2	ui.sidebar.pickUnavailable	当前环境未提供项目选择通道	Project picker is not available in this environment
+B1/B2	ui.sidebar.runtimeSettings	{runtime} 设置	{runtime} settings
+B1/B2	ui.sidebar.settingsDisabled	导入项目后可配置引擎	Import a project to configure the engine
+B1/B2	ui.sidebar.settings	设置	Settings
+B1/B2	ui.sidebar.roleCount	{count} 个角色	{"one":"{count} role","other":"{count} roles"}
+B1/B2	ui.queue.expand	展开全文	Expand full text
+B1/B2	ui.queue.collapse	收起全文	Collapse full text
+B1/B2	ui.queue.fullText	全文	Full text
+B1/B2	ui.queue.withdrawTitle	撤回该条排队消息（仅未投递者可撤）	Withdraw this queued message (only before delivery)
+B1/B2	ui.queue.withdrawing	撤回中…	Withdrawing…
+B1/B2	ui.queue.withdraw	撤回	Withdraw
+B1/B2	ui.queueSubview.backRole	返回角色资料	Back to role profile
+B1/B2	ui.queueSubview.backWork	返回工作概览	Back to work overview
+B1/B2	ui.queueSubview.emptyTitle	选择角色后查看队列	Select a role to view its queue
+B1/B2	ui.queueSubview.emptySub	先从左侧选择角色，再查看该角色的当前工作与排队消息。	Select a role on the left, then view that role's current work and queued messages.
+B1/B2	ui.queueSubview.queued	排队 {count}	Queued {count}
+B1/B2	ui.queueSubview.showAll	查看更多队列（{count}）	View more queue ({count})
+B1/B2	ui.queueSubview.collapse	收起队列	Collapse queue
+B1/B2	ui.work.title	{roleName} · 工作概览	{roleName} · Work overview
+B1/B2	ui.work.emptyTitle	选择角色后查看工作概览	Select a role to view its work overview
+B1/B2	ui.work.emptySub	先在左侧选择角色，再打开工作概览；内容跟随当前角色。	Select a role on the left, then open the work overview; content follows the current role.
+B1/B2	ui.work.pending	待处理 {count}	Pending {count}
+B1/B2	ui.work.locateTitle	定位到原交互卡（不会自动作答）	Jump to the original interaction card (does not answer it)
+B1/B2	ui.work.locate	定位	Locate
+B1/B2	ui.work.currentWork	当前工作	Current work
+B1/B2	ui.work.queued	排队	Queued
+B1/B2	ui.work.viewAllQueueAria	查看全部队列（{count} 项）	View the full queue ({count} items)
+B1/B2	ui.work.viewAllQueue	查看全部队列（{count}）	View full queue ({count})
+B1/B2	ui.work.recentReports	最近回交	Recent handbacks
+B1/B2	ui.work.emptyPending	无待处理请求	No pending requests
+B1/B2	ui.work.emptyQueue	无进行中或排队消息	No in-progress or queued messages
+B1/B2	ui.work.emptyReports	暂无回交报告	No handback reports yet
+B1/B2	ui.work.overviewAria	工作概览，{count} 项待处理	Work overview, {count} pending
+B1/B2	ui.work.kind.choice	待选择	Awaiting choice
+B1/B2	ui.work.kind.confirm	待确认	Awaiting confirmation
+B1/B2	ui.work.requestFallback	交互请求	Interaction request
+B1/B2	ui.work.reportStatus.blocked	被拦下	Blocked
+B1/B2	ui.work.origin.report	报告声明：	Reported by the report: 
+B1/B2	ui.work.origin.system	系统按终态记录：	Recorded by the system as terminal: 
+B1/B2	ui.work.origin.unconfirmed	来源未确认：	Source unconfirmed: 
+B1/B2	ui.drawer.collapseTitle	收起（Esc）	Collapse (Esc)
+B1/B2	ui.engineSelect.aria	会话引擎	Session engine
+B1/B2	ui.engineSelect.ariaCurrent	会话引擎，当前 {title}	Session engine, currently {title}
+B1/B2	ui.composer.readFileFailed	读取文件失败	Could not read the file
+B1/B2	ui.composer.currentRole	当前角色	current role
+B1/B2	ui.composer.emptyMessageHint	请输入消息内容；图片会随消息一起发送。	Enter a message; images are sent together with the message.
+B1/B2	ui.composer.sendChannelUnavailable	发送通道不可用（当前版本未提供）。	Send channel unavailable (not provided in this version).
+B1/B2	ui.composer.imageCount	（图片 ×{count}）	(Images ×{count})
+B1/B2	ui.composer.sendFailed	发送失败	Send failed
+B1/B2	ui.composer.sendExceptionPrefix	发送异常：	Send error: 
+B1/B2	ui.composer.sendFailedPrefix	发送失败：	Send failed: 
+B1/B2	ui.composer.sendNotReturned	发送调用未正常返回，实际轮次结果尚未报告。	The send call did not return normally; the actual turn result has not been reported yet.
+B1/B2	ui.composer.queuedPosition	已入队：等它完成当前任务后处理（第 {position} 位）。	Queued: it will run after the current task completes (position {position}).
+B1/B2	ui.composer.stopFailedPrefix	停止失败：	Stop failed: 
+B1/B2	ui.composer.stopRequested	已请求停止当前轮次——轮次仍会以收尾事件结束。	Stop requested for the current turn — the turn will still end with a completion event.
+B1/B2	ui.composer.imageFallbackName	图片	Image
+B1/B2	ui.composer.pickChannelUnavailable	当前版本未提供选图通道。	Image picker is not provided in this version.
+B1/B2	ui.composer.pickFailedNoData	选图失败：未收到图片数据。	Image selection failed: no image data received.
+B1/B2	ui.composer.pickFailedPrefix	选图失败：	Image selection failed: 
+B1/B2	ui.composer.readImageFailedPrefix	读取图片失败：	Could not read image: 
+B1/B2	ui.composer.attachValidationUnavailable	当前版本未提供附件校验通道。	Attachment validation is not provided in this version.
+B1/B2	ui.composer.pastedImage	粘贴的图片	Pasted image
+B1/B2	ui.composer.imageValidationFailedPrefix	图片校验失败：	Image validation failed: 
+B1/B2	ui.composer.imageValidationFailed	图片校验失败。	Image validation failed.
+B1/B2	ui.composer.imageOnly	只支持图片文件（png / jpeg / webp / gif）。	Only image files are supported (png / jpeg / webp / gif).
+B1/B2	ui.composer.removeImage	移除图片	Remove image
+B1/B2	ui.composer.placeholderToRole	给{role}发送消息…	Message {role}…
+B1/B2	ui.composer.placeholderSelectRole	选择角色后发送消息…	Select a role to send a message…
+B1/B2	ui.composer.ariaMessage	发送给当前角色的消息	Message to the current role
+B1/B2	ui.composer.addImage	添加图片（png / jpeg / webp / gif，≤5MB）	Add image (png / jpeg / webp / gif, ≤5MB)
+B1/B2	ui.composer.addImageUnavailable	当前版本未提供选图通道	Image picker is not provided in this version
+B1/B2	ui.composer.ariaAddImage	添加图片	Add image
+B1/B2	ui.composer.enterHint	Enter 发送，Shift + Enter 换行	Enter to send, Shift + Enter for a new line
+B1/B2	ui.composer.stopTitle	停止当前轮次	Stop the current turn
+B1/B2	ui.composer.sendWithEnter	发送（Enter）	Send (Enter)
+B1/B2	ui.composer.sessionNotOpen	会话未开启：先选择角色并开启会话	Session not started: select a role and start a session
+B1/B2	ui.composer.ariaSend	发送	Send
+B1/B2	ui.composer.send	发送	Send
+B1/B2	ui.composer.dismissHint	关闭提示	Dismiss hint
+B1/B2	ui.composer.footerWorking	Enter 发送，Shift+Enter 换行；发送失败会如实提示。	Enter to send, Shift+Enter for a new line; failures are reported honestly.
+B1/B2	ui.composer.footerIdle	选择角色并开启会话后可发送。	Select a role and start a session to send.
+B1/B2	ui.composer.writeBoundaryNote	实际写入导入项目，角色边界外的写入会被拒绝。	Writes go to the imported project; writes outside the role boundary are rejected.
+B1/B2	ui.confirm.shellDenyNote	点「拒绝」、按 Esc 或关闭本框 = 不放行（不会执行）。	Clicking Reject, pressing Esc, or closing this box = no approval (nothing runs).
+B1/B2	ui.confirm.shellApproveNote	批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界；请逐字核对命令原文。	Once approved, the command runs with the current OS user's permissions and may bypass the ANS file write boundary; verify the exact command first.
+B1/B2	ui.confirm.recoveryNote	点「取消」、按 Esc 或关闭本框 = 不执行；仅点「执行」才会执行。	Clicking Cancel, pressing Esc, or closing this box = not executed; only Execute runs it.
+B1/B2	ui.confirm.unknownRole	(未标识)	(unidentified)
+B1/B2	ui.confirm.matchedReason	命中原因：{reason}	Match reason: {reason}
+B1/B2	ui.confirm.reviewOriginal	审核原文（内部用语，仅供核查）：{reason}	Review text (internal wording, for verification only): {reason}
+B1/B2	ui.confirm.suApprovalBadge	su 审批	su approval
+B1/B2	ui.confirm.closeNoApprove	关闭（不放行）	Close (no approval)
+B1/B2	ui.confirm.detailsArgv	详情（argv / cwd）	Details (argv / cwd)
+B1/B2	ui.confirm.cwd	工作目录（cwd）	Working directory (cwd)
+B1/B2	ui.confirm.argv	规范化参数 argv	Normalized argv
+B1/B2	ui.confirm.approve	放行执行	Approve and run
+B1/B2	ui.confirm.reject	拒绝	Reject
+B1/B2	ui.confirm.actionWithLabel	动作：{label}（{action}）	Action: {label} ({action})
+B1/B2	ui.confirm.action	动作：{action}	Action: {action}
+B1/B2	ui.confirm.proposer	提议方：{name}	Proposed by: {name}
+B1/B2	ui.confirm.proposedAt	提议时间：{time}	Proposed at: {time}
+B1/B2	ui.confirm.targetItem	目标条目：{id}	Target item: {id}
+B1/B2	ui.confirm.recoveryTitle	恢复操作请求	Recovery request
+B1/B2	ui.confirm.closeNoExecute	关闭（不执行）	Close (do not execute)
+B1/B2	ui.confirm.targetRole	目标角色：{role}	Target role: {role}
+B1/B2	ui.confirm.reasonProvided	原因（提议方提供）：{reason}	Reason (from proposer): {reason}
+B1/B2	ui.confirm.evidenceLabel	证据（提议方提供，逐字）：	Evidence (from proposer, verbatim):
+B1/B2	ui.confirm.detailsRecovery	详情（提议方 / 时间 / 条目）	Details (proposer / time / item)
+B1/B2	ui.confirm.execute	执行	Execute
+B1/B2	ui.confirm.failedShell	未能回传你的决定（通道未接或异常）——按 fail-closed 不放行；请让角色重新发起。	Your decision could not be delivered (channel missing or failed) — fail-closed: not approved. Ask the role to initiate it again.
+B1/B2	ui.confirm.expiredRecovery	此确认已失效（应用重启或请求已结束），未获执行——请让提议方重新发起。	This confirmation has expired (app restart or request ended) and was not executed — ask the proposer to initiate it again.
+B1/B2	ui.confirm.failedRecovery	未能回传你的决定（通道未接或异常）——按 fail-closed 不执行；请让提议方重新发起。	Your decision could not be delivered (channel missing or failed) — fail-closed: not executed. Ask the proposer to initiate it again.
+B1/B2	ui.confirm.sourceDispatchWithRole	派发 · 来自 {roleId}	Dispatch · from {roleId}
+B1/B2	ui.confirm.sourceDispatch	派发	Dispatch
+B1/B2	ui.confirm.sourceHandbackWithRole	回交 · 来自 {roleId}	Handback · from {roleId}
+B1/B2	ui.confirm.sourceHandback	回交	Handback
+B1/B2	ui.confirm.queueRunning	进行中	In progress
+B1/B2	ui.confirm.withdrawn	已撤回排队消息：{summary}	Queued message withdrawn: {summary}
+B1/B2	ui.confirm.withdrawInvalid	撤回无效：{detail}	Withdrawal had no effect: {detail}
+B1/B2	ui.confirm.withdrawFailed	撤回失败：{detail}	Withdrawal failed: {detail}
+B1/B2	ui.confirm.imageTypeUnsupported	图片类型不支持：{type}——只支持 png / jpeg / webp / gif。	Unsupported image type: {type} — only png / jpeg / webp / gif are supported.
+B1/B2	ui.confirm.imageTooLarge	图片过大（> {mb}MB）——请压缩后再发。	Image too large (> {mb}MB) — compress it and try again.
+B1/B2	ui.settings.placeholderSet	已设置，留空则不修改	Already set; leave empty to keep unchanged
+B1/B2	ui.settings.hide	隐藏	Hide
+B1/B2	ui.settings.show	显示	Show
+B1/B2	ui.settings.optionDefault	留空（平台默认）	Empty (platform default)
+B1/B2	ui.settings.rangeOffPreset	当前值不在预设档位；改为预设档位后保存	Current value is off-preset; switch to a preset before saving
+B1/B2	ui.settings.secretTag	机密	Secret
+B1/B2	ui.settings.statusChecking	检查中…	Checking…
+B1/B2	ui.settings.statusUnknown	配置未知	Configuration unknown
+B1/B2	ui.settings.statusMissing	缺配置	Missing configuration
+B1/B2	ui.settings.statusConfigured	已配置	Configured
+B1/B2	ui.settings.engineSettingsAria	引擎设置	Engine settings
+B1/B2	ui.settings.runtimeConfigCurrent	{runtime} 配置（当前会话引擎）	{runtime} configuration (current session engine)
+B1/B2	ui.settings.runtimeConfig	{runtime} 配置	{runtime} configuration
+B1/B2	ui.settings.panelNote	配置只影响所选引擎；不会切换当前会话。	Configuration only affects the selected engine; it does not switch the current session.
+B1/B2	ui.settings.pathNotReported	（保存位置未报告）	(save location not reported)
+B1/B2	ui.settings.saveNote	保存到仓库根 .env，只修改本引擎字段。	Saved to the repository-root .env; only this engine's fields change.
+B1/B2	ui.settings.readFailed	读取配置失败。	Could not read the configuration.
+B1/B2	ui.settings.incomplete	{label} 配置不完整，缺：{missing}。请补齐后保存。	{label} configuration is incomplete; missing: {missing}. Fill it in before saving.
+B1/B2	ui.settings.advanced	高级	Advanced
+B1/B2	ui.settings.advancedHint	以下高级项均可留空；留空 = 使用默认值。	All advanced fields may be left empty; empty = use the default value.
+B1/B2	ui.settings.saveToEnv	保存到 .env	Save to .env
+B1/B2	ui.settings.saveNoteTitle	已保存到 .env（改动键：{keys}）。{tail}{application}	Saved to .env (changed keys: {keys}). {tail}{application}
+B1/B2	ui.settings.saveNoteShort	已保存到 .env（改动键 {count} 个）。{tail}{application}	Saved to .env ({count} changed keys). {tail}{application}
+B1/B2	ui.settings.stillMissingCount	必填配置仍缺 {count} 项（见上方）。	Required configuration still missing {count} items (see above).
+B1/B2	ui.settings.stillMissingList	必填配置仍缺：{keys}。	Required configuration still missing: {keys}.
+B1/B2	ui.settings.requiredReady	必填配置已齐备。	Required configuration is complete.
+B1/B2	ui.settings.applicationCurrent	当前配置已应用。	The current configuration is applied.
+B1/B2	ui.settings.applicationNextSession	下一次开启会话时应用。	Applied when the next session opens.
+B1/B2	ui.settings.applicationAfterActiveTurn	当前轮次继续使用原配置；结束后下一次输入应用新配置。	The current turn keeps the old configuration; the next input uses the new one.
+B1/B2	ui.settings.applicationAfterActiveTurnShort	当前轮次继续使用原配置；下一次输入应用。	The current turn keeps the old configuration; the next input applies it.
+B1/B2	ui.settings.applicationUnknown	配置应用时点未报告。	Configuration application timing not reported.
+B1/B2	ui.runtimeConfig.unknownEngine	未知引擎	Unknown engine
+B1/B2	ui.runtimeConfig.summaryNotReady	配置摘要未就绪	Configuration summary not ready
+B1/B2	ui.runtimeConfig.source.file	文件	File
+B1/B2	ui.runtimeConfig.source.environment	环境	Environment
+B1/B2	ui.runtimeConfig.source.fallback	回退	Fallback
+B1/B2	ui.runtimeConfig.source.default	默认	Default
+B1/B2	ui.runtimeConfig.sourceUnknown	来源未报告	Source not reported
+B1/B2	ui.runtimeConfig.fieldRequired	{label} · 必填	{label} · Required
+B1/B2	ui.runtimeConfig.fieldOptional	{label} · 可选	{label} · Optional
+B1/B2	ui.runtimeConfig.requiredReady	{label} 必填配置已齐备。{application}	{label} required configuration is complete. {application}
+B1/B2	ui.runtimeConfig.readFailedWithDetail	读取配置失败：{detail}	Could not read configuration: {detail}
+B1/B2	ui.runtimeConfig.saveFailed	保存失败：{detail}	Save failed: {detail}
+B1/B2	ui.runtimeConfig.saveException	保存异常：{detail}	Save error: {detail}
+B1/B2	ui.runtimeConfig.saving	正在保存…	Saving…
+B1/B2	ui.runtimeConfig.readFailedForLabel	读取 {label} 配置失败，请打开设置检查或重试。	Could not read the {label} configuration; open settings to check or retry.
+B1/B2	ui.runtimeConfig.checkingLabel	正在检查 {label} 配置…	Checking the {label} configuration…
+B1/B2	ui.runtimeConfig.engineSettingsTitle	{label} 配置	{label} configuration
+B1/B2	ui.runtimeConfig.engineSettingsTabTitle	{label} 设置	{label} settings
+B1/B2	ui.runtimeConfig.openEngineSettings	打开 {label} 设置	Open {label} settings
+B1/B2	ui.governance.checkAndReaccept	检查并重新接受	Check and re-accept
+B1/B2	ui.governance.establish	建立治理记录	Create governance record
+B1/B2	ui.governance.readingPreview	正在读取预览…	Reading preview…
+B1/B2	ui.governance.reacceptPreview	重新接受治理边界（预览）	Re-accept governance boundary (preview)
+B1/B2	ui.governance.upgradePreview	升级为三权治理模型（预览）	Upgrade to trio governance (preview)
+B1/B2	ui.governance.establishPreview	建立治理记录（预览）	Create governance record (preview)
+B1/B2	ui.governance.reaccepting	正在重新接受…	Re-accepting…
+B1/B2	ui.governance.confirmAccept	确认接受	Confirm acceptance
+B1/B2	ui.governance.modelLabel	治理模型（建立时写入 .ans）：	Governance model (written to .ans on creation):
+B1/B2	ui.governance.modelAria	治理模型	Governance model
+B1/B2	ui.governance.modelToWrite	将写入的治理模型：{model}	Governance model to be written: {model}
+B1/B2	ui.governance.pinObjects	将 pin 的对象（{pinCount} 项）及角色（{roleCount} 个）：	Objects to pin: {pinCount}; roles: {roleCount}:
+B1/B2	ui.governance.establishing	正在建立治理记录…	Creating governance record…
+B1/B2	ui.governance.upgrading	正在升级…	Upgrading…
+B1/B2	ui.governance.confirmUpgrade	确认升级	Confirm upgrade
+B1/B2	ui.governance.model.single	旧模型（su）	Legacy model (su)
+B1/B2	ui.governance.model.trio	三权 · 五角色	Trio · five roles
+B1/B2	ui.governance.modelShort.trio	三权	Trio
+B1/B2	ui.governance.status.awaitingCustomer	等待客户决定	Awaiting customer decision
+B1/B2	ui.governance.status.inProgress	进行中	In progress
+B1/B2	ui.governance.status.blocked	阻塞	Blocked
+B1/B2	ui.governance.status.escalated	已升级客户	Escalated to customer
+B1/B2	ui.governance.modelLine	治理模型：{model}	Governance model: {model}
+B1/B2	ui.governance.currentFlow	当前流程：{flowId}	Current flow: {flowId}
+B1/B2	ui.governance.noRecordBody	本项目有 {roleCount} 个项目角色，但尚无治理记录（.ans/project.json）。项目角色可按各自边界工作；治理角色暂时无法写入。	This project has {roleCount} project roles but no governance record yet (.ans/project.json). Project roles can work within their own boundaries; governance roles cannot write for now.
+B1/B2	ui.governance.reasonNotProvided	原因未提供	Reason not provided
+B1/B2	ui.governance.recordUnavailable	治理记录不可用：{reason}；本版不自动覆盖	Governance record unavailable: {reason}; this version does not overwrite automatically
+B1/B2	ui.governance.primaryRole	主入口角色	Primary role
+B1/B2	ui.governance.noRecordTitle	尚无治理记录	No governance record yet
+B1/B2	ui.governance.recordUnavailableTitle	治理记录不可用	Governance record unavailable
+B1/B2	ui.governance.establishHint	与 {roleName} 对话前，请先建立治理记录；也可在终端运行 ans govern <项目目录>。	Before talking to {roleName}, create the governance record; you can also run ans govern <project-dir> in a terminal.
+B1/B2	ui.governance.roleIntro.liaison	客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给提案 Draft 形成提案。我不写提案、不批准。本版起默认入口为主理 Lead；提案 Draft 与历史提案不变。	Default customer entry: you say what to do, and I first confirm goal, scope, and acceptance, then hand it to Draft to form a proposal. I neither write proposals nor approve. From this version the default entry is Lead; Draft and historical proposals are unchanged.
+B1/B2	ui.governance.roleIntro.proposal	通常由主理 Lead 交接打开；客户也可以直接找我。我只写提案，不批准。	Usually opened via a handoff from Lead; customers may also come to me directly. I only write proposals and do not approve.
+B1/B2	ui.governance.roleIntro.nomination	客户任命后打开写卡；只按团队计划与任命名单写角色卡与边界，不选择角色、不批准。	Opened after customer appointment to write cards; writes role cards and boundaries only per the team plan and appointment list; does not select roles or approve.
+B1/B2	ui.governance.roleIntro.schedule	通常由已接受提案开启流程；只负责排步骤与派发，不批准方案	Usually opened after a proposal is accepted; only orders steps and dispatches, does not approve plans
+B1/B2	ui.governance.roleIntro.verification	通常由交付回交后的验收步骤打开；只核对证据、出验收卡，不批准。	Usually opened by the acceptance step after delivery handback; only checks evidence and issues acceptance cards, does not approve.
+B1/B2	ui.governance.mismatch.modified	{count} 个内容已变更	{count} changed
+B1/B2	ui.governance.mismatch.missing	{count} 个缺失	{count} missing
+B1/B2	ui.governance.mismatch.unreadable	{count} 个不可读	{count} unreadable
+B1/B2	ui.governance.mismatch.someInconsistent	存在不一致	inconsistencies exist
+B1/B2	ui.governance.mismatch.summary	治理记录与盘上边界不一致：共 {pinCount} 条 pin，其中 {diffCount} 个与记录不一致（{detail}）。未确认前，会话不能开启、写入会被拒绝。	Governance record and on-disk boundaries are inconsistent: {pinCount} pins, of which {diffCount} differ from the record ({detail}). Until confirmed, sessions cannot start and writes are rejected.
+B1/B2	ui.governance.mismatch.title	治理记录与盘上边界不一致	Governance record and on-disk boundaries are inconsistent
+B1/B2	ui.governance.mismatch.note	确认接受后只会刷新 SHA-256 与留痕，不会修改任何边界文件内容。	Accepting refreshes SHA-256 and the audit trail only; it does not modify any boundary file content.
+B1/B2	ui.governance.mismatch.hint	也可在终端核对 git 历史后再处理。	You can also verify the git history in a terminal before acting.
+B1/B2	ui.governance.pin.changed	{path} — 内容已变更（pin {pinned}… → 现 {actual}…）	{path} — content changed (pin {pinned}… → now {actual}…)
+B1/B2	ui.governance.pin.missing	{path} — 文件缺失（无法重新 pin）	{path} — file missing (cannot re-pin)
+B1/B2	ui.governance.pin.unreadable	{path} — 文件不可读（无法重新 pin）	{path} — file unreadable (cannot re-pin)
+B1/B2	ui.governance.reacceptPinned	将重算这 {count} 条 pin；不新增、不删除 pin 条目，不修改任何边界文件内容。	Recalculates {count} pins; adds or removes no pin entries and modifies no boundary file content.
+B1/B2	ui.governance.reacceptWriteLine	将写入：.ans/project.json、docs/bootstrap-manifest.md	Will write: .ans/project.json, docs/bootstrap-manifest.md
+B1/B2	ui.governance.reacceptWarning	如果不认识这些改动，请先通过 git 历史或备份核对，不要直接接受。	If you do not recognize these changes, verify them via git history or a backup first; do not accept blindly.
+B1/B2	ui.governance.reacceptSuccess	已重新接受：更新 {updated} 条 pin（共 {total} 条），写入 .ans/project.json 与 docs/bootstrap-manifest.md。项目已恢复可用。	Re-accepted: updated {updated} pins ({total} total); wrote .ans/project.json and docs/bootstrap-manifest.md. The project is usable again.
+B1/B2	ui.governance.reacceptNotWritten	本次未写入任何文件。	No files were written this time.
+B1/B2	ui.governance.reacceptNoRecord	没有治理记录；请先建立治理记录。	No governance record; create one first.
+B1/B2	ui.governance.reacceptInvalidRecord	治理记录不可用；本版不提供修复。	Governance record unavailable; this version does not provide a repair.
+B1/B2	ui.governance.reacceptNotNeeded	边界与记录一致，无需重新接受。	Boundaries match the record; no re-acceptance needed.
+B1/B2	ui.governance.reacceptPreviewStale	预览后边界文件又有变化，已取消本次写入；请重新检查。	Boundary files changed again after the preview; this write was cancelled. Check again.
+B1/B2	ui.governance.reacceptFixFiles	请先处理上述文件后重试。	Resolve the files above, then retry.
+B1/B2	ui.governance.reacceptBusy	上一次操作仍在进行中；本次未写入任何文件。	A previous operation is still running; no files were written this time.
+B1/B2	ui.governance.establishWritePath	将写入：{path}	Will write: {path}
+B1/B2	ui.governance.establishAdoptExisting	将采纳既有治理边界文档（不覆盖其内容）。	Will adopt the existing governance boundary document (without overwriting its content).
+B1/B2	ui.governance.establishWriteBoundary	将写入治理边界文档：{path}。	Will write governance boundary document: {path}.
+B1/B2	ui.governance.establishBoundaryNotReported	治理边界文档：（未报告）	Governance boundary document: (not reported)
+B1/B2	ui.governance.establishLegacyBoundary	{path}（旧版 Markdown 边界；将被原样 pin，迁移属后续版本）	{path} (legacy Markdown boundary; pinned verbatim, migration is a later version)
+B1/B2	ui.governance.establishDeclaration	不扩大任何角色写边界、不修改任何角色边界文件内容。	Does not widen any role's write boundary or modify any role boundary file content.
+B1/B2	ui.governance.establishAlreadyExists	治理记录已存在；本次未写入任何文件。	A governance record already exists; no files were written this time.
+B1/B2	ui.governance.establishBusy	上一次建立仍在进行中；本次未写入任何文件。	A previous creation is still running; no files were written this time.
+B1/B2	ui.governance.establishInvalidRecord	治理记录不可用；本版不自动覆盖，修复路径待后续版本。	Governance record unavailable; this version does not overwrite automatically; a repair path is planned.
+B1/B2	ui.governance.errorCode	错误码：{code}	Error code: {code}
+B1/B2	ui.governance.noFilesWritten	未写入任何文件。	No files were written.
+B1/B2	ui.governance.modelOption.single	单模型（single）	Single model (single)
+B1/B2	ui.governance.modelOption.trio	三权（trio）	Trio (trio)
+B1/B2	ui.governance.modelChoiceUnwired	当前桌面窗口未接线治理模型选择；本版不能按所选模型建立，按钮已禁用。	This desktop window has not wired the governance model selector; this version cannot create by the selected model, and the button is disabled.
+B1/B2	ui.governance.trioArtifactsHint	检测到三权产物（docs/proposals / docs/nominations / docs/flows），建议选择 trio；请由你点选。	Trio artifacts detected (docs/proposals / docs/nominations / docs/flows); trio is recommended. Please choose explicitly.
+B1/B2	ui.governance.legacyModelHint	本项目使用旧治理模型（su）。可升级为三权模型。	This project uses the legacy governance model (su). It can be upgraded to trio.
+B1/B2	ui.governance.migrationLabel	查看差异 / 升级	View diff / upgrade
+B1/B2	ui.governance.migrationPending	升级入口待本版后续	Upgrade entry pending in a later version
+B1/B2	ui.governance.migrationOpenTitle	打开迁移预览（零写入）；确认后只改 .ans 的 governanceModel 并追加 manifest 记录。	Opens the migration preview (zero writes); confirming only changes .ans governanceModel and appends a manifest record.
+B1/B2	ui.governance.migrationUnwired	迁移预览与写入尚未接线；本版不可用。	Migration preview and write are not wired yet; unavailable in this version.
+B1/B2	ui.governance.migration.legacyModel	旧模型	Legacy model
+B1/B2	ui.governance.migration.fieldMissing	（字段缺失，将新增 governanceModel: "trio"）	(field missing, will add governanceModel: "trio")
+B1/B2	ui.governance.migration.modelLine	模型：{from} → {to}	Model: {from} → {to}
+B1/B2	ui.governance.migration.modelField	将写入 .ans 字段：{field}	Will write .ans field: {field}
+B1/B2	ui.governance.migration.manifestAppend	将追加 manifest 记录：{id}	Will append manifest record: {id}
+B1/B2	ui.governance.migration.pinChange	pin 变更：{item}	Pin change: {item}
+B1/B2	ui.governance.migration.pinNoChange	pin 变更：无（不重算 pin）	Pin change: none (pins are not recalculated)
+B1/B2	ui.governance.migration.retained	保留文件：{files}	Retained files: {files}
+B1/B2	ui.governance.migration.digest	预览摘要（前 8 位）：{digest}	Preview digest (first 8): {digest}
+B1/B2	ui.governance.migration.zeroWrite	预览零写入。确认后只改 .ans 的 governanceModel 并追加 manifest 记录；不重写角色卡/边界/pin/历史会话。	Preview writes nothing. Confirming only changes .ans governanceModel and appends a manifest record; role cards/boundaries/pins/session history are not rewritten.
+B1/B2	ui.governance.migration.success	已升级为三权治理模型（.ans governanceModel = "trio"）。旧角色卡/边界/pin/历史会话保留。	Upgraded to trio governance (.ans governanceModel = "trio"). Legacy role cards/boundaries/pins/session history are retained.
+B1/B2	ui.governance.migration.alreadyTrio	已是三权治理模型，无需升级；本次未写入任何文件。	Already trio governance; no upgrade needed. No files were written this time.
+B1/B2	ui.governance.migration.noRecord	没有治理记录（.ans/project.json）；本次未写入任何文件。	No governance record (.ans/project.json); no files were written this time.
+B1/B2	ui.governance.migration.blocked	升级被阻止；本次未写入任何文件。	Upgrade blocked; no files were written this time.
+B1/B2	ui.governance.migration.previewStale	预览后 .ans 又有变化，已取消本次写入；请重新检查。	.ans changed again after the preview; this write was cancelled. Check again.
+B1/B2	ui.governance.migration.busy	上一次升级仍在进行中；本次未写入任何文件。	A previous upgrade is still running; no files were written this time.
+B1/B2	ui.governance.migration.invalidRequest	升级请求无效；本次未写入任何文件。	Invalid upgrade request; no files were written this time.
+B1/B2	ui.governance.migration.status	状态：{status}	Status: {status}
+B1/B2	ui.governance.migration.writeFailed	写入阶段失败，可能已写入部分文件，请核对现场。	The write phase failed; some files may have been written. Verify the current state.
+B1/B2	ui.governance.decisionBadge	治理决定 · 客户最终批准	Governance decision · final customer approval
+B1/B2	ui.governance.intentBadge	需求确认 · 客户	Intent confirmation · customer
+B1/B2	ui.governance.queueNote	等待前一个决定	Waiting for the previous decision
+B1/B2	ui.governance.mirrorBadge	镜像 · 主入口	Mirror · primary
+B1/B2	ui.governance.power.proposal	提案	Proposal
+B1/B2	ui.governance.power.appointment	任命	Appointment
+B1/B2	ui.governance.power.appointmentWrite	任命写卡	Appointment card-writing
+B1/B2	ui.governance.power.scheduleWrite	编排	Scheduling
+B1/B2	ui.governance.power.acceptance	验收	Acceptance
+B1/B2	ui.governance.power.intentConfirm	需求确认	Intent confirmation
+B1/B2	ui.governance.decisionLine.step	步骤：{stepId}	Step: {stepId}
+B1/B2	ui.governance.decisionLine.power	权力类型：{power}	Power type: {power}
+B1/B2	ui.governance.decisionLine.writePath	将写路径：{path}	Path to write: {path}
+B1/B2	ui.governance.decisionLine.summary	摘要：{summary}	Summary: {summary}
+B1/B2	ui.governance.decisionLine.hash	哈希：{sha256}	Hash: {sha256}
+B1/B2	ui.governance.decisionSourceFallback	发起角色	Originating role
+B1/B2	ui.governance.decisionTitle	来自 {name} 的治理决定 · 客户最终批准	Governance decision from {name} · final customer approval
+B1/B2	ui.governance.moreDecisions	还有 {count} 个决定等待前一个决定	There are {count} more decisions waiting for the previous decision
+B1/B2	ui.reportCard.viewSource	查看来源角色文档	View source role documents
+B1/B2	ui.reportCard.unsupportedVersion	不支持此报告版本，未生成成果摘要。	This report version is not supported; no outcome summary was generated.
+B1/B2	ui.reportCard.sourceLine	来源 {sourceName} · {origin}	Source {sourceName} · {origin}
+B1/B2	ui.reportCard.title	任务报告	Task report
+B1/B2	ui.reportCard.runtimeUnknown	引擎未知	Engine unknown
+B1/B2	ui.reportCard.task	任务 {taskId}	Task {taskId}
+B1/B2	ui.reportCard.taskUnknown	任务关联未知	Task association unknown
+B1/B2	ui.reportCard.turn	轮次 {turnId}	Turn {turnId}
+B1/B2	ui.reportCard.turnNotProvided	轮次未提供	Turn not provided
+B1/B2	ui.reportCard.excerptLabel	报告原文摘录	Report excerpt
+B1/B2	ui.reportCard.folded	摘要已折叠，完整可用显示副本见下方	Summary folded; the full safe display copy is below
+B1/B2	ui.reportCard.storage	报告存储	Report storage
+B1/B2	ui.reportCard.independentAcceptance	独立验收	Independent acceptance
+B1/B2	ui.reportCard.notConfirmed	尚未确认	Not confirmed yet
+B1/B2	ui.reportCard.disclaimer	以上为报告或终态记录，不等于独立验收通过。	The above is a report or terminal record; it is not an independent acceptance pass.
+B1/B2	ui.reportCard.viewFull	查看完整报告摘要与证据	View full report summary and evidence
+B1/B2	ui.reportCard.noEvidence	（未提供证据）	(no evidence provided)
+B1/B2	ui.reportCard.receiptHistory	接收历史	Receipt history
+B1/B2	ui.reportCard.targetInput	目标输入记录	Target input record
+B1/B2	ui.reportCard.targetTurn	目标轮次结果	Target turn result
+B1/B2	ui.reportView.provenance.timestamp	原时间未保存或不可展示	Original time not saved or displayable
+B1/B2	ui.reportView.provenance.anchorToken	原定位标记未提供	Original anchor token not provided
+B1/B2	ui.reportView.provenance.oversize	原调用身份超出展示预算	Original call identity exceeds the display budget
+B1/B2	ui.reportView.originFormal	正式回交	Formal handback
+B1/B2	ui.reportView.originTerminal	终态记录	Terminal record
+B1/B2	ui.reportView.originUnconfirmed	来源未确认	Source unconfirmed
+B1/B2	ui.reportView.evidenceTruncatedSome	部分证据显示已截断	Some evidence is truncated
+B1/B2	ui.reportView.evidenceRedactedSome	部分证据已净化	Some evidence is redacted
+B1/B2	ui.reportView.evidenceOmitted	另有 {count} 条证据因预算省略	{"one":"{count} more evidence item omitted for budget","other":"{count} more evidence items omitted for budget"}
+B1/B2	ui.reportView.saveError.conflict	保存内容冲突，不能自动覆盖。	Saved content conflicts; it cannot be overwritten automatically.
+B1/B2	ui.reportView.saveError.invalid	保存材料无效，不能自动恢复。	Invalid saved material; it cannot be restored automatically.
+B1/B2	ui.reportView.saveError.replayDamaged	历史记录损坏，不能自动补存。	History record damaged; it cannot be backfilled automatically.
+B1/B2	ui.reportView.saveError.replayChanged	历史记录已变化，不能自动补存。	History record changed; it cannot be backfilled automatically.
+B1/B2	ui.reportView.saveError.snapshotExpired	可补存的会话材料已失效，无法在此补存。	The session material available for backfill has expired; it cannot be backfilled here.
+B1/B2	ui.reportView.saveError.provenanceTooLarge	回交记录超过展示与来源预算，尚未继续投递。	The handback record exceeds the display and provenance budget; delivery has not continued.
+B1/B2	ui.reportView.saveError.textProjectionFailed	交接显示内容生成失败，尚未交给Provider。	Could not generate the handback display content; it has not been handed to the Provider.
+B1/B2	ui.reportView.savedTargetHistory	接收历史已保存	Receipt history saved
+B1/B2	ui.reportView.savedReport	报告已保存	Report saved
+B1/B2	ui.reportView.save.sessionOnly	仅本次会话可见，未启用历史保存。	Visible only in this session; history saving is disabled.
+B1/B2	ui.reportView.save.unsupported	当前会话无法确认或不支持此保存恢复能力。	The current session cannot confirm or does not support this save/restore capability.
+B1/B2	ui.reportView.save.historyNotSaved	本次接收历史未保存；执行状态以上方实际结果为准。	This receipt history was not saved; execution status is subject to the actual results above.
+B1/B2	ui.reportView.save.reportNotSaved	报告尚未保存，暂未继续回交。可补存原报告，无需重新运行任务。	The report has not been saved, so the handback has not continued. You can backfill the original report without rerunning the task.
+B1/B2	ui.reportView.savingReport	正在保存报告…	Saving report…
+B1/B2	ui.reportView.save.historyReceiptPending	尚未取得最终历史回执，处理可能已开始。	Final history receipt not obtained yet; processing may have started.
+B1/B2	ui.reportView.save.reportUnconfirmed	报告保存状态未确认。	Report save status unconfirmed.
+B1/B2	ui.reportView.retryHistory	重试保存历史	Retry saving history
+B1/B2	ui.reportView.retryReport	重试保存报告	Retry saving report
+B1/B2	ui.reportView.retryNote	补存已有记录，不再次执行或投递。	Backfills the existing record; does not execute or deliver again.
+B1/B2	ui.reportView.turnStatus.timedOut	运行超时	Timed out
+B1/B2	ui.reportView.history.unconfirmed	未确认	Unconfirmed
+B1/B2	ui.reportView.history.saved	已保存	Saved
+B1/B2	ui.reportView.history.disabled	未启用历史保存	History saving disabled
+B1/B2	ui.reportView.history.notSaved	尚未保存	Not saved yet
+B1/B2	ui.reportView.history.maybeStarted	可能已开始，结果未确认	May have started; result unconfirmed
+B1/B2	ui.reportView.history.notHandedToProvider	尚未交给Provider	Not handed to the Provider yet
+B1/B2	ui.reportView.batch	回交投递 · 本批 {count} 份（不表示全部收齐）	Handback delivery · {count} in this batch (not all received)
+B1/B2	ui.reportView.modelInputMissing	此处未记录完整模型输入	The full model input is not recorded here
+B1/B2	ui.reportView.displayTruncated	显示副本已截断	Display copy truncated
+B1/B2	ui.reportView.summaryTruncated	摘要已截断	Summary truncated
+B1/B2	ui.reportView.replicaMissing	交接内容安全显示副本未提供，不能显示完整模型输入。	No safe display copy of the handback content was provided; the full model input cannot be shown.
+B1/B2	ui.reportView.taskRequestLabel	任务请求原文	Original task request
+B1/B2	ui.reportView.replyOriginalLabel	本轮角色回复原文（展开）	Original role reply for this turn (expand)
+B1/B2	ui.reportView.deliveryReplyLabel	本轮回交处理回复原文（展开）	Original handback-processing reply for this turn (expand)
+B1/B2	ui.reportView.projection.reportUnreadable	报告记录不可读（{count} 条）	Unreadable report records: {count}
+B1/B2	ui.reportView.projection.omitted	省略前 {count} 条历史投影	History projections before omission: {count}
+B1/B2	ui.reportView.projection.invalid	无效投影条目 {count}	Invalid projection entries: {count}
+B1/B2	ui.reportView.projection.truncated	历史投影已截断	History projection truncated
+B1/B2	ui.reportView.projection.skipped	原解析跳过 {count} 条	Skipped by the original parse: {count}
+B1/B2	ui.documentView.expired	文档上下文已失效。	Document context is no longer valid.
+B1/B2	ui.documentView.reading	正在读取已列文档…	Reading listed documents…
+B1/B2	ui.documentView.openReadonly	只读打开此文档	Open this document read-only
+B1/B2	ui.documentView.unreadable	当前项目/范围不可读	Not readable in the current project/scope
+B1/B2	ui.document.error.invalidRequest	文档请求无效。	Invalid document request.
+B1/B2	ui.document.error.projectNotGranted	尚未获得当前项目的文档读取许可，请重新选择项目文件夹。	Document read permission for the current project has not been granted; reselect the project folder.
+B1/B2	ui.document.error.projectNotActive	该项目不是当前项目。	This project is not the current project.
+B1/B2	ui.document.error.staleScope	项目文档列表已失效，请返回当前项目重新选择。	The project document list is stale; return to the current project and select again.
+B1/B2	ui.document.error.unknownDocument	文档引用未知。	Unknown document reference.
+B1/B2	ui.document.error.notListed	该文档已不在可读清单中。	This document is no longer in the readable list.
+B1/B2	ui.document.error.outsideProject	该文件不在当前项目允许的阅读范围。	This file is outside the readable scope allowed for the current project.
+B1/B2	ui.document.error.symlinkNotAllowed	符号链接文档不可读取。	Symlinked documents cannot be read.
+B1/B2	ui.document.error.notFound	文档不存在。	Document not found.
+B1/B2	ui.document.error.notFile	该引用不是普通文件。	This reference is not a regular file.
+B1/B2	ui.document.error.unsupportedFormat	此文档格式暂不支持。	This document format is not supported yet.
+B1/B2	ui.document.error.invalidUtf8	文档不是有效UTF-8文本。	The document is not valid UTF-8 text.
+B1/B2	ui.document.error.binaryContent	文档包含二进制内容，不能预览。	The document contains binary content and cannot be previewed.
+B1/B2	ui.document.error.tooLarge	文档超过256KiB，无法在此预览。	The document exceeds 256KiB and cannot be previewed here.
+B1/B2	ui.document.error.permissionDenied	没有读取此文档的权限。	No permission to read this document.
+B1/B2	ui.document.error.changedDuringRead	读取期间文档发生变化，请重新选择。	The document changed during reading; select it again.
+B1/B2	ui.document.error.unsupportedEnvironment	当前环境暂不支持安全读取项目文档。	This environment does not support safe reading of project documents yet.
+B1/B2	ui.document.error.ioError	文档读取失败。	Document read failed.
+B1/B2	ui.document.error.fallback	无法读取此文档。	Could not read this document.
+B1/B2	ui.document.readonlyMeta	只读文档 · {bytes} 字节	Read-only document · {bytes} bytes
+B1/B2	ui.document.reading	正在读取文档…	Reading document…
+B1/B2	ui.document.unlisted	此链接尚未提供阅读入口。	This link has no reading entry yet.
+B1/B2	ui.document.empty	该角色当前没有已列出的可读文档。	This role currently has no listed readable documents.
+B1/B2	ui.document.pickHint	以下是当前项目中该角色已列出的可读文档，请选择要阅读的文件。	These are the readable documents listed for this role in the current project; choose one to read.
+B1/B2	ui.document.sourceTitle	{roleName} · 来源文档	{roleName} · Source documents
+B1/B2	ui.document.backList	返回来源文档	Back to source documents
+B1/B2	ui.document.refresh	刷新已列文档	Refresh listed documents
+B1/B2	ui.document.read	阅读	Read
+B1/B2	ui.profile.title	{roleName} · 角色资料	{roleName} · Role profile
+B1/B2	ui.profile.aria	角色资料，{count} 项进行中或排队	Role profile, {count} in progress or queued
+B1/B2	ui.profile.noEntries	（无条目）	(no entries)
+B1/B2	ui.profile.noEntriesParseFailed	（无条目；解析失败：{detail}）	(no entries; parse failed: {detail})
+B1/B2	ui.profile.emptyTitle	选择角色后查看资料	Select a role to view its profile
+B1/B2	ui.profile.emptySub	先在左侧选择角色，再从会话头部的“角色资料”或“工作概览”打开对应面板；内容跟随当前角色。	Select a role on the left, then open the matching panel from the session header's “Role profile” or “Work overview”; content follows the current role.
+B1/B2	ui.profile.cardTab	角色卡	Role card
+B1/B2	ui.profile.emptyCard	（空）	(empty)
+B1/B2	ui.profile.boundaryTab	边界条目	Boundary entries
+B1/B2	ui.profile.changelogTab	变更记录	Change log
+B1/B2	ui.profile.noChangelog	（无 changelog.md）	(no changelog.md)
+B1/B2	ui.profile.docsTab	文档	Documents
+B1/B2	ui.profile.noDocs	（无 docs/ 目录或为空）	(no docs/ directory or it is empty)
+B1/B2	ui.profile.viewListedDocs	查看已列文档	View listed documents
+B1/B2	ui.profile.pendingQueue	待办 / 队列	Pending / queue
+B1/B2	ui.queue.title	{roleName} · 队列	{roleName} · Queue
+B1/B2	ui.status.label.stopped	已停止	Stopped
+B1/B2	ui.status.label.closed	未开启	Not started
+B1/B2	ui.status.label.idle	空闲	Idle
+B1/B2	ui.status.label.working	工作中	Working
+B1/B2	ui.status.label.waitingConfirm	等待你确认	Waiting for you
+B1/B2	ui.status.label.error	错误	Error
+B1/B2	ui.status.label.idleRecovered	空闲（已恢复）	Idle (restored)
+B1/B2	ui.status.title.closed	尚未开启会话（点它即可开启）	Session not started (click to start)
+B1/B2	ui.status.title.idle	会话已开启，当前没有在跑的任务	Session started; no task is running
+B1/B2	ui.status.title.working	有轮次在跑（切走后仍在后台跑的轮次同样计入）或队列有待办	A turn is running (turns that keep running in the background after switching count too) or the queue has pending items
+B1/B2	ui.status.title.waitingConfirm	有交互请求挂起，等你在会话流里作答	An interaction request is pending, waiting for your answer in the conversation
+B1/B2	ui.status.title.stopped	会话已停止（历史保留在界面上；再点开为新会话）	Session stopped (history stays on screen; clicking again starts a new session)
+B1/B2	ui.status.title.error	最近一次轮次或会话以错误结束	The latest turn or session ended with an error
+B1/B2	ui.status.title.idleRecovered	句柄未开；聊天流里是该角色恢复出来的历史记录	No live handle; the conversation shows history restored for this role
+B1/B2	ui.status.title.unknown	未知状态（保守占位）	Unknown status (conservative placeholder)
+B1/B2	ui.status.pendingCount	{count} 待办	{"one":"{count} pending","other":"{count} pending"}
+B1/B2	ui.status.queueNote.enqueued	另有 {count} 项已入队，当前任务完成后依次处理	{"one":"{count} more item is queued and runs after the current task","other":"{count} more items are queued and run after the current task"}
+B1/B2	ui.status.queueNote.pending	另有 {count} 项待办在队列中（完成后依次处理）	{"one":"{count} more item is pending in the queue (processed in order)","other":"{count} more items are pending in the queue (processed in order)"}
+B1/B2	ui.chatRow.noFileTarget	无文件目标	No file target
+B1/B2	ui.chatRow.timeNotRecorded	未记录	Not recorded
+B1/B2	ui.chatRow.legacyStatusSource	状态来源：旧文本分类，不是新机器执行事实	Status source: legacy text classification, not new machine execution facts
+B1/B2	ui.chatRow.legacyClassification	旧文本分类，不是新机器执行事实	Legacy text classification, not new machine execution facts
+B1/B2	ui.chatRow.unsupportedDetail	不支持此详情版本。	This detail version is not supported.
+B1/B2	ui.chatRow.noDetails	这条历史没有保存更多目标和错误详情。	This history entry saved no further target or error details.
+B1/B2	ui.chatRow.actualCommand	实际命令	Actual command
+B1/B2	ui.chatRow.targetFile	目标文件	Target file
+B1/B2	ui.chatRow.noFileTargetDetail	本次调用无文件目标（交互/派发类工具）	No file target for this call (interaction/dispatch tools)
+B1/B2	ui.chatRow.message	消息	Message
+B1/B2	ui.chatRow.error	错误	Error
+B1/B2	ui.chatRow.result	结果	Result
+B1/B2	ui.chatRow.exitCode	退出码：{code}	Exit code: {code}
+B1/B2	ui.chatRow.signal	信号：{signal}	Signal: {signal}
+B1/B2	ui.chatRow.stdout	标准输出	stdout
+B1/B2	ui.chatRow.stderr	标准错误	stderr
+B1/B2	ui.chatRow.duration	耗时：{ms} ms	Duration: {ms} ms
+B1/B2	ui.chatRow.budgetOmitted	部分展示内容因预算省略	Part of the display content was omitted for budget
+B1/B2	ui.chatRow.nonTextResult	非文本结果未展示	Non-text result not shown
+B1/B2	ui.chatRow.unsupportedInput	未支持的输入未展示	Unsupported input not shown
+B1/B2	ui.chatRow.timeNotSaved	时间未保存	Time not saved
+B1/B2	ui.chatRow.operationNotApproved	操作未放行	Operation not approved
+B1/B2	ui.chatRow.targetNotRecorded	目标未记录	Target not recorded
+B1/B2	ui.chatRow.choose	请选择	Please choose
+B1/B2	ui.chatRow.confirm	请确认	Please confirm
+B1/B2	ui.chatRow.preview	预览内容	Preview
+B1/B2	ui.chatRow.submit	提交	Submit
+B1/B2	ui.chatRow.confirmAction	确认	Confirm
+B1/B2	ui.chatRow.rejectAction	拒绝	Reject
+B1/B2	ui.chatRow.turnEnded	本轮结束	Turn ended
+B1/B2	ui.chatRow.judgeDetails	详情（命令原文 / 理由 / 证据）	Details (command / reason / evidence)
+B1/B2	ui.chatRow.commandOriginal	命令原文	Original command
+B1/B2	ui.chatRow.customerMessage	客户说明：{message}	Customer note: {message}
+B1/B2	ui.chatRow.customerMessageNote	客户说明由系统整理。	The customer note is compiled by the system.
+B1/B2	ui.chatRow.evidence	证据	Evidence
+B1/B2	ui.chatRow.hardDenyOverride	hardDenyOverride：true（deny 档被判断 agent 放行）。	hardDenyOverride: true (deny tier approved by the judge agent).
+B1/B2	ui.chatRow.durationStat	耗时 {ms}ms	Duration {ms}ms
+B1/B2	ui.chatRow.readCalls	读取 {count} 次	Reads {count}
+B1/B2	ui.chatRow.readBytes	{bytes} 字节	{bytes} bytes
+B1/B2	ui.chatRow.decisionDetails	详情（判断理由 / 选中项 / 证据）	Details (judge reason / selected items / evidence)
+B1/B2	ui.chatRow.perPath	逐路径结论	Per-path outcome
+B1/B2	ui.chatRow.pathResult	{path}：{result}	{path}: {result}
+B1/B2	ui.chatRow.allowed	允许	Allowed
+B1/B2	ui.chatRow.denied	拒绝	Denied
+B1/B2	ui.chatStore.context.opened	会话已开启	Session started
+B1/B2	ui.chatStore.context.projectLoadFailed	项目加载失败	Project loading failed
+B1/B2	ui.chatStore.context.primaryNoSession	主入口 · 尚未开启会话	Primary · session not started
+B1/B2	ui.chatStore.context.opening	正在开启或恢复会话…	Opening or restoring session…
+B1/B2	ui.chatStore.context.notConnected	未连接主进程	Not connected to the main process
+B1/B2	ui.chatStore.context.channelUnavailable	会话通道不可用	Session channel unavailable
+B1/B2	ui.chatStore.error.noDesktopBridge	当前环境未提供桌面通道	Desktop bridge is not available in this environment
+B1/B2	ui.chatStore.error.noSessionChannel	当前版本未提供会话通道	Session channel is not provided in this version
+B1/B2	ui.chatStore.openFailed	会话开启失败	Session failed to start
+B1/B2	ui.chatStore.openFailedWithReason	开启会话失败：{reason}	Could not start session: {reason}
+B1/B2	ui.chatStore.context.continues	会话继续使用现有上下文	The session continues with the existing context
+B1/B2	ui.chatStore.context.recovered	已从本地恢复模型上下文	Model context restored locally
+B1/B2	ui.chatStore.context.recoveryFailed	恢复失败，当前为新会话	Restore failed; this is a new session
+B1/B2	ui.chatStore.context.newSession	新会话	New session
+B1/B2	ui.chatStore.context.sourceUnreported	上下文来源未报告	Context source not reported
+B1/B2	ui.chatStore.context.historyFailed	历史读取失败	History read failed
+B1/B2	ui.chatStore.context.engineSwitched	已切换引擎；点角色重新开启会话	Engine switched; click the role to reopen the session
+B1/B2	ui.chatStore.replayFailed	会话记录读取失败，未回放：{detail}	Could not read the session record; not replayed: {detail}
+B1/B2	ui.chatStore.historyRetainedSuffix	；可读历史保留，模型未恢复	; readable history retained, model not restored
+B1/B2	ui.chatStore.context.historyRecovered	会话记录已恢复	Session record restored
+B1/B2	ui.chatStore.error.operatorChannelMissing	operatorRespond 通道未接	operatorRespond channel not wired
+B1/B2	ui.chatStore.operatorChannelNotAccepted	通道未受理	Channel did not accept the request
+B1/B2	ui.chatStore.context.openingSession	正在开启会话…	Opening session…
+B1/B2	ui.chatStore.context.openedBackground	会话已开启；后台正在工作，暂无可见消息	Session started; working in the background, no visible messages yet
+B1/B2	ui.chatStore.toolNotApproved	{toolName} 未放行	{toolName} not approved
+B1/B2	ui.chatStream.withdrawUnavailable	撤回无效：当前版本未提供撤回通道。	Withdrawal had no effect: withdrawal is not provided in this version.
+B1/B2	ui.chatStream.running	进行中	In progress
+B1/B2	ui.chatStream.queuePosition	第 {position} 位	position {position}
+B1/B2	ui.chatStream.empty.noProjectSub	在左侧点击「导入项目」选择项目根目录；导入后点击任意角色开始聊天。	Click “Import project” on the left to choose the project root; after importing, click any role to start chatting.
+B1/B2	ui.chatStream.empty.notBootstrappedTitle	项目尚未 bootstrap	Project not bootstrapped yet
+B1/B2	ui.chatStream.empty.notBootstrappedSubWithRole	与 {roleName} 对话，让它把角色建出来；左树会随之长出。	Chat with {roleName} to have it create the roles; the tree will grow accordingly.
+B1/B2	ui.chatStream.empty.notBootstrappedSubPrimary	与主入口对话，让它把角色建出来；左树会随之长出。	Chat with the primary entry to have it create the roles; the tree will grow accordingly.
+B1/B2	ui.chatStream.empty.noRolesTitle	该项目下未枚举到角色	No roles found in this project
+B1/B2	ui.chatStream.empty.noRolesSub	请确认项目包含角色卡目录与治理边界；重新导入项目后重试。	Make sure the project contains role card directories and governance boundaries; re-import the project and retry.
+B1/B2	ui.chatStream.empty.selectRoleTitle	选择角色开始聊天	Select a role to start chatting
+B1/B2	ui.chatStream.empty.selectRoleSub	从左侧角色树选择角色；每个角色保留自己的会话历史。	Select a role from the tree on the left; each role keeps its own session history.
+B1/B2	ui.chatStream.empty.startSub	点下方按钮开启会话；发送消息后，这里会显示对话与工具记录。	Click the button below to start the session; after you send a message, the conversation and tool records appear here.
+B1/B2	ui.chatStream.empty.openedTitle	会话已开启，可直接输入消息	Session started; you can type a message now
+B1/B2	ui.chatStream.empty.openedSub	发送第一条消息后，这里会显示对话与工具记录。写入由治理引擎把关，越界操作会在对话中直接提示。	After the first message, the conversation and tool records appear here. Writes are checked by the governance engine; out-of-boundary operations are flagged directly in the conversation.
+B1/B2	ui.chatStream.openingSession	正在开启与角色 {roleName} 的会话…	Opening session with {roleName}…
+B1/B2	ui.chatStream.loadingHistory	正在载入会话历史…	Loading session history…
+B1/B2	ui.chatStream.startConversation	开始与 {roleName} 对话	Start a conversation with {roleName}
+B1/B2	ui.chatStream.working	正在工作	Working
+B1/B2	ui.chatStream.pendingLocate	有 {count} 条待确认 · 定位	{"one":"{count} pending confirmation · locate","other":"{count} pending confirmations · locate"}
+B1/B2	ui.tool.status.called	调用发起	Call started
+B1/B2	ui.tool.status.denied	已拒绝	Denied
+B1/B2	ui.tool.status.failed	执行失败	Execution failed
+B1/B2	ui.tool.status.timedOut	超时终止	Terminated on timeout
+B1/B2	ui.tool.status.completed	已执行完成	Executed
+B1/B2	ui.tool.status.completedExit	已执行完成（退出码 {code}）	Executed (exit code {code})
+B1/B2	ui.tool.status.completedShort	执行完成	Execution complete
+B1/B2	ui.tool.status.returned	工具返回	Tool returned
+B1/B2	ui.tool.status.unknown	状态未记录	Status not recorded
+B1/B2	ui.tool.status.recorded	已记录	Recorded
+B1/B2	ui.tool.status.notApproved	未放行	Not approved
+B1/B2	ui.tool.status.running	运行中	Running
+B1/B2	ui.tool.status.done	完成	Done
+B1/B2	ui.tool.summary	本轮 {count} 个调用	This turn: {count} tool calls
+B1/B2	ui.tool.summaryWithTools	本轮 {count} 个调用：{tools}	This turn: {count} tool calls: {tools}
+B1/B2	ui.tool.containsDenied	含 {count} 条未放行	{count} not approved
+B1/B2	ui.tool.containsFailed	含 {count} 条失败	{count} failed
+B1/B2	ui.tool.containsUnknown	含状态未记录	status not recorded for some
+B1/B2	ui.events.target	目标：{target}	Target: {target}
+B1/B2	ui.events.timedOut	已超时	Timed out
+B1/B2	ui.events.systemMessage	系统消息 · {label}	System message · {label}
+B1/B2	ui.events.systemNotice	系统通知	System notice
+B1/B2	ui.events.systemNoticeWithLabel	系统通知 · {label}	System notice · {label}
+B1/B2	ui.events.dispatchTask	派发任务	Dispatched task
+B1/B2	ui.events.dispatchTaskWithRole	派发任务 · 来自 {role}	Dispatched task · from {role}
+B1/B2	ui.events.handbackDelivery	回交投递	Handback delivery
+B1/B2	ui.events.handbackDeliveryWithRole	回交投递 · 来自 {role}	Handback delivery · from {role}
+B1/B2	ui.events.handbackLegacy	回交已收到（旧来源，安全详情未提供）	Handback received (legacy source, safe details unavailable)
+B1/B2	ui.events.legacyUnknown	旧/未知系统记录：{summary}	Legacy/unknown system record: {summary}
+B1/B2	ui.events.historyRecord	（历史记录）	(history record)
+B1/B2	ui.reasoning.fallbackLabel	已思考	Thought
+B1/B2	ui.reasoning.unsafe	推理内容无法安全显示	Reasoning content cannot be displayed safely
+B1/B2	ui.reasoning.omitted	平台省略了思考正文，无法显示具体内容。	The platform omitted the thinking text; details cannot be shown.
+B1/B2	ui.reasoning.empty	没有可显示的思考正文。	No thinking text to display.
+B1/B2	ui.reasoning.partial	平台省略了部分思考正文。	The platform omitted part of the thinking text.
+B1/B2	ui.reasoning.thoughtSeconds	已思考 {seconds} 秒	Thought for {seconds}s
+B1/B2	ui.reasoning.omittedSuffix	（内容由平台省略）	 (content omitted by the platform)
+B1/B2	ui.reasoning.partialSuffix	（部分内容由平台省略）	 (partially omitted by the platform)
+B1/B2	ui.markdown.externalUnavailable	当前环境未提供外部打开通道	External opening is not available in this environment
+B1/B2	ui.markdown.openFailed	链接未能打开：{detail}	Could not open the link: {detail}
+B1/B2	ui.markdown.openFailedChannel	链接未能打开：通道异常	Could not open the link: channel error
+B1/B2	ui.operator.kind.choice	待选择	Awaiting choice
+B1/B2	ui.operator.result.confirm	已确认。	Confirmed.
+B1/B2	ui.operator.result.deny	已回『不同意』（未获同意）。	Replied “Disagree” (not approved).
+B1/B2	ui.operator.result.cancel	已取消（未获同意）。	Cancelled (not approved).
+B1/B2	ui.operator.result.submit	已提交。	Submitted.
+B1/B2	ui.operator.submitting	已提交，等待主进程受理…	Submitted; waiting for the main process to accept…
+B1/B2	ui.operator.expired	请求已失效，未获同意。	The request has expired and was not approved.
+B1/B2	ui.operator.expiredWithReason	请求已失效，未获同意。原因：{reason}	The request has expired and was not approved. Reason: {reason}
+B1/B2	ui.operator.expiredRetry	请求已失效，未获同意。请让角色重新发起。	The request has expired and was not approved. Ask the role to initiate it again.
+B1/B2	ui.operator.retryFailed	回传失败：{detail}——请重试。	Delivery failed: {detail} — please retry.
+B1/B2	ui.judge.mode.approval	代审批	Approval delegation
+B1/B2	ui.judge.mode.decision	代决策	Decision delegation
+B1/B2	ui.judge.titleWithRole	命令审批 · {roleName}	Command approval · {roleName}
+B1/B2	ui.judge.titleSu	SU 命令审批	SU command approval
+B1/B2	ui.judge.titleShell	shell 命令请求	shell command request
+B1/B2	ui.judge.tier.risky	风险命令（risky）	Risky command (risky)
+B1/B2	ui.judge.tier.review	未自动判定（review）	Not auto-classified (review)
+B1/B2	ui.judge.tier.deny	硬拒类（deny）	Hard-deny class (deny)
+B1/B2	ui.judge.shellOn	替我审批中 · 判断 agent	Approving for you · judge agent
+B1/B2	ui.judge.shellOff	替我审批	Approve for me
+B1/B2	ui.judge.decisionOn	替我决策中 · 判断 agent	Deciding for you · judge agent
+B1/B2	ui.judge.decisionOff	替我决策	Decide for me
+B1/B2	ui.judge.bridgeMissing	当前版本不支持自动判断，保持手动	Automatic judging is not supported in this version; staying manual
+B1/B2	ui.judge.decisionSingleNote	旧治理模型（single）不支持代决策	The legacy governance model (single) does not support decision delegation
+B1/B2	ui.judge.shellOffTitle	手动逐条确认 shell 命令与 trio 写盘/写卡确认（默认）	Manually confirm each shell command and each trio write/appointment-write confirmation (default)
+B1/B2	ui.judge.shellOnTitle	判断 agent 先评估 shell 命令与 trio 写盘/写卡确认；可随时关闭	The judge agent evaluates shell commands and trio write/appointment-write confirmations first; can be turned off anytime
+B1/B2	ui.judge.decisionOffTitle	手动逐张确认提案接受、任命与验收（默认）	Manually confirm each proposal acceptance, appointment, and acceptance (default)
+B1/B2	ui.judge.decisionOnTitle	判断 agent 先评估提案接受、任命与验收；可随时关闭	The judge agent evaluates proposal acceptance, appointments, and acceptance first; can be turned off anytime
+B1/B2	ui.judge.warningClose	知道了	Got it
+B1/B2	ui.judge.toggleOn.shell	替我审批中：shell 命令与写盘/写卡确认（write / appointment-write / schedule-write）将由判断 agent 代批。	Approving for you: shell commands and write/appointment-write/schedule-write confirmations (write / appointment-write / schedule-write) will be auto-approved by the judge agent.
+B1/B2	ui.judge.toggleOn.decision	替我决策中：提案接受、任命、验收将由判断 agent 代批。	Deciding for you: proposal acceptance, appointments, and acceptance will be auto-approved by the judge agent.
+B1/B2	ui.judge.scopeNote	判断 agent 只读项目内代码/文档/角色卡（不含 .env、密钥/凭据、.ans 账本/会话、审计日志与项目外），不写文件、不执行命令；只代你「接受/任命/确认/验收」，不会代你拒绝、要求修改或勾选证据不足的候选；不确定、缺证据、读取失败、引擎不可用、超时或解析失败会按所属开关回落逐张卡，由你决定。	The judge agent only reads project code/documents/role cards (excluding .env, keys/credentials, the .ans ledger/sessions, audit logs, and anything outside the project); it does not write files or run commands. It only acts for you on “accept/appoint/confirm/accept”, and never rejects for you, requests changes, or ticks under-evidenced candidates. When uncertain, lacking evidence, read failures, engine unavailable, timeout, or parse failure occur, it falls back to card-by-card handling for that switch and you decide.
+B1/B2	ui.judge.quickPathNote	提案快捷路径（accept-quick）默认不代批；旧治理模型（single/su）的治理方向卡仍逐张确认；single 下写盘确认仍逐张手动。	The proposal quick path (accept-quick) is not delegated by default; governance direction cards under the legacy model (single/su) are still confirmed card by card; under single, write confirmations are still manual.
+B1/B2	ui.judge.costNote	每次代批会产生一次模型调用（token/延迟）；结果行与审计会标明「judge 代批 · 代审批/代决策」；可能误判，可随时关闭。	Each delegated decision makes one model call (tokens/latency); result rows and the audit trail are marked “judge delegation · approve/decide”; misjudgments are possible and it can be turned off anytime.
+B1/B2	ui.judge.toggleFailed	未能确认自动判断开关（通道异常）；保持原状态。	Could not confirm the automatic-judging switch (channel error); keeping the previous state.
+B1/B2	ui.judge.summaryFallback	无法概括命令；展开查看原文	Cannot summarize the command; expand to view the original
+B1/B2	ui.judge.alternative	替代方案：{value}	Alternative: {value}
+B1/B2	ui.judge.alternativeWithRationale	替代方案：{value}（{rationale}）	Alternative: {value} ({rationale})
+B1/B2	ui.judge.tierLine	档位：{tier}	Tier: {tier}
+B1/B2	ui.judge.hardDenyNote	该命令属于硬拒类，判断 agent 判定必要后放行；请复核	This command belongs to the hard-deny class; the judge agent approved it as necessary. Please review.
+B1/B2	ui.judge.reasonLine	判断理由：{reason}	Judge reason: {reason}
+B1/B2	ui.judge.approvedHardDeny	已替你放行（判断 agent · 代审批 · deny 档）	Approved for you (judge agent · approval delegation · deny tier)
+B1/B2	ui.judge.approved	已替你放行（判断 agent · 代审批）	Approved for you (judge agent · approval delegation)
+B1/B2	ui.judge.notApproved	未放行（判断 agent · 代审批）	Not approved (judge agent · approval delegation)
+B1/B2	ui.judge.hardDenyLabel	deny 档 · judge 放行	deny tier · judge approved
+B1/B2	ui.judge.engineText	判断引擎：{engine}	Judge engine: {engine}
+B1/B2	ui.judge.closeAndRetry	可关闭「替我审批」后重试（改为手动确认），或按替代方案调整命令。	Turn off “Approve for me” and retry (manual confirmation), or adjust the command per the alternative.
+B1/B2	ui.judge.headline.acceptProposal	接受提案（{selected}）	Accept proposal ({selected})
+B1/B2	ui.judge.headline.acceptance	验收通过（{selected}）	Acceptance passed ({selected})
+B1/B2	ui.judge.headline.appointment	任命 {selected}	Appoint {selected}
+B1/B2	ui.judge.headline.appointmentNotReported	任命（未报告选中项）	Appoint (selected items not reported)
+B1/B2	ui.judge.headline.writeConfirm	确认写入 {count} 个路径（{paths}{tail}）	Confirm writing {count} paths ({paths}{tail})
+B1/B2	ui.judge.headline.writeNotReported	确认写入（未报告路径）	Confirm write (paths not reported)
+B1/B2	ui.judge.headline.autoApproved	已代批	Auto-approved
+B1/B2	ui.judge.headline.autoApprovedWithKind	已代批（{cardKind}）	Auto-approved ({cardKind})
+B1/B2	ui.judge.flowSuffix	 · 流程 {flowId}	 · flow {flowId}
+B1/B2	ui.judge.titlePrefix	judge 代批 · {label}	judge delegation · {label}
+B1/B2	ui.judge.selectedLine	选中项：{items}	Selected: {items}
+B1/B2	ui.judge.pathsLine	路径：{paths}	Paths: {paths}
+B1/B2	ui.judge.flowText	流程：{flowId}	Flow: {flowId}
+B1/B2	ui.judge.recovery.stopNote	停该角色当前轮次；不销毁会话。	Stops the role's current turn; does not destroy the session.
+B1/B2	ui.judge.recovery.rebuildNote	重建该角色会话（保留 ANS 回放）；目标正忙时不会执行。	Rebuilds this role's session (keeps ANS replay); skipped while the target is busy.
+B1/B2	ui.judge.recovery.redeliver	重新投递	Redeliver
+B1/B2	ui.judge.recovery.redeliverNote	触发该角色投递队列立即重试。	Triggers an immediate retry of this role's delivery queue.
+B1/B2	ui.drawerStore.noSourceRole	无法确定来源角色，暂不能列出来源文档。	Cannot determine the source role; cannot list source documents right now.
+B1/B2	ui.drawerStore.refreshFailed	文档清单刷新失败。	Document list refresh failed.
+B1/B2	ui.drawerStore.withdrawUnavailable	当前版本未提供撤回通道	Withdrawal is not provided in this version
+B1/B2	ui.governanceStore.previewUnavailable	预览通道不可用（桌面窗口尚未接线）。	Preview channel unavailable (desktop window not wired yet).
+B1/B2	ui.governanceStore.migrationUnavailable	迁移通道不可用（桌面窗口尚未接线）。	Migration channel unavailable (desktop window not wired yet).
+B1/B2	ui.governanceStore.previewFailed	预览失败。	Preview failed.
+B1/B2	ui.governanceStore.reacceptUnavailable	重新接受通道不可用（桌面窗口尚未接线）。	Re-accept channel unavailable (desktop window not wired yet).
+B1/B2	ui.governanceStore.establishUnavailable	建立通道不可用（桌面窗口尚未接线）。	Creation channel unavailable (desktop window not wired yet).
+B1/B2	ui.governanceStore.reacceptFailed	重新接受失败（主进程未返回 message）。	Re-accept failed (the main process returned no message).
+B1/B2	ui.governanceStore.reacceptEffect	治理角色将在下一轮发送前按新边界重建（若正在运行，下一轮结束后生效）。	Governance roles will be rebuilt against the new boundary before their next send (if running, effective after the current turn).
+B1/B2	ui.governanceStore.establishFailed	建立失败（主进程未返回 finalize.message）。	Creation failed (the main process returned no finalize.message).
+B1/B2	ui.governanceStore.cancelled	已取消，未写入任何文件。	Cancelled; no files were written.
+B1/B2	ui.governanceStore.nextStep	下一步：{step}	Next step: {step}
+B1/B2	ui.governanceStore.flow	流程 {flowId}	Flow {flowId}
+B1/B2	ui.reportStore.sessionNotAvailable	当前没有原会话可供保存恢复。	No original session is available for save/restore.
+B1/B2	ui.reportStore.unsupported	当前会话不支持此保存恢复能力。	The current session does not support this save/restore capability.
+B1/B2	ui.reportStore.projectNotActive	项目已失效。	The project is no longer active.
+B1/B2	ui.reportStore.scopeMismatch	保存状态范围不符。	Save status scope mismatch.
+B1/B2	ui.reportStore.statusUnavailable	无法取得保存状态。	Could not obtain the save status.
+B1/B2	ui.settingsStore.noConfigChannel	当前环境未提供配置通道	Configuration channel is not available in this environment
+B1/B2	ui.settingsStore.configChannelUnavailable	当前版本未提供配置通道	Configuration channel is not provided in this version
+B1/B2	ui.settingsStore.saveChannelUnavailable	当前版本未提供配置保存通道	Configuration save channel is not provided in this version
+B3	main.common.unknownRuntime	未知运行时。	Unknown runtime.
+B3	main.common.unknownRole	(未知角色)	(unknown role)
+B3	main.common.reloadInterface	重新加载界面	Reload interface
+B3	main.common.recoveryPageTitle	界面需要恢复	Interface needs recovery
+B3	main.common.recoveryPageHeading	界面暂时无法显示	The interface cannot be displayed right now
+B3	main.common.recoveryPageBody	点击重新加载可恢复界面，已有任务不会自动重发。	Click reload to recover the interface; existing tasks are not resent automatically.
+B3	main.session.contextRecoveryFailed	原生上下文恢复失败，已重建上下文。	Native context restore failed; the context was rebuilt.
+B3	main.session.rebuiltBoundary	该角色边界已更新或运行时配置已保存（{changed}），已作废旧会话，按新边界重开；上下文恢复结果以引擎实际返回为准。	This role's boundary was updated or the runtime configuration was saved ({changed}); the old session was invalidated and reopened against the new boundary. The context restore result is subject to the engine's actual response.
+B3	main.session.rebuiltSkills	该角色已安装技能已变更（{changed}），已作废旧会话，按新技能登记重开；上下文恢复结果以引擎实际返回为准。	This role's installed skills changed ({changed}); the old session was invalidated and reopened with the new skill registrations. The context restore result is subject to the engine's actual response.
+B3	main.session.rebuildFailed	按新边界重开会话失败：{detail}（请重试或点击左侧角色）。	Could not reopen the session against the new boundary: {detail} (retry or click the role on the left).
+B3	main.session.intentHandoffFailed	应用无法把意图交给 Draft（提案）：{detail}；未重试	The app could not hand the intent to Draft: {detail}; no retry
+B3	main.session.openProposalFailed	无法开启 Draft（提案）会话（{detail}）	Could not open the Draft session ({detail})
+B3	main.session.sendProposalFailed	发送任务给 Draft（提案）失败（{detail}）	Could not send the task to Draft ({detail})
+B3	main.session.proposalQueued	Draft（提案）工作中，已排队	Draft is working; the task is queued
+B3	main.session.proposalWorking	已交给 Draft（提案）（工作中）	Handed to Draft (working)
+B3	main.session.intentHandedOff	已把意图「{intentId}」交给 Draft（提案）（handoffKind={handoffKind}）——交接 ≠ 客户批准。	Intent “{intentId}” handed to Draft (handoffKind={handoffKind}) — handoff ≠ customer approval.
+B3	main.session.clarificationEmpty	澄清问题不能为空；未提交。	The clarification question cannot be empty; not submitted.
+B3	main.session.clarificationDisplayFailed	无法在主入口显示澄清请求；未提交。	Could not display the clarification request in the primary entry; not submitted.
+B3	main.session.clarificationShown	已在主入口（{roleId}）显示；客户回答后由 Lead（主理）更新意图并交接。	Shown in the primary entry ({roleId}); after the customer answers, Lead updates the intent and hands it off.
+B3	main.session.missingProjectOrRole	缺少项目根或角色 id。	Missing project root or role id.
+B3	main.session.readyContinue	会话已就绪，续接当前会话。	Session ready; continuing the current session.
+B3	main.session.closedClickRole	会话已关闭，请重新点击角色。	The session is closed; click the role again.
+B3	main.session.continuing	已在该角色的会话中，续接当前会话。	Already in this role's session; continuing it.
+B3	main.session.configAfterTurn	当前轮次继续使用原配置，新配置在轮次结束后应用。	The current turn keeps the old configuration; the new configuration applies after the turn ends.
+B3	main.session.boundaryRebuildFailed	该角色边界已更新，但按新边界重开会话失败：{detail}。请重试。	This role's boundary was updated, but reopening the session against the new boundary failed: {detail}. Please retry.
+B3	main.session.projectNotEnumerated	尚未枚举该项目；请先导入项目（app:list-project）。	The project has not been enumerated; import the project first (app:list-project).
+B3	main.session.roleNotFound	项目 {projectRoot} 下未找到角色：{roleId}	Role not found under project {projectRoot}: {roleId}
+B3	main.session.eventStreamError	会话事件流异常：{detail}	Session event stream error: {detail}
+B3	main.session.rebuildFailedNoSend	该角色边界已更新，但按新边界重开会话失败：{detail}——本条消息未发送，请重试。	This role's boundary was updated, but reopening the session against the new boundary failed: {detail} — this message was not sent; please retry.
+B3	main.session.notOpen	会话尚未开启（点击左侧角色即可开启）。	The session is not started (click the role on the left to start it).
+B3	main.session.youMessage	你：{text}	You: {text}
+B3	main.session.stopNoSession	角色 {roleId} 没有打开的会话——没有可停止的轮次。	Role {roleId} has no open session — there is no turn to stop.
+B3	main.session.stopUnsupported	当前运行时不支持停止	The current runtime does not support stopping
+B3	main.session.stopNoMatch	没有匹配的会话，请指定项目与运行时。	No matching session; specify the project and runtime.
+B3	main.session.releasedRole	已关闭与角色 {roleId} 的会话（历史记录保留在界面上）。	Closed the session with role {roleId} (history stays on screen).
+B3	main.session.releaseError	释放会话出错：{detail}	Error releasing the session: {detail}
+B3	main.session.noOpenSessions	当前没有打开的会话。	No open sessions.
+B3	main.session.closed	会话已关闭。	Session closed.
+B3	main.session.closedAll	已关闭全部会话（{count} 个）。	Closed all sessions ({count}).
+B3	main.session.recoveryDelivery	恢复投递 · 来自 {role}	Recovery delivery · from {role}
+B3	main.session.withdrawIncomplete	撤回参数不完整。	Incomplete withdrawal parameters.
+B3	main.session.withdrawRunning	该条已进入「进行中」，撤回无效（它正在被执行）。	This item is already “in progress”; withdrawal has no effect (it is being executed).
+B3	main.session.withdrawNotCustomer	该条不是客户消息（派发/回交属治理流）——只读，不可撤回。	This item is not a customer message (dispatch/handback belong to the governance flow) — read-only, cannot be withdrawn.
+B3	main.session.withdrawNotQueued	该条不在排队中（可能已投递或已撤回）。	This item is not queued (it may have been delivered or withdrawn).
+B3	main.session.safeCopyPending	交接内容（安全显示副本）：等待生成	Handback content (safe display copy): pending generation
+B3	main.session.saveSnapshotExpired	原保存材料已失效。	The original saved material has expired.
+B3	main.session.saveUnsupported	当前会话不支持此保存操作。	The current session does not support this save operation.
+B3	main.session.handbackMalformed	收到一条**形状不符**的回交事件（缺 handback 载荷 / 缺 roleId）——**未投递**（如实忽略；不崩、不静默）。	Received a **malformed** handback event (missing handback payload / missing roleId) — **not delivered** (ignored honestly; no crash, no silence).
+B3	main.session.handbackRenderFailed	回交载荷无法渲染（{detail}）——**未投递**（如实忽略；不崩）。	Could not render the handback payload ({detail}) — **not delivered** (ignored honestly; no crash).
+B3	main.session.handbackException	回交处理异常已拦截（不产生未捕获拒绝）：{detail}	Handback processing exception intercepted (no unhandled rejection): {detail}
+B3	main.session.dispatchRejectedEmpty	派发未受理：roleId 与 task 都必须非空。	Dispatch not accepted: roleId and task must both be non-empty.
+B3	main.session.dispatchNoDispatcher	派发未受理：未枚举到本项目治理模型下的派发主人（trio=Steward（统筹） / single=主入口）——**未投递**。	Dispatch not accepted: could not find the dispatch owner for this project's governance model (trio=Steward / single=primary entry) — **not delivered**.
+B3	main.session.dispatchNoDispatcherShort	派发未受理：未枚举到派发主人——**未投递**（不静默）。	Dispatch not accepted: no dispatch owner found — **not delivered** (not silent).
+B3	main.session.dispatchWrongSource	派发未受理：来源角色 {from} 不是本项目派发主人 {dispatcher}{modelNote}。	Dispatch not accepted: source role {from} is not this project's dispatch owner {dispatcher}{modelNote}.
+B3	main.session.dispatchWrongSourceShort	派发未受理：来源角色 {from} 不是派发主人 {dispatcher}——**未投递**（不静默）。	Dispatch not accepted: source role {from} is not the dispatch owner {dispatcher} — **not delivered** (not silent).
+B3	main.session.dispatchUnknownTarget	派发未受理：角色 {roleId} 不在本项目（未枚举到）。	Dispatch not accepted: role {roleId} is not in this project (not enumerated).
+B3	main.session.dispatchUnknownTargetShort	派发未受理：角色 {roleId} 不在本项目——**未投递**（不静默）。	Dispatch not accepted: role {roleId} is not in this project — **not delivered** (not silent).
+B3	main.session.dispatchBuiltinTarget	派发未受理：{roleId} 是内置治理角色（trio 三人与 su 均不可被派发）——派发对象应是项目角色。	Dispatch not accepted: {roleId} is a built-in governance role (neither the trio nor su can receive dispatches) — dispatch targets must be project roles.
+B3	main.session.dispatchBuiltinTargetShort	派发未受理：{roleId} 是内置治理角色——**未投递**（不静默）。	Dispatch not accepted: {roleId} is a built-in governance role — **not delivered** (not silent).
+B3	main.session.dispatchGateDenied	派发被治理门禁拒绝：{message}	Dispatch rejected by the governance gate: {message}
+B3	main.session.dispatchGateRejected	派发未受理（治理门禁 {code}）：{message}——**未投递**（不静默）。	Dispatch not accepted (governance gate {code}): {message} — **not delivered** (not silent).
+B3	main.session.dispatchDuplicateCoordinate	该协调消息（目标 {roleId}，同内容/流程）已在投递队列中——已去重，不重复投递。	This coordination message (target {roleId}, same content/flow) is already in the delivery queue — deduplicated, not delivered again.
+B3	main.session.dispatchDuplicate	该派发（目标 {roleId}，同任务文本/流程步骤）已在投递队列中——已去重，不重复投递。	This dispatch (target {roleId}, same task text/flow step) is already in the delivery queue — deduplicated, not delivered again.
+B3	main.session.dispatchSummaryCoordinate	协调 · 来自 {from} → {to}：{text}	Coordination · from {from} → {to}: {text}
+B3	main.session.dispatchSummary	派发 · 来自 {from}：{text}	Dispatch · from {from}: {text}
+B3	main.session.sessionWillAutoOpen	（其会话未开——将自动开启）	 (its session is not open — it will open automatically)
+B3	main.session.acceptedCoordinate	已受理：协调消息将投递给 {to}{openNote}（来源 {from} → Steward；协调 ≠ 客户批准，不解除任何派发/验收门禁；受理≠已完成）。	Accepted: the coordination message will be delivered to {to}{openNote} (source {from} → Steward; coordination ≠ customer approval and does not clear any dispatch/acceptance gate; accepted ≠ completed).
+B3	main.session.acceptedTask	已受理：任务将投递给角色 {to} 的会话{openNote}；投递结果/失败会在其聊天流与 {from} 的聊天流如实显示（受理≠已完成）。	Accepted: the task will be delivered to role {to}'s session{openNote}; delivery results/failures are shown honestly in its chat stream and in {from}'s chat stream (accepted ≠ completed).
+B3	main.session.recoveryNoMatch	未找到匹配的会话（请指定项目与运行时）。	No matching session found; specify the project and runtime.
+B3	main.session.recoveryNoSession	该角色没有打开的会话——无可重建的会话（可先在界面点开该角色，或改用其他动作）。	This role has no open session — nothing to rebuild (open the role in the UI first, or use another action).
+B3	main.session.recoveryBusy	该角色有轮次在跑——不打断（可先 abort-turn 停止本轮，或等其结束后重试）。	This role has a running turn — not interrupted (stop the turn with abort-turn first, or retry after it ends).
+B3	main.session.recoveryConcurrent	会话状态已变化（并发开启/重建）——本次重建未执行，请核对后重试。	Session state changed (concurrent open/rebuild) — this rebuild was not executed; verify and retry.
+B3	main.session.rebuiltByRecovery	已按要求（客户确认的恢复动作）重建角色 {roleId} 的会话（保留 ANS 回放）；上下文恢复结果以引擎实际返回为准。	Rebuilt role {roleId}'s session as requested (customer-confirmed recovery action; ANS replay retained). The context restore result is subject to the engine's actual response.
+B3	main.session.redeliverNoMatch	未找到匹配的会话/队列（请指定项目与运行时）。	No matching session/queue found; specify the project and runtime.
+B3	main.session.redeliverInFlight	该条目已进入「进行中」（正在投递/执行）——无需重投（其收尾按既有 settled 语义）。	This item is already “in progress” (being delivered/executed) — no redelivery needed (it settles per the existing settled semantics).
+B3	main.session.redeliverNotQueued	条目不在排队中（可能已投出、已撤回或 id 不符）——未触发重试。	The item is not queued (it may have been sent, withdrawn, or the id does not match) — no retry triggered.
+B3	main.session.redeliverQueued	已触发队列重试；该条目仍在队列第 {position} 位（目标忙或未开——保留待重试，下次时机自动再试）。	Queue retry triggered; the item is still at queue position {position} (target busy or not open — kept for retry, which happens automatically at the next opportunity).
+B3	main.session.redeliverSent	已触发队列重试；该条目已出队投出（进行中）。	Queue retry triggered; the item left the queue and was sent (in progress).
+B3	main.session.redeliverGone	已触发队列重试；该条目已不在队列（已在本次重试中投出，或已被处理/撤回）。	Queue retry triggered; the item is no longer queued (it was sent during this retry, or was handled/withdrawn).
+B3	main.session.redeliverCleared	已触发队列重试；队列已清空，该角色的投递已在途（进行中）。	Queue retry triggered; the queue is empty and this role's delivery is in flight (in progress).
+B3	main.session.redeliverEmpty	已触发队列重试；该角色的投递队列已空。	Queue retry triggered; this role's delivery queue is empty.
+B3	main.session.redeliverRemaining	已触发队列重试；仍有 {count} 条在队列（目标忙或未开——保留待重试），{inflight}。	Queue retry triggered; {count} items remain queued (target busy or not open — kept for retry), {inflight}.
+B3	main.session.redeliverInFlightOne	1 条在途	1 in flight
+B3	main.session.redeliverNoInflight	无在途	none in flight
+B3	main.session.recoveryProposalRejected	恢复提议未受理：{message}	Recovery proposal not accepted: {message}
+B3	main.session.recoveryRoleEmpty	roleId 必须非空。	roleId must be non-empty.
+B3	main.session.recoveryBadAction	action 必须是 abort-turn / rebuild-session / redeliver（收到 {type}）。	action must be abort-turn / rebuild-session / redeliver (received {type}).
+B3	main.session.recoveryMissingEvidence	evidence（证据）必须非空——恢复动作必须有事实依据。	evidence must be non-empty — recovery actions require factual grounds.
+B3	main.session.recoveryTargetMissing	角色 {roleId} 不在本项目（未枚举到）——未推送任何确认卡。	Role {roleId} is not in this project (not enumerated) — no confirmation card was pushed.
+B3	main.session.recoveryTargetBuiltin	{roleId} 是内置治理角色——恢复动作只针对项目角色（未推送任何确认卡）。	{roleId} is a built-in governance role — recovery actions target project roles only (no confirmation card was pushed).
+B3	main.session.recoveryAbortRequested	已请求停止角色「{roleId}」的当前轮次——轮次仍以既有 settled 收尾（不制造「已停止」假象）。	Requested stopping role “{roleId}”'s current turn — the turn still settles via the existing settled path (no fake “stopped” state).
+B3	main.session.recoveryAbortFailed	停止失败（未知原因）——未假装已执行。	Stop failed (unknown reason) — not pretending it was executed.
+B3	main.session.recoveryRebuilt	角色「{roleId}」的会话已重建（保留历史回放；上下文恢复结果以引擎实际返回为准）。	Rebuilt role “{roleId}”'s session (history replay retained; the context restore result is subject to the engine's actual response).
+B3	main.session.recoveryRebuildFailed	重建失败（未知原因）——没有任何动作发生。	Rebuild failed (unknown reason) — no action took place.
+B3	main.session.recoveryChannelUnwired	恢复确认通道未接线——未获执行（fail-closed），没有任何动作发生。	Recovery confirmation channel not wired — not executed (fail-closed); no action took place.
+B3	main.session.recoveryDeclined	客户未确认（拒绝/取消，或确认通道失效）——「{action}」没有执行，也没有任何动作发生。	The customer did not confirm (rejected/cancelled, or the confirmation channel expired) — “{action}” was not executed and no action took place.
+B3	main.session.recoveryReceipt	恢复回执（{action} · 角色 {roleId}）：{message}	Recovery receipt ({action} · role {roleId}): {message}
+B3	main.session.recoveryAutoText	[系统·恢复] 恢复提议由桌面**自动执行**（「替我决策」开关开启——自动执行 ≠ 客户逐项批准）：{action} · 角色 {roleId} · {executed}。	[System·Recovery] The recovery proposal was **executed automatically** by the desktop (“Decide for me” switch on — automatic execution ≠ per-item customer approval): {action} · role {roleId} · {executed}.
+B3	main.session.recoveryAutoSummary	系统·恢复 · 自动执行 · {action} · 角色 {roleId} · {executed}	System·Recovery · auto-executed · {action} · role {roleId} · {executed}
+B3	main.session.executed	已执行	executed
+B3	main.session.notExecuted	未执行	not executed
+B3	main.session.configNextSession	该角色当前没有打开的会话（并非在跑轮次）——新会话打开即生效。	This role has no open session (no turn is running) — the new configuration takes effect when a new session opens.
+B3	main.session.install.notCustomerTurn	本动作仅可在客户消息发起的轮次执行——未执行。	This action can only run in a turn initiated by a customer message — not executed.
+B3	main.session.install.roleNotFound	角色「{roleId}」不是本项目项目角色（或为内置治理角色）——未执行。	Role “{roleId}” is not a project role of this project (or is a built-in governance role) — not executed.
+B3	main.session.install.skillNotRegistered	技能未登记：docs/skills/{name}/install.md 不存在——先落盘再{verb}；未执行。	Skill not registered: docs/skills/{name}/install.md does not exist — write it first, then {verb}; not executed.
+B3	main.session.install.skillNotRegisteredInstall	技能未登记：docs/skills/{name}/install.md 不存在——先落盘再安装；未执行。	Skill not registered: docs/skills/{name}/install.md does not exist — write it first, then install; not executed.
+B3	main.session.install.skillNotRegisteredUninstall	技能未登记：docs/skills/{name}/install.md 不存在或不可解析——没有可撤销的登记；未执行。	Skill not registered: docs/skills/{name}/install.md does not exist or cannot be parsed — nothing to unregister; not executed.
+B3	main.session.install.roleNotListed	登记中未包含角色「{roleId}」——未执行；如确要安装请先更新登记。	The registration does not include role “{roleId}” — not executed; update the registration first if installation is intended.
+B3	main.session.install.skillStatus	技能未登记为已安装：docs/skills/{name}/install.md 状态为「{status}」——先改登记再安装；未执行。	Skill not registered as installed: docs/skills/{name}/install.md status is “{status}” — update the registration before installing; not executed.
+B3	main.session.install.registrationUnchanged	登记仍含角色「{roleId}」——先改登记再卸载；未执行。	The registration still includes role “{roleId}” — update the registration before uninstalling; not executed.
+B3	main.session.install.skillMissing	技能内容缺失：{path} 不存在或不可读——先落盘再安装；未执行。	Skill content missing: {path} does not exist or is unreadable — write it first, then install; not executed.
+B3	main.session.install.skillMissingUninstall	技能内容缺失：{path} 不存在或不可读——无法如实回执（sha256 与「文件保留」陈述）；未执行。	Skill content missing: {path} does not exist or is unreadable — cannot issue an honest receipt (sha256 and “file retained” statement); not executed.
+B3	main.session.install.rebuildFailed	技能登记已{action}，但按新登记重建角色「{roleId}」的会话失败：{detail}——登记仍在、会话未重建（未假装已生效；可在该角色下一次打开会话时生效，或重试）。	Skill registration was {action}, but rebuilding role “{roleId}”'s session with the new registration failed: {detail} — the registration remains and the session was not rebuilt (not pretending it took effect; it can take effect the next time the role opens a session, or retry).
+B3	main.session.install.effectiveRebuilt	已重建该角色会话、即刻生效	this role's session was rebuilt and takes effect immediately
+B3	main.session.install.effectiveNextSession	该角色当前未打开会话——新会话起生效	this role currently has no open session — effective from the next session
+B3	main.session.install.effectiveAfterTurn	该角色正在运行轮次（不打断）——新会话起生效	this role has a running turn (not interrupted) — effective from the next session
+B3	main.session.install.installedSkill	已安装技能「{name}」→ 角色「{roleId}」；{effective}；内容：{path}（sha256 {digest}）。	Installed skill “{name}” → role “{roleId}”; {effective}; content: {path} (sha256 {digest}).
+B3	main.session.install.uninstalledSkill	已卸载技能「{name}」（角色「{roleId}」）；效果已撤，文件保留于 {path}（sha256 {digest}）；{effective}。	Uninstalled skill “{name}” (role “{roleId}”); the effect was withdrawn, the file remains at {path} (sha256 {digest}); {effective}.
+B3	main.session.install.summarySkill	系统·安装 · 已{verb}技能「{name}」· 角色「{roleId}」· {effectiveShort}	System·Install · {verb} skill “{name}” · role “{roleId}” · {effectiveShort}
+B3	main.session.install.effectiveShortRebuilt	即刻生效（已重建）	effective immediately (rebuilt)
+B3	main.session.install.effectiveShortNextSession	新会话起生效	effective from the next session
+B3	main.session.install.mcpNotRegistered	MCP 未登记：docs/mcp/{name}.md 不存在——先落盘再{verb}；未执行。	MCP not registered: docs/mcp/{name}.md does not exist — write it first, then {verb}; not executed.
+B3	main.session.install.mcpNotRegisteredInstall	MCP 未登记：docs/mcp/{name}.md 不存在——先落盘再安装；未执行。	MCP not registered: docs/mcp/{name}.md does not exist — write it first, then install; not executed.
+B3	main.session.install.mcpNotRegisteredUninstall	MCP 未登记：docs/mcp/{name}.md 不存在或不可解析——没有可撤销的声明；未执行。	MCP not registered: docs/mcp/{name}.md does not exist or cannot be parsed — nothing to revoke; not executed.
+B3	main.session.install.mcpStatus	MCP 未登记为已安装：docs/mcp/{name}.md 状态为「{status}」——先改声明再安装；未执行。	MCP not registered as installed: docs/mcp/{name}.md status is “{status}” — update the declaration before installing; not executed.
+B3	main.session.install.mcpDeclarationMissing	MCP 未登记：{path} 不存在——先落盘再安装；未执行。	MCP not registered: {path} does not exist — write it first, then install; not executed.
+B3	main.session.install.mcpDeclarationMissingUninstall	MCP 声明缺失：{path} 不存在或不可读——无法如实回执（sha256 与「文件保留」陈述）；未执行。	MCP declaration missing: {path} does not exist or is unreadable — cannot issue an honest receipt (sha256 and “file retained” statement); not executed.
+B3	main.session.install.mcpRebuildFailed	MCP 声明已{action}，但按新声明重建角色「{roleId}」的会话失败：{detail}——声明仍在、会话未重建（未假装已生效；可在该角色下一次打开会话时生效，或重试）。	MCP declaration was {action}, but rebuilding role “{roleId}”'s session with the new declaration failed: {detail} — the declaration remains and the session was not rebuilt (not pretending it took effect; it can take effect the next time the role opens a session, or retry).
+B3	main.session.install.installedMcp	已安装 MCP「{name}」→ 角色「{roleId}」；{effective}；声明：{path}（sha256 {digest}）；外来 MCP 工具在 ANS 门禁之外执行（能力级授予，非逐调用受审）。	Installed MCP “{name}” → role “{roleId}”; {effective}; declaration: {path} (sha256 {digest}); external MCP tools run outside ANS gates (capability-level grant, not per-call review).
+B3	main.session.install.uninstalledMcp	已卸载 MCP「{name}」（角色「{roleId}」）；效果已撤，声明文件保留于 {path}（sha256 {digest}）；已发生的副作用不可撤；{effective}。	Uninstalled MCP “{name}” (role “{roleId}”); the effect was withdrawn, the declaration file remains at {path} (sha256 {digest}); side effects already caused cannot be undone; {effective}.
+B3	main.session.install.summaryMcp	系统·安装 · 已{verb}MCP「{name}」· 角色「{roleId}」· {effectiveShort}	System·Install · {verb} MCP “{name}” · role “{roleId}” · {effectiveShort}
+B3	main.session.delivery.malformedItem	投递条目形状不符（缺正文/来源）——已丢弃该条并如实记行（不崩）。	Malformed delivery item (missing body/source) — item dropped and recorded honestly (no crash).
+B3	main.session.delivery.machineryException	投递机异常已拦截（不产生未捕获拒绝）：{detail}	Delivery machinery exception intercepted (no unhandled rejection): {detail}
+B3	main.session.delivery.noTarget	有{kind}（来自 {sourceRoleId}）待投递，但当前枚举不到目标（主入口角色）——**未投递**（已保留；下次时机自动重试）。	A {kind} (from {sourceRoleId}) is waiting for delivery, but the target (primary entry) cannot be found — **not delivered** (kept; retried automatically at the next opportunity).
+B3	main.session.delivery.openFailedHandback	有回交（来自 {sourceRoleId}）待投递，但**开启 {target} 会话失败**：{detail}——未投递（已保留；下次时机自动重试：你打开 {target}、或下一次回交/一轮结束）。	A handback (from {sourceRoleId}) is waiting for delivery, but **opening {target}'s session failed**: {detail} — not delivered (kept; retried automatically at the next opportunity: when you open {target}, or on the next handback/turn end).
+B3	main.session.delivery.openFailedDispatch	有派发任务（来自 {sourceRoleId}）待投递给角色 {target}，但**开启其会话失败**：{detail}——未投递（已保留；下次时机自动重试：你打开该角色、或下一次派发/一轮结束）。	A dispatched task (from {sourceRoleId}) is waiting for delivery to role {target}, but **opening its session failed**: {detail} — not delivered (kept; retried automatically at the next opportunity: when you open that role, or on the next dispatch/turn end).
+B3	main.session.delivery.handbackBatch	回交批次 · {count} 份报告 · 来自 {roles}	Handback batch · {count} reports · from {roles}
+B3	main.session.delivery.autoDelivered	已自动投递 {roles} 的回交给 {target}（等待验收与汇总）。	Automatically delivered the handback(s) from {roles} to {target} (awaiting acceptance and summary).
+B3	main.session.delivery.dispatchedNote	已派发任务给 {target}（已投递到其会话；其结果/回交会回到本会话）。	Dispatched the task to {target} (delivered to its session; its result/handback returns to this session).
+B3	main.session.delivery.handbackFailed	回交投递失败（来自 {sourceRoleId}）：{detail}——未丢弃，已保留待重试（下次时机自动重试）。	Handback delivery failed (from {sourceRoleId}): {detail} — not discarded; kept for retry (retried automatically at the next opportunity).
+B3	main.session.delivery.dispatchFailed	派发投递失败（目标 {target}）：{detail}——**未丢弃**，已保留待重试（下次时机自动重试）。	Dispatch delivery failed (target {target}): {detail} — **not discarded**; kept for retry (retried automatically at the next opportunity).
+B3	main.session.delivery.systemFailed	系统消息投递失败（目标 {target}）：{detail}——**未丢弃**，已保留待重试（下次时机自动重试）。	System message delivery failed (target {target}): {detail} — **not discarded**; kept for retry (retried automatically at the next opportunity).
+B3	main.session.delivery.queuedFailed	排队消息投递失败（角色 {target}）：{detail}——**未丢弃**，已保留待重试（下次时机自动重试）。	Queued message delivery failed (role {target}): {detail} — **not discarded**; kept for retry (retried automatically at the next opportunity).
+B3	main.session.delivery.maybeProcessed	可能已经处理或保存状态未知，未自动重发；可核对历史保存状态。	It may already have been processed or its save status is unknown; not resent automatically. Check the history save status.
+B3	main.session.delivery.retained	输入尚未交给模型，未丢弃，已保留同一批次待重试。	The input has not been handed to the model and was not discarded; the same batch is kept for retry.
+B3	main.interface.toggleInvalid	开关请求无效（需 {enabled:boolean}）。	Invalid switch request (requires {enabled:boolean}).
+B3	main.interface.toggleNotBoolean	enabled 必须为布尔值。	enabled must be a boolean.
+B3	main.interface.toggleUnknownField	开关请求含未知字段。	The switch request contains unknown fields.
+B3	main.interface.teamPlanMissingTypeColumn	团队计划角色表缺少「类型」列（须标 new / changed / existing）	The team plan role table is missing the “Type” column (must be new / changed / existing)
+B3	main.interface.teamPlanNoSchemaV2	团队计划未声明 teamPlanSchema: 2：按 v1 兼容校验（不强制模块/公开契约/测试面等 v2 字段；建议迁移团队计划 v2）	The team plan does not declare teamPlanSchema: 2: validated for v1 compatibility (v2 fields such as modules/public contracts/test surface are not required; migrating the team plan to v2 is recommended)
+B3	main.interface.teamPlanNoFrontmatter	团队计划缺少 frontmatter（须含 flowId/version/riskTier/recommended）	The team plan is missing frontmatter (must include flowId/version/riskTier/recommended)
+B3	main.interface.teamPlanNoFlowId	团队计划 frontmatter 缺少 flowId	The team plan frontmatter is missing flowId
+B3	main.interface.teamPlanNoRecommended	团队计划缺少唯一的机器可读推荐集（recommended 内联数组或「推荐：」行；空集/重复/歧义不接受）	The team plan lacks a unique machine-readable recommendation set (a recommended inline array or a “Recommended:” line; empty/duplicate/ambiguous sets are not accepted)
+B3	main.interface.verifierFinished	Proof / 验收复核已结束（flowId={flowId}）；报告见 {report}（附件见 docs/verification/）与 {governance}；验收卡/客户决定由应用继续（本行不构成验收结论或客户批准）。	Proof / acceptance review finished (flowId={flowId}); report at {report} (attachments under docs/verification/) and {governance}; the acceptance card/customer decision continues in the app (this line is not an acceptance conclusion or customer approval).
+B3	main.interface.acceptanceCloseFailed	验收已通过但流程收口失败（流程 {flowId}）：{detail}；未派 verifier，流程保持待收口（请核对 flow YAML）。	Acceptance passed but flow closing failed (flow {flowId}): {detail}; no verifier dispatched, the flow remains pending closure (check the flow YAML).
+B3	main.interface.acceptanceClosed	验收已通过（判断代批或客户手批，以账本 customer.decision 为准），流程 {flowId} 已收口（保留验收步骤已标 done）。	Acceptance passed (judge delegation or manual customer approval, per the ledger's customer.decision); flow {flowId} is closed (the acceptance step remains marked done).
+B3	main.interface.deliveredStepsHeader	流程 {flowId}：以下步骤已 delivered，等待 Steward / 统筹 核证：	Flow {flowId}: the following steps are delivered, awaiting Steward verification:
+B3	main.interface.deliveredStepLine	- 步骤 {stepId} 已 delivered（owner={owner}），请核对账本/产物证据，用 flow_step_update 标 done 或退回修正；不要直接写 flow YAML。	- Step {stepId} is delivered (owner={owner}); verify the ledger/artifact evidence, then mark it done with flow_step_update or return it for rework; do not write the flow YAML directly.
+B3	main.interface.deliveredVerificationNote	核证要求：先核对账本与产物证据再更新步骤状态；未达 done 条件请退回修正；不要直接 write_file 流程 YAML。	Verification requirements: check ledger and artifact evidence before updating step status; return for rework when done conditions are not met; do not write the flow YAML directly with write_file.
+B3	main.interface.deliveredWaitNote	流程 {flowId}：步骤 {steps} 已 delivered，等待 Steward / 统筹 核证（已投核证任务）。	Flow {flowId}: steps {steps} are delivered, awaiting Steward verification (verification task dispatched).
+B3	main.interface.criteriaMissing	实施前验收标准缺失或为空（{path}）；未派验收判定	Pre-implementation acceptance criteria missing or empty ({path}); acceptance decision not dispatched
+B3	main.interface.changePackageMissing	变更包缺失（{path}）；未派验收判定	Change package missing ({path}); acceptance decision not dispatched
+B3	main.interface.changePackageNoRisk	变更包缺少 riskTier（T0–T3）：{path}；未派验收判定	Change package is missing riskTier (T0–T3): {path}; acceptance decision not dispatched
+B3	main.interface.flowValidationFailed	流程状态 YAML 校验失败：{detail}	Flow state YAML validation failed: {detail}
+B3	main.interface.advanceOpenFailed	收尾推进失败：无法开启 Proof / 验收 会话：{detail}；未自动重试。	Closing advance failed: could not open the Proof session: {detail}; no automatic retry.
+B3	main.interface.advanceSendFailed	收尾推进失败：发送验收任务给 Proof / 验收 失败：{detail}；未自动重试。	Closing advance failed: sending the acceptance task to Proof failed: {detail}; no automatic retry.
+B3	main.interface.piBusy	Pi 的旧轮次仍在执行，新配置将在其结束后应用。消息可继续排队。	Pi's previous turn is still running; the new configuration applies after it ends. Messages can keep queueing.
+B3	main.interface.readFileNotFound	文件不存在	File not found
+B3	main.interface.readFileFailed	读取失败：{detail}	Read failed: {detail}
+B3	main.interface.teamPlanMissingUnreadable	团队计划缺失或不可读（账本 appointment 已绑定该计划）；请 Steward / 统筹 重新写出计划后再校验	The team plan is missing or unreadable (the ledger appointment is bound to it); have Steward rewrite the plan before validating again
+B3	main.interface.teamPlanMissingLegacy	团队计划缺失：按 legacy 流程只做最低结构检查（建议迁移 team-plan / role-cards 流程）	Team plan missing: only the minimum structural checks are performed for legacy flows (migrating to the team-plan / role-cards flow is recommended)
+B3	main.interface.teamPlanRoleMissing	团队计划缺少推荐/任命角色 {roleId} 的角色行	The team plan is missing a role row for recommended/appointed role {roleId}
+B3	main.interface.teamPlanRoleTypeInvalid	团队计划角色 {roleId} 的类型缺失或不可识别（须为 new / changed / existing）	The team plan role {roleId} has a missing or unrecognized type (must be new / changed / existing)
+B3	main.interface.teamPlanRoleFieldEmpty	团队计划角色 {roleId} 的「{label}」为空（计划缺细节）	The team plan role {roleId} has an empty “{label}” (plan lacks detail)
+B3	main.interface.teamPlanFlowMismatch	frontmatter flowId="{planFlowId}" 与流程 {flowId} 不一致	frontmatter flowId="{planFlowId}" does not match flow {flowId}
+B3	main.interface.cardEmpty	文件为空（需要角色卡正文）	File is empty (role card body required)
+B3	main.interface.cardNoHeading	缺少 Markdown 标题（至少一行以 # 开头）	Missing Markdown heading (at least one line starting with #)
+B3	main.interface.cardMissingSection	缺少「{label}」章节或等价内容（第 5 项必填）	Missing the “{label}” section or equivalent content (item 5 is required)
+B3	main.interface.boundaryEmpty	文件为空（需要 role + entries 的边界 YAML）	File is empty (boundary YAML with role + entries required)
+B3	main.interface.boundaryParseFailed	边界 YAML 解析失败：{detail}	Boundary YAML parse failed: {detail}
+B3	main.interface.boundaryNoEntries	entries 为空（Section 1 至少需要一条条目）	entries is empty (Section 1 needs at least one entry)
+B3	main.interface.boundaryRoleMismatch	顶层 role 与目录 id 不一致（YAML role={declared}，目录={roleId}）	Top-level role does not match the directory id (YAML role={declared}, directory={roleId})
+B3	main.interface.boundaryMissingRootDocs	entries 缺少角色根工作文档条目 {path}（第 5 项必填）	entries is missing the role root work-document entry {path} (item 5 is required)
+B3	main.interface.boundaryOnlyRootDocs	entries 仅含角色根工作文档条目，未见团队计划的实际写集条目（请核对计划写集）	entries only contains role root work-document entries; no actual writeset entries from the team plan were found (check the plan writeset)
+B3	main.interface.directorySpecMissing	团队计划角色 {roleId} 的授权目录「{path}」缺少目录规范行（计划问题：请 Convener 补齐目录规范）	The authorized directory “{path}” for team plan role {roleId} has no directory-spec row (plan issue: ask Convener to add the directory spec)
+B3	main.interface.moduleImplMissing	团队计划模块「{module}」缺少实现目录，无法核对边界更宽部分（计划问题：请 Convener 补充实现目录）	Team plan module “{module}” has no implementation directory, so wider boundary parts cannot be checked (plan issue: ask Convener to add implementation directories)
+B3	main.interface.authorizedDirNotCoveredExisting	计划授权目录「{path}」未被 boundary.yaml entries 覆盖（existing：仅提醒，不阻塞；迁移提示：下次实质变更时补齐目录条目）	Authorized directory “{path}” is not covered by boundary.yaml entries (existing: warning only, not blocking; migration note: add the directory entry at the next substantive change)
+B3	main.interface.authorizedDirNotCovered	计划授权目录「{path}」未被 boundary.yaml entries 覆盖（Crew：按团队计划把该目录加入 Section 1；若计划目录本身有误，报告 Convener 修正计划）	Authorized directory “{path}” is not covered by boundary.yaml entries (Crew: add the directory to Section 1 per the team plan; if the plan directory itself is wrong, report it to Convener for correction)
+B3	main.interface.precisePathNotCoveredExisting	计划精确写集「{path}」未被 boundary.yaml entries 覆盖（existing：仅提醒，不阻塞；迁移提示：下次实质变更时补齐）	Precise write path “{path}” from the plan is not covered by boundary.yaml entries (existing: warning only, not blocking; migration note: add it at the next substantive change)
+B3	main.interface.precisePathNotCovered	计划精确写集「{path}」未被 boundary.yaml entries 覆盖（Crew：按团队计划把该文件加入 Section 1；若计划本身有误，报告 Convener 修正计划）	Precise write path “{path}” from the plan is not covered by boundary.yaml entries (Crew: add the file to Section 1 per the team plan; if the plan is wrong, report it to Convener for correction)
+B3	main.interface.boundaryDirWider	boundary.yaml 目录条目「{path}」{wider}（new 角色边界目录必须与计划授权目录一致，不得更宽/更窄；Crew 收窄边界或报告 Convener 修正计划）	boundary.yaml directory entry “{path}” {wider} (new role boundary directories must match the plan's authorized directories, neither wider nor narrower; Crew narrows the boundary or reports it to Convener for plan correction)
+B3	main.interface.boundaryDirWiderWord	比计划授权目录更宽	is wider than the authorized directory
+B3	main.interface.boundaryDirNotInPlan	不在计划授权目录集合中	is not in the authorized directory set
+B3	main.interface.boundaryMissingAuthorizedDir	boundary.yaml 缺少计划授权目录「{path}」的目录条目（new 角色边界目录必须与计划授权目录一致，不得更宽/更窄；Crew 补齐目录条目）	boundary.yaml is missing a directory entry for authorized directory “{path}” (new role boundary directories must match the plan's authorized directories, neither wider nor narrower; Crew adds the entry)
+B3	main.interface.boundaryDirWiderExisting	boundary.yaml 目录条目「{path}」比计划授权目录宽（existing：仅提醒，不阻塞；迁移提示：下次实质变更时按 v3 收窄/迁移{extra}）	boundary.yaml directory entry “{path}” is wider than the authorized directory (existing: warning only, not blocking; migration note: narrow/migrate per v3 at the next substantive change{extra})
+B3	main.interface.boundaryDirWiderExistingExtra	；且不在角色模块实现目录内，交 readiness 按既有职责复核	; and it is not inside the role's module implementation directories, so readiness must review it against existing duties
+B3	main.interface.boundaryDirWiderChanged	boundary.yaml 目录条目「{path}」比计划授权目录宽且不在角色模块实现目录内（changed：交 readiness 按既有职责复核，不硬拒）	boundary.yaml directory entry “{path}” is wider than the authorized directory and outside the role's module implementation directories (changed: readiness reviews it against existing duties; not hard-rejected)
+B3	main.interface.boundaryWiderMultiModule	boundary.yaml 更宽目录覆盖多个模块实现目录（{modules}；多模块扩张，交 readiness 复核）	A wider boundary.yaml directory covers multiple module implementation directories ({modules}; multi-module expansion — readiness review)
+B3	main.interface.writesetNotCoveredExisting	计划写集「{path}」未被 boundary.yaml entries 覆盖（existing：仅提醒，不阻塞；下次实质变更时补齐）	Plan writeset “{path}” is not covered by boundary.yaml entries (existing: warning only, not blocking; add it at the next substantive change)
+B3	main.interface.writesetNotCovered	计划写集「{path}」未被 boundary.yaml entries 覆盖（Crew：按团队计划把该路径加入 Section 1；若计划写集本身有误，报告 Convener 修正计划）	Plan writeset “{path}” is not covered by boundary.yaml entries (Crew: add the path to Section 1 per the team plan; if the plan writeset itself is wrong, report it to Convener for correction)
+B3	main.interface.docEmptyExisting	文件为空（existing/legacy：仅提醒）	File is empty (existing/legacy: warning only)
+B3	main.interface.docNoHeadingExisting	缺少 Markdown 标题（existing/legacy：仅提醒）	Missing Markdown heading (existing/legacy: warning only)
+B3	main.interface.featureMapNoContent	既无功能表/列表行，也未声明无直接负责的系统功能	No function table/list rows and no declaration of having no directly responsible system functions
+B3	main.interface.functionalDescriptionMissing	缺少职责/交接/代码位置或等价内容	Missing responsibilities/handoff/code locations or equivalent content
+B3	main.interface.memoNoContinuation	至少需要一行 YYYY-MM-DD 的续接记录	At least one YYYY-MM-DD continuation record is required
+B3	main.interface.apiSpecMissing	未包含接口/导出/契约说明，也未写 not-applicable + 非空理由	No interface/export/contract description and no not-applicable + non-empty reason
+B3	main.interface.apiSpecNotApplicableNoReason	api-spec.md 标为 not-applicable 但未给出非空理由	api-spec.md is marked not-applicable but gives no non-empty reason
+B3	main.interface.projectListWarning	listProject 警告：{warning}	listProject warning: {warning}
+B3	main.interface.writeValidationFailed	流程 {flowId}：写卡产物未通过校验（appointment 步骤不能继续；未派 Steward / 统筹 做 role-readiness，也未把步骤标为 done）。	Flow {flowId}: the role-card/write artifacts failed validation (the appointment step cannot continue; Steward was not dispatched for role-readiness and the step was not marked done).
+B3	main.interface.specificProblems	具体问题：	Specific problems:
+B3	main.interface.warningsHeader	提醒（不阻塞，existing/legacy 角色）：	Warnings (non-blocking, existing/legacy roles):
+B3	main.interface.fixWriteCard	请修正上述文件后**重新发 appointment-write 确认卡**完成写卡（role-card.md 需含第 5 项必填章节；boundary.yaml 需为合法 YAML，顶层 role 与目录 id 一致，entries 含角色根工作文档与实际写集；工作文档按 feature-map/functional-description/memo/api-spec 补齐，api-spec 不适用时写 not-applicable + 非空理由）。	Fix the files above, then **send a new appointment-write confirmation card** to finish writing (role-card.md must contain the item-5 required sections; boundary.yaml must be valid YAML with top-level role matching the directory id and entries covering the role root work documents and the actual writeset; complete the work documents per feature-map/functional-description/memo/api-spec, and write not-applicable + a non-empty reason when api-spec does not apply).
+B3	main.interface.fixTeamPlanV3	请按 v3 修正/补充团队计划（frontmatter teamPlanSchema: 3 与非空 directories；模块清单每个 module 的非空实现目录；角色表授权目录/精确写集；目录规范表 12 字段；每目录唯一 owner/不重叠/共享策略；治理关键路径只精确授权），必要时递增版本并重发任命卡；修正后应用会重新校验。	Fix/complete the team plan per v3 (frontmatter teamPlanSchema: 3 and non-empty directories; a non-empty implementation directory for every module; authorized directories/precise writesets in the role table; a 12-field directory-spec table; one unique owner per directory / no overlaps / sharing strategy; governance-critical paths authorized by exact files only), bump the version if needed, and resend the appointment card; the app re-validates after the fix.
+B3	main.interface.fixTeamPlanLegacy	请修正/补充团队计划（frontmatter flowId/version/riskTier/recommended；角色表逐角色含类型 new/changed/existing、职责目标、能力要求、唯一写集、依赖），必要时递增为 v2 并重发任命卡；修正后应用会重新校验。	Fix/complete the team plan (frontmatter flowId/version/riskTier/recommended; per-role type new/changed/existing, responsibility goals, capability requirements, unique writeset, dependencies), bump it to v2 if needed, and resend the appointment card; the app re-validates after the fix.
+B3	main.interface.teamPlanValidationFailed	流程 {flowId}：团队计划未通过结构校验（任命的写卡步骤暂停；Crew 不自行补计划，应用未派 role-readiness、未把步骤标为 done）。	Flow {flowId}: the team plan failed structural validation (the appointment's card-writing step is paused; Crew does not fix plans on its own, and the app did not dispatch role-readiness or mark the step done).
+B3	main.interface.crewBlocking	Crew / 组队 修正 {count} 个	Crew fixes {count}
+B3	main.interface.planBlocking	Steward / 统筹 补充计划 {count} 个	Steward completes plan items {count}
+B3	main.interface.writeBlockingSummary	写卡产物未通过校验（流程 {flowId}）：{count} 个问题——已反馈 {routed}；未派 Steward / 统筹 做 role-readiness、未把 appointment 步骤标为 done。首个问题：{path}：{issue}	The write artifacts failed validation (flow {flowId}): {count} issues — routed {routed}; Steward was not dispatched for role-readiness and the appointment step was not marked done. First issue: {path}: {issue}
+B3	main.interface.queueKind.handback	回交	Handback
+B3	main.interface.queueKind.dispatch	派发	Dispatch
+B3	main.interface.queueKind.system	系统	System
+B3	main.interface.queueKind.message	消息	Message
+B3	main.interface.queueRecovered	已从上次运行恢复 {count} 条任务并重投（应用重启/崩溃后续跑；不弹客户卡、不把步骤标 done）：
+{lines}	Recovered and redelivered {count} tasks from the previous run (resuming after app restart/crash; no customer cards, no steps marked done):
+{lines}
+B3	main.interface.staleSteps	流程 {flowId}：检测到 {count} 个步骤可能因应用重启/崩溃丢失（flow YAML 标记为已派发，但 owner 无会话/队列/在途投递）：
+{facts}
+请用 flow_get 核对当前 revision，必要时用 flow_step_supersede 换新步骤并 dispatch_task 重派；不要重复使用已派 stepId。	Flow {flowId}: {count} steps may have been lost due to an app restart/crash (the flow YAML marks them dispatched, but the owner has no session/queue/in-flight delivery):
+{facts}
+Use flow_get to check the current revision; if needed, use flow_step_supersede to create new steps and dispatch_task to redispatch; do not reuse dispatched stepIds.
+B3	main.interface.saveProjectNotActive	该项目不是当前导入项目。	This project is not the current imported project.
+B3	main.interface.missingProjectRoot	缺少项目根路径。	Missing project root path.
+B3	main.interface.pinCheckFailed	pin 证据检查失败：{detail}	Pin evidence check failed: {detail}
+B3	main.interface.projectNotCurrent	项目不是当前导入项目；本次未写入任何文件。	The project is not the current imported project; no files were written this time.
+B3	main.interface.governanceModelInvalid	governanceModel 必须是 single 或 trio；本次未写入任何文件。	governanceModel must be single or trio; no files were written this time.
+B3	main.interface.confirmMissing	缺少操作者确认（confirm:true）；本次未写入任何文件。	Missing operator confirmation (confirm:true); no files were written this time.
+B3	main.interface.previewDigestInvalid	缺少有效的预览摘要（previewDigest 必须为 64 位十六进制）；本次未写入任何文件。	Missing a valid preview digest (previewDigest must be 64 hex characters); no files were written this time.
+B3	main.interface.sessionRequestInvalid	会话请求须指定项目、角色与运行时。	Session requests must specify the project, role, and runtime.
+B3	main.interface.imageNotSent	图片未发送（{detail}）——本条消息未发出，请移除该图后重试。	Image not sent ({detail}) — this message was not sent; remove the image and retry.
+B3	main.interface.imageNotSentUnsupported	图片未发送（内容不是受支持的图片——真实格式不在 {mimes} 之内，扩展名/声明类型不作数）。本条消息未发出，请移除该图后重试。	Image not sent (the content is not a supported image — the real format is not among {mimes}; file extensions/declared types do not count). This message was not sent; remove the image and retry.
+B3	main.interface.autoAdvanceFailed	自动推进失败：{detail}	Automatic advance failed: {detail}
+B3	main.interface.autoAdvanceStalled	自动推进停住：{detail}	Automatic advance stalled: {detail}
+B3	main.interface.dispatchNoProjectRoot	缺少项目根，无法后台派发	Missing project root; cannot dispatch in the background
+B3	main.interface.dispatchNoRuntime	缺少运行时，无法后台派发	Missing runtime; cannot dispatch in the background
+B3	main.interface.openSessionFailed	无法开启 {label} 会话：{detail}	Could not open the {label} session: {detail}
+B3	main.interface.sendTaskFailed	发送任务给 {label} 失败：{detail}	Sending the task to {label} failed: {detail}
+B3	main.interface.missingFlowIdWrite	缺少流程信息（flowId），未派发写卡任务	Missing flow information (flowId); card-writing task not dispatched
+B3	main.interface.appointmentNotApproved	账本最新任命决定为 {decision}（未获客户同意），未派发写卡任务	The latest appointment decision in the ledger is {decision} (not approved by the customer); card-writing task not dispatched
+B3	main.interface.missingAppointmentList	缺少任命名单，未派发写卡任务	Missing appointment list; card-writing task not dispatched
+B3	main.interface.teamPlanMissingBound	流程 {flowId}：团队计划缺失（docs/scheduling/{flowId}-team-vN.md）{bound}；未派 Crew 写卡、未继续推进。请 Steward / 统筹 先写团队计划。	Flow {flowId}: team plan missing (docs/scheduling/{flowId}-team-vN.md){bound}; Crew card-writing not dispatched and the flow did not advance. Have Steward write the team plan first.
+B3	main.interface.teamPlanMissingShort	团队计划缺失{bound}；未派 Crew 写卡（不猜计划、不自行扩大职责）	Team plan missing{bound}; Crew card-writing not dispatched (no guessing plans, no unilateral scope expansion)
+B3	main.interface.appointmentVsPlanMismatch	客户实际任命名单（{appointed}）与团队计划推荐集（{recommended}）不同；请 Steward / 统筹 修订团队计划为 {version} 以反映实际任命（Crew 只按实际名单写卡）。	The customer's actual appointment list ({appointed}) differs from the team plan's recommended set ({recommended}); have Steward revise the team plan to {version} to reflect the actual appointment (Crew writes cards only for the actual list).
+B3	main.interface.missingFlowOrList	缺少流程信息（flowId/任命名单），未自动派发	Missing flow information (flowId/appointment list); automatic dispatch not performed
+B3	main.interface.missingFlowIdNomination	缺少流程信息（flowId），未派发提名任务	Missing flow information (flowId); nomination task not dispatched
+B3	main.interface.flowYamlTimeout	Steward / 统筹 本轮未在时限内结束，流程状态 YAML {path} 未确认；未派发提名任务	Steward did not finish within the time limit; flow state YAML {path} is unconfirmed; nomination task not dispatched
+B3	main.interface.flowYamlMissing	Steward / 统筹 未写出流程状态 YAML {path}；未派发提名任务（同名 .md 人读视图不算落盘）	Steward did not write flow state YAML {path}; nomination task not dispatched (a same-named human-readable .md does not count as written state)
+B3	main.interface.flowYamlInvalid	流程状态 YAML 校验失败（{path}）：{detail}；未派发提名任务	Flow state YAML validation failed ({path}): {detail}; nomination task not dispatched
+B3	main.interface.flowYamlUnreadable	流程状态 YAML {path} 不可读：{detail}；未派发提名任务	Flow state YAML {path} is unreadable: {detail}; nomination task not dispatched
+B3	main.interface.missingFlowInfoNomination	缺少流程信息，未派发提名任务	Missing flow information; nomination task not dispatched
+B3	main.interface.openCrewFailed	无法开启 Crew / 组队 会话：{detail}	Could not open the Crew session: {detail}
+B3	main.interface.sendNominationFailed	发送提名任务给 Crew / 组队 失败：{detail}	Sending the nomination task to Crew failed: {detail}
+B3	main.interface.linkScheme	只允许打开 http/https 链接。	Only http/https links can be opened.
+B3	main.interface.linkTooLong	链接过长，已拒绝。	The link is too long and was rejected.
+B3	main.interface.externalOpenUnwired	外部打开未接线（fail-closed）。	External opening not wired (fail-closed).
+B3	main.interface.pickImageUnwired	选图未接线（fail-closed）。	Image picking not wired (fail-closed).
+B3	main.interface.readImageFailed	读取图片失败：{detail}	Could not read the image: {detail}
+B3	main.interface.imageUnsupported	内容不是受支持的图片（真实格式不在 {mimes} 之内）——扩展名不作数。	The content is not a supported image (the real format is not among {mimes}) — file extension does not count.
+B3	main.interface.imageUnsupportedShort	内容不是受支持的图片（真实格式不在 {mimes} 之内）。	The content is not a supported image (the real format is not among {mimes}).
+B3	main.governance.acceptanceAdvance	流程 {flowId} 步骤已全部完成，已自动派发验收复核给 Proof（工作中）	Flow {flowId}: all steps are complete; acceptance review was dispatched to Proof automatically (working)
+B3	main.governance.acceptanceBlocked	自动验收未派发：流程 {flowId} 未通过收尾门。原因：{issue}。{advice}	Automatic acceptance not dispatched: flow {flowId} did not pass the closing gate. Reason: {issue}. {advice}
+B3	main.governance.acceptanceBlockedTerminal	无需操作：流程已收口，应用不会重复派发验收复核。	No action needed: the flow is already closed; the app will not dispatch acceptance review again.
+B3	main.governance.acceptanceBlockedAdvice	建议：若旧步骤已被 retake 取代，请把对应的 aborted/failed 步骤在流程状态文件 {path} 中标为 superseded（或 cancelled）；或用新的 stepId 重新派发任务并在流程状态文件中更新状态与证据。修正后下一次事件会自动重新检查；应用不会自动改写流程状态文件，也不会自动派 Proof。	Suggestion: if old steps were replaced by a retake, mark the corresponding aborted/failed steps as superseded (or cancelled) in the flow state file {path}; or dispatch a new task with a new stepId and update the status and evidence in the flow state file. The next event re-checks automatically after the fix; the app does not rewrite the flow state file and does not automatically dispatch Proof.
+B3	main.governance.nominationDispatched	已派发提名任务给 Crew / 组队（工作中）	Nomination task dispatched to Crew (working)
+B3	main.governance.roleCardDispatched	已派发写卡任务给 Crew / 组队（工作中）	Card-writing task dispatched to Crew (working)
+B3	main.governance.flowTaskDispatched	已派发流程任务给 Steward / 统筹（工作中）	Flow task dispatched to Steward (working)
+B3	main.governance.flowYamlAndNomination	流程状态 YAML 已落盘，已派发提名任务给 Crew / 组队（工作中）	Flow state YAML written; nomination task dispatched to Crew (working)
+B3	main.governance.roleReadinessDispatched	写卡结构校验通过，已派发角色就绪复核给 Steward / 统筹（工作中）	Card structure validation passed; role-readiness review dispatched to Steward (working)
+B3	main.governance.criteriaDispatched	流程 {flowId}：已派发实施前标准编写任务给 Proof / 验收（工作中）	Flow {flowId}: pre-implementation criteria-writing task dispatched to Proof (working)
+B3	main.governance.nominationAlreadyDone	提名已完成，未重复派发；已请 Steward / 统筹 继续下一步	Nomination already complete; not dispatched again. Steward has been asked to continue with the next step.
+B3	main.history.invalidRequest	历史请求须指定项目、角色与运行时。	History requests must specify the project, role, and runtime.
+B3	main.history.deliveryState	投递历史状态	Delivery history status
+B3	main.history.deliveryMaybeStarted	投递可能已开始	Delivery may have started
+B3	main.history.legacyReadFailed	旧历史读取失败。	Legacy history read failed.
+B3	main.history.readOrProjectionFailed	历史读取或安全投影失败。	History read or safe projection failed.
+B3	main.history.callTool	调用工具 {name}	Called tool {name}
+B3	main.history.invalidSessionHeader	首行不是有效的会话头（type!=session）	The first line is not a valid session header (type!=session)
+B3	main.history.emptySession	会话文件为空或无有效会话头	The session file is empty or has no valid session header
+B3	main.history.sessionReadFailed	会话文件读取失败：{detail}	Session file read failed: {detail}
+B3	main.composerImages.typeUnsupported	图片类型不支持：{type}——只支持 {mimes}。	Unsupported image type: {type} — only {mimes} are supported.
+B3	main.composerImages.emptyContent	图片内容为空或无法读取。	Image content is empty or cannot be read.
+B3	main.composerImages.tooLargeWithLimit	图片过大（{size} > 上限 {max}）——请压缩后再发。	Image too large ({size} > limit {max}) — compress it and try again.
+B3	main.composerImages.dataMissing	图片数据缺失（空）。	Image data is missing (empty).
+B3	main.composerImages.notBase64	图片数据不是合法的 base64。	Image data is not valid base64.
+B3	main.composerImages.tooLarge	图片过大（> {max}）——请压缩后再发。	Image too large (> {max}) — compress it and try again.
+B3	main.composerImages.decodeFailed	图片数据解码失败。	Image data decoding failed.
+B3	main.confirm.expiredTimeout	确认已超时，旧确认失效。	Confirmation timed out; the old confirmation is no longer valid.
+B3	main.confirm.expiredStopped	本轮已停止或会话已重建，旧确认失效。	This turn was stopped or the session was rebuilt; the old confirmation is no longer valid.
+B3	main.recovery.expired	此恢复确认已失效（应用关闭或会话已重建），**未获执行**——可让 su 重新提议。	This recovery confirmation has expired (app closed or session rebuilt) and was **not executed** — su may propose again.
+B3	main.operator.channelUnavailable	操作者确认通道未配置（无 presenter），拒绝执行（fail-closed）	Operator confirmation channel is not configured (no presenter); execution denied (fail-closed)
+B3	main.operator.timeoutRejected	操作者确认超时（>{ms}ms），拒绝执行（fail-closed）	Operator confirmation timed out (>{ms}ms); execution denied (fail-closed)
+B3	main.operator.channelErrorRejected	操作者确认通道不可用，拒绝执行（fail-closed）：{detail}	Operator confirmation channel unavailable; execution denied (fail-closed): {detail}
+B3	main.operator.rejected	操作者拒绝执行	Operator denied execution
+B3	main.operator.judgeTimeoutManual	判断超时（>{ms}ms），已转手动确认。	Judging timed out (>{ms}ms); switched to manual confirmation.
+B3	main.operator.judgeAbortedManual	本轮已中止，判断结果不生效（交回既有中止路径）。	This turn was aborted; the judge result does not apply (returned to the existing abort path).
+B3	main.operator.judgeErrorManual	判断异常：{detail}。已转手动确认。	Judging error: {detail}. Switched to manual confirmation.
+B3	main.operator.manualDenyAdvice.narrowCommand	请改用落盘脚本或拆分命令后重试。	Use a script written to disk or split the command, then retry.
+B3	main.operator.manualDenyAdvice.narrowJudge	请缩小判断范围（改用落盘脚本或拆分命令）后重试。	Narrow the reviewed scope (use a script written to disk or split the command), then retry.
+B3	main.operator.manualDenyAdvice.narrowRead	请缩小读取范围或改用落盘脚本后重试。	Narrow the read scope or use a script written to disk, then retry.
+B3	main.operator.manualDenyAdvice.aborted	本轮已中止，命令未执行；如仍需执行请重新发起。	This turn was aborted and the command was not executed; initiate it again if it is still needed.
+B3	main.operator.manualDenyAdvice.switchOff	请关闭「替我审批」后手动确认。	Turn off “Approve for me” and confirm manually.
+B3	main.operator.manualDenyAdvice.retry	请重试，如持续失败请关闭「替我审批」后手动确认。	Retry; if it keeps failing, turn off “Approve for me” and confirm manually.
+B3	main.operator.judgeResultDeliveryFailed	审查结果投达失败，无法在聊天中显示判断结论，已拒绝；{detail}。	Could not deliver the review result, so the judge conclusion cannot be shown in the chat; denied. {detail}.
+B3	main.operator.judgeRowFailedManual	判断 agent 已完成判断，但结果无法在聊天中显示；规则判定仅作参考，本卡已转你手动确认。	The judge agent finished judging, but the result cannot be shown in the chat; the rule decision is reference only and this card switched to your manual confirmation.
+B3	main.operator.judgeIncompleteManual	判断 agent 未能完成判断：{reason}。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。	The judge agent could not complete judging: {reason}. The rule decision is reference only; you confirm manually only when the judge agent has not completed. Switched to your manual confirmation.
+B3	main.operator.judgeReason.retryCapped	同类命令连续被拒，已达重试上限	Similar commands were rejected repeatedly; the retry cap was reached
+B3	main.operator.judgeReason.contextMissing	缺少当前轮任务上下文	Missing the task context for the current turn
+B3	main.operator.judgeReason.contextTooLarge	命令或上下文过大	The command or context is too large
+B3	main.operator.judgeReason.modelManual	判断 agent 自报无法判断	The judge agent reported it cannot judge
+B3	main.operator.judgeReason.fallback	判断未完成	Judging did not complete
+B3	main.operator.judgeDeniedHead	判断 agent 未放行该命令。	The judge agent did not approve this command.
+B3	main.operator.judgeExplainToCustomer	请向客户说明：{message}	Explain to the customer: {message}
+B3	main.operator.judgeReasonLine	原因：{reason}	Reason: {reason}
+B3	main.operator.judgeAlternative	替代方案（{kind}）：{value}	Alternative ({kind}): {value}
+B3	main.operator.judgeWayOut	出路：如需执行，请关闭「替我审批」后重试。	Way out: to execute it, turn off “Approve for me” and retry.
+B3	main.operator.judgeWillRun	它会在项目里执行：{word}	It will run in the project: {word}
+B3	main.operator.shellReview.title	受治理 shell 审核 · 操作者确认（第三闸 a）	Governed shell review · operator confirmation (third gate a)
+B3	main.operator.shellReview.intro	这是一条需要在执行前由你**亲自确认**的 shell 命令（pm 模型审读拿不准/不可用，故升级到你）。	This shell command must be **personally confirmed** by you before execution (the pm model review was unsure or unavailable, so it escalated to you).
+B3	main.operator.shellReview.verify	请**逐字核对**下面的命令原文后再决定；点「放行」将真的在项目里启动子进程执行它。	**Verify the exact command text below** before deciding; clicking “Approve” will really start a subprocess in the project to run it.
+B3	main.operator.shellReview.escalationHeader	── 升级原因（为何交你确认） ──	── Escalation reason (why it came to you) ──
+B3	main.operator.shellReview.argvEmpty	（argv 为空）	(argv is empty)
+B3	main.operator.shellReview.commandHeader	── 命令原文（逐字，未加工） ──	── Original command (verbatim, unprocessed) ──
+B3	main.operator.shellReview.argvHeader	── 规范化参数 argv（JSON 转义显示；引号仅为界定符） ──	── Normalized argv (JSON-escaped; quotes are delimiters only) ──
+B3	main.operator.shellReview.cwdHeader	── 工作目录 cwd ──	── Working directory (cwd) ──
+B3	main.operator.shellReview.denyNote	点「拒绝」或关闭对话框 = 不放行（不会执行）。	Clicking “Reject” or closing the dialog = no approval (nothing runs).
+B3	main.operator.approvalTierLine	{role} 审批档：{tier}——须逐条客户批准才执行；批准后可能绕过 ANS 文件写边界（命令以当前 OS 用户权限运行）。拒绝/超时/通道不可用 = 拒绝；默认拒绝、无「记住」，不自动通过。	{role} approval tier: {tier} — each one requires customer approval before execution; once approved it may bypass the ANS file write boundary (the command runs with the current OS user's permissions). Rejection/timeout/channel-unavailable = reject; default is reject, there is no “remember”, and nothing passes automatically.
+B3	main.operator.review.risky	自动审核判定这条命令有风险——按治理规则，有风险的命令必须由你亲自确认才能执行。	Automatic review judged this command risky — per the governance rules, risky commands require your personal confirmation before execution.
+B3	main.operator.review.timeout	自动审核超时，未给出结论——按 fail-closed 交你确认。	Automatic review timed out without a conclusion — fail-closed: handed to you for confirmation.
+B3	main.operator.review.parse	自动审核给出的结论无法解析，未能形成明确意见——按 fail-closed 交你确认。	The automatic review conclusion cannot be parsed, so no clear opinion was formed — fail-closed: handed to you for confirmation.
+B3	main.operator.review.error	自动审核出错了，未给出结论——按 fail-closed 交你确认。	Automatic review failed without a conclusion — fail-closed: handed to you for confirmation.
+B3	main.operator.review.unavailable	自动审核当前不可用（审读会话未接上）——按 fail-closed 交你确认。	Automatic review is currently unavailable (review session not connected) — fail-closed: handed to you for confirmation.
+B3	main.operator.review.unsure	自动审核拿不准——按 fail-closed 交你确认。	Automatic review was unsure — fail-closed: handed to you for confirmation.
+B3	main.operator.review.fallback	审核未能给出明确结论，按 fail-closed 交你确认。	The review could not produce a clear conclusion; fail-closed: handed to you for confirmation.
+B3	main.operator.expiredTimeout	操作者确认超时（>{ms}ms），未获放行——可让角色重新发起。	Operator confirmation timed out (>{ms}ms) and was not approved — the role may initiate it again.
+B3	main.operator.expiredTimeoutNoMs	操作者确认超时，未获放行——可让角色重新发起。	Operator confirmation timed out and was not approved — the role may initiate it again.
+B3	main.operator.expiredStopped	本轮已结束、停止或会话已重建，旧 shell 确认失效。	This turn ended or was stopped, or the session was rebuilt; the old shell confirmation is no longer valid.
+B3	main.operator.judgeTimeoutError	判断超时（{ms}ms）：未在时限内得到判断结论。	Judging timed out ({ms}ms): no judge conclusion within the time limit.
+B3	main.operator.confirmTimeoutError	操作者确认超时（{ms}ms）：未在时限内得到操作者选择。	Operator confirmation timed out ({ms}ms): no operator choice within the time limit.
+B3	main.customerInput.judgeDecisionHead	judge 代批 · 代决策：接受提案（accept）	judge delegation · decision: accept proposal (accept)
+B3	main.customerInput.judgeAcceptanceHead	judge 代批 · 代决策：验收通过（accept）	judge delegation · decision: acceptance passed (accept)
+B3	main.customerInput.judgeAppointmentHead	judge 代批 · 代决策：任命 {ids}	judge delegation · decision: appoint {ids}
+B3	main.customerInput.judgeWriteHead	judge 代批 · 代审批：确认写入 {count} 个路径（{paths}）	judge delegation · approval: confirm writing {count} paths ({paths})
+B3	main.customerInput.expiredQueued	排队决定已自动处理（未呈现客户卡）	Queued decision was handled automatically (customer card was not presented)
+B3	main.customerInput.deliveryFailed	客户交互请求未能送达界面：{detail}	The customer interaction request could not reach the interface: {detail}
+B3	main.customerInput.rowFailedManual	判断已完成，但结果无法在聊天中显示；已转你手动确认。	Judging completed, but the result cannot be shown in the chat; switched to your manual confirmation.
+B3	main.customerInput.judgeNotDelegated	判断 agent 未代批（{label}）：{reason}；已转你手动确认。	The judge agent did not delegate ({label}): {reason}; switched to your manual confirmation.
+B3	main.customerInput.rejectNotApproval	拒绝仅适用于审批组	Rejection applies only to the approval group
+B3	main.customerInput.switchOff	你已关闭对应开关	You turned off the corresponding switch
+B3	main.customerInput.groupMismatch	判断结果分组与卡片不符	The judge result group does not match the card
+B3	main.customerInput.notRecommended	判断结论与卡片选项不符	The judge conclusion does not match the card options
+B3	main.customerInput.emitChannelMissing	判断结果行通道未配置	The judge result row channel is not configured
+B3	main.customerInput.rowFailed	判断结果无法在聊天中显示	The judge result cannot be shown in the chat
+B3	main.customerInput.turnAborted	本轮已中止，判断结果不生效。	This turn was aborted; the judge result does not apply.
+B3	main.customerInput.judgeException	判断异常：{detail}	Judging error: {detail}
+B3	main.customerInput.judgeTimeout	判断超时（>{ms}）	Judging timed out (>{ms})
+B3	main.customerInput.parseFailed	判断结果形状非法	The judge result has an invalid shape
+B3	main.customerInput.ledgerUnavailable	{label}未通过：{reason}{detail}。本次自动判断未通过/未完成，已拒绝；请按上述原因修正后重新提交确认。	{label} did not pass: {reason}{detail}. This automatic judgment did not pass/did not complete and was rejected; correct the cause above and submit the confirmation again.
+B3	main.customerInput.ledgerUnavailableShort	{label}未通过：{reason}。本次自动判断未通过/未完成，已拒绝；请按上述原因修正后重新提交确认。	{label} did not pass: {reason}. This automatic judgment did not pass/did not complete and was rejected; correct the cause above and submit the confirmation again.
+B3	main.customerInput.presenterMissing	客户交互通道未配置（无 presenter），未获同意（fail-closed）	The customer interaction channel is not configured (no presenter); not approved (fail-closed)
+B3	main.customerInput.noPendingRequest	没有待答的交互请求（轮次停止、会话重建或应用关闭会使旧请求失效）	No pending interaction request (stopping a turn, rebuilding a session, or closing the app invalidates old requests)
+B3	main.customerInput.missingDecision	缺决定内容	Missing decision content
+B3	main.customerInput.choiceMismatch	决定与请求类型不符（请求是 choice）	The decision does not match the request type (the request is choice)
+B3	main.customerInput.confirmMustBeBoolean	确认决定必须是布尔值	A confirm decision must be a boolean
+B3	main.customerInput.customerDeclined	客户不同意	Customer disagreed
+B3	main.customerInput.confirmMismatch	决定与请求类型不符（请求是 confirm）	The decision does not match the request type (the request is confirm)
+B3	main.customerInput.customerCancelled	客户取消	Customer cancelled
+B3	main.customerInput.selectionMustBeArray	选择内容必须是字符串数组	The selection must be an array of strings
+B3	main.customerInput.emptySelection	未选择任何选项（空选择不受理；点「取消」才是拒绝）	No option selected (an empty selection is not accepted; use “Cancel” to reject)
+B3	main.customerInput.selectionNotInRequest	选项不在本次请求中（按请求快照校验拒绝）	The option is not part of this request (rejected against the request snapshot)
+B3	main.customerInput.singleChoiceOnly	单选题只能选一个	Single-choice questions accept only one option
+B3	main.customerInput.unknownDecisionType	未知的决定类型	Unknown decision type
+B3	main.customerInput.reason.timeout	判断超时	Judging timed out
+B3	main.customerInput.reason.aborted	本轮已中止	This turn was aborted
+B3	main.customerInput.reason.unavailable	判断服务不可用	Judge service unavailable
+B3	main.customerInput.reason.unsupportedEngine	当前引擎不支持自动判断	The current engine does not support automatic judging
+B3	main.customerInput.reason.parseFailed	判断结果无法解析	The judge result cannot be parsed
+B3	main.customerInput.reason.artifactMissing	规范物证缺失	Required artifact evidence is missing
+B3	main.customerInput.reason.artifactNotRead	判断未读取必需的项目文件	Judging did not read the required project files
+B3	main.customerInput.reason.pathOutsideBoundary	写盘路径不在允许范围内	A write path is outside the allowed scope
+B3	main.customerInput.reason.pathUnverified	写盘路径无法逐项核对	Write paths cannot be verified one by one
+B3	main.customerInput.reason.notRecommended	候选与推荐/选项不一致	The candidate does not match the recommendation/options
+B3	main.customerInput.reason.insufficientEvidence	证据不足	Insufficient evidence
+B3	main.customerInput.reason.ledgerUnavailable	治理事实不可读	Governance facts are unreadable
+B3	main.customerInput.reason.groupMismatch	判断结果与卡片分组不一致	The judge result does not match the card group
+B3	main.customerInput.reason.budget	读取预算已用尽	The read budget is exhausted
+B3	main.customerInput.reason.readTruncated	读取内容被截断	The read content was truncated
+B3	main.customerInput.reason.contextMissing	缺少判断所需的上下文	Missing the context required for judging
+B3	main.customerInput.reason.fallback	判断未给出可代批结论	Judging did not produce a delegable conclusion
+B3	main.customerInput.rework.head	{label}拒绝：{reason}。本次自动判断未通过/未完成，已拒绝；请按上述原因修正后重新提交确认。	{label} rejected: {reason}. This automatic judgment did not pass/did not complete and was rejected; correct the cause above and submit the confirmation again.
+B3	main.judgeReason.readDeniedPrefix	判断读取被拒：	Judge read denied: 
+B3	main.judgeReason.readDeniedDetail	读取被拒：	Read denied: 
+B3	main.judgeReason.readDeniedFallback	所需项目文件无法读取（未记录具体路径）	A required project file could not be read (no specific path recorded)
+B3	main.judgeReason.readDeniedTail	，已转手动确认。	; switched to manual confirmation.
+B3	main.runtimeConfig.readFileFailed	无法读取运行时配置文件。	Could not read the runtime configuration file.
+B3	main.runtimeConfig.invalidUrl	地址格式无效	Invalid URL format
+B3	main.runtimeConfig.demoNoConfig	演示运行时无需配置。	The demo runtime needs no configuration.
+B3	main.runtimeConfig.settingsMustBeObject	设置必须是键值对象。	Settings must be a key-value object.
+B3	main.runtimeConfig.valueMustBeString	设置值必须是字符串。	Setting values must be strings.
+B3	main.runtimeConfig.urlCredentials	API 地址须为不含用户名或密码的 http/https 地址。	The API base URL must be an http/https URL without username or password.
+B3	main.runtimeConfig.invalidApiUrl	API 地址格式无效。	Invalid API base URL.
+B3	main.runtimeConfig.choiceInvalid	{label}取值无效：仅接受 {accepted}（或留空维持平台默认）。	Invalid value for {label}: only {accepted} is accepted (or leave empty to keep the platform default).
+B3	main.runtimeConfig.integerInvalid	{label}必须是{bound}正整数。	{label} must be a{bound} positive integer.
+B3	main.runtimeConfig.integerBound	 ≥ {min} 的	 value ≥ {min}
+B3	main.runtimeConfig.notSaved	运行时配置未保存，无法写入配置文件。	Runtime configuration was not saved; cannot write the configuration file.
+B3	main.project.governanceInvalid	治理记录不可用（.ans/project.json 不可解析或结构无效）	Governance record unavailable (.ans/project.json is unparseable or structurally invalid)
+B3	main.project.governanceUnaccepted	治理记录未接受（accepted 不为 true）	Governance record not accepted (accepted is not true)
+B3	main.project.governancePathEmpty	治理记录缺少治理边界路径（governanceBoundary.path 为空）	Governance record is missing the governance boundary path (governanceBoundary.path is empty)
+B3	main.project.pinCheckFailed	pin 证据检查失败	Pin evidence check failed
+B3	main.project.pinMissing	治理记录未提供可验证 pin	The governance record provides no verifiable pins
+B3	main.runtimeResolution.noRuntime	无法确定项目引擎，请先选择引擎；本次自动验收派发已跳过（不会循环重试）。	Could not determine the project engine; select an engine first. This automatic acceptance dispatch was skipped (no loop retries).
+B3	main.runtimeResolution.invalidParams	持久化参数无效。	Invalid persistence parameters.
+B3	main.runtimeResolution.persistFailed	引擎选择未能写入持久化文件。	The engine selection could not be written to the persistence file.
+B3	main.watchdog.signal.turnDeadline	轮次到点检查	Turn deadline check
+B3	main.watchdog.signal.queueStuck	投递排队积压	Delivery queue backlog
+B3	main.watchdog.signal.cmdTimeout	命令超时	Command timeout
+B3	main.watchdog.signal.repeatFail	重复失败	Repeated failures
+B3	main.watchdog.durationSeconds	{seconds} 秒	{seconds} s
+B3	main.watchdog.durationMinutesSeconds	{minutes} 分 {seconds} 秒	{minutes} min {seconds} s
+B3	main.watchdog.durationHours	{hours} 小时	{hours} h
+B3	main.watchdog.kind.handback	回交	Handback
+B3	main.watchdog.kind.dispatch	派发	Dispatch
+B3	main.watchdog.kind.system	系统	System
+B3	main.watchdog.action.redeliver	重投任务	Redeliver task
+B3	main.watchdog.recoveryNote	系统·恢复 · {action} · 角色 {roleId} · {executed}	System·Recovery · {action} · role {roleId} · {executed}
+B3	main.watchdog.stormGuard	系统·看护 · 风暴护栏 · 已抑制 {count} 条	System·Watchdog · storm guard · {count} suppressed
+B3	main.watchdog.recoverySignal	系统·看护 · 看护恢复 · {signal} · 角色 {roleId}	System·Watchdog · watchdog recovery · {signal} · role {roleId}
+B3	main.watchdog.turnAbortedText	{prefix} 回合自动中止：角色「{roleId}」本轮已耗 {elapsed}（显式配置的自动中止时限 {limit}）。自动中止 ≠ 客户批准：这是看护按「替我决策/替我审批」开关执行的停止动作，只停止本回合、不代表客户逐项审批；轮次收尾后队列中的回交/派发按既有顺序继续投递。	{prefix} turn aborted automatically: role “{roleId}” consumed {elapsed} this turn (explicitly configured auto-abort limit {limit}). Auto-abort ≠ customer approval: this is the watchdog stopping the turn according to the “Decide for me / Approve for me” switches; it stops only this turn and does not represent per-item customer approval. After the turn settles, queued handbacks/dispatches continue in the existing order.
+B3	main.watchdog.turnAbortedSummary	系统·看护 · 回合自动中止 · 角色 {roleId}	System·Watchdog · turn auto-aborted · role {roleId}
+B3	main.watchdog.turnDeadlineElapsedAbort	本轮有效已耗约 {elapsed}（看护检查时限 {timeoutMs}ms；到点仅检查；显式配置的自动中止时限 {limit}，开关开启时看护到点自动中止）	This turn has consumed about {elapsed} (watchdog check limit {timeoutMs}ms; at the limit it only checks; explicitly configured auto-abort limit {limit}, the watchdog aborts automatically at the limit when the switch is on)
+B3	main.watchdog.turnDeadlineElapsedNoAbort	本轮有效已耗约 {elapsed}（看护检查时限 {timeoutMs}ms；到点仅检查、不中止本轮；未配置看护自动中止）	This turn has consumed about {elapsed} (watchdog check limit {timeoutMs}ms; at the limit it only checks and does not abort; no watchdog auto-abort configured)
+B3	main.watchdog.turnDeadlineAdvice	请用 role_status / session_tail 核对该角色是否卡死；仍在推进则不动作；确认卡死可 propose_recovery（开关开启时由桌面自动执行；关闭时仍需客户确认后应用执行）	Use role_status / session_tail to check whether the role is stuck; if it is still progressing, take no action; if stuck, use propose_recovery (the desktop executes it automatically when the switch is on; when off it still requires customer confirmation before the app executes)
+B3	main.watchdog.turnDeadlineLastResort	整轮最后兜底 {text}（运行时硬上限，不是看护自动中止）	Whole-turn last resort {text} (runtime hard limit, not watchdog auto-abort)
+B3	main.watchdog.turnDeadlineStarted	本轮自 {time} 开始、至今仍在进行	This turn started at {time} and is still running
+B3	main.watchdog.turnDeadlinePendingCard	该角色有挂起确认卡时不触发本信号（正确等待不报）	This signal is not triggered while the role has a pending confirmation card (correct waiting is not reported)
+B3	main.watchdog.queueStuckHead	队首已排队 {age}（队列深度 {depth}）	Queue head has waited {age} (queue depth {depth})
+B3	main.watchdog.queueStuckItem	- [{kind}] 来自 {source}：{summary}（入队 {time}）	- [{kind}] from {source}: {summary} (enqueued {time})
+B3	main.watchdog.repeatFailWindow	近 {minutes} 分钟窗口内已有 {count} 次轮次以 failed/timed_out 结束	{count} turns ended as failed/timed_out within the last {minutes} min
+B3	main.watchdog.repeatFailLast	最近一次 {detail}	Most recent {detail}
+B3	main.watchdog.repeatFailUnknown	（未知）	(unknown)
+B3	main.watchdog.cmdTimeoutTimedOut	{time}（结构化事实 display.process.timedOut=true——F-1 已自动终止该命令、轮次继续）	{time} (structured fact display.process.timedOut=true — F-1 already terminated the command automatically; the turn continues)
+B3	main.watchdog.cmdTimeoutNote	命令原文与输出在该角色会话流；本告警不含命令原文	The original command and output are in this role's session stream; this alert contains no command text
+B3	main.watchdog.systemSource	（系统）	(system)
+B3	main.demo.toolCall	模型请求调用 write_file -> {path}	Model requested write_file -> {path}
+B3	main.demo.unknownToolDenied	未知工具，拒绝执行：write_file	Unknown tool; refusing to execute: write_file
+B3	main.demo.message	（演示运行时·第 {turn} 轮）收到：{text}	(Demo runtime · turn {turn}) received: {text}
+B3	main.demo.inBoundsWrite	角色边界内的写入尝试	Write attempt inside the role boundary
+B3	main.demo.outOfBoundsWrite	越界写入尝试	Out-of-boundary write attempt
+B3	main.demo.turnEndedPrototype	第 {turn} 轮结束（原型阶段未真正落盘）。	Turn {turn} ended (nothing was actually written during the prototype phase).
+B3	main.demo.turnEnded	第 {turn} 轮结束（演示运行时）。	Turn {turn} ended (demo runtime).

@@ -1,0 +1,14 @@
+# 变更前基线（2026-10-23，S2 第一次编辑前实测；工作树含既有未提交变更的上下文）
+# git hash-object（从上到下：flow-state.ts / flow-service.ts / pipeline flow-state.ts / flow-state.test.ts / flow-service.test.ts）
+ec1ba7c1706cc5b07ef17f01ef935bf529a8ea9a
+467d0925d4f5c687fb1f19787ef8d3dcfe9dd3a5
+729597beba576f710a28c819386215145b793f6b
+015a60ac9c39f9137a25440c2c51ff34cda9245f
+0d28dad9cf2e2daebdb8b47fb44b32163a961e57
+# sha256sum
+f9c4959a8def24ecfbc317220ece27545195f1f7eaed0d930cb37a1b63252e44 *src/common/编排/flow-state.ts
+82049e2bf9570e23f3af43ee77654c3f5e8b9b23468518f1d0592cfd85ee514b *src/common/编排/flow-service.ts
+78172c7a760fc5f0df8319763032a0a80175daddf7a4102507feb2850ff08a9a *src/pipeline/orchestration/flow-state.ts
+a1419d2de869c079e161f19d46c51ef1809b61bc62c2fd64953102a3398c0862 *test/编排/flow-state.test.ts
+28d1b9b4cbe2899a0e69202983b92532d99d84af3473f72d918e1aa01f9af680 *test/编排/flow-service.test.ts
+# 新增文件 src/common/编排/acceptance-rework.ts 与 test/编排/acceptance-rework.test.ts 编辑前不存在

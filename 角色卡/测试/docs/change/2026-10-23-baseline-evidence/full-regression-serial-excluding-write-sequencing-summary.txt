@@ -1,0 +1,65 @@
+=== T3 补跑：B0 后 / 目录 v3 实施前 串行全量（排除已知挂起文件） ===
+captured_at: 2026-10-23 11:33:47 +0800
+command: node --test --test-concurrency=1 <full-regression-excluded-file-list.txt 的 353 个文件>
+excluded: test/pi-adapter/write-sequencing.test.ts（已知挂起：3 个用例打印 ✔ 后进程不退出；2026-10-22 与 2026-10-23 首轮均复现）
+file_count: 353
+log: full-regression-serial-excluding-write-sequencing.log
+
+--- 汇总 ---
+start: 2026-10-23 11:26:59
+ℹ tests 3591
+ℹ suites 0
+ℹ pass 3563
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 18
+ℹ todo 0
+ℹ duration_ms 292946.5576
+exit_code=1
+end: 2026-10-23 11:31:52
+elapsed_seconds=293
+
+--- 10 个失败（分类） ---
+A. Windows symlink EPERM 既有（9，与历史基线清单逐条一致）：
+✖ native symlink and storage runtime mismatch fail before SDK query (3.44ms)
+✖ native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary (23.8902ms)
+✖ store validate callback rejects directory symlink before Pi parse or new native write (5.9895ms)
+✖ Pi storage refuses file symlink and role/runtime mismatch without touching other storage (7.8943ms)
+✖ D3 linked workspace root remains usable; linked target itself is not replaced (6.5509ms)
+✖ store: traversal, mismatched scope and symlinked runtime directories rejected (2.4938ms)
+✖ store: native validation stays lazy and native symlink is rejected before effects (3.3314ms)
+✖ 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛 (7.3638ms)
+✖ node test外指符号链接路径不获委托；项目内测试路径获委托 (2.0976ms)
+B. 桌面时序偶发（1，非确定性；隔离复跑见下）：
+✖ 2026-10-22 第 5 项迁移策略：existing 角色只做最低检查（warning 不阻塞）⇒ 仍派 Convener readiness (63.2124ms)
+
+--- 隔离复跑（test/桌面应用/interface.test.ts） ---
+run1: 97 tests / 96 pass / 1 fail（失败用例换为：2026-10-22 V12：existing 角色计划写集未覆盖 boundary ⇒ 只 warning、仍派 readiness）
+run2: 97/97 pass；run3: 97/97 pass
+结论：同一文件内两个兄弟 readiness/ledger 用例在不同次运行中交替失败、两次整文件复跑全绿 ⇒ 桌面时序偶发（非确定性），不作 B0 确定性新增失败；B0 对 interface.ts 的 diff 仅为 preferences IPC/服务增量，未触及 advanceGovernanceFlow/dispatch/ledger 路径。
+
+--- 跳过（18，与历史基线清单一致） ---
+﹣ owned native process group cleanup kills a wrapper and child that ignore SIGTERM (0.0944ms) # SKIP
+﹣ 会话目录不可写：明确抛错（含目录与原因），绝不静默退化成「不落盘」 (0.2084ms) # chmod 语义在 Windows 不适用
+﹣ D3 write and edit preserve existing ordinary modes and strip special bits (0.0913ms) # SKIP
+﹣ D3 handler under strict umask retains existing mode and keeps new files private (0.0466ms) # SKIP
+﹣ D3 chmod failure reaches the handler without committing file or mode (0.0557ms) # SKIP
+﹣ D3 sync failure reaches the handler without committing file or mode (0.0316ms) # SKIP
+﹣ D3 AC3/5: explicit cat executable requires existing approval; refusal, unavailable, timeout and abort never execute (0.0546ms) # SKIP
+﹣ D3 AC4: ordinary cat/ls/rg/git reads remain fast; rg --pre forms need approval without pattern/filename false positives (0.0408ms) # SKIP
+﹣ D3 AC5: review follows ordinary/operator/advisory policy; readonly refuses without asking (0.0293ms) # SKIP
+﹣ D3 AC6: real write/edit preserve regular modes and new files use safe creation (0.0275ms) # SKIP
+﹣ D3 AC6: strict umask in isolated child cannot strip old executable mode (0.0422ms) # SKIP
+﹣ D3 AC7: chmod/fsync failure and abort do not commit or leave a temp (0.094ms) # SKIP
+﹣ unreadable（权限）：文件不可读 → status=unreadable、actual=null (0.0765ms) # SKIP
+﹣ D3 finalMode 应用普通权限位，未传时保持既有安全创建行为 (0.0644ms) # SKIP
+﹣ D3 严格 umask 下 finalMode 不丢执行位（独立子进程） (0.0209ms) # SKIP
+﹣ D3 chmod 失败不提交内容或权限，并清理临时文件 (0.014ms) # SKIP
+﹣ D3 sync 失败不提交内容或权限，并清理临时文件 (0.0124ms) # SKIP
+﹣ D3 chmod 完成后中止仍保留原文件及权限 (0.0128ms) # SKIP
+
+--- 与历史基线对照 ---
+历史 N3/v1.6.0 基线（HEAD 64ed44a）：3448 tests / 3421 pass / 9 fail / 18 skip（docs/acceptance/governance-split-1-3-5-report-v1.md；2026-10-22 baseline 记录）
+角色粒度终验（阶段 E）：3528 / 3501 / 9 / 18
+本次（B0 后、排除 write-sequencing 3 例）：3591 / 3563 / 10 / 18 / 0 todo；exit 1
+差额核对：3591 = 3448 + 80（角色粒度阶段新增）+ 66（B0 新增）- 3（本轮排除）；fail 9 → 10 仅因 1 次桌面时序偶发；skip 不变（18）。

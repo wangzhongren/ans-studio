@@ -16,6 +16,7 @@ import {
   evaluateFlowCompletion,
   flowCompletionIssue,
   flowStatePath,
+  latestAcceptanceDecision,
   parseFlowStateYaml,
   validateFlowEvidence,
   FLOW_STEP_KINDS,
@@ -1625,4 +1626,215 @@ steps:
   if (!notDepending.ok) {
     assert.ok(notDepending.errors.some((error) => /必须（直接或传递）依赖 contract-freeze/.test(error.message)));
   }
+});
+
+// —————————————————————— 2026-10-23 验收返工路由：最新验收决定 ——————————————————————
+//
+// 方案 v1 / Q1 A：只有**最新** acceptance = accepted 才收口；rejected 是「待返工」，不是 closed；
+// allowRejectedAcceptance 默认 false，仅重派门传 true；changes-requested/none/缺字段 fail-closed。
+
+function acceptanceEntry(
+  flowId: string,
+  customerDecision?: "accepted" | "rejected" | "changes-requested" | "none",
+  over: Partial<GovernanceLedgerEntry> = {},
+): GovernanceLedgerEntry {
+  return entry({
+    kind: "customer.decision",
+    flowId,
+    actorRoleId: "verifier",
+    power: "acceptance",
+    decisionKind: "acceptance",
+    ...(customerDecision !== undefined ? { customerDecision } : {}),
+    ...over,
+  });
+}
+
+test("latestAcceptanceDecision：无/其他 flow ⇒ none；accepted/rejected 按账本 append 顺序取最后一条（不看 at）", () => {
+  assert.deepEqual(latestAcceptanceDecision("todo-list-v1", []), { kind: "none" });
+  assert.deepEqual(latestAcceptanceDecision("todo-list-v1", todoLedger()), { kind: "none" });
+  assert.equal(latestAcceptanceDecision("todo-list-v1", [acceptanceEntry("other-flow", "accepted")]).kind, "none");
+
+  const accepted = latestAcceptanceDecision("todo-list-v1", [...todoLedger(), acceptanceEntry("todo-list-v1", "accepted")]);
+  assert.equal(accepted.kind, "accepted");
+  if (accepted.kind === "accepted") {
+    assert.equal(accepted.entry.customerDecision, "accepted");
+    assert.equal(accepted.entry.flowId, "todo-list-v1");
+  }
+
+  const rejected = latestAcceptanceDecision("todo-list-v1", [...todoLedger(), acceptanceEntry("todo-list-v1", "rejected")]);
+  assert.equal(rejected.kind, "rejected");
+
+  // append 顺序优先于 at：数组最后一条 rejected（at 更早）⇒ rejected；反过来 ⇒ accepted。
+  const order = latestAcceptanceDecision("todo-list-v1", [
+    acceptanceEntry("todo-list-v1", "accepted", { at: "2026-10-23T09:00:00.000Z" }),
+    acceptanceEntry("todo-list-v1", "rejected", { at: "2026-10-23T08:00:00.000Z" }),
+  ]);
+  assert.equal(order.kind, "rejected", "按账本 append 顺序，不按 at 字符串排序");
+
+  const reversed = latestAcceptanceDecision("todo-list-v1", [
+    acceptanceEntry("todo-list-v1", "rejected", { at: "2026-10-23T09:00:00.000Z" }),
+    acceptanceEntry("todo-list-v1", "accepted", { at: "2026-10-23T08:00:00.000Z" }),
+  ]);
+  assert.equal(reversed.kind, "accepted");
+});
+
+test("latestAcceptanceDecision：changes-requested/none/缺字段/空串 ⇒ unresolved（fail-closed）；账本坏行 ⇒ ledger-unavailable", () => {
+  const unresolvedCases: GovernanceLedgerEntry[] = [
+    acceptanceEntry("todo-list-v1", "changes-requested"),
+    acceptanceEntry("todo-list-v1", "none"),
+    acceptanceEntry("todo-list-v1"),
+    entry({
+      kind: "customer.decision",
+      flowId: "todo-list-v1",
+      decisionKind: "acceptance",
+      customerDecision: "" as unknown as GovernanceLedgerEntry["customerDecision"],
+    }),
+  ];
+  for (const candidate of unresolvedCases) {
+    const result = latestAcceptanceDecision("todo-list-v1", [candidate]);
+    assert.equal(result.kind, "unresolved", `customerDecision=${JSON.stringify(candidate.customerDecision)} 应为 unresolved`);
+  }
+
+  const badLedger = latestAcceptanceDecision("todo-list-v1", { entries: [], errors: ["第 1 行不是合法 JSON"] });
+  assert.equal(badLedger.kind, "ledger-unavailable");
+  if (badLedger.kind === "ledger-unavailable") assert.deepEqual(badLedger.errors, ["第 1 行不是合法 JSON"]);
+});
+
+test("evaluateFlowCompletion（2026-10-23）：最新 rejected ⇒ 不 closed（等待返工），strict 默认不放行", () => {
+  const flow = parseOk(TODO_FLOW_YAML, "todo-list-v1");
+  const result = evaluateFlowCompletion(flow, [...todoLedger(), acceptanceEntry("todo-list-v1", "rejected")]);
+  assert.equal(result.ready, false);
+  if (!result.ready) {
+    assert.ok(result.issues.some((issue) => /验收已拒绝，流程等待返工/.test(issue)));
+    assert.ok(result.issues.some((issue) => /返工后需重新派发验收/.test(issue)));
+    assert.ok(result.issues.every((issue) => !issue.includes("已收口")), "rejected 不得再返回「已收口」");
+  }
+});
+
+test("evaluateFlowCompletion（2026-10-23）：最新 accepted ⇒ 收口；与 rejected 文案区分", () => {
+  const flow = parseOk(TODO_FLOW_YAML, "todo-list-v1");
+  const result = evaluateFlowCompletion(flow, [...todoLedger(), acceptanceEntry("todo-list-v1", "accepted")]);
+  assert.equal(result.ready, false);
+  if (!result.ready) {
+    assert.ok(result.issues.some((issue) => /已有验收决定（accepted）/.test(issue) && /已收口/.test(issue)));
+    assert.ok(result.issues.every((issue) => !issue.includes("等待返工")));
+  }
+});
+
+test("evaluateFlowCompletion：allowRejectedAcceptance 默认 false；true + 齐备 ⇒ ready；true 仍返回具体未完成原因", () => {
+  const flow = parseOk(TODO_FLOW_YAML, "todo-list-v1");
+  const ledger = [...todoLedger(), acceptanceEntry("todo-list-v1", "rejected")];
+
+  const relaxed = evaluateFlowCompletion(flow, ledger, { allowRejectedAcceptance: true });
+  assert.deepEqual(relaxed, { ready: true });
+
+  const missingDispatch = ledger.filter(
+    (item) => !(item.kind === "dispatch.accepted" && item.stepId === "verification-evidence"),
+  );
+  const incomplete = evaluateFlowCompletion(flow, missingDispatch, { allowRejectedAcceptance: true });
+  assert.equal(incomplete.ready, false);
+  if (!incomplete.ready) {
+    assert.ok(incomplete.issues.some((issue) => /缺少 dispatch\.accepted/.test(issue)), "放行 rejected 仍须给出具体原因");
+  }
+
+  const pendingFlow = parseOk(
+    TODO_FLOW_YAML.replace(
+      "    kind: dispatch\n    status: done\n    evidence: { kind: dispatch, ref: delivery-backend }",
+      "    kind: dispatch\n    status: pending\n    evidence: { kind: dispatch, ref: delivery-backend }",
+    ),
+    "todo-list-v1",
+  );
+  const statusIncomplete = evaluateFlowCompletion(pendingFlow, ledger, { allowRejectedAcceptance: true });
+  assert.equal(statusIncomplete.ready, false);
+  if (!statusIncomplete.ready) {
+    assert.ok(
+      statusIncomplete.issues.some((issue) => /执行步骤 delivery-backend 尚未完成/.test(issue)),
+      "放行 rejected 仍须返回具体未完成步骤",
+    );
+  }
+
+  const unresolved = evaluateFlowCompletion(
+    flow,
+    [...todoLedger(), acceptanceEntry("todo-list-v1", "changes-requested")],
+    { allowRejectedAcceptance: true },
+  );
+  assert.equal(unresolved.ready, false, "allowRejectedAcceptance 只放行 rejected，不放行未结算/异常决定");
+});
+
+test("evaluateFlowCompletion：accepted 不受 allowRejectedAcceptance 影响（仍收口）；rejected + verification dispatched ⇒ 不 ready", () => {
+  const flow = parseOk(TODO_FLOW_YAML, "todo-list-v1");
+  const accepted = evaluateFlowCompletion(flow, [...todoLedger(), acceptanceEntry("todo-list-v1", "accepted")], {
+    allowRejectedAcceptance: true,
+  });
+  assert.equal(accepted.ready, false);
+  if (!accepted.ready) assert.ok(accepted.issues.some((issue) => /已收口/.test(issue)));
+
+  const dispatchedFlow = parseOk(
+    TODO_FLOW_YAML.replace("    kind: acceptance\n    status: pending", "    kind: acceptance\n    status: dispatched"),
+    "todo-list-v1",
+  );
+  const dispatched = evaluateFlowCompletion(
+    dispatchedFlow,
+    [...todoLedger(), acceptanceEntry("todo-list-v1", "rejected")],
+    { allowRejectedAcceptance: true },
+  );
+  assert.equal(dispatched.ready, false, "verification dispatched ⇒ 不能重派（须先 app-only reopen）");
+  if (!dispatched.ready) {
+    assert.ok(dispatched.issues.some((issue) => /验收步骤状态为 dispatched/.test(issue)));
+  }
+});
+
+test("evaluateFlowCompletion：accepted 后 rejected 按最新决定不 closed；rejected 后 accepted 按最新决定收口", () => {
+  const flow = parseOk(TODO_FLOW_YAML, "todo-list-v1");
+  const acceptedThenRejected = evaluateFlowCompletion(flow, [
+    ...todoLedger(),
+    acceptanceEntry("todo-list-v1", "accepted", { at: "2026-10-23T09:00:00.000Z" }),
+    acceptanceEntry("todo-list-v1", "rejected", { at: "2026-10-23T08:00:00.000Z" }),
+  ]);
+  assert.equal(acceptedThenRejected.ready, false);
+  if (!acceptedThenRejected.ready) {
+    assert.ok(acceptedThenRejected.issues.some((issue) => /等待返工/.test(issue)));
+    assert.ok(acceptedThenRejected.issues.every((issue) => !issue.includes("已收口")));
+  }
+
+  const rejectedThenAccepted = evaluateFlowCompletion(flow, [
+    ...todoLedger(),
+    acceptanceEntry("todo-list-v1", "rejected"),
+    acceptanceEntry("todo-list-v1", "accepted"),
+  ]);
+  assert.equal(rejectedThenAccepted.ready, false);
+  if (!rejectedThenAccepted.ready) assert.ok(rejectedThenAccepted.issues.some((issue) => /已收口/.test(issue)));
+});
+
+test("evaluateFlowCompletion：verification done + 最新 rejected ⇒ 异常（提示人工核对，不重开、不说已收口）", () => {
+  const doneFlow = parseOk(
+    TODO_FLOW_YAML.replace(
+      "  - id: verification\n    title: 独立复核\n    owner: verifier\n    kind: acceptance\n    status: pending\n",
+      "  - id: verification\n    title: 独立复核\n    owner: verifier\n    kind: acceptance\n    status: done\n    evidence: { kind: acceptance, ref: acceptance }\n",
+    ),
+    "todo-list-v1",
+  );
+  // 账本：先 accepted（满足 done 证据对账），后 rejected（最新决定）。
+  const result = evaluateFlowCompletion(doneFlow, [
+    ...todoLedger(),
+    acceptanceEntry("todo-list-v1", "accepted"),
+    acceptanceEntry("todo-list-v1", "rejected"),
+  ]);
+  assert.equal(result.ready, false);
+  if (!result.ready) {
+    assert.ok(result.issues.some((issue) => /验收步骤已完成（done），但最新验收决定为 rejected/.test(issue)));
+    assert.ok(result.issues.some((issue) => /人工核对/.test(issue)));
+    assert.ok(result.issues.every((issue) => !issue.includes("已收口")), "accepted 后 rejected 不得返回已收口");
+  }
+});
+
+test("evaluateFlowCompletion：最新验收决定为 changes-requested ⇒ fail-closed（allowRejectedAcceptance 不放行）", () => {
+  const flow = parseOk(TODO_FLOW_YAML, "todo-list-v1");
+  const result = evaluateFlowCompletion(
+    flow,
+    [...todoLedger(), acceptanceEntry("todo-list-v1", "changes-requested")],
+    { allowRejectedAcceptance: true },
+  );
+  assert.equal(result.ready, false);
+  if (!result.ready) assert.ok(result.issues.some((issue) => /不是 accepted\/rejected/.test(issue)));
 });

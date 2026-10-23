@@ -28,11 +28,11 @@ import {
   judgeWarningLines,
   JUDGE_GROUP_APPROVAL,
   JUDGE_GROUP_DECISION,
-  SHELL_JUDGE_WARNING_CLOSE_LABEL,
   type JudgeGroup,
 } from "@/chat/judge";
 import { useConfirmStore } from "@/stores/confirm-store";
 import { RUNTIME_OPTIONS, useUiStore } from "@/stores/ui-store";
+import { useLocaleState, useT } from "@/i18n";
 
 interface Attachment {
   id: string;
@@ -68,10 +68,10 @@ function resultRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function readFileBase64(file: File): Promise<string> {
+function readFileBase64(file: File, readFailedText: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error("读取文件失败"));
+    reader.onerror = () => reject(new Error(readFailedText));
     reader.onload = () => {
       const value = String(reader.result || "");
       const index = value.indexOf("base64,");
@@ -96,6 +96,8 @@ function releaseAttachments(list: Attachment[]): void {
 let attachSeq = 0;
 
 export function Composer() {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [status, setStatus] = useState("");
   const [halting, setHalting] = useState(false);
@@ -123,10 +125,10 @@ export function Composer() {
   const acknowledgeWarning = useConfirmStore((s) => s.acknowledgeWarning);
 
   const role = findRole(roles, selectedRoleId);
-  const roleName = role ? roleDisplayName(role) : "未选择角色";
+  const roleName = role ? roleDisplayName(role, locale) : t("ui.role.noneSelected");
   const runtimeLabel =
     RUNTIME_OPTIONS.find((option) => option.id === runtime)?.label || "Claude";
-  const selectedRoleName = role ? roleDisplayName(role) : "当前角色";
+  const selectedRoleName = role ? roleDisplayName(role, locale) : t("ui.composer.currentRole");
   const sessionOpen = !!selectedRoleId && sessionOpenRoleId === selectedRoleId;
   const busy = !!selectedRoleId && roleBusy[selectedRoleId] === true;
   const bridge = getDesktopBridge();
@@ -139,6 +141,7 @@ export function Composer() {
     judge.approval.enabled,
     judge.approval.busy,
     null,
+    locale,
   );
   const decisionView = judgeToggleView(
     JUDGE_GROUP_DECISION,
@@ -146,8 +149,9 @@ export function Composer() {
     judge.decision.enabled,
     judge.decision.busy,
     { singleDisabled },
+    locale,
   );
-  const warningLines = judgeWarningLines(warning.groups);
+  const warningLines = judgeWarningLines(warning.groups, locale);
 
   attachmentsRef.current = attachments;
 
@@ -232,16 +236,16 @@ export function Composer() {
     if (!el || !roleId) return;
     if (!text) {
       // 图片随消息发送，不单独发图（队列条目正文形状钉死非空正文）。
-      setStatus("请输入消息内容；图片会随消息一起发送。");
-      setHint("请输入消息内容；图片会随消息一起发送。");
+      setStatus(t("ui.composer.emptyMessageHint"));
+      setHint(t("ui.composer.emptyMessageHint"));
       return;
     }
     if (!projectRoot) {
-      setStatus("尚未导入项目。");
+      setStatus(t("ui.sidebar.noProjectPeriod"));
       return;
     }
     if (!bridge?.sendSession) {
-      setStatus("发送通道不可用（当前版本未提供）。");
+      setStatus(t("ui.composer.sendChannelUnavailable"));
       return;
     }
     if (sessionOpenRoleId !== roleId) {
@@ -264,7 +268,9 @@ export function Composer() {
     const target = { projectRoot, roleId, runtime };
     const sendKey = draftKey(runtime, roleId);
     const clientMessageId = uuid();
-    const displayText = images.length > 0 ? "（图片 ×" + images.length + "）" + text : text;
+    const displayText = images.length > 0
+      ? t("ui.composer.imageCount", { count: images.length }) + text
+      : text;
     // 提交后即腾出输入框；未接受拒发时恢复原文与附件。
     syncDraft(sendKey);
     el.value = "";
@@ -288,7 +294,9 @@ export function Composer() {
     }
     if (res.ok === false) {
       const reason =
-        typeof res.error === "string" && res.error !== "" ? res.error : "发送失败";
+        typeof res.error === "string" && res.error !== ""
+          ? res.error
+          : t("ui.composer.sendFailed");
       const accepted = res.inputAccepted === true;
       const outcome = typeof res.outcome === "string" ? res.outcome : "";
       if (!accepted) {
@@ -319,10 +327,12 @@ export function Composer() {
           appendSystemRow(
             roleId,
             "sys-call",
-            (res.transportException ? "发送异常：" : "发送失败：") + reason,
+            (res.transportException
+              ? t("ui.composer.sendExceptionPrefix")
+              : t("ui.composer.sendFailedPrefix")) + reason,
           );
-          setStatus("发送失败：" + reason);
-          setHint("发送失败：" + reason);
+          setStatus(t("ui.composer.sendFailedPrefix") + reason);
+          setHint(t("ui.composer.sendFailedPrefix") + reason);
         }
         return;
       }
@@ -342,7 +352,7 @@ export function Composer() {
         return;
       }
       if (typeof res.turnId === "string" && res.turnId) {
-        setHint("发送调用未正常返回，实际轮次结果尚未报告。", {
+        setHint(t("ui.composer.sendNotReturned"), {
           kind: "send",
           roleId,
           runtime,
@@ -364,8 +374,7 @@ export function Composer() {
         return;
       }
       const position = Number(res.position) || 1;
-      const queuedMsg =
-        "已入队：等它完成当前任务后处理（第 " + position + " 位）。";
+      const queuedMsg = t("ui.composer.queuedPosition", { position });
       appendSystemRow(roleId, "sys-queue", queuedMsg);
       setHint(queuedMsg, {
         kind: "queue",
@@ -399,13 +408,13 @@ export function Composer() {
     let res: Record<string, unknown> = {};
     try {
       if (!bridge?.abortSession) {
-        appendSystemRow(roleId, "sys-call", "当前运行时不支持停止。");
+        appendSystemRow(roleId, "sys-call", t("shared.common.stopUnsupportedPeriod"));
         setHalting(false);
         return;
       }
       res = resultRecord(await bridge.abortSession(target));
     } catch (error) {
-      appendSystemRow(roleId, "sys-call", "停止失败：" + String(error));
+      appendSystemRow(roleId, "sys-call", t("ui.composer.stopFailedPrefix") + String(error));
       setHalting(false);
       return;
     }
@@ -413,16 +422,18 @@ export function Composer() {
       appendSystemRow(
         roleId,
         "sys-call",
-        "已请求停止当前轮次——轮次仍会以收尾事件结束。",
+        t("ui.composer.stopRequested"),
       );
     } else if (res.supported !== true) {
-      appendSystemRow(roleId, "sys-call", "当前运行时不支持停止。");
+      appendSystemRow(roleId, "sys-call", t("shared.common.stopUnsupportedPeriod"));
     } else {
       appendSystemRow(
         roleId,
         "sys-call",
-        "停止失败：" +
-          (typeof res.error === "string" && res.error ? res.error : "未知原因"),
+        t("ui.composer.stopFailedPrefix") +
+          (typeof res.error === "string" && res.error
+            ? res.error
+            : t("shared.common.unknownReason")),
       );
     }
     setHalting(false);
@@ -438,7 +449,7 @@ export function Composer() {
     return {
       id: "att-" + ++attachSeq,
       key: "att-" + attachSeq,
-      name: typeof image.name === "string" ? image.name : "图片",
+      name: typeof image.name === "string" ? image.name : t("ui.composer.imageFallbackName"),
       mime: typeof image.mime === "string" ? image.mime : "image/png",
       size: typeof image.size === "number" ? image.size : 0,
       dataBase64,
@@ -451,7 +462,7 @@ export function Composer() {
     const requestRole = selectedRoleId;
     const requestKey = requestRole ? draftKey(runtime, requestRole) : "";
     if (!bridge?.pickImage) {
-      setStatus("当前版本未提供选图通道。");
+      setStatus(t("ui.composer.pickChannelUnavailable"));
       return;
     }
     try {
@@ -460,7 +471,7 @@ export function Composer() {
         const image = result.image as Record<string, unknown>;
         const dataBase64 = typeof image.dataBase64 === "string" ? image.dataBase64 : "";
         if (!dataBase64) {
-          setStatus("选图失败：未收到图片数据。");
+          setStatus(t("ui.composer.pickFailedNoData"));
           return;
         }
         const mime = typeof image.mime === "string" ? image.mime : "image/png";
@@ -476,19 +487,21 @@ export function Composer() {
         setStatus("");
       } else {
         setStatus(
-          "选图失败：" +
-            (typeof result.error === "string" ? result.error : "未知原因"),
+          t("ui.composer.pickFailedPrefix") +
+            (typeof result.error === "string"
+              ? result.error
+              : t("shared.common.unknownReason")),
         );
       }
     } catch (error) {
-      setStatus("选图失败：" + String(error));
+      setStatus(t("ui.composer.pickFailedPrefix") + String(error));
     }
   };
 
   const attachBrowserFile = async (file: File) => {
     const requestRole = selectedRoleId;
     const requestKey = requestRole ? draftKey(runtime, requestRole) : "";
-    const problem = clientImageProblem(file as ImageFileLike);
+    const problem = clientImageProblem(file as ImageFileLike, locale);
     if (problem) {
       setStatus(problem);
       setHint(problem);
@@ -496,33 +509,33 @@ export function Composer() {
     }
     let dataBase64 = "";
     try {
-      dataBase64 = await readFileBase64(file);
+      dataBase64 = await readFileBase64(file, t("ui.composer.readFileFailed"));
     } catch (error) {
-      setStatus("读取图片失败：" + String(error));
+      setStatus(t("ui.composer.readImageFailedPrefix") + String(error));
       return;
     }
     if (!bridge?.attachImage) {
-      setStatus("当前版本未提供附件校验通道。");
+      setStatus(t("ui.composer.attachValidationUnavailable"));
       return;
     }
     let result: Record<string, unknown> = {};
     try {
       result = resultRecord(
         await bridge.attachImage({
-          name: file.name || "粘贴的图片",
+          name: file.name || t("ui.composer.pastedImage"),
           mime: file.type || "",
           dataBase64,
         }),
       );
     } catch (error) {
-      setStatus("图片校验失败：" + String(error));
+      setStatus(t("ui.composer.imageValidationFailedPrefix") + String(error));
       return;
     }
     if (result.ok !== true || !result.image || typeof result.image !== "object") {
       setStatus(
         typeof result.error === "string" && result.error
           ? result.error
-          : "图片校验失败。",
+          : t("ui.composer.imageValidationFailed"),
       );
       return;
     }
@@ -563,7 +576,7 @@ export function Composer() {
       if (String(file.type || "").indexOf("image/") === 0) {
         void attachBrowserFile(file);
       } else {
-        setStatus("只支持图片文件（png / jpeg / webp / gif）。");
+        setStatus(t("ui.composer.imageOnly"));
       }
     });
   };
@@ -605,8 +618,8 @@ export function Composer() {
               className="attach-rm"
               type="button"
               data-key={attachment.key}
-              title="移除图片"
-              aria-label="移除图片"
+              title={t("ui.composer.removeImage")}
+              aria-label={t("ui.composer.removeImage")}
               onClick={() => removeAttachment(attachment.key)}
             >
               <X size={12} strokeWidth={1.5} aria-hidden="true" />
@@ -638,9 +651,11 @@ export function Composer() {
           rows={1}
           defaultValue=""
           placeholder={
-            role ? "给" + roleName + "发送消息…" : "选择角色后发送消息…"
+            role
+              ? t("ui.composer.placeholderToRole", { role: selectedRoleName })
+              : t("ui.composer.placeholderSelectRole")
           }
-          aria-label="发送给当前角色的消息"
+          aria-label={t("ui.composer.ariaMessage")}
           spellCheck={false}
           className="min-h-7 max-h-40 resize-none rounded-none border-0 bg-transparent p-0 text-sm leading-[22px] shadow-none focus-visible:border-0 focus-visible:outline-none dark:bg-transparent"
           onInput={grow}
@@ -661,10 +676,10 @@ export function Composer() {
             type="button"
             title={
               bridge?.pickImage
-                ? "添加图片（png / jpeg / webp / gif，≤5MB）"
-                : "当前版本未提供选图通道"
+                ? t("ui.composer.addImage")
+                : t("ui.composer.addImageUnavailable")
             }
-            aria-label="添加图片"
+            aria-label={t("ui.composer.ariaAddImage")}
             disabled={!bridge?.pickImage || !sessionOpen}
             onClick={() => void pickImage()}
           >
@@ -684,7 +699,7 @@ export function Composer() {
               id="auto-approve-toggle"
               checked={approvalView.checked}
               disabled={approvalView.disabled}
-              aria-label="替我审批"
+              aria-label={t("ui.judge.shellOff")}
               onChange={onJudgeToggle(JUDGE_GROUP_APPROVAL)}
             />
             <span id="auto-approve-label">{approvalView.label}</span>
@@ -716,7 +731,7 @@ export function Composer() {
               id="judge-decision-toggle"
               checked={decisionView.checked}
               disabled={decisionView.disabled}
-              aria-label="替我决策"
+              aria-label={t("ui.judge.decisionOff")}
               onChange={onJudgeToggle(JUDGE_GROUP_DECISION)}
             />
             <span id="judge-decision-label">{decisionView.label}</span>
@@ -737,7 +752,7 @@ export function Composer() {
             {roleName} / {runtimeLabel}
           </span>
           <span className="composer-keyboard">
-            Enter 发送，Shift + Enter 换行
+            {t("ui.composer.enterHint")}
           </span>
 
           <div className="composer-actions">
@@ -749,12 +764,12 @@ export function Composer() {
               type="button"
               hidden={!busy}
               disabled={halting}
-              title="停止当前轮次"
-              aria-label="停止当前轮次"
+              title={t("ui.composer.stopTitle")}
+              aria-label={t("ui.composer.stopTitle")}
               onClick={() => void halt()}
             >
               <Square size={12} strokeWidth={1.5} aria-hidden="true" />
-              停止本轮
+              {t("shared.common.stopTurn")}
             </Button>
             <Button
               id="btn-send"
@@ -768,14 +783,14 @@ export function Composer() {
               }
               title={
                 canSend
-                  ? "发送（Enter）"
-                  : "会话未开启：先选择角色并开启会话"
+                  ? t("ui.composer.sendWithEnter")
+                  : t("ui.composer.sessionNotOpen")
               }
-              aria-label="发送"
+              aria-label={t("ui.composer.ariaSend")}
               aria-describedby="composer-demo-status"
               onClick={() => void send()}
             >
-              发送
+              {t("ui.composer.send")}
               <ArrowUp size={14} strokeWidth={1.5} aria-hidden="true" />
             </Button>
           </div>
@@ -800,11 +815,11 @@ export function Composer() {
           id="shell-judge-warning-close"
           className="judge-warning-close"
           type="button"
-          title="关闭提示"
-          aria-label={SHELL_JUDGE_WARNING_CLOSE_LABEL}
+          title={t("ui.composer.dismissHint")}
+          aria-label={t("ui.judge.warningClose")}
           onClick={acknowledgeWarning}
         >
-          {SHELL_JUDGE_WARNING_CLOSE_LABEL}
+          {t("ui.judge.warningClose")}
         </button>
       </div>
 
@@ -812,11 +827,11 @@ export function Composer() {
         <span id="composer-demo-status" role="status" aria-live="polite">
           {status ||
             (canSend
-              ? "Enter 发送，Shift+Enter 换行；发送失败会如实提示。"
-              : "选择角色并开启会话后可发送。")}
+              ? t("ui.composer.footerWorking")
+              : t("ui.composer.footerIdle"))}
         </span>
         <span id="runtime-note" className="runtime-note">
-          实际写入导入项目，角色边界外的写入会被拒绝。
+          {t("ui.composer.writeBoundaryNote")}
         </span>
       </div>
     </div>

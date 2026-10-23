@@ -20,21 +20,22 @@ import { useUiStore } from "@/stores/ui-store";
 import { useDrawerStore } from "@/stores/drawer-store";
 import {
   canRetryDocument,
-  DOCUMENT_BACK_LIST_TEXT,
-  DOCUMENT_BACK_ROLE_TEXT,
-  DOCUMENT_EMPTY_TEXT,
-  DOCUMENT_LIST_NOTE,
-  DOCUMENT_READ_TEXT,
-  DOCUMENT_READING_TEXT,
-  DOCUMENT_REFRESH_TEXT,
-  DOCUMENT_RETRY_TEXT,
-  DOCUMENT_UNLISTED_TEXT,
+  documentBackListText,
+  documentBackRoleText,
+  documentEmptyText,
   documentErrorText,
+  documentListNote,
+  documentReadText,
+  documentReadingText,
   documentReadableRef,
+  documentRefreshText,
+  documentRetryText,
+  documentUnlistedText,
   resolveDocumentLink,
 } from "@/chat/document-view";
 import { createRenderer } from "@/chat/markdown";
 import { findRole, roleDisplayName } from "@/chat/role-view";
+import { useLocaleState, useT } from "@/i18n";
 
 /**
  * 文档只读 Markdown：复用既有受控管线的安全规则（html:false、图片转义、
@@ -55,6 +56,8 @@ function renderDocumentMarkdown(text: unknown): string {
 }
 
 export function DocumentView() {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const docsView = useDrawerStore((s) => s.document);
   const roles = useChatStore((s) => s.roles);
   const readDocument = useDrawerStore((s) => s.readDocument);
@@ -62,7 +65,9 @@ export function DocumentView() {
   const backToList = useDrawerStore((s) => s.backToList);
   const backToRole = useDrawerStore((s) => s.backToRole);
   const role = docsView ? findRole(roles, docsView.roleId) : null;
-  const roleName = role ? roleDisplayName(role) : docsView?.roleId || "角色";
+  const roleName = role
+    ? roleDisplayName(role, locale)
+    : docsView?.roleId || t("shared.common.role");
 
   // 阅读态 Esc 先回列表（再 Esc 才由 Drawer 关闭）。
   useEffect(() => {
@@ -90,7 +95,7 @@ export function DocumentView() {
   }, [docsView]);
 
   if (!docsView) {
-    return <div className="muted small">文档上下文已失效。</div>;
+    return <div className="muted small">{t("ui.documentView.expired")}</div>;
   }
 
   if (docsView.mode === "list") {
@@ -103,12 +108,12 @@ export function DocumentView() {
           onClick={() => flushSync(() => backToRole())}
         >
           <ArrowLeft size={12} strokeWidth={1.5} aria-hidden="true" />
-          {DOCUMENT_BACK_ROLE_TEXT}
+          {documentBackRoleText(locale)}
         </button>
-        <p className="document-source-note">{DOCUMENT_LIST_NOTE}</p>
+        <p className="document-source-note">{documentListNote(locale)}</p>
         {!docsView.scope ? (
           <p className="document-scope-error" role="status">
-            {documentErrorText(docsView.unavailable || "PROJECT_NOT_GRANTED")}
+            {documentErrorText(docsView.unavailable || "PROJECT_NOT_GRANTED", locale)}
           </p>
         ) : null}
         {docsView.listError ? (
@@ -118,7 +123,7 @@ export function DocumentView() {
         ) : null}
         {docsView.loadingRefs ? (
           <p className="muted small" role="status">
-            正在读取已列文档…
+            {documentReadingText(locale)}
           </p>
         ) : null}
         {docsView.refs.length > 0 ? (
@@ -138,18 +143,22 @@ export function DocumentView() {
                     className="document-read-button"
                     data-doc-id={ref.documentId}
                     disabled={!readable}
-                    title={readable ? "只读打开此文档" : "当前项目/范围不可读"}
+                    title={
+                      readable
+                        ? t("ui.documentView.openReadonly")
+                        : t("ui.documentView.unreadable")
+                    }
                     onClick={() => void readDocument(ref)}
                   >
                     <FileText size={12} strokeWidth={1.5} aria-hidden="true" />
-                    {DOCUMENT_READ_TEXT}
+                    {documentReadText(locale)}
                   </Button>
                 </li>
               );
             })}
           </ul>
          ) : !docsView.loadingRefs && !docsView.listError ? (
-          <p className="muted small">{DOCUMENT_EMPTY_TEXT}</p>
+          <p className="muted small">{documentEmptyText(locale)}</p>
         ) : null}
         <Button
           variant="ghost"
@@ -160,7 +169,7 @@ export function DocumentView() {
           onClick={() => void refreshDocumentList()}
         >
           <RefreshCw size={12} strokeWidth={1.5} aria-hidden="true" />
-          {DOCUMENT_REFRESH_TEXT}
+          {documentRefreshText(locale)}
         </Button>
         <span className="sr-only">{roleName}</span>
       </div>
@@ -177,11 +186,11 @@ export function DocumentView() {
         onClick={() => flushSync(() => backToList())}
       >
         <ArrowLeft size={12} strokeWidth={1.5} aria-hidden="true" />
-        {DOCUMENT_BACK_LIST_TEXT}
+        {documentBackListText(locale)}
       </button>
       <p className="document-path">{docsView.ref?.relativePath || ""}</p>
       <div id="document-read-status" className="document-read-status" role="status" aria-live="polite">
-        {docsView.mode === "loading" ? DOCUMENT_READING_TEXT : null}
+        {docsView.mode === "loading" ? documentReadingText(locale) : null}
         {docsView.mode === "error" ? docsView.errorText : null}
         {docsView.mode === "content" ? docsView.statusText : null}
         {docsView.mode === "error" && canRetryDocument(docsView.errorCode) ? (
@@ -193,7 +202,7 @@ export function DocumentView() {
               if (docsView.ref) void readDocument(docsView.ref);
             }}
           >
-            {DOCUMENT_RETRY_TEXT}
+            {documentRetryText(locale)}
           </button>
         ) : null}
       </div>
@@ -221,7 +230,7 @@ export function DocumentView() {
           }
           if (resolution.kind === "unavailable") {
             const status = document.getElementById("document-read-status");
-            if (status) status.textContent = DOCUMENT_UNLISTED_TEXT;
+            if (status) status.textContent = documentUnlistedText(locale);
           }
         }}
       >

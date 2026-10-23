@@ -82,6 +82,20 @@ function registerIpc() {
     }
   });
   registerHandler = diagnosticModule.createWindowIpcRegistrar(win, ipcMain, diagnostic);
+  // i18n B0（2026-10-23）：本 e2e harness 自建窗口，不经过 app/main.ts 的 registerPreferencesIpc；
+  // 渲染层启动即读偏好。按真实契约同形注册桩（内存值、不写盘、不触仓库 .ans/.env），
+  // 避免日志出现 `No handler registered for 'preferences:get'`（D6 观察到 3 处）。
+  let e2eLocale = "zh-CN";
+  const e2eSupportedLocales = ["zh-CN", "en-US"];
+  registerHandler("preferences:get", () => ({ version: 1, locale: e2eLocale, supported: e2eSupportedLocales }));
+  registerHandler("preferences:set-locale", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, locale: e2eLocale, error: "invalid-sender" };
+    const locale = input !== null && typeof input === "object" && typeof input.locale === "string" ? input.locale : "";
+    if (!e2eSupportedLocales.includes(locale)) return { ok: false, locale: e2eLocale, error: "invalid-locale" };
+    e2eLocale = locale;
+    if (!win.isDestroyed()) win.webContents.send("preferences:locale-changed", { locale });
+    return { ok: true, locale };
+  });
   diagnosticModule.observeWindowDiagnostics(win, diagnostic, () => {
     void win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(diagnosticModule.RECOVERY_PAGE));
   });
@@ -1736,11 +1750,37 @@ async function run() {
   repairCheck("SESSION_REPAIR_FAILED_OPEN_EXPLICIT_RECOVERY", await wc().executeJavaScript("window.__ansRenderer.state.sessionOpenRoleId === '桌面窗口' && !document.getElementById('btn-send').disabled"));
   repairCheck("SESSION_REPAIR_FAILED_OPEN_NO_REPLAY", repairSendRequests.length === sendsBeforeOpenFailure);
 
+  // 2026-10-23（I9）：断言前先确认目标角色 pane 已选中并挂载（虚拟 pane 按角色渲染）。
+  await waitRepair("window.__ansRenderer.state.selectedRoleId === '桌面窗口' && !!document.querySelector('#chat .chat-pane[data-role-id=\"桌面窗口\"]')");
   for (const [status, label] of [["unreported", "未报告"], ["failed", "失败"], ["aborted", "已中止"]]) {
+    // 2026-10-23（I9）：聊天 pane 的行由行模型异步投影；行数超虚拟阈值后离屏行还不构造 DOM。
+    // 修复仅调整「什么时候找」：先记录事实（行模型计数/滚动量/已挂载 handback 数），发送后等行进入
+    // 行模型，再**贴底并等待卡片挂载**后才断言；断言语义不变（该状态的结论标签必须出现在
+    // `.msg-handback .hb-head strong`）。
+    const diagExpr = "(() => { const c=document.getElementById('chat'); const d=window.__ansRenderer.rowModelDebug('桌面窗口')||{}; return { rowCount: d.count, scrollTop: c?c.scrollTop:null, scrollHeight: c?c.scrollHeight:null, clientHeight: c?c.clientHeight:null, handbacks: document.querySelectorAll('#chat .msg-handback').length, heads: [...document.querySelectorAll('#chat .msg-handback .hb-head strong')].map(e=>e.textContent) }; })()";
+    const scrollBottomExpr = "(() => { const c=document.getElementById('chat'); if (!c) return false; c.scrollTop=c.scrollHeight; c.dispatchEvent(new Event('scroll',{bubbles:true})); return true; })()";
+    const matchExpr = "[...document.querySelectorAll('#chat .msg-handback .hb-head strong')].some(e=>e.textContent.includes(" + JSON.stringify(label) + "))";
+    const before = await wc().executeJavaScript(diagExpr);
+    log("REPORT_STATUS_" + status.toUpperCase() + "_BEFORE=" + JSON.stringify(before));
     wc().send("session:event", { roleId: "桌面窗口", event: { kind: "handback", summary: "新状态", report: { version: 1, reportId: "e2e-hb-status-" + status, source: { roleId: "桌面窗口", runtime: "pi" }, origin: "terminal-fallback", status, summary: { text: status }, evidence: [], at: "2026-10-13T00:00:00Z" } } });
-    await sleep(80);
-    // 结论标签现由 `.hb-head strong`（reportDeclaration）承载（原 `.hb-status` 载体随卡片重做退役）。
-    repairCheck("REPORT_STATUS_" + status.toUpperCase(), await wc().executeJavaScript("[...document.querySelectorAll('#chat .msg-handback .hb-head strong')].some(e=>e.textContent.includes(" + JSON.stringify(label) + "))"));
+    let rowAppended = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const now = await wc().executeJavaScript(diagExpr);
+      rowAppended = now.rowCount > before.rowCount;
+      if (rowAppended) break;
+      await sleep(20);
+    }
+    log("REPORT_STATUS_" + status.toUpperCase() + "_APPENDED=" + rowAppended + " " + JSON.stringify(await wc().executeJavaScript(diagExpr)));
+    await wc().executeJavaScript(scrollBottomExpr);
+    let matched = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      matched = await wc().executeJavaScript(matchExpr);
+      if (matched) break;
+      await wc().executeJavaScript(scrollBottomExpr);
+      await sleep(20);
+    }
+    log("REPORT_STATUS_" + status.toUpperCase() + "_AFTER=" + JSON.stringify(await wc().executeJavaScript(diagExpr)));
+    repairCheck("REPORT_STATUS_" + status.toUpperCase(), matched);
   }
 
   // 真实renderer进程退出→明确故障页→用户点击恢复；沿同一helper及受限preload，不调用模型。

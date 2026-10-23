@@ -38,6 +38,8 @@ import { openSettingsDrawer } from "@/stores/drawer-store";
 import { runtimeLabel } from "@/chat/runtime-config";
 import { roleBadgeCount, badgeText } from "@/chat/work-view";
 import { pendingKindFor } from "@/chat/operator-view";
+import { useLocaleState, useT } from "@/i18n";
+import type { Locale } from "@/i18n";
 
 function statusIcon(kind: string) {
   if (kind === "st-working") {
@@ -60,25 +62,28 @@ function RoleRow({
   primary,
   tabbable,
   onSelect,
+  locale,
 }: {
   role: RoleView;
   primary: boolean;
   tabbable: boolean;
   onSelect: () => void;
+  locale: Locale;
 }) {
+  const t = useT();
   const selectedRoleId = useUiStore((s) => s.selectedRoleId);
   const runtime = useUiStore((s) => s.runtime);
   const roleBusy = useChatStore((s) => s.roleBusy);
   const roleMeta = useChatStore((s) => s.roleMeta);
   const queueByRole = useChatStore((s) => s.queueByRole);
   const pendingOperator = useChatStore((s) => s.pendingOperator);
-  const gov = governanceView(role.governanceFunction);
-  const displayName = roleDisplayName(role);
+  const gov = governanceView(role.governanceFunction, locale);
+  const displayName = roleDisplayName(role, locale);
   const runtimeLabel =
     RUNTIME_OPTIONS.find((option) => option.id === runtime)?.label || "Claude";
   // PM §十七：待选择与待确认是两种不同的未决语义；只按呈现面（源/镜像）聚合，
   // 任一 choice ⇒「待选择」，否则「等待你确认」；无 pending ⇒ null（回真实状态）。
-  const pendingKind = pendingKindFor(pendingOperator, role.roleId);
+  const pendingKind = pendingKindFor(pendingOperator, role.roleId, locale);
   const awaiting = pendingKind !== null;
   const status = deriveRoleStatus({
     awaitingConfirm: awaiting,
@@ -91,7 +96,7 @@ function RoleRow({
   });
   // PM §十三/§十七：状态标签只表达状态；唯一可见数字徽标是 .ti-count（当前+排队）。
   // 等待态文案用未决种类替换，不附带数量；作答/失效后 pending 清空即回真实状态。
-  const badge = statusBadge(status, 0);
+  const badge = statusBadge(status, 0, locale);
   const statusLabel =
     status === "awaiting-confirm" && pendingKind ? pendingKind : badge.label;
   const workCount = roleBadgeCount(
@@ -99,11 +104,11 @@ function RoleRow({
     (queueByRole[role.roleId] || []).length,
   );
   const description = [
-    primary ? "主入口：默认入口与主路径" : "",
-    gov ? gov.builtinNote : role.builtIn ? "内置角色：定义在 SKILL.md，无角色目录" : "",
+    primary ? t("ui.sidebar.primaryHint") : "",
+    gov ? gov.builtinNote : role.builtIn ? t("ui.sidebar.builtinRoleNote") : "",
   ]
     .filter(Boolean)
-    .join("；");
+    .join(locale === "zh-CN" ? "；" : "; ");
   const active = selectedRoleId === role.roleId;
   return (
     <button
@@ -121,7 +126,7 @@ function RoleRow({
       tabIndex={tabbable ? 0 : -1}
       aria-current={active ? "true" : undefined}
       aria-description={description || undefined}
-      title={displayName + (description ? "；" + description : "")}
+      title={displayName + (description ? (locale === "zh-CN" ? "；" : "; ") + description : "")}
       onClick={onSelect}
     >
       <span className="ti-icon" aria-hidden="true">
@@ -135,18 +140,16 @@ function RoleRow({
           <span
             className="ti-count"
             title={
-              "当前工作 " +
-              (roleBusy[role.roleId] === true ? 1 : 0) +
-              " 项，排队 " +
-              (queueByRole[role.roleId] || []).length +
-              " 项"
+              t("ui.sidebar.busyAria", {
+                busy: roleBusy[role.roleId] === true ? 1 : 0,
+                queued: (queueByRole[role.roleId] || []).length,
+              })
             }
             aria-label={
-              "当前工作 " +
-              (roleBusy[role.roleId] === true ? 1 : 0) +
-              " 项，排队 " +
-              (queueByRole[role.roleId] || []).length +
-              " 项"
+              t("ui.sidebar.busyAria", {
+                busy: roleBusy[role.roleId] === true ? 1 : 0,
+                queued: (queueByRole[role.roleId] || []).length,
+              })
             }
           >
             {badgeText(workCount)}
@@ -162,7 +165,7 @@ function RoleRow({
           </span>
         </span>
         {gov || role.builtIn ? (
-          <span className="ti-builtin">{gov?.builtinNote || "内置角色：定义在 SKILL.md，无角色目录"}</span>
+          <span className="ti-builtin">{gov?.builtinNote || t("ui.sidebar.builtinRoleNote")}</span>
         ) : null}
       </span>
     </button>
@@ -170,6 +173,8 @@ function RoleRow({
 }
 
 export function Sidebar() {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
   const runtime = useUiStore((s) => s.runtime);
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
@@ -255,9 +260,10 @@ export function Sidebar() {
   };
 
   // 组内组长在前（旧 roleGroups 同口径；只在渲染前排序，不改仓库数据）。
-  const groups = groupRoles(roles, primaryRoleId).map((group) => ({
+  const groups = groupRoles(roles, primaryRoleId, locale).map((group) => ({
     ...group,
     roles: group.roles.slice().sort(
+      // 「组长」是角色数据里的分组职责值（机器/用户数据），不是 UI 文案。
       (a, b) => Number(b.groupDuty === "组长") - Number(a.groupDuty === "组长"),
     ),
   }));
@@ -303,13 +309,13 @@ export function Sidebar() {
         await loadProject(root);
       }
     } catch {
-      useChatStore.getState().setHint("选择项目失败，请重试。");
+      useChatStore.getState().setHint(t("ui.sidebar.selectProjectFailed"));
     }
   };
 
   const projectName = projectRoot
     ? projectRoot.split(/[\\/]/).filter(Boolean).pop() || projectRoot
-    : "尚未导入项目";
+    : t("ui.sidebar.noProject");
   const pickAvailable = !!getDesktopBridge()?.pickProject;
 
   return (
@@ -329,8 +335,8 @@ export function Sidebar() {
           id="sidebar-collapse"
           className="sidebar-toggle sidebar-collapse"
           type="button"
-          aria-label="收起左侧栏"
-          title="收起左侧栏"
+          aria-label={t("ui.sidebar.collapse")}
+          title={t("ui.sidebar.collapse")}
           aria-expanded={!sidebarCollapsed}
           onClick={collapse}
         >
@@ -349,27 +355,27 @@ export function Sidebar() {
           <div
             id="project-path"
             className={"project-path" + (projectRoot ? "" : " is-empty")}
-            title={projectRoot || "尚未导入项目"}
+            title={projectRoot || t("ui.sidebar.noProject")}
           >
-            {projectRoot || "尚未导入项目"}
+            {projectRoot || t("ui.sidebar.noProject")}
           </div>
         </div>
       </div>
 
       <div className="tree-label-row">
-        <span className="tree-label">工作空间</span>
+        <span className="tree-label">{t("ui.sidebar.workspace")}</span>
       </div>
 
       <nav
         id="role-tree"
         className="tree"
-        aria-label="角色列表"
+        aria-label={t("ui.sidebar.roleListAria")}
         ref={treeRef}
         onKeyDown={onTreeKeyDown}
       >
         {flat.length === 0 ? (
           <div className="tree-empty">
-            {projectRoot ? "该项目下未枚举到角色。" : "尚未导入项目。"}
+            {projectRoot ? t("ui.sidebar.noRolesInProject") : t("ui.sidebar.noProjectPeriod")}
           </div>
         ) : (
           groups.map((group) => (
@@ -382,6 +388,7 @@ export function Sidebar() {
                   primary={role.roleId === primaryRoleId}
                   tabbable={role.roleId === activeId}
                   onSelect={() => void selectRole(role.roleId)}
+                  locale={locale}
                 />
               ))}
             </Fragment>
@@ -395,12 +402,12 @@ export function Sidebar() {
         className="sidebar-resizer"
         role="separator"
         aria-orientation="vertical"
-        aria-label="调整左侧栏宽度"
+        aria-label={t("ui.sidebar.resizeAria")}
         aria-valuenow={sidebarWidth}
         aria-valuemin={SIDEBAR_MIN}
         aria-valuemax={SIDEBAR_MAX}
         tabIndex={0}
-        title="拖动调整左栏宽度；双击复位 248px"
+        title={t("ui.sidebar.resizeTitle")}
         onPointerDown={onResizerPointerDown}
         onPointerMove={onResizerPointerMove}
         onPointerUp={onResizerPointerUp}
@@ -415,10 +422,16 @@ export function Sidebar() {
           variant="ghost"
           className="w-full justify-start font-normal"
           disabled={!pickAvailable}
-          title={pickAvailable ? (projectRoot ? "切换项目" : "导入项目") : "当前环境未提供项目选择通道"}
+          title={
+            pickAvailable
+              ? projectRoot
+                ? t("ui.sidebar.switchProject")
+                : t("ui.sidebar.importProject")
+              : t("ui.sidebar.pickUnavailable")
+          }
           onClick={() => void importProject()}
         >
-          {projectRoot ? "切换项目" : "导入项目"}
+          {projectRoot ? t("ui.sidebar.switchProject") : t("ui.sidebar.importProject")}
         </Button>
         <Button
           id="tab-pi"
@@ -427,20 +440,20 @@ export function Sidebar() {
           disabled={!projectRoot}
           title={
             projectRoot
-              ? runtimeLabel(runtime) + " 设置"
-              : "导入项目后可配置引擎"
+              ? t("ui.sidebar.runtimeSettings", { runtime: runtimeLabel(runtime, locale) })
+              : t("ui.sidebar.settingsDisabled")
           }
           aria-label={
             projectRoot
-              ? runtimeLabel(runtime) + " 设置"
-              : "导入项目后可配置引擎"
+              ? t("ui.sidebar.runtimeSettings", { runtime: runtimeLabel(runtime, locale) })
+              : t("ui.sidebar.settingsDisabled")
           }
           onClick={(event) => openSettingsDrawer(runtime, event.currentTarget)}
         >
-          设置
+          {t("ui.sidebar.settings")}
         </Button>
         <div id="sidebar-role-count" className="sidebar-role-count">
-          {projectRoot ? roles.length + " 个角色" : "尚未导入项目"}
+          {projectRoot ? t("ui.sidebar.roleCount", { count: roles.length }) : t("ui.sidebar.noProject")}
         </div>
       </div>
 

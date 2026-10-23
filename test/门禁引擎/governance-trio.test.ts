@@ -17,6 +17,11 @@
 // 分析」不得建议 accept、不得进入实现；Lead 把演进诉求写进 acceptance 但不替客户决定架构；Crew 写区
 // 与架构模块一一对应且禁止重叠；Steward 流程/派发引用架构模块并含 contract-freeze 与集成/端到端
 // 步骤；Proof 核对实现与架构声明一致、缺章节或偏离声明不得建议 accept。
+// 2026-10-23 客户闸门 2 确认并授权实施目录级授权（directory-ownership；T3）：只改 Convener/Crew/Verifier
+// 卡文本——团队计划 v3（`teamPlanSchema: 3`/`directories`/模块清单 `实现目录` 必填/角色表 `授权目录`+
+// `精确写集`/目录规范表/唯一 owner/不重叠/共享策略/治理关键路径精确授权/readiness 目录列）、Crew 按计划
+// 目录写边界且不得跨目录/改规范/new 更宽、Verifier 核对布局报告与原始证据且不把结构通过当语义正确；
+// 注册表 entries/forbidden/preauthorized、能力位、id/显示名与工程基线零变化。
 // 实施口径：`角色卡/项目管理/docs/design/2026-10-17_design_governance-trio-review.md`
 // §5.1–§5.6、§九-1/3/4/12/15；`2026-10-18_design_governance-liaison-review.md` §4.1–§4.7。
 //
@@ -392,12 +397,12 @@ test("客户 2026-10-19 架构批评：基线新增「架构与可扩展性」�
   // Crew / 组队：写区与角色卡同架构模块一一对应，禁止重叠；每个模块有明确属主。
   const n = governanceRoleOf("nominator")!.cardText;
   assert.ok(
-    n.includes("写区（boundary.yaml）与角色卡必须与团队计划的唯一写集一一对应"),
-    "Crew 写区与角色卡须与团队计划唯一写集一一对应",
+    n.includes("写区（boundary.yaml）与角色卡必须与团队计划的 `授权目录`/`精确写集` 一一对应"),
+    "Crew 写区与角色卡须与团队计划授权目录/精确写集一一对应",
   );
-  assert.ok(n.includes("并与提案中的架构模块对应"), "Crew 写区仍须对应提案架构模块");
+  assert.ok(n.includes("并与提案中的架构模块/`实现目录` 对应"), "Crew 写区仍须对应提案架构模块/实现目录");
   assert.ok(n.includes("禁止写区重叠"), "Crew 禁止写区重叠");
-  assert.ok(n.includes("每个模块必须有明确属主"), "Crew 每个模块须有明确属主");
+  assert.ok(n.includes("每个目录/模块必须有明确属主"), "Crew 每个目录/模块须有明确属主");
 
   // Steward / 统筹：流程与派发引用架构模块/边界；contract-freeze 与集成/端到端步骤必须存在。
   const c = governanceRoleOf("convener")!.cardText;
@@ -650,7 +655,7 @@ test("卡文本：Steward / 统筹 团队计划机器可读推荐集（appointme
   assert.match(t, /不要用 YAML 块数组/, "YAML 块数组会解析为空推荐集");
   assert.match(t, /推荐集与卡选项一致/);
   assert.match(t, /推荐集只列项目角色，不得含五个内置治理角色 id/);
-  assert.match(t, /每个推荐角色必须有 roleId、职责目标、能力要求、唯一写集、依赖行/);
+  assert.match(t, /每个推荐角色必须有 roleId、职责目标、能力要求、授权目录、精确写集、依赖行/);
   // 推荐集约定只属 Steward / 统筹（团队计划作者）；其余四张卡不得定义（避免第二份口径）。
   for (const id of ["liaison", "rapporteur", "nominator", "verifier"] as const) {
     assert.doesNotMatch(governanceRoleOf(id)!.cardText, /recommended:/, `${id} 不定义推荐集`);
@@ -661,7 +666,7 @@ test("卡文本：角色卡写入归属——Crew 按团队计划 appointment-wr
   const n = governanceRoleOf("nominator")!.cardText;
   assert.match(n, /读团队计划（客户确认后）/);
   assert.match(n, /只对任命名单内的角色发 `request_confirmation`/);
-  assert.match(n, /计划缺能力细节时\*\*停止写卡并报告 Steward \/ 统筹 补充\*\*/);
+  assert.match(n, /计划缺能力细节、目录规范、`实现目录`[\s\S]{0,120}\*\*停止写卡并报告 Steward \/ 统筹 补充\*\*/);
   assert.match(n, /不自行扩大职责/);
   assert.match(n, /写卡全部完成且应用结构校验通过后/);
   // 2026-10-22：Crew 不再先写提名文件再弹 appointment 卡，也不再以提名文件为物证。
@@ -674,7 +679,7 @@ test("卡文本：角色卡写入归属——Crew 按团队计划 appointment-wr
   assert.match(c, /角色由 Crew \/ 组队 在任命决定后经 `appointment-write`/, "写卡归属 Crew / 组队");
   assert.match(c, /角色不存在时不得派发/, "角色不存在时不得派发");
   assert.match(c, /不得代写角色卡/, "Steward 不得代写角色卡");
-  assert.match(c, /你是 `docs\/scheduling\/<flowId>-team-v1\.md`（v2…）的唯一作者/, "Steward 是团队计划唯一作者");
+  assert.match(c, /你是 `docs\/scheduling\/<flowId>-team-v1\.md`（后续版本 `-team-v2\.md`…）的唯一作者/, "Steward 是团队计划唯一作者");
   assert.match(c, /`cardKind=appointment`/, "Steward 发 appointment 卡");
   assert.match(c, /role-readiness/, "Steward 做角色就绪复核");
   assert.match(c, /变更包/, "Steward 组变更包");
@@ -1370,17 +1375,26 @@ test("2026-10-22 角色粒度/MapReduce：ENGINEERING_QUALITY_BASELINE 文本逐
   assert.equal(ENGINEERING_QUALITY_BASELINE, expected, "工程质量基线文本必须逐字不变");
 });
 
-test("2026-10-22 角色粒度/MapReduce 卡文本（P1/P4/P5/P13）：Convener/Crew 要求 v2 计划/模块覆盖/依赖/粒度/readiness/flow 字段", () => {
+test("2026-10-22/2026-10-23 角色粒度、MapReduce 与目录授权卡文本（P1/P3/P4/P5/P10/P11/P13）：Convener/Crew 要求 v3 计划/目录规范/实现目录/readiness/flow 字段", () => {
   const c = governanceRoleOf("convener")!.cardText;
   for (const needle of [
-    "teamPlanSchema: 2",
+    "teamPlanSchema: 3",
     "modules: [<module-a>, <module-b>]",
-    "`module` / 职责 / 公开契约 / 架构来源四列",
+    "`module` / 职责 / 公开契约 / 架构来源 / 实现目录五列",
     "恰好覆盖 `modules` 集合",
-    "roleId | 类型 | module | 职责目标 | 能力要求 | 唯一写集 | 公开契约 | 测试面 | 依赖 | dependsOn | 并行组 | 组别 | apiSpec | 粒度理由",
+    "**每个 module 必须有非空 `实现目录`（Q9 A）**",
+    "不得写 `—`/空",
+    "roleId | 类型 | module | 职责目标 | 能力要求 | 授权目录 | 精确写集 | 公开契约 | 测试面 | 依赖 | dependsOn | 并行组 | 组别 | apiSpec | 粒度理由",
+    "`唯一写集` 仅作 v3 兼容别名",
+    "`边界` 列名在 v3 不再接受",
+    "目录 | owner | 类型 | 用途 | 命名 | 允许子目录 | 允许文件类型 | 公开契约 | 测试面 | 依赖 | 禁写区 | 共享",
     "一个模块一个 Map 角色、一个角色一个模块",
     "`module: reduce`",
     "无重复/孤儿/未声明模块",
+    "每个目录恰好一个 owner",
+    "不同角色的目录不得相同、不得互为祖先/子目录",
+    "`shared: split` 的父目录除外",
+    "治理关键路径不得作为普通 `授权目录`",
     "跨角色两两不相交",
     "同一 `map-*` 组内角色之间不得有依赖路径",
     "Map 角色不得依赖 Reduce",
@@ -1388,6 +1402,7 @@ test("2026-10-22 角色粒度/MapReduce 卡文本（P1/P4/P5/P13）：Convener/C
     "`exception-review`",
     "不得把「字段齐全」当成「粒度正确」",
     "`docs/scheduling/<flowId>-readiness-v1.md`",
+    "`directories`/`spec`/`shared`/`layout`",
     "`module`/`contract`/`testSurface`/`parallel`/`dependsOn`/`granularity`",
     "`status: pass|gaps`",
     "delivery-<module>",
@@ -1400,29 +1415,104 @@ test("2026-10-22 角色粒度/MapReduce 卡文本（P1/P4/P5/P13）：Convener/C
     "旧步骤无 `dependsOn` 不新增检查",
     "不新增 `FlowStepKind`",
   ]) {
-    assert.ok(c.includes(needle), `Convener 卡须含 v2 要求「${needle}」`);
+    assert.ok(c.includes(needle), `Convener 卡须含 v3 要求「${needle}」`);
   }
   assert.doesNotMatch(c, /cardKind=(map|reduce|parallel)/, "不得用 cardKind 表达 Map/Reduce");
 
   const n = governanceRoleOf("nominator")!.cardText;
   for (const needle of [
-    "读 `module` / 公开契约 / 测试面 / `dependsOn` / 并行组 / `粒度理由`",
+    "读目录规范与每个 module 的 `实现目录`",
+    "并按 v2 读 `module` / 公开契约 / 测试面 / `dependsOn` / 并行组 / `粒度理由`",
     "bounded context（module）",
+    "bounded context（module）** 与模块 **`实现目录`",
     "公开契约",
     "测试面",
     "**上下游依赖**（`dependsOn` 与交接输入输出）",
     "粒度理由",
-    "boundary 按计划的唯一写集逐条写（精确路径/目录，不多不少）",
+    "`授权目录` 落目录条目（directory）、`精确写集` 落精确文件条目（file），不多不少",
+    "`new` 角色边界目录与计划 `授权目录` 一致（角色根工作文档除外，不得更宽）",
+    "不得改目录规范、不得跨目录、不得把他人目录并进自己边界",
+    "v3 目录落卡纪律（必须）",
     "不得写整层角色",
     "纳米角色",
-    "不自行补计划、不自行增删模块/角色/写集",
-    "计划缺 module/公开契约/测试面/`dependsOn`/粒度理由/写集",
+    "不自行补计划、不自行增删目录/模块/角色/写集",
+    "计划缺 module/公开契约/测试面/`dependsOn`/粒度理由/`授权目录`/`精确写集`/目录规范/`实现目录`",
   ]) {
-    assert.ok(n.includes(needle), `Crew 卡须含 v2 要求「${needle}」`);
+    assert.ok(n.includes(needle), `Crew 卡须含 v3 要求「${needle}」`);
   }
   // 沿用上轮已落地边界：Crew 不选角色、不发 appointment、不写 nominations。
   assert.doesNotMatch(n, /提名权/);
   assert.doesNotMatch(n, /只用 `appointment`/);
   assert.doesNotMatch(n, /只写 `docs\/nominations/);
   assert.match(n, /不再写 `docs\/nominations\/\*\*`、不再发 appointment 卡/);
+});
+
+// —————————————————————— 8) 2026-10-23 目录级授权（directory-ownership）卡文本负例 ——————————————————————
+
+function assertCardIncludes(text: string, needles: readonly string[], label: string): void {
+  for (const needle of needles) {
+    assert.ok(text.includes(needle), `${label}须含「${needle}」`);
+  }
+}
+
+test("2026-10-23 目录授权负例（P10/P11）：Convener 漏 `实现目录`/目录规范/readiness 目录列不得发卡或放行", () => {
+  // 验收标准 v1.1（Q9 A）：v3 模块清单每个 module 的 `实现目录` 必填非空；目录规范表与 readiness
+  // 的 `directories`/`spec`/`shared`/`layout` 是 v3 计划的硬要求，漏项不得被当成「计划完整」。
+  const c = governanceRoleOf("convener")!.cardText;
+  assertCardIncludes(
+    c,
+    [
+      "**每个 module 必须有非空 `实现目录`（Q9 A）**",
+      "不得写 `—`/空",
+      "恰好覆盖 `directories`（不多、不少、不重复）",
+      "缺任一项视为计划不完整，不得发 appointment 卡",
+      "**逐角色/逐目录**记录 `directories`/`spec`/`shared`/`layout`",
+      "结构校验通过不等于粒度/规范正确",
+      "不得把「字段齐全」当成「粒度正确」",
+      "不得把「字段齐全/结构通过」当成「粒度正确/规范合理」",
+    ],
+    "Convener 漏项负例",
+  );
+  // 反向：旧 v2-only 口径（只按精确写集/唯一写集发卡）不得残留。
+  assert.doesNotMatch(c, /## 团队判断与团队计划（v2，必须）/, "不得残留 v2 计划章节标题");
+  assert.doesNotMatch(c, /写团队计划（v2）/, "不得残留 v2 写计划口径");
+  assert.doesNotMatch(c, /v2 计划 frontmatter 必须含 `teamPlanSchema: 2`/, "不得残留 v2 frontmatter 口径");
+  assert.doesNotMatch(c, /唯一写集是分号分隔的精确路径\/目录/, "不得残留 v2 唯一写集语义");
+});
+
+test("2026-10-23 目录授权负例（P10）：Crew 跨目录/改规范/new 更宽/自行扩权均被禁止；不确定交回 Convener", () => {
+  const n = governanceRoleOf("nominator")!.cardText;
+  assertCardIncludes(
+    n,
+    [
+      "不得改目录规范、不得跨目录、不得把他人目录并进自己边界",
+      "`new` 角色边界目录与计划 `授权目录` 一致（角色根工作文档除外，不得更宽）",
+      "`changed`/`existing` 计划 ⊆ 边界、更宽部分限于该角色模块实现目录/既有职责",
+      "不确定性交回 Convener，不自行扩大范围",
+      "不自行补计划、不自行增删目录/模块/角色/写集",
+    ],
+    "Crew 目录负例",
+  );
+  // 反向：旧 v2 口径（只按唯一写集写边界）不足以覆盖 v3 目录授权。
+  assert.doesNotMatch(n, /boundary 按计划的唯一写集逐条写/, "不得残留只按唯一写集写边界的旧口径");
+  assert.doesNotMatch(n, /v2 粒度落卡纪律/, "不得残留 v2 粒度落卡纪律标题");
+});
+
+test("2026-10-23 目录授权负例（P10/P12）：Proof 核对布局报告+原始证据、不把结构通过当语义正确、未真实启动/演示不得 accept", () => {
+  const v = governanceRoleOf("verifier")!.cardText;
+  assertCardIncludes(
+    v,
+    [
+      "核对目录布局核对报告（改动路径 → 目录规范）与原始 `git status`/diff/候选哈希",
+      "布局 fail 不得标 pass",
+      "不把「字段齐全/结构通过」当成「语义正确」",
+      "目录内聚、规范合理、共享必要、契约与测试面真实性以 readiness 记录与验收判断为准",
+      "缺失或无法对应候选判 insufficient evidence",
+      "未真实运行、未演示时不得建议 accept",
+    ],
+    "Proof 目录负例",
+  );
+  // 反向：不得把布局报告摘要当原始证据，也不得用结构通过代替语义核对。
+  assert.doesNotMatch(v, /布局报告摘要即可/, "布局报告摘要不能替代原始证据");
+  assert.doesNotMatch(v, /结构通过即语义正确/, "结构通过不得等同语义正确");
 });

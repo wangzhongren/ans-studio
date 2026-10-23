@@ -1,0 +1,82 @@
+== boundary file hashes ==
+角色卡/桌面窗口/boundary.md | 1d12d0b4aceb293ed0315986ee82b844603d75bdde71589867bb000f5230744e | b13881b8935309c123a6681f1f6017583f5d18da
+角色卡/桌面窗口/boundary.yaml | 569a0a208024883709ba2ce47cbd62349856b5e82377c760bf08a764ca332c2f | 531a500a5778eb55de0461bbcd0a53db6bb0d7a6
+角色卡/桌面UI/boundary.md | 99578261917e2bdb359828aa77dc1a0ff0cf5c31174eeb97f7d666c21cb52cf0 | e3812b73aeaa768b522300dbe69d67f7b550c1a1
+角色卡/桌面UI/boundary.yaml | e1af4d93ab5e022ec447c0412743e41974d04be8ef12cc1c5a5914dd90dda093 | 0bf2a1cbaa134675727052c04a22eeffac838b39
+角色卡/项目管理/boundary.md | 6f75bee458e672e8b4be78b17e4910ee13ba8f50057ce26e30cee012fba45d5c | 878e2a412554ed982e873418e729f73e132288f5
+角色卡/项目管理/boundary.yaml | cfdc7408010bb9da1e3d5e9f723eb7a38956471d13860e8ac5588e7c3693cfff | 6540b1f989fc5a667a8c684447ae94f02b6c0859
+角色卡/测试/boundary.md | 9a2eba3fc842f185eb228ef49cd30dfd66ec3933c42cca0202ff2ae26c97859f | dbc5f154df1487d5df15980a535c56f8a697eb58
+角色卡/测试/boundary.yaml | 3c8f7e0e34d44bcdc55995f2747cd8eccaea7ad0875ad074569f6acc7beea14c | 81208f8d3370bdc58091b81367ca06732476a380
+
+== 桌面窗口 entries for target paths ==
+10:| 单文件 | `app/preload.cjs` | 受限 IPC 桥（contextBridge 白名单） |
+11:| 目录 | `app/desktop/` | 桌面 Interface（主进程侧纯逻辑）：会话、项目装配、历史、交互、引擎配置、图片、批推与诊断 |
+12:| 单文件 | `src/model/project-document.ts` | B 专属 Model 唯一主属：版本、文档引用、可信导入类型、请求/结果与错误类型；不含 IO |
+13:| 单文件 | `src/pipeline/project-document/read-project-document.ts` | B Pipeline 公开入口：编排文档 reader 创建、scope 更新、读取与关闭 |
+14:| 单文件 | `src/service/project-document/abstract/document-reader.ts` | B Service 抽象：受限文档服务接口与 Provider 所需读取条件 |
+15:| 单文件 | `src/service/project-document/public/read-project-document.ts` | B Service 公开入口：创建/调用受限文档服务 |
+16:| 单文件 | `src/service/project-document/impl/read-project-document.ts` | B Service 实现：唯一 scope registry、清单资格、预算/格式/编码政策与错误映射 |
+17:| 单文件 | `src/provider/project-document/abstract/file-reader.ts` | B Provider 抽象：文件句柄事实与受限有界 IO 接口 |
+18:| 单文件 | `src/provider/project-document/public/file-reader.ts` | B Provider 公开入口：平台文件读取能力工厂 |
+19:| 单文件 | `src/provider/project-document/impl/file-reader.ts` | B Provider 实现：lstat/realpath/open/fstat、有界 read/close 与平台能力检查 |
+29:| 单文件 | `test/桌面应用/interface.test.ts` | 主进程侧测试：Interface 处理器 |
+35:| 单文件 | `test/桌面应用/project.test.ts` | 主进程侧测试：枚举构造 ProjectConfig |
+41:| 单文件 | `test/桌面应用/e2e/main.mjs` | 桌面端到端总自检台（真实 Electron） |
+43:| 单文件 | `test/桌面应用/project-document.test.ts` | B 专属测试：服务/Provider 预算、编码、句柄竞态、grant/scope 与引用失效 |
+
+== 桌面UI entries for renderer/test ==
+9:| 目录 | `app/renderer/` | 渲染进程前端（HTML/CSS/renderer.js 与 markdown/role-status/tool-rows/ui-labels 纯函数模块及 vendor 库）；包含渲染层 React 源码（src/）、样式、组件、渲染层 tsconfig/components.json 与构建产物（dist/） |
+19:| 目录 | `test/桌面UI/` | 渲染层 React 组件与设计系统守卫测试（独立目录，与桌面窗口的 test/桌面应用/ 精确文件授权互不重叠） |
+
+== 项目管理 entries for i18n ==
+7:| 目录（私有） | `src/common/shared/` | 跨角色共享组件 |
+8:| 目录（测试） | `test/项目管理/shared/` | 共享组件的单元测试与夹具 |
+
+== 测试 entries ==
+7:    path: test/测试/
+
+== provider zero-change check ==
+status:
+diff-stat:
+(empty above means zero change)
+
+== test/桌面应用 new-file check ==
+status entries:
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/acceptance-dispatch.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/boundary-refresh.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/e2e/main.mjs"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/multi-runtime.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/operator-wiring.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/pi-config.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/session.test.ts"
+untracked under test/桌面应用:
+untracked_count=0
+HEAD_files=31
+worktree_tracked_files=31
+
+== planned new renderer file ==
+ABSENT (as expected at S1)
+app/renderer directory authorization: see 桌面UI boundary line 9
+
+== e2e per-file authorization (yaml) ==
+103-    purpose: 主进程侧测试——su 生效边界经 .ans 治理边界路径采纳（project/interface）
+104-  - kind: file
+105:    path: test/桌面应用/e2e/main.mjs
+106-    purpose: 桌面端到端总自检台（真实 Electron：主进程装配 + preload + renderer；含窗口/会话/界面检查点）
+107-  - kind: file
+
+== exact target ownership (yaml entries) ==
+12:    path: app/preload.cjs
+15:    path: app/desktop/
+18:    path: src/model/project-document.ts
+24:    path: src/service/project-document/abstract/document-reader.ts
+27:    path: src/service/project-document/public/read-project-document.ts
+30:    path: src/service/project-document/impl/read-project-document.ts
+33:    path: src/provider/project-document/abstract/file-reader.ts
+36:    path: src/provider/project-document/public/file-reader.ts
+39:    path: src/provider/project-document/impl/file-reader.ts
+69:    path: test/桌面应用/interface.test.ts
+87:    path: test/桌面应用/project.test.ts
+105:    path: test/桌面应用/e2e/main.mjs
+111:    path: test/桌面应用/project-document.test.ts

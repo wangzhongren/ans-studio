@@ -1,0 +1,18 @@
+== real Electron self-check (test/桌面应用/e2e/main.mjs) ==
+command: ANS_E2E_OUTDIR=<evidence>/electron-e2e ./node_modules/.bin/electron test/桌面应用/e2e/main.mjs
+cwd: /c/Users/51054/Desktop/work/ans-studio
+electron: v44.7.0 (`./node_modules/.bin/electron --version`, measured in this shell; package.json electron 44.7.0)
+exit_code: 0
+report: 角色卡/测试/docs/change/2026-10-23-directory-ownership-evidence/electron-e2e/report.txt (mtime 2026-10-23 12:15:20 +0800)
+stdout/stderr raw: 角色卡/测试/docs/change/2026-10-23-directory-ownership-evidence/electron-e2e-main.log
+screenshots: 17 png
+ROLE_COUNT=16
+ROLE_IDS=su, 编排, 测试, 产品, 独立验收, 门禁引擎, 项目管理, 宣传, 运行时核心, 装配, 桌面窗口, 桌面UI, Claude适配器, Codex适配器, Pi适配器, UIUX设计师
+E2E_PASS=true
+E2E_FAILURES=
+E2E_DONE=1
+
+observations:
+- report is real Electron main process + real preload + real renderer (no mock); no real model/credentials used.
+- log contains 3 x "No handler registered for 'preferences:get'" (i18n B0 preferences IPC not registered by this legacy e2e harness). Non-fatal: E2E_PASS=true, exit 0. This is i18n B0/desktop context, NOT a directory-ownership v3 assertion and NOT caused by testing-role changes.
+- the e2e self-check does not exercise v3 team plans; v3 plan parse + layout check is demonstrated deterministically in a temp project root by test/测试/directory-layout.test.ts (see v3-demo-temp-root.txt).

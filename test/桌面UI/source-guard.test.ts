@@ -127,18 +127,28 @@ test("Sidebar 身份：主入口/内置只在 class/data/aria/title；不渲染 
   assert.equal(/statusBadge\(status,\s*[1-9]/.test(sidebar), false);
 });
 
-test("治理/报告事实不持久化：localStorage 仅左栏偏好；无 indexedDB/sessionStorage", () => {
+// i18n B0：语言偏好允许 `localStorage["ans.locale"]` 作为首屏镜像（方案 §4.6/§4.7）；
+// 允许集仍是精确白名单，其余文件不得借道 localStorage 持久化。
+const LOCAL_STORAGE_ALLOWED = [
+  "app/renderer/src/stores/ui-store.ts",
+  "app/renderer/src/i18n/locale-store.ts",
+];
+
+test("治理/报告事实不持久化：localStorage 仅左栏偏好与语言镜像；无 indexedDB/sessionStorage", () => {
   for (const file of sourceFiles) {
     const source = read(file);
     assert.equal(/\bindexedDB\b|\bsessionStorage\b/.test(source), false, rel(file));
     if (/\blocalStorage\b/.test(source) && !source.includes("不写 localStorage")) {
-      assert.equal(
-        rel(file),
-        "app/renderer/src/stores/ui-store.ts",
-        rel(file) + " persists beyond sidebar preferences",
+      assert.ok(
+        LOCAL_STORAGE_ALLOWED.includes(rel(file)),
+        rel(file) + " persists beyond sidebar preferences and the i18n locale mirror",
       );
     }
   }
+  // 语言镜像只允许 `ans.locale` 一个键，且不得借用左栏偏好键。
+  const localeStoreSource = read(join(RENDERER, "i18n", "locale-store.ts"));
+  assert.match(localeStoreSource, /LOCALE_STORAGE_KEY = "ans\.locale"/);
+  assert.equal(/ans\.sidebar\./.test(localeStoreSource), false);
   const ui = read(join(RENDERER, "stores", "ui-store.ts"));
   assert.match(ui, /SIDEBAR_WIDTH_STORAGE_KEY = "ans\.sidebar\.width"/);
   assert.match(ui, /SIDEBAR_COLLAPSED_STORAGE_KEY = "ans\.sidebar\.collapsed"/);
@@ -166,6 +176,27 @@ test("阅读锚点：纯模块无定时器/动画；full replay 先记录后重�
   assert.match(pane, /takeReadingAnchor\(roleId\)/);
   assert.match(pane, /chat\.scrollTop = next/);
   assert.equal(/scrollTo\(\{[^}]*behavior/.test(pane), false);
+});
+
+test("i18n B4：runtime 显示名经 facade 共享 key；不导入 runtime-shared（node 依赖）", () => {
+  const source = codeOnly(read(join(RENDERER, "chat", "runtime-config.ts")));
+  // 共享 `runtime-shared.ts` 顶层 import node:os/node:path，渲染层只能经 facade 用同一 key。
+  assert.equal(
+    /from\s+["'][^"']*runtime-shared/.test(source),
+    false,
+    "runtime-config imports runtime-shared",
+  );
+  assert.equal(
+    /from\s+["'][^"']*shared\/runtime-/.test(source),
+    false,
+    "runtime-config imports shared runtime modules",
+  );
+  assert.match(source, /from\s+"(@\/i18n|\.\.\/i18n\/index\.ts)"/);
+  assert.match(source, /RUNTIME_LABEL_KEYS/);
+  assert.match(source, /shared\.runtimeSettings\.runtime\.demo/);
+  // demo 在本地映射里是语言中性值，用户可见中文只存在共享目录。
+  assert.match(source, /demo:\s*"demo"/);
+  assert.equal(/["']演示["']/.test(source), false, "demo Chinese literal");
 });
 
 test("视觉/组件单一来源：状态转轮只用 lucide LoaderCircle；无自绘 SVG；无第二 UI 库", () => {

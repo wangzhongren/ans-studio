@@ -1,0 +1,12 @@
+# 行尾记录（工作区原始字节；git core.autocrlf=true）
+# HEAD 基线（git show 管道）：
+  runtime-settings.ts: JavaScript source, Unicode text, UTF-8 text
+  runtime-shared.ts: JavaScript source, Unicode text, UTF-8 text
+  runtime-settings.test.ts: JavaScript source, Unicode text, UTF-8 text
+# 候选（工作区）：
+  src/common/shared/runtime-settings.ts: JavaScript source, Unicode text, UTF-8 text
+  src/common/shared/runtime-shared.ts: JavaScript source, Unicode text, UTF-8 text, with CRLF line terminators
+  test/项目管理/shared/runtime-settings.test.ts: JavaScript source, Unicode text, UTF-8 text
+  test/项目管理/shared/runtime-shared.test.ts: JavaScript source, Unicode text, UTF-8 text, with CRLF line terminators
+  test/项目管理/shared/i18n.test.ts: JavaScript source, Unicode text, UTF-8 text
+  test/项目管理/shared/i18n-guard-allowlist.ts: JavaScript source, Unicode text, UTF-8 text

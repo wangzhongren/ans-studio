@@ -1,0 +1,13 @@
+date: 2026-10-23T19:27:58+08:00
+cwd: /c/Users/51054/Desktop/work/ans-studio
+os: MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+shell: 5.3.15(2)-release
+node: C:/Users/51054/AppData/Local/Programs/nodejs/node.exe (v24.22.1)
+npm: 11.19.1
+git HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+git branch: main
+
+Commands and results:
+1) C:/Users/51054/AppData/Local/Programs/nodejs/node.exe --test "test/项目管理/shared/**/*.test.ts"  => exit 0; tests 184, pass 179, fail 0, skipped 5 (pre-existing atomic-write D3 Windows skips), todo 0, duration 4913.3818ms
+2) npm.cmd run typecheck (PATH prepended with C:/Users/51054/AppData/Local/Programs/nodejs) => exit 0; no diagnostics
+3) node --test "test/测试/i18n-integration.test.ts" (read-only supplementary) => exit 0; tests 8, pass 8, fail 0

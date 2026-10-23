@@ -1,0 +1,38 @@
+# package.json runner facts (read-only)
+{
+  "name": "ans-cli",
+  "version": "1.6.0",
+  "engines": {
+    "node": ">=23.6"
+  },
+  "scripts": {
+    "start": "node bin/ans.js",
+    "doctor": "node bin/ans.js doctor",
+    "demo": "node bin/ans.js role run 编排 --task T-1",
+    "app": "electron app/main.ts",
+    "test:assembly": "node --test \"test/装配/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "typecheck:renderer": "tsc -p app/renderer/tsconfig.json",
+    "dev:renderer": "vite --config vite.config.ts",
+    "build:renderer": "vite build --config vite.config.ts",
+    "preview:renderer": "vite preview --config vite.config.ts",
+    "package": "electron-builder --config electron-builder.yml",
+    "package:local": "npm run build:renderer && electron-builder --config electron-builder.yml --publish never -c.directories.output=release-output/local",
+    "verify:local": "node test/装配/verify-local-package.mjs",
+    "release:prepare": "node src/common/装配/release-prepare.mjs",
+    "release:verify": "node src/common/装配/release-verify.mjs"
+  }
+}
+
+# test runner: node --test; no npm test script
+# test file inventory
+all_test_files=359
+excluded_hang_file=test/pi-adapter/write-sequencing.test.ts
+full_run_files=358
+test/编排 test_files=51
+test/桌面应用 test_files=25
+test/runtime-core test_files=36
+test/项目管理/shared test_files=10
+test/测试 test_files=123
+test/装配 test_files=11
+test/桌面应用/e2e/main.mjs present=yes (not .test.ts; not run in S1 baseline; S7 item)

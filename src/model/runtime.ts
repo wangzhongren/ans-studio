@@ -1365,15 +1365,23 @@ export interface GovernanceJudgeFacts {
    */
   teamPlanConfirmed?: boolean;
   /**
-   * 团队计划 schema 版本（2026-10-22 角色粒度/MapReduce；方案 §5.1：`1` = legacy 缺省、`2` = 本方案）。
-   * 可选；缺失＝应用未提供/未解析，不得据此假定 v2。物证仍沿用 `artifacts.teamPlanPath`，不新增 artifact kind。
+   * 团队计划 schema 版本（2026-10-22 角色粒度/MapReduce；2026-10-23 目录级授权 v3）。
+   * `1` = legacy 缺省、`2` = 角色粒度/MapReduce v2、`3` = 目录级授权 v3（v2 字段 + 授权目录/目录规范）。
+   * 可选；缺失＝应用未提供/未解析，不得据此假定任何版本（尤其不得假定 v3）。
+   * 物证仍沿用 `artifacts.teamPlanPath`，不新增 artifact kind。
    */
-  teamPlanSchema?: 1 | 2;
+  teamPlanSchema?: 1 | 2 | 3;
   /**
    * 团队计划模块 id 摘要（有界、去重；供 prompt/审计）。可选；缺失＝应用未提供。
    * 只是机器摘要，**不**代表应用已做粒度语义判断（语义复核仍在 Convener readiness）。
    */
   teamPlanModules?: string[];
+  /**
+   * 团队计划授权目录摘要（v3；有界、去重；只作 judge 事实摘要，供 prompt/审计）。可选；缺失＝应用未提供，
+   * 不得据此假定 v3（v1/v2 计划通常无目录列）。长度/内容由生产方（编排）裁剪；目录是否合规仍由
+   * V-D/V12/布局核对与 readiness 判定，本字段不构成写权、授权或语义结论。
+   */
+  teamPlanDirectories?: string[];
 }
 
 // —————————————— 会话级后台任务（2026-10-22 客户确认设计 B1–B4） ——————————————

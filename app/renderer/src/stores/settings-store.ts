@@ -8,6 +8,7 @@
 
 import { create } from "zustand";
 import { getDesktopBridge } from "@/lib/platform";
+import { useLocaleStore, translate, type Locale } from "@/i18n";
 import { useChatStore } from "@/chat/chat-store";
 import { useUiStore, type RuntimeId } from "@/stores/ui-store";
 import {
@@ -40,11 +41,25 @@ import {
 
 export type SettingsStatusKind = "ok" | "warn" | "err" | "";
 
+/** 结构化状态码（机器标识，不翻译）：面板据此判断“保存成功”，不解析文案。 */
+export type SettingsStatusCode =
+  | ""
+  | "reading"
+  | "warning"
+  | "complete"
+  | "read-failed"
+  | "saving"
+  | "saved"
+  | "save-failed"
+  | "save-exception";
+
 export interface SettingsStatus {
   text: string;
   kind: SettingsStatusKind;
   /** 完整状态（逐键/完整 application），用于 title/追溯。 */
   title: string;
+  /** 结构化状态码；替代旧 `text.startsWith("已保存到 .env")` 文本判定。 */
+  code: SettingsStatusCode;
 }
 
 export interface ConfigNotice {
@@ -119,6 +134,11 @@ function currentRuntime(): RuntimeId {
   return useUiStore.getState().runtime;
 }
 
+/** 当前界面语言（i18n B1）：文案在生成时按当前 locale 渲染。 */
+function currentLocale(): Locale {
+  return useLocaleStore.getState().locale;
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object"
     ? (value as Record<string, unknown>)
@@ -133,8 +153,9 @@ function setStatus(
   text: string,
   kind: SettingsStatusKind = "",
   title?: string,
+  code: SettingsStatusCode = "",
 ): void {
-  useSettingsStore.setState({ status: { text, kind, title: title || text } });
+  useSettingsStore.setState({ status: { text, kind, title: title || text, code } });
 }
 
 function hiddenNotice(): ConfigNotice {
@@ -169,13 +190,13 @@ function applyNotice(
     useSettingsStore.setState({ notice: hiddenNotice() });
     return;
   }
-  const label = runtimeLabel(runtime);
+  const label = runtimeLabel(runtime, currentLocale());
   if (error !== undefined) {
     useSettingsStore.setState({
       notice: {
         visible: true,
         kind: "err",
-        message: readFailureNoticeText(label),
+        message: readFailureNoticeText(label, currentLocale()),
         actionable: true,
       },
     });
@@ -191,7 +212,7 @@ function applyNotice(
       ? {
           visible: true,
           kind: "warn",
-          message: missingNoticeText(label, missing),
+          message: missingNoticeText(label, missing, currentLocale()),
           actionable: true,
         }
       : hiddenNotice(),
@@ -202,23 +223,28 @@ function applyPanelView(runtime: RuntimeId, view: RuntimeConfigView): void {
   const store = useSettingsStore.getState();
   if (runtime !== store.engine) return;
   const missing = missingKeysOf(view);
-  const label = runtimeLabel(runtime);
+  const label = runtimeLabel(runtime, currentLocale());
   useSettingsStore.setState({
     views: { ...store.views, [runtime]: view },
     loading: false,
     readError: "",
   });
   if (missing.length > 0) {
-    setStatus(configWarningText(label, missing), "warn");
+    setStatus(configWarningText(label, missing, currentLocale()), "warn", undefined, "warning");
   } else {
-    setStatus(configCompleteText(label, view.application), "ok");
+    setStatus(
+      configCompleteText(label, view.application, currentLocale()),
+      "ok",
+      undefined,
+      "complete",
+    );
   }
 }
 
 function applyPanelError(runtime: RuntimeId, error: unknown): void {
   const store = useSettingsStore.getState();
   if (runtime !== store.engine) return;
-  setStatus(readFailureStatusText(error), "err");
+  setStatus(readFailureStatusText(error, currentLocale()), "err", undefined, "read-failed");
   useSettingsStore.setState({
     views: { ...store.views, [runtime]: null },
     loading: false,
@@ -228,18 +254,20 @@ function applyPanelError(runtime: RuntimeId, error: unknown): void {
 
 async function readView(runtime: RuntimeId): Promise<RuntimeConfigView> {
   const bridge = getDesktopBridge();
-  if (!bridge) throw new Error("当前环境未提供配置通道");
+  if (!bridge) throw new Error(translate(currentLocale(), "ui.settingsStore.noConfigChannel"));
   let raw: unknown;
   if (bridge.getRuntimeConfig) {
     raw = await bridge.getRuntimeConfig(runtime);
   } else if (runtime === "pi" && bridge.getPiConfig) {
     raw = await bridge.getPiConfig();
   } else {
-    throw new Error("当前版本未提供配置通道");
+    throw new Error(translate(currentLocale(), "ui.settingsStore.configChannelUnavailable"));
   }
-  const validation = validateRuntimeConfigView(raw, runtime);
+  const validation = validateRuntimeConfigView(raw, runtime, currentLocale());
   if (!validation.ok || !validation.view) {
-    throw new Error(validation.error || "配置摘要未就绪");
+    throw new Error(
+      validation.error || translate(currentLocale(), "ui.runtimeConfig.summaryNotReady"),
+    );
   }
   return validation.view;
 }
@@ -251,7 +279,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   loading: false,
   saving: false,
   readError: "",
-  status: { text: "", kind: "", title: "" },
+  status: { text: "", kind: "", title: "", code: "" },
   notice: hiddenNotice(),
   viewsProjectRoot: null,
 
@@ -269,14 +297,19 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     if (root) {
       if (get().engine === engine) {
         set({ loading: true, readError: "" });
-        setStatus(readingNoticeText(runtimeLabel(engine)), "");
+        setStatus(
+          readingNoticeText(runtimeLabel(engine, currentLocale()), currentLocale()),
+          "",
+          undefined,
+          "reading",
+        );
         applyNotice(engine, null);
         if (engine === currentRuntime()) {
           set({
             notice: {
               visible: true,
               kind: "",
-              message: readingNoticeText(runtimeLabel(engine)),
+              message: readingNoticeText(runtimeLabel(engine, currentLocale()), currentLocale()),
               actionable: false,
             },
           });
@@ -353,7 +386,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     loadVersion += 1;
     lastLoad = { version: loadVersion, runtime, projectRoot: root };
     set({ saving: true });
-    setStatus(savingStatusText(), "");
+    setStatus(savingStatusText(currentLocale()), "", undefined, "saving");
     let res: Record<string, unknown> = {};
     try {
       const bridge = getDesktopBridge();
@@ -363,7 +396,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       } else if (runtime === "pi" && bridge?.savePiConfig) {
         res = asRecord(await bridge.savePiConfig(updates));
       } else {
-        res = { ok: false, error: "当前版本未提供配置保存通道" };
+        res = {
+          ok: false,
+          error: translate(currentLocale(), "ui.settingsStore.saveChannelUnavailable"),
+        };
       }
     } catch (error) {
       if (!saveTokenCurrent(token, lastSave, runtime, projectRoot())) {
@@ -371,7 +407,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         return false;
       }
       set({ saving: false });
-      setStatus(saveExceptionStatusText(error), "err");
+      setStatus(saveExceptionStatusText(error), "err", undefined, "save-exception");
       return false;
     }
     if (!saveTokenCurrent(token, lastSave, runtime, projectRoot())) {
@@ -380,7 +416,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     }
     if (res.ok !== true) {
       set({ saving: false });
-      setStatus(saveFailureStatusText(res.error), "err");
+      setStatus(saveFailureStatusText(res.error), "err", undefined, "save-failed");
       return false;
     }
     const appliedKeys = Array.isArray(res.appliedKeys)
@@ -395,9 +431,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     }
     if (refreshed && get().engine === runtime) {
       setStatus(
-        savedStatusText(appliedKeys, refreshed.missing, application),
+        savedStatusText(appliedKeys, refreshed.missing, application, currentLocale()),
         refreshed.missing.length > 0 ? "warn" : "ok",
-        savedStatusTitle(appliedKeys, refreshed.missing, application),
+        savedStatusTitle(appliedKeys, refreshed.missing, application, currentLocale()),
+        "saved",
       );
       useSettingsStore.setState({
         views: { ...get().views, [runtime]: refreshed.view },
@@ -422,7 +459,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       loading: false,
       saving: false,
       readError: "",
-      status: { text: "", kind: "", title: "" },
+      status: { text: "", kind: "", title: "", code: "" },
       notice: hiddenNotice(),
       viewsProjectRoot: root,
       engine: currentRuntime(),
@@ -448,20 +485,32 @@ export function invalidatePendingSaves(): void {
   lastSave = { version: saveVersion, runtime: "", projectRoot: null };
 }
 
-export function settingsEngineTitle(): string {
-  return engineSettingsTitle(runtimeLabel(useSettingsStore.getState().engine));
+export function settingsEngineTitle(locale: Locale = currentLocale()): string {
+  return engineSettingsTitle(runtimeLabel(useSettingsStore.getState().engine, locale), locale);
 }
 
-export function applicationText(application: unknown): string {
-  return applicationLabel(application);
+export function applicationText(
+  application: unknown,
+  locale: Locale = currentLocale(),
+): string {
+  return applicationLabel(application, locale);
 }
 
 /** 菜单项状态文字（文字为主，不只靠颜色；失败显示「配置未知」而非「缺配置」）。 */
-export function menuConfigStatusText(summary: MenuConfigSummary | undefined): string {
-  if (!summary || summary.status === "checking") return "检查中…";
-  if (summary.status === "configured") return "已配置";
-  if (summary.status === "missing") return "缺配置";
-  return "配置未知";
+export function menuConfigStatusText(
+  summary: MenuConfigSummary | undefined,
+  locale: Locale = currentLocale(),
+): string {
+  if (!summary || summary.status === "checking") {
+    return translate(locale, "ui.settings.statusChecking");
+  }
+  if (summary.status === "configured") {
+    return translate(locale, "ui.settings.statusConfigured");
+  }
+  if (summary.status === "missing") {
+    return translate(locale, "ui.settings.statusMissing");
+  }
+  return translate(locale, "ui.settings.statusUnknown");
 }
 
 export function menuConfigStatusKind(summary: MenuConfigSummary | undefined): MenuConfigStatus {

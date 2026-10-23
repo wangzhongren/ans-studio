@@ -13,18 +13,35 @@
 
 import os from "node:os";
 import path from "node:path";
+import type { MessageKey } from "./i18n/keys.ts";
 
 /** 运行时种类取值（单一来源，与编排/装配/桌面三处对齐）。 */
 export const RUNTIME_KINDS = ["demo", "pi", "codex", "claude"] as const;
 /** demo 为装配演示替身；其余值为真实执行引擎，缺配置时由对应适配器明确报错。 */
 export type RuntimeKind = (typeof RUNTIME_KINDS)[number];
 
-/** 界面与 CLI 共用的引擎显示名。此目录仅描述选择，不判断授权或 SDK 可用性。 */
+/**
+ * 引擎显示名的语言中性值。Pi/Codex/Claude 是品牌名（原样展示）；`demo` 是语言中性标识——
+ * 其**用户可见文案**走 i18n key（见 `RUNTIME_LABEL_KEYS`），不再以中文字面量保存在共享元数据中。
+ * 此目录仅描述选择，不判断授权或 SDK 可用性。
+ */
 export const RUNTIME_LABELS: Readonly<Record<RuntimeKind, string>> = {
-  demo: "演示",
+  demo: "demo",
   pi: "Pi",
   codex: "Codex",
   claude: "Claude",
+};
+
+/**
+ * 引擎显示名的 i18n key（单一来源；2026-10-23 B4）。`null` 表示品牌名不需翻译，
+ * 直接使用 `RUNTIME_LABELS`。渲染层**不得**导入本文件（顶层 `node:os`/`node:path`）：
+ * 渲染层经 facade 用同一 key（`shared.runtimeSettings.runtime.demo`）取词。
+ */
+export const RUNTIME_LABEL_KEYS: Readonly<Record<RuntimeKind, MessageKey | null>> = {
+  demo: "shared.runtimeSettings.runtime.demo",
+  pi: null,
+  codex: null,
+  claude: null,
 };
 
 /** 默认运行时（命令行、环境变量都缺省时）。 */

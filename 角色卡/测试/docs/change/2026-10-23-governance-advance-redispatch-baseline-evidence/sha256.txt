@@ -1,0 +1,17 @@
+273eb1cbc0a4682b135fef8ebddcf510ec0ced3280c07b9bb58e3a3afc03c5ed *2026-10-23-governance-advance-redispatch-baseline-evidence/directed-acceptance-dispatch.log
+d0af0a991a11c39e5b98ad0e463394448d09d058d26ce58227bffdec63da450e *2026-10-23-governance-advance-redispatch-baseline-evidence/directed-desktop-interface.log
+4495e8a073cdd47b85bbf47c250ed1b673c4a98ade153d6b1ad7856719b9140a *2026-10-23-governance-advance-redispatch-baseline-evidence/directed-flow-service.log
+4880870c1b56ce6a40fd8983b1986dd4c190360849625c78ff0bd49f9384af78 *2026-10-23-governance-advance-redispatch-baseline-evidence/directed-governance-e2e-auto.log
+86808f61d7cdba00ddcbdeaef3a436ecd73f23fd0b0e48b5a6de6ef6f8ed0633 *2026-10-23-governance-advance-redispatch-baseline-evidence/environment-and-target-hashes.txt
+be2c9190dd9f8ab7b375a965120382195748323d5d606166d4c6f60597354fbd *2026-10-23-governance-advance-redispatch-baseline-evidence/full-regression-excluded-file-list.txt
+585547376a9b86cda472c38cba361c0a8416faf1d0da01263e4fcb2bffd2465d *2026-10-23-governance-advance-redispatch-baseline-evidence/full-regression-isolation-interface-run1.log
+3eddaa77198372701a79937c075db9da554bcf37119a07dbe1641d4244c16a30 *2026-10-23-governance-advance-redispatch-baseline-evidence/full-regression-isolation-interface-run2.log
+a989bb2221fe594001672c9cd8b411ac2af3b717679752f1c10de852883d176d *2026-10-23-governance-advance-redispatch-baseline-evidence/full-regression-serial-excluding-write-sequencing.log
+f017c69d33e5083a1ed4ddaf2e2ae2447027385571933e3c64b411149f7d7af4 *2026-10-23-governance-advance-redispatch-baseline-evidence/full-regression-summary.txt
+447ca473858c9ac3db608e835765d03a1b4c4d6761e8e01a5c0875d0125873fb *2026-10-23-governance-advance-redispatch-baseline-evidence/typecheck-renderer.log
+d20ecdbf2349c5c81405b244bb80f8a12eac3dc2acda4132501fd52caac3a769 *2026-10-23-governance-advance-redispatch-baseline-evidence/typecheck.log
+56c0e1843173af5c1d50bdf86847bc3215b11dd0a1f514c9233783419da5d007 *2026-10-23-governance-advance-redispatch-baseline-evidence/worktree-end.txt
+0a6b791d5673d2bffbf5c06d736554e3a7c7f37fac3a0610e47876cc72413624 *2026-10-23-governance-advance-redispatch-baseline-evidence/worktree-hashes-end.txt
+0a6b791d5673d2bffbf5c06d736554e3a7c7f37fac3a0610e47876cc72413624 *2026-10-23-governance-advance-redispatch-baseline-evidence/worktree-hashes-start.txt
+aa61bb265575da36ff04e5693624961a2f590399473a2092b27a7dfaa949efdd *2026-10-23-governance-advance-redispatch-baseline-evidence/worktree-start.txt
+c5605c034aecdb2b380d48f03484410808a0627750a4f799063d1c8dca221544 *2026-10-23_change_governance-advance-redispatch-baseline.md

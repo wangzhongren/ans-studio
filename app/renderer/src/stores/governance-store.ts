@@ -21,6 +21,12 @@ import {
   type MigrationPreviewView,
   type ReacceptPreviewView,
 } from "@/chat/governance-view";
+import { useLocaleStore, translate, type Locale } from "@/i18n";
+
+/** 当前界面语言（i18n B1）：治理预览/失败的可见文案按当前 locale 渲染。 */
+function currentLocale(): Locale {
+  return useLocaleStore.getState().locale;
+}
 
 export type GovernanceMode = "establish" | "reaccept" | "migrate";
 export type GovernanceModelChoice = "single" | "trio";
@@ -135,18 +141,34 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
     let res: unknown = null;
     try {
       if (!projectRoot) {
-        res = { ok: false, status: "invalid-request", message: "尚未导入项目。" };
+        res = {
+          ok: false,
+          status: "invalid-request",
+          message: translate(currentLocale(), "ui.sidebar.noProjectPeriod"),
+        };
       } else if (target === "reaccept") {
         res = bridge?.previewGovernanceReacceptance
           ? await bridge.previewGovernanceReacceptance(projectRoot)
-          : { ok: false, status: "invalid-request", message: "预览通道不可用（桌面窗口尚未接线）。" };
+          : {
+              ok: false,
+              status: "invalid-request",
+              message: translate(currentLocale(), "ui.governanceStore.previewUnavailable"),
+            };
       } else if (target === "migrate") {
         res = bridge?.previewGovernanceMigration
           ? await bridge.previewGovernanceMigration(projectRoot)
-          : { ok: false, status: "not-available", message: "迁移通道不可用（桌面窗口尚未接线）。" };
+          : {
+              ok: false,
+              status: "not-available",
+              message: translate(currentLocale(), "ui.governanceStore.migrationUnavailable"),
+            };
       } else {
         if (!bridge?.previewGovernanceRecord) {
-          res = { ok: false, code: "unavailable", message: "预览通道不可用（桌面窗口尚未接线）。" };
+          res = {
+            ok: false,
+            code: "unavailable",
+            message: translate(currentLocale(), "ui.governanceStore.previewUnavailable"),
+          };
         } else if (known) {
           res = await bridge.previewGovernanceRecord(projectRoot, {
             governanceModel: get().modelChoice,
@@ -167,21 +189,27 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
     const record = asRecord(res);
     if (record.ok !== true) {
       const status = asString(record.status) || asString(record.code);
-      const message = asString(record.message) || "预览失败。";
+      const message =
+        asString(record.message) || translate(currentLocale(), "ui.governanceStore.previewFailed");
       if (target === "reaccept") {
-        const view = governanceReacceptFailureView("guard", status, message);
+        const view = governanceReacceptFailureView("guard", status, message, currentLocale());
         set({
           loading: false,
           error: { message: view.lines[0] || message, detail: view.lines.slice(1).join(" ") },
         });
       } else if (target === "migrate") {
-        const view = governanceMigrationFailureView("guard", status, message);
+        const view = governanceMigrationFailureView("guard", status, message, currentLocale());
         set({
           loading: false,
           result: { kind: "failure", lines: view.lines, noRetry: view.noRetry },
         });
       } else {
-        const view = governanceFailureView("guard", asString(record.code), message);
+        const view = governanceFailureView(
+          "guard",
+          asString(record.code),
+          message,
+          currentLocale(),
+        );
         set({
           loading: false,
           result: { kind: "failure", lines: view.lines, noRetry: view.noRetry },
@@ -191,7 +219,7 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
     }
     const preview = previewOf(res);
     if (target === "reaccept") {
-      const view = governanceReacceptPreviewView(preview);
+      const view = governanceReacceptPreviewView(preview, currentLocale());
       set({
         loading: false,
         preview,
@@ -202,7 +230,7 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
       return;
     }
     if (target === "migrate") {
-      const view = governanceMigrationPreviewView(preview);
+      const view = governanceMigrationPreviewView(preview, currentLocale());
       set({
         loading: false,
         preview,
@@ -212,7 +240,7 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
       });
       return;
     }
-    const view = governanceEstablishPreviewView(preview);
+    const view = governanceEstablishPreviewView(preview, currentLocale());
     set({
       loading: false,
       preview,
@@ -238,7 +266,12 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
     if (useChatStore.getState().projectRoot !== projectRoot || get().mode !== "establish") return;
     const record = asRecord(res);
     if (record.ok !== true) {
-      const view = governanceFailureView("guard", asString(record.code), asString(record.message));
+      const view = governanceFailureView(
+        "guard",
+        asString(record.code),
+        asString(record.message),
+        currentLocale(),
+      );
       set({
         loading: false,
         result: { kind: "failure", lines: view.lines, noRetry: view.noRetry },
@@ -246,7 +279,7 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
       return;
     }
     const preview = previewOf(res);
-    const view = governanceEstablishPreviewView(preview);
+    const view = governanceEstablishPreviewView(preview, currentLocale());
     set({
       loading: false,
       preview,
@@ -267,11 +300,21 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
       if (state.mode === "reaccept") {
         res = bridge?.reacceptGovernancePins
           ? await bridge.reacceptGovernancePins(projectRoot, state.previewDigest)
-          : { ok: false, phase: "guard", status: "invalid-request", message: "重新接受通道不可用（桌面窗口尚未接线）。" };
+          : {
+              ok: false,
+              phase: "guard",
+              status: "invalid-request",
+              message: translate(currentLocale(), "ui.governanceStore.reacceptUnavailable"),
+            };
       } else if (state.mode === "migrate") {
         res = bridge?.migrateGovernanceModel
           ? await bridge.migrateGovernanceModel(projectRoot, state.previewDigest)
-          : { ok: false, phase: "guard", status: "invalid-request", message: "迁移通道不可用（桌面窗口尚未接线）。" };
+          : {
+              ok: false,
+              phase: "guard",
+              status: "invalid-request",
+              message: translate(currentLocale(), "ui.governanceStore.migrationUnavailable"),
+            };
       } else {
         const options: Record<string, unknown> = {};
         if (governanceModelKnown()) options.governanceModel = state.modelChoice;
@@ -281,7 +324,10 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
               ok: false,
               phase: "guard",
               code: "unavailable",
-              finalize: { status: "blocked", message: "建立通道不可用（桌面窗口尚未接线）。" },
+              finalize: {
+                status: "blocked",
+                message: translate(currentLocale(), "ui.governanceStore.establishUnavailable"),
+              },
             };
       }
     } catch (error) {
@@ -297,7 +343,11 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
         const view = get().reaccept;
         const lines = [
           message ||
-            governanceReacceptSuccessText(view?.pinCount, view?.changed.length),
+            governanceReacceptSuccessText(
+              view?.pinCount,
+              view?.changed.length,
+              currentLocale(),
+            ),
         ];
         // 成功时清掉可能残留的「已取消」提示（旧同口径），不与成功文案并存。
         useChatStore.getState().setHint("");
@@ -307,7 +357,8 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
       const view = governanceReacceptFailureView(
         phase,
         status,
-        message || "重新接受失败（主进程未返回 message）。",
+        message || translate(currentLocale(), "ui.governanceStore.reacceptFailed"),
+        currentLocale(),
       );
       set({ busy: false, result: { kind: "failure", lines: view.lines, noRetry: view.noRetry } });
       return;
@@ -318,12 +369,16 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
       if (record.ok === true && status === "completed") {
         set({
           busy: false,
-          result: { kind: "success", lines: [governanceMigrationSuccessText()], noRetry: true },
+          result: {
+            kind: "success",
+            lines: [governanceMigrationSuccessText(currentLocale())],
+            noRetry: true,
+          },
           canConfirm: false,
         });
         return;
       }
-      const view = governanceMigrationFailureView(phase, status, message);
+      const view = governanceMigrationFailureView(phase, status, message, currentLocale());
       set({ busy: false, result: { kind: "failure", lines: view.lines, noRetry: view.noRetry } });
       return;
     }
@@ -335,9 +390,10 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
         busy: false,
         result: {
           kind: "success",
-          lines: [message, "治理角色将在下一轮发送前按新边界重建（若正在运行，下一轮结束后生效）。"].filter(
-            (line) => line !== "",
-          ),
+          lines: [
+            message,
+            translate(currentLocale(), "ui.governanceStore.reacceptEffect"),
+          ].filter((line) => line !== ""),
           noRetry: true,
         },
         canConfirm: false,
@@ -347,7 +403,8 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
     const view = governanceFailureView(
       phase,
       code,
-      message || "建立失败（主进程未返回 finalize.message）。",
+      message || translate(currentLocale(), "ui.governanceStore.establishFailed"),
+      currentLocale(),
     );
     set({ busy: false, result: { kind: "failure", lines: view.lines, noRetry: view.noRetry } });
   },
@@ -355,7 +412,7 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
   cancel: () => {
     if (get().busy) return;
     set({ ...EMPTY_STATE, open: false, nextStep: get().nextStep });
-    useChatStore.getState().setHint("已取消，未写入任何文件。");
+    useChatStore.getState().setHint(translate(currentLocale(), "ui.governanceStore.cancelled"));
   },
 
   close: () => {
@@ -369,9 +426,23 @@ export const useGovernanceStore = create<GovernanceState>((set, get) => ({
     const roleId = asString(record.roleId);
     const cardKind = asString(record.cardKind);
     if (!nextFunction && !roleId) return;
-    const parts = ["下一步：" + (nextFunction || cardKind || "治理步骤")];
+    // 兜底步骤名来自 shared key（`ui.governanceStore.stepFallback`）。
+    const parts = [
+      translate(currentLocale(), "ui.governanceStore.nextStep", {
+        step:
+          nextFunction ||
+          cardKind ||
+          translate(currentLocale(), "ui.governanceStore.stepFallback"),
+      }),
+    ];
     if (roleId) parts.push(roleId);
-    if (asString(record.flowId)) parts.push("流程 " + asString(record.flowId));
+    if (asString(record.flowId)) {
+      parts.push(
+        translate(currentLocale(), "ui.governanceStore.flow", {
+          flowId: asString(record.flowId),
+        }),
+      );
+    }
     set({ nextStep: parts.join(" · ") });
   },
 }));

@@ -1,0 +1,51 @@
+== final identity check ==
+recorded_at=2026-10-23 21:56:18 +0800
+branch=main
+HEAD=ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+HEAD_tree=1149238a834f31588797016d6ee2289a4ac3e97b
+cached_count=0
+status_entries=233
+src_app_test_status_entries=121
+
+== baseline docs ==
+design_sha256=9b69a7864112eb3df0c1da86b6ce653bb9235d4c655ac4d6f3b979e29080c26d
+team_plan_sha256=8ec6e0d7f264a89bad3cb081371079dca8e2785750f29df9769704342f895fa8
+criteria_sha256=12981ed44ee1786d4a73d9441b823075b6ed88a23ae10b95d928afb225f6efcb
+communication_sha256=016798a1541e232a33d32ec4b3b97a7dce156fdfe580aa527bde23461da4d09a
+other_intent_sha256=3ee1f45ad7fcb234b83b6c4b4daf83c86ee18b02c9372eb495ad8171bf13d38d
+
+== stability ==
+target_hashes_diff_bytes=0
+src_app_test_file_list_diff=empty
+src_app_test_hash_diff=empty
+provider_status=0
+provider_diff=0
+test_desktop_app_untracked=0
+
+== snapshots ==
+src_app_test_snapshot=af53fea60be3efd6ca2f6ef1fdd4cbaabd60b64301e5f4ca7a8e8f2d98b9328e
+freeze_files=691
+freeze_snapshot=ace00e17c8473dd330ebc2c1f69e59666d308a9865fe02a0709dfa4722d8b3a9
+
+== results ==
+typecheck_exit=0
+typecheck_renderer_exit=0
+build_renderer_exit=0
+e2e_exit=0
+e2e_pass=E2E_PASS=true
+affected_tests=400 pass=400 fail=0 skipped=0
+
+== record ==
+record_sha256=a6aa70d53e7806baee108973692a460527995c3d041ab1a9e658abf561ccb353
+record_lines=271
+record_bytes=33765
+
+== boundary hashes ==
+1d12d0b4aceb293ed0315986ee82b844603d75bdde71589867bb000f5230744e 角色卡/桌面窗口/boundary.md
+569a0a208024883709ba2ce47cbd62349856b5e82377c760bf08a764ca332c2f 角色卡/桌面窗口/boundary.yaml
+99578261917e2bdb359828aa77dc1a0ff0cf5c31174eeb97f7d666c21cb52cf0 角色卡/桌面UI/boundary.md
+e1af4d93ab5e022ec447c0412743e41974d04be8ef12cc1c5a5914dd90dda093 角色卡/桌面UI/boundary.yaml
+6f75bee458e672e8b4be78b17e4910ee13ba8f50057ce26e30cee012fba45d5c 角色卡/项目管理/boundary.md
+cfdc7408010bb9da1e3d5e9f723eb7a38956471d13860e8ac5588e7c3693cfff 角色卡/项目管理/boundary.yaml
+9a2eba3fc842f185eb228ef49cd30dfd66ec3933c42cca0202ff2ae26c97859f 角色卡/测试/boundary.md
+3c8f7e0e34d44bcdc55995f2747cd8eccaea7ad0875ad074569f6acc7beea14c 角色卡/测试/boundary.yaml

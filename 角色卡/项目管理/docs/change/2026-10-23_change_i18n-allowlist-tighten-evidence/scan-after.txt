@@ -1,0 +1,24 @@
+scan=after scanned=107 allowlist=18
+allowlisted-with-han=18 allowlisted-zero-han(stale)=0 allowlisted-not-scanned=0 violations=0
+--- allowlisted & still Han ---
+app/desktop/chat-adapter.ts
+app/desktop/governance-advance.ts
+app/desktop/interface.ts
+app/desktop/judge-reason.ts
+app/desktop/operator-channel.ts
+app/desktop/packaged-smoke.ts
+app/desktop/project.ts
+app/desktop/runtime-resolution.ts
+app/desktop/session-history.ts
+app/desktop/session.ts
+app/desktop/watchdog.ts
+app/renderer/src/chat/events.ts
+app/renderer/src/shell/ChatHeader.tsx
+app/renderer/src/shell/Sidebar.tsx
+app/renderer/src/test-driver.ts
+src/index.ts
+src/interface/cli/govern.ts
+src/interface/cli/run.ts
+--- allowlisted & zero Han (stale) ---
+--- allowlisted & not in scan scope ---
+--- NOT allowlisted & still Han (violations) ---

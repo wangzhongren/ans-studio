@@ -1,0 +1,18 @@
+== v3 计划解析 / 布局核对 demo（临时项目根，确定性） ==
+command: node --test test/测试/directory-layout.test.ts
+raw log: 2026-10-23-directory-ownership-evidence/directory-layout.log
+result: tests 1 / pass 1 / fail 0 / exit 0
+
+mode:
+- 临时项目根内真实 git 仓库（git init; commit 初始文件）；
+- 团队计划由真实 parseTeamPlan（pipeline 公共出口 run-role.ts）解析（teamPlanSchema: 3、directories、目录规范 5 行、模块实现目录）；
+- 改动清单直接取原始 `git status --short --untracked-files=all`（含 ??/ D/R old -> new）与 git diff --name-only / --cached --name-only；
+- 真实 checkDirectoryLayout（同上公共出口）逐路径核对；报告打印在日志中（逐路径表 + 原始 status + 候选哈希），写临时根 layout-report.md（不写本仓库 docs/verification/）。
+
+covered:
+- src/storefront/handlers/create-order.ts / src/storefront/tests/create-order.test.ts / src/checkout/handlers/quote.ts => pass（目录内自行新建文件/子目录）
+- 删除按原路径（src/storefront/legacy-old.ts，deleted 标记）；重命名按新路径（renamed.ts）；跨目录重命名取新路径 owner=reviewer
+- 跨目录/他人目录（roleId=executor 检查 reviewer 目录）=> fail
+- 命名不符（CreateOrder.ts）/ 子目录越界（models/order.ts）/ 禁写区（.env）/ 目录外（scripts/*）/ 路径逃逸（../、绝对路径）=> fail
+- 管理记录（docs/scheduling/raw-note.md）与角色根工作文档（角色卡/executor/extra.md）=> skipped
+- 同一输入两次核对逐行一致；报告行数 = 原始 git status 行数；含 fail 时整体 not pass

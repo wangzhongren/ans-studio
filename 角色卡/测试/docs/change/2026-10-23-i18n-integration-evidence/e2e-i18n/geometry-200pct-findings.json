@@ -1,0 +1,185 @@
+{
+  "viewport": {
+    "vw": 480,
+    "vh": 310,
+    "dpr": 2
+  },
+  "doc": {
+    "sw": 480,
+    "cw": 480
+  },
+  "sidebarState": 208,
+  "sidebarWidth": 208,
+  "titlebar": {
+    "sel": "#titlebar",
+    "x": 0,
+    "y": 0,
+    "w": 480,
+    "h": 36,
+    "sw": 480,
+    "cw": 480,
+    "hOverflow": false,
+    "overflowX": "visible",
+    "visible": true,
+    "rBottom": 36,
+    "inViewportY": true
+  },
+  "piPanel": {
+    "sel": "#pi-panel",
+    "x": 57,
+    "y": 100,
+    "w": 423,
+    "h": 210,
+    "sw": 423,
+    "cw": 423,
+    "hOverflow": false,
+    "overflowX": "visible",
+    "visible": true,
+    "rBottom": 310,
+    "inViewportY": true
+  },
+  "piSave": {
+    "sel": "#pi-save",
+    "x": 73,
+    "y": 332,
+    "w": 113.41,
+    "h": 28,
+    "sw": 111,
+    "cw": 111,
+    "hOverflow": false,
+    "overflowX": "visible",
+    "visible": true,
+    "rBottom": 360,
+    "inViewportY": false
+  },
+  "piStatus": {
+    "sel": "#pi-status",
+    "x": 198,
+    "y": 332,
+    "w": 265.59,
+    "h": 28.34,
+    "sw": 266,
+    "cw": 266,
+    "hOverflow": false,
+    "overflowX": "hidden",
+    "visible": true,
+    "rBottom": 361,
+    "inViewportY": false
+  },
+  "clickable": [
+    {
+      "id": "#win-close",
+      "visible": true,
+      "centerInsideViewport": true,
+      "hit": true,
+      "rect": {
+        "x": 434,
+        "y": 0,
+        "w": 46,
+        "h": 35
+      }
+    },
+    {
+      "id": "#pi-save",
+      "visible": true,
+      "centerInsideViewport": false,
+      "hit": false,
+      "rect": {
+        "x": 73,
+        "y": 332,
+        "w": 113,
+        "h": 28
+      }
+    },
+    {
+      "id": "#pi-language-select",
+      "visible": true,
+      "centerInsideViewport": true,
+      "hit": true,
+      "rect": {
+        "x": 73,
+        "y": 131,
+        "w": 391,
+        "h": 32
+      }
+    }
+  ],
+  "ancestors": [
+    {
+      "id": "pi-panel",
+      "cls": "pi-panel",
+      "overflowY": "visible",
+      "sh": 278,
+      "ch": 210,
+      "top": 100,
+      "bottom": 310
+    },
+    {
+      "id": "right-drawer",
+      "cls": "drawer open",
+      "overflowY": "hidden",
+      "sh": 342,
+      "ch": 274,
+      "top": 36,
+      "bottom": 310
+    },
+    {
+      "id": "",
+      "cls": "app",
+      "overflowY": "hidden",
+      "sh": 274,
+      "ch": 274,
+      "top": 36,
+      "bottom": 310
+    },
+    {
+      "id": "",
+      "cls": "app-shell",
+      "overflowY": "hidden",
+      "sh": 310,
+      "ch": 310,
+      "top": 0,
+      "bottom": 310
+    },
+    {
+      "id": "root",
+      "cls": "",
+      "overflowY": "visible",
+      "sh": 310,
+      "ch": 310,
+      "top": 0,
+      "bottom": 310
+    },
+    {
+      "id": "",
+      "cls": "",
+      "overflowY": "hidden",
+      "sh": 310,
+      "ch": 310,
+      "top": 0,
+      "bottom": 310
+    }
+  ],
+  "truncation": [
+    {
+      "tag": "DIV",
+      "id": "project-name",
+      "cls": "project-name",
+      "title": "ans-i18n-project-qPtv5x",
+      "aria": null,
+      "sw": 182,
+      "cw": 125,
+      "text": "ans-i18n-project-qPtv5x"
+    },
+    {
+      "tag": "DIV",
+      "id": "project-path",
+      "cls": "project-path",
+      "title": "C:/Users/51054/AppData/Local/Temp/ans-i18n-project-qPtv5x",
+      "aria": null,
+      "sw": 367,
+      "cw": 125,
+      "text": "C:/Users/51054/AppData/Local/T"
+    }
+  ]
+}

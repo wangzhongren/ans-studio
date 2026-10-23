@@ -1,0 +1,13 @@
+total 1203 {"B0-out-of-scope":13,"exact":837,"composed-all-chunks":337,"no-literal-trace":12,"composed-partial":4}
+NO-TRACE ui.queueSubview.backWork | 返回工作概览
+NO-TRACE ui.runtimeConfig.fieldOptional | {label} · 可选
+NO-TRACE ui.profile.noEntries | （无条目）
+NO-TRACE ui.profile.noEntriesParseFailed | （无条目；解析失败：{detail}）
+NO-TRACE ui.chatRow.pathResult | {path}：{result}
+NO-TRACE ui.chatStream.queuePosition | 第 {position} 位
+NO-TRACE ui.events.dispatchTaskWithRole | 派发任务 · 来自 {role}
+NO-TRACE ui.operator.expiredRetry | 请求已失效，未获同意。请让角色重新发起。
+NO-TRACE ui.judge.headline.autoApprovedWithKind | 已代批（{cardKind}）
+NO-TRACE main.runtimeConfig.integerBound |  ≥ {min} 的
+NO-TRACE main.watchdog.durationSeconds | {seconds} 秒
+NO-TRACE main.watchdog.durationMinutesSeconds | {minutes} 分 {seconds} 秒

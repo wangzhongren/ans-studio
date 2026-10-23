@@ -1,0 +1,32 @@
+# 注册表零变化证明（2026-10-23）
+
+## 1) governance-roles.ts 改动 hunk 范围（全部位于卡文本常量/文件头注释）
+@@ -56,0 +57,13 @@
+@@ -357 +370 @@ const NOMINATOR_CARD_TEXT = [
+@@ -359 +372 @@ const NOMINATOR_CARD_TEXT = [
+@@ -389,2 +402,2 @@ const NOMINATOR_CARD_TEXT = [
+@@ -397 +410 @@ const NOMINATOR_CARD_TEXT = [
+@@ -448,3 +461,3 @@ const NOMINATOR_CARD_TEXT = [
+@@ -480,10 +493,14 @@ const CONVENER_CARD_TEXT = [
+@@ -495,3 +512,3 @@ const CONVENER_CARD_TEXT = [
+@@ -500 +517 @@ const CONVENER_CARD_TEXT = [
+@@ -618,4 +635,4 @@ const CONVENER_CARD_TEXT = [
+@@ -636 +653 @@ const VERIFIER_CARD_TEXT = [
+@@ -638 +655 @@ const VERIFIER_CARD_TEXT = [
+@@ -691 +708,2 @@ const VERIFIER_CARD_TEXT = [
+
+## 2) 排除卡文本字符串行与注释后，diff 中无注册表/能力位/基线/导出函数改动
+检查：git diff 数据行中，凡不以「  "」开头的行（即非卡文本字符串、非注释）应无以下标识符：
+（无匹配：非卡文本行零注册表/能力位/基线/导出函数改动）
+
+## 3) 测试钉住（gate-engine-suite.txt 中相关用例）
+✔ 注册表：五内置顺序 liaison→rapporteur→nominator→convener→verifier，职能含 liaison/proposal/nomination/schedule/verification (2.0108ms)
+✔ 注册表：Section 1 与评审 §5.2/§4.2 表逐项一致（root 恒 project） (0.3006ms)
+✔ 注册表：预授权目录按治理分工调整（Crew 移除 nominations；Convener +scheduling；Verifier +acceptance；其余不变） (0.1841ms)
+✔ 注册表：能力矩阵——Lead 沟通+交接+intent-confirm+派发协调；Steward 派发/看护/恢复；Crew 独享技能/MCP；Proof 只验收 (0.3474ms)
+✔ 注册表：forbiddenWritePaths 按段展开（无 glob），覆盖应用独占路径与其他治理角色目录 (1.7918ms)
+✔ 2026-10-22 角色粒度/MapReduce：注册表 entries/预授权/禁写/能力位零变化（不扩张写权、不改 id/显示名） (0.2542ms)
+✔ 2026-10-22 角色粒度/MapReduce：ENGINEERING_QUALITY_BASELINE 文本逐字不变（P10/P12） (0.0437ms)
+
+## 4) 工程基线文本逐字断言（测试通过）
+✔ 2026-10-22 角色粒度/MapReduce：ENGINEERING_QUALITY_BASELINE 文本逐字不变（P10/P12） (0.0437ms)

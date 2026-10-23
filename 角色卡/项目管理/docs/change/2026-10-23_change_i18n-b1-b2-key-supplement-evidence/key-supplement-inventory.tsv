@@ -1,0 +1,11 @@
+key	zh-CN	en-US	consumer	context
+ui.chatHeader.tabWork	工作概览	Work overview	app/renderer/src/shell/ChatHeader.tsx:126,130	会话头 tab 可见标签与零角标 aria-label 兜底；同文案复用：shell/QueueSubview.tsx:37 返回来源视图可见文本
+ui.chatHeader.tabCard	角色资料	Role profile	app/renderer/src/shell/ChatHeader.tsx:144,147	同上（角色资料 tab）；QueueSubview.tsx:37 复用
+ui.settings.saveNoteNoChanges	已保存到 .env（改动键 无）。{tail}{application}	Saved to .env (no keys changed). {tail} {application}	app/renderer/src/chat/runtime-config.ts:391-400	零改动键分支；非零分支复用 ui.settings.saveNoteShort；tail 复用 stillMissingCount/requiredReady；application 复用 application*
+ui.runtimeConfig.unknownError	未知错误	Unknown error	app/renderer/src/chat/runtime-config.ts:367,373	空 detail 兜底；前缀复用 ui.runtimeConfig.saveFailed/saveException
+ui.confirm.expiredShell	此确认已失效，未获放行——请让角色重新发起。	This confirmation has expired and was not approved — ask the role to initiate it again.	app/renderer/src/stores/confirm-store.ts:252	无 reason 的 shell 失效兜底；带「超时或应用重启」的版本是 shared.common.shellConfirmationExpired，不逐字等价
+ui.governanceStore.stepFallback	治理步骤	Governance step	app/renderer/src/stores/governance-store.ts:432	nextStep 的 {step} 兜底（nextFunction/cardKind 均缺省时）
+ui.judge.roleName.liaison	Lead / 主理	Lead	app/renderer/src/chat/judge.ts:51	roleId=liaison 的 shell 确认标题角色名；现源码英文在前，与 ui.role.governance.liaison.name（主理 / Lead）顺序不同
+ui.judge.roleName.verifier	Proof / 验收	Proof	app/renderer/src/chat/judge.ts:55	roleId=verifier；与 ui.role.governance.verifier.name（验收 / Proof）顺序不同
+ui.judge.headline.writeConfirmOverflow	确认写入 {count} 个路径（{paths} 等 {count} 个）	{one: Confirm writing {count} path ({paths}, etc.), other: Confirm writing {count} paths ({paths}, etc.)}	app/renderer/src/chat/judge.ts:497-508	路径 > 3 的完整标题，替代 " 等 " + N + " 个" 运行时拼接；≤ 3 复用 ui.judge.headline.writeConfirm
+ui.reportView.savingHistory	正在保存历史…	Saving history…	app/renderer/src/chat/report-view.ts:296,371	历史保存 pending；报告版复用 ui.reportView.savingReport

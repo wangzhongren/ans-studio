@@ -28,6 +28,7 @@ import {
   menuConfigStatusText,
   useSettingsStore,
 } from "@/stores/settings-store";
+import { useLocaleState, useT } from "@/i18n";
 
 interface EngineSelectProps {
   value: RuntimeId;
@@ -78,6 +79,8 @@ function placement(
 }
 
 export function EngineSelect({ value, disabled = false, onChange }: EngineSelectProps) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -299,7 +302,7 @@ export function EngineSelect({ value, disabled = false, onChange }: EngineSelect
         className="engine-trigger"
         value={selected.id}
         disabled={disabled}
-        aria-label={`会话引擎，当前 ${shownTitle}`}
+        aria-label={t("ui.engineSelect.ariaCurrent", { title: shownTitle })}
         aria-haspopup="listbox"
         aria-controls="runtime-options"
         aria-expanded={open}
@@ -350,7 +353,7 @@ export function EngineSelect({ value, disabled = false, onChange }: EngineSelect
         ref={menuRef}
         className="engine-menu"
         role="listbox"
-        aria-label="会话引擎"
+        aria-label={t("ui.engineSelect.aria")}
         data-direction="down"
         hidden={!open}
       >
@@ -380,7 +383,7 @@ export function EngineSelect({ value, disabled = false, onChange }: EngineSelect
                   className={"engine-option-status is-" + statusKind}
                   data-menu-status={statusKind}
                 >
-                  {menuConfigStatusText(summary)}
+                  {menuConfigStatusText(summary, locale)}
                 </span>
               </span>
               <Check

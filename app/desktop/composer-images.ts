@@ -14,6 +14,7 @@
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 /** 允许的图片 MIME（与文件选择器扩展名过滤同一口径）。 */
 export const ALLOWED_IMAGE_MIMES: readonly string[] = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+import { mainT } from "./i18n.ts";
 
 export interface ImageAttachmentInfo {
   name: string;
@@ -49,14 +50,14 @@ export function mimeForFileName(name: string): string | null {
 export function validateImage(mime: unknown, byteLength: unknown): ImageAttachmentResult {
   const m = typeof mime === "string" ? mime.toLowerCase() : "";
   if (!ALLOWED_IMAGE_MIMES.includes(m)) {
-    return { ok: false, error: `图片类型不支持：${m === "" ? "（未知）" : m}——只支持 ${ALLOWED_IMAGE_MIMES.join(" / ")}。` };
+    return { ok: false, error: mainT("main.composerImages.typeUnsupported", { type: m === "" ? mainT("main.watchdog.repeatFailUnknown") : m, mimes: ALLOWED_IMAGE_MIMES.join(" / ") }) };
   }
   const size = typeof byteLength === "number" && Number.isFinite(byteLength) ? byteLength : -1;
   if (size <= 0) {
-    return { ok: false, error: "图片内容为空或无法读取。" };
+    return { ok: false, error: mainT("main.composerImages.emptyContent") };
   }
   if (size > MAX_IMAGE_BYTES) {
-    return { ok: false, error: `图片过大（${formatBytes(size)} > 上限 ${formatBytes(MAX_IMAGE_BYTES)}）——请压缩后再发。` };
+    return { ok: false, error: mainT("main.composerImages.tooLargeWithLimit", { size: formatBytes(size), max: formatBytes(MAX_IMAGE_BYTES) }) };
   }
   return { ok: true, image: { name: "", mime: m, size } };
 }
@@ -64,21 +65,21 @@ export function validateImage(mime: unknown, byteLength: unknown): ImageAttachme
 /** base64 解码（严格字符集；返回**真实字节缓冲**——后续校验与嗅探都以它为准）。 */
 export function decodeImageBase64(dataBase64: unknown): { ok: true; buffer: Buffer } | { ok: false; error: string } {
   if (typeof dataBase64 !== "string" || dataBase64.trim() === "") {
-    return { ok: false, error: "图片数据缺失（空）。" };
+    return { ok: false, error: mainT("main.composerImages.dataMissing") };
   }
   const s = dataBase64.replace(/\s+/g, "");
   if (!/^[A-Za-z0-9+/]*={0,2}$/.test(s) || s.length % 4 !== 0) {
-    return { ok: false, error: "图片数据不是合法的 base64。" };
+    return { ok: false, error: mainT("main.composerImages.notBase64") };
   }
   // 解码前先按 base64 长度粗算字节数，防超大串（上限+余量以外直接拒，避免为判尺寸先分配大缓冲）。
   const approx = (s.length / 4) * 3;
   if (approx > MAX_IMAGE_BYTES + 8) {
-    return { ok: false, error: `图片过大（> ${formatBytes(MAX_IMAGE_BYTES)}）——请压缩后再发。` };
+    return { ok: false, error: mainT("main.composerImages.tooLarge", { max: formatBytes(MAX_IMAGE_BYTES) }) };
   }
   try {
     return { ok: true, buffer: Buffer.from(s, "base64") };
   } catch {
-    return { ok: false, error: "图片数据解码失败。" };
+    return { ok: false, error: mainT("main.composerImages.decodeFailed") };
   }
 }
 
@@ -111,7 +112,7 @@ export function sanitizeImageName(name: unknown): string {
     // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f]/g, "")
     .trim();
-  return (cleaned === "" ? "图片" : cleaned).slice(0, 120);
+  return (cleaned === "" ? mainT("ui.composer.imageFallbackName") : cleaned).slice(0, 120);
 }
 
 function formatBytes(n: number): string {
