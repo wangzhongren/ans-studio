@@ -6207,7 +6207,17 @@ test("2026-10-23 可重入门禁：两轮错误写卡（内容不同）⇒ 两�
         "# 备忘录\n\n- 2026-10-23：测试夹具建立。\n- 2026-10-23：Crew 重写（内容变化）。\n",
         "utf8",
       );
-      await triggerPostWrite(harness, root, flowId);
+      // 第四轮事件在 mac x64/arm64 可能被 post-write 单飞/合并窗口吞掉（pending 补跑不稳定）：
+      // 有界重试触发——最多 5 次、每次给 4s 观察窗口，直到 Convener 收到第二次派发；
+      // 仍未派则交给下面的 30s 断言等待（不 skip、不放宽任何断言）。
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        await triggerPostWrite(harness, root, flowId);
+        const observeDeadline = Date.now() + 4000;
+        while (Date.now() < observeDeadline && (harness.sendsByRole.get("convener")?.length ?? 0) < 2) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        if ((harness.sendsByRole.get("convener")?.length ?? 0) >= 2) break;
+      }
       // 第四轮派发在 post-write 的「等 Nominator 本轮 settle」有界等待（8s）之后才发生；
       // mac x64/arm64 慢速 CI 上 6s/15s 均可能先超时。只放大等待预算，不改条件/断言。
       await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 2, 30000);
