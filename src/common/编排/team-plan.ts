@@ -1993,7 +1993,10 @@ function parseTeamPlanDirectories(frontmatter: string, issues: TeamPlanIssue[]):
       });
     }
     if (parsed.path === undefined || parsed.issues.length > 0) continue;
-    const key = compareKey(parsed.path);
+    // V-D1 重复判定（2026-10-24 跨平台修正）：directories 去重键在**所有平台**都不区分大小写。
+    // `compareKey` 只在 Windows 折叠大小写（其余平台反映真实文件系统语义），会让 macOS/Linux 漏报
+    // `src/api/` 与 `SRC/API/` 的重复；此处只用于比较键，不改变 `parsed.path` 本身（展示/落盘值保留原大小写）。
+    const key = parsed.path.toLowerCase();
     if (seen.has(key)) {
       issues.push({
         code: "V-D1",

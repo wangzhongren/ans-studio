@@ -64,18 +64,18 @@ test('release overlay returns v1.3.0 one-off entries to fail-closed or excluded'
 });
 
 // v1.4.0 overlay-2（首跑 run 39389502551 后按精确路径列入的 1 项产品修复 + 4 项测试/夹具修复）
-// 已随 v1.5.0 冻结源吸收、整批移出白名单：生产修复回到 src/ fail-closed，4 个测试文件落 test/ excluded，
+// 已随 v1.5.0 冻结源吸收、整批移出白名单：生产修复回到 src/ fail-closed，测试文件落 test/ excluded，
 // 同目录未列名文件同样不随构建树；断言不放宽。
+// 例外：test/桌面应用/interface.test.ts 于 v1.7.0 发布阻断修复中重新按精确路径入列，
+// 其入选由下方 v1.7.0 blocking-fix 用例断言；本用例保留其余条目的 fail-closed/excluded 边界。
 test('release overlay returns v1.4.0 overlay-2 entries to fail-closed or excluded', () => {
   assert.throws(() => selectOverlay(['src/common/编排/shell-command-guard.ts']), /Unreviewed production overlay/);
   const result = selectOverlay(['test/编排/shell-command-guard.test.ts',
     'test/编排/flow-service.test.ts',
-    'test/桌面应用/interface.test.ts',
     'test/桌面应用/runtime-resolution.test.ts']);
   assert.deepEqual(result.selected, []);
   assert.deepEqual(result.excluded, ['test/编排/shell-command-guard.test.ts',
     'test/编排/flow-service.test.ts',
-    'test/桌面应用/interface.test.ts',
     'test/桌面应用/runtime-resolution.test.ts']);
 });
 
@@ -111,6 +111,24 @@ test('release overlay includes exactly the reviewed v1.5.0 fix batch by exact pa
     'test/测试/g5-reasoning-verify/d-codex.test.ts',
     'test/测试/governance-e2e-auto/d-dispatch-listing.test.ts']);
   assert.throws(() => selectOverlay(['src/common/codex-adapter/config.ts']), /Unreviewed production overlay/);
+});
+
+// v1.7.0 发布阻断修复（tag v1.7.0 不可移动，经评审走显式 overlay）：1 项产品修复 + 2 项测试修复按精确路径入选；
+// 同目录未列名 test/ 仍 excluded，未列名 src/ 仍 fail-closed。断言不放宽。
+test('release overlay includes exactly the reviewed v1.7.0 blocking-fix batch by exact path', () => {
+  const result = selectOverlay(['package.json',
+    'src/common/编排/team-plan.ts',
+    'test/桌面应用/interface.test.ts',
+    'test/桌面应用/project-document.test.ts',
+    'test/桌面应用/runtime-resolution.test.ts',
+    'test/桌面应用/session-rebuild-race.test.ts']);
+  assert.deepEqual(result.selected, ['package.json',
+    'src/common/编排/team-plan.ts',
+    'test/桌面应用/interface.test.ts',
+    'test/桌面应用/project-document.test.ts']);
+  assert.deepEqual(result.excluded, ['test/桌面应用/runtime-resolution.test.ts',
+    'test/桌面应用/session-rebuild-race.test.ts']);
+  assert.throws(() => selectOverlay(['src/common/编排/flow-service.ts']), /Unreviewed production overlay/);
 });
 
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
