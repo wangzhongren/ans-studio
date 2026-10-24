@@ -12,6 +12,7 @@ export {
   flowStatePath,
   isReservedAcceptanceStepId,
   latestAcceptanceDecision,
+  listReadyFlowSteps,
   FLOW_QUALITY_TIERS,
   FLOW_STEP_KINDS,
   FLOW_STEP_STATUSES,
@@ -79,4 +80,10 @@ export type {
   EvaluateFlowCompletionResult,
   EvaluateFlowCompletionOptions,
   LatestAcceptanceDecision,
+  /** 2026-10-24 P0-2：就绪步骤纯规划器（桌面只经本公共出口消费）。 */
+  ReadyFlowDispatchedStepIds,
+  ReadyFlowStep,
+  SkippedFlowStep,
+  ReadyFlowStopReason,
+  ListReadyFlowStepsResult,
 } from "../../common/编排/flow-state.ts";

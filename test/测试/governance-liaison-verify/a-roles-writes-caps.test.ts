@@ -303,8 +303,9 @@ test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent
       "function",
       "Liaison 注入 dispatchTask（工作流协调用；不是客户批准；不得据此伪造客户同意）",
     );
-    // 内置治理角色的 flow 三工具（Flow YAML 唯一机器状态）：flowGet 给所有角色，
-    // flowStepUpdate/flowStepSupersede 给内置治理角色（本矩阵覆盖五个 trio 内置角色）。
+    // 内置治理角色的 flow 三工具（Flow YAML 唯一机器状态）：flowGet / flowStepUpdate 给所有角色
+    // （2026-10-24 P1-7：项目 owner 用 flow_step_update 标自己的 delivered）；flowStepSupersede
+    // 只给内置治理角色（本矩阵覆盖五个 trio 内置角色）。
     assert.equal(typeof l.flowGet, "function", "Liaison 注入 flowGet（读流程状态 YAML）");
     assert.equal(typeof l.flowStepUpdate, "function", "Liaison 注入 flowStepUpdate（更新流程步骤）");
     assert.equal(typeof l.flowStepSupersede, "function", "Liaison 注入 flowStepSupersede（替代旧步骤）");

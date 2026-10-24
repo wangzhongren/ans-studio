@@ -10,9 +10,11 @@
 //      `targetRoleIds` 必须含目标角色；否则拒（「请先取得客户任命」）。
 //   3. 派发范围门：`dispatch` —— 目标不是内置治理角色、提案已接受、目标在任命名单内**或**快捷路径
 //      复用既有项目角色、`flowId`/`stepId` 必填且流程文件存在对应步骤、同一 `flowId+stepId` 未派发过。
-//      2026-10-22 验收第 3 项（O2，客户按推荐项）：已有 appointment 决定的 flow，派发项目角色前
-//      还要求 `docs/acceptance/<flowId>-criteria-v1.md` 存在且结构合格；`proposal-accept-quick`
-//      （快捷复用既有角色）与无 appointment 决定的旧流程显式豁免（见 `evaluateDispatchGate`）。
+//      2026-10-22 验收第 3 项（O2，客户按推荐项）：派发项目角色前的验收标准门槛；2026-10-24
+//      P1-5 收紧为**只对发布版本**（flow YAML 顶层 `release: true`）生效，读取
+//      `docs/acceptance/<flowId>-criteria-vN.md` 的**最新版本**（扫描取最高 N）并做结构校验；
+//      非发布/legacy（无 YAML 或未标 release）豁免，不要求 Verifier 文件；`proposal-accept-quick`
+//      （快捷复用既有角色）仍显式豁免（见 `evaluateDispatchGate`）。
 //      2026-10-24（P0-3/P1-4，设计 v1 §6.4 执行门）：`dependsOn` 解析 `supersededBy` 链（前置 superseded
 //      ⇒ 解析到最终非 superseded 步骤并判 done；缺失/未知/成环明确拒绝，不按「未 done」混同）；
 //      结构化步骤的 `owner` 必须等于派发目标（旧版 `.md`/无 owner 不新增检查；coordinate/app-only 例外）。
@@ -32,7 +34,7 @@
 // 状态（YAML 存在即只认 YAML，校验失败 fail-closed；仅在 YAML 缺失时回落旧版 `.md`）；`status: accepted`
 // 写在 Markdown 里不改变任何判定。
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { GovernanceModel } from "../../model/role.ts";
 import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
@@ -224,9 +226,36 @@ export function parseFlowStepIds(text: string): string[] {
 
 // —————————————————————— 验收标准前置门槛（O2，2026-10-22） ——————————————————————
 
-/** 实施前验收标准的约定路径（`docs/acceptance/<flowId>-criteria-v1.md`；方案 §7.1）。 */
-export function acceptanceCriteriaRelPath(flowId: string): string {
-  return `docs/acceptance/${flowId}-criteria-v1.md`;
+/** 验收标准的约定路径（`docs/acceptance/<flowId>-criteria-vN.md`；`version` 缺省 1，兼容历史调用）。 */
+export function acceptanceCriteriaRelPath(flowId: string, version = 1): string {
+  return `docs/acceptance/${flowId}-criteria-v${version}.md`;
+}
+
+/**
+ * 发布版本的最新验收标准（2026-10-24 P1-5）：扫描 `docs/acceptance/` 下
+ * `<flowId>-criteria-vN.md`，取 N 最高的文件；目录不可读/无匹配 ⇒ `undefined`（调用方按缺失处理）。
+ * 只认后缀为正整数（>=1）的 `.md`；v2 存在时不再回退 v1（v2 不合格即拒绝）。
+ */
+function latestAcceptanceCriteriaRelPath(projectRoot: string, flowId: string): string | undefined {
+  const dir = path.join(projectRoot, "docs", "acceptance");
+  const prefix = `${flowId}-criteria-v`;
+  const suffix = ".md";
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return undefined;
+  }
+  let latest: { version: number; name: string } | undefined;
+  for (const name of names) {
+    if (!name.startsWith(prefix) || !name.endsWith(suffix)) continue;
+    const versionText = name.slice(prefix.length, name.length - suffix.length);
+    if (!/^\d+$/.test(versionText)) continue;
+    const version = Number(versionText);
+    if (!Number.isSafeInteger(version) || version < 1) continue;
+    if (latest === undefined || version > latest.version) latest = { version, name };
+  }
+  return latest === undefined ? undefined : `docs/acceptance/${latest.name}`;
 }
 
 export interface AcceptanceCriteriaCheck {
@@ -273,33 +302,43 @@ export function validateAcceptanceCriteriaText(text: string, flowId: string): Ac
 }
 
 /**
- * 实施派发前的验收标准门槛（O2）：
- *   · 仅对**已有 appointment 决定**的 flow 生效（旧流程/无任命流程显式豁免）；
- *   · 最新提案决定是 `proposal-accept-quick`（快捷复用既有角色）时显式豁免；
- *   · 标准文件缺失/不可读 ⇒ `acceptance-criteria-missing`；结构不合格 ⇒ `acceptance-criteria-invalid`。
- * 该门槛不改变派发权归属，只增加「先写标准」的机械前置。
+ * 实施派发前的验收标准门槛（O2；2026-10-24 P1-5 收紧）：
+ *   · **只对发布版本生效**：flow YAML 顶层 `release: true`；非发布/legacy（`.md` 或缺省 release）
+ *     豁免，不再要求 Verifier 写出的标准文件；
+ *   · 最新提案决定是 `proposal-accept-quick`（快捷复用既有角色）时显式豁免（既有语义）；
+ *   · 发布版本读取 `docs/acceptance/<flowId>-criteria-vN.md` 的**最新版本**（扫描取最高 N），
+ *     缺失/不可读 ⇒ `acceptance-criteria-missing`；结构不合格 ⇒ `acceptance-criteria-invalid`。
+ * 该门槛不改变派发权归属，只增加「发布前先有标准」的机械前置。
  */
 function evaluateAcceptanceCriteriaGate(
   input: GovernanceGateInput,
   snapshot: GovernanceLedgerSnapshot,
+  flow: FlowState | undefined,
 ): GovernanceGateDecision {
   const flowId = input.flowId as string;
-  const appointment = latestDecision(snapshot, flowId, (entry) => entry.decisionKind === "appointment");
-  if (appointment === undefined) return { allowed: true };
+  // 非发布/legacy：没有 release 标记就不要求 Verifier 文件（P1-5）。
+  if (flow?.release !== true) return { allowed: true };
   const latestProposal = latestDecision(snapshot, flowId, (entry) =>
     PROPOSAL_DECISION_KINDS.has(entry.decisionKind as GovernanceDecisionKind),
   );
   if (latestProposal?.decisionKind === "proposal-accept-quick") return { allowed: true };
 
-  const rel = acceptanceCriteriaRelPath(flowId);
+  const rel = latestAcceptanceCriteriaRelPath(input.projectRoot, flowId);
+  if (rel === undefined) {
+    return deny(
+      "acceptance-criteria-missing",
+      `治理门禁：流程 ${flowId} 是发布版本（release: true），但 docs/acceptance/${flowId}-criteria-vN.md ` +
+        "不存在或不可读；请先在实施派发前写出最新版本的结构合格标准（含验收表、风险档位、判定规则、证据计划）。",
+    );
+  }
   let text: string;
   try {
     text = readFileSync(path.join(input.projectRoot, ...rel.split("/")), "utf8");
   } catch {
     return deny(
       "acceptance-criteria-missing",
-      `治理门禁：流程 ${flowId} 已有客户任命，但实施前验收标准 ${rel} 不存在或不可读；` +
-        "请先由 Proof / 验收在实施派发前写出完成标准（含验收表、风险档位、判定规则、证据计划）。",
+      `治理门禁：流程 ${flowId} 是发布版本（release: true），但实施前验收标准 ${rel} 不存在或不可读；` +
+        "请先在实施派发前写出最新版本的结构合格标准（含验收表、风险档位、判定规则、证据计划）。",
     );
   }
   const check = validateAcceptanceCriteriaText(text, flowId);
@@ -307,7 +346,7 @@ function evaluateAcceptanceCriteriaGate(
     return deny(
       "acceptance-criteria-invalid",
       `治理门禁：实施前验收标准 ${rel} 结构不合格（${check.issues.join("；")}）；` +
-        "请补齐后重新派发（不把「标准待补」当通过）。",
+        "请补齐后重新派发（不把「标准待补」当通过；发布版本读取最新版本，不回退旧版本）。",
     );
   }
   return { allowed: true };
@@ -414,13 +453,16 @@ function evaluateDispatchGate(
     }
   }
 
-  // 4) 实施前验收标准门槛（O2，2026-10-22）：已有 appointment 决定的 flow 必须先写标准；
-  //    最新提案为 accept-quick（快捷复用既有角色）或旧流程（无 appointment）显式豁免。
-  const criteria = evaluateAcceptanceCriteriaGate(input, snapshot);
+  // 4) 流程文件步骤查询（只判存在，不读 status）：YAML 时同时得到 release 与结构化步骤，
+  //    供验收标准门槛判定是否为发布版本（P1-5）。
+  const lookup = lookupFlowStep(input.projectRoot, input.flowId, input.stepId);
+
+  // 4a) 实施前验收标准门槛（O2，2026-10-22；2026-10-24 P1-5：只对发布版本 `release: true` 生效，
+  //     读取 `docs/acceptance/<flowId>-criteria-vN.md` 的最新版本；非发布/legacy 与 accept-quick 豁免）。
+  const criteria = evaluateAcceptanceCriteriaGate(input, snapshot, lookup.flow);
   if (!criteria.allowed) return criteria;
 
-  // 5) 流程文件中存在对应步骤（只判存在，不读 status）。
-  const lookup = lookupFlowStep(input.projectRoot, input.flowId, input.stepId);
+  // 4b) 流程文件中必须存在对应步骤。
   if (!lookup.found) {
     return deny(
       "flow-step-missing",
@@ -429,7 +471,7 @@ function evaluateDispatchGate(
     );
   }
 
-  // 5a) owner 校验（2026-10-24 P1-4，设计 v1 §6.4 执行门）：结构化步骤的 `owner` 必须等于派发目标。
+  // 5) owner 校验（2026-10-24 P1-4，设计 v1 §6.4 执行门）：结构化步骤的 `owner` 必须等于派发目标。
   //     旧版 `.md`（无结构化步骤）与 owner 缺省的 legacy 流程不新增检查；coordinate/app-only 派发
   //     不经过本门（coordinate 走 `evaluateCoordinateGate`，app-only 由应用直接执行）。
   const stepOwner = lookup.step?.owner;
@@ -441,7 +483,7 @@ function evaluateDispatchGate(
     );
   }
 
-  // 5b) 前置依赖（2026-10-22 MapReduce 方案 A；2026-10-24 P0-3 解析 supersededBy 链）：
+  // 6) 前置依赖（2026-10-22 MapReduce 方案 A；2026-10-24 P0-3 解析 supersededBy 链）：
   //     步骤声明 dependsOn 时，前置必须 done；前置已被 superseded ⇒ 沿 supersededBy 解析到最终
   //     非 superseded 步骤再判 done。缺失/未知引用/替代链成环 ⇒ `dependencies-unresolved`
   //     （明确拒绝，不按「未 done」混同）。不改变派发权归属；旧步骤无 dependsOn ⇒ 不新增检查。
@@ -479,7 +521,7 @@ function evaluateDispatchGate(
     }
   }
 
-  // 6) 同一 flowId+stepId 未被派发过。
+  // 7) 同一 flowId+stepId 未被派发过。
   const dispatched = snapshot.entries.some(
     (entry) =>
       entry.kind === "dispatch.accepted" &&

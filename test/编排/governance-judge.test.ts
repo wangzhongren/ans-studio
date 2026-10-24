@@ -3477,7 +3477,7 @@ test("run-role：Convener 任命形状兜底后卡前守卫拒绝（无团队计
   });
 });
 
-test("run-role：flow 能力注入——项目角色只有 flowGet；内置治理角色有 get/update/supersede", async () => {
+test("run-role：flow 能力注入——项目角色有 get/update（P1-7 owner 交付）、无 supersede；内置治理角色有 get/update/supersede", async () => {
   await withRoot(async (root) => {
     const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
     const handle = await openRoleSession(
@@ -3486,8 +3486,12 @@ test("run-role：flow 能力注入——项目角色只有 flowGet；内置治�
     );
     try {
       assert.equal(typeof captured.caps?.flowGet, "function", "项目角色有 flowGet");
-      assert.equal(captured.caps?.flowStepUpdate, undefined, "项目角色本批不给 update");
-      assert.equal(captured.caps?.flowStepSupersede, undefined, "项目角色本批不给 supersede");
+      assert.equal(
+        typeof captured.caps?.flowStepUpdate,
+        "function",
+        "项目角色有 flowStepUpdate（2026-10-24 P1-7：owner 用既有工具标自己的 delivered）",
+      );
+      assert.equal(captured.caps?.flowStepSupersede, undefined, "项目角色仍不给 supersede（仅工作流管理者）");
     } finally {
       await handle.dispose();
     }

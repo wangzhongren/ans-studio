@@ -211,9 +211,42 @@ function acceptanceCriteriaText(flowId = "flow-a"): string {
   ].join("\n");
 }
 
-function writeAcceptanceCriteria(root: string, flowId = "flow-a", text = acceptanceCriteriaText(flowId)): void {
+function writeAcceptanceCriteria(
+  root: string,
+  flowId = "flow-a",
+  text = acceptanceCriteriaText(flowId),
+  version = 1,
+): void {
   mkdirSync(join(root, "docs", "acceptance"), { recursive: true });
-  writeFileSync(join(root, "docs", "acceptance", `${flowId}-criteria-v1.md`), text, "utf8");
+  writeFileSync(join(root, "docs", "acceptance", `${flowId}-criteria-v${version}.md`), text, "utf8");
+}
+
+/** 结构化 flow YAML（P1-5 发布门槛用；`release` 缺省 = 非发布；owner 与派发目标 A 一致）。 */
+function writeReleaseFlowYaml(
+  root: string,
+  options: { flowId?: string; stepId?: string; owner?: string; release?: boolean } = {},
+): void {
+  const flowId = options.flowId ?? "flow-a";
+  const stepId = options.stepId ?? "impl";
+  const owner = options.owner ?? "A";
+  mkdirSync(join(root, "docs", "flows"), { recursive: true });
+  writeFileSync(
+    join(root, "docs", "flows", `${flowId}.yaml`),
+    [
+      `flowId: ${flowId}`,
+      "version: 1",
+      "qualityTier: production",
+      ...(options.release === true ? ["release: true"] : []),
+      "steps:",
+      `  - id: ${stepId}`,
+      "    title: 实现",
+      `    owner: ${owner}`,
+      "    kind: dispatch",
+      "    status: pending",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
 }
 
 test("write-team-plan：Convener 在提案接受后放行；其他角色/缺 flowId 拒；旧 write-nomination 仍 legacy", () => {
@@ -238,9 +271,9 @@ test("write-team-plan：Convener 在提案接受后放行；其他角色/缺 flo
   assert.deepEqual(evaluateGovernanceGate(legacy, snapshot([ACCEPT])), { allowed: true });
 });
 
-test("dispatch 正例：提案接受 + 任命名单 + 标准存在 + 流程步骤 + 未派发 → 放行", () => {
+test("dispatch 正例：提案接受 + 任命名单 + 发布版本标准存在 + 流程步骤 + 未派发 → 放行", () => {
   withRoot((root) => {
-    writeFlow(root);
+    writeReleaseFlowYaml(root, { release: true });
     writeAcceptanceCriteria(root);
     const result = evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A]));
     assert.deepEqual(result, { allowed: true });
@@ -284,34 +317,28 @@ test("dispatch：flowId/stepId 必填；提案未接受拒；目标不在任命�
   });
 });
 
-test("dispatch O2 门槛：已有 appointment 的 flow 缺标准/标准不合格拒；accept-quick 与旧流程显式豁免", () => {
+test("dispatch O2/P1-5 门槛：只对发布版本生效；非发布/legacy 豁免；最新 vN 生效、v2 优先且不回退 v1", () => {
+  // 非发布 appointment flow：缺 criteria 仍可派发（不要求 Verifier 文件）。
   withRoot((root) => {
-    writeFlow(root);
-    assert.equal(
-      blocked(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A]))),
-      "acceptance-criteria-missing",
-    );
-    writeAcceptanceCriteria(root, "flow-a", "# 只有标题\n");
-    assert.equal(
-      blocked(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A]))),
-      "acceptance-criteria-invalid",
-    );
-    writeAcceptanceCriteria(root);
-    assert.deepEqual(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A])), { allowed: true });
-  });
-
-  // accept-quick 快捷路径显式豁免（即便账本存在 appointment 决定）。
-  withRoot((root) => {
-    writeFlow(root);
-    mkdirSync(join(root, "角色卡", "A"), { recursive: true });
-    writeFileSync(join(root, "角色卡", "A", "role-card.md"), "# A\n");
+    writeReleaseFlowYaml(root);
     assert.deepEqual(
-      evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT_QUICK, APPOINT_A])),
+      evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A])),
       { allowed: true },
+      "非发布（release 缺省）不要求验收标准文件",
     );
   });
 
-  // 旧流程（无 appointment 决定）：标准门槛不适用；仍按既有任命门拒非快捷派发。
+  // legacy Markdown（无 YAML/release）：同样豁免。
+  withRoot((root) => {
+    writeFlow(root);
+    assert.deepEqual(
+      evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A])),
+      { allowed: true },
+      "legacy .md 无 release 标记 ⇒ 豁免标准门",
+    );
+  });
+
+  // legacy/无 appointment：标准门豁免，仍按既有任命门拒非快捷派发。
   withRoot((root) => {
     writeFlow(root);
     mkdirSync(join(root, "角色卡", "A"), { recursive: true });
@@ -320,6 +347,67 @@ test("dispatch O2 门槛：已有 appointment 的 flow 缺标准/标准不合格
       blocked(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT]))),
       "appointment-required",
       "无 appointment 的旧流程不得先报标准缺失（显式豁免）",
+    );
+  });
+
+  // 发布版本缺标准 ⇒ 拒绝。
+  withRoot((root) => {
+    writeReleaseFlowYaml(root, { release: true });
+    assert.equal(
+      blocked(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A]))),
+      "acceptance-criteria-missing",
+    );
+  });
+
+  // 发布版本 + 最新标准结构不合格 ⇒ 拒绝。
+  withRoot((root) => {
+    writeReleaseFlowYaml(root, { release: true });
+    writeAcceptanceCriteria(root, "flow-a", "# 只有标题\n");
+    assert.equal(
+      blocked(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A]))),
+      "acceptance-criteria-invalid",
+    );
+  });
+
+  // v2 生效：只有 v2、结构合格 ⇒ 放行。
+  withRoot((root) => {
+    writeReleaseFlowYaml(root, { release: true });
+    writeAcceptanceCriteria(root, "flow-a", acceptanceCriteriaText("flow-a"), 2);
+    assert.deepEqual(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A])), { allowed: true });
+  });
+
+  // v1+v2：取 v2（v1 合格、v2 不合格 ⇒ 拒绝，不回退 v1）。
+  withRoot((root) => {
+    writeReleaseFlowYaml(root, { release: true });
+    writeAcceptanceCriteria(root, "flow-a");
+    writeAcceptanceCriteria(root, "flow-a", "# 只有标题\n", 2);
+    assert.equal(
+      blocked(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A]))),
+      "acceptance-criteria-invalid",
+      "存在 v2 时必须校验 v2，不能回退合格的 v1",
+    );
+  });
+
+  // v1+v2：取 v2（v1 不合格、v2 合格 ⇒ 放行）。
+  withRoot((root) => {
+    writeReleaseFlowYaml(root, { release: true });
+    writeAcceptanceCriteria(root, "flow-a", "# 只有标题\n");
+    writeAcceptanceCriteria(root, "flow-a", acceptanceCriteriaText("flow-a"), 2);
+    assert.deepEqual(
+      evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A])),
+      { allowed: true },
+      "v2 合格即可，旧 v1 不影响",
+    );
+  });
+
+  // accept-quick 快捷路径显式豁免（即便发布版本 + 账本存在 appointment 决定）。
+  withRoot((root) => {
+    writeReleaseFlowYaml(root, { release: true });
+    mkdirSync(join(root, "角色卡", "A"), { recursive: true });
+    writeFileSync(join(root, "角色卡", "A", "role-card.md"), "# A\n");
+    assert.deepEqual(
+      evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT_QUICK, APPOINT_A])),
+      { allowed: true },
     );
   });
 });
@@ -348,6 +436,7 @@ test("validateAcceptanceCriteriaText：flowId/验收表/档位/判定/证据计�
   assert.ok(validateAcceptanceCriteriaText(withoutFreeze, "flow-a").issues.some((issue) => issue.includes("版本")));
 
   assert.equal(acceptanceCriteriaRelPath("flow-a"), "docs/acceptance/flow-a-criteria-v1.md");
+  assert.equal(acceptanceCriteriaRelPath("flow-a", 2), "docs/acceptance/flow-a-criteria-v2.md");
 });
 
 test("dispatch：快捷路径（accept-quick）可跳过任命复用既有项目角色；非既有角色仍拒", () => {

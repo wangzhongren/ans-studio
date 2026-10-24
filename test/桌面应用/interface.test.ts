@@ -2667,8 +2667,9 @@ test("任命→Crew 写卡主路径（2026-10-22 第 1 项）：只派 Crew 写�
     const ledger = await readGovernanceLedger(root);
     const dispatches = ledger.entries.filter((entry) => entry.kind === "dispatch.accepted" && entry.flowId === "flow-e");
     assert.ok(dispatches.some((entry) => entry.targetRoleId === "nominator" && entry.stepId === "role-cards"), "账本写卡派发 stepId=role-cards");
-    assert.ok(
-      dispatches.some((entry) => entry.targetRoleId === "convener" && entry.stepId === "role-readiness"),
+    assert.equal(
+      await waitForReadinessDispatchCount(root, "flow-e", 1),
+      1,
       "账本 readiness 派发 stepId=role-readiness",
     );
     await iface.stopSession();
@@ -4396,7 +4397,7 @@ test("写卡后推进：appointment-write answered 后 listing 出现目标角�
     made.settles.get("nominator")!();
     await new Promise((resolve) => setTimeout(resolve, 250));
     assert.equal(made.sendsByRole.get("convener")!.length, 1, "同 flow+convener 不重派");
-    assert.equal(await ledgersConvenerDispatches(root, flowId), 1, "账本仍恰一条");
+    assert.equal(await waitForConvenerDispatchCount(root, flowId, 1), 1, "账本仍恰一条");
     // 2026-10-23 可重入门禁 P9：legacy（无团队计划）不写 role-cards 验证记录、不新增账本种类。
     assert.equal(existsSync(path.join(root, ".ans", "governance", "role-cards")), false, "legacy 不写 .ans role-cards 记录");
     assert.equal(
@@ -4827,15 +4828,9 @@ test("2026-10-22 第 5 项迁移策略：existing 角色只做最低检查（war
       await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) > 0, 5000);
       assert.match(harness.sendsByRole.get("convener")![0]!, /role-readiness/, "existing 角色 warning 不阻塞 readiness");
       assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 0, "不反馈 Crew（无阻塞问题）");
-      const ledger = await readGovernanceLedger(root);
-      assert.ok(
-        ledger.entries.some(
-          (entry) =>
-            entry.kind === "dispatch.accepted" &&
-            entry.flowId === flowId &&
-            entry.targetRoleId === "convener" &&
-            entry.stepId === "role-readiness",
-        ),
+      assert.equal(
+        await waitForReadinessDispatchCount(root, flowId, 1),
+        1,
         "readiness 派发入账 stepId=role-readiness",
       );
     } finally {
@@ -4963,15 +4958,9 @@ test("2026-10-22 v2 团队计划：读取模块清单/v2 字段/并行组；计�
       assert.match(readiness, /每分片独立证据/);
       assert.match(readiness, /等全部 Map done/);
       assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 0, "覆盖通过：不退回 Crew");
-      const ledger = await readGovernanceLedger(root);
-      assert.ok(
-        ledger.entries.some(
-          (entry) =>
-            entry.kind === "dispatch.accepted" &&
-            entry.flowId === flowId &&
-            entry.targetRoleId === "convener" &&
-            entry.stepId === "role-readiness",
-        ),
+      assert.equal(
+        await waitForReadinessDispatchCount(root, flowId, 1),
+        1,
         "V12 通过后才派 readiness（stepId=role-readiness）",
       );
     } finally {
@@ -5080,7 +5069,7 @@ test("2026-10-22 V12：existing 角色计划写集未覆盖 boundary ⇒ 只 war
       await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) > 0, 5000);
       assert.match(harness.sendsByRole.get("convener")![0]!, /role-readiness/, "existing 未覆盖不阻塞 readiness");
       assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 0, "warning 不退回 Crew");
-      assert.equal(await ledgersConvenerDispatches(root, flowId), 1, "readiness 派发入账");
+      assert.equal(await waitForConvenerDispatchCount(root, flowId, 1), 1, "readiness 派发入账");
     } finally {
       await harness.iface.stopSession();
     }
@@ -5453,7 +5442,7 @@ test("2026-10-23 V12 v3：existing 宽边界只 warning + 迁移提示、不强�
       await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) > 0, 5000);
       assert.match(harness.sendsByRole.get("convener")![0]!, /role-readiness/, "existing 宽边界只 warning：不阻塞 readiness");
       assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 0, "warning 不退回 Crew");
-      assert.equal(await ledgersConvenerDispatches(root, flowId), 1, "readiness 派发入账");
+      assert.equal(await waitForConvenerDispatchCount(root, flowId, 1), 1, "readiness 派发入账");
     } finally {
       await harness.iface.stopSession();
     }
@@ -6151,7 +6140,7 @@ test("2026-10-23 跨重启账本锚：早期无 stepId 派发不挡；通过记�
     try {
       await new Promise((resolve) => setTimeout(resolve, 900));
       assert.equal(harnessB.sendsByRole.get("convener")?.length ?? 0, 0, "通过记录后有 readiness 派发：新实例跳过");
-      assert.equal(await ledgersConvenerDispatches(rootB, flowId), 1, "账本不重复");
+      assert.equal(await waitForConvenerDispatchCount(rootB, flowId, 1), 1, "账本不重复");
       assert.equal(harnessB.sendsByRole.get("nominator")?.length ?? 0, 0, "不重复反馈");
     } finally {
       await harnessB.iface.stopSession();
@@ -6307,7 +6296,7 @@ test("2026-10-23 role-cards 收口：终态拒绝（不覆盖）；已 done 幂�
       harness.settles.get("nominator")?.();
       await new Promise((resolve) => setTimeout(resolve, 900));
       assert.equal(harness.sendsByRole.get("convener")!.length, 1, "已 done + 已有派发：不重复");
-      assert.equal(await ledgersConvenerDispatches(rootIdem, flowId), 1);
+      assert.equal(await waitForConvenerDispatchCount(rootIdem, flowId, 1), 1);
     } finally {
       await harness.iface.stopSession();
     }
@@ -6468,7 +6457,7 @@ test("2026-10-23 防自激：稳定状态重复刷新 10 次不产生新派发/�
       await new Promise((resolve) => setTimeout(resolve, 900));
       assert.equal(harness.sendsByRole.get("convener")!.length, 1, "10 次刷新不重复派发");
       assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 0, "10 次刷新不重复反馈");
-      assert.equal(await ledgersConvenerDispatches(root, flowId), 1, "账本仍恰一条");
+      assert.equal(await waitForConvenerDispatchCount(root, flowId, 1), 1, "账本仍恰一条");
       assert.equal(harness.projectChanged(), changedAfterDispatch, "稳定状态不再 emitProjectChanged（无 listProject→check→changed 循环）");
     } finally {
       await harness.iface.stopSession();
@@ -6572,7 +6561,7 @@ test("2026-10-23 S5 回归：flow 缺 role-cards 同指纹连续 settle/refresh 
       await harness.iface.listProject({ projectRoot: root });
       await new Promise((resolve) => setTimeout(resolve, 800));
       assert.equal(harness.sendsByRole.get("convener")!.length, 3, "收口成功后不重复派发");
-      assert.equal(await ledgersConvenerDispatches(root, flowId), 1);
+      assert.equal(await waitForConvenerDispatchCount(root, flowId, 1), 1);
     } finally {
       await harness.iface.stopSession();
     }
@@ -6984,6 +6973,342 @@ test("2026-10-24 治理协调唤醒：阻塞阶段→Lead；同 revision/阶段�
         "真实状态行不被预算丢弃",
       );
       assert.equal((sendsByRole.get("verifier") ?? []).length, 0, "始终不派 Proof（非发布 + 阻塞）");
+    } finally {
+      await iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————————————— 2026-10-24 P0-2 就绪步骤继续调度（ready 唤醒） ——————————————
+
+/**
+ * ready 唤醒夹具：`setup` done；`build`（项目 worker dispatch）/ `docs`（Steward 自有 artifact）/
+ * `review`（内置 rapporteur artifact）pending 且依赖已 done；另含验收 pending。
+ * `delivered: true` 时追加一个 delivered（待核证）步骤，用于验证 delivered 优先、不向 Steward 双发。
+ */
+function readyWakeFlowYaml(
+  flowId: string,
+  marker = "rev-a",
+  options: { delivered?: boolean } = {},
+): string {
+  return [
+    `flowId: ${flowId}`,
+    "version: 1",
+    "qualityTier: production",
+    "steps:",
+    "  - id: setup",
+    "    title: 准备",
+    "    owner: executor",
+    "    kind: dispatch",
+    "    status: done",
+    "    evidence: { kind: dispatch, ref: setup }",
+    "  - id: contract-freeze",
+    "    title: 契约冻结",
+    "    owner: rapporteur",
+    "    kind: artifact",
+    "    status: done",
+    "    evidence: { kind: artifact, ref: docs/contracts/flow-ready-api-v1.md }",
+    ...(options.delivered === true
+      ? [
+          "  - id: integration",
+          "    title: 集成",
+          "    owner: executor",
+          "    kind: dispatch",
+          "    status: delivered",
+        ]
+      : []),
+    "  - id: build",
+    `    title: 构建（${marker}）`,
+    "    owner: executor",
+    "    kind: dispatch",
+    "    status: pending",
+    "    parallelGroup: map-build",
+    "    dependsOn: [contract-freeze, setup]",
+    "  - id: docs",
+    "    title: 文档",
+    "    owner: convener",
+    "    kind: artifact",
+    "    status: pending",
+    "    parallelGroup: map-build",
+    "    dependsOn: [contract-freeze, setup]",
+    "  - id: review",
+    "    title: 评审",
+    "    owner: rapporteur",
+    "    kind: artifact",
+    "    status: pending",
+    "    dependsOn: [contract-freeze, setup]",
+    "  - id: verification",
+    "    title: 验收",
+    "    owner: app",
+    "    kind: acceptance",
+    "    status: pending",
+    "",
+  ].join("\n");
+}
+
+/** 写 flow YAML 并返回绝对路径（ready 唤醒测试用；调用前无需另建目录）。 */
+function writeReadyWakeFlow(root: string, flowId: string, text: string): string {
+  const dir = path.join(root, "docs", "flows");
+  mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `${flowId}.yaml`);
+  writeFileSync(file, text, "utf8");
+  return file;
+}
+
+test("2026-10-24 P0-2 ready 唤醒：done + 后续 pending ready ⇒ Steward 一条 [自动推进]（含全部 ready/并行组/依赖）；不派 acceptance、不标 done", async () => {
+  const root = makeTempProjectRoot("ans-ready-wake-");
+  try {
+    const flowId = "flow-ready";
+    const flowFile = writeReadyWakeFlow(root, flowId, readyWakeFlowYaml(flowId));
+    const listing: ProjectListing = { ...listingWithProjectRoles({ ...trioListing(), projectRoot: root }, ["executor"]), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const events: SessionEventEnvelope[] = [];
+    const customerCalls: unknown[] = [];
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: (envelope) => { events.push(envelope); },
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        const sends = sendsByRole.get(input.roleId) ?? [];
+        sendsByRole.set(input.roleId, sends);
+        return scriptedGovernanceHandle(sends).handle;
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+      customerInput: async (request) => {
+        customerCalls.push(request);
+        return { outcome: "declined", reason: "ready 唤醒不应弹卡" };
+      },
+    });
+    try {
+      await iface.listProject({ projectRoot: root });
+      await waitForTest(() => (sendsByRole.get("convener")?.length ?? 0) === 1, 4000);
+      const task = sendsByRole.get("convener")![0]!;
+      assert.match(task, /^\[自动推进\] 流程 flow-ready/, "向 Steward 投 [自动推进] 任务");
+      assert.match(task, /revision：[0-9a-f]{64}/, "带当前 flow revision（sha256 全量）");
+      // 全部 ready（含内置 owner rapporteur / Steward 自有 artifact）与字段都携带。
+      for (const id of ["build", "docs", "review"]) {
+        assert.ok(task.includes(id), `就绪步骤 ${id} 在消息中`);
+      }
+      assert.match(task, /build｜owner=executor｜kind=dispatch｜parallelGroup=map-build｜dependsOn=contract-freeze、setup/, "项目 worker 步骤带 owner/kind/并行组/依赖");
+      assert.match(task, /docs｜owner=convener｜kind=artifact｜parallelGroup=map-build｜dependsOn=contract-freeze、setup/, "Steward 自有 artifact 同样携带并行组/依赖");
+      assert.match(task, /review｜owner=rapporteur｜kind=artifact｜parallelGroup=无｜dependsOn=contract-freeze、setup/, "内置 owner 步骤也如实列出（但不代派）");
+      assert.match(task, /flow_get/, "要求先 flow_get");
+      assert.match(task, /dispatch_task/, "要求用 dispatch_task 派项目 worker");
+      assert.match(task, /不要把这些步骤直接标 done/, "不代标 done");
+      assert.match(task, /不要派 acceptance/, "不派 acceptance/Proof");
+      assert.equal(sendsByRole.get("verifier")?.length ?? 0, 0, "不派 Proof/verifier");
+      assert.equal(customerCalls.length, 0, "全程零客户卡");
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(
+        ledger.entries.filter((entry) => entry.kind === "dispatch.accepted" && entry.flowId === flowId).length,
+        0,
+        "ready 唤醒只提示：不写 dispatch.accepted 账本",
+      );
+      // 不写 flow：pending 仍是 pending、验收步骤不动。
+      const parsed = parseFlowStateYaml(readFileSync(flowFile, "utf8"), flowId);
+      assert.equal(parsed.ok, true);
+      if (parsed.ok) {
+        for (const id of ["build", "docs", "review"]) {
+          assert.equal(parsed.flow.steps.find((step) => step.id === id)?.status, "pending", `${id} 未被自动改状态`);
+        }
+        assert.equal(parsed.flow.steps.find((step) => step.id === "verification")?.status, "pending", "验收步骤不动");
+      }
+    } finally {
+      await iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-24 P0-2 ready 唤醒：仅有 app / acceptance / customer-decision ⇒ 无 ready，不唤醒", async () => {
+  const root = makeTempProjectRoot("ans-ready-none-");
+  try {
+    const flowId = "flow-ready-none";
+    writeReadyWakeFlow(
+      root,
+      flowId,
+      [
+        `flowId: ${flowId}`,
+        "version: 1",
+        "qualityTier: production",
+        "steps:",
+        "  - id: setup",
+        "    title: 准备",
+        "    owner: executor",
+        "    kind: dispatch",
+        "    status: done",
+        "    evidence: { kind: dispatch, ref: setup }",
+        "  - id: app-output",
+        "    title: 应用产物",
+        "    owner: app",
+        "    kind: artifact",
+        "    status: pending",
+        "  - id: decision",
+        "    title: 客户决定",
+        "    owner: nominator",
+        "    kind: customer-decision",
+        "    status: pending",
+        "  - id: verification",
+        "    title: 验收",
+        "    owner: app",
+        "    kind: acceptance",
+        "    status: pending",
+        "",
+      ].join("\n"),
+    );
+    const listing: ProjectListing = { ...listingWithProjectRoles({ ...trioListing(), projectRoot: root }, ["executor"]), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: () => {},
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        const sends = sendsByRole.get(input.roleId) ?? [];
+        sendsByRole.set(input.roleId, sends);
+        return scriptedGovernanceHandle(sends).handle;
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    });
+    try {
+      await iface.listProject({ projectRoot: root });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      assert.equal(sendsByRole.get("convener")?.length ?? 0, 0, "app-owned/customer-decision/acceptance 不自动派 ⇒ 不唤醒 Steward");
+      assert.equal(sendsByRole.get("verifier")?.length ?? 0, 0, "不派 Proof");
+    } finally {
+      await iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-24 P0-2 ready 唤醒：同 revision 去重；Steward busy 跳过；settle 后新 revision 再唤醒", async () => {
+  const root = makeTempProjectRoot("ans-ready-dedupe-");
+  try {
+    const flowId = "flow-ready-dedupe";
+    const flowFile = writeReadyWakeFlow(root, flowId, readyWakeFlowYaml(flowId, "rev-a"));
+    const listing: ProjectListing = { ...listingWithProjectRoles({ ...trioListing(), projectRoot: root }, ["executor"]), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const controls = new Map<string, ReturnType<typeof scriptedGovernanceHandle>>();
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: () => {},
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        const sends = sendsByRole.get(input.roleId) ?? [];
+        sendsByRole.set(input.roleId, sends);
+        const made = scriptedGovernanceHandle(sends);
+        controls.set(input.roleId, made);
+        return made.handle;
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    });
+    const readySends = (): string[] => (sendsByRole.get("convener") ?? []).filter((text) => text.startsWith("[自动推进]"));
+    try {
+      await iface.listProject({ projectRoot: root });
+      await waitForTest(() => readySends().length === 1, 4000);
+      // 同 revision：重复真实事件（listProject）不刷屏。
+      await iface.listProject({ projectRoot: root });
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      assert.equal(readySends().length, 1, "同 revision + 同一 ready 集合只唤醒一次");
+      // Steward busy（首条 [自动推进] 未 settle）⇒ 新 revision 也不并发注入。
+      writeFileSync(flowFile, readyWakeFlowYaml(flowId, "rev-b"), "utf8");
+      await iface.listProject({ projectRoot: root });
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      assert.equal(readySends().length, 1, "Steward busy/在途 ⇒ 跳过等下一次真实事件");
+      // Steward settle 后的下一次真实事件 ⇒ 新 revision 再唤醒一次。
+      controls.get("convener")!.settle();
+      await waitForTest(() => readySends().length === 2, 4000);
+      assert.match(readySends()[1]!, /构建（rev-b）/, "新 revision 的 ready 集合可见");
+    } finally {
+      await iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-24 P0-2 ready 唤醒：预算——同一 ready 集合（阶段）最多 2 次，之后停止", async () => {
+  const root = makeTempProjectRoot("ans-ready-budget-");
+  try {
+    const flowId = "flow-ready-budget";
+    const flowFile = writeReadyWakeFlow(root, flowId, readyWakeFlowYaml(flowId, "rev-a"));
+    const listing: ProjectListing = { ...listingWithProjectRoles({ ...trioListing(), projectRoot: root }, ["executor"]), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const controls = new Map<string, ReturnType<typeof scriptedGovernanceHandle>>();
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: () => {},
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        const sends = sendsByRole.get(input.roleId) ?? [];
+        sendsByRole.set(input.roleId, sends);
+        const made = scriptedGovernanceHandle(sends);
+        controls.set(input.roleId, made);
+        return made.handle;
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    });
+    const readySends = (): string[] => (sendsByRole.get("convener") ?? []).filter((text) => text.startsWith("[自动推进]"));
+    try {
+      await iface.listProject({ projectRoot: root });
+      await waitForTest(() => readySends().length === 1, 4000);
+      // 第 2 次：新 revision、同一 ready 集合（同阶段第 2 次，允许）。
+      writeFileSync(flowFile, readyWakeFlowYaml(flowId, "rev-b"), "utf8");
+      controls.get("convener")!.settle();
+      await waitForTest(() => readySends().length === 2, 4000);
+      // 第 3 次：新 revision、同一 ready 集合 ⇒ 同阶段预算 2 次，停止 ready 唤醒。
+      controls.get("convener")!.settle();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      writeFileSync(flowFile, readyWakeFlowYaml(flowId, "rev-c"), "utf8");
+      await iface.listProject({ projectRoot: root });
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      assert.equal(readySends().length, 2, "同一 ready 集合最多 2 次唤醒（预算）");
+    } finally {
+      await iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-24 P0-2 ready 唤醒：有 delivered 待核证 ⇒ 本轮只发 delivered 核证，不向 Steward 双发 [自动推进]", async () => {
+  const root = makeTempProjectRoot("ans-ready-delivered-");
+  try {
+    const flowId = "flow-ready-delivered";
+    writeReadyWakeFlow(root, flowId, readyWakeFlowYaml(flowId, "rev-a", { delivered: true }));
+    const listing: ProjectListing = { ...listingWithProjectRoles({ ...trioListing(), projectRoot: root }, ["executor"]), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: () => {},
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        const sends = sendsByRole.get(input.roleId) ?? [];
+        sendsByRole.set(input.roleId, sends);
+        return scriptedGovernanceHandle(sends).handle;
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    });
+    try {
+      await iface.listProject({ projectRoot: root });
+      await waitForTest(() => (sendsByRole.get("convener")?.length ?? 0) >= 1, 4000);
+      const convenerSends = sendsByRole.get("convener")!;
+      assert.equal(convenerSends.length, 1, "delivered 核证优先：Steward 恰一条消息");
+      assert.match(convenerSends[0]!, /integration 已 delivered/, "核证任务指向 delivered 步骤");
+      assert.equal(
+        convenerSends.filter((text) => text.startsWith("[自动推进]")).length,
+        0,
+        "有 delivered 待核证时本轮不做 ready 唤醒（不双发）",
+      );
     } finally {
       await iface.stopSession();
     }

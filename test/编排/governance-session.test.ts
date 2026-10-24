@@ -465,6 +465,14 @@ test("标准工作流（2026-10-24 更新）：trio 与 single/su 提示均含�
       [/非发布（`release` 缺省\/false）[^\n]*不派 verifier criteria、不派 Proof、不标 acceptance done/, "非发布不派 criteria/Proof"],
       [/Steward 用既有 `request_confirmation`（`cardKind=schedule-write`）[^\n]*`release`/, "Steward 用 schedule-write 标记 release"],
       [/发布验收派发不是验收决定/, "发布验收派发不是验收决定"],
+      // 2026-10-24 P1-5：标准门只对发布版本生效，读取最新 vN；非发布/legacy 豁免。
+      [/最新版本\*\*（扫描取最高 N）/, "发布版本读取 criteria 最新版本"],
+      [/非发布\/legacy（无 YAML 或未标 release）豁免/, "非发布/legacy 豁免标准文件"],
+      // 2026-10-24 P1-7：delivered 只能步骤 owner 标记，manager 不代标，worker 不能 done。
+      [/`dispatched → delivered` 只能由\*\*步骤 owner\*\*/, "delivered 仅步骤 owner"],
+      [/Steward \/ Lead 等 manager \*\*不得代标 `delivered`\*\*/, "manager 不得代标 delivered"],
+      [/项目 worker 已注入既有 `flow_get` \/ `flow_step_update`/, "项目 worker 获得既有 flow 工具"],
+      [/派发时在任务文本写明「完成后用 `flow_get` \/ `flow_step_update` 标自己的 `delivered`，不要标 `done`」/, "派发任务写明 owner 交付方式"],
       [/Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）/, "Proof 标准复核流程标题"],
       [/用审批档 shell 跑测试/, "用审批档 shell 跑测试"],
       [
@@ -680,8 +688,131 @@ test("shell 审批档（2026-10-19）：五个内置治理角色 operator-approv
   });
 });
 
-// —————————————————————— ③ 预授权 / 禁写 ——————————————————————
+// —————————————————————— ②b P1-7：项目角色获得既有 flow_step_update ——————————————————————
 
+/**
+ * 项目角色夹具（与 shell 审批档用例同形）：项目角色拿既有 flow 工具是为了把自己的步骤标 delivered；
+ * flow_step_supersede 仍只给内置治理角色（工作流管理者）。
+ */
+function projectRoleProject(root: string, roleId: string, file: string): ProjectConfig {
+  const dir = join(root, "角色卡", roleId);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "role-card.md"), `# 角色 ${roleId}\n`);
+  writeFileSync(
+    join(dir, "boundary.yaml"),
+    `role: ${roleId}\nentries:\n  - kind: file\n    path: ${file}\n    purpose: 测试条目\n`,
+  );
+  return {
+    projectRoot: root,
+    skillRoot: root,
+    roles: { [roleId]: { card: `角色卡/${roleId}/role-card.md`, boundary: `角色卡/${roleId}/boundary.yaml` } },
+    builtInRoles: [],
+    governanceBoundary: { path: `角色卡/${roleId}/boundary.yaml`, acceptance: { accepted: true, source: "test:project-role" } },
+  };
+}
+
+test("2026-10-24 P1-7：项目角色会话注入既有 flowStepUpdate（无 flowStepSupersede）；owner delivered 通过、done 拒绝；manager 不代标 delivered、可核 done", async () => {
+  await withRoot(async (root) => {
+    const flowAbs = join(root, "docs", "flows", "flow-a.yaml");
+    mkdirSync(join(flowAbs, ".."), { recursive: true });
+    writeFileSync(
+      flowAbs,
+      [
+        "flowId: flow-a",
+        "version: 1",
+        "qualityTier: production",
+        "steps:",
+        "  - id: impl",
+        "    title: 实现",
+        "    owner: X",
+        "    kind: dispatch",
+        "    status: dispatched",
+        "  - id: impl-other",
+        "    title: 另一实现",
+        "    owner: X",
+        "    kind: dispatch",
+        "    status: dispatched",
+        "",
+      ].join("\n"),
+    );
+    mkdirSync(join(root, ".ans", "governance"), { recursive: true });
+    writeFileSync(
+      governanceLedgerPath(root),
+      JSON.stringify(entry({ kind: "dispatch.accepted", actorRoleId: "convener", power: "schedule", stepId: "impl" })) + "\n",
+    );
+
+    const captured = {} as Captured;
+    const handle = await openRoleSession(
+      { roleId: "X", project: projectRoleProject(root, "X", "src/x.ts") },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const caps = captured.caps!;
+      assert.equal(typeof caps.flowGet, "function", "项目角色注入既有 flow_get");
+      assert.equal(
+        typeof caps.flowStepUpdate,
+        "function",
+        "项目角色注入既有 flow_step_update（P1-7：owner 需要标自己的 delivered）",
+      );
+      assert.equal(caps.flowStepSupersede, undefined, "flow_step_supersede 仍只给工作流管理者");
+
+      const read = await caps.flowGet!({ flowId: "flow-a" });
+      assert.equal(read.ok, true, read.error ?? "");
+      const delivered = await caps.flowStepUpdate!({
+        flowId: "flow-a",
+        stepId: "impl",
+        status: "delivered",
+        expectedRevision: read.revision!,
+      });
+      assert.equal(delivered.ok, true, delivered.error ?? "");
+      const done = await caps.flowStepUpdate!({
+        flowId: "flow-a",
+        stepId: "impl",
+        status: "done",
+        evidence: { kind: "dispatch", ref: "impl" },
+        expectedRevision: delivered.revision!,
+      });
+      assert.equal(done.ok, false);
+      assert.equal(done.code, "invalid-transition", "worker 不能标 done");
+    } finally {
+      await handle.dispose();
+    }
+
+    const managerCaptured = {} as Captured;
+    const managerHandle = await openRoleSession(
+      { roleId: "convener", project: withBuiltIn(trioProject(root), "convener") },
+      { createAdapter: capturingFactory(managerCaptured) },
+    );
+    try {
+      const caps = managerCaptured.caps!;
+      assert.equal(typeof caps.flowStepSupersede, "function", "manager 保留 flow_step_supersede");
+      const read = await caps.flowGet!({ flowId: "flow-a" });
+      assert.equal(read.ok, true, read.error ?? "");
+      const managerDelivered = await caps.flowStepUpdate!({
+        flowId: "flow-a",
+        stepId: "impl-other",
+        status: "delivered",
+        expectedRevision: read.revision!,
+      });
+      assert.equal(managerDelivered.ok, false);
+      assert.equal(managerDelivered.code, "invalid-transition", "manager 不代标 delivered");
+
+      const managerDone = await caps.flowStepUpdate!({
+        flowId: "flow-a",
+        stepId: "impl",
+        status: "done",
+        evidence: { kind: "dispatch", ref: "impl" },
+        expectedRevision: read.revision!,
+      });
+      assert.equal(managerDone.ok, true, managerDone.error ?? "");
+      assert.equal(managerDone.flow?.steps.find((step) => step.id === "impl")?.status, "done");
+    } finally {
+      await managerHandle.dispose();
+    }
+  });
+});
+
+// —————————————————————— ③ 预授权 / 禁写 ——————————————————————
 test("预授权：Rapporteur 可写 proposals/contracts/自身记录；提名/流程仍拒", async () => {
   await withRoot(async (root) => {
     const captured = {} as Captured;

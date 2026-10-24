@@ -1601,3 +1601,47 @@ test("2026-10-24 发布验收门（S2a）：Steward 卡内置回交向 Lead 汇�
     }
   }
 });
+
+test("2026-10-24 P1-7：Steward/Lead 卡写明 dispatched→delivered 仅步骤 owner；manager 只核 delivered→done、worker 不能 done", () => {
+  // 计划 P1-7：`dispatched → delivered` 收紧为仅步骤 owner（项目角色）标记；Steward/Lead 是 manager，
+  // 不得代标 delivered，只能在 worker delivered 后核证 done 或标 failed/blocked；worker 不能 done。
+  for (const id of ["convener", "liaison"] as const) {
+    const t = governanceRoleOf(id)!.cardText;
+    for (const needle of [
+      "`dispatched → delivered` 只能由该步骤的 owner（项目角色",
+      "不得代标 `delivered`",
+      "只能在 owner 交付 `delivered` 后核证并标 `done`",
+      "或标 `failed` / `blocked`",
+      "worker 不能标 `done`",
+    ]) {
+      assert.ok(t.includes(needle), `${id} 卡须含 P1-7 步骤状态权限「${needle}」`);
+    }
+  }
+  // 原有「Steward 可更新全部步骤」权限描述必须保留——例外只收紧 dispatched→delivered，
+  // 不删除 done/failed/blocked 能力，也不缩小其他治理能力。
+  const steward = governanceRoleOf("convener")!.cardText;
+  assert.ok(
+    steward.includes("Steward 可更新全部步骤，其他角色只能更新自己的步骤"),
+    "Steward 卡须保留可更新全部步骤的原权限描述",
+  );
+  assert.ok(
+    steward.includes("**例外：`dispatched → delivered` 只能由该步骤的 owner（项目角色）标记"),
+    "Steward 卡须在权限描述处写明 delivered 例外",
+  );
+  assert.ok(steward.includes("`delivered → done`"), "Steward 仍可核证 delivered→done");
+  assert.ok(steward.includes("或标 `failed` / `blocked`"), "Steward 仍可标 failed/blocked");
+  // 五卡共享总则同步该规则（单一来源）；worker 卡既有的「不要自己标 done」不被放松。
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    assert.ok(spec.cardText.includes("worker 不能标 `done`"), `${spec.id} 卡总则须含 worker 不能 done`);
+    assert.ok(spec.cardText.includes("不得代标 `delivered`"), `${spec.id} 卡总则须含 manager 不代标 delivered`);
+  }
+  for (const id of ["rapporteur", "nominator", "verifier"] as const) {
+    assert.ok(governanceRoleOf(id)!.cardText.includes("不要自己标 `done`"), `${id} 仍不得自己标 done`);
+  }
+  // 能力矩阵零变化：P1-7 只改卡文本，不新增能力位。
+  assert.deepEqual(
+    BUILT_IN_GOVERNANCE_ROLES.filter((s) => s.capabilities.dispatchTask).map((s) => s.id),
+    ["liaison", "convener"],
+    "dispatch_task 仍只给 Lead 与 Steward",
+  );
+});

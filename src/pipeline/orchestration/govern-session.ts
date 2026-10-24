@@ -611,6 +611,10 @@ const ARCHITECTURE_EXTENSIBILITY_REQUIREMENTS = [
  * 齐备后，应用才按发布验收门派 Proof；非发布不派。内置角色状态/回交向主理汇总，主理只协调不批准；
  * 提示**不承诺**未实现的自动推进（步骤 done 不会自动派下一步）。验收仍由 Proof 核对 + 客户/判断
  * agent 决定。
+ *
+ * 2026-10-24 后续收紧：P1-5 验收标准门只对发布版本生效、读取 `-criteria-vN` 最新版本（v1 不再硬编码）；
+ * P1-7 `dispatched → delivered` 只能由步骤 owner 标记，Steward/Lead 不代标 delivered，worker 不能 done；
+ * P1-6 revision 冲突由应用只读预检后单次重试（`flow.conflict.retry`），提示仍要求冲突时先重读。
  */
 const STANDARD_WORKFLOW_PROMPT = [
   "**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 团队计划与客户任命 → Crew 写角色卡与角色就绪 → 流程与派发 → 发布验收（仅发布版本）；",
@@ -622,7 +626,8 @@ const STANDARD_WORKFLOW_PROMPT = [
   "**Map/Reduce 与 flow（方案 A）**：flow step 可选 `parallelGroup: map-<slug> | reduce` 与 `dependsOn: [step-id]`（不新增 `kind`）；Map 交付步骤 id 用 `delivery-<module>` 并先依赖 `contract-freeze`；Reduce 步骤等全部 Map `done` 后再跑契约/集成/e2e。dispatch 门禁会硬拦前置未 `done` 的派发，不改变派发权归属；旧 flow 不填字段行为不变。",
   "**测试分片与证据（Reduce）**：测试角色按模块并行分片，每分片使用独立临时项目根/端口/输出目录/日志并留原始证据；不得共享可变夹具、不得并发写同一文件。Reduce 合并 manifest（候选哈希/分片清单/命令/日志路径/结果/环境）后跑契约/集成/e2e 与真实启动演示，`verification-evidence` 步骤指向 manifest。",
   "**客户不做内部调度**：阶段流转与门禁由应用负责；**应用不承诺自动推进下一步**（步骤 done 不会自动触发下一步派发），内置角色用 `flow_get` / `flow_step_update` / `flow_step_supersede` 与 `dispatch_task` 按门禁推进，主理只协调不批准；客户只在需要客户决定的事项（提案接受、任命、写盘确认、发布验收动作）上做决定，不需要逐阶段手动转交或触发。",
-  "**验收标准（2026-10-22 第 3 项）**：Proof 在客户任命后、实施派发前先写 `docs/acceptance/<flowId>-criteria-v1.md`（验收表/风险档位/判定规则/证据计划）；应用把「标准已存在且结构合格」作为实施派发前置（accept-quick/旧流程显式豁免）。**2026-10-24 起：非发布流程应用不自动派 verifier 写标准/不启动 Proof**（标准归属另做 P1-5 变更）；发布版本才由应用按发布验收门派 Proof 写标准并复核。",
+  "**验收标准（2026-10-22 第 3 项；2026-10-24 P1-5 收紧）**：发布版本（flow YAML 顶层 `release: true`）在实施派发前要求 `docs/acceptance/<flowId>-criteria-vN.md` 的**最新版本**（扫描取最高 N）存在且结构合格（验收表/风险档位/判定规则/证据计划）；**非发布/legacy（无 YAML 或未标 release）豁免**，不要求该文件、不派 verifier 写标准。应用自动写 criteria 仍只在发布版本发生；发布版本由应用按发布验收门派 Proof 写标准并复核。",
+  "**步骤交付纪律（2026-10-24 P1-7）**：`dispatched → delivered` 只能由**步骤 owner**（项目角色 / worker）标记；Steward / Lead 等 manager **不得代标 `delivered`**，只能在 owner 交付 `delivered` 后核对证据再标 `delivered → done`，或标 `failed` / `blocked`；项目 worker 已注入既有 `flow_get` / `flow_step_update`，只能更新 owner=自己的步骤（delivered / failed / blocked），不能标 `done`；派发时在任务文本写明「完成后用 `flow_get` / `flow_step_update` 标自己的 `delivered`，不要标 `done`」；`failed` / `blocked` 迁移保持既有语义。",
   "**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：",
   "① 读证据（流程状态 YAML `docs/flows/<flowId>.yaml`、提案/契约、团队计划、变更包 `docs/scheduling/<flowId>-change-v1.md`、交付与回交报告、演示证据路径）；",
   "② 用审批档 shell 跑测试（逐条执行提案声明的单元/集成/端到端测试，命令逐条提交审批并记录输出）；",

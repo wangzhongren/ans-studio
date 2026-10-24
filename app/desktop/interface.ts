@@ -172,12 +172,15 @@ import {
   parseAcceptanceReworkReport,
   parseFlowStateYaml,
   reopenAcceptanceStepForRework as realReopenAcceptanceStepForRework,
+  // 2026-10-24 P0-2：就绪步骤纯规划器（只读；桌面只经 Pipeline 公共出口消费，不直接 import 私有 common）。
+  listReadyFlowSteps,
   type AcceptanceReworkItem,
   type AcceptanceReworkParseResult,
   type CompleteRoleCardsStepInput,
   type CompleteRoleCardsStepResult,
   type FlowState,
   type LatestAcceptanceDecision,
+  type ReadyFlowStep,
   type ReopenAcceptanceStepForReworkInput,
 } from "../../src/pipeline/orchestration/flow-state.ts";
 // G-2（2026-10-16 客户批准）：恢复确认卡通道（W5——presenter/回包/关窗清帐在 main 接线，本层只透传）与
@@ -3101,6 +3104,169 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     });
   };
 
+  // —————— 2026-10-24 P0-2 就绪步骤继续调度唤醒 ——————
+  //
+  // 现场：应用只在 delivered/blocked 唤醒；步骤 done 后没有「下一步 ready」计算，Steward 结束回合后
+  // 下一步 pending 无人推进。本层在既有验收检查入口读**当前** flow 与账本 `dispatch.accepted` 的 stepId
+  // 集合，调编排只读规划器 `listReadyFlowSteps`；只对 **Steward 可执行**的就绪步骤向 Steward 投一条
+  // `[自动推进]` 任务：
+  //   · `owner === "convener"` 的 artifact（Steward 自身产物，继续执行并回交）；
+  //   · 项目 worker（listing 中非内置角色）的 dispatch / artifact（由 Steward 用 dispatch_task 派）。
+  // 其它内置 owner（rapporteur / nominator / verifier）跳过，交既有 app / 治理路径；customer-decision /
+  // acceptance / app-owned 由规划器自身 stop/跳过。**只提示、不派发、不标 done、不写 flow/账本、不轮询**；
+  // release 门仍由 P0-1 控制（本层不派 acceptance / verifier / Proof）。
+  // · 去重键 `projectRoot+flowId+revision+sortedReadyIds`；与 delivered 唤醒 / 治理协调唤醒共用同一 flow
+  //   revision（`flowRevisionForGate`），**有 delivered 待核证时本轮不做 ready 唤醒**（delivered 核证优先，
+  //   避免向 Steward 双发）。
+  // · Steward busy / 有排队或在途投递 ⇒ 跳过等下一次真实事件（不并发注入）。
+  // · 内存预算：每 flow 24 次、同一 ready 集合（阶段）2 次、连续 2 次无进展即停；不持久化（重启按当前状态重建）。
+  const READY_WAKE_TOTAL_LIMIT = 24;
+  const READY_WAKE_SAME_STAGE_LIMIT = 2;
+  const READY_WAKE_NO_PROGRESS_LIMIT = 2;
+  interface ReadyWakeState {
+    total: number;
+    /** 上一轮 ready 集合签名（sorted ids）；同集合 = 同阶段。 */
+    stage: string | null;
+    sameStage: number;
+    noProgress: number;
+    /** 达总预算后停止 ready 唤醒（真实回交/状态行不受影响）。 */
+    stopped: boolean;
+  }
+  const readyWakes = new Map<string, ReadyWakeState>();
+  /** 去重键：`projectRoot\0flowId` → `sha256(revision\0sortedReadyIds)`（只记内存）。 */
+  const readyWakeNotified = new Map<string, string>();
+
+  /** Steward 是否可执行该就绪步骤（fail-closed：owner 不在 listing 的未知角色不唤醒）。 */
+  const isStewardExecutableReadyStep = (step: ReadyFlowStep, listing: ProjectListing): boolean => {
+    const owner = step.owner.trim();
+    if (owner === "convener") return step.kind === "artifact";
+    const role = listing.roles.find((candidate) => candidate.roleId === owner);
+    return role !== undefined && role.builtIn !== true;
+  };
+
+  /**
+   * 标准工作流的两个步骤由**应用确定性门控**管理，不走 ready 唤醒（交既有 app/governance 路径）：
+   *   · `role-cards`：任命决定后由应用派 Crew/Nominator，结构校验通过后由应用收口 done；
+   *   · `role-readiness`：role-cards 收口后由应用派 Convener 复核。
+   * 规划器只按声明的 dependsOn 判依赖；这两步即使未声明 dependsOn 或前置未 done，也不让 ready 唤醒
+   * 与应用的写卡收口/readiness 派发在同一事件里双发。其余 ready（团队计划/变更包/项目 worker 步骤）照常。
+   */
+  const APP_MANAGED_READY_STEP_IDS: ReadonlySet<string> = new Set([ROLE_CARDS_STEP_ID, "role-readiness"]);
+
+  /** `[自动推进]` 继续调度任务文案：含 flowId / revision / 全部 ready 的 id/owner/kind/parallelGroup/dependsOn。 */
+  const buildReadyAdvanceTaskMessage = (input: {
+    flowId: string;
+    revision: string;
+    ready: readonly ReadyFlowStep[];
+  }): string => {
+    return [
+      `[自动推进] 流程 ${input.flowId} 有可继续调度的就绪步骤（当前 revision：${input.revision}）。`,
+      "就绪步骤（按 flow 原顺序）：",
+      ...input.ready.map(
+        (step) =>
+          `- ${step.id}｜owner=${step.owner}｜kind=${step.kind}｜parallelGroup=${step.parallelGroup ?? "无"}｜dependsOn=${step.dependsOn.length > 0 ? step.dependsOn.join("、") : "无"}｜title=${step.title}`,
+      ),
+      "要求：",
+      "1) 先 flow_get 读取当前流程与账本状态（含 revision），核对依赖与已派发记录后再动作。",
+      "2) 项目 worker 的 dispatch / artifact 步骤用 dispatch_task 按 owner 派发（stepId 与 flow 完全一致；同一 parallelGroup 可并行；账本已有 dispatch.accepted 的步骤不要重复派）。",
+      "3) owner 为 Steward / 统筹（convener）自身的 artifact 步骤请继续执行并回交。",
+      "4) 不要把这些步骤直接标 done（done 由证据核证决定）；不要派 acceptance / verifier / Proof（发布验收仍由既有 release 门控制）。",
+      "本消息只是继续调度提示：应用未自动派发、未改 flow/账本、未替客户决定。",
+    ].join("\n");
+  };
+
+  const wakeStewardForReadySteps = async (info: {
+    projectRoot: string;
+    flowId: string;
+    flow: FlowState;
+    revision: string;
+    ledgerEntries: readonly GovernanceLedgerEntry[];
+    listing: ProjectListing;
+    deliveredNotifiedHash?: string;
+    diagnostic: ReturnType<typeof createDiagnosticLogger>;
+  }): Promise<string | undefined> => {
+    const { projectRoot, flowId, flow, revision, diagnostic } = info;
+    const key = acceptanceFlowKey(projectRoot, flowId);
+    // 有 delivered 待核证 ⇒ 本轮先等 Steward 核证（与 delivered 唤醒共享同一 revision 指纹，不双发）。
+    const deliveredPending = flow.steps.some(
+      (step) => step.status === "delivered" && typeof step.owner === "string" && step.owner.trim() !== "",
+    );
+    if (deliveredPending || info.deliveredNotifiedHash !== undefined) {
+      diagnostic.record("flow.ready-wake.skip", { flowId, reasonCode: "delivered-pending" });
+      return undefined;
+    }
+    // 已派发（账本 dispatch.accepted）的 stepId 集合：按 flowId 过滤（纯输入，不写账本）。
+    const dispatchedStepIds = new Set<string>();
+    for (const entry of info.ledgerEntries) {
+      if (entry.kind !== "dispatch.accepted" || entry.flowId !== flowId) continue;
+      const stepId = typeof entry.stepId === "string" ? entry.stepId.trim() : "";
+      if (stepId !== "") dispatchedStepIds.add(stepId);
+    }
+    const plan = listReadyFlowSteps(flow, dispatchedStepIds);
+    // 应用确定性门控管理的步骤（role-cards / role-readiness）由既有 app/governance 路径推进，不在此唤醒。
+    const readySteps = plan.ready.filter((step) => !APP_MANAGED_READY_STEP_IDS.has(step.id));
+    if (readySteps.length === 0) {
+      readyWakeNotified.delete(key); // 状态已变化：允许后续真实 ready 再唤醒
+      return undefined;
+    }
+    // 只有 Steward 可执行的 ready 才唤醒；其它内置 owner 留给既有 app / 治理路径（不越权代派）。
+    if (!readySteps.some((step) => isStewardExecutableReadyStep(step, info.listing))) return undefined;
+    const readyIds = readySteps.map((step) => step.id).sort();
+    const dedupe = createHash("sha256").update(`${revision}\u0000${readyIds.join("\u0000")}`).digest("hex");
+    if (readyWakeNotified.get(key) === dedupe) return dedupe; // 同 revision + 同一 ready 集合只唤醒一次
+    // Steward 忙 / 有排队或在途投递 ⇒ 等下一次真实事件（不并发注入、不轮询）。
+    const stewardBusy = RUNTIME_KINDS.some(
+      (runtime) =>
+        manager.isRoleBusy(projectRoot, "convener", runtime) || manager.hasPendingDelivery(projectRoot, "convener", runtime),
+    );
+    if (stewardBusy) {
+      diagnostic.record("flow.ready-wake.skip", { flowId, reasonCode: "steward-busy" });
+      return undefined;
+    }
+    const state = readyWakes.get(key) ?? { total: 0, stage: null, sameStage: 0, noProgress: 0, stopped: false };
+    readyWakes.set(key, state);
+    if (state.stopped) return undefined;
+    if (state.total >= READY_WAKE_TOTAL_LIMIT) {
+      state.stopped = true;
+      diagnostic.record("flow.ready-wake.skip", { flowId, reasonCode: "budget-total" });
+      return undefined;
+    }
+    const stageKey = readyIds.join(",");
+    const sameStage = state.stage === stageKey;
+    if (sameStage && (state.sameStage >= READY_WAKE_SAME_STAGE_LIMIT || state.noProgress >= READY_WAKE_NO_PROGRESS_LIMIT)) {
+      diagnostic.record("flow.ready-wake.skip", { flowId, reasonCode: "budget-stage" });
+      return undefined;
+    }
+    const runtime = await resolveNoteRuntime(projectRoot);
+    if (runtime === undefined) {
+      diagnostic.record("flow.ready-wake.skip", { flowId, reasonCode: "runtime-unresolved" });
+      return undefined;
+    }
+    const task = buildReadyAdvanceTaskMessage({ flowId, revision, ready: readySteps });
+    const opened = await manager.openBackground({ projectRoot, roleId: "convener", runtime });
+    if (!opened.ok) {
+      diagnostic.error("flow.ready-wake.open.failed", new Error(opened.error ?? "unknown"), { flowId });
+      return undefined;
+    }
+    const sent = await manager.sendBackground({ projectRoot, roleId: "convener", runtime, text: task });
+    if (!sent.ok) {
+      diagnostic.error("flow.ready-wake.send.failed", new Error(sent.error ?? "unknown"), { flowId });
+      return undefined;
+    }
+    // 账目只在成功投递后记账/去重：失败保留下一次真实事件重试（不循环）。
+    if (!sameStage) {
+      state.stage = stageKey;
+      state.sameStage = 0;
+      state.noProgress = 0;
+    }
+    state.sameStage += 1;
+    state.total += 1;
+    if (sameStage) state.noProgress += 1;
+    readyWakeNotified.set(key, dedupe);
+    diagnostic.record("flow.ready-wake.sent", { flowId, count: readySteps.length });
+    return dedupe;
+  };
+
   // —————— 收尾推进（2026-10-18 真机缺口；2026-10-19 客户反馈「独立核准应该是标准流程」）——————
   // 触发面：**任意角色 settle**、回交到达/settle、桌面侧治理账本追加（dispatch.accepted）、导入项目/启动
   // 后的补齐检查。本层只读流程状态与账本做**触发门**检查，全部完成且证据按步骤类型齐备才后台派 Proof /
@@ -3275,6 +3441,19 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // 2026-10-24 治理协调唤醒（S3）：只把阻塞/交付待核证阶段交给 Lead；不自动推进、不派项目角色。
       if (parsedFlowForGate !== undefined && flowRevisionForGate !== undefined) {
         await noteGovernanceCoordination(info.projectRoot, info.flowId, parsedFlowForGate, flowRevisionForGate, {
+          ...(deliveredNotifiedHash !== undefined ? { deliveredNotifiedHash } : {}),
+          diagnostic,
+        });
+        // 2026-10-24 P0-2：就绪步骤继续调度唤醒。读同一份 flow/revision + 账本已派发集合，只对
+        // Steward 可执行的 ready 投一条 `[自动推进]` 提示；不派发、不标 done、不写 flow/账本。
+        // 有 delivered 待核证时本轮不唤醒（delivered 核证优先；与 delivered 唤醒共享同一 revision 指纹）。
+        await wakeStewardForReadySteps({
+          projectRoot: info.projectRoot,
+          flowId: info.flowId,
+          flow: parsedFlowForGate,
+          revision: flowRevisionForGate,
+          ledgerEntries: ledger.entries,
+          listing,
           ...(deliveredNotifiedHash !== undefined ? { deliveredNotifiedHash } : {}),
           diagnostic,
         });
