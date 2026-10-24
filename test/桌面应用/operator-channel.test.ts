@@ -534,11 +534,11 @@ test("M-1 数据面：白话摘要只取命令首词（不编意图）；升级�
 test("审批档角色化（纯映射）：五内置治理角色显示其注册名；su/缺省保持 SU；项目角色不显示治理角色名", () => {
   const reason = "su-审批档[risky]：命中规则（ruleset:x）；批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界。";
   const builtInNames: [string, string][] = [
-    ["liaison", "Lead / 主理"],
-    ["rapporteur", "Draft / 提案"],
-    ["nominator", "Crew / 组队"],
-    ["convener", "Steward / 统筹"],
-    ["verifier", "Proof / 验收"],
+    ["liaison", "主理"],
+    ["rapporteur", "提案"],
+    ["nominator", "组队"],
+    ["convener", "统筹"],
+    ["verifier", "验收"],
   ];
   for (const [roleId, name] of builtInNames) {
     assert.equal(approvalRoleDisplayName(roleId), name, `${roleId} 的展示名来自内置注册表`);
@@ -570,7 +570,7 @@ test("审批档角色化（纯映射）：五内置治理角色显示其注册�
   );
   assert.equal(built.tier, "risky", "内部档位解析不变");
   assert.equal(built.policy, "su-approval", "内部策略名不变");
-  assert.ok(built.reasonPlain.startsWith("Proof / 验收 审批档：风险命令（risky）"), "verifier 数据面按实际角色显示");
+  assert.ok(built.reasonPlain.startsWith("验收 审批档：风险命令（risky）"), "verifier 数据面按实际角色显示");
   assert.equal(built.reasonPlain.includes("SU 审批档"), false, "verifier 数据面不再出现「SU 审批档」");
   assert.equal(built.reasonRaw, reason, "内部 su-审批档[tier] 前缀保留不改（解析兼容）");
   assert.equal(parseSuApprovalTier(built.reasonRaw), "risky", "内部前缀仍可解析");
@@ -585,7 +585,7 @@ test("审批档角色化（presenter 接线）：metadata.roleId=verifier ⇒ �
 
   const verifier = p.presenter.present(suPrompt, describeShellCommand(suPrompt), { roleId: "verifier", projectRoot: "/proj", runtime: "pi", signal });
   assert.equal(sent.length, 1, "卡片已推达");
-  assert.ok(sent[0].reasonPlain.startsWith("Proof / 验收 审批档：风险命令（risky）"), "verifier 卡片按实际角色显示");
+  assert.ok(sent[0].reasonPlain.startsWith("验收 审批档：风险命令（risky）"), "verifier 卡片按实际角色显示");
   assert.equal(sent[0].reasonPlain.includes("SU 审批档"), false, "verifier 卡片不再出现「SU 审批档」");
   assert.equal(sent[0].reasonRaw, reason, "折叠详情仍是内部原文（解析兼容）");
   assert.equal(sent[0].tier, "risky");
@@ -604,7 +604,7 @@ test("审批档角色化（presenter 接线）：metadata.roleId=verifier ⇒ �
   const project = p.presenter.present(projectPrompt, describeShellCommand(projectPrompt), { roleId: "X", projectRoot: "/proj", runtime: "pi", signal });
   assert.equal(sent[2].policy, "project");
   assert.equal(sent[2].tier, null);
-  for (const name of ["Lead / 主理", "Draft / 提案", "Crew / 组队", "Steward / 统筹", "Proof / 验收"]) {
+  for (const name of ["主理", "提案", "组队", "统筹", "验收"]) {
     assert.equal(sent[2].reasonPlain.includes(name), false, `项目角色卡片不显示治理角色名：${name}`);
   }
   assert.equal(sent[2].reasonPlain.includes("SU 审批档"), false);

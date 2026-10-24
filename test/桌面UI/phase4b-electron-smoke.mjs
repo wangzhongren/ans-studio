@@ -421,7 +421,7 @@ app.whenReady().then(async () => {
     const beforeResponses = calls.operatorResponses.length;
     check(
       "mirror card renders on liaison with badge/source and same id",
-      await js(`(()=>{const c=document.querySelector('#chat .chat-pane[data-role-id="liaison"] [data-request-id="smoke-mirror-1"]');return !!c&&c.classList.contains('is-mirror')&&c.dataset.surfaceRoleId==='liaison'&&c.querySelector('.op-mirror-badge').textContent==='镜像 · 主入口'&&c.querySelector('.op-gov-badge').textContent==='治理决定 · 客户最终批准'&&c.querySelector('.op-mirror-source').textContent.includes('来自 Draft / 提案')&&c.querySelectorAll('.op-actions button').length===2;})()`),
+      await js(`(()=>{const c=document.querySelector('#chat .chat-pane[data-role-id="liaison"] [data-request-id="smoke-mirror-1"]');return !!c&&c.classList.contains('is-mirror')&&c.dataset.surfaceRoleId==='liaison'&&c.querySelector('.op-mirror-badge').textContent==='镜像 · 主入口'&&c.querySelector('.op-gov-badge').textContent==='治理决定 · 客户最终批准'&&c.querySelector('.op-mirror-source').textContent.includes('来自 提案')&&c.querySelectorAll('.op-actions button').length===2;})()`),
     );
     await js(`document.querySelector('#chat .chat-pane[data-role-id="liaison"] [data-request-id="smoke-mirror-1"] .op-confirm').click()`);
     await sleep(120);

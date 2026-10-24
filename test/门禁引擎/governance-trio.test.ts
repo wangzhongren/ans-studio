@@ -141,7 +141,7 @@ test("注册表：五内置顺序 liaison→rapporteur→nominator→convener→
   );
   assert.deepEqual(
     BUILT_IN_GOVERNANCE_ROLES.map((s) => s.displayName),
-    ["Lead / 主理", "Draft / 提案", "Crew / 组队", "Steward / 统筹", "Proof / 验收"],
+    ["主理", "提案", "组队", "统筹", "验收"],
   );
   for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
     assert.equal(governanceRoleOf(spec.id)?.id, spec.id);
@@ -847,7 +847,7 @@ test("trio：listProject 不返回 su；resolveRole 五人返回内置卡文本�
   // ProjectRoleSummary.displayName：内置角色由注册表填入统一显示名；项目角色不填。
   assert.deepEqual(
     listing.roles.map((r) => r.displayName),
-    ["Lead / 主理", "Draft / 提案", "Crew / 组队", "Steward / 统筹", "Proof / 验收"],
+    ["主理", "提案", "组队", "统筹", "验收"],
   );
   assert.equal(listing.primaryRoleId, "liaison");
   assert.equal(listing.roles.some((r) => r.roleId === "su"), false, "trio 下 su 隐藏");
@@ -1254,8 +1254,9 @@ test("resolveGovernanceRole：single 只认 su；trio 缺省仍 rapporteur/propo
 
 // —————————————————————— 7) 2026-10-22 角色粒度/MapReduce（P1/P4/P5/P6/P10/P13） ——————————————————————
 
-test("2026-10-22 角色粒度/MapReduce：注册表 entries/预授权/禁写/能力位零变化（不扩张写权、不改 id/显示名）", () => {
-  // 本批只改 Convener/Crew/Verifier 卡文本（产品数据）；注册表写权、能力位、内部 id/显示名必须逐字不变。
+test("2026-10-22 角色粒度/MapReduce：注册表 entries/预授权/禁写/能力位零变化（不扩张写权、不改 id）", () => {
+  // 本批只改 Convener/Crew/Verifier 卡文本（产品数据）；注册表写权、能力位、内部 id 必须逐字不变；
+  // 显示名按 2026-10-24 客户要求改为纯中文（见下方断言）。
   const appOnly = [".ans/", "docs/bootstrap-manifest.md", "角色卡/governance-boundary.yaml"];
   const builtInDirs = [
     "角色卡/liaison/",
@@ -1341,8 +1342,8 @@ test("2026-10-22 角色粒度/MapReduce：注册表 entries/预授权/禁写/能
   );
   assert.deepEqual(
     BUILT_IN_GOVERNANCE_ROLES.map((s) => s.displayName),
-    ["Lead / 主理", "Draft / 提案", "Crew / 组队", "Steward / 统筹", "Proof / 验收"],
-    "显示名不得变化",
+    ["主理", "提案", "组队", "统筹", "验收"],
+    "显示名按 2026-10-24 客户要求改为纯中文（去掉英文别名）",
   );
   assert.deepEqual(
     BUILT_IN_GOVERNANCE_ROLES.map((s) => s.function),

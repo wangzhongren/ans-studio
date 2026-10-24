@@ -2105,7 +2105,7 @@ test("治理自动推进：接受提案 → 后台派发提名任务给 Nominato
   // 成功系统行落**当前**聊天流（Rapporteur），措辞按客户要求。
   const notes = events.filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note");
   assert.equal(notes.length, 1);
-  assert.equal(notes[0].event.summary, "已派发提名任务给 Crew / 组队（工作中）");
+  assert.equal(notes[0].event.summary, "已派发提名任务给组队（工作中）");
   await iface.stopSession();
 });
 
@@ -2181,8 +2181,8 @@ test("治理自动推进（真机修正）：accept 先派 Convener 写流程状
     assert.equal(sendsByRole.get("nominator")?.length ?? 0, 0, "流程状态 YAML 落盘前绝不派 Nominator");
     assert.deepEqual(sendsByRole.get("convener"), [
       "流程 flow-a：客户已接受提案 docs/proposals/flow-a-v1.md。" +
-        "请先写流程状态 YAML docs/flows/flow-a.yaml（唯一机器状态，字段/枚举按门禁卡的流程 YAML schema；首个步骤为提名：由 Crew / 组队 读取提案并给出候选角色）。" +
-        "同名 .md 仅可选人读视图，不得承载门禁状态。写完后本轮即可结束；提名任务会在流程状态 YAML 落盘后由应用派给 Crew / 组队。不要把步骤说成已派发。",
+        "请先写流程状态 YAML docs/flows/flow-a.yaml（唯一机器状态，字段/枚举按门禁卡的流程 YAML schema；首个步骤为提名：由组队读取提案并给出候选角色）。" +
+        "同名 .md 仅可选人读视图，不得承载门禁状态。写完后本轮即可结束；提名任务会在流程状态 YAML 落盘后由应用派给组队。不要把步骤说成已派发。",
     ], "第一段任务明确要求先写流程状态 YAML、首步提名");
 
     settleConvener!();
@@ -2201,8 +2201,8 @@ test("治理自动推进（真机修正）：accept 先派 Convener 写流程状
       // （2026-10-19 阻塞可见性，落 Lead）。本断言只钉治理推进链的系统行，不把该独立系统行混进来（其内容另测）。
       .filter((summary) => !summary.startsWith("自动验收未派发"));
     assert.deepEqual(notes, [
-      "已派发流程任务给 Steward / 统筹（工作中）",
-      "流程状态 YAML 已落盘，已派发提名任务给 Crew / 组队（工作中）",
+      "已派发流程任务给统筹（工作中）",
+      "流程状态 YAML 已落盘，已派发提名任务给组队（工作中）",
     ]);
     await iface.stopSession();
   } finally {
@@ -2338,8 +2338,8 @@ test("2026-10-20 flow 工具推进（真机修正）：YAML 已存在且提名�
     const notes = events
       .filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note")
       .map((e) => e.event.summary);
-    assert.ok(notes.includes("提名已完成，未重复派发；已请 Steward / 统筹 继续下一步"), "系统行说明提名已完成、未重复派发");
-    assert.ok(!notes.some((summary) => summary.includes("已派发提名任务给 Crew / 组队")), "不刷「已派发提名任务」的系统行");
+    assert.ok(notes.includes("提名已完成，未重复派发；已请统筹继续下一步"), "系统行说明提名已完成、未重复派发");
+    assert.ok(!notes.some((summary) => summary.includes("已派发提名任务给组队")), "不刷「已派发提名任务」的系统行");
     await iface.stopSession();
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -2395,7 +2395,7 @@ test("治理自动推进（真机修正）：Convener 未写流程状态 YAML �
       .filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note")
       .map((e) => e.event.summary);
     assert.equal(notes.length, 2);
-    assert.match(notes[1] ?? "", /自动推进停住：Steward \/ 统筹 未写出流程状态 YAML/);
+    assert.match(notes[1] ?? "", /自动推进停住：统筹未写出流程状态 YAML/);
     // 不循环：再等一拍，Convener 不再收到第二条任务。
     await new Promise((resolve) => setTimeout(resolve, 150));
     assert.equal(sendsByRole.get("convener")?.length, 1, "不重试、不循环派发");
@@ -2659,11 +2659,11 @@ test("任命→Crew 写卡主路径（2026-10-22 第 1 项）：只派 Crew 写�
     const sourceNotes = events
       .filter((e) => e.roleId === "convener" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note")
       .map((e) => e.event.summary);
-    assert.ok(sourceNotes.includes("已派发写卡任务给 Crew / 组队（工作中）"), "写卡派发系统行");
+    assert.ok(sourceNotes.includes("已派发写卡任务给组队（工作中）"), "写卡派发系统行");
     const leadNotes = events
       .filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note")
       .map((e) => e.event.summary);
-    assert.ok(leadNotes.includes("写卡结构校验通过，已派发角色就绪复核给 Steward / 统筹（工作中）"), "readiness 派发系统行（Lead 可见）");
+    assert.ok(leadNotes.includes("写卡结构校验通过，已派发角色就绪复核给统筹（工作中）"), "readiness 派发系统行（Lead 可见）");
     const ledger = await readGovernanceLedger(root);
     const dispatches = ledger.entries.filter((entry) => entry.kind === "dispatch.accepted" && entry.flowId === "flow-e");
     assert.ok(dispatches.some((entry) => entry.targetRoleId === "nominator" && entry.stepId === "role-cards"), "账本写卡派发 stepId=role-cards");
@@ -2824,8 +2824,8 @@ test("链式推进（真机 5ms 误报）：派发后会话立即释放、YAML �
     assert.deepEqual(openRoles, ["convener", "nominator"], "YAML 落盘后继续派 Nominator（会话释放不判死）");
     assert.equal(sendsByRole.get("nominator")?.length, 1, "提名任务恰一次");
     assert.deepEqual(advanceChainNotes(events, "rapporteur"), [
-      "已派发流程任务给 Steward / 统筹（工作中）",
-      "流程状态 YAML 已落盘，已派发提名任务给 Crew / 组队（工作中）",
+      "已派发流程任务给统筹（工作中）",
+      "流程状态 YAML 已落盘，已派发提名任务给组队（工作中）",
     ], "无「自动推进停住」假错误");
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -2878,7 +2878,7 @@ test("链式推进：一直不落盘 ⇒ 到时限如实失败一次、不派 No
     assert.ok(!openRoles.includes("nominator"), "YAML 未落盘绝不派 Nominator");
     const notes = advanceChainNotes(events, "rapporteur");
     assert.equal(notes.length, 2, "成功一行 + 失败恰一行");
-    assert.match(notes[1] ?? "", /自动推进停住：Steward \/ 统筹 未写出流程状态 YAML/);
+    assert.match(notes[1] ?? "", /自动推进停住：统筹未写出流程状态 YAML/);
     await new Promise((resolve) => setTimeout(resolve, 120));
     assert.equal(advanceChainNotes(events, "rapporteur").length, 2, "失败系统行不刷屏");
     assert.equal(sendsByRole.get("convener")?.length, 1, "不重试、不循环派发");
@@ -2923,7 +2923,7 @@ test("链式推进：Convener 回合一直在跑（busy）到时限仍无 YAML �
     assert.match(result.error ?? "", /本轮未在时限内结束，流程状态 YAML docs\/flows\/flow-a\.yaml 未确认/);
     const notes = advanceChainNotes(events, "rapporteur");
     assert.equal(notes.length, 2);
-    assert.match(notes[1] ?? "", /自动推进停住：Steward \/ 统筹 本轮未在时限内结束/);
+    assert.match(notes[1] ?? "", /自动推进停住：统筹本轮未在时限内结束/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -2988,8 +2988,8 @@ test("链式推进：回合结束后轮询继续等（看护中止/下一投递�
     assert.deepEqual(openRoles, ["convener", "nominator"]);
     assert.equal(sendsByRole.get("nominator")?.length, 1);
     assert.deepEqual(advanceChainNotes(events, "rapporteur"), [
-      "已派发流程任务给 Steward / 统筹（工作中）",
-      "流程状态 YAML 已落盘，已派发提名任务给 Crew / 组队（工作中）",
+      "已派发流程任务给统筹（工作中）",
+      "流程状态 YAML 已落盘，已派发提名任务给组队（工作中）",
     ], "中止后恢复：只有成功行，无失败/重复系统行");
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -3054,9 +3054,9 @@ test("任命→Crew 写卡（会话立即释放）：写卡任务不判死；角
     assert.match(sendsByRole.get("convener")![0]!, /role-readiness/);
     // 无「本轮未在时限内结束」假错误；写卡成功行 + readiness 行如实（readiness 系统行落 Lead 主入口）。
     const sourceNotes = advanceChainNotes(events, "convener");
-    assert.ok(sourceNotes.includes("已派发写卡任务给 Crew / 组队（工作中）"));
+    assert.ok(sourceNotes.includes("已派发写卡任务给组队（工作中）"));
     const leadNotes = deliveryNotes(events, "rapporteur");
-    assert.ok(leadNotes.includes("写卡结构校验通过，已派发角色就绪复核给 Steward / 统筹（工作中）"));
+    assert.ok(leadNotes.includes("写卡结构校验通过，已派发角色就绪复核给统筹（工作中）"));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -3223,13 +3223,13 @@ test("收尾推进：回交送达 Convener 且流程全部完成 ⇒ 派 Proof /
     assert.match(verifierSends[0] ?? "", /不要自行验收或代替客户决定/);
     // 系统行在投递成功的同一异步链里 emit；CI 负载下仍可能晚于 send 可见一拍——有界等待，不改文案断言。
     await waitForTest(
-      () => deliveryNoteSummaries(scenario.events, scenario.primaryRoleId).some((note) => /已自动派发验收复核给 Proof（工作中）/.test(note)),
+      () => deliveryNoteSummaries(scenario.events, scenario.primaryRoleId).some((note) => /已自动派发验收复核给验收（工作中）/.test(note)),
       2000,
     );
     const notes = deliveryNoteSummaries(scenario.events, scenario.primaryRoleId);
     // 2026-10-19 客户反馈：验收复核是标准流程——系统行须说明「自动派发」且不冒充客户批准。
     // 2026-10-19 客户决定：自动验收门反馈统一发给 Lead（主入口 primaryRoleId），不再发 Convener。
-    assert.ok(notes.some((note) => /已自动派发验收复核给 Proof（工作中）/.test(note)), "Lead 系统行如实告知已自动派发");
+    assert.ok(notes.some((note) => /已自动派发验收复核给验收（工作中）/.test(note)), "Lead 系统行如实告知已自动派发");
     // 2026-10-19 客户决定：自动验收门反馈统一发给 Lead（主入口 primaryRoleId），不再发 Convener。
     // 该场景中 Convener 仍会收到回交/派发类系统行；这里只钉「自动验收反馈」不落 Convener。
     const acceptanceNoteOnConvener = deliveryNoteSummaries(scenario.events, "convener")
@@ -3329,7 +3329,7 @@ test("治理自动推进失败：目标角色缺失/发送失败 → 如实错�
   });
   assert.equal(missing.ok, false);
   assert.equal(missing.dispatched, false);
-  assert.match(missing.error ?? "", /Crew \/ 组队/);
+  assert.match(missing.error ?? "", /组队/);
   const failureNotes = events.filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note");
   assert.equal(failureNotes.length, 1, "失败如实落一行系统行");
   assert.match(failureNotes[0].event.summary ?? "", /自动推进失败/);
@@ -3367,7 +3367,7 @@ test("治理自动推进失败：目标角色缺失/发送失败 → 如实错�
     context: { sourceRoleId: "rapporteur", projectRoot: "/proj", runtime: "demo" },
   });
   assert.equal(sendFailed.ok, false);
-  assert.match(sendFailed.error ?? "", /发送任务给 Crew \/ 组队 失败/);
+  assert.match(sendFailed.error ?? "", /发送任务给 组队 失败/);
   const notes2 = events2.filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note");
   assert.equal(notes2.length, 1);
   assert.match(notes2[0].event.summary ?? "", /自动推进失败/);
@@ -4386,7 +4386,7 @@ test("写卡后推进：appointment-write answered 后 listing 出现目标角�
     const notes = made.events
       .filter((envelope) => envelope.roleId === "rapporteur" && envelope.event.kind === "message" && (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note")
       .map((envelope) => envelope.event.summary);
-    assert.ok(notes.includes("已派发流程任务给 Steward / 统筹（工作中）"), "Lead 看到自动推进系统行");
+    assert.ok(notes.includes("已派发流程任务给统筹（工作中）"), "Lead 看到自动推进系统行");
 
     // 去重：重复 appointment-write 触发 + 治理角色 settle 都不重派。
     await made.iface.advanceGovernanceFlow({
@@ -4447,7 +4447,7 @@ test("2026-10-20 写卡产物门控：重试耗尽仍缺文件 ⇒ 反馈 Crew �
       assert.equal(notes.length, 1, "Lead 恰一条系统行（写卡产物未通过校验）");
       assert.equal(notes[0].roleId, "rapporteur", "系统行落 Lead（主入口）");
       assert.match(notes[0].event.summary ?? "", /写卡产物未通过校验/);
-      assert.match(notes[0].event.summary ?? "", /未派 Steward/);
+      assert.match(notes[0].event.summary ?? "", /未派统筹/);
 
       // 重复 settle + 再次 appointment-write answered：同 flow+问题哈希不重复反馈、仍不派 Convener。
       harness.settles.get("nominator")?.();
@@ -4764,8 +4764,8 @@ test("2026-10-22 写卡校验分流：Crew 文件问题反馈 Crew；团队计�
         .map((e) => e.event.summary)
         .find((summary) => summary.includes("写卡产物未通过校验"));
       assert.ok(leadNote !== undefined, "Lead 可见");
-      assert.match(leadNote!, /Crew \/ 组队 修正/);
-      assert.match(leadNote!, /Steward \/ 统筹 补充计划/);
+      assert.match(leadNote!, /组队修正/);
+      assert.match(leadNote!, /统筹补充计划/);
     } finally {
       await harness.iface.stopSession();
     }
@@ -5012,7 +5012,7 @@ test("2026-10-22 V12：new 角色计划写集未被 boundary 覆盖 ⇒ 退回 C
       await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) > 0, 5000);
       const feedback = harness.sendsByRole.get("nominator")![0]!;
       assert.match(feedback, /计划写集「src\/other\/」未被 boundary\.yaml entries 覆盖/, "V12 指出未覆盖的计划写集");
-      assert.match(feedback, /报告 Convener 修正计划/, "Crew 文案给出计划有误时的回归路径");
+      assert.match(feedback, /报告统筹修正计划/, "Crew 文案给出计划有误时的回归路径");
       assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "不派 readiness");
       assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "不写 readiness 派发账本");
     } finally {
@@ -5300,7 +5300,7 @@ test("2026-10-23 V12 v3：new 角色授权目录未被 boundary 覆盖 ⇒ 退�
       const feedback = harness.sendsByRole.get("nominator")![0]!;
       assert.match(feedback, /计划授权目录「src\/module-a\/」未被 boundary\.yaml entries 覆盖/, "V12 指出未覆盖的计划授权目录");
       assert.match(feedback, /计划授权目录「src\/module-a\/tests\/」未被 boundary\.yaml entries 覆盖/, "嵌套计划目录同样需要目录条目覆盖");
-      assert.match(feedback, /报告 Convener 修正计划/, "Crew 文案给出计划有误时的回归路径");
+      assert.match(feedback, /报告统筹修正计划/, "Crew 文案给出计划有误时的回归路径");
       assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "V12 失败不派 readiness");
       assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "不写 readiness 派发账本");
     } finally {
@@ -6486,7 +6486,7 @@ test("2026-10-23 readiness 文案兼容：未传新选项时 v1/v2/v3 逐字不�
     });
     assert.ok(extended.startsWith(base), "传入新选项只追加、不改写既有文案");
     assert.match(extended, /应用已在结构校验通过后把 role-cards 标为 done/);
-    assert.match(extended, /只推进 role-readiness，不要重写角色卡、不要重新派 Crew/);
+    assert.match(extended, /只推进 role-readiness，不要重写角色卡、不要重新派组队/);
     assert.match(extended, /role-readiness 已 done：不要重做角色就绪复核，核对既有记录与证据后继续推进后续步骤/);
   }
 });
@@ -6729,7 +6729,7 @@ test("i18n B3：主进程生成点按当前 locale 取词（en-US）；切回 zh
     );
     assert.equal(
       governanceAcceptanceAdvanceNote("f"),
-      "流程 f 步骤已全部完成，已自动派发验收复核给 Proof（工作中）",
+      "流程 f 步骤已全部完成，已自动派发验收复核给验收（工作中）",
     );
     assert.equal(mainT("main.session.releaseNoSession", { roleId: "A" }), "角色 A 没有打开的会话。");
     assert.equal(
@@ -6748,13 +6748,13 @@ test("i18n B3：主进程生成点按当前 locale 取词（en-US）；切回 zh
       mainT("main.watchdog.signalSummary", { signal: "命令超时", roleId: "A" }),
       "系统·看护 · 命令超时 · 角色 A",
     );
-    assert.equal(mainT("main.session.dispatchModelNote"), "（trio：Steward（统筹）或主理 Lead）");
+    assert.equal(mainT("main.session.dispatchModelNote"), "（trio：统筹或主理）");
     assert.equal(
       mainT("main.interface.teamPlanMissingBoundHint", { plan: "docs/scheduling/f-team-v1.md" }),
       "（账本 appointment 绑定 docs/scheduling/f-team-v1.md）",
     );
-    assert.equal(mainT("ui.role.governance.crew.name"), "Crew / 组队");
-    assert.equal(mainT("ui.role.governance.steward.name"), "Steward / 统筹");
+    assert.equal(mainT("ui.role.governance.crew.name"), "组队");
+    assert.equal(mainT("ui.role.governance.steward.name"), "统筹");
     const unknownImageZh = validateImage("", 10);
     assert.equal(unknownImageZh.ok, false);
     if (!unknownImageZh.ok) assert.match(unknownImageZh.error, /^图片类型不支持：（未知）——只支持 /);
@@ -6945,7 +6945,7 @@ test("2026-10-24 治理协调唤醒：阻塞阶段→Lead；同 revision/阶段�
       assert.match(first, /阶段：存在 failed \/ blocked \/ aborted 步骤/, "阻塞阶段被识别");
       assert.match(first, /impl 当前状态 failed/, "带具体步骤事实");
       assert.match(first, /协调不是客户批准/, "协调 ≠ 客户批准");
-      assert.match(first, /不要直接派 Crew \/ Proof \/ 项目 worker/, "不越权");
+      assert.match(first, /不要直接派组队 \/ 验收 \/ 项目 worker/, "不越权");
       assert.equal((sendsByRole.get("verifier") ?? []).length, 0, "协调唤醒不派 Proof");
       assert.equal((sendsByRole.get("convener") ?? []).length, 0, "协调唤醒不派 Steward");
 
@@ -7420,7 +7420,7 @@ test("2026-10-24 P0-1 发布门（Interface）：非发布不派 Proof/不写标
       assert.match(sendsByRole.get("verifier")![0]!, /请汇总证据并出验收卡/);
       assert.equal((await readGovernanceLedger(root)).entries.filter((entry) => entry.kind === "dispatch.accepted" && entry.targetRoleId === "verifier").length, 1, "发布流程写 verifier 派发账本");
       await waitForTest(
-        () => deliveryNoteSummaries(events, "rapporteur").some((note) => /已自动派发验收复核给 Proof/.test(note)),
+        () => deliveryNoteSummaries(events, "rapporteur").some((note) => /已自动派发验收复核给验收/.test(note)),
         4000,
       );
     } finally {

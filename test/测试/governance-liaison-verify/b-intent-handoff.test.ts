@@ -608,7 +608,7 @@ test("桌面交接闭环：后台开 Rapporteur + 恰一条任务；不切换 pa
     // 2026-10-18 五角色收口：内部角色 settle 改投 `[系统·治理反馈]` 汇总任务（不是原文 delivery-note）；
     // 因此 Liaison 流里的 delivery-note 只剩交接成功这一条。
     assert.equal(notes.length, 1, `成功系统行恰一条，落 Lead 聊天流（实得：${notes.map((envelope) => envelope.event.summary ?? "").join(" | ")}）`);
-    assert.equal(notes[0]?.event.summary, "已交给 Draft（提案）（工作中）");
+    assert.equal(notes[0]?.event.summary, "已交给提案（工作中）");
     // 当前 pane 仍可对 Liaison 发言（投递可能异步入队，轮询到真实 prompt 发生）。
     if (manager.openForRoleId() !== "liaison") {
       const reopened = await manager.open({ projectRoot: root, roleId: "liaison", runtime: "demo" });
@@ -654,7 +654,7 @@ test("桌面交接失败：只落失败系统行、无成功账本、不循环�
         (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
     );
     assert.equal(notes.length, 1, "失败恰一条系统行（不循环重试）");
-    assert.match(notes[0]?.event.summary ?? "", /应用无法把意图交给 Draft（提案）：.*；未重试/);
+    assert.match(notes[0]?.event.summary ?? "", /应用无法把意图交给提案：.*；未重试/);
     await manager.stop(null);
   } finally {
     cleanup();

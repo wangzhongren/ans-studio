@@ -150,15 +150,15 @@ export const zhCN = {
   "ui.role.group.governance": "治理职能（内置）",
   "ui.role.group.default": "工作角色",
   "ui.role.governance.builtinNote": "内置角色：随应用发布，无角色目录",
-  "ui.role.governance.liaison.name": "主理 / Lead",
+  "ui.role.governance.liaison.name": "主理",
   "ui.role.governance.liaison.power": "客户沟通 · 不拥有最终批准权",
-  "ui.role.governance.draft.name": "Draft / 提案",
+  "ui.role.governance.draft.name": "提案",
   "ui.role.governance.draft.power": "提案权 · 不拥有最终批准权",
-  "ui.role.governance.crew.name": "Crew / 组队",
+  "ui.role.governance.crew.name": "组队",
   "ui.role.governance.crew.power": "写卡权（客户任命后） · 不拥有最终批准权",
-  "ui.role.governance.steward.name": "Steward / 统筹",
+  "ui.role.governance.steward.name": "统筹",
   "ui.role.governance.steward.power": "排期权 · 不拥有最终批准权",
-  "ui.role.governance.verifier.name": "验收 / Proof",
+  "ui.role.governance.verifier.name": "验收",
   "ui.role.governance.verifier.power": "验收权 · 不拥有最终批准权",
 
   // ---- 侧栏（shell/Sidebar.tsx）----
@@ -406,9 +406,9 @@ export const zhCN = {
   "ui.governance.establishHint":
     "与 {roleName} 对话前，请先建立治理记录；也可在终端运行 ans govern <项目目录>。",
   "ui.governance.roleIntro.liaison":
-    "客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给提案 Draft 形成提案。我不写提案、不批准。本版起默认入口为主理 Lead；提案 Draft 与历史提案不变。",
+    "客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给提案角色形成提案。我不写提案、不批准。本版起默认入口为主理；提案角色与历史提案不变。",
   "ui.governance.roleIntro.proposal":
-    "通常由主理 Lead 交接打开；客户也可以直接找我。我只写提案，不批准。",
+    "通常由主理交接打开；客户也可以直接找我。我只写提案，不批准。",
   "ui.governance.roleIntro.nomination": "客户任命后打开写卡；只按团队计划与任命名单写角色卡与边界，不选择角色、不批准。",
   "ui.governance.roleIntro.schedule": "通常由已接受提案开启流程；只负责排步骤与派发，不批准方案",
   "ui.governance.roleIntro.verification":
@@ -808,11 +808,11 @@ export const zhCN = {
   "ui.judge.mode.approval": "代审批",
   "ui.judge.mode.decision": "代决策",
   "ui.judge.titleWithRole": "命令审批 · {roleName}",
-  // judge shell 确认标题的内置治理角色名：顺序按现源码（英文在前）。
+  // judge shell 确认标题的内置治理角色名（2026-10-24 起 zh-CN 为纯中文角色名）。
   // draft / crew / steward 与 `ui.role.governance.*.name` 逐字相同，复用这 3 个 key；
-  // liaison / verifier 的现源码顺序与目录相反，单列 judge key（不改 roleId/GovernanceFunction）。
-  "ui.judge.roleName.liaison": "Lead / 主理",
-  "ui.judge.roleName.verifier": "Proof / 验收",
+  // liaison / verifier 单列 judge key（不改 roleId/GovernanceFunction）。
+  "ui.judge.roleName.liaison": "主理",
+  "ui.judge.roleName.verifier": "验收",
   "ui.judge.titleSu": "SU 命令审批",
   "ui.judge.titleShell": "shell 命令请求",
   "ui.judge.tier.risky": "风险命令（risky）",
@@ -920,18 +920,18 @@ export const zhCN = {
     "该角色已安装技能已变更（{changed}），已作废旧会话，按新技能登记重开；上下文恢复结果以引擎实际返回为准。",
   "main.session.rebuildChangedRuntimeConfig": "运行时配置",
   "main.session.rebuildFailed": "按新边界重开会话失败：{detail}（请重试或点击左侧角色）。",
-  "main.session.intentHandoffFailed": "应用无法把意图交给 Draft（提案）：{detail}；未重试",
-  "main.session.openProposalFailed": "无法开启 Draft（提案）会话（{detail}）",
-  "main.session.sendProposalFailed": "发送任务给 Draft（提案）失败（{detail}）",
-  "main.session.proposalQueued": "Draft（提案）工作中，已排队",
-  "main.session.proposalWorking": "已交给 Draft（提案）（工作中）",
+  "main.session.intentHandoffFailed": "应用无法把意图交给提案：{detail}；未重试",
+  "main.session.openProposalFailed": "无法开启提案会话（{detail}）",
+  "main.session.sendProposalFailed": "发送任务给提案失败（{detail}）",
+  "main.session.proposalQueued": "提案工作中，已排队",
+  "main.session.proposalWorking": "已交给提案（工作中）",
   "main.session.intentHandedOff":
-    "已把意图「{intentId}」交给 Draft（提案）（handoffKind={handoffKind}）——交接 ≠ 客户批准。",
+    "已把意图「{intentId}」交给提案（handoffKind={handoffKind}）——交接 ≠ 客户批准。",
   "main.session.clarificationEmpty": "澄清问题不能为空；未提交。",
   "main.session.clarificationDisplayFailed": "无法在主入口显示澄清请求；未提交。",
   "main.session.clarificationShown":
-    "已在主入口（{roleId}）显示；客户回答后由 Lead（主理）更新意图并交接。",
-  "main.session.clarificationDelivery": "Draft（提案）需要澄清：{question}",
+    "已在主入口（{roleId}）显示；客户回答后由主理更新意图并交接。",
+  "main.session.clarificationDelivery": "提案需要澄清：{question}",
   "main.session.missingProjectOrRole": "缺少项目根或角色 id。",
   "main.session.readyContinue": "会话已就绪，续接当前会话。",
   "main.session.closedClickRole": "会话已关闭，请重新点击角色。",
@@ -969,9 +969,9 @@ export const zhCN = {
   "main.session.handbackException": "回交处理异常已拦截（不产生未捕获拒绝）：{detail}",
   "main.session.dispatchRejectedEmpty": "派发未受理：roleId 与 task 都必须非空。",
   "main.session.dispatchNoDispatcher":
-    "派发未受理：未枚举到本项目治理模型下的派发主人（trio=Steward（统筹） / single=主入口）——**未投递**。",
+    "派发未受理：未枚举到本项目治理模型下的派发主人（trio=统筹 / single=主入口）——**未投递**。",
   "main.session.dispatchNoDispatcherShort": "派发未受理：未枚举到派发主人——**未投递**（不静默）。",
-  "main.session.dispatchModelNote": "（trio：Steward（统筹）或主理 Lead）",
+  "main.session.dispatchModelNote": "（trio：统筹或主理）",
   "main.session.dispatchWrongSource":
     "派发未受理：来源角色 {from} 不是本项目派发主人 {dispatcher}{modelNote}。",
   "main.session.dispatchWrongSourceShort":
@@ -994,7 +994,7 @@ export const zhCN = {
   "main.session.dispatchSummary": "派发 · 来自 {from}：{text}",
   "main.session.sessionWillAutoOpen": "（其会话未开——将自动开启）",
   "main.session.acceptedCoordinate":
-    "已受理：协调消息将投递给 {to}{openNote}（来源 {from} → Steward；协调 ≠ 客户批准，不解除任何派发/验收门禁；受理≠已完成）。",
+    "已受理：协调消息将投递给 {to}{openNote}（来源 {from} → 统筹；协调 ≠ 客户批准，不解除任何派发/验收门禁；受理≠已完成）。",
   "main.session.acceptedTask":
     "已受理：任务将投递给角色 {to} 的会话{openNote}；投递结果/失败会在其聊天流与 {from} 的聊天流如实显示（受理≠已完成）。",
   "main.session.recoveryNoMatch": "未找到匹配的会话（请指定项目与运行时）。",
@@ -1132,29 +1132,29 @@ export const zhCN = {
   "main.interface.teamPlanNoRecommended":
     "团队计划缺少唯一的机器可读推荐集（recommended 内联数组或「推荐：」行；空集/重复/歧义不接受）",
   "main.interface.verifierFinished":
-    "Proof / 验收复核已结束（flowId={flowId}）；报告见 {report}（附件见 docs/verification/）与 {governance}；验收卡/客户决定由应用继续（本行不构成验收结论或客户批准）。",
+    "验收复核已结束（flowId={flowId}）；报告见 {report}（附件见 docs/verification/）与 {governance}；验收卡/客户决定由应用继续（本行不构成验收结论或客户批准）。",
   "main.interface.acceptanceCloseFailed":
-    "验收已通过但流程收口失败（流程 {flowId}）：{detail}；未派 verifier，流程保持待收口（请核对 flow YAML）。",
+    "验收已通过但流程收口失败（流程 {flowId}）：{detail}；未派验收，流程保持待收口（请核对 flow YAML）。",
   "main.interface.acceptanceClosed":
     "验收已通过（判断代批或客户手批，以账本 customer.decision 为准），流程 {flowId} 已收口（保留验收步骤已标 done）。",
-  "main.interface.deliveredStepsHeader": "流程 {flowId}：以下步骤已 delivered，等待 Steward / 统筹 核证：",
+  "main.interface.deliveredStepsHeader": "流程 {flowId}：以下步骤已 delivered，等待统筹核证：",
   "main.interface.deliveredStepLine":
     "- 步骤 {stepId} 已 delivered（owner={owner}），请核对账本/产物证据，用 flow_step_update 标 done 或退回修正；不要直接写 flow YAML。",
   "main.interface.deliveredVerificationNote":
     "核证要求：先核对账本与产物证据再更新步骤状态；未达 done 条件请退回修正；不要直接 write_file 流程 YAML。",
   "main.interface.deliveredWaitNote":
-    "流程 {flowId}：步骤 {steps} 已 delivered，等待 Steward / 统筹 核证（已投核证任务）。",
+    "流程 {flowId}：步骤 {steps} 已 delivered，等待统筹核证（已投核证任务）。",
   "main.interface.criteriaMissing": "实施前验收标准缺失或为空（{path}）；未派验收判定",
   "main.interface.changePackageMissing": "变更包缺失（{path}）；未派验收判定",
   "main.interface.changePackageNoRisk": "变更包缺少 riskTier（T0–T3）：{path}；未派验收判定",
   "main.interface.flowValidationFailed": "流程状态 YAML 校验失败：{detail}",
-  "main.interface.advanceOpenFailed": "收尾推进失败：无法开启 Proof / 验收 会话：{detail}；未自动重试。",
-  "main.interface.advanceSendFailed": "收尾推进失败：发送验收任务给 Proof / 验收 失败：{detail}；未自动重试。",
+  "main.interface.advanceOpenFailed": "收尾推进失败：无法开启验收会话：{detail}；未自动重试。",
+  "main.interface.advanceSendFailed": "收尾推进失败：发送验收任务给验收失败：{detail}；未自动重试。",
   "main.interface.piBusy": "Pi 的旧轮次仍在执行，新配置将在其结束后应用。消息可继续排队。",
   "main.interface.readFileNotFound": "文件不存在",
   "main.interface.readFileFailed": "读取失败：{detail}",
   "main.interface.teamPlanMissingUnreadable":
-    "团队计划缺失或不可读（账本 appointment 已绑定该计划）；请 Steward / 统筹 重新写出计划后再校验",
+    "团队计划缺失或不可读（账本 appointment 已绑定该计划）；请统筹重新写出计划后再校验",
   "main.interface.teamPlanMissingLegacy": "团队计划缺失：按 legacy 流程只做最低结构检查（建议迁移 team-plan / role-cards 流程）",
   "main.interface.teamPlanRoleMissing": "团队计划缺少推荐/任命角色 {roleId} 的角色行",
   "main.interface.teamPlanRoleTypeInvalid":
@@ -1174,23 +1174,23 @@ export const zhCN = {
   "main.interface.boundaryOnlyRootDocs":
     "entries 仅含角色根工作文档条目，未见团队计划的实际写集条目（请核对计划写集）",
   "main.interface.directorySpecMissing":
-    "团队计划角色 {roleId} 的授权目录「{path}」缺少目录规范行（计划问题：请 Convener 补齐目录规范）",
+    "团队计划角色 {roleId} 的授权目录「{path}」缺少目录规范行（计划问题：请统筹补齐目录规范）",
   "main.interface.moduleImplMissing":
-    "团队计划模块「{module}」缺少实现目录，无法核对边界更宽部分（计划问题：请 Convener 补充实现目录）",
+    "团队计划模块「{module}」缺少实现目录，无法核对边界更宽部分（计划问题：请统筹补充实现目录）",
   "main.interface.authorizedDirNotCoveredExisting":
     "计划授权目录「{path}」未被 boundary.yaml entries 覆盖（existing：仅提醒，不阻塞；迁移提示：下次实质变更时补齐目录条目）",
   "main.interface.authorizedDirNotCovered":
-    "计划授权目录「{path}」未被 boundary.yaml entries 覆盖（Crew：按团队计划把该目录加入 Section 1；若计划目录本身有误，报告 Convener 修正计划）",
+    "计划授权目录「{path}」未被 boundary.yaml entries 覆盖（组队：按团队计划把该目录加入 Section 1；若计划目录本身有误，报告统筹修正计划）",
   "main.interface.precisePathNotCoveredExisting":
     "计划精确写集「{path}」未被 boundary.yaml entries 覆盖（existing：仅提醒，不阻塞；迁移提示：下次实质变更时补齐）",
   "main.interface.precisePathNotCovered":
-    "计划精确写集「{path}」未被 boundary.yaml entries 覆盖（Crew：按团队计划把该文件加入 Section 1；若计划本身有误，报告 Convener 修正计划）",
+    "计划精确写集「{path}」未被 boundary.yaml entries 覆盖（组队：按团队计划把该文件加入 Section 1；若计划本身有误，报告统筹修正计划）",
   "main.interface.boundaryDirWider":
-    "boundary.yaml 目录条目「{path}」{wider}（new 角色边界目录必须与计划授权目录一致，不得更宽/更窄；Crew 收窄边界或报告 Convener 修正计划）",
+    "boundary.yaml 目录条目「{path}」{wider}（new 角色边界目录必须与计划授权目录一致，不得更宽/更窄；组队收窄边界或报告统筹修正计划）",
   "main.interface.boundaryDirWiderWord": "比计划授权目录更宽",
   "main.interface.boundaryDirNotInPlan": "不在计划授权目录集合中",
   "main.interface.boundaryMissingAuthorizedDir":
-    "boundary.yaml 缺少计划授权目录「{path}」的目录条目（new 角色边界目录必须与计划授权目录一致，不得更宽/更窄；Crew 补齐目录条目）",
+    "boundary.yaml 缺少计划授权目录「{path}」的目录条目（new 角色边界目录必须与计划授权目录一致，不得更宽/更窄；组队补齐目录条目）",
   "main.interface.boundaryDirWiderExisting":
     "boundary.yaml 目录条目「{path}」比计划授权目录宽（existing：仅提醒，不阻塞；迁移提示：下次实质变更时按 v3 收窄/迁移{extra}）",
   "main.interface.boundaryDirWiderExistingExtra":
@@ -1202,7 +1202,7 @@ export const zhCN = {
   "main.interface.writesetNotCoveredExisting":
     "计划写集「{path}」未被 boundary.yaml entries 覆盖（existing：仅提醒，不阻塞；下次实质变更时补齐）",
   "main.interface.writesetNotCovered":
-    "计划写集「{path}」未被 boundary.yaml entries 覆盖（Crew：按团队计划把该路径加入 Section 1；若计划写集本身有误，报告 Convener 修正计划）",
+    "计划写集「{path}」未被 boundary.yaml entries 覆盖（组队：按团队计划把该路径加入 Section 1；若计划写集本身有误，报告统筹修正计划）",
   "main.interface.docEmptyExisting": "文件为空（existing/legacy：仅提醒）",
   "main.interface.docEmpty": "文件为空（需要正文）",
   "main.interface.readErrorExistingSuffix": "（existing/legacy：仅提醒）",
@@ -1214,7 +1214,7 @@ export const zhCN = {
   "main.interface.apiSpecNotApplicableNoReason": "api-spec.md 标为 not-applicable 但未给出非空理由",
   "main.interface.projectListWarning": "listProject 警告：{warning}",
   "main.interface.writeValidationFailed":
-    "流程 {flowId}：写卡产物未通过校验（appointment 步骤不能继续；未派 Steward / 统筹 做 role-readiness，也未把步骤标为 done）。",
+    "流程 {flowId}：写卡产物未通过校验（appointment 步骤不能继续；未派统筹做 role-readiness，也未把步骤标为 done）。",
   "main.interface.specificProblems": "具体问题：",
   "main.interface.warningsHeader": "提醒（不阻塞，existing/legacy 角色）：",
   "main.interface.fixWriteCard":
@@ -1224,13 +1224,13 @@ export const zhCN = {
   "main.interface.fixTeamPlanLegacy":
     "请修正/补充团队计划（frontmatter flowId/version/riskTier/recommended；角色表逐角色含类型 new/changed/existing、职责目标、能力要求、唯一写集、依赖），必要时递增为 v2 并重发任命卡；修正后应用会重新校验。",
   "main.interface.teamPlanValidationFailed":
-    "流程 {flowId}：团队计划未通过结构校验（任命的写卡步骤暂停；Crew 不自行补计划，应用未派 role-readiness、未把步骤标为 done）。",
+    "流程 {flowId}：团队计划未通过结构校验（任命的写卡步骤暂停；组队不自行补计划，应用未派 role-readiness、未把步骤标为 done）。",
   "main.interface.roleCardsStepMissing":
-    "流程缺少 id 为 \"{stepId}\" 的步骤（团队计划存在但 flow 未声明 role-cards，无法完成收口；请 Convener 补齐 flow 步骤）。",
-  "main.interface.crewBlocking": "Crew / 组队 修正 {count} 个",
-  "main.interface.planBlocking": "Steward / 统筹 补充计划 {count} 个",
+    "流程缺少 id 为 \"{stepId}\" 的步骤（团队计划存在但 flow 未声明 role-cards，无法完成收口；请统筹补齐 flow 步骤）。",
+  "main.interface.crewBlocking": "组队修正 {count} 个",
+  "main.interface.planBlocking": "统筹补充计划 {count} 个",
   "main.interface.writeBlockingSummary":
-    "写卡产物未通过校验（流程 {flowId}）：{count} 个问题——已反馈 {routed}；未派 Steward / 统筹 做 role-readiness、未把 appointment 步骤标为 done。首个问题：{path}：{issue}",
+    "写卡产物未通过校验（流程 {flowId}）：{count} 个问题——已反馈 {routed}；未派统筹做 role-readiness、未把 appointment 步骤标为 done。首个问题：{path}：{issue}",
   "main.interface.queueKind.handback": "回交",
   "main.interface.queueKind.dispatch": "派发",
   "main.interface.queueKind.system": "系统",
@@ -1267,22 +1267,22 @@ export const zhCN = {
   "main.interface.teamPlanMissingNoRoles": "缺少团队计划/任命名单，未派发写卡任务",
   "main.interface.teamPlanMissingBoundHint": "（账本 appointment 绑定 {plan}）",
   "main.interface.teamPlanMissingBound":
-    "流程 {flowId}：团队计划缺失（docs/scheduling/{flowId}-team-vN.md）{bound}；未派 Crew 写卡、未继续推进。请 Steward / 统筹 先写团队计划。",
-  "main.interface.teamPlanMissingShort": "团队计划缺失{bound}；未派 Crew 写卡（不猜计划、不自行扩大职责）",
+    "流程 {flowId}：团队计划缺失（docs/scheduling/{flowId}-team-vN.md）{bound}；未派组队写卡、未继续推进。请统筹先写团队计划。",
+  "main.interface.teamPlanMissingShort": "团队计划缺失{bound}；未派组队写卡（不猜计划、不自行扩大职责）",
   "main.interface.appointmentVsPlanMismatch":
-    "客户实际任命名单（{appointed}）与团队计划推荐集（{recommended}）不同；请 Steward / 统筹 修订团队计划为 {version} 以反映实际任命（Crew 只按实际名单写卡）。",
+    "客户实际任命名单（{appointed}）与团队计划推荐集（{recommended}）不同；请统筹修订团队计划为 {version} 以反映实际任命（组队只按实际名单写卡）。",
   "main.interface.missingFlowOrList": "缺少流程信息（flowId/任命名单），未自动派发",
   "main.interface.missingFlowIdNomination": "缺少流程信息（flowId），未派发提名任务",
   "main.interface.flowYamlTimeout":
-    "Steward / 统筹 本轮未在时限内结束，流程状态 YAML {path} 未确认；未派发提名任务",
+    "统筹本轮未在时限内结束，流程状态 YAML {path} 未确认；未派发提名任务",
   "main.interface.flowYamlMissing":
-    "Steward / 统筹 未写出流程状态 YAML {path}；未派发提名任务（同名 .md 人读视图不算落盘）",
+    "统筹未写出流程状态 YAML {path}；未派发提名任务（同名 .md 人读视图不算落盘）",
   "main.interface.flowYamlInvalid":
     "流程状态 YAML 校验失败（{path}）：{detail}；未派发提名任务",
   "main.interface.flowYamlUnreadable": "流程状态 YAML {path} 不可读：{detail}；未派发提名任务",
   "main.interface.missingFlowInfoNomination": "缺少流程信息，未派发提名任务",
-  "main.interface.openCrewFailed": "无法开启 Crew / 组队 会话：{detail}",
-  "main.interface.sendNominationFailed": "发送提名任务给 Crew / 组队 失败：{detail}",
+  "main.interface.openCrewFailed": "无法开启组队会话：{detail}",
+  "main.interface.sendNominationFailed": "发送提名任务给组队失败：{detail}",
   "main.interface.linkScheme": "只允许打开 http/https 链接。",
   "main.interface.linkTooLong": "链接过长，已拒绝。",
   "main.interface.externalOpenUnwired": "外部打开未接线（fail-closed）。",
@@ -1292,32 +1292,32 @@ export const zhCN = {
   "main.interface.imageUnsupportedShort": "内容不是受支持的图片（真实格式不在 {mimes} 之内）。",
 
   // ---- 治理推进系统行（governance-advance.ts；仅用户可见，不含 agent 任务文案）----
-  "main.governance.acceptanceAdvance": "流程 {flowId} 步骤已全部完成，已自动派发验收复核给 Proof（工作中）",
+  "main.governance.acceptanceAdvance": "流程 {flowId} 步骤已全部完成，已自动派发验收复核给验收（工作中）",
   "main.governance.acceptanceBlocked":
     "自动验收未派发：流程 {flowId} 未通过收尾门。原因：{issue}。{advice}",
   "main.governance.acceptanceBlockedTerminal": "无需操作：流程已收口，应用不会重复派发验收复核。",
   "main.governance.acceptanceBlockedAdvice":
-    "建议：若旧步骤已被 retake 取代，请把对应的 aborted/failed 步骤在流程状态文件 {path} 中标为 superseded（或 cancelled）；或用新的 stepId 重新派发任务并在流程状态文件中更新状态与证据。修正后下一次事件会自动重新检查；应用不会自动改写流程状态文件，也不会自动派 Proof。",
-  "main.governance.nominationDispatched": "已派发提名任务给 Crew / 组队（工作中）",
-  "main.governance.roleCardDispatched": "已派发写卡任务给 Crew / 组队（工作中）",
-  "main.governance.flowTaskDispatched": "已派发流程任务给 Steward / 统筹（工作中）",
-  "main.governance.flowYamlAndNomination": "流程状态 YAML 已落盘，已派发提名任务给 Crew / 组队（工作中）",
-  "main.governance.roleReadinessDispatched": "写卡结构校验通过，已派发角色就绪复核给 Steward / 统筹（工作中）",
-  "main.governance.criteriaDispatched": "流程 {flowId}：已派发实施前标准编写任务给 Proof / 验收（工作中）",
-  "main.governance.nominationAlreadyDone": "提名已完成，未重复派发；已请 Steward / 统筹 继续下一步",
+    "建议：若旧步骤已被 retake 取代，请把对应的 aborted/failed 步骤在流程状态文件 {path} 中标为 superseded（或 cancelled）；或用新的 stepId 重新派发任务并在流程状态文件中更新状态与证据。修正后下一次事件会自动重新检查；应用不会自动改写流程状态文件，也不会自动派验收。",
+  "main.governance.nominationDispatched": "已派发提名任务给组队（工作中）",
+  "main.governance.roleCardDispatched": "已派发写卡任务给组队（工作中）",
+  "main.governance.flowTaskDispatched": "已派发流程任务给统筹（工作中）",
+  "main.governance.flowYamlAndNomination": "流程状态 YAML 已落盘，已派发提名任务给组队（工作中）",
+  "main.governance.roleReadinessDispatched": "写卡结构校验通过，已派发角色就绪复核给统筹（工作中）",
+  "main.governance.criteriaDispatched": "流程 {flowId}：已派发实施前标准编写任务给验收（工作中）",
+  "main.governance.nominationAlreadyDone": "提名已完成，未重复派发；已请统筹继续下一步",
 
   // ---- 验收返工路由系统行（2026-10-23 验收返工路由；方案 §6.3.3）----
   // 参数契约：{flowId} 流程 id；{reportPath} 报告相对路径；{detail} 有界诊断/错误原文。
   // 来源语义：仅客户手拒来源写「客户拒绝」；judge/自动来源只写自动决策措辞，不得写成客户拒绝，
   // 也不得声称路由已成功——实际失败由 Failed/AuditFailed 系统行如实报告。
   "main.governance.acceptanceReworkRoutedCustomer":
-    "流程 {flowId}：验收结果为客户拒绝；应用已按路由规则把返工交 Steward / 统筹（Convener）组织。",
+    "流程 {flowId}：验收结果为客户拒绝；应用已按路由规则把返工交统筹组织。",
   "main.governance.acceptanceReworkRoutedAutomatic":
-    "流程 {flowId}：自动决策未通过/未完成（判断代批/自动退回）；应用已按路由规则把返工交 Steward / 统筹（Convener）组织。",
+    "流程 {flowId}：自动决策未通过/未完成（判断代批/自动退回）；应用已按路由规则把返工交统筹组织。",
   "main.governance.acceptanceReworkPending":
     "流程 {flowId}：返工路由尚未完成（等待发送或等待下一次事件重试）；应用暂不派发验收复核，也不会重复通知。",
   "main.governance.acceptanceReworkReportIncomplete":
-    "流程 {flowId}：验收报告缺少可解析的 acceptance-rework/v1 结构化返工段（{detail}）；应用已把报告路径 {reportPath} 与解析错误交 Steward / 统筹（Convener）组织人工返工，未生成返工项、未创建流程步骤。",
+    "流程 {flowId}：验收报告缺少可解析的 acceptance-rework/v1 结构化返工段（{detail}）；应用已把报告路径 {reportPath} 与解析错误交统筹组织人工返工，未生成返工项、未创建流程步骤。",
   "main.governance.acceptanceReworkFailed":
     "流程 {flowId}：返工路由失败（{detail}）；应用不声称已送达，也不会派发验收复核；修正后下一次事件会自动重试。",
   "main.governance.acceptanceReworkAuditFailed":

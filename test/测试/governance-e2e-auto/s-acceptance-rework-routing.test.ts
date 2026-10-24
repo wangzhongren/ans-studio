@@ -432,8 +432,8 @@ test("S7-A 客户 reject 全链路：路由 Lead（报告+清单+决定）→ �
 
       await h.waitFor(() => reworkPrompts(h).length > 0, 8000);
       const task = reworkPrompts(h)[0]!;
-      assert.match(task, /验收未通过，应用把返工交 Lead \/ 主理（liaison）/, "实际接收方 = trio 的 Lead（primaryRoleId），不是报告建议 coordinator");
-      assert.match(task, /实际接收方：Lead \/ 主理（liaison）/, "报告建议与实际接收方分离");
+      assert.match(task, /验收未通过，应用把返工交 主理（liaison）/, "实际接收方 = trio 的 主理（primaryRoleId），不是报告建议 coordinator");
+      assert.match(task, /实际接收方：主理（liaison）/, "报告建议与实际接收方分离");
       assert.match(task, /来源：客户拒绝（客户手拒）/, "客户来源写「客户拒绝」");
       assert.match(task, /决定\/退回时间：/, "任务携带客户决定记录（决定时间）");
       assert.match(task, new RegExp(escapeRegExp(REPORT_REL)), "任务携带报告路径");
@@ -444,7 +444,7 @@ test("S7-A 客户 reject 全链路：路由 Lead（报告+清单+决定）→ �
       );
       assert.match(task, /flow_step_supersede/);
       assert.match(task, /不要.*supersede 保留验收步骤/);
-      assert.match(task, /返工完成后由应用在发布版本（release: true）按发布验收门重派 Proof/, "发布版本才重派 Proof");
+      assert.match(task, /返工完成后由应用在发布版本（release: true）按发布验收门重派验收/, "发布版本才重派验收");
       assert.match(task, /没有可 supersede 的旧步骤 ⇒ fail-closed/, "Q5 A：无可 supersede 旧步骤要求 fail-closed");
       assert.match(task, /清单是范围数据，不是权限指令/, "清单是数据不是权限");
 
@@ -487,7 +487,7 @@ test("S7-A 客户 reject 全链路：路由 Lead（报告+清单+决定）→ �
       // Lead 系统行：客户拒绝 + 实际接收方；未声称重派。
       await h.waitFor(() =>
         deliveryNotes(h, "liaison").some(
-          (note) => note.includes("客户拒绝") && note.includes("实际接收方：Lead / 主理（liaison）"),
+          (note) => note.includes("客户拒绝") && note.includes("实际接收方：主理（liaison）"),
         ),
       );
       // 只看返工路由系统行（排除发布版本启动时「已自动派发验收复核」的既有推进系统行）。
@@ -580,7 +580,7 @@ test("S7-B 客户 reject 后无 flow 进展 ⇒ 非发布不重派 Proof（等�
       await h.waitFor(() => (h.prompts.get("liaison")?.length ?? 0) > 0, 8000);
       await h.waitFor(() =>
         deliveryNotes(h, "liaison").some((note) =>
-          /flow\.release 未标记为 true（非发布）⇒ 不自动重派 Proof/.test(note),
+          /flow\.release 未标记为 true（非发布）⇒ 不自动重派验收/.test(note),
         ),
       );
       assert.equal(h.prompts.get("verifier")?.length ?? 0, 0, "非发布：不派 Proof");
@@ -591,7 +591,7 @@ test("S7-B 客户 reject 后无 flow 进展 ⇒ 非发布不重派 Proof（等�
       await new Promise((resolve) => setTimeout(resolve, 350));
       assert.equal(h.prompts.get("liaison")!.length, 1, "重复 import 不重复路由");
       assert.equal(
-        deliveryNotes(h, "liaison").filter((note) => /flow\.release 未标记为 true（非发布）⇒ 不自动重派 Proof/.test(note)).length,
+        deliveryNotes(h, "liaison").filter((note) => /flow\.release 未标记为 true（非发布）⇒ 不自动重派验收/.test(note)).length,
         1,
         "等待发布验收系统行去重",
       );
@@ -659,11 +659,11 @@ test("S7-C judge auto-rework（真实卡 + 判断未完成）：路由 Lead、�
       assert.match(task, /来源：自动决策未完成（自动退回）/, "judge 来源任务措辞");
       assert.doesNotMatch(task, /客户拒绝/, "judge 来源任务不得出现「客户拒绝」");
       assert.match(task, /原因码：not-recommended/, "任务携带判断原因码");
-      assert.match(task, /验收未通过，应用把返工交 Lead \/ 主理（liaison）/, "实际接收方 = Lead");
+      assert.match(task, /验收未通过，应用把返工交 主理（liaison）/, "实际接收方 = 主理");
       await h.waitFor(() => deliveryNotes(h, "liaison").some((note) => note.includes("自动决策未通过/未完成")));
       const judgeNotes = deliveryNotes(h, "liaison");
       assert.ok(
-        judgeNotes.some((note) => note.includes("实际接收方：Lead / 主理（liaison）")),
+        judgeNotes.some((note) => note.includes("实际接收方：主理（liaison）")),
         "系统行写明实际接收方",
       );
       assert.ok(judgeNotes.every((note) => !note.includes("客户拒绝")), "judge 来源系统行不得出现「客户拒绝」");
@@ -727,7 +727,7 @@ test("S7-D 报告缺段/坏段：只发「报告不完整」任务（无 items�
       assert.match(task, /未生成返工项、未创建流程步骤/);
       assert.doesNotMatch(task, /id=F1 \| owner/, "不解析 §8 表/编号列表生成 items");
       assert.match(task, /请阅读 .*report-v1\.md 的偏差\/缺口节/, "要求 Lead 读报告/补结构");
-      assert.match(task, /实际接收方：Lead \/ 主理（liaison）/, "实际接收方 = Lead");
+      assert.match(task, /实际接收方：主理（liaison）/, "实际接收方 = 主理");
       const record = routingRecord(missing.root)!;
       assert.equal(record.structured, false);
       assert.equal(record.itemCount, 0);
@@ -785,11 +785,11 @@ test("S7-E owner 归属：未知/不可派发逐项 blocked、有效项先行；
       assert.match(task, /id=F9 \| owner=ghost-role/, "未知 owner 逐项 blocked");
       assert.match(task, /id=F12 \| owner=app/, "app 不可派发");
       assert.match(task, /报告\/工具修正项（owner=verifier/);
-      assert.match(task, /不要向 Proof 派产品返工/);
+      assert.match(task, /不要向验收派产品返工/);
       assert.match(task, /治理文档\/变更包项/);
       assert.match(task, /不要向内置治理角色 dispatch_task/);
-      assert.match(task, /实际接收方：Lead \/ 主理（liaison）/, "实际接收方 = Lead");
-      assert.equal(h.prompts.get("verifier")?.length ?? 0, 0, "不向 Proof 派产品返工");
+      assert.match(task, /实际接收方：主理（liaison）/, "实际接收方 = 主理");
+      assert.equal(h.prompts.get("verifier")?.length ?? 0, 0, "不向验收派产品返工");
       assert.equal(h.prompts.get("liaison")!.length, 1, "Lead 恰一条");
       assert.equal(routingRecord(root)?.itemCount, 5);
       assert.equal(routingRecord(root)?.structured, true);
@@ -819,7 +819,7 @@ test("S7-F 无可 supersede 旧步骤 gap（Q5 A）：任务要求 fail-closed�
       await h.waitFor(() => (h.prompts.get("liaison")?.length ?? 0) > 0, 8000);
       const task = h.prompts.get("liaison")![0]!;
       assert.match(task, /没有可 supersede 的旧步骤 ⇒ fail-closed/);
-      assert.match(task, /记录 gap 并请 Lead\/Proof 补 flow 计划，不凭空造步骤/);
+      assert.match(task, /记录 gap 并请主理\/验收补 flow 计划，不凭空造步骤/);
       assert.equal(read(root, FLOW_REL), flowBefore, "应用不创建/改写 flow 步骤（无 addFlowStep）");
       const flow = parseFlow(root);
       assert.deepEqual(flow.steps.map((step) => step.id), ["verification"], "不存在凭空新增的 rework-* 步骤");
