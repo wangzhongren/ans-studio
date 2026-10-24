@@ -4248,6 +4248,30 @@ interface PostWriteHarness {  iface: ReturnType<typeof createDesktopInterface>;
   customerCalls: unknown[];
 }
 
+/**
+ * 等前一轮「写卡后推进检查」真正结束（v1.7.0 发布 CI：mac 第四轮不派发）。
+ * 应用 `runPostWriteAdvanceCheck` 是**单飞**（`postWriteAdvanceRunning`），运行中到达的事件只记 pending；
+ * 且检查开头可能先等 Nominator 本轮 settle（**有界 8s**）。单飞状态不可直接从测试观察，故在调用方
+ * `settle()` 之后留足 8s 上界，并要求可观察状态（sends / project:changed）在窗口内稳定。
+ * 只影响等待预算，不改任何断言/条件；第二次上界兜底防无限挂起。
+ */
+async function waitForPostWriteCheckQuiescence(harness: PostWriteHarness): Promise<void> {
+  const started = Date.now();
+  let lastSignature = "";
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const signature = JSON.stringify({
+      convener: harness.sendsByRole.get("convener")?.length ?? 0,
+      nominator: harness.sendsByRole.get("nominator")?.length ?? 0,
+      changed: harness.projectChanged(),
+    });
+    const elapsed = Date.now() - started;
+    if (elapsed >= 8200 && signature === lastSignature) return;
+    if (elapsed >= 12000) return;
+    lastSignature = signature;
+  }
+}
+
 /** 2026-10-20 写卡产物门控：写出一个角色的 role-card.md / boundary.yaml（可按需注入坏内容）。 */
 function writeRoleArtifactFiles(
   root: string,
@@ -6174,6 +6198,9 @@ test("2026-10-23 可重入门禁：两轮错误写卡（内容不同）⇒ 两�
       // 先让 Convener 本轮结束（后台会话 busy 时新消息会排队，不会落到测试的 sends 数组）。
       harness.settles.get("convener")?.();
       await new Promise((resolve) => setTimeout(resolve, 100));
+      // 关键：先确认前一轮 post-write 检查真正结束（单飞 + 8s nominator-settle 有界等待）。
+      // 否则第四轮 trigger 只会落 pending/被单飞挡住，慢 CI 上再等多久也不会派。
+      await waitForPostWriteCheckQuiescence(harness);
       await appendCrewWriteMarker(root, flowId);
       writeFileSync(
         path.join(root, "角色卡", "executor", "memo.md"),
@@ -6182,8 +6209,8 @@ test("2026-10-23 可重入门禁：两轮错误写卡（内容不同）⇒ 两�
       );
       await triggerPostWrite(harness, root, flowId);
       // 第四轮派发在 post-write 的「等 Nominator 本轮 settle」有界等待（8s）之后才发生；
-      // 6s 在慢速 CI（mac x64/arm64）会先超时。只放大等待预算，不改条件/断言。
-      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 2, 15000);
+      // mac x64/arm64 慢速 CI 上 6s/15s 均可能先超时。只放大等待预算，不改条件/断言。
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 2, 30000);
       assert.equal(await waitForConvenerDispatchCount(root, flowId, 2), 2, "内容变化后允许再次派发（新指纹/新 Crew 写卡锚）");
       assert.equal(harness.customerCalls.length, 0, "再次派发仍不弹客户卡");
       assert.equal(

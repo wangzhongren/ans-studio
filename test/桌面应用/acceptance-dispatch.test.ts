@@ -2793,7 +2793,22 @@ test("2026-10-23 报告兜底：缺段/坏段只发「报告不完整」任务�
       assert.match(task, /治理文档\/变更包项/);
       assert.match(task, /不要向内置治理角色 dispatch_task/);
       assert.match(task, /实际接收方：liaison/, "实际接收方 = Lead（coordinator 只是建议）");
-      assert.equal(owners.sendsByRole.get("verifier")?.length ?? 0, 0, "不向 Proof 派产品返工");
+      // 2026-10-24「所有变更自动验收」：流程完成/返工复核时应用会合法地给 verifier 派验收任务；
+      // 原意是「不向 Proof 派**产品返工**」，因此只对**返工语义**的 verifier 任务断言为 0
+      // （返工任务含可派发项/报告修正项/逐项 owner 清单与「不要向验收派产品返工」；验收任务不含）。
+      const verifierSends = owners.sendsByRole.get("verifier") ?? [];
+      const productReworkToVerifier = verifierSends.filter(
+        (text) =>
+          /可派发项（按 owner 分组/.test(text) ||
+          /报告\/工具修正项（owner=verifier/.test(text) ||
+          /不要向验收派产品返工/.test(text) ||
+          /\bid=[^\s|]+\s*\|\s*owner=/.test(text),
+      );
+      assert.equal(productReworkToVerifier.length, 0, "不向 Proof 派产品返工（自动验收/返工复核任务不算）");
+      assert.ok(
+        verifierSends.every((text) => /请汇总证据并出验收卡/.test(text)),
+        "verifier 收到的仅是验收/复核任务，不是产品返工",
+      );
       assert.equal(owners.sendsByRole.get("liaison")!.length, 1, "Lead 恰一条（不因 verifier/convener owner 再派）");
     } finally {
       await owners.iface.stopSession();
