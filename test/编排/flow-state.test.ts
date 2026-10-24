@@ -17,10 +17,12 @@ import {
   flowCompletionIssue,
   flowStatePath,
   latestAcceptanceDecision,
+  listReadyFlowSteps,
   parseFlowStateYaml,
   validateFlowEvidence,
   FLOW_STEP_KINDS,
   type FlowState,
+  type FlowStateStep,
 } from "../../src/common/编排/flow-state.ts";
 import { evaluateGovernanceGate } from "../../src/common/编排/governance-gate.ts";
 import type { GovernanceLedgerEntry } from "../../src/common/编排/governance-ledger.ts";
@@ -1979,4 +1981,280 @@ test("evaluateFlowCompletion：最新验收决定为 changes-requested ⇒ fail-
   );
   assert.equal(result.ready, false);
   if (!result.ready) assert.ok(result.issues.some((issue) => /不是 accepted\/rejected/.test(issue)));
+});
+
+// —————————————————————— 2026-10-24 P0-2：就绪步骤纯规划器 ——————————————————————
+//
+// `listReadyFlowSteps(flow, dispatchedStepIds)`：纯只读，不读账本/不写盘/不改 flow。
+// 口径：pending + kind ∈ {dispatch, artifact} + owner 非空且非 app + 未 dispatch.accepted +
+// dependsOn 全部 done（前置 superseded 时沿 supersededBy 链解析到最终非 superseded 步骤）。
+
+function flowOf(steps: FlowStateStep[], over: Partial<FlowState> = {}): FlowState {
+  return {
+    flowId: "ready-demo",
+    version: 1,
+    qualityTier: "production",
+    steps,
+    ...over,
+  };
+}
+
+function step(partial: Partial<FlowStateStep> & Pick<FlowStateStep, "id">): FlowStateStep {
+  return {
+    title: partial.id,
+    owner: "backend",
+    kind: "dispatch",
+    status: "pending",
+    ...partial,
+  };
+}
+
+test("P0-2 就绪：前置全 done ⇒ ready；前置未 done ⇒ dependency-not-done；非 pending 不列出", () => {
+  const flow = flowOf([
+    step({ id: "plan", kind: "artifact", owner: "convener", status: "done" }),
+    step({ id: "api", owner: "api", dependsOn: ["plan"] }),
+    step({ id: "web", owner: "web", dependsOn: ["plan"] }),
+    step({ id: "integration", owner: "integration", dependsOn: ["api", "web"] }),
+    step({ id: "in-flight", status: "dispatched" }),
+  ]);
+  const result = listReadyFlowSteps(flow);
+  assert.deepEqual(
+    result.ready.map((item) => item.id),
+    ["api", "web"],
+  );
+  assert.deepEqual(result.skipped, [{ id: "integration", reason: "dependency-not-done" }]);
+  assert.equal(result.stopReason, undefined);
+  // ready 步骤携带 id/title/owner/kind/dependsOn。
+  assert.deepEqual(result.ready[0], {
+    id: "api",
+    title: "api",
+    owner: "api",
+    kind: "dispatch",
+    dependsOn: ["plan"],
+  });
+
+  // 传入已派发集合时，前置全部 done 的步骤仍须未被派发。
+  const dispatched = listReadyFlowSteps(flow, new Set(["api"]));
+  assert.deepEqual(
+    dispatched.ready.map((item) => item.id),
+    ["web"],
+  );
+  assert.deepEqual(dispatched.skipped, [
+    { id: "api", reason: "already-dispatched" },
+    { id: "integration", reason: "dependency-not-done" },
+  ]);
+});
+
+test("P0-2 就绪：前置 superseded 沿 supersededBy 单跳/链式解析到最终 done ⇒ ready；最终未 done ⇒ dependency-not-done", () => {
+  const chain = listReadyFlowSteps(
+    flowOf([
+      step({ id: "api-v1", status: "superseded", supersededBy: "api-v2" }),
+      step({ id: "api-v2", status: "superseded", supersededBy: "api-v3" }),
+      step({ id: "api-v3", status: "done" }),
+      step({ id: "web", owner: "web", dependsOn: ["api-v1"] }),
+      step({ id: "qa", owner: "qa", dependsOn: ["api-v1", "api-v2"] }),
+    ]),
+  );
+  assert.deepEqual(
+    chain.ready.map((item) => item.id),
+    ["web", "qa"],
+  );
+  assert.deepEqual(chain.skipped, []);
+  // dependsOn 原样返回声明的前置 id（不改写成解析后的 api-v3）。
+  assert.deepEqual(chain.ready.find((item) => item.id === "web")!.dependsOn, ["api-v1"]);
+
+  const notDone = listReadyFlowSteps(
+    flowOf([
+      step({ id: "api-v1", status: "superseded", supersededBy: "api-v2" }),
+      step({ id: "api-v2", status: "dispatched" }),
+      step({ id: "web", owner: "web", dependsOn: ["api-v1"] }),
+    ]),
+  );
+  assert.deepEqual(notDone.ready, []);
+  assert.deepEqual(notDone.skipped, [{ id: "web", reason: "dependency-not-done" }]);
+});
+
+test("P0-2 就绪：前置缺失 / supersededBy 链成环 / 未知引用 ⇒ 各自不 ready + 原因", () => {
+  const missing = listReadyFlowSteps(flowOf([step({ id: "web", dependsOn: ["ghost"] })]));
+  assert.deepEqual(missing.skipped, [{ id: "web", reason: "dependency-missing" }]);
+
+  const cycle = listReadyFlowSteps(
+    flowOf([
+      step({ id: "a", status: "superseded", supersededBy: "b" }),
+      step({ id: "b", status: "superseded", supersededBy: "a" }),
+      step({ id: "web", dependsOn: ["a"] }),
+    ]),
+  );
+  assert.deepEqual(cycle.skipped, [{ id: "web", reason: "dependency-cycle" }]);
+
+  const unknownTarget = listReadyFlowSteps(
+    flowOf([
+      step({ id: "a", status: "superseded", supersededBy: "ghost" }),
+      step({ id: "web", dependsOn: ["a"] }),
+    ]),
+  );
+  assert.deepEqual(unknownTarget.skipped, [{ id: "web", reason: "dependency-unknown" }]);
+
+  // superseded 但缺 supersededBy（解析器本应拒绝；纯函数仍 fail-closed）。
+  const noPointer = listReadyFlowSteps(
+    flowOf([
+      step({ id: "a", status: "superseded" }),
+      step({ id: "web", dependsOn: ["a"] }),
+    ]),
+  );
+  assert.deepEqual(noPointer.skipped, [{ id: "web", reason: "dependency-unknown" }]);
+});
+
+test("P0-2 就绪：账本已 dispatch 的 stepId 排除（Set / 数组输入等价；优先于依赖检查）", () => {
+  const flow = flowOf([step({ id: "api" }), step({ id: "web", dependsOn: ["ghost"] })]);
+  const asSet = listReadyFlowSteps(flow, new Set(["api"]));
+  assert.deepEqual(
+    asSet.ready.map((item) => item.id),
+    [],
+  );
+  assert.deepEqual(asSet.skipped, [
+    { id: "api", reason: "already-dispatched" },
+    { id: "web", reason: "dependency-missing" },
+  ]);
+
+  const asArray = listReadyFlowSteps(flow, ["api"]);
+  assert.deepEqual(asArray.skipped[0], { id: "api", reason: "already-dispatched" });
+
+  // 已派发优先于依赖未 done / 缺失：已派发步骤不再重复提示。
+  const dispatchedWithBadDeps = listReadyFlowSteps(
+    flowOf([step({ id: "api", dependsOn: ["ghost"] })]),
+    ["api"],
+  );
+  assert.deepEqual(dispatchedWithBadDeps.skipped, [{ id: "api", reason: "already-dispatched" }]);
+});
+
+test("P0-2 就绪：同一并行组内满足前置的步骤全部返回（不串行化）；无 parallelGroup 时不凭空出现字段", () => {
+  const flow = flowOf([
+    step({ id: "contract-freeze", kind: "artifact", owner: "convener", status: "done" }),
+    step({ id: "api", owner: "api", parallelGroup: "map-a", dependsOn: ["contract-freeze"] }),
+    step({ id: "web", owner: "web", parallelGroup: "map-a", dependsOn: ["contract-freeze"] }),
+    step({ id: "mobile", owner: "mobile", parallelGroup: "map-b", dependsOn: ["contract-freeze"] }),
+    step({ id: "reduce", owner: "integration", parallelGroup: "reduce", dependsOn: ["api", "web", "mobile"] }),
+  ]);
+  const result = listReadyFlowSteps(flow);
+  assert.deepEqual(
+    result.ready.map((item) => item.id),
+    ["api", "web", "mobile"],
+  );
+  assert.deepEqual(result.ready.find((item) => item.id === "api")!.parallelGroup, "map-a");
+  assert.equal("parallelGroup" in result.ready[0]!, true);
+  assert.deepEqual(result.ready.find((item) => item.id === "api")!.dependsOn, ["contract-freeze"]);
+  assert.deepEqual(result.skipped, [{ id: "reduce", reason: "dependency-not-done" }]);
+  assert.equal(result.stopReason, undefined);
+
+  const plain = listReadyFlowSteps(flowOf([step({ id: "api" })]));
+  assert.equal("parallelGroup" in plain.ready[0]!, false);
+});
+
+test("P0-2 硬停：customer-decision/acceptance 不进入 ready；无自动步骤时 stopReason 为客户决定优先", () => {
+  const both = listReadyFlowSteps(
+    flowOf([
+      step({ id: "appointment", kind: "customer-decision", owner: "convener" }),
+      step({ id: "acceptance", kind: "acceptance", owner: "verifier" }),
+    ]),
+  );
+  assert.deepEqual(both.ready, []);
+  assert.equal(both.stopReason, "awaiting-customer");
+  assert.deepEqual(both.skipped, [
+    { id: "appointment", reason: "awaiting-customer" },
+    { id: "acceptance", reason: "awaiting-acceptance" },
+  ]);
+
+  const acceptanceOnly = listReadyFlowSteps(
+    flowOf([step({ id: "acceptance", kind: "acceptance", owner: "verifier" })]),
+  );
+  assert.deepEqual(acceptanceOnly.ready, []);
+  assert.equal(acceptanceOnly.stopReason, "awaiting-acceptance");
+
+  // 仍有 ready 自动步骤时 stopReason 缺席（验收步骤全程 pending，不能被当成「无法继续调度」）；
+  // 人工闸门步骤仍以 skipped 明确列出。
+  const mixed = listReadyFlowSteps(
+    flowOf([
+      step({ id: "appointment", kind: "customer-decision", owner: "convener" }),
+      step({ id: "plan", kind: "artifact", owner: "convener" }),
+      step({ id: "acceptance", kind: "acceptance", owner: "verifier" }),
+    ]),
+  );
+  assert.deepEqual(
+    mixed.ready.map((item) => item.id),
+    ["plan"],
+  );
+  assert.equal(mixed.stopReason, undefined);
+  assert.deepEqual(mixed.skipped, [
+    { id: "appointment", reason: "awaiting-customer" },
+    { id: "acceptance", reason: "awaiting-acceptance" },
+  ]);
+});
+
+test("P0-2 硬停：owner 为 app / 空 ⇒ skip（应用自身或无法调度；不是客户闸门，不设 stopReason）", () => {
+  const result = listReadyFlowSteps(
+    flowOf([
+      step({ id: "import", owner: "app" }),
+      step({ id: "export", owner: " APP " }),
+      step({ id: "legacy", owner: "" }),
+    ]),
+  );
+  assert.deepEqual(result.ready, []);
+  assert.deepEqual(result.skipped, [
+    { id: "import", reason: "app-owned" },
+    { id: "export", reason: "app-owned" },
+    { id: "legacy", reason: "owner-missing" },
+  ]);
+  assert.equal(result.stopReason, undefined);
+});
+
+test("P0-2 发布/验收不自动：release:true 也只把验收步骤列为 awaiting-acceptance，不进 ready", () => {
+  const result = listReadyFlowSteps(
+    flowOf(
+      [
+        step({ id: "delivery", status: "done" }),
+        step({ id: "acceptance", kind: "acceptance", owner: "verifier" }),
+      ],
+      { release: true },
+    ),
+  );
+  assert.deepEqual(result.ready, []);
+  assert.equal(result.stopReason, "awaiting-acceptance");
+  assert.deepEqual(result.skipped, [{ id: "acceptance", reason: "awaiting-acceptance" }]);
+});
+
+test("P0-2 legacy 兼容：无 dependsOn/parallelGroup 的 flow，pending dispatch/artifact 全部 ready", () => {
+  const legacy = parseOk(
+    `flowId: legacy-ready-v1
+version: 1
+qualityTier: production
+steps:
+  - id: contract-freeze
+    title: 冻结契约
+    owner: Steward
+    kind: artifact
+    status: pending
+  - id: delivery-backend
+    title: 后端交付
+    owner: backend
+    kind: dispatch
+    status: pending
+  - id: verification
+    title: 独立复核
+    owner: verifier
+    kind: acceptance
+    status: pending
+`,
+    "legacy-ready-v1",
+  );
+  const result = listReadyFlowSteps(legacy);
+  assert.deepEqual(
+    result.ready.map((item) => item.id),
+    ["contract-freeze", "delivery-backend"],
+  );
+  assert.deepEqual(result.ready[0]!.dependsOn, []);
+  assert.equal("parallelGroup" in result.ready[0]!, false);
+  // legacy 无 dependsOn：后端交付不因未声明前置而被挡（不新增检查）。
+  assert.equal(result.stopReason, undefined);
+  assert.deepEqual(result.skipped, [{ id: "verification", reason: "awaiting-acceptance" }]);
 });

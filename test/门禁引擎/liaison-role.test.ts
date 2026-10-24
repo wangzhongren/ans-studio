@@ -274,6 +274,22 @@ test("Lead 卡文本：治理协调（2026-10-24）——接报内置状态/回�
   assert.match(t, /协调 ≠ 客户批准/, "协调 ≠ 客户批准");
   assert.match(t, /应用仍执行闸门 0\/1\/2/, "应用门禁仍执行");
   assert.match(t, /你的协调不替代任何门禁/, "协调不替代门禁");
+  // 2026-10-24 P1-7：Lead 作为 manager（与 Steward 同权限）不得代标 delivered；
+  // 只能在 owner 交付 delivered 后核证 done，或标 failed/blocked；worker 不能 done。
+  assert.match(t, /与 Steward \/ 统筹 同权限/, "Lead 管理工作流的管理权限描述保留");
+  assert.match(
+    t,
+    /`dispatched → delivered` 只能由该步骤的 owner（项目角色 \/ worker）标记/,
+    "Lead 不得代标 delivered",
+  );
+  assert.match(t, /不得代标 `delivered`/, "Lead 卡须写明不得代标 delivered");
+  assert.match(
+    t,
+    /只能在 owner 交付 `delivered` 后核证并标 `done`（`delivered → done`）/,
+    "Lead 只能核证 delivered→done",
+  );
+  assert.match(t, /或标 `failed` \/ `blocked`/, "Lead 仍可标 failed/blocked");
+  assert.match(t, /worker 不能标 `done`/, "worker 不能 done");
   // 旧「向项目角色派发协调任务」必须消失（Q1：项目 worker 由 Steward 派）。
   assert.doesNotMatch(t, /向 Steward \/ 统筹 与项目角色派发协调任务/);
   assert.doesNotMatch(t, /向 Steward \/ 统筹与项目角色派发协调任务/);

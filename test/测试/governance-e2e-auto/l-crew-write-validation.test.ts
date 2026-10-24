@@ -72,6 +72,23 @@ function correctionsOf(h: Harness): string[] {
   return (h.prompts.get("nominator") ?? []).filter((prompt) => CORRECTION_RE.test(prompt));
 }
 
+/**
+ * Convener 收到的「写卡/readiness 派发」任务，**排除** 2026-10-24 P0-2 的 `[自动推进]` 继续调度提示。
+ * P0-2 之后步骤 done/状态变化会把就绪步骤提示投给 Steward，它不是写卡校验通过后的派发；
+ * 断言次数/内容时只统计非 `[自动推进]` 消息（不把自动推进当写卡失败，也不放松「不派 Convener」）。
+ */
+function convenerDispatches(h: Harness): string[] {
+  return (h.prompts.get("convener") ?? []).filter((prompt) => !prompt.startsWith("[自动推进]"));
+}
+
+/** Convener 收到的消息只能匹配目标派发（allowed）或是 P0-2 `[自动推进]` 提示；其它一律视为越权派发。 */
+function assertOnlyExpectedConvenerPrompts(h: Harness, allowed: readonly RegExp[]): void {
+  const unexpected = (h.prompts.get("convener") ?? []).filter(
+    (prompt) => !prompt.startsWith("[自动推进]") && !allowed.some((pattern) => pattern.test(prompt)),
+  );
+  assert.deepEqual(unexpected, [], "Convener 只应收到目标派发与 P0-2 [自动推进] 提示");
+}
+
 function leadValidationNotes(h: Harness): string[] {
   return h.events.flatMap((envelope) => {
     if (envelope.roleId !== "liaison") return [];
@@ -148,10 +165,11 @@ test("正常写卡 ⇒ 确定性校验通过，继续派 Convener 恰一次", as
     const sent = await h.send("nominator", "请写出 executor 的角色卡与边界。");
     assert.equal(sent.ok, true, sent.error ?? "");
 
-    await h.waitFor(() => (h.prompts.get("convener")?.length ?? 0) === 1, 5000);
+    await h.waitFor(() => convenerDispatches(h).length === 1, 5000);
     assert.equal(correctionsOf(h).length, 0, "校验通过不得退回 Crew 修正");
-    assert.equal(h.prompts.get("convener")!.length, 1, "Convener 恰一次");
-    assert.match(h.prompts.get("convener")![0]!, /客户已完成任命 executor/);
+    assert.equal(convenerDispatches(h).length, 1, "Convener 恰一次");
+    assert.match(convenerDispatches(h)[0]!, /客户已完成任命 executor/);
+    assertOnlyExpectedConvenerPrompts(h, [/客户已完成任命 executor/]);
     assert.equal(h.presented.length, 0, "正常写卡全程 0 张客户卡");
 
     const ledger = await h.waitForLedger(
@@ -195,14 +213,16 @@ for (const bad of BAD_CASES) {
       assert.equal(first.length, 1, "首次校验失败恰一条修正任务");
       assert.match(first[0]!, bad.expected, `修正任务须含具体路径/错误（${bad.name}）`);
       assert.match(first[0]!, /重新发 appointment-write 确认卡/, "修正任务须要求重发 appointment-write 卡");
-      assert.equal(h.prompts.get("convener")?.length ?? 0, 0, "校验失败不得派 Convener");
+      assert.equal(convenerDispatches(h).length, 0, "校验失败不得派 Convener");
+      assertOnlyExpectedConvenerPrompts(h, []);
       assert.equal(h.presented.length, 0, "校验失败不得弹客户卡");
 
       // 修正任务本身会跑一轮并 settle，触发重复检查；同 flow+问题哈希必须去重。
       await new Promise((resolve) => setTimeout(resolve, 1200));
       assert.equal(correctionsOf(h).length, 1, "同问题重复 settle 不得重复反馈");
       assert.equal(leadValidationNotes(h).length, 1, "Lead 系统行同问题不刷屏");
-      assert.equal(h.prompts.get("convener")?.length ?? 0, 0, "重复 settle 仍不得派 Convener");
+      assert.equal(convenerDispatches(h).length, 0, "重复 settle 仍不得派 Convener");
+      assertOnlyExpectedConvenerPrompts(h, []);
     } finally {
       await h.stop();
       h.cleanup();
@@ -240,8 +260,9 @@ test("Crew 修正后重新写卡 ⇒ 校验通过并继续派 Convener 恰一次
     assert.equal(correctionsOf(h).length, 1, "首次失败恰一条修正任务");
     assert.match(correctionsOf(h)[0]!, /role-card\.md：文件不存在/);
 
-    await h.waitFor(() => (h.prompts.get("convener")?.length ?? 0) === 1, 5000);
-    assert.equal(h.prompts.get("convener")!.length, 1, "修正通过后 Convener 恰一次");
+    await h.waitFor(() => convenerDispatches(h).length === 1, 5000);
+    assert.equal(convenerDispatches(h).length, 1, "修正通过后 Convener 恰一次");
+    assertOnlyExpectedConvenerPrompts(h, [/客户已完成任命 executor/]);
     assert.equal(correctionsOf(h).length, 1, "修正通过后不再重复反馈");
     assert.equal(h.presented.length, 0, "全程 0 张客户卡");
 

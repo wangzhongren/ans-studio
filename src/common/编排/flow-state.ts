@@ -1185,3 +1185,216 @@ export function flowCompletionIssue(flow: FlowState, ledger: FlowLedgerInput): s
   const result = evaluateFlowCompletion(flow, ledger);
   return result.ready ? undefined : result.issues.join("；");
 }
+
+// —————————————————————— 就绪步骤（2026-10-24 P0-2） ——————————————————————
+//
+// 纯只读规划器：给定 flow 与「账本里已 dispatch.accepted 的 stepId」，算出下一批可继续调度的步骤。
+// **不读盘、不写盘、不改 flow、不派发、不标 done**；桌面只把结果转成给 Steward 的「继续调度」提示，
+// 是否派发/如何派发仍由既有治理门禁与角色决定。本函数不新增 flow 字段/枚举/持久化。
+
+/**
+ * `listReadyFlowSteps` 的已派发输入：账本 `dispatch.accepted.stepId` 的投影。
+ * `ReadonlySet<string>` 或 `readonly string[]` 均可（调用方从治理账本自行收集，按 flowId 过滤）。
+ */
+export type ReadyFlowDispatchedStepIds = ReadonlySet<string> | readonly string[];
+
+/**
+ * 就绪步骤（可继续调度）。
+ * `kind` 只会是 `dispatch` / `artifact`：`customer-decision`/`acceptance` 是人工闸门，**永不**进入 ready。
+ */
+export interface ReadyFlowStep {
+  id: string;
+  title: string;
+  owner: string;
+  kind: "dispatch" | "artifact";
+  /** 原样携带步骤声明的并行组（未声明则字段缺席）。 */
+  parallelGroup?: string;
+  /** 原样携带步骤声明的 dependsOn（未声明 = 空数组；不改写为解析后的替代链）。 */
+  dependsOn: string[];
+}
+
+/**
+ * 被跳过的 pending 步骤及机器可读原因：
+ *   · `already-dispatched`    账本已有 dispatch.accepted（该 stepId 已派发过）；
+ *   · `awaiting-customer`     `kind: customer-decision`（待客户决定，人工闸门）；
+ *   · `awaiting-acceptance`   `kind: acceptance`（验收出口，永不自动）；
+ *   · `app-owned`             `owner` 为 `app`（应用自身执行，不交角色调度）；
+ *   · `owner-missing`         `owner` 为空（无法确定调度对象，fail-closed）；
+ *   · `dependency-missing`    dependsOn 引用的步骤不存在；
+ *   · `dependency-unknown`    前置已 superseded 但 supersededBy 缺失，或指向不存在的步骤；
+ *   · `dependency-cycle`      supersededBy 链成环（防御性；YAML 解析已拒绝替代环）；
+ *   · `dependency-not-done`   前置（解析后的最终非 superseded 步骤）尚未 done。
+ */
+export interface SkippedFlowStep {
+  id: string;
+  reason:
+    | "already-dispatched"
+    | "awaiting-customer"
+    | "awaiting-acceptance"
+    | "app-owned"
+    | "owner-missing"
+    | "dependency-missing"
+    | "dependency-unknown"
+    | "dependency-cycle"
+    | "dependency-not-done";
+}
+
+/**
+ * 流程当前停在的人工闸门（仅当**没有 ready 步骤**时报告）：
+ *   · `awaiting-customer`   至少一个 pending `customer-decision` 步骤（优先）；
+ *   · `awaiting-acceptance` 否则，至少一个 pending `acceptance` 步骤。
+ *
+ * 注意：ready 非空时**不**报 stopReason——验收步骤通常全程 pending，若无条件报告会让调用方误以为
+ * 流程无法继续调度（P0-2 的唤醒被永久压住）。ready 为空的其它原因（步骤在途/阻塞）不在此报告，
+ * 由 skipped 与既有收尾门覆盖。
+ */
+export type ReadyFlowStopReason = "awaiting-customer" | "awaiting-acceptance";
+
+/** `listReadyFlowSteps` 结果：ready / skipped 均保持 `flow.steps` 原顺序。 */
+export interface ListReadyFlowStepsResult {
+  ready: ReadyFlowStep[];
+  /** 被考虑（`status: pending`）但未就绪的步骤；非 pending 步骤不列出。 */
+  skipped: SkippedFlowStep[];
+  stopReason?: ReadyFlowStopReason;
+}
+
+/** 单个 dependsOn 前置解析结果（仅内部用）。 */
+type ReadyDependencyResolution =
+  | { ok: true; step: FlowStateStep }
+  | { ok: false; reason: "missing" | "unknown" | "cycle" };
+
+/**
+ * dependsOn 前置解析（与 P0-3 派发门同一口径）：前置若已 `superseded`，沿 `supersededBy` 链解析到
+ * 最终非 superseded 步骤；缺失/未知/成环返回 `ok:false`（不按「未 done」混同）。
+ */
+function resolveReadyDependency(
+  byId: ReadonlyMap<string, FlowStateStep>,
+  depId: string,
+): ReadyDependencyResolution {
+  const visited = new Set<string>();
+  let currentId = depId;
+  for (;;) {
+    if (visited.has(currentId)) return { ok: false, reason: "cycle" };
+    visited.add(currentId);
+    const step = byId.get(currentId);
+    if (step === undefined) {
+      return { ok: false, reason: currentId === depId ? "missing" : "unknown" };
+    }
+    if (step.status !== "superseded") return { ok: true, step };
+    const next = step.supersededBy?.trim();
+    if (next === undefined || next === "") return { ok: false, reason: "unknown" };
+    currentId = next;
+  }
+}
+
+/**
+ * 计算下一批可继续调度的步骤（纯函数，2026-10-24 P0-2）。
+ *
+ * 就绪条件（全部满足）：
+ *   1. `status === "pending"`；
+ *   2. `kind` 为 `dispatch` / `artifact`（`customer-decision`/`acceptance` 是人工闸门，skip）；
+ *   3. `owner` 非空且不是 `app`（应用自身执行，skip）；
+ *   4. stepId 不在 `dispatchedStepIds`（账本已有 dispatch.accepted，已派发，skip）；
+ *   5. `dependsOn` 每项解析到最终非 superseded 步骤后必须 `done`；缺失/未知/成环 ⇒ 不 ready 并给出原因。
+ *
+ * 顺序：先按 step 判定 kind/owner/已派发/依赖（第一个命中者决定 skipped.reason），再看 ready 是否为空
+ * 决定 stopReason。函数无副作用：不读账本、不写盘、不修改入参。
+ */
+export function listReadyFlowSteps(
+  flow: FlowState,
+  dispatchedStepIds: ReadyFlowDispatchedStepIds = [],
+): ListReadyFlowStepsResult {
+  const byId = new Map<string, FlowStateStep>();
+  for (const step of flow.steps) {
+    if (!byId.has(step.id)) byId.set(step.id, step);
+  }
+  const dispatched = new Set<string>(dispatchedStepIds);
+  const ready: ReadyFlowStep[] = [];
+  const skipped: SkippedFlowStep[] = [];
+  let pendingCustomerDecision = false;
+  let pendingAcceptance = false;
+
+  for (const step of flow.steps) {
+    if (step.status !== "pending") continue;
+    if (step.kind === "customer-decision") pendingCustomerDecision = true;
+    if (step.kind === "acceptance") pendingAcceptance = true;
+  }
+
+  for (const step of flow.steps) {
+    if (step.status !== "pending") continue;
+
+    if (step.kind === "acceptance") {
+      skipped.push({ id: step.id, reason: "awaiting-acceptance" });
+      continue;
+    }
+    if (step.kind === "customer-decision") {
+      skipped.push({ id: step.id, reason: "awaiting-customer" });
+      continue;
+    }
+
+    const owner = step.owner.trim();
+    if (owner === "") {
+      skipped.push({ id: step.id, reason: "owner-missing" });
+      continue;
+    }
+    if (owner.toLowerCase() === "app") {
+      skipped.push({ id: step.id, reason: "app-owned" });
+      continue;
+    }
+    if (dispatched.has(step.id)) {
+      skipped.push({ id: step.id, reason: "already-dispatched" });
+      continue;
+    }
+
+    // 依赖：缺失/未知/成环优先于「未 done」；多个前置时取第一个未解析原因。
+    let unresolvedReason: SkippedFlowStep["reason"] | undefined;
+    let hasNotDone = false;
+    for (const depId of step.dependsOn ?? []) {
+      const resolution = resolveReadyDependency(byId, depId);
+      if (!resolution.ok) {
+        if (unresolvedReason === undefined) {
+          unresolvedReason =
+            resolution.reason === "missing"
+              ? "dependency-missing"
+              : resolution.reason === "cycle"
+                ? "dependency-cycle"
+                : "dependency-unknown";
+        }
+        continue;
+      }
+      if (resolution.step.status !== "done") hasNotDone = true;
+    }
+    if (unresolvedReason !== undefined) {
+      skipped.push({ id: step.id, reason: unresolvedReason });
+      continue;
+    }
+    if (hasNotDone) {
+      skipped.push({ id: step.id, reason: "dependency-not-done" });
+      continue;
+    }
+
+    ready.push({
+      id: step.id,
+      title: step.title,
+      owner: step.owner,
+      kind: step.kind,
+      ...(step.parallelGroup !== undefined ? { parallelGroup: step.parallelGroup } : {}),
+      dependsOn: [...(step.dependsOn ?? [])],
+    });
+  }
+
+  const stopReason: ReadyFlowStopReason | undefined =
+    ready.length > 0
+      ? undefined
+      : pendingCustomerDecision
+        ? "awaiting-customer"
+        : pendingAcceptance
+          ? "awaiting-acceptance"
+          : undefined;
+
+  return {
+    ready,
+    skipped,
+    ...(stopReason !== undefined ? { stopReason } : {}),
+  };
+}

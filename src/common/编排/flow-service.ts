@@ -7,15 +7,20 @@
 //
 // 钉死语义：
 //   · **串行**：同一项目（projectRoot）的 mutation 走进程内 Promise 链（读-改-写都在临界区）；
-//   · **版本校验**：`expectedRevision` 必须等于当前文件字节的 sha256，否则 `revision-conflict`；
+//   · **版本校验 + 单次重试**（2026-10-24 P1-6）：`expectedRevision` 必须等于当前文件字节的 sha256；
+//     冲突时重读当前 flow，仅当目标步骤当前状态仍允许该迁移、且 done 证据在当前账本仍有效时，
+//     用当前 revision **重试一次**（诊断 `flow.conflict.retry`）；否则仍返回 `revision-conflict`
+//     （不掩盖真实冲突，不无限重试）；
 //   · **证据对账**：`done` 必须有 evidence，并用 `flow-state.ts::validateFlowEvidence` 对候选 flow
 //     与账本对账（只过滤目标 stepId 的 issue）；
 //   · **原子写**：复用 `common/shared/atomic-write.ts`（tmp + fsync + rename）；失败不破坏原文件；
 //   · **幂等**：目标步骤当前 status/evidence 与请求一致 ⇒ `idempotent:true`，不写盘；
 //   · **权限**：工作流管理者 = Steward/Convener（actorPower="schedule"）或 Lead/Liaison
 //     （actorPower="liaison"，2026-10-20 客户拍板「把主理 Lead 设为工作流管理者」）——可更新全部未终态步骤；
-//     其他角色只能更新 owner=自己的步骤，且只允许 `dispatched→delivered`、
-//     `dispatched|delivered→failed|blocked`；`pending→dispatched`、`delivered→done`、supersede 仅管理者。
+//     其他角色只能更新 owner=自己的步骤。**2026-10-24 P1-7 收紧**：`dispatched→delivered` **只允许步骤
+//     owner** 标记（Steward/Lead 等 manager 不代标 delivered）；`delivered→done` 仍仅管理者；
+//     `dispatched|delivered→failed|blocked` 保持；`pending→dispatched`、`failed|blocked→dispatched` 仅管理者；
+//     supersede 仅管理者。
 //
 // 本模块不 import 适配器/运行时核心；只读 `flow-state.ts` 与账本，写 YAML 经共享原子写原语。
 
@@ -286,23 +291,89 @@ export function validateReleaseOnlyExtension(input: {
 /**
  * 合法状态迁移（管理者/owner 共用；owner 另有额外限制在调用处）：
  *   pending → dispatched（仅管理者）
- *   dispatched → delivered | failed | blocked
- *   delivered → done（仅管理者） | failed | blocked
+ *   dispatched → delivered（**仅步骤 owner**；2026-10-24 P1-7：Steward/Lead 等 manager 不代标 delivered）
+ *   dispatched | delivered → failed | blocked（owner 或管理者）
+ *   delivered → done（仅管理者）
  *   failed | blocked | aborted → dispatched（仅管理者：重派）
  * `superseded` 只能走 `supersede`，不能经 update 设置。
  */
-function isTransitionAllowed(from: FlowToolStatus, to: FlowToolStatus, isManager: boolean): boolean {
+function isTransitionAllowed(
+  from: FlowToolStatus,
+  to: FlowToolStatus,
+  actor: { isManager: boolean; isOwner: boolean },
+): boolean {
   if (to === "superseded") return false;
-  if (from === "pending") return isManager && to === "dispatched";
-  if (from === "dispatched") return to === "delivered" || to === "failed" || to === "blocked";
+  if (from === "pending") return actor.isManager && to === "dispatched";
+  if (from === "dispatched") {
+    // P1-7：交付声明只能由步骤 owner 发出；manager 只能在 delivered 之后核证 done。
+    if (to === "delivered") return actor.isOwner;
+    return to === "failed" || to === "blocked";
+  }
   if (from === "delivered") {
-    if (to === "done") return isManager;
+    if (to === "done") return actor.isManager;
     return to === "failed" || to === "blocked";
   }
   if (from === "failed" || from === "blocked" || from === "aborted") {
-    return isManager && to === "dispatched";
+    return actor.isManager && to === "dispatched";
   }
   return false;
+}
+
+/**
+ * **P1-6**：revision 冲突后的单次重试预检（**只读**；不改状态、不写账本、不补 artifact 观测）。
+ *
+ * 仅当同时满足才用当前 revision 重试一次：
+ *   · 目标步骤仍存在，调用者仍是管理者或该步骤 owner；
+ *   · 当前状态与请求状态不同（同状态属于幂等重放/并发已更新，交回调用方重读，不重试）；
+ *   · 当前状态不是终态，且 `isTransitionAllowed` 仍允许该迁移；
+ *   · `done`：证据存在、kind 与步骤 kind 对应，且按当前账本 `validateFlowEvidence` 对账有效。
+ *
+ * 任一条不满足 ⇒ 保持 `revision-conflict`（不掩盖真实冲突；不无限重试）。
+ */
+async function canRetryStaleUpdate(args: {
+  projectRoot: string;
+  flow: FlowState;
+  stepId: string;
+  status: FlowToolStatus;
+  evidence?: FlowToolEvidence;
+  actorRoleId: string;
+  isManager: boolean;
+}): Promise<boolean> {
+  const step = args.flow.steps.find((candidate) => candidate.id === args.stepId);
+  if (step === undefined) return false;
+  const isOwner = step.owner === args.actorRoleId;
+  if (!args.isManager && !isOwner) return false;
+  if (args.status === "superseded") return false;
+  if (step.status === args.status) return false;
+  if (TERMINAL_STATUSES.has(step.status)) return false;
+  if (!isTransitionAllowed(step.status, args.status, { isManager: args.isManager, isOwner })) return false;
+
+  const nextEvidence = args.evidence ?? step.evidence;
+  if (args.status !== "done") return true;
+  if (nextEvidence === undefined || nextEvidence.kind !== step.kind) return false;
+
+  let ledger;
+  try {
+    ledger = await readGovernanceLedger(args.projectRoot);
+  } catch {
+    return false;
+  }
+  if (ledger.errors.length > 0) return false;
+  const nextFlow: FlowState = {
+    ...args.flow,
+    steps: args.flow.steps.map((item) =>
+      item.id === step.id
+        ? {
+            ...item,
+            status: "done" as const,
+            evidence: { kind: nextEvidence.kind, ref: nextEvidence.ref },
+          }
+        : item,
+    ),
+  };
+  const evidenceResult = validateFlowEvidence(nextFlow, ledger.entries);
+  if (evidenceResult.ok) return true;
+  return !evidenceResult.issues.some((issue) => issue.stepId === step.id);
 }
 
 // —————————————————————— 串行队列 ——————————————————————
@@ -468,6 +539,7 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
         if (!read.ok) return read.result;
         const { flow, revision } = read;
         const flowView = viewOf(flow, revision, actorRoleId, actorPower);
+        const isManager = isManagerPower(actorPower);
         if (input.expectedRevision !== revision) {
           log.record("flow.conflict", {
             flowId,
@@ -475,13 +547,32 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
             expectedRevision: input.expectedRevision,
             actualRevision: revision,
           });
-          return {
-            ok: false,
-            code: "revision-conflict",
-            revision,
-            flow: flowView,
-            error: `流程版本已变化（期望 ${input.expectedRevision}，当前 ${revision}），请重新读取后重试。`,
-          };
+          // P1-6：只读预检通过才用当前 revision 重试一次；否则保持 revision-conflict（不掩盖真实冲突）。
+          const retry = await canRetryStaleUpdate({
+            projectRoot,
+            flow,
+            stepId: input.stepId,
+            status: input.status,
+            ...(input.evidence !== undefined ? { evidence: input.evidence } : {}),
+            actorRoleId,
+            isManager,
+          });
+          if (!retry) {
+            return {
+              ok: false,
+              code: "revision-conflict",
+              revision,
+              flow: flowView,
+              error: `流程版本已变化（期望 ${input.expectedRevision}，当前 ${revision}），请重新读取后重试。`,
+            };
+          }
+          log.record("flow.conflict.retry", {
+            flowId,
+            stepId: input.stepId,
+            expectedRevision: input.expectedRevision,
+            actualRevision: revision,
+            actorRoleId,
+          });
         }
 
         const index = flow.steps.findIndex((step) => step.id === input.stepId);
@@ -489,7 +580,6 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
           return { ok: false, code: "step-not-found", revision, flow: flowView, error: `流程中没有步骤 ${input.stepId}。` };
         }
         const step = flow.steps[index]!;
-        const isManager = isManagerPower(actorPower);
 
         // 权限：管理者全部；其他仅 owner=自己。
         if (!isManager && step.owner !== actorRoleId) {
@@ -511,13 +601,22 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
         }
 
         // 状态变化时校验迁移；仅 evidence 变化（status 不变）允许（非终态）。
-        if (step.status !== input.status && !isTransitionAllowed(step.status, input.status, isManager)) {
+        if (
+          step.status !== input.status &&
+          !isTransitionAllowed(step.status, input.status, {
+            isManager,
+            isOwner: step.owner === actorRoleId,
+          })
+        ) {
+          const deliveredOnlyOwner = step.status === "dispatched" && input.status === "delivered";
           return {
             ok: false,
             code: "invalid-transition",
             revision,
             flow: flowView,
-            error: `不允许从 ${step.status} 迁移到 ${input.status}（${isManager ? "Steward/Lead" : `owner ${actorRoleId}`}）。`,
+            error: deliveredOnlyOwner
+              ? `不允许从 dispatched 迁移到 delivered：delivered 只能由步骤 ${step.id} 的 owner（${step.owner}）标记，Steward/Lead 不代标交付。`
+              : `不允许从 ${step.status} 迁移到 ${input.status}（${isManager ? "Steward/Lead" : `owner ${actorRoleId}`}）。`,
           };
         }
 

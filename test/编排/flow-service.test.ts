@@ -160,8 +160,8 @@ test("release（P0-1）：flow_get 视图带 release（缺省 false）；update 
 
     const updated = await steward(root).update({
       flowId: "flow-a",
-      stepId: "delivery",
-      status: "delivered",
+      stepId: "impl",
+      status: "dispatched",
       expectedRevision: released.revision!,
     });
     assert.equal(updated.ok, true, updated.error ?? "");
@@ -263,12 +263,13 @@ test("get：defaultFlowId / 缺失 flowId / 不存在 / 非法 YAML", async () =
   });
 });
 
-test("update：expectedRevision 不匹配 ⇒ revision-conflict（带当前 revision/flow，不写盘）", async () => {
+test("update：revision 过期且当前状态不允许该迁移 ⇒ 仍 revision-conflict（带当前 revision/flow，不写盘）", async () => {
   await withRoot(async (root) => {
-    writeFile(root, FLOW_REL, flowYaml());
+    writeFile(root, FLOW_REL, flowYaml({ implStatus: "delivered" }));
     const before = readFileSync(join(root, ...FLOW_REL.split("/")), "utf8");
     const service = steward(root);
     const current = await service.get({ flowId: "flow-a" });
+    // delivered → dispatched 不是合法迁移 ⇒ P1-6 不重试，保持真实冲突。
     const result = await service.update({
       flowId: "flow-a",
       stepId: "impl",
@@ -283,7 +284,95 @@ test("update：expectedRevision 不匹配 ⇒ revision-conflict（带当前 revi
   });
 });
 
-test("Steward：pending→dispatched→delivered→done（dispatch 证据对账）", async () => {
+test("P1-6：stale revision + 目标步骤仍可迁移 ⇒ 重读当前 revision 重试一次成功", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, flowYaml());
+    const service = steward(root);
+    const stale = (await service.get({ flowId: "flow-a" })).revision!;
+    // 模拟 schedule-write：flow 被合法改写（目标步骤 impl 仍 pending），旧 revision 过期。
+    const rewritten = flowYaml().replace("title: 前端交付", "title: 前端交付（改写）");
+    writeFile(root, FLOW_REL, rewritten);
+
+    const result = await service.update({
+      flowId: "flow-a",
+      stepId: "impl",
+      status: "dispatched",
+      expectedRevision: stale,
+    });
+    assert.equal(result.ok, true, result.error ?? "");
+    assert.notEqual(result.revision, stale, "重试使用当前 revision 写盘");
+    assert.equal(stepOf(readFlow(root).flow, "impl").status, "dispatched");
+    assert.equal(stepOf(readFlow(root).flow, "delivery").title, "前端交付（改写）", "并发写入的其它字段保留");
+  });
+});
+
+test("P1-6：并发改到不可迁移 ⇒ 仍 conflict（不掩盖真实冲突、不写盘）", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, flowYaml());
+    const service = steward(root);
+    const stale = (await service.get({ flowId: "flow-a" })).revision!;
+    // 模拟并发：impl 已被改为 delivered；delivered → dispatched 不允许。
+    writeFile(root, FLOW_REL, flowYaml({ implStatus: "delivered" }));
+    const before = readFileSync(join(root, ...FLOW_REL.split("/")), "utf8");
+
+    const result = await service.update({
+      flowId: "flow-a",
+      stepId: "impl",
+      status: "dispatched",
+      expectedRevision: stale,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "revision-conflict", "不可迁移 ⇒ 如实返回冲突");
+    assert.equal(stepOf(readFlow(root).flow, "impl").status, "delivered", "并发状态不被覆盖");
+    assert.equal(readFileSync(join(root, ...FLOW_REL.split("/")), "utf8"), before, "冲突不得写盘");
+  });
+});
+
+test("P1-6：stale revision + done 证据在当前账本无效 ⇒ 不重试、如实失败", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, flowYaml({ implStatus: "delivered" }));
+    const service = steward(root);
+    const stale = (await service.get({ flowId: "flow-a" })).revision!;
+    // 旧 revision 过期（无关字段改写），但账本没有 dispatch.accepted ⇒ done 证据无效。
+    writeFile(root, FLOW_REL, flowYaml({ implStatus: "delivered" }).replace("title: 实现", "title: 实现（改写）"));
+    const before = readFileSync(join(root, ...FLOW_REL.split("/")), "utf8");
+
+    const result = await service.update({
+      flowId: "flow-a",
+      stepId: "impl",
+      status: "done",
+      evidence: { kind: "dispatch", ref: "impl" },
+      expectedRevision: stale,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "revision-conflict", "证据不足不触发重试，保留原始冲突");
+    assert.equal(stepOf(readFlow(root).flow, "impl").status, "delivered", "不标 done");
+    assert.equal(readFileSync(join(root, ...FLOW_REL.split("/")), "utf8"), before, "不写盘");
+  });
+});
+
+test("P1-6：stale revision + done 证据在当前账本有效 ⇒ 重试一次成功", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, flowYaml({ implStatus: "delivered" }));
+    writeLedger(root, [ledgerEntry({ kind: "dispatch.accepted", flowId: "flow-a", stepId: "impl" })]);
+    const service = steward(root);
+    const stale = (await service.get({ flowId: "flow-a" })).revision!;
+    writeFile(root, FLOW_REL, flowYaml({ implStatus: "delivered" }).replace("title: 实现", "title: 实现（改写）"));
+
+    const result = await service.update({
+      flowId: "flow-a",
+      stepId: "impl",
+      status: "done",
+      evidence: { kind: "dispatch", ref: "impl" },
+      expectedRevision: stale,
+    });
+    assert.equal(result.ok, true, result.error ?? "");
+    assert.equal(stepOf(readFlow(root).flow, "impl").status, "done");
+    assert.deepEqual(stepOf(readFlow(root).flow, "impl").evidence, { kind: "dispatch", ref: "impl" });
+  });
+});
+
+test("Steward：pending→dispatched；P1-7 delivered 仅 owner；delivered→done 仅管理者（dispatch 证据对账）", async () => {
   await withRoot(async (root) => {
     writeFile(root, FLOW_REL, flowYaml());
     const service = steward(root);
@@ -294,9 +383,28 @@ test("Steward：pending→dispatched→delivered→done（dispatch 证据对账�
     revision = dispatched.revision!;
     assert.equal(stepOf(readFlow(root).flow, "impl").status, "dispatched");
 
-    const delivered = await service.update({ flowId: "flow-a", stepId: "impl", status: "delivered", expectedRevision: revision });
+    // P1-7：Steward 是 manager，但步骤 owner 是 backend ⇒ 不得代标 delivered。
+    const stewardDelivered = await service.update({ flowId: "flow-a", stepId: "impl", status: "delivered", expectedRevision: revision });
+    assert.equal(stewardDelivered.ok, false);
+    assert.equal(stewardDelivered.code, "invalid-transition");
+    assert.match(stewardDelivered.error ?? "", /owner/);
+    assert.equal(stepOf(readFlow(root).flow, "impl").status, "dispatched", "manager 代标不得落盘");
+
+    const backend = owner(root, "backend");
+    const delivered = await backend.update({ flowId: "flow-a", stepId: "impl", status: "delivered", expectedRevision: revision });
     assert.equal(delivered.ok, true, delivered.error ?? "");
     revision = delivered.revision!;
+
+    // worker 不能 done（delivered→done 仅管理者）。
+    const workerDone = await backend.update({
+      flowId: "flow-a",
+      stepId: "impl",
+      status: "done",
+      evidence: { kind: "dispatch", ref: "impl" },
+      expectedRevision: revision,
+    });
+    assert.equal(workerDone.ok, false);
+    assert.equal(workerDone.code, "invalid-transition", "worker 不能标 done");
 
     const missingEvidence = await service.update({ flowId: "flow-a", stepId: "impl", status: "done", expectedRevision: revision });
     assert.equal(missingEvidence.ok, false);
@@ -392,7 +500,7 @@ test("owner：只能更新自己的步骤、只能 dispatched→delivered 或 di
   });
 });
 
-test("Lead（liaison）作为工作流管理者：canUpdate 全部未终态，可 update/supersede；证据/revision 校验不变", async () => {
+test("Lead（liaison）作为工作流管理者：canUpdate 全部未终态，可 update/supersede；P1-7 不代标 delivered；证据/revision 校验不变", async () => {
   await withRoot(async (root) => {
     writeFile(root, FLOW_REL, flowYaml());
     const lead = createFlowService({ projectRoot: root, actorRoleId: "liaison", actorPower: "liaison" });
@@ -401,10 +509,16 @@ test("Lead（liaison）作为工作流管理者：canUpdate 全部未终态，�
     assert.deepEqual(view.flow?.canUpdate, ["impl", "delivery", "contract-freeze", "verification"], "Lead=全部未终态");
 
     let revision = view.revision!;
-    // Lead 可更新他人 owner 的步骤（管理者）。
+    // Lead 可更新他人 owner 的步骤（管理者）：pending→dispatched 放行。
+    const dispatched = await lead.update({ flowId: "flow-a", stepId: "impl", status: "dispatched", expectedRevision: revision });
+    assert.equal(dispatched.ok, true, dispatched.error ?? "");
+    revision = dispatched.revision!;
+
+    // P1-7：Lead 不能代标 delivered（delivery 的 owner 是 frontend）。
     const delivered = await lead.update({ flowId: "flow-a", stepId: "delivery", status: "delivered", expectedRevision: revision });
-    assert.equal(delivered.ok, true, delivered.error ?? "");
-    revision = delivered.revision!;
+    assert.equal(delivered.ok, false);
+    assert.equal(delivered.code, "invalid-transition", "Lead 不能代标 delivered");
+    assert.match(delivered.error ?? "", /owner/);
 
     // Lead 可 supersede。
     const superseded = await lead.supersede({

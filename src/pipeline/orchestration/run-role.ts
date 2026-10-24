@@ -291,8 +291,9 @@ export interface AdapterCapabilities {
   governanceJudge?: GovernanceJudgeToolOptions;
   /**
    * 2026-10-20 Flow 文件方法化（客户拍板「按这个方案做吧」）：应用是 `docs/flows/<flowId>.yaml`
-   * 的**唯一写者**。`flowGet` 给所有角色；`flowStepUpdate`/`flowStepSupersede` 只给内置治理角色
-   * （权限由 `common/编排/flow-service.ts` 校验）。未注入 ⇒ 对应工具不注册。
+   * 的**唯一写者**。`flowGet` 给所有角色；`flowStepUpdate` 也给所有角色（2026-10-24 P1-7：项目 owner
+   * 需要用既有工具把 owner=自己的步骤标 `delivered`；迁移/权限仍由 flow-service 裁决）；
+   * `flowStepSupersede` 只给内置治理角色（工作流管理者）。未注入 ⇒ 对应工具不注册。
    */
   flowGet?: FlowGetFn;
   flowStepUpdate?: FlowStepUpdateFn;
@@ -1324,7 +1325,8 @@ export async function openRoleSession(
   }
 
   // 2026-10-20 Flow 文件方法化：应用是 `docs/flows/<flowId>.yaml` 唯一写者。
-  // `flow_get` 给所有角色；`flow_step_update` / `flow_step_supersede` 只给内置治理角色（service 再校验权限）。
+  // `flow_get` 给所有角色；`flow_step_update` 也给所有角色（2026-10-24 P1-7：项目 owner 用既有工具
+  // 标自己的 delivered；权限/迁移仍由 flow-service 校验）；`flow_step_supersede` 只给内置治理角色。
   // `flowGet` 缺省 flowId 用**调用时**的 currentFlowId（会话中途切 flow 也能取对）。
   const flowService = createFlowService({
     projectRoot: input.project.projectRoot,
@@ -1335,9 +1337,8 @@ export async function openRoleSession(
     const flowId = payload.flowId ?? currentFlowId;
     return flowService.get(flowId !== undefined ? { flowId } : {});
   };
-  const flowStepUpdate: FlowStepUpdateFn | undefined = builtInGovernance
-    ? (payload) => flowService.update(payload)
-    : undefined;
+  // P1-7：项目 worker 是步骤 owner，需要用自己的 flow_step_update 标 delivered（不能标 done）。
+  const flowStepUpdate: FlowStepUpdateFn = (payload) => flowService.update(payload);
   const flowStepSupersede: FlowStepSupersedeFn | undefined = builtInGovernance
     ? (payload) => flowService.supersede(payload)
     : undefined;

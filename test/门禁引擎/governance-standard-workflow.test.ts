@@ -60,6 +60,12 @@ test("标准工作流：五卡各恰有一个「标准工作流」章节，并�
         "不承担内部角色调度",
         "应用仍负责门禁（闸门 0/1/2、发布验收门）与阶段流转",
         "只有发布版本才由应用派 Proof / 验收，非发布不派",
+        // 2026-10-24 P1-7：delivered 由步骤 owner 标，manager 只核 done；worker 不能 done。
+        "**步骤状态权限（必须）**",
+        "`dispatched → delivered` 只能由该步骤的 owner（项目角色 / worker）标记",
+        "manager（Steward / 统筹、Lead / 主理）不得代标 `delivered`",
+        "只能在 owner 交付 `delivered` 后核证并标 `done`（`delivered → done`）",
+        "worker 不能标 `done`",
         "不要等客户催办",
         "也不要替应用推进下一阶段",
       ],
@@ -231,6 +237,11 @@ test("标准工作流：Steward / 统筹——写团队计划→发 appointment 
       "Steward 不派发治理角色、不代替验收、不催办",
       "只向已任命、已写卡且 readiness pass 的项目角色发起 `dispatch_task`",
       "不把「已派发」写成「已完成」",
+      // 2026-10-24 P1-7：登记完成里写明 delivered 只能由 owner 标、manager 只核 done、worker 不能 done。
+      "`dispatched → delivered` 只能由该步骤的 owner（项目角色 / worker）标记，你不得代标 `delivered`",
+      "只能在 owner 交付 `delivered` 后核证并标 `done`（`delivered → done`）",
+      "或标 `failed` / `blocked`",
+      "worker 不能标 `done`",
     ],
     "Steward 标准工作流",
   );
@@ -513,6 +524,11 @@ test("标准工作流：流程工具——Steward 初始创建例外 + flow_get/
       "步骤推进 ≠ 客户批准",
       "Steward 可更新全部步骤，其他角色只能更新自己的步骤",
       "`flow_step_supersede`（Steward/Lead 工作流管理者）做返工",
+      // 2026-10-24 P1-7：保留「可更新全部步骤」权限，同时钉死 delivered 例外。
+      "**例外：`dispatched → delivered` 只能由该步骤的 owner（项目角色）标记",
+      "你不得代标 `delivered`",
+      "只能在 owner 交付 `delivered` 后核证 `delivered → done`",
+      "worker 不能标 `done`",
     ],
     "Steward 流程工具纪律",
   );
