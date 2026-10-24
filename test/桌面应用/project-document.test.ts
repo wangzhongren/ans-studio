@@ -160,7 +160,7 @@ test('B Service silently rejects non-whitelist role-root candidates, de-duplicat
   try{
    await service.grantNativeSelection(f.root);
    const view=service.updateListing(service.beginListing(f.root),f.root,candidates);
-   assert.deepEqual(view.documents.A.map(d=>d.relativePath),['roles/A/role-card.md','roles/A/feature-map.md'],'只有精确白名单路径被铸造，重复候选去重为一条');
+   assert.deepEqual(view.documents.A.map(d=>d.relativePath),['roles/A/role-card.md','roles/A/changelog.md','roles/A/feature-map.md'],'只有精确白名单路径被铸造，重复候选去重为一条；既有 card/changelog 之后追加根文档');
   }finally{service.dispose();}
   const noDir=createProjectDocumentService();
   try{

@@ -6181,7 +6181,9 @@ test("2026-10-23 可重入门禁：两轮错误写卡（内容不同）⇒ 两�
         "utf8",
       );
       await triggerPostWrite(harness, root, flowId);
-      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 2, 6000);
+      // 第四轮派发在 post-write 的「等 Nominator 本轮 settle」有界等待（8s）之后才发生；
+      // 6s 在慢速 CI（mac x64/arm64）会先超时。只放大等待预算，不改条件/断言。
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 2, 15000);
       assert.equal(await waitForConvenerDispatchCount(root, flowId, 2), 2, "内容变化后允许再次派发（新指纹/新 Crew 写卡锚）");
       assert.equal(harness.customerCalls.length, 0, "再次派发仍不弹客户卡");
       assert.equal(
