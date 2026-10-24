@@ -398,7 +398,7 @@ test("dispatch：流程文件/步骤缺失拒；同一 flowId+stepId 重复派�
   });
 });
 
-test("coordinate：仅 Liaison→Convener；flowId 必填、stepId 可选；不要求提案/任命/流程步骤/去重", () => {
+test("coordinate（2026-10-24 闸门 1）：仅 Liaison→Convener + 最新提案接受；flowId 必填、stepId 可选；不要求任命/步骤/去重", () => {
   withRoot((root) => {
     const coordinate = (over: Partial<GovernanceGateInput> = {}): GovernanceGateInput =>
       input({
@@ -410,15 +410,27 @@ test("coordinate：仅 Liaison→Convener；flowId 必填、stepId 可选；不�
         ...over,
       });
 
-    // 空账本 + 没有流程文件/步骤 ⇒ 仍允许（协调消息不是项目步骤派发）。
-    assert.deepEqual(evaluateGovernanceGate(coordinate(), snapshot([])), { allowed: true });
-    assert.deepEqual(evaluateGovernanceGate(coordinate({ stepId: "delivery-backend" }), snapshot([])), { allowed: true });
+    // 2026-10-24 收紧（设计 v1 §6.4 闸门 1）：空账本/提案未接受 ⇒ 拒绝协调。
+    assert.equal(blocked(evaluateGovernanceGate(coordinate(), snapshot([]))), "proposal-not-accepted");
+    assert.equal(
+      blocked(evaluateGovernanceGate(coordinate(), snapshot([decision({ decisionKind: "proposal-revise" })]))),
+      "proposal-not-accepted",
+    );
+    // 提案接受/快捷接受后放行；不要求任命、步骤存在或未派发（没有流程文件也允许）。
+    assert.deepEqual(evaluateGovernanceGate(coordinate(), snapshot([ACCEPT])), { allowed: true });
+    assert.deepEqual(evaluateGovernanceGate(coordinate({ stepId: "delivery-backend" }), snapshot([ACCEPT])), {
+      allowed: true,
+    });
+    assert.deepEqual(evaluateGovernanceGate(coordinate(), snapshot([ACCEPT_QUICK])), { allowed: true });
 
-    assert.equal(blocked(evaluateGovernanceGate(coordinate({ flowId: undefined }), snapshot([]))), "missing-flow-id");
-    assert.equal(blocked(evaluateGovernanceGate(coordinate({ stepId: "Bad_ID" }), snapshot([]))), "missing-step-id");
-    assert.equal(blocked(evaluateGovernanceGate(coordinate({ roleId: "convener" }), snapshot([]))), "forbidden");
-    assert.equal(blocked(evaluateGovernanceGate(coordinate({ roleId: "backend" }), snapshot([]))), "forbidden");
-    assert.equal(blocked(evaluateGovernanceGate(coordinate({ targetRoleId: "backend" }), snapshot([]))), "forbidden");
+    assert.equal(blocked(evaluateGovernanceGate(coordinate({ flowId: undefined }), snapshot([ACCEPT]))), "missing-flow-id");
+    assert.equal(blocked(evaluateGovernanceGate(coordinate({ stepId: "Bad_ID" }), snapshot([ACCEPT]))), "missing-step-id");
+    assert.equal(blocked(evaluateGovernanceGate(coordinate({ roleId: "convener" }), snapshot([ACCEPT]))), "forbidden");
+    assert.equal(blocked(evaluateGovernanceGate(coordinate({ roleId: "backend" }), snapshot([ACCEPT]))), "forbidden");
+    assert.equal(
+      blocked(evaluateGovernanceGate(coordinate({ targetRoleId: "backend" }), snapshot([ACCEPT]))),
+      "forbidden",
+    );
     assert.equal(blocked(evaluateGovernanceGate(coordinate(), snapshot([], ["坏行"]))), "ledger-corrupt");
 
     // 既有 dispatch 零放宽：空账本 Convener→项目角色仍 proposal-not-accepted。
@@ -488,10 +500,10 @@ test("slug 收紧：尾连字符在 coordinate/dispatch 被拒，文案展示新
         ...over,
       });
 
-    const badCoordinateFlow = evaluateGovernanceGate(coordinate({ flowId: "flow-" }), snapshot([]));
+    const badCoordinateFlow = evaluateGovernanceGate(coordinate({ flowId: "flow-" }), snapshot([ACCEPT]));
     assert.equal(blocked(badCoordinateFlow), "missing-flow-id");
     assert.match((badCoordinateFlow as { message: string }).message, /0,62/, "文案必须插值现行正则");
-    const badCoordinateStep = evaluateGovernanceGate(coordinate({ stepId: "impl-" }), snapshot([]));
+    const badCoordinateStep = evaluateGovernanceGate(coordinate({ stepId: "impl-" }), snapshot([ACCEPT]));
     assert.equal(blocked(badCoordinateStep), "missing-step-id");
 
     const badDispatchFlow = evaluateGovernanceGate(
@@ -506,9 +518,10 @@ test("slug 收紧：尾连字符在 coordinate/dispatch 被拒，文案展示新
     );
     assert.equal(blocked(badDispatchStep), "missing-step-id");
 
-    // 旧合法值仍放行：含连续连字符（coordinate 不要求流程步骤存在）。
-    assert.deepEqual(evaluateGovernanceGate(coordinate({ flowId: "a--b" }), snapshot([])), { allowed: true });
-    assert.deepEqual(evaluateGovernanceGate(coordinate({ stepId: "a--b" }), snapshot([])), { allowed: true });
+    // 旧合法值仍放行：含连续连字符（coordinate 不要求流程步骤存在；该 flow 的提案已接受即可）。
+    const acceptDashed = decision({ flowId: "a--b", decisionKind: "proposal-accept", customerDecision: "accepted" });
+    assert.deepEqual(evaluateGovernanceGate(coordinate({ flowId: "a--b" }), snapshot([acceptDashed])), { allowed: true });
+    assert.deepEqual(evaluateGovernanceGate(coordinate({ stepId: "a--b" }), snapshot([ACCEPT])), { allowed: true });
   });
 });
 
@@ -606,6 +619,241 @@ test("dispatch dependsOn：旧 flow（无 dependsOn）不新增检查；YAML 坏
     );
     assert.deepEqual(
       evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A])),
+      { allowed: true },
+    );
+  });
+});
+
+// —————————————————————— 2026-10-24 P0-3：dependsOn 解析 supersededBy 链 ——————————————————————
+
+/** 返工替代链 flow：目标步骤 dependsOn 一个被 superseded 的旧步骤。 */
+function supersedeChainFlow(lines: {
+  middle?: "done" | "pending" | "superseded";
+  final?: "done" | "pending";
+  /** 第二跳：middle 再被 final 取代。 */
+  twoHops?: boolean;
+} = {}): string {
+  const middle = lines.middle ?? "superseded";
+  const final = lines.final ?? "done";
+  const steps = [
+    "  - id: delivery-persistence",
+    "    title: 旧持久化",
+    "    owner: A",
+    "    kind: dispatch",
+    "    status: superseded",
+    ...(lines.twoHops === false ? [] : ["    supersededBy: delivery-persistence-rework"]),
+    "  - id: delivery-persistence-rework",
+    "    title: 返工持久化",
+    "    owner: A",
+    "    kind: dispatch",
+    `    status: ${middle}`,
+    ...(middle === "done"
+      ? ["    evidence: { kind: dispatch, ref: delivery-persistence-rework }"]
+      : []),
+    ...(middle === "superseded" ? ["    supersededBy: delivery-persistence-final"] : []),
+    ...(lines.twoHops === true
+      ? [
+          "  - id: delivery-persistence-final",
+          "    title: 二次返工",
+          "    owner: A",
+          "    kind: dispatch",
+          `    status: ${final}`,
+          ...(final === "done" ? ["    evidence: { kind: dispatch, ref: delivery-persistence-final }"] : []),
+        ]
+      : []),
+    "  - id: integration-e2e",
+    "    title: 集成与演示",
+    "    owner: A",
+    "    kind: dispatch",
+    "    status: pending",
+    "    dependsOn: [delivery-persistence]",
+  ];
+  return ["flowId: flow-a", "version: 1", "qualityTier: production", "steps:", ...steps, ""].join("\n");
+}
+
+test("dispatch P0-3：前置 superseded ⇒ 解析到最终非 superseded 步骤判 done（单跳/链式均放行）", () => {
+  withRoot((root) => {
+    writeAcceptanceCriteria(root);
+    writeYamlFlow(root, supersedeChainFlow({ middle: "done" }));
+    assert.deepEqual(
+      evaluateGovernanceGate(dispatchInput(root, { stepId: "integration-e2e" }), snapshot([ACCEPT, APPOINT_A])),
+      { allowed: true },
+      "单跳：旧步骤 superseded 但替代步骤 done ⇒ 放行",
+    );
+
+    writeYamlFlow(root, supersedeChainFlow({ twoHops: true, final: "done" }));
+    assert.deepEqual(
+      evaluateGovernanceGate(dispatchInput(root, { stepId: "integration-e2e" }), snapshot([ACCEPT, APPOINT_A])),
+      { allowed: true },
+      "链式：superseded → superseded → done ⇒ 解析到最终步骤放行",
+    );
+  });
+});
+
+test("dispatch P0-3：替代链最终步骤未 done ⇒ dependencies-not-done（文案给出解析后的步骤）", () => {
+  withRoot((root) => {
+    writeAcceptanceCriteria(root);
+    writeYamlFlow(root, supersedeChainFlow({ middle: "pending" }));
+    const result = evaluateGovernanceGate(
+      dispatchInput(root, { stepId: "integration-e2e" }),
+      snapshot([ACCEPT, APPOINT_A]),
+    );
+    assert.equal(blocked(result), "dependencies-not-done");
+    assert.match((result as { message: string }).message, /delivery-persistence→delivery-persistence-rework（pending）/);
+  });
+});
+
+test("dispatch P0-3：superseded 缺少 supersededBy ⇒ dependencies-unresolved（不按未 done 混同）", () => {
+  withRoot((root) => {
+    writeAcceptanceCriteria(root);
+    writeYamlFlow(
+      root,
+      [
+        "flowId: flow-a",
+        "version: 1",
+        "qualityTier: production",
+        "steps:",
+        "  - id: delivery-persistence",
+        "    title: 旧持久化",
+        "    owner: A",
+        "    kind: dispatch",
+        "    status: superseded",
+        "  - id: integration-e2e",
+        "    title: 集成与演示",
+        "    owner: A",
+        "    kind: dispatch",
+        "    status: pending",
+        "    dependsOn: [delivery-persistence]",
+        "",
+      ].join("\n"),
+    );
+    const result = evaluateGovernanceGate(
+      dispatchInput(root, { stepId: "integration-e2e" }),
+      snapshot([ACCEPT, APPOINT_A]),
+    );
+    assert.equal(blocked(result), "dependencies-unresolved");
+    assert.match((result as { message: string }).message, /缺少 supersededBy/);
+    assert.doesNotMatch((result as { message: string }).message, /尚未全部 done/);
+  });
+});
+
+test("dispatch P0-3：supersededBy 未知/成环的坏 flow ⇒ fail-closed（解析拒绝，不按未 done 混同）", () => {
+  withRoot((root) => {
+    writeAcceptanceCriteria(root);
+    // supersededBy 指向不存在的步骤：parse 拒绝 ⇒ 门禁 fail-closed（flow-step-missing）。
+    writeYamlFlow(
+      root,
+      [
+        "flowId: flow-a",
+        "version: 1",
+        "qualityTier: production",
+        "steps:",
+        "  - id: old-step",
+        "    title: 旧步骤",
+        "    owner: A",
+        "    kind: dispatch",
+        "    status: superseded",
+        "    supersededBy: ghost-step",
+        "  - id: integration-e2e",
+        "    title: 集成",
+        "    owner: A",
+        "    kind: dispatch",
+        "    status: pending",
+        "    dependsOn: [old-step]",
+        "",
+      ].join("\n"),
+    );
+    assert.equal(
+      blocked(
+        evaluateGovernanceGate(dispatchInput(root, { stepId: "integration-e2e" }), snapshot([ACCEPT, APPOINT_A])),
+      ),
+      "flow-step-missing",
+    );
+
+    // 替代环：parse 拒绝 ⇒ 同样 fail-closed。
+    writeYamlFlow(
+      root,
+      [
+        "flowId: flow-a",
+        "version: 1",
+        "qualityTier: production",
+        "steps:",
+        "  - id: step-a",
+        "    title: A",
+        "    owner: A",
+        "    kind: dispatch",
+        "    status: superseded",
+        "    supersededBy: step-b",
+        "  - id: step-b",
+        "    title: B",
+        "    owner: A",
+        "    kind: dispatch",
+        "    status: superseded",
+        "    supersededBy: step-a",
+        "  - id: integration-e2e",
+        "    title: 集成",
+        "    owner: A",
+        "    kind: dispatch",
+        "    status: pending",
+        "    dependsOn: [step-a]",
+        "",
+      ].join("\n"),
+    );
+    assert.equal(
+      blocked(
+        evaluateGovernanceGate(dispatchInput(root, { stepId: "integration-e2e" }), snapshot([ACCEPT, APPOINT_A])),
+      ),
+      "flow-step-missing",
+    );
+  });
+});
+
+// —————————————————————— 2026-10-24 P1-4：dispatch 校验 step.owner === targetRoleId ——————————————————————
+
+test("dispatch P1-4：owner 与目标一致放行；owner 非空且错配 ⇒ owner-mismatch；legacy .md 不新增检查", () => {
+  withRoot((root) => {
+    writeAcceptanceCriteria(root);
+    writeYamlFlow(
+      root,
+      [
+        "flowId: flow-a",
+        "version: 1",
+        "qualityTier: production",
+        "steps:",
+        "  - id: impl",
+        "    title: 实现",
+        "    owner: B",
+        "    kind: dispatch",
+        "    status: pending",
+        "",
+      ].join("\n"),
+    );
+    // 任命名单含 A 与 B；步骤 owner=B，派给 A ⇒ owner-mismatch（不改变任命/标准门）。
+    const appointmentAB = decision({
+      actorRoleId: "convener",
+      power: "schedule",
+      decisionKind: "appointment",
+      customerDecision: "appointed",
+      targetRoleIds: ["A", "B"],
+    });
+    const mismatch = evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, appointmentAB]));
+    assert.equal(blocked(mismatch), "owner-mismatch");
+    assert.match((mismatch as { message: string }).message, /owner 是 B/);
+    assert.match((mismatch as { message: string }).message, /派发目标 A/);
+
+    // owner=B 且目标 B：owner 一致，放行（任命名单含 B、标准已存在）。
+    assert.deepEqual(
+      evaluateGovernanceGate(dispatchInput(root, { targetRoleId: "B" }), snapshot([ACCEPT, appointmentAB])),
+      { allowed: true },
+    );
+
+    // 旧版 .md（无结构化 owner）保持既有行为，不新增 owner 检查。
+    // 删除同名 YAML：YAML 存在即唯一机器状态，会遮蔽旧版 .md 回落。
+    rmSync(join(root, "docs", "flows", "flow-a.yaml"), { force: true });
+    writeFlow(root, "flow-a", ["impl"]);
+    writeAcceptanceCriteria(root);
+    assert.deepEqual(
+      evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, appointmentAB])),
       { allowed: true },
     );
   });

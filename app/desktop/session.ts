@@ -82,6 +82,20 @@ import type { OrchestrationEvent, HandbackEvent } from "../../src/common/编排/
 // E-1（2026-10-12）：「回交后的 su 验收」的两件**单一来源**（编排提供，只读导入、不复制）——
 // `renderHandbackPrompt`（投递给 su 的输入文案）与 `handbackKey`（去重键）。**两前端共用、不得各写一份**。
 import { renderHandbackPrompt, renderHandbackBatchPrompt, handbackKey, extractDispatchReadPaths, planDispatchDelivery, type TaskHandback } from "../../src/common/编排/handback.ts";
+
+/**
+ * 内置来源回交→Lead 与同轮 settle 治理反馈的去重窗口（2026-10-24）：标记只在回交入队后到本轮
+ * settle 之间的短窗口内有效；超出即不抑制（宁可重复一次，也不永久吞掉后续轮次的反馈）。
+ */
+const GOVERNANCE_HANDBACK_MIRROR_DEDUPE_MS = 5 * 60 * 1000;
+
+/** Proof settle 状态措辞（只用于「状态 + 指针」投递；不解释报告内容、不猜验收结论）。 */
+const PROOF_STATUS_TEXT: Readonly<Record<RuntimeTurnOutcome, string>> = {
+  completed: "本轮已完成",
+  failed: "本轮失败",
+  aborted: "本轮已中止",
+  timed_out: "本轮超时",
+};
 // ↑ G-1／A2（2026-10-16 客户批准；设计 `2026-10-16_design_contract-workflow-dispatch.md` §四/§九 A2；
 // 编排 A1 交回接口见 `角色卡/编排/docs/change/2026-10-16_change_contract-workflow-dispatch-a1.md` §五）：
 // 派发必读块的**提取**（`extractDispatchReadPaths`）、**判据**（`planDispatchDelivery`：契约缺失 ⇒ fail-closed
@@ -131,7 +145,7 @@ import type {
   RequestClarificationReceipt,
 } from "../../src/model/runtime.ts";
 // W6-B：决定卡镜像判据与意图交接任务文案（纯逻辑在 governance-advance.ts；本层只做接线）。
-import { buildIntentHandoffMessage, isMirroredGovernanceCard } from "./governance-advance.ts";
+import { buildIntentHandoffMessage, governanceAcceptanceReportPath, isMirroredGovernanceCard } from "./governance-advance.ts";
 // H-1（2026-10-12）：派发能力的冻结契约（§4 冻结家；只读导入、不复制形状）。
 import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions } from "../../src/model/runtime.ts";
 // G-4/I3（2026-10-16 客户批准）：技能安装/卸载能力的冻结契约（设计 §3.2 冻结家 `src/model/runtime.ts`；
@@ -887,6 +901,13 @@ export class SessionManager {
    * 前置 `…`）。settle 时由 `mirrorGovernanceFeedback` 取出即删。不参与任何判定。
    */
   private readonly lastAssistantText = new Map<string, { turnId?: string; text: string }>();
+  /**
+   * **内置来源回交已投 Lead 的短时标记**（2026-10-24 治理协调，设计 v1 §6.2/§6.3）：
+   * `queueKey` → 入队时刻。内置角色回交在编排侧被 `suppressHandback` 抑制，正常不会出现；
+   * `handleHandback` 仍需对「防御性出现」的内置回交路由到 Lead，并与同一轮 settle 的
+   * `mirrorGovernanceFeedback` **去重**（同一轮只向 Lead 投一条）。只在内存、短时有效；不参与任何判定。
+   */
+  private readonly governanceHandbackMirrored = new Map<string, number>();
   /**
    * **回交主人**最近一次开会话所用 runtime（评审 §5.6：`lastSuRuntime` → `lastGovernanceRuntime`）：
    * trio = Convener（`schedule`），single = 主入口 su。看护向回交主人投系统消息时 queueKey 需要 runtime
@@ -2228,12 +2249,16 @@ export class SessionManager {
                 // 投给主入口（Lead）——由 Lead 向客户汇总，不再原文贴到 pane。取出即删 ⇒ 同一轮只投一次。
                 // 用**事件循环的 projectRoot**（与 lastAssistantText 的 queueKey 同源）——不要用 en.projectRoot
                 // （会话 entry 的 root 可能是斜杠变体，getListing 精确匹配会静默 miss）。
-                void this.mirrorGovernanceFeedback(projectRoot, runtime, roleId);
+                // 2026-10-24（治理协调）：带本轮 flowId/终局——Proof 只发状态+报告指针（不转全文）。
                 const settledOutcomeRaw = origin?.outcome ?? (ev.detail as { outcome?: unknown } | undefined)?.outcome;
                 const settledOutcome =
                   settledOutcomeRaw === "completed" || settledOutcomeRaw === "failed" || settledOutcomeRaw === "aborted" || settledOutcomeRaw === "timed_out"
                     ? settledOutcomeRaw
                     : undefined;
+                void this.mirrorGovernanceFeedback(projectRoot, runtime, roleId, {
+                  ...(settledOrigin?.flowIds !== undefined && settledOrigin.flowIds.length > 0 ? { flowIds: settledOrigin.flowIds } : {}),
+                  ...(settledOutcome !== undefined ? { outcome: settledOutcome } : {}),
+                });
                 if (settledOutcome !== undefined) {
                   this.lastTurns.set(this.queueKey(en.projectRoot, roleId, runtime), { outcome: settledOutcome, at: new Date(this.now()).toISOString() });
                 }
@@ -2551,12 +2576,20 @@ export class SessionManager {
    *    失败只诊断、**绝不打断 settle**。
    *  · `getListing` 在精确 miss 时做**斜杠归一兜底**（真机：事件循环 root 与枚举缓存 key 可能正/反斜杠
    *    不一致）；仅查找变体，**不改变**调用方 key。
+   *  · 2026-10-24（治理协调，设计 v1 §4.3/§6.5）：**Proof（`governanceFunction === "verification"`）只投
+   *    「状态 + 报告/治理路径指针」，不转述报告正文**（Proof 的权威报告给客户/应用，Lead 不能编辑/代批/改判）。
+   *  · 内置来源回交若已由 `handleHandback` 防御性投给 Lead（同一轮），本函数**不再重复投**（短时标记去重）。
    *  · 每个 early-return 记一条 `governance.feedback.skip`（不记正文）；成功记 `governance.feedback.mirrored`
    *    （`targetRoleId` = Lead 的真实 roleId，不记来源）。
    */
-  private async mirrorGovernanceFeedback(projectRoot: string, runtime: RuntimeKind, roleId: string): Promise<void> {
+  private async mirrorGovernanceFeedback(
+    projectRoot: string,
+    runtime: RuntimeKind,
+    roleId: string,
+    options: { flowIds?: readonly string[]; outcome?: RuntimeTurnOutcome } = {},
+  ): Promise<void> {
     const diagnostic = createDiagnosticLogger({ component: "desktop.governance-feedback", projectRoot, roleId });
-    const skip = (reason: "no-listing" | "non-trio" | "primary" | "not-builtin" | "no-text"): void => {
+    const skip = (reason: "no-listing" | "non-trio" | "primary" | "not-builtin" | "no-text" | "handback-mirrored"): void => {
       // 共享白名单只落允许字段名 ⇒ 同时带 `reasonCode`（机器可读）；绝不带正文。
       diagnostic.record("governance.feedback.skip", { reason, reasonCode: reason });
     };
@@ -2569,20 +2602,47 @@ export class SessionManager {
       const role = listing.roles.find((r) => r.roleId === roleId);
       if (role === undefined || role.builtIn !== true || role.governanceFunction === undefined) return skip("not-builtin");
       const key = this.queueKey(projectRoot, roleId, runtime);
+      // 内置来源回交已防御性投给 Lead（同一轮）：settle 反馈与它去重（同一轮只投一条）。
+      const handbackMirroredAt = this.governanceHandbackMirrored.get(key);
+      if (handbackMirroredAt !== undefined) {
+        this.governanceHandbackMirrored.delete(key);
+        if (this.now() - handbackMirroredAt <= GOVERNANCE_HANDBACK_MIRROR_DEDUPE_MS) {
+          this.lastAssistantText.delete(key);
+          return skip("handback-mirrored");
+        }
+      }
       const last = this.lastAssistantText.get(key);
       if (last === undefined) return skip("no-text");
       this.lastAssistantText.delete(key); // 取出即删：同一轮只投一次
       const text = last.text.trim();
       if (text === "") return skip("no-text");
-      const chars = Array.from(text);
-      const body = chars.length > 4000 ? chars.slice(0, 4000).join("") : text;
       // 显示名：listing 的 `displayName`（Lead / Draft / Crew / Steward / Proof），否则回退 roleId。
       const displayName = this.roleDisplayName(projectRoot, roleId);
-      const task = [
-        `[系统·治理反馈] 来自 ${displayName} 的内部反馈（内部材料，请汇总后告知客户，不要逐字转述）：`,
-        body,
-        "请用 1-3 句话向客户汇总：完成了什么、是否有风险/阻塞、下一步或需要客户决定什么。不要逐字转述内部报告，不要使用内部行话，不要声称客户已批准。",
-      ].join("\n");
+      const isProof = role.governanceFunction === "verification";
+      let body = "";
+      let task: string;
+      if (isProof) {
+        // Proof 独立性：只发状态 + 报告/治理路径指针；正文丢弃、不转全文、不摘要替代报告。
+        const flowIds = await this.resolveProofFlowIds(projectRoot, options.flowIds);
+        const reportPath = flowIds.length > 0 ? governanceAcceptanceReportPath(flowIds[0]!) : "docs/acceptance/<flowId>-report-vN.md";
+        const governancePath = flowIds.length > 0 ? `docs/governance/verifier/${flowIds[0]}.md` : "docs/governance/verifier/<flowId>.md";
+        const statusText = options.outcome !== undefined ? PROOF_STATUS_TEXT[options.outcome] ?? options.outcome : "已结束";
+        task = [
+          `[系统·治理反馈] 来自 ${displayName} 的验收状态（只含状态与报告指针；不转述报告正文）：`,
+          `状态：${statusText}${flowIds.length > 0 ? `（流程 ${flowIds.join("、")}）` : ""}`,
+          `报告路径：${reportPath}`,
+          `治理记录：${governancePath}`,
+          "请只向客户说明验收复核已结束与报告位置；不要转述报告内容，不要编辑/代批/改判验收结论，也不要把报告当作客户批准。验收卡与客户决定仍由应用/客户处理。",
+        ].join("\n");
+      } else {
+        const chars = Array.from(text);
+        body = chars.length > 4000 ? chars.slice(0, 4000).join("") : text;
+        task = [
+          `[系统·治理反馈] 来自 ${displayName} 的内部反馈（内部材料，请汇总后告知客户，不要逐字转述）：`,
+          body,
+          "请用 1-3 句话向客户汇总：完成了什么、是否有风险/阻塞、下一步或需要客户决定什么。不要逐字转述内部报告，不要使用内部行话，不要声称客户已批准。",
+        ].join("\n");
+      }
       const opened = await this.openBackground({ projectRoot, roleId: primaryRoleId, runtime });
       if (!opened.ok) {
         diagnostic.error("governance.feedback.open.failed", new Error(opened.error ?? "无法开启主入口会话"), { targetRoleId: primaryRoleId });
@@ -2595,7 +2655,7 @@ export class SessionManager {
       }
       const mirroredChars = Array.from(body).length;
       // `targetRoleId`/`count`/`busy` 是共享白名单里的允许名（chars/roleId 本身不在白名单）。
-      diagnostic.record("governance.feedback.mirrored", {
+      diagnostic.record(isProof ? "governance.feedback.pointer" : "governance.feedback.mirrored", {
         targetRoleId: primaryRoleId,
         chars: mirroredChars,
         count: mirroredChars,
@@ -2604,6 +2664,28 @@ export class SessionManager {
     } catch (error) {
       // 镜像/诊断失败绝不打断 settle。
       diagnostic.error("governance.feedback.failed", error);
+    }
+  }
+
+  /**
+   * Proof settle 的报告指针：优先用本轮投递 origin 的 flowId；缺失时按账本 verifier 派发记录取最近的
+   * flow（有界；读不到 ⇒ 空集，只给通用目录指针）。**只读**，不猜验收结论、不伪造报告版本。
+   */
+  private async resolveProofFlowIds(projectRoot: string, hinted?: readonly string[]): Promise<string[]> {
+    const hintedIds = [...new Set((hinted ?? []).filter((id): id is string => typeof id === "string" && id !== ""))];
+    if (hintedIds.length > 0) return hintedIds.slice(0, 3);
+    try {
+      const ledger = await readGovernanceLedger(projectRoot);
+      if (ledger.errors.length > 0) return [];
+      const verificationFlows: string[] = [];
+      for (const entry of ledger.entries) {
+        if (entry.kind !== "dispatch.accepted" || entry.targetRoleId !== "verifier") continue;
+        if (typeof entry.flowId !== "string" || entry.flowId === "") continue;
+        if (!verificationFlows.includes(entry.flowId)) verificationFlows.push(entry.flowId);
+      }
+      return verificationFlows.slice(-3);
+    } catch {
+      return [];
     }
   }
 
@@ -3069,7 +3151,24 @@ export class SessionManager {
       if (report) report = structuredClone(report);
       if (liveReport) liveReport = structuredClone(liveReport);
       const ownerRoleId = this.handbackOwnerRoleId(projectRoot);
-      if (isBuiltInGovernanceRoleId(hb.roleId) || (ownerRoleId !== null && hb.roleId === ownerRoleId)) return; // 内置治理角色不自我回交（编排也不发；防御）
+      // 2026-10-24（治理协调，设计 v1 §6.2/§6.3）：**按来源**选回交目标——
+      //  · 内置治理角色（Draft/Steward/Crew/Proof；编排 `suppressHandback` 正常不发，这里只做防御路由）
+      //    → Lead（`primaryRoleId`），Lead 自身不自我回交；single/su 保持旧行为（内置来源不自我回交）。
+      //  · 项目 worker → Steward（`handbackOwnerRoleId` 不变；single 仍是 su）。
+      // 不解除编排的 `suppressHandback`、不新增工具/账本 kind；只是消息路由。
+      const listing = this.findListingForFeedback(projectRoot);
+      const model: GovernanceModel = listing?.governanceModel ?? "single";
+      const builtInSource = isBuiltInGovernanceRoleId(hb.roleId);
+      let targetRoleId: string | null = ownerRoleId;
+      if (builtInSource) {
+        if (model !== "trio") return; // single/su：内置来源（su 自身）不自我回交（旧行为逐字不变）
+        const leadRoleId = typeof listing?.primaryRoleId === "string" ? listing.primaryRoleId : "";
+        if (leadRoleId === "") return; // 主入口未枚举到：不猜、不改投 Steward；settle 反馈同样按无 listing 跳过
+        if (hb.roleId === leadRoleId) return; // Lead 自身不自我回交（防循环）
+        targetRoleId = leadRoleId;
+      } else if (ownerRoleId !== null && hb.roleId === ownerRoleId) {
+        return; // single su 自身等防御（trio 的 Convener 走上方内置分支）
+      }
       const key = `${projectRoot}\u0000${runtime}\u0000${handbackKey(hb)}`;
       if (this.enqueuedHandbackKeys.has(key)) {
         diagnostic.record("report.duplicate");
@@ -3083,16 +3182,16 @@ export class SessionManager {
         text = renderHandbackPrompt(hb);
       } catch (err) {
         this.emitDeliveryNote(projectRoot, runtime,
-          ownerRoleId,
+          targetRoleId,
           hb.roleId,
           mainT("main.session.handbackRenderFailed", { detail: err instanceof Error ? err.message : String(err) })
         );
         return;
       }
-      this.enqueueDelivery(projectRoot, ownerRoleId ?? "", {
+      this.enqueueDelivery(projectRoot, targetRoleId ?? "", {
         kind: "handback",
         runtime,
-        targetRoleId: ownerRoleId ?? "",
+        targetRoleId: targetRoleId ?? "",
         sourceRoleId: hb.roleId,
         text,
         summary: mainT("ui.events.handbackDeliveryWithRole", { role: hb.roleId }),
@@ -3102,8 +3201,13 @@ export class SessionManager {
         ...(report ? { report } : {}),
         ...(liveReport ? { liveReport, liveDurability } : {}),
       });
+      // 内置来源回交已投 Lead ⇒ 同一轮 settle 的治理反馈不再重复投（短时标记，见 mirrorGovernanceFeedback）。
+      if (builtInSource && model === "trio") {
+        this.governanceHandbackMirrored.set(this.queueKey(projectRoot, hb.roleId, runtime), this.now());
+        diagnostic.record("report.routed.lead", { targetRoleId: targetRoleId ?? "" });
+      }
       diagnostic.record("report.enqueued");
-      await this.drainQueue(projectRoot, ownerRoleId, runtime);
+      await this.drainQueue(projectRoot, targetRoleId, runtime);
     } catch (err) {
       diagnostic.error("report.failed", err);
       // 兜底（belt & braces）：任何意外都如实拦截为系统行——**不产生未捕获拒绝**。

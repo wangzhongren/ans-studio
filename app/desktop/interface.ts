@@ -125,6 +125,7 @@ import {
   buildAcceptanceReworkTaskMessage,
   buildAcceptanceTaskMessage,
   buildGovernanceAdvanceMessage,
+  buildGovernanceCoordinationTaskMessage,
   buildNominationAlreadyDoneMessage,
   buildRoleReadinessTaskMessage,
   flowCompletionIssue,
@@ -1664,6 +1665,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const acceptanceCriteriaDispatched = new Set<string>();
   /** 标准/变更包门槛的阻塞提示去重：`projectRoot\0flowId` → 原因（同原因只提示一次；原因变化再提示）。 */
   const acceptanceArtifactBlockedNotified = new Map<string, string>();
+  /**
+   * 2026-10-24 P0-1：非发布流程「停在发布验收前」系统行的去重：`projectRoot\0flowId` → flow revision
+   * （legacy 无 YAML 记 `legacy`）。同一 revision 只提示一次；flow/标记变化才再提示。
+   */
+  const acceptanceReleaseAwaitingNotified = new Map<string, string>();
   /** 每项目最多一条「无法确定项目引擎」系统行（后续真实事件只记诊断；不循环重试、不刷屏）。 */
   const acceptanceRuntimeUnresolvedNotified = new Set<string>();
   let runAcceptanceCheck: ((projectRoot: string, trigger: "settle" | "ledger" | "import") => Promise<void>) | undefined;
@@ -2056,11 +2062,18 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     }
   }
 
-  async function sendReworkTaskToConvener(
+  /**
+   * 返工任务的**实际接收方**（2026-10-24 治理协调）：trio = Lead（`primaryRoleId`，主理）；
+   * single/su 保持原行为（本路由目前只在 trio 生效，single 不会走到这里）。发送仍复用既有
+   * openBackground/sendBackground（忙 ⇒ 既有投递队列，不并发注入）。
+   */
+  async function sendReworkTaskToReceiver(
     projectRoot: string,
+    targetRoleId: string,
     runtimeHint: RuntimeKind | undefined,
     text: string,
   ): Promise<{ ok: boolean; error?: string; runtime?: RuntimeKind; queued?: boolean }> {
+    if (targetRoleId === "") return { ok: false, error: "实际接收方未枚举到（不猜、不改投）" };
     let resolution: RuntimeResolution;
     try {
       resolution = await resolveAcceptanceRuntime(
@@ -2071,11 +2084,18 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
     if (!resolution.ok) return { ok: false, error: resolution.message };
-    const opened = await manager.openBackground({ projectRoot, roleId: "convener", runtime: resolution.runtime });
+    const opened = await manager.openBackground({ projectRoot, roleId: targetRoleId, runtime: resolution.runtime });
     if (!opened.ok) return { ok: false, error: opened.error ?? "open-failed", runtime: resolution.runtime };
-    const sent = await manager.sendBackground({ projectRoot, roleId: "convener", runtime: resolution.runtime, text });
+    const sent = await manager.sendBackground({ projectRoot, roleId: targetRoleId, runtime: resolution.runtime, text });
     if (!sent.ok) return { ok: false, error: sent.error ?? "send-failed", runtime: resolution.runtime };
     return { ok: true, runtime: resolution.runtime, queued: sent.queued === true };
+  }
+
+  /** listing 里的角色显示名（无 displayName ⇒ roleId；只用于任务/系统行的「实际接收方」标注）。 */
+  function reworkReceiverLabel(projectRoot: string, roleId: string): string {
+    const role = listingCache.get(projectRoot)?.roles.find((candidate) => candidate.roleId === roleId);
+    const name = (role as { displayName?: unknown } | undefined)?.displayName;
+    return typeof name === "string" && name.trim() !== "" ? name.trim() : roleId;
   }
 
   /**
@@ -2117,6 +2137,21 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     }
     const nowIso = new Date().toISOString();
     const flowSnapshot = await readFlowSnapshot(projectRoot, flowId);
+    // 2026-10-24 治理协调：**实际接收方**由应用按治理模型决定（trio = Lead / 主理），报告里的
+    // `coordinator` 只保留为「报告建议」。Lead 未枚举到 ⇒ fail-closed（不猜、不改投 Steward）。
+    const receiverRoleId = (listingCache.get(projectRoot)?.primaryRoleId ?? "").trim();
+    if (receiverRoleId === "") {
+      diagnostic.record("acceptance.rework.receiver.missing", { flowId });
+      noteReworkOnce(projectRoot, flowId, "failed", "receiver-missing", note, governanceAcceptanceReworkFailedNote(flowId, "项目主入口（Lead / 主理）未枚举到；不猜、不改投，等待重新枚举后重试。"));
+      return "failed";
+    }
+    const receiverLabel = reworkReceiverLabel(projectRoot, receiverRoleId);
+    const releaseForRework = flowSnapshot !== undefined
+      ? (() => {
+          const parsedFlow = parseFlowStateYaml(flowSnapshot.text, flowId);
+          return parsedFlow.ok && parsedFlow.flow.release === true;
+        })()
+      : false;
     const record: AcceptanceReworkRoutingRecord = {
       schema: REWORK_ROUTING_SCHEMA,
       flowId,
@@ -2165,13 +2200,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       ...(report.missing ? { reportMissing: true } : {}),
       structured,
       ...(report.parse.ok ? { coordinator: report.parse.section.coordinator } : {}),
+      receiver: { roleId: receiverRoleId, displayName: receiverLabel },
+      release: releaseForRework,
       items: ownerPlan.dispatchable,
       blockedItems: ownerPlan.blocked,
       reportFixItems: ownerPlan.reportFix,
       governanceItems: ownerPlan.governance,
       ...(!report.parse.ok ? { itemErrors: report.parse.errors.map((item) => `${item.path}: ${item.message}`) } : {}),
     });
-    const sentResult = await sendReworkTaskToConvener(projectRoot, facts.runtimeHint, task);
+    const sentResult = await sendReworkTaskToReceiver(projectRoot, receiverRoleId, facts.runtimeHint, task);
     if (!sentResult.ok) {
       const detail = sentResult.error ?? mainT("shared.common.unknownReason");
       const failedRecord: AcceptanceReworkRoutingRecord = { ...record, status: "failed", error: detail, at: new Date().toISOString() };
@@ -2193,10 +2230,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       diagnostic.error("acceptance.rework.record.sent.write.failed", error, { flowId });
     }
     diagnostic.record("acceptance.rework.sent", { flowId, source: normalized.source, structured, itemCount: items.length, queued: sentResult.queued === true });
-    note(governanceAcceptanceReworkRoutedNote(flowId, normalized.source));
+    // 系统行写明**实际接收方**（trio = Lead / 主理；coordinator 只是报告建议）。
+    note(`${governanceAcceptanceReworkRoutedNote(flowId, normalized.source)}（实际接收方：${receiverLabel}（${receiverRoleId}））`);
     if (!report.parse.ok) {
       const detail = report.parse.errors.map((item) => `${item.path}: ${item.message}`).slice(0, 5).join("；") || report.parse.reason;
-      note(governanceAcceptanceReworkReportIncompleteNote(flowId, report.relPath, detail));
+      note(`${governanceAcceptanceReworkReportIncompleteNote(flowId, report.relPath, detail)}（实际接收方：${receiverLabel}（${receiverRoleId}））`);
     }
     const appendLedgerFn = deps.appendGovernanceLedgerFn ?? appendGovernanceLedger;
     const appended = await appendLedgerFn(projectRoot, {
@@ -2206,7 +2244,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       actorRoleId: "app",
       power: "app",
       trigger: "settle",
-      targetRoleId: "convener",
+      targetRoleId: receiverRoleId,
       messageSummary: ledgerSummary(task),
       ...(sentResult.runtime !== undefined ? { runtime: sentResult.runtime } : {}),
     });
@@ -2850,22 +2888,22 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     flowId: string,
     note: (summary: string) => void,
     diagnostic: ReturnType<typeof createDiagnosticLogger>,
-  ): Promise<void> => {
+  ): Promise<string | undefined> => {
     const key = acceptanceFlowKey(projectRoot, flowId);
     let bytes: Buffer;
     try {
       bytes = await readFile(path.join(projectRoot, governanceFlowStatePath(flowId)));
     } catch {
-      return; // 无 YAML/不可读：不在此处理（验收门另有 reason）
+      return undefined; // 无 YAML/不可读：不在此处理（验收门另有 reason）
     }
     const parsed = parseFlowStateYaml(bytes.toString("utf8"), flowId);
-    if (!parsed.ok) return; // 解析失败交给验收门，不猜
+    if (!parsed.ok) return undefined; // 解析失败交给验收门，不猜
     const delivered = parsed.flow.steps.filter(
       (step) => step.status === "delivered" && typeof step.owner === "string" && step.owner.trim() !== "",
     );
     if (delivered.length === 0) {
       deliveredWakeNotified.delete(key); // 状态已变化：清除，允许后续真实 delivered 再唤醒
-      return;
+      return undefined;
     }
     // owner 有活会话/busy/队列/在途投递 ⇒ 等下一次事件（不抢跑）。
     const waitingForOwner = delivered.some((step) => {
@@ -2877,15 +2915,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
       return false;
     });
-    if (waitingForOwner) return;
+    if (waitingForOwner) return undefined;
     const revision = createHash("sha256").update(bytes).digest("hex");
     const deliveredIds = delivered.map((step) => step.id).sort();
     const notifyHash = createHash("sha256").update(`${revision}\u0000${deliveredIds.join("\u0000")}`).digest("hex");
-    if (deliveredWakeNotified.get(key) === notifyHash) return; // 同 revision+同一 delivered 集合只派/提示一次
+    if (deliveredWakeNotified.get(key) === notifyHash) return notifyHash; // 同 revision+同一 delivered 集合只派/提示一次
     const runtime = await resolveNoteRuntime(projectRoot);
     if (runtime === undefined) {
       diagnostic.record("acceptance.delivered-wake.runtime-unresolved", { flowId });
-      return;
+      return undefined;
     }
     const task = [
       `流程 ${flowId}：以下步骤已 delivered，等待 Steward / 统筹 核证：`,
@@ -2898,16 +2936,169 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     const opened = await manager.openBackground({ projectRoot, roleId: "convener", runtime });
     if (!opened.ok) {
       diagnostic.error("acceptance.delivered-wake.open.failed", new Error(opened.error ?? "unknown"), { flowId });
-      return; // 失败只诊断（下一次真实事件可再试；不循环）
+      return undefined; // 失败只诊断（下一次真实事件可再试；不循环）
     }
     const sent = await manager.sendBackground({ projectRoot, roleId: "convener", runtime, text: task });
     if (!sent.ok) {
       diagnostic.error("acceptance.delivered-wake.send.failed", new Error(sent.error ?? "unknown"), { flowId });
-      return;
+      return undefined;
     }
     deliveredWakeNotified.set(key, notifyHash);
     diagnostic.record("acceptance.delivered-wake.sent", { flowId, count: delivered.length });
     note(mainT("main.interface.deliveredWaitNote", { flowId, steps: deliveredIds.join("、") }));
+    // 返回「本 revision 已通知」指纹：治理协调唤醒与它共享，避免同一 revision 再向 Lead 发第二条消息。
+    return notifyHash;
+  };
+
+  // —————— 2026-10-24 治理协调唤醒（设计 v1 §6.3；S3）——————
+  //
+  // 触发面复用既有验收检查入口（任意角色 settle / 回交到达/settle / 账本追加 / 导入/启动补齐）。
+  // 只做**唤醒**：读 flow 机器状态，把「阻塞」「交付待核证」两类阶段交给 Lead（`primaryRoleId`）
+  // 协调；**不自动推进步骤、不派项目角色、不写 flow/账本、不弹客户卡、不轮询**。
+  // （非发布「等待发布验收」由 P0-1 发布门的**状态系统行**如实说明，不用协调任务双发。）
+  // · 复用既有投递机（openBackground/sendBackground）：Lead 忙/有在途 ⇒ 不并发注入，等下一次真实事件；
+  // · 独立去重键（projectRoot+flowId+revision+stage）；delivered 阶段与 `wakeStewardForDeliveredSteps`
+  //   共享「本 revision 已通知」指纹（同一 revision 不双发）；
+  // · 内存预算：每 flow 24 次、同一阶段 2 次、连续 2 次无进展即停（只停协调唤醒；
+  //   真实回交/状态行/验收系统行不经此预算，绝不丢弃）；应用重启不持久化预算——按当前 flow/账本重建；
+  // · 不新增 IPC/卡片种类/UI/账本 kind。
+  const COORDINATION_WAKE_TOTAL_LIMIT = 24;
+  const COORDINATION_WAKE_SAME_STAGE_LIMIT = 2;
+  const COORDINATION_WAKE_NO_PROGRESS_LIMIT = 2;
+  interface CoordinationWakeState {
+    total: number;
+    stage: string | null;
+    sameStage: number;
+    noProgress: number;
+    /** 达总预算后停止协调唤醒（流程后续有结果也不再打扰；真实回交/系统行不受影响）。 */
+    stopped: boolean;
+  }
+  const coordinationWakes = new Map<string, CoordinationWakeState>();
+  /** 去重键：`projectRoot\0flowId` → `${revision}\0${stage}`（只记内存；重启按当前 revision 重建）。 */
+  const coordinationWakeNotified = new Map<string, string>();
+
+  interface CoordinationStage {
+    key: string;
+    description: string;
+    details: string[];
+  }
+
+  /** 从 flow 机器状态派生「需要主理协调」的阶段；无 = 不唤醒（不猜、不轮询）。 */
+  const coordinationStageOf = (flow: FlowState): CoordinationStage | undefined => {
+    const execution = flow.steps.filter((step) => step.kind !== "acceptance");
+    const blocked = execution.filter(
+      (step) => step.status === "failed" || step.status === "blocked" || step.status === "aborted",
+    );
+    if (blocked.length > 0) {
+      const sorted = [...blocked].sort((a, b) => a.id.localeCompare(b.id));
+      return {
+        key: `blocked:${sorted.map((step) => `${step.id}:${step.status}`).join(",")}`,
+        description: "存在 failed / blocked / aborted 步骤，需要主理协调返工或修正",
+        details: sorted.slice(0, 10).map((step) => `- 步骤 ${step.id} 当前状态 ${step.status}（owner=${step.owner ?? "未标注"}）`),
+      };
+    }
+    const delivered = execution.filter((step) => step.status === "delivered");
+    if (delivered.length > 0) {
+      const sorted = [...delivered].sort((a, b) => a.id.localeCompare(b.id));
+      return {
+        key: `delivered:${sorted.map((step) => step.id).join(",")}`,
+        description: "步骤已交付，等待 Steward / 统筹 核证",
+        details: sorted.slice(0, 10).map((step) => `- 步骤 ${step.id} 已 delivered（owner=${step.owner ?? "未标注"}）`),
+      };
+    }
+    // 非发布「等待发布验收」不走协调唤醒任务：由发布验收门的**状态系统行**如实说明（不双发）。
+    return undefined;
+  };
+
+  const noteGovernanceCoordination = async (
+    projectRoot: string,
+    flowId: string,
+    flow: FlowState,
+    revision: string,
+    context: { deliveredNotifiedHash?: string; diagnostic: ReturnType<typeof createDiagnosticLogger> },
+  ): Promise<void> => {
+    const { diagnostic } = context;
+    const listing = listingCache.get(projectRoot);
+    if (listing?.governanceModel !== "trio") return;
+    const leadRoleId = typeof listing.primaryRoleId === "string" ? listing.primaryRoleId.trim() : "";
+    if (leadRoleId === "") return;
+    const stage = coordinationStageOf(flow);
+    if (stage === undefined) return;
+    const key = acceptanceFlowKey(projectRoot, flowId);
+    const deliveredIds = flow.steps
+      .filter((step) => step.status === "delivered" && typeof step.owner === "string" && step.owner.trim() !== "")
+      .map((step) => step.id)
+      .sort();
+    const deliveredHash =
+      stage.key.startsWith("delivered:") && deliveredIds.length > 0
+        ? createHash("sha256").update(`${revision}\u0000${deliveredIds.join("\u0000")}`).digest("hex")
+        : undefined;
+    // 与 wakeStewardForDeliveredSteps 共享「本 revision 已通知」：同一 delivered 集合不再向 Lead 双发。
+    if (deliveredHash !== undefined && context.deliveredNotifiedHash === deliveredHash) {
+      diagnostic.record("governance.coordination.skip", { flowId, reasonCode: "delivered-wake-shared" });
+      return;
+    }
+    const dedupe = `${revision}\u0000${stage.key}`;
+    if (coordinationWakeNotified.get(key) === dedupe) return;
+    // Lead 忙 / 有排队或在途投递 ⇒ 不并发注入；等下一次真实事件（不轮询、不抢跑）。
+    const leadBusy = RUNTIME_KINDS.some(
+      (runtime) => manager.isRoleBusy(projectRoot, leadRoleId, runtime) || manager.hasPendingDelivery(projectRoot, leadRoleId, runtime),
+    );
+    if (leadBusy) {
+      diagnostic.record("governance.coordination.skip", { flowId, reasonCode: "lead-busy" });
+      return;
+    }
+    // 内存预算：只约束「协调唤醒」本身；真实回交/状态行/验收系统行不走此预算。
+    const state = coordinationWakes.get(key) ?? { total: 0, stage: null, sameStage: 0, noProgress: 0, stopped: false };
+    coordinationWakes.set(key, state);
+    if (state.stopped) return;
+    if (state.total >= COORDINATION_WAKE_TOTAL_LIMIT) {
+      state.stopped = true;
+      diagnostic.record("governance.coordination.skip", { flowId, reasonCode: "budget-total" });
+      return;
+    }
+    const sameStage = state.stage === stage.key;
+    if (sameStage && (state.sameStage >= COORDINATION_WAKE_SAME_STAGE_LIMIT || state.noProgress >= COORDINATION_WAKE_NO_PROGRESS_LIMIT)) {
+      diagnostic.record("governance.coordination.skip", { flowId, reasonCode: "budget-stage" });
+      return;
+    }
+    const runtime = await resolveNoteRuntime(projectRoot);
+    if (runtime === undefined) {
+      diagnostic.record("governance.coordination.skip", { flowId, reasonCode: "runtime-unresolved" });
+      return;
+    }
+    const task = buildGovernanceCoordinationTaskMessage({
+      flowId,
+      revision,
+      stage: stage.key,
+      description: stage.description,
+      details: stage.details,
+    });
+    const opened = await manager.openBackground({ projectRoot, roleId: leadRoleId, runtime });
+    if (!opened.ok) {
+      diagnostic.error("governance.coordination.open.failed", new Error(opened.error ?? "unknown"), { flowId });
+      return;
+    }
+    const sent = await manager.sendBackground({ projectRoot, roleId: leadRoleId, runtime, text: task });
+    if (!sent.ok) {
+      diagnostic.error("governance.coordination.send.failed", new Error(sent.error ?? "unknown"), { flowId });
+      return;
+    }
+    // 账目只在成功投递后记账/去重：失败保留到下一次真实事件重试（不循环）。
+    if (!sameStage) {
+      state.stage = stage.key;
+      state.sameStage = 0;
+      state.noProgress = 0;
+    }
+    state.sameStage += 1;
+    state.total += 1;
+    if (sameStage) state.noProgress += 1;
+    coordinationWakeNotified.set(key, dedupe);
+    diagnostic.record("governance.coordination.sent", {
+      flowId,
+      count: state.total,
+      reasonCode: stage.key.startsWith("delivered:") ? "delivered" : stage.key === "awaiting-release" ? "awaiting-release" : "blocked",
+    });
   };
 
   // —————— 收尾推进（2026-10-18 真机缺口；2026-10-19 客户反馈「独立核准应该是标准流程」）——————
@@ -2996,6 +3187,22 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       const reworkBranch =
         flowStateExistsForRework &&
         (latest.kind === "rejected" || (latest.kind === "none" && autoReworkRecord !== undefined));
+      // ———— 2026-10-24 P0-1：读 flow 机器状态取顶层 `release`（缺省/false = 非发布） ————
+      // 发布验收门的唯一素材：`flow.release === true` 才允许自动派 verifier / 写 acceptance-criteria /
+      // 返工后自动重派 Proof；非发布停在 `awaiting-release-acceptance`（不派、不写标准、不标 acceptance done）。
+      let parsedFlowForGate: FlowState | undefined;
+      let flowRevisionForGate: string | undefined;
+      try {
+        const gateBytes = await readFile(path.join(info.projectRoot, flowStatePath(info.flowId)));
+        const parsedForGate = parseFlowStateYaml(gateBytes.toString("utf8"), info.flowId);
+        if (parsedForGate.ok) {
+          parsedFlowForGate = parsedForGate.flow;
+          flowRevisionForGate = createHash("sha256").update(gateBytes).digest("hex");
+        }
+      } catch {
+        parsedFlowForGate = undefined; // 无 YAML/不可读：legacy 路径按「非发布」处理（release 缺省 = false）
+      }
+      const releaseMarked = parsedFlowForGate?.release === true;
       if (reworkBranch) {
         // delivered 核证 / artifact 补登仍是独立时机（返工步骤 delivered 也要唤醒 Steward）。
         await backfillFlowArtifacts(info.projectRoot, info.flowId, diagnostic);
@@ -3035,6 +3242,17 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           );
           if (routeResult !== "sent") return;
         }
+        // 2026-10-24 P0-1：非发布流程即使返工完成也不自动重派 Proof（发布版本才由应用按发布验收门派）。
+        if (!releaseMarked) {
+          const revisionTag = flowRevisionForGate ?? "legacy";
+          if (acceptanceReleaseAwaitingNotified.get(key) !== revisionTag) {
+            acceptanceReleaseAwaitingNotified.set(key, revisionTag);
+            note(`流程 ${info.flowId}：返工已按路由交主理组织；flow.release 未标记为 true（非发布）⇒ 不自动重派 Proof/verifier、不标记 acceptance done；发布版本才由 Steward / 统筹 用 schedule-write 卡把 release 显式标为 true。`);
+            diagnostic.record("acceptance.release.awaiting", { flowId: info.flowId, reasonCode: "release-unmarked" });
+          }
+          acceptanceDispatchedFlows.delete(key);
+          return;
+        }
         const freshRecord = (await readReworkRoutingRecord(info.projectRoot, info.flowId)).record;
         await redispatchAcceptanceRework({
           projectRoot: info.projectRoot,
@@ -3052,12 +3270,22 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       await backfillFlowArtifacts(info.projectRoot, info.flowId, diagnostic);
       // 2026-10-20 真机：步骤 delivered 后唤醒 Steward 核证（无活会话/队列才投；同 revision+集合去重）。
       // 放在 verifier 去重之前——即使本次不派 verifier，也必须评估 delivered 核证。
-      await wakeStewardForDeliveredSteps(info.projectRoot, info.flowId, note, diagnostic);
+      // 2026-10-24：返回「本 revision+delivered 集合已通知」指纹，供治理协调唤醒共享（同一 revision 不双发）。
+      const deliveredNotifiedHash = await wakeStewardForDeliveredSteps(info.projectRoot, info.flowId, note, diagnostic);
+      // 2026-10-24 治理协调唤醒（S3）：只把阻塞/交付待核证阶段交给 Lead；不自动推进、不派项目角色。
+      if (parsedFlowForGate !== undefined && flowRevisionForGate !== undefined) {
+        await noteGovernanceCoordination(info.projectRoot, info.flowId, parsedFlowForGate, flowRevisionForGate, {
+          ...(deliveredNotifiedHash !== undefined ? { deliveredNotifiedHash } : {}),
+          diagnostic,
+        });
+      }
       // ———— 2026-10-22 第 3 项：新流程的「实施前标准 → 变更包 → 验收判定」门槛（方案 §7.2/§7.3/§7.6） ————
       // 只作用于**新契约流程**（flow YAML 含 team-plan/role-cards/role-readiness/acceptance-criteria/change-package
       // 任一 step id）；legacy flow 保持原行为（G4/O4 迁移兼容）。标准缺失 ⇒ 派 Verifier 写标准
       // （stepId=acceptance-criteria；账本+运行期去重、不循环）并阻塞验收判定；变更包缺失/缺 riskTier ⇒ 阻塞
       // 验收判定 + Lead 系统行（去重）。判定时把标准/变更包/档位带进任务文案（不猜、不把「待补」当通过）。
+      // 2026-10-24 P0-1：以上自动派发（含写 acceptance-criteria）**只在 flow.release === true 时**执行；
+      // 非发布连标准都不派（不写 acceptance-criteria），停在发布验收前。
       let acceptanceTaskOptions: {
         riskTier?: GovernanceRiskTier;
         criteriaPath?: string;
@@ -3065,17 +3293,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         /** 团队计划 schema（v3 验收任务追加布局核对要求；v1/v2 文案不变）。 */
         teamPlanSchema?: 1 | 2 | 3;
       } = {};
-      let newContractFlow = false;
-      try {
-        const flowStateProbeText = await readFile(path.join(info.projectRoot, flowStatePath(info.flowId)), "utf8");
-        const parsedFlowState = parseFlowStateYaml(flowStateProbeText, info.flowId);
-        if (parsedFlowState.ok) {
-          newContractFlow = parsedFlowState.flow.steps.some((step) => NEW_CONTRACT_FLOW_STEP_IDS.has(step.id));
-        }
-      } catch {
-        newContractFlow = false; // 无 YAML：legacy 门（Markdown 回退）按原逻辑。
-      }
-      if (newContractFlow) {
+      const newContractFlow = parsedFlowForGate?.steps.some((step) => NEW_CONTRACT_FLOW_STEP_IDS.has(step.id)) ?? false;
+      if (releaseMarked && newContractFlow) {
         let appointmentEntry: GovernanceLedgerEntry | undefined;
         let latestProposalKind: string | undefined;
         for (const entry of ledger.entries) {
@@ -3295,6 +3514,26 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
       // 门已通过（本次判定）：清除阻塞告知记忆——若之后再次被挡（即使原因文本相同）会重新告知。
       acceptanceBlockedNotified.delete(key);
+      // ———— 2026-10-24 P0-1 发布验收门：非发布停在发布验收前（awaiting-release-acceptance） ————
+      // 只有 flow 顶层 `release === true`（显式发布动作，经既有 schedule-write 卡）才允许自动派 verifier；
+      // 非发布（缺省/false，含 legacy 无 YAML）不派 verifier/Proof、不写 acceptance-criteria、不标 acceptance done。
+      if (!releaseMarked) {
+        const gateRevision = flowStateText !== undefined ? createHash("sha256").update(flowStateText).digest("hex") : "legacy";
+        if (acceptanceReleaseAwaitingNotified.get(key) !== gateRevision) {
+          acceptanceReleaseAwaitingNotified.set(key, gateRevision);
+          note(
+            flowStateText === undefined
+              ? `流程 ${info.flowId}：legacy 流程无 flow YAML/release 标记（视为非发布）⇒ 停在发布验收前（awaiting-release-acceptance）；不派 verifier/Proof、不写 acceptance-criteria、不标记 acceptance done。发布版本才由 Steward / 统筹 用 schedule-write 卡显式标记 release: true。`
+              : `流程 ${info.flowId}：全部步骤已完成，但 flow.release 未标记为 true（非发布）⇒ 停在发布验收前（awaiting-release-acceptance）；不派 verifier/Proof、不写 acceptance-criteria、不标记 acceptance done。发布版本才由 Steward / 统筹 用 schedule-write 卡把 release 显式标为 true。`,
+          );
+          diagnostic.record("acceptance.release.awaiting", {
+            flowId: info.flowId,
+            reasonCode: flowStateText === undefined ? "legacy" : "release-unmarked",
+          });
+        }
+        acceptanceDispatchedFlows.delete(key); // 后续 flow/发布标记变化的事件可再检查（不是循环）
+        return;
+      }
       const evidence =
         info.evidence.length > 0 ? info.evidence : acceptanceEvidenceByFlow.get(key) ?? [];
       // 引擎选择（2026-10-19 真机缺陷修复）：活跃会话/真实事件 → 应用内已选/持久化 → `.ans/sessions`
@@ -5156,7 +5395,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         }
       }
       if (listing.governanceModel !== "trio") return;
-      const diagnostic = createDiagnosticLogger({ component: "desktop.governance-acceptance", projectRoot, roleId: "convener" });
+      const diagnostic = createDiagnosticLogger({ component: "desktop.governance-acceptance", projectRoot, roleId: listing.primaryRoleId });
       const runtimeHint: RuntimeKind | undefined = info.runtime ?? info.engine;
       const note = (summary: string): void => {
         try {

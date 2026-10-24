@@ -54,8 +54,12 @@ test("标准工作流：五卡各恰有一个「标准工作流」章节，并�
       [
         "阶段流转由应用负责",
         "你按本角色的标准工作流执行",
+        "内置角色（Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收）的状态与回交向主理（Lead / 主理）汇总",
+        "主理只做治理协调，不批准提案、任命或验收",
         "客户只在需求确认、提案/任命/写卡、验收卡上做决定",
         "不承担内部角色调度",
+        "应用仍负责门禁（闸门 0/1/2、发布验收门）与阶段流转",
+        "只有发布版本才由应用派 Proof / 验收，非发布不派",
         "不要等客户催办",
         "也不要替应用推进下一阶段",
       ],
@@ -197,7 +201,7 @@ test("第 5 项 readiness（P8）：Steward 写 pass/gaps 记录，gap 退回 Cr
   );
 });
 
-test("标准工作流：Steward / 统筹——写团队计划→发 appointment 卡→readiness→派发项目角色→收齐回交→登记完成→组变更包；应用自动派 Proof", () => {
+test("标准工作流：Steward / 统筹——写团队计划→发 appointment 卡→readiness→派发项目角色→收齐回交→登记完成→组变更包；发布版本才派 Proof、非发布不派", () => {
   const t = cardTextOf("convener");
   assertIncludesAll(
     t,
@@ -215,14 +219,24 @@ test("标准工作流：Steward / 统筹——写团队计划→发 appointment 
       "派发项目角色",
       "收齐回交",
       "登记完成",
-      "应用自动派 Proof",
+      "内置治理角色的状态 / 回交向 Lead / 主理 汇总",
+      "返工由 Lead / 主理 协调",
+      "只有发布版本才由应用派 Proof / 验收，非发布不派",
+      "非发布流程在 change-package 完成后停在等待发布验收",
+      "`cardKind=schedule-write`",
+      "flow 顶层 `release`",
+      "缺省 / `false` 改为 `true`",
+      "其余步骤与字段逐字不变",
+      "其他字段或步骤变化仍按原校验拒绝",
       "Steward 不派发治理角色、不代替验收、不催办",
       "只向已任命、已写卡且 readiness pass 的项目角色发起 `dispatch_task`",
       "不把「已派发」写成「已完成」",
-      "全部步骤齐备后",
     ],
     "Steward 标准工作流",
   );
+  // 旧「流程齐备后应用自动派 Proof」口径必须消失（P0-1：非发布不派）。
+  assert.doesNotMatch(t, /由应用自动派 Proof/, "Steward 不得再写自动派 Proof");
+  assert.doesNotMatch(t, /流程齐备后由应用自动派/, "非发布流程不得自动派 Proof");
 });
 
 test("标准工作流：Steward / 统筹——流程机器状态改为 docs/flows/<flowId>.yaml（schema/保留 ID/evidence/superseded）", () => {
@@ -544,7 +558,13 @@ test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/f
       "flow_step_update",
       "flow_step_supersede",
       "dispatch_task",
-      "向 Steward / 统筹 与项目角色派发协调任务",
+      "向 Steward / 统筹 派协调任务",
+      "项目 worker 由 Steward / 统筹 派，你不直接派项目角色",
+      "不直接派 Crew / Proof / 项目 worker",
+      "闸门 0 已结算",
+      "闸门 1 已结算",
+      "协调 ≠ 客户批准",
+      "只收 Proof 的状态与报告指针",
       "自足并带 `flowId`",
       "向 Steward 派协调任务可省 `stepId`",
       "派发/推进 ≠ 客户批准",
@@ -557,12 +577,14 @@ test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/f
       "不得发 `request_choice` 问客户",
       "Lead 只能发 `intent-confirm` 需求确认卡",
       "内部决策由你自行决定",
-      "`dispatch_task` 派给 Steward / 项目角色",
       "并用 flow 工具记录",
       "不得把内部选择包装成客户决定或另发 `request_choice`",
     ],
     "Lead 工作流管理",
   );
+  // 旧「可向项目角色派发协调任务」口径必须消失（Q1：项目 worker 由 Steward 派）。
+  assert.doesNotMatch(lead, /向 Steward \/ 统筹 与项目角色派发协调任务/);
+  assert.doesNotMatch(lead, /派给 Steward \/ 项目角色/);
   // 能力位：dispatchTask=true；其余能力不变。
   const leadCaps = governanceRoleOf("liaison")!.capabilities;
   assert.equal(leadCaps.dispatchTask, true, "Lead 具备 dispatch_task");
@@ -634,7 +656,8 @@ test("标准工作流：Proof / 验收——实施前写标准→核对档位/�
       "未真实运行、未演示时不得建议 accept",
       "架构或质量章节缺失",
       "不接受客户手动派发作为常态",
-      "流程齐备后应用自动派发验收",
+      "发布版本流程齐备后应用按发布验收门派发验收",
+      "非发布不派 Proof / 验收",
     ],
     "Proof 标准工作流",
   );

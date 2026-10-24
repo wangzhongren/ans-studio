@@ -161,6 +161,16 @@ export interface FlowState {
   version: number;
   qualityTier: FlowQualityTier;
   status?: string;
+  /**
+   * 发布验收标记（可选；缺省 = false = 非发布，2026-10-24 闸门 2 delta P0-1）。
+   *
+   * **只有 `true`（发布版本）才允许应用按发布验收门派 Proof / 启动 verifier criteria；**
+   * 非发布流程在 change-package 后停在等待发布验收，不派 Proof、不写标准、不标 acceptance done。
+   * 标记只能由 Steward 用既有 `request_confirmation(cardKind=schedule-write)` 写一份只把 release
+   * 从 false/缺省改为 true、其余字段/步骤不变的 flow YAML（应用做受控扩展校验）；不是新 step kind、
+   * 不是账本 kind、不是新卡片种类。
+   */
+  release?: boolean;
   steps: FlowStateStep[];
 }
 
@@ -221,7 +231,7 @@ export type EvaluateFlowCompletionResult =
 
 // —————————————————————— 解析与校验 ——————————————————————
 
-const TOP_LEVEL_KEYS = new Set(["flowId", "version", "qualityTier", "status", "steps"]);
+const TOP_LEVEL_KEYS = new Set(["flowId", "version", "qualityTier", "status", "release", "steps"]);
 const STEP_KEYS = new Set([
   "id",
   "title",
@@ -286,6 +296,7 @@ function flowParseFailure(errors: FlowStateError[]): ParseFlowStateResult {
  *
  * 校验规则（确定性，逐条对应客户决定）：
  *   1. flowId 与文件名一致；version 正整数；qualityTier ∈ {prototype, production}；steps 非空、id 唯一；
+ *      可选 `release` 必须是布尔（缺省 = false = 非发布；只有 true 才允许发布验收派 Proof）；
  *   2. 保留 id `verification`/`acceptance` 至多一个、必须是 `kind: acceptance`、初始 `status: pending`
  *      （完成后允许 `done` 且必须带 `acceptance` 证据）；执行/证据步骤不得占用这两个 id；
  *   3. `kind`/`status`/`evidence.kind` 严格枚举；`done` 步骤必须有 evidence，且 evidence.kind 与步骤
@@ -349,6 +360,14 @@ export function parseFlowStateYaml(text: string, flowId: string): ParseFlowState
 
   if (document.status !== undefined && (typeof document.status !== "string" || document.status.trim() === "")) {
     push("status", "status 为可选人读字段；给出时必须是非空字符串");
+  }
+
+  // release（2026-10-24 P0-1）：可选布尔；缺省 = false（非发布）。未知类型 fail-closed。
+  if (document.release !== undefined && typeof document.release !== "boolean") {
+    push(
+      "release",
+      `release 必须是布尔值 true / false（缺省 = 非发布；当前 ${JSON.stringify(document.release)}）`,
+    );
   }
 
   // —— steps ——
@@ -696,6 +715,7 @@ export function parseFlowStateYaml(text: string, flowId: string): ParseFlowState
       version: rawVersion as number,
       qualityTier: qualityTier as FlowQualityTier,
       ...(typeof document.status === "string" ? { status: document.status.trim() } : {}),
+      ...(typeof document.release === "boolean" ? { release: document.release } : {}),
       steps,
     },
   };

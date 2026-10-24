@@ -3,10 +3,10 @@
 // **验收返工自动路由与 rejected 重新派发**的独立端到端链路。
 //
 // 覆盖（客户已确认 Q1–Q13 A；O1–O4 不做）：
-//   · 客户 reject（真实验收卡 + 客户通道）→ 路由 Convener（报告 + acceptance-rework/v1 items + 决定记录）
+//   · 客户 reject（真实验收卡 + 客户通道）→ 路由 Lead / 主理（报告 + acceptance-rework/v1 items + 决定记录）
 //     → 不派 Proof → `.ans/governance/acceptance/<flowId>/rework-routing.json` → rework 完成/flow 更新
-//     → 恰好一次重派 Proof → accepted 收口；重复触发/同内容不重派；无热循环。
-//   · judge auto-rework（真实验收卡 + 真实判断 driver deny）→ 路由 Convener、无 customer.decision、
+//     → 发布版本（release: true）恰好一次重派 Proof → accepted 收口；重复触发/同内容不重派；无热循环。
+//   · judge auto-rework（真实验收卡 + 真实判断 driver deny）→ 路由 Lead、无 customer.decision、
 //     回执/系统行写「自动决策未通过/未完成」且不把 judge 退回写成客户拒绝。
 //   · 报告缺段/坏段 → 「报告不完整」兜底、不生成 items、不建 flow 步骤、不解析自由文本。
 //   · 未知 owner 逐项 blocked、有效项先行；verifier/convener 特殊归属；无可 supersede 旧步骤 fail-closed（Q5 A）。
@@ -156,8 +156,15 @@ function invalidReport(): string {
 function acceptanceFlowYaml(
   flowId = FLOW,
   steps: readonly { id: string; status: string; kind?: string; evidence?: { kind: string; ref: string }; dependsOn?: string[] }[],
+  options: { release?: boolean } = {},
 ): string {
-  const lines = [`flowId: ${flowId}`, "version: 1", "qualityTier: production", "steps:"];
+  const lines = [
+    `flowId: ${flowId}`,
+    "version: 1",
+    "qualityTier: production",
+    ...(options.release === true ? ["release: true"] : []),
+    "steps:",
+  ];
   for (const step of steps) {
     const kind = step.kind ?? (step.id === "verification" || step.id === "acceptance" ? "acceptance" : "dispatch");
     lines.push(
@@ -179,19 +186,20 @@ function flowFilePath(root: string, flowId = FLOW): string {
   return path.join(root, "docs", "flows", `${flowId}.yaml`);
 }
 
-/** 写 flow YAML（可选把 mtime 落到给定时刻；用于「rejection 之后有实质更新」的确定性时间线）。 */
+/** 写 flow YAML（可选把 mtime 落到给定时刻；`release: true` = 发布版本，缺省 = 非发布）。 */
 function writeFlowState(
   root: string,
   steps: readonly FlowDocStep[] | readonly { id: string; status: string; kind?: string; evidence?: { kind: string; ref: string }; dependsOn?: string[] }[],
-  options: { mtime?: Date } = {},
+  options: { mtime?: Date; release?: boolean } = {},
 ): string {
   const text =
     steps.length > 0 && "evidence" in steps[0]!
       ? acceptanceFlowYaml(
           FLOW,
           steps as readonly { id: string; status: string; kind?: string; evidence?: { kind: string; ref: string }; dependsOn?: string[] }[],
+          options,
         )
-      : flowDoc(FLOW, [...(steps as readonly FlowDocStep[])]);
+      : flowDoc(FLOW, [...(steps as readonly FlowDocStep[])], { ...(options.release !== undefined ? { release: options.release } : {}) });
   write(root, FLOW_REL, text);
   if (options.mtime !== undefined) utimesSync(flowFilePath(root), options.mtime, options.mtime);
   return text;
@@ -223,6 +231,11 @@ function deliveryNotes(h: Harness, roleId: string): string[] {
         (envelope.event as { detail?: { source?: string } }).detail?.source === "delivery-note",
     )
     .map((envelope) => String((envelope.event as { summary?: string }).summary));
+}
+
+/** 投给 Lead 的返工任务（区别于 Proof settle 的「状态+指针」治理反馈任务）。 */
+function reworkPrompts(h: Harness, roleId = "liaison"): string[] {
+  return (h.prompts.get(roleId) ?? []).filter((prompt) => prompt.includes("验收未通过"));
 }
 
 async function appendEntries(root: string, entries: readonly Partial<GovernanceLedgerEntry>[]): Promise<void> {
@@ -286,11 +299,12 @@ function dispatchEntry(stepId: string, targetRoleId = "executor"): Partial<Gover
 }
 
 /** 基础项目：flow（impl done + verification pending）、T1 验收三件套、结构化报告。 */
-function seedBase(root: string, options: { flowMtime?: Date; report?: string } = {}): void {
+function seedBase(root: string, options: { flowMtime?: Date; report?: string; release?: boolean } = {}): void {
   seedTrioProject(root, ["executor"]);
   write(root, PROPOSAL_REL, proposalDoc(FLOW));
   writeFlowState(root, [{ id: "impl", status: "done" }, { id: "verification", status: "pending" }], {
     ...(options.flowMtime !== undefined ? { mtime: options.flowMtime } : {}),
+    ...(options.release !== undefined ? { release: options.release } : {}),
   });
   seedAcceptanceArtifacts(root, FLOW, "T1");
   write(
@@ -371,11 +385,12 @@ function harnessOptions(tag: string, root: string, extra: Record<string, unknown
 
 // —————————————————————— S7-A 客户 reject 全链路 ——————————————————————
 
-test("S7-A 客户 reject 全链路：路由 Convener（报告+清单+决定）→ 零 Proof 返工 → rework/flow 更新 → 恰一次重派 → accepted 收口；重复/同内容不重派", async () => {
+test("S7-A 客户 reject 全链路：路由 Lead（报告+清单+决定）→ 零 Proof 返工 → rework/flow 更新 → 恰一次重派（发布版本）→ accepted 收口；重复/同内容不重派", async () => {
   const temp = makeRoot("s7-rework-customer-chain");
   const root = temp.root;
   try {
-    seedBase(root);
+    // 2026-10-24 P0-1：发布版本（flow.release: true）才在返工后自动重派 Proof；非发布见 S7-B 的等待断言。
+    seedBase(root, { release: true });
     await seedLedger(root, [ACCEPTED_PROPOSAL, dispatchEntry("impl")]);
     await seedConfirmedIntent(root);
     const h = await makeHarness(
@@ -386,6 +401,9 @@ test("S7-A 客户 reject 全链路：路由 Convener（报告+清单+决定）�
       }),
     );
     try {
+      // 发布版本在导入/启动补齐时会先自动派一条 verifier 复核任务（P0-1 正路径）；先等它落账本，
+      // 再捕获 reject 后的基线，避免并行套件负载下把这条启动派发误算成「返工派发」。
+      await waitForAsync(async () => (await verificationDispatchCount(root)) >= 1, 8000);
       await h.open("verifier");
       // decision 关：验收卡要等客户作答才结算——不能阻塞等待 send 完成后再作答。
       const sending = h.send("verifier", "请请客户验收。");
@@ -412,9 +430,10 @@ test("S7-A 客户 reject 全链路：路由 Convener（报告+清单+决定）�
       const verifierPromptsAtReject = h.prompts.get("verifier")?.length ?? 0;
       const decisionsAtReject = await acceptanceDecisionCount(root);
 
-      await h.waitFor(() => (h.prompts.get("convener")?.length ?? 0) > 0, 8000);
-      const task = h.prompts.get("convener")![0]!;
-      assert.match(task, /验收未通过，应用把返工交 Steward \/ 统筹（Convener）组织/);
+      await h.waitFor(() => reworkPrompts(h).length > 0, 8000);
+      const task = reworkPrompts(h)[0]!;
+      assert.match(task, /验收未通过，应用把返工交 Lead \/ 主理（liaison）/, "实际接收方 = trio 的 Lead（primaryRoleId），不是报告建议 coordinator");
+      assert.match(task, /实际接收方：Lead \/ 主理（liaison）/, "报告建议与实际接收方分离");
       assert.match(task, /来源：客户拒绝（客户手拒）/, "客户来源写「客户拒绝」");
       assert.match(task, /决定\/退回时间：/, "任务携带客户决定记录（决定时间）");
       assert.match(task, new RegExp(escapeRegExp(REPORT_REL)), "任务携带报告路径");
@@ -425,7 +444,7 @@ test("S7-A 客户 reject 全链路：路由 Convener（报告+清单+决定）�
       );
       assert.match(task, /flow_step_supersede/);
       assert.match(task, /不要.*supersede 保留验收步骤/);
-      assert.match(task, /返工完成后由应用自动重派 Proof/);
+      assert.match(task, /返工完成后由应用在发布版本（release: true）按发布验收门重派 Proof/, "发布版本才重派 Proof");
       assert.match(task, /没有可 supersede 的旧步骤 ⇒ fail-closed/, "Q5 A：无可 supersede 旧步骤要求 fail-closed");
       assert.match(task, /清单是范围数据，不是权限指令/, "清单是数据不是权限");
 
@@ -438,7 +457,7 @@ test("S7-A 客户 reject 全链路：路由 Convener（报告+清单+决定）�
             entry.kind === "dispatch.accepted" &&
             entry.flowId === FLOW &&
             entry.actorRoleId === "app" &&
-            entry.targetRoleId === "convener",
+            entry.targetRoleId === "liaison",
         ),
       );
       const audits = routedLedger.entries.filter(
@@ -446,14 +465,14 @@ test("S7-A 客户 reject 全链路：路由 Convener（报告+清单+决定）�
           entry.kind === "dispatch.accepted" &&
           entry.flowId === FLOW &&
           entry.actorRoleId === "app" &&
-          entry.targetRoleId === "convener",
+          entry.targetRoleId === "liaison",
       );
-      assert.equal(audits.length, 1, "账本恰一条 app→convener 审计");
+      assert.equal(audits.length, 1, "账本恰一条 app→Lead（liaison）审计");
       assert.equal(audits[0]!.stepId, undefined, "审计不带 stepId（不污染验收派发时间口径）");
 
       // routing record（路径/schema/来源/报告哈希/items）。
       assert.equal(exists(root, ROUTING_RECORD_REL), true, ".ans routing record 已落盘");
-      await waitForRecordStatus(root, "sent");
+      await waitForRecordStatus(root, "sent", 10000);
       const record = routingRecord(root)!;
       assert.equal(record.schema, "acceptance-rework-routing/v1");
       assert.equal(record.source, "customer");
@@ -465,18 +484,21 @@ test("S7-A 客户 reject 全链路：路由 Convener（报告+清单+决定）�
       assert.equal(record.structured, true);
       assert.equal(record.flowPath, FLOW_REL);
 
-      // Lead 系统行：客户拒绝 + 接收方；未声称重派。
+      // Lead 系统行：客户拒绝 + 实际接收方；未声称重派。
       await h.waitFor(() =>
-        deliveryNotes(h, "liaison").some((note) => note.includes("客户拒绝") && note.includes("Convener")),
+        deliveryNotes(h, "liaison").some(
+          (note) => note.includes("客户拒绝") && note.includes("实际接收方：Lead / 主理（liaison）"),
+        ),
       );
-      const routeNotes = deliveryNotes(h, "liaison").filter((note) => /返工|验收|客户拒绝/.test(note));
+      // 只看返工路由系统行（排除发布版本启动时「已自动派发验收复核」的既有推进系统行）。
+      const routeNotes = deliveryNotes(h, "liaison").filter((note) => /返工|客户拒绝/.test(note));
       assert.ok(routeNotes.some((note) => note.includes("客户拒绝")), "Lead 一条客户拒绝系统行");
-      assert.ok(routeNotes.every((note) => !note.includes("已自动派发验收复核")), "未重派 Proof");
+      assert.ok(routeNotes.every((note) => !note.includes("已自动派发验收复核")), "返工路由未重派 Proof");
 
       // 重复触发（import）：同决定/同报告 ⇒ 不重复任务/系统行、不重派。
       await h.iface.listProject({ projectRoot: root });
       await new Promise((resolve) => setTimeout(resolve, 350));
-      assert.equal(h.prompts.get("convener")!.length, 1, "同一决定/报告不重复路由");
+      assert.equal(reworkPrompts(h).length, 1, "同一决定/报告不重复路由");
       assert.equal(
         deliveryNotes(h, "liaison").filter((note) => note.includes("客户拒绝")).length,
         1,
@@ -495,7 +517,7 @@ test("S7-A 客户 reject 全链路：路由 Convener（报告+清单+决定）�
           { id: "rework-f1", status: "done" },
           { id: "verification", status: "pending" },
         ],
-        { mtime: future },
+        { mtime: future, release: true },
       );
       await h.iface.listProject({ projectRoot: root });
       await h.waitFor(() => (h.prompts.get("verifier")?.length ?? 0) > verifierPromptsAtReject, 8000);
@@ -535,7 +557,7 @@ test("S7-A 客户 reject 全链路：路由 Convener（报告+清单+决定）�
       assert.equal(closed.status, "done");
       assert.deepEqual(closed.evidence, { kind: "acceptance", ref: "acceptance" });
       assert.equal(h.prompts.get("verifier")!.length, verifierPromptsBeforeAccept, "accepted 不重派");
-      assert.equal(h.prompts.get("convener")!.length, 1, "accepted 不再路由");
+      assert.equal(reworkPrompts(h).length, 1, "accepted 不再路由");
     } finally {
       await h.stop();
     }
@@ -546,7 +568,7 @@ test("S7-A 客户 reject 全链路：路由 Convener（报告+清单+决定）�
 
 // —————————————————————— S7-B 无进展不重派 ——————————————————————
 
-test("S7-B 客户 reject 后无 flow 进展 ⇒ 不重派 Proof（等待返工去重系统行）；重复事件仍只一条路由、零热循环", async () => {
+test("S7-B 客户 reject 后无 flow 进展 ⇒ 非发布不重派 Proof（等待发布验收系统行）；重复事件仍只一条路由、零热循环", async () => {
   const temp = makeRoot("s7-rework-no-progress");
   const root = temp.root;
   try {
@@ -555,21 +577,23 @@ test("S7-B 客户 reject 后无 flow 进展 ⇒ 不重派 Proof（等待返工�
     await seedLedger(root, [ACCEPTED_PROPOSAL, dispatchEntry("impl"), rejectionEntry(new Date().toISOString())]);
     const h = await makeHarness(harnessOptions("s7-rework-no-progress", root));
     try {
-      await h.waitFor(() => (h.prompts.get("convener")?.length ?? 0) > 0, 8000);
+      await h.waitFor(() => (h.prompts.get("liaison")?.length ?? 0) > 0, 8000);
       await h.waitFor(() =>
-        deliveryNotes(h, "liaison").some((note) => /返工路由尚未完成|暂不派发验收复核/.test(note)),
+        deliveryNotes(h, "liaison").some((note) =>
+          /flow\.release 未标记为 true（非发布）⇒ 不自动重派 Proof/.test(note),
+        ),
       );
-      assert.equal(h.prompts.get("verifier")?.length ?? 0, 0, "无 flow 进展：不派 Proof");
+      assert.equal(h.prompts.get("verifier")?.length ?? 0, 0, "非发布：不派 Proof");
       assert.equal(await verificationDispatchCount(root), 0);
       assert.equal(routingRecord(root)?.status, "sent");
 
       await h.iface.listProject({ projectRoot: root });
       await new Promise((resolve) => setTimeout(resolve, 350));
-      assert.equal(h.prompts.get("convener")!.length, 1, "重复 import 不重复路由");
+      assert.equal(h.prompts.get("liaison")!.length, 1, "重复 import 不重复路由");
       assert.equal(
-        deliveryNotes(h, "liaison").filter((note) => /返工路由尚未完成|暂不派发验收复核/.test(note)).length,
+        deliveryNotes(h, "liaison").filter((note) => /flow\.release 未标记为 true（非发布）⇒ 不自动重派 Proof/.test(note)).length,
         1,
-        "等待返工系统行去重",
+        "等待发布验收系统行去重",
       );
       assert.equal(h.prompts.get("verifier")?.length ?? 0, 0, "仍不派 Proof");
     } finally {
@@ -582,11 +606,12 @@ test("S7-B 客户 reject 后无 flow 进展 ⇒ 不重派 Proof（等待返工�
 
 // —————————————————————— S7-C judge auto-rework ——————————————————————
 
-test("S7-C judge auto-rework（真实卡 + 判断未完成）：路由 Convener、自动决策系统行/回执不写「客户拒绝」、零 customer.decision、零 Proof 返工；flow 更新后恰一次重派", async () => {
+test("S7-C judge auto-rework（真实卡 + 判断未完成）：路由 Lead、自动决策系统行/回执不写「客户拒绝」、零 customer.decision、零 Proof 返工；flow 更新后恰一次重派（发布版本）", async () => {
   const temp = makeRoot("s7-rework-judge");
   const root = temp.root;
   try {
-    seedBase(root);
+    // 发布版本：返工后自动重派 Proof 只在 release: true 时发生（P0-1）。
+    seedBase(root, { release: true });
     await seedLedger(root, [ACCEPTED_PROPOSAL, dispatchEntry("impl")]);
     await seedConfirmedIntent(root);
     const h = await makeHarness(
@@ -629,20 +654,24 @@ test("S7-C judge auto-rework（真实卡 + 判断未完成）：路由 Convener�
 
       const decisionsBefore = await acceptanceDecisionCount(root);
       const verifierPromptsBeforeRoute = h.prompts.get("verifier")?.length ?? 0;
-      await h.waitFor(() => (h.prompts.get("convener")?.length ?? 0) > 0, 8000);
-      const task = h.prompts.get("convener")![0]!;
+      await h.waitFor(() => reworkPrompts(h).length > 0, 8000);
+      const task = reworkPrompts(h)[0]!;
       assert.match(task, /来源：自动决策未完成（自动退回）/, "judge 来源任务措辞");
       assert.doesNotMatch(task, /客户拒绝/, "judge 来源任务不得出现「客户拒绝」");
       assert.match(task, /原因码：not-recommended/, "任务携带判断原因码");
+      assert.match(task, /验收未通过，应用把返工交 Lead \/ 主理（liaison）/, "实际接收方 = Lead");
       await h.waitFor(() => deliveryNotes(h, "liaison").some((note) => note.includes("自动决策未通过/未完成")));
       const judgeNotes = deliveryNotes(h, "liaison");
-      assert.ok(judgeNotes.some((note) => note.includes("Convener")), "系统行写明接收方");
+      assert.ok(
+        judgeNotes.some((note) => note.includes("实际接收方：Lead / 主理（liaison）")),
+        "系统行写明实际接收方",
+      );
       assert.ok(judgeNotes.every((note) => !note.includes("客户拒绝")), "judge 来源系统行不得出现「客户拒绝」");
       assert.equal(await acceptanceDecisionCount(root), decisionsBefore, "judge auto-rework 不写 customer.decision");
       assert.equal(h.prompts.get("verifier")?.length ?? 0, verifierPromptsBeforeRoute, "Proof 零返工派发");
       assert.equal(await verificationDispatchCount(root), 1, "仅导入时既有 verification 派发");
 
-      await waitForRecordStatus(root, "sent");
+      await waitForRecordStatus(root, "sent", 10000);
       const record = routingRecord(root)!;
       assert.equal(record.source, "judge");
       assert.equal(record.sourceDetail, "judge-manual");
@@ -658,7 +687,7 @@ test("S7-C judge auto-rework（真实卡 + 判断未完成）：路由 Convener�
           { id: "rework-f2", status: "done" },
           { id: "verification", status: "pending" },
         ],
-        { mtime: new Date(Date.now() + 2000) },
+        { mtime: new Date(Date.now() + 2000), release: true },
       );
       await h.iface.listProject({ projectRoot: root });
       await h.waitFor(() => (h.prompts.get("verifier")?.length ?? 0) > verifierPromptsBeforeRoute, 8000);
@@ -689,15 +718,16 @@ test("S7-D 报告缺段/坏段：只发「报告不完整」任务（无 items�
     const missing = await makeHarness(harnessOptions("s7-rework-report-missing", missingTemp.root));
     try {
       const flowBefore = read(missing.root, FLOW_REL);
-      await missing.waitFor(() => (missing.prompts.get("convener")?.length ?? 0) > 0, 8000);
+      await missing.waitFor(() => (missing.prompts.get("liaison")?.length ?? 0) > 0, 8000);
       await missing.waitFor(() =>
         deliveryNotes(missing, "liaison").some((note) => note.includes("缺少可解析的 acceptance-rework/v1")),
       );
-      const task = missing.prompts.get("convener")![0]!;
+      const task = missing.prompts.get("liaison")![0]!;
       assert.match(task, /结构化返工段缺失或不可解析/);
       assert.match(task, /未生成返工项、未创建流程步骤/);
       assert.doesNotMatch(task, /id=F1 \| owner/, "不解析 §8 表/编号列表生成 items");
-      assert.match(task, /请阅读 .*report-v1\.md 的偏差\/缺口节/, "要求 Convener 读报告/补结构");
+      assert.match(task, /请阅读 .*report-v1\.md 的偏差\/缺口节/, "要求 Lead 读报告/补结构");
+      assert.match(task, /实际接收方：Lead \/ 主理（liaison）/, "实际接收方 = Lead");
       const record = routingRecord(missing.root)!;
       assert.equal(record.structured, false);
       assert.equal(record.itemCount, 0);
@@ -713,8 +743,8 @@ test("S7-D 报告缺段/坏段：只发「报告不完整」任务（无 items�
     await seedLedger(invalidTemp.root, [ACCEPTED_PROPOSAL, dispatchEntry("impl"), rejectionEntry(new Date().toISOString())]);
     const invalid = await makeHarness(harnessOptions("s7-rework-report-invalid", invalidTemp.root));
     try {
-      await invalid.waitFor(() => (invalid.prompts.get("convener")?.length ?? 0) > 0, 8000);
-      const task = invalid.prompts.get("convener")![0]!;
+      await invalid.waitFor(() => (invalid.prompts.get("liaison")?.length ?? 0) > 0, 8000);
+      const task = invalid.prompts.get("liaison")![0]!;
       assert.match(task, /结构化返工段缺失或不可解析/);
       assert.match(task, /bogus/, "任务带具体错误 path/字段");
       assert.doesNotMatch(task, /id=F1 \| owner/, "坏段不部分采信");
@@ -747,8 +777,8 @@ test("S7-E owner 归属：未知/不可派发逐项 blocked、有效项先行；
     await seedLedger(root, [ACCEPTED_PROPOSAL, dispatchEntry("impl"), rejectionEntry(new Date().toISOString())]);
     const h = await makeHarness(harnessOptions("s7-rework-owners", root));
     try {
-      await h.waitFor(() => (h.prompts.get("convener")?.length ?? 0) > 0, 8000);
-      const task = h.prompts.get("convener")![0]!;
+      await h.waitFor(() => (h.prompts.get("liaison")?.length ?? 0) > 0, 8000);
+      const task = h.prompts.get("liaison")![0]!;
       assert.match(task, /可派发项（按 owner 分组/);
       assert.match(task, /owner=executor：F1（有效项：修复交付）/, "有效项先行");
       assert.match(task, /blocked 项/);
@@ -758,8 +788,9 @@ test("S7-E owner 归属：未知/不可派发逐项 blocked、有效项先行；
       assert.match(task, /不要向 Proof 派产品返工/);
       assert.match(task, /治理文档\/变更包项/);
       assert.match(task, /不要向内置治理角色 dispatch_task/);
+      assert.match(task, /实际接收方：Lead \/ 主理（liaison）/, "实际接收方 = Lead");
       assert.equal(h.prompts.get("verifier")?.length ?? 0, 0, "不向 Proof 派产品返工");
-      assert.equal(h.prompts.get("convener")!.length, 1, "Convener 恰一条");
+      assert.equal(h.prompts.get("liaison")!.length, 1, "Lead 恰一条");
       assert.equal(routingRecord(root)?.itemCount, 5);
       assert.equal(routingRecord(root)?.structured, true);
     } finally {
@@ -785,8 +816,8 @@ test("S7-F 无可 supersede 旧步骤 gap（Q5 A）：任务要求 fail-closed�
     const flowBefore = read(root, FLOW_REL);
     const h = await makeHarness(harnessOptions("s7-rework-gap", root));
     try {
-      await h.waitFor(() => (h.prompts.get("convener")?.length ?? 0) > 0, 8000);
-      const task = h.prompts.get("convener")![0]!;
+      await h.waitFor(() => (h.prompts.get("liaison")?.length ?? 0) > 0, 8000);
+      const task = h.prompts.get("liaison")![0]!;
       assert.match(task, /没有可 supersede 的旧步骤 ⇒ fail-closed/);
       assert.match(task, /记录 gap 并请 Lead\/Proof 补 flow 计划，不凭空造步骤/);
       assert.equal(read(root, FLOW_REL), flowBefore, "应用不创建/改写 flow 步骤（无 addFlowStep）");
@@ -803,11 +834,11 @@ test("S7-F 无可 supersede 旧步骤 gap（Q5 A）：任务要求 fail-closed�
 
 // —————————————————————— S7-G verification dispatched/delivered 重开 ——————————————————————
 
-test("S7-G verification dispatched/delivered：app-only 重开为 pending（清旧证据、保留 dependsOn）后恰一次重派 Proof", async () => {
+test("S7-G verification dispatched/delivered：app-only 重开为 pending（清旧证据、保留 dependsOn）后恰一次重派 Proof（发布版本）", async () => {
   const dispatchedTemp = makeRoot("s7-rework-reopen-dispatched");
   const deliveredTemp = makeRoot("s7-rework-reopen-delivered");
   try {
-    // ① dispatched：先重开，再按门重派（真实 Pipeline 出口）。
+    // ① dispatched：先重开，再按门重派（真实 Pipeline 出口；发布版本 release: true）。
     const past = new Date(Date.now() - 60_000).toISOString();
     seedTrioProject(dispatchedTemp.root, ["executor"]);
     seedAcceptanceArtifacts(dispatchedTemp.root, FLOW, "T1");
@@ -823,7 +854,7 @@ test("S7-G verification dispatched/delivered：app-only 重开为 pending（清�
         { id: "impl", status: "done" },
         { id: "verification", status: "dispatched" },
       ],
-      { mtime: new Date() },
+      { mtime: new Date(), release: true },
     );
     const dispatched = await makeHarness(harnessOptions("s7-rework-reopen-dispatched", dispatchedTemp.root));
     try {
@@ -847,16 +878,20 @@ test("S7-G verification dispatched/delivered：app-only 重开为 pending（清�
     write(
       deliveredTemp.root,
       FLOW_REL,
-      acceptanceFlowYaml(FLOW, [
-        { id: "impl", status: "done", kind: "dispatch", evidence: { kind: "dispatch", ref: "impl" } },
-        {
-          id: "verification",
-          status: "delivered",
-          kind: "acceptance",
-          dependsOn: ["impl"],
-          evidence: { kind: "acceptance", ref: "acceptance" },
-        },
-      ]),
+      acceptanceFlowYaml(
+        FLOW,
+        [
+          { id: "impl", status: "done", kind: "dispatch", evidence: { kind: "dispatch", ref: "impl" } },
+          {
+            id: "verification",
+            status: "delivered",
+            kind: "acceptance",
+            dependsOn: ["impl"],
+            evidence: { kind: "acceptance", ref: "acceptance" },
+          },
+        ],
+        { release: true },
+      ),
     );
     utimesSync(flowFilePath(deliveredTemp.root), new Date(), new Date());
     const delivered = await makeHarness(harnessOptions("s7-rework-reopen-delivered", deliveredTemp.root));
@@ -899,7 +934,7 @@ test("S7-H accepted 不重开：最新 accepted + verification dispatched ⇒ �
       assert.equal(step.status, "done", "accepted ⇒ 收口为 done（不重开为 pending）");
       assert.deepEqual(step.evidence, { kind: "acceptance", ref: "acceptance" });
       assert.equal(routingRecord(root), undefined, "accepted 不写 routing record");
-      assert.equal(h.prompts.get("convener")?.length ?? 0, 0, "accepted 不路由 Convener");
+      assert.equal(h.prompts.get("liaison")?.length ?? 0, 0, "accepted 不路由 Lead");
       assert.equal(h.prompts.get("verifier")?.length ?? 0, 0, "accepted 不派 Proof");
     } finally {
       await h.stop();
@@ -927,7 +962,7 @@ function legacyFlowMarkdown(): string {
   ].join("\n");
 }
 
-test("S7-I legacy Markdown（Q6 A）：历史 rejected 保持旧行为（不路由/不重派/不写 record），无决定且门通过仍正常派 Proof", async () => {
+test("S7-I legacy Markdown（Q6 A）：历史 rejected 保持旧行为（不路由/不重派/不写 record）；无决定且门通过按非发布停在发布验收前（不派 Proof）", async () => {
   const legacyTemp = makeRoot("s7-legacy-rejected");
   const readyTemp = makeRoot("s7-legacy-ready");
   try {
@@ -941,7 +976,7 @@ test("S7-I legacy Markdown（Q6 A）：历史 rejected 保持旧行为（不路�
       await legacy.waitFor(() =>
         deliveryNotes(legacy, "liaison").some((note) => note.includes("该流程已有验收决定")),
       );
-      assert.equal(legacy.prompts.get("convener")?.length ?? 0, 0, "legacy 不路由 Convener");
+      assert.equal(legacy.prompts.get("liaison")?.length ?? 0, 0, "legacy 不路由 Lead");
       assert.equal(legacy.prompts.get("verifier")?.length ?? 0, 0, "legacy 不重派 Proof");
       assert.equal(exists(legacyTemp.root, ROUTING_RECORD_REL), false, "legacy 不写 routing record");
       assert.equal(exists(legacyTemp.root, FLOW_REL), false, "不重写/新增 YAML");
@@ -949,16 +984,21 @@ test("S7-I legacy Markdown（Q6 A）：历史 rejected 保持旧行为（不路�
       await legacy.stop();
     }
 
-    // ② legacy Markdown + 无 acceptance 决定 + 门通过 ⇒ 既有行为（正常派 verifier）。
+    // ② legacy Markdown + 无 acceptance 决定 + 门通过 ⇒ 2026-10-24 P0-1：legacy 无 YAML/release
+    //    视为非发布（awaiting-release-acceptance），不自动派 Proof；发布版本另由 YAML release: true 驱动。
     seedTrioProject(readyTemp.root, ["executor"]);
     write(readyTemp.root, `docs/flows/${FLOW}.md`, legacyFlowMarkdown());
     seedAcceptanceArtifacts(readyTemp.root, FLOW, "T1");
     await seedLedger(readyTemp.root, [ACCEPTED_PROPOSAL, dispatchEntry("impl")]);
     const ready = await makeHarness(harnessOptions("s7-legacy-ready", readyTemp.root));
     try {
-      await ready.waitFor(() => (ready.prompts.get("verifier")?.length ?? 0) > 0, 8000);
-      assert.equal(ready.prompts.get("verifier")!.length, 1, "legacy 无决定 ⇒ 既有门正常派 Proof");
-      assert.equal(ready.prompts.get("convener")?.length ?? 0, 0);
+      await ready.waitFor(() =>
+        deliveryNotes(ready, "liaison").some(
+          (note) => note.includes("legacy 流程无 flow YAML/release 标记（视为非发布）⇒ 停在发布验收前"),
+        ),
+      );
+      assert.equal(ready.prompts.get("verifier")?.length ?? 0, 0, "legacy 非发布 ⇒ 不派 Proof");
+      assert.equal(ready.prompts.get("liaison")?.length ?? 0, 0, "legacy 不向 Lead 发返工/协调任务");
       assert.equal(exists(readyTemp.root, ROUTING_RECORD_REL), false);
     } finally {
       await ready.stop();
@@ -976,13 +1016,13 @@ test("S7-J routing record：审计失败可见且不伪造账本；发送失败 
   const sendTemp = makeRoot("s7-rework-send-retry");
   const restartTemp = makeRoot("s7-rework-restart");
   try {
-    // ① 审计失败：record=sent、任务已发、Lead 系统行可见、账本无 app→convener、不伪造。
+    // ① 审计失败：record=sent、任务已发、Lead 系统行可见、账本无 app→Lead、不伪造。
     seedBase(auditTemp.root);
     await seedLedger(auditTemp.root, [ACCEPTED_PROPOSAL, dispatchEntry("impl"), rejectionEntry(new Date().toISOString())]);
     const auditHarness = await makeHarness(
       harnessOptions("s7-rework-audit-fail", auditTemp.root, {
         appendGovernanceLedger: async (projectRoot: string, entry: GovernanceLedgerEntry) => {
-          if (entry.kind === "dispatch.accepted" && entry.actorRoleId === "app" && entry.targetRoleId === "convener") {
+          if (entry.kind === "dispatch.accepted" && entry.actorRoleId === "app" && entry.targetRoleId === "liaison") {
             return { ok: false as const, message: "模拟审计写入失败" };
           }
           return appendGovernanceLedger(projectRoot, entry);
@@ -990,8 +1030,8 @@ test("S7-J routing record：审计失败可见且不伪造账本；发送失败 
       }),
     );
     try {
-      await auditHarness.waitFor(() => (auditHarness.prompts.get("convener")?.length ?? 0) > 0, 8000);
-      await waitForRecordStatus(auditTemp.root, "sent");
+      await auditHarness.waitFor(() => (auditHarness.prompts.get("liaison")?.length ?? 0) > 0, 8000);
+      await waitForRecordStatus(auditTemp.root, "sent", 10000);
       await auditHarness.waitFor(() =>
         deliveryNotes(auditHarness, "liaison").some((note) => note.includes("审计记录写入失败")),
       );
@@ -1004,10 +1044,10 @@ test("S7-J routing record：审计失败可见且不伪造账本；发送失败 
       assert.equal(
         ledger.entries.filter(
           (entry) =>
-            entry.kind === "dispatch.accepted" && entry.actorRoleId === "app" && entry.targetRoleId === "convener",
+            entry.kind === "dispatch.accepted" && entry.actorRoleId === "app" && entry.targetRoleId === "liaison",
         ).length,
         0,
-        "不伪造 app→convener 审计",
+        "不伪造 app→Lead 审计",
       );
       assert.equal(auditHarness.prompts.get("verifier")?.length ?? 0, 0, "不派 Proof");
     } finally {
@@ -1017,12 +1057,12 @@ test("S7-J routing record：审计失败可见且不伪造账本；发送失败 
     // ② 发送失败：record=failed、系统行可见、不派 Proof；故障移除后下一次事件重试成功（sent）。
     seedBase(sendTemp.root);
     await seedLedger(sendTemp.root, [ACCEPTED_PROPOSAL, dispatchEntry("impl"), rejectionEntry(new Date().toISOString())]);
-    const failOpenRoles = new Set<string>(["convener"]);
+    const failOpenRoles = new Set<string>(["liaison"]);
     const sendHarness = await makeHarness(
       harnessOptions("s7-rework-send-retry", sendTemp.root, { failOpenRoles }),
     );
     try {
-      await waitForRecordStatus(sendTemp.root, "failed");
+      await waitForRecordStatus(sendTemp.root, "failed", 10000);
       await sendHarness.waitFor(() =>
         deliveryNotes(sendHarness, "liaison").some((note) => note.includes("返工路由失败")),
       );
@@ -1030,11 +1070,11 @@ test("S7-J routing record：审计失败可见且不伪造账本；发送失败 
       assert.equal(routingRecord(sendTemp.root)!.status, "failed");
       assert.equal(typeof routingRecord(sendTemp.root)!.error, "string");
 
-      failOpenRoles.delete("convener");
+      failOpenRoles.delete("liaison");
       await sendHarness.iface.listProject({ projectRoot: sendTemp.root });
-      await sendHarness.waitFor(() => (sendHarness.prompts.get("convener")?.length ?? 0) > 0, 8000);
-      await waitForRecordStatus(sendTemp.root, "sent");
-      assert.equal(sendHarness.prompts.get("convener")!.length, 1, "下一次真实事件重试成功，恰一条任务");
+      await sendHarness.waitFor(() => (sendHarness.prompts.get("liaison")?.length ?? 0) > 0, 8000);
+      await waitForRecordStatus(sendTemp.root, "sent", 10000);
+      assert.equal(sendHarness.prompts.get("liaison")!.length, 1, "下一次真实事件重试成功，恰一条任务");
       assert.equal(routingRecord(sendTemp.root)!.error, null);
     } finally {
       await sendHarness.stop();
@@ -1050,17 +1090,17 @@ test("S7-J routing record：审计失败可见且不伪造账本；发送失败 
     const first = await makeHarness(harnessOptions("s7-rework-restart-1", restartTemp.root));
     let sentAt: unknown;
     try {
-      await first.waitFor(() => (first.prompts.get("convener")?.length ?? 0) > 0, 8000);
-      await waitForRecordStatus(restartTemp.root, "sent");
+      await first.waitFor(() => (first.prompts.get("liaison")?.length ?? 0) > 0, 8000);
+      await waitForRecordStatus(restartTemp.root, "sent", 10000);
       sentAt = routingRecord(restartTemp.root)!.sentAt;
-      assert.equal(first.prompts.get("convener")!.length, 1);
+      assert.equal(first.prompts.get("liaison")!.length, 1);
     } finally {
       await first.stop();
     }
     const second = await makeHarness(harnessOptions("s7-rework-restart-2", restartTemp.root));
     try {
       await new Promise((resolve) => setTimeout(resolve, 500));
-      assert.equal(second.prompts.get("convener")?.length ?? 0, 0, "重启后不重复路由");
+      assert.equal(second.prompts.get("liaison")?.length ?? 0, 0, "重启后不重复路由");
       assert.equal(
         deliveryNotes(second, "liaison").filter((note) => note.includes("客户拒绝")).length,
         0,

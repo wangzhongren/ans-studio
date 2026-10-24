@@ -15,6 +15,7 @@ import type { SessionEvent } from "../../src/provider/pi/session.ts";
 import { createFakeRuntimeAdapter } from "../../src/provider/pi/session.ts";
 import type { RuntimeAdapter, OperatorChannelFn } from "../../src/provider/pi/session.ts";
 import type { OrchestrationEvent, TaskHandback } from "../../src/common/编排/handback.ts";
+import { renderHandbackPrompt } from "../../src/common/编排/handback.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
 import { openRoleSession, createPiAdapterFactory, type RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import { listProject, type ProjectListing } from "../../src/service/role/resolve-role.ts";
@@ -27,7 +28,7 @@ import type { CustomerInputFn } from "../../src/model/runtime.ts";
 import { buildIntentHandoffMessage } from "../../app/desktop/governance-advance.ts";
 import { createMainI18n, mainT } from "../../app/desktop/i18n.ts";
 import type { HandOffIntentPayload } from "../../src/model/runtime.ts";
-import { readGovernanceLedger } from "../../src/pipeline/orchestration/govern-session.ts";
+import { appendGovernanceLedger, readGovernanceLedger } from "../../src/pipeline/orchestration/govern-session.ts";
 // G-2（2026-10-16 客户批准）：看护器纯逻辑（W1 信号/去重/冷却/风暴护栏；W3 收束已于 2026-10-18 移除）
 // ——**假快照＋注入时钟**，不起真实会话（集成面在 message-queue/dispatch-delivery 的 G-2 块）。
 import {
@@ -978,6 +979,7 @@ function governanceListing(opts: { model?: "trio" | "single"; roleIds?: string[]
     if (id === "rapporteur") return "proposal";
     if (id === "nominator") return "nomination";
     if (id === "convener") return "schedule";
+    if (id === "verifier") return "verification";
     return undefined;
   };
   return {
@@ -988,7 +990,7 @@ function governanceListing(opts: { model?: "trio" | "single"; roleIds?: string[]
       boundaryPath: "",
       cardText: `# ${id}`,
       boundary: { entries: [], boundarySource: "<built-in>", acceptance: { accepted: true, source: "test:w6b" } },
-      builtIn: true,
+      builtIn: model === "single" ? id === "su" : functionOf(id) !== undefined,
       ...(functionOf(id) !== undefined ? { governanceFunction: functionOf(id) } : {}),
     })),
     warnings: [],
@@ -1095,6 +1097,113 @@ test("W6-B 能力路由：liaison=handOffIntent+协调派发；rapporteur=提案
     "single 回交主人=primaryRoleId（su）",
   );
   await singleMgr.stop(null);
+});
+
+test("治理协调（session）：内置 settle→Lead；Proof 只发状态+报告指针；内置回交→Lead 且同轮 settle 不双发；worker 回交→Steward", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "ans-session-governance-"));
+  const base = governanceListing({ roleIds: ["liaison", "rapporteur", "nominator", "convener", "verifier", "A"] });
+  const listing: ProjectListing = { ...base, projectRoot: root };
+  const streams: Record<string, OrchestrationEvent[]> = {};
+  const sent: Record<string, string[]> = {};
+  const makeScriptedHandle = (roleId: string): RoleSessionHandle => {
+    let index = 0;
+    return {
+      async send(text: string): Promise<void> {
+        (sent[roleId] ??= []).push(text);
+      },
+      events(): AsyncIterable<OrchestrationEvent> {
+        return {
+          [Symbol.asyncIterator]() {
+            return {
+              async next(): Promise<IteratorResult<OrchestrationEvent>> {
+                for (let attempts = 0; attempts < 400; attempts += 1) {
+                  const queue = streams[roleId] ?? [];
+                  if (index < queue.length) return { value: queue[index++]!, done: false };
+                  await new Promise((resolve) => setTimeout(resolve, 5));
+                }
+                return { value: undefined as unknown as OrchestrationEvent, done: true };
+              },
+            };
+          },
+        };
+      },
+      async dispose(): Promise<void> {},
+    };
+  };
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      streams[input.roleId] ??= [];
+      sent[input.roleId] ??= [];
+      return makeScriptedHandle(input.roleId);
+    },
+    createPiAdapterFactory: () => { throw new Error("本用例不应构造 pi 适配器"); },
+    createDemoAdapter: () => { throw new Error("本用例不应构造 demo 适配器"); },
+    buildProjectConfig,
+    getListing: (value) => (value === root ? listing : undefined),
+    emitEvent: () => {},
+  });
+  const waitUntil = async (check: () => boolean): Promise<void> => {
+    for (let attempt = 0; attempt < 400 && !check(); attempt += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+    assert.ok(check(), "等待实际事件超时");
+  };
+  try {
+    // Proof 的报告指针来源：账本中该 flow 的 verifier 派发记录（无本轮 flowId 时的兜底）。
+    await appendGovernanceLedger(root, {
+      at: new Date().toISOString(),
+      kind: "dispatch.accepted",
+      flowId: "flow-proof",
+      stepId: "verification",
+      actorRoleId: "app",
+      power: "app",
+      targetRoleId: "verifier",
+    });
+    await mgr.open({ projectRoot: root, roleId: "verifier", runtime: "demo" });
+    await mgr.send("复核", undefined, { roleId: "verifier" });
+    streams.verifier!.push({ kind: "message", summary: "报告正文-不得转述", turnId: "v1" } as OrchestrationEvent);
+    streams.verifier!.push({ kind: "settled", summary: "verifier 一轮结束", detail: { outcome: "completed" } } as unknown as OrchestrationEvent);
+    await waitUntil(() => (sent.liaison?.length ?? 0) > 0);
+    const proofTask = sent.liaison![0]!;
+    assert.match(proofTask, /^\[系统·治理反馈\] 来自 verifier 的验收状态/, "Proof 状态投 Lead");
+    assert.match(proofTask, /状态：本轮已完成/, "只写状态，不转述报告正文");
+    assert.ok(proofTask.includes("docs/acceptance/flow-proof-report-v1.md"), "报告路径指针");
+    assert.ok(proofTask.includes("docs/governance/verifier/flow-proof.md"), "治理记录指针");
+    assert.ok(!proofTask.includes("报告正文-不得转述"), "不转全文/不摘要替代报告");
+    assert.ok(!/通过|不通过|已批准|客户同意/.test(proofTask), "不伪造验收结论/不冒充客户批准");
+    // Lead 本轮收尾：放行后续投递（内置回交）——不 settled 会一直 busy，投递机按既有语义排队。
+    streams.liaison!.push({ kind: "settled", summary: "liaison 一轮结束" } as OrchestrationEvent);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // 内置来源回交（编排正常抑制；防御性出现）→ Lead；同一轮 settle 的治理反馈与它去重（不双发）。
+    await mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+    await mgr.send("协调", undefined, { roleId: "convener" });
+    const builtInHandback: TaskHandback = {
+      roleId: "convener",
+      taskId: "T-internal",
+      status: "completed",
+      summary: "内置回交",
+      evidence: [],
+      at: new Date().toISOString(),
+    };
+    streams.convener!.push({ kind: "handback", summary: "内置回交", handback: builtInHandback } as OrchestrationEvent);
+    await waitUntil(() => sent.liaison!.includes(renderHandbackPrompt(builtInHandback)));
+    const afterHandback = sent.liaison!.length;
+    streams.convener!.push({ kind: "message", summary: "内部收尾正文", turnId: "c1" } as OrchestrationEvent);
+    streams.convener!.push({ kind: "settled", summary: "convener 一轮结束" } as OrchestrationEvent);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    assert.equal(sent.liaison!.length, afterHandback, "同一轮内置回交与 settle 反馈不双发");
+    assert.ok(!sent.liaison!.some((text) => text.startsWith("[系统·治理反馈] 来自 convener")), "不重复投递内置反馈");
+    assert.ok(!sent.convener!.includes(renderHandbackPrompt(builtInHandback)), "内置来源不自我回交");
+
+    // 项目 worker 回交 → Steward（handbackOwnerRoleId 语义不变）。
+    await mgr.open({ projectRoot: root, roleId: "A", runtime: "demo" });
+    const workerHandback: TaskHandback = { ...builtInHandback, roleId: "A", taskId: "T-worker" };
+    streams.A!.push({ kind: "handback", summary: "A 完成", handback: workerHandback } as OrchestrationEvent);
+    await waitUntil(() => sent.convener!.includes(renderHandbackPrompt(workerHandback)));
+    assert.ok(!sent.liaison!.includes(renderHandbackPrompt(workerHandback)), "项目 worker 回交不投 Lead");
+  } finally {
+    await mgr.stop(null);
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("Liaison 客户通道：intent-confirm 正常呈现/手答；proposal 被编排白名单拒绝且不弹卡", async () => {

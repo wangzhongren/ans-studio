@@ -10,7 +10,9 @@
 // 段形状（方案 §5.2.1）：
 //   ```yaml
 //   schema: acceptance-rework/v1
-//   coordinator: convener            # 可选；缺省 convener；接受别名 steward；其他值 warning 仍路由 Convener
+//   coordinator: convener            # 可选；缺省 convener；接受别名 steward；其他值 warning。
+//                                    # 2026-10-24：本字段只是「报告建议」，实际接收方由应用按治理模型
+//                                    # 决定（trio → Lead / 主理；single/su 保持原接收方），不由报告指定。
 //   items:
 //     - id: F1                       # 必填、唯一；^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$
 //       owner: platform-foundation   # 必填；恰好一个角色 id（形状校验；存在性由桌面路由层校验）
@@ -79,7 +81,10 @@ export interface AcceptanceReworkItem {
 /** 通过校验的返工段。 */
 export interface AcceptanceReworkSection {
   schema: typeof ACCEPTANCE_REWORK_SCHEMA;
-  /** 实际接收协调者：**固定 `convener`**（报告不能指定其他协调者；Q3 A）。 */
+  /**
+   * 报告建议的协调者（**兼容值，固定 `convener`**）。2026-10-24 起：实际接收方由应用按治理模型决定
+   * （trio → Lead / 主理；single/su 保持原接收方），报告不能指定实际接收方；schema/字段不变。
+   */
   coordinator: "convener";
   /** 报告里 `coordinator` 的原始值（缺省/null 表示未写）；仅作审计/提示。 */
   coordinatorDeclaration: string | null;
@@ -334,7 +339,8 @@ export function parseAcceptanceReworkReport(markdown: string): AcceptanceReworkP
         coordinatorDeclaration = raw;
         if (raw !== "convener" && raw !== "steward") {
           warnings.push(
-            `coordinator=${JSON.stringify(raw)} 不受支持；协调者固定为 Convener（报告不能指定其他协调者）。`,
+            `coordinator=${JSON.stringify(raw)} 不受支持；协调者建议值固定为 Convener` +
+              "（实际接收方由应用按治理模型决定，报告不能指定）。",
           );
         }
       }

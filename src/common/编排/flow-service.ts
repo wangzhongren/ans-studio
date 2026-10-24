@@ -130,7 +130,17 @@ function isManagerPower(power: string): boolean {
   return power === "schedule" || power === "liaison";
 }
 
-function viewOf(flow: FlowState, revision: string, actorRoleId: string, actorPower: string): FlowToolView {
+/**
+ * `flow_get` / flow 回执视图（**2026-10-24 P0-1**：在运行时契约 `FlowToolView` 之上承载
+ * `release`）。`src/model/runtime.ts` 的 `FlowToolView` 是运行时核心冻结契约；本角色不改该文件，
+ * 编排侧以结构扩展返回同一形状 + `release`（结构兼容，桌面/工具层原样透传，不重算）。
+ */
+export interface FlowToolViewWithRelease extends FlowToolView {
+  /** 发布验收标记（缺省 false）：只有 true 才允许应用按发布验收门派 Proof/启动验收。 */
+  release: boolean;
+}
+
+function viewOf(flow: FlowState, revision: string, actorRoleId: string, actorPower: string): FlowToolViewWithRelease {
   const isManager = isManagerPower(actorPower);
   const canUpdate = flow.steps
     .filter((step) => !TERMINAL_STATUSES.has(step.status))
@@ -140,6 +150,7 @@ function viewOf(flow: FlowState, revision: string, actorRoleId: string, actorPow
     flowId: flow.flowId,
     revision,
     qualityTier: flow.qualityTier,
+    release: flow.release === true,
     steps: flow.steps.map((step) => ({
       id: step.id,
       title: step.title,
@@ -163,6 +174,7 @@ function serializeFlow(flow: FlowState): string {
     version: flow.version,
     qualityTier: flow.qualityTier,
     ...(flow.status !== undefined ? { status: flow.status } : {}),
+    ...(flow.release !== undefined ? { release: flow.release } : {}),
     steps: flow.steps.map((step) => ({
       id: step.id,
       title: step.title,
@@ -189,6 +201,86 @@ function sameOptionalStringList(left: readonly string[] | undefined, right: read
   if (left === undefined && right === undefined) return true;
   if (left === undefined || right === undefined) return false;
   return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+// —————————————————————— 受控扩展：release 标记（2026-10-24 P0-1） ——————————————————————
+
+/** `validateReleaseOnlyExtension` 的判定结果（`ok:false` 时 code 为机读原因）。 */
+export interface ReleaseExtensionValidation {
+  ok: boolean;
+  /**
+   * 拒绝原因：
+   *   · `previous-invalid`     现有流程 YAML 不合法（受控扩展只能在有效流程上标记 release）；
+   *   · `invalid-flow`         候选 YAML 不合法；
+   *   · `release-downgrade`    试图把 release 从 true 改回 false/缺省（发布标记不能撤回）；
+   *   · `release-other-changes` 发布标记（任一侧 release: true）伴随其它字段/步骤变化。
+   */
+  code?: string;
+  error?: string;
+}
+
+/** 「除 release 外的字段/步骤逐字段不变」比较（字段顺序由解析器固定）。 */
+function flowsEqualExceptRelease(left: FlowState, right: FlowState): boolean {
+  const { release: _leftRelease, ...leftRest } = left;
+  const { release: _rightRelease, ...rightRest } = right;
+  return JSON.stringify(leftRest) === JSON.stringify(rightRest);
+}
+
+/**
+ * **受控扩展校验**（2026-10-24 P0-1，闸门 2 delta §2/§4）：**只约束发布标记（release）本身**。
+ *
+ * 作用域（2026-10-24 协调修正）：
+ *   · **双方都非发布（previous/next 均非 true）⇒ 通过**：普通 flow 写卡（扩步骤、修 dependsOn 等）
+ *     不是发布标记，保持既有 `parseFlowStateYaml` 校验，不做 release-only 限制；
+ *   · 只有 `previous.release === true` 或 `next.release === true` 时才执行 release-only 规则：
+ *       - false/缺省→true 且其余字段/步骤逐字段不变（含顺序）⇒ 通过；
+ *       - true→false/缺省 ⇒ `release-downgrade`（发布标记不能撤回）；
+ *       - true→true 或 false/缺省→true 但其它字段/步骤有变化 ⇒ `release-other-changes`。
+ *
+ * 规则（fail-closed）：现有文件不合法 ⇒ `previous-invalid`；候选不合法 ⇒ `invalid-flow`。
+ * 纯函数：只解析两段 YAML 文本，不写盘；由编排 `run-role` 的 Flow YAML 写卡校验接线调用。
+ */
+export function validateReleaseOnlyExtension(input: {
+  flowId: string;
+  previousText: string;
+  nextText: string;
+}): ReleaseExtensionValidation {
+  const previous = parseFlowStateYaml(input.previousText, input.flowId);
+  if (!previous.ok) {
+    return {
+      ok: false,
+      code: "previous-invalid",
+      error: `现有流程 YAML 校验失败（${previous.error}）；受控扩展只允许在有效流程上标记 release。`,
+    };
+  }
+  const next = parseFlowStateYaml(input.nextText, input.flowId);
+  if (!next.ok) {
+    return { ok: false, code: "invalid-flow", error: `候选流程 YAML 校验失败：${next.error}` };
+  }
+
+  const previouslyReleased = previous.flow.release === true;
+  const nextReleased = next.flow.release === true;
+  // 普通 flow 写卡（双方都非发布）：不涉及发布标记，按既有 YAML 校验放行；不施加 release-only 限制。
+  if (!previouslyReleased && !nextReleased) return { ok: true };
+  if (previouslyReleased && !nextReleased) {
+    return {
+      ok: false,
+      code: "release-downgrade",
+      error:
+        "受控扩展不允许把 release 从 true 改回 false/缺省（发布标记不能撤回；" +
+        "如需撤回必须重开闸门并另做变更）。",
+    };
+  }
+  if (!flowsEqualExceptRelease(previous.flow, next.flow)) {
+    return {
+      ok: false,
+      code: "release-other-changes",
+      error:
+        "发布标记（release）只能单独设置：只允许 release 从 false/缺省→true，其余字段/步骤必须保持不变；" +
+        "本次候选还改动了其它内容（请用 flow_get / flow_step_update / flow_step_supersede 推进步骤）。",
+    };
+  }
+  return { ok: true };
 }
 
 /**

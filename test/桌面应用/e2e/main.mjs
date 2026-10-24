@@ -1850,6 +1850,152 @@ async function run() {
   repairCheck("MAC_CLOSE_REOPEN_LOADS_WITHOUT_DUPLICATE_HANDLERS", await wc().executeJavaScript("!!document.getElementById('inp-message') && !!window.desktop"));
   repairCheck("MAC_CLOSE_REOPEN_NO_AUTO_SEND", repairSendRequests.length === sendsBeforeCrash);
 
+  // —————— 2026-10-24 治理协调 / P0-1 发布验收门（最小真实主进程检查；不新增 UI）——————
+  // 用真实 `createDesktopInterface`（真实 Electron 主进程进程内）+ OUTDIR 临时项目：
+  //  ① 非发布 flow（release 缺省）完成 ⇒ Lead 系统行 awaiting-release-acceptance；不派 verifier/Proof；
+  //  ② flow 顶层 release: true 后才派 verifier；目标夹具文件不被改写（零写入）。
+  {
+    const projectMod = await import(pathToFileURL(path.join(APP_DIR, "desktop", "project.ts")).href);
+    const coordRoot = path.join(OUTDIR, "governance-coordination-project");
+    const flowId = "e2e-coordination";
+    const flowPath = path.join(coordRoot, "docs", "flows", `${flowId}.yaml`);
+    const ledgerPath = path.join(coordRoot, ".ans", "governance", "ledger.jsonl");
+    fs.mkdirSync(path.dirname(flowPath), { recursive: true });
+    fs.mkdirSync(path.dirname(ledgerPath), { recursive: true });
+    const flowSteps = [
+      "steps:",
+      "  - id: nomination",
+      "    title: 提名",
+      "    owner: nominator",
+      "    kind: customer-decision",
+      "    status: done",
+      "    evidence:",
+      "      kind: customer-decision",
+      "      ref: appointment",
+      "  - id: contract-freeze",
+      "    title: 契约",
+      "    owner: rapporteur",
+      "    kind: artifact",
+      "    status: done",
+      "    evidence:",
+      "      kind: artifact",
+      `      ref: docs/contracts/${flowId}-api-v1.md`,
+      "  - id: impl",
+      "    title: 实现",
+      "    owner: executor",
+      "    kind: dispatch",
+      "    status: done",
+      "    evidence:",
+      "      kind: dispatch",
+      "      ref: impl",
+      "  - id: verification",
+      "    title: 验收",
+      "    owner: app",
+      "    kind: acceptance",
+      "    status: pending",
+    ];
+    const writeCoordFlow = (release) => {
+      fs.writeFileSync(
+        flowPath,
+        [`flowId: ${flowId}`, "version: 1", "qualityTier: production", ...(release ? ["release: true"] : []), ...flowSteps, ""].join("\n"),
+        "utf8",
+      );
+    };
+    writeCoordFlow(false);
+    fs.writeFileSync(
+      ledgerPath,
+      [
+        JSON.stringify({ at: "2026-10-24T00:00:00.000Z", kind: "customer.decision", flowId, stepId: "nomination", decisionKind: "appointment", customerDecision: "appointed", actorRoleId: "nominator", power: "nomination" }),
+        JSON.stringify({ at: "2026-10-24T00:00:01.000Z", kind: "artifact.observed", artifactPath: `docs/contracts/${flowId}-api-v1.md`, actorRoleId: "rapporteur", power: "proposal" }),
+        JSON.stringify({ at: "2026-10-24T00:00:02.000Z", kind: "dispatch.accepted", flowId, stepId: "impl", actorRoleId: "convener", power: "schedule", targetRoleId: "executor" }),
+      ].join("\n") + "\n",
+      "utf8",
+    );
+    const builtIn = (roleId, governanceFunction) => ({
+      roleId,
+      cardPath: "",
+      boundaryPath: "",
+      cardText: `# ${roleId}`,
+      boundary: { entries: [], boundarySource: "<built-in:trio>", acceptance: { accepted: false, source: "" } },
+      builtIn: true,
+      governanceFunction,
+    });
+    const listing = {
+      projectRoot: coordRoot,
+      roles: [
+        builtIn("liaison", "liaison"),
+        builtIn("rapporteur", "proposal"),
+        builtIn("nominator", "nomination"),
+        builtIn("convener", "schedule"),
+        builtIn("verifier", "verification"),
+        { roleId: "executor", cardPath: "角色卡/executor/role-card.md", boundaryPath: "角色卡/executor/boundary.yaml", cardText: "# executor", boundary: { entries: [], boundarySource: "角色卡/executor/boundary.yaml", acceptance: { accepted: false, source: "" } } },
+      ],
+      warnings: [],
+      hasRoles: true,
+      primaryRoleId: "liaison",
+      governanceModel: "trio",
+    };
+    const coordSends = new Map();
+    const coordEvents = [];
+    const coordIface = createDesktopInterface({
+      pickDirectory: async () => coordRoot,
+      emitEvent: (envelope) => coordEvents.push(envelope),
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        const sends = coordSends.get(input.roleId) ?? [];
+        coordSends.set(input.roleId, sends);
+        return {
+          async send(text) { sends.push(text); },
+          events() {
+            return {
+              [Symbol.asyncIterator]() {
+                return {
+                  async next() {
+                    for (let i = 0; i < 400; i += 1) await sleep(5);
+                    return { value: undefined, done: true };
+                  },
+                };
+              },
+            };
+          },
+          async dispose() {},
+        };
+      },
+      buildProjectConfigFn: projectMod.buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    });
+    const waitForGovernance = async (check, label) => {
+      for (let i = 0; i < 300 && !check(); i += 1) await sleep(10);
+      repairCheck(label, check());
+    };
+    try {
+      await coordIface.listProject({ projectRoot: coordRoot });
+      const leadNotes = () =>
+        coordEvents
+          .filter((envelope) => envelope.roleId === "liaison" && envelope.event.kind === "message" && envelope.event.detail && envelope.event.detail.source === "delivery-note")
+          .map((envelope) => String(envelope.event.summary ?? ""));
+      await waitForGovernance(() => leadNotes().some((note) => note.includes("awaiting-release-acceptance")), "GOVERNANCE_AWAITING_RELEASE_SYSTEM_LINE");
+      repairCheck("GOVERNANCE_NON_RELEASE_NO_PROOF", (coordSends.get("verifier") ?? []).length === 0);
+      // flow 文件不被应用改写（目标零写入；fixture 自身仅由本检查的 release 标记步骤改写）。
+      const nonReleaseText = fs.readFileSync(flowPath, "utf8");
+      await sleep(250);
+      repairCheck("GOVERNANCE_NON_RELEASE_FLOW_UNCHANGED", fs.readFileSync(flowPath, "utf8") === nonReleaseText);
+      repairCheck("GOVERNANCE_NON_RELEASE_NO_CRITERIA_FILE", !fs.existsSync(path.join(coordRoot, "docs", "acceptance", `${flowId}-criteria-v1.md`)));
+
+      // 显式发布标记（release: true）⇒ 下一次真实事件才派 verifier/Proof。
+      writeCoordFlow(true);
+      await coordIface.listProject({ projectRoot: coordRoot });
+      await waitForGovernance(() => (coordSends.get("verifier") ?? []).length > 0, "GOVERNANCE_RELEASE_DISPATCHES_PROOF");
+      const releaseText = fs.readFileSync(flowPath, "utf8");
+      await sleep(250);
+      repairCheck("GOVERNANCE_RELEASE_FLOW_UNCHANGED", fs.readFileSync(flowPath, "utf8") === releaseText);
+      repairCheck("GOVERNANCE_RELEASE_NO_ACCEPTANCE_DONE", /id: verification\n\s+title: 验收\n\s+owner: app\n\s+kind: acceptance\n\s+status: pending/.test(releaseText));
+      log("GOVERNANCE_COORDINATION=" + JSON.stringify({ leadNotes: leadNotes().length, verifierSends: (coordSends.get("verifier") ?? []).length }));
+    } finally {
+      await coordIface.stopSession();
+    }
+  }
+
   log("E2E_PASS=" + (repairFailures.length === 0));
   log("E2E_FAILURES=" + repairFailures.join(", "));
   log("E2E_DONE=1");

@@ -22,6 +22,7 @@ import {
   intentHandoffArgs,
   makeHarness,
   makeRoot,
+  seedLedger,
   seedTrioProject,
   write,
 } from "./fixture.ts";
@@ -76,6 +77,19 @@ test("Lead 通用 choice 不呈现客户：declined + 指导；随后 flow_get/d
   const temp = makeRoot("lead-internal-choice");
   seedTrioProject(temp.root);
   write(temp.root, FLOW_REL, flowDoc(FLOW, [{ id: "impl", status: "pending" }]));
+  // 2026-10-24 闸门 1（设计 v1 §6.4）：coordinate（Lead→Steward）要求该 flow 的最新提案决定已接受；
+  // 不能以空账本放行。这里补真实的 proposal-accept 种子，让下面的 dispatch_task 走真实门禁。
+  await seedLedger(temp.root, [
+    {
+      kind: "customer.decision",
+      flowId: FLOW,
+      decisionKind: "proposal-accept",
+      customerDecision: "accepted",
+      actorRoleId: "rapporteur",
+      power: "proposal",
+      decisionEvidence: { kind: "customer-input" },
+    },
+  ]);
   const h = await makeHarness({
     tag: "lead-internal-choice",
     root: temp.root,
@@ -111,10 +125,11 @@ test("Lead 通用 choice 不呈现客户：declined + 指导；随后 flow_get/d
       (entries) => entries.some((entry) => entry.kind === "dispatch.accepted" && entry.targetRoleId === "convener"),
       3000,
     );
-    assert.equal(
-      ledger.entries.some((entry) => entry.kind === "customer.decision"),
-      false,
-      "通用 choice 不得写 customer.decision 账本",
+    const decisions = ledger.entries.filter((entry) => entry.kind === "customer.decision");
+    assert.deepEqual(
+      decisions.map((entry) => entry.decisionKind),
+      ["proposal-accept"],
+      "通用 choice 不得写 customer.decision（仅保留夹具的 proposal-accept 种子）",
     );
     const coordinate = ledger.entries.find(
       (entry) => entry.kind === "dispatch.accepted" && entry.targetRoleId === "convener",

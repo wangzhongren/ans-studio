@@ -622,3 +622,228 @@ test("r7 v3 测试分片隔离：各自临时根/输出/日志；共享只读 v3
     temp.cleanup();
   }
 });
+
+// —————————————————————— 2026-10-24 P1-4 owner 校验 ——————————————————————
+
+test("r8 P1-4 owner==target：错派给非 owner 被拒（owner-mismatch、不写账本）；派给 owner 受理", async () => {
+  const temp = makeRoot("mapreduce-owner");
+  await seedDispatchProject(temp.root);
+  const h = await makeHarness({ tag: "mapreduce-owner", root: temp.root, approval: true, decision: true });
+  try {
+    await h.open("convener");
+    const caps = h.capsByRole.get("convener");
+    assert.ok(caps?.dispatchTask, "Convener 应注入 dispatch_task");
+
+    // delivery-storefront 的 owner 是 executor：派给 reviewer 必须被 owner 门拒绝。
+    const mismatch = (await caps!.dispatchTask!({
+      roleId: "reviewer",
+      task: "Map 交付 storefront（错派）",
+      flowId: FLOW,
+      stepId: "delivery-storefront",
+    })) as { ok: boolean; message: string };
+    assert.equal(mismatch.ok, false, "非 owner 派发必须被拒");
+    assert.match(mismatch.message, /owner 是 executor/, "拒绝文案写明 owner");
+    assert.match(mismatch.message, /不一致/);
+    const afterMismatch = await h.waitForLedger(() => true);
+    assert.equal(
+      afterMismatch.entries.some(
+        (entry) =>
+          entry.kind === "dispatch.accepted" &&
+          entry.stepId === "delivery-storefront" &&
+          entry.targetRoleId === "reviewer",
+      ),
+      false,
+      "被拒的错派不得写账本",
+    );
+
+    // 派给 owner=executor：受理并写账本。
+    const match = (await caps!.dispatchTask!({
+      roleId: "executor",
+      task: "Map 交付 storefront",
+      flowId: FLOW,
+      stepId: "delivery-storefront",
+    })) as { ok: boolean; message: string };
+    assert.equal(match.ok, true, match.message);
+    const ledger = await h.waitForLedger(
+      (entries) =>
+        entries.some(
+          (entry) =>
+            entry.kind === "dispatch.accepted" &&
+            entry.stepId === "delivery-storefront" &&
+            entry.targetRoleId === "executor",
+        ),
+      5000,
+    );
+    assert.ok(
+      ledger.entries.some(
+        (entry) =>
+          entry.kind === "dispatch.accepted" &&
+          entry.stepId === "delivery-storefront" &&
+          entry.targetRoleId === "executor",
+      ),
+      "owner 派发应入账",
+    );
+  } finally {
+    await h.stop();
+    h.cleanup();
+    temp.cleanup();
+  }
+});
+
+// —————————————————————— 2026-10-24 P0-3 dependsOn 解析 supersededBy 链 ——————————————————————
+
+test("r9 P0-3：前置 superseded ⇒ 沿 supersededBy 解析到 done；缺失替代/未知/成环 fail-closed；并行组不退化", async () => {
+  // —— 正例：下游 dependsOn 旧（superseded）步骤，解析到已完成的新步骤后放行。 ——
+  const okTemp = makeRoot("mapreduce-superseded-ok");
+  try {
+    seedTrioProject(okTemp.root, ["executor", "tester"]);
+    write(
+      okTemp.root,
+      FLOW_REL,
+      flowDoc(FLOW, [
+        { id: "delivery-persistence", owner: "executor", kind: "dispatch", status: "superseded", supersededBy: "delivery-persistence-rework" },
+        {
+          id: "delivery-persistence-rework",
+          owner: "executor",
+          kind: "dispatch",
+          status: "done",
+          evidence: { kind: "dispatch", ref: "delivery-persistence-rework" },
+        },
+        {
+          id: "integration-e2e",
+          owner: "tester",
+          kind: "dispatch",
+          status: "pending",
+          parallelGroup: "reduce",
+          dependsOn: ["delivery-persistence"],
+        },
+        { id: "verification", kind: "acceptance", status: "pending" },
+      ]),
+    );
+    write(okTemp.root, CRITERIA_REL, acceptanceCriteriaDoc(FLOW));
+    await seedLedger(okTemp.root, [
+      { decisionKind: "proposal-accept", customerDecision: "accepted", actorRoleId: "rapporteur", power: "proposal" },
+      {
+        decisionKind: "appointment",
+        customerDecision: "appointed",
+        actorRoleId: "convener",
+        power: "schedule",
+        targetRoleIds: ["executor", "tester"],
+        artifactPath: TEAM_PLAN_REL,
+      },
+      { kind: "dispatch.accepted", actorRoleId: "convener", power: "schedule", stepId: "delivery-persistence-rework", targetRoleId: "executor" },
+    ]);
+    const okHarness = await makeHarness({ tag: "mapreduce-superseded-ok", root: okTemp.root, approval: true, decision: true });
+    try {
+      await okHarness.open("convener");
+      const caps = okHarness.capsByRole.get("convener");
+      assert.ok(caps?.dispatchTask, "Convener 应注入 dispatch_task");
+      const allowed = (await caps!.dispatchTask!({
+        roleId: "tester",
+        task: "Reduce｜契约/集成（旧前置已 superseded）",
+        flowId: FLOW,
+        stepId: "integration-e2e",
+      })) as { ok: boolean; message: string };
+      assert.equal(allowed.ok, true, `superseded 前置应解析到 done 后放行：${allowed.message}`);
+      const ledger = await okHarness.waitForLedger(
+        (entries) => entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "integration-e2e"),
+        5000,
+      );
+      assert.ok(
+        ledger.entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "integration-e2e"),
+        "放行后应入账",
+      );
+    } finally {
+      await okHarness.stop();
+      okHarness.cleanup();
+    }
+  } finally {
+    okTemp.cleanup();
+  }
+
+  // —— 负例 1：前置 superseded 但缺 supersededBy ⇒ dependencies-unresolved（不按「未 done」混同）。 ——
+  const missingTemp = makeRoot("mapreduce-superseded-missing");
+  try {
+    seedTrioProject(missingTemp.root, ["executor", "tester"]);
+    write(
+      missingTemp.root,
+      FLOW_REL,
+      flowDoc(FLOW, [
+        { id: "delivery-persistence", owner: "executor", kind: "dispatch", status: "superseded" },
+        {
+          id: "integration-e2e",
+          owner: "tester",
+          kind: "dispatch",
+          status: "pending",
+          parallelGroup: "reduce",
+          dependsOn: ["delivery-persistence"],
+        },
+        { id: "verification", kind: "acceptance", status: "pending" },
+      ]),
+    );
+    write(missingTemp.root, CRITERIA_REL, acceptanceCriteriaDoc(FLOW));
+    await seedLedger(missingTemp.root, [
+      { decisionKind: "proposal-accept", customerDecision: "accepted", actorRoleId: "rapporteur", power: "proposal" },
+      {
+        decisionKind: "appointment",
+        customerDecision: "appointed",
+        actorRoleId: "convener",
+        power: "schedule",
+        targetRoleIds: ["executor", "tester"],
+        artifactPath: TEAM_PLAN_REL,
+      },
+    ]);
+    const missingHarness = await makeHarness({
+      tag: "mapreduce-superseded-missing",
+      root: missingTemp.root,
+      approval: true,
+      decision: true,
+    });
+    try {
+      await missingHarness.open("convener");
+      const caps = missingHarness.capsByRole.get("convener");
+      const denied = (await caps!.dispatchTask!({
+        roleId: "tester",
+        task: "Reduce｜契约/集成（替代关系缺失）",
+        flowId: FLOW,
+        stepId: "integration-e2e",
+      })) as { ok: boolean; message: string };
+      assert.equal(denied.ok, false, "superseded 前置缺 supersededBy 必须拒绝");
+      assert.match(denied.message, /前置依赖无法解析/);
+      assert.match(denied.message, /缺少 supersededBy/);
+      const ledger = await missingHarness.waitForLedger(() => true);
+      assert.equal(
+        ledger.entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "integration-e2e"),
+        false,
+        "被拒的派发不得写账本",
+      );
+    } finally {
+      await missingHarness.stop();
+      missingHarness.cleanup();
+    }
+  } finally {
+    missingTemp.cleanup();
+  }
+
+  // —— 负例 2：supersededBy 指向未知步骤 / 替代链成环 ⇒ 解析期 fail-closed（具体错误）。 ——
+  const unknown = parseFlowStateYaml(
+    flowDoc(FLOW, [
+      { id: "old-step", owner: "executor", kind: "dispatch", status: "superseded", supersededBy: "ghost-step" },
+      { id: "verification", kind: "acceptance", status: "pending" },
+    ]),
+    FLOW,
+  );
+  assert.equal(unknown.ok, false, "未知 supersededBy 必须被流程校验拒绝");
+  assert.match(unknown.ok ? "" : unknown.error, /supersededBy 指向不存在的步骤/);
+
+  const cyclic = parseFlowStateYaml(
+    flowDoc(FLOW, [
+      { id: "step-a", owner: "executor", kind: "dispatch", status: "superseded", supersededBy: "step-b" },
+      { id: "step-b", owner: "executor", kind: "dispatch", status: "superseded", supersededBy: "step-a" },
+      { id: "verification", kind: "acceptance", status: "pending" },
+    ]),
+    FLOW,
+  );
+  assert.equal(cyclic.ok, false, "supersededBy 成环必须被流程校验拒绝");
+  assert.match(cyclic.ok ? "" : cyclic.error, /替代关系形成环/);
+});

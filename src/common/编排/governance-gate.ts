@@ -13,10 +13,14 @@
 //      2026-10-22 验收第 3 项（O2，客户按推荐项）：已有 appointment 决定的 flow，派发项目角色前
 //      还要求 `docs/acceptance/<flowId>-criteria-v1.md` 存在且结构合格；`proposal-accept-quick`
 //      （快捷复用既有角色）与无 appointment 决定的旧流程显式豁免（见 `evaluateDispatchGate`）。
+//      2026-10-24（P0-3/P1-4，设计 v1 §6.4 执行门）：`dependsOn` 解析 `supersededBy` 链（前置 superseded
+//      ⇒ 解析到最终非 superseded 步骤并判 done；缺失/未知/成环明确拒绝，不按「未 done」混同）；
+//      结构化步骤的 `owner` 必须等于派发目标（旧版 `.md`/无 owner 不新增检查；coordinate/app-only 例外）。
 //   4. 协调消息门：`coordinate`（2026-10-20 客户拍板「把主理 Lead 设为工作流管理者，可和所有职能角色
 //      沟通」）——仅 Liaison（Lead）→ Convener（Steward）；`flowId` 必填、`stepId` 可选；
-//      **不是**项目步骤派发，不要求提案接受/任命名单/流程步骤存在/未派发去重。
-//      `dispatch`（Convener → 项目角色）逐字不变。
+//      **不是**项目步骤派发，不要求任命名单/流程步骤存在/未派发去重。
+//      2026-10-24（设计 v1 §6.4 闸门 1）：最新提案决定必须是 `proposal-accept`/`proposal-accept-quick`，
+//      否则拒（协调不能先于客户接受提案）；`dispatch`（Convener → 项目角色）其余语义不变。
 //
 // **fail-closed**（评审 §6.2/§九-16）：
 //   · 账本快照 `errors` 非空 → 拒一切门禁动作，文案提示检查 `.ans/governance/ledger.jsonl`；
@@ -141,17 +145,22 @@ export function evaluateGovernanceGate(
     case "dispatch":
       return evaluateDispatchGate(input, snapshot);
     case "coordinate":
-      return evaluateCoordinateGate(input);
+      return evaluateCoordinateGate(input, snapshot);
   }
 }
 
 /**
  * 协调消息门（2026-10-20 客户拍板）：Lead（Liaison）可以给 Steward（Convener）发协调消息。
  *
- * **不是项目步骤派发**：不要求提案已接受、目标在任命名单、流程步骤存在、`flowId+stepId` 未派发；
- * 只校验来源/目标/flowId（stepId 可选，给出时必须是 slug）。`dispatch` 门逐字不变。
+ * **不是项目步骤派发**：不要求目标在任命名单、流程步骤存在、`flowId+stepId` 未派发；
+ * 只校验来源/目标/flowId（stepId 可选，给出时必须是 slug），以及**闸门 1**
+ * （2026-10-24 设计 v1 §6.4）：该 flow 的最新提案决定必须是 `proposal-accept`/`proposal-accept-quick`
+ * ——协调不能先于客户接受提案。`evaluateDispatchGate` 的其它语义不受影响。
  */
-export function evaluateCoordinateGate(input: GovernanceGateInput): GovernanceGateDecision {
+export function evaluateCoordinateGate(
+  input: GovernanceGateInput,
+  snapshot: GovernanceLedgerSnapshot,
+): GovernanceGateDecision {
   if (input.roleId !== "liaison") {
     return deny("forbidden", "治理门禁：协调消息（coordinate）只能由主理 Lead 发起。");
   }
@@ -164,7 +173,8 @@ export function evaluateCoordinateGate(input: GovernanceGateInput): GovernanceGa
   if (input.stepId !== undefined && !isSlug(input.stepId)) {
     return deny("missing-step-id", `治理门禁：协调消息给出 stepId 时必须是合法 slug（\`${GOVERNANCE_SLUG_PATTERN}\`）。`);
   }
-  return { allowed: true };
+  // 闸门 1（2026-10-24 收紧）：最新提案决定必须是接受/快捷接受；不要求步骤/任命/未派发。
+  return evaluateProposalGate(input, snapshot);
 }
 
 /**
@@ -419,16 +429,46 @@ function evaluateDispatchGate(
     );
   }
 
-  // 5b) 前置依赖（2026-10-22 MapReduce 方案 A）：步骤声明 dependsOn 时，全部前置必须 done。
-  //     不改变派发权归属；旧步骤无 dependsOn ⇒ 不新增检查（旧 flow 行为逐字不变）。
+  // 5a) owner 校验（2026-10-24 P1-4，设计 v1 §6.4 执行门）：结构化步骤的 `owner` 必须等于派发目标。
+  //     旧版 `.md`（无结构化步骤）与 owner 缺省的 legacy 流程不新增检查；coordinate/app-only 派发
+  //     不经过本门（coordinate 走 `evaluateCoordinateGate`，app-only 由应用直接执行）。
+  const stepOwner = lookup.step?.owner;
+  if (typeof stepOwner === "string" && stepOwner.trim() !== "" && stepOwner !== target) {
+    return deny(
+      "owner-mismatch",
+      `治理门禁：步骤 ${input.stepId} 的 owner 是 ${stepOwner}，与派发目标 ${target} 不一致；` +
+        "请把该步骤派给 owner（流程按 owner 对账，错派会让流程与执行者不一致）。",
+    );
+  }
+
+  // 5b) 前置依赖（2026-10-22 MapReduce 方案 A；2026-10-24 P0-3 解析 supersededBy 链）：
+  //     步骤声明 dependsOn 时，前置必须 done；前置已被 superseded ⇒ 沿 supersededBy 解析到最终
+  //     非 superseded 步骤再判 done。缺失/未知引用/替代链成环 ⇒ `dependencies-unresolved`
+  //     （明确拒绝，不按「未 done」混同）。不改变派发权归属；旧步骤无 dependsOn ⇒ 不新增检查。
   const dependsOn = lookup.step?.dependsOn ?? [];
-  if (dependsOn.length > 0) {
+  if (dependsOn.length > 0 && lookup.flow !== undefined) {
     const notDone: string[] = [];
+    const unresolved: string[] = [];
     for (const depId of dependsOn) {
-      const dependency = lookup.flow?.steps.find((step) => step.id === depId);
-      if (dependency === undefined || dependency.status !== "done") {
-        notDone.push(`${depId}（${dependency?.status ?? "missing"}）`);
+      const resolution = resolveDependencyStep(lookup.flow, depId);
+      if (!resolution.ok) {
+        unresolved.push(`${depId}：${resolution.reason}`);
+        continue;
       }
+      if (resolution.step.status !== "done") {
+        notDone.push(
+          resolution.step.id === depId
+            ? `${depId}（${resolution.step.status}）`
+            : `${depId}→${resolution.step.id}（${resolution.step.status}）`,
+        );
+      }
+    }
+    if (unresolved.length > 0) {
+      return deny(
+        "dependencies-unresolved",
+        `治理门禁：步骤 ${input.stepId} 的前置依赖无法解析（${unresolved.join("、")}）；` +
+          "缺失步骤、supersededBy 指向未知步骤或替代链成环一律拒绝；请先修复流程步骤/替代关系后派发。",
+      );
     }
     if (notDone.length > 0) {
       return deny(
@@ -465,6 +505,50 @@ function deny(code: string, message: string): GovernanceGateDecision {
 
 function isSlug(value: unknown): value is string {
   return typeof value === "string" && SLUG_RE.test(value);
+}
+
+/**
+ * `dependsOn` 前置解析（2026-10-24 P0-3）：前置步骤若已 `superseded`，沿 `supersededBy` 链解析到
+ * **最终非 superseded 步骤**再判 `done`（返工替代后下游不应被旧引用硬拦）。
+ *
+ * fail-closed（返回 `ok:false`，调用方用 `dependencies-unresolved` 明确拒绝，不按「未 done」混同）：
+ *   · 前置 id 不存在；
+ *   · superseded 步骤缺少 `supersededBy`，或 `supersededBy` 指向未知步骤；
+ *   · `supersededBy` 链成环（防御性；flow-state 解析已拒绝 YAML 内的替代环）。
+ */
+function resolveDependencyStep(
+  flow: FlowState,
+  depId: string,
+): { ok: true; step: FlowStateStep } | { ok: false; reason: string } {
+  const byId = new Map<string, FlowStateStep>();
+  for (const step of flow.steps) {
+    if (!byId.has(step.id)) byId.set(step.id, step);
+  }
+  const visited: string[] = [];
+  const seen = new Set<string>();
+  let currentId = depId;
+  for (;;) {
+    if (seen.has(currentId)) {
+      return { ok: false, reason: `supersededBy 链成环：${[...visited, currentId].join(" → ")}` };
+    }
+    seen.add(currentId);
+    visited.push(currentId);
+    const step = byId.get(currentId);
+    if (step === undefined) {
+      return {
+        ok: false,
+        reason:
+          currentId === depId
+            ? `步骤 "${depId}" 不存在`
+            : `supersededBy 指向不存在的步骤 "${currentId}"`,
+      };
+    }
+    if (step.status !== "superseded") return { ok: true, step };
+    if (step.supersededBy === undefined || step.supersededBy.trim() === "") {
+      return { ok: false, reason: `步骤 "${currentId}" 已 superseded 但缺少 supersededBy` };
+    }
+    currentId = step.supersededBy;
+  }
 }
 
 /** 该 flow 的最新一条满足谓词的 `customer.decision`（append 顺序 = 时间顺序）。 */

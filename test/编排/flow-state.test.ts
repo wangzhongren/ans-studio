@@ -928,6 +928,44 @@ steps:
   }
 });
 
+// —————————————————————— 2026-10-24 P0-1：flow 顶层 release（发布验收标记） ——————————————————————
+
+test("release（P0-1）：缺省等价非发布；true/false 解析保留；非法类型 ⇒ 具体路径报错；未知字段仍拒绝", () => {
+  // 缺省：字段不出现（视图按 false 处理）。
+  assert.equal(parseOk(TODO_FLOW_YAML, "todo-list-v1").release, undefined);
+
+  const released = parseOk(
+    TODO_FLOW_YAML.replace("qualityTier: production", "qualityTier: production\nrelease: true"),
+    "todo-list-v1",
+  );
+  assert.equal(released.release, true, "release: true 解析保留");
+
+  const explicitFalse = parseOk(
+    TODO_FLOW_YAML.replace("qualityTier: production", "qualityTier: production\nrelease: false"),
+    "todo-list-v1",
+  );
+  assert.equal(explicitFalse.release, false, "显式 false 解析保留（与缺省同义）");
+
+  const invalid = parseFlowStateYaml(
+    TODO_FLOW_YAML.replace("qualityTier: production", "qualityTier: production\nrelease: yes"),
+    "todo-list-v1",
+  );
+  assert.equal(invalid.ok, false);
+  if (!invalid.ok) {
+    const releaseError = invalid.errors.find((error) => error.path === "release");
+    assert.ok(releaseError, "非法 release 类型必须报 release 路径");
+    assert.match(releaseError!.message, /布尔/);
+  }
+
+  // release 不打开宽泛顶层字段：拼写错误的未知字段仍被拒绝。
+  assert.ok(
+    errorPaths(
+      TODO_FLOW_YAML.replace("qualityTier: production", "qualityTier: production\nreleased: true"),
+      "todo-list-v1",
+    ).includes("released"),
+  );
+});
+
 test("YAML 语法错误 / 重复键 ⇒ 校验失败（path=$）", () => {
   const syntax = parseFlowStateYaml("flowId: [unterminated\n", "bad-v1");
   assert.equal(syntax.ok, false);
@@ -1414,6 +1452,110 @@ test("写前校验（S3/T11）：声明 docs/flows/flow-.yaml ⇒ 宽捕获后�
     } finally {
       await handle.dispose();
     }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————————————————————— 2026-10-24 P0-1：flow 文件的受控扩展（release 标记） ——————————————————————
+
+const RELEASE_BASE_FLOW_YAML = [
+  "flowId: flow-a",
+  "version: 1",
+  "qualityTier: production",
+  "steps:",
+  "  - id: impl",
+  "    title: 实现",
+  "    owner: A",
+  "    kind: dispatch",
+  "    status: pending",
+  "  - id: acceptance",
+  "    title: 验收",
+  "    owner: verifier",
+  "    kind: acceptance",
+  "    status: pending",
+  "",
+].join("\n");
+
+function withRelease(text: string, value: "true" | "false" = "true"): string {
+  return text.replace("qualityTier: production", `qualityTier: production\nrelease: ${value}`);
+}
+
+test("写前校验（P0-1）：release 标记只允许 false/缺省→true；普通 flow 写卡仍通过；true→false 与伴随变化拒绝", async () => {
+  const root = mkdtempSync(join(tmpdir(), "ans-flow-card-release-"));
+  try {
+    const project = roleFixture(root);
+    mkdirSync(join(root, "docs", "flows"), { recursive: true });
+    writeFileSync(join(root, "docs", "flows", "flow-a.yaml"), RELEASE_BASE_FLOW_YAML, "utf8");
+
+    const ask = async (preview: string, rel = "docs/flows/flow-a.yaml", flowId = "flow-a") => {
+      const captured = capturingAdapter();
+      let rawCalls = 0;
+      const raw: CustomerInputFn = () => {
+        rawCalls += 1;
+        return { outcome: "answered", value: { confirmed: true }, operatorId: "test" };
+      };
+      const handle = await openRoleSession(
+        { roleId: "X", project, customerInput: raw },
+        {
+          createAdapter: (_gate, injected) => {
+            captured.holder.caps = injected;
+            return captured.adapter;
+          },
+        },
+      );
+      try {
+        const out = await captured.holder.caps!.customerInput!({
+          kind: "confirm",
+          title: "写流程",
+          preview: `## ${rel}\n${preview}`,
+          paths: [rel],
+          flowId,
+        });
+        return { out, rawCalls: () => rawCalls };
+      } finally {
+        await handle.dispose();
+      }
+    };
+
+    // 1) 只加 release: true、其余逐字段不变 ⇒ 发卡（放行到原始客户通道）。
+    const marked = await ask(withRelease(RELEASE_BASE_FLOW_YAML));
+    assert.equal(marked.out?.outcome, "answered", JSON.stringify(marked.out));
+    assert.equal(marked.rawCalls(), 1);
+
+    // 2) release: true 但同时改步骤 ⇒ 拒绝，且不发卡（发布标记必须单独设置）。
+    const otherChanges = await ask(
+      withRelease(RELEASE_BASE_FLOW_YAML.replace("status: pending", "status: dispatched")),
+    );
+    assert.equal(otherChanges.out?.outcome, "declined");
+    assert.match(
+      (otherChanges.out as { reason?: string }).reason ?? "",
+      /其余字段\/步骤必须保持不变/,
+    );
+    assert.equal(otherChanges.rawCalls(), 0, "被拒的卡不得触达原始客户通道");
+
+    // 3) 未设置 release（双方都非发布）的普通 flow 扩展/字段写卡 ⇒ 仍通过（既有 YAML 校验）。
+    const normalExtension = await ask(RELEASE_BASE_FLOW_YAML.replace("status: pending", "status: dispatched"));
+    assert.equal(
+      normalExtension.out?.outcome,
+      "answered",
+      `release 缺省的普通流程扩展不应被 release-only 拦截：${JSON.stringify(normalExtension.out)}`,
+    );
+    assert.equal(normalExtension.rawCalls(), 1, "普通 flow 写卡照常呈现客户通道");
+
+    // 4) release true→false/缺省 ⇒ 拒绝（发布标记不能撤回）。
+    writeFileSync(join(root, "docs", "flows", "flow-a.yaml"), withRelease(RELEASE_BASE_FLOW_YAML), "utf8");
+    const downgrade = await ask(RELEASE_BASE_FLOW_YAML);
+    assert.equal(downgrade.out?.outcome, "declined");
+    assert.match((downgrade.out as { reason?: string }).reason ?? "", /不能撤回/);
+
+    // 5) 初始创建（目标文件不存在）保持既有校验：允许带 release 的合法新 flow。
+    const created = await ask(
+      withRelease(RELEASE_BASE_FLOW_YAML.replace(/flowId: flow-a/g, "flowId: flow-b")),
+      "docs/flows/flow-b.yaml",
+      "flow-b",
+    );
+    assert.equal(created.out?.outcome, "answered", "初始创建不受受控扩展限制（仍须 YAML 合法）");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

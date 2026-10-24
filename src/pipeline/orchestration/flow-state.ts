@@ -50,6 +50,10 @@ export type {
   CompleteRoleCardsValidatedFile,
   ObserveFlowArtifactsResult,
   ReopenAcceptanceStepForReworkInput,
+  /** 2026-10-24 P0-1：flow 回执视图携带 `release`（缺省 false）；桌面只经本公共出口消费。 */
+  FlowToolViewWithRelease,
+  /** 2026-10-24 P0-1：受控扩展（release 标记）校验结果。 */
+  ReleaseExtensionValidation,
 } from "../../common/编排/flow-service.ts";
 
 export type {

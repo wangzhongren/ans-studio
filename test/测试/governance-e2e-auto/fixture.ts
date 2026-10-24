@@ -211,15 +211,30 @@ export interface FlowDocStep {
   parallelGroup?: string;
   /** 2026-10-22 MapReduce 方案 A：可选前置步骤 id 列表；旧 flow 不填。 */
   dependsOn?: readonly string[];
+  /** 2026-10-19 替代关系：本步骤取代的旧步骤 id（可选；与 supersededBy 成对）。 */
+  supersedes?: readonly string[];
+  /** 2026-10-24 P0-3：本步骤被哪个新步骤取代（仅 `status: superseded` 时有意义）。 */
+  supersededBy?: string;
 }
 
 /**
  * 生成合法 Flow YAML（`docs/flows/<flowId>.yaml` 唯一机器状态；契约见 `src/common/编排/flow-state.ts`）。
  * 顶层 flowId/version/qualityTier/steps；每步 id/title/owner/kind/status；done 必须带同 kind 的 evidence
  * （dispatch 的 ref=账本 stepId；acceptance 的 ref 固定 "acceptance"）。pending 等状态不要求 evidence。
+ * `options.release`（2026-10-24 P0-1）：显式发布标记；缺省不写 = 非发布（产品契约 `release` 可选布尔）。
  */
-export function flowDoc(flowId = FLOW, steps: FlowDocStep[] = [{ id: "impl", status: "pending" }]): string {
-  const lines = [`flowId: ${flowId}`, "version: 1", "qualityTier: production", "steps:"];
+export function flowDoc(
+  flowId = FLOW,
+  steps: FlowDocStep[] = [{ id: "impl", status: "pending" }],
+  options: { release?: boolean } = {},
+): string {
+  const lines = [
+    `flowId: ${flowId}`,
+    "version: 1",
+    "qualityTier: production",
+    ...(options.release === true ? ["release: true"] : []),
+    "steps:",
+  ];
   for (const step of steps) {
     const status = step.status ?? "pending";
     const kind = step.kind ?? (step.id === "verification" || step.id === "acceptance" ? "acceptance" : "dispatch");
@@ -234,6 +249,10 @@ export function flowDoc(flowId = FLOW, steps: FlowDocStep[] = [{ id: "impl", sta
     );
     if (step.parallelGroup !== undefined) lines.push(`    parallelGroup: ${step.parallelGroup}`);
     if (step.dependsOn !== undefined) lines.push(`    dependsOn: [${step.dependsOn.join(", ")}]`);
+    if (step.supersedes !== undefined && step.supersedes.length > 0) {
+      lines.push(`    supersedes: [${step.supersedes.join(", ")}]`);
+    }
+    if (step.supersededBy !== undefined) lines.push(`    supersededBy: ${step.supersededBy}`);
     if (status === "done") {
       const evidence =
         step.evidence ??

@@ -12,7 +12,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createFlowService, type FlowService } from "../../src/common/编排/flow-service.ts";
+import {
+  createFlowService,
+  validateReleaseOnlyExtension,
+  type FlowService,
+  type FlowToolViewWithRelease,
+} from "../../src/common/编排/flow-service.ts";
 import { completeAcceptanceStep, completeRoleCardsStep, observeFlowArtifacts, reopenAcceptanceStepForRework } from "../../src/pipeline/orchestration/flow-state.ts";
 import { parseFlowStateYaml, type FlowState } from "../../src/common/编排/flow-state.ts";
 import { readGovernanceLedger, type GovernanceLedgerEntry } from "../../src/common/编排/governance-ledger.ts";
@@ -138,6 +143,98 @@ test("get：revision=文件 sha256；Steward/owner/stranger 的 canUpdate 投影
     const asStranger = await owner(root, "nobody").get({ flowId: "flow-a" });
     assert.deepEqual(asStranger.flow?.canUpdate, []);
   });
+});
+
+test("release（P0-1）：flow_get 视图带 release（缺省 false）；update 保留 release: true", async () => {
+  await withRoot(async (root) => {
+    const releasedYaml = flowYaml().replace("qualityTier: production", "qualityTier: production\nrelease: true");
+    writeFile(root, FLOW_REL, releasedYaml);
+
+    const released = await steward(root).get({ flowId: "flow-a" });
+    assert.equal(released.ok, true);
+    assert.equal((released.flow as FlowToolViewWithRelease).release, true, "release: true 透出到 flow 视图");
+
+    writeFile(root, "docs/flows/flow-b.yaml", flowYaml().replace(/flow-a/g, "flow-b"));
+    const plain = await steward(root).get({ flowId: "flow-b" });
+    assert.equal(((plain.flow as FlowToolViewWithRelease) ?? {}).release, false, "缺省 release = false（非发布）");
+
+    const updated = await steward(root).update({
+      flowId: "flow-a",
+      stepId: "delivery",
+      status: "delivered",
+      expectedRevision: released.revision!,
+    });
+    assert.equal(updated.ok, true, updated.error ?? "");
+    assert.equal((updated.flow as FlowToolViewWithRelease).release, true, "回执视图保留 release");
+    const text = readFlow(root).text;
+    assert.match(text, /^release: true$/m, "serialize 保留 release: true（步骤更新不清除）");
+  });
+});
+
+test("validateReleaseOnlyExtension（P0-1）：只约束 release 标记；双方非发布按普通 flow 写卡放行", () => {
+  const base = flowYaml();
+  const released = base.replace("qualityTier: production", "qualityTier: production\nrelease: true");
+
+  assert.deepEqual(validateReleaseOnlyExtension({ flowId: "flow-a", previousText: base, nextText: released }), {
+    ok: true,
+  });
+  assert.deepEqual(
+    validateReleaseOnlyExtension({ flowId: "flow-a", previousText: released, nextText: released }),
+    { ok: true },
+    "release true→true 且其余不变（幂等重发）放行",
+  );
+
+  // 双方都非发布：普通流程扩展/字段写卡（如修 dependsOn、改步骤）不施加 release-only 限制。
+  const normalExtension = base.replace("status: pending", "status: dispatched");
+  assert.deepEqual(
+    validateReleaseOnlyExtension({ flowId: "flow-a", previousText: base, nextText: normalExtension }),
+    { ok: true },
+    "release 缺省的普通 flow 扩展仍通过（按既有 YAML 校验）",
+  );
+  assert.deepEqual(validateReleaseOnlyExtension({ flowId: "flow-a", previousText: base, nextText: base }), {
+    ok: true,
+  });
+
+  const changedStep = released.replace("status: pending", "status: dispatched");
+  const otherChanges = validateReleaseOnlyExtension({
+    flowId: "flow-a",
+    previousText: base,
+    nextText: changedStep,
+  });
+  assert.equal(otherChanges.ok, false);
+  assert.equal(otherChanges.code, "release-other-changes", "false→true 带其它变化拒绝");
+
+  const trueWithChange = validateReleaseOnlyExtension({
+    flowId: "flow-a",
+    previousText: released,
+    nextText: changedStep,
+  });
+  assert.equal(trueWithChange.ok, false);
+  assert.equal(trueWithChange.code, "release-other-changes", "true/true 带其它变化拒绝");
+
+  const downgrade = validateReleaseOnlyExtension({
+    flowId: "flow-a",
+    previousText: released,
+    nextText: base,
+  });
+  assert.equal(downgrade.ok, false);
+  assert.equal(downgrade.code, "release-downgrade");
+
+  const invalidNext = validateReleaseOnlyExtension({
+    flowId: "flow-a",
+    previousText: base,
+    nextText: "flowId: flow-a\n",
+  });
+  assert.equal(invalidNext.ok, false);
+  assert.equal(invalidNext.code, "invalid-flow");
+
+  const invalidPrevious = validateReleaseOnlyExtension({
+    flowId: "flow-a",
+    previousText: "flowId: flow-a\n",
+    nextText: released,
+  });
+  assert.equal(invalidPrevious.ok, false);
+  assert.equal(invalidPrevious.code, "previous-invalid");
 });
 
 test("get：defaultFlowId / 缺失 flowId / 不存在 / 非法 YAML", async () => {

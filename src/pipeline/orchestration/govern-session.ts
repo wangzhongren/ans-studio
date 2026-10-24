@@ -113,6 +113,12 @@ export type {
   EvaluateFlowCompletionResult,
 } from "../../common/编排/flow-state.ts";
 
+// 2026-10-24 P0-1：flow 回执视图的 release 标记（`FlowToolView` + release；桌面只经公共出口消费）。
+export type {
+  FlowToolViewWithRelease,
+  ReleaseExtensionValidation,
+} from "../../common/编排/flow-service.ts";
+
 // ── W6-A（2026-10-18）：意图交接/澄清的 Pipeline 公共出口 ──────────────────────────────────
 // 四角色评审 §5.2：桌面窗口只依赖 Pipeline 公共出口，**不直接导入**编排私有 `common/`。
 // 薄再导出：`validateIntentHandoff`/`intentHandoffDedupeKey`/澄清轮次计数与上限。
@@ -601,19 +607,22 @@ const ARCHITECTURE_EXTENSIBILITY_REQUIREMENTS = [
  * **成对同步**：单一来源在 `src/common/门禁引擎/governance-roles.ts` 的角色卡文案。分层规则禁止
  * 导入其他角色的私有 common，故在本层**复制**一份并注明来源；任一侧改文案必须同批同步。
  * 本块是治理会话提示（CLI `ans govern` 与经 `runGovernSession` 的前端）的行为约束，不改变任何
- * 门禁判定：自动派发仍由应用在流程齐备后执行，验收仍由 Proof 核对 + 客户/判断 agent 决定。
+ * 门禁判定：2026-10-24 起（P0-1/设计 v1 方案 A）只有发布版本（flow 顶层 `release: true`）且在流程
+ * 齐备后，应用才按发布验收门派 Proof；非发布不派。内置角色状态/回交向主理汇总，主理只协调不批准；
+ * 提示**不承诺**未实现的自动推进（步骤 done 不会自动派下一步）。验收仍由 Proof 核对 + 客户/判断
+ * agent 决定。
  */
 const STANDARD_WORKFLOW_PROMPT = [
-  "**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 团队计划与客户任命 → Crew 写角色卡与角色就绪 → 流程与派发 → 独立验收；",
-  "trio 依次由 Lead / 主理、Draft / 提案、Steward / 统筹、Crew / 组队、Proof / 验收承担（Steward 先写团队计划并发任命卡，客户任命后由 Crew 按计划写卡），single/su 由同一治理角色按同一顺序推进。",
-  "**流程状态唯一机器状态**：`docs/flows/<flowId>.yaml`（同名 `.md` 仅人读视图，不得承载门禁状态）；步骤必须显式写 `kind` / `evidence` / `supersedes`；新流程使用 step id `team-plan` / `appointment` / `role-cards` / `role-readiness` / `acceptance-criteria` / `change-package`（kind 仍为现有 dispatch / customer-decision / artifact / acceptance）；保留 id `verification` / `acceptance`（`kind: acceptance`，初始 `status: pending`，由应用自动派 Proof，不得占用、不得标 `done`）。",
+  "**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 团队计划与客户任命 → Crew 写角色卡与角色就绪 → 流程与派发 → 发布验收（仅发布版本）；",
+  "trio 依次由 Lead / 主理、Draft / 提案、Steward / 统筹、Crew / 组队、Proof / 验收承担（Steward 先写团队计划并发任命卡，客户任命后由 Crew 按计划写卡），single/su 由同一治理角色按同一顺序推进。**两层执行与汇报**：Draft/Steward/Crew/Proof 的状态与回交向 Lead / 主理汇总，项目 worker 的回交仍归 Steward；**主理只做治理协调，不批准提案/任命/验收，不直接派 Crew/Proof，不写验收报告**；项目 worker 仍由 Steward 派。",
+  "**流程状态唯一机器状态**：`docs/flows/<flowId>.yaml`（同名 `.md` 仅人读视图，不得承载门禁状态）；步骤必须显式写 `kind` / `evidence` / `supersedes`；新流程使用 step id `team-plan` / `appointment` / `role-cards` / `role-readiness` / `acceptance-criteria` / `change-package`（kind 仍为现有 dispatch / customer-decision / artifact / acceptance）；保留 id `verification` / `acceptance`（`kind: acceptance`，初始 `status: pending`，由应用在**发布版本**按发布验收门派 Proof，不得占用、不得标 `done`）。",
   "**团队计划（2026-10-22 第 1 项）**：Steward 先写 `docs/scheduling/<flowId>-team-v1.md`（frontmatter flowId/version/riskTier/`recommended: [role-a, role-b]` 与每个角色的职责目标/能力要求/写集/依赖行），再发 `request_choice(cardKind=appointment)`；计划不完整/flowId 不一致/推荐集为空或含内置角色/选项不覆盖推荐集时，应用**不向客户发卡**并退回 Steward。客户任命后由 Crew 读取计划写卡；Crew 不选角色、不改计划。",
   "**团队计划 v2（角色粒度 / MapReduce）**：新流程写 `teamPlanSchema: 2`、frontmatter `modules: [module-a, module-b]`（内联数组、ASCII slug、非空无重复）与「模块清单」表（module/职责/公开契约/架构来源）；角色表 14 列 roleId/类型/module/职责目标/能力要求/唯一写集/公开契约/测试面/依赖/dependsOn/并行组/组别/apiSpec/粒度理由。默认一个模块一个角色、写集跨角色两两不相交（精确路径/目录，不用通配符）、dependsOn 无环、同 map 组无依赖、Reduce 覆盖全部 Map；整层名/多模块必须写「粒度理由」并交 readiness 例外复核。旧计划（无 `teamPlanSchema: 2`）按 v1 兼容，不强制迁移。",
   "**团队计划 v3（目录级授权，2026-10-23）**：新流程优先写 `teamPlanSchema: 3`（v2 字段全部保留）与 frontmatter `directories: [dir-a/, dir-b/]`（非空内联数组；项目相对、以 `/` 结尾、无通配符/`..`/绝对路径、无重复；不得与治理关键路径重叠）。模块清单每个 module 必须写非空 `实现目录`（Q9 A；不得写 `—`），角色 implementation/tests/docs 目录必须在对应模块实现目录内或等于模块目录；角色表用 `授权目录` + `精确写集` 两列（`唯一写集` 仅作 v3 兼容别名并带 warning；`边界` 列名在 v3 不再接受）；正文必须有「目录规范」表（目录/owner/类型/用途/命名/允许子目录/允许文件类型/公开契约/测试面/依赖/禁写区/共享），每个目录恰好一个 owner、目录不得相同/互为祖先或子目录；共享目录用 none/read-only/split（split 父目录本身不分配、子目录各有 owner）；治理关键路径（`.ans/`、`角色卡/`、`docs/scheduling|acceptance|communication|flows|nominations|verification/`、`src/common/shared/`、release/packaging、`.env`/密钥、`src/model/` 根单例契约）只能精确文件授权，不得作为普通 `授权目录`。执行角色可在规范允许的命名/子目录/文件类型内自行新建文件/子目录；不得跨目录、不得改规范、不得写他人目录。应用只做 V-D1–V-D9 确定性校验；目录是否内聚、规范是否合理、共享是否必要、契约/测试面是否真实由 readiness 逐目录复核（结构通过不等于语义正确）。旧 v1/v2 计划保持原行为，不强制迁移。",
   "**Map/Reduce 与 flow（方案 A）**：flow step 可选 `parallelGroup: map-<slug> | reduce` 与 `dependsOn: [step-id]`（不新增 `kind`）；Map 交付步骤 id 用 `delivery-<module>` 并先依赖 `contract-freeze`；Reduce 步骤等全部 Map `done` 后再跑契约/集成/e2e。dispatch 门禁会硬拦前置未 `done` 的派发，不改变派发权归属；旧 flow 不填字段行为不变。",
   "**测试分片与证据（Reduce）**：测试角色按模块并行分片，每分片使用独立临时项目根/端口/输出目录/日志并留原始证据；不得共享可变夹具、不得并发写同一文件。Reduce 合并 manifest（候选哈希/分片清单/命令/日志路径/结果/环境）后跑契约/集成/e2e 与真实启动演示，`verification-evidence` 步骤指向 manifest。",
-  "**客户不做内部调度**：阶段流转由应用负责，客户不需要逐阶段手动转交或触发；只有需要客户决定的事项（提案接受、任命、写盘确认、验收）才经治理卡呈给客户。",
-  "**验收标准（2026-10-22 第 3 项）**：Proof 在客户任命后、实施派发前先写 `docs/acceptance/<flowId>-criteria-v1.md`（验收表/风险档位/判定规则/证据计划）；应用把「标准已存在且结构合格」作为实施派发前置（accept-quick/旧流程显式豁免）。",
+  "**客户不做内部调度**：阶段流转与门禁由应用负责；**应用不承诺自动推进下一步**（步骤 done 不会自动触发下一步派发），内置角色用 `flow_get` / `flow_step_update` / `flow_step_supersede` 与 `dispatch_task` 按门禁推进，主理只协调不批准；客户只在需要客户决定的事项（提案接受、任命、写盘确认、发布验收动作）上做决定，不需要逐阶段手动转交或触发。",
+  "**验收标准（2026-10-22 第 3 项）**：Proof 在客户任命后、实施派发前先写 `docs/acceptance/<flowId>-criteria-v1.md`（验收表/风险档位/判定规则/证据计划）；应用把「标准已存在且结构合格」作为实施派发前置（accept-quick/旧流程显式豁免）。**2026-10-24 起：非发布流程应用不自动派 verifier 写标准/不启动 Proof**（标准归属另做 P1-5 变更）；发布版本才由应用按发布验收门派 Proof 写标准并复核。",
   "**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：",
   "① 读证据（流程状态 YAML `docs/flows/<flowId>.yaml`、提案/契约、团队计划、变更包 `docs/scheduling/<flowId>-change-v1.md`、交付与回交报告、演示证据路径）；",
   "② 用审批档 shell 跑测试（逐条执行提案声明的单元/集成/端到端测试，命令逐条提交审批并记录输出）；",
@@ -621,8 +630,8 @@ const STANDARD_WORKFLOW_PROMPT = [
   "④ 质量/架构核对（按工程质量基线逐项核对，并核对实现与架构方案/影响分析一致：模块边界、依赖方向、扩展点、schema/API 版本迁移）；",
   "⑤ 验收报告与验收卡（报告写入 `docs/acceptance/<flowId>-report-v1.md`，**首行五项**：风险档位｜判定依据｜选定检查｜复用证据｜全量回归；判定/详细证据附件写 `docs/verification/`；再发 request_choice：cardKind=acceptance、选项 accept/reject）。",
   "**档位纪律**：变更包标 T0–T3，团队计划档位为下限；Proof 可升档、不能降档；报告档位不得低于变更包档位；全量回归只在 T3 或证据不足时执行；T0–T3 定义以技能 `references/testing.md` 为唯一口径（`qualityTier` 不是风险档位）。",
-  "**自动派发**：应用会在流程齐备（执行步骤全部 done 且按显式 `kind` 与账本证据对账、无未结算决定、验收步骤 pending）后自动派发 Proof / 验收，不需要客户手动触发；",
-  "自动派发不是验收决定——验收卡仍由 Proof 核对后发出，由客户/判断 agent 决定。",
+  "**发布验收门（2026-10-24，P0-1）**：只有**发布版本**（flow YAML 顶层 `release: true`）且在流程齐备（执行步骤全部 done 且按显式 `kind` 与账本证据对账、无未结算决定、验收步骤 pending）后，应用才按发布验收门派发 Proof / 验收；非发布（`release` 缺省/false）在 change-package 后停在等待发布验收，**不派 verifier criteria、不派 Proof、不标 acceptance done**。发布标记只能由 Steward 用既有 `request_confirmation`（`cardKind=schedule-write`）写一份只把 `release` 从 false/缺省改为 true、其余字段/步骤不变的 flow YAML，经客户/判断 agent 确认；主理不得代批、不得直接派 Proof。",
+  "发布验收派发不是验收决定——验收卡仍由 Proof 核对后发出，由客户/判断 agent 决定；应用不承诺自动推进下一步。",
 ].join("\n");
 
 /**
@@ -653,7 +662,8 @@ const ENGINEERING_QUALITY_STAGE_REQUIREMENTS =
  *  客户 2026-10-19 新反馈（「这个独立核准应该是标准流程，而不是我在发给他。」「内置角色应该有自己的
  *  工作流。」）：两类提示在角色纪律/任务要求之前追加 `STANDARD_WORKFLOW_PROMPT`——阶段流转由应用负责、
  *  内置角色按标准工作流执行、客户不做内部调度；Proof 按「读证据 → 审批档 shell 跑测试 → 真实启动演示
- *  → 质量/架构核对 → 验收卡」标准复核；流程齐备后应用自动派发 Proof，不需要客户手动触发。
+ *  → 质量/架构核对 → 验收卡」标准复核。2026-10-24（P0-1）：只有发布版本（`release: true`）才由应用
+ *  按发布验收门派 Proof，非发布不派；内置状态/回交向主理汇总，主理只协调不批准；提示不承诺自动推进。
  *  该块与门禁引擎角色卡「标准工作流」章节成对同步（单一来源在其注册表卡文本）。 */
 function buildGovernPrompt(
   taskId: string,
@@ -780,7 +790,8 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         "步骤必须显式写 `kind` / `evidence` / `supersedes`；新流程使用 step id `team-plan` / `appointment` / " +
         "`role-cards` / `role-readiness` / `acceptance-criteria` / `change-package`（kind 仍为现有 dispatch / " +
         "customer-decision / artifact / acceptance）；保留 id `verification` / `acceptance` " +
-        "（`kind: acceptance`，初始 pending，由应用自动派 Proof，你不占用、不派发、不标 done）；" +
+        "（`kind: acceptance`，初始 pending，由应用在**发布版本**（`release: true`）按发布验收门派 Proof；" +
+        "非发布不派；你不占用、不派发、不标 done）；" +
         "项目工作流写入 `docs/workflow.md`，治理工作记录写入 `docs/governance/convener/**`。\n" +
         "**团队计划（2026-10-22 第 1 项，你的新增职责）**：写 `docs/scheduling/<flowId>-team-v1.md`" +
         "（frontmatter `flowId`/`version`/`riskTier`/`recommended: [role-a, role-b]`；角色表含 roleId/职责目标/" +
@@ -808,6 +819,11 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         "与真实启动演示。\n" +
         "**变更包（第 3 项）**：收齐证据后写 `docs/scheduling/<flowId>-change-v1.md`（frontmatter `flowId`/`version`/" +
         "`riskTier`/`candidate`/`changedPaths`/`evidence`）；档位不得低于团队计划档位。\n" +
+        "**发布标记（2026-10-24，P0-1）**：只有**发布版本**在 change-package 完成后，才用既有 " +
+        "`request_confirmation`（`cardKind=schedule-write`）写一份只把 flow 顶层 `release` 从 false/缺省改为 " +
+        "`true`、其余字段/步骤**逐字段不变**的 `docs/flows/<flowId>.yaml`，交客户/判断 agent 确认；非发布保持缺省 " +
+        "false；不得借写卡改其它字段/步骤（步骤推进用 `flow_get` / `flow_step_update` / `flow_step_supersede`）。" +
+        "应用只在 `release: true` 时才按发布验收门派 Proof；你不能直接派 Proof、不能代批发布标记。\n" +
         "**质量与演示**：流程单与派发任务必须携带质量与演示要求——每个交付步骤写明按工程质量基线执行，" +
         "验收步骤写明必须真实启动应用并演示（启动命令、访问地址或截图/录屏）；未真实运行的交付不得写" +
         "「已完成」或「可验收」。\n" +
@@ -831,6 +847,9 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         "才用 `hand_off_intent` 把意图交给应用（intentId/handoffKind/goal/scope/acceptance/summary，须与意图文件逐项一致）；" +
         "应用在后台投递给报告员，不打开/不切换客户会话。\n" +
         "**交接 ≠ 客户批准**，也不解锁任何门禁；同一意图不要重复交接。\n" +
+        "**治理协调（2026-10-24）**：Draft/Steward/Crew/Proof 的状态/回交向主理汇总；你只做治理协调——" +
+        "不批准提案/任命/验收、不直接派 Crew/Proof、不写验收报告，Proof 只收状态+报告指针；" +
+        "协调 ≠ 客户批准，所有派发仍由应用按门禁校验（提案接受/任命/发布验收门不因协调放宽）。\n" +
         "信息不足就先向客户问清；客户回答后更新意图文件，再用 `handoffKind=clarification` 交接。\n" +
         "你不写提案、不任命、不排程、不派发、不安装、不写账本；不得批准或声称已获客户批准。"
       );
@@ -845,6 +864,9 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         "变更包、交付与回交证据，独立逐项核对。\n" +
         "**实施前先写标准（2026-10-22 第 3 项）**：客户任命后、实施派发前，按客户确认的策划方案版本写完成标准；" +
         "应用把「标准存在且结构合格」作为实施派发前置；标准写盘后冻结，实施开始后不得为适配候选修改。\n" +
+        "**发布验收门（2026-10-24，P0-1）**：应用只在**发布版本**（flow YAML 顶层 `release: true`）才派发验收任务/" +
+        "启动标准与复核；非发布流程不启动 verifier/Proof、不写验收标准、不标 acceptance done；" +
+        "发布标记由 Steward 用既有 schedule-write 写卡并经客户确认，不由你代批。\n" +
         "**按风险档位判定**：先核对变更包 `docs/scheduling/<flowId>-change-v1.md` 的 T0–T3 档位与改动是否相符；" +
         "T0 只查文档、T1 只跑受影响单测、T2 补受影响集成、全量回归只在 T3 或证据不足时执行；" +
         "复用同候选、同输入/依赖、同命令的有效证据，只补缺失/失效/高风险；Verifier 可升档、不能降档；" +

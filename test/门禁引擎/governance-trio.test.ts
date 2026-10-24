@@ -1516,3 +1516,88 @@ test("2026-10-23 目录授权负例（P10/P12）：Proof 核对布局报告+原�
   assert.doesNotMatch(v, /布局报告摘要即可/, "布局报告摘要不能替代原始证据");
   assert.doesNotMatch(v, /结构通过即语义正确/, "结构通过不得等同语义正确");
 });
+
+// —————————————————————— 9) 2026-10-24 治理协调（S2a）+ 发布验收门 ——————————————————————
+
+test("2026-10-24 治理协调（S2a）：Lead 卡接报内置状态/回交、闸门 0/1 后才交接/coordinate、不直派 Crew/Proof/项目 worker、Proof 只收状态+指针、协调≠批准", () => {
+  const l = governanceRoleOf("liaison")!.cardText;
+  for (const needle of [
+    "## 治理协调（Lead / 主理）",
+    "Draft / 提案、Steward / 统筹、Crew / 组队、Proof / 验收 的状态与回交向**你**汇总",
+    "维护「阶段 / 阻塞 / 下一步」视图",
+    "代批 `confirm`（闸门 0 已结算）后，才用 `hand_off_intent`",
+    "客户已接受提案（闸门 1 已结算）后，才用 `dispatch_task` 的 coordinate 向 Steward / 统筹 派",
+    "不直接派 Crew / Proof / 项目 worker",
+    "项目 worker（Map / Reduce）由 Steward / 统筹 派",
+    "只收 Proof 的状态与报告指针",
+    "不批准提案、任命、验收",
+    "协调 ≠ 客户批准",
+    "应用仍执行闸门 0/1/2",
+    "你的协调不替代任何门禁",
+  ]) {
+    assert.ok(l.includes(needle), `Lead 治理协调卡文本须含「${needle}」`);
+  }
+  // Q1 口径：旧「向项目角色派发协调任务」必须消失；项目 worker 仍由 Steward 派。
+  assert.doesNotMatch(l, /向 Steward \/ 统筹 与项目角色派发协调任务/);
+  assert.doesNotMatch(l, /向 Steward \/ 统筹与项目角色派发协调任务/);
+  assert.doesNotMatch(l, /派给 Steward \/ 项目角色/);
+  assert.doesNotMatch(l, /向项目角色派发协调任务/);
+  // 能力矩阵不变：dispatchTask / handOffIntent 仍只给既有角色，不新增能力位或工具。
+  assert.deepEqual(
+    BUILT_IN_GOVERNANCE_ROLES.filter((s) => s.capabilities.dispatchTask).map((s) => s.id),
+    ["liaison", "convener"],
+    "dispatch_task 仍只给 Lead（协调）与 Steward（项目派发）",
+  );
+  assert.deepEqual(
+    BUILT_IN_GOVERNANCE_ROLES.filter((s) => s.capabilities.handOffIntent).map((s) => s.id),
+    ["liaison"],
+    "hand_off_intent 仍只给 Lead",
+  );
+  assert.deepEqual(
+    Object.keys(governanceRoleOf("liaison")!.capabilities).sort(),
+    [
+      "customerInput",
+      "dispatchTask",
+      "handOffIntent",
+      "installMcp",
+      "installSkill",
+      "proposeRecovery",
+      "requestClarification",
+      "roleStatus",
+      "sessionTail",
+      "shell",
+    ].sort(),
+    "治理协调不得新增能力位",
+  );
+});
+
+test("2026-10-24 发布验收门（S2a）：Steward 卡内置回交向 Lead 汇总、发布版本才派 Proof、release 仅 false/缺省→true、返工由 Lead 协调、不派治理角色", () => {
+  const c = governanceRoleOf("convener")!.cardText;
+  for (const needle of [
+    "内置治理角色的状态 / 回交向 Lead / 主理 汇总",
+    "返工由 Lead / 主理 协调",
+    "只有发布版本才由应用派 Proof / 验收，非发布不派",
+    "非发布流程在 change-package 完成后停在等待发布验收",
+    "`cardKind=schedule-write`",
+    "flow 顶层 `release`",
+    "缺省 / `false` 改为 `true`",
+    "其余步骤与字段逐字不变",
+    "其他字段或步骤变化仍按原校验拒绝",
+    "Steward 不派发治理角色、不代替验收、不催办",
+  ]) {
+    assert.ok(c.includes(needle), `Steward 发布门卡文本须含「${needle}」`);
+  }
+  assert.doesNotMatch(c, /由应用自动派 Proof/, "Steward 卡不得再写非发布自动派 Proof");
+  assert.doesNotMatch(c, /流程齐备后由应用自动派/, "Steward 卡不得再写流程齐备自动派 Proof");
+  // 五卡总则（单一来源）逐字包含内置汇报、主理只协调、应用门禁与发布门。
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    for (const needle of [
+      "内置角色（Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收）的状态与回交向主理（Lead / 主理）汇总",
+      "主理只做治理协调，不批准提案、任命或验收",
+      "应用仍负责门禁（闸门 0/1/2、发布验收门）与阶段流转",
+      "只有发布版本才由应用派 Proof / 验收，非发布不派",
+    ]) {
+      assert.ok(spec.cardText.includes(needle), `${spec.id} 卡标准工作流总则须含「${needle}」`);
+    }
+  }
+});

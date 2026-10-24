@@ -44,6 +44,7 @@ import {
   roleBoundaryDoc,
   roleCardDoc,
   roleWorkDocs,
+  seedLedger,
   seedTrioProject,
   teamPlanDoc,
   teamPlanV2Doc,
@@ -53,26 +54,40 @@ import {
   type ScriptContext,
   type TeamPlanV2RoleInput,
 } from "./fixture.ts";
+import type { DesktopDeps } from "../../../app/desktop/interface.ts";
 
 const ROLE_CARD_REL = "角色卡/executor/role-card.md";
 const ROLE_BOUNDARY_REL = "角色卡/executor/boundary.yaml";
 const INTENT_REL = "docs/intents/intent-a.md";
 
+/** 固定引擎解析：发布验收门的自动派发需要确定性 runtime（不触真实凭据）。 */
+const RESOLVE_RUNTIME: DesktopDeps["resolveRuntimeFn"] = async () => ({
+  ok: true,
+  runtime: "claude",
+  source: "credentials",
+  skipped: [],
+});
+
 /**
  * 最终流程 YAML（所有执行步骤 done、验收步骤 pending）：证据与账本对账。
  * 团队计划/标准/变更包是 artifact；appointment 是 customer-decision；role-cards/readiness/impl 是 dispatch。
+ * `release: true`（2026-10-24 P0-1）显式标记发布版本；缺省 = 非发布。
  */
-function finalFlowDoc(): string {
-  return flowDoc(FLOW, [
-    { id: "team-plan", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: TEAM_PLAN_REL } },
-    { id: "appointment", kind: "customer-decision", status: "done", evidence: { kind: "customer-decision", ref: "appointment" } },
-    { id: "role-cards", kind: "dispatch", status: "done" },
-    { id: "role-readiness", kind: "dispatch", status: "done" },
-    { id: "acceptance-criteria", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: CRITERIA_REL } },
-    { id: "change-package", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: CHANGE_PACKAGE_REL } },
-    { id: "impl", kind: "dispatch", status: "done" },
-    { id: "verification", kind: "acceptance", status: "pending" },
-  ]);
+function finalFlowDoc(options: { release?: boolean } = {}): string {
+  return flowDoc(
+    FLOW,
+    [
+      { id: "team-plan", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: TEAM_PLAN_REL } },
+      { id: "appointment", kind: "customer-decision", status: "done", evidence: { kind: "customer-decision", ref: "appointment" } },
+      { id: "role-cards", kind: "dispatch", status: "done" },
+      { id: "role-readiness", kind: "dispatch", status: "done" },
+      { id: "acceptance-criteria", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: CRITERIA_REL } },
+      { id: "change-package", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: CHANGE_PACKAGE_REL } },
+      { id: "impl", kind: "dispatch", status: "done" },
+      { id: "verification", kind: "acceptance", status: "pending" },
+    ],
+    options,
+  );
 }
 
 // —————————————————————— 2026-10-22 v2 完整链路（团队计划 v2 + MapReduce） ——————————————————————
@@ -459,6 +474,21 @@ test("五角色全自动链路：意图→提案→团队计划→任命→Crew 
     assert.equal(exists(temp.root, NOMINATION_REL), false, "新流程不再产生 docs/nominations/ 提名文件");
 
     // 阶段 1b：Verifier 写实施前标准（O2 前置；真实会话 + 真实预授权写区 + artifact.observed）。
+    // 2026-10-24 P0-1：该 flow 未标记 release（非发布）⇒ 应用不自动派 verifier 写标准；
+    // 标准由用例显式驱动真实 Verifier 会话补位（离线夹具，避免依赖自动派发）。
+    assert.equal(exists(temp.root, CRITERIA_REL), false, "非发布：应用不得自动写 acceptance-criteria");
+    const beforeCriteriaLedger = await h.waitForLedger(() => true);
+    assert.equal(
+      beforeCriteriaLedger.entries.some(
+        (entry) =>
+          entry.kind === "dispatch.accepted" &&
+          entry.actorRoleId === "app" &&
+          entry.targetRoleId === "verifier" &&
+          entry.stepId === "acceptance-criteria",
+      ),
+      false,
+      "非发布：应用不得自动派 verifier 写 acceptance-criteria",
+    );
     const verifierOpened = await h.iface.openSession({ projectRoot: temp.root, roleId: "verifier", runtime: "claude" });
     assert.equal(verifierOpened.ok, true, verifierOpened.error ?? "");
     const criteriaTask = await h.send("verifier", "请写实施前完成标准（acceptance-criteria）。");
@@ -509,6 +539,40 @@ test("五角色全自动链路：意图→提案→团队计划→任命→Crew 
     const finalizeTask = await h.send("convener", "请收尾流程：按账本证据把执行步骤标 done。");
     assert.equal(finalizeTask.ok, true, finalizeTask.error ?? "");
     await h.waitFor(() => /^\s+status: done$/m.test(readFileSync(`${temp.root}/${FLOW_REL}`, "utf8")) && /id: impl/.test(readFileSync(`${temp.root}/${FLOW_REL}`, "utf8")), 8000);
+
+    // 2026-10-24 P0-1（非发布）：change-package done 后停在发布验收前——不派 verifier/Proof、
+    // 不自动标 acceptance done；Lead 收到 awaiting-release-acceptance 系统行。
+    await h.waitFor(
+      () =>
+        h.events.some(
+          (envelope) =>
+            envelope.roleId === "liaison" &&
+            envelope.event.kind === "message" &&
+            (envelope.event as { detail?: { source?: string } }).detail?.source === "delivery-note" &&
+            String((envelope.event as { summary?: string }).summary).includes(
+              "flow.release 未标记为 true（非发布）⇒ 停在发布验收前",
+            ),
+        ),
+      8000,
+    );
+    const releaseGateLedger = await h.waitForLedger(() => true);
+    assert.equal(
+      releaseGateLedger.entries.some(
+        (entry) =>
+          entry.kind === "dispatch.accepted" &&
+          entry.actorRoleId === "app" &&
+          entry.targetRoleId === "verifier" &&
+          entry.stepId === "verification",
+      ),
+      false,
+      "非发布：change-package 后不得自动派 verifier/Proof",
+    );
+    const pendingAcceptance = parseFlowStateYaml(readFileSync(`${temp.root}/${FLOW_REL}`, "utf8"), FLOW);
+    assert.equal(pendingAcceptance.ok, true, pendingAcceptance.ok ? "" : pendingAcceptance.error);
+    if (pendingAcceptance.ok) {
+      const step = pendingAcceptance.flow.steps.find((candidate) => candidate.kind === "acceptance")!;
+      assert.equal(step.status, "pending", "非发布：无验收决定前 acceptance 保持 pending，不自动标 done");
+    }
 
     // —— 阶段 4：Verifier 写报告 + acceptance 卡；判断代批（验收机械门槛读流程/账本/标准/报告/变更包） ——
     // 等变更包与最终流程 YAML 的 artifact.observed 落账（验收机械门槛对账所需）。
@@ -1573,6 +1637,117 @@ test("v3 完整链路：计划 v3 → appointment → Crew 目录边界 → read
   } finally {
     await h.stop();
     h.cleanup();
+    temp.cleanup();
+  }
+});
+
+// —————————————————————— 2026-10-24 P0-1 发布验收门（release 显式动作） ——————————————————————
+
+test("发布验收门（P0-1）：非发布 change-package 后不派 verifier/Proof、不标 acceptance done；release: true 才自动派", async () => {
+  const temp = makeRoot("release-gate");
+  const root = temp.root;
+  try {
+    seedTrioProject(root, ["executor"]);
+    const steps = [
+      { id: "impl", kind: "dispatch", status: "done", owner: "executor", evidence: { kind: "dispatch", ref: "impl" } },
+      { id: "verification", kind: "acceptance", status: "pending" },
+    ] as const;
+    write(root, FLOW_REL, flowDoc(FLOW, [...steps]));
+    await seedLedger(root, [
+      { decisionKind: "proposal-accept", customerDecision: "accepted", actorRoleId: "rapporteur", power: "proposal" },
+      {
+        kind: "dispatch.accepted",
+        flowId: FLOW,
+        actorRoleId: "convener",
+        power: "schedule",
+        stepId: "impl",
+        targetRoleId: "executor",
+      },
+    ]);
+    const h = await makeHarness({
+      tag: "release-gate",
+      root,
+      decision: false,
+      resolveRuntime: RESOLVE_RUNTIME,
+      scriptForRole: () => [],
+    });
+    try {
+      const awaitingText = "flow.release 未标记为 true（非发布）⇒ 停在发布验收前";
+      await h.waitFor(
+        () =>
+          h.events.some(
+            (envelope) =>
+              envelope.roleId === "liaison" &&
+              envelope.event.kind === "message" &&
+              (envelope.event as { detail?: { source?: string } }).detail?.source === "delivery-note" &&
+              String((envelope.event as { summary?: string }).summary).includes(awaitingText),
+          ),
+        8000,
+      );
+      assert.equal(h.prompts.get("verifier")?.length ?? 0, 0, "非发布：不派 verifier/Proof");
+      assert.equal(exists(root, CRITERIA_REL), false, "非发布：不写 acceptance-criteria");
+      assert.equal(exists(root, REPORT_REL), false, "非发布：不写验收报告");
+      let ledger = await h.waitForLedger(() => true);
+      assert.equal(
+        ledger.entries.some(
+          (entry) =>
+            entry.kind === "dispatch.accepted" &&
+            entry.actorRoleId === "app" &&
+            entry.targetRoleId === "verifier",
+        ),
+        false,
+        "非发布：账本不得出现应用自动派 verifier",
+      );
+      let parsed = parseFlowStateYaml(readFileSync(`${root}/${FLOW_REL}`, "utf8"), FLOW);
+      assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.error);
+      if (parsed.ok) {
+        assert.equal(
+          parsed.flow.steps.find((step) => step.kind === "acceptance")!.status,
+          "pending",
+          "非发布：不标 acceptance done",
+        );
+      }
+
+      // 显式发布动作的结果：既有 schedule-write 已把顶层 release 标为 true（此处只重放写后的 flow 机器状态），
+      // 下一次真实事件（listProject/import）才由应用按发布验收门派 verifier。
+      write(root, FLOW_REL, flowDoc(FLOW, [...steps], { release: true }));
+      await h.iface.listProject({ projectRoot: root });
+      await h.waitFor(() => (h.prompts.get("verifier")?.length ?? 0) > 0, 8000);
+      ledger = await h.waitForLedger(
+        (entries) =>
+          entries.some(
+            (entry) =>
+              entry.kind === "dispatch.accepted" &&
+              entry.actorRoleId === "app" &&
+              entry.targetRoleId === "verifier" &&
+              entry.stepId === "verification",
+          ),
+        8000,
+      );
+      assert.ok(
+        ledger.entries.some(
+          (entry) =>
+            entry.kind === "dispatch.accepted" &&
+            entry.actorRoleId === "app" &&
+            entry.targetRoleId === "verifier" &&
+            entry.stepId === "verification",
+        ),
+        "release: true ⇒ 应用按发布验收门派 verifier/Proof 并审计",
+      );
+      parsed = parseFlowStateYaml(readFileSync(`${root}/${FLOW_REL}`, "utf8"), FLOW);
+      assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.error);
+      if (parsed.ok) {
+        assert.equal(
+          parsed.flow.steps.find((step) => step.kind === "acceptance")!.status,
+          "pending",
+          "派发 Proof 不等于验收通过：acceptance 仍等客户决定",
+        );
+      }
+      assert.equal(h.presented.length, 0, "无验收决定：不呈现客户卡");
+    } finally {
+      await h.stop();
+    }
+  } finally {
     temp.cleanup();
   }
 });

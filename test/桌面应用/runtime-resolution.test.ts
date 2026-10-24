@@ -150,24 +150,9 @@ function listingWithProjectRoles(base: ProjectListing, roleIds: string[]): Proje
   };
 }
 
-function flowMarkdown(flowId: string, steps: ReadonlyArray<readonly [id: string, status: string]>, extra: readonly string[] = []): string {
-  return [
-    "---",
-    `flowId: ${flowId}`,
-    ...extra,
-    "---",
-    "",
-    "# 流程单",
-    "",
-    "| stepId | 步骤 | 状态 |",
-    "| --- | --- | --- |",
-    ...steps.map(([id, status]) => `| ${id} | 步骤 ${id} | ${status} |`),
-  ].join("\n");
-}
-
-function writeFlowFile(projectRoot: string, flowId: string, markdown: string): void {
+function writeFlowFile(projectRoot: string, flowId: string, yaml: string): void {
   mkdirSync(path.join(projectRoot, "docs", "flows"), { recursive: true });
-  writeFileSync(path.join(projectRoot, "docs", "flows", `${flowId}.md`), markdown);
+  writeFileSync(path.join(projectRoot, "docs", "flows", `${flowId}.yaml`), yaml);
 }
 
 async function seedGovernanceEvidence(projectRoot: string, flowId: string): Promise<void> {
@@ -192,18 +177,45 @@ async function seedGovernanceEvidence(projectRoot: string, flowId: string): Prom
 }
 
 function acceptanceFlow(flowId: string): string {
-  return flowMarkdown(
-    flowId,
-    [
-      ["nomination", "done"],
-      ["contract-freeze", "done"],
-      ["roles-ready", "done"],
-      ["delivery-server", "done"],
-      ["verification", "pending"],
-      ["acceptance", "pending"],
-    ],
-    [`contract: docs/contracts/${flowId}-api-v1.md`],
-  );
+  // 2026-10-24 P0-1：自动派 Proof 需要发布标记（flow 顶层 release: true）；本文件只测引擎解析/派发接线，
+  // 因此固定为发布流程。证据形状与 `seedGovernanceEvidence` 的账本条目一一对应。
+  return [
+    `flowId: ${flowId}`,
+    "version: 1",
+    "qualityTier: production",
+    "release: true",
+    "steps:",
+    "  - id: nomination",
+    "    title: 步骤 nomination",
+    "    owner: nominator",
+    "    kind: customer-decision",
+    "    status: done",
+    "    evidence:",
+    "      kind: customer-decision",
+    "      ref: appointment",
+    "  - id: contract-freeze",
+    "    title: 步骤 contract-freeze",
+    "    owner: rapporteur",
+    "    kind: artifact",
+    "    status: done",
+    "    evidence:",
+    "      kind: artifact",
+    `      ref: docs/contracts/${flowId}-api-v1.md`,
+    "  - id: delivery-server",
+    "    title: 步骤 delivery-server",
+    "    owner: executor",
+    "    kind: dispatch",
+    "    status: done",
+    "    evidence:",
+    "      kind: dispatch",
+    "      ref: delivery-server",
+    "  - id: verification",
+    "    title: 验收",
+    "    owner: app",
+    "    kind: acceptance",
+    "    status: pending",
+    "",
+  ].join("\n");
 }
 
 /** 可推任意事件（含 settled）的会话句柄（与既有 interface 测试同思路）。 */

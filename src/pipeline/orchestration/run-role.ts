@@ -140,6 +140,7 @@ import {
 import { CLI_POSITIONING } from "../../common/编排/cli-positioning.ts";
 import {
   createFlowService,
+  validateReleaseOnlyExtension,
   type FlowGetFn,
   type FlowStepSupersedeFn,
   type FlowStepUpdateFn,
@@ -965,7 +966,10 @@ export async function openRoleSession(
           // `docs/flows/<flowId>.yaml`（唯一机器状态），preview 中的 YAML 必须先通过确定性校验；
           // 不合法 ⇒ 拒绝该卡（不发卡、不发行、不写账本），把具体 path + reason 交回 Steward 修正。
           // `schedule-write` 与普通 `write` 走同一闸；未声明 YAML 的旧版 .md 卡保持迁移兼容。
-          const flowYamlError = validateFlowYamlCard(
+          // 2026-10-24（P0-1 受控扩展）：目标文件已存在时，仅当涉及 release 标记（任一侧 release: true）
+          // 才执行 release-only 校验；双方都非发布时保持普通 flow 写卡（既有 YAML 校验）。
+          const flowYamlError = await validateFlowYamlCard(
+            input.project.projectRoot,
             effectiveReq,
             completeness.declaredPaths,
             effectiveReq.flowId ?? effectiveMetadata?.flowId,
@@ -2037,14 +2041,19 @@ function flowYamlBodyFromPreview(preview: string | undefined, rel: string): stri
  *   · 文件名候选先按 `isGovernanceFlowId` 校验：**非空但不合法 ⇒ 拒绝该卡**（明确写出候选值与
  *     现行规则），不得因路径正则不匹配而静默跳过 YAML 校验（2026-10-22 slug 收紧，设计 §3.4）；
  *   · 卡片 flowId（若有）必须与文件名一致；
- *   · preview 必须能提取出 YAML 正文，且 `parseFlowStateYaml` 全部通过。
+ *   · preview 必须能提取出 YAML 正文，且 `parseFlowStateYaml` 全部通过；
+ *   · **2026-10-24 P0-1 受控扩展**：目标文件已存在时，仅当涉及 release 标记（previous/next 任一为
+ *     true）才执行 release-only 校验——只允许 release false/缺省→true 且其余字段/步骤逐字段不变；
+ *     release true→false、true/true 或 false→true 伴随其它变化一律拒绝。**双方都非发布时不做
+ *     release-only 限制**（普通流程扩展/字段写卡按既有 `parseFlowStateYaml` 校验放行）。
  * 返回 `undefined` = 通过；否则返回给模型/Steward 的具体错误文案（含每条 path + reason）。
  */
-function validateFlowYamlCard(
+async function validateFlowYamlCard(
+  projectRoot: string,
   req: CustomerInputRequest,
   declaredPaths: readonly string[],
   cardFlowId: string | undefined,
-): string | undefined {
+): Promise<string | undefined> {
   if (req.kind !== "confirm") return undefined;
   const targets = flowYamlTargetsOf(declaredPaths);
   if (targets.length === 0) return undefined;
@@ -2071,9 +2080,34 @@ function validateFlowYamlCard(
       continue;
     }
     const parsed = parseFlowStateYaml(yamlText, target.flowId);
-    if (parsed.ok) continue;
-    for (const error of parsed.errors.slice(0, 50)) {
-      failures.push(`${target.rel} ${error.path}: ${error.message}`);
+    if (!parsed.ok) {
+      for (const error of parsed.errors.slice(0, 50)) {
+        failures.push(`${target.rel} ${error.path}: ${error.message}`);
+      }
+      continue;
+    }
+    // 受控扩展：仅 release 标记（任一侧 release: true）受 release-only 约束；普通写卡按既有 YAML 校验。
+    let previousText: string | undefined;
+    try {
+      previousText = await readFile(path.join(projectRoot, ...target.rel.split("/")), "utf8");
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+        failures.push(
+          `${target.rel}: 现有流程 YAML 不可读（${err instanceof Error ? err.message : String(err)}）；` +
+            "拒绝该卡（fail-closed）",
+        );
+        continue;
+      }
+    }
+    if (previousText !== undefined) {
+      const extension = validateReleaseOnlyExtension({
+        flowId: target.flowId,
+        previousText,
+        nextText: yamlText,
+      });
+      if (!extension.ok) {
+        failures.push(`${target.rel}: ${extension.error ?? "受控扩展校验失败"}`);
+      }
     }
   }
 

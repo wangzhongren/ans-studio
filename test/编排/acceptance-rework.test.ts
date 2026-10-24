@@ -91,7 +91,7 @@ test("acceptance-rework：合法段（字符串/数组 evidence）⇒ ok；schem
   ]);
 });
 
-test("acceptance-rework：coordinator 缺省 ⇒ convener/declaration null；steward 别名；未知值 warning 仍路由 Convener", () => {
+test("acceptance-rework：coordinator 缺省 ⇒ convener/declaration null；steward 别名；未知值 warning（实际接收方由应用决定）", () => {
   const withoutCoordinator = VALID_SECTION.split("\n")
     .filter((line) => !line.startsWith("coordinator:"))
     .join("\n");
@@ -103,14 +103,14 @@ test("acceptance-rework：coordinator 缺省 ⇒ convener/declaration null；ste
   const steward = parseOk(
     parseAcceptanceReworkReport(reportWithYaml(VALID_SECTION.replace("coordinator: convener", "coordinator: steward"))),
   );
-  assert.equal(steward.section.coordinator, "convener", "别名 steward 仍路由 Convener");
+  assert.equal(steward.section.coordinator, "convener", "别名 steward 规范化 convener（报告建议值）");
   assert.equal(steward.section.coordinatorDeclaration, "steward");
   assert.deepEqual(steward.warnings, []);
 
   const unknown = parseOk(
     parseAcceptanceReworkReport(reportWithYaml(VALID_SECTION.replace("coordinator: convener", "coordinator: lead"))),
   );
-  assert.equal(unknown.section.coordinator, "convener", "报告不能指定其他协调者");
+  assert.equal(unknown.section.coordinator, "convener", "报告不能指定协调者（实际接收方由应用按模型决定）");
   assert.equal(unknown.section.coordinatorDeclaration, "lead");
   assert.equal(unknown.warnings.length, 1);
   assert.match(unknown.warnings[0]!, /coordinator="lead" 不受支持/);

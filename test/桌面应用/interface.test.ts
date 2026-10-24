@@ -3104,9 +3104,29 @@ async function runHandbackAcceptanceScenario(status: string) {
   const flowId = "flow-a";
   const listing = listingWithProjectRoles({ ...trioListing(), projectRoot: root }, ["executor"]);
   mkdirSync(path.join(root, "docs", "flows"), { recursive: true });
+  // 2026-10-24 P0-1：自动派 Proof 需要发布标记（flow 顶层 release: true）。本场景验证回交收尾推进
+  // （发布版本），因此写 YAML 机器状态；状态由参数控制（done/pending/blocked）。
   writeFileSync(
-    path.join(root, "docs", "flows", `${flowId}.md`),
-    `| 步骤 | 状态 |\n| --- | --- |\n| impl | ${status} |\n| verification | pending |\n`,
+    path.join(root, "docs", "flows", `${flowId}.yaml`),
+    [
+      `flowId: ${flowId}`,
+      "version: 1",
+      "qualityTier: production",
+      "release: true",
+      "steps:",
+      "  - id: impl",
+      "    title: 实现",
+      "    owner: executor",
+      "    kind: dispatch",
+      `    status: ${status}`,
+      ...(status === "done" ? ["    evidence:", "      kind: dispatch", "      ref: impl"] : []),
+      "  - id: verification",
+      "    title: 验收",
+      "    owner: app",
+      "    kind: acceptance",
+      "    status: pending",
+      "",
+    ].join("\n"),
   );
   await appendGovernanceLedger(root, {
     at: new Date().toISOString(),
@@ -6879,6 +6899,213 @@ function reworkReport(items: ReadonlyArray<{ id: string; owner: string; action: 
   ].join("\n");
 }
 
+test("2026-10-24 治理协调唤醒：阻塞阶段→Lead；同 revision/阶段去重；Lead busy 不并发注入；同阶段预算 2 次；不派 Proof", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "ans-coordination-wake-"));
+  try {
+    const flowId = "flow-coordination";
+    mkdirSync(path.join(root, "docs", "flows"), { recursive: true });
+    const writeCoordFlow = (marker: string): void => {
+      writeFileSync(
+        path.join(root, "docs", "flows", `${flowId}.yaml`),
+        [
+          `flowId: ${flowId}`,
+          "version: 1",
+          "qualityTier: production",
+          "steps:",
+          "  - id: impl",
+          `    title: 实现（${marker}）`,
+          "    owner: executor",
+          "    kind: dispatch",
+          "    status: failed",
+          "  - id: verification",
+          "    title: 验收",
+          "    owner: app",
+          "    kind: acceptance",
+          "    status: pending",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+    };
+    writeCoordFlow("rev-a");
+    const listing: ProjectListing = { ...listingWithProjectRoles({ ...trioListing(), projectRoot: root }, ["executor"]), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const events: SessionEventEnvelope[] = [];
+    const controls = new Map<string, ReturnType<typeof scriptedGovernanceHandle>>();
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: (envelope) => { events.push(envelope); },
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        const sends: string[] = [];
+        sendsByRole.set(input.roleId, sends);
+        const made = scriptedGovernanceHandle(sends);
+        controls.set(input.roleId, made);
+        return made.handle;
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    });
+    const coordinationSends = (roleId: string): string[] =>
+      (sendsByRole.get(roleId) ?? []).filter((text) => text.startsWith("[系统·治理协调]"));
+    try {
+      await iface.listProject({ projectRoot: root });
+      await waitForTest(() => coordinationSends("rapporteur").length === 1, 4000);
+      const first = coordinationSends("rapporteur")[0]!;
+      assert.match(first, /流程 flow-coordination 的阶段需要主理协调/, "协调任务投 Lead（primaryRoleId）");
+      assert.match(first, /阶段：存在 failed \/ blocked \/ aborted 步骤/, "阻塞阶段被识别");
+      assert.match(first, /impl 当前状态 failed/, "带具体步骤事实");
+      assert.match(first, /协调不是客户批准/, "协调 ≠ 客户批准");
+      assert.match(first, /不要直接派 Crew \/ Proof \/ 项目 worker/, "不越权");
+      assert.equal((sendsByRole.get("verifier") ?? []).length, 0, "协调唤醒不派 Proof");
+      assert.equal((sendsByRole.get("convener") ?? []).length, 0, "协调唤醒不派 Steward");
+
+      // Lead busy（首条协调投递未 settle）⇒ 新 revision 也不并发注入。
+      writeCoordFlow("rev-b");
+      await iface.listProject({ projectRoot: root });
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      assert.equal(coordinationSends("rapporteur").length, 1, "Lead busy ⇒ 不并发注入（等下一次真实事件）");
+
+      // Lead settle 后的下一次真实事件 ⇒ 新 revision 再唤醒一次（同阶段第 2 次）。
+      controls.get("rapporteur")!.settle();
+      await waitForTest(() => coordinationSends("rapporteur").length === 2, 4000);
+      assert.match(coordinationSends("rapporteur")[1]!, /实现（rev-b）|revision：/, "新 revision 的协调任务可见");
+
+      // 同阶段第 3 次（新 revision）⇒ 同阶段预算 2 次，停止协调唤醒；真实回交/状态行不受预算影响。
+      controls.get("rapporteur")!.settle();
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      writeCoordFlow("rev-c");
+      await iface.listProject({ projectRoot: root });
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      assert.equal(coordinationSends("rapporteur").length, 2, "同阶段最多 2 次协调唤醒（预算）");
+      // 阻塞状态行仍如实存在（不经预算）：被预算只停协调唤醒，不丢真实状态。
+      assert.ok(
+        deliveryNoteSummaries(events, "rapporteur").some((note) => note.includes("自动验收未派发")),
+        "真实状态行不被预算丢弃",
+      );
+      assert.equal((sendsByRole.get("verifier") ?? []).length, 0, "始终不派 Proof（非发布 + 阻塞）");
+    } finally {
+      await iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-24 P0-1 发布门（Interface）：非发布不派 Proof/不写标准；flow.release=true 才派 verifier", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "ans-interface-release-gate-"));
+  try {
+    const flowId = "flow-release-gate";
+    const flowPath = path.join(root, "docs", "flows", `${flowId}.yaml`);
+    mkdirSync(path.dirname(flowPath), { recursive: true });
+    const flowLines = [
+      `flowId: ${flowId}`,
+      "version: 1",
+      "qualityTier: production",
+      "steps:",
+      "  - id: nomination",
+      "    title: 提名",
+      "    owner: nominator",
+      "    kind: customer-decision",
+      "    status: done",
+      "    evidence:",
+      "      kind: customer-decision",
+      "      ref: appointment",
+      "  - id: contract-freeze",
+      "    title: 契约",
+      "    owner: rapporteur",
+      "    kind: artifact",
+      "    status: done",
+      "    evidence:",
+      "      kind: artifact",
+      `      ref: docs/contracts/${flowId}-api-v1.md`,
+      "  - id: delivery-server",
+      "    title: 交付",
+      "    owner: executor",
+      "    kind: dispatch",
+      "    status: done",
+      "    evidence:",
+      "      kind: dispatch",
+      "      ref: delivery-server",
+      "  - id: verification",
+      "    title: 验收",
+      "    owner: app",
+      "    kind: acceptance",
+      "    status: pending",
+    ];
+    const writeReleaseFlow = (release: boolean): void => {
+      writeFileSync(flowPath, [...flowLines.slice(0, 3), ...(release ? ["release: true"] : []), ...flowLines.slice(3), ""].join("\n"), "utf8");
+    };
+    writeReleaseFlow(false);
+    await appendGovernanceLedger(root, {
+      at: new Date().toISOString(),
+      kind: "customer.decision",
+      flowId,
+      stepId: "nomination",
+      decisionKind: "appointment",
+      customerDecision: "appointed",
+      actorRoleId: "nominator",
+      power: "nomination",
+    });
+    await appendGovernanceLedger(root, {
+      at: new Date().toISOString(),
+      kind: "artifact.observed",
+      artifactPath: `docs/contracts/${flowId}-api-v1.md`,
+      actorRoleId: "rapporteur",
+      power: "proposal",
+    });
+    await appendGovernanceLedger(root, {
+      at: new Date().toISOString(),
+      kind: "dispatch.accepted",
+      flowId,
+      stepId: "delivery-server",
+      actorRoleId: "convener",
+      power: "schedule",
+      targetRoleId: "executor",
+    });
+    const sendsByRole = new Map<string, string[]>();
+    const events: SessionEventEnvelope[] = [];
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: (envelope) => { events.push(envelope); },
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        const sends: string[] = [];
+        sendsByRole.set(input.roleId, sends);
+        return scriptedGovernanceHandle(sends).handle;
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    });
+    const listing: ProjectListing = { ...listingWithProjectRoles({ ...trioListing(), projectRoot: root }, ["executor"]), projectRoot: root };
+    try {
+      await iface.listProject({ projectRoot: root });
+      await waitForTest(
+        () => deliveryNoteSummaries(events, "rapporteur").some((note) => note.includes("awaiting-release-acceptance")),
+        4000,
+      );
+      assert.equal((sendsByRole.get("verifier") ?? []).length, 0, "非发布：不派 verifier/Proof");
+      assert.equal(existsSync(path.join(root, "docs", "acceptance", `${flowId}-criteria-v1.md`)), false, "非发布：不写 acceptance-criteria");
+      assert.equal((await readGovernanceLedger(root)).entries.filter((entry) => entry.kind === "dispatch.accepted" && entry.targetRoleId === "verifier").length, 0, "非发布：无 verifier 派发账本");
+      // 显式发布标记 ⇒ 下一次真实事件才派 verifier。
+      writeReleaseFlow(true);
+      await iface.listProject({ projectRoot: root });
+      await waitForTest(() => (sendsByRole.get("verifier")?.length ?? 0) > 0, 4000);
+      assert.equal(sendsByRole.get("verifier")!.length, 1, "release:true ⇒ 恰一次 verifier 派发");
+      assert.match(sendsByRole.get("verifier")![0]!, /请汇总证据并出验收卡/);
+      assert.equal((await readGovernanceLedger(root)).entries.filter((entry) => entry.kind === "dispatch.accepted" && entry.targetRoleId === "verifier").length, 1, "发布流程写 verifier 派发账本");
+      await waitForTest(
+        () => deliveryNoteSummaries(events, "rapporteur").some((note) => /已自动派发验收复核给 Proof/.test(note)),
+        4000,
+      );
+    } finally {
+      await iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("2026-10-23 验收返工路由：routeAcceptanceAutoRework 接线（judge 来源自动决策系统行、record、不自造客户决定）；最新 rejected 路由 / 最新 accepted 收口", async () => {
   const autoRoot = makeTempProjectRoot("ans-interface-rework-auto-");
   const customerRoot = makeTempProjectRoot("ans-interface-rework-customer-");
@@ -6931,10 +7158,10 @@ test("2026-10-23 验收返工路由：routeAcceptanceAutoRework 接线（judge �
         at: new Date().toISOString(),
       };
       await autoIface.routeAcceptanceAutoRework(info);
-      await waitForTest(() => (autoSends.get("convener")?.length ?? 0) > 0, 3000);
-      assert.equal(autoSends.get("convener")!.length, 1, "onAutoRework 接线 ⇒ 恰一条 Convener 返工任务");
-      assert.match(autoSends.get("convener")![0]!, /自动决策未完成（自动退回）/);
-      assert.ok(!/客户拒绝/.test(autoSends.get("convener")![0]!), "judge 来源任务不写客户拒绝");
+      await waitForTest(() => (autoSends.get("rapporteur")?.length ?? 0) > 0, 3000);
+      assert.equal(autoSends.get("rapporteur")!.length, 1, "onAutoRework 接线 ⇒ 恰一条 Lead 返工任务");
+      assert.match(autoSends.get("rapporteur")![0]!, /自动决策未完成（自动退回）/);
+      assert.ok(!/客户拒绝/.test(autoSends.get("rapporteur")![0]!), "judge 来源任务不写客户拒绝");
       const autoNotes = deliveryNoteSummaries(autoEvents, autoListing.primaryRoleId);
       assert.ok(autoNotes.some((note) => note.includes("自动决策未通过/未完成")), "PM key 系统行（自动来源）可见");
       assert.ok(autoNotes.filter((note) => note.includes("客户拒绝")).length === 0, "judge 来源系统行不含客户拒绝");
@@ -6953,7 +7180,7 @@ test("2026-10-23 验收返工路由：routeAcceptanceAutoRework 接线（judge �
       );
       await autoIface.routeAcceptanceAutoRework({ ...info });
       await new Promise((resolve) => setTimeout(resolve, 120));
-      assert.equal(autoSends.get("convener")!.length, 1, "同一 requestId/报告不重复路由");
+      assert.equal(autoSends.get("rapporteur")!.length, 1, "同一 requestId/报告不重复路由");
     } finally {
       await autoIface.stopSession();
     }
@@ -7001,7 +7228,7 @@ test("2026-10-23 验收返工路由：routeAcceptanceAutoRework 接线（judge �
     });
     try {
       await customerIface.listProject({ projectRoot: customerRoot });
-      await waitForTest(() => (customerSends.get("convener")?.length ?? 0) > 0, 4000);
+      await waitForTest(() => (customerSends.get("rapporteur")?.length ?? 0) > 0, 4000);
       // routed 系统行在 record sent 写之后发出：以它为准等待（避免 Windows 上轮询读取与 rename 竞争）。
       await waitForTest(
         () => deliveryNoteSummaries(customerEvents, customerListing.primaryRoleId).some((note) => note.includes("客户拒绝")),
@@ -7009,7 +7236,7 @@ test("2026-10-23 验收返工路由：routeAcceptanceAutoRework 接线（judge �
       );
       assert.equal(customerSends.get("verifier")?.length ?? 0, 0, "最新 rejected 不派 Proof 返工");
       const customerNotes = deliveryNoteSummaries(customerEvents, customerListing.primaryRoleId);
-      assert.ok(customerNotes.some((note) => note.includes("客户拒绝") && note.includes("Convener")), "PM key 系统行（客户来源）可见");
+      assert.ok(customerNotes.some((note) => note.includes("客户拒绝") && note.includes("实际接收方：rapporteur")), "系统行写明实际接收方（Lead）");
       const customerRecord = JSON.parse(
         readFileSync(path.join(customerRoot, ".ans", "governance", "acceptance", customerFlowId, "rework-routing.json"), "utf8"),
       ) as Record<string, unknown>;
