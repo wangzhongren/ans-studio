@@ -34,32 +34,26 @@ ANS Studio 面向希望在真实项目中使用多个 AI 角色协作的开发�
 
 ## 下载与运行
 
-当前版本：**v1.6.0**（2026-10-23 发布）。运行包自带运行环境，启动应用无需另装 Node.js；执行项目的 `npm test`、Git 等命令，仍需安装该项目所需的开发工具链。
+当前版本：**v1.7.0**（2026-10-24 发布）。运行包自带运行环境，启动应用无需另装 Node.js；执行项目的 `npm test`、Git 等命令，仍需安装该项目所需的开发工具链。
 
 | 系统 | 下载 | 校验文件 | 启动方式 |
 | --- | --- | --- | --- |
-| macOS 13+ · Apple Silicon | [mac-arm64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.6.0/ANS-Studio-1.6.0-mac-arm64.zip) | [SHA256SUMS-darwin-arm64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.6.0/SHA256SUMS-darwin-arm64.txt) | 完整解压，打开 `ANS Studio.app` |
-| macOS 13+ · Intel | [mac-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.6.0/ANS-Studio-1.6.0-mac-x64.zip) | [SHA256SUMS-darwin-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.6.0/SHA256SUMS-darwin-x64.txt) | 完整解压，打开 `ANS Studio.app` |
-| Windows 10/11 · x64 | [win-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.6.0/ANS-Studio-1.6.0-win-x64.zip) | [SHA256SUMS-win32-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.6.0/SHA256SUMS-win32-x64.txt) | 完整解压，打开 `ANS Studio.exe`，保留同目录资源文件 |
+| macOS 13+ · Apple Silicon | [mac-arm64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/ANS-Studio-1.7.0-mac-arm64.zip) | [SHA256SUMS-darwin-arm64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/SHA256SUMS-darwin-arm64.txt) | 完整解压，打开 `ANS Studio.app` |
+| macOS 13+ · Intel | [mac-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/ANS-Studio-1.7.0-mac-x64.zip) | [SHA256SUMS-darwin-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/SHA256SUMS-darwin-x64.txt) | 完整解压，打开 `ANS Studio.app` |
+| Windows 10/11 · x64 | [win-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/ANS-Studio-1.7.0-win-x64.zip) | [SHA256SUMS-win32-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/SHA256SUMS-win32-x64.txt) | 完整解压，打开 `ANS Studio.exe`，保留同目录资源文件 |
 
-下载后先核对 SHA256：macOS 在下载目录执行 `shasum -a 256 -c SHA256SUMS-darwin-arm64.txt`（Intel 用 `SHA256SUMS-darwin-x64.txt`）；Windows PowerShell 执行 `Get-FileHash .\ANS-Studio-1.6.0-win-x64.zip -Algorithm SHA256`，与 `SHA256SUMS-win32-x64.txt` 对照。[SHA256SUMS-overlay.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.6.0/SHA256SUMS-overlay.txt)、[release-provenance.json](https://github.com/wangzhongren/ans-studio/releases/download/v1.6.0/release-provenance.json) 与 [overlay.patch](https://github.com/wangzhongren/ans-studio/releases/download/v1.6.0/overlay.patch) 记录固定源码与打包适配，来源核验见[本次发布记录](角色卡/装配/docs/change/2026-10-23_change_release-v1.6.0-prepare.md)。
+下载后先核对 SHA256：macOS 在下载目录执行 `shasum -a 256 -c SHA256SUMS-darwin-arm64.txt`（Intel 用 `SHA256SUMS-darwin-x64.txt`）；Windows PowerShell 执行 `Get-FileHash .\ANS-Studio-1.7.0-win-x64.zip -Algorithm SHA256`，与 `SHA256SUMS-win32-x64.txt` 对照。[SHA256SUMS-overlay.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/SHA256SUMS-overlay.txt)、[release-provenance.json](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/release-provenance.json) 与 [overlay.patch](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/overlay.patch) 记录固定源码与打包适配，来源核验见[本次发布记录](角色卡/装配/docs/change/2026-10-24_change_release-v1.7.0-prepare.md)。
 
 <details>
-<summary>v1.6.0 SHA256</summary>
+<summary>v1.7.0 SHA256（发布后回填）</summary>
 
-| 产物 | SHA256 |
-| --- | --- |
-| `ANS-Studio-1.6.0-mac-arm64.zip` | `4a7cc21525748e2afb03bb248d69968478281424ef2296bfd947a0245642c9ee` |
-| `ANS-Studio-1.6.0-mac-x64.zip` | `e1faedf05ab1bfdb8c2293ce17179cb8ae66ea9c4e31b348219ad19af400ffaf` |
-| `ANS-Studio-1.6.0-win-x64.zip` | `2c454cfec00c8c683cf1c42bdcd6eb8a85b2a4a4590089e08b186bc562954877` |
-| `overlay.patch` | `a279b6ab29817394c248681bcd47e774785ae909bb1ecb1b81e1559915f0f60e` |
-| `release-provenance.json` | `43ab7b3dc3a355172529df57e974210a1efab3a5dc65528bb745c619f95227d8` |
+v1.7.0 的 SHA256 在构建完成前无法确定，本表不预填：v1.7.0 发布后由 Release 的 `SHA256SUMS-darwin-arm64.txt`、`SHA256SUMS-darwin-x64.txt`、`SHA256SUMS-win32-x64.txt` 与 `SHA256SUMS-overlay.txt` 回填/核对。
 
 运行包**未签名、未公证**：macOS 未公证、Windows 未做代码签名，首次启动可能提示来源未验证。
 
 </details>
 
-v1.6.0 要点：新增受治理后台任务与治理守卫；桌面思考行显示修复；独立验收默认先判 T0–T3 风险档位，按档位复用证据；团队计划升级为 bounded context 模块粒度（模块/契约/测试面/并行组/依赖），角色卡拆分能力与工作流描述；测试改为模块分片并行 + Reduce 合并；旧 v1 计划/流程/角色卡保持兼容。
+v1.7.0 要点：独立验收恢复为覆盖所有变更（含非发布变更），`release` 仅是可选的发布元数据，验收标准门覆盖所有声明验收标准的新契约流程；任命（appointment）客户决定自动收口，写卡校验反馈去重并加忙时门控；中文界面使用中文内置角色名，角色详情展示角色根文档，支持目录级授权与 zh-CN/en-US 双语界面（i18n），流程步骤完成后自动推进，验收返工按路由回到 Lead，Lead 承担治理协调；旧 v1/v2/v3 计划、流程与角色卡保持兼容。
 
 运行包尚未签名或公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示来源未验证。请从上述 Release 下载，先核对 SHA256 再运行。
 
@@ -224,6 +218,7 @@ npm run typecheck
 
 ## 深入了解
 
+- [v1.7.0 发布准备](角色卡/装配/docs/change/2026-10-24_change_release-v1.7.0-prepare.md)：冻结源、发布配方与本地预检结果。
 - [v1.6.0 发布准备](角色卡/装配/docs/change/2026-10-23_change_release-v1.6.0-prepare.md)：冻结源、发布配方与三平台产物。
 - [v1.5.0 发布准备](角色卡/装配/docs/change/2026-10-22_change_release-v1.5.0-prepare.md)：冻结源、发布配方与本地预检结果。
 - [v1.4.0 发布验收与公开下载](角色卡/测试/docs/change/2026-10-20_change_v1.4-release-verification.md)：实际产物、来源与测试证据。
