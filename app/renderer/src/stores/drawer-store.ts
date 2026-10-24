@@ -13,6 +13,7 @@ import { useChatStore } from "@/chat/chat-store";
 import { useUiStore, type RuntimeId } from "@/stores/ui-store";
 import {
   documentReadRequest,
+  documentReadableRef,
   documentStatusText,
   documentErrorText,
   roleDocumentRefs,
@@ -21,7 +22,14 @@ import {
   type DocumentRef,
   type DocumentScope,
 } from "@/chat/document-view";
+import { matchDocumentRefByPath } from "@/chat/profile-docs";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useLocaleStore, translate, type Locale } from "@/i18n";
+
+/** 当前界面语言（i18n B1）：抽屉内生成的提示按当前 locale 渲染。 */
+function currentLocale(): Locale {
+  return useLocaleStore.getState().locale;
+}
 
 export type DrawerTab = "card" | "work" | "pi" | "document" | null;
 
@@ -55,6 +63,8 @@ export interface DocumentViewState {
   errorCode: string;
   errorText: string;
   listScroll: number;
+  /** 根文档点击目标（项目相对）；刷新后精确匹配 opaque ref，并用于返回焦点。 */
+  targetRelativePath: string | null;
 }
 
 interface DrawerState {
@@ -78,7 +88,11 @@ interface DrawerState {
   setScrollTop: (roleKey: string, top: number) => void;
   toggleFull: (roleKey: string, id: string, open: boolean) => void;
   setDocumentScroll: (top: number) => void;
-  openDocumentList: (roleId: string, origin: "card" | "work" | "report") => Promise<void>;
+  openDocumentList: (
+    roleId: string,
+    origin: "card" | "work" | "report",
+    targetRelativePath?: string,
+  ) => Promise<void>;
   refreshDocumentList: () => Promise<void>;
   readDocument: (ref: DocumentRef) => Promise<void>;
   backToList: () => void;
@@ -318,7 +332,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     set({ document: { ...document, listScroll: top } });
   },
 
-  openDocumentList: async (roleId, origin) => {
+  openDocumentList: async (roleId, origin, targetRelativePath) => {
     const projectRoot = useChatStore.getState().projectRoot;
     const runtime = useUiStore.getState().runtime;
     documentReadVersion += 1;
@@ -352,6 +366,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       errorCode: "",
       errorText: "",
       listScroll: 0,
+      targetRelativePath: targetRelativePath || null,
     };
     useDrawerStore.setState((state) => ({
       tab: "document",
@@ -362,7 +377,11 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     useUiStore.getState().setDrawerOpen(true);
     if (!projectRoot) {
       useDrawerStore.setState({
-        document: { ...view, loadingRefs: false, listError: "尚未导入项目。" },
+        document: {
+          ...view,
+          loadingRefs: false,
+          listError: translate(currentLocale(), "ui.sidebar.noProjectPeriod"),
+        },
       });
       return;
     }
@@ -389,6 +408,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       const refs = role ? roleDocumentRefs(role) : [];
       const current = get().document;
       if (!current || version !== documentReadVersion) return;
+      const target = current.targetRelativePath;
       useDrawerStore.setState({
         document: {
           ...current,
@@ -396,15 +416,31 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
           scope,
           unavailable: asString(listing.documentReadUnavailable) || null,
           loadingRefs: false,
-          listError: role ? "" : "无法确定来源角色，暂不能列出来源文档。",
+          listError: role
+            ? ""
+            : translate(currentLocale(), "ui.drawerStore.noSourceRole"),
         },
       });
+      // 根文档点击：刷新后用 `relativePath` 精确匹配 opaque 引用；命中且 scope
+      // 可读才走既有阅读态。未命中/无 scope/平台不支持停留列表态，由
+      // DocumentView 展示既有结构化错误；不构造路径、不生成 documentId、不重试。
+      if (target) {
+        const latest = get().document;
+        const matched = latest ? matchDocumentRefByPath(latest.refs, target) : null;
+        if (matched && latest?.scope && documentReadableRef(matched, latest.scope)) {
+          await get().readDocument(matched);
+        }
+      }
     } catch {
       if (version !== documentReadVersion) return;
       const current = get().document;
       if (!current) return;
       useDrawerStore.setState({
-        document: { ...current, loadingRefs: false, listError: "文档清单刷新失败。" },
+        document: {
+          ...current,
+          loadingRefs: false,
+          listError: translate(currentLocale(), "ui.drawerStore.refreshFailed"),
+        },
       });
     }
   },
@@ -470,7 +506,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
             ...currentDocument,
             mode: "content",
             result: validation.result,
-            statusText: documentStatusText(validation.result),
+            statusText: documentStatusText(validation.result, currentLocale()),
           },
         });
       } else {
@@ -480,7 +516,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
             mode: "error",
             result: null,
             errorCode: validation.code,
-            errorText: documentErrorText(validation.code),
+            errorText: documentErrorText(validation.code, currentLocale()),
           },
         });
       }
@@ -494,7 +530,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
           mode: "error",
           result: null,
           errorCode: "IO_ERROR",
-          errorText: documentErrorText("IO_ERROR"),
+          errorText: documentErrorText("IO_ERROR", currentLocale()),
         },
       });
     }
@@ -522,13 +558,26 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   backToRole: () => {
     documentReadVersion += 1;
     const current = get().document;
-    queueDrawerFocus(".role-document-entry");
+    // 从根文档进入时焦点回触发按钮（data-root-doc-path 精确标记）；
+    // 按钮已不在（角色/文档刷新）则选择器回退到既有“查看已列文档”入口。
+    const target = current?.targetRelativePath;
+    const selector = target
+      ? '[data-root-doc-path="' + CSS.escape(target) + '"], .role-document-entry'
+      : ".role-document-entry";
+    queueDrawerFocus(selector);
     set((state) => ({
       tab: "card",
       queueView: null,
       document: current ? { ...current, mode: "list", ref: null } : null,
       nonce: state.nonce + 1,
     }));
+    // flushSync 提交后微任务即聚焦（早于 rAF 兜底；不可见窗口 rAF 可能不触发）。
+    queueMicrotask(() => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (element && element.getClientRects().length > 0) {
+        element.focus({ preventScroll: true });
+      }
+    });
   },
 
   invalidateDocumentRead: (options) => {
@@ -586,10 +635,14 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       const bridge = getDesktopBridge();
       res = bridge?.withdrawQueued
         ? asRecord(await bridge.withdrawQueued({ projectRoot, roleId, runtime }, id))
-        : { ok: false, error: "当前版本未提供撤回通道" };
+        : {
+            ok: false,
+            error: translate(currentLocale(), "ui.drawerStore.withdrawUnavailable"),
+          };
       if (res.ok === true) {
-        const okText =
-          "已撤回排队消息：" + (asString(res.summary) || "");
+        const okText = translate(currentLocale(), "ui.confirm.withdrawn", {
+          summary: asString(res.summary) || "",
+        });
         appendSystem(okText);
         set((state) => {
           const current = state.withdraw[key];
@@ -602,12 +655,16 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
         });
         return;
       }
-      const failText =
-        "撤回无效：" + (asString(res.error) || "未知原因");
+      const failText = translate(currentLocale(), "ui.confirm.withdrawInvalid", {
+        detail:
+          asString(res.error) || translate(currentLocale(), "shared.common.unknownReason"),
+      });
       writeFeedback(failText);
       appendSystem(failText);
     } catch (error) {
-      const errorText = "撤回失败：" + String(error);
+      const errorText = translate(currentLocale(), "ui.confirm.withdrawFailed", {
+        detail: String(error),
+      });
       writeFeedback(errorText);
       appendSystem(errorText);
     } finally {

@@ -1,0 +1,19 @@
+date: 2026-10-23T12:30:32+08:00
+cwd: /c/Users/51054/Desktop/work/ans-studio
+HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+branch: main
+node: v24.22.1
+npm: 11.19.1
+os: Windows 11 Pro 10.0.26300 / Git Bash
+
+== baseline (before D5 edits, this session) ==
+npm run typecheck: exit 1, single error app/desktop/interface.ts(1125,5): TS2322 Type '1 | 2 | 3' is not assignable to type '1 | 2' (D4 编排/运行时核心已冻结 v3，桌面 TeamPlanInfo 仍为 1|2)
+node --test test/桌面应用/interface.test.ts: exit 0, tests 97 / pass 97 / fail 0
+
+== D6 follow-up (2026-10-23, same role context) ==
+缺口：提案接受后 Convener 任务文案仍默认团队计划 v2（真实模型可能照写 v2）。修正：新流程默认 v3；显式 schema 1/2 续接保留原 v2 文案；计划修正反馈/任命名单不一致系统行按实际 schema 提示 v3/v2。
+e2e harness：D6 日志 'No handler registered for preferences:get' ×3 确认为 test/桌面应用/e2e/main.mjs 自建窗口未注册（真实 app/main.ts 经 registerPreferencesIpc 注册）；在 harness 补 preferences:get/set-locale 内存桩（非产品代码）。
+真实 Electron 自检：./node_modules/electron/dist/electron.exe test/桌面应用/e2e/main.mjs，exit 0，E2E_PASS=true，E2E_FAILURES=（空），preferences handler 错误 0（见 e2e-main-report.txt / e2e-main-stdout.log）。
+
+== concurrency context ==
+工作树同时存在 i18n B0（app/main.ts、app/preload.cjs、app/renderer/**、app/desktop/i18n.ts、preferences.ts、interface.ts 的偏好接线、interface.test.ts 的 i18n 用例）与人事边界漂移校正——均属并发上下文，不纳入本变更新增候选；本记录只列 D5 新增/修改点。

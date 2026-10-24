@@ -1,0 +1,6 @@
+OUT=C:/Users/51054/AppData/Local/Temp/ans-s6-phase4a-20261023-233921
+EXIT=1
+RUN2_OUT=C:/Users/51054/AppData/Local/Temp/ans-s6-phase4a-run2-20261023-234008
+RUN2_EXIT=1
+BASELINE_OUT=C:/Users/51054/AppData/Local/Temp/ans-s6-baseline-phase4a-20261023-235139
+BASELINE_EXIT=1

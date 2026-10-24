@@ -1,0 +1,23 @@
+captured_at: 2026-10-23 10:54:19 +0800
+git rev-parse HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+--- git status --short -- src app test ---
+(空=无改动)
+--- git status --short ---
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"
+?? .claude/
+?? demos/
+?? docs/acceptance/directory-ownership-criteria-v1.md
+?? docs/acceptance/i18n-criteria-v1.md
+?? docs/communication/2026-10-23_intent_i18n-and-directory-ownership.md
+?? docs/planning/2026-10-23_design_directory-ownership.md
+?? docs/planning/2026-10-23_design_i18n.md
+?? docs/scheduling/2026-10-23-directory-ownership-team-plan.md
+?? docs/scheduling/2026-10-23-i18n-team-plan.md
+?? docs/scheduling/memo.md
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-23-baseline-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-23_change_i18n-directory-baseline.md"
+--- git diff --cached --name-only ---
+(空=无暂存)

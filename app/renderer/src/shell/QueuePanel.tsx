@@ -9,6 +9,7 @@
 import { useDrawerStore, currentReadingKey } from "@/stores/drawer-store";
 import { queueTimeText } from "@/chat/work-view";
 import type { QueueItemView } from "@/chat/confirm-logic";
+import { useT } from "@/i18n";
 
 export function QueuePanel({
   roleId,
@@ -19,6 +20,7 @@ export function QueuePanel({
   items: readonly QueueItemView[];
   emptyText: string;
 }) {
+  const t = useT();
   const key = currentReadingKey(roleId);
   const reading = useDrawerStore((s) => s.reading[key]);
   const withdraw = useDrawerStore((s) => s.withdraw[key]);
@@ -63,14 +65,14 @@ export function QueuePanel({
                       data-safe-input={safeInput ? "true" : "false"}
                       data-id={encodeURIComponent(item.id)}
                       aria-expanded={opened}
-                      title={opened ? "收起全文" : "展开全文"}
+                      title={opened ? t("ui.queue.collapse") : t("ui.queue.expand")}
                       onClick={() => toggleFull(key, item.id, !opened)}
                     >
                       {opened
-                        ? "收起"
+                        ? t("shared.common.collapse")
                         : safeInput
-                          ? "交接内容（安全显示副本）"
-                          : "全文"}
+                          ? t("shared.common.safeCopyTitle")
+                          : t("ui.queue.fullText")}
                     </button>
                   ) : null}
                   {item.canWithdraw ? (
@@ -78,11 +80,11 @@ export function QueuePanel({
                       className="q-withdraw"
                       type="button"
                       data-id={encodeURIComponent(item.id)}
-                      title="撤回该条排队消息（仅未投递者可撤）"
+                      title={t("ui.queue.withdrawTitle")}
                       disabled={withdrawing}
                       onClick={() => void withdrawQueued(roleId, item.id)}
                     >
-                      {withdrawing ? "撤回中…" : "撤回"}
+                      {withdrawing ? t("ui.queue.withdrawing") : t("ui.queue.withdraw")}
                     </button>
                   ) : null}
                 </div>

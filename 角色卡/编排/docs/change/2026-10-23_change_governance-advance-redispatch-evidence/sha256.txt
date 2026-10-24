@@ -1,0 +1,8 @@
+# sha256 of evidence files and change record (captured 2026-10-23 13:34:58 +0800)
+# sha256.txt itself is not self-hashed; its bytes are whatever this manifest's writer produced.
+095ca4e4df75397fc05021e2590d5aeb87519aa6d15715d19c37e4e3bff9d40e *角色卡/编排/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/artifact-record-and-ledger-sample.txt
+0b7574d0b3acdb4770a1193a62b78327d84ed820dc88591a2f4f38501d6ace30 *角色卡/编排/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/environment-and-candidate-hashes.txt
+4d7afe3a7bf7b32c830f6bc1b825b92f597494b215db23dcb0721642ece4f5c3 *角色卡/编排/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/directed-flow-service.log
+50771525c388fcfb990a2bef91efed576c7b6b7dcaae2c87aabad2c8dc6654ae *角色卡/编排/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/orchestration-directory.log
+ab6b8719a50938048b044490067f7e7641c76db6e3a2c2e9821b0c2707a6a113 *角色卡/编排/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/typecheck.log
+f5ad0cfb4d577515a1d3b73aa63933ce21aa406a4ce8ada0eb03b434c032bf1a *角色卡/编排/docs/change/2026-10-23_change_governance-advance-redispatch.md

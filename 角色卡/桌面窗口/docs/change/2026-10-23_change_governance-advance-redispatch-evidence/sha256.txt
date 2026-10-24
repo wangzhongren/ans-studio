@@ -1,0 +1,77 @@
+# 2026-10-23T17:21:05+08:00 sha256 of change record + evidence files
+42c884cee5a1d98a7007743d1940eb96c7bbdcc9d7818f35e724ae24fee1dca8 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/candidate-hashes.txt
+48c1711efba880e8aa037eb8c6e9bba09abd2aaec49cf88355e9d8c00872802a *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/desktop-directory.log
+838cd2cd2da3a3de790706fe4c98dbe8fa12a0aad6ed248ba4ea30cc6c4ce39b *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/directed-acceptance-dispatch.log
+e31d0ef9b2b250cde822a1a2b4c37fdfa44c9cb2ddf986f33331053ca9136065 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/directed-interface.log
+864260e74a2042f4483bbf2d2586e59fa496e0f28522e3560dfbb599f18bec37 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/directed-redispatch-e2e.log
+1155ab1937f5dbcf9cf18473fbb9ec7c01f73590af812f908dffbed62bb41be0 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/00-titlebar.png
+204bd6e8e1ee51b8595199a8bb46bb11fcd5fa62a23240dd4e6de4bcc1f18972 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/01-import.png
+204bd6e8e1ee51b8595199a8bb46bb11fcd5fa62a23240dd4e6de4bcc1f18972 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/01b-su.png
+4ca1550ada3592a274f673997b3933dc2fe6ffa0da513d2f5c19d985df3ac5a9 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/02-chat.png
+4ca1550ada3592a274f673997b3933dc2fe6ffa0da513d2f5c19d985df3ac5a9 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/03-denied.png
+7a753d6bc6cf82c67fb95f336d8aaf261c901997c2de79beaaac07add8e22938 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/04-profile.png
+c407a07d4c919592a234b1c64753512ba47ff894e34a1aaaa332e68a76a606af *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/05-bootstrap.png
+1bd61fb32106cd83149adb778d44bab667fb548ada460bda96f3675712de1222 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/06-refresh.png
+a3c334e51909b09ea3631daef2f66f7a077c5d50932081d2ad917705e0f2ebf9 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/07-handback.png
+512e85f9b7ab2ddb54ec57efab3840b8f77b7fba8e3acdcffd54cb5ac0c0d408 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/08-su-pane.png
+691d7b33dc632a4778645f85fd9760f59c089c8ea817f87efb153dce5eebe10d *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/09-pi-panel.png
+96292911e9e29c04ee33f0b9b8202f9fd9af9f7e78a33eb93a7497c104116c2a *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/10-pi-saved.png
+dafd703d2ec8d1788b8649e12e164d1076e62ebe819fdfdc0c2f61ad229d3396 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/11-operator-card.png
+7a753d6bc6cf82c67fb95f336d8aaf261c901997c2de79beaaac07add8e22938 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/12-composer.png
+950dc55cd65aaeaad272de3109dc433f0ad7d6cd9d6c560b7278490ac4055e57 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/12-restore.png
+d792823ef991c0c085ec73096730c1c5ac0af6cb951c7b01814e7e749d93e7ad *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/14-operator-crosspane.png
+a0faaa99649b2e5983cf9390343a979c1687c16485e00257c3dcf351864a4f3e *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/15-anchor-reanchor.png
+96c433660c69536b338e771300308ecab749cbc7339910b9cca674c76172435a *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/anchor-qLWIID/.ans/sessions/su/s.jsonl
+419d741ece35acd6f9edc7f7616db30b6ad2a16bf355a10d3882b8c79282a1ab *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/anchor-qLWIID/角色卡/示例角色/boundary.yaml
+bd642d41f3370b102ce9ac25b59cddee7ce8999446398f1ef3bdeedd7e7eb024 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/anchor-qLWIID/角色卡/示例角色/role-card.md
+0b56c9dcfeb61a14f149bfd0711a17c86ea18f866028206dc96b44298ba30e35 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/diagnostics/ans-diagnostics-2026-10-23.jsonl
+88e65d884e6487aac8988ab48053d122f25859e3516c1f69df2bdf55f2c3705a *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/e2e-pi.env
+ab66df64bc9a7d92b42eb000480c610cd1ed115509a6945cd0b7cd9c0db1b3c8 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/launch.txt
+f89859c4fc45bf819efe0b64c7fb9a30f868e18370d592c2348dabfb9178dff0 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/p13-second-project/角色卡/B/boundary.yaml
+0841b8d734ede1fd38f32d319760971263c8f8252562521d95078b86c962a068 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/p13-second-project/角色卡/B/role-card.md
+f10ec661d01578435597efe62936ad658147fce871bcc31cf40c41360357f45e *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/proj-S3sMt3/.ans/sessions/su/s.jsonl
+131c47e529eacde4fa7d7c57b5ca7aa655bf49bddbdb9e444269bb29ae2f81f1 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/proj-S3sMt3/.ans/sessions/示例角色/s.jsonl
+419d741ece35acd6f9edc7f7616db30b6ad2a16bf355a10d3882b8c79282a1ab *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/proj-S3sMt3/角色卡/示例角色/boundary.yaml
+dde0b31b942647dda6f0023fc4d4c4bc834ee7cef20544a94a39ce10e690da6d *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/proj-S3sMt3/角色卡/示例角色/role-card.md
+1b0fe367381a1c8b92c829a84099526091ca88b275d169b0d5e5c622453f0639 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/report.txt
+326bbf439ee69195f212ebb81a8b0193d1d2bf2c31b1d23f768f7dc01e17adde *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1/stdout.log
+1155ab1937f5dbcf9cf18473fbb9ec7c01f73590af812f908dffbed62bb41be0 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/00-titlebar.png
+204bd6e8e1ee51b8595199a8bb46bb11fcd5fa62a23240dd4e6de4bcc1f18972 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/01-import.png
+204bd6e8e1ee51b8595199a8bb46bb11fcd5fa62a23240dd4e6de4bcc1f18972 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/01b-su.png
+1096ac859b5e4efb2007525f47a3e29095005576627c2c1a6106e1fb2967c385 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/02-chat.png
+152fd06841a2fbd271157c1346903d4df1a1cae341947573adc7f3633394c9be *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/03-denied.png
+48ba8ae345321bd82c6d7f8abcd3fb57f4e4212ab9b65cfa3cbd7dc329f8fea3 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/04-profile.png
+48ba8ae345321bd82c6d7f8abcd3fb57f4e4212ab9b65cfa3cbd7dc329f8fea3 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/05-bootstrap.png
+48ba8ae345321bd82c6d7f8abcd3fb57f4e4212ab9b65cfa3cbd7dc329f8fea3 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/06-refresh.png
+1498609ca04ca8671ed5a8e94bb1d4afde5bbd42d10321c8648b05c9de7f6e05 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/07-handback.png
+1498609ca04ca8671ed5a8e94bb1d4afde5bbd42d10321c8648b05c9de7f6e05 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/08-su-pane.png
+1498609ca04ca8671ed5a8e94bb1d4afde5bbd42d10321c8648b05c9de7f6e05 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/09-pi-panel.png
+1498609ca04ca8671ed5a8e94bb1d4afde5bbd42d10321c8648b05c9de7f6e05 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/10-pi-saved.png
+54f4b90df2199c36481cab18bbdb291e2ab727364cfde5c6b5904e2ebf14e14c *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/11-operator-card.png
+48ba8ae345321bd82c6d7f8abcd3fb57f4e4212ab9b65cfa3cbd7dc329f8fea3 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/12-composer.png
+ca4254edd34be9923672fea5489a5d356c319517580bf9224962c59bee8a00c8 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/12-restore.png
+ca4254edd34be9923672fea5489a5d356c319517580bf9224962c59bee8a00c8 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/14-operator-crosspane.png
+1498609ca04ca8671ed5a8e94bb1d4afde5bbd42d10321c8648b05c9de7f6e05 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/15-anchor-reanchor.png
+a8ffeebf2dd0457a0616f81fe8abd4eb6707b7a0e500944ee9a1bdcadd9427e3 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/anchor-Wcjq7P/.ans/sessions/su/s.jsonl
+419d741ece35acd6f9edc7f7616db30b6ad2a16bf355a10d3882b8c79282a1ab *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/anchor-Wcjq7P/角色卡/示例角色/boundary.yaml
+bd642d41f3370b102ce9ac25b59cddee7ce8999446398f1ef3bdeedd7e7eb024 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/anchor-Wcjq7P/角色卡/示例角色/role-card.md
+b87033b89f3e55abf7795b0b110ac1ae3dc065edf1328ec2d765f8ddeb075435 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/diagnostics/ans-diagnostics-2026-10-23.jsonl
+88e65d884e6487aac8988ab48053d122f25859e3516c1f69df2bdf55f2c3705a *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/e2e-pi.env
+f7284d7fa0bb73c100ff0121f2c6e0146d0ba4aec660ce87922c6b6313d89fa9 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/launch.txt
+f89859c4fc45bf819efe0b64c7fb9a30f868e18370d592c2348dabfb9178dff0 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/p13-second-project/角色卡/B/boundary.yaml
+0841b8d734ede1fd38f32d319760971263c8f8252562521d95078b86c962a068 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/p13-second-project/角色卡/B/role-card.md
+71e417be43f444e290b5b4d59206b833979724add39da16d321e5eff705aa93f *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/proj-LDckFV/.ans/sessions/su/s.jsonl
+0d2f7f64ecdb2924772eb7119719550f2f3212a26a3326c60788a185dd198b1a *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/proj-LDckFV/.ans/sessions/示例角色/s.jsonl
+419d741ece35acd6f9edc7f7616db30b6ad2a16bf355a10d3882b8c79282a1ab *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/proj-LDckFV/角色卡/示例角色/boundary.yaml
+dde0b31b942647dda6f0023fc4d4c4bc834ee7cef20544a94a39ce10e690da6d *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/proj-LDckFV/角色卡/示例角色/role-card.md
+2cb337b6fa3081a01551e8ec97bdc270aa75d5724bce517ae3eca2269cec0fd1 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/report.txt
+326bbf439ee69195f212ebb81a8b0193d1d2bf2c31b1d23f768f7dc01e17adde *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-2/stdout.log
+e9f0bcfe1c05fb611542c149c7f3bff0555d6efaefb74db387521c805d7df6ff *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/sha256.txt
+ade31a3d16b07da5edaea36ec34dee4ac23a9585035ec7180290addc22501f92 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/typecheck.log
+f66c4b5a86efc52f7c0505ae8911e1eab6cac92ac24773d20f8f8243f67e8152 *角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch.md
+## candidate recheck
+80bb89cb214938f2127f8da5c72d1384eda692ba 7a02b434729689eaa83cfd622bc3dcb25ce460a1ac1ec365939c0f1bf268f158 app/desktop/interface.ts
+f4c997f2b330d5b5220518fe6640aac0eaf6a2b2 c84cf85454facff4e4013f7b8ad305da49d9a4eefd4aad63dcb1d21792c32fa7 app/desktop/governance-advance.ts
+2185ae934ab8fff6377fd02504cadc0619e44d5e 448b2586fe133badfbbc7abd36253d405aea04516091146467e96afcb149dda0 test/桌面应用/interface.test.ts
+d321afd85bbae8a15ed3a9910c7c1183903e91fa 2141841bcc14650ba65d9323d16bbc1b54004a478fc80681adfcd8922257c9e9 test/桌面应用/acceptance-dispatch.test.ts
+142e0f18d7701964053d97c6412d38809684c329 c48f2e5a0d4a84e91cfd5daf8386bdb793d3e4ac3868d2023063dc53e0c8474b test/桌面应用/e2e/main.mjs

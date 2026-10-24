@@ -1,0 +1,12 @@
+# i18n B4 桌面窗口候选哈希（2026-10-23；未 commit）
+# 格式：git-hash-object  sha256sum  path
+5e31bf723668a3fd23f507626e81b83e864ef6a8  7378de73696fef47051cad872ef3a62f81b34fc4c91ffbd0a68c47d2b3860bbe  app/desktop/runtime-config.ts
+9b758a3e1017e03b8ff7ef6f04956223f0449038  de8415c80cec79e33cdc4392ebc78dc2a9c3a94be60808c3d7537378bfd34a97  app/desktop/pi-config.ts
+7bb3449dfec0719a87c041b3eaa4aea8768d621b  a34846ae4a287adf2fec37defe8ed2e6e136b29a618b6b006ccbe6741391aa5e  app/desktop/runtime-resolution.ts
+413fccdbdf8acbd7a27e09c2aa98ea680dcb7ac5  358e99c245df28ad25fcba6ee24e1313b5b59706a45db589e1094c2566668146  test/桌面应用/multi-runtime.test.ts
+bbcd9683ea70d65b621732d98273be3f35ca6ce4  8e98274a0c596ea7cffa200642d252a7d7d858e96840079159c0786979921351  test/桌面应用/pi-config.test.ts
+2185ae934ab8fff6377fd02504cadc0619e44d5e  448b2586fe133badfbbc7abd36253d405aea04516091146467e96afcb149dda0  test/桌面应用/interface.test.ts
+# 写前基线（B4 前）：runtime-config.ts=a3896b13d11e233e9d9f412cca5b586c3777eaef、interface.test.ts=4b10dc1269f86230e288563581d72b045ffa2003（B3 证据 hashes.txt）；multi-runtime.test.ts=98c65d39d757167636ead859c11634d725384814、pi-config.test.ts=178eca81093b58a10db0e66b2c690d933e516e97（HEAD blob，写前未改）
+# 变更文档与证据（候选；hashes.txt 自身为自引用，不记录稳定哈希）
+df4c27f3d838afc0093b1df8dccc563e1e4bcc7d  922e046f51cda69e1d59381cfec2bd25cba3e9247a495525d2938ee240e7ac45  角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b4-desktop.md
+06237de9099c719828199efe86a9d0dd45954615  93cc98e59ef3947066f858732d9fe55f19e882a9122fe0d1621d3e42d31f8f8d  角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b4-desktop-evidence/test-desktop-full-run1-flaky.log

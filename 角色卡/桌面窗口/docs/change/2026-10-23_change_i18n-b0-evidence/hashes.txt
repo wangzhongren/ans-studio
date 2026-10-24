@@ -1,0 +1,63 @@
+candidate files (working tree; not committed)
+generated: 2026-10-23T03:25:13Z (UTC)
+
+app/desktop/preferences.ts
+  git hash-object: 008f74d17b1290776ea0399106dbca7c6b2031e9
+  sha256sum: 381deae724e914a4dba0a753849eb5eee63080163cfcb6a1b90c21fecb19d66e
+app/desktop/i18n.ts
+  git hash-object: ee4554de5f258b4d1408e7dc82c328ab468f593c
+  sha256sum: 080ad5282253f59ecfd298d73e494e1967a2fd0a814c3da71fe695d1398154fb
+app/desktop/interface.ts
+  git hash-object: 8be5a3387af3d5c90cd4d9291b47e6ba6987b0ed
+  sha256sum: 06f1455626c44a079192f96a010ea0982944a8957810e92699597c508282ac81
+app/main.ts
+  git hash-object: 49cd5530345958d2e4f5dcb2887dfabfb5b37240
+  sha256sum: 89d822f88821ad9f16cd9be3862670f75a4582400d26a87781f42e26f2d8a98f
+app/preload.cjs
+  git hash-object: 247985dabcbae2551c200fc85abfc39827b7002e
+  sha256sum: e4af7435116bcca92e4aa043213194f82d1c5b9f2bd1646a0c523c0bfa89d1f1
+test/桌面应用/interface.test.ts
+  git hash-object: 97b685d8c3ad5600fbfcfce278f07631ad4ab0c9
+  sha256sum: c6ad7de5b46da6cce45e74463ae0464a114d74ab031dd8e5bda6c2d746b67459
+角色卡/桌面窗口/api-spec.md
+  git hash-object: 92cd12f376088d2d413c0a305df103579bc6d795
+  sha256sum: a58a8c735c605d602d47fcec74fb51d9938c43c716c8f08dfec7e9912c7afd62
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0.md
+  git hash-object: 0a7a9e9ce8584939259627755202e52d616597e8
+  sha256sum: 52b651bcf6e28ab7485fc788d9d3f01385bef22afce4ff708bea782648355108
+
+evidence files
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/baseline-interface-run2-fail1.log
+  sha256sum: 8c294c5070a42bc98302ce5d7d2161e17da3768b79f47805e79a63087d6ca77c
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/baseline-interface-run3-pass.log
+  sha256sum: e08df2865b88d75702ab857c2ee4d23776df5acab459fed9f0b7c6c71455d153
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/cross-role-i18n-guard.log
+  sha256sum: 879fadf518dd193976bfa93b0e55f5c1f2739880ab5d96010f4c4a423043b16e
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/i18n-b0-focused.log
+  sha256sum: 87e9cc2963a50fb59c0a1505320e44d753e7c1794dbc767f302bee0f19c25cc0
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/interface-test-final.log
+  sha256sum: e25e76db3149792cff27e6f9f560f574d570e953229f014130f19da6b26fc2b2
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/interface-test-flaky-readiness.log
+  sha256sum: 0a6fc8408a03cbe4929eb108e24bd517c43e78fffe58c4c28e107b78b32c5b43
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/interface-test.log
+  sha256sum: dc7be4c0e11c6084266d6b03eb75304d28f0de27240d571689d0112eefb8acd4
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/neighbor-acceptance-dispatch.log
+  sha256sum: db1592fa66cdf66acba7848f88785fbd619b4b94198eb1471b29692ff7966f6a
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/neighbor-composer-images.log
+  sha256sum: d8843f1c9d9d907db72ae263c6905ca329553ffbcdf68e992da7aafafcaed081
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/neighbor-dispatch-fresh-enum.log
+  sha256sum: af121b16b34bf072d21d2858de85b40295a422a6c59718c95fc3319930ce8174
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/neighbor-multi-runtime.log
+  sha256sum: 2b63aae69691ad45da38f27fb675a9114fec5daa702788c88d708eef595d4341
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/neighbor-p0-halt-and-images.log
+  sha256sum: 723d87798532f05c33de4d9dbafd82b7c2a7f170509bba906dcf9beff9def672
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/neighbor-pi-config.log
+  sha256sum: 33adce187b8ff466aff3c88b91e3cbf8db73530c707be6857b16b573a7040198
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/neighbor-runtime-resolution.log
+  sha256sum: f5c01278b371d1c83ea22a0ff9a08f7c2b7dfdd5763a82989ce78a8f1923f4f0
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/neighbor-su-effective-boundary.log
+  sha256sum: 83d28dc6150b147eeeb3cee7ee787069d595446dfa99046d10720675417b7b68
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/typecheck.log
+  sha256sum: 325a4d219f579f6e7171aaebf66f765101680ef177c7be423244a4b03dfbaeb2
+角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/environment.txt
+  sha256sum: 13935e0d79f3c12ce1bdb161f658a96c8e0ebe02070140047aad9a6523bc3ed9

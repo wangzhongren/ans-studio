@@ -11,6 +11,7 @@ import { getDesktopBridge } from "@/lib/platform";
 import type { DesktopBridge } from "@/lib/platform";
 import { useChatStore } from "@/chat/chat-store";
 import { useUiStore } from "@/stores/ui-store";
+import { useLocaleStore, translate, type Locale } from "@/i18n";
 import {
   asCardRecord,
   expiryHitsCard,
@@ -108,6 +109,11 @@ function viewIdentity(): { projectRoot: string | null; runtime: string } {
     projectRoot: useChatStore.getState().projectRoot,
     runtime: useUiStore.getState().runtime,
   };
+}
+
+/** 当前界面语言（i18n B1）：失效兜底提示按当前 locale 渲染。 */
+function currentLocale(): Locale {
+  return useLocaleStore.getState().locale;
 }
 
 function decisionSingleDisabled(): boolean {
@@ -249,7 +255,7 @@ export const useConfirmStore = create<ConfirmStore>((set, get) => ({
       .setHint(
         typeof reason === "string" && reason !== ""
           ? reason
-          : "此确认已失效，未获放行——请让角色重新发起。",
+          : translate(currentLocale(), "ui.confirm.expiredShell"),
       );
   },
 
@@ -374,7 +380,7 @@ export const useConfirmStore = create<ConfirmStore>((set, get) => ({
     } catch {
       res = null;
     }
-    const next = shellJudgeToggleResult(s.enabled, res);
+    const next = shellJudgeToggleResult(s.enabled, res, currentLocale());
     const current = get().judge[group];
     const record = asCardRecord(res);
     const available =
@@ -434,7 +440,7 @@ function readJudgeState(
 ): void {
   const done = (res: unknown) => {
     if (pushedFlags[group]) return;
-    const next = shellJudgeToggleResult(false, res);
+    const next = shellJudgeToggleResult(false, res, currentLocale());
     const record = asCardRecord(res);
     const current = useConfirmStore.getState().judge[group];
     const available =

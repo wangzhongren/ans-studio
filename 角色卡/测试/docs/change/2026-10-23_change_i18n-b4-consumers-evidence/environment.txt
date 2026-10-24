@@ -1,0 +1,8 @@
+captured_at: 2026-10-23 16:33:00 +0800
+cwd: /c/Users/51054/Desktop/work/ans-studio
+node: v24.22.1
+npm: 11.19.1
+os: MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+shell: Git Bash (MINGW64)
+branch: main
+head: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1

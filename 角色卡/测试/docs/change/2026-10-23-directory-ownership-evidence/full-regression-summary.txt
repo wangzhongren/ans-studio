@@ -1,0 +1,14 @@
+== full regression summary (excluded write-sequencing) ==
+files: 355
+ℹ tests 3655
+ℹ pass 3627
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 18
+ℹ todo 0
+ℹ duration_ms 283628.504
+exit_code=1 finished: 2026-10-23 12:20:25 +0800
+
+baseline (B0, 角色卡/测试/docs/change/2026-10-23_change_i18n-directory-baseline.md §9.4): tests 3591 / pass 3563 / fail 10 / skipped 18 / todo 0
+delta: tests +64 = own v3/layout +25 (v3 semantics 24 + layout e2e 1); test/编排/directory-conformance.test.ts (D4 existing context) +15; other D4/D5 context +24
+fail set: 9 x Windows symlink EPERM (baseline class) + 1 x desktop session-lifecycle timing flake in i-full-chain (new instance, nondeterministic; see chain-flake-isolation)

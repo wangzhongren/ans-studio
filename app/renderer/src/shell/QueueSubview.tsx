@@ -12,8 +12,9 @@ import { ArrowLeft } from "lucide-react";
 import { useChatStore } from "@/chat/chat-store";
 import { useDrawerStore, queueDrawerFocus } from "@/stores/drawer-store";
 import { findRole, roleDisplayName } from "@/chat/role-view";
-import { queueGroups, QUEUE_EMPTY_TEXT } from "@/chat/work-view";
+import { queueGroups } from "@/chat/work-view";
 import { QueuePanel } from "@/shell/QueuePanel";
+import { useLocaleState, useT } from "@/i18n";
 
 const SUBVIEW_LIMIT = 50;
 
@@ -29,9 +30,11 @@ export function QueueSubview({
   const runningByRole = useChatStore((s) => s.runningByRole);
   const [showAll, setShowAll] = useState(false);
   const backFromQueue = useDrawerStore((s) => s.backFromQueue);
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const role = findRole(roles, roleId);
-  const roleName = role ? roleDisplayName(role) : "未选择角色";
-  const backText = origin === "card" ? "角色资料" : "工作概览";
+  const roleName = role ? roleDisplayName(role, locale) : t("ui.role.noneSelected");
+  const backText = origin === "card" ? t("ui.chatHeader.tabCard") : t("ui.chatHeader.tabWork");
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -56,8 +59,8 @@ export function QueueSubview({
   if (!roleId || !role) {
     return (
       <div className="right-empty">
-        <p className="empty-title">选择角色后查看队列</p>
-        <p className="empty-sub">先从左侧选择角色，再查看该角色的当前工作与排队消息。</p>
+        <p className="empty-title">{t("ui.queueSubview.emptyTitle")}</p>
+        <p className="empty-sub">{t("ui.queueSubview.emptySub")}</p>
       </div>
     );
   }
@@ -65,6 +68,7 @@ export function QueueSubview({
   const groups = queueGroups(
     queueByRole[roleId] || [],
     runningByRole[roleId] || null,
+    locale,
   );
   const queued =
     showAll || groups.queued.length <= SUBVIEW_LIMIT
@@ -77,7 +81,7 @@ export function QueueSubview({
         type="button"
         className="btn-mini queue-back"
         data-queue-action="back"
-        aria-label={"返回" + backText}
+        aria-label={origin === "card" ? t("ui.queueSubview.backRole") : t("ui.queueSubview.backWork")}
         onClick={() => {
           queueDrawerFocus(".queue-view-all");
           backFromQueue();
@@ -89,25 +93,32 @@ export function QueueSubview({
 
       <div id="right-queue-body" className="role-work">
         {groups.running.length === 0 && groups.queued.length === 0 ? (
-          <div className="muted small">{QUEUE_EMPTY_TEXT}</div>
+          <div className="muted small">{t("ui.work.emptyQueue")}</div>
         ) : null}
         {groups.running.length > 0 ? (
-          <section className="work-section" aria-label="当前工作">
-            <h3 className="work-heading">当前工作</h3>
-            <QueuePanel roleId={roleId} items={groups.running} emptyText={QUEUE_EMPTY_TEXT} />
+          <section className="work-section" aria-label={t("ui.work.currentWork")}>
+            <h3 className="work-heading">{t("ui.work.currentWork")}</h3>
+            <QueuePanel roleId={roleId} items={groups.running} emptyText={t("ui.work.emptyQueue")} />
           </section>
         ) : null}
         {groups.queued.length > 0 ? (
-          <section className="work-section" aria-label={"排队 " + groups.queued.length}>
-            <h3 className="work-heading">排队 {groups.queued.length}</h3>
-            <QueuePanel roleId={roleId} items={queued} emptyText={QUEUE_EMPTY_TEXT} />
+          <section
+            className="work-section"
+            aria-label={t("ui.queueSubview.queued", { count: groups.queued.length })}
+          >
+            <h3 className="work-heading">
+              {t("ui.queueSubview.queued", { count: groups.queued.length })}
+            </h3>
+            <QueuePanel roleId={roleId} items={queued} emptyText={t("ui.work.emptyQueue")} />
             {groups.queued.length > SUBVIEW_LIMIT ? (
               <button
                 type="button"
                 className="btn-mini q-more"
                 onClick={() => setShowAll((value) => !value)}
               >
-                {showAll ? "收起队列" : "查看更多队列（" + groups.queued.length + "）"}
+                {showAll
+                  ? t("ui.queueSubview.collapse")
+                  : t("ui.queueSubview.showAll", { count: groups.queued.length })}
               </button>
             ) : null}
           </section>

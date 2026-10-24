@@ -1,0 +1,10 @@
+# 环境与基线（2026-10-23）
+date_local: 2026-10-23 11:40:56 +0800
+cwd: /c/Users/51054/Desktop/work/ans-studio
+os: MINGW64_NT-10.0-26300 3.6.10-710e5275.x86_64 x86_64
+node: v24.22.1
+npm: 11.19.1
+node_path: /c/Users/51054/AppData/Local/Programs/nodejs/node
+HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+branch: main
+cached_diff: 

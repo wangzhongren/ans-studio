@@ -1,0 +1,19 @@
+date: 2026-10-23T11:51:37+08:00
+HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+--- git status --short -- (my write set) ---
+ M "src/common/\347\274\226\346\216\222/team-plan.ts"
+ M src/pipeline/orchestration/govern-session.ts
+ M src/pipeline/orchestration/run-role.ts
+ M "test/\347\274\226\346\216\222/team-plan.test.ts"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/api-spec.md"
+?? "src/common/\347\274\226\346\216\222/directory-conformance.ts"
+?? "test/\347\274\226\346\216\222/directory-conformance.test.ts"
+?? "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/docs/change/2026-10-23_change_directory-ownership-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/docs/change/2026-10-23_change_directory-ownership.md"
+--- git diff --name-only -- (my write set) ---
+"src/common/\347\274\226\346\216\222/team-plan.ts"
+src/pipeline/orchestration/govern-session.ts
+src/pipeline/orchestration/run-role.ts
+"test/\347\274\226\346\216\222/team-plan.test.ts"
+"\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/api-spec.md"
+--- git diff --cached --name-only (whole repo; empty = nothing staged) ---

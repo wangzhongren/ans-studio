@@ -1,12 +1,13 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { translate, useLocaleStore } from "./i18n/index.ts";
 import "./index.css";
 import "./shell/shell.css";
 
 const host = document.getElementById("root");
 if (!host) {
-  throw new Error("缺少 #root 挂载点");
+  throw new Error(translate(useLocaleStore.getState().locale, "ui.app.missingRoot"));
 }
 
 // 诊断守卫（只读）：记录 CSP 违规，供 Phase 2 的 file:///CSP 门禁核验。

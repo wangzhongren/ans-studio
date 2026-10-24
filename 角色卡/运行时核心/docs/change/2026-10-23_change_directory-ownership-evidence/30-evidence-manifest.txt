@@ -1,0 +1,14 @@
+== Fri Oct 23 11:39:08     2026 evidence manifest (self-hash excluded; this file changes when written) ==
+00-baseline-env-hashes.txt	sha256=e964b2410333791c18e9855b8f3b1ad987d012344ceaf57dea8a1fdb3904ea90
+01-baseline-targeted.log	sha256=6548f37c828f091e3bd171709d29b730dedcedb9dbc73a41edb2280f980ea3f4
+02-baseline-runtime-core.log	sha256=850641a9bc57ee2a966672a18a8d6ead54a6c50f99bb1a545675017b55f90134
+03-baseline-typecheck.log	sha256=806e931448e81a09b5d4c88299c8c969c41de985288a33347dbc7bcad36db880
+10-after-targeted.log	sha256=ee367df33cb37f1d91be3c8e861a804400de1a982ee310e844fbe3a4bfb6b9ab
+11-after-runtime-core.log	sha256=270bd2085e83b466750d51340771ac5b484cb31659644e98512c976bbaa1bffc
+12-after-typecheck.log	sha256=806e931448e81a09b5d4c88299c8c969c41de985288a33347dbc7bcad36db880
+13-type-closure-and-diff.log	sha256=2f183d018cdb2c3d58065ea6a4d3b2dd99070524560db0fda9d861c7f39221db
+20-after-hashes-and-diff.txt	sha256=07c5a6fac714293e9d98ba3f17cc556dc17e5822a05a4d29fde7d3475ed962ef
+
+== candidate product hashes (for cross-check with change doc) ==
+src/model/runtime.ts	blob=c50e1f44dab21d035b1a8e296f0e3749e470b9b0	sha256=ca6c0f09e65e4b1a4bdcae00144e13e0c313c025dfc0ec0f0ad102e0f57492f3
+test/runtime-core/governance-flow-metadata.test.ts	blob=d1e1ca2c66a363cdab8a9f1bebf12b6d768e2f78	sha256=9253e55945bfdb1cc2c120ab2e8d73bb67415b6afe39e438f56e9fb0208200f1

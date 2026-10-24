@@ -16,8 +16,12 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore, type RuntimeId } from "@/stores/ui-store";
+import { languageOptions, useLocaleState, useT } from "@/i18n";
+import { translate } from "@/i18n";
+import type { Locale } from "@/i18n";
 import {
   applicationLabel,
+  configWarningText,
   fieldControl,
   fieldHelp,
   fieldLabelText,
@@ -67,6 +71,8 @@ function SecretField({
   shown: boolean;
   onToggle: () => void;
 }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   return (
     <span className="pi-input-wrap">
       <input
@@ -76,8 +82,10 @@ function SecretField({
         autoComplete="off"
         spellCheck={false}
         defaultValue=""
-        placeholder={field.isSet ? "已设置，留空则不修改" : "未设置"}
-        aria-label={fieldLabelText(field)}
+        placeholder={
+          field.isSet ? t("ui.settings.placeholderSet") : t("shared.common.notSet")
+        }
+        aria-label={fieldLabelText(field, locale)}
       />
       <button
         id={"pi-toggle-secret-" + field.key}
@@ -86,7 +94,7 @@ function SecretField({
         aria-pressed={shown}
         onClick={onToggle}
       >
-        {shown ? "隐藏" : "显示"}
+        {shown ? t("ui.settings.hide") : t("ui.settings.show")}
       </button>
     </span>
   );
@@ -99,6 +107,8 @@ function ChoiceField({
   field: ConfigField;
   initial: string;
 }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const choices = field.choices || [];
   const labels = field.choiceLabels || [];
   const currentInChoices = choices.indexOf(initial) >= 0;
@@ -108,9 +118,9 @@ function ChoiceField({
         id={"pi-inp-" + field.key}
         className="pi-input pi-select"
         defaultValue={initial}
-        aria-label={fieldLabelText(field)}
+        aria-label={fieldLabelText(field, locale)}
       >
-        <option value="">留空（平台默认）</option>
+        <option value="">{t("ui.settings.optionDefault")}</option>
         {choices.map((choice, index) => (
           <option key={choice} value={choice}>
             {typeof labels[index] === "string" && labels[index] !== ""
@@ -135,6 +145,8 @@ function RangeField({
   initial: string;
   epoch: number;
 }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const choices = field.choices || [];
   const fallback = rangeFallsBack({ ...field, value: initial });
   const startIndex = Math.max(0, rangeIndex(choices, initial));
@@ -159,7 +171,7 @@ function RangeField({
           aria-describedby={"pi-range-note-" + field.key}
         />
         <span className="pi-range-note" id={"pi-range-note-" + field.key} role="note">
-          当前值不在预设档位；改为预设档位后保存
+          {t("ui.settings.rangeOffPreset")}
         </span>
       </span>
     );
@@ -173,7 +185,7 @@ function RangeField({
         min={0}
         max={Math.max(0, choices.length - 1)}
         step={1}
-        label={fieldLabelText(field)}
+        label={fieldLabelText(field, locale)}
         valueText={rangeAriaValueText(field, index)}
         onValueChange={(next) => {
           const clamped = Math.max(0, Math.min(choices.length - 1, Math.round(next)));
@@ -213,6 +225,8 @@ function FieldRow({
   secretShown: boolean;
   onToggleSecret: () => void;
 }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const control = fieldControl(field);
   const controlId =
     control === "range" && !rangeFallsBack({ ...field, value: initial })
@@ -241,7 +255,7 @@ function FieldRow({
           autoComplete="off"
           spellCheck={false}
           defaultValue={initial}
-          aria-label={fieldLabelText(field)}
+          aria-label={fieldLabelText(field, locale)}
         />
       </span>
     );
@@ -249,22 +263,90 @@ function FieldRow({
   return (
     <label className="pi-field" htmlFor={controlId} data-field-key={field.key}>
       <span className="pi-field-label">
-        {fieldLabelText(field)}
-        {field.secret === true ? <span className="pi-secret-tag">机密</span> : null}
+        {fieldLabelText(field, locale)}
+        {field.secret === true ? (
+          <span className="pi-secret-tag">{t("ui.settings.secretTag")}</span>
+        ) : null}
       </span>
       {body}
-      <span className="runtime-field-help">{fieldHelp(field)}</span>
+      <span className="runtime-field-help">{fieldHelp(field, locale)}</span>
     </label>
   );
 }
 
-function engineStatusText(view: RuntimeConfigView | null, loading: boolean): string {
-  if (loading) return "检查中…";
-  if (!view) return "配置未知";
-  return missingKeysOf(view).length > 0 ? "缺配置" : "已配置";
+function engineStatusText(
+  view: RuntimeConfigView | null,
+  loading: boolean,
+  locale: Locale,
+): string {
+  if (loading) return translate(locale, "ui.settings.statusChecking");
+  if (!view) return translate(locale, "ui.settings.statusUnknown");
+  return translate(
+    locale,
+    missingKeysOf(view).length > 0
+      ? "ui.settings.statusMissing"
+      : "ui.settings.statusConfigured",
+  );
 }
 
+// ---- 语言区（B0）开始 ----
+/**
+ * 通用/语言区（i18n B0）：设置面板顶部、引擎 tabs 之前。
+ *
+ * 只做语言骨架：标题/说明/选项/保存失败错误全部来自 shared 目录（`ui.settings.language.*`），
+ * 本区不新增中文硬编码；切换交给 locale store（乐观更新 + 失败回滚）。
+ * 引擎设置文案仍为中文，B1/B2 批次再迁移；保存条高度与引擎配置区布局不变。
+ */
+function LanguageSection() {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
+  const error = useLocaleState((s) => s.error);
+  const setLocale = useLocaleState((s) => s.setLocale);
+  const options = languageOptions(locale, t);
+  return (
+    <section id="pi-language-section" aria-labelledby="pi-language-title">
+      <div className="pi-panel-note">
+        <div className="pi-fields">
+          <label className="pi-field" htmlFor="pi-language-select">
+            <span className="pi-field-label" id="pi-language-title">
+              {t("ui.settings.language.title")}
+            </span>
+            <span className="pi-input-wrap">
+              <select
+                id="pi-language-select"
+                className="pi-input pi-select"
+                value={locale}
+                aria-describedby="pi-language-description"
+                onChange={(event) => {
+                  void setLocale(event.target.value);
+                }}
+              >
+                {options.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </span>
+            <span className="runtime-field-help" id="pi-language-description">
+              {t("ui.settings.language.description")}
+            </span>
+          </label>
+          {error ? (
+            <div className="pi-alert is-err" role="alert">
+              <span>{error}</span>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+// ---- 语言区（B0）结束 ----
+
 export function SettingsPanel({ hidden }: { hidden: boolean }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const engine = useSettingsStore((s) => s.engine);
   const views = useSettingsStore((s) => s.views);
   const loading = useSettingsStore((s) => s.loading);
@@ -309,9 +391,10 @@ export function SettingsPanel({ hidden }: { hidden: boolean }) {
   }, [engine, view]);
 
   // 保存成功：清空机密输入并从最新视图重置（失败保留草稿）。
-  const savedText = status.text.startsWith("已保存到 .env");
+  // 结构化状态码（不再解析本地化文案）。
+  const saved = status.code === "saved";
   useEffect(() => {
-    if (!savedText || !view) return;
+    if (!saved || !view) return;
     setDrafts((current) => ({
       ...current,
       [engine]: { values: initialFieldValues(view.fields), dirty: false },
@@ -325,7 +408,7 @@ export function SettingsPanel({ hidden }: { hidden: boolean }) {
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savedText, view]);
+  }, [saved, view]);
 
   const syncDraftFromDom = (markDirty = true) => {
     if (!view) return;
@@ -336,7 +419,7 @@ export function SettingsPanel({ hidden }: { hidden: boolean }) {
     }));
   };
 
-  const label = runtimeLabel(engine);
+  const label = runtimeLabel(engine, locale);
   const missing = missingKeysOf(view);
   const { main, advanced } = partitionFields(view?.fields || []);
   const initialValues = draft?.values || (view ? initialFieldValues(view.fields) : {});
@@ -376,10 +459,11 @@ export function SettingsPanel({ hidden }: { hidden: boolean }) {
 
   return (
     <div id="pi-panel" className="pi-panel" hidden={hidden}>
+      <LanguageSection />
       <div
         className="pi-engine-tabs"
         role="tablist"
-        aria-label="引擎设置"
+        aria-label={t("ui.settings.engineSettingsAria")}
         onKeyDown={onTabKeyDown}
       >
         {ENGINES.map((id) => (
@@ -398,12 +482,12 @@ export function SettingsPanel({ hidden }: { hidden: boolean }) {
             data-engine={id}
             title={
               id === currentRuntime
-                ? runtimeLabel(id) + " 配置（当前会话引擎）"
-                : runtimeLabel(id) + " 配置"
+                ? t("ui.settings.runtimeConfigCurrent", { runtime: runtimeLabel(id, locale) })
+                : t("ui.settings.runtimeConfig", { runtime: runtimeLabel(id, locale) })
             }
             onClick={() => switchEngine(id)}
           >
-            {runtimeLabel(id)}
+            {runtimeLabel(id, locale)}
             {id === currentRuntime ? (
               <span className="pi-engine-dot" aria-hidden="true" />
             ) : null}
@@ -416,23 +500,23 @@ export function SettingsPanel({ hidden }: { hidden: boolean }) {
         id="pi-engine-panel"
         aria-labelledby={"pi-engine-tab-" + engine}
       >
-      <p className="pi-panel-note">配置只影响所选引擎；不会切换当前会话。</p>
+      <p className="pi-panel-note">{t("ui.settings.panelNote")}</p>
       <div className="pi-scroll">
         <div
           id="pi-panel-path"
           className="pi-panel-path"
           title={view?.path || ""}
         >
-          {view?.path || "（保存位置未报告）"}
+          {view?.path || t("ui.settings.pathNotReported")}
         </div>
         <p className="pi-panel-hint">
-          保存到仓库根 .env，只修改本引擎字段。
-          {applicationLabel(view?.application || "next-session")}
+          {t("ui.settings.saveNote")}
+          {applicationLabel(view?.application || "next-session", locale)}
         </p>
         {!view && !loading ? (
           <div className="pi-alert is-err" role="alert">
             <CircleAlert size={14} strokeWidth={1.5} aria-hidden="true" />
-            <span>{status.text || "读取配置失败。"}</span>
+            <span>{status.text || t("ui.settings.readFailed")}</span>
             <Button
               variant="ghost"
               size="sm"
@@ -440,16 +524,14 @@ export function SettingsPanel({ hidden }: { hidden: boolean }) {
               id="pi-retry-read"
               onClick={() => void useSettingsStore.getState().load(engine)}
             >
-              重试读取
+              {t("shared.common.retryRead")}
             </Button>
           </div>
         ) : null}
         {view && missing.length > 0 ? (
           <div className="pi-alert is-warn" role="alert">
             <CircleAlert size={14} strokeWidth={1.5} aria-hidden="true" />
-            <span>
-              {label} 配置不完整，缺：{missing.join("、")}。请补齐后保存。
-            </span>
+            <span>{configWarningText(label, missing, locale)}</span>
           </div>
         ) : null}
         <div className="pi-fields">
@@ -473,10 +555,10 @@ export function SettingsPanel({ hidden }: { hidden: boolean }) {
         <details className="pi-advanced" hidden={advanced.length === 0}>
           <summary>
             <ChevronRight size={12} strokeWidth={1.5} className="pi-chev" aria-hidden="true" />
-            高级
+            {t("ui.settings.advanced")}
           </summary>
           <div className="pi-advanced-body">
-            <p className="pi-advanced-hint">以下高级项均可留空；留空 = 使用默认值。</p>
+            <p className="pi-advanced-hint">{t("ui.settings.advancedHint")}</p>
             {advanced.map((field) => (
               <FieldRow
                 key={field.key + ":" + epoch}
@@ -490,7 +572,7 @@ export function SettingsPanel({ hidden }: { hidden: boolean }) {
           </div>
         </details>
         <div className="pi-engine-status" role="status" aria-live="polite">
-          {label} · {engineStatusText(view, loading)}
+          {label} · {engineStatusText(view, loading, locale)}
         </div>
       </div>
       <div className="pi-save-bar">
@@ -501,7 +583,7 @@ export function SettingsPanel({ hidden }: { hidden: boolean }) {
           disabled={!view || saving || loading}
           onClick={() => void save()}
         >
-          保存到 .env
+          {t("ui.settings.saveToEnv")}
         </Button>
         <span
           id="pi-status"

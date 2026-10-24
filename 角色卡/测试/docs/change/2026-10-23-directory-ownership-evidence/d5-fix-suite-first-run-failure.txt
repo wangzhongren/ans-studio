@@ -1,0 +1,14 @@
+# D5 修复后最终候选：首次套件运行的确定性失败与测试更新记录
+
+- 时间：2026-10-23（最终候选复核期间，桌面 D5 修复后）
+- 命令：`node --test "test/测试/governance-e2e-auto/**/*.test.ts"`
+- 首跑结果：123 tests / 122 pass / **1 fail** / 0 skipped（exit 1）
+- 失败用例：`场景2c（v2）：接受提案 ⇒ 同一轮写 v2 团队计划/MapReduce flow 并直接发任命卡；Crew 文案含模块清单`
+- 位置：`test/测试/governance-e2e-auto/b-proposal-accept-timing.test.ts:341`
+- 断言原文：`assert.match(convenerTask, /团队计划 v2/);`
+- 实际值（原文摘录，长度截断处用 … 标记；完整文案由 `buildGovernanceAdvanceMessage` 生成）：
+  `流程 flow-a：客户已接受提案 docs/proposals/flow-a-v1.md。请先写流程状态 YAML docs/flows/flow-a.yaml…并在 docs/scheduling/flow-a-team-v1.md 写出/更新**团队计划 v3（目录级授权）**（新流程默认 v3；frontmatter：flowId、version、riskTier、teamPlanSchema: 3、recommended: [角色id,...]、modules: [模块id,...]、directories: [目录/,...]（非空、以 / 结尾）；…readiness 记录逐角色列 directories/spec/shared/layout…v1/v2 旧计划继续可读（不强制迁移）；新流程请用 v3。…`
+- 分类：**确定性失败，原因是测试断言滞后于桌面窗口 D5 有意行为变更**（提案接受→Convener 默认任务文案从 v2 改为 v3；显式 v1/v2 文案保留）。不是产品缺陷，不是偶发。
+- 处置（测试角色，写集内）：更新 `b-proposal-accept-timing.test.ts` 的 Convener 断言到真实默认 v3 行为，并新增 `directories`/`目录规范`/`实现目录` 正向断言 + `doesNotMatch(/团队计划 v2/)`；场景仍由 Convener 脚本写 v2 计划，Crew 文案仍按实际 v2 计划断言 —— legacy v2 覆盖未删除、未弱化。
+- 更新后复跑：**123/123 pass**（最终日志 `final-governance-e2e-auto-suite.log`）。
+- 未修改产品代码；未放宽其他断言。

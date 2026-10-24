@@ -1,0 +1,26 @@
+=== test/测试/**/*.test.ts 全量串行（--test-concurrency=1） ===
+captured_at: 2026-10-23 16:32:28–16:34:09 +0800
+command: node --test --test-concurrency=1 'test/测试/**/*.test.ts'
+log: test-quanliang-serial.log
+
+ℹ tests 814
+ℹ pass 804
+ℹ fail 4
+ℹ skipped 6
+ℹ duration_ms 101123.6112
+exit_code=1
+
+=== 4 个失败（原文见 log）与分类 ===
+1) existing-project-compat-verify/b-establish.test.ts:172 「B4 V5：预览零写入；取消不调 IPC（渲染源码级守卫）」
+   原因：渲染层 i18n 并行迁移把「已取消，未写入任何文件」从源码字面量改为目录 key（测试读 app/renderer 源码正则）。
+   基线：2026-10-23-baseline-evidence 全量 log 为 ✔（当时渲染层未迁）。归属：桌面UI i18n 迁移，非本 worker 写集。
+2) g4-skill-verify/b-render-double-check.test.ts:182 「读取器入参防御（对抗）…」
+   原因：EPERM symlink（Windows 平台限制，fs.symlinkSync）。
+   基线：既有红（同清单，全仓 9 个 symlink EPERM 之一）。
+3) governance-e2e-auto/i-full-chain.test.ts 「五角色全自动链路…」
+4) governance-e2e-auto/i-full-chain.test.ts:620 「v2 完整链路…」
+   原因样本：AssertionError「会话尚未开启（点击左侧角色即可开启）」；相关文件为前序批次未提交改动（mtime 12:10–14:20）且 app/desktop/session.ts 等被并行角色修改，属并行迁移窗口。
+   基线：2026-10-23-baseline-evidence 全量 log 为 ✔；当前工作区含其他角色未提交改动，与本批 runtime-settings 断言迁移无关。
+
+=== 与本批关系 ===
+4 个失败均不在本 worker 迁移的三个套件内，均不涉及 runtime-settings/runtime-shared 契约；本批三套件及同目录/相邻套件全绿。

@@ -25,9 +25,12 @@ import { Drawer } from "@/shell/Drawer";
 import { Sidebar } from "@/shell/Sidebar";
 import { TitleBar } from "@/shell/TitleBar";
 import { installTestDriver } from "@/test-driver";
+import { useLocaleStore } from "@/i18n";
+import { useT } from "@/i18n";
 import { useUiStore } from "@/stores/ui-store";
 
 export default function App() {
+  const t = useT();
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
   const setDrawerOpen = useUiStore((s) => s.setDrawerOpen);
@@ -42,6 +45,8 @@ export default function App() {
   useEffect(() => {
     installChatRuntime();
     installTestDriver();
+    // i18n B0：首屏镜像已在 store 创建时读入；这里补 lang/文件校正/广播订阅。
+    void useLocaleStore.getState().init();
   }, []);
 
   useEffect(() => {
@@ -101,8 +106,8 @@ export default function App() {
                   id="sidebar-expand"
                   className="sidebar-toggle sidebar-expand"
                   type="button"
-                  aria-label="展开左侧栏"
-                  title="展开左侧栏"
+                  aria-label={t("ui.app.expandSidebar")}
+                  title={t("ui.app.expandSidebar")}
                   aria-expanded={!collapsed}
                   hidden={!collapsed}
                   onClick={expandSidebar}
@@ -127,8 +132,8 @@ export default function App() {
                     {selectedRoleId
                       ? paneMeta[selectedRoleId]?.contextText ||
                         roleMeta[selectedRoleId]?.contextText ||
-                        "尚未开启会话"
-                      : "尚未导入项目或选择角色"}
+                        t("ui.chatHeader.noSession")
+                      : t("ui.app.emptySub")}
                   </span>
                 </div>
 

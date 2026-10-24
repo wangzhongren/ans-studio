@@ -1,0 +1,4 @@
+reused_key	zh-CN	en-US	source_gap	consume_target
+ui.events.dispatchTask	派发任务	Dispatched task	B3 #8 kindDispatchTask	app/desktop/session.ts:4260（delivery.noTarget 的 {kind}）
+ui.composer.imageFallbackName	图片	Image	B3 #14 defaultName	app/desktop/composer-images.ts:115（sanitizeImageName 兜底）
+main.watchdog.repeatFailUnknown	（未知）	(unknown)	B3 #13 unknownType	app/desktop/composer-images.ts:53（typeUnsupported 的 {type} 兜底）

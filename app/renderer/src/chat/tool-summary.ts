@@ -8,6 +8,7 @@
  * 纯函数，无 DOM/存储依赖，供渲染与 node 单测共用。
  */
 
+import { DEFAULT_LOCALE, translate, type Locale } from "../i18n/index.ts";
 import type { ActivityItem } from "./types.ts";
 
 export interface ActivityPhaseRow {
@@ -38,10 +39,15 @@ export function shortTime(at: string): string {
 }
 
 /** 同一次调用的相位合并（旧 `mergePhases` 同口径：turnId + callId 去重）。 */
-export function mergePhases(items: ActivityItem[]): ActivityPhaseRow[] {
+export function mergePhases(
+  items: ActivityItem[],
+  locale: Locale = DEFAULT_LOCALE,
+): ActivityPhaseRow[] {
   const list = Array.isArray(items) ? items : [];
   const byCall = new Map<string, ActivityPhaseRow>();
   const rows: ActivityPhaseRow[] = [];
+  const fallbackTool = translate(locale, "shared.common.tool");
+  const fallbackStatus = translate(locale, "ui.tool.status.recorded");
   for (let index = 0; index < list.length; index += 1) {
     const item = list[index] || ({} as ActivityItem);
     const callId = typeof item.callId === "string" ? item.callId : "";
@@ -58,10 +64,10 @@ export function mergePhases(items: ActivityItem[]): ActivityPhaseRow[] {
       phases: [index],
       callId,
       turnId,
-      toolName: item.toolName || "工具",
+      toolName: item.toolName || fallbackTool,
       target: item.target || "",
       status: item.status || "recorded",
-      statusText: item.statusText || "已记录",
+      statusText: item.statusText || fallbackStatus,
       at: typeof item.at === "string" ? item.at : "",
       items: [item],
     };
@@ -72,35 +78,41 @@ export function mergePhases(items: ActivityItem[]): ActivityPhaseRow[] {
 }
 
 /** 行内相位文案（旧 `status` 事实单点；与折叠摘要同源，不另判）。 */
-export function activityPhaseLabel(item: ActivityItem): string {
+export function activityPhaseLabel(
+  item: ActivityItem,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   switch (item.status) {
     case "running":
     case "call":
     case "start":
-      return "调用发起";
+      return translate(locale, "ui.tool.status.called");
     case "denied":
-      return "已拒绝";
+      return translate(locale, "ui.tool.status.denied");
     case "failed":
-      return "执行失败";
+      return translate(locale, "ui.tool.status.failed");
     case "timed-out":
-      return "超时终止";
+      return translate(locale, "ui.tool.status.timedOut");
     case "exited-nonzero":
-      return item.statusText || "已执行完成";
+      return item.statusText || translate(locale, "ui.tool.status.completed");
     case "completed":
-      return "执行完成";
+      return translate(locale, "ui.tool.status.completedShort");
     case "returned":
-      return "工具返回";
+      return translate(locale, "ui.tool.status.returned");
     case "unknown":
-      return "状态未记录";
+      return translate(locale, "ui.tool.status.unknown");
     case "recorded":
-      return item.statusText || "已记录";
+      return item.statusText || translate(locale, "ui.tool.status.recorded");
     default:
-      return item.statusText || "状态未记录";
+      return item.statusText || translate(locale, "ui.tool.status.unknown");
   }
 }
 
 /** 合并行的终态（末相位优先，空目标回退首相位）。 */
-export function phaseRowView(row: ActivityPhaseRow): ActivityPhaseRow {
+export function phaseRowView(
+  row: ActivityPhaseRow,
+  locale: Locale = DEFAULT_LOCALE,
+): ActivityPhaseRow {
   const first = row.items[0] || ({} as ActivityItem);
   const terminal = row.items[row.items.length - 1] || first;
   const status = terminal.status || row.status;
@@ -109,7 +121,7 @@ export function phaseRowView(row: ActivityPhaseRow): ActivityPhaseRow {
     toolName: terminal.toolName || first.toolName || row.toolName,
     target: terminal.target || first.target || row.target,
     status,
-    statusText: activityPhaseLabel({ ...terminal, status }),
+    statusText: activityPhaseLabel({ ...terminal, status }, locale),
     at: (terminal.at || first.at || row.at || "") as string,
   };
 }
@@ -123,9 +135,13 @@ export interface CallSummary {
 }
 
 /** 折叠摘要计数（纯计数，不改条目事实）。 */
-export function callSummary(items: ActivityItem[]): CallSummary {
+export function callSummary(
+  items: ActivityItem[],
+  locale: Locale = DEFAULT_LOCALE,
+): CallSummary {
   const list = Array.isArray(items) ? items : [];
-  const rows = mergePhases(list);
+  const rows = mergePhases(list, locale);
+  const fallbackTool = translate(locale, "shared.common.tool");
   let denied = 0;
   let failed = 0;
   let unknown = false;
@@ -149,7 +165,7 @@ export function callSummary(items: ActivityItem[]): CallSummary {
     const name =
       (terminal && terminal.toolName) ||
       (first && first.toolName) ||
-      "工具";
+      fallbackTool;
     if (!toolIndex.has(name)) {
       toolIndex.set(name, tools.length);
       tools.push({ name, count: 0 });
@@ -160,13 +176,26 @@ export function callSummary(items: ActivityItem[]): CallSummary {
 }
 
 /** 折叠行文案（旧 `foldSummaryText` 同文案）。 */
-export function foldSummaryText(summary: CallSummary): string {
+export function foldSummaryText(
+  summary: CallSummary,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   const tools = summary.tools
     .map((tool) => tool.name + (tool.count > 1 ? " ×" + tool.count : ""))
     .join(" / ");
-  let text = "本轮 " + summary.calls + " 个调用" + (tools ? "：" + tools : "");
-  if (summary.denied > 0) text += " · 含 " + summary.denied + " 条未放行";
-  if (summary.failed > 0) text += " · 含 " + summary.failed + " 条失败";
-  if (summary.unknown) text += " · 含状态未记录";
+  let text = translate(
+    locale,
+    tools ? "ui.tool.summaryWithTools" : "ui.tool.summary",
+    { count: summary.calls, tools },
+  );
+  if (summary.denied > 0) {
+    text += " · " + translate(locale, "ui.tool.containsDenied", { count: summary.denied });
+  }
+  if (summary.failed > 0) {
+    text += " · " + translate(locale, "ui.tool.containsFailed", { count: summary.failed });
+  }
+  if (summary.unknown) {
+    text += " · " + translate(locale, "ui.tool.containsUnknown");
+  }
   return text;
 }

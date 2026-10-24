@@ -1,0 +1,87 @@
+# Target project read-only snapshot (ans-gateway), S1 baseline 2026-10-23-acceptance-rework-routing
+recorded_local=2026-10-23 18:51:53 +0800
+target_root=C:/Users/51054/Desktop/work/ans-gateway
+
+## File hashes / sizes / mtimes (before)
+docs/flows/ai-governance-pipeline.yaml | sha256=0805213ab87ad8fa5c3ac8d5fce8fb0b641f9b9e50873d75ec5a7a4278903928 | bytes=13787 | lines=418 | mtime=2026-10-23 18:43:13.939159400 +0800
+.ans/governance/ledger.jsonl | sha256=6d70bdeba0bd4160a47689dcce19980d1658a5b9349435cd25073bb7d799a48d | bytes=377313 | lines=530 | mtime=2026-10-23 18:50:44.040915400 +0800
+docs/acceptance/ai-governance-pipeline-report-v1.md | sha256=0106dc8092fec6f7bf14b96aac6d2e07f0d0023b9136e5cd7335c7c9df04c801 | bytes=21897 | lines=163 | mtime=2026-10-23 15:59:53.996593200 +0800
+docs/acceptance/ai-governance-pipeline-report-v2.md | sha256=d0df0789ae3a01ad8955165417e287186cb13b573206ea5224fc0d33433d9d32 | bytes=15288 | lines=150 | mtime=2026-10-23 17:37:20.759361800 +0800
+
+## git status of target project (read-only, summary)
+NOT_A_GIT_REPO
+
+## Flow / ledger / report structured snapshot (node script, read-only)
+## flow
+flow_sha256=0805213ab87ad8fa5c3ac8d5fce8fb0b641f9b9e50873d75ec5a7a4278903928 bytes=13787 lines=419
+flowId=ai-governance-pipeline
+step_count=40
+status_counts={"done":18,"superseded":21,"pending":1}
+kind_counts={"customer-decision":2,"artifact":12,"dispatch":25,"acceptance":1}
+verification_step={"id":"verification","kind":"acceptance","status":"pending","dependsOn":null,"evidence":null}
+non_acceptance_steps=39 done=18 superseded=21
+steps:
+  - id=intent-confirm kind=customer-decision status=done dependsOn=[]
+  - id=proposal kind=artifact status=done dependsOn=[]
+  - id=contract-freeze kind=artifact status=done dependsOn=[]
+  - id=team-plan kind=artifact status=done dependsOn=[]
+  - id=appointment kind=customer-decision status=done dependsOn=[]
+  - id=role-cards kind=artifact status=done dependsOn=["appointment"]
+  - id=role-readiness kind=artifact status=done dependsOn=["role-cards"]
+  - id=acceptance-criteria kind=artifact status=superseded dependsOn=["role-readiness"]
+  - id=acceptance-criteria-v2 kind=artifact status=done dependsOn=[]
+  - id=delivery-core-domain kind=dispatch status=superseded dependsOn=["contract-freeze"]
+  - id=rework-domain-error-code kind=dispatch status=done dependsOn=[]
+  - id=delivery-platform-foundation kind=dispatch status=superseded dependsOn=["contract-freeze"]
+  - id=delivery-platform-foundation-rework-1 kind=dispatch status=superseded dependsOn=[]
+  - id=delivery-platform-foundation-rework-2 kind=dispatch status=superseded dependsOn=[]
+  - id=rework-platform-clean-env kind=dispatch status=superseded dependsOn=[]
+  - id=rework-clean-install-evidence kind=dispatch status=done dependsOn=[]
+  - id=delivery-llm-providers kind=dispatch status=superseded dependsOn=["contract-freeze","delivery-core-domain"]
+  - id=rework-provider-extension-drill kind=dispatch status=done dependsOn=[]
+  - id=delivery-persistence-store kind=dispatch status=superseded dependsOn=["contract-freeze","delivery-core-domain"]
+  - id=rework-persistence-retention-active-run kind=dispatch status=done dependsOn=[]
+  - id=delivery-pipeline-runtime kind=dispatch status=superseded dependsOn=["contract-freeze","delivery-core-domain","delivery-llm-providers","delivery-persistence-store"]
+  - id=delivery-pipeline-runtime-rework-1 kind=dispatch status=superseded dependsOn=[]
+  - id=rework-pipeline-active-run kind=dispatch status=done dependsOn=[]
+  - id=delivery-interface-web kind=dispatch status=superseded dependsOn=["contract-freeze","delivery-core-domain","delivery-platform-foundation","delivery-persistence-store","delivery-pipeline-runtime"]
+  - id=delivery-interface-web-v2 kind=dispatch status=superseded dependsOn=[]
+  - id=delivery-interface-web-rework-1 kind=dispatch status=superseded dependsOn=[]
+  - id=rework-interface-rate-limit kind=dispatch status=done dependsOn=[]
+  - id=test-map-shards kind=dispatch status=superseded dependsOn=["delivery-core-domain","delivery-platform-foundation","delivery-llm-providers","delivery-persistence-store","delivery-pipeline-runtime","delivery-interface-web"]
+  - id=test-map-shards-v2 kind=dispatch status=done dependsOn=[]
+  - id=integration-e2e kind=dispatch status=superseded dependsOn=["test-map-shards"]
+  - id=integration-e2e-v2 kind=dispatch status=superseded dependsOn=[]
+  - id=integration-e2e-v3 kind=dispatch status=superseded dependsOn=[]
+  - id=rework-qa-shard-manifest-hash kind=dispatch status=done dependsOn=[]
+  - id=verification-evidence kind=artifact status=superseded dependsOn=["integration-e2e"]
+  - id=verification-evidence-v2 kind=artifact status=superseded dependsOn=[]
+  - id=rework-qa-regression-evidence kind=artifact status=superseded dependsOn=[]
+  - id=rework-qa-perf-baseline kind=dispatch status=done dependsOn=[]
+  - id=change-package kind=artifact status=superseded dependsOn=["verification-evidence"]
+  - id=change-package-v2 kind=artifact status=done dependsOn=[]
+  - id=verification kind=acceptance status=pending dependsOn=[]
+
+## ledger
+ledger_sha256=6d70bdeba0bd4160a47689dcce19980d1658a5b9349435cd25073bb7d799a48d bytes=377313 lines=531 non_empty_lines=530
+parsed_entries=530 bad_lines=0
+acceptance_decision_count=1
+acceptance_decision line=368 at=2026-10-23T08:05:01.066Z customerDecision=rejected evidenceKind=customer-input flowId=ai-governance-pipeline
+latest_acceptance_decision={"line":368,"at":"2026-10-23T08:05:01.066Z","customerDecision":"rejected","evidenceKind":"customer-input"}
+verifier_dispatch_count=3
+verifier_dispatch line=18 at=2026-10-23T04:08:48.685Z stepId=acceptance-criteria actorRoleId=app
+verifier_dispatch line=23 at=2026-10-23T04:11:36.290Z stepId=acceptance-criteria actorRoleId=app
+verifier_dispatch line=359 at=2026-10-23T08:01:26.084Z stepId=verification actorRoleId=app
+app_to_convener_dispatch_count=2
+ledger_kind_counts={"customer.decision":97,"artifact.observed":383,"dispatch.accepted":48,"intent.handed-off":2}
+
+## reports
+report-v1: sha256=0106dc8092fec6f7bf14b96aac6d2e07f0d0023b9136e5cd7335c7c9df04c801 bytes=21897 lines=164 acceptance-rework_mentions=0 fenced_yaml_blocks=0 fence_markers=0
+report-v2: sha256=d0df0789ae3a01ad8955165417e287186cb13b573206ea5224fc0d33433d9d32 bytes=15288 lines=151 acceptance-rework_mentions=0 fenced_yaml_blocks=0 fence_markers=2
+snapshot_script_exit=0
+
+## File hashes after (zero-write check)
+docs/flows/ai-governance-pipeline.yaml | sha256=0805213ab87ad8fa5c3ac8d5fce8fb0b641f9b9e50873d75ec5a7a4278903928 | bytes=13787
+.ans/governance/ledger.jsonl | sha256=6d70bdeba0bd4160a47689dcce19980d1658a5b9349435cd25073bb7d799a48d | bytes=377313
+docs/acceptance/ai-governance-pipeline-report-v1.md | sha256=0106dc8092fec6f7bf14b96aac6d2e07f0d0023b9136e5cd7335c7c9df04c801 | bytes=21897
+docs/acceptance/ai-governance-pipeline-report-v2.md | sha256=d0df0789ae3a01ad8955165417e287186cb13b573206ea5224fc0d33433d9d32 | bytes=15288

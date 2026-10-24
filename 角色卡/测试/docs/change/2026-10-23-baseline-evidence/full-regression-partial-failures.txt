@@ -1,0 +1,22 @@
+=== 部分运行中的失败（4）与跳过（2） ===
+✖ native symlink and storage runtime mismatch fail before SDK query (3.7385ms)
+✖ native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary (18.942ms)
+﹣ owned native process group cleanup kills a wrapper and child that ignore SIGTERM (0.0953ms) # SKIP
+✖ store validate callback rejects directory symlink before Pi parse or new native write (11.2804ms)
+✖ Pi storage refuses file symlink and role/runtime mismatch without touching other storage (7.7751ms)
+﹣ 会话目录不可写：明确抛错（含目录与原因），绝不静默退化成「不落盘」 (0.2074ms) # chmod 语义在 Windows 不适用
+
+=== write-sequencing 测试名核对 ===
+5:// `write_file`/`edit_file` 未钉 `executionMode:"sequential"` ⇒ 同批 write+edit（同一文件）并行抢跑：
+9://   A（对照组，抹掉两写类工具的 executionMode = 修复前状态）：**丢写复现**（edit 效果缺失）；
+46: * `stripSequential: true` = 对照组：从两写类工具上抹掉 `executionMode`（= 修复前行为）。
+56:        delete piTool["executionMode"];
+127:test("describeTool：write_file / edit_file 钉 executionMode:'sequential'；read_file / run_shell 不加", () => {
+129:    assert.equal(describeTool(name).executionMode, "sequential", `${name} 必须钉 sequential（W-1：读改写竞态）`);
+131:  assert.equal(describeTool("read_file").executionMode, undefined, "read_file 纯读不加（结论见 real-adapter 注释）");
+132:  assert.equal(describeTool("run_shell").executionMode, undefined);
+134:  assert.equal(describeTool("request_confirmation").executionMode, "sequential");
+135:  assert.equal(describeTool("submit_report").executionMode, undefined);
+
+=== 该文件 test() 声明计数 ===
+3

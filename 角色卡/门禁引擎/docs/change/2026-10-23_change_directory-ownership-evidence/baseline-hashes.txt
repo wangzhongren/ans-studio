@@ -1,0 +1,20 @@
+# 写前基线（2026-10-23，改动前工作区实测）
+# HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+# 命令: git hash-object <file> ; sha256sum <file>
+
+## git hash-object（Git blob SHA-1）
+f074f0e15598b85cd47048652adca9bde07a5259  src/common/门禁引擎/governance-roles.ts
+356d4433f58a6b0172afb5be11ae263c0a261e77  test/门禁引擎/governance-trio.test.ts
+32fc34c914ca87852fc7e779921cc57f0d37243e  test/门禁引擎/governance-standard-workflow.test.ts
+ccb1fd5f79d1204949430c2ee1f6529b0fc2839d  角色卡/门禁引擎/api-spec.md
+fd97d4e43051c93869ed27b2335ab89ad3050515  角色卡/门禁引擎/memo.md
+
+## sha256sum（文件 SHA-256）
+2fea2f941c90dbb611f6dcf08e332c0fcb94d9da0476a2c3b4ea753919fdfb4d  src/common/门禁引擎/governance-roles.ts
+5885ea294d8fdb56f119e1b59ebc987195c8184e86a409b0350eb8bf12d8e62a  test/门禁引擎/governance-trio.test.ts
+29399c19d79a097fe6daa6f5c9d1a9e5c9c67d94f6627377a98b4883b20807f7  test/门禁引擎/governance-standard-workflow.test.ts
+899a2f7f23952992a9e8b813ef0fa7a207d9e29c3f92018c492176b85d5db8bc  角色卡/门禁引擎/api-spec.md
+3bfd9ee429609216f52163b2c12b1dfa0e1fe6238dc82d8b94d0948c984f16fb  角色卡/门禁引擎/memo.md
+
+## 写前测试基线
+# node --test "test/门禁引擎/**/*.test.ts" => 313 tests / 312 pass / 0 fail / 1 skipped / exit 0

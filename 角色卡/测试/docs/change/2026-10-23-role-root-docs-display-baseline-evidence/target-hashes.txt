@@ -1,0 +1,36 @@
+recorded_at=2026-10-23 21:48:29 +0800
+columns: path | exists | vs_HEAD | git_hash_object | sha256 | bytes
+app/desktop/project.ts | yes | modified_vs_HEAD | e5d24d22b951ec7152facf62a6e2260073ec45f0 | d69c79294109ebb2bafa248631be558193a5b421b4249070a9b2abc2a6dd45d2 | 23615
+app/desktop/interface.ts | yes | modified_vs_HEAD | a49a84c85a431648fdd2fa58ea11e07b2ee3bcfb | 20e9b545eb3a41faa24a4269aad863ec331885173ce9a8d9599f952d719139bf | 336550
+src/model/project-document.ts | yes | equal_HEAD | 980504823f3dd35b48801663d52be6c99d1f7c2f | bdae97e739d18bbe3a7da7b79f231fab5954d0c056bc4888e6598dae8e556d72 | 1843
+src/service/project-document/abstract/document-reader.ts | yes | equal_HEAD | 3a3c148c019bd6e315520f145b227c6b840c5a85 | 62fd248bbec7b4f04203e66b521cfdbb7b0bc6464b2438ac43cc2a4e2bf14558 | 513
+src/service/project-document/impl/read-project-document.ts | yes | equal_HEAD | c3109f6bd41c619ab4fcb37da24129b2f0c30ce8 | 6c7037a5bc60b3b7d9574e5a2b8088a7c42ccfd073e01580db72f5fbfff0a373 | 7454
+src/service/project-document/public/read-project-document.ts | yes | equal_HEAD | b55b39c595ed555d34ba803e7b5d64e93bc5a03d | 5e43160370c1b07fdce01fac395e4df1a8a92f1f6d2d4e9d82b74395b49a0678 | 497
+src/pipeline/project-document/read-project-document.ts | yes | equal_HEAD | edd6705e09dc2936cae00cee9ffa04403b663228 | 19cdfd532f0d6570d948e6c1252932b93ab36fdd4f36efa5df5f9a82d7c15eec | 718
+src/provider/project-document/abstract/file-reader.ts | yes | equal_HEAD | 6d8f92a8c0a1bf943a6f25894ee42d62d5ee6333 | 45a170632d50ebe9cb125c135c0c937c6d15ed5c64274105f2fac816867a89ff | 706
+src/provider/project-document/impl/file-reader.ts | yes | equal_HEAD | 752e760f95589fbacd0cf0de7552abcae13aaaed | 977a8d7b71ad53172988caee6b1a99b6f684a4c8989b570d53656ae9a1ba3b61 | 5284
+src/provider/project-document/public/file-reader.ts | yes | equal_HEAD | 23b51e679d42fb090e5e28090c9823a96b7446ae | 1c228b6a780f9bccfe07e257f331ba4f90de48a1b6f72ecbaf12e8e69cbe5cb6 | 286
+app/preload.cjs | yes | modified_vs_HEAD | 247985dabcbae2551c200fc85abfc39827b7002e | e4af7435116bcca92e4aa043213194f82d1c5b9f2bd1646a0c523c0bfa89d1f1 | 23747
+app/main.ts | yes | modified_vs_HEAD | b7801bc06e83187b35b373ee7986743eea96b1ed | cc7982ea7156e2b55d2f434b1e3aa0fb1c61372aeeca50cd8b5a25f771346342 | 63034
+app/renderer/src/shell/ProfilePanel.tsx | yes | modified_vs_HEAD | 43225790b26324059edc75173f63443014fe7072 | 3cc118d1c0dd7d99613811e644f72d51c23dddd27d182385f30c18a26e35a20d | 13102
+app/renderer/src/shell/DocumentView.tsx | yes | modified_vs_HEAD | 2305e62ca0f58754f9d2c9cd7d4a3473337dc7f1 | 55d05c5d213dfe01b4a6a78e668f8e9bc44c627325f7d839bceaebdd9bd3ced0 | 9770
+app/renderer/src/chat/document-view.ts | yes | modified_vs_HEAD | 902269c10bcc7b02fcefa44c80dc906dda025b71 | 4bf32a9d34f7ded97f2e1a83d7a10f3966d69142aa5178910080c608854be3ff | 9593
+app/renderer/src/chat/types.ts | yes | modified_vs_HEAD | fb42aae9775b3342d12da3ae5668e2f7b50bd144 | 720c0663bd909e3904ad594eba8025161edd2fc5c01f12f8f0e46bb2663d27b8 | 5018
+app/renderer/src/chat/profile-docs.ts | NO | absent | - | - | -
+app/renderer/src/stores/drawer-store.ts | yes | modified_vs_HEAD | 4f40b1507b4cc5650b0c9f604ef7f9586e07830f | 4cb2431a0e658f54d225f245c98582db71e63cb543ec56e27e2d61579197fda1 | 23065
+app/renderer/src/shell/phase4a.css | yes | modified_vs_HEAD | cf877d7878b968352cc9b0c9418769e445944112 | 052ea23040804e4ab2872c2a6b6813ba816db92f0c1e90d3c7ae2c0393391100 | 20963
+src/common/shared/i18n/messages/zh-CN.ts | yes | untracked_not_in_HEAD | c0501469ed8b8631e63ba124f419aa642a034400 | d487a8d4853004daea619a82b2d760ff3218d6fd1015f1c29623d2ae15953e4e | 115558
+src/common/shared/i18n/messages/en-US.ts | yes | untracked_not_in_HEAD | 74ab4a7d654143b20b6614d7508f48da67c211cc | 05089d70b7b1e0ee720d619efb57aa8d305b7b8f004f4be66144476257e4b373 | 122490
+test/桌面应用/project.test.ts | yes | equal_HEAD | 923f2f316cd40a40582b32d406e6805f6ea2f8f8 | ab72bb57a661de610fcfd4f32c1b5bd3d0e930a0ae0569da6437ec72c6275d8e | 15034
+test/桌面应用/project-document.test.ts | yes | equal_HEAD | 60857a9790734c57e43618ca956df4f8e3daab6f | 654b383d8e77773f2d6b597c9e91a45a93c84b5a0afb79cc5566b0862d5d3e75 | 20617
+test/桌面应用/interface.test.ts | yes | modified_vs_HEAD | 1e545367e512b3d2cf740ee531eefe2b9757e884 | c01a060e94703e71e8e043995285ae113151a86b6afe9e24faac4bbd3805a575 | 358766
+test/桌面应用/e2e/main.mjs | yes | modified_vs_HEAD | 142e0f18d7701964053d97c6412d38809684c329 | c48f2e5a0d4a84e91cfd5daf8386bdb793d3e4ac3868d2023063dc53e0c8474b | 173881
+test/桌面UI/document-view.test.ts | yes | equal_HEAD | a7ad14456c3ff627fe5cf86f6ec54d7b7b27abf4 | 683954c016f6604fb6ffb975572aabaca861ff2478442552f8b8abbfdf314ef4 | 6613
+test/桌面UI/role-view.test.ts | yes | equal_HEAD | 7cbccd4a00fca9cc55d42c5badd9e15c95999f72 | 6f98d780213a921cba13402e1f3fa58df8377d95fcd4be5f2f6ed067fc597e3d | 5035
+test/桌面UI/phase4a-electron-smoke.mjs | yes | equal_HEAD | f311e2a2f7ba91f736e1d257247677f729bb97e0 | 7f4045274f7a0ec840342a736075923382b7aa0c9e3bcf8e3df3faa940d37421 | 69601
+test/桌面UI/phase4a-smoke-preload.cjs | yes | equal_HEAD | 18ac5d7cf0dc6edaf8913e70ee2c1861696d7076 | 0ac84b5ce7fd73331c1572095622ed3b7a381cfff33ab2ac6688c28761b0457e | 5100
+test/桌面UI/source-guard.test.ts | yes | modified_vs_HEAD | 7e2e654cf4596c982130b7c843645932eb5c7d82 | 6c761264753e2c4e2b2110a53fd41fdd7326a4076423d157f4e69feec90a0e5b | 12002
+test/测试/p1p7-document-integration.test.ts | yes | equal_HEAD | 9a8d79d6560b8e8f699879bf7a59179ee9f25ea8 | d1150aa1aab1cbc67314242673e966e7ba1746457a6320d53b98b03192c53683 | 9184
+test/测试/i18n-integration.test.ts | yes | untracked_not_in_HEAD | ab22f2b8e7dca485deefe5acde153d257975c776 | 57aa7ff82e18add312580b17dc2e7e10c6deae12b5f03d5c9e34b80bb68a0ba3 | 26733
+test/项目管理/shared/i18n.test.ts | yes | untracked_not_in_HEAD | 26501c142dbd2c03bd6db6e135a0a29da8d46a3b | d8e7567797d9a324e1e2f9889b84758c81ac1b6df76f98b63c2c652f3bebac97 | 54322
+test/项目管理/shared/i18n-guard.test.ts | yes | untracked_not_in_HEAD | 3358a1428f60b1d115e9a3af5aab39601938eb12 | 05003446fd8973b9954dd10593f8f5df284d68b3d733b8832a83338f949cf7e9 | 6151

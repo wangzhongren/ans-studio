@@ -1,0 +1,184 @@
+=== 基线环境与身份（治理写卡推进可重入门禁闭环，T3） ===
+captured_at: 2026-10-23 13:20:13 +0800
+OS: MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+Windows:  Microsoft Windows [�汾 10.0.26300.9711] 
+Shell: bash 5.3.15(2)-release
+PATH 注记: 每条命令前 export PATH="/c/Users/51054/AppData/Local/Programs/nodejs:$PATH"
+node: /c/Users/51054/AppData/Local/Programs/nodejs/node v24.22.1
+npm: /c/Users/51054/AppData/Local/Programs/nodejs/npm 11.19.1
+git rev-parse HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+git rev-parse HEAD^{tree}: 1149238a834f31588797016d6ee2289a4ac3e97b
+git branch --show-current: main
+
+=== git status --short ===
+ M app/desktop/governance-advance.ts
+ M app/desktop/interface.ts
+ M app/main.ts
+ M app/preload.cjs
+ M app/renderer/src/App.tsx
+ M app/renderer/src/lib/platform.ts
+ M app/renderer/src/shell/SettingsPanel.tsx
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+ M "src/common/\347\274\226\346\216\222/team-plan.ts"
+ M "src/common/\351\227\250\347\246\201\345\274\225\346\223\216/governance-roles.ts"
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/govern-session.ts
+ M src/pipeline/orchestration/run-role.ts
+ M test/runtime-core/governance-flow-metadata.test.ts
+ M "test/\346\241\214\351\235\242UI/source-guard.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/e2e/main.mjs"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/operator-wiring.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/b-proposal-accept-timing.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/fixture.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/i-full-chain.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/p-team-plan-guard.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/q-role-granularity.test.ts"
+ M "test/\346\265\213\350\257\225/governance-e2e-auto/r-mapreduce-parallel.test.ts"
+ M "test/\347\274\226\346\216\222/team-plan.test.ts"
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/governance-standard-workflow.test.ts"
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/governance-trio.test.ts"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/architecture/shared-components.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/memo.md"
+?? .claude/
+?? app/desktop/i18n.ts
+?? app/desktop/preferences.ts
+?? app/renderer/src/i18n/
+?? demos/
+?? docs/acceptance/directory-ownership-criteria-v1.md
+?? docs/acceptance/directory-ownership-report-v1.md
+?? docs/acceptance/i18n-criteria-v1.md
+?? docs/communication/2026-10-23_intent_governance-advance-redispatch.md
+?? docs/communication/2026-10-23_intent_i18n-and-directory-ownership.md
+?? docs/planning/2026-10-23_design_directory-ownership.md
+?? docs/planning/2026-10-23_design_governance-advance-redispatch.md
+?? docs/planning/2026-10-23_design_i18n.md
+?? docs/scheduling/2026-10-23-directory-ownership-team-plan.md
+?? docs/scheduling/2026-10-23-governance-advance-redispatch-team-plan.md
+?? docs/scheduling/2026-10-23-i18n-team-plan.md
+?? docs/scheduling/directory-ownership-change-v1.md
+?? docs/scheduling/memo.md
+?? src/common/shared/i18n/
+?? "src/common/\347\274\226\346\216\222/directory-conformance.ts"
+?? "test/\346\241\214\351\235\242UI/i18n-store.test.ts"
+?? "test/\346\241\214\351\235\242UI/i18n-view.test.ts"
+?? "test/\346\265\213\350\257\225/directory-layout.test.ts"
+?? "test/\347\274\226\346\216\222/directory-conformance.test.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard-allowlist.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard-scanner.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard.test.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-23_change_i18n-b0-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-23_change_i18n-b0.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_directory-ownership-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_directory-ownership.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_i18n-b0-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_i18n-b0.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-23-baseline-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-23-directory-ownership-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-23-governance-advance-redispatch-baseline-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-23_change_directory-ownership.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-23_change_i18n-directory-baseline.md"
+?? "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/docs/change/2026-10-23_change_directory-ownership-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/docs/change/2026-10-23_change_directory-ownership.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/docs/change/2026-10-23_change_directory-ownership-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/docs/change/2026-10-23_change_directory-ownership.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/docs/change/2026-10-23_change_directory-ownership-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/docs/change/2026-10-23_change_directory-ownership.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-10-23_change_i18n-b0-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-10-23_change_i18n-b0.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-10-23_change_i18n-b1-b4-keys-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-10-23_change_i18n-b1-b4-keys.md"
+
+=== git diff --stat ===
+warning: in the working copy of 'test/测试/governance-e2e-auto/p-team-plan-guard.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '角色卡/桌面窗口/api-spec.md', LF will be replaced by CRLF the next time Git touches it
+ app/desktop/governance-advance.ts                  |  125 +-
+ app/desktop/interface.ts                           |  402 ++++-
+ app/main.ts                                        |   79 +-
+ app/preload.cjs                                    |   19 +
+ app/renderer/src/App.tsx                           |    3 +
+ app/renderer/src/lib/platform.ts                   |   16 +
+ app/renderer/src/shell/SettingsPanel.tsx           |   57 +
+ docs/communication/memo.md                         |   20 +-
+ docs/planning/memo.md                              |    5 +
+ "src/common/\347\274\226\346\216\222/team-plan.ts" | 1816 ++++++++++++++++++--
+ .../governance-roles.ts"                           |   76 +-
+ src/model/runtime.ts                               |   14 +-
+ src/pipeline/orchestration/govern-session.ts       |   15 +-
+ src/pipeline/orchestration/run-role.ts             |   39 +-
+ test/runtime-core/governance-flow-metadata.test.ts |   50 +
+ .../source-guard.test.ts"                          |   20 +-
+ .../e2e/main.mjs"                                  |   14 +
+ .../interface.test.ts"                             |  855 ++++++++-
+ .../operator-wiring.test.ts"                       |    4 +-
+ .../b-proposal-accept-timing.test.ts"              |    9 +-
+ .../governance-e2e-auto/fixture.ts"                |  463 ++++-
+ .../governance-e2e-auto/i-full-chain.test.ts"      |  563 ++++++
+ .../governance-e2e-auto/p-team-plan-guard.test.ts" |  246 +++
+ .../q-role-granularity.test.ts"                    |  261 ++-
+ .../r-mapreduce-parallel.test.ts"                  |  232 +++
+ "test/\347\274\226\346\216\222/team-plan.test.ts"  |  524 ++++++
+ .../governance-standard-workflow.test.ts"          |   99 +-
+ .../governance-trio.test.ts"                       |  124 +-
+ .../\346\241\214\351\235\242UI/api-spec.md"        |   28 +
+ .../api-spec.md"                                   |   30 +
+ .../boundary.md"                                   |    2 +
+ .../changelog.md"                                  |    2 +
+ .../\347\274\226\346\216\222/api-spec.md"          |   34 +
+ .../\347\274\226\346\216\222/boundary.md"          |    1 +
+ .../\347\274\226\346\216\222/changelog.md"         |   10 +
+ .../api-spec.md"                                   |    6 +
+ .../memo.md"                                       |    2 +
+ .../api-spec.md"                                   |   12 +
+ .../memo.md"                                       |    2 +
+ .../api-spec.md"                                   |   64 +
+ .../docs/architecture/shared-components.md"        |   17 +
+ .../memo.md"                                       |    1 +
+ 42 files changed, 6049 insertions(+), 312 deletions(-)
+
+=== git diff --cached --name-only ===
+(空=无暂存)
+
+=== 目标文件起始哈希 ===
+app/desktop/interface.ts
+  hash-object: 61e91311207c739d560d308577135c2205feffb8
+  sha256: 1f580f0f5ba5431461fbd451034ab95314651f47a4b9d7a4fc3e39548c305ed4
+  size: 275347 B
+app/desktop/governance-advance.ts
+  hash-object: 8f90a7138a2742509c484e5c856b26497878c3e7
+  sha256: 90dbfbd1cb32474b8687d11e02cbe507f1c8773f57af8e1e7bd6499975e4bb90
+  size: 78182 B
+src/common/编排/flow-service.ts
+  hash-object: cdba51754e73e4d39bfbdedea7ecc788a05e76e8
+  sha256: 6808144984231aa7e57f650201734c3ee00da2d9abb809682cd006344bb588b7
+  size: 39767 B
+src/pipeline/orchestration/flow-state.ts
+  hash-object: 2a32991ceab908ece10bbead248f4cd9849d8084
+  sha256: 5d9c0bd3b4ae7bbe0b80a1eefea77017e62a22c84276eb53f88be837861652e6
+  size: 1405 B
+test/桌面应用/interface.test.ts
+  hash-object: 3e3b9083f646aaf0d5925d1915ab9408fd6fc842
+  sha256: 45cec1f88f0a8fc3cca47443f45fea93898faf500d21bd0b1891dbf204711242
+  size: 289104 B
+test/桌面应用/acceptance-dispatch.test.ts
+  hash-object: 0b4a1ca63425cf6fdec3323d53add34a5234ea10
+  sha256: c87341ec7c76864c86d0be88b618c7e16d370df09041e19ab0fa3b34a9eb1149
+  size: 110739 B
+test/编排/flow-service.test.ts
+  hash-object: 9bdbe3de063a0cada0bae3e0158fefc719dfe38b
+  sha256: 4df55487d246d626cefe5c77288c7e83467d771bef98a5dcaaa211f0d16f43f0
+  size: 47088 B

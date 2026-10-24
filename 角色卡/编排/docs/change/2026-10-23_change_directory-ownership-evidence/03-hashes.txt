@@ -1,0 +1,21 @@
+# 2026-10-23 directory-ownership (编排) candidate + evidence hashes
+generated: 2026-10-23T11:51:16+08:00
+HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+
+## product/test files (git hash-object / sha256sum)
+68700bec4fbe8a13d3b6767e88870f1f9d7d37e1	f976fd0925d7661f71f1b84cf48b04cce07bc19f8b65c696c5cceecbcdc1b5e7	src/common/编排/team-plan.ts
+400af3c2d4a9a9338ded55d7acd106f931648456	a8168a73033b902084465e5d76e0e37724e6de91d6a635e503d8349a6240f5db	src/common/编排/directory-conformance.ts
+846ab5a03796211c219c5dea2c1e237a9e312f82	46204a7e6624439dcfaa4866d424186638cb33216252a9ec26ea51e8fc3e98fd	src/pipeline/orchestration/run-role.ts
+eac5c3df0048f41d4e098a586872b4961fd607fb	195b5100197486299327d038599cdf974b247aa57e79fff2dab4bafa6a3358f0	src/pipeline/orchestration/govern-session.ts
+2bf9b5c9be13788f7209e4ab9a92d64cf3ee69c5	46d657bad532fe7eabb6eb1b8dc079b7047fd96450e33b48e4ec6d5aab2c356e	test/编排/team-plan.test.ts
+23b3d7405d02f736abad498f12d5fa1c033a959a	8028c7c694c7c00d01aa5db47488dc27648ab22173a9914cbcc7c8d91b9581dc	test/编排/directory-conformance.test.ts
+
+## role docs
+0d8a9d08aa5104cd5d4cdb04524dc0d851b268d1	fca50f72fc7010689bbaabc91820b376076bd16b4cc93a3306ac730259e118d3	角色卡/编排/docs/change/2026-10-23_change_directory-ownership.md
+99e6c1d648febc3527453e6a39df0ade6748bb35	b58ce2c23b3b13b9a0db5d5a406d6c50a59245b1ca3ca0d71a231257f16cb3b8	角色卡/编排/api-spec.md
+
+## evidence
+a3eb33c8fb4dc84cd0de1746856ec4d2bdcc3b7089498bad90391fefcebe1ed6	角色卡/编排/docs/change/2026-10-23_change_directory-ownership-evidence/01-test-orchestration.log
+9fde0be87f6d689ecf8766a58faf281b09644740eb8692bbd610ac33be831109	角色卡/编排/docs/change/2026-10-23_change_directory-ownership-evidence/02-typecheck.log
+401ac856e8770c505302d041a5af69d449151bff344f843e4a335679196005f4	角色卡/编排/docs/change/2026-10-23_change_directory-ownership-evidence/04-critical-v3-negatives.log
+c0a34b0b3e9d1b5398f8d34563bc34cfa9c96df9938e0e29baf7c070811a79c5	角色卡/编排/docs/change/2026-10-23_change_directory-ownership-evidence/05-git-status.txt

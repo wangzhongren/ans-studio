@@ -1,0 +1,57 @@
+# 目标项目只读快照（S7；本角色零写入）
+TARGET=/c/Users/51054/Desktop/work/ans-gateway
+TIME_START=2026-10-23T21:07:30+08:00
+GIT_REPO=no
+FILE docs/flows/ai-governance-pipeline.yaml
+bd057b1d3157851cc68ba26a4f54fa726b112c55dd9e7b7c5fd9169186054163 *docs/flows/ai-governance-pipeline.yaml
+LINES 671
+BYTES 22551
+MTIME 2026-10-23 20:57:56.508226600 +0800
+FILE .ans/governance/ledger.jsonl
+bdafbf45ad1444c6b6d15fc1b25654c86b65fd9035a9c2e4eeef3cf18f218564 *.ans/governance/ledger.jsonl
+LINES 751
+BYTES 484243
+MTIME 2026-10-23 20:57:37.379382900 +0800
+FILE docs/acceptance/ai-governance-pipeline-report-v1.md
+0106dc8092fec6f7bf14b96aac6d2e07f0d0023b9136e5cd7335c7c9df04c801 *docs/acceptance/ai-governance-pipeline-report-v1.md
+LINES 163
+BYTES 21897
+MTIME 2026-10-23 15:59:53.996593200 +0800
+FILE docs/acceptance/ai-governance-pipeline-report-v2.md
+d0df0789ae3a01ad8955165417e287186cb13b573206ea5224fc0d33433d9d32 *docs/acceptance/ai-governance-pipeline-report-v2.md
+LINES 150
+BYTES 15288
+MTIME 2026-10-23 17:37:20.759361800 +0800
+FLOW_STEPS 59
+LEDGER_NONEMPTY 751
+LEDGER_BAD_JSON 0
+FLOW_STATUS_COUNTS {"done":18,"superseded":40,"pending":1}
+LEDGER_KIND_COUNTS {"customer.decision":121,"artifact.observed":547,"dispatch.accepted":79,"intent.handed-off":4}
+ACCEPTANCE_DECISION_LINES 1
+368:{"at":"2026-10-23T08:05:01.066Z","kind":"customer.decision","flowId":"ai-governance-pipeline","actorRoleId":"verifier","power":"acceptance","decisionKind":"acceptance","customerDecision":"rejected","decisionEvidence":{"kind":"customer-i...
+VERIFICATION_DISPATCH_LINES 1
+359:{"at":"2026-10-23T08:01:26.084Z","kind":"dispatch.accepted","flowId":"ai-governance-pipeline","stepId":"verification","actorRoleId":"app","power":"app","trigger":"settle","targetRoleId":"verifier"...
+UNRESOLVED_DECISION_LINES 1
+REPORT_V1_ACCEPTANCE_REWORK 0
+REPORT_V2_ACCEPTANCE_REWORK 0
+--- dirs (target writes would appear here) ---
+total 480
+drwxr-xr-x 1 51054 197609      0 Oct 23 11:57 .
+drwxr-xr-x 1 51054 197609      0 Oct 23 21:06 ..
+-rw-r--r-- 1 51054 197609 484243 Oct 23 20:57 ledger.jsonl
+total 28
+drwxr-xr-x 1 51054 197609     0 Oct 23 20:57 .
+drwxr-xr-x 1 51054 197609     0 Oct 23 21:06 ..
+-rw-r--r-- 1 51054 197609 22551 Oct 23 20:57 ai-governance-pipeline.yaml
+total 76
+drwxr-xr-x 1 51054 197609     0 Oct 23 17:37 .
+drwxr-xr-x 1 51054 197609     0 Oct 23 21:06 ..
+-rw-r--r-- 1 51054 197609 26292 Oct 23 12:13 ai-governance-pipeline-criteria-v1.md
+-rw-r--r-- 1 51054 197609 21897 Oct 23 15:59 ai-governance-pipeline-report-v1.md
+-rw-r--r-- 1 51054 197609 15288 Oct 23 17:37 ai-governance-pipeline-report-v2.md
+TIME_END=2026-10-23T21:07:31+08:00
+--- after hashes (same command) ---
+bd057b1d3157851cc68ba26a4f54fa726b112c55dd9e7b7c5fd9169186054163 *docs/flows/ai-governance-pipeline.yaml
+bdafbf45ad1444c6b6d15fc1b25654c86b65fd9035a9c2e4eeef3cf18f218564 *.ans/governance/ledger.jsonl
+0106dc8092fec6f7bf14b96aac6d2e07f0d0023b9136e5cd7335c7c9df04c801 *docs/acceptance/ai-governance-pipeline-report-v1.md
+d0df0789ae3a01ad8955165417e287186cb13b573206ea5224fc0d33433d9d32 *docs/acceptance/ai-governance-pipeline-report-v2.md

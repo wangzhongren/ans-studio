@@ -54,8 +54,12 @@ test("标准工作流：五卡各恰有一个「标准工作流」章节，并�
       [
         "阶段流转由应用负责",
         "你按本角色的标准工作流执行",
+        "内置角色（Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收）的状态与回交向主理（Lead / 主理）汇总",
+        "主理只做治理协调，不批准提案、任命或验收",
         "客户只在需求确认、提案/任命/写卡、验收卡上做决定",
         "不承担内部角色调度",
+        "应用仍负责门禁（闸门 0/1/2、发布验收门）与阶段流转",
+        "只有发布版本才由应用派 Proof / 验收，非发布不派",
         "不要等客户催办",
         "也不要替应用推进下一阶段",
       ],
@@ -114,9 +118,12 @@ test("标准工作流：Crew / 组队——读客户确认后的团队计划→a
     [
       "读团队计划（客户确认后）",
       "docs/scheduling/<flowId>-team-v1.md",
-      "你只读，不修改、不自行增删角色/边界/写集",
-      "任命名单内每个角色的职责目标、能力要求、唯一写集、依赖",
-      "计划缺能力细节时**停止写卡并报告 Steward / 统筹 补充**",
+      "你只读，不修改、不自行增删角色/目录/边界/写集",
+      "任命名单内每个角色的职责目标、能力要求、`授权目录`、`精确写集`、依赖",
+      "读目录规范与每个 module 的 `实现目录`",
+      "`唯一写集` 仅作兼容别名，按 `精确写集` 处理",
+      "`边界` 列名在 v3 不再接受",
+      "**停止写卡并报告 Steward / 统筹 补充**",
       "只对任命名单内的角色发 `request_confirmation`",
       "appointment-write 逐路径写卡",
       "第 5 项内容清单",
@@ -149,9 +156,12 @@ test("第 5 项内容清单（P7）：Crew 卡逐项列出 role-card 章节、bo
       "质量职责",
       "标准工作流（按序：输入→动作→交付→回交）",
       "交付物清单",
+      "bounded context（module）** 与模块 **`实现目录`",
+      "`授权目录`/`精确写集`**（与团队计划一致）",
       "boundary.yaml",
       "角色根工作文档条目",
-      "实际写集",
+      "`授权目录`（directory 条目，与计划目录一致）与 `精确写集`（file 条目）",
+      "按计划逐条落盘",
       "feature-map.md",
       "functional-description.md",
       "memo.md",
@@ -163,7 +173,7 @@ test("第 5 项内容清单（P7）：Crew 卡逐项列出 role-card 章节、bo
       "docs/change/",
       "docs/fix/",
       "不创建空目录/空文件冒充交付",
-      "内容以团队计划的职责目标/能力要求/唯一写集/依赖为准",
+      "内容以团队计划的职责目标/能力要求/`授权目录`/`精确写集`/目录规范/依赖为准",
     ],
     "Crew 第 5 项内容清单",
   );
@@ -177,10 +187,13 @@ test("第 5 项 readiness（P8）：Steward 写 pass/gaps 记录，gap 退回 Cr
     t,
     [
       "role-readiness",
+      "`docs/scheduling/<flowId>-readiness-v1.md`",
       "status: pass|gaps",
-      "职责目标、能力要求、写集/边界、依赖/交接、质量责任",
+      "职责目标、能力要求、`授权目录`/`精确写集`/边界、依赖/交接、质量责任",
+      "`directories`/`spec`/`shared`/`layout`",
+      "`module`/`contract`/`testSurface`/`parallel`/`dependsOn`/`granularity`",
       "gap 报告应用退回 Crew 修正",
-      "团队计划缺能力细节时由你补充计划",
+      "计划缺能力/目录/规范细节时由你以新计划版本补充",
       "readiness 不是验收标准、不是客户确认",
       "pass 后才按 flow 步骤派发项目角色",
     ],
@@ -188,7 +201,7 @@ test("第 5 项 readiness（P8）：Steward 写 pass/gaps 记录，gap 退回 Cr
   );
 });
 
-test("标准工作流：Steward / 统筹——写团队计划→发 appointment 卡→readiness→派发项目角色→收齐回交→登记完成→组变更包；应用自动派 Proof", () => {
+test("标准工作流：Steward / 统筹——写团队计划→发 appointment 卡→readiness→派发项目角色→收齐回交→登记完成→组变更包；发布版本才派 Proof、非发布不派", () => {
   const t = cardTextOf("convener");
   assertIncludesAll(
     t,
@@ -206,14 +219,24 @@ test("标准工作流：Steward / 统筹——写团队计划→发 appointment 
       "派发项目角色",
       "收齐回交",
       "登记完成",
-      "应用自动派 Proof",
+      "内置治理角色的状态 / 回交向 Lead / 主理 汇总",
+      "返工由 Lead / 主理 协调",
+      "只有发布版本才由应用派 Proof / 验收，非发布不派",
+      "非发布流程在 change-package 完成后停在等待发布验收",
+      "`cardKind=schedule-write`",
+      "flow 顶层 `release`",
+      "缺省 / `false` 改为 `true`",
+      "其余步骤与字段逐字不变",
+      "其他字段或步骤变化仍按原校验拒绝",
       "Steward 不派发治理角色、不代替验收、不催办",
       "只向已任命、已写卡且 readiness pass 的项目角色发起 `dispatch_task`",
       "不把「已派发」写成「已完成」",
-      "全部步骤齐备后",
     ],
     "Steward 标准工作流",
   );
+  // 旧「流程齐备后应用自动派 Proof」口径必须消失（P0-1：非发布不派）。
+  assert.doesNotMatch(t, /由应用自动派 Proof/, "Steward 不得再写自动派 Proof");
+  assert.doesNotMatch(t, /流程齐备后由应用自动派/, "非发布流程不得自动派 Proof");
 });
 
 test("标准工作流：Steward / 统筹——流程机器状态改为 docs/flows/<flowId>.yaml（schema/保留 ID/evidence/superseded）", () => {
@@ -535,7 +558,13 @@ test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/f
       "flow_step_update",
       "flow_step_supersede",
       "dispatch_task",
-      "向 Steward / 统筹 与项目角色派发协调任务",
+      "向 Steward / 统筹 派协调任务",
+      "项目 worker 由 Steward / 统筹 派，你不直接派项目角色",
+      "不直接派 Crew / Proof / 项目 worker",
+      "闸门 0 已结算",
+      "闸门 1 已结算",
+      "协调 ≠ 客户批准",
+      "只收 Proof 的状态与报告指针",
       "自足并带 `flowId`",
       "向 Steward 派协调任务可省 `stepId`",
       "派发/推进 ≠ 客户批准",
@@ -548,12 +577,14 @@ test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/f
       "不得发 `request_choice` 问客户",
       "Lead 只能发 `intent-confirm` 需求确认卡",
       "内部决策由你自行决定",
-      "`dispatch_task` 派给 Steward / 项目角色",
       "并用 flow 工具记录",
       "不得把内部选择包装成客户决定或另发 `request_choice`",
     ],
     "Lead 工作流管理",
   );
+  // 旧「可向项目角色派发协调任务」口径必须消失（Q1：项目 worker 由 Steward 派）。
+  assert.doesNotMatch(lead, /向 Steward \/ 统筹 与项目角色派发协调任务/);
+  assert.doesNotMatch(lead, /派给 Steward \/ 项目角色/);
   // 能力位：dispatchTask=true；其余能力不变。
   const leadCaps = governanceRoleOf("liaison")!.capabilities;
   assert.equal(leadCaps.dispatchTask, true, "Lead 具备 dispatch_task");
@@ -625,7 +656,8 @@ test("标准工作流：Proof / 验收——实施前写标准→核对档位/�
       "未真实运行、未演示时不得建议 accept",
       "架构或质量章节缺失",
       "不接受客户手动派发作为常态",
-      "流程齐备后应用自动派发验收",
+      "发布版本流程齐备后应用按发布验收门派发验收",
+      "非发布不派 Proof / 验收",
     ],
     "Proof 标准工作流",
   );
@@ -698,22 +730,39 @@ test("注册表：按 2026-10-22 治理分工只调整 Convener/Crew/Verifier �
 
 // —————————————————————— 2026-10-22 角色粒度（bounded context）与 MapReduce（P1/P4/P5/P6/P7/P13） ——————————————————————
 
-test("标准工作流：团队计划 v2（P1/P2/P4/P5）——Convener 卡要求 schema/模块清单/v2 角色表/模块覆盖/写集/DAG/并行组/粒度", () => {
+test("标准工作流：团队计划 v3（P1/P2/P3/P4/P5）——Convener 卡要求 schema/directories/实现目录/目录规范/授权目录/精确写集/唯一 owner/不重叠/共享/依赖/粒度", () => {
   const t = cardTextOf("convener");
   assertIncludesAll(
     t,
     [
-      "## 团队判断与团队计划（v2，必须）",
-      "`teamPlanSchema: 2`",
+      "## 团队判断与团队计划（v3，必须）",
+      "`teamPlanSchema: 3`",
       "`modules: [<module-a>, <module-b>]`",
-      "`module` / 职责 / 公开契约 / 架构来源四列",
+      "`directories: [<dir-a>/, <dir-b>/]`",
+      "`module` / 职责 / 公开契约 / 架构来源 / 实现目录五列",
       "恰好覆盖 `modules` 集合",
-      "roleId | 类型 | module | 职责目标 | 能力要求 | 唯一写集 | 公开契约 | 测试面 | 依赖 | dependsOn | 并行组 | 组别 | apiSpec | 粒度理由",
+      "**每个 module 必须有非空 `实现目录`（Q9 A）**",
+      "不得写 `—`/空",
+      "角色 implementation/tests/docs 目录必须在该模块 `实现目录` 内或模块目录本身",
+      "roleId | 类型 | module | 职责目标 | 能力要求 | 授权目录 | 精确写集 | 公开契约 | 测试面 | 依赖 | dependsOn | 并行组 | 组别 | apiSpec | 粒度理由",
+      "`唯一写集` 仅作 v3 兼容别名",
+      "`边界` 列名在 v3 不再接受",
+      "目录 | owner | 类型 | 用途 | 命名 | 允许子目录 | 允许文件类型 | 公开契约 | 测试面 | 依赖 | 禁写区 | 共享",
+      "恰好覆盖 `directories`",
+      "每个目录恰好一个 owner",
+      "不同角色的目录不得相同、不得互为祖先/子目录",
+      "`shared: split` 的父目录除外",
+      "`精确写集` 文件不得落在他人目录内",
+      "`shared: none` 不得被其他角色引用",
+      "不允许两个角色共写同一目录",
+      "治理关键路径不得作为普通 `授权目录`",
+      "`src/model/` 不整体目录授权",
       "一个模块一个 Map 角色、一个角色一个模块",
       "每个模块必须恰好被一个 Map 角色覆盖",
       "无重复/孤儿/未声明模块",
       "Reduce 角色写 `module: reduce`",
-      "分号分隔的精确路径/目录",
+      "分号分隔的目录条目",
+      "分号分隔的精确文件路径",
       "不得含通配符/省略号/散文/`..`/绝对路径",
       "跨角色两两不相交",
       "目标必须存在、无自依赖/重复/环",
@@ -722,36 +771,43 @@ test("标准工作流：团队计划 v2（P1/P2/P4/P5）——Convener 卡要求
       "每个 Reduce 角色的 dependsOn 必须直接或传递覆盖全部 Map 角色",
       "整层名（frontend/backend/web/server/client/ui/fullstack/all/common/shared/utils 等）",
       "`exception-review`",
-      "单文件写集/极小模块只记 warning",
+      "单文件目录/极小模块只记 warning",
       "禁止函数级/单文件/按钮/端点级纳米角色",
       "不得把「字段齐全」当成「粒度正确」",
       "五维判断与协调成本",
+      "缺任一项视为计划不完整，不得发 appointment 卡",
+      "目录规范/计划只能由你以新计划版本写",
+      "不原地改已确认版本",
+      "角色或范围发生实质变化时必须重开闸门 2",
     ],
-    "Convener 团队计划 v2",
+    "Convener 团队计划 v3",
   );
   // 不得把结构字段齐全当成语义完成。
   assert.doesNotMatch(t, /字段齐全[^。]{0,20}(即|就)(代表|说明|等于)粒度正确/);
   assert.doesNotMatch(t, /结构校验通过[^。]{0,10}(即|就)(代表|说明)粒度正确/);
 });
 
-test("标准工作流：readiness v2（P5）——逐角色 module/contract/testSurface/parallel/dependsOn/granularity 与 pass/gaps；例外须明确批准", () => {
+test("标准工作流：readiness v3（P5/P11）——逐角色/逐目录 directories/spec/shared/layout 与 v2 列、pass/gaps；例外须明确批准", () => {
   const t = cardTextOf("convener");
   assertIncludesAll(
     t,
     [
-      "逐项核对 module / 公开契约 / 测试面 / 并行组 / dependsOn / 粒度理由",
+      "逐角色对照团队计划核对职责目标、能力要求、`授权目录`/`精确写集`/边界、依赖/交接、质量责任",
+      "**逐角色/逐目录**记录 `directories`/`spec`/`shared`/`layout`",
+      "同时保留 v2 的 `module`/`contract`/`testSurface`/`parallel`/`dependsOn`/`granularity`",
       "`exception-review` 例外必须明确批准或退回",
       "`docs/scheduling/<flowId>-readiness-v1.md`",
       "`status: pass|gaps`",
-      "逐角色列 `module`/`contract`/`testSurface`/`parallel`/`dependsOn`/`granularity`",
       "每项 pass/gap + 证据",
+      "目录是否内聚、规范是否合理、共享是否必要、契约与测试面是否真实",
+      "`new` 一致、`changed`/`existing` 计划 ⊆ 边界",
       "gap 报告应用退回 Crew 修正",
-      "团队计划缺能力细节时由你补充计划",
+      "计划缺能力/目录/规范细节时由你以新计划版本补充",
       "readiness 不是验收标准、不是客户确认",
-      "结构校验通过不等于粒度正确",
-      "语义粒度必须由 readiness 对照客户确认的架构逐项判断",
+      "结构校验通过不等于粒度/规范正确",
+      "语义必须由 readiness 对照客户确认的架构逐项判断",
     ],
-    "readiness v2",
+    "readiness v3",
   );
 });
 
@@ -804,27 +860,33 @@ test("标准工作流：MapReduce flow 模板（P6）——delivery-<module>/par
   assert.equal(byId.get("contract-freeze")?.status, "done", "contract-freeze 是 Map 入口条件");
 });
 
-test("标准工作流：Crew v2（P13）——读 module/契约/测试面/dependsOn/粒度理由；角色卡写 bounded context/契约/测试面/上下游/粒度；boundary 按计划写集", () => {
+test("标准工作流：Crew v3（P10/P13）——读授权目录/精确写集/目录规范/实现目录；角色卡写目录与契约/测试面/上下游/粒度；boundary 按计划逐条落盘", () => {
   const t = cardTextOf("nominator");
   assertIncludesAll(
     t,
     [
-      "按 v2 读 `module` / 公开契约 / 测试面 / `dependsOn` / 并行组 / `粒度理由`",
+      "读目录规范与每个 module 的 `实现目录`",
+      "并按 v2 读 `module` / 公开契约 / 测试面 / `dependsOn` / 并行组 / `粒度理由`",
+      "`唯一写集` 仅作兼容别名，按 `精确写集` 处理",
+      "`边界` 列名在 v3 不再接受",
       "bounded context（module）",
       "公开契约",
       "测试面",
       "**上下游依赖**（`dependsOn` 与交接输入输出）",
       "粒度理由",
-      "boundary 按计划的唯一写集逐条写（精确路径/目录，不多不少）",
-      "v2 粒度落卡纪律（必须）",
+      "`授权目录` 落目录条目（directory）、`精确写集` 落精确文件条目（file），不多不少",
+      "`new` 角色边界目录与计划 `授权目录` 一致（角色根工作文档除外，不得更宽）",
+      "不得改目录规范、不得跨目录、不得把他人目录并进自己边界",
+      "v3 目录落卡纪律（必须）",
       "一个角色 = 一个 bounded context/模块",
       "不得写整层角色",
       "纳米角色",
-      "计划缺 module/公开契约/测试面/`dependsOn`/粒度理由/写集",
-      "只报告 Steward / 统筹，不自行补计划",
-      "不自行增删模块/角色/写集",
+      "计划缺 module/公开契约/测试面/`dependsOn`/粒度理由/`授权目录`/`精确写集`/目录规范/`实现目录`",
+      "只报告 Steward / 统筹",
+      "不自行补计划",
+      "不自行增删目录/模块/角色/写集",
     ],
-    "Crew v2 写卡",
+    "Crew v3 写卡",
   );
   // 上轮边界保持：Crew 不选角色、不发 appointment、不写 nominations。
   assertIncludesAll(

@@ -1,0 +1,100 @@
+== result ==
+{
+  "ok": true,
+  "revision": "92356653c035fb0779023c2e372cc5ccde16db711f6041a58fe879121acd440e",
+  "flow": {
+    "flowId": "flow-a",
+    "revision": "92356653c035fb0779023c2e372cc5ccde16db711f6041a58fe879121acd440e",
+    "qualityTier": "production",
+    "steps": [
+      {
+        "id": "role-cards",
+        "title": "角色卡结构校验",
+        "owner": "app",
+        "kind": "artifact",
+        "status": "done",
+        "evidence": {
+          "kind": "artifact",
+          "ref": ".ans/governance/role-cards/flow-a/dbd96295d9976a2766064f03f48d1f670c6db395e6145d34cae0854435861b5b.json"
+        }
+      },
+      {
+        "id": "verification",
+        "title": "验收",
+        "owner": "verifier",
+        "kind": "acceptance",
+        "status": "pending"
+      }
+    ],
+    "canUpdate": []
+  },
+  "evidence": {
+    "kind": "artifact",
+    "ref": ".ans/governance/role-cards/flow-a/dbd96295d9976a2766064f03f48d1f670c6db395e6145d34cae0854435861b5b.json"
+  },
+  "recordPath": ".ans/governance/role-cards/flow-a/dbd96295d9976a2766064f03f48d1f670c6db395e6145d34cae0854435861b5b.json"
+}
+== flow yaml ==
+flowId: flow-a
+version: 1
+qualityTier: production
+steps:
+  - id: role-cards
+    title: 角色卡结构校验
+    owner: app
+    kind: artifact
+    status: done
+    evidence:
+      kind: artifact
+      ref: .ans/governance/role-cards/flow-a/dbd96295d9976a2766064f03f48d1f670c6db395e6145d34cae0854435861b5b.json
+  - id: verification
+    title: 验收
+    owner: verifier
+    kind: acceptance
+    status: pending
+
+== record json ==
+{
+  "schema": "role-cards-gate/v1",
+  "flowId": "flow-a",
+  "at": "2026-10-23T05:33:55.531Z",
+  "roleIds": [
+    "A"
+  ],
+  "appointmentArtifactPath": "docs/scheduling/flow-a-team-v1.md",
+  "teamPlan": null,
+  "fingerprint": "dbd96295d9976a2766064f03f48d1f670c6db395e6145d34cae0854435861b5b",
+  "files": [
+    {
+      "path": "角色卡/A/api-spec.md",
+      "sha256": "0679a0e65dd53abaaf46a22d9aaf6a715ac611a7f71e40d61086613e21b72b00"
+    },
+    {
+      "path": "角色卡/A/boundary.yaml",
+      "sha256": "be6357f67b75349e9a9a40298545e15d587db08859b49dbc475a972762c0f364"
+    },
+    {
+      "path": "角色卡/A/feature-map.md",
+      "sha256": "9736ba51764b2d120295b0de1e969ef7cb9496969add12cfc84efe9933cb3dfc"
+    },
+    {
+      "path": "角色卡/A/functional-description.md",
+      "sha256": "37e067591e9fd6847a2971568ed2759bc2765d97db52353cf548ab3d7c4860b0"
+    },
+    {
+      "path": "角色卡/A/memo.md",
+      "sha256": "742f98c757f7fac91b21ac5bf013e2fe8afc1e77232ee51ab69c531dc7cb19e5"
+    },
+    {
+      "path": "角色卡/A/role-card.md",
+      "sha256": "52729b6f766007b8c0ca5d26463f4d916c05e248d37a069e07883d6fe162cfbd"
+    }
+  ],
+  "result": "structure-pass",
+  "semantic": "pending",
+  "disclaimer": "结构校验通过，不代表 readiness/验收/客户批准；语义 readiness 仍由 Convener 复核。"
+}
+
+== ledger ==
+{"at":"2026-10-23T05:33:55.534Z","kind":"artifact.observed","actorRoleId":"app","power":"app","artifactPath":".ans/governance/role-cards/flow-a/dbd96295d9976a2766064f03f48d1f670c6db395e6145d34cae0854435861b5b.json","artifactSha256":"de5ba8745dd28f45501729065417bcab005a2a8858b4bc6ef4de1cf04b5e65ec","flowId":"flow-a"}
+

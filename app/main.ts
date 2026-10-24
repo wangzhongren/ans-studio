@@ -17,7 +17,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 
-import { createDesktopInterface, createShellJudgeSwitch, isShellJudgeIpcSender, type DesktopInterface } from "./desktop/interface.ts";
+import { createDesktopInterface, createShellJudgeSwitch, isShellJudgeIpcSender, registerPreferencesIpc, type DesktopInterface } from "./desktop/interface.ts";
+// i18n B0（2026-10-23）：主进程 translator（窗口/对话框/启动错误框）与应用级语言偏好
+// （`<userData>/ans/preferences.json`，只写 userData；不写项目 `.ans`/`.env`）。
+import { createMainI18n, desktopTexts } from "./desktop/i18n.ts";
+import { preferencesFilePath, readPreferences } from "./desktop/preferences.ts";
 // 运行时配置：开发使用仓库 `.env`，安装包使用 userData/.env，启动载入 `process.env`（补 Electron 缺失的 `--env-file`）；
 // 面板经 IPC 读写同一 `.env`。**`.env` 的读写全仓唯一**在共享模块 `src/common/shared/env-file.ts`
 // （pm 属主）——此处**只读导入，不复制**；路径由 `./desktop/pi-config.ts` 解析（可注入，测试/e2e 用临时路径）。
@@ -38,7 +42,7 @@ import {
 } from "./desktop/operator-channel.ts";
 // 客户交互通道（A-5，2026-10-12）：su 的 request_confirmation / request_choice 经它摆到聊天流里的交互卡
 // 并取回客户裁决（per-window pending Map + **按请求快照校验回包**——渲染进程输入不可信）。
-import { createCustomerInputChannel } from "./desktop/customer-input.ts";
+import { createCustomerInputChannel, type AutoReworkCallbackInfo } from "./desktop/customer-input.ts";
 // 治理下一步（2026-10-18 客户修正）：客户决定成功后由应用**后台**把下一步任务派给目标治理角色
 // （不打开/切换当前会话）。推导与文案在 governance-advance.ts；派发动作在 Interface（advanceGovernanceFlow）。
 import type { GovernanceNextStepContext, GovernanceNextStepPayload } from "./desktop/governance-advance.ts";
@@ -65,6 +69,10 @@ if (smokeRequest) {
   app.setPath("userData", smokeRequest.userDataPath);
 }
 let desktopEnvPath: string | undefined;
+// i18n B0（2026-10-23）：启动早期读取偏好后设置；默认 zh-CN（读不到/损坏时保持默认，不阻塞启动）。
+// main.ts 与 Interface 共享同一 translator 实例——窗口标题、对话框、启动错误框与 IPC 错误文案同一 locale。
+const mainI18n = createMainI18n();
+let preferencesPath: string | undefined;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 5B：唯一生产入口 = Vite 构建产物 `renderer/dist/index.html`（PM §17.1）。
@@ -98,13 +106,31 @@ async function loadDesktopEnv(envPath: string): Promise<void> {
   }
 }
 
+/**
+ * 本地化窗口标题的唯一接线（i18n B0，2026-10-23 真机缺陷）：
+ * 渲染页 `<title>` 加载后会触发 `page-title-updated`，默认把窗口标题改成页面标题——en-US 下
+ * 页面标题仍是中文，会把 `main.window.title` 的英文覆盖掉（PowerShell `MainWindowTitle` 复现）。
+ * 这里 **preventDefault()** 并用**当前 locale** 的 `desktopTexts().windowTitle` 调 `win.setTitle`；
+ * `did-finish-load` 后再补一次作为防御。locale 成功切换后的 `win.setTitle` 仍由
+ * `registerPreferencesIpc` 的 `onLocaleChanged` 负责（本函数不改变该路径）。
+ */
+function applyLocalizedWindowTitle(win: BrowserWindow): void {
+  win.on("page-title-updated", (event) => {
+    event.preventDefault();
+    if (!win.isDestroyed()) win.setTitle(desktopTexts(mainI18n).windowTitle);
+  });
+  win.webContents.on("did-finish-load", () => {
+    if (!win.isDestroyed()) win.setTitle(desktopTexts(mainI18n).windowTitle);
+  });
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1360,
     height: 860,
     minWidth: 960,
     minHeight: 620,
-    title: "ANS 桌面应用（受治理会话）",
+    title: desktopTexts(mainI18n).windowTitle,
     icon: APP_ICON_PATH,
     backgroundColor: "#0f1115",
     // 客户要求（2026-10-11）：去掉原生标题栏与默认菜单栏，自绘一个。
@@ -121,6 +147,8 @@ function createWindow(): BrowserWindow {
       sandbox: false,
     },
   });
+  // 建窗后、任何加载之前挂上：页面标题不得覆盖本地化窗口标题。
+  applyLocalizedWindowTitle(win);
   return win;
 }
 
@@ -452,6 +480,11 @@ function registerIpc(win: BrowserWindow): void {
   let advanceGovernanceFlow:
     | ((payload: GovernanceNextStepPayload, context: GovernanceNextStepContext) => void)
     | undefined;
+  // 2026-10-23 验收返工路由：judge auto-rework（acceptance 卡 deny/manual）结算后的隔离回调句柄——
+  // 与 `advanceGovernanceFlow` 同模式，在 desktop 建立后接到 `routeAcceptanceAutoRework`；只接线，不放业务。
+  let routeAcceptanceAutoRework:
+    | ((info: AutoReworkCallbackInfo) => void)
+    | undefined;
   const customerChannel = createCustomerInputChannel({
     presenter: (payload) => {
       if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现交互请求");
@@ -472,6 +505,12 @@ function registerIpc(win: BrowserWindow): void {
       if (win.isDestroyed()) return;
       win.webContents.send("governance:next-step", payload);
       advanceGovernanceFlow?.(payload, context);
+    },
+    // 2026-10-23 验收返工路由（Q7 A）：acceptance 卡的 judge deny/manual 自动退回**结算后**隔离回调。
+    // 本通道只传事实；路由/记录/系统行在 Interface（`routeAcceptanceAutoRework`）。窗口已关不派发。
+    onAutoRework: (info) => {
+      if (win.isDestroyed()) return;
+      routeAcceptanceAutoRework?.(info);
     },
     // 判断 agent（2026-10-18 双开关评审 §8.1/§8.3）：按卡种所属组读**各自**开关（主进程权威）；
     // 两开关互不影响；判断闭包由每会话上下文（`ctx.governanceJudge`）提供。
@@ -610,14 +649,19 @@ function registerIpc(win: BrowserWindow): void {
       : undefined;
 
   if (!desktopEnvPath) throw new Error("运行时配置路径尚未初始化。");
+  if (!preferencesPath) throw new Error("语言偏好路径尚未初始化。");
   const desktop = createDesktopInterface({
     envFilePath: desktopEnvPath,
+    // i18n B0（2026-10-23）：应用级语言偏好文件与共享 translator（同一实例贯穿窗口/对话框/错误文案）。
+    // 偏好只写 userData；不写项目 `.ans`/`.env`/治理账本。
+    preferencesPath,
+    mainI18n,
     // 自动验收派发/冷启动补齐的 per-project 引擎选择：user-data 下的独立文件（不写项目 `.ans`、
     // 不碰治理账本）——下次冷启动据此选对引擎（2026-10-19 真机缺陷：无活跃会话时曾回退 claude）。
     runtimeStatePath: path.join(app.getPath("userData"), "ans", "runtime-selection.json"),
     pickDirectory: async () => {
       const result = await dialog.showOpenDialog(win, {
-        title: "导入项目（选择项目根文件夹）",
+        title: desktopTexts(mainI18n).importProjectDialogTitle,
         properties: ["openDirectory"],
       });
       if (result.canceled || result.filePaths.length === 0) return null;
@@ -674,7 +718,7 @@ function registerIpc(win: BrowserWindow): void {
     // （类型嗅探/≤5MB 都在 interface 层；此处只读不判）。取消 → null（如实回 `cancelled`）。
     pickImageFileFn: async () => {
       const result = await dialog.showOpenDialog(win, {
-        title: "选择图片",
+        title: desktopTexts(mainI18n).pickImageDialogTitle,
         properties: ["openFile"],
         filters: [{ name: "图片", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
       });
@@ -685,11 +729,40 @@ function registerIpc(win: BrowserWindow): void {
     },
   });
   iface = desktop;
+  // —————— i18n B0（2026-10-23）：preferences:get / preferences:set-locale ——————
+  // 成功切换后：更新窗口标题（新 locale）并广播 `preferences:locale-changed`。当前单窗口；
+  // 遍历 BrowserWindow.getAllWindows() 为未来多窗口留好同一通道（多窗口联动本身不在 B0 验证）。
+  // 推送/标题更新失败只记诊断，**不翻转已成功的持久化回执**（registerPreferencesIpc 只对 ok:true 调用）。
+  registerPreferencesIpc(registerHandler, desktop, {
+    onLocaleChanged: (locale) => {
+      if (!win.isDestroyed()) {
+        try {
+          win.setTitle(desktopTexts(mainI18n).windowTitle);
+        } catch (error) {
+          mainDiagnostic.error("preferences.window-title.failed", error, { reasonCode: "set-title-failed" });
+        }
+      }
+      for (const target of BrowserWindow.getAllWindows()) {
+        if (target.isDestroyed()) continue;
+        try {
+          target.webContents.send("preferences:locale-changed", { locale });
+        } catch (error) {
+          mainDiagnostic.error("preferences.locale-changed.failed", error, { reasonCode: "send-failed" });
+        }
+      }
+    },
+  });
   // 治理下一步的后台派发（2026-10-18 客户修正）：打开目标治理角色会话并投递一条任务；不调用任何渲染侧
   // open/select，当前会话与输入焦点不变。Interface 内部已隔离失败（诊断 + 系统行），此处只兜底意外抛错。
   advanceGovernanceFlow = (payload, context) => {
     void desktop.advanceGovernanceFlow({ payload, context }).catch((error) => {
       mainDiagnostic.error("governance.advance.failed", error, { cardKind: payload.cardKind, flowId: payload.flowId });
+    });
+  };
+  // 2026-10-23 验收返工路由：judge auto-rework 事实交 Interface（只接线；失败只诊断，不影响已结算的 decline）。
+  routeAcceptanceAutoRework = (info) => {
+    void desktop.routeAcceptanceAutoRework(info).catch((error) => {
+      mainDiagnostic.error("acceptance.rework.auto.failed", error, { flowId: info.flowId, source: info.source });
     });
   };
   desktop.startWatchdog(); // G-2/W1：看护周期 tick（默认 30s，仅 env 可调）——窗口注册后启动
@@ -819,6 +892,17 @@ app.whenReady().then(async () => {
   // Resolve once after Electron initialization; package resources are never the settings write target.
   const userDataPath = app.getPath("userData");
   if (app.isPackaged) await fs.promises.mkdir(userDataPath, { recursive: true, mode: 0o700 });
+  // i18n B0（2026-10-23）：建窗前**尽早**读取应用级语言偏好（`<userData>/ans/preferences.json`）。
+  // 缺失 ⇒ zh-CN 且**不写文件**；损坏/不可读/非法 locale/未知 version ⇒ zh-CN + 稳定诊断，不阻塞启动。
+  preferencesPath = preferencesFilePath(userDataPath);
+  const preferencesRead = await readPreferences(preferencesPath);
+  mainI18n.setLocale(preferencesRead.locale);
+  for (const diagnostic of preferencesRead.diagnostics) {
+    mainDiagnostic.record(diagnostic.code, {
+      reasonCode: diagnostic.reasonCode,
+      ...(diagnostic.errorCode !== undefined ? { errorCode: diagnostic.errorCode } : {}),
+    });
+  }
   desktopEnvPath = resolveDesktopEnvPath({ isPackaged: app.isPackaged, userDataPath });
   await loadDesktopEnv(desktopEnvPath);
   // Phase 5A（PM §17.3）：smoke-only 入口覆盖——必须位于包内 app/renderer/dist/ 且为 .html。
@@ -879,7 +963,9 @@ app.whenReady().then(async () => {
   });
 }).catch((error) => {
   mainDiagnostic.error("app.start.failed", error);
-  dialog.showErrorBox("应用启动失败", "界面无法启动，请查看诊断日志后重新打开。");
+  // 启动早期错误框：使用已读取的持久化 locale；读不到/尚未读取时 mainI18n 保持 zh-CN。
+  const startupText = desktopTexts(mainI18n);
+  dialog.showErrorBox(startupText.startupErrorTitle, startupText.startupErrorDetail);
 });
 
 process.on("uncaughtExceptionMonitor", (error) => mainDiagnostic.error("app.uncaught-exception", error));

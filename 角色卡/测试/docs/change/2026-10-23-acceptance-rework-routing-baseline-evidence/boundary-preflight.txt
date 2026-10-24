@@ -1,0 +1,69 @@
+# Boundary / ownership preflight (read-only), 2026-10-23-acceptance-rework-routing S1
+recorded_local=2026-10-23 18:51:26 +0800
+
+## Desktop window boundary entries for test/桌面应用/acceptance-dispatch.test.ts
+-- 角色卡/桌面窗口/boundary.md --
+44:| 单文件 | `test/桌面应用/acceptance-dispatch.test.ts` | 主进程侧测试——自动验收证据门、触发面与持久化去重（interface/governance-advance） |
+-- 角色卡/桌面窗口/boundary.yaml --
+114:    path: test/桌面应用/acceptance-dispatch.test.ts
+
+## app/main.ts ownership entry in desktop boundary (md/yaml)
+9:| 单文件 | `app/main.ts` | Electron 主进程入口：建窗与窗口生命周期、IPC 注册、诊断与恢复接线 |
+9:    path: app/main.ts
+
+## app/main.ts NOT in assembly boundary
+NOT FOUND in assembly md (expected)
+NOT FOUND in assembly yaml (expected)
+
+## Boundary file hashes (read-only baseline)
+PRESENT | 81208f8d3370bdc58091b81367ca06732476a380 | 3c8f7e0e34d44bcdc55995f2747cd8eccaea7ad0875ad074569f6acc7beea14c | 角色卡/测试/boundary.yaml
+PRESENT | b13881b8935309c123a6681f1f6017583f5d18da | 1d12d0b4aceb293ed0315986ee82b844603d75bdde71589867bb000f5230744e | 角色卡/桌面窗口/boundary.md
+PRESENT | 531a500a5778eb55de0461bbcd0a53db6bb0d7a6 | 569a0a208024883709ba2ce47cbd62349856b5e82377c760bf08a764ca332c2f | 角色卡/桌面窗口/boundary.yaml
+PRESENT | c998301317c6400f8b827d877d3bdb1141c98e53 | c6c40b14e88e5e62eff55f1c2202302b369d68cf7254b62e46db58fb426a1c8f | 角色卡/编排/boundary.md
+PRESENT | 36f0a80152206d60c079e73b4f6ad175f04c06ed | d1f20dfecf9c80286b02a8817e280b03a6bb1cec71e9341ffdf9769df1765a9e | 角色卡/编排/boundary.yaml
+PRESENT | d955d23028ad038cf84877139312666881064aa3 | 01ac2f9fabb7683a3576b544412aa6315aaf1d7f9b3a95d79d09d8b75a055d40 | 角色卡/运行时核心/boundary.md
+PRESENT | b7248d7303dc8d29f3be6d56df2defd0d755554e | 0d09c597b4ae9f6f395cd1264eaa2096b58d1c72dbe1625460ea9ed15b93964b | 角色卡/运行时核心/boundary.yaml
+PRESENT | 878e2a412554ed982e873418e729f73e132288f5 | 6f75bee458e672e8b4be78b17e4910ee13ba8f50057ce26e30cee012fba45d5c | 角色卡/项目管理/boundary.md
+PRESENT | 6540b1f989fc5a667a8c684447ae94f02b6c0859 | cfdc7408010bb9da1e3d5e9f723eb7a38956471d13860e8ac5588e7c3693cfff | 角色卡/项目管理/boundary.yaml
+
+## test/装配 imports of shared / affected modules (read-only grep)
+test/装配/cli-parse.test.ts:20:test("role run 编排 --task T-1 -> role-run（argv 为指令后的剩余参数）", () => {
+test/装配/cli-parse.test.ts:21:  const inv = parseInvocation(["role", "run", "编排", "--task", "T-1"]);
+test/装配/cli-parse.test.ts:24:    assert.equal(inv.roleId, "编排");
+test/装配/cli-parse.test.ts:26:    assert.deepEqual(inv.argv, ["编排", "--task", "T-1"]);
+test/装配/cli-parse.test.ts:41:  assert.equal(parseInvocation(["role", "run", "编排"]).kind, "unknown");
+test/装配/cli-parse.test.ts:70:  const withTask = parseInvocation(["role", "run", "编排", "--task", "T-1", "--help"]);
+test/装配/cli-parse.test.ts:73:    assert.equal(withTask.roleId, "编排");
+test/装配/cli-parse.test.ts:75:    assert.deepEqual(withTask.argv, ["编排", "--task", "T-1", "--help"]);
+test/装配/cli-parse.test.ts:80:  const missing = parseInvocation(["role", "run", "编排"]);
+test/装配/cli-parse.test.ts:86:  assert.equal(parseInvocation(["role", "run", "编排", "help"]).kind, "unknown");
+test/装配/cli-parse.test.ts:93:test("init 子命令已移除 -> unknown（客户废除 init，见编排 T16）", () => {
+test/装配/config-loader.test.ts:234:  const code = await main(["role", "run", "编排", "--task", "T-1"], {});
+test/装配/config.test.ts:46:    ["Pi适配器", "门禁引擎", "编排", "测试", "项目管理", "装配", "运行时核心", "Codex适配器", "Claude适配器"].sort(),
+test/装配/config.test.ts:67:test("T-1 的 writeSet 是演示角色“编排”边界的真子集（用于演示 F4）", () => {
+test/装配/config.test.ts:70:  const boundaryPaths = readBoundaryPaths(project.roles["编排"].boundary);
+test/装配/config.test.ts:71:  assert.ok(boundaryPaths.length > 0, "应能从编排边界解析出路径");
+test/装配/config.test.ts:73:  // 子集：writeSet 每项都在编排边界内。
+test/装配/config.test.ts:75:    assert.ok(boundaryPaths.includes(p), `writeSet 项不在编排边界内：${p}`);
+test/装配/config.test.ts:82:test("演示任务 scope 携带 conditions（门禁引擎新增字段），编排边界无 conditional-directory 故为空", () => {
+test/装配/config.test.ts:85:  assert.deepEqual(scope.conditions, [], "编排边界无 conditional-directory 条目，演示任务不声明条件");
+test/装配/config.test.ts:91:  const boundaryPaths = readBoundaryPaths(project.roles["编排"].boundary);
+test/装配/config.test.ts:99:  // 第二笔：命中边界（目录条目 src/common/编排/），但不在 writeSet（F4）。
+test/装配/config.test.ts:101:    boundaryPaths.includes("src/common/编排/"),
+test/装配/config.test.ts:102:    "编排边界应含 src/common/编排/ 目录条目",
+test/装配/config.test.ts:105:    inBoundaryOutWriteSet.startsWith("src/common/编排/"),
+test/装配/config.test.ts:106:    `第二笔应落在 src/common/编排/ 目录下：${inBoundaryOutWriteSet}`,
+test/装配/demo-runtime.test.ts:10:const STUB_ROLE = { id: "编排" } as unknown as ResolvedRole;
+test/装配/entry.test.ts:65:  const r = runEntry(["role", "run", "编排", "--task", "T-1", "--runtime", "pi"]);
+test/装配/entry.test.ts:72:  const r = runEntry(["role", "run", "编排", "--task", "T-1", "--runtime", "demo"]);
+test/装配/govern-target.test.ts:5:// 上工作——CLI 连「对某个空文件夹做 bootstrap」都办不到。T32（编排）已解析位置参数并给出 §6 安全的出口
+test/装配/govern-target.test.ts:28://     `write`），否则会在触达客户前被编排守卫拒绝）；
+test/装配/govern-target.test.ts:46:// 2026-10-12：入口链路经编排 §6 安全的 Interface 出口驱动（装配本就动态导入它）；假适配器/脚本来自
+test/装配/govern-target.test.ts:153:    assert.deepEqual(Object.keys(project.roles).sort(), ["Pi适配器", "门禁引擎", "编排", "测试", "项目管理", "装配", "运行时核心", "Codex适配器", "Claude适配器"].sort(), `${label}：保留六个原角色并登记三个已接受的运行时角色`);
+test/装配/govern-target.test.ts:231:  // `request_confirmation` 把**将写出的具体路径**摆给客户；客户确认后**编排**才把这些路径发行进
+test/装配/govern-target.test.ts:235:  // 2026-10-19 呈现前完整性闸（编排 `validateConfirmPreviewCompleteness`）：写盘类确认卡的 preview
+test/装配/govern-target.test.ts:273:    // 编排经 `createAdapter(gate, capabilities)` 把（已包发行器的）客户通道注入适配器：
+test/装配/govern-target.test.ts:291:  // 且编排已计算 judgeContext（判断链的唯一入口事实）。被守卫拒绝的卡既不会到达这里，也没有 judgeContext。
+test/装配/governance-model-injection.test.ts:5:// `ProjectConfig`。对新空目录，编排经 `listProject` 已选到 rapporteur，`resolveRole` 却按缺省
+test/装配/governance-model-injection.test.ts:23:import { readGovernanceModel } from "../../src/common/shared/config-loader.ts";
+test/装配/main.test.ts:54:  assert.match(text, /编排/);

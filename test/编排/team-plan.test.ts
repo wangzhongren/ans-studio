@@ -11,8 +11,10 @@ import {
   isGovernanceWritesetPath,
   legacyTeamPlanRoleRowIssues,
   parseTeamPlan,
+  parseTeamPlanModuleIds,
   parseWritesetCell,
   teamPlanIssueMessages,
+  TEAM_PLAN_SCHEMA_V3,
   validateTeamPlanFlowConsistency,
   writesetsOverlap,
 } from "../../src/common/编排/team-plan.ts";
@@ -713,4 +715,526 @@ test("V11：Reduce 未覆盖全部 Map / 缺 Reduce 步骤 / 缺 contract-freeze
   assert.ok(
     validateTeamPlanFlowConsistency(plan, noContractFreeze).some((issue) => /缺少 contract-freeze 步骤/.test(issue.message)),
   );
+});
+
+// —————————————————————— v3：目录级授权（2026-10-23） ——————————————————————
+
+interface V3RoleSpec extends RoleSpec {
+  /** `授权目录` 原始单元格。 */
+  dirs: string;
+  /** `精确写集` 原始单元格（`无` 合法）。 */
+  precise: string;
+}
+
+const V3_ROLES: V3RoleSpec[] = [
+  {
+    ...BASE_ROLES[0]!,
+    dirs: "`src/api/`; `src/api/tests/`; `src/api/docs/`",
+    precise: "`docs/contracts/api-v1.md`",
+    testSurface: "`src/api/tests/`",
+  },
+  {
+    ...BASE_ROLES[1]!,
+    dirs: "`src/storefront/`; `src/storefront/tests/`",
+    precise: "无",
+    testSurface: "`src/storefront/tests/`",
+  },
+  {
+    ...BASE_ROLES[2]!,
+    dirs: "`test/integration/`",
+    precise: "无",
+    testSurface: "`test/integration/`（集成/e2e）",
+  },
+];
+
+const V3_MODULE_ROWS = [
+  "| api | 结算 API、订单状态、价格计算 | `docs/contracts/api-v1.md` | `docs/planning/design.md` §4.1 | `src/api/` |",
+  "| storefront | 结算页面、表单、错误展示 | `docs/contracts/api-v1.md`（消费） | `docs/planning/design.md` §4.2 | `src/storefront/` |",
+];
+
+const V3_DIRECTORIES = [
+  "src/api/",
+  "src/api/tests/",
+  "src/api/docs/",
+  "src/storefront/",
+  "src/storefront/tests/",
+  "test/integration/",
+];
+
+const V3_DIRECTORY_ROWS = [
+  "| `src/api/` | api | implementation | 结算 API 与订单状态 | kebab-case | `tests/`; `docs/`; `handlers/` | .ts | `docs/contracts/api-v1.md` | `src/api/tests/` | 无 | `.env`; `*.log`; `dist/` | none |",
+  "| `src/api/tests/` | api | tests | API 单元/层测试 | `*.test.ts` | `fixtures/` | .ts | internal（消费 api 契约） | `src/api/tests/` | `src/api/` | `dist/` | none |",
+  "| `src/api/docs/` | api | docs | 模块说明/变更记录 | kebab-case | `design/`; `change/` | .md | internal（模块文档） | — | `src/api/` | `.env` | none |",
+  "| `src/storefront/` | storefront | implementation | 结算页面与交互 | kebab-case | `tests/` | .ts | `docs/contracts/api-v1.md`（消费） | `src/storefront/tests/` | 无 | `dist/` | none |",
+  "| `src/storefront/tests/` | storefront | tests | 页面单元/层测试 | `*.test.ts` | — | .ts | internal（消费 api 契约） | `src/storefront/tests/` | `src/storefront/` | `dist/` | none |",
+  "| `test/integration/` | integration | tests | 契约/集成/e2e | kebab-case | `fixtures/` | .ts | internal（集成测试） | `test/integration/` | `src/api/`; `src/storefront/` | `.env` | none |",
+];
+
+const V3_ROLE_HEADER =
+  "| roleId | 类型 | module | 职责目标 | 能力要求 | 授权目录 | 精确写集 | 公开契约 | 测试面 | 依赖 | dependsOn | 并行组 | 组别 | apiSpec | 粒度理由 |";
+
+interface V3PlanOptions {
+  flowId?: string;
+  version?: number | string;
+  riskTier?: string;
+  schema?: string | null;
+  recommended?: string[];
+  modules?: string[];
+  moduleHeader?: string;
+  moduleRows?: string[];
+  roleHeader?: string;
+  roles?: V3RoleSpec[];
+  directoryHeader?: string;
+  directoryRows?: string[];
+  directories?: string[];
+  /** 直接覆盖 frontmatter `directories` 行（用于缺省/块数组等负例）。 */
+  directoriesLine?: string | null;
+  omitDirectorySection?: boolean;
+  coordinationBody?: string;
+}
+
+function v3RoleRow(role: V3RoleSpec): string {
+  return `| ${role.roleId} | ${role.type} | ${role.module} | ${role.duty} | ${role.ability} | ${role.dirs} | ${role.precise} | ${role.contract} | ${role.testSurface} | ${role.deps} | ${role.dependsOn} | ${role.parallelGroup} | ${role.group} | ${role.apiSpec} | ${role.rationale} |`;
+}
+
+function v3PlanDoc(options: V3PlanOptions = {}): string {
+  const flowId = options.flowId ?? "flow-a";
+  const modules = options.modules ?? ["api", "storefront"];
+  const roles = options.roles ?? V3_ROLES;
+  const recommended = options.recommended ?? roles.map((role) => role.roleId);
+  const directories = options.directories ?? V3_DIRECTORIES;
+  const directoriesLine =
+    options.directoriesLine === undefined
+      ? `directories: [${directories.join(", ")}]`
+      : options.directoriesLine;
+  const moduleHeader = options.moduleHeader ?? "| module | 职责 | 公开契约 | 架构来源 | 实现目录 |";
+  const moduleSeparator =
+    moduleHeader === "| module | 职责 | 公开契约 | 架构来源 |"
+      ? "| --- | --- | --- | --- |"
+      : "| --- | --- | --- | --- | --- |";
+  const directoryHeader =
+    options.directoryHeader ??
+    "| 目录 | owner | 类型 | 用途 | 命名 | 允许子目录 | 允许文件类型 | 公开契约 | 测试面 | 依赖 | 禁写区 | 共享 |";
+  const directoryRows = options.directoryRows ?? V3_DIRECTORY_ROWS;
+  const lines = [
+    "---",
+    `flowId: ${flowId}`,
+    `version: ${options.version ?? 1}`,
+    ...(options.schema === null ? [] : [`teamPlanSchema: ${options.schema ?? 3}`]),
+    `riskTier: ${options.riskTier ?? "T3"}`,
+    `recommended: [${recommended.join(", ")}]`,
+    `modules: [${modules.join(", ")}]`,
+    ...(directoriesLine === null ? [] : [directoriesLine]),
+    "---",
+    "",
+    `# 团队计划 ${flowId}`,
+    "",
+    "## 模块清单",
+    "",
+    moduleHeader,
+    moduleSeparator,
+    ...(options.moduleRows ?? V3_MODULE_ROWS),
+    "",
+    "## 参与角色与职责",
+    "",
+    options.roleHeader ?? V3_ROLE_HEADER,
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...roles.map(v3RoleRow),
+    "",
+    ...(options.omitDirectorySection === true
+      ? []
+      : [
+          "## 目录规范",
+          "",
+          directoryHeader,
+          "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+          ...directoryRows,
+          "",
+        ]),
+    "## 五维判断与协调成本",
+    "",
+    options.coordinationBody ??
+      "- 责任独立性：api/storefront/integration 各有独立变化原因与契约。\n- 范围归属：目录唯一 owner、互不重叠。\n- 契约影响：api 唯一主属。\n- 证据独立性：每个角色有独立测试面。\n- 协调成本：两个 Map 组可并行，未拆到函数级。",
+    "",
+  ];
+  return lines.join("\n") + "\n";
+}
+
+function v3messages(text: string, severity: "error" | "warning" | "exception-review" = "error"): string[] {
+  return teamPlanIssueMessages(parseTeamPlan(text), severity);
+}
+
+function v3role(over: Partial<V3RoleSpec> & Pick<V3RoleSpec, "roleId">): V3RoleSpec {
+  const base = V3_ROLES.find((item) => item.roleId === over.roleId) ?? V3_ROLES[0]!;
+  return { ...base, ...over };
+}
+
+test("v3 正向：directories/目录规范/授权目录+精确写集/模块实现目录/唯一 owner/依赖 DAG/V11 不变", () => {
+  const result = parseTeamPlan(v3PlanDoc());
+  assert.equal(result.ok, true, teamPlanIssueMessages(result).join("；"));
+  assert.equal(result.teamPlanSchema, TEAM_PLAN_SCHEMA_V3);
+  assert.equal(result.legacy, false);
+  assert.deepEqual(result.directories, V3_DIRECTORIES);
+  assert.equal(result.directorySpecs.length, 6);
+  const apiSpec = result.directorySpecs.find((spec) => spec.dir === "src/api/")!;
+  assert.equal(apiSpec.owner, "api");
+  assert.equal(apiSpec.kind, "implementation");
+  assert.deepEqual(apiSpec.subdirs, ["tests", "docs", "handlers"]);
+  assert.deepEqual(apiSpec.extensions, [".ts"]);
+  assert.equal(apiSpec.shared, "none");
+  assert.deepEqual(result.directorySpecs.find((spec) => spec.dir === "src/api/tests/")?.dependencies, ["src/api/"]);
+  assert.equal(result.moduleList.find((row) => row.module === "api")?.implementationDir, "src/api/");
+  const api = result.roleRows.find((row) => row.roleId === "api")!;
+  assert.deepEqual(api.authorizedDirs.map((entry) => entry.path), ["src/api/", "src/api/tests/", "src/api/docs/"]);
+  assert.deepEqual(api.preciseWritesets.map((entry) => entry.path), ["docs/contracts/api-v1.md"]);
+  // v3 不改 flow schema / V11：同一模块/角色/并行组时 V11 与 v2 完全一致。
+  assert.deepEqual(validateTeamPlanFlowConsistency(result, flowOf()), []);
+});
+
+test("V-D1：缺/空/块数组/重复/非法语法/治理路径/大小写重复 ⇒ error", () => {
+  assert.ok(v3messages(v3PlanDoc({ directoriesLine: null })).some((message) => /缺少 frontmatter `directories`/.test(message)));
+  assert.ok(v3messages(v3PlanDoc({ directoriesLine: "directories: []" })).some((message) => /directories 不得为空/.test(message)));
+  assert.ok(v3messages(v3PlanDoc({ directoriesLine: "directories:" })).some((message) => /内联数组/.test(message)));
+  assert.ok(
+    v3messages(v3PlanDoc({ directories: [...V3_DIRECTORIES, "src/api/"] })).some((message) =>
+      /directories 重复列出目录「src\/api\/」/.test(message),
+    ),
+  );
+  assert.ok(
+    v3messages(v3PlanDoc({ directoriesLine: "directories: [../src/api/]" })).some((message) => /含空段|\.\./.test(message)),
+  );
+  assert.ok(
+    v3messages(v3PlanDoc({ directoriesLine: "directories: [C:/abs/]" })).some((message) => /绝对路径|盘符/.test(message)),
+  );
+  assert.ok(
+    v3messages(v3PlanDoc({ directoriesLine: "directories: [src/api./]" })).some((message) => /以空格或点结尾/.test(message)),
+  );
+  assert.ok(
+    v3messages(v3PlanDoc({ directoriesLine: "directories: [src/api/, SRC/API/]" })).some((message) =>
+      /directories 重复列出目录/.test(message),
+    ),
+  );
+  for (const governed of [".ans/", "角色卡/", "docs/scheduling/", "docs/acceptance/", "docs/communication/", "docs/flows/", "docs/nominations/", "docs/verification/", "src/common/shared/", "src/model/", ".github/workflows/", "src/common/装配/"]) {
+    assert.ok(
+      v3messages(v3PlanDoc({ directoriesLine: `directories: [${governed}]`, directories: [governed] })).some((message) =>
+        /治理关键路径/.test(message),
+      ),
+      `治理关键路径 ${governed} 必须被 V-D1 拒绝`,
+    );
+  }
+});
+
+test("V-D2：规范表缺列/缺行/多行/重复行/owner 非推荐/必填空/枚举非法 ⇒ error", () => {
+  assert.ok(
+    v3messages(v3PlanDoc({ omitDirectorySection: true })).some((message) => /缺少「目录规范」表/.test(message)),
+  );
+  assert.ok(
+    v3messages(v3PlanDoc({ directoryHeader: "| 目录 | owner | 类型 | 用途 | 命名 | 允许子目录 | 允许文件类型 | 公开契约 | 测试面 | 依赖 | 禁写区 |" })).some(
+      (message) => /目录规范表缺少必需列（共享）/.test(message),
+    ),
+  );
+  assert.ok(
+    v3messages(v3PlanDoc({ directoryRows: V3_DIRECTORY_ROWS.slice(0, -1) })).some((message) =>
+      /目录规范缺少目录「test\/integration\/」/.test(message),
+    ),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        directoryRows: [
+          ...V3_DIRECTORY_ROWS,
+          "| `src/extra/` | integration | tests | 额外 | kebab-case | — | .ts | internal（额外） | test/integration/ | 无 | — | none |",
+        ],
+      }),
+    ).some((message) => /未声明的目录「src\/extra\/」/.test(message)),
+  );
+  assert.ok(
+    v3messages(v3PlanDoc({ directoryRows: [...V3_DIRECTORY_ROWS, V3_DIRECTORY_ROWS[0]!] })).some((message) =>
+      /目录规范重复列出目录「src\/api\/」/.test(message),
+    ),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        directoryRows: [V3_DIRECTORY_ROWS[0]!.replace("| api |", "| ghost |"), ...V3_DIRECTORY_ROWS.slice(1)],
+      }),
+    ).some((message) => /owner「ghost」不是推荐角色/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        directoryRows: [V3_DIRECTORY_ROWS[0]!.replace("| 结算 API 与订单状态 |", "| — |"), ...V3_DIRECTORY_ROWS.slice(1)],
+      }),
+    ).some((message) => /用途为空/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        directoryRows: [V3_DIRECTORY_ROWS[0]!.replace("| implementation |", "| impl |"), ...V3_DIRECTORY_ROWS.slice(1)],
+      }),
+    ).some((message) => /类型「impl」非法/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        directoryRows: [V3_DIRECTORY_ROWS[0]!.replace("| `src/api/tests/` | 无 |", "| — | 无 |"), ...V3_DIRECTORY_ROWS.slice(1)],
+      }),
+    ).some((message) => /测试面为空/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        directoryRows: [V3_DIRECTORY_ROWS[0]!.replace("| none |", "| both |"), ...V3_DIRECTORY_ROWS.slice(1)],
+      }),
+    ).some((message) => /共享值「both」非法/.test(message)),
+  );
+});
+
+test("V-D3：角色引用未声明目录/owner 不符/孤儿目录/文件例外缺粒度理由 ⇒ error", () => {
+  assert.ok(
+    v3messages(v3PlanDoc({ roles: [V3_ROLES[0]!, V3_ROLES[1]!, v3role({ roleId: "integration", dirs: "`test/other/`" })] })).some(
+      (message) => /不在 frontmatter `directories` 中/.test(message),
+    ),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        roles: [V3_ROLES[0]!, v3role({ roleId: "storefront", dirs: "`src/storefront/`; `src/api/tests/`" }), V3_ROLES[2]!],
+      }),
+    ).some((message) => /owner 是「api」（owner 不一致）/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        roles: [v3role({ roleId: "api", dirs: "`src/api/`; `src/api/tests/`" }), V3_ROLES[1]!, V3_ROLES[2]!],
+      }),
+    ).some((message) => /孤儿目录/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        roles: [
+          V3_ROLES[0]!,
+          V3_ROLES[1]!,
+          v3role({ roleId: "integration", dirs: "无", precise: "`test/integration/manifest.md`", rationale: "—" }),
+        ],
+      }),
+    ).some((message) => /文件例外，必须写「粒度理由」/.test(message)),
+  );
+});
+
+test("V-D4：跨角色目录重叠/嵌套/精确文件落入他人目录/精确文件相等 ⇒ error", () => {
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        roles: [V3_ROLES[0]!, v3role({ roleId: "storefront", dirs: "`src/api/`; `src/storefront/`; `src/storefront/tests/`" }), V3_ROLES[2]!],
+      }),
+    ).some((message) => /目录\/写集重叠/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        directories: [...V3_DIRECTORIES, "src/api/nested/"],
+        directoryRows: [
+          ...V3_DIRECTORY_ROWS,
+          "| `src/api/nested/` | storefront | implementation | 嵌套 | kebab-case | — | .ts | internal（嵌套） | `src/api/tests/` | `src/api/` | — | none |",
+        ],
+        roles: [V3_ROLES[0]!, v3role({ roleId: "storefront", dirs: "`src/storefront/`; `src/storefront/tests/`; `src/api/nested/`" }), V3_ROLES[2]!],
+      }),
+    ).some((message) => /目录\/写集重叠/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        roles: [
+          v3role({ roleId: "api", precise: "`docs/contracts/api-v1.md`; `src/storefront/logo.ts`" }),
+          V3_ROLES[1]!,
+          V3_ROLES[2]!,
+        ],
+      }),
+    ).some((message) => /目录\/写集重叠/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        roles: [
+          v3role({ roleId: "api", precise: "`docs/contracts/shared.ts`" }),
+          v3role({ roleId: "storefront", precise: "`docs/contracts/shared.ts`" }),
+          V3_ROLES[2]!,
+        ],
+      }),
+    ).some((message) => /目录\/写集重叠/.test(message)),
+  );
+});
+
+test("V-D5：依赖不存在/方向不一致/成环/禁写区冲突/子目录/扩展名/internal 契约 ⇒ error", () => {
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        directoryRows: [V3_DIRECTORY_ROWS[0]!, V3_DIRECTORY_ROWS[1]!.replace("| `src/api/` | `dist/` |", "| `src/ghost/` | `dist/` |"), ...V3_DIRECTORY_ROWS.slice(2)],
+      }),
+    ).some((message) => /依赖目标「src\/ghost\/」不存在/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        directoryRows: [V3_DIRECTORY_ROWS[0]!.replace("| 无 | `.env`", "| `src/storefront/` | `.env`"), ...V3_DIRECTORY_ROWS.slice(1)],
+      }),
+    ).some((message) => /方向不一致/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        directoryRows: [
+          V3_DIRECTORY_ROWS[0]!.replace("| 无 | `.env`", "| `src/storefront/` | `.env`"),
+          ...V3_DIRECTORY_ROWS.slice(1, 3),
+          V3_DIRECTORY_ROWS[3]!.replace("| 无 | `dist/`", "| `src/api/` | `dist/`"),
+          ...V3_DIRECTORY_ROWS.slice(4),
+        ],
+      }),
+    ).some((message) => /目录依赖形成环/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        directoryRows: [V3_DIRECTORY_ROWS[0]!.replace("| `.env`; `*.log`; `dist/` |", "| `*.ts` |"), ...V3_DIRECTORY_ROWS.slice(1)],
+      }),
+    ).some((message) => /禁写区「\*\.ts」与允许文件类型「\.ts」冲突/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        directoryRows: [V3_DIRECTORY_ROWS[0]!.replace("`tests/`; `docs/`; `handlers/`", "`../handlers/`"), ...V3_DIRECTORY_ROWS.slice(1)],
+      }),
+    ).some((message) => /允许子目录项.*非法/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        directoryRows: [V3_DIRECTORY_ROWS[0]!.replace("| .ts |", "| * |"), ...V3_DIRECTORY_ROWS.slice(1)],
+      }),
+    ).some((message) => /不能使用 `\*`（仅 docs\/evidence 可用）/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        directoryRows: [V3_DIRECTORY_ROWS[2]!.replace("internal（模块文档）", "internal"), ...V3_DIRECTORY_ROWS.slice(0, 2), ...V3_DIRECTORY_ROWS.slice(3)],
+      }),
+    ).some((message) => /internal 必须附非空理由/.test(message)),
+  );
+});
+
+test("V-D6：缺实现目录列/空实现目录/角色目录不在模块实现目录/整层名无理由与有理由", () => {
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        moduleHeader: "| module | 职责 | 公开契约 | 架构来源 |",
+        moduleRows: V3_MODULE_ROWS.map((row) => row.replace(/ \| `src\/[^`]+` \|$/, " |")),
+      }),
+    ).some((message) => /缺少必需列「实现目录」/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        moduleRows: [V3_MODULE_ROWS[0]!.replace("| `src/api/` |", "| — |"), V3_MODULE_ROWS[1]!],
+      }),
+    ).some((message) => /模块清单「api」缺少非空的「实现目录」/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        moduleRows: [V3_MODULE_ROWS[0]!.replace("| `src/api/` |", "| `src/api-impl/` |"), V3_MODULE_ROWS[1]!],
+      }),
+    ).some((message) => /不在模块实现目录内/.test(message)),
+  );
+  const layerDirectories = V3_DIRECTORIES.map((dir) => (dir === "test/integration/" ? "test/" : dir));
+  const layerRows = V3_DIRECTORY_ROWS.map((row) =>
+    row.startsWith("| `test/integration/`") ? row.replace("| `test/integration/` |", "| `test/` |") : row,
+  );
+  const layerRoles = [V3_ROLES[0]!, V3_ROLES[1]!, v3role({ roleId: "integration", dirs: "`test/`", rationale: "—" })];
+  const layerNoReason = parseTeamPlan(
+    v3PlanDoc({ directories: layerDirectories, directoryRows: layerRows, roles: layerRoles }),
+  );
+  assert.ok(
+    teamPlanIssueMessages(layerNoReason).some((message) => /整层\/整应用目录且未写「粒度理由」/.test(message)),
+  );
+  const layerWithReason = parseTeamPlan(
+    v3PlanDoc({
+      directories: layerDirectories,
+      directoryRows: layerRows,
+      roles: [V3_ROLES[0]!, V3_ROLES[1]!, v3role({ roleId: "integration", dirs: "`test/`", rationale: "跨模块测试树，属既有职责" })],
+    }),
+  );
+  assert.equal(layerWithReason.ok, true, teamPlanIssueMessages(layerWithReason).join("；"));
+  assert.ok(
+    teamPlanIssueMessages(layerWithReason, "exception-review").some((message) => /整层名黑名单/.test(message)),
+  );
+});
+
+test("V-D6：单文件目录 warning（不阻断）交 readiness", () => {
+  const result = parseTeamPlan(
+    v3PlanDoc({
+      roles: [V3_ROLES[0]!, V3_ROLES[1]!, v3role({ roleId: "integration", dirs: "`test/integration/`" })],
+      directoryRows: [
+        ...V3_DIRECTORY_ROWS.slice(0, 5),
+        V3_DIRECTORY_ROWS[5]!.replace("| `fixtures/` | .ts |", "| — | .ts |"),
+      ],
+    }),
+  );
+  assert.equal(result.ok, true, teamPlanIssueMessages(result).join("；"));
+  assert.ok(teamPlanIssueMessages(result, "warning").some((message) => /疑似单文件目录/.test(message)));
+});
+
+test("V-D7/V-D8：治理路径精确写集目录被拒；shared: split 父目录不得直接分配", () => {
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        roles: [v3role({ roleId: "api", precise: "`src/common/shared/`" }), V3_ROLES[1]!, V3_ROLES[2]!],
+      }),
+    ).some((message) => /只能精确文件/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        directoryRows: [V3_DIRECTORY_ROWS[0]!, ...V3_DIRECTORY_ROWS.slice(1, 2), V3_DIRECTORY_ROWS[2]!.replace("| none |", "| split |"), ...V3_DIRECTORY_ROWS.slice(3)],
+      }),
+    ).some((message) => /shared: split，但父目录本身被角色 api 直接分配/.test(message)),
+  );
+});
+
+test("V-D9：路径逃逸/UNC/尾随点；角色授权目录路径安全", () => {
+  assert.ok(
+    v3messages(v3PlanDoc({ directoriesLine: "directories: [../outside/]" })).some((message) => /空段|\.\./.test(message)),
+  );
+  assert.ok(
+    v3messages(v3PlanDoc({ directoriesLine: "directories: [\\\\server\\share\\]" })).some((message) => /UNC|绝对路径|空段/.test(message)),
+  );
+  assert.ok(
+    v3messages(
+      v3PlanDoc({
+        roles: [v3role({ roleId: "api", dirs: "`../src/api/`" }), V3_ROLES[1]!, V3_ROLES[2]!],
+      }),
+    ).some((message) => /授权目录项「\.\.\/src\/api\/」/.test(message)),
+  );
+});
+
+test("v3 列名兼容：唯一写集别名 warning；边界列名 error；未知 schema 拒绝", () => {
+  const alias = parseTeamPlan(v3PlanDoc({ roleHeader: V3_ROLE_HEADER.replace("精确写集", "唯一写集") }));
+  assert.equal(alias.ok, true, teamPlanIssueMessages(alias).join("；"));
+  assert.ok(teamPlanIssueMessages(alias, "warning").some((message) => /「唯一写集」别名/.test(message)));
+  const boundary = parseTeamPlan(v3PlanDoc({ roleHeader: V3_ROLE_HEADER.replace("精确写集", "边界") }));
+  assert.ok(teamPlanIssueMessages(boundary).some((message) => /不再接受「边界」列名/.test(message)));
+  const unknown = parseTeamPlan(v3PlanDoc({ schema: "9" }));
+  assert.ok(teamPlanIssueMessages(unknown).some((message) => /teamPlanSchema 只能是 1（legacy）、2 或 3/.test(message)));
+});
+
+test("v1/v2 legacy 不变：v2 计划仍按 2 解析且不要求 directories/实现目录", () => {
+  const v2 = parseTeamPlan(planDoc());
+  assert.equal(v2.ok, true, teamPlanIssueMessages(v2).join("；"));
+  assert.equal(v2.teamPlanSchema, 2);
+  assert.deepEqual(v2.directories, []);
+  assert.deepEqual(v2.directorySpecs, []);
+  assert.equal(v2.moduleList.every((row) => row.implementationDir === undefined), true);
+  assert.equal(parseTeamPlan(planDoc({ schema: null })).teamPlanSchema, 1);
+  assert.equal(parseTeamPlanModuleIds(planDoc()).modules?.length, 2);
 });

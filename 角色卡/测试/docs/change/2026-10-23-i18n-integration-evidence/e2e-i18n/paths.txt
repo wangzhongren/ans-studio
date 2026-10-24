@@ -1,0 +1,3 @@
+USERDATA=/tmp/ans-i18n-userdata-BmOKhf
+PROJECT=/tmp/ans-i18n-project-qPtv5x
+E2E_MAIN_USERDATA=/tmp/ans-e2e-main-userdata-2E0E7N

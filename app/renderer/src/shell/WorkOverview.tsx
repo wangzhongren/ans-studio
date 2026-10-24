@@ -16,12 +16,10 @@ import {
   pendingViews,
   queueGroups,
   recentHandbacks,
-  QUEUE_EMPTY_TEXT,
-  RECENT_REPORTS_EMPTY,
-  WORK_EMPTY_PENDING,
 } from "@/chat/work-view";
 import { findRole, roleDisplayName } from "@/chat/role-view";
 import { QueuePanel } from "@/shell/QueuePanel";
+import { useLocaleState, useT } from "@/i18n";
 
 /** 工作概览只做队列预览：当前工作 + 前 3 条排队；全量在「队列」子视图。 */
 const QUEUE_PREVIEW_LIMIT = 3;
@@ -47,6 +45,8 @@ function emptyLine(text: string): ReactElement {
 }
 
 export function WorkOverview({ roleId }: { roleId: string | null }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const roles = useChatStore((s) => s.roles);
   const pendingOperator = useChatStore((s) => s.pendingOperator);
   const queueByRole = useChatStore((s) => s.queueByRole);
@@ -54,34 +54,37 @@ export function WorkOverview({ roleId }: { roleId: string | null }) {
   const paneVersions = useChatStore((s) => s.paneVersions);
   const openQueue = useDrawerStore((s) => s.openQueue);
   const role = findRole(roles, roleId);
-  const roleName = role ? roleDisplayName(role) : "未选择角色";
+  const roleName = role ? roleDisplayName(role, locale) : t("ui.role.noneSelected");
 
   if (!roleId || !role) {
     return (
       <div className="right-empty">
-        <p className="empty-title">选择角色后查看工作概览</p>
-        <p className="empty-sub">先在左侧选择角色，再打开工作概览；内容跟随当前角色。</p>
+        <p className="empty-title">{t("ui.work.emptyTitle")}</p>
+        <p className="empty-sub">{t("ui.work.emptySub")}</p>
       </div>
     );
   }
 
-  const pending = pendingViews(pendingOperator, roleId);
-  const groups = queueGroups(queueByRole[roleId] || [], runningByRole[roleId] || null);
+  const pending = pendingViews(pendingOperator, roleId, locale);
+  const groups = queueGroups(queueByRole[roleId] || [], runningByRole[roleId] || null, locale);
   const visibleQueued = groups.queued.slice(0, QUEUE_PREVIEW_LIMIT);
   const rows = getRowModel(roleId)?.rows || [];
   void paneVersions; // 行模型变更信号：重渲染最近回交
-  const reports = recentHandbacks(rows);
+  const reports = recentHandbacks(rows, locale);
 
   return (
     <div className="work-overview">
       <div id="right-queue-body" className="role-work">
-        <section className="work-section" aria-label={"待处理 " + pending.length}>
+        <section
+          className="work-section"
+          aria-label={t("ui.work.pending", { count: pending.length })}
+        >
           <h3 className="work-heading">
             <CheckSquare size={13} strokeWidth={1.5} aria-hidden="true" />
-            待处理 {pending.length}
+            {t("ui.work.pending", { count: pending.length })}
           </h3>
           {pending.length === 0 ? (
-            emptyLine(WORK_EMPTY_PENDING)
+            emptyLine(t("ui.work.emptyPending"))
           ) : (
             <ul className="pending-requests">
               {pending.map((item) => (
@@ -92,10 +95,10 @@ export function WorkOverview({ roleId }: { roleId: string | null }) {
                     type="button"
                     className="btn-mini pending-locate"
                     data-request-id={item.requestId}
-                    title="定位到原交互卡（不会自动作答）"
+                    title={t("ui.work.locateTitle")}
                     onClick={() => locateRequest(item.requestId)}
                   >
-                    定位
+                    {t("ui.work.locate")}
                   </button>
                 </li>
               ))}
@@ -105,39 +108,39 @@ export function WorkOverview({ roleId }: { roleId: string | null }) {
 
         <section
           className="work-section"
-          aria-label="当前工作"
+          aria-label={t("ui.work.currentWork")}
           hidden={groups.running.length === 0}
         >
           <h3 className="work-heading">
             <ArrowDownToLine size={13} strokeWidth={1.5} aria-hidden="true" />
-            当前工作
+            {t("ui.work.currentWork")}
           </h3>
-          <QueuePanel roleId={roleId} items={groups.running} emptyText={QUEUE_EMPTY_TEXT} />
+          <QueuePanel roleId={roleId} items={groups.running} emptyText={t("ui.work.emptyQueue")} />
         </section>
 
-        <section className="work-section" aria-label="排队">
+        <section className="work-section" aria-label={t("ui.work.queued")}>
           <h3 className="work-heading">
             <AlertCircle size={13} strokeWidth={1.5} aria-hidden="true" />
-            排队
+            {t("ui.work.queued")}
           </h3>
-          <QueuePanel roleId={roleId} items={visibleQueued} emptyText={QUEUE_EMPTY_TEXT} />
+          <QueuePanel roleId={roleId} items={visibleQueued} emptyText={t("ui.work.emptyQueue")} />
           {groups.total > QUEUE_PREVIEW_LIMIT ? (
             <button
               type="button"
               className="btn-mini q-more queue-view-all"
-              aria-label={"查看全部队列（" + groups.total + " 项）"}
+              aria-label={t("ui.work.viewAllQueueAria", { count: groups.total })}
               onClick={(event) => openQueue("work", event.currentTarget)}
             >
-              查看全部队列（{groups.total}）
+              {t("ui.work.viewAllQueue", { count: groups.total })}
             </button>
           ) : null}
         </section>
       </div>
 
-      <section className="recent-reports" aria-label="最近回交">
-        <h3 className="work-heading">最近回交</h3>
+      <section className="recent-reports" aria-label={t("ui.work.recentReports")}>
+        <h3 className="work-heading">{t("ui.work.recentReports")}</h3>
         {reports.length === 0 ? (
-          emptyLine(RECENT_REPORTS_EMPTY)
+          emptyLine(t("ui.work.emptyReports"))
         ) : (
           reports.map((report) => (
             <div className="recent-report" key={report.key} data-report-identity={report.key}>

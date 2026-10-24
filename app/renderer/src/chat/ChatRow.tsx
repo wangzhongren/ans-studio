@@ -31,12 +31,12 @@ import { findRole, roleDisplayName } from "@/chat/role-view";
 import {
   governanceCardMetaView,
   governanceMirrorSourceLabel,
-  GOVERNANCE_MIRROR_BADGE,
-  GOVERNANCE_QUEUE_NOTE,
+  governanceQueueNote,
+  governanceMirrorBadge,
 } from "@/chat/governance-view";
 import {
   operatorQueued,
-  OPERATOR_SUBMITTING_NOTE,
+  operatorSubmittingNote,
 } from "@/chat/operator-view";
 import { metadataLabel, textFlags } from "@/chat/report-view";
 import { ReportCard, DeliveryCard } from "@/shell/ReportCard";
@@ -51,11 +51,13 @@ import {
 } from "@/chat/tool-summary";
 import { useUiStore } from "@/stores/ui-store";
 import {
-  REASONING_EMPTY_NOTE,
-  REASONING_FALLBACK_LABEL,
-  REASONING_OMITTED_NOTE,
-  REASONING_PARTIAL_NOTE,
+  reasoningEmptyNote,
+  reasoningFallbackLabel,
+  reasoningOmittedNote,
+  reasoningPartialNote,
+  reasoningUnsafeNote,
 } from "@/chat/reasoning";
+import { useLocaleState, useT } from "@/i18n";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object"
@@ -101,11 +103,13 @@ function SystemIcon({ cls }: { cls: string }) {
 
 /** task-request / reply-original 折叠（同一行内容不复制；展开状态跨重建保持）。 */
 function Folded({ row, roleId, children }: { row: ChatRow; roleId: string; children: ReactNode }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const data = asRecord(row.data);
   const fold = asString(data.fold);
   if (fold !== "task-request" && fold !== "reply-original") return <>{children}</>;
   const open = data.foldOpen === true;
-  const flags = textFlags(data.projection);
+  const flags = textFlags(data.projection, locale);
   return (
     <details
       className={fold}
@@ -117,7 +121,10 @@ function Folded({ row, roleId, children }: { row: ChatRow; roleId: string; child
       }}
     >
       <summary>
-        {asString(data.foldLabel) || (fold === "task-request" ? "任务请求原文" : "本轮角色回复原文（展开）")}
+        {asString(data.foldLabel) ||
+          (fold === "task-request"
+            ? t("ui.reportView.taskRequestLabel")
+            : t("ui.reportView.replyOriginalLabel"))}
         {flags ? <small className="original-flags projection-flags">{flags}</small> : null}
       </summary>
       <div className="task-request-body">{children}</div>
@@ -152,11 +159,15 @@ function AssistantRow({ row, roleId }: { row: ChatRow; roleId: string }) {
 }
 
 function ActivityRow({ phaseRow }: { phaseRow: ActivityPhaseRow }) {
-  const view = phaseRowView(phaseRow);
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
+  const view = phaseRowView(phaseRow, locale);
   const running =
     view.status === "running" || view.status === "call" || view.status === "start";
-  const label = phaseRow.items.map(activityPhaseLabel).join(" → ");
-  const fullTarget = view.target || "无文件目标";
+  const label = phaseRow.items
+    .map((item) => activityPhaseLabel(item, locale))
+    .join(" → ");
+  const fullTarget = view.target || t("ui.chatRow.noFileTarget");
   const shownTarget = fullTarget.length > 72 ? fullTarget.slice(0, 72) + "…" : fullTarget;
   return (
     <div
@@ -166,7 +177,7 @@ function ActivityRow({ phaseRow }: { phaseRow: ActivityPhaseRow }) {
       data-activity-phases={phaseRow.phases.join(" ")}
     >
       <span className="activity-time" title={view.at || undefined}>
-        {shortTime(view.at) || "未记录"}
+        {shortTime(view.at) || t("ui.chatRow.timeNotRecorded")}
       </span>
       <div>
         <span className="activity-op">{view.toolName}</span>
@@ -185,13 +196,14 @@ function ActivityRow({ phaseRow }: { phaseRow: ActivityPhaseRow }) {
 const DEFER_TOOL_ROWS_WHEN_CLOSED = 40;
 
 function ActivitiesRow({ row, roleId }: { row: ChatRow; roleId: string }) {
+  const locale = useLocaleState((s) => s.locale);
   const data = asRecord(row.data);
   const items = asArray<ActivityItem>(data.items);
   const open = data.open === true;
-  const summary = callSummary(items);
+  const summary = callSummary(items, locale);
   // 契约例外按**调用数**（mergePhases 行数）判定，不是相位条目数。
   const deferClosed = !open && summary.calls > DEFER_TOOL_ROWS_WHEN_CLOSED;
-  const merged = deferClosed ? [] : mergePhases(items);
+  const merged = deferClosed ? [] : mergePhases(items, locale);
   return (
     <details
       className="tool-records"
@@ -211,7 +223,7 @@ function ActivitiesRow({ row, roleId }: { row: ChatRow; roleId: string }) {
         />
         <Terminal size={12} strokeWidth={1.5} aria-hidden="true" />
         <span className={"record-count" + (summary.denied > 0 || summary.failed > 0 ? " has-exception" : "")}>
-          {foldSummaryText(summary)}
+          {foldSummaryText(summary, locale)}
         </span>
       </summary>
       {merged.length > 0 ? (
@@ -241,22 +253,24 @@ function DisplayField({ label, value }: { label: string; value: unknown }) {
 }
 
 function ToolDetails({ activity }: { activity: ActivityItem }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const display = asRecord(activity.display);
   const notes = [
     activity.legacyStatusSource === "legacy-classifier"
-      ? "状态来源：旧文本分类，不是新机器执行事实"
+      ? t("ui.chatRow.legacyStatusSource")
       : "",
-    metadataLabel(activity.metadataOmissions),
-    textFlags(activity.legacyTextProjection),
+    metadataLabel(activity.metadataOmissions, locale),
+    textFlags(activity.legacyTextProjection, locale),
   ]
     .filter(Boolean)
-    .join("；");
+    .join(locale === "zh-CN" ? "；" : "; ");
   const metadata = notes ? <p className="projection-flags">{notes}</p> : null;
   if (activity.displayUnsupported) {
     return (
       <>
         {metadata}
-        <p className="muted">不支持此详情版本。</p>
+        <p className="muted">{t("ui.chatRow.unsupportedDetail")}</p>
       </>
     );
   }
@@ -264,39 +278,58 @@ function ToolDetails({ activity }: { activity: ActivityItem }) {
     return (
       <>
         {metadata}
-        <p className="muted">这条历史没有保存更多目标和错误详情。</p>
+        <p className="muted">{t("ui.chatRow.noDetails")}</p>
       </>
     );
   }
   const target = asRecord(display.target);
   const process = asRecord(display.process);
   const omissions = Array.isArray(display.omissions) ? display.omissions : [];
+  const omissionLabel = (reason: unknown): string => {
+    if (reason === "budget") return t("ui.chatRow.budgetOmitted");
+    if (reason === "unsupported-content") return t("ui.chatRow.nonTextResult");
+    return t("ui.chatRow.unsupportedInput");
+  };
   return (
     <>
       {metadata}
       {Object.keys(target).length > 0 ? (
-        <DisplayField label={target.kind === "command" ? "实际命令" : "目标文件"} value={target.value} />
+        <DisplayField
+          label={
+            target.kind === "command"
+              ? t("ui.chatRow.actualCommand")
+              : t("ui.chatRow.targetFile")
+          }
+          value={target.value}
+        />
       ) : (
-        <p className="muted">本次调用无文件目标（交互/派发类工具）</p>
+        <p className="muted">{t("ui.chatRow.noFileTargetDetail")}</p>
       )}
-      <DisplayField label={activity.status === "exited-nonzero" ? "消息" : "错误"} value={display.error} />
-      <DisplayField label="结果" value={display.resultText} />
-      {typeof process.exitCode === "number" ? <p>退出码：{process.exitCode}</p> : null}
-      {typeof process.signal === "string" && process.signal ? <p>信号：{process.signal}</p> : null}
-      <DisplayField label="标准输出" value={process.stdout} />
-      <DisplayField label="标准错误" value={process.stderr} />
-      {typeof display.durationMs === "number" ? <p>耗时：{display.durationMs} ms</p> : null}
+      <DisplayField
+        label={
+          activity.status === "exited-nonzero"
+            ? t("ui.chatRow.message")
+            : t("ui.chatRow.error")
+        }
+        value={display.error}
+      />
+      <DisplayField label={t("ui.chatRow.result")} value={display.resultText} />
+      {typeof process.exitCode === "number" ? (
+        <p>{t("ui.chatRow.exitCode", { code: process.exitCode })}</p>
+      ) : null}
+      {typeof process.signal === "string" && process.signal ? (
+        <p>{t("ui.chatRow.signal", { signal: process.signal })}</p>
+      ) : null}
+      <DisplayField label={t("ui.chatRow.stdout")} value={process.stdout} />
+      <DisplayField label={t("ui.chatRow.stderr")} value={process.stderr} />
+      {typeof display.durationMs === "number" ? (
+        <p>{t("ui.chatRow.duration", { ms: display.durationMs })}</p>
+      ) : null}
       {omissions.length > 0 ? (
         <p className="muted">
           {omissions
-            .map((reason) =>
-              reason === "budget"
-                ? "部分展示内容因预算省略"
-                : reason === "unsupported-content"
-                  ? "非文本结果未展示"
-                  : "未支持的输入未展示",
-            )
-            .join("；")}
+            .map((reason) => omissionLabel(reason))
+            .join(locale === "zh-CN" ? "；" : "; ")}
         </p>
       ) : null}
     </>
@@ -304,6 +337,7 @@ function ToolDetails({ activity }: { activity: ActivityItem }) {
 }
 
 function ToolLifecycleRow({ row, roleId }: { row: ChatRow; roleId: string }) {
+  const t = useT();
   const data = asRecord(row.data);
   const stages = asRecord(data.stages);
   const order = ["start", "blocked", "result"]
@@ -316,7 +350,7 @@ function ToolLifecycleRow({ row, roleId }: { row: ChatRow; roleId: string }) {
     asString(activity.fullTarget) ||
     asString(asRecord(stages.start).fullTarget) ||
     asString(activity.target) ||
-    "无文件目标";
+    t("ui.chatRow.noFileTarget");
   const labelText =
     order.length > 0
       ? order.map((item) => asString(item.label) || asString(item.statusText)).join(" → ")
@@ -324,7 +358,7 @@ function ToolLifecycleRow({ row, roleId }: { row: ChatRow; roleId: string }) {
   return (
     <details className="tool-call-record" {...detailProps(row, roleId, "details")}>
       <summary>
-        <span className="tool-call-time" title={asString(activity.at) || "时间未保存"}>
+        <span className="tool-call-time" title={asString(activity.at) || t("ui.chatRow.timeNotSaved")}>
           {shortTime(asString(activity.at))}
         </span>
         <strong>{asString(activity.toolName)}</strong>
@@ -366,12 +400,16 @@ function SystemRow({ row }: { row: ChatRow }) {
 }
 
 function DeniedRow({ row, roleId }: { row: ChatRow; roleId: string }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const data = asRecord(row.data);
   const text = asString(data.text);
-  const headline = text.split(/\r?\n/)[0] || "操作未放行";
+  const headline = text.split(/\r?\n/)[0] || t("ui.chatRow.operationNotApproved");
   const target = asString(data.target);
   const legacyFlags = data.legacy === true
-    ? [metadataLabel(data.metadataOmissions), textFlags(data.projection)].filter(Boolean).join("；")
+    ? [metadataLabel(data.metadataOmissions, locale), textFlags(data.projection, locale)]
+        .filter(Boolean)
+        .join(locale === "zh-CN" ? "；" : "; ")
     : "";
   return (
     <details
@@ -390,14 +428,17 @@ function DeniedRow({ row, roleId }: { row: ChatRow; roleId: string }) {
           {target && !headline.includes(target) ? (
             <span className="denied-target">{target}</span>
           ) : !target ? (
-            <span className="denied-target">目标未记录</span>
+            <span className="denied-target">{t("ui.chatRow.targetNotRecorded")}</span>
           ) : null}
         </span>
       </summary>
       <div className="sys-detail">
         {data.legacy === true ? (
           <p className="projection-flags">
-            {"旧文本分类，不是新机器执行事实" + (legacyFlags ? "；" + legacyFlags : "")}
+            {t("ui.chatRow.legacyClassification") +
+              (legacyFlags
+                ? (locale === "zh-CN" ? "；" : "; ") + legacyFlags
+                : "")}
           </p>
         ) : null}
         {text}
@@ -407,6 +448,7 @@ function DeniedRow({ row, roleId }: { row: ChatRow; roleId: string }) {
 }
 
 function InjectedRow({ row }: { row: ChatRow }) {
+  const t = useT();
   const data = asRecord(row.data);
   const kind = asString(data.kind) || "system";
   if (kind === "system-notice") {
@@ -415,7 +457,9 @@ function InjectedRow({ row }: { row: ChatRow }) {
         <span className="sys-ico">
           <ShieldCheck size={12} strokeWidth={1.5} aria-hidden="true" />
         </span>
-        <span className="sys-notice-badge">{asString(data.label) || "系统通知"}</span>
+        <span className="sys-notice-badge">
+          {asString(data.label) || t("ui.events.systemNotice")}
+        </span>
         <span className="sys-text">
           {asString(data.displayBody) || asString(data.body)}
         </span>
@@ -454,6 +498,8 @@ function HandbackRow({ row, roleId }: { row: ChatRow; roleId: string }) {
 }
 
 function OperatorRow({ row, roleId }: { row: ChatRow; roleId: string }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const data = asRecord(row.data);
   const payload = asRecord(data.payload);
   const request = asRecord(payload.request);
@@ -468,7 +514,7 @@ function OperatorRow({ row, roleId }: { row: ChatRow; roleId: string }) {
   const isMirror = data.isMirror === true;
   const surfaceRoleId = asString(data.surfaceRoleId) || roleId;
   const queued = data.queued === true || operatorQueued(payload);
-  const meta = governanceCardMetaView(request);
+  const meta = governanceCardMetaView(request, locale);
   const toolLifecycle = asRecord(data.toolLifecycle);
   const lifecycleStages = asRecord(toolLifecycle.stages);
   const lifecycleText = ["start", "blocked", "result"]
@@ -479,7 +525,7 @@ function OperatorRow({ row, roleId }: { row: ChatRow; roleId: string }) {
     .join(" → ");
   const roles = useChatStore((s) => s.roles);
   const drawerOpen = useUiStore((s) => s.drawerOpen);
-  const sourceName = roleDisplayName(findRole(roles, asString(payload.roleId)));
+  const sourceName = roleDisplayName(findRole(roles, asString(payload.roleId)), locale);
   const setSelected = (next: string[]) => {
     useChatStore.getState().setOperatorSelected(roleId, row.id, next);
   };
@@ -493,11 +539,11 @@ function OperatorRow({ row, roleId }: { row: ChatRow; roleId: string }) {
   const note = retryError
     ? retryError
     : submitting
-      ? OPERATOR_SUBMITTING_NOTE
+      ? operatorSubmittingNote(locale)
       : closed
-        ? finalNote || "请求已失效，未获同意。"
+        ? finalNote || t("ui.operator.expired")
         : queued
-          ? GOVERNANCE_QUEUE_NOTE
+          ? governanceQueueNote(locale)
           : "";
   const noteClass =
     state === "expired" || retryError ? "op-note op-note-err" : "op-note";
@@ -508,18 +554,23 @@ function OperatorRow({ row, roleId }: { row: ChatRow; roleId: string }) {
       data-surface-role-id={surfaceRoleId}
       data-state={state}
       role="group"
-      aria-label={asString(request.title) || "交互请求"}
+      aria-label={asString(request.title) || t("ui.work.requestFallback")}
       inert={drawerOpen ? true : undefined}
     >
       {meta.governance || isMirror ? (
         <div className="op-badges">
           {meta.governance ? <span className="op-gov-badge">{meta.badge}</span> : null}
-          {isMirror ? <span className="op-mirror-badge">{GOVERNANCE_MIRROR_BADGE}</span> : null}
+          {isMirror ? (
+            <span className="op-mirror-badge">{governanceMirrorBadge(locale)}</span>
+          ) : null}
         </div>
       ) : null}
       {isMirror ? (
         <p className="op-mirror-source">
-          {governanceMirrorSourceLabel(sourceName || asString(payload.roleId))}
+          {governanceMirrorSourceLabel(
+            sourceName || asString(payload.roleId),
+            locale,
+          )}
         </p>
       ) : null}
       {meta.lines.length > 0 ? (
@@ -529,12 +580,15 @@ function OperatorRow({ row, roleId }: { row: ChatRow; roleId: string }) {
           ))}
         </div>
       ) : null}
-      <div className="op-title">{asString(request.title) || (kind === "choice" ? "请选择" : "请确认")}</div>
+      <div className="op-title">
+        {asString(request.title) ||
+          (kind === "choice" ? t("ui.chatRow.choose") : t("ui.chatRow.confirm"))}
+      </div>
       {lifecycleText ? <div className="op-tool-lifecycle">{lifecycleText}</div> : null}
       {request.detail ? <p className="op-note">{asString(request.detail)}</p> : null}
       {preview ? (
         <details className="op-preview">
-          <summary>预览内容</summary>
+          <summary>{t("ui.chatRow.preview")}</summary>
           <div
             className="op-preview-body card-md"
             dangerouslySetInnerHTML={markdownHtml(preview)}
@@ -575,7 +629,7 @@ function OperatorRow({ row, roleId }: { row: ChatRow; roleId: string }) {
         </div>
       ) : null}
       {judgeNotice ? <div className="op-judge-notice">{judgeNotice}</div> : null}
-      {queued ? <p className="op-queued">{GOVERNANCE_QUEUE_NOTE}</p> : null}
+      {queued ? <p className="op-queued">{governanceQueueNote(locale)}</p> : null}
       {/* PM §十三 最小例外（2026-10-21）：失效/已答卡（closed）收起全部动作按钮，
           保留 disabled、finalNote、aria 与卡片容器（旧 freezeOperatorCard 同义）；
           只此一处，不改其它行渲染。排队卡不提供可操作按钮。 */}
@@ -589,19 +643,19 @@ function OperatorRow({ row, roleId }: { row: ChatRow; roleId: string }) {
               disabled={closed || submitting || selected.length === 0 || (request.multiple !== true && selected.length !== 1)}
               onClick={() => respond({ kind: "choice", selected })}
             >
-              提交
+              {t("ui.chatRow.submit")}
             </button>
             <button className="op-cancel" type="button" hidden={closed} disabled={closed || submitting} onClick={() => respond({ kind: "choice", cancelled: true })}>
-              取消
+              {t("shared.common.cancel")}
             </button>
           </>
         ) : (
           <>
             <button className="op-confirm" type="button" hidden={closed} disabled={closed || submitting} onClick={() => respond({ kind: "confirm", confirmed: true })}>
-              确认
+              {t("ui.chatRow.confirmAction")}
             </button>
             <button className="op-deny" type="button" hidden={closed} disabled={closed || submitting} onClick={() => respond({ kind: "confirm", confirmed: false })}>
-              拒绝
+              {t("ui.chatRow.rejectAction")}
             </button>
           </>
         )}
@@ -624,6 +678,7 @@ function QueueAggregateRow({ row }: { row: ChatRow }) {
 }
 
 function TurnTerminalRow({ row }: { row: ChatRow }) {
+  const t = useT();
   const data = asRecord(row.data);
   const outcome = asString(data.outcome);
   const sources = Array.isArray(data.sources)
@@ -631,7 +686,7 @@ function TurnTerminalRow({ row }: { row: ChatRow }) {
         .map((source) => asString(asRecord(source).text))
         .filter((text) => text !== "")
     : [];
-  const lines = sources.length > 0 ? sources : [asString(data.text) || "本轮结束"];
+  const lines = sources.length > 0 ? sources : [asString(data.text) || t("ui.chatRow.turnEnded")];
   return (
     <div
       className={"sys sys-call turn-terminal" + (row.replay ? " is-replay" : "")}
@@ -651,6 +706,7 @@ function TurnTerminalRow({ row }: { row: ChatRow }) {
 }
 
 function ReasoningRow({ row, roleId }: { row: ChatRow; roleId: string }) {
+  const locale = useLocaleState((s) => s.locale);
   const data = asRecord(row.data);
   const status = asString(data.status);
   const omitted = status === "omitted";
@@ -659,11 +715,11 @@ function ReasoningRow({ row, roleId }: { row: ChatRow; roleId: string }) {
   const hasText = text.trim() !== "";
   const partialOmitted = !omitted && data.partialOmitted === true;
   const note = omitted
-    ? REASONING_OMITTED_NOTE
+    ? reasoningOmittedNote(locale)
     : !hasText
-      ? REASONING_EMPTY_NOTE
+      ? reasoningEmptyNote(locale)
       : partialOmitted
-        ? REASONING_PARTIAL_NOTE
+        ? reasoningPartialNote(locale)
         : "";
   return (
     <details
@@ -679,7 +735,7 @@ function ReasoningRow({ row, roleId }: { row: ChatRow; roleId: string }) {
           aria-hidden="true"
         />
         <span className="tool-title">
-          {asString(data.label) || REASONING_FALLBACK_LABEL}
+          {asString(data.label) || reasoningFallbackLabel(locale)}
         </span>
       </summary>
       {hasText ? <pre className="reasoning-text">{text}</pre> : null}
@@ -694,6 +750,7 @@ function ReasoningRow({ row, roleId }: { row: ChatRow; roleId: string }) {
  * 这里只产 `.sys-ico` + `.sys-text.sj-body`。所有动态文本经 React 文本节点（等价 esc）。
  */
 function ShellJudgeResultBody({ view }: { view: import("@/chat/judge").ShellJudgeResultView }) {
+  const t = useT();
   const d = view.details;
   return (
     <>
@@ -729,27 +786,31 @@ function ShellJudgeResultBody({ view }: { view: import("@/chat/judge").ShellJudg
               strokeWidth={1.5}
               aria-hidden="true"
             />
-            详情（命令原文 / 理由 / 证据）
+            {t("ui.chatRow.judgeDetails")}
           </summary>
           <div className="sj-details-body">
             {d.command ? (
               <>
-                <p className="sj-d-label">命令原文</p>
+                <p className="sj-d-label">{t("ui.chatRow.commandOriginal")}</p>
                 <pre className="sj-pre">{d.command}</pre>
               </>
             ) : null}
             {d.cwd ? <p className="sj-kv">cwd：{d.cwd}</p> : null}
-            {d.reason ? <p className="sj-kv">判断理由：{d.reason}</p> : null}
+            {d.reason ? (
+              <p className="sj-kv">{t("ui.judge.reasonLine", { reason: d.reason })}</p>
+            ) : null}
             {d.alternative ? <p className="sj-kv">{d.alternative}</p> : null}
             {d.customerMessage ? (
-              <p className="sj-kv">客户说明：{d.customerMessage}</p>
+              <p className="sj-kv">
+                {t("ui.chatRow.customerMessage", { message: d.customerMessage })}
+              </p>
             ) : null}
             {d.customerMessageSynthesized ? (
-              <p className="sj-note">客户说明由系统整理。</p>
+              <p className="sj-note">{t("ui.chatRow.customerMessageNote")}</p>
             ) : null}
             {d.evidence.length > 0 ? (
               <>
-                <p className="sj-d-label">证据</p>
+                <p className="sj-d-label">{t("ui.chatRow.evidence")}</p>
                 <ul className="sj-evidence">
                   {d.evidence.map((item, index) => (
                     <li key={index}>{item}</li>
@@ -758,7 +819,7 @@ function ShellJudgeResultBody({ view }: { view: import("@/chat/judge").ShellJudg
               </>
             ) : null}
             {d.hardDenyOverride ? (
-              <p className="sj-note">hardDenyOverride：true（deny 档被判断 agent 放行）。</p>
+              <p className="sj-note">{t("ui.chatRow.hardDenyOverride")}</p>
             ) : null}
             {d.toolCallId ? <p className="sj-note">toolCallId：{d.toolCallId}</p> : null}
           </div>
@@ -773,11 +834,19 @@ function GovernanceJudgeResultBody({
 }: {
   view: import("@/chat/judge").GovernanceJudgeResultView;
 }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const d = view.details;
   const stats: string[] = [];
-  if (d.durationMs !== null) stats.push("耗时 " + d.durationMs + "ms");
-  if (d.readCalls !== null) stats.push("读取 " + d.readCalls + " 次");
-  if (d.readBytes !== null) stats.push(d.readBytes + " 字节");
+  if (d.durationMs !== null) {
+    stats.push(t("ui.chatRow.durationStat", { ms: d.durationMs }));
+  }
+  if (d.readCalls !== null) {
+    stats.push(t("ui.chatRow.readCalls", { count: d.readCalls }));
+  }
+  if (d.readBytes !== null) {
+    stats.push(t("ui.chatRow.readBytes", { bytes: d.readBytes }));
+  }
   return (
     <>
       <span className="sys-ico">
@@ -807,24 +876,41 @@ function GovernanceJudgeResultBody({
               strokeWidth={1.5}
               aria-hidden="true"
             />
-            详情（判断理由 / 选中项 / 证据）
+            {t("ui.chatRow.decisionDetails")}
           </summary>
           <div className="sj-details-body">
-            {d.flowId ? <p className="sj-kv">流程：{d.flowId}</p> : null}
-            {d.reason ? <p className="sj-kv">判断理由：{d.reason}</p> : null}
+            {d.flowId ? (
+              <p className="sj-kv">{t("ui.judge.flowText", { flowId: d.flowId })}</p>
+            ) : null}
+            {d.reason ? (
+              <p className="sj-kv">{t("ui.judge.reasonLine", { reason: d.reason })}</p>
+            ) : null}
             {d.selected.length > 0 ? (
-              <p className="sj-kv">选中项：{d.selected.join("、")}</p>
+              <p className="sj-kv">
+                {t("ui.judge.selectedLine", {
+                  items: d.selected.join(locale === "zh-CN" ? "、" : ", "),
+                })}
+              </p>
             ) : null}
             {d.paths.length > 0 ? (
-              <p className="sj-kv">路径：{d.paths.join("、")}</p>
+              <p className="sj-kv">
+                {t("ui.judge.pathsLine", {
+                  paths: d.paths.join(locale === "zh-CN" ? "、" : ", "),
+                })}
+              </p>
             ) : null}
             {d.pathDecisions.length > 0 ? (
               <>
-                <p className="sj-d-label">逐路径结论</p>
+                <p className="sj-d-label">{t("ui.chatRow.perPath")}</p>
                 <ul className="sj-evidence">
                   {d.pathDecisions.map((item, index) => (
                     <li key={index}>
-                      {item.path}：{item.ok ? "允许" : "拒绝"}
+                      {t("ui.chatRow.pathResult", {
+                        path: item.path,
+                        result: item.ok
+                          ? t("ui.chatRow.allowed")
+                          : t("ui.chatRow.denied"),
+                      })}
                       {item.reason ? "（" + item.reason + "）" : ""}
                     </li>
                   ))}
@@ -833,7 +919,7 @@ function GovernanceJudgeResultBody({
             ) : null}
             {d.evidence.length > 0 ? (
               <>
-                <p className="sj-d-label">证据</p>
+                <p className="sj-d-label">{t("ui.chatRow.evidence")}</p>
                 <ul className="sj-evidence">
                   {d.evidence.map((item, index) => (
                     <li key={index}>{item}</li>

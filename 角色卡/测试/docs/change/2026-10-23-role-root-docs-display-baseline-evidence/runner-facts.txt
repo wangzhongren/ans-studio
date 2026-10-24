@@ -1,0 +1,28 @@
+== baseline documents ==
+docs/planning/2026-10-23_design_role-root-docs-display.md | sha256=9b69a7864112eb3df0c1da86b6ce653bb9235d4c655ac4d6f3b979e29080c26d | git=e898e65b9b388c2e4fdc529bfbbcf6fbe03fa5b4 | bytes=81547 | lines=1023
+docs/scheduling/2026-10-23-role-root-docs-display-team-plan.md | sha256=8ec6e0d7f264a89bad3cb081371079dca8e2785750f29df9769704342f895fa8 | git=98f41bd0be9c16e1b5556509acc4c581a2c0818c | bytes=68269 | lines=488
+角色卡/测试/role-card.md | sha256=452cee435b7f08c6dd6f34b1156d7b5ea5f08ba8862ad68d824d2ff44af10068 | git=a1a0099b486e50ddf8a375954a7e1caa40675b30 | bytes=2419 | lines=29
+角色卡/测试/boundary.md | sha256=9a2eba3fc842f185eb228ef49cd30dfd66ec3933c42cca0202ff2ae26c97859f | git=dbc5f154df1487d5df15980a535c56f8a697eb58 | bytes=1198 | lines=19
+角色卡/测试/boundary.yaml | sha256=3c8f7e0e34d44bcdc55995f2747cd8eccaea7ad0875ad074569f6acc7beea14c | git=81208f8d3370bdc58091b81367ca06732476a380 | bytes=1214 | lines=32
+
+== runner facts ==
+node=v24.22.1
+npm=11.19.1
+electron=
+v44.7.0
+package=1.6.0
+test/桌面应用 files=31 (tracked=31, untracked=0)
+test/桌面UI test.ts files=25
+test/测试 p1p7=present i18n-integration=present
+
+== build:renderer outputs ==
+app/renderer/dist/assets/ans-studio-ans-icon-DOpmqMAU.png | 55057 bytes
+app/renderer/dist/assets/index-BEwoJaDj.css | 109103 bytes
+app/renderer/dist/assets/index-Bp8JeL_K.js | 1061487 bytes
+app/renderer/dist/index.html | 597 bytes
+
+build output sha256:
+ff88e313c9c6a41fa94f5e34b9e1798169ea7ffece2404e5c9fc6474f788d32c *app/renderer/dist/assets/ans-studio-ans-icon-DOpmqMAU.png
+75cae32df1d7672fd762c2fa1803191db023cc6206643d26dd8263a63f7fd625 *app/renderer/dist/assets/index-BEwoJaDj.css
+759d86fcdbf4a58c27f0c9e97ea67e30c832abc036d59a04904a8940449bb2ea *app/renderer/dist/assets/index-Bp8JeL_K.js
+e6f7a1260029e786e4a9d26c9a660447712bdea5a532ab3f170e1d5caecf2d71 *app/renderer/dist/index.html

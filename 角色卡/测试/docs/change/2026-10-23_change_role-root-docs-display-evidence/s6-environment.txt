@@ -1,0 +1,13 @@
+# S6 environment (2026-10-23)
+timestamp: 2026-10-23 23:36:53 +0800
+cwd: /c/Users/51054/Desktop/work/ans-studio
+os: MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+shell: 5.3.15(2)-release
+node: v24.22.1 (/c/Users/51054/AppData/Local/Programs/nodejs/node)
+npm: 11.19.1
+electron: v44.7.0
+branch: v1.7.0-work
+HEAD: 6407d636b69e3f8eb12fb872e2622172bcbff583
+HEAD tree: 221818f12e56266819a20f6c16b5634567fd91fb
+staged entries: 0
+worktree status entries before S6 evidence writes (porcelain -uall): 168

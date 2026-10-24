@@ -1,0 +1,8 @@
+captured_at: 2026-10-23 17:22:32 +0800
+HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+branch: main
+node: v24.22.1
+npm: 11.19.1
+git: git version 2.55.0.windows.5
+OS: Windows_NT MINGW64_NT-10.0-26300 3.6.10-710e5275.x86_64
+cwd: C:/Users/51054/Desktop/work/ans-studio

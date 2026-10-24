@@ -25,12 +25,40 @@
 | `chat/chat-store.ts` | 行模型/pane 版本/历史回放/阅读锚点/队列与状态；`window.__ansRenderer` 的数据源 |
 | `test-driver.ts` | `window.__ansRenderer` 21 个方法/状态字段（e2e 唯一驱动面） |
 | `shell/*` + `stores/*` | App/标题栏/左树/会话头/输入区/抽屉/设置/治理面板/work-overview；`lib/platform.ts` 是 `window.desktop` 唯一入口 |
+| `i18n/index.ts` + `i18n/locale-store.ts` | 渲染层 i18n facade（只再导出 shared 单一实现；`useLocaleState`/`useT`/`languageOptions`）与 locale store（`zh-CN`/`en-US`、localStorage 镜像、preferences IPC 校正/广播、失败回滚）。详见下节。 |
 
 ### appointment 文案（2026-10-22 治理拆分，现行）
 
 - `chat/governance-view.ts`：`GOVERNANCE_CARD_POWER.appointment = "任命"`、`GOVERNANCE_CARD_POWER["appointment-write"] = "任命写卡"`（旧值「提名」）；`GOVERNANCE_ROLE_HINT.nomination = "客户任命后打开写卡；只按团队计划与任命名单写角色卡与边界，不选择角色、不批准。"`（旧值以「通常由流程单提名步骤打开」开头）。
 - `chat/role-view.ts`：`governanceFunction="nomination"` 副标题为 `写卡权（客户任命后） · 不拥有最终批准权`（旧「提名权」）；显示名 `Crew / 组队` 与内部 id/`GovernanceFunction` 值不变。
 - 仅文案变化：渲染逻辑、DOM 结构与交互行为未变；下文历史段中的旧文案记录不再现行。
+
+### i18n B0 渲染侧契约（2026-10-23）
+
+> 状态：**implemented-unverified**（B0 骨架）。范围仅语言选择与 locale 状态；引擎设置/聊天等文案迁移属 B1/B2，尚未进行。真实 Electron 切换/重启/布局证据待 I9。
+
+**消费方式**：渲染层组件只 `import ... from "@/i18n"`；shared 目录/插值/复数/回退唯一实现在 `src/common/shared/i18n/`（项目管理），facade 与 store 经相对路径导入，不复制目录/resolver、不新增 Vite alias。
+
+- `app/renderer/src/i18n/index.ts`（facade）
+  - 再导出 shared：`translate`、`createTranslator`、`Locale`、`isLocale`、`resolveLocale`、`SUPPORTED_LOCALES`、`DEFAULT_LOCALE`、`MessageKey`、`MessageParams`、`MessageTemplate`、`TranslateOptions`、`TranslateDiagnostic`、`zhCN`、`enUS`。
+  - `LANGUAGE_OPTION_KEYS: Record<Locale, MessageKey>`：语言选项 → 文案 key 的显式静态映射（无运行时拼接 key）。
+  - `languageOptions(locale, t)`：纯视图模型（`{id,label,selected}`），无 DOM 依赖。
+  - `useLocaleState(selector)`：vanilla store 的 React 选择器 hook（不含 `useLocaleStore` 这个 StoreApi 本身）。
+  - `useT()`：返回随 `locale` 变化的 translator（`createTranslator(locale)`）。
+- `app/renderer/src/i18n/locale-store.ts`（locale store）
+  - `LOCALE_STORAGE_KEY = "ans.locale"`：仅首屏镜像；治理/报告事实不写 localStorage（`source-guard` 按精确白名单守卫）。
+  - `createLocaleStore(deps: LocaleStoreDeps)`：可注入 `readStoredLocale`/`writeStoredLocale`/`applyDocumentLang`/`getBridge`/`onDiagnostic`；生产单例 `useLocaleStore`（`StoreApi<LocaleStoreState>`，非 hook）。
+  - 状态：`locale: Locale`（默认 `zh-CN`）、`error: string | null`（本地化保存失败文案）、`initialized: boolean`。
+  - `init()`：幂等（并发/重复调用不重复读偏好、不重复订阅）。顺序：同步镜像（创建时）→ `document.documentElement.lang` → `getPreferences()` 文件校正（合法值才采用并回写镜像）→ 订阅 `onLocaleChanged`。启动期间用户已切换或已收到广播时，晚到的文件快照不覆盖（方案 §4.6 优先级）。IPC 不可用/失败只记诊断（`locale.preferences.readFailed` 等），不阻塞 UI。
+  - `setLocale(next: string)`：非法值返回 `false` 且不改状态；合法值乐观更新 store/lang/镜像后调用 `window.desktop.setLocale`；`ok:false`/异常回滚三者并设置 `translate(previous, "ui.settings.language.saveFailed")`；IPC 不可用时保留本地镜像（降级）返回 `true`。
+  - `t(key, params?)`：`translate(get().locale, key, params)`。
+  - 诊断码（机器标识，不翻译）：`locale.mirror.invalid`、`locale.preferences.readFailed`、`locale.preferences.saveFailed`、`locale.subscribe.failed`。
+- `lib/platform.ts`：`DesktopBridge` 新增三个**可选**方法（与桌面窗口/preload 契约一致，定义与实现属桌面窗口）：
+  - `getPreferences(): Promise<{version:1; locale:"zh-CN"|"en-US"; supported:string[]}>`
+  - `setLocale(locale: string): Promise<{ok:boolean; locale:"zh-CN"|"en-US"; error?:string}>`
+  - `onLocaleChanged(cb: (payload:{locale:"zh-CN"|"en-US"}) => void): () => void`
+- `App.tsx`：既有启动 effect 内追加 `void useLocaleStore.getState().init()`；不论文案、不改聊天/布局逻辑。
+- `shell/SettingsPanel.tsx` 语言区（DOM 契约）：`#pi-language-section`（位于 `#pi-panel` 顶部、`.pi-engine-tabs` 之前；保存条 `.pi-save-bar` 64px 不变）→ `#pi-language-title`、`select#pi-language-select`（选项 `zh-CN`/`en-US`，`value` 绑定当前 locale，`onChange` 调 `setLocale`）、`#pi-language-description`、错误 `role="alert"`。语言区只使用 `ui.settings.language.*` key，无中文硬编码、无新增 CSS/inline style；引擎设置文案保持现状（B1/B2 迁移）。
 
 ## 对外依赖（只读消费）
 
@@ -535,3 +563,20 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 - DOM：`#governance-status`（`[data-governance-state]`）、`#governance-preview`（class 精确 `governance-preview`；`[data-governance-reaccept]`/`[data-governance-cancel]`/`[data-governance-close]`/`[data-governance-establish]`/`[data-governance-migrate]`、`data-mode`）、`#governance-migration`；治理卡 `.op-gov-badge/.op-meta/.op-mirror-badge/.op-mirror-source/.op-queued/.op-preview/.op-preview-body/.is-mirror[data-surface-role-id]`；聚合 `.op-queue-aggregate`；`#op-chip/.op-chip-text`；报告 `.msg-handback .report-*/.persistence-state/.persistence-message/.persistence-retry/.persistence-error`；交付 `.msg-delivery > .persistence-state`、`.delivery-batch-facts`、`.delivery-report`、`.safe-input-copy`；折叠 `.task-request/.reply-original/.task-request-body/.original-flags`；菜单 `.engine-option-main/.engine-option-status[data-menu-status]`。
 - 状态/焦点：治理预览非模态、标题聚焦、Esc 回触发、无陷阱；聚合行不可聚焦；镜像不抢焦点；报告重试 pending 保留同按钮（disabled）；`#op-chip` 点击先 close 抽屉再滚到原卡并聚焦；`.op-request[inert] .op-actions{visibility:hidden}`（抽屉覆盖）。
 - 无新增 DOM 例外；既有 `DEFER_TOOL_ROWS_WHEN_CLOSED=40` 与失效 operator 动作 `hidden` 保持唯一。C2 检查重锚为「收起 + 原因可见」。
+
+## i18n B1/B2 渲染侧契约增量（2026-10-23）
+
+- 消费方式：组件一律 `import { useT, useLocaleState, translate } from "@/i18n"`；facade 只再导出 shared（`app/renderer/src/i18n/index.ts`）与 locale store，不复制目录/resolver。`useT()` 随 locale 重渲染组件。
+- 纯逻辑：`chat/{status,role-view,work-view,confirm-logic,governance-view,runtime-config,report-view,document-view,tool-summary,reasoning,operator-view,judge,events}.ts` 的用户可见函数新增**末尾可选 `locale`**（默认 `DEFAULT_LOCALE = "zh-CN"`）。旧调用/旧 zh 断言保持逐字；渲染组件传当前 `locale`。文本常量（如 `STOPPED_LABEL`、`GOVERNANCE_QUEUE_NOTE`）保留为 zh-CN 计算值；新增 `*Text(locale)` 函数供消费方按语言取值。
+- 结构化状态替代文本判定：`SettingsStatus.code`（`saved` 等）替代 `status.text.startsWith("已保存到 .env")`；`RoleMeta.readableHistoryRetained` 替代 `contextText.indexOf("可读历史保留")`；治理失败视图按 phase/status 与目录短语判断零写入。
+- 数据不翻译：`roleId`、`groupDuty`（如「组长」数据值）、`flowId/stepId/cardKind`、路径、工具/模型输出、外部错误原文、`[系统·…]`/`【系统通知】`/`[派发]`/`[回交]`/`用户指令：` 历史解析正则与协议前缀。
+- 共享 key 缺口已由 PM 补齐并接线（1213 key）：`ui.chatHeader.tabWork/tabCard`（ChatHeader/QueueSubview）、`ui.settings.saveNoteNoChanges`、`ui.runtimeConfig.unknownError`、`ui.confirm.expiredShell`、`ui.governanceStore.stepFallback`、`ui.judge.roleName.liaison/verifier`、`ui.judge.headline.writeConfirmOverflow`、`ui.reportView.savingHistory`。残余渲染层中文仅：`events.ts` 机器正则/协议前缀、`Sidebar` 的 `groupDuty` 数据值、`ChatHeader` 的 `恢复失败：` 主进程文本解析、非目标 `test-driver.ts`。
+- 测试：`test/桌面UI/i18n-b1-b2.test.ts` 覆盖 en-US 输出、已迁移文件零 Han 扫描与残余清单；旧 `test/桌面UI` 中文断言逐字通过。
+
+## i18n B4 渲染侧契约增量（2026-10-23）
+
+- `chat/runtime-config.ts`：`RUNTIME_LABELS` 保持 `Record<string, string>` 且改为**语言中性**（`demo: "demo"`、`pi/codex/claude` 品牌名原样）；新增 `RUNTIME_LABEL_KEYS: Readonly<Record<string, MessageKey | null>>`（demo → `shared.runtimeSettings.runtime.demo`，品牌名为 `null`）。
+- `runtimeLabel(runtime, locale = DEFAULT_LOCALE)`：先查 `RUNTIME_LABEL_KEYS`，非 null 时经 facade `translate(locale, key)` 取词；否则用中性 `RUNTIME_LABELS`；未知非空 runtime 原样透传，空值回退 `ui.runtimeConfig.unknownEngine`（zh「未知引擎」/ en「Unknown engine」）。`validateRuntimeConfigView` 的缺省 `label` 同路径解析，主进程显式 `label` 仍优先。
+- 渲染层**不导入** `runtime-shared.ts`（顶层 `node:os`/`node:path`）；本地只静态引用同一 key，不复制目录/翻译实现。B4 不新增/修改 shared key。
+- 200% 短视口（`@media (max-height: 480px)`）：`#pi-panel` 自身纵向滚动、`.pi-save-bar` `position:sticky;bottom:0`、`.pi-scroll` 解除内层滚动；`#pi-save` 在 480×310 CSS 下中心可命中（I9 P6）。960×620 不命中该媒体查询，原 flex/static 布局不变。
+- 测试：`test/桌面UI/runtime-config.test.ts` 新增 zh/en demo 与品牌名断言、中性映射/key 映射/未知回退、读取视图解析；`test/桌面UI/source-guard.test.ts` 守卫「不导入 runtime-shared / 无 demo 中文字面量」。旧 zh 断言逐字保留。

@@ -338,9 +338,16 @@ test("场景2c（v2）：接受提案 ⇒ 同一轮写 v2 团队计划/MapReduce
     assert.match(crewTask, /模块清单：storefront/);
     assert.match(crewTask, /module\/公开契约\/测试面\/dependsOn\/并行组\/粒度理由/);
     const convenerTask = h.prompts.get("convener")![0]!;
-    assert.match(convenerTask, /团队计划 v2/);
+    // 2026-10-23 目录级授权（D5 修复后口径）：提案接受时**新流程默认写 v3 计划**；本场景仍由 Convener
+    // 脚本写 v2 计划（既有 v2 链路/legacy 覆盖保留），因此 Convener 任务给默认 v3 文案，而 Crew 任务按
+    // **实际 v2 计划**给 v2 文案。显式 v2 文案在 `operator-wiring` 单测覆盖，此处不重复。
+    assert.match(convenerTask, /团队计划 v3/);
+    assert.match(convenerTask, /directories/);
+    assert.match(convenerTask, /目录规范/);
+    assert.match(convenerTask, /实现目录/);
     assert.match(convenerTask, /parallelGroup/);
     assert.match(convenerTask, /dependsOn/);
+    assert.doesNotMatch(convenerTask, /团队计划 v2/, "新流程默认 v3，不得再给 Convener 默认 v2 文案");
     assert.equal(exists(temp.root, NOMINATION_REL), false);
   } finally {
     await h.stop();

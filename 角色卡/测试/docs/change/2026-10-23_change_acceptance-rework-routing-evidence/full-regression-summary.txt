@@ -1,0 +1,36 @@
+# S7 T3 串行全量回归（最终候选）
+- 命令（实际）：mapfile -t FILES < full-regression-excluded-file-list.txt; node --test --test-concurrency=1 "${FILES[@]}"
+- 文件清单：full-regression-excluded-file-list.txt（find test -name '*.test.ts' ! -path 'test/pi-adapter/write-sequencing.test.ts' | sort）⇒ 360 个文件（全部 .test.ts 361 个，排除 1 个）
+- 排除：test/pi-adapter/write-sequencing.test.ts（3 个 test()；已知挂起：打印 ✔ 后进程不退出；S1 同处置）。排除方式为显式文件清单，不静默跳过。
+- 环境：Windows 11 / Git Bash；Node v24.22.1；cwd C:\Users\51054\Desktop\work\ans-studio；HEAD ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1；工作区候选（candidate-hashes.txt）
+- 原始日志：full-regression-serial-excluding-write-sequencing.log
+- 结果：exit 1；tests 3790 / pass 3763 / fail 9 / skipped 18 / todo 0 / cancelled 0；duration_ms 327811.78；2026-10-23T20:57:19+08:00 → 21:02:47+08:00
+
+## 与 S1 基线逐项对照
+| 指标 | S1 基线 | S7 最终 | 差额 | 说明 |
+|------|---------|---------|------|------|
+| 文件数 | 358 | 360 | +2 | S2 新增 test/编排/acceptance-rework.test.ts；本角色新增 s-acceptance-rework-routing.test.ts |
+| tests | 3725 | 3790 | +65 | S2 +40、S3 +10、S4 +2、S5 +3、S7 +10 |
+| pass | 3697 | 3763 | +66 | +65 新用例通过；另 S1 的 1 次 i-full-chain 时序偶发本轮未复现 |
+| fail | 10 | 9 | -1 | 失败集合 = S1 的 9 项既有 Windows symlink EPERM；无新增确定性失败 |
+| skipped | 18 | 18 | 0 | 全部既有平台/设计跳过（POSIX 权限/进程组在 Windows 不适用） |
+| todo | 0 | 0 | 0 | 无 |
+
+## 9 项失败（全部 EPERM: operation not permitted, symlink；errno -4048）
+1. test/claude-adapter/session.test.ts: native symlink and storage runtime mismatch fail before SDK query
+2. test/codex-adapter/session.test.ts: native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary
+3. test/pi-adapter/injected-runtime.test.ts: store validate callback rejects directory symlink before Pi parse or new native write
+4. test/pi-adapter/injected-runtime.test.ts: Pi storage refuses file symlink and role/runtime mismatch without touching other storage
+5. test/runtime-core/file-write-safety.test.ts: D3 linked workspace root remains usable; linked target itself is not replaced
+6. test/runtime-core/session-store.test.ts: store: traversal, mismatched scope and symlinked runtime directories rejected
+7. test/runtime-core/session-store.test.ts: store: native validation stays lazy and native symlink is rejected before effects
+8. test/测试/g4-skill-verify/b-render-double-check.test.ts: 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛
+9. test/编排/shell-authorized-routine.test.ts: node test外指符号链接路径不获委托；项目内测试路径获委托
+
+## 18 项跳过（既有，逐条同 S1）
+codex-adapter 1（Windows 无 POSIX 进程组）、pi-adapter 1（chmod 语义）、runtime-core file-write-safety 4、test/测试/lightweight-permission-repairs 6、门禁引擎 pin-evidence 1、test/项目管理/shared/atomic-write 5。无新增 skip/todo。
+
+## i-full-chain 时序偶发（S1 已分类；S7 复核）
+- T3 全量本轮：i-full-chain 3/3 通过（未复现）。
+- 整文件隔离复跑 6 次：run1 3/3、run2 1/3（2 项失败）、run3 2/3（1 项）、run4 3/3、run5 2/3（1 项）、run6 3/3；失败均为 `会话尚未开启（点击左侧角色即可开启）` / `会话已关闭，请重新点击角色。`（open→send/close 生命周期竞态），日志 isolated-i-full-chain-run1..6.log。
+- 族对照：与 S1 §6.3(B)、目录授权 D6、i18n 集成记录同族；非本变更确定性新增失败（本变更未改 i-full-chain/fixture 默认路径；新增夹具钩子默认关闭），也不掩盖：本轮 T3 全量记录为 0 次。

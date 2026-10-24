@@ -1,0 +1,52 @@
+# S6 failure classification (2026-10-23)
+
+## Test suites (all candidate, HEAD 6407d63, branch v1.7.0-work)
+
+| suite | exit | counts | classification |
+| --- | --- | --- | --- |
+| `node --test "test/桌面UI/**/*.test.ts"` | 0 | 209 tests / 209 pass / 0 fail / 0 skipped | all pass |
+| `node --test --test-concurrency=1 test/桌面应用/project.test.ts test/桌面应用/project-document.test.ts test/桌面应用/interface.test.ts` | 0 | 164 / 164 pass | all pass |
+| `node --test --test-concurrency=1 test/测试/p1p7-document-integration.test.ts test/测试/i18n-integration.test.ts` | 0 | 10 / 10 pass (2 + 8) | all pass; 13 is the 3-file cross-layer set below |
+| `node --test --test-concurrency=1 test/测试/p1p7-document-integration.test.ts test/桌面应用/su-effective-boundary.test.ts test/桌面应用/genesis-bootstrap.test.ts` | 0 | 13 / 13 pass | matches S2/S3 cross-layer regression |
+| `node --test "test/项目管理/shared/**/*.test.ts"` | 0 | 186 tests / 181 pass / 5 skipped / 0 fail | all pass; 5 existing Windows platform skips (atomic-write finalMode) |
+| `npm run typecheck` | 0 | no diagnostics | pass |
+| `npm run typecheck:renderer` | 0 | no diagnostics | pass |
+| `npm run build:renderer` | 0 | built; existing >500kB chunk warning only | pass |
+
+No new failure, no skip, no assertion weakened. The 10-vs-13 expectation difference is a counting artifact: `p1p7` has 2 tests and `i18n-integration` has 8; the S2/S3 13/13 command added `su-effective-boundary` + `genesis-bootstrap` (11 tests). Both commands are green.
+
+## Phase 4A (real Electron, controlled IPC)
+
+| run | source | checks | failures | exit |
+| --- | --- | --- | --- | --- |
+| current candidate run 1 | `s6-phase4a-smoke-current.log` / `s6-phase4a-report-current.json` | 108 | 10 | 1 |
+| current candidate run 2 | `s6-phase4a-smoke-run2.log` / `s6-phase4a-report-run2.json` | 108 | 10 | 1 |
+| clean HEAD 6407d63 baseline (git archive + rebuilt renderer) | `s6-phase4a-baseline-head.log` | 99 | 12 | 1 |
+
+- The two current runs have the identical 10-failure set.
+- **All 10 current failures are a subset of the 12 clean-HEAD baseline failures. New failures = 0.**
+- Two baseline failures now pass on the candidate: `DOCUMENT_BACK_ROLE_RESTORES_ENTRY_FOCUS` (S4 added a queueMicrotask fallback) and `QUEUE_SUBVIEW_ESC_RETURNS_WORK_AND_FOCUS` (baseline rAF/timing flake).
+- All 9 S4 root-doc checks pass in both current runs:
+  `PROFILE_DOCS_GROUPS_ROOT_AND_SUBDIR`, `PROFILE_ROOT_DOC_BUTTON_TITLE_ARIA`, `ROOT_DOC_WINDOWS_UNAVAILABLE_STRUCTURED_ERROR`, `ROOT_DOC_BACK_ROLE_FOCUSES_ROOT_BUTTON`, `ROOT_DOC_OPENS_DOCUMENT_VIEW_READONLY`, `ROOT_DOC_LIST_APPENDS_REFS_WITHOUT_PREFIX_CHANGE`, `ROOT_DOC_API_SPEC_NOT_APPLICABLE_PLAIN_TEXT`, `PROFILE_EMPTY_DOCS_HONEST_STATE`, `ZOOM_200_ROOT_DOC_BUTTON_REACHABLE`.
+- The 10 failures are in pre-existing settings/fields, settings-tab keyboard/focus, slider keyboard/focus, queue focus and 960 drawer focus families; all are baseline failures. Phase4A's hidden-window rAF throttling (S4 diagnostic: `rafTicks:1` in 220ms) explains the focus family. None is on a root-doc path.
+
+## Real Electron e2e (`test/桌面应用/e2e/main.mjs`, unchanged)
+
+| run | userData | exit | report |
+| --- | --- | --- | --- |
+| run 1 | fresh temp | 0 | `E2E_PASS=true`, `E2E_FAILURES=` (empty) |
+| run 2 | fresh temp | 0 | `E2E_PASS=true`, `E2E_FAILURES=` (empty) |
+
+## Real Electron root-doc probe (S6 test-role probe copy; not a product/test change)
+
+The unchanged e2e harness does not assert root-doc DOM. To close the real-app gap, S6 ran a patched copy of the same harness outside the repository (`s6-probe-real-electron-script.mjs`; diff `s6-probe-script.diff`), with the same real preload, renderer and desktop interface against the real repository. Run 3 (final) result:
+
+- `S6_ROOT_DOCS_THREE_NAMES_ORDER=true` — exactly `角色卡/桌面窗口/feature-map.md`, `.../functional-description.md`, `.../api-spec.md` in fixed order.
+- `S6_ROOT_DOCS_GROUPS_ORDER=true` — groups `root` then `subdir`.
+- `S6_ROOT_DOCS_MEMO_ABSENT=true` — no memo/role-card/boundary inside the root group.
+- `S6_ROOT_DOCS_LABELS` — `角色根文档`, `功能导航`, `模块视图与代码位置`, `接口 / 实现报告`.
+- `S6_ROOT_DOCS_CLICK_UNAVAILABLE=true` — click stays in list state, no body, shows `当前环境暂不支持安全读取项目文档。`.
+- `E2E_PASS=true`, `E2E_FAILURES=` (empty).
+- Screenshots: `s6-probe-root-docs-profile.png`, `s6-probe-root-docs-unavailable.png`.
+
+Superseded probe iterations (before the grant re-establishment / assertion narrowing) are in `pre-final-probe/`; they are not product failures.

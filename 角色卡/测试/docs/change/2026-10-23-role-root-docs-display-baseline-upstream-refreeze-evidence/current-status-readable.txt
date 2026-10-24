@@ -1,0 +1,243 @@
+# full git status (core.quotePath=false), 2026-10-23 22:26:15 +0800
+branch=main HEAD=ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+status_entries=238
+cached=0
+
+ M app/desktop/chat-adapter.ts
+ M app/desktop/composer-images.ts
+ M app/desktop/confirm-card.ts
+ M app/desktop/customer-input.ts
+ M app/desktop/diagnostics.ts
+ M app/desktop/governance-advance.ts
+ M app/desktop/interface.ts
+ M app/desktop/judge-reason.ts
+ M app/desktop/operator-channel.ts
+ M app/desktop/project.ts
+ M app/desktop/recovery-channel.ts
+ M app/desktop/runtime-config.ts
+ M app/desktop/runtime-history.ts
+ M app/desktop/runtime-resolution.ts
+ M app/desktop/session-history.ts
+ M app/desktop/session.ts
+ M app/desktop/watchdog.ts
+ M app/main.ts
+ M app/preload.cjs
+ M app/renderer/src/App.tsx
+ M app/renderer/src/chat/ChatRow.tsx
+ M app/renderer/src/chat/ChatStream.tsx
+ M app/renderer/src/chat/chat-store.ts
+ M app/renderer/src/chat/confirm-logic.ts
+ M app/renderer/src/chat/document-view.ts
+ M app/renderer/src/chat/events.ts
+ M app/renderer/src/chat/governance-view.ts
+ M app/renderer/src/chat/judge.ts
+ M app/renderer/src/chat/markdown.ts
+ M app/renderer/src/chat/operator-view.ts
+ M app/renderer/src/chat/reasoning.ts
+ M app/renderer/src/chat/report-view.ts
+ M app/renderer/src/chat/role-view.ts
+ M app/renderer/src/chat/runtime-config.ts
+ M app/renderer/src/chat/status.ts
+ M app/renderer/src/chat/tool-summary.ts
+ M app/renderer/src/chat/types.ts
+ M app/renderer/src/chat/work-view.ts
+ M app/renderer/src/lib/platform.ts
+ M app/renderer/src/main.tsx
+ M app/renderer/src/shell/ChatHeader.tsx
+ M app/renderer/src/shell/Composer.tsx
+ M app/renderer/src/shell/ConfirmCard.tsx
+ M app/renderer/src/shell/DocumentView.tsx
+ M app/renderer/src/shell/Drawer.tsx
+ M app/renderer/src/shell/EngineSelect.tsx
+ M app/renderer/src/shell/GovernancePanel.tsx
+ M app/renderer/src/shell/ProfilePanel.tsx
+ M app/renderer/src/shell/QueuePanel.tsx
+ M app/renderer/src/shell/QueueSubview.tsx
+ M app/renderer/src/shell/ReportCard.tsx
+ M app/renderer/src/shell/SettingsPanel.tsx
+ M app/renderer/src/shell/Sidebar.tsx
+ M app/renderer/src/shell/TitleBar.tsx
+ M app/renderer/src/shell/WorkOverview.tsx
+ M app/renderer/src/shell/phase4a.css
+ M app/renderer/src/stores/confirm-store.ts
+ M app/renderer/src/stores/drawer-store.ts
+ M app/renderer/src/stores/governance-store.ts
+ M app/renderer/src/stores/report-store.ts
+ M app/renderer/src/stores/settings-store.ts
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+ M src/common/shared/runtime-settings.ts
+ M src/common/shared/runtime-shared.ts
+ M src/common/编排/flow-service.ts
+ M src/common/编排/flow-state.ts
+ M src/common/编排/team-plan.ts
+ M src/common/门禁引擎/governance-roles.ts
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/flow-state.ts
+ M src/pipeline/orchestration/govern-session.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/provider/runtime/tools.ts
+ M test/runtime-core/governance-flow-metadata.test.ts
+ M test/runtime-core/tools.test.ts
+ M test/桌面UI/runtime-config.test.ts
+ M test/桌面UI/source-guard.test.ts
+ M test/桌面应用/acceptance-dispatch.test.ts
+ M test/桌面应用/boundary-refresh.test.ts
+ M test/桌面应用/e2e/main.mjs
+ M test/桌面应用/interface.test.ts
+ M test/桌面应用/multi-runtime.test.ts
+ M test/桌面应用/operator-wiring.test.ts
+ M test/桌面应用/pi-config.test.ts
+ M test/桌面应用/session.test.ts
+ M test/测试/existing-project-compat-verify/b-establish.test.ts
+ M test/测试/g5-reasoning-verify/f-settings.test.ts
+ M test/测试/governance-e2e-auto/b-proposal-accept-timing.test.ts
+ M test/测试/governance-e2e-auto/fixture.ts
+ M test/测试/governance-e2e-auto/i-full-chain.test.ts
+ M test/测试/governance-e2e-auto/p-team-plan-guard.test.ts
+ M test/测试/governance-e2e-auto/q-role-granularity.test.ts
+ M test/测试/governance-e2e-auto/r-mapreduce-parallel.test.ts
+ M test/测试/t29-pi-config-roundtrip.test.ts
+ M test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts
+ M test/编排/flow-service.test.ts
+ M test/编排/flow-state.test.ts
+ M test/编排/team-plan.test.ts
+ M test/门禁引擎/governance-standard-workflow.test.ts
+ M test/门禁引擎/governance-trio.test.ts
+ M test/项目管理/shared/runtime-settings.test.ts
+ M test/项目管理/shared/runtime-shared.test.ts
+ M 角色卡/桌面UI/api-spec.md
+ M 角色卡/桌面窗口/api-spec.md
+ M 角色卡/桌面窗口/boundary.md
+ M 角色卡/桌面窗口/changelog.md
+ M 角色卡/测试/memo.md
+ M 角色卡/编排/api-spec.md
+ M 角色卡/编排/boundary.md
+ M 角色卡/编排/changelog.md
+ M 角色卡/运行时核心/api-spec.md
+ M 角色卡/运行时核心/memo.md
+ M 角色卡/门禁引擎/api-spec.md
+ M 角色卡/门禁引擎/memo.md
+ M 角色卡/项目管理/api-spec.md
+ M 角色卡/项目管理/docs/architecture/shared-components.md
+ M 角色卡/项目管理/memo.md
+?? .claude/
+?? app/desktop/i18n.ts
+?? app/desktop/preferences.ts
+?? app/renderer/src/i18n/
+?? demos/
+?? docs/acceptance/acceptance-rework-routing-criteria-v1.md
+?? docs/acceptance/acceptance-rework-routing-report-v1.md
+?? docs/acceptance/directory-ownership-criteria-v1.md
+?? docs/acceptance/directory-ownership-report-v1.md
+?? docs/acceptance/governance-advance-redispatch-criteria-v1.md
+?? docs/acceptance/governance-advance-redispatch-report-v1.md
+?? docs/acceptance/i18n-criteria-v1.md
+?? docs/acceptance/i18n-report-v1.md
+?? docs/acceptance/memo.md
+?? docs/acceptance/role-root-docs-display-criteria-v1.md
+?? docs/communication/2026-10-23_intent_acceptance-rework-routing.md
+?? docs/communication/2026-10-23_intent_artifact-observation-race.md
+?? docs/communication/2026-10-23_intent_governance-advance-redispatch.md
+?? docs/communication/2026-10-23_intent_i18n-and-directory-ownership.md
+?? docs/communication/2026-10-23_intent_role-root-docs-display.md
+?? docs/planning/2026-10-23_design_acceptance-rework-routing.md
+?? docs/planning/2026-10-23_design_artifact-observation-race.md
+?? docs/planning/2026-10-23_design_directory-ownership.md
+?? docs/planning/2026-10-23_design_governance-advance-redispatch.md
+?? docs/planning/2026-10-23_design_i18n.md
+?? docs/planning/2026-10-23_design_role-root-docs-display.md
+?? docs/scheduling/2026-10-23-acceptance-rework-routing-team-plan.md
+?? docs/scheduling/2026-10-23-directory-ownership-team-plan.md
+?? docs/scheduling/2026-10-23-governance-advance-redispatch-team-plan.md
+?? docs/scheduling/2026-10-23-i18n-team-plan.md
+?? docs/scheduling/2026-10-23-role-root-docs-display-team-plan.md
+?? docs/scheduling/acceptance-rework-routing-change-v1.md
+?? docs/scheduling/directory-ownership-change-v1.md
+?? docs/scheduling/governance-advance-redispatch-change-v1.md
+?? docs/scheduling/i18n-change-v1.md
+?? docs/scheduling/memo.md
+?? src/common/shared/i18n/
+?? src/common/编排/acceptance-rework.ts
+?? src/common/编排/directory-conformance.ts
+?? test/桌面UI/i18n-b1-b2.test.ts
+?? test/桌面UI/i18n-store.test.ts
+?? test/桌面UI/i18n-view.test.ts
+?? test/测试/directory-layout.test.ts
+?? test/测试/governance-e2e-auto/l-redispatch-reentrant-gate.test.ts
+?? test/测试/governance-e2e-auto/s-acceptance-rework-routing.test.ts
+?? test/测试/i18n-integration.test.ts
+?? test/测试/redispatch-target-recompute.ts
+?? test/编排/acceptance-rework.test.ts
+?? test/编排/directory-conformance.test.ts
+?? test/项目管理/shared/i18n-guard-allowlist.ts
+?? test/项目管理/shared/i18n-guard-scanner.ts
+?? test/项目管理/shared/i18n-guard.test.ts
+?? test/项目管理/shared/i18n.test.ts
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b0-evidence/
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b0.md
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b1-b2-evidence/
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b1-b2.md
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4-evidence/
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4.md
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_acceptance-rework-routing-evidence/
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_acceptance-rework-routing.md
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership-evidence/
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership.md
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch.md
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0.md
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b3-evidence/
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b3.md
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b4-desktop-evidence/
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b4-desktop.md
+?? 角色卡/测试/docs/change/2026-10-23-acceptance-rework-routing-baseline-evidence/
+?? 角色卡/测试/docs/change/2026-10-23-baseline-evidence/
+?? 角色卡/测试/docs/change/2026-10-23-directory-ownership-evidence/
+?? 角色卡/测试/docs/change/2026-10-23-governance-advance-redispatch-baseline-evidence/
+?? 角色卡/测试/docs/change/2026-10-23-governance-advance-redispatch-evidence/
+?? 角色卡/测试/docs/change/2026-10-23-governance-advance-redispatch-finding-convener-feedback-loop.md
+?? 角色卡/测试/docs/change/2026-10-23-i18n-integration-evidence/
+?? 角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-evidence/
+?? 角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-upstream-refreeze-evidence/
+?? 角色卡/测试/docs/change/2026-10-23_change_acceptance-rework-routing-baseline.md
+?? 角色卡/测试/docs/change/2026-10-23_change_acceptance-rework-routing-evidence/
+?? 角色卡/测试/docs/change/2026-10-23_change_acceptance-rework-routing.md
+?? 角色卡/测试/docs/change/2026-10-23_change_artifact-observation-race-verification-evidence/
+?? 角色卡/测试/docs/change/2026-10-23_change_directory-ownership.md
+?? 角色卡/测试/docs/change/2026-10-23_change_governance-advance-redispatch-baseline.md
+?? 角色卡/测试/docs/change/2026-10-23_change_governance-advance-redispatch.md
+?? 角色卡/测试/docs/change/2026-10-23_change_i18n-b4-consumers-evidence/
+?? 角色卡/测试/docs/change/2026-10-23_change_i18n-b4-consumers.md
+?? 角色卡/测试/docs/change/2026-10-23_change_i18n-directory-baseline.md
+?? 角色卡/测试/docs/change/2026-10-23_change_i18n-integration.md
+?? 角色卡/测试/docs/change/2026-10-23_change_role-root-docs-display-baseline.md
+?? 角色卡/编排/docs/change/2026-10-23_change_acceptance-rework-routing-evidence/
+?? 角色卡/编排/docs/change/2026-10-23_change_acceptance-rework-routing.md
+?? 角色卡/编排/docs/change/2026-10-23_change_artifact-observation-race-evidence/
+?? 角色卡/编排/docs/change/2026-10-23_change_artifact-observation-race.md
+?? 角色卡/编排/docs/change/2026-10-23_change_directory-ownership-evidence/
+?? 角色卡/编排/docs/change/2026-10-23_change_directory-ownership.md
+?? 角色卡/编排/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/
+?? 角色卡/编排/docs/change/2026-10-23_change_governance-advance-redispatch.md
+?? 角色卡/运行时核心/docs/change/2026-10-23_change_acceptance-rework-routing-evidence/
+?? 角色卡/运行时核心/docs/change/2026-10-23_change_acceptance-rework-routing.md
+?? 角色卡/运行时核心/docs/change/2026-10-23_change_directory-ownership-evidence/
+?? 角色卡/运行时核心/docs/change/2026-10-23_change_directory-ownership.md
+?? 角色卡/门禁引擎/docs/change/2026-10-23_change_directory-ownership-evidence/
+?? 角色卡/门禁引擎/docs/change/2026-10-23_change_directory-ownership.md
+?? 角色卡/项目管理/docs/change/2026-10-23_change_acceptance-rework-routing-evidence/
+?? 角色卡/项目管理/docs/change/2026-10-23_change_acceptance-rework-routing.md
+?? 角色卡/项目管理/docs/change/2026-10-23_change_i18n-allowlist-tighten-evidence/
+?? 角色卡/项目管理/docs/change/2026-10-23_change_i18n-allowlist-tighten.md
+?? 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0-evidence/
+?? 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0.md
+?? 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b2-key-supplement-evidence/
+?? 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b2-key-supplement.md
+?? 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b4-keys-evidence/
+?? 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b4-keys.md
+?? 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b3-key-supplement-evidence/
+?? 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b3-key-supplement.md
+?? 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b4-metadata-evidence/
+?? 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b4-metadata.md

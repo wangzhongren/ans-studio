@@ -1,0 +1,20 @@
+# 候选哈希（2026-10-23 实施后）
+
+`git hash-object`：
+```
+1faff2c6ba1e46875fb977aae2f998d11b9e5a96
+61f04d009336b87f63025c2081e6ac75bab659e4
+```
+
+`sha256sum`：
+```
+43511d2afa5e24cdfedfb1709e75dec83eebfed24f5efa8b01243f88365ccc1f *src/common/编排/flow-service.ts
+42881027a5c9eca2a0c9008e72241dfc6c5880145c19410dbb1eaaaf38313d33 *test/编排/flow-service.test.ts
+```
+
+行数：
+```
+  1857 src/common/编排/flow-service.ts
+  2388 test/编排/flow-service.test.ts
+  4245 total
+```

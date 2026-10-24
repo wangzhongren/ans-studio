@@ -1,18 +1,22 @@
 // src/common/编排/team-plan.ts
-// **团队计划 v2 的单一解析/校验实现**（2026-10-22 角色粒度/MapReduce；策划方案 §5，Q9 推荐 A）。
+// **团队计划 v2/v3 的单一解析/校验实现**（v2：2026-10-22 角色粒度/MapReduce；v3：2026-10-23
+// 目录级授权 + 目录规范，策划方案 `2026-10-23_design_directory-ownership.md` §4–§5）。
 //
 // 纪律：
 //   · 单一实现：`run-role.ts` 的卡前守卫与桌面写卡后校验（经 pipeline 公共出口）都消费本模块，
-//     不保留第二份 v2 解析；推荐集解析复用 `governance-judge-facts.ts::parseRecommendedRoleIds`。
-//   · 确定性：只做结构/覆盖/写集/环/并行组/粒度启发式（V1–V10），**不调用模型**、不做语义判断；
-//     语义复核仍归 Convener readiness。V11（flow-plan 一致性）在 flow 已写时做确定性核对。
-//   · 兼容：缺省或 `teamPlanSchema: 1` 的旧计划走 v1 分支（只保留既有表格结构检查），不强制新字段。
-//   · 旧计划/旧 flow/旧角色卡不重写；本模块只读文本、不写盘。
+//     不保留第二份 v2/v3 解析；推荐集解析复用 `governance-judge-facts.ts::parseRecommendedRoleIds`。
+//   · 确定性：只做结构/覆盖/写集/目录规范/环/并行组/粒度启发式（V1–V11 + V-D1–V-D9），**不调用模型**、
+//     不做语义判断；语义复核仍归 Convener readiness。V11（flow-plan 一致性）在 flow 已写时做确定性核对。
+//   · 兼容：缺省或 `teamPlanSchema: 1` 的旧计划走 v1 分支（只保留既有表格结构检查），不强制新字段；
+//     `teamPlanSchema: 2` 逐字保留 2026-10-22 行为；`teamPlanSchema: 3` = v2 字段 + 授权目录/目录规范。
+//   · 旧计划/旧 flow/旧角色卡不重写；本模块只读文本、不写盘（仅在给出 projectRoot 时做只读 realpath 核对）。
 //
 // 行号与字段以实际代码/策划方案正文为准；本模块不新增 cardKind / FlowStepKind / artifact kind。
 
+import { join as joinPath } from "node:path";
 import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 import { isBuiltInGovernanceRoleId } from "../../service/boundary/resolve-boundary.ts";
+import { compareKey, isUnderOrEqual, isWithinReal, realResolve, toPosix } from "../../common/shared/path-primitives.ts";
 import { parseRecommendedRoleIds } from "./governance-judge-facts.ts";
 import type { FlowState, FlowStateStep } from "./flow-state.ts";
 
@@ -20,6 +24,7 @@ import type { FlowState, FlowStateStep } from "./flow-state.ts";
 
 export const TEAM_PLAN_SCHEMA_LEGACY = 1;
 export const TEAM_PLAN_SCHEMA_V2 = 2;
+export const TEAM_PLAN_SCHEMA_V3 = 3;
 
 /** 团队计划模块清单行（frontmatter `modules` 的人类可读说明）。 */
 export interface TeamPlanModule {
@@ -27,6 +32,41 @@ export interface TeamPlanModule {
   responsibility: string;
   contract: string;
   architectureSource: string;
+  /** v3：模块实现目录（项目相对、以 `/` 结尾）；v3 每个 module 必填非空（Q9 A）。 */
+  implementationDir?: string;
+}
+
+/** 目录规范类型（设计 §4.3）。 */
+export type DirectoryKind = "implementation" | "tests" | "docs" | "evidence" | "shared";
+/** 目录共享策略（设计 §4.4）。 */
+export type DirectoryShared = "none" | "read-only" | "split";
+/** `允许子目录`：`—` 不许新建 / 显式列表 / `*` 一层 / `**` 任意层。 */
+export type DirectorySubdirs = string[] | "*" | "**" | "—";
+
+/**
+ * 目录规范行（v3 团队计划「目录规范」表；设计 §4.3/§8.2）。
+ * 解析产物的字段为清洗后的原始值；结构化校验结果见 `TeamPlanIssue`。
+ */
+export interface DirectorySpec {
+  /** 项目相对目录（以 `/` 结尾；大小写按原样显示）。 */
+  dir: string;
+  /** 唯一写角色（roleId）。 */
+  owner: string;
+  kind: DirectoryKind;
+  purpose: string;
+  /** `any` / `kebab-case` / `camelCase` / `snake_case` / `PascalCase` / `*.test.ts` / `/regex/`。 */
+  naming: string;
+  subdirs: DirectorySubdirs;
+  /** 允许文件扩展名（含前导点）；`*` 仅 docs/evidence。 */
+  extensions: string[];
+  /** 公开契约路径或 `internal` + 非空理由。 */
+  contract: string;
+  testSurface: string[];
+  /** 本计划目录（以 `/` 结尾）或外部契约路径；无依赖为空数组。 */
+  dependencies: string[];
+  /** 目录内禁写区（相对前缀/文件名/`*.ext`）。 */
+  forbidden: string[];
+  shared: DirectoryShared;
 }
 
 /** 写集条目（精确路径；目录以 `/` 结尾）。 */
@@ -52,9 +92,21 @@ export interface TeamPlanRoleRow {
   primaryModule?: string;
   duty: string;
   ability: string;
-  /** 唯一写集原始单元格。 */
+  /** 唯一写集原始单元格（v2；v3 = `精确写集` 原始单元格）。 */
   writeset: string;
   writesets: WritesetEntry[];
+  /** v3：`授权目录` 原始单元格（分号分隔目录条目）。 */
+  authorizedDirsRaw: string;
+  /** v3：解析后的授权目录条目（必须是目录；非法项在 issues 报告）。 */
+  authorizedDirs: WritesetEntry[];
+  /** v3：`精确写集` 原始单元格（`无` 合法）。 */
+  preciseWritesetRaw: string;
+  /** v3：解析后的精确写集条目（文件；目录应放 `授权目录`）。 */
+  preciseWritesets: WritesetEntry[];
+  /** v3：`授权目录` 单元格解析问题（不含治理/归属判定）。 */
+  authorizedDirIssues: string[];
+  /** v3：`精确写集` 单元格解析问题（不含治理/归属判定）。 */
+  preciseWritesetIssues: string[];
   contracts: string[];
   testSurface: string[];
   /** 人类可读依赖说明（`无` 合法）。 */
@@ -88,7 +140,7 @@ export interface TeamPlanParseResult {
   ok: boolean;
   /** 缺省/`teamPlanSchema: 1` ⇒ true（只跑既有 v1 表格检查）。 */
   legacy: boolean;
-  teamPlanSchema: 1 | 2;
+  teamPlanSchema: 1 | 2 | 3;
   flowId?: string;
   version?: number;
   riskTier?: string;
@@ -96,6 +148,10 @@ export interface TeamPlanParseResult {
   modules: string[];
   moduleList: TeamPlanModule[];
   roleRows: TeamPlanRoleRow[];
+  /** v3：frontmatter `directories`（规范化、以 `/` 结尾；v1/v2 为空）。 */
+  directories: string[];
+  /** v3：目录规范表（v1/v2 为空）。 */
+  directorySpecs: DirectorySpec[];
   /** 全部问题（error 阻断；warning/exception-review 记录但不阻断发卡）。 */
   issues: TeamPlanIssue[];
 }
@@ -103,6 +159,11 @@ export interface TeamPlanParseResult {
 export interface ParseTeamPlanOptions {
   /** 期望的 flowId（卡片/文件名）；给出时 frontmatter 必须一致。 */
   flowId?: string;
+  /**
+   * 项目根（可选；只读）：给出时对 v3 目录/写集路径的已存在祖先做 realpath 逃逸核对（V-D9）。
+   * 未给出时只做词法路径安全核对；不写盘、不读 git。
+   */
+  projectRoot?: string;
 }
 
 // —————————————————————— 基础工具 ——————————————————————
@@ -203,6 +264,7 @@ const MODULE_TABLE_PATTERNS = {
   responsibility: /^(职责|responsibility|purpose)$/,
   contract: /^(公开契约|契约|contract|publiccontract)$/,
   architectureSource: /^(架构来源|架构依据|架构引用|source|architecturesource)$/,
+  implementationDir: /^(实现目录|implementationdir|implementationdirectory|impldir)$/,
 } as const;
 
 function cleanCell(value: unknown): string {
@@ -218,6 +280,15 @@ function cleanCell(value: unknown): string {
 
 function isEmptyCell(value: string): boolean {
   return value === "" || value === "-" || value === "—" || value === "–";
+}
+
+/**
+ * 目录规范/路径单元格清洗：只去首尾反引号与空白，**不**剥离开头的 `*`/`_`
+ * （`*.test.ts`、`*.log`、`*` 是有效语法；`cleanCell` 会把开头的 `*` 当 Markdown 粗体剥掉）。
+ */
+function cleanSpecCell(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.trim().replace(/^`+/, "").replace(/`+$/, "").trim();
 }
 
 function unquote(value: string): string {
@@ -335,6 +406,623 @@ export function writesetsOverlap(a: WritesetEntry, b: WritesetEntry): boolean {
   if (b.directory) return aPath === bPath || aPath.startsWith(`${bPath}/`);
   return aPath === bPath;
 }
+
+// —————————————————————— v3：治理关键路径 / 目录规范 ——————————————————————
+
+/**
+ * 治理关键路径（目录级）：**不得**作为普通 `授权目录`（设计 §5.5，V-D1/V-D7）。
+ * 覆盖检查按「相等或互为祖先/子目录」判定——例如 `docs/` 会因包含 `docs/scheduling/` 而被拒绝。
+ */
+const GOVERNANCE_DIRECTORY_PATHS: readonly string[] = [
+  ".ans",
+  "角色卡",
+  "docs/scheduling",
+  "docs/acceptance",
+  "docs/communication",
+  "docs/flows",
+  "docs/nominations",
+  "docs/verification",
+  "src/common/shared",
+  "src/model",
+  ".github/workflows",
+  "src/common/装配",
+];
+
+/** 密钥/环境路径的目录段（V-D7；`.env`、`.env.*` 与常见密钥目录）。 */
+const SECRET_DIRECTORY_SEGMENTS: ReadonlySet<string> = new Set([
+  ".env",
+  "secrets",
+  ".secrets",
+  "credentials",
+  ".ssh",
+  "keys",
+]);
+
+/** 整层/整应用目录名黑名单（V-D6 tripwire；只匹配单段目录，如 `src/`、`app/`、`test/`）。 */
+const WHOLE_LAYER_DIR_NAMES: ReadonlySet<string> = new Set([
+  "src",
+  "app",
+  "test",
+  "tests",
+  "common",
+  "shared",
+  "utils",
+  "util",
+  "lib",
+  "libs",
+  "components",
+  "services",
+  "models",
+  "views",
+  "controllers",
+  "helpers",
+  "hooks",
+  "pages",
+  "packages",
+  "modules",
+  "misc",
+  "all",
+]);
+
+const DIRECTORY_KINDS: readonly DirectoryKind[] = ["implementation", "tests", "docs", "evidence", "shared"];
+const DIRECTORY_SHARED_VALUES: readonly DirectoryShared[] = ["none", "read-only", "split"];
+const NAMING_ENUMS: ReadonlySet<string> = new Set(["any", "kebab-case", "camelCase", "snake_case", "PascalCase"]);
+
+/** v3 角色表列（v2 列 + `授权目录`；`唯一写集` 为 `精确写集` 的别名）。 */
+const ROLE_TABLE_COLUMNS_V3 = [
+  "roleId",
+  "type",
+  "module",
+  "duty",
+  "ability",
+  "authorizedDirs",
+  "writes",
+  "contract",
+  "testSurface",
+  "deps",
+  "dependsOn",
+  "parallelGroup",
+  "group",
+  "apiSpec",
+  "granularityRationale",
+] as const;
+
+const ROLE_TABLE_PATTERNS_V3: Record<string, RegExp> = {
+  roleId: /^(roleid|角色id)$/,
+  type: /^(类型|type|roletype)$/,
+  module: /^(module|boundedcontext|模块|模块id)$/,
+  duty: /^(职责目标|职责|duty|responsibility)$/,
+  ability: /^(能力要求|能力|ability|capability)$/,
+  authorizedDirs: /^(授权目录|目录授权|authorizeddirs|authorizeddirectories|alloweddirs|alloweddirectories|directories)$/,
+  // v3 不再接受 v2 的「边界」别名（避免与目录列歧义）；`唯一写集` 仅作兼容别名（warning）。
+  writes: /^(精确写集|精确写入|precisewriteset|precisewrites|writeset|writes|write|唯一写集)$/,
+  contract: /^(公开契约|契约|contract|publiccontract)$/,
+  testSurface: /^(测试面|testsurface|测试范围|testscope)$/,
+  deps: /^(依赖|依赖说明|deps|dependencies)$/,
+  dependsOn: /^(dependson|机器依赖)$/,
+  parallelGroup: /^(并行组|parallelgroup|parallel)$/,
+  group: /^(组别|group|category)$/,
+  apiSpec: /^(apispec|接口声明)$/,
+  granularityRationale: /^(粒度理由|granularityrationale|granularityreason|granularity)$/,
+};
+
+const ROLE_TABLE_LABEL_V3: Record<string, string> = {
+  ...ROLE_TABLE_LABEL,
+  authorizedDirs: "授权目录",
+  writes: "精确写集",
+};
+
+const DIRECTORY_TABLE_PATTERNS: Record<keyof DirectorySpec, RegExp> = {
+  dir: /^(目录|目录路径|dir|directory)$/,
+  owner: /^(owner|属主|所有者)$/,
+  kind: /^(类型|kind|type)$/,
+  purpose: /^(用途|purpose|responsibility)$/,
+  naming: /^(命名|命名规则|naming)$/,
+  subdirs: /^(允许子目录|子目录|subdirs|subdirectories|allowedsubdirs)$/,
+  extensions: /^(允许文件类型|文件类型|extensions|filetypes|allowedfiletypes)$/,
+  contract: /^(公开契约|契约|contract|publiccontract)$/,
+  testSurface: /^(测试面|testsurface|testscope)$/,
+  dependencies: /^(依赖|dependencies|deps)$/,
+  forbidden: /^(禁写区|forbidden|forbiddenzones)$/,
+  shared: /^(共享|shared|sharing)$/,
+};
+
+const DIRECTORY_TABLE_LABELS: Record<keyof DirectorySpec, string> = {
+  dir: "目录",
+  owner: "owner",
+  kind: "类型",
+  purpose: "用途",
+  naming: "命名",
+  subdirs: "允许子目录",
+  extensions: "允许文件类型",
+  contract: "公开契约",
+  testSurface: "测试面",
+  dependencies: "依赖",
+  forbidden: "禁写区",
+  shared: "共享",
+};
+
+interface ParsedPlanPath {
+  /** 规范化路径（目录保留结尾 `/`；非法时可能为 undefined）。 */
+  path?: string;
+  directory: boolean;
+  issues: string[];
+}
+
+/** 词法路径安全核对（V-D1/V-D9；不触碰文件系统）。 */
+function parsePlanPath(raw: string, wantDirectory: boolean): ParsedPlanPath {
+  const text = cleanSpecCell(raw);
+  const issues: string[] = [];
+  if (text === "" || text === "-" || text === "—" || text === "–") {
+    return { directory: wantDirectory, issues: ["为空"] };
+  }
+  if (/\s/.test(text)) issues.push("含空白/散文");
+  if (/[*?[\]{}]/.test(text) || text.includes("...") || text.includes("…")) issues.push("含通配符/省略号");
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(text)) issues.push("是 URL");
+  let posix = toPosix(text);
+  if (posix.startsWith("./")) posix = posix.slice(2);
+  if (posix.startsWith("//")) {
+    issues.push("是 UNC 路径");
+  } else if (posix.startsWith("/") || /^[A-Za-z]:\//.test(posix) || /^[A-Za-z]:$/.test(posix)) {
+    issues.push("是绝对路径/盘符");
+  }
+  const directory = posix.endsWith("/");
+  if (wantDirectory && !directory) issues.push("目录必须以 / 结尾");
+  if (!wantDirectory && directory) issues.push("必须是精确文件（目录请放「授权目录」）");
+  const trimmed = posix.replace(/\/+$/, "");
+  const segments = trimmed.split("/");
+  if (trimmed === "" || segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
+    issues.push("含空段/./..");
+  }
+  for (const segment of segments) {
+    if (/[ .]$/.test(segment)) issues.push(`路径段「${segment}」以空格或点结尾`);
+  }
+  const normalized = trimmed === "" ? undefined : `${trimmed}/`;
+  return {
+    ...(normalized !== undefined ? { path: wantDirectory || directory ? normalized : trimmed } : {}),
+    directory,
+    issues,
+  };
+}
+
+/** 治理关键路径命中（V-D1/V-D7；相等或互为祖先/子目录）。返回命中的治理根。 */
+export function governanceDirectoryHit(value: string): string | undefined {
+  const dir = compareKey(toPosix(value).replace(/\/+$/, ""));
+  if (dir === "") return undefined;
+  for (const rootRaw of GOVERNANCE_DIRECTORY_PATHS) {
+    const root = compareKey(rootRaw);
+    if (dir === root || dir.startsWith(`${root}/`) || root.startsWith(`${dir}/`)) return rootRaw;
+  }
+  return undefined;
+}
+
+/** 密钥/环境目录段命中（V-D7）。 */
+function secretDirectoryHit(value: string): string | undefined {
+  const segments = toPosix(value).replace(/\/+$/, "").split("/");
+  for (const segment of segments) {
+    const lower = segment.toLowerCase();
+    if (SECRET_DIRECTORY_SEGMENTS.has(lower) || lower.startsWith(".env.")) return segment;
+  }
+  return undefined;
+}
+
+/** 单段整层名（V-D6 tripwire）。 */
+function wholeLayerDirectoryHit(value: string): string | undefined {
+  const trimmed = toPosix(value).replace(/\/+$/, "");
+  if (trimmed === "" || trimmed.includes("/")) return undefined;
+  return WHOLE_LAYER_DIR_NAMES.has(trimmed.toLowerCase()) ? trimmed : undefined;
+}
+
+/** 大小写不敏感比较下的两条 v3 路径是否重叠（V-D4）。 */
+function planPathsOverlap(a: WritesetEntry, b: WritesetEntry): boolean {
+  const left: WritesetEntry = { ...a, path: compareKey(a.path) };
+  const right: WritesetEntry = { ...b, path: compareKey(b.path) };
+  return writesetsOverlap(left, right);
+}
+
+/** 精确写集单元格（v3）：`无`/空 ⇒ 空集；目录项允许但会提示应放 `授权目录`。 */
+function parsePreciseWritesetCell(raw: string): { entries: WritesetEntry[]; issues: string[] } {
+  if (isNoDependencyCell(raw)) return { entries: [], issues: [] };
+  const entries: WritesetEntry[] = [];
+  const issues: string[] = [];
+  const seen = new Set<string>();
+  for (const partRaw of raw.split(/[;；]/)) {
+    const part = cleanSpecCell(partRaw);
+    if (part === "") {
+      issues.push("精确写集存在空项（分号之间不得为空）");
+      continue;
+    }
+    const directory = toPosix(part).endsWith("/");
+    const parsed = parsePlanPath(part, directory);
+    for (const issue of parsed.issues) issues.push(`精确写集项「${part}」${issue}`);
+    if (parsed.path === undefined || parsed.issues.length > 0) continue;
+    const key = compareKey(parsed.path);
+    if (seen.has(key)) {
+      issues.push(`精确写集项「${part}」重复出现`);
+      continue;
+    }
+    seen.add(key);
+    entries.push({ raw: part, path: parsed.path, directory });
+  }
+  return { entries, issues };
+}
+
+/** 授权目录单元格（v3）：`无`/空 ⇒ 空集；每项必须是目录。 */
+function parseAuthorizedDirsCell(raw: string): { entries: WritesetEntry[]; issues: string[] } {
+  if (isNoDependencyCell(raw)) return { entries: [], issues: [] };
+  const entries: WritesetEntry[] = [];
+  const issues: string[] = [];
+  const seen = new Set<string>();
+  for (const partRaw of raw.split(/[;；]/)) {
+    const part = cleanSpecCell(partRaw);
+    if (part === "") {
+      issues.push("授权目录存在空项（分号之间不得为空）");
+      continue;
+    }
+    const parsed = parsePlanPath(part, true);
+    for (const issue of parsed.issues) issues.push(`授权目录项「${part}」${issue}`);
+    if (parsed.path === undefined || parsed.issues.length > 0) continue;
+    const key = compareKey(parsed.path);
+    if (seen.has(key)) {
+      issues.push(`授权目录项「${part}」重复出现`);
+      continue;
+    }
+    seen.add(key);
+    entries.push({ raw: part, path: parsed.path, directory: true });
+  }
+  return { entries, issues };
+}
+
+/** 命名规范是否合法（固定枚举 / `*.test.ts` 通配 / `/regex/`）。 */
+function isValidNamingSpec(raw: string): boolean {
+  const value = cleanSpecCell(raw);
+  if (NAMING_ENUMS.has(value)) return true;
+  if (/^\*\.[A-Za-z0-9._-]+$/.test(value)) return true;
+  if (/^\/.+\/[a-z]*$/.test(value)) {
+    const match = /^\/(.+)\/([a-z]*)$/.exec(value);
+    if (match === null) return false;
+    try {
+      new RegExp(match[1]!, match[2]!);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+function parseSubdirsCell(raw: string): { value: DirectorySubdirs; issues: string[] } {
+  const text = cleanSpecCell(raw);
+  const issues: string[] = [];
+  if (text === "" || text === "—" || text === "–" || text === "-" || text.toLowerCase() === "none") {
+    return { value: "—", issues };
+  }
+  if (text === "*") return { value: "*", issues };
+  if (text === "**") return { value: "**", issues };
+  const list: string[] = [];
+  for (const partRaw of text.split(/[;；]/)) {
+    const part = cleanSpecCell(partRaw).replace(/\/+$/, "");
+    if (part === "") {
+      issues.push("允许子目录存在空项");
+      continue;
+    }
+    if (/[\\/]/.test(part) || /\s/.test(part) || part === "." || part === ".." || /[*?[\]{}]/.test(part)) {
+      issues.push(`允许子目录项「${partRaw}」非法（只接受相对目录名，不含 /、空白、通配符或 ..）`);
+      continue;
+    }
+    list.push(part);
+  }
+  if (list.length === 0 && issues.length === 0) return { value: "—", issues };
+  return { value: list, issues };
+}
+
+function parseExtensionsCell(raw: string): { values: string[]; issues: string[] } {
+  const text = cleanSpecCell(raw);
+  const values: string[] = [];
+  const issues: string[] = [];
+  if (text === "" || text === "—" || text === "–" || text === "-" || text.toLowerCase() === "none") {
+    issues.push("允许文件类型不能为空（docs/evidence 可用 `*`）");
+    return { values, issues };
+  }
+  for (const partRaw of text.split(/[;；,，]/)) {
+    const part = cleanSpecCell(partRaw);
+    if (part === "") {
+      issues.push("允许文件类型存在空项");
+      continue;
+    }
+    if (part === "*") {
+      values.push(part);
+      continue;
+    }
+    if (!/^\.[A-Za-z0-9.+-]+$/.test(part)) {
+      issues.push(`允许文件类型「${part}」非法（须为 .ext 或 *）`);
+      continue;
+    }
+    if (values.includes(part)) {
+      issues.push(`允许文件类型「${part}」重复`);
+      continue;
+    }
+    values.push(part);
+  }
+  return { values, issues };
+}
+
+function parseDependenciesCell(raw: string): { values: string[]; issues: string[] } {
+  const text = cleanSpecCell(raw);
+  const values: string[] = [];
+  const issues: string[] = [];
+  if (isNoDependencyCell(text)) return { values, issues };
+  for (const partRaw of text.split(/[;；,，]/)) {
+    const part = cleanSpecCell(partRaw);
+    if (part === "") {
+      issues.push("依赖存在空项");
+      continue;
+    }
+    if (/\s/.test(part) || /[*?[\]{}]/.test(part)) {
+      issues.push(`依赖项「${part}」非法（不接受空白/通配符）`);
+      continue;
+    }
+    let normalized = toPosix(part);
+    if (normalized.startsWith("./")) normalized = normalized.slice(2);
+    const body = normalized.replace(/\/+$/, "");
+    if (normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized) || body.split("/").some((s) => s === "" || s === "." || s === "..")) {
+      issues.push(`依赖项「${part}」非法（须为本计划目录或外部契约路径）`);
+      continue;
+    }
+    const key = compareKey(normalized);
+    if (values.some((value) => compareKey(value) === key)) {
+      issues.push(`依赖项「${part}」重复`);
+      continue;
+    }
+    values.push(normalized);
+  }
+  return { values, issues };
+}
+
+function parseForbiddenCell(raw: string): { values: string[]; issues: string[] } {
+  const text = cleanSpecCell(raw);
+  const values: string[] = [];
+  const issues: string[] = [];
+  if (isNoDependencyCell(text)) return { values, issues };
+  for (const partRaw of text.split(/[;；]/)) {
+    const part = cleanSpecCell(partRaw);
+    if (part === "") {
+      issues.push("禁写区存在空项");
+      continue;
+    }
+    if (/\s/.test(part)) {
+      issues.push(`禁写区项「${part}」含空白`);
+      continue;
+    }
+    if (/^\*\.[A-Za-z0-9._-]+$/.test(part)) {
+      values.push(part);
+      continue;
+    }
+    let normalized = toPosix(part);
+    if (normalized.startsWith("./")) normalized = normalized.slice(2);
+    const body = normalized.replace(/\/+$/, "");
+    if (normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized) || body.split("/").some((s) => s === "" || s === "." || s === "..")) {
+      issues.push(`禁写区项「${part}」非法（必须是目录内相对路径/文件名/` + "`*.ext`" + `）`);
+      continue;
+    }
+    values.push(normalized);
+  }
+  return { values, issues };
+}
+
+function parseSharedCell(raw: string): { value: DirectoryShared; issues: string[] } {
+  const text = cleanSpecCell(raw).toLowerCase();
+  if (text === "none" || text === "无" || text === "—" || text === "-") return { value: "none", issues: [] };
+  if (text === "read-only" || text === "readonly" || text === "只读") return { value: "read-only", issues: [] };
+  if (text === "split" || text === "拆分") return { value: "split", issues: [] };
+  return { value: "none", issues: [`共享值「${cleanSpecCell(raw)}」非法；只能是 none / read-only / split`] };
+}
+
+function parseDirectoryKind(raw: string): DirectoryKind | undefined {
+  const text = cleanSpecCell(raw).toLowerCase();
+  return (DIRECTORY_KINDS as readonly string[]).includes(text) ? (text as DirectoryKind) : undefined;
+}
+
+function contractReason(raw: string): string {
+  return cleanSpecCell(raw)
+    .replace(/^internal\b/i, "")
+    .replace(/^[\s（(：:—–\-,，;；]+/, "")
+    .replace(/[\s）)]+$/, "")
+    .trim();
+}
+
+// —————————————————————— v3：目录规范表解析 ——————————————————————
+
+interface DirectorySpecRowParse {
+  specs: DirectorySpec[];
+  /** key（compareKey 后的 dir）→ 行数（检测重复行）。 */
+  duplicateDirs: string[];
+}
+
+function parseDirectorySpecTable(
+  lines: readonly string[],
+  issues: TeamPlanIssue[],
+): DirectorySpecRowParse {
+  const specs: DirectorySpec[] = [];
+  const duplicateDirs: string[] = [];
+  const table = findTableAfterHeading(
+    lines,
+    /^\s{0,3}#{1,6}\s*(?:[0-9]+[.、]?\s*)?(?:目录规范|目录规范表|directory\s*spec)/i,
+  );
+  if (table === undefined) {
+    issues.push({
+      code: "V-D2",
+      severity: "error",
+      message:
+        "v3 团队计划缺少「目录规范」表（表头 目录/owner/类型/用途/命名/允许子目录/允许文件类型/公开契约/测试面/依赖/禁写区/共享）",
+    });
+    return { specs, duplicateDirs };
+  }
+  const header = table.header.map(normalizeHeaderCell);
+  const columnOf = new Map<keyof DirectorySpec, number>();
+  for (const key of Object.keys(DIRECTORY_TABLE_PATTERNS) as Array<keyof DirectorySpec>) {
+    const matches = header
+      .map((cell, index) => (DIRECTORY_TABLE_PATTERNS[key].test(cell) ? index : -1))
+      .filter((index) => index !== -1);
+    if (matches.length > 1) {
+      issues.push({
+        code: "V-D2",
+        severity: "error",
+        path: `directories.header.${key}`,
+        message: `目录规范表列「${DIRECTORY_TABLE_LABELS[key]}」重复/歧义（第 ${matches.map((index) => index + 1).join("、")} 列）`,
+      });
+    } else if (matches.length === 1) {
+      columnOf.set(key, matches[0]!);
+    }
+  }
+  const missing = (Object.keys(DIRECTORY_TABLE_PATTERNS) as Array<keyof DirectorySpec>).filter(
+    (key) => !columnOf.has(key) && !issues.some((issue) => issue.path === `directories.header.${key}`),
+  );
+  if (missing.length > 0) {
+    issues.push({
+      code: "V-D2",
+      severity: "error",
+      message: `目录规范表缺少必需列（${missing.map((key) => DIRECTORY_TABLE_LABELS[key]).join("/")}）`,
+    });
+  }
+  const seen = new Set<string>();
+  for (const cells of table.rows) {
+    const cell = (key: keyof DirectorySpec): string => cleanSpecCell(cells[columnOf.get(key) ?? -1] ?? "");
+    if (cells.every((value) => value.trim() === "")) continue;
+    const rawDir = cell("dir");
+    const parsedDir = parsePlanPath(rawDir, true);
+    for (const issue of parsedDir.issues) {
+      issues.push({ code: "V-D5", severity: "error", path: rawDir, message: `目录规范「${rawDir}」${issue}` });
+    }
+    if (parsedDir.path === undefined || parsedDir.issues.length > 0) continue;
+    const dir = parsedDir.path;
+    const key = compareKey(dir);
+    if (seen.has(key)) {
+      duplicateDirs.push(dir);
+      issues.push({ code: "V-D2", severity: "error", path: dir, message: `目录规范重复列出目录「${dir}」（每个目录恰好一行）` });
+      continue;
+    }
+    seen.add(key);
+
+    const owner = cell("owner");
+    if (owner === "") {
+      issues.push({ code: "V-D2", severity: "error", path: dir, message: `目录规范「${dir}」的 owner 为空` });
+    }
+    const kindRaw = cell("kind");
+    const kind = parseDirectoryKind(kindRaw);
+    if (kind === undefined) {
+      issues.push({
+        code: "V-D2",
+        severity: "error",
+        path: dir,
+        message: `目录规范「${dir}」的类型「${kindRaw}」非法；只能是 ${DIRECTORY_KINDS.join("/")}`,
+      });
+    }
+    const purpose = cell("purpose");
+    if (purpose === "" || isEmptyCell(purpose)) {
+      issues.push({ code: "V-D2", severity: "error", path: dir, message: `目录规范「${dir}」的用途为空` });
+    }
+    const naming = cell("naming");
+    if (naming === "" || !isValidNamingSpec(naming)) {
+      issues.push({
+        code: "V-D5",
+        severity: "error",
+        path: dir,
+        message: `目录规范「${dir}」的命名「${naming}」非法；须为 any/kebab-case/camelCase/snake_case/PascalCase、*.ext 通配或 /regex/`,
+      });
+    }
+    const subdirs = parseSubdirsCell(cell("subdirs"));
+    for (const issue of subdirs.issues) {
+      issues.push({ code: "V-D5", severity: "error", path: dir, message: `目录规范「${dir}」${issue}` });
+    }
+    const extensions = parseExtensionsCell(cell("extensions"));
+    for (const issue of extensions.issues) {
+      issues.push({ code: "V-D5", severity: "error", path: dir, message: `目录规范「${dir}」${issue}` });
+    }
+    if (kind !== undefined && kind !== "docs" && kind !== "evidence" && extensions.values.includes("*")) {
+      issues.push({
+        code: "V-D5",
+        severity: "error",
+        path: dir,
+        message: `目录规范「${dir}」的允许文件类型不能使用 \`*\`（仅 docs/evidence 可用）`,
+      });
+    }
+    const contract = cell("contract");
+    if (contract === "" || isEmptyCell(contract)) {
+      issues.push({ code: "V-D2", severity: "error", path: dir, message: `目录规范「${dir}」的公开契约为空` });
+    } else if (/^internal\b/i.test(contract) && contractReason(contract) === "") {
+      issues.push({
+        code: "V-D5",
+        severity: "error",
+        path: dir,
+        message: `目录规范「${dir}」的公开契约 internal 必须附非空理由`,
+      });
+    } else if (!/^internal\b/i.test(contract) && !/[\\/]/.test(contract) && !/\.md$/i.test(contract)) {
+      issues.push({
+        code: "V-D5",
+        severity: "error",
+        path: dir,
+        message: `目录规范「${dir}」的公开契约「${contract}」须为路径或 internal + 理由`,
+      });
+    }
+    const testSurfaceRaw = cell("testSurface");
+    const testSurface = isEmptyCell(testSurfaceRaw) || testSurfaceRaw === "—" ? [] : splitListCell(testSurfaceRaw);
+    const testSurfaceOptional = kind === "docs" || kind === "evidence";
+    if (testSurface.length === 0 && !testSurfaceOptional) {
+      issues.push({
+        code: "V-D2",
+        severity: "error",
+        path: dir,
+        message: `目录规范「${dir}」的测试面为空（${String(kind)} 类型必填；docs/evidence 可写 \`—\`）`,
+      });
+    }
+    const dependencies = parseDependenciesCell(cell("dependencies"));
+    for (const issue of dependencies.issues) {
+      issues.push({ code: "V-D5", severity: "error", path: dir, message: `目录规范「${dir}」${issue}` });
+    }
+    const forbidden = parseForbiddenCell(cell("forbidden"));
+    for (const issue of forbidden.issues) {
+      issues.push({ code: "V-D5", severity: "error", path: dir, message: `目录规范「${dir}」${issue}` });
+    }
+    const shared = parseSharedCell(cell("shared"));
+    for (const issue of shared.issues) {
+      issues.push({ code: "V-D2", severity: "error", path: dir, message: `目录规范「${dir}」${issue}` });
+    }
+    const requiredRawFields: Array<[keyof DirectorySpec, string]> = [
+      ["subdirs", "允许子目录"],
+      ["dependencies", "依赖"],
+      ["forbidden", "禁写区"],
+      ["shared", "共享"],
+    ];
+    for (const [field, label] of requiredRawFields) {
+      if (cell(field) === "") {
+        issues.push({
+          code: "V-D2",
+          severity: "error",
+          path: dir,
+          message: `目录规范「${dir}」的${label}为空（必填；无请写 —/无/none）`,
+        });
+      }
+    }
+
+    specs.push({
+      dir,
+      owner,
+      kind: kind ?? "implementation",
+      purpose,
+      naming,
+      subdirs: subdirs.value,
+      extensions: extensions.values,
+      contract,
+      testSurface,
+      dependencies: dependencies.values,
+      forbidden: forbidden.values,
+      shared: shared.value,
+    });
+  }
+  return { specs, duplicateDirs };
+}
+
 
 // —————————————————————— frontmatter ——————————————————————
 
@@ -545,8 +1233,12 @@ function apiSpecOf(raw: string): { status?: "required" | "not-applicable"; reaso
   return reason === "" ? { status } : { status, reason };
 }
 
-function parseRoleRow(cells: readonly string[], columnOf: Map<RoleTableColumn, number>): TeamPlanRoleRow {
-  const cell = (column: RoleTableColumn): string => cleanCell(cells[columnOf.get(column) ?? -1] ?? "");
+function parseRoleRow(
+  cells: readonly string[],
+  columnOf: Map<string, number>,
+  v3 = false,
+): TeamPlanRoleRow {
+  const cell = (column: string): string => cleanCell(cells[columnOf.get(column) ?? -1] ?? "");
   const module = cell("module");
   const modules = splitModuleCell(module);
   const isReduce = modules.length === 1 && modules[0] === "reduce";
@@ -555,6 +1247,10 @@ function parseRoleRow(cells: readonly string[], columnOf: Map<RoleTableColumn, n
   const parsedApiSpec = apiSpecOf(apiSpec);
   const rawDependsOn = cell("dependsOn");
   const writeset = cell("writes");
+  const rawAuthorizedDirs = v3 ? cell("authorizedDirs") : "";
+  const authorized = v3 ? parseAuthorizedDirsCell(rawAuthorizedDirs) : { entries: [], issues: [] };
+  const precise = v3 ? parsePreciseWritesetCell(writeset) : { entries: parseWritesetCell(writeset).entries, issues: [] };
+  const writesets = v3 ? precise.entries : parseWritesetCell(writeset).entries;
   return {
     roleId: cell("roleId"),
     roleType: cell("type"),
@@ -564,7 +1260,13 @@ function parseRoleRow(cells: readonly string[], columnOf: Map<RoleTableColumn, n
     duty: cell("duty"),
     ability: cell("ability"),
     writeset,
-    writesets: parseWritesetCell(writeset).entries,
+    writesets,
+    authorizedDirsRaw: rawAuthorizedDirs,
+    authorizedDirs: authorized.entries,
+    preciseWritesetRaw: writeset,
+    preciseWritesets: writesets,
+    authorizedDirIssues: authorized.issues,
+    preciseWritesetIssues: precise.issues,
     contracts: splitListCell(cell("contract")),
     testSurface: splitListCell(cell("testSurface")),
     deps: cell("deps"),
@@ -606,15 +1308,16 @@ export function parseTeamPlan(text: string, options: ParseTeamPlanOptions = {}):
     : undefined;
   const schemaRaw = frontmatterFirst(frontmatter, "teamPlanSchema");
   const schemaValue = schemaRaw !== undefined ? unquote(schemaRaw) : undefined;
-  const teamPlanSchema: 1 | 2 = schemaValue === "2" ? 2 : 1;
+  const teamPlanSchema: 1 | 2 | 3 = schemaValue === "2" ? 2 : schemaValue === "3" ? 3 : 1;
   const legacy = teamPlanSchema === 1;
+  const v3 = teamPlanSchema === 3;
 
-  if (schemaValue !== undefined && schemaValue !== "1" && schemaValue !== "2") {
+  if (schemaValue !== undefined && schemaValue !== "1" && schemaValue !== "2" && schemaValue !== "3") {
     issues.push({
       code: "V1",
       severity: "error",
       path: "teamPlanSchema",
-      message: `teamPlanSchema 只能是 1（legacy）或 2；当前「${schemaValue}」`,
+      message: `teamPlanSchema 只能是 1（legacy）、2 或 3；当前「${schemaValue}」`,
     });
   }
 
@@ -637,6 +1340,8 @@ export function parseTeamPlan(text: string, options: ParseTeamPlanOptions = {}):
       modules: [],
       moduleList: [],
       roleRows: [],
+      directories: [],
+      directorySpecs: [],
       issues,
     };
   }
@@ -692,47 +1397,82 @@ export function parseTeamPlan(text: string, options: ParseTeamPlanOptions = {}):
 
   // ——————— V2：角色表列 ———————
   const roleTable = findRoleTable(lines);
-  const columnOf = new Map<RoleTableColumn, number>();
+  const columnOf = new Map<string, number>();
   const roleRows: TeamPlanRoleRow[] = [];
   if (roleTable === undefined) {
     issues.push({
       code: "V2",
       severity: "error",
-      message:
-        "团队计划缺少角色表（v2 表头须含 roleId/类型/module/职责目标/能力要求/唯一写集/公开契约/测试面/依赖/dependsOn/并行组/组别/apiSpec/粒度理由）",
+      message: v3
+        ? "团队计划缺少角色表（v3 表头须含 roleId/类型/module/职责目标/能力要求/授权目录/精确写集/公开契约/测试面/依赖/dependsOn/并行组/组别/apiSpec/粒度理由）"
+        : "团队计划缺少角色表（v2 表头须含 roleId/类型/module/职责目标/能力要求/唯一写集/公开契约/测试面/依赖/dependsOn/并行组/组别/apiSpec/粒度理由）",
     });
   } else {
     const header = roleTable.header.map(normalizeHeaderCell);
-    for (const column of ROLE_TABLE_COLUMNS) {
+    const columns: readonly string[] = v3 ? ROLE_TABLE_COLUMNS_V3 : ROLE_TABLE_COLUMNS;
+    const patterns: Record<string, RegExp> = v3
+      ? ROLE_TABLE_PATTERNS_V3
+      : (ROLE_TABLE_PATTERNS as unknown as Record<string, RegExp>);
+    const labels: Record<string, string> = v3
+      ? ROLE_TABLE_LABEL_V3
+      : (ROLE_TABLE_LABEL as unknown as Record<string, string>);
+    if (v3) {
+      for (const cell of header) {
+        if (cell === "边界") {
+          issues.push({
+            code: "V2",
+            severity: "error",
+            path: "roles.header.boundary",
+            message:
+              "v3 团队计划角色表不再接受「边界」列名（v2 别名）；精确文件请用「精确写集」，目录请用「授权目录」",
+          });
+        }
+      }
+    }
+    for (const column of columns) {
+      const pattern = patterns[column];
+      if (pattern === undefined) continue;
       const indexes = header
-        .map((cell, index) => (ROLE_TABLE_PATTERNS[column].test(cell) ? index : -1))
+        .map((cell, index) => (pattern.test(cell) ? index : -1))
         .filter((index) => index !== -1);
       if (indexes.length > 1) {
         issues.push({
           code: "V2",
           severity: "error",
           path: `roles.header.${column}`,
-          message: `团队计划角色表列「${ROLE_TABLE_LABEL[column]}」重复/歧义（第 ${indexes.map((index) => index + 1).join("、")} 列）`,
+          message: `团队计划角色表列「${labels[column] ?? column}」重复/歧义（第 ${indexes.map((index) => index + 1).join("、")} 列）`,
         });
       } else if (indexes.length === 1) {
         columnOf.set(column, indexes[0]!);
       }
     }
-    const missing = ROLE_TABLE_COLUMNS.filter((column) => !columnOf.has(column) && !issues.some(
+    const missing = columns.filter((column) => !columnOf.has(column) && !issues.some(
       (issue) => issue.path === `roles.header.${column}`,
     ));
     if (missing.length > 0) {
       issues.push({
         code: "V2",
         severity: "error",
-        message: `团队计划角色表缺少必需列（${missing.map((column) => ROLE_TABLE_LABEL[column]).join("/")}）`,
+        message: `团队计划角色表缺少必需列（${missing.map((column) => labels[column] ?? column).join("/")}）`,
       });
+    }
+    if (v3) {
+      const writesIndex = columnOf.get("writes");
+      if (writesIndex !== undefined && header[writesIndex] === "唯一写集") {
+        issues.push({
+          code: "V-D3",
+          severity: "warning",
+          path: "roles.header.writes",
+          message:
+            "v3 团队计划角色表使用「唯一写集」别名；已按「精确写集」处理（建议把列名改为「精确写集」）",
+        });
+      }
     }
     for (const cells of roleTable.rows) {
       if (cells.every((cell) => isSeparatorRow([cell]))) continue;
       const roleId = cleanCell(cells[columnOf.get("roleId") ?? -1] ?? "");
       if (roleId === "") continue;
-      roleRows.push(parseRoleRow(cells, columnOf));
+      roleRows.push(parseRoleRow(cells, columnOf, v3));
     }
   }
 
@@ -766,18 +1506,32 @@ export function parseTeamPlan(text: string, options: ParseTeamPlanOptions = {}):
       });
     }
   }
-  const requiredCells: Array<[string, keyof TeamPlanRoleRow]> = [
-    ["module", "module"],
-    ["职责目标", "duty"],
-    ["能力要求", "ability"],
-    ["唯一写集", "writeset"],
-    ["公开契约", "contracts"],
-    ["测试面", "testSurface"],
-    ["依赖", "deps"],
-    ["并行组", "parallelGroup"],
-    ["组别", "group"],
-    ["apiSpec", "apiSpec"],
-  ];
+  const requiredCells: Array<[string, keyof TeamPlanRoleRow]> = v3
+    ? [
+        ["module", "module"],
+        ["职责目标", "duty"],
+        ["能力要求", "ability"],
+        ["授权目录", "authorizedDirsRaw"],
+        ["精确写集", "writeset"],
+        ["公开契约", "contracts"],
+        ["测试面", "testSurface"],
+        ["依赖", "deps"],
+        ["并行组", "parallelGroup"],
+        ["组别", "group"],
+        ["apiSpec", "apiSpec"],
+      ]
+    : [
+        ["module", "module"],
+        ["职责目标", "duty"],
+        ["能力要求", "ability"],
+        ["唯一写集", "writeset"],
+        ["公开契约", "contracts"],
+        ["测试面", "testSurface"],
+        ["依赖", "deps"],
+        ["并行组", "parallelGroup"],
+        ["组别", "group"],
+        ["apiSpec", "apiSpec"],
+      ];
   for (const row of roleRows) {
     if (!["new", "changed", "existing"].includes(row.roleType)) {
       issues.push({
@@ -811,16 +1565,50 @@ export function parseTeamPlan(text: string, options: ParseTeamPlanOptions = {}):
     if (apiSpec.issue !== undefined) {
       issues.push({ code: "V3", severity: "error", roleId: row.roleId, message: `团队计划角色 ${row.roleId} ${apiSpec.issue}` });
     }
-    if (row.writeset !== "" && row.writesets.length === 0) {
-      issues.push({
-        code: "V5",
-        severity: "error",
-        roleId: row.roleId,
-        message: `团队计划角色 ${row.roleId} 的写集没有任何合法条目`,
-      });
-    }
-    for (const issue of parseWritesetCell(row.writeset).issues) {
-      issues.push({ code: "V5", severity: "error", roleId: row.roleId, message: `团队计划角色 ${row.roleId}：${issue}` });
+    if (v3) {
+      if (row.authorizedDirsRaw !== "" && row.authorizedDirs.length === 0 && !isNoDependencyCell(row.authorizedDirsRaw)) {
+        issues.push({
+          code: "V-D3",
+          severity: "error",
+          roleId: row.roleId,
+          message: `团队计划角色 ${row.roleId} 的授权目录没有任何合法条目`,
+        });
+      }
+      for (const issue of row.authorizedDirIssues) {
+        issues.push({ code: "V-D3", severity: "error", roleId: row.roleId, message: `团队计划角色 ${row.roleId}：${issue}` });
+      }
+      if (!isNoDependencyCell(row.preciseWritesetRaw) && row.preciseWritesets.length === 0) {
+        issues.push({
+          code: "V-D3",
+          severity: "error",
+          roleId: row.roleId,
+          message: `团队计划角色 ${row.roleId} 的精确写集没有任何合法条目`,
+        });
+      }
+      for (const issue of row.preciseWritesetIssues) {
+        issues.push({ code: "V-D3", severity: "error", roleId: row.roleId, message: `团队计划角色 ${row.roleId}：${issue}` });
+      }
+      for (const entry of row.preciseWritesets) {
+        if (!entry.directory) continue;
+        issues.push({
+          code: "V-D3",
+          severity: "warning",
+          roleId: row.roleId,
+          message: `团队计划角色 ${row.roleId} 的精确写集含目录「${entry.path}」；目录应优先放「授权目录」（warning，不硬拒）`,
+        });
+      }
+    } else {
+      if (row.writeset !== "" && row.writesets.length === 0) {
+        issues.push({
+          code: "V5",
+          severity: "error",
+          roleId: row.roleId,
+          message: `团队计划角色 ${row.roleId} 的写集没有任何合法条目`,
+        });
+      }
+      for (const issue of parseWritesetCell(row.writeset).issues) {
+        issues.push({ code: "V5", severity: "error", roleId: row.roleId, message: `团队计划角色 ${row.roleId}：${issue}` });
+      }
     }
     for (const contract of row.contracts) {
       if (/^internal\b/i.test(contract)) {
@@ -855,7 +1643,7 @@ export function parseTeamPlan(text: string, options: ParseTeamPlanOptions = {}):
   }
 
   // ——————— V4：模块清单与模块覆盖 ———————
-  const moduleList = parseModuleList(lines, issues);
+  const moduleList = parseModuleList(lines, issues, v3);
   const listedModules = new Set(moduleList.map((row) => row.module));
   const declaredModules = new Set(modules);
   for (const module of modules) {
@@ -1112,11 +1900,29 @@ export function parseTeamPlan(text: string, options: ParseTeamPlanOptions = {}):
   }
   checkCoordinationSection(body, issues);
 
+  // ——————— V-D1–V-D9：目录级授权（仅 v3；v1/v2 不进入） ———————
+  let directories: string[] = [];
+  let directorySpecs: DirectorySpec[] = [];
+  if (v3) {
+    const v3Result = validateV3DirectoryOwnership({
+      frontmatter,
+      lines,
+      moduleList,
+      roleRows,
+      recommended,
+      reachableFrom,
+      issues,
+      ...(options.projectRoot !== undefined ? { projectRoot: options.projectRoot } : {}),
+    });
+    directories = v3Result.directories;
+    directorySpecs = v3Result.directorySpecs;
+  }
+
   const ok = !issues.some((issue) => issue.severity === "error");
   return {
     ok,
     legacy: false,
-    teamPlanSchema: 2,
+    teamPlanSchema,
     ...(flowId !== undefined && flowId !== "" ? { flowId } : {}),
     ...(version !== undefined ? { version } : {}),
     ...(riskTier !== undefined ? { riskTier } : {}),
@@ -1124,8 +1930,645 @@ export function parseTeamPlan(text: string, options: ParseTeamPlanOptions = {}):
     modules,
     moduleList,
     roleRows,
+    directories,
+    directorySpecs,
     issues,
   };
+}
+
+// —————————————————————— v3：V-D1–V-D9 目录级授权校验 ——————————————————————
+
+/** 解析 frontmatter `directories`（v3 必填；Q1 A 强制）。 */
+function parseTeamPlanDirectories(frontmatter: string, issues: TeamPlanIssue[]): string[] {
+  const values = frontmatterValues(frontmatter, "directories");
+  if (values.length === 0) {
+    issues.push({
+      code: "V-D1",
+      severity: "error",
+      path: "directories",
+      message:
+        "v3 团队计划缺少 frontmatter `directories`（须为同一行非空内联数组 `directories: [dir-a/, dir-b/]`；Q1 A 强制）",
+    });
+    return [];
+  }
+  const distinct = [...new Set(values.map((value) => value.trim()))];
+  if (distinct.length > 1) {
+    issues.push({
+      code: "V-D1",
+      severity: "error",
+      path: "directories",
+      message: "frontmatter 出现多个不一致的 directories（只能有一个机器可读来源）",
+    });
+  }
+  const value = values[0]!;
+  if (value === "") {
+    issues.push({
+      code: "V-D1",
+      severity: "error",
+      path: "directories",
+      message: "directories 必须写成同一行内联数组 `directories: [dir-a/, dir-b/]`（不接受 YAML 块数组）",
+    });
+    return [];
+  }
+  const cleaned = value.replace(/^\[/, "").replace(/\]$/, "").trim();
+  if (cleaned === "") {
+    issues.push({ code: "V-D1", severity: "error", path: "directories", message: "directories 不得为空（至少一个目录）" });
+    return [];
+  }
+  const dirs: string[] = [];
+  const seen = new Set<string>();
+  for (const partRaw of cleaned.split(/[,，、]/)) {
+    const part = cleanSpecCell(partRaw).replace(/^["']+/, "").replace(/["']+$/, "").trim();
+    if (part === "") {
+      issues.push({ code: "V-D1", severity: "error", path: "directories", message: "directories 存在空项/歧义" });
+      continue;
+    }
+    const parsed = parsePlanPath(part, true);
+    for (const issue of parsed.issues) {
+      issues.push({
+        code: "V-D1",
+        severity: "error",
+        path: "directories",
+        message: `directories 项「${part}」${issue}`,
+      });
+    }
+    if (parsed.path === undefined || parsed.issues.length > 0) continue;
+    const key = compareKey(parsed.path);
+    if (seen.has(key)) {
+      issues.push({
+        code: "V-D1",
+        severity: "error",
+        path: parsed.path,
+        message: `directories 重复列出目录「${parsed.path}」`,
+      });
+      continue;
+    }
+    seen.add(key);
+    const governance = governanceDirectoryHit(parsed.path);
+    if (governance !== undefined) {
+      issues.push({
+        code: "V-D1",
+        severity: "error",
+        path: parsed.path,
+        message: `目录「${parsed.path}」与治理关键路径「${governance}/」重叠；治理关键路径不得作为普通授权目录（V-D7）`,
+      });
+      continue;
+    }
+    const secret = secretDirectoryHit(parsed.path);
+    if (secret !== undefined) {
+      issues.push({
+        code: "V-D1",
+        severity: "error",
+        path: parsed.path,
+        message: `目录「${parsed.path}」命中密钥/环境路径段「${secret}」；不得作为普通授权目录`,
+      });
+      continue;
+    }
+    dirs.push(parsed.path);
+  }
+  return dirs;
+}
+
+interface V3DirectoryOwnershipArgs {
+  frontmatter: string;
+  lines: readonly string[];
+  moduleList: TeamPlanModule[];
+  roleRows: TeamPlanRoleRow[];
+  recommended: string[];
+  reachableFrom: (id: string) => Set<string>;
+  issues: TeamPlanIssue[];
+  projectRoot?: string;
+}
+
+/**
+ * V-D1–V-D9 的 v3 目录级授权校验（确定性；不调用模型、不做语义判断）。
+ * 语义复核（目录是否内聚、规范是否合理、共享是否必要、契约/测试面是否真实）仍归 Convener readiness。
+ */
+function validateV3DirectoryOwnership(args: V3DirectoryOwnershipArgs): {
+  directories: string[];
+  directorySpecs: DirectorySpec[];
+} {
+  const { issues, roleRows, recommended } = args;
+  const directories = parseTeamPlanDirectories(args.frontmatter, issues);
+  const specParse = parseDirectorySpecTable(args.lines, issues);
+  const directorySpecs = specParse.specs;
+  const declaredKeys = new Set(directories.map((dir) => compareKey(dir)));
+  const specByKey = new Map<string, DirectorySpec>();
+  for (const spec of directorySpecs) {
+    const key = compareKey(spec.dir);
+    if (specByKey.has(key)) continue; // 重复行已在解析时报告
+    specByKey.set(key, spec);
+  }
+
+  // ——————— V-D2：规范表恰好覆盖 directories；owner / 必填 / 枚举 ———————
+  for (const [key, spec] of specByKey) {
+    if (!declaredKeys.has(key)) {
+      issues.push({
+        code: "V-D2",
+        severity: "error",
+        path: spec.dir,
+        message: `目录规范含 frontmatter \`directories\` 未声明的目录「${spec.dir}」`,
+      });
+    }
+    if (spec.owner !== "" && !recommended.includes(spec.owner)) {
+      issues.push({
+        code: "V-D2",
+        severity: "error",
+        path: spec.dir,
+        message: `目录规范「${spec.dir}」的 owner「${spec.owner}」不是推荐角色（owner 必须是推荐集成员）`,
+      });
+    }
+  }
+  for (const dir of directories) {
+    if (!specByKey.has(compareKey(dir))) {
+      issues.push({
+        code: "V-D2",
+        severity: "error",
+        path: dir,
+        message: `目录规范缺少目录「${dir}」的规范行（frontmatter/规范表/角色表必须三处一致）`,
+      });
+    }
+  }
+
+  // ——————— V-D3：角色引用 / owner 一致 / 孤儿 / 文件例外 ———————
+  const references = new Map<string, string[]>();
+  for (const row of roleRows) {
+    for (const entry of row.authorizedDirs) {
+      const key = compareKey(entry.path);
+      if (!declaredKeys.has(key)) {
+        issues.push({
+          code: "V-D3",
+          severity: "error",
+          roleId: row.roleId,
+          path: entry.path,
+          message: `团队计划角色 ${row.roleId} 的授权目录「${entry.path}」不在 frontmatter \`directories\` 中`,
+        });
+        continue;
+      }
+      const spec = specByKey.get(key);
+      if (spec !== undefined && spec.owner !== row.roleId) {
+        issues.push({
+          code: "V-D3",
+          severity: "error",
+          roleId: row.roleId,
+          path: entry.path,
+          message: `团队计划角色 ${row.roleId} 引用了目录「${entry.path}」，但目录规范 owner 是「${spec.owner}」（owner 不一致）`,
+        });
+        continue;
+      }
+      const refs = references.get(key) ?? [];
+      if (!refs.includes(row.roleId)) refs.push(row.roleId);
+      references.set(key, refs);
+    }
+  }
+  for (const dir of directories) {
+    const key = compareKey(dir);
+    const spec = specByKey.get(key);
+    if (spec?.shared === "split") continue; // split 父目录是容器，本身不得直接分配（V-D5/V-D8）
+    const refs = references.get(key) ?? [];
+    if (refs.length === 0) {
+      issues.push({
+        code: "V-D3",
+        severity: "error",
+        path: dir,
+        message: `目录「${dir}」没有被任何角色行的「授权目录」引用（孤儿目录）`,
+      });
+    }
+  }
+  for (const id of recommended) {
+    const row = roleRows.find((candidate) => candidate.roleId === id);
+    if (row === undefined) continue; // 缺行已由 V3 报告
+    if (row.authorizedDirs.length === 0 && row.preciseWritesets.length === 0) {
+      issues.push({
+        code: "V-D3",
+        severity: "error",
+        roleId: row.roleId,
+        message: `推荐角色 ${row.roleId} 至少需要一个「授权目录」或「精确写集」（不能没有任何写权限）`,
+      });
+    } else if (row.authorizedDirs.length === 0 && row.granularityRationale === undefined) {
+      issues.push({
+        code: "V-D3",
+        severity: "error",
+        roleId: row.roleId,
+        message: `推荐角色 ${row.roleId} 只有「精确写集」文件例外，必须写「粒度理由」`,
+      });
+    }
+  }
+
+  // ——————— V-D4：目录/写集不重叠（大小写不敏感；V-D9 口径） ———————
+  for (let i = 0; i < roleRows.length; i += 1) {
+    for (let j = i + 1; j < roleRows.length; j += 1) {
+      const a = roleRows[i]!;
+      const b = roleRows[j]!;
+      let reported = false;
+      const report = (left: WritesetEntry, right: WritesetEntry): void => {
+        if (reported) return;
+        issues.push({
+          code: "V-D4",
+          severity: "error",
+          roleId: a.roleId,
+          message:
+            `团队计划角色 ${a.roleId} 与 ${b.roleId} 的目录/写集重叠：` +
+            `「${left.path}」与「${right.path}」（跨角色必须两两不相交；shared: split 父目录除外）`,
+        });
+        reported = true;
+      };
+      for (const left of a.authorizedDirs) {
+        for (const right of b.authorizedDirs) {
+          if (planPathsOverlap(left, right)) report(left, right);
+        }
+      }
+      for (const left of a.preciseWritesets) {
+        for (const right of b.authorizedDirs) {
+          if (planPathsOverlap(left, right)) report(left, right);
+        }
+        for (const right of b.preciseWritesets) {
+          if (planPathsOverlap(left, right)) report(left, right);
+        }
+      }
+      for (const left of b.preciseWritesets) {
+        for (const right of a.authorizedDirs) {
+          if (planPathsOverlap(left, right)) report(right, left);
+        }
+      }
+    }
+  }
+
+  // ——————— V-D5：规范语法 / 依赖 DAG / split 容器 ———————
+  const edges = new Map<string, string[]>();
+  const displayOf = new Map<string, string>();
+  for (const dir of directories) displayOf.set(compareKey(dir), dir);
+  for (const spec of directorySpecs) {
+    const key = compareKey(spec.dir);
+    const deps: string[] = [];
+    for (const dependency of spec.dependencies) {
+      if (dependency.endsWith("/")) {
+        const depKey = compareKey(dependency);
+        if (!declaredKeys.has(depKey)) {
+          issues.push({
+            code: "V-D5",
+            severity: "error",
+            path: spec.dir,
+            message: `目录规范「${spec.dir}」的依赖目标「${dependency}」不存在（须是本计划目录或外部契约路径）`,
+          });
+          continue;
+        }
+        if (depKey === key) {
+          issues.push({
+            code: "V-D5",
+            severity: "error",
+            path: spec.dir,
+            message: `目录规范「${spec.dir}」不能依赖自己`,
+          });
+          continue;
+        }
+        deps.push(depKey);
+        const dependencySpec = specByKey.get(depKey);
+        if (dependencySpec !== undefined && dependencySpec.owner !== spec.owner && spec.owner !== "") {
+          if (!args.reachableFrom(spec.owner).has(dependencySpec.owner)) {
+            issues.push({
+              code: "V-D5",
+              severity: "error",
+              path: spec.dir,
+              message:
+                `目录规范「${spec.dir}」（owner ${spec.owner}）依赖「${dependency}」（owner ${dependencySpec.owner}），` +
+                `但角色 dependsOn 方向不一致（${spec.owner} 未直接或传递依赖 ${dependencySpec.owner}）`,
+            });
+          }
+        }
+        continue;
+      }
+      if (!dependency.includes("/") && !/\.md$/i.test(dependency)) {
+        issues.push({
+          code: "V-D5",
+          severity: "error",
+          path: spec.dir,
+          message: `目录规范「${spec.dir}」的依赖目标「${dependency}」不是本计划目录或外部契约路径`,
+        });
+      }
+    }
+    edges.set(key, deps);
+    for (const forbidden of spec.forbidden) {
+      if (/^\*\.[A-Za-z0-9._-]+$/.test(forbidden)) {
+        const extension = `.${forbidden.slice(2)}`;
+        if (spec.extensions.includes(extension)) {
+          issues.push({
+            code: "V-D5",
+            severity: "error",
+            path: spec.dir,
+            message: `目录规范「${spec.dir}」的禁写区「${forbidden}」与允许文件类型「${extension}」冲突`,
+          });
+        }
+        continue;
+      }
+      const normalized = forbidden.replace(/\/+$/, "");
+      if (forbidden.endsWith("/")) {
+        const name = normalized.split("/").pop() ?? "";
+        const allowsSubdir = spec.subdirs === "*" || spec.subdirs === "**" || (Array.isArray(spec.subdirs) && spec.subdirs.includes(name));
+        if (allowsSubdir) {
+          issues.push({
+            code: "V-D5",
+            severity: "error",
+            path: spec.dir,
+            message: `目录规范「${spec.dir}」的禁写区「${forbidden}」与允许子目录「${name}」冲突`,
+          });
+        }
+        continue;
+      }
+      const base = normalized.split("/").pop() ?? "";
+      const extension = base.includes(".") ? base.slice(base.lastIndexOf(".")) : "";
+      if (extension !== "" && spec.extensions.includes(extension)) {
+        issues.push({
+          code: "V-D5",
+          severity: "error",
+          path: spec.dir,
+          message: `目录规范「${spec.dir}」的禁写区「${forbidden}」与允许文件类型「${extension}」冲突`,
+        });
+      }
+    }
+  }
+  for (const cycle of detectDirectoryCycles(edges, displayOf)) {
+    issues.push({
+      code: "V-D5",
+      severity: "error",
+      message: `目录依赖形成环：${cycle.join(" → ")}`,
+    });
+  }
+
+  // ——————— V-D6：模块实现目录 / 目录归属 / 整层黑名单 / 单文件 warning ———————
+  const moduleImpl = new Map<string, string>();
+  for (const moduleRow of args.moduleList) {
+    if (moduleRow.implementationDir === undefined) continue; // 缺列/空值已报告
+    const impl = moduleRow.implementationDir;
+    const governance = governanceDirectoryHit(impl);
+    if (governance !== undefined) {
+      issues.push({
+        code: "V-D6",
+        severity: "error",
+        module: moduleRow.module,
+        message: `模块「${moduleRow.module}」的实现目录「${impl}」与治理关键路径「${governance}/」重叠`,
+      });
+      continue;
+    }
+    const secret = secretDirectoryHit(impl);
+    if (secret !== undefined) {
+      issues.push({
+        code: "V-D6",
+        severity: "error",
+        module: moduleRow.module,
+        message: `模块「${moduleRow.module}」的实现目录「${impl}」命中密钥/环境路径段「${secret}」`,
+      });
+      continue;
+    }
+    const layer = wholeLayerDirectoryHit(impl);
+    if (layer !== undefined) {
+      const ownerRow = roleRows.find((row) => row.isMap && row.modules.includes(moduleRow.module));
+      if (ownerRow?.granularityRationale === undefined) {
+        issues.push({
+          code: "V-D6",
+          severity: "error",
+          module: moduleRow.module,
+          message: `模块「${moduleRow.module}」的实现目录「${impl}」是整层/整应用目录且未写「粒度理由」（硬拒）`,
+        });
+      } else {
+        issues.push({
+          code: "V-D6",
+          severity: "exception-review",
+          module: moduleRow.module,
+          message: `模块「${moduleRow.module}」的实现目录「${impl}」命中整层名黑名单，已写粒度理由；交 Convener readiness 例外复核`,
+        });
+      }
+    }
+    moduleImpl.set(moduleRow.module, impl);
+  }
+  for (const row of roleRows) {
+    const effectiveModules = row.modules.filter((module) => module !== "reduce");
+    for (const entry of row.authorizedDirs) {
+      const spec = specByKey.get(compareKey(entry.path));
+      if (spec !== undefined && (spec.kind === "implementation" || spec.kind === "tests" || spec.kind === "docs")) {
+        if (row.isReduce) continue; // Reduce 是跨模块测试角色，不归属单一 module 实现目录（仍受黑名单/治理路径约束）
+        const candidates = effectiveModules
+          .map((module) => moduleImpl.get(module))
+          .filter((value): value is string => value !== undefined);
+        if (candidates.length === 0) {
+          issues.push({
+            code: "V-D6",
+            severity: "error",
+            roleId: row.roleId,
+            path: entry.path,
+            message: `团队计划角色 ${row.roleId} 的目录「${entry.path}」无法核对模块实现目录（对应 module 缺少非空实现目录）`,
+          });
+        } else if (!candidates.some((impl) => isUnderOrEqual(entry.path, impl))) {
+          issues.push({
+            code: "V-D6",
+            severity: "error",
+            roleId: row.roleId,
+            path: entry.path,
+            message:
+              `团队计划角色 ${row.roleId} 的 ${spec.kind} 目录「${entry.path}」不在模块实现目录内` +
+              `（${effectiveModules.map((module) => `${module}: ${moduleImpl.get(module) ?? "?"}`).join("；")}）`,
+          });
+        }
+      }
+    }
+  }
+  for (const spec of directorySpecs) {
+    const layer = wholeLayerDirectoryHit(spec.dir);
+    if (layer === undefined) continue;
+    const ownerRow = roleRows.find((row) => row.roleId === spec.owner);
+    if (ownerRow?.granularityRationale === undefined) {
+      issues.push({
+        code: "V-D6",
+        severity: "error",
+        path: spec.dir,
+        message: `目录规范「${spec.dir}」是整层/整应用目录且未写「粒度理由」（硬拒）`,
+      });
+    } else {
+      issues.push({
+        code: "V-D6",
+        severity: "exception-review",
+        path: spec.dir,
+        message: `目录规范「${spec.dir}」命中整层名黑名单，已写粒度理由；交 Convener readiness 例外复核`,
+      });
+    }
+  }
+  for (const row of roleRows) {
+    if (row.authorizedDirs.length !== 1 || row.preciseWritesets.length > 0) continue;
+    const spec = specByKey.get(compareKey(row.authorizedDirs[0]!.path));
+    if (spec === undefined) continue;
+    if (
+      spec.subdirs === "—" &&
+      spec.extensions.length === 1 &&
+      spec.kind !== "docs" &&
+      spec.kind !== "evidence"
+    ) {
+      issues.push({
+        code: "V-D6",
+        severity: "warning",
+        roleId: row.roleId,
+        path: spec.dir,
+        message: `团队计划角色 ${row.roleId} 只有一个单层单类型目录「${spec.dir}」（疑似单文件目录）；交 readiness 判断是否应合并（warning，不硬拒）`,
+      });
+    }
+  }
+
+  // ——————— V-D7：治理关键路径只能精确文件 ———————
+  for (const row of roleRows) {
+    for (const entry of row.authorizedDirs) {
+      const governance = governanceDirectoryHit(entry.path);
+      if (governance !== undefined) {
+        issues.push({
+          code: "V-D7",
+          severity: "error",
+          roleId: row.roleId,
+          path: entry.path,
+          message: `团队计划角色 ${row.roleId} 把治理关键路径「${governance}/」作为普通授权目录；只能按既有治理授权精确文件`,
+        });
+      }
+      const secret = secretDirectoryHit(entry.path);
+      if (secret !== undefined) {
+        issues.push({
+          code: "V-D7",
+          severity: "error",
+          roleId: row.roleId,
+          path: entry.path,
+          message: `团队计划角色 ${row.roleId} 把密钥/环境路径段「${secret}」作为普通授权目录`,
+        });
+      }
+    }
+    for (const entry of row.preciseWritesets) {
+      if (!entry.directory) continue;
+      const governance = governanceDirectoryHit(entry.path);
+      const secret = secretDirectoryHit(entry.path);
+      if (governance !== undefined || secret !== undefined) {
+        issues.push({
+          code: "V-D7",
+          severity: "error",
+          roleId: row.roleId,
+          path: entry.path,
+          message:
+            `团队计划角色 ${row.roleId} 的精确写集把治理关键路径/密钥路径「${entry.path}」写成了目录；` +
+            "治理关键路径只能精确文件",
+        });
+      }
+    }
+  }
+
+  // ——————— V-D8：共享策略 ———————
+  for (const spec of directorySpecs) {
+    const key = compareKey(spec.dir);
+    const refs = references.get(key) ?? [];
+    if (spec.shared === "split") {
+      if (refs.length > 0) {
+        issues.push({
+          code: "V-D8",
+          severity: "error",
+          path: spec.dir,
+          message: `目录规范「${spec.dir}」标记 shared: split，但父目录本身被角色 ${refs.join("、")} 直接分配（只能分配子目录）`,
+        });
+      }
+      if (spec.subdirs === "—") {
+        issues.push({
+          code: "V-D8",
+          severity: "error",
+          path: spec.dir,
+          message: `目录规范「${spec.dir}」标记 shared: split，但「允许子目录」为 —（split 容器必须允许子目录）`,
+        });
+      }
+      const children = directories.filter((dir) => {
+        const parent = dir.replace(/\/+$/, "").split("/").slice(0, -1).join("/");
+        return compareKey(`${parent}/`) === key;
+      });
+      if (children.length === 0) {
+        issues.push({
+          code: "V-D8",
+          severity: "error",
+          path: spec.dir,
+          message: `目录规范「${spec.dir}」标记 shared: split，但没有子目录规范行（子目录必须各有 owner）`,
+        });
+      }
+      for (const child of children) {
+        const childSpec = specByKey.get(compareKey(child));
+        if (childSpec === undefined || childSpec.owner === "") {
+          issues.push({
+            code: "V-D8",
+            severity: "error",
+            path: child,
+            message: `shared: split 的子目录「${child}」缺少 owner`,
+          });
+        }
+      }
+      continue;
+    }
+    if (refs.length > 1) {
+      issues.push({
+        code: "V-D8",
+        severity: "error",
+        path: spec.dir,
+        message:
+          `目录规范「${spec.dir}」被多个角色引用（${refs.join("、")}）；shared: ${spec.shared} 只允许唯一 owner` +
+          "（共享请用 read-only 或拆子目录 owner / split）",
+      });
+    }
+  }
+
+  // ——————— V-D9：realpath 逃逸（仅在给出 projectRoot 时；只读） ———————
+  if (args.projectRoot !== undefined && args.projectRoot !== "") {
+    const projectRoot = args.projectRoot;
+    const rootReal = realResolve(projectRoot);
+    const checkReal = (rel: string, label: string): void => {
+      const target = realResolve(joinPath(projectRoot, ...rel.replace(/\/+$/, "").split("/")));
+      if (!isWithinReal(rootReal, target)) {
+        args.issues.push({
+          code: "V-D9",
+          severity: "error",
+          path: rel,
+          message: `${label}「${rel}」经 realpath 解析后逃出项目根「${target}」`,
+        });
+      }
+    };
+    for (const dir of directories) checkReal(dir, "目录");
+    for (const row of roleRows) {
+      for (const entry of row.authorizedDirs) checkReal(entry.path, "授权目录");
+      for (const entry of row.preciseWritesets) checkReal(entry.path, "精确写集");
+    }
+    for (const moduleRow of args.moduleList) {
+      if (moduleRow.implementationDir !== undefined) checkReal(moduleRow.implementationDir, "模块实现目录");
+    }
+  }
+
+  return { directories, directorySpecs };
+}
+
+function detectDirectoryCycles(
+  edges: Map<string, string[]>,
+  displayOf: Map<string, string>,
+): string[][] {
+  const state = new Map<string, 1 | 2>();
+  const stack: string[] = [];
+  const cycles: string[][] = [];
+  const reported = new Set<string>();
+  const visit = (key: string): void => {
+    const current = state.get(key);
+    if (current === 2) return;
+    if (current === 1) {
+      const start = stack.indexOf(key);
+      const cycle = [...stack.slice(start), key];
+      const cycleKey = [...new Set(cycle)].sort().join("\u0000");
+      if (!reported.has(cycleKey)) {
+        reported.add(cycleKey);
+        cycles.push(cycle.map((item) => displayOf.get(item) ?? item));
+      }
+      return;
+    }
+    state.set(key, 1);
+    stack.push(key);
+    for (const target of edges.get(key) ?? []) visit(target);
+    stack.pop();
+    state.set(key, 2);
+  };
+  for (const key of edges.keys()) visit(key);
+  return cycles;
 }
 
 function looksLikeTestPath(value: string): boolean {
@@ -1142,7 +2585,7 @@ function looksLikeReduceTestSurface(value: string): boolean {
   return false;
 }
 
-function parseModuleList(lines: readonly string[], issues: TeamPlanIssue[]): TeamPlanModule[] {
+function parseModuleList(lines: readonly string[], issues: TeamPlanIssue[], v3 = false): TeamPlanModule[] {
   const table = findTableAfterHeading(
     lines,
     /^\s{0,3}#{1,6}\s*(?:[0-9]+[.、]?\s*)?(?:模块清单|模块列表|module\s*list)/i,
@@ -1151,7 +2594,9 @@ function parseModuleList(lines: readonly string[], issues: TeamPlanIssue[]): Tea
     issues.push({
       code: "V4",
       severity: "error",
-      message: "团队计划缺少「模块清单」表（表头 module/职责/公开契约/架构来源）",
+      message: v3
+        ? "团队计划缺少「模块清单」表（表头 module/职责/公开契约/架构来源/实现目录）"
+        : "团队计划缺少「模块清单」表（表头 module/职责/公开契约/架构来源）",
     });
     return [];
   }
@@ -1161,14 +2606,22 @@ function parseModuleList(lines: readonly string[], issues: TeamPlanIssue[]): Tea
     const index = header.findIndex((cell) => MODULE_TABLE_PATTERNS[key].test(cell));
     if (index !== -1) columnOf[key] = index;
   }
-  const missing = (Object.keys(MODULE_TABLE_PATTERNS) as Array<keyof typeof MODULE_TABLE_PATTERNS>).filter(
-    (key) => columnOf[key] === undefined,
+  const coreKeys = (Object.keys(MODULE_TABLE_PATTERNS) as Array<keyof typeof MODULE_TABLE_PATTERNS>).filter(
+    (key) => key !== "implementationDir",
   );
+  const missing = coreKeys.filter((key) => columnOf[key] === undefined);
   if (missing.length > 0) {
     issues.push({
       code: "V4",
       severity: "error",
       message: `模块清单表缺少必需列（${missing.join("/")}）`,
+    });
+  }
+  if (v3 && columnOf.implementationDir === undefined) {
+    issues.push({
+      code: "V-D6",
+      severity: "error",
+      message: "v3 模块清单表缺少必需列「实现目录」（Q9 A：每个 module 必须写非空实现目录）",
     });
   }
   const rows: TeamPlanModule[] = [];
@@ -1200,7 +2653,36 @@ function parseModuleList(lines: readonly string[], issues: TeamPlanIssue[]): Tea
         message: `模块清单「${module}」的架构来源「${architectureSource}」不是可追溯引用（须引用方案/架构文档路径或章节）`,
       });
     }
-    rows.push({ module, responsibility, contract, architectureSource });
+    let implementationDir: string | undefined;
+    if (v3) {
+      const rawImplementation = cleanSpecCell(cells[columnOf.implementationDir ?? -1] ?? "");
+      if (rawImplementation === "" || isEmptyCell(rawImplementation)) {
+        issues.push({
+          code: "V-D6",
+          severity: "error",
+          module,
+          message: `模块清单「${module}」缺少非空的「实现目录」（v3 每个 module 必填；Q9 A）`,
+        });
+      } else {
+        const parsed = parsePlanPath(rawImplementation, true);
+        for (const issue of parsed.issues) {
+          issues.push({
+            code: "V-D6",
+            severity: "error",
+            module,
+            message: `模块清单「${module}」的实现目录「${rawImplementation}」${issue}`,
+          });
+        }
+        if (parsed.path !== undefined && parsed.issues.length === 0) implementationDir = parsed.path;
+      }
+    }
+    rows.push({
+      module,
+      responsibility,
+      contract,
+      architectureSource,
+      ...(implementationDir !== undefined ? { implementationDir } : {}),
+    });
   }
   return rows;
 }

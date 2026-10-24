@@ -1,0 +1,23 @@
+# S3/S6 pre-edit baseline (recorded before edits; 2026-10-23)
+
+app/desktop/customer-input.ts
+  git hash-object: 049117443573c6f844ff2f5c39572010e38d1b2e
+  sha256sum: 2fd40074b7463fa0573dd1a1d0db0c7aa393abf5f620c3385b0797ca815209e2
+app/desktop/interface.ts
+  git hash-object: 80bb89cb214938f2127f8da5c72d1384eda692ba
+  sha256sum: 7a02b434729689eaa83cfd622bc3dcb25ce460a1ac1ec365939c0f1bf268f158
+app/desktop/governance-advance.ts
+  git hash-object: f4c997f2b330d5b5220518fe6640aac0eaf6a2b2
+  sha256sum: c84cf85454facff4e4013f7b8ad305da49d9a4eefd4aad63dcb1d21792c32fa7
+app/main.ts
+  git hash-object: 49cd5530345958d2e4f5dcb2887dfabfb5b37240
+  sha256sum: 89d822f88821ad9f16cd9be3862670f75a4582400d26a87781f42e26f2d8a98f
+test/桌面应用/acceptance-dispatch.test.ts
+  git hash-object: d321afd85bbae8a15ed3a9910c7c1183903e91fa
+  sha256sum: 2141841bcc14650ba65d9323d16bbc1b54004a478fc80681adfcd8922257c9e9
+test/桌面应用/interface.test.ts
+  git hash-object: 2185ae934ab8fff6377fd02504cadc0619e44d5e
+  sha256sum: 448b2586fe133badfbbc7abd36253d405aea04516091146467e96afcb149dda0
+test/桌面应用/operator-wiring.test.ts
+  git hash-object: 73c1e22dcd64e88debc5f7b62625760292db637c
+  sha256sum: a8c9f24617b2e03b947b2257bcff60a5c917222af279ca86d34fbf4bc11cbed7

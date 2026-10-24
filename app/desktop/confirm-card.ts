@@ -27,6 +27,7 @@
 
 import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
 import type { RuntimeKind } from "../../src/common/shared/runtime-shared.ts";
+import { mainT } from "./i18n.ts";
 
 /** 挂起卡的会话上下文（谁在等：被审/被恢复会话的角色；`signal` 为中止来源——轮次停止/会话重建/通道超时）。 */
 export interface ConfirmCardMetadata {
@@ -126,14 +127,14 @@ export function createConfirmCardCore<TRequest>(opts: CreateConfirmCardCoreOptio
           typeof cleanupAfterMs === "number" && Number.isFinite(cleanupAfterMs) && cleanupAfterMs > 0
             ? setTimeout(() => {
                 diagnostic.record(`${opts.eventPrefix}.expired`, { requestId: id });
-                expire(id, "确认已超时，旧确认失效。");
+                expire(id, mainT("main.confirm.expiredTimeout"));
               }, cleanupAfterMs)
             : undefined;
         const cancel = () => {
           const reason = metadata?.signal?.reason as unknown;
           const disposition = options?.abortDisposition
             ? options.abortDisposition(reason)
-            : { reason: "本轮已停止或会话已重建，旧确认失效。", diagnosticEvent: `${opts.eventPrefix}.cancelled` };
+            : { reason: mainT("main.confirm.expiredStopped"), diagnosticEvent: `${opts.eventPrefix}.cancelled` };
           diagnostic.record(disposition.diagnosticEvent, { requestId: id, ...(disposition.fields ?? {}) });
           expire(id, disposition.reason);
         };

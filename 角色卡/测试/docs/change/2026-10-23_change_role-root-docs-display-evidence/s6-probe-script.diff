@@ -1,0 +1,78 @@
+--- "test/\346\241\214\351\235\242\345\272\224\347\224\250/e2e/main.mjs"	2026-10-23 17:17:31.530336500 +0800
++++ C:/Users/51054/AppData/Local/Temp/ans-s6-probe/role-root-docs-probe.mjs	2026-10-23 23:48:49.233848100 +0800
+@@ -17,7 +17,7 @@
+ import { app, BrowserWindow, ipcMain, Menu } from "electron";
+ 
+ const HERE = path.dirname(fileURLToPath(import.meta.url));
+-const APP_DIR = path.resolve(HERE, "..", "..", "..", "app");
++const APP_DIR = process.env.ANS_E2E_APP_DIR || path.resolve(HERE, "..", "..", "..", "app");
+ const REPO_ROOT = process.env.ANS_E2E_PROJECT || path.resolve(HERE, "..", "..", "..");
+ const OUTDIR = process.env.ANS_E2E_OUTDIR || fs.mkdtempSync(path.join(os.tmpdir(), "ans-e2e-"));
+ // 看门狗修复（2026-10-12）：OUTDIR 由调用方指定时必须**先建目录**——否则收尾 report.txt 写入抛 ENOENT
+@@ -1850,6 +1850,66 @@
+   repairCheck("MAC_CLOSE_REOPEN_LOADS_WITHOUT_DUPLICATE_HANDLERS", await wc().executeJavaScript("!!document.getElementById('inp-message') && !!window.desktop"));
+   repairCheck("MAC_CLOSE_REOPEN_NO_AUTO_SEND", repairSendRequests.length === sendsBeforeCrash);
+ 
++  // S6 probe (test role, real Electron, real repo, Windows): role root docs list + click fail-closed.
++  try {
++    // Re-establish a document grant on the real project (this harness closes/reopens the window earlier).
++    nextPickPath = REPO_ROOT;
++    await wc().executeJavaScript("window.desktop.pickProject()");
++    await sleep(200);
++    await wc().executeJavaScript("window.__ansRenderer.loadProject(" + JSON.stringify(REPO_ROOT) + ")");
++    for (let attempt = 0; attempt < 100; attempt += 1) {
++      if (await wc().executeJavaScript("window.__ansRenderer.state.projectRoot === " + JSON.stringify(REPO_ROOT))) break;
++      await sleep(50);
++    }
++    await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
++    await sleep(400);
++    await wc().executeJavaScript("document.getElementById('tab-card').click()");
++    await sleep(500);
++    await wc().executeJavaScript("(() => { const d=document.querySelector('details[data-section=\"docs\"]'); if (d && !d.open) d.open=true; })()");
++    await sleep(300);
++    const rootProbe = await wc().executeJavaScript(`(() => {
++      const sec=document.querySelector('details[data-section="docs"]');
++      if (!sec) return { exists:false };
++      const groups=[...sec.querySelectorAll('[data-docs-group]')].map((g)=>g.getAttribute('data-docs-group'));
++      const names=[...sec.querySelectorAll('[data-root-doc-path]')].map((b)=>b.getAttribute('data-root-doc-path'));
++      const rootText=sec.querySelector('[data-docs-group="root"]')?.textContent||'';
++      const subText=sec.querySelector('[data-docs-group="subdir"]')?.textContent||'';
++      return { exists:true, groups, names, count:sec.querySelector('.sec-count')?.textContent||'',
++        rootText, subText:subText.slice(0,200), memo:sec.textContent.includes('memo.md'), roleCard:sec.textContent.includes('role-card.md'),
++        rootMemo:rootText.includes('memo.md'), rootRoleCard:rootText.includes('role-card.md'), rootBoundary:rootText.includes('boundary'),
++        hasFeature:rootText.includes('feature-map.md'), hasFunctional:rootText.includes('functional-description.md'), hasApi:rootText.includes('api-spec.md') };
++    })()`);
++    log("S6_ROOT_DOCS_PROBE=" + JSON.stringify(rootProbe));
++    log("S6_ROOT_DOCS_THREE_NAMES_ORDER=" + (rootProbe.exists === true && rootProbe.names.length === 3 && rootProbe.names[0] === '角色卡/桌面窗口/feature-map.md' && rootProbe.names[1] === '角色卡/桌面窗口/functional-description.md' && rootProbe.names[2] === '角色卡/桌面窗口/api-spec.md'));
++    log("S6_ROOT_DOCS_GROUPS_ORDER=" + (Array.isArray(rootProbe.groups) && rootProbe.groups.length === 2 && rootProbe.groups[0] === 'root' && rootProbe.groups[1] === 'subdir'));
++    log("S6_ROOT_DOCS_MEMO_ABSENT=" + (rootProbe.rootMemo === false && rootProbe.rootRoleCard === false && rootProbe.rootBoundary === false && !rootProbe.names.some((n)=>n.includes('memo'))));
++    log("S6_ROOT_DOCS_LABELS=" + JSON.stringify({ root: (rootProbe.rootText||'').slice(0,120), sub: (rootProbe.subText||'').slice(0,80) }));
++    log("S6_ROOT_DOCS_PROFILE_SHOT=" + (await shot("s6-probe-root-docs-profile.png")));
++    await wc().executeJavaScript("document.querySelector('[data-root-doc-path$=\"/feature-map.md\"]').click()");
++    let clickProbe = { hasError:false };
++    for (let attempt = 0; attempt < 50; attempt += 1) {
++      clickProbe = await wc().executeJavaScript(`(() => {
++        const sec=document.querySelector('details[data-section="docs"]');
++        const body=sec?sec.textContent:'';
++        const errs=[...document.querySelectorAll('.document-scope-error')].map((e)=>e.textContent);
++        return { hasError: body.includes('当前环境暂不支持安全读取项目文档') || errs.some((t)=>t.includes('当前环境暂不支持安全读取项目文档')),
++          errors: errs, modeList: !!document.querySelector('[data-doc-action="back-role"]'),
++          hasBody: !!document.querySelector('#right-body .document-body, #right-body .document-reader, #right-body .document-content, #right-body pre'),
++          text: body.slice(0,300) };
++      })()`);
++      if (clickProbe.hasError) break;
++      await sleep(100);
++    }
++    log("S6_ROOT_DOCS_CLICK_PROBE=" + JSON.stringify(clickProbe));
++    log("S6_ROOT_DOCS_CLICK_UNAVAILABLE=" + (clickProbe.hasError === true));
++    log("S6_ROOT_DOCS_CLICK_SHOT=" + (await shot("s6-probe-root-docs-unavailable.png")));
++    await wc().executeJavaScript("(() => { const b=document.querySelector('[data-doc-action=\"back-role\"]'); if (b) b.click(); })()");
++    await sleep(300);
++    await wc().executeJavaScript("(() => { const d=document.getElementById('tab-card'); if (d && document.getElementById('right-drawer').classList.contains('open')) d.click(); })()");
++    await sleep(200);
++  } catch (error) {
++    log("S6_ROOT_DOCS_PROBE_ERROR=" + String(error && error.stack || error));
++  }
+   log("E2E_PASS=" + (repairFailures.length === 0));
+   log("E2E_FAILURES=" + repairFailures.join(", "));
+   log("E2E_DONE=1");

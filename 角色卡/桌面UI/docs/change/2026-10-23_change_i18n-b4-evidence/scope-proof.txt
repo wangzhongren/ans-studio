@@ -1,0 +1,169 @@
+=== A) 本批写集文件状态（git status --short）===
+ M app/renderer/src/chat/runtime-config.ts
+ M app/renderer/src/shell/phase4a.css
+ M "test/\346\241\214\351\235\242UI/runtime-config.test.ts"
+ M "test/\346\241\214\351\235\242UI/source-guard.test.ts"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/api-spec.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-23_change_i18n-b4-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-23_change_i18n-b4.md"
+
+=== B) 依赖/构建配置零改动（以上命令未列出即无改动）===
+package.json / package-lock.json / tsconfig.json / app/renderer/tsconfig.json / vite.config.ts
+
+=== C) 本批新增测试 diff（runtime-config.test.ts 在本批前为 HEAD 原样）===
+diff --git "a/test/\346\241\214\351\235\242UI/runtime-config.test.ts" "b/test/\346\241\214\351\235\242UI/runtime-config.test.ts"
+index b499531..bded84b 100644
+--- "a/test/\346\241\214\351\235\242UI/runtime-config.test.ts"
++++ "b/test/\346\241\214\351\235\242UI/runtime-config.test.ts"
+@@ -28,6 +28,8 @@ import {
+   rangeValue,
+   readFailureNoticeText,
+   readFailureStatusText,
++  RUNTIME_LABELS,
++  RUNTIME_LABEL_KEYS,
+   runtimeLabel,
+   saveFailureStatusText,
+   applicationShortLabel,
+@@ -153,6 +155,60 @@ test("读取结果校验：runtime/fields/missingKeys 必须齐备，畸形按
+   assert.equal(validateRuntimeConfigView(null, "pi").ok, false);
+ });
+ 
++test("B4 引擎显示名：demo 走共享 key（zh/en），Pi/Codex/Claude 品牌名原样", () => {
++  // 本地映射语言中性：不保存 demo 中文；用户可见文案只来自共享 key。
++  assert.deepEqual(RUNTIME_LABELS, {
++    demo: "demo",
++    pi: "Pi",
++    codex: "Codex",
++    claude: "Claude",
++  });
++  assert.equal(/[一-鿿]/.test(Object.values(RUNTIME_LABELS).join("")), false);
++  assert.equal(RUNTIME_LABEL_KEYS.demo, "shared.runtimeSettings.runtime.demo");
++  assert.equal(RUNTIME_LABEL_KEYS.pi, null);
++  assert.equal(RUNTIME_LABEL_KEYS.codex, null);
++  assert.equal(RUNTIME_LABEL_KEYS.claude, null);
++
++  // zh-CN 逐字沿用共享目录；en-US 同 key 解析为 Demo；品牌名两种语言都不翻译。
++  assert.equal(runtimeLabel("demo"), "演示");
++  assert.equal(runtimeLabel("demo", "en-US"), "Demo");
++  const brands = ["pi", "codex", "claude"] as const;
++  for (const brand of brands) {
++    assert.equal(runtimeLabel(brand), RUNTIME_LABELS[brand]);
++    assert.equal(runtimeLabel(brand, "en-US"), RUNTIME_LABELS[brand]);
++  }
++
++  // 未知引擎：非空原样透传；空值走本地化文案（不发明标签）。
++  assert.equal(runtimeLabel("future-engine"), "future-engine");
++  assert.equal(runtimeLabel("future-engine", "en-US"), "future-engine");
++  assert.equal(runtimeLabel("", "zh-CN"), "未知引擎");
++  assert.equal(runtimeLabel("", "en-US"), "Unknown engine");
++});
++
++test("B4 读取视图：主进程未给 label 时按 locale 解析，显式 label 优先", () => {
++  const demo = validateRuntimeConfigView(
++    { runtime: "demo", missingKeys: [], fields: [] },
++    "demo",
++    "en-US",
++  );
++  assert.equal(demo.ok, true);
++  assert.equal(demo.view?.label, "Demo");
++
++  const zh = validateRuntimeConfigView(
++    { runtime: "demo", missingKeys: [], fields: [] },
++    "demo",
++    "zh-CN",
++  );
++  assert.equal(zh.view?.label, "演示");
++
++  const labelled = validateRuntimeConfigView(
++    { runtime: "demo", label: "Custom", missingKeys: [], fields: [] },
++    "demo",
++    "zh-CN",
++  );
++  assert.equal(labelled.view?.label, "Custom");
++});
++
+ test("文案：缺配/齐备/application/来源/帮助/入口标题逐字基线", () => {
+   assert.equal(runtimeLabel("codex"), "Codex");
+   assert.equal(
+
+=== D) runtime-config.ts B4 收敛段（最终候选）===
+
+export type ConfigControl = "range" | "select" | "text" | "password";
+
+/**
+ * 引擎显示名的**语言中性**值：Pi/Codex/Claude 是品牌名（原样展示）；`demo` 是中性标识，
+ * 用户可见文案由 `RUNTIME_LABEL_KEYS` 指向共享 i18n key（zh-CN / en-US 均取共享目录）。
+ * 与共享 `runtime-shared.ts` 的 `RUNTIME_LABELS` 同口径，但本模块不导入该文件。
+ */
+export const RUNTIME_LABELS: Record<string, string> = {
+  demo: "demo",
+  pi: "Pi",
+  codex: "Codex",
+  claude: "Claude",
+};
+
+/**
+ * 需要本地化的引擎显示名 key（B4）。key 单一来源是共享 `runtime-shared.ts` 的
+ * `RUNTIME_LABEL_KEYS`；渲染层不得导入该模块（顶层 node:os/node:path），因此在此用
+ * 显式静态映射引用同一 key（不是第二份目录/翻译实现）。`null` = 品牌名原样。
+ */
+export const RUNTIME_LABEL_KEYS: Readonly<Record<string, MessageKey | null>> = {
+  demo: "shared.runtimeSettings.runtime.demo",
+  pi: null,
+  codex: null,
+  claude: null,
+};
+
+export function runtimeLabel(
+  runtime: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const key = RUNTIME_LABEL_KEYS[runtime];
+  if (key) return translate(locale, key);
+
+=== E) phase4a.css 200% 布局修复 diff（纯新增）===
+diff --git a/app/renderer/src/shell/phase4a.css b/app/renderer/src/shell/phase4a.css
+index d3a13df..cf877d7 100644
+--- a/app/renderer/src/shell/phase4a.css
++++ b/app/renderer/src/shell/phase4a.css
+@@ -996,3 +996,29 @@
+     margin-left: auto;
+   }
+ }
++
++/* —— 200%（短视口）：设置面板整体滚动，保存条贴底可达 ——
++   960×620 物理窗口 @200% = 480×310 CSS：语言区 + 引擎 tabs + 保存条的高度超过
++   面板可用高度，原 flex 布局把保存/状态条推到视口下方（I9 P6 失败）。此档改为
++   `#pi-panel` 自身纵向滚动、保存条 sticky 贴底；960×620（CSS 高 620）不命中本档，
++   普通布局保持不变。 */
++@media (max-height: 480px) {
++  #pi-panel.pi-panel {
++    display: block;
++    overflow-y: auto;
++    overscroll-behavior: contain;
++    scroll-padding-bottom: 64px;
++  }
++  #pi-panel .pi-tabpanel {
++    display: block;
++    min-height: 0;
++  }
++  #pi-panel .pi-scroll {
++    overflow: visible;
++  }
++  #pi-panel .pi-save-bar {
++    position: sticky;
++    bottom: 0;
++    z-index: 1;
++  }
++}
+
+=== F) 写集外文件的既有并发改动（非本批；本角色未写入）===
+工作区存在 B1/B2/B3、项目管理共享 B4、桌面窗口并发改动（如 src/common/shared/runtime-shared.ts、app/desktop/runtime-config.ts），均在本批开始前/并发由其他角色写入；本批只编辑 A) 中文件与证据目录。
+
+=== G) 文件 mtime（本批编辑时刻）===
+2026-10-23 16:31:19.146660000 +0800 app/renderer/src/chat/runtime-config.ts
+2026-10-23 17:16:05.657546000 +0800 app/renderer/src/shell/phase4a.css
+2026-10-23 16:36:56.306355900 +0800 test/桌面UI/runtime-config.test.ts
+2026-10-23 16:33:07.743956100 +0800 test/桌面UI/source-guard.test.ts
+2026-10-23 17:15:02.026083200 +0800 角色卡/桌面UI/api-spec.md
+2026-10-23 17:16:11.437788000 +0800 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b4.md

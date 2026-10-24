@@ -46,6 +46,7 @@ import {
   renderWatchdogStormGuard,
   type WatchdogSignalKind,
 } from "../../src/common/编排/watchdog.ts";
+import { mainT } from "./i18n.ts";
 
 // —————————————————————— 阈值表（提案 §3.2；PM 已按默认采纳——全部常量集中于此，便于后续调参与评审） ——————————————————————
 
@@ -148,20 +149,23 @@ export type WatchdogObservation =
 // —————————————————————— 事实行与呈现辅助（文案主体在编排单一来源；这边只出事实与摘要） ——————————————————————
 
 /** 信号短标签（**仅队列行摘要**用——正文标签在编排单一来源，本表不得用于正文）。 */
-const SIGNAL_SHORT: Record<WatchdogSignalKind, string> = {
-  "turn-deadline": "轮次到点检查",
-  "queue-stuck": "投递排队积压",
-  "cmd-timeout": "命令超时",
-  "repeat-fail": "重复失败",
-};
+/** 信号短标签（**仅队列行摘要**用——正文标签在编排单一来源，本表不得用于正文）。按当前 locale 取词。 */
+function signalShortLabel(signal: WatchdogSignalKind): string {
+  switch (signal) {
+    case "turn-deadline": return mainT("main.watchdog.signal.turnDeadline");
+    case "queue-stuck": return mainT("main.watchdog.signal.queueStuck");
+    case "cmd-timeout": return mainT("main.watchdog.signal.cmdTimeout");
+    case "repeat-fail": return mainT("main.watchdog.signal.repeatFail");
+  }
+}
 
 /** 毫秒时长 → 人话（<60s 用「N 秒」，否则「M 分 S 秒」；事实行用）。 */
 export function formatDurationMs(ms: number): string {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));
-  if (totalSeconds < 60) return `${totalSeconds} 秒`;
+  if (totalSeconds < 60) return mainT("main.watchdog.durationSeconds", { seconds: totalSeconds });
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  return `${minutes} 分 ${seconds} 秒`;
+  return mainT("main.watchdog.durationMinutesSeconds", { minutes, seconds });
 }
 
 /** 时刻（ms）→ 本地 `HH:mm:ss`（事实行用；如实展示当时的钟点）。 */
@@ -173,10 +177,10 @@ export function formatClock(ms: number): string {
 
 /** 队列条目 kind → 事实行标签（#2）。 */
 function queueKindLabel(kind: string): string {
-  if (kind === "handback") return "回交";
-  if (kind === "dispatch") return "派发";
-  if (kind === "message") return "客户消息";
-  if (kind === "system") return "系统";
+  if (kind === "handback") return mainT("main.watchdog.kind.handback");
+  if (kind === "dispatch") return mainT("main.watchdog.kind.dispatch");
+  if (kind === "message") return mainT("shared.common.customerMessage");
+  if (kind === "system") return mainT("main.watchdog.kind.system");
   return kind;
 }
 
@@ -187,15 +191,19 @@ function shorten(text: string, n: number): string {
 
 /** 恢复动作的短标签（**仅队列行摘要**用——回执正文由编排 `renderRecoveryReceipt` 渲染原始 token）。 */
 export function recoveryActionLabel(action: string): string {
-  if (action === "abort-turn") return "停止本轮";
-  if (action === "rebuild-session") return "重建会话";
-  if (action === "redeliver") return "重投任务";
+  if (action === "abort-turn") return mainT("shared.common.stopTurn");
+  if (action === "rebuild-session") return mainT("shared.common.rebuildSession");
+  if (action === "redeliver") return mainT("main.watchdog.action.redeliver");
   return action;
 }
 
 /** 恢复回执的队列行摘要（右栏「待办 / 队列」用；呈现面）。 */
 export function recoveryReceiptSummary(targetRoleId: string, action: string, executed: boolean): string {
-  return `系统·恢复 · ${recoveryActionLabel(action)} · 角色 ${targetRoleId} · ${executed ? "已执行" : "未执行"}`;
+  return mainT("main.watchdog.recoveryNote", {
+    action: recoveryActionLabel(action),
+    roleId: targetRoleId,
+    executed: executed ? mainT("main.session.executed") : mainT("main.session.notExecuted"),
+  });
 }
 
 // —————————————————————— 服务本体 ——————————————————————
@@ -365,7 +373,7 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
   /** 整轮最后兜底（固定 1 小时、无 env）：整小时用「N 小时」，否则按既有毫秒格式化。 */
   const lastResortText = (runtime: RuntimeKind): string => {
     const ms = turnTimeouts(runtime).turnLastResortMs;
-    return ms >= 3_600_000 && ms % 3_600_000 === 0 ? `${ms / 3_600_000} 小时` : formatDurationMs(ms);
+    return ms >= 3_600_000 && ms % 3_600_000 === 0 ? mainT("main.watchdog.durationHours", { hours: ms / 3_600_000 }) : formatDurationMs(ms);
   };
 
   /** 投递一条系统消息（统一入口；失败（本层回调抛错）如实记诊断并视为未投出——绝不向上抛）。 */
@@ -404,7 +412,7 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
     loggerFor(projectRoot).record("watchdog.suppressed", { reasonCode: "storm", count: storm.suppressed });
     if (!storm.noticeSent) {
       storm.noticeSent = true;
-      outbound(projectRoot, { text: renderWatchdogStormGuard(storm.suppressed), summary: `系统·看护 · 风暴护栏 · 已抑制 ${storm.suppressed} 条` }, "storm-notice");
+      outbound(projectRoot, { text: renderWatchdogStormGuard(storm.suppressed), summary: mainT("main.watchdog.stormGuard", { count: storm.suppressed }) }, "storm-notice");
     }
     return false;
   };
@@ -471,7 +479,7 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
       } else if (tryStormDelivery(projectRoot, {
         // 恢复行只在**告警确实投出过**时投（su 看过告警才需要「已解除」的对账）；仍受风暴护栏约束。
         text: renderWatchdogRecovery({ signal, roleId, hits: st.hits, suppressed: st.suppressed }),
-        summary: `系统·看护 · 看护恢复 · ${SIGNAL_SHORT[signal]} · 角色 ${roleId}`,
+        summary: mainT("main.watchdog.recoverySignal", { signal: signalShortLabel(signal), roleId }),
       }, `recovery-${key}`)) {
         loggerFor(projectRoot).record("watchdog.recovery", { state: key, count: st.hits });
       }
@@ -548,8 +556,8 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
             loggerFor(projectRoot).record("watchdog.auto-abort", { roleId: role.roleId, turnId: identity, elapsedMs: elapsed, limitMs: abortLimit });
             // Lead 系统行：自动中止 ≠ 客户批准（经既有投递机；一条/轮）。
             outbound(projectRoot, {
-              text: `${WATCHDOG_ALERT_PREFIX} 回合自动中止：角色「${role.roleId}」本轮已耗 ${formatDurationMs(elapsed)}（显式配置的自动中止时限 ${formatDurationMs(abortLimit)}）。自动中止 ≠ 客户批准：这是看护按「替我决策/替我审批」开关执行的停止动作，只停止本回合、不代表客户逐项审批；轮次收尾后队列中的回交/派发按既有顺序继续投递。`,
-              summary: `系统·看护 · 回合自动中止 · 角色 ${role.roleId}`,
+              text: mainT("main.watchdog.turnAbortedText", { prefix: WATCHDOG_ALERT_PREFIX, roleId: role.roleId, elapsed: formatDurationMs(elapsed), limit: formatDurationMs(abortLimit) }),
+              summary: mainT("main.watchdog.turnAbortedSummary", { roleId: role.roleId }),
             }, `auto-abort-${role.roleId}`);
           }
         }
@@ -563,15 +571,15 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
             roleId: role.roleId,
             facts: [
               abortLimit > 0
-                ? `本轮有效已耗约 ${formatDurationMs(at - startedAt)}（看护检查时限 ${turnTimeoutMs(role.runtime)}ms；到点仅检查；显式配置的自动中止时限 ${formatDurationMs(abortLimit)}，开关开启时看护到点自动中止）`
-                : `本轮有效已耗约 ${formatDurationMs(at - startedAt)}（看护检查时限 ${turnTimeoutMs(role.runtime)}ms；到点仅检查、不中止本轮；未配置看护自动中止）`,
-              `请用 role_status / session_tail 核对该角色是否卡死；仍在推进则不动作；确认卡死可 propose_recovery（开关开启时由桌面自动执行；关闭时仍需客户确认后应用执行）`,
-              `整轮最后兜底 ${lastResortText(role.runtime)}（运行时硬上限，不是看护自动中止）`,
-              `本轮自 ${formatClock(startedAt)} 开始、至今仍在进行`,
-              `该角色有挂起确认卡时不触发本信号（正确等待不报）`,
+                ? mainT("main.watchdog.turnDeadlineElapsedAbort", { elapsed: formatDurationMs(at - startedAt), timeoutMs: turnTimeoutMs(role.runtime), limit: formatDurationMs(abortLimit) })
+                : mainT("main.watchdog.turnDeadlineElapsedNoAbort", { elapsed: formatDurationMs(at - startedAt), timeoutMs: turnTimeoutMs(role.runtime) }),
+              mainT("main.watchdog.turnDeadlineAdvice"),
+              mainT("main.watchdog.turnDeadlineLastResort", { text: lastResortText(role.runtime) }),
+              mainT("main.watchdog.turnDeadlineStarted", { time: formatClock(startedAt) }),
+              mainT("main.watchdog.turnDeadlinePendingCard"),
             ],
           }),
-          summary: `系统·看护 · ${SIGNAL_SHORT["turn-deadline"]} · 角色 ${role.roleId}`,
+          summary: mainT("main.watchdog.signalSummary", { signal: signalShortLabel("turn-deadline"), roleId: role.roleId }),
         }),
       });
     }
@@ -593,11 +601,11 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
             signal: "queue-stuck",
             roleId: q.targetRoleId,
             facts: [
-              `队首已排队 ${formatDurationMs(headAge)}（队列深度 ${depth}）`,
-              `- [${queueKindLabel(head!.kind)}] 来自 ${head!.sourceRoleId === "" ? "（系统）" : head!.sourceRoleId}：${shorten(head!.summary, 60)}（入队 ${formatClock(head!.enqueuedAtMs)}）`,
+              mainT("main.watchdog.queueStuckHead", { age: formatDurationMs(headAge), depth }),
+              mainT("main.watchdog.queueStuckItem", { kind: queueKindLabel(head!.kind), source: head!.sourceRoleId === "" ? mainT("main.watchdog.systemSource") : head!.sourceRoleId, summary: shorten(head!.summary, 60), time: formatClock(head!.enqueuedAtMs) }),
             ],
           }),
-          summary: `系统·看护 · ${SIGNAL_SHORT["queue-stuck"]} · 角色 ${q.targetRoleId}（深度 ${depth}）`,
+          summary: mainT("main.watchdog.queueStuckSummary", { signal: signalShortLabel("queue-stuck"), roleId: q.targetRoleId, depth }),
         }),
       });
     }
@@ -624,11 +632,11 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
             signal: "repeat-fail",
             roleId,
             facts: [
-              `近 ${Math.round(config.repeatFailWindowMs / 60000)} 分钟窗口内已有 ${pruned.length} 次轮次以 failed/timed_out 结束`,
-              `最近一次 ${last !== undefined ? `${formatClock(last.at)}（${last.outcome}）` : "（未知）"}`,
+              mainT("main.watchdog.repeatFailWindow", { minutes: Math.round(config.repeatFailWindowMs / 60000), count: pruned.length }),
+              mainT("main.watchdog.repeatFailLast", { detail: last !== undefined ? `${formatClock(last.at)}（${last.outcome}）` : mainT("main.watchdog.repeatFailUnknown") }),
             ],
           }),
-          summary: `系统·看护 · ${SIGNAL_SHORT["repeat-fail"]} · 角色 ${roleId}（${pruned.length} 次）`,
+          summary: mainT("main.watchdog.repeatFailSummary", { signal: signalShortLabel("repeat-fail"), roleId, count: pruned.length }),
         }),
       });
     }
@@ -699,11 +707,11 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
               signal: "cmd-timeout",
               roleId: observation.roleId,
               facts: [
-                `${formatClock(observation.at)}（结构化事实 display.process.timedOut=true——F-1 已自动终止该命令、轮次继续）`,
-                `命令原文与输出在该角色会话流；本告警不含命令原文`,
+                mainT("main.watchdog.cmdTimeoutTimedOut", { time: formatClock(observation.at) }),
+                mainT("main.watchdog.cmdTimeoutNote"),
               ],
             }),
-            summary: `系统·看护 · ${SIGNAL_SHORT["cmd-timeout"]} · 角色 ${observation.roleId}`,
+            summary: mainT("main.watchdog.signalSummary", { signal: signalShortLabel("cmd-timeout"), roleId: observation.roleId }),
           }, `alert-cmd-timeout:${observation.roleId}`)) {
             st.lastDeliveredAt = at;
             st.suppressedSinceDelivered = 0;

@@ -86,6 +86,7 @@ import { normalizeArgv } from "../../src/common/shared/argv-primitives.ts";
 // G-2/W5（2026-10-16 客户批准）：确认卡的 pending/replay/expire 机制抽入**共享通用件**
 // （`confirm-card.ts`，与恢复确认卡同件——设计 §6.2「实现建议」）；本文件的行为逐字保留（见下方注释）。
 import { createConfirmCardCore } from "./confirm-card.ts";
+import { mainT } from "./i18n.ts";
 // 判断回落 reason 的人话映射（2026-10-18 客户反馈：read-denied 丢具体路径/原因）：与治理通道**同解**的小件。
 import { readDeniedHumanReason, stripTrailingSentencePunct } from "./judge-reason.ts";
 // F-4-M1（2026-10-16 客户批准）：shell 审核预算的 env 名**单一来源**在编排（shell-deadline.ts——
@@ -242,7 +243,7 @@ export interface ShellJudgeResultPayload {
   tier: "risky" | "review" | "deny" | null;
   /** 客户 D1：deny 档被 judge 放行；聊天行据此标「deny 档 · judge 放行」。 */
   hardDenyOverride?: true;
-  label?: "deny 档 · judge 放行";
+  label?: string;
   reason?: string;
   customerMessage?: string;
   alternative?: ShellJudgeAlternative;
@@ -311,29 +312,29 @@ export function describeShellCommand(prompt: OperatorPrompt): ShellCommandDispla
 
 /** 组装给操作者看的提示正文（强调「逐字核对」与「放行=真的执行」，并说明为何被问到）。 */
 function renderConfirmText(command: string, argvLines: string[], cwd: string, reason?: string): string {
-  const argvBlock = argvLines.length > 0 ? argvLines.join("\n") : "（argv 为空）";
+  const argvBlock = argvLines.length > 0 ? argvLines.join("\n") : mainT("main.operator.shellReview.argvEmpty");
   const lines = [
-    "受治理 shell 审核 · 操作者确认（第三闸 a）",
+    mainT("main.operator.shellReview.title"),
     "",
-    "这是一条需要在执行前由你**亲自确认**的 shell 命令（pm 模型审读拿不准/不可用，故升级到你）。",
-    "请**逐字核对**下面的命令原文后再决定；点「放行」将真的在项目里启动子进程执行它。",
+    mainT("main.operator.shellReview.intro"),
+    mainT("main.operator.shellReview.verify"),
   ];
   if (reason !== undefined) {
     // 为何升级到人（(b) 拿不准 / 不可用的原话）——让操作者知道为什么被问到。
-    lines.push("", "── 升级原因（为何交你确认） ──", reason);
+    lines.push("", mainT("main.operator.shellReview.escalationHeader"), reason);
   }
   lines.push(
     "",
-    "── 命令原文（逐字，未加工） ──",
+    mainT("main.operator.shellReview.commandHeader"),
     command,
     "",
-    "── 规范化参数 argv（JSON 转义显示；引号仅为界定符） ──",
+    mainT("main.operator.shellReview.argvHeader"),
     argvBlock,
     "",
-    "── 工作目录 cwd ──",
+    mainT("main.operator.shellReview.cwdHeader"),
     cwd,
     "",
-    "点「拒绝」或关闭对话框 = 不放行（不会执行）。",
+    mainT("main.operator.shellReview.denyNote"),
   );
   return lines.join("\n");
 }
@@ -399,7 +400,7 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
     const presentConfirmed = async (display: ShellCommandDisplay): Promise<OperatorOutcome> => {
       // 退路：通道未配置 → 不可用（能力缺席即 fail-closed；绝不当「没人问、那就放行」）。
       if (opts.presenter === undefined) {
-        return { outcome: "unavailable", reason: "操作者确认通道未配置（无 presenter），拒绝执行（fail-closed）" };
+        return { outcome: "unavailable", reason: mainT("main.operator.channelUnavailable") };
       }
       let decision: OperatorDecision;
       try {
@@ -416,14 +417,14 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
         return {
           outcome: "unavailable",
           reason: timedOut
-            ? `操作者确认超时（>${timeoutMs}ms），拒绝执行（fail-closed）`
-            : `操作者确认通道不可用，拒绝执行（fail-closed）：${reasonOf(err)}`,
+            ? mainT("main.operator.timeoutRejected", { ms: timeoutMs })
+            : mainT("main.operator.channelErrorRejected", { detail: reasonOf(err) }),
         };
       }
 
       // 人明确放行（恰为 true）才放行；拒绝/缺字段/非布尔 → 一律拒绝。
       if (decision.allow !== true) {
-        return { outcome: "deny", operatorId, reason: decision.note ?? "操作者拒绝执行" };
+        return { outcome: "deny", operatorId, reason: decision.note ?? mainT("main.operator.rejected") };
       }
       return { outcome: "allow", operatorId };
     };
@@ -479,10 +480,10 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
         verdict: "manual",
         reasonCode: timedOut ? "timeout" : aborted ? "aborted" : "unavailable",
         reason: timedOut
-          ? `判断超时（>${judgeTimeoutMs}ms），已转手动确认。`
+          ? mainT("main.operator.judgeTimeoutManual", { ms: judgeTimeoutMs })
           : aborted
-            ? "本轮已中止，判断结果不生效（交回既有中止路径）。"
-            : `判断异常：${reasonOf(err)}。已转手动确认。`,
+            ? mainT("main.operator.judgeAbortedManual")
+            : mainT("main.operator.judgeErrorManual", { detail: reasonOf(err) }),
       };
     } finally {
       if (timer !== undefined) clearTimeout(timer);
@@ -521,7 +522,7 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
 
     // 客户 D1：deny 档放行**只按 tier 置标记**，不转换、不拦截、不弹卡。
     const hardDenyOverride = outcome.verdict === "allow" && (tier === "deny" || outcome.hardDenyOverride === true);
-    const label = hardDenyOverride ? ("deny 档 · judge 放行" as const) : undefined;
+    const label = hardDenyOverride ? mainT("ui.judge.hardDenyLabel") : undefined;
     const audit: ShellJudgeAudit & { label?: typeof label } = {
       engine,
       verdict: outcome.verdict,
@@ -580,7 +581,7 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
     if (outcome.verdict === "allow") {
       // **结果行是放行条件**：投达失败 ⇒ 按拒绝处理（row-failed），**不再弹客户确认卡**（2026-10-19 裁定）。
       try {
-        if (opts.emitJudgeResult === undefined) throw new Error("判断结果行通道未配置");
+        if (opts.emitJudgeResult === undefined) throw new Error(mainT("main.customerInput.emitChannelMissing"));
         opts.emitJudgeResult(payload);
       } catch (err) {
         const detail = reasonOf(err);
@@ -610,7 +611,7 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
 
     // deny：发结果行（失败**只记诊断**，仍 deny——拒绝是安全方向）；**不调用 presenter**。
     try {
-      if (opts.emitJudgeResult === undefined) throw new Error("判断结果行通道未配置");
+      if (opts.emitJudgeResult === undefined) throw new Error(mainT("main.customerInput.emitChannelMissing"));
       opts.emitJudgeResult(payload);
     } catch (err) {
       judgeLog.record("shell-judge.row.failed", { requestId: payload.id, toolCallId: payload.toolCallId, verdict: payload.verdict, reason: reasonOf(err) });
@@ -636,25 +637,25 @@ export function manualJudgeDenyReason(reasonCode: string, reason?: string): stri
 function manualDenyAdvice(reasonCode: string): string {
   switch (reasonCode) {
     case "context-too-large":
-      return "请改用落盘脚本或拆分命令后重试。";
+      return mainT("main.operator.manualDenyAdvice.narrowCommand");
     case "budget":
     case "read-truncated":
-      return "请缩小判断范围（改用落盘脚本或拆分命令）后重试。";
+      return mainT("main.operator.manualDenyAdvice.narrowJudge");
     case "read-denied":
-      return "请缩小读取范围或改用落盘脚本后重试。";
+      return mainT("main.operator.manualDenyAdvice.narrowRead");
     case "aborted":
-      return "本轮已中止，命令未执行；如仍需执行请重新发起。";
+      return mainT("main.operator.manualDenyAdvice.aborted");
     case "unsupported-engine":
     case "context-missing":
-      return "请关闭「替我审批」后手动确认。";
+      return mainT("main.operator.manualDenyAdvice.switchOff");
     default:
-      return "请重试，如持续失败请关闭「替我审批」后手动确认。";
+      return mainT("main.operator.manualDenyAdvice.retry");
   }
 }
 
 /** `row-failed`（判断结果行投达失败）→ 拒绝的返回理由：结果行是放行条件，投达失败即 fail-closed。 */
 export function rowFailedJudgeDenyReason(detail: string): string {
-  return `审查结果投达失败，无法在聊天中显示判断结论，已拒绝；${stripTrailingSentencePunct(detail)}。`;
+  return mainT("main.operator.judgeResultDeliveryFailed", { detail: stripTrailingSentencePunct(detail) });
 }
 
 /**
@@ -664,44 +665,44 @@ export function rowFailedJudgeDenyReason(detail: string): string {
  */
 export function manualJudgeNotice(reasonCode: string, reason?: string): string {
   if (reasonCode === "row-failed") {
-    return "判断 agent 已完成判断，但结果无法在聊天中显示；规则判定仅作参考，本卡已转你手动确认。";
+    return mainT("main.operator.judgeRowFailedManual");
   }
-  return `判断 agent 未能完成判断：${stripTrailingSentencePunct(judgeManualHumanReason(reasonCode, reason))}。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。`;
+  return mainT("main.operator.judgeIncompleteManual", { reason: stripTrailingSentencePunct(judgeManualHumanReason(reasonCode, reason)) });
 }
 
 /** reasonCode → 人话（未知码回落到判断给出的有界理由；绝不复述内部行话以外的细节）。 */
 function judgeManualHumanReason(reasonCode: string, reason?: string): string {
   switch (reasonCode) {
-    case "unsupported-engine": return "当前引擎不支持自动判断";
-    case "unavailable": return "判断服务不可用";
-    case "timeout": return "判断超时";
-    case "aborted": return "本轮已中止";
-    case "parse-failed": return "判断结果无法解析";
+    case "unsupported-engine": return mainT("main.customerInput.reason.unsupportedEngine");
+    case "unavailable": return mainT("main.customerInput.reason.unavailable");
+    case "timeout": return mainT("main.customerInput.reason.timeout");
+    case "aborted": return mainT("main.customerInput.reason.aborted");
+    case "parse-failed": return mainT("main.customerInput.reason.parseFailed");
     case "read-denied": return readDeniedHumanReason(reason);
-    case "budget": return "读取预算已用尽";
-    case "read-truncated": return "读取内容被截断";
-    case "retry-capped": return "同类命令连续被拒，已达重试上限";
-    case "context-missing": return "缺少当前轮任务上下文";
-    case "context-too-large": return "命令或上下文过大";
-    case "model-manual": return "判断 agent 自报无法判断";
+    case "budget": return mainT("main.customerInput.reason.budget");
+    case "read-truncated": return mainT("main.customerInput.reason.readTruncated");
+    case "retry-capped": return mainT("main.operator.judgeReason.retryCapped");
+    case "context-missing": return mainT("main.operator.judgeReason.contextMissing");
+    case "context-too-large": return mainT("main.operator.judgeReason.contextTooLarge");
+    case "model-manual": return mainT("main.operator.judgeReason.modelManual");
     default: {
       const text = typeof reason === "string" ? reason.trim() : "";
-      return text !== "" ? text.slice(0, 200) : "判断未完成";
+      return text !== "" ? text.slice(0, 200) : mainT("main.operator.judgeReason.fallback");
     }
   }
 }
 
 /** `deny` 返回请求角色的文本（PM 评审 §8.4 逐行口径）；应用不自动重试、不自动执行替代方案。 */
 export function formatJudgeDenyReason(outcome: Pick<ShellJudgeOutcome, "reason" | "customerMessage" | "alternative">): string {
-  const lines = ["判断 agent 未放行该命令。"];
+  const lines = [mainT("main.operator.judgeDeniedHead")];
   const customerMessage = typeof outcome.customerMessage === "string" ? outcome.customerMessage.trim() : "";
-  if (customerMessage !== "") lines.push(`请向客户说明：${customerMessage}`);
+  if (customerMessage !== "") lines.push(mainT("main.operator.judgeExplainToCustomer", { message: customerMessage }));
   const reason = typeof outcome.reason === "string" ? outcome.reason.trim() : "";
-  if (reason !== "") lines.push(`原因：${reason}`);
+  if (reason !== "") lines.push(mainT("main.operator.judgeReasonLine", { reason }));
   if (outcome.alternative !== undefined) {
-    lines.push(`替代方案（${outcome.alternative.kind}）：${outcome.alternative.value}`);
+    lines.push(mainT("main.operator.judgeAlternative", { kind: outcome.alternative.kind, value: outcome.alternative.value }));
   }
-  lines.push("出路：如需执行，请关闭「替我审批」后重试。");
+  lines.push(mainT("main.operator.judgeWayOut"));
   return lines.join("\n");
 }
 
@@ -721,7 +722,7 @@ export function shellIntentSummary(command: string): string | null {
   if (firstLine === undefined) return null;
   const word = firstLine.trim().split(/\s+/)[0];
   if (word === undefined || word === "") return null;
-  return `它会在项目里执行：${word}`;
+  return mainT("main.operator.judgeWillRun", { word });
 }
 
 /** **su 审批档原因解析（2026-10-17）**：只认**行首固定前缀** `su-审批档[tier]`（前缀单一来源＝编排
@@ -759,12 +760,8 @@ export function approvalRoleDisplayName(roleId?: string, displayName?: string): 
 function suApprovalPlainReason(tier: SuApprovalTier, roleDisplayName?: string): string {
   const role = typeof roleDisplayName === "string" && roleDisplayName.trim() !== "" ? roleDisplayName.trim() : "SU";
   const tierText =
-    tier === "deny" ? "硬拒类（deny）" : tier === "risky" ? "风险命令（risky）" : "未自动判定（review）";
-  return (
-    `${role} 审批档：${tierText}——须逐条客户批准才执行；` +
-    "批准后可能绕过 ANS 文件写边界（命令以当前 OS 用户权限运行）。" +
-    "拒绝/超时/通道不可用 = 拒绝；默认拒绝、无「记住」，不自动通过。"
-  );
+    tier === "deny" ? mainT("ui.judge.tier.deny") : tier === "risky" ? mainT("ui.judge.tier.risky") : mainT("ui.judge.tier.review");
+  return mainT("main.operator.approvalTierLine", { role, tier: tierText });
 }
 
 /** 升级原因 → **人话**（(b) 判读的内部用语**不得**原样示人；未识别一律给 fail-closed 通用句——
@@ -775,13 +772,13 @@ export function plainReasonFor(reason: unknown, roleDisplayName?: string): strin
   const raw = typeof reason === "string" ? reason : "";
   const suTier = parseSuApprovalTier(raw);
   if (suTier !== null) return suApprovalPlainReason(suTier, roleDisplayName);
-  if (/risky/i.test(raw)) return "自动审核判定这条命令有风险——按治理规则，有风险的命令必须由你亲自确认才能执行。";
-  if (/超时|timeout/i.test(raw)) return "自动审核超时，未给出结论——按 fail-closed 交你确认。";
-  if (/json|解析|parse/i.test(raw)) return "自动审核给出的结论无法解析，未能形成明确意见——按 fail-closed 交你确认。";
-  if (/报错|异常|error/i.test(raw)) return "自动审核出错了，未给出结论——按 fail-closed 交你确认。";
-  if (/未接入|无会话|不可用|unavailable/i.test(raw)) return "自动审核当前不可用（审读会话未接上）——按 fail-closed 交你确认。";
-  if (/拿不准|不确定/.test(raw)) return "自动审核拿不准——按 fail-closed 交你确认。";
-  return "审核未能给出明确结论，按 fail-closed 交你确认。";
+  if (/risky/i.test(raw)) return mainT("main.operator.review.risky");
+  if (/超时|timeout/i.test(raw)) return mainT("main.operator.review.timeout");
+  if (/json|解析|parse/i.test(raw)) return mainT("main.operator.review.parse");
+  if (/报错|异常|error/i.test(raw)) return mainT("main.operator.review.error");
+  if (/未接入|无会话|不可用|unavailable/i.test(raw)) return mainT("main.operator.review.unavailable");
+  if (/拿不准|不确定/.test(raw)) return mainT("main.operator.review.unsure");
+  return mainT("main.operator.review.fallback");
 }
 
 /** 确认卡的**数据面**（主进程 → 渲染侧；只呈现，不含任何判定）。 */
@@ -879,7 +876,7 @@ export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOpt
     eventPrefix: "shell-confirm",
     component: "desktop.shell-confirm",
     present: opts.present,
-    expiredResponse: "此确认已失效（超时或应用重启），未获放行——请让角色重新发起。",
+    expiredResponse: mainT("shared.common.shellConfirmationExpired"),
     onExpired: (payload) => {
       opts.onExpired?.({
         id: payload.id,
@@ -918,12 +915,12 @@ export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOpt
                 const timeoutMs = (reason as Error & { timeoutMs?: unknown }).timeoutMs;
                 const n = typeof timeoutMs === "number" && Number.isFinite(timeoutMs) ? timeoutMs : undefined;
                 return {
-                  reason: n !== undefined ? `操作者确认超时（>${n}ms），未获放行——可让角色重新发起。` : "操作者确认超时，未获放行——可让角色重新发起。",
+                  reason: n !== undefined ? mainT("main.operator.expiredTimeout", { ms: n }) : mainT("main.operator.expiredTimeoutNoMs"),
                   diagnosticEvent: "shell-confirm.timeout",
                   ...(n !== undefined ? { fields: { durationMs: n } } : {}),
                 };
               }
-              return { reason: "本轮已结束、停止或会话已重建，旧 shell 确认失效。", diagnosticEvent: "shell-confirm.cancelled" };
+              return { reason: mainT("main.operator.expiredStopped"), diagnosticEvent: "shell-confirm.cancelled" };
             },
           },
         );
@@ -946,7 +943,7 @@ const SHELL_JUDGE_CHANNEL_TIMEOUT_NAME = "ShellJudgeChannelTimeoutError";
 
 /** 判断通道独立超时（与确认卡超时互不占用；超时 ⇒ manual/timeout）。 */
 function judgeTimeoutError(timeoutMs: number): Error {
-  const err = new Error(`判断超时（${timeoutMs}ms）：未在时限内得到判断结论。`) as Error & { timeoutMs?: number };
+  const err = new Error(mainT("main.operator.judgeTimeoutError", { ms: timeoutMs })) as Error & { timeoutMs?: number };
   err.name = SHELL_JUDGE_CHANNEL_TIMEOUT_NAME;
   err.timeoutMs = timeoutMs;
   return err;
@@ -955,7 +952,7 @@ function judgeTimeoutError(timeoutMs: number): Error {
 /** 构造带标记的超时错误（与 pi-adapter/timeout.ts 同风格，但**本角色自持**——不跨角色导入他人私有 common/）。
  *  **F-4-M2**：`timeoutMs` 随错误对象携带——中止组合信号后，呈现侧凭 `signal.reason` 写出含实际时限的如实文案。 */
 function confirmTimeoutError(timeoutMs: number): Error {
-  const err = new Error(`操作者确认超时（${timeoutMs}ms）：未在时限内得到操作者选择。`) as Error & { timeoutMs?: number };
+  const err = new Error(mainT("main.operator.confirmTimeoutError", { ms: timeoutMs })) as Error & { timeoutMs?: number };
   err.name = OPERATOR_CONFIRM_TIMEOUT_NAME;
   err.timeoutMs = timeoutMs;
   return err;

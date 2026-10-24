@@ -1,0 +1,5 @@
+git diff --stat -- src/provider/project-document app/preload.cjs app/main.ts
+(empty above means zero diff)
+
+git status --short -- src/provider/project-document app/preload.cjs app/main.ts
+(empty above means zero changes)

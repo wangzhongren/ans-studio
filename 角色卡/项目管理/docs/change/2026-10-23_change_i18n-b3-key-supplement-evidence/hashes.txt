@@ -1,0 +1,23 @@
+# 写盘后复算：git hash-object + sha256sum
+# changed files
+8dbc6bcaa15695b5458a80d43497b393f5185efd  a19ae3cb81b5cd9e0133505777d0aa67ea1c83884467837e219e40a9ca4c02dd  src/common/shared/i18n/messages/zh-CN.ts
+36783b3356a122667405c7a60d0d18c71f3b78ee  8bfd4564c016ab00f076ee1b2543226b191b55feedfce133bcdb90c4607adaf5  src/common/shared/i18n/messages/en-US.ts
+acbb61ecb67a48bcea7e61d3326a1d3b723e3cde  90e0434e681dc26199cee6c10ba0fab2234b7b0e832b9adba307f6fd4c020228  test/项目管理/shared/i18n.test.ts
+2074058e2dfc04c3763da1d0e6a0dc409a424432  96dcf24de6f302e30e8111591c61efaafc5c059c0d6b96ab5b5234192f0733f0  角色卡/项目管理/docs/change/2026-10-23_change_i18n-b3-key-supplement.md
+# evidence files
+18c6e00d0c54575a8b27b416f2377e94fc186688  8364ee14721b91e9d8b8f2f75c7b8b8ee7de5ba196b5a55d56aaaf5eaf50fa30  角色卡/项目管理/docs/change/2026-10-23_change_i18n-b3-key-supplement-evidence/classification.tsv
+46b85cbaa0ec90dfcf8b2a0b6e9de241c4705c62  cedf346f1ca1fad0d336ca9ebb8c97bad5d3b3e622911049a9ecff198c7e22aa  角色卡/项目管理/docs/change/2026-10-23_change_i18n-b3-key-supplement-evidence/env.log
+5747bdee51a714ce36ee76a8d3452eeb5b5ddf20  7233aea023c5b675f5d9ae908e0beac16fd93b710d64916901f119aed0d0bca8  角色卡/项目管理/docs/change/2026-10-23_change_i18n-b3-key-supplement-evidence/guard.log
+422828367cc20eacda1ff1f50c5f2116c0a11681  27811ade5780ae1962c3acbd0003dc2fad80d1f3fb11b8b5ed4091ab250c7bf8  角色卡/项目管理/docs/change/2026-10-23_change_i18n-b3-key-supplement-evidence/kept-non-target.tsv
+6aee54b84e43c123d0f98913f3bf78ad93b706fd  3e5e77944617ec2770bad0301f4ebe643df55fdcd510e31ed55bf941fd840fd1  角色卡/项目管理/docs/change/2026-10-23_change_i18n-b3-key-supplement-evidence/new-keys.tsv
+8b28b0e70b63ede686b25d49c101f965d48a01c4  858d3fc4575ce747cae4c3180808c2736f826ab92c4c44381cd2a40531cf8e99  角色卡/项目管理/docs/change/2026-10-23_change_i18n-b3-key-supplement-evidence/reused-keys.tsv
+06c1b5d55029c0ce3bbb5cc3f27abf8a157a7d9f  6e563b5f0464c2ae425aedb3c9c3ce65c428df96eaf90c0583d231e578576738  角色卡/项目管理/docs/change/2026-10-23_change_i18n-b3-key-supplement-evidence/stale-allowlist.log
+5c133c2102bde8623411e46f6c407cdf4388ce74  ef0e955585cf1fe7e797eedfc4d40eb7ed2845dcb06e3692f6c428602887f221  角色卡/项目管理/docs/change/2026-10-23_change_i18n-b3-key-supplement-evidence/test-i18n.log
+390117f48fda89b98cfe4abe2f46af51398badac  7c94e959ddf4a4c9558bc2c08d42d20d54611ebe9149cbc24f3f1b3686ffaa5f  角色卡/项目管理/docs/change/2026-10-23_change_i18n-b3-key-supplement-evidence/test-shared.log
+038d3fbde87f82f4d44dd463412934ac3beb8101  806e931448e81a09b5d4c88299c8c969c41de985288a33347dbc7bcad36db880  角色卡/项目管理/docs/change/2026-10-23_change_i18n-b3-key-supplement-evidence/typecheck.log
+26771c489d90915094626b8b3e74adbf1311205e  a2cca81ca8c11074930cd1a774e90b7a4966b14cef8928e72c4fcdc043038d91  角色卡/项目管理/docs/change/2026-10-23_change_i18n-b3-key-supplement-evidence/write-set-verification.log
+# input references
+0116e1808132bd38f2169b6066051988185ac237  2a824e21607540b28eb808cc6c04f980a3f5532af9c7118b2356dd00f8fa49f4  角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b3.md
+04a2bc81fbd528fa2e6d285af507dd85cccc25e3  844db4798033ba09d8a6c7d3d4eb49b6a90a37a7b803853e5771ed45e1146eac  docs/planning/2026-10-23_design_i18n.md
+2eef1c117934f3a1a951525a06623b12683314d8  3fe03da20f451fb4e106aeba10c90cff9702ee91b129ad201cb568b2f1046942  角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b4-keys-evidence/non-target-and-classification.md
+26dd276d2f3157986fefbfbcf3614d5cd0dd5d6b  5ccc758fef0f900cc113cd82b51d9cfb722f9da9bd67790d03eefc5211c6551f  docs/scheduling/2026-10-23-i18n-team-plan.md

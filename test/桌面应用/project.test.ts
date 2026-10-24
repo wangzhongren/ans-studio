@@ -4,9 +4,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import fs from "node:fs/promises";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 
-import { applyPinEvidence, buildProjectConfig, deriveGovernanceRecord, deriveGovernanceRecordWithPins, readRoleDocsIndex, resolveSkillRoot, posixDirname } from "../../app/desktop/project.ts";
+import { applyPinEvidence, buildProjectConfig, deriveGovernanceRecord, deriveGovernanceRecordWithPins, readRoleDocsIndex, resolveSkillRoot, posixDirname, projectDocumentCandidates } from "../../app/desktop/project.ts";
+import { configureDiagnostics, disposeDiagnostics, flushDiagnostics } from "../../src/common/shared/diagnostics.ts";
 import { listProject, resolveRole } from "../../src/service/role/resolve-role.ts";
 import type { PinEvidenceFile, PinEvidenceResult } from "../../src/model/boundary.ts";
 
@@ -310,4 +313,155 @@ test("deriveGovernanceRecordWithPins：mismatch 明细映射为 pin-mismatch；�
     inspectPinnedBoundariesFn: async () => { throw new Error("磁盘读取爆炸"); },
   });
   assert.deepEqual(failed, { state: "invalid", reason: "pin 证据检查失败：磁盘读取爆炸" }, "异常必须归为 invalid，绝不外抛");
+});
+
+// —————— 角色根文档索引（role-root-docs-display S2）：白名单/顺序/memo 排除/changelog 与 docs 不回归 ——————
+
+async function makeRoleProject(): Promise<{ root: string; roleDir: string; cleanup: () => Promise<void> }> {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-role-docs-"));
+  const roleDir = path.join(root, "角色卡", "R");
+  await fs.mkdir(path.join(roleDir, "docs", "design"), { recursive: true });
+  return { root, roleDir, cleanup: () => fs.rm(root, { recursive: true, force: true }) };
+}
+
+test("readRoleDocsIndex：rootDocs 只含三个白名单文件（固定顺序），memo/任意根文件永不入索引；changelog 与 docs/ 不回归", async () => {
+  const { root, roleDir, cleanup } = await makeRoleProject();
+  try {
+    await fs.writeFile(path.join(roleDir, "role-card.md"), "card");
+    await fs.writeFile(path.join(roleDir, "feature-map.md"), "fm body");
+    await fs.writeFile(path.join(roleDir, "functional-description.md"), "fd body");
+    await fs.writeFile(path.join(roleDir, "api-spec.md"), "not-applicable");
+    await fs.writeFile(path.join(roleDir, "memo.md"), "memo-private-marker");
+    await fs.writeFile(path.join(roleDir, "arbitrary.md"), "arbitrary-root-marker");
+    await fs.writeFile(path.join(roleDir, "changelog.md"), "changelog body");
+    await fs.writeFile(path.join(roleDir, "docs", "z.md"), "z");
+    await fs.writeFile(path.join(roleDir, "docs", "design", "a.md"), "a");
+    await fs.writeFile(path.join(roleDir, "docs", ".hidden.md"), "hidden");
+
+    const idx = await readRoleDocsIndex(root, "角色卡/R/role-card.md");
+    assert.deepEqual(idx.rootDocs, [
+      { name: "feature-map.md", path: "角色卡/R/feature-map.md", kind: "file" },
+      { name: "functional-description.md", path: "角色卡/R/functional-description.md", kind: "file" },
+      { name: "api-spec.md", path: "角色卡/R/api-spec.md", kind: "file" },
+    ], "rootDocs 必须恰好三个白名单文件且顺序固定");
+    const serialized = JSON.stringify(idx);
+    assert.equal(serialized.includes("memo"), false, "memo.md 永不进入任何索引字段");
+    assert.equal(serialized.includes("memo-private-marker"), false, "索引不得读取 memo 正文");
+    assert.equal(serialized.includes("arbitrary"), false, "任意根文件不得被索引");
+    assert.equal(idx.changelog?.path, "角色卡/R/changelog.md", "changelog 仍保留在独立字段");
+    assert.equal(idx.changelog?.text, "changelog body");
+    assert.deepEqual(idx.docs, [
+      { path: "docs/design", kind: "directory" },
+      { path: "docs/design/a.md", kind: "file" },
+      { path: "docs/z.md", kind: "file" },
+    ], "docs/ 遍历、排序与隐藏文件跳过保持既有语义（不回归）");
+  } finally {
+    await cleanup();
+  }
+});
+
+test("readRoleDocsIndex：部分根文档缺失只返回存在的，顺序保持相对；只有 memo 时 rootDocs 为空且不抛错", async () => {
+  const { root, roleDir, cleanup } = await makeRoleProject();
+  try {
+    await fs.writeFile(path.join(roleDir, "role-card.md"), "card");
+    await fs.writeFile(path.join(roleDir, "feature-map.md"), "fm");
+    await fs.writeFile(path.join(roleDir, "api-spec.md"), "api");
+    await fs.rm(path.join(roleDir, "docs"), { recursive: true, force: true });
+    const partial = await readRoleDocsIndex(root, "角色卡/R/role-card.md");
+    assert.deepEqual(partial.rootDocs.map((d) => d.name), ["feature-map.md", "api-spec.md"], "缺失项不占位，相对顺序保持");
+    assert.equal(partial.changelog, null, "无 changelog 时为 null，不要求补写");
+    assert.deepEqual(partial.docs, [], "无 docs/ 时为空索引");
+
+    await fs.rm(path.join(roleDir, "feature-map.md"));
+    await fs.rm(path.join(roleDir, "api-spec.md"));
+    await fs.writeFile(path.join(roleDir, "memo.md"), "memo only");
+    const memoOnly = await readRoleDocsIndex(root, "角色卡/R/role-card.md");
+    assert.deepEqual(memoOnly.rootDocs, [], "只有 memo 时不得产生任何根文档条目");
+  } finally {
+    await cleanup();
+  }
+});
+
+test("readRoleDocsIndex：cardPath 为空/绝对/盘符/反斜杠/空段/`.`/`..` 一律返回空索引且不抛错", async () => {
+  const { root, roleDir, cleanup } = await makeRoleProject();
+  try {
+    await fs.writeFile(path.join(roleDir, "role-card.md"), "card");
+    await fs.writeFile(path.join(roleDir, "feature-map.md"), "fm");
+    for (const cardPath of [
+      "role-card.md", // 空角色目录
+      "/abs/角色卡/R/role-card.md",
+      "C:/abs/角色卡/R/role-card.md",
+      "角色卡\\R\\role-card.md",
+      "角色卡//R/role-card.md",
+      "角色卡/./R/role-card.md",
+      "角色卡/../R/role-card.md",
+      "../角色卡/R/role-card.md",
+    ]) {
+      const idx = await readRoleDocsIndex(root, cardPath);
+      assert.deepEqual(idx, { changelog: null, docs: [], rootDocs: [] }, `非法 cardPath ${JSON.stringify(cardPath)} 必须返回空索引`);
+    }
+    // 角色目录存在但不是目录：空索引，不越界读取。
+    await fs.writeFile(path.join(root, "角色卡", "plainfile.md"), "x");
+    const notDir = await readRoleDocsIndex(root, "角色卡/plainfile.md/role-card.md");
+    assert.deepEqual(notDir, { changelog: null, docs: [], rootDocs: [] });
+  } finally {
+    await cleanup();
+  }
+});
+
+test("readRoleDocsIndex：符号链接角色目录与根文档不列入（POSIX 实测；Windows 以非法路径/非目录用例覆盖）", async (t) => {
+  if (process.platform === "win32") {
+    t.diagnostic("Windows 创建符号链接受权限限制；索引跳过逻辑由非法路径/非目录用例覆盖，POSIX 另行实测。");
+    return;
+  }
+  const outside = await fs.mkdtemp(path.join(os.tmpdir(), "ans-role-docs-outside-"));
+  const { root, roleDir, cleanup } = await makeRoleProject();
+  try {
+    await fs.writeFile(path.join(roleDir, "role-card.md"), "card");
+    // 正常角色目录下的根文档符号链接：不列入。
+    await fs.writeFile(path.join(outside, "target.md"), "outside target");
+    await fs.symlink(path.join(outside, "target.md"), path.join(roleDir, "feature-map.md"));
+    const linkedFile = await readRoleDocsIndex(root, "角色卡/R/role-card.md");
+    assert.deepEqual(linkedFile.rootDocs, [], "符号链接根文档不得列入");
+    // 角色目录本身是符号链接：整个索引为空。
+    await fs.symlink(outside, path.join(root, "角色卡", "Linked"));
+    await fs.writeFile(path.join(outside, "role-card.md"), "outside card");
+    const linkedDir = await readRoleDocsIndex(root, "角色卡/Linked/role-card.md");
+    assert.deepEqual(linkedDir, { changelog: null, docs: [], rootDocs: [] }, "符号链接角色目录不得读取");
+  } finally {
+    await cleanup();
+    await fs.rm(outside, { recursive: true, force: true });
+  }
+});
+
+test("projectDocumentCandidates：透传 rootDocs 元数据；旧调用方（无 rootDocs）不产生字段", () => {
+  const docs = [{ path: "docs/x.md", kind: "file" as const }];
+  const base = { roleId: "A", builtIn: false, cardPath: "角色卡/A/role-card.md", changelog: null, docs };
+  assert.equal(Object.hasOwn(projectDocumentCandidates(base), "rootDocs"), false, "旧调用方缺省时行为不变");
+  const withRoots = projectDocumentCandidates({
+    ...base,
+    rootDocs: [{ name: "feature-map.md", path: "角色卡/A/feature-map.md", kind: "file" }],
+  });
+  assert.deepEqual(withRoots.rootDocs, [{ path: "角色卡/A/feature-map.md", kind: "file" }], "只透传元数据（项目相对路径）");
+});
+
+test("readRoleDocsIndex：索引跳过记录元数据诊断（含 reasonCode，不写路径/正文）", async () => {
+  const { root, cleanup } = await makeRoleProject();
+  const logsDir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-role-docs-logs-"));
+  configureDiagnostics({ directory: logsDir });
+  try {
+    await readRoleDocsIndex(root, "../outside/role-card.md");
+    await readRoleDocsIndex(path.join(root, "missing-project"), "角色卡/R/role-card.md");
+    await flushDiagnostics();
+    const files = await fs.readdir(logsDir);
+    const text = (await Promise.all(files.map((name) => fs.readFile(path.join(logsDir, name), "utf8")))).join("\n");
+    assert.match(text, /"event":"role-docs\.index\.skipped"/, "索引跳过应留元数据诊断");
+    assert.match(text, /"reasonCode":"invalid-card-path"/);
+    assert.match(text, /"reasonCode":"role-dir-missing"/);
+    assert.equal(text.includes("outside"), false, "诊断不得写入被拒绝的路径");
+  } finally {
+    await disposeDiagnostics();
+    await cleanup();
+    await fs.rm(logsDir, { recursive: true, force: true });
+  }
 });

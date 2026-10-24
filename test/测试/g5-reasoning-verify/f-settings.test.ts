@@ -12,6 +12,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { RUNTIME_SETTINGS, getRuntimeSettingsDefinition } from "../../../src/common/shared/runtime-settings.ts";
+import { translate, type MessageKey } from "../../../src/common/shared/i18n/index.ts";
 import { REASONING_EFFORT_ENV_KEYS, REASONING_EFFORT_VALUES } from "../../../src/common/runtime-core/reasoning.ts";
 import { getRuntimeConfig, saveRuntimeConfig } from "../../../app/desktop/runtime-config.ts";
 import { PI_PANEL_KEYS, getPiConfig, savePiConfig } from "../../../app/desktop/pi-config.ts";
@@ -24,7 +25,7 @@ function tempEnv(): { envPath: string; cleanup(): void } {
 
 // —————————————————————— ① 注册表三字段 / choices / help ——————————————————————
 
-test("F1 三字段：键＝冻结 env 键逐字；label「推理强度」；可选非机密；choices 值域与冻结五值单一来源（Codex 无 off）", () => {
+test("F1 三字段：键＝冻结 env 键逐字；labelKey 经目录解析回「推理强度」；可选非机密；choices 值域与冻结五值单一来源（Codex 无 off）", () => {
   const expectations: Array<{ runtime: "claude" | "codex" | "pi"; choices: string[] }> = [
     { runtime: "claude", choices: [...REASONING_EFFORT_VALUES] },
     { runtime: "codex", choices: REASONING_EFFORT_VALUES.filter((value) => value !== "off") },
@@ -34,26 +35,37 @@ test("F1 三字段：键＝冻结 env 键逐字；label「推理强度」；可�
     const field = getRuntimeSettingsDefinition(runtime)!.fields.find((candidate) => candidate.key === REASONING_EFFORT_ENV_KEYS[runtime]);
     assert.ok(field, `${runtime} 必有推理强度字段`);
     assert.equal(field.key, REASONING_EFFORT_ENV_KEYS[runtime], "键＝冻结 env 键（逐字）");
-    assert.equal(field.label, "推理强度");
+    // B4：共享元数据只保存目录 key；经 shared `translate` 解析回迁移前 zh-CN 文案（逐字语义不变）。
+    assert.equal(field.labelKey, "shared.runtimeSettings.reasoning.label", `${runtime} labelKey 指向共享推理强度 key`);
+    assert.equal(translate("zh-CN", field.labelKey), "推理强度");
+    assert.equal("label" in field, false, "B4：元数据不再携带 label 字面量");
     assert.equal(field.required, false, "可选（不改 missingKeys 判据）");
     assert.equal(field.secret, false, "非机密");
     assert.deepEqual([...(field.choices ?? [])], choices, `${runtime} choices 值域＝冻结五值单一来源`);
   }
+  assert.equal(translate("en-US", getRuntimeSettingsDefinition("pi")!.fields.find((candidate) => candidate.key === REASONING_EFFORT_ENV_KEYS.pi)!.labelKey), "Reasoning effort", "en-US 同 key 可解析（最小 en 断言）");
   assert.equal(REASONING_EFFORT_VALUES.includes("off"), true, "冻结值域含 off（claude/pi 全量）");
   assert.deepEqual([...(RUNTIME_SETTINGS.codex.fields.find((field) => field.key === "ANS_CODEX_REASONING_EFFORT")!.choices ?? [])], ["low", "medium", "high", "xhigh"], "Codex 无 off（平台无该档）");
 });
 
-test("F2 help 文案：三平台统一含「维持平台默认／档位梯／思考计入输出 tokens」（计费如实在位）", () => {
+test("F2 help 文案：三平台同一 helpKey 经目录解析为「维持平台默认／档位梯／思考计入输出 tokens」（计费如实在位）", () => {
   const helps = new Set<string>();
+  const helpKeys = new Set<MessageKey>();
   for (const runtime of ["claude", "codex", "pi"] as const) {
     const field = getRuntimeSettingsDefinition(runtime)!.fields.find((candidate) => candidate.key === REASONING_EFFORT_ENV_KEYS[runtime])!;
-    assert.ok(field.help && field.help.length > 0, runtime + " help 在场");
-    assert.ok(field.help!.includes("留空＝维持平台默认"), runtime + " 未设态如实");
-    assert.ok(field.help!.includes("关/低/中/高/极高"), runtime + " 档位梯如实");
-    assert.ok(field.help!.includes("思考计入输出 tokens"), runtime + " 计费如实");
-    helps.add(field.help!);
+    assert.ok(field.helpKey, runtime + " helpKey 在场");
+    assert.equal("help" in field, false, "B4：元数据不再携带 help 字面量");
+    helpKeys.add(field.helpKey!);
+    const help = translate("zh-CN", field.helpKey!);
+    assert.ok(help.length > 0, runtime + " help 经目录解析非空");
+    assert.ok(help.includes("留空＝维持平台默认"), runtime + " 未设态如实");
+    assert.ok(help.includes("关/低/中/高/极高"), runtime + " 档位梯如实");
+    assert.ok(help.includes("思考计入输出 tokens"), runtime + " 计费如实");
+    helps.add(help);
   }
+  assert.equal(helpKeys.size, 1, "三平台 helpKey 同一（单一来源）");
   assert.equal(helps.size, 1, "三平台 help 逐字统一（同一句）");
+  assert.equal(translate("en-US", [...helpKeys][0]).includes("Thinking counts toward output tokens"), true, "en-US 同 key 可解析（最小 en 断言）");
 });
 
 // —————————————————————— ② 保存链：choices 拒 / trim 规范形 / 空串清除 / 批量原子 ——————————————————————

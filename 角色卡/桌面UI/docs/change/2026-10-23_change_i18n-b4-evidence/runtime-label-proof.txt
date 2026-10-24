@@ -1,0 +1,57 @@
+=== 1) runtimeLabel 实际输出（真实 shared 目录经 facade translate）===
+{
+  "labels": {
+    "demo": "demo",
+    "pi": "Pi",
+    "codex": "Codex",
+    "claude": "Claude"
+  },
+  "keys": {
+    "demo": "shared.runtimeSettings.runtime.demo",
+    "pi": null,
+    "codex": null,
+    "claude": null
+  },
+  "zh": {
+    "demo": "演示",
+    "pi": "Pi",
+    "codex": "Codex",
+    "claude": "Claude",
+    "unknownEmpty": "未知引擎"
+  },
+  "en": {
+    "demo": "Demo",
+    "pi": "Pi",
+    "codex": "Codex",
+    "claude": "Claude",
+    "unknownEmpty": "Unknown engine"
+  },
+  "sharedZh": "演示",
+  "sharedEn": "Demo"
+}
+
+=== 2) runtime-config.ts 全部 import（无 runtime-shared / node:*）===
+18:import {
+23:} from "../i18n/index.ts";
+
+=== 3) runtime-shared / node:os / node:path 出现位置（仅注释）===
+14: * 是品牌名，原样展示。渲染层**不导入** `runtime-shared.ts`（顶层 node:os/node:path），
+66: * 与共享 `runtime-shared.ts` 的 `RUNTIME_LABELS` 同口径，但本模块不导入该文件。
+76: * 需要本地化的引擎显示名 key（B4）。key 单一来源是共享 `runtime-shared.ts` 的
+77: * `RUNTIME_LABEL_KEYS`；渲染层不得导入该模块（顶层 node:os/node:path），因此在此用
+
+=== 4) demo 相关行 ===
+12: * i18n B4：引擎显示名中的 `demo` 不再以中文字面量保存在本地，改用共享 key
+13: * `shared.runtimeSettings.runtime.demo`（经 facade `translate` 取词）；Pi/Codex/Claude
+64: * 引擎显示名的**语言中性**值：Pi/Codex/Claude 是品牌名（原样展示）；`demo` 是中性标识，
+69:  demo: "demo",
+81:  demo: "shared.runtimeSettings.runtime.demo",
+
+=== 5) 代码面（去注释）无中文 demo 字面量 ===
+demo Chinese literal: false
+RUNTIME_LABELS block: export const RUNTIME_LABELS: Record<string, string> = {
+  demo: "demo",
+  pi: "Pi",
+  codex: "Codex",
+  claude: "Claude",
+};

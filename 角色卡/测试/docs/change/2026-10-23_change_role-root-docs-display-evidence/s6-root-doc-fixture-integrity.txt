@@ -1,0 +1,12 @@
+# Real-repo role-root fixture integrity after S6 Electron runs (2026-10-23)
+# Windows fail-closed path: Service returns UNSUPPORTED_ENVIRONMENT before any read; tests use a reader stub that throws 'must not read'.
+
+## git status for 角色卡/桌面窗口 root docs (expect empty)
+(end)
+
+## current sha256 / mtime / bytes (post-run; no pre-run mtime snapshot was taken because the Windows path never reads)
+520e21e9e4a8bb6d4bd3ebec4cd870a87fda045c3ba7f187861ba392deef3746  2026-10-22 11:05:52.268601300 +0800  16494  角色卡/桌面窗口/feature-map.md
+9fcc0b0a47f6283a224d15a661a1a26fec5b36b8275bdba46167028be3ed80f4  2026-10-22 11:05:52.268601300 +0800  9372  角色卡/桌面窗口/functional-description.md
+9de77960367b63673cc595f41ac6df4e8365ee703d1f67d89dacc6faff5d7df2  2026-10-23 16:21:31.071763700 +0800  79029  角色卡/桌面窗口/api-spec.md
+
+## POSIX mtime/byteLength assertions: NOT EXECUTED (Windows environment).

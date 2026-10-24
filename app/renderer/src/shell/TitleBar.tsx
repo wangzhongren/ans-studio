@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { Copy, Minus, Square, X } from "lucide-react";
 import ansIcon from "@/assets/ans-studio-ans-icon.png";
+import { useT } from "@/i18n";
 import {
   callWindowControl,
   getWindowControlAvailability,
@@ -37,6 +38,7 @@ function useMaximized(): boolean {
 }
 
 export function TitleBar() {
+  const t = useT();
   const availability = getWindowControlAvailability();
   const maximized = useMaximized();
   const windowControlsAvailable =
@@ -47,21 +49,21 @@ export function TitleBar() {
       <div className="titlebar-left">
         {!windowControlsAvailable ? (
           <span className="titlebar-note" role="status">
-            窗口控制不可用
+            {t("ui.titlebar.windowControlsUnavailable")}
           </span>
         ) : null}
       </div>
       <div className="titlebar-brand">
         <img className="titlebar-mark" src={ansIcon} alt="ANS" width={20} height={20} />
-        <span className="titlebar-sub">治理会话工作台</span>
+        <span className="titlebar-sub">{t("ui.titlebar.subtitle")}</span>
       </div>
       <div className="titlebar-controls">
         <button
           id="win-min"
           className="win-btn"
           type="button"
-          title={availability.minimize ? "最小化" : "当前环境未提供窗口控制"}
-          aria-label="最小化"
+          title={availability.minimize ? t("ui.titlebar.minimize") : t("ui.titlebar.controlsUnavailableHint")}
+          aria-label={t("ui.titlebar.minimize")}
           disabled={!availability.minimize}
           onClick={() => callWindowControl("minimizeWindow")}
         >
@@ -74,11 +76,11 @@ export function TitleBar() {
           title={
             availability.maximize
               ? maximized
-                ? "还原"
-                : "最大化"
-              : "当前环境未提供窗口控制"
+                ? t("ui.titlebar.restore")
+                : t("ui.titlebar.maximize")
+              : t("ui.titlebar.controlsUnavailableHint")
           }
-          aria-label={maximized ? "还原" : "最大化"}
+          aria-label={maximized ? t("ui.titlebar.restore") : t("ui.titlebar.maximize")}
           disabled={!availability.maximize}
           onClick={() => callWindowControl("toggleMaximize")}
         >
@@ -92,8 +94,8 @@ export function TitleBar() {
           id="win-close"
           className="win-btn win-btn-close"
           type="button"
-          title={availability.close ? "关闭" : "当前环境未提供窗口控制"}
-          aria-label="关闭"
+          title={availability.close ? t("shared.common.close") : t("ui.titlebar.controlsUnavailableHint")}
+          aria-label={t("shared.common.close")}
           disabled={!availability.close}
           onClick={() => callWindowControl("closeWindow")}
         >

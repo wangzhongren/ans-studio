@@ -5,6 +5,7 @@
  * 排队态（不可作答）；计数只按当前项目×引擎的唯一 id。不合并、不代答、不重排。
  */
 
+import { DEFAULT_LOCALE, translate, type Locale } from "../i18n/index.ts";
 import { governanceCardMetaView, type GovernanceCardMeta } from "./governance-view.ts";
 
 export interface OperatorPayloadLike {
@@ -72,9 +73,12 @@ export function operatorOutsideView(payload: unknown, selectedRoleId: string | n
 
 export interface OperatorCardMeta extends GovernanceCardMeta {}
 
-export function operatorCardMeta(payload: unknown): OperatorCardMeta {
+export function operatorCardMeta(
+  payload: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): OperatorCardMeta {
   const record = asOperatorRecord(payload);
-  return governanceCardMetaView(record.request);
+  return governanceCardMetaView(record.request, locale);
 }
 
 /**
@@ -113,7 +117,8 @@ export function queuedIds(
 export function pendingKindFor(
   pending: Record<string, Record<string, unknown>>,
   roleId: string,
-): "待选择" | "等待你确认" | null {
+  locale: Locale = DEFAULT_LOCALE,
+): string | null {
   if (!roleId) return null;
   let found = false;
   let hasChoice = false;
@@ -128,48 +133,71 @@ export function pendingKindFor(
     if (request.kind === "choice") hasChoice = true;
   }
   if (!found) return null;
-  return hasChoice ? "待选择" : "等待你确认";
+  return translate(
+    locale,
+    hasChoice ? "ui.work.kind.choice" : "ui.status.label.waitingConfirm",
+  );
 }
 
-const FINAL_NOTES: Record<string, string> = {
-  confirm: "已确认。",
-  deny: "已回『不同意』（未获同意）。",
-  cancel: "已取消（未获同意）。",
-  submit: "已提交。",
-};
+const FINAL_NOTE_KEYS = {
+  confirm: "ui.operator.result.confirm",
+  deny: "ui.operator.result.deny",
+  cancel: "ui.operator.result.cancel",
+  submit: "ui.operator.result.submit",
+} as const;
 
 /** 终态说明（作答成功；过期/失败另有文案）。 */
-export function operatorFinalNote(decision: unknown): string {
+export function operatorFinalNote(
+  decision: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   const record =
     decision && typeof decision === "object"
       ? (decision as Record<string, unknown>)
       : {};
   if (record.kind === "confirm") {
-    return record.confirmed === true ? FINAL_NOTES.confirm : FINAL_NOTES.deny;
+    return translate(
+      locale,
+      record.confirmed === true ? FINAL_NOTE_KEYS.confirm : FINAL_NOTE_KEYS.deny,
+    );
   }
   if (record.kind === "choice") {
-    if (record.cancelled === true) return FINAL_NOTES.cancel;
-    return FINAL_NOTES.submit;
+    if (record.cancelled === true) return translate(locale, FINAL_NOTE_KEYS.cancel);
+    return translate(locale, FINAL_NOTE_KEYS.submit);
   }
-  return FINAL_NOTES.submit;
+  return translate(locale, FINAL_NOTE_KEYS.submit);
 }
 
-export const OPERATOR_SUBMITTING_NOTE = "已提交，等待主进程受理…";
-export const OPERATOR_EXPIRED_NOTE = "请求已失效，未获同意。";
+export function operatorSubmittingNote(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.operator.submitting");
+}
 
-export function operatorExpiredNote(reason: unknown): string {
+export function operatorExpiredNote(
+  reason: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   const text = typeof reason === "string" && reason !== "" ? reason : "";
-  return text ? "请求已失效，未获同意。原因：" + text : OPERATOR_EXPIRED_NOTE + "请让角色重新发起。";
+  return text
+    ? translate(locale, "ui.operator.expiredWithReason", { reason: text })
+    : translate(locale, "ui.operator.expiredRetry");
 }
 
 /** 作答失败的可见原因（可重试；请求仍 open）。 */
-export function operatorRetryNote(error: unknown): string {
-  return (
-    "回传失败：" +
-    (typeof error === "string" && error !== "" ? error : String(error ?? "通道未受理")) +
-    "——请重试。"
-  );
+export function operatorRetryNote(
+  error: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return translate(locale, "ui.operator.retryFailed", {
+    detail:
+      typeof error === "string" && error !== ""
+        ? error
+        : String(error ?? translate(locale, "ui.chatStore.operatorChannelNotAccepted")),
+  });
 }
+
+/** 旧导出名（zh-CN 值），供未迁移调用方逐字使用。 */
+export const OPERATOR_SUBMITTING_NOTE = operatorSubmittingNote(DEFAULT_LOCALE);
+export const OPERATOR_EXPIRED_NOTE = translate(DEFAULT_LOCALE, "ui.operator.expired");
 
 /** 同一 id 是否已由可操作卡/镜像面呈现（排队聚合不重复计数）。 */
 export function queuedWithoutPresented(

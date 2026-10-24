@@ -1,0 +1,73 @@
+# Target file hashes at S1 baseline (2026-10-23-acceptance-rework-routing)
+# columns: status | git-hash-object | sha256 | bytes | path
+# 'status' ABSENT = file does not exist yet (planned new file)
+# recorded_local=2026-10-23 18:51:15 +0800 HEAD=ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+
+PRESENT | ec1ba7c1706cc5b07ef17f01ef935bf529a8ea9a | f9c4959a8def24ecfbc317220ece27545195f1f7eaed0d930cb37a1b63252e44 | 47540 | src/common/编排/flow-state.ts
+PRESENT | 467d0925d4f5c687fb1f19787ef8d3dcfe9dd3a5 | 82049e2bf9570e23f3af43ee77654c3f5e8b9b23468518f1d0592cfd85ee514b | 66448 | src/common/编排/flow-service.ts
+ABSENT | - | - | - | src/common/编排/acceptance-rework.ts
+PRESENT | 729597beba576f710a28c819386215145b793f6b | 78172c7a760fc5f0df8319763032a0a80175daddf7a4102507feb2850ff08a9a | 1664 | src/pipeline/orchestration/flow-state.ts
+PRESENT | 049117443573c6f844ff2f5c39572010e38d1b2e | 2fd40074b7463fa0573dd1a1d0db0c7aa393abf5f620c3385b0797ca815209e2 | 65944 | app/desktop/customer-input.ts
+PRESENT | 80bb89cb214938f2127f8da5c72d1384eda692ba | 7a02b434729689eaa83cfd622bc3dcb25ce460a1ac1ec365939c0f1bf268f158 | 292874 | app/desktop/interface.ts
+PRESENT | f4c997f2b330d5b5220518fe6640aac0eaf6a2b2 | c84cf85454facff4e4013f7b8ad305da49d9a4eefd4aad63dcb1d21792c32fa7 | 78874 | app/desktop/governance-advance.ts
+PRESENT | 49cd5530345958d2e4f5dcb2887dfabfb5b37240 | 89d822f88821ad9f16cd9be3862670f75a4582400d26a87781f42e26f2d8a98f | 61888 | app/main.ts
+PRESENT | 2023e9f08be24c577f8c1adc91fc8f5d8792271b | c2e09c875b2fc633d4b1991379c1ccfdc12e32547e63ad344b96f5178463560c | 166067 | src/provider/runtime/tools.ts
+PRESENT | b38c7664bdbbf20ffa0ddc2ecf0de4d9bfaf0914 | 02fd19459fb8cb628b5b6d6054726852901c22abb5bd4309a5fb224727255df8 | 113741 | src/common/shared/i18n/messages/zh-CN.ts
+PRESENT | 15cfccc73faf6cd66c1243357f822ac357c23ecb | 9522a65d6166d4fc6c4a9562bb86e59e705d44c721ac92e73385e8e0ebe28fff | 120976 | src/common/shared/i18n/messages/en-US.ts
+PRESENT | 015a60ac9c39f9137a25440c2c51ff34cda9245f | a1419d2de869c079e161f19d46c51ef1809b61bc62c2fd64953102a3398c0862 | 54784 | test/编排/flow-state.test.ts
+PRESENT | 0d28dad9cf2e2daebdb8b47fb44b32163a961e57 | 28d1b9b4cbe2899a0e69202983b92532d99d84af3473f72d918e1aa01f9af680 | 69600 | test/编排/flow-service.test.ts
+ABSENT | - | - | - | test/编排/acceptance-rework.test.ts
+PRESENT | d321afd85bbae8a15ed3a9910c7c1183903e91fa | 2141841bcc14650ba65d9323d16bbc1b54004a478fc80681adfcd8922257c9e9 | 108863 | test/桌面应用/acceptance-dispatch.test.ts
+PRESENT | 2185ae934ab8fff6377fd02504cadc0619e44d5e | 448b2586fe133badfbbc7abd36253d405aea04516091146467e96afcb149dda0 | 346615 | test/桌面应用/interface.test.ts
+PRESENT | 73c1e22dcd64e88debc5f7b62625760292db637c | a8c9f24617b2e03b947b2257bcff60a5c917222af279ca86d34fbf4bc11cbed7 | 123401 | test/桌面应用/operator-wiring.test.ts
+PRESENT | 142e0f18d7701964053d97c6412d38809684c329 | c48f2e5a0d4a84e91cfd5daf8386bdb793d3e4ac3868d2023063dc53e0c8474b | 173881 | test/桌面应用/e2e/main.mjs
+PRESENT | a1d10ddfd29932d57732c3d86a55d88f0ec80b36 | a99c52cea45661a63910182d4df0502691d29eef08a627e431fbf964afcd1ef6 | 20547 | test/runtime-core/tools.test.ts
+PRESENT | bca8e6ad8d9c36677acacef88f96faaab526f855 | af234a1b74c695bfadfa666e540534a05fc5acaad6683a760d1527ffb7c6621f | 46368 | test/项目管理/shared/i18n.test.ts
+PRESENT | 3358a1428f60b1d115e9a3af5aab39601938eb12 | 05003446fd8973b9954dd10593f8f5df284d68b3d733b8832a83338f949cf7e9 | 6151 | test/项目管理/shared/i18n-guard.test.ts
+
+## test/测试/governance-e2e-auto contents
+PRESENT | 4c3f19126ccad98fafac5f298f0a5fe359f89875 | d0e5d6fb41ab31094db71cde0e4362befa5728e2a028b9ee12317c93e8c0162d | 5859 | test/测试/governance-e2e-auto/a-proposal-write-auto.test.ts
+PRESENT | aa3f78bc0ecdc69c9d0ecc0ccf565340de6311e7 | bc0ce9cee9bf9dcdb2d45a33f61bbbf99ceb6eac6f8487e7a4f40983772616e7 | 16407 | test/测试/governance-e2e-auto/b-proposal-accept-timing.test.ts
+PRESENT | f82a56df555ab9ff06d251b20bb93634a07c6f9a | 563a60d045e9ee8f087b51706f04eedffc95fdf944430e958e8e261ddc0c5e37 | 21234 | test/测试/governance-e2e-auto/c-appointment-timing.test.ts
+PRESENT | 5806783c3c75f749e773d10a24939ed7cdb48919 | 7c661be3cb5931971d957929839c0b517f2e360ad00b6079e3307b73310dabc6 | 13430 | test/测试/governance-e2e-auto/d-dispatch-listing.test.ts
+PRESENT | 2a380f9c1ffa4caded8410fa28361cadafc793a4 | ecdf2c229b239c6f36dd52ec34b62524e5fb73428859f2944d045ca7c907f0d7 | 10171 | test/测试/governance-e2e-auto/e-switch-matrix.test.ts
+PRESENT | b8ebde757d9ceb5483146114cc7e1d6f3fdba76c | 97af55e68337b468eb180db23c6e90f6adaef54aa013c7a65c677a54988e7e3a | 13494 | test/测试/governance-e2e-auto/f-acceptance-gate.test.ts
+PRESENT | 9ce3caed83e87f21f4444875b054d79bf4816e69 | ec1b2c1dde230dc758c25b361100fcbae8802ef356c75524f2fe5c22c69f5981 | 74257 | test/测试/governance-e2e-auto/fixture.ts
+PRESENT | 739fd731ff07fd17f6f5cb05f59a0834e59e3c91 | 91052b6a669c89f3613ccdf6cdee13680edcf587b5a3e225d6ced1ac98f8e315 | 7605 | test/测试/governance-e2e-auto/g-judge-timeout.test.ts
+PRESENT | fff06e578f8ba081a6c84ed7b053dbd8c3125f5c | 21dc469f8ef09395e6bbbd666e824ecc8ffc5cfbf86cea6a5ad6bc225a8e4fe6 | 6827 | test/测试/governance-e2e-auto/h-list-dir.test.ts
+PRESENT | 76cf0dae9aea3612c35b4047dc1a848053da4d8b | c14bd78bc5fc6500706f43031e2bd1a5d7c0143a0ee0e9608ec49fdb28df995f | 80656 | test/测试/governance-e2e-auto/i-full-chain.test.ts
+PRESENT | 6e88420738315a366101c0f3850f9a236b1b8f8b | b064d92296ca9948a1c52b5d01d4019bb9c1557ad3ff46fb6442164fd45ea578 | 9830 | test/测试/governance-e2e-auto/j-intent-confirm.test.ts
+PRESENT | f381238ca2d2e2f1fc0ffae91e67060204294fc7 | ed5432de6797a7b34224ea47fdb86203e3259c34b0f509c8c9acdf53dee70b07 | 2302 | test/测试/governance-e2e-auto/k-governance-feedback.test.ts
+PRESENT | 38f824f5249001f76335697f19eb38aac3c110c8 | 8c7aeee9b1008dbb4f93b364b66a89d7a9e0e749c45c6c6aff3a31b9e4432304 | 10567 | test/测试/governance-e2e-auto/l-crew-write-validation.test.ts
+PRESENT | cb6f483461815570ef0a18b7fbb251f5cdc0aa5d | 48fb0aa8467479904a9b2a7b4498b5f6a3cf200b2782f1eee52c76813ec85e3e | 24806 | test/测试/governance-e2e-auto/l-redispatch-reentrant-gate.test.ts
+PRESENT | 7fe7ac5ed67fa578fd5e5f0506279cfd6a836677 | e5864234c75a219c39255ab51f4113ec177beafadf303cc7439e41f73549e6f7 | 10612 | test/测试/governance-e2e-auto/m-lead-internal-choice.test.ts
+PRESENT | 7eb1ea95122bfa7632c88c348f3e3166c4928df5 | 3bc3af5f271415f91196a1afe0476ffd872edc23cad32cfa73487c61a2476c76 | 35993 | test/测试/governance-e2e-auto/n-invalid-governance-card.test.ts
+PRESENT | 8dde9b6b05c5b74a35089f00cfc97dbe24189ae9 | 04f64e2f39bb76030f34960e87e4c76c25ff340715e983c6d00e16a2e89335a3 | 27971 | test/测试/governance-e2e-auto/o-slug-trailing-hyphen.test.ts
+PRESENT | da5b0c53bf3b44bdc652c15a2ee2107341ce81b6 | c35da9810c995a3d556e2f406323a273024e5521dac77cb23c14d4f933296cee | 20802 | test/测试/governance-e2e-auto/p-team-plan-guard.test.ts
+PRESENT | 8a1cd8a85a64250de4ff9958cc58c157adca264a | 9689f5cbe1ec299921d6d92d3174a68369d482b985a6bd37d999c3e9d8148c52 | 32302 | test/测试/governance-e2e-auto/q-role-granularity.test.ts
+PRESENT | 7973d367a43fbd09a893496f1d73b67e80e022e9 | 305cc0ab4027e16ea25cb5730cb6324533732385810b1b5d774a5eb516726159 | 30898 | test/测试/governance-e2e-auto/r-mapreduce-parallel.test.ts
+
+## test/测试/governance-judge-cards-verify contents (if exists)
+PRESENT | 366e78e17668beb07e68a3653f279c0a078cdcc2 | a6ebe70393c9bf63b8e07ddce924ca6324292eb82aa47d1dc73e25ed01052851 | 8804 | test/测试/governance-judge-cards-verify/a-switch-matrix.test.ts
+PRESENT | a584c737c0818cb998eedb1b9cd39e0251b7658d | 6dddb7d714226a7269aa510cf1865dfd7238700c45e36f4af5c99a92107a96a6 | 35842 | test/测试/governance-judge-cards-verify/b-card-kinds.test.ts
+PRESENT | 81ba9e3edf9768779d9d42134757da9190623f4c | e73f03998b43cb0f6e4f44feea918c3155f006bbb3b5f08394606d0500929fc5 | 14305 | test/测试/governance-judge-cards-verify/c-fallback.test.ts
+PRESENT | 66b2e9928d2a4d5ae65c3466c2cf7d94a882bf87 | fd71ce11b49e86fe324580e8b18a16092361d0e7d1b2bc255da5a0d476c88474 | 14080 | test/测试/governance-judge-cards-verify/d-audit-ledger.test.ts
+PRESENT | e225a367b08cfa17db9e4c4a2a7c268698cc7de6 | be3bca279a55d384ed37466cecd7880680e6bf26a8432cd4e6aed541fc92ec7c | 8530 | test/测试/governance-judge-cards-verify/e-queue-once.test.ts
+PRESENT | 10c147deea3dbdfd459bfab1a8ebed41028709e3 | e984f7b95e3bdb3ec9ba6b636536055194af669d1d6fedd7a9d1ceea82f3bc94 | 35471 | test/测试/governance-judge-cards-verify/fixture.ts
+
+## HEAD identity of selected target files (git ls-tree)
+EQUAL_TO_HEAD | head_blob=ec1ba7c1706cc5b07ef17f01ef935bf529a8ea9a | worktree=ec1ba7c1706cc5b07ef17f01ef935bf529a8ea9a | src/common/编排/flow-state.ts
+MODIFIED_IN_WORKTREE | head_blob=cdba51754e73e4d39bfbdedea7ecc788a05e76e8 | worktree=467d0925d4f5c687fb1f19787ef8d3dcfe9dd3a5 | src/common/编排/flow-service.ts
+MODIFIED_IN_WORKTREE | head_blob=2a32991ceab908ece10bbead248f4cd9849d8084 | worktree=729597beba576f710a28c819386215145b793f6b | src/pipeline/orchestration/flow-state.ts
+MODIFIED_IN_WORKTREE | head_blob=98ed6fc3bdae3a4f252478fd2b0755cbcd2225d5 | worktree=049117443573c6f844ff2f5c39572010e38d1b2e | app/desktop/customer-input.ts
+MODIFIED_IN_WORKTREE | head_blob=203e36f492f4bcc07689810bdd6c861a75e5cba9 | worktree=80bb89cb214938f2127f8da5c72d1384eda692ba | app/desktop/interface.ts
+MODIFIED_IN_WORKTREE | head_blob=965e46568a49c4e445ae947de3addd21a51a1d5f | worktree=f4c997f2b330d5b5220518fe6640aac0eaf6a2b2 | app/desktop/governance-advance.ts
+MODIFIED_IN_WORKTREE | head_blob=c64174f2dbff957944772973e5aaf31f69b8c687 | worktree=49cd5530345958d2e4f5dcb2887dfabfb5b37240 | app/main.ts
+EQUAL_TO_HEAD | head_blob=2023e9f08be24c577f8c1adc91fc8f5d8792271b | worktree=2023e9f08be24c577f8c1adc91fc8f5d8792271b | src/provider/runtime/tools.ts
+EQUAL_TO_HEAD | head_blob=015a60ac9c39f9137a25440c2c51ff34cda9245f | worktree=015a60ac9c39f9137a25440c2c51ff34cda9245f | test/编排/flow-state.test.ts
+MODIFIED_IN_WORKTREE | head_blob=9bdbe3de063a0cada0bae3e0158fefc719dfe38b | worktree=0d28dad9cf2e2daebdb8b47fb44b32163a961e57 | test/编排/flow-service.test.ts
+MODIFIED_IN_WORKTREE | head_blob=0b4a1ca63425cf6fdec3323d53add34a5234ea10 | worktree=d321afd85bbae8a15ed3a9910c7c1183903e91fa | test/桌面应用/acceptance-dispatch.test.ts
+MODIFIED_IN_WORKTREE | head_blob=f3b8cae8c2bf637020c469e1874f675f6a2aef9f | worktree=2185ae934ab8fff6377fd02504cadc0619e44d5e | test/桌面应用/interface.test.ts
+MODIFIED_IN_WORKTREE | head_blob=da29d2675969f84bf401acd0840974408a33b013 | worktree=73c1e22dcd64e88debc5f7b62625760292db637c | test/桌面应用/operator-wiring.test.ts
+MODIFIED_IN_WORKTREE | head_blob=bd53f6ef640ad5dc93623be683b7b45f2e3c488f | worktree=142e0f18d7701964053d97c6412d38809684c329 | test/桌面应用/e2e/main.mjs
+EQUAL_TO_HEAD | head_blob=a1d10ddfd29932d57732c3d86a55d88f0ec80b36 | worktree=a1d10ddfd29932d57732c3d86a55d88f0ec80b36 | test/runtime-core/tools.test.ts

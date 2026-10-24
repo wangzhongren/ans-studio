@@ -1,0 +1,28 @@
+# S6 role root-doc scenario matrix (2026-10-23)
+
+Source of truth: Phase 4A real Electron original output (controlled IPC fixture) + the S6 real-app probe (real repository, real preload/interface/renderer) + affected suites. Pure-logic/backend tests are cited only where the Electron fixtures do not cover the case.
+
+| # | scenario | evidence | result |
+| --- | --- | --- | --- |
+| 1 | 3 root docs + docs/ present: two groups, order, count = 3 + docs files | Phase4A `PROFILE_DOCS_GROUPS_ROOT_AND_SUBDIR` (count 103 = 3 + 100) pass in both runs; probe real repo groups [root,subdir], names in fixed order, count 311 | pass |
+| 2 | Partial root docs: only existing ones, no placeholders, relative order kept | `test/桌面应用/project.test.ts` partial-missing cases pass (164/164); `test/桌面UI/profile-docs.test.ts` partial cases pass (209/209) | pass |
+| 3 | No root docs / built-in / old main without rootDocs: honest whole-section empty state | Phase4A `PROFILE_EMPTY_DOCS_HONEST_STATE` pass (B role, `（暂无角色文档）`, count `无`); pure tests old-main `rootDocs` absent | pass |
+| 4 | Role-root `memo.md` never listed/rendered (docs/ entries are unrelated) | Phase4A `PROFILE_DOCS_GROUPS_ROOT_AND_SUBDIR` asserts no `memo.md`; probe `S6_ROOT_DOCS_MEMO_ABSENT=true` (root group + root button paths); backend index/candidate tests exclude memo | pass |
+| 5 | changelog optional, independent; not merged into docs/ | `test/桌面应用/project.test.ts` changelog optional and docs non-regression cases pass; Phase4A `PROFILE_DOCS_GROUPS_ROOT_AND_SUBDIR` shows docs group only; no changelog entry in docs group | pass |
+| 6 | docs/ existing traversal/sort/limit unchanged | Phase4A count 103 = 3 + 100 docs; backend `docs` non-regression tests pass (164/164) | pass |
+| 7 | Root doc click, readable path: opens existing DocumentView read-only | Phase4A `ROOT_DOC_OPENS_DOCUMENT_VIEW_READONLY`, `ROOT_DOC_LIST_APPENDS_REFS_WITHOUT_PREFIX_CHANGE` pass | pass (controlled IPC) |
+| 8 | Root doc click, Windows: stays list state, existing `UNSUPPORTED_ENVIRONMENT`, no body/bytes | Phase4A `ROOT_DOC_WINDOWS_UNAVAILABLE_STRUCTURED_ERROR` pass; real-app probe `S6_ROOT_DOCS_CLICK_UNAVAILABLE=true`, errors [`当前环境暂不支持安全读取项目文档。`], `hasBody=false`, screenshot `s6-probe-root-docs-unavailable.png`; Windows fail-closed test asserts `serviceReads=0`/`checkpoints=0`/no refs/fixture bytes+mtime unchanged; real root docs `git status` clean and mtime predates runs (`s6-root-doc-fixture-integrity.txt`) | pass (Windows fail-closed) |
+| 9 | Two groups / count / root order in real app | probe `S6_ROOT_DOCS_GROUPS_ORDER=true`, `S6_ROOT_DOCS_THREE_NAMES_ORDER=true`, count 311; screenshot `s6-probe-root-docs-profile.png` | pass |
+| 10 | api-spec `not-applicable` is ordinary text; no badge/error | Phase4A `ROOT_DOC_API_SPEC_NOT_APPLICABLE_PLAIN_TEXT` pass (text exactly `not-applicable`, no error/badge) | pass |
+| 11 | role-card / boundary not duplicated into docs; changelog stays in its own section | Phase4A `PROFILE_DOCS_GROUPS_ROOT_AND_SUBDIR` asserts no `role-card.md`; probe root group excludes role-card/boundary; pure tests filter them | pass |
+| 12 | Focus returns to triggering root-doc button | Phase4A `ROOT_DOC_BACK_ROLE_FOCUSES_ROOT_BUTTON` pass in both runs | pass |
+| 13 | 200% / 960 narrow drawer: root buttons reachable, no horizontal overflow | Phase4A `ZOOM_200_ROOT_DOC_BUTTON_REACHABLE`, `ZOOM_200_PROFILE_NO_OVERFLOW`, `RUNTIME_960_*` (unrelated focus failures only) | pass for root-doc reachability/layout |
+| 14 | zh/en labels; filenames/paths/`not-applicable` not translated | `test/项目管理/shared/**` 186/181 pass (5 existing Windows skips) incl. key parity; `test/测试/i18n-integration.test.ts` 10/10; probe zh labels observed | pass |
+| 15 | Old renderer / old main additive compatibility | `test/桌面应用/interface.test.ts` 121/121 in the 164/164 run (S2/S3 record); Phase4A B-role old-main shape; no preload/IPC diff | pass |
+| 16 | POSIX real body read (`feature-map.md`/`functional-description.md`/`api-spec.md`, byteLength, mtime, `not-applicable`) | **NOT EXECUTED** — current environment is Windows 11; real POSIX Provider reads cannot run here. Not substituted with Windows listing evidence. | not executed / environment limitation |
+| 17 | POSIX symlink / race provider codes (real) | **NOT EXECUTED** — Windows; POSIX branches exist in tests, Windows path covered by invalid-path/non-directory cases | not executed / environment limitation |
+
+## Windows vs POSIX
+
+- Windows (this run): root-doc index metadata lists three names; click fails closed with the existing structured error; no scope/refs/body; probe `hasBody=false`.
+- POSIX: not executed on this machine. Do not read this record as "all platforms can read body". Only the platform-independent injected-reader tests pass on Windows.

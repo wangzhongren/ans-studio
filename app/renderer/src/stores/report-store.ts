@@ -9,6 +9,12 @@
 import { create } from "zustand";
 import { getDesktopBridge } from "@/lib/platform";
 import { asReportRecord } from "@/chat/report-view";
+import { useLocaleStore, translate, type Locale } from "@/i18n";
+
+/** 当前界面语言（i18n B1）：保存/探测失败的可见原因按当前 locale 渲染。 */
+function currentLocale(): Locale {
+  return useLocaleStore.getState().locale;
+}
 
 export interface ReportScope {
   projectRoot: string | null;
@@ -59,13 +65,18 @@ interface ReportState {
   clearProject: (projectRoot: string | null) => void;
 }
 
-const SAVE_ERROR_TEXT: Record<string, string> = {
-  SNAPSHOT_EXPIRED: "可补存的会话材料已失效，无法在此补存。",
-  SESSION_NOT_AVAILABLE: "当前没有原会话可供保存恢复。",
-  UNSUPPORTED: "当前会话不支持此保存恢复能力。",
-  PROJECT_NOT_ACTIVE: "项目已失效。",
-  INVALID_REQUEST: "保存请求无效。",
-};
+const SAVE_ERROR_KEYS = {
+  SNAPSHOT_EXPIRED: "ui.reportView.saveError.snapshotExpired",
+  SESSION_NOT_AVAILABLE: "ui.reportStore.sessionNotAvailable",
+  UNSUPPORTED: "ui.reportStore.unsupported",
+  PROJECT_NOT_ACTIVE: "ui.reportStore.projectNotActive",
+  INVALID_REQUEST: "shared.common.invalidSaveRequest",
+} as const;
+
+function saveErrorText(code: string, locale: Locale): string {
+  const key = SAVE_ERROR_KEYS[code as keyof typeof SAVE_ERROR_KEYS];
+  return translate(locale, key ?? "ui.reportStore.statusUnavailable");
+}
 
 function scopeMatches(a: ReportScope, b: ReportScope): boolean {
   return (
@@ -92,14 +103,18 @@ function envelopeValue(raw: unknown, scope: ReportScope): { ok: boolean; value: 
   if (record.version === 1 && typeof record.ok === "boolean") {
     const envelopeScope = scopeOf(record.scope);
     if (envelopeScope && record.scope && !scopeMatches(envelopeScope, scope)) {
-      return { ok: false, value: null, error: "保存状态范围不符。" };
+      return {
+        ok: false,
+        value: null,
+        error: translate(currentLocale(), "ui.reportStore.scopeMismatch"),
+      };
     }
     if (record.ok !== true) {
       const code = typeof record.code === "string" ? record.code : "";
       return {
         ok: false,
         value: null,
-        error: SAVE_ERROR_TEXT[code] || "无法取得保存状态。",
+        error: saveErrorText(code, currentLocale()),
       };
     }
     return { ok: true, value: record.value ?? null, error: "" };

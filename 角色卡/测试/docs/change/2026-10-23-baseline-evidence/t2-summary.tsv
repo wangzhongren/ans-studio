@@ -1,0 +1,13 @@
+log	tests	pass	fail	skipped	todo	duration_ms	exit_code
+t2-cross-role-g5-f-settings.log	8	8	0	0	0	163.1349	0
+t2-cross-role-t29-pi-config-roundtrip.log	11	11	0	0	0	274.6544	0
+t2-cross-role-turn-watch-c-cross-runtime-settings.log	5	5	0	0	0	217.2415	0
+t2-desktop-app-composer-images.log	3	3	0	0	0	221.8701	0
+t2-desktop-app-dispatch-delivery.log	52	52	0	0	0	17948.1327	0
+t2-desktop-app-interface.log	83	83	0	0	0	11230.3818	0
+t2-desktop-app-multi-runtime.log	38	38	0	0	0	986.6196	0
+t2-desktop-app-operator-channel.log	53	53	0	0	0	759.3602	0
+t2-desktop-app-pi-config.log	16	16	0	0	0	341.971	0
+t2-desktop-app-session.log	32	32	0	0	0	952.506	0
+t2-desktop-ui.log	163	163	0	0	0	462.2548	0
+t2-project-management-shared.log	137	132	0	5	0	5189.2991	0

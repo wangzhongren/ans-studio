@@ -5,12 +5,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
-import { createDesktopInterface, createShellJudgeSwitch, isShellJudgeIpcSender } from "../../app/desktop/interface.ts";
+import { createDesktopInterface, createShellJudgeSwitch, isShellJudgeIpcSender, registerPreferencesIpc } from "../../app/desktop/interface.ts";
+import { createMainI18n, desktopTexts, mainT } from "../../app/desktop/i18n.ts";
+import { validateImage, sanitizeImageName } from "../../app/desktop/composer-images.ts";
+import { describeShellCommand, plainReasonFor } from "../../app/desktop/operator-channel.ts";
+import { readDeniedHumanReason } from "../../app/desktop/judge-reason.ts";
+import { formatDurationMs, recoveryReceiptSummary } from "../../app/desktop/watchdog.ts";
+import { saveRuntimeConfig } from "../../app/desktop/runtime-config.ts";
+import { RUNTIME_SETTINGS } from "../../src/common/shared/runtime-settings.ts";
+import { renderRecoveryPage } from "../../app/desktop/diagnostics.ts";
+import { judgeResultSummary } from "../../app/desktop/customer-input.ts";
+import {
+  createPreferencesService,
+  preferencesFilePath,
+  readPreferences,
+  type PreferencesDiagnostic,
+} from "../../app/desktop/preferences.ts";
 import type { SessionEventEnvelope } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
@@ -31,9 +46,19 @@ import type {
   GovernanceMigrationResult,
 } from "../../src/pipeline/orchestration/govern-session.ts";
 import { readGovernanceLedger, appendGovernanceLedger } from "../../src/pipeline/orchestration/govern-session.ts";
+// 2026-10-23 可重入门禁：flow 机器状态只经公共出口读取（测试断言 role-cards/readiness 状态）。
+import { parseFlowStateYaml, completeRoleCardsStep as realCompleteRoleCardsStep } from "../../src/pipeline/orchestration/flow-state.ts";
+import type { DesktopDeps } from "../../app/desktop/interface.ts";
 import type { PinEvidenceResult } from "../../src/model/boundary.ts";
 // 2026-10-20：流程推进任务文案的 YAML 存在性分支（真机：flow 工具已注册但 Steward 未被要求使用）。
-import { buildGovernanceAdvanceMessage, type GovernanceNextStepPayload } from "../../app/desktop/governance-advance.ts";
+import {
+  buildAcceptanceCriteriaTaskMessage,
+  buildAcceptanceTaskMessage,
+  buildGovernanceAdvanceMessage,
+  buildRoleReadinessTaskMessage,
+  governanceAcceptanceAdvanceNote,
+  type GovernanceNextStepPayload,
+} from "../../app/desktop/governance-advance.ts";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -145,6 +170,7 @@ test("内置角色 su：RoleView 标为 builtIn，且不去读文档索引（car
   assert.equal(res.roles[0].builtIn, true);
   assert.equal(res.roles[0].changelog, null, "内置角色无 changelog");
   assert.deepEqual(res.roles[0].docs, [], "不得把项目根当角色目录去 walk");
+  assert.deepEqual(res.roles[0].rootDocs, [], "内置角色 rootDocs 诚实为空，不读项目根");
 });
 
 test("openSession 点角色即开：scope undefined、导入即授权；多轮 send 透传、stop 收口", async () => {
@@ -890,6 +916,48 @@ async function assertWindowsInterfaceClosed(iface:ReturnType<typeof createDeskto
  const refreshed=await iface.listProject({projectRoot:root});assert.equal(refreshed.documentReadUnavailable,'UNSUPPORTED_ENVIRONMENT');assert.equal(refreshed.documentScope,undefined);assert.ok(refreshed.roles.every(role=>(role.documents??[]).length===0));
  assert.deepEqual(await fs.readFile(file),before);assert.equal((await fs.stat(file)).mtimeMs,stat.mtimeMs);
 }
+
+test('B Interface listProject exposes rootDocs metadata, appends root-document refs, and never surfaces memo', async (t) => {
+ const fs=await import('node:fs/promises');const os=await import('node:os');
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'ans-doc-roots-'));
+ await fs.mkdir(path.join(root,'角色卡/A/docs'),{recursive:true});
+ await fs.writeFile(path.join(root,'角色卡/A/role-card.md'),'# card');
+ for(const [name,body] of [['feature-map.md','fm body'],['functional-description.md','fd body'],['api-spec.md','not-applicable']] as const) await fs.writeFile(path.join(root,'角色卡/A',name),body);
+ await fs.writeFile(path.join(root,'角色卡/A/memo.md'),'memo-private-marker');
+ await fs.writeFile(path.join(root,'角色卡/A/docs/report.md'),'report body');
+ const listing={...FAKE_LISTING,projectRoot:root};
+ const iface=createDesktopInterface({pickDirectory:async()=>root,emitEvent:()=>{},listProjectFn:async()=>listing,envFilePath:path.join(root,'absent-fake-env')});
+ try{
+  await iface.pickProject();
+  const view=await iface.listProject({projectRoot:root});
+  const role=view.roles[0];
+  assert.deepEqual(role.rootDocs,[
+   {name:'feature-map.md',path:'角色卡/A/feature-map.md',kind:'file'},
+   {name:'functional-description.md',path:'角色卡/A/functional-description.md',kind:'file'},
+   {name:'api-spec.md',path:'角色卡/A/api-spec.md',kind:'file'},
+  ],'RoleView.rootDocs 按白名单顺序装配项目相对路径');
+  assert.equal(JSON.stringify(view).includes('memo'),false,'memo 永不进入 listProject 载荷');
+  assert.equal(JSON.stringify(view).includes('memo-private-marker'),false,'rootDocs 只含元数据，不读正文');
+  if(process.platform==='win32'){
+   assert.equal(view.documentReadUnavailable,'UNSUPPORTED_ENVIRONMENT');
+   assert.deepEqual(role.documents,[],'Windows 不铸造根文档 refs，但 rootDocs 元数据仍可列出');
+   t.diagnostic('Windows: rootDocs metadata listed with no refs/content; POSIX read asserted on supported platforms.');
+  }else{
+   assert.ok(view.documentScope);
+   const refs=role.documents??[];
+   assert.deepEqual(refs.slice(0,2).map(r=>r.relativePath),['角色卡/A/role-card.md','角色卡/A/docs/report.md'],'既有 refs 顺序前缀不变');
+   assert.deepEqual(refs.slice(-3).map(r=>r.relativePath),['角色卡/A/feature-map.md','角色卡/A/functional-description.md','角色卡/A/api-spec.md'],'根文档 refs 追加在既有条目之后');
+   const apiRef=refs.find(r=>r.relativePath==='角色卡/A/api-spec.md')!;
+   const read=await iface.readProjectDocument({version:1,projectViewId:apiRef.projectViewId,documentId:apiRef.documentId});
+   assert.ok(read.ok);if(read.ok)assert.equal(read.text,'not-applicable','not-applicable 按普通文本读取');
+  }
+  // 无新 IPC/preload 通道：源码级断言 + Interface 面断言。
+  const preload=readFileSync(path.join(REPO_ROOT,'app','preload.cjs'),'utf8');
+  assert.equal(/rootDoc|root-doc|root_doc/i.test(preload),false,'不得新增根文档 IPC/preload 通道');
+  assert.equal('readRootDocument' in iface,false,'不得新增根文档读取方法');
+ }finally{iface.disposeProjectDocuments();await fs.rm(root,{recursive:true,force:true});}
+});
+
 
 // ———————————————— I2（existing-project-compat V1）：治理记录预览/建立的 Interface 接线 ————————————————
 
@@ -2529,6 +2597,10 @@ test("任命→Crew 写卡主路径（2026-10-22 第 1 项）：只派 Crew 写�
       return rolesPresent ? listingWithProjectRoles(base, ["executor"]) : base;
     };
     writeTeamPlanFile(root, "flow-e", { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    // 2026-10-23 可重入门禁：团队计划存在 ⇒ flow 必须声明 role-cards 步骤（应用在结构校验通过后收口）。
+    writeRoleCardsFlowFixture(root, "flow-e");
+    // 夹具补足实施前标准（新契约流程的验收门会先要标准；本组只聚焦写卡→readiness 链路）。
+    writeAcceptanceCriteriaFile(root, "flow-e");
     await seedAppointmentDecision(root, "flow-e", ["executor"]);
     const sendsByRole = new Map<string, string[]>();
     const openRoles: string[] = [];
@@ -2927,6 +2999,10 @@ test("任命→Crew 写卡（会话立即释放）：写卡任务不判死；角
   const root = makeTempProjectRoot("ans-advance-appointment-dispose-");
   try {
     writeTeamPlanFile(root, "flow-e", { recommended: ["executor"], rows: [{ roleId: "executor", type: "existing" }] });
+    // 2026-10-23 可重入门禁：团队计划存在 ⇒ flow 声明 role-cards；收口要求六文件齐全（existing 也需）。
+    writeRoleCardsFlowFixture(root, "flow-e");
+    // 夹具补足实施前标准（新契约流程的验收门会先要标准；本组只聚焦写卡→readiness 链路）。
+    writeAcceptanceCriteriaFile(root, "flow-e");
     await seedAppointmentDecision(root, "flow-e", ["executor"]);
     let listingCalls = 0;
     const listingNow = (): ProjectListing => {
@@ -2943,7 +3019,7 @@ test("任命→Crew 写卡（会话立即释放）：写卡任务不判死；角
       emitEvent: (envelope) => { events.push(envelope); },
       listProjectFn: async () => {
         listingCalls += 1;
-        if (listingCalls >= 3) writeRoleArtifactFiles(root, "executor");
+        if (listingCalls >= 3) writeFullRoleArtifacts(root, "executor");
         return listingNow();
       },
       openRoleSessionFn: async (input) => {
@@ -3028,9 +3104,29 @@ async function runHandbackAcceptanceScenario(status: string) {
   const flowId = "flow-a";
   const listing = listingWithProjectRoles({ ...trioListing(), projectRoot: root }, ["executor"]);
   mkdirSync(path.join(root, "docs", "flows"), { recursive: true });
+  // 2026-10-24 P0-1：自动派 Proof 需要发布标记（flow 顶层 release: true）。本场景验证回交收尾推进
+  // （发布版本），因此写 YAML 机器状态；状态由参数控制（done/pending/blocked）。
   writeFileSync(
-    path.join(root, "docs", "flows", `${flowId}.md`),
-    `| 步骤 | 状态 |\n| --- | --- |\n| impl | ${status} |\n| verification | pending |\n`,
+    path.join(root, "docs", "flows", `${flowId}.yaml`),
+    [
+      `flowId: ${flowId}`,
+      "version: 1",
+      "qualityTier: production",
+      "release: true",
+      "steps:",
+      "  - id: impl",
+      "    title: 实现",
+      "    owner: executor",
+      "    kind: dispatch",
+      `    status: ${status}`,
+      ...(status === "done" ? ["    evidence:", "      kind: dispatch", "      ref: impl"] : []),
+      "  - id: verification",
+      "    title: 验收",
+      "    owner: app",
+      "    kind: acceptance",
+      "    status: pending",
+      "",
+    ].join("\n"),
   );
   await appendGovernanceLedger(root, {
     at: new Date().toISOString(),
@@ -3834,6 +3930,136 @@ function writeTeamPlanV2File(
   return `docs/scheduling/${flowId}-team-v${version}.md`;
 }
 
+/** 2026-10-23 目录级授权 v3：写 v3 团队计划（frontmatter directories + 授权目录/精确写集 + 目录规范 + 实现目录）。 */
+function writeTeamPlanV3File(
+  root: string,
+  flowId: string,
+  options: {
+    version?: number;
+    /** 模块清单 `实现目录`（默认 `src/module-a/`）。 */
+    implementationDir?: string;
+    /** frontmatter directories（默认实现目录 + 其下 tests/）。 */
+    directories?: string[];
+    /** Map 角色（executor）类型（默认 new；可设 changed/existing）。 */
+    mapRoleType?: string;
+    /** Map 角色授权目录单元格（默认实现目录 + 其下 tests/）。 */
+    mapDirs?: string;
+    /** Map 角色精确写集单元格（默认 `无`）。 */
+    mapPrecise?: string;
+    /** 整体覆盖角色行（含 Reduce 行时必须自带 reduce 角色）。 */
+    rows?: Array<{
+      roleId: string;
+      type?: string;
+      module?: string;
+      dirs?: string;
+      precise?: string;
+      contract?: string;
+      testSurface?: string;
+      deps?: string;
+      dependsOn?: string;
+      parallelGroup?: string;
+      group?: string;
+      apiSpec?: string;
+    }>;
+    /** 目录规范行覆盖（默认 = directories）。 */
+    specDirs?: string[];
+    /** 故意缺目录规范行的目录（负例：来源分流到 Convener）。 */
+    omitSpecFor?: string[];
+    /** 目录规范 owner（默认 executor；负例可改成非推荐角色）。 */
+    specOwner?: string;
+  } = {},
+): string {
+  const version = options.version ?? 1;
+  const implementationDir = options.implementationDir ?? "src/module-a/";
+  const directories = options.directories ?? [implementationDir, `${implementationDir}tests/`];
+  const testDir = directories.find((dir) => /(^|\/)tests\/$/.test(dir)) ?? `${implementationDir}tests/`;
+  const rows =
+    options.rows ??
+    [
+      {
+        roleId: "executor",
+        type: options.mapRoleType ?? "new",
+        module: "module-a",
+        dirs: options.mapDirs ?? `${implementationDir}; ${implementationDir}tests/`,
+        precise: options.mapPrecise ?? "无",
+        testSurface: testDir,
+      },
+      {
+        roleId: "tester",
+        type: "existing",
+        module: "reduce",
+        dirs: "无",
+        precise: "test/测试/",
+        contract: "internal（测试目录只消费模块契约）",
+        testSurface: "test/测试/",
+        deps: "依赖全部 Map",
+        dependsOn: "executor",
+        parallelGroup: "reduce",
+        group: "测试",
+        apiSpec: "not-applicable（Reduce 角色不导出接口）",
+      },
+    ];
+  const recommended = rows.filter((row) => row.module !== "reduce").map((row) => row.roleId);
+  const specDirs = (options.specDirs ?? directories).filter((dir) => !(options.omitSpecFor ?? []).includes(dir));
+  const specRowOf = (dir: string): string => {
+    const tests = /(^|\/)tests\/$/.test(dir);
+    const hasTestsChild = directories.includes(`${dir}tests/`);
+    const testSurface = tests ? dir : hasTestsChild ? `${dir}tests/` : testDir;
+    return (
+      `| ${dir} | ${options.specOwner ?? "executor"} | ${tests ? "tests" : "implementation"} | ` +
+      `${tests ? "模块测试" : "模块实现"} | ${tests ? "*.test.ts" : "kebab-case"} | ${tests ? "—" : hasTestsChild ? "tests" : "—"} | ` +
+      `.ts | ${tests ? "internal（测试目录只消费模块契约）" : "docs/contracts/module-a-v1.md"} | ${testSurface} | 无 | — | none |`
+    );
+  };
+  const text = [
+    "---",
+    `flowId: ${flowId}`,
+    `version: ${version}`,
+    "riskTier: T3",
+    "teamPlanSchema: 3",
+    `recommended: [${recommended.join(", ")}]`,
+    "modules: [module-a]",
+    `directories: [${directories.join(", ")}]`,
+    "---",
+    "",
+    `# 团队计划：${flowId}`,
+    "",
+    "## 模块清单",
+    "",
+    "| module | 职责 | 公开契约 | 架构来源 | 实现目录 |",
+    "| --- | --- | --- | --- | --- |",
+    `| module-a | 模块 A 交付 | docs/contracts/module-a-v1.md | docs/planning/${flowId}-v1.md §4 | ${implementationDir} |`,
+    "",
+    "## 参与角色与职责",
+    "",
+    "| roleId | 类型 | module | 职责目标 | 能力要求 | 授权目录 | 精确写集 | 公开契约 | 测试面 | 依赖 | dependsOn | 并行组 | 组别 | apiSpec | 粒度理由 |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...rows.map(
+      (row) =>
+        `| ${row.roleId} | ${row.type ?? "new"} | ${row.module ?? "module-a"} | ${"实现交付"} | ${"工程能力"} | ${row.dirs ?? "无"} | ${row.precise ?? "无"} | ${row.contract ?? "docs/contracts/module-a-v1.md"} | ${row.testSurface ?? testDir} | ${row.deps ?? "无"} | ${row.dependsOn ?? "无"} | ${row.parallelGroup ?? (row.module === "reduce" ? "reduce" : "map-a")} | ${row.group ?? (row.module === "reduce" ? "测试" : "交付")} | ${row.apiSpec ?? "required"} | — |`,
+    ),
+    "",
+    "## 目录规范",
+    "",
+    "| 目录 | owner | 类型 | 用途 | 命名 | 允许子目录 | 允许文件类型 | 公开契约 | 测试面 | 依赖 | 禁写区 | 共享 |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...specDirs.map(specRowOf),
+    "",
+    "## 五维判断与协调成本",
+    "",
+    "- 责任独立性：单模块交付与 Reduce 证据合并职责独立。",
+    "- 范围归属：Map 写集与 Reduce 测试写集不相交。",
+    "- 契约影响：模块契约由 executor 唯一主属，Reduce 只消费。",
+    "- 证据独立性：各自独立测试面与证据。",
+    "- 协调成本：单模块无需进一步拆分。",
+    "",
+  ].join("\n");
+  const dir = path.join(root, "docs", "scheduling");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, `${flowId}-team-v${version}.md`), text);
+  return `docs/scheduling/${flowId}-team-v${version}.md`;
+}
+
 /** 2026-10-22 第 5 项：写出一个 new/changed 角色的完整必填产物（章节 + boundary 条目 + 四份工作文档）。 */
 function writeFullRoleArtifacts(
   root: string,
@@ -3916,8 +4142,64 @@ function writeFullRoleArtifacts(
   writeFileSync(path.join(dir, "api-spec.md"), "# API\n\n## 接口\n\n- 无共享接口；仅内部实现。\n");
 }
 
-/** 2026-10-22 第 3 项：实施前验收标准（满足编排 O2 结构门槛：验收表/档位/判定规则/证据计划/版本冻结）。 */
-function writeAcceptanceCriteriaFile(root: string, flowId: string, riskTier = "T1"): void {
+/**
+ * 2026-10-23 可重入门禁（governance-advance-redispatch）：写 flow YAML（role-cards + role-readiness）。
+ * role-cards 默认 `artifact` pending；`status:"done"` 时按 kind 生成 evidence（artifact 缺省给夹具记录路径）。
+ * `roleCards:false` ⇒ 不写 role-cards 步骤（flow 缺陷负例）。
+ */
+function writeRoleCardsFlowFixture(
+  root: string,
+  flowId: string,
+  options: {
+    roleCards:
+      | {
+          status?: "pending" | "dispatched" | "delivered" | "done" | "superseded" | "failed" | "blocked" | "aborted";
+          kind?: "artifact" | "dispatch";
+          evidenceRef?: string;
+        }
+      | false;
+    roleReadinessStatus?: "pending" | "dispatched" | "delivered" | "done" | "superseded" | "failed" | "blocked" | "aborted";
+  } = { roleCards: {} },
+): string {
+  const roleCards =
+    options.roleCards === false
+      ? undefined
+      : { status: "pending" as const, kind: "artifact" as const, ...options.roleCards };
+  const readinessStatus = options.roleReadinessStatus ?? "pending";
+  const steps: string[] = [];
+  if (roleCards !== undefined) {
+    steps.push(
+      "  - id: role-cards",
+      "    title: 角色卡写入",
+      "    owner: nominator",
+      `    kind: ${roleCards.kind}`,
+      `    status: ${roleCards.status}`,
+    );
+    if (roleCards.status === "done") {
+      const ref =
+        roleCards.evidenceRef ??
+        (roleCards.kind === "dispatch" ? "role-cards" : `.ans/governance/role-cards/${flowId}/fixture.json`);
+      steps.push(`    evidence: { kind: ${roleCards.kind}, ref: ${ref} }`);
+    }
+  }
+  steps.push(
+    "  - id: role-readiness",
+    "    title: 角色就绪复核",
+    "    owner: convener",
+    "    kind: artifact",
+    `    status: ${readinessStatus}`,
+  );
+  if (readinessStatus === "done") {
+    steps.push(`    evidence: { kind: artifact, ref: docs/scheduling/${flowId}-readiness-v1.md }`);
+  }
+  const text = [`flowId: ${flowId}`, "version: 1", "qualityTier: production", "steps:", ...steps, ""].join("\n");
+  const dir = path.join(root, "docs", "flows");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, `${flowId}.yaml`), text, "utf8");
+  return `docs/flows/${flowId}.yaml`;
+}
+
+/** 2026-10-22 第 3 项：实施前验收标准（满足编排 O2 结构门槛：验收表/档位/判定规则/证据计划/版本冻结）。 */function writeAcceptanceCriteriaFile(root: string, flowId: string, riskTier = "T1"): void {
   const text = [
     "---",
     `flowId: ${flowId}`,
@@ -3967,7 +4249,12 @@ function writeRoleArtifactFiles(
   );
 }
 
-async function makePostWriteHarness(root: string, targets: string[], rolesPresent: () => boolean): Promise<PostWriteHarness> {
+async function makePostWriteHarness(
+  root: string,
+  targets: string[],
+  rolesPresent: () => boolean,
+  extraDeps: Partial<DesktopDeps> = {},
+): Promise<PostWriteHarness> {
   const sendsByRole = new Map<string, string[]>();
   const events: SessionEventEnvelope[] = [];
   const settles = new Map<string, () => void>();
@@ -3981,7 +4268,8 @@ async function makePostWriteHarness(root: string, targets: string[], rolesPresen
       projectRoot: root,
     }),
     openRoleSessionFn: async (input) => {
-      const sends: string[] = [];
+      // 同一角色多次 open（后台会话释放后重开）时复用同一数组：跨轮次的发送计数不丢失。
+      const sends = sendsByRole.get(input.roleId) ?? [];
       sendsByRole.set(input.roleId, sends);
       const made = settleableGovernanceHandle(sends);
       settles.set(input.roleId, made.settle);
@@ -3995,6 +4283,8 @@ async function makePostWriteHarness(root: string, targets: string[], rolesPresen
       customerCalls.push(request);
       return { outcome: "declined", reason: "测试替身：写卡门控不应弹卡" };
     },
+    // 2026-10-23：可注入 role-cards 收口桩（stale/失败路径）；缺省走真实公共出口。
+    ...extraDeps,
   });
   await iface.listProject({ projectRoot: root });
   return { iface, sendsByRole, events, settles, projectChanged: () => projectChanged, customerCalls };
@@ -4009,6 +4299,39 @@ async function ledgersConvenerDispatches(root: string, flowId: string): Promise<
   return ledger.entries.filter(
     (entry) => entry.kind === "dispatch.accepted" && entry.flowId === flowId && entry.targetRoleId === "convener",
   ).length;
+}
+
+/** readiness（stepId=role-readiness）派发计数（排除 appointment 链早期无 stepId 的旧派发）。 */
+async function ledgersReadinessDispatches(root: string, flowId: string): Promise<number> {
+  const ledger = await readGovernanceLedger(root);
+  return ledger.entries.filter(
+    (entry) =>
+      entry.kind === "dispatch.accepted" &&
+      entry.flowId === flowId &&
+      entry.targetRoleId === "convener" &&
+      entry.stepId === "role-readiness",
+  ).length;
+}
+
+async function waitForReadinessDispatchCount(root: string, flowId: string, expected: number, timeoutMs = 4000): Promise<number> {
+  const deadline = Date.now() + timeoutMs;
+  let count = 0;
+  for (;;) {
+    count = await ledgersReadinessDispatches(root, flowId);
+    if (count === expected || Date.now() >= deadline) return count;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+/** 2026-10-23：派发账本 append 在 send 之后异步落盘——有界轮询，避免「已观察发送、立即读账本」竞态。 */
+async function waitForConvenerDispatchCount(root: string, flowId: string, expected: number, timeoutMs = 4000): Promise<number> {
+  const deadline = Date.now() + timeoutMs;
+  let count = 0;
+  for (;;) {
+    count = await ledgersConvenerDispatches(root, flowId);
+    if (count === expected || Date.now() >= deadline) return count;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 }
 
 test("写卡后推进：appointment-write answered 后 listing 出现目标角色 ⇒ 自动派 Convener 恰一次、账本同形审计、左树刷新", async () => {
@@ -4074,6 +4397,13 @@ test("写卡后推进：appointment-write answered 后 listing 出现目标角�
     await new Promise((resolve) => setTimeout(resolve, 250));
     assert.equal(made.sendsByRole.get("convener")!.length, 1, "同 flow+convener 不重派");
     assert.equal(await ledgersConvenerDispatches(root, flowId), 1, "账本仍恰一条");
+    // 2026-10-23 可重入门禁 P9：legacy（无团队计划）不写 role-cards 验证记录、不新增账本种类。
+    assert.equal(existsSync(path.join(root, ".ans", "governance", "role-cards")), false, "legacy 不写 .ans role-cards 记录");
+    assert.equal(
+      (await readGovernanceLedger(root)).entries.some((entry) => entry.kind === "artifact.observed"),
+      false,
+      "legacy 不新增 artifact.observed 账本种类",
+    );
     await made.iface.stopSession();
   } finally {
     // 异常路径兜底停止（正常路径已在用例末尾 stop）。
@@ -4480,10 +4810,16 @@ test("2026-10-22 第 5 项迁移策略：existing 角色只做最低检查（war
   try {
     const flowId = "flow-existing";
     writeTeamPlanFile(root, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "existing" }] });
+    // 2026-10-23：团队计划存在 ⇒ flow 声明 role-cards；收口要求六文件齐全（夹具补足，断言不放宽）。
+    writeRoleCardsFlowFixture(root, flowId);
+    // 夹具补足实施前标准（新契约流程的验收门会先要标准；本组只聚焦写卡→readiness 链路）。
+    writeAcceptanceCriteriaFile(root, flowId);
     await seedAppointmentDecision(root, flowId, ["executor"]);
     const harness = await makePostWriteHarness(root, ["executor"], () => true);
     try {
-      writeRoleArtifactFiles(root, "executor");
+      writeFullRoleArtifacts(root, "executor");
+      // existing 只做最低检查：角色卡缺第 5 项必填章节也只是 warning（不阻塞）。
+      writeFileSync(path.join(root, "角色卡", "executor", "role-card.md"), "# executor\n\n职责说明（existing 最低检查）。\n", "utf8");
       await harness.iface.advanceGovernanceFlow({
         payload: appointmentWritePayload(flowId),
         context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
@@ -4605,6 +4941,10 @@ test("2026-10-22 v2 团队计划：读取模块清单/v2 字段/并行组；计�
   try {
     const flowId = "flow-v2-ok";
     writeTeamPlanV2File(root, flowId);
+    // 2026-10-23 可重入门禁：团队计划存在 ⇒ flow 声明 role-cards（应用收口后再派 readiness）。
+    writeRoleCardsFlowFixture(root, flowId);
+    // 夹具补足实施前标准（新契约流程的验收门会先要标准；本组只聚焦写卡→readiness 链路）。
+    writeAcceptanceCriteriaFile(root, flowId);
     await seedAppointmentDecision(root, flowId, ["executor"]);
     const harness = await makePostWriteHarness(root, ["executor"], () => true);
     try {
@@ -4728,7 +5068,11 @@ test("2026-10-22 V12：existing 角色计划写集未覆盖 boundary ⇒ 只 war
     const harness = await makePostWriteHarness(root, ["executor"], () => true);
     try {
       // existing：最低文件检查（无完整工作文档）也只是 warning；V12 未覆盖同样只 warning。
-      writeRoleArtifactFiles(root, "executor");
+      // 2026-10-23 可重入门禁：团队计划存在 ⇒ flow 声明 role-cards；收口要求六文件齐全（夹具补足）。
+      writeRoleCardsFlowFixture(root, flowId);
+      // 夹具补足实施前标准（新契约流程的验收门会先要标准；本组只聚焦写卡→readiness 链路）。
+      writeAcceptanceCriteriaFile(root, flowId);
+      writeFullRoleArtifacts(root, "executor");
       await harness.iface.advanceGovernanceFlow({
         payload: appointmentWritePayload(flowId),
         context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
@@ -4795,5 +5139,2184 @@ test("2026-10-22 v2 计划问题来源分流：缺公开契约 ⇒ 反馈 Conven
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————— 2026-10-23 目录级授权 v3（任务 `2026-10-23-directory-ownership`，D5 桌面窗口）：v3 解析消费 /
+// V12 授权目录+精确写集覆盖 / new 一致 / changed·existing 覆盖与宽边界 warning / 来源分流 / v2 不变 ——————
+
+test("2026-10-23 v3 任务文案：Crew 写卡/readiness/验收标准/验收任务含授权目录/规范/布局；v2 文案不变", () => {
+  const payload: GovernanceNextStepPayload = {
+    version: 1,
+    flowId: "flow-v3-text",
+    cardKind: "appointment",
+    nextFunction: "role-card-write",
+    roleId: "nominator",
+  };
+  const options = {
+    teamPlanPath: "docs/scheduling/flow-v3-text-team-v1.md",
+    teamPlanVersion: 1,
+    teamPlanSchema: 3 as const,
+    teamPlanModules: ["module-a"],
+    teamPlanDirectories: ["src/module-a/", "src/module-a/tests/"],
+  };
+  const crew = buildGovernanceAdvanceMessage(payload, ["executor"], options)!;
+  assert.match(crew, /团队计划 v3/, "Crew 文案标明 v3");
+  assert.match(crew, /授权目录：src\/module-a\/、src\/module-a\/tests\//, "Crew 文案带授权目录摘要");
+  assert.match(crew, /new 角色边界目录必须与计划授权目录一致/, "Crew 文案含 new 一致规则");
+  assert.match(crew, /changed\/existing 计划目录必须被边界覆盖/, "Crew 文案含 changed/existing 覆盖规则");
+  assert.match(crew, /目录规范/, "Crew 文案含目录规范约束");
+  assert.match(crew, /治理关键路径/, "Crew 文案含治理关键路径精确授权");
+  // 2026-10-23 D6 缺口修正：提案接受后的 Convener 新流程默认 v3（不得再默认 v2）。
+  const acceptPayload: GovernanceNextStepPayload = {
+    version: 1,
+    flowId: "flow-v3-text",
+    cardKind: "proposal",
+    nextFunction: "schedule",
+    roleId: "convener",
+  };
+  const acceptV3 = buildGovernanceAdvanceMessage(acceptPayload, undefined, {
+    proposalDecision: "accept",
+    teamPlanPath: "docs/scheduling/flow-v3-text-team-v1.md",
+  })!;
+  assert.match(acceptV3, /团队计划 v3（目录级授权）/, "提案接受后的新流程默认 v3");
+  assert.match(acceptV3, /teamPlanSchema: 3/);
+  assert.match(acceptV3, /directories/, "v3 文案要求 frontmatter directories");
+  assert.match(acceptV3, /实现目录/, "v3 文案要求模块实现目录（Q9 A）");
+  assert.match(acceptV3, /授权目录/);
+  assert.match(acceptV3, /精确写集/);
+  assert.match(acceptV3, /目录规范/);
+  assert.match(acceptV3, /directories\/spec\/shared\/layout/, "v3 文案要求 readiness 逐目录列");
+  assert.doesNotMatch(acceptV3, /新流程默认 v2/, "新流程文案不得再默认 v2");
+  assert.doesNotMatch(acceptV3, /teamPlanSchema: 2/, "新流程文案不得要求写 teamPlanSchema: 2");
+  // 已有 v2 计划续接（显式 schema 2）：原 v2 文案逐字保留。
+  const acceptV2 = buildGovernanceAdvanceMessage(acceptPayload, undefined, {
+    proposalDecision: "accept",
+    teamPlanPath: "docs/scheduling/flow-v3-text-team-v1.md",
+    teamPlanSchema: 2,
+  })!;
+  assert.match(acceptV2, /团队计划 v2/);
+  assert.match(acceptV2, /新流程默认 v2/);
+  assert.match(acceptV2, /teamPlanSchema: 2/);
+  assert.doesNotMatch(acceptV2, /teamPlanSchema: 3/);
+  // v2 文案不出现 v3 追加段（legacy v2 逐字保留）
+  const crewV2 = buildGovernanceAdvanceMessage(payload, ["executor"], {
+    teamPlanPath: options.teamPlanPath,
+    teamPlanVersion: options.teamPlanVersion,
+    teamPlanSchema: 2,
+    teamPlanModules: options.teamPlanModules,
+  })!;
+  assert.match(crewV2, /团队计划 v2/);
+  assert.doesNotMatch(crewV2, /v3 写卡要求/);
+  assert.doesNotMatch(crewV2, /授权目录：/);
+
+  const readinessV2 = buildRoleReadinessTaskMessage(
+    "flow-v2-text",
+    ["executor"],
+    "docs/scheduling/flow-v2-text-team-v1.md",
+    1,
+    { teamPlanSchema: 2, modules: ["storefront"] },
+  );
+  assert.match(readinessV2, /module\/contract\/testSurface\/parallel\/dependsOn\/granularity/);
+  assert.doesNotMatch(readinessV2, /directories\/spec\/shared\/layout/, "v2 readiness 不要求 v3 列");
+
+  const acceptance = buildAcceptanceTaskMessage("flow-v3-text", ["docs/reports/impl.md"], { teamPlanSchema: 3 });
+  assert.match(acceptance, /布局核对报告/);
+  assert.match(acceptance, /原始 git status\/diff/);
+  assert.match(acceptance, /new 边界与计划一致/);
+  assert.match(acceptance, /changed\/existing 计划 ⊆ 边界/);
+  assert.match(acceptance, /不得建议 accept/);
+  assert.doesNotMatch(buildAcceptanceTaskMessage("flow-v3-text", []), /布局核对报告/, "无 schema 时验收文案不变");
+
+  const criteria = buildAcceptanceCriteriaTaskMessage("flow-v3-text", { teamPlanSchema: 3 });
+  assert.match(criteria, /v3 schema/);
+  assert.match(criteria, /布局核对（改动路径 → 目录规范/);
+  assert.match(criteria, /原始 git status\/diff/);
+  assert.doesNotMatch(buildAcceptanceCriteriaTaskMessage("flow-v3-text"), /v3 schema/, "无 schema 时标准文案不变");
+});
+
+test("2026-10-23 v3 团队计划：读取授权目录/精确写集/目录规范/实现目录；V12 覆盖通过 ⇒ readiness 含目录/规范/布局", async () => {
+  const root = makeTempProjectRoot("ans-v3-team-plan-");
+  try {
+    const flowId = "flow-v3-ok";
+    writeTeamPlanV3File(root, flowId, { mapPrecise: "src/singleton.ts" });
+    // 2026-10-23 可重入门禁：团队计划存在 ⇒ flow 声明 role-cards（应用收口后再派 readiness）。
+    writeRoleCardsFlowFixture(root, flowId);
+    // 夹具补足实施前标准（新契约流程的验收门会先要标准；本组只聚焦写卡→readiness 链路）。
+    writeAcceptanceCriteriaFile(root, flowId);
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      // new 角色：boundary 目录条目与计划授权目录一致 + 精确写集文件被 file 条目覆盖。
+      writeFullRoleArtifacts(root, "executor", {
+        boundaryWrites: [
+          { kind: "directory", path: "src/module-a/" },
+          { kind: "directory", path: "src/module-a/tests/" },
+          { kind: "file", path: "src/singleton.ts" },
+        ],
+      });
+      await harness.iface.advanceGovernanceFlow({
+        payload: appointmentWritePayload(flowId),
+        context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+      });
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) > 0, 5000);
+      const readiness = harness.sendsByRole.get("convener")![0]!;
+      assert.match(readiness, /团队计划为 v3（teamPlanSchema: 3）/);
+      assert.match(readiness, /模块清单：module-a/);
+      assert.match(readiness, /授权目录：src\/module-a\/、src\/module-a\/tests\//, "v3 授权目录进入 readiness");
+      assert.match(readiness, /模块实现目录：module-a→src\/module-a\//, "v3 模块实现目录视图");
+      assert.match(readiness, /directories\/spec\/shared\/layout/, "readiness 逐目录列 directories/spec/shared/layout");
+      assert.match(readiness, /目录规范/);
+      assert.match(readiness, /治理关键路径/);
+      assert.match(readiness, /new 边界目录与计划一致/);
+      assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 0, "V12 覆盖通过：不退回 Crew");
+      // 账本写盘在 send 之后异步落盘：短轮询等待（同候选，不改变断言语义）。
+      let readinessLedger = false;
+      const ledgerDeadline = Date.now() + 5000;
+      while (!readinessLedger && Date.now() < ledgerDeadline) {
+        const ledger = await readGovernanceLedger(root);
+        readinessLedger = ledger.entries.some(
+          (entry) =>
+            entry.kind === "dispatch.accepted" &&
+            entry.flowId === flowId &&
+            entry.targetRoleId === "convener" &&
+            entry.stepId === "role-readiness",
+        );
+        if (!readinessLedger) await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      assert.equal(readinessLedger, true, "V12 通过后才派 readiness（stepId=role-readiness）");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 V12 v3：new 角色授权目录未被 boundary 覆盖 ⇒ 退回 Crew、不派 readiness", async () => {
+  const root = makeTempProjectRoot("ans-v3-uncovered-");
+  try {
+    const flowId = "flow-v3-uncovered";
+    writeTeamPlanV3File(root, flowId);
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      // 无目录条目（默认只有角色根文档 + 单个文件）：两条计划授权目录都不被覆盖。
+      writeFullRoleArtifacts(root, "executor");
+      await harness.iface.advanceGovernanceFlow({
+        payload: appointmentWritePayload(flowId),
+        context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+      });
+      await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) > 0, 5000);
+      const feedback = harness.sendsByRole.get("nominator")![0]!;
+      assert.match(feedback, /计划授权目录「src\/module-a\/」未被 boundary\.yaml entries 覆盖/, "V12 指出未覆盖的计划授权目录");
+      assert.match(feedback, /计划授权目录「src\/module-a\/tests\/」未被 boundary\.yaml entries 覆盖/, "嵌套计划目录同样需要目录条目覆盖");
+      assert.match(feedback, /报告 Convener 修正计划/, "Crew 文案给出计划有误时的回归路径");
+      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "V12 失败不派 readiness");
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "不写 readiness 派发账本");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 V12 v3：new 角色 boundary 目录比计划宽（额外目录）⇒ 退回 Crew、不派 readiness", async () => {
+  const root = makeTempProjectRoot("ans-v3-new-wider-");
+  try {
+    const flowId = "flow-v3-new-wider";
+    writeTeamPlanV3File(root, flowId);
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      writeFullRoleArtifacts(root, "executor", {
+        boundaryWrites: [
+          { kind: "directory", path: "src/module-a/" },
+          { kind: "directory", path: "src/module-a/tests/" },
+          { kind: "directory", path: "src/module-a/extra" },
+        ],
+      });
+      await harness.iface.advanceGovernanceFlow({
+        payload: appointmentWritePayload(flowId),
+        context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+      });
+      await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) > 0, 5000);
+      const feedback = harness.sendsByRole.get("nominator")![0]!;
+      assert.match(feedback, /boundary\.yaml 目录条目「src\/module-a\/extra」不在计划授权目录集合中/);
+      assert.match(feedback, /new 角色边界目录必须与计划授权目录一致，不得更宽\/更窄/);
+      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "new 宽边界阻塞、不派 readiness");
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "不写 readiness 派发账本");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 V12 v3：new 角色边界被祖先目录覆盖但未逐条对应计划授权目录 ⇒ 退回 Crew（不得更窄）", async () => {
+  const root = makeTempProjectRoot("ans-v3-new-narrower-");
+  try {
+    const flowId = "flow-v3-new-narrower";
+    writeTeamPlanV3File(root, flowId);
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      // 只写祖先目录 src/module-a/：覆盖两条计划目录，但目录集合仍缺 src/module-a/tests/（集合不一致）。
+      writeFullRoleArtifacts(root, "executor", {
+        boundaryWrites: [{ kind: "directory", path: "src/module-a/" }],
+      });
+      await harness.iface.advanceGovernanceFlow({
+        payload: appointmentWritePayload(flowId),
+        context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+      });
+      await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) > 0, 5000);
+      const feedback = harness.sendsByRole.get("nominator")![0]!;
+      assert.match(feedback, /boundary\.yaml 缺少计划授权目录「src\/module-a\/tests\/」的目录条目/);
+      assert.match(feedback, /不得更宽\/更窄/);
+      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "集合不一致阻塞、不派 readiness");
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "不写 readiness 派发账本");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 V12 v3：changed 边界更宽越出模块实现目录 ⇒ warning（不硬拒）；未覆盖精确写集仍阻塞", async () => {
+  const root = makeTempProjectRoot("ans-v3-changed-");
+  try {
+    const flowId = "flow-v3-changed";
+    writeTeamPlanV3File(root, flowId, {
+      implementationDir: "src/module-a/",
+      directories: ["src/module-a/api/", "src/module-a/api/tests/"],
+      mapRoleType: "changed",
+      mapDirs: "src/module-a/api/; src/module-a/api/tests/",
+      mapPrecise: "src/singleton.ts",
+    });
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      // src/module-a/ 覆盖计划目录（更宽但在模块实现目录内）；src/other/ 越出模块 → warning；
+      // src/singleton.ts 精确写集未覆盖 → 阻塞。
+      writeFullRoleArtifacts(root, "executor", {
+        boundaryWrites: [
+          { kind: "directory", path: "src/module-a/" },
+          { kind: "directory", path: "src/other/" },
+        ],
+      });
+      await harness.iface.advanceGovernanceFlow({
+        payload: appointmentWritePayload(flowId),
+        context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+      });
+      await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) > 0, 5000);
+      const feedback = harness.sendsByRole.get("nominator")![0]!;
+      assert.match(feedback, /计划精确写集「src\/singleton\.ts」未被 boundary\.yaml entries 覆盖/, "精确写集未覆盖阻塞");
+      assert.match(feedback, /boundary\.yaml 目录条目「src\/other」比计划授权目录宽且不在角色模块实现目录内（changed：交 readiness 按既有职责复核，不硬拒）/, "越出模块实现目录只 warning");
+      assert.doesNotMatch(feedback, /目录条目「src\/module-a」比计划授权目录宽/, "模块实现目录内的更宽边界不告警");
+      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "存在阻塞项：不派 readiness");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 V12 v3：existing 宽边界只 warning + 迁移提示、不强制重写，仍派 readiness", async () => {
+  const root = makeTempProjectRoot("ans-v3-existing-");
+  try {
+    const flowId = "flow-v3-existing";
+    writeTeamPlanV3File(root, flowId, {
+      implementationDir: "src/module-a/",
+      directories: ["src/module-a/api/"],
+      mapRoleType: "existing",
+      mapDirs: "src/module-a/api/",
+    });
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      // existing：boundary 用更宽的模块实现目录（src/module-a/）覆盖计划目录 src/module-a/api/。
+      // 2026-10-23 可重入门禁：团队计划存在 ⇒ flow 声明 role-cards；收口要求六文件齐全（夹具补足）。
+      writeRoleCardsFlowFixture(root, flowId);
+      // 夹具补足实施前标准（新契约流程的验收门会先要标准；本组只聚焦写卡→readiness 链路）。
+      writeAcceptanceCriteriaFile(root, flowId);
+      writeFullRoleArtifacts(root, "executor", {
+        boundaryWrites: [{ kind: "directory", path: "src/module-a/" }],
+      });
+      await harness.iface.advanceGovernanceFlow({
+        payload: appointmentWritePayload(flowId),
+        context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+      });
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) > 0, 5000);
+      assert.match(harness.sendsByRole.get("convener")![0]!, /role-readiness/, "existing 宽边界只 warning：不阻塞 readiness");
+      assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 0, "warning 不退回 Crew");
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 1, "readiness 派发入账");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 V12 v3 来源分流：目录规范缺失（计划问题）⇒ 反馈 Convener、不退回 Crew", async () => {
+  const root = makeTempProjectRoot("ans-v3-plan-source-");
+  try {
+    const flowId = "flow-v3-plan-source";
+    writeTeamPlanV3File(root, flowId, {
+      directories: ["src/module-a/"],
+      mapDirs: "src/module-a/",
+      omitSpecFor: ["src/module-a/"],
+    });
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      // boundary 覆盖计划目录（只有计划缺规范行这一个问题，来源应为 Convener）。
+      writeFullRoleArtifacts(root, "executor", {
+        boundaryWrites: [{ kind: "directory", path: "src/module-a/" }],
+      });
+      await harness.iface.advanceGovernanceFlow({
+        payload: appointmentWritePayload(flowId),
+        context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+      });
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) > 0, 5000);
+      const planText = harness.sendsByRole.get("convener")![0]!;
+      assert.match(planText, /团队计划未通过结构校验/, "计划问题反馈 Convener");
+      assert.match(planText, /目录规范缺少目录「src\/module-a\/」/, "具体到缺失的目录规范行");
+      assert.match(planText, /按 v3 修正\/补充团队计划/, "v3 计划问题按 v3 口径提示 Convener（不误导为 v2）");
+      assert.doesNotMatch(planText, /请对照团队计划/, "不是 readiness 任务");
+      assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 0, "计划问题不误退 Crew");
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "不写 readiness 派发账本");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————— i18n B0（2026-10-23，任务 `2026-10-23-i18n`）：应用级语言偏好 / 主进程标题 / IPC ——————
+//
+// 范围：偏好文件读写（缺失/合法/损坏/非法 locale/未知 version/不可读/写失败）、setLocale 语义、
+// preferences:get / preferences:set-locale 通道形状与成功/失败广播、translator 更新与历史不追溯、
+// preload 三个白名单方法名、窗口/对话框/启动错误框文案。全部注入临时目录与假 registrar，
+// **不启动真实 Electron**；偏好路径绝不指向真实 userData/仓库根。
+
+type PreferencesTestHandler = (event: unknown, ...args: unknown[]) => unknown;
+
+function registerPreferencesForTest(
+  iface: Pick<ReturnType<typeof createDesktopInterface>, "getPreferences" | "setLocale">,
+): { handlers: Map<string, PreferencesTestHandler>; changed: string[] } {
+  const handlers = new Map<string, PreferencesTestHandler>();
+  const changed: string[] = [];
+  registerPreferencesIpc(
+    (channel, listener) => {
+      handlers.set(channel, listener);
+    },
+    iface,
+    { onLocaleChanged: (locale) => changed.push(locale) },
+  );
+  return { handlers, changed };
+}
+
+test("i18n B0 preferences：缺失文件 → 默认 zh-CN、不创建文件或目录", async () => {
+  const root = makeTempProjectRoot("ans-i18n-pref-missing-");
+  try {
+    const file = preferencesFilePath(root);
+    assert.equal(file, path.join(root, "ans", "preferences.json"), "偏好路径固定为 <userData>/ans/preferences.json");
+    const result = await readPreferences(file);
+    assert.equal(result.state, "missing");
+    assert.equal(result.locale, "zh-CN");
+    assert.deepEqual(result.diagnostics, []);
+    assert.equal(existsSync(file), false, "读取不得创建偏好文件");
+    assert.equal(existsSync(path.dirname(file)), false, "读取不得创建 ans 目录");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("i18n B0 preferences：合法文件 → 读取 locale（逐字）", async () => {
+  const root = makeTempProjectRoot("ans-i18n-pref-valid-");
+  try {
+    const file = path.join(root, "preferences.json");
+    writeFileSync(file, `${JSON.stringify({ version: 1, locale: "en-US" })}\n`);
+    const before = readFileSync(file, "utf8");
+    const result = await readPreferences(file);
+    assert.equal(result.state, "valid");
+    assert.equal(result.locale, "en-US");
+    assert.deepEqual(result.diagnostics, []);
+    assert.equal(readFileSync(file, "utf8"), before, "读取不得改写文件");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("i18n B0 preferences：损坏 JSON/非法 locale/未知 version/不可读 → 默认 zh-CN + 稳定诊断", async () => {
+  const root = makeTempProjectRoot("ans-i18n-pref-invalid-");
+  try {
+    const cases = [
+      { name: "corrupt", content: "{ not json", code: "preferences.read.invalid", reason: "corrupt-json" },
+      {
+        name: "invalid-locale",
+        content: JSON.stringify({ version: 1, locale: "fr-FR" }),
+        code: "preferences.locale.invalid",
+        reason: "invalid-locale",
+      },
+      {
+        name: "unknown-version",
+        content: JSON.stringify({ version: 2, locale: "en-US" }),
+        code: "preferences.read.invalid",
+        reason: "unsupported-version",
+      },
+    ] as const;
+    for (const item of cases) {
+      const file = path.join(root, `${item.name}.json`);
+      writeFileSync(file, item.content);
+      const result = await readPreferences(file);
+      assert.equal(result.state, "invalid", item.name);
+      assert.equal(result.locale, "zh-CN", item.name);
+      assert.equal(result.diagnostics.length, 1, item.name);
+      assert.equal(result.diagnostics[0].code, item.code, item.name);
+      assert.equal(result.diagnostics[0].reasonCode, item.reason, item.name);
+    }
+    // 不可读（目录当文件）：不抛错，回退 zh-CN + read.invalid。
+    const dirAsFile = path.join(root, "dir.json");
+    mkdirSync(dirAsFile);
+    const unreadable = await readPreferences(dirAsFile);
+    assert.equal(unreadable.state, "invalid");
+    assert.equal(unreadable.locale, "zh-CN");
+    assert.equal(unreadable.diagnostics[0]?.code, "preferences.read.invalid");
+    assert.equal(unreadable.diagnostics[0]?.reasonCode, "unreadable");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("i18n B0 preferences：setLocale 合法 → 原子写、内存/视图更新、无临时文件残留", async () => {
+  const root = makeTempProjectRoot("ans-i18n-pref-set-");
+  try {
+    const file = preferencesFilePath(root);
+    const diagnostics: PreferencesDiagnostic[] = [];
+    const service = createPreferencesService({
+      filePath: file,
+      initialLocale: "zh-CN",
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+    const result = await service.setLocale("en-US");
+    assert.deepEqual(result, { ok: true, locale: "en-US" });
+    assert.equal(service.getLocale(), "en-US");
+    assert.deepEqual(service.getView(), {
+      version: 1,
+      locale: "en-US",
+      supported: ["zh-CN", "en-US"],
+    });
+    assert.equal(
+      readFileSync(file, "utf8"),
+      `${JSON.stringify({ version: 1, locale: "en-US" })}\n`,
+      "文件形状 {version:1, locale} + 换行",
+    );
+    assert.deepEqual(readdirSync(path.dirname(file)), ["preferences.json"], "原子写不残留临时文件");
+    assert.deepEqual(diagnostics, [], "合法切换无诊断");
+    // 使用共享 atomicWrite（唯一落盘实现）：源码只导入共享原语、不复制 rename/writeFile。
+    const source = readFileSync(path.join(REPO_ROOT, "app", "desktop", "preferences.ts"), "utf8");
+    assert.match(source, /import \{ atomicWrite \} from "\.\.\/\.\.\/src\/common\/shared\/atomic-write\.ts"/);
+    assert.doesNotMatch(source, /\brename\s*\(/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("i18n B0 preferences：setLocale 非法 → ok:false、不写文件/不改内存 + 稳定诊断", async () => {
+  const root = makeTempProjectRoot("ans-i18n-pref-reject-");
+  try {
+    const file = preferencesFilePath(root);
+    const diagnostics: PreferencesDiagnostic[] = [];
+    const service = createPreferencesService({
+      filePath: file,
+      initialLocale: "zh-CN",
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+    for (const bad of ["fr-FR", "en", "zh", "", null, 42]) {
+      const result = await service.setLocale(bad);
+      assert.equal(result.ok, false, `非法值 ${String(bad)} 必须拒绝`);
+      assert.equal(result.locale, "zh-CN");
+      assert.equal(result.ok === false ? result.error : undefined, "invalid-locale");
+    }
+    assert.equal(service.getLocale(), "zh-CN", "非法值不改内存");
+    assert.equal(existsSync(file), false, "非法值不得创建偏好文件");
+    assert.equal(
+      diagnostics.filter((diagnostic) => diagnostic.code === "preferences.locale.invalid").length,
+      6,
+      "每次拒绝都留稳定诊断",
+    );
+    assert.ok(diagnostics.every((diagnostic) => diagnostic.reasonCode === "set-locale-rejected"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("i18n B0 preferences：写失败 → ok:false、不改内存 + preferences.write.failed", async () => {
+  const root = makeTempProjectRoot("ans-i18n-pref-writefail-");
+  try {
+    // 让 `<root>/ans` 是普通文件：mkdir(dirname) 失败，写不进（Windows/POSIX 均为 EEXIST/ENOTDIR）。
+    const blockedParent = path.join(root, "ans");
+    writeFileSync(blockedParent, "not a directory");
+    const file = path.join(blockedParent, "preferences.json");
+    const diagnostics: PreferencesDiagnostic[] = [];
+    const service = createPreferencesService({
+      filePath: file,
+      initialLocale: "zh-CN",
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+    const result = await service.setLocale("en-US");
+    assert.equal(result.ok, false);
+    assert.equal(result.locale, "zh-CN");
+    assert.equal(result.ok === false ? result.error : undefined, "write-failed");
+    assert.equal(service.getLocale(), "zh-CN", "写失败不改内存");
+    assert.equal(diagnostics[0]?.code, "preferences.write.failed");
+    assert.equal(diagnostics[0]?.reasonCode, "write-failed");
+    assert.equal(typeof diagnostics[0]?.errorCode, "string", "保留原始错误码供诊断");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("i18n B0 IPC：preferences:get 形状、set-locale 成功广播并更新 translator；旧文本不追溯", async () => {
+  const root = makeTempProjectRoot("ans-i18n-ipc-ok-");
+  try {
+    const file = preferencesFilePath(path.join(root, "userData"));
+    const mainI18n = createMainI18n("zh-CN");
+    const iface = createDesktopInterface({
+      pickDirectory: async () => null,
+      emitEvent: () => {},
+      preferencesPath: file,
+      mainI18n,
+    });
+    const { handlers, changed } = registerPreferencesForTest(iface);
+    assert.deepEqual([...handlers.keys()].sort(), ["preferences:get", "preferences:set-locale"]);
+
+    const view = (await handlers.get("preferences:get")!({})) as Record<string, unknown>;
+    assert.deepEqual(view, { version: 1, locale: "zh-CN", supported: ["zh-CN", "en-US"] });
+
+    const oldLine = mainI18n.t("main.error.startup.detail");
+    assert.equal(oldLine, "界面无法启动，请查看诊断日志后重新打开。");
+    const result = (await handlers.get("preferences:set-locale")!({}, { locale: "en-US" })) as Record<string, unknown>;
+    assert.deepEqual(result, { ok: true, locale: "en-US" });
+    assert.deepEqual(changed, ["en-US"], "成功切换只广播一次");
+    assert.equal(mainI18n.getLocale(), "en-US", "translator 随成功切换更新");
+    assert.equal(desktopTexts(mainI18n).windowTitle, "ANS Desktop (Governed Sessions)");
+    assert.equal(oldLine, "界面无法启动，请查看诊断日志后重新打开。", "已生成文本不追溯");
+    const viewAfter = (await handlers.get("preferences:get")!({})) as Record<string, unknown>;
+    assert.deepEqual(viewAfter, { version: 1, locale: "en-US", supported: ["zh-CN", "en-US"] });
+    assert.equal(JSON.parse(readFileSync(file, "utf8")).locale, "en-US", "IPC 成功后已持久化");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("i18n B0 IPC：非法 locale → ok:false（本地化错误）、不写文件、不广播", async () => {
+  const root = makeTempProjectRoot("ans-i18n-ipc-invalid-");
+  try {
+    const file = preferencesFilePath(path.join(root, "userData"));
+    const mainI18n = createMainI18n("zh-CN");
+    const iface = createDesktopInterface({
+      pickDirectory: async () => null,
+      emitEvent: () => {},
+      preferencesPath: file,
+      mainI18n,
+    });
+    const { handlers, changed } = registerPreferencesForTest(iface);
+    const handler = handlers.get("preferences:set-locale")!;
+    for (const input of [{ locale: "fr-FR" }, { locale: "en" }, { locale: 42 }, {}, undefined, "en-US"]) {
+      const result = (await handler({}, input)) as Record<string, unknown>;
+      assert.equal(result.ok, false, `非法入参 ${JSON.stringify(input)} 必须拒绝`);
+      assert.equal(result.locale, "zh-CN");
+      assert.equal(result.error, "语言偏好无效，已恢复为简体中文。", "错误文案按当前 locale（zh-CN）");
+    }
+    assert.deepEqual(changed, [], "失败不广播");
+    assert.equal(existsSync(file), false, "失败不写文件");
+    assert.equal(mainI18n.getLocale(), "zh-CN", "失败不改 translator");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("i18n B0 IPC：写失败 → ok:false（保存失败文案）、不广播、translator 不变", async () => {
+  const root = makeTempProjectRoot("ans-i18n-ipc-writefail-");
+  try {
+    const blockedParent = path.join(root, "ans");
+    writeFileSync(blockedParent, "not a directory");
+    const file = path.join(blockedParent, "preferences.json");
+    const mainI18n = createMainI18n("zh-CN");
+    const iface = createDesktopInterface({
+      pickDirectory: async () => null,
+      emitEvent: () => {},
+      preferencesPath: file,
+      mainI18n,
+    });
+    const { handlers, changed } = registerPreferencesForTest(iface);
+    const result = (await handlers.get("preferences:set-locale")!({}, { locale: "en-US" })) as Record<string, unknown>;
+    assert.deepEqual(result, { ok: false, locale: "zh-CN", error: "无法保存语言偏好，请稍后重试。" });
+    assert.deepEqual(changed, [], "写失败不广播");
+    assert.equal(mainI18n.getLocale(), "zh-CN", "写失败不改 translator");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("i18n B0 preload：仅新增三个白名单方法（getPreferences/setLocale/onLocaleChanged）", () => {
+  const source = readFileSync(path.join(REPO_ROOT, "app", "preload.cjs"), "utf8");
+  assert.match(source, /getPreferences:\s*\(\)\s*=>\s*ipcRenderer\.invoke\("preferences:get"\)/);
+  assert.match(source, /setLocale:\s*\(locale\)\s*=>/);
+  assert.match(source, /"preferences:set-locale"/);
+  assert.match(source, /onLocaleChanged:\s*\(cb\)\s*=>/);
+  assert.match(source, /"preferences:locale-changed"/);
+  // 仍不暴露 Node/fs/path/child_process 等宽泛能力。
+  assert.doesNotMatch(source, /require\(["'](?:node:)?fs["']\)/);
+  assert.doesNotMatch(source, /require\(["']node:(?:path|child_process|process)["']\)/);
+});
+
+test("i18n B0 main.ts：窗口/导入项目/选择图片/启动错误框走 desktopTexts（不硬编码标题）", () => {
+  const source = readFileSync(path.join(REPO_ROOT, "app", "main.ts"), "utf8");
+  assert.match(source, /title: desktopTexts\(mainI18n\)\.windowTitle/, "窗口标题");
+  assert.match(source, /title: desktopTexts\(mainI18n\)\.importProjectDialogTitle/, "导入项目对话框标题");
+  assert.match(source, /title: desktopTexts\(mainI18n\)\.pickImageDialogTitle/, "选择图片对话框标题");
+  assert.match(
+    source,
+    /dialog\.showErrorBox\(startupText\.startupErrorTitle, startupText\.startupErrorDetail\)/,
+    "启动错误框",
+  );
+  assert.doesNotMatch(source, /title: "ANS 桌面应用（受治理会话）"/, "窗口标题不再硬编码");
+});
+
+test("i18n B0 main.ts：page-title-updated 不得覆盖本地化窗口标题（2026-10-23 真机缺陷）", () => {
+  const source = readFileSync(path.join(REPO_ROOT, "app", "main.ts"), "utf8");
+  assert.match(source, /applyLocalizedWindowTitle\(win\)/, "建窗后、加载前接线");
+  assert.match(source, /win\.on\("page-title-updated", \(event\) => \{/, "监听页面标题更新");
+  assert.match(source, /event\.preventDefault\(\)/, "阻止页面标题覆盖");
+  assert.match(
+    source,
+    /win\.setTitle\(desktopTexts\(mainI18n\)\.windowTitle\)/,
+    "用当前 locale 的窗口标题回写",
+  );
+  assert.match(source, /did-finish-load/, "加载完成后再补一次本地化标题");
+});
+
+test("i18n B0 标题：窗口/导入项目/选择图片/启动错误框 zh-CN 与 en-US（main.ts 取词口径）", () => {
+  const zh = createMainI18n("zh-CN");
+  assert.deepEqual(desktopTexts(zh), {
+    windowTitle: "ANS 桌面应用（受治理会话）",
+    importProjectDialogTitle: "导入项目（选择项目根文件夹）",
+    pickImageDialogTitle: "选择图片",
+    startupErrorTitle: "应用启动失败",
+    startupErrorDetail: "界面无法启动，请查看诊断日志后重新打开。",
+  });
+  const en = createMainI18n("en-US");
+  assert.deepEqual(desktopTexts(en), {
+    windowTitle: "ANS Desktop (Governed Sessions)",
+    importProjectDialogTitle: "Import Project (Select Project Root Folder)",
+    pickImageDialogTitle: "Choose Image",
+    startupErrorTitle: "Application Failed to Start",
+    startupErrorDetail: "The interface could not start. Check the diagnostics log and reopen the application.",
+  });
+  zh.setLocale("en-US");
+  assert.equal(desktopTexts(zh).startupErrorTitle, "Application Failed to Start", "切换后新生成文本用新 locale");
+});
+
+test("i18n B0 边界：偏好只落注入的 userData 路径，不创建项目 .ans/.env/治理账本", async () => {
+  const projectRoot = makeTempProjectRoot("ans-i18n-project-");
+  const userDataRoot = makeTempProjectRoot("ans-i18n-userdata-");
+  try {
+    const file = preferencesFilePath(userDataRoot);
+    const iface = createDesktopInterface({
+      pickDirectory: async () => null,
+      emitEvent: () => {},
+      preferencesPath: file,
+    });
+    const result = await iface.setLocale({ locale: "en-US" });
+    assert.deepEqual(result, { ok: true, locale: "en-US" });
+    assert.equal(existsSync(path.join(projectRoot, ".ans")), false, "不写项目 .ans");
+    assert.equal(existsSync(path.join(projectRoot, ".env")), false, "不写 .env");
+    assert.deepEqual(readdirSync(projectRoot), [], "项目根零写入");
+    assert.equal(existsSync(file), true, "偏好只写注入的 userData 路径");
+    assert.equal(existsSync(path.join(userDataRoot, "ans", "preferences.json")), true);
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+    rmSync(userDataRoot, { recursive: true, force: true });
+  }
+});
+
+// —————— 2026-10-23 治理写卡推进可重入门禁（方案 A：指纹/去重/账本锚/刷新探针/role-cards 收口） ——————
+//
+// 客户闸门 0/1/2 已确认（`docs/communication/2026-10-23_intent_governance-advance-redispatch.md`）。
+// 本组钉住：内容指纹去重、账本锚跨重启、项目刷新探针、`completeRoleCardsStep` 收口顺序与防自激。
+
+/** 读 flow 机器状态步骤（测试断言 role-cards/readiness 状态与证据；解析走公共出口）。 */
+function readFlowStepsForTest(
+  root: string,
+  flowId: string,
+): Array<{ id: string; status: string; evidence?: { kind: string; ref: string } }> | undefined {
+  try {
+    const text = readFileSync(path.join(root, "docs", "flows", `${flowId}.yaml`), "utf8");
+    const parsed = parseFlowStateYaml(text, flowId);
+    return parsed.ok ? parsed.flow.steps : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** 账本写一条 Crew `appointment-write` 接受记录（模拟 Crew 重写卡后的锚点前移）。 */
+async function appendCrewWriteMarker(root: string, flowId: string): Promise<void> {
+  const appended = await appendGovernanceLedger(root, {
+    at: new Date().toISOString(),
+    kind: "customer.decision",
+    flowId,
+    stepId: "role-cards",
+    decisionKind: "appointment-write",
+    customerDecision: "accepted",
+    actorRoleId: "nominator",
+    power: "nomination",
+    paths: [`角色卡/${flowId}/role-card.md`],
+  });
+  assert.equal(appended.ok, true, appended.ok ? "" : appended.message);
+}
+
+/** 账本写一条 app→角色派发（测试构造账本锚；`stepId` 缺省＝appointment 链早期无 stepId 形态）。 */
+async function appendAppDispatch(
+  root: string,
+  flowId: string,
+  input: { targetRoleId: "convener" | "nominator"; stepId?: string },
+): Promise<void> {
+  const appended = await appendGovernanceLedger(root, {
+    at: new Date().toISOString(),
+    kind: "dispatch.accepted",
+    flowId,
+    ...(input.stepId !== undefined ? { stepId: input.stepId } : {}),
+    actorRoleId: "app",
+    power: "app",
+    trigger: "customer-decision",
+    targetRoleId: input.targetRoleId,
+    messageSummary: "测试夹具：app 派发",
+  });
+  assert.equal(appended.ok, true, appended.ok ? "" : appended.message);
+}
+
+async function triggerPostWrite(harness: PostWriteHarness, root: string, flowId: string): Promise<void> {
+  await harness.iface.advanceGovernanceFlow({
+    payload: appointmentWritePayload(flowId),
+    context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+  });
+}
+
+test("2026-10-23 可重入门禁：两轮错误写卡（内容不同）⇒ 两次反馈；修正后 role-cards 恰一次 done、readiness 恰一次、无客户卡/客户决定", async () => {
+  const root = makeTempProjectRoot("ans-role-cards-reentry-");
+  try {
+    const flowId = "flow-reentry";
+    writeTeamPlanFile(root, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(root, flowId);
+    writeAcceptanceCriteriaFile(root, flowId);
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      // 第一轮 V1：boundary 顶层 role 与目录 id 不一致 ⇒ 反馈 Crew。
+      writeFullRoleArtifacts(root, "executor");
+      writeRoleArtifactFiles(root, "executor", {
+        boundary: ["role: someone-else", "entries:", "  - kind: file", "    path: src/a.ts", "    purpose: p", ""].join("\n"),
+      });
+      await triggerPostWrite(harness, root, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) === 1, 6000);
+      assert.match(harness.sendsByRole.get("nominator")![0]!, /顶层 role 与目录 id 不一致/);
+      harness.settles.get("nominator")?.(); // 模拟 Crew 本轮结束（否则下一轮检查会等其 settle）
+      // 第二轮 V2：内容变化（role-card 为空）——同问题族但文件内容已变 ⇒ 必须重新进入并再次反馈。
+      writeFullRoleArtifacts(root, "executor");
+      writeFileSync(path.join(root, "角色卡", "executor", "role-card.md"), "", "utf8");
+      await triggerPostWrite(harness, root, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) === 2, 6000);
+      assert.match(harness.sendsByRole.get("nominator")![1]!, /文件为空（需要角色卡正文）/);
+      harness.settles.get("nominator")?.();
+      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "不合格：不派 Convener");
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "不合格：不写 readiness 派发账本");
+      // 第三轮 V3：修正为合格 ⇒ role-cards 恰一次 done + 验证记录 + readiness 恰一次。
+      writeFullRoleArtifacts(root, "executor");
+      await triggerPostWrite(harness, root, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 1, 6000);
+      const steps = readFlowStepsForTest(root, flowId)!;
+      const roleCardsStep = steps.find((step) => step.id === "role-cards")!;
+      assert.equal(roleCardsStep.status, "done", "结构校验通过后 role-cards 由应用标 done");
+      assert.equal(roleCardsStep.evidence?.kind, "artifact");
+      const recordRel = roleCardsStep.evidence!.ref;
+      assert.match(recordRel, /^\.ans\/governance\/role-cards\/flow-reentry\/[0-9a-f]{64}\.json$/);
+      const recordPath = path.join(root, ...recordRel.split("/"));
+      assert.equal(existsSync(recordPath), true, "应用验证记录存在");
+      const record = JSON.parse(readFileSync(recordPath, "utf8")) as Record<string, unknown>;
+      assert.equal(record.schema, "role-cards-gate/v1");
+      assert.equal(record.result, "structure-pass");
+      assert.equal(record.semantic, "pending");
+      assert.equal(record.fingerprint, recordRel.split("/").pop()!.replace(/\.json$/, ""), "记录路径＝指纹");
+      assert.match(String(record.disclaimer), /不代表 readiness/);
+      const ledger = await readGovernanceLedger(root);
+      const readiness = ledger.entries.filter(
+        (entry) => entry.kind === "dispatch.accepted" && entry.flowId === flowId && entry.targetRoleId === "convener",
+      );
+      assert.equal(readiness.length, 1, "readiness 恰一次派发");
+      assert.equal(readiness[0]!.stepId, "role-readiness");
+      assert.equal(readiness[0]!.actorRoleId, "app");
+      assert.equal(readiness[0]!.power, "app", "应用动作 ≠ 客户批准");
+      const observed = ledger.entries.filter((entry) => entry.kind === "artifact.observed" && entry.artifactPath === recordRel);
+      assert.equal(observed.length, 1, "artifact.observed 恰一条（power=app）");
+      assert.equal(observed[0]!.actorRoleId, "app");
+      assert.equal(observed[0]!.power, "app");
+      assert.equal(ledger.entries.filter((entry) => entry.kind === "customer.decision").length, 1, "只有 appointment 决定");
+      assert.equal(ledger.entries.some((entry) => entry.decisionKind === "acceptance"), false, "无客户验收决定");
+      assert.equal(harness.customerCalls.length, 0, "全程零客户卡");
+      assert.match(harness.sendsByRole.get("convener")![0]!, /应用已在结构校验通过后把 role-cards 标为 done/);
+      assert.match(harness.sendsByRole.get("convener")![0]!, /只推进 role-readiness/);
+      assert.match(harness.sendsByRole.get("convener")![0]!, /不要重写角色卡/);
+      // 同指纹重复 settle/刷新 ⇒ 不重复反馈/派发。
+      await triggerPostWrite(harness, root, flowId);
+      harness.settles.get("nominator")?.();
+      for (let i = 0; i < 3; i += 1) await harness.iface.listProject({ projectRoot: root });
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 2, "同内容不重复反馈");
+      assert.equal(harness.sendsByRole.get("convener")!.length, 1, "同内容不重复派发");
+      assert.equal(await waitForConvenerDispatchCount(root, flowId, 1), 1, "账本仍恰一条");
+      // 第四轮：已有成功派发后 Crew 重写（内容变化、仍合格）⇒ 重新进入校验并允许再次派发（方案 A2/P1④）。
+      // 先让 Convener 本轮结束（后台会话 busy 时新消息会排队，不会落到测试的 sends 数组）。
+      harness.settles.get("convener")?.();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await appendCrewWriteMarker(root, flowId);
+      writeFileSync(
+        path.join(root, "角色卡", "executor", "memo.md"),
+        "# 备忘录\n\n- 2026-10-23：测试夹具建立。\n- 2026-10-23：Crew 重写（内容变化）。\n",
+        "utf8",
+      );
+      await triggerPostWrite(harness, root, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 2, 6000);
+      assert.equal(await waitForConvenerDispatchCount(root, flowId, 2), 2, "内容变化后允许再次派发（新指纹/新 Crew 写卡锚）");
+      assert.equal(harness.customerCalls.length, 0, "再次派发仍不弹客户卡");
+      assert.equal(
+        (await readGovernanceLedger(root)).entries.some((entry) => entry.decisionKind === "acceptance"),
+        false,
+        "仍无客户验收决定",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 指纹去重：mtime-only 不触发；团队计划内容变化（问题集相同）⇒ 重新反馈", async () => {
+  const root = makeTempProjectRoot("ans-role-cards-fingerprint-");
+  try {
+    const flowId = "flow-fingerprint";
+    writeTeamPlanFile(root, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(root, flowId);
+    writeAcceptanceCriteriaFile(root, flowId);
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      writeRoleArtifactFiles(root, "executor", {
+        boundary: ["role: someone-else", "entries:", "  - kind: file", "    path: src/a.ts", "    purpose: p", ""].join("\n"),
+      });
+      await triggerPostWrite(harness, root, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) === 1, 6000);
+      harness.settles.get("nominator")?.();
+      // 仅改 mtime（内容不变）：指纹不含时间 ⇒ 不重新反馈。
+      const next = new Date(Date.now() + 60_000);
+      for (const name of ["role-card.md", "boundary.yaml"]) {
+        utimesSync(path.join(root, "角色卡", "executor", name), next, next);
+      }
+      await triggerPostWrite(harness, root, flowId);
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 1, "mtime-only 不重新反馈");
+      // 团队计划内容/版本变化（问题集相同）：指纹变化 ⇒ 必须重新反馈。
+      writeTeamPlanFile(root, flowId, {
+        version: 2,
+        recommended: ["executor"],
+        rows: [{ roleId: "executor", type: "new" }],
+      });
+      await triggerPostWrite(harness, root, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) === 2, 6000);
+      assert.match(harness.sendsByRole.get("nominator")![1]!, /顶层 role 与目录 id 不一致/, "问题集可以相同，但内容/计划变化须再次反馈");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 项目刷新探针：无 Crew 事件，仅 listProject ⇒ 不合格反馈、手工修正后推进", async () => {
+  const root = makeTempProjectRoot("ans-role-cards-refresh-");
+  try {
+    const flowId = "flow-refresh";
+    writeTeamPlanFile(root, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(root, flowId);
+    writeAcceptanceCriteriaFile(root, flowId);
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    writeFullRoleArtifacts(root, "executor");
+    writeFileSync(path.join(root, "角色卡", "executor", "role-card.md"), "", "utf8");
+    // 导入后的刷新探针（无 settle/appointment-write 事件）即应排完整检查并反馈不合格。
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) >= 1, 6000);
+      assert.match(harness.sendsByRole.get("nominator")![0]!, /文件为空/);
+      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "不合格：不推进");
+      harness.settles.get("nominator")?.();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      // 手工修正文件（无任何 Crew 事件），再次刷新 ⇒ 探针排检查 → 合格推进。
+      writeFullRoleArtifacts(root, "executor");
+      await harness.iface.listProject({ projectRoot: root });
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) >= 1, 6000);
+      const steps = readFlowStepsForTest(root, flowId)!;
+      assert.equal(steps.find((step) => step.id === "role-cards")?.status, "done", "刷新后合格推进 role-cards done");
+      assert.equal(await waitForConvenerDispatchCount(root, flowId, 1), 1);
+      assert.ok(harness.projectChanged() >= 1, "实际动作触发 project:changed（左树刷新）");
+      assert.equal(harness.customerCalls.length, 0, "不弹客户卡");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 跨重启账本锚：早期无 stepId 派发不挡；通过记录之后 readiness 派发挡；有记录无派发放行", async () => {
+  // 夹具 A（目标项目形态）：appointment → 旧 app→Convener（无 stepId）→ 后续 Crew 写卡 → 新实例仍放行。
+  const rootA = makeTempProjectRoot("ans-anchor-a-");
+  try {
+    const flowId = "flow-anchor-a";
+    writeTeamPlanFile(rootA, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(rootA, flowId);
+    writeAcceptanceCriteriaFile(rootA, flowId);
+    await seedAppointmentDecision(rootA, flowId, ["executor"]);
+    await appendAppDispatch(rootA, flowId, { targetRoleId: "convener" });
+    await appendCrewWriteMarker(rootA, flowId);
+    await appendAppDispatch(rootA, flowId, { targetRoleId: "convener" }); // 锚之后仍无 stepId：不算 readiness
+    writeFullRoleArtifacts(rootA, "executor");
+    const harnessA = await makePostWriteHarness(rootA, ["executor"], () => true);
+    try {
+      await waitForTest(() => (harnessA.sendsByRole.get("convener")?.length ?? 0) === 1, 8000);
+      assert.equal(await waitForReadinessDispatchCount(rootA, flowId, 1), 1, "新实例恰一次 readiness 派发（旧无 stepId 条目不计）");
+      const ledgerA = await readGovernanceLedger(rootA);
+      assert.ok(
+        ledgerA.entries.some(
+          (entry) =>
+            entry.kind === "dispatch.accepted" &&
+            entry.flowId === flowId &&
+            entry.targetRoleId === "convener" &&
+            entry.stepId === "role-readiness",
+        ),
+        "旧无 stepId 派发不挡：new 实例仍派 readiness",
+      );
+      assert.equal(
+        readFlowStepsForTest(rootA, flowId)!.find((step) => step.id === "role-cards")?.status,
+        "done",
+        "role-cards 由应用收口",
+      );
+    } finally {
+      await harnessA.iface.stopSession();
+    }
+  } finally {
+    rmSync(rootA, { recursive: true, force: true });
+  }
+
+  // 夹具 B：当前指纹通过记录之后已有 readiness 派发 ⇒ 新实例必须跳过（不重复派发/反馈）。
+  const rootB = makeTempProjectRoot("ans-anchor-b-");
+  try {
+    const flowId = "flow-anchor-b";
+    const recordRel = `.ans/governance/role-cards/${flowId}/pass.json`;
+    writeTeamPlanFile(rootB, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(rootB, flowId, { roleCards: { status: "done", evidenceRef: recordRel } });
+    writeAcceptanceCriteriaFile(rootB, flowId);
+    await seedAppointmentDecision(rootB, flowId, ["executor"]);
+    writeFullRoleArtifacts(rootB, "executor");
+    const observed = await appendGovernanceLedger(rootB, {
+      at: new Date().toISOString(),
+      kind: "artifact.observed",
+      flowId,
+      actorRoleId: "app",
+      power: "app",
+      artifactPath: recordRel,
+    });
+    assert.equal(observed.ok, true, observed.ok ? "" : observed.message);
+    await appendAppDispatch(rootB, flowId, { targetRoleId: "convener", stepId: "role-readiness" });
+    const harnessB = await makePostWriteHarness(rootB, ["executor"], () => true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      assert.equal(harnessB.sendsByRole.get("convener")?.length ?? 0, 0, "通过记录后有 readiness 派发：新实例跳过");
+      assert.equal(await ledgersConvenerDispatches(rootB, flowId), 1, "账本不重复");
+      assert.equal(harnessB.sendsByRole.get("nominator")?.length ?? 0, 0, "不重复反馈");
+    } finally {
+      await harnessB.iface.stopSession();
+    }
+  } finally {
+    rmSync(rootB, { recursive: true, force: true });
+  }
+
+  // 夹具 C：通过记录存在但其后无 readiness 派发 ⇒ 新实例放行。
+  const rootC = makeTempProjectRoot("ans-anchor-c-");
+  try {
+    const flowId = "flow-anchor-c";
+    const recordRel = `.ans/governance/role-cards/${flowId}/pass.json`;
+    writeTeamPlanFile(rootC, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(rootC, flowId, { roleCards: { status: "done", evidenceRef: recordRel } });
+    writeAcceptanceCriteriaFile(rootC, flowId);
+    await seedAppointmentDecision(rootC, flowId, ["executor"]);
+    writeFullRoleArtifacts(rootC, "executor");
+    const observed = await appendGovernanceLedger(rootC, {
+      at: new Date().toISOString(),
+      kind: "artifact.observed",
+      flowId,
+      actorRoleId: "app",
+      power: "app",
+      artifactPath: recordRel,
+    });
+    assert.equal(observed.ok, true, observed.ok ? "" : observed.message);
+    const harnessC = await makePostWriteHarness(rootC, ["executor"], () => true);
+    try {
+      await waitForTest(() => (harnessC.sendsByRole.get("convener")?.length ?? 0) >= 1, 8000);
+      assert.equal(await waitForConvenerDispatchCount(rootC, flowId, 1), 1, "有通过记录、无派发 ⇒ 恰一次放行");
+    } finally {
+      await harnessC.iface.stopSession();
+    }
+  } finally {
+    rmSync(rootC, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 role-cards 收口：dispatch kind 用账本证据完成，不写 .ans 记录", async () => {
+  const root = makeTempProjectRoot("ans-role-cards-dispatch-kind-");
+  try {
+    const flowId = "flow-rc-dispatch";
+    writeTeamPlanFile(root, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(root, flowId, { roleCards: { kind: "dispatch" } });
+    writeAcceptanceCriteriaFile(root, flowId);
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    await appendAppDispatch(root, flowId, { targetRoleId: "nominator", stepId: "role-cards" });
+    writeFullRoleArtifacts(root, "executor");
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      await triggerPostWrite(harness, root, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 1, 6000);
+      const roleCards = readFlowStepsForTest(root, flowId)!.find((step) => step.id === "role-cards")!;
+      assert.equal(roleCards.status, "done");
+      assert.deepEqual(roleCards.evidence, { kind: "dispatch", ref: "role-cards" }, "dispatch kind 证据来自账本派发");
+      assert.equal(existsSync(path.join(root, ".ans", "governance", "role-cards")), false, "dispatch kind 不写 .ans 验证记录");
+      assert.equal(await waitForConvenerDispatchCount(root, flowId, 1), 1);
+      assert.equal(harness.customerCalls.length, 0);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 role-cards 收口：团队计划存在但 flow 缺步骤 ⇒ 反馈 Convener、不派 readiness；同指纹不刷屏", async () => {
+  const root = makeTempProjectRoot("ans-role-cards-missing-step-");
+  try {
+    const flowId = "flow-rc-missing";
+    writeTeamPlanFile(root, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(root, flowId, { roleCards: false });
+    writeAcceptanceCriteriaFile(root, flowId);
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    writeFullRoleArtifacts(root, "executor");
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      await triggerPostWrite(harness, root, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) >= 1, 6000);
+      const feedback = harness.sendsByRole.get("convener")![0]!;
+      assert.match(feedback, /流程状态 YAML 未通过结构校验/);
+      assert.match(feedback, /role-cards/);
+      assert.doesNotMatch(feedback, /请对照团队计划/, "不是 readiness 任务");
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "不写 readiness 派发账本");
+      assert.equal(
+        readFlowStepsForTest(root, flowId)!.some((step) => step.id === "role-cards"),
+        false,
+        "不伪造 role-cards 步骤",
+      );
+      // 同指纹再次触发：反馈不重复（内容未变）。
+      await triggerPostWrite(harness, root, flowId);
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 1, "同内容不刷屏");
+      assert.equal(harness.customerCalls.length, 0);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 role-cards 收口：终态拒绝（不覆盖）；已 done 幂等（不重复 done/派发）", async () => {
+  // 终态：role-cards failed ⇒ 不覆盖、不派。
+  const rootTerminal = makeTempProjectRoot("ans-role-cards-terminal-");
+  try {
+    const flowId = "flow-rc-terminal";
+    writeTeamPlanFile(rootTerminal, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(rootTerminal, flowId, { roleCards: { status: "failed" } });
+    writeAcceptanceCriteriaFile(rootTerminal, flowId);
+    await seedAppointmentDecision(rootTerminal, flowId, ["executor"]);
+    writeFullRoleArtifacts(rootTerminal, "executor");
+    const harness = await makePostWriteHarness(rootTerminal, ["executor"], () => true);
+    try {
+      await triggerPostWrite(harness, rootTerminal, flowId);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "终态不派");
+      assert.equal(await ledgersConvenerDispatches(rootTerminal, flowId), 0, "终态不写派发账本");
+      assert.equal(
+        readFlowStepsForTest(rootTerminal, flowId)!.find((step) => step.id === "role-cards")?.status,
+        "failed",
+        "不覆盖终态",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(rootTerminal, { recursive: true, force: true });
+  }
+
+  // 已 done 幂等：flow 已是 done（证据已存在）⇒ 应用只补派 readiness，不重复 done/账本。
+  const rootIdem = makeTempProjectRoot("ans-role-cards-idempotent-");
+  try {
+    const flowId = "flow-rc-idem";
+    const recordRel = `.ans/governance/role-cards/${flowId}/done.json`;
+    writeTeamPlanFile(rootIdem, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(rootIdem, flowId, { roleCards: { status: "done", evidenceRef: recordRel } });
+    writeAcceptanceCriteriaFile(rootIdem, flowId);
+    await seedAppointmentDecision(rootIdem, flowId, ["executor"]);
+    writeFullRoleArtifacts(rootIdem, "executor");
+    const harness = await makePostWriteHarness(rootIdem, ["executor"], () => true);
+    try {
+      await triggerPostWrite(harness, rootIdem, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 1, 6000);
+      assert.equal(await waitForConvenerDispatchCount(rootIdem, flowId, 1), 1, "已 done：readiness 恰一次");
+      assert.equal(
+        readFlowStepsForTest(rootIdem, flowId)!.find((step) => step.id === "role-cards")?.evidence?.ref,
+        recordRel,
+        "保留既有证据（幂等不重写）",
+      );
+      await triggerPostWrite(harness, rootIdem, flowId);
+      harness.settles.get("nominator")?.();
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      assert.equal(harness.sendsByRole.get("convener")!.length, 1, "已 done + 已有派发：不重复");
+      assert.equal(await ledgersConvenerDispatches(rootIdem, flowId), 1);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(rootIdem, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 role-cards 收口：stale（校验后文件又变）⇒ 只诊断不派；下一次触发重试成功", async () => {
+  const root = makeTempProjectRoot("ans-role-cards-stale-");
+  try {
+    const flowId = "flow-rc-stale";
+    writeTeamPlanFile(root, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(root, flowId);
+    writeAcceptanceCriteriaFile(root, flowId);
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    writeFullRoleArtifacts(root, "executor");
+    let calls = 0;
+    const harness = await makePostWriteHarness(root, ["executor"], () => true, {
+      completeRoleCardsStepFn: async (input) => {
+        calls += 1;
+        if (calls === 1) {
+          return { ok: false, code: "role-cards-stale", error: "角色卡在校验后发生变化（测试注入）" };
+        }
+        return realCompleteRoleCardsStep(input);
+      },
+    });
+    try {
+      await triggerPostWrite(harness, root, flowId);
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "stale：不派 Convener");
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "stale：不写派发账本");
+      assert.equal(
+        readFlowStepsForTest(root, flowId)!.find((step) => step.id === "role-cards")?.status,
+        "pending",
+        "stale：不写 flow done",
+      );
+      await triggerPostWrite(harness, root, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 1, 6000);
+      assert.equal(
+        readFlowStepsForTest(root, flowId)!.find((step) => step.id === "role-cards")?.status,
+        "done",
+        "下一次触发重试成功",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 顺序无关：boundary 条目逆序仍通过；逆序缺 api-spec 条目被逐项报告", async () => {
+  const reversedBoundary = (roleId: string, options: { omitApiSpec?: boolean } = {}): string =>
+    [
+      `role: ${roleId}`,
+      "entries:",
+      "  - kind: file",
+      "    path: src/delivery",
+      "    purpose: 实施写集",
+      ...(options.omitApiSpec === true
+        ? []
+        : ["  - kind: file", `    path: 角色卡/${roleId}/api-spec.md`, "    purpose: 接口说明"]),
+      "  - kind: file",
+      `    path: 角色卡/${roleId}/memo.md`,
+      "    purpose: 备忘录",
+      "  - kind: file",
+      `    path: 角色卡/${roleId}/functional-description.md`,
+      "    purpose: 模块说明",
+      "  - kind: file",
+      `    path: 角色卡/${roleId}/feature-map.md`,
+      "    purpose: 功能导航",
+      "  - kind: file",
+      `    path: 角色卡/${roleId}/role-card.md`,
+      "    purpose: 角色卡",
+      "",
+    ].join("\n");
+
+  const rootOk = makeTempProjectRoot("ans-boundary-reversed-ok-");
+  try {
+    const flowId = "flow-boundary-ok";
+    writeTeamPlanFile(rootOk, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(rootOk, flowId);
+    writeAcceptanceCriteriaFile(rootOk, flowId);
+    await seedAppointmentDecision(rootOk, flowId, ["executor"]);
+    writeFullRoleArtifacts(rootOk, "executor");
+    writeFileSync(path.join(rootOk, "角色卡", "executor", "boundary.yaml"), reversedBoundary("executor"), "utf8");
+    const harness = await makePostWriteHarness(rootOk, ["executor"], () => true);
+    try {
+      await triggerPostWrite(harness, rootOk, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 1, 6000);
+      assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 0, "逆序不影响必填条目覆盖判定");
+      assert.equal(
+        readFlowStepsForTest(rootOk, flowId)!.find((step) => step.id === "role-cards")?.status,
+        "done",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(rootOk, { recursive: true, force: true });
+  }
+
+  const rootBad = makeTempProjectRoot("ans-boundary-reversed-missing-");
+  try {
+    const flowId = "flow-boundary-missing";
+    writeTeamPlanFile(rootBad, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(rootBad, flowId);
+    writeAcceptanceCriteriaFile(rootBad, flowId);
+    await seedAppointmentDecision(rootBad, flowId, ["executor"]);
+    writeFullRoleArtifacts(rootBad, "executor");
+    writeFileSync(
+      path.join(rootBad, "角色卡", "executor", "boundary.yaml"),
+      reversedBoundary("executor", { omitApiSpec: true }),
+      "utf8",
+    );
+    const harness = await makePostWriteHarness(rootBad, ["executor"], () => true);
+    try {
+      await triggerPostWrite(harness, rootBad, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) >= 1, 6000);
+      assert.match(
+        harness.sendsByRole.get("nominator")![0]!,
+        /entries 缺少角色根工作文档条目 角色卡\/executor\/api-spec\.md/,
+        "遍历全部条目而非只看前几条",
+      );
+      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "缺必填条目：不派 readiness");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(rootBad, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 防自激：稳定状态重复刷新 10 次不产生新派发/反馈/project:changed", async () => {
+  const root = makeTempProjectRoot("ans-role-cards-no-selfexcite-");
+  try {
+    const flowId = "flow-no-selfexcite";
+    writeTeamPlanFile(root, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(root, flowId);
+    writeAcceptanceCriteriaFile(root, flowId);
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    writeFullRoleArtifacts(root, "executor");
+    // 导入刷新探针直接推进一次（无 Crew 事件）。
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 1, 8000);
+      const changedDeadline = Date.now() + 3000;
+      while (harness.projectChanged() === 0 && Date.now() < changedDeadline) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      const changedAfterDispatch = harness.projectChanged();
+      assert.ok(changedAfterDispatch >= 1, "实际派发触发 project:changed");
+      for (let i = 0; i < 10; i += 1) {
+        await harness.iface.listProject({ projectRoot: root });
+        await new Promise((resolve) => setTimeout(resolve, 60));
+      }
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      assert.equal(harness.sendsByRole.get("convener")!.length, 1, "10 次刷新不重复派发");
+      assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 0, "10 次刷新不重复反馈");
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 1, "账本仍恰一条");
+      assert.equal(harness.projectChanged(), changedAfterDispatch, "稳定状态不再 emitProjectChanged（无 listProject→check→changed 循环）");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 readiness 文案兼容：未传新选项时 v1/v2/v3 逐字不变；传入只追加新句", () => {
+  const flowId = "flow-readiness-compat";
+  const planRel = `docs/scheduling/${flowId}-team-v1.md`;
+  // v1/v2/v3 三种既有调用：未传新选项 ⇒ 不含任何新句，且传入新选项时旧文案是**前缀**（逐字不变）。
+  for (const options of [
+    {},
+    { teamPlanSchema: 2 as const, modules: ["storefront"] },
+    { teamPlanSchema: 3 as const, modules: ["module-a"], directories: ["src/module-a/"], implementationDirs: ["module-a→src/module-a/"] },
+  ]) {
+    const base = buildRoleReadinessTaskMessage(flowId, ["executor"], planRel, 1, options);
+    assert.doesNotMatch(base, /role-cards 标为 done/, "未传新选项：不出现 role-cards done 句");
+    assert.doesNotMatch(base, /不要重做角色就绪复核/, "未传新选项：不出现 readiness 已 done 句");
+    const extended = buildRoleReadinessTaskMessage(flowId, ["executor"], planRel, 1, {
+      ...options,
+      roleCardsDone: { evidenceRef: `.ans/governance/role-cards/${flowId}/abc.json` },
+      roleReadinessAlreadyDone: true,
+    });
+    assert.ok(extended.startsWith(base), "传入新选项只追加、不改写既有文案");
+    assert.match(extended, /应用已在结构校验通过后把 role-cards 标为 done/);
+    assert.match(extended, /只推进 role-readiness，不要重写角色卡、不要重新派 Crew/);
+    assert.match(extended, /role-readiness 已 done：不要重做角色就绪复核，核对既有记录与证据后继续推进后续步骤/);
+  }
+});
+
+test("2026-10-23 S5 回归：flow 缺 role-cards 同指纹连续 settle/refresh ⇒ Convener 反馈恰一次、无重复 projectChanged；内容变化再反馈；补步骤后收口派 readiness 恰一次", async () => {
+  const root = makeTempProjectRoot("ans-role-cards-defect-loop-");
+  try {
+    const flowId = "flow-defect-loop";
+    writeTeamPlanFile(root, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(root, flowId, { roleCards: false });
+    writeAcceptanceCriteriaFile(root, flowId);
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    writeFullRoleArtifacts(root, "executor");
+    const harness = await makePostWriteHarness(root, ["executor"], () => true);
+    try {
+      // 首条 flow 缺陷反馈（探针/完整检查）。
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 1, 8000);
+      assert.match(harness.sendsByRole.get("convener")![0]!, /流程状态 YAML 未通过结构校验/);
+      // 让 Convener 本轮结束：否则重复消息只会排队、暴露不出「同指纹重复反馈」缺陷（S5 e2e 形态）。
+      harness.settles.get("convener")?.();
+      // 治理角色 settle 自身也会异步刷新 listing 并 emit（既有设计）：先等它落定，再取基线。
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const changedDeadline = Date.now() + 3000;
+      while (harness.projectChanged() === 0 && Date.now() < changedDeadline) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      const changedAfterFirst = harness.projectChanged();
+      assert.ok(changedAfterFirst >= 1, "首条反馈触发一次 project:changed");
+      // 同指纹连续刷新（探针每次都会排完整检查）+ appointment-write 触发：不得重复反馈、不得重复
+      // project:changed。注意：不再反复 settle Convener——治理角色 settle 自身按既有设计会刷新 listing，
+      // 会把「检查产生的 emit」与既有 settle 刷新混在一起；首条反馈后 Convener 已空闲，重复消息会直接可见。
+      for (let i = 0; i < 6; i += 1) {
+        await triggerPostWrite(harness, root, flowId);
+        await harness.iface.listProject({ projectRoot: root });
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      assert.equal(harness.sendsByRole.get("convener")!.length, 1, "同指纹：Convener 反馈恰一次（S5 回归）");
+      assert.equal(harness.projectChanged(), changedAfterFirst, "同指纹重复检查不再 emitProjectChanged");
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "flow 缺陷：不派 readiness");
+      assert.equal(harness.customerCalls.length, 0, "无客户卡");
+      // 内容变化（指纹变化）⇒ 再次反馈一次。
+      writeFileSync(
+        path.join(root, "角色卡", "executor", "memo.md"),
+        "# 备忘录\n\n- 2026-10-23：测试夹具建立。\n- 2026-10-23：内容变化（指纹变化）。\n",
+        "utf8",
+      );
+      await triggerPostWrite(harness, root, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 2, 6000);
+      harness.settles.get("convener")?.();
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      assert.equal(harness.sendsByRole.get("convener")!.length, 2, "内容变化后恰再次反馈一次（不循环）");
+      // 补上 flow 的 role-cards 步骤 ⇒ 收口成功并派 readiness 恰一次。
+      writeRoleCardsFlowFixture(root, flowId);
+      await triggerPostWrite(harness, root, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 3, 8000);
+      assert.equal(await waitForConvenerDispatchCount(root, flowId, 1), 1, "补步骤后 readiness 恰一次");
+      assert.equal(
+        readFlowStepsForTest(root, flowId)!.find((step) => step.id === "role-cards")?.status,
+        "done",
+        "补步骤后 role-cards 收口 done",
+      );
+      assert.match(harness.sendsByRole.get("convener")![2]!, /应用已在结构校验通过后把 role-cards 标为 done/);
+      assert.equal(harness.customerCalls.length, 0, "全程无客户卡");
+      assert.equal(
+        (await readGovernanceLedger(root)).entries.filter((entry) => entry.kind === "customer.decision").length,
+        1,
+        "全程只有 appointment 客户决定，无 customer.decision 新增",
+      );
+      // 收口后再次刷新：不重复派发。
+      harness.settles.get("convener")?.();
+      await harness.iface.listProject({ projectRoot: root });
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      assert.equal(harness.sendsByRole.get("convener")!.length, 3, "收口成功后不重复派发");
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 1);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————————————— i18n B3（2026-10-23）：主进程用户可见文本 en-US 断言（zh-CN 默认逐字不变） ——————————————
+// 设计：`docs/planning/2026-10-23_design_i18n.md` §4.11/§9.1 B3；验收：P3/P7/P8/P9/P11。
+// 旧 zh 断言全部保留在上述用例；本组只**新增** en-US 断言与「生成点 mainT 取当前 locale」的观察。
+test("i18n B3：主进程生成点按当前 locale 取词（en-US）；切回 zh-CN 后 zh 输出逐字不变", async () => {
+  const en = createMainI18n("en-US");
+  try {
+    // 纯逻辑生成点（mainT 读取进程当前 translator，与 main.ts/Interface 同一实例）。
+    assert.equal(mainT("main.session.youMessage", { text: "hi" }), "You: hi");
+    assert.equal(
+      mainT("main.session.dispatchRejectedEmpty"),
+      "Dispatch not accepted: roleId and task must both be non-empty.",
+    );
+    assert.equal(mainT("main.demo.message", { turn: 1, text: "hi" }), "(Demo runtime · turn 1) received: hi");
+    assert.equal(
+      mainT("main.watchdog.recoveryNote", { action: mainT("shared.common.stopTurn"), roleId: "A", executed: mainT("main.session.executed") }),
+      "System·Recovery · Stop turn · role A · executed",
+    );
+    const badImage = validateImage("image/x-icon", 10);
+    assert.equal(badImage.ok, false);
+    assert.match(badImage.error ?? "", /^Unsupported image type: image\/x-icon — only /);
+    const emptyImage = validateImage("image/png", 0);
+    assert.equal(emptyImage.ok, false);
+    if (!emptyImage.ok) assert.equal(emptyImage.error, "Image content is empty or cannot be read.");
+
+    assert.equal(readDeniedHumanReason("判断读取被拒：a.txt"), "Read denied: a.txt");
+    assert.equal(readDeniedHumanReason(""), "A required project file could not be read (no specific path recorded)");
+
+    const shell = describeShellCommand({ command: "ls -la", argv: ["ls", "-la"], cwd: "/tmp", toolCallId: "t1" });
+    assert.ok(shell.text.startsWith("Governed shell review · operator confirmation (third gate a)"), "shell 审核标题 en");
+    assert.ok(shell.text.includes("── Original command (verbatim, unprocessed) ──"), "命令原文标题 en");
+
+    assert.match(plainReasonFor("risky"), /^Automatic review judged this command risky —/);
+
+    assert.equal(formatDurationMs(65_000), "1 min 5 s");
+    assert.equal(formatDurationMs(3_600_000), "60 min 0 s", "毫秒格式化 ≤ 小时分支（既有口径）");
+    assert.equal(
+      recoveryReceiptSummary("A", "redeliver", true),
+      "System·Recovery · Redeliver task · role A · executed",
+    );
+
+    assert.equal(
+      judgeResultSummary({ group: "approval", cardKind: "proposal", flowId: "f" }),
+      "judge delegation · decision: accept proposal (accept) · flow f",
+    );
+
+    assert.equal(
+      governanceAcceptanceAdvanceNote("f"),
+      "Flow f: all steps are complete; acceptance review was dispatched to Proof automatically (working)",
+    );
+
+    const saved = await saveRuntimeConfig({ runtime: "demo", updates: {} });
+    assert.equal(saved.ok, false);
+    assert.equal(saved.error, "The demo runtime needs no configuration.");
+
+    assert.equal(
+      mainT("main.history.invalidRequest"),
+      "History requests must specify the project, role, and runtime.",
+    );
+
+    // 2026-10-23 PM 补 key（21 新增 + 3 复用）：用户可见接线点 en。
+    assert.equal(mainT("main.session.releaseNoSession", { roleId: "A" }), "Role A has no open session.");
+    assert.equal(
+      mainT("main.session.clarificationDelivery", { question: "q" }),
+      "Draft (proposal) needs clarification: q",
+    );
+    assert.equal(
+      mainT("main.session.delivery.receivedDispatch", { role: "Crew" }),
+      "Received a dispatched task from Crew — follow the task text and hand back a report when done.",
+    );
+    assert.equal(
+      mainT("main.session.delivery.handbackFailedShort", { sourceRoleId: "A", detail: "x" }),
+      "Handback delivery failed (from A): x",
+    );
+    assert.equal(mainT("main.session.rebuildChangedRuntimeConfig"), "runtime configuration");
+    assert.equal(mainT("main.session.install.verbInstall"), "install");
+    assert.equal(mainT("main.session.install.verbUninstall"), "uninstall");
+    assert.equal(mainT("ui.events.dispatchTask"), "Dispatched task");
+    assert.equal(mainT("main.customerInput.judgeWriteHeadZero"), "judge delegation · approval: confirm writing 0 paths");
+    assert.equal(
+      mainT("main.customerInput.judgeWriteHeadOverflow", { count: 4, paths: "a、b、c" }),
+      "judge delegation · approval: confirm writing 4 paths (a、b、c, etc.)",
+    );
+    assert.equal(mainT("main.customerInput.autoApprovalLabel"), "Auto-approval");
+    assert.equal(mainT("main.customerInput.autoDecisionLabel"), "Auto-decision");
+    assert.equal(mainT("main.watchdog.repeatFailUnknown"), "(unknown)");
+    assert.equal(mainT("ui.composer.imageFallbackName"), "Image");
+    assert.equal(
+      mainT("main.watchdog.signalSummary", { signal: "Command timeout", roleId: "A" }),
+      "System·Watchdog · Command timeout · role A",
+    );
+    assert.equal(
+      mainT("main.watchdog.queueStuckSummary", { signal: "Queue backlog", roleId: "A", depth: 2 }),
+      "System·Watchdog · Queue backlog · role A (depth 2)",
+    );
+    assert.equal(
+      mainT("main.watchdog.repeatFailSummary", { signal: "Repeated failures", roleId: "A", count: 3 }),
+      "System·Watchdog · Repeated failures · role A (3 times)",
+    );
+    assert.equal(mainT("main.interface.docEmpty"), "File is empty (body required)");
+    assert.equal(mainT("main.interface.boundaryDeclaredMissing"), "not provided");
+    assert.equal(
+      mainT("main.interface.teamPlanMissingNoRoles"),
+      "Missing team plan/appointment list; card-writing task not dispatched",
+    );
+    assert.match(
+      mainT("main.interface.roleCardsStepMissing", { stepId: "role-cards" }),
+      /^The flow is missing the step with id "role-cards"/,
+    );
+    assert.equal(mainT("main.interface.readErrorExistingSuffix"), " (existing/legacy: warning only)");
+    assert.equal(
+      mainT("main.interface.queueRecoveredLine", { kind: "Handback", summary: "s", roleId: "A", runtime: "pi" }),
+      "- [Handback] s (role A · pi)",
+    );
+    assert.equal(
+      mainT("main.interface.staleStepFact", { stepId: "s1", owner: "A", status: "dispatched" }),
+      "- Step s1 (owner: A, status: dispatched)",
+    );
+    // 最后两项补 key + 复用角色名：en/zh 逐字。
+    assert.equal(mainT("main.session.dispatchModelNote"), " (trio: Steward or Lead)");
+    assert.equal(
+      mainT("main.interface.teamPlanMissingBoundHint", { plan: "docs/scheduling/f-team-v1.md" }),
+      " (appointment ledger bound to docs/scheduling/f-team-v1.md)",
+    );
+    assert.equal(mainT("ui.role.governance.crew.name"), "Crew");
+    assert.equal(mainT("ui.role.governance.steward.name"), "Steward");
+    // 复用项的生成点：未知图片类型 → (unknown)；空文件名 → Image。
+    const unknownImage = validateImage("", 10);
+    assert.equal(unknownImage.ok, false);
+    if (!unknownImage.ok) assert.match(unknownImage.error, /^Unsupported image type: \(unknown\) — only /);
+    assert.equal(sanitizeImageName(""), "Image");
+
+    const page = renderRecoveryPage();
+    assert.ok(page.includes('lang="en-US"'), "恢复页 lang 随 locale");
+    assert.ok(page.includes("Interface needs recovery") && page.includes("Reload interface"), "恢复页文案 en");
+
+    // Interface 生成点：注入 en translator 后，历史请求错误按 en 生成（mainT 同实例）。
+    const iface = createDesktopInterface({
+      pickDirectory: async () => "/proj",
+      emitEvent: () => {},
+      listProjectFn: async () => FAKE_LISTING,
+      mainI18n: en,
+    });
+    await assert.rejects(
+      () => iface.getSessionHistory({} as never),
+      { message: "History requests must specify the project, role, and runtime." },
+    );
+
+    // 切回 zh-CN：同一生成点恢复逐字中文（旧断言口径）。
+    createMainI18n("zh-CN");
+    assert.equal(mainT("main.session.youMessage", { text: "hi" }), "你：hi");
+    assert.equal(mainT("main.session.dispatchRejectedEmpty"), "派发未受理：roleId 与 task 都必须非空。");
+    assert.equal(readDeniedHumanReason("判断读取被拒：a.txt"), "读取被拒：a.txt");
+    assert.equal(formatDurationMs(65_000), "1 分 5 秒");
+    assert.equal(
+      judgeResultSummary({ group: "approval", cardKind: "proposal", flowId: "f" }),
+      "judge 代批 · 代决策：接受提案（accept） · 流程 f",
+    );
+    assert.equal(
+      governanceAcceptanceAdvanceNote("f"),
+      "流程 f 步骤已全部完成，已自动派发验收复核给 Proof（工作中）",
+    );
+    assert.equal(mainT("main.session.releaseNoSession", { roleId: "A" }), "角色 A 没有打开的会话。");
+    assert.equal(
+      mainT("main.customerInput.judgeWriteHeadOverflow", { count: 4, paths: "a、b、c" }),
+      "judge 代批 · 代审批：确认写入 4 个路径（a、b、c等 4 个）",
+    );
+    assert.equal(
+      mainT("main.interface.queueRecoveredLine", { kind: "回交", summary: "s", roleId: "A", runtime: "pi" }),
+      "- [回交] s（角色 A · pi）",
+    );
+    assert.match(
+      mainT("main.interface.roleCardsStepMissing", { stepId: "role-cards" }),
+      /^流程缺少 id 为 "role-cards" 的步骤/,
+    );
+    assert.equal(
+      mainT("main.watchdog.signalSummary", { signal: "命令超时", roleId: "A" }),
+      "系统·看护 · 命令超时 · 角色 A",
+    );
+    assert.equal(mainT("main.session.dispatchModelNote"), "（trio：Steward（统筹）或主理 Lead）");
+    assert.equal(
+      mainT("main.interface.teamPlanMissingBoundHint", { plan: "docs/scheduling/f-team-v1.md" }),
+      "（账本 appointment 绑定 docs/scheduling/f-team-v1.md）",
+    );
+    assert.equal(mainT("ui.role.governance.crew.name"), "Crew / 组队");
+    assert.equal(mainT("ui.role.governance.steward.name"), "Steward / 统筹");
+    const unknownImageZh = validateImage("", 10);
+    assert.equal(unknownImageZh.ok, false);
+    if (!unknownImageZh.ok) assert.match(unknownImageZh.error, /^图片类型不支持：（未知）——只支持 /);
+    assert.equal(sanitizeImageName(""), "图片");
+    assert.match(renderRecoveryPage(), /lang="zh-CN"/);
+  } finally {
+    createMainI18n("zh-CN");
+    renderRecoveryPage();
+  }
+});
+
+// —————— i18n B4（2026-10-23）：共享设置元数据 key 化后，主进程视图解析回渲染层契约 ——————
+// 设计：`docs/planning/2026-10-23_design_i18n.md` §4.9/§9.1 B4；验收：P7/P9。
+// 旧 zh 断言全部保留在上述用例；本组只**新增** en-US 断言与字段集/契约不变的观察。
+test("i18n B4：getRuntimeConfig 视图按当前 locale 解析 label/help/choiceLabels（key 字段不进 IPC）；字段集/必填/choices 不变；demo 走共享 key", async () => {
+  const root = makeTempProjectRoot("ans-i18n-b4-");
+  const en = createMainI18n("en-US");
+  try {
+    const envPath = path.join(root, "fake.env");
+    const iface = createDesktopInterface({
+      pickDirectory: async () => null,
+      emitEvent: () => {},
+      envFilePath: envPath,
+      piConfigEnv: {},
+      mainI18n: en,
+    });
+    try {
+      const pi = await iface.getRuntimeConfig("pi");
+      const byKey = Object.fromEntries(pi.fields.map((field) => [field.key, field]));
+      // en-US 目录文案（主进程解析，不是共享模块里的第二份中文）。
+      assert.equal(byKey.ANTHROPIC_AUTH_TOKEN.label, "Access token");
+      assert.equal(byKey.ANS_PI_CONTEXT_WINDOW.label, "Context window");
+      assert.equal(
+        byKey.ANS_PI_CONTEXT_WINDOW.help,
+        "Drag to pick a preset; maximum 1M tokens. Leave empty for the system default (500k). Applied when the next session opens.",
+      );
+      assert.deepEqual(byKey.ANS_PI_CONTEXT_WINDOW.choiceLabels, ["System default (500k)", "32k", "64k", "128k", "256k", "500k", "1M"]);
+      assert.deepEqual(byKey.ANS_PI_REASONING_EFFORT.choiceLabels, ["Off", "Low", "Medium", "High", "XHigh"]);
+      // 渲染层 IPC 契约不变：key 字段不出现；字段集/必填/choices 与注册表逐项一致。
+      assert.deepEqual(pi.fields.map((field) => field.key), RUNTIME_SETTINGS.pi.fields.map((field) => field.key));
+      assert.deepEqual(pi.fields.map((field) => field.required), RUNTIME_SETTINGS.pi.fields.map((field) => field.required));
+      assert.deepEqual(byKey.ANS_PI_CONTEXT_WINDOW.choices, RUNTIME_SETTINGS.pi.fields.find((field) => field.key === "ANS_PI_CONTEXT_WINDOW")!.choices);
+      assert.equal(byKey.ANS_PI_CONTEXT_WINDOW.control, "range");
+      assert.deepEqual(byKey.ANS_PI_CONTEXT_WINDOW.integer, { min: 1 });
+      assert.equal(byKey.ANTHROPIC_AUTH_TOKEN.secret, true);
+      for (const field of pi.fields) {
+        assert.equal(Object.hasOwn(field, "labelKey"), false, `${field.key} 不暴露 labelKey`);
+        assert.equal(Object.hasOwn(field, "helpKey"), false, `${field.key} 不暴露 helpKey`);
+        assert.equal(Object.hasOwn(field, "choiceLabelKeys"), false, `${field.key} 不暴露 choiceLabelKeys`);
+      }
+      // 品牌名不翻译；demo 显示名走 `RUNTIME_LABEL_KEYS.demo`（en Demo）。
+      assert.equal((await iface.getRuntimeConfig("codex")).label, "Codex");
+      assert.equal((await iface.getRuntimeConfig("claude")).label, "Claude");
+      assert.equal((await iface.getRuntimeConfig("demo")).label, "Demo");
+      // Interface 保存链的校验错误同样按当前 locale（label/choiceLabels 已解析；不回显提交值）。
+      const bad = await iface.saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_REASONING_EFFORT: "max" } });
+      assert.equal(bad.ok, false);
+      assert.equal(
+        bad.error,
+        "Invalid value for Reasoning effort: only Off / Low / Medium / High / XHigh is accepted (or leave empty to keep the platform default).",
+      );
+      assert.equal((bad.error ?? "").includes("max"), false, "错误不回显提交值原文");
+    } finally {
+      await iface.stopSession();
+    }
+    // 切回 zh-CN：同一视图/错误逐字中文（旧断言口径不变；P7）。
+    createMainI18n("zh-CN");
+    const zh = createDesktopInterface({
+      pickDirectory: async () => null,
+      emitEvent: () => {},
+      envFilePath: envPath,
+      piConfigEnv: {},
+    });
+    try {
+      const pi = await zh.getRuntimeConfig("pi");
+      const field = pi.fields.find((candidate) => candidate.key === "ANS_PI_CONTEXT_WINDOW")!;
+      assert.equal(field.label, "上下文窗口");
+      assert.equal(field.help, "拖动选择预设档位，最大 1M tokens；留空＝系统默认（500k）；下一次开启会话时应用。");
+      assert.deepEqual(field.choiceLabels, ["系统默认（500k）", "32k", "64k", "128k", "256k", "500k", "1M"]);
+      assert.equal((await zh.getRuntimeConfig("demo")).label, "演示");
+      const bad = await zh.saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_PROMPT_TIMEOUT_MS: "abc" } });
+      assert.equal(bad.ok, false);
+      assert.ok(
+        (bad.error ?? "").startsWith("看护检查时限取值无效：仅接受 系统默认（5 分钟） / "),
+        "zh 错误逐字（label 与 choiceLabels 来自目录，与迁移前字面量一致）",
+      );
+    } finally {
+      await zh.stopSession();
+    }
+  } finally {
+    createMainI18n("zh-CN");
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————————————— 2026-10-23 验收返工路由：onAutoRework 接线 / 最新 accepted-rejected / record / 系统行 ——————————————
+
+/** 最小机器状态 YAML（交付 done + 验收 pending）。 */
+function reworkFlowYaml(flowId: string): string {
+  return [
+    `flowId: ${flowId}`,
+    "version: 1",
+    "qualityTier: production",
+    "steps:",
+    "  - id: delivery-server",
+    "    title: 交付",
+    "    owner: executor",
+    "    kind: dispatch",
+    "    status: done",
+    "    evidence:",
+    "      kind: dispatch",
+    "      ref: delivery-server",
+    "  - id: verification",
+    "    title: 验收",
+    "    owner: app",
+    "    kind: acceptance",
+    "    status: pending",
+  ].join("\n");
+}
+
+function reworkReport(items: ReadonlyArray<{ id: string; owner: string; action: string }>): string {
+  return [
+    "# 验收报告",
+    "",
+    "```yaml",
+    "schema: acceptance-rework/v1",
+    "items:",
+    ...items.flatMap((item) => [`  - id: ${item.id}`, `    owner: ${item.owner}`, `    action: ${item.action}`]),
+    "```",
+    "",
+  ].join("\n");
+}
+
+test("2026-10-24 治理协调唤醒：阻塞阶段→Lead；同 revision/阶段去重；Lead busy 不并发注入；同阶段预算 2 次；不派 Proof", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "ans-coordination-wake-"));
+  try {
+    const flowId = "flow-coordination";
+    mkdirSync(path.join(root, "docs", "flows"), { recursive: true });
+    const writeCoordFlow = (marker: string): void => {
+      writeFileSync(
+        path.join(root, "docs", "flows", `${flowId}.yaml`),
+        [
+          `flowId: ${flowId}`,
+          "version: 1",
+          "qualityTier: production",
+          "steps:",
+          "  - id: impl",
+          `    title: 实现（${marker}）`,
+          "    owner: executor",
+          "    kind: dispatch",
+          "    status: failed",
+          "  - id: verification",
+          "    title: 验收",
+          "    owner: app",
+          "    kind: acceptance",
+          "    status: pending",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+    };
+    writeCoordFlow("rev-a");
+    const listing: ProjectListing = { ...listingWithProjectRoles({ ...trioListing(), projectRoot: root }, ["executor"]), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const events: SessionEventEnvelope[] = [];
+    const controls = new Map<string, ReturnType<typeof scriptedGovernanceHandle>>();
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: (envelope) => { events.push(envelope); },
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        const sends: string[] = [];
+        sendsByRole.set(input.roleId, sends);
+        const made = scriptedGovernanceHandle(sends);
+        controls.set(input.roleId, made);
+        return made.handle;
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    });
+    const coordinationSends = (roleId: string): string[] =>
+      (sendsByRole.get(roleId) ?? []).filter((text) => text.startsWith("[系统·治理协调]"));
+    try {
+      await iface.listProject({ projectRoot: root });
+      await waitForTest(() => coordinationSends("rapporteur").length === 1, 4000);
+      const first = coordinationSends("rapporteur")[0]!;
+      assert.match(first, /流程 flow-coordination 的阶段需要主理协调/, "协调任务投 Lead（primaryRoleId）");
+      assert.match(first, /阶段：存在 failed \/ blocked \/ aborted 步骤/, "阻塞阶段被识别");
+      assert.match(first, /impl 当前状态 failed/, "带具体步骤事实");
+      assert.match(first, /协调不是客户批准/, "协调 ≠ 客户批准");
+      assert.match(first, /不要直接派 Crew \/ Proof \/ 项目 worker/, "不越权");
+      assert.equal((sendsByRole.get("verifier") ?? []).length, 0, "协调唤醒不派 Proof");
+      assert.equal((sendsByRole.get("convener") ?? []).length, 0, "协调唤醒不派 Steward");
+
+      // Lead busy（首条协调投递未 settle）⇒ 新 revision 也不并发注入。
+      writeCoordFlow("rev-b");
+      await iface.listProject({ projectRoot: root });
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      assert.equal(coordinationSends("rapporteur").length, 1, "Lead busy ⇒ 不并发注入（等下一次真实事件）");
+
+      // Lead settle 后的下一次真实事件 ⇒ 新 revision 再唤醒一次（同阶段第 2 次）。
+      controls.get("rapporteur")!.settle();
+      await waitForTest(() => coordinationSends("rapporteur").length === 2, 4000);
+      assert.match(coordinationSends("rapporteur")[1]!, /实现（rev-b）|revision：/, "新 revision 的协调任务可见");
+
+      // 同阶段第 3 次（新 revision）⇒ 同阶段预算 2 次，停止协调唤醒；真实回交/状态行不受预算影响。
+      controls.get("rapporteur")!.settle();
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      writeCoordFlow("rev-c");
+      await iface.listProject({ projectRoot: root });
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      assert.equal(coordinationSends("rapporteur").length, 2, "同阶段最多 2 次协调唤醒（预算）");
+      // 阻塞状态行仍如实存在（不经预算）：被预算只停协调唤醒，不丢真实状态。
+      assert.ok(
+        deliveryNoteSummaries(events, "rapporteur").some((note) => note.includes("自动验收未派发")),
+        "真实状态行不被预算丢弃",
+      );
+      assert.equal((sendsByRole.get("verifier") ?? []).length, 0, "始终不派 Proof（非发布 + 阻塞）");
+    } finally {
+      await iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-24 P0-1 发布门（Interface）：非发布不派 Proof/不写标准；flow.release=true 才派 verifier", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "ans-interface-release-gate-"));
+  try {
+    const flowId = "flow-release-gate";
+    const flowPath = path.join(root, "docs", "flows", `${flowId}.yaml`);
+    mkdirSync(path.dirname(flowPath), { recursive: true });
+    const flowLines = [
+      `flowId: ${flowId}`,
+      "version: 1",
+      "qualityTier: production",
+      "steps:",
+      "  - id: nomination",
+      "    title: 提名",
+      "    owner: nominator",
+      "    kind: customer-decision",
+      "    status: done",
+      "    evidence:",
+      "      kind: customer-decision",
+      "      ref: appointment",
+      "  - id: contract-freeze",
+      "    title: 契约",
+      "    owner: rapporteur",
+      "    kind: artifact",
+      "    status: done",
+      "    evidence:",
+      "      kind: artifact",
+      `      ref: docs/contracts/${flowId}-api-v1.md`,
+      "  - id: delivery-server",
+      "    title: 交付",
+      "    owner: executor",
+      "    kind: dispatch",
+      "    status: done",
+      "    evidence:",
+      "      kind: dispatch",
+      "      ref: delivery-server",
+      "  - id: verification",
+      "    title: 验收",
+      "    owner: app",
+      "    kind: acceptance",
+      "    status: pending",
+    ];
+    const writeReleaseFlow = (release: boolean): void => {
+      writeFileSync(flowPath, [...flowLines.slice(0, 3), ...(release ? ["release: true"] : []), ...flowLines.slice(3), ""].join("\n"), "utf8");
+    };
+    writeReleaseFlow(false);
+    await appendGovernanceLedger(root, {
+      at: new Date().toISOString(),
+      kind: "customer.decision",
+      flowId,
+      stepId: "nomination",
+      decisionKind: "appointment",
+      customerDecision: "appointed",
+      actorRoleId: "nominator",
+      power: "nomination",
+    });
+    await appendGovernanceLedger(root, {
+      at: new Date().toISOString(),
+      kind: "artifact.observed",
+      artifactPath: `docs/contracts/${flowId}-api-v1.md`,
+      actorRoleId: "rapporteur",
+      power: "proposal",
+    });
+    await appendGovernanceLedger(root, {
+      at: new Date().toISOString(),
+      kind: "dispatch.accepted",
+      flowId,
+      stepId: "delivery-server",
+      actorRoleId: "convener",
+      power: "schedule",
+      targetRoleId: "executor",
+    });
+    const sendsByRole = new Map<string, string[]>();
+    const events: SessionEventEnvelope[] = [];
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: (envelope) => { events.push(envelope); },
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        const sends: string[] = [];
+        sendsByRole.set(input.roleId, sends);
+        return scriptedGovernanceHandle(sends).handle;
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    });
+    const listing: ProjectListing = { ...listingWithProjectRoles({ ...trioListing(), projectRoot: root }, ["executor"]), projectRoot: root };
+    try {
+      await iface.listProject({ projectRoot: root });
+      await waitForTest(
+        () => deliveryNoteSummaries(events, "rapporteur").some((note) => note.includes("awaiting-release-acceptance")),
+        4000,
+      );
+      assert.equal((sendsByRole.get("verifier") ?? []).length, 0, "非发布：不派 verifier/Proof");
+      assert.equal(existsSync(path.join(root, "docs", "acceptance", `${flowId}-criteria-v1.md`)), false, "非发布：不写 acceptance-criteria");
+      assert.equal((await readGovernanceLedger(root)).entries.filter((entry) => entry.kind === "dispatch.accepted" && entry.targetRoleId === "verifier").length, 0, "非发布：无 verifier 派发账本");
+      // 显式发布标记 ⇒ 下一次真实事件才派 verifier。
+      writeReleaseFlow(true);
+      await iface.listProject({ projectRoot: root });
+      await waitForTest(() => (sendsByRole.get("verifier")?.length ?? 0) > 0, 4000);
+      assert.equal(sendsByRole.get("verifier")!.length, 1, "release:true ⇒ 恰一次 verifier 派发");
+      assert.match(sendsByRole.get("verifier")![0]!, /请汇总证据并出验收卡/);
+      assert.equal((await readGovernanceLedger(root)).entries.filter((entry) => entry.kind === "dispatch.accepted" && entry.targetRoleId === "verifier").length, 1, "发布流程写 verifier 派发账本");
+      await waitForTest(
+        () => deliveryNoteSummaries(events, "rapporteur").some((note) => /已自动派发验收复核给 Proof/.test(note)),
+        4000,
+      );
+    } finally {
+      await iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-23 验收返工路由：routeAcceptanceAutoRework 接线（judge 来源自动决策系统行、record、不自造客户决定）；最新 rejected 路由 / 最新 accepted 收口", async () => {
+  const autoRoot = makeTempProjectRoot("ans-interface-rework-auto-");
+  const customerRoot = makeTempProjectRoot("ans-interface-rework-customer-");
+  const acceptedRoot = makeTempProjectRoot("ans-interface-rework-accepted-");
+  try {
+    // ① judge auto-rework：routeAcceptanceAutoRework（main.ts onAutoRework 的接线目标）。
+    const autoFlowId = "flow-iface-auto";
+    mkdirSync(path.join(autoRoot, "docs", "flows"), { recursive: true });
+    writeFileSync(path.join(autoRoot, "docs", "flows", `${autoFlowId}.yaml`), reworkFlowYaml(autoFlowId), "utf8");
+    mkdirSync(path.join(autoRoot, "docs", "acceptance"), { recursive: true });
+    writeFileSync(path.join(autoRoot, "docs", "acceptance", `${autoFlowId}-report-v1.md`), reworkReport([{ id: "F1", owner: "executor", action: "修复" }]), "utf8");
+    await appendGovernanceLedger(autoRoot, {
+      at: new Date().toISOString(),
+      kind: "dispatch.accepted",
+      flowId: autoFlowId,
+      stepId: "delivery-server",
+      actorRoleId: "convener",
+      power: "schedule",
+      targetRoleId: "executor",
+    });
+    const autoSends = new Map<string, string[]>();
+    const autoEvents: SessionEventEnvelope[] = [];
+    const autoListing: ProjectListing = { ...listingWithProjectRoles({ ...trioListing(), projectRoot: autoRoot }, ["executor"]), projectRoot: autoRoot };
+    const autoIface = createDesktopInterface({
+      pickDirectory: async () => autoRoot,
+      emitEvent: (envelope) => { autoEvents.push(envelope); },
+      listProjectFn: async () => autoListing,
+      openRoleSessionFn: async (input) => {
+        const sends: string[] = [];
+        autoSends.set(input.roleId, sends);
+        return quietGovernanceHandle(sends);
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    });
+    try {
+      await autoIface.listProject({ projectRoot: autoRoot });
+      const info = {
+        flowId: autoFlowId,
+        cardKind: "acceptance" as const,
+        source: "judge-manual" as const,
+        reasonCode: "timeout",
+        reason: "自动判断超时",
+        operatorId: "judge:pi",
+        engine: "pi" as const,
+        requestId: "op-iface-1",
+        roleId: "convener",
+        projectRoot: autoRoot,
+        runtime: "pi" as const,
+        at: new Date().toISOString(),
+      };
+      await autoIface.routeAcceptanceAutoRework(info);
+      await waitForTest(() => (autoSends.get("rapporteur")?.length ?? 0) > 0, 3000);
+      assert.equal(autoSends.get("rapporteur")!.length, 1, "onAutoRework 接线 ⇒ 恰一条 Lead 返工任务");
+      assert.match(autoSends.get("rapporteur")![0]!, /自动决策未完成（自动退回）/);
+      assert.ok(!/客户拒绝/.test(autoSends.get("rapporteur")![0]!), "judge 来源任务不写客户拒绝");
+      const autoNotes = deliveryNoteSummaries(autoEvents, autoListing.primaryRoleId);
+      assert.ok(autoNotes.some((note) => note.includes("自动决策未通过/未完成")), "PM key 系统行（自动来源）可见");
+      assert.ok(autoNotes.filter((note) => note.includes("客户拒绝")).length === 0, "judge 来源系统行不含客户拒绝");
+      const autoRecord = JSON.parse(
+        readFileSync(path.join(autoRoot, ".ans", "governance", "acceptance", autoFlowId, "rework-routing.json"), "utf8"),
+      ) as Record<string, unknown>;
+      assert.equal(autoRecord.schema, "acceptance-rework-routing/v1");
+      assert.equal(autoRecord.source, "judge");
+      assert.equal(autoRecord.status, "sent");
+      assert.equal(autoRecord.itemCount, 1);
+      const autoLedger = await readGovernanceLedger(autoRoot);
+      assert.equal(
+        autoLedger.entries.some((entry) => entry.kind === "customer.decision"),
+        false,
+        "judge auto-rework 不自造 customer.decision",
+      );
+      await autoIface.routeAcceptanceAutoRework({ ...info });
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      assert.equal(autoSends.get("rapporteur")!.length, 1, "同一 requestId/报告不重复路由");
+    } finally {
+      await autoIface.stopSession();
+    }
+
+    // ② 最新 rejected：导入检查读账本 ⇒ 路由 Convener + 客户拒绝系统行 + record。
+    const customerFlowId = "flow-iface-customer";
+    mkdirSync(path.join(customerRoot, "docs", "flows"), { recursive: true });
+    writeFileSync(path.join(customerRoot, "docs", "flows", `${customerFlowId}.yaml`), reworkFlowYaml(customerFlowId), "utf8");
+    mkdirSync(path.join(customerRoot, "docs", "acceptance"), { recursive: true });
+    writeFileSync(path.join(customerRoot, "docs", "acceptance", `${customerFlowId}-report-v1.md`), reworkReport([{ id: "F2", owner: "executor", action: "修复" }]), "utf8");
+    const now = Date.now();
+    await appendGovernanceLedger(customerRoot, {
+      at: new Date(now).toISOString(),
+      kind: "dispatch.accepted",
+      flowId: customerFlowId,
+      stepId: "delivery-server",
+      actorRoleId: "convener",
+      power: "schedule",
+      targetRoleId: "executor",
+    });
+    await appendGovernanceLedger(customerRoot, {
+      at: new Date(now + 1000).toISOString(),
+      kind: "customer.decision",
+      flowId: customerFlowId,
+      actorRoleId: "liaison",
+      power: "app",
+      decisionKind: "acceptance",
+      customerDecision: "rejected",
+      decisionEvidence: { kind: "customer-input" },
+    });
+    const customerSends = new Map<string, string[]>();
+    const customerEvents: SessionEventEnvelope[] = [];
+    const customerListing: ProjectListing = { ...listingWithProjectRoles({ ...trioListing(), projectRoot: customerRoot }, ["executor"]), projectRoot: customerRoot };
+    const customerIface = createDesktopInterface({
+      pickDirectory: async () => customerRoot,
+      emitEvent: (envelope) => { customerEvents.push(envelope); },
+      listProjectFn: async () => customerListing,
+      openRoleSessionFn: async (input) => {
+        const sends: string[] = [];
+        customerSends.set(input.roleId, sends);
+        return quietGovernanceHandle(sends);
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    });
+    try {
+      await customerIface.listProject({ projectRoot: customerRoot });
+      await waitForTest(() => (customerSends.get("rapporteur")?.length ?? 0) > 0, 4000);
+      // routed 系统行在 record sent 写之后发出：以它为准等待（避免 Windows 上轮询读取与 rename 竞争）。
+      await waitForTest(
+        () => deliveryNoteSummaries(customerEvents, customerListing.primaryRoleId).some((note) => note.includes("客户拒绝")),
+        4000,
+      );
+      assert.equal(customerSends.get("verifier")?.length ?? 0, 0, "最新 rejected 不派 Proof 返工");
+      const customerNotes = deliveryNoteSummaries(customerEvents, customerListing.primaryRoleId);
+      assert.ok(customerNotes.some((note) => note.includes("客户拒绝") && note.includes("实际接收方：rapporteur")), "系统行写明实际接收方（Lead）");
+      const customerRecord = JSON.parse(
+        readFileSync(path.join(customerRoot, ".ans", "governance", "acceptance", customerFlowId, "rework-routing.json"), "utf8"),
+      ) as Record<string, unknown>;
+      assert.equal(customerRecord.source, "customer");
+      assert.equal(customerRecord.sourceDetail, "customer-input");
+    } finally {
+      await customerIface.stopSession();
+    }
+
+    // ③ 先 rejected 后 accepted：最新 accepted ⇒ 收口、不路由。
+    const acceptedFlowId = "flow-iface-accepted";
+    mkdirSync(path.join(acceptedRoot, "docs", "flows"), { recursive: true });
+    writeFileSync(path.join(acceptedRoot, "docs", "flows", `${acceptedFlowId}.yaml`), reworkFlowYaml(acceptedFlowId), "utf8");
+    await appendGovernanceLedger(acceptedRoot, {
+      at: new Date(now).toISOString(),
+      kind: "dispatch.accepted",
+      flowId: acceptedFlowId,
+      stepId: "delivery-server",
+      actorRoleId: "convener",
+      power: "schedule",
+      targetRoleId: "executor",
+    });
+    await appendGovernanceLedger(acceptedRoot, {
+      at: new Date(now + 1000).toISOString(),
+      kind: "customer.decision",
+      flowId: acceptedFlowId,
+      actorRoleId: "liaison",
+      power: "app",
+      decisionKind: "acceptance",
+      customerDecision: "rejected",
+    });
+    await appendGovernanceLedger(acceptedRoot, {
+      at: new Date(now + 2000).toISOString(),
+      kind: "customer.decision",
+      flowId: acceptedFlowId,
+      actorRoleId: "liaison",
+      power: "app",
+      decisionKind: "acceptance",
+      customerDecision: "accepted",
+    });
+    const acceptedSends = new Map<string, string[]>();
+    const acceptedEvents: SessionEventEnvelope[] = [];
+    const acceptedListing2: ProjectListing = { ...listingWithProjectRoles({ ...trioListing(), projectRoot: acceptedRoot }, ["executor"]), projectRoot: acceptedRoot };
+    const acceptedIface = createDesktopInterface({
+      pickDirectory: async () => acceptedRoot,
+      emitEvent: (envelope) => { acceptedEvents.push(envelope); },
+      listProjectFn: async () => acceptedListing2,
+      openRoleSessionFn: async (input) => {
+        const sends: string[] = [];
+        acceptedSends.set(input.roleId, sends);
+        return quietGovernanceHandle(sends);
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    });
+    try {
+      await acceptedIface.listProject({ projectRoot: acceptedRoot });
+      await waitForTest(
+        () => deliveryNoteSummaries(acceptedEvents, acceptedListing2.primaryRoleId).some((note) => note.includes("验收已通过")),
+        4000,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      assert.equal(acceptedSends.get("convener")?.length ?? 0, 0, "最新 accepted ⇒ 不路由");
+      assert.equal(acceptedSends.get("verifier")?.length ?? 0, 0, "最新 accepted ⇒ 不派");
+      const parsed = parseFlowStateYaml(readFileSync(path.join(acceptedRoot, "docs", "flows", `${acceptedFlowId}.yaml`), "utf8"), acceptedFlowId);
+      assert.equal(parsed.ok, true);
+      if (parsed.ok) {
+        assert.equal(parsed.flow.steps.find((step) => step.kind === "acceptance")?.status, "done", "最新 accepted 收口");
+      }
+      assert.equal(
+        existsSync(path.join(acceptedRoot, ".ans", "governance", "acceptance", acceptedFlowId, "rework-routing.json")),
+        false,
+        "accepted 不写 routing record",
+      );
+    } finally {
+      await acceptedIface.stopSession();
+    }
+  } finally {
+    rmSync(autoRoot, { recursive: true, force: true });
+    rmSync(customerRoot, { recursive: true, force: true });
+    rmSync(acceptedRoot, { recursive: true, force: true });
   }
 });

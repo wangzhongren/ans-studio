@@ -1,0 +1,157 @@
+# i18n B1/B2 candidate hashes
+# generated: 2026-10-23 (local)
+# command per file: git hash-object <path> ; sha256sum <path>
+
+FILE app/renderer/src/App.tsx
+  blob   5ec29faf16547c84fc660f85429771edc57282af
+  sha256 d419a0cb1f061eedf775d4ab216798949307c11757e88910c2eac74c82351df0
+FILE app/renderer/src/main.tsx
+  blob   bd5084d90e8ffe2f60c45074aaa6b867b3ad0bf2
+  sha256 de80128f313dcc20741ac9c157466db795189178861761da1f84964dd4cad833
+FILE app/renderer/src/shell/TitleBar.tsx
+  blob   b5ae1f75e72b316f5c3a15d3b444c324eb270a23
+  sha256 6fcbf23f59275939c0f68a84062dc4cb03c0721ee4ed31f5fc9d2c8eb2612dc3
+FILE app/renderer/src/shell/Sidebar.tsx
+  blob   06de765033fda8af0638bc8eb9486240f233602b
+  sha256 1468ad25023581980c5d3dfc17c22318006b313715d4acd6403e926f447e3a32
+FILE app/renderer/src/shell/ChatHeader.tsx
+  blob   a9415dca39609e8bd772e8924c4daa42937f2025
+  sha256 73bfa960e7dbd07d68d2f3ec5fee9213e4d528718a7db5133ad75a44c795ab1a
+FILE app/renderer/src/shell/Composer.tsx
+  blob   7d7b1949a58786eb21730dfcc72fd8898f5c0039
+  sha256 c2eed0a6ab6b5dd3d179651076cf4a633e24cbe8420ec9e4e9a180f2781d5b80
+FILE app/renderer/src/shell/ConfirmCard.tsx
+  blob   3ae927ec7e661d0893350bd7df1c6eefb040548f
+  sha256 dbf9d2d9ec95939f2de9d5830ed7c8bda2423d3e1191672decb2e8b98b8b9295
+FILE app/renderer/src/shell/Drawer.tsx
+  blob   e5d1bd03e2bd0e71624a8527f5106356254f616c
+  sha256 46042e54298a21ea3c4b4475a76254aaf3e759bfee35721250d391f028405432
+FILE app/renderer/src/shell/EngineSelect.tsx
+  blob   752df7cc85196369f7a9ce09a0a8fc335af46819
+  sha256 3a0d0ec72885e4d1a7c562c9fb9ca8db5b334b6f99a827fd393af24da1880ac2
+FILE app/renderer/src/shell/SettingsPanel.tsx
+  blob   bd72e3598e49719b8992d239921fafb2b4f982ec
+  sha256 b32d26a782a36eacb0b1d179b258660f90ee62822e732961c666875d154d900f
+FILE app/renderer/src/shell/GovernancePanel.tsx
+  blob   9a1176755a4e931f8303fe7c555a574db5e4b61b
+  sha256 899f4373713df4d2af48837bf8e5da6fff329fd2dd83c5a5faf18514a68a34c5
+FILE app/renderer/src/shell/ReportCard.tsx
+  blob   571dad4b7f1d2f62eb7d3ddce3b1f4112520bc27
+  sha256 c29a2ef7d4e59066a85ccb3b625af94c7ba15448dd2f4f7e697c83e875ec24ed
+FILE app/renderer/src/shell/DocumentView.tsx
+  blob   2305e62ca0f58754f9d2c9cd7d4a3473337dc7f1
+  sha256 55d05c5d213dfe01b4a6a78e668f8e9bc44c627325f7d839bceaebdd9bd3ced0
+FILE app/renderer/src/shell/ProfilePanel.tsx
+  blob   43225790b26324059edc75173f63443014fe7072
+  sha256 3cc118d1c0dd7d99613811e644f72d51c23dddd27d182385f30c18a26e35a20d
+FILE app/renderer/src/shell/QueuePanel.tsx
+  blob   1f90fcf7b43c373b972152709267045015d53fa2
+  sha256 7ba24ab5d8b28ef581369342ff0a1db74e566e603a36cb4d8e62540b618d1c38
+FILE app/renderer/src/shell/QueueSubview.tsx
+  blob   0a511adec8da2bbd082381a5659f26a1e867a670
+  sha256 773b35a31e396109c9b0bca14f31958f454a8ea3bcbf441f71d8487efc527d2b
+FILE app/renderer/src/shell/WorkOverview.tsx
+  blob   acb67867b2bfae68b274ef82264e7cb4a1301e3d
+  sha256 37ecba1e5b67dd1d1b55912459711216a1ec7f0b0869de0a3e12fe59e210fbef
+FILE app/renderer/src/chat/status.ts
+  blob   ca211409cb39b9f5cfedd2be3093091f42abdd9d
+  sha256 00960b216bd586aea0a29e7a9d184895649b3ae060c0b6f69aa035de1516faa7
+FILE app/renderer/src/chat/runtime-config.ts
+  blob   f71983a7401ff25930794affa970279cbdaae922
+  sha256 fecf84cc21c461fdd8ce0ad8a86b85a10f58de025bbf8ffbd7be5289d8b74c9f
+FILE app/renderer/src/chat/role-view.ts
+  blob   4989595a36a58444cd805cfc3531af1716bc4539
+  sha256 62d6a4291131a933cfb28b9e8dc264811a7599f031697ce952657a3235351660
+FILE app/renderer/src/chat/governance-view.ts
+  blob   f365befb78d70021370edecd405b99b1d11c873d
+  sha256 c01a9d0fdb2f70ca3f89f839c94a7afee5e7808bddf988da8e804a8eaab98a58
+FILE app/renderer/src/chat/work-view.ts
+  blob   5bbf5f48eba18043cbcf6001d1fe3ed659e4aa03
+  sha256 d3e3cb39c61951bb38a808000545f052adea1d213b7aca7a0cec130152fde43c
+FILE app/renderer/src/chat/confirm-logic.ts
+  blob   1b0b754c2bc61c098a802277cb13361527d68916
+  sha256 d73add0740e49205a72b42ae7977af252cfcb9b17bcf8dfdb3c44494b69b05ad
+FILE app/renderer/src/chat/ChatRow.tsx
+  blob   62cc1f69ea5b04caa1a0a51b08e286f6d3e1b63d
+  sha256 37012bcde0202c2f460d29e85994b97d39ea871c7a4739895d41ebdd18d22f5a
+FILE app/renderer/src/chat/ChatStream.tsx
+  blob   5f2a8949af04adbd97302858df67a82b41d5b3fd
+  sha256 9a27cb0b653048d8037123e6c3e0c32314072fe0053bb0c35fc038d063d20c82
+FILE app/renderer/src/chat/chat-store.ts
+  blob   807b8b202ebdd5b98e9ef6133b6ef81c5cb294d8
+  sha256 6c5add9700c13d663fd0a6ef15a808355b325a5948779716bb34416b20c285f8
+FILE app/renderer/src/chat/document-view.ts
+  blob   902269c10bcc7b02fcefa44c80dc906dda025b71
+  sha256 4bf32a9d34f7ded97f2e1a83d7a10f3966d69142aa5178910080c608854be3ff
+FILE app/renderer/src/chat/events.ts
+  blob   b44ba33a7793acb86e40511a746d30d896299dc6
+  sha256 547cd43219027d7e815d6ded4327aec2179f26f780f4add6599268a90e62a182
+FILE app/renderer/src/chat/judge.ts
+  blob   21803c66119f5c469d7c448957bad8ef64800438
+  sha256 e4135e938108caa72d4fe8e29b58953ef322ac456493ec65fb903b960ee8cf30
+FILE app/renderer/src/chat/markdown.ts
+  blob   d047bdce729852835d6d204db759055a8f3bca74
+  sha256 c1b8692836e7bc8ffc7a9ad0892bebfc55c72f84387520081a75bfa7e41021f9
+FILE app/renderer/src/chat/operator-view.ts
+  blob   909fe48759783dd4d5a1332ef479c215417f50d3
+  sha256 2b90895e4cbe6f9b6fae9d9c951a3dfb564b3d395db39e7bde8e02035a27c749
+FILE app/renderer/src/chat/reasoning.ts
+  blob   fb42bdfdec395f8c979ad7f813aa1fbb092a7eb6
+  sha256 cc17729bed91ae0dfc6e1df322b1e03ae7110cbdbcaac5d786f6dfe8e7630f19
+FILE app/renderer/src/chat/report-view.ts
+  blob   4631265fb86ea940be714572f97c65b213acdd95
+  sha256 32a38a2c9501e89ec654eed4a390f6b80a9ce3cdc2e4d38757bd4790f151f21d
+FILE app/renderer/src/chat/tool-summary.ts
+  blob   dfb7acb46723fe1b94104747b6c897d7f30c74f8
+  sha256 b8651b662f387d6eaadb44860f3a4d959988a843389c5b0f1b0bc6fff3aa4e87
+FILE app/renderer/src/chat/types.ts
+  blob   fb42aae9775b3342d12da3ae5668e2f7b50bd144
+  sha256 720c0663bd909e3904ad594eba8025161edd2fc5c01f12f8f0e46bb2663d27b8
+FILE app/renderer/src/stores/confirm-store.ts
+  blob   3a701f9ea2bc893614e6746c2d93d00141c12d0e
+  sha256 24ff2d49e90d239e207cb7c083fe570c46484f27a92c71e5820f3240a0d8ed1c
+FILE app/renderer/src/stores/settings-store.ts
+  blob   36cb584d9436087765ee6e7cc8adb84ea103e5b3
+  sha256 08d5776858253e5d20e347641e1589f5f274f062d4de59ffdea27501e3150f89
+FILE app/renderer/src/stores/drawer-store.ts
+  blob   4f40b1507b4cc5650b0c9f604ef7f9586e07830f
+  sha256 4cb2431a0e658f54d225f245c98582db71e63cb543ec56e27e2d61579197fda1
+FILE app/renderer/src/stores/governance-store.ts
+  blob   767bc5add7cd73ef3ab198cbb89260595d0d7d80
+  sha256 970e165ad7902ecd07ce70fdb6129fcd1e7e1dc911e9eada89d85a65a48e0ffc
+FILE app/renderer/src/stores/report-store.ts
+  blob   663ad8636964d5961280b4c65ce9707de5e5284d
+  sha256 54c9c271bccdf8b11b69ca5611b2ca02fb2faaffcc40ff25891f3c32f252ce18
+FILE test/桌面UI/i18n-b1-b2.test.ts
+  blob   356bbd0b6f74fa70af84905039f030f7caa63f8e
+  sha256 6ba30a285c4ed5cd791807af4b48d606f1014be85c816757fa9d85ff5f5cbc78
+FILE 角色卡/桌面UI/api-spec.md
+  blob   323a51a8afc85eb7b72719ac2dc9219cf1fd42e3
+  sha256 02a72ddbe6c1f0534d2baf1d244d72ff9bb0725e819ad0b6a76bb3045e4530c1
+FILE 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b1-b2.md
+  blob   127162d13989237fd6efd66fa5c1e045e52c51bd
+  sha256 d8205f3bc24cc2ffb620d79531178448e1fbd1111230a2914acce49a7f48b86e
+FILE 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b1-b2-evidence/test-desktop-ui.log
+  blob   903d4c76af823a2b3ce83ea2cae520b0bfd17cdb
+  sha256 55e9a50397338fe9bb57bbad601a9e3fe6261a332fdf2e1dbdb12cd4a0089782
+FILE 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b1-b2-evidence/typecheck-renderer.log
+  blob   f042ecb341306416ee98528ca27792cae05ced0d
+  sha256 8207c337c04a8c67a20c715a823639d2b11233ba06542c88e81b2eda12415c7e
+FILE 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b1-b2-evidence/typecheck-root.log
+  blob   9ec9e731d7ce6c0df6b793028848894cf5af8036
+  sha256 c80860c8851a5337fd1b3ae394ae9213dd482e4afe9d3ec2ec590b2f88c8a8ea
+FILE 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b1-b2-evidence/build-renderer.log
+  blob   fc13da2821b62b3d2247d7707e4cf4d965016d61
+  sha256 f17b0b956282b745be12fb06c7dea936c7ef8c1ed95cba804dcff5f9eb6ff5e2
+FILE 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b1-b2-evidence/zh-equivalence.log
+  blob   8dbc5f88898d223994ef89ea0920c95664f18105
+  sha256 387b7f3f9ead67e75a2f3ddf59e2ff2e269034810869e2f6d1e87ce594cc4536
+FILE 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b1-b2-evidence/zh-equivalence-harness.mjs
+  blob   57acc5f4e69e664f8093df91f73f3bad18e2f620
+  sha256 079d39cedb3507b36a544ca90ef52852964b57ebfd1508cc223f59c71256272a
+FILE 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b1-b2-evidence/residual-scan.log
+  blob   0498b88b87d84041cf9fac16baf0e7534df5d0e6
+  sha256 fcae6411bc0c1a69b73c1087545eaf834c2507c1043da46fb17c429f54f00e03
+FILE 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b1-b2-evidence/i18n-guard-stale.log
+  blob   d73d6b82a3e1286c413ac57d349901a105eb51e1
+  sha256 906b2e4a7161d04c3da69b392ab34d5b9e487de794b5c2dceb650b25fa0a0b27

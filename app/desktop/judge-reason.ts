@@ -11,14 +11,12 @@
 // 本模块只做**展示映射**（不参与任何判定）：提取冒号后的具体内容、去尾、限长，拼成
 // `读取被拒：<具体内容>`；无具体记录时如实说明「未记录具体路径」。
 
+import { mainT } from "./i18n.ts";
+
 /** 编排约定的 `read-denied` 具体原因标记（全角冒号）。 */
 const READ_DENIED_MARKER = "判断读取被拒：";
-/** 映射输出的人话前缀。 */
-const READ_DENIED_DETAIL_PREFIX = "读取被拒：";
 /** 映射输出的长度上限（Unicode 码点；与既有 reason 默认分支的 200 边界同口径）。 */
 const MAX_REASON_CHARS = 200;
-/** 无具体记录时的兜底（不再只说笼统一句）。 */
-const READ_DENIED_FALLBACK = "所需项目文件无法读取（未记录具体路径）";
 /** driver 已在 reason 里写过的收尾语——提取具体内容时去掉，避免卡片重复。 */
 const READ_DENIED_TAIL = "，已转手动确认。";
 
@@ -37,15 +35,17 @@ export function stripTrailingSentencePunct(reason: string): string {
  */
 export function readDeniedHumanReason(reason?: string): string {
   const text = typeof reason === "string" ? reason.trim() : "";
+  const fallback = mainT("main.judgeReason.readDeniedFallback");
   const at = text.indexOf(READ_DENIED_MARKER);
-  if (at < 0) return READ_DENIED_FALLBACK;
+  if (at < 0) return fallback;
 
   let detail = text.slice(at + READ_DENIED_MARKER.length).trim();
   if (detail.endsWith(READ_DENIED_TAIL)) detail = detail.slice(0, -READ_DENIED_TAIL.length).trim();
   if (detail.endsWith("。")) detail = detail.slice(0, -1).trim();
-  if (detail === "") return READ_DENIED_FALLBACK;
+  if (detail === "") return fallback;
 
-  const budget = MAX_REASON_CHARS - READ_DENIED_DETAIL_PREFIX.length;
+  const prefix = mainT("main.judgeReason.readDeniedDetail");
+  const budget = MAX_REASON_CHARS - prefix.length;
   const bounded = Array.from(detail).slice(0, budget).join("");
-  return `${READ_DENIED_DETAIL_PREFIX}${bounded}`;
+  return `${prefix}${bounded}`;
 }

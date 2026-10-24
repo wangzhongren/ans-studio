@@ -1,0 +1,17 @@
+captured_at: 2026-10-23 11:26:34 +0800
+=== 9222 监听检查 ===
+  TCP    127.0.0.1:9222         127.0.0.1:62017        TIME_WAIT       0
+  TCP    127.0.0.1:9222         127.0.0.1:62023        TIME_WAIT       0
+  TCP    127.0.0.1:9222         127.0.0.1:62043        TIME_WAIT       0
+  TCP    127.0.0.1:9222         127.0.0.1:62045        TIME_WAIT       0
+  TCP    127.0.0.1:9222         127.0.0.1:62048        TIME_WAIT       0
+  TCP    127.0.0.1:62016        127.0.0.1:9222         TIME_WAIT       0
+  TCP    127.0.0.1:62022        127.0.0.1:9222         TIME_WAIT       0
+  TCP    127.0.0.1:62042        127.0.0.1:9222         TIME_WAIT       0
+  TCP    127.0.0.1:62044        127.0.0.1:9222         TIME_WAIT       0
+  TCP    127.0.0.1:62047        127.0.0.1:9222         TIME_WAIT       0
+=== Electron 进程 ===
+NO_ELECTRON_PROCESS
+=== Node 进程 ===
+  4219288       0       0      24984  ?              0 23:22:25 C:\Users\51054\AppData\Local\Programs\nodejs\node.exe
+      604     603     603      16412  ?         197609 09:17:28 /c/Users/51054/AppData/Local/Programs/nodejs/node

@@ -354,11 +354,11 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
 
     const trio = trioProject(root);
     const expectations: Array<["liaison" | "proposal" | "nomination" | "schedule" | "verification", RegExp[]]> = [
-      ["liaison", [/沟通权纪律（Lead \/ 主理/, /docs\/intents\//, /hand_off_intent/, /交接 ≠ 客户批准/, /intent-confirm/, /质量档位/, /原型档/]],
+      ["liaison", [/沟通权纪律（Lead \/ 主理/, /docs\/intents\//, /hand_off_intent/, /交接 ≠ 客户批准/, /intent-confirm/, /质量档位/, /原型档/, /治理协调（2026-10-24）/, /不直接派 Crew\/Proof/, /Proof 只收状态\+报告指针/]],
       ["proposal", [/提案权纪律（Draft \/ 提案/, /docs\/proposals\//, /cardKind=proposal/, /不拥有最终批准权/, /证据计划/, /工程质量基线/, /架构方案/, /架构影响分析/, /扩展点/, /模块分解与职责/]],
       ["nomination", [/组队\/写卡纪律（Crew \/ 组队/, /docs\/scheduling\//, /appointment-write/, /不再发任命卡/, /团队计划/]],
-      ["schedule", [/编排权纪律（Steward \/ 统筹/, /docs\/flows\//, /docs\/scheduling\//, /cardKind=appointment/, /dispatch_task/, /flowId.*stepId/, /真实启动/, /演示/, /架构与边界/, /契约冻结/, /扩展点必须有覆盖步骤/]],
-      ["verification", [/验收权纪律（Proof \/ 验收/, /docs\/acceptance\//, /docs\/verification\//, /cardKind=acceptance/, /验收 ≠ 批准/, /未被真实启动.*不得建议 accept/, /架构核对/, /模块边界与依赖方向未被破坏/, /schema\/API 版本与/, /风险档位/, /T0–T3/]],
+      ["schedule", [/编排权纪律（Steward \/ 统筹/, /docs\/flows\//, /docs\/scheduling\//, /cardKind=appointment/, /dispatch_task/, /flowId.*stepId/, /真实启动/, /演示/, /架构与边界/, /契约冻结/, /扩展点必须有覆盖步骤/, /发布标记（2026-10-24，P0-1）/, /cardKind=schedule-write/, /非发布保持缺省/, /非发布不派/]],
+      ["verification", [/验收权纪律（Proof \/ 验收/, /docs\/acceptance\//, /docs\/verification\//, /cardKind=acceptance/, /验收 ≠ 批准/, /未被真实启动.*不得建议 accept/, /架构核对/, /模块边界与依赖方向未被破坏/, /schema\/API 版本与/, /风险档位/, /T0–T3/, /发布验收门（2026-10-24，P0-1）/, /非发布流程不启动 verifier\/Proof/]],
     ];
     for (const [fn, patterns] of expectations) {
       const { captured, factory } = promptCapturing();
@@ -422,7 +422,7 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
   });
 });
 
-test("标准工作流（2026-10-19 客户反馈）：trio 与 single/su 提示均含阶段流转/自动派发/Proof 标准复核流程", async () => {
+test("标准工作流（2026-10-24 更新）：trio 与 single/su 提示均含阶段流转/发布验收门/主理协调/Proof 标准复核流程", async () => {
   await withRoot(async (root) => {
     const promptCapturing = () => {
       const captured: { prompt?: string } = {};
@@ -448,6 +448,8 @@ test("标准工作流（2026-10-19 客户反馈）：trio 与 single/su 提示�
     };
 
     // 客户原话：「这个独立核准应该是标准流程，而不是我在发给他。」「内置角色应该有自己的工作流。」
+    // 2026-10-24（设计 v1 方案 A + P0-1）：内置状态/回交向主理汇总，主理只协调不批准；只有发布版本
+    // （flow 顶层 release: true）才由应用按发布验收门派 Proof；非发布不派；不承诺自动推进。
     const required: Array<[RegExp, string]> = [
       [/标准工作流（阶段流转由应用负责）/, "标准工作流标题"],
       [/内置角色按标准工作流执行/, "内置角色按标准工作流执行"],
@@ -456,9 +458,13 @@ test("标准工作流（2026-10-19 客户反馈）：trio 与 single/su 提示�
       [/显式写 `kind` \/ `evidence` \/ `supersedes`/, "显式 kind/evidence/supersedes"],
       [/保留 id `verification` \/ `acceptance`/, "保留验收 id"],
       [/客户不做内部调度/, "客户不做内部调度"],
-      [/应用会在流程齐备[^\n]*后自动派发 Proof \/ 验收/, "流程齐备后自动派发 Proof"],
-      [/不需要客户手动触发/, "不需要客户手动触发"],
-      [/自动派发不是验收决定/, "自动派发不是验收决定"],
+      [/回交向 Lead \/ 主理汇总/, "内置状态/回交向主理汇总"],
+      [/主理只做治理协调，不批准提案\/任命\/验收/, "主理只协调不批准"],
+      [/应用不承诺自动推进下一步/, "不承诺未实现的自动推进"],
+      [/只有\*\*发布版本\*\*（flow YAML 顶层 `release: true`）/, "发布版本才派 Proof"],
+      [/非发布（`release` 缺省\/false）[^\n]*不派 verifier criteria、不派 Proof、不标 acceptance done/, "非发布不派 criteria/Proof"],
+      [/Steward 用既有 `request_confirmation`（`cardKind=schedule-write`）[^\n]*`release`/, "Steward 用 schedule-write 标记 release"],
+      [/发布验收派发不是验收决定/, "发布验收派发不是验收决定"],
       [/Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）/, "Proof 标准复核流程标题"],
       [/用审批档 shell 跑测试/, "用审批档 shell 跑测试"],
       [

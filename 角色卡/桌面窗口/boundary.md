@@ -41,6 +41,8 @@
 | 单文件 | `test/桌面应用/e2e/main.mjs` | 桌面端到端总自检台（真实 Electron） |
 | 单文件 | `test/桌面应用/multi-runtime.test.ts` | 多引擎会话隔离、路由、设置及恢复契约测试 |
 | 单文件 | `test/桌面应用/project-document.test.ts` | B 专属测试：服务/Provider 预算、编码、句柄竞态、grant/scope 与引用失效 |
+| 单文件 | `test/桌面应用/acceptance-dispatch.test.ts` | 主进程侧测试——自动验收证据门、触发面与持久化去重（interface/governance-advance） |
+| 单文件 | `test/桌面应用/runtime-resolution.test.ts` | 主进程侧测试——自动派发/冷启动引擎解析优先级、per-project 持久化与「无法确定时不派发」 |
 | 单文件 | `角色卡/桌面窗口/feature-map.md` | 功能导航 |
 | 单文件 | `角色卡/桌面窗口/memo.md` | 本角色工作备忘录 |
 | 单文件 | `角色卡/桌面窗口/changelog.md` | 本角色治理变更记录 |

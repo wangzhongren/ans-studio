@@ -1,0 +1,44 @@
+# Target project drift observation (read-only) during S1 baseline run
+observed_local=2026-10-23 18:57:37 +0800
+note: NOT a second baseline; recorded only because target project changed externally after the 18:51:53 snapshot.
+
+docs/flows/ai-governance-pipeline.yaml | sha256=c1507e125744af6cee64206d41144462ba4e9638a027d10a8476e9d25875a4c4 | bytes=14466 | lines=437 | mtime=2026-10-23 18:56:26.184660800 +0800
+.ans/governance/ledger.jsonl | sha256=614db6d8bb775ebd7a70f38345807719b577f12b80b05a47fd6c74fc5d222507 | bytes=388212 | lines=538 | mtime=2026-10-23 18:57:18.715950800 +0800
+docs/acceptance/ai-governance-pipeline-report-v1.md | sha256=0106dc8092fec6f7bf14b96aac6d2e07f0d0023b9136e5cd7335c7c9df04c801 | bytes=21897 | lines=163 | mtime=2026-10-23 15:59:53.996593200 +0800
+docs/acceptance/ai-governance-pipeline-report-v2.md | sha256=d0df0789ae3a01ad8955165417e287186cb13b573206ea5224fc0d33433d9d32 | bytes=15288 | lines=150 | mtime=2026-10-23 17:37:20.759361800 +0800
+
+## flow
+flow_sha256=c1507e125744af6cee64206d41144462ba4e9638a027d10a8476e9d25875a4c4 bytes=14466 lines=438
+flowId=ai-governance-pipeline
+step_count=42
+status_counts={"done":17,"superseded":23,"pending":2}
+kind_counts={"customer-decision":2,"artifact":13,"dispatch":26,"acceptance":1}
+verification_step={"id":"verification","kind":"acceptance","status":"pending","dependsOn":null,"evidence":null}
+non_acceptance_steps=41 done=17 superseded=23
+steps:
+  - id=intent-confirm kind=customer-decision status=done dependsOn=[]
+  - id=proposal kind=artifact status=superseded dependsOn=[]
+  - id=proposal-v2 kind=artifact status=done dependsOn=[]
+  - id=contract-freeze kind=artifact status=done dependsOn=[]
+  - id=team-plan kind=artifact status=done dependsOn=[]
+  - id=appointment kind=customer-decision status=done dependsOn=[]
+  - id=role-cards kind=artifact status=done dependsOn=["appointment"]
+  - id=role-readiness kind=artifact status=done dependsOn=["role-cards"]
+  - id=acceptance-criteria kind=artifact status=superseded dependsOn=["role-readiness"]
+  - id=acceptance-criteria-v2 kind=artifact status=done dependsOn=[]
+  - id=delivery-core-domain kind=dispatch status=superseded dependsOn=["contract-freeze"]
+## ledger
+ledger_sha256=614db6d8bb775ebd7a70f38345807719b577f12b80b05a47fd6c74fc5d222507 bytes=388212 lines=539 non_empty_lines=538
+parsed_entries=538 bad_lines=0
+acceptance_decision_count=1
+acceptance_decision line=368 at=2026-10-23T08:05:01.066Z customerDecision=rejected evidenceKind=customer-input flowId=ai-governance-pipeline
+latest_acceptance_decision={"line":368,"at":"2026-10-23T08:05:01.066Z","customerDecision":"rejected","evidenceKind":"customer-input"}
+## reports
+report-v1: sha256=0106dc8092fec6f7bf14b96aac6d2e07f0d0023b9136e5cd7335c7c9df04c801 bytes=21897 lines=164 acceptance-rework_mentions=0 fenced_yaml_blocks=0 fence_markers=0
+report-v2: sha256=d0df0789ae3a01ad8955165417e287186cb13b573206ea5224fc0d33433d9d32 bytes=15288 lines=151 acceptance-rework_mentions=0 fenced_yaml_blocks=0 fence_markers=2
+snapshot_exit=0
+
+## zero-write attribution
+- 18:51:53 snapshot command computed before/after hashes inside the same command: identical (see target-project-snapshot.txt).
+- first observed change at 18:57:17 (flow 0805213a... -> c1507e12..., ledger 6d70bdeb... -> 614db6d8...), after the baseline snapshot command had exited.
+- external actor/session (target project not a git repo); this testing role performed read-only reads only.

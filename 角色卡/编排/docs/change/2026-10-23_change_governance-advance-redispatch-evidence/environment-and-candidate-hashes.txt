@@ -1,0 +1,39 @@
+# captured: 2026-10-23 13:33:43 +0800
+# repo: /c/Users/51054/Desktop/work/ans-studio
+# branch: main
+# HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+# node: v24.22.1
+# npm: 11.19.1
+# uname: MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+
+## git status (target files)
+ M "src/common/\347\274\226\346\216\222/flow-service.ts"
+ M src/pipeline/orchestration/flow-state.ts
+ M "test/\347\274\226\346\216\222/flow-service.test.ts"
+
+## candidate hashes (after implementation)
+file: src/common/编排/flow-service.ts
+  git hash-object: 467d0925d4f5c687fb1f19787ef8d3dcfe9dd3a5
+  sha256sum: 82049e2bf9570e23f3af43ee77654c3f5e8b9b23468518f1d0592cfd85ee514b
+  bytes: 66448
+file: src/pipeline/orchestration/flow-state.ts
+  git hash-object: 729597beba576f710a28c819386215145b793f6b
+  sha256sum: 78172c7a760fc5f0df8319763032a0a80175daddf7a4102507feb2850ff08a9a
+  bytes: 1664
+file: test/编排/flow-service.test.ts
+  git hash-object: 0d28dad9cf2e2daebdb8b47fb44b32163a961e57
+  sha256sum: 28d1b9b4cbe2899a0e69202983b92532d99d84af3473f72d918e1aa01f9af680
+  bytes: 69600
+
+## baseline hashes (before implementation, from 角色卡/测试/docs/change/2026-10-23_change_governance-advance-redispatch-baseline.md)
+flow-service.ts  cdba51754e73e4d39bfbdedea7ecc788a05e76e8  6808144984231aa7e57f650201734c3ee00da2d9abb809682cd006344bb588b7
+flow-state.ts    2a32991ceab908ece10bbead248f4cd9849d8084  5d9c0bd3b4ae7bbe0b80a1eefea77017e62a22c84276eb53f88be837861652e6
+flow-service.test.ts 9bdbe3de063a0cada0bae3e0158fefc719dfe38b  4df55487d246d626cefe5c77288c7e83467d771bef98a5dcaaa211f0d16f43f0
+
+## diff stat
+ .../\347\274\226\346\216\222/flow-service.ts"      | 658 ++++++++++++++++++++-
+ src/pipeline/orchestration/flow-state.ts           |  13 +-
+ .../\347\274\226\346\216\222/flow-service.test.ts" | 482 ++++++++++++++-
+ 3 files changed, 1147 insertions(+), 6 deletions(-)
+
+## staged (must be empty)

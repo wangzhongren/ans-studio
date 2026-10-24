@@ -1935,8 +1935,8 @@ test("routeDispatch 反例（trio）：无客户接受/无任命/目标内置/�
 // ——————————————————————————————————————————————————————————————————————————————————————
 
 test("2026-10-20 Lead→Steward 协调：Liaison 受理并投递、零客户卡、同文可再发；账本 power=liaison（不是客户批准）", async () => {
-  // coordinate 门不要求提案接受/任命（flow-a 步骤无关）——空账本即可。
-  const dir = await makeTrioRoot();
+  // 2026-10-24 闸门 1 收紧：coordinate 要求最新提案已接受（accept / accept-quick）；不再接受空账本。
+  const dir = await makeTrioRoot([trioEntry({ decisionKind: "proposal-accept" })]);
   const customerCalls: unknown[] = [];
   const customerInput: DesktopCustomerInputFn = async (request) => {
     customerCalls.push(request);
@@ -1972,7 +1972,11 @@ test("2026-10-20 Lead→Steward 协调：Liaison 受理并投递、零客户卡�
   assert.equal(written[0].stepId, undefined, "协调不是步骤派发：不写 stepId");
   assert.equal(written[0].trigger, undefined, "非客户决定触发（trigger 缺席）");
   assert.ok((written[0].messageSummary ?? "").startsWith("[协调] "), "账本摘要标明协调");
-  assert.equal(ledger.entries.some((entry) => entry.kind === "customer.decision"), false, "不写客户决定账本（不是客户批准）");
+  assert.equal(
+    ledger.entries.filter((entry) => entry.kind === "customer.decision").length,
+    1,
+    "只保留夹具的提案接受决定（闸门 1 用）；协调不写新的客户决定（不是客户批准）",
+  );
   // 重复协调：同文送达后再发一次 ⇒ 仍受理（不套用项目步骤的 duplicate-dispatch 去重）。
   if (!h.streams.convener) h.streams.convener = [];
   h.streams.convener.push({ kind: "settled", summary: "结束" });
@@ -2010,7 +2014,7 @@ test("2026-10-20 Lead→项目角色仍走 dispatch 门禁（wrong-role 拒）�
   await h.mgr.stop(null);
 });
 
-test("回交/看护路由（trio）：项目角色回交与系统消息改投 Convener；Rapporteur 不接收", async () => {
+test("回交/看护路由（trio）：项目角色回交与系统消息改投 Convener；内置来源回交防御性投 Lead；Rapporteur 不接收项目回交/系统消息", async () => {
   const dir = await makeTrioRoot();
   const h = makeHarness({ projectRoot: dir, customListing: trioListing(dir) });
   await h.mgr.open({ projectRoot: dir, roleId: "rapporteur", runtime: "demo" });
@@ -2023,20 +2027,23 @@ test("回交/看护路由（trio）：项目角色回交与系统消息改投 Co
   (h.streams.A ??= []).push({ kind: "handback", roleId: "A", summary: "A 完成", handback: HANDBACK_A } as OrchestrationEvent);
   await tick(250);
   assert.ok(h.sent.convener.includes(renderHandbackPrompt(HANDBACK_A)), "回交原文投给 Convener");
-  assert.equal((h.sent.rapporteur ?? []).length, 0, "Rapporteur 不接收回交投递（只镜像由渲染侧负责）");
+  assert.equal((h.sent.rapporteur ?? []).length, 0, "Rapporteur 不接收项目角色回交投递（只镜像由渲染侧负责）");
   assert.equal(h.mgr.watchdogSnapshot(dir)!.governanceRoleId, "convener", "看护快照的治理主人=Convener");
-  // 三人不自我回交（防御）：内置角色的回交事件不被再次投递。
+  // 2026-10-24 治理协调：内置来源回交（编排正常抑制；防御性出现）→ Lead（primaryRoleId），
+  // Lead 自身不自我回交；项目 worker 仍投 Steward。
+  const builtInHandback = { ...HANDBACK_A, roleId: "convener" } as TaskHandback;
   const beforeSelf = h.sent.convener.length;
-  (h.streams.convener ??= []).push({ kind: "handback", roleId: "convener", summary: "内置回交", handback: { ...HANDBACK_A, roleId: "convener" } } as OrchestrationEvent);
-  await tick(120);
-  assert.equal(h.sent.convener.length, beforeSelf, "内置治理角色不自我回交（防御性忽略）");
+  (h.streams.convener ??= []).push({ kind: "handback", roleId: "convener", summary: "内置回交", handback: builtInHandback } as OrchestrationEvent);
+  await tick(180);
+  assert.equal(h.sent.convener.length, beforeSelf, "内置来源不回投 Steward 自身（不自我回交）");
+  assert.ok(h.sent.rapporteur.includes(renderHandbackPrompt(builtInHandback)), "内置来源回交防御性投给 Lead（Rapporteur）");
   // 回交那一轮结束（convener 空闲）后再投系统消息——看护系统消息同样投 Convener。
   (h.streams.convener ??= []).push({ kind: "settled", summary: "convener 一轮结束" } as OrchestrationEvent);
   await tick(120);
   h.mgr.watchdogDeliver(dir, { text: "[系统·看护] 测试", summary: "系统·看护 · 测试", dedupKey: "k-trio" });
   await tick(200);
   assert.ok(h.sent.convener.includes("[系统·看护] 测试"), "系统消息投给 Convener");
-  assert.equal((h.sent.rapporteur ?? []).length, 0, "Rapporteur 不接收系统消息");
+  assert.equal(h.sent.rapporteur.filter((text) => text === "[系统·看护] 测试").length, 0, "Rapporteur 不接收看护系统消息");
   await h.mgr.stop(null);
 });
 

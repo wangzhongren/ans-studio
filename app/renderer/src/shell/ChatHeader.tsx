@@ -31,6 +31,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useUiStore } from "@/stores/ui-store";
 import { EngineSelect } from "@/shell/EngineSelect";
 import { GovernancePanel } from "@/shell/GovernancePanel";
+import { useLocaleState, useT } from "@/i18n";
 import "@/shell/phase4b.css";
 
 export interface ChatHeaderProps {
@@ -38,6 +39,8 @@ export interface ChatHeaderProps {
 }
 
 export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const runtime = useUiStore((s) => s.runtime);
   const selectedRoleId = useUiStore((s) => s.selectedRoleId);
   const drawerOpen = useUiStore((s) => s.drawerOpen);
@@ -52,10 +55,11 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
   const notice = useSettingsStore((s) => s.notice);
 
   const role = findRole(roles, selectedRoleId);
+  const roleName = roleDisplayName(role, locale);
   const contextText =
     (selectedRoleId ? paneMeta[selectedRoleId]?.contextText : "") ||
     (selectedRoleId ? roleMeta[selectedRoleId]?.contextText : "") ||
-    "尚未开启会话";
+    t("ui.chatHeader.noSession");
   // 恢复失败原因如实放在 title（旧 renderer 同义）：文案里不把失败说成「已从本地恢复」。
   const contextWarning =
     selectedRoleId ? roleMeta[selectedRoleId]?.contextWarning || "" : "";
@@ -87,10 +91,10 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
           <div className="session-identity">
             <div className="session-title-row">
               <span id="chat-role" className="chat-role">
-                {role ? roleDisplayName(role) : "未选择角色"}
+                {role ? roleName : t("ui.role.noneSelected")}
               </span>
               <span id="chat-role-sub" className="chat-role-sub" hidden={!!role}>
-                {role ? "" : "从左侧选择一个角色开始聊天"}
+                {role ? "" : t("ui.chatHeader.selectRoleHint")}
               </span>
             </div>
             <span
@@ -119,11 +123,11 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
               aria-haspopup="dialog"
               aria-expanded={drawerOpen && drawerTab === "work"}
               aria-label={
-                pendingCount > 0 ? workBadgeAria(pendingCount) : "工作概览"
+                pendingCount > 0 ? workBadgeAria(pendingCount, locale) : t("ui.chatHeader.tabWork")
               }
               onClick={openWork}
             >
-              工作概览
+              {t("ui.chatHeader.tabWork")}
               {workBadgeCount(pendingCount) > 0 ? (
                 <span className="tab-badge" aria-hidden="true">
                   {badgeText(pendingCount)}
@@ -137,10 +141,10 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
               className={drawerOpen && (drawerTab || "card") === "card" ? "active" : undefined}
               aria-haspopup="dialog"
               aria-expanded={drawerOpen && (drawerTab || "card") === "card"}
-              aria-label={roleCount > 0 ? roleBadgeAria(roleCount) : "角色资料"}
+              aria-label={roleCount > 0 ? roleBadgeAria(roleCount, locale) : t("ui.chatHeader.tabCard")}
               onClick={toggleCard}
             >
-              角色资料
+              {t("ui.chatHeader.tabCard")}
               {roleCount > 0 ? (
                 <span className="tab-badge is-neutral" aria-hidden="true">
                   {badgeText(roleCount)}
@@ -173,7 +177,7 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
             openSettingsDrawer(runtime, event.currentTarget);
           }}
         >
-          {openEngineSettingsLabel(runtimeLabel(runtime))}
+          {openEngineSettingsLabel(runtimeLabel(runtime, locale), locale)}
         </button>
       </div>
     </>

@@ -1,0 +1,9 @@
+# 写前基线哈希（2026-10-23，工作区字节；git status 对两文件为空）
+
+file	src/provider/runtime/tools.ts
+git hash-object	2023e9f08be24c577f8c1adc91fc8f5d8792271b
+sha256sum	c2e09c875b2fc633d4b1991379c1ccfdc12e32547e63ad344b96f5178463560c
+
+file	test/runtime-core/tools.test.ts
+git hash-object	a1d10ddfd29932d57732c3d86a55d88f0ec80b36
+sha256sum	a99c52cea45661a63910182d4df0502691d29eef08a627e431fbf964afcd1ef6

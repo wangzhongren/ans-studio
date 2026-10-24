@@ -1,0 +1,17 @@
+# S2 候选文件（2026-10-23 最终，编辑后实测）
+# git hash-object
+723f34659101f80f757b0e3ead74560a17c3770d
+8d783e991b885c6d72b7e269c8e9f1a012c9be1a
+45843ef4bb2ff0c338ce89219e116ede21f9d9d6
+bb6963db1c716e99b8e956ca0711ac1fb545cd1b
+43cc48ab169d27f2a2fdf25c12093bad07574a3d
+6aa7af358bc71ad4771998eac070d98a1fdf4e56
+9c3ec88ce070015190b13f847b2b25dcc641a455
+# sha256sum
+ea271ee88067b0b2bcf67576141f09dd6efaa0e2a78f01e66b2ebdb74148bd4a *src/common/编排/flow-state.ts
+29cd83f99fd0e7d73801c76dc0f70921704dbfd5f37e3f65820c0de7c5213919 *src/common/编排/flow-service.ts
+a8598588cda2d3a805c2879c5381870184a0973cb68e8b3a893ff40048ea9559 *src/common/编排/acceptance-rework.ts
+96966286ca48e5356d39bb2e825b424aec7b7c3022bb8a321d98c3be715f59dc *src/pipeline/orchestration/flow-state.ts
+3efba1b9e5fabf08f029b6cfa8d5abf27a4c56d423b730014c92b953c6f05ea8 *test/编排/flow-state.test.ts
+eef623a4bace3206bcfc225d1fb522b326e4a871f2bc0bd7d32fcb9c1a794342 *test/编排/flow-service.test.ts
+99735a3123ef6e4f0cec474ae766f560e96a98692e2c6789e422285cbce70fb1 *test/编排/acceptance-rework.test.ts

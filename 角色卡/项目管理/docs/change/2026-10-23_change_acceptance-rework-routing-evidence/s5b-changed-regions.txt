@@ -1,0 +1,47 @@
+=== zh-CN.ts (governance section, lines 1295-1317) ===
+  "main.governance.roleReadinessDispatched": "写卡结构校验通过，已派发角色就绪复核给 Steward / 统筹（工作中）",
+  "main.governance.criteriaDispatched": "流程 {flowId}：已派发实施前标准编写任务给 Proof / 验收（工作中）",
+  "main.governance.nominationAlreadyDone": "提名已完成，未重复派发；已请 Steward / 统筹 继续下一步",
+
+  // ---- 验收返工路由系统行（2026-10-23 验收返工路由；方案 §6.3.3）----
+  // 参数契约：{flowId} 流程 id；{reportPath} 报告相对路径；{detail} 有界诊断/错误原文。
+  // 来源语义：仅客户手拒来源写「客户拒绝」；judge/自动来源只写自动决策措辞，不得写成客户拒绝，
+  // 也不得声称路由已成功——实际失败由 Failed/AuditFailed 系统行如实报告。
+  "main.governance.acceptanceReworkRoutedCustomer":
+    "流程 {flowId}：验收结果为客户拒绝；应用已按路由规则把返工交 Steward / 统筹（Convener）组织。",
+  "main.governance.acceptanceReworkRoutedAutomatic":
+    "流程 {flowId}：自动决策未通过/未完成（判断代批/自动退回）；应用已按路由规则把返工交 Steward / 统筹（Convener）组织。",
+  "main.governance.acceptanceReworkPending":
+    "流程 {flowId}：返工路由尚未完成（等待发送或等待下一次事件重试）；应用暂不派发验收复核，也不会重复通知。",
+  "main.governance.acceptanceReworkReportIncomplete":
+    "流程 {flowId}：验收报告缺少可解析的 acceptance-rework/v1 结构化返工段（{detail}）；应用已把报告路径 {reportPath} 与解析错误交 Steward / 统筹（Convener）组织人工返工，未生成返工项、未创建流程步骤。",
+  "main.governance.acceptanceReworkFailed":
+    "流程 {flowId}：返工路由失败（{detail}）；应用不声称已送达，也不会派发验收复核；修正后下一次事件会自动重试。",
+  "main.governance.acceptanceReworkAuditFailed":
+    "流程 {flowId}：返工任务已按路由规则转交，但审计记录写入失败（{detail}）；已发送事实不翻转，应用不会伪造账本，请检查账本与诊断。",
+
+  // ---- 会话历史（runtime-history.ts / session-history.ts）----
+  "main.history.invalidRequest": "历史请求须指定项目、角色与运行时。",
+
+=== en-US.ts (governance section, lines 1472-1492) ===
+    "Card structure validation passed; role-readiness review dispatched to Steward (working)",
+  "main.governance.criteriaDispatched":
+    "Flow {flowId}: pre-implementation criteria-writing task dispatched to Proof (working)",
+  "main.governance.nominationAlreadyDone":
+    "Nomination already complete; not dispatched again. Steward has been asked to continue with the next step.",
+
+  "main.governance.acceptanceReworkRoutedCustomer":
+    "Flow {flowId}: the customer rejected the acceptance result; the app routed the rework to Steward (Convener) under the routing rules.",
+  "main.governance.acceptanceReworkRoutedAutomatic":
+    "Flow {flowId}: the automatic decision did not pass or did not complete (judge proxy approval / automatic return); the app routed the rework to Steward (Convener) under the routing rules.",
+  "main.governance.acceptanceReworkPending":
+    "Flow {flowId}: rework routing is not complete yet (waiting to send or waiting for the next event to retry); the app is not dispatching acceptance review for now and will not notify repeatedly.",
+  "main.governance.acceptanceReworkReportIncomplete":
+    "Flow {flowId}: the acceptance report has no parseable acceptance-rework/v1 structured rework section ({detail}); the app passed report path {reportPath} and the parse error to Steward (Convener) for manual rework; no rework items were generated and no flow steps were created.",
+  "main.governance.acceptanceReworkFailed":
+    "Flow {flowId}: rework routing failed ({detail}); the app does not claim delivery and will not dispatch acceptance review; the next event retries automatically after the issue is fixed.",
+  "main.governance.acceptanceReworkAuditFailed":
+    "Flow {flowId}: the rework task was routed, but writing the audit record failed ({detail}); the sent fact is not reversed, the app does not fabricate ledger entries; check the ledger and diagnostics.",
+
+  "main.history.invalidRequest":
+    "History requests must specify the project, role, and runtime.",

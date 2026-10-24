@@ -1,0 +1,561 @@
+diff --git "a/test/\346\265\213\350\257\225/governance-e2e-auto/fixture.ts" "b/test/\346\265\213\350\257\225/governance-e2e-auto/fixture.ts"
+index 732e734..336177a 100644
+--- "a/test/\346\265\213\350\257\225/governance-e2e-auto/fixture.ts"
++++ "b/test/\346\265\213\350\257\225/governance-e2e-auto/fixture.ts"
+@@ -46,12 +46,14 @@ import {
+ import {
+   createDesktopInterface,
+   createShellJudgeSwitch,
++  type DesktopDeps,
+   type DesktopInterface,
+   type ShellJudgeSwitch,
+ } from "../../../app/desktop/interface.ts";
+ import type { SessionEventEnvelope } from "../../../app/desktop/session.ts";
+ import {
+   createCustomerInputChannel,
++  type AutoReworkCallbackInfo,
+   type CustomerInputChannel,
+   type DesktopCustomerInputFn,
+   type OperatorDecisionPayload,
+@@ -422,6 +424,457 @@ export function teamPlanV2Doc(flowId = FLOW, options: TeamPlanV2Options): string
+   ];
+   return lines.join("\n") + "\n";
+ }
++
++// —————————————————————— 团队计划 v3（2026-10-23 目录级授权） ——————————————————————
++//
++// v3 = v2 字段 + frontmatter `directories` + 模块清单 `实现目录` + 角色表 `授权目录`/`精确写集`
++// + 「目录规范」12 列表。生成器**不替换** v1/v2 夹具（不得批量迁移）：旧流程继续用 `teamPlanDoc`/
++// `teamPlanV2Doc`；v3 场景用本函数。校验仍由产品 `src/common/编排/team-plan.ts` 单一实现执行。
++
++export interface TeamPlanV3RoleInput {
++  roleId: string;
++  type?: string;
++  module: string;
++  duty?: string;
++  ability?: string;
++  /** `授权目录` 单元格（分号分隔目录，以 `/` 结尾）。 */
++  authorizedDirs: string;
++  /** `精确写集` 单元格（精确文件；`无` 合法）。 */
++  preciseWrites?: string;
++  contract?: string;
++  testSurface?: string;
++  deps?: string;
++  dependsOn?: string;
++  parallelGroup?: string;
++  group?: string;
++  apiSpec?: string;
++  rationale?: string;
++}
++
++export interface TeamPlanV3ModuleInput {
++  module: string;
++  responsibility?: string;
++  contract?: string;
++  architectureSource?: string;
++  /** v3：模块实现目录（必填非空；角色 implementation/tests/docs 目录须在其下）。 */
++  implementationDir?: string;
++}
++
++export interface TeamPlanV3DirectoryInput {
++  dir: string;
++  owner: string;
++  kind?: string;
++  purpose?: string;
++  naming?: string;
++  subdirs?: string;
++  extensions?: string;
++  contract?: string;
++  testSurface?: string;
++  dependencies?: string;
++  forbidden?: string;
++  shared?: string;
++}
++
++export interface TeamPlanV3Options {
++  version?: number;
++  riskTier?: string;
++  frontmatterFlowId?: string;
++  /** frontmatter `recommended` 覆盖；缺省 = rows 中非 reduce 角色 + reduce 角色（v3 owner 必须是推荐角色）。 */
++  recommended?: readonly string[];
++  /** frontmatter `modules` 覆盖。 */
++  modules?: readonly string[];
++  /** 角色行；必填，便于正/负例精确控制。 */
++  rows: readonly TeamPlanV3RoleInput[];
++  /** 模块清单行（结构化或原始 Markdown 行）。 */
++  moduleRows?: readonly (TeamPlanV3ModuleInput | string)[];
++  /** 模块清单表头覆盖（缺 `实现目录`/表头别名等负例）。 */
++  moduleHeader?: string;
++  omitModuleSection?: boolean;
++  /** 目录规范行（结构化或原始 Markdown 行）；必填。 */
++  directoryRows: readonly (TeamPlanV3DirectoryInput | string)[];
++  /** 目录规范表头覆盖（缺列负例）。 */
++  directoryHeader?: string;
++  omitDirectorySection?: boolean;
++  /**
++   * frontmatter `directories` 覆盖（负例：重复/治理路径/逃逸/整层名）。
++   * `null` = 省略该行；缺省 = 从结构化目录规范行推导。
++   */
++  directories?: readonly string[] | null;
++  /** 角色表 `精确写集` 列名覆盖（`唯一写集` 别名 warning / `边界` 列名 error 负例）。 */
++  writesHeader?: string;
++  omitCoordinationSection?: boolean;
++}
++
++/** 目录规范表行（结构化 → Markdown；未给字段使用夹具默认值）。 */
++export function v3DirectoryRowText(row: TeamPlanV3DirectoryInput): string {
++  const kind = row.kind ?? "implementation";
++  const testSurface = row.testSurface ?? (kind === "docs" || kind === "evidence" ? "—" : `test/owned-${row.owner}/`);
++  const extensions = row.extensions ?? (kind === "docs" || kind === "evidence" ? ".md" : ".ts");
++  return `| \`${row.dir}\` | ${row.owner} | ${kind} | ${row.purpose ?? "夹具目录"} | ${row.naming ?? "any"} | ${row.subdirs ?? "—"} | ${extensions} | ${row.contract ?? `internal（夹具 ${row.owner} 目录）`} | ${testSurface} | ${row.dependencies ?? "无"} | ${row.forbidden ?? "—"} | ${row.shared ?? "none"} |`;
++}
++
++/** 模块清单行（v3 五列）。 */
++export function v3ModuleRowText(row: TeamPlanV3ModuleInput): string {
++  return `| ${row.module} | ${row.responsibility ?? `${row.module} 模块交付`} | ${row.contract ?? `docs/contracts/${row.module}-v1.md`} | ${row.architectureSource ?? "docs/planning/design.md §4"} | \`${row.implementationDir ?? `src/${row.module}/`}\` |`;
++}
++
++/**
++ * 生成团队计划 v3（`teamPlanSchema: 3`）：frontmatter `directories` + 模块清单（`实现目录`）+
++ * 15 列角色表（`授权目录`/`精确写集`）+ 「目录规范」12 列表 + 五维章节。
++ * 合规场景由调用方给出 rows/moduleRows/directoryRows；负例通过覆盖字段构造。
++ */
++export function teamPlanV3Doc(flowId = FLOW, options: TeamPlanV3Options): string {
++  const rows = options.rows;
++  const modules =
++    options.modules ??
++    [...new Set(rows.map((row) => row.module).filter((module) => module !== "" && !module.split(/[+＋]/).includes("reduce")))];
++  const recommended =
++    options.recommended ??
++    rows.filter((row) => row.roleId !== "").map((row) => row.roleId);
++  const version = options.version ?? 1;
++  const riskTier = options.riskTier ?? "T3";
++  const moduleRows =
++    options.moduleRows ??
++    modules.map((module) => ({
++      module,
++      responsibility: `${module} 模块交付`,
++      contract: `docs/contracts/${module}-v1.md`,
++      architectureSource: `docs/planning/${flowId}-v1.md §4`,
++      implementationDir: `src/${module}/`,
++    }));
++  const moduleRowText = moduleRows.map((row) => (typeof row === "string" ? row : v3ModuleRowText(row)));
++  const moduleHeader = options.moduleHeader ?? "| module | 职责 | 公开契约 | 架构来源 | 实现目录 |";
++  const moduleSeparator =
++    moduleHeader.split("|").filter((cell) => cell.trim() !== "").length === 4
++      ? "| --- | --- | --- | --- |"
++      : "| --- | --- | --- | --- | --- |";
++  const directoryRows = options.directoryRows;
++  const structuredDirs = directoryRows.filter((row): row is TeamPlanV3DirectoryInput => typeof row !== "string");
++  const directoriesLine =
++    options.directories === null
++      ? undefined
++      : `directories: [${(options.directories ?? structuredDirs.map((row) => row.dir)).join(", ")}]`;
++  const directoryRowText = directoryRows.map((row) => (typeof row === "string" ? row : v3DirectoryRowText(row)));
++  const directoryHeader =
++    options.directoryHeader ??
++    "| 目录 | owner | 类型 | 用途 | 命名 | 允许子目录 | 允许文件类型 | 公开契约 | 测试面 | 依赖 | 禁写区 | 共享 |";
++  const writesHeader = options.writesHeader ?? "精确写集";
++  const lines = [
++    "---",
++    `flowId: ${options.frontmatterFlowId ?? flowId}`,
++    `version: ${version}`,
++    "teamPlanSchema: 3",
++    `riskTier: ${riskTier}`,
++    `recommended: [${recommended.join(", ")}]`,
++    `modules: [${modules.join(", ")}]`,
++    ...(directoriesLine !== undefined ? [directoriesLine] : []),
++    "---",
++    "",
++    `# 团队计划 ${flowId} v${version}`,
++    "",
++    ...(options.omitModuleSection === true
++      ? []
++      : [
++          "## 模块清单",
++          "",
++          moduleHeader,
++          moduleSeparator,
++          ...moduleRowText,
++          "",
++        ]),
++    "## 参与角色与职责",
++    "",
++    `| roleId | 类型 | module | 职责目标 | 能力要求 | 授权目录 | ${writesHeader} | 公开契约 | 测试面 | 依赖 | dependsOn | 并行组 | 组别 | apiSpec | 粒度理由 |`,
++    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
++    ...rows.map(
++      (row) =>
++        `| ${row.roleId} | ${row.type ?? "new"} | ${row.module} | ${row.duty ?? "实现本模块的交付"} | ${row.ability ?? "能读写代码并交付测试"} | ${row.authorizedDirs} | ${row.preciseWrites ?? "无"} | ${row.contract ?? "internal（夹具模块无跨角色公开契约）"} | ${row.testSurface ?? `test/owned-${row.roleId}/`} | ${row.deps ?? "无"} | ${row.dependsOn ?? "无"} | ${row.parallelGroup ?? "map-a"} | ${row.group ?? "交付"} | ${row.apiSpec ?? "required"} | ${row.rationale ?? "—"} |`,
++    ),
++    "",
++    ...(options.omitDirectorySection === true
++      ? []
++      : [
++          "## 目录规范",
++          "",
++          directoryHeader,
++          "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
++          ...directoryRowText,
++          "",
++        ]),
++    ...(options.omitCoordinationSection === true
++      ? []
++      : [
++          "## 五维判断与协调成本",
++          "",
++          "- 责任独立性：各模块有独立变化原因；目录 owner 唯一、职责独立。",
++          "- 范围归属：授权目录互不重叠，各角色只写自己的目录。",
++          "- 契约影响：公开契约由对应 Map 角色唯一主属，消费方只读。",
++          "- 证据独立性：每个角色有独立测试面与目录级证据。",
++          "- 协调成本：按目录并行收益高于交接成本，未拆到函数级。",
++          "",
++        ]),
++  ];
++  return lines.join("\n") + "\n";
++}
++
++/**
++ * 规范化 v3 场景（夹具共享形状；i-full-chain / q / r / layout 复用）：
++ * 两个 Map 模块（storefront、checkout-api）+ 一个既有 Reduce 角色（tester）。
++ * 目录规范默认字段故意保持最小合法值；负例按需覆盖。
++ */
++export function v3CanonicalParts(flowId = FLOW): {
++  modules: string[];
++  recommended: string[];
++  rows: TeamPlanV3RoleInput[];
++  moduleRows: TeamPlanV3ModuleInput[];
++  directoryRows: TeamPlanV3DirectoryInput[];
++} {
++  const modules = ["storefront", "checkout-api"];
++  const moduleRows: TeamPlanV3ModuleInput[] = [
++    {
++      module: "storefront",
++      responsibility: "商店模块（结算页与表单）",
++      contract: "docs/contracts/storefront-v1.md",
++      architectureSource: `docs/planning/${flowId}-v1.md §4.2`,
++      implementationDir: "src/storefront/",
++    },
++    {
++      module: "checkout-api",
++      responsibility: "结算 API 与订单状态",
++      contract: "docs/contracts/checkout-v1.md",
++      architectureSource: `docs/planning/${flowId}-v1.md §4.3`,
++      implementationDir: "src/checkout/",
++    },
++  ];
++  const rows: TeamPlanV3RoleInput[] = [
++    {
++      roleId: "executor",
++      type: "new",
++      module: "storefront",
++      duty: "实现商店模块与目录内测试",
++      ability: "前端/契约/测试",
++      authorizedDirs: "`src/storefront/`; `src/storefront/tests/`",
++      preciseWrites: "无",
++      contract: "`docs/contracts/storefront-v1.md`",
++      testSurface: "`src/storefront/tests/`",
++      dependsOn: "无",
++      parallelGroup: "map-a",
++      group: "交付",
++      apiSpec: "required",
++    },
++    {
++      roleId: "reviewer",
++      type: "new",
++      module: "checkout-api",
++      duty: "实现结算 API 与目录内测试",
++      ability: "后端/契约/测试",
++      authorizedDirs: "`src/checkout/`; `src/checkout/tests/`",
++      preciseWrites: "无",
++      contract: "`docs/contracts/checkout-v1.md`",
++      testSurface: "`src/checkout/tests/`",
++      dependsOn: "无",
++      parallelGroup: "map-b",
++      group: "交付",
++      apiSpec: "required",
++    },
++    {
++      roleId: "tester",
++      type: "existing",
++      module: "reduce",
++      duty: "契约/集成/e2e 与证据合并",
++      ability: "测试/环境/证据",
++      authorizedDirs: "`test/测试/`",
++      preciseWrites: `\`docs/verification/${flowId}/manifest.md\``,
++      contract: "internal（消费 storefront/checkout 契约）",
++      testSurface: "`test/测试/`（集成/e2e）",
++      deps: "依赖全部 Map 角色",
++      dependsOn: "executor, reviewer",
++      parallelGroup: "reduce",
++      group: "测试",
++      apiSpec: "not-applicable（Reduce 角色不导出产品接口）",
++    },
++  ];
++  const directoryRows: TeamPlanV3DirectoryInput[] = [
++    {
++      dir: "src/storefront/",
++      owner: "executor",
++      kind: "implementation",
++      purpose: "商店模块实现（页面/表单/错误展示）",
++      naming: "kebab-case",
++      subdirs: "tests/; handlers/",
++      extensions: ".ts",
++      contract: "`docs/contracts/storefront-v1.md`",
++      testSurface: "`src/storefront/tests/`",
++      dependencies: "无",
++      forbidden: ".env; *.log; dist/",
++    },
++    {
++      dir: "src/storefront/tests/",
++      owner: "executor",
++      kind: "tests",
++      purpose: "商店模块单元/层测试",
++      naming: "*.test.ts",
++      subdirs: "fixtures/",
++      extensions: ".ts",
++      contract: "internal（消费 storefront 契约）",
++      testSurface: "`src/storefront/tests/`",
++      dependencies: "`src/storefront/`",
++      forbidden: "dist/",
++    },
++    {
++      dir: "src/checkout/",
++      owner: "reviewer",
++      kind: "implementation",
++      purpose: "结算 API 与订单状态",
++      naming: "kebab-case",
++      subdirs: "tests/; handlers/",
++      extensions: ".ts",
++      contract: "`docs/contracts/checkout-v1.md`",
++      testSurface: "`src/checkout/tests/`",
++      dependencies: "无",
++      forbidden: ".env; *.log; dist/",
++    },
++    {
++      dir: "src/checkout/tests/",
++      owner: "reviewer",
++      kind: "tests",
++      purpose: "结算 API 单元/层测试",
++      naming: "*.test.ts",
++      subdirs: "fixtures/",
++      extensions: ".ts",
++      contract: "internal（消费 checkout 契约）",
++      testSurface: "`src/checkout/tests/`",
++      dependencies: "`src/checkout/`",
++      forbidden: "dist/",
++    },
++    {
++      dir: "test/测试/",
++      owner: "tester",
++      kind: "tests",
++      purpose: "跨模块契约/集成/e2e 与证据合并",
++      naming: "kebab-case",
++      subdirs: "**",
++      extensions: ".ts",
++      contract: "internal（集成/e2e 证据目录）",
++      testSurface: "`test/测试/`",
++      dependencies: "`src/storefront/`; `src/checkout/`",
++      forbidden: ".env",
++    },
++  ];
++  return { modules, recommended: rows.map((row) => row.roleId), rows, moduleRows, directoryRows };
++}
++
++/**
++ * `shared: split` 场景（q/p 共享）：父目录是容器（本身不分配），两个子目录各有 owner。
++ * `parentAssigned: true` = 负例（父目录被角色直接分配 ⇒ V-D8）。
++ */
++export function v3SharedSplitPlan(flowId = FLOW, options: { parentAssigned?: boolean } = {}): string {
++  const rows: TeamPlanV3RoleInput[] = [
++    {
++      roleId: "executor",
++      type: "new",
++      module: "workspace-a",
++      duty: "实现 A 模块",
++      ability: "代码/测试",
++      authorizedDirs: options.parentAssigned === true ? "`src/workspace/a/`; `src/workspace/`" : "`src/workspace/a/`",
++      preciseWrites: "无",
++      contract: "internal（A 模块）",
++      testSurface: "`src/workspace/a/`",
++      dependsOn: "无",
++      parallelGroup: "map-a",
++      group: "交付",
++      apiSpec: "required",
++    },
++    {
++      roleId: "reviewer",
++      type: "new",
++      module: "workspace-b",
++      duty: "实现 B 模块",
++      ability: "代码/测试",
++      authorizedDirs: "`src/workspace/b/`",
++      preciseWrites: "无",
++      contract: "internal（B 模块）",
++      testSurface: "`src/workspace/b/`",
++      dependsOn: "无",
++      parallelGroup: "map-b",
++      group: "交付",
++      apiSpec: "required",
++    },
++    {
++      roleId: "tester",
++      type: "existing",
++      module: "reduce",
++      duty: "集成/e2e 与证据",
++      ability: "测试/证据",
++      authorizedDirs: "无",
++      preciseWrites: `\`docs/verification/${flowId}/manifest.md\``,
++      contract: "internal（消费 A/B 契约）",
++      testSurface: "`test/测试/`（集成/e2e）",
++      deps: "依赖全部 Map 角色",
++      dependsOn: "executor, reviewer",
++      parallelGroup: "reduce",
++      group: "测试",
++      apiSpec: "not-applicable（Reduce 不导出接口）",
++      rationale: "文件例外：证据 manifest",
++    },
++  ];
++  const moduleRows: TeamPlanV3ModuleInput[] = [
++    { module: "workspace-a", implementationDir: "src/workspace/a/" },
++    { module: "workspace-b", implementationDir: "src/workspace/b/" },
++  ];
++  const directoryRows: TeamPlanV3DirectoryInput[] = [
++    {
++      dir: "src/workspace/",
++      owner: "executor",
++      kind: "shared",
++      purpose: "共享容器（split）",
++      naming: "any",
++      subdirs: "a/; b/",
++      extensions: ".ts",
++      contract: "internal（容器）",
++      testSurface: "`src/workspace/a/`",
++      dependencies: "无",
++      forbidden: "—",
++      shared: "split",
++    },
++    {
++      dir: "src/workspace/a/",
++      owner: "executor",
++      kind: "implementation",
++      purpose: "A 模块",
++      naming: "any",
++      subdirs: "*",
++      extensions: ".ts",
++      contract: "internal（A）",
++      testSurface: "`src/workspace/a/`",
++      dependencies: "无",
++      forbidden: "—",
++      shared: "none",
++    },
++    {
++      dir: "src/workspace/b/",
++      owner: "reviewer",
++      kind: "implementation",
++      purpose: "B 模块",
++      naming: "any",
++      subdirs: "*",
++      extensions: ".ts",
++      contract: "internal（B）",
++      testSurface: "`src/workspace/b/`",
++      dependencies: "无",
++      forbidden: "—",
++      shared: "none",
++    },
++  ];
++  return teamPlanV3Doc(flowId, {
++    modules: ["workspace-a", "workspace-b"],
++    recommended: ["executor", "reviewer", "tester"],
++    rows,
++    moduleRows,
++    directoryRows,
++  });
++}
++
+ export function roleCardDoc(roleId = "executor"): string {
+   return [
+     `# 角色：${roleId}`,
+@@ -462,7 +915,12 @@ export function roleCardDoc(roleId = "executor"): string {
+ /** 新流程 boundary.yaml：角色根工作文档条目 + 实际写集（与团队计划一致；可传额外写集目录）。 */
+ export function roleBoundaryDoc(
+   roleId = "executor",
+-  options: { writes?: readonly string[]; files?: readonly string[] } = {},
++  options: {
++    writes?: readonly string[];
++    files?: readonly string[];
++    /** v3：额外精确文件/目录条目（如 Reduce 角色的证据文件），原样追加。 */
++    extraEntries?: readonly { kind: "file" | "directory" | "conditional-directory"; path: string; purpose?: string }[];
++  } = {},
+ ): string {
+   const files = options.files ?? ["feature-map.md", "functional-description.md", "memo.md", "api-spec.md"];
+   const writes = options.writes ?? [`src/owned-${roleId}/`];
+@@ -479,6 +937,11 @@ export function roleBoundaryDoc(
+       `    path: ${path}`,
+       "    purpose: 角色代码/测试写集",
+     ]),
++    ...(options.extraEntries ?? []).flatMap((entry) => [
++      `  - kind: ${entry.kind}`,
++      `    path: ${entry.path}`,
++      `    purpose: ${entry.purpose ?? "计划精确写集"}`,
++    ]),
+     "",
+   ].join("\n");
+ }
+@@ -1026,6 +1489,21 @@ export interface HarnessOptions {
+    * 特殊场景可按需覆盖（如等待较慢的脚本轮次）。
+    */
+   governanceChain?: { pollIntervalMs?: number; timeoutMs?: number; settledGraceMs?: number };
++  /**
++   * 2026-10-23 验收返工路由（S7 e2e）：把客户交互通道的 `onAutoRework` 接到
++   * `desktop.routeAcceptanceAutoRework`（与 `app/main.ts` 同模式，仅接线）。缺省 false ⇒
++   * 既有用例行为逐字不变（通道不注册该回调）。
++   */
++  wireAutoRework?: boolean;
++  /**
++   * 注入「后台打开指定角色会话失败」（可随时增删条目）：用于返工路由发送失败 → record failed →
++   * 下一次事件重试成功的可见性用例。缺省不注入。
++   */
++  failOpenRoles?: Set<string>;
++  /** 注入引擎解析结果（缺省走产品 `resolveProjectRuntime`；验收返工路由用例固定为夹具引擎）。 */
++  resolveRuntime?: DesktopDeps["resolveRuntimeFn"];
++  /** 注入审计账本追加（缺省真实 `appendGovernanceLedger`；用于「审计失败可见、不伪造」用例）。 */
++  appendGovernanceLedger?: DesktopDeps["appendGovernanceLedgerFn"];
+ }
+ 
+ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
+@@ -1088,6 +1566,14 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
+         /* 结果行进度只是展示面：失败不影响已完成的代批 */
+       }
+     },
++    // 2026-10-23 验收返工路由（S7）：与 `app/main.ts` 同模式只接线；缺省不注册（既有用例零变化）。
++    ...(options.wireAutoRework === true
++      ? {
++          onAutoRework: (info: AutoReworkCallbackInfo) => {
++            void iface?.routeAcceptanceAutoRework(info);
++          },
++        }
++      : {}),
+   });
+ 
+   const adapterFactory = scriptedAdapterFactory({
+@@ -1115,6 +1601,9 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
+     },
+     listProjectFn: listProject,
+     openRoleSessionFn: async (input, deps) => {
++      if (options.failOpenRoles?.has(input.roleId) === true) {
++        throw new Error(`模拟打开 ${input.roleId} 会话失败：${options.tag}`);
++      }
+       openRoles.push(input.roleId);
+       capsByRole.set(input.roleId, {
+         ...(input.customerInput !== undefined ? { customerInput: input.customerInput } : {}),
+@@ -1133,6 +1622,10 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
+     },
+     runtimeOptions: { modelId: "fixture-model" },
+     customerInput: observedCustomerInput,
++    ...(options.resolveRuntime !== undefined ? { resolveRuntimeFn: options.resolveRuntime } : {}),
++    ...(options.appendGovernanceLedger !== undefined
++      ? { appendGovernanceLedgerFn: options.appendGovernanceLedger }
++      : {}),
+     createGovernanceJudgeFn: (judgeOptions) => {
+       const invoke = judgeFactory(options.judge ?? {}, options.judgeTimeoutMs)(judgeOptions);
+       return (request, signal) => {

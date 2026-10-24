@@ -15,15 +15,15 @@ import {
   governanceMissingText,
   governanceModelStatusText,
   governanceMigrationButtonView,
+  governanceModelSuggestText,
+  governanceModelUnwiredText,
   governancePinMismatchText,
   projectRoleCount,
-  GOVERNANCE_MIGRATION_TEXT,
-  GOVERNANCE_MODEL_SUGGEST,
-  GOVERNANCE_MODEL_UNWIRED,
   governanceModelOptionText,
 } from "@/chat/governance-view";
 import { getDesktopBridge } from "@/lib/platform";
 import { useGovernanceStore } from "@/stores/governance-store";
+import { useLocaleState, useT } from "@/i18n";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -34,6 +34,8 @@ function asString(value: unknown): string {
 }
 
 export function GovernancePanel() {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const projectRoot = useChatStore((s) => s.projectRoot);
   const hasRoles = useChatStore((s) => s.hasRoles);
   const roles = useChatStore((s) => s.roles);
@@ -65,18 +67,18 @@ export function GovernancePanel() {
   const migrationWired =
     typeof getDesktopBridge()?.previewGovernanceMigration === "function" &&
     typeof getDesktopBridge()?.migrateGovernanceModel === "function";
-  const migrationButton = governanceMigrationButtonView(migrationWired);
+  const migrationButton = governanceMigrationButtonView(migrationWired, locale);
 
   let statusText = "";
   if (projectRoot) {
     if (recordState === "pin-mismatch") {
-      statusText = governancePinMismatchText(record.pinCount, changed);
+      statusText = governancePinMismatchText(record.pinCount, changed, locale);
     } else if (recordState === "missing") {
-      statusText = governanceMissingText(projectRoleCount(roles));
+      statusText = governanceMissingText(projectRoleCount(roles), locale);
     } else if (recordState === "invalid") {
-      statusText = governanceInvalidText(record.reason);
+      statusText = governanceInvalidText(record.reason, locale);
     } else if (modelKnown) {
-      statusText = governanceModelStatusText(governanceModel);
+      statusText = governanceModelStatusText(governanceModel, locale);
     }
     if (nextStep) statusText = statusText ? statusText + " · " + nextStep : nextStep;
   }
@@ -146,7 +148,7 @@ export function GovernancePanel() {
             aria-controls="governance-preview"
             onClick={openPreview}
           >
-            检查并重新接受
+            {t("ui.governance.checkAndReaccept")}
           </button>
         ) : action === "establish" ? (
           <button
@@ -157,14 +159,14 @@ export function GovernancePanel() {
             aria-controls="governance-preview"
             onClick={openPreview}
           >
-            建立治理记录
+            {t("ui.governance.establish")}
           </button>
         ) : null}
       </div>
 
       {projectRoot && governanceModel === "single" ? (
         <div id="governance-migration" className="governance-migration" role="status">
-          <span className="gov-migration-text">{GOVERNANCE_MIGRATION_TEXT}</span>
+          <span className="gov-migration-text">{t("ui.governance.legacyModelHint")}</span>
           <button
             type="button"
             className="gov-action"
@@ -201,24 +203,24 @@ export function GovernancePanel() {
                 aria-live="polite"
               >
                 {loading
-                  ? "正在读取预览…"
+                  ? t("ui.governance.readingPreview")
                   : success
                     ? mode === "reaccept"
-                      ? "重新接受治理边界（预览）"
+                      ? t("ui.governance.reacceptPreview")
                       : mode === "migrate"
-                        ? "升级为三权治理模型（预览）"
-                        : "建立治理记录（预览）"
+                        ? t("ui.governance.upgradePreview")
+                        : t("ui.governance.establishPreview")
                     : result?.kind === "failure"
                       ? mode === "reaccept"
-                        ? "重新接受治理边界（预览）"
+                        ? t("ui.governance.reacceptPreview")
                         : mode === "migrate"
-                          ? "升级为三权治理模型（预览）"
-                          : "建立治理记录（预览）"
+                          ? t("ui.governance.upgradePreview")
+                          : t("ui.governance.establishPreview")
                       : mode === "reaccept"
-                        ? reaccept?.title || "重新接受治理边界（预览）"
+                        ? reaccept?.title || t("ui.governance.reacceptPreview")
                         : mode === "migrate"
-                          ? migration?.title || "升级为三权治理模型（预览）"
-                          : establish?.title || "建立治理记录（预览）"}
+                          ? migration?.title || t("ui.governance.upgradePreview")
+                          : establish?.title || t("ui.governance.establishPreview")}
               </div>
               {!success ? (
                 <button
@@ -228,16 +230,16 @@ export function GovernancePanel() {
                   disabled={busy}
                   onClick={cancelPreview}
                 >
-                  取消
+                  {t("shared.common.cancel")}
                 </button>
               ) : (
                 <button type="button" className="gp-mini" data-governance-close onClick={close}>
-                  关闭
+                  {t("shared.common.close")}
                 </button>
               )}
             </div>
 
-            {loading ? <p className="gp-muted">正在读取预览…</p> : null}
+            {loading ? <p className="gp-muted">{t("ui.governance.readingPreview")}</p> : null}
 
             {!loading && mode === "reaccept" && reaccept ? (
               <div className="gp-body">
@@ -262,7 +264,9 @@ export function GovernancePanel() {
                     disabled={!canConfirm || busy}
                     onClick={() => void useGovernanceStore.getState().confirm()}
                   >
-                    {busy ? "正在重新接受…" : "确认接受"}
+                    {busy
+                      ? t("ui.governance.reaccepting")
+                      : t("ui.governance.confirmAccept")}
                   </button>
                 </div>
               </div>
@@ -270,8 +274,8 @@ export function GovernancePanel() {
 
             {!loading && mode === "establish" && establish ? (
               <div className="gp-body">
-                <p className="gp-label">治理模型（建立时写入 .ans）：</p>
-                <div className="gp-radios" role="radiogroup" aria-label="治理模型">
+                <p className="gp-label">{t("ui.governance.modelLabel")}</p>
+                <div className="gp-radios" role="radiogroup" aria-label={t("ui.governance.modelAria")}>
                   {(["single", "trio"] as const).map((model) => (
                     <label key={model} className={modelChoice === model ? "is-selected" : undefined}>
                       <input
@@ -282,14 +286,22 @@ export function GovernancePanel() {
                         disabled={busy || !modelKnown}
                         onChange={() => void useGovernanceStore.getState().selectModel(model)}
                       />
-                      <span>{governanceModelOptionText(model)}</span>
+                      <span>{governanceModelOptionText(model, locale)}</span>
                     </label>
                   ))}
                 </div>
-                <p>将写入的治理模型：{governanceModelOptionText(modelChoice) || "（未报告）"}</p>
-                {!modelKnown ? <p className="gp-warning">{GOVERNANCE_MODEL_UNWIRED}</p> : null}
+                <p>
+                  {t("ui.governance.modelToWrite", {
+                    model:
+                      governanceModelOptionText(modelChoice, locale) ||
+                      t("shared.common.notProvided"),
+                  })}
+                </p>
+                {!modelKnown ? (
+                  <p className="gp-warning">{governanceModelUnwiredText(locale)}</p>
+                ) : null}
                 {establish.suggestion === "trio" ? (
-                  <p className="gp-warning">{GOVERNANCE_MODEL_SUGGEST}</p>
+                  <p className="gp-warning">{governanceModelSuggestText(locale)}</p>
                 ) : null}
                 {establish.writeLines.map((line, index) => (
                   <p className="gp-file" key={index}>
@@ -297,7 +309,10 @@ export function GovernancePanel() {
                   </p>
                 ))}
                 <p>
-                  将 pin 的对象（{establish.pinCount} 项）及角色（{establish.roleCount} 个）：
+                  {t("ui.governance.pinObjects", {
+                    pinCount: establish.pinCount,
+                    roleCount: establish.roleCount,
+                  })}
                 </p>
                 {establish.pinPaths.map((path, index) => (
                   <p className="gp-file" key={"pin-" + index}>
@@ -324,7 +339,9 @@ export function GovernancePanel() {
                     disabled={!canConfirm || busy}
                     onClick={() => void useGovernanceStore.getState().confirm()}
                   >
-                    {busy ? "正在建立治理记录…" : "建立治理记录"}
+                    {busy
+                      ? t("ui.governance.establishing")
+                      : t("ui.governance.establish")}
                   </button>
                 </div>
               </div>
@@ -356,7 +373,7 @@ export function GovernancePanel() {
                     disabled={!canConfirm || busy}
                     onClick={() => void useGovernanceStore.getState().confirm()}
                   >
-                    {busy ? "正在升级…" : "确认升级"}
+                    {busy ? t("ui.governance.upgrading") : t("ui.governance.confirmUpgrade")}
                   </button>
                 </div>
               </div>

@@ -82,6 +82,20 @@ function registerIpc() {
     }
   });
   registerHandler = diagnosticModule.createWindowIpcRegistrar(win, ipcMain, diagnostic);
+  // i18n B0（2026-10-23）：本 e2e harness 自建窗口，不经过 app/main.ts 的 registerPreferencesIpc；
+  // 渲染层启动即读偏好。按真实契约同形注册桩（内存值、不写盘、不触仓库 .ans/.env），
+  // 避免日志出现 `No handler registered for 'preferences:get'`（D6 观察到 3 处）。
+  let e2eLocale = "zh-CN";
+  const e2eSupportedLocales = ["zh-CN", "en-US"];
+  registerHandler("preferences:get", () => ({ version: 1, locale: e2eLocale, supported: e2eSupportedLocales }));
+  registerHandler("preferences:set-locale", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, locale: e2eLocale, error: "invalid-sender" };
+    const locale = input !== null && typeof input === "object" && typeof input.locale === "string" ? input.locale : "";
+    if (!e2eSupportedLocales.includes(locale)) return { ok: false, locale: e2eLocale, error: "invalid-locale" };
+    e2eLocale = locale;
+    if (!win.isDestroyed()) win.webContents.send("preferences:locale-changed", { locale });
+    return { ok: true, locale };
+  });
   diagnosticModule.observeWindowDiagnostics(win, diagnostic, () => {
     void win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(diagnosticModule.RECOVERY_PAGE));
   });
@@ -1736,11 +1750,37 @@ async function run() {
   repairCheck("SESSION_REPAIR_FAILED_OPEN_EXPLICIT_RECOVERY", await wc().executeJavaScript("window.__ansRenderer.state.sessionOpenRoleId === '桌面窗口' && !document.getElementById('btn-send').disabled"));
   repairCheck("SESSION_REPAIR_FAILED_OPEN_NO_REPLAY", repairSendRequests.length === sendsBeforeOpenFailure);
 
+  // 2026-10-23（I9）：断言前先确认目标角色 pane 已选中并挂载（虚拟 pane 按角色渲染）。
+  await waitRepair("window.__ansRenderer.state.selectedRoleId === '桌面窗口' && !!document.querySelector('#chat .chat-pane[data-role-id=\"桌面窗口\"]')");
   for (const [status, label] of [["unreported", "未报告"], ["failed", "失败"], ["aborted", "已中止"]]) {
+    // 2026-10-23（I9）：聊天 pane 的行由行模型异步投影；行数超虚拟阈值后离屏行还不构造 DOM。
+    // 修复仅调整「什么时候找」：先记录事实（行模型计数/滚动量/已挂载 handback 数），发送后等行进入
+    // 行模型，再**贴底并等待卡片挂载**后才断言；断言语义不变（该状态的结论标签必须出现在
+    // `.msg-handback .hb-head strong`）。
+    const diagExpr = "(() => { const c=document.getElementById('chat'); const d=window.__ansRenderer.rowModelDebug('桌面窗口')||{}; return { rowCount: d.count, scrollTop: c?c.scrollTop:null, scrollHeight: c?c.scrollHeight:null, clientHeight: c?c.clientHeight:null, handbacks: document.querySelectorAll('#chat .msg-handback').length, heads: [...document.querySelectorAll('#chat .msg-handback .hb-head strong')].map(e=>e.textContent) }; })()";
+    const scrollBottomExpr = "(() => { const c=document.getElementById('chat'); if (!c) return false; c.scrollTop=c.scrollHeight; c.dispatchEvent(new Event('scroll',{bubbles:true})); return true; })()";
+    const matchExpr = "[...document.querySelectorAll('#chat .msg-handback .hb-head strong')].some(e=>e.textContent.includes(" + JSON.stringify(label) + "))";
+    const before = await wc().executeJavaScript(diagExpr);
+    log("REPORT_STATUS_" + status.toUpperCase() + "_BEFORE=" + JSON.stringify(before));
     wc().send("session:event", { roleId: "桌面窗口", event: { kind: "handback", summary: "新状态", report: { version: 1, reportId: "e2e-hb-status-" + status, source: { roleId: "桌面窗口", runtime: "pi" }, origin: "terminal-fallback", status, summary: { text: status }, evidence: [], at: "2026-10-13T00:00:00Z" } } });
-    await sleep(80);
-    // 结论标签现由 `.hb-head strong`（reportDeclaration）承载（原 `.hb-status` 载体随卡片重做退役）。
-    repairCheck("REPORT_STATUS_" + status.toUpperCase(), await wc().executeJavaScript("[...document.querySelectorAll('#chat .msg-handback .hb-head strong')].some(e=>e.textContent.includes(" + JSON.stringify(label) + "))"));
+    let rowAppended = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const now = await wc().executeJavaScript(diagExpr);
+      rowAppended = now.rowCount > before.rowCount;
+      if (rowAppended) break;
+      await sleep(20);
+    }
+    log("REPORT_STATUS_" + status.toUpperCase() + "_APPENDED=" + rowAppended + " " + JSON.stringify(await wc().executeJavaScript(diagExpr)));
+    await wc().executeJavaScript(scrollBottomExpr);
+    let matched = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      matched = await wc().executeJavaScript(matchExpr);
+      if (matched) break;
+      await wc().executeJavaScript(scrollBottomExpr);
+      await sleep(20);
+    }
+    log("REPORT_STATUS_" + status.toUpperCase() + "_AFTER=" + JSON.stringify(await wc().executeJavaScript(diagExpr)));
+    repairCheck("REPORT_STATUS_" + status.toUpperCase(), matched);
   }
 
   // 真实renderer进程退出→明确故障页→用户点击恢复；沿同一helper及受限preload，不调用模型。
@@ -1809,6 +1849,152 @@ async function run() {
   await waitRepair("window.__ansRenderer && window.__ansRenderer.state.sessionOpenRoleId === '桌面窗口'");
   repairCheck("MAC_CLOSE_REOPEN_LOADS_WITHOUT_DUPLICATE_HANDLERS", await wc().executeJavaScript("!!document.getElementById('inp-message') && !!window.desktop"));
   repairCheck("MAC_CLOSE_REOPEN_NO_AUTO_SEND", repairSendRequests.length === sendsBeforeCrash);
+
+  // —————— 2026-10-24 治理协调 / P0-1 发布验收门（最小真实主进程检查；不新增 UI）——————
+  // 用真实 `createDesktopInterface`（真实 Electron 主进程进程内）+ OUTDIR 临时项目：
+  //  ① 非发布 flow（release 缺省）完成 ⇒ Lead 系统行 awaiting-release-acceptance；不派 verifier/Proof；
+  //  ② flow 顶层 release: true 后才派 verifier；目标夹具文件不被改写（零写入）。
+  {
+    const projectMod = await import(pathToFileURL(path.join(APP_DIR, "desktop", "project.ts")).href);
+    const coordRoot = path.join(OUTDIR, "governance-coordination-project");
+    const flowId = "e2e-coordination";
+    const flowPath = path.join(coordRoot, "docs", "flows", `${flowId}.yaml`);
+    const ledgerPath = path.join(coordRoot, ".ans", "governance", "ledger.jsonl");
+    fs.mkdirSync(path.dirname(flowPath), { recursive: true });
+    fs.mkdirSync(path.dirname(ledgerPath), { recursive: true });
+    const flowSteps = [
+      "steps:",
+      "  - id: nomination",
+      "    title: 提名",
+      "    owner: nominator",
+      "    kind: customer-decision",
+      "    status: done",
+      "    evidence:",
+      "      kind: customer-decision",
+      "      ref: appointment",
+      "  - id: contract-freeze",
+      "    title: 契约",
+      "    owner: rapporteur",
+      "    kind: artifact",
+      "    status: done",
+      "    evidence:",
+      "      kind: artifact",
+      `      ref: docs/contracts/${flowId}-api-v1.md`,
+      "  - id: impl",
+      "    title: 实现",
+      "    owner: executor",
+      "    kind: dispatch",
+      "    status: done",
+      "    evidence:",
+      "      kind: dispatch",
+      "      ref: impl",
+      "  - id: verification",
+      "    title: 验收",
+      "    owner: app",
+      "    kind: acceptance",
+      "    status: pending",
+    ];
+    const writeCoordFlow = (release) => {
+      fs.writeFileSync(
+        flowPath,
+        [`flowId: ${flowId}`, "version: 1", "qualityTier: production", ...(release ? ["release: true"] : []), ...flowSteps, ""].join("\n"),
+        "utf8",
+      );
+    };
+    writeCoordFlow(false);
+    fs.writeFileSync(
+      ledgerPath,
+      [
+        JSON.stringify({ at: "2026-10-24T00:00:00.000Z", kind: "customer.decision", flowId, stepId: "nomination", decisionKind: "appointment", customerDecision: "appointed", actorRoleId: "nominator", power: "nomination" }),
+        JSON.stringify({ at: "2026-10-24T00:00:01.000Z", kind: "artifact.observed", artifactPath: `docs/contracts/${flowId}-api-v1.md`, actorRoleId: "rapporteur", power: "proposal" }),
+        JSON.stringify({ at: "2026-10-24T00:00:02.000Z", kind: "dispatch.accepted", flowId, stepId: "impl", actorRoleId: "convener", power: "schedule", targetRoleId: "executor" }),
+      ].join("\n") + "\n",
+      "utf8",
+    );
+    const builtIn = (roleId, governanceFunction) => ({
+      roleId,
+      cardPath: "",
+      boundaryPath: "",
+      cardText: `# ${roleId}`,
+      boundary: { entries: [], boundarySource: "<built-in:trio>", acceptance: { accepted: false, source: "" } },
+      builtIn: true,
+      governanceFunction,
+    });
+    const listing = {
+      projectRoot: coordRoot,
+      roles: [
+        builtIn("liaison", "liaison"),
+        builtIn("rapporteur", "proposal"),
+        builtIn("nominator", "nomination"),
+        builtIn("convener", "schedule"),
+        builtIn("verifier", "verification"),
+        { roleId: "executor", cardPath: "角色卡/executor/role-card.md", boundaryPath: "角色卡/executor/boundary.yaml", cardText: "# executor", boundary: { entries: [], boundarySource: "角色卡/executor/boundary.yaml", acceptance: { accepted: false, source: "" } } },
+      ],
+      warnings: [],
+      hasRoles: true,
+      primaryRoleId: "liaison",
+      governanceModel: "trio",
+    };
+    const coordSends = new Map();
+    const coordEvents = [];
+    const coordIface = createDesktopInterface({
+      pickDirectory: async () => coordRoot,
+      emitEvent: (envelope) => coordEvents.push(envelope),
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        const sends = coordSends.get(input.roleId) ?? [];
+        coordSends.set(input.roleId, sends);
+        return {
+          async send(text) { sends.push(text); },
+          events() {
+            return {
+              [Symbol.asyncIterator]() {
+                return {
+                  async next() {
+                    for (let i = 0; i < 400; i += 1) await sleep(5);
+                    return { value: undefined, done: true };
+                  },
+                };
+              },
+            };
+          },
+          async dispose() {},
+        };
+      },
+      buildProjectConfigFn: projectMod.buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    });
+    const waitForGovernance = async (check, label) => {
+      for (let i = 0; i < 300 && !check(); i += 1) await sleep(10);
+      repairCheck(label, check());
+    };
+    try {
+      await coordIface.listProject({ projectRoot: coordRoot });
+      const leadNotes = () =>
+        coordEvents
+          .filter((envelope) => envelope.roleId === "liaison" && envelope.event.kind === "message" && envelope.event.detail && envelope.event.detail.source === "delivery-note")
+          .map((envelope) => String(envelope.event.summary ?? ""));
+      await waitForGovernance(() => leadNotes().some((note) => note.includes("awaiting-release-acceptance")), "GOVERNANCE_AWAITING_RELEASE_SYSTEM_LINE");
+      repairCheck("GOVERNANCE_NON_RELEASE_NO_PROOF", (coordSends.get("verifier") ?? []).length === 0);
+      // flow 文件不被应用改写（目标零写入；fixture 自身仅由本检查的 release 标记步骤改写）。
+      const nonReleaseText = fs.readFileSync(flowPath, "utf8");
+      await sleep(250);
+      repairCheck("GOVERNANCE_NON_RELEASE_FLOW_UNCHANGED", fs.readFileSync(flowPath, "utf8") === nonReleaseText);
+      repairCheck("GOVERNANCE_NON_RELEASE_NO_CRITERIA_FILE", !fs.existsSync(path.join(coordRoot, "docs", "acceptance", `${flowId}-criteria-v1.md`)));
+
+      // 显式发布标记（release: true）⇒ 下一次真实事件才派 verifier/Proof。
+      writeCoordFlow(true);
+      await coordIface.listProject({ projectRoot: coordRoot });
+      await waitForGovernance(() => (coordSends.get("verifier") ?? []).length > 0, "GOVERNANCE_RELEASE_DISPATCHES_PROOF");
+      const releaseText = fs.readFileSync(flowPath, "utf8");
+      await sleep(250);
+      repairCheck("GOVERNANCE_RELEASE_FLOW_UNCHANGED", fs.readFileSync(flowPath, "utf8") === releaseText);
+      repairCheck("GOVERNANCE_RELEASE_NO_ACCEPTANCE_DONE", /id: verification\n\s+title: 验收\n\s+owner: app\n\s+kind: acceptance\n\s+status: pending/.test(releaseText));
+      log("GOVERNANCE_COORDINATION=" + JSON.stringify({ leadNotes: leadNotes().length, verifierSends: (coordSends.get("verifier") ?? []).length }));
+    } finally {
+      await coordIface.stopSession();
+    }
+  }
 
   log("E2E_PASS=" + (repairFailures.length === 0));
   log("E2E_FAILURES=" + repairFailures.join(", "));

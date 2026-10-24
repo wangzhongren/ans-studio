@@ -1,0 +1,17 @@
+src/model/project-document.ts
+src/service/project-document/impl/read-project-document.ts
+app/desktop/project.ts
+app/desktop/interface.ts
+test/桌面应用/project.test.ts
+test/桌面应用/project-document.test.ts
+test/桌面应用/interface.test.ts
+app/renderer/src/chat/types.ts
+app/renderer/src/shell/ProfilePanel.tsx
+app/renderer/src/stores/drawer-store.ts
+app/renderer/src/shell/phase4a.css
+test/桌面UI/phase4a-electron-smoke.mjs
+app/renderer/src/chat/profile-docs.ts
+test/桌面UI/profile-docs.test.ts
+src/common/shared/i18n/messages/zh-CN.ts
+src/common/shared/i18n/messages/en-US.ts
+test/项目管理/shared/i18n.test.ts

@@ -9,6 +9,8 @@ import { createDesktopInterface } from "../../app/desktop/interface.ts";
 import { SessionManager, type SessionManagerDeps, type SessionEventEnvelope } from "../../app/desktop/session.ts";
 import { getRuntimeConfig, saveRuntimeConfig } from "../../app/desktop/runtime-config.ts";
 import { RUNTIME_SETTINGS, type RuntimeSettingField } from "../../src/common/shared/runtime-settings.ts";
+import { RUNTIME_LABELS } from "../../src/common/shared/runtime-shared.ts";
+import { createMainI18n } from "../../app/desktop/i18n.ts";
 import { getSessionHistory } from "../../app/desktop/runtime-history.ts";
 import { createCustomerInputChannel, type OperatorExpiredPayload, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
 import { createShellConfirmPresenter, createDesktopOperatorChannel } from "../../app/desktop/operator-channel.ts";
@@ -227,11 +229,12 @@ test("档位字段（choices＋choiceLabels）：Pi 上下文窗口/看护检查
     const cleared = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_CONTEXT_WINDOW: "   " } }, { envPath: temp.envPath });
     assert.equal(cleared.ok, true);
     assert.equal((await getRuntimeConfig("pi", { envPath: temp.envPath, env: {} })).fields.find((f) => f.key === "ANS_PI_CONTEXT_WINDOW")!.isSet, false, "清除后未设");
-    // 无 choiceLabels 的字段：错误仍用 raw choices（分支保留，用临时合成字段验证）。
+    // 无 choiceLabelKeys 的字段：错误仍用 raw choices（分支保留，用临时合成字段验证）。
+    // 2026-10-23 i18n B4：字段展示名只来自目录 key；合成字段复用既有 key（zh 值「推理强度」）。
     const fields = RUNTIME_SETTINGS.pi.fields as RuntimeSettingField[];
     fields.push({
       key: "ANS_PI_TEST_CHOICES_ONLY",
-      label: "测试档位",
+      labelKey: "shared.runtimeSettings.reasoning.label",
       required: false,
       secret: false,
       choices: ["alpha", "beta"],
@@ -241,7 +244,7 @@ test("档位字段（choices＋choiceLabels）：Pi 上下文窗口/看护检查
       const fallback = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_TEST_CHOICES_ONLY: "gamma" } }, { envPath: temp.envPath });
       assert.equal(fallback.ok, false);
       assert.ok(
-        (fallback.error ?? "").includes("测试档位取值无效：仅接受 alpha / beta"),
+        (fallback.error ?? "").includes("推理强度取值无效：仅接受 alpha / beta"),
         "无标签字段回退 raw choices",
       );
       assert.equal((fallback.error ?? "").includes("gamma"), false, "回退分支同样不回显提交值原文");
@@ -255,6 +258,80 @@ test("档位字段（choices＋choiceLabels）：Pi 上下文窗口/看护检查
     assert.equal(rejected.ok, false);
     assert.equal(fs.readFileSync(temp.envPath, "utf8"), beforeMixed, "同批非法 ⇒ 整批零写入");
   } finally { temp.cleanup(); }
+});
+
+test("i18n B4：设置视图 label/help/choiceLabels 按当前 locale 从共享 key 解析（en-US）；字段集/必填/choices 不变；demo 走共享 key；切回 zh 逐字", async () => {
+  const temp = fixture();
+  createMainI18n("en-US");
+  try {
+    // 视图字段：key → 展示文案（en-US 目录）；无 helpKey/choiceLabelKeys 的字段不出现对应属性。
+    const piView = await getRuntimeConfig("pi", { envPath: temp.envPath, env: {} });
+    const byKey = Object.fromEntries(piView.fields.map((field) => [field.key, field]));
+    assert.equal(byKey.ANTHROPIC_AUTH_TOKEN.label, "Access token");
+    assert.equal(Object.hasOwn(byKey.ANTHROPIC_AUTH_TOKEN, "help"), false);
+    assert.equal(Object.hasOwn(byKey.ANTHROPIC_AUTH_TOKEN, "choiceLabels"), false);
+    assert.equal(byKey.ANS_PI_CONTEXT_WINDOW.label, "Context window");
+    assert.equal(
+      byKey.ANS_PI_CONTEXT_WINDOW.help,
+      "Drag to pick a preset; maximum 1M tokens. Leave empty for the system default (500k). Applied when the next session opens.",
+    );
+    assert.deepEqual(byKey.ANS_PI_CONTEXT_WINDOW.choiceLabels, ["System default (500k)", "32k", "64k", "128k", "256k", "500k", "1M"]);
+    assert.equal(byKey.ANS_PI_REASONING_EFFORT.label, "Reasoning effort");
+    assert.deepEqual(byKey.ANS_PI_REASONING_EFFORT.choiceLabels, ["Off", "Low", "Medium", "High", "XHigh"]);
+    const codexView = await getRuntimeConfig("codex", { envPath: temp.envPath, env: {} });
+    const codexKey = codexView.fields.find((field) => field.key === "CODEX_API_KEY")!;
+    assert.equal(codexKey.label, "API key");
+    assert.equal(codexKey.help, "If OPENAI_API_KEY already exists, it can be used as the credential.");
+    assert.equal(codexKey.fallbackKeys?.[0], "OPENAI_API_KEY", "fallbackKeys 原样透传");
+
+    // 契约不变：字段 key 集/必填/choices 与共享注册表逐项一致；key 字段（labelKey/helpKey/choiceLabelKeys）不进 IPC 视图。
+    assert.deepEqual(piView.fields.map((field) => field.key), RUNTIME_SETTINGS.pi.fields.map((field) => field.key));
+    assert.deepEqual(piView.fields.map((field) => field.required), RUNTIME_SETTINGS.pi.fields.map((field) => field.required));
+    assert.deepEqual(byKey.ANS_PI_CONTEXT_WINDOW.choices, RUNTIME_SETTINGS.pi.fields.find((field) => field.key === "ANS_PI_CONTEXT_WINDOW")!.choices);
+    for (const field of piView.fields) {
+      assert.equal(Object.hasOwn(field, "labelKey"), false, `${field.key} 不暴露 labelKey`);
+      assert.equal(Object.hasOwn(field, "helpKey"), false, `${field.key} 不暴露 helpKey`);
+      assert.equal(Object.hasOwn(field, "choiceLabelKeys"), false, `${field.key} 不暴露 choiceLabelKeys`);
+    }
+
+    // demo 显示名走共享 key（`RUNTIME_LABEL_KEYS.demo`），Pi/Codex/Claude 品牌名不变。
+    assert.equal((await getRuntimeConfig("demo", { envPath: temp.envPath, env: {} })).label, "Demo");
+    for (const runtime of ["pi", "codex", "claude"] as const) {
+      assert.equal((await getRuntimeConfig(runtime, { envPath: temp.envPath, env: {} })).label, RUNTIME_LABELS[runtime]);
+    }
+
+    // 保存错误：en-US 目录文案 + 解析后的 choiceLabels；校验仍以 raw choices 为准、不回显提交值。
+    const bad = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_REASONING_EFFORT: "max" } }, { envPath: temp.envPath });
+    assert.equal(bad.ok, false);
+    assert.equal(
+      bad.error,
+      "Invalid value for Reasoning effort: only Off / Low / Medium / High / XHigh is accepted (or leave empty to keep the platform default).",
+    );
+    assert.equal((bad.error ?? "").includes("max"), false, "错误不回显提交值原文");
+    const badInteger = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_PROMPT_TIMEOUT_MS: "-1" } }, { envPath: temp.envPath });
+    assert.equal(badInteger.ok, false);
+    assert.ok(
+      (badInteger.error ?? "").startsWith("Invalid value for Watchdog check limit: only System default (5 min) / "),
+      "档位错误 label 与 choiceLabels 按 en 解析（校验仍以 raw choices 为准）",
+    );
+
+    // 切回 zh-CN：同一视图与错误逐字为既有中文（旧断言口径不变）。
+    createMainI18n("zh-CN");
+    const zhView = await getRuntimeConfig("pi", { envPath: temp.envPath, env: {} });
+    const zhField = zhView.fields.find((field) => field.key === "ANS_PI_CONTEXT_WINDOW")!;
+    assert.equal(zhField.label, "上下文窗口");
+    assert.equal(zhField.help, "拖动选择预设档位，最大 1M tokens；留空＝系统默认（500k）；下一次开启会话时应用。");
+    assert.deepEqual(zhField.choiceLabels, ["系统默认（500k）", "32k", "64k", "128k", "256k", "500k", "1M"]);
+    assert.equal((await getRuntimeConfig("demo", { envPath: temp.envPath, env: {} })).label, "演示");
+    const zhBad = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_REASONING_EFFORT: "max" } }, { envPath: temp.envPath });
+    assert.equal(
+      zhBad.error,
+      "推理强度取值无效：仅接受 关 / 低 / 中 / 高 / 极高（或留空维持平台默认）。",
+    );
+  } finally {
+    createMainI18n("zh-CN");
+    temp.cleanup();
+  }
 });
 
 test("D1 same role and project across engines and same role across projects keep distinct handles and exact input targets", async () => {

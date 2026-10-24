@@ -1,5 +1,15 @@
 # 编排 变更记录
 
+## 2026-10-23 — 补登 `flow-state.ts` 至权威 `boundary.md` Section 1（Markdown/YAML 漂移校正）
+
+**来源**：客户闸门 2（[记录](../../docs/communication/2026-10-23_intent_governance-advance-redispatch.md)「闸门 2 确认与实施授权」）明确选择「**授权人事补边界条目**」。团队计划 §4.5 核对：`src/pipeline/orchestration/flow-state.ts` 只在 `角色卡/编排/boundary.yaml`，未在权威 `角色卡/编排/boundary.md` Section 1。
+
+**改了什么**
+- `角色卡/编排/boundary.md` Section 1 在 `src/pipeline/orchestration/run-role.ts` / `govern-session.ts` 之后补一行：单文件 `src/pipeline/orchestration/flow-state.ts`，用途与 `boundary.yaml` 既有条目逐字一致：`流程状态 YAML 契约的 Pipeline 公共出口（桌面自动验收门消费；实现同源于 src/common/编排/flow-state.ts）`。
+- `boundary.yaml` 已有该条目，核对路径/用途/类型一致，**未重复添加、未改其他条目**。
+
+**性质**：既有条目的 Markdown/YAML 漂移校正，不是扩权——不新增角色、不扩大权限、不改其他路径；未改 `role-card.md`、其他角色、产品/测试源码。
+
 ## 2026-10-19 — 判断路径确定性前置封堵：长内联命令与无界递归搜索
 
 **来源**：客户原话「grep/长内联命令 这个应该让判断AI 做好封堵。」真机：test-engineer 超长内联 `node -e` 报 `manual/context-too-large`；大目录/挂住的 grep 卡 17 分钟。本批只改编排（`src/common/编排/`、`test/编排/`、本角色文档），未碰 `app/**`、其他角色文件、运行时核心与 git 历史。

@@ -1,0 +1,5 @@
+--- diff stat ---
+ src/common/shared/i18n/messages/en-US.ts           |  11 ++
+ src/common/shared/i18n/messages/zh-CN.ts           |  10 ++
+ .../shared/i18n.test.ts"                           | 128 ++++++++++++++++++++-
+ 3 files changed, 146 insertions(+), 3 deletions(-)

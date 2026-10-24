@@ -1,0 +1,23 @@
+# i18n B0 desktop-UI candidate + evidence hashes
+# date: 2026-10-23T11:15:36+08:00 head: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+# line format: <path> | git hash-object | sha256sum
+app/renderer/src/i18n/index.ts | 5fe20dd651f667943617c94f69291c93224166f4 | 0249f3440f4364c1aab704bf13f3b53caae6699c795ec9eb5d9ede10f534c144
+app/renderer/src/i18n/locale-store.ts | f822e6bbd83335193af73a6daee1f684fc1aa1b0 | e24599f0455afb1cddde7bce102cfe83ca044b3e077e81f09773b7f88fbc1b16
+app/renderer/src/lib/platform.ts | 8c27680945897a1e39ec75c9198420d5e8d28dd9 | 6866ea181edb4d1096d54fda03ab170103adfa25afaa7bb88c407e200c9e5341
+app/renderer/src/App.tsx | 9fee1ab40f822fd90ae532f414aced511206d348 | 3d1e946d1dcc085f715f0fadad87d90d11429317b8694cef273a24b434ceb0ed
+app/renderer/src/shell/SettingsPanel.tsx | 9c6e75c25b10b412b499d903f1eacd02c61b7b85 | bfbd1598d2cbca40552945239181124d979aa8a23220a3e78564a407b59cd135
+test/桌面UI/i18n-store.test.ts | 9aafc11efb9c8a34d95f4e2ed96887ce56fce467 | 600c81540ba63c51c81b9f189e11d56853037ce9dc36360cec3e4bbb019728ee
+test/桌面UI/i18n-view.test.ts | 9a88dc258e1512cbc1961de9f0d10cbf82385d8d | 7fb032a2ea7e30a6c9cc81cf41c590acdd23977f2758c55afce9f442b076e861
+test/桌面UI/source-guard.test.ts | 6491c1706a0786c59bc65e54ac90400b07fc4f54 | fe97e947fc354e3af1b1710ceec29b0de131beda85e8ad4f60489fead419f114
+角色卡/桌面UI/api-spec.md | e5987effa2bfcb97c1cec854b3e68280af8982c1 | 115ac19b55632036d7e7986d306f142693cd2c7a2fdd2189c7a18f81845e8da6
+角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b0.md | be78f7f1b57be4fd15bf727edd32211d6f9546eb | c58ce2ef67dce54da502d095ff7c97272ede2c600d5d2512e8a36c7d4fd1759a
+角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b0-evidence/baseline-hashes.txt | 48cc269f57499c592bef1c4a9ae8984a1c10dcc9 | 0b08a56c887faab7dc9aad3d56bf63ada282cf584bfc2c5dab4415c4cf769a82
+角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b0-evidence/baseline-test.log | 032d542c2c782a456209396d12c0fce3c2376944 | 60bdf8600fc0203d77226c6689c82a89a0c3b922fa62545c3dc012cbdb9c3ec1
+角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b0-evidence/desktopui-suite.log | 88efb1e1d1eef8dd22d0307b631bf63d6a995070 | 52dd2cdd701f764d87e10d198d971b5ccdd1c4b828383a65c6eed560fdd00a9d
+角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b0-evidence/i18n-store-test.log | 43da95c25ac0ae1df931f3b98a5afd73d44f0157 | 5b61439409de53d368190feea01be6a628128ccf729e849631ae7ada0715bdf9
+角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b0-evidence/i18n-view-test.log | 7a12f9e42bf0a4b5c63af9d20bcc28cfd10bc228 | 3da45949f6a4819fcf68a783e66e92d5b3686639e6bb357619a387ed7f7b8b13
+角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b0-evidence/source-guard-test.log | e004b956669a496d19c3a139e4c16639342a866d | 0f3e78b3ce6f992c40bfe0fa472b5b5ff870f265a7a54e07d856afc1ca40baec
+角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b0-evidence/typecheck-renderer.log | 51bdbd4ebd67968c7fb6ae350c150a820b6b6f81 | 3ac75dc070190347f59dba62f639539b3a6cdde727795980b56ec7e81af59839
+角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b0-evidence/typecheck-root.log | 1aa1f9b65e0c30bd3bfb5dfb57fc9c56e43a0b68 | 9359a9091cc49ec16c9316d72fab1ae95c8b31e0ebfff051dba760eee658ca16
+角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b0-evidence/build-renderer.log | 60e3f793922e49368cba2c3c35f0ae256ee52446 | 00ad26e9a7fb18e7b6e657224c0b5e10b6234c9132b4e8c412e597146892e421
+角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b0-evidence/write-set-status.txt | 3189e14817b10786db831c2c53c5f4d19c3526e7 | b2bb44aa9ca0c7abe07076c92193609ca163b47af0659aa8900e7c0ce0eef1f8

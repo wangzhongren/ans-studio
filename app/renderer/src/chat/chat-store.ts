@@ -80,6 +80,12 @@ import type {
 } from "@/chat/types";
 import { useUiStore, type RuntimeId } from "@/stores/ui-store";
 import { useReportStore } from "@/stores/report-store";
+import { useLocaleStore, translate, type Locale } from "@/i18n";
+
+/** 当前界面语言（i18n B2）：事件投影/状态文案按事件到达时的 locale 渲染。 */
+function currentLocale(): Locale {
+  return useLocaleStore.getState().locale;
+}
 
 type Dict<T> = Record<string, T>;
 
@@ -273,7 +279,7 @@ function claimOptimisticUserRow(
   model: RowModel<ChatRow>,
   row: Record<string, unknown>,
 ): boolean {
-  const descriptor = historyRowToDescriptor(row);
+  const descriptor = historyRowToDescriptor(row, currentLocale());
   if (descriptor.kind !== "user") return false;
   const turnId = asString(descriptor.turnId);
   const text = asString(asDict(descriptor.data).text);
@@ -398,7 +404,7 @@ function ensureMeta(meta: Dict<RoleMeta>, roleId: string): RoleMeta {
       error: false,
       hadSession: false,
       restored: false,
-      contextText: "尚未开启会话",
+      contextText: translate(currentLocale(), "ui.chatHeader.noSession"),
     };
   }
   return meta[roleId];
@@ -475,7 +481,7 @@ function applyFoldToRow(row: ChatRow, roleId: string): boolean {
     row.data = {
       ...data,
       fold: "task-request",
-      foldLabel: "任务请求原文",
+      foldLabel: translate(currentLocale(), "ui.reportView.taskRequestLabel"),
       foldOpen: foldOpenSet(roleId).has(foldIdentity(row)),
     };
     return true;
@@ -486,7 +492,9 @@ function applyFoldToRow(row: ChatRow, roleId: string): boolean {
     row.data = {
       ...data,
       fold: "reply-original",
-      foldLabel: info.receiver ? "本轮回交处理回复原文（展开）" : "本轮角色回复原文（展开）",
+      foldLabel: info.receiver
+        ? translate(currentLocale(), "ui.reportView.deliveryReplyLabel")
+        : translate(currentLocale(), "ui.reportView.replyOriginalLabel"),
       foldOpen: foldOpenSet(roleId).has(foldIdentity(row)),
     };
     return true;
@@ -572,7 +580,7 @@ function refreshQueueAggregate(): void {
   const runtime = useUiStore.getState().runtime;
   const queued = queuedWithoutPresented(state.queuedOperator, state.pendingOperator);
   const count = trio && primary ? queuedCountForView(queued, state.projectRoot, runtime) : 0;
-  const text = governanceQueueAggregateText(count);
+  const text = governanceQueueAggregateText(count, currentLocale());
   const dirty = new Set<string>();
   for (const [roleId, model] of models) {
     const rows = model.rows.filter((row) => row.kind === "queue-aggregate");
@@ -723,7 +731,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     localMeta.live = true;
     const paneMeta = { ...get().paneMeta };
     paneMeta[roleId] = {
-      ...(paneMeta[roleId] || { loading: false, emptyNote: false, contextText: "会话已开启" }),
+      ...(paneMeta[roleId] || {
+        loading: false,
+        emptyNote: false,
+        contextText: translate(currentLocale(), "ui.chatStore.context.opened"),
+      }),
       loading: false,
       emptyNote: false,
     };
@@ -781,7 +793,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         paneMeta[selected] = {
           loading: false,
           emptyNote: false,
-          contextText: "项目加载失败",
+          contextText: translate(currentLocale(), "ui.chatStore.context.projectLoadFailed"),
           error: String(error),
         };
       }
@@ -845,7 +857,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       paneMeta[selected] = {
         loading: false,
         emptyNote: true,
-        contextText: selected === listing.primaryRoleId ? "主入口 · 尚未开启会话" : "尚未开启会话",
+        contextText:
+          selected === listing.primaryRoleId
+            ? translate(currentLocale(), "ui.chatStore.context.primaryNoSession")
+            : translate(currentLocale(), "ui.chatHeader.noSession"),
       };
     }
     set({
@@ -903,7 +918,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     paneMeta[roleId] = {
       ...(paneMeta[roleId] || { emptyNote: true, contextText: "" }),
       loading: !alreadyLoaded,
-      contextText: alreadyOpen ? paneMeta[roleId]?.contextText || "会话已开启" : "正在开启或恢复会话…",
+      contextText: alreadyOpen
+        ? paneMeta[roleId]?.contextText ||
+          translate(currentLocale(), "ui.chatStore.context.opened")
+        : translate(currentLocale(), "ui.chatStore.context.opening"),
       error: undefined,
     };
     set({
@@ -916,7 +934,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         ...paneMeta[roleId],
         loading: false,
         emptyNote: true,
-        contextText: "尚未导入项目",
+        contextText: translate(currentLocale(), "ui.sidebar.noProject"),
       };
       set({ paneMeta, paneVersions: bumpVersions(get().paneVersions, [roleId]) });
       return;
@@ -945,8 +963,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       paneMeta[roleId] = {
         ...paneMeta[roleId],
         loading: false,
-        error: "当前环境未提供桌面通道",
-        contextText: "未连接主进程",
+        error: translate(currentLocale(), "ui.chatStore.error.noDesktopBridge"),
+        contextText: translate(currentLocale(), "ui.chatStore.context.notConnected"),
       };
       set({ paneMeta, paneVersions: bumpVersions(get().paneVersions, [roleId]) });
       return;
@@ -956,8 +974,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         paneMeta[roleId] = {
           ...paneMeta[roleId],
           loading: false,
-          error: "当前版本未提供会话通道",
-          contextText: "会话通道不可用",
+          error: translate(currentLocale(), "ui.chatStore.error.noSessionChannel"),
+          contextText: translate(currentLocale(), "ui.chatStore.context.channelUnavailable"),
         };
         set({ paneMeta, paneVersions: bumpVersions(get().paneVersions, [roleId]) });
         return;
@@ -969,7 +987,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         result = { ok: false, error: String(error) };
       }
       if (result.ok === false) {
-        const reason = asString(result.error) || "会话开启失败";
+        const reason =
+          asString(result.error) || translate(currentLocale(), "ui.chatStore.openFailed");
         const roleMeta = { ...get().roleMeta };
         ensureMeta(roleMeta, roleId).error = true;
         const nextPane = { ...get().paneMeta };
@@ -977,17 +996,24 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           ...nextPane[roleId],
           loading: false,
           error: reason,
-          contextText: "会话开启失败",
+          contextText: translate(currentLocale(), "ui.chatStore.openFailed"),
         };
         const model = modelFor(roleId);
         model.append(makeRow({
           kind: "system",
-          data: { cls: "sys-call sys-config", text: "开启会话失败：" + reason },
+          data: {
+            cls: "sys-call sys-config",
+            text: translate(currentLocale(), "ui.chatStore.openFailedWithReason", {
+              reason,
+            }),
+          },
         }));
         set({
           roleMeta,
           paneMeta: nextPane,
-          hint: "开启会话失败：" + reason,
+          hint: translate(currentLocale(), "ui.chatStore.openFailedWithReason", {
+            reason,
+          }),
           paneVersions: bumpVersions(get().paneVersions, [roleId]),
         });
         return;
@@ -997,14 +1023,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const resumed = result.resumed === true || contextSource === "resumed";
       // 旧 showSessionContext 同口径：resumed/recovered/fresh 文案逐字；不把恢复失败说成已恢复。
       const contextText = resumed
-        ? "会话继续使用现有上下文"
+        ? translate(currentLocale(), "ui.chatStore.context.continues")
         : contextSource === "recovered"
-          ? "已从本地恢复模型上下文"
+          ? translate(currentLocale(), "ui.chatStore.context.recovered")
           : contextSource === "fresh"
             ? contextWarning
-              ? "恢复失败，当前为新会话"
-              : "新会话"
-            : "上下文来源未报告";
+              ? translate(currentLocale(), "ui.chatStore.context.recoveryFailed")
+              : translate(currentLocale(), "ui.chatStore.context.newSession")
+            : translate(currentLocale(), "ui.chatStore.context.sourceUnreported");
       if (!resumed && contextSource === "fresh") {
         pendingReadableHistory.add(roleId);
       }
@@ -1034,7 +1060,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           loading: false,
           historyLoaded: true,
           error: String(error),
-          contextText: "历史读取失败",
+          contextText: translate(currentLocale(), "ui.chatStore.context.historyFailed"),
         };
         set({ paneMeta: nextPane, paneVersions: bumpVersions(get().paneVersions, [roleId]) });
       }
@@ -1061,7 +1087,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (selected && paneMeta[selected]) {
       paneMeta[selected] = {
         ...paneMeta[selected],
-        contextText: "已切换引擎；点角色重新开启会话",
+        contextText: translate(currentLocale(), "ui.chatStore.context.engineSwitched"),
         loading: false,
       };
     }
@@ -1137,7 +1163,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           hintSource = null;
         }
       }
-      const descriptor = describeEvent(event);
+      const descriptor = describeEvent(event, currentLocale());
       if (!descriptor) continue;
       const scope = {
         projectRoot: typeof envelope.projectRoot === "string" ? envelope.projectRoot : projectRoot,
@@ -1229,7 +1255,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const pane = paneMeta[roleId] || {
         loading: false,
         emptyNote: true,
-        contextText: "会话已开启",
+        contextText: translate(currentLocale(), "ui.chatStore.context.opened"),
       };
       paneMeta[roleId] = {
         ...pane,
@@ -1328,7 +1354,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
     if (payloadRuntime && payloadRuntime !== useUiStore.getState().runtime) return;
     const rows = asArray<Record<string, unknown>>(record.rows);
-    const historyRows = dedupeHistoryRows(rows);
+    const historyRows = dedupeHistoryRows(rows, currentLocale());
     const signatures = rows.map(rowSignature);
     const previous = historySignatures.get(roleId) || null;
     const planned = planReplay(previous, signatures);
@@ -1354,10 +1380,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       return appended;
     };
     const appendHistoryRow = (row: Record<string, unknown>): ChatRow =>
-      appendHistoryDescriptor(historyRowToDescriptor(row));
+      appendHistoryDescriptor(historyRowToDescriptor(row, currentLocale()));
     /** 增量回放：同一轮同一文本的实时行已存在时，不再追加第二条（实时回显不是新事实）。 */
     const liveCoversHistoryRow = (row: Record<string, unknown>): boolean => {
-      const descriptor = historyRowToDescriptor(row);
+      const descriptor = historyRowToDescriptor(row, currentLocale());
       if (
         descriptor.kind !== "user" &&
         descriptor.kind !== "assistant" &&
@@ -1420,7 +1446,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           "reasoning",
         ]);
         const historyDescriptors = dedupeHistoryDescriptors(
-          historyRows.map((row) => historyRowToDescriptor(row)),
+          historyRows.map((row) => historyRowToDescriptor(row, currentLocale())),
         );
         const groupOf = (kind: string): string =>
           kind === "injected" || kind === "user"
@@ -1580,7 +1606,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             let merged = asDict(existing.data);
             let changed = false;
             for (const piece of reasoningPiecesFromData(asDict(row.data))) {
-              const result = mergeReasoningRowData(merged, piece);
+              const result = mergeReasoningRowData(merged, piece, currentLocale());
               if (result.changed) {
                 merged = result.data;
                 changed = true;
@@ -1612,7 +1638,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       historyKeyCounts.set(roleId, countHistoryEventKeys(historyRows));
       liveKeyCounts.delete(roleId);
     } else if (plan.mode === "append") {
-      const appendRows = dedupeHistoryRows(rows.slice(plan.from));
+      const appendRows = dedupeHistoryRows(rows.slice(plan.from), currentLocale());
       for (const row of appendRows) {
         if (claimOptimisticUserRow(model, row)) continue;
         if (liveCoversHistoryRow(row)) continue;
@@ -1632,21 +1658,29 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (error && rows.length === 0) {
       appendDescriptor(model, {
         kind: "system",
-        data: { cls: "sys-call sys-replay-divider", text: "会话记录读取失败，未回放：" + error },
+        data: {
+          cls: "sys-call sys-replay-divider",
+          text: translate(currentLocale(), "ui.chatStore.replayFailed", {
+            detail: error,
+          }),
+        },
         replay: true,
       }, roleId);
     }
-    const projectionText = historyProjectionText(record);
+    const projectionText = historyProjectionText(record, currentLocale());
     const roleMeta = { ...get().roleMeta };
     const meta = ensureMeta(roleMeta, roleId);
     if (pendingReadableHistory.has(roleId)) {
       pendingReadableHistory.delete(roleId);
-      if (rows.length > 0 && meta.contextText.indexOf("可读历史保留") < 0) {
-        meta.contextText = meta.contextText + "；可读历史保留，模型未恢复";
+      if (rows.length > 0 && meta.readableHistoryRetained !== true) {
+        meta.readableHistoryRetained = true;
+        meta.contextText =
+          meta.contextText + translate(currentLocale(), "ui.chatStore.historyRetainedSuffix");
       }
     }
     meta.restored = true;
-    meta.contextText = meta.contextText || "会话记录已恢复";
+    meta.contextText =
+      meta.contextText || translate(currentLocale(), "ui.chatStore.context.historyRecovered");
     const paneMeta = { ...get().paneMeta };
     paneMeta[roleId] = {
       loading: false,
@@ -1689,12 +1723,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     meta.hadSession = true;
     const contextSource = asString(record.contextSource);
     const contextWarning = asString(record.contextWarning);
-    if (contextSource === "recovered") meta.contextText = "已从本地恢复模型上下文";
-    else if (contextSource === "fresh") {
-      const base = contextWarning ? "恢复失败，当前为新会话" : "新会话";
+    if (contextSource === "recovered") {
+      meta.contextText = translate(currentLocale(), "ui.chatStore.context.recovered");
+    } else if (contextSource === "fresh") {
+      const base = contextWarning
+        ? translate(currentLocale(), "ui.chatStore.context.recoveryFailed")
+        : translate(currentLocale(), "ui.chatStore.context.newSession");
       meta.contextText =
-        meta.contextText.indexOf("可读历史保留") >= 0 && !contextWarning
-          ? base + "；可读历史保留，模型未恢复"
+        meta.readableHistoryRetained === true && !contextWarning
+          ? base + translate(currentLocale(), "ui.chatStore.historyRetainedSuffix")
           : base;
     }
     if (contextWarning) meta.contextWarning = contextWarning;
@@ -1854,10 +1891,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         result = { ok: false, error: String(error) };
       }
     } else {
-      result = { ok: false, error: "operatorRespond 通道未接" };
+      result = { ok: false, error: translate(currentLocale(), "ui.chatStore.error.operatorChannelMissing") };
     }
     if (result.ok === true) {
-      const note = operatorFinalNote(decision);
+      const note = operatorFinalNote(decision, currentLocale());
       updateOperatorRows(id, { state: "decided", finalNote: note, retryError: "" });
       const pendingOperator = { ...get().pendingOperator };
       delete pendingOperator[id];
@@ -1876,7 +1913,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     updateOperatorRows(id, {
       state: "open",
       finalNote: null,
-      retryError: operatorRetryNote(asString(result.error) || "通道未受理"),
+      retryError: operatorRetryNote(asString(result.error) || translate(currentLocale(), "ui.chatStore.operatorChannelNotAccepted"), currentLocale()),
     });
     set({ paneVersions: bumpVersions(get().paneVersions, dirty) });
   },
@@ -1887,7 +1924,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     delete pendingOperator[id];
     const queuedOperator = { ...get().queuedOperator };
     delete queuedOperator[id];
-    const note = operatorExpiredNote(reason);
+    const note = operatorExpiredNote(reason, currentLocale());
     const dirty = updateOperatorRows(
       id,
       { state: "expired", finalNote: note, retryError: "" },
@@ -1947,14 +1984,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       loading: meta.loading === true,
       loadingText: meta.loading
         ? rows.length === 0 && !busy && !queued
-          ? "正在开启会话…"
-          : "正在载入会话历史…"
+          ? translate(currentLocale(), "ui.chatStore.context.openingSession")
+          : translate(currentLocale(), "ui.chatStream.loadingHistory")
         : "",
       note: meta.emptyNote === true,
       noteText: meta.emptyNote
         ? get().roleBusy[roleId]
-          ? "会话已开启；后台正在工作，暂无可见消息"
-          : "会话已开启，可直接输入消息"
+          ? translate(currentLocale(), "ui.chatStore.context.openedBackground")
+          : translate(currentLocale(), "ui.chatStream.empty.openedTitle")
         : "",
       assistant,
       text: [
@@ -2166,7 +2203,7 @@ function appendExceptionalActivity(
     effective.deniedSummary ||
     effective.visibleSummary ||
     (effective.summary || "").split(/\r?\n/)[0] ||
-    effective.toolName + " 未放行";
+    translate(currentLocale(), "ui.chatStore.toolNotApproved", { toolName: effective.toolName });
   const row = makeRow({
     kind: "denied",
     data: { text, target: effective.target || "", activity: effective },
@@ -2200,7 +2237,7 @@ function appendReasoningDescriptor(
       let merged = asDict(existing.data);
       let changed = false;
       for (const piece of reasoningPiecesFromData(data)) {
-        const result = mergeReasoningRowData(merged, piece);
+        const result = mergeReasoningRowData(merged, piece, currentLocale());
         if (result.changed) {
           merged = result.data;
           changed = true;

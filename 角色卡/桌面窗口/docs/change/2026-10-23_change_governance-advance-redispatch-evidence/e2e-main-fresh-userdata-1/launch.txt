@@ -1,0 +1,5 @@
+# command: node_modules/.bin/electron --user-data-dir=<fresh temp> test/桌面应用/e2e/main.mjs
+# cwd: /c/Users/51054/Desktop/work/ans-studio
+# started: 2026-10-23T17:17:37+08:00
+# userData: C:\Users\51054\AppData\Local\Temp/ans-e2e-userdata-rL9yHL
+# outdir: /c/Users/51054/Desktop/work/ans-studio/角色卡/桌面窗口/docs/change/2026-10-23_change_governance-advance-redispatch-evidence/e2e-main-fresh-userdata-1

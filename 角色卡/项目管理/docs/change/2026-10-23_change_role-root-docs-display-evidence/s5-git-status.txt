@@ -1,0 +1,4 @@
+--- git status --short ---
+ M src/common/shared/i18n/messages/en-US.ts
+ M src/common/shared/i18n/messages/zh-CN.ts
+ M "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"

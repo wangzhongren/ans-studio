@@ -81,6 +81,8 @@ const state = {
   docMode: "success",
   docPending: [],
   docDeferred: false,
+  // Windows 形状：索引仍列根文档名，但无 scope/refs，读取不可用（Q9 A）。
+  docsUnavailable: false,
   withdrawMode: "deferred",
   withdrawPending: [],
   withdrawThrow: false,
@@ -121,6 +123,13 @@ const roleA = {
   boundaryPath: "角色卡/A/boundary.yaml",
   changelog: { path: "角色卡/A/changelog.md", text: "# 变更记录\n\n" + "保留变更阅读位置。\n\n".repeat(100) },
   docs: Array.from({ length: 100 }, (_, index) => ({ kind: "file", path: "docs/record-" + index + ".md" })),
+  // 角色根文档（S4 夹具：主进程索引的元数据形状；顺序即展示顺序）。
+  rootDocs: [
+    { name: "feature-map.md", path: ROOT + "/角色卡/A/feature-map.md", kind: "file" },
+    { name: "functional-description.md", path: ROOT + "/角色卡/A/functional-description.md", kind: "file" },
+    { name: "api-spec.md", path: ROOT + "/角色卡/A/api-spec.md", kind: "file" },
+  ],
+  // opaque 引用：根文档追加在既有 docs 之后（不复制正文）。
   documents: [
     {
       version: 1,
@@ -140,6 +149,33 @@ const roleA = {
       label: "报告 2",
       format: "text",
     },
+    {
+      version: 1,
+      projectViewId: "epoch-one",
+      documentId: "root-feature-map",
+      roleId: "A",
+      relativePath: ROOT + "/角色卡/A/feature-map.md",
+      label: "feature-map.md",
+      format: "markdown",
+    },
+    {
+      version: 1,
+      projectViewId: "epoch-one",
+      documentId: "root-functional-description",
+      roleId: "A",
+      relativePath: ROOT + "/角色卡/A/functional-description.md",
+      label: "functional-description.md",
+      format: "markdown",
+    },
+    {
+      version: 1,
+      projectViewId: "epoch-one",
+      documentId: "root-api-spec",
+      roleId: "A",
+      relativePath: ROOT + "/角色卡/A/api-spec.md",
+      label: "api-spec.md",
+      format: "markdown",
+    },
   ],
 };
 const roleB = {
@@ -154,16 +190,28 @@ const roleB = {
 };
 
 function listing(projectRoot = ROOT) {
+  const roles = [
+    { ...roleA, cardPath: projectRoot + "/角色卡/A/role-card.md" },
+    { ...roleB, cardPath: projectRoot + "/角色卡/B/role-card.md" },
+  ];
+  if (state.docsUnavailable) {
+    // 与 Windows 真实回包同形：索引元数据仍在，但 scope 缺席、无 refs、读取不可用。
+    return {
+      projectRoot,
+      primaryRoleId: "A",
+      hasRoles: true,
+      warnings: [],
+      documentReadUnavailable: "UNSUPPORTED_ENVIRONMENT",
+      roles: roles.map((role) => ({ ...role, documents: [] })),
+    };
+  }
   return {
     projectRoot,
     primaryRoleId: "A",
     hasRoles: true,
     warnings: [],
     documentScope: { version: 1, projectViewId: "epoch-one", projectRoot },
-    roles: [
-      { ...roleA, cardPath: projectRoot + "/角色卡/A/role-card.md" },
-      { ...roleB, cardPath: projectRoot + "/角色卡/B/role-card.md" },
-    ],
+    roles,
   };
 }
 
@@ -282,6 +330,45 @@ ipcMain.handle("project:document-read", (_e, input) => {
     }
     if (state.docMode === "PROJECT_NOT_GRANTED") {
       return { ok: false, version: 1, projectViewId: input.projectViewId, documentId: input.documentId, code: "PROJECT_NOT_GRANTED", message: "fixed" };
+    }
+    if (input.documentId === "root-feature-map") {
+      return {
+        ok: true,
+        version: 1,
+        projectViewId: input.projectViewId,
+        documentId: input.documentId,
+        roleId: "A",
+        relativePath: ROOT + "/角色卡/A/feature-map.md",
+        format: "markdown",
+        byteLength: 34,
+        text: "# 功能导航\n\n根文档正文 feature map",
+      };
+    }
+    if (input.documentId === "root-functional-description") {
+      return {
+        ok: true,
+        version: 1,
+        projectViewId: input.projectViewId,
+        documentId: input.documentId,
+        roleId: "A",
+        relativePath: ROOT + "/角色卡/A/functional-description.md",
+        format: "markdown",
+        byteLength: 46,
+        text: "# 模块视图\n\n根文档正文 functional description",
+      };
+    }
+    if (input.documentId === "root-api-spec") {
+      return {
+        ok: true,
+        version: 1,
+        projectViewId: input.projectViewId,
+        documentId: input.documentId,
+        roleId: "A",
+        relativePath: ROOT + "/角色卡/A/api-spec.md",
+        format: "markdown",
+        byteLength: 14,
+        text: "not-applicable",
+      };
     }
     if (input.documentId === "doc-two") {
       return {
@@ -893,11 +980,68 @@ app.whenReady().then(async () => {
       (await js(`document.getElementById('right-body').scrollTop>100`)),
     nested,
   );
+  // S4：文档节两组（角色根文档 / docs/）；顺序、计数、memo/role-card 过滤、按钮语义。
+  check(
+    "PROFILE_DOCS_GROUPS_ROOT_AND_SUBDIR",
+    await js(`(()=>{const sec=document.querySelector('details[data-section="docs"]');const groups=[...sec.querySelectorAll('[data-docs-group]')].map(g=>g.getAttribute('data-docs-group'));const names=[...sec.querySelectorAll('[data-root-doc-path]')].map(b=>b.getAttribute('data-root-doc-path'));const rootText=sec.querySelector('[data-docs-group="root"]')?.textContent||'';const subText=sec.querySelector('[data-docs-group="subdir"]')?.textContent||'';return groups.join(',')==='root,subdir'&&names.length===3&&names[0].endsWith('/角色卡/A/feature-map.md')&&names[1].endsWith('/角色卡/A/functional-description.md')&&names[2].endsWith('/角色卡/A/api-spec.md')&&sec.querySelector('.sec-count').textContent==='103'&&rootText.includes('角色根文档')&&rootText.includes('功能导航')&&subText.includes('docs/ 目录')&&!sec.textContent.includes('memo.md')&&!sec.textContent.includes('role-card.md');})()`),
+    await js(`(()=>{const sec=document.querySelector('details[data-section="docs"]');return {groups:[...sec.querySelectorAll('[data-docs-group]')].map(g=>g.getAttribute('data-docs-group')),names:[...sec.querySelectorAll('[data-root-doc-path]')].map(b=>b.getAttribute('data-root-doc-path')),count:sec.querySelector('.sec-count')?.textContent,memo:sec.textContent.includes('memo.md')};})()`),
+  );
+  check(
+    "PROFILE_ROOT_DOC_BUTTON_TITLE_ARIA",
+    await js(`(()=>{const b=document.querySelector('[data-root-doc-path$="/feature-map.md"]');const label='只读打开 feature-map.md';return !!b&&b.tagName==='BUTTON'&&b.title===label&&b.getAttribute('aria-label')===label;})()`),
+  );
+  // 平台诚实：索引仍列名；Windows 形状（无 scope/refs）点开停留列表态 + 既有结构化错误。
+  state.docsUnavailable = true;
+  await js(`document.querySelector('[data-root-doc-path$="/feature-map.md"]').click()`);
+  await sleep(260);
+  check(
+    "ROOT_DOC_WINDOWS_UNAVAILABLE_STRUCTURED_ERROR",
+    await js(`window.__ansRenderer.state.rightTab==='document'&&!document.getElementById('document-read-text')&&!document.querySelector('.document-list')&&(document.querySelector('.document-scope-error')?.textContent||'').includes('当前环境暂不支持安全读取项目文档')&&!document.getElementById('right-body').textContent.includes('根文档正文')`),
+    await js(`({tab:window.__ansRenderer.state.rightTab,error:document.querySelector('.document-scope-error')?.textContent||'',list:!!document.querySelector('.document-list'),body:document.getElementById('right-body').textContent.slice(0,160)})`),
+  );
+  await js(`document.querySelector('[data-doc-action="back-role"]').click()`);
+  await sleep(220);
+  check(
+    "ROOT_DOC_BACK_ROLE_FOCUSES_ROOT_BUTTON",
+    await js(`window.__ansRenderer.state.rightTab==='card'&&(document.activeElement.getAttribute('data-root-doc-path')||'').endsWith('/角色卡/A/feature-map.md')`),
+    await js(`({tab:window.__ansRenderer.state.rightTab,active:document.activeElement&&(document.activeElement.tagName+'.'+document.activeElement.className),path:document.activeElement.getAttribute&&document.activeElement.getAttribute('data-root-doc-path'),docsOpen:document.querySelector('details[data-section="docs"]')?.open})`),
+  );
+  state.docsUnavailable = false;
+  // 可读分支：点击根文档 → 刷新后按 relativePath 精确匹配 ref → 既有 DocumentView 阅读态。
+  await js(`document.querySelector('[data-root-doc-path$="/feature-map.md"]').click()`);
+  await sleep(280);
+  check(
+    "ROOT_DOC_OPENS_DOCUMENT_VIEW_READONLY",
+    await js(`window.__ansRenderer.state.rightTab==='document'&&document.getElementById('document-read-text').textContent.includes('根文档正文 feature map')&&document.getElementById('document-read-status').textContent.includes('只读文档')&&(document.querySelector('.document-path')?.textContent||'').endsWith('/角色卡/A/feature-map.md')&&!document.querySelector('#document-read-text script,#document-read-text img')`),
+    await js(`({path:document.querySelector('.document-path')?.textContent,status:document.getElementById('document-read-status')?.textContent})`),
+  );
+  await js(`document.querySelector('[data-doc-action="back-list"]').click()`);
+  await sleep(140);
+  check(
+    "ROOT_DOC_LIST_APPENDS_REFS_WITHOUT_PREFIX_CHANGE",
+    await js(`document.querySelectorAll('[data-doc-id]').length===5&&!!document.querySelector('[data-doc-id="doc-one"]')&&!!document.querySelector('[data-doc-id="doc-two"]')&&!!document.querySelector('[data-doc-id="root-feature-map"]')&&!!document.querySelector('[data-doc-id="root-functional-description"]')&&!!document.querySelector('[data-doc-id="root-api-spec"]')`),
+  );
+  await js(`document.querySelector('[data-doc-action="back-role"]').click()`);
+  await sleep(220);
+  // api-spec 的 not-applicable 当普通文本：无 badge/特殊错误。
+  await js(`document.querySelector('[data-root-doc-path$="/api-spec.md"]').click()`);
+  await sleep(280);
+  check(
+    "ROOT_DOC_API_SPEC_NOT_APPLICABLE_PLAIN_TEXT",
+    await js(`(document.getElementById('document-read-text')?.textContent||'').trim()==='not-applicable'&&!document.querySelector('.document-scope-error')&&!document.querySelector('#document-read-status [class*="badge"]')`),
+    await js(`document.getElementById('document-read-text')?.textContent`),
+  );
+  await js(`document.querySelector('[data-doc-action="back-list"]').click()`);
+  await sleep(120);
+  await js(`document.querySelector('[data-doc-action="back-role"]').click()`);
+  await sleep(200);
   await js(`[...document.querySelectorAll('#right-body button')].find(x=>x.textContent==='查看已列文档').click()`);
   await sleep(180);
   check(
     "DOCUMENT_LIST_OPAQUE_REFS_ONLY",
-    await js(`document.getElementById('drawer-title').textContent==='A · 来源文档'&&document.querySelectorAll('[data-doc-id]').length===2&&document.querySelector('.document-source-note')&&window.__ansRenderer.state.selectedRoleId==='A'`),
+    await js(`document.getElementById('drawer-title').textContent==='A · 来源文档'&&document.querySelectorAll('[data-doc-id]').length===5&&document.querySelector('.document-source-note')&&window.__ansRenderer.state.selectedRoleId==='A'`),
+    // 5 = 既有 docs 2 条 + 新增根文档 3 条（新增 refs，不是回归）。
+    await js(`document.querySelectorAll('[data-doc-id]').length`),
   );
   await js(`document.querySelector('[data-doc-id="doc-one"]').click()`);
   await sleep(200);
@@ -977,6 +1121,14 @@ app.whenReady().then(async () => {
   check(
     "ROLE_SWITCH_INVALIDATES_DOCUMENT_VIEW",
     await js(`window.__ansRenderer.state.rightTab===null&&!document.getElementById('document-read-text')&&!document.querySelector('.document-list')`),
+  );
+  // B 无根文档且无 docs（旧 main 形状缺 rootDocs）：整节诚实空态，不伪造。
+  await js(`document.getElementById('tab-card').click()`);
+  await sleep(180);
+  check(
+    "PROFILE_EMPTY_DOCS_HONEST_STATE",
+    await js(`(()=>{const sec=document.querySelector('details[data-section="docs"]');return !!sec&&!sec.querySelector('[data-docs-group]')&&sec.textContent.includes('（暂无角色文档）')&&sec.querySelector('.sec-count').textContent==='无';})()`),
+    await js(`document.querySelector('details[data-section="docs"]')?.textContent`),
   );
   await js(`await window.__ansRenderer.selectRole('A')`);
 
@@ -1198,9 +1350,12 @@ app.whenReady().then(async () => {
     "QUEUE_SUBVIEW_FROM_PROFILE_ESC_RESTORES_ROLE_FOCUS",
     await js(`document.getElementById('drawer-title').textContent==='A · 角色资料'&&document.activeElement.classList.contains('queue-view-all')`),
   );
+  await js(`document.querySelector('details[data-section="docs"]').open=true`);
+  await sleep(100);
   check(
     "WIDTH_960_PROFILE_NO_OVERFLOW",
-    await js(`document.body.scrollWidth===innerWidth&&document.getElementById('right-body').scrollWidth===document.getElementById('right-body').clientWidth`),
+    await js(`document.body.scrollWidth===innerWidth&&document.getElementById('right-body').scrollWidth===document.getElementById('right-body').clientWidth&&(()=>{const d=document.getElementById('right-body').getBoundingClientRect();return [...document.querySelectorAll('[data-root-doc-path]')].every(b=>{const r=b.getBoundingClientRect();return r.width>0&&r.left>=d.left-0.5&&r.right<=d.right+0.5&&b.title.length>0&&b.getAttribute('aria-label')===b.title;});})()`),
+    await js(`(()=>{const d=document.getElementById('right-body').getBoundingClientRect();return {drawer:{left:d.left,right:d.right},buttons:[...document.querySelectorAll('[data-root-doc-path]')].map(b=>{const r=b.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width,title:b.title};})};})()`),
   );
   await js(`document.getElementById('right-body').scrollTop=0`);
   await sleep(80);
@@ -1222,6 +1377,7 @@ app.whenReady().then(async () => {
   check(
     "WIDTH_960_SETTINGS_NO_OVERFLOW",
     await js(`document.body.scrollWidth===innerWidth&&(()=>{const p=document.getElementById('pi-panel');return p.scrollWidth===p.clientWidth;})()&&[...document.querySelectorAll('#pi-panel input')].every(x=>x.getBoundingClientRect().right<=innerWidth)`),
+    await js(`(()=>{const p=document.getElementById('pi-panel');return {body:document.body.scrollWidth,inner:innerWidth,panel:{scroll:p.scrollWidth,client:p.clientWidth},inputs:[...document.querySelectorAll('#pi-panel input')].map(x=>({id:x.id,right:x.getBoundingClientRect().right}))};})()`),
   );
   check(
     "WIDTH_960_SAVE_STATUS_NOT_CLIPPED",
@@ -1271,6 +1427,14 @@ app.whenReady().then(async () => {
   await sleep(180);
   await js(`document.getElementById('tab-card').click()`);
   await sleep(220);
+  await js(`document.querySelector('details[data-section="docs"]').open=true`);
+  await js(`document.querySelector('[data-root-doc-path]').scrollIntoView({block:'center'})`);
+  await sleep(140);
+  check(
+    "ZOOM_200_ROOT_DOC_BUTTON_REACHABLE",
+    await js(`(()=>{const b=document.querySelector('[data-root-doc-path]');const r=b.getBoundingClientRect();const hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.width>0&&r.height>0&&r.left>=0&&r.right<=innerWidth&&(hit===b||b.contains(hit))&&b.title.length>0&&b.getAttribute('aria-label')===b.title;})()`),
+    await js(`(()=>{const b=document.querySelector('[data-root-doc-path]');const r=b.getBoundingClientRect();return {rect:{left:r.left,right:r.right,top:r.top,bottom:r.bottom},innerWidth,title:b.title};})()`),
+  );
   check(
     "ZOOM_200_PROFILE_NO_OVERFLOW",
     await js(`document.body.scrollWidth===innerWidth&&document.getElementById('right-body').scrollWidth===document.getElementById('right-body').clientWidth`),

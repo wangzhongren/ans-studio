@@ -1,0 +1,8 @@
+# 2026-10-23 acceptance-rework-routing S2 evidence environment
+date_local: 2026-10-23T19:33:55+0800
+cwd: /c/Users/51054/Desktop/work/ans-studio
+shell: 5.3.15(2)-release
+node: /c/Users/51054/AppData/Local/Programs/nodejs/node v24.22.1
+npm: /c/Users/51054/AppData/Local/Programs/nodejs/npm 11.19.1
+platform: win32 x64 v24.22.1
+HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1

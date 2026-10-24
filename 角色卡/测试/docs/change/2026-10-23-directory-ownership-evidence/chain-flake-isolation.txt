@@ -1,0 +1,10 @@
+== i-full-chain desktop timing flake isolation (2026-10-23) ==
+full serial regression run: 五角色全自动链路 failed at i-full-chain.test.ts:476 send(convener) => '会话尚未开启（点击左侧角色即可开启）。'
+full i-file run1: 3/3 pass (exit 0)
+full i-file run2: 2/3 pass; v2 完整链路 failed at i-full-chain.test.ts:912 send(tester) => '会话已关闭，请重新点击角色。'
+full i-file run3: 3/3 pass (exit 0)
+full i-file run4: 3/3 pass (exit 0)
+isolated each test (--test-name-pattern, 2 runs each): 2/2 pass for 五角色全自动链路, v2 完整链路, v3 完整链路
+legacy two-test combination (五角色+v2, 3 runs): 3/3 runs all green
+classification: desktop session-lifecycle timing flake (same family as baseline interface.test.ts readiness/ledger flake); NOT a deterministic assertion failure.
+owner: 桌面窗口 (product session/LRU lifecycle) — reported, not fixed by testing role.

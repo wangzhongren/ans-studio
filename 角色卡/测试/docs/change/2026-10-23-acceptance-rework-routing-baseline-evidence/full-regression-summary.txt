@@ -1,0 +1,61 @@
+# T3 full regression summary (serial, excluding write-sequencing)
+recorded_local=2026-10-23 19:05:09 +0800
+HEAD=ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+
+## Command
+node --test --test-concurrency=1 "${FILES[@]}"  # FILES from full-regression-excluded-file-list.txt
+
+## Totals
+files=358 (all test/**/*.test.ts=359; excluded=1)
+excluded_file=test/pi-adapter/write-sequencing.test.ts (3 test(); known hang: 3 tests print check marks then process never exits; reproduced 2026-10-22 and 2026-10-23 baselines)
+ℹ tests 3725
+ℹ suites 0
+ℹ pass 3697
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 18
+ℹ todo 0
+ℹ duration_ms 310182.9178
+start=2026-10-23 18:57:10 +0800
+end=2026-10-23 19:02:20 +0800
+exit_code=1
+
+## Failure classification (10)
+### (A) Existing Windows symlink EPERM: 9
+1. test/claude-adapter/session.test.ts:637 native symlink and storage runtime mismatch fail before SDK query
+2. test/codex-adapter/session.test.ts:351 native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary
+3. test/pi-adapter/injected-runtime.test.ts:185 store validate callback rejects directory symlink before Pi parse or new native write
+4. test/pi-adapter/injected-runtime.test.ts:193 Pi storage refuses file symlink and role/runtime mismatch without touching other storage
+5. test/runtime-core/file-write-safety.test.ts:97 D3 linked workspace root remains usable; linked target itself is not replaced
+6. test/runtime-core/session-store.test.ts:46 store: traversal, mismatched scope and symlinked runtime directories rejected
+7. test/runtime-core/session-store.test.ts:58 store: native validation stays lazy and native symlink is rejected before effects
+8. test/测试/g4-skill-verify/b-render-double-check.test.ts:182 读取器入参防御（对抗）
+9. test/编排/shell-authorized-routine.test.ts:103 node test外指符号链接路径不获委托；项目内测试路径获委托
+All 9 are EPERM errno -4048 symlink, same list as historical baseline (no new deterministic failure).
+
+### (B) Desktop session-lifecycle timing flake: 1
+test/测试/governance-e2e-auto/i-full-chain.test.ts:477 (test at :230) '五角色全自动链路…' AssertionError '会话尚未开启（点击左侧角色即可开启）' (176.008ms; readinessTask.ok expected true, actual false).
+Isolation: full-regression-isolation-i-full-chain-run1.log FAIL (same line 477, 176.2866ms); run2 PASS 3/3 (9.4s); run3 PASS 3/3 (9.5s).
+Same family documented in directory-ownership D6 and i18n integration (send(convener) '会话尚未开启'); non-deterministic session open->send race; not a deterministic new failure; product change not implemented.
+Note: the same test passed inside the affected test/测试/** suite run (822/815/1/6).
+
+## Skips (18, all existing platform/design skips)
+- codex-adapter 1 (Windows no POSIX process group)
+- pi-adapter 1 (chmod semantics not applicable on Windows)
+- runtime-core file-write-safety 4 (D3 POSIX mode/umask)
+- test/测试/lightweight-permission-repairs 6 (D3 AC3-AC7 POSIX)
+- 门禁引擎 pin-evidence 1 (unreadable permission)
+- test/项目管理/shared/atomic-write 5 (D3 finalMode/umask/chmod/sync)
+No new skip/todo.
+
+## Delta vs previous recorded full baseline (governance-advance final: 356 files, 3693/3666/9/18)
+- files: 356 -> 358 (+2): test/桌面UI/i18n-b1-b2.test.ts, test/测试/i18n-integration.test.ts (diff of file lists).
+- tests: 3693 -> 3725 (+32); pass 3666 -> 3697 (+31); fail 9 -> 10 (+1); skipped 18 -> 18; todo 0 -> 0.
+- +1 fail is the i-full-chain session-lifecycle timing flake (B), not deterministic; 9 EPERM unchanged.
+- +32 tests: the two new files contribute 13 (i18n-b1-b2 + i18n-integration measured 13/13 together); the remaining +19 come from i18n-final additions inside existing test files/current worktree (this change is unimplemented). Current worktree suite counts match the i18n integration record: desktop app 558/558, shared 181/176/0/5, assembly 84/84, test-domain 822/815/1/6, orchestration 810/809/1.
+
+## Judgment for S1 baseline
+- Deterministic failures: 9 existing Windows symlink EPERM only.
+- One non-deterministic desktop session-lifecycle timing flake, isolated and classified; must be re-isolated at S7 if it recurs.
+- 18 existing skips; no new skip/todo.
+- T3 full baseline is usable as the S1 reference; it is not a pass/acceptance verdict.

@@ -356,3 +356,43 @@ A4 legacy provenance窄修：protected工具t.statusSource/target.source分别�
 ## 5B 步骤 c（2026-10-21）
 
 生产入口切换为包内 `app/renderer/dist/index.html`；main.mjs 默认同入口并保留 `ANS_RENDERER_ENTRY` 覆盖；packaged smoke 期望包内 dist 入口（smoke-only 覆盖仍限 `app/renderer/dist/`）。旧段退役：`hot-path.test.ts` 保留 push-batcher/事件风暴/哈希缓存 3 项（旧 renderer/vendor Markdown 段删除）；`message-queue.test.ts` 保留主进程队列 14 项（旧 renderer/styles/role-status 源钉删除，新增新渲染器 `chat/ipc.ts` `session:role-state`/`applyRoleState` 源钉）。详见 [变更记录 §十一](docs/change/2026-10-21_change_ui-platform-phase5a-entry.md)。
+
+## i18n B0 应用级语言偏好（2026-10-23，任务 `2026-10-23-i18n`）
+
+实现 [变更记录](docs/change/2026-10-23_change_i18n-b0.md)。本批只做 B0 基础设施（偏好文件、IPC/preload、窗口/对话框/启动错误框、主进程 translator）；主进程系统行/应用错误的批量迁移属 B3，**本版未做**。
+
+| preload 方法 | IPC / 参数 | 返回 |
+| --- | --- | --- |
+| getPreferences() | preferences:get（无参） | `{version:1, locale:"zh-CN"\|"en-US", supported:string[]}` |
+| setLocale(locale) | preferences:set-locale `{locale:string}`（桥内只透传字符串；非法值由主进程拒绝） | `{ok:true, locale}` \| `{ok:false, locale:当前, error}` |
+| onLocaleChanged(cb) | 订阅 preferences:locale-changed（主→渲；成功持久化后） | `{locale}`；返回取消订阅函数 |
+
+- 偏好文件 `<userData>/ans/preferences.json`，形状 `{version:1, locale}`；写入用共享 `atomicWrite`（唯一实现）；**首次启动无文件不写**，用户切换时写；损坏/不可读/非法 locale/未知 version/不可写 ⇒ `zh-CN` + **稳定诊断码**（`preferences.read.invalid` / `preferences.locale.invalid` / `preferences.write.failed`，附 `reasonCode`/`errorCode`），不阻塞启动；**不写项目 `.ans`/`.env`/治理账本**，不读真实凭据。
+- `DesktopDeps`：`preferencesPath?`（缺省不持久化，`setLocale` 如实失败）、`mainI18n?`（main.ts 与 Interface 共享同一实例）、`onPreferencesDiagnostic?`。`DesktopInterface.getPreferences()` / `setLocale(input)` 为纯逻辑；`registerPreferencesIpc(registerHandler, desktop, {onLocaleChanged})`（`app/desktop/interface.ts`，不依赖 electron，可注入假 registrar 测试）注册 `preferences:get` / `preferences:set-locale`，**只在 `ok:true` 后**调用 `onLocaleChanged`（失败不广播）。
+- `app/desktop/i18n.ts`：`createMainI18n()`（`t` 在调用当刻读当前 locale；`setLocale` 只更新内存，持久化归 preferences）、`desktopTexts()` 统一取 `main.window.title`、`main.dialog.importProject.title`、`main.dialog.pickImage.title`、`main.error.startup.title/detail`。main.ts 在成功切换后 `win.setTitle` 并按 `BrowserWindow.getAllWindows()` 广播 `preferences:locale-changed`；推送/标题失败只诊断，不翻转已成功的回执。
+- **历史不追溯**：已生成的系统行/会话历史/报告保持生成时语言；切换只影响之后新生成的文本与 UI chrome。B0 覆盖窗口标题、导入项目/选择图片对话框标题、启动错误框与偏好通道；真实 Electron 重启/切换证据待 I9（独立测试/验收），本记录不声称完整 i18n 验收。
+
+## 目录级授权 v3 桌面契约（2026-10-23，任务 `2026-10-23-directory-ownership`）
+
+实现 [变更记录](docs/change/2026-10-23_change_directory-ownership.md)。桌面**只消费**编排公共出口 `src/pipeline/orchestration/run-role.ts`（`parseTeamPlan`/`teamPlanIssueMessages`/`writesetsOverlap`）与共享路径原语，不复制 v3 解析；v1/v2 行为与文案逐字保留。
+
+- `TeamPlanInfo`：`teamPlanSchema: 1 | 2 | 3`；v3 视图字段 `directories: string[]`（frontmatter `directories`）、`directorySpecs: DirectorySpec[]`（目录规范表）、`moduleList: TeamPlanModule[]`（含模块 `implementationDir`）；`TeamPlanRoleRow` 增 `authorizedDirs`/`preciseWritesets`（`WritesetEntry[]`，v1/v2 为空）。
+- `parseTeamPlanInfo`：经公共出口 `parseTeamPlan` 单一解析；v3 返回 `teamPlanSchema: 3`；v2/legacy 输出与桌面旧门槛文案不变。
+- V12（`validateAppointmentArtifacts`，Crew 写卡后、readiness 前）：
+  - 每个计划 `授权目录` 必须被该角色 `boundary.yaml` 的 `directory`/`conditional-directory`（same/ancestor）覆盖；每个 `精确写集` 必须被 `file` 或 `directory` 覆盖；
+  - `new`：boundary 目录条目（排除 `角色卡/<roleId>/` 角色根）与计划授权目录集合一致（不得更宽/更窄），违反阻塞；
+  - `changed`/`existing`：计划 ⊆ 边界；更宽部分在该角色模块实现目录内可接受，越出/多模块扩张 → warning + readiness；`existing` 宽边界只 warning + 迁移提示，不强制重写；
+  - 来源分流：Crew（boundary 条目/覆盖/一致性）vs Convener（目录规范/模块实现目录缺口）；任一阻塞不派 readiness、不写 readiness 账本；
+  - v2 V12 逐字不变（精确写集必须被覆盖；existing 只 warning）。
+- 提案接受后的 Convener 任务文案：**新流程默认 v3**（frontmatter `teamPlanSchema: 3` + `directories`、模块 `实现目录`、角色表 `授权目录`+`精确写集`、目录规范表、readiness 逐目录 `directories/spec/shared/layout`）；已有 v1/v2 计划续接（调用方显式传 schema）时原 v2 文案逐字保留。计划修正反馈与「修订计划」系统行按实际 schema 提示 v3/v2。
+- 任务文案（`governance-advance.ts`）：`teamPlanSchema?: 1 | 2 | 3`；仅 v3 追加授权目录+精确写集写边界、`new` 一致、`changed`/`existing` 覆盖、目录规范/共享/治理关键路径、readiness 逐目录 `directories/spec/shared/layout`、验收布局核对报告 + 原始 `git status`/`diff`；v1/v2 文案逐字不变。发给 agent 的任务文案本轮不翻译（i18n B3 只翻译用户可见系统行）。
+
+## i18n B3 主进程用户可见文本（2026-10-23，任务 `2026-10-23-i18n`）
+
+实现 [变更记录](docs/change/2026-10-23_change_i18n-b3.md)（状态 `implemented-unverified`）。本批只迁移 `app/desktop/` 中应用生成、最终显示给用户的文本；**不新增 IPC 通道、不改载荷形状**。
+
+- `app/desktop/i18n.ts` 新增进程级绑定：`mainT(key, params)`（当前 locale 翻译入口；`createMainI18n` 实例即读取目标）、`mainLocale()`、`type MainTranslate`。`main.ts` 直接构造的 customer-input / operator-channel / 确认卡同进程读取 `mainT`，无需新增注入；`main.ts`/`preload.cjs` 未改。
+- `app/desktop/diagnostics.ts`：`renderRecoveryPage()` 按当前 locale 生成恢复页；`RECOVERY_PAGE` 改为 ESM live binding（`let`），Interface 在构造与 `preferences:set-locale` 成功后调用 `refreshRecoveryPage()`；`main.ts` 既有 `RECOVERY_PAGE` 引用不变。
+- 生成点：`session.ts`、`interface.ts`、`governance-advance.ts`（仅系统行）、`customer-input.ts`、`operator-channel.ts`、`watchdog.ts`、`runtime-history.ts`、`session-history.ts`、`project.ts`、`runtime-config.ts`、`runtime-resolution.ts`、`composer-images.ts`、`confirm-card.ts`、`recovery-channel.ts`、`judge-reason.ts`、`chat-adapter.ts`（demo）；key 取共享目录 `main.*`（个别复用 `shared.common.*`/`ui.judge.*` 既有 key）。
+- **非目标**：发给 agent 的任务文案/提示词、`role_status`/`session_tail` 输出、外部错误原文（`{detail}` 参数）、诊断/日志文本、机器标识/协议标记、角色卡/团队计划 schema 词汇、B4 的 `RUNTIME_LABELS`。缺 key 已由 PM 批次 `2026-10-23_change_i18n-b3-key-supplement.md` 及后续两项补齐（23 新增 + 5 复用）并在生成点接线；按 PM 指示保持中文的 agent-facing 项：`install.actionChanged/actionReverted`、`manualJudgeDenyConnector`、`addRoleCardsStep`、`flowStateValidationFailed`。`roleCardsStepMissing` 通过 `AppointmentArtifactIssue.userVisibleIssue` 分离 agent 任务与 Lead 摘要（agent 正文保持中文，指纹输入不变）；`dispatchModelNote` / `teamPlanMissingBoundHint` 已接线，`targetLabel` 复用 `ui.role.governance.crew.name` / `ui.role.governance.steward.name`。
+- 验收证据：`node --test` interface 118/118、operator-wiring 53/53、全量桌面 555/555、`npm run typecheck` 0；真实 UI/布局（I9）待独立测试/验收。

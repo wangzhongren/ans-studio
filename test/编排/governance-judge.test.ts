@@ -3516,8 +3516,19 @@ test("governanceDispatchActionFor：Liaison→Convener=coordinate；其余=dispa
   assert.equal(governanceDispatchActionFor("backend", "convener"), "dispatch");
 });
 
-test("run-role：Liaison→Convener 走 coordinate（无需提案/任命）；Liaison→项目角色仍 dispatch", async () => {
+test("run-role：Liaison→Convener 走 coordinate（提案接受后；不要求任命/步骤）；Liaison→项目角色仍 dispatch", async () => {
   await withRoot(async (root) => {
+    // 2026-10-24 闸门 1：coordinate 要求该 flow 的最新提案决定为 accept/accept-quick（不再空账本放行）。
+    writeFile(root, ".ans/governance/ledger.jsonl", JSON.stringify({
+      at: "2026-10-24T00:00:00.000Z",
+      kind: "customer.decision",
+      flowId: "flow-a",
+      actorRoleId: "rapporteur",
+      power: "proposal",
+      decisionKind: "proposal-accept",
+      customerDecision: "accepted",
+      decisionEvidence: { kind: "customer-input" },
+    }) + "\n");
     const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
     let forwarded = 0;
     const handle = await openRoleSession(
@@ -3546,7 +3557,37 @@ test("run-role：Liaison→Convener 走 coordinate（无需提案/任命）；Li
       );
       assert.equal(dispatch?.ok, false);
       assert.match(dispatch?.message ?? "", /派发被治理门禁拒绝/);
-      assert.equal(forwarded, 1, "Liaison→项目角色不是 coordinate，空账本应被 dispatch 门拒");
+      assert.equal(forwarded, 1, "Liaison→项目角色不是 coordinate，dispatch 门仍拒（来源只允许 Steward）");
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("run-role：Liaison→Convener 在提案未接受前被 coordinate 门拒绝（2026-10-24 闸门 1）", async () => {
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    let forwarded = 0;
+    const handle = await openRoleSession(
+      {
+        roleId: "liaison",
+        project: trioProject(root, "liaison"),
+        autoRepin: false,
+        dispatchTask: () => {
+          forwarded += 1;
+          return { ok: true, message: "forwarded" };
+        },
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const coordinate = await captured.caps!.dispatchTask!(
+        { roleId: "convener", task: "协调：请确认流程步骤", flowId: "flow-a" },
+        undefined,
+      );
+      assert.equal(coordinate?.ok, false, "空账本（无提案接受）不得协调");
+      assert.match(coordinate?.message ?? "", /proposal-not-accepted|提案/);
+      assert.equal(forwarded, 0, "拒投不进入前端路由");
     } finally {
       await handle.dispose();
     }

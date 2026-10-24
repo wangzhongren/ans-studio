@@ -8,6 +8,19 @@
 
 export type RuntimeKind = "pi" | "codex" | "claude";
 
+/**
+ * 角色根文档元数据（与主进程 `RoleRootDocEntry` 同形，additive）。
+ *
+ * `path` 是**项目相对**路径（如 `角色卡/A/feature-map.md`），只用于与 opaque
+ * `documents[].relativePath` 精确匹配；渲染层不按它拼文件系统路径。白名单/
+ * 顺序由后端索引给出，渲染层不复制。
+ */
+export interface RoleRootDocEntry {
+  name: string;
+  path: string;
+  kind: "file";
+}
+
 export interface RoleView {
   roleId: string;
   cardText?: string;
@@ -20,6 +33,8 @@ export interface RoleView {
   groupDuty?: string;
   changelog?: unknown;
   docs?: unknown[];
+  /** 角色根文档（可选；旧 main 缺省时按 `[]` 消费，不显示根文档组）。 */
+  rootDocs?: RoleRootDocEntry[];
 }
 
 export interface Listing {
@@ -157,5 +172,7 @@ export interface RoleMeta {
   contextText: string;
   /** 主进程给的恢复失败原因（title/追溯；缺省不猜）。 */
   contextWarning?: string;
+  /** 会话 record 已恢复但模型未恢复（结构化标记；用于追加历史保留说明，不解析文案）。 */
+  readableHistoryRetained?: boolean;
   lastEvent?: string;
 }

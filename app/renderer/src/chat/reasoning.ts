@@ -14,6 +14,8 @@
  * 不读 DOM、不依赖 store，供 node 单测直接 import。
  */
 
+import { DEFAULT_LOCALE, translate, type Locale } from "../i18n/index.ts";
+
 export type ReasoningStatus = "complete" | "omitted";
 
 /** 一段推理事实（已由核心投影：`text` 是 DisplayTextV1.text；omitted 时为空串）。 */
@@ -34,11 +36,32 @@ export interface ReasoningRowData extends Record<string, unknown> {
 }
 
 /** 旧行没有 label 时的兜底文案（与 reasoningLabel 同源；不允许第二份文案实现）。 */
-export const REASONING_FALLBACK_LABEL = "已思考";
-export const REASONING_UNSAFE_NOTE = "推理内容无法安全显示";
-export const REASONING_OMITTED_NOTE = "平台省略了思考正文，无法显示具体内容。";
-export const REASONING_EMPTY_NOTE = "没有可显示的思考正文。";
-export const REASONING_PARTIAL_NOTE = "平台省略了部分思考正文。";
+export function reasoningFallbackLabel(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.reasoning.fallbackLabel");
+}
+
+export function reasoningUnsafeNote(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.reasoning.unsafe");
+}
+
+export function reasoningOmittedNote(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.reasoning.omitted");
+}
+
+export function reasoningEmptyNote(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.reasoning.empty");
+}
+
+export function reasoningPartialNote(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.reasoning.partial");
+}
+
+/** 旧导出名（zh-CN 值），供未迁移调用方/测试逐字使用。 */
+export const REASONING_FALLBACK_LABEL = reasoningFallbackLabel(DEFAULT_LOCALE);
+export const REASONING_UNSAFE_NOTE = reasoningUnsafeNote(DEFAULT_LOCALE);
+export const REASONING_OMITTED_NOTE = reasoningOmittedNote(DEFAULT_LOCALE);
+export const REASONING_EMPTY_NOTE = reasoningEmptyNote(DEFAULT_LOCALE);
+export const REASONING_PARTIAL_NOTE = reasoningPartialNote(DEFAULT_LOCALE);
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -62,18 +85,27 @@ export function validReasoningDurationMs(value: unknown): number | undefined {
  * 有真实时长 → 「已思考 N 秒」（四舍五入、下限 1）；无信号 → 「已思考」；
  * omitted → 追加「（内容由平台省略）」；合并后部分省略 → 追加「（部分内容由平台省略）」。
  */
-export function reasoningLabel(input: {
-  status: ReasoningStatus;
-  durationMs?: number;
-  partialOmitted?: boolean;
-}): string {
+export function reasoningLabel(
+  input: {
+    status: ReasoningStatus;
+    durationMs?: number;
+    partialOmitted?: boolean;
+  },
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   const durationMs = validReasoningDurationMs(input.durationMs);
   const base =
     durationMs !== undefined
-      ? "已思考 " + Math.max(1, Math.round(durationMs / 1000)) + " 秒"
-      : REASONING_FALLBACK_LABEL;
-  if (input.status === "omitted") return base + "（内容由平台省略）";
-  if (input.partialOmitted === true) return base + "（部分内容由平台省略）";
+      ? translate(locale, "ui.reasoning.thoughtSeconds", {
+          seconds: Math.max(1, Math.round(durationMs / 1000)),
+        })
+      : reasoningFallbackLabel(locale);
+  if (input.status === "omitted") {
+    return base + translate(locale, "ui.reasoning.omittedSuffix");
+  }
+  if (input.partialOmitted === true) {
+    return base + translate(locale, "ui.reasoning.partialSuffix");
+  }
   return base;
 }
 
@@ -117,7 +149,10 @@ export function reasoningPieceFromDetail(detail: unknown): ReasoningPiece | null
   return record ? reasoningPieceFromCarrier(record.reasoning) : null;
 }
 
-function composeReasoningData(pieces: ReasoningPiece[]): ReasoningRowData {
+function composeReasoningData(
+  pieces: ReasoningPiece[],
+  locale: Locale = DEFAULT_LOCALE,
+): ReasoningRowData {
   const safePieces = pieces.map(sanitizePiece);
   const status: ReasoningStatus = safePieces.some(
     (piece) => piece.status === "complete",
@@ -140,15 +175,18 @@ function composeReasoningData(pieces: ReasoningPiece[]): ReasoningRowData {
     status,
     text,
     ...(durationMs !== undefined ? { durationMs } : {}),
-    label: reasoningLabel({ status, durationMs, partialOmitted }),
+    label: reasoningLabel({ status, durationMs, partialOmitted }, locale),
     ...(partialOmitted ? { partialOmitted: true } : {}),
     pieces: safePieces,
   };
 }
 
 /** 单段事实 → 行数据（第一段建行）。 */
-export function reasoningRowDataFromPiece(piece: ReasoningPiece): ReasoningRowData {
-  return composeReasoningData([piece]);
+export function reasoningRowDataFromPiece(
+  piece: ReasoningPiece,
+  locale: Locale = DEFAULT_LOCALE,
+): ReasoningRowData {
+  return composeReasoningData([piece], locale);
 }
 
 /** 从行数据读取已收 piece（只认本模块写出的结构；损坏条目忽略，保守不猜）。 */
@@ -193,6 +231,7 @@ export function reasoningPiecesFromData(data: Record<string, unknown>): Reasonin
 export function mergeReasoningRowData(
   existing: Record<string, unknown>,
   incoming: ReasoningPiece,
+  locale: Locale = DEFAULT_LOCALE,
 ): { data: Record<string, unknown>; changed: boolean } {
   const piece = sanitizePiece(incoming);
   const pieces = reasoningPiecesFromData(existing);
@@ -200,7 +239,7 @@ export function mergeReasoningRowData(
   if (pieces.some((candidate) => reasoningPieceFingerprint(candidate) === fingerprint)) {
     return { data: existing, changed: false };
   }
-  const composed = composeReasoningData([...pieces, piece]);
+  const composed = composeReasoningData([...pieces, piece], locale);
   const data: Record<string, unknown> = { ...existing, ...composed };
   if (composed.durationMs === undefined) delete data.durationMs;
   if (!composed.partialOmitted) delete data.partialOmitted;

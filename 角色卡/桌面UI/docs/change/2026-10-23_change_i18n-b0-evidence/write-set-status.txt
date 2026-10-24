@@ -1,0 +1,83 @@
+date: 2026-10-23T11:15:36+08:00
+head: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+branch: main
+
+== A. git status --short (full worktree context) ==
+ M app/desktop/interface.ts
+ M app/main.ts
+ M app/preload.cjs
+ M app/renderer/src/App.tsx
+ M app/renderer/src/lib/platform.ts
+ M app/renderer/src/shell/SettingsPanel.tsx
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+ M "test/\346\241\214\351\235\242UI/source-guard.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/architecture/shared-components.md"
+?? .claude/
+?? app/desktop/i18n.ts
+?? app/desktop/preferences.ts
+?? app/renderer/src/i18n/
+?? demos/
+?? docs/acceptance/directory-ownership-criteria-v1.md
+?? docs/acceptance/i18n-criteria-v1.md
+?? docs/communication/2026-10-23_intent_i18n-and-directory-ownership.md
+?? docs/planning/2026-10-23_design_directory-ownership.md
+?? docs/planning/2026-10-23_design_i18n.md
+?? docs/scheduling/2026-10-23-directory-ownership-team-plan.md
+?? docs/scheduling/2026-10-23-i18n-team-plan.md
+?? docs/scheduling/memo.md
+?? src/common/shared/i18n/
+?? "test/\346\241\214\351\235\242UI/i18n-store.test.ts"
+?? "test/\346\241\214\351\235\242UI/i18n-view.test.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard-allowlist.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard-scanner.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard.test.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-23_change_i18n-b0-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-23_change_i18n-b0.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_i18n-b0-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_i18n-b0.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-23-baseline-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-23_change_i18n-directory-baseline.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-10-23_change_i18n-b0-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-10-23_change_i18n-b0.md"
+
+== B. desktop-UI write set status (this candidate) ==
+ M app/renderer/src/App.tsx
+ M app/renderer/src/lib/platform.ts
+ M app/renderer/src/shell/SettingsPanel.tsx
+ M "test/\346\241\214\351\235\242UI/source-guard.test.ts"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/api-spec.md"
+?? app/renderer/src/i18n/
+?? "test/\346\241\214\351\235\242UI/i18n-store.test.ts"
+?? "test/\346\241\214\351\235\242UI/i18n-view.test.ts"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-23_change_i18n-b0-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-23_change_i18n-b0.md"
+
+== C. desktop-UI write set diff names ==
+app/renderer/src/App.tsx
+app/renderer/src/lib/platform.ts
+app/renderer/src/shell/SettingsPanel.tsx
+"test/\346\241\214\351\235\242UI/source-guard.test.ts"
+"\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/api-spec.md"
+
+== D. git diff --cached --name-only (must be empty) ==
+
+== E. concurrent non-candidate context (desktop window I4b; NOT written by desktop-UI) ==
+ M app/desktop/interface.ts
+ M app/main.ts
+ M app/preload.cjs
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/interface.test.ts"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"
+?? app/desktop/i18n.ts
+?? app/desktop/preferences.ts
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_i18n-b0-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-10-23_change_i18n-b0.md"

@@ -234,7 +234,7 @@ test("Liaison 能力：customerInput=true（仅 intent-confirm）、handOffInten
     customerInput: true,
     handOffIntent: true,
     requestClarification: false,
-    // 客户 2026-10-20：Lead / 主理 兼任工作流管理者，可向 Steward / 项目角色派发协调任务。
+    // 客户 2026-10-20：Lead / 主理 兼任工作流管理者，可向 Steward / 统筹 派协调任务；项目 worker 由 Steward 派。
     dispatchTask: true,
     roleStatus: false,
     sessionTail: false,
@@ -246,6 +246,48 @@ test("Liaison 能力：customerInput=true（仅 intent-confirm）、handOffInten
   });
   assert.equal(spec!.preauthorizedDirs.includes("docs/intents/"), true);
   assert.equal(spec!.preauthorizedDirs.some((d) => d.startsWith("docs/governance/")), false);
+});
+
+test("Lead 卡文本：治理协调（2026-10-24）——接报内置状态/回交、闸门 0/1 后才交接/coordinate、不直派 Crew/Proof/项目 worker、Proof 只收状态+指针、协调≠批准", () => {
+  const t = governanceRoleOf("liaison")!.cardText;
+  assert.match(t, /## 治理协调（Lead \/ 主理）/);
+  assert.match(
+    t,
+    /Draft \/ 提案、Steward \/ 统筹、Crew \/ 组队、Proof \/ 验收 的状态与回交向\*\*你\*\*汇总/,
+    "Lead 接报 Draft/Steward/Crew/Proof 的状态与回交",
+  );
+  assert.match(t, /维护「阶段 \/ 阻塞 \/ 下一步」视图/, "Lead 维护阶段/阻塞/下一步视图");
+  assert.match(
+    t,
+    /代批 `confirm`（闸门 0 已结算）后，才用 `hand_off_intent`/,
+    "闸门 0 结算后才 hand_off_intent 给 Draft",
+  );
+  assert.match(
+    t,
+    /客户已接受提案（闸门 1 已结算）后，才用 `dispatch_task` 的 coordinate 向 Steward \/ 统筹 派/,
+    "闸门 1 结算后才 coordinate 给 Steward",
+  );
+  assert.match(t, /不直接派 Crew \/ Proof \/ 项目 worker/, "Lead 不直接派 Crew/Proof/项目 worker");
+  assert.match(t, /项目 worker（Map \/ Reduce）由 Steward \/ 统筹 派/, "项目 worker 由 Steward 派");
+  assert.match(t, /只收 Proof 的状态与报告指针/, "Proof 只给 Lead 状态+报告指针");
+  assert.match(t, /不批准提案、任命、验收/, "Lead 不批准提案/任命/验收");
+  assert.match(t, /协调 ≠ 客户批准/, "协调 ≠ 客户批准");
+  assert.match(t, /应用仍执行闸门 0\/1\/2/, "应用门禁仍执行");
+  assert.match(t, /你的协调不替代任何门禁/, "协调不替代门禁");
+  // 旧「向项目角色派发协调任务」必须消失（Q1：项目 worker 由 Steward 派）。
+  assert.doesNotMatch(t, /向 Steward \/ 统筹 与项目角色派发协调任务/);
+  assert.doesNotMatch(t, /向 Steward \/ 统筹与项目角色派发协调任务/);
+  assert.doesNotMatch(t, /派给 Steward \/ 项目角色/);
+  assert.doesNotMatch(t, /向项目角色派发协调任务/);
+  // 能力位不变：治理协调不新增工具/能力位。
+  const cap = governanceRoleOf("liaison")!.capabilities;
+  assert.equal(cap.handOffIntent, true, "hand_off_intent 仍保留");
+  assert.equal(cap.dispatchTask, true, "dispatch_task 仍保留（仅向 Steward 协调）");
+  assert.deepEqual(
+    [cap.roleStatus, cap.sessionTail, cap.proposeRecovery, cap.installSkill, cap.installMcp],
+    [false, false, false, false, false],
+    "治理协调不新增看护/恢复/技能/MCP 能力",
+  );
 });
 
 test("Lead 卡文本：需求确认——先发 intent-confirm 复述目标/范围/验收，confirm（客户或判断代批）后才交接；revise 永不由判断代选", () => {

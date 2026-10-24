@@ -3,16 +3,20 @@
  * 队列分组（进行中 / 第 N 位）、最近回交去重与排序、tab 角标。
  *
  * 唯一数据源：主进程 role-state 快照与当前 pane 的真实行；本模块不造第二套状态。
+ *
+ * i18n B1：展示文案来自 shared 目录（`ui.work.*` 等），纯函数接受可选 `locale`
+ * （默认 zh-CN）；`roleId`/自定义分组名/报告正文等数据不翻译。
  */
 
+import { DEFAULT_LOCALE, translate, type Locale, type MessageKey } from "../i18n/index.ts";
 import { queueItemViews, type QueueItemView } from "./confirm-logic.ts";
 import { operatorSurfaces } from "./operator-view.ts";
 import type { ChatRow } from "./types.ts";
 
 export interface PendingRequestView {
   id: string;
-  /** `choice` ⇒ 待选择；其余（confirm）⇒ 待确认。 */
-  kindLabel: "待选择" | "待确认";
+  /** choice ⇒ 待选择；其余（confirm）⇒ 待确认（按当前 locale 渲染的展示文案）。 */
+  kindLabel: string;
   title: string;
   requestId: string;
 }
@@ -31,6 +35,7 @@ function asString(value: unknown): string {
 export function pendingViews(
   pendingOperator: Record<string, Record<string, unknown>>,
   roleId: string | null,
+  locale: Locale = DEFAULT_LOCALE,
 ): PendingRequestView[] {
   if (!roleId) return [];
   const views: PendingRequestView[] = [];
@@ -40,8 +45,11 @@ export function pendingViews(
     const kind = asString(request.kind);
     views.push({
       id,
-      kindLabel: kind === "choice" ? "待选择" : "待确认",
-      title: asString(request.title) || "交互请求",
+      kindLabel: translate(
+        locale,
+        kind === "choice" ? "ui.work.kind.choice" : "ui.work.kind.confirm",
+      ),
+      title: asString(request.title) || translate(locale, "ui.work.requestFallback"),
       requestId: id,
     });
   }
@@ -65,8 +73,9 @@ export interface QueueGroups {
 export function queueGroups(
   queue: readonly Record<string, unknown>[] | null | undefined,
   running: Record<string, unknown> | null | undefined,
+  locale: Locale = DEFAULT_LOCALE,
 ): QueueGroups {
-  const views = queueItemViews(queue || [], running || null);
+  const views = queueItemViews(queue || [], running || null, locale);
   return {
     running: views.filter((view) => view.running),
     queued: views.filter((view) => !view.running),
@@ -103,25 +112,29 @@ export interface RecentHandbackView {
   order: number;
 }
 
-const REPORT_STATUS_LABELS: Record<string, string> = {
-  completed: "已完成",
-  blocked: "被拦下",
-  unreported: "未报告",
-  failed: "失败",
-  aborted: "已中止",
+const REPORT_STATUS_KEYS: Record<string, MessageKey> = {
+  completed: "shared.common.completed",
+  blocked: "ui.work.reportStatus.blocked",
+  unreported: "shared.common.notReported",
+  failed: "shared.common.failed",
+  aborted: "shared.common.aborted",
 };
 
 /** 旧 `reportDeclaration` 逐字基线：来源 + 状态，不把报告声明说成独立验收。 */
-export function reportDeclaration(report: unknown): string {
+export function reportDeclaration(
+  report: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   const record = asRecord(report);
   const status = asString(record.status);
-  const origin =
+  const originKey: MessageKey =
     record.origin === "submitted-report"
-      ? "报告声明："
+      ? "ui.work.origin.report"
       : record.origin === "terminal-fallback"
-        ? "系统按终态记录："
-        : "来源未确认：";
-  return origin + (REPORT_STATUS_LABELS[status] || "未知状态");
+        ? "ui.work.origin.system"
+        : "ui.work.origin.unconfirmed";
+  const statusKey = REPORT_STATUS_KEYS[status] ?? "shared.common.unknownStatus";
+  return translate(locale, originKey) + translate(locale, statusKey);
 }
 
 function reportSummaryText(report: unknown): string {
@@ -129,9 +142,12 @@ function reportSummaryText(report: unknown): string {
   return asString(summary.text);
 }
 
-function reportFlags(report: unknown): string {
+function reportFlags(report: unknown, locale: Locale): string {
   const summary = asRecord(asRecord(report).summary);
-  return [summary.redacted ? "已净化" : "", summary.truncated ? "已截断" : ""]
+  return [
+    summary.redacted ? translate(locale, "shared.common.redacted") : "",
+    summary.truncated ? translate(locale, "shared.common.truncated") : "",
+  ]
     .filter(Boolean)
     .join(" · ");
 }
@@ -156,7 +172,10 @@ function reportIdentity(report: unknown, index: number): string {
  * 最近回交：当前 pane 的真实 handback 行 + 交付批内的真实结构化报告；
  * 同 reportId+来源身份只列一次；保持行序（旧 `currentWorkReports` 同向）。
  */
-export function recentHandbacks(rows: readonly ChatRow[] | null | undefined): RecentHandbackView[] {
+export function recentHandbacks(
+  rows: readonly ChatRow[] | null | undefined,
+  locale: Locale = DEFAULT_LOCALE,
+): RecentHandbackView[] {
   const views: RecentHandbackView[] = [];
   const seen = new Set<string>();
   let order = 0;
@@ -167,9 +186,9 @@ export function recentHandbacks(rows: readonly ChatRow[] | null | undefined): Re
     seen.add(key);
     views.push({
       key,
-      declaration: reportDeclaration(report),
+      declaration: reportDeclaration(report, locale),
       summary: Array.from(reportSummaryText(report)).slice(0, 120).join(""),
-      flags: reportFlags(report),
+      flags: reportFlags(report, locale),
       order,
     });
     order += 1;
@@ -192,29 +211,40 @@ export function recentHandbacks(rows: readonly ChatRow[] | null | undefined): Re
   return views;
 }
 
-export const WORK_EMPTY_PENDING = "无待处理请求";
-export const QUEUE_EMPTY_TEXT = "无进行中或排队消息";
-export const RECENT_REPORTS_EMPTY = "暂无回交报告";
-export const WORK_TITLE_SUFFIX = " · 工作概览";
-export const PROFILE_TITLE_SUFFIX = " · 角色资料";
-export const QUEUE_TITLE_SUFFIX = " · 队列";
-
-export function workTitle(roleName: string): string {
-  return (roleName || "角色") + WORK_TITLE_SUFFIX;
+export function workEmptyPending(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.work.emptyPending");
 }
 
-export function profileTitle(roleName: string): string {
-  return (roleName || "角色") + PROFILE_TITLE_SUFFIX;
+export function queueEmptyText(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.work.emptyQueue");
 }
 
-export function queueTitle(roleName: string): string {
-  return (roleName || "角色") + QUEUE_TITLE_SUFFIX;
+export function recentReportsEmpty(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.work.emptyReports");
 }
 
-export function workBadgeAria(count: number): string {
-  return "工作概览，" + badgeText(count) + " 项待处理";
+export function workTitle(roleName: string, locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.work.title", {
+    roleName: roleName || translate(locale, "shared.common.role"),
+  });
 }
 
-export function roleBadgeAria(count: number): string {
-  return "角色资料，" + badgeText(count) + " 项进行中或排队";
+export function profileTitle(roleName: string, locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.profile.title", {
+    roleName: roleName || translate(locale, "shared.common.role"),
+  });
+}
+
+export function queueTitle(roleName: string, locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.queue.title", {
+    roleName: roleName || translate(locale, "shared.common.role"),
+  });
+}
+
+export function workBadgeAria(count: number, locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.work.overviewAria", { count: badgeText(count) });
+}
+
+export function roleBadgeAria(count: number, locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.profile.aria", { count: badgeText(count) });
 }

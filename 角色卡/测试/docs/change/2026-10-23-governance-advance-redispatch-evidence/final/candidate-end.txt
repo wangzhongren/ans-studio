@@ -1,0 +1,5 @@
+captured_at: 2026-10-23 14:48:43 +0800
+git rev-parse HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+git rev-parse HEAD^{tree}: 1149238a834f31588797016d6ee2289a4ac3e97b
+--- git diff --cached --name-only ---
+(空=无暂存)

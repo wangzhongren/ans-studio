@@ -1,0 +1,109 @@
+s1_file_count=129
+current_file_count=129
+only_in_s1=0
+only_in_current=0
+s1_recorded_content_hashes=82
+s1_no_content_hash_markers=47
+s1_hash_match=82
+s1_hash_mismatch=0
+
+## paths without S1 content hash (S1 quoting bug: literal quoted name -> DELETED_OR_MISSING)
+a8598588cda2d3a805c2879c5381870184a0973cb68e8b3a893ff40048ea9559  19752  2026-10-23T11:33:20.118Z  older_than_s1_freeze  src/common/编排/acceptance-rework.ts
+a8168a73033b902084465e5d76e0e37724e6de91d6a635e503d8349a6240f5db  16396  2026-10-23T03:49:13.963Z  older_than_s1_freeze  src/common/编排/directory-conformance.ts
+43511d2afa5e24cdfedfb1709e75dec83eebfed24f5efa8b01243f88365ccc1f  80212  2026-10-23T14:20:20.766Z  NEWER_THAN_S1_FREEZE  src/common/编排/flow-service.ts
+ea271ee88067b0b2bcf67576141f09dd6efaa0e2a78f01e66b2ebdb74148bd4a  52297  2026-10-23T11:29:02.935Z  older_than_s1_freeze  src/common/编排/flow-state.ts
+f976fd0925d7661f71f1b84cf48b04cce07bc19f8b65c696c5cceecbcdc1b5e7  117805  2026-10-23T03:50:50.489Z  older_than_s1_freeze  src/common/编排/team-plan.ts
+90b480fa7b43e31dac88e533cf12cd86641cdb0a176ca9d9c22531896ce94803  101342  2026-10-23T03:38:19.514Z  older_than_s1_freeze  src/common/门禁引擎/governance-roles.ts
+6ba30a285c4ed5cd791807af4b48d606f1014be85c816757fa9d85ff5f5cbc78  13751  2026-10-23T07:31:12.499Z  older_than_s1_freeze  test/桌面UI/i18n-b1-b2.test.ts
+600c81540ba63c51c81b9f189e11d56853037ce9dc36360cec3e4bbb019728ee  12423  2026-10-23T03:13:07.282Z  older_than_s1_freeze  test/桌面UI/i18n-store.test.ts
+7fb032a2ea7e30a6c9cc81cf41c590acdd23977f2758c55afce9f442b076e861  9736  2026-10-23T03:13:07.283Z  older_than_s1_freeze  test/桌面UI/i18n-view.test.ts
+563e7a795f8d00dee0dd328e0ea6c46be22ca9c8bc42eb8b5c9a4854f26dfb41  11986  2026-10-23T08:36:56.306Z  older_than_s1_freeze  test/桌面UI/runtime-config.test.ts
+6c761264753e2c4e2b2110a53fd41fdd7326a4076423d157f4e69feec90a0e5b  12002  2026-10-23T08:33:07.744Z  older_than_s1_freeze  test/桌面UI/source-guard.test.ts
+cb6b78133aa35a8d6f4f0abe0c8b03a39a35fec163cc212533ca5462a823f1f8  147331  2026-10-23T12:14:28.152Z  older_than_s1_freeze  test/桌面应用/acceptance-dispatch.test.ts
+d08988c94ece4b8bf3489ea9d9d208cf4ef9af120db0c2d4b445fa3527fe0bd1  29372  2026-10-23T07:38:25.353Z  older_than_s1_freeze  test/桌面应用/boundary-refresh.test.ts
+c48f2e5a0d4a84e91cfd5daf8386bdb793d3e4ac3868d2023063dc53e0c8474b  173881  2026-10-23T09:17:31.530Z  older_than_s1_freeze  test/桌面应用/e2e/main.mjs
+c01a060e94703e71e8e043995285ae113151a86b6afe9e24faac4bbd3805a575  358766  2026-10-23T12:09:15.420Z  older_than_s1_freeze  test/桌面应用/interface.test.ts
+358e99c245df28ad25fcba6ee24e1313b5b59706a45db589e1094c2566668146  86312  2026-10-23T08:31:37.768Z  older_than_s1_freeze  test/桌面应用/multi-runtime.test.ts
+326c9156819126b6dbe58669f0bb73ea439228f9c6b3fd7fe55cdfded3dbac8a  130187  2026-10-23T11:49:37.076Z  older_than_s1_freeze  test/桌面应用/operator-wiring.test.ts
+8e98274a0c596ea7cffa200642d252a7d7d858e96840079159c0786979921351  29914  2026-10-23T08:32:20.119Z  older_than_s1_freeze  test/桌面应用/pi-config.test.ts
+8e560d11ffccfa94647a259a42bdadcb9586f0de25eec4face1daacc9fe89c65  77895  2026-10-23T08:18:38.930Z  older_than_s1_freeze  test/桌面应用/session.test.ts
+7a4b845f4b8396a9b23ae90746197b64051a00abfea1663bee3e343af191154e  14526  2026-10-23T04:13:30.394Z  older_than_s1_freeze  test/测试/directory-layout.test.ts
+9505901ba077d01b43adca00ccd53e09fb542ff40d932bac665af14f84b895f2  25684  2026-10-23T08:36:44.322Z  older_than_s1_freeze  test/测试/existing-project-compat-verify/b-establish.test.ts
+a919eee53f4a25148cbce92a2853b20f7fbbe86a98d2fa330be4f7bb63355082  14799  2026-10-23T08:30:58.333Z  older_than_s1_freeze  test/测试/g5-reasoning-verify/f-settings.test.ts
+bc0ce9cee9bf9dcdb2d45a33f61bbbf99ceb6eac6f8487e7a4f40983772616e7  16407  2026-10-23T04:32:16.977Z  older_than_s1_freeze  test/测试/governance-e2e-auto/b-proposal-accept-timing.test.ts
+2e4e571aa4b8aeae9da21ab59323e45b83b23c94d6fec307a226fde019ad7e71  76009  2026-10-23T12:32:22.679Z  older_than_s1_freeze  test/测试/governance-e2e-auto/fixture.ts
+c14bd78bc5fc6500706f43031e2bd1a5d7c0143a0ee0e9608ec49fdb28df995f  80656  2026-10-23T06:20:24.188Z  older_than_s1_freeze  test/测试/governance-e2e-auto/i-full-chain.test.ts
+48fb0aa8467479904a9b2a7b4498b5f6a3cf200b2782f1eee52c76813ec85e3e  24806  2026-10-23T06:18:06.087Z  older_than_s1_freeze  test/测试/governance-e2e-auto/l-redispatch-reentrant-gate.test.ts
+c35da9810c995a3d556e2f406323a273024e5521dac77cb23c14d4f933296cee  20802  2026-10-23T04:10:35.444Z  older_than_s1_freeze  test/测试/governance-e2e-auto/p-team-plan-guard.test.ts
+9689f5cbe1ec299921d6d92d3174a68369d482b985a6bd37d999c3e9d8148c52  32302  2026-10-23T04:11:05.602Z  older_than_s1_freeze  test/测试/governance-e2e-auto/q-role-granularity.test.ts
+305cc0ab4027e16ea25cb5730cb6324533732385810b1b5d774a5eb516726159  30898  2026-10-23T04:11:33.947Z  older_than_s1_freeze  test/测试/governance-e2e-auto/r-mapreduce-parallel.test.ts
+931001895808f889b1b3abbd2eff5e6dcce85fa7a6bfb2007ef9fb73d191d5ae  51137  2026-10-23T12:52:09.095Z  older_than_s1_freeze  test/测试/governance-e2e-auto/s-acceptance-rework-routing.test.ts
+57aa7ff82e18add312580b17dc2e7e10c6deae12b5f03d5c9e34b80bb68a0ba3  26733  2026-10-23T08:48:36.543Z  older_than_s1_freeze  test/测试/i18n-integration.test.ts
+4bbf858785b2cc0918fedade0ef9ec654484bd3b4147b947ccd7440d9cc7e551  8055  2026-10-23T06:23:06.959Z  older_than_s1_freeze  test/测试/redispatch-target-recompute.ts
+71842ced0d1ae05e551696468ad27dbcad2791239dfca003c170694d1611287e  21638  2026-10-23T08:31:05.181Z  older_than_s1_freeze  test/测试/t29-pi-config-roundtrip.test.ts
+10765961cafc67b19485c1606347840fdce2e95008d6645da9ad76d01eaceab8  10174  2026-10-23T08:31:11.918Z  older_than_s1_freeze  test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts
+99735a3123ef6e4f0cec474ae766f560e96a98692e2c6789e422285cbce70fb1  18702  2026-10-23T11:33:27.400Z  older_than_s1_freeze  test/编排/acceptance-rework.test.ts
+8028c7c694c7c00d01aa5db47488dc27648ab22173a9914cbcc7c8d91b9581dc  12669  2026-10-23T03:46:21.273Z  older_than_s1_freeze  test/编排/directory-conformance.test.ts
+42881027a5c9eca2a0c9008e72241dfc6c5880145c19410dbb1eaaaf38313d33  104698  2026-10-23T14:22:03.358Z  NEWER_THAN_S1_FREEZE  test/编排/flow-service.test.ts
+3efba1b9e5fabf08f029b6cfa8d5abf27a4c56d423b730014c92b953c6f05ea8  65603  2026-10-23T11:36:34.119Z  older_than_s1_freeze  test/编排/flow-state.test.ts
+46d657bad532fe7eabb6eb1b8dc079b7047fd96450e33b48e4ec6d5aab2c356e  55034  2026-10-23T03:47:59.969Z  older_than_s1_freeze  test/编排/team-plan.test.ts
+b16a06741dd3a5770792e3917ef5c9773d934ff169e40f72a74bfe033d6427a6  44135  2026-10-23T03:42:34.349Z  older_than_s1_freeze  test/门禁引擎/governance-standard-workflow.test.ts
+452f7ff134e4aced40a5e35242a01ecb947ed0ef155f120d311283de0ee988a6  86100  2026-10-23T03:40:03.531Z  older_than_s1_freeze  test/门禁引擎/governance-trio.test.ts
+29541e89cc65cfe51dfab194efc0bfd4d265d5d4293c58b3fe8b740f5363da3b  5564  2026-10-23T09:03:22.882Z  older_than_s1_freeze  test/项目管理/shared/i18n-guard-allowlist.ts
+132a5325f7d5d1c552ad32b31a53fe4b659f74fbfc0f46d629ce273073e1661b  8264  2026-10-23T03:01:37.123Z  older_than_s1_freeze  test/项目管理/shared/i18n-guard-scanner.ts
+05003446fd8973b9954dd10593f8f5df284d68b3d733b8832a83338f949cf7e9  6151  2026-10-23T03:01:46.303Z  older_than_s1_freeze  test/项目管理/shared/i18n-guard.test.ts
+d8e7567797d9a324e1e2f9889b84758c81ac1b6df76f98b63c2c652f3bebac97  54322  2026-10-23T11:27:09.675Z  older_than_s1_freeze  test/项目管理/shared/i18n.test.ts
+d7e77b25291d928fe47ed1f0b23ace0782b8dd577724fc5884d7615cc79ffaac  21927  2026-10-23T08:24:31.095Z  older_than_s1_freeze  test/项目管理/shared/runtime-settings.test.ts
+ce44fcb9469dd8a33c4a4870389316707516ca9685dd9084aecd3a11338a0ee8  5194  2026-10-23T08:24:39.439Z  older_than_s1_freeze  test/项目管理/shared/runtime-shared.test.ts
+no_baseline_hash_paths=47 newer_than_s1_freeze=2
+
+## target files comparison vs S1 target-hashes.txt
+UNCHANGED  app/desktop/project.ts  sha256=d69c79294109ebb2bafa248631be558193a5b421b4249070a9b2abc2a6dd45d2  git=15f08e5d3a7a25cf443dd595dcf61828efb7df39  bytes=23615
+UNCHANGED  app/desktop/interface.ts  sha256=20e9b545eb3a41faa24a4269aad863ec331885173ce9a8d9599f952d719139bf  git=a49a84c85a431648fdd2fa58ea11e07b2ee3bcfb  bytes=336550
+UNCHANGED  src/model/project-document.ts  sha256=bdae97e739d18bbe3a7da7b79f231fab5954d0c056bc4888e6598dae8e556d72  git=eea9476c4ed265d5247687e5dd4fa09a012a5171  bytes=1843
+UNCHANGED  src/service/project-document/abstract/document-reader.ts  sha256=62fd248bbec7b4f04203e66b521cfdbb7b0bc6464b2438ac43cc2a4e2bf14558  git=e6211c39e415dfae9a199fa2a22c03285c0969ef  bytes=513
+UNCHANGED  src/service/project-document/impl/read-project-document.ts  sha256=6c7037a5bc60b3b7d9574e5a2b8088a7c42ccfd073e01580db72f5fbfff0a373  git=5791d525274b97b947860d2a4f680e60080b2960  bytes=7454
+UNCHANGED  src/service/project-document/public/read-project-document.ts  sha256=5e43160370c1b07fdce01fac395e4df1a8a92f1f6d2d4e9d82b74395b49a0678  git=4178228155d96d5f1677ec1b7c35a0b6bd8db223  bytes=497
+UNCHANGED  src/pipeline/project-document/read-project-document.ts  sha256=19cdfd532f0d6570d948e6c1252932b93ab36fdd4f36efa5df5f9a82d7c15eec  git=ac24b8acbc0d570db9a469d4ca562b00f4e96bc3  bytes=718
+UNCHANGED  src/provider/project-document/abstract/file-reader.ts  sha256=45a170632d50ebe9cb125c135c0c937c6d15ed5c64274105f2fac816867a89ff  git=f67bddb3eab33f06cf52760b999b4b7029bd1364  bytes=706
+UNCHANGED  src/provider/project-document/impl/file-reader.ts  sha256=977a8d7b71ad53172988caee6b1a99b6f684a4c8989b570d53656ae9a1ba3b61  git=ca790abf4f9e89ea361803b5c182d07440948e6b  bytes=5284
+UNCHANGED  src/provider/project-document/public/file-reader.ts  sha256=1c228b6a780f9bccfe07e257f331ba4f90de48a1b6f72ecbaf12e8e69cbe5cb6  git=166e325817e7c38015bfbe022785bf1bcfcb58ec  bytes=286
+UNCHANGED  app/preload.cjs  sha256=e4af7435116bcca92e4aa043213194f82d1c5b9f2bd1646a0c523c0bfa89d1f1  git=88f558714a8eb9764b76f970d9e2a0d076625c3d  bytes=23747
+UNCHANGED  app/main.ts  sha256=cc7982ea7156e2b55d2f434b1e3aa0fb1c61372aeeca50cd8b5a25f771346342  git=413b028f393bef62b0f94f779a61c982165f88a4  bytes=63034
+UNCHANGED  app/renderer/src/shell/ProfilePanel.tsx  sha256=3cc118d1c0dd7d99613811e644f72d51c23dddd27d182385f30c18a26e35a20d  git=1f48989119c0d823ab64b21ca187cc7498da5a91  bytes=13102
+UNCHANGED  app/renderer/src/shell/DocumentView.tsx  sha256=55d05c5d213dfe01b4a6a78e668f8e9bc44c627325f7d839bceaebdd9bd3ced0  git=81d2aece6d158a66219bf968ba2657e2dd81140b  bytes=9770
+UNCHANGED  app/renderer/src/chat/document-view.ts  sha256=4bf32a9d34f7ded97f2e1a83d7a10f3966d69142aa5178910080c608854be3ff  git=902269c10bcc7b02fcefa44c80dc906dda025b71  bytes=9593
+UNCHANGED  app/renderer/src/chat/types.ts  sha256=720c0663bd909e3904ad594eba8025161edd2fc5c01f12f8f0e46bb2663d27b8  git=737aa1fb51ddd605bd78dde1d5bf0b6a36ef43cb  bytes=5018
+ABSENT_AS_EXPECTED  app/renderer/src/chat/profile-docs.ts
+UNCHANGED  app/renderer/src/stores/drawer-store.ts  sha256=4cb2431a0e658f54d225f245c98582db71e63cb543ec56e27e2d61579197fda1  git=4f40b1507b4cc5650b0c9f604ef7f9586e07830f  bytes=23065
+UNCHANGED  app/renderer/src/shell/phase4a.css  sha256=052ea23040804e4ab2872c2a6b6813ba816db92f0c1e90d3c7ae2c0393391100  git=17a963f87262dff68c266fb8ecda62a0dcebef24  bytes=20963
+UNCHANGED  src/common/shared/i18n/messages/zh-CN.ts  sha256=d487a8d4853004daea619a82b2d760ff3218d6fd1015f1c29623d2ae15953e4e  git=c0501469ed8b8631e63ba124f419aa642a034400  bytes=115558
+UNCHANGED  src/common/shared/i18n/messages/en-US.ts  sha256=05089d70b7b1e0ee720d619efb57aa8d305b7b8f004f4be66144476257e4b373  git=74ab4a7d654143b20b6614d7508f48da67c211cc  bytes=122490
+UNCHANGED  test/桌面应用/project.test.ts  sha256=ab72bb57a661de610fcfd4f32c1b5bd3d0e930a0ae0569da6437ec72c6275d8e  git=764bd104013b40b1eb0ada99f12dada21df3ae73  bytes=15034
+UNCHANGED  test/桌面应用/project-document.test.ts  sha256=654b383d8e77773f2d6b597c9e91a45a93c84b5a0afb79cc5566b0862d5d3e75  git=c49b17b644e83a5c466a65f5ef5eb657bcd8be0f  bytes=20617
+UNCHANGED  test/桌面应用/interface.test.ts  sha256=c01a060e94703e71e8e043995285ae113151a86b6afe9e24faac4bbd3805a575  git=1e545367e512b3d2cf740ee531eefe2b9757e884  bytes=358766
+UNCHANGED  test/桌面应用/e2e/main.mjs  sha256=c48f2e5a0d4a84e91cfd5daf8386bdb793d3e4ac3868d2023063dc53e0c8474b  git=142e0f18d7701964053d97c6412d38809684c329  bytes=173881
+UNCHANGED  test/桌面UI/document-view.test.ts  sha256=683954c016f6604fb6ffb975572aabaca861ff2478442552f8b8abbfdf314ef4  git=8255e14dfe04929433a1d963208d2099201a727c  bytes=6613
+UNCHANGED  test/桌面UI/role-view.test.ts  sha256=6f98d780213a921cba13402e1f3fa58df8377d95fcd4be5f2f6ed067fc597e3d  git=c256c234587394338fa60029a6a595610deed728  bytes=5035
+UNCHANGED  test/桌面UI/phase4a-electron-smoke.mjs  sha256=7f4045274f7a0ec840342a736075923382b7aa0c9e3bcf8e3df3faa940d37421  git=75aa0bc9c6b755691b353373c2bea64b9f749ee3  bytes=69601
+UNCHANGED  test/桌面UI/phase4a-smoke-preload.cjs  sha256=0ac84b5ce7fd73331c1572095622ed3b7a381cfff33ab2ac6688c28761b0457e  git=7b68ac170a74021e1a6e1f88ec5001f53fb39006  bytes=5100
+UNCHANGED  test/桌面UI/source-guard.test.ts  sha256=6c761264753e2c4e2b2110a53fd41fdd7326a4076423d157f4e69feec90a0e5b  git=90ff6bf29ad4d96b36532d0876d36c79f5795b38  bytes=12002
+UNCHANGED  test/测试/p1p7-document-integration.test.ts  sha256=d1150aa1aab1cbc67314242673e966e7ba1746457a6320d53b98b03192c53683  git=6ea3460d0ac74a46e2aad60f881c7cea8ae6f875  bytes=9184
+UNCHANGED  test/测试/i18n-integration.test.ts  sha256=57aa7ff82e18add312580b17dc2e7e10c6deae12b5f03d5c9e34b80bb68a0ba3  git=ab22f2b8e7dca485deefe5acde153d257975c776  bytes=26733
+UNCHANGED  test/项目管理/shared/i18n.test.ts  sha256=d8e7567797d9a324e1e2f9889b84758c81ac1b6df76f98b63c2c652f3bebac97  git=26501c142dbd2c03bd6db6e135a0a29da8d46a3b  bytes=54322
+UNCHANGED  test/项目管理/shared/i18n-guard.test.ts  sha256=05003446fd8973b9954dd10593f8f5df284d68b3d733b8832a83338f949cf7e9  git=3358a1428f60b1d115e9a3af5aab39601938eb12  bytes=6151
+target_unchanged=34 target_changed=0 target_missing=0
+
+## role card boundary hashes vs final-check.txt
+UNCHANGED  角色卡/桌面窗口/boundary.md
+UNCHANGED  角色卡/桌面窗口/boundary.yaml
+UNCHANGED  角色卡/桌面UI/boundary.md
+UNCHANGED  角色卡/桌面UI/boundary.yaml
+UNCHANGED  角色卡/项目管理/boundary.md
+UNCHANGED  角色卡/项目管理/boundary.yaml
+UNCHANGED  角色卡/测试/boundary.md
+UNCHANGED  角色卡/测试/boundary.yaml
+boundary_unchanged=8 boundary_changed=0
+
+## DIFF LIST
+(none)

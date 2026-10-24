@@ -32,6 +32,9 @@ import {
 import { createDesktopInterface } from "../../app/desktop/interface.ts";
 // G-5 漂移守卫：面板键集与注册表 `RUNTIME_SETTINGS.pi` 字段集逐键对齐（只读导入）。
 import { RUNTIME_SETTINGS } from "../../src/common/shared/runtime-settings.ts";
+// i18n B4：设置视图的中文/英文文案由主进程按当前 locale 从共享目录 key 解析。
+import { getRuntimeConfig, saveRuntimeConfig } from "../../app/desktop/runtime-config.ts";
+import { createMainI18n } from "../../app/desktop/i18n.ts";
 
 /** 哨兵 token 值——用于断言它绝不出现在视图/回报/错误文本里。 */
 const SENTINEL_TOKEN = "SENTINEL-TOKEN-9f3a1c-DO-NOT-LEAK";
@@ -409,4 +412,64 @@ test('packaged smoke script checks entry/root/driver/CSP plus existing IPC witho
  assert.ok(Object.values(observed.checks).every(value=>value===true));
  assert.equal(observed.entryUrl,entryUrl);
  assert.equal(JSON.stringify(observed).includes(SENTINEL_TOKEN),false);
+});
+
+// —————————————— i18n B4（2026-10-23）：旧面板路径的注册表视图/保存错误按当前 locale ——————————————
+// 旧 zh 断言全部保留在上述用例；本组只**新增** en-US 断言（切回 zh 后逐字中文）。
+// `pi-config.ts` 自身面板视图只含 key/secret/value/isSet（无展示文案，不复制目录）；
+// 生产面 `pi-config:*` IPC 未注入替身时委托 `getRuntimeConfig`/`saveRuntimeConfig`（B4 解析点）。
+test("i18n B4：pi 设置视图 label/help/choiceLabels 按 en-US 解析、保存错误 en；旧面板视图无文案字段；切回 zh 逐字", async () => {
+  const t = makeTempEnv(["ANS_PI_MODEL=m", ""].join("\n"));
+  createMainI18n("en-US");
+  try {
+    const view = await getRuntimeConfig("pi", { envPath: t.envPath, env: {} });
+    const byKey = Object.fromEntries(view.fields.map((f) => [f.key, f]));
+    assert.equal(byKey.ANTHROPIC_AUTH_TOKEN.label, "Access token");
+    assert.equal(byKey.ANS_PI_BASE_URL.label, "API base URL");
+    assert.equal(byKey.ANS_PI_MODEL.label, "Model");
+    assert.equal(byKey.ANS_PI_CONTEXT_WINDOW.label, "Context window");
+    assert.deepEqual(
+      byKey.ANS_PI_CONTEXT_WINDOW.choiceLabels,
+      ["System default (500k)", "32k", "64k", "128k", "256k", "500k", "1M"],
+    );
+    assert.equal(
+      byKey.ANS_PI_PROMPT_TIMEOUT_MS.help,
+      "At the limit, the governance role is only asked to check whether the turn is stuck; the turn is not aborted. If it is still progressing, no action is taken; one hour is the last-resort limit. Leave empty for the system default (5 minutes). Unit: ms. Applied when the next session opens.",
+    );
+    // 字段集与旧面板键集逐键对齐（B4 不改字段集/必填/choices）。
+    assert.deepEqual(view.fields.map((f) => f.key), PI_PANEL_KEYS);
+    assert.deepEqual(view.fields.map((f) => f.required), RUNTIME_SETTINGS.pi.fields.map((f) => f.required));
+
+    // 旧面板模块视图：仍只含 key/secret/value/isSet（无 label/help/choiceLabels——不复制目录文案）。
+    const panel = await getPiConfig(t.envPath);
+    for (const field of panel.fields) {
+      assert.deepEqual(Object.keys(field).sort(), ["isSet", "key", "secret", "value"], `${field.key} 旧面板字段形状不变`);
+    }
+    assert.equal(panel.fields.find((f) => f.key === "ANS_PI_MODEL")?.value, "m", "旧面板值回填与 locale 无关");
+
+    // 保存错误（旧路径委托注册表保存链）：en 文案 + 已解析 choiceLabels；不回显提交值。
+    const bad = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_REASONING_EFFORT: "max" } }, { envPath: t.envPath });
+    assert.equal(bad.ok, false);
+    assert.equal(
+      bad.error,
+      "Invalid value for Reasoning effort: only Off / Low / Medium / High / XHigh is accepted (or leave empty to keep the platform default).",
+    );
+    assert.equal((bad.error ?? "").includes("max"), false, "错误不回显提交值原文");
+
+    // 切回 zh-CN：同一视图/错误逐字（旧断言口径）。
+    createMainI18n("zh-CN");
+    const zhView = await getRuntimeConfig("pi", { envPath: t.envPath, env: {} });
+    const zhByKey = Object.fromEntries(zhView.fields.map((f) => [f.key, f]));
+    assert.equal(zhByKey.ANTHROPIC_AUTH_TOKEN.label, "访问令牌");
+    assert.equal(zhByKey.ANS_PI_MODEL.label, "模型");
+    assert.deepEqual(
+      zhByKey.ANS_PI_CONTEXT_WINDOW.choiceLabels,
+      ["系统默认（500k）", "32k", "64k", "128k", "256k", "500k", "1M"],
+    );
+    const zhBad = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_REASONING_EFFORT: "max" } }, { envPath: t.envPath });
+    assert.equal(zhBad.error, "推理强度取值无效：仅接受 关 / 低 / 中 / 高 / 极高（或留空维持平台默认）。");
+  } finally {
+    createMainI18n("zh-CN");
+    t.cleanup();
+  }
 });

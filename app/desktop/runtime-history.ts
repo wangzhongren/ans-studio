@@ -2,6 +2,7 @@ import { readRoleSessionHistory, projectRoleLegacyHistory } from "../../src/pipe
 import type { RuntimeKind, PromptInputEventDetail, ToolEventDetailV1, RuntimeReportSnapshotV1, RuntimeDeliveryReceiptV1 } from "../../src/model/runtime.ts";
 import { readRoleSessionHistory as readLegacyPiHistory, toRuntimeLegacyEntries, classifyProcessOutcome, type ReplayRow } from "./session-history.ts";
 import { isRuntimeKind } from "./runtime-config.ts";
+import { mainT } from "./i18n.ts";
 
 export interface SessionHistoryView {
   projectRoot: string; roleId: string; runtime: RuntimeKind; rows: ReplayRow[]; error: string | null; skipped: number;
@@ -10,7 +11,7 @@ export interface SessionHistoryView {
 }
 // All IPC text is obtained through the public Pipeline's protected history projection.
 export async function getSessionHistory(input: { projectRoot: string; roleId: string; runtime: RuntimeKind }, context?: { credentialEnvNames?: readonly string[] }): Promise<SessionHistoryView> {
-  if (!input || typeof input.projectRoot !== "string" || typeof input.roleId !== "string" || !isRuntimeKind(input.runtime)) throw new Error("历史请求须指定项目、角色与运行时。");
+  if (!input || typeof input.projectRoot !== "string" || typeof input.roleId !== "string" || !isRuntimeKind(input.runtime)) throw new Error(mainT("main.history.invalidRequest"));
   const base: SessionHistoryView = { ...input, rows: [], error: null, skipped: 0 };
   try {
     const history = await readRoleSessionHistory(input, context);
@@ -51,9 +52,9 @@ export async function getSessionHistory(input: { projectRoot: string; roleId: st
         && typeof reasoningCarrier.reasoning === 'object' && reasoningCarrier.reasoning !== null) {
         row.reasoning = reasoningCarrier.reasoning as ReplayRow['reasoning'];
       }
-      if (detail?.source === 'delivery-receipt' as string && detail?.receipt) { row.kind = 'tool'; row.text = '投递历史状态'; row.deliveryReceipt = detail.receipt; base.rows.push(row); continue; }
+      if (detail?.source === 'delivery-receipt' as string && detail?.receipt) { row.kind = 'tool'; row.text = mainT("main.history.deliveryState"); row.deliveryReceipt = detail.receipt; base.rows.push(row); continue; }
       if (detail?.source === 'delivery-boundary' as string) {
-        row.kind = 'tool'; row.text = '投递可能已开始';
+        row.kind = 'tool'; row.text = mainT("main.history.deliveryMaybeStarted");
         if (detail.version === 1 && detail.deliveryId && detail.attemptId && detail.turnId && detail.stage === 'provider-may-start') row.deliveryBoundary = { version: 1, deliveryId: detail.deliveryId, attemptId: detail.attemptId, turnId: detail.turnId, stage: detail.stage };
         base.rows.push(row); continue;
       }
@@ -90,7 +91,7 @@ export async function getSessionHistory(input: { projectRoot: string; roleId: st
       const legacy = await readLegacyPiHistory(input.projectRoot, input.roleId);
       const protectedHistory = projectRoleLegacyHistory({ ...input, runtime: 'pi', readOk: legacy.ok, entries: toRuntimeLegacyEntries(legacy.rows), source: legacy.source, error: legacy.error, skipped: legacy.skipped }, context);
       if (!protectedHistory.ok) { base.error = protectedHistory.message.text; return base; }
-      base.error = protectedHistory.reader.ok ? null : protectedHistory.reader.error?.text ?? '旧历史读取失败。'; base.skipped = protectedHistory.reader.skipped; base.projection = protectedHistory.projection;
+      base.error = protectedHistory.reader.ok ? null : protectedHistory.reader.error?.text ?? mainT("main.history.legacyReadFailed"); base.skipped = protectedHistory.reader.skipped; base.projection = protectedHistory.projection;
       base.rows = protectedHistory.entries.map(entry => {
         // F-8-b：**同一结构化判据**在旧历史投影路径上防御式复读——当前核心投影不携带 `display.process`
         // （旧文本永不变成执行事实，见 multi-runtime 的钉子），`processClass` 恒为 null、行为逐字不变；
@@ -103,5 +104,5 @@ export async function getSessionHistory(input: { projectRoot: string; roleId: st
       });
     }
     return base;
-  } catch { return { ...base, rows: [], error: '历史读取或安全投影失败。' }; }
+  } catch { return { ...base, rows: [], error: mainT("main.history.readOrProjectionFailed") }; }
 }

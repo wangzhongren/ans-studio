@@ -1,0 +1,93 @@
+== final candidate environment ==
+2026-10-23 12:31:35 +0800
+HEAD=ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+node=v24.22.1
+
+== git status --short (quotePath off) ==
+ M app/desktop/governance-advance.ts
+ M app/desktop/interface.ts
+ M app/main.ts
+ M app/preload.cjs
+ M app/renderer/src/App.tsx
+ M app/renderer/src/lib/platform.ts
+ M app/renderer/src/shell/SettingsPanel.tsx
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+ M src/common/编排/team-plan.ts
+ M src/common/门禁引擎/governance-roles.ts
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/govern-session.ts
+ M src/pipeline/orchestration/run-role.ts
+ M test/runtime-core/governance-flow-metadata.test.ts
+ M test/桌面UI/source-guard.test.ts
+ M test/桌面应用/e2e/main.mjs
+ M test/桌面应用/interface.test.ts
+ M test/桌面应用/operator-wiring.test.ts
+ M test/测试/governance-e2e-auto/fixture.ts
+ M test/测试/governance-e2e-auto/i-full-chain.test.ts
+ M test/测试/governance-e2e-auto/p-team-plan-guard.test.ts
+ M test/测试/governance-e2e-auto/q-role-granularity.test.ts
+ M test/测试/governance-e2e-auto/r-mapreduce-parallel.test.ts
+ M test/编排/team-plan.test.ts
+ M test/门禁引擎/governance-standard-workflow.test.ts
+ M test/门禁引擎/governance-trio.test.ts
+ M 角色卡/桌面UI/api-spec.md
+ M 角色卡/桌面窗口/api-spec.md
+ M 角色卡/桌面窗口/boundary.md
+ M 角色卡/桌面窗口/changelog.md
+ M 角色卡/编排/api-spec.md
+ M 角色卡/运行时核心/api-spec.md
+ M 角色卡/运行时核心/memo.md
+ M 角色卡/门禁引擎/api-spec.md
+ M 角色卡/门禁引擎/memo.md
+ M 角色卡/项目管理/api-spec.md
+ M 角色卡/项目管理/docs/architecture/shared-components.md
+?? .claude/
+?? app/desktop/i18n.ts
+?? app/desktop/preferences.ts
+?? app/renderer/src/i18n/
+?? demos/
+?? docs/acceptance/directory-ownership-criteria-v1.md
+?? docs/acceptance/i18n-criteria-v1.md
+?? docs/communication/2026-10-23_intent_i18n-and-directory-ownership.md
+?? docs/planning/2026-10-23_design_directory-ownership.md
+?? docs/planning/2026-10-23_design_i18n.md
+?? docs/scheduling/2026-10-23-directory-ownership-team-plan.md
+?? docs/scheduling/2026-10-23-i18n-team-plan.md
+?? docs/scheduling/memo.md
+?? src/common/shared/i18n/
+?? src/common/编排/directory-conformance.ts
+?? test/桌面UI/i18n-store.test.ts
+?? test/桌面UI/i18n-view.test.ts
+?? test/测试/directory-layout.test.ts
+?? test/编排/directory-conformance.test.ts
+?? test/项目管理/shared/i18n-guard-allowlist.ts
+?? test/项目管理/shared/i18n-guard-scanner.ts
+?? test/项目管理/shared/i18n-guard.test.ts
+?? test/项目管理/shared/i18n.test.ts
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b0-evidence/
+?? 角色卡/桌面UI/docs/change/2026-10-23_change_i18n-b0.md
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership-evidence/
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_directory-ownership.md
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0-evidence/
+?? 角色卡/桌面窗口/docs/change/2026-10-23_change_i18n-b0.md
+?? 角色卡/测试/docs/change/2026-10-23-baseline-evidence/
+?? 角色卡/测试/docs/change/2026-10-23-directory-ownership-evidence/
+?? 角色卡/测试/docs/change/2026-10-23_change_directory-ownership.md
+?? 角色卡/测试/docs/change/2026-10-23_change_i18n-directory-baseline.md
+?? 角色卡/编排/docs/change/2026-10-23_change_directory-ownership-evidence/
+?? 角色卡/编排/docs/change/2026-10-23_change_directory-ownership.md
+?? 角色卡/运行时核心/docs/change/2026-10-23_change_directory-ownership-evidence/
+?? 角色卡/运行时核心/docs/change/2026-10-23_change_directory-ownership.md
+?? 角色卡/门禁引擎/docs/change/2026-10-23_change_directory-ownership-evidence/
+?? 角色卡/门禁引擎/docs/change/2026-10-23_change_directory-ownership.md
+?? 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0-evidence/
+?? 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b0.md
+
+== diff stat: desktop delta ==
+ app/desktop/governance-advance.ts                  | 125 ++-
+ app/desktop/interface.ts                           | 402 +++++++++-
+ .../e2e/main.mjs"                                  |  14 +
+ .../interface.test.ts"                             | 855 ++++++++++++++++++++-
+ .../operator-wiring.test.ts"                       |   4 +-
+ 5 files changed, 1357 insertions(+), 43 deletions(-)

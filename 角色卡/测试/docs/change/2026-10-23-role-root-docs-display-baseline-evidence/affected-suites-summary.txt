@@ -1,0 +1,27 @@
+== affected suites baseline (T2, not full T3) ==
+recorded_at=2026-10-23 21:53:25 +0800
+runner=node --test --test-concurrency=1 (Node v24.22.1)
+
+command                                                    exit   tests   pass   fail  skipped  duration_ms 
+project.test.ts project-document.test.ts interface.test.ts 0      152     152    0     0        33103.3018  
+test/桌面UI/**/*.test.ts (all 25 files)                  0      195     195    0     0        2315.0597   
+test/测试/p1p7-document-integration.test.ts              0      2       2      0     0        104.7941    
+test/测试/i18n-integration.test.ts                       0      8       8      0     0        393.9839    
+test/项目管理/shared/i18n{,-guard}.test.ts             0      43      43     0     0        293.1825    
+
+TOTAL tests=400 pass=400 fail=0 skipped=0 todo=0; all five commands exit 0.
+
+== failure classification ==
+none: no failed, cancelled, skipped or todo tests in the five affected suites.
+no Windows symlink EPERM, no timing flake, no environment skip observed in this T2 baseline.
+
+== e2e (real Electron, optional S1 item) ==
+command=./node_modules/.bin/electron --user-data-dir=<fresh temp> test/桌面应用/e2e/main.mjs
+ANS_E2E_OUTDIR=角色卡/测试/docs/change/2026-10-23-role-root-docs-display-baseline-evidence/e2e-output
+electron=v44.7.0 userData=fresh temp dir (see e2e-run-meta.txt)
+exit_code=0; report.txt: E2E_PASS=true; E2E_FAILURES=(empty); E2E_DONE=1
+scope=existing Windows behavior only; does not test new root-doc listing/display (not implemented at S1).
+
+== additional suites considered ==
+test/装配 and test/编排: not run. Affected test files import only types from src/common/编排/{handback,watchdog}.ts; no test/装配 or test/编排 test file is imported by the affected tests (import-scan.txt). No product code from those suites is in the target write set.
+test/桌面UI/phase4a-electron-smoke.mjs: not run at S1; scheduled for S6 affected UI smoke, not part of this T2 baseline item.

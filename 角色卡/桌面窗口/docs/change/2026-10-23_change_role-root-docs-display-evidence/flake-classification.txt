@@ -1,0 +1,35 @@
+失败分类与复跑记录（S2+S3 目标套件）
+=====================================
+
+日期：2026-10-23（本地）
+环境：Windows 11 Pro 10.0.26300；Git Bash；Node v24.22.1 / npm 11.19.1
+命令：`node --test --test-concurrency=1 test/桌面应用/project.test.ts test/桌面应用/project-document.test.ts test/桌面应用/interface.test.ts`
+
+一、最终候选（`hashes.txt` 当前 7 文件）
+-----------------------------------------
+- 全套件连续 3 次：**164/164 pass**，exit 0 —— `test-desktop-app-targets.log`（final-run3 原样）、`test-desktop-app-targets.final-run1.log`、`test-desktop-app-targets.final-run2.log`。
+- `test/桌面应用/interface.test.ts` 单文件连续 5 次：**121/121 pass**，exit 0 —— `interface-alone-final-run1.log` … `interface-alone-final-run5.log`。
+- 无失败、无跳过、无 todo；未修改/删除/跳过任何既有断言。
+
+二、HEAD 干净归档基线对照
+--------------------------
+方法：`git archive HEAD | tar -x -C <临时目录>`（HEAD `6407d63`），`node_modules` 以 junction 只读接上；同一 Node/命令。
+- `baseline-head-archive.targets-pass.log`：三个目标文件 152/152 pass，exit 0。
+- `baseline-head-archive.interface-pass1.log`、`baseline-head-archive.interface-pass2.log`：`interface.test.ts` 各 120/120 pass。
+
+三、预最终迭代的时序偶发（保留原始日志，非最终候选）
+------------------------------------------------------
+最终候选第一版曾把三个根文档的 `lstat` 串行排在既有 changelog/docs 读取之后。该版本上：
+- `pre-final-iteration/targets.run1-fail.log`：163/164，失败「第 5 项迁移策略…仍派 Convener readiness」ledger stepId=role-readiness。
+- `pre-final-iteration/targets.run2-fail.log`：同一条失败。
+- `pre-final-iteration/targets.run3.log`：162/164，失败「V12：existing 角色计划写集未覆盖 boundary ⇒ 仍派 readiness」「可重入门禁…role-cards 恰一次 done、readiness 恰一次」。
+- `pre-final-iteration/targets.run4.log`、`run5.log`：164/164 pass。
+- `pre-final-iteration/interface-alone.run1-fail.log`：120/121，失败「任命→Crew 写卡主路径…才派 Convener 做 role-readiness」；`run2-pass.log`：121/121 pass。
+失败集合在重跑之间漂移，均为既有治理 flow/readiness/ledger 时序断言（测试在收到 send 后立即读账本），不触及本次改动路径。
+处理：把三个根文档的元数据 `lstat` 改为与既有 changelog/docs 读取**并行**启动（返回顺序仍由 `Promise.all` 固定为白名单顺序；安全校验/诊断/契约不变），减少 `listProject` 新增的串行延迟。最终候选随即 3/3 全套件、5/5 interface 单文件通过。未改测试断言或跳过用例。
+
+四、分类结论
+------------
+- 预最终迭代的失败为**既有测试时序竞态被串行元数据延迟放大**；通过产品代码并行化元数据检查消除，不是通过改测试/跳过达到。
+- 最终候选无新增确定性失败；基线归档 152/152 通过。
+- 残余：S6 在隔离负载下复跑真实 Electron 与桌面套件；若稳定复现按 S6 失败分类流程回报统筹。

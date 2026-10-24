@@ -1,0 +1,268 @@
+file_count=129
+snapshot_sha256=36ae8c046bf61ec8d87b0c18983c2bc725db184343eacd0eea294f3297a3ec5c
+file_list_sha256=26d5f4d0d71c08c8db0dfe514cb9d47580b106180e3c177f70550e2118677c48
+
+## FILES
+app/desktop/chat-adapter.ts
+app/desktop/composer-images.ts
+app/desktop/confirm-card.ts
+app/desktop/customer-input.ts
+app/desktop/diagnostics.ts
+app/desktop/governance-advance.ts
+app/desktop/i18n.ts
+app/desktop/interface.ts
+app/desktop/judge-reason.ts
+app/desktop/operator-channel.ts
+app/desktop/preferences.ts
+app/desktop/project.ts
+app/desktop/recovery-channel.ts
+app/desktop/runtime-config.ts
+app/desktop/runtime-history.ts
+app/desktop/runtime-resolution.ts
+app/desktop/session-history.ts
+app/desktop/session.ts
+app/desktop/watchdog.ts
+app/main.ts
+app/preload.cjs
+app/renderer/src/App.tsx
+app/renderer/src/chat/ChatRow.tsx
+app/renderer/src/chat/ChatStream.tsx
+app/renderer/src/chat/chat-store.ts
+app/renderer/src/chat/confirm-logic.ts
+app/renderer/src/chat/document-view.ts
+app/renderer/src/chat/events.ts
+app/renderer/src/chat/governance-view.ts
+app/renderer/src/chat/judge.ts
+app/renderer/src/chat/markdown.ts
+app/renderer/src/chat/operator-view.ts
+app/renderer/src/chat/reasoning.ts
+app/renderer/src/chat/report-view.ts
+app/renderer/src/chat/role-view.ts
+app/renderer/src/chat/runtime-config.ts
+app/renderer/src/chat/status.ts
+app/renderer/src/chat/tool-summary.ts
+app/renderer/src/chat/types.ts
+app/renderer/src/chat/work-view.ts
+app/renderer/src/i18n/index.ts
+app/renderer/src/i18n/locale-store.ts
+app/renderer/src/lib/platform.ts
+app/renderer/src/main.tsx
+app/renderer/src/shell/ChatHeader.tsx
+app/renderer/src/shell/Composer.tsx
+app/renderer/src/shell/ConfirmCard.tsx
+app/renderer/src/shell/DocumentView.tsx
+app/renderer/src/shell/Drawer.tsx
+app/renderer/src/shell/EngineSelect.tsx
+app/renderer/src/shell/GovernancePanel.tsx
+app/renderer/src/shell/ProfilePanel.tsx
+app/renderer/src/shell/QueuePanel.tsx
+app/renderer/src/shell/QueueSubview.tsx
+app/renderer/src/shell/ReportCard.tsx
+app/renderer/src/shell/SettingsPanel.tsx
+app/renderer/src/shell/Sidebar.tsx
+app/renderer/src/shell/TitleBar.tsx
+app/renderer/src/shell/WorkOverview.tsx
+app/renderer/src/shell/phase4a.css
+app/renderer/src/stores/confirm-store.ts
+app/renderer/src/stores/drawer-store.ts
+app/renderer/src/stores/governance-store.ts
+app/renderer/src/stores/report-store.ts
+app/renderer/src/stores/settings-store.ts
+src/common/shared/i18n/format.ts
+src/common/shared/i18n/index.ts
+src/common/shared/i18n/keys.ts
+src/common/shared/i18n/locales.ts
+src/common/shared/i18n/messages/en-US.ts
+src/common/shared/i18n/messages/zh-CN.ts
+src/common/shared/i18n/translate.ts
+src/common/shared/i18n/types.ts
+src/common/shared/runtime-settings.ts
+src/common/shared/runtime-shared.ts
+src/common/编排/acceptance-rework.ts
+src/common/编排/directory-conformance.ts
+src/common/编排/flow-service.ts
+src/common/编排/flow-state.ts
+src/common/编排/team-plan.ts
+src/common/门禁引擎/governance-roles.ts
+src/model/runtime.ts
+src/pipeline/orchestration/flow-state.ts
+src/pipeline/orchestration/govern-session.ts
+src/pipeline/orchestration/run-role.ts
+src/provider/runtime/tools.ts
+test/runtime-core/governance-flow-metadata.test.ts
+test/runtime-core/tools.test.ts
+test/桌面UI/i18n-b1-b2.test.ts
+test/桌面UI/i18n-store.test.ts
+test/桌面UI/i18n-view.test.ts
+test/桌面UI/runtime-config.test.ts
+test/桌面UI/source-guard.test.ts
+test/桌面应用/acceptance-dispatch.test.ts
+test/桌面应用/boundary-refresh.test.ts
+test/桌面应用/e2e/main.mjs
+test/桌面应用/interface.test.ts
+test/桌面应用/multi-runtime.test.ts
+test/桌面应用/operator-wiring.test.ts
+test/桌面应用/pi-config.test.ts
+test/桌面应用/session.test.ts
+test/测试/directory-layout.test.ts
+test/测试/existing-project-compat-verify/b-establish.test.ts
+test/测试/g5-reasoning-verify/f-settings.test.ts
+test/测试/governance-e2e-auto/b-proposal-accept-timing.test.ts
+test/测试/governance-e2e-auto/fixture.ts
+test/测试/governance-e2e-auto/i-full-chain.test.ts
+test/测试/governance-e2e-auto/l-redispatch-reentrant-gate.test.ts
+test/测试/governance-e2e-auto/p-team-plan-guard.test.ts
+test/测试/governance-e2e-auto/q-role-granularity.test.ts
+test/测试/governance-e2e-auto/r-mapreduce-parallel.test.ts
+test/测试/governance-e2e-auto/s-acceptance-rework-routing.test.ts
+test/测试/i18n-integration.test.ts
+test/测试/redispatch-target-recompute.ts
+test/测试/t29-pi-config-roundtrip.test.ts
+test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts
+test/编排/acceptance-rework.test.ts
+test/编排/directory-conformance.test.ts
+test/编排/flow-service.test.ts
+test/编排/flow-state.test.ts
+test/编排/team-plan.test.ts
+test/门禁引擎/governance-standard-workflow.test.ts
+test/门禁引擎/governance-trio.test.ts
+test/项目管理/shared/i18n-guard-allowlist.ts
+test/项目管理/shared/i18n-guard-scanner.ts
+test/项目管理/shared/i18n-guard.test.ts
+test/项目管理/shared/i18n.test.ts
+test/项目管理/shared/runtime-settings.test.ts
+test/项目管理/shared/runtime-shared.test.ts
+
+## HASHES
+55830144325b073728824c6a2f9370d2fd685fc27763256b5c4992f56b0d1df4  app/desktop/chat-adapter.ts
+5b24c0e8bb0167c6d0ac2ec98bb16461afa2a6b466b45bad3f3d135499435b9c  app/desktop/composer-images.ts
+3c09fc95db93fd7fd12785ae58cb2c649286a139f84fc9a793c7ea3a66e17d0b  app/desktop/confirm-card.ts
+dd709a41b8e8307570814c346542218674ba996af65300f31c1ceea96168b186  app/desktop/customer-input.ts
+c5e64cd04cf5281c14fa295b7bc4ea36b9fcbbe5e61f7a8d2bfb70e8efd5aef0  app/desktop/diagnostics.ts
+3a75af8c4a111e75930df25acc1417fca5013dbbbd2b2208623a3123206a5947  app/desktop/governance-advance.ts
+e7a55fd12d4e5f3bbd11e9670fc63509ac6f10b341970e1350518f2465883587  app/desktop/i18n.ts
+20e9b545eb3a41faa24a4269aad863ec331885173ce9a8d9599f952d719139bf  app/desktop/interface.ts
+e02f4d40136c02aadc52c009cd6ea86207f7dd4b06ee8377c3ea2aec358878db  app/desktop/judge-reason.ts
+36055abcd562c71f8df9230990a015c55f050cbb93ba177611b3a0b9ccc33ed2  app/desktop/operator-channel.ts
+381deae724e914a4dba0a753849eb5eee63080163cfcb6a1b90c21fecb19d66e  app/desktop/preferences.ts
+d69c79294109ebb2bafa248631be558193a5b421b4249070a9b2abc2a6dd45d2  app/desktop/project.ts
+2fcee235fa136431545c1728ac2139c19eed12f581937dd46c68916322af1365  app/desktop/recovery-channel.ts
+7378de73696fef47051cad872ef3a62f81b34fc4c91ffbd0a68c47d2b3860bbe  app/desktop/runtime-config.ts
+6842f960353cf53af5c7d4a08986a15041602d4289537533b71c66121727c206  app/desktop/runtime-history.ts
+a34846ae4a287adf2fec37defe8ed2e6e136b29a618b6b006ccbe6741391aa5e  app/desktop/runtime-resolution.ts
+b678c0f4f3dc788a8f5673d437995ebddd1f5ac49a9d4b7845447752c22b33c1  app/desktop/session-history.ts
+da11f50e0b51648bdc7a9394796811e91ec199a4fca6d4b78e9e95e4d22045c1  app/desktop/session.ts
+993eec2e5ad15e3254f7e9780bd0d84188e9a88a285f3af4dd0ddbeda3327eb3  app/desktop/watchdog.ts
+cc7982ea7156e2b55d2f434b1e3aa0fb1c61372aeeca50cd8b5a25f771346342  app/main.ts
+e4af7435116bcca92e4aa043213194f82d1c5b9f2bd1646a0c523c0bfa89d1f1  app/preload.cjs
+d419a0cb1f061eedf775d4ab216798949307c11757e88910c2eac74c82351df0  app/renderer/src/App.tsx
+37012bcde0202c2f460d29e85994b97d39ea871c7a4739895d41ebdd18d22f5a  app/renderer/src/chat/ChatRow.tsx
+9a27cb0b653048d8037123e6c3e0c32314072fe0053bb0c35fc038d063d20c82  app/renderer/src/chat/ChatStream.tsx
+6c5add9700c13d663fd0a6ef15a808355b325a5948779716bb34416b20c285f8  app/renderer/src/chat/chat-store.ts
+d73add0740e49205a72b42ae7977af252cfcb9b17bcf8dfdb3c44494b69b05ad  app/renderer/src/chat/confirm-logic.ts
+4bf32a9d34f7ded97f2e1a83d7a10f3966d69142aa5178910080c608854be3ff  app/renderer/src/chat/document-view.ts
+547cd43219027d7e815d6ded4327aec2179f26f780f4add6599268a90e62a182  app/renderer/src/chat/events.ts
+c01a9d0fdb2f70ca3f89f839c94a7afee5e7808bddf988da8e804a8eaab98a58  app/renderer/src/chat/governance-view.ts
+e4135e938108caa72d4fe8e29b58953ef322ac456493ec65fb903b960ee8cf30  app/renderer/src/chat/judge.ts
+c1b8692836e7bc8ffc7a9ad0892bebfc55c72f84387520081a75bfa7e41021f9  app/renderer/src/chat/markdown.ts
+2b90895e4cbe6f9b6fae9d9c951a3dfb564b3d395db39e7bde8e02035a27c749  app/renderer/src/chat/operator-view.ts
+cc17729bed91ae0dfc6e1df322b1e03ae7110cbdbcaac5d786f6dfe8e7630f19  app/renderer/src/chat/reasoning.ts
+32a38a2c9501e89ec654eed4a390f6b80a9ce3cdc2e4d38757bd4790f151f21d  app/renderer/src/chat/report-view.ts
+62d6a4291131a933cfb28b9e8dc264811a7599f031697ce952657a3235351660  app/renderer/src/chat/role-view.ts
+7bbd8b1d0c1a6bf402e19efb14c44cd323d463f618cb1ec47072beb90c21cad4  app/renderer/src/chat/runtime-config.ts
+00960b216bd586aea0a29e7a9d184895649b3ae060c0b6f69aa035de1516faa7  app/renderer/src/chat/status.ts
+b8651b662f387d6eaadb44860f3a4d959988a843389c5b0f1b0bc6fff3aa4e87  app/renderer/src/chat/tool-summary.ts
+720c0663bd909e3904ad594eba8025161edd2fc5c01f12f8f0e46bb2663d27b8  app/renderer/src/chat/types.ts
+d3e3cb39c61951bb38a808000545f052adea1d213b7aca7a0cec130152fde43c  app/renderer/src/chat/work-view.ts
+0249f3440f4364c1aab704bf13f3b53caae6699c795ec9eb5d9ede10f534c144  app/renderer/src/i18n/index.ts
+e24599f0455afb1cddde7bce102cfe83ca044b3e077e81f09773b7f88fbc1b16  app/renderer/src/i18n/locale-store.ts
+6866ea181edb4d1096d54fda03ab170103adfa25afaa7bb88c407e200c9e5341  app/renderer/src/lib/platform.ts
+de80128f313dcc20741ac9c157466db795189178861761da1f84964dd4cad833  app/renderer/src/main.tsx
+73bfa960e7dbd07d68d2f3ec5fee9213e4d528718a7db5133ad75a44c795ab1a  app/renderer/src/shell/ChatHeader.tsx
+c2eed0a6ab6b5dd3d179651076cf4a633e24cbe8420ec9e4e9a180f2781d5b80  app/renderer/src/shell/Composer.tsx
+dbf9d2d9ec95939f2de9d5830ed7c8bda2423d3e1191672decb2e8b98b8b9295  app/renderer/src/shell/ConfirmCard.tsx
+55d05c5d213dfe01b4a6a78e668f8e9bc44c627325f7d839bceaebdd9bd3ced0  app/renderer/src/shell/DocumentView.tsx
+46042e54298a21ea3c4b4475a76254aaf3e759bfee35721250d391f028405432  app/renderer/src/shell/Drawer.tsx
+3a0d0ec72885e4d1a7c562c9fb9ca8db5b334b6f99a827fd393af24da1880ac2  app/renderer/src/shell/EngineSelect.tsx
+899f4373713df4d2af48837bf8e5da6fff329fd2dd83c5a5faf18514a68a34c5  app/renderer/src/shell/GovernancePanel.tsx
+3cc118d1c0dd7d99613811e644f72d51c23dddd27d182385f30c18a26e35a20d  app/renderer/src/shell/ProfilePanel.tsx
+7ba24ab5d8b28ef581369342ff0a1db74e566e603a36cb4d8e62540b618d1c38  app/renderer/src/shell/QueuePanel.tsx
+773b35a31e396109c9b0bca14f31958f454a8ea3bcbf441f71d8487efc527d2b  app/renderer/src/shell/QueueSubview.tsx
+c29a2ef7d4e59066a85ccb3b625af94c7ba15448dd2f4f7e697c83e875ec24ed  app/renderer/src/shell/ReportCard.tsx
+b32d26a782a36eacb0b1d179b258660f90ee62822e732961c666875d154d900f  app/renderer/src/shell/SettingsPanel.tsx
+1468ad25023581980c5d3dfc17c22318006b313715d4acd6403e926f447e3a32  app/renderer/src/shell/Sidebar.tsx
+6fcbf23f59275939c0f68a84062dc4cb03c0721ee4ed31f5fc9d2c8eb2612dc3  app/renderer/src/shell/TitleBar.tsx
+37ecba1e5b67dd1d1b55912459711216a1ec7f0b0869de0a3e12fe59e210fbef  app/renderer/src/shell/WorkOverview.tsx
+052ea23040804e4ab2872c2a6b6813ba816db92f0c1e90d3c7ae2c0393391100  app/renderer/src/shell/phase4a.css
+24ff2d49e90d239e207cb7c083fe570c46484f27a92c71e5820f3240a0d8ed1c  app/renderer/src/stores/confirm-store.ts
+4cb2431a0e658f54d225f245c98582db71e63cb543ec56e27e2d61579197fda1  app/renderer/src/stores/drawer-store.ts
+970e165ad7902ecd07ce70fdb6129fcd1e7e1dc911e9eada89d85a65a48e0ffc  app/renderer/src/stores/governance-store.ts
+54c9c271bccdf8b11b69ca5611b2ca02fb2faaffcc40ff25891f3c32f252ce18  app/renderer/src/stores/report-store.ts
+08d5776858253e5d20e347641e1589f5f274f062d4de59ffdea27501e3150f89  app/renderer/src/stores/settings-store.ts
+5bcdccd09074e5539a23617d7d0caecfd5386942802c54f14a08080f4398b38a  src/common/shared/i18n/format.ts
+70994c1df6d235563df977a77b7939929edcd149abd8e4cef04225aa6c91052e  src/common/shared/i18n/index.ts
+4346aa4e724b86bbf7e7d7c27af9ef84de85648ac463861766a206fd5c91c469  src/common/shared/i18n/keys.ts
+9431b06bb2d7119e7870c5a7ab58e502f1d82b9dbc2c81736a833bad5955c6f6  src/common/shared/i18n/locales.ts
+05089d70b7b1e0ee720d619efb57aa8d305b7b8f004f4be66144476257e4b373  src/common/shared/i18n/messages/en-US.ts
+d487a8d4853004daea619a82b2d760ff3218d6fd1015f1c29623d2ae15953e4e  src/common/shared/i18n/messages/zh-CN.ts
+c9967f7920b63d0f26c50e2b252ae67135c6494cee7d541fe2f8d07d6eae118f  src/common/shared/i18n/translate.ts
+942eb3d1933d266bb59e97f79872606ba073ea149c7a4269c39a1185c58849e6  src/common/shared/i18n/types.ts
+a5fedea2d6ae2fbfda9eaf03caf1a83493f0d5c76c37369342892615024ec6d2  src/common/shared/runtime-settings.ts
+2e01eaa0d137c2e0bd84d0befdbc995d14a81d444f47225ae206d4c155167799  src/common/shared/runtime-shared.ts
+a8598588cda2d3a805c2879c5381870184a0973cb68e8b3a893ff40048ea9559  src/common/编排/acceptance-rework.ts
+a8168a73033b902084465e5d76e0e37724e6de91d6a635e503d8349a6240f5db  src/common/编排/directory-conformance.ts
+43511d2afa5e24cdfedfb1709e75dec83eebfed24f5efa8b01243f88365ccc1f  src/common/编排/flow-service.ts
+ea271ee88067b0b2bcf67576141f09dd6efaa0e2a78f01e66b2ebdb74148bd4a  src/common/编排/flow-state.ts
+f976fd0925d7661f71f1b84cf48b04cce07bc19f8b65c696c5cceecbcdc1b5e7  src/common/编排/team-plan.ts
+90b480fa7b43e31dac88e533cf12cd86641cdb0a176ca9d9c22531896ce94803  src/common/门禁引擎/governance-roles.ts
+ca6c0f09e65e4b1a4bdcae00144e13e0c313c025dfc0ec0f0ad102e0f57492f3  src/model/runtime.ts
+96966286ca48e5356d39bb2e825b424aec7b7c3022bb8a321d98c3be715f59dc  src/pipeline/orchestration/flow-state.ts
+195b5100197486299327d038599cdf974b247aa57e79fff2dab4bafa6a3358f0  src/pipeline/orchestration/govern-session.ts
+46204a7e6624439dcfaa4866d424186638cb33216252a9ec26ea51e8fc3e98fd  src/pipeline/orchestration/run-role.ts
+b3bc52c45042c7493b8ed9e122654513481f67f7877e4d551a6e0479e88153a1  src/provider/runtime/tools.ts
+9253e55945bfdb1cc2c120ab2e8d73bb67415b6afe39e438f56e9fb0208200f1  test/runtime-core/governance-flow-metadata.test.ts
+c7db7e1f5db919b2f9a61c8c15f97ab9b5c8afd54e82c3d8f960cbc005f5ad94  test/runtime-core/tools.test.ts
+6ba30a285c4ed5cd791807af4b48d606f1014be85c816757fa9d85ff5f5cbc78  test/桌面UI/i18n-b1-b2.test.ts
+600c81540ba63c51c81b9f189e11d56853037ce9dc36360cec3e4bbb019728ee  test/桌面UI/i18n-store.test.ts
+7fb032a2ea7e30a6c9cc81cf41c590acdd23977f2758c55afce9f442b076e861  test/桌面UI/i18n-view.test.ts
+563e7a795f8d00dee0dd328e0ea6c46be22ca9c8bc42eb8b5c9a4854f26dfb41  test/桌面UI/runtime-config.test.ts
+6c761264753e2c4e2b2110a53fd41fdd7326a4076423d157f4e69feec90a0e5b  test/桌面UI/source-guard.test.ts
+cb6b78133aa35a8d6f4f0abe0c8b03a39a35fec163cc212533ca5462a823f1f8  test/桌面应用/acceptance-dispatch.test.ts
+d08988c94ece4b8bf3489ea9d9d208cf4ef9af120db0c2d4b445fa3527fe0bd1  test/桌面应用/boundary-refresh.test.ts
+c48f2e5a0d4a84e91cfd5daf8386bdb793d3e4ac3868d2023063dc53e0c8474b  test/桌面应用/e2e/main.mjs
+c01a060e94703e71e8e043995285ae113151a86b6afe9e24faac4bbd3805a575  test/桌面应用/interface.test.ts
+358e99c245df28ad25fcba6ee24e1313b5b59706a45db589e1094c2566668146  test/桌面应用/multi-runtime.test.ts
+326c9156819126b6dbe58669f0bb73ea439228f9c6b3fd7fe55cdfded3dbac8a  test/桌面应用/operator-wiring.test.ts
+8e98274a0c596ea7cffa200642d252a7d7d858e96840079159c0786979921351  test/桌面应用/pi-config.test.ts
+8e560d11ffccfa94647a259a42bdadcb9586f0de25eec4face1daacc9fe89c65  test/桌面应用/session.test.ts
+7a4b845f4b8396a9b23ae90746197b64051a00abfea1663bee3e343af191154e  test/测试/directory-layout.test.ts
+9505901ba077d01b43adca00ccd53e09fb542ff40d932bac665af14f84b895f2  test/测试/existing-project-compat-verify/b-establish.test.ts
+a919eee53f4a25148cbce92a2853b20f7fbbe86a98d2fa330be4f7bb63355082  test/测试/g5-reasoning-verify/f-settings.test.ts
+bc0ce9cee9bf9dcdb2d45a33f61bbbf99ceb6eac6f8487e7a4f40983772616e7  test/测试/governance-e2e-auto/b-proposal-accept-timing.test.ts
+2e4e571aa4b8aeae9da21ab59323e45b83b23c94d6fec307a226fde019ad7e71  test/测试/governance-e2e-auto/fixture.ts
+c14bd78bc5fc6500706f43031e2bd1a5d7c0143a0ee0e9608ec49fdb28df995f  test/测试/governance-e2e-auto/i-full-chain.test.ts
+48fb0aa8467479904a9b2a7b4498b5f6a3cf200b2782f1eee52c76813ec85e3e  test/测试/governance-e2e-auto/l-redispatch-reentrant-gate.test.ts
+c35da9810c995a3d556e2f406323a273024e5521dac77cb23c14d4f933296cee  test/测试/governance-e2e-auto/p-team-plan-guard.test.ts
+9689f5cbe1ec299921d6d92d3174a68369d482b985a6bd37d999c3e9d8148c52  test/测试/governance-e2e-auto/q-role-granularity.test.ts
+305cc0ab4027e16ea25cb5730cb6324533732385810b1b5d774a5eb516726159  test/测试/governance-e2e-auto/r-mapreduce-parallel.test.ts
+931001895808f889b1b3abbd2eff5e6dcce85fa7a6bfb2007ef9fb73d191d5ae  test/测试/governance-e2e-auto/s-acceptance-rework-routing.test.ts
+57aa7ff82e18add312580b17dc2e7e10c6deae12b5f03d5c9e34b80bb68a0ba3  test/测试/i18n-integration.test.ts
+4bbf858785b2cc0918fedade0ef9ec654484bd3b4147b947ccd7440d9cc7e551  test/测试/redispatch-target-recompute.ts
+71842ced0d1ae05e551696468ad27dbcad2791239dfca003c170694d1611287e  test/测试/t29-pi-config-roundtrip.test.ts
+10765961cafc67b19485c1606347840fdce2e95008d6645da9ad76d01eaceab8  test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts
+99735a3123ef6e4f0cec474ae766f560e96a98692e2c6789e422285cbce70fb1  test/编排/acceptance-rework.test.ts
+8028c7c694c7c00d01aa5db47488dc27648ab22173a9914cbcc7c8d91b9581dc  test/编排/directory-conformance.test.ts
+42881027a5c9eca2a0c9008e72241dfc6c5880145c19410dbb1eaaaf38313d33  test/编排/flow-service.test.ts
+3efba1b9e5fabf08f029b6cfa8d5abf27a4c56d423b730014c92b953c6f05ea8  test/编排/flow-state.test.ts
+46d657bad532fe7eabb6eb1b8dc079b7047fd96450e33b48e4ec6d5aab2c356e  test/编排/team-plan.test.ts
+b16a06741dd3a5770792e3917ef5c9773d934ff169e40f72a74bfe033d6427a6  test/门禁引擎/governance-standard-workflow.test.ts
+452f7ff134e4aced40a5e35242a01ecb947ed0ef155f120d311283de0ee988a6  test/门禁引擎/governance-trio.test.ts
+29541e89cc65cfe51dfab194efc0bfd4d265d5d4293c58b3fe8b740f5363da3b  test/项目管理/shared/i18n-guard-allowlist.ts
+132a5325f7d5d1c552ad32b31a53fe4b659f74fbfc0f46d629ce273073e1661b  test/项目管理/shared/i18n-guard-scanner.ts
+05003446fd8973b9954dd10593f8f5df284d68b3d733b8832a83338f949cf7e9  test/项目管理/shared/i18n-guard.test.ts
+d8e7567797d9a324e1e2f9889b84758c81ac1b6df76f98b63c2c652f3bebac97  test/项目管理/shared/i18n.test.ts
+d7e77b25291d928fe47ed1f0b23ace0782b8dd577724fc5884d7615cc79ffaac  test/项目管理/shared/runtime-settings.test.ts
+ce44fcb9469dd8a33c4a4870389316707516ca9685dd9084aecd3a11338a0ee8  test/项目管理/shared/runtime-shared.test.ts
+
+## DETAILS_JSON
+[{"status":"OK","path":"app/desktop/chat-adapter.ts","sha256":"55830144325b073728824c6a2f9370d2fd685fc27763256b5c4992f56b0d1df4","gitBlob":"5b60f0df792e5bf285bf58c3163f1eda3539634d","size":6876},{"status":"OK","path":"app/desktop/composer-images.ts","sha256":"5b24c0e8bb0167c6d0ac2ec98bb16461afa2a6b466b45bad3f3d135499435b9c","gitBlob":"add3330c0ff2f3ae413f4e91a0b90e16c1f9d55f","size":5796},{"status":"OK","path":"app/desktop/confirm-card.ts","sha256":"3c09fc95db93fd7fd12785ae58cb2c649286a139f84fc9a793c7ea3a66e17d0b","gitBlob":"511d162cabb0515b46351a0b33e5926bd5ef840a","size":10044},{"status":"OK","path":"app/desktop/customer-input.ts","sha256":"dd709a41b8e8307570814c346542218674ba996af65300f31c1ceea96168b186","gitBlob":"bf9df963ad90af77063a2e926f0919a19bc9dc66","size":70607},{"status":"OK","path":"app/desktop/diagnostics.ts","sha256":"c5e64cd04cf5281c14fa295b7bc4ea36b9fcbbe5e61f7a8d2bfb70e8efd5aef0","gitBlob":"a204dae55efabb1e00d2496857e2da9e72f178f2","size":5389},{"status":"OK","path":"app/desktop/governance-advance.ts","sha256":"3a75af8c4a111e75930df25acc1417fca5013dbbbd2b2208623a3123206a5947","gitBlob":"5577fbb0c1f4a1925f1ca892e5eb9e031644de99","size":92296},{"status":"OK","path":"app/desktop/i18n.ts","sha256":"e7a55fd12d4e5f3bbd11e9670fc63509ac6f10b341970e1350518f2465883587","gitBlob":"427b707b62e60f14b620c0807d73a02c8323e12e","size":4773},{"status":"OK","path":"app/desktop/interface.ts","sha256":"20e9b545eb3a41faa24a4269aad863ec331885173ce9a8d9599f952d719139bf","gitBlob":"a49a84c85a431648fdd2fa58ea11e07b2ee3bcfb","size":336550},{"status":"OK","path":"app/desktop/judge-reason.ts","sha256":"e02f4d40136c02aadc52c009cd6ea86207f7dd4b06ee8377c3ea2aec358878db","gitBlob":"acaa54c4b6d4e7c9d37c29c5161637246743a58d","size":2930},{"status":"OK","path":"app/desktop/operator-channel.ts","sha256":"36055abcd562c71f8df9230990a015c55f050cbb93ba177611b3a0b9ccc33ed2","gitBlob":"eec50dea364ef7699c75351eacaab450116709d0","size":62022},{"status":"OK","path":"app/desktop/preferences.ts","sha256":"381deae724e914a4dba0a753849eb5eee63080163cfcb6a1b90c21fecb19d66e","gitBlob":"008f74d17b1290776ea0399106dbca7c6b2031e9","size":9622},{"status":"OK","path":"app/desktop/project.ts","sha256":"d69c79294109ebb2bafa248631be558193a5b421b4249070a9b2abc2a6dd45d2","gitBlob":"15f08e5d3a7a25cf443dd595dcf61828efb7df39","size":23615},{"status":"OK","path":"app/desktop/recovery-channel.ts","sha256":"2fcee235fa136431545c1728ac2139c19eed12f581937dd46c68916322af1365","gitBlob":"0cc168fd8add22ec7daf6b7e25e5bc5423bf2140","size":7101},{"status":"OK","path":"app/desktop/runtime-config.ts","sha256":"7378de73696fef47051cad872ef3a62f81b34fc4c91ffbd0a68c47d2b3860bbe","gitBlob":"8132b32a57152e17555b00026fbf7318c57a2e3a","size":11653},{"status":"OK","path":"app/desktop/runtime-history.ts","sha256":"6842f960353cf53af5c7d4a08986a15041602d4289537533b71c66121727c206","gitBlob":"2d73950a0b1a7f9660f8d5577dedf71e99d7c264","size":10956},{"status":"OK","path":"app/desktop/runtime-resolution.ts","sha256":"a34846ae4a287adf2fec37defe8ed2e6e136b29a618b6b006ccbe6741391aa5e","gitBlob":"6358dece52fa61ece5a45e169e300fcdb215512d","size":16038},{"status":"OK","path":"app/desktop/session-history.ts","sha256":"b678c0f4f3dc788a8f5673d437995ebddd1f5ac49a9d4b7845447752c22b33c1","gitBlob":"2c280c87524813d460a49d3bb880312671f1bd33","size":22571},{"status":"OK","path":"app/desktop/session.ts","sha256":"da11f50e0b51648bdc7a9394796811e91ec199a4fca6d4b78e9e95e4d22045c1","gitBlob":"35342c5833a7980ab8b4c66dc94268eb37d7a728","size":296209},{"status":"OK","path":"app/desktop/watchdog.ts","sha256":"993eec2e5ad15e3254f7e9780bd0d84188e9a88a285f3af4dd0ddbeda3327eb3","gitBlob":"5d7405ec29ad89b28338c6958eeb024d1afd733c","size":41749},{"status":"OK","path":"app/main.ts","sha256":"cc7982ea7156e2b55d2f434b1e3aa0fb1c61372aeeca50cd8b5a25f771346342","gitBlob":"413b028f393bef62b0f94f779a61c982165f88a4","size":63034},{"status":"OK","path":"app/preload.cjs","sha256":"e4af7435116bcca92e4aa043213194f82d1c5b9f2bd1646a0c523c0bfa89d1f1","gitBlob":"88f558714a8eb9764b76f970d9e2a0d076625c3d","size":23747},{"status":"OK","path":"app/renderer/src/App.tsx","sha256":"d419a0cb1f061eedf775d4ab216798949307c11757e88910c2eac74c82351df0","gitBlob":"3d8fb75c86b0ddd82075d9c3cb7d91635b2090ed","size":5607},{"status":"OK","path":"app/renderer/src/chat/ChatRow.tsx","sha256":"37012bcde0202c2f460d29e85994b97d39ea871c7a4739895d41ebdd18d22f5a","gitBlob":"ae7ed8ffda1761113b3f3d3ee946bbea01dfab1d","size":36972},{"status":"OK","path":"app/renderer/src/chat/ChatStream.tsx","sha256":"9a27cb0b653048d8037123e6c3e0c32314072fe0053bb0c35fc038d063d20c82","gitBlob":"922cc53edaa9a28b33d528e1e4b1976df037ef7f","size":14975},{"status":"OK","path":"app/renderer/src/chat/chat-store.ts","sha256":"6c5add9700c13d663fd0a6ef15a808355b325a5948779716bb34416b20c285f8","gitBlob":"807b8b202ebdd5b98e9ef6133b6ef81c5cb294d8","size":96877},{"status":"OK","path":"app/renderer/src/chat/confirm-logic.ts","sha256":"d73add0740e49205a72b42ae7977af252cfcb9b17bcf8dfdb3c44494b69b05ad","gitBlob":"1b0b754c2bc61c098a802277cb13361527d68916","size":11152},{"status":"OK","path":"app/renderer/src/chat/document-view.ts","sha256":"4bf32a9d34f7ded97f2e1a83d7a10f3966d69142aa5178910080c608854be3ff","gitBlob":"902269c10bcc7b02fcefa44c80dc906dda025b71","size":9593},{"status":"OK","path":"app/renderer/src/chat/events.ts","sha256":"547cd43219027d7e815d6ded4327aec2179f26f780f4add6599268a90e62a182","gitBlob":"b44ba33a7793acb86e40511a746d30d896299dc6","size":37319},{"status":"OK","path":"app/renderer/src/chat/governance-view.ts","sha256":"c01a9d0fdb2f70ca3f89f839c94a7afee5e7808bddf988da8e804a8eaab98a58","gitBlob":"f365befb78d70021370edecd405b99b1d11c873d","size":29669},{"status":"OK","path":"app/renderer/src/chat/judge.ts","sha256":"e4135e938108caa72d4fe8e29b58953ef322ac456493ec65fb903b960ee8cf30","gitBlob":"419bcb0eb0864ab211c8fbe0df711efffe0f732d","size":21553},{"status":"OK","path":"app/renderer/src/chat/markdown.ts","sha256":"c1b8692836e7bc8ffc7a9ad0892bebfc55c72f84387520081a75bfa7e41021f9","gitBlob":"f17466d0894dba448bc34f40ad7b71b7e3a0e967","size":7407},{"status":"OK","path":"app/renderer/src/chat/operator-view.ts","sha256":"2b90895e4cbe6f9b6fae9d9c951a3dfb564b3d395db39e7bde8e02035a27c749","gitBlob":"803b1af5ac431f45cb3d28edfa07860c52e9229c","size":7948},{"status":"OK","path":"app/renderer/src/chat/reasoning.ts","sha256":"cc17729bed91ae0dfc6e1df322b1e03ae7110cbdbcaac5d786f6dfe8e7630f19","gitBlob":"e86091a11075588dbe48036edbf485205dde41b0","size":11395},{"status":"OK","path":"app/renderer/src/chat/report-view.ts","sha256":"32a38a2c9501e89ec654eed4a390f6b80a9ce3cdc2e4d38757bd4790f151f21d","gitBlob":"4631265fb86ea940be714572f97c65b213acdd95","size":17576},{"status":"OK","path":"app/renderer/src/chat/role-view.ts","sha256":"62d6a4291131a933cfb28b9e8dc264811a7599f031697ce952657a3235351660","gitBlob":"4989595a36a58444cd805cfc3531af1716bc4539","size":4715},{"status":"OK","path":"app/renderer/src/chat/runtime-config.ts","sha256":"7bbd8b1d0c1a6bf402e19efb14c44cd323d463f618cb1ec47072beb90c21cad4","gitBlob":"4877d82de2e65ff685be43411357f129ea453ca5","size":18796},{"status":"OK","path":"app/renderer/src/chat/status.ts","sha256":"00960b216bd586aea0a29e7a9d184895649b3ae060c0b6f69aa035de1516faa7","gitBlob":"ca211409cb39b9f5cfedd2be3093091f42abdd9d","size":4027},{"status":"OK","path":"app/renderer/src/chat/tool-summary.ts","sha256":"b8651b662f387d6eaadb44860f3a4d959988a843389c5b0f1b0bc6fff3aa4e87","gitBlob":"a90f31bd5636320a7065d762e35b53374aa61929","size":7177},{"status":"OK","path":"app/renderer/src/chat/types.ts","sha256":"720c0663bd909e3904ad594eba8025161edd2fc5c01f12f8f0e46bb2663d27b8","gitBlob":"737aa1fb51ddd605bd78dde1d5bf0b6a36ef43cb","size":5018},{"status":"OK","path":"app/renderer/src/chat/work-view.ts","sha256":"d3e3cb39c61951bb38a808000545f052adea1d213b7aca7a0cec130152fde43c","gitBlob":"5bbf5f48eba18043cbcf6001d1fe3ed659e4aa03","size":8468},{"status":"OK","path":"app/renderer/src/i18n/index.ts","sha256":"0249f3440f4364c1aab704bf13f3b53caae6699c795ec9eb5d9ede10f534c144","gitBlob":"8155444aea4628d45f436883386510e06c0c2b86","size":3235},{"status":"OK","path":"app/renderer/src/i18n/locale-store.ts","sha256":"e24599f0455afb1cddde7bce102cfe83ca044b3e077e81f09773b7f88fbc1b16","gitBlob":"8fddc58b31f851eb02880d317dece4b280e6f9f9","size":11113},{"status":"OK","path":"app/renderer/src/lib/platform.ts","sha256":"6866ea181edb4d1096d54fda03ab170103adfa25afaa7bb88c407e200c9e5341","gitBlob":"a773672f221ac52213a47a62fcd4651844f9fbfb","size":8632},{"status":"OK","path":"app/renderer/src/main.tsx","sha256":"de80128f313dcc20741ac9c157466db795189178861761da1f84964dd4cad833","gitBlob":"c5cd337514c2158a304367fbafe1524b6e5a5040","size":1201},{"status":"OK","path":"app/renderer/src/shell/ChatHeader.tsx","sha256":"73bfa960e7dbd07d68d2f3ec5fee9213e4d528718a7db5133ad75a44c795ab1a","gitBlob":"32a75005bf59c3ca1dca16c6aebd24b788c33abe","size":7315},{"status":"OK","path":"app/renderer/src/shell/Composer.tsx","sha256":"c2eed0a6ab6b5dd3d179651076cf4a633e24cbe8420ec9e4e9a180f2781d5b80","gitBlob":"4ced860e9892873e7594e3f4a917f7ebc66e84c4","size":30175},{"status":"OK","path":"app/renderer/src/shell/ConfirmCard.tsx","sha256":"dbf9d2d9ec95939f2de9d5830ed7c8bda2423d3e1191672decb2e8b98b8b9295","gitBlob":"7744e18001f1bb6a296701c76e1567570867db8d","size":16420},{"status":"OK","path":"app/renderer/src/shell/DocumentView.tsx","sha256":"55d05c5d213dfe01b4a6a78e668f8e9bc44c627325f7d839bceaebdd9bd3ced0","gitBlob":"81d2aece6d158a66219bf968ba2657e2dd81140b","size":9770},{"status":"OK","path":"app/renderer/src/shell/Drawer.tsx","sha256":"46042e54298a21ea3c4b4475a76254aaf3e759bfee35721250d391f028405432","gitBlob":"22c619c22fa2d1592acc69e5222c76c8391071f7","size":10245},{"status":"OK","path":"app/renderer/src/shell/EngineSelect.tsx","sha256":"3a0d0ec72885e4d1a7c562c9fb9ca8db5b334b6f99a827fd393af24da1880ac2","gitBlob":"05200f4b9a91481cff5d756e25bbf9d3e5254a75","size":14007},{"status":"OK","path":"app/renderer/src/shell/GovernancePanel.tsx","sha256":"899f4373713df4d2af48837bf8e5da6fff329fd2dd83c5a5faf18514a68a34c5","gitBlob":"615a0e6cb4298995d988c890e822c3b283fde07f","size":16336},{"status":"OK","path":"app/renderer/src/shell/ProfilePanel.tsx","sha256":"3cc118d1c0dd7d99613811e644f72d51c23dddd27d182385f30c18a26e35a20d","gitBlob":"1f48989119c0d823ab64b21ca187cc7498da5a91","size":13102},{"status":"OK","path":"app/renderer/src/shell/QueuePanel.tsx","sha256":"7ba24ab5d8b28ef581369342ff0a1db74e566e603a36cb4d8e62540b618d1c38","gitBlob":"ff6b749890c055751edc6325cfd3d4659fa0d9c5","size":4428},{"status":"OK","path":"app/renderer/src/shell/QueueSubview.tsx","sha256":"773b35a31e396109c9b0bca14f31958f454a8ea3bcbf441f71d8487efc527d2b","gitBlob":"464aca2ce6987a8594d1ce533ffd07178d687c13","size":4946},{"status":"OK","path":"app/renderer/src/shell/ReportCard.tsx","sha256":"c29a2ef7d4e59066a85ccb3b625af94c7ba15448dd2f4f7e697c83e875ec24ed","gitBlob":"8ee1416a1bab7ce2ae6d7d39453dcfe8a07e90c3","size":13815},{"status":"OK","path":"app/renderer/src/shell/SettingsPanel.tsx","sha256":"b32d26a782a36eacb0b1d179b258660f90ee62822e732961c666875d154d900f","gitBlob":"0f9890b8369f126f6f318926b882832523efccc2","size":20298},{"status":"OK","path":"app/renderer/src/shell/Sidebar.tsx","sha256":"1468ad25023581980c5d3dfc17c22318006b313715d4acd6403e926f447e3a32","gitBlob":"82028086f10eb756f4b21519b7d49c271e9ab0fb","size":16630},{"status":"OK","path":"app/renderer/src/shell/TitleBar.tsx","sha256":"6fcbf23f59275939c0f68a84062dc4cb03c0721ee4ed31f5fc9d2c8eb2612dc3","gitBlob":"4714f48b9e225584780aaffb4da5a5d26efcac35","size":3744},{"status":"OK","path":"app/renderer/src/shell/WorkOverview.tsx","sha256":"37ecba1e5b67dd1d1b55912459711216a1ec7f0b0869de0a3e12fe59e210fbef","gitBlob":"4afc0dc89f1370c8ad98761212b88c8f0881001e","size":6875},{"status":"OK","path":"app/renderer/src/shell/phase4a.css","sha256":"052ea23040804e4ab2872c2a6b6813ba816db92f0c1e90d3c7ae2c0393391100","gitBlob":"17a963f87262dff68c266fb8ecda62a0dcebef24","size":20963},{"status":"OK","path":"app/renderer/src/stores/confirm-store.ts","sha256":"24ff2d49e90d239e207cb7c083fe570c46484f27a92c71e5820f3240a0d8ed1c","gitBlob":"3a701f9ea2bc893614e6746c2d93d00141c12d0e","size":16060},{"status":"OK","path":"app/renderer/src/stores/drawer-store.ts","sha256":"4cb2431a0e658f54d225f245c98582db71e63cb543ec56e27e2d61579197fda1","gitBlob":"4f40b1507b4cc5650b0c9f604ef7f9586e07830f","size":23065},{"status":"OK","path":"app/renderer/src/stores/governance-store.ts","sha256":"970e165ad7902ecd07ce70fdb6129fcd1e7e1dc911e9eada89d85a65a48e0ffc","gitBlob":"fa1483f80b6f7409511b6b7ed8f1883098bbfdbc","size":15623},{"status":"OK","path":"app/renderer/src/stores/report-store.ts","sha256":"54c9c271bccdf8b11b69ca5611b2ca02fb2faaffcc40ff25891f3c32f252ce18","gitBlob":"663ad8636964d5961280b4c65ce9707de5e5284d","size":15264},{"status":"OK","path":"app/renderer/src/stores/settings-store.ts","sha256":"08d5776858253e5d20e347641e1589f5f274f062d4de59ffdea27501e3150f89","gitBlob":"ccab913dce3874db2796bebc3503740ad23bee89","size":17834},{"status":"OK","path":"src/common/shared/i18n/format.ts","sha256":"5bcdccd09074e5539a23617d7d0caecfd5386942802c54f14a08080f4398b38a","gitBlob":"6af5507796498283cc88f582ccb1bc212523aad5","size":1462},{"status":"OK","path":"src/common/shared/i18n/index.ts","sha256":"70994c1df6d235563df977a77b7939929edcd149abd8e4cef04225aa6c91052e","gitBlob":"adaf5e5d928d83bea9f99502cd98f2dff3540616","size":1354},{"status":"OK","path":"src/common/shared/i18n/keys.ts","sha256":"4346aa4e724b86bbf7e7d7c27af9ef84de85648ac463861766a206fd5c91c469","gitBlob":"359974ff62b94b41491b89cba0248f36f4ed219a","size":700},{"status":"OK","path":"src/common/shared/i18n/locales.ts","sha256":"9431b06bb2d7119e7870c5a7ab58e502f1d82b9dbc2c81736a833bad5955c6f6","gitBlob":"38001c4b83181d0f3eec78342b355acffda959a0","size":1745},{"status":"OK","path":"src/common/shared/i18n/messages/en-US.ts","sha256":"05089d70b7b1e0ee720d619efb57aa8d305b7b8f004f4be66144476257e4b373","gitBlob":"74ab4a7d654143b20b6614d7508f48da67c211cc","size":122490},{"status":"OK","path":"src/common/shared/i18n/messages/zh-CN.ts","sha256":"d487a8d4853004daea619a82b2d760ff3218d6fd1015f1c29623d2ae15953e4e","gitBlob":"c0501469ed8b8631e63ba124f419aa642a034400","size":115558},{"status":"OK","path":"src/common/shared/i18n/translate.ts","sha256":"c9967f7920b63d0f26c50e2b252ae67135c6494cee7d541fe2f8d07d6eae118f","gitBlob":"b5f32940ca14e5dc40f37ec59b3067073bd26c8b","size":6822},{"status":"OK","path":"src/common/shared/i18n/types.ts","sha256":"942eb3d1933d266bb59e97f79872606ba073ea149c7a4269c39a1185c58849e6","gitBlob":"1e31eb529cb8d83d9a3a37e09262c1570026a65c","size":1513},{"status":"OK","path":"src/common/shared/runtime-settings.ts","sha256":"a5fedea2d6ae2fbfda9eaf03caf1a83493f0d5c76c37369342892615024ec6d2","gitBlob":"5169a7791b63802ee73f34951b66b43aed4d07a7","size":8554},{"status":"OK","path":"src/common/shared/runtime-shared.ts","sha256":"2e01eaa0d137c2e0bd84d0befdbc995d14a81d444f47225ae206d4c155167799","gitBlob":"56ac1c845723e5e63fe5d125d48ea13c8b71c03a","size":4429},{"status":"OK","path":"src/common/编排/acceptance-rework.ts","sha256":"a8598588cda2d3a805c2879c5381870184a0973cb68e8b3a893ff40048ea9559","gitBlob":"45843ef4bb2ff0c338ce89219e116ede21f9d9d6","size":19752},{"status":"OK","path":"src/common/编排/directory-conformance.ts","sha256":"a8168a73033b902084465e5d76e0e37724e6de91d6a635e503d8349a6240f5db","gitBlob":"400af3c2d4a9a9338ded55d7acd106f931648456","size":16396},{"status":"OK","path":"src/common/编排/flow-service.ts","sha256":"43511d2afa5e24cdfedfb1709e75dec83eebfed24f5efa8b01243f88365ccc1f","gitBlob":"0864ff1a2280c9cc26da972182a4ac0b6ff17619","size":80212},{"status":"OK","path":"src/common/编排/flow-state.ts","sha256":"ea271ee88067b0b2bcf67576141f09dd6efaa0e2a78f01e66b2ebdb74148bd4a","gitBlob":"095c449decd9bf5cf81d367c61ec3464ee9ba951","size":52297},{"status":"OK","path":"src/common/编排/team-plan.ts","sha256":"f976fd0925d7661f71f1b84cf48b04cce07bc19f8b65c696c5cceecbcdc1b5e7","gitBlob":"f23a2a95e7661eab94c8ffef07919e9236379c00","size":117805},{"status":"OK","path":"src/common/门禁引擎/governance-roles.ts","sha256":"90b480fa7b43e31dac88e533cf12cd86641cdb0a176ca9d9c22531896ce94803","gitBlob":"7841788f6d30b0e54057e8fa3ed220207a0b157b","size":101342},{"status":"OK","path":"src/model/runtime.ts","sha256":"ca6c0f09e65e4b1a4bdcae00144e13e0c313c025dfc0ec0f0ad102e0f57492f3","gitBlob":"df533ed374ec4e3f2ec338db5f2e4882a897cb07","size":99570},{"status":"OK","path":"src/pipeline/orchestration/flow-state.ts","sha256":"96966286ca48e5356d39bb2e825b424aec7b7c3022bb8a321d98c3be715f59dc","gitBlob":"bb6963db1c716e99b8e956ca0711ac1fb545cd1b","size":2662},{"status":"OK","path":"src/pipeline/orchestration/govern-session.ts","sha256":"195b5100197486299327d038599cdf974b247aa57e79fff2dab4bafa6a3358f0","gitBlob":"9b5b022af7e411f784759fc8640b52937b30c7d5","size":66940},{"status":"OK","path":"src/pipeline/orchestration/run-role.ts","sha256":"46204a7e6624439dcfaa4866d424186638cb33216252a9ec26ea51e8fc3e98fd","gitBlob":"af8e166d7a698741611c8f56fd437e75b48bf78c","size":176851},{"status":"OK","path":"src/provider/runtime/tools.ts","sha256":"b3bc52c45042c7493b8ed9e122654513481f67f7877e4d551a6e0479e88153a1","gitBlob":"3a84229493c1996c39a03a46ef19f2e959500d9d","size":168074},{"status":"OK","path":"test/runtime-core/governance-flow-metadata.test.ts","sha256":"9253e55945bfdb1cc2c120ab2e8d73bb67415b6afe39e438f56e9fb0208200f1","gitBlob":"af1882a8a03846c244a0f295622d5a6e78db7026","size":29876},{"status":"OK","path":"test/runtime-core/tools.test.ts","sha256":"c7db7e1f5db919b2f9a61c8c15f97ab9b5c8afd54e82c3d8f960cbc005f5ad94","gitBlob":"0591b58a4b00898dd30c398cc04373928b3c8071","size":29169},{"status":"OK","path":"test/桌面UI/i18n-b1-b2.test.ts","sha256":"6ba30a285c4ed5cd791807af4b48d606f1014be85c816757fa9d85ff5f5cbc78","gitBlob":"356bbd0b6f74fa70af84905039f030f7caa63f8e","size":13751},{"status":"OK","path":"test/桌面UI/i18n-store.test.ts","sha256":"600c81540ba63c51c81b9f189e11d56853037ce9dc36360cec3e4bbb019728ee","gitBlob":"5059f61c90a62f624ee43eca2bb12b46feb92a3e","size":12423},{"status":"OK","path":"test/桌面UI/i18n-view.test.ts","sha256":"7fb032a2ea7e30a6c9cc81cf41c590acdd23977f2758c55afce9f442b076e861","gitBlob":"aa1802ebf8e8d0a444f6ae0ac5f68fc009726c61","size":9736},{"status":"OK","path":"test/桌面UI/runtime-config.test.ts","sha256":"563e7a795f8d00dee0dd328e0ea6c46be22ca9c8bc42eb8b5c9a4854f26dfb41","gitBlob":"bb8f93730b912d979154ed4065ab2e74f3461000","size":11986},{"status":"OK","path":"test/桌面UI/source-guard.test.ts","sha256":"6c761264753e2c4e2b2110a53fd41fdd7326a4076423d157f4e69feec90a0e5b","gitBlob":"90ff6bf29ad4d96b36532d0876d36c79f5795b38","size":12002},{"status":"OK","path":"test/桌面应用/acceptance-dispatch.test.ts","sha256":"cb6b78133aa35a8d6f4f0abe0c8b03a39a35fec163cc212533ca5462a823f1f8","gitBlob":"b9eea6669f6fe44a7bed563e9b07bb3a3f42d34e","size":147331},{"status":"OK","path":"test/桌面应用/boundary-refresh.test.ts","sha256":"d08988c94ece4b8bf3489ea9d9d208cf4ef9af120db0c2d4b445fa3527fe0bd1","gitBlob":"0203ef394871829241a3bbce453cd22764e2a6ad","size":29372},{"status":"OK","path":"test/桌面应用/e2e/main.mjs","sha256":"c48f2e5a0d4a84e91cfd5daf8386bdb793d3e4ac3868d2023063dc53e0c8474b","gitBlob":"142e0f18d7701964053d97c6412d38809684c329","size":173881},{"status":"OK","path":"test/桌面应用/interface.test.ts","sha256":"c01a060e94703e71e8e043995285ae113151a86b6afe9e24faac4bbd3805a575","gitBlob":"1e545367e512b3d2cf740ee531eefe2b9757e884","size":358766},{"status":"OK","path":"test/桌面应用/multi-runtime.test.ts","sha256":"358e99c245df28ad25fcba6ee24e1313b5b59706a45db589e1094c2566668146","gitBlob":"2bfe710af3ceb561bd5b7177bda29d09464fbe3c","size":86312},{"status":"OK","path":"test/桌面应用/operator-wiring.test.ts","sha256":"326c9156819126b6dbe58669f0bb73ea439228f9c6b3fd7fe55cdfded3dbac8a","gitBlob":"26cd93a8ca6d4056f0e66e04a56373199948e5a6","size":130187},{"status":"OK","path":"test/桌面应用/pi-config.test.ts","sha256":"8e98274a0c596ea7cffa200642d252a7d7d858e96840079159c0786979921351","gitBlob":"52759bc21b11770ee18d4a9d2bcf323789a26598","size":29914},{"status":"OK","path":"test/桌面应用/session.test.ts","sha256":"8e560d11ffccfa94647a259a42bdadcb9586f0de25eec4face1daacc9fe89c65","gitBlob":"ac14f8f7e4801a74b7aec1acf96df084d353063f","size":77895},{"status":"OK","path":"test/测试/directory-layout.test.ts","sha256":"7a4b845f4b8396a9b23ae90746197b64051a00abfea1663bee3e343af191154e","gitBlob":"1eb758d1e0e4f8a1fb2141187a69dc8d714ee18f","size":14526},{"status":"OK","path":"test/测试/existing-project-compat-verify/b-establish.test.ts","sha256":"9505901ba077d01b43adca00ccd53e09fb542ff40d932bac665af14f84b895f2","gitBlob":"6bccbdcff72661de0668770d4ea8459972e46710","size":25684},{"status":"OK","path":"test/测试/g5-reasoning-verify/f-settings.test.ts","sha256":"a919eee53f4a25148cbce92a2853b20f7fbbe86a98d2fa330be4f7bb63355082","gitBlob":"63bb8f00f1226fc1d3f035e365dc5fbb5bc84aab","size":14799},{"status":"OK","path":"test/测试/governance-e2e-auto/b-proposal-accept-timing.test.ts","sha256":"bc0ce9cee9bf9dcdb2d45a33f61bbbf99ceb6eac6f8487e7a4f40983772616e7","gitBlob":"1fd38616c3f3a7e7bc078f3317006c8971d88379","size":16407},{"status":"OK","path":"test/测试/governance-e2e-auto/fixture.ts","sha256":"2e4e571aa4b8aeae9da21ab59323e45b83b23c94d6fec307a226fde019ad7e71","gitBlob":"0b47d165765b82434b1cc732d3a3da739d875c77","size":76009},{"status":"OK","path":"test/测试/governance-e2e-auto/i-full-chain.test.ts","sha256":"c14bd78bc5fc6500706f43031e2bd1a5d7c0143a0ee0e9608ec49fdb28df995f","gitBlob":"76cf0dae9aea3612c35b4047dc1a848053da4d8b","size":80656},{"status":"OK","path":"test/测试/governance-e2e-auto/l-redispatch-reentrant-gate.test.ts","sha256":"48fb0aa8467479904a9b2a7b4498b5f6a3cf200b2782f1eee52c76813ec85e3e","gitBlob":"cb6f483461815570ef0a18b7fbb251f5cdc0aa5d","size":24806},{"status":"OK","path":"test/测试/governance-e2e-auto/p-team-plan-guard.test.ts","sha256":"c35da9810c995a3d556e2f406323a273024e5521dac77cb23c14d4f933296cee","gitBlob":"da5b0c53bf3b44bdc652c15a2ee2107341ce81b6","size":20802},{"status":"OK","path":"test/测试/governance-e2e-auto/q-role-granularity.test.ts","sha256":"9689f5cbe1ec299921d6d92d3174a68369d482b985a6bd37d999c3e9d8148c52","gitBlob":"66e81ecae46720a4f063f16cc29f119e63723ca3","size":32302},{"status":"OK","path":"test/测试/governance-e2e-auto/r-mapreduce-parallel.test.ts","sha256":"305cc0ab4027e16ea25cb5730cb6324533732385810b1b5d774a5eb516726159","gitBlob":"7da873470d4e313407fc2b5957505a8c88b13348","size":30898},{"status":"OK","path":"test/测试/governance-e2e-auto/s-acceptance-rework-routing.test.ts","sha256":"931001895808f889b1b3abbd2eff5e6dcce85fa7a6bfb2007ef9fb73d191d5ae","gitBlob":"1cc677239100e763383a8edeb2d4d86b8774a5ba","size":51137},{"status":"OK","path":"test/测试/i18n-integration.test.ts","sha256":"57aa7ff82e18add312580b17dc2e7e10c6deae12b5f03d5c9e34b80bb68a0ba3","gitBlob":"ab22f2b8e7dca485deefe5acde153d257975c776","size":26733},{"status":"OK","path":"test/测试/redispatch-target-recompute.ts","sha256":"4bbf858785b2cc0918fedade0ef9ec654484bd3b4147b947ccd7440d9cc7e551","gitBlob":"54ec1704f19abda5bf5cd98a7ada6df14ddafa44","size":8055},{"status":"OK","path":"test/测试/t29-pi-config-roundtrip.test.ts","sha256":"71842ced0d1ae05e551696468ad27dbcad2791239dfca003c170694d1611287e","gitBlob":"c128017cbd883bc64613e61f8cb55482f8886a2a","size":21638},{"status":"OK","path":"test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts","sha256":"10765961cafc67b19485c1606347840fdce2e95008d6645da9ad76d01eaceab8","gitBlob":"6cf25c1ad228b468758e6b0fa4d3d96ff7249b3c","size":10174},{"status":"OK","path":"test/编排/acceptance-rework.test.ts","sha256":"99735a3123ef6e4f0cec474ae766f560e96a98692e2c6789e422285cbce70fb1","gitBlob":"9c3ec88ce070015190b13f847b2b25dcc641a455","size":18702},{"status":"OK","path":"test/编排/directory-conformance.test.ts","sha256":"8028c7c694c7c00d01aa5db47488dc27648ab22173a9914cbcc7c8d91b9581dc","gitBlob":"23b3d7405d02f736abad498f12d5fa1c033a959a","size":12669},{"status":"OK","path":"test/编排/flow-service.test.ts","sha256":"42881027a5c9eca2a0c9008e72241dfc6c5880145c19410dbb1eaaaf38313d33","gitBlob":"f588db2bdbc0a638591c2c376cfeda5c12200cb3","size":104698},{"status":"OK","path":"test/编排/flow-state.test.ts","sha256":"3efba1b9e5fabf08f029b6cfa8d5abf27a4c56d423b730014c92b953c6f05ea8","gitBlob":"8c23ced3b1c3416f7516917107da70598adbc068","size":65603},{"status":"OK","path":"test/编排/team-plan.test.ts","sha256":"46d657bad532fe7eabb6eb1b8dc079b7047fd96450e33b48e4ec6d5aab2c356e","gitBlob":"a46d490e163122c7bcc7f9cf734afd97fdbc11a3","size":55034},{"status":"OK","path":"test/门禁引擎/governance-standard-workflow.test.ts","sha256":"b16a06741dd3a5770792e3917ef5c9773d934ff169e40f72a74bfe033d6427a6","gitBlob":"240f6aba7b1a1a8d9e28461f9878a8b988f9caac","size":44135},{"status":"OK","path":"test/门禁引擎/governance-trio.test.ts","sha256":"452f7ff134e4aced40a5e35242a01ecb947ed0ef155f120d311283de0ee988a6","gitBlob":"2295574f0a83ce4708062e2c9547bab1d7e004de","size":86100},{"status":"OK","path":"test/项目管理/shared/i18n-guard-allowlist.ts","sha256":"29541e89cc65cfe51dfab194efc0bfd4d265d5d4293c58b3fe8b740f5363da3b","gitBlob":"58f414f696f56b8a848c32a16a946851b6927e26","size":5564},{"status":"OK","path":"test/项目管理/shared/i18n-guard-scanner.ts","sha256":"132a5325f7d5d1c552ad32b31a53fe4b659f74fbfc0f46d629ce273073e1661b","gitBlob":"78f9085a776a16c801240440988c566bb62c9ef1","size":8264},{"status":"OK","path":"test/项目管理/shared/i18n-guard.test.ts","sha256":"05003446fd8973b9954dd10593f8f5df284d68b3d733b8832a83338f949cf7e9","gitBlob":"3358a1428f60b1d115e9a3af5aab39601938eb12","size":6151},{"status":"OK","path":"test/项目管理/shared/i18n.test.ts","sha256":"d8e7567797d9a324e1e2f9889b84758c81ac1b6df76f98b63c2c652f3bebac97","gitBlob":"26501c142dbd2c03bd6db6e135a0a29da8d46a3b","size":54322},{"status":"OK","path":"test/项目管理/shared/runtime-settings.test.ts","sha256":"d7e77b25291d928fe47ed1f0b23ace0782b8dd577724fc5884d7615cc79ffaac","gitBlob":"085dc35ae5c85cec2ba11099ca85103c34fbd8b9","size":21927},{"status":"OK","path":"test/项目管理/shared/runtime-shared.test.ts","sha256":"ce44fcb9469dd8a33c4a4870389316707516ca9685dd9084aecd3a11338a0ee8","gitBlob":"304756d2c37359c0086538c5cef939842eccab5f","size":5194}]

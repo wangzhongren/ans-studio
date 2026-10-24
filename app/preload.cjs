@@ -17,6 +17,25 @@ contextBridge.exposeInMainWorld("desktop", {
   /** 调系统文件夹选择器导入项目，返回项目根路径或 null。 */
   pickProject: () => ipcRenderer.invoke("app:pick-project"),
 
+  // —— i18n B0（2026-10-23）：应用级语言偏好（只读白名单；不暴露 Node/宽泛 ipcRenderer）——
+  /**
+   * 读取应用级语言偏好（主进程权威）：`{version:1, locale, supported:string[]}`。
+   * 偏好文件缺失/损坏/非法 ⇒ 主进程回退 `zh-CN` + 启动诊断，不阻塞界面。
+   */
+  getPreferences: () => ipcRenderer.invoke("preferences:get"),
+  /**
+   * 切换界面语言：只接受 `"zh-CN"`/`"en-US"`；成功持久化到 userData 后返回 `{ok:true, locale}`，
+   * 非法值/写失败返回 `{ok:false, locale:当前, error}`（不改内存/文件、不广播）。
+   */
+  setLocale: (locale) =>
+    ipcRenderer.invoke("preferences:set-locale", { locale: typeof locale === "string" ? locale : "" }),
+  /** 订阅语言切换推送 `{locale}`（成功切换且持久化后才推）；返回取消订阅函数。 */
+  onLocaleChanged: (cb) => {
+    const listener = (_event, payload) => cb(payload);
+    ipcRenderer.on("preferences:locale-changed", listener);
+    return () => ipcRenderer.removeListener("preferences:locale-changed", listener);
+  },
+
   /** 枚举项目下的角色（含角色卡正文、边界条目、文档与变更记录索引）。 */
   listProject: (projectRoot) => ipcRenderer.invoke("app:list-project", { projectRoot }),
 

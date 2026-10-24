@@ -1,0 +1,53 @@
+=== T3 串行全量回归挂起记录 ===
+captured_at: 2026-10-23 10:53:52 +0800
+command: node --test --test-concurrency=1 "test/**/*.test.ts"
+start_time_from_log: start: 2026-10-23 10:42:51
+log_last_mtime: 2026-10-23 10:44:02.493136500 +0800
+log_lines: 530
+completed_pass_markers (^✔): 463
+completed_fail_markers (^✖): 4
+completed_skip_markers (^﹣): 2
+last_20_lines:
+✔ 未配置 writeRoot：写入获准（ok:true）但不落盘 (0.5135ms)
+✔ 缺少 path 参数：拒绝且不判定 (0.0777ms)
+✔ write_file 缺少 content：拒绝且不落盘 (0.394ms)
+✔ 到点检查不中止主轮：promptMs 到点后轮次继续并正常完成 (126.7384ms)
+✔ 最后兜底到点中止整轮：错误与诊断标记均为「最后兜底」，与检查时限区分 (103.3898ms)
+✔ 截断收尾补发段仍用检查时限，不继承 last-resort (70.1171ms)
+✔ buildExplicitRuntime：克隆模型 compat 已显式收窄（两能力位 false；strict/adaptive/fallbacks 收窄；其余保留） (524.4279ms)
+✔ wire 级：收窄后**不再生成** tool_removal/tool_addition 块；对照组（两能力位改回 true）能复现该块 (52.2789ms)
+✔ 存量防御：检测只认 system 消息里的字面块（用户正文提及同名串不误报） (12.9239ms)
+✔ 存量防御：全污染目录 → 跳过恢复、新建并如实 note；污染+干净 → 恢复干净旧档并记 skipped (54.0993ms)
+✔ 存量防御：干净会话恢复逐字不变（无 note / 无 skipped） (6.1282ms)
+✔ describeTool：write_file / edit_file 钉 executionMode:'sequential'；read_file / run_shell 不加 (0.7627ms)
+✔ A 对照组（抹掉 executionMode，= 修复前）：同批 write+edit 丢写复现（3 连跑全中） (6077.6927ms)
+ℹ A 对照组第 1 轮：丢写复现 {"hasWrite":true,"hasEditEffect":false}
+ℹ A 对照组第 2 轮：丢写复现 {"hasWrite":true,"hasEditEffect":false}
+ℹ A 对照组第 3 轮：丢写复现 {"hasWrite":true,"hasEditEffect":false}
+✔ B 主组（修复后原样）：同批 write+edit 顺序执行、无丢写（3 连跑全中） (5474.9451ms)
+ℹ B 主组第 1 轮：顺序执行、无丢写 {"hasWrite":true,"hasEditEffect":true}
+ℹ B 主组第 2 轮：顺序执行、无丢写 {"hasWrite":true,"hasEditEffect":true}
+ℹ B 主组第 3 轮：顺序执行、无丢写 {"hasWrite":true,"hasEditEffect":true}
+
+=== 进程快照（挂起时） ===
+      452     451     451      14308  ?         197609 22:24:44 /c/Users/51054/Desktop/work/ans-studio/node_modules/electron/dist/electron
+  4221752       0       0      27448  ?              0 22:24:45 C:\Users\51054\Desktop\work\ans-studio\node_modules\electron\dist\electron.exe
+  4195168       0       0        864  ?              0 22:24:45 C:\Users\51054\Desktop\work\ans-studio\node_modules\electron\dist\electron.exe
+  4212380       0       0      18076  ?              0 22:24:45 C:\Users\51054\Desktop\work\ans-studio\node_modules\electron\dist\electron.exe
+  4219288       0       0      24984  ?              0 23:22:25 C:\Users\51054\AppData\Local\Programs\nodejs\node.exe
+      604     603     603      16412  ?         197609 09:17:28 /c/Users/51054/AppData/Local/Programs/nodejs/node
+     2693    2689    2689      26164  ?         197609 10:42:51 /c/Users/51054/AppData/Local/Programs/nodejs/node
+  4213832       0       0      19528  ?              0 10:43:51 C:\Users\51054\AppData\Local\Programs\nodejs\node.exe
+
+=== 终止记录 ===
+stop_requested_at: 2026-10-23 10:54:00 +0800
+TaskStop: b89ris01v (background bash) 已终止
+log_mtime_after_stop: 2026-10-23 10:44:02.493136500 +0800
+log_has_exit_code: 0
+--- 终止后进程检查（应无 26164/19528） ---
+      452     451     451      14308  ?         197609 22:24:44 /c/Users/51054/Desktop/work/ans-studio/node_modules/electron/dist/electron
+  4221752       0       0      27448  ?              0 22:24:45 C:\Users\51054\Desktop\work\ans-studio\node_modules\electron\dist\electron.exe
+  4195168       0       0        864  ?              0 22:24:45 C:\Users\51054\Desktop\work\ans-studio\node_modules\electron\dist\electron.exe
+  4212380       0       0      18076  ?              0 22:24:45 C:\Users\51054\Desktop\work\ans-studio\node_modules\electron\dist\electron.exe
+  4219288       0       0      24984  ?              0 23:22:25 C:\Users\51054\AppData\Local\Programs\nodejs\node.exe
+      604     603     603      16412  ?         197609 09:17:28 /c/Users/51054/AppData/Local/Programs/nodejs/node

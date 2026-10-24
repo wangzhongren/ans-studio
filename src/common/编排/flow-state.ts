@@ -161,6 +161,16 @@ export interface FlowState {
   version: number;
   qualityTier: FlowQualityTier;
   status?: string;
+  /**
+   * 发布验收标记（可选；缺省 = false = 非发布，2026-10-24 闸门 2 delta P0-1）。
+   *
+   * **只有 `true`（发布版本）才允许应用按发布验收门派 Proof / 启动 verifier criteria；**
+   * 非发布流程在 change-package 后停在等待发布验收，不派 Proof、不写标准、不标 acceptance done。
+   * 标记只能由 Steward 用既有 `request_confirmation(cardKind=schedule-write)` 写一份只把 release
+   * 从 false/缺省改为 true、其余字段/步骤不变的 flow YAML（应用做受控扩展校验）；不是新 step kind、
+   * 不是账本 kind、不是新卡片种类。
+   */
+  release?: boolean;
   steps: FlowStateStep[];
 }
 
@@ -221,7 +231,7 @@ export type EvaluateFlowCompletionResult =
 
 // —————————————————————— 解析与校验 ——————————————————————
 
-const TOP_LEVEL_KEYS = new Set(["flowId", "version", "qualityTier", "status", "steps"]);
+const TOP_LEVEL_KEYS = new Set(["flowId", "version", "qualityTier", "status", "release", "steps"]);
 const STEP_KEYS = new Set([
   "id",
   "title",
@@ -286,6 +296,7 @@ function flowParseFailure(errors: FlowStateError[]): ParseFlowStateResult {
  *
  * 校验规则（确定性，逐条对应客户决定）：
  *   1. flowId 与文件名一致；version 正整数；qualityTier ∈ {prototype, production}；steps 非空、id 唯一；
+ *      可选 `release` 必须是布尔（缺省 = false = 非发布；只有 true 才允许发布验收派 Proof）；
  *   2. 保留 id `verification`/`acceptance` 至多一个、必须是 `kind: acceptance`、初始 `status: pending`
  *      （完成后允许 `done` 且必须带 `acceptance` 证据）；执行/证据步骤不得占用这两个 id；
  *   3. `kind`/`status`/`evidence.kind` 严格枚举；`done` 步骤必须有 evidence，且 evidence.kind 与步骤
@@ -349,6 +360,14 @@ export function parseFlowStateYaml(text: string, flowId: string): ParseFlowState
 
   if (document.status !== undefined && (typeof document.status !== "string" || document.status.trim() === "")) {
     push("status", "status 为可选人读字段；给出时必须是非空字符串");
+  }
+
+  // release（2026-10-24 P0-1）：可选布尔；缺省 = false（非发布）。未知类型 fail-closed。
+  if (document.release !== undefined && typeof document.release !== "boolean") {
+    push(
+      "release",
+      `release 必须是布尔值 true / false（缺省 = 非发布；当前 ${JSON.stringify(document.release)}）`,
+    );
   }
 
   // —— steps ——
@@ -696,6 +715,7 @@ export function parseFlowStateYaml(text: string, flowId: string): ParseFlowState
       version: rawVersion as number,
       qualityTier: qualityTier as FlowQualityTier,
       ...(typeof document.status === "string" ? { status: document.status.trim() } : {}),
+      ...(typeof document.release === "boolean" ? { release: document.release } : {}),
       steps,
     },
   };
@@ -1000,10 +1020,51 @@ export function validateFlowEvidence(
 
 const BLOCKING_STATUSES: ReadonlySet<FlowStepStatus> = new Set(["failed", "blocked", "aborted"]);
 
-function hasAcceptanceDecision(flowId: string, ledger: readonly GovernanceLedgerEntry[]): boolean {
-  return ledger.some(
-    (entry) => entry.kind === "customer.decision" && entry.flowId === flowId && entry.decisionKind === "acceptance",
-  );
+/**
+ * 最新验收决定（2026-10-23 验收返工路由方案 v1 §5.1.2 / Q1 A）。
+ *
+ * 取代旧 `hasAcceptanceDecision`「存在任意 acceptance 决定即收口」的布尔口径：
+ *   · 「最新」按**账本 append（数组）顺序**取该 flow 最后一条
+ *     `customer.decision{decisionKind:"acceptance"}`；`at` 只用于时间比较，不参与排序；
+ *   · 最新 `customerDecision:"accepted"` ⇒ `accepted`（唯一收口依据）；
+ *   · 最新 `"rejected"` ⇒ `rejected`（待返工，**不是** closed）；
+ *   · 其余（`changes-requested`/`none`/`unclassified`/缺字段/未知值）⇒ `unresolved`
+ *     （fail-closed：不自动收口、不自动重派，交 Lead/人工）；
+ *   · 无 acceptance 决定 ⇒ `none`（沿用既有收尾门：验收步骤 pending 且执行步骤齐备 ⇒ 可派发）；
+ *   · 账本有坏行/不可读 ⇒ `ledger-unavailable`（调用方必须 fail-closed，不猜内容）。
+ */
+export type LatestAcceptanceDecision =
+  | { kind: "none" }
+  | { kind: "ledger-unavailable"; errors: readonly string[] }
+  | { kind: "accepted"; entry: GovernanceLedgerEntry }
+  | { kind: "rejected"; entry: GovernanceLedgerEntry }
+  | { kind: "unresolved"; entry: GovernanceLedgerEntry };
+
+/** 取该 flow 按账本 append 顺序**最后一条** acceptance 决定并分类（纯函数，不读盘）。 */
+export function latestAcceptanceDecision(flowId: string, ledgerInput: FlowLedgerInput): LatestAcceptanceDecision {
+  const { entries, errors } = ledgerOf(ledgerInput);
+  if (errors.length > 0) return { kind: "ledger-unavailable", errors: [...errors] };
+  let latest: GovernanceLedgerEntry | undefined;
+  for (const entry of entries) {
+    if (entry.kind === "customer.decision" && entry.flowId === flowId && entry.decisionKind === "acceptance") {
+      latest = entry;
+    }
+  }
+  if (latest === undefined) return { kind: "none" };
+  if (latest.customerDecision === "accepted") return { kind: "accepted", entry: latest };
+  if (latest.customerDecision === "rejected") return { kind: "rejected", entry: latest };
+  return { kind: "unresolved", entry: latest };
+}
+
+/** `evaluateFlowCompletion` 的可选项（2026-10-23 验收返工路由方案 v1 §5.5.3 / Q4 A）。 */
+export interface EvaluateFlowCompletionOptions {
+  /**
+   * 默认 `false`（strict）：最新 acceptance 决定为 `rejected` ⇒ 不 ready（「验收已拒绝，流程等待返工」）。
+   * 仅桌面重派门处理 rejected/auto-rework 流程时传 `true`——rejected 不再挡收尾门，但仍逐条返回
+   * 执行步骤未完成 / 证据缺失 / 未结算决定等**具体原因**；`accepted` 与 `unresolved` 不受该选项影响
+   * （accepted 仍收口；unresolved 仍 fail-closed）。
+   */
+  allowRejectedAcceptance?: boolean;
 }
 
 function hasUnresolvedDecision(flowId: string, ledger: readonly GovernanceLedgerEntry[]): boolean {
@@ -1024,16 +1085,25 @@ function hasUnresolvedDecision(flowId: string, ledger: readonly GovernanceLedger
  *   · `superseded` 步骤不参与判定；
  *   · 执行步骤（`kind !== "acceptance"`）必须全部 `done`，且证据与账本对账通过；
  *   · `failed/blocked/aborted` 未标 `superseded` 一律 fail-closed；
- *   · 必须有且仅有一个验收步骤（保留 id verification/acceptance），且仍为 `pending`；
- *     已 `done` / 已有 `customer.decision{acceptance}` ⇒ 视为已收口（不是可再派发）；
- *     已 `dispatched/delivered` ⇒ 验收进行中（不重复派发）；
- *   · 存在未结算决定（unclassified / customerDecision none|undefined）⇒ 不齐备。
+ *   · 必须有且仅有一个验收步骤（保留 id verification/acceptance）；按**最新**验收决定（账本 append
+ *     顺序，见 `latestAcceptanceDecision`）判定：
+ *       - 最新 `accepted` ⇒ 已收口（不再派发）；
+ *       - 最新 `rejected` ⇒ 默认 strict 不齐备（「验收已拒绝，流程等待返工」）；仅
+ *         `allowRejectedAcceptance:true` 时放行，继续返回执行步骤/证据/未结算决定等具体原因；
+ *       - 最新未结算/异常（changes-requested/none/unclassified/缺字段）⇒ fail-closed；
+ *       - 无决定 ⇒ 验收步骤 `pending` 才放行；`dispatched/delivered` ⇒ 验收进行中（不重复派发）；
+ *       - 验收步骤已 `done` 且最新 `rejected` ⇒ 异常状态（不自动重开/重派，提示人工核对）；
+ *   · 存在未结算决定（unclassified / customerDecision none|undefined|空串）⇒ 不齐备（口径不变）。
+ *
+ * 2026-10-23 验收返工路由（方案 v1 Q1 A）：只有最新 `accepted` 收口；`rejected` 是「待返工」，
+ * 不再被当作永久收口。legacy Markdown 行为不在本函数（由桌面窗口按 Q6 A 保持并加回归锁）。
  *
  * 证据类型完全由 flow 的显式 `kind` 决定，**不看 stepId 前缀**。
  */
 export function evaluateFlowCompletion(
   flow: FlowState,
   ledgerInput: FlowLedgerInput,
+  options: EvaluateFlowCompletionOptions = {},
 ): EvaluateFlowCompletionResult {
   const { entries: ledger, errors: ledgerErrors } = ledgerOf(ledgerInput);
   if (ledgerErrors.length > 0) {
@@ -1060,22 +1130,45 @@ export function evaluateFlowCompletion(
     }
   }
 
-  // 3) 验收步骤：必须存在、唯一（parse 已保证至多一个）、尚未有验收决定。
+  // 3) 验收步骤：必须存在、唯一（parse 已保证至多一个）；按最新验收决定判定。
   const acceptanceSteps = active.filter((step) => step.kind === "acceptance");
   if (acceptanceSteps.length === 0) {
     issues.push("流程缺少验收步骤（保留 id verification/acceptance）。");
   } else {
     const step = acceptanceSteps[0]!;
+    // 账本 errors 已在上方返回，这里传 entries ⇒ 不会得到 ledger-unavailable。
+    const latest = latestAcceptanceDecision(flow.flowId, ledger);
     if (step.status === "done") {
-      issues.push("验收步骤已完成，流程已收口，无需再派发验收。");
-    } else if (hasAcceptanceDecision(flow.flowId, ledger)) {
-      issues.push("该流程已有验收决定，流程已收口。");
+      if (latest.kind === "rejected") {
+        issues.push(
+          "验收步骤已完成（done），但最新验收决定为 rejected；异常状态，不自动重开/重派，请人工核对。",
+        );
+      } else {
+        issues.push("验收步骤已完成，流程已收口，无需再派发验收。");
+      }
+    } else if (latest.kind === "accepted") {
+      issues.push("该流程已有验收决定（accepted），流程已收口。");
+    } else if (latest.kind === "rejected") {
+      if (options.allowRejectedAcceptance === true) {
+        if (step.status !== "pending") {
+          issues.push(`验收步骤状态为 ${step.status}，验收已派发/进行中，无需重复派发。`);
+        }
+      } else {
+        issues.push("验收已拒绝，流程等待返工；返工后需重新派发验收。");
+      }
+    } else if (latest.kind === "unresolved") {
+      issues.push(
+        "该流程最新验收决定不是 accepted/rejected（未结算/异常），不自动收口、不自动重派；请人工核对。",
+      );
+    } else if (latest.kind === "ledger-unavailable") {
+      // 防御分支：正常在函数入口已按 ledger errors 返回。
+      issues.push("治理账本不可读或存在坏行，无法核对验收决定。");
     } else if (step.status !== "pending") {
       issues.push(`验收步骤状态为 ${step.status}，验收已派发/进行中，无需重复派发。`);
     }
   }
 
-  // 4) 未结算决定（与桌面 flowCompletionIssue 同口径）。
+  // 4) 未结算决定（与桌面 flowCompletionIssue 同口径；口径保持 2026-10-19 不变）。
   if (hasUnresolvedDecision(flow.flowId, ledger)) {
     issues.push("该流程仍有未结算的决定。");
   }

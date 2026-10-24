@@ -4,7 +4,23 @@
  *
  * 字段列表/必填/秘密/closed 值域/整数约束全部来自主进程 `getRuntimeConfig` 元数据；
  * 本模块**不复制**第二份字段表或校验表（只做控件选择与展示映射）。
+ *
+ * i18n B1：展示文案来自 shared `ui.settings.*`/`ui.runtimeConfig.*`，纯函数接受
+ * 可选 `locale`（默认 zh-CN）。`field.label/help/choiceLabels` 是主进程数据（B4 迁移），
+ * 本模块不翻译其内容。
+ *
+ * i18n B4：引擎显示名中的 `demo` 不再以中文字面量保存在本地，改用共享 key
+ * `shared.runtimeSettings.runtime.demo`（经 facade `translate` 取词）；Pi/Codex/Claude
+ * 是品牌名，原样展示。渲染层**不导入** `runtime-shared.ts`（顶层 node:os/node:path），
+ * 只在此以显式静态映射引用同一 key。
  */
+
+import {
+  DEFAULT_LOCALE,
+  translate,
+  type Locale,
+  type MessageKey,
+} from "../i18n/index.ts";
 
 /** 与 ui-store 的 RuntimeId 同值域；此处本地声明避免纯逻辑模块依赖 UI 别名。 */
 export type ConfigRuntime = "pi" | "codex" | "claude";
@@ -44,14 +60,37 @@ export interface RuntimeConfigView {
 
 export type ConfigControl = "range" | "select" | "text" | "password";
 
+/**
+ * 引擎显示名的**语言中性**值：Pi/Codex/Claude 是品牌名（原样展示）；`demo` 是中性标识，
+ * 用户可见文案由 `RUNTIME_LABEL_KEYS` 指向共享 i18n key（zh-CN / en-US 均取共享目录）。
+ * 与共享 `runtime-shared.ts` 的 `RUNTIME_LABELS` 同口径，但本模块不导入该文件。
+ */
 export const RUNTIME_LABELS: Record<string, string> = {
+  demo: "demo",
   pi: "Pi",
   codex: "Codex",
   claude: "Claude",
 };
 
-export function runtimeLabel(runtime: string): string {
-  return RUNTIME_LABELS[runtime] || String(runtime || "未知引擎");
+/**
+ * 需要本地化的引擎显示名 key（B4）。key 单一来源是共享 `runtime-shared.ts` 的
+ * `RUNTIME_LABEL_KEYS`；渲染层不得导入该模块（顶层 node:os/node:path），因此在此用
+ * 显式静态映射引用同一 key（不是第二份目录/翻译实现）。`null` = 品牌名原样。
+ */
+export const RUNTIME_LABEL_KEYS: Readonly<Record<string, MessageKey | null>> = {
+  demo: "shared.runtimeSettings.runtime.demo",
+  pi: null,
+  codex: null,
+  claude: null,
+};
+
+export function runtimeLabel(
+  runtime: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const key = RUNTIME_LABEL_KEYS[runtime];
+  if (key) return translate(locale, key);
+  return RUNTIME_LABELS[runtime] || String(runtime || translate(locale, "ui.runtimeConfig.unknownEngine"));
 }
 
 export function isRuntimeId(value: unknown): value is ConfigRuntime {
@@ -198,25 +237,27 @@ export interface ConfigValidation {
 export function validateRuntimeConfigView(
   raw: unknown,
   expectedRuntime: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): ConfigValidation {
+  const notReady = translate(locale, "ui.runtimeConfig.summaryNotReady");
   if (!raw || typeof raw !== "object") {
-    return { ok: false, view: null, error: "配置摘要未就绪" };
+    return { ok: false, view: null, error: notReady };
   }
   const record = raw as Record<string, unknown>;
   const runtime = asString(record.runtime);
   const fields = record.fields;
   const missingKeys = record.missingKeys;
   if (runtime !== expectedRuntime) {
-    return { ok: false, view: null, error: "配置摘要未就绪" };
+    return { ok: false, view: null, error: notReady };
   }
   if (!Array.isArray(fields)) {
-    return { ok: false, view: null, error: "配置摘要未就绪" };
+    return { ok: false, view: null, error: notReady };
   }
   if (
     !Array.isArray(missingKeys) ||
     !missingKeys.every((key) => typeof key === "string")
   ) {
-    return { ok: false, view: null, error: "配置摘要未就绪" };
+    return { ok: false, view: null, error: notReady };
   }
   const cleanFields: ConfigField[] = fields
     .filter((field): field is Record<string, unknown> => !!field && typeof field === "object")
@@ -229,7 +270,7 @@ export function validateRuntimeConfigView(
     ok: true,
     view: {
       runtime,
-      label: asString(record.label) || runtimeLabel(runtime),
+      label: asString(record.label) || runtimeLabel(runtime, locale),
       path: asString(record.path),
       revision: typeof record.revision === "number" ? record.revision : undefined,
       application: asString(record.application) || "next-session",
@@ -245,87 +286,159 @@ export function missingKeysOf(view: RuntimeConfigView | null): string[] {
   return view ? view.missingKeys.slice() : [];
 }
 
-export function applicationLabel(application: unknown): string {
-  return (
-    {
-      current: "当前配置已应用。",
-      "next-session": "下一次开启会话时应用。",
-      "after-active-turn":
-        "当前轮次继续使用原配置；结束后下一次输入应用新配置。",
-    }[asString(application)] || "配置应用时点未报告。"
-  );
+export function applicationLabel(
+  application: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const key =
+    asString(application) === "current"
+      ? "ui.settings.applicationCurrent"
+      : asString(application) === "next-session"
+        ? "ui.settings.applicationNextSession"
+        : asString(application) === "after-active-turn"
+          ? "ui.settings.applicationAfterActiveTurn"
+          : "ui.settings.applicationUnknown";
+  return translate(locale, key);
 }
 
-export function sourceLabel(field: ConfigField): string {
-  const labels: Record<string, string> = {
-    file: "文件",
-    environment: "环境",
-    fallback: "回退",
-    default: "默认",
-    unset: "未设置",
-  };
-  const base = labels[asString(field.source)] || "来源未报告";
+/** 列表连接符（结构标点，不是文案；zh 与旧实现逐字一致）。 */
+function listSeparator(locale: Locale): string {
+  return locale === "zh-CN" ? "、" : ", ";
+}
+
+export function sourceLabel(
+  field: ConfigField,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const source = asString(field.source);
+  const keys = {
+    file: "ui.runtimeConfig.source.file",
+    environment: "ui.runtimeConfig.source.environment",
+    fallback: "ui.runtimeConfig.source.fallback",
+    default: "ui.runtimeConfig.source.default",
+    unset: "shared.common.notSet",
+  } as const;
+  const base =
+    source === "file" || source === "environment" || source === "fallback" ||
+    source === "default" || source === "unset"
+      ? translate(locale, keys[source])
+      : translate(locale, "ui.runtimeConfig.sourceUnknown");
   const fallbackKey =
     asString(field.fallbackKey) || asStringArray(field.fallbackKeys)[0] || "";
-  return field.source === "fallback" && fallbackKey
-    ? base + "（" + fallbackKey + "）"
-    : base;
+  if (field.source === "fallback" && fallbackKey) {
+    return locale === "zh-CN"
+      ? base + "（" + fallbackKey + "）"
+      : base + " (" + fallbackKey + ")";
+  }
+  return base;
 }
 
-export function fieldHelp(field: ConfigField): string {
+export function fieldHelp(field: ConfigField, locale: Locale = DEFAULT_LOCALE): string {
   const key = field.key;
   const help = asString(field.help);
-  return key + " · " + sourceLabel(field) + (help ? "。" + help : "");
+  const glue = locale === "zh-CN" ? "。" : ". ";
+  return key + " · " + sourceLabel(field, locale) + (help ? glue + help : "");
 }
 
 /** 字段标签（旧面板逐字载体）：`<label> · 必填/可选`。 */
-export function fieldLabelText(field: ConfigField): string {
-  return (asString(field.label) || field.key) + " · " + (field.required === true ? "必填" : "可选");
-}
-
-export function configWarningText(label: string, missing: readonly string[]): string {
-  return label + " 配置不完整，缺：" + missing.join("、") + "。请补齐后保存。";
-}
-
-export function configCompleteText(label: string, application: unknown): string {
-  return label + " 必填配置已齐备。" + applicationLabel(application);
-}
-
-export function readFailureStatusText(error: unknown): string {
-  return "读取配置失败：" + (error instanceof Error ? error.message : String(error ?? ""));
-}
-
-export function saveFailureStatusText(error: unknown): string {
-  return "保存失败：" + (typeof error === "string" && error !== "" ? error : "未知错误");
-}
-
-export function saveExceptionStatusText(error: unknown): string {
-  return (
-    "保存异常：" +
-    (error instanceof Error ? error.message : String(error ?? "未知错误"))
+export function fieldLabelText(
+  field: ConfigField,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const label = asString(field.label) || field.key;
+  return translate(
+    locale,
+    field.required === true
+      ? "ui.runtimeConfig.fieldRequired"
+      : "ui.runtimeConfig.fieldOptional",
+    { label },
   );
 }
 
-export function savingStatusText(): string {
-  return "正在保存…";
+export function configWarningText(
+  label: string,
+  missing: readonly string[],
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return translate(locale, "ui.settings.incomplete", {
+    label,
+    missing: missing.join(listSeparator(locale)),
+  });
 }
 
-/** 保存条可见状态：64px 内两行可读（键名/缺项明细放 title 与缺项 Alert）。 */
+export function configCompleteText(
+  label: string,
+  application: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return translate(locale, "ui.runtimeConfig.requiredReady", {
+    label,
+    application: applicationLabel(application, locale),
+  });
+}
+
+export function readFailureStatusText(
+  error: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return translate(locale, "ui.runtimeConfig.readFailedWithDetail", {
+    detail: error instanceof Error ? error.message : String(error ?? ""),
+  });
+}
+
+export function saveFailureStatusText(
+  error: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return translate(locale, "ui.runtimeConfig.saveFailed", {
+    detail:
+      typeof error === "string" && error !== ""
+        ? error
+        : translate(locale, "ui.runtimeConfig.unknownError"),
+  });
+}
+
+export function saveExceptionStatusText(
+  error: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return translate(locale, "ui.runtimeConfig.saveException", {
+    detail:
+      error instanceof Error
+        ? error.message
+        : String(error ?? translate(locale, "ui.runtimeConfig.unknownError")),
+  });
+}
+
+export function savingStatusText(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.runtimeConfig.saving");
+}
+
+/**
+ * 保存条可见状态：64px 内两行可读（键名/缺项明细放 title 与缺项 Alert）。
+ * 零改动键使用独立 key（`saveNoteNoChanges`），避免「无 个」拼接。
+ */
 export function savedStatusText(
   appliedKeys: readonly string[],
   missing: readonly string[],
   application: unknown,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
-  const keys = appliedKeys.length > 0 ? appliedKeys.length + " 个" : "无";
-  return (
-    "已保存到 .env（改动键 " +
-    keys +
-    "）。" +
-    (missing.length > 0
-      ? "必填配置仍缺 " + missing.length + " 项（见上方）。"
-      : "必填配置已齐备。") +
-    applicationShortLabel(application)
-  );
+  const tail = missing.length > 0
+    ? translate(locale, "ui.settings.stillMissingCount", { count: missing.length })
+    : translate(locale, "ui.settings.requiredReady");
+  const applicationText = applicationShortLabel(application, locale);
+  if (appliedKeys.length === 0) {
+    return translate(locale, "ui.settings.saveNoteNoChanges", {
+      tail,
+      application: applicationText,
+    });
+  }
+  return translate(locale, "ui.settings.saveNoteShort", {
+    count: appliedKeys.length,
+    tail,
+    application: applicationText,
+  });
 }
 
 /** 保存条完整状态（title/读屏/追溯）：逐键与完整 application 文案。 */
@@ -333,54 +446,84 @@ export function savedStatusTitle(
   appliedKeys: readonly string[],
   missing: readonly string[],
   application: unknown,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
-  const keys = appliedKeys.length > 0 ? appliedKeys.join("、") : "无";
-  return (
-    "已保存到 .env（改动键：" +
-    keys +
-    "）。" +
-    (missing.length > 0
-      ? "必填配置仍缺：" + missing.join("、") + "。"
-      : "必填配置已齐备。") +
-    applicationLabel(application)
-  );
+  const keys = appliedKeys.length > 0
+    ? appliedKeys.join(listSeparator(locale))
+    : translate(locale, "shared.common.none");
+  const tail = missing.length > 0
+    ? translate(locale, "ui.settings.stillMissingList", {
+        keys: missing.join(listSeparator(locale)),
+      })
+    : translate(locale, "ui.settings.requiredReady");
+  return translate(locale, "ui.settings.saveNoteTitle", {
+    keys,
+    tail,
+    application: applicationLabel(application, locale),
+  });
 }
 
 /** 应用时点短句（视觉两行内完整；完整文案见 `applicationLabel` 与设置说明）。 */
-export function applicationShortLabel(application: unknown): string {
-  return (
-    {
-      current: "当前配置已应用。",
-      "next-session": "下一次开启会话时应用。",
-      "after-active-turn": "当前轮次继续使用原配置；下一次输入应用。",
-    }[asString(application)] || "配置应用时点未报告。"
-  );
+export function applicationShortLabel(
+  application: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const value = asString(application);
+  const key =
+    value === "current"
+      ? "ui.settings.applicationCurrent"
+      : value === "next-session"
+        ? "ui.settings.applicationNextSession"
+        : value === "after-active-turn"
+          ? "ui.settings.applicationAfterActiveTurnShort"
+          : "ui.settings.applicationUnknown";
+  return translate(locale, key);
 }
 
-export function missingNoticeText(label: string, missing: readonly string[]): string {
-  return (
-    label + " 配置不完整，缺：" + missing.join("、") + "。请补齐后保存。"
-  );
+export function missingNoticeText(
+  label: string,
+  missing: readonly string[],
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return translate(locale, "ui.settings.incomplete", {
+    label,
+    missing: missing.join(listSeparator(locale)),
+  });
 }
 
-export function readFailureNoticeText(label: string): string {
-  return "读取 " + label + " 配置失败，请打开设置检查或重试。";
+export function readFailureNoticeText(
+  label: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return translate(locale, "ui.runtimeConfig.readFailedForLabel", { label });
 }
 
-export function readingNoticeText(label: string): string {
-  return "正在检查 " + label + " 配置…";
+export function readingNoticeText(
+  label: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return translate(locale, "ui.runtimeConfig.checkingLabel", { label });
 }
 
-export function engineSettingsTitle(label: string): string {
-  return label + " 配置";
+export function engineSettingsTitle(
+  label: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return translate(locale, "ui.runtimeConfig.engineSettingsTitle", { label });
 }
 
-export function engineSettingsTabTitle(label: string): string {
-  return label + " 设置";
+export function engineSettingsTabTitle(
+  label: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return translate(locale, "ui.runtimeConfig.engineSettingsTabTitle", { label });
 }
 
-export function openEngineSettingsLabel(label: string): string {
-  return "打开 " + label + " 设置";
+export function openEngineSettingsLabel(
+  label: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return translate(locale, "ui.runtimeConfig.openEngineSettings", { label });
 }
 
 /** 档位控件读屏标签：range 的 aria-valuetext 与 output 用同一标签（单一映射点）。 */

@@ -4,7 +4,12 @@
  *
  * 渲染侧只拿 `documentScope` 与 opaque `documentId/projectViewId`；
  * 不接收 root/路径/URL，不构造文件系统路径。
+ *
+ * i18n B2：展示文案来自 shared `ui.document.*`/`ui.documentView.*`，纯函数接受
+ * 可选 `locale`（默认 zh-CN）。错误码、路径、文档 id 是机器值，不翻译。
  */
+
+import { DEFAULT_LOCALE, translate, type Locale, type MessageKey } from "../i18n/index.ts";
 
 export interface DocumentScope {
   version: number;
@@ -45,30 +50,33 @@ export type DocumentReadValidation =
   | { ok: false; code: string };
 
 /** 错误码 → 既有文案（与旧 `Rt.documentError` 逐字一致；纯展示映射）。 */
-const DOCUMENT_ERRORS: Record<string, string> = {
-  INVALID_REQUEST: "文档请求无效。",
-  PROJECT_NOT_GRANTED: "尚未获得当前项目的文档读取许可，请重新选择项目文件夹。",
-  PROJECT_NOT_ACTIVE: "该项目不是当前项目。",
-  STALE_SCOPE: "项目文档列表已失效，请返回当前项目重新选择。",
-  UNKNOWN_DOCUMENT: "文档引用未知。",
-  NOT_LISTED: "该文档已不在可读清单中。",
-  OUTSIDE_PROJECT: "该文件不在当前项目允许的阅读范围。",
-  SYMLINK_NOT_ALLOWED: "符号链接文档不可读取。",
-  NOT_FOUND: "文档不存在。",
-  NOT_FILE: "该引用不是普通文件。",
-  UNSUPPORTED_FORMAT: "此文档格式暂不支持。",
-  INVALID_UTF8: "文档不是有效UTF-8文本。",
-  BINARY_CONTENT: "文档包含二进制内容，不能预览。",
-  TOO_LARGE: "文档超过256KiB，无法在此预览。",
-  PERMISSION_DENIED: "没有读取此文档的权限。",
-  CHANGED_DURING_READ: "读取期间文档发生变化，请重新选择。",
-  UNSUPPORTED_ENVIRONMENT: "当前环境暂不支持安全读取项目文档。",
-  IO_ERROR: "文档读取失败。",
+const DOCUMENT_ERROR_KEYS: Record<string, MessageKey> = {
+  INVALID_REQUEST: "ui.document.error.invalidRequest",
+  PROJECT_NOT_GRANTED: "ui.document.error.projectNotGranted",
+  PROJECT_NOT_ACTIVE: "ui.document.error.projectNotActive",
+  STALE_SCOPE: "ui.document.error.staleScope",
+  UNKNOWN_DOCUMENT: "ui.document.error.unknownDocument",
+  NOT_LISTED: "ui.document.error.notListed",
+  OUTSIDE_PROJECT: "ui.document.error.outsideProject",
+  SYMLINK_NOT_ALLOWED: "ui.document.error.symlinkNotAllowed",
+  NOT_FOUND: "ui.document.error.notFound",
+  NOT_FILE: "ui.document.error.notFile",
+  UNSUPPORTED_FORMAT: "ui.document.error.unsupportedFormat",
+  INVALID_UTF8: "ui.document.error.invalidUtf8",
+  BINARY_CONTENT: "ui.document.error.binaryContent",
+  TOO_LARGE: "ui.document.error.tooLarge",
+  PERMISSION_DENIED: "ui.document.error.permissionDenied",
+  CHANGED_DURING_READ: "ui.document.error.changedDuringRead",
+  UNSUPPORTED_ENVIRONMENT: "ui.document.error.unsupportedEnvironment",
+  IO_ERROR: "ui.document.error.ioError",
 };
 
-export function documentErrorText(code: unknown): string {
-  const key = typeof code === "string" ? code : "";
-  return DOCUMENT_ERRORS[key] || "无法读取此文档。";
+export function documentErrorText(
+  code: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const key = typeof code === "string" ? DOCUMENT_ERROR_KEYS[code] : undefined;
+  return translate(locale, key ?? "ui.document.error.fallback");
 }
 
 /** 角色 listing 里已列出的可读文档（opaque 引用；畸形条目丢弃，不猜路径）。 */
@@ -223,22 +231,56 @@ export function canRetryDocument(code: unknown): boolean {
   );
 }
 
-export function documentStatusText(result: DocumentReadResult | null): string {
-  return result ? "只读文档 · " + result.byteLength + " 字节" : "";
+export function documentStatusText(
+  result: DocumentReadResult | null,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return result
+    ? translate(locale, "ui.document.readonlyMeta", { bytes: result.byteLength })
+    : "";
 }
 
-export const DOCUMENT_READING_TEXT = "正在读取文档…";
-export const DOCUMENT_UNLISTED_TEXT = "此链接尚未提供阅读入口。";
-export const DOCUMENT_EMPTY_TEXT = "该角色当前没有已列出的可读文档。";
-export const DOCUMENT_LIST_NOTE =
-  "以下是当前项目中该角色已列出的可读文档，请选择要阅读的文件。";
-export const DOCUMENT_SOURCE_TITLE_SUFFIX = " · 来源文档";
-export const DOCUMENT_BACK_ROLE_TEXT = "返回角色资料";
-export const DOCUMENT_BACK_LIST_TEXT = "返回来源文档";
-export const DOCUMENT_REFRESH_TEXT = "刷新已列文档";
-export const DOCUMENT_READ_TEXT = "阅读";
-export const DOCUMENT_RETRY_TEXT = "重试读取";
+export function documentReadingText(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.document.reading");
+}
 
-export function documentSourceTitle(roleName: string): string {
-  return (roleName || "角色") + DOCUMENT_SOURCE_TITLE_SUFFIX;
+export function documentUnlistedText(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.document.unlisted");
+}
+
+export function documentEmptyText(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.document.empty");
+}
+
+export function documentListNote(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.document.pickHint");
+}
+
+export function documentBackRoleText(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.queueSubview.backRole");
+}
+
+export function documentBackListText(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.document.backList");
+}
+
+export function documentRefreshText(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.document.refresh");
+}
+
+export function documentReadText(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "ui.document.read");
+}
+
+export function documentRetryText(locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "shared.common.retryRead");
+}
+
+export function documentSourceTitle(
+  roleName: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return translate(locale, "ui.document.sourceTitle", {
+    roleName: roleName || translate(locale, "shared.common.role"),
+  });
 }

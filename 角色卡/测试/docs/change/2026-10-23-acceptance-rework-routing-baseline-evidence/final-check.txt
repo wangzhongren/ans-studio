@@ -1,0 +1,23 @@
+# Final identity check
+checked_local=2026-10-23 19:06:46 +0800
+HEAD=ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1 tree=1149238a834f31588797016d6ee2289a4ac3e97b staged=0
+status_src_app_test=114
+
+## Our additions (untracked, within 角色卡/测试/docs/change/)
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-23-acceptance-rework-routing-baseline-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-23_change_acceptance-rework-routing-baseline.md"
+
+## Boundary/card/plan files unchanged vs preflight
+81208f8d3370bdc58091b81367ca06732476a380 | 3c8f7e0e34d44bcdc55995f2747cd8eccaea7ad0875ad074569f6acc7beea14c | 角色卡/测试/boundary.yaml
+b13881b8935309c123a6681f1f6017583f5d18da | 1d12d0b4aceb293ed0315986ee82b844603d75bdde71589867bb000f5230744e | 角色卡/桌面窗口/boundary.md
+531a500a5778eb55de0461bbcd0a53db6bb0d7a6 | 569a0a208024883709ba2ce47cbd62349856b5e82377c760bf08a764ca332c2f | 角色卡/桌面窗口/boundary.yaml
+c998301317c6400f8b827d877d3bdb1141c98e53 | c6c40b14e88e5e62eff55f1c2202302b369d68cf7254b62e46db58fb426a1c8f | 角色卡/编排/boundary.md
+36f0a80152206d60c079e73b4f6ad175f04c06ed | d1f20dfecf9c80286b02a8817e280b03a6bb1cec71e9341ffdf9769df1765a9e | 角色卡/编排/boundary.yaml
+d955d23028ad038cf84877139312666881064aa3 | 01ac2f9fabb7683a3576b544412aa6315aaf1d7f9b3a95d79d09d8b75a055d40 | 角色卡/运行时核心/boundary.md
+b7248d7303dc8d29f3be6d56df2defd0d755554e | 0d09c597b4ae9f6f395cd1264eaa2096b58d1c72dbe1625460ea9ed15b93964b | 角色卡/运行时核心/boundary.yaml
+878e2a412554ed982e873418e729f73e132288f5 | 6f75bee458e672e8b4be78b17e4910ee13ba8f50057ce26e30cee012fba45d5c | 角色卡/项目管理/boundary.md
+6540b1f989fc5a667a8c684447ae94f02b6c0859 | cfdc7408010bb9da1e3d5e9f723eb7a38956471d13860e8ac5588e7c3693cfff | 角色卡/项目管理/boundary.yaml
+
+## Team plan / design drafts unchanged (hash + size)
+d95fc81733ce824333bad86c74d984c5d045c8545e2373071f8de93c143a48ab | 52106 | docs/scheduling/2026-10-23-acceptance-rework-routing-team-plan.md
+9ceea6420965185ff7e0fd16675c250c9f2c31ffa45baa43cff159957726a4c5 | 97531 | docs/planning/2026-10-23_design_acceptance-rework-routing.md

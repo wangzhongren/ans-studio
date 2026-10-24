@@ -6,7 +6,11 @@
  * 失效/通道异常只收卡或如实定格，绝不呈现为已放行/已执行。
  *
  * 纯函数、无 DOM/存储依赖；`test/桌面UI/` 的 node 单测直接 import。
+ *
+ * i18n B1：用户可见文案来自 shared 目录；纯函数接受可选 `locale`（默认 zh-CN）。
  */
+
+import { DEFAULT_LOCALE, translate, type Locale } from "../i18n/index.ts";
 
 export interface ConfirmCardRecord {
   id: string;
@@ -72,34 +76,49 @@ export interface ConfirmResponseOutcome {
   hint: string;
 }
 
-const SHELL_EXPIRED_HINT = "此确认已失效（超时或应用重启），未获放行——请让角色重新发起。";
-const SHELL_CHANNEL_HINT =
-  "未能回传你的决定（通道未接或异常）——按 fail-closed 不放行；请让角色重新发起。";
-const RECOVERY_EXPIRED_TEXT = "此确认已失效（应用重启或请求已结束），未获执行——请让提议方重新发起。";
-const RECOVERY_CHANNEL_TEXT =
-  "未能回传你的决定（通道未接或异常）——按 fail-closed 不执行；请让提议方重新发起。";
+function shellExpiredHint(locale: Locale): string {
+  return translate(locale, "shared.common.shellConfirmationExpired");
+}
+
+function shellChannelHint(locale: Locale): string {
+  return translate(locale, "ui.confirm.failedShell");
+}
+
+function recoveryExpiredText(locale: Locale): string {
+  return translate(locale, "ui.confirm.expiredRecovery");
+}
+
+function recoveryChannelText(locale: Locale): string {
+  return translate(locale, "ui.confirm.failedRecovery");
+}
 
 /** shell 卡回包结果 → 收起/提示（旧 respondShellConfirm 同口径）。 */
-export function shellResponseOutcome(res: unknown): ConfirmResponseOutcome {
+export function shellResponseOutcome(
+  res: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): ConfirmResponseOutcome {
   const record = asCardRecord(res);
   if (record.ok === true) return { close: true, expired: false, hint: "" };
   if (record.expired === true) {
-    return { close: true, expired: true, hint: SHELL_EXPIRED_HINT };
+    return { close: true, expired: true, hint: shellExpiredHint(locale) };
   }
-  return { close: true, expired: false, hint: SHELL_CHANNEL_HINT };
+  return { close: true, expired: false, hint: shellChannelHint(locale) };
 }
 
 /**
  * 恢复卡回包结果：成功 ⇒ 收起；失效/通道异常 ⇒ 保留卡片、定格为失效态，
  * 提示语必须是 `按 fail-closed 不执行`（旧 markRecoveryConfirmExpired 同口径）。
  */
-export function recoveryResponseOutcome(res: unknown): ConfirmResponseOutcome {
+export function recoveryResponseOutcome(
+  res: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): ConfirmResponseOutcome {
   const record = asCardRecord(res);
   if (record.ok === true) return { close: true, expired: false, hint: "" };
   if (record.expired === true) {
-    return { close: false, expired: true, hint: RECOVERY_EXPIRED_TEXT };
+    return { close: false, expired: true, hint: recoveryExpiredText(locale) };
   }
-  return { close: false, expired: true, hint: RECOVERY_CHANNEL_TEXT };
+  return { close: false, expired: true, hint: recoveryChannelText(locale) };
 }
 
 /**
@@ -148,7 +167,7 @@ export interface QueueEntry {
 }
 
 export interface QueueItemView extends QueueEntry {
-  /** "进行中" 或排队位次（1..N，如实：排队 ≠ 已执行）。 */
+  /** 「进行中」或排队位次（1..N，如实：排队 ≠ 已执行）；已按 locale 渲染。 */
   position: string;
   running: boolean;
   /** 仅客户消息且未投递（非进行中）者可撤回。 */
@@ -157,15 +176,23 @@ export interface QueueItemView extends QueueEntry {
   text: string;
 }
 
-function queueSourceLabel(kind: string, sourceRoleId: string): string {
+function queueSourceLabel(
+  kind: string,
+  sourceRoleId: string,
+  locale: Locale,
+): string {
   if (kind === "dispatch") {
-    return sourceRoleId ? "派发 · 来自 " + sourceRoleId : "派发";
+    return sourceRoleId
+      ? translate(locale, "ui.confirm.sourceDispatchWithRole", { roleId: sourceRoleId })
+      : translate(locale, "ui.confirm.sourceDispatch");
   }
   if (kind === "handback") {
-    return sourceRoleId ? "回交 · 来自 " + sourceRoleId : "回交";
+    return sourceRoleId
+      ? translate(locale, "ui.confirm.sourceHandbackWithRole", { roleId: sourceRoleId })
+      : translate(locale, "ui.confirm.sourceHandback");
   }
-  if (kind === "system") return "系统";
-  return "客户消息";
+  if (kind === "system") return translate(locale, "shared.common.system");
+  return translate(locale, "shared.common.customerMessage");
 }
 
 function shortenQueueText(summary: string): string {
@@ -187,16 +214,20 @@ function pickQueueEntry(value: unknown): QueueEntry {
 }
 
 /** 队列条目视图（旧 `UiLabels.queueItemViews` 同口径：running 在前 + 排队 1..N）。 */
-export function queueItemViews(queue: unknown, running: unknown): QueueItemView[] {
+export function queueItemViews(
+  queue: unknown,
+  running: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): QueueItemView[] {
   const views: QueueItemView[] = [];
   if (running && typeof running === "object") {
     const entry = pickQueueEntry(running);
     views.push({
       ...entry,
-      position: "进行中",
+      position: translate(locale, "ui.confirm.queueRunning"),
       running: true,
       canWithdraw: false,
-      sourceLabel: queueSourceLabel(entry.kind, entry.sourceRoleId),
+      sourceLabel: queueSourceLabel(entry.kind, entry.sourceRoleId, locale),
       text: shortenQueueText(entry.summary),
     });
   }
@@ -208,7 +239,7 @@ export function queueItemViews(queue: unknown, running: unknown): QueueItemView[
       position: String(index + 1),
       running: false,
       canWithdraw: entry.kind === "message" && entry.id !== "",
-      sourceLabel: queueSourceLabel(entry.kind, entry.sourceRoleId),
+      sourceLabel: queueSourceLabel(entry.kind, entry.sourceRoleId, locale),
       text: shortenQueueText(entry.summary),
     });
   }
@@ -222,23 +253,39 @@ export interface WithdrawOutcome {
 }
 
 /** 撤回回包 → 就地回执（绝不假装撤掉）。 */
-export function withdrawOutcome(res: unknown): WithdrawOutcome {
+export function withdrawOutcome(
+  res: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): WithdrawOutcome {
   const record = asCardRecord(res);
   if (record.ok === true) {
     return {
       ok: true,
-      text: "已撤回排队消息：" + (typeof record.summary === "string" ? record.summary : ""),
+      text: translate(locale, "ui.confirm.withdrawn", {
+        summary: typeof record.summary === "string" ? record.summary : "",
+      }),
     };
   }
   return {
     ok: false,
-    text: "撤回无效：" + (typeof record.error === "string" && record.error ? record.error : "未知原因"),
+    text: translate(locale, "ui.confirm.withdrawInvalid", {
+      detail:
+        typeof record.error === "string" && record.error
+          ? record.error
+          : translate(locale, "shared.common.unknownReason"),
+    }),
   };
 }
 
 /** 撤回异常（IPC 抛错）→ 就地回执。 */
-export function withdrawExceptionOutcome(error: unknown): WithdrawOutcome {
-  return { ok: false, text: "撤回失败：" + String(error) };
+export function withdrawExceptionOutcome(
+  error: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): WithdrawOutcome {
+  return {
+    ok: false,
+    text: translate(locale, "ui.confirm.withdrawFailed", { detail: String(error) }),
+  };
 }
 
 // —————— 附件类型呈现（渲染侧快速筛；权威校验在主进程）——————
@@ -252,17 +299,26 @@ export interface ImageFileLike {
 }
 
 /** 客户端快速筛：只挡明显不合规者并如实提示；真实字节校验在主进程。 */
-export function clientImageProblem(file: ImageFileLike): string {
+export function clientImageProblem(
+  file: ImageFileLike,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   if (IMAGE_MIME_ALLOW.indexOf(String(file.type || "")) < 0) {
-    return "图片类型不支持：" + (file.type || "（未知）") + "——只支持 png / jpeg / webp / gif。";
+    const unknownType =
+      "（" + translate(locale, "shared.common.unknown") + "）";
+    return translate(locale, "ui.confirm.imageTypeUnsupported", {
+      type: file.type || unknownType,
+    });
   }
   if (file.size > IMAGE_MAX_BYTES) {
-    return "图片过大（> " + Math.round(IMAGE_MAX_BYTES / 1024 / 1024) + "MB）——请压缩后再发。";
+    return translate(locale, "ui.confirm.imageTooLarge", {
+      mb: Math.round(IMAGE_MAX_BYTES / 1024 / 1024),
+    });
   }
   return "";
 }
 
-/** 附件 chip 的悬停标题（名称 + KB 大小）。 */
+/** 附件 chip 的悬停标题（名称 + KB 大小；内容为数据，不翻译）。 */
 export function attachmentTitle(name: string, size: number): string {
   const kb = Math.max(1, Math.round((Number(size) || 0) / 1024));
   return name + "（" + kb + "KB）";

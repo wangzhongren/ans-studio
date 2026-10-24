@@ -1,0 +1,22 @@
+key	zh-CN（逐字取当前源码）	en-US	consume_target（B3 后续接线点）
+main.session.releaseNoSession	角色 {roleId} 没有打开的会话。	Role {roleId} has no open session.	app/desktop/session.ts:2471（stop 的 release 回执）
+main.session.clarificationDelivery	Draft（提案）需要澄清：{question}	Draft (proposal) needs clarification: {question}	app/desktop/session.ts:1638（emitDeliveryNote 系统行）
+main.session.delivery.receivedDispatch	已接收来自 {role} 的派发任务——请按任务文本执行，完成后交回报告。	Received a dispatched task from {role} — follow the task text and hand back a report when done.	app/desktop/session.ts:4381（emitDeliveryNote 系统行）
+main.session.delivery.handbackFailedShort	回交投递失败（来自 {sourceRoleId}）：{detail}	Handback delivery failed (from {sourceRoleId}): {detail}	app/desktop/session.ts:4418（cAttempt=true 分支；!cAttempt 复用 handbackFailed）
+main.session.rebuildChangedRuntimeConfig	运行时配置	runtime configuration	app/desktop/session.ts:1211（rebuiltBoundary/rebuiltSkills 的 {changed}）
+main.session.install.verbInstall	安装	install	app/desktop/session.ts:3717/3865（summarySkill/summaryMcp 的 {verb}）
+main.session.install.verbUninstall	卸载	uninstall	app/desktop/session.ts:3717/3865（summarySkill/summaryMcp 的 {verb}）
+main.customerInput.judgeWriteHeadZero	judge 代批 · 代审批：确认写入 0 个路径	judge delegation · approval: confirm writing 0 paths	app/desktop/customer-input.ts:163（judgeResultSummary 零路径）
+main.customerInput.judgeWriteHeadOverflow	{other: judge 代批 · 代审批：确认写入 {count} 个路径（{paths}等 {count} 个）}	{one: judge delegation · approval: confirm writing {count} path ({paths}, etc.); other: judge delegation · approval: confirm writing {count} paths ({paths}, etc.)}	app/desktop/customer-input.ts:164-166（路径 > 3 的整句，替代拼接 tail）
+main.customerInput.autoApprovalLabel	自动审批	Auto-approval	app/desktop/customer-input.ts:827,1150（{label}）
+main.customerInput.autoDecisionLabel	自动决策	Auto-decision	app/desktop/customer-input.ts:827,1150（{label}）
+main.watchdog.signalSummary	系统·看护 · {signal} · 角色 {roleId}	System·Watchdog · {signal} · role {roleId}	app/desktop/watchdog.ts:582（turn-deadline）、714（cmd-timeout）
+main.watchdog.queueStuckSummary	系统·看护 · {signal} · 角色 {roleId}（深度 {depth}）	System·Watchdog · {signal} · role {roleId} (depth {depth})	app/desktop/watchdog.ts:608
+main.watchdog.repeatFailSummary	系统·看护 · {signal} · 角色 {roleId}（{count} 次）	System·Watchdog · {signal} · role {roleId} ({count} times)	app/desktop/watchdog.ts:639
+main.interface.docEmpty	文件为空（需要正文）	File is empty (body required)	app/desktop/interface.ts:3028（fullCheck 分支）
+main.interface.boundaryDeclaredMissing	未提供	not provided	app/desktop/interface.ts:2843（boundaryRoleMismatch 的 {declared}）
+main.interface.teamPlanMissingNoRoles	缺少团队计划/任命名单，未派发写卡任务	Missing team plan/appointment list; card-writing task not dispatched	app/desktop/interface.ts:4630（autoAdvanceFailed 的 {detail}）
+main.interface.roleCardsStepMissing	流程缺少 id 为 "{stepId}" 的步骤（团队计划存在但 flow 未声明 role-cards，无法完成收口；请 Convener 补齐 flow 步骤）。	The flow is missing the step with id "{stepId}" (the team plan exists but the flow does not declare role-cards, so closure cannot complete; ask the Convener to add the flow step).	app/desktop/interface.ts:3702（issue → writeBlockingSummary:3218）
+main.interface.readErrorExistingSuffix	（existing/legacy：仅提醒）	 (existing/legacy: warning only)	app/desktop/interface.ts:3023
+main.interface.queueRecoveredLine	- [{kind}] {summary}（角色 {roleId} · {runtime}）	- [{kind}] {summary} (role {roleId} · {runtime})	app/desktop/interface.ts:3286（queueRecovered 的 {lines}）
+main.interface.staleStepFact	- 步骤 {stepId}（owner: {owner}，status: {status}）	- Step {stepId} (owner: {owner}, status: {status})	app/desktop/interface.ts:3365（staleSteps 的 {facts}）

@@ -52,6 +52,7 @@ export type { CustomerInputRequest, CustomerInputOutcome, CustomerInputFn };
 // 须按其时序锚点落位）。请求本体（kind/title）与回放侧（session-history.ts 解析的 toolCall 块）两侧
 // 各自用同一函数拼键，渲染侧据此把卡锚定回「调用工具 request_confirmation」附近。只读导入、不复制。
 import { interactionAnchorKey } from "./request-anchor.ts";
+import { mainT } from "./i18n.ts";
 // 判断回落 reason 的人话映射（2026-10-18 客户反馈：read-denied 丢具体路径/原因）：与 shell 通道**同解**的小件。
 import { readDeniedHumanReason, stripTrailingSentencePunct } from "./judge-reason.ts";
 import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
@@ -151,17 +152,43 @@ export interface OperatorJudgeResultPayload {
 export function judgeResultSummary(
   payload: Pick<OperatorJudgeResultPayload, "group" | "cardKind" | "selected" | "confirmed" | "paths" | "flowId">,
 ): string {
-  const flow = typeof payload.flowId === "string" && payload.flowId !== "" ? ` · 流程 ${payload.flowId}` : "";
-  if (payload.cardKind === "proposal") return `judge 代批 · 代决策：接受提案（accept）${flow}`;
-  if (payload.cardKind === "acceptance") return `judge 代批 · 代决策：验收通过（accept）${flow}`;
+  const flow = typeof payload.flowId === "string" && payload.flowId !== "" ? mainT("ui.judge.flowSuffix", { flowId: payload.flowId }) : "";
+  if (payload.cardKind === "proposal") return mainT("main.customerInput.judgeDecisionHead") + flow;
+  if (payload.cardKind === "acceptance") return mainT("main.customerInput.judgeAcceptanceHead") + flow;
   if (payload.cardKind === "appointment") {
     const ids = Array.isArray(payload.selected) ? payload.selected : [];
-    return `judge 代批 · 代决策：任命 ${ids.join("、")}${flow}`;
+    return mainT("main.customerInput.judgeAppointmentHead", { ids: ids.join("、") }) + flow;
   }
   const paths = Array.isArray(payload.paths) ? payload.paths : [];
+  if (paths.length === 0) return mainT("main.customerInput.judgeWriteHeadZero");
   const shown = paths.slice(0, 3).join("、");
-  const tail = paths.length > 3 ? `等 ${paths.length} 个` : "";
-  return `judge 代批 · 代审批：确认写入 ${paths.length} 个路径${paths.length > 0 ? `（${shown}${tail}）` : ""}`;
+  if (paths.length > 3) {
+    return mainT("main.customerInput.judgeWriteHeadOverflow", { count: paths.length, paths: shown });
+  }
+  return mainT("main.customerInput.judgeWriteHead", { count: paths.length, paths: shown });
+}
+
+/**
+ * **验收卡 judge auto-rework 回调事实**（2026-10-23 验收返工路由方案 v1 §5.3.1 / Q7 A）。
+ *
+ * 只描述**已结算**的 judge 自动退回（`declined`、`operatorId:"judge:*"`、非 `notPresented`）；本模块
+ * **不路由、不写账本、不伪造客户决定**——路由由主进程接线到 Interface（`routeAcceptanceAutoRework`）。
+ */
+export interface AutoReworkCallbackInfo {
+  flowId: string;
+  cardKind: GovernanceCardKind;
+  /** `judge-deny`＝判断 agent 拒绝；`judge-manual`＝判断未能代批（timeout/parse-failed/not-recommended/group-mismatch）。 */
+  source: "judge-deny" | "judge-manual";
+  reasonCode: string;
+  /** 已人话化的可操作原因（与结算给发起角色的 decline reason 同源）。 */
+  reason: string;
+  operatorId: string;
+  engine: RuntimeKind;
+  requestId: string;
+  roleId: string;
+  projectRoot?: string;
+  runtime?: RuntimeKind;
+  at: string;
 }
 
 export interface CreateCustomerInputChannelOptions {
@@ -209,6 +236,15 @@ export interface CreateCustomerInputChannelOptions {
    * 结果行是代批的可见性条件；主进程推 IPC `session:operator-judge`。
    */
   emitJudgeResult?: (payload: OperatorJudgeResultPayload) => void;
+  /**
+   * **验收卡 judge auto-rework 回调**（2026-10-23 验收返工路由方案 v1 §5.3.1；Q7 A）：
+   * 只在 `cardKind==="acceptance"` 的 judge deny/manual **成功结算为 declined 之后**回调，且 allowlist：
+   * verdict `deny`；manual 的 `timeout`/`parse-failed`/`not-recommended`/`group-mismatch`。
+   * **不触发**：`switch-off`（回原卡）、`aborted`/取消、`unavailable`、`notPresented`、
+   * `ledger-unavailable`、`row-failed`。回调**隔离**：抛错只记诊断，不影响已结算的 decline、
+   * 三态/账本语义或后续排队；本模块自身不路由、不开会话、不写盘。
+   */
+  onAutoRework?: (info: AutoReworkCallbackInfo) => void;
 }
 
 export interface CustomerInputChannel {
@@ -429,6 +465,50 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   };
 
   /**
+   * judge auto-rework 的**验收卡**回调（2026-10-23 验收返工路由 §5.3.1 / Q7 A）。
+   *
+   * 只在 acceptance 卡、judge 来源、decline 已结算后调用；只传事实。隔离：抛错只记诊断，绝不影响
+   * 已完成的 decline 结算、三态或排队流转（同 `notifyNextStep` 的隔离口径）。
+   */
+  const notifyAutoRework = (
+    entry: ChannelEntry,
+    plan: JudgePlan,
+    outcome: GovernanceJudgeOutcome,
+    source: AutoReworkCallbackInfo["source"],
+    reason: string,
+  ): void => {
+    if (opts.onAutoRework === undefined) return;
+    if (plan.cardKind !== "acceptance") return; // 只对验收卡；其他卡零行为变化
+    const flowId = plan.request.flowId;
+    if (typeof flowId !== "string" || flowId === "") return;
+    const info: AutoReworkCallbackInfo = {
+      flowId,
+      cardKind: plan.cardKind,
+      source,
+      reasonCode: outcome.reasonCode,
+      reason,
+      operatorId: `judge:${outcome.engine}`,
+      engine: outcome.engine,
+      requestId: entry.payload.id,
+      roleId: entry.payload.roleId,
+      ...(entry.payload.projectRoot !== undefined ? { projectRoot: entry.payload.projectRoot } : {}),
+      ...(entry.payload.runtime !== undefined ? { runtime: entry.payload.runtime } : {}),
+      at: new Date().toISOString(),
+    };
+    try {
+      opts.onAutoRework(info);
+      diagnostic.record("interaction.auto-rework", {
+        requestId: entry.payload.id,
+        flowId,
+        source,
+        reasonCode: outcome.reasonCode,
+      });
+    } catch (error) {
+      diagnostic.error("interaction.auto-rework.failed", error, { requestId: entry.payload.id, flowId, source });
+    }
+  };
+
+  /**
    * 结算一张卡（已呈现或判断中）：清对应登记/占位 → 清监听 → resolve → 下一步推导 → 按序呈现同项目下一张。
    * **`notifyNextStep`/`drainProject` 恰一次**（§4.3）：代批成功与客户手批走同一条结算路径，
    * 下一步的 `advanceGovernanceFlow`/`dispatch.accepted(app)` 语义逐字不变。
@@ -442,7 +522,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     // 2026-10-20 真机：排队请求被判断 agent 直接代批/自动退回（从未 presenter 呈现）⇒ 界面必须删掉
     // 「等待前一个决定」排队行（onExpired 复用 session:operator-expired 的既有删除处理）。
     if (entry.queuedNotified === true && entry.presented !== true) {
-      notifyExpired(entry, "排队决定已自动处理（未呈现客户卡）");
+      notifyExpired(entry, mainT("main.customerInput.expiredQueued"));
     }
     entry.cleanup();
     entry.resolve(outcome);
@@ -467,7 +547,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     } catch (err) {
       diagnostic.error("interaction.present.failed", err, { requestId: entry.payload.id });
       // 推不达（窗口已关等）→ 未获同意（fail-closed），不留悬案；继续呈现同项目下一张。
-      settleActive(entry, { outcome: "declined", operatorId, reason: `客户交互请求未能送达界面：${reasonOf(err)}` });
+      settleActive(entry, { outcome: "declined", operatorId, reason: mainT("main.customerInput.deliveryFailed", { detail: reasonOf(err) }) });
     }
   };
 
@@ -584,9 +664,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
    * 客户已选择手动 → 原卡 + 本提示）。其余 manual/deny 自动退回重做，不再呈现客户卡。
    */
   const judgeManualNotice = (group: GovernanceJudgeGroup, reasonCode: string, reason?: string): string => {
-    const label = group === "approval" ? "代审批" : "代决策";
-    if (reasonCode === "row-failed") return "判断已完成，但结果无法在聊天中显示；已转你手动确认。";
-    return `判断 agent 未代批（${label}）：${stripTrailingSentencePunct(judgeHumanReason(reasonCode, reason))}；已转你手动确认。`;
+    const label = group === "approval" ? mainT("ui.judge.mode.approval") : mainT("ui.judge.mode.decision");
+    if (reasonCode === "row-failed") return mainT("main.customerInput.rowFailedManual");
+    return mainT("main.customerInput.judgeNotDelegated", { label, reason: stripTrailingSentencePunct(judgeHumanReason(reasonCode, reason)) });
   };
 
   /**
@@ -605,13 +685,13 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     if (judgeVerdictOf(outcome) === "deny") {
       // 仅 approval 组允许 deny（编排对 decision 组会回落 manual；这里再防御一次）。
       if (group !== "approval") {
-        outcome = manualOutcome(plan, "deny-not-approval", "拒绝仅适用于审批组");
+        outcome = manualOutcome(plan, "deny-not-approval", mainT("main.customerInput.rejectNotApproval"));
       } else if (opts.judge?.isGroupEnabled(group) !== true) {
         // 判断期间开关被关/重载复位：拒绝结论也不再具有代批授权 ⇒ 回落客户手动。
         diagnostic.record("governance-judge.switch.off", { requestId: entry.payload.id, group });
-        outcome = manualOutcome(plan, "switch-off", "你已关闭对应开关");
+        outcome = manualOutcome(plan, "switch-off", mainT("main.customerInput.switchOff"));
       } else if (outcome.group !== group || outcome.cardKind !== cardKind) {
-        outcome = manualOutcome(plan, "group-mismatch", "判断结果分组与卡片不符");
+        outcome = manualOutcome(plan, "group-mismatch", mainT("main.customerInput.groupMismatch"));
       } else {
         if (entry.state !== "judging") return; // 已中止/已结算：丢弃结果
         const reason = judgeReworkReasonText(group, outcome, "deny");
@@ -630,6 +710,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
           { outcome: "declined", operatorId: `judge:${outcome.engine}`, reason },
           "judging",
         );
+        // 2026-10-23 验收返工路由：deny 的验收卡在结算后隔离回调（不改变 decline/三态语义）。
+        notifyAutoRework(entry, plan, outcome, "judge-deny", reason);
         return;
       }
     }
@@ -637,13 +719,13 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       // §4.3-1：判断期间开关可能被关/重载复位 ⇒ 再查一次（主进程权威）。
       if (opts.judge?.isGroupEnabled(group) !== true) {
         diagnostic.record("governance-judge.switch.off", { requestId: entry.payload.id, group });
-        outcome = manualOutcome(plan, "switch-off", "你已关闭对应开关");
+        outcome = manualOutcome(plan, "switch-off", mainT("main.customerInput.switchOff"));
       } else if (outcome.group !== group || outcome.cardKind !== cardKind) {
-        outcome = manualOutcome(plan, "group-mismatch", "判断结果分组与卡片不符");
+        outcome = manualOutcome(plan, "group-mismatch", mainT("main.customerInput.groupMismatch"));
       } else {
         const value = approvedValue(entry.request, outcome);
         if (value === undefined) {
-          outcome = manualOutcome(plan, "not-recommended", "判断结论与卡片选项不符");
+          outcome = manualOutcome(plan, "not-recommended", mainT("main.customerInput.notRecommended"));
         } else {
           const payload: OperatorJudgeResultPayload = {
             version: 1,
@@ -673,7 +755,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
           };
           let rowFailed = false;
           try {
-            if (opts.emitJudgeResult === undefined) throw new Error("判断结果行通道未配置");
+            if (opts.emitJudgeResult === undefined) throw new Error(mainT("main.customerInput.emitChannelMissing"));
             opts.emitJudgeResult(payload);
           } catch (error) {
             // 结果行是 approve 的条件：投达失败 ⇒ manual（row-failed）⇒ 自动退回重做（不呈现客户卡）。
@@ -725,7 +807,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
             );
             return;
           }
-          outcome = manualOutcome(plan, "row-failed", "判断结果无法在聊天中显示");
+          outcome = manualOutcome(plan, "row-failed", mainT("main.customerInput.rowFailed"));
         }
       }
     }
@@ -764,6 +846,21 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       { outcome: "declined", operatorId: `judge:${outcome.engine}`, reason: reworkReason },
       "judging",
     );
+    // 2026-10-23 验收返工路由（allowlist）：verdict deny 的防御回落（decision 组 `deny-not-approval`）
+    // 与 manual 的 timeout/parse-failed/not-recommended/group-mismatch 触发；switch-off/aborted/
+    // unavailable/row-failed/ledger-unavailable 不触发（只记诊断/既有系统行，不路由）。
+    const rawDeny = judgeVerdictOf(rawOutcome) === "deny";
+    const manualAutoRework =
+      outcome.reasonCode === "timeout" ||
+      outcome.reasonCode === "parse-failed" ||
+      outcome.reasonCode === "not-recommended" ||
+      outcome.reasonCode === "group-mismatch";
+    if (rawDeny && (outcome.reasonCode === "deny-not-approval" || outcome.reasonCode === "group-mismatch")) {
+      // acceptance 属 decision 组：deny 被防御性回落 manual；原始裁决仍是 deny ⇒ 按 judge-deny 路由。
+      notifyAutoRework(entry, plan, outcome, "judge-deny", reworkReason);
+    } else if (!rawDeny && manualAutoRework) {
+      notifyAutoRework(entry, plan, outcome, "judge-manual", reworkReason);
+    }
   };
 
   /** 启动一次判断（异步、不阻塞队列）；迟到/中止后的结果看到 `state !== "judging"` 一律丢弃。 */
@@ -788,7 +885,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       outcome = manualOutcome(
         plan,
         touched ? "aborted" : "unavailable",
-        touched ? "本轮已中止，判断结果不生效。" : `判断异常：${reasonOf(error)}`,
+        touched ? mainT("main.customerInput.turnAborted") : mainT("main.customerInput.judgeException", { detail: reasonOf(error) }),
       );
     }
     if (entry.state !== "judging") return; // 中止/关窗/已结算：不写任何东西
@@ -797,7 +894,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       outcome = manualOutcome(
         plan,
         timedOut ? "timeout" : "aborted",
-        timedOut ? `判断超时（>${formatJudgeTimeoutMs(plan.timeoutMs)}）` : "本轮已中止，判断结果不生效。",
+        timedOut ? mainT("main.customerInput.judgeTimeout", { ms: formatJudgeTimeoutMs(plan.timeoutMs) }) : mainT("main.customerInput.turnAborted"),
       );
     } else if (
       outcome === null ||
@@ -805,7 +902,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       judgeVerdictOf(outcome as { verdict?: unknown }) === undefined
     ) {
       // 注入的 fn 未按契约交回裁决（未知 verdict 含旧值）：防御性 fail-closed，绝不默认放行。
-      outcome = manualOutcome(plan, "parse-failed", "判断结果形状非法");
+      outcome = manualOutcome(plan, "parse-failed", mainT("main.customerInput.parseFailed"));
     }
     settleJudgeOutcome(entry, plan, outcome);
   };
@@ -822,10 +919,12 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     if (entry.metadata?.judgeContext?.unavailableReason !== undefined) {
       const unavailableReason = entry.metadata.judgeContext.unavailableReason;
       const detail = stripTrailingSentencePunct(unavailableReason.trim());
-      const label = plan.group === "approval" ? "自动审批" : "自动决策";
+      const label = plan.group === "approval" ? mainT("main.customerInput.autoApprovalLabel") : mainT("main.customerInput.autoDecisionLabel");
+      const unavailableHuman = judgeHumanReason("ledger-unavailable");
       const reason =
-        `${label}未通过：${judgeHumanReason("ledger-unavailable")}${detail !== "" ? `（${detail}）` : ""}。` +
-        `本次自动判断未通过/未完成，已拒绝；请按上述原因修正后重新提交确认。`;
+        detail !== ""
+          ? mainT("main.customerInput.ledgerUnavailable", { label, reason: unavailableHuman, detail: `（${detail}）` })
+          : mainT("main.customerInput.ledgerUnavailableShort", { label, reason: unavailableHuman });
       diagnostic.record("governance-judge.manual-as-rework", {
         requestId: entry.payload.id,
         group: plan.group,
@@ -874,8 +973,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     if (next.signals.some((signal) => signal.aborted)) {
       next.state = "done";
       next.cleanup();
-      next.resolve({ outcome: "unavailable", reason: "本轮已停止或会话已重建，旧确认失效。" });
-      notifyExpired(next, "本轮已停止或会话已重建，旧确认失效。");
+      next.resolve({ outcome: "unavailable", reason: mainT("main.confirm.expiredStopped") });
+      notifyExpired(next, mainT("main.confirm.expiredStopped"));
       drainProject(projectKey);
       return;
     }
@@ -892,7 +991,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     new Promise<CustomerInputOutcome>((resolve) => {
       // 退路：通道未配置 → 不可用（能力缺席即 fail-closed；绝不当「没人问、那就放行」）。
       if (opts.presenter === undefined) {
-        resolve({ outcome: "unavailable", reason: "客户交互通道未配置（无 presenter），未获同意（fail-closed）" });
+        resolve({ outcome: "unavailable", reason: mainT("main.customerInput.presenterMissing") });
         return;
       }
       const id = opts.nextId ? opts.nextId() : `op-${++seq}`;
@@ -934,8 +1033,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         if (wasOccupying && activeByProject.get(projectKey) === id) activeByProject.delete(projectKey);
         entry.state = "done";
         entry.cleanup();
-        entry.resolve({ outcome: "unavailable", reason: "本轮已停止或会话已重建，旧确认失效。" });
-        notifyExpired(entry, "本轮已停止或会话已重建，旧确认失效。");
+        entry.resolve({ outcome: "unavailable", reason: mainT("main.confirm.expiredStopped") });
+        notifyExpired(entry, mainT("main.confirm.expiredStopped"));
         if (wasOccupying) drainProject(projectKey);
       };
       if (activeByProject.has(projectKey)) {
@@ -972,53 +1071,53 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     if (!entry) {
       // 终态：该 id 已无挂起请求——G-1 起只剩「应用关闭/重启清空了未决请求」这一种真实原因（无按时间超时）。
       // 界面据此**定格**，不得解冻重试；文案如实指向重启/关闭。
-      return { ok: false, error: "没有待答的交互请求（轮次停止、会话重建或应用关闭会使旧请求失效）", expired: true };
+      return { ok: false, error: mainT("main.customerInput.noPendingRequest"), expired: true };
     }
     const d = input.decision as OperatorDecisionPayload | undefined;
     if (!d || typeof d !== "object") {
-      return { ok: false, error: "缺决定内容" };
+      return { ok: false, error: mainT("main.customerInput.missingDecision") };
     }
     // —— confirm：恰 `confirmed:true` ⇒ answered；`confirmed:false` ⇒ declined（客户不同意）。——
     if (d.kind === "confirm") {
       if (entry.request.kind !== "confirm") {
-        return { ok: false, error: "决定与请求类型不符（请求是 choice）" };
+        return { ok: false, error: mainT("main.customerInput.choiceMismatch") };
       }
       if (d.confirmed !== true && d.confirmed !== false) {
-        return { ok: false, error: "确认决定必须是布尔值" };
+        return { ok: false, error: mainT("main.customerInput.confirmMustBeBoolean") };
       }
       settleActive(entry, d.confirmed === true
         ? { outcome: "answered", value: { confirmed: true }, operatorId }
-        : { outcome: "declined", operatorId, reason: "客户不同意" });
+        : { outcome: "declined", operatorId, reason: mainT("main.customerInput.customerDeclined") });
       return { ok: true };
     }
     // —— choice：取消 ⇒ declined；作答 ⇒ selected 必须 ⊆ 已给选项、去重、单选恰一个。——
     if (d.kind === "choice") {
       if (entry.request.kind !== "choice") {
-        return { ok: false, error: "决定与请求类型不符（请求是 confirm）" };
+        return { ok: false, error: mainT("main.customerInput.confirmMismatch") };
       }
       if (d.cancelled === true) {
-        settleActive(entry, { outcome: "declined", operatorId, reason: "客户取消" });
+        settleActive(entry, { outcome: "declined", operatorId, reason: mainT("main.customerInput.customerCancelled") });
         return { ok: true };
       }
       const rawSel = d.selected;
       if (!Array.isArray(rawSel) || rawSel.some((s) => typeof s !== "string")) {
-        return { ok: false, error: "选择内容必须是字符串数组" };
+        return { ok: false, error: mainT("main.customerInput.selectionMustBeArray") };
       }
       const selected = [...new Set(rawSel as string[])];
       if (selected.length === 0) {
-        return { ok: false, error: "未选择任何选项（空选择不受理；点「取消」才是拒绝）" };
+        return { ok: false, error: mainT("main.customerInput.emptySelection") };
       }
       const offered = new Set(entry.request.options.map((o) => o.id));
       if (selected.some((s) => !offered.has(s))) {
-        return { ok: false, error: "选项不在本次请求中（按请求快照校验拒绝）" };
+        return { ok: false, error: mainT("main.customerInput.selectionNotInRequest") };
       }
       if (entry.request.multiple !== true && selected.length !== 1) {
-        return { ok: false, error: "单选题只能选一个" };
+        return { ok: false, error: mainT("main.customerInput.singleChoiceOnly") };
       }
       settleActive(entry, { outcome: "answered", value: { selected }, operatorId });
       return { ok: true };
     }
-    return { ok: false, error: "未知的决定类型" };
+    return { ok: false, error: mainT("main.customerInput.unknownDecisionType") };
   }
 
   function rejectAllPending(reason: string): void {
@@ -1099,25 +1198,25 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 /** 判断回落的人话映射（未知码回落到有界理由；仅展示，不参与任何判定）。 */
 function judgeHumanReason(reasonCode: string, reason?: string): string {
   switch (reasonCode) {
-    case "switch-off": return "你已关闭对应开关";
-    case "timeout": return typeof reason === "string" && reason !== "" ? reason : "判断超时";
-    case "aborted": return "本轮已中止";
-    case "unavailable": return "判断服务不可用";
-    case "unsupported-engine": return "当前引擎不支持自动判断";
-    case "parse-failed": return "判断结果无法解析";
-    case "artifact-missing": return "规范物证缺失";
-    case "artifact-not-read": return "判断未读取必需的项目文件";
-    case "path-outside-boundary": return "写盘路径不在允许范围内";
-    case "path-unverified": return "写盘路径无法逐项核对";
-    case "not-recommended": return "候选与推荐/选项不一致";
-    case "insufficient-evidence": return "证据不足";
-    case "ledger-unavailable": return "治理事实不可读";
-    case "group-mismatch": return "判断结果与卡片分组不一致";
+    case "switch-off": return mainT("main.customerInput.switchOff");
+    case "timeout": return typeof reason === "string" && reason !== "" ? reason : mainT("main.customerInput.reason.timeout");
+    case "aborted": return mainT("main.customerInput.reason.aborted");
+    case "unavailable": return mainT("main.customerInput.reason.unavailable");
+    case "unsupported-engine": return mainT("main.customerInput.reason.unsupportedEngine");
+    case "parse-failed": return mainT("main.customerInput.reason.parseFailed");
+    case "artifact-missing": return mainT("main.customerInput.reason.artifactMissing");
+    case "artifact-not-read": return mainT("main.customerInput.reason.artifactNotRead");
+    case "path-outside-boundary": return mainT("main.customerInput.reason.pathOutsideBoundary");
+    case "path-unverified": return mainT("main.customerInput.reason.pathUnverified");
+    case "not-recommended": return mainT("main.customerInput.reason.notRecommended");
+    case "insufficient-evidence": return mainT("main.customerInput.reason.insufficientEvidence");
+    case "ledger-unavailable": return mainT("main.customerInput.reason.ledgerUnavailable");
+    case "group-mismatch": return mainT("main.customerInput.reason.groupMismatch");
     case "read-denied": return readDeniedHumanReason(reason);
-    case "budget": return "读取预算已用尽";
-    case "read-truncated": return "读取内容被截断";
-    case "context-missing": return "缺少判断所需的上下文";
-    default: return typeof reason === "string" && reason !== "" ? reason : "判断未给出可代批结论";
+    case "budget": return mainT("main.customerInput.reason.budget");
+    case "read-truncated": return mainT("main.customerInput.reason.readTruncated");
+    case "context-missing": return mainT("main.customerInput.reason.contextMissing");
+    default: return typeof reason === "string" && reason !== "" ? reason : mainT("main.customerInput.reason.fallback");
   }
 }
 
@@ -1143,7 +1242,8 @@ function judgeReworkReasonText(
   outcome: GovernanceJudgeOutcome,
   kind: "deny" | "manual",
 ): string {
-  const label = group === "approval" ? "自动审批" : "自动决策";
-  const head = kind === "deny" ? `${label}拒绝` : `${label}未通过`;
-  return `${head}：${judgeReworkHumanReason(outcome)}。本次自动判断未通过/未完成，已拒绝；请按上述原因修正后重新提交确认。`;
+  const label = group === "approval" ? mainT("main.customerInput.autoApprovalLabel") : mainT("main.customerInput.autoDecisionLabel");
+  return kind === "deny"
+    ? mainT("main.customerInput.rework.head", { label, reason: judgeReworkHumanReason(outcome) })
+    : mainT("main.customerInput.ledgerUnavailableShort", { label, reason: judgeReworkHumanReason(outcome) });
 }

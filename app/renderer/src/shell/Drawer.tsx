@@ -27,9 +27,12 @@ import { ProfilePanel } from "@/shell/ProfilePanel";
 import { WorkOverview } from "@/shell/WorkOverview";
 import { DocumentView } from "@/shell/DocumentView";
 import { QueueSubview } from "@/shell/QueueSubview";
+import { useLocaleState, useT } from "@/i18n";
 import "@/shell/phase4a.css";
 
 export function Drawer() {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const open = useUiStore((s) => s.drawerOpen);
   const selectedRoleId = useUiStore((s) => s.selectedRoleId);
   const runtime = useUiStore((s) => s.runtime);
@@ -51,23 +54,23 @@ export function Drawer() {
   const roleKey = currentReadingKey(selectedRoleId);
 
   const role = findRole(roles, selectedRoleId);
-  const roleName = role ? roleDisplayName(role) : "未选择角色";
+  const roleName = role ? roleDisplayName(role, locale) : t("ui.role.noneSelected");
   const documentRole = docsView ? findRole(roles, docsView.roleId) : null;
   const documentRoleName = documentRole
-    ? roleDisplayName(documentRole)
-    : docsView?.roleId || "角色";
+    ? roleDisplayName(documentRole, locale)
+    : docsView?.roleId || t("shared.common.role");
 
   const showingQueue =
     queueView !== null && (effective === "work" || effective === "card");
   const title = showingQueue
-    ? queueTitle(roleName)
+    ? queueTitle(roleName, locale)
     : effective === "pi"
-      ? engineSettingsTitle(runtimeLabel(settingsEngine))
+      ? engineSettingsTitle(runtimeLabel(settingsEngine, locale), locale)
       : effective === "work"
-        ? workTitle(roleName)
+        ? workTitle(roleName, locale)
         : effective === "document" && docsView
-          ? documentSourceTitle(documentRoleName)
-          : profileTitle(roleName);
+          ? documentSourceTitle(documentRoleName, locale)
+          : profileTitle(roleName, locale);
 
   useEffect(() => {
     if (open) {
@@ -213,8 +216,8 @@ export function Drawer() {
             ref={closeRef}
             className="drawer-close"
             type="button"
-            title="收起（Esc）"
-            aria-label="收起"
+            title={t("ui.drawer.collapseTitle")}
+            aria-label={t("shared.common.collapse")}
             tabIndex={open ? 0 : -1}
             onClick={() => useDrawerStore.getState().close()}
           >

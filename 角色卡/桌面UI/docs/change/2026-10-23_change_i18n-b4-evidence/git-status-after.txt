@@ -1,0 +1,7 @@
+ M app/renderer/src/chat/runtime-config.ts
+ M app/renderer/src/shell/phase4a.css
+ M "test/\346\241\214\351\235\242UI/runtime-config.test.ts"
+ M "test/\346\241\214\351\235\242UI/source-guard.test.ts"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/api-spec.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-23_change_i18n-b4-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-10-23_change_i18n-b4.md"

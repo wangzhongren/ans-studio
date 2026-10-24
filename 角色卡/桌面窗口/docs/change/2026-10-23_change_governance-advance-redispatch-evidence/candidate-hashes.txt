@@ -1,0 +1,23 @@
+# 2026-10-23T17:20:58+08:00
+# HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+## app/desktop/interface.ts
+git hash-object: 80bb89cb214938f2127f8da5c72d1384eda692ba
+sha256sum: 7a02b434729689eaa83cfd622bc3dcb25ce460a1ac1ec365939c0f1bf268f158
+size: 292874 B
+## app/desktop/governance-advance.ts
+git hash-object: f4c997f2b330d5b5220518fe6640aac0eaf6a2b2
+sha256sum: c84cf85454facff4e4013f7b8ad305da49d9a4eefd4aad63dcb1d21792c32fa7
+size: 78874 B
+## test/桌面应用/interface.test.ts
+git hash-object: 2185ae934ab8fff6377fd02504cadc0619e44d5e
+sha256sum: 448b2586fe133badfbbc7abd36253d405aea04516091146467e96afcb149dda0
+size: 346615 B
+## test/桌面应用/acceptance-dispatch.test.ts
+git hash-object: d321afd85bbae8a15ed3a9910c7c1183903e91fa
+sha256sum: 2141841bcc14650ba65d9323d16bbc1b54004a478fc80681adfcd8922257c9e9
+size: 108863 B
+## test/桌面应用/e2e/main.mjs
+git hash-object: 142e0f18d7701964053d97c6412d38809684c329
+sha256sum: c48f2e5a0d4a84e91cfd5daf8386bdb793d3e4ac3868d2023063dc53e0c8474b
+size: 173881 B
+## git diff --cached --name-only

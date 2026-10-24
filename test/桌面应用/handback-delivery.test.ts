@@ -66,6 +66,34 @@ function listingWithSuAndA(): ProjectListing {
   };
 }
 
+/** 2026-10-24 治理协调：trio 内置五角色 + 项目角色 A（主入口=Lead/liaison）。 */
+function trioHandbackListing(): ProjectListing {
+  const builtIn = (roleId: string, governanceFunction: NonNullable<ProjectListing["roles"][number]["governanceFunction"]>): ProjectListing["roles"][number] => ({
+    roleId,
+    cardPath: "",
+    boundaryPath: "",
+    cardText: `# ${roleId}`,
+    boundary: { entries: [], boundarySource: "<built-in:trio>", acceptance: { accepted: false, source: "" } },
+    builtIn: true,
+    governanceFunction,
+  });
+  return {
+    projectRoot: "/proj",
+    roles: [
+      builtIn("liaison", "liaison"),
+      builtIn("rapporteur", "proposal"),
+      builtIn("nominator", "nomination"),
+      builtIn("convener", "schedule"),
+      builtIn("verifier", "verification"),
+      listingWithSuAndA().roles.find((role) => role.roleId === "A")!,
+    ],
+    warnings: [],
+    hasRoles: true,
+    primaryRoleId: "liaison",
+    governanceModel: "trio",
+  };
+}
+
 interface Harness {
   mgr: SessionManager;
   streams: Record<string, OrchestrationEvent[]>;
@@ -81,10 +109,10 @@ interface Harness {
 }
 
 /** 可脚本化假句柄：events() 从共享流拉（轮询；dispose 后立即收口）；send 记入 sent（可注入一次失败或可控挂起）。 */
-function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: number; failReportSendTimes?: number; extraRoles?: string[]; customize?: (roleId: string, handle: RoleSessionHandle) => RoleSessionHandle } = {}): Harness {
-  const listing = listingWithSuAndA();
-  const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
-  const sent: Record<string, string[]> = { su: [], A: [] };
+function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: number; failReportSendTimes?: number; extraRoles?: string[]; customListing?: ProjectListing; customize?: (roleId: string, handle: RoleSessionHandle) => RoleSessionHandle } = {}): Harness {
+  const listing = opts.customListing ?? listingWithSuAndA();
+  const streams: Record<string, OrchestrationEvent[]> = {};
+  const sent: Record<string, string[]> = {};
   for (const roleId of opts.extraRoles ?? []) {
     listing.roles.push({
       roleId,
@@ -97,8 +125,10 @@ function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: numb
         acceptance: { accepted: false, source: "" },
       },
     });
-    streams[roleId] = [];
-    sent[roleId] = [];
+  }
+  for (const role of listing.roles) {
+    streams[role.roleId] ??= [];
+    sent[role.roleId] ??= [];
   }
   const sendOptions: Record<string, RoleSessionSendOptions[]> = {};
   const envelopes: { roleId: string; event: import("../../app/desktop/session.ts").DesktopOrchestrationEvent }[] = [];
@@ -544,4 +574,44 @@ test("F-2-T3 长轮不阻塞回交：B 的投递轮挂起期间，A settle 产�
   assert.ok(String(h.sent.B[0]).includes("长活"), "B 收到的是那条派发（恰一次）");
   assert.equal(h.sent.su.length, 1, "su 无重复投递");
   await h.mgr.stop(null);
+});
+
+test("2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发", async () => {
+  const h = makeHarness({ customListing: trioHandbackListing() });
+  try {
+    await h.mgr.open({ projectRoot: "/proj", roleId: "liaison", runtime: "demo" });
+    await tick(30);
+    await h.mgr.open({ projectRoot: "/proj", roleId: "convener", runtime: "demo" });
+    await tick(30);
+    await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+    await tick(30);
+
+    // ① 项目 worker 回交 → Steward（Convener）；Lead 不接收项目回交。
+    h.streams.A.push({ kind: "handback", summary: "A 完成", handback: HANDBACK_A1 } as OrchestrationEvent);
+    await waitUntil(() => h.sent.convener.includes(renderHandbackPrompt(HANDBACK_A1)));
+    assert.ok(!h.sent.liaison.includes(renderHandbackPrompt(HANDBACK_A1)), "项目 worker 回交不投 Lead");
+
+    // Steward 那一轮结束（空闲），并放行 Lead。
+    h.streams.convener.push({ kind: "settled", summary: "Convener 一轮结束" } as OrchestrationEvent);
+    h.streams.liaison.push({ kind: "settled", summary: "Lead 一轮结束" } as OrchestrationEvent);
+    await tick(120);
+
+    // ② 内置来源回交（防御性出现）→ Lead（primaryRoleId）；不自我回交。
+    await h.mgr.send("协调", undefined, { roleId: "convener" });
+    const builtInHandback: TaskHandback = { ...HANDBACK_A1, roleId: "convener", taskId: "T-internal" };
+    h.streams.convener.push({ kind: "handback", summary: "内置回交", handback: builtInHandback } as OrchestrationEvent);
+    await waitUntil(() => h.sent.liaison.includes(renderHandbackPrompt(builtInHandback)));
+    assert.ok(!h.sent.convener.includes(renderHandbackPrompt(builtInHandback)), "内置来源不自我回交");
+    // 放行 Lead（回交投递占用一轮），再让 convener 同一轮 settle：治理反馈与已投回交去重。
+    h.streams.liaison.push({ kind: "settled", summary: "Lead 一轮结束" } as OrchestrationEvent);
+    await tick(120);
+    const liaisonSendsAfterHandback = h.sent.liaison.length;
+    h.streams.convener.push({ kind: "message", summary: "内置收尾正文", turnId: "c-internal" } as OrchestrationEvent);
+    h.streams.convener.push({ kind: "settled", summary: "Convener 一轮结束" } as OrchestrationEvent);
+    await tick(250);
+    assert.equal(h.sent.liaison.length, liaisonSendsAfterHandback, "同一轮内置回交与 settle 反馈不双发");
+    assert.ok(!h.sent.liaison.some((text) => text.startsWith("[系统·治理反馈] 来自 convener")), "不重复投递内置反馈");
+  } finally {
+    await h.mgr.stop(null);
+  }
 });

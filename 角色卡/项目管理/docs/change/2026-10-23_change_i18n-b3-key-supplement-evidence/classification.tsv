@@ -1,0 +1,26 @@
+item	b3_suggested_key	source	classification	decision	reason
+1	main.session.releaseNoSession	app/desktop/session.ts:2471	用户可见	新增	method stop 的 release 回执（StopResult.note，经 IPC 返回操作者）；与 stopNoSession（含“没有可停止的轮次”）不同文案。
+2	main.session.clarificationDelivery	app/desktop/session.ts:1638	用户可见	新增	emitDeliveryNote 系统行（主入口 pane 显示“报告员需要澄清”）。
+3	main.session.handbackDeliveryFailedShort	app/desktop/session.ts:4413-4418	用户可见	新增（改名 main.session.delivery.handbackFailedShort）	emitDeliveryNote 投递失败行；cAttempt=true 分支无“保留待重试”后缀（非 cAttempt 分支逐字复用既有 main.session.delivery.handbackFailed）。
+4	main.session.delivery.receivedDispatch	app/desktop/session.ts:4381	用户可见	新增	emitDeliveryNote 系统行（目标 pane“任务到货”）；不是发给模型的消息体（投递正文另经 sendDelivery）。
+5	main.session.rebuildChangedRuntimeConfig	app/desktop/session.ts:1211	用户可见	新增	{changed} 参数进入 main.session.rebuiltBoundary/rebuiltSkills 系统行；缺省会向 en 混入中文。
+6	main.session.install.verbInstall / verbUninstall	app/desktop/session.ts:3717,3865	用户可见	新增	{verb} 进入 install summary 系统行（summarySkill/summaryMcp）；同时用于 agent 回执，但用户可见面决定需补。
+7	main.session.install.actionChanged / actionReverted	app/desktop/session.ts:3803,3948	agent-facing	保持	仅进入 rebuild-failed 的 agent 工具回执（InstallSkillReceipt.message）；无结果行、无系统行（PM 分类文档：能力安装/卸载中面向角色的说明不翻译）。
+8	main.session.delivery.kindDispatchTask	app/desktop/session.ts:4260	用户可见	复用	复用 ui.events.dispatchTask（zh 逐字“派发任务”，en “Dispatched task”）；不新增重复文案。
+9	main.customerInput.judgeWriteHeadZero	app/desktop/customer-input.ts:163	用户可见	新增	judge 代批结果行人话（渲染侧与主入口共用）；零路径整句与 judgeWriteHead（带括号）不逐字等价。
+10	main.customerInput.writePathsTail	app/desktop/customer-input.ts:164-166	用户可见	新增（整句模板 main.customerInput.judgeWriteHeadOverflow）	路径 > 3 的溢出：改为完整模板（{count}/{paths}，en 复数 one/other），避免“ 等 N 个”字符串拼接；zh 逐字保持无空格“{paths}等 {count} 个”。
+11	main.customerInput.autoApprovalLabel / autoDecisionLabel	app/desktop/customer-input.ts:827,1150	用户可见	新增	{label} 进入 ledgerUnavailable/rework.head 客户可见拒绝文案；缺省会向 en 混入中文。
+12	main.operator.manualJudgeDenyConnector	app/desktop/operator-channel.ts:631-633	agent-facing	保持	manual→deny 的理由随 OperatorOutcome.deny.reason 进入 deny 工具结果（角色可见）；按注释不产生结果行，无客户 UI 面。
+13	main.composerImages.unknownType	app/desktop/composer-images.ts:53	用户可见	复用	复用 main.watchdog.repeatFailUnknown（zh 逐字“（未知）”，en “(unknown)”）；通用短占位，不新增重复文案。
+14	main.composerImages.defaultName	app/desktop/composer-images.ts:115	用户可见	复用	复用 ui.composer.imageFallbackName（zh 逐字“图片”，en “Image”）；同一语义（图片名兜底）。
+15	main.watchdog.queueStuckSummary / repeatFailSummary / cmdTimeoutSummary	app/desktop/watchdog.ts:582,608,639,714	用户可见	新增（signalSummary/queueStuckSummary/repeatFailSummary）	队列行摘要（summary 显示于系统行）；信号名已 key 化，其余仍中文。B3 漏列同格式的 turn-deadline 摘要（582），本批并入 signalSummary（与 cmd-timeout 摘要同文案）。
+16	main.interface.docEmpty	app/desktop/interface.ts:3028	用户可见	新增	工作文档 fullCheck 分支 issue 文本；经 writeBlockingSummary 系统行显示首个问题，也进入 Crew 写卡反馈。
+17	main.interface.boundaryDeclaredMissing	app/desktop/interface.ts:2843	用户可见	新增	boundaryRoleMismatch 的 {declared} 参数（issue 文本）；缺省会向 en 混入中文。
+18	main.interface.teamPlanMissingNoRoles	app/desktop/interface.ts:4630	用户可见	新增	fail(...) 经 main.interface.autoAdvanceFailed 系统行显示（detail 参数）。
+19	main.interface.roleCardsStepMissing	app/desktop/interface.ts:3702	用户可见	新增	flow 缺陷 issue：作为首个 blocking issue 进入 writeBlockingSummary 系统行（客户可见）；同时作为 Convener 任务数据（与既有已 key 化的其它 issue 同口径）。
+20	main.interface.addRoleCardsStep	app/desktop/interface.ts:3112	agent-facing	保持	仅出现在 buildAppointmentPlanFeedback（发给 Convener 的任务正文）中的 flow 补步指令；方案 §4.11 任务文案不翻译。
+21	main.interface.flowStateValidationFailed	app/desktop/interface.ts:3107	agent-facing	保持	仅出现在 buildAppointmentPlanFeedback（Convener 任务抬头），不是客户系统行；不补。
+22	main.interface.readErrorExistingSuffix	app/desktop/interface.ts:3023	用户可见	新增	读文件错误后缀（issue 文本），进入 writeBlockingSummary/Crew 反馈。
+23	main.interface.queueRecoveredLine	app/desktop/interface.ts:3286	用户可见	新增	main.interface.queueRecovered 系统行的 {lines} 行模板（渲染侧直接显示）。
+24	main.interface.staleStepFact	app/desktop/interface.ts:3365	用户可见	新增	main.interface.staleSteps 系统行的 {facts} 行模板（stepId/owner/status 为机器值原样插入）。
++	（B3 未列）main.watchdog.signalSummary	app/desktop/watchdog.ts:582,714	用户可见	新增	与 #15 同类的 turn-deadline 摘要（B3 漏列）；与 cmd-timeout 摘要文案相同，共用一个 key 避免重复。

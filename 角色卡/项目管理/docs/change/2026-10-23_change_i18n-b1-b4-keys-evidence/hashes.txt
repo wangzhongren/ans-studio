@@ -1,0 +1,46 @@
+# i18n B1–B4 key contract candidate hashes
+# generated: 2026-10-23 (local)
+# command per file: git hash-object <path> ; sha256sum <path>
+
+FILE src/common/shared/i18n/messages/zh-CN.ts
+  blob   6f30a56a75479d2f6af78c487f75f25ecb47d18a
+  sha256 7f2eefd1b235bc377104530bade2dcb42932eae5cfe4e775152e60a8d7702f1c
+FILE src/common/shared/i18n/messages/en-US.ts
+  blob   5e5e706397b6146709f51e5f777c313e34c04bd9
+  sha256 7c6214dee6f37d3c12d0b33161a0e23f425843429cc461010d632890698d67d5
+FILE test/项目管理/shared/i18n.test.ts
+  blob   7cc3f5f0c65426ec82fec72550f5faf81e679d79
+  sha256 4eb1ef28b225ee6bbdbfd4bd11f5454a8ba1f4f42c2118a6f6bec0791cd1a850
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b4-keys.md
+  blob   2b98cbb18f2678f42483abc3f8a10d651195dd02
+  sha256 8ae99d8e232203e47fd6b2a8473d9f85b6c7a9a081f6dd6b36a4c1acf53f7793
+FILE 角色卡/项目管理/api-spec.md
+  blob   2ef5fbee111172998154d343815b8488fcd2345f
+  sha256 0e49ca9f4553ecb5fc61b9f3e46a82887d5ee7c964ab6fb8e4105627008ad228
+FILE 角色卡/项目管理/memo.md
+  blob   4d3f7eb49e098dd8747db3bef3178c581375ad57
+  sha256 c64ffb7a03893cf09aba9688f0f549858836ae0ce14147c407aa18384b294847
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b4-keys-evidence/key-inventory.tsv
+  blob   a0e7f13f7f3337b37aace13a7e91420a4db0a2f9
+  sha256 d47725d716751ebe49a8b42cb144cfce7855860acfe2ab9cc1931ec84b892abe
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b4-keys-evidence/zh-verbatim-mapping.tsv
+  blob   2a3957c07d966fdc4d9b7ae876dd4b235a8506f8
+  sha256 ec6da95ec67552910c2e6d71e52649dbc47123441bd1a6612cf1abdda5483e0b
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b4-keys-evidence/zh-verbatim-summary.txt
+  blob   73936639046fdd7e90779ffc1e1958543a08b4f1
+  sha256 c1c59ce70bcd29dcd9bcb4fbb772fd9855ae4a106d271cd91fa9876e5bf02cf3
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b4-keys-evidence/non-target-and-classification.md
+  blob   2eef1c117934f3a1a951525a06623b12683314d8
+  sha256 3fe03da20f451fb4e106aeba10c90cff9702ee91b129ad201cb568b2f1046942
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b4-keys-evidence/test-shared.log
+  blob   8c3ddf11874b2822da7406cb94fee582132a6462
+  sha256 42d68711b5fe3e3323c9a2ce463182140e6a172fd796cbedcd218dcfe8aafad5
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b4-keys-evidence/typecheck.log
+  blob   e7b738f40df8135aa67e2081a8e99c2c8c7e8c66
+  sha256 496a02b1582389a5a19befed843d77464aa7cb63566d483d0dd6133bbed8379f
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b4-keys-evidence/typecheck-renderer.log
+  blob   94c43547a411983e21f4c28777cb46476566fdb7
+  sha256 7e2f77f01dde1d2dfe5fa7ef574f95efbc398f05d312f29e3709bce86f34de6c
+FILE 角色卡/项目管理/docs/change/2026-10-23_change_i18n-b1-b4-keys-evidence/guard.log
+  blob   2b43a3f22df5d52b582638e0aa2d00ae6c198c96
+  sha256 6a1aa882c405341c2822fe15e13d5fbbb6c99e01a6ca6adfea26e22fa917a4b8

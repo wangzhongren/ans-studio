@@ -866,6 +866,58 @@
   height: 32px;
   padding: 0 10px;
 }
+
+/* —— 文档分组（角色根文档 / docs/；只伸缩/换行，不新增固定高度）—— */
+.profile-docs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.profile-docs-group {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.profile-docs-heading {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.profile-root-docs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.profile-root-docs li {
+  min-width: 0;
+}
+.root-doc-entry {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 28px;
+  padding: 4px 8px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  text-align: left;
+  white-space: normal;
+}
+.root-doc-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--foreground);
+}
+.root-doc-purpose {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 10.5px;
+  color: var(--text-3);
+}
 .profile-todo {
   display: flex;
   flex-direction: column;
@@ -994,5 +1046,31 @@
   }
   .document-read-button {
     margin-left: auto;
+  }
+}
+
+/* —— 200%（短视口）：设置面板整体滚动，保存条贴底可达 ——
+   960×620 物理窗口 @200% = 480×310 CSS：语言区 + 引擎 tabs + 保存条的高度超过
+   面板可用高度，原 flex 布局把保存/状态条推到视口下方（I9 P6 失败）。此档改为
+   `#pi-panel` 自身纵向滚动、保存条 sticky 贴底；960×620（CSS 高 620）不命中本档，
+   普通布局保持不变。 */
+@media (max-height: 480px) {
+  #pi-panel.pi-panel {
+    display: block;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-padding-bottom: 64px;
+  }
+  #pi-panel .pi-tabpanel {
+    display: block;
+    min-height: 0;
+  }
+  #pi-panel .pi-scroll {
+    overflow: visible;
+  }
+  #pi-panel .pi-save-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
   }
 }

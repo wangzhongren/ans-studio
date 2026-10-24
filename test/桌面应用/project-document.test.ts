@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { PROJECT_DOCUMENT_MAX_BYTES } from '../../src/model/project-document.ts';
+import { PROJECT_DOCUMENT_MAX_BYTES, type ProjectDocumentRoleCandidates } from '../../src/model/project-document.ts';
 import { createProjectDocumentFileReader, DocumentFileError } from '../../src/provider/project-document/public/file-reader.ts';
 async function fixture() { const root = await fs.mkdtemp(path.join(os.tmpdir(),'ans-doc-')); return {root,cleanup:()=>fs.rm(root,{recursive:true,force:true})}; }
 test('B Model budget is raw bytes; Provider reads a checked local descriptor without changing bytes',async(t)=>{
@@ -99,9 +99,145 @@ test('B a newer native selection invalidates an older listing without revoking t
  }finally{service.dispose();}
 });
 
+// —————— 角色根文档候选（role-root-docs-display S2）：精确白名单/refs 追加/拒绝/Windows fail-closed ——————
+
+const ROOT_DOC_CANDIDATES = [
+ {path:'roles/A/feature-map.md',kind:'file' as const},
+ {path:'roles/A/functional-description.md',kind:'file' as const},
+ {path:'roles/A/api-spec.md',kind:'file' as const},
+];
+
+async function prepareWithRootDocs(){
+ const f=await prepare();
+ await fs.writeFile(path.join(f.root,'roles/A/feature-map.md'),'feature map body');
+ await fs.writeFile(path.join(f.root,'roles/A/functional-description.md'),'functional description body');
+ await fs.writeFile(path.join(f.root,'roles/A/api-spec.md'),'not-applicable');
+ return f;
+}
+
+test('B Service mints opaque refs only for exact role-root candidates and appends them after existing refs',async(t)=>{
+ const f=await prepareWithRootDocs();
+ try{
+  const candidates=[{...roles[0],rootDocs:ROOT_DOC_CANDIDATES}];
+  if(process.platform==='win32'){await assertWindowsFailClosed(f.root,process.platform,candidates);t.diagnostic('Windows B2 fail-closed asserted for role-root candidates; POSIX read assertions remain active on supported platforms.');return;}
+  const service=createProjectDocumentService();
+  try{
+   await service.grantNativeSelection(f.root);
+   const before=service.updateListing(service.beginListing(f.root),f.root,[roles[0]]);
+   const beforeRefs=before.documents.A.map(d=>({relativePath:d.relativePath,documentId:d.documentId}));
+   const view=service.updateListing(service.beginListing(f.root),f.root,candidates);
+   const refs=view.documents.A;
+   assert.deepEqual(refs.slice(0,beforeRefs.length).map(d=>d.relativePath),beforeRefs.map(r=>r.relativePath),'既有 card/changelog/docs refs 顺序前缀不变');
+   for(let i=0;i<beforeRefs.length;i++)assert.equal(refs[i].documentId,beforeRefs[i].documentId,'既有 documentId 在刷新后保持稳定');
+   assert.deepEqual(refs.slice(beforeRefs.length).map(d=>d.relativePath),ROOT_DOC_CANDIDATES.map(d=>d.path),'根文档 refs 按候选顺序追加在既有条目之后');
+   const rootRef=refs.find(d=>d.relativePath==='roles/A/api-spec.md')!;
+   assert.equal(rootRef.label,'api-spec.md');assert.equal(rootRef.format,'markdown');
+   const result=await service.read({version:1,projectViewId:rootRef.projectViewId,documentId:rootRef.documentId});
+   assert.ok(result.ok);if(result.ok){assert.equal(result.text,'not-applicable','api-spec 的 not-applicable 按普通文本读取，无特殊错误');assert.equal(result.byteLength,Buffer.byteLength('not-applicable'));}
+  }finally{service.dispose();}
+ }finally{await f.cleanup();}
+});
+
+test('B Service silently rejects non-whitelist role-root candidates, de-duplicates legal paths and rejects empty roleDir',async(t)=>{
+ const f=await prepare();
+ try{
+  const bad=[
+   {path:'roles/A/memo.md',kind:'file' as const},
+   {path:'roles/A/arbitrary.md',kind:'file' as const},
+   {path:'roles/A/feature-map.md',kind:'directory' as unknown as 'file'},
+   {path:'roles/A/../A/feature-map.md',kind:'file' as const},
+   {path:'roles/B/feature-map.md',kind:'file' as const},
+   {path:'roles/A/docs/feature-map.md',kind:'file' as const},
+   {path:'/roles/A/feature-map.md',kind:'file' as const},
+   {path:'roles/A/FEATURE-MAP.MD',kind:'file' as const},
+   {path:'roles\\A\\feature-map.md',kind:'file' as const},
+   {path:'roles/A/feature-map.md:x',kind:'file' as const},
+   {path:'roles//A/feature-map.md',kind:'file' as const},
+  ];
+  const candidates=[{...roles[0],docs:[],rootDocs:[...bad,{path:'roles/A/feature-map.md',kind:'file' as const},{path:'roles/A/feature-map.md',kind:'file' as const}]}];
+  if(process.platform==='win32'){await assertWindowsFailClosed(f.root,process.platform,candidates);t.diagnostic('Windows B2 fail-closed asserted for rejected role-root candidates; POSIX rejection assertions remain active on supported platforms.');return;}
+  const service=createProjectDocumentService();
+  try{
+   await service.grantNativeSelection(f.root);
+   const view=service.updateListing(service.beginListing(f.root),f.root,candidates);
+   assert.deepEqual(view.documents.A.map(d=>d.relativePath),['roles/A/role-card.md','roles/A/feature-map.md'],'只有精确白名单路径被铸造，重复候选去重为一条');
+  }finally{service.dispose();}
+  const noDir=createProjectDocumentService();
+  try{
+   await noDir.grantNativeSelection(f.root);
+   const view=noDir.updateListing(noDir.beginListing(f.root),f.root,[{...roles[0],roleId:'B',cardPath:'role-card.md',docs:[],rootDocs:[{path:'feature-map.md',kind:'file' as const}]}]);
+   assert.deepEqual(view.documents.B,[],'roleDir 为空时拒绝所有 rootDocs');
+  }finally{noDir.dispose();}
+ }finally{await f.cleanup();}
+});
+
+test('B Windows fail-closed: role-root candidates mint no refs and read no bytes on every host',async()=>{
+ const f=await fixture();
+ try{await assertWindowsFailClosed(f.root,'win32',[{...roles[0],rootDocs:ROOT_DOC_CANDIDATES}]);}finally{await f.cleanup();}
+});
+
+test('B Service role-root whitelist, de-duplication and ref ordering are platform-independent (injected reader)',async()=>{
+ let id=0;
+ const service=createProjectDocumentService({fileReader:{newId:()=>String(++id),resolveRoot:async root=>root,read:async()=>new Uint8Array(Buffer.from('not-applicable'))}});
+ try{
+  await service.grantNativeSelection('/proj');
+  const before=service.updateListing(service.beginListing('/proj'),'/proj',[roles[0]]);
+  const beforeIds=before.documents.A.map(d=>d.documentId);
+  const bad=[
+   {path:'roles/A/memo.md',kind:'file' as const},
+   {path:'roles/A/arbitrary.md',kind:'file' as const},
+   {path:'roles/A/../A/feature-map.md',kind:'file' as const},
+   {path:'roles/B/feature-map.md',kind:'file' as const},
+   {path:'roles/A/docs/feature-map.md',kind:'file' as const},
+   {path:'/roles/A/feature-map.md',kind:'file' as const},
+   {path:'roles/A/FEATURE-MAP.MD',kind:'file' as const},
+   {path:'roles\\A\\feature-map.md',kind:'file' as const},
+   {path:'roles/A/feature-map.md:x',kind:'file' as const},
+   {path:'roles//A/feature-map.md',kind:'file' as const},
+  ];
+  const view=service.updateListing(service.beginListing('/proj'),'/proj',[{...roles[0],rootDocs:[...bad,...ROOT_DOC_CANDIDATES,{path:'roles/A/feature-map.md',kind:'file' as const}]}]);
+  assert.deepEqual(view.documents.A.map(d=>d.relativePath),[
+   'roles/A/role-card.md','roles/A/changelog.md','roles/A/docs/report.md','roles/A/docs/plain.txt',
+   'roles/A/feature-map.md','roles/A/functional-description.md','roles/A/api-spec.md',
+  ],'非法候选被静默拒绝、重复去重、根文档追加在既有 card/changelog/docs refs 之后');
+  assert.deepEqual(view.documents.A.slice(0,beforeIds.length).map(d=>d.documentId),beforeIds,'既有 documentId 前缀保持稳定');
+  const apiRef=view.documents.A[view.documents.A.length-1];
+  assert.equal(apiRef.label,'api-spec.md');assert.equal(apiRef.format,'markdown');assert.equal(apiRef.relativePath.startsWith('roles/A/'),true);
+  const result=await service.read({version:1,projectViewId:apiRef.projectViewId,documentId:apiRef.documentId});
+  assert.ok(result.ok);if(result.ok)assert.equal(result.text,'not-applicable','not-applicable 按普通 UTF-8 文本读取');
+ }finally{service.dispose();}
+});
+
+test('B Service diagnostics record listing availability and rejected root candidates without content or paths',async()=>{
+ const {configureDiagnostics,flushDiagnostics,disposeDiagnostics}=await import('../../src/common/shared/diagnostics.ts');
+ const f=await fixture();const logsDir=await fs.mkdtemp(path.join(os.tmpdir(),'ans-doc-logs-'));
+ configureDiagnostics({directory:logsDir});
+ try{
+  let id=0;const ok=createProjectDocumentService({fileReader:{newId:()=>String(++id),resolveRoot:async root=>root,read:async()=>new Uint8Array([65])}});
+  try{
+   await ok.grantNativeSelection('/one');
+   ok.updateListing(ok.beginListing('/one'),'/one',[{...roles[0],rootDocs:[{path:'roles/A/memo.md',kind:'file' as const},{path:'roles/A/feature-map.md',kind:'file' as const}]}]);
+  }finally{ok.dispose();}
+  const unsupported=createProjectDocumentService({fileReader:{newId:()=>String(++id),resolveRoot:async()=>{throw new DocumentFileError('UNSUPPORTED_ENVIRONMENT');},read:async()=>{throw new Error('must not read');}}});
+  try{
+   await unsupported.grantNativeSelection('/one');
+   unsupported.updateListing(unsupported.beginListing('/one'),'/one',[{...roles[0],rootDocs:ROOT_DOC_CANDIDATES}]);
+  }finally{unsupported.dispose();}
+  await flushDiagnostics();
+  const files=await fs.readdir(logsDir);
+  const text=(await Promise.all(files.map(name=>fs.readFile(path.join(logsDir,name),'utf8')))).join('\n');
+  assert.match(text,/"event":"project-document\.listing\.unavailable"/);
+  assert.match(text,/"errorCode":"UNSUPPORTED_ENVIRONMENT"/);
+  assert.match(text,/"event":"project-document\.root\.skipped"/,'非法根文档候选应留数量诊断');
+  assert.equal(text.includes('roles/A'),false,'诊断不得写入候选/项目路径');
+  assert.equal(text.includes('not-applicable'),false,'诊断不得写入文档正文');
+ }finally{await disposeDiagnostics();await fs.rm(logsDir,{recursive:true,force:true});await f.cleanup();}
+});
+
+
 
 /** B2 deliberately does not enable native document reads on Windows. These are assertions, not skips. */
-async function assertWindowsFailClosed(root: string, platform = process.platform): Promise<void> {
+async function assertWindowsFailClosed(root: string, platform = process.platform, candidateRoles: readonly ProjectDocumentRoleCandidates[] = roles): Promise<void> {
  const file=path.join(root,'roles/A/docs/report.md');await fs.mkdir(path.dirname(file),{recursive:true});await fs.writeFile(file,'private fixture must not be returned');
  const before=await fs.readFile(file);const beforeStat=await fs.stat(file);let checkpoints=0,serviceReads=0;
  const provider=createProjectDocumentFileReader({platform,checkpoint:()=>{checkpoints++;}});
@@ -109,8 +245,8 @@ async function assertWindowsFailClosed(root: string, platform = process.platform
  await assert.rejects(provider.read(root,'roles/A/docs/report.md',PROJECT_DOCUMENT_MAX_BYTES),(e:unknown)=>e instanceof DocumentFileError&&e.code==='UNSUPPORTED_ENVIRONMENT');
  const service=createProjectDocumentService({fileReader:{...provider,async read(...args){serviceReads++;return provider.read(...args);}}});
  try{
-  const ungranted=service.updateListing(service.beginListing(root),root,roles);assert.equal(ungranted.documentReadUnavailable,'PROJECT_NOT_GRANTED');
-  await service.grantNativeSelection(root);const view=service.updateListing(service.beginListing(root),root,roles);
+  const ungranted=service.updateListing(service.beginListing(root),root,candidateRoles);assert.equal(ungranted.documentReadUnavailable,'PROJECT_NOT_GRANTED');
+  await service.grantNativeSelection(root);const view=service.updateListing(service.beginListing(root),root,candidateRoles);
   assert.equal(view.documentReadUnavailable,'UNSUPPORTED_ENVIRONMENT');assert.equal(view.documentScope,undefined);assert.ok(Object.values(view.documents).every(refs=>refs.length===0),'no refs are minted without platform support');
   const failure=await service.read({version:1,projectViewId:'never-issued',documentId:'never-issued'});assert.ok(!failure.ok);if(!failure.ok){assert.equal(failure.code,'UNSUPPORTED_ENVIRONMENT');assert.equal(Object.hasOwn(failure,'text'),false);}
   assert.equal(serviceReads,0,'the Service never attempts content IO without a granted readable scope');assert.equal(checkpoints,0,'Windows refuses before file-open/read checkpoints');assert.deepEqual(await fs.readFile(file),before);assert.equal((await fs.stat(file)).mtimeMs,beforeStat.mtimeMs);

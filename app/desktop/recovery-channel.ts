@@ -20,6 +20,7 @@
 
 import { createConfirmCardCore, type ConfirmCardMetadata } from "./confirm-card.ts";
 import type { RuntimeKind } from "../../src/common/shared/runtime-shared.ts";
+import { mainT } from "./i18n.ts";
 
 /** G-2 恢复动作集（V1 钉死三项；PM 已按提案采纳）。 */
 export const RECOVERY_ACTIONS = ["abort-turn", "rebuild-session", "redeliver"] as const;
@@ -90,7 +91,7 @@ export function createRecoveryConfirmPresenter(opts: CreateRecoveryConfirmPresen
     eventPrefix: "recovery-confirm",
     component: "desktop.recovery-confirm",
     present: opts.present,
-    expiredResponse: "此恢复确认已失效（应用关闭或会话已重建），**未获执行**——可让 su 重新提议。",
+    expiredResponse: mainT("main.recovery.expired"),
     onExpired: (payload) => {
       opts.onExpired?.({
         id: payload.id,

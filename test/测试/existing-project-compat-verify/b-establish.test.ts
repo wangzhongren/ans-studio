@@ -48,6 +48,7 @@ import {
 } from "../../../src/service/boundary/resolve-boundary.ts";
 import type { BoundarySection1 } from "../../../src/model/boundary.ts";
 import { governanceActionFor, governanceFailureView } from "../../../app/renderer/src/chat/governance-view.ts";
+import { translate } from "../../../src/common/shared/i18n/index.ts";
 
 /** 5B：旧 ui-labels.js 已删除；映射到新渲染器 governance-view 纯逻辑。 */
 async function loadUiLabels(): Promise<Record<string, Function>> {
@@ -185,11 +186,28 @@ test("B4 V5：预览零写入；取消不调 IPC（渲染源码级守卫）；pr
     assert.equal(UL.canEstablishGovernance(true, false, "missing"), false);
     assert.equal(UL.canEstablishGovernance(false, true, "missing"), false);
 
-    // 取消：新渲染器只经 governance-store cancel（不直接调 IPC），提示文案保留。
+    // 取消：新渲染器只经 governance-store cancel（不直接调 IPC）。
+    // B1（2026-10-23 i18n）：提示文案已从源码中文字面量迁到共享目录 key
+    // `ui.governanceStore.cancelled`；源码守卫改为匹配 **keyed translate 调用**（不是自由文本），
+    // 旧中文由共享目录 zh-CN 逐字断言保留，守卫强度不降。
     const panel = fs.readFileSync(new URL("../../../app/renderer/src/shell/GovernancePanel.tsx", import.meta.url), "utf8");
     assert.match(panel, /cancelPreview/);
     const store = fs.readFileSync(new URL("../../../app/renderer/src/stores/governance-store.ts", import.meta.url), "utf8");
-    assert.match(store, /已取消，未写入任何文件/);
+    assert.match(
+      store,
+      /cancel:\s*\(\)\s*=>\s*\{[\s\S]{0,400}?translate\(\s*currentLocale\(\s*\)\s*,\s*"ui\.governanceStore\.cancelled"\s*\)/,
+      "cancel 路径须经 keyed translate 取词（ui.governanceStore.cancelled）",
+    );
+    assert.equal(
+      store.includes("已取消，未写入任何文件"),
+      false,
+      "governance-store 不再内嵌旧中文字面量（文案单一来源＝共享目录）",
+    );
+    assert.equal(
+      translate("zh-CN", "ui.governanceStore.cancelled"),
+      "已取消，未写入任何文件。",
+      "共享目录 zh-CN 仍为迁移前文案（逐字）",
+    );
     assert.equal(/cancel:[\s\S]{0,200}?bridge\./.test(store), false, "cancel 不直接调用 IPC");
   } finally {
     fx.cleanup();

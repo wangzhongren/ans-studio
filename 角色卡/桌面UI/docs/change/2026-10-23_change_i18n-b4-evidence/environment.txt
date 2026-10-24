@@ -1,0 +1,7 @@
+date: 2026-10-23T16:31:42+08:00
+cwd: /c/Users/51054/Desktop/work/ans-studio
+node: v24.22.1
+npm: 11.19.1
+os: MINGW64_NT-10.0-26300 3.6.10-710e5275.x86_64 x86_64
+git HEAD: ee59296545ce9c6ac7cae7693dfc2138b9f5e6d1
+git branch: main

@@ -8,11 +8,12 @@
 // 边界纪律：本文件**不**做任何"路径能不能写"的判断——那永远是门禁引擎 resolveWrite 的事。
 
 import path from "node:path";
-import { readdir, readFile, stat } from "node:fs/promises";
+import { lstat, readdir, readFile, stat } from "node:fs/promises";
 
 import type { Acceptance, PinEntry, PinEvidenceFile, PinEvidenceResult } from "../../src/model/boundary.ts";
 import type { ProjectConfig, RoleLocation } from "../../src/model/role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
+import { ROLE_ROOT_DOC_FILENAMES, type RoleRootDocName } from "../../src/model/project-document.ts";
 // 只读 pin 证据检查：**唯一实现**在门禁引擎私有 `src/common/门禁引擎/pin-evidence.ts`，跨角色只可经
 // Service 公开出口 `src/service/boundary/resolve-boundary.ts` 消费（PM 评审 §5.1/§7）。
 import { inspectPinnedBoundaries } from "../../src/service/boundary/resolve-boundary.ts";
@@ -20,8 +21,13 @@ import { inspectPinnedBoundaries } from "../../src/service/boundary/resolve-boun
 import type { LoadConfigOptions, LoadedConfig } from "../../src/common/shared/config-loader.ts";
 // 跨角色共享运行时原语（**单一来源**，pm 属主 `src/common/shared/`）：仅取 `resolveSkillRoot`。
 import { resolveSkillRoot } from "../../src/common/shared/runtime-shared.ts";
-// 跨角色共享路径原语（**单一来源**，pm 属主 `src/common/shared/`）：仅取 `toPosix`。
-import { toPosix } from "../../src/common/shared/path-primitives.ts";
+// 跨角色共享路径原语（**单一来源**，pm 属主 `src/common/shared/`）：仅取 `toPosix`/词法校验原语。
+import { isAbsoluteAny, normalizeLexical, toPosix } from "../../src/common/shared/path-primitives.ts";
+// 共享诊断 logger（**单一来源**，pm 属主 `src/common/shared/`）：未配置时为空操作；只记元数据。
+import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
+import { mainT } from "./i18n.ts";
+
+const docsDiagnostic = createDiagnosticLogger({ component: "desktop.project" });
 
 /**
  * 技能根解析：优先 ANS_SKILL_ROOT，否则默认技能目录 `~/.claude/skills/ans-governed-construction`。
@@ -223,11 +229,17 @@ export interface GovernanceRecordStatus {
 }
 
 /** `ans-invalid` 且载入器未给降级原因时的等价原因（载入器实际恒给，纯函数仍显式兜底）。 */
-const GOVERNANCE_INVALID_REASON = "治理记录不可用（.ans/project.json 不可解析或结构无效）";
+function governanceInvalidReason(): string {
+  return mainT("main.project.governanceInvalid");
+}
 /** `ans` 且 accepted 不为 true、载入器未给降级原因时的等价原因。 */
-const GOVERNANCE_UNACCEPTED_REASON = "治理记录未接受（accepted 不为 true）";
+function governanceUnacceptedReason(): string {
+  return mainT("main.project.governanceUnaccepted");
+}
 /** `ans` 且 accepted 但治理边界路径为空时的等价原因。 */
-const GOVERNANCE_PATH_EMPTY_REASON = "治理记录缺少治理边界路径（governanceBoundary.path 为空）";
+function governancePathEmptyReason(): string {
+  return mainT("main.project.governancePathEmpty");
+}
 
 /**
  * 由载入器结果事实派生 `governanceRecord` 状态（纯函数，便于单测）。
@@ -249,15 +261,15 @@ export function deriveGovernanceRecord(input: {
 
   // `.ans` 存在但不可解析/不可用：invalid，原因如实取载入器降级文本。
   if (source.kind === "ans-invalid") {
-    return { state: "invalid", reason: source.downgradeReason ?? GOVERNANCE_INVALID_REASON };
+    return { state: "invalid", reason: source.downgradeReason ?? governanceInvalidReason() };
   }
 
   // kind === "ans"：记录在盘上，但结构可用性还要看 accepted 与治理边界路径。
   if (source.acceptance.accepted !== true) {
-    return { state: "invalid", reason: source.downgradeReason ?? GOVERNANCE_UNACCEPTED_REASON };
+    return { state: "invalid", reason: source.downgradeReason ?? governanceUnacceptedReason() };
   }
   if (governanceBoundaryPath.trim() === "") {
-    return { state: "invalid", reason: GOVERNANCE_PATH_EMPTY_REASON };
+    return { state: "invalid", reason: governancePathEmptyReason() };
   }
   return { state: "present" };
 }
@@ -276,7 +288,7 @@ export function applyPinEvidence(
 ): GovernanceRecordStatus {
   if (record.state !== "present") return record;
   if (evidence.state === "invalid") {
-    return { state: "invalid", reason: evidence.reason ?? "pin 证据检查失败" };
+    return { state: "invalid", reason: evidence.reason ?? mainT("main.project.pinCheckFailed") };
   }
   if (evidence.state === "mismatch") {
     return { state: "pin-mismatch", pinFiles: evidence.files, pinCount: evidence.checked };
@@ -306,7 +318,7 @@ export async function deriveGovernanceRecordWithPins(input: {
   if (input.record.state !== "present") return input.record;
   try {
     if (!Array.isArray(input.pins) || input.pins.length === 0) {
-      return { state: "invalid", reason: "治理记录未提供可验证 pin" };
+      return { state: "invalid", reason: mainT("main.project.pinMissing") };
     }
     const inspect = input.inspectPinnedBoundariesFn ?? inspectPinnedBoundaries;
     const governanceBoundaryPath = input.governanceBoundaryPath ?? "";
@@ -318,7 +330,7 @@ export async function deriveGovernanceRecordWithPins(input: {
     return applyPinEvidence(input.record, evidence);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { state: "invalid", reason: `pin 证据检查失败：${message}` };
+    return { state: "invalid", reason: mainT("main.interface.pinCheckFailed", { detail: message }) };
   }
 }
 
@@ -328,11 +340,22 @@ export interface DocsIndexEntry {
   kind: "file" | "directory";
 }
 
+/** 角色根目录下的白名单文档条目（仅元数据；正文只经受限文档 Service/Provider 读取）。 */
+export interface RoleRootDocEntry {
+  /** 规范文件名，来自 Model 唯一白名单 `ROLE_ROOT_DOC_FILENAMES`。 */
+  name: RoleRootDocName;
+  /** 项目相对路径（如 `角色卡/编排/feature-map.md`），用于与 opaque ref.relativePath 精确匹配。 */
+  path: string;
+  kind: "file";
+}
+
 export interface RoleDocsIndex {
   /** 变更记录：changelog.md 是否存在及正文（不存在为 null）。 */
   changelog: { path: string; text: string } | null;
   /** docs/ 目录索引（相对角色目录的路径 + 类型）。 */
   docs: DocsIndexEntry[];
+  /** 角色根文档：固定白名单顺序，仅实际存在的直接普通文件；永不包含 memo.md。 */
+  rootDocs: RoleRootDocEntry[];
 }
 
 const MAX_DOC_ENTRIES = 500;
@@ -361,17 +384,74 @@ async function walkDir(absDir: string, relPrefix: string, out: DocsIndexEntry[])
 }
 
 /**
- * 读取某角色的变更记录与 docs/ 目录索引。
+ * 读取某角色的变更记录、docs/ 目录索引与角色根文档元数据。
  * 输入 cardPathRel 为角色卡项目相对路径（如 角色卡/编排/role-card.md）；角色目录取其父目录。
+ *
+ * 根文档只按 Model 白名单逐个 `lstat` 三个精确文件名，不扫描角色根目录、不读取正文、不触碰 memo.md；
+ * 角色目录非法/非目录/符号链接时返回空索引。`docs/` 与 `changelog` 的既有读取逻辑保持不变。
  */
 export async function readRoleDocsIndex(
   projectRoot: string,
   cardPathRel: string,
 ): Promise<RoleDocsIndex> {
+  const empty = (): RoleDocsIndex => ({ changelog: null, docs: [], rootDocs: [] });
   const roleDirRel = posixDirname(cardPathRel);
-  const roleDirAbs = path.join(projectRoot, ...roleDirRel.split("/").filter(Boolean));
+  // 与 Service/设计 §5.3.1 同口径的词法校验：空、绝对路径、反斜杠、盘符/冒号、空段、`.`/`..` 一律拒绝。
+  // 注意：`posixDirname` 会先经 `toPosix` 归一化反斜杠，故原始 cardPath 的反斜杠/NUL 必须单独拒绝。
+  const roleDirValid =
+    !!roleDirRel &&
+    !cardPathRel.includes("\\") &&
+    !cardPathRel.includes("\0") &&
+    !isAbsoluteAny(roleDirRel) &&
+    !roleDirRel.includes("\\") &&
+    !roleDirRel.includes(":") &&
+    !roleDirRel.includes("\0") &&
+    normalizeLexical(roleDirRel) === roleDirRel &&
+    roleDirRel.split("/").every((part) => !!part && part !== "." && part !== "..");
+  if (!roleDirValid) {
+    docsDiagnostic.record("role-docs.index.skipped", { reasonCode: "invalid-card-path" });
+    return empty();
+  }
+  const roleDirAbs = path.join(projectRoot, ...roleDirRel.split("/"));
 
-  // changelog.md
+  // 角色目录本身：只接受非符号链接的目录；否则不越界、不读取、不伪造。
+  try {
+    const s = await lstat(roleDirAbs);
+    if (!s.isDirectory() || s.isSymbolicLink()) {
+      docsDiagnostic.record("role-docs.index.skipped", {
+        reasonCode: s.isSymbolicLink() ? "role-dir-symlink" : "role-dir-not-directory",
+      });
+      return empty();
+    }
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    docsDiagnostic.record("role-docs.index.skipped", { reasonCode: code === "ENOENT" ? "role-dir-missing" : "role-dir-inspect-failed" });
+    return empty();
+  }
+
+  // 角色根文档：只 lstat 白名单三个精确文件名，不 readdir 根目录、不读正文、不 lstat memo.md。
+  // 三个检查与既有 changelog/docs 读取并行启动（顺序由 Promise.all 保持），避免给 listProject 增加串行延迟。
+  const rootChecks = ROLE_ROOT_DOC_FILENAMES.map(async (name): Promise<RoleRootDocEntry | null> => {
+    try {
+      const s = await lstat(path.join(roleDirAbs, name));
+      if (s.isFile() && !s.isSymbolicLink()) {
+        return { name, path: `${roleDirRel}/${name}`, kind: "file" };
+      }
+      docsDiagnostic.record("role-docs.root.skipped", {
+        reasonCode: s.isSymbolicLink() ? "symlink" : "not-regular-file",
+        path: name,
+      });
+      return null;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "ENOENT") {
+        docsDiagnostic.record("role-docs.root.inspect-failed", { reasonCode: "inspect-failed", path: name });
+      }
+      return null;
+    }
+  });
+
+  // changelog.md（既有逻辑保持：存在则读正文）
   let changelog: RoleDocsIndex["changelog"] = null;
   const changelogRel = `${roleDirRel}/changelog.md`;
   try {
@@ -384,7 +464,7 @@ export async function readRoleDocsIndex(
     changelog = null;
   }
 
-  // docs/ 目录索引
+  // docs/ 目录索引（既有遍历/排序/上限/隐藏文件跳过不变）
   const docs: DocsIndexEntry[] = [];
   const docsAbs = path.join(roleDirAbs, "docs");
   try {
@@ -394,7 +474,9 @@ export async function readRoleDocsIndex(
     // 无 docs 目录：返回空索引。
   }
 
-  return { changelog, docs };
+  const rootDocs = (await Promise.all(rootChecks)).filter((d): d is RoleRootDocEntry => d !== null);
+  docsDiagnostic.record("role-docs.index", { count: rootDocs.length, ok: true });
+  return { changelog, docs, rootDocs };
 }
 
 
@@ -402,7 +484,9 @@ export async function readRoleDocsIndex(
 export function projectDocumentCandidates(role: {
   roleId: string; builtIn: boolean; cardPath: string;
   changelog: { path: string; text: string } | null; docs: DocsIndexEntry[];
+  rootDocs?: readonly RoleRootDocEntry[];
 }): import("../../src/model/project-document.ts").ProjectDocumentRoleCandidates {
   return { roleId: role.roleId, builtIn: role.builtIn, cardPath: role.cardPath,
-    ...(role.changelog ? { changelogPath: role.changelog.path } : {}), docs: role.docs };
+    ...(role.changelog ? { changelogPath: role.changelog.path } : {}), docs: role.docs,
+    ...(role.rootDocs ? { rootDocs: role.rootDocs.map((d) => ({ path: d.path, kind: d.kind })) } : {}) };
 }

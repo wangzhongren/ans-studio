@@ -1,0 +1,28 @@
+# S6 post-run worktree check (2026-10-23, after tests/Electron/probe/build)
+## app/renderer/dist status (build output; expect ignored/untracked-not-candidate)
+ignored? .gitignore:9:app/renderer/dist/	app/renderer/dist/index.html
+
+## .ans / session artifacts status (expect ignored/untracked, not candidate)
+
+## candidate/product/test status after runs (expect same 17)
+17
+ M app/desktop/interface.ts
+ M app/desktop/project.ts
+ M app/renderer/src/chat/types.ts
+ M app/renderer/src/shell/ProfilePanel.tsx
+ M app/renderer/src/shell/phase4a.css
+ M app/renderer/src/stores/drawer-store.ts
+ M src/common/shared/i18n/messages/en-US.ts
+ M src/common/shared/i18n/messages/zh-CN.ts
+ M src/model/project-document.ts
+ M src/service/project-document/impl/read-project-document.ts
+ M test/桌面UI/phase4a-electron-smoke.mjs
+ M test/桌面应用/interface.test.ts
+ M test/桌面应用/project-document.test.ts
+ M test/桌面应用/project.test.ts
+ M test/项目管理/shared/i18n.test.ts
+?? app/renderer/src/chat/profile-docs.ts
+?? test/桌面UI/profile-docs.test.ts
+
+## protected paths after runs (expect empty)
+(end)

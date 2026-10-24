@@ -1,0 +1,31 @@
+# Ownership coverage preflight for team-plan §3 write-set (read-only)
+recorded_local=2026-10-23 18:58:03 +0800
+
+-- desktop interface.test.ts (md)
+29:| 单文件 | `test/桌面应用/interface.test.ts` | 主进程侧测试：Interface 处理器 |
+-- desktop operator-wiring.test.ts (md)
+32:| 单文件 | `test/桌面应用/operator-wiring.test.ts` | 主进程侧测试：交互通道与锚点键 |
+-- desktop e2e main.mjs (md)
+41:| 单文件 | `test/桌面应用/e2e/main.mjs` | 桌面端到端总自检台（真实 Electron） |
+-- orchestration pipeline flow-state (md)
+12:| 单文件 | `src/pipeline/orchestration/flow-state.ts` | 流程状态 YAML 契约的 Pipeline 公共出口（桌面自动验收门消费；实现同源于 src/common/编排/flow-state.ts） |
+-- orchestration test dir (md)
+14:| 目录（测试） | `test/编排/` | 本角色的单元与层契约测试及夹具 |
+-- orchestration private dir (md)
+12:| 单文件 | `src/pipeline/orchestration/flow-state.ts` | 流程状态 YAML 契约的 Pipeline 公共出口（桌面自动验收门消费；实现同源于 src/common/编排/flow-state.ts） |
+13:| 目录（私有） | `src/common/编排/` | 本角色私有辅助代码 |
+-- runtime-core tools.ts (md)
+11:| 单文件 | `src/provider/runtime/tools.ts` | 公共受治理工具执行 |
+-- runtime-core test dir (md)
+15:| 目录 | `test/runtime-core/` | 本角色单元测试与契约夹具 |
+-- PM shared dir (md)
+7:| 目录（私有） | `src/common/shared/` | 跨角色共享组件 |
+-- PM shared test dir (md)
+8:| 目录（测试） | `test/项目管理/shared/` | 共享组件的单元测试与夹具 |
+-- testing test dir (yaml)
+7:    path: test/测试/
+
+## Conclusion (read-only preflight)
+- team-plan §6.2 condition: desktop acceptance-dispatch.test.ts entry present in both md and yaml => condition satisfied at this baseline.
+- app/main.ts is listed under desktop window boundary (md line 9 / yaml line 9) and absent from assembly boundary => matches team-plan role-label correction.
+- No boundary/card text was modified by this testing role.

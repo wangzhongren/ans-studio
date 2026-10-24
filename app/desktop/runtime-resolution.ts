@@ -24,6 +24,7 @@ import { atomicWrite } from "../../src/common/shared/atomic-write.ts";
 import type { EnvTarget } from "../../src/common/shared/env-file.ts";
 import type { RuntimeKind } from "../../src/common/shared/runtime-shared.ts";
 import { getRuntimeConfig } from "./runtime-config.ts";
+import type { MainTranslate } from "./i18n.ts";
 
 /** 自动派发只考虑真实引擎；`demo` 是聊天演示引擎，不参与自动验收/冷启动派发。 */
 export const AUTO_RUNTIME_CANDIDATES = ["pi", "codex", "claude"] as const;
@@ -51,7 +52,7 @@ export interface RuntimeResolutionSuccess {
 
 export interface RuntimeResolutionFailure {
   ok: false;
-  message: typeof RUNTIME_UNRESOLVED_MESSAGE;
+  message: string;
   skipped: RuntimeCandidateSkip[];
 }
 
@@ -73,6 +74,11 @@ export interface ResolveProjectRuntimeInput extends RuntimeResolutionRequest {
   envPath: string;
   /** 环境目标（缺省 `process.env`；测试注入假对象以隔离真实进程环境）。 */
   env?: EnvTarget;
+  /**
+   * 主进程 translator（B3，可选）：传入时失败文案按当前 locale 生成；**不传**保持既有
+   * `RUNTIME_UNRESOLVED_MESSAGE`（旧测试与既有调用逐字不变）。
+   */
+  t?: MainTranslate;
 }
 
 export function isAutoRuntimeKind(value: unknown): value is AutoRuntimeKind {
@@ -303,5 +309,5 @@ export async function resolveProjectRuntime(input: ResolveProjectRuntimeInput): 
     skipped.push({ runtime, reason: "missing-credentials" });
   }
   // 5. 仍无法确定：明确失败（不派发、不循环重试）。
-  return { ok: false, message: RUNTIME_UNRESOLVED_MESSAGE, skipped };
+  return { ok: false, message: input.t !== undefined ? input.t("main.runtimeResolution.noRuntime") : RUNTIME_UNRESOLVED_MESSAGE, skipped };
 }

@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 
 import { resolveRuntimeTimeouts } from "../../../src/common/runtime-core/timeout.ts";
 import { RUNTIME_SETTINGS } from "../../../src/common/shared/runtime-settings.ts";
+import { translate } from "../../../src/common/shared/i18n/index.ts";
 import { PI_PANEL_KEYS } from "../../../app/desktop/pi-config.ts";
 import { BUILT_IN_ROLE_CARD_TEXT } from "../../../src/common/门禁引擎/boundary-core.ts";
 import { SessionManager } from "../../../app/desktop/session.ts";
@@ -80,12 +81,18 @@ test("C1 三运行时默认时限：检查 300000、兜底 3600000、构造 1200
   assert.equal(resolveRuntimeTimeouts("pi", {}, { ANS_PI_PROMPT_TIMEOUT_MS: "bogus" }).promptTimeoutMs, 300_000);
 });
 
-test("C2 设置元数据：label/档位/默认标签/help 逐字；1 小时兜底不暴露", () => {
+test("C2 设置元数据：labelKey/档位/默认标签/helpKey 经目录解析逐字；1 小时兜底不暴露", () => {
   const field = RUNTIME_SETTINGS.pi.fields.find((f) => f.key === "ANS_PI_PROMPT_TIMEOUT_MS");
   assert.ok(field, "Pi 面板须有 ANS_PI_PROMPT_TIMEOUT_MS 字段");
-  assert.equal(field!.label, "看护检查时限");
+  // B4（2026-10-23）：共享元数据只保存目录 key；经 shared `translate` 解析回迁移前 zh-CN 文案（逐字保留）。
+  assert.equal(translate("zh-CN", field!.labelKey), "看护检查时限");
+  assert.equal("label" in field!, false, "B4：元数据不再携带 label 字面量");
   assert.deepEqual(field!.choices, ["", "60000", "120000", "300000", "600000", "900000", "1800000"]);
-  assert.deepEqual(field!.choiceLabels, [
+  assert.ok(
+    field!.choiceLabelKeys !== undefined && field!.choiceLabelKeys.length === field!.choices!.length,
+    "B4：choiceLabelKeys 在场且与 choices 等长",
+  );
+  assert.deepEqual(field!.choiceLabelKeys!.map((key) => translate("zh-CN", key)), [
     "系统默认（5 分钟）",
     "1 分钟",
     "2 分钟",
@@ -96,9 +103,15 @@ test("C2 设置元数据：label/档位/默认标签/help 逐字；1 小时兜�
   ]);
   assert.equal(field!.control, "range");
   assert.deepEqual(field!.integer, { min: 1000 });
+  // en-US 最小断言：同一批 key 在英文目录可解析（标签/默认档）。
+  assert.equal(translate("en-US", field!.labelKey), "Watchdog check limit");
+  assert.equal(translate("en-US", field!.choiceLabelKeys![0]), "System default (5 min)");
   // 评审 §3.3 的核心语义必须齐备（help 原文与评审的逐字差异见报告「偏差」节）：
+  assert.ok(field!.helpKey, "B4：helpKey 在场");
+  assert.equal("help" in field!, false, "B4：元数据不再携带 help 字面量");
+  const help = translate("zh-CN", field!.helpKey!);
   for (const must of ["不中止本轮", "仍在推进则不动作", "1 小时为最后兜底", "留空＝系统默认（5 分钟）", "下一次开启会话时应用"]) {
-    assert.ok((field!.help ?? "").includes(must), `help 须含：${must}`);
+    assert.ok(help.includes(must), `help 须含：${must}`);
   }
   // 1 小时兜底不暴露：无同名设置字段、面板里也没有。
   assert.equal(

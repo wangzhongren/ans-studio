@@ -1,0 +1,119 @@
+== Fri Oct 23 11:38:27     2026 after hashes ==
+src/model/runtime.ts	blob=c50e1f44dab21d035b1a8e296f0e3749e470b9b0	sha256=ca6c0f09e65e4b1a4bdcae00144e13e0c313c025dfc0ec0f0ad102e0f57492f3
+test/runtime-core/governance-flow-metadata.test.ts	blob=d1e1ca2c66a363cdab8a9f1bebf12b6d768e2f78	sha256=9253e55945bfdb1cc2c120ab2e8d73bb67415b6afe39e438f56e9fb0208200f1
+角色卡/运行时核心/api-spec.md	blob=fd5738b0697ee1b80e2ff441afa24d82f127b949	sha256=f37801e8e4f18b74f2a18b6bdf0eebea5aa51d3fa309f5c0396370b34fcd3609
+角色卡/运行时核心/memo.md	blob=a0d829ee618905b082c761e4cb6dfbd57048fb42	sha256=09667506c6390e8e3f041ae1f7c44d0c74c4daf72b7f606522936a9427aff8bc
+
+== git status --short (runtime-core-related only) ==
+ M src/model/runtime.ts
+ M test/runtime-core/governance-flow-metadata.test.ts
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/memo.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/docs/change/2026-10-23_change_directory-ownership-evidence/"
+
+== git diff --stat (runtime-core-related only) ==
+ src/model/runtime.ts                               | 14 ++++--
+ test/runtime-core/governance-flow-metadata.test.ts | 50 ++++++++++++++++++++++
+ .../api-spec.md"                                   |  6 +++
+ .../memo.md"                                       |  2 +
+ 4 files changed, 69 insertions(+), 3 deletions(-)
+
+== git diff --name-only (runtime-core-related only) ==
+src/model/runtime.ts
+test/runtime-core/governance-flow-metadata.test.ts
+"\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/api-spec.md"
+"\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/memo.md"
+
+== unified diff of model + test ==
+diff --git a/src/model/runtime.ts b/src/model/runtime.ts
+index 4b96ae9..c50e1f4 100644
+--- a/src/model/runtime.ts
++++ b/src/model/runtime.ts
+@@ -1365,15 +1365,23 @@ export interface GovernanceJudgeFacts {
+    */
+   teamPlanConfirmed?: boolean;
+   /**
+-   * 团队计划 schema 版本（2026-10-22 角色粒度/MapReduce；方案 §5.1：`1` = legacy 缺省、`2` = 本方案）。
+-   * 可选；缺失＝应用未提供/未解析，不得据此假定 v2。物证仍沿用 `artifacts.teamPlanPath`，不新增 artifact kind。
++   * 团队计划 schema 版本（2026-10-22 角色粒度/MapReduce；2026-10-23 目录级授权 v3）。
++   * `1` = legacy 缺省、`2` = 角色粒度/MapReduce v2、`3` = 目录级授权 v3（v2 字段 + 授权目录/目录规范）。
++   * 可选；缺失＝应用未提供/未解析，不得据此假定任何版本（尤其不得假定 v3）。
++   * 物证仍沿用 `artifacts.teamPlanPath`，不新增 artifact kind。
+    */
+-  teamPlanSchema?: 1 | 2;
++  teamPlanSchema?: 1 | 2 | 3;
+   /**
+    * 团队计划模块 id 摘要（有界、去重；供 prompt/审计）。可选；缺失＝应用未提供。
+    * 只是机器摘要，**不**代表应用已做粒度语义判断（语义复核仍在 Convener readiness）。
+    */
+   teamPlanModules?: string[];
++  /**
++   * 团队计划授权目录摘要（v3；有界、去重；只作 judge 事实摘要，供 prompt/审计）。可选；缺失＝应用未提供，
++   * 不得据此假定 v3（v1/v2 计划通常无目录列）。长度/内容由生产方（编排）裁剪；目录是否合规仍由
++   * V-D/V12/布局核对与 readiness 判定，本字段不构成写权、授权或语义结论。
++   */
++  teamPlanDirectories?: string[];
+ }
+ 
+ // —————————————— 会话级后台任务（2026-10-22 客户确认设计 B1–B4） ——————————————
+diff --git a/test/runtime-core/governance-flow-metadata.test.ts b/test/runtime-core/governance-flow-metadata.test.ts
+index 1ba4b62..d1e1ca2 100644
+--- a/test/runtime-core/governance-flow-metadata.test.ts
++++ b/test/runtime-core/governance-flow-metadata.test.ts
+@@ -196,6 +196,56 @@ test("2026-10-22：judge facts 可选团队计划 schema/模块摘要；物证
+   assert.deepEqual(Object.keys(artifacts), ["teamPlanPath"], "团队计划沿用 teamPlanPath，不新增 artifact kind");
+ });
+ 
++test("2026-10-23 目录级授权：judge facts 接受 schema 1/2/3 与有界目录摘要；缺失不假定 v3；旧字段/枚举不变", () => {
++  const baseFacts = {
++    governanceModel: "trio" as const,
++    flowId: "flow-alpha",
++    ledgerErrors: 0,
++    unresolvedClarificationCount: 0,
++    latestDecisionKinds: [] as string[],
++  };
++  const legacyFacts: GovernanceJudgeFacts = { ...baseFacts };
++  const factsV1 = { ...baseFacts, teamPlanSchema: 1 } satisfies GovernanceJudgeFacts;
++  const factsV2 = {
++    ...baseFacts,
++    teamPlanSchema: 2,
++    teamPlanModules: ["checkout-api", "checkout-web"],
++  } satisfies GovernanceJudgeFacts;
++  const factsV3 = {
++    ...baseFacts,
++    teamPlanSchema: 3,
++    teamPlanModules: ["checkout-api"],
++    teamPlanDirectories: ["src/checkout/api/", "test/checkout/api/"],
++  } satisfies GovernanceJudgeFacts;
++  // 未知 schema 版本必须在类型层被拒绝（由 tsc 校验 @ts-expect-error；应用不会产生该值）。
++  // @ts-expect-error teamPlanSchema 仅接受 1 | 2 | 3
++  const rejectedSchema: GovernanceJudgeFacts = { ...baseFacts, teamPlanSchema: 4 };
++
++  assert.equal(factsV1.teamPlanSchema, 1);
++  assert.equal(factsV2.teamPlanSchema, 2);
++  assert.equal(factsV3.teamPlanSchema, 3, "v3 值可原样传入 judge facts（不伪装成 v2）");
++  assert.deepEqual(factsV3.teamPlanDirectories, ["src/checkout/api/", "test/checkout/api/"]);
++  assert.equal(Object.hasOwn(legacyFacts, "teamPlanSchema"), false, "缺失＝未提供，不凭空造值");
++  assert.equal(Object.hasOwn(legacyFacts, "teamPlanDirectories"), false, "缺失＝未提供，不凭空造值");
++  assert.equal(legacyFacts.teamPlanSchema, undefined, "缺失不得假定 v3");
++  assert.equal(legacyFacts.teamPlanDirectories, undefined, "缺失不得假定应用提供了目录摘要");
++  assert.equal(Object.hasOwn(factsV2, "teamPlanDirectories"), false, "v2 facts 不凭空出现目录摘要");
++  assert.equal(rejectedSchema.teamPlanSchema, 4, "运行期值仅用于证明类型拒绝；应用不构造该值");
++
++  // 物证仍沿用 teamPlanPath；v3 不新增 artifact kind。
++  const artifacts = {
++    teamPlanPath: "docs/scheduling/flow-alpha-team-v3.md",
++  } satisfies NonNullable<GovernanceJudgeRequest["artifacts"]>;
++  const contextArtifacts = { ...artifacts } satisfies NonNullable<GovernanceJudgeContext["artifacts"]>;
++  assert.deepEqual(artifacts, contextArtifacts, "Request/Context artifacts 同形");
++  assert.deepEqual(Object.keys(artifacts), ["teamPlanPath"], "v3 沿用 teamPlanPath，不新增 artifact kind");
++
++  // 旧枚举值零变化（本次只扩可选字段，不改 kind/power/decision 枚举）。
++  const stepKinds = ["proposal", "nomination", "dispatch", "acceptance"] as const satisfies readonly GovernanceStepKind[];
++  assert.deepEqual([...stepKinds], ["proposal", "nomination", "dispatch", "acceptance"]);
++  assert.deepEqual([...FLOW_TOOL_STEP_KINDS], ["dispatch", "customer-decision", "artifact", "acceptance"]);
++});
++
+ test("request_choice：flowId/stepId/cardKind 原样进入卡片请求与回调 metadata；缺席时保持旧形状", async () => {
+   let request!: CustomerInputRequest;
+   let metadata!: CustomerInputMetadata;

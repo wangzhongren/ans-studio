@@ -1,0 +1,4 @@
+# command: node_modules/.bin/electron --user-data-dir=<fresh temp> test/桌面应用/e2e/main.mjs
+# started: 2026-10-23T17:33:15+0800
+# userData: /c/Users/51054/AppData/Local/Temp/ans-e2e-final-userdata-ilDStt
+# outdir: C:/Users/51054/Desktop/work/ans-studio/角色卡/测试/docs/change/2026-10-23-i18n-integration-evidence/rerun-final/e2e-main-fresh-2

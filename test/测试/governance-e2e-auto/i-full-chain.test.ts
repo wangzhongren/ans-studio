@@ -15,6 +15,13 @@ import { readFileSync } from "node:fs";
 
 import type { ToolCall } from "../../../src/model/runtime.ts";
 import {
+  checkDirectoryLayout,
+  layoutCheckPassed,
+  parseTeamPlan,
+  teamPlanIssueMessages,
+} from "../../../src/pipeline/orchestration/run-role.ts";
+import { parseFlowStateYaml } from "../../../src/pipeline/orchestration/flow-state.ts";
+import {
   CHANGE_PACKAGE_REL,
   CRITERIA_REL,
   FLOW,
@@ -37,33 +44,50 @@ import {
   roleBoundaryDoc,
   roleCardDoc,
   roleWorkDocs,
+  seedLedger,
   seedTrioProject,
   teamPlanDoc,
   teamPlanV2Doc,
+  teamPlanV3Doc,
+  v3CanonicalParts,
   write,
   type ScriptContext,
   type TeamPlanV2RoleInput,
 } from "./fixture.ts";
+import type { DesktopDeps } from "../../../app/desktop/interface.ts";
 
 const ROLE_CARD_REL = "角色卡/executor/role-card.md";
 const ROLE_BOUNDARY_REL = "角色卡/executor/boundary.yaml";
 const INTENT_REL = "docs/intents/intent-a.md";
 
+/** 固定引擎解析：发布验收门的自动派发需要确定性 runtime（不触真实凭据）。 */
+const RESOLVE_RUNTIME: DesktopDeps["resolveRuntimeFn"] = async () => ({
+  ok: true,
+  runtime: "claude",
+  source: "credentials",
+  skipped: [],
+});
+
 /**
  * 最终流程 YAML（所有执行步骤 done、验收步骤 pending）：证据与账本对账。
  * 团队计划/标准/变更包是 artifact；appointment 是 customer-decision；role-cards/readiness/impl 是 dispatch。
+ * `release: true`（2026-10-24 P0-1）显式标记发布版本；缺省 = 非发布。
  */
-function finalFlowDoc(): string {
-  return flowDoc(FLOW, [
-    { id: "team-plan", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: TEAM_PLAN_REL } },
-    { id: "appointment", kind: "customer-decision", status: "done", evidence: { kind: "customer-decision", ref: "appointment" } },
-    { id: "role-cards", kind: "dispatch", status: "done" },
-    { id: "role-readiness", kind: "dispatch", status: "done" },
-    { id: "acceptance-criteria", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: CRITERIA_REL } },
-    { id: "change-package", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: CHANGE_PACKAGE_REL } },
-    { id: "impl", kind: "dispatch", status: "done" },
-    { id: "verification", kind: "acceptance", status: "pending" },
-  ]);
+function finalFlowDoc(options: { release?: boolean } = {}): string {
+  return flowDoc(
+    FLOW,
+    [
+      { id: "team-plan", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: TEAM_PLAN_REL } },
+      { id: "appointment", kind: "customer-decision", status: "done", evidence: { kind: "customer-decision", ref: "appointment" } },
+      { id: "role-cards", kind: "dispatch", status: "done" },
+      { id: "role-readiness", kind: "dispatch", status: "done" },
+      { id: "acceptance-criteria", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: CRITERIA_REL } },
+      { id: "change-package", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: CHANGE_PACKAGE_REL } },
+      { id: "impl", kind: "dispatch", status: "done" },
+      { id: "verification", kind: "acceptance", status: "pending" },
+    ],
+    options,
+  );
 }
 
 // —————————————————————— 2026-10-22 v2 完整链路（团队计划 v2 + MapReduce） ——————————————————————
@@ -450,6 +474,21 @@ test("五角色全自动链路：意图→提案→团队计划→任命→Crew 
     assert.equal(exists(temp.root, NOMINATION_REL), false, "新流程不再产生 docs/nominations/ 提名文件");
 
     // 阶段 1b：Verifier 写实施前标准（O2 前置；真实会话 + 真实预授权写区 + artifact.observed）。
+    // 2026-10-24 P0-1：该 flow 未标记 release（非发布）⇒ 应用不自动派 verifier 写标准；
+    // 标准由用例显式驱动真实 Verifier 会话补位（离线夹具，避免依赖自动派发）。
+    assert.equal(exists(temp.root, CRITERIA_REL), false, "非发布：应用不得自动写 acceptance-criteria");
+    const beforeCriteriaLedger = await h.waitForLedger(() => true);
+    assert.equal(
+      beforeCriteriaLedger.entries.some(
+        (entry) =>
+          entry.kind === "dispatch.accepted" &&
+          entry.actorRoleId === "app" &&
+          entry.targetRoleId === "verifier" &&
+          entry.stepId === "acceptance-criteria",
+      ),
+      false,
+      "非发布：应用不得自动派 verifier 写 acceptance-criteria",
+    );
     const verifierOpened = await h.iface.openSession({ projectRoot: temp.root, roleId: "verifier", runtime: "claude" });
     assert.equal(verifierOpened.ok, true, verifierOpened.error ?? "");
     const criteriaTask = await h.send("verifier", "请写实施前完成标准（acceptance-criteria）。");
@@ -500,6 +539,40 @@ test("五角色全自动链路：意图→提案→团队计划→任命→Crew 
     const finalizeTask = await h.send("convener", "请收尾流程：按账本证据把执行步骤标 done。");
     assert.equal(finalizeTask.ok, true, finalizeTask.error ?? "");
     await h.waitFor(() => /^\s+status: done$/m.test(readFileSync(`${temp.root}/${FLOW_REL}`, "utf8")) && /id: impl/.test(readFileSync(`${temp.root}/${FLOW_REL}`, "utf8")), 8000);
+
+    // 2026-10-24 P0-1（非发布）：change-package done 后停在发布验收前——不派 verifier/Proof、
+    // 不自动标 acceptance done；Lead 收到 awaiting-release-acceptance 系统行。
+    await h.waitFor(
+      () =>
+        h.events.some(
+          (envelope) =>
+            envelope.roleId === "liaison" &&
+            envelope.event.kind === "message" &&
+            (envelope.event as { detail?: { source?: string } }).detail?.source === "delivery-note" &&
+            String((envelope.event as { summary?: string }).summary).includes(
+              "flow.release 未标记为 true（非发布）⇒ 停在发布验收前",
+            ),
+        ),
+      8000,
+    );
+    const releaseGateLedger = await h.waitForLedger(() => true);
+    assert.equal(
+      releaseGateLedger.entries.some(
+        (entry) =>
+          entry.kind === "dispatch.accepted" &&
+          entry.actorRoleId === "app" &&
+          entry.targetRoleId === "verifier" &&
+          entry.stepId === "verification",
+      ),
+      false,
+      "非发布：change-package 后不得自动派 verifier/Proof",
+    );
+    const pendingAcceptance = parseFlowStateYaml(readFileSync(`${temp.root}/${FLOW_REL}`, "utf8"), FLOW);
+    assert.equal(pendingAcceptance.ok, true, pendingAcceptance.ok ? "" : pendingAcceptance.error);
+    if (pendingAcceptance.ok) {
+      const step = pendingAcceptance.flow.steps.find((candidate) => candidate.kind === "acceptance")!;
+      assert.equal(step.status, "pending", "非发布：无验收决定前 acceptance 保持 pending，不自动标 done");
+    }
 
     // —— 阶段 4：Verifier 写报告 + acceptance 卡；判断代批（验收机械门槛读流程/账本/标准/报告/变更包） ——
     // 等变更包与最终流程 YAML 的 artifact.observed 落账（验收机械门槛对账所需）。
@@ -842,10 +915,18 @@ test("v2 完整链路：团队计划 v2 → appointment → Crew 写卡 → read
     }
 
     // v2 流程序列化证据：初始 flow YAML 携带 parallelGroup/dependsOn。
+    // 2026-10-23 S3/S4 起，应用 `completeRoleCardsStep` 收口后会以 canonical serializer 重写整份 flow
+    // （dependsOn 由内联数组变为块列表）。此处按**结构化解析**断言字段语义（更强，不依赖文本格式）。
     const initialFlow = readFileSync(`${temp.root}/${FLOW_REL}`, "utf8");
-    assert.match(initialFlow, /parallelGroup: map-a/);
-    assert.match(initialFlow, /dependsOn: \[contract-freeze\]/);
-    assert.match(initialFlow, /parallelGroup: reduce/);
+    const initialParsed = parseFlowStateYaml(initialFlow, FLOW);
+    assert.equal(initialParsed.ok, true, initialParsed.ok ? "" : `flow YAML 应可解析：${initialParsed.error}`);
+    if (initialParsed.ok) {
+      const storefront = initialParsed.flow.steps.find((step) => step.id === "delivery-storefront");
+      const integration = initialParsed.flow.steps.find((step) => step.id === "integration-e2e");
+      assert.equal(storefront?.parallelGroup, "map-a", "Map 步骤应属 map-a 并行组");
+      assert.deepEqual(storefront?.dependsOn, ["contract-freeze"], "Map 步骤应依赖 contract-freeze");
+      assert.equal(integration?.parallelGroup, "reduce", "Reduce 步骤应属 reduce 并行组");
+    }
 
     // —— 阶段 2：Verifier 写标准 → Convener readiness（v2 文案）→ Map 并行派发 ——
     const verifierOpened = await h.iface.openSession({ projectRoot: temp.root, roleId: "verifier", runtime: "claude" });
@@ -932,8 +1013,15 @@ test("v2 完整链路：团队计划 v2 → appointment → Crew 写卡 → read
       return true;
     }, 4000);
     const finalFlowText = readFileSync(`${temp.root}/${FLOW_REL}`, "utf8");
-    assert.match(finalFlowText, /parallelGroup: reduce/);
-    assert.match(finalFlowText, /dependsOn: \[delivery-storefront, delivery-checkout-api\]/);
+    // canonical serializer 会把 dependsOn 写成块列表；按结构化解析断言语义（同上，不依赖文本格式）。
+    const finalParsed = parseFlowStateYaml(finalFlowText, FLOW);
+    assert.equal(finalParsed.ok, true, finalParsed.ok ? "" : `flow YAML 应可解析：${finalParsed.error}`);
+    if (finalParsed.ok) {
+      const shards = finalParsed.flow.steps.find((step) => step.id === "test-map-shards");
+      const integration = finalParsed.flow.steps.find((step) => step.id === "integration-e2e");
+      assert.equal(integration?.parallelGroup, "reduce", "Reduce 步骤应属 reduce 并行组");
+      assert.deepEqual(shards?.dependsOn, ["delivery-storefront", "delivery-checkout-api"], "分片步骤应依赖两个 Map 步骤");
+    }
 
     const verifierReopen = await h.iface.openSession({ projectRoot: temp.root, roleId: "verifier", runtime: "claude" });
     assert.equal(verifierReopen.ok, true, verifierReopen.error ?? "");
@@ -994,6 +1082,672 @@ test("v2 完整链路：团队计划 v2 → appointment → Crew 写卡 → read
   } finally {
     await h.stop();
     h.cleanup();
+    temp.cleanup();
+  }
+});
+
+// —————————————————————— 2026-10-23 v3 完整链路（目录级授权） ——————————————————————
+//
+// 计划 v3（frontmatter directories/模块 实现目录/授权目录+精确写集/目录规范表）→ appointment →
+// Crew 写卡/目录边界（V12：new 边界与计划一致、existing 计划 ⊆ 边界）→ readiness（directories/spec/
+// shared/layout）→ Map 在授权目录内新建文件/子目录 → 布局核对 pass → Reduce manifest → 变更包 →
+// Verifier → acceptance。legacy v2 完整链路由同文件上一条用例保持。
+
+const V3_CONTRACT_STOREFRONT_REL = "docs/contracts/storefront-v1.md";
+const V3_CONTRACT_CHECKOUT_REL = "docs/contracts/checkout-v1.md";
+const V3_MANIFEST_REL = `docs/verification/${FLOW}/manifest.md`;
+const V3_TESTER = "tester";
+const V3_MAP_FILES = ["src/storefront/handlers/create-order.ts", "src/storefront/tests/create-order.test.ts"];
+const V3_CHECKOUT_FILES = ["src/checkout/handlers/quote.ts", "src/checkout/tests/quote.test.ts"];
+const V3 = v3CanonicalParts(FLOW);
+
+function v3TeamPlan(): string {
+  return teamPlanV3Doc(FLOW, {
+    modules: V3.modules,
+    recommended: V3.recommended,
+    rows: V3.rows,
+    moduleRows: V3.moduleRows,
+    directoryRows: V3.directoryRows,
+  });
+}
+
+function v3InitialFlowDoc(): string {
+  return flowDoc(FLOW, [
+    { id: "team-plan", kind: "artifact", status: "pending" },
+    { id: "appointment", kind: "customer-decision", status: "pending" },
+    { id: "role-cards", kind: "dispatch", status: "pending" },
+    { id: "role-readiness", kind: "dispatch", status: "pending" },
+    { id: "acceptance-criteria", kind: "artifact", status: "pending" },
+    { id: "contract-freeze", kind: "artifact", status: "pending" },
+    { id: "delivery-storefront", title: "Map A｜storefront", owner: "executor", kind: "dispatch", status: "pending", parallelGroup: "map-a", dependsOn: ["contract-freeze"] },
+    { id: "delivery-checkout-api", title: "Map B｜checkout-api", owner: "reviewer", kind: "dispatch", status: "pending", parallelGroup: "map-b", dependsOn: ["contract-freeze"] },
+    { id: "test-map-shards", title: "Map 测试分片", owner: V3_TESTER, kind: "dispatch", status: "pending", parallelGroup: "reduce", dependsOn: ["delivery-storefront", "delivery-checkout-api"] },
+    { id: "integration-e2e", title: "Reduce｜契约/集成/端到端", owner: V3_TESTER, kind: "dispatch", status: "pending", parallelGroup: "reduce", dependsOn: ["test-map-shards"] },
+    { id: "verification-evidence", title: "Reduce｜证据与真实启动", owner: V3_TESTER, kind: "artifact", status: "pending", parallelGroup: "reduce", dependsOn: ["integration-e2e"] },
+    { id: "change-package", kind: "artifact", status: "pending" },
+    { id: "verification", kind: "acceptance", status: "pending" },
+  ]);
+}
+
+function v3FlowDoc(options: {
+  mapDone?: boolean;
+  shardsDone?: boolean;
+  e2eDone?: boolean;
+  evidenceDone?: boolean;
+} = {}): string {
+  const status = (done: boolean | undefined): string => (done === true ? "done" : "pending");
+  return flowDoc(FLOW, [
+    { id: "team-plan", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: TEAM_PLAN_REL } },
+    { id: "appointment", kind: "customer-decision", status: "done", evidence: { kind: "customer-decision", ref: "appointment" } },
+    { id: "role-cards", kind: "dispatch", status: "done" },
+    { id: "role-readiness", kind: "dispatch", status: "done" },
+    { id: "acceptance-criteria", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: CRITERIA_REL } },
+    { id: "contract-freeze", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: V3_CONTRACT_STOREFRONT_REL } },
+    { id: "delivery-storefront", title: "Map A｜storefront", owner: "executor", kind: "dispatch", status: status(options.mapDone), parallelGroup: "map-a", dependsOn: ["contract-freeze"] },
+    { id: "delivery-checkout-api", title: "Map B｜checkout-api", owner: "reviewer", kind: "dispatch", status: status(options.mapDone), parallelGroup: "map-b", dependsOn: ["contract-freeze"] },
+    { id: "test-map-shards", title: "Map 测试分片", owner: V3_TESTER, kind: "dispatch", status: status(options.shardsDone), parallelGroup: "reduce", dependsOn: ["delivery-storefront", "delivery-checkout-api"] },
+    { id: "integration-e2e", title: "Reduce｜契约/集成/端到端", owner: V3_TESTER, kind: "dispatch", status: status(options.e2eDone), parallelGroup: "reduce", dependsOn: ["test-map-shards"] },
+    { id: "verification-evidence", title: "Reduce｜证据与真实启动", owner: V3_TESTER, kind: "artifact", status: status(options.evidenceDone), parallelGroup: "reduce", dependsOn: ["integration-e2e"], ...(options.evidenceDone === true ? { evidence: { kind: "artifact", ref: V3_MANIFEST_REL } } : {}) },
+    { id: "change-package", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: CHANGE_PACKAGE_REL } },
+    { id: "verification", kind: "acceptance", status: "pending" },
+  ]);
+}
+
+function v3ReadinessDoc(): string {
+  return [
+    "---",
+    `flowId: ${FLOW}`,
+    "version: 1",
+    "status: pass",
+    "---",
+    "",
+    `# 角色就绪复核 ${FLOW}（v3 目录级授权）`,
+    "",
+    "| roleId | module | 职责目标 | 能力要求 | directories | spec | shared | layout | 公开契约 | 测试面 | 依赖/dependsOn | 并行/粒度 | 结论 | 证据 |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| executor | storefront | pass | pass | pass（src/storefront/、src/storefront/tests/） | pass（命名/子目录/类型/禁写区） | none | pass | pass | pass | pass | map-a / 单模块 | pass | 角色卡/executor/boundary.yaml |",
+    "| reviewer | checkout-api | pass | pass | pass（src/checkout/、src/checkout/tests/） | pass | none | pass | pass | pass | pass | map-b / 单模块 | pass | 角色卡/reviewer/boundary.yaml |",
+    `| ${V3_TESTER} | reduce | pass | pass | pass（test/测试/、精确 manifest） | pass | none | pass | pass | pass | pass | reduce / 覆盖全部 Map | pass | 角色卡/${V3_TESTER}/boundary.yaml |`,
+    "",
+  ].join("\n");
+}
+
+function v3ManifestDoc(): string {
+  return [
+    "---",
+    `flowId: ${FLOW}`,
+    "candidate: fixture-candidate",
+    "teamPlanSchema: 3",
+    "environment: offline-scripted",
+    "---",
+    "",
+    "# MapReduce 证据（v3 完整链路夹具）",
+    "",
+    "## Map 分片",
+    "| module | directory | command | log | result |",
+    "| --- | --- | --- | --- | --- |",
+    "| storefront | src/storefront/ | node --test \"src/storefront/tests/**\" | map-storefront.log | pass |",
+    "| checkout-api | src/checkout/ | node --test \"src/checkout/tests/**\" | map-checkout.log | pass |",
+    "",
+    "## Reduce",
+    "| check | command | log | result |",
+    "| --- | --- | --- | --- |",
+    "| layout | directory-conformance | layout-report.md | pass |",
+    "| integration-e2e | node --test \"test/测试/e2e/**\" | reduce-e2e.log | pass |",
+    "",
+  ].join("\n");
+}
+
+/** v3 Map 角色 Crew 产物（boundary 目录条目与计划授权目录逐条一致）。 */
+function v3MapRoleFiles(roleId: string, writes: string[]): Array<[string, string]> {
+  return [
+    [`角色卡/${roleId}/role-card.md`, roleCardDoc(roleId)],
+    [`角色卡/${roleId}/boundary.yaml`, roleBoundaryDoc(roleId, { writes })],
+    ...Object.entries(roleWorkDocs(roleId)).map(([file, content]) => [`角色卡/${roleId}/${file}`, content] as [string, string]),
+  ];
+}
+
+/** 预置既有 Reduce 角色（test/测试/ 目录 + 精确证据文件）。 */
+function seedV3Tester(root: string): void {
+  write(root, `角色卡/${V3_TESTER}/role-card.md`, roleCardDoc(V3_TESTER));
+  write(
+    root,
+    `角色卡/${V3_TESTER}/boundary.yaml`,
+    roleBoundaryDoc(V3_TESTER, {
+      writes: ["test/测试/"],
+      extraEntries: [{ kind: "file", path: V3_MANIFEST_REL, purpose: "证据 manifest" }],
+    }),
+  );
+  for (const [file, content] of Object.entries(roleWorkDocs(V3_TESTER))) {
+    write(root, `角色卡/${V3_TESTER}/${file}`, content);
+  }
+}
+
+test("v3 完整链路：计划 v3 → appointment → Crew 目录边界 → readiness → Map 目录内新建 → 布局核对 → Reduce → 变更包 → Verifier → acceptance", async () => {
+  const temp = makeRoot("full-chain-v3");
+  seedTrioProject(temp.root);
+  seedV3Tester(temp.root);
+  let readinessDone = false;
+  let reportDone = false;
+
+  const scriptForRole = (ctx: ScriptContext): ToolCall[] => {
+    if (
+      ctx.roleId === "liaison" &&
+      !ctx.prompt.includes("[系统·治理反馈]") &&
+      !/已交给报告员|客户意图已交接/.test(ctx.prompt)
+    ) {
+      return [
+        { name: "write_file", args: { path: INTENT_REL, content: intentDoc("intent-a") } },
+        {
+          name: "request_choice",
+          args: {
+            title: "需求确认 intent-a",
+            question: "请确认目标、范围与验收标准。",
+            flowId: FLOW,
+            cardKind: "intent-confirm",
+            options: [
+              { id: "confirm", label: "确认" },
+              { id: "revise", label: "修改" },
+            ],
+          },
+        },
+        { name: "hand_off_intent", args: intentHandoffArgs("intent-a") },
+      ];
+    }
+    if (ctx.roleId === "rapporteur" && /客户意图已交接|请形成提案/.test(ctx.prompt)) {
+      return [
+        { name: "write_file", args: { path: PROPOSAL_REL, content: proposalDoc(FLOW, 1, "intent-a") } },
+        { name: "write_file", args: { path: V3_CONTRACT_STOREFRONT_REL, content: "# 契约 storefront-v1\n\n冻结契约（v3 夹具）。\n" } },
+        { name: "write_file", args: { path: V3_CONTRACT_CHECKOUT_REL, content: "# 契约 checkout-v1\n\n冻结契约（v3 夹具）。\n" } },
+        {
+          name: "request_choice",
+          args: {
+            title: `提案 ${FLOW}`,
+            question: "是否接受该提案？",
+            flowId: FLOW,
+            cardKind: "proposal",
+            options: [
+              { id: "accept", label: "接受" },
+              { id: "accept-quick", label: "快捷接受" },
+              { id: "revise", label: "要求修改" },
+              { id: "reject", label: "拒绝" },
+            ],
+          },
+        },
+      ];
+    }
+    if (ctx.roleId === "convener") {
+      if (/客户已接受提案/.test(ctx.prompt)) {
+        return [
+          { name: "write_file", args: { path: FLOW_REL, content: v3InitialFlowDoc() } },
+          { name: "write_file", args: { path: TEAM_PLAN_REL, content: v3TeamPlan() } },
+          {
+            name: "request_choice",
+            args: {
+              title: `任命 ${FLOW}`,
+              question: "选择要任命的角色",
+              flowId: FLOW,
+              cardKind: "appointment",
+              multiple: true,
+              options: [
+                { id: "executor", label: "Executor" },
+                { id: "reviewer", label: "Reviewer" },
+                { id: V3_TESTER, label: "Tester" },
+              ],
+            },
+          },
+        ];
+      }
+      if (/角色就绪复核|role-readiness/.test(ctx.prompt)) {
+        if (!exists(temp.root, CRITERIA_REL) || readinessDone) return [];
+        readinessDone = true;
+        return [
+          { name: "write_file", args: { path: READINESS_REL, content: v3ReadinessDoc() } },
+          { name: "write_file", args: { path: CHANGE_PACKAGE_REL, content: changePackageDoc(FLOW, "T3") } },
+          // 契约冻结/治理步骤 done 后并行派发两个 Map（各自授权目录内新建文件/子目录）。
+          { name: "write_file", args: { path: FLOW_REL, content: v3FlowDoc({}) } },
+          { name: "dispatch_task", args: { roleId: "executor", task: "Map A｜storefront 交付（授权目录 src/storefront/，自行设计文件/子目录）", flowId: FLOW, stepId: "delivery-storefront" } },
+          { name: "dispatch_task", args: { roleId: "reviewer", task: "Map B｜checkout-api 交付（授权目录 src/checkout/，自行设计文件/子目录）", flowId: FLOW, stepId: "delivery-checkout-api" } },
+        ];
+      }
+      if (/收尾 Map/.test(ctx.prompt)) {
+        return [
+          { name: "write_file", args: { path: FLOW_REL, content: v3FlowDoc({ mapDone: true }) } },
+          { name: "dispatch_task", args: { roleId: V3_TESTER, task: "Map 测试分片（按模块并行、每分片独立证据）", flowId: FLOW, stepId: "test-map-shards" } },
+          { name: "write_file", args: { path: FLOW_REL, content: v3FlowDoc({ mapDone: true, shardsDone: true }) } },
+          { name: "dispatch_task", args: { roleId: V3_TESTER, task: "Reduce｜契约/集成/端到端（合并 manifest 后跑）", flowId: FLOW, stepId: "integration-e2e" } },
+          { name: "write_file", args: { path: FLOW_REL, content: v3FlowDoc({ mapDone: true, shardsDone: true, e2eDone: true }) } },
+        ];
+      }
+      if (/收尾流程/.test(ctx.prompt)) {
+        return [
+          { name: "write_file", args: { path: FLOW_REL, content: v3FlowDoc({ mapDone: true, shardsDone: true, e2eDone: true, evidenceDone: true }) } },
+        ];
+      }
+      return [];
+    }
+    if (ctx.roleId === "nominator") {
+      if (/appointment-write/.test(ctx.prompt)) {
+        const files = [
+          ...v3MapRoleFiles("executor", ["src/storefront/", "src/storefront/tests/"]),
+          ...v3MapRoleFiles("reviewer", ["src/checkout/", "src/checkout/tests/"]),
+        ];
+        return [
+          {
+            name: "request_confirmation",
+            args: {
+              title: `写盘确认 ${FLOW}（v3 两个 Map 角色）`,
+              paths: files.map(([rel]) => rel),
+              preview: [
+                "将写入以下文件（逐路径正文）：",
+                "",
+                ...files.map(([rel, content]) => `## ${rel}\n\n${content}`),
+              ].join("\n"),
+              flowId: FLOW,
+              cardKind: "appointment-write",
+            },
+          },
+          ...files.map(([path, content]) => ({ name: "write_file", args: { path, content } })),
+        ];
+      }
+      return [];
+    }
+    if (ctx.roleId === "verifier") {
+      if (/实施前完成标准|acceptance-criteria/.test(ctx.prompt)) {
+        return [{ name: "write_file", args: { path: CRITERIA_REL, content: acceptanceCriteriaDoc(FLOW) } }];
+      }
+      if (/出验收卡|验收报告/.test(ctx.prompt)) {
+        if (reportDone) return [];
+        reportDone = true;
+        return [
+          { name: "write_file", args: { path: REPORT_REL, content: acceptanceReportDoc(FLOW, "T3") } },
+          {
+            name: "request_choice",
+            args: {
+              title: `验收 ${FLOW}`,
+              question: "是否验收通过？",
+              flowId: FLOW,
+              cardKind: "acceptance",
+              options: [
+                { id: "accept", label: "通过" },
+                { id: "reject", label: "不通过" },
+              ],
+            },
+          },
+        ];
+      }
+      return [];
+    }
+    if (ctx.roleId === V3_TESTER) {
+      if (/合并分片证据|manifest/.test(ctx.prompt)) {
+        return [{ name: "write_file", args: { path: V3_MANIFEST_REL, content: v3ManifestDoc() } }];
+      }
+      return [{ name: "submit_report", args: { status: "completed", summary: "Reduce 分片/集成任务完成（离线夹具）。" } }];
+    }
+    if (ctx.roleId === "executor" && /Map/.test(ctx.prompt)) {
+      // Map 在授权目录内自行新建文件/子目录（不新增计划/边界条目）。
+      return [
+        { name: "write_file", args: { path: V3_MAP_FILES[0]!, content: "export const createOrder = (): string => \"order\";\n" } },
+        { name: "write_file", args: { path: V3_MAP_FILES[1]!, content: "import { test } from \"node:test\";\nimport assert from \"node:assert/strict\";\ntest(\"createOrder\", () => assert.equal(typeof 1, \"number\"));\n" } },
+        { name: "submit_report", args: { status: "completed", summary: "storefront Map 交付完成（目录内新建）。" } },
+      ];
+    }
+    if (ctx.roleId === "reviewer" && /Map/.test(ctx.prompt)) {
+      return [
+        { name: "write_file", args: { path: V3_CHECKOUT_FILES[0]!, content: "export const quote = (): number => 42;\n" } },
+        { name: "write_file", args: { path: V3_CHECKOUT_FILES[1]!, content: "import { test } from \"node:test\";\nimport assert from \"node:assert/strict\";\ntest(\"quote\", () => assert.equal(1, 1));\n" } },
+        { name: "submit_report", args: { status: "completed", summary: "checkout-api Map 交付完成（目录内新建）。" } },
+      ];
+    }
+    return [];
+  };
+
+  const h = await makeHarness({
+    tag: "full-chain-v3",
+    root: temp.root,
+    approval: true,
+    decision: true,
+    scriptForRole,
+    governanceChain: { pollIntervalMs: 10, timeoutMs: 5000, settledGraceMs: 10 },
+  });
+  try {
+    await h.open("liaison");
+    const sent = await h.send("liaison", "请把客户意图交给报告员。");
+    assert.equal(sent.ok, true, sent.error ?? "");
+
+    // —— 阶段 1：v3 计划 + 目录边界 → appointment → Crew 写两个 new 角色（tester 为既有） ——
+    try {
+      await h.waitFor(
+        () => exists(temp.root, `角色卡/executor/role-card.md`) && exists(temp.root, `角色卡/reviewer/role-card.md`),
+        20000,
+      );
+    } catch (error) {
+      throw new Error(
+        `${(error as Error).message}；openRoles=${JSON.stringify(h.openRoles)}；results=${JSON.stringify(h.results.slice(-16))}`,
+      );
+    }
+    const planText = readFileSync(`${temp.root}/${TEAM_PLAN_REL}`, "utf8");
+    assert.match(planText, /teamPlanSchema: 3/);
+    assert.match(planText, /directories: \[src\/storefront\//);
+    assert.match(planText, /\| 实现目录 \|/);
+    assert.match(planText, /\| 授权目录 \| 精确写集 \|/);
+    assert.match(planText, /## 目录规范/);
+    const parsedPlan = parseTeamPlan(planText, { flowId: FLOW, projectRoot: temp.root });
+    assert.equal(parsedPlan.ok, true, teamPlanIssueMessages(parsedPlan).join("；"));
+    assert.equal(parsedPlan.teamPlanSchema, 3);
+    assert.equal(parsedPlan.directorySpecs.length, 5);
+
+    const phase1 = await h.waitForLedger(
+      (entries) =>
+        entries.some((entry) => entry.decisionKind === "appointment") &&
+        entries.some((entry) => entry.decisionKind === "appointment-write"),
+      20000,
+    );
+    const appointment = phase1.entries.find((entry) => entry.decisionKind === "appointment")!;
+    assert.deepEqual(appointment.targetRoleIds, ["executor", "reviewer", V3_TESTER]);
+    assert.equal(appointment.artifactPath, TEAM_PLAN_REL);
+    assert.equal(appointment.decisionEvidence?.kind, "judge");
+    assert.ok(
+      h.prompts.get("nominator")?.some(
+        (prompt) =>
+          /团队计划 v3/.test(prompt) &&
+          /授权目录：src\/storefront\//.test(prompt) &&
+          /v3 写卡要求/.test(prompt) &&
+          /new 角色边界目录必须与计划授权目录一致/.test(prompt),
+      ),
+      `Crew 任务应含 v3 授权目录/写卡要求；实际=${JSON.stringify(h.prompts.get("nominator"))}`,
+    );
+
+    // 应用的 post-write 推进应把 v3 readiness 任务（含目录/规范/布局列）投给 Convener。
+    let autoReadinessPrompt: string | undefined;
+    try {
+      await h.waitFor(
+        () => {
+          autoReadinessPrompt = (h.prompts.get("convener") ?? []).find((prompt) =>
+            /团队计划为 v3（teamPlanSchema: 3）/.test(prompt),
+          );
+          return autoReadinessPrompt !== undefined;
+        },
+        15000,
+      );
+    } catch {
+      /* 下方断言会带上实际提示列表 */
+    }
+    assert.ok(autoReadinessPrompt, `应用应投 v3 readiness 任务；实际=${JSON.stringify(h.prompts.get("convener"))}`);
+    assert.match(autoReadinessPrompt!, /授权目录：src\/storefront\//);
+    assert.match(autoReadinessPrompt!, /模块实现目录：storefront→src\/storefront\//);
+    assert.match(autoReadinessPrompt!, /directories\/spec\/shared\/layout/);
+    assert.match(autoReadinessPrompt!, /目录规范（owner\/类型\/用途\/命名/);
+
+    // —— 阶段 2：Verifier 写标准 → Convener readiness（v3 目录/规范/共享/布局）→ Map 并行派发 ——
+    const verifierOpened = await h.iface.openSession({ projectRoot: temp.root, roleId: "verifier", runtime: "claude" });
+    assert.equal(verifierOpened.ok, true, verifierOpened.error ?? "");
+    const criteriaTask = await h.send("verifier", "请写实施前完成标准（acceptance-criteria）。");
+    assert.equal(criteriaTask.ok, true, criteriaTask.error ?? "");
+    await h.waitFor(() => exists(temp.root, CRITERIA_REL), 8000);
+
+    const convenerForReadiness = await h.iface.openSession({ projectRoot: temp.root, roleId: "convener", runtime: "claude" });
+    assert.equal(convenerForReadiness.ok, true, convenerForReadiness.error ?? "");
+    const readinessTask = await h.send("convener", "请继续角色就绪复核（role-readiness）。");
+    assert.equal(readinessTask.ok, true, readinessTask.error ?? "");
+    const phase2 = await h.waitForLedger(
+      (entries) =>
+        entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "delivery-storefront") &&
+        entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "delivery-checkout-api") &&
+        entries.some((entry) => entry.kind === "artifact.observed" && entry.artifactPath === READINESS_REL),
+      20000,
+    );
+    const mapDispatches = phase2.entries.filter(
+      (entry) => entry.kind === "dispatch.accepted" && (entry.stepId === "delivery-storefront" || entry.stepId === "delivery-checkout-api"),
+    );
+    assert.deepEqual(mapDispatches.map((entry) => entry.stepId), ["delivery-storefront", "delivery-checkout-api"]);
+    assert.deepEqual(mapDispatches.map((entry) => entry.targetRoleId), ["executor", "reviewer"]);
+    const readinessText = readFileSync(`${temp.root}/${READINESS_REL}`, "utf8");
+    for (const column of ["directories", "spec", "shared", "layout", "module", "测试面", "粒度"]) {
+      assert.match(readinessText, new RegExp(column), `readiness 应含 ${column} 列`);
+    }
+
+    // —— 阶段 3：Map 在授权目录内新建文件/子目录（真实 gate 放行）→ 布局核对 pass ——
+    await h.waitFor(() => V3_MAP_FILES.every((rel) => exists(temp.root, rel)), 10000);
+    await h.waitFor(() => V3_CHECKOUT_FILES.every((rel) => exists(temp.root, rel)), 10000);
+    assert.equal(exists(temp.root, "src/storefront/handlers"), true, "Map 可自行新建一层子目录");
+    const roleDirs = new Map(parsedPlan.roleRows.map((row) => [row.roleId, row.authorizedDirs.map((entry) => entry.path)]));
+    const layout = checkDirectoryLayout({
+      changedPaths: [...V3_MAP_FILES, ...V3_CHECKOUT_FILES],
+      specs: parsedPlan.directorySpecs,
+      roleDirs,
+      projectRoot: temp.root,
+    });
+    assert.equal(layoutCheckPassed(layout), true, JSON.stringify(layout.rows.filter((row) => row.result === "fail"), null, 2));
+    const ownerOf = (path: string): string | undefined => layout.rows.find((row) => row.path === path)?.owner;
+    for (const rel of V3_MAP_FILES) assert.equal(ownerOf(rel), "executor");
+    for (const rel of V3_CHECKOUT_FILES) assert.equal(ownerOf(rel), "reviewer");
+    // 反例：executor 自检他人目录 ⇒ fail（布局核对可复算，不是永远 pass）。
+    const cross = checkDirectoryLayout({
+      changedPaths: [V3_CHECKOUT_FILES[0]!],
+      specs: parsedPlan.directorySpecs,
+      roleDirs,
+      projectRoot: temp.root,
+      roleId: "executor",
+    });
+    assert.equal(cross.ok, false);
+    assert.match(cross.rows[0]!.reason ?? "", /非本次角色 executor/);
+
+    // —— 阶段 4：Map done → 测试分片 → 集成 → Reduce manifest ——
+    const convenerForMapFinalize = await h.iface.openSession({ projectRoot: temp.root, roleId: "convener", runtime: "claude" });
+    assert.equal(convenerForMapFinalize.ok, true, convenerForMapFinalize.error ?? "");
+    const mapFinalize = await h.send("convener", "请收尾 Map：把两个 Map 交付标 done 并派发 Reduce 测试分片与集成。");
+    assert.equal(mapFinalize.ok, true, mapFinalize.error ?? "");
+    const phase3 = await h.waitForLedger(
+      (entries) =>
+        entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "test-map-shards") &&
+        entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "integration-e2e"),
+      15000,
+    );
+    const dispatchOrder = phase3.entries
+      .filter((entry) => entry.kind === "dispatch.accepted" && typeof entry.stepId === "string")
+      .map((entry) => entry.stepId);
+    assert.ok(dispatchOrder.indexOf("test-map-shards") > dispatchOrder.indexOf("delivery-checkout-api"), "Reduce 分片晚于全部 Map");
+    assert.ok(dispatchOrder.indexOf("integration-e2e") > dispatchOrder.indexOf("test-map-shards"), "集成晚于分片");
+
+    const testerOpened = await h.iface.openSession({ projectRoot: temp.root, roleId: V3_TESTER, runtime: "claude" });
+    assert.equal(testerOpened.ok, true, testerOpened.error ?? "");
+    const manifestTask = await h.send(V3_TESTER, "请合并分片证据（manifest）并写 docs/verification。");
+    assert.equal(manifestTask.ok, true, manifestTask.error ?? "");
+    await h.waitFor(() => exists(temp.root, V3_MANIFEST_REL), 8000);
+    const manifestObserved = await h.waitForLedger(
+      (entries) => entries.some((entry) => entry.kind === "artifact.observed" && entry.artifactPath === V3_MANIFEST_REL),
+      8000,
+    );
+    assert.ok(manifestObserved.entries.some((entry) => entry.artifactPath === V3_MANIFEST_REL), "manifest 应作为 artifact 被观察");
+
+    // —— 阶段 5：收尾 flow → Verifier 报告 + acceptance ——
+    const convenerFinal = await h.iface.openSession({ projectRoot: temp.root, roleId: "convener", runtime: "claude" });
+    assert.equal(convenerFinal.ok, true, convenerFinal.error ?? "");
+    const finalizeTask = await h.send("convener", "请收尾流程：按账本证据把剩余执行步骤标 done。");
+    assert.equal(finalizeTask.ok, true, finalizeTask.error ?? "");
+    await h.waitFor(() => {
+      const text = readFileSync(`${temp.root}/${FLOW_REL}`, "utf8");
+      return /- id: verification-evidence\r?\n(?:    [^\n]*\n)*?    status: done/.test(text);
+    }, 8000);
+    let stableFlow = "";
+    await h.waitFor(() => {
+      const text = readFileSync(`${temp.root}/${FLOW_REL}`, "utf8");
+      if (text !== stableFlow) {
+        stableFlow = text;
+        return false;
+      }
+      return true;
+    }, 4000);
+
+    const verifierReopen = await h.iface.openSession({ projectRoot: temp.root, roleId: "verifier", runtime: "claude" });
+    assert.equal(verifierReopen.ok, true, verifierReopen.error ?? "");
+    const acceptanceTask = await h.send("verifier", "请汇总证据并出验收卡（附验收报告）。");
+    assert.equal(acceptanceTask.ok, true, acceptanceTask.error ?? "");
+    const final = await h.waitForLedger(
+      (entries) => entries.some((entry) => entry.decisionKind === "acceptance"),
+      25000,
+    );
+    const acceptance = final.entries.find((entry) => entry.decisionKind === "acceptance");
+    if (acceptance === undefined) {
+      throw new Error(
+        `应有 acceptance 客户决定（判断代批）；judgeRows=${JSON.stringify(h.judgeRows)}；` +
+          `verifierPrompts=${JSON.stringify(h.prompts.get("verifier"))}；` +
+          `flow=${readFileSync(`${temp.root}/${FLOW_REL}`, "utf8")}；` +
+          `recentResults=${JSON.stringify(h.results.slice(-15))}`,
+      );
+    }
+    assert.equal(acceptance.customerDecision, "accepted");
+    assert.equal(acceptance.decisionEvidence?.kind, "judge");
+    assert.equal(exists(temp.root, REPORT_REL), true);
+
+    // —— 汇总：账本可还原、v3 产物齐备、0 张手卡 ——
+    const ledger = await h.waitForLedger(() => true);
+    assert.deepEqual(ledger.errors, []);
+    for (const kind of ["appointment", "appointment-write", "acceptance"]) {
+      assert.ok(
+        ledger.entries.some((entry) => entry.kind === "customer.decision" && entry.decisionKind === kind),
+        `应有 ${kind} 决定`,
+      );
+    }
+    for (const stepId of ["role-cards", "role-readiness", "delivery-storefront", "delivery-checkout-api", "test-map-shards", "integration-e2e"]) {
+      assert.ok(
+        ledger.entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === stepId),
+        `账本应有 ${stepId} 派发`,
+      );
+    }
+    for (const rel of [
+      TEAM_PLAN_REL,
+      FLOW_REL,
+      V3_CONTRACT_STOREFRONT_REL,
+      V3_CONTRACT_CHECKOUT_REL,
+      CRITERIA_REL,
+      REPORT_REL,
+      CHANGE_PACKAGE_REL,
+      READINESS_REL,
+      V3_MANIFEST_REL,
+      ...V3_MAP_FILES,
+      ...V3_CHECKOUT_FILES,
+      "角色卡/executor/role-card.md",
+      "角色卡/reviewer/role-card.md",
+    ]) {
+      assert.equal(exists(temp.root, rel), true, `应落盘：${rel}`);
+    }
+    assert.equal(h.presented.length, 0, "双开关开 + 判断 allow ⇒ 0 张手动卡");
+  } finally {
+    await h.stop();
+    h.cleanup();
+    temp.cleanup();
+  }
+});
+
+// —————————————————————— 2026-10-24 P0-1 发布验收门（release 显式动作） ——————————————————————
+
+test("发布验收门（P0-1）：非发布 change-package 后不派 verifier/Proof、不标 acceptance done；release: true 才自动派", async () => {
+  const temp = makeRoot("release-gate");
+  const root = temp.root;
+  try {
+    seedTrioProject(root, ["executor"]);
+    const steps = [
+      { id: "impl", kind: "dispatch", status: "done", owner: "executor", evidence: { kind: "dispatch", ref: "impl" } },
+      { id: "verification", kind: "acceptance", status: "pending" },
+    ] as const;
+    write(root, FLOW_REL, flowDoc(FLOW, [...steps]));
+    await seedLedger(root, [
+      { decisionKind: "proposal-accept", customerDecision: "accepted", actorRoleId: "rapporteur", power: "proposal" },
+      {
+        kind: "dispatch.accepted",
+        flowId: FLOW,
+        actorRoleId: "convener",
+        power: "schedule",
+        stepId: "impl",
+        targetRoleId: "executor",
+      },
+    ]);
+    const h = await makeHarness({
+      tag: "release-gate",
+      root,
+      decision: false,
+      resolveRuntime: RESOLVE_RUNTIME,
+      scriptForRole: () => [],
+    });
+    try {
+      const awaitingText = "flow.release 未标记为 true（非发布）⇒ 停在发布验收前";
+      await h.waitFor(
+        () =>
+          h.events.some(
+            (envelope) =>
+              envelope.roleId === "liaison" &&
+              envelope.event.kind === "message" &&
+              (envelope.event as { detail?: { source?: string } }).detail?.source === "delivery-note" &&
+              String((envelope.event as { summary?: string }).summary).includes(awaitingText),
+          ),
+        8000,
+      );
+      assert.equal(h.prompts.get("verifier")?.length ?? 0, 0, "非发布：不派 verifier/Proof");
+      assert.equal(exists(root, CRITERIA_REL), false, "非发布：不写 acceptance-criteria");
+      assert.equal(exists(root, REPORT_REL), false, "非发布：不写验收报告");
+      let ledger = await h.waitForLedger(() => true);
+      assert.equal(
+        ledger.entries.some(
+          (entry) =>
+            entry.kind === "dispatch.accepted" &&
+            entry.actorRoleId === "app" &&
+            entry.targetRoleId === "verifier",
+        ),
+        false,
+        "非发布：账本不得出现应用自动派 verifier",
+      );
+      let parsed = parseFlowStateYaml(readFileSync(`${root}/${FLOW_REL}`, "utf8"), FLOW);
+      assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.error);
+      if (parsed.ok) {
+        assert.equal(
+          parsed.flow.steps.find((step) => step.kind === "acceptance")!.status,
+          "pending",
+          "非发布：不标 acceptance done",
+        );
+      }
+
+      // 显式发布动作的结果：既有 schedule-write 已把顶层 release 标为 true（此处只重放写后的 flow 机器状态），
+      // 下一次真实事件（listProject/import）才由应用按发布验收门派 verifier。
+      write(root, FLOW_REL, flowDoc(FLOW, [...steps], { release: true }));
+      await h.iface.listProject({ projectRoot: root });
+      await h.waitFor(() => (h.prompts.get("verifier")?.length ?? 0) > 0, 8000);
+      ledger = await h.waitForLedger(
+        (entries) =>
+          entries.some(
+            (entry) =>
+              entry.kind === "dispatch.accepted" &&
+              entry.actorRoleId === "app" &&
+              entry.targetRoleId === "verifier" &&
+              entry.stepId === "verification",
+          ),
+        8000,
+      );
+      assert.ok(
+        ledger.entries.some(
+          (entry) =>
+            entry.kind === "dispatch.accepted" &&
+            entry.actorRoleId === "app" &&
+            entry.targetRoleId === "verifier" &&
+            entry.stepId === "verification",
+        ),
+        "release: true ⇒ 应用按发布验收门派 verifier/Proof 并审计",
+      );
+      parsed = parseFlowStateYaml(readFileSync(`${root}/${FLOW_REL}`, "utf8"), FLOW);
+      assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.error);
+      if (parsed.ok) {
+        assert.equal(
+          parsed.flow.steps.find((step) => step.kind === "acceptance")!.status,
+          "pending",
+          "派发 Proof 不等于验收通过：acceptance 仍等客户决定",
+        );
+      }
+      assert.equal(h.presented.length, 0, "无验收决定：不呈现客户卡");
+    } finally {
+      await h.stop();
+    }
+  } finally {
     temp.cleanup();
   }
 });

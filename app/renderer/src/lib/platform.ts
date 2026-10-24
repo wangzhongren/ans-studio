@@ -87,6 +87,22 @@ export interface DesktopBridge {
   retryDeliveryHistorySave?: (input: unknown) => Promise<unknown>;
   onReportPersistenceUpdated?: (callback: (payload: unknown) => void) => () => void;
   onDeliveryHistoryUpdated?: (callback: (payload: unknown) => void) => () => void;
+
+  // —— i18n 应用级语言偏好（定义/实现属桌面窗口；这里只按名消费）——
+  // 权威文件为 <userData>/ans/preferences.json；本地镜像仅用于首屏快速读取。
+  getPreferences?: () => Promise<{
+    version: 1;
+    locale: "zh-CN" | "en-US";
+    supported: string[];
+  }>;
+  setLocale?: (locale: string) => Promise<{
+    ok: boolean;
+    locale: "zh-CN" | "en-US";
+    error?: string;
+  }>;
+  onLocaleChanged?: (
+    callback: (payload: { locale: "zh-CN" | "en-US" }) => void,
+  ) => () => void;
 }
 
 declare global {

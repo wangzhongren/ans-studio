@@ -1,0 +1,229 @@
+diff --git a/src/common/shared/runtime-settings.ts b/src/common/shared/runtime-settings.ts
+index bb45456..5169a77 100644
+--- a/src/common/shared/runtime-settings.ts
++++ b/src/common/shared/runtime-settings.ts
+@@ -1,9 +1,17 @@
+ // SDK settings metadata, maintained once by 项目管理. Never returns secret values.
++//
++// i18n（2026-10-23 B4）：展示文案不再以中文字面量保存在本模块，而是目录 key
++// （`src/common/shared/i18n/messages/{zh-CN,en-US}.ts` 的 `shared.runtimeSettings.*`）。
++// 主进程在构造设置视图时按当前 locale 解析 key → `label`/`help`/`choiceLabels` 再推给渲染层；
++// 渲染层视图契约不变（见 `角色卡/项目管理/api-spec.md`）。key 的类型是 `MessageKey`，
++// 拼写错误/目录缺 key 在编译期失败；本模块只描述设置，不描述控件实现。
+ import { RUNTIME_LABELS, type RuntimeKind } from "./runtime-shared.ts";
++import type { MessageKey } from "./i18n/keys.ts";
+ 
+ export interface RuntimeSettingField {
+   key: string;
+-  label: string;
++  /** 展示标签的目录 key（`shared.runtimeSettings.*`）；主进程按当前 locale 解析为 `label`。 */
++  labelKey: MessageKey;
+   required: boolean;
+   secret: boolean;
+   /** Explicit adapter-supported credential alternatives; these are not separate login modes. */
+@@ -17,9 +25,9 @@ export interface RuntimeSettingField {
+   /** Explicitly use a range/slider control. Only present when the UI should not use the default
+    *  control for this field (e.g. a select for `choices`). Describes the setting, not an implementation. */
+   control?: "range";
+-  /** Friendly labels aligned 1:1 with `choices` (same length). Absent means the UI falls back to
+-   *  raw values; save errors may use these labels. */
+-  choiceLabels?: readonly string[];
++  /** Friendly label **directory keys** aligned 1:1 with `choices` (same length). Absent means the
++   *  UI falls back to raw values; save errors may use the resolved labels. */
++  choiceLabelKeys?: readonly MessageKey[];
+   /**
+    * Integer constraint metadata: present means the value must be an integer within these
+    * inclusive bounds (each bound optional; `min: 1` expresses "positive integer"). This
+@@ -28,75 +36,122 @@ export interface RuntimeSettingField {
+    * non-empty values (the empty string is the explicit default/clear option).
+    */
+   integer?: { min?: number; max?: number };
+-  help?: string;
++  /** 帮助文本的目录 key；主进程按当前 locale 解析为 `help`。 */
++  helpKey?: MessageKey;
+ }
+ 
+ export interface RuntimeSettingsDefinition {
+   runtime: Exclude<RuntimeKind, "demo">;
++  /** 品牌显示名（Pi/Codex/Claude），不翻译、不进目录；demo 无设置定义。 */
+   label: string;
+   fields: readonly RuntimeSettingField[];
+ }
+ 
+ /** Reasoning-effort help: one verbatim wording shared by the three platforms. */
+-const REASONING_EFFORT_HELP = "留空＝维持平台默认（现状零变化）；档位依次为 关/低/中/高/极高（缺省档语义见平台）；思考计入输出 tokens。";
++const REASONING_EFFORT_HELP_KEY: MessageKey = "shared.runtimeSettings.reasoning.help";
+ 
+ /** This describes settings, not account or endpoint availability. Adapters validate actual requests. */
+ export const RUNTIME_SETTINGS: Readonly<Record<Exclude<RuntimeKind, "demo">, RuntimeSettingsDefinition>> = {
+   pi: {
+     runtime: "pi", label: RUNTIME_LABELS.pi,
+     fields: [
+-      { key: "ANTHROPIC_AUTH_TOKEN", label: "访问令牌", required: true, secret: true },
+-      { key: "ANS_PI_BASE_URL", label: "API 地址", required: true, secret: false },
+-      { key: "ANS_PI_MODEL", label: "模型", required: true, secret: false },
++      { key: "ANTHROPIC_AUTH_TOKEN", labelKey: "shared.runtimeSettings.pi.token.label", required: true, secret: true },
++      { key: "ANS_PI_BASE_URL", labelKey: "shared.runtimeSettings.field.apiBaseUrl.label", required: true, secret: false },
++      { key: "ANS_PI_MODEL", labelKey: "shared.runtimeSettings.field.model.label", required: true, secret: false },
+       {
+-        key: "ANS_PI_CONTEXT_WINDOW", label: "上下文窗口", required: false, secret: false,
++        key: "ANS_PI_CONTEXT_WINDOW", labelKey: "shared.runtimeSettings.pi.contextWindow.label", required: false, secret: false,
+         choices: ["", "32768", "65536", "131072", "262144", "500000", "1048576"],
+-        choiceLabels: ["系统默认（500k）", "32k", "64k", "128k", "256k", "500k", "1M"],
++        choiceLabelKeys: [
++          "shared.runtimeSettings.pi.contextWindow.choice.default",
++          "shared.runtimeSettings.pi.contextWindow.choice.k32",
++          "shared.runtimeSettings.pi.contextWindow.choice.k64",
++          "shared.runtimeSettings.pi.contextWindow.choice.k128",
++          "shared.runtimeSettings.pi.contextWindow.choice.k256",
++          "shared.runtimeSettings.pi.contextWindow.choice.k500",
++          "shared.runtimeSettings.pi.contextWindow.choice.m1",
++        ],
+         control: "range", integer: { min: 1 },
+-        help: "拖动选择预设档位，最大 1M tokens；留空＝系统默认（500k）；下一次开启会话时应用。",
++        helpKey: "shared.runtimeSettings.pi.contextWindow.help",
+       },
+       {
+         // 看护到点检查专用：适配器不再用该值中止整轮（最后兜底固定 1 小时，见 runtime-core/timeout.ts）。
+-        key: "ANS_PI_PROMPT_TIMEOUT_MS", label: "看护检查时限", required: false, secret: false,
++        key: "ANS_PI_PROMPT_TIMEOUT_MS", labelKey: "shared.runtimeSettings.pi.promptTimeout.label", required: false, secret: false,
+         choices: ["", "60000", "120000", "300000", "600000", "900000", "1800000"],
+-        choiceLabels: ["系统默认（5 分钟）", "1 分钟", "2 分钟", "5 分钟", "10 分钟", "15 分钟", "30 分钟"],
++        choiceLabelKeys: [
++          "shared.runtimeSettings.pi.promptTimeout.choice.default",
++          "shared.runtimeSettings.pi.promptTimeout.choice.m1",
++          "shared.runtimeSettings.pi.promptTimeout.choice.m2",
++          "shared.runtimeSettings.pi.promptTimeout.choice.m5",
++          "shared.runtimeSettings.pi.promptTimeout.choice.m10",
++          "shared.runtimeSettings.pi.promptTimeout.choice.m15",
++          "shared.runtimeSettings.pi.promptTimeout.choice.m30",
++        ],
+         control: "range", integer: { min: 1000 },
+-        help: "到点只通知治理角色检查是否卡死，不中止本轮；仍在推进则不动作；1 小时为最后兜底；留空＝系统默认（5 分钟）；单位 ms；下一次开启会话时应用。",
++        helpKey: "shared.runtimeSettings.pi.promptTimeout.help",
+       },
+       {
+-        key: "ANS_PI_REASONING_EFFORT", label: "推理强度", required: false, secret: false,
++        key: "ANS_PI_REASONING_EFFORT", labelKey: "shared.runtimeSettings.reasoning.label", required: false, secret: false,
+         choices: ["off", "low", "medium", "high", "xhigh"],
+-        choiceLabels: ["关", "低", "中", "高", "极高"],
+-        help: REASONING_EFFORT_HELP,
++        choiceLabelKeys: [
++          "shared.runtimeSettings.reasoning.choice.off",
++          "shared.runtimeSettings.reasoning.choice.low",
++          "shared.runtimeSettings.reasoning.choice.medium",
++          "shared.runtimeSettings.reasoning.choice.high",
++          "shared.runtimeSettings.reasoning.choice.xhigh",
++        ],
++        helpKey: REASONING_EFFORT_HELP_KEY,
+       },
+     ],
+   },
+   codex: {
+     runtime: "codex", label: RUNTIME_LABELS.codex,
+     fields: [
+-      { key: "CODEX_API_KEY", label: "API 密钥", required: true, secret: true, fallbackKeys: ["OPENAI_API_KEY"], help: "已有 OPENAI_API_KEY 时可使用其作为凭据。" },
+-      { key: "ANS_CODEX_MODEL", label: "模型", required: true, secret: false },
+-      { key: "ANS_CODEX_BASE_URL", label: "API 地址", required: false, secret: false, help: "留空使用 OpenAI API；自定义地址须兼容 Responses API。" },
++      {
++        key: "CODEX_API_KEY", labelKey: "shared.runtimeSettings.field.apiKey.label", required: true, secret: true,
++        fallbackKeys: ["OPENAI_API_KEY"], helpKey: "shared.runtimeSettings.codex.apiKey.help",
++      },
++      { key: "ANS_CODEX_MODEL", labelKey: "shared.runtimeSettings.field.model.label", required: true, secret: false },
++      {
++        key: "ANS_CODEX_BASE_URL", labelKey: "shared.runtimeSettings.field.apiBaseUrl.label", required: false, secret: false,
++        helpKey: "shared.runtimeSettings.codex.apiBaseUrl.help",
++      },
+       // Codex has no "off" level; the choices list states the platform's real ladder.
+       {
+-        key: "ANS_CODEX_REASONING_EFFORT", label: "推理强度", required: false, secret: false,
++        key: "ANS_CODEX_REASONING_EFFORT", labelKey: "shared.runtimeSettings.reasoning.label", required: false, secret: false,
+         choices: ["low", "medium", "high", "xhigh"],
+-        choiceLabels: ["低", "中", "高", "极高"],
+-        help: REASONING_EFFORT_HELP,
++        choiceLabelKeys: [
++          "shared.runtimeSettings.reasoning.choice.low",
++          "shared.runtimeSettings.reasoning.choice.medium",
++          "shared.runtimeSettings.reasoning.choice.high",
++          "shared.runtimeSettings.reasoning.choice.xhigh",
++        ],
++        helpKey: REASONING_EFFORT_HELP_KEY,
+       },
+     ],
+   },
+   claude: {
+     runtime: "claude", label: RUNTIME_LABELS.claude,
+     fields: [
+-      { key: "ANTHROPIC_API_KEY", label: "API 密钥", required: true, secret: true },
+-      { key: "ANS_CLAUDE_MODEL", label: "模型", required: false, secret: false, help: "留空使用 SDK 默认模型。" },
+-      { key: "ANTHROPIC_BASE_URL", label: "API 地址", required: false, secret: false, help: "留空使用 SDK 默认服务。" },
++      { key: "ANTHROPIC_API_KEY", labelKey: "shared.runtimeSettings.field.apiKey.label", required: true, secret: true },
++      {
++        key: "ANS_CLAUDE_MODEL", labelKey: "shared.runtimeSettings.field.model.label", required: false, secret: false,
++        helpKey: "shared.runtimeSettings.claude.model.help",
++      },
++      {
++        key: "ANTHROPIC_BASE_URL", labelKey: "shared.runtimeSettings.field.apiBaseUrl.label", required: false, secret: false,
++        helpKey: "shared.runtimeSettings.claude.apiBaseUrl.help",
++      },
+       {
+-        key: "ANS_CLAUDE_REASONING_EFFORT", label: "推理强度", required: false, secret: false,
++        key: "ANS_CLAUDE_REASONING_EFFORT", labelKey: "shared.runtimeSettings.reasoning.label", required: false, secret: false,
+         choices: ["off", "low", "medium", "high", "xhigh"],
+-        choiceLabels: ["关", "低", "中", "高", "极高"],
+-        help: REASONING_EFFORT_HELP,
++        choiceLabelKeys: [
++          "shared.runtimeSettings.reasoning.choice.off",
++          "shared.runtimeSettings.reasoning.choice.low",
++          "shared.runtimeSettings.reasoning.choice.medium",
++          "shared.runtimeSettings.reasoning.choice.high",
++          "shared.runtimeSettings.reasoning.choice.xhigh",
++        ],
++        helpKey: REASONING_EFFORT_HELP_KEY,
+       },
+     ],
+   },
+diff --git a/src/common/shared/runtime-shared.ts b/src/common/shared/runtime-shared.ts
+index 9aa3adc..d741f6b 100644
+--- a/src/common/shared/runtime-shared.ts
++++ b/src/common/shared/runtime-shared.ts
+@@ -13,20 +13,37 @@
+ 
+ import os from "node:os";
+ import path from "node:path";
++import type { MessageKey } from "./i18n/keys.ts";
+ 
+ /** 运行时种类取值（单一来源，与编排/装配/桌面三处对齐）。 */
+ export const RUNTIME_KINDS = ["demo", "pi", "codex", "claude"] as const;
+ /** demo 为装配演示替身；其余值为真实执行引擎，缺配置时由对应适配器明确报错。 */
+ export type RuntimeKind = (typeof RUNTIME_KINDS)[number];
+ 
+-/** 界面与 CLI 共用的引擎显示名。此目录仅描述选择，不判断授权或 SDK 可用性。 */
++/**
++ * 引擎显示名的语言中性值。Pi/Codex/Claude 是品牌名（原样展示）；`demo` 是语言中性标识——
++ * 其**用户可见文案**走 i18n key（见 `RUNTIME_LABEL_KEYS`），不再以中文字面量保存在共享元数据中。
++ * 此目录仅描述选择，不判断授权或 SDK 可用性。
++ */
+ export const RUNTIME_LABELS: Readonly<Record<RuntimeKind, string>> = {
+-  demo: "演示",
++  demo: "demo",
+   pi: "Pi",
+   codex: "Codex",
+   claude: "Claude",
+ };
+ 
++/**
++ * 引擎显示名的 i18n key（单一来源；2026-10-23 B4）。`null` 表示品牌名不需翻译，
++ * 直接使用 `RUNTIME_LABELS`。渲染层**不得**导入本文件（顶层 `node:os`/`node:path`）：
++ * 渲染层经 facade 用同一 key（`shared.runtimeSettings.runtime.demo`）取词。
++ */
++export const RUNTIME_LABEL_KEYS: Readonly<Record<RuntimeKind, MessageKey | null>> = {
++  demo: "shared.runtimeSettings.runtime.demo",
++  pi: null,
++  codex: null,
++  claude: null,
++};
++
+ /** 默认运行时（命令行、环境变量都缺省时）。 */
+ export const DEFAULT_RUNTIME: RuntimeKind = "demo";
+ 

@@ -11,6 +11,7 @@
 import type { BoundarySection1 } from "../../src/model/boundary.ts";
 import type { RuntimeAdapter, RoleSession, SessionEvent, WriteGate, PromptOptions } from "../../src/provider/pi/session.ts";
 import { buildGovernedTools } from "../../src/provider/pi/tools.ts";
+import { mainT } from "./i18n.ts";
 
 /** 越界示例路径：落在项目根内但几乎必不在任何角色边界内，用于稳定演示「写之前被拒」。 */
 const OUT_OF_BOUNDS_PATH = "src/__desktop_out_of_bounds__.ts";
@@ -71,9 +72,9 @@ export function createChatDemoAdapter(opts: { gate: WriteGate; boundary: Boundar
       let turn = 0;
 
       const attempt = async (path: string, note: string): Promise<void> => {
-        push({ kind: "tool_call", summary: `模型请求调用 write_file -> ${path}`, detail: { name: "write_file", args: { path } } });
+        push({ kind: "tool_call", summary: mainT("main.demo.toolCall", { path }), detail: { name: "write_file", args: { path } } });
         if (!writeTool) {
-          push({ kind: "denied", summary: `未知工具，拒绝执行：write_file`, detail: { name: "write_file", args: { path } } });
+          push({ kind: "denied", summary: mainT("main.demo.unknownToolDenied"), detail: { name: "write_file", args: { path } } });
           return;
         }
         // 经受治理工具执行——判定发生在工具内部「写入之前」，与真实适配器同一条路径。
@@ -92,14 +93,14 @@ export function createChatDemoAdapter(opts: { gate: WriteGate; boundary: Boundar
           if (demoPromptLog.length >= 50) demoPromptLog.shift();
           demoPromptLog.push({ roleId: role.id, text, opts: promptOpts === undefined ? undefined : promptOpts });
           turn += 1;
-          push({ kind: "message", summary: `（演示运行时·第 ${turn} 轮）收到：${text}` });
-          if (inBound) await attempt(inBound, "角色边界内的写入尝试");
-          await attempt(OUT_OF_BOUNDS_PATH, "越界写入尝试");
-          push({ kind: "message", summary: `第 ${turn} 轮结束（原型阶段未真正落盘）。` });
+          push({ kind: "message", summary: mainT("main.demo.message", { turn, text }) });
+          if (inBound) await attempt(inBound, mainT("main.demo.inBoundsWrite"));
+          await attempt(OUT_OF_BOUNDS_PATH, mainT("main.demo.outOfBoundsWrite"));
+          push({ kind: "message", summary: mainT("main.demo.turnEndedPrototype", { turn }) });
           // L-1（2026-10-12）：轮次**终止信号**与真实适配器对齐（真实 pi 适配器在 `agent_settled` 时发此）——
           // 会话管理器据此把该角色置回「空闲」并放行其队列。demo 端此前不发（无此语义）；L-1 起忙态判据
           // 依赖它：不发则一轮跑完忙态永不复位（后续消息只能入队、永不投递）——绝不可删。
-          push({ kind: "settled", summary: `第 ${turn} 轮结束（演示运行时）。` });
+          push({ kind: "settled", summary: mainT("main.demo.turnEnded", { turn }) });
         },
 
         events(): AsyncIterable<SessionEvent> {
