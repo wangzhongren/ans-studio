@@ -5,7 +5,7 @@ title: v1.7.0 发布准备：发布源 tag v1.7.0（358cde9）、版本与发布
 created: "2026-10-24"
 updated: "2026-10-24"
 timezone: Asia/Shanghai
-status: preparing
+status: verified-published
 related: []
 events:
   - date: "2026-10-24"
@@ -38,11 +38,28 @@ events:
   - date: "2026-10-24"
     kind: implemented
     summary: overlay 再增列 src/common/shared/diagnostics.ts（第二条生产修复）；发布打包测试夹具同步
+  - date: "2026-10-24"
+    kind: published
+    summary: 最终 CI run 40100540042 四 job 全绿；v1.7.0 公开发布（publishedAt 2026-10-24T14:16:39Z）；README 回填三平台 ZIP/overlay/provenance SHA256
 ---
 
 # v1.7.0 发布准备
 
-客户决定发布 **1.7.0**、**未签名 ZIP**（同 v1.6.0 形态）。版本标识与发布说明已切换，发布流水线（`release-policy`、`.github/workflows/release.yml`、`test/装配/release-packaging.test.ts`）已在 tag 确定后切到 v1.7.0。本记录随发布进展更新；最终 CI/资产/SHA 在完成后填入。
+客户决定发布 **1.7.0**、**未签名 ZIP**（同 v1.6.0 形态）。版本标识与发布说明已切换，发布流水线已在 tag 确定后切到 v1.7.0，并已于 **2026-10-24T14:16:39Z** 公开发布；最终 CI/资产/SHA 已回填。
+
+## 发布结果（2026-10-24）
+
+- 最终 CI：run **`40100540042`**（源 tag v1.7.0=`358cde9`）**success**，三平台 build job 与 release job 全部通过。
+- 发布：draft=false，publishedAt **2026-10-24T14:16:39Z**，title `ANS Studio 1.7.0`，URL <https://github.com/wangzhongren/ans-studio/releases/tag/v1.7.0>。
+- 公开资产：`ANS-Studio-1.7.0-mac-arm64.zip`、`ANS-Studio-1.7.0-mac-x64.zip`、`ANS-Studio-1.7.0-win-x64.zip`，以及各平台 `SHA256SUMS-*.txt`、`SHA256SUMS-overlay.txt`、`release-provenance.json`、`overlay.patch`。
+- 资产 SHA256（GitHub Release digest）：
+  - `ANS-Studio-1.7.0-mac-arm64.zip`：`734aa9325adaf30b3fec0ab2f1392470a4645e8d2143c17f3eb1125091206f42`
+  - `ANS-Studio-1.7.0-mac-x64.zip`：`45d493d0dd3f339265d482d1f1bb374723c46cb9789b570fb9f2c43b15191a77`
+  - `ANS-Studio-1.7.0-win-x64.zip`：`7a3fc9cbcd6e49585ab535aebf4bbfa571814121b65162f8c16a327857de20a3`
+  - `overlay.patch`：`8d30b0cfbf953fe47e51752081671a17a0b95c6ece40051d6f09c20800e3f131`
+  - `release-provenance.json`：`283ee68bbfe8d332027d6bc48a82c39e644c6d26dd6ae35776ee38a2e07456d2`
+- 发布前共 6 次 run 因 overlay/测试/diagnostics 阻断（interface 等待预算、project-document 期望、V-D1 POSIX、acceptance-dispatch Lead note、diagnostics root 脱敏等），逐轮以显式 overlay 修复、tag 不移动；最终 run 40100540042 全绿。
+- 三平台运行包**未签名、未公证**（同 v1.6.0 形态）。
 
 ## 版本与冻结源
 
@@ -148,15 +165,21 @@ events:
 | `node --test "test/装配/**/*.test.ts"` | 0 | 85 tests / 85 pass / 0 fail / 0 skip |
 | `selectOverlay` 预判 | 0 | `diagnostics.ts` 与既有 blocking-fix 路径（team-plan、interface、project-document、acceptance-dispatch）入选；未列名同目录测试 excluded；未列名 `src/common/编排/flow-service.ts` 抛 `Unreviewed production overlay` |
 
-## 发布配方（已切换，待 CI）
+## 发布配方（已生效）
 
 - `src/common/装配/release-policy.mjs`：`SOURCE_REF='v1.7.0'`、`SOURCE_SHA='358cde9152584be29eff3a7564c99d9dd53463d8'`；白名单＝基础集（`package.json`、`package-lock.json`、`.github/workflows/release.yml`；dirs＝`src/common/装配/`、`test/装配/`）＋历史精确条目＋v1.7.0 发布阻断修复 5 条（`src/common/编排/team-plan.ts`、`src/common/shared/diagnostics.ts`、`test/桌面应用/interface.test.ts`、`test/桌面应用/project-document.test.ts`、`test/桌面应用/acceptance-dispatch.test.ts`），未列名 `app/`/`src/` 仍 fail-closed。
 - `src/common/装配/release-policy.d.mts`：字面量与 `.mjs` 同步。
 - `test/装配/release-packaging.test.ts`：`SOURCE_REF`/`SOURCE_SHA` 断言及打包面用例切到 v1.7.0 与上述 SHA；新增 v1.7.0 blocking-fix 精确入选用例；断言不放宽、未删测试。
 - `.github/workflows/release.yml`：workflow_dispatch `source_ref` 默认、并发组、`gh release view/create/upload/edit`、标题与 notes 全部 → v1.7.0；未签名沿用 `CSC_IDENTITY_AUTO_DISCOVERY: 'false'`；`publish` 默认仍为 false（draft），发布时以工作流输入 `publish=true` 公开。
-- 待办：修复文件由对应角色提交后，提交本 overlay 变更，用同一 tag v1.7.0 重新触发三平台 CI；prepare 预演结果（overlayPaths/actualTree/overlayPatchSha256）与 run id 由 CI 回填。
+- 已生效：最终 run 40100540042 以同一 tag v1.7.0 + 上述 overlay 构建成功；prepare 产出的 overlayPaths/actualTree/overlayPatchSha256 见 Release 的 `release-provenance.json` 与各平台 manifest。
 
-## CI、资产与 SHA（待回填）
+## CI、资产与 SHA
+
+### 最终 CI run 40100540042（success）
+
+- 三平台 build job 与 release job 全部 success；draft=false，publishedAt **2026-10-24T14:16:39Z**。
+- URL <https://github.com/wangzhongren/ans-studio/releases/tag/v1.7.0>；title `ANS Studio 1.7.0`。
+- 资产 SHA256 见「发布结果」；三平台运行包未签名/未公证。
 
 ### CI run 40092292623（失败，源 tag v1.7.0=358cde9）
 
@@ -168,7 +191,7 @@ events:
   - `src/common/编排/team-plan.ts`：目录大小写重复跨平台修复（唯一生产文件）。
   - `test/桌面应用/interface.test.ts`：第四轮等待预算 6000→15000。
   - `test/桌面应用/project-document.test.ts`：期望补 changelog。
-- 待重新触发：同一 tag v1.7.0 + 更新后的 overlay；新 run id 待回填。
+- 后续：同一 tag v1.7.0 + 更新后的 overlay 继续重跑。
 - 修复核对（2026-10-24）：`src/common/编排/team-plan.ts` 的 V-D1 修复已落地——以 `parsed.path.toLowerCase()` 作比较键（只改比较键，展示/落盘保留原大小写），替换原 `compareKey`；编排角色以模拟 darwin 复跑 29/29，旧键复现 28/29 且仅 V-D1 失败，提交前已核对。本角色未改该文件。
 
 ### CI run 40093494057（第二次，仍失败，源 tag v1.7.0=358cde9）
@@ -178,7 +201,7 @@ events:
   1. `test/桌面应用/acceptance-dispatch.test.ts`：自动验收的合法 verifier 发送被旧的“不派 Proof”断言误伤。
   2. `test/桌面应用/interface.test.ts`：第四轮被前一轮 post-write 单飞挡住。
 - 处置：tag 仍不移动；overlay 再按精确路径加入 `test/桌面应用/acceptance-dispatch.test.ts`（interface 已在列），由桌面角色修复测试断言。
-- 当时待第三次重跑：同一 tag v1.7.0 + 更新后的 overlay；新 run id 待回填。
+- 后续：同一 tag v1.7.0 + 更新后的 overlay 继续重跑。
 
 ### CI run 40096974937（第五次，Windows 剩 2 项，源 tag v1.7.0=358cde9）
 
@@ -187,16 +210,16 @@ events:
   1. `test/桌面应用/acceptance-dispatch.test.ts`：Lead note 相关等待（桌面角色修复中）。
   2. diagnostics root 输出过度脱敏：由项目管理角色修复 `src/common/shared/diagnostics.ts`。
 - 处置：tag 仍不移动；overlay 再按精确路径加入 `src/common/shared/diagnostics.ts`（第二条生产修复）。
-- 待第六次重跑：同一 tag v1.7.0 + 更新后的 overlay；新 run id 待回填。
-- 说明：中间轮次的修复批次由协调方处理，本记录只展开当前仍未通过的第五次。
+- 后续：同一 tag v1.7.0 + 更新后的 overlay 继续重跑，最终 run 40100540042 通过。
+- 说明：中间轮次的修复批次由协调方处理，本记录只展开当时仍未通过的第五次。
 
-- 第六次三平台 CI run：**待触发/待回填**；不编造 run id。
-- 资产：`ANS-Studio-1.7.0-mac-arm64.zip`、`ANS-Studio-1.7.0-mac-x64.zip`、`ANS-Studio-1.7.0-win-x64.zip`，以及各平台 `SHA256SUMS-*.txt`、`SHA256SUMS-overlay.txt`、`release-provenance.json`、`overlay.patch`；SHA256 在构建完成前未知，**未预填**，发布后由 Release 校验文件回填/核对。
+- 发布前 6 次 run 的阻断与修复见「发布结果」；最终 run 40100540042 全绿。
+- 资产：已公开发布（三个 ZIP、各平台 `SHA256SUMS-*.txt`、`SHA256SUMS-overlay.txt`、`release-provenance.json`、`overlay.patch`）；SHA256 见「发布结果」与 README。
 - 三平台运行包**未签名、未公证**（同 v1.6.0 形态）：macOS 未公证、Windows 未做代码签名。
 
 ## 证据边界
 
-- 发布准备轮只做版本字段、README 发布说明与本记录，并运行本地 `typecheck`、`typecheck:renderer` 与装配测试；流水线切换轮只改发布策略、workflow 与发布打包测试，并运行 `typecheck`、装配测试、release.yml YAML 解析与 `selectOverlay` 预判；CI 阻断修复轮只增列经评审的 overlay 精确路径并同步测试夹具；第二次 CI 阻断修复轮再增列 `test/桌面应用/acceptance-dispatch.test.ts`；第五次 CI 后 overlay 再增列 `src/common/shared/diagnostics.ts`。
-- CI run 40092292623、40093494057 与 40096974937 的失败结论来自协调方转达的发布修复任务；本角色未重跑这些 run，也未改修复文件的内容，只把经评审的精确路径加入 overlay 并补选择断言。
-- prepare 预演仍未执行：当前 HEAD `2c19285` 已含此前 overlay 与修复，但 `src/common/shared/diagnostics.ts`、`test/桌面应用/acceptance-dispatch.test.ts` 的修复与本次 overlay 增列仍在工作树未提交，预演会漏掉这些改动；待一并提交后由 CI 执行并回填。
-- 未运行全量测试、`build:renderer`；未触发 CI，未下载或启动 ZIP。三平台构建/解压/启动 smoke 仍由 CI 原生 runner 执行；桌面在线链路验证范围与 v1.6.0 记录一致，不因本版扩大。
+- 发布前各轮 CI 失败结论来自协调方转达与最终 run 记录；本角色未重跑这些 run，也未改修复文件内容，只维护 overlay 白名单/发布测试夹具与发布记录。
+- 本轮（发布后回填）只改 `README.md` 的 v1.7.0 SHA256 表与本记录；未改产品/源码/测试/README 其他内容。
+- 三平台构建/解压/启动 smoke 由 CI 原生 runner 执行（最终 run 40100540042 success）；SHA256 取自 GitHub Release 资产 digest。
+- 本角色未独立下载或启动 ZIP；桌面在线链路验证范围与 v1.6.0 记录一致，不因本版扩大。
