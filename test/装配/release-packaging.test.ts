@@ -113,19 +113,21 @@ test('release overlay includes exactly the reviewed v1.5.0 fix batch by exact pa
   assert.throws(() => selectOverlay(['src/common/codex-adapter/config.ts']), /Unreviewed production overlay/);
 });
 
-// v1.7.0 发布阻断修复（tag v1.7.0 不可移动，经评审走显式 overlay）：1 项产品修复 + 2 项测试修复按精确路径入选；
+// v1.7.0 发布阻断修复（tag v1.7.0 不可移动，经评审走显式 overlay）：1 项产品修复 + 3 项测试修复按精确路径入选；
 // 同目录未列名 test/ 仍 excluded，未列名 src/ 仍 fail-closed。断言不放宽。
 test('release overlay includes exactly the reviewed v1.7.0 blocking-fix batch by exact path', () => {
   const result = selectOverlay(['package.json',
     'src/common/编排/team-plan.ts',
     'test/桌面应用/interface.test.ts',
     'test/桌面应用/project-document.test.ts',
+    'test/桌面应用/acceptance-dispatch.test.ts',
     'test/桌面应用/runtime-resolution.test.ts',
     'test/桌面应用/session-rebuild-race.test.ts']);
   assert.deepEqual(result.selected, ['package.json',
     'src/common/编排/team-plan.ts',
     'test/桌面应用/interface.test.ts',
-    'test/桌面应用/project-document.test.ts']);
+    'test/桌面应用/project-document.test.ts',
+    'test/桌面应用/acceptance-dispatch.test.ts']);
   assert.deepEqual(result.excluded, ['test/桌面应用/runtime-resolution.test.ts',
     'test/桌面应用/session-rebuild-race.test.ts']);
   assert.throws(() => selectOverlay(['src/common/编排/flow-service.ts']), /Unreviewed production overlay/);

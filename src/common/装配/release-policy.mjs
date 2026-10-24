@@ -5,8 +5,9 @@ export const SOURCE_SHA = '358cde9152584be29eff3a7564c99d9dd53463d8';
 // i18n、自动推进、验收返工路由、Lead 治理协调）；白名单保持基础集，未列名 app//src/ 仍 fail-closed。
 // v1.7.0 发布阻断修复（tag v1.7.0 不可移动，经评审走显式 overlay；按精确路径、单文件不开目录、断言不放宽）：
 //   · 生产（唯一）：src/common/编排/team-plan.ts——目录大小写重复跨平台修复（V-D1 POSIX）。
-//   · 测试 2 条：test/桌面应用/interface.test.ts（第四轮等待预算 6000→15000）、
-//     test/桌面应用/project-document.test.ts（期望补 changelog）。
+//   · 测试 3 条：test/桌面应用/interface.test.ts（第四轮等待预算 6000→15000）、
+//     test/桌面应用/project-document.test.ts（期望补 changelog）、
+//     test/桌面应用/acceptance-dispatch.test.ts（自动验收合法发送不再被旧“不派 Proof”断言误伤）。
 // 以下历史条目仅作保留。
 // v1.6.0 overlay（历史）：冻结源 tag v1.6.0 已含全部产品/测试代码（治理角色粒度、团队计划 v2、
 // MapReduce 测试、受治理后台任务、思考行显示修复、验收风险档位）。
@@ -30,6 +31,7 @@ const files = new Set(['package.json', 'package-lock.json', '.github/workflows/r
   'src/common/编排/team-plan.ts',
   'test/桌面应用/interface.test.ts',
   'test/桌面应用/project-document.test.ts',
+  'test/桌面应用/acceptance-dispatch.test.ts',
   'src/common/codex-adapter/reasoning-catalog.ts',
   'test/codex-adapter/reasoning-catalog.test.ts',
   'test/codex-adapter/fixtures.ts',
