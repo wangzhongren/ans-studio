@@ -33,10 +33,16 @@ interface Store {
 }
 let store: Store | undefined;
 
+// 环境值脱敏只针对可辨识的 secret 值：环境名须明确敏感（token/secret/password/api key/auth），
+// 且值长度须 >= 8。过短的环境值多是通用词（如 Windows 环境的 "root"），全局子串替换会误伤诊断
+// event 名（project-document.root.skipped 被改成 project-document.[REDACTED].skipped），且短值不具
+// secret 强度；Bearer、key=value、URL userinfo 等文本模式脱敏不受此下限影响。
+const ENV_SECRET_MIN_LENGTH = 8;
+
 function scrub(text: string): string {
   let value = text;
   for (const [name, secret] of Object.entries(process.env)) {
-    if (/token|secret|password|api_?key|auth/i.test(name) && secret && secret.length >= 4) {
+    if (/token|secret|password|api_?key|auth/i.test(name) && secret && secret.length >= ENV_SECRET_MIN_LENGTH) {
       value = value.split(secret).join("[REDACTED]");
     }
   }

@@ -1114,6 +1114,11 @@ test("2026-10-24 所有变更独立验收：非发布新契约流程同样派 ve
       const awaitingNotes = () =>
         deliveryNotes(harness.events, "liaison").filter((note) => note.includes("awaiting-release-acceptance"));
       assert.equal(awaitingNotes().length, 0, "不再有 awaiting-release-acceptance 提示");
+      // Windows 慢速 CI：criteria 账本已落盘时 Lead 系统行可能晚一步可见——有界等待后断言（不放宽原意）。
+      await waitFor(
+        () => deliveryNotes(harness.events, "liaison").some((note) => note.includes("实施前验收标准缺失")),
+        4000,
+      );
       assert.ok(
         deliveryNotes(harness.events, "liaison").some((note) => note.includes("实施前验收标准缺失")),
         "Lead 可见阻塞原因",
