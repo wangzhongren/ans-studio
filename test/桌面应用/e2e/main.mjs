@@ -1850,10 +1850,10 @@ async function run() {
   repairCheck("MAC_CLOSE_REOPEN_LOADS_WITHOUT_DUPLICATE_HANDLERS", await wc().executeJavaScript("!!document.getElementById('inp-message') && !!window.desktop"));
   repairCheck("MAC_CLOSE_REOPEN_NO_AUTO_SEND", repairSendRequests.length === sendsBeforeCrash);
 
-  // —————— 2026-10-24 治理协调 / P0-1 发布验收门（最小真实主进程检查；不新增 UI）——————
+  // —————— 2026-10-24 所有变更独立验收（最小真实主进程检查；不新增 UI）——————
   // 用真实 `createDesktopInterface`（真实 Electron 主进程进程内）+ OUTDIR 临时项目：
-  //  ① 非发布 flow（release 缺省）完成 ⇒ Lead 系统行 awaiting-release-acceptance；不派 verifier/Proof；
-  //  ② flow 顶层 release: true 后才派 verifier；目标夹具文件不被改写（零写入）。
+  //  ① 非发布 flow（release 缺省）完成 ⇒ 同样派 verifier/Proof；不再出现 awaiting-release-acceptance 系统行；
+  //  ② flow 顶层 release: true 只是元数据（不改变派发语义）；目标夹具文件不被改写（零写入）。
   {
     const projectMod = await import(pathToFileURL(path.join(APP_DIR, "desktop", "project.ts")).href);
     const coordRoot = path.join(OUTDIR, "governance-coordination-project");
@@ -1974,22 +1974,28 @@ async function run() {
         coordEvents
           .filter((envelope) => envelope.roleId === "liaison" && envelope.event.kind === "message" && envelope.event.detail && envelope.event.detail.source === "delivery-note")
           .map((envelope) => String(envelope.event.summary ?? ""));
-      await waitForGovernance(() => leadNotes().some((note) => note.includes("awaiting-release-acceptance")), "GOVERNANCE_AWAITING_RELEASE_SYSTEM_LINE");
-      repairCheck("GOVERNANCE_NON_RELEASE_NO_PROOF", (coordSends.get("verifier") ?? []).length === 0);
+      await waitForGovernance(() => (coordSends.get("verifier") ?? []).length > 0, "GOVERNANCE_NON_RELEASE_DISPATCHES_PROOF");
+      repairCheck(
+        "GOVERNANCE_NO_AWAITING_RELEASE_SYSTEM_LINE",
+        !leadNotes().some((note) => note.includes("awaiting-release-acceptance")),
+      );
       // flow 文件不被应用改写（目标零写入；fixture 自身仅由本检查的 release 标记步骤改写）。
       const nonReleaseText = fs.readFileSync(flowPath, "utf8");
       await sleep(250);
       repairCheck("GOVERNANCE_NON_RELEASE_FLOW_UNCHANGED", fs.readFileSync(flowPath, "utf8") === nonReleaseText);
       repairCheck("GOVERNANCE_NON_RELEASE_NO_CRITERIA_FILE", !fs.existsSync(path.join(coordRoot, "docs", "acceptance", `${flowId}-criteria-v1.md`)));
 
-      // 显式发布标记（release: true）⇒ 下一次真实事件才派 verifier/Proof。
+      // release: true 只是元数据（不新增/不撤销任何门）；flow 更新后的真实事件照常评估（零写入不变）。
       writeCoordFlow(true);
       await coordIface.listProject({ projectRoot: coordRoot });
-      await waitForGovernance(() => (coordSends.get("verifier") ?? []).length > 0, "GOVERNANCE_RELEASE_DISPATCHES_PROOF");
-      const releaseText = fs.readFileSync(flowPath, "utf8");
       await sleep(250);
+      const releaseText = fs.readFileSync(flowPath, "utf8");
       repairCheck("GOVERNANCE_RELEASE_FLOW_UNCHANGED", fs.readFileSync(flowPath, "utf8") === releaseText);
       repairCheck("GOVERNANCE_RELEASE_NO_ACCEPTANCE_DONE", /id: verification\n\s+title: 验收\n\s+owner: app\n\s+kind: acceptance\n\s+status: pending/.test(releaseText));
+      repairCheck(
+        "GOVERNANCE_RELEASE_NO_AWAITING_SYSTEM_LINE",
+        !leadNotes().some((note) => note.includes("awaiting-release-acceptance")),
+      );
       log("GOVERNANCE_COORDINATION=" + JSON.stringify({ leadNotes: leadNotes().length, verifierSends: (coordSends.get("verifier") ?? []).length }));
     } finally {
       await coordIface.stopSession();

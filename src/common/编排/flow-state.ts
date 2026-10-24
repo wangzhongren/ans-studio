@@ -162,10 +162,10 @@ export interface FlowState {
   qualityTier: FlowQualityTier;
   status?: string;
   /**
-   * 发布验收标记（可选；缺省 = false = 非发布，2026-10-24 闸门 2 delta P0-1）。
+   * 发布元数据标记（可选；缺省 = false = 非发布，2026-10-24 P0-1；同日客户修订：所有变更独立验收）。
    *
-   * **只有 `true`（发布版本）才允许应用按发布验收门派 Proof / 启动 verifier criteria；**
-   * 非发布流程在 change-package 后停在等待发布验收，不派 Proof、不写标准、不标 acceptance done。
+   * **`release` 仅可选发布元数据，不是独立验收的启动条件**：所有变更（含非发布）在流程齐备后
+   * 都由应用按验收门派 Proof / 验收并启动 verifier criteria；该标记不改变验收范围。
    * 标记只能由 Steward 用既有 `request_confirmation(cardKind=schedule-write)` 写一份只把 release
    * 从 false/缺省改为 true、其余字段/步骤不变的 flow YAML（应用做受控扩展校验）；不是新 step kind、
    * 不是账本 kind、不是新卡片种类。
@@ -296,7 +296,7 @@ function flowParseFailure(errors: FlowStateError[]): ParseFlowStateResult {
  *
  * 校验规则（确定性，逐条对应客户决定）：
  *   1. flowId 与文件名一致；version 正整数；qualityTier ∈ {prototype, production}；steps 非空、id 唯一；
- *      可选 `release` 必须是布尔（缺省 = false = 非发布；只有 true 才允许发布验收派 Proof）；
+ *      可选 `release` 必须是布尔（缺省 = false = 非发布；仅发布元数据，不是独立验收的启动条件）；
  *   2. 保留 id `verification`/`acceptance` 至多一个、必须是 `kind: acceptance`、初始 `status: pending`
  *      （完成后允许 `done` 且必须带 `acceptance` 证据）；执行/证据步骤不得占用这两个 id；
  *   3. `kind`/`status`/`evidence.kind` 严格枚举；`done` 步骤必须有 evidence，且 evidence.kind 与步骤
@@ -362,7 +362,8 @@ export function parseFlowStateYaml(text: string, flowId: string): ParseFlowState
     push("status", "status 为可选人读字段；给出时必须是非空字符串");
   }
 
-  // release（2026-10-24 P0-1）：可选布尔；缺省 = false（非发布）。未知类型 fail-closed。
+  // release（2026-10-24 P0-1；同日客户修订：仅可选发布元数据，不是独立验收的启动条件）：
+  // 可选布尔；缺省 = false（非发布）。未知类型 fail-closed。
   if (document.release !== undefined && typeof document.release !== "boolean") {
     push(
       "release",
@@ -1039,6 +1040,53 @@ export type LatestAcceptanceDecision =
   | { kind: "accepted"; entry: GovernanceLedgerEntry }
   | { kind: "rejected"; entry: GovernanceLedgerEntry }
   | { kind: "unresolved"; entry: GovernanceLedgerEntry };
+
+/**
+ * 是否为可作 `customer-decision` 证据的账本决定类型（`unclassified` 不是证据）。
+ * 纯函数；与 `parseFlowStateYaml` / `validateFlowEvidence` 共用同一份枚举，不新增 kind。
+ */
+export function isCustomerDecisionKindRef(value: unknown): value is string {
+  return typeof value === "string" && CUSTOMER_DECISION_KIND_REFS.has(value);
+}
+
+/** 是否为「已结算」的客户决定结果（accepted / accepted-quick / appointed；与对账同口径）。 */
+export function isResolvedCustomerDecision(value: unknown): boolean {
+  return typeof value === "string" && RESOLVED_CUSTOMER_DECISIONS.has(value);
+}
+
+/**
+ * 指定 `decisionKind` 的最新客户决定（2026-10-24 appointment 应用收口用）。
+ *
+ * 与 `latestAcceptanceDecision` 同口径：按账本 append（数组）顺序取该 flow 最后一条
+ * `customer.decision{decisionKind}`；`at` 不参与排序；账本坏行 ⇒ `ledger-unavailable`（fail-closed）。
+ * **不匹配 `stepId`**：账本 `customer.decision.stepId` 只是发起步骤的审计标记（例如任命决定可能记在
+ * `role-cards`），证据匹配键是 `flowId + decisionKind`（与 `validateFlowEvidence` 同一口径）。
+ */
+export type LatestCustomerDecision =
+  | { kind: "none" }
+  | { kind: "ledger-unavailable"; errors: readonly string[] }
+  | { kind: "resolved"; entry: GovernanceLedgerEntry }
+  | { kind: "unresolved"; entry: GovernanceLedgerEntry };
+
+/** 取该 flow 指定 decisionKind 按账本 append 顺序**最后一条**客户决定并分类（纯函数，不读盘）。 */
+export function latestCustomerDecision(
+  flowId: string,
+  decisionKind: string,
+  ledgerInput: FlowLedgerInput,
+): LatestCustomerDecision {
+  const { entries, errors } = ledgerOf(ledgerInput);
+  if (errors.length > 0) return { kind: "ledger-unavailable", errors: [...errors] };
+  let latest: GovernanceLedgerEntry | undefined;
+  for (const entry of entries) {
+    if (entry.kind === "customer.decision" && entry.flowId === flowId && entry.decisionKind === decisionKind) {
+      latest = entry;
+    }
+  }
+  if (latest === undefined) return { kind: "none" };
+  return isResolvedCustomerDecision(latest.customerDecision)
+    ? { kind: "resolved", entry: latest }
+    : { kind: "unresolved", entry: latest };
+}
 
 /** 取该 flow 按账本 append 顺序**最后一条** acceptance 决定并分类（纯函数，不读盘）。 */
 export function latestAcceptanceDecision(flowId: string, ledgerInput: FlowLedgerInput): LatestAcceptanceDecision {

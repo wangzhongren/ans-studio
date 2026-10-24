@@ -160,6 +160,9 @@ import {
 // 不直接 import 编排私有 `src/common/编排/`；单一实现与 schema 由编排拥有。
 import {
   completeAcceptanceStep as realCompleteAcceptanceStep,
+  // 2026-10-24 appointment 收口：客户任命决定已落账后，由应用专用 `completeCustomerDecisionStep`
+  // 把 flow 的 appointment 客户决定步骤标 done（只经公共出口消费；不注册为角色工具）。
+  completeCustomerDecisionStep as realCompleteCustomerDecisionStep,
   // 2026-10-23 可重入门禁（governance-advance-redispatch A4/A5）：结构校验通过后由应用专用
   // `completeRoleCardsStep` 把 flow 的 role-cards 标 done（只经公共出口消费；不注册为角色工具）。
   completeRoleCardsStep as realCompleteRoleCardsStep,
@@ -176,6 +179,7 @@ import {
   listReadyFlowSteps,
   type AcceptanceReworkItem,
   type AcceptanceReworkParseResult,
+  type CompleteCustomerDecisionStepInput,
   type CompleteRoleCardsStepInput,
   type CompleteRoleCardsStepResult,
   type FlowState,
@@ -646,6 +650,20 @@ export interface DesktopDeps {
    * 出口 `flow-state.ts::completeRoleCardsStep` 调用；测试可注入桩件。
    */
   completeRoleCardsStepFn?: (input: CompleteRoleCardsStepInput) => Promise<CompleteRoleCardsStepResult>;
+  /**
+   * **appointment 客户决定步骤收口**（2026-10-24 P0：从零项目 appointment 一直 pending）：客户任命决定
+   * 已落账后，在角色卡校验/readiness 之前把 flow 的 `id:"appointment"`（kind=customer-decision）标 done +
+   * `evidence:{kind:"customer-decision",ref:"appointment"}`。缺省经 Pipeline 公共出口
+   * `flow-state.ts::completeCustomerDecisionStep`（幂等、原子写、未结算/缺失 fail-closed；不写客户决定、
+   * 不伪造批准）；测试可注入桩件/观察调用顺序。
+   */
+  completeCustomerDecisionStepFn?: (input: CompleteCustomerDecisionStepInput) => Promise<{
+    ok?: boolean;
+    idempotent?: boolean;
+    code?: string;
+    error?: string;
+    message?: string;
+  }>;
   /**
    * **flow artifact 证据补登**（2026-10-20 真机：旧扫描规则写下的证据文件在重启后不会被补
    * `artifact.observed`，Steward 无法把 delivered 步骤标 done）：缺省经 Pipeline 公共出口
@@ -1551,6 +1569,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const createGovernanceJudgeFn = deps.createGovernanceJudgeFn ?? realCreateGovernanceJudge;
   // 2026-10-23 可重入门禁：role-cards 收口（缺省＝Pipeline 公共出口；桌面不复制编排逻辑）。
   const completeRoleCardsStepFn = deps.completeRoleCardsStepFn ?? realCompleteRoleCardsStep;
+  const completeCustomerDecisionStepFn =
+    deps.completeCustomerDecisionStepFn ?? realCompleteCustomerDecisionStep;
   // Pi 配置面板：函数与目标路径均可注入（**测试/e2e 必须注入临时 `.env`**，绝不碰真实仓库根 `.env`）。
   const getPiConfigFn = deps.getPiConfigFn ?? realGetPiConfig;
   const savePiConfigFn = deps.savePiConfigFn ?? realSavePiConfig;
@@ -1668,11 +1688,6 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const acceptanceCriteriaDispatched = new Set<string>();
   /** 标准/变更包门槛的阻塞提示去重：`projectRoot\0flowId` → 原因（同原因只提示一次；原因变化再提示）。 */
   const acceptanceArtifactBlockedNotified = new Map<string, string>();
-  /**
-   * 2026-10-24 P0-1：非发布流程「停在发布验收前」系统行的去重：`projectRoot\0flowId` → flow revision
-   * （legacy 无 YAML 记 `legacy`）。同一 revision 只提示一次；flow/标记变化才再提示。
-   */
-  const acceptanceReleaseAwaitingNotified = new Map<string, string>();
   /** 每项目最多一条「无法确定项目引擎」系统行（后续真实事件只记诊断；不循环重试、不刷屏）。 */
   const acceptanceRuntimeUnresolvedNotified = new Set<string>();
   let runAcceptanceCheck: ((projectRoot: string, trigger: "settle" | "ledger" | "import") => Promise<void>) | undefined;
@@ -2958,7 +2973,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // 触发面复用既有验收检查入口（任意角色 settle / 回交到达/settle / 账本追加 / 导入/启动补齐）。
   // 只做**唤醒**：读 flow 机器状态，把「阻塞」「交付待核证」两类阶段交给 Lead（`primaryRoleId`）
   // 协调；**不自动推进步骤、不派项目角色、不写 flow/账本、不弹客户卡、不轮询**。
-  // （非发布「等待发布验收」由 P0-1 发布门的**状态系统行**如实说明，不用协调任务双发。）
+  // （验收/Proof 由既有验收检查入口按流程完成度自动派发，不用协调任务重复。）
   // · 复用既有投递机（openBackground/sendBackground）：Lead 忙/有在途 ⇒ 不并发注入，等下一次真实事件；
   // · 独立去重键（projectRoot+flowId+revision+stage）；delivered 阶段与 `wakeStewardForDeliveredSteps`
   //   共享「本 revision 已通知」指纹（同一 revision 不双发）；
@@ -3009,7 +3024,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         details: sorted.slice(0, 10).map((step) => `- 步骤 ${step.id} 已 delivered（owner=${step.owner ?? "未标注"}）`),
       };
     }
-    // 非发布「等待发布验收」不走协调唤醒任务：由发布验收门的**状态系统行**如实说明（不双发）。
+    // 无阻塞/交付待核证阶段 ⇒ 不唤醒（验收由验收检查入口按完成度自动派发，不在此重复）。
     return undefined;
   };
 
@@ -3100,7 +3115,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     diagnostic.record("governance.coordination.sent", {
       flowId,
       count: state.total,
-      reasonCode: stage.key.startsWith("delivered:") ? "delivered" : stage.key === "awaiting-release" ? "awaiting-release" : "blocked",
+      reasonCode: stage.key.startsWith("delivered:") ? "delivered" : "blocked",
     });
   };
 
@@ -3114,7 +3129,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   //   · 项目 worker（listing 中非内置角色）的 dispatch / artifact（由 Steward 用 dispatch_task 派）。
   // 其它内置 owner（rapporteur / nominator / verifier）跳过，交既有 app / 治理路径；customer-decision /
   // acceptance / app-owned 由规划器自身 stop/跳过。**只提示、不派发、不标 done、不写 flow/账本、不轮询**；
-  // release 门仍由 P0-1 控制（本层不派 acceptance / verifier / Proof）。
+  // 验收/Proof 仍由既有验收检查入口自动派发（本层不派 acceptance / verifier / Proof）。
   // · 去重键 `projectRoot+flowId+revision+sortedReadyIds`；与 delivered 唤醒 / 治理协调唤醒共用同一 flow
   //   revision（`flowRevisionForGate`），**有 delivered 待核证时本轮不做 ready 唤醒**（delivered 核证优先，
   //   避免向 Steward 双发）。
@@ -3170,7 +3185,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       "1) 先 flow_get 读取当前流程与账本状态（含 revision），核对依赖与已派发记录后再动作。",
       "2) 项目 worker 的 dispatch / artifact 步骤用 dispatch_task 按 owner 派发（stepId 与 flow 完全一致；同一 parallelGroup 可并行；账本已有 dispatch.accepted 的步骤不要重复派）。",
       "3) owner 为统筹（convener）自身的 artifact 步骤请继续执行并回交。",
-      "4) 不要把这些步骤直接标 done（done 由证据核证决定）；不要派 acceptance / 验收（发布验收仍由既有 release 门控制）。",
+      "4) 不要把这些步骤直接标 done（done 由证据核证决定）；不要派 acceptance / 验收（验收由应用按流程完成度自动派发 Proof）。",
       "本消息只是继续调度提示：应用未自动派发、未改 flow/账本、未替客户决定。",
     ].join("\n");
   };
@@ -3353,9 +3368,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       const reworkBranch =
         flowStateExistsForRework &&
         (latest.kind === "rejected" || (latest.kind === "none" && autoReworkRecord !== undefined));
-      // ———— 2026-10-24 P0-1：读 flow 机器状态取顶层 `release`（缺省/false = 非发布） ————
-      // 发布验收门的唯一素材：`flow.release === true` 才允许自动派 verifier / 写 acceptance-criteria /
-      // 返工后自动重派 Proof；非发布停在 `awaiting-release-acceptance`（不派、不写标准、不标 acceptance done）。
+      // ———— 读 flow 机器状态（治理协调/就绪唤醒/新契约标准判断共用） ————
+      // 2026-10-24 客户修订（所有变更独立验收）：`release` 仅保留为解析出的元数据/既有字段，
+      // **不再作为独立验收的门**；自动派 verifier / 写 acceptance-criteria / 返工后重派 Proof
+      // 对所有满足流程完成与证据条件的 flow 生效。
       let parsedFlowForGate: FlowState | undefined;
       let flowRevisionForGate: string | undefined;
       try {
@@ -3366,9 +3382,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           flowRevisionForGate = createHash("sha256").update(gateBytes).digest("hex");
         }
       } catch {
-        parsedFlowForGate = undefined; // 无 YAML/不可读：legacy 路径按「非发布」处理（release 缺省 = false）
+        parsedFlowForGate = undefined; // 无 YAML/不可读：legacy 路径（无机器状态，不参与协调/就绪判定）
       }
-      const releaseMarked = parsedFlowForGate?.release === true;
       if (reworkBranch) {
         // delivered 核证 / artifact 补登仍是独立时机（返工步骤 delivered 也要唤醒 Steward）。
         await backfillFlowArtifacts(info.projectRoot, info.flowId, diagnostic);
@@ -3408,17 +3423,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           );
           if (routeResult !== "sent") return;
         }
-        // 2026-10-24 P0-1：非发布流程即使返工完成也不自动重派 Proof（发布版本才由应用按发布验收门派）。
-        if (!releaseMarked) {
-          const revisionTag = flowRevisionForGate ?? "legacy";
-          if (acceptanceReleaseAwaitingNotified.get(key) !== revisionTag) {
-            acceptanceReleaseAwaitingNotified.set(key, revisionTag);
-            note(`流程 ${info.flowId}：返工已按路由交主理组织；flow.release 未标记为 true（非发布）⇒ 不自动重派验收、不标记 acceptance done；发布版本才由统筹用 schedule-write 卡把 release 显式标为 true。`);
-            diagnostic.record("acceptance.release.awaiting", { flowId: info.flowId, reasonCode: "release-unmarked" });
-          }
-          acceptanceDispatchedFlows.delete(key);
-          return;
-        }
+        // 返工已按路由交主理组织；返工完成后按既有重派门自动重派 Proof（所有流程，不区分 release）。
         const freshRecord = (await readReworkRoutingRecord(info.projectRoot, info.flowId)).record;
         await redispatchAcceptanceRework({
           projectRoot: info.projectRoot,
@@ -3463,8 +3468,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // 任一 step id）；legacy flow 保持原行为（G4/O4 迁移兼容）。标准缺失 ⇒ 派 Verifier 写标准
       // （stepId=acceptance-criteria；账本+运行期去重、不循环）并阻塞验收判定；变更包缺失/缺 riskTier ⇒ 阻塞
       // 验收判定 + Lead 系统行（去重）。判定时把标准/变更包/档位带进任务文案（不猜、不把「待补」当通过）。
-      // 2026-10-24 P0-1：以上自动派发（含写 acceptance-criteria）**只在 flow.release === true 时**执行；
-      // 非发布连标准都不派（不写 acceptance-criteria），停在发布验收前。
+      // 2026-10-24 客户修订（所有变更独立验收）：以上自动派发（含写 acceptance-criteria）**对所有
+      // 新契约流程生效**；`release` 不再是门（非发布同样写标准、同样进入验收判定）。
       let acceptanceTaskOptions: {
         riskTier?: GovernanceRiskTier;
         criteriaPath?: string;
@@ -3473,7 +3478,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         teamPlanSchema?: 1 | 2 | 3;
       } = {};
       const newContractFlow = parsedFlowForGate?.steps.some((step) => NEW_CONTRACT_FLOW_STEP_IDS.has(step.id)) ?? false;
-      if (releaseMarked && newContractFlow) {
+      if (newContractFlow) {
         let appointmentEntry: GovernanceLedgerEntry | undefined;
         let latestProposalKind: string | undefined;
         for (const entry of ledger.entries) {
@@ -3693,26 +3698,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
       // 门已通过（本次判定）：清除阻塞告知记忆——若之后再次被挡（即使原因文本相同）会重新告知。
       acceptanceBlockedNotified.delete(key);
-      // ———— 2026-10-24 P0-1 发布验收门：非发布停在发布验收前（awaiting-release-acceptance） ————
-      // 只有 flow 顶层 `release === true`（显式发布动作，经既有 schedule-write 卡）才允许自动派 verifier；
-      // 非发布（缺省/false，含 legacy 无 YAML）不派 verifier/Proof、不写 acceptance-criteria、不标 acceptance done。
-      if (!releaseMarked) {
-        const gateRevision = flowStateText !== undefined ? createHash("sha256").update(flowStateText).digest("hex") : "legacy";
-        if (acceptanceReleaseAwaitingNotified.get(key) !== gateRevision) {
-          acceptanceReleaseAwaitingNotified.set(key, gateRevision);
-          note(
-            flowStateText === undefined
-              ? `流程 ${info.flowId}：legacy 流程无 flow YAML/release 标记（视为非发布）⇒ 停在发布验收前（awaiting-release-acceptance）；不派验收、不写 acceptance-criteria、不标记 acceptance done。发布版本才由统筹用 schedule-write 卡显式标记 release: true。`
-              : `流程 ${info.flowId}：全部步骤已完成，但 flow.release 未标记为 true（非发布）⇒ 停在发布验收前（awaiting-release-acceptance）；不派验收、不写 acceptance-criteria、不标记 acceptance done。发布版本才由统筹用 schedule-write 卡把 release 显式标为 true。`,
-          );
-          diagnostic.record("acceptance.release.awaiting", {
-            flowId: info.flowId,
-            reasonCode: flowStateText === undefined ? "legacy" : "release-unmarked",
-          });
-        }
-        acceptanceDispatchedFlows.delete(key); // 后续 flow/发布标记变化的事件可再检查（不是循环）
-        return;
-      }
+      // 2026-10-24 客户修订（所有变更独立验收）：完成度/证据门通过后，所有 flow（含 legacy 无 YAML）
+      // 都进入验收派发；`release` 只是元数据，不再阻断。
       const evidence =
         info.evidence.length > 0 ? info.evidence : acceptanceEvidenceByFlow.get(key) ?? [];
       // 引擎选择（2026-10-19 真机缺陷修复）：活跃会话/真实事件 → 应用内已选/持久化 → `.ans/sessions`
@@ -3895,10 +3882,14 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     warning?: boolean;
   };
   /**
-   * 反馈去重（2026-10-23 可重入门禁 A2/Q3）：`projectRoot\0flowId` → **当前角色卡内容指纹**。
-   * 同指纹不重复反馈；内容变化（含问题集相同但文件已改）⇒ 指纹变化重新反馈；校验通过后清除。
+   * 反馈去重（2026-10-24 现场缺陷：每写一个角色就全量校验，六件卡 fingerprint 每次都变，导致同一
+   * 「缺 reduce-integration」投 4 条）：`projectRoot\0flowId` → **已反馈的 issue key 集合**
+   * （`source|roleId|path|blocking|issue`，另含缺失 roleIds）。**不再使用全量六件卡 fingerprint**：
+   * 同一 issue 只投一条，只有出现新 issue / 新缺失角色才再投；issue 消失时从集合移除（后续复发可再报）。
+   * fingerprint 只保留给成功记录/readiness 派发去重（`roleCardsAnchorIndex`/`applicationConvenerDispatchKey`）。
+   * 成功收口 + 派发后清空（与旧行为一致，下一次真实写卡问题重新开始一轮反馈）。
    */
-  const appointmentArtifactFeedback = new Map<string, string>();
+  const appointmentArtifactFeedback = new Map<string, Set<string>>();
 
   /** 新/变更角色的 role-card 必填章节（方案 §6.1 第 1–9 项；等价标题即可）。 */
   const REQUIRED_ROLE_CARD_SECTIONS: ReadonlyArray<{ label: string; test: RegExp }> = [
@@ -4298,12 +4289,19 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     return issues;
   };
 
+  /**
+   * 写卡校验反馈的**系统/治理前缀**（2026-10-24 现场缺陷：`sendBackground` 的任务在组队聊天里显示成
+   * 「你」，被误读为客户发言）。任务正文首行明确标注来源；renderer 的 source 标签不在本层，后续由桌面 UI 补。
+   */
+  const APPOINTMENT_WRITE_FEEDBACK_PREFIX = "[系统·写卡校验]";
+
   /** Crew 修正任务文本（逐文件列出 Crew 来源问题；要求重发 appointment-write 卡完成写卡）。 */
   const buildAppointmentArtifactFeedback = (flowId: string, issues: readonly AppointmentArtifactIssue[]): string => {
     const crewIssues = issues.filter((issue) => issue.source !== "convener");
     const blocking = crewIssues.filter((issue) => issue.warning !== true);
     const warnings = crewIssues.filter((issue) => issue.warning === true);
     return [
+      APPOINTMENT_WRITE_FEEDBACK_PREFIX,
       mainT("main.interface.writeValidationFailed", { flowId }),
       mainT("main.interface.specificProblems"),
       ...blocking.map((issue) => `- ${issue.path}：${issue.issue}`),
@@ -4330,6 +4328,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         ? "请按 v3 修正/补充团队计划（frontmatter teamPlanSchema: 3 与非空 directories；模块清单每个 module 的非空实现目录；角色表授权目录/精确写集；目录规范表 12 字段；每目录唯一 owner/不重叠/共享策略；治理关键路径只精确授权），必要时递增版本并重发任命卡；修正后应用会重新校验。"
         : "请修正/补充团队计划（frontmatter flowId/version/riskTier/recommended；角色表逐角色含类型 new/changed/existing、职责目标、能力要求、唯一写集、依赖），必要时递增为 v2 并重发任命卡；修正后应用会重新校验。";
     return [
+      APPOINTMENT_WRITE_FEEDBACK_PREFIX,
       flowDefect
         ? `流程 ${flowId}：流程状态 YAML 未通过结构校验（任命的写卡步骤暂停；应用未派 role-readiness、未把步骤标为 done）。`
         : `流程 ${flowId}：团队计划未通过结构校验（任命的写卡步骤暂停；组队不自行补计划，应用未派 role-readiness、未把步骤标为 done）。`,
@@ -4347,8 +4346,12 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
    *  - Crew 来源（role-card/boundary/工作文档）⇒ 反馈 Crew 修正（重发 appointment-write）；
    *  - Convener 来源（团队计划缺行/缺职责·能力·写集·依赖/类型不可识别/flow 缺 role-cards 步骤）⇒ 反馈 Convener；
    *  - 仅 warning（existing/legacy 的最低检查提醒）⇒ 只记诊断，不派任务、不发系统行（避免噪音）。
-   * 去重（2026-10-23 A2/Q3）：`projectRoot\0flowId` → **当前内容指纹**；同指纹不重复反馈，内容变化才再报；
-   * 通过后清除。发送失败**不登记**去重，下一次真实事件重试（不循环）。
+   * 触发门控（2026-10-24 现场缺陷）：只有组队 `nominator` **空闲且无 queue/在途投递**时才投递；组队仍在
+   * 写本轮（busy/排队）⇒ 直接跳过，等下一次 settle 的真实事件再评估（不因每次 write_file/刷新立即投）。
+   * 去重（2026-10-24）：`projectRoot\0flowId` → **已反馈的 issue key 集合**
+   * （`source|roleId|path|issue` + 缺失 roleIds），**不再使用全量六件卡 fingerprint**；同一 issue 只投一条，
+   * 新 issue / 新缺失角色才再投；issue 消失时从集合移除（后续复发可再报一次）。
+   * 发送失败**不登记**去重，下一次真实事件重试（不循环）。
    * 返回是否至少成功投递了一条反馈（供防自激的「实际动作」判定）。
    */
   const reportAppointmentArtifactIssues = async (
@@ -4356,7 +4359,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     flowId: string,
     issues: readonly AppointmentArtifactIssue[],
     listing: ProjectListing | undefined,
-    options: { runtime?: RuntimeKind; fingerprint?: string } = {},
+    options: { runtime?: RuntimeKind; missingRoleIds?: readonly string[] } = {},
   ): Promise<boolean> => {
     if (issues.length === 0) return false;
     const diagnostic = createDiagnosticLogger({ component: "desktop.governance-advance", projectRoot, roleId: "nominator" });
@@ -4365,18 +4368,18 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       diagnostic.record("advance.appointment.artifacts-warning", { flowId, count: issues.length });
       return false; // 只有提醒：不阻塞、不派任务（迁移策略：existing/legacy 仅记录 warning）
     }
-    const issuesHash = createHash("sha256")
-      .update(
-        issues
-          .map((issue) => `${issue.roleId}\u0000${issue.path}\u0000${issue.source ?? "crew"}\u0000${issue.warning === true ? "w" : "b"}\u0000${issue.issue}`)
-          .sort()
-          .join("\n"),
-      )
-      .digest("hex");
-    // 2026-10-23：去重值＝当前内容指纹（拿不到时回落问题哈希，行为与旧版一致）。
-    const dedupeValue = options.fingerprint ?? issuesHash;
+    // issue 集合 key：只把**阻塞问题**作为「新反馈」的触发条件（warning 随反馈正文附带，不单独造成新投递）。
+    const issueKeys = [
+      ...blocking.map((issue) => `${issue.source ?? "crew"}|${issue.roleId}|${issue.path}|${issue.issue}`),
+      ...(options.missingRoleIds ?? []).map((roleId) => `missing|${roleId}`),
+    ].sort();
     const dedupeKey = `${projectRoot}\u0000${flowId}`;
-    if (appointmentArtifactFeedback.get(dedupeKey) === dedupeValue) return false; // 同指纹：不刷屏
+    const reported = appointmentArtifactFeedback.get(dedupeKey);
+    if (reported !== undefined && issueKeys.every((issueKey) => reported.has(issueKey))) {
+      // 同一 issue 集合已投过：不刷屏；同步收敛集合（已消失的 issue 后续复发时可再报一次）。
+      appointmentArtifactFeedback.set(dedupeKey, new Set(issueKeys));
+      return false;
+    }
     let runtime: RuntimeKind | undefined =
       options.runtime ?? acceptanceRuntimeHints.get(projectRoot) ?? manager.activeRuntimeFor(projectRoot);
     if (runtime === undefined) {
@@ -4390,6 +4393,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     if (runtime === undefined) {
       diagnostic.record("advance.appointment.artifacts.runtime-unresolved", { flowId });
       return false;
+    }
+    // 2026-10-24 触发门控：组队本轮仍在写（busy）或有排队/在途投递 ⇒ 不投；下一次 settle 再评估。
+    const crewBusy = manager.isRoleBusy(projectRoot, "nominator", runtime);
+    const crewPending = manager.hasPendingDelivery(projectRoot, "nominator", runtime);
+    if (crewBusy || crewPending) {
+      diagnostic.record("advance.appointment.artifacts.crew-busy", { flowId, busy: crewBusy, pending: crewPending });
+      return false; // 不登记去重：settle 后同一 issue 仍应投一条
     }
     const crewIssues = issues.filter((issue) => issue.source !== "convener");
     const crewBlocking = blocking.filter((issue) => issue.source !== "convener");
@@ -4426,9 +4436,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       dispatchedAny = true;
     }
     if (!dispatchedAny) return false;
-    appointmentArtifactFeedback.set(dedupeKey, dedupeValue);
+    appointmentArtifactFeedback.set(dedupeKey, new Set(issueKeys));
     diagnostic.record("advance.appointment.artifacts-rejected", { flowId, count: blocking.length });
-    // Lead 系统行（去重随哈希）：如实说明未推进、已按来源退回。
+    // Lead 系统行（去重随 issue 集合）：如实说明未推进、已按来源退回；同一 issue 集合只发一条。
     const primaryRoleId = listing?.primaryRoleId;
     if (typeof primaryRoleId === "string" && primaryRoleId !== "") {
       const routed = [
@@ -4492,6 +4502,71 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     } catch {
       return undefined;
     }
+  };
+
+  // —————— 2026-10-24 P0：appointment（客户决定步骤）收口 ——————
+  //
+  // 现场缺陷：从零项目客户已完成任命，但 flow 的 appointment 步骤一直 pending（应用没有 app-only 收口；
+  // 角色工具只能按状态机推进，done 还需 manager）。合同：只认账本最新已结算 appointment 决定；幂等；
+  // 失败 fail-closed（**不伪造 decided**）——如实诊断，非 legacy/未结算类失败再落一条 Lead 系统行。
+  const APPOINTMENT_STEP_ID = "appointment";
+  /** 静默诊断码：legacy 流程无 appointment 步骤 / flow 未落盘 / 决定未结算——属预期迁移/等待态，不打扰 Lead。 */
+  const APPOINTMENT_COMPLETION_QUIET_CODES: ReadonlySet<string> = new Set([
+    "customer-decision-step-missing",
+    "not-found",
+    "customer-decision-missing",
+    "customer-decision-not-resolved",
+  ]);
+  /** 失败系统行去重：`projectRoot\0flowId` → 上一次已提示的 code（同 code 不刷屏）。 */
+  const appointmentCompletionNotified = new Map<string, string>();
+  const notifyAppointmentCompletionFailure = async (
+    projectRoot: string,
+    flowId: string,
+    code: string,
+    error?: string,
+  ): Promise<void> => {
+    const key = `${projectRoot}\u0000${flowId}`;
+    if (appointmentCompletionNotified.get(key) === code) return;
+    const runtime = await resolveNoteRuntime(projectRoot);
+    if (runtime === undefined) return; // 无法确定引擎：只保留诊断，不猜
+    appointmentCompletionNotified.set(key, code);
+    emitLeadDeliveryNote(
+      projectRoot,
+      runtime,
+      `${APPOINTMENT_WRITE_FEEDBACK_PREFIX} 流程 ${flowId}：appointment 客户决定步骤收口失败（${code}），未标记为 done；已继续角色卡校验。${error !== undefined && error !== "" ? `原因：${error}` : ""}`,
+    );
+  };
+  /**
+   * 客户任命决定已落账 ⇒ 把 flow 的 appointment 步骤标 done（应用专用；幂等）。
+   * 返回「本次是否真的写入」（idempotent ⇒ false，供防自激的实际动作判定）。
+   */
+  const completeAppointmentDecisionStep = async (projectRoot: string, flowId: string): Promise<boolean> => {
+    const diagnostic = createDiagnosticLogger({ component: "desktop.governance-advance", projectRoot, roleId: "convener" });
+    let result: { ok?: boolean; idempotent?: boolean; code?: string; error?: string; message?: string };
+    try {
+      result = await completeCustomerDecisionStepFn({
+        projectRoot,
+        flowId,
+        stepId: APPOINTMENT_STEP_ID,
+        decisionKind: "appointment",
+      });
+    } catch (error) {
+      diagnostic.error("advance.appointment.complete.failed", error, { flowId });
+      await notifyAppointmentCompletionFailure(projectRoot, flowId, "exception", error instanceof Error ? error.message : String(error));
+      return false;
+    }
+    if (result.ok === true) {
+      // 成功（含幂等）后清除失败提示去重：后续若再出现新失败，仍能如实再提示一次。
+      appointmentCompletionNotified.delete(`${projectRoot}\u0000${flowId}`);
+      if (result.idempotent !== true) diagnostic.record("advance.appointment.completed", { flowId });
+      return result.idempotent !== true;
+    }
+    const code = result.code ?? "unknown";
+    diagnostic.record("advance.appointment.complete-rejected", { flowId, code });
+    if (!APPOINTMENT_COMPLETION_QUIET_CODES.has(code)) {
+      await notifyAppointmentCompletionFailure(projectRoot, flowId, code, result.error);
+    }
+    return false;
   };
 
   /** 启动/项目导入时恢复上次运行的投递队列并自动重投（幂等：每个进程只跑一次）。 */
@@ -4830,6 +4905,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           (id): id is string => typeof id === "string" && id.trim() !== "",
         );
         if (targets.length === 0) continue;
+        // 2026-10-24 P0：appointment 决定已落账 ⇒ 在角色卡校验/readiness 之前收口客户决定步骤（幂等）。
+        // 只对**已结算**决定调用；拒绝/取消/未结算保持 fail-closed（编排拒绝写盘，不伪造 decided）。
+        if (RESOLVED_APPOINTMENT_DECISIONS.has(appointment.customerDecision ?? "")) {
+          if (await completeAppointmentDecisionStep(projectRoot, flowId)) performedAction = true;
+        }
         const missing = targets.filter((roleId) => !listing.roles.some((role) => role.roleId === roleId));
         if (missing.length > 0) {
           // 角色仍缺：只记诊断；本轮结束后统一按 100/300/600ms 有界重试（不派、不发系统行）。
@@ -4877,23 +4957,17 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         const artifactBlockers = artifactIssues.filter((issue) => issue.warning !== true);
         if (artifactBlockers.length > 0) {
           diagnostic.record("advance.appointment.artifacts-invalid", { flowId, count: artifactBlockers.length });
-          if (
-            await reportAppointmentArtifactIssues(projectRoot, flowId, artifactIssues, listing, {
-              fingerprint: fingerprintInfo.fingerprint,
-            })
-          ) {
+          if (await reportAppointmentArtifactIssues(projectRoot, flowId, artifactIssues, listing)) {
             performedAction = true;
           }
           continue;
         }
         // 仅 warning（existing/legacy 的最低检查提醒）：不阻塞推进；report 只记诊断、不派任务。
         if (artifactIssues.length > 0) {
-          await reportAppointmentArtifactIssues(projectRoot, flowId, artifactIssues, listing, {
-            fingerprint: fingerprintInfo.fingerprint,
-          });
+          await reportAppointmentArtifactIssues(projectRoot, flowId, artifactIssues, listing);
         }
         // 2026-10-23 S5 修复：**不得**在「校验通过」后立即清空反馈去重——收口可能失败（如 flow 缺
-        // `role-cards` 步骤），失败分支仍会发 Convener 反馈；若先清空，下一次检查会再次发同一指纹反馈
+        // `role-cards` 步骤），失败分支仍会发 Convener 反馈；若先清空，下一次检查会再次发同一 issue 反馈
         // （S5 e2e：1.3s 内 20 条重复）。反馈去重只在**完整成功**（收口 + 派发/账本）之后清除。
         // 2026-10-23 A4/A5：团队计划存在 ⇒ 先由应用把 role-cards 收口（唯一 flow 写者）；legacy 无计划
         // 且无该步骤 ⇒ 保持旧行为（不写验证记录、旧文案/旧派发）。
@@ -4929,11 +5003,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
                   source: "convener",
                 },
               ];
-              if (
-                await reportAppointmentArtifactIssues(projectRoot, flowId, flowIssues, listing, {
-                  fingerprint: fingerprintInfo.fingerprint,
-                })
-              ) {
+              if (await reportAppointmentArtifactIssues(projectRoot, flowId, flowIssues, listing)) {
                 performedAction = true;
               }
             } else {
@@ -5043,8 +5113,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           dedupeKeyPrefix: keyPrefix,
         });
         performedAction = true;
-        // 2026-10-23 S5 修复：只有「收口成功 + 派发/账本成功」后才清空反馈去重（同指纹可再次反馈的唯一入口
-        // 是内容变化后重新校验失败）；失败分支保留去重，避免同指纹重复刷屏。
+        // 2026-10-23 S5 修复：只有「收口成功 + 派发/账本成功」后才清空反馈去重（同一 issue 集合可再次反馈的
+        // 唯一入口是收口成功后出现的新问题）；失败分支保留去重，避免同一 issue 重复刷屏。
         if (dispatchCommitted) appointmentArtifactFeedback.delete(`${projectRoot}\u0000${flowId}`);
         diagnostic.record("advance.post-write.dispatched", { flowId, queued: sent.queued === true });
         postWriteAdvanceRetries.delete(projectRoot); // 已推进：重试计数归零
@@ -5061,20 +5131,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           postWriteAdvanceRetries.delete(projectRoot);
           diagnostic.record("advance.post-write.roles-missing.final", { count: attempt });
           // 2026-10-20 确定性门控：有界重试耗尽仍有缺角色 ⇒ 把具体问题反馈 Crew 修正
-          // （不派 Convener、不把步骤标 done、不弹客户卡）。反馈去重按内容指纹。
+          // （不派 Convener、不把步骤标 done、不弹客户卡）。反馈去重按 issue 集合（同一缺失角色只投一条）。
           for (const [flowId, { entry: appointment }] of latestAppointment) {
             const retryTargets = (appointment.targetRoleIds ?? []).filter(
               (id): id is string => typeof id === "string" && id.trim() !== "",
             );
             if (retryTargets.length === 0) continue;
-            const retryPlan = await readTeamPlanInfo(projectRoot, flowId, appointment.artifactPath);
-            const retryFingerprint = await computeRoleCardsFingerprint({
-              projectRoot,
-              flowId,
-              roleIds: retryTargets,
-              ...(typeof appointment.artifactPath === "string" ? { appointmentArtifactPath: appointment.artifactPath } : {}),
-              ...(retryPlan !== undefined ? { teamPlan: { relPath: retryPlan.relPath, version: retryPlan.version } } : {}),
-            });
+            const retryMissing = retryTargets.filter(
+              (roleId) => !listing.roles.some((role) => role.roleId === roleId),
+            );
             const issues = await validateAppointmentArtifacts(projectRoot, retryTargets, listing, {
               flowId,
               ...(typeof appointment.artifactPath === "string" ? { appointmentArtifactPath: appointment.artifactPath } : {}),
@@ -5083,7 +5148,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             diagnostic.record("advance.appointment.artifacts-invalid", { flowId, count: issues.length });
             if (
               await reportAppointmentArtifactIssues(projectRoot, flowId, issues, listing, {
-                fingerprint: retryFingerprint.fingerprint,
+                missingRoleIds: retryMissing,
               })
             ) {
               performedAction = true;
@@ -5898,6 +5963,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         // 名单：账本决定优先（客户实际选择的持久记录）；竞态未读到账本时回落卡片上下文。
         const targets = [...new Set(ledgerTargets.length > 0 ? ledgerTargets : contextTargets)];
         if (targets.length === 0) return fail(mainT("main.interface.missingAppointmentList"));
+        // 2026-10-24 P0：客户任命决定已落账 ⇒ 先在角色卡校验/readiness 之前收口 flow 的 appointment
+        // 客户决定步骤（应用专用、幂等）。失败只诊断/系统行，**不伪造 decided**；legacy 流程无该步骤时不阻断。
+        if (latest !== undefined && RESOLVED_APPOINTMENT_DECISIONS.has(latest.entry.customerDecision ?? "")) {
+          await completeAppointmentDecisionStep(projectRoot, flowId);
+        }
         // 团队计划：账本 artifactPath 优先 → 卡片显式 context → 按 flowId 扫描最新 -team-vN.md；
         // 仅 legacy（无团队计划但有提名文件）才回落提名——绝不猜目录。
         const preferredPlan = latest?.entry.artifactPath ?? context.teamPlanPath;

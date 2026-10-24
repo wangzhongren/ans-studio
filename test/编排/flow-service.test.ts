@@ -18,7 +18,13 @@ import {
   type FlowService,
   type FlowToolViewWithRelease,
 } from "../../src/common/编排/flow-service.ts";
-import { completeAcceptanceStep, completeRoleCardsStep, observeFlowArtifacts, reopenAcceptanceStepForRework } from "../../src/pipeline/orchestration/flow-state.ts";
+import {
+  completeAcceptanceStep,
+  completeCustomerDecisionStep,
+  completeRoleCardsStep,
+  observeFlowArtifacts,
+  reopenAcceptanceStepForRework,
+} from "../../src/pipeline/orchestration/flow-state.ts";
 import { parseFlowStateYaml, type FlowState } from "../../src/common/编排/flow-state.ts";
 import { readGovernanceLedger, type GovernanceLedgerEntry } from "../../src/common/编排/governance-ledger.ts";
 
@@ -2595,5 +2601,373 @@ test("A13（2026-10-23）不可对账 ref（首尾空格）⇒ insufficient-evid
     assert.equal(flowBytes(root), before);
     assert.equal((await artifactObservations(root)).length, 0);
   });
+});
+
+// —————————————————————— 2026-10-24 应用专用：completeCustomerDecisionStep ——————————————————————
+//
+// 现场：从零项目 demos/bookmark-manager 的 flow 里 appointment（owner=convener，
+// kind=customer-decision）一直 pending；账本已有客户/判断 agent 的 appointment 决定。
+// 角色工具按状态机不能把 pending 直接标 done（服务端拒绝，正确）；应用缺少 app-only 收口，
+// 导致 dependsOn appointment 的 role-cards / readiness 卡住。本函数只依据账本已结算决定收口。
+
+function customerDecisionFlow(
+  over: {
+    id?: string;
+    status?: string;
+    kind?: string;
+    /** 完整 YAML evidence 行（如 `{ kind: customer-decision, ref: appointment }`）。 */
+    evidence?: string;
+    dependsOn?: string[];
+    includeStep?: boolean;
+  } = {},
+): string {
+  const id = over.id ?? "appointment";
+  const lines = ["flowId: flow-a", "version: 1", "qualityTier: production", "steps:"];
+  if (over.includeStep !== false) {
+    lines.push(
+      `  - id: ${id}`,
+      "    title: 客户决定任命名单（任命卡）",
+      "    owner: convener",
+      `    kind: ${over.kind ?? "customer-decision"}`,
+      `    status: ${over.status ?? "pending"}`,
+      ...(over.evidence !== undefined ? [`    evidence: ${over.evidence}`] : []),
+    );
+  }
+  lines.push(
+    "  - id: role-cards",
+    "    title: 角色卡",
+    "    owner: nominator",
+    "    kind: dispatch",
+    "    status: pending",
+    ...(over.dependsOn !== undefined
+      ? ["    dependsOn:", ...over.dependsOn.map((dep) => `      - ${dep}`)]
+      : []),
+    "  - id: verification",
+    "    title: 验收",
+    "    owner: app",
+    "    kind: acceptance",
+    "    status: pending",
+    "",
+  );
+  return lines.join("\n");
+}
+
+/** appointment 已结算账本（stepId 故意与 flow 步骤 id 不同：匹配只看 flowId + decisionKind）。 */
+function appointmentDecisionLedger(over: Partial<GovernanceLedgerEntry> = {}): GovernanceLedgerEntry[] {
+  return [
+    ledgerEntry({
+      kind: "customer.decision",
+      flowId: "flow-a",
+      stepId: "role-cards",
+      actorRoleId: "convener",
+      power: "schedule",
+      decisionKind: "appointment",
+      customerDecision: "appointed",
+      ...over,
+    }),
+  ];
+}
+
+test("completeCustomerDecisionStep：pending appointment + 最新 appointed ⇒ done + customer-decision 证据；其他步骤/字段不变；重复幂等", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, customerDecisionFlow({ dependsOn: ["appointment"] }));
+    writeLedger(root, appointmentDecisionLedger());
+    const flowAbs = join(root, ...FLOW_REL.split("/"));
+    const beforeRevision = (await steward(root).get({ flowId: "flow-a" })).revision!;
+    const beforeLedger = (await readGovernanceLedger(root)).entries.length;
+
+    const completed = await completeCustomerDecisionStep({
+      projectRoot: root,
+      flowId: "flow-a",
+      stepId: "appointment",
+      decisionKind: "appointment",
+    });
+    assert.equal(completed.ok, true, completed.error ?? "");
+    assert.notEqual(completed.idempotent, true);
+    assert.notEqual(completed.revision, beforeRevision);
+
+    const flow = readFlow(root).flow;
+    const appointment = stepOf(flow, "appointment");
+    assert.equal(appointment.status, "done");
+    assert.deepEqual(appointment.evidence, { kind: "customer-decision", ref: "appointment" });
+    assert.equal(appointment.owner, "convener", "owner 不变");
+    assert.equal(appointment.kind, "customer-decision", "kind 不变");
+    assert.equal(appointment.title, "客户决定任命名单（任命卡）", "title 不变");
+    assert.equal(stepOf(flow, "role-cards").status, "pending", "其他步骤 status 不变");
+    assert.deepEqual(stepOf(flow, "role-cards").dependsOn, ["appointment"], "dependsOn 保留");
+    assert.equal(stepOf(flow, "verification").status, "pending");
+    assert.equal(flow.version, 1, "flow schema/顶层字段不变");
+    assert.equal(flow.qualityTier, "production");
+    assert.equal("release" in flow, false);
+
+    const afterFirst = readFileSync(flowAbs, "utf8");
+    assert.equal(
+      (await readGovernanceLedger(root)).entries.length,
+      beforeLedger,
+      "不写客户决定账本、不伪造客户批准",
+    );
+
+    // 幂等：不带 decisionKind（从步骤 evidence.ref 解析）重放。
+    const again = await completeCustomerDecisionStep({ projectRoot: root, flowId: "flow-a", stepId: "appointment" });
+    assert.equal(again.ok, true, again.error ?? "");
+    assert.equal(again.idempotent, true);
+    assert.equal(again.revision, completed.revision);
+    assert.equal(readFileSync(flowAbs, "utf8"), afterFirst, "幂等不得写盘");
+  });
+});
+
+test("completeCustomerDecisionStep：无决定 / 未结算 / 最新非已结算 ⇒ fail-closed，flow 字节不变", async () => {
+  // 无任何 appointment 决定。
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, customerDecisionFlow({ dependsOn: ["appointment"] }));
+    const before = flowBytes(root);
+    const result = await completeCustomerDecisionStep({ projectRoot: root, flowId: "flow-a", stepId: "appointment" });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "customer-decision-missing");
+    assert.match(result.error ?? "", /appointment/);
+    assert.equal(flowBytes(root), before, "无决定不得写 flow");
+  });
+
+  // 最新 customerDecision=none（未结算）。
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, customerDecisionFlow({ dependsOn: ["appointment"] }));
+    writeLedger(root, appointmentDecisionLedger({ customerDecision: "none" }));
+    const before = flowBytes(root);
+    const result = await completeCustomerDecisionStep({ projectRoot: root, flowId: "flow-a", stepId: "appointment" });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "customer-decision-not-resolved");
+    assert.match(result.error ?? "", /none/);
+    assert.equal(flowBytes(root), before);
+  });
+
+  // 曾 appointed，但最新一条 appointment 决定 rejected ⇒ 只认最新，fail-closed。
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, customerDecisionFlow({ dependsOn: ["appointment"] }));
+    writeLedger(root, [
+      ...appointmentDecisionLedger(),
+      ...appointmentDecisionLedger({ customerDecision: "rejected" }),
+    ]);
+    const before = flowBytes(root);
+    const result = await completeCustomerDecisionStep({ projectRoot: root, flowId: "flow-a", stepId: "appointment" });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "customer-decision-not-resolved");
+    assert.match(result.error ?? "", /rejected/);
+    assert.equal(flowBytes(root), before, "最新 rejected 不得写 flow");
+    assert.equal(stepOf(readFlow(root).flow, "appointment").status, "pending");
+  });
+});
+
+test("completeCustomerDecisionStep：已 done 且证据相同 ⇒ ok/idempotent，不读账本、不写盘", async () => {
+  await withRoot(async (root) => {
+    writeFile(
+      root,
+      FLOW_REL,
+      customerDecisionFlow({
+        status: "done",
+        evidence: "{ kind: customer-decision, ref: appointment }",
+        dependsOn: ["appointment"],
+      }),
+    );
+    // 故意不写账本：已 done 同证据必须幂等，不能被账本缺失反转为失败。
+    const before = flowBytes(root);
+    const revision = (await steward(root).get({ flowId: "flow-a" })).revision!;
+
+    const result = await completeCustomerDecisionStep({ projectRoot: root, flowId: "flow-a", stepId: "appointment" });
+    assert.equal(result.ok, true, result.error ?? "");
+    assert.equal(result.idempotent, true);
+    assert.equal(result.revision, revision);
+    assert.equal(flowBytes(root), before);
+
+    const explicit = await completeCustomerDecisionStep({
+      projectRoot: root,
+      flowId: "flow-a",
+      stepId: "appointment",
+      decisionKind: "appointment",
+    });
+    assert.equal(explicit.ok, true);
+    assert.equal(explicit.idempotent, true);
+  });
+});
+
+test("completeCustomerDecisionStep：错 kind / 终态 / 缺步骤 ⇒ 明确错误码，不写盘", async () => {
+  // 非 customer-decision 步骤。
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, customerDecisionFlow({ kind: "dispatch", dependsOn: ["appointment"] }));
+    writeLedger(root, appointmentDecisionLedger());
+    const before = flowBytes(root);
+    const result = await completeCustomerDecisionStep({ projectRoot: root, flowId: "flow-a", stepId: "appointment" });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "customer-decision-kind-unsupported");
+    assert.match(result.error ?? "", /dispatch/);
+    assert.equal(flowBytes(root), before);
+  });
+
+  // 终态：superseded / failed / blocked / aborted。
+  for (const status of ["superseded", "failed", "blocked", "aborted"]) {
+    await withRoot(async (root) => {
+      writeFile(root, FLOW_REL, customerDecisionFlow({ status, dependsOn: ["appointment"] }));
+      writeLedger(root, appointmentDecisionLedger());
+      const before = flowBytes(root);
+      const result = await completeCustomerDecisionStep({ projectRoot: root, flowId: "flow-a", stepId: "appointment" });
+      assert.equal(result.ok, false, status);
+      assert.equal(result.code, "customer-decision-step-terminal", status);
+      assert.match(result.error ?? "", new RegExp(status));
+      assert.equal(flowBytes(root), before, `${status} 不得被覆盖`);
+    });
+  }
+
+  // 步骤不存在。
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, customerDecisionFlow({ includeStep: false }));
+    writeLedger(root, appointmentDecisionLedger());
+    const before = flowBytes(root);
+    const result = await completeCustomerDecisionStep({ projectRoot: root, flowId: "flow-a", stepId: "appointment" });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "customer-decision-step-missing");
+    assert.equal(flowBytes(root), before);
+  });
+
+  // flowId / stepId 形状。
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, customerDecisionFlow({ dependsOn: ["appointment"] }));
+    const badFlow = await completeCustomerDecisionStep({ projectRoot: root, flowId: "flow-", stepId: "appointment" });
+    assert.equal(badFlow.code, "missing-flow-id");
+    const badStep = await completeCustomerDecisionStep({ projectRoot: root, flowId: "flow-a", stepId: "appointment-" });
+    assert.equal(badStep.code, "missing-step-id");
+    const noRoot = await completeCustomerDecisionStep({ projectRoot: "  ", flowId: "flow-a", stepId: "appointment" });
+    assert.equal(noRoot.code, "invalid-input");
+  });
+});
+
+test("completeCustomerDecisionStep：decisionKind 解析（evidence.ref 优先 / 非法 / 冲突 / 无法解析）", async () => {
+  // 无显式输入、无 evidence 时，stepId 本身是合法 decisionKind ⇒ appointment。
+  // （主用例已覆盖。）带 evidence.ref 时按 evidence.ref 匹配账本。
+  await withRoot(async (root) => {
+    writeFile(
+      root,
+      FLOW_REL,
+      customerDecisionFlow({
+        evidence: "{ kind: customer-decision, ref: appointment-write }",
+        dependsOn: ["appointment"],
+      }),
+    );
+    writeLedger(root, [
+      ledgerEntry({
+        kind: "customer.decision",
+        flowId: "flow-a",
+        stepId: "role-cards",
+        actorRoleId: "nominator",
+        power: "nomination",
+        decisionKind: "appointment-write",
+        customerDecision: "accepted",
+      }),
+    ]);
+    const result = await completeCustomerDecisionStep({ projectRoot: root, flowId: "flow-a", stepId: "appointment" });
+    assert.equal(result.ok, true, result.error ?? "");
+    assert.deepEqual(stepOf(readFlow(root).flow, "appointment").evidence, {
+      kind: "customer-decision",
+      ref: "appointment-write",
+    });
+  });
+
+  // 非法 decisionKind。
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, customerDecisionFlow({ dependsOn: ["appointment"] }));
+    writeLedger(root, appointmentDecisionLedger());
+    const before = flowBytes(root);
+    const invalid = await completeCustomerDecisionStep({
+      projectRoot: root,
+      flowId: "flow-a",
+      stepId: "appointment",
+      decisionKind: "unclassified",
+    });
+    assert.equal(invalid.ok, false);
+    assert.equal(invalid.code, "invalid-decision-kind");
+    assert.equal(flowBytes(root), before);
+  });
+
+  // 显式 decisionKind 与步骤 evidence.ref 冲突。
+  await withRoot(async (root) => {
+    writeFile(
+      root,
+      FLOW_REL,
+      customerDecisionFlow({
+        evidence: "{ kind: customer-decision, ref: appointment }",
+        dependsOn: ["appointment"],
+      }),
+    );
+    writeLedger(root, appointmentDecisionLedger());
+    const before = flowBytes(root);
+    const mismatch = await completeCustomerDecisionStep({
+      projectRoot: root,
+      flowId: "flow-a",
+      stepId: "appointment",
+      decisionKind: "appointment-write",
+    });
+    assert.equal(mismatch.ok, false);
+    assert.equal(mismatch.code, "decision-kind-mismatch");
+    assert.equal(flowBytes(root), before);
+  });
+
+  // 既无 evidence.ref，stepId 也不是合法 decisionKind ⇒ 无法解析。
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, customerDecisionFlow({ id: "decision-gate" }));
+    writeLedger(root, appointmentDecisionLedger());
+    const before = flowBytes(root);
+    const unresolved = await completeCustomerDecisionStep({
+      projectRoot: root,
+      flowId: "flow-a",
+      stepId: "decision-gate",
+    });
+    assert.equal(unresolved.ok, false);
+    assert.equal(unresolved.code, "decision-kind-unresolved");
+    assert.equal(flowBytes(root), before);
+  });
+});
+
+test("completeCustomerDecisionStep：账本坏行 ⇒ ledger-unavailable，flow 不变", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, customerDecisionFlow({ dependsOn: ["appointment"] }));
+    writeFile(root, ".ans/governance/ledger.jsonl", "{bad json\n");
+    const before = flowBytes(root);
+    const result = await completeCustomerDecisionStep({ projectRoot: root, flowId: "flow-a", stepId: "appointment" });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "ledger-unavailable");
+    assert.equal(flowBytes(root), before);
+    assert.equal(stepOf(readFlow(root).flow, "appointment").status, "pending");
+  });
+});
+
+test("completeCustomerDecisionStep：并发两调用经串行队列 ⇒ 一完成一幂等，最终 revision 一致", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, customerDecisionFlow({ dependsOn: ["appointment"] }));
+    writeLedger(root, appointmentDecisionLedger());
+    const [first, second] = await Promise.all([
+      completeCustomerDecisionStep({ projectRoot: root, flowId: "flow-a", stepId: "appointment" }),
+      completeCustomerDecisionStep({ projectRoot: root, flowId: "flow-a", stepId: "appointment" }),
+    ]);
+    assert.equal(first.ok, true, first.error ?? "");
+    assert.equal(second.ok, true, second.error ?? "");
+    assert.equal([first, second].filter((result) => result.idempotent === true).length, 1, "恰一幂等");
+    assert.equal(first.revision, second.revision);
+    assert.equal(stepOf(readFlow(root).flow, "appointment").status, "done");
+  });
+});
+
+test("completeCustomerDecisionStep 不注册为角色工具：AdapterCapabilities/run-role/model/provider 无该能力，公共出口再导出", () => {
+  const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
+  const runRoleSource = readFileSync(join(repoRoot, "src", "pipeline", "orchestration", "run-role.ts"), "utf8");
+  const runtimeSource = readFileSync(join(repoRoot, "src", "model", "runtime.ts"), "utf8");
+  const providerToolsSource = readFileSync(join(repoRoot, "src", "provider", "runtime", "tools.ts"), "utf8");
+  const publicExit = readFileSync(join(repoRoot, "src", "pipeline", "orchestration", "flow-state.ts"), "utf8");
+
+  assert.doesNotMatch(runRoleSource, /completeCustomerDecisionStep/, "run-role 不得注册/引用应用专用收口函数");
+  assert.doesNotMatch(runtimeSource, /completeCustomerDecisionStep/, "model/runtime 不得承载该能力");
+  assert.doesNotMatch(providerToolsSource, /completeCustomerDecisionStep/, "provider 工具不得暴露该能力");
+  assert.match(publicExit, /completeCustomerDecisionStep/, "桌面公共出口必须再导出");
+  assert.match(publicExit, /CompleteCustomerDecisionStepInput/);
+  assert.match(runRoleSource, /flowGet\?: FlowGetFn/);
+  assert.match(runRoleSource, /flowStepUpdate\?: FlowStepUpdateFn/);
+  assert.match(runRoleSource, /flowStepSupersede\?: FlowStepSupersedeFn/);
 });
 

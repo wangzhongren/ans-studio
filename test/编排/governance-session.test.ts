@@ -357,8 +357,8 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
       ["liaison", [/沟通权纪律（主理/, /docs\/intents\//, /hand_off_intent/, /交接 ≠ 客户批准/, /intent-confirm/, /质量档位/, /原型档/, /治理协调（2026-10-24）/, /不直接派 Crew\/Proof/, /Proof 只收状态\+报告指针/]],
       ["proposal", [/提案权纪律（提案/, /docs\/proposals\//, /cardKind=proposal/, /不拥有最终批准权/, /证据计划/, /工程质量基线/, /架构方案/, /架构影响分析/, /扩展点/, /模块分解与职责/]],
       ["nomination", [/组队\/写卡纪律（组队/, /docs\/scheduling\//, /appointment-write/, /不再发任命卡/, /团队计划/]],
-      ["schedule", [/编排权纪律（统筹/, /docs\/flows\//, /docs\/scheduling\//, /cardKind=appointment/, /dispatch_task/, /flowId.*stepId/, /真实启动/, /演示/, /架构与边界/, /契约冻结/, /扩展点必须有覆盖步骤/, /发布标记（2026-10-24，P0-1）/, /cardKind=schedule-write/, /非发布保持缺省/, /非发布不派/]],
-      ["verification", [/验收权纪律（验收/, /docs\/acceptance\//, /docs\/verification\//, /cardKind=acceptance/, /验收 ≠ 批准/, /未被真实启动.*不得建议 accept/, /架构核对/, /模块边界与依赖方向未被破坏/, /schema\/API 版本与/, /风险档位/, /T0–T3/, /发布验收门（2026-10-24，P0-1）/, /非发布流程不启动 verifier\/Proof/]],
+      ["schedule", [/编排权纪律（统筹/, /docs\/flows\//, /docs\/scheduling\//, /cardKind=appointment/, /dispatch_task/, /flowId.*stepId/, /真实启动/, /演示/, /架构与边界/, /契约冻结/, /扩展点必须有覆盖步骤/, /发布标记（2026-10-24，P0-1）/, /cardKind=schedule-write/, /不是发布版本保持缺省/, /所有变更（含非发布）[^\n]*验收门派 Proof/]],
+      ["verification", [/验收权纪律（验收/, /docs\/acceptance\//, /docs\/verification\//, /cardKind=acceptance/, /验收 ≠ 批准/, /未被真实启动.*不得建议 accept/, /架构核对/, /模块边界与依赖方向未被破坏/, /schema\/API 版本与/, /风险档位/, /T0–T3/, /独立验收门（2026-10-24 修订：所有变更）/, /所有变更（含非发布）/]],
     ];
     for (const [fn, patterns] of expectations) {
       const { captured, factory } = promptCapturing();
@@ -422,7 +422,7 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
   });
 });
 
-test("标准工作流（2026-10-24 更新）：trio 与 single/su 提示均含阶段流转/发布验收门/主理协调/Proof 标准复核流程", async () => {
+test("标准工作流（2026-10-24 修订：所有变更）：trio 与 single/su 提示均含阶段流转/所有变更独立验收/主理协调/Proof 标准复核流程", async () => {
   await withRoot(async (root) => {
     const promptCapturing = () => {
       const captured: { prompt?: string } = {};
@@ -448,8 +448,9 @@ test("标准工作流（2026-10-24 更新）：trio 与 single/su 提示均含�
     };
 
     // 客户原话：「这个独立核准应该是标准流程，而不是我在发给他。」「内置角色应该有自己的工作流。」
-    // 2026-10-24（设计 v1 方案 A + P0-1）：内置状态/回交向主理汇总，主理只协调不批准；只有发布版本
-    // （flow 顶层 release: true）才由应用按发布验收门派 Proof；非发布不派；不承诺自动推进。
+    // 2026-10-24 客户修订（撤销「仅发布版本」口径）：内置状态/回交向主理汇总，主理只协调不批准；
+    // 所有变更（含非发布）在流程齐备后都由应用按验收门派 Proof；`release` 仅可选发布元数据、不是
+    // 启动条件；不承诺自动推进。
     const required: Array<[RegExp, string]> = [
       [/标准工作流（阶段流转由应用负责）/, "标准工作流标题"],
       [/内置角色按标准工作流执行/, "内置角色按标准工作流执行"],
@@ -461,13 +462,15 @@ test("标准工作流（2026-10-24 更新）：trio 与 single/su 提示均含�
       [/回交向 Lead \/ 主理汇总/, "内置状态/回交向主理汇总"],
       [/主理只做治理协调，不批准提案\/任命\/验收/, "主理只协调不批准"],
       [/应用不承诺自动推进下一步/, "不承诺未实现的自动推进"],
-      [/只有\*\*发布版本\*\*（flow YAML 顶层 `release: true`）/, "发布版本才派 Proof"],
-      [/非发布（`release` 缺省\/false）[^\n]*不派 verifier criteria、不派 Proof、不标 acceptance done/, "非发布不派 criteria/Proof"],
-      [/Steward 用既有 `request_confirmation`（`cardKind=schedule-write`）[^\n]*`release`/, "Steward 用 schedule-write 标记 release"],
-      [/发布验收派发不是验收决定/, "发布验收派发不是验收决定"],
-      // 2026-10-24 P1-5：标准门只对发布版本生效，读取最新 vN；非发布/legacy 豁免。
-      [/最新版本\*\*（扫描取最高 N）/, "发布版本读取 criteria 最新版本"],
-      [/非发布\/legacy（无 YAML 或未标 release）豁免/, "非发布/legacy 豁免标准文件"],
+      [/应用对\*\*所有变更（含非发布）\*\*按验收门派发 Proof/, "所有变更（含非发布）流程齐备后派 Proof"],
+      [/`release` 仅可选发布元数据，\*\*不是独立验收的启动条件\*\*/, "release 仅可选元数据、不是启动条件"],
+      [/Steward 用既有 `request_confirmation`（`cardKind=schedule-write`）[^\n]*`release`/, "Steward 用 schedule-write 写 release 元数据"],
+      [/验收派发不是验收决定/, "验收派发不是验收决定"],
+      // 2026-10-24 修订：标准门对所有声明 acceptance-criteria 步骤的新契约 flow（含非发布）生效，读取最新 vN；
+      // legacy（无 YAML 或无该步骤）保留原放行。
+      [/声明了 `acceptance-criteria` 步骤的新契约 flow YAML/, "criteria 门覆盖所有新契约 flow"],
+      [/最新版本\*\*（扫描取最高 N）/, "读取 criteria 最新版本"],
+      [/legacy（无 YAML 或无 `acceptance-criteria` 步骤）[^\n]*保留原放行/, "legacy 无 criteria 步骤保留原放行"],
       // 2026-10-24 P1-7：delivered 只能步骤 owner 标记，manager 不代标，worker 不能 done。
       [/`dispatched → delivered` 只能由\*\*步骤 owner\*\*/, "delivered 仅步骤 owner"],
       [/Steward \/ Lead 等 manager \*\*不得代标 `delivered`\*\*/, "manager 不得代标 delivered"],

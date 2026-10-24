@@ -32,8 +32,10 @@ import { atomicWrite } from "../shared/atomic-write.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 import {
   flowStatePath,
+  isCustomerDecisionKindRef,
   isReservedAcceptanceStepId,
   latestAcceptanceDecision,
+  latestCustomerDecision,
   parseFlowStateYaml,
   validateFlowEvidence,
   type FlowState,
@@ -141,7 +143,10 @@ function isManagerPower(power: string): boolean {
  * 编排侧以结构扩展返回同一形状 + `release`（结构兼容，桌面/工具层原样透传，不重算）。
  */
 export interface FlowToolViewWithRelease extends FlowToolView {
-  /** 发布验收标记（缺省 false）：只有 true 才允许应用按发布验收门派 Proof/启动验收。 */
+  /**
+   * 发布元数据标记（缺省 false）：`release` 仅可选发布元数据，**不是独立验收的启动条件**；
+   * 所有变更（含非发布）在流程齐备后都由应用按验收门派 Proof / 验收（2026-10-24 客户修订）。
+   */
   release: boolean;
 }
 
@@ -948,6 +953,265 @@ export async function completeAcceptanceStep(input: {
       flow: candidate,
       event: "flow.acceptance.completed",
       fields: { flowId, stepId: step.id },
+      writeFile: (absPath, data) => atomicWrite(absPath, data),
+      log,
+      viewActorRoleId: "app",
+      viewActorPower: "app",
+    });
+  }).catch(internalError);
+}
+
+// —————————————————————— 应用专用：completeCustomerDecisionStep ——————————————————————
+
+/** 已是终态、应用不得覆盖的步骤状态（`done` 单独按幂等处理）。 */
+const CUSTOMER_DECISION_TERMINAL_STATUSES: ReadonlySet<string> = new Set([
+  "superseded",
+  "failed",
+  "blocked",
+  "aborted",
+]);
+
+/** `completeCustomerDecisionStep` 输入（应用专用，不是角色工具参数）。 */
+export interface CompleteCustomerDecisionStepInput {
+  projectRoot: string;
+  flowId: string;
+  /** 目标步骤 id；该步骤必须是 `kind: "customer-decision"`。 */
+  stepId: string;
+  /**
+   * 账本 `customer.decision.decisionKind`（例如 `appointment`）。
+   *
+   * 缺省按步骤 `evidence.ref` 解析；无 evidence 时仅当 `stepId` 本身是合法 decisionKind
+   * （例如 `appointment`）才可用。给出时必须与步骤 evidence.ref 一致（否则 fail-closed）。
+   */
+  decisionKind?: string;
+}
+
+/**
+ * **应用专用**：客户决定已结算后，把 flow YAML 中指定 `kind:"customer-decision"` 步骤置
+ * `status:"done"` + `evidence:{kind:"customer-decision",ref:decisionKind}`。
+ *
+ * 背景（2026-10-24 appointment 收口）：`appointment`（owner=convener）是客户决定步骤，
+ * 角色工具只能按状态机推进（pending→dispatched→delivered→done）且 `done` 需 manager；
+ * 应用此前没有 app-only 收口，导致客户已任命的流程停在 pending、阻塞 dependsOn/readiness。
+ *
+ * 契约（钉死）：
+ *   · **只认最新已结算决定**：按账本 append 顺序取该 flow 最后一条
+ *     `customer.decision{decisionKind}`（不匹配 ledger `stepId`，与 `validateFlowEvidence` 同口径）；
+ *     最新结果必须是已结算（accepted / accepted-quick / appointed）。
+ *     无决定 ⇒ `customer-decision-missing`；最新未结算/拒绝 ⇒ `customer-decision-not-resolved`；
+ *     账本不可读/坏行 ⇒ `ledger-unavailable`（全部 fail-closed，不写 flow）。
+ *   · **只允许 `kind:"customer-decision"` 步骤**：其它 kind ⇒ `customer-decision-kind-unsupported`。
+ *   · **不改 owner/kind/其他步骤/flow schema**：只改目标步骤的 status 与 evidence；写盘仍经
+ *     候选 YAML 复核 + 账本对账（`validateFlowEvidence`，只过滤目标 stepId 的 issue）。
+ *   · **幂等**：已 `done` 且 evidence 与本次 decisionKind 相同 ⇒ `{ok:true,idempotent:true}`，
+ *     不读账本、不写盘；已 `done` 但证据不同或终态（superseded/failed/blocked/aborted）⇒
+ *     `customer-decision-step-terminal`（不覆盖终态）。
+ *   · 步骤不存在 ⇒ `customer-decision-step-missing`；flowId/stepId 非法 ⇒ `missing-flow-id` /
+ *     `missing-step-id`；decisionKind 非法/冲突/无法解析 ⇒ `invalid-decision-kind` /
+ *     `decision-kind-mismatch` / `decision-kind-unresolved`。
+ *   · **不注册为角色工具**（不进 `AdapterCapabilities` / 三 flow 工具）；桌面只经
+ *     `src/pipeline/orchestration/flow-state.ts` 公共出口调用。
+ *   · 与 `createFlowService` / `completeAcceptanceStep` 共用 per-project 串行队列、候选 YAML
+ *     复核与原子写；写事件 `flow.customer-decision.completed`，view actor `app/app`；
+ *     写失败不破坏原文件。
+ */
+export async function completeCustomerDecisionStep(
+  input: CompleteCustomerDecisionStepInput,
+): Promise<FlowToolResult> {
+  if (typeof input?.projectRoot !== "string" || input.projectRoot.trim() === "") {
+    return { ok: false, code: "invalid-input", error: "缺少 projectRoot。" };
+  }
+  const projectRoot = path.resolve(input.projectRoot);
+  const flowId = input.flowId;
+  if (typeof flowId !== "string" || !FLOW_ID_RE.test(flowId)) {
+    return { ok: false, code: "missing-flow-id", error: "缺少合法 flowId（应形如 todo-list-v1）。" };
+  }
+  if (typeof input.stepId !== "string" || !FLOW_ID_RE.test(input.stepId)) {
+    return { ok: false, code: "missing-step-id", error: "缺少合法 stepId。" };
+  }
+  const log = createDiagnosticLogger({ component: "orchestration.flow-service", projectRoot });
+
+  return serialize(projectRoot, async () => {
+    const read = await readFlowState(projectRoot, flowId);
+    if (!read.ok) return read.result;
+    const view = viewOf(read.flow, read.revision, "app", "app");
+    const index = read.flow.steps.findIndex((step) => step.id === input.stepId);
+    if (index === -1) {
+      return {
+        ok: false,
+        code: "customer-decision-step-missing",
+        revision: read.revision,
+        flow: view,
+        error: `流程中没有步骤 ${input.stepId}（无法完成客户决定步骤）。`,
+      };
+    }
+    const step = read.flow.steps[index]!;
+    if (step.kind !== "customer-decision") {
+      return {
+        ok: false,
+        code: "customer-decision-kind-unsupported",
+        revision: read.revision,
+        flow: view,
+        error: `步骤 ${step.id} 的 kind=${step.kind}，本函数只完成 kind=customer-decision 的步骤。`,
+      };
+    }
+
+    // 1) 解析 decisionKind：显式输入 → 步骤 evidence.ref → stepId（仅当本身是合法 decisionKind）。
+    const explicitKind = typeof input.decisionKind === "string" ? input.decisionKind.trim() : undefined;
+    if (explicitKind !== undefined && explicitKind !== "" && !isCustomerDecisionKindRef(explicitKind)) {
+      return {
+        ok: false,
+        code: "invalid-decision-kind",
+        revision: read.revision,
+        flow: view,
+        error: `decisionKind 非法："${explicitKind}"（必须是账本 customer.decision 的合法 decisionKind，如 appointment）。`,
+      };
+    }
+    const evidenceRef = step.evidence?.kind === "customer-decision" ? step.evidence.ref : undefined;
+    if (explicitKind !== undefined && explicitKind !== "" && evidenceRef !== undefined && explicitKind !== evidenceRef) {
+      return {
+        ok: false,
+        code: "decision-kind-mismatch",
+        revision: read.revision,
+        flow: view,
+        error: `decisionKind 与步骤 ${step.id} 的 evidence.ref 不一致（输入 ${explicitKind}，evidence ${evidenceRef}）。`,
+      };
+    }
+    const decisionKind =
+      explicitKind !== undefined && explicitKind !== ""
+        ? explicitKind
+        : evidenceRef ?? (isCustomerDecisionKindRef(step.id) ? step.id : undefined);
+    if (decisionKind === undefined) {
+      return {
+        ok: false,
+        code: "decision-kind-unresolved",
+        revision: read.revision,
+        flow: view,
+        error: `无法确定账本 decisionKind：步骤 ${step.id} 无 evidence.ref，且 stepId 本身不是合法 decisionKind；请在输入中显式提供 decisionKind。`,
+      };
+    }
+
+    // 2) 幂等 / 终态（先于账本 I/O：已 done 同证据不因账本后变而失败）。
+    if (step.status === "done") {
+      if (step.evidence?.kind === "customer-decision" && step.evidence.ref === decisionKind) {
+        return { ok: true, idempotent: true, revision: read.revision, flow: view };
+      }
+      return {
+        ok: false,
+        code: "customer-decision-step-terminal",
+        revision: read.revision,
+        flow: view,
+        error: `步骤 ${step.id} 已是 done，但证据与本次 decisionKind=${decisionKind} 不一致；done 是终态，应用不覆盖。`,
+      };
+    }
+    if (CUSTOMER_DECISION_TERMINAL_STATUSES.has(step.status)) {
+      return {
+        ok: false,
+        code: "customer-decision-step-terminal",
+        revision: read.revision,
+        flow: view,
+        error: `步骤 ${step.id} 已是终态 ${step.status}，应用不覆盖终态。`,
+      };
+    }
+
+    // 3) 账本：只看最新一条同 flowId + decisionKind 的决定，必须已结算。
+    let ledger;
+    try {
+      ledger = await readGovernanceLedger(projectRoot);
+    } catch (err) {
+      return {
+        ok: false,
+        code: "ledger-unavailable",
+        revision: read.revision,
+        flow: view,
+        error: `治理账本不可读：${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+    if (ledger.errors.length > 0) {
+      return {
+        ok: false,
+        code: "ledger-unavailable",
+        revision: read.revision,
+        flow: view,
+        error: `治理账本不可读或存在坏行：${ledger.errors[0]}`,
+      };
+    }
+    const latest = latestCustomerDecision(flowId, decisionKind, ledger.entries);
+    if (latest.kind === "none") {
+      return {
+        ok: false,
+        code: "customer-decision-missing",
+        revision: read.revision,
+        flow: view,
+        error: `该流程尚无客户决定（decisionKind=${decisionKind}）；未完成步骤 ${step.id}。`,
+      };
+    }
+    if (latest.kind === "unresolved") {
+      return {
+        ok: false,
+        code: "customer-decision-not-resolved",
+        revision: read.revision,
+        flow: view,
+        error:
+          `该流程最新 ${decisionKind} 客户决定不是已结算结果` +
+          `（customerDecision=${latest.entry.customerDecision ?? "缺少"}）；未完成步骤 ${step.id}（fail-closed）。`,
+      };
+    }
+    if (latest.kind === "ledger-unavailable") {
+      // 防御分支：账本 errors 已在上方返回。
+      return {
+        ok: false,
+        code: "ledger-unavailable",
+        revision: read.revision,
+        flow: view,
+        error: "治理账本不可读或存在坏行，无法核对客户决定。",
+      };
+    }
+
+    // 4) 只改目标步骤：status done + customer-decision 证据；owner/kind 及其它步骤原样保留。
+    const candidate: FlowState = {
+      ...read.flow,
+      steps: read.flow.steps.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              status: "done" as const,
+              evidence: { kind: "customer-decision" as const, ref: decisionKind },
+            }
+          : item,
+      ),
+    };
+    const parsedCandidate = parseFlowStateYaml(serializeFlow(candidate), flowId);
+    if (!parsedCandidate.ok) {
+      return {
+        ok: false,
+        code: "invalid-flow",
+        revision: read.revision,
+        flow: view,
+        error: `候选流程 YAML 校验失败：${parsedCandidate.error}`,
+      };
+    }
+    const evidenceResult = validateFlowEvidence(parsedCandidate.flow, ledger.entries);
+    if (!evidenceResult.ok) {
+      const issues = evidenceResult.issues.filter((issue) => issue.stepId === step.id);
+      if (issues.length > 0) {
+        return {
+          ok: false,
+          code: "insufficient-evidence",
+          revision: read.revision,
+          flow: view,
+          error: issues.map((issue) => issue.message).join("；"),
+          issues: issues.map((issue) => `${issue.path}: ${issue.message}`),
+        };
+      }
+    }
+
+    return writeFlowState({
+      projectRoot,
+      flowId,
+      flow: parsedCandidate.flow,
+      event: "flow.customer-decision.completed",
+      fields: { flowId, stepId: step.id, decisionKind },
       writeFile: (absPath, data) => atomicWrite(absPath, data),
       log,
       viewActorRoleId: "app",

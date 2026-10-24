@@ -177,8 +177,8 @@ async function seedGovernanceEvidence(projectRoot: string, flowId: string): Prom
 }
 
 function acceptanceFlow(flowId: string): string {
-  // 2026-10-24 P0-1：自动派 Proof 需要发布标记（flow 顶层 release: true）；本文件只测引擎解析/派发接线，
-  // 因此固定为发布流程。证据形状与 `seedGovernanceEvidence` 的账本条目一一对应。
+  // 2026-10-24 客户修订：`release` 仅保留为既有元数据（不再作为独立验收门）；本文件只测引擎解析/派发接线，
+  // 夹具保留 release: true 以覆盖该字段的解析。证据形状与 `seedGovernanceEvidence` 的账本条目一一对应。
   return [
     `flowId: ${flowId}`,
     "version: 1",

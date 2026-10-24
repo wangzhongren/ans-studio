@@ -47,7 +47,7 @@ import type {
 } from "../../src/pipeline/orchestration/govern-session.ts";
 import { readGovernanceLedger, appendGovernanceLedger } from "../../src/pipeline/orchestration/govern-session.ts";
 // 2026-10-23 可重入门禁：flow 机器状态只经公共出口读取（测试断言 role-cards/readiness 状态）。
-import { parseFlowStateYaml, completeRoleCardsStep as realCompleteRoleCardsStep } from "../../src/pipeline/orchestration/flow-state.ts";
+import { parseFlowStateYaml, completeRoleCardsStep as realCompleteRoleCardsStep, completeCustomerDecisionStep as realCompleteCustomerDecisionStep } from "../../src/pipeline/orchestration/flow-state.ts";
 import type { DesktopDeps } from "../../app/desktop/interface.ts";
 import type { PinEvidenceResult } from "../../src/model/boundary.ts";
 // 2026-10-20：流程推进任务文案的 YAML 存在性分支（真机：flow 工具已注册但 Steward 未被要求使用）。
@@ -3105,8 +3105,8 @@ async function runHandbackAcceptanceScenario(status: string) {
   const flowId = "flow-a";
   const listing = listingWithProjectRoles({ ...trioListing(), projectRoot: root }, ["executor"]);
   mkdirSync(path.join(root, "docs", "flows"), { recursive: true });
-  // 2026-10-24 P0-1：自动派 Proof 需要发布标记（flow 顶层 release: true）。本场景验证回交收尾推进
-  // （发布版本），因此写 YAML 机器状态；状态由参数控制（done/pending/blocked）。
+  // 2026-10-24 客户修订：release 仅元数据（不再作为独立验收门）。本场景验证回交收尾推进，
+  // 因此写 YAML 机器状态；状态由参数控制（done/pending/blocked）。
   writeFileSync(
     path.join(root, "docs", "flows", `${flowId}.yaml`),
     [
@@ -4152,7 +4152,12 @@ function writeRoleCardsFlowFixture(
   root: string,
   flowId: string,
   options: {
-    roleCards:
+    /**
+     * 2026-10-24 appointment 收口：为 true 时在 role-cards 之前写入 `id:"appointment"` 的
+     * `kind:customer-decision` 步骤（缺省不写，保持既有 legacy 夹具逐字不变）。
+     */
+    appointment?: boolean;
+    roleCards?:
       | {
           status?: "pending" | "dispatched" | "delivered" | "done" | "superseded" | "failed" | "blocked" | "aborted";
           kind?: "artifact" | "dispatch";
@@ -4165,9 +4170,18 @@ function writeRoleCardsFlowFixture(
   const roleCards =
     options.roleCards === false
       ? undefined
-      : { status: "pending" as const, kind: "artifact" as const, ...options.roleCards };
+      : { status: "pending" as const, kind: "artifact" as const, ...(options.roleCards ?? {}) };
   const readinessStatus = options.roleReadinessStatus ?? "pending";
   const steps: string[] = [];
+  if (options.appointment === true) {
+    steps.push(
+      "  - id: appointment",
+      "    title: 任命",
+      "    owner: convener",
+      "    kind: customer-decision",
+      "    status: pending",
+    );
+  }
   if (roleCards !== undefined) {
     steps.push(
       "  - id: role-cards",
@@ -5900,6 +5914,189 @@ async function triggerPostWrite(harness: PostWriteHarness, root: string, flowId:
   });
 }
 
+test("2026-10-24 appointment 收口：客户决定已落账 ⇒ 角色卡校验/readiness 之前先标 appointment done（幂等、不伪造客户决定）", async () => {
+  const root = makeTempProjectRoot("ans-appointment-close-");
+  try {
+    const flowId = "flow-appointment-close";
+    writeTeamPlanFile(root, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(root, flowId, { appointment: true });
+    writeAcceptanceCriteriaFile(root, flowId);
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    writeFullRoleArtifacts(root, "executor");
+    const order: string[] = [];
+    const harness = await makePostWriteHarness(root, ["executor"], () => true, {
+      completeCustomerDecisionStepFn: async (input) => {
+        order.push("complete-customer-decision");
+        return realCompleteCustomerDecisionStep(input);
+      },
+      completeRoleCardsStepFn: async (input) => {
+        order.push("complete-role-cards");
+        return realCompleteRoleCardsStep(input);
+      },
+    });
+    try {
+      await triggerPostWrite(harness, root, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 1, 8000);
+      const steps = readFlowStepsForTest(root, flowId)!;
+      const appointmentStep = steps.find((step) => step.id === "appointment")!;
+      assert.equal(appointmentStep.status, "done", "appointment 客户决定步骤由应用收口（不再一直 pending）");
+      assert.deepEqual(
+        appointmentStep.evidence,
+        { kind: "customer-decision", ref: "appointment" },
+        "证据指向 appointment 客户决定（不是伪造批准）",
+      );
+      assert.equal(steps.find((step) => step.id === "role-cards")?.status, "done", "role-cards 收口正常");
+      assert.equal(await waitForReadinessDispatchCount(root, flowId, 1), 1, "readiness 恰一次");
+      assert.ok(order.includes("complete-customer-decision"), "appointment 收口被调用");
+      assert.ok(order.includes("complete-role-cards"), "role-cards 收口被调用");
+      assert.ok(
+        order.indexOf("complete-customer-decision") < order.indexOf("complete-role-cards"),
+        "appointment 收口先于 role-cards 收口/readiness",
+      );
+      assert.equal(
+        (await readGovernanceLedger(root)).entries.filter((entry) => entry.kind === "customer.decision").length,
+        1,
+        "应用收口不写客户决定（账本仍只有 appointment 一条）",
+      );
+      assert.equal(harness.customerCalls.length, 0, "全程零客户卡");
+      // 幂等：重复触发/刷新不改证据、不重复派发、不产生失败系统行。
+      harness.settles.get("nominator")?.();
+      harness.settles.get("convener")?.();
+      await triggerPostWrite(harness, root, flowId);
+      await harness.iface.listProject({ projectRoot: root });
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      assert.deepEqual(
+        readFlowStepsForTest(root, flowId)!.find((step) => step.id === "appointment")?.evidence,
+        { kind: "customer-decision", ref: "appointment" },
+        "幂等：appointment 证据不变",
+      );
+      assert.equal(await waitForReadinessDispatchCount(root, flowId, 1), 1, "幂等：readiness 不重复");
+      assert.equal(
+        deliveryNoteSummaries(harness.events, "rapporteur").filter((summary) => /appointment 客户决定步骤收口失败/.test(summary)).length,
+        0,
+        "成功收口无失败系统行",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-24 appointment 收口失败：不伪造 decided、如实落一条 Lead 系统行；role-cards/readiness 照常但 appointment 仍 pending", async () => {
+  const root = makeTempProjectRoot("ans-appointment-close-failed-");
+  try {
+    const flowId = "flow-appointment-close-failed";
+    writeTeamPlanFile(root, flowId, { recommended: ["executor"], rows: [{ roleId: "executor", type: "new" }] });
+    writeRoleCardsFlowFixture(root, flowId, { appointment: true });
+    writeAcceptanceCriteriaFile(root, flowId);
+    await seedAppointmentDecision(root, flowId, ["executor"]);
+    writeFullRoleArtifacts(root, "executor");
+    let calls = 0;
+    const harness = await makePostWriteHarness(root, ["executor"], () => true, {
+      completeCustomerDecisionStepFn: async () => {
+        calls += 1;
+        return { ok: false, code: "ledger-unavailable", error: "测试替身：账本不可读" };
+      },
+    });
+    try {
+      await triggerPostWrite(harness, root, flowId);
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 1, 8000);
+      assert.ok(calls >= 1, "appointment 收口已尝试");
+      const steps = readFlowStepsForTest(root, flowId)!;
+      const appointmentStep = steps.find((step) => step.id === "appointment")!;
+      assert.equal(appointmentStep.status, "pending", "失败不伪造 decided：appointment 仍未完成");
+      assert.equal(appointmentStep.evidence, undefined, "失败不写证据");
+      // 失败如实落 Lead 系统行（同一 code 不刷屏）。
+      await triggerPostWrite(harness, root, flowId);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      const failureNotes = deliveryNoteSummaries(harness.events, "rapporteur").filter((summary) =>
+        /appointment 客户决定步骤收口失败（ledger-unavailable）/.test(summary),
+      );
+      assert.equal(failureNotes.length, 1, "同一失败 code 只落一条系统行");
+      assert.match(failureNotes[0]!, /未标记为 done/, "系统行如实说明未完成");
+      assert.equal(harness.customerCalls.length, 0, "不弹客户卡");
+      assert.equal(
+        (await readGovernanceLedger(root)).entries.filter((entry) => entry.kind === "customer.decision").length,
+        1,
+        "失败路径不写客户决定",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-24 写卡反馈门控：Crew busy/partial 不投；settle 后缺一个角色只投一条；补齐 5 角色后 role-cards/readiness 正常", async () => {
+  const root = makeTempProjectRoot("ans-appointment-feedback-gate-");
+  try {
+    const flowId = "flow-feedback-gate";
+    const targets = ["r1", "r2", "r3", "r4", "reduce-integration"];
+    writeTeamPlanFile(root, flowId, {
+      recommended: targets,
+      rows: targets.map((roleId) => ({ roleId, type: "new" })),
+    });
+    writeRoleCardsFlowFixture(root, flowId, { appointment: true });
+    writeAcceptanceCriteriaFile(root, flowId);
+    await seedAppointmentDecision(root, flowId, targets);
+    // partial：5 个角色已枚举，但只写出 4 个（缺 reduce-integration 的文件）。
+    for (const roleId of targets.slice(0, 4)) writeFullRoleArtifacts(root, roleId);
+    const harness = await makePostWriteHarness(root, targets, () => true);
+    try {
+      // 真实主路径：appointment 决定后派 Crew 写卡；组队随后处于 busy/本轮在写。
+      const advanced = await harness.iface.advanceGovernanceFlow({
+        payload: { version: 1, flowId, cardKind: "appointment", nextFunction: "role-card-write", roleId: "nominator" },
+        context: { sourceRoleId: "convener", projectRoot: root, runtime: "demo", targetRoleIds: targets, stepId: "role-cards" },
+      });
+      assert.equal(advanced.ok, true, advanced.ok ? "" : (advanced.error ?? "unknown"));
+      assert.equal(advanced.targetRoleId, "nominator", "appointment → Crew 写卡");
+      await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) === 1, 3000);
+      // Crew busy：写卡后检查/刷新不得立即投反馈（不因每次 write_file/listProject 就投）。
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      assert.equal(harness.sendsByRole.get("nominator")!.length, 1, "Crew busy：不立即投反馈");
+      // Crew settle ⇒ 本轮写卡结束，写卡后检查只投一条「缺 reduce-integration」。
+      harness.settles.get("nominator")?.();
+      await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) === 2, 10000);
+      const feedback = harness.sendsByRole.get("nominator")![1]!;
+      assert.ok(feedback.startsWith("[系统·写卡校验]"), "反馈任务带系统/治理前缀（不伪造客户）");
+      assert.match(feedback, /角色卡\/reduce-integration\/role-card\.md/, "只报缺失的 reduce-integration 文件");
+      assert.doesNotMatch(feedback, /角色卡\/r1\/role-card\.md/, "已写出的角色不再列入问题");
+      const blockingNotes = deliveryNoteSummaries(harness.events, "rapporteur").filter((summary) =>
+        /写卡产物未通过校验/.test(summary),
+      );
+      assert.equal(blockingNotes.length, 1, "Lead 写卡阻塞系统行恰一条");
+      // 反馈投递后组队 busy：再次刷新/触发不重复投递同一 issue。
+      await harness.iface.listProject({ projectRoot: root });
+      await triggerPostWrite(harness, root, flowId);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      assert.equal(harness.sendsByRole.get("nominator")!.length, 2, "同一缺失 issue 只投一条");
+      assert.equal(
+        deliveryNoteSummaries(harness.events, "rapporteur").filter((summary) => /写卡产物未通过校验/.test(summary)).length,
+        1,
+        "Lead 系统行仍恰一条",
+      );
+      // 补齐第 5 个角色（组队本轮结束）⇒ role-cards 收口 + readiness 恰一次；不再反馈。
+      harness.settles.get("nominator")?.();
+      writeFullRoleArtifacts(root, "reduce-integration");
+      await harness.iface.listProject({ projectRoot: root });
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 1, 10000);
+      const steps = readFlowStepsForTest(root, flowId)!;
+      assert.equal(steps.find((step) => step.id === "appointment")?.status, "done", "appointment 已收口");
+      assert.equal(steps.find((step) => step.id === "role-cards")?.status, "done", "role-cards 收口");
+      assert.equal(await waitForReadinessDispatchCount(root, flowId, 1), 1, "readiness 恰一次");
+      assert.equal(harness.sendsByRole.get("nominator")!.length, 2, "补齐 5 角色后不再反馈");
+      assert.equal(harness.customerCalls.length, 0, "全程零客户卡");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("2026-10-23 可重入门禁：两轮错误写卡（内容不同）⇒ 两次反馈；修正后 role-cards 恰一次 done、readiness 恰一次、无客户卡/客户决定", async () => {
   const root = makeTempProjectRoot("ans-role-cards-reentry-");
   try {
@@ -6000,7 +6197,7 @@ test("2026-10-23 可重入门禁：两轮错误写卡（内容不同）⇒ 两�
   }
 });
 
-test("2026-10-23 指纹去重：mtime-only 不触发；团队计划内容变化（问题集相同）⇒ 重新反馈", async () => {
+test("2026-10-24 issue 集合去重：mtime-only / 计划内容变化但问题集相同 ⇒ 不重新反馈；新 issue 才再投", async () => {
   const root = makeTempProjectRoot("ans-role-cards-fingerprint-");
   try {
     const flowId = "flow-fingerprint";
@@ -6016,7 +6213,7 @@ test("2026-10-23 指纹去重：mtime-only 不触发；团队计划内容变化�
       await triggerPostWrite(harness, root, flowId);
       await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) === 1, 6000);
       harness.settles.get("nominator")?.();
-      // 仅改 mtime（内容不变）：指纹不含时间 ⇒ 不重新反馈。
+      // 仅改 mtime（内容不变）：不重新反馈。
       const next = new Date(Date.now() + 60_000);
       for (const name of ["role-card.md", "boundary.yaml"]) {
         utimesSync(path.join(root, "角色卡", "executor", name), next, next);
@@ -6024,15 +6221,21 @@ test("2026-10-23 指纹去重：mtime-only 不触发；团队计划内容变化�
       await triggerPostWrite(harness, root, flowId);
       await new Promise((resolve) => setTimeout(resolve, 900));
       assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 1, "mtime-only 不重新反馈");
-      // 团队计划内容/版本变化（问题集相同）：指纹变化 ⇒ 必须重新反馈。
+      // 团队计划内容/版本变化（问题集相同）：feedback 去重按 issue 集合 ⇒ 同一 issue 只投一条，不重复刷屏。
       writeTeamPlanFile(root, flowId, {
         version: 2,
         recommended: ["executor"],
         rows: [{ roleId: "executor", type: "new" }],
       });
       await triggerPostWrite(harness, root, flowId);
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 1, "问题集相同：计划版本变化不重复反馈");
+      // 新 issue（role-card 为空）⇒ 必须再投一条（只投一次）。
+      writeFileSync(path.join(root, "角色卡", "executor", "role-card.md"), "", "utf8");
+      await triggerPostWrite(harness, root, flowId);
       await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) === 2, 6000);
-      assert.match(harness.sendsByRole.get("nominator")![1]!, /顶层 role 与目录 id 不一致/, "问题集可以相同，但内容/计划变化须再次反馈");
+      assert.match(harness.sendsByRole.get("nominator")![1]!, /文件为空（需要角色卡正文）/, "新 issue 如实再投");
+      assert.match(harness.sendsByRole.get("nominator")![1]!, /顶层 role 与目录 id 不一致/, "仍存在的既有 issue 一并列出");
     } finally {
       await harness.iface.stopSession();
     }
@@ -6491,7 +6694,7 @@ test("2026-10-23 readiness 文案兼容：未传新选项时 v1/v2/v3 逐字不�
   }
 });
 
-test("2026-10-23 S5 回归：flow 缺 role-cards 同指纹连续 settle/refresh ⇒ Convener 反馈恰一次、无重复 projectChanged；内容变化再反馈；补步骤后收口派 readiness 恰一次", async () => {
+test("2026-10-24 S5 回归：flow 缺 role-cards 同一 issue 连续 settle/refresh ⇒ Convener 反馈恰一次、无重复 projectChanged；内容变化但问题集相同不再反馈；补步骤后收口派 readiness 恰一次", async () => {
   const root = makeTempProjectRoot("ans-role-cards-defect-loop-");
   try {
     const flowId = "flow-defect-loop";
@@ -6505,7 +6708,7 @@ test("2026-10-23 S5 回归：flow 缺 role-cards 同指纹连续 settle/refresh 
       // 首条 flow 缺陷反馈（探针/完整检查）。
       await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 1, 8000);
       assert.match(harness.sendsByRole.get("convener")![0]!, /流程状态 YAML 未通过结构校验/);
-      // 让 Convener 本轮结束：否则重复消息只会排队、暴露不出「同指纹重复反馈」缺陷（S5 e2e 形态）。
+      // 让 Convener 本轮结束：否则重复消息只会排队、暴露不出「同一 issue 重复反馈」缺陷（S5 e2e 形态）。
       harness.settles.get("convener")?.();
       // 治理角色 settle 自身也会异步刷新 listing 并 emit（既有设计）：先等它落定，再取基线。
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -6515,7 +6718,7 @@ test("2026-10-23 S5 回归：flow 缺 role-cards 同指纹连续 settle/refresh 
       }
       const changedAfterFirst = harness.projectChanged();
       assert.ok(changedAfterFirst >= 1, "首条反馈触发一次 project:changed");
-      // 同指纹连续刷新（探针每次都会排完整检查）+ appointment-write 触发：不得重复反馈、不得重复
+      // 同一 issue 集合连续刷新（探针每次都会排完整检查）+ appointment-write 触发：不得重复反馈、不得重复
       // project:changed。注意：不再反复 settle Convener——治理角色 settle 自身按既有设计会刷新 listing，
       // 会把「检查产生的 emit」与既有 settle 刷新混在一起；首条反馈后 Convener 已空闲，重复消息会直接可见。
       for (let i = 0; i < 6; i += 1) {
@@ -6524,32 +6727,30 @@ test("2026-10-23 S5 回归：flow 缺 role-cards 同指纹连续 settle/refresh 
         await new Promise((resolve) => setTimeout(resolve, 150));
       }
       await new Promise((resolve) => setTimeout(resolve, 900));
-      assert.equal(harness.sendsByRole.get("convener")!.length, 1, "同指纹：Convener 反馈恰一次（S5 回归）");
-      assert.equal(harness.projectChanged(), changedAfterFirst, "同指纹重复检查不再 emitProjectChanged");
+      assert.equal(harness.sendsByRole.get("convener")!.length, 1, "同一 issue：Convener 反馈恰一次（S5 回归）");
+      assert.equal(harness.projectChanged(), changedAfterFirst, "同一 issue 重复检查不再 emitProjectChanged");
       assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "flow 缺陷：不派 readiness");
       assert.equal(harness.customerCalls.length, 0, "无客户卡");
-      // 内容变化（指纹变化）⇒ 再次反馈一次。
+      // 角色卡内容变化但**问题集相同**（仍是缺 role-cards 步骤）⇒ 不再反馈（issue 集合去重）。
       writeFileSync(
         path.join(root, "角色卡", "executor", "memo.md"),
-        "# 备忘录\n\n- 2026-10-23：测试夹具建立。\n- 2026-10-23：内容变化（指纹变化）。\n",
+        "# 备忘录\n\n- 2026-10-23：测试夹具建立。\n- 2026-10-23：内容变化（问题集不变）。\n",
         "utf8",
       );
       await triggerPostWrite(harness, root, flowId);
-      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 2, 6000);
-      harness.settles.get("convener")?.();
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      assert.equal(harness.sendsByRole.get("convener")!.length, 2, "内容变化后恰再次反馈一次（不循环）");
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      assert.equal(harness.sendsByRole.get("convener")!.length, 1, "问题集相同：内容变化不重复反馈");
       // 补上 flow 的 role-cards 步骤 ⇒ 收口成功并派 readiness 恰一次。
       writeRoleCardsFlowFixture(root, flowId);
       await triggerPostWrite(harness, root, flowId);
-      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 3, 8000);
+      await waitForTest(() => (harness.sendsByRole.get("convener")?.length ?? 0) === 2, 8000);
       assert.equal(await waitForConvenerDispatchCount(root, flowId, 1), 1, "补步骤后 readiness 恰一次");
       assert.equal(
         readFlowStepsForTest(root, flowId)!.find((step) => step.id === "role-cards")?.status,
         "done",
         "补步骤后 role-cards 收口 done",
       );
-      assert.match(harness.sendsByRole.get("convener")![2]!, /应用已在结构校验通过后把 role-cards 标为 done/);
+      assert.match(harness.sendsByRole.get("convener")![1]!, /应用已在结构校验通过后把 role-cards 标为 done/);
       assert.equal(harness.customerCalls.length, 0, "全程无客户卡");
       assert.equal(
         (await readGovernanceLedger(root)).entries.filter((entry) => entry.kind === "customer.decision").length,
@@ -6560,7 +6761,7 @@ test("2026-10-23 S5 回归：flow 缺 role-cards 同指纹连续 settle/refresh 
       harness.settles.get("convener")?.();
       await harness.iface.listProject({ projectRoot: root });
       await new Promise((resolve) => setTimeout(resolve, 800));
-      assert.equal(harness.sendsByRole.get("convener")!.length, 3, "收口成功后不重复派发");
+      assert.equal(harness.sendsByRole.get("convener")!.length, 2, "收口成功后不重复派发");
       assert.equal(await waitForConvenerDispatchCount(root, flowId, 1), 1);
     } finally {
       await harness.iface.stopSession();
@@ -7317,7 +7518,7 @@ test("2026-10-24 P0-2 ready 唤醒：有 delivered 待核证 ⇒ 本轮只发 de
   }
 });
 
-test("2026-10-24 P0-1 发布门（Interface）：非发布不派 Proof/不写标准；flow.release=true 才派 verifier", async () => {
+test("2026-10-24 所有变更独立验收（Interface）：非发布流程同样派 verifier/Proof；release 仅为元数据", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "ans-interface-release-gate-"));
   try {
     const flowId = "flow-release-gate";
@@ -7403,26 +7604,46 @@ test("2026-10-24 P0-1 发布门（Interface）：非发布不派 Proof/不写标
       resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
     });
     const listing: ProjectListing = { ...listingWithProjectRoles({ ...trioListing(), projectRoot: root }, ["executor"]), projectRoot: root };
+    const verifierDispatchCount = async (): Promise<number> =>
+      (await readGovernanceLedger(root)).entries.filter((entry) => entry.kind === "dispatch.accepted" && entry.targetRoleId === "verifier").length;
+    const waitForVerifierDispatches = async (expected: number): Promise<void> => {
+      const deadline = Date.now() + 4000;
+      while (Date.now() < deadline) {
+        if ((await verifierDispatchCount()) === expected) return;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      throw new Error(`等待验收派发账本达到 ${expected} 条超时（当前 ${await verifierDispatchCount()}）`);
+    };
     try {
       await iface.listProject({ projectRoot: root });
-      await waitForTest(
-        () => deliveryNoteSummaries(events, "rapporteur").some((note) => note.includes("awaiting-release-acceptance")),
-        4000,
+      // ① 非发布（release 缺省）流程完成 ⇒ 同样派 verifier/Proof（2026-10-24 客户修订）。
+      await waitForTest(() => (sendsByRole.get("verifier")?.length ?? 0) > 0, 4000);
+      assert.match(sendsByRole.get("verifier")![0]!, /请汇总证据并出验收卡/);
+      await waitForVerifierDispatches(1);
+      assert.equal(
+        deliveryNoteSummaries(events, "rapporteur").filter((note) => note.includes("awaiting-release-acceptance")).length,
+        0,
+        "非发布不再停在「发布验收前」",
       );
-      assert.equal((sendsByRole.get("verifier") ?? []).length, 0, "非发布：不派 verifier/Proof");
-      assert.equal(existsSync(path.join(root, "docs", "acceptance", `${flowId}-criteria-v1.md`)), false, "非发布：不写 acceptance-criteria");
-      assert.equal((await readGovernanceLedger(root)).entries.filter((entry) => entry.kind === "dispatch.accepted" && entry.targetRoleId === "verifier").length, 0, "非发布：无 verifier 派发账本");
-      // 显式发布标记 ⇒ 下一次真实事件才派 verifier。
+      // ② release:true 只是元数据：flow 更新触发一次按版本的复核重派（与任何 flow 更新同一路径，不是发布门）。
       writeReleaseFlow(true);
       await iface.listProject({ projectRoot: root });
-      await waitForTest(() => (sendsByRole.get("verifier")?.length ?? 0) > 0, 4000);
-      assert.equal(sendsByRole.get("verifier")!.length, 1, "release:true ⇒ 恰一次 verifier 派发");
-      assert.match(sendsByRole.get("verifier")![0]!, /请汇总证据并出验收卡/);
-      assert.equal((await readGovernanceLedger(root)).entries.filter((entry) => entry.kind === "dispatch.accepted" && entry.targetRoleId === "verifier").length, 1, "发布流程写 verifier 派发账本");
+      await waitForVerifierDispatches(2);
+      // 重派任务可能因会话忙碌而排队（sendBackground queued），以**账本**为派发事实；文案细节由
+      // acceptance-dispatch 的 flow 版本重派用例覆盖。这里只钉住「release 标记不改变派发路径」。
+      assert.equal(
+        deliveryNoteSummaries(events, "rapporteur").filter((note) => note.includes("awaiting-release-acceptance")).length,
+        0,
+        "release 标记不产生等待行",
+      );
       await waitForTest(
         () => deliveryNoteSummaries(events, "rapporteur").some((note) => /已自动派发验收复核给验收/.test(note)),
         4000,
       );
+      // flow 不被应用改写：release 保持、验收步骤保持 pending（不自动标 done）。
+      const flowText = readFileSync(flowPath, "utf8");
+      assert.match(flowText, /release: true/, "release 元数据保留（应用不代写/不代删）");
+      assert.match(flowText, /id: verification\n\s+title: 验收\n\s+owner: app\n\s+kind: acceptance\n\s+status: pending/, "acceptance 不自动 done");
     } finally {
       await iface.stopSession();
     }

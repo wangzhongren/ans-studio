@@ -497,12 +497,12 @@ async function seedGovernanceEvidence(projectRoot: string, flowId: string, dispa
   ]);
 }
 
-test("自动验收（导入补齐，发布流程）：门通过 + release:true ⇒ 自动派 Proof 一条复核任务 + 写账本；重启/重复事件不重派", async () => {
+test("自动验收（导入补齐）：门通过 ⇒ 自动派 Proof 一条复核任务 + 写账本；重启/重复事件不重派", async () => {
   const root = makeTempProjectRoot("ans-acceptance-import-");
   try {
     const flowId = "flow-auto";
-    // 2026-10-24 P0-1：自动派 Proof 只在 flow.release === true（显式发布流程）时发生。
-    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId), { release: true }));
+    // 2026-10-24 客户修订：所有变更（release 缺省＝非发布）同样自动派 Proof；release 不再是门。
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
     await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
     const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
     const harness = await makeHarness(root, listing);
@@ -555,16 +555,16 @@ test("自动验收（导入补齐，发布流程）：门通过 + release:true �
   }
 });
 
-test("自动验收（任意角色 settle + 流程状态变更，发布流程）：交付步骤补齐后由 settle 触发；重复 settle 只派一次", async () => {
+test("自动验收（任意角色 settle + 流程状态变更）：交付步骤补齐后由 settle 触发；重复 settle 只派一次", async () => {
   const root = makeTempProjectRoot("ans-acceptance-settle-");
   try {
     const flowId = "flow-settle";
-    // 导入时仍有执行步骤 pending：补齐检查不派（release:true 的发布流程也一样要等步骤完成）。
+    // 导入时仍有执行步骤 pending：补齐检查不派（非发布流程也一样要等步骤完成）。
     const pendingSteps: FlowYamlStepInput[] = [
       ...yamlAcceptanceSteps(flowId).filter((step) => step.id !== "delivery-server"),
       { id: "delivery-server", kind: "dispatch", status: "pending" },
     ];
-    writeFlowStateFile(root, flowId, flowStateYaml(flowId, pendingSteps, { release: true }));
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, pendingSteps));
     await seedGovernanceEvidence(root, flowId, []);
     const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
     const harness = await makeHarness(root, listing);
@@ -577,7 +577,7 @@ test("自动验收（任意角色 settle + 流程状态变更，发布流程）�
       await appendLedger(root, [
         { kind: "dispatch.accepted", flowId, stepId: "delivery-server", actorRoleId: "convener", power: "schedule", targetRoleId: "executor" },
       ]);
-      writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId), { release: true }));
+      writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
       const control = harness.controls.get("executor")!;
       control.settle();
       control.settle();
@@ -707,8 +707,9 @@ test("自动验收阻塞可见性：门未通过 ⇒ Lead 恰一条系统行（�
       assert.ok(changed[1]!.includes("delivery-server=aborted"), "新系统行如实带新原因");
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "仍不派 Proof");
 
-      // 门通过：修正流程 + 补派发证据（发布流程 YAML release:true）⇒ 自动派发路径不变，且不再发阻塞行。
-      writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId), { release: true }));
+      // 门通过：修正流程 + 补派发证据（release 缺省＝非发布；2026-10-24 客户修订后同样自动派 Proof）⇒
+      // 自动派发路径不变，且不再发阻塞行。
+      writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
       await appendLedger(root, [
         { kind: "dispatch.accepted", flowId, stepId: "delivery-server", actorRoleId: "convener", power: "schedule", targetRoleId: "executor" },
       ]);
@@ -750,19 +751,20 @@ test("自动验收阻塞可见性：已解决（门通过）后再次阻塞同�
       assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "executor", runtime: "demo" })).ok, true);
       const control = harness.controls.get("executor")!;
 
-      // 第一次放行：流程修正 + 补证据 ⇒ 收尾门通过；**非发布**（无 flow YAML/release）停在发布验收前，
-      // 只落 awaiting-release 系统行——不发生引擎解析/Proof 派发（2026-10-24 P0-1）。
+      // 第一次放行：流程修正 + 补证据 ⇒ 收尾门通过并进入验收派发路径；本用例注入「引擎无法确定」
+      // ⇒ 只落一条明确系统行、不发生 Proof 派发。2026-10-24 客户修订：非发布/legacy 也走同一路径
+      // （不再停在发布验收前）。
       writeFlowFile(root, flowId, withDeliveryStatus("done"));
       await appendLedger(root, [
         { kind: "dispatch.accepted", flowId, stepId: "delivery-server", actorRoleId: "convener", power: "schedule", targetRoleId: "executor" },
       ]);
       control.settle();
-      await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes("awaiting-release-acceptance")));
+      await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes(RUNTIME_UNRESOLVED_MESSAGE)));
       assert.equal(blockerNotes(harness.events, "liaison").length, 1, "门通过本身不发阻塞行");
-      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "非发布：不派 Proof");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "引擎无法确定：不派 Proof");
       assert.ok(
-        !deliveryNotes(harness.events, "liaison").some((note) => note.includes(RUNTIME_UNRESOLVED_MESSAGE)),
-        "非发布停在发布验收前，不进入引擎解析/Proof 派发",
+        !deliveryNotes(harness.events, "liaison").some((note) => note.includes("awaiting-release-acceptance")),
+        "不再出现「停在发布验收前」等待行",
       );
 
       // 再次阻塞（原因文本与第一次相同）：门通过时已清去重记忆 ⇒ 重新告知。
@@ -837,7 +839,7 @@ interface FlowYamlStepInput {
   supersededBy?: string;
 }
 
-/** 构造块状 YAML（机器状态；手写而非 JSON，覆盖真实文件形状）。`release` 仅测试显式发布流程时写。 */
+/** 构造块状 YAML（机器状态；手写而非 JSON，覆盖真实文件形状）。`release` 仅供参考元数据（2026-10-24 修订后不再作为独立验收门）。 */
 function flowStateYaml(flowId: string, steps: readonly FlowYamlStepInput[], options: { release?: boolean } = {}): string {
   const lines = [
     `flowId: ${flowId}`,
@@ -1088,33 +1090,59 @@ test("自动验收 YAML：机器状态齐备 ⇒ 自动派 Proof；Markdown 人�
   }
 });
 
-test("2026-10-24 P0-1：非发布流程（release 缺省）change-package done ⇒ 停在发布验收前；不派 verifier/Proof、不写 acceptance-criteria、不标 acceptance done", async () => {
+test("2026-10-24 所有变更独立验收：非发布新契约流程同样派 verifier 写标准，补齐后派 Proof；release 不参与判定", async () => {
   const root = makeTempProjectRoot("ans-acceptance-non-release-");
   try {
     const flowId = "flow-non-release";
-    // release 缺省 = 非发布。
+    // release 缺省 = 非发布；客户 2026-10-24 修订：非发布同样先写标准、再进入验收判定。
     writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractSteps(flowId, { criteria: false, change: true })));
     writeNewContractEvidenceFiles(root, flowId, { criteria: false, change: "T2" });
     await appendNewContractLedger(root, flowId, { criteria: false, change: true });
     const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
     const harness = await makeHarness(root, listing);
     try {
+      // ① 非发布同样派 Verifier 写 acceptance-criteria（不再停在发布验收前）。
+      await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0);
+      const criteriaMessage = harness.sendsByRole.get("verifier")![0]!;
+      assert.match(criteriaMessage, /实施前完成标准/);
+      assert.match(criteriaMessage, new RegExp(`docs/acceptance/${flowId}-criteria-v1\\.md`));
+      assert.match(criteriaMessage, /不要发验收卡/);
+      await waitForAsync(async () => (await criteriaDispatches(root, flowId)).length > 0);
+      assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "判定未派（只有写标准任务）");
+      assert.equal((await verifierDispatches(root, flowId)).length, 0, "标准缺失：不派验收判定");
+      assert.equal(existsSync(path.join(root, "docs", "acceptance", `${flowId}-criteria-v1.md`)), false, "应用不代写 acceptance-criteria");
       const awaitingNotes = () =>
         deliveryNotes(harness.events, "liaison").filter((note) => note.includes("awaiting-release-acceptance"));
-      await waitFor(() => awaitingNotes().length === 1);
-      assert.match(awaitingNotes()[0]!, /非发布/);
-      assert.match(awaitingNotes()[0]!, /不派验收/);
-      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "非发布：不派 verifier/Proof");
-      assert.equal((await verifierDispatches(root, flowId)).length, 0, "非发布：无 verification 派发账本");
-      assert.equal((await criteriaDispatches(root, flowId)).length, 0, "非发布：不派 acceptance-criteria 写标准任务");
-      assert.equal(existsSync(path.join(root, "docs", "acceptance", `${flowId}-criteria-v1.md`)), false, "非发布：不写 acceptance-criteria");
-      // 重复 settle：同一 revision 不刷屏，仍不派。
+      assert.equal(awaitingNotes().length, 0, "不再有 awaiting-release-acceptance 提示");
+      assert.ok(
+        deliveryNotes(harness.events, "liaison").some((note) => note.includes("实施前验收标准缺失")),
+        "Lead 可见阻塞原因",
+      );
+      // 重复 settle：标准任务不重复派（账本/运行期去重）。
       assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "executor", runtime: "demo" })).ok, true);
       harness.controls.get("executor")!.settle();
       await sleep(300);
-      assert.equal(awaitingNotes().length, 1, "同一 revision 只提示一次");
-      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "仍不派");
-      // flow 不被改写：验收步骤保持 pending（应用不自动标 done）。
+      assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "同流程不重复派标准任务");
+      // Verifier 写完标准（本轮结束）：让排队中的后续任务可投出。
+      harness.controls.get("verifier")?.settle();
+      await sleep(100);
+
+      // ② 补齐标准 + 变更包 ⇒ 非发布同样派 Proof 判定（任务带档位/报告路径）。
+      writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "T2" });
+      writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractSteps(flowId, { criteria: true, change: true })));
+      await appendNewContractLedger(root, flowId, { criteria: true, change: true });
+      await harness.iface.listProject({ projectRoot: root });
+      await waitForAsync(async () => (await verifierDispatches(root, flowId)).length > 0, 5000);
+      harness.controls.get("verifier")?.settle();
+      await sleep(200);
+      const verifierSends = harness.sendsByRole.get("verifier") ?? [];
+      const judgeMessage = verifierSends[verifierSends.length - 1]!;
+      assert.match(judgeMessage, /当前档位：T2/, "判定任务带变更包风险档位");
+      assert.match(judgeMessage, new RegExp(`docs/acceptance/${flowId}-report-v1\\.md`), "报告路径进 docs/acceptance");
+      assert.equal((await verifierDispatches(root, flowId)).length, 1, "判定派发恰一次（stepId=verification）");
+      assert.equal((await criteriaDispatches(root, flowId)).length, 1, "标准任务恰一次（stepId=acceptance-criteria）");
+
+      // ③ flow 不被改写：release 保持缺省、验收步骤保持 pending（应用不代写发布标记/不自动标 done）。
       const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${flowId}.yaml`), "utf8"), flowId);
       assert.equal(parsed.ok, true);
       if (parsed.ok) {
@@ -1523,7 +1551,7 @@ test("2026-10-23 验收返工路由（客户拒绝）：最新 rejected ⇒ 路�
       assert.match(task, /id=F1 \| owner=executor \| action=修复交付并补证据 \| evidence=docs\/verification\/f1\.log/);
       assert.match(task, /flow_step_supersede/);
       assert.match(task, /不要.*supersede 保留验收步骤/);
-      assert.match(task, /返工完成后由应用在发布版本.*重派验收/, "release:true ⇒ 返工后可重派验收");
+      assert.match(task, /返工完成后由应用按验收门（所有变更，含非发布）自动重派验收/, "返工后由应用按验收门自动重派（release 不是条件）");
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "Proof 不接收返工派发");
       assert.equal(completeCalls.length, 0, "rejected ⇒ 不收口");
       // routed 系统行在 record sent 写之后发出：先等它，再断言任务/记录（避免发送可见早于系统行的竞态）。
@@ -1623,7 +1651,7 @@ test("2026-10-23 验收返工路由（重派门）：rejection 后无 flow 进�
   const acceptedRoot = makeTempProjectRoot("ans-rework-accepted-");
   try {
     const flowId = "flow-rework-no-progress";
-    // flow 先写，rejection 决定在之后（mtime <= decisionAt）⇒ 无进展。发布流程（release:true）用于观察重派门。
+    // flow 先写，rejection 决定在之后（mtime <= decisionAt）⇒ 无进展。release:true 仅元数据（不参与重派判定）。
     writeFlowStateFile(noProgressRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId), { release: true }));
     await seedGovernanceEvidence(noProgressRoot, flowId, ["delivery-server"]);
     await appendAcceptanceDecisionAt(noProgressRoot, flowId, "rejected", new Date().toISOString());
@@ -1798,7 +1826,7 @@ test("2026-10-23 兼容（Q6 A）：legacy Markdown 流程 + 历史 rejected ⇒
       await legacy.iface.stopSession();
     }
 
-    // ② 无验收决定：发布流程（release:true）走既有门 ⇒ 正常派 verifier（收口/返工路由不介入）。
+    // ② 无验收决定：流程齐备 ⇒ 走既有门正常派 verifier（收口/返工路由不介入）；release 仅元数据。
     writeFlowStateFile(noDecisionRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId), { release: true }));
     await seedGovernanceEvidence(noDecisionRoot, flowId, ["delivery-server"]);
     const noneListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: noDecisionRoot };
@@ -2021,7 +2049,7 @@ test("2026-10-20 delivered 唤醒：已有 acceptance accepted ⇒ 收口优先�
       await acceptedHarness.iface.stopSession();
     }
 
-    // ② 步骤 done（无 delivered）：不派核证；发布流程（release:true）齐备 ⇒ 照常派 verifier 一次。
+    // ② 步骤 done（无 delivered）：不派核证；流程齐备 ⇒ 照常派 verifier 一次（release 仅元数据）。
     writeFlowStateFile(doneRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId), { release: true }));
     await seedGovernanceEvidence(doneRoot, flowId, ["delivery-server"]);
     const doneListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: doneRoot };
@@ -2281,6 +2309,7 @@ test("2026-10-20 artifact 补登（真实编排出口）：文件存在但账本
 // 新流程（flow YAML 含 team-plan/role-cards/role-readiness/acceptance-criteria/change-package）在派验收判定前
 // 必须有结构合格的实施前标准与变更包（riskTier）；标准缺失时应用先派 Verifier 写标准（stepId=acceptance-criteria），
 // 不把「待补」当通过；legacy 流程（无新 step id）保持原行为。
+// 2026-10-24 客户修订（所有变更独立验收）：以上门槛不再以 `release` 为门——非发布新契约流程同样派标准/判定。
 
 function writeNewContractEvidenceFiles(
   root: string,
@@ -2422,7 +2451,7 @@ test("2026-10-22 第 3 项：新契约流程标准缺失 ⇒ 派 Verifier 写标
   const root = makeTempProjectRoot("ans-new-contract-criteria-");
   const flowId = "flow-new-gate";
   try {
-    writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractSteps(flowId, { criteria: false, change: false }), { release: true }));
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractSteps(flowId, { criteria: false, change: false })));
     writeNewContractEvidenceFiles(root, flowId, { criteria: false, change: "none" });
     await appendNewContractLedger(root, flowId, { criteria: false, change: false });
     const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
@@ -2452,7 +2481,7 @@ test("2026-10-22 第 3 项：新契约流程标准缺失 ⇒ 派 Verifier 写标
 
       // 补齐标准 + 变更包 + 更新 flow 证据（criteria/change 步骤 done）。
       writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "T3" });
-      writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractSteps(flowId, { criteria: true, change: true }), { release: true }));
+      writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractSteps(flowId, { criteria: true, change: true })));
       await appendNewContractLedger(root, flowId, { criteria: true, change: true });
       // 2026-10-23 可重入门禁：刷新探针会在 listProject 时占用后台会话（LRU=3），可能回收 executor 会话；
       // 用**既有「项目刷新/导入」触发面**（import）重新评估验收门，不依赖可能被回收的会话 settle。
@@ -2479,7 +2508,7 @@ test("2026-10-22 第 3 项：新契约流程变更包缺失/缺 riskTier ⇒ 不
   const root = makeTempProjectRoot("ans-new-contract-change-");
   const flowId = "flow-new-change";
   try {
-    writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractSteps(flowId, { criteria: true, change: false }), { release: true }));
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractSteps(flowId, { criteria: true, change: false })));
     writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "none" });
     await appendNewContractLedger(root, flowId, { criteria: true, change: false });
     const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };

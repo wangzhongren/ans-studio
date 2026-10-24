@@ -221,7 +221,8 @@ export interface FlowDocStep {
  * 生成合法 Flow YAML（`docs/flows/<flowId>.yaml` 唯一机器状态；契约见 `src/common/编排/flow-state.ts`）。
  * 顶层 flowId/version/qualityTier/steps；每步 id/title/owner/kind/status；done 必须带同 kind 的 evidence
  * （dispatch 的 ref=账本 stepId；acceptance 的 ref 固定 "acceptance"）。pending 等状态不要求 evidence。
- * `options.release`（2026-10-24 P0-1）：显式发布标记；缺省不写 = 非发布（产品契约 `release` 可选布尔）。
+ * `options.release`（2026-10-24 客户修订）：仅可选发布元数据；缺省不写。独立验收范围＝所有变更，
+ * release 不改变 criteria / Proof 的自动派发（产品契约 `release` 可选布尔）。
  */
 export function flowDoc(
   flowId = FLOW,

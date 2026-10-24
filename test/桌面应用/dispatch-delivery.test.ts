@@ -1644,12 +1644,13 @@ async function writeInvalidAcceptanceCriteria(dir: string, flowId = "flow-a"): P
 /**
  * 造一个可过派发门禁的 trio 项目根：流程单含步骤 `impl`；账本按用例写入。
  * 2026-10-22：默认写入结构合格的实施前验收标准（O2 门要求）；缺失/不合格用 `acceptanceCriteria` 显式指定。
- * 2026-10-24 P1-5：验收标准门只对发布版本（flow YAML `release: true`）生效；`release: true` 时写 YAML
- * 机器状态（legacy `.md` 无 release 标记 ⇒ 非发布，缺标准也豁免）。
+ * 2026-10-24 客户修订（所有变更独立验收）：验收标准门不再以 `release` 为门，按 flow **声明
+ * `acceptance-criteria` 步骤**的新契约判定；`yaml: true` 写含该步骤的非发布 YAML 机器状态
+ * （`release: true` 仅作元数据），缺省仍写 legacy `.md`（无声明 ⇒ 豁免）。
  */
 async function makeTrioRoot(
   ledgerEntries: Record<string, unknown>[] = [],
-  options: { acceptanceCriteria?: "valid" | "missing" | "invalid"; release?: boolean } = {},
+  options: { acceptanceCriteria?: "valid" | "missing" | "invalid"; yaml?: boolean; release?: boolean } = {},
 ): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-trio-dispatch-"));
   await fs.mkdir(path.join(dir, "docs", "flows"), { recursive: true });
@@ -1658,19 +1659,24 @@ async function makeTrioRoot(
     ["# 流程 flow-a", "", "| 步骤 | 主人 | 状态 |", "| --- | --- | --- |", "| impl | A | pending |", ""].join("\n"),
     "utf8",
   );
-  if (options.release === true) {
+  if (options.yaml === true || options.release === true) {
     await fs.writeFile(
       path.join(dir, "docs", "flows", "flow-a.yaml"),
       [
         "flowId: flow-a",
         "version: 1",
         "qualityTier: production",
-        "release: true",
+        ...(options.release === true ? ["release: true"] : []),
         "steps:",
         "  - id: impl",
         "    title: 实现",
         "    owner: A",
         "    kind: dispatch",
+        "    status: pending",
+        "  - id: acceptance-criteria",
+        "    title: 验收标准",
+        "    owner: verifier",
+        "    kind: artifact",
         "    status: pending",
         "",
       ].join("\n"),
@@ -1903,19 +1909,20 @@ test("routeDispatch 反例（trio）：无客户接受/无任命/目标内置/�
   assert.equal(ledger4.entries.filter((entry) => entry.kind === "dispatch.accepted").length, 1, "被拒的重复派发不新增账本");
   await h4.mgr.stop(null);
 
-  // ⑤ 发布版本（release: true）任命已记录但**实施前验收标准缺失**：O2 发布门拒（不派、不写账本）。
+  // ⑤ 非发布（flow YAML、release 缺省）声明了 acceptance-criteria 新契约步骤、任命已记录但**标准缺失**：
+  // 标准门拒（不派、不写账本）。2026-10-24 客户修订（所有变更独立验收）：标准门不再以 release 为门。
   const missingCriteriaRoot = await makeTrioRoot(
     [
       trioEntry({ decisionKind: "proposal-accept" }),
       trioEntry({ decisionKind: "appointment", power: "nomination", actorRoleId: "nominator", targetRoleIds: ["A"] }),
     ],
-    { acceptanceCriteria: "missing", release: true },
+    { acceptanceCriteria: "missing", yaml: true },
   );
   const h5 = makeHarness({ projectRoot: missingCriteriaRoot, customListing: trioListing(missingCriteriaRoot) });
   await h5.mgr.open({ projectRoot: missingCriteriaRoot, roleId: "convener", runtime: "demo" });
   await tick(30);
   const r5 = (await h5.capabilitiesOf("convener")!.dispatchTask!({ roleId: "A", task: "缺标准", flowId: "flow-a", stepId: "impl" }))!;
-  assert.equal(r5.ok, false, "发布版本实施前标准缺失 ⇒ 拒投（O2）");
+  assert.equal(r5.ok, false, "非发布新契约流程实施前标准缺失 ⇒ 拒投");
   assert.match(r5.message ?? "", /结构合格标准|验收标准/, "回执点明需要结构合格的验收标准");
   assert.match(r5.message ?? "", /不存在或不可读/, "如实原因：标准文件缺失");
   assert.equal(h5.sent.A.length, 0, "拒投不投递");
@@ -1926,19 +1933,19 @@ test("routeDispatch 反例（trio）：无客户接受/无任命/目标内置/�
   );
   await h5.mgr.stop(null);
 
-  // ⑥ 发布版本标准存在但**结构不合格**（缺验收表/档位/判定规则/证据计划/版本冻结）：同样拒，提示补齐。
+  // ⑥ 非发布新契约流程标准存在但**结构不合格**（缺验收表/档位/判定规则/证据计划/版本冻结）：同样拒，提示补齐。
   const invalidCriteriaRoot = await makeTrioRoot(
     [
       trioEntry({ decisionKind: "proposal-accept" }),
       trioEntry({ decisionKind: "appointment", power: "nomination", actorRoleId: "nominator", targetRoleIds: ["A"] }),
     ],
-    { acceptanceCriteria: "invalid", release: true },
+    { acceptanceCriteria: "invalid", yaml: true },
   );
   const h6 = makeHarness({ projectRoot: invalidCriteriaRoot, customListing: trioListing(invalidCriteriaRoot) });
   await h6.mgr.open({ projectRoot: invalidCriteriaRoot, roleId: "convener", runtime: "demo" });
   await tick(30);
   const r6 = (await h6.capabilitiesOf("convener")!.dispatchTask!({ roleId: "A", task: "坏标准", flowId: "flow-a", stepId: "impl" }))!;
-  assert.equal(r6.ok, false, "发布版本实施前标准结构不合格 ⇒ 拒投（O2）");
+  assert.equal(r6.ok, false, "非发布新契约流程实施前标准结构不合格 ⇒ 拒投");
   assert.match(r6.message ?? "", /结构不合格/, "如实原因：结构不合格");
   assert.match(r6.message ?? "", /补齐/, "可操作建议：补齐后重新派发");
   assert.equal(h6.sent.A.length, 0, "拒投不投递");
@@ -1949,23 +1956,24 @@ test("routeDispatch 反例（trio）：无客户接受/无任命/目标内置/�
   );
   await h6.mgr.stop(null);
 
-  // ⑦ 非发布（legacy `.md`，无 release 标记）缺标准：P1-5 豁免——允许派发并写账本（不再要求 Verifier 文件）。
-  const nonReleaseRoot = await makeTrioRoot(
+  // ⑦ legacy `.md`（无 YAML、未声明 acceptance-criteria 新契约步骤）缺标准：豁免——允许派发并写账本
+  // （标准门按 flow 声明的新契约步骤生效，不看 release；legacy 保持原行为）。
+  const legacyRoot = await makeTrioRoot(
     [
       trioEntry({ decisionKind: "proposal-accept" }),
       trioEntry({ decisionKind: "appointment", power: "nomination", actorRoleId: "nominator", targetRoleIds: ["A"] }),
     ],
     { acceptanceCriteria: "missing" },
   );
-  const h7 = makeHarness({ projectRoot: nonReleaseRoot, customListing: trioListing(nonReleaseRoot) });
-  await h7.mgr.open({ projectRoot: nonReleaseRoot, roleId: "convener", runtime: "demo" });
+  const h7 = makeHarness({ projectRoot: legacyRoot, customListing: trioListing(legacyRoot) });
+  await h7.mgr.open({ projectRoot: legacyRoot, roleId: "convener", runtime: "demo" });
   await tick(30);
-  const r7 = (await h7.capabilitiesOf("convener")!.dispatchTask!({ roleId: "A", task: "非发布缺标准", flowId: "flow-a", stepId: "impl" }))!;
-  assert.equal(r7.ok, true, "非发布未标 release ⇒ 验收标准门豁免（P1-5）");
+  const r7 = (await h7.capabilitiesOf("convener")!.dispatchTask!({ roleId: "A", task: "legacy 缺标准", flowId: "flow-a", stepId: "impl" }))!;
+  assert.equal(r7.ok, true, "legacy 未声明 acceptance-criteria 步骤 ⇒ 验收标准门豁免");
   await tick(120);
   assert.equal(h7.sent.A.length, 1, "豁免后照常投递");
   assert.equal(
-    (await readGovernanceLedger(nonReleaseRoot)).entries.filter((entry) => entry.kind === "dispatch.accepted").length,
+    (await readGovernanceLedger(legacyRoot)).entries.filter((entry) => entry.kind === "dispatch.accepted").length,
     1,
     "豁免后写 dispatch.accepted",
   );

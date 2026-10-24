@@ -37,14 +37,17 @@ export {
 // 2026-10-20 应用专用：客户验收 accepted 后把 flow YAML 的保留验收步骤置 done。
 // 2026-10-23 应用专用：结构校验通过后把 flow YAML 的 `role-cards` 步骤置 done。
 // 2026-10-23 应用专用：返工前把保留验收步骤从 dispatched/delivered 安全重开为 pending。
+// 2026-10-24 应用专用：账本客户决定已结算后把 `kind:customer-decision` 步骤置 done（appointment 收口）。
 // 桌面只经本公共出口消费；均不注册为角色工具。
 export {
   completeAcceptanceStep,
+  completeCustomerDecisionStep,
   completeRoleCardsStep,
   observeFlowArtifacts,
   reopenAcceptanceStepForRework,
 } from "../../common/编排/flow-service.ts";
 export type {
+  CompleteCustomerDecisionStepInput,
   CompleteRoleCardsEvidence,
   CompleteRoleCardsStepInput,
   CompleteRoleCardsStepResult,
