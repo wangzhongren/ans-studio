@@ -747,7 +747,7 @@ const VERIFIER_CARD_TEXT = [
 export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
   {
     id: "liaison",
-    displayName: "Lead / 主理",
+    displayName: "主理",
     function: "liaison",
     cardText: LIAISON_CARD_TEXT,
     entries: [
@@ -786,7 +786,7 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
   },
   {
     id: "rapporteur",
-    displayName: "Draft / 提案",
+    displayName: "提案",
     function: "proposal",
     cardText: RAPPORTEUR_CARD_TEXT,
     entries: [
@@ -816,7 +816,7 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
   },
   {
     id: "nominator",
-    displayName: "Crew / 组队",
+    displayName: "组队",
     function: "nomination",
     cardText: NOMINATOR_CARD_TEXT,
     entries: [
@@ -852,7 +852,7 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
   },
   {
     id: "convener",
-    displayName: "Steward / 统筹",
+    displayName: "统筹",
     function: "schedule",
     cardText: CONVENER_CARD_TEXT,
     entries: [
@@ -885,7 +885,7 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
   },
   {
     id: "verifier",
-    displayName: "Proof / 验收",
+    displayName: "验收",
     function: "verification",
     cardText: VERIFIER_CARD_TEXT,
     entries: [

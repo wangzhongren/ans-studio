@@ -17,13 +17,13 @@ import type { RoleView } from "../../app/renderer/src/chat/types.ts";
 const role = (extra: Partial<RoleView> & { roleId: string }): RoleView =>
   ({ cardText: "", boundary: { entries: [] }, ...extra }) as RoleView;
 
-test("W4/W6-C：五角色中文名+英文名/权力副标题/内置标识按 governanceFunction 派生", () => {
+test("W4/W6-C：五角色纯中文名/权力副标题/内置标识按 governanceFunction 派生", () => {
   const cases: Array<[string, string, string]> = [
-    ["liaison", "主理 / Lead", "客户沟通 · 不拥有最终批准权"],
-    ["proposal", "Draft / 提案", "提案权 · 不拥有最终批准权"],
-    ["nomination", "Crew / 组队", "写卡权（客户任命后） · 不拥有最终批准权"],
-    ["schedule", "Steward / 统筹", "排期权 · 不拥有最终批准权"],
-    ["verification", "验收 / Proof", "验收权 · 不拥有最终批准权"],
+    ["liaison", "主理", "客户沟通 · 不拥有最终批准权"],
+    ["proposal", "提案", "提案权 · 不拥有最终批准权"],
+    ["nomination", "组队", "写卡权（客户任命后） · 不拥有最终批准权"],
+    ["schedule", "统筹", "排期权 · 不拥有最终批准权"],
+    ["verification", "验收", "验收权 · 不拥有最终批准权"],
   ];
   for (const [fn, name, power] of cases) {
     const view = governanceView(fn);

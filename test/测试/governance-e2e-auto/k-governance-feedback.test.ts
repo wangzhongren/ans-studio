@@ -27,7 +27,7 @@ test("内部角色 settle：Lead 收到 [系统·治理反馈] 汇总任务，�
       5000,
     );
     const feedback = h.prompts.get("liaison")!.find((prompt) => prompt.startsWith("[系统·治理反馈]"))!;
-    assert.match(feedback, /^\[系统·治理反馈\] 来自 Draft \/ 提案 的内部反馈/, "显示名取listing的 displayName（Draft / 提案）");
+    assert.match(feedback, /^\[系统·治理反馈\] 来自 提案 的内部反馈/, "显示名取listing的 displayName（提案）");
     assert.match(feedback, /请写提案/, "内部正文作为内部材料带给 Lead");
     assert.match(feedback, /汇总后告知客户/, "要求 Lead 汇总后再告知客户");
     assert.match(feedback, /不要逐字转述/, "禁止原文照搬");

@@ -1357,7 +1357,7 @@ test("W6-B 意图交接：后台开 Rapporteur、当前 pane 不变、只投一�
       (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
   );
   assert.equal(notes.length, 1, "成功系统行恰一条，落 Liaison 聊天流");
-  assert.equal(notes[0].event.summary, "已交给 Draft（提案）（工作中）");
+  assert.equal(notes[0].event.summary, "已交给提案（工作中）");
 
   // 当前 pane 仍可正常对 Liaison 发言（活动角色没有被改）。
   await mgr.send("客户继续说话");
@@ -1421,7 +1421,7 @@ test("W6-B 意图交接失败：不重试、只落失败系统行、当前 pane 
   };
   const receipt = await liaisonInput!.handOffIntent!(payload, { turnId: "turn-2" });
   assert.equal(receipt.ok, false, "投递失败如实回执（不假装成功）");
-  assert.match(receipt.message ?? "", /发送任务给 Draft（提案）失败/);
+  assert.match(receipt.message ?? "", /发送任务给提案失败/);
   assert.equal(rapporteurSendCalls, 1, "失败不重试（恰好一次投递尝试）");
   const notes = events.filter(
     (envelope) =>
@@ -1430,7 +1430,7 @@ test("W6-B 意图交接失败：不重试、只落失败系统行、当前 pane 
       (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
   );
   assert.equal(notes.length, 1, "失败恰一条系统行（不循环重试）");
-  assert.match(notes[0].event.summary ?? "", /应用无法把意图交给 Draft（提案）：.*；未重试/);
+  assert.match(notes[0].event.summary ?? "", /应用无法把意图交给提案：.*；未重试/);
   assert.equal(mgr.openForRoleId(), "liaison", "失败不切 pane");
   await mgr.stop(null);
 });
@@ -1480,7 +1480,7 @@ test("W6-B 澄清送达：主入口 Liaison 系统行；不弹决定卡（客户
       (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
   );
   assert.equal(notes.length, 1, "系统行落主入口 Liaison");
-  assert.equal(notes[0].event.summary, "Draft（提案）需要澄清：验收标准是否包含离线场景？");
+  assert.equal(notes[0].event.summary, "提案需要澄清：验收标准是否包含离线场景？");
   assert.equal(customerInputCalls, 0, "澄清不弹客户决定卡、不占「一项目一卡」队列");
   await mgr.stop(null);
 });
@@ -1606,7 +1606,7 @@ test("i18n B3 session：未开会话的 send 回执按 en-US 生成；切回 zh-
     assert.equal(mainT("main.session.dispatchModelNote"), " (trio: Steward or Lead)");
     createMainI18n("zh-CN");
     assert.equal(mainT("main.session.releaseNoSession", { roleId: "A" }), "角色 A 没有打开的会话。");
-    assert.equal(mainT("main.session.dispatchModelNote"), "（trio：Steward（统筹）或主理 Lead）");
+    assert.equal(mainT("main.session.dispatchModelNote"), "（trio：统筹或主理）");
     assert.equal(
       mainT("main.session.delivery.handbackFailedShort", { sourceRoleId: "A", detail: "x" }),
       "回交投递失败（来自 A）：x",

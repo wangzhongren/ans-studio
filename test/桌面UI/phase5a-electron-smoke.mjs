@@ -608,8 +608,8 @@ app.whenReady().then(async () => {
     check(
       "S0 hasRoles=false shows bootstrap title/sub/CTA once and no governance CTA",
       s0.title === "项目尚未 bootstrap"
-        && s0.sub.includes("与 主理 / Lead 对话") && s0.sub.includes("左树会随之长出")
-        && s0.cta === "开始与 主理 / Lead 对话"
+        && s0.sub.includes("与 主理 对话") && s0.sub.includes("左树会随之长出")
+        && s0.cta === "开始与 主理 对话"
         && s0.gov === false
         && s0.mentions === 1
         && !s0.treeText.includes("未枚举")

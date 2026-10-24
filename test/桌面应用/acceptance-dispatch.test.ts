@@ -533,7 +533,7 @@ test("自动验收（导入补齐，发布流程）：门通过 + release:true �
 
       // 可见性：Lead（主入口）系统行说明「自动派发」，不冒充客户批准；客户决定不再发 Convener。
       const notes = deliveryNotes(harness.events, "liaison");
-      assert.ok(notes.some((note) => /已自动派发验收复核给 Proof（工作中）/.test(note)), "Lead 系统行如实告知自动派发");
+      assert.ok(notes.some((note) => /已自动派发验收复核给验收（工作中）/.test(note)), "Lead 系统行如实告知自动派发");
       assert.equal(deliveryNotes(harness.events, "convener").length, 0, "自动验收反馈不再发 Convener");
       assert.ok(notes.every((note) => !/客户已批准|验收通过/.test(note)), "不得冒充客户批准");
 
@@ -718,7 +718,7 @@ test("自动验收阻塞可见性：门未通过 ⇒ Lead 恰一条系统行（�
       assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "门通过后仍按原路径恰派一条验收任务");
       assert.equal(blockerNotes(harness.events, "liaison").length, 2, "门通过：不发新的阻塞行");
       assert.ok(
-        deliveryNotes(harness.events, "liaison").some((note) => /已自动派发验收复核给 Proof/.test(note)),
+        deliveryNotes(harness.events, "liaison").some((note) => /已自动派发验收复核给验收/.test(note)),
         "成功路径的既有系统行（发给 Lead）不变",
       );
       assert.equal(deliveryNotes(harness.events, "convener").length, 0, "成功行也不发 Convener");
@@ -1074,7 +1074,7 @@ test("自动验收 YAML：机器状态齐备 ⇒ 自动派 Proof；Markdown 人�
     try {
       await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0);
       await waitFor(() =>
-        deliveryNotes(harness.events, "liaison").some((note) => /已自动派发验收复核给 Proof（工作中）/.test(note)),
+        deliveryNotes(harness.events, "liaison").some((note) => /已自动派发验收复核给验收（工作中）/.test(note)),
       );
       assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "YAML 齐备 ⇒ 恰一条验收复核任务");
       await waitForAsync(async () => (await verifierDispatches(root, flowId)).length > 0);
@@ -1103,7 +1103,7 @@ test("2026-10-24 P0-1：非发布流程（release 缺省）change-package done �
         deliveryNotes(harness.events, "liaison").filter((note) => note.includes("awaiting-release-acceptance"));
       await waitFor(() => awaitingNotes().length === 1);
       assert.match(awaitingNotes()[0]!, /非发布/);
-      assert.match(awaitingNotes()[0]!, /不派 verifier\/Proof/);
+      assert.match(awaitingNotes()[0]!, /不派验收/);
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "非发布：不派 verifier/Proof");
       assert.equal((await verifierDispatches(root, flowId)).length, 0, "非发布：无 verification 派发账本");
       assert.equal((await criteriaDispatches(root, flowId)).length, 0, "非发布：不派 acceptance-criteria 写标准任务");
@@ -1354,7 +1354,7 @@ test("2026-10-20 verifier settle ⇒ Lead 系统行含报告路径（同 flow+�
       mkdirSync(path.dirname(reportAbs), { recursive: true });
       writeFileSync(reportAbs, "# 验收复核\n\n结论：未给出（示例报告）。\n", "utf8");
       const proofNotes = () =>
-        deliveryNotes(harness.events, "liaison").filter((note) => note.includes("Proof / 验收复核已结束"));
+        deliveryNotes(harness.events, "liaison").filter((note) => note.includes("验收复核已结束"));
       harness.controls.get("verifier")!.settle();
       await waitFor(() => proofNotes().length > 0);
       assert.equal(proofNotes().length, 1, "verifier settle ⇒ Lead 恰一条复核结束系统行");
@@ -1523,7 +1523,7 @@ test("2026-10-23 验收返工路由（客户拒绝）：最新 rejected ⇒ 路�
       assert.match(task, /id=F1 \| owner=executor \| action=修复交付并补证据 \| evidence=docs\/verification\/f1\.log/);
       assert.match(task, /flow_step_supersede/);
       assert.match(task, /不要.*supersede 保留验收步骤/);
-      assert.match(task, /返工完成后由应用在发布版本.*重派 Proof/, "release:true ⇒ 返工后可重派 Proof");
+      assert.match(task, /返工完成后由应用在发布版本.*重派验收/, "release:true ⇒ 返工后可重派验收");
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "Proof 不接收返工派发");
       assert.equal(completeCalls.length, 0, "rejected ⇒ 不收口");
       // routed 系统行在 record sent 写之后发出：先等它，再断言任务/记录（避免发送可见早于系统行的竞态）。
@@ -1921,7 +1921,7 @@ test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任
       assert.match(sends[0]!, /flow_step_update/, "要求用 flow_step_update 核证");
       assert.match(sends[0]!, /不要直接写 flow YAML/, "禁止直接写 flow YAML");
       const wakeNotes = () =>
-        deliveryNotes(harness.events, "liaison").filter((note) => note.includes("已 delivered，等待 Steward"));
+        deliveryNotes(harness.events, "liaison").filter((note) => note.includes("已 delivered，等待统筹"));
       assert.equal(wakeNotes().length, 1, "Lead 恰一条「已 delivered，等待 Steward 核证」系统行");
       assert.ok(wakeNotes()[0]!.includes("integration-e2e") && wakeNotes()[0]!.includes("verification-evidence"));
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "流程未齐备 ⇒ 不派 verifier");
@@ -2760,7 +2760,7 @@ test("2026-10-23 报告兜底：缺段/坏段只发「报告不完整」任务�
       assert.match(task, /ghost-role/);
       assert.match(task, /id=F12 \| owner=app/);
       assert.match(task, /报告\/工具修正项（owner=verifier/);
-      assert.match(task, /不要向 Proof 派产品返工/);
+      assert.match(task, /不要向验收派产品返工/);
       assert.match(task, /治理文档\/变更包项/);
       assert.match(task, /不要向内置治理角色 dispatch_task/);
       assert.match(task, /实际接收方：liaison/, "实际接收方 = Lead（coordinator 只是建议）");

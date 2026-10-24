@@ -648,8 +648,8 @@ test("B1/B2 key 增补：10 个 key 全部存在（zh + en），zh 逐字取当�
     "此确认已失效，未获放行——请让角色重新发起。",
   );
   assert.equal(zhCN["ui.governanceStore.stepFallback"], "治理步骤");
-  assert.equal(zhCN["ui.judge.roleName.liaison"], "Lead / 主理");
-  assert.equal(zhCN["ui.judge.roleName.verifier"], "Proof / 验收");
+  assert.equal(zhCN["ui.judge.roleName.liaison"], "主理");
+  assert.equal(zhCN["ui.judge.roleName.verifier"], "验收");
   assert.deepEqual(zhCN["ui.judge.headline.writeConfirmOverflow"], {
     other: "确认写入 {count} 个路径（{paths} 等 {count} 个）",
   });
@@ -673,12 +673,38 @@ test("B1/B2 key 增补：en-US 自然英文；judge 复用 3 个既有治理角�
   assert.equal(enUS["ui.judge.roleName.verifier"], "Proof");
   assert.equal(enUS["ui.reportView.savingHistory"], "Saving history…");
   // 顺序相同的三个内置治理角色名不重复收录，复用既有 ui.role.governance.*.name。
-  assert.equal(zhCN["ui.role.governance.draft.name"], "Draft / 提案");
-  assert.equal(zhCN["ui.role.governance.crew.name"], "Crew / 组队");
-  assert.equal(zhCN["ui.role.governance.steward.name"], "Steward / 统筹");
+  assert.equal(zhCN["ui.role.governance.draft.name"], "提案");
+  assert.equal(zhCN["ui.role.governance.crew.name"], "组队");
+  assert.equal(zhCN["ui.role.governance.steward.name"], "统筹");
   assert.equal(enUS["ui.role.governance.draft.name"], "Draft");
   assert.equal(enUS["ui.role.governance.crew.name"], "Crew");
   assert.equal(enUS["ui.role.governance.steward.name"], "Steward");
+});
+
+test("zh-CN 内置角色名：治理角色与 judge 角色名为纯中文；目录值不含英文角色别名", () => {
+  const roleNameKeys = [
+    "ui.role.governance.liaison.name",
+    "ui.role.governance.draft.name",
+    "ui.role.governance.crew.name",
+    "ui.role.governance.steward.name",
+    "ui.role.governance.verifier.name",
+    "ui.judge.roleName.liaison",
+    "ui.judge.roleName.verifier",
+  ] as const satisfies readonly MessageKey[];
+  assert.deepEqual(
+    roleNameKeys.map((key) => zhCN[key]),
+    ["主理", "提案", "组队", "统筹", "验收", "主理", "验收"],
+  );
+  for (const key of roleNameKeys) {
+    assert.match(String(zhCN[key]), /^[\p{Script=Han}]+$/u, `zh-CN 角色名必须为纯中文：${key}`);
+  }
+  // 中文目录值不得再出现英文角色别名（en-US 保持英文，不在本断言范围）。
+  const aliasPattern =
+    /\b(?:lead|draft|crew|steward|proof|convener|nominator|verifier|liaison|rapporteur)\b/i;
+  for (const [key, template] of Object.entries(zhCN)) {
+    const text = typeof template === "string" ? template : Object.values(template).join("");
+    assert.equal(aliasPattern.test(text), false, `zh-CN 值含英文角色别名：${key}`);
+  }
 });
 
 test("B1/B2 key 增补：插值与复数（overflow 标题按 count 选 other/one；保存条无 count）", () => {
@@ -887,7 +913,7 @@ test("B3 key 增补：23 个 key 全部存在（zh + en），zh 逐字取当前�
     assert.ok(key in enUS, `en-US 缺增补 key：${key}`);
   }
   assert.equal(zhCN["main.session.releaseNoSession"], "角色 {roleId} 没有打开的会话。");
-  assert.equal(zhCN["main.session.clarificationDelivery"], "Draft（提案）需要澄清：{question}");
+  assert.equal(zhCN["main.session.clarificationDelivery"], "提案需要澄清：{question}");
   assert.equal(
     zhCN["main.session.delivery.receivedDispatch"],
     "已接收来自 {role} 的派发任务——请按任务文本执行，完成后交回报告。",
@@ -898,7 +924,7 @@ test("B3 key 增补：23 个 key 全部存在（zh + en），zh 逐字取当前�
   );
   assert.equal(
     zhCN["main.session.dispatchModelNote"],
-    "（trio：Steward（统筹）或主理 Lead）",
+    "（trio：统筹或主理）",
   );
   assert.equal(zhCN["main.session.rebuildChangedRuntimeConfig"], "运行时配置");
   assert.equal(zhCN["main.session.install.verbInstall"], "安装");
@@ -924,7 +950,7 @@ test("B3 key 增补：23 个 key 全部存在（zh + en），zh 逐字取当前�
   assert.equal(zhCN["main.interface.teamPlanMissingBoundHint"], "（账本 appointment 绑定 {plan}）");
   assert.equal(
     zhCN["main.interface.roleCardsStepMissing"],
-    "流程缺少 id 为 \"{stepId}\" 的步骤（团队计划存在但 flow 未声明 role-cards，无法完成收口；请 Convener 补齐 flow 步骤）。",
+    "流程缺少 id 为 \"{stepId}\" 的步骤（团队计划存在但 flow 未声明 role-cards，无法完成收口；请统筹补齐 flow 步骤）。",
   );
   assert.equal(zhCN["main.interface.readErrorExistingSuffix"], "（existing/legacy：仅提醒）");
   assert.equal(zhCN["main.interface.queueRecoveredLine"], "- [{kind}] {summary}（角色 {roleId} · {runtime}）");
@@ -1014,7 +1040,7 @@ test("B3 key 增补：插值与复数（overflow 按 count 选 one/other；队�
         plan: "docs/scheduling/x-team-v2.md",
       }),
     }),
-    "团队计划缺失（账本 appointment 绑定 docs/scheduling/x-team-v2.md）；未派 Crew 写卡（不猜计划、不自行扩大职责）",
+    "团队计划缺失（账本 appointment 绑定 docs/scheduling/x-team-v2.md）；未派组队写卡（不猜计划、不自行扩大职责）",
   );
   assert.equal(
     translate("en-US", "main.interface.teamPlanMissingShort", {
@@ -1026,11 +1052,11 @@ test("B3 key 增补：插值与复数（overflow 按 count 选 one/other；队�
   );
   assert.equal(
     translate("zh-CN", "main.session.dispatchWrongSource", {
-      from: "Crew",
-      dispatcher: "Steward",
+      from: "组队",
+      dispatcher: "统筹",
       modelNote: translate("zh-CN", "main.session.dispatchModelNote"),
     }),
-    "派发未受理：来源角色 Crew 不是本项目派发主人 Steward（trio：Steward（统筹）或主理 Lead）。",
+    "派发未受理：来源角色 组队 不是本项目派发主人 统筹（trio：统筹或主理）。",
   );
   assert.equal(
     translate("en-US", "main.session.dispatchWrongSource", {
@@ -1147,9 +1173,8 @@ test("验收返工路由 key：客户来源写「客户拒绝」；judge/自动�
 
   assert.ok(customerZh.includes("客户拒绝"), "客户来源必须写明「客户拒绝」");
   assert.ok(customerEn.includes("customer rejected"), "en-US 客户来源必须写明 customer rejected");
-  for (const value of [customerZh, customerEn]) {
-    assert.ok(value.includes("Convener"), "系统行必须写明接收方 Convener");
-  }
+  assert.ok(customerZh.includes("统筹"), "zh-CN 系统行必须写明接收方统筹");
+  assert.ok(customerEn.includes("Convener"), "en-US 系统行必须写明接收方 Convener");
 
   assert.ok(
     automaticZh.includes("自动决策未通过/未完成（判断代批/自动退回）"),
@@ -1167,7 +1192,7 @@ test("验收返工路由 key：客户来源写「客户拒绝」；judge/自动�
 test("验收返工路由 key：zh-CN/en-US 取值与插值（客户/自动/等待/缺段/失败/审计失败）", () => {
   assert.equal(
     translate("zh-CN", "main.governance.acceptanceReworkRoutedCustomer", { flowId: "flow-a" }),
-    "流程 flow-a：验收结果为客户拒绝；应用已按路由规则把返工交 Steward / 统筹（Convener）组织。",
+    "流程 flow-a：验收结果为客户拒绝；应用已按路由规则把返工交统筹组织。",
   );
   assert.equal(
     translate("en-US", "main.governance.acceptanceReworkRoutedCustomer", { flowId: "flow-a" }),
@@ -1175,7 +1200,7 @@ test("验收返工路由 key：zh-CN/en-US 取值与插值（客户/自动/等�
   );
   assert.equal(
     translate("zh-CN", "main.governance.acceptanceReworkRoutedAutomatic", { flowId: "flow-a" }),
-    "流程 flow-a：自动决策未通过/未完成（判断代批/自动退回）；应用已按路由规则把返工交 Steward / 统筹（Convener）组织。",
+    "流程 flow-a：自动决策未通过/未完成（判断代批/自动退回）；应用已按路由规则把返工交统筹组织。",
   );
   assert.equal(
     translate("en-US", "main.governance.acceptanceReworkRoutedAutomatic", { flowId: "flow-a" }),

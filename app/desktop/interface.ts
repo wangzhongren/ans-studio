@@ -2145,7 +2145,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     const receiverRoleId = (listingCache.get(projectRoot)?.primaryRoleId ?? "").trim();
     if (receiverRoleId === "") {
       diagnostic.record("acceptance.rework.receiver.missing", { flowId });
-      noteReworkOnce(projectRoot, flowId, "failed", "receiver-missing", note, governanceAcceptanceReworkFailedNote(flowId, "项目主入口（Lead / 主理）未枚举到；不猜、不改投，等待重新枚举后重试。"));
+      noteReworkOnce(projectRoot, flowId, "failed", "receiver-missing", note, governanceAcceptanceReworkFailedNote(flowId, "项目主入口（主理）未枚举到；不猜、不改投，等待重新枚举后重试。"));
       return "failed";
     }
     const receiverLabel = reworkReceiverLabel(projectRoot, receiverRoleId);
@@ -2357,7 +2357,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       acceptanceStep.status === "aborted" ||
       acceptanceStep.status === "superseded"
     ) {
-      blocked(`验收步骤状态为 ${acceptanceStep.status}（终态）；不自动重开，请人工 / Convener 处理。`);
+      blocked(`验收步骤状态为 ${acceptanceStep.status}（终态）；不自动重开，请人工 / 统筹 处理。`);
       return;
     }
     if (
@@ -2929,7 +2929,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       return undefined;
     }
     const task = [
-      `流程 ${flowId}：以下步骤已 delivered，等待 Steward / 统筹 核证：`,
+      `流程 ${flowId}：以下步骤已 delivered，等待统筹核证：`,
       ...delivered.map(
         (step) =>
           `- 步骤 ${step.id} 已 delivered（owner=${step.owner}），请核对账本/产物证据，用 flow_step_update 标 done 或退回修正；不要直接写 flow YAML。`,
@@ -3005,7 +3005,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       const sorted = [...delivered].sort((a, b) => a.id.localeCompare(b.id));
       return {
         key: `delivered:${sorted.map((step) => step.id).join(",")}`,
-        description: "步骤已交付，等待 Steward / 统筹 核证",
+        description: "步骤已交付，等待统筹核证",
         details: sorted.slice(0, 10).map((step) => `- 步骤 ${step.id} 已 delivered（owner=${step.owner ?? "未标注"}）`),
       };
     }
@@ -3169,8 +3169,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       "要求：",
       "1) 先 flow_get 读取当前流程与账本状态（含 revision），核对依赖与已派发记录后再动作。",
       "2) 项目 worker 的 dispatch / artifact 步骤用 dispatch_task 按 owner 派发（stepId 与 flow 完全一致；同一 parallelGroup 可并行；账本已有 dispatch.accepted 的步骤不要重复派）。",
-      "3) owner 为 Steward / 统筹（convener）自身的 artifact 步骤请继续执行并回交。",
-      "4) 不要把这些步骤直接标 done（done 由证据核证决定）；不要派 acceptance / verifier / Proof（发布验收仍由既有 release 门控制）。",
+      "3) owner 为统筹（convener）自身的 artifact 步骤请继续执行并回交。",
+      "4) 不要把这些步骤直接标 done（done 由证据核证决定）；不要派 acceptance / 验收（发布验收仍由既有 release 门控制）。",
       "本消息只是继续调度提示：应用未自动派发、未改 flow/账本、未替客户决定。",
     ].join("\n");
   };
@@ -3413,7 +3413,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           const revisionTag = flowRevisionForGate ?? "legacy";
           if (acceptanceReleaseAwaitingNotified.get(key) !== revisionTag) {
             acceptanceReleaseAwaitingNotified.set(key, revisionTag);
-            note(`流程 ${info.flowId}：返工已按路由交主理组织；flow.release 未标记为 true（非发布）⇒ 不自动重派 Proof/verifier、不标记 acceptance done；发布版本才由 Steward / 统筹 用 schedule-write 卡把 release 显式标为 true。`);
+            note(`流程 ${info.flowId}：返工已按路由交主理组织；flow.release 未标记为 true（非发布）⇒ 不自动重派验收、不标记 acceptance done；发布版本才由统筹用 schedule-write 卡把 release 显式标为 true。`);
             diagnostic.record("acceptance.release.awaiting", { flowId: info.flowId, reasonCode: "release-unmarked" });
           }
           acceptanceDispatchedFlows.delete(key);
@@ -3702,8 +3702,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           acceptanceReleaseAwaitingNotified.set(key, gateRevision);
           note(
             flowStateText === undefined
-              ? `流程 ${info.flowId}：legacy 流程无 flow YAML/release 标记（视为非发布）⇒ 停在发布验收前（awaiting-release-acceptance）；不派 verifier/Proof、不写 acceptance-criteria、不标记 acceptance done。发布版本才由 Steward / 统筹 用 schedule-write 卡显式标记 release: true。`
-              : `流程 ${info.flowId}：全部步骤已完成，但 flow.release 未标记为 true（非发布）⇒ 停在发布验收前（awaiting-release-acceptance）；不派 verifier/Proof、不写 acceptance-criteria、不标记 acceptance done。发布版本才由 Steward / 统筹 用 schedule-write 卡把 release 显式标为 true。`,
+              ? `流程 ${info.flowId}：legacy 流程无 flow YAML/release 标记（视为非发布）⇒ 停在发布验收前（awaiting-release-acceptance）；不派验收、不写 acceptance-criteria、不标记 acceptance done。发布版本才由统筹用 schedule-write 卡显式标记 release: true。`
+              : `流程 ${info.flowId}：全部步骤已完成，但 flow.release 未标记为 true（非发布）⇒ 停在发布验收前（awaiting-release-acceptance）；不派验收、不写 acceptance-criteria、不标记 acceptance done。发布版本才由统筹用 schedule-write 卡把 release 显式标为 true。`,
           );
           diagnostic.record("acceptance.release.awaiting", {
             flowId: info.flowId,
@@ -4332,7 +4332,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     return [
       flowDefect
         ? `流程 ${flowId}：流程状态 YAML 未通过结构校验（任命的写卡步骤暂停；应用未派 role-readiness、未把步骤标为 done）。`
-        : `流程 ${flowId}：团队计划未通过结构校验（任命的写卡步骤暂停；Crew 不自行补计划，应用未派 role-readiness、未把步骤标为 done）。`,
+        : `流程 ${flowId}：团队计划未通过结构校验（任命的写卡步骤暂停；组队不自行补计划，应用未派 role-readiness、未把步骤标为 done）。`,
       "具体问题：",
       ...planIssues.map((issue) => `- ${issue.path}：${issue.issue}`),
       ...(flowDefect
@@ -4924,7 +4924,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
                 {
                   roleId: "流程",
                   path: `docs/flows/${flowId}.yaml`,
-                  issue: `流程缺少 id 为 "${ROLE_CARDS_STEP_ID}" 的步骤（团队计划存在但 flow 未声明 role-cards，无法完成收口；请 Convener 补齐 flow 步骤）。`,
+                  issue: `流程缺少 id 为 "${ROLE_CARDS_STEP_ID}" 的步骤（团队计划存在但 flow 未声明 role-cards，无法完成收口；请统筹补齐 flow 步骤）。`,
                   userVisibleIssue: mainT("main.interface.roleCardsStepMissing", { stepId: ROLE_CARDS_STEP_ID }),
                   source: "convener",
                 },
