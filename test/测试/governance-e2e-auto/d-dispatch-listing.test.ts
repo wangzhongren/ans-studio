@@ -7,9 +7,10 @@
 //   · 已有 appointment 的 flow，派发项目角色前必须有结构合格的实施前验收标准（O2 硬门槛）。
 // 旧断言「任命后派 Convener」与新分工冲突，已按新方案更新；「未任命/未写卡拒绝」强度保留并新增 O2 门槛负例。
 //
-// 2026-10-24 后续（P1-5/P1-7/P0-2）更新：
-//   · P1-5：标准门**只对发布版本**（`release: true`）生效，读取 `<flowId>-criteria-vN.md` 最新版本；
-//     非发布/legacy 豁免（场景 4c 正例、4d 版本矩阵）。场景 4 的 ⑤ 负例因此显式标 release。
+// 2026-10-24 客户修订（独立验收范围＝所有变更；P1-5/P1-7/P0-2）更新：
+//   · P1-5：标准门对**所有声明 `acceptance-criteria` 步骤的新契约 flow**生效（含非发布；`release` 只是
+//     可选发布元数据，不是启动条件），读取 `<flowId>-criteria-vN.md` 最新版本；legacy（无 YAML/无该步骤）
+//     保留原放行（场景 4c/4d 覆盖两侧）。
 //   · P1-7：`dispatched → delivered` 只能由步骤 owner（项目 worker）标记，Steward/Lead 不代标；
 //     `delivered → done` 仅管理者（场景 4e）。
 //   · P0-2：步骤 done 后后续 pending 变 ready ⇒ Steward 收到一条 `[自动推进]` 提示；应用不自动派发、
@@ -46,12 +47,16 @@ const ROLE_BOUNDARY_REL = "角色卡/executor/boundary.yaml";
 test("场景4：未任命/未写卡/缺标准拒绝派发；role_status 刷新后可见新角色；写卡+标准后派发受理并双类账本", async () => {
   const temp = makeRoot("dispatch-listing");
   seedTrioProject(temp.root, ["worker"]);
-  // 2026-10-24 P1-5：验收标准门**只对发布版本**（`release: true`）生效；本场景 ⑤ 要验证「发布版本缺
-  // 标准 ⇒ 拒」，故流程显式标 release（非发布豁免的正例见场景 4c）。
+  // 2026-10-24 客户修订：标准门对声明 `acceptance-criteria` 步骤的新契约 flow 生效（含非发布；
+  // `release` 不是启动条件）。本场景 ⑤ 验证「非发布新契约 flow 缺标准 ⇒ 拒」。
   write(
     temp.root,
     FLOW_REL,
-    flowDoc(FLOW, [{ id: "impl", status: "pending" }, { id: "work", status: "pending" }], { release: true }),
+    flowDoc(FLOW, [
+      { id: "acceptance-criteria", kind: "artifact", status: "pending" },
+      { id: "impl", status: "pending" },
+      { id: "work", status: "pending" },
+    ]),
   );
   // 团队计划：executor 为 existing（只做最低结构检查，迁移策略），供任命后应用派 Crew 写卡使用。
   write(temp.root, TEAM_PLAN_REL, teamPlanDoc(FLOW, ["executor"], { rowOverrides: { executor: { type: "existing" } } }));
@@ -118,14 +123,15 @@ test("场景4：未任命/未写卡/缺标准拒绝派发；role_status 刷新�
     const listing = await h.iface.listProject({ projectRoot: temp.root });
     assert.equal(listing.roles.some((role) => role.roleId === "executor"), true, "左树 listing 可枚举 executor");
 
-    // ⑤ O2 门槛负例（2026-10-24 P1-5）：发布版本（release: true）缺实施前标准 ⇒ 派发拒绝
-    //（不把「标准待补」当通过；非发布版本由场景 4c 证明豁免）。
+    // ⑤ O2 门槛负例（2026-10-24 客户修订：所有变更）：声明 acceptance-criteria 的非发布新契约 flow
+    // 缺实施前标准 ⇒ 派发拒绝（不把「标准待补」当通过；legacy 无该步骤的放行见场景 4c）。
     const noCriteria = (await caps!.dispatchTask!({ roleId: "executor", task: "执行 impl", flowId: FLOW, stepId: "impl" })) as {
       ok: boolean;
       message: string;
     };
-    assert.equal(noCriteria.ok, false, "发布版本缺实施前标准不得派发");
-    assert.match(noCriteria.message, /发布版本（release: true）/);
+    assert.equal(noCriteria.ok, false, "非发布新契约 flow 缺实施前标准不得派发");
+    assert.match(noCriteria.message, /声明了 acceptance-criteria 步骤/);
+    assert.match(noCriteria.message, /所有变更（含非发布）/);
     assert.match(noCriteria.message, new RegExp(`${FLOW}-criteria-vN\\.md 不存在或不可读`));
 
     // ⑥ 补写结构合格的标准后派发受理（Convener 的 dispatch_task）。
@@ -255,7 +261,7 @@ test("场景4b（v2）：Map 组可并行派发；listing/role_status 可见；R
   }
 });
 
-// —————————————————————— 2026-10-24 P1-5：发布 criteria 最新版 / 非发布豁免 ——————————————————————
+// —————————————————————— 2026-10-24 客户修订：criteria 门适用范围（所有变更） ——————————————————————
 
 /** 派发前置账本（proposal-accept + appointment executor；与场景 4 同口径）。 */
 async function seedAppointedLedger(root: string): Promise<void> {
@@ -272,47 +278,99 @@ async function seedAppointedLedger(root: string): Promise<void> {
   ]);
 }
 
-test("场景4c（P1-5）：非发布 flow 缺验收标准 ⇒ 豁免放行，不要求/不伪造 Verifier 文件", async () => {
-  const temp = makeRoot("dispatch-non-release");
-  seedTrioProject(temp.root, ["executor"]);
-  // 非发布（flow YAML 无 release）：P1-5 下 criteria 门豁免——不需要 docs/acceptance/<flow>-criteria-*.md。
-  write(temp.root, FLOW_REL, flowDoc(FLOW, [{ id: "impl", status: "pending" }]));
-  write(temp.root, TEAM_PLAN_REL, teamPlanDoc(FLOW, ["executor"], { rowOverrides: { executor: { type: "existing" } } }));
-  await seedAppointedLedger(temp.root);
-  assert.equal(exists(temp.root, CRITERIA_REL), false, "前置：非发布 flow 没有验收标准文件");
-
-  const h = await makeHarness({ tag: "dispatch-non-release", root: temp.root, approval: true, decision: true });
+test("场景4c（2026-10-24 客户修订）：非发布新契约 flow 缺标准同样拒绝；legacy（无流 YAML）保留放行", async () => {
+  const blockedTemp = makeRoot("dispatch-non-release-blocked");
+  const legacyTemp = makeRoot("dispatch-legacy-exempt");
   try {
-    await h.open("convener");
-    const caps = h.capsByRole.get("convener")!;
-    const receipt = (await caps.dispatchTask!({ roleId: "executor", task: "执行 impl", flowId: FLOW, stepId: "impl" })) as {
-      ok: boolean;
-      message: string;
-    };
-    assert.equal(receipt.ok, true, `非发布缺标准应豁免放行：${receipt.message}`);
-    assert.match(receipt.message, /已受理|已接收/);
-    const ledger = await h.waitForLedger(
-      (entries) => entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "impl"),
-      5000,
+    // ① 非发布但声明 acceptance-criteria ⇒ 标准门生效（所有变更，不再按 release 豁免）。
+    seedTrioProject(blockedTemp.root, ["executor"]);
+    write(
+      blockedTemp.root,
+      FLOW_REL,
+      flowDoc(FLOW, [
+        { id: "acceptance-criteria", kind: "artifact", status: "pending" },
+        { id: "impl", status: "pending" },
+      ]),
     );
-    assert.ok(
-      ledger.entries.some(
-        (entry) => entry.kind === "dispatch.accepted" && entry.stepId === "impl" && entry.targetRoleId === "executor",
-      ),
-      "非发布派发照常写 dispatch.accepted(executor)",
+    write(blockedTemp.root, TEAM_PLAN_REL, teamPlanDoc(FLOW, ["executor"], { rowOverrides: { executor: { type: "existing" } } }));
+    await seedAppointedLedger(blockedTemp.root);
+    assert.equal(exists(blockedTemp.root, CRITERIA_REL), false, "前置：非发布新契约 flow 没有验收标准文件");
+
+    const blocked = await makeHarness({ tag: "dispatch-non-release-blocked", root: blockedTemp.root, approval: true, decision: true });
+    try {
+      await blocked.open("convener");
+      const caps = blocked.capsByRole.get("convener")!;
+      const receipt = (await caps.dispatchTask!({ roleId: "executor", task: "执行 impl", flowId: FLOW, stepId: "impl" })) as {
+        ok: boolean;
+        message: string;
+      };
+      assert.equal(receipt.ok, false, "非发布新契约 flow 缺标准不得派发");
+      assert.match(receipt.message, /声明了 acceptance-criteria 步骤/);
+      assert.match(receipt.message, /所有变更（含非发布）/);
+      assert.equal(exists(blockedTemp.root, CRITERIA_REL), false, "拒绝不得伪造标准文件");
+      const ledger = await blocked.waitForLedger(() => true);
+      assert.equal(
+        ledger.entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "impl"),
+        false,
+        "被拒派发不得写 dispatch.accepted",
+      );
+    } finally {
+      await blocked.stop();
+      blocked.cleanup();
+    }
+
+    // ② legacy（无 flow YAML，仅人读 Markdown）：没有可定位标准的机器状态 ⇒ 保留原放行。
+    seedTrioProject(legacyTemp.root, ["executor"]);
+    write(
+      legacyTemp.root,
+      `docs/flows/${FLOW}.md`,
+      ["---", `flowId: ${FLOW}`, "---", "", "# 流程单", "", "| stepId | 步骤 | 状态 |", "| --- | --- | --- |", "| impl | 交付 | pending |", ""].join("\n"),
     );
-    assert.equal(exists(temp.root, CRITERIA_REL), false, "非发布豁免不得伪造标准文件");
+    write(legacyTemp.root, TEAM_PLAN_REL, teamPlanDoc(FLOW, ["executor"], { rowOverrides: { executor: { type: "existing" } } }));
+    await seedAppointedLedger(legacyTemp.root);
+
+    const legacy = await makeHarness({ tag: "dispatch-legacy-exempt", root: legacyTemp.root, approval: true, decision: true });
+    try {
+      await legacy.open("convener");
+      const caps = legacy.capsByRole.get("convener")!;
+      const receipt = (await caps.dispatchTask!({ roleId: "executor", task: "执行 impl", flowId: FLOW, stepId: "impl" })) as {
+        ok: boolean;
+        message: string;
+      };
+      assert.equal(receipt.ok, true, `legacy 无 YAML 应保留放行：${receipt.message}`);
+      assert.match(receipt.message, /已受理|已接收/);
+      const ledger = await legacy.waitForLedger(
+        (entries) => entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "impl"),
+        5000,
+      );
+      assert.ok(
+        ledger.entries.some(
+          (entry) => entry.kind === "dispatch.accepted" && entry.stepId === "impl" && entry.targetRoleId === "executor",
+        ),
+        "legacy 派发照常写 dispatch.accepted(executor)",
+      );
+    } finally {
+      await legacy.stop();
+      legacy.cleanup();
+    }
   } finally {
-    await h.stop();
-    h.cleanup();
-    temp.cleanup();
+    blockedTemp.cleanup();
+    legacyTemp.cleanup();
   }
 });
 
-test("场景4d（P1-5）：发布 flow 读取 criteria 最新版本——v1 坏/v2 好受理；v3 坏即使 v2 好也拒（不回退）", async () => {
+test("场景4d（P1-5）：非发布新契约 flow 读取 criteria 最新版本——v1 坏/v2 好受理；v3 坏即使 v2 好也拒（不回退）", async () => {
   const temp = makeRoot("dispatch-criteria-latest");
   seedTrioProject(temp.root, ["executor"]);
-  write(temp.root, FLOW_REL, flowDoc(FLOW, [{ id: "impl", status: "pending" }, { id: "work", status: "pending" }], { release: true }));
+  write(
+    temp.root,
+    FLOW_REL,
+    flowDoc(FLOW, [
+      { id: "acceptance-criteria", kind: "artifact", status: "pending" },
+      { id: "impl", status: "pending" },
+      { id: "work", status: "pending" },
+    ]),
+  );
   write(temp.root, TEAM_PLAN_REL, teamPlanDoc(FLOW, ["executor"], { rowOverrides: { executor: { type: "existing" } } }));
   const v1Rel = `docs/acceptance/${FLOW}-criteria-v1.md`;
   const v2Rel = `docs/acceptance/${FLOW}-criteria-v2.md`;
@@ -326,12 +384,12 @@ test("场景4d（P1-5）：发布 flow 读取 criteria 最新版本——v1 坏/
     await h.open("convener");
     const caps = h.capsByRole.get("convener")!;
 
-    // v1 不合格、v2 最新且合格 ⇒ 受理（证明不再硬编码读取 v1）。
+    // v1 不合格、v2 最新且合格 ⇒ 受理（证明不再硬编码读取 v1，且非发布不豁免）。
     const first = (await caps.dispatchTask!({ roleId: "executor", task: "执行 impl", flowId: FLOW, stepId: "impl" })) as {
       ok: boolean;
       message: string;
     };
-    assert.equal(first.ok, true, `发布 flow 应读最新 v2 并放行：${first.message}`);
+    assert.equal(first.ok, true, `非发布新契约 flow 应读最新 v2 并放行：${first.message}`);
     assert.match(first.message, /已受理|已接收/);
 
     // v3 不合格（即使 v2 合格）⇒ 最新版本优先、不回退旧版本，拒绝派发。
@@ -547,16 +605,34 @@ test("场景4e（P1-7/P0-2）：owner 标 delivered、manager 不代标；done �
     const flowTextAfterWake = read(temp.root, FLOW_REL);
 
     // ⑤ 只提示、不自动派发：无 work 的 dispatch.accepted、无 verifier/Proof、不写账本、不弹客户卡。
+    // 注：既有「任命后推进 Convener」检查（app → convener、无 stepId、客户已完成任命）可与 ready 唤醒
+    // 并行落账；它不属于本场景的派发，但也不能把「ready 唤醒写账本」掩盖过去——用允许清单精确区分。
     const ledger = await h.waitForLedger(() => true);
     assert.equal(
       ledger.entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "work"),
       false,
       "ready 唤醒不得自动派发 work",
     );
+    const dispatchEntries = ledger.entries.filter((entry) => entry.kind === "dispatch.accepted");
+    const unexplained = dispatchEntries.filter(
+      (entry) =>
+        !(
+          (entry.stepId === "impl" && entry.targetRoleId === "rapporteur") ||
+          (entry.stepId === undefined &&
+            entry.targetRoleId === "convener" &&
+            typeof entry.messageSummary === "string" &&
+            entry.messageSummary.includes("客户已完成任命"))
+        ),
+    );
+    assert.deepEqual(
+      unexplained,
+      [],
+      `账本只应有种子 impl 与既有任命推进（ready 唤醒不得写 dispatch 账本）；实际=${JSON.stringify(dispatchEntries)}`,
+    );
     assert.equal(
-      ledger.entries.filter((entry) => entry.kind === "dispatch.accepted").length,
-      1,
-      "账本只应有种子 impl 派发（唤醒不写 dispatch 账本）",
+      dispatchEntries.some((entry) => entry.targetRoleId === "executor" || entry.targetRoleId === "verifier"),
+      false,
+      "ready 唤醒不得向 executor/verifier 自动派发",
     );
     assert.equal(
       ledger.entries.filter((entry) => entry.kind === "customer.decision").length,

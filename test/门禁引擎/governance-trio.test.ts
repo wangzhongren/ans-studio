@@ -1518,7 +1518,7 @@ test("2026-10-23 目录授权负例（P10/P12）：Proof 核对布局报告+原�
   assert.doesNotMatch(v, /结构通过即语义正确/, "结构通过不得等同语义正确");
 });
 
-// —————————————————————— 9) 2026-10-24 治理协调（S2a）+ 发布验收门 ——————————————————————
+// —————————————————————— 9) 2026-10-24 治理协调（S2a）+ 独立验收（所有变更） ——————————————————————
 
 test("2026-10-24 治理协调（S2a）：Lead 卡接报内置状态/回交、闸门 0/1 后才交接/coordinate、不直派 Crew/Proof/项目 worker、Proof 只收状态+指针、协调≠批准", () => {
   const l = governanceRoleOf("liaison")!.cardText;
@@ -1572,13 +1572,14 @@ test("2026-10-24 治理协调（S2a）：Lead 卡接报内置状态/回交、闸
   );
 });
 
-test("2026-10-24 发布验收门（S2a）：Steward 卡内置回交向 Lead 汇总、发布版本才派 Proof、release 仅 false/缺省→true、返工由 Lead 协调、不派治理角色", () => {
+test("2026-10-24 独立验收（所有变更，客户同日修订）：Steward 卡内置回交向 Lead 汇总、所有变更流程齐备后应用派 Proof、release 仅可选元数据、返工由 Lead 协调、不派治理角色", () => {
   const c = governanceRoleOf("convener")!.cardText;
   for (const needle of [
     "内置治理角色的状态 / 回交向 Lead / 主理 汇总",
     "返工由 Lead / 主理 协调",
-    "只有发布版本才由应用派 Proof / 验收，非发布不派",
-    "非发布流程在 change-package 完成后停在等待发布验收",
+    // 客户同日修订：撤销 release-only，独立验收覆盖所有变更（含非发布）。
+    "所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 Proof / 验收",
+    "`release` 只是可选发布元数据",
     "`cardKind=schedule-write`",
     "flow 顶层 `release`",
     "缺省 / `false` 改为 `true`",
@@ -1586,19 +1587,26 @@ test("2026-10-24 发布验收门（S2a）：Steward 卡内置回交向 Lead 汇�
     "其他字段或步骤变化仍按原校验拒绝",
     "Steward 不派发治理角色、不代替验收、不催办",
   ]) {
-    assert.ok(c.includes(needle), `Steward 发布门卡文本须含「${needle}」`);
+    assert.ok(c.includes(needle), `Steward 独立验收卡文本须含「${needle}」`);
   }
-  assert.doesNotMatch(c, /由应用自动派 Proof/, "Steward 卡不得再写非发布自动派 Proof");
-  assert.doesNotMatch(c, /流程齐备后由应用自动派/, "Steward 卡不得再写流程齐备自动派 Proof");
-  // 五卡总则（单一来源）逐字包含内置汇报、主理只协调、应用门禁与发布门。
+  // 旧「仅发布版本才派 Proof / 非发布不派 / 停在等待发布验收」口径必须消失。
+  assert.doesNotMatch(c, /非发布不派/, "Steward 卡不得再写非发布不派");
+  assert.doesNotMatch(c, /只有发布版本才由应用派/, "Steward 卡不得再写只有发布版本才派 Proof");
+  assert.doesNotMatch(c, /停在等待发布验收/, "Steward 卡不得再写停在等待发布验收");
+  // 五卡总则（单一来源）逐字包含内置汇报、主理只协调、应用门禁与所有变更独立验收。
   for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
     for (const needle of [
       "内置角色（Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收）的状态与回交向主理（Lead / 主理）汇总",
       "主理只做治理协调，不批准提案、任命或验收",
-      "应用仍负责门禁（闸门 0/1/2、发布验收门）与阶段流转",
-      "只有发布版本才由应用派 Proof / 验收，非发布不派",
+      "应用仍负责门禁（闸门 0/1/2、验收门）与阶段流转",
+      "**所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 Proof / 验收**",
+      "`release` 只是可选发布元数据，不是独立验收的启动条件",
     ]) {
       assert.ok(spec.cardText.includes(needle), `${spec.id} 卡标准工作流总则须含「${needle}」`);
+    }
+    // 旧发布独占口径不得残留（注释不算卡文本）。
+    for (const legacy of ["非发布不派", "只有发布版本才由应用派", "发布验收门", "停在等待发布验收"]) {
+      assert.ok(!spec.cardText.includes(legacy), `${spec.id} 卡不得再出现旧发布独占口径「${legacy}」`);
     }
   }
 });

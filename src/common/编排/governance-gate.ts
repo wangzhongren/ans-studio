@@ -11,10 +11,12 @@
 //   3. 派发范围门：`dispatch` —— 目标不是内置治理角色、提案已接受、目标在任命名单内**或**快捷路径
 //      复用既有项目角色、`flowId`/`stepId` 必填且流程文件存在对应步骤、同一 `flowId+stepId` 未派发过。
 //      2026-10-22 验收第 3 项（O2，客户按推荐项）：派发项目角色前的验收标准门槛；2026-10-24
-//      P1-5 收紧为**只对发布版本**（flow YAML 顶层 `release: true`）生效，读取
-//      `docs/acceptance/<flowId>-criteria-vN.md` 的**最新版本**（扫描取最高 N）并做结构校验；
-//      非发布/legacy（无 YAML 或未标 release）豁免，不要求 Verifier 文件；`proposal-accept-quick`
-//      （快捷复用既有角色）仍显式豁免（见 `evaluateDispatchGate`）。
+//      客户修订（撤销「仅发布版本」口径，独立验收范围＝**所有变更**）：所有**声明了
+//      `acceptance-criteria` 步骤的新契约 flow YAML**（含非发布；`release` 只是可选发布元数据，
+//      不是启动条件）在实施派发前都要求 `docs/acceptance/<flowId>-criteria-vN.md` 的**最新版本**
+//      （扫描取最高 N）存在且结构校验合格；legacy（无 YAML 或无 `acceptance-criteria` 步骤）没有可
+//      定位标准的机器状态，保留原放行；`proposal-accept-quick`（快捷复用既有角色）仍显式豁免
+//      （见 `evaluateDispatchGate`）。
 //      2026-10-24（P0-3/P1-4，设计 v1 §6.4 执行门）：`dependsOn` 解析 `supersededBy` 链（前置 superseded
 //      ⇒ 解析到最终非 superseded 步骤并判 done；缺失/未知/成环明确拒绝，不按「未 done」混同）；
 //      结构化步骤的 `owner` 必须等于派发目标（旧版 `.md`/无 owner 不新增检查；coordinate/app-only 例外）。
@@ -232,9 +234,10 @@ export function acceptanceCriteriaRelPath(flowId: string, version = 1): string {
 }
 
 /**
- * 发布版本的最新验收标准（2026-10-24 P1-5）：扫描 `docs/acceptance/` 下
- * `<flowId>-criteria-vN.md`，取 N 最高的文件；目录不可读/无匹配 ⇒ `undefined`（调用方按缺失处理）。
- * 只认后缀为正整数（>=1）的 `.md`；v2 存在时不再回退 v1（v2 不合格即拒绝）。
+ * 最新验收标准（2026-10-24 修订：适用于所有声明 `acceptance-criteria` 步骤的新契约 flow）：
+ * 扫描 `docs/acceptance/` 下 `<flowId>-criteria-vN.md`，取 N 最高的文件；目录不可读/无匹配
+ * ⇒ `undefined`（调用方按缺失处理）。只认后缀为正整数（>=1）的 `.md`；v2 存在时不再回退 v1
+ * （v2 不合格即拒绝）。
  */
 function latestAcceptanceCriteriaRelPath(projectRoot: string, flowId: string): string | undefined {
   const dir = path.join(projectRoot, "docs", "acceptance");
@@ -301,14 +304,20 @@ export function validateAcceptanceCriteriaText(text: string, flowId: string): Ac
   return issues.length === 0 ? { ok: true, issues: [] } : { ok: false, issues };
 }
 
+/** 新契约流程声明「实施前标准」的步骤 id（2026-10-24 客户修订：所有变更独立验收）。 */
+const ACCEPTANCE_CRITERIA_STEP_ID = "acceptance-criteria";
+
 /**
- * 实施派发前的验收标准门槛（O2；2026-10-24 P1-5 收紧）：
- *   · **只对发布版本生效**：flow YAML 顶层 `release: true`；非发布/legacy（`.md` 或缺省 release）
- *     豁免，不再要求 Verifier 写出的标准文件；
+ * 实施派发前的验收标准门槛（O2；2026-10-24 客户修订：**所有变更**，不再只对发布版本）：
+ *   · **适用范围**：flow YAML（新契约流程）声明了 `acceptance-criteria` 步骤 ⇒ 实施派发前必须已有
+ *     `docs/acceptance/<flowId>-criteria-vN.md` 的**最新版本**（扫描取最高 N）且结构合格；
+ *     **不要求 `release: true`**——`release` 仅可选发布元数据，不是启动条件；
+ *   · legacy（无 YAML、或 YAML 未声明 `acceptance-criteria` 步骤的旧流程）没有可定位标准的机器状态，
+ *     保留原放行（不给旧流程新增不可满足的硬门）；
  *   · 最新提案决定是 `proposal-accept-quick`（快捷复用既有角色）时显式豁免（既有语义）；
- *   · 发布版本读取 `docs/acceptance/<flowId>-criteria-vN.md` 的**最新版本**（扫描取最高 N），
- *     缺失/不可读 ⇒ `acceptance-criteria-missing`；结构不合格 ⇒ `acceptance-criteria-invalid`。
- * 该门槛不改变派发权归属，只增加「发布前先有标准」的机械前置。
+ *   · 缺失/不可读 ⇒ `acceptance-criteria-missing`；结构不合格 ⇒ `acceptance-criteria-invalid`
+ *     （存在 v2 时校验 v2，不回退 v1）。
+ * 该门槛不改变派发权归属，只增加「实施前先有标准」的机械前置。
  */
 function evaluateAcceptanceCriteriaGate(
   input: GovernanceGateInput,
@@ -316,8 +325,11 @@ function evaluateAcceptanceCriteriaGate(
   flow: FlowState | undefined,
 ): GovernanceGateDecision {
   const flowId = input.flowId as string;
-  // 非发布/legacy：没有 release 标记就不要求 Verifier 文件（P1-5）。
-  if (flow?.release !== true) return { allowed: true };
+  // legacy/旧流程：无 YAML 可解析（坏 YAML 由后续步骤检查 fail-closed），或 YAML 未声明
+  // `acceptance-criteria` 步骤 —— 没有机器状态可定位「实施前标准」要求，保留原放行，不新增硬门。
+  if (flow === undefined || !flow.steps.some((step) => step.id === ACCEPTANCE_CRITERIA_STEP_ID)) {
+    return { allowed: true };
+  }
   const latestProposal = latestDecision(snapshot, flowId, (entry) =>
     PROPOSAL_DECISION_KINDS.has(entry.decisionKind as GovernanceDecisionKind),
   );
@@ -327,8 +339,9 @@ function evaluateAcceptanceCriteriaGate(
   if (rel === undefined) {
     return deny(
       "acceptance-criteria-missing",
-      `治理门禁：流程 ${flowId} 是发布版本（release: true），但 docs/acceptance/${flowId}-criteria-vN.md ` +
-        "不存在或不可读；请先在实施派发前写出最新版本的结构合格标准（含验收表、风险档位、判定规则、证据计划）。",
+      `治理门禁：流程 ${flowId} 声明了 acceptance-criteria 步骤，但 docs/acceptance/${flowId}-criteria-vN.md ` +
+        "不存在或不可读；所有变更（含非发布）在实施派发前都必须先写出最新版本的结构合格标准" +
+        "（含验收表、风险档位、判定规则、证据计划）。",
     );
   }
   let text: string;
@@ -337,8 +350,9 @@ function evaluateAcceptanceCriteriaGate(
   } catch {
     return deny(
       "acceptance-criteria-missing",
-      `治理门禁：流程 ${flowId} 是发布版本（release: true），但实施前验收标准 ${rel} 不存在或不可读；` +
-        "请先在实施派发前写出最新版本的结构合格标准（含验收表、风险档位、判定规则、证据计划）。",
+      `治理门禁：流程 ${flowId} 声明了 acceptance-criteria 步骤，但实施前验收标准 ${rel} 不存在或不可读；` +
+        "所有变更（含非发布）在实施派发前都必须先写出最新版本的结构合格标准" +
+        "（含验收表、风险档位、判定规则、证据计划）。",
     );
   }
   const check = validateAcceptanceCriteriaText(text, flowId);
@@ -346,7 +360,8 @@ function evaluateAcceptanceCriteriaGate(
     return deny(
       "acceptance-criteria-invalid",
       `治理门禁：实施前验收标准 ${rel} 结构不合格（${check.issues.join("；")}）；` +
-        "请补齐后重新派发（不把「标准待补」当通过；发布版本读取最新版本，不回退旧版本）。",
+        "流程声明了 acceptance-criteria 步骤（所有变更，含非发布），实施派发前必须补合格；" +
+        "请补齐后重新派发（不把「标准待补」当通过；读取最新版本，不回退旧版本）。",
     );
   }
   return { allowed: true };
@@ -453,12 +468,14 @@ function evaluateDispatchGate(
     }
   }
 
-  // 4) 流程文件步骤查询（只判存在，不读 status）：YAML 时同时得到 release 与结构化步骤，
-  //    供验收标准门槛判定是否为发布版本（P1-5）。
+  // 4) 流程文件步骤查询（只判存在，不读 status）：YAML 时同时得到结构化步骤，
+  //    供验收标准门槛判定是否为新契约流程（声明了 `acceptance-criteria` 步骤）。
   const lookup = lookupFlowStep(input.projectRoot, input.flowId, input.stepId);
 
-  // 4a) 实施前验收标准门槛（O2，2026-10-22；2026-10-24 P1-5：只对发布版本 `release: true` 生效，
-  //     读取 `docs/acceptance/<flowId>-criteria-vN.md` 的最新版本；非发布/legacy 与 accept-quick 豁免）。
+  // 4a) 实施前验收标准门槛（O2，2026-10-22；2026-10-24 客户修订：**所有变更**——所有声明了
+  //     `acceptance-criteria` 步骤的新契约 flow YAML（含非发布）都要求
+  //     `docs/acceptance/<flowId>-criteria-vN.md` 最新版本结构合格；`release` 不是前提；
+  //     legacy（无 YAML/无该步骤）与 accept-quick 豁免）。
   const criteria = evaluateAcceptanceCriteriaGate(input, snapshot, lookup.flow);
   if (!criteria.allowed) return criteria;
 

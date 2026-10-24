@@ -102,3 +102,9 @@
 - 2026-10-22 Reduce 完成（`verified-by-tests-only`）：变更包 `docs/scheduling/role-granularity-parallel-testing-change-v1.md`（hash `4191fb44…` / SHA-256 `95a2da33…`）；候选 29 文件；T3 全量 3528/3501/9/18（9 项均基线 EPERM，零新增）；typecheck 双 0、exact build 0、e2e 99/99、Electron E2E_PASS、v2 demo 与 legacy demo 均 DEMO_PASS。
 - 2026-10-22 独立验收结论：**通过（当前候选）**。报告 `docs/acceptance/role-granularity-parallel-testing-report-v1.md`（blob `34f59312…` / SHA-256 `07fc5f88…`）；P1–P14/G1–G2 全部 pass；29 文件复算 mismatches=0。残余：桌面并行偶发、中文路径演示受限、v2 demo 夹具账本字段、Provider 未扩参、真实在线模型/非 Windows/打包未验证；方案 §5.4.1 V12 与 §9.1/§5.5/P9 措辞冲突建议下一版本统一。
 - 2026-10-22 客户明确要求提交本次工作树改动（29 个产品/测试候选 + 治理/验收/角色记录）。验收通过本身仍不授权推送、合并或发布；提交由客户本次指令单独授权。
+
+- 2026-10-24 **客户修订（取代发布独占）**：客户明确选择“所有变更”启动独立验收；原“独立验收只随发布版本启动”不再生效。记录 `docs/communication/2026-10-24_intent_independent-acceptance-all-changes.md`。应用需撤销 P0-1 release 门与 P1-5 非发布豁免；角色卡/项目规则同步；本修订自身也按新口径独立验收。
+
+- 2026-10-24 **应用验证（所有变更独立验收）**：worktree 新代码重启后，bookmark-manager-v1（无 release）10:40 自动派 `verification` 给 verifier；verifier 写 `criteria-v1`、真实复跑官方三命令与探针、写 `report-v1`，判定 **fail（需返工）**：A-25 README 缺“前端不适用”声明；G-06/V-D7 执行角色写入未授权 `docs/evidence/**`。验收卡被应用自动决策拒绝（非客户决定）；flow `verification` 仍 pending；Lead 已收到报告并被要求按返工路由组织返工，不直接 accept。独立验收门已按“所有变更”真实工作。
+
+- 2026-10-24 **bookmark-manager 返工完成并重新验收**：客户选 A 后，Convener 发 appointment 卡（multiSelect），Crew 经 appointment-write 将 `docs/evidence/` 授权给 reduce-integration（boundary `8cf602c6…`）；reduce 在 19:41 真实重跑 build/test/demo 并重抓证据；README v6、团队计划 v11、变更包 v4；verifier 第五轮 35/35 pass；验收卡于 11:48 自动决策 accepted；flow `verification` 已 done（evidence=acceptance）。目标项目本身有独立证据链/授权闭环，非发布同样走独立验收。

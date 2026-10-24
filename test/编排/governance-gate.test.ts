@@ -221,10 +221,15 @@ function writeAcceptanceCriteria(
   writeFileSync(join(root, "docs", "acceptance", `${flowId}-criteria-v${version}.md`), text, "utf8");
 }
 
-/** 结构化 flow YAML（P1-5 发布门槛用；`release` 缺省 = 非发布；owner 与派发目标 A 一致）。 */
-function writeReleaseFlowYaml(
+/**
+ * 结构化 flow YAML（2026-10-24 修订：criteria 门槛对所有**声明了 `acceptance-criteria` 步骤**的
+ * 新契约 flow 生效，含非发布；`release` 只是可选发布元数据）。默认带新契约的 `acceptance-criteria`
+ * 步骤；`criteriaStep: false` ⇒ 旧式 YAML（无该步骤，模拟迁移期流程）。
+ * `impl` 步骤 owner 与派发目标 A 一致。
+ */
+function writeFlowYaml(
   root: string,
-  options: { flowId?: string; stepId?: string; owner?: string; release?: boolean } = {},
+  options: { flowId?: string; stepId?: string; owner?: string; release?: boolean; criteriaStep?: boolean } = {},
 ): void {
   const flowId = options.flowId ?? "flow-a";
   const stepId = options.stepId ?? "impl";
@@ -243,6 +248,15 @@ function writeReleaseFlowYaml(
       `    owner: ${owner}`,
       "    kind: dispatch",
       "    status: pending",
+      ...(options.criteriaStep === false
+        ? []
+        : [
+            "  - id: acceptance-criteria",
+            "    title: 实施前完成标准",
+            "    owner: verifier",
+            "    kind: artifact",
+            "    status: pending",
+          ]),
       "",
     ].join("\n"),
     "utf8",
@@ -271,9 +285,9 @@ test("write-team-plan：Convener 在提案接受后放行；其他角色/缺 flo
   assert.deepEqual(evaluateGovernanceGate(legacy, snapshot([ACCEPT])), { allowed: true });
 });
 
-test("dispatch 正例：提案接受 + 任命名单 + 发布版本标准存在 + 流程步骤 + 未派发 → 放行", () => {
+test("dispatch 正例：提案接受 + 任命名单 + 新契约流程标准存在 + 流程步骤 + 未派发 → 放行", () => {
   withRoot((root) => {
-    writeReleaseFlowYaml(root, { release: true });
+    writeFlowYaml(root, { release: true });
     writeAcceptanceCriteria(root);
     const result = evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A]));
     assert.deepEqual(result, { allowed: true });
@@ -317,24 +331,54 @@ test("dispatch：flowId/stepId 必填；提案未接受拒；目标不在任命�
   });
 });
 
-test("dispatch O2/P1-5 门槛：只对发布版本生效；非发布/legacy 豁免；最新 vN 生效、v2 优先且不回退 v1", () => {
-  // 非发布 appointment flow：缺 criteria 仍可派发（不要求 Verifier 文件）。
+test("dispatch 验收标准门槛（2026-10-24 修订：所有变更）：新契约 flow（含非发布）缺/坏标准一律拒；legacy 无 YAML/无 criteria 步骤豁免；accept-quick 豁免", () => {
+  // 新契约非发布 flow（release 缺省）：缺 criteria ⇒ 拒绝——所有变更都要独立验收标准。
   withRoot((root) => {
-    writeReleaseFlowYaml(root);
-    assert.deepEqual(
-      evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A])),
-      { allowed: true },
-      "非发布（release 缺省）不要求验收标准文件",
+    writeFlowYaml(root);
+    const result = evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A]));
+    assert.equal(blocked(result), "acceptance-criteria-missing", "非发布（release 缺省）同样要求验收标准文件");
+    assert.match((result as { message: string }).message, /所有变更/, "文案改为所有变更口径");
+    assert.doesNotMatch((result as { message: string }).message, /发布版本/, "文案不再以发布版本为前提");
+  });
+
+  // release: true 只是可选发布元数据：新契约 flow 缺 criteria 同样拒（口径与是否发布无关）。
+  withRoot((root) => {
+    writeFlowYaml(root, { release: true });
+    assert.equal(
+      blocked(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A]))),
+      "acceptance-criteria-missing",
+      "release: true 不是启动条件，标准缺失同样拒绝",
     );
   });
 
-  // legacy Markdown（无 YAML/release）：同样豁免。
+  // 非发布新契约 flow + 最新标准存在且合格 ⇒ 放行。
+  withRoot((root) => {
+    writeFlowYaml(root);
+    writeAcceptanceCriteria(root);
+    assert.deepEqual(
+      evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A])),
+      { allowed: true },
+      "非发布（release 缺省）+ 标准合格 ⇒ 放行",
+    );
+  });
+
+  // legacy Markdown（无 YAML）：没有机器状态可定位标准步骤，保留原放行。
   withRoot((root) => {
     writeFlow(root);
     assert.deepEqual(
       evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A])),
       { allowed: true },
-      "legacy .md 无 release 标记 ⇒ 豁免标准门",
+      "legacy .md 无 YAML ⇒ 豁免标准门（不新增不可满足的硬门）",
+    );
+  });
+
+  // 旧式 YAML（无 acceptance-criteria 步骤）：同样保留原放行。
+  withRoot((root) => {
+    writeFlowYaml(root, { criteriaStep: false });
+    assert.deepEqual(
+      evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A])),
+      { allowed: true },
+      "YAML 未声明 acceptance-criteria 步骤 ⇒ 豁免标准门",
     );
   });
 
@@ -350,18 +394,9 @@ test("dispatch O2/P1-5 门槛：只对发布版本生效；非发布/legacy 豁�
     );
   });
 
-  // 发布版本缺标准 ⇒ 拒绝。
+  // 新契约 flow（非发布）+ 最新标准结构不合格 ⇒ 拒绝。
   withRoot((root) => {
-    writeReleaseFlowYaml(root, { release: true });
-    assert.equal(
-      blocked(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A]))),
-      "acceptance-criteria-missing",
-    );
-  });
-
-  // 发布版本 + 最新标准结构不合格 ⇒ 拒绝。
-  withRoot((root) => {
-    writeReleaseFlowYaml(root, { release: true });
+    writeFlowYaml(root);
     writeAcceptanceCriteria(root, "flow-a", "# 只有标题\n");
     assert.equal(
       blocked(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A]))),
@@ -371,14 +406,14 @@ test("dispatch O2/P1-5 门槛：只对发布版本生效；非发布/legacy 豁�
 
   // v2 生效：只有 v2、结构合格 ⇒ 放行。
   withRoot((root) => {
-    writeReleaseFlowYaml(root, { release: true });
+    writeFlowYaml(root);
     writeAcceptanceCriteria(root, "flow-a", acceptanceCriteriaText("flow-a"), 2);
     assert.deepEqual(evaluateGovernanceGate(dispatchInput(root), snapshot([ACCEPT, APPOINT_A])), { allowed: true });
   });
 
   // v1+v2：取 v2（v1 合格、v2 不合格 ⇒ 拒绝，不回退 v1）。
   withRoot((root) => {
-    writeReleaseFlowYaml(root, { release: true });
+    writeFlowYaml(root, { release: true });
     writeAcceptanceCriteria(root, "flow-a");
     writeAcceptanceCriteria(root, "flow-a", "# 只有标题\n", 2);
     assert.equal(
@@ -390,7 +425,7 @@ test("dispatch O2/P1-5 门槛：只对发布版本生效；非发布/legacy 豁�
 
   // v1+v2：取 v2（v1 不合格、v2 合格 ⇒ 放行）。
   withRoot((root) => {
-    writeReleaseFlowYaml(root, { release: true });
+    writeFlowYaml(root, { release: true });
     writeAcceptanceCriteria(root, "flow-a", "# 只有标题\n");
     writeAcceptanceCriteria(root, "flow-a", acceptanceCriteriaText("flow-a"), 2);
     assert.deepEqual(
@@ -400,9 +435,9 @@ test("dispatch O2/P1-5 门槛：只对发布版本生效；非发布/legacy 豁�
     );
   });
 
-  // accept-quick 快捷路径显式豁免（即便发布版本 + 账本存在 appointment 决定）。
+  // accept-quick 快捷路径显式豁免（新契约 flow + 账本存在 appointment 决定也不要求标准）。
   withRoot((root) => {
-    writeReleaseFlowYaml(root, { release: true });
+    writeFlowYaml(root, { release: true });
     mkdirSync(join(root, "角色卡", "A"), { recursive: true });
     writeFileSync(join(root, "角色卡", "A", "role-card.md"), "# A\n");
     assert.deepEqual(

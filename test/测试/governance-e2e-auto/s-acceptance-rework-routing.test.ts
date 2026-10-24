@@ -5,7 +5,8 @@
 // 覆盖（客户已确认 Q1–Q13 A；O1–O4 不做）：
 //   · 客户 reject（真实验收卡 + 客户通道）→ 路由 Lead / 主理（报告 + acceptance-rework/v1 items + 决定记录）
 //     → 不派 Proof → `.ans/governance/acceptance/<flowId>/rework-routing.json` → rework 完成/flow 更新
-//     → 发布版本（release: true）恰好一次重派 Proof → accepted 收口；重复触发/同内容不重派；无热循环。
+//     → **所有变更（含非发布）**恰好一次重派 Proof → accepted 收口；重复触发/同内容不重派；无热循环。
+//     （2026-10-24 客户修订：`release` 只是可选发布元数据，不是重派/验收的启动条件。）
 //   · judge auto-rework（真实验收卡 + 真实判断 driver deny）→ 路由 Lead、无 customer.decision、
 //     回执/系统行写「自动决策未通过/未完成」且不把 judge 退回写成客户拒绝。
 //   · 报告缺段/坏段 → 「报告不完整」兜底、不生成 items、不建 flow 步骤、不解析自由文本。
@@ -186,7 +187,7 @@ function flowFilePath(root: string, flowId = FLOW): string {
   return path.join(root, "docs", "flows", `${flowId}.yaml`);
 }
 
-/** 写 flow YAML（可选把 mtime 落到给定时刻；`release: true` = 发布版本，缺省 = 非发布）。 */
+/** 写 flow YAML（可选把 mtime 落到给定时刻；`release: true` = 可选发布元数据，缺省不写）。 */
 function writeFlowState(
   root: string,
   steps: readonly FlowDocStep[] | readonly { id: string; status: string; kind?: string; evidence?: { kind: string; ref: string }; dependsOn?: string[] }[],
@@ -385,12 +386,14 @@ function harnessOptions(tag: string, root: string, extra: Record<string, unknown
 
 // —————————————————————— S7-A 客户 reject 全链路 ——————————————————————
 
-test("S7-A 客户 reject 全链路：路由 Lead（报告+清单+决定）→ 零 Proof 返工 → rework/flow 更新 → 恰一次重派（发布版本）→ accepted 收口；重复/同内容不重派", async () => {
+test("S7-A 客户 reject 全链路：路由 Lead（报告+清单+决定）→ 零 Proof 返工 → rework/flow 更新 → 恰一次重派（非发布同样重派）→ accepted 收口；重复/同内容不重派", async () => {
   const temp = makeRoot("s7-rework-customer-chain");
   const root = temp.root;
   try {
-    // 2026-10-24 P0-1：发布版本（flow.release: true）才在返工后自动重派 Proof；非发布见 S7-B 的等待断言。
-    seedBase(root, { release: true });
+    // 2026-10-24 客户修订（独立验收范围＝所有变更）：本场景不标 release（非发布）——
+    // 返工后仍必须自动重派 Proof（release 只是可选元数据，不是重派条件）。
+    // flow mtime 显式早于 reject 决定，避免同一毫秒写盘被误判为「已有进展」。
+    seedBase(root, { flowMtime: new Date(Date.now() - 60_000) });
     await seedLedger(root, [ACCEPTED_PROPOSAL, dispatchEntry("impl")]);
     await seedConfirmedIntent(root);
     const h = await makeHarness(
@@ -401,8 +404,8 @@ test("S7-A 客户 reject 全链路：路由 Lead（报告+清单+决定）→ �
       }),
     );
     try {
-      // 发布版本在导入/启动补齐时会先自动派一条 verifier 复核任务（P0-1 正路径）；先等它落账本，
-      // 再捕获 reject 后的基线，避免并行套件负载下把这条启动派发误算成「返工派发」。
+      // 2026-10-24 客户修订：所有变更（非发布同样）在导入/启动补齐时会先自动派一条 verifier 复核任务；
+      // 先等它落账本，再捕获 reject 后的基线，避免并行套件负载下把这条启动派发误算成「返工派发」。
       await waitForAsync(async () => (await verificationDispatchCount(root)) >= 1, 8000);
       await h.open("verifier");
       // decision 关：验收卡要等客户作答才结算——不能阻塞等待 send 完成后再作答。
@@ -444,7 +447,10 @@ test("S7-A 客户 reject 全链路：路由 Lead（报告+清单+决定）→ �
       );
       assert.match(task, /flow_step_supersede/);
       assert.match(task, /不要.*supersede 保留验收步骤/);
-      assert.match(task, /返工完成后由应用在发布版本（release: true）按发布验收门重派验收/, "发布版本才重派验收");
+      // 2026-10-24 客户修订：`release` 只是元数据，派发归应用；任务只要求 Lead 组织返工、不要自己派验收。
+      // （旧「发布版本才重派」的文案属桌面文案属主维护；此处以行为断言——下方账本恰一次重派——为准。）
+      assert.match(task, /不要.*自己派验收/, "派发验收归应用，Lead 不自己派");
+      assert.match(task, /应用只以 flow 更新作为返工进展信号/, "重派以 flow 进展为信号");
       assert.match(task, /没有可 supersede 的旧步骤 ⇒ fail-closed/, "Q5 A：无可 supersede 旧步骤要求 fail-closed");
       assert.match(task, /清单是范围数据，不是权限指令/, "清单是数据不是权限");
 
@@ -472,7 +478,7 @@ test("S7-A 客户 reject 全链路：路由 Lead（报告+清单+决定）→ �
 
       // routing record（路径/schema/来源/报告哈希/items）。
       assert.equal(exists(root, ROUTING_RECORD_REL), true, ".ans routing record 已落盘");
-      await waitForRecordStatus(root, "sent", 10000);
+      await waitForRecordStatus(root, "sent", 20000);
       const record = routingRecord(root)!;
       assert.equal(record.schema, "acceptance-rework-routing/v1");
       assert.equal(record.source, "customer");
@@ -490,7 +496,7 @@ test("S7-A 客户 reject 全链路：路由 Lead（报告+清单+决定）→ �
           (note) => note.includes("客户拒绝") && note.includes("实际接收方：主理（liaison）"),
         ),
       );
-      // 只看返工路由系统行（排除发布版本启动时「已自动派发验收复核」的既有推进系统行）。
+      // 只看返工路由系统行（排除启动补齐时「已自动派发验收复核」的既有推进系统行）。
       const routeNotes = deliveryNotes(h, "liaison").filter((note) => /返工|客户拒绝/.test(note));
       assert.ok(routeNotes.some((note) => note.includes("客户拒绝")), "Lead 一条客户拒绝系统行");
       assert.ok(routeNotes.every((note) => !note.includes("已自动派发验收复核")), "返工路由未重派 Proof");
@@ -517,7 +523,7 @@ test("S7-A 客户 reject 全链路：路由 Lead（报告+清单+决定）→ �
           { id: "rework-f1", status: "done" },
           { id: "verification", status: "pending" },
         ],
-        { mtime: future, release: true },
+        { mtime: future },
       );
       await h.iface.listProject({ projectRoot: root });
       await h.waitFor(() => (h.prompts.get("verifier")?.length ?? 0) > verifierPromptsAtReject, 8000);
@@ -568,32 +574,43 @@ test("S7-A 客户 reject 全链路：路由 Lead（报告+清单+决定）→ �
 
 // —————————————————————— S7-B 无进展不重派 ——————————————————————
 
-test("S7-B 客户 reject 后无 flow 进展 ⇒ 非发布不重派 Proof（等待发布验收系统行）；重复事件仍只一条路由、零热循环", async () => {
+test("S7-B 客户 reject 后无 flow 进展 ⇒ 仍不重派 Proof（所有变更同一门，非发布不例外）；重复事件仍只一条路由、零热循环", async () => {
   const temp = makeRoot("s7-rework-no-progress");
   const root = temp.root;
   try {
-    seedBase(root);
-    // flow 先写，rejection 决定在其后（mtime <= decisionAt）⇒ 无进展。
+    // flow 的 mtime 显式落到 60s 前，rejection 决定在其后 ⇒ 无进展判定不受同一毫秒写盘时序影响。
+    seedBase(root, { flowMtime: new Date(Date.now() - 60_000) });
     await seedLedger(root, [ACCEPTED_PROPOSAL, dispatchEntry("impl"), rejectionEntry(new Date().toISOString())]);
     const h = await makeHarness(harnessOptions("s7-rework-no-progress", root));
     try {
       await h.waitFor(() => (h.prompts.get("liaison")?.length ?? 0) > 0, 8000);
-      await h.waitFor(() =>
-        deliveryNotes(h, "liaison").some((note) =>
-          /flow\.release 未标记为 true（非发布）⇒ 不自动重派验收/.test(note),
-        ),
-      );
-      assert.equal(h.prompts.get("verifier")?.length ?? 0, 0, "非发布：不派 Proof");
+      // 2026-10-24 客户修订：不再有 release 等待门；不重派的唯一原因是「返工后 flow 无实质更新」。
+      let notesSeen: string[] = [];
+      try {
+        await h.waitFor(() => {
+          notesSeen = deliveryNotes(h, "liaison");
+          return notesSeen.some((note) => note.includes("返工路由尚未完成"));
+        }, 15000);
+      } catch (error) {
+        throw new Error(
+          `${(error as Error).message}；notes=${JSON.stringify(notesSeen)}；record=${JSON.stringify(routingRecord(root))}`,
+        );
+      }
+      assert.equal(h.prompts.get("verifier")?.length ?? 0, 0, "无 flow 进展：不派 Proof（非发布不例外）");
       assert.equal(await verificationDispatchCount(root), 0);
       assert.equal(routingRecord(root)?.status, "sent");
+      assert.ok(
+        deliveryNotes(h, "liaison").every((note) => !/release|发布验收/.test(note)),
+        "不得再出现 release/发布验收等待门系统行",
+      );
 
       await h.iface.listProject({ projectRoot: root });
       await new Promise((resolve) => setTimeout(resolve, 350));
       assert.equal(h.prompts.get("liaison")!.length, 1, "重复 import 不重复路由");
       assert.equal(
-        deliveryNotes(h, "liaison").filter((note) => /flow\.release 未标记为 true（非发布）⇒ 不自动重派验收/.test(note)).length,
+        deliveryNotes(h, "liaison").filter((note) => note.includes("返工路由尚未完成")).length,
         1,
-        "等待发布验收系统行去重",
+        "等待重派系统行去重",
       );
       assert.equal(h.prompts.get("verifier")?.length ?? 0, 0, "仍不派 Proof");
     } finally {
@@ -606,11 +623,12 @@ test("S7-B 客户 reject 后无 flow 进展 ⇒ 非发布不重派 Proof（等�
 
 // —————————————————————— S7-C judge auto-rework ——————————————————————
 
-test("S7-C judge auto-rework（真实卡 + 判断未完成）：路由 Lead、自动决策系统行/回执不写「客户拒绝」、零 customer.decision、零 Proof 返工；flow 更新后恰一次重派（发布版本）", async () => {
+test("S7-C judge auto-rework（真实卡 + 判断未完成）：路由 Lead、自动决策系统行/回执不写「客户拒绝」、零 customer.decision、零 Proof 返工；flow 更新后恰一次重派（release 元数据不影响）", async () => {
   const temp = makeRoot("s7-rework-judge");
   const root = temp.root;
   try {
-    // 发布版本：返工后自动重派 Proof 只在 release: true 时发生（P0-1）。
+    // 2026-10-24 客户修订：本场景保留 `release: true` 只覆盖「发布元数据形态」；
+    // 重派门对所有变更一致（非发布的同链路见 S7-A）。
     seedBase(root, { release: true });
     await seedLedger(root, [ACCEPTED_PROPOSAL, dispatchEntry("impl")]);
     await seedConfirmedIntent(root);
@@ -671,7 +689,7 @@ test("S7-C judge auto-rework（真实卡 + 判断未完成）：路由 Lead、�
       assert.equal(h.prompts.get("verifier")?.length ?? 0, verifierPromptsBeforeRoute, "Proof 零返工派发");
       assert.equal(await verificationDispatchCount(root), 1, "仅导入时既有 verification 派发");
 
-      await waitForRecordStatus(root, "sent", 10000);
+      await waitForRecordStatus(root, "sent", 20000);
       const record = routingRecord(root)!;
       assert.equal(record.source, "judge");
       assert.equal(record.sourceDetail, "judge-manual");
@@ -713,7 +731,7 @@ test("S7-D 报告缺段/坏段：只发「报告不完整」任务（无 items�
   const invalidTemp = makeRoot("s7-rework-report-invalid");
   try {
     // ① 缺段：目标项目形态（§8 表 / §9.1 列表）也不得被解析。
-    seedBase(missingTemp.root, { report: plainReportWithTables() });
+    seedBase(missingTemp.root, { report: plainReportWithTables(), flowMtime: new Date(Date.now() - 60_000) });
     await seedLedger(missingTemp.root, [ACCEPTED_PROPOSAL, dispatchEntry("impl"), rejectionEntry(new Date().toISOString())]);
     const missing = await makeHarness(harnessOptions("s7-rework-report-missing", missingTemp.root));
     try {
@@ -739,7 +757,7 @@ test("S7-D 报告缺段/坏段：只发「报告不完整」任务（无 items�
     }
 
     // ② 坏段（未知字段）：整段不采信、错误具体可见。
-    seedBase(invalidTemp.root, { report: invalidReport() });
+    seedBase(invalidTemp.root, { report: invalidReport(), flowMtime: new Date(Date.now() - 60_000) });
     await seedLedger(invalidTemp.root, [ACCEPTED_PROPOSAL, dispatchEntry("impl"), rejectionEntry(new Date().toISOString())]);
     const invalid = await makeHarness(harnessOptions("s7-rework-report-invalid", invalidTemp.root));
     try {
@@ -766,6 +784,7 @@ test("S7-E owner 归属：未知/不可派发逐项 blocked、有效项先行；
   const root = temp.root;
   try {
     seedBase(root, {
+      flowMtime: new Date(Date.now() - 60_000),
       report: reworkReport([
         { id: "F1", owner: "executor", action: "有效项：修复交付" },
         { id: "F9", owner: "ghost-role", action: "未知 owner" },
@@ -809,7 +828,8 @@ test("S7-F 无可 supersede 旧步骤 gap（Q5 A）：任务要求 fail-closed�
   try {
     seedTrioProject(root, ["executor"]);
     // 只有保留验收步骤：executor 的 F-item 没有可 supersede 的旧活动步骤。
-    writeFlowState(root, [{ id: "verification", status: "pending" }]);
+    // mtime 早于 reject 决定，确保「无进展 ⇒ 不重派」判定不受同一毫秒写盘时序影响。
+    writeFlowState(root, [{ id: "verification", status: "pending" }], { mtime: new Date(Date.now() - 60_000) });
     seedAcceptanceArtifacts(root, FLOW, "T1");
     write(root, REPORT_REL, reworkReport([{ id: "F1", owner: "executor", action: "新增交付项" }]));
     await seedLedger(root, [ACCEPTED_PROPOSAL, rejectionEntry(new Date().toISOString())]);
@@ -834,11 +854,11 @@ test("S7-F 无可 supersede 旧步骤 gap（Q5 A）：任务要求 fail-closed�
 
 // —————————————————————— S7-G verification dispatched/delivered 重开 ——————————————————————
 
-test("S7-G verification dispatched/delivered：app-only 重开为 pending（清旧证据、保留 dependsOn）后恰一次重派 Proof（发布版本）", async () => {
+test("S7-G verification dispatched/delivered：app-only 重开为 pending（清旧证据、保留 dependsOn）后恰一次重派 Proof（release 元数据不影响）", async () => {
   const dispatchedTemp = makeRoot("s7-rework-reopen-dispatched");
   const deliveredTemp = makeRoot("s7-rework-reopen-delivered");
   try {
-    // ① dispatched：先重开，再按门重派（真实 Pipeline 出口；发布版本 release: true）。
+    // ① dispatched：先重开，再按门重派（真实 Pipeline 出口；保留 release: true 覆盖发布元数据形态）。
     const past = new Date(Date.now() - 60_000).toISOString();
     seedTrioProject(dispatchedTemp.root, ["executor"]);
     seedAcceptanceArtifacts(dispatchedTemp.root, FLOW, "T1");
@@ -962,7 +982,7 @@ function legacyFlowMarkdown(): string {
   ].join("\n");
 }
 
-test("S7-I legacy Markdown（Q6 A）：历史 rejected 保持旧行为（不路由/不重派/不写 record）；无决定且门通过按非发布停在发布验收前（不派 Proof）", async () => {
+test("S7-I legacy Markdown（Q6 A）：历史 rejected 保持旧行为（不路由/不重派/不写 record）；无决定且门通过 ⇒ legacy 无 YAML 也自动派 Proof", async () => {
   const legacyTemp = makeRoot("s7-legacy-rejected");
   const readyTemp = makeRoot("s7-legacy-ready");
   try {
@@ -978,28 +998,53 @@ test("S7-I legacy Markdown（Q6 A）：历史 rejected 保持旧行为（不路�
       );
       assert.equal(legacy.prompts.get("liaison")?.length ?? 0, 0, "legacy 不路由 Lead");
       assert.equal(legacy.prompts.get("verifier")?.length ?? 0, 0, "legacy 不重派 Proof");
+      assert.equal(await verificationDispatchCount(legacyTemp.root), 0, "legacy rejected 不写验收派发账本");
       assert.equal(exists(legacyTemp.root, ROUTING_RECORD_REL), false, "legacy 不写 routing record");
       assert.equal(exists(legacyTemp.root, FLOW_REL), false, "不重写/新增 YAML");
     } finally {
       await legacy.stop();
     }
 
-    // ② legacy Markdown + 无 acceptance 决定 + 门通过 ⇒ 2026-10-24 P0-1：legacy 无 YAML/release
-    //    视为非发布（awaiting-release-acceptance），不自动派 Proof；发布版本另由 YAML release: true 驱动。
+    // ② legacy Markdown + 无 acceptance 决定 + 门通过 ⇒ 2026-10-24 客户修订：**所有变更**（含 legacy
+    //    无 flow YAML）都进入验收派发；`release` 不是启动条件（legacy 也没有该元数据）。
     seedTrioProject(readyTemp.root, ["executor"]);
     write(readyTemp.root, `docs/flows/${FLOW}.md`, legacyFlowMarkdown());
     seedAcceptanceArtifacts(readyTemp.root, FLOW, "T1");
     await seedLedger(readyTemp.root, [ACCEPTED_PROPOSAL, dispatchEntry("impl")]);
     const ready = await makeHarness(harnessOptions("s7-legacy-ready", readyTemp.root));
     try {
-      await ready.waitFor(() =>
-        deliveryNotes(ready, "liaison").some(
-          (note) => note.includes("legacy 流程无 flow YAML/release 标记（视为非发布）⇒ 停在发布验收前"),
-        ),
+      await ready.waitFor(() => (ready.prompts.get("verifier")?.length ?? 0) > 0, 8000);
+      assert.equal(ready.prompts.get("verifier")!.length, 1, "legacy 无 YAML 也自动派 Proof（恰一次）");
+      assert.match(ready.prompts.get("verifier")![0]!, /请汇总证据并出验收卡/, "派发的是真实验收复核任务");
+      const ledger = await ready.waitForLedger(
+        (entries) =>
+          entries.some(
+            (entry) =>
+              entry.kind === "dispatch.accepted" &&
+              entry.flowId === FLOW &&
+              entry.actorRoleId === "app" &&
+              entry.targetRoleId === "verifier" &&
+              entry.stepId === "verification",
+          ),
+        8000,
       );
-      assert.equal(ready.prompts.get("verifier")?.length ?? 0, 0, "legacy 非发布 ⇒ 不派 Proof");
+      assert.ok(
+        ledger.entries.some(
+          (entry) =>
+            entry.kind === "dispatch.accepted" &&
+            entry.flowId === FLOW &&
+            entry.actorRoleId === "app" &&
+            entry.targetRoleId === "verifier" &&
+            entry.stepId === "verification",
+        ),
+        "legacy 自动派 Proof 应写 dispatch.accepted(stepId=verification)",
+      );
       assert.equal(ready.prompts.get("liaison")?.length ?? 0, 0, "legacy 不向 Lead 发返工/协调任务");
       assert.equal(exists(readyTemp.root, ROUTING_RECORD_REL), false);
+      assert.ok(
+        deliveryNotes(ready, "liaison").every((note) => !/release|发布验收/.test(note)),
+        "不得再出现 release/发布验收等待门系统行",
+      );
     } finally {
       await ready.stop();
     }
@@ -1017,7 +1062,7 @@ test("S7-J routing record：审计失败可见且不伪造账本；发送失败 
   const restartTemp = makeRoot("s7-rework-restart");
   try {
     // ① 审计失败：record=sent、任务已发、Lead 系统行可见、账本无 app→Lead、不伪造。
-    seedBase(auditTemp.root);
+    seedBase(auditTemp.root, { flowMtime: new Date(Date.now() - 60_000) });
     await seedLedger(auditTemp.root, [ACCEPTED_PROPOSAL, dispatchEntry("impl"), rejectionEntry(new Date().toISOString())]);
     const auditHarness = await makeHarness(
       harnessOptions("s7-rework-audit-fail", auditTemp.root, {
@@ -1031,7 +1076,7 @@ test("S7-J routing record：审计失败可见且不伪造账本；发送失败 
     );
     try {
       await auditHarness.waitFor(() => (auditHarness.prompts.get("liaison")?.length ?? 0) > 0, 8000);
-      await waitForRecordStatus(auditTemp.root, "sent", 10000);
+      await waitForRecordStatus(auditTemp.root, "sent", 20000);
       await auditHarness.waitFor(() =>
         deliveryNotes(auditHarness, "liaison").some((note) => note.includes("审计记录写入失败")),
       );
@@ -1055,14 +1100,14 @@ test("S7-J routing record：审计失败可见且不伪造账本；发送失败 
     }
 
     // ② 发送失败：record=failed、系统行可见、不派 Proof；故障移除后下一次事件重试成功（sent）。
-    seedBase(sendTemp.root);
+    seedBase(sendTemp.root, { flowMtime: new Date(Date.now() - 60_000) });
     await seedLedger(sendTemp.root, [ACCEPTED_PROPOSAL, dispatchEntry("impl"), rejectionEntry(new Date().toISOString())]);
     const failOpenRoles = new Set<string>(["liaison"]);
     const sendHarness = await makeHarness(
       harnessOptions("s7-rework-send-retry", sendTemp.root, { failOpenRoles }),
     );
     try {
-      await waitForRecordStatus(sendTemp.root, "failed", 10000);
+      await waitForRecordStatus(sendTemp.root, "failed", 20000);
       await sendHarness.waitFor(() =>
         deliveryNotes(sendHarness, "liaison").some((note) => note.includes("返工路由失败")),
       );
@@ -1073,7 +1118,7 @@ test("S7-J routing record：审计失败可见且不伪造账本；发送失败 
       failOpenRoles.delete("liaison");
       await sendHarness.iface.listProject({ projectRoot: sendTemp.root });
       await sendHarness.waitFor(() => (sendHarness.prompts.get("liaison")?.length ?? 0) > 0, 8000);
-      await waitForRecordStatus(sendTemp.root, "sent", 10000);
+      await waitForRecordStatus(sendTemp.root, "sent", 20000);
       assert.equal(sendHarness.prompts.get("liaison")!.length, 1, "下一次真实事件重试成功，恰一条任务");
       assert.equal(routingRecord(sendTemp.root)!.error, null);
     } finally {
@@ -1091,7 +1136,7 @@ test("S7-J routing record：审计失败可见且不伪造账本；发送失败 
     let sentAt: unknown;
     try {
       await first.waitFor(() => (first.prompts.get("liaison")?.length ?? 0) > 0, 8000);
-      await waitForRecordStatus(restartTemp.root, "sent", 10000);
+      await waitForRecordStatus(restartTemp.root, "sent", 20000);
       sentAt = routingRecord(restartTemp.root)!.sentAt;
       assert.equal(first.prompts.get("liaison")!.length, 1);
     } finally {
