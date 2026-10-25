@@ -396,3 +396,15 @@ A4 legacy provenance窄修：protected工具t.statusSource/target.source分别�
 - 生成点：`session.ts`、`interface.ts`、`governance-advance.ts`（仅系统行）、`customer-input.ts`、`operator-channel.ts`、`watchdog.ts`、`runtime-history.ts`、`session-history.ts`、`project.ts`、`runtime-config.ts`、`runtime-resolution.ts`、`composer-images.ts`、`confirm-card.ts`、`recovery-channel.ts`、`judge-reason.ts`、`chat-adapter.ts`（demo）；key 取共享目录 `main.*`（个别复用 `shared.common.*`/`ui.judge.*` 既有 key）。
 - **非目标**：发给 agent 的任务文案/提示词、`role_status`/`session_tail` 输出、外部错误原文（`{detail}` 参数）、诊断/日志文本、机器标识/协议标记、角色卡/团队计划 schema 词汇、B4 的 `RUNTIME_LABELS`。缺 key 已由 PM 批次 `2026-10-23_change_i18n-b3-key-supplement.md` 及后续两项补齐（23 新增 + 5 复用）并在生成点接线；按 PM 指示保持中文的 agent-facing 项：`install.actionChanged/actionReverted`、`manualJudgeDenyConnector`、`addRoleCardsStep`、`flowStateValidationFailed`。`roleCardsStepMissing` 通过 `AppointmentArtifactIssue.userVisibleIssue` 分离 agent 任务与 Lead 摘要（agent 正文保持中文，指纹输入不变）；`dispatchModelNote` / `teamPlanMissingBoundHint` 已接线，`targetLabel` 复用 `ui.role.governance.crew.name` / `ui.role.governance.steward.name`。
 - 验收证据：`node --test` interface 118/118、operator-wiring 53/53、全量桌面 555/555、`npm run typecheck` 0；真实 UI/布局（I9）待独立测试/验收。
+
+## 2026-10-25 治理反馈客户投影（聊天面板调整 A3/A4）
+
+计划 [实施计划](docs/design/2026-10-25_plan_chat-panel-adjustments.md)。**不新增 IPC/preload 通道、不改事件 kind/信封形状**；只在既有 `prompt-input` 消息事件的 `detail` 上新增**可选**字段 `clientProjection`。
+
+- 类型（`app/desktop/session.ts` 导出 `GovernanceClientProjectionV1`）：
+  `{ version: 1; kind: "governance-feedback"; fingerprint: string; sourceRole: { roleId, displayName }; statusCode: "completed"|"failed"|"aborted"|"timed_out"|"unknown"|"internal-feedback"; statusText: string; flowIds?: string[]; reportPath?: string; governancePath?: string; action: "report-ready"|"await-lead-summary" }`。
+- 生产者：`SessionManager.mirrorGovernanceFeedback` 在向 Lead 投递 `[系统·治理反馈]` 任务**成功（含 queued）后**登记投影（键 = `projectRoot+roleId+runtime` + 任务文本 sha256；有界 128 条 FIFO + 30 分钟 TTL，只在内存）。Proof：`statusCode` 取本轮 `outcome`（缺省 `unknown`）、`statusText` 取既有 `PROOF_STATUS_TEXT`（缺省「已结束」）、带 `flowIds/reportPath/governancePath`、`action:"report-ready"`；非 Proof 内置：`statusCode:"internal-feedback"`、`statusText:"内部反馈"`、`action:"await-lead-summary"`，不编造报告路径。
+- 消费者：事件消费循环对 `detail.source === "prompt-input"` 且文本逐字命中的消息事件，把投影并入外推事件 `envelope.event.detail.clientProjection`；`detail.text` **内部原文原样保留**（审计/可折叠）。未命中（普通消息、文本被计划改写、重启/回放行）⇒ 事件与旧版逐字相同；渲染侧回退到既有文本归类。
+- `fingerprint`：`sha256(canonical{kind, sourceRoleId, statusCode, flowIds(排序), reportPath, governancePath, textHash})`——同来源/同状态/同流程/同指针/同正文相同，供 UI 合并连续状态行（×N）。
+- 非目标：不持久化投影（恢复/回放回退文本归类）；不改 renderer；不参与任何判定、不自动验收。
+- 验收证据（实施后）：`test/桌面应用/session.test.ts` 新增投影用例；桌面套件与 typecheck 结果见变更记录。

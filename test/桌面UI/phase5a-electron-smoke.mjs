@@ -737,12 +737,12 @@ app.whenReady().then(async () => {
       if (!facts || !safe) return { ok: false, reason: 'facts' };
       card.scrollIntoView({ block: 'start' });
       const chat = document.getElementById('chat').getBoundingClientRect();
-      const title = [...card.querySelectorAll(':scope > p, :scope > .msg-head, :scope > .mi-head')].find((n) => n.textContent.includes('回交投递'));
+      const title = [...card.querySelectorAll(':scope > p, :scope > .msg-head, :scope > .mi-head')].find((n) => n.textContent.includes('交付'));
       const t = title ? title.getBoundingClientRect() : null;
       const f = facts.getBoundingClientRect();
       const s = safe.getBoundingClientRect();
       return {
-        ok: card.textContent.includes('回交投递 · 本批 1 份（不表示全部收齐）')
+        ok: card.textContent.includes('交付 · 本批 1 份（不表示全部收齐）')
           && facts.querySelectorAll('dt').length === 3
           && !!t && t.height > 0 && t.top >= chat.top - 1 && t.bottom <= chat.bottom + 1
           && f.height > 0 && f.top >= chat.top - 1 && f.top <= chat.bottom

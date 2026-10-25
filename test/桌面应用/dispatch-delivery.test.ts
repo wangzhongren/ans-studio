@@ -457,7 +457,7 @@ test('delivery notes are typed system messages, never ghost tools or extra promp
   const notes=h.envelopes.filter(e=>e.event.kind==='message'&&(e.event.detail as {source?:string}|undefined)?.source==='delivery-note');
   assert.equal(notes.length,2);
   assert.ok(notes.some(e=>e.roleId==='A'&&e.event.summary==='已接收来自 su 的派发任务——请按任务文本执行，完成后交回报告。'));
-  assert.ok(notes.some(e=>e.roleId==='su'&&e.event.summary==='已派发任务给 A（已投递到其会话；其结果/回交会回到本会话）。'));
+  assert.ok(notes.some(e=>e.roleId==='su'&&e.event.summary==='已派发任务给 A（已投递到其会话；其结果/交付会回到本会话）。'));
   for(const note of notes){assert.equal(note.projectRoot,'/proj');assert.equal(note.runtime,'demo');assert.equal(Object.hasOwn(note.event,'turnId'),false);assert.deepEqual((note.event as {detail:unknown}).detail,{source:'delivery-note'});}
   const actual=worker.find(e=>e.event.kind==='tool_call')!.event as {turnId?:string;detail?:{toolCallId?:string;phase?:string}};assert.equal(actual.turnId,'actual-turn');assert.equal(actual.detail?.toolCallId,'actual-call');assert.equal(actual.detail?.phase,'start');
  }finally{await h.mgr.stop();}

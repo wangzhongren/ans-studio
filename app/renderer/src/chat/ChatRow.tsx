@@ -11,6 +11,7 @@
 
 import { type SyntheticEvent, memo, type ReactNode } from "react";
 import {
+  Bot,
   Check,
   ChevronRight,
   CircleAlert,
@@ -25,6 +26,8 @@ import {
 import {
   renderMarkdown,
 } from "@/chat/markdown";
+import { clientProjectionFrom } from "@/chat/events";
+import { projectionStatusText } from "@/chat/projection-view";
 import type { ActivityItem, ChatRow } from "@/chat/types";
 import { useChatStore } from "@/chat/chat-store";
 import { findRole, roleDisplayName } from "@/chat/role-view";
@@ -147,8 +150,27 @@ function UserRow({ row, roleId }: { row: ChatRow; roleId: string }) {
 
 function AssistantRow({ row, roleId }: { row: ChatRow; roleId: string }) {
   const data = asRecord(row.data);
+  const locale = useLocaleState((s) => s.locale);
+  const roles = useChatStore((s) => s.roles);
+  const role = findRole(roles, roleId);
+  const roleName = role ? roleDisplayName(role, locale) : "";
+  const at = asString(data.at);
+  const time = shortTime(at);
   return (
     <Folded row={row} roleId={roleId}>
+      {roleName || time ? (
+        <div className="msg-meta" data-turn-id={row.turnId || undefined}>
+          <span className="msg-avatar" aria-hidden="true">
+            {roleName.slice(0, 1)}
+          </span>
+          {roleName ? <span className="msg-role">{roleName}</span> : null}
+          {time ? (
+            <time className="msg-time" dateTime={at || undefined}>
+              {time}
+            </time>
+          ) : null}
+        </div>
+      ) : null}
       <div
         className={"msg msg-assistant" + (row.replay ? " is-replay" : "")}
         data-turn-id={row.turnId || undefined}
@@ -449,6 +471,7 @@ function DeniedRow({ row, roleId }: { row: ChatRow; roleId: string }) {
 
 function InjectedRow({ row }: { row: ChatRow }) {
   const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const data = asRecord(row.data);
   const kind = asString(data.kind) || "system";
   if (kind === "system-notice") {
@@ -466,12 +489,99 @@ function InjectedRow({ row }: { row: ChatRow }) {
       </div>
     );
   }
+  const label = asString(data.label);
+  const body = asString(data.body);
+  const projection = clientProjectionFrom(data.clientProjection);
+  const projectionCount =
+    typeof data.projectionCount === "number" &&
+    Number.isFinite(data.projectionCount) &&
+    data.projectionCount > 1
+      ? Math.floor(data.projectionCount)
+      : 1;
+  const occurrences = asArray<Record<string, unknown>>(data.projectionOccurrences);
+  const flowIds = projection?.flowIds ?? [];
+  const projectionStatus = projection
+    ? projectionStatusText(projection.statusCode, projection.statusText, locale)
+    : "";
+  // A3：有客户投影时只展示投影（状态/流程/报告路径/来源角色），内部原文默认折叠。
+  // 无投影（旧事件/恢复行）保持既有渲染，不猜、不伪造字段。
+  if (kind === "system" && projection) {
+    return (
+      <div
+        className={
+          "msg msg-injected is-system is-projection" + (row.replay ? " is-replay" : "")
+        }
+        data-projection-kind={projection.kind}
+        data-projection-status={projection.statusCode}
+        data-projection-action={projection.action}
+      >
+        <div className="mi-head">
+          <span className="mi-chip">{label}</span>
+          <span className="mi-source">
+            {projection.sourceRole.displayName || projection.sourceRole.roleId}
+          </span>
+          {projectionCount > 1 ? (
+            <span className="mi-count">×{projectionCount}</span>
+          ) : null}
+        </div>
+        <div className="mi-projection">
+          {projectionStatus ? (
+            <p className="mi-status">{projectionStatus}</p>
+          ) : null}
+          {flowIds.map((flowId, index) => (
+            <p className="mi-flow" key={flowId + ":" + index}>
+              {t("ui.judge.flowText", { flowId })}
+            </p>
+          ))}
+          {projection.reportPath ? (
+            <p className="mi-path" title={projection.reportPath}>
+              <FileText size={12} strokeWidth={1.5} aria-hidden="true" />
+              <code>{projection.reportPath}</code>
+            </p>
+          ) : null}
+          {projection.governancePath ? (
+            <p className="mi-path" title={projection.governancePath}>
+              <FileText size={12} strokeWidth={1.5} aria-hidden="true" />
+              <code>{projection.governancePath}</code>
+            </p>
+          ) : null}
+        </div>
+        {body ? (
+          <details className="mi-raw">
+            <summary>
+              <ChevronRight
+                className="disclosure-chevron"
+                size={12}
+                strokeWidth={1.5}
+                aria-hidden="true"
+              />
+              {asString(data.foldLabel) || label}
+            </summary>
+            {occurrences.length > 0 ? (
+              <ul className="mi-occurrences">
+                {occurrences.map((occurrence, index) => (
+                  <li key={index}>
+                    {shortTime(asString(occurrence.at)) ||
+                      t("ui.chatRow.timeNotRecorded")}
+                    {asString(occurrence.turnId)
+                      ? " · " + asString(occurrence.turnId)
+                      : ""}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="mi-body" dangerouslySetInnerHTML={markdownHtml(body)} />
+          </details>
+        ) : null}
+      </div>
+    );
+  }
   return (
     <div className={"msg msg-injected is-" + kind + (row.replay ? " is-replay" : "")}>
       <div className="mi-head">
-        <span className="mi-chip">{asString(data.label)}</span>
+        <span className="mi-chip">{label}</span>
       </div>
-      <div className="mi-body" dangerouslySetInnerHTML={markdownHtml(asString(data.body))} />
+      <div className="mi-body" dangerouslySetInnerHTML={markdownHtml(body)} />
     </div>
   );
 }
@@ -687,9 +797,11 @@ function TurnTerminalRow({ row }: { row: ChatRow }) {
         .filter((text) => text !== "")
     : [];
   const lines = sources.length > 0 ? sources : [asString(data.text) || t("ui.chatRow.turnEnded")];
+  const primary = lines[0];
+  const merged = lines.length > 1;
   return (
     <div
-      className={"sys sys-call turn-terminal" + (row.replay ? " is-replay" : "")}
+      className={"sys sys-call turn-terminal" + (row.replay ? " is-replay" : "") + (merged ? " is-merged" : "")}
       data-turn-id={asString(data.turnId)}
       data-outcome={outcome}
     >
@@ -697,9 +809,28 @@ function TurnTerminalRow({ row }: { row: ChatRow }) {
         {outcome === "completed" ? <Check size={12} strokeWidth={1.5} aria-hidden="true" /> : <CircleAlert size={12} strokeWidth={1.5} aria-hidden="true" />}
       </span>
       <div className="sys-text">
-        {lines.map((line, index) => (
-          <div key={index}>{line}</div>
-        ))}
+        <span className="tt-primary">{primary}</span>
+        {merged ? (
+          <>
+            <span className="tt-count">×{lines.length}</span>
+            <details className="tt-sources">
+              <summary>
+                <ChevronRight
+                  className="disclosure-chevron"
+                  size={12}
+                  strokeWidth={1.5}
+                  aria-hidden="true"
+                />
+                {t("ui.chatRow.evidence")}
+              </summary>
+              <ul>
+                {lines.map((line, index) => (
+                  <li key={index}>{line}</li>
+                ))}
+              </ul>
+            </details>
+          </>
+        ) : null}
       </div>
     </div>
   );
@@ -849,17 +980,28 @@ function GovernanceJudgeResultBody({
   }
   return (
     <>
-      <span className="sys-ico">
-        <Check size={12} strokeWidth={1.5} aria-hidden="true" />
+      <span className="sys-ico judge-auto-ico">
+        <Bot size={13} strokeWidth={1.5} aria-hidden="true" />
       </span>
-      <div className="sys-text sj-body">
-        <div className="sj-head">
-          <span className="sj-title">{view.title}</span>
-          <span className="sj-badge">{view.badge}</span>
+      <div
+        className={"sys-text sj-body governance-judge-card is-" + view.kindClass}
+        role="group"
+        aria-label={view.title}
+        data-auto="true"
+        data-card-kind={view.cardKind || undefined}
+        data-group={view.group}
+      >
+        <div className="gj-head">
+          <span className="gj-auto-badge">
+            <Bot size={11} strokeWidth={1.75} aria-hidden="true" />
+            {view.title}
+          </span>
+          <span className="gj-source-chip">{view.sourceLabel}</span>
+          {view.flowText ? <span className="gj-flow-chip">{view.flowText}</span> : null}
         </div>
-        <div className="sj-cmd">{view.headline}</div>
-        <div className="sj-meta">
-          {[view.engineText, view.operatorText, view.flowText, shortTime(view.at)]
+        <div className="gj-headline">{view.headline}</div>
+        <div className="sj-meta gj-meta">
+          {[view.engineText, view.operatorText, shortTime(view.at)]
             .filter(Boolean)
             .join(" · ")}
         </div>
@@ -868,6 +1010,7 @@ function GovernanceJudgeResultBody({
             {line}
           </div>
         ))}
+        <p className="gj-note">{view.customerNote}</p>
         <details className="sj-details">
           <summary>
             <ChevronRight

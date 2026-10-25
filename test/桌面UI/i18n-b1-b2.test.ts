@@ -183,7 +183,7 @@ test("B2 纯逻辑 en-US：报告/文档/工具/推理/操作者/判断/事件",
   });
   assert.equal(
     deliveryBatchTitle(2, "en-US"),
-    "Handback delivery · 2 in this batch (not all received)",
+    "Delivery · 2 in this batch (not all received)",
   );
   assert.equal(
     historyProjectionText({ reportErrors: [{}] }, "en-US"),

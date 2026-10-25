@@ -422,10 +422,25 @@ export function shellJudgeResultView(
 
 // —————— 治理代批结果行视图（`session:operator-judge`）——————
 
+export type GovernanceJudgeKindClass =
+  | "proposal"
+  | "acceptance"
+  | "appointment"
+  | "write"
+  | "generic";
+
 export interface GovernanceJudgeResultView {
   group: JudgeGroup;
   groupLabel: string;
   cardKind: string;
+  /** 展示分类（只用于卡片样式，不改变任何语义字段）。 */
+  kindClass: GovernanceJudgeKindClass;
+  /** 该行始终是自动代批（judge），用于显式区分客户手批。 */
+  isAuto: true;
+  /** 来源徽标（共享 i18n：自动代理）。 */
+  sourceLabel: string;
+  /** 「自动代批 ≠ 客户手批」说明（共享 i18n）。 */
+  customerNote: string;
   title: string;
   badge: string;
   headline: string;
@@ -449,6 +464,20 @@ export interface GovernanceJudgeResultView {
     requestId: string;
     flowId: string;
   };
+}
+
+function governanceJudgeKindClass(cardKind: string): GovernanceJudgeKindClass {
+  if (cardKind === "proposal") return "proposal";
+  if (cardKind === "acceptance") return "acceptance";
+  if (cardKind === "appointment") return "appointment";
+  if (
+    cardKind === "write" ||
+    cardKind === "appointment-write" ||
+    cardKind === "schedule-write"
+  ) {
+    return "write";
+  }
+  return "generic";
 }
 
 export function governanceJudgeResultView(
@@ -557,6 +586,10 @@ export function governanceJudgeResultView(
     group,
     groupLabel,
     cardKind,
+    kindClass: governanceJudgeKindClass(cardKind),
+    isAuto: true,
+    sourceLabel: translate(locale, "ui.judge.autoSource"),
+    customerNote: translate(locale, "ui.judge.autoNotCustomerNote"),
     title: translate(locale, "ui.judge.titlePrefix", { label: groupLabel }),
     badge: groupLabel,
     headline,

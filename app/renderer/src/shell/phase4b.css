@@ -29,6 +29,37 @@
 .gov-text {
   min-width: 0;
   overflow-wrap: anywhere;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* C1：模型文本单独 chip；流程/下一步详情可换行，不再把机器标识挤成一行。 */
+.gov-chip {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-micro);
+  background: var(--card);
+  color: var(--text-2);
+  font-size: 11.5px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.gov-text.is-warn .gov-chip,
+.governance-status[data-governance-state="missing"] .gov-chip {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.gov-detail {
+  min-width: 0;
+  color: var(--text-3);
+  font-size: 11.5px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 .gov-action {
   flex: 0 0 auto;
@@ -907,19 +938,38 @@
   .chat-empty .empty-icon {
     display: none;
   }
-  /* 480 CSS：审批/决策开关收成「复选框 + 单字」，完整文案保留在 title/aria-label，底栏不横溢。 */
+  /* 480 CSS：审批/决策开关收成「图标 + 复选框 + 两字短标签」，完整文案保留在 title/aria-label。
+     「托管」分组标题始终可见；200% 极窄宽度下只省略装饰图标（复选框/短标签/标题保留），
+     保证 composer 无横向溢出。 */
   .col-mid .composer .composer-bottom {
-    gap: 4px;
+    gap: 2px;
+  }
+  .col-mid .composer .composer-trust {
+    gap: 2px;
+  }
+  .col-mid .composer .composer-trust-title {
+    font-size: 10px;
+  }
+  .col-mid .composer .composer-auto-approve {
+    gap: 3px;
+    padding: 0 4px;
+  }
+  .col-mid .composer .composer-auto-approve .trust-icon {
+    display: none;
+  }
+  .col-mid .composer .composer-auto-approve input {
+    width: 12px;
+    height: 12px;
   }
   .col-mid .composer .composer-auto-approve span {
     font-size: 0;
   }
   .col-mid .composer #auto-approve-label::after {
-    content: "审";
+    content: "审批";
     font-size: 10px;
   }
   .col-mid .composer #judge-decision-label::after {
-    content: "决";
+    content: "决策";
     font-size: 10px;
   }
 }

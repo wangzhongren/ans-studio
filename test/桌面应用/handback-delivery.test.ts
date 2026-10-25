@@ -229,7 +229,7 @@ test("E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandb
   assert.equal(h.sent.su[0], renderHandbackPrompt(HANDBACK_A1), "投递文本 === 编排 renderHandbackPrompt 的输出（**单一来源**，非复制）");
   assert.ok(h.sent.su[0].includes("角色卡/A/role-card.md") && h.sent.su[0].includes("请验收"), "含报告字段与验收请求");
   assert.ok(
-    h.envelopes.some((e) => e.roleId === "su" && e.event.kind === "message" && (e.event.detail as {source?: string} | undefined)?.source === "delivery-note" && /已自动投递 A 的回交/.test(e.event.summary)),
+    h.envelopes.some((e) => e.roleId === "su" && e.event.kind === "message" && (e.event.detail as {source?: string} | undefined)?.source === "delivery-note" && /已将 A 的交付自动投递给 su/.test(e.event.summary)),
     "投递成功应有如实系统行（进 su 的 pane）"
   );
   await h.mgr.stop(null);
@@ -438,7 +438,7 @@ test("E-1 投递失败：如实系统行（含原因）+ 放回队首保留；�
   h.streams.A.push({ kind: "handback", summary: "回交", handback: HANDBACK_A1 });
   await tick(150);
   assert.equal(h.sent.su.length, 0, "首次投递失败 → 未送达");
-  const failNote = h.envelopes.find((e) => e.roleId === "su" && e.event.kind === "message" && (e.event.detail as {source?: string} | undefined)?.source === "delivery-note" && /回交投递失败/.test(e.event.summary));
+  const failNote = h.envelopes.find((e) => e.roleId === "su" && e.event.kind === "message" && (e.event.detail as {source?: string} | undefined)?.source === "delivery-note" && /交付投递失败/.test(e.event.summary));
   assert.ok(failNote, "**如实系统行**（不得静默）");
   assert.ok(/未丢弃/.test(failNote!.event.summary) && /重试/.test(failNote!.event.summary), "系统行须说明「未丢弃/保留待重试」");
 

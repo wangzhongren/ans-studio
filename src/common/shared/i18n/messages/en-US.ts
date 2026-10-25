@@ -68,7 +68,7 @@ export const enUS = {
   "shared.common.aborted": "Aborted",
   "shared.common.redacted": "Redacted",
   "shared.common.truncated": "Truncated",
-  "shared.common.safeCopyTitle": "Handback content (safe display copy)",
+  "shared.common.safeCopyTitle": "Handover content (safe display copy)",
   "shared.common.working": "Working",
 
   "shared.common.stopUnsupportedPeriod": "The current runtime does not support stopping.",
@@ -200,16 +200,18 @@ export const enUS = {
   "ui.work.emptySub":
     "Select a role on the left, then open the work overview; content follows the current role.",
   "ui.work.pending": "Pending {count}",
+  // Count-free title (A2; desktop UI wiring: use with a separate count badge)
+  "ui.work.pendingTitle": "Pending",
   "ui.work.locateTitle": "Jump to the original interaction card (does not answer it)",
   "ui.work.locate": "Locate",
   "ui.work.currentWork": "Current work",
   "ui.work.queued": "Queued",
   "ui.work.viewAllQueueAria": "View the full queue ({count} items)",
   "ui.work.viewAllQueue": "View full queue ({count})",
-  "ui.work.recentReports": "Recent handbacks",
+  "ui.work.recentReports": "Recent deliveries",
   "ui.work.emptyPending": "No pending requests",
   "ui.work.emptyQueue": "No in-progress or queued messages",
-  "ui.work.emptyReports": "No handback reports yet",
+  "ui.work.emptyReports": "No delivery reports yet",
   "ui.work.overviewAria": "Work overview, {count} pending",
   "ui.work.kind.choice": "Awaiting choice",
   "ui.work.kind.confirm": "Awaiting confirmation",
@@ -226,6 +228,8 @@ export const enUS = {
 
   "ui.composer.readFileFailed": "Could not read the file",
   "ui.composer.currentRole": "current role",
+  // Visible group title (B1; desktop UI wiring: title of .composer-trust)
+  "ui.composer.trustGroupTitle": "Delegation",
   "ui.composer.emptyMessageHint":
     "Enter a message; images are sent together with the message.",
   "ui.composer.sendChannelUnavailable": "Send channel unavailable (not provided in this version).",
@@ -309,8 +313,8 @@ export const enUS = {
     "Your decision could not be delivered (channel missing or failed) — fail-closed: not executed. Ask the proposer to initiate it again.",
   "ui.confirm.sourceDispatchWithRole": "Dispatch · from {roleId}",
   "ui.confirm.sourceDispatch": "Dispatch",
-  "ui.confirm.sourceHandbackWithRole": "Handback · from {roleId}",
-  "ui.confirm.sourceHandback": "Handback",
+  "ui.confirm.sourceHandbackWithRole": "Delivery · from {roleId}",
+  "ui.confirm.sourceHandback": "Delivery",
   "ui.confirm.queueRunning": "In progress",
   "ui.confirm.withdrawn": "Queued message withdrawn: {summary}",
   "ui.confirm.withdrawInvalid": "Withdrawal had no effect: {detail}",
@@ -421,7 +425,7 @@ export const enUS = {
   "ui.governance.roleIntro.schedule":
     "Usually opened after a proposal is accepted; only orders steps and dispatches, does not approve plans",
   "ui.governance.roleIntro.verification":
-    "Usually opened by the acceptance step after delivery handback; only checks evidence and issues acceptance cards, does not approve.",
+    "Usually opened by the acceptance step after delivery completes; only checks evidence and issues acceptance cards, does not approve.",
   "ui.governance.mismatch.modified": "{count} changed",
   "ui.governance.mismatch.missing": "{count} missing",
   "ui.governance.mismatch.unreadable": "{count} unreadable",
@@ -559,7 +563,7 @@ export const enUS = {
   "ui.reportView.provenance.timestamp": "Original time not saved or displayable",
   "ui.reportView.provenance.anchorToken": "Original anchor token not provided",
   "ui.reportView.provenance.oversize": "Original call identity exceeds the display budget",
-  "ui.reportView.originFormal": "Formal handback",
+  "ui.reportView.originFormal": "Formal delivery",
   "ui.reportView.originTerminal": "Terminal record",
   "ui.reportView.originUnconfirmed": "Source unconfirmed",
   "ui.reportView.evidenceTruncatedSome": "Some evidence is truncated",
@@ -579,9 +583,9 @@ export const enUS = {
   "ui.reportView.saveError.snapshotExpired":
     "The session material available for backfill has expired; it cannot be backfilled here.",
   "ui.reportView.saveError.provenanceTooLarge":
-    "The handback record exceeds the display and provenance budget; delivery has not continued.",
+    "The delivery record exceeds the display and provenance budget; nothing further has been delivered.",
   "ui.reportView.saveError.textProjectionFailed":
-    "Could not generate the handback display content; it has not been handed to the Provider.",
+    "Could not generate the delivery display content; it has not been handed to the Provider.",
   "ui.reportView.savedTargetHistory": "Receipt history saved",
   "ui.reportView.savedReport": "Report saved",
   "ui.reportView.save.sessionOnly":
@@ -591,7 +595,7 @@ export const enUS = {
   "ui.reportView.save.historyNotSaved":
     "This receipt history was not saved; execution status is subject to the actual results above.",
   "ui.reportView.save.reportNotSaved":
-    "The report has not been saved, so the handback has not continued. You can backfill the original report without rerunning the task.",
+    "The report has not been saved, so the delivery has not continued. You can backfill the original report without rerunning the task.",
   "ui.reportView.savingReport": "Saving report…",
   "ui.reportView.savingHistory": "Saving history…",
   "ui.reportView.save.historyReceiptPending":
@@ -608,16 +612,16 @@ export const enUS = {
   "ui.reportView.history.notSaved": "Not saved yet",
   "ui.reportView.history.maybeStarted": "May have started; result unconfirmed",
   "ui.reportView.history.notHandedToProvider": "Not handed to the Provider yet",
-  "ui.reportView.batch": "Handback delivery · {count} in this batch (not all received)",
+  "ui.reportView.batch": "Delivery · {count} in this batch (not all received)",
   "ui.reportView.modelInputMissing": "The full model input is not recorded here",
   "ui.reportView.displayTruncated": "Display copy truncated",
   "ui.reportView.summaryTruncated": "Summary truncated",
   "ui.reportView.replicaMissing":
-    "No safe display copy of the handback content was provided; the full model input cannot be shown.",
+    "No safe display copy of the handover content was provided; the full model input cannot be shown.",
   "ui.reportView.taskRequestLabel": "Original task request",
   "ui.reportView.replyOriginalLabel": "Original role reply for this turn (expand)",
   "ui.reportView.deliveryReplyLabel":
-    "Original handback-processing reply for this turn (expand)",
+    "Original delivery-processing reply for this turn (expand)",
   "ui.reportView.projection.reportUnreadable": "Unreadable report records: {count}",
   "ui.reportView.projection.omitted": "History projections before omission: {count}",
   "ui.reportView.projection.invalid": "Invalid projection entries: {count}",
@@ -760,7 +764,7 @@ export const enUS = {
   "ui.chatRow.customerMessage": "Customer note: {message}",
   "ui.chatRow.customerMessageNote": "The customer note is compiled by the system.",
   "ui.chatRow.evidence": "Evidence",
-  "ui.chatRow.hardDenyOverride": "hardDenyOverride: true (deny tier approved by the judge agent).",
+  "ui.chatRow.hardDenyOverride": "hardDenyOverride: true (deny tier approved by the automatic agent).",
   "ui.chatRow.durationStat": "Duration {ms}ms",
   "ui.chatRow.readCalls": "Reads {count}",
   "ui.chatRow.readBytes": "{bytes} bytes",
@@ -769,6 +773,13 @@ export const enUS = {
   "ui.chatRow.pathResult": "{path}: {result}",
   "ui.chatRow.allowed": "Allowed",
   "ui.chatRow.denied": "Denied",
+  // Client projection status (A3: clientProjection.statusCode → text mapping; desktop UI wiring)
+  "ui.projection.status.completed": "Completed",
+  "ui.projection.status.failed": "Failed",
+  "ui.projection.status.aborted": "Aborted",
+  "ui.projection.status.timedOut": "Timed out",
+  "ui.projection.status.unknown": "Unknown",
+  "ui.projection.status.internalFeedback": "Internal feedback",
   "ui.chatStore.context.opened": "Session started",
   "ui.chatStore.context.projectLoadFailed": "Project loading failed",
   "ui.chatStore.context.primaryNoSession": "Primary · session not started",
@@ -851,9 +862,9 @@ export const enUS = {
   "ui.events.systemNoticeWithLabel": "System notice · {label}",
   "ui.events.dispatchTask": "Dispatched task",
   "ui.events.dispatchTaskWithRole": "Dispatched task · from {role}",
-  "ui.events.handbackDelivery": "Handback delivery",
-  "ui.events.handbackDeliveryWithRole": "Handback delivery · from {role}",
-  "ui.events.handbackLegacy": "Handback received (legacy source, safe details unavailable)",
+  "ui.events.handbackDelivery": "Delivery",
+  "ui.events.handbackDeliveryWithRole": "Delivery · from {role}",
+  "ui.events.handbackLegacy": "Delivery received (legacy source, safe details unavailable)",
   "ui.events.legacyUnknown": "Legacy/unknown system record: {summary}",
   "ui.events.historyRecord": "(history record)",
   "ui.reasoning.fallbackLabel": "Thought",
@@ -891,27 +902,27 @@ export const enUS = {
   "ui.judge.tier.risky": "Risky command (risky)",
   "ui.judge.tier.review": "Not auto-classified (review)",
   "ui.judge.tier.deny": "Hard-deny class (deny)",
-  "ui.judge.shellOn": "Approving for you · judge agent",
+  "ui.judge.shellOn": "Approving for you · automatic agent",
   "ui.judge.shellOff": "Approve for me",
-  "ui.judge.decisionOn": "Deciding for you · judge agent",
+  "ui.judge.decisionOn": "Deciding for you · automatic agent",
   "ui.judge.decisionOff": "Decide for me",
   "ui.judge.bridgeMissing": "Automatic judging is not supported in this version; staying manual",
   "ui.judge.decisionSingleNote": "The legacy governance model (single) does not support decision delegation",
   "ui.judge.shellOffTitle":
     "Manually confirm each shell command and each trio write/appointment-write confirmation (default)",
   "ui.judge.shellOnTitle":
-    "The judge agent evaluates shell commands and trio write/appointment-write confirmations first; can be turned off anytime",
+    "The automatic agent evaluates shell commands and trio write/appointment-write confirmations first; can be turned off anytime",
   "ui.judge.decisionOffTitle":
     "Manually confirm each proposal acceptance, appointment, and acceptance (default)",
   "ui.judge.decisionOnTitle":
-    "The judge agent evaluates proposal acceptance, appointments, and acceptance first; can be turned off anytime",
+    "The automatic agent evaluates proposal acceptance, appointments, and acceptance first; can be turned off anytime",
   "ui.judge.warningClose": "Got it",
   "ui.judge.toggleOn.shell":
-    "Approving for you: shell commands and write/appointment-write/schedule-write confirmations (write / appointment-write / schedule-write) will be auto-approved by the judge agent.",
+    "Approving for you: shell commands and write/appointment-write/schedule-write confirmations (write / appointment-write / schedule-write) will be auto-approved by the automatic agent.",
   "ui.judge.toggleOn.decision":
-    "Deciding for you: proposal acceptance, appointments, and acceptance will be auto-approved by the judge agent.",
+    "Deciding for you: proposal acceptance, appointments, and acceptance will be auto-approved by the automatic agent.",
   "ui.judge.scopeNote":
-    "The judge agent only reads project code/documents/role cards (excluding .env, keys/credentials, the .ans ledger/sessions, audit logs, and anything outside the project); it does not write files or run commands. It only acts for you on “accept/appoint/confirm/accept”, and never rejects for you, requests changes, or ticks under-evidenced candidates. When uncertain, lacking evidence, read failures, engine unavailable, timeout, or parse failure occur, it falls back to card-by-card handling for that switch and you decide.",
+    "The automatic agent only reads project code/documents/role cards (excluding .env, keys/credentials, the .ans ledger/sessions, audit logs, and anything outside the project); it does not write files or run commands. It only acts for you on “accept/appoint/confirm/accept”, and never rejects for you, requests changes, or ticks under-evidenced candidates. When uncertain, lacking evidence, read failures, engine unavailable, timeout, or parse failure occur, it falls back to card-by-card handling for that switch and you decide.",
   "ui.judge.quickPathNote":
     "The proposal quick path (accept-quick) is not delegated by default; governance direction cards under the legacy model (single/su) are still confirmed card by card; under single, write confirmations are still manual.",
   "ui.judge.costNote":
@@ -923,12 +934,12 @@ export const enUS = {
   "ui.judge.alternativeWithRationale": "Alternative: {value} ({rationale})",
   "ui.judge.tierLine": "Tier: {tier}",
   "ui.judge.hardDenyNote":
-    "This command belongs to the hard-deny class; the judge agent approved it as necessary. Please review.",
+    "This command belongs to the hard-deny class; the automatic agent approved it as necessary. Please review.",
   "ui.judge.reasonLine": "Judge reason: {reason}",
   "ui.judge.approvedHardDeny":
-    "Approved for you (judge agent · approval delegation · deny tier)",
-  "ui.judge.approved": "Approved for you (judge agent · approval delegation)",
-  "ui.judge.notApproved": "Not approved (judge agent · approval delegation)",
+    "Approved for you (automatic agent · approval delegation · deny tier)",
+  "ui.judge.approved": "Approved for you (automatic agent · approval delegation)",
+  "ui.judge.notApproved": "Not approved (automatic agent · approval delegation)",
   "ui.judge.hardDenyLabel": "deny tier · judge approved",
   "ui.judge.engineText": "Judge engine: {engine}",
   "ui.judge.closeAndRetry":
@@ -947,6 +958,10 @@ export const enUS = {
   "ui.judge.headline.autoApprovedWithKind": "Auto-approved ({cardKind})",
   "ui.judge.flowSuffix": " · flow {flowId}",
   "ui.judge.titlePrefix": "judge delegation · {label}",
+  // Delegation source and the “automatic delegation ≠ customer manual approval” note (A0; desktop UI wiring)
+  "ui.judge.autoSource": "Automatic agent",
+  "ui.judge.autoNotCustomerNote":
+    "Automatic delegation ≠ customer manual approval: this result comes from the automatic agent under the governance switches; the customer retains the final decision.",
   "ui.judge.selectedLine": "Selected: {items}",
   "ui.judge.pathsLine": "Paths: {paths}",
   "ui.judge.flowText": "Flow: {flowId}",
@@ -1061,18 +1076,18 @@ export const enUS = {
   "main.session.withdrawRunning":
     "This item is already “in progress”; withdrawal has no effect (it is being executed).",
   "main.session.withdrawNotCustomer":
-    "This item is not a customer message (dispatch/handback belong to the governance flow) — read-only, cannot be withdrawn.",
+    "This item is not a customer message (dispatch/delivery belong to the governance flow) — read-only, cannot be withdrawn.",
   "main.session.withdrawNotQueued":
     "This item is not queued (it may have been delivered or withdrawn).",
-  "main.session.safeCopyPending": "Handback content (safe display copy): pending generation",
+  "main.session.safeCopyPending": "Delivery content (safe display copy): pending generation",
   "main.session.saveSnapshotExpired": "The original saved material has expired.",
   "main.session.saveUnsupported": "The current session does not support this save operation.",
   "main.session.handbackMalformed":
-    "Received a **malformed** handback event (missing handback payload / missing roleId) — **not delivered** (ignored honestly; no crash, no silence).",
+    "Received a **malformed** delivery event (missing delivery payload / missing roleId) — **not delivered** (ignored honestly; no crash, no silence).",
   "main.session.handbackRenderFailed":
-    "Could not render the handback payload ({detail}) — **not delivered** (ignored honestly; no crash).",
+    "Could not render the delivery payload ({detail}) — **not delivered** (ignored honestly; no crash).",
   "main.session.handbackException":
-    "Handback processing exception intercepted (no unhandled rejection): {detail}",
+    "Delivery processing exception intercepted (no unhandled rejection): {detail}",
   "main.session.dispatchRejectedEmpty":
     "Dispatch not accepted: roleId and task must both be non-empty.",
   "main.session.dispatchNoDispatcher":
@@ -1228,21 +1243,21 @@ export const enUS = {
   "main.session.delivery.noTarget":
     "A {kind} (from {sourceRoleId}) is waiting for delivery, but the target (primary entry) cannot be found — **not delivered** (kept; retried automatically at the next opportunity).",
   "main.session.delivery.openFailedHandback":
-    "A handback (from {sourceRoleId}) is waiting for delivery, but **opening {target}'s session failed**: {detail} — not delivered (kept; retried automatically at the next opportunity: when you open {target}, or on the next handback/turn end).",
+    "A delivery (from {sourceRoleId}) is waiting for delivery, but **opening {target}'s session failed**: {detail} — not delivered (kept; retried automatically at the next opportunity: when you open {target}, or on the next delivery/turn end).",
   "main.session.delivery.openFailedDispatch":
     "A dispatched task (from {sourceRoleId}) is waiting for delivery to role {target}, but **opening its session failed**: {detail} — not delivered (kept; retried automatically at the next opportunity: when you open that role, or on the next dispatch/turn end).",
   "main.session.delivery.handbackBatch":
-    "Handback batch · {count} reports · from {roles}",
+    "Delivery batch · {count} reports · from {roles}",
   "main.session.delivery.autoDelivered":
-    "Automatically delivered the handback(s) from {roles} to {target} (awaiting acceptance and summary).",
+    "Automatically delivered {roles}' submissions to {target} (awaiting acceptance and summary).",
   "main.session.delivery.dispatchedNote":
-    "Dispatched the task to {target} (delivered to its session; its result/handback returns to this session).",
+    "Dispatched the task to {target} (delivered to its session; its result/delivery returns to this session).",
   "main.session.delivery.receivedDispatch":
     "Received a dispatched task from {role} — follow the task text and hand back a report when done.",
   "main.session.delivery.handbackFailed":
-    "Handback delivery failed (from {sourceRoleId}): {detail} — not discarded; kept for retry (retried automatically at the next opportunity).",
+    "Delivery failed (from {sourceRoleId}): {detail} — not discarded; kept for retry (retried automatically at the next opportunity).",
   "main.session.delivery.handbackFailedShort":
-    "Handback delivery failed (from {sourceRoleId}): {detail}",
+    "Delivery failed (from {sourceRoleId}): {detail}",
   "main.session.delivery.dispatchFailed":
     "Dispatch delivery failed (target {target}): {detail} — **not discarded**; kept for retry (retried automatically at the next opportunity).",
   "main.session.delivery.systemFailed":
@@ -1387,7 +1402,7 @@ export const enUS = {
   "main.interface.planBlocking": "Steward completes plan items {count}",
   "main.interface.writeBlockingSummary":
     "The write artifacts failed validation (flow {flowId}): {count} issues — routed {routed}; Steward was not dispatched for role-readiness and the appointment step was not marked done. First issue: {path}: {issue}",
-  "main.interface.queueKind.handback": "Handback",
+  "main.interface.queueKind.handback": "Delivery",
   "main.interface.queueKind.dispatch": "Dispatch",
   "main.interface.queueKind.system": "System",
   "main.interface.queueKind.message": "Message",
@@ -1552,17 +1567,17 @@ export const enUS = {
   "main.operator.judgeResultDeliveryFailed":
     "Could not deliver the review result, so the judge conclusion cannot be shown in the chat; denied. {detail}.",
   "main.operator.judgeRowFailedManual":
-    "The judge agent finished judging, but the result cannot be shown in the chat; the rule decision is reference only and this card switched to your manual confirmation.",
+    "The automatic agent finished judging, but the result cannot be shown in the chat; the rule decision is reference only and this card switched to your manual confirmation.",
   "main.operator.judgeIncompleteManual":
-    "The judge agent could not complete judging: {reason}. The rule decision is reference only; you confirm manually only when the judge agent has not completed. Switched to your manual confirmation.",
+    "The automatic agent could not complete judging: {reason}. The rule decision is reference only; you confirm manually only when the automatic agent has not completed. Switched to your manual confirmation.",
   "main.operator.judgeReason.retryCapped":
     "Similar commands were rejected repeatedly; the retry cap was reached",
   "main.operator.judgeReason.contextMissing":
     "Missing the task context for the current turn",
   "main.operator.judgeReason.contextTooLarge": "The command or context is too large",
-  "main.operator.judgeReason.modelManual": "The judge agent reported it cannot judge",
+  "main.operator.judgeReason.modelManual": "The automatic agent reported it cannot judge",
   "main.operator.judgeReason.fallback": "Judging did not complete",
-  "main.operator.judgeDeniedHead": "The judge agent did not approve this command.",
+  "main.operator.judgeDeniedHead": "The automatic agent did not approve this command.",
   "main.operator.judgeExplainToCustomer": "Explain to the customer: {message}",
   "main.operator.judgeReasonLine": "Reason: {reason}",
   "main.operator.judgeAlternative": "Alternative ({kind}): {value}",
@@ -1626,7 +1641,7 @@ export const enUS = {
   "main.customerInput.rowFailedManual":
     "Judging completed, but the result cannot be shown in the chat; switched to your manual confirmation.",
   "main.customerInput.judgeNotDelegated":
-    "The judge agent did not delegate ({label}): {reason}; switched to your manual confirmation.",
+    "The automatic agent did not delegate ({label}): {reason}; switched to your manual confirmation.",
   "main.customerInput.rejectNotApproval": "Rejection applies only to the approval group",
   "main.customerInput.switchOff": "You turned off the corresponding switch",
   "main.customerInput.groupMismatch":
@@ -1734,7 +1749,7 @@ export const enUS = {
   "main.watchdog.durationSeconds": "{seconds} s",
   "main.watchdog.durationMinutesSeconds": "{minutes} min {seconds} s",
   "main.watchdog.durationHours": "{hours} h",
-  "main.watchdog.kind.handback": "Handback",
+  "main.watchdog.kind.handback": "Delivery",
   "main.watchdog.kind.dispatch": "Dispatch",
   "main.watchdog.kind.system": "System",
   "main.watchdog.action.redeliver": "Redeliver task",
@@ -1743,7 +1758,7 @@ export const enUS = {
   "main.watchdog.recoverySignal":
     "System·Watchdog · watchdog recovery · {signal} · role {roleId}",
   "main.watchdog.turnAbortedText":
-    "{prefix} turn aborted automatically: role “{roleId}” consumed {elapsed} this turn (explicitly configured auto-abort limit {limit}). Auto-abort ≠ customer approval: this is the watchdog stopping the turn according to the “Decide for me / Approve for me” switches; it stops only this turn and does not represent per-item customer approval. After the turn settles, queued handbacks/dispatches continue in the existing order.",
+    "{prefix} turn aborted automatically: role “{roleId}” consumed {elapsed} this turn (explicitly configured auto-abort limit {limit}). Auto-abort ≠ customer approval: this is the watchdog stopping the turn according to the “Decide for me / Approve for me” switches; it stops only this turn and does not represent per-item customer approval. After the turn settles, queued deliveries/dispatches continue in the existing order.",
   "main.watchdog.turnAbortedSummary":
     "System·Watchdog · turn auto-aborted · role {roleId}",
   "main.watchdog.signalSummary": "System·Watchdog · {signal} · role {roleId}",

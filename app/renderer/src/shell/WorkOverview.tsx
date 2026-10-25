@@ -1,18 +1,22 @@
 /**
- * 工作概览（Phase 4A）：待处理（定位）/ 当前工作 / 排队 / 最近回交。
+ * 工作概览（Phase 4A；2026-10-25 UI/UX 调整）：待处理（定位）/ 当前工作 / 排队 / 最近交付。
  *
  * - 待处理只列真实 `pendingOperator` 快照；「定位」关闭抽屉并聚焦已挂载的 operator 卡
  *   （不自动作答、不切角色/引擎）；完整虚拟行 locator 属 4B。
  * - 队列成员唯一来自 `session:role-state` 快照；工作概览与角色资料共用同一队列组件。
- * - 最近回交只列当前 pane 的真实 handback 行，按报告身份去重；完整报告/persistence 属 4B。
+ * - 最近交付只列当前 pane 的真实 handback 行，按报告身份去重；完整报告/persistence 属 4B。
+ * - 空态：各区块一张虚线空态卡；全部为空时只显示一张总空态卡，各区块仍保留在 DOM
+ *   （hidden）供既有 textContent 契约读取，不新增 `details[data-section]`。
  */
 
-import type { ReactElement } from "react";
-import { AlertCircle, ArrowDownToLine, CheckSquare } from "lucide-react";
+import type { ReactElement, ReactNode } from "react";
+import { FileCheck2, Inbox, ListOrdered, MapPin, PlayCircle } from "lucide-react";
 import { useChatStore, getRowModel } from "@/chat/chat-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useDrawerStore } from "@/stores/drawer-store";
 import {
+  badgeText,
+  isWorkOverviewEmpty,
   pendingViews,
   queueGroups,
   recentHandbacks,
@@ -40,8 +44,64 @@ function locateRequest(requestId: string): void {
   card.focus({ preventScroll: true });
 }
 
-function emptyLine(text: string): ReactElement {
-  return <p className="muted small">{text}</p>;
+function WorkSection({
+  icon,
+  title,
+  ariaLabel,
+  badge,
+  active,
+  dot = true,
+  hidden,
+  children,
+}: {
+  icon: ReactElement;
+  title: string;
+  ariaLabel: string;
+  badge?: string;
+  active: boolean;
+  dot?: boolean;
+  hidden?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      className={"work-section" + (active ? " has-items" : " is-empty")}
+      aria-label={ariaLabel}
+      hidden={hidden}
+    >
+      <h3 className="work-heading">
+        <span className="work-heading-icon" aria-hidden="true">
+          {icon}
+        </span>
+        <span className="work-heading-label">{title}</span>
+        {badge !== undefined ? (
+          <span
+            className={"work-heading-count" + (active ? " is-active" : "")}
+            aria-hidden="true"
+          >
+            {badge}
+          </span>
+        ) : null}
+        {dot ? (
+          <span
+            className="work-heading-dot"
+            data-active={active ? "true" : "false"}
+            aria-hidden="true"
+          />
+        ) : null}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+function WorkEmpty({ text }: { text: string }) {
+  return (
+    <div className="work-empty">
+      <Inbox size={14} strokeWidth={1.5} aria-hidden="true" />
+      <span>{text}</span>
+    </div>
+  );
 }
 
 export function WorkOverview({ roleId }: { roleId: string | null }) {
@@ -69,22 +129,41 @@ export function WorkOverview({ roleId }: { roleId: string | null }) {
   const groups = queueGroups(queueByRole[roleId] || [], runningByRole[roleId] || null, locale);
   const visibleQueued = groups.queued.slice(0, QUEUE_PREVIEW_LIMIT);
   const rows = getRowModel(roleId)?.rows || [];
-  void paneVersions; // 行模型变更信号：重渲染最近回交
+  void paneVersions; // 行模型变更信号：重渲染最近交付
   const reports = recentHandbacks(rows, locale);
+  const allEmpty = isWorkOverviewEmpty(pending.length, groups.total, reports.length);
 
   return (
-    <div className="work-overview">
-      <div id="right-queue-body" className="role-work">
-        <section
-          className="work-section"
-          aria-label={t("ui.work.pending", { count: pending.length })}
+    <div className={"work-overview" + (allEmpty ? " is-all-empty" : "")}>
+      {allEmpty ? (
+        <div className="work-empty-overview" role="status">
+          <span className="work-empty-overview-icon" aria-hidden="true">
+            <Inbox size={16} strokeWidth={1.5} />
+          </span>
+          <div className="work-empty-overview-copy">
+            <p className="work-empty-overview-title">{t("ui.work.emptyPending")}</p>
+            <p className="work-empty-overview-sub">
+              {t("ui.work.emptyQueue")} · {t("ui.work.emptyReports")}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      <div id="right-queue-body" className="role-work" hidden={allEmpty}>
+        <WorkSection
+          icon={<Inbox size={14} strokeWidth={1.5} />}
+          title={t("ui.work.pendingTitle")}
+          ariaLabel={
+            pending.length > 0
+              ? t("ui.work.pending", { count: pending.length })
+              : t("ui.work.pendingTitle")
+          }
+          badge={badgeText(pending.length)}
+          active={pending.length > 0}
+          dot={false}
         >
-          <h3 className="work-heading">
-            <CheckSquare size={13} strokeWidth={1.5} aria-hidden="true" />
-            {t("ui.work.pending", { count: pending.length })}
-          </h3>
           {pending.length === 0 ? (
-            emptyLine(t("ui.work.emptyPending"))
+            <WorkEmpty text={t("ui.work.emptyPending")} />
           ) : (
             <ul className="pending-requests">
               {pending.map((item) => (
@@ -98,49 +177,77 @@ export function WorkOverview({ roleId }: { roleId: string | null }) {
                     title={t("ui.work.locateTitle")}
                     onClick={() => locateRequest(item.requestId)}
                   >
+                    <MapPin size={12} strokeWidth={1.5} aria-hidden="true" />
                     {t("ui.work.locate")}
                   </button>
                 </li>
               ))}
             </ul>
           )}
-        </section>
+        </WorkSection>
 
-        <section
-          className="work-section"
-          aria-label={t("ui.work.currentWork")}
+        <WorkSection
+          icon={<PlayCircle size={14} strokeWidth={1.5} />}
+          title={t("ui.work.currentWork")}
+          ariaLabel={t("ui.work.currentWork")}
+          active={groups.running.length > 0}
           hidden={groups.running.length === 0}
         >
-          <h3 className="work-heading">
-            <ArrowDownToLine size={13} strokeWidth={1.5} aria-hidden="true" />
-            {t("ui.work.currentWork")}
-          </h3>
-          <QueuePanel roleId={roleId} items={groups.running} emptyText={t("ui.work.emptyQueue")} />
-        </section>
+          <QueuePanel
+            roleId={roleId}
+            items={groups.running}
+            emptyText={t("ui.work.emptyQueue")}
+          />
+        </WorkSection>
 
-        <section className="work-section" aria-label={t("ui.work.queued")}>
-          <h3 className="work-heading">
-            <AlertCircle size={13} strokeWidth={1.5} aria-hidden="true" />
-            {t("ui.work.queued")}
-          </h3>
-          <QueuePanel roleId={roleId} items={visibleQueued} emptyText={t("ui.work.emptyQueue")} />
-          {groups.total > QUEUE_PREVIEW_LIMIT ? (
-            <button
-              type="button"
-              className="btn-mini q-more queue-view-all"
-              aria-label={t("ui.work.viewAllQueueAria", { count: groups.total })}
-              onClick={(event) => openQueue("work", event.currentTarget)}
-            >
-              {t("ui.work.viewAllQueue", { count: groups.total })}
-            </button>
-          ) : null}
-        </section>
+        <WorkSection
+          icon={<ListOrdered size={14} strokeWidth={1.5} />}
+          title={t("ui.work.queued")}
+          ariaLabel={t("ui.work.queued")}
+          active={groups.total > 0}
+        >
+          {groups.total === 0 ? (
+            <WorkEmpty text={t("ui.work.emptyQueue")} />
+          ) : (
+            <>
+              <QueuePanel
+                roleId={roleId}
+                items={visibleQueued}
+                emptyText={t("ui.work.emptyQueue")}
+              />
+              {groups.total > QUEUE_PREVIEW_LIMIT ? (
+                <button
+                  type="button"
+                  className="btn-mini q-more queue-view-all"
+                  aria-label={t("ui.work.viewAllQueueAria", { count: groups.total })}
+                  onClick={(event) => openQueue("work", event.currentTarget)}
+                >
+                  {t("ui.work.viewAllQueue", { count: groups.total })}
+                </button>
+              ) : null}
+            </>
+          )}
+        </WorkSection>
       </div>
 
-      <section className="recent-reports" aria-label={t("ui.work.recentReports")}>
-        <h3 className="work-heading">{t("ui.work.recentReports")}</h3>
+      <section
+        className={"recent-reports" + (reports.length === 0 ? " is-empty" : "")}
+        aria-label={t("ui.work.recentReports")}
+        hidden={allEmpty}
+      >
+        <h3 className="work-heading">
+          <span className="work-heading-icon" aria-hidden="true">
+            <FileCheck2 size={14} strokeWidth={1.5} />
+          </span>
+          <span className="work-heading-label">{t("ui.work.recentReports")}</span>
+          <span
+            className="work-heading-dot"
+            data-active={reports.length > 0 ? "true" : "false"}
+            aria-hidden="true"
+          />
+        </h3>
         {reports.length === 0 ? (
-          emptyLine(t("ui.work.emptyReports"))
+          <WorkEmpty text={t("ui.work.emptyReports")} />
         ) : (
           reports.map((report) => (
             <div className="recent-report" key={report.key} data-report-identity={report.key}>

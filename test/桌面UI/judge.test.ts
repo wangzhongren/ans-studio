@@ -39,7 +39,7 @@ test("shell 判断结果：allow/deny 视图逐字；manual 不产生结果行",
   assert.ok(allow);
   assert.equal(allow!.verdict, "allow");
   assert.equal(allow!.denyOverride, true);
-  assert.equal(allow!.title, "已替你放行（判断 agent · 代审批 · deny 档）");
+  assert.equal(allow!.title, "已替你放行（自动代理 · 代审批 · deny 档）");
   assert.equal(allow!.label, "deny 档 · judge 放行");
   assert.equal(allow!.engineText, "判断引擎：Claude");
   assert.equal(allow!.operatorText, "operator:judge:claude");
@@ -58,7 +58,7 @@ test("shell 判断结果：allow/deny 视图逐字；manual 不产生结果行",
   });
   assert.ok(deny);
   assert.equal(deny!.denyOverride, false);
-  assert.equal(deny!.title, "未放行（判断 agent · 代审批）");
+  assert.equal(deny!.title, "未放行（自动代理 · 代审批）");
   assert.equal(deny!.tierText, "档位：risky");
   assert.ok(deny!.lines.includes("判断理由：会删除未提交源码"));
   assert.ok(deny!.lines.includes("替代方案：rm -rf dist（只清理构建产物）"));
@@ -89,6 +89,10 @@ test("治理代批结果：分组/结论/理由/路径/统计逐项映射；未�
   assert.equal(proposal!.title, "judge 代批 · 代决策");
   assert.equal(proposal!.headline, "接受提案（accept） · 流程 flow-a");
   assert.equal(proposal!.operatorText, "operator:judge:claude");
+  assert.equal(proposal!.kindClass, "proposal");
+  assert.equal(proposal!.isAuto, true);
+  assert.equal(proposal!.sourceLabel, "自动代理");
+  assert.ok(proposal!.customerNote.includes("自动代批 ≠ 客户手批"));
   assert.deepEqual(proposal!.details.evidence, ["docs/proposals/flow-a-v1.md"]);
   assert.equal(proposal!.details.durationMs, 1200);
 
@@ -102,11 +106,25 @@ test("治理代批结果：分组/结论/理由/路径/统计逐项映射；未�
   assert.ok(write);
   assert.equal(write!.title, "judge 代批 · 代审批");
   assert.equal(write!.headline, "确认写入 2 个路径（docs/a.md、docs/b.md）");
+  assert.equal(write!.kindClass, "write");
   assert.deepEqual(write!.details.pathDecisions[1], {
     path: "docs/b.md",
     ok: false,
     reason: "越界",
   });
+
+  const acceptance = governanceJudgeResultView({
+    group: "decision",
+    cardKind: "acceptance",
+    selected: ["accept"],
+  });
+  assert.equal(acceptance!.kindClass, "acceptance");
+  const appointment = governanceJudgeResultView({ group: "decision", cardKind: "appointment" });
+  assert.equal(appointment!.kindClass, "appointment");
+  const unknown = governanceJudgeResultView({ group: "approval", cardKind: "schedule-write" });
+  assert.equal(unknown!.kindClass, "write");
+  const generic = governanceJudgeResultView({ group: "approval", cardKind: "mystery" });
+  assert.equal(generic!.kindClass, "generic");
 
   assert.equal(governanceJudgeResultView({ group: "unknown" }), null);
 });
@@ -120,7 +138,7 @@ test("双开关视图：桥缺失禁用并显示固定文案；single 禁用代�
 
   const on = judgeToggleView(JUDGE_GROUP_APPROVAL, true, true, false, null);
   assert.equal(on.checked, true);
-  assert.equal(on.label, "替我审批中 · 判断 agent");
+  assert.equal(on.label, "替我审批中 · 自动代理");
   const busy = judgeToggleView(JUDGE_GROUP_APPROVAL, true, true, true, null);
   assert.equal(busy.disabled, true);
   assert.equal(busy.checked, true);

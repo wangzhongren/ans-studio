@@ -10,6 +10,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { X } from "lucide-react";
 import { useChatStore } from "@/chat/chat-store";
 import { findRole, roleDisplayName } from "@/chat/role-view";
 import { useUiStore } from "@/stores/ui-store";
@@ -208,9 +209,9 @@ export function Drawer() {
         }}
       >
         <div className="drawer-head">
-          <span className="drawer-title" id="drawer-title">
+          <h2 className="drawer-title" id="drawer-title">
             {title}
-          </span>
+          </h2>
           <button
             id="drawer-close"
             ref={closeRef}
@@ -221,7 +222,7 @@ export function Drawer() {
             tabIndex={open ? 0 : -1}
             onClick={() => useDrawerStore.getState().close()}
           >
-            ×
+            <X size={14} strokeWidth={1.5} aria-hidden="true" />
           </button>
         </div>
 

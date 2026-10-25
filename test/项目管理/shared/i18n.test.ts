@@ -588,14 +588,14 @@ test("B1–B4 key 分区：ui/main/shared 计数与总 key 数符合契约（漏
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
   assert.deepEqual(prefixes, {
-    ui: 698, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7
+    ui: 708, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7 + 2026-10-25 chat-panel 10
     main: 486, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6
     shared: 62, // B4 元数据 + 跨层通用短词
     preferences: 3, // B0
   });
-  assert.equal(keys.length, 1249);
+  assert.equal(keys.length, 1259);
   // B1/B2 与 B3 分区（扣除 B0 的 5 个 ui.* / 5 个 main.*）。
-  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 693);
+  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 703);
   assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 481);
 });
 
@@ -920,7 +920,7 @@ test("B3 key 增补：23 个 key 全部存在（zh + en），zh 逐字取当前�
   );
   assert.equal(
     zhCN["main.session.delivery.handbackFailedShort"],
-    "回交投递失败（来自 {sourceRoleId}）：{detail}",
+    "交付投递失败（来自 {sourceRoleId}）：{detail}",
   );
   assert.equal(
     zhCN["main.session.dispatchModelNote"],
@@ -969,7 +969,7 @@ test("B3 key 增补：en-US 自然英文；三个缺口复用既有同文案 key
   );
   assert.equal(
     enUS["main.session.delivery.handbackFailedShort"],
-    "Handback delivery failed (from {sourceRoleId}): {detail}",
+    "Delivery failed (from {sourceRoleId}): {detail}",
   );
   // 前导空格：拼接在 `... dispatch owner {dispatcher}{modelNote}.` 之后自然成句。
   assert.equal(enUS["main.session.dispatchModelNote"], " (trio: Steward or Lead)");
@@ -1094,12 +1094,12 @@ test("B3 key 增补：插值与复数（overflow 按 count 选 one/other；队�
   );
   assert.equal(
     translate("zh-CN", "main.interface.queueRecoveredLine", {
-      kind: "回交",
+      kind: "交付",
       summary: "报告已交回",
       roleId: "编排",
       runtime: "pi",
     }),
-    "- [回交] 报告已交回（角色 编排 · pi）",
+    "- [交付] 报告已交回（角色 编排 · pi）",
   );
   assert.equal(
     translate("en-US", "main.interface.queueRecoveredLine", {

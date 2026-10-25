@@ -1,5 +1,7 @@
 # ANS Studio
 
+[English](README.en.md)
+
 **让 AI 按角色分工，在明确的文件边界内完成代码任务。**
 
 ANS Studio 面向希望在真实项目中使用多个 AI 角色协作的开发者：从需求与授权开始，经过派发、修改和测试，再把执行证据交回检查。提供桌面应用与 CLI；桌面默认使用 Claude，也可切换 Pi 或 Codex，CLI 支持 demo（不调用模型）、Pi、Codex 与 Claude。

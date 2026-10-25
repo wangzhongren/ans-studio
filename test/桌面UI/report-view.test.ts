@@ -51,7 +51,7 @@ test("声明/来源：submitted/terminal/unknown 逐字；版本不支持", () =
     "系统按终态记录：已中止",
   );
   assert.equal(reportDeclaration(report({ origin: undefined, status: "mystery" })), "来源未确认：未知状态");
-  assert.equal(reportOriginLabel("submitted-report"), "正式回交");
+  assert.equal(reportOriginLabel("submitted-report"), "正式交付");
   assert.equal(reportOriginLabel("terminal-fallback"), "终态记录");
   assert.equal(reportOriginLabel(undefined), "来源未确认");
   assert.equal(reportVersionSupported(report()), true);
@@ -107,7 +107,7 @@ test("持久化状态矩阵：saved/failed/disabled/expired/unknown/conflict；�
 });
 
 test("交付批次事实：saved/failed/未回执；标题逐字不表示全部收齐", () => {
-  assert.equal(deliveryBatchTitle(2), "回交投递 · 本批 2 份（不表示全部收齐）");
+  assert.equal(deliveryBatchTitle(2), "交付 · 本批 2 份（不表示全部收齐）");
   const saved = deliveryBatchFacts(
     { version: 1, attemptId: "a1", inputSaved: true, history: "saved", outcome: "completed" },
     null,
