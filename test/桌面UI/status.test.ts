@@ -27,7 +27,7 @@ test("状态优先级：等待确认 > 工作中（busy/队列）> 错误 > 空�
 test("徽标：working 类名/队列后缀/停止唯一措辞", () => {
   const working = statusBadge("working", 2);
   assert.equal(working.className, "st-working");
-  assert.equal(working.label, "工作中 · 2 待办");
+  assert.equal(working.label, "工作中 · 2 待处理");
   assert.ok(working.title.includes("已入队"));
   const error = statusBadge("error", 0);
   assert.equal(error.className, "st-error");

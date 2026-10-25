@@ -88,6 +88,19 @@ export function workBadgeCount(pendingCount: number): number {
   return Math.max(0, Math.floor(Number(pendingCount) || 0));
 }
 
+/** 工作概览四节是否全空（待处理/队列/最近交付）；全空时只显示一张总空态卡。 */
+export function isWorkOverviewEmpty(
+  pendingCount: number,
+  queueTotal: number,
+  reportCount: number,
+): boolean {
+  return (
+    Math.max(0, Math.floor(Number(pendingCount) || 0)) === 0 &&
+    Math.max(0, Math.floor(Number(queueTotal) || 0)) === 0 &&
+    Math.max(0, Math.floor(Number(reportCount) || 0)) === 0
+  );
+}
+
 /** 角色角标 = 当前工作（busy=1）+ 排队数。 */
 export function roleBadgeCount(busy: boolean, queueLength: number): number {
   return (busy ? 1 : 0) + Math.max(0, Math.floor(Number(queueLength) || 0));

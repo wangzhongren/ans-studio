@@ -8,7 +8,7 @@
  *  - 跨引擎草稿（内存 runtime×role；成功发送/切项目清除）；
  *  - 三引擎设置（metadata 驱动、掩码/显示、Slider/回退、保存 loading/saved/missing/error/晚到）；
  *  - 角色资料抽屉 + 文档只读（错误码/重试/链接/焦点/迟到失效）；
- *  - 工作概览（待处理/定位/当前工作/排队/最近回交/角标）；
+ *  - 工作概览（待处理/定位/当前工作/排队/最近交付/角标）；
  *  - 队列抽屉（位次/来源/全文/撤回就地回执）；
  *  - 1360/960 截图；零 console/CSP。
  *
@@ -89,7 +89,7 @@ const state = {
   activeQueue: [
     { id: "q-msg", kind: "message", summary: "客户排队消息", full: "客户排队消息全文与补充说明。", at: "2026-10-21T10:01:00Z" },
     { id: "q-dispatch", kind: "dispatch", sourceRoleId: "B", summary: "派发任务", full: "", at: "2026-10-21T10:02:00Z" },
-    { id: "q-handback", kind: "handback", sourceRoleId: "B", summary: "回交报告", full: "", at: "2026-10-21T10:03:00Z" },
+    { id: "q-handback", kind: "handback", sourceRoleId: "B", summary: "交付报告", full: "", at: "2026-10-21T10:03:00Z" },
   ],
   busy: true,
   pendingOperator: null,
@@ -1159,7 +1159,7 @@ app.whenReady().then(async () => {
   );
   check(
     "SIDEBAR_SINGLE_COUNT_BADGE_ONLY_AND_QUEUE_IN_TITLE",
-    await js(`(()=>{const item=document.querySelector('.tree-item[data-role-id="A"]');const status=item.querySelector('.ti-status');const count=item.querySelector('.ti-count');return !!count&&count.textContent==='4'&&!status.textContent.includes('待办')&&count.getAttribute('title').includes('排队 3 项')&&count.getAttribute('aria-label').includes('当前工作 1 项');})()`),
+    await js(`(()=>{const item=document.querySelector('.tree-item[data-role-id="A"]');const status=item.querySelector('.ti-status');const count=item.querySelector('.ti-count');return !!count&&count.textContent==='4'&&!status.textContent.includes('待处理')&&count.getAttribute('title').includes('排队 3 项')&&count.getAttribute('aria-label').includes('当前工作 1 项');})()`),
     await js(`(()=>{const item=document.querySelector('.tree-item[data-role-id="A"]');return {status:item.querySelector('.ti-status').textContent,count:item.querySelector('.ti-count')&&item.querySelector('.ti-count').textContent,title:item.querySelector('.ti-count')&&item.querySelector('.ti-count').getAttribute('title')};})()`),
   );
 
@@ -1233,7 +1233,7 @@ app.whenReady().then(async () => {
   // —————— 5. 队列：位次/来源/全文/撤回 ——————
   check(
     "QUEUE_POSITIONS_SOURCES_AND_WITHDRAW_ELIGIBILITY",
-    await js(`(()=>{const items=[...document.querySelectorAll('#right-body .q-item')];const nonRunning=items.filter(x=>!x.classList.contains('is-running'));const run=items.find(x=>x.classList.contains('is-running'));const pos=nonRunning.map(x=>x.querySelector('.q-pos').textContent);const src=nonRunning.map(x=>x.querySelector('.q-src').textContent);const withdraw=[...document.querySelectorAll('#right-body .q-withdraw')];return !!run&&run.querySelector('.q-pos')===null&&pos.join(',')==='1,2,3'&&src[0]==='客户消息'&&src[1].includes('派发')&&src[2].includes('回交')&&withdraw.length===1&&!!document.querySelector('#right-body .q-toggle');})()`),
+    await js(`(()=>{const items=[...document.querySelectorAll('#right-body .q-item')];const nonRunning=items.filter(x=>!x.classList.contains('is-running'));const run=items.find(x=>x.classList.contains('is-running'));const pos=nonRunning.map(x=>x.querySelector('.q-pos').textContent);const src=nonRunning.map(x=>x.querySelector('.q-src').textContent);const withdraw=[...document.querySelectorAll('#right-body .q-withdraw')];return !!run&&run.querySelector('.q-pos')===null&&pos.join(',')==='1,2,3'&&src[0]==='客户消息'&&src[1].includes('派发')&&src[2].includes('交付')&&withdraw.length===1&&!!document.querySelector('#right-body .q-toggle');})()`),
     await js(`(()=>{const items=[...document.querySelectorAll('#right-body .q-item')];return {count:items.length,items:items.map(x=>({cls:x.className,pos:x.querySelector('.q-pos')&&x.querySelector('.q-pos').textContent,src:x.querySelector('.q-src')&&x.querySelector('.q-src').textContent})),withdraw:document.querySelectorAll('#right-body .q-withdraw').length,toggle:!!document.querySelector('#right-body .q-toggle')};})()`),
   );
   await js(`document.querySelector('#right-body .q-toggle').click()`);
@@ -1335,7 +1335,7 @@ app.whenReady().then(async () => {
   );
   check(
     "PROFILE_STATUS_ONLY_NO_PENDING_COUNT",
-    await js(`(()=>{const s=document.querySelector('#right-body .role-status');return !!s&&!s.textContent.includes('待办')&&!s.textContent.includes('·')&&!!document.querySelector('#right-body .queue-view-all');})()`),
+    await js(`(()=>{const s=document.querySelector('#right-body .role-status');return !!s&&!s.textContent.includes('待处理')&&!s.textContent.includes('·')&&!!document.querySelector('#right-body .queue-view-all');})()`),
     await js(`document.querySelector('#right-body .role-status')&&document.querySelector('#right-body .role-status').textContent`),
   );
   await js(`document.querySelector('#right-body .queue-view-all').click()`);

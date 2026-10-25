@@ -1,11 +1,12 @@
 // test/桌面UI/work-view.test.ts
 // Phase 4A 纯逻辑：待处理计数/定位项、队列分组（进行中/第 N 位）、
-// 最近回交去重/排序、tab 角标（工作=待处理；角色=当前工作+排队）、空态。
+// 最近交付去重/排序、tab 角标（工作=待处理；角色=当前工作+排队）、空态。
 
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
   badgeText,
+  isWorkOverviewEmpty,
   pendingCountFor,
   pendingViews,
   queueGroups,
@@ -37,8 +38,7 @@ const pendingOperator: Record<string, Record<string, unknown>> = {
   },
 };
 
-test("待处理：按角色过滤、类型文案、定位项就是请求 id", () => {
-  const views = pendingViews(pendingOperator, "A");
+test("待处理：按角色过滤、类型文案、定位项就是请求 id", () => {  const views = pendingViews(pendingOperator, "A");
   assert.deepEqual(
     views.map((item) => [item.id, item.kindLabel, item.title, item.requestId]),
     [
@@ -60,7 +60,7 @@ test("队列分组：进行中在前 + 排队 1..N；来源标签与撤回资格
     [
       { id: "msg-1", kind: "message", summary: "客户消息", full: "客户消息全文", at: "2026-10-13T10:01:00Z" },
       { id: "dispatch", kind: "dispatch", sourceRoleId: "B", summary: "派发任务", full: "", at: "" },
-      { id: "handback", kind: "handback", sourceRoleId: "C", summary: "回交报告", full: "", at: "" },
+      { id: "handback", kind: "handback", sourceRoleId: "C", summary: "交付报告", full: "", at: "" },
     ],
     { id: "running", kind: "message", summary: "正在处理", full: "", at: "" },
   );
@@ -72,7 +72,7 @@ test("队列分组：进行中在前 + 排队 1..N；来源标签与撤回资格
   assert.deepEqual(groups.queued.map((item) => item.sourceLabel), [
     "客户消息",
     "派发 · 来自 B",
-    "回交 · 来自 C",
+    "交付 · 来自 C",
   ]);
   assert.deepEqual(groups.queued.map((item) => item.canWithdraw), [true, false, false]);
   assert.equal(queueGroups([], null).total, 0);
@@ -103,7 +103,7 @@ test("角标：工作=待处理数；角色=当前工作(busy=1)+排队；99+ �
   assert.equal(roleBadgeAria(4), "角色资料，4 项进行中或排队");
 });
 
-test("回交声明逐字：报告声明/系统终态/来源未确认 × 状态", () => {
+test("交付声明逐字：报告声明/系统终态/来源未确认 × 状态", () => {
   assert.equal(
     reportDeclaration({ origin: "submitted-report", status: "completed" }),
     "报告声明：已完成",
@@ -125,7 +125,7 @@ function handbackRow(report: Record<string, unknown>, id = "row"): ChatRow {
   };
 }
 
-test("最近回交：只列 handback 行；同 reportId 去重；保持行序", () => {
+test("最近交付：只列 handback 行；同 reportId 去重；保持行序", () => {
   const reportOne = {
     version: 1,
     reportId: "report-one",
@@ -159,7 +159,7 @@ test("最近回交：只列 handback 行；同 reportId 去重；保持行序", 
   assert.deepEqual(recentHandbacks(null), []);
 });
 
-test("最近回交：摘要最多 120 字符；无 report 的 handback 不造报告", () => {
+test("最近交付：摘要最多 120 字符；无 report 的 handback 不造报告", () => {
   const report = {
     reportId: "long",
     origin: "submitted-report",
@@ -170,4 +170,13 @@ test("最近回交：摘要最多 120 字符；无 report 的 handback 不造报
   assert.equal(Array.from(views[0].summary).length, 120);
   const noReport: ChatRow = { id: "x", kind: "handback", data: {}, height: 40 };
   assert.deepEqual(recentHandbacks([noReport]), []);
+});
+
+test("工作概览全空判定：仅待处理/队列/最近交付都为 0 时合并总空态", () => {
+  assert.equal(isWorkOverviewEmpty(0, 0, 0), true);
+  assert.equal(isWorkOverviewEmpty(1, 0, 0), false);
+  assert.equal(isWorkOverviewEmpty(0, 2, 0), false);
+  assert.equal(isWorkOverviewEmpty(0, 0, 1), false);
+  assert.equal(isWorkOverviewEmpty(-1, 0, 0), true);
+  assert.equal(isWorkOverviewEmpty(Number.NaN, 0, 0), true);
 });

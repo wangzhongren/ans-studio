@@ -156,10 +156,37 @@ export interface ChatRow {
   detailsOpen?: Record<string, boolean>;
 }
 
+/**
+ * 事件层可选客户投影（桌面窗口 `GovernanceClientProjectionV1`，消费副本）。
+ *
+ * 来源：`prompt-input` 事件 `detail.clientProjection`；仅当桌面窗口实现后附带。
+ * 渲染层只读、不持久化；字段缺失/形状不符 ⇒ 完全回退旧文本归类。
+ */
+export interface ClientProjectionV1 {
+  version: 1;
+  kind: "governance-feedback";
+  fingerprint: string;
+  sourceRole: { roleId: string; displayName: string };
+  statusCode:
+    | "completed"
+    | "failed"
+    | "aborted"
+    | "timed_out"
+    | "unknown"
+    | "internal-feedback";
+  statusText: string;
+  flowIds?: string[];
+  reportPath?: string;
+  governancePath?: string;
+  action: "report-ready" | "await-lead-summary";
+}
+
 export interface PaneMeta {
   loading: boolean;
   emptyNote: boolean;
   contextText: string;
+  /** 历史投影诊断（报告不可读/省略/无效/跳过）；与 contextText 分开，避免重复。 */
+  projectionText?: string;
   error?: string;
   historyLoaded?: boolean;
 }

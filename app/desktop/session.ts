@@ -89,6 +89,14 @@ import { renderHandbackPrompt, renderHandbackBatchPrompt, handbackKey, extractDi
  */
 const GOVERNANCE_HANDBACK_MIRROR_DEDUPE_MS = 5 * 60 * 1000;
 
+/**
+ * 治理反馈客户投影的登记表（2026-10-25 A3）：`queueKey + sha256(text)` → 投影。
+ * 发送成功时登记；`prompt-input` 回显到达时按同一文本查表并附到事件 detail。
+ * 有界 + TTL：只有运行期提示用途，不持久化（恢复/回放行回退到既有文本归类）。
+ */
+const GOVERNANCE_CLIENT_PROJECTION_LIMIT = 128;
+const GOVERNANCE_CLIENT_PROJECTION_TTL_MS = 30 * 60 * 1000;
+
 /** Proof settle 状态措辞（只用于「状态 + 指针」投递；不解释报告内容、不猜验收结论）。 */
 const PROOF_STATUS_TEXT: Readonly<Record<RuntimeTurnOutcome, string>> = {
   completed: "本轮已完成",
@@ -207,6 +215,31 @@ export interface SessionEventEnvelope {
   projectRoot: string;
   runtime: RuntimeKind;
   event: DesktopOrchestrationEvent;
+}
+
+/**
+ * 治理反馈的**客户投影**（2026-10-25 UI/UX 评审 A3/A4，设计
+ * `角色卡/桌面窗口/docs/design/2026-10-25_plan_chat-panel-adjustments.md`）：
+ * 附在 `prompt-input` 消息事件的 `detail.clientProjection` 上，供渲染侧只显示客户可读信息；
+ * 内部原文仍在 `detail.text`（审计/可折叠），本结构**不含**内部正文。字段可选：缺失时渲染侧
+ * 按既有文本归类，行为与现在一致。`fingerprint` 供 UI 合并连续同内容状态行（×N）。
+ */
+export interface GovernanceClientProjectionV1 {
+  version: 1;
+  kind: "governance-feedback";
+  /** 稳定指纹：sha256(canonical{kind, sourceRoleId, statusCode, flowIds(排序), reportPath, governancePath, textHash})。 */
+  fingerprint: string;
+  sourceRole: { roleId: string; displayName: string };
+  /** 机器可读状态：Proof 为四值终局/unknown；非 Proof 内部反馈为 internal-feedback。 */
+  statusCode: "completed" | "failed" | "aborted" | "timed_out" | "unknown" | "internal-feedback";
+  /** 与任务正文一致的状态文本（应用生成，非伪造）。 */
+  statusText: string;
+  flowIds?: string[];
+  /** 仅 Proof 指针任务提供。 */
+  reportPath?: string;
+  governancePath?: string;
+  /** 客户侧动作：报告已就绪（可打开/等待验收卡）或等待 Lead 汇总。 */
+  action: "report-ready" | "await-lead-summary";
 }
 
 /**
@@ -908,6 +941,13 @@ export class SessionManager {
    * `mirrorGovernanceFeedback` **去重**（同一轮只向 Lead 投一条）。只在内存、短时有效；不参与任何判定。
    */
   private readonly governanceHandbackMirrored = new Map<string, number>();
+  /**
+   * **治理反馈客户投影登记表**（2026-10-25 A3/A4）：`queueKey + \0 + sha256(text)` → 投影 + 登记时刻。
+   * `mirrorGovernanceFeedback` 发送成功后登记；事件消费循环对 `prompt-input` 回显按同一文本查表，
+   * 命中则把 `clientProjection` 附到外推事件的 `detail`（内部原文 `detail.text` 原样保留）。
+   * 有界（128，FIFO）+ 30 分钟 TTL；只在内存、不持久化、不参与任何判定。
+   */
+  private readonly governanceClientProjections = new Map<string, { projection: GovernanceClientProjectionV1; at: number }>();
   /**
    * **回交主人**最近一次开会话所用 runtime（评审 §5.6：`lastSuRuntime` → `lastGovernanceRuntime`）：
    * trio = Convener（`schedule`），single = 主入口 su。看护向回交主人投系统消息时 queueKey 需要 runtime
@@ -2320,6 +2360,16 @@ export class SessionManager {
             }
             if (detail?.source === 'delivery-receipt' && detail.receipt) this.rememberReceipt(entry, detail.receipt);
             if (detail?.source === 'delivery-boundary' || detail?.source === 'delivery-receipt') envelope.event = { ...ev, summary: mainT("main.history.deliveryState") };
+            // 2026-10-25 A3/A4：治理反馈的输入回显 → 附带客户投影（找到才附加；miss 时事件逐字不变）。
+            if (detail?.source === 'prompt-input' && typeof detail.text === 'string') {
+              const projection = this.lookupGovernanceClientProjection(projectRoot, roleId, runtime, detail.text);
+              if (projection !== undefined) {
+                envelope.event = {
+                  ...ev,
+                  detail: { ...(detail as unknown as Record<string, unknown>), clientProjection: projection },
+                };
+              }
+            }
           }
           // G-2/W1 信号 #3：命令超时限（F-1 事实）——只认 `display.process` 结构化投影（`timedOut === true`），
           // 判据复用 session-history.ts 的同一实现（不解析文本、不另写一份）；低频高信号 ⇒ 看护侧单次即报。
@@ -2564,6 +2614,73 @@ export class SessionManager {
     this.deps.emitEvent({ roleId, projectRoot, runtime, event: { kind: "message", summary, detail: { source: "delivery-note" } } });
   }
 
+  /** 治理反馈客户投影的登记键：`queueKey` + 文本 sha256（回显文本需逐字一致才命中；不猜）。 */
+  private governanceProjectionKey(projectRoot: string, roleId: string, runtime: RuntimeKind, text: string): string {
+    return `${this.queueKey(projectRoot, roleId, runtime)}\u0000${createHash("sha256").update(text).digest("hex")}`;
+  }
+
+  /**
+   * A4 稳定指纹：同来源/同状态/同流程（排序）/同报告与治理指针/同正文 ⇒ 同值；任一变化 ⇒ 新值。
+   * 只用于 UI 合并连续状态行（×N），不参与任何判定。
+   */
+  private governanceProjectionFingerprint(input: {
+    sourceRoleId: string;
+    statusCode: GovernanceClientProjectionV1["statusCode"];
+    flowIds: readonly string[];
+    reportPath?: string;
+    governancePath?: string;
+    text: string;
+  }): string {
+    return createHash("sha256")
+      .update(
+        JSON.stringify({
+          kind: "governance-feedback",
+          sourceRoleId: input.sourceRoleId,
+          statusCode: input.statusCode,
+          flowIds: [...input.flowIds].sort(),
+          reportPath: input.reportPath ?? null,
+          governancePath: input.governancePath ?? null,
+          textHash: createHash("sha256").update(input.text).digest("hex"),
+        }),
+      )
+      .digest("hex");
+  }
+
+  /** 发送成功后登记投影（有界 FIFO；同键刷新登记时刻）。失败不登记（调用方只在 `sent.ok` 后调用）。 */
+  private registerGovernanceClientProjection(
+    projectRoot: string,
+    roleId: string,
+    runtime: RuntimeKind,
+    text: string,
+    projection: GovernanceClientProjectionV1,
+  ): void {
+    const key = this.governanceProjectionKey(projectRoot, roleId, runtime, text);
+    this.governanceClientProjections.delete(key);
+    this.governanceClientProjections.set(key, { projection, at: this.now() });
+    while (this.governanceClientProjections.size > GOVERNANCE_CLIENT_PROJECTION_LIMIT) {
+      const oldest = this.governanceClientProjections.keys().next().value;
+      if (oldest === undefined) break;
+      this.governanceClientProjections.delete(oldest);
+    }
+  }
+
+  /** `prompt-input` 回显查找投影：命中且未过期才返回（过期即清理）；miss ⇒ 事件保持原样。 */
+  private lookupGovernanceClientProjection(
+    projectRoot: string,
+    roleId: string,
+    runtime: RuntimeKind,
+    text: string,
+  ): GovernanceClientProjectionV1 | undefined {
+    const key = this.governanceProjectionKey(projectRoot, roleId, runtime, text);
+    const found = this.governanceClientProjections.get(key);
+    if (found === undefined) return undefined;
+    if (this.now() - found.at > GOVERNANCE_CLIENT_PROJECTION_TTL_MS) {
+      this.governanceClientProjections.delete(key);
+      return undefined;
+    }
+    return found.projection;
+  }
+
   /**
    * **收尾反馈 → 主入口汇总任务**（2026-10-18 客户反馈：原文镜像 = 「直接转述」，不对）。
    * trio 的内部内置角色（Rapporteur/Nominator/Convener——改名后即 Draft/Crew/Steward/Proof）一轮结束后，
@@ -2621,6 +2738,7 @@ export class SessionManager {
       const isProof = role.governanceFunction === "verification";
       let body = "";
       let task: string;
+      let projection: GovernanceClientProjectionV1;
       if (isProof) {
         // Proof 独立性：只发状态 + 报告/治理路径指针；正文丢弃、不转全文、不摘要替代报告。
         const flowIds = await this.resolveProofFlowIds(projectRoot, options.flowIds);
@@ -2634,6 +2752,26 @@ export class SessionManager {
           `治理记录：${governancePath}`,
           "请只向客户说明验收复核已结束与报告位置；不要转述报告内容，不要编辑/代批/改判验收结论，也不要把报告当作客户批准。验收卡与客户决定仍由应用/客户处理。",
         ].join("\n");
+        const statusCode = options.outcome ?? "unknown";
+        projection = {
+          version: 1,
+          kind: "governance-feedback",
+          fingerprint: this.governanceProjectionFingerprint({
+            sourceRoleId: roleId,
+            statusCode,
+            flowIds,
+            reportPath,
+            governancePath,
+            text: task,
+          }),
+          sourceRole: { roleId, displayName },
+          statusCode,
+          statusText,
+          ...(flowIds.length > 0 ? { flowIds } : {}),
+          reportPath,
+          governancePath,
+          action: "report-ready",
+        };
       } else {
         const chars = Array.from(text);
         body = chars.length > 4000 ? chars.slice(0, 4000).join("") : text;
@@ -2642,6 +2780,22 @@ export class SessionManager {
           body,
           "请用 1-3 句话向客户汇总：完成了什么、是否有风险/阻塞、下一步或需要客户决定什么。不要逐字转述内部报告，不要使用内部行话，不要声称客户已批准。",
         ].join("\n");
+        const hintedFlowIds = [...new Set((options.flowIds ?? []).filter((id): id is string => typeof id === "string" && id !== ""))].slice(0, 3);
+        projection = {
+          version: 1,
+          kind: "governance-feedback",
+          fingerprint: this.governanceProjectionFingerprint({
+            sourceRoleId: roleId,
+            statusCode: "internal-feedback",
+            flowIds: hintedFlowIds,
+            text: task,
+          }),
+          sourceRole: { roleId, displayName },
+          statusCode: "internal-feedback",
+          statusText: "内部反馈",
+          ...(hintedFlowIds.length > 0 ? { flowIds: hintedFlowIds } : {}),
+          action: "await-lead-summary",
+        };
       }
       const opened = await this.openBackground({ projectRoot, roleId: primaryRoleId, runtime });
       if (!opened.ok) {
@@ -2653,6 +2807,9 @@ export class SessionManager {
         diagnostic.error("governance.feedback.dispatch.failed", new Error(sent.error ?? "治理反馈投递失败"), { targetRoleId: primaryRoleId });
         return;
       }
+      // 2026-10-25 A3/A4：发送成功后登记客户投影；运行时把这条输入回显为 `prompt-input` 时，
+      // 由事件消费循环按同一文本附到 `detail.clientProjection`（内部原文仍保留在 `detail.text`）。
+      this.registerGovernanceClientProjection(projectRoot, primaryRoleId, runtime, task, projection);
       const mirroredChars = Array.from(body).length;
       // `targetRoleId`/`count`/`busy` 是共享白名单里的允许名（chars/roleId 本身不在白名单）。
       diagnostic.record(isProof ? "governance.feedback.pointer" : "governance.feedback.mirrored", {

@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, ImagePlus, Square, X } from "lucide-react";
+import { ArrowUp, ImagePlus, Scale, ShieldCheck, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { getDesktopBridge } from "@/lib/platform";
@@ -686,67 +686,90 @@ export function Composer() {
             <ImagePlus size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
 
-          <label
-            className={
-              "composer-auto-approve" +
-              (approvalView.enabled ? " is-on" : "") +
-              (!approvalView.available ? " is-unsupported" : "")
-            }
-            title={approvalView.title}
+          <div
+            className="composer-trust"
+            role="group"
+            aria-label={t("ui.composer.trustGroupTitle")}
           >
-            <input
-              type="checkbox"
-              id="auto-approve-toggle"
-              checked={approvalView.checked}
-              disabled={approvalView.disabled}
-              aria-label={t("ui.judge.shellOff")}
-              onChange={onJudgeToggle(JUDGE_GROUP_APPROVAL)}
-            />
-            <span id="auto-approve-label">{approvalView.label}</span>
-          </label>
-          <span
-            id="auto-approve-status"
-            className={
-              "composer-judge-status" + (approvalStatusIsNote ? " is-note" : "")
-            }
-            role="status"
-            aria-live="polite"
-            hidden={approvalStatus === ""}
-          >
-            {approvalStatus}
-          </span>
+            <span className="composer-trust-title">
+              {t("ui.composer.trustGroupTitle")}
+            </span>
+            <label
+              className={
+                "composer-auto-approve" +
+                (approvalView.enabled ? " is-on" : "") +
+                (!approvalView.available ? " is-unsupported" : "")
+              }
+              data-trust="approval"
+              title={approvalView.title}
+            >
+              <ShieldCheck
+                className="trust-icon"
+                size={13}
+                strokeWidth={1.5}
+                aria-hidden="true"
+              />
+              <input
+                type="checkbox"
+                id="auto-approve-toggle"
+                checked={approvalView.checked}
+                disabled={approvalView.disabled}
+                aria-label={t("ui.judge.shellOff")}
+                onChange={onJudgeToggle(JUDGE_GROUP_APPROVAL)}
+              />
+              <span id="auto-approve-label">{approvalView.label}</span>
+            </label>
+            <span
+              id="auto-approve-status"
+              className={
+                "composer-judge-status" + (approvalStatusIsNote ? " is-note" : "")
+              }
+              role="status"
+              aria-live="polite"
+              hidden={approvalStatus === ""}
+            >
+              {approvalStatus}
+            </span>
 
-          <label
-            className={
-              "composer-auto-approve" +
-              (decisionView.enabled ? " is-on" : "") +
-              (!decisionView.available || decisionView.singleDisabled
-                ? " is-unsupported"
-                : "")
-            }
-            title={decisionView.title}
-          >
-            <input
-              type="checkbox"
-              id="judge-decision-toggle"
-              checked={decisionView.checked}
-              disabled={decisionView.disabled}
-              aria-label={t("ui.judge.decisionOff")}
-              onChange={onJudgeToggle(JUDGE_GROUP_DECISION)}
-            />
-            <span id="judge-decision-label">{decisionView.label}</span>
-          </label>
-          <span
-            id="judge-decision-status"
-            className={
-              "composer-judge-status" + (decisionStatusIsNote ? " is-note" : "")
-            }
-            role="status"
-            aria-live="polite"
-            hidden={decisionStatus === ""}
-          >
-            {decisionStatus}
-          </span>
+            <label
+              className={
+                "composer-auto-approve" +
+                (decisionView.enabled ? " is-on" : "") +
+                (!decisionView.available || decisionView.singleDisabled
+                  ? " is-unsupported"
+                  : "")
+              }
+              data-trust="decision"
+              title={decisionView.title}
+            >
+              <Scale
+                className="trust-icon"
+                size={13}
+                strokeWidth={1.5}
+                aria-hidden="true"
+              />
+              <input
+                type="checkbox"
+                id="judge-decision-toggle"
+                checked={decisionView.checked}
+                disabled={decisionView.disabled}
+                aria-label={t("ui.judge.decisionOff")}
+                onChange={onJudgeToggle(JUDGE_GROUP_DECISION)}
+              />
+              <span id="judge-decision-label">{decisionView.label}</span>
+            </label>
+            <span
+              id="judge-decision-status"
+              className={
+                "composer-judge-status" + (decisionStatusIsNote ? " is-note" : "")
+              }
+              role="status"
+              aria-live="polite"
+              hidden={decisionStatus === ""}
+            >
+              {decisionStatus}
+            </span>
+          </div>
 
           <span id="composer-scope" className="composer-scope">
             {roleName} / {runtimeLabel}

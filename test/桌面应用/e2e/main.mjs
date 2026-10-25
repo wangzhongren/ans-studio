@@ -1056,7 +1056,7 @@ async function run() {
     },
   });
   await sleep(300);
-  log("SU_DELIVERY_CARD_PRESENT=" + (await wc().executeJavaScript("(() => { const c=document.querySelector('#chat .msg-injected.msg-delivery'); return !!c && c.textContent.includes('回交投递 · 本批 1 份') && !!c.querySelector('.delivery-report .hb-head'); })()")));
+  log("SU_DELIVERY_CARD_PRESENT=" + (await wc().executeJavaScript("(() => { const c=document.querySelector('#chat .msg-injected.msg-delivery'); return !!c && c.textContent.includes('交付 · 本批 1 份') && !!c.querySelector('.delivery-report .hb-head'); })()")));
   await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   await sleep(600);
   log("SOURCE_REPORT_BLOCKED=" + (await wc().executeJavaScript("(() => { const c=document.querySelector('#chat .msg-handback.is-blocked'); return !!c && !!c.querySelector('.hb-head strong') && c.querySelector('.hb-head strong').textContent.includes('被拦下'); })()")));
@@ -1095,7 +1095,7 @@ async function run() {
   log("REPORT_DELIVERY_DETAILS_COLLAPSED=" + (await wc().executeJavaScript("[...document.querySelectorAll('#chat .msg-injected.is-handback details')].some(e=>!e.open)")));
   log("REPORT_DELIVERY_INLINE_BODY_NEW=" + (await wc().executeJavaScript("(() => { const c=document.querySelector('#chat .msg-injected.is-handback'); return !!c && (c.querySelector('.mi-body')||{textContent:''}).textContent.includes('做完了'); })()")));
   log("INJECTED_CHIP_LABEL=" + (await wc().executeJavaScript("(document.querySelector('#chat .msg-injected .mi-chip')||{textContent:''}).textContent")));
-  log("INJECTED_CHIP_DELIVERY_LABEL=" + (await wc().executeJavaScript("(() => { const t=(document.querySelector('#chat .msg-injected .mi-chip')||{textContent:''}).textContent; return t.includes('回交投递') && t.includes('规划者'); })()")));
+  log("INJECTED_CHIP_DELIVERY_LABEL=" + (await wc().executeJavaScript("(() => { const t=(document.querySelector('#chat .msg-injected .mi-chip')||{textContent:''}).textContent; return t.includes('交付 · 来自') && t.includes('规划者'); })()")));
   log("INJECTED_NOT_USER_BUBBLE=" + (await wc().executeJavaScript("(() => { const el=document.querySelector('#chat .msg-injected'); return !!el && !el.classList.contains('msg-user'); })()")));
   // 手输防误伤（2026-10-16 语义重锚；现行判据见上）：真发一条**以投递前缀开头**的文本，再推它
   // 的 `用户指令：` 文本层回显（summary 形态——无 typed 标记）→ ① 手输仍是普通用户气泡；
@@ -1117,16 +1117,16 @@ async function run() {
   // **队列行**；清空快照 → 徽标回「空闲」、队列行移除（界面只如实转述快照，不做界面侧推测）。
   await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: true, summaries: ['你：排队一', '你：排队二'] })");
   await sleep(150);
-  log("ROLE_STATE_BADGE_WORKING_PENDING=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面窗口')>=0); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-working') && s.textContent.includes('工作中 · 2 待办'); })()")));
+  log("ROLE_STATE_BADGE_WORKING_PENDING=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面窗口')>=0); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-working') && s.textContent.includes('工作中 · 2 待处理'); })()")));
   await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: true, summaries: ['你：排队一', '你：排队二'], queue: [{kind:'message',sourceRoleId:'桌面窗口',summary:'你：排队一',at:'2026-10-12T03:00:00.000Z'},{kind:'message',sourceRoleId:'桌面窗口',summary:'你：排队二',at:'2026-10-12T03:01:00.000Z'}], running: null })");
   await sleep(200);
-  log("ROLE_STATE_BADGE_SINGLE_COUNT_WORKING=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面窗口')>=0); const c=it && it.querySelector('.ti-count'); const s=it && it.querySelector('.ti-status'); return !!c && c.textContent.trim()==='3' && (c.getAttribute('title')||'').includes('当前工作 1 项，排队 2 项') && !!s && s.textContent.includes('工作中') && !s.textContent.includes('待办'); })()")));
+  log("ROLE_STATE_BADGE_SINGLE_COUNT_WORKING=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面窗口')>=0); const c=it && it.querySelector('.ti-count'); const s=it && it.querySelector('.ti-status'); return !!c && c.textContent.trim()==='3' && (c.getAttribute('title')||'').includes('当前工作 1 项，排队 2 项') && !!s && s.textContent.includes('工作中') && !s.textContent.includes('待处理'); })()")));
   // 2026-10-16 v3 重锚：working 态图标已从文本字形（◐）换成 **SVG 弧线转轮**（role-status.js
   // SPINNER_SVG，全应用唯一一枚；`.ts-ico` 内为纯 SVG、无文本）——原断言 `.ts-ico` textContent 非空
   // → 新断言 `.ti-status .ts-ico svg.spin-arc` 存在（守卫同一能力：工作徽标含图标；其余态仍为文本字形）。
   log("ROLE_STATE_BADGE_HAS_ICON=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面窗口')>=0); const s=it && it.querySelector('.ti-status .ts-ico svg.spin-arc'); return !!s; })()")));
   log("ROLE_STATE_BADGE_HOVER_FULL=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面窗口')>=0); const s=it && it.querySelector('.ti-status'); return !!s && (s.getAttribute('title')||'').includes('2 项已入队'); })()")));
-  log("ROLE_STATE_QUEUE_ROW=" + (await wc().executeJavaScript("(document.querySelector('#chat .queue-row .q-text')||{textContent:''}).textContent.includes('【队列】2 条待办：你：排队一')")));
+  log("ROLE_STATE_QUEUE_ROW=" + (await wc().executeJavaScript("(document.querySelector('#chat .queue-row .q-text')||{textContent:''}).textContent.includes('【队列】2 条待处理：你：排队一')")));
   await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: false, summaries: [] })");
   await sleep(120);
   log("ROLE_STATE_CLEARED=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面窗口')>=0); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-idle') && !document.querySelector('#chat .queue-row'); })()")));
@@ -1153,14 +1153,14 @@ async function run() {
   // + 位次 + 空占位（数据经 role-state 真实快照通道，不造第二套数据源）。
   await wc().executeJavaScript("document.getElementById('tab-work').click()");
   await sleep(300);
-  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: true, summaries: ['你：排队一'], queue: [{kind:'message', sourceRoleId:'桌面窗口', summary:'你：排队一', at:'2026-10-12T03:00:00.000Z'},{kind:'dispatch', sourceRoleId:'su', summary:'派发 · 来自 su：做X', at:'2026-10-12T03:01:00.000Z'}], running: {kind:'handback', sourceRoleId:'A', summary:'回交投递 · 来自 A', at:'2026-10-12T02:59:00.000Z'} })");
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: true, summaries: ['你：排队一'], queue: [{kind:'message', sourceRoleId:'桌面窗口', summary:'你：排队一', at:'2026-10-12T03:00:00.000Z'},{kind:'dispatch', sourceRoleId:'su', summary:'派发 · 来自 su：做X', at:'2026-10-12T03:01:00.000Z'}], running: {kind:'handback', sourceRoleId:'A', summary:'交付 · 来自 A', at:'2026-10-12T02:59:00.000Z'} })");
   await sleep(200);
   log("RIGHT_QUEUE_SECTION=" + (await wc().executeJavaScript("!!document.querySelector('#right-body #right-queue-body')")));
   log("RIGHT_QUEUE_ROWS=" + (await wc().executeJavaScript("document.querySelectorAll('#right-queue-body .q-item').length")));
   // 进行中最前：首行带 is-running 且归「当前工作」组标题下（v2 结构——行内不再印「进行中」字样）。
   log("RIGHT_QUEUE_RUNNING_FIRST=" + (await wc().executeJavaScript("(() => { const body=document.querySelector('#right-queue-body'); const first=body && body.querySelector('.q-item'); const heading=body && body.querySelector('.work-heading'); return !!first && first.classList.contains('is-running') && !!heading && heading.textContent.includes('当前工作'); })()")));
-  log("RIGHT_QUEUE_SOURCES=" + (await wc().executeJavaScript("(() => { const t=document.querySelector('#right-queue-body').textContent; return t.includes('回交投递') && t.includes('客户消息') && t.includes('su 派发') && t.includes('你：排队一'); })()")));
-  log("RIGHT_QUEUE_SOURCES_WORK_OVERVIEW=" + (await wc().executeJavaScript("(() => { const body=document.querySelector('#right-queue-body'); if (!body) return false; const t=body.textContent; return t.includes('回交投递') && t.includes('排队一') && (t.includes('派发') || t.includes('su')); })()")));
+  log("RIGHT_QUEUE_SOURCES=" + (await wc().executeJavaScript("(() => { const t=document.querySelector('#right-queue-body').textContent; return t.includes('交付') && t.includes('客户消息') && t.includes('su 派发') && t.includes('你：排队一'); })()")));
+  log("RIGHT_QUEUE_SOURCES_WORK_OVERVIEW=" + (await wc().executeJavaScript("(() => { const body=document.querySelector('#right-queue-body'); if (!body) return false; const t=body.textContent; return t.includes('交付') && t.includes('排队一') && (t.includes('派发') || t.includes('su')); })()")));
   log("ROLE_STATE_QUEUE_ROW_WORK_OVERVIEW=" + (await wc().executeJavaScript("(() => { const body=document.querySelector('#right-queue-body'); if (!body) return false; const rows=[...body.querySelectorAll('.q-item')]; const headings=[...body.querySelectorAll('.work-heading')].map((h)=>h.textContent); return rows.length>=2 && rows[0].classList.contains('is-running') && headings.some((t)=>t.includes('当前工作')) && headings.some((t)=>t.includes('排队')); })()")));
   await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: false, summaries: [], queue: [], running: null })");
   await sleep(150);

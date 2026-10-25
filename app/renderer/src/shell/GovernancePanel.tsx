@@ -69,19 +69,34 @@ export function GovernancePanel() {
     typeof getDesktopBridge()?.migrateGovernanceModel === "function";
   const migrationButton = governanceMigrationButtonView(migrationWired, locale);
 
-  let statusText = "";
+  let statusChip = "";
+  let statusDetail = "";
+  let statusWarn = false;
   if (projectRoot) {
+    let core = "";
     if (recordState === "pin-mismatch") {
-      statusText = governancePinMismatchText(record.pinCount, changed, locale);
+      core = governancePinMismatchText(record.pinCount, changed, locale);
+      statusWarn = true;
     } else if (recordState === "missing") {
-      statusText = governanceMissingText(projectRoleCount(roles), locale);
+      core = governanceMissingText(projectRoleCount(roles), locale);
+      statusWarn = true;
     } else if (recordState === "invalid") {
-      statusText = governanceInvalidText(record.reason, locale);
+      core = governanceInvalidText(record.reason, locale);
+      statusWarn = true;
     } else if (modelKnown) {
-      statusText = governanceModelStatusText(governanceModel, locale);
+      core = governanceModelStatusText(governanceModel, locale);
     }
-    if (nextStep) statusText = statusText ? statusText + " · " + nextStep : nextStep;
+    // 正常模型态：模型文本单独成 chip，流程/下一步详情另起一段（窄屏可换行）；
+    // 异常态保持原来的单行完整文案（含下一步），不改变既有 textContent 契约。
+    if (!statusWarn) {
+      statusChip = core;
+      statusDetail = nextStep;
+    } else {
+      statusChip = core;
+      if (nextStep) statusChip = statusChip ? statusChip + " · " + nextStep : nextStep;
+    }
   }
+  const statusText = statusChip + statusDetail;
   const statusVisible = projectRoot !== null && statusText !== "";
 
   const openPreview = (event: MouseEvent<HTMLElement>) => {
@@ -138,7 +153,14 @@ export function GovernancePanel() {
         <span className="gov-shield" aria-hidden="true">
           <ShieldCheck size={13} strokeWidth={1.5} />
         </span>
-        <span className="gov-text">{statusVisible ? statusText : ""}</span>
+        <span className={"gov-text" + (statusWarn ? " is-warn" : "")}>
+          {statusVisible ? (
+            <>
+              {statusChip ? <span className="gov-chip">{statusChip}</span> : null}
+              {statusDetail ? <span className="gov-detail">{statusDetail}</span> : null}
+            </>
+          ) : null}
+        </span>
         {action === "reaccept" ? (
           <button
             type="button"

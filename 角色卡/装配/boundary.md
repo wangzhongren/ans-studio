@@ -13,6 +13,7 @@
 | 单文件 | `tsconfig.json` | TypeScript 编译配置 |
 | 单文件 | `vite.config.ts` | 渲染层 Vite 构建配置（仅构建 app/renderer；主进程与 preload 保持无构建） |
 | 单文件 | `README.md` | 安装与使用说明 |
+| 单文件 | `README.en.md` | README 英文版（English translation；与 README.md 同属装配） |
 | 单文件 | `LICENSE` | 客户指定的项目开源许可证 |
 | 单文件 | `.env` | 本地环境配置，含 Pi 凭据；不入库 |
 | 单文件 | `.env.example` | 环境变量示例，只含占位符，可入库 |

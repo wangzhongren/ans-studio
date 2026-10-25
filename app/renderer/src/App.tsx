@@ -33,12 +33,16 @@ export default function App() {
   const t = useT();
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
+  const drawerOpen = useUiStore((s) => s.drawerOpen);
   const setDrawerOpen = useUiStore((s) => s.setDrawerOpen);
   const setSidebarCollapsed = useUiStore((s) => s.setSidebarCollapsed);
   const selectedRoleId = useUiStore((s) => s.selectedRoleId);
   const hint = useChatStore((s) => s.hint);
   const paneMeta = useChatStore((s) => s.paneMeta);
-  const roleMeta = useChatStore((s) => s.roleMeta);
+  // A1：历史投影诊断与上下文状态分开；这里只显示投影文本（没有就不显示）。
+  const projectionText = selectedRoleId
+    ? paneMeta[selectedRoleId]?.projectionText || ""
+    : "";
   const groupRef = useRef<GroupImperativeHandle | null>(null);
   const groupHostRef = useRef<HTMLDivElement | null>(null);
 
@@ -85,7 +89,7 @@ export default function App() {
       <CSPProvider disableStyleElements>
         <div className="app-shell">
         <TitleBar />
-        <div className={`app${collapsed ? " is-sidebar-collapsed" : ""}`}>
+        <div className={`app${collapsed ? " is-sidebar-collapsed" : ""}${drawerOpen ? " drawer-open" : ""}`}>
           <ResizablePanelGroup
             orientation="horizontal"
             groupRef={groupRef}
@@ -121,19 +125,18 @@ export default function App() {
 
                 <ChatHeader onOpenDrawer={() => setDrawerOpen(true)} />
 
-                <div className="session-notice" role="status">
+                <div className="session-notice">
                   <span id="composer-hint" className="composer-hint">
                     {hint}
                   </span>
                   <span
                     id="history-projection-note"
                     className="context-state"
+                    role={projectionText ? "status" : undefined}
+                    aria-live={projectionText ? "polite" : undefined}
+                    hidden={!projectionText}
                   >
-                    {selectedRoleId
-                      ? paneMeta[selectedRoleId]?.contextText ||
-                        roleMeta[selectedRoleId]?.contextText ||
-                        t("ui.chatHeader.noSession")
-                      : t("ui.app.emptySub")}
+                    {projectionText}
                   </span>
                 </div>
 

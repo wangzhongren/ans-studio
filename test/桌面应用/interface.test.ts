@@ -6892,7 +6892,7 @@ test("i18n B3：主进程生成点按当前 locale 取词（en-US）；切回 zh
     );
     assert.equal(
       mainT("main.session.delivery.handbackFailedShort", { sourceRoleId: "A", detail: "x" }),
-      "Handback delivery failed (from A): x",
+      "Delivery failed (from A): x",
     );
     assert.equal(mainT("main.session.rebuildChangedRuntimeConfig"), "runtime configuration");
     assert.equal(mainT("main.session.install.verbInstall"), "install");
@@ -6931,8 +6931,8 @@ test("i18n B3：主进程生成点按当前 locale 取词（en-US）；切回 zh
     );
     assert.equal(mainT("main.interface.readErrorExistingSuffix"), " (existing/legacy: warning only)");
     assert.equal(
-      mainT("main.interface.queueRecoveredLine", { kind: "Handback", summary: "s", roleId: "A", runtime: "pi" }),
-      "- [Handback] s (role A · pi)",
+      mainT("main.interface.queueRecoveredLine", { kind: "Delivery", summary: "s", roleId: "A", runtime: "pi" }),
+      "- [Delivery] s (role A · pi)",
     );
     assert.equal(
       mainT("main.interface.staleStepFact", { stepId: "s1", owner: "A", status: "dispatched" }),
@@ -6988,8 +6988,8 @@ test("i18n B3：主进程生成点按当前 locale 取词（en-US）；切回 zh
       "judge 代批 · 代审批：确认写入 4 个路径（a、b、c等 4 个）",
     );
     assert.equal(
-      mainT("main.interface.queueRecoveredLine", { kind: "回交", summary: "s", roleId: "A", runtime: "pi" }),
-      "- [回交] s（角色 A · pi）",
+      mainT("main.interface.queueRecoveredLine", { kind: "交付", summary: "s", roleId: "A", runtime: "pi" }),
+      "- [交付] s（角色 A · pi）",
     );
     assert.match(
       mainT("main.interface.roleCardsStepMissing", { stepId: "role-cards" }),

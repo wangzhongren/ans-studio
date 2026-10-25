@@ -1348,7 +1348,7 @@ test("替我审·deny：不调用 presenter；结果行投达 + 格式化原因�
   assert.equal(res.outcome, "deny");
   assert.equal((res as { operatorId?: string }).operatorId, "judge:codex");
   const reason = (res as { reason?: string }).reason ?? "";
-  assert.match(reason, /判断 agent 未放行该命令/);
+  assert.match(reason, /自动代理未放行该命令/);
   assert.match(reason, /请向客户说明：这条命令会改文件/);
   assert.match(reason, /原因：该命令会改写工作区/);
   assert.match(reason, /替代方案（command）：git status/);
@@ -1684,7 +1684,7 @@ test("承接 2026-10-18 裁定：shell-judge.decision 诊断保留 c 规则判�
 
 test("judgeNotice：buildShellConfirmRequest 原样拷贝、不进入 reasonRaw（§10.4）", () => {
   const display = describeShellCommand(req("ls", ["ls"], "/proj", "普通原因"));
-  display.judgeNotice = "判断 agent 未能完成判断：判断超时。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。";
+  display.judgeNotice = "自动代理未能完成判断：判断超时。规则判定仅作参考；自动代理未完成时才由你手批。已转你手动确认。";
   const built = buildShellConfirmRequest("sc-1", display);
   assert.equal(built.judgeNotice, display.judgeNotice, "judgeNotice 原样拷贝");
   assert.equal(built.reasonRaw, "普通原因", "judgeNotice 不进入 reasonRaw");

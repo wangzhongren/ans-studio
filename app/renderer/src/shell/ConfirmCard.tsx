@@ -220,6 +220,7 @@ function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
             <Button
               id="sc-deny"
               ref={denyRef}
+              variant="outline"
               className="confirm-default-focus min-w-[88px]"
               disabled={busy}
               onClick={() => void respond(false)}

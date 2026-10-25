@@ -22,6 +22,7 @@ import {
   describeEvent,
   envelopeMatches,
   historyRowToDescriptor,
+  mergeClientProjectionData,
   normalizeEnvelopes,
   type NewRowDescriptor,
 } from "@/chat/events";
@@ -1686,7 +1687,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       loading: false,
       emptyNote: rows.length === 0 && model.rows.length === 0,
       historyLoaded: true,
-      contextText: projectionText || meta.contextText,
+      contextText: meta.contextText,
+      ...(projectionText ? { projectionText } : {}),
       error: error || undefined,
     };
     set({
@@ -2274,6 +2276,19 @@ function appendDescriptor(
   descriptor: NewRowDescriptor,
   roleId = "",
 ): ChatRow {
+  // A4：连续同指纹的治理反馈投影合并为一行（×N），不新增重复状态行。
+  if (descriptor.kind === "injected") {
+    const previous = model.rows[model.rows.length - 1];
+    if (previous && previous.kind === "injected") {
+      const merged = mergeClientProjectionData(previous.data, descriptor.data);
+      if (merged) {
+        previous.data = merged;
+        previous.height = Math.max(previous.height || 0, estimateHeight("injected"));
+        if (roleId) activityGroupByRole.set(roleId, null);
+        return previous;
+      }
+    }
+  }
   if (descriptor.kind === "reasoning" && descriptor.data) {
     return appendReasoningDescriptor(model, roleId, descriptor);
   }

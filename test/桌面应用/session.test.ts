@@ -21,7 +21,7 @@ import { openRoleSession, createPiAdapterFactory, type RoleSessionHandle } from 
 import { listProject, type ProjectListing } from "../../src/service/role/resolve-role.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { createChatDemoAdapter, firstProjectFilePath } from "../../app/desktop/chat-adapter.ts";
-import { SessionManager, MAX_LIVE_SESSIONS, type SessionEventEnvelope } from "../../app/desktop/session.ts";
+import { SessionManager, MAX_LIVE_SESSIONS, type SessionEventEnvelope, type GovernanceClientProjectionV1 } from "../../app/desktop/session.ts";
 import { createCustomerInputChannel } from "../../app/desktop/customer-input.ts";
 import type { CustomerInputFn } from "../../src/model/runtime.ts";
 // W6-B（2026-10-18）：四角色能力矩阵与意图交接/澄清的桌面投递端。
@@ -1206,6 +1206,165 @@ test("治理协调（session）：内置 settle→Lead；Proof 只发状态+报�
   }
 });
 
+test("2026-10-25 A3/A4 客户投影：治理反馈 prompt-input 附带结构化投影与稳定指纹；内部原文保留、未登记文本不变", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "ans-session-projection-"));
+  const base = governanceListing({ roleIds: ["liaison", "rapporteur", "nominator", "convener", "verifier", "A"] });
+  const listing: ProjectListing = { ...base, projectRoot: root };
+  const streams: Record<string, OrchestrationEvent[]> = {};
+  const sent: Record<string, string[]> = {};
+  const emitted: SessionEventEnvelope[] = [];
+  const makeScriptedHandle = (roleId: string): RoleSessionHandle => {
+    let index = 0;
+    return {
+      async send(text: string): Promise<void> {
+        (sent[roleId] ??= []).push(text);
+      },
+      events(): AsyncIterable<OrchestrationEvent> {
+        return {
+          [Symbol.asyncIterator]() {
+            return {
+              async next(): Promise<IteratorResult<OrchestrationEvent>> {
+                for (let attempts = 0; attempts < 800; attempts += 1) {
+                  const queue = streams[roleId] ?? [];
+                  if (index < queue.length) return { value: queue[index++]!, done: false };
+                  await new Promise((resolve) => setTimeout(resolve, 5));
+                }
+                return { value: undefined as unknown as OrchestrationEvent, done: true };
+              },
+            };
+          },
+        };
+      },
+      async dispose(): Promise<void> {},
+    };
+  };
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      streams[input.roleId] ??= [];
+      sent[input.roleId] ??= [];
+      return makeScriptedHandle(input.roleId);
+    },
+    createPiAdapterFactory: () => { throw new Error("本用例不应构造 pi 适配器"); },
+    createDemoAdapter: () => { throw new Error("本用例不应构造 demo 适配器"); },
+    buildProjectConfig,
+    getListing: (value) => (value === root ? listing : undefined),
+    emitEvent: (envelope) => emitted.push(envelope),
+  });
+  const waitUntil = async (check: () => boolean): Promise<void> => {
+    for (let attempt = 0; attempt < 800 && !check(); attempt += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+    assert.ok(check(), "等待实际事件超时");
+  };
+  /** 模拟运行时把程序化输入回显为 `prompt-input` 消息事件（与 provider/service 的真实形状一致）。 */
+  const echo = (roleId: string, text: string, turnId: string): void => {
+    streams[roleId]!.push({
+      kind: "message",
+      summary: `用户指令：${text}`,
+      turnId,
+      detail: { source: "prompt-input", text },
+    } as unknown as OrchestrationEvent);
+  };
+  const detailFor = (text: string): Record<string, unknown> | undefined =>
+    emitted
+      .map((candidate) => (candidate.event as { detail?: unknown }).detail as Record<string, unknown> | undefined)
+      .find((detail) => detail?.text === text);
+  const projectionFor = (text: string): GovernanceClientProjectionV1 | undefined =>
+    detailFor(text)?.clientProjection as GovernanceClientProjectionV1 | undefined;
+  try {
+    await appendGovernanceLedger(root, {
+      at: new Date().toISOString(),
+      kind: "dispatch.accepted",
+      flowId: "flow-proof",
+      stepId: "verification",
+      actorRoleId: "app",
+      power: "app",
+      targetRoleId: "verifier",
+    });
+    // ① Proof completed：投影 = 报告已就绪；内部原文仍在 detail.text；重复回显同指纹。
+    await mgr.open({ projectRoot: root, roleId: "verifier", runtime: "demo" });
+    await mgr.send("复核一", undefined, { roleId: "verifier" });
+    streams.verifier!.push({ kind: "message", summary: "报告正文-不得转述", turnId: "v1" } as OrchestrationEvent);
+    streams.verifier!.push({ kind: "settled", summary: "verifier 一轮结束", detail: { outcome: "completed" } } as unknown as OrchestrationEvent);
+    await waitUntil(() => (sent.liaison?.length ?? 0) > 0);
+    const proofTask = sent.liaison![0]!;
+    echo("liaison", proofTask, "l1");
+    await waitUntil(() => projectionFor(proofTask) !== undefined);
+    const proofDetail = detailFor(proofTask)!;
+    assert.equal(proofDetail.text, proofTask, "内部原文保留（审计）");
+    const proofProjection = projectionFor(proofTask)!;
+    assert.equal(proofProjection.version, 1);
+    assert.equal(proofProjection.kind, "governance-feedback");
+    assert.deepEqual(proofProjection.sourceRole, { roleId: "verifier", displayName: "verifier" });
+    assert.equal(proofProjection.statusCode, "completed");
+    assert.equal(proofProjection.statusText, "本轮已完成");
+    assert.deepEqual(proofProjection.flowIds, ["flow-proof"]);
+    assert.equal(proofProjection.reportPath, "docs/acceptance/flow-proof-report-v1.md");
+    assert.equal(proofProjection.governancePath, "docs/governance/verifier/flow-proof.md");
+    assert.equal(proofProjection.action, "report-ready");
+    assert.match(proofProjection.fingerprint, /^[0-9a-f]{64}$/);
+    assert.ok(!JSON.stringify(proofProjection).includes("报告正文-不得转述"), "投影不含内部正文");
+    echo("liaison", proofTask, "l1b");
+    await waitUntil(
+      () =>
+        emitted.filter(
+          (candidate) =>
+            ((candidate.event as { detail?: { clientProjection?: { fingerprint?: string } } }).detail?.clientProjection?.fingerprint) ===
+            proofProjection.fingerprint,
+        ).length >= 2,
+    );
+    // 释放 Lead 队列，准备下一轮。
+    streams.liaison!.push({ kind: "settled", summary: "liaison 一轮结束" } as OrchestrationEvent);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // ② Proof failed：同流程不同状态 ⇒ 指纹不同；statusText 如实。
+    await mgr.send("复核二", undefined, { roleId: "verifier" });
+    streams.verifier!.push({ kind: "message", summary: "报告正文2", turnId: "v2" } as OrchestrationEvent);
+    streams.verifier!.push({ kind: "settled", summary: "verifier 一轮结束", detail: { outcome: "failed" } } as unknown as OrchestrationEvent);
+    await waitUntil(() => (sent.liaison?.length ?? 0) >= 2);
+    const failedTask = sent.liaison![1]!;
+    echo("liaison", failedTask, "l2");
+    await waitUntil(() => projectionFor(failedTask) !== undefined);
+    const failedProjection = projectionFor(failedTask)!;
+    assert.equal(failedProjection.statusCode, "failed");
+    assert.equal(failedProjection.statusText, "本轮失败");
+    assert.notEqual(failedProjection.fingerprint, proofProjection.fingerprint, "状态变化 ⇒ 指纹变化");
+    streams.liaison!.push({ kind: "settled", summary: "liaison 一轮结束" } as OrchestrationEvent);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // ③ 非 Proof 内置内部反馈：只投影「等待 Lead 汇总」，无状态/报告路径；内部正文仅在 detail.text。
+    await mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+    await mgr.send("协调", undefined, { roleId: "convener" });
+    streams.convener!.push({ kind: "message", summary: "内部收尾正文", turnId: "c1" } as OrchestrationEvent);
+    streams.convener!.push({ kind: "settled", summary: "convener 一轮结束" } as OrchestrationEvent);
+    await waitUntil(() => (sent.liaison?.length ?? 0) >= 3);
+    const internalTask = sent.liaison![2]!;
+    echo("liaison", internalTask, "l3");
+    await waitUntil(() => projectionFor(internalTask) !== undefined);
+    const internalDetail = detailFor(internalTask)!;
+    const internalProjection = projectionFor(internalTask)!;
+    assert.equal(internalProjection.statusCode, "internal-feedback");
+    assert.equal(internalProjection.statusText, "内部反馈");
+    assert.equal(internalProjection.action, "await-lead-summary");
+    assert.equal(internalProjection.reportPath, undefined);
+    assert.equal(internalProjection.governancePath, undefined);
+    assert.equal(internalProjection.flowIds, undefined);
+    assert.ok(String(internalDetail.text).includes("内部收尾正文"), "内部正文只保留在 detail.text（审计）");
+    assert.ok(!JSON.stringify(internalProjection).includes("内部收尾正文"), "投影不含内部正文");
+
+    // ④ 未登记的 prompt-input 文本 ⇒ 事件逐字不变（无 clientProjection）。
+    streams.liaison!.push({
+      kind: "message",
+      summary: "用户指令：未登记",
+      turnId: "l4",
+      detail: { source: "prompt-input", text: "未登记" },
+    } as unknown as OrchestrationEvent);
+    await waitUntil(() => detailFor("未登记") !== undefined);
+    assert.equal(Object.hasOwn(detailFor("未登记")!, "clientProjection"), false, "未登记文本不附加投影");
+  } finally {
+    await mgr.stop(null);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("Liaison 客户通道：intent-confirm 正常呈现/手答；proposal 被编排白名单拒绝且不弹卡", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "ans-liaison-input-"));
   try {
@@ -1601,7 +1760,7 @@ test("i18n B3 session：未开会话的 send 回执按 en-US 生成；切回 zh-
     );
     assert.equal(
       mainT("main.session.delivery.handbackFailedShort", { sourceRoleId: "A", detail: "x" }),
-      "Handback delivery failed (from A): x",
+      "Delivery failed (from A): x",
     );
     assert.equal(mainT("main.session.dispatchModelNote"), " (trio: Steward or Lead)");
     createMainI18n("zh-CN");
@@ -1609,7 +1768,7 @@ test("i18n B3 session：未开会话的 send 回执按 en-US 生成；切回 zh-
     assert.equal(mainT("main.session.dispatchModelNote"), "（trio：统筹或主理）");
     assert.equal(
       mainT("main.session.delivery.handbackFailedShort", { sourceRoleId: "A", detail: "x" }),
-      "回交投递失败（来自 A）：x",
+      "交付投递失败（来自 A）：x",
     );
     createMainI18n("zh-CN");
     const zh = await mgr.send("hi", undefined, { projectRoot: listing.projectRoot, roleId: "桌面窗口", runtime: "demo" });

@@ -7,6 +7,7 @@
 
 import type {
   ActivityItem,
+  ClientProjectionV1,
   RowKind,
   SessionEnvelope,
   SessionEvent,
@@ -381,6 +382,125 @@ export interface InjectedMessage {
   displayBody?: string;
   sourceRoleId?: string;
   remainder?: string;
+  /** 事件层可选客户投影（桌面窗口 `GovernanceClientProjectionV1`）；形状不符不附带。 */
+  clientProjection?: ClientProjectionV1;
+  /** 事件时间（ISO；仅用于短时间显示，不猜）。 */
+  at?: string;
+}
+
+const CLIENT_PROJECTION_STATUS = new Set<ClientProjectionV1["statusCode"]>([
+  "completed",
+  "failed",
+  "aborted",
+  "timed_out",
+  "unknown",
+  "internal-feedback",
+]);
+const CLIENT_PROJECTION_ACTIONS = new Set<ClientProjectionV1["action"]>([
+  "report-ready",
+  "await-lead-summary",
+]);
+
+/**
+ * 校验并读取事件层可选客户投影（桌面窗口 `GovernanceClientProjectionV1`）。
+ * 只接受版本 1 / governance-feedback；任何字段缺失或越界都返回 null（回退旧文本归类）。
+ */
+export function clientProjectionFrom(value: unknown): ClientProjectionV1 | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (record.version !== 1 || record.kind !== "governance-feedback") return null;
+  const fingerprint =
+    typeof record.fingerprint === "string" ? record.fingerprint.trim() : "";
+  if (fingerprint === "") return null;
+  const source =
+    record.sourceRole && typeof record.sourceRole === "object"
+      ? (record.sourceRole as Record<string, unknown>)
+      : null;
+  const sourceRoleId =
+    source && typeof source.roleId === "string" ? source.roleId.trim() : "";
+  if (!source || sourceRoleId === "") return null;
+  const statusCode =
+    typeof record.statusCode === "string" ? record.statusCode : "";
+  if (!CLIENT_PROJECTION_STATUS.has(statusCode as ClientProjectionV1["statusCode"])) {
+    return null;
+  }
+  const action = typeof record.action === "string" ? record.action : "";
+  if (!CLIENT_PROJECTION_ACTIONS.has(action as ClientProjectionV1["action"])) {
+    return null;
+  }
+  const flowIds = Array.isArray(record.flowIds)
+    ? record.flowIds.filter(
+        (id): id is string => typeof id === "string" && id.trim() !== "",
+      )
+    : [];
+  return {
+    version: 1,
+    kind: "governance-feedback",
+    fingerprint,
+    sourceRole: {
+      roleId: sourceRoleId,
+      displayName:
+        typeof source.displayName === "string" ? source.displayName : "",
+    },
+    statusCode: statusCode as ClientProjectionV1["statusCode"],
+    statusText:
+      typeof record.statusText === "string" ? record.statusText : "",
+    ...(flowIds.length > 0 ? { flowIds } : {}),
+    ...(typeof record.reportPath === "string" && record.reportPath !== ""
+      ? { reportPath: record.reportPath }
+      : {}),
+    ...(typeof record.governancePath === "string" &&
+    record.governancePath !== ""
+      ? { governancePath: record.governancePath }
+      : {}),
+    action: action as ClientProjectionV1["action"],
+  };
+}
+
+/**
+ * 连续同指纹注入投影的合并数据（A4）：仅当上一条数据与新数据的
+ * `clientProjection.fingerprint` 非空且相等时返回合并后的 data，否则返回 null。
+ * `occurrences` 只保留最近 8 次，避免无限增长；不改变原 data 对象。
+ */
+export function mergeClientProjectionData(
+  previous: unknown,
+  next: unknown,
+): Record<string, unknown> | null {
+  const previousData =
+    previous && typeof previous === "object"
+      ? (previous as Record<string, unknown>)
+      : null;
+  const nextData =
+    next && typeof next === "object" ? (next as Record<string, unknown>) : null;
+  if (!previousData || !nextData) return null;
+  const previousProjection = clientProjectionFrom(previousData.clientProjection);
+  const nextProjection = clientProjectionFrom(nextData.clientProjection);
+  if (!previousProjection || !nextProjection) return null;
+  if (previousProjection.fingerprint !== nextProjection.fingerprint) return null;
+  const previousCount =
+    typeof previousData.projectionCount === "number" &&
+    Number.isFinite(previousData.projectionCount) &&
+    previousData.projectionCount >= 1
+      ? Math.floor(previousData.projectionCount)
+      : 1;
+  const previousOccurrences = Array.isArray(previousData.projectionOccurrences)
+    ? previousData.projectionOccurrences
+    : [];
+  const occurrence: Record<string, unknown> = {};
+  if (typeof nextData.at === "string" && nextData.at !== "") {
+    occurrence.at = nextData.at;
+  }
+  if (typeof nextData.turnId === "string" && nextData.turnId !== "") {
+    occurrence.turnId = nextData.turnId;
+  }
+  const occurrences = Object.keys(occurrence).length
+    ? [...previousOccurrences, occurrence].slice(-8)
+    : previousOccurrences;
+  return {
+    ...previousData,
+    projectionCount: previousCount + 1,
+    ...(occurrences.length > 0 ? { projectionOccurrences: occurrences } : {}),
+  };
 }
 
 /**
@@ -558,17 +678,35 @@ export function describeEvent(
     }
     if (source === "prompt-input") {
       const text = stringDetail(event, "text");
+      const projection = clientProjectionFrom(objectDetail(event, "clientProjection"));
       const injected = classifyInjected(text, locale);
       if (injected) {
         return {
           kind: "injected",
-          data: injected,
+          data: {
+            ...injected,
+            ...(projection
+              ? { clientProjection: projection, turnId: turnId || undefined }
+              : {}),
+            ...(typeof event.at === "string" && event.at !== ""
+              ? { at: event.at }
+              : {}),
+          },
           turnId,
         };
       }
       return { kind: "user", data: { text }, turnId };
     }
-    return { kind: "assistant", data: { text: summary }, turnId };
+    return {
+      kind: "assistant",
+      data: {
+        text: summary,
+        ...(typeof event.at === "string" && event.at !== ""
+          ? { at: event.at }
+          : {}),
+      },
+      turnId,
+    };
   }
   if (kind === "tool_call" || kind === "accepted" || kind === "denied") {
     if (kind === "denied") {
@@ -842,14 +980,33 @@ export function historyRowToDescriptor(
       };
     }
     const injected = classifyInjected(text, locale);
-    if (injected) return { ...base, kind: "injected", data: injected };
+    if (injected) {
+      const projection = clientProjectionFrom(row.clientProjection);
+      return {
+        ...base,
+        kind: "injected",
+        data: {
+          ...injected,
+          ...(projection
+            ? { clientProjection: projection, turnId: turnId || undefined }
+            : {}),
+          ...(typeof row.at === "string" && row.at !== ""
+            ? { at: row.at }
+            : {}),
+        },
+      };
+    }
     return { ...base, kind: "user", data: { text, projection: row.textProjection } };
   }
   if (kind === "assistant") {
     return {
       ...base,
       kind: "assistant",
-      data: { text, projection: row.textProjection },
+      data: {
+        text,
+        projection: row.textProjection,
+        ...(typeof row.at === "string" && row.at !== "" ? { at: row.at } : {}),
+      },
     };
   }
   if (

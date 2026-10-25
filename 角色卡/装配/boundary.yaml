@@ -31,6 +31,9 @@ entries:
     path: README.md
     purpose: 安装与使用说明
   - kind: file
+    path: README.en.md
+    purpose: README 英文版（English translation；与 README.md 同属装配）
+  - kind: file
     path: LICENSE
     purpose: 客户指定的项目开源许可证
   - kind: file
