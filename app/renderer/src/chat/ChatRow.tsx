@@ -11,6 +11,7 @@
 
 import { type SyntheticEvent, memo, type ReactNode } from "react";
 import {
+  AlertTriangle,
   Bot,
   Check,
   ChevronRight,
@@ -52,6 +53,18 @@ import {
   shortTime,
   type ActivityPhaseRow,
 } from "@/chat/tool-summary";
+import {
+  extractToolErrorReason,
+  toolDetailsContainText,
+  toolFailureFullText,
+} from "@/chat/tool-error";
+import {
+  ToolErrorFullEntry,
+  ToolErrorSummary,
+} from "@/chat/tool-error-view";
+import { ShellJudgeRowCard } from "@/chat/judge-row-view";
+import { toolRowTextDisplay } from "@/chat/tool-row-text";
+import { ToolDetailsView } from "@/chat/tool-details-view";
 import { useUiStore } from "@/stores/ui-store";
 import {
   reasoningEmptyNote,
@@ -190,7 +203,7 @@ function ActivityRow({ phaseRow }: { phaseRow: ActivityPhaseRow }) {
     .map((item) => activityPhaseLabel(item, locale))
     .join(" → ");
   const fullTarget = view.target || t("ui.chatRow.noFileTarget");
-  const shownTarget = fullTarget.length > 72 ? fullTarget.slice(0, 72) + "…" : fullTarget;
+  const targetView = toolRowTextDisplay(fullTarget);
   return (
     <div
       className="tool-activity"
@@ -203,10 +216,13 @@ function ActivityRow({ phaseRow }: { phaseRow: ActivityPhaseRow }) {
       </span>
       <div>
         <span className="activity-op">{view.toolName}</span>
-        <span className="activity-target" title={fullTarget}>{shownTarget}</span>
+        <span className="activity-target" title={targetView.title}>{targetView.display}</span>
       </div>
-      <span className={"activity-state " + (running ? "running" : view.status)}>
+      <span className={"activity-state " + (running ? "running" : view.status)} title={label || undefined}>
         {running ? <LoaderCircle size={12} strokeWidth={1.5} aria-hidden="true" /> : null}
+        {view.status === "failed" || view.status === "timed-out" ? (
+          <AlertTriangle size={12} strokeWidth={1.5} aria-hidden="true" />
+        ) : null}
         {label}
       </span>
     </div>
@@ -262,104 +278,9 @@ function ActivitiesRow({ row, roleId }: { row: ChatRow; roleId: string }) {
   );
 }
 
-function DisplayField({ label, value }: { label: string; value: unknown }) {
-  const record = asRecord(value);
-  if (typeof record.text !== "string") return null;
-  return (
-    <section className="tool-detail-field">
-      <strong>{label}</strong>
-      <span className="projection-flags">{textFlags(record)}</span>
-      <pre>{record.text}</pre>
-    </section>
-  );
-}
-
-function ToolDetails({ activity }: { activity: ActivityItem }) {
-  const t = useT();
-  const locale = useLocaleState((s) => s.locale);
-  const display = asRecord(activity.display);
-  const notes = [
-    activity.legacyStatusSource === "legacy-classifier"
-      ? t("ui.chatRow.legacyStatusSource")
-      : "",
-    metadataLabel(activity.metadataOmissions, locale),
-    textFlags(activity.legacyTextProjection, locale),
-  ]
-    .filter(Boolean)
-    .join(locale === "zh-CN" ? "；" : "; ");
-  const metadata = notes ? <p className="projection-flags">{notes}</p> : null;
-  if (activity.displayUnsupported) {
-    return (
-      <>
-        {metadata}
-        <p className="muted">{t("ui.chatRow.unsupportedDetail")}</p>
-      </>
-    );
-  }
-  if (!activity.hasDisplay || Object.keys(display).length === 0) {
-    return (
-      <>
-        {metadata}
-        <p className="muted">{t("ui.chatRow.noDetails")}</p>
-      </>
-    );
-  }
-  const target = asRecord(display.target);
-  const process = asRecord(display.process);
-  const omissions = Array.isArray(display.omissions) ? display.omissions : [];
-  const omissionLabel = (reason: unknown): string => {
-    if (reason === "budget") return t("ui.chatRow.budgetOmitted");
-    if (reason === "unsupported-content") return t("ui.chatRow.nonTextResult");
-    return t("ui.chatRow.unsupportedInput");
-  };
-  return (
-    <>
-      {metadata}
-      {Object.keys(target).length > 0 ? (
-        <DisplayField
-          label={
-            target.kind === "command"
-              ? t("ui.chatRow.actualCommand")
-              : t("ui.chatRow.targetFile")
-          }
-          value={target.value}
-        />
-      ) : (
-        <p className="muted">{t("ui.chatRow.noFileTargetDetail")}</p>
-      )}
-      <DisplayField
-        label={
-          activity.status === "exited-nonzero"
-            ? t("ui.chatRow.message")
-            : t("ui.chatRow.error")
-        }
-        value={display.error}
-      />
-      <DisplayField label={t("ui.chatRow.result")} value={display.resultText} />
-      {typeof process.exitCode === "number" ? (
-        <p>{t("ui.chatRow.exitCode", { code: process.exitCode })}</p>
-      ) : null}
-      {typeof process.signal === "string" && process.signal ? (
-        <p>{t("ui.chatRow.signal", { signal: process.signal })}</p>
-      ) : null}
-      <DisplayField label={t("ui.chatRow.stdout")} value={process.stdout} />
-      <DisplayField label={t("ui.chatRow.stderr")} value={process.stderr} />
-      {typeof display.durationMs === "number" ? (
-        <p>{t("ui.chatRow.duration", { ms: display.durationMs })}</p>
-      ) : null}
-      {omissions.length > 0 ? (
-        <p className="muted">
-          {omissions
-            .map((reason) => omissionLabel(reason))
-            .join(locale === "zh-CN" ? "；" : "; ")}
-        </p>
-      ) : null}
-    </>
-  );
-}
-
 function ToolLifecycleRow({ row, roleId }: { row: ChatRow; roleId: string }) {
   const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const data = asRecord(row.data);
   const stages = asRecord(data.stages);
   const order = ["start", "blocked", "result"]
@@ -377,32 +298,53 @@ function ToolLifecycleRow({ row, roleId }: { row: ChatRow; roleId: string }) {
     order.length > 0
       ? order.map((item) => asString(item.label) || asString(item.statusText)).join(" → ")
       : asString(activity.label) || asString(activity.statusText);
+  const failed = activity.failed === true;
+  const toolName = asString(activity.toolName);
+  const targetView = toolRowTextDisplay(target);
+  // 失败行：summary 只留工具名 + 失败徽标 + 一行原因；完整原文交给展开区。
+  const fullErrorText = failed ? toolFailureFullText(activity) : "";
+  const errorReason = failed
+    ? extractToolErrorReason(fullErrorText, { toolName, maxLength: 48 })
+    : "";
+  const detailItems = order.length > 0 ? order : [activity];
+  const detailsHaveFullText =
+    failed && fullErrorText !== "" &&
+    toolDetailsContainText(detailItems, fullErrorText, errorReason);
+  const statusClass = asString(activity.status) || "recorded";
   return (
-    <details className="tool-call-record" {...detailProps(row, roleId, "details")}>
-      <summary>
-        <span className="tool-call-time" title={asString(activity.at) || t("ui.chatRow.timeNotSaved")}>
-          {shortTime(asString(activity.at))}
-        </span>
-        <strong>{asString(activity.toolName)}</strong>
-        <span className="tool-call-target">{target}</span>
-        <span className={"tool-call-status " + (asString(activity.status) || "recorded")}>
-          {labelText}
-        </span>
-        {activity.failed && asString(activity.visibleSummary) ? (
-          <span className="tool-call-error">
-            {asString(activity.visibleSummary).slice(0, 180)}
+    <details
+      className="tool-call-record"
+      data-failed={failed ? "true" : undefined}
+      {...detailProps(row, roleId, "details")}
+    >
+      {failed ? (
+        <ToolErrorSummary
+          timeText={shortTime(asString(activity.at))}
+          timeTitle={asString(activity.at) || t("ui.chatRow.timeNotSaved")}
+          toolName={toolName}
+          target={targetView.display}
+          targetTitle={targetView.title}
+          statusLabel={labelText || t("ui.tool.status.failed")}
+          statusClass={statusClass}
+          reason={errorReason}
+        />
+      ) : (
+        <summary>
+          <span className="tool-call-time" title={asString(activity.at) || t("ui.chatRow.timeNotSaved")}>
+            {shortTime(asString(activity.at))}
           </span>
-        ) : null}
-      </summary>
+          <strong>{toolName}</strong>
+          <span className="tool-call-target" title={targetView.title}>{targetView.display}</span>
+          <span className={"tool-call-status " + statusClass} title={labelText || undefined}>
+            {labelText}
+          </span>
+        </summary>
+      )}
       <div className="tool-call-details">
-        {order.length > 0
-          ? order.map((item, index) => (
-              <div className="tool-call-stage" key={index}>
-                <h4>{asString(item.label) || asString(item.statusText)}</h4>
-                <ToolDetails activity={item} />
-              </div>
-            ))
-          : <ToolDetails activity={activity} />}
+        {failed && fullErrorText !== "" && !detailsHaveFullText ? (
+          <ToolErrorFullEntry label={t("ui.chatRow.error")} text={fullErrorText} />
+        ) : null}
+        <ToolDetailsView items={detailItems} t={t} locale={locale} />
       </div>
     </details>
   );
@@ -882,82 +824,7 @@ function ReasoningRow({ row, roleId }: { row: ChatRow; roleId: string }) {
  */
 function ShellJudgeResultBody({ view }: { view: import("@/chat/judge").ShellJudgeResultView }) {
   const t = useT();
-  const d = view.details;
-  return (
-    <>
-      <span className="sys-ico">
-        {view.verdict === "allow" ? (
-          <Check size={12} strokeWidth={1.5} aria-hidden="true" />
-        ) : (
-          <ShieldAlert size={12} strokeWidth={1.5} aria-hidden="true" />
-        )}
-      </span>
-      <div className="sys-text sj-body">
-        <div className="sj-head">
-          <span className="sj-title">{view.title}</span>
-          {view.denyOverride ? <span className="sj-badge">{view.label}</span> : null}
-        </div>
-        <div className="sj-cmd">{view.summary}</div>
-        <div className="sj-meta">
-          {[view.tierText, view.engineText, view.operatorText, shortTime(view.at)]
-            .filter(Boolean)
-            .join(" · ")}
-        </div>
-        {view.lines.map((line, index) => (
-          <div className="sj-line" key={index}>
-            {line}
-          </div>
-        ))}
-        {view.retryHint ? <div className="sj-exit">{view.retryHint}</div> : null}
-        <details className="sj-details">
-          <summary>
-            <ChevronRight
-              className="disclosure-chevron"
-              size={12}
-              strokeWidth={1.5}
-              aria-hidden="true"
-            />
-            {t("ui.chatRow.judgeDetails")}
-          </summary>
-          <div className="sj-details-body">
-            {d.command ? (
-              <>
-                <p className="sj-d-label">{t("ui.chatRow.commandOriginal")}</p>
-                <pre className="sj-pre">{d.command}</pre>
-              </>
-            ) : null}
-            {d.cwd ? <p className="sj-kv">cwd：{d.cwd}</p> : null}
-            {d.reason ? (
-              <p className="sj-kv">{t("ui.judge.reasonLine", { reason: d.reason })}</p>
-            ) : null}
-            {d.alternative ? <p className="sj-kv">{d.alternative}</p> : null}
-            {d.customerMessage ? (
-              <p className="sj-kv">
-                {t("ui.chatRow.customerMessage", { message: d.customerMessage })}
-              </p>
-            ) : null}
-            {d.customerMessageSynthesized ? (
-              <p className="sj-note">{t("ui.chatRow.customerMessageNote")}</p>
-            ) : null}
-            {d.evidence.length > 0 ? (
-              <>
-                <p className="sj-d-label">{t("ui.chatRow.evidence")}</p>
-                <ul className="sj-evidence">
-                  {d.evidence.map((item, index) => (
-                    <li key={index}>{item}</li>
-                  ))}
-                </ul>
-              </>
-            ) : null}
-            {d.hardDenyOverride ? (
-              <p className="sj-note">{t("ui.chatRow.hardDenyOverride")}</p>
-            ) : null}
-            {d.toolCallId ? <p className="sj-note">toolCallId：{d.toolCallId}</p> : null}
-          </div>
-        </details>
-      </div>
-    </>
-  );
+  return <ShellJudgeRowCard view={view} t={t} />;
 }
 
 function GovernanceJudgeResultBody({

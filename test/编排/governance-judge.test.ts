@@ -2975,10 +2975,15 @@ test("run-role：无效治理卡被拒后无客户决定账本、写集未发行
       await assertNotPresented(root, out, [/缺少合法的 flowId/]);
       assert.equal(rawCalls, 0);
 
-      // 写集未发行：docs/workflow.md 在 convener 边界内，但不在任何预授权目录 ⇒ 仍被 F4 拒。
-      const denied = captured.gate!("docs/workflow.md");
-      assert.equal(denied.allowed, false, "无效卡被拒后不得发行任何写入路径");
-      assert.match(denied.reason ?? "", /不在任务 writeSet 内（F4）/);
+      // 无效卡被拒 ⇒ 未向客户呈现、未写客户决定账本（下方断言）。
+      // 注意（2026-10-25 客户规则）：`docs/workflow.md` 是 Convener Section 1 的**精确文件条目**，
+      // 属**写入预授权**的初始写集——gate 直接放行是预授权本身，不是本次发卡的发行结果；因此它不再
+      // 能用来证明「未发行」，发行证据以「客户通道零调用 + 账本无 customer.decision」为准。
+      const allowed = captured.gate!("docs/workflow.md");
+      assert.equal(allowed.allowed, true, "Section 1 内路径属预授权初始写集（无需发卡确认）");
+      await flushGovernanceLedger(root);
+      const ledger = await readGovernanceLedger(root);
+      assert.deepEqual(ledger.entries, [], "无效卡不得写任何客户决定账本");
     } finally {
       await handle.dispose();
     }
@@ -4120,7 +4125,7 @@ test("deny：approval 组合法；缺 reason 规范化失败；decision 组回�
     engine: "claude",
   });
   assert.equal(decisionDeny.verdict, "manual");
-  assert.match(decisionDeny.reason ?? "", /决策卡不能由判断 agent 拒绝/);
+  assert.match(decisionDeny.reason ?? "", /决策卡不能由自动代理拒绝/);
 
   // 审计字段：deny 无 value/paths，但保留原因/证据/读取统计。
   const audit = governanceJudgeAuditFromOutcome(deny);

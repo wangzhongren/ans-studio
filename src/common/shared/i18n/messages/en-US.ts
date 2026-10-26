@@ -221,6 +221,94 @@ export const enUS = {
   "ui.work.origin.system": "Recorded by the system as terminal: ",
   "ui.work.origin.unconfirmed": "Source unconfirmed: ",
 
+  // ---- Background tasks panel (renderer; runtime BackgroundTaskCapability: list/read/stop) ----
+  "ui.background.title": "Background tasks",
+  "ui.background.count": {
+    one: "{count} background task",
+    other: "{count} background tasks",
+  },
+  "ui.background.empty": "No background tasks",
+  "ui.background.runningSummary": "{count} running",
+  "ui.background.role": "Role",
+  "ui.background.command": "Command",
+  "ui.background.startedAt": "Started",
+  "ui.background.pid": "PID",
+  "ui.background.duration": "Running time",
+  "ui.background.exitCode": "Exit code {code}",
+  "ui.background.state.running": "Running",
+  "ui.background.state.exited": "Exited",
+  "ui.background.state.stopped": "Stopped",
+  "ui.background.state.failed": "Failed",
+  "ui.background.state.killTimeout": "Stop timed out",
+  "ui.background.viewLog": "View log",
+  "ui.background.hideLog": "Hide log",
+  "ui.background.logEmpty": "No output yet",
+  "ui.background.logTruncated": "Log is long; showing the most recent part",
+  "ui.background.stop": "Stop",
+  "ui.background.stopConfirm": "Stop this background task?",
+  "ui.background.stopFailed": "Failed to stop: {detail}",
+  "ui.background.readFailed": "Failed to read log: {detail}",
+  "ui.background.loadFailed": "Failed to load background tasks: {detail}",
+  "ui.background.refresh": "Refresh",
+
+  // Flow status panel (renderer; step progress from docs/flows/<flowId>.yaml)
+  "ui.flow.title": "Flow status",
+  "ui.flow.progress": "{done}/{total} steps",
+  "ui.flow.current": "Current step",
+  "ui.flow.owner": "Owner",
+  "ui.flow.updatedAt": "Updated",
+  "ui.flow.empty": "No flow status",
+  "ui.flow.loadFailed": "Failed to load flow status: {detail}",
+  "ui.flow.parseError": "Failed to parse {file}: {detail}",
+  "ui.flow.showAll": "Show all steps",
+  "ui.flow.hideAll": "Hide unfinished steps",
+  "ui.flow.state.pending": "Pending",
+  "ui.flow.state.dispatched": "Dispatched",
+  "ui.flow.state.delivered": "Delivered",
+  "ui.flow.state.done": "Done",
+  "ui.flow.state.failed": "Failed",
+  "ui.flow.state.blocked": "Blocked",
+  "ui.flow.state.superseded": "Superseded",
+  "ui.flow.kind.artifact": "Artifact",
+  "ui.flow.kind.dispatch": "Dispatch",
+  "ui.flow.kind.customerDecision": "Customer decision",
+  "ui.flow.kind.acceptance": "Acceptance",
+  "ui.flow.refresh": "Refresh",
+
+  // Acceptance triage card (result/severity/options/advice/source/report text; desktop UI wiring)
+  "ui.triage.title": "Acceptance triage",
+  "ui.triage.question": "How should this acceptance result be handled?",
+  "ui.triage.option.rework": "Send to coordinator for fixes",
+  "ui.triage.option.reportOnly": "Report only, no rework",
+  "ui.triage.advice.rework":
+    "Recommend sending to the coordinator for fixes — blockers: {blockers}, major items: {majors}; the improvement plan is actionable",
+  "ui.triage.advice.reportOnly":
+    "Recommend reporting only, without rework — minor/style items: {minors}",
+  "ui.triage.advice.none": "No automatic recommendation; please decide manually",
+  "ui.triage.conclusion.pass": "Pass",
+  "ui.triage.conclusion.fail": "Fail",
+  "ui.triage.conclusion.conditional": "Conditional pass",
+  "ui.triage.severity.blocker": "Blocker",
+  "ui.triage.severity.major": "Major",
+  "ui.triage.severity.minor": "Minor",
+  "ui.triage.severity.nit": "Nit",
+  "ui.triage.section.summary": "Result",
+  "ui.triage.section.failures": "Failures",
+  "ui.triage.section.improvements": "Improvements",
+  "ui.triage.section.source": "Decision source",
+  "ui.triage.source.judge": "Judge delegation",
+  "ui.triage.source.customer": "Customer choice",
+  "ui.triage.warn.blockingReportOnly":
+    "The report contains blockers; reporting only will leave them unfixed",
+  "ui.triage.report.head": "Acceptance result: {conclusion}",
+  "ui.triage.report.reasonLine": "{id} · {severity}: {reason}",
+  "ui.triage.report.actionLine": "Suggested improvement: {action}",
+  "ui.triage.report.pathLine": "Report: {path}",
+  "ui.triage.report.noRework": "No rework this time ({source})",
+  "ui.triage.returnedToVerifier":
+    "Acceptance report lacks the triage structure; returned to Proof to fill it in",
+  "ui.triage.missingReport": "Acceptance report unreadable: {detail}",
+
   "ui.drawer.collapseTitle": "Collapse (Esc)",
 
   "ui.engineSelect.aria": "Session engine",
@@ -1021,6 +1109,13 @@ export const enUS = {
   "main.common.recoveryPageBody":
     "Click reload to recover the interface; existing tasks are not resent automatically.",
 
+  // Background task service
+  "main.backgroundTasks.unavailable": "Background task service unavailable",
+
+  // Flow status service (docs/flows/<flowId>.yaml reads)
+  "main.flowStatus.unavailable": "Flow status service unavailable",
+  "main.flowStatus.invalidProject": "Invalid project directory",
+
   "main.session.contextRecoveryFailed":
     "Native context restore failed; the context was rebuilt.",
   "main.session.rebuiltBoundary":
@@ -1709,6 +1804,19 @@ export const enUS = {
     "{label} rejected: {reason}. This automatic judgment did not pass/did not complete and was rejected; correct the cause above and submit the confirmation again.",
   "main.customerInput.autoApprovalLabel": "Auto-approval",
   "main.customerInput.autoDecisionLabel": "Auto-decision",
+  // Write pre-authorization system lines (write-preauthorization.ts; customer rule of 2026-10-25).
+  "main.customerInput.writePreauthorization.accepted":
+    "Boundary write pre-authorized; allowed: {paths}",
+  "main.customerInput.writePreauthorization.rejected":
+    "System pre-authorization rejected: {paths} (outside the role boundary; no customer card, no judge call)",
+  "main.customerInput.writePreauthorization.reason.boundary":
+    "Target path is outside the role's writable boundary",
+  "main.customerInput.writePreauthorization.reason.unresolved":
+    "Declared path cannot be resolved",
+  "main.customerInput.writePreauthorization.reason.mixed":
+    "Request contains out-of-boundary paths; rejected as a whole",
+  "main.customerInput.writePreauthorization.noPaths":
+    "Write confirmation has no resolvable declared paths",
   "main.judgeReason.readDeniedPrefix": "Judge read denied: ",
   "main.judgeReason.readDeniedDetail": "Read denied: ",
   "main.judgeReason.readDeniedFallback":

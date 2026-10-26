@@ -31,6 +31,8 @@
 | 会话开局注入（已安装技能节，G-4 I4） | `renderInstalledSkillsSection(projectRoot, roleId)`：读 `docs/skills/<name>/install.md` 登记＋当刻字节 digest，渲染「本角色已安装技能（先读）」指针节；坏件跳过不拒会、零技能空串；三适配器系统提示各拼接一段（接线待其属主） | 编排侧已实现（渲染单一来源；三适配器接线待其属主） | [G-4 I4/I5 记录](docs/change/2026-10-16_change_g4-skill-injection-and-preauth.md) |
 | 交互工具 CLI 通道 | CLI 端的客户确认/操作者确认通道（stdin 问答；EOF/未识别一律 fail-closed） | 已实现 | 功能文档待补（[客户确认不设超时](docs/change/2026-10-12_change_customer-input-no-timeout.md)） |
 | 会话自持目录（重启恢复） | 会话数据按角色/runtime 隔离于 `.ans/sessions/<role>/<runtime>/`（Service 注入存储，实际持久化才建目录） | 已实现（编排侧） | 功能文档待补（[session-dir 接线](docs/change/2026-10-12_change_session-dir-restore-wiring.md)） |
+| **独立复核请求能力透传（`request_acceptance`，2026-10-25）** | 内置治理角色会话可把应用注入的 `requestAcceptance` 透传到运行时选项；未提供/项目角色 ⇒ 工具不注册；请求复核 ≠ 客户批准 | 编排侧已实现（桌面注入与 UI 待桌面窗口角色） | [变更记录](docs/change/2026-10-25_change_request-acceptance-and-acceptance-criteria-step.md)；公开面见 [api-spec](api-spec.md#2026-10-25-独立复核能力透传与验收标准步骤收口编排-ab-面) |
+| **验收标准步骤收口（`completeAcceptanceCriteriaStep`，2026-10-25）** | 应用校验最新 `docs/acceptance/<flowId>-criteria-vN.md` 存在后，补 app/app `artifact.observed` 并把 flow 的 `acceptance-criteria` 从 pending/dispatched 收口到 done（幂等/不改其它步骤/不写客户决定） | 编排侧已实现（桌面接线待桌面窗口角色；未经独立验收） | [变更记录](docs/change/2026-10-25_change_request-acceptance-and-acceptance-criteria-step.md)；公开面见 [api-spec](api-spec.md#2026-10-25-独立复核能力透传与验收标准步骤收口编排-ab-面) |
 
 ## 说明
 

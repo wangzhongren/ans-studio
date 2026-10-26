@@ -73,12 +73,14 @@ test("开关默认关：请求走原确认卡，判断 agent 0 次调用，审�
     assert.equal(off.warningVisible, false);
     const on = UL.shellJudgeToggleView(true, true, false);
     assert.equal(on.checked, true);
-    assert.equal(on.label, "替我审批中 · 判断 agent");
+    // 文案来源：共享 i18n `ui.judge.shellOn`（2026-10 B1 起为「自动代理」）。
+    assert.equal(on.label, "替我审批中 · 自动代理");
     assert.equal(on.warningVisible, true);
     const warning = UL.shellJudgeWarningLines();
     assert.equal(warning.length, 4, "开启警告：approval 一段 + 三条通用说明（按组列行）");
     assert.match(warning[0]!, /替我审批中：shell 命令与写盘\/写卡确认/);
-    assert.match(warning[1]!, /判断 agent 只读项目内代码\/文档\/角色卡/);
+    // 文案来源：共享 i18n `ui.judge.scopeNote`（同上批次改为「自动代理只读……」）。
+    assert.match(warning[1]!, /自动代理只读项目内代码\/文档\/角色卡/);
     assert.match(warning[2]!, /accept-quick/);
     assert.match(warning[3]!, /每次代批会产生一次模型调用/);
     assert.equal(UL.shellJudgeToggleView(false, true, false).label, "当前版本不支持自动判断，保持手动");
@@ -167,7 +169,8 @@ test("开启后 judge allow：0 卡、1 行、审计 operator:judge:<引擎> + j
     const UL = await loadUiLabels();
     const view = UL.shellJudgeResultView(row);
     assert.ok(view !== null);
-    assert.equal(view.title, "已替你放行（判断 agent · 代审批）");
+    // 文案来源：共享 i18n `ui.judge.approved`。
+    assert.equal(view.title, "已替你放行（自动代理 · 代审批）");
     assert.equal(view.operatorText, "operator:judge:claude");
     assert.equal(view.engineText, "判断引擎：Claude");
     assert.equal(view.denyOverride, false);

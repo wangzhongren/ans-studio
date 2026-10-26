@@ -21,11 +21,17 @@ import {
   dedupeHistoryRows,
   describeEvent,
   envelopeMatches,
+  historyRenderParts,
   historyRowToDescriptor,
   mergeClientProjectionData,
   normalizeEnvelopes,
   type NewRowDescriptor,
 } from "@/chat/events";
+import {
+  liveRowIdentity,
+  planHistoryMerge,
+  type LiveRowIdentity,
+} from "@/chat/history-merge";
 import {
   governanceJudgeResultView,
   shellJudgeResultView,
@@ -273,17 +279,15 @@ function countHistoryEventKeys(rows: ReadonlyArray<Record<string, unknown>>): Ma
 }
 
 /**
- * 增量回放时，历史 user 行优先认领尚未绑定 turnId 的本地乐观行（同文本、先到先得）。
+ * 增量回放时，历史 user 呈现分片优先认领尚未绑定 turnId 的本地乐观行（同文本、先到先得）。
  * 这样「先键入发送、后到历史」不会再叠一条相同用户气泡；turnId 回填后 ACK 仍按文本幂等。
+ * 以**呈现分片文本**为参数：system-notice 历史行的用户正文在拆分后的 user 分片里。
  */
-function claimOptimisticUserRow(
+function claimOptimisticUserText(
   model: RowModel<ChatRow>,
-  row: Record<string, unknown>,
+  turnId: string,
+  text: string,
 ): boolean {
-  const descriptor = historyRowToDescriptor(row, currentLocale());
-  if (descriptor.kind !== "user") return false;
-  const turnId = asString(descriptor.turnId);
-  const text = asString(asDict(descriptor.data).text);
   if (!turnId || !text) return false;
   for (const candidate of model.rows) {
     if (candidate.kind !== "user" || candidate.turnId) continue;
@@ -1382,42 +1386,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     };
     const appendHistoryRow = (row: Record<string, unknown>): ChatRow =>
       appendHistoryDescriptor(historyRowToDescriptor(row, currentLocale()));
-    /** 增量回放：同一轮同一文本的实时行已存在时，不再追加第二条（实时回显不是新事实）。 */
-    const liveCoversHistoryRow = (row: Record<string, unknown>): boolean => {
-      const descriptor = historyRowToDescriptor(row, currentLocale());
-      if (
-        descriptor.kind !== "user" &&
-        descriptor.kind !== "assistant" &&
-        descriptor.kind !== "system" &&
-        descriptor.kind !== "injected" &&
-        descriptor.kind !== "denied"
-      ) {
-        return false;
-      }
-      const data = asDict(descriptor.data);
-      const text = asString(data.text) || asString(data.body);
-      if (!text) return false;
-      const turnId = asString(descriptor.turnId);
-      for (const candidate of model.rows) {
-        if (candidate.replay) continue;
-        if (
-          candidate.kind !== "user" &&
-          candidate.kind !== "assistant" &&
-          candidate.kind !== "system" &&
-          candidate.kind !== "injected" &&
-          candidate.kind !== "denied"
-        ) {
-          continue;
-        }
-        const candidateData = asDict(candidate.data);
-        const candidateText =
-          asString(candidateData.text) || asString(candidateData.body);
-        if (candidateText !== text) continue;
-        if (asString(candidate.turnId) !== turnId) continue;
-        return true;
-      }
-      return false;
-    };
     let added = 0;
     if (plan.mode === "full") {
       if (rows.length === 0 && model.rows.length > 0) {
@@ -1468,17 +1436,18 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           ) {
             continue;
           }
-          const data = asDict(descriptor.data);
-          const text = (asString(data.body) || asString(data.text))
-            .split(/\r?\n/)[0]
-            .trim();
-          if (text === "") continue;
-          const group = groupOf(descriptor.kind);
-          const turnId = asString(descriptor.turnId);
-          const exactKey = group + "|" + turnId + "|" + text;
-          exactCounts.set(exactKey, (exactCounts.get(exactKey) || 0) + 1);
-          const looseKey = group + "|" + text;
-          looseCounts.set(looseKey, (looseCounts.get(looseKey) || 0) + 1);
+          // 按**呈现分片**计数：system-notice 历史行会拆成通知行 + 用户正文行，
+          // 与实时行的呈现身份一致后才能被下方 preserve 循环正确覆盖。
+          for (const part of historyRenderParts(descriptor)) {
+            const text = part.text.split(/\r?\n/)[0].trim();
+            if (text === "") continue;
+            const group = groupOf(part.kind);
+            const turnId = asString(descriptor.turnId);
+            const exactKey = group + "|" + turnId + "|" + text;
+            exactCounts.set(exactKey, (exactCounts.get(exactKey) || 0) + 1);
+            const looseKey = group + "|" + text;
+            looseCounts.set(looseKey, (looseCounts.get(looseKey) || 0) + 1);
+          }
         }
         const consume = (counts: Map<string, number>, key: string): boolean => {
           const count = counts.get(key) || 0;
@@ -1640,11 +1609,42 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       liveKeyCounts.delete(roleId);
     } else if (plan.mode === "append") {
       const appendRows = dedupeHistoryRows(rows.slice(plan.from), currentLocale());
+      // 实时行身份在每条历史行前重算：上一条认领可能刚回填了乐观行的 turnId。
+      const liveIdentities = (): LiveRowIdentity[] =>
+        model.rows
+          .map((candidate) => liveRowIdentity(candidate))
+          .filter((identity): identity is LiveRowIdentity => identity !== null);
       for (const row of appendRows) {
-        if (claimOptimisticUserRow(model, row)) continue;
-        if (liveCoversHistoryRow(row)) continue;
-        appendHistoryRow(row);
-        added += 1;
+        const descriptor = historyRowToDescriptor(row, currentLocale());
+        const turnId = asString(descriptor.turnId);
+        // 先认领本地乐观行（同文、无 turnId）；system-notice 的用户正文在拆分后的 user 分片。
+        const claimed = new Set<string>();
+        for (const part of historyRenderParts(descriptor)) {
+          if (part.kind !== "user") continue;
+          if (claimOptimisticUserText(model, turnId, part.text)) claimed.add(part.text);
+        }
+        // 按呈现分片判定（通知/用户正文分别覆盖）；不同 turn 的同文输入保留。
+        const decision = planHistoryMerge(descriptor, liveIdentities(), claimed);
+        if (decision.appendRow) {
+          appendHistoryRow(row);
+          added += 1;
+        }
+        if (decision.appendNoticeOnly) {
+          appendHistoryDescriptor({
+            ...descriptor,
+            data: { ...asDict(descriptor.data), remainder: "" },
+          });
+          added += 1;
+        }
+        for (const text of decision.appendUserTexts) {
+          appendHistoryDescriptor({
+            kind: "user",
+            data: { text },
+            ...(turnId ? { turnId } : {}),
+            replay: true,
+          });
+          added += 1;
+        }
       }
       added += appendHistoryReports(roleId, reports, scope, false);
       historySignatures.set(roleId, signatures);

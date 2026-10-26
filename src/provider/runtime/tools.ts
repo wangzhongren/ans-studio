@@ -39,6 +39,9 @@ import type {
   FlowGetFn,
   FlowStepUpdateFn,
   FlowStepSupersedeFn,
+  RequestAcceptanceFn,
+  RequestAcceptanceInput,
+  RequestAcceptanceResult,
   FlowToolEvidence,
   FlowToolResult,
   FlowToolStatus,
@@ -150,6 +153,9 @@ export const FLOW_STEP_UPDATE_TOOL_NAME = "flow_step_update";
 
 /** flow_step_supersede 工具名（2026-10-20；新步骤取代旧步骤，Steward/Lead（工作流管理者）——服务端校验）。 */
 export const FLOW_STEP_SUPERSEDE_TOOL_NAME = "flow_step_supersede";
+
+/** request_acceptance 工具名（2026-10-25；交付就绪后由统筹直接请应用派独立复核/Proof）。 */
+export const REQUEST_ACCEPTANCE_TOOL_NAME = "request_acceptance";
 
 /** 扩展层对 run_shell 的能力级判定结果：非 undefined 即阻断（默认拒绝）。 */
 export interface ShellKillSwitchDecision {
@@ -1191,6 +1197,14 @@ function isJudgeOperator(operatorId: string | undefined): boolean {
 }
 
 /**
+ * `outcome.operatorId` 是否来自**系统裁决**（`system:<机制>`，如 `system:write-preauthorization`）。
+ * 系统预授权不是客户手批、不是判断代批：回执必须按此前缀分流，不得套用客户确认/拒绝措辞。
+ */
+function isSystemOperator(operatorId: string | undefined): boolean {
+  return operatorId !== undefined && operatorId.startsWith("system:");
+}
+
+/**
  * 判断 agent 自动退回回执（2026-10-23 验收返工路由方案 §5.3.3 / Q7 A）：judge 的 `declined`
  * **不是客户拒绝**，不得套用「客户拒绝」措辞。只有验收卡（`request_choice` +
  * `cardKind:"acceptance"`）走应用返工路由，才写 Convener/重新提交验收；其余 judge 退回
@@ -1204,6 +1218,83 @@ function judgeDeclined(name: string, reason: string | undefined, acceptanceRewor
   return {
     ok: false,
     message: `${name}：自动决策未通过/未完成${detail}；这不是客户拒绝；${handling}`,
+  };
+}
+
+/**
+ * 系统预授权**放行**回执（2026-10-25 边界内写入预授权）：应用在触达客户通道之前直接放行
+ * 边界内写盘——没有呈现确认卡，也没有判断 agent 参与。**不得**说成「客户已确认」；
+ * `confirmed:true` 保留为技术凭据（唯一凭据契约不变），但来源必须如实标注为系统预授权。
+ */
+function systemPreauthorizationAccepted(name: string, title: string, operatorId: string | undefined): ToolResult {
+  return {
+    ok: true,
+    message:
+      `${name}：系统预授权已直接放行（边界内写入；confirmed:true；${operatorTag(operatorId)}；「${title}」）——` +
+      `这是系统预授权，不是客户确认，也不是判断 agent 代批。` +
+      `可按已放行的内容继续（如写盘，写入须与向客户预览的内容一致）；` +
+      `向客户汇报时说明这是系统预授权放行，不要说成客户确认。`,
+  };
+}
+
+/**
+ * 系统预授权**拒绝**回执（边界外/不可写）：应用在未呈现确认卡、未调用判断 agent 的情况下直接
+ * 拒绝。它不是客户拒绝、不是客户未同意；原因也不是「发卡缺项」——**不得**引导模型「补齐后重新
+ * 调用」，边界外写入不会因重试而获准（2026-10-25 边界内写入预授权）。
+ */
+function systemPreauthorizationDeclined(name: string, reason: string | undefined): ToolResult {
+  const detail = reason !== undefined && reason.trim() !== "" ? reason : "未提供";
+  return {
+    ok: false,
+    message:
+      `${name}：系统预授权拒绝（边界外或不可写；原因：${detail}）——` +
+      `这是系统预授权判定，不是客户拒绝，也不是客户未同意。` +
+      `不要改写参数或重复调用本工具重试：边界外写入不会因重试而获准。` +
+      `请如实告知客户该写入被系统预授权拒绝（不要声称客户拒绝或同意）。`,
+  };
+}
+
+/**
+ * 验收分诊回执（2026-10-25 验收分诊设计 §7.3）：客户在**分诊卡**上的选择（下发统筹修改 / 仅汇报不返工）
+ * 不是客户在验收卡上直接 accept/reject——即使「仅汇报」按既有 accepted 结算，也不得说成客户选择 accept。
+ */
+function acceptanceTriageReceipt(
+  name: string,
+  triage: { disposition: "rework" | "report-only"; source: "judge" | "customer"; conclusion: string },
+  selection: string,
+): ToolResult {
+  const source = triage.source === "judge" ? "判断代批（替我决策）" : "客户在验收分诊卡上的选择";
+  const headline =
+    triage.disposition === "report-only"
+      ? "按验收分诊卡选择「仅汇报不返工」处理（不是客户在验收卡上直接选择 accept）"
+      : "按验收分诊卡选择「下发统筹修改」处理（以验收 reject 结算并交统筹组织返工；不是客户放弃验收）";
+  return {
+    ok: true,
+    message:
+      `${name}：${source}——${headline}；验收结论仍为 ${triage.conclusion}。` +
+      `请如实向客户说明这是分诊处置，不要宣称客户直接接受或直接拒绝了验收。` +
+      `（实际选项回执：${selection}）`,
+  };
+}
+
+/**
+ * 验收分诊**自动处置**回执（2026-10-25 验收分诊设计 §4.4 / §8）：判断代批或结构不足时验收卡
+ * **未向客户呈现**，应用已按分诊结果处置——不得说成客户拒绝/同意。
+ */
+function acceptanceTriageDeclinedReceipt(
+  name: string,
+  triage: { disposition: "rework" | "report-only"; source: "judge" | "customer"; conclusion: string },
+  reason: string | undefined,
+): ToolResult {
+  const label = triage.disposition === "report-only" ? "仅汇报不返工" : "下发统筹修改";
+  const source = triage.source === "judge" ? "判断代批（替我决策）" : "客户分诊选择";
+  const detail = reason !== undefined && reason.trim() !== "" ? `；说明：${reason}` : "";
+  return {
+    ok: false,
+    message:
+      `${name}：验收分诊已按「${label}」处置（${source}；验收结论 ${triage.conclusion}）——` +
+      `验收卡未向客户呈现，**不是客户拒绝**；请用 flow_get 核对流程与治理账本，` +
+      `不要宣称客户拒绝或同意，也不要重复提交同一报告${detail}。`,
   };
 }
 
@@ -1227,6 +1318,10 @@ function abortedToolResult(name: string): ToolResult {
   if (name === FLOW_GET_TOOL_NAME) return { ok: false, message: `${name}：流程读取**未完成**（原因：会话已中止）——不要据此推断流程状态。` };
   if (name === FLOW_STEP_UPDATE_TOOL_NAME || name === FLOW_STEP_SUPERSEDE_TOOL_NAME) {
     return { ok: false, message: `${name}：变更**未完成**（原因：会话已中止）——**不要当它已生效**；如确需，先 flow_get 看最新 revision 再重试。` };
+  }
+  // 独立复核请求（2026-10-25）：中止时**不假设已派发**（零副作用面如实）。
+  if (name === REQUEST_ACCEPTANCE_TOOL_NAME) {
+    return { ok: false, message: `${name}：独立复核请求**未获结果**（原因：会话已中止）——**不要当已派发**；如实告知客户。` };
   }
   // 2026-10-22 后台任务（B1）：中止时**不假设已启动/已停止**（零副作用面如实）。
   if (name === START_BACKGROUND_TASK_TOOL_NAME) {
@@ -1313,6 +1408,11 @@ async function askCustomer(
  * - `ok:false` 且措辞「治理确认卡未发出」＝ 应用在**呈现前**拒绝发卡（`declined + notPresented:true`，
  *   如治理角色缺 `flowId`/`cardKind`）——客户**从未看到**卡片：不要写盘，也不要声称客户拒绝或同意；
  *   按回执补齐参数后重新调用（2026-10-22 无效治理卡守卫设计 §4.6）。
+ * - `operatorId` 以 `system:` 开头（如 `system:write-preauthorization`，2026-10-25 边界内写入预授权）：
+ *   `answered + confirmed:true` ＝ 系统预授权**直接放行**（边界内写入；**不是客户确认**）；
+ *   `declined` ＝ 系统预授权**拒绝**（边界外/不可写；**不是客户拒绝、不是客户未同意**，边界外写入
+ *   不会因重试而获准）。该分支按 `operatorId` 先于 `notPresented` 判定——系统拒绝也会置
+ *   `notPresented:true`，但原因不是「发卡缺项」，不能套用「卡未发出/请补齐后重新调用」的文案。
  */
 function makeRequestConfirmationTool(
   fn: CustomerInputFn,
@@ -1353,6 +1453,9 @@ function makeRequestConfirmationTool(
       });
       if ("ok" in out) return out; // 通道故障 / 超时 / 中止 → 未获同意
       if (out.outcome === "declined") {
+        // 系统预授权拒绝（2026-10-25 边界内写入预授权）：`system:` 前缀且同时带 `notPresented:true`；
+        // 必须在 notPresented 分支之前识别——它是边界判定，不是「发卡缺项」，不得引导模型补齐重发。
+        if (isSystemOperator(out.operatorId)) return systemPreauthorizationDeclined(name, out.reason);
         // 应用在触达客户通道之前拒绝发卡（治理字段不齐等）：卡片**未呈现**，不得说成客户拒绝。
         if (out.notPresented === true) return cardNotPresented(name, out.reason);
         // 判断 agent 自动退回：不是客户拒绝；确认卡不走验收返工路由，用通用文案。
@@ -1369,6 +1472,10 @@ function makeRequestConfirmationTool(
             ok: true,
             message: judgeReceipt(name, out.judge, `已确认「${title}」（confirmed:true）`),
           };
+        }
+        // 系统预授权放行（2026-10-25）：不说成「客户已确认」；judge 路径已在上方逐字保留。
+        if (isSystemOperator(out.operatorId)) {
+          return systemPreauthorizationAccepted(name, title, out.operatorId);
         }
         return {
           ok: true,
@@ -1490,9 +1597,13 @@ function makeRequestChoiceTool(
       const out = await askCustomer(name, req, fn, timeoutMs, call.signal, gate, { ...metadata, ...governance.value });
       if ("ok" in out) return out; // 通道故障 / 超时 / 中止 → 未获同意
       if (out.outcome === "declined") {
+        // 验收分诊自动处置（判断代批 / 异常卡分诊选择）：卡未呈现、应用已按分诊处置；
+        // 不得说成客户拒绝，也不得说成客户同意（2026-10-25 验收分诊设计 §4.4 / §8）。
+        if (out.triage !== undefined) return acceptanceTriageDeclinedReceipt(name, out.triage, out.reason);
+        // 应用在触达客户通道之前结算（验收分诊退回补报告等）：卡片未呈现，不得说成客户拒绝。
+        if (out.notPresented === true) return cardNotPresented(name, out.reason);
         // 判断 agent 自动退回：不是客户拒绝。仅验收卡（cardKind:"acceptance"）走应用返工路由
         // （2026-10-23 验收返工路由 §5.3.3）；其他卡种/未给 cardKind 用通用文案。
-        // `notPresented` 在本工具既有行为中不改变措辞（O1 未授权）；此处分流只看 operatorId/cardKind。
         if (isJudgeOperator(out.operatorId)) {
           return judgeDeclined(name, out.reason, governance.value.cardKind === "acceptance");
         }
@@ -1515,6 +1626,10 @@ function makeRequestChoiceTool(
         return opt !== undefined ? `${opt.id}（${opt.label}）` : id;
       });
       const selection = labels.length > 0 ? labels.join("、") : "（未选择任何项）";
+      if (out.triage !== undefined) {
+        // 验收分诊卡的选择：按分诊结果结算了验收请求，但**不是**客户在验收卡上直接 accept/reject。
+        return acceptanceTriageReceipt(name, out.triage, selection);
+      }
       if (out.judge !== undefined) {
         // 判断 agent 代批：不得说成客户本人选择（评审 §7.5）。
         return {
@@ -2587,6 +2702,99 @@ function makeFlowStepSupersedeTool(fn: FlowStepSupersedeFn): ExecutableTool {
   };
 }
 
+// —————————————— 独立复核请求（2026-10-25 客户要求；request_acceptance） ——————————————
+//
+// 背景：统筹（Steward）交付完成后应能**直接提交独立复核**，不再等应用的一次 settle/账本事件才派 Proof。
+// 本层只做两件事：**参数形状校验**（非法在触达能力前拒绝，不猜测、不静默丢弃）＋**调用注入能力并如实
+// 转达回执**（`ok`/`code`/`message`；失败不伪装成功）。派发（Proof/验收）、验收标准/变更包/风险档/流程
+// 完整性校验与 flow/账本写入全部在**应用注入的能力**侧——本工具不写 flow/账本、不做治理判定、不改客户
+// 决定、不代表客户批准。未注入能力 ⇒ 工具不注册（沿 flow_get 先例，能力缺席＝最强 fail-closed）。
+
+/** `request_acceptance` 回执 code 的冻结枚举（与 `RequestAcceptanceResult` 同一契约；契约外回执 fail-closed）。 */
+const REQUEST_ACCEPTANCE_CODES: readonly RequestAcceptanceResult["code"][] = Object.freeze([
+  "dispatched",
+  "flow-not-found",
+  "criteria-missing",
+  "change-package-missing",
+  "change-package-no-risk",
+  "flow-incomplete",
+  "runtime-unresolved",
+  "already-dispatched",
+  "unavailable",
+]);
+const REQUEST_ACCEPTANCE_CODE_SET: ReadonlySet<string> = new Set(REQUEST_ACCEPTANCE_CODES);
+
+/**
+ * 回执 → 工具结果：**原样**转达 `ok`/`code`/`message`（可选 `flowId`/`runtime` 一并如实呈现）。
+ * 契约外回执（缺失/非对象/缺 ok/code/message/未知 code）⇒ fail-closed「未获明确结果」，按未派发处理，
+ * **绝不说成已派发**。`dispatched` 也不代表客户批准或验收通过（见文案纪律）。
+ */
+function requestAcceptanceResultMessage(name: string, value: unknown): ToolResult {
+  const contractExternal = (): ToolResult => ({
+    ok: false,
+    message: `${name}：应用未返回明确结果（回执缺失或非法）——按**未派发**处理；**不要当已派发**，如实告知客户。`,
+  });
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return contractExternal();
+  const receipt = value as Partial<RequestAcceptanceResult>;
+  if (
+    typeof receipt.ok !== "boolean" ||
+    typeof receipt.code !== "string" ||
+    !REQUEST_ACCEPTANCE_CODE_SET.has(receipt.code) ||
+    typeof receipt.message !== "string" ||
+    receipt.message.trim() === ""
+  ) {
+    return contractExternal();
+  }
+  const parts = [`ok=${receipt.ok}`, `code=${receipt.code}`];
+  if (typeof receipt.flowId === "string" && receipt.flowId !== "") parts.push(`flowId=${receipt.flowId}`);
+  if (typeof receipt.runtime === "string" && receipt.runtime.length > 0) parts.push(`runtime=${receipt.runtime}`);
+  const detail = `（${parts.join("；")}）：${receipt.message}`;
+  if (receipt.ok) {
+    const headline = receipt.code === "dispatched" ? "独立复核已派发" : "请求已受理";
+    return {
+      ok: true,
+      message:
+        `${name}：${headline}${detail}。` +
+        `注意：**请求复核 ≠ 客户批准**——本工具不改客户决定、不代表客户批准；派发与 flow/账本状态由应用实现，` +
+        `不要宣称验收已通过。`,
+    };
+  }
+  return { ok: false, message: `${name}：独立复核请求**未成功**${detail}——**不要当已派发**；如实告知客户。` };
+}
+
+/** request_acceptance：交付就绪后请应用派独立复核（参数 `flowId?`/`note?`；回执如实转达）。 */
+function makeRequestAcceptanceTool(fn: RequestAcceptanceFn): ExecutableTool {
+  const name = REQUEST_ACCEPTANCE_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      // flowId 可选：缺省/空白＝当前流程（由应用归一）；非字符串 ⇒ 在触达能力前拒绝。
+      const rawFlowId = call.args["flowId"];
+      if (rawFlowId !== undefined && rawFlowId !== null && typeof rawFlowId !== "string") {
+        return flowArgumentError(name, "flowId 参数非法（应为字符串；可省略＝当前流程）");
+      }
+      const flowId = typeof rawFlowId === "string" && rawFlowId.trim() !== "" ? rawFlowId : undefined;
+      const note = readFlowOptionalText(call.args, "note", name);
+      if (!note.ok) return note.result;
+      const input: RequestAcceptanceInput = {
+        ...(flowId !== undefined ? { flowId } : {}),
+        ...(note.value !== undefined ? { note: note.value } : {}),
+      };
+      let result: unknown;
+      try {
+        result = await raceAbort(
+          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(input); }),
+          call.signal,
+          `${name} 派发独立复核`,
+        );
+      } catch (err) {
+        return { ok: false, message: `${name}：独立复核请求**未完成**（原因：${reasonOf(err)}）——**不要当已派发**；如实告知客户。` };
+      }
+      return requestAcceptanceResultMessage(name, result);
+    },
+  };
+}
+
 /**
  * 构造受治理工具集：
  * - 写入类 write_file / edit_file（先 gate，获准且配置了 writeRoot 时落盘）；
@@ -2721,6 +2929,11 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   if (flowStepUpdate !== undefined) tools.push(makeFlowStepUpdateTool(flowStepUpdate));
   const flowStepSupersede = options?.flowStepSupersede;
   if (flowStepSupersede !== undefined) tools.push(makeFlowStepSupersedeTool(flowStepSupersede));
+  // 结构性保证（2026-10-25 独立复核请求，沿 flow_get 先例）：**未注入能力时 `request_acceptance` 不存在**。
+  // 只给内置治理角色——由调用方（编排/桌面注入端）决定注入；未注入 ⇒ 模型无法请求
+  // （能力缺席 = 最强 fail-closed）。派发/校验/flow/账本由能力实现，本层只路由并如实转达回执。
+  const requestAcceptance = options?.requestAcceptance;
+  if (requestAcceptance !== undefined) tools.push(makeRequestAcceptanceTool(requestAcceptance));
   // Observe customer waits without storing titles, previews or selected values.
   return tools.map((tool) => {
     const { parameters, ...description } = describeTool(tool.name);

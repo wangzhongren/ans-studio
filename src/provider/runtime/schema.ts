@@ -135,13 +135,16 @@ export function describeTool(name: string): ToolDescription {
   if (name === "request_confirmation") {
     // 交互工具族（设计 A-1/A-2）：请求客户确认（可带预览——如角色卡 + 边界摘要）。
     // 已授权项目任务可推进；扩张治理边界仍须客户确认。
+    // 2026-10-25 客户新规则：角色边界（Section 1）内的写入是预授权——write_file/edit_file 直接写、
+    // 无需逐次 request_confirmation；本工具用于治理敏感写入（角色卡/边界/共享目录/flows/账本等）
+    // 与需要客户决定的动作，**不是**边界内普通写盘的前置步骤（文案与 write_file/edit_file 描述同口径）。
     // 2026-10-16 客户裁定（su 写 `docs/su/**` 与 `docs/contracts/**` 免逐次审批；编排预置进 su
-    // 会话初始 writeSet、门禁引擎同步 su 卡「确认制要点」）：本工具文案补「唯一例外（仅内置治理
-    // 角色 su）——写盘许可已预置、免逐次确认、开会话与重建后均生效」；G-4（2026-10-16 批准）后
+    // 会话初始 writeSet、门禁引擎同步 su 卡「确认制要点」）：本工具文案补「治理写盘的预授权例外（仅
+    // 内置治理角色 su）——写盘许可已预置、免逐次确认、开会话与重建后均生效」；G-4（2026-10-16 批准）后
     // 预授权再增 `docs/skills/**`、扩为三棵；**G-4 V2（2026-10-16「按推荐批准，开始实施」）后
     // 再增 `docs/mcp/**`、扩为四棵**（与门禁引擎 V2 新卡文本同口径；编排 `SU_PREAUTHORIZED_WRITE_DIRS`
-    // 同批已落——登记规则：「门禁引擎/编排若再调预置口径须回改本处文案与测试」）；其余一切写盘仍逐条
-    // 确认，非 su 角色语义不变（例外不做 su 限定即会把普通角色带歪）。
+    // 同批已落——登记规则：「门禁引擎/编排若再调预置口径须回改本处文案与测试」）；四棵树之外的治理敏感
+    // 写盘仍逐条确认，非 su 角色语义不变（例外不做 su 限定即会把普通角色带歪）。
     // executionMode:"sequential"（A-6）：防止同批的 write_file 抢跑于确认（Pi 缺省同批并行执行工具）。
     return {
       parameters: {
@@ -197,10 +200,12 @@ export function describeTool(name: string): ToolDescription {
         additionalProperties: true,
       },
       description:
-        "向客户请求确认并**挂起等待其回应**（前端渲染成交互卡）。已接受项目边界内、已授权任务的**读取与检查**" +
-        "无需逐次确认；**写盘一律先经本工具确认**——把将写出的路径列入 preview，客户返回 `confirmed:true` 后系统才为这些路径发行写盘许可。" +
-        "**唯一例外（仅内置治理角色 su）**：`docs/su/**`（su 自己的工作笔记）、`docs/contracts/**`（跨角色契约文档）、`docs/skills/**`（su 给角色安装的技能文档）与 `docs/mcp/**`（su 给角色安装的 MCP 声明文档）的写盘许可**已预置**——" +
-        "写入这四棵目录树**无需逐次确认**、直接写即可（开会话与重建后均生效）；四棵树之外的一切写盘仍须逐条确认。" +
+        "向客户请求确认并**挂起等待其回应**（前端渲染成交互卡）。本工具用于**治理敏感写入或需要客户决定的事项**" +
+        "（角色卡、边界、共享目录与治理写集——如 flows、账本等——的写盘，以及新建/扩张角色边界、治理写集等须客户拍板的变更）；" +
+        "**它不是边界内普通写盘的前置步骤**：目标路径在你的角色边界（Section 1 白名单）内时，write_file / edit_file **直接写**即可，" +
+        "**不需要**逐次调用本工具。治理敏感写盘把将写出的路径列入 preview，客户返回 `confirmed:true` 后系统才为这些路径发行写盘许可。" +
+        "**治理写盘的预授权例外（仅内置治理角色 su）**：`docs/su/**`（su 自己的工作笔记）、`docs/contracts/**`（跨角色契约文档）、`docs/skills/**`（su 给角色安装的技能文档）与 `docs/mcp/**`（su 给角色安装的 MCP 声明文档）的写盘许可**已预置**——" +
+        "写入这四棵目录树**无需逐次确认**、直接写即可（开会话与重建后均生效）；四棵树之外的**治理敏感写盘**仍按既有规则逐条确认（角色边界内的普通写盘不在此列）。" +
         "真正新建或扩张角色边界、治理写集时，须由 su 把变更呈给客户确认（角色卡全文与边界摘要放进 preview），" +
         "仅当返回「客户已确认」时才落盘。未获同意（拒绝/超时/通道不可用）→ **不要写盘**，如实告知客户，不得假设同意。" +
         "**preview 必须列出将要写出的具体路径**（项目内相对路径，如 `角色卡/示例/role-card.md`）——写盘许可依 preview 所列路径发行；" +
@@ -216,9 +221,10 @@ export function describeTool(name: string): ToolDescription {
         "普通项目角色与 single/su 的 `flowId`/`stepId`/`cardKind` 仍为可选；" +
         "这些字段只用于卡片显示与账本分类，**字段本身不构成任何授权**——治理门禁只认应用签发的客户决定。",
       promptGuidelines: [
-        "已接受项目边界内、已授权任务的**读取与检查**无需逐次确认；**写盘（write_file / edit_file 等）一律先经本工具确认**——" +
+        "边界（Section 1 白名单）内的写入是预授权：write_file / edit_file **直接写**，**不需要**本工具逐次确认；" +
+          "本工具用于**治理敏感写入**（角色卡 / 边界 / 共享目录 / 治理写集如 flows、账本等）或**需要客户决定的动作**——" +
           "把将写出的路径逐条列入 preview，客户返回 `confirmed:true` 后系统才会为这些路径发行写盘许可；对话里的口头同意不是凭据。" +
-          "**唯一例外（仅内置治理角色 su）**：`docs/su/**`、`docs/contracts/**`、`docs/skills/**` 与 `docs/mcp/**` 的写盘许可已预置——写这四棵目录树无需逐次确认、直接写即可（开会话与重建后均生效）；四棵树之外的一切写盘仍须逐条确认。" +
+          "**治理写盘的预授权例外（仅内置治理角色 su）**：`docs/su/**`、`docs/contracts/**`、`docs/skills/**` 与 `docs/mcp/**` 的写盘许可已预置——写这四棵目录树无需逐次确认、直接写即可（开会话与重建后均生效）；四棵树之外的治理敏感写盘仍按既有规则逐条确认。" +
           "新建或扩张角色边界、治理写集须由 su 经 request_confirmation 取得客户的**明确同意**。未获该变更同意 → 不执行治理变更，不得假设同意。",
         "**内置治理角色**（liaison / rapporteur / nominator / convener / verifier）每次调用 request_confirmation 都必须同时携带 `flowId` 与 `cardKind`；" +
           "缺失任一项会被应用拒绝且不会向客户发卡——不要省略、不要猜测；收到「卡片未发出」回执时补齐后重新调用。",
@@ -1091,6 +1097,41 @@ export function describeTool(name: string): ToolDescription {
       ],
     };
   }
+  if (name === "request_acceptance") {
+    // 独立复核请求（2026-10-25 客户要求；只给内置治理角色 注入，注入才注册）。
+    // 文案纪律：只用于交付/证据/变更包已就绪后的**独立复核派发** / 不改客户决定、不代表客户批准、
+    // 不写 flow/账本（由应用实现）/ 回执如实转达 ok/code/message，失败不伪装成功。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          flowId: {
+            type: "string",
+            description: "Flow id to request acceptance for; omit for the current/default flow (resolved by the application)",
+          },
+          note: {
+            type: "string",
+            description: "Optional short note recorded with the request (e.g. what is ready for independent review)",
+          },
+        },
+        required: [],
+        additionalProperties: false,
+      },
+      description:
+        "请应用**派发一次独立复核**（Proof / 验收）——只用于交付物、证据与变更包**已就绪之后**，" +
+        "由统筹（Steward）在交付完成后**直接提交**，不依赖应用的事件（settle/账本）触发。" +
+        "`flowId` 缺省＝当前/默认流程；`note` 为可选说明。应用会校验验收标准、变更包与风险档等前置条件，并按回执如实告知是否已派发。" +
+        "**本工具不改变任何客户决定、不代表客户批准、不写 flow/账本**——派发与状态写入由应用实现；" +
+        "回执的 `ok` / `code` / `message` **原样如实转达**（`code` 如 `dispatched` / `criteria-missing` / `change-package-missing` / " +
+        "`change-package-no-risk` / `flow-incomplete` / `runtime-unresolved` / `already-dispatched` / `unavailable`），" +
+        "**失败绝不伪装成功**。",
+      promptGuidelines: [
+        "只在交付/证据/变更包**已就绪后**调用；它是请应用派独立复核（Proof/验收），不是客户决定、不是验收结论。",
+        "`flowId` 省略＝当前流程，`note` 可选；按回执的 `code`/`message` 如实向客户说明——非 `dispatched` 时不要宣称已派发、不要反复重试。",
+        "请求复核 ≠ 客户批准：本工具不改客户决定、不写 flow/账本；`dispatched` 也不代表验收已通过。",
+      ],
+    };
+  }
   if (!["write_file", "edit_file", "read_file"].includes(name)) throw new Error(`未知 ANS 工具：${name}`);
   const parameters = {
     type: "object",
@@ -1105,9 +1146,13 @@ export function describeTool(name: string): ToolDescription {
   };
   const description =
     name === "write_file"
-      ? "受治理的文件写入工具。写入前会向门禁引擎请求判定；被拒绝时不落盘。"
+      ? "受治理的文件写入工具。目标路径在你的角色边界（Section 1 白名单）内时**直接写入**——这是预授权，**不需要 request_confirmation**；" +
+        "边界外的写入会被 WriteGate 拒绝。每次写入仍会向门禁引擎请求判定，被拒绝时不落盘。" +
+        "治理敏感写入（角色卡 / 边界 / 共享目录 / flows / 账本等）仍按既有确认与审批规则执行。"
       : name === "edit_file"
-        ? "受治理的文件编辑工具。编辑前会向门禁引擎请求判定；被拒绝时不落盘。"
+        ? "受治理的文件编辑工具。目标路径在你的角色边界（Section 1 白名单）内时**直接编辑**——这是预授权，**不需要 request_confirmation**；" +
+          "边界外的写入会被 WriteGate 拒绝。每次编辑仍会向门禁引擎请求判定，被拒绝时不落盘。" +
+          "治理敏感写入（角色卡 / 边界 / 共享目录 / flows / 账本等）仍按既有确认与审批规则执行。"
         : "读取文件内容。读取不受写边界约束（写边界只约束「能否改」，不约束「能否看」）。";
   // executionMode（设计 W-1，真机「同轮丢写」修复）：
   // Pi **缺省同批并行**执行工具（pi-agent-core agent.js:145，A-6 已实测；批级规则：任一工具为

@@ -226,6 +226,66 @@ test("O-1：投递路径同样检查——目标边界陈旧 ⇒ 重建后再投
   await h.mgr.stop(null);
 });
 
+// ————— 2026-10-25 真机重复投递修复 × O-1：应用任务在重建前后至多投递一次 —————
+// 客户真机：Convener 边界刚被角色卡写入改过 ⇒ 任务投递前后触发 `rebuildIfBoundaryStale`；同一
+// 「role-readiness 派发任务」在聊天里出现两条 user 消息而账本只有一条 dispatch.accepted。
+// 语义钉死：重建**不重发已投递/已 ACK 的任务**；重建发生在投递前 ⇒ 队列保留、重建后续投恰一次；
+// 显式返工（重新入队）仍放行；真实客户同文消息不受影响（另在 dispatch-delivery 覆盖）。
+
+test("O-1 × 应用任务稳定身份（重建在投递后）：已投递任务不随重建重发；重建后同任务再调按已投递去重", async () => {
+  const dir = makeProject();
+  const h = makeHarness(listing(dir));
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+
+  const task = "role-readiness 派发任务：组队写卡已通过结构校验";
+  const first = await h.mgr.sendBackground({ projectRoot: dir, roleId: "A", runtime: "demo", text: task });
+  assert.equal(first.ok, true);
+  assert.match(String(first.clientMessageId), /^ans-app-task:/, "应用任务带稳定身份");
+  await tick(80);
+  assert.equal(h.sent.A.filter((t) => t === task).length, 1, "首次投递恰一条");
+  h.streams.A.push({ kind: "settled", summary: "一轮结束" });
+  await tick(80);
+
+  // 边界变更 ⇒ 下一次发言触发 A 会话作废重建（dispose → 新句柄）。
+  fs.writeFileSync(path.join(dir, "角色卡", "A", "boundary.yaml"), "entries:\n  - root: project\n", "utf8");
+  const again = await h.mgr.send("继续");
+  assert.equal(again.ok, true);
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 2, "重建确已发生");
+  await tick(120);
+  assert.equal(h.sent.A.filter((t) => t === task).length, 1, "重建后不重发已投递任务（无第二条 user 消息）");
+
+  // 重建后应用侧再调同一任务（另一链路/重复检查）⇒ 按已投递去重，不再投递。
+  const dup = await h.mgr.sendBackground({ projectRoot: dir, roleId: "A", runtime: "demo", text: task });
+  assert.equal(dup.ok, true);
+  assert.equal(dup.duplicate, true, "重建后的同任务调用不重投");
+  await tick(80);
+  assert.equal(h.sent.A.filter((t) => t === task).length, 1);
+  await h.mgr.stop(null);
+});
+
+test("O-1 × 应用任务稳定身份（重建在投递前）：排队任务经重建后续投恰一次", async () => {
+  const dir = makeProject();
+  const h = makeHarness(listing(dir));
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+
+  // A 忙（占位轮未 settle）⇒ 应用任务排队；排队期间边界变化 ⇒ settle 放行时先重建、再投递恰一次。
+  const busy = await h.mgr.send("占位（让 A 忙）");
+  assert.equal(busy.ok, true);
+  const task = "role-readiness 派发任务：组队写卡已通过结构校验（重建前排队）";
+  const queued = await h.mgr.sendBackground({ projectRoot: dir, roleId: "A", runtime: "demo", text: task });
+  assert.equal(queued.ok, true);
+  assert.equal(queued.queued, true, "A 忙 ⇒ 任务排队（不并发）");
+  fs.writeFileSync(path.join(dir, "角色卡", "A", "boundary.yaml"), "entries:\n  - root: project\n", "utf8");
+  h.streams.A.push({ kind: "settled", summary: "一轮结束" });
+  await tick(350);
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 2, "投递前检出陈旧 ⇒ 作废重建");
+  assert.equal(h.sent.A.filter((t) => t === task).length, 1, "重建后续投恰一次（队列不丢、不重复）");
+  assert.ok(h.envelopes.some((e) => /边界已更新/.test(String(e.event.summary || ""))), "重建如实记行");
+  await h.mgr.stop(null);
+});
+
 test("O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递/su-settle 扫描；措辞按 D-1 两分支", () => {
   assert.ok(SESSION_SRC.includes('createHash("sha256")'), "信号 = 内容哈希（可信信号，非界面推测）");
   assert.ok(SESSION_SRC.includes("private async boundaryDiff("), "差异检查（逐文件比对）");

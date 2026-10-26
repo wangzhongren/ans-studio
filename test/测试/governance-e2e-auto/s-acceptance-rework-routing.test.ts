@@ -533,7 +533,13 @@ test("S7-A 客户 reject 全链路：路由 Lead（报告+清单+决定）→ �
       assert.match(redispatchTask, /流程在上次验收复核后有更新/);
       assert.match(redispatchTask, new RegExp(`docs/acceptance/${FLOW}-report-v2\\.md`), "重派要求写 vN+1");
       assert.ok(redispatchTask.includes(REPORT_REL), "重派任务引用被拒报告（不覆盖）");
-      assert.match(redispatchTask, /acceptance-rework\/v1/, "重派任务含结构化返工段硬要求");
+      // 2026-10-25 验收分诊：重派任务的结构化硬要求已从旧 `acceptance-rework/v1` 升级为
+      // `acceptance-triage/v1`（items 为旧段超集：结论 + 严重度 + 失败原因 + 改进方案指针）。
+      assert.match(redispatchTask, /acceptance-triage\/v1/, "重派任务含结构化分诊段硬要求");
+      assert.match(redispatchTask, /severity/, "重派任务要求逐项严重度");
+      assert.match(redispatchTask, /reason（不通过原因）与 action（改进方案）必填/, "重派任务要求原因与改进方案");
+      assert.match(redispatchTask, /targets 或 criteria/, "重派任务要求改进方案指针");
+      assert.doesNotMatch(redispatchTask, /schema: acceptance-rework\/v1/, "重派任务不再要求旧 rework v1 段");
       assert.match(redispatchTask, /不要覆盖被拒报告/);
 
       const started = Date.now();

@@ -160,6 +160,52 @@ test("非法条目形状：拒写、零副作用（不建 .ans）", async () => 
   });
 });
 
+test("写入预授权 evidence：合法条目可读写；带 decisionKind/judge 或非 system: operatorId 的条目拒写（收口门不可见）", async () => {
+  await withRoot(async (root) => {
+    const valid: GovernanceLedgerEntry = {
+      at: "2026-10-25T00:00:00.000Z",
+      kind: "customer.decision",
+      actorRoleId: "rapporteur",
+      power: "proposal",
+      flowId: "flow-a",
+      customerDecision: "accepted",
+      decisionEvidence: { kind: "system-preauthorization", operatorId: "system:write-preauthorization" },
+      paths: ["docs/proposals/flow-a-v2.md"],
+    };
+    assert.deepEqual(await appendGovernanceLedger(root, valid), { ok: true });
+    const read = await readGovernanceLedger(root);
+    assert.deepEqual(read.errors, []);
+    assert.equal(read.entries[0]?.decisionEvidence?.kind, "system-preauthorization");
+    assert.equal(read.entries[0]?.decisionKind, undefined, "系统预授权不带门禁键 decisionKind");
+
+    const badDecisionKind: GovernanceLedgerEntry = { ...valid, at: "2026-10-25T00:00:01.000Z", decisionKind: "acceptance" };
+    const badJudge: GovernanceLedgerEntry = {
+      ...valid,
+      at: "2026-10-25T00:00:02.000Z",
+      decisionEvidence: {
+        kind: "system-preauthorization",
+        operatorId: "system:write-preauthorization",
+        judge: { group: "decision", cardKind: "write", engine: "claude", reasonCode: "sufficient" },
+      },
+    };
+    const badOperator: GovernanceLedgerEntry = {
+      ...valid,
+      at: "2026-10-25T00:00:03.000Z",
+      decisionEvidence: { kind: "system-preauthorization", operatorId: "operation-1" },
+    };
+
+    const badKindResult = await appendGovernanceLedger(root, badDecisionKind);
+    assert.equal(badKindResult.ok, false);
+    if (!badKindResult.ok) assert.match(badKindResult.message, /不得携带 decisionKind/);
+    assert.equal((await appendGovernanceLedger(root, badJudge)).ok, false);
+    assert.equal((await appendGovernanceLedger(root, badOperator)).ok, false);
+
+    const after = await readGovernanceLedger(root);
+    assert.equal(after.entries.length, 1, "非法的系统预授权条目不落盘");
+    assert.deepEqual(after.errors, []);
+  });
+});
+
 test("自动派发去重兼容：dispatch.accepted(targetRoleId=verifier, stepId=verification) 可记录/读回；旧条目缺 trigger 仍合法", async () => {
   await withRoot(async (root) => {
     // 2026-10-19：应用在流程齐备后自动派发 Proof / 验收——账本记录形状（不新增 kind/字段）。

@@ -24,6 +24,7 @@ import { RUNTIME_UNRESOLVED_MESSAGE } from "../../app/desktop/runtime-resolution
 import {
   acceptanceDispatchRecorded,
   acceptanceLastDispatchAtMs,
+  buildAcceptanceTaskMessage,
   flowCompletionIssue,
   flowStepEvidenceKind,
   flowStepHasEvidence,
@@ -31,7 +32,20 @@ import {
   governanceFlowStatePath,
   type FlowCompletionLedgerEntryLike,
 } from "../../app/desktop/governance-advance.ts";
-import { evaluateFlowCompletion, flowStatePath, parseFlowStateYaml } from "../../src/pipeline/orchestration/flow-state.ts";
+import { createCustomerInputChannel, type AcceptanceTriageGateFacts } from "../../app/desktop/customer-input.ts";
+import {
+  acceptanceTriageIdForReport,
+  buildAcceptanceTriageRecord,
+  completeAcceptanceCriteriaStep,
+  evaluateFlowCompletion,
+  flowStatePath,
+  latestAcceptanceDecision,
+  parseAcceptanceTriageReport,
+  parseFlowStateYaml,
+  readAcceptanceTriageRecord,
+  recommendAcceptanceTriage,
+  writeAcceptanceTriageRecord,
+} from "../../src/pipeline/orchestration/flow-state.ts";
 import {
   appendGovernanceLedger,
   readGovernanceLedger,
@@ -199,6 +213,8 @@ interface Harness {
   sendsByRole: Map<string, string[]>;
   events: SessionEventEnvelope[];
   controls: Map<string, ReturnType<typeof scriptedHandle>>;
+  /** 2026-10-25 request_acceptance：捕获每次 openRoleSession 的入参（验证能力注入矩阵/取得能力闭包）。 */
+  openInputs: Map<string, Parameters<NonNullable<DesktopDeps["openRoleSessionFn"]>>[0]>;
 }
 
 async function makeHarness(
@@ -207,17 +223,27 @@ async function makeHarness(
   options: {
     resolveRuntime?: DesktopDeps["resolveRuntimeFn"];
     completeAcceptanceStep?: DesktopDeps["completeAcceptanceStepFn"];
+    completeAcceptanceCriteriaStep?: DesktopDeps["completeAcceptanceCriteriaStepFn"];
     customerInput?: DesktopDeps["customerInput"];
     observeFlowArtifacts?: DesktopDeps["observeFlowArtifactsFn"];
     /** 2026-10-23 验收返工路由：重开验收步骤（缺省真实 Pipeline 出口）、审计账本追加、会话打开失败注入。 */
     reopenAcceptanceStep?: DesktopDeps["reopenAcceptanceStepForReworkFn"];
     appendGovernanceLedger?: DesktopDeps["appendGovernanceLedgerFn"];
     failOpenRoles?: Set<string>;
+    /** 2026-10-25 验收分诊：重启恢复重推分诊卡（缺省不注入 ⇒ 不重推）。 */
+    presentAcceptanceTriageCard?: DesktopDeps["presentAcceptanceTriageCard"];
+    /** 2026-10-25 验收分诊：判断决策开关（缺省 false；测试可注入已开启的开关实例）。 */
+    decisionJudgeSwitch?: DesktopDeps["decisionJudgeSwitch"];
+    /** 2026-10-25 request_acceptance 有界超时（测试注入短预算）。 */
+    requestAcceptanceLimits?: DesktopDeps["requestAcceptanceLimits"];
+    /** 2026-10-25 request_acceptance 真机挂起复现：会话开启永不 resolve。 */
+    hangOpenRoleSession?: boolean;
   } = {},
 ): Promise<Harness> {
   const sendsByRole = new Map<string, string[]>();
   const events: SessionEventEnvelope[] = [];
   const controls = new Map<string, ReturnType<typeof scriptedHandle>>();
+  const openInputs = new Map<string, Parameters<NonNullable<DesktopDeps["openRoleSessionFn"]>>[0]>();
   const iface = createDesktopInterface({
     pickDirectory: async () => projectRoot,
     emitEvent: (envelope) => {
@@ -225,6 +251,10 @@ async function makeHarness(
     },
     listProjectFn: async () => listing,
     openRoleSessionFn: async (input) => {
+      openInputs.set(input.roleId, input);
+      if (options.hangOpenRoleSession === true && input.roleId === "verifier") {
+        return new Promise(() => {}); // 真机复现：引擎启动/开会话无 ACK ⇒ 永不 resolve
+      }
       if (options.failOpenRoles?.has(input.roleId) === true) {
         throw new Error(`模拟打开 ${input.roleId} 会话失败`);
       }
@@ -241,6 +271,10 @@ async function makeHarness(
       options.resolveRuntime ?? (async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] })),
     // 2026-10-20：验收通过后的流程收口（编排 completeAcceptanceStep 的桌面注入面；测试用桩验证消费语义）。
     ...(options.completeAcceptanceStep !== undefined ? { completeAcceptanceStepFn: options.completeAcceptanceStep } : {}),
+    // 2026-10-25 request_acceptance：验收标准步骤收口（缺省真实 Pipeline 出口；测试可包一层观察调用）。
+    ...(options.completeAcceptanceCriteriaStep !== undefined
+      ? { completeAcceptanceCriteriaStepFn: options.completeAcceptanceCriteriaStep }
+      : {}),
     // 2026-10-20：delivered 唤醒/收口全程不得弹客户卡——测试可注入记录器。
     ...(options.customerInput !== undefined ? { customerInput: options.customerInput } : {}),
     // 2026-10-20：flow artifact 证据补登（编排 observeFlowArtifacts 的桌面注入面）。
@@ -248,9 +282,12 @@ async function makeHarness(
     // 2026-10-23 验收返工路由：重开验收步骤 / 审计失败 / 会话打开失败注入（只影响被测路径）。
     ...(options.reopenAcceptanceStep !== undefined ? { reopenAcceptanceStepForReworkFn: options.reopenAcceptanceStep } : {}),
     ...(options.appendGovernanceLedger !== undefined ? { appendGovernanceLedgerFn: options.appendGovernanceLedger } : {}),
+    ...(options.presentAcceptanceTriageCard !== undefined ? { presentAcceptanceTriageCard: options.presentAcceptanceTriageCard } : {}),
+    ...(options.decisionJudgeSwitch !== undefined ? { decisionJudgeSwitch: options.decisionJudgeSwitch } : {}),
+    ...(options.requestAcceptanceLimits !== undefined ? { requestAcceptanceLimits: options.requestAcceptanceLimits } : {}),
   });
   await iface.listProject({ projectRoot });
-  return { iface, sendsByRole, events, controls };
+  return { iface, sendsByRole, events, controls, openInputs };
 }
 
 function deliveryNotes(events: SessionEventEnvelope[], roleId: string): string[] {
@@ -1630,7 +1667,8 @@ test("2026-10-23 验收返工路由（重派门）：rejection 后 flow 实质�
       assert.match(task, /流程在上次验收复核后有更新/);
       assert.match(task, new RegExp(`docs/acceptance/${flowId}-report-v2\\.md`), "重派要求写 vN+1");
       assert.ok(task.includes(reportRel), "重派任务引用被拒报告路径（不覆盖）");
-      assert.match(task, /acceptance-rework\/v1/, "验收任务含结构化返工段硬要求");
+      assert.match(task, /acceptance-triage\/v1/, "验收任务含分诊段硬要求（2026-10-25 起取代 acceptance-rework/v1）");
+      assert.match(task, /severity/, "验收任务写明四档 severity");
       assert.equal(harness.sendsByRole.get("liaison")!.length, 1, "路由任务恰一条（实际接收方 Lead）");
       await waitForAsync(async () => (await verifierDispatches(root, flowId)).length === 1);
       await sleep(300); // record 的 lastDispatched* 写在账本之后；单次读取避免 Windows rename/read 竞争
@@ -2961,4 +2999,1020 @@ test("2026-10-23 acceptanceLastDispatchAtMs / acceptanceDispatchRecorded 收窄�
   };
   assert.equal(acceptanceDispatchRecorded(flowId, verificationOnly), true, "stepId=verification 仍计入（含 app 记录）");
   assert.equal(acceptanceLastDispatchAtMs(flowId, verificationOnly), Date.parse("2026-10-23T03:00:00.000Z"));
+});
+
+// —————————————— 2026-10-25 request_acceptance（独立复核请求能力） ——————————————
+//
+// 运行时核心的 `request_acceptance` 工具只路由载荷；应用侧能力（本组）负责：
+//   · flowId 归一（显式优先；省略时仅唯一 flow YAML 才采用，多流程不猜）；
+//   · flow/验收标准/变更包/riskTier 存在性；`acceptance-criteria` 步骤经编排助手收口；
+//   · `parseFlowStateYaml` + `evaluateFlowCompletion` 完整性；运行时解析；
+//   · 既有自动验收派发（force/request），并**如实区分** dispatched / already-dispatched / 失败。
+// 能力只注入内置治理角色会话（项目角色不注入）；请求复核 ≠ 客户批准。
+
+/** 取出内置治理角色会话捕获到的 requestAcceptance 能力（未注入即失败）。 */
+function requestAcceptanceOf(harness: Harness, roleId: string): import("../../src/model/runtime.ts").RequestAcceptanceFn {
+  const fn = harness.openInputs.get(roleId)?.requestAcceptance;
+  assert.ok(fn, `${roleId} 会话应注入 requestAcceptance`);
+  return fn;
+}
+
+/** 新契约流程，但把 `acceptance-criteria` 步骤替换为指定状态（用于收口调用/跳过断言）。 */
+function newContractStepsWithCriteriaStatus(flowId: string, status: string): FlowYamlStepInput[] {
+  return newContractSteps(flowId, { criteria: false, change: true }).flatMap((step) =>
+    step.id === "delivery-server"
+      ? [{ id: "acceptance-criteria", kind: "artifact", status, owner: "verifier" }, step]
+      : [step],
+  );
+}
+
+test("2026-10-25 request_acceptance：flowId 归一——唯一 YAML 采用；多流程/无流程要求显式 flowId（不猜）", async () => {
+  const root = makeTempProjectRoot("ans-request-acceptance-normalize-");
+  try {
+    writeFlowStateFile(root, "flow-only", flowStateYaml("flow-only", yamlAcceptanceSteps("flow-only")));
+    const harness = await makeHarness(root, { ...trioListing(), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      const requestAcceptance = requestAcceptanceOf(harness, "convener");
+
+      // 唯一 YAML ⇒ 采用它（本用例标准缺失，code=criteria-missing 但 flowId 已归一）。
+      const single = await requestAcceptance({});
+      assert.equal(single.ok, false);
+      assert.equal(single.code, "criteria-missing");
+      assert.equal(single.flowId, "flow-only", "唯一 flow YAML 被采用");
+
+      // 第二个 YAML ⇒ 不猜，要求显式 flowId。
+      writeFlowStateFile(root, "flow-second", flowStateYaml("flow-second", yamlAcceptanceSteps("flow-second")));
+      const multi = await requestAcceptance({});
+      assert.equal(multi.ok, false);
+      assert.equal(multi.code, "flow-not-found");
+      assert.match(multi.message, /指定 flowId/);
+      assert.ok(multi.message.includes("flow-only") && multi.message.includes("flow-second"), "消息列出候选流程");
+
+      // 显式 flowId：不存在/非法 slug 均如实 flow-not-found。
+      const missing = await requestAcceptance({ flowId: "no-such-flow" });
+      assert.equal(missing.code, "flow-not-found");
+      assert.equal(missing.flowId, "no-such-flow");
+      const illegal = await requestAcceptance({ flowId: "../escape" });
+      assert.equal(illegal.code, "flow-not-found");
+
+      // 无 YAML ⇒ flow-not-found（提示要求指定 flowId）。
+      rmSync(path.join(root, "docs", "flows"), { recursive: true, force: true });
+      const none = await requestAcceptance({});
+      assert.equal(none.code, "flow-not-found");
+      assert.match(none.message, /没有流程 YAML/);
+      assert.match(none.message, /指定 flowId/);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-25 request_acceptance：失败 code 映射（criteria-missing / change-package-missing / no-risk / flow-incomplete / runtime-unresolved）", async () => {
+  const root = makeTempProjectRoot("ans-request-acceptance-codes-");
+  try {
+    const flowId = "flow-request-map";
+    // 执行步骤 delivery-server 先保持 pending：标准/变更包齐备后由完整性门给出 flow-incomplete。
+    const pendingSteps = yamlAcceptanceSteps(flowId).map((step) =>
+      step.id === "delivery-server" ? { ...step, status: "pending", evidence: undefined } : step,
+    );
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, pendingSteps));
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    const harness = await makeHarness(root, { ...trioListing(), projectRoot: root }, {
+      resolveRuntime: async () => ({ ok: false, message: "无法确定项目引擎（测试）；本次自动验收派发已跳过。", skipped: [] }),
+    });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      const requestAcceptance = requestAcceptanceOf(harness, "convener");
+
+      const missingCriteria = await requestAcceptance({ flowId });
+      assert.equal(missingCriteria.ok, false);
+      assert.equal(missingCriteria.code, "criteria-missing");
+      assert.ok(missingCriteria.message.includes(`docs/acceptance/${flowId}-criteria-v1.md`));
+
+      writeNewContractEvidenceFiles(root, flowId, { criteria: true });
+      const missingChange = await requestAcceptance({ flowId });
+      assert.equal(missingChange.code, "change-package-missing");
+      assert.ok(missingChange.message.includes(`docs/scheduling/${flowId}-change-v1.md`));
+
+      writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "no-risk" });
+      const noRisk = await requestAcceptance({ flowId });
+      assert.equal(noRisk.code, "change-package-no-risk");
+      assert.ok(noRisk.message.includes(`${flowId}-change-v1.md`));
+
+      writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "T2" });
+      const incomplete = await requestAcceptance({ flowId });
+      assert.equal(incomplete.code, "flow-incomplete");
+      assert.match(incomplete.message, /delivery-server/, "message 含具体未完成步骤");
+
+      // 完成流程（同一账本）⇒ 运行时解析失败如实映射（不派发）。
+      writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+      const unresolved = await requestAcceptance({ flowId });
+      assert.equal(unresolved.code, "runtime-unresolved");
+      assert.match(unresolved.message, /无法确定项目引擎（测试）/);
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "运行时未解析：不派发");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-25 request_acceptance：acceptance-criteria pending ⇒ 经编排助手收口后继续；已 done ⇒ 不重复调用（幂等）", async () => {
+  const root = makeTempProjectRoot("ans-request-acceptance-criteria-step-");
+  try {
+    const flowId = "flow-request-criteria";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractStepsWithCriteriaStatus(flowId, "pending")));
+    writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "T2" });
+    await appendNewContractLedger(root, flowId, { criteria: false, change: true });
+    const calls: Array<{ projectRoot: string; flowId: string }> = [];
+    const harness = await makeHarness(root, { ...trioListing(), projectRoot: root }, {
+      completeAcceptanceCriteriaStep: async (input) => {
+        calls.push({ projectRoot: input.projectRoot, flowId: input.flowId });
+        return completeAcceptanceCriteriaStep(input);
+      },
+    });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      const requestAcceptance = requestAcceptanceOf(harness, "convener");
+      const result = await requestAcceptance({ flowId });
+      assert.equal(result.ok, true, result.message);
+      assert.equal(result.code, "dispatched");
+      assert.deepEqual(calls, [{ projectRoot: root, flowId }], "标准步骤 pending ⇒ 调用一次编排收口助手");
+      const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${flowId}.yaml`), "utf8"), flowId);
+      assert.ok(parsed.ok);
+      assert.equal(parsed.flow.steps.find((step) => step.id === "acceptance-criteria")?.status, "done", "收口后步骤为 done");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 1, "收口后继续派发验收复核");
+    } finally {
+      await harness.iface.stopSession();
+    }
+
+    // 已 done：不调用收口助手，直接继续派发（幂等）。
+    const doneFlowId = "flow-request-criteria-done";
+    writeFlowStateFile(root, doneFlowId, flowStateYaml(doneFlowId, newContractSteps(doneFlowId, { criteria: true, change: true })));
+    writeNewContractEvidenceFiles(root, doneFlowId, { criteria: true, change: "T2" });
+    await appendNewContractLedger(root, doneFlowId, { criteria: true, change: true });
+    let doneCalls = 0;
+    const doneHarness = await makeHarness(root, { ...trioListing(), projectRoot: root }, {
+      completeAcceptanceCriteriaStep: async (input) => {
+        doneCalls += 1;
+        return completeAcceptanceCriteriaStep(input);
+      },
+    });
+    try {
+      assert.equal((await doneHarness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      const result = await requestAcceptanceOf(doneHarness, "convener")({ flowId: doneFlowId });
+      assert.equal(result.ok, true, result.message);
+      assert.equal(result.code, "dispatched");
+      assert.equal(doneCalls, 0, "acceptance-criteria 已 done：不重复调用收口助手");
+    } finally {
+      await doneHarness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-25 request_acceptance：收口助手失败按 code 映射（criteria-missing / flow-incomplete）且 message 原样带出", async () => {
+  const root = makeTempProjectRoot("ans-request-acceptance-criteria-fail-");
+  try {
+    const writePendingCriteriaFlow = (flowId: string): void => {
+      writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractStepsWithCriteriaStatus(flowId, "pending")));
+      writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "T2" });
+    };
+    writePendingCriteriaFlow("flow-request-criteria-missing");
+    writePendingCriteriaFlow("flow-request-criteria-terminal");
+    await appendNewContractLedger(root, "flow-request-criteria-missing", { criteria: false, change: true });
+    await appendNewContractLedger(root, "flow-request-criteria-terminal", { criteria: false, change: true });
+    let mode: "missing" | "terminal" = "missing";
+    const harness = await makeHarness(root, { ...trioListing(), projectRoot: root }, {
+      completeAcceptanceCriteriaStep: async () => {
+        if (mode === "missing") {
+          return { ok: false, code: "acceptance-criteria-missing", error: "标准缺失（测试）" };
+        }
+        return { ok: false, code: "acceptance-criteria-step-terminal", error: "步骤终态（测试）" };
+      },
+    });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      const requestAcceptance = requestAcceptanceOf(harness, "convener");
+      const missing = await requestAcceptance({ flowId: "flow-request-criteria-missing" });
+      assert.equal(missing.code, "criteria-missing");
+      assert.equal(missing.message, "标准缺失（测试）", "message 原样带出");
+      mode = "terminal";
+      const terminal = await requestAcceptance({ flowId: "flow-request-criteria-terminal" });
+      assert.equal(terminal.code, "flow-incomplete");
+      assert.equal(terminal.message, "步骤终态（测试）", "message 原样带出");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-25 request_acceptance：派发回执区分 dispatched 与 already-dispatched（同 flow 同版本不重复派）", async () => {
+  const root = makeTempProjectRoot("ans-request-acceptance-dispatch-");
+  try {
+    const flowId = "flow-request-dispatch";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractSteps(flowId, { criteria: true, change: true })));
+    writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "T2" });
+    await appendNewContractLedger(root, flowId, { criteria: true, change: true });
+    const harness = await makeHarness(root, { ...trioListing(), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      const requestAcceptance = requestAcceptanceOf(harness, "convener");
+      const first = await requestAcceptance({ flowId });
+      assert.equal(first.ok, true, first.message);
+      assert.equal(first.code, "dispatched");
+      assert.equal(first.flowId, flowId);
+      assert.equal(first.runtime, "pi");
+      assert.match(first.message, /不代表客户批准/);
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 1, "派发恰一条验收任务");
+
+      const second = await requestAcceptance({ flowId });
+      assert.equal(second.ok, false, "重复请求不得说成 dispatched");
+      assert.equal(second.code, "already-dispatched");
+      assert.equal(second.flowId, flowId);
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 1, "已派发版本不重复派发");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-25 request_acceptance：注入矩阵——内置治理角色有、项目角色无", async () => {
+  const root = makeTempProjectRoot("ans-request-acceptance-injection-");
+  try {
+    const listing: ProjectListing = {
+      ...listingWithProjectRoles(trioListing(), ["executor"]),
+      projectRoot: root,
+    };
+    const harness = await makeHarness(root, listing);
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "executor", runtime: "demo" })).ok, true);
+      assert.equal(typeof harness.openInputs.get("convener")?.requestAcceptance, "function", "内置治理角色注入能力");
+      assert.equal(harness.openInputs.get("executor")?.requestAcceptance, undefined, "项目角色不注入能力");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-25 request_acceptance：flow_step_update 成功（尤其 done）触发验收门重检；失败调用不触发", async () => {
+  const root = makeTempProjectRoot("ans-request-acceptance-flow-step-trigger-");
+  try {
+    const flowId = "flow-request-trigger";
+    // 先让流程未完成：导入时的补齐检查会跑一次但不会派发；等它结束后再验证「事件触发」本身。
+    const pendingSteps = newContractSteps(flowId, { criteria: true, change: true }).map((step) =>
+      step.id === "delivery-server" ? { ...step, status: "pending", evidence: undefined } : step,
+    );
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, pendingSteps));
+    writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "T2" });
+    await appendNewContractLedger(root, flowId, { criteria: true, change: true });
+    const listing: ProjectListing = {
+      ...listingWithProjectRoles(trioListing(), ["executor"]),
+      projectRoot: root,
+    };
+    const harness = await makeHarness(root, listing);
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "executor", runtime: "demo" })).ok, true);
+      // 导入补齐检查（40ms tick）已跑到完整性门并落 Lead 阻塞行 ⇒ 它不会再派 verifier。
+      await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes("delivery-server")));
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "未完成流程不派发");
+      const control = harness.controls.get("executor")!;
+      // 失败/开始类事件不算推进信号。
+      control.emit({
+        kind: "denied",
+        summary: "flow_step_update 失败",
+        detail: { toolName: "flow_step_update", phase: "result", ok: false },
+      } as SessionEvent);
+      control.emit({
+        kind: "tool_call",
+        summary: "模型请求调用 flow_step_update",
+        detail: { toolName: "flow_step_update", phase: "start" },
+      } as SessionEvent);
+      await sleep(220);
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "失败/开始事件不触发验收检查");
+
+      // 流程补全后，一次成功的 flow_step_update ⇒ 经既有 40ms 有界调度重检并派发（门已满足）。
+      writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractSteps(flowId, { criteria: true, change: true })));
+      control.emit({
+        kind: "accepted",
+        summary: "flow_step_update 执行完成",
+        detail: { toolName: "flow_step_update", phase: "result", ok: true },
+      } as SessionEvent);
+      await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0);
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 1, "成功后触发一次验收派发（不循环）");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————————————— 2026-10-25 验收分诊（acceptance-triage） ——————————————
+//
+// 设计 `2026-10-25_design_acceptance-triage.md`：trio + YAML + acceptance 卡 + fail/conditional ⇒
+// 确定性建议 +（「替我决策」开且权威）judge-rule 自动处置 / 否则客户分诊卡；缺结构退回 Proof；
+// pass 不分诊；记录 `.ans/.../triage-v1.json` 幂等；账本 `acceptance.triage` 不是 customer.decision。
+
+interface TriageItemInput {
+  id?: string;
+  severity?: string;
+  owner?: string;
+  reason?: string;
+  action?: string;
+  targets?: string[];
+  criteria?: string;
+}
+
+/** 合成一份带 `acceptance-triage/v1` 段的报告。 */
+function triageReportBody(options: {
+  conclusion?: "pass" | "fail" | "conditional";
+  items?: TriageItemInput[];
+  extra?: string[];
+} = {}): string {
+  const conclusion = options.conclusion ?? "fail";
+  const items = options.items ?? [];
+  const yaml: string[] = ["schema: acceptance-triage/v1", `conclusion: ${conclusion}`];
+  if (items.length === 0) {
+    yaml.push("items: []");
+  } else {
+    yaml.push("items:");
+    for (const item of items) {
+      yaml.push(`  - id: ${item.id ?? "F1"}`);
+      yaml.push(`    severity: ${item.severity ?? "blocker"}`);
+      yaml.push(`    owner: ${item.owner ?? "executor"}`);
+      yaml.push(`    reason: ${JSON.stringify(item.reason ?? "测试失败原因")}`);
+      yaml.push(`    action: ${JSON.stringify(item.action ?? "修复测试失败并补证据")}`);
+      if (item.targets !== undefined) yaml.push(`    targets: [${item.targets.join(", ")}]`);
+      if (item.criteria !== undefined) yaml.push(`    criteria: ${JSON.stringify(item.criteria)}`);
+    }
+  }
+  return ["# 验收报告", "", ...(options.extra ?? []), "", "```yaml", ...yaml, "```", ""].join("\n");
+}
+
+function triageFacts(root: string, flowId: string): AcceptanceTriageGateFacts {
+  return {
+    requestId: "op-triage-test",
+    roleId: "verifier",
+    projectRoot: root,
+    runtime: "pi",
+    request: {
+      kind: "choice",
+      title: "验收",
+      cardKind: "acceptance",
+      flowId,
+      stepId: "verification",
+      options: [
+        { id: "accept", label: "通过" },
+        { id: "reject", label: "退回" },
+      ],
+    },
+    metadata: {
+      flowId,
+      stepId: "verification",
+      cardKind: "acceptance",
+      judgeContext: {
+        flowId,
+        facts: { governanceModel: "trio", flowId, ledgerErrors: 0, unresolvedClarificationCount: 0, latestDecisionKinds: [] },
+      },
+    },
+    governanceModel: "trio",
+  };
+}
+
+async function enableDecisionJudge(harness: Harness): Promise<void> {
+  const reply = harness.iface.setDecisionJudgeEnabled({ enabled: true });
+  assert.equal(reply.ok, true, `决策开关应可开启：${reply.ok ? "" : reply.error}`);
+}
+
+async function runSettleRun(result: Awaited<ReturnType<Harness["iface"]["evaluateAcceptanceTriage"]>>): Promise<void> {
+  assert.equal(result.action, "settle");
+  if (result.action !== "settle") return;
+  assert.equal(result.outcome.outcome, "declined");
+  assert.equal(result.outcome.outcome === "declined" ? result.outcome.notPresented : undefined, true, "退回/自动处置不得呈现验收卡");
+  if (result.run !== undefined) await result.run();
+}
+
+test("验收分诊：报告缺 acceptance-triage/v1 ⇒ declined+notPresented 退回 Proof；不弹卡/不返工/不写 customer.decision", async () => {
+  const root = makeTempProjectRoot("ans-triage-missing-");
+  try {
+    const flowId = "flow-triage-missing";
+    // 流程故意留 pending（不触发自动验收派发）——本用例只测分诊前闸。
+    const pendingSteps = yamlAcceptanceSteps(flowId).map((step) =>
+      step.id === "delivery-server" ? { ...step, status: "pending", evidence: undefined } : step,
+    );
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, pendingSteps));
+    const reportRel = writeAcceptanceReportFile(root, flowId, 1, "# 验收报告\n\n没有结构化分诊段。\n");
+    const harness = await makeHarness(root, { ...trioListing(), projectRoot: root });
+    try {
+      const result = await harness.iface.evaluateAcceptanceTriage(triageFacts(root, flowId));
+      assert.equal(result.action, "settle");
+      if (result.action !== "settle") return;
+      assert.equal(result.outcome.outcome, "declined");
+      assert.equal(result.outcome.outcome === "declined" ? result.outcome.notPresented : undefined, true);
+      assert.match(result.outcome.outcome === "declined" ? result.outcome.reason ?? "" : "", /退回|分诊结构/);
+      const read = await readAcceptanceTriageRecord(root, flowId);
+      assert.equal(read.record?.status, "returned-to-verifier");
+      assert.equal(read.record?.parseFailure, "missing");
+      assert.equal(read.record?.reportSha256, null, "无分诊结构不伪造报告 sha");
+      assert.equal(read.record?.reportPath, reportRel);
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.some((entry) => entry.kind === "customer.decision"), false, "退回不写客户决定");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "不派 Proof");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("验收分诊：pass 报告不分诊（proceed，不写 triage 记录）", async () => {
+  const root = makeTempProjectRoot("ans-triage-pass-");
+  try {
+    const flowId = "flow-triage-pass";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    writeAcceptanceReportFile(root, flowId, 1, triageReportBody({ conclusion: "pass", items: [] }));
+    const harness = await makeHarness(root, { ...trioListing(), projectRoot: root });
+    try {
+      const result = await harness.iface.evaluateAcceptanceTriage(triageFacts(root, flowId));
+      assert.equal(result.action, "proceed");
+      const read = await readAcceptanceTriageRecord(root, flowId);
+      assert.equal(read.record, undefined, "pass 不写分诊记录");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("验收分诊：只有 minor/nit ⇒ judge-rule 自动仅汇报（report-only），主理确定性汇报，账本不污染 latestAcceptanceDecision", async () => {
+  const root = makeTempProjectRoot("ans-triage-report-only-");
+  try {
+    const flowId = "flow-triage-report-only";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    writeAcceptanceReportFile(
+      root,
+      flowId,
+      1,
+      triageReportBody({
+        conclusion: "fail",
+        items: [
+          { id: "F1", severity: "nit", owner: "executor", reason: "命名风格不统一", action: "统一命名", targets: ["src/a.ts"] },
+          { id: "F2", severity: "minor", owner: "executor", reason: "注释缺失", action: "补注释", criteria: "docs/acceptance/x-criteria-v1.md#C3" },
+        ],
+      }),
+    );
+    const harness = await makeHarness(root, { ...trioListing(), projectRoot: root });
+    try {
+      await enableDecisionJudge(harness);
+      const result = await harness.iface.evaluateAcceptanceTriage(triageFacts(root, flowId));
+      await runSettleRun(result);
+      const read = await readAcceptanceTriageRecord(root, flowId);
+      assert.equal(read.record?.status, "report-only");
+      assert.equal(read.record?.disposition, "report-only");
+      assert.equal(read.record?.source, "judge");
+      assert.equal(read.record?.sourceDetail, "judge-rule");
+      assert.equal(read.record?.reportedAt !== null, true, "汇报后记录 reportedAt");
+      const notes = deliveryNotes(harness.events, "liaison");
+      assert.ok(notes.some((note) => note.includes("验收结论：不通过")), "主理汇报含结论");
+      assert.ok(notes.some((note) => note.includes("F1") && note.includes("风格建议") && note.includes("命名风格不统一")), "逐项 severity/reason");
+      assert.ok(notes.some((note) => note.includes("改进建议：统一命名")), "逐项 action+指针");
+      assert.ok(notes.some((note) => note.includes("本次不返工") && note.includes("判断代批")), "决定来源");
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.some((entry) => entry.kind === "customer.decision"), false, "判断代批不写 customer.decision");
+      assert.equal(ledger.entries.filter((entry) => entry.kind === "acceptance.triage").length, 1);
+      assert.equal(latestAcceptanceDecision(flowId, ledger).kind, "none", "acceptance.triage 不参与 latestAcceptanceDecision");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "仅汇报不派 Proof");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("验收分诊：blocker/major 可执行 ⇒ judge-rule 自动返工（任务含 severity/reason/action，minor/nit 非阻断；不写客户决定）", async () => {
+  const root = makeTempProjectRoot("ans-triage-rework-");
+  try {
+    const flowId = "flow-triage-rework";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    writeAcceptanceReportFile(
+      root,
+      flowId,
+      1,
+      triageReportBody({
+        conclusion: "fail",
+        items: [
+          { id: "F1", severity: "blocker", owner: "executor", reason: "入口不可用", action: "修复启动入口", targets: ["src/main.ts"] },
+          { id: "F2", severity: "major", owner: "executor", reason: "契约不符", action: "按 criteria 修正", criteria: "docs/acceptance/x-criteria-v1.md#C1" },
+          { id: "F3", severity: "nit", owner: "executor", reason: "措辞偏好", action: "统一措辞", targets: ["docs/readme.md"] },
+        ],
+      }),
+    );
+    const listing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      await enableDecisionJudge(harness);
+      const first = await harness.iface.evaluateAcceptanceTriage(triageFacts(root, flowId));
+      await runSettleRun(first);
+      const read = await readAcceptanceTriageRecord(root, flowId);
+      assert.equal(read.record?.status, "dispatched");
+      assert.equal(read.record?.disposition, "rework");
+      assert.equal(read.record?.source, "judge");
+      assert.equal(read.record?.sourceDetail, "judge-rule");
+      const routingPath = path.join(root, ".ans", "governance", "acceptance", flowId, "rework-routing.json");
+      assert.equal(existsSync(routingPath), true, "写返工路由记录");
+      const routing = JSON.parse(readFileSync(routingPath, "utf8")) as { status: string; source: string; sourceDetail: string };
+      assert.equal(routing.status, "sent");
+      assert.equal(routing.source, "judge");
+      assert.equal(routing.sourceDetail, "judge-rule");
+      const tasks = harness.sendsByRole.get("liaison") ?? [];
+      assert.equal(tasks.length, 1, "唯一一条统筹任务");
+      const task = tasks[0]!;
+      assert.match(task, /severity=blocker/);
+      assert.match(task, /reason=入口不可用/);
+      assert.match(task, /action=修复启动入口/);
+      assert.match(task, /criteria=docs\/acceptance\/x-criteria-v1\.md#C1/);
+      assert.match(task, /severity=nit（非阻断，可选后续）/);
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.some((entry) => entry.kind === "customer.decision"), false, "judge-rule 不写客户决定");
+      assert.equal(ledger.entries.filter((entry) => entry.kind === "acceptance.triage").length, 1);
+      assert.equal(latestAcceptanceDecision(flowId, ledger).kind, "none");
+      // 幂等：同一报告再次到达 ⇒ 只结算，不再路由、不重复任务。
+      const second = await harness.iface.evaluateAcceptanceTriage(triageFacts(root, flowId));
+      assert.equal(second.action, "settle");
+      assert.equal((harness.sendsByRole.get("liaison") ?? []).length, 1, "同报告不重复派工");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("验收分诊：blocker/major 不可执行（owner 未知）⇒ 退回 Proof 补报告（R4，不弹卡）", async () => {
+  const root = makeTempProjectRoot("ans-triage-infeasible-");
+  try {
+    const flowId = "flow-triage-infeasible";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    writeAcceptanceReportFile(
+      root,
+      flowId,
+      1,
+      triageReportBody({
+        items: [{ id: "F1", severity: "blocker", owner: "ghost-role", reason: "关键问题", action: "修复", targets: ["src/x.ts"] }],
+      }),
+    );
+    const harness = await makeHarness(root, { ...trioListing(), projectRoot: root });
+    try {
+      await enableDecisionJudge(harness);
+      const result = await harness.iface.evaluateAcceptanceTriage(triageFacts(root, flowId));
+      await runSettleRun(result);
+      const read = await readAcceptanceTriageRecord(root, flowId);
+      assert.equal(read.record?.status, "returned-to-verifier");
+      assert.equal(read.record?.parseFailure, null);
+      assert.equal(read.record?.recommendation, "return-to-verifier");
+      assert.equal(read.record?.recommendationBasis, "blocker-major-infeasible");
+      assert.equal((harness.sendsByRole.get("liaison") ?? []).length, 0, "不派返工任务");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("验收分诊客户卡：结论/失败项/改进方案/建议/警示 + 仅汇报映射为 accepted 但带 triage 归因", async () => {
+  const root = makeTempProjectRoot("ans-triage-customer-card-");
+  try {
+    const flowId = "flow-triage-customer";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    writeAcceptanceReportFile(
+      root,
+      flowId,
+      1,
+      triageReportBody({
+        items: [{ id: "F1", severity: "blocker", owner: "executor", reason: "入口不可用", action: "修复入口", targets: ["src/main.ts"] }],
+      }),
+    );
+    const listing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      const result = await harness.iface.evaluateAcceptanceTriage(triageFacts(root, flowId));
+      assert.equal(result.action, "triage-card");
+      if (result.action !== "triage-card") return;
+      assert.match(result.card.id, new RegExp(`^triage-${flowId}-[a-f0-9]{8}$`));
+      assert.match(result.card.preview ?? "", /验收结论：不通过/);
+      assert.match(result.card.preview ?? "", /F1 · 阻断：入口不可用/);
+      assert.match(result.card.preview ?? "", /改进建议：修复入口/);
+      assert.match(result.card.preview ?? "", /建议下发统筹修改/);
+      assert.match(result.card.preview ?? "", /报告含阻断项，仅汇报将不修复/);
+      assert.deepEqual(result.card.options.map((option) => option.id), ["rework", "report-only"]);
+      const awaiting = await readAcceptanceTriageRecord(root, flowId);
+      assert.equal(awaiting.record?.status, "awaiting-decision");
+      assert.equal(result.card.id, awaiting.record?.triageId);
+      const answered = await result.onAnswer({ outcome: "answered", selected: ["report-only"] });
+      assert.equal(answered.settlement?.outcome, "answered");
+      assert.deepEqual(answered.settlement?.outcome === "answered" ? answered.settlement.value.selected : [], ["accept"]);
+      const triage = answered.settlement?.triage;
+      assert.equal(triage?.disposition, "report-only");
+      assert.equal(triage?.source, "customer");
+      assert.equal(triage?.conclusion, "fail");
+      if (answered.run !== undefined) await answered.run();
+      const decided = await readAcceptanceTriageRecord(root, flowId);
+      assert.equal(decided.record?.status, "report-only");
+      assert.equal(decided.record?.source, "customer");
+      assert.equal(decided.record?.sourceDetail, "triage-customer");
+      const ledger = await readGovernanceLedger(root);
+      const audit = ledger.entries.filter((entry) => entry.kind === "acceptance.triage");
+      assert.equal(audit.length, 1);
+      assert.equal(audit[0]?.acceptanceTriage?.source, "customer");
+      assert.equal(audit[0]?.acceptanceTriage?.disposition, "report-only");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("验收分诊客户卡：下发统筹修改映射为 reject 结算 + 客户来源返工路由", async () => {
+  const root = makeTempProjectRoot("ans-triage-customer-rework-");
+  try {
+    const flowId = "flow-triage-customer-rework";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    writeAcceptanceReportFile(
+      root,
+      flowId,
+      1,
+      triageReportBody({
+        items: [{ id: "F1", severity: "major", owner: "executor", reason: "关键功能缺失", action: "补齐功能", targets: ["src/feature.ts"] }],
+      }),
+    );
+    const listing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      const result = await harness.iface.evaluateAcceptanceTriage(triageFacts(root, flowId));
+      assert.equal(result.action, "triage-card");
+      if (result.action !== "triage-card") return;
+      const answered = await result.onAnswer({ outcome: "answered", selected: ["rework"] });
+      assert.equal(answered.settlement?.outcome, "answered");
+      assert.deepEqual(answered.settlement?.outcome === "answered" ? answered.settlement.value.selected : [], ["reject"]);
+      assert.equal(answered.settlement?.triage?.disposition, "rework");
+      if (answered.run !== undefined) await answered.run();
+      const routingPath = path.join(root, ".ans", "governance", "acceptance", flowId, "rework-routing.json");
+      assert.equal(existsSync(routingPath), true);
+      const routing = JSON.parse(readFileSync(routingPath, "utf8")) as { status: string; source: string; sourceDetail: string };
+      assert.equal(routing.status, "sent");
+      assert.equal(routing.source, "customer");
+      assert.equal(routing.sourceDetail, "triage-customer");
+      assert.equal((harness.sendsByRole.get("liaison") ?? []).length, 1);
+      const decided = await readAcceptanceTriageRecord(root, flowId);
+      assert.equal(decided.record?.status, "dispatched");
+      assert.equal(decided.record?.source, "customer");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("验收分诊通道：分诊卡替换验收卡（稳定 id）；gate settle 不呈现卡片", async () => {
+  const presented: Array<{ id: string; request: { kind: string } }> = [];
+  let ran = false;
+  const channel = createCustomerInputChannel({
+    presenter: (payload) => presented.push(payload as unknown as { id: string; request: { kind: string } }),
+    operatorId: "customer-1",
+    acceptanceTriage: () => ({
+      action: "triage-card",
+      card: {
+        id: "triage-flow-abcdef12",
+        roleId: "liaison",
+        title: "验收分诊 · flow",
+        question: "如何处理？",
+        options: [
+          { id: "rework", label: "下发统筹修改" },
+          { id: "report-only", label: "仅汇报不返工" },
+        ],
+      },
+      onAnswer: () => ({
+        settlement: {
+          outcome: "answered",
+          value: { selected: ["accept"] },
+          triage: { disposition: "report-only", source: "customer", conclusion: "fail", triageId: "triage-flow-abcdef12" },
+        },
+        run: () => {
+          ran = true;
+        },
+      }),
+    }),
+  });
+  const acceptanceRequest = {
+    kind: "choice" as const,
+    title: "验收",
+    cardKind: "acceptance" as const,
+    flowId: "flow",
+    options: [
+      { id: "accept", label: "通过" },
+      { id: "reject", label: "退回" },
+    ],
+  };
+  const pending = channel.customerInput(acceptanceRequest, { roleId: "verifier", projectRoot: "/p", governanceModel: "trio" });
+  await waitFor(() => presented.length === 1);
+  assert.equal(presented[0]?.id, "triage-flow-abcdef12", "呈现的是分诊卡而非验收卡");
+  assert.equal(presented[0]?.request.kind, "choice");
+  const reply = channel.respond({ id: "triage-flow-abcdef12", decision: { kind: "choice", selected: ["report-only"] } });
+  assert.equal(reply.ok, true);
+  const outcome = await pending;
+  assert.ok(outcome);
+  assert.equal(outcome.outcome, "answered");
+  assert.equal(outcome.outcome === "answered" ? outcome.triage?.disposition : undefined, "report-only");
+  await waitFor(() => ran);
+  channel.rejectAllPending("done");
+
+  const presentedSettle: unknown[] = [];
+  const channelSettle = createCustomerInputChannel({
+    presenter: (payload) => presentedSettle.push(payload),
+    operatorId: "customer-1",
+    acceptanceTriage: () => ({
+      action: "settle",
+      outcome: { outcome: "declined", notPresented: true, reason: "报告缺少分诊结构，已退回补报告" },
+    }),
+  });
+  const settled = await channelSettle.customerInput(acceptanceRequest, { roleId: "verifier", projectRoot: "/p", governanceModel: "trio" });
+  assert.ok(settled);
+  assert.equal(settled.outcome, "declined");
+  assert.equal(settled.outcome === "declined" ? settled.notPresented : undefined, true);
+  assert.equal(presentedSettle.length, 0, "退回不呈现验收卡");
+  channelSettle.rejectAllPending("done");
+});
+
+test("验收分诊 T3 回归：客户选「下发统筹修改」后旧 latest-rejected 路由不得抢跑——恰一条 triage 任务（有 severity/reason，来源 triage-customer）", async () => {
+  const root = makeTempProjectRoot("ans-triage-t3-race-");
+  try {
+    const flowId = "flow-triage-t3";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    writeAcceptanceReportFile(
+      root,
+      flowId,
+      1,
+      triageReportBody({
+        items: [
+          { id: "F1", severity: "blocker", owner: "executor", reason: "入口不可用", action: "修复入口", targets: ["src/main.ts"] },
+          { id: "F2", severity: "nit", owner: "executor", reason: "措辞偏好", action: "统一措辞", targets: ["docs/readme.md"] },
+        ],
+      }),
+    );
+    const listing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      // 1) 客户在分诊卡选「下发统筹修改」：onAnswer 先落 triage 承接记录，再返回 reject 结算。
+      const result = await harness.iface.evaluateAcceptanceTriage(triageFacts(root, flowId));
+      assert.equal(result.action, "triage-card");
+      if (result.action !== "triage-card") return;
+      const answered = await result.onAnswer({ outcome: "answered", selected: ["rework"] });
+      assert.equal(answered.settlement?.outcome, "answered");
+      assert.deepEqual(answered.settlement?.outcome === "answered" ? answered.settlement.value.selected : [], ["reject"]);
+      const claimed = await readAcceptanceTriageRecord(root, flowId);
+      assert.equal(claimed.record?.status, "failed");
+      assert.equal(claimed.record?.disposition, "rework");
+      assert.equal(claimed.record?.sourceDetail, "triage-customer");
+      // 2) 模拟编排把客户结算写入账本（run-role recordCustomerDecision 的异步效果）。
+      await appendLedger(root, [
+        {
+          kind: "customer.decision",
+          flowId,
+          decisionKind: "acceptance",
+          customerDecision: "rejected",
+          actorRoleId: "verifier",
+          power: "acceptance",
+          decisionEvidence: { kind: "customer-input" },
+        },
+      ]);
+      // 3) 旧触发面（导入/任意 settle 的有界验收检查）先到：必须认领 triage，而不是发旧格式任务。
+      await harness.iface.listProject({ projectRoot: root });
+      await waitFor(() => (harness.sendsByRole.get("liaison")?.length ?? 0) > 0, 5000);
+      await sleep(250); // 观察窗：不得出现第二条任务
+      const tasks = harness.sendsByRole.get("liaison") ?? [];
+      assert.equal(tasks.length, 1, "恰一条返工任务（旧 latest-rejected 路由不得抢跑）");
+      const task = tasks[0]!;
+      assert.match(task, /severity=blocker/, "任务带 triage severity");
+      assert.match(task, /reason=入口不可用/);
+      assert.match(task, /action=修复入口/);
+      assert.match(task, /验收分诊判断代批|客户验收分诊选择|客户在验收分诊卡/, "来源措辞为分诊，不是客户手拒");
+      assert.doesNotMatch(task, /客户拒绝（客户手拒）/, "旧格式来源文案不得出现");
+      const routing = JSON.parse(
+        readFileSync(path.join(root, ".ans", "governance", "acceptance", flowId, "rework-routing.json"), "utf8"),
+      ) as { status: string; source: string; sourceDetail: string };
+      assert.equal(routing.status, "sent");
+      assert.equal(routing.source, "customer");
+      assert.equal(routing.sourceDetail, "triage-customer");
+      // 4) 客户作答的 run() 随后执行：按同一身份去重，不重复发任务。
+      if (answered.run !== undefined) await answered.run();
+      await sleep(150);
+      assert.equal((harness.sendsByRole.get("liaison") ?? []).length, 1, "run() 去重后仍恰一条任务");
+      const decided = await readAcceptanceTriageRecord(root, flowId);
+      assert.equal(decided.record?.status, "dispatched");
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.filter((entry) => entry.kind === "acceptance.triage").length, 1, "账本分诊审计恰一条");
+      assert.equal(
+        ledger.entries.filter((entry) => entry.kind === "customer.decision" && entry.decisionKind === "acceptance").length,
+        1,
+        "customer.decision 恰一条（分诊卡结算）",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("验收分诊恢复：awaiting-decision 重启重推同一张卡（稳定 id，只推一次）", async () => {
+  const root = makeTempProjectRoot("ans-triage-recovery-");
+  try {
+    const flowId = "flow-triage-recovery";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    writeAcceptanceReportFile(
+      root,
+      flowId,
+      1,
+      triageReportBody({
+        items: [{ id: "F1", severity: "blocker", owner: "executor", reason: "入口不可用", action: "修复入口", targets: ["src/main.ts"] }],
+      }),
+    );
+    const listing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const first = await makeHarness(root, listing);
+    try {
+      const result = await first.iface.evaluateAcceptanceTriage(triageFacts(root, flowId));
+      assert.equal(result.action, "triage-card");
+    } finally {
+      await first.iface.stopSession();
+    }
+    const pushed: Array<{ id: string }> = [];
+    const second = await makeHarness(root, listing, {
+      presentAcceptanceTriageCard: (card) => {
+        pushed.push(card);
+        return { ok: true };
+      },
+    });
+    try {
+      await waitFor(() => pushed.length === 1);
+      assert.match(pushed[0]!.id, new RegExp(`^triage-${flowId}-[a-f0-9]{8}$`));
+      await second.iface.listProject({ projectRoot: root });
+      await sleep(150);
+      assert.equal(pushed.length, 1, "同一进程/同一项目不重复重推");
+    } finally {
+      await second.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("验收分诊：report-only 同 sha 抑制重派；新报告 sha 允许新一轮验收", async () => {
+  const root = makeTempProjectRoot("ans-triage-suppress-");
+  try {
+    const flowId = "flow-triage-suppress";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    const body = triageReportBody({ items: [{ id: "F1", severity: "nit", owner: "executor", reason: "风格", action: "统一", targets: ["src/a.ts"] }] });
+    const reportRel = writeAcceptanceReportFile(root, flowId, 1, body);
+    const parsed = parseAcceptanceTriageReport(body);
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) return;
+    const recommendation = recommendAcceptanceTriage(parsed.triage);
+    const { createHash } = await import("node:crypto");
+    const sha = createHash("sha256").update(readFileSync(path.join(root, ...reportRel.split("/")))).digest("hex");
+    const record = buildAcceptanceTriageRecord({
+      flowId,
+      reportPath: reportRel,
+      reportVersion: 1,
+      reportSha256: sha,
+      triage: parsed.triage,
+      recommendation,
+      status: "report-only",
+      disposition: "report-only",
+      source: "judge",
+      sourceDetail: "judge-rule",
+      decidedAt: new Date().toISOString(),
+      reportedAt: new Date().toISOString(),
+    });
+    const written = await writeAcceptanceTriageRecord(root, record);
+    assert.equal(written.ok, true);
+    const harness = await makeHarness(root, { ...trioListing(), projectRoot: root });
+    try {
+      await sleep(200);
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "同 sha report-only 不派 Proof");
+      // 新报告（新 sha）⇒ 允许新一轮验收派发。
+      writeAcceptanceReportFile(
+        root,
+        flowId,
+        2,
+        triageReportBody({ conclusion: "fail", items: [{ id: "N1", severity: "major", owner: "executor", reason: "新问题", action: "修复新问题", targets: ["src/b.ts"] }] }),
+      );
+      await harness.iface.listProject({ projectRoot: root });
+      await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0, 5000);
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 1);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("验收任务文案：要求 acceptance-triage/v1 与四档 severity（2026-10-25）", () => {
+  const text = buildAcceptanceTaskMessage("flow-task-text", [], {
+    reportPath: "docs/acceptance/flow-task-text-report-v1.md",
+  });
+  assert.match(text, /acceptance-triage\/v1/);
+  for (const severity of ["blocker", "major", "minor", "nit"]) {
+    assert.ok(text.includes(severity), `任务文案必须含 severity 定义：${severity}`);
+  }
+  assert.match(text, /fail\/conditional 必须至少一个 item/);
+});
+
+// —————————————— 2026-10-25 request_acceptance 有界超时（真机：工具 12 分钟不返回） ——————————————
+
+test("request_acceptance：依赖永不 resolve ⇒ 按有界超时返回 unavailable（不挂起），并提示可能已派发", async () => {
+  const root = makeTempProjectRoot("ans-request-acceptance-timeout-");
+  try {
+    const flowId = "flow-request-timeout";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractStepsWithCriteriaStatus(flowId, "pending")));
+    writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "T2" });
+    const harness = await makeHarness(root, { ...trioListing(), projectRoot: root }, {
+      completeAcceptanceCriteriaStep: () => new Promise(() => {}),
+      requestAcceptanceLimits: { totalMs: 150, stageMs: 60 },
+    });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      const capability = requestAcceptanceOf(harness, "convener");
+      const started = Date.now();
+      const result = await capability({ flowId });
+      const elapsed = Date.now() - started;
+      assert.equal(result.ok, false);
+      assert.equal(result.code, "unavailable");
+      assert.match(result.message, /超时/);
+      assert.match(result.message, /可能已派发/);
+      assert.match(result.message, /flow_get/);
+      assert.ok(elapsed < 3000, `必须在有界时限内返回（实际 ${elapsed}ms）`);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("request_acceptance：派发阶段 openBackground 永不 resolve ⇒ 阶段超时（不挂起），不谎报已派发", async () => {
+  const root = makeTempProjectRoot("ans-request-acceptance-open-hang-");
+  try {
+    const flowId = "flow-request-open-hang";
+    const completeSteps = newContractSteps(flowId, { criteria: true, change: true });
+    const notReady = completeSteps.map((step) =>
+      step.id === "delivery-server" ? { ...step, status: "pending", evidence: undefined } : step,
+    );
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, notReady));
+    writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "T2" });
+    const harness = await makeHarness(root, { ...trioListing(), projectRoot: root }, {
+      hangOpenRoleSession: true,
+      requestAcceptanceLimits: { totalMs: 200, stageMs: 80 },
+    });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      const capability = requestAcceptanceOf(harness, "convener");
+      // 让流程在**导入之后**变为完成（避免导入补齐检查抢在能力调用前进入挂起派发）。
+      writeFlowStateFile(root, flowId, flowStateYaml(flowId, completeSteps));
+      await appendNewContractLedger(root, flowId, { criteria: true, change: true });
+      const started = Date.now();
+      const result = await capability({ flowId });
+      const elapsed = Date.now() - started;
+      assert.equal(result.ok, false, `不得谎报成功：${JSON.stringify(result)}`);
+      assert.equal(result.code, "unavailable");
+      assert.match(result.message, /验收复核派发/);
+      assert.match(result.message, /超时/);
+      assert.match(result.message, /可能已派发/);
+      assert.ok(elapsed < 3000, `派发阶段挂起也必须按超时返回（实际 ${elapsed}ms）`);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

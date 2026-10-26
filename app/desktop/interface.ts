@@ -21,7 +21,11 @@ import type { GovernanceFunction, GovernanceModel, ProjectConfig } from "../../s
 // 会话事件流类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。外推时套上 `roleId` 信封
 // （`SessionEventEnvelope`，B-2）——**类型从编排/本角色只读导入、不复制形状**。
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, DispatchTaskFn, PromptImage, PromptOptions, FinalizeResult } from "../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputOutcome, CustomerInputTriageOutcome, DispatchTaskFn, PromptImage, PromptOptions, FinalizeResult } from "../../src/model/runtime.ts";
+// 2026-10-25 独立复核请求（`request_acceptance`）：能力回执/载荷形状唯一来源＝契约家 `model/runtime.ts`
+// （只读导入，不复制形状）；flowId 形状同样复用运行时核心导出的 slug 常量（不另写正则）。
+import type { RequestAcceptanceFn, RequestAcceptanceInput, RequestAcceptanceResult } from "../../src/model/runtime.ts";
+import { GOVERNANCE_SLUG_PATTERN } from "../../src/model/runtime.ts";
 
 import { listProject as realListProject } from "../../src/service/role/resolve-role.ts";
 import {
@@ -70,6 +74,7 @@ import {
   type GovernanceMigrationResult,
   type GovernanceMigrationWriteInput,
   type GovernanceLedgerEntry,
+  type AcceptanceTriageLedgerDecision,
 } from "../../src/pipeline/orchestration/govern-session.ts";
 export type { GovernanceMigrationPreviewResult, GovernanceMigrationResult } from "../../src/pipeline/orchestration/govern-session.ts";
 // 只读 pin 证据检查：**唯一实现**在门禁引擎私有模块，只经 Service 公开出口消费（跨角色边界纪律）。
@@ -105,6 +110,11 @@ import {
   type StopResult,
   type WithdrawResult,
   type SessionEventEnvelope,
+  type BackgroundTasksListReply,
+  type BackgroundTaskReadInput,
+  type BackgroundTaskReadReply,
+  type BackgroundTaskStopInput,
+  type BackgroundTaskStopReply,
 } from "./session.ts";
 // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状与构造（**只读转出**——形状 `Omit` 自编排
 // `AssembleShellGateOptions`，见 operator-channel.ts；本层不另立第二份）。
@@ -115,7 +125,18 @@ import type { DesktopOperatorChannelFn, DesktopShellArming } from "./operator-ch
 import type { AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions } from "../../src/pipeline/orchestration/shell-arming.ts";
 // 客户确认制交互（A-5）：桌面侧的客户通道形状（带角色上下文）——本层只透传，实现在 `customer-input.ts`。
 // 判断代批结果行的结构化载荷与人话摘要（2026-10-18 双开关评审 §8.1/§9.3）同源，不在这里另写一份。
-import { judgeResultSummary, type AutoReworkCallbackInfo, type DesktopCustomerInputFn, type OperatorJudgeResultPayload } from "./customer-input.ts";
+import {
+  judgeResultSummary,
+  type AcceptanceTriageAnswer,
+  type AcceptanceTriageAnswerResult,
+  type AcceptanceTriageCardSpec,
+  type AcceptanceTriageGateFacts,
+  type AcceptanceTriageGateResult,
+  type AutoReworkCallbackInfo,
+  type DesktopCustomerInputFn,
+  type OperatorJudgeResultPayload,
+  type PresentAcceptanceTriageCardFn,
+} from "./customer-input.ts";
 // 治理下一步（2026-10-18 客户修正）：客户决定成功后的**后台派发**。推导/文案纯逻辑在 governance-advance.ts；
 // 本层负责打开目标治理角色会话、投递**唯一一条**任务，并把成功/失败经既有 delivery-note 系统行如实落流。
 import {
@@ -124,6 +145,8 @@ import {
   buildAcceptanceCriteriaTaskMessage,
   buildAcceptanceReworkTaskMessage,
   buildAcceptanceTaskMessage,
+  buildAcceptanceTriageCardLines,
+  buildAcceptanceTriageReportText,
   buildGovernanceAdvanceMessage,
   buildGovernanceCoordinationTaskMessage,
   buildNominationAlreadyDoneMessage,
@@ -139,6 +162,8 @@ import {
   governanceAcceptanceReworkReportIncompleteNote,
   governanceAcceptanceReworkRoutedNote,
   governanceAcceptanceReportPath,
+  governanceAcceptanceTriageMissingReportNote,
+  governanceAcceptanceTriageReturnedNote,
   governanceAdvanceSuccessNote,
   governanceChangePackagePath,
   governanceFlowPath,
@@ -160,6 +185,9 @@ import {
 // 不直接 import 编排私有 `src/common/编排/`；单一实现与 schema 由编排拥有。
 import {
   completeAcceptanceStep as realCompleteAcceptanceStep,
+  // 2026-10-25 request_acceptance：验收标准工件就绪后把 flow 的 `acceptance-criteria` 步骤收口为 done
+  // （应用专用；桌面只经公共出口消费，不写第二份 flow 写盘/证据对账）。
+  completeAcceptanceCriteriaStep as realCompleteAcceptanceCriteriaStep,
   // 2026-10-24 appointment 收口：客户任命决定已落账后，由应用专用 `completeCustomerDecisionStep`
   // 把 flow 的 appointment 客户决定步骤标 done（只经公共出口消费；不注册为角色工具）。
   completeCustomerDecisionStep as realCompleteCustomerDecisionStep,
@@ -174,15 +202,33 @@ import {
   observeFlowArtifacts as realObserveFlowArtifacts,
   parseAcceptanceReworkReport,
   parseFlowStateYaml,
+  // 2026-10-25 验收分诊：报告 `acceptance-triage/v1` 解析、§5.1 默认建议、triage→rework 映射与
+  // `.ans` 分诊记录读写——**唯一实现**在编排；桌面只经 Pipeline 公共出口消费。
+  parseAcceptanceTriageReport,
+  recommendAcceptanceTriage,
+  acceptanceTriageToReworkItems,
+  acceptanceTriageIdForReport,
+  acceptanceTriageItemsDigest,
+  acceptanceTriageRecordMatchesReport,
+  buildAcceptanceTriageRecord,
+  readAcceptanceTriageRecord,
+  writeAcceptanceTriageRecord,
   reopenAcceptanceStepForRework as realReopenAcceptanceStepForRework,
   // 2026-10-24 P0-2：就绪步骤纯规划器（只读；桌面只经 Pipeline 公共出口消费，不直接 import 私有 common）。
   listReadyFlowSteps,
   type AcceptanceReworkItem,
   type AcceptanceReworkParseResult,
+  type AcceptanceTriageRecommendation,
+  type AcceptanceTriageRecord,
+  type AcceptanceTriageSection,
+  type AcceptanceTriageItemExecutability,
+  type CompleteAcceptanceCriteriaStepResult,
   type CompleteCustomerDecisionStepInput,
   type CompleteRoleCardsStepInput,
   type CompleteRoleCardsStepResult,
   type FlowState,
+  type FlowStepKind,
+  type FlowStepStatus,
   type LatestAcceptanceDecision,
   type ReadyFlowStep,
   type ReopenAcceptanceStepForReworkInput,
@@ -290,6 +336,68 @@ export interface ListProjectResult {
    */
   governanceRecord: GovernanceRecordStatus;
 }
+
+// —————————————— 2026-10-25：流程状态只读视图（`flow:status`） ——————————————
+//
+// 渲染侧展示 `docs/flows/*.yaml` 的步骤进度，**只读**：只做目录列举 + 文件读取 + 既有
+// `parseFlowStateYaml` 解析；不写任何文件、不碰治理账本、不改变 flow 的 revision（revision 只是
+// 文件内容 sha256 的只读派生，与编排 flow 工具同口径）。坏文件逐文件进 `errors`，不阻断其他文件。
+
+/** 单个流程步骤的只读视图（只保留渲染展示所需字段；不复制 evidence/supersedes 等编排语义）。 */
+export interface FlowStatusStepView {
+  id: string;
+  title: string;
+  kind: FlowStepKind;
+  owner: string;
+  status: FlowStepStatus;
+}
+
+/**
+ * 步骤计数（`aborted` 不在计数键内，只计入 `total`——与 `main.flowStatus` 视图契约一致）。
+ * 所有字段恒为非负整数；`total === steps.length`。
+ */
+export interface FlowStatusCounts {
+  total: number;
+  done: number;
+  delivered: number;
+  dispatched: number;
+  pending: number;
+  failed: number;
+  blocked: number;
+  superseded: number;
+}
+
+/** 单个流程文件（`docs/flows/<flowId>.yaml`）的只读视图。 */
+export interface FlowStatusFlowView {
+  flowId: string;
+  /**
+   * 文件内容 `sha256`（与编排 flow 工具的 revision 同口径）。**只读派生**：本方法不写文件、
+   * 不改 revision。类型标可选以兼容未来无 revision 的来源；当前实现恒给出。
+   */
+  revision?: string;
+  steps: FlowStatusStepView[];
+  counts: FlowStatusCounts;
+  /** 在途步骤 id（`dispatched`/`delivered`），按 flow YAML 的步骤顺序；可能为空数组（没有 current）。 */
+  current: string[];
+  /** 文件 mtime（ISO 8601）。 */
+  updatedAt: string;
+}
+
+/** 单个坏文件的解析/读取错误（`file` 为项目相对路径 `docs/flows/<name>.yaml`）。 */
+export interface FlowStatusFileError {
+  file: string;
+  error: string;
+}
+
+/**
+ * `flowStatus(projectRoot)` 回执。
+ * - `{ok:true, flows, errors}`：扫描成功。`docs/flows` 目录不存在 ⇒ `flows:[]`、`errors:[]`（不是错误）；
+ *   某个文件不可读/解析失败 ⇒ 只进 `errors`，其余文件照常返回。
+ * - `{ok:false, error}`：`projectRoot` 非空字符串且为已存在目录这一前提不成立（或目录扫描本身失败）。
+ */
+export type FlowStatusReply =
+  | { ok: true; flows: FlowStatusFlowView[]; errors: FlowStatusFileError[] }
+  | { ok: false; error: string };
 
 // —————————————— V1b 迁移入口（评审 §5.5/§11.2；编排侧已就绪） ——————————————
 //
@@ -436,6 +544,8 @@ export interface DesktopDeps {
       customerInput?: CustomerInputFn;
       /** 派发任务能力（H-1）：仅内置治理角色（su）会话注入（见 session.ts::routeDispatch）。 */
       dispatchTask?: DispatchTaskFn;
+      /** 独立复核请求能力（2026-10-25 request_acceptance）：仅内置治理角色会话注入（见 session.ts）。 */
+      requestAcceptance?: RequestAcceptanceFn;
       /** W6-B：意图交接投递端（仅 Liaison 注入；编排已校验/写账本，桌面只后台投递）。 */
       handOffIntent?: import("../../src/model/runtime.ts").HandOffIntentFn;
       /** W6-B：澄清送达端（仅 Rapporteur 注入；编排已判两轮上限/写账本，桌面只落主入口系统行）。 */
@@ -577,6 +687,12 @@ export interface DesktopDeps {
    */
   customerInput?: DesktopCustomerInputFn;
   /**
+   * **重启恢复：呈现分诊卡**（2026-10-25 验收分诊设计 §9.4 `awaiting-decision`）——
+   * 主进程用 `customer-input.ts::createCustomerInputChannel(...).presentAcceptanceTriageCard` 注入；
+   * 缺省 ⇒ 不重推卡（重启后由下一次真实验收卡触发分诊），**不伪造客户决定**。
+   */
+  presentAcceptanceTriageCard?: PresentAcceptanceTriageCardFn;
+  /**
    * 系统图片选择器（K-2）：由主进程注入（electron dialog + fs 读——**渲染进程不碰文件**）。
    * 返回 `{name, dataBase64}` 或 `null`（用户取消）；抛错 → 本层归为如实失败。测试/e2e 注入替身。
    */
@@ -644,6 +760,27 @@ export interface DesktopDeps {
     error?: string;
     message?: string;
   }>;
+  /**
+   * **验收标准步骤收口**（2026-10-25 request_acceptance）：缺省经 Pipeline 公共出口
+   * `flow-state.ts::completeAcceptanceCriteriaStep`（应用专用；幂等、原子写、标准缺失 fail-closed）。
+   * 桌面只消费收口结果（成功含 alreadyDone 继续；失败按 code 如实映射），不自行改 flow。
+   */
+  completeAcceptanceCriteriaStepFn?: (input: { projectRoot: string; flowId: string }) => Promise<CompleteAcceptanceCriteriaStepResult>;
+  /**
+   * **独立复核请求能力**（2026-10-25 request_acceptance）：桌面 Interface 提供的应用侧实现（按项目绑定）。
+   * SessionManager 仅对内置治理角色会话注入（项目角色不注入）；编排再按 builtInGovernance 收口。
+   * 语义：flowId 归一 → 标准/变更包/风险档校验 → `acceptance-criteria` 收口 → 流程完整性 → 运行时解析
+   * → 既有自动验收派发（`force:true, trigger:"request"`）。**请求复核 ≠ 客户批准**：不写客户决定、
+   * 不写 `customer.decision`。缺省不注入 ⇒ 工具不注册（结构性 fail-closed）。
+   */
+  requestAcceptance?: (projectRoot: string, input: RequestAcceptanceInput) => Promise<RequestAcceptanceResult>;
+  /**
+   * **独立复核请求的时限**（2026-10-25 真机缺陷：`request_acceptance` 工具调用 12 分钟不返回、统筹会话
+   * 一直 busy）。总预算缺省 ≤60s；单阶段（标准收口/引擎解析/验收派发）缺省 ≤20s。超时如实返回
+   * `{ok:false, code:"unavailable"}` 并提示「可能已派发，请用 flow_get 核对」，**绝不让工具无限挂起**。
+   * 测试注入更短时限（不得为 0/负数）。
+   */
+  requestAcceptanceLimits?: { totalMs?: number; stageMs?: number };
   /**
    * **role-cards 步骤收口**（2026-10-23 可重入门禁 A4/A5）：结构校验通过后把 flow YAML 的
    * `id:"role-cards"` 步骤标为 done（应用专用；不注册为角色工具、不写客户决定）。缺省经 Pipeline 公共
@@ -733,6 +870,19 @@ export interface DesktopInterface {
   readProjectDocument(input: unknown): Promise<ReadProjectDocumentResult>;
   disposeProjectDocuments(): void;
   listProject(input: { projectRoot: string }): Promise<ListProjectResult>;
+  /**
+   * **流程状态只读视图（2026-10-25，`flow:status`）**：扫描 `<projectRoot>/docs/flows/*.yaml`，
+   * 每个文件用编排公共出口的 `parseFlowStateYaml(text, flowId)` 解析（`flowId` = 文件名去 `.yaml`），
+   * 返回 `{flowId, revision, steps, counts, current, updatedAt}`。
+   *
+   * - `projectRoot` 非空且为已存在目录，否则 `{ok:false, error: main.flowStatus.invalidProject}`；
+   * - `docs/flows` 不存在 ⇒ `{ok:true, flows:[], errors:[]}`（不是错误）；
+   * - 坏 YAML/不可读文件 ⇒ 逐文件进 `errors:[{file,error}]`，不阻断其他文件；
+   * - `current` = `dispatched`/`delivered` 步骤 id（按 YAML 步骤顺序），可能为空；
+   * - **只读**：不写任何文件、不碰治理账本、不改变 revision（revision 为文件内容 sha256 只读派生）。
+   * 不抛异常；参数/IO 失败一律回执 `{ok:false,error}`。
+   */
+  flowStatus(projectRoot: string): Promise<FlowStatusReply>;
   /**
    * **I2/C1（existing-project-compat V1）**：预览「建立治理记录」——**只读**（不写文件、不建目录）。
    * 守卫：`projectRoot` 非空且等于当前导入项目；否则 `invalid-request`（本层合成，不调用机制）。
@@ -837,6 +987,18 @@ export interface DesktopInterface {
    * 不派 Proof 返工、不替客户验收；失败只诊断/系统行，不伪造路由。不挂 IPC、不暴露给渲染侧。
    */
   routeAcceptanceAutoRework(info: AutoReworkCallbackInfo): Promise<void>;
+  /**
+   * **验收分诊呈现前闸**（2026-10-25 设计 `2026-10-25_design_acceptance-triage.md` §3.2 / §4 / §5 / §7）。
+   *
+   * 由主进程把客户交互通道的 `acceptanceTriage` 前闸接到本方法（与 `routeAcceptanceAutoRework` 同模式）。
+   * 只对 trio + YAML 流程 + `cardKind:"acceptance"` 的请求求值：读最新验收报告 + sha256 →
+   * `parseAcceptanceTriageReport` → 缺/坏结构写 `returned-to-verifier` 记录并**不呈现**验收卡；
+   * `pass` ⇒ `proceed`（既有验收卡路径）；`fail/conditional` ⇒ `recommendAcceptanceTriage`；
+   * 「替我决策」开且建议权威 ⇒ 按建议自动处置（judge-rule）；否则返回**客户分诊卡**。
+   * 本方法不做 IO 之外的判定扩展：解析/建议/记录/路由实现全部来自编排公共出口；**不写 customer.decision**。
+   * 不挂 IPC、不暴露给渲染侧。
+   */
+  evaluateAcceptanceTriage(facts: AcceptanceTriageGateFacts): Promise<AcceptanceTriageGateResult>;
   /** 关闭会话（B-2 **定向**：给定 `roleId` 只关它、历史留在界面上；缺省/`null` 关全部，供换项目/退出）。 */
   stopSession(input?: { roleId?: string | null; projectRoot?: string; runtime?: RuntimeKind }): Promise<StopResult>;
   /**
@@ -854,6 +1016,25 @@ export interface DesktopInterface {
   /** 保活中的角色 id 列表（B-2：左树「有活动会话」小圆点的数据源；纯读、无副作用）。 */
   listLiveSessions(): Promise<string[]>;
   listLiveSessionViews(): Promise<{ projectRoot: string; roleId: string; runtime: RuntimeKind; profileRevision: number }[]>;
+  /**
+   * **后台任务聚合列表（2026-10-25，桌面任务面板）**：按 `projectRoot + runtime` 聚合当前所有已打开会话的
+   * 后台任务——每项 = `BackgroundTaskSnapshot` + `roleId` + `runtime`。直接读各会话句柄、**不缓存/不持久化**；
+   * 句柄无能力跳过该角色；没有任何具备能力的活会话 ⇒ 空列表 + `unavailable:true`（区别于「没有任务」）。
+   * 参数缺失/非法 ⇒ `{ok:false, error}`（不抛）。
+   */
+  listBackgroundTasks(input: { projectRoot: string; runtime: RuntimeKind }): Promise<BackgroundTasksListReply>;
+  /**
+   * **读取后台任务日志**：以 `{projectRoot, runtime, roleId, taskId}` 精确寻址；`stream`（stdout/stderr/both）
+   * 与 `tailLines` 原样透传（上限 200 行由底层钳制并如实标注 `tailClamped`）。找不到会话/句柄无能力/
+   * 未知任务（底层 `undefined`）一律 `{ok:false, error}`——绝不伪造任务状态或日志内容。
+   */
+  readBackgroundTask(input: BackgroundTaskReadInput): Promise<BackgroundTaskReadReply>;
+  /**
+   * **停止后台任务**：以 `{projectRoot, runtime, roleId, taskId, force?}` 精确寻址。底层结果**原样返回**
+   * （`ok:true` 或 `ok:false` 的 `unknown-task`/`closed`/`timeout`）——**不得改写为成功**；桌面层不可用
+   * （无会话/无能力/底层抛错）为 `reason:"closed"`/`"unavailable"` 的如实失败。
+   */
+  stopBackgroundTask(input: BackgroundTaskStopInput): Promise<BackgroundTaskStopReply>;
   getSessionHistory(input: SessionOpenRequest): Promise<SessionHistoryView>;
   getRuntimeConfig(runtime: RuntimeKind): Promise<RuntimeConfigView>;
   saveRuntimeConfig(input: { runtime: RuntimeKind; updates: unknown }): Promise<RuntimeConfigSaveResult>;
@@ -957,6 +1138,38 @@ type FlowStateProbe =
 /** 治理模型封闭值域（评审 §5.1/§5.5；缺省 `single`）。 */
 function isGovernanceModelValue(value: unknown): value is GovernanceModel {
   return value === "single" || value === "trio";
+}
+
+/**
+ * 事件是否为一次**成功**的 `flow_step_update` 工具调用（2026-10-25）。
+ *
+ * 生产事件面（运行时核心/Service 投影）形状：`kind:"accepted"` + `detail.{toolName,phase:"result",ok:true}`；
+ * 兼容未投影的旧形状：`kind:"accepted"` + `detail.call.name` / `detail.result.ok`。
+ * 判定纪律：只认 handler 的**成功结果**——`start`/`blocked`/`denied`/`ok:false` 一律不算（避免把「准备调用」
+ * 或失败调用当成流程推进信号）；不解析 summary 文本、不猜工具名。
+ */
+function isSuccessfulFlowStepUpdate(event: { kind: string; detail?: unknown }): boolean {
+  const detail = event.detail;
+  if (detail === null || typeof detail !== "object" || Array.isArray(detail)) return false;
+  const record = detail as Record<string, unknown>;
+  const call =
+    record.call !== null && typeof record.call === "object" && !Array.isArray(record.call)
+      ? (record.call as Record<string, unknown>)
+      : {};
+  const result =
+    record.result !== null && typeof record.result === "object" && !Array.isArray(record.result)
+      ? (record.result as Record<string, unknown>)
+      : {};
+  const toolName =
+    typeof record.toolName === "string" ? record.toolName : typeof call.name === "string" ? call.name : "";
+  if (toolName !== "flow_step_update") return false;
+  if (event.kind === "denied") return false;
+  const phase = record.phase;
+  if (phase === "start" || phase === "blocked") return false;
+  // `accepted`（handler 成功）或旧投影的 `tool_call + phase:"result"`；其余（尤其 start）不算。
+  if (event.kind !== "accepted" && phase !== "result") return false;
+  const ok = typeof record.ok === "boolean" ? record.ok : typeof result.ok === "boolean" ? result.ok : undefined;
+  return ok !== false;
 }
 
 // —————————————— 2026-10-22 治理分工第 1/3/5 项：调度/验收产物定位与团队计划结构读取 ——————————————
@@ -1571,6 +1784,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const completeRoleCardsStepFn = deps.completeRoleCardsStepFn ?? realCompleteRoleCardsStep;
   const completeCustomerDecisionStepFn =
     deps.completeCustomerDecisionStepFn ?? realCompleteCustomerDecisionStep;
+  // 2026-10-25 request_acceptance：验收标准步骤收口（缺省＝Pipeline 公共出口；桌面不复制编排写盘/校验）。
+  const completeAcceptanceCriteriaStepFn =
+    deps.completeAcceptanceCriteriaStepFn ?? realCompleteAcceptanceCriteriaStep;
   // Pi 配置面板：函数与目标路径均可注入（**测试/e2e 必须注入临时 `.env`**，绝不碰真实仓库根 `.env`）。
   const getPiConfigFn = deps.getPiConfigFn ?? realGetPiConfig;
   const savePiConfigFn = deps.savePiConfigFn ?? realSavePiConfig;
@@ -1887,6 +2103,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     reasonCode?: string;
     reason?: string;
     runtimeHint?: RuntimeKind;
+    /**
+     * 2026-10-25 验收分诊：解析好的 `acceptance-triage/v1` 段与**分诊时**报告快照。给出时返工任务
+     * 消费 triage items（含 severity/reason/targets/criteria），不再依赖 `acceptance-rework/v1` 段。
+     */
+    triage?: AcceptanceTriageSection;
+    reportPath?: string;
+    reportVersion?: number;
+    reportSha256?: string;
+    reportMissing?: boolean;
   }
 
   /** 路由记录/系统行的运行期去重（重启后仍以磁盘 record 为准）。 */
@@ -1937,7 +2162,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   async function planAcceptanceReworkOwners(
     projectRoot: string,
     flowId: string,
-    items: readonly AcceptanceReworkItem[],
+    items: readonly (AcceptanceReworkItem & Partial<Pick<AcceptanceReworkTaskItem, "severity" | "reason" | "criteria" | "targets" | "blocking">>)[],
   ): Promise<AcceptanceReworkOwnerPlan> {
     const plan: AcceptanceReworkOwnerPlan = { dispatchable: [], blocked: [], reportFix: [], governance: [] };
     let listing = listingCache.get(projectRoot);
@@ -1955,6 +2180,12 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         owner: item.owner,
         action: item.action,
         ...(item.evidence.length > 0 ? { evidence: item.evidence } : {}),
+        // 2026-10-25 分诊上下文（旧 rework v1 项没有这些字段 ⇒ 任务文案逐字不变）。
+        ...(item.severity !== undefined ? { severity: item.severity } : {}),
+        ...(item.reason !== undefined ? { reason: item.reason } : {}),
+        ...(item.criteria !== undefined ? { criteria: item.criteria } : {}),
+        ...(item.targets !== undefined ? { targets: item.targets } : {}),
+        ...(item.blocking !== undefined ? { blocking: item.blocking } : {}),
       };
       if (item.owner === "verifier") {
         plan.reportFix.push(entry);
@@ -1990,9 +2221,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     if (facts.source === "customer") {
       if (facts.sourceDetail === "judge") return { source: "judge", sourceDetail: "judge" };
       if (facts.sourceDetail === "customer-input") return { source: "customer", sourceDetail: "customer-input" };
+      if (facts.sourceDetail === "triage-customer") return { source: "customer", sourceDetail: "triage-customer" };
       return { source: "judge", sourceDetail: "judge-manual", warning: `未知 sourceDetail=${facts.sourceDetail}，按 judge-manual 保守处理` };
     }
-    if (facts.sourceDetail === "judge-deny" || facts.sourceDetail === "judge-manual") {
+    if (facts.sourceDetail === "judge-deny" || facts.sourceDetail === "judge-manual" || facts.sourceDetail === "judge-rule") {
       return { source: "judge", sourceDetail: facts.sourceDetail };
     }
     return { source: "judge", sourceDetail: "judge-manual", warning: `未知 sourceDetail=${facts.sourceDetail}，按 judge-manual 保守处理` };
@@ -2053,16 +2285,37 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     await mkdir(dir, { recursive: true });
     const finalPath = path.join(dir, "rework-routing.json");
     const tmpPath = path.join(dir, `rework-routing.json.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`);
-    try {
-      await writeFile(tmpPath, `${JSON.stringify(record, null, 2)}\n`, "utf8");
-      await rename(tmpPath, finalPath);
-    } catch (error) {
+    const cleanup = async (): Promise<void> => {
       try {
         await unlink(tmpPath);
       } catch {
         /* 临时文件可能不存在：忽略清理失败 */
       }
+    };
+    try {
+      await writeFile(tmpPath, `${JSON.stringify(record, null, 2)}\n`, "utf8");
+    } catch (error) {
+      await cleanup();
       throw error;
+    }
+    // 2026-10-25 Windows 并发读下 rename 偶发 EPERM/EBUSY（杀毒/索引/另一读者持句柄）：
+    // 有界重试（≤4 次、约 100ms 内）；仍失败则如实抛错（调用方 best-effort 语义不变）。
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        await rename(tmpPath, finalPath);
+        return;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        const transient = code === "EPERM" || code === "EBUSY" || code === "EACCES";
+        if (!transient || attempt >= 3) {
+          await cleanup();
+          throw error;
+        }
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, 10 * (attempt + 1));
+          (timer as { unref?: () => void }).unref?.();
+        });
+      }
     }
   }
 
@@ -2132,18 +2385,22 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       diagnostic.record("acceptance.rework.source.unknown", { flowId, detail: normalized.warning });
     }
     const report = await readAcceptanceReportSnapshot(projectRoot, flowId);
-    const items = report.parse.ok ? report.parse.section.items : [];
+    const triage = facts.triage;
+    // 分诊路径：任务项来自 `acceptance-triage/v1`（含严重度/原因/改进指针）；旧路径仍读 rework v1。
+    const items = triage !== undefined ? acceptanceTriageToReworkItems(triage) : report.parse.ok ? report.parse.section.items : [];
     const ownerPlan = await planAcceptanceReworkOwners(projectRoot, flowId, items);
-    const reportSha = report.sha256;
+    const reportSha = facts.reportSha256 ?? report.sha256;
     const memoryKey = reworkIdentityKey(projectRoot, facts, reportSha);
     if (reworkSentInMemory.has(memoryKey)) return "sent";
-    const structured = report.parse.ok;
+    const structured = triage !== undefined || report.parse.ok;
     const itemsDigest =
-      items.length > 0
-        ? createHash("sha256")
-            .update(JSON.stringify(items.map((item) => ({ id: item.id, owner: item.owner, action: item.action, evidence: item.evidence }))))
-            .digest("hex")
-        : null;
+      triage !== undefined
+        ? acceptanceTriageItemsDigest(triage.items)
+        : items.length > 0
+          ? createHash("sha256")
+              .update(JSON.stringify(items.map((item) => ({ id: item.id, owner: item.owner, action: item.action, evidence: item.evidence }))))
+              .digest("hex")
+          : null;
     const existing = await readReworkRoutingRecord(projectRoot, flowId);
     if (existing.corrupt !== undefined) {
       // 损坏/未知 schema：不猜、不派 Proof；重建 record（app 私有状态，事实来自账本/报告）。
@@ -2179,12 +2436,12 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       requestId: facts.requestId ?? null,
       reasonCode: facts.reasonCode ?? null,
       reason: facts.reason !== undefined ? Array.from(facts.reason).slice(0, 500).join("") : null,
-      reportPath: report.relPath,
+      reportPath: facts.reportPath ?? report.relPath,
       reportSha256: reportSha ?? null,
       itemsDigest,
       itemCount: items.length,
       structured,
-      coordinator: report.parse.ok ? report.parse.section.coordinator : "convener",
+      coordinator: triage !== undefined ? "convener" : report.parse.ok ? report.parse.section.coordinator : "convener",
       flowPath: flowStatePath(flowId),
       flowSha256AtRoute: flowSnapshot?.sha256 ?? null,
       flowMtimeMsAtRoute: flowSnapshot?.mtimeMs ?? null,
@@ -2212,19 +2469,20 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       ...(facts.requestId !== undefined ? { requestId: facts.requestId } : {}),
       ...(facts.reasonCode !== undefined ? { reasonCode: facts.reasonCode } : {}),
       ...(facts.reason !== undefined ? { reason: facts.reason } : {}),
-      reportPath: report.relPath,
-      reportVersion: report.version,
-      ...(report.sha256 !== undefined ? { reportSha256: report.sha256 } : {}),
-      ...(report.missing ? { reportMissing: true } : {}),
+      reportPath: facts.reportPath ?? report.relPath,
+      reportVersion: facts.reportVersion ?? report.version,
+      ...(reportSha !== undefined ? { reportSha256: reportSha } : {}),
+      ...((facts.reportMissing ?? report.missing) ? { reportMissing: true } : {}),
       structured,
-      ...(report.parse.ok ? { coordinator: report.parse.section.coordinator } : {}),
+      ...(triage !== undefined ? { coordinator: "convener" as const } : report.parse.ok ? { coordinator: report.parse.section.coordinator } : {}),
       receiver: { roleId: receiverRoleId, displayName: receiverLabel },
       release: releaseForRework,
       items: ownerPlan.dispatchable,
       blockedItems: ownerPlan.blocked,
       reportFixItems: ownerPlan.reportFix,
       governanceItems: ownerPlan.governance,
-      ...(!report.parse.ok ? { itemErrors: report.parse.errors.map((item) => `${item.path}: ${item.message}`) } : {}),
+      ...(triage !== undefined ? { triageSchema: true } : {}),
+      ...(triage === undefined && !report.parse.ok ? { itemErrors: report.parse.errors.map((item) => `${item.path}: ${item.message}`) } : {}),
     });
     const sentResult = await sendReworkTaskToReceiver(projectRoot, receiverRoleId, facts.runtimeHint, task);
     if (!sentResult.ok) {
@@ -2250,9 +2508,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     diagnostic.record("acceptance.rework.sent", { flowId, source: normalized.source, structured, itemCount: items.length, queued: sentResult.queued === true });
     // 系统行写明**实际接收方**（trio = Lead / 主理；coordinator 只是报告建议）。
     note(`${governanceAcceptanceReworkRoutedNote(flowId, normalized.source)}（实际接收方：${receiverLabel}（${receiverRoleId}））`);
-    if (!report.parse.ok) {
+    if (triage === undefined && !report.parse.ok) {
       const detail = report.parse.errors.map((item) => `${item.path}: ${item.message}`).slice(0, 5).join("；") || report.parse.reason;
-      note(`${governanceAcceptanceReworkReportIncompleteNote(flowId, report.relPath, detail)}（实际接收方：${receiverLabel}（${receiverRoleId}））`);
+      note(`${governanceAcceptanceReworkReportIncompleteNote(flowId, facts.reportPath ?? report.relPath, detail)}（实际接收方：${receiverLabel}（${receiverRoleId}））`);
     }
     const appendLedgerFn = deps.appendGovernanceLedgerFn ?? appendGovernanceLedger;
     const appended = await appendLedgerFn(projectRoot, {
@@ -2537,6 +2795,987 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     diagnostic.record("acceptance.redispatch.sent", { flowId, source: latest.kind, queued: sent.queued === true });
   };
 
+  // —————————————— 2026-10-25 验收分诊（设计 `2026-10-25_design_acceptance-triage.md` §3–§10） ——————————————
+  //
+  // 放置层：客户交互通道的**呈现前闸**（customer-input.ts::presentEntry）→ 本方法。只有
+  // **trio + YAML 流程 + cardKind="acceptance"** 进入分诊；报告 `conclusion=pass` 不分诊（既有验收卡路径）；
+  // 缺/坏/矛盾结构 ⇒ 写 `returned-to-verifier` 记录并以 `declined + notPresented` 退回 Proof 补报告；
+  // `fail/conditional` ⇒ 编排纯函数建议 + 「替我决策」开关：
+  //   · 开关开且建议权威 ⇒ 按建议自动处置（`source:"judge"`，`sourceDetail:"judge-rule"`）；
+  //   · 否则 ⇒ 客户分诊卡（复用 operator choice；稳定 id `triage-<flowId>-<sha8>`）。
+  // 幂等：`flowId + reportSha256`（记录文件）+ 卡 id；新报告 sha 覆盖旧记录（`previousReportSha256`）。
+  // 账本：处置后 best-effort 追加 `acceptance.triage`（按 triageId 去重），**绝不写 customer.decision**；
+  // 客户在分诊卡上的选择经既有验收结算路径写成 acceptance accepted/rejected（有活请求时）。
+
+  /** 分诊处置来源明细（judge-rule = 确定性规则代批；triage-customer = 客户在分诊卡选择）。 */
+  type AcceptanceTriageSourceDetail = "judge-rule" | "triage-customer";
+
+  interface AcceptanceTriagePlan {
+    projectRoot: string;
+    flowId: string;
+    triage: AcceptanceTriageSection;
+    recommendation: AcceptanceTriageRecommendation;
+    reportPath: string;
+    reportVersion: number;
+    reportSha256: string;
+    triageId: string;
+    runtime?: RuntimeKind;
+  }
+
+  /** 分诊系统行落主入口（与自动验收/返工路由同一口径；失败只诊断）。 */
+  const makeAcceptanceTriageNote = (
+    projectRoot: string,
+    runtimeHint?: RuntimeKind,
+  ): { roleId: string; note: (summary: string) => void; diagnostic: ReturnType<typeof createDiagnosticLogger> } => {
+    const roleId = (listingCache.get(projectRoot)?.primaryRoleId ?? "").trim();
+    const diagnostic = createDiagnosticLogger({ component: "desktop.acceptance-triage", projectRoot, ...(roleId !== "" ? { roleId } : {}) });
+    const note = (summary: string): void => {
+      if (roleId === "") return;
+      try {
+        emitSessionEvent({
+          roleId,
+          projectRoot,
+          runtime: runtimeHint ?? acceptanceRuntimeHints.get(projectRoot) ?? "claude",
+          event: { kind: "message", summary, detail: { source: "delivery-note" } },
+        });
+      } catch (error) {
+        diagnostic.error("acceptance.triage.note.failed", error);
+      }
+    };
+    return { roleId, note, diagnostic };
+  };
+
+  /** owner 可执行性（项目 listing + 内置治理角色；§5.2）：未知/不可派发 ⇒ not-executable。 */
+  const makeAcceptanceTriageExecutability = async (
+    projectRoot: string,
+  ): Promise<{
+    check?: (item: AcceptanceTriageSection["items"][number]) => AcceptanceTriageItemExecutability;
+    listingUnavailable?: string;
+  }> => {
+    let listing = listingCache.get(projectRoot);
+    if (listing === undefined) {
+      try {
+        listing = await listProjectFn(projectRoot);
+        listingCache.set(listing.projectRoot, listing);
+      } catch (error) {
+        return { listingUnavailable: `项目 listing 不可用：${error instanceof Error ? error.message : String(error)}` };
+      }
+    }
+    const cached = listing;
+    return {
+      check: (item): AcceptanceTriageItemExecutability => {
+        if (item.owner === "app" || item.owner === "customer") {
+          return { status: "not-executable", reasons: ["应用/客户不是可派发的返工 owner"] };
+        }
+        if (item.owner === "verifier") {
+          return { status: "executable", reasons: ["报告/工具修正项归验收（不作为产品返工派发）"] };
+        }
+        if (item.owner === "convener" || isBuiltInGovernanceRoleId(item.owner)) {
+          return { status: "executable", reasons: ["内置治理角色（治理文档/变更包项）"] };
+        }
+        const role = cached.roles.find((candidate) => candidate.roleId === item.owner);
+        if (role === undefined) {
+          return { status: "not-executable", reasons: ["项目中未枚举到该角色（未知/未任命）"] };
+        }
+        if (role.builtIn === true) return { status: "executable", reasons: ["内置治理角色"] };
+        return { status: "executable" };
+      },
+    };
+  };
+
+  /** 解析失败的可读细节（有界；供记录 error 与系统行）。 */
+  const acceptanceTriageParseDetail = (
+    snapshot: AcceptanceReportSnapshot,
+    parsed: Exclude<ReturnType<typeof parseAcceptanceTriageReport>, { ok: true }>,
+  ): string => {
+    if (snapshot.missing) return mainT("ui.triage.missingReport", { detail: "报告文件缺失或为空" });
+    const detail = parsed.errors.slice(0, 5).map((item) => `${item.path}: ${item.message}`).join("；");
+    return detail !== "" ? detail : `分诊结构 ${parsed.code}`;
+  };
+
+  /** 写好一条分诊记录（构建 + 原子写）；失败只返回错误（调用方按 §10 回落原验收卡）。 */
+  const writeAcceptanceTriageRecordSafe = async (
+    projectRoot: string,
+    input: Parameters<typeof buildAcceptanceTriageRecord>[0],
+  ): Promise<{ ok: true; record: AcceptanceTriageRecord } | { ok: false; error: string }> => {
+    const record = buildAcceptanceTriageRecord(input);
+    const written = await writeAcceptanceTriageRecord(projectRoot, record);
+    if (written.ok !== true) return { ok: false, error: written.error };
+    return { ok: true, record: written.record };
+  };
+
+  /** 账本审计 `acceptance.triage`（按 triageId 去重；不是 customer.decision；失败只诊断/系统行）。 */
+  const appendAcceptanceTriageAudit = async (
+    projectRoot: string,
+    record: AcceptanceTriageRecord,
+    sourceDetail: string,
+    note: (summary: string) => void,
+    diagnostic: ReturnType<typeof createDiagnosticLogger>,
+  ): Promise<void> => {
+    if (record.disposition === null || record.source === null) return;
+    if (record.reportSha256 === null) return; // 账本 schema 要求 64-hex；无报告内容不伪造
+    const appendLedgerFn = deps.appendGovernanceLedgerFn ?? appendGovernanceLedger;
+    try {
+      const ledger = await readGovernanceLedger(projectRoot);
+      const exists = ledger.entries.some(
+        (entry) => entry.kind === "acceptance.triage" && entry.acceptanceTriage?.triageId === record.triageId,
+      );
+      if (exists) return;
+      const decision: AcceptanceTriageLedgerDecision = {
+        schema: "acceptance-triage-decision/v1",
+        triageId: record.triageId,
+        disposition: record.disposition,
+        source: record.source,
+        sourceDetail,
+        reportPath: record.reportPath,
+        reportSha256: record.reportSha256,
+        conclusion: record.conclusion ?? "fail",
+        decidedAt: record.decidedAt ?? new Date().toISOString(),
+        ...(record.recommendation !== null ? { recommendation: record.recommendation } : {}),
+        ...(record.recommendationBasis !== null ? { recommendationBasis: record.recommendationBasis } : {}),
+        override: record.override,
+        requestId: record.requestId,
+      };
+      const appended = await appendLedgerFn(projectRoot, {
+        at: new Date().toISOString(),
+        kind: "acceptance.triage",
+        flowId: record.flowId,
+        actorRoleId: "app",
+        power: "app",
+        messageSummary: `验收分诊：${record.disposition === "rework" ? "下发统筹修改" : "仅汇报不返工"}（来源 ${record.source}/${sourceDetail}；报告 ${record.reportPath}）`,
+        acceptanceTriage: decision,
+        ...(record.reportSha256 !== null ? { artifactPath: record.reportPath, artifactSha256: record.reportSha256, ...(record.reportVersion >= 1 ? { artifactVersion: record.reportVersion } : {}) } : {}),
+      });
+      if (!appended.ok) {
+        diagnostic.error("acceptance.triage.audit.failed", new Error(appended.message), { flowId: record.flowId });
+        note(governanceAcceptanceReworkAuditFailedNote(record.flowId, appended.message));
+      }
+    } catch (error) {
+      diagnostic.error("acceptance.triage.audit.failed", error, { flowId: record.flowId });
+      note(governanceAcceptanceReworkAuditFailedNote(record.flowId, error instanceof Error ? error.message : String(error)));
+    }
+  };
+
+  /** 有界等待「客户在分诊卡上的验收结算」落账（返工路由的身份键需要账本决定时间；≤约 400ms）。 */
+  const waitForAcceptanceDecisionAt = async (
+    projectRoot: string,
+    flowId: string,
+    notBeforeMs: number,
+  ): Promise<string | undefined> => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        const ledger = await readGovernanceLedger(projectRoot);
+        if (ledger.errors.length === 0) {
+          let found: string | undefined;
+          for (const entry of ledger.entries) {
+            if (entry.kind !== "customer.decision" || entry.flowId !== flowId || entry.decisionKind !== "acceptance") continue;
+            const at = Date.parse(entry.at);
+            if (Number.isFinite(at) && at >= notBeforeMs) found = entry.at;
+          }
+          if (found !== undefined) return found;
+        }
+      } catch {
+        /* 读失败按未找到处理：下一次真实事件重试（不猜） */
+      }
+      if (attempt < 4) {
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, 80);
+          (timer as { unref?: () => void }).unref?.();
+        });
+      }
+    }
+    return undefined;
+  };
+
+  /** 同一 flow 的分诊处置互斥（客户作答的 run 与 dispatch 的 triage 重试可能同时到达）。 */
+  const triageDispositionInFlight = new Set<string>();
+
+  /**
+   * 执行一次分诊处置（§8.1 / §8.2）：
+   *   · rework ⇒ 记录 dispatched + 既有返工路由（triage items 随任务）+ 账本审计；
+   *   · report-only ⇒ 记录 report-only + 主理确定性汇报（reportedAt）+ 账本审计。
+   * 失败如实：记录写失败 ⇒ 不执行（调用方已回落原验收卡）；路由/汇报失败 ⇒ 记录 failed + 下一次真实事件重试。
+   */
+  const executeAcceptanceTriageDisposition = async (args: {
+    plan: AcceptanceTriagePlan;
+    disposition: "rework" | "report-only";
+    source: "judge" | "customer";
+    sourceDetail: AcceptanceTriageSourceDetail;
+    decidedAt: string;
+    /** 客户在有活请求时结算后的账本决定时间（返工身份键；缺省 ⇒ 不等待）。 */
+    decisionAt?: string;
+    note: (summary: string) => void;
+    diagnostic: ReturnType<typeof createDiagnosticLogger>;
+    /** 记录里是否沿用既有 reportPath/version/sha（分诊时快照）。 */
+    reportMissing?: boolean;
+  }): Promise<void> => {
+    const { plan, disposition, source, sourceDetail, decidedAt, note, diagnostic } = args;
+    const baseInput = {
+      flowId: plan.flowId,
+      reportPath: plan.reportPath,
+      reportVersion: plan.reportVersion,
+      reportSha256: plan.reportSha256,
+      triage: plan.triage,
+      recommendation: plan.recommendation,
+      triageId: plan.triageId,
+      triageCardId: plan.triageId,
+      source,
+      sourceDetail,
+      decidedAt,
+      requestId: plan.triageId,
+    } as const;
+    if (disposition === "report-only") {
+      const written = await writeAcceptanceTriageRecordSafe(plan.projectRoot, {
+        ...baseInput,
+        status: "report-only",
+        disposition: "report-only",
+        reportedAt: null,
+        error: null,
+      });
+      if (!written.ok) {
+        diagnostic.error("acceptance.triage.record.write.failed", new Error(written.error), { flowId: plan.flowId });
+        note(governanceAcceptanceReworkFailedNote(plan.flowId, `分诊记录写入失败：${written.error}；未执行处置。`));
+        return;
+      }
+      note(
+        buildAcceptanceTriageReportText({
+          triage: plan.triage,
+          source,
+          reportPath: plan.reportPath,
+          reportVersion: plan.reportVersion,
+        }),
+      );
+      const reported = await writeAcceptanceTriageRecordSafe(plan.projectRoot, {
+        ...baseInput,
+        status: "report-only",
+        disposition: "report-only",
+        reportedAt: new Date().toISOString(),
+        error: null,
+      });
+      const finalRecord = reported.ok ? reported.record : written.record;
+      await appendAcceptanceTriageAudit(plan.projectRoot, finalRecord, sourceDetail, note, diagnostic);
+      diagnostic.record("acceptance.triage.reported-only", { flowId: plan.flowId, source, sourceDetail });
+      return;
+    }
+    // rework：先写一条“执行中/失败态”记录（写失败 ⇒ 不路由、不执行；调用方已回落原卡）。
+    const inFlightKey = `${canonicalProjectRoot(plan.projectRoot)}\u0000${plan.flowId}`;
+    if (triageDispositionInFlight.has(inFlightKey)) {
+      diagnostic.record("acceptance.triage.disposition.in-flight", { flowId: plan.flowId });
+      return;
+    }
+    triageDispositionInFlight.add(inFlightKey);
+    const interim = await writeAcceptanceTriageRecordSafe(plan.projectRoot, {
+      ...baseInput,
+      status: "failed",
+      disposition: "rework",
+      reportedAt: null,
+      error: "分诊返工路由执行中",
+    });
+    if (!interim.ok) {
+      triageDispositionInFlight.delete(inFlightKey);
+      diagnostic.error("acceptance.triage.record.write.failed", new Error(interim.error), { flowId: plan.flowId });
+      note(governanceAcceptanceReworkFailedNote(plan.flowId, `分诊记录写入失败：${interim.error}；未执行处置。`));
+      return;
+    }
+    const routeResult = await routeAcceptanceRework(
+      {
+        projectRoot: plan.projectRoot,
+        flowId: plan.flowId,
+        source,
+        sourceDetail,
+        ...(args.decisionAt !== undefined ? { decisionAt: args.decisionAt } : {}),
+        requestId: plan.triageId,
+        reason: plan.recommendation.reasons.slice(0, 3).join(" "),
+        ...(plan.runtime !== undefined ? { runtimeHint: plan.runtime } : {}),
+        triage: plan.triage,
+        reportPath: plan.reportPath,
+        reportVersion: plan.reportVersion,
+        reportSha256: plan.reportSha256,
+        ...(args.reportMissing === true ? { reportMissing: true } : {}),
+      },
+      { note, diagnostic },
+    );
+    if (routeResult !== "sent") {
+      const failedRecord = await writeAcceptanceTriageRecordSafe(plan.projectRoot, {
+        ...baseInput,
+        status: "failed",
+        disposition: "rework",
+        reportedAt: null,
+        error: "返工路由未完成（pending/failed）；下一次真实事件重试",
+      });
+      if (!failedRecord.ok) {
+        diagnostic.error("acceptance.triage.record.write.failed", new Error(failedRecord.error), { flowId: plan.flowId });
+      }
+      triageDispositionInFlight.delete(inFlightKey);
+      scheduleAcceptanceCheck(plan.projectRoot, "settle");
+      return;
+    }
+    const dispatched = await writeAcceptanceTriageRecordSafe(plan.projectRoot, {
+      ...baseInput,
+      status: "dispatched",
+      disposition: "rework",
+      reportedAt: null,
+      error: null,
+    });
+    if (!dispatched.ok) {
+      diagnostic.error("acceptance.triage.record.write.failed", new Error(dispatched.error), { flowId: plan.flowId });
+    }
+    await appendAcceptanceTriageAudit(
+      plan.projectRoot,
+      dispatched.ok ? dispatched.record : interim.record,
+      sourceDetail,
+      note,
+      diagnostic,
+    );
+    scheduleAcceptanceCheck(plan.projectRoot, "settle");
+    triageDispositionInFlight.delete(inFlightKey);
+    diagnostic.record("acceptance.triage.dispatched", { flowId: plan.flowId, source, sourceDetail });
+  };
+
+  /**
+   * **分诊承接的返工重试**（e2e T3 修复）：`dispatchAcceptanceForFlow` 读到同 sha 的 triage record
+   * （`disposition:"rework"`，状态 `failed`）时，不再走旧 `routeAcceptanceRework`（旧格式/「客户拒绝」文案），
+   * 而是按报告重新解析 triage 并复用 `executeAcceptanceTriageDisposition` 重试——保证任务唯一且带
+   * severity/reason/action/指针，来源 `judge-rule` / `triage-customer`。
+   */
+  const retryAcceptanceTriageRework = async (input: {
+    projectRoot: string;
+    flowId: string;
+    record: AcceptanceTriageRecord;
+    decisionAt?: string;
+    note: (summary: string) => void;
+    diagnostic: ReturnType<typeof createDiagnosticLogger>;
+    runtimeHint?: RuntimeKind;
+  }): Promise<"sent" | "retrying" | "skipped"> => {
+    const { projectRoot, flowId, record, note, diagnostic } = input;
+    if (record.reportSha256 === null) return "skipped";
+    const snapshot = await readAcceptanceReportSnapshot(projectRoot, flowId);
+    if ((snapshot.sha256 ?? null) !== record.reportSha256) return "skipped"; // 新报告：旧处置不继承
+    const parsed = parseAcceptanceTriageReport(snapshot.text);
+    if (parsed.ok !== true || parsed.triage.conclusion === "pass") {
+      diagnostic.record("acceptance.triage.retry.unparseable", { flowId });
+      return "skipped";
+    }
+    const exec = await makeAcceptanceTriageExecutability(projectRoot);
+    const recommendation = recommendAcceptanceTriage(parsed.triage, exec.check !== undefined ? { checkExecutability: exec.check } : {});
+    if (recommendation.disposition !== "rework") return "skipped";
+    const plan: AcceptanceTriagePlan = {
+      projectRoot,
+      flowId,
+      triage: parsed.triage,
+      recommendation,
+      reportPath: snapshot.relPath,
+      reportVersion: snapshot.version,
+      reportSha256: record.reportSha256,
+      triageId: record.triageId,
+      ...(input.runtimeHint !== undefined ? { runtime: input.runtimeHint } : {}),
+    };
+    const sourceDetail: AcceptanceTriageSourceDetail =
+      record.sourceDetail === "judge-rule" ? "judge-rule" : "triage-customer";
+    await executeAcceptanceTriageDisposition({
+      plan,
+      disposition: "rework",
+      source: record.source ?? "customer",
+      sourceDetail,
+      decidedAt: record.decidedAt ?? new Date().toISOString(),
+      ...(input.decisionAt !== undefined ? { decisionAt: input.decisionAt } : {}),
+      note,
+      diagnostic,
+    });
+    const after = await readAcceptanceTriageRecord(projectRoot, flowId);
+    if (after.record?.status === "dispatched") return "sent";
+    diagnostic.record("acceptance.triage.retry.pending", { flowId, status: after.record?.status ?? "missing" });
+    return "retrying";
+  };
+
+  /**
+   * 客户在分诊卡上的作答 → 被拦验收请求的结算（§7.3）+ 处置执行。
+   *
+   * **e2e T3 修复**：客户选「下发统筹修改」时，先**同步等**一条 triage 承接记录落盘
+   * （`failed` + `disposition:"rework"` + `source:"customer"`）再返回结算——否则旧的
+   * `dispatchAcceptanceForFlow` latest-rejected 分支会抢在 `run()` 之前用旧格式/「客户拒绝」文案路由；
+   * dispatch 读到该记录会跳过旧路由并调用 `retryAcceptanceTriageRework`（同一身份去重，任务仍唯一）。
+   * 记录写失败 ⇒ 不登记 `run`、回落旧路由（fail-safe：宁可一条旧格式任务，也不双发/无记录路由）。
+   */
+  const buildAcceptanceTriageAnswerHandler = (
+    plan: AcceptanceTriagePlan,
+    liveOptions: ReadonlySet<string>,
+    note: (summary: string) => void,
+    diagnostic: ReturnType<typeof createDiagnosticLogger>,
+    hasLiveRequest: boolean,
+  ): ((answer: AcceptanceTriageAnswer) => AcceptanceTriageAnswerResult | Promise<AcceptanceTriageAnswerResult>) => {
+    return async (answer) => {
+      const triageField = (disposition: "rework" | "report-only") => ({
+        disposition,
+        source: "customer" as const,
+        conclusion: plan.triage.conclusion,
+        triageId: plan.triageId,
+      });
+      if (answer.outcome !== "answered") {
+        // 取消/关窗：结算为 declined（客户未作答；记录保持 awaiting-decision 供重推），不执行处置。
+        return {
+          settlement: hasLiveRequest
+            ? { outcome: "declined", reason: answer.reason ?? "客户取消验收分诊" }
+            : null,
+        };
+      }
+      const picked: "rework" | "report-only" | undefined = answer.selected.includes("report-only")
+        ? "report-only"
+        : answer.selected.includes("rework")
+          ? "rework"
+          : undefined;
+      if (picked === undefined) {
+        return {
+          settlement: hasLiveRequest
+            ? { outcome: "declined", reason: `验收分诊选择非法：${answer.selected.join("、") || "（空）"}` }
+            : null,
+        };
+      }
+      const decidedAt = new Date().toISOString();
+      const settleLive = (): CustomerInputOutcome | null => {
+        if (!hasLiveRequest) return null;
+        // 异常卡（选项不含 accept/reject）：不猜，以 declined（客户本人选择）结算，仍执行分诊处置。
+        if (!liveOptions.has("accept") || !liveOptions.has("reject")) {
+          return {
+            outcome: "declined",
+            reason: picked === "rework" ? "分诊选择：下发统筹修改" : "分诊选择：仅汇报不返工",
+            triage: triageField(picked),
+          };
+        }
+        return picked === "report-only"
+          ? { outcome: "answered", value: { selected: ["accept"] }, triage: triageField("report-only") }
+          : { outcome: "answered", value: { selected: ["reject"] }, triage: triageField("rework") };
+      };
+      const settlement = settleLive();
+      if (picked === "rework") {
+        // 先落「分诊承接返工」记录，再让结算回到编排/账本——关闭旧路由抢跑窗口。
+        const claimed = await writeAcceptanceTriageRecordSafe(plan.projectRoot, {
+          flowId: plan.flowId,
+          reportPath: plan.reportPath,
+          reportVersion: plan.reportVersion,
+          reportSha256: plan.reportSha256,
+          triage: plan.triage,
+          recommendation: plan.recommendation,
+          status: "failed",
+          disposition: "rework",
+          source: "customer",
+          sourceDetail: "triage-customer",
+          decidedAt,
+          requestId: plan.triageId,
+          error: "分诊返工路由执行中",
+        });
+        if (!claimed.ok) {
+          diagnostic.error("acceptance.triage.record.write.failed", new Error(claimed.error), { flowId: plan.flowId });
+          note(governanceAcceptanceReworkFailedNote(plan.flowId, `分诊记录写入失败：${claimed.error}；本次回落既有返工路径。`));
+          return { settlement }; // 无 triage 记录：旧 dispatch 路径接管（一条旧格式任务，不双发）
+        }
+        const run = async (): Promise<void> => {
+          const decideBaseMs = Date.now();
+          const decisionAt = hasLiveRequest
+            ? await waitForAcceptanceDecisionAt(plan.projectRoot, plan.flowId, decideBaseMs)
+            : undefined;
+          await executeAcceptanceTriageDisposition({
+            plan,
+            disposition: "rework",
+            source: "customer",
+            sourceDetail: "triage-customer",
+            decidedAt,
+            ...(decisionAt !== undefined ? { decisionAt } : {}),
+            note,
+            diagnostic,
+          });
+        };
+        return { settlement, run };
+      }
+      const run = async (): Promise<void> => {
+        await executeAcceptanceTriageDisposition({
+          plan,
+          disposition: "report-only",
+          source: "customer",
+          sourceDetail: "triage-customer",
+          decidedAt,
+          note,
+          diagnostic,
+        });
+      };
+      return { settlement, run };
+    };
+  };
+
+  /**
+   * 分诊记录读取后的恢复/幂等分支（§9.4）：返回 undefined 表示继续重新解析（`failed`/新报告）。
+   * 同一 flowId+sha 的终态不重复执行；awaiting-decision 复用同一分诊卡 id 重推/挂靠。
+   */
+  const resumeAcceptanceTriageRecord = async (args: {
+    projectRoot: string;
+    flowId: string;
+    listing: ProjectListing;
+    record: AcceptanceTriageRecord;
+    snapshot: AcceptanceReportSnapshot;
+    note: (summary: string) => void;
+    diagnostic: ReturnType<typeof createDiagnosticLogger>;
+    runtime?: RuntimeKind;
+  }): Promise<AcceptanceTriageGateResult | undefined> => {
+    const { projectRoot, flowId, record, snapshot, note, diagnostic } = args;
+    const settleDeclined = (reason: string, triage?: CustomerInputTriageOutcome): AcceptanceTriageGateResult => ({
+      action: "settle",
+      outcome: {
+        outcome: "declined",
+        operatorId: "judge:triage",
+        notPresented: true,
+        reason,
+        ...(triage !== undefined ? { triage } : {}),
+      },
+    });
+    if (record.status === "returned-to-verifier") {
+      diagnostic.record("acceptance.triage.idempotent", { flowId, status: record.status });
+      return settleDeclined(governanceAcceptanceTriageReturnedNote(record.error ?? record.parseFailure ?? "分诊结构缺失"));
+    }
+    if (record.status === "dispatched") {
+      diagnostic.record("acceptance.triage.idempotent", { flowId, status: record.status });
+      return settleDeclined(
+        `验收分诊：已下发统筹修改（同一报告不重复分诊；报告 ${record.reportPath}）。`,
+        record.conclusion !== null && record.source !== null
+          ? { disposition: "rework", source: record.source, conclusion: record.conclusion, triageId: record.triageId }
+          : undefined,
+      );
+    }
+    if (record.status === "report-only") {
+      diagnostic.record("acceptance.triage.idempotent", { flowId, status: record.status });
+      return settleDeclined(
+        `验收分诊：已仅汇报不返工（同一报告不重复分诊；报告 ${record.reportPath}）。`,
+        record.conclusion !== null && record.source !== null
+          ? { disposition: "report-only", source: record.source, conclusion: record.conclusion, triageId: record.triageId }
+          : undefined,
+      );
+    }
+    if (record.status !== "awaiting-decision") return undefined; // failed：重新评估
+    // awaiting-decision：按同一报告重建分诊卡（报告 sha 必须仍一致；否则等新报告）。
+    if (record.reportSha256 === null || record.reportSha256 !== (snapshot.sha256 ?? null)) return undefined;
+    const parsed = parseAcceptanceTriageReport(snapshot.text);
+    if (parsed.ok !== true || parsed.triage.conclusion === "pass") {
+      diagnostic.record("acceptance.triage.recover.unparseable", { flowId });
+      return undefined;
+    }
+    const exec = await makeAcceptanceTriageExecutability(projectRoot);
+    const recommendation = recommendAcceptanceTriage(parsed.triage, exec.check !== undefined ? { checkExecutability: exec.check } : {});
+    const plan: AcceptanceTriagePlan = {
+      projectRoot,
+      flowId,
+      triage: parsed.triage,
+      recommendation,
+      reportPath: snapshot.relPath,
+      reportVersion: snapshot.version,
+      reportSha256: snapshot.sha256 ?? "",
+      triageId: acceptanceTriageIdForReport(flowId, snapshot.sha256 ?? null),
+      ...(args.runtime !== undefined ? { runtime: args.runtime } : {}),
+    };
+    const liveOptions = new Set<string>();
+    const card = buildAcceptanceTriageCardSpec(plan, args.listing);
+    return {
+      action: "triage-card",
+      card,
+      onAnswer: buildAcceptanceTriageAnswerHandler(plan, liveOptions, note, diagnostic, false),
+    };
+  };
+
+  /** 分诊卡（应用自有 choice；无 cardKind ⇒ 不判断/不写账本/不推导下一步）。 */
+  const buildAcceptanceTriageCardSpec = (
+    plan: AcceptanceTriagePlan,
+    listing: ProjectListing,
+  ): AcceptanceTriageCardSpec => {
+    const roleId = listing.primaryRoleId?.trim() ?? "";
+    return {
+      id: plan.triageId,
+      roleId,
+      ...(plan.projectRoot !== "" ? { projectRoot: plan.projectRoot } : {}),
+      ...(plan.runtime !== undefined ? { runtime: plan.runtime } : {}),
+      title: `${mainT("ui.triage.title")} · ${plan.flowId}`,
+      question: mainT("ui.triage.question"),
+      preview: buildAcceptanceTriageCardLines({
+        triage: plan.triage,
+        recommendation: plan.recommendation,
+        reportPath: plan.reportPath,
+        reportVersion: plan.reportVersion,
+      }).join("\n"),
+      options: [
+        { id: "rework", label: mainT("ui.triage.option.rework") },
+        { id: "report-only", label: mainT("ui.triage.option.reportOnly") },
+      ],
+    };
+  };
+
+  const evaluateAcceptanceTriageUnsafe = async (
+    facts: AcceptanceTriageGateFacts,
+  ): Promise<AcceptanceTriageGateResult> => {
+    const request = facts.request;
+    if (request.kind !== "choice") return { action: "proceed" };
+    const cardKind = request.cardKind ?? facts.metadata?.cardKind;
+    if (cardKind !== "acceptance") return { action: "proceed" };
+    if (facts.governanceModel !== "trio") return { action: "proceed" };
+    const projectRoot =
+      typeof facts.projectRoot === "string" && facts.projectRoot !== "" ? facts.projectRoot : "";
+    if (projectRoot === "") return { action: "proceed" };
+    let listing = listingCache.get(projectRoot);
+    if (listing === undefined) {
+      try {
+        listing = await listProjectFn(projectRoot);
+        listingCache.set(listing.projectRoot, listing);
+      } catch {
+        return { action: "proceed" }; // 未枚举/枚举失败：保持既有验收卡路径
+      }
+    }
+    if (listing.governanceModel !== "trio") return { action: "proceed" };
+    const flowId = facts.metadata?.judgeContext?.flowId ?? request.flowId ?? facts.metadata?.flowId;
+    if (typeof flowId !== "string" || !new RegExp(GOVERNANCE_SLUG_PATTERN).test(flowId)) return { action: "proceed" };
+    // YAML-only（§11.1）：legacy Markdown 保持既有验收卡/终态语义，不分诊。
+    try {
+      await stat(path.join(projectRoot, flowStatePath(flowId)));
+    } catch {
+      return { action: "proceed" };
+    }
+    const runtime = facts.runtime ?? facts.metadata?.runtime;
+    const { note, diagnostic } = makeAcceptanceTriageNote(projectRoot, runtime);
+    const snapshot = await readAcceptanceReportSnapshot(projectRoot, flowId);
+    const reportSha = snapshot.sha256 ?? null;
+    const recordRead = await readAcceptanceTriageRecord(projectRoot, flowId);
+    if (recordRead.corrupt !== undefined) {
+      // §10：记录损坏 ⇒ 不猜、不自动执行；回落原验收卡 + 主理如实系统行（去重）。
+      diagnostic.record("acceptance.triage.record.corrupt", { flowId, detail: recordRead.corrupt });
+      noteReworkOnce(projectRoot, flowId, "triage:corrupt", recordRead.corrupt, note, governanceAcceptanceTriageReturnedNote(`分诊记录损坏（${recordRead.corrupt}）；按原验收卡人工处理`));
+      return { action: "proceed" };
+    }
+    const existing = recordRead.record;
+    if (existing !== undefined && acceptanceTriageRecordMatchesReport(existing, flowId, reportSha)) {
+      const resumed = await resumeAcceptanceTriageRecord({
+        projectRoot,
+        flowId,
+        listing,
+        record: existing,
+        snapshot,
+        note,
+        diagnostic,
+        ...(runtime !== undefined ? { runtime } : {}),
+      });
+      if (resumed !== undefined) return resumed;
+    }
+    // —— 解析 `acceptance-triage/v1`（纯函数；缺/坏/矛盾 ⇒ 退回 Proof，不猜） ——
+    const parsed = parseAcceptanceTriageReport(snapshot.text);
+    if (parsed.ok !== true) {
+      const detail = acceptanceTriageParseDetail(snapshot, parsed);
+      // 记录 schema：`parseFailure=missing` ⇒ 不伪造 sha（报告存在但无分诊段也按 missing 处理，同编排口径）。
+      const shaForRecord = parsed.code === "missing" ? null : reportSha;
+      const written = await writeAcceptanceTriageRecordSafe(projectRoot, {
+        flowId,
+        reportPath: snapshot.relPath,
+        reportVersion: snapshot.version,
+        reportSha256: shaForRecord,
+        parseFailure: parsed.code,
+        status: "returned-to-verifier",
+        triageId: acceptanceTriageIdForReport(flowId, shaForRecord),
+        error: Array.from(detail).slice(0, 512).join(""),
+      });
+      if (!written.ok) {
+        diagnostic.error("acceptance.triage.record.write.failed", new Error(written.error), { flowId });
+        note(governanceAcceptanceReworkFailedNote(flowId, `分诊记录写入失败：${written.error}；按原验收卡人工处理。`));
+        return { action: "proceed" };
+      }
+      noteReworkOnce(projectRoot, flowId, "triage:returned", detail, note, governanceAcceptanceTriageReturnedNote(detail));
+      diagnostic.record("acceptance.triage.returned", { flowId, code: parsed.code });
+      return {
+        action: "settle",
+        outcome: {
+          outcome: "declined",
+          operatorId: "judge:triage",
+          notPresented: true,
+          reason: governanceAcceptanceTriageReturnedNote(detail),
+        },
+      };
+    }
+    if (parsed.triage.conclusion === "pass") {
+      // R1：通过报告不分诊（不写 triage 记录，保持既有验收卡路径）。
+      diagnostic.record("acceptance.triage.skipped", { flowId, reason: "pass" });
+      return { action: "proceed" };
+    }
+    const exec = await makeAcceptanceTriageExecutability(projectRoot);
+    const recommendation = recommendAcceptanceTriage(parsed.triage, exec.check !== undefined ? { checkExecutability: exec.check } : {});
+    if (exec.listingUnavailable !== undefined) {
+      diagnostic.record("acceptance.triage.listing.unavailable", { flowId, detail: exec.listingUnavailable });
+    }
+    const plan: AcceptanceTriagePlan = {
+      projectRoot,
+      flowId,
+      triage: parsed.triage,
+      recommendation,
+      reportPath: snapshot.relPath,
+      reportVersion: snapshot.version,
+      reportSha256: reportSha ?? "",
+      triageId: acceptanceTriageIdForReport(flowId, reportSha),
+      ...(runtime !== undefined ? { runtime } : {}),
+    };
+    // R4/R5（结构不足/矛盾）⇒ 退回 Proof 补报告（不弹卡、不返工）。
+    if (recommendation.disposition === "return-to-verifier") {
+      const detail = recommendation.reasons.slice(0, 3).join(" ") || "改进方案不可执行";
+      const written = await writeAcceptanceTriageRecordSafe(projectRoot, {
+        flowId,
+        reportPath: snapshot.relPath,
+        reportVersion: snapshot.version,
+        reportSha256: reportSha,
+        triage: parsed.triage,
+        recommendation,
+        status: "returned-to-verifier",
+        triageId: plan.triageId,
+        error: Array.from(detail).slice(0, 512).join(""),
+      });
+      if (!written.ok) {
+        diagnostic.error("acceptance.triage.record.write.failed", new Error(written.error), { flowId });
+        note(governanceAcceptanceReworkFailedNote(flowId, `分诊记录写入失败：${written.error}；按原验收卡人工处理。`));
+        return { action: "proceed" };
+      }
+      noteReworkOnce(projectRoot, flowId, "triage:infeasible", detail, note, governanceAcceptanceTriageReturnedNote(detail));
+      diagnostic.record("acceptance.triage.returned", { flowId, code: "infeasible" });
+      return {
+        action: "settle",
+        outcome: {
+          outcome: "declined",
+          operatorId: "judge:triage",
+          notPresented: true,
+          reason: governanceAcceptanceTriageReturnedNote(detail),
+        },
+      };
+    }
+    if (recommendation.disposition !== "rework" && recommendation.disposition !== "report-only") {
+      return { action: "proceed" }; // no-triage（防御；pass 已处理）
+    }
+    // —— 判断代批（复用「替我决策」decision 组开关；v1 = 确定性规则 judge-rule） ——
+    if (decisionJudgeSwitch.isEnabled() && recommendation.authoritative === true) {
+      const decidedAt = new Date().toISOString();
+      if (recommendation.disposition === "report-only") {
+        const written = await writeAcceptanceTriageRecordSafe(projectRoot, {
+          flowId,
+          reportPath: snapshot.relPath,
+          reportVersion: snapshot.version,
+          reportSha256: reportSha,
+          triage: parsed.triage,
+          recommendation,
+          status: "report-only",
+          disposition: "report-only",
+          source: "judge",
+          sourceDetail: "judge-rule",
+          decidedAt,
+          requestId: plan.triageId,
+          error: null,
+        });
+        if (!written.ok) {
+          diagnostic.error("acceptance.triage.record.write.failed", new Error(written.error), { flowId });
+          note(governanceAcceptanceReworkFailedNote(flowId, `分诊记录写入失败：${written.error}；按原验收卡人工处理。`));
+          return { action: "proceed" };
+        }
+        return {
+          action: "settle",
+          outcome: {
+            outcome: "declined",
+            operatorId: "judge:triage",
+            notPresented: true,
+            reason: `验收分诊（判断代批 judge-rule）：仅汇报不返工；报告 ${snapshot.relPath}（v${snapshot.version}）。`,
+            triage: { disposition: "report-only", source: "judge", conclusion: parsed.triage.conclusion, triageId: plan.triageId },
+          },
+          run: async () => {
+            note(buildAcceptanceTriageReportText({ triage: parsed.triage, source: "judge", reportPath: snapshot.relPath, reportVersion: snapshot.version }));
+            const reported = await writeAcceptanceTriageRecordSafe(projectRoot, {
+              flowId,
+              reportPath: snapshot.relPath,
+              reportVersion: snapshot.version,
+              reportSha256: reportSha,
+              triage: parsed.triage,
+              recommendation,
+              status: "report-only",
+              disposition: "report-only",
+              source: "judge",
+              sourceDetail: "judge-rule",
+              decidedAt,
+              requestId: plan.triageId,
+              reportedAt: new Date().toISOString(),
+              error: null,
+            });
+            await appendAcceptanceTriageAudit(
+              projectRoot,
+              reported.ok ? reported.record : written.record,
+              "judge-rule",
+              note,
+              diagnostic,
+            );
+          },
+        };
+      }
+      // rework：先写执行态记录（写失败 ⇒ 不自动执行，回落原验收卡）。
+      const interim = await writeAcceptanceTriageRecordSafe(projectRoot, {
+        flowId,
+        reportPath: snapshot.relPath,
+        reportVersion: snapshot.version,
+        reportSha256: reportSha,
+        triage: parsed.triage,
+        recommendation,
+        status: "failed",
+        disposition: "rework",
+        source: "judge",
+        sourceDetail: "judge-rule",
+        decidedAt,
+        requestId: plan.triageId,
+        error: "分诊返工路由执行中",
+      });
+      if (!interim.ok) {
+        diagnostic.error("acceptance.triage.record.write.failed", new Error(interim.error), { flowId });
+        note(governanceAcceptanceReworkFailedNote(flowId, `分诊记录写入失败：${interim.error}；按原验收卡人工处理。`));
+        return { action: "proceed" };
+      }
+      return {
+        action: "settle",
+        outcome: {
+          outcome: "declined",
+          operatorId: "judge:triage",
+          notPresented: true,
+          reason: `验收分诊（判断代批 judge-rule）：已下发统筹修改；报告 ${snapshot.relPath}（v${snapshot.version}）。`,
+          triage: { disposition: "rework", source: "judge", conclusion: parsed.triage.conclusion, triageId: plan.triageId },
+        },
+        run: async () => {
+          await executeAcceptanceTriageDisposition({
+            plan,
+            disposition: "rework",
+            source: "judge",
+            sourceDetail: "judge-rule",
+            decidedAt,
+            note,
+            diagnostic,
+          });
+        },
+      };
+    }
+    // —— 客户分诊卡（开关关 / 建议不权威 / 无法核对可执行性） ——
+    const written = await writeAcceptanceTriageRecordSafe(projectRoot, {
+      flowId,
+      reportPath: snapshot.relPath,
+      reportVersion: snapshot.version,
+      reportSha256: reportSha,
+      triage: parsed.triage,
+      recommendation,
+      status: "awaiting-decision",
+      triageId: plan.triageId,
+      error: exec.listingUnavailable !== undefined ? Array.from(exec.listingUnavailable).slice(0, 512).join("") : null,
+    });
+    if (!written.ok) {
+      diagnostic.error("acceptance.triage.record.write.failed", new Error(written.error), { flowId });
+      note(governanceAcceptanceReworkFailedNote(flowId, `分诊记录写入失败：${written.error}；按原验收卡人工处理。`));
+      return { action: "proceed" };
+    }
+    const liveOptions = new Set(request.options.map((option) => option.id));
+    return {
+      action: "triage-card",
+      card: buildAcceptanceTriageCardSpec(plan, listing),
+      onAnswer: buildAcceptanceTriageAnswerHandler(plan, liveOptions, note, diagnostic, true),
+    };
+  };
+
+  /** 公开方法：任何异常都按 `proceed` 回落既有验收卡路径（fail-safe，不伪造任何处置）。 */
+  const evaluateAcceptanceTriage = async (
+    facts: AcceptanceTriageGateFacts,
+  ): Promise<AcceptanceTriageGateResult> => {
+    try {
+      return await evaluateAcceptanceTriageUnsafe(facts);
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.acceptance-triage" }).error("acceptance.triage.gate.failed", error);
+      return { action: "proceed" };
+    }
+  };
+
+  // —————— 重启恢复（§9.4）：扫 `.ans/governance/acceptance/*/triage-v1.json` ——————
+  // `awaiting-decision` ⇒ 以同一 triageCardId 重推一次分诊卡（无活请求，作答只执行处置）；
+  // `report-only` 且 reportedAt 为空 ⇒ 补一次主理汇报；`dispatched`/`returned-to-verifier` 不动作。
+  const triageRecoveryDone = new Set<string>();
+  const runAcceptanceTriageRecovery = async (projectRoot: string): Promise<void> => {
+    const listing = listingCache.get(projectRoot);
+    if (listing === undefined || listing.governanceModel !== "trio") return;
+    let dirs: string[] = [];
+    try {
+      dirs = await readdir(path.join(projectRoot, ".ans", "governance", "acceptance"), { withFileTypes: true })
+        .then((entries) => entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name));
+    } catch {
+      return;
+    }
+    const noteContext = makeAcceptanceTriageNote(projectRoot);
+    for (const flowId of dirs) {
+      if (!new RegExp(GOVERNANCE_SLUG_PATTERN).test(flowId)) continue;
+      const read = await readAcceptanceTriageRecord(projectRoot, flowId);
+      if (read.corrupt !== undefined) {
+        noteContext.diagnostic.record("acceptance.triage.recover.corrupt", { flowId });
+        continue;
+      }
+      const record = read.record;
+      if (record === undefined) continue;
+      if (record.status === "awaiting-decision") {
+        const snapshot = await readAcceptanceReportSnapshot(projectRoot, flowId);
+        if (record.reportSha256 === null || record.reportSha256 !== (snapshot.sha256 ?? null)) continue; // 新报告：等新卡
+        const parsed = parseAcceptanceTriageReport(snapshot.text);
+        if (parsed.ok !== true || parsed.triage.conclusion === "pass") continue;
+        const exec = await makeAcceptanceTriageExecutability(projectRoot);
+        const recommendation = recommendAcceptanceTriage(parsed.triage, exec.check !== undefined ? { checkExecutability: exec.check } : {});
+        const plan: AcceptanceTriagePlan = {
+          projectRoot,
+          flowId,
+          triage: parsed.triage,
+          recommendation,
+          reportPath: snapshot.relPath,
+          reportVersion: snapshot.version,
+          reportSha256: record.reportSha256,
+          triageId: record.triageId,
+        };
+        const answer = buildAcceptanceTriageAnswerHandler(plan, new Set<string>(), noteContext.note, noteContext.diagnostic, false);
+        const pushed = deps.presentAcceptanceTriageCard?.(buildAcceptanceTriageCardSpec(plan, listing), answer);
+        if (pushed !== undefined && !pushed.ok) {
+          noteContext.diagnostic.record("acceptance.triage.recover.push.failed", { flowId, detail: pushed.error });
+        } else {
+          noteContext.diagnostic.record("acceptance.triage.recover.repushed", { flowId });
+        }
+        continue;
+      }
+      if (record.status === "report-only" && record.reportedAt === null && record.reportSha256 !== null) {
+        const snapshot = await readAcceptanceReportSnapshot(projectRoot, flowId);
+        if (record.reportSha256 !== (snapshot.sha256 ?? null)) continue;
+        const parsed = parseAcceptanceTriageReport(snapshot.text);
+        if (parsed.ok !== true) continue;
+        noteContext.note(
+          buildAcceptanceTriageReportText({
+            triage: parsed.triage,
+            source: record.source ?? "judge",
+            reportPath: record.reportPath,
+            reportVersion: record.reportVersion,
+          }),
+        );
+        // 只补 `reportedAt`（保序：直接覆盖既有 record 的同一形状，不重建/丢字段）。
+        const reported = await writeAcceptanceTriageRecord(projectRoot, {
+          ...record,
+          reportedAt: new Date().toISOString(),
+          at: new Date().toISOString(),
+        });
+        if (reported.ok !== true) {
+          noteContext.diagnostic.error("acceptance.triage.recover.report.write.failed", new Error(reported.error), { flowId });
+        }
+        noteContext.diagnostic.record("acceptance.triage.recover.reported", { flowId });
+      }
+    }
+  };
+
+  const scheduleAcceptanceTriageRecovery = (projectRoot: string): void => {
+    if (triageRecoveryDone.has(projectRoot)) return;
+    triageRecoveryDone.add(projectRoot);
+    const timer = setTimeout(() => {
+      void runAcceptanceTriageRecovery(projectRoot).catch((error) =>
+        createDiagnosticLogger({ component: "desktop.acceptance-triage", projectRoot }).error("acceptance.triage.recover.failed", error),
+      );
+    }, 80);
+    (timer as { unref?: () => void }).unref?.();
+  };
+
   /**
    * 应用动作审计的**唯一写入口**：`dispatch.accepted{actorRoleId:"app",power:"app"}`——应用推进
    * **不是客户批准**（不写 customerDecision/decisionEvidence）。仅 trio 且项目根存在时写；失败只记诊断、
@@ -2710,6 +3949,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         // 陈旧者作废重建（内部逐会话隔离、绝不上抛；在跑的轮次跳过）。fire-and-forget，不阻塞事件外推。
         void manager.refreshStaleBoundaries();
       }
+    }
+    // 2026-10-25 request_acceptance：`flow_step_update` 成功（尤其 done）是流程推进的真实信号——让验收门
+    // 在流程更新后重检（走既有 40ms 有界合并；dispatch 自身按 flow mtime/账本去重，不循环、不重复派发）。
+    if (
+      typeof envelope.projectRoot === "string" &&
+      envelope.projectRoot !== "" &&
+      isSuccessfulFlowStepUpdate(envelope.event)
+    ) {
+      scheduleAcceptanceCheck(envelope.projectRoot, "ledger");
     }
   };
 
@@ -2956,7 +4204,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       diagnostic.error("acceptance.delivered-wake.open.failed", new Error(opened.error ?? "unknown"), { flowId });
       return undefined; // 失败只诊断（下一次真实事件可再试；不循环）
     }
-    const sent = await manager.sendBackground({ projectRoot, roleId: "convener", runtime, text: task });
+    // 2026-10-25：任务文本不含 revision ⇒ 用本 revision+delivered 集合的**语义指纹**作稳定身份：
+    // 同一 revision 不重投；revision 变化（即使文本相同）仍是新任务，照常唤醒。
+    const sent = await manager.sendBackground({
+      projectRoot,
+      roleId: "convener",
+      runtime,
+      text: task,
+      identitySeed: `${projectRoot}\u0000${flowId}\u0000${notifyHash}`,
+    });
     if (!sent.ok) {
       diagnostic.error("acceptance.delivered-wake.send.failed", new Error(sent.error ?? "unknown"), { flowId });
       return undefined;
@@ -3291,6 +4547,21 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // 不参与判定。仅 YAML **不存在**时回退 legacy Markdown `flowCompletionIssue`（诊断标注 legacy）。
   // 去重：运行期每 flow 一次 + 账本 `dispatch.accepted{targetRoleId:verifier}` 持久化（重启不重派）；
   // 失败如实落 Lead（主入口）系统行，不循环重试。
+  /**
+   * 自动验收派发的结构化回执（2026-10-25 `request_acceptance` 能力用）：调用方必须能区分
+   * 「真的派出去了」「同一 flow 版本已派过（未重复派发）」与「被门挡住/失败」——**不得**把未派发说成
+   * `dispatched`。既有调用方（settle/回交/账本/导入）继续忽略返回值，行为逐字不变。
+   */
+  type AcceptanceDispatchOutcome = {
+    flowId: string;
+    status: "dispatched" | "already-dispatched" | "blocked" | "failed";
+    /** 未派发的可映射原因（`dispatched`/`already-dispatched` 不携带）。 */
+    code?: "criteria-missing" | "change-package-missing" | "change-package-no-risk" | "flow-incomplete" | "runtime-unresolved" | "unavailable";
+    message: string;
+    runtime?: RuntimeKind;
+    queued?: boolean;
+  };
+
   const dispatchAcceptanceForFlow = async (info: {
     projectRoot: string;
     flowId: string;
@@ -3298,10 +4569,16 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     evidence: readonly string[];
     /** 回交 settle 是确定性完成信号：不因该回交自身仍在 `activeDeliveries` 而推迟。 */
     force?: boolean;
-    trigger: "handback" | "settle" | "ledger" | "import";
-  }): Promise<void> => {
+    trigger: "handback" | "settle" | "ledger" | "import" | "request";
+  }): Promise<AcceptanceDispatchOutcome> => {
+    const dispatchOutcome = (result: Omit<AcceptanceDispatchOutcome, "flowId">): AcceptanceDispatchOutcome => ({
+      flowId: info.flowId,
+      ...result,
+    });
     const listing = listingCache.get(info.projectRoot);
-    if (listing?.governanceModel !== "trio") return; // single/旧项目不产生验收推进
+    if (listing?.governanceModel !== "trio") {
+      return dispatchOutcome({ status: "failed", code: "unavailable", message: "当前项目不是 trio 治理模型；未派发验收复核。" });
+    }
     const key = acceptanceFlowKey(info.projectRoot, info.flowId);
     // 2026-10-19 客户决定（经项目管理转达）：自动验收门的反馈**统一发给 Lead（主入口）**，不再发
     // Convener——包括「未派发 + 具体原因 + superseded/新 stepId 建议」「已自动派发验收复核给 Proof」
@@ -3329,7 +4606,27 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         // 验收已通过（客户手批或判断代批）：调编排 `completeAcceptanceStep` 收口（标 done + acceptance
         // 证据；幂等、原子、未 accepted 拒绝），随后**直接 return**，不再派 verifier。
         await closeAcceptedFlow(info.projectRoot, info.flowId, latest.entry, note, diagnostic);
-        return;
+        return dispatchOutcome({ status: "already-dispatched", message: "流程已有验收通过决定并已收口；本次未重复派发。" });
+      }
+      // ———— 2026-10-25 验收分诊：report-only 抑制重派（设计 §8.2.4 / A7） ————
+      // 判断代批「仅汇报」不写 customer.decision（最新决定仍是 none）；若不抑制，验收检查会在每个真实
+      // 事件里重派 Proof、再次触发分诊。**同 sha 才抑制**：新报告（新 sha）允许新一轮验收。
+      // 记录损坏 ⇒ 不猜（继续既有路径；记录损坏的提示在分诊前闸/恢复里已给）。
+      const triageGateRead = await readAcceptanceTriageRecord(info.projectRoot, info.flowId);
+      const triageGateRecord = triageGateRead.record;
+      if (
+        triageGateRecord !== undefined &&
+        triageGateRecord.status === "report-only" &&
+        triageGateRecord.reportSha256 !== null
+      ) {
+        const gateSnapshot = await readAcceptanceReportSnapshot(info.projectRoot, info.flowId);
+        if ((gateSnapshot.sha256 ?? null) === triageGateRecord.reportSha256) {
+          diagnostic.record("acceptance.triage.report-only.suppressed", { flowId: info.flowId });
+          return dispatchOutcome({
+            status: "already-dispatched",
+            message: "该流程最新验收报告已按分诊「仅汇报不返工」处理；同报告不再派发验收复核（新报告才允许新一轮）。",
+          });
+        }
       }
       // ———— 2026-10-23 验收返工路由：rejected / auto-rework 只作用于 YAML 机器状态流程（Q6 A）。 ————
       // legacy Markdown（无 flow YAML）保持旧行为（任意 acceptance 决定终结），不路由、不重派。
@@ -3346,6 +4643,21 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         : {};
       const routingRecord = routingRecordRead.record;
       const autoReworkRecord = routingRecord !== undefined && routingRecord.source === "judge" ? routingRecord : undefined;
+      // ———— 2026-10-25 e2e T3：分诊承接的返工（同 sha + disposition rework）不再走旧路由 ————
+      // 客户在分诊卡选「下发统筹修改」后，结算先落 `failed/disposition:rework/source:customer` 记录；
+      // 旧 latest-rejected 分支若抢跑会发旧格式、「客户拒绝」文案的任务。这里先认领：同 sha 且
+      // `failed|dispatched` ⇒ 由 triage 处置（失败时用报告重新解析并重试），旧路由跳过。
+      let triageReworkRecord: AcceptanceTriageRecord | undefined;
+      if (
+        flowStateExistsForRework &&
+        triageGateRecord !== undefined &&
+        triageGateRecord.disposition === "rework" &&
+        triageGateRecord.reportSha256 !== null &&
+        (triageGateRecord.status === "failed" || triageGateRecord.status === "dispatched")
+      ) {
+        const claimSnapshot = await readAcceptanceReportSnapshot(info.projectRoot, info.flowId);
+        if ((claimSnapshot.sha256 ?? null) === triageGateRecord.reportSha256) triageReworkRecord = triageGateRecord;
+      }
       // 损坏/未知 schema 的 routing record：无法区分「已发送/未发送」⇒ fail-closed，不派 Proof、
       // 交人工/重建（Q9 / P6；不猜、不伪造 sent）。
       if (
@@ -3363,11 +4675,16 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           note,
           governanceAcceptanceReworkFailedNote(info.flowId, `返工路由记录损坏/未知 schema（${routingRecordRead.corrupt}）；不派发验收复核，请重建/人工核对。`),
         );
-        return;
+        return dispatchOutcome({
+          status: "blocked",
+          code: "flow-incomplete",
+          message: `返工路由记录损坏/未知 schema（${routingRecordRead.corrupt}）；未派发验收复核。`,
+        });
       }
       const reworkBranch =
         flowStateExistsForRework &&
-        (latest.kind === "rejected" || (latest.kind === "none" && autoReworkRecord !== undefined));
+        (latest.kind === "rejected" ||
+          (latest.kind === "none" && (autoReworkRecord !== undefined || triageReworkRecord !== undefined)));
       // ———— 读 flow 机器状态（治理协调/就绪唤醒/新契约标准判断共用） ————
       // 2026-10-24 客户修订（所有变更独立验收）：`release` 仅保留为解析出的元数据/既有字段，
       // **不再作为独立验收的门**；自动派 verifier / 写 acceptance-criteria / 返工后重派 Proof
@@ -3391,20 +4708,78 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         if (latest.kind === "rejected") {
           const evidence = latest.entry.decisionEvidence;
           const judgeAudit = evidence?.kind === "judge" ? evidence.judge : undefined;
-          const routeResult = await routeAcceptanceRework(
-            {
+          if (triageReworkRecord !== undefined) {
+            // e2e T3：本次 reject 是分诊卡「下发统筹修改」的结算 ⇒ 只执行 triage 处置，不再发旧格式任务。
+            diagnostic.record("acceptance.rework.triage-owned", {
+              flowId: info.flowId,
+              status: triageReworkRecord.status,
+              sourceDetail: triageReworkRecord.sourceDetail,
+            });
+            if (triageReworkRecord.status === "failed") {
+              const retried = await retryAcceptanceTriageRework({
+                projectRoot: info.projectRoot,
+                flowId: info.flowId,
+                record: triageReworkRecord,
+                ...(typeof latest.entry.at === "string" ? { decisionAt: latest.entry.at } : {}),
+                note,
+                diagnostic,
+                ...(info.runtime !== undefined ? { runtimeHint: info.runtime } : {}),
+              });
+              if (retried !== "sent") {
+                return dispatchOutcome({
+                  status: "blocked",
+                  code: "flow-incomplete",
+                  message: "验收分诊返工路由尚未完成（pending/failed）；本次未派发验收复核，也不会回落到旧格式返工任务。",
+                });
+              }
+            }
+          } else {
+            const routeResult = await routeAcceptanceRework(
+              {
+                projectRoot: info.projectRoot,
+                flowId: info.flowId,
+                source: "customer",
+                sourceDetail: evidence?.kind ?? "customer-input",
+                ...(typeof latest.entry.at === "string" ? { decisionAt: latest.entry.at } : {}),
+                ...(judgeAudit?.reasonCode !== undefined ? { reasonCode: judgeAudit.reasonCode } : {}),
+                ...(judgeAudit?.reason !== undefined ? { reason: judgeAudit.reason } : {}),
+                ...(info.runtime !== undefined ? { runtimeHint: info.runtime } : {}),
+              },
+              { note, diagnostic },
+            );
+            if (routeResult !== "sent") {
+              // record pending/failed：本次不派 Proof，下一次真实事件重试
+              return dispatchOutcome({
+                status: "blocked",
+                code: "flow-incomplete",
+                message: "验收返工路由尚未完成（pending/failed）；本次未派发验收复核。",
+              });
+            }
+          }
+        } else if (triageReworkRecord !== undefined) {
+          // latest=none（判断代批/重启）但分诊记录认领返工：与上同理，只走 triage 处置。
+          diagnostic.record("acceptance.rework.triage-owned", {
+            flowId: info.flowId,
+            status: triageReworkRecord.status,
+            sourceDetail: triageReworkRecord.sourceDetail,
+          });
+          if (triageReworkRecord.status === "failed") {
+            const retried = await retryAcceptanceTriageRework({
               projectRoot: info.projectRoot,
               flowId: info.flowId,
-              source: "customer",
-              sourceDetail: evidence?.kind ?? "customer-input",
-              ...(typeof latest.entry.at === "string" ? { decisionAt: latest.entry.at } : {}),
-              ...(judgeAudit?.reasonCode !== undefined ? { reasonCode: judgeAudit.reasonCode } : {}),
-              ...(judgeAudit?.reason !== undefined ? { reason: judgeAudit.reason } : {}),
+              record: triageReworkRecord,
+              note,
+              diagnostic,
               ...(info.runtime !== undefined ? { runtimeHint: info.runtime } : {}),
-            },
-            { note, diagnostic },
-          );
-          if (routeResult !== "sent") return; // record pending/failed：本次不派 Proof，下一次真实事件重试
+            });
+            if (retried !== "sent") {
+              return dispatchOutcome({
+                status: "blocked",
+                code: "flow-incomplete",
+                message: "验收分诊返工路由尚未完成（pending/failed）；本次未派发验收复核。",
+              });
+            }
+          }
         } else if (autoReworkRecord !== undefined && autoReworkRecord.status !== "sent") {
           // 重启/失败重试：事实来自耐久 record（不依赖回调内存态）。
           const routeResult = await routeAcceptanceRework(
@@ -3421,7 +4796,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             },
             { note, diagnostic },
           );
-          if (routeResult !== "sent") return;
+          if (routeResult !== "sent") {
+            return dispatchOutcome({
+              status: "blocked",
+              code: "flow-incomplete",
+              message: "验收返工路由尚未完成（pending/failed）；本次未派发验收复核。",
+            });
+          }
         }
         // 返工已按路由交主理组织；返工完成后按既有重派门自动重派 Proof（所有流程，不区分 release）。
         const freshRecord = (await readReworkRoutingRecord(info.projectRoot, info.flowId)).record;
@@ -3434,7 +4815,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           diagnostic,
           ...(info.runtime !== undefined ? { runtimeHint: info.runtime } : {}),
         });
-        return;
+        return dispatchOutcome({
+          status: "blocked",
+          code: "flow-incomplete",
+          message: "流程处于验收返工/重派路由处理中；本次未派发新的验收复核。",
+        });
       }
       // 2026-10-20 真机：先把 flow artifact 证据补登（幂等；旧扫描规则写下的 evidence.ref 文件），
       // 再唤醒 Steward / 跑验收判定——Steward 的 flow_step_update done 才能通过 insufficient-evidence。
@@ -3566,21 +4951,25 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
               diagnostic.record("acceptance.criteria.blocked", { flowId: info.flowId });
             }
             acceptanceDispatchedFlows.delete(key);
-            return;
+            return dispatchOutcome({ status: "blocked", code: "criteria-missing", message: criteriaReason });
           }
           const changePackage = await readChangePackageInfo(info.projectRoot, info.flowId);
           if (changePackage === undefined || changePackage.text.trim() === "" || changePackage.riskTier === undefined) {
-            const changeReason =
-              changePackage === undefined || changePackage.text.trim() === ""
-                ? mainT("main.interface.changePackageMissing", { path: governanceChangePackagePath(info.flowId) })
-                : mainT("main.interface.changePackageNoRisk", { path: changePackage.relPath });
+            const changeMissing = changePackage === undefined || changePackage.text.trim() === "";
+            const changeReason = changeMissing
+              ? mainT("main.interface.changePackageMissing", { path: governanceChangePackagePath(info.flowId) })
+              : mainT("main.interface.changePackageNoRisk", { path: changePackage.relPath });
             if (acceptanceArtifactBlockedNotified.get(key) !== changeReason) {
               acceptanceArtifactBlockedNotified.set(key, changeReason);
               note(changeReason);
               diagnostic.record("acceptance.change-package.blocked", { flowId: info.flowId });
             }
             acceptanceDispatchedFlows.delete(key);
-            return;
+            return dispatchOutcome({
+              status: "blocked",
+              code: changeMissing ? "change-package-missing" : "change-package-no-risk",
+              message: changeReason,
+            });
           }
           const planForAcceptance = await readTeamPlanInfo(info.projectRoot, info.flowId);
           acceptanceTaskOptions = {
@@ -3604,7 +4993,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       let flowUpdatedSinceReview = false;
       const recordedMtime = acceptanceDispatchedFlows.get(key);
       if (recordedMtime !== undefined) {
-        if (flowStateMtimeMs === undefined || recordedMtime === flowStateMtimeMs) return; // 同版本已派
+        if (flowStateMtimeMs === undefined || recordedMtime === flowStateMtimeMs) {
+          // 同版本已派
+          return dispatchOutcome({
+            status: "already-dispatched",
+            message: "该流程当前版本已派发验收复核（运行期去重）；本次未重复派发。",
+          });
+        }
         acceptanceDispatchedFlows.delete(key);
         flowUpdatedSinceReview = true; // flow 在上次复核后有更新：本次为重派，任务文案注明
       }
@@ -3616,20 +5011,31 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       if (lastVerifierAtMs !== undefined) {
         if (flowStateMtimeMs === undefined || lastVerifierAtMs >= flowStateMtimeMs) {
           diagnostic.record("acceptance.ledger.dedup", { flowId: info.flowId });
-          return; // 保留运行期占位（本进程同版本也不再检查）
+          // 保留运行期占位（本进程同版本也不再检查）
+          return dispatchOutcome({
+            status: "already-dispatched",
+            message: "该流程当前版本已有验收复核派发记录（账本去重）；本次未重复派发。",
+          });
         }
         flowUpdatedSinceReview = true;
         diagnostic.record("acceptance.ledger.stale", { flowId: info.flowId, lastVerifierAtMs });
       } else if (acceptanceDispatchRecorded(info.flowId, ledger)) {
         // 旧记录缺 `at`/不可解析：无法做版本比较 ⇒ 维持旧行为（有记录即不派），不猜、不重派。
         diagnostic.record("acceptance.ledger.dedup-legacy", { flowId: info.flowId });
-        return;
+        return dispatchOutcome({
+          status: "already-dispatched",
+          message: "治理账本已有验收复核派发记录（缺时间戳，按旧规则不重派）。",
+        });
       }
       // 该 flow 仍有在途派发/回交/运行轮次 ⇒ 推迟到下一次事件（避免在交付完成前抢跑派 Proof）。
       if (info.force !== true && manager.hasActiveWorkForFlow(info.projectRoot, info.flowId)) {
         acceptanceDispatchedFlows.delete(key);
         diagnostic.record("acceptance.deferred.active-work", { flowId: info.flowId });
-        return;
+        return dispatchOutcome({
+          status: "blocked",
+          code: "unavailable",
+          message: "该流程仍有在途工作；本次未派发验收复核。",
+        });
       }
       // —————— 机器状态判定：YAML 优先，Markdown 仅 legacy 回退 ——————
       // `docs/flows/<flowId>.yaml` 存在 ⇒ 它是**唯一机器状态**：语法/形状/保留 id 校验失败、或证据不足，
@@ -3645,7 +5051,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           // 存在但不可读（权限/IO）：按不可读处理，不落 legacy 猜测；后续事件可再检查。
           diagnostic.error("acceptance.flow-state.unreadable", error, { path: flowStateRel });
           acceptanceDispatchedFlows.delete(key);
-          return;
+          return dispatchOutcome({
+            status: "blocked",
+            code: "flow-incomplete",
+            message: `流程状态 YAML 不可读：${flowStateRel}；本次未派发验收复核。`,
+          });
         }
       }
       let issue: string | undefined;
@@ -3677,7 +5087,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         } catch (error) {
           diagnostic.record("acceptance.flow.unreadable", { path: flowRel, mode: "legacy" });
           acceptanceDispatchedFlows.delete(key); // 流程单未落盘：保持现状，后续事件可再检查
-          return;
+          return dispatchOutcome({
+            status: "blocked",
+            code: "flow-incomplete",
+            message: `流程单不存在或不可读：${flowRel}；本次未派发验收复核。`,
+          });
         }
         issue = flowCompletionIssue(info.flowId, markdown, ledger);
       }
@@ -3694,7 +5108,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           diagnostic.record("acceptance.flow.incomplete.notified", { flowId: info.flowId, reason: issue, mode: issueMode, roleId: noteRoleId });
         }
         acceptanceDispatchedFlows.delete(key); // 未完成/证据不足：不派；后续事件可再检查（不是循环）
-        return;
+        return dispatchOutcome({ status: "blocked", code: "flow-incomplete", message: issue });
       }
       // 门已通过（本次判定）：清除阻塞告知记忆——若之后再次被挡（即使原因文本相同）会重新告知。
       acceptanceBlockedNotified.delete(key);
@@ -3722,7 +5136,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           acceptanceRuntimeUnresolvedNotified.add(info.projectRoot);
           note(resolution.message);
         }
-        return;
+        return dispatchOutcome({ status: "blocked", code: "runtime-unresolved", message: resolution.message });
       }
       const runtime = resolution.runtime;
       noteRuntime = runtime; // 之后的开/发/系统行都按实际引擎路由（Pi 视图可见）
@@ -3735,15 +5149,17 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       if (!opened.ok) {
         acceptanceDispatchedFlows.delete(key);
         diagnostic.error("acceptance.open.failed", new Error(opened.error ?? "unknown"), { flowId: info.flowId });
-        note(mainT("main.interface.advanceOpenFailed", { detail: opened.error ?? mainT("shared.common.unknownReason") }));
-        return;
+        const noteText = mainT("main.interface.advanceOpenFailed", { detail: opened.error ?? mainT("shared.common.unknownReason") });
+        note(noteText);
+        return dispatchOutcome({ status: "failed", code: "unavailable", message: noteText, runtime });
       }
       const sent = await manager.sendBackground({ projectRoot: info.projectRoot, roleId: "verifier", runtime, text: message });
       if (!sent.ok) {
         acceptanceDispatchedFlows.delete(key);
         diagnostic.error("acceptance.send.failed", new Error(sent.error ?? "unknown"), { flowId: info.flowId });
-        note(mainT("main.interface.advanceSendFailed", { detail: sent.error ?? mainT("shared.common.unknownReason") }));
-        return;
+        const noteText = mainT("main.interface.advanceSendFailed", { detail: sent.error ?? mainT("shared.common.unknownReason") });
+        note(noteText);
+        return dispatchOutcome({ status: "failed", code: "unavailable", message: noteText, runtime });
       }
       // 系统行在**投递成功即发**（不等审计落盘）：可见性不依赖持久化 I/O 的完成时序；账本写失败只记诊断，
       // 不翻转「已派发」这个事实（既有语义不变，只是更早呈现）。
@@ -3755,6 +5171,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         diagnostic.error("acceptance.runtime.persist.failed", new Error(persisted.error ?? "unknown"), { flowId: info.flowId });
       }
       // 持久化去重 + 审计：应用自动派发 ≠ 客户批准（不写 customerDecision/decisionEvidence）。
+      // `trigger:"settle"` 是账本枚举的既有值（`GovernanceLedgerTrigger` 暂无 request 值；真实来源见
+      // 上方诊断 `acceptance.dispatched.trigger`，不在本层私扩账本 schema）。
       const appended = await appendGovernanceLedger(info.projectRoot, {
         at: new Date().toISOString(),
         kind: "dispatch.accepted",
@@ -3771,11 +5189,365 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         diagnostic.error("acceptance.ledger.failed", new Error(appended.message), { flowId: info.flowId });
       }
       diagnostic.record("acceptance.dispatched", { flowId: info.flowId, queued: sent.queued === true, trigger: info.trigger, mode: issueMode });
+      return dispatchOutcome({
+        status: "dispatched",
+        message: `已派发验收复核（流程 ${info.flowId}，引擎 ${runtime}）。`,
+        runtime,
+        queued: sent.queued === true,
+      });
     } catch (error) {
       acceptanceDispatchedFlows.delete(key);
       diagnostic.error("acceptance.advance.failed", error, { flowId: info.flowId });
+      return dispatchOutcome({
+        status: "failed",
+        code: "unavailable",
+        message: `验收派发失败：${error instanceof Error ? error.message : String(error)}`,
+      });
     }
   };
+
+  // —————— 2026-10-25 独立复核请求（`request_acceptance`）：应用侧能力实现 ——————
+  //
+  // 运行时核心的工具只做参数校验并**如实转达**回执；校验与派发全部在这里：
+  //   flowId 归一 → flow/验收标准/变更包/风险档存在性 → `acceptance-criteria` 步骤收口（编排公共出口）
+  //   → `parseFlowStateYaml` + `evaluateFlowCompletion` 流程完整性 → `resolveAcceptanceRuntime`
+  //   → 既有 `dispatchAcceptanceForFlow({force:true, trigger:"request"})`。
+  // 纪律：**请求复核 ≠ 客户批准**——本能力不写客户决定、不写 `customer.decision`；flow 收口只经编排助手
+  // （`completeAcceptanceCriteriaStep`），本层不自行改 flow。未派发时如实返回原因，绝不把未派发说成已派发。
+  /** 同 project+flow 的请求在途去重（并发/重复请求不重复派发；进程内，不持久化）。 */
+  const requestAcceptanceInFlight = new Set<string>();
+  /**
+   * 2026-10-25 真机缺陷（工具调用 12 分钟不返回）：独立复核请求必须有**界**——总预算与单阶段预算。
+   * 超时不取消底层动作（可能已派发；下一条真实事件/账本去重会收口），只保证工具回执必然返回；
+   * 文案如实写「可能已派发，请用 flow_get 核对」，不谎报成功也不谎报失败。
+   */
+  const requestAcceptanceTotalMs = (() => {
+    const raw = deps.requestAcceptanceLimits?.totalMs;
+    return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 60_000;
+  })();
+  const requestAcceptanceStageMs = (() => {
+    const raw = deps.requestAcceptanceLimits?.stageMs;
+    const fallback = Math.max(1, Math.min(20_000, requestAcceptanceTotalMs));
+    return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : fallback;
+  })();
+  /** 有界等待：超时返回 `{timedOut:true}`；底层 promise 继续（不取消、不伪造结果）。 */
+  const withRequestAcceptanceDeadline = async <T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+  ): Promise<{ timedOut: false; value: T } | { timedOut: true }> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<{ timedOut: true }>((resolve) => {
+      timer = setTimeout(() => resolve({ timedOut: true }), Math.max(1, timeoutMs));
+      (timer as { unref?: () => void }).unref?.();
+    });
+    try {
+      return await Promise.race([
+        promise.then((value) => ({ timedOut: false as const, value })),
+        timeout,
+      ]);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
+  };
+  const requestAcceptanceTimeoutResult = (flowId: string, stage: string, elapsedMs: number): RequestAcceptanceResult => {
+    // 只记阶段与耗时（不记凭据/正文）；底层动作可能仍在进行，下一次真实事件/账本去重会收口。
+    createDiagnosticLogger({ component: "desktop.request-acceptance" }).record("request-acceptance.timeout", {
+      flowId,
+      stage,
+      elapsedMs,
+    });
+    return {
+      ok: false,
+      code: "unavailable",
+      message:
+        `已受理独立复核请求，但${stage}确认回执超时（约 ${Math.round(elapsedMs / 1000)}s 未返回）；` +
+        `**可能已派发/正在处理**，请用 flow_get 核对流程与治理账本，不要重复请求；本次不声称已派发。`,
+      flowId,
+    };
+  };
+
+  const performRequestAcceptance = async (
+    projectRoot: string,
+    flowId: string,
+    input: RequestAcceptanceInput,
+  ): Promise<RequestAcceptanceResult> => {
+    void input; // 载荷里的 note 仅作可选说明；不写账本、不参与判定（保留形状，不猜语义）。
+    const startedAtMs = Date.now();
+    const remainingMs = (): number => Math.max(1, requestAcceptanceTotalMs - (Date.now() - startedAtMs));
+    const stageBudgetMs = (): number => Math.min(requestAcceptanceStageMs, remainingMs());
+    const flowRel = governanceFlowStatePath(flowId);
+    let flowText: string;
+    try {
+      flowText = await readFile(path.join(projectRoot, ...flowRel.split("/")), "utf8");
+    } catch {
+      return {
+        ok: false,
+        code: "flow-not-found",
+        message: `流程状态 YAML 不存在或不可读：${flowRel}；未派发独立复核。`,
+        flowId,
+      };
+    }
+    let parsed = parseFlowStateYaml(flowText, flowId);
+    if (!parsed.ok) {
+      const detail = parsed.errors.slice(0, 10).map((item) => `${item.path}: ${item.message}`).join("；");
+      return { ok: false, code: "flow-incomplete", message: `流程状态 YAML 校验失败：${detail}；未派发独立复核。`, flowId };
+    }
+    // 存在性校验：最新验收标准（版本扫描不回退旧版本；空文件按缺失处理——不把「待补」当通过）。
+    const criteria = await readAcceptanceCriteriaInfo(projectRoot, flowId);
+    if (criteria === undefined || criteria.text.trim() === "") {
+      return {
+        ok: false,
+        code: "criteria-missing",
+        message: mainT("main.interface.criteriaMissing", { path: governanceAcceptanceCriteriaPath(flowId) }),
+        flowId,
+      };
+    }
+    // 存在性校验：变更包 + 风险档位。
+    const changePackage = await readChangePackageInfo(projectRoot, flowId);
+    if (changePackage === undefined || changePackage.text.trim() === "") {
+      return {
+        ok: false,
+        code: "change-package-missing",
+        message: mainT("main.interface.changePackageMissing", { path: governanceChangePackagePath(flowId) }),
+        flowId,
+      };
+    }
+    if (changePackage.riskTier === undefined) {
+      return {
+        ok: false,
+        code: "change-package-no-risk",
+        message: mainT("main.interface.changePackageNoRisk", { path: changePackage.relPath }),
+        flowId,
+      };
+    }
+    // 标准步骤收口：只在 pending/dispatched 时交给编排助手（已 done 直接继续，避免多余写盘）。
+    const criteriaStep = parsed.flow.steps.find((step) => step.id === "acceptance-criteria");
+    if (criteriaStep !== undefined && (criteriaStep.status === "pending" || criteriaStep.status === "dispatched")) {
+      let completed: CompleteAcceptanceCriteriaStepResult;
+      let completedRace: { timedOut: false; value: CompleteAcceptanceCriteriaStepResult } | { timedOut: true };
+      try {
+        completedRace = await withRequestAcceptanceDeadline(
+          Promise.resolve().then(() => completeAcceptanceCriteriaStepFn({ projectRoot, flowId })),
+          stageBudgetMs(),
+        );
+      } catch (error) {
+        return {
+          ok: false,
+          code: "flow-incomplete",
+          message: `验收标准步骤收口失败：${error instanceof Error ? error.message : String(error)}；未派发独立复核。`,
+          flowId,
+        };
+      }
+      if (completedRace.timedOut) {
+        return requestAcceptanceTimeoutResult(flowId, "验收标准步骤收口", Date.now() - startedAtMs);
+      }
+      completed = completedRace.value;
+      if (!completed.ok) {
+        const detail = completed.error ?? completed.issues?.join("；") ?? mainT("shared.common.unknownReason");
+        if (completed.code === "acceptance-criteria-missing" || completed.code === "acceptance-criteria-unobservable") {
+          return { ok: false, code: "criteria-missing", message: detail, flowId };
+        }
+        if (completed.code === "not-found" || completed.code === "invalid-flow") {
+          return { ok: false, code: "flow-not-found", message: detail, flowId };
+        }
+        return { ok: false, code: "flow-incomplete", message: detail, flowId };
+      }
+      // 收口会写 flow：重新读取并按最新状态判定（读/解析失败不伪造成功）。
+      try {
+        flowText = await readFile(path.join(projectRoot, ...flowRel.split("/")), "utf8");
+      } catch {
+        return {
+          ok: false,
+          code: "flow-incomplete",
+          message: `验收标准步骤已收口，但流程状态 YAML 重新读取失败：${flowRel}；未派发独立复核。`,
+          flowId,
+        };
+      }
+      parsed = parseFlowStateYaml(flowText, flowId);
+      if (!parsed.ok) {
+        const detail = parsed.errors.slice(0, 10).map((item) => `${item.path}: ${item.message}`).join("；");
+        return {
+          ok: false,
+          code: "flow-incomplete",
+          message: `验收标准步骤已收口，但流程状态 YAML 校验失败：${detail}；未派发独立复核。`,
+          flowId,
+        };
+      }
+    }
+    // 流程完整性：与自动验收门同一实现（只读；账本读失败/坏行 fail-closed）。
+    let ledger: Awaited<ReturnType<typeof readGovernanceLedger>>;
+    try {
+      ledger = await readGovernanceLedger(projectRoot);
+    } catch (error) {
+      return {
+        ok: false,
+        code: "flow-incomplete",
+        message: `治理账本不可读，无法核对流程完成度：${error instanceof Error ? error.message : String(error)}；未派发独立复核。`,
+        flowId,
+      };
+    }
+    const evaluation = evaluateFlowCompletion(parsed.flow, ledger);
+    if (!evaluation.ready) {
+      return {
+        ok: false,
+        code: "flow-incomplete",
+        message: `流程尚未完成：${evaluation.issues.slice(0, 5).join("；")}`,
+        flowId,
+      };
+    }
+    // 运行时解析：与自动验收派发同一解析器；无法确定 ⇒ 不派发（绝不回退桌面默认引擎）。
+    // 有界：引擎/凭据探测不得让工具调用无限挂起。
+    let resolution: RuntimeResolution;
+    try {
+      const resolvedRace = await withRequestAcceptanceDeadline(resolveAcceptanceRuntime(projectRoot), stageBudgetMs());
+      if (resolvedRace.timedOut) {
+        return requestAcceptanceTimeoutResult(flowId, "项目引擎解析", Date.now() - startedAtMs);
+      }
+      resolution = resolvedRace.value;
+    } catch (error) {
+      return {
+        ok: false,
+        code: "runtime-unresolved",
+        message: `无法解析项目引擎：${error instanceof Error ? error.message : String(error)}；未派发独立复核。`,
+        flowId,
+      };
+    }
+    if (!resolution.ok) {
+      return { ok: false, code: "runtime-unresolved", message: resolution.message, flowId };
+    }
+    // 派发：复用既有自动验收门（force 跳过在途守卫；trigger=request 只用于诊断/审计来源）。
+    // 有界：`openBackground`/`sendBackground` 或流程写队列若挂起，工具回执仍必须按超时如实返回。
+    const dispatchedRace = await withRequestAcceptanceDeadline(
+      dispatchAcceptanceForFlow({
+        projectRoot,
+        flowId,
+        runtime: resolution.runtime,
+        evidence: [],
+        force: true,
+        trigger: "request",
+      }),
+      stageBudgetMs(),
+    );
+    if (dispatchedRace.timedOut) {
+      return requestAcceptanceTimeoutResult(flowId, "验收复核派发", Date.now() - startedAtMs);
+    }
+    const dispatchResult = dispatchedRace.value;
+    if (dispatchResult.status === "dispatched") {
+      return {
+        ok: true,
+        code: "dispatched",
+        message: `已派发独立验收复核（流程 ${flowId}，引擎 ${dispatchResult.runtime}）；请求复核不代表客户批准。`,
+        flowId,
+        runtime: dispatchResult.runtime,
+      };
+    }
+    if (dispatchResult.status === "already-dispatched") {
+      return {
+        ok: false,
+        code: "already-dispatched",
+        message: dispatchResult.message,
+        flowId,
+        runtime: dispatchResult.runtime ?? resolution.runtime,
+      };
+    }
+    return {
+      ok: false,
+      code: dispatchResult.code ?? "unavailable",
+      message: dispatchResult.message,
+      flowId,
+      runtime: dispatchResult.runtime ?? resolution.runtime,
+    };
+  };
+
+  /**
+   * `request_acceptance` 能力的项目入口：**flowId 归一**（显式优先；省略时仅当 `docs/flows` 恰有一个
+   * YAML 才采用，多流程/无流程一律 `flow-not-found` 并提示指定 flowId，**不猜**）+ 同 flow 在途去重。
+   */
+  const requestAcceptanceForProject = async (
+    projectRoot: string,
+    input: RequestAcceptanceInput,
+  ): Promise<RequestAcceptanceResult> => {
+    const root = typeof projectRoot === "string" ? projectRoot.trim() : "";
+    if (root === "") {
+      return { ok: false, code: "unavailable", message: "缺少项目根，无法提交独立复核请求。" };
+    }
+    let flowId: string | undefined;
+    if (typeof input?.flowId === "string" && input.flowId.trim() !== "") {
+      flowId = input.flowId.trim();
+    } else {
+      let yamlIds: string[] = [];
+      try {
+        const names = await readdir(path.join(root, "docs", "flows"));
+        yamlIds = [
+          ...new Set(
+            names
+              .filter((name) => name.endsWith(".yaml") && name.length > ".yaml".length)
+              .map((name) => name.slice(0, -".yaml".length)),
+          ),
+        ];
+      } catch {
+        yamlIds = [];
+      }
+      if (yamlIds.length === 1) {
+        flowId = yamlIds[0]!;
+      } else {
+        const detail =
+          yamlIds.length === 0
+            ? "docs/flows 下没有流程 YAML"
+            : `docs/flows 下有 ${yamlIds.length} 个流程 YAML（${yamlIds.slice(0, 5).join("、")}）`;
+        return { ok: false, code: "flow-not-found", message: `无法确定要复核的流程：${detail}；请显式指定 flowId。` };
+      }
+    }
+    const resolvedFlowId = flowId;
+    if (resolvedFlowId === undefined) {
+      return { ok: false, code: "flow-not-found", message: "无法确定要复核的流程；请显式指定 flowId。" };
+    }
+    if (!new RegExp(GOVERNANCE_SLUG_PATTERN).test(resolvedFlowId)) {
+      return {
+        ok: false,
+        code: "flow-not-found",
+        message: `flowId 非法：${resolvedFlowId}；须匹配 ${GOVERNANCE_SLUG_PATTERN}。`,
+        flowId: resolvedFlowId,
+      };
+    }
+    const key = `${canonicalProjectRoot(root)}\u0000${resolvedFlowId}`;
+    if (requestAcceptanceInFlight.has(key)) {
+      return {
+        ok: false,
+        code: "already-dispatched",
+        message: "该流程的独立复核请求正在处理中；未重复派发。",
+        flowId: resolvedFlowId,
+      };
+    }
+    requestAcceptanceInFlight.add(key);
+    try {
+      // 兜底总预算：任何未单独包裹的 await 也不得让工具调用无限挂起（底层动作不取消，可能已派发）。
+      const outer = await withRequestAcceptanceDeadline(
+        performRequestAcceptance(root, resolvedFlowId, input),
+        requestAcceptanceTotalMs + 1_000,
+      );
+      if (outer.timedOut) {
+        return requestAcceptanceTimeoutResult(resolvedFlowId, "独立复核请求", requestAcceptanceTotalMs);
+      }
+      return outer.value;
+    } catch (error) {
+      // 防御：能力自身异常也如实回执（工具层仍会兜住，但这里先给出可操作的未确认说明）。
+      createDiagnosticLogger({ component: "desktop.request-acceptance" }).error("request-acceptance.failed", error, { flowId: resolvedFlowId });
+      return {
+        ok: false,
+        code: "unavailable",
+        message:
+          `独立复核请求执行失败：${error instanceof Error ? error.message : String(error)}；` +
+          `**可能已部分执行**，请用 flow_get 核对流程与治理账本，不要重复请求。`,
+        flowId: resolvedFlowId,
+      };
+    } finally {
+      requestAcceptanceInFlight.delete(key);
+    }
+  };
+
+  // 能力注入：缺省用本层实现；测试/宿主可整体替换（签名与 SessionManagerDeps 同形，项目根由会话补入）。
+  const requestAcceptanceCapability = deps.requestAcceptance ?? requestAcceptanceForProject;
 
   const manager = new SessionManager({
     openRoleSession: openRoleSessionFn,
@@ -3821,6 +5593,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // 客户交互通道（A-5）：su 的 request_confirmation/request_choice 经它摆到界面并取回裁决
     // （仅内置治理角色会话消费；缺省未接 ⇒ 不注入 ⇒ 无确认制——绝不悄悄放行）。
     customerInput: deps.customerInput,
+    // 2026-10-25 独立复核请求（request_acceptance）：应用侧能力（SessionManager 仅对内置治理角色会话
+    // 注入；项目角色不注入；编排再按 builtInGovernance 收口）。**请求复核 ≠ 客户批准**。
+    requestAcceptance: requestAcceptanceCapability,
     // G-2/W5：恢复确认卡通道（缺省 ⇒ 恢复提议「未接线、未获执行」如实回执——fail-closed）。
     recoveryConfirm: deps.recoveryConfirm,
     // 2026-10-20（客户总原则「我勾选了替我决策就不用我来管了」）：决策开关开启 ⇒ 恢复提议不弹客户卡、
@@ -5187,6 +6962,22 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     return result;
   }
 
+  /**
+   * 后台任务 read/stop 共用的寻址校验（渲染进程输入不可信）：三元身份 + taskId 必须为非空字符串，
+   * runtime 必须是已知引擎。缺任一 ⇒ undefined（本层合成 `invalid-request` 回执，不调会话管理器）。
+   */
+  const backgroundTaskTarget = (
+    input: unknown,
+  ): { projectRoot: string; runtime: RuntimeKind; roleId: string; taskId: string } | undefined => {
+    if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+    const value = input as Record<string, unknown>;
+    if (typeof value.projectRoot !== "string" || value.projectRoot === "") return undefined;
+    if (typeof value.roleId !== "string" || value.roleId === "") return undefined;
+    if (typeof value.taskId !== "string" || value.taskId === "") return undefined;
+    if (!isRuntimeKind(value.runtime)) return undefined;
+    return { projectRoot: value.projectRoot, runtime: value.runtime, roleId: value.roleId, taskId: value.taskId };
+  };
+
   return {
     retryReportSave: input => persistenceCall('retryReportSave', input),
     getReportSaveState: input => persistenceCall('getReportSaveState', input),
@@ -5304,6 +7095,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // 走同一道门 + 账本持久化去重；事件驱动（40ms 合并窗口），不是轮询。
       if (generation === importSequence && (listing.governanceModel ?? "single") === "trio") {
         scheduleAcceptanceCheck(listing.projectRoot, "import");
+        // 2026-10-25 验收分诊：应用启动/导入后按 `.ans` 分诊记录恢复（awaiting-decision 重推卡；
+        // report-only 未汇报的补一次）。只读/幂等；失败只诊断，不阻塞导入。
+        scheduleAcceptanceTriageRecovery(listing.projectRoot);
       }
       return {
         ...(documentListing.documentScope ? { documentScope: documentListing.documentScope } : {}),
@@ -5318,6 +7112,95 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         governanceModel: listing.governanceModel ?? "single",
         governanceRecord,
       };
+    },
+
+    // —————— 2026-10-25：流程状态只读视图（`flow:status`）——————
+    // 渲染侧展示 `docs/flows/*.yaml` 的步骤进度。**只读**：目录列举 + 读取 + 既有 `parseFlowStateYaml`；
+    // 不写任何文件、不碰治理账本、不改变 revision（revision 只是文件内容 sha256 的只读派生）。
+    // 坏文件逐文件进 `errors`，不阻断其他文件；`docs/flows` 不存在不是错误（flows:[]）。
+    async flowStatus(projectRoot: string): Promise<FlowStatusReply> {
+      if (typeof projectRoot !== "string" || projectRoot.trim() === "") {
+        return { ok: false, error: mainT("main.flowStatus.invalidProject") };
+      }
+      let rootIsDirectory = false;
+      try {
+        rootIsDirectory = (await stat(projectRoot)).isDirectory();
+      } catch {
+        return { ok: false, error: mainT("main.flowStatus.invalidProject") };
+      }
+      if (!rootIsDirectory) {
+        return { ok: false, error: mainT("main.flowStatus.invalidProject") };
+      }
+      const flowsDir = path.join(projectRoot, "docs", "flows");
+      let names: string[];
+      try {
+        names = await readdir(flowsDir);
+      } catch (error) {
+        // 目录不存在（含路径上的某段不是目录）⇒ 空列表，不是错误；其余失败如实回执。
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === "ENOENT" || code === "ENOTDIR") return { ok: true, flows: [], errors: [] };
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+      const flows: FlowStatusFlowView[] = [];
+      const errors: FlowStatusFileError[] = [];
+      // 只认顶层 `*.yaml`；按文件名排序，保证回执顺序稳定。
+      for (const name of names.filter((entry) => entry.endsWith(".yaml")).sort()) {
+        const flowId = name.slice(0, -".yaml".length);
+        const file = flowStatePath(flowId); // 项目相对路径 `docs/flows/<name>`
+        try {
+          const abs = path.join(flowsDir, name);
+          const [bytes, info] = await Promise.all([readFile(abs), stat(abs)]);
+          const parsed = parseFlowStateYaml(bytes.toString("utf8"), flowId);
+          if (!parsed.ok) {
+            errors.push({ file, error: parsed.error });
+            continue;
+          }
+          const counts: FlowStatusCounts = {
+            total: parsed.flow.steps.length,
+            done: 0,
+            delivered: 0,
+            dispatched: 0,
+            pending: 0,
+            failed: 0,
+            blocked: 0,
+            superseded: 0,
+          };
+          for (const step of parsed.flow.steps) {
+            // 计数键按 `FlowStatusCounts` 封闭值域；`aborted` 等只计入 total。
+            switch (step.status) {
+              case "done": counts.done += 1; break;
+              case "delivered": counts.delivered += 1; break;
+              case "dispatched": counts.dispatched += 1; break;
+              case "pending": counts.pending += 1; break;
+              case "failed": counts.failed += 1; break;
+              case "blocked": counts.blocked += 1; break;
+              case "superseded": counts.superseded += 1; break;
+              default: break;
+            }
+          }
+          flows.push({
+            flowId,
+            // 与编排 flow 工具的 revision 同口径（文件内容 sha256）；只读派生，不写盘。
+            revision: createHash("sha256").update(bytes).digest("hex"),
+            steps: parsed.flow.steps.map((step) => ({
+              id: step.id,
+              title: step.title,
+              kind: step.kind,
+              owner: step.owner,
+              status: step.status,
+            })),
+            counts,
+            // 在途步骤（可能有多个，按 YAML 步骤顺序）；没有则空数组。
+            current: parsed.flow.steps
+              .filter((step) => step.status === "dispatched" || step.status === "delivered")
+              .map((step) => step.id),
+            updatedAt: info.mtime.toISOString(),
+          });
+        } catch (error) {
+          errors.push({ file, error: error instanceof Error ? error.message : String(error) });
+        }
+      }
+      return { ok: true, flows, errors };
     },
 
     // —————— I2/C1（existing-project-compat V1，2026-10-17 PM 评审 §二 I2 / §四.2 / §4.6）——————
@@ -5621,8 +7504,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
 
     // —————— 2026-10-23 验收返工路由：judge auto-rework（customer-input `onAutoRework` 接线）——————
     // 只消费事实；无 customer.decision；YAML-only（Q6 A：legacy 不接返工路由/重派）；Proof 不接收返工。
-    async routeAcceptanceAutoRework(info: AutoReworkCallbackInfo): Promise<void> {
-      if (info === null || typeof info !== "object") return;
+    async routeAcceptanceAutoRework(info: AutoReworkCallbackInfo): Promise<void> {      if (info === null || typeof info !== "object") return;
       if (info.cardKind !== "acceptance") return; // 防御：通道已限定；非验收卡零行为
       const flowId = typeof info.flowId === "string" ? info.flowId : "";
       if (flowId === "") return;
@@ -5712,6 +7594,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         // 路由成功后立即走一次有界验收检查：record=sent ⇒ 同一次真实事件内可继续重派门（无进展则不派）。
         scheduleAcceptanceCheck(projectRoot, "settle");
       }
+    },
+
+    // —————— 2026-10-25 验收分诊呈现前闸（customer-input `acceptanceTriage` 接线）——————
+    // 只对 trio + YAML + cardKind=acceptance 求值；pass 照旧、缺结构退回、fail/conditional 按建议/卡处置。
+    // 不写 customer.decision；路由/记录/账本见 `executeAcceptanceTriageDisposition`。
+    async evaluateAcceptanceTriage(facts: AcceptanceTriageGateFacts): Promise<AcceptanceTriageGateResult> {
+      return evaluateAcceptanceTriage(facts);
     },
 
     // 应用代客户推进治理流程（2026-10-18 客户修正）：后台打开目标治理角色 + 投递唯一一条任务。
@@ -6238,6 +8127,51 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     },
 
     async listLiveSessionViews() { return manager.liveSessionViews(); },
+
+    // —————— 会话级后台任务（2026-10-25，桌面任务面板）——————
+    // 只做参数校验与转发：任务表/日志只存在于各会话内存（不缓存/不持久化），聚合与寻址在 SessionManager。
+    // 错误一律回执 `{ok:false,...}`（不抛）；stop 的底层失败 reason 原样透传、绝不改写成成功。
+    async listBackgroundTasks(input): Promise<BackgroundTasksListReply> {
+      const projectRoot = input && typeof input.projectRoot === "string" ? input.projectRoot : "";
+      if (projectRoot === "" || !isRuntimeKind(input?.runtime)) {
+        return { ok: false, error: mainT("main.interface.sessionRequestInvalid") };
+      }
+      return manager.listBackgroundTasks(projectRoot, input.runtime);
+    },
+
+    async readBackgroundTask(input): Promise<BackgroundTaskReadReply> {
+      const target = backgroundTaskTarget(input);
+      if (target === undefined) return { ok: false, error: mainT("main.interface.sessionRequestInvalid") };
+      const value = input as unknown as Record<string, unknown>;
+      const stream = value.stream;
+      if (stream !== undefined && stream !== "stdout" && stream !== "stderr" && stream !== "both") {
+        return { ok: false, error: mainT("main.interface.sessionRequestInvalid") };
+      }
+      const tailLines = value.tailLines;
+      if (
+        tailLines !== undefined &&
+        !(typeof tailLines === "number" && Number.isInteger(tailLines) && tailLines >= 1)
+      ) {
+        return { ok: false, error: mainT("main.interface.sessionRequestInvalid") };
+      }
+      return manager.readBackgroundTask({
+        ...target,
+        ...(stream !== undefined ? { stream } : {}),
+        ...(tailLines !== undefined ? { tailLines } : {}),
+      });
+    },
+
+    async stopBackgroundTask(input): Promise<BackgroundTaskStopReply> {
+      const target = backgroundTaskTarget(input);
+      if (target === undefined) {
+        return { ok: false, reason: "unavailable", message: mainT("main.interface.sessionRequestInvalid") };
+      }
+      const force = (input as unknown as Record<string, unknown>).force;
+      if (force !== undefined && typeof force !== "boolean") {
+        return { ok: false, reason: "unavailable", message: mainT("main.interface.sessionRequestInvalid") };
+      }
+      return manager.stopBackgroundTask({ ...target, ...(force === true ? { force: true } : {}) });
+    },
     async getSessionHistory(input) { const history = await getSessionHistory(input, { credentialEnvNames: [...(deps.runtimeOptions?.extraCredentialEnvVars ?? []), ...(deps.runtimeOptions?.apiKeyEnvVar ? [deps.runtimeOptions.apiKeyEnvVar] : [])] }); manager.registerPersistenceHistory(history); return history; },
     async getRuntimeConfig(runtime) {
       return getRuntimeConfig(runtime, { envPath: envFilePath, env: deps.piConfigEnv, revision: manager.profileRevision(runtime), application: application(runtime) });

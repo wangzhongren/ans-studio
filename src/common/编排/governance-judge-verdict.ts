@@ -345,7 +345,7 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
       return manualOutcome(
         args,
         "model-manual",
-        "决策卡不能由判断 agent 拒绝（decision 组只判断意图漂移）；请修正后重新提交。",
+        "决策卡不能由自动代理拒绝（decision 组只判断意图漂移）；请修正后重新提交。",
       );
     }
     // 防御性一致性（与 approve 同口径）；**不执行** approve 的逐路径/读取/证据机械门槛。
@@ -586,7 +586,7 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
   // 直接调用者未给该参数时保持旧口径（全部规范物证），向后兼容。
   const requiredReadPaths = uniquePaths(args.requiredReadPaths ?? requiredArtifacts.paths);
   if (requiredReadPaths.some((path) => !readPaths.has(path))) {
-    return manualOutcome(args, "artifact-not-read", "判断 agent 未实际读取全部必读物证；请缩小物证范围或补齐可读正文后重新提交。");
+    return manualOutcome(args, "artifact-not-read", "自动代理未实际读取全部必读物证；请缩小物证范围或补齐可读正文后重新提交。");
   }
   // required-read 超预算：不降低门槛（评审 §5.4）。
   const maxCalls = 8;

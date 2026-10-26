@@ -17,12 +17,20 @@ import {
   formatJudgeTimeoutMs,
   DEFAULT_GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_MS,
   GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_ENV,
+  WRITE_PREAUTHORIZATION_OPERATOR_ID,
   type OperatorRequestPayload,
   type OperatorJudgeResultPayload,
   type AutoReworkCallbackInfo,
   type GovernanceNextStepContext,
   type GovernanceNextStepPayload,
 } from "../../app/desktop/customer-input.ts";
+// 2026-10-25 客户新规则「写自己角色权限内的路径，直接放行」：边界内写入预授权（桌面应用层兜底）。
+import {
+  evaluateWritePreauthorization,
+  governanceSensitiveWriteCategory,
+  type WritePreauthorizationEvent,
+} from "../../app/desktop/write-preauthorization.ts";
+import type { BoundarySection1 } from "../../src/model/boundary.ts";
 import { createMainI18n } from "../../app/desktop/i18n.ts";
 import {
   buildAcceptanceTaskMessage,
@@ -2518,4 +2526,387 @@ test("2026-10-20 已呈现路径不补发排队 onExpired：第一张呈现、�
   const outcome = await p2;
   assert.equal(outcome!.outcome, "answered");
   assert.equal(expired.length, 0, "呈现过的卡不补发「排队移除」通知（不双通知）");
+});
+
+// ————— 2026-10-25 客户新规则：边界内写入预授权（桌面应用层兜底） —————
+//
+// 真机：统筹写自己边界内的 `docs/scheduling/wukong-2d-layout-v1.md` 仍弹「确认写入 1 个路径」判断代批卡。
+// 客户要求「写自己角色权限内的路径，直接放行」「边界外不给写、直接拒绝」；治理敏感类别保留各自既有确认
+// 流程（Crew 写 角色卡/** 的 appointment-write、Steward 创建 docs/flows/** 的 schedule-write、.ans、
+// 共享目录、发布/变更包等）。预授权与「替我审批/替我决策」开关无关；审计来源为 system 预授权，
+// 不是客户手批（tester / operation-*）、不是 judge 代批。
+
+function acceptedBoundary(
+  entries: Array<{ path: string; kind: "file" | "directory" | "conditional-directory"; condition?: string }>,
+): BoundarySection1 {
+  return {
+    entries: entries.map((entry) => ({
+      root: "project" as const,
+      path: entry.path,
+      kind: entry.kind,
+      ...(entry.condition !== undefined ? { condition: entry.condition } : {}),
+      purpose: "test",
+    })),
+    boundarySource: "<test>",
+    acceptance: { accepted: true, source: "test" },
+  };
+}
+
+const CONVENER_WRITE_BOUNDARY = acceptedBoundary([
+  { path: "docs/scheduling/", kind: "directory" },
+  { path: "docs/workflow.md", kind: "file" },
+  { path: "docs/governance/convener/", kind: "directory" },
+]);
+
+function writePreauthChannel(opts: {
+  judgeCalls?: string[];
+  notices?: WritePreauthorizationEvent[];
+  enabled?: boolean;
+} = {}) {
+  const pushed: OperatorRequestPayload[] = [];
+  let n = 0;
+  const channel = createCustomerInputChannel({
+    presenter: (payload) => pushed.push(payload),
+    operatorId: "tester",
+    nextId: () => `op-${++n}`,
+    writePreauthorization: evaluateWritePreauthorization,
+    onWritePreauthorization: (event) => opts.notices?.push(event),
+    judge: {
+      isGroupEnabled: () => opts.enabled === true,
+      fn: async (request) => {
+        opts.judgeCalls?.push(request.cardKind ?? "");
+        return {
+          verdict: "approve",
+          group: request.group,
+          cardKind: request.cardKind,
+          reasonCode: "sufficient",
+          engine: request.runtime,
+          value: request.card.kind === "confirm" ? { confirmed: true as const } : { selected: ["accept"] },
+        };
+      },
+    },
+  });
+  return { channel, pushed };
+}
+
+const PREAUTH_CTX = {
+  roleId: "convener",
+  projectRoot: "/proj",
+  runtime: "claude" as const,
+  governanceModel: "trio" as const,
+  writeBoundary: CONVENER_WRITE_BOUNDARY,
+  skillRoot: "/skill",
+};
+
+function writeCard(paths: string[], title = "确认写入"): CustomerInputRequest {
+  return { kind: "confirm", title, cardKind: "write", flowId: "flow-a", paths };
+}
+
+test("写盘预授权：边界内普通路径 ⇒ 直接 answered（无客户卡、无 judge、系统行/诊断、来源=system）", async () => {
+  const judgeCalls: string[] = [];
+  const notices: WritePreauthorizationEvent[] = [];
+  const { channel, pushed } = writePreauthChannel({ judgeCalls, notices, enabled: true });
+  const outcome = (await channel.customerInput(
+    writeCard(["docs/scheduling/wukong-2d-layout-v1.md"]),
+    PREAUTH_CTX,
+    { cardKind: "write", flowId: "flow-a", judgeContext: judgeContextOf("flow-a") },
+  ))!;
+
+  assert.equal(outcome.outcome, "answered", "边界内写入直接以同意结算");
+  assert.deepEqual((outcome as { value?: unknown }).value, { confirmed: true });
+  assert.equal(outcome.operatorId, WRITE_PREAUTHORIZATION_OPERATOR_ID, "来源＝系统预授权（不是客户、不是 judge）");
+  const acceptOperator: string | undefined = outcome.operatorId;
+  assert.ok(acceptOperator !== "tester" && !acceptOperator.startsWith("judge:"), "不得伪造客户手批/judge 代批");
+  assert.equal((outcome as { judge?: unknown }).judge, undefined, "不产生 judge 审计字段");
+  assert.equal(pushed.length, 0, "不呈现客户卡");
+  assert.equal(judgeCalls.length, 0, "即使开关开启也不调用判断 agent");
+  assert.equal(channel.pendingCount(), 0, "不占挂起/排队");
+  assert.equal(channel.judgingCount(), 0);
+  assert.equal(notices.length, 1, "落一条可见系统行事件");
+  assert.equal(notices[0]!.action, "accept");
+  assert.deepEqual(notices[0]!.paths, ["docs/scheduling/wukong-2d-layout-v1.md"]);
+  assert.match(notices[0]!.summary, /边界内写入预授权，已直接放行：docs\/scheduling\/wukong-2d-layout-v1\.md/);
+  assert.equal(notices[0]!.roleId, "convener");
+  assert.equal(notices[0]!.runtime, "claude");
+});
+
+test("写盘预授权：边界外路径 ⇒ 直接拒绝（无卡、无 judge；原因列出路径与该角色可写边界）", async () => {
+  const judgeCalls: string[] = [];
+  const notices: WritePreauthorizationEvent[] = [];
+  const { channel, pushed } = writePreauthChannel({ judgeCalls, notices, enabled: true });
+  const outcome = (await channel.customerInput(
+    writeCard(["src/impl/main.ts"]),
+    PREAUTH_CTX,
+    { cardKind: "write", flowId: "flow-a", judgeContext: judgeContextOf("flow-a") },
+  ))!;
+
+  assert.equal(outcome.outcome, "declined", "边界外直接拒绝");
+  assert.equal(outcome.operatorId, WRITE_PREAUTHORIZATION_OPERATOR_ID, "来源＝系统预授权拒绝（不是客户拒绝）");
+  const rejectOperator: string | undefined = outcome.operatorId;
+  assert.ok(rejectOperator !== "tester" && !rejectOperator.startsWith("judge:"), "不得伪造客户拒绝/judge deny");
+  assert.equal((outcome as { judge?: unknown }).judge, undefined);
+  assert.equal((outcome as { notPresented?: boolean }).notPresented, true, "卡片从未呈现（不是客户拒绝）");
+  const reason = outcome.outcome === "declined" ? outcome.reason ?? "" : "";
+  assert.match(reason, /系统预授权拒绝/);
+  assert.match(reason, /src\/impl\/main\.ts/);
+  assert.match(reason, /docs\/scheduling/ , "拒绝原因列出该角色此刻可写的边界");
+  assert.match(reason, /边界外不给写/);
+  assert.equal(pushed.length, 0, "不呈现客户卡");
+  assert.equal(judgeCalls.length, 0, "不调用判断 agent");
+  assert.equal(channel.pendingCount(), 0);
+  assert.equal(notices.length, 1);
+  assert.equal(notices[0]!.action, "reject");
+  assert.match(notices[0]!.summary, /系统预授权拒绝写入：src\/impl\/main\.ts/);
+});
+
+test("写盘预授权：混合（一内一外）⇒ 整体不自动通过，直接拒绝", async () => {
+  const judgeCalls: string[] = [];
+  const { channel, pushed } = writePreauthChannel({ judgeCalls, enabled: true });
+  const outcome = (await channel.customerInput(
+    writeCard(["docs/scheduling/a.md", "src/impl/b.ts"]),
+    PREAUTH_CTX,
+    { cardKind: "write", flowId: "flow-a", judgeContext: judgeContextOf("flow-a") },
+  ))!;
+  assert.equal(outcome.outcome, "declined", "混合路径整体拒绝（绝不放行半张卡）");
+  assert.equal(outcome.operatorId, WRITE_PREAUTHORIZATION_OPERATOR_ID);
+  assert.match(outcome.outcome === "declined" ? outcome.reason ?? "" : "", /src\/impl\/b\.ts/);
+  assert.equal(pushed.length, 0);
+  assert.equal(judgeCalls.length, 0);
+});
+
+test("写盘预授权：声明路径无法解析（绝对路径/..）⇒ 直接拒绝（fail-closed，不是客户拒绝）", async () => {
+  for (const bad of ["/abs/x.md", "../escape.md"]) {
+    const notices: WritePreauthorizationEvent[] = [];
+    const { channel, pushed } = writePreauthChannel({ notices });
+    const outcome = (await channel.customerInput(
+      { kind: "confirm", title: "写盘", cardKind: "write", flowId: "flow-a", paths: [bad] },
+      PREAUTH_CTX,
+    ))!;
+    assert.equal(outcome.outcome, "declined", `${bad}：无法解析 ⇒ 拒绝`);
+    assert.equal(outcome.operatorId, WRITE_PREAUTHORIZATION_OPERATOR_ID);
+    assert.match(outcome.outcome === "declined" ? outcome.reason ?? "" : "", /可解析的声明路径|无法解析/);
+    assert.equal(pushed.length, 0, "不呈现客户卡");
+    assert.equal(notices[0]?.action, "reject");
+  }
+});
+
+test("写盘预授权：preview 声明（无显式 paths）同样按边界判定；边界内直接放行", async () => {
+  const { channel, pushed } = writePreauthChannel();
+  const outcome = (await channel.customerInput(
+    { kind: "confirm", title: "写盘", cardKind: "write", flowId: "flow-a", preview: "docs/scheduling/layout.md\n\n# 布局方案\n内容…" },
+    PREAUTH_CTX,
+  ))!;
+  assert.equal(outcome.outcome, "answered");
+  assert.equal(outcome.operatorId, WRITE_PREAUTHORIZATION_OPERATOR_ID);
+  assert.equal(pushed.length, 0);
+});
+
+test("写盘预授权：治理敏感类别保持既有确认流程（不自动放行/拒绝、不调 judge）", async () => {
+  const sensitivePaths = [
+    "角色卡/impl/role-card.md", // Crew appointment-write
+    "角色卡/impl/boundary.yaml",
+    "docs/flows/flow-a.yaml", // Steward schedule-write
+    ".ans/project.json", // 应用治理记录
+    "src/common/shared/i18n/messages/zh-CN.ts", // 共享目录
+    "shared/contracts.ts",
+    "docs/scheduling/flow-a-change-v1.md", // 变更包
+    "package.json", // 发布/packaging
+  ];
+  const boundary = acceptedBoundary([
+    { path: "角色卡/", kind: "directory" },
+    { path: "docs/flows/", kind: "directory" },
+    { path: ".ans/", kind: "directory" },
+    { path: "src/common/shared/", kind: "directory" },
+    { path: "shared/", kind: "directory" },
+    { path: "docs/scheduling/", kind: "directory" },
+    { path: "package.json", kind: "file" },
+  ]);
+  for (const path of sensitivePaths) {
+    assert.ok(governanceSensitiveWriteCategory(path) !== undefined, `${path} 应归为治理敏感类别`);
+    const judgeCalls: string[] = [];
+    const { channel, pushed } = writePreauthChannel({ judgeCalls, enabled: false });
+    const pending = channel.customerInput(
+      writeCard([path]),
+      { ...PREAUTH_CTX, writeBoundary: boundary },
+      { cardKind: "write", flowId: "flow-a" },
+    );
+    assert.equal(pushed.length, 1, `${path}：仍呈现既有确认卡（不自动放行）`);
+    assert.equal(channel.pendingCount(), 1);
+    assert.equal(judgeCalls.length, 0, `${path}：开关关闭时不调 judge（既有卡片路径）`);
+    assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "confirm", confirmed: true } }).ok, true);
+    const outcome = (await pending)!;
+    assert.equal(outcome.outcome, "answered");
+    assert.equal(outcome.operatorId, "tester", `${path}：客户手批来源保持既有语义`);
+  }
+  // 团队计划 / readiness / 普通调度文档不属敏感类别（Section 1 内预授权，照常自动放行）。
+  // `docs/workflow.md` 是 Convener Section 1 的精确文件预授权（编排已确认）——不属敏感类别，
+  // 由角色边界判定（见下条用例：Convener 自动放行；其它角色边界外直接拒绝）。
+  for (const path of [
+    "docs/scheduling/flow-a-team-v1.md",
+    "docs/scheduling/flow-a-readiness-v1.md",
+    "docs/scheduling/wukong-2d-layout-v1.md",
+    "docs/governance/convener/notes.md",
+    "docs/workflow.md",
+  ]) {
+    assert.equal(governanceSensitiveWriteCategory(path), undefined, `${path} 不应被列为治理敏感`);
+  }
+});
+
+test("写盘预授权：docs/workflow.md 按角色边界判定——Convener 自动放行；其它角色边界外直接拒绝", async () => {
+  // Convener：docs/workflow.md 在其 Section 1 精确文件条目内 ⇒ 预授权，无卡、无 judge。
+  const convener = writePreauthChannel({ enabled: true });
+  const accepted = (await convener.channel.customerInput(
+    writeCard(["docs/workflow.md"]),
+    PREAUTH_CTX,
+    { cardKind: "write", flowId: "flow-a", judgeContext: judgeContextOf("flow-a") },
+  ))!;
+  assert.equal(accepted.outcome, "answered", "Convener 写自己边界内的 workflow.md ⇒ 直接放行");
+  assert.equal(accepted.operatorId, WRITE_PREAUTHORIZATION_OPERATOR_ID);
+  assert.equal(convener.pushed.length, 0, "无客户卡");
+  assert.equal(convener.channel.judgingCount(), 0);
+
+  // 其它角色（如 Rapporteur）的 Section 1 不含 docs/workflow.md ⇒ 边界外直接拒绝（不弹卡、不调 judge）。
+  const judgeCalls: string[] = [];
+  const rapporteur = writePreauthChannel({ judgeCalls, enabled: true });
+  const rejectedOutcome = (await rapporteur.channel.customerInput(
+    writeCard(["docs/workflow.md"]),
+    {
+      ...PREAUTH_CTX,
+      roleId: "rapporteur",
+      writeBoundary: acceptedBoundary([{ path: "docs/proposals/", kind: "directory" }]),
+    },
+    { cardKind: "write", flowId: "flow-a", judgeContext: judgeContextOf("flow-a") },
+  ))!;
+  assert.equal(rejectedOutcome.outcome, "declined", "其它角色边界外 ⇒ 直接拒绝");
+  assert.equal(rejectedOutcome.operatorId, WRITE_PREAUTHORIZATION_OPERATOR_ID);
+  assert.match(rejectedOutcome.outcome === "declined" ? rejectedOutcome.reason ?? "" : "", /docs\/workflow\.md/);
+  assert.equal(rapporteur.pushed.length, 0);
+  assert.equal(judgeCalls.length, 0, "不调用判断 agent");
+});
+
+test("写盘预授权：非写盘确认（未声明路径）零行为变化——照旧呈现客户卡", async () => {
+  const { channel, pushed } = writePreauthChannel();
+  const pending = channel.customerInput({ kind: "confirm", title: "确认任命？" }, PREAUTH_CTX);
+  assert.equal(pushed.length, 1, "无声明写入路径 ⇒ 走既有卡片路径");
+  assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "confirm", confirmed: true } }).ok, true);
+  assert.equal((await pending)!.outcome, "answered");
+});
+
+test("写盘预授权与开关无关：开关关闭仍自动放行；未注入预授权时行为逐字不变（旧卡照旧）", async () => {
+  // 开关关闭（enabled:false）：预授权仍直接放行（不需要「替我审批/替我决策」）。
+  const off = writePreauthChannel({ enabled: false });
+  const outcome = (await off.channel.customerInput(
+    writeCard(["docs/scheduling/wukong-2d-layout-v1.md"]),
+    PREAUTH_CTX,
+    { cardKind: "write", flowId: "flow-a" },
+  ))!;
+  assert.equal(outcome.outcome, "answered");
+  assert.equal(outcome.operatorId, WRITE_PREAUTHORIZATION_OPERATOR_ID);
+  assert.equal(off.pushed.length, 0);
+
+  // 未注入 writePreauthorization（或会话未给边界快照）：旧行为逐字不变——卡片照旧呈现。
+  const legacyPushed: OperatorRequestPayload[] = [];
+  const legacy = createCustomerInputChannel({ presenter: (payload) => legacyPushed.push(payload), operatorId: "tester" });
+  void legacy.customerInput(writeCard(["docs/scheduling/wukong-2d-layout-v1.md"]), PREAUTH_CTX);
+  assert.equal(legacyPushed.length, 1, "未注入预授权 ⇒ 既有卡片路径");
+
+  const noBoundaryPushed: OperatorRequestPayload[] = [];
+  const noBoundary = createCustomerInputChannel({
+    presenter: (payload) => noBoundaryPushed.push(payload),
+    operatorId: "tester",
+    writePreauthorization: evaluateWritePreauthorization,
+  });
+  void noBoundary.customerInput(writeCard(["docs/scheduling/wukong-2d-layout-v1.md"]), {
+    roleId: "convener",
+    projectRoot: "/proj",
+    runtime: "claude" as const,
+  });
+  assert.equal(noBoundaryPushed.length, 1, "无边界快照 ⇒ 不判定（绝不「不知道边界就放行」）");
+});
+
+test("写盘预授权：文案走共享 i18n key，随当前 locale（en-US）生成，来源/notPresented 语义不变", async () => {
+  createMainI18n("en-US");
+  try {
+    const notices: WritePreauthorizationEvent[] = [];
+    const acceptChannel = writePreauthChannel({ notices });
+    const accepted = (await acceptChannel.channel.customerInput(
+      writeCard(["docs/scheduling/layout.md"]),
+      PREAUTH_CTX,
+    ))!;
+    assert.equal(accepted.outcome, "answered");
+    assert.equal(accepted.operatorId, WRITE_PREAUTHORIZATION_OPERATOR_ID, "来源不随 locale 变化");
+    assert.match(notices[0]!.summary, /Boundary write pre-authorized; allowed: docs\/scheduling\/layout\.md/);
+
+    const rejectNotices: WritePreauthorizationEvent[] = [];
+    const rejectChannel = writePreauthChannel({ notices: rejectNotices });
+    const rejected = (await rejectChannel.channel.customerInput(
+      writeCard(["src/impl/main.ts"]),
+      PREAUTH_CTX,
+    ))!;
+    assert.equal(rejected.outcome, "declined");
+    assert.equal(rejected.operatorId, WRITE_PREAUTHORIZATION_OPERATOR_ID);
+    assert.equal((rejected as { notPresented?: boolean }).notPresented, true);
+    const reason = rejected.outcome === "declined" ? rejected.reason ?? "" : "";
+    assert.match(reason, /System pre-authorization rejected: src\/impl\/main\.ts/);
+    assert.match(reason, /outside the role(?:'s)? writable boundary/, "拒绝原因按 en-US 渲染");
+    assert.match(rejectNotices[0]!.summary, /System pre-authorization rejected: src\/impl\/main\.ts/);
+    assert.equal(rejectChannel.pushed.length, 0, "仍不呈现客户卡");
+  } finally {
+    createMainI18n("zh-CN");
+  }
+});
+
+test("写盘预授权接线（SessionManager）：确认制会话把已接受的 Section 1 快照交给通道", async () => {
+  const listing: ProjectListing = {
+    projectRoot: "/proj-write-preauth",
+    roles: [
+      {
+        roleId: "convener",
+        cardPath: "",
+        boundaryPath: "",
+        cardText: "# convener",
+        boundary: { entries: [], boundarySource: "<built-in>", acceptance: { accepted: false, source: "" } },
+        builtIn: true,
+        governanceFunction: "schedule",
+      },
+    ],
+    warnings: [],
+    hasRoles: false,
+    primaryRoleId: "liaison",
+    governanceModel: "trio",
+  };
+  let captured: CustomerInputFn | undefined;
+  const seenCtx: { writeBoundary?: BoundarySection1; skillRoot?: string; roleId: string }[] = [];
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      captured = input.customerInput;
+      return quietHandle();
+    },
+    createPiAdapterFactory: () => {
+      throw new Error("本用例不应构造 pi 适配器");
+    },
+    createDemoAdapter: () => {
+      throw new Error("本用例不应构造 demo 适配器");
+    },
+    buildProjectConfig,
+    getListing: (root) => (root === listing.projectRoot ? listing : undefined),
+    emitEvent: () => {},
+    customerInput: (_req, ctx) => {
+      seenCtx.push(ctx as { writeBoundary?: BoundarySection1; skillRoot?: string; roleId: string });
+      return { outcome: "declined", reason: "替身：拒绝" };
+    },
+  });
+  assert.equal((await mgr.open({ projectRoot: listing.projectRoot, roleId: "convener", runtime: "demo" })).ok, true);
+  assert.equal(typeof captured, "function", "确认制会话注入 customerInput");
+  await captured!({ kind: "confirm", title: "写盘" });
+  const ctx = seenCtx[0]!;
+  assert.equal(ctx.roleId, "convener");
+  assert.equal(typeof ctx.skillRoot, "string");
+  assert.ok(ctx.writeBoundary !== undefined, "边界快照应传入通道");
+  assert.equal(ctx.writeBoundary!.acceptance.accepted, true, "快照带接受证据（与开会话同一解析源）");
+  assert.ok(
+    ctx.writeBoundary!.entries.some((entry) => entry.root === "project" && entry.path === "docs/scheduling/"),
+    "convener 的 Section 1 含 docs/scheduling/",
+  );
+  await mgr.stop(null);
 });

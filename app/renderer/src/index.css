@@ -51,6 +51,14 @@
   --warning-foreground: #14171a;
   --warning-bg: #24211a;
   --warning-border: #4e422a;
+  /* 工作态专用薄荷绿（高饱和/高明度，区别于低饱和的 --primary 选中绿；深色主题）。 */
+  --working: #5ee0b0;
+  --working-bg: #14261e;
+  --working-border: #3f8a68;
+  /* 流程状态「已派发/已交付」冷色（小面积 chip/进度提示，不与工作态混淆）。 */
+  --info: #86c5e3;
+  --info-bg: #182630;
+  --info-border: #4f86a3;
   --success-bg: #22302b;
   --success-hover: #7fb29b;
   --primary-active: #5e8f7a;

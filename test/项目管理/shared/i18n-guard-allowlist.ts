@@ -54,6 +54,10 @@ export const I18N_GUARD_ALLOWLIST: readonly string[] = [
   "app/desktop/session.ts",
   // 技能路径「编排」+ `[watchdog] tick 失败…` stderr 日志行（日志不翻译）——classification §4。
   "app/desktop/watchdog.ts",
+  // 技能路径「编排」出现在 import specifier（机器路径）——classification §4。写入预授权系统行/拒绝
+  // 原因的展示文案已入共享目录（`main.customerInput.writePreauthorization.*`，2026-10-25），
+  // 桌面角色接线前本文件仍含中文；接线后仅剩机器路径，继续保留在清单。
+  "app/desktop/write-preauthorization.ts",
   // 历史文本解析正则、系统行/【系统通知】/[派发]/[回交] 协议标记、`USER_ECHO_PREFIX`——
   // classification §3/§6（渲染层只呈现，主进程负责翻译）。
   "app/renderer/src/chat/events.ts",

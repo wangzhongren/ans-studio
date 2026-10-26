@@ -29,6 +29,9 @@
 //   写盘前 su 必须先用 `request_confirmation` 把预览摆给客户；客户确认后**编排**把「已预览且校验在
 //   边界内的具体路径」发行进 writeSet，F4 拒掉一切未确认路径。CLI 缺省补终端通道
 //   （`createCliCustomerInput`：确认 y/n、勾选数字序号）。
+//   2026-10-25 客户规则（「写自己角色权限内的路径，直接放行」）：trio 五角色在**无任务级 scope 收窄**
+//   时 Section 1 全量预授权（与 `run-role.ts` 的 gate 同口径）；旧 su 的卡未声明该规则，本段确认制
+//   行为逐字不变；有任务 scope 时仍按既有确认制/预授权目录，不并入 Section 1。
 // A-4：**「提议 + 确认」的收口已删**（客户：「客户确定了才加，不要有个收口，收口去掉」）——
 //   `finalizeBootstrap`/`operatorChannel`/句柄 `finalize()` 均不存在。写出 `.ans`(pin) +
 //   `角色卡/governance-boundary.yaml` + `docs/bootstrap-manifest.md` 的**自动收尾**由
@@ -42,6 +45,11 @@ import type {
   RuntimeKind,
   CustomerInputFn,
   SessionEvent,
+  BackgroundTaskSnapshot,
+  BackgroundTaskReadOptions,
+  BackgroundTaskReadResult,
+  BackgroundTaskStopOptions,
+  BackgroundTaskStopResult,
 } from "../../model/runtime.ts";
 import { openRoleSession, isFailedSettlement, type RoleSessionDeps, type RoleSessionHandle, type RoleSessionSendOptions } from "./run-role.ts";
 import { listProject, resolveGovernanceRole, resolveRole } from "../../service/role/resolve-role.ts";
@@ -60,6 +68,7 @@ import { createCliCustomerInput } from "../../common/编排/operator-channel.ts"
 // 薄再导出：不改变 `openGovernanceSession` 既有行为。
 export {
   GOVERNANCE_LEDGER_REL,
+  ACCEPTANCE_TRIAGE_DECISION_SCHEMA,
   appendGovernanceLedger,
   readGovernanceLedger,
   refreshGovernanceLedgerSnapshot,
@@ -73,6 +82,7 @@ export type {
   GovernanceLedgerAppendResult,
   GovernancePower,
   GovernanceDecisionKind,
+  AcceptanceTriageLedgerDecision,
 } from "../../common/编排/governance-ledger.ts";
 export { evaluateGovernanceGate, parseFlowStepIds } from "../../common/编排/governance-gate.ts";
 export type {
@@ -373,6 +383,27 @@ export async function openGovernanceSession(
     getDeliveryReceipt: (id) => handle.getDeliveryReceipt!(id),
     onPersistenceChange: (listener) => handle.onPersistenceChange!(listener),
     abort: () => handle.abort!(),
+    // 会话级后台任务访问面（2026-10-25，桌面任务面板）：与底层句柄同一**纯透传**口径——
+    // 底层缺席 ⇒ 本句柄属性缺席（不伪造空实现）；stop 的结果/异常原样返回（不吞 ok:false）。
+    ...(handle.listBackgroundTasks !== undefined
+      ? { listBackgroundTasks: (): BackgroundTaskSnapshot[] => handle.listBackgroundTasks!() }
+      : {}),
+    ...(handle.readBackgroundTask !== undefined
+      ? {
+          readBackgroundTask: (
+            taskId: string,
+            readOptions?: BackgroundTaskReadOptions
+          ): BackgroundTaskReadResult | undefined => handle.readBackgroundTask!(taskId, readOptions),
+        }
+      : {}),
+    ...(handle.stopBackgroundTask !== undefined
+      ? {
+          stopBackgroundTask: (
+            taskId: string,
+            stopOptions?: BackgroundTaskStopOptions
+          ): Promise<BackgroundTaskStopResult> => handle.stopBackgroundTask!(taskId, stopOptions),
+        }
+      : {}),
     governanceRoleId: govId,
     ...(spec !== undefined ? { governanceFunction: spec.function } : {}),
     boundarySource: resolved.boundarySource,
@@ -450,6 +481,14 @@ export async function runGovernSession(
   const roleSpec = governanceRoleOf(handle.governanceRoleId);
   const roleLabel = roleSpec?.displayName ?? "内置治理角色";
   const preauthorizedDirs = roleSpec?.preauthorizedDirs ?? LEGACY_SU_PREAUTHORIZED_DIRS;
+  // 2026-10-25 客户规则（「写自己角色权限内的路径，直接放行」）：**无任务级 scope 收窄**时，trio
+  // 五角色的写盘预授权来源是 **Section 1 条目**（含 `docs/workflow.md` 这类精确文件，不再是
+  // preauthorizedDirs 的目录子集）；有 scope 时保留既有 preauthorizedDirs 子集（不并入 Section 1，
+  // 与 openRoleSession 的 gate 同口径）。旧 su 仍是四棵预授权目录（2026-10-16 裁定，A-3 逐字不变）。
+  const section1Preauthorized = roleSpec !== undefined && handle.scope === undefined;
+  const preauthorizedWrites: readonly string[] =
+    section1Preauthorized ? roleSpec!.entries.map((entry) => entry.path) : preauthorizedDirs;
+  const preauthorizedLabel = section1Preauthorized ? "Section 1 预授权" : "预授权目录";
   // 治理职能 → 权力文案（数据驱动；Liaison 是沟通权，不是决定权）。
   const functionLabel =
     roleSpec !== undefined
@@ -473,7 +512,8 @@ export async function runGovernSession(
     kind: "message",
     summary: confirmationMode
       ? `客户确认制：${roleLabel} 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝` +
-        `（预授权目录 ${preauthorizedDirs.map((dir) => `${dir.endsWith("/") ? dir : `${dir}/`}`).join("、")} 除外——属初始写集、无需确认可直接写）。` +
+        `（${preauthorizedLabel} ${preauthorizedWrites.map((dir) => `\`${dir}\``).join("、")} 属初始写集、无需逐次确认可直接写；` +
+        "治理敏感写入仍由治理门禁要求既有客户决定卡）。" +
         (roleIds.length > 0 ? `（目标角色：${roleIds.join("、")}）` : "")
       : handle.scope
         ? `治理边界条件目录已声明：conditions=[${handle.scope.conditions.join(", ")}]；` +
@@ -490,6 +530,7 @@ export async function runGovernSession(
           canWrite: confirmationMode || handle.scope === undefined,
           confirmFirst: confirmationMode,
           spec: roleSpec,
+          section1Preauthorized,
           preauthorizedDirs,
         }),
     );
@@ -680,6 +721,9 @@ function buildGovernPrompt(
     canWrite: boolean;
     confirmFirst: boolean;
     spec?: BuiltInGovernanceRoleSpec;
+    /** 无任务级 scope 收窄 ⇒ Section 1 全量预授权（与编排 gate 同口径）。 */
+    section1Preauthorized: boolean;
+    /** 有任务 scope 时仍免确认的既有预授权目录（trio 注册表；su 分支不用本项）。 */
     preauthorizedDirs: readonly string[];
   },
 ): string {
@@ -723,13 +767,24 @@ function buildGovernPrompt(
   // —— trio：注册表驱动的角色纪律（不写「已批准」；不自我回执客户决定）——
   const spec = opts.spec;
   const writable = spec.entries.map((entry) => `\`${entry.path}\``).join("、");
+  // 2026-10-25 客户规则（原文「写自己角色权限内的路径，直接放行」）：**无任务 scope 收窄**时
+  // Section 1 内写入是预授权，直接写、不逐次确认；`request_confirmation` 只保留给治理敏感写入
+  // （角色卡 / 边界变更、他人写集、`docs/flows/**` 流程 YAML / 治理账本、发布 / 变更包等）与需要
+  // 客户拍板的事项——这些仍由治理门禁在写盘前要求既有客户决定卡，预授权不绕过任何门禁。
+  // 有任务 scope 时保持旧确认制口径（既有 `preauthorizedDirs` 子集照旧免确认，其余须确认）。
   const preauth = opts.preauthorizedDirs.map((dir) => `\`${dir}\``).join("、");
   const confirmRule = opts.confirmFirst
-    ? "\n**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（内容摘要 + **将要写出的具体路径**）" +
-      "请客户确认；拿到 confirmed:true 后才写；未获同意/通道不可用 → 不写盘、如实告知。" +
-      (opts.preauthorizedDirs.length > 0
-        ? `（预授权目录 ${preauth} 属初始写集，可直接写、无需确认；其余路径未确认 = 拒绝。）`
-        : "（本角色没有预授权目录：所有写盘都须先确认。）")
+    ? opts.section1Preauthorized
+      ? "\n**写入预授权（客户 2026-10-25 规则）**：你的 Section 1 边界内写入是预授权的——直接用 " +
+        "`write_file` / `edit_file` 写，**不需要逐次发 `request_confirmation` 写卡**；写权上界仍由 WriteGate " +
+        "的边界判定保证（边界外照旧拒绝）。`request_confirmation` 只保留给治理敏感写入与需要客户决定的动作：" +
+        "角色卡 / 边界变更、共享目录或他人写集、`docs/flows/**` 流程 YAML / 治理账本、发布 / 变更包等仍按" +
+        "既有禁止与审批规则处理（如 appointment-write / schedule-write 仍须对应客户决定卡）。"
+      : "\n**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（内容摘要 + **将要写出的具体路径**）" +
+        "请客户确认；拿到 confirmed:true 后才写；未获同意/通道不可用 → 不写盘、如实告知。" +
+        (preauth.length > 0
+          ? `（既有预授权目录 ${preauth} 属初始写集，可直接写、无需确认；其余路径未确认 = 拒绝。）`
+          : "（本角色没有预授权目录：所有写盘都须先确认。）")
     : "";
   const head =
     `任务 ${taskId}：你是内置治理角色「${spec.displayName}」，在注册表的 Section 1 内工作（可写：${writable}）。` +

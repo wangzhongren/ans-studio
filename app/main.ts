@@ -43,6 +43,10 @@ import {
 // 客户交互通道（A-5，2026-10-12）：su 的 request_confirmation / request_choice 经它摆到聊天流里的交互卡
 // 并取回客户裁决（per-window pending Map + **按请求快照校验回包**——渲染进程输入不可信）。
 import { createCustomerInputChannel, type AutoReworkCallbackInfo } from "./desktop/customer-input.ts";
+// 边界内写入预授权（2026-10-25 客户新规则「写自己角色权限内的路径，直接放行」）：判定纯逻辑在
+// write-preauthorization.ts（边界唯一来源 = 门禁 resolveWrite）；本文件只接线——通道在呈现卡片/调用
+// 判断之前求值，accept/reject 直接结算并落一条可见系统行（既有 delivery-note 事件行）。
+import { evaluateWritePreauthorization } from "./desktop/write-preauthorization.ts";
 // 治理下一步（2026-10-18 客户修正）：客户决定成功后由应用**后台**把下一步任务派给目标治理角色
 // （不打开/切换当前会话）。推导与文案在 governance-advance.ts；派发动作在 Interface（advanceGovernanceFlow）。
 import type { GovernanceNextStepContext, GovernanceNextStepPayload } from "./desktop/governance-advance.ts";
@@ -485,6 +489,9 @@ function registerIpc(win: BrowserWindow): void {
   let routeAcceptanceAutoRework:
     | ((info: AutoReworkCallbackInfo) => void)
     | undefined;
+  // 2026-10-25 验收分诊：客户通道的**呈现前闸**句柄——desktop 建立后接到 `evaluateAcceptanceTriage`
+  // （与上两个同模式；在此之前不会有验收卡到达——会话尚未开启）。缺省 ⇒ 通道不分诊（旧行为）。
+  let acceptanceTriageGate: DesktopInterface["evaluateAcceptanceTriage"] | undefined;
   const customerChannel = createCustomerInputChannel({
     presenter: (payload) => {
       if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现交互请求");
@@ -511,6 +518,25 @@ function registerIpc(win: BrowserWindow): void {
     onAutoRework: (info) => {
       if (win.isDestroyed()) return;
       routeAcceptanceAutoRework?.(info);
+    },
+    // 2026-10-25 验收分诊（呈现前闸）：只对 cardKind=acceptance 的请求调用；desktop 建立后接线。
+    // gate 未接线 ⇒ proceed（既有验收卡路径逐字不变）；分诊卡/结算/路由全在 Interface。
+    acceptanceTriage: (facts) =>
+      acceptanceTriageGate !== undefined ? acceptanceTriageGate(facts) : Promise.resolve({ action: "proceed" }),
+    // 2026-10-25 客户新规则「写自己角色权限内的路径，直接放行」：写盘确认在**呈现卡片/调用判断之前**
+    // 做边界预授权判定（边界唯一来源 = 门禁 resolveWrite；会话边界快照由 SessionManager 提供）。
+    // accept/reject 直接结算（不弹卡、不调 judge）；治理敏感类别返回 confirm ⇒ 走既有卡片/判断路径。
+    writePreauthorization: evaluateWritePreauthorization,
+    // 预授权结算的可见系统行（既有事件流的 delivery-note 系统行；渲染侧已有该样式，不新增通道/不改 UI）。
+    onWritePreauthorization: (event) => {
+      if (win.isDestroyed()) return;
+      if (event.runtime === undefined) return;
+      emitEvent({
+        roleId: event.roleId,
+        projectRoot: event.projectRoot,
+        runtime: event.runtime,
+        event: { kind: "message", summary: event.summary, detail: { source: "delivery-note" } },
+      });
     },
     // 判断 agent（2026-10-18 双开关评审 §8.1/§8.3）：按卡种所属组读**各自**开关（主进程权威）；
     // 两开关互不影响；判断闭包由每会话上下文（`ctx.governanceJudge`）提供。
@@ -685,6 +711,9 @@ function registerIpc(win: BrowserWindow): void {
     },
     // 客户交互通道（A-5）：仅内置治理角色（su）会话消费（见 session.ts 的注入判据）。
     customerInput: customerChannel.customerInput,
+    // 2026-10-25 验收分诊：重启恢复时由 Interface 以稳定 id 重推分诊卡（同通道、同 pending/作答校验；
+    // 无活体验收请求时只执行处置，不伪造 customer.decision）。
+    presentAcceptanceTriageCard: customerChannel.presentAcceptanceTriageCard,
     // G-2/W5（2026-10-16 客户批准）：恢复确认卡通道（仅 su 的 propose_recovery 桥消费；缺省 ⇒ 未接线
     // 即「未获执行」如实回执——fail-closed，绝不「没人问就执行」）。
     recoveryConfirm,
@@ -765,6 +794,8 @@ function registerIpc(win: BrowserWindow): void {
       mainDiagnostic.error("acceptance.rework.auto.failed", error, { flowId: info.flowId, source: info.source });
     });
   };
+  // 2026-10-25 验收分诊：呈现前闸接到 Interface（只接线；gate 内部已 fail-safe 回落既有验收卡）。
+  acceptanceTriageGate = (facts) => desktop.evaluateAcceptanceTriage(facts);
   desktop.startWatchdog(); // G-2/W1：看护周期 tick（默认 30s，仅 env 可调）——窗口注册后启动
   win.on("closed", () => {
     desktop.stopWatchdog(); // G-2/W1：窗关停 tick（看护绝不跨窗口残留）
@@ -825,6 +856,32 @@ function registerIpc(win: BrowserWindow): void {
   registerHandler("session:live", () => desktop.listLiveSessions());
   registerHandler("session:live-views", () => desktop.listLiveSessionViews());
   registerHandler("session:history-get", (_event, input) => desktop.getSessionHistory(input));
+  // —— 会话级后台任务（2026-10-25，桌面任务面板）：聚合列表 / 读日志 / 停止 ——
+  // 渲染进程输入不可信：**来源校验在本 handler**（同 app:recovery-state 等既有模式）；参数校验与失败回执
+  // 全在 Interface（返回 `{ok:false,...}` 而不是抛）。任务只存在于各会话内存——不缓存、不持久化、不伪造。
+  registerHandler("background-tasks:list", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
+    return desktop.listBackgroundTasks(input);
+  });
+  registerHandler("background-tasks:read", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
+    return desktop.readBackgroundTask(input);
+  });
+  registerHandler("background-tasks:stop", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
+    return desktop.stopBackgroundTask(input);
+  });
+  // —— 流程状态只读（2026-10-25）：扫描 `<projectRoot>/docs/flows/*.yaml` 供渲染侧展示步骤进度 ——
+  // 渲染进程输入不可信：**来源校验在本 handler**；参数校验与只读扫描全在 Interface
+  // （非空 projectRoot 且目录存在；坏文件逐文件回 errors；不写文件/不碰账本/不改 revision）。
+  registerHandler("flow:status", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
+    const projectRoot =
+      input !== null && typeof input === "object" && typeof (input as { projectRoot?: unknown }).projectRoot === "string"
+        ? (input as { projectRoot: string }).projectRoot
+        : "";
+    return desktop.flowStatus(projectRoot);
+  });
   // B-1：Markdown 链接外开——渲染进程输入经 Interface 校验（仅 http/https）后交系统浏览器。
   registerHandler("app:open-external", (_e, input) => desktop.openExternal(input));
   // K-2：输入区图片——选图（主进程读文件）与粘贴/拖入字节校验（渲染进程不碰文件）；

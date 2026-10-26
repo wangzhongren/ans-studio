@@ -497,11 +497,13 @@ export type { CreateGovernanceJudgeOptions } from "../../common/编排/governanc
   - `paths`/`pathProbes`：confirm 卡从 title/preview/detail 用 `extractPathCandidates` 提取候选，再用与 issuer 同一份 `resolveWrite`（`writeSet:[candidate]` + 会话 conditions）探测；`allowedPathRoots` 取角色边界 project 条目；`forbiddenPaths` 取 trio 注册表；`artifacts` 按 cardKind/来源角色（`latestVersionedArtifact` + `docs/flows/<id>.md`）；`recommendedRoleIds` 解析最新提名文件；`facts` 由账本快照提炼。
   - 计算失败 → `unavailableReason` + `facts.ledgerErrors:1`；`recordCustomerDecision` 仍用 `originalMetadata` 的 toolCallId/turnId。
 - `recordCustomerDecision`：`answered && out.judge` → `decisionEvidence.kind:"judge"` + 有界 `judge`；`actorRoleId`/`power` 不变；`judge.group` 与 `governanceCardGroup(cardKind)` 不符只记 `governance-judge.group.mismatch`、不翻转决定；账本失败另记 `governance-judge.audit.failed`。
+- `recordCustomerDecision`（2026-10-25 写入预授权）：`operatorId` 以 `system:` 开头（桌面 `system:write-preauthorization`）走独立分支——接受写 `decisionEvidence.kind:"system-preauthorization"` + `operatorId`，**不写** `decisionKind`/`targetRoleIds`，`customerDecision` 只记 `accepted`；拒绝**不写** `customer.decision`（无 unclassified/none 污染），只记诊断 `governance.preauthorization.declined`。真实客户与 `judge:` 路径逐字不变。系统预授权条目对 `latestAcceptanceDecision`/`evaluateFlowCompletion` 不可见。
 - single/su/项目角色：不计算 `judgeContext`、不注入 `governanceJudge`，能力矩阵逐字不变。
 
 ### 账本（`governance-ledger.ts`）
 
 - `decisionEvidence.kind` 增 `"judge"`；`decisionEvidence.judge?: GovernanceJudgeAudit`（有界）。旧读者忽略；门禁只读 `decisionKind/customerDecision`（已核对不读 `decisionEvidence`）。
+- `decisionEvidence.kind` 增 `"system-preauthorization"`（2026-10-25 写入预授权）+ `decisionEvidence.operatorId?: string`（`system:` 前缀）。写入/读取校验：该 kind 必须带 system: operatorId、**禁止** `decisionKind`、`customerDecision` 必须为 `accepted`、禁止 `judge`——收口门不可能把系统预授权读成客户决定/未结算决定。
 
 ### 交互工具回执（`provider/runtime/tools.ts`）
 
@@ -632,3 +634,48 @@ Pipeline 公共出口 `src/pipeline/orchestration/run-role.ts` 再导出（桌�
 - `node --test "test/编排/**/*.test.ts"`：796 tests / 795 pass / 1 fail（既有 Windows symlink EPERM `shell-authorized-routine.test.ts:103`，基线一致）；`npm run typecheck` exit 1，唯一错误 `app/desktop/interface.ts(1125,5)`（并行桌面窗口 D5 待消费 `1|2|3`）。
 - 定向：`team-plan` 29/29、`directory-conformance` 15/15。
 - 已知限制：V12/e2e/全量 T3 回归归 D5/D6/D7；不做任务级 `writeDirs`；Reduce 豁免模块实现目录归属；单文件目录为启发式 warning；realpath 仅在给出 `projectRoot` 时核对。文档状态 `implemented-unverified`，未提交/暂存/推送。
+
+## 2026-10-25 独立复核能力透传与验收标准步骤收口（编排 A/B 面）
+
+状态：**implemented-unverified**（编排定向测试与 typecheck 通过；桌面接线、e2e、独立验收未做）。
+
+### A. `request_acceptance` 能力透传
+
+- `AdapterCapabilities.requestAcceptance?: RequestAcceptanceFn`；`openRoleSession` 输入同名可选字段。
+  **只在内置治理角色会话**并入 capabilities（`builtInGovernance`；项目角色即便误给也不注入）；未提供 ⇒ 缺席。
+- `createRuntimeAdapterFactory` 把 `capabilities.requestAcceptance` 并入运行时选项（与 `flowGet`/`flowStepUpdate` 同形）；
+  运行时核心据此注册 `request_acceptance`，缺席则不注册（结构性 fail-closed）。
+- 类型单一来源 `src/model/runtime.ts`：`RequestAcceptanceInput` / `RequestAcceptanceResult`（code 冻结枚举）/
+  `RequestAcceptanceFn`。编排只透传，不写 flow/账本、不做治理判定；**请求复核 ≠ 客户批准**。
+
+### B. `completeAcceptanceCriteriaStep`（公共出口 `src/pipeline/orchestration/flow-state.ts`）
+
+```ts
+completeAcceptanceCriteriaStep(input: { projectRoot: string; flowId: string }):
+  Promise<CompleteAcceptanceCriteriaStepResult>;
+
+interface CompleteAcceptanceCriteriaStepResult extends FlowToolResult {
+  evidence?: { kind: "artifact"; ref: string };
+  criteriaPath?: string;
+  alreadyDone?: boolean;
+}
+```
+
+- 只处理精确 id `acceptance-criteria`；缺步骤 `acceptance-criteria-step-missing`；kind 非 artifact
+  `acceptance-criteria-kind-unsupported`；已 done ⇒ `ok/idempotent/alreadyDone/code:"already-done"`（不写盘）；
+  仅 `pending`/`dispatched` 可收口，其它状态 `acceptance-criteria-step-terminal`。
+- 标准：复用 `latestAcceptanceCriteriaRelPath`（`docs/acceptance/<flowId>-criteria-vN.md` 最高 N）；
+  缺失/不可读 `acceptance-criteria-missing`；不可安全观察 `acceptance-criteria-unobservable`。
+- 账本：补 `artifact.observed{actorRoleId:"app",power:"app",artifactPath,artifactSha256,flowId}`（同 path+sha 不重复）；
+  不写 `customer.decision`。错误码 `ledger-unavailable` / `ledger-write-failed` / `insufficient-evidence` / `write-failed`。
+- 候选 YAML 复核 + `validateFlowEvidence` 沿用 flow-service 内部同一套（只过滤目标 stepId issue）；
+  per-project 串行队列 + 原子写；事件 `flow.acceptance-criteria.completed`，view actor `app/app`。
+- 不新增 `FlowStepKind`、不改步骤权限规则、不注册为角色工具、不改其它步骤/owner/kind。
+
+### 证据（2026-10-25，win32 / Node v24.22.1）
+
+- `npm run typecheck` → exit 0。
+- `node --test "test/编排/**/*.test.ts"` → 908 tests / 906 pass / 1 fail / 1 skip；唯一红＝既有 Windows
+  symlink `shell-authorized-routine.test.ts` 创建链接 `EPERM`（基线一致，本批未触碰）。
+- 定向：`flow-service.test.ts` 84（83 pass + 1 既有 skip；含新增 7 例）、`request-acceptance.test.ts` 2/2。
+- 桌面消费：`app/desktop/interface.ts` 从本公共出口 import；本角色未改 `app/**`、未 commit/push。

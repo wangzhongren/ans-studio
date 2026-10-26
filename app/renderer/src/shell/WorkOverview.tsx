@@ -23,6 +23,8 @@ import {
 } from "@/chat/work-view";
 import { findRole, roleDisplayName } from "@/chat/role-view";
 import { QueuePanel } from "@/shell/QueuePanel";
+import { FlowStatusPanel } from "@/shell/FlowStatusPanel";
+import { BackgroundTasksPanel } from "@/shell/BackgroundTasksPanel";
 import { useLocaleState, useT } from "@/i18n";
 
 /** 工作概览只做队列预览：当前工作 + 前 3 条排队；全量在「队列」子视图。 */
@@ -113,6 +115,8 @@ export function WorkOverview({ roleId }: { roleId: string | null }) {
   const runningByRole = useChatStore((s) => s.runningByRole);
   const paneVersions = useChatStore((s) => s.paneVersions);
   const openQueue = useDrawerStore((s) => s.openQueue);
+  const projectRoot = useChatStore((s) => s.projectRoot);
+  const runtime = useUiStore((s) => s.runtime);
   const role = findRole(roles, roleId);
   const roleName = role ? roleDisplayName(role, locale) : t("ui.role.noneSelected");
 
@@ -229,6 +233,10 @@ export function WorkOverview({ roleId }: { roleId: string | null }) {
           )}
         </WorkSection>
       </div>
+
+      <FlowStatusPanel projectRoot={projectRoot} />
+
+      <BackgroundTasksPanel projectRoot={projectRoot} runtime={runtime} />
 
       <section
         className={"recent-reports" + (reports.length === 0 ? " is-empty" : "")}

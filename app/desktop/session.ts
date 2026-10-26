@@ -1,5 +1,5 @@
 import { RuntimeDeliveryError } from "../../src/model/runtime.ts";
-import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1, DeliveryReceiptQueryV1, RuntimeDeliveryReceiptV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1 } from "../../src/model/runtime.ts";
+import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1, DeliveryReceiptQueryV1, RuntimeDeliveryReceiptV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1, BackgroundTaskSnapshot, BackgroundTaskReadOptions, BackgroundTaskReadResult, BackgroundTaskStopOptions, BackgroundTaskStopResult } from "../../src/model/runtime.ts";
 // app/desktop/session.ts
 // 桌面应用的「会话」装配（纯逻辑，不依赖 electron，可在 node 下单测）。
 //
@@ -54,11 +54,11 @@ import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, Repo
 //    缺件（`deps.shellArming` 或 `deps.shellOperatorChannel` 为 undefined）⇒ **不传** ⇒ 不 arm
 //    （能力缺席 = fail-closed，绝不放宽）。
 
-import type { Acceptance } from "../../src/model/boundary.ts";
+import type { Acceptance, BoundarySection1 } from "../../src/model/boundary.ts";
 import type { GovernanceModel, ProjectConfig } from "../../src/model/role.ts";
 // 三权（评审 §5.1/§5.6）：内置治理角色 id 判定 / 注册表统一来自门禁引擎的 Service 公开出口
 // （桌面**不复制**第二份 id 列表，也不直接导入 `src/common/门禁引擎/` 私有模块）。
-import { isBuiltInGovernanceRoleId } from "../../src/service/boundary/resolve-boundary.ts";
+import { isBuiltInGovernanceRoleId, resolveBoundary } from "../../src/service/boundary/resolve-boundary.ts";
 // 治理账本与派发门禁（评审 §5.6/§5.7/§6.2）：只经编排的 Pipeline 公共出口（`govern-session.ts`
 // 薄再导出）消费——桌面**不直接导入**编排私有 `common/`（§十一.3）。
 import {
@@ -142,6 +142,9 @@ import {
 // 运行时核心 R2 handler 落树后按需重定向（interface 点见 api-spec；本层不复制第二份判定）。
 import { isRecoveryAction, type RecoveryConfirmPresenter } from "./recovery-channel.ts";
 import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn } from "../../src/model/runtime.ts";
+// 2026-10-25 独立复核请求（request_acceptance）：能力/回执形状唯一来源＝契约家 `model/runtime.ts`
+// （只读导入、不复制；注入端只做项目绑定，校验/派发由 Interface 能力实现）。
+import type { RequestAcceptanceFn, RequestAcceptanceInput, RequestAcceptanceResult } from "../../src/model/runtime.ts";
 // W6-B（四角色评审 §5.3/§5.4）：意图交接与澄清的冻结形状（§4 契约家）——只读导入、不复制。
 // 编排（run-role）已完成校验/去重/每轮一次/两轮上限并在成功回执后写账本；本层只是**投递端**。
 import type {
@@ -315,6 +318,12 @@ export interface SendResult {
   queued?: boolean;
   /** 入队位次（`queued:true` 时给出）。 */
   position?: number;
+  /**
+   * **同一应用任务已投递/已入队，本次没有再次投递**（2026-10-25 真机重复投递修复）：
+   * 仅对带稳定 `clientMessageId`（`ans-app-task:` 前缀）的应用任务成立——同文＝同一任务，
+   * 重建前后至多投递一次；真实客户消息不走此判据（同文重复发送仍是两个意图）。
+   */
+  duplicate?: true;
 }
 
 export interface StopResult {
@@ -329,6 +338,57 @@ export interface WithdrawResult {
   summary?: string;
   error?: string;
 }
+
+// —————————————— 会话级后台任务聚合（2026-10-25，桌面任务面板 B） ——————————————
+//
+// 运行时 `RoleSession` 已提供三个**可选**方法（`listBackgroundTasks?/readBackgroundTask?/stopBackgroundTask?`，
+// `src/model/runtime.ts`），编排 `RoleSessionHandle` 原样透传。本层只做**按项目×引擎的聚合与精确寻址**：
+//  · 任务表/日志/pid 只在各会话内存，**不缓存、不持久化、不伪造**；跨会话聚合只是一次读取的快照拼接；
+//  · 会话句柄没有 `listBackgroundTasks` ⇒ 跳过该角色；该项目×引擎没有任何会话具备能力 ⇒ 空列表 +
+//    `unavailable:true`（UI 据此区分「当前没有任务」与「该运行时/会话不支持」）；
+//  · read/stop 一律以 `projectRoot+roleId+runtime` 精确寻址；找不到会话或能力缺席如实失败；
+//  · 底层 stop 的 `{ok:false, reason:"unknown-task"|"closed"|"timeout"}` 与异常**不吞、不改写为成功**。
+
+/** 聚合列表中的单条任务：运行时快照 + 所属角色/引擎（同一项目×引擎可聚合多个角色）。 */
+export interface BackgroundTaskView extends BackgroundTaskSnapshot {
+  roleId: string;
+  runtime: RuntimeKind;
+}
+
+/** 列表回执：`unavailable` 区分「没有任务」与「没有具备能力的活会话」。参数非法时 `ok:false`。 */
+export type BackgroundTasksListReply =
+  | { ok: true; projectRoot: string; runtime: RuntimeKind; tasks: BackgroundTaskView[]; unavailable: boolean }
+  | { ok: false; error: string };
+
+/** 读取日志入参（寻址三元组与 taskId 必填；`stream`/`tailLines` 与运行时契约同名同义）。 */
+export interface BackgroundTaskReadInput {
+  projectRoot: string;
+  runtime: RuntimeKind;
+  roleId: string;
+  taskId: string;
+  stream?: "stdout" | "stderr" | "both";
+  tailLines?: number;
+}
+
+/** 读取回执：成功包底层结果（同一引用）；未知任务（底层 `undefined`）/无会话/无能力如实失败，不伪造内容。 */
+export type BackgroundTaskReadReply = { ok: true; result: BackgroundTaskReadResult } | { ok: false; error: string };
+
+/** 停止入参（寻址同上；`force` 同 `stop_background_task`）。 */
+export interface BackgroundTaskStopInput {
+  projectRoot: string;
+  runtime: RuntimeKind;
+  roleId: string;
+  taskId: string;
+  force?: boolean;
+}
+
+/**
+ * 停止回执：底层结果**原样**返回（成功 / `unknown-task` / `closed` / `timeout`，不改写成成功）。
+ * 桌面层额外两种如实失败：找不到会话 ⇒ `reason:"closed"`（会话不可用）；句柄无能力 ⇒ `reason:"unavailable"`。
+ */
+export type BackgroundTaskStopReply =
+  | BackgroundTaskStopResult
+  | { ok: false; reason: "unavailable"; message: string };
 
 // （A-5：finalize 面已删——提议/确认/手动收口不复存在；产物收尾由编排在 settle 后自动完成，见文件头。）
 
@@ -347,6 +407,8 @@ export interface SessionManagerDeps {
       customerInput?: CustomerInputFn;
       /** **派发任务能力**（H-1）：仅内置治理角色（su）会话注入（见 SessionManager.open 与 routeDispatch）。 */
       dispatchTask?: DispatchTaskFn;
+      /** **独立复核请求能力**（2026-10-25 request_acceptance）：仅内置治理角色会话注入（见 SessionManager.open）。 */
+      requestAcceptance?: RequestAcceptanceFn;
       /**
        * **意图交接投递端**（W6-B，四角色评审 §5.3）：仅 trio 联络官（`governanceFunction === "liaison"`）
        * 会话注入。编排（run-role）先做文件/去重/每轮一次校验，成功回执后写 `intent.handed-off`；
@@ -538,6 +600,13 @@ export interface SessionManagerDeps {
    * （发行 writeSet 在编排 `confirmed-writes.ts`；写不写在 gate/工具）。
    */
   customerInput?: DesktopCustomerInputFn;
+  /**
+   * **独立复核请求能力**（2026-10-25 `request_acceptance`）：绑定项目的应用侧实现（`projectRoot` 由本层
+   * 按会话补入，工具载荷只带 `flowId?`/`note?`）。校验/派发/flow 收口全在实现内；**请求复核 ≠ 客户批准**。
+   * **仅内置治理角色（`role.builtIn === true`）会话注入**——项目角色不注入（同 `customerInput` 判据）；
+   * 编排再按 `builtInGovernance` 收口。缺省 ⇒ 不注入 ⇒ 工具不注册（结构性 fail-closed）。
+   */
+  requestAcceptance?: (projectRoot: string, input: RequestAcceptanceInput) => Promise<RequestAcceptanceResult>;
   /**
    * **实时重枚举并刷新共享角色缓存（2026-10-13 首轮寻址修复）**：`routeDispatch` 缓存 miss 时调用一次——
    * 实现应为「与界面 `listProject` **同一路径**读盘枚举 + 更新**同一份**共享缓存」（Interface 层给出）。
@@ -746,6 +815,8 @@ export interface PersistedDeliveryItemV1 {
     enqueuedAt: string;
     flowId?: string;
     deliveryId?: string;
+    /** 应用任务的稳定身份（2026-10-25）：跨重启恢复后与新的同任务调用相认（「已投递」标记本身只在内存）。 */
+    clientMessageId?: string;
     handback?: TaskHandback;
     report?: RuntimeReportSnapshotV1;
     liveReport?: RuntimeLiveReportViewV1;
@@ -772,6 +843,28 @@ export interface DeliveryQueueRestoreReport {
 function shortenText(s: string, n: number): string {
   const flat = String(s == null ? "" : s).replace(/\s+/g, " ").trim();
   return flat.length > n ? `${flat.slice(0, n)}…` : flat;
+}
+
+/**
+ * **应用任务稳定身份前缀**（2026-10-25 真机重复投递修复：「role-readiness 派发任务」在重建前后
+ * 出现两条 user 消息、账本却只有一条 `dispatch.accepted`）。
+ *
+ * 应用派发的任务（派发/验收/协调/意图交接等）没有调用方自带的稳定 id；`sendBackground` 每次入队都用
+ * 随机键时，同一任务的两次应用侧调用（两条链路/一次重试）会被当成两条独立消息重复投递。本层为这类
+ * 任务生成**内容稳定键**（项目+目标角色+引擎+正文 sha256，或派发的既有内容 `dedupKey` sha256）：
+ *  · 同任务同键——重建后续投、应用侧重复调用、重启后恢复的队列项都能认出来，**至多投递一次**；
+ *  · 真实客户消息不生成该键（渲染侧 UUID 或缺失）——「同文重复发送是两个意图」的语义逐字不变；
+ *  · 显式**重新入队**（`enqueueDelivery`，如返工后同文再派）会清除「已投递」标记——返工回路仍可用。
+ *
+ * 前缀只用于本层身份判别（不构成权限/授权语义）；渲染侧传来的任意 `clientMessageId` 不会命中该前缀
+ * （随机 UUID），因此不会被误当成应用任务。
+ */
+const APP_TASK_CLIENT_MESSAGE_ID_PREFIX = "ans-app-task:";
+/** 「已投递」应用任务标记的内存上界（FIFO 淘汰；防长跑进程无界增长）。 */
+const MAX_DELIVERED_APP_TASK_IDS = 1024;
+
+function isAppTaskClientMessageId(value: unknown): value is string {
+  return typeof value === "string" && value.startsWith(APP_TASK_CLIENT_MESSAGE_ID_PREFIX) && value.length > APP_TASK_CLIENT_MESSAGE_ID_PREFIX.length;
 }
 
 /** 「替我审」`turnText` 上界（PM 评审 §8.1：≤4KB；超出截断，不据此 manual）。 */
@@ -964,6 +1057,18 @@ export class SessionManager {
   private deliveryPersistSeq = 0;
   private readonly deliveredDeliveryKeys = new Set<string>();
   /**
+   * **应用任务「已投递」标记（2026-10-25 真机重复投递修复；只在内存）**：稳定 `clientMessageId`
+   * （`ans-app-task:` 前缀）→ 本进程内已 ACK/投递成功。判据：
+   *  · **ACK 即已投递**（`sendDelivery` 的 onTurnStarted 同步回执）或发送成功——之后同一任务的重建续投/
+   *    应用侧重复调用**一律不再发送**；失败但从未 ACK 的仍按既有语义保留重试；
+   *  · **跨重启语义**：标记不落盘。重启后持久队列里的 in-flight/queued 项仍按既有「重启续跑」重投
+   *    一次（无法证明上一进程已投递）；但同一应用任务的**内容稳定键**会随队列项持久化，重启后新的
+   *    同任务调用可与恢复项相认（不重复入队）。
+   *  · **显式重新入队**（返工同文再派）清除对应键——送达后同文再派仍放行（既有返工回路不变）。
+   *  · 有界 FIFO（`MAX_DELIVERED_APP_TASK_IDS`）防长跑进程无界增长；淘汰最旧键只影响极旧同文的去重。
+   */
+  private readonly deliveredAppTaskIds = new Set<string>();
+  /**
    * 持久化**武装**标志：只有在 `restorePersistedDeliveries()` 读过磁盘（或确认文件不存在）后才允许写——
    * 防止启动早期（恢复之前）的一次入队用空内存快照覆盖磁盘上的待恢复条目。
    */
@@ -1021,6 +1126,99 @@ export class SessionManager {
   liveSessionViews(): { projectRoot: string; roleId: string; runtime: RuntimeKind; profileRevision: number }[] {
     return [...this.sessions.values()].map((entry) => ({ projectRoot: entry.projectRoot, roleId: entry.roleId, runtime: entry.runtime, profileRevision: entry.profileRevision }));
   }
+
+  /**
+   * 聚合当前已打开会话的后台任务（2026-10-25）：按 `projectRoot + runtime` 过滤，直接读各句柄的
+   * `listBackgroundTasks()`，**不缓存、不持久化**（任务只存在于会话内存）。句柄无该方法 ⇒ 跳过该角色；
+   * 没有任何具备能力的活会话 ⇒ 空列表 + `unavailable:true`（「没有任务」与「不支持」必须可区分）。
+   */
+  listBackgroundTasks(projectRoot: string, runtime: RuntimeKind): BackgroundTasksListReply {
+    const tasks: BackgroundTaskView[] = [];
+    let capable = 0;
+    for (const entry of this.sessions.values()) {
+      if (entry.projectRoot !== projectRoot || entry.runtime !== runtime) continue;
+      const list = entry.handle.listBackgroundTasks;
+      if (list === undefined) continue;
+      capable += 1;
+      try {
+        for (const task of list.call(entry.handle)) {
+          // 快照只读复制：加来源角色/引擎；不缓存、不跨会话记忆。
+          tasks.push({ ...task, roleId: entry.roleId, runtime: entry.runtime });
+        }
+      } catch (error) {
+        // 单会话读取异常不拖垮整个列表、也不伪造任务：如实记诊断，其余角色照常返回。
+        createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: entry.roleId }).error(
+          "background-tasks.list.failed",
+          error,
+          { runtime: entry.runtime },
+        );
+      }
+    }
+    return { ok: true, projectRoot, runtime, tasks, unavailable: capable === 0 };
+  }
+
+  /**
+   * 读取某会话内后台任务的状态与日志尾部（默认 both/40 行、上限 200 由底层钳制）。
+   * 找不到会话/句柄无能力如实失败；未知/已过期任务由底层返回 `undefined`——本层按失败回执，不造任务、不造日志。
+   */
+  readBackgroundTask(input: BackgroundTaskReadInput): BackgroundTaskReadReply {
+    const entry = this.sessions.get(this.sessionKey(input.projectRoot, input.roleId, input.runtime));
+    if (entry === undefined) {
+      return { ok: false, error: mainT("main.session.releaseNoSession", { roleId: input.roleId }) };
+    }
+    const read = entry.handle.readBackgroundTask;
+    if (read === undefined) {
+      return { ok: false, error: mainT("main.backgroundTasks.unavailable") };
+    }
+    const options: BackgroundTaskReadOptions = {
+      ...(input.stream !== undefined ? { stream: input.stream } : {}),
+      ...(input.tailLines !== undefined ? { tailLines: input.tailLines } : {}),
+    };
+    const hasOptions = input.stream !== undefined || input.tailLines !== undefined;
+    try {
+      const result = read.call(entry.handle, input.taskId, hasOptions ? options : undefined);
+      if (result === undefined) {
+        // 未知/已过期任务：底层如实返回 undefined。本层不猜状态、不伪造日志，按失败回执。
+        return { ok: false, error: mainT("main.backgroundTasks.unavailable") };
+      }
+      return { ok: true, result };
+    } catch (error) {
+      // 契约上 read 不抛；真抛了也如实回执（不静默、不伪造空结果）。
+      createDiagnosticLogger({ component: "desktop.session", projectRoot: input.projectRoot, roleId: input.roleId }).error(
+        "background-tasks.read.failed",
+        error,
+        { runtime: input.runtime, taskId: input.taskId },
+      );
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
+   * 停止某会话内的后台任务：底层结果（含 `unknown-task`/`closed`/`timeout`，以及成功）**原样返回**，
+   * 绝不改写成成功。找不到会话 ⇒ `closed`（会话不可用）；句柄无能力 ⇒ `unavailable`；
+   * 底层抛错 ⇒ 如实失败并带原始消息（不吞异常、不假装已停止）。
+   */
+  async stopBackgroundTask(input: BackgroundTaskStopInput): Promise<BackgroundTaskStopReply> {
+    const entry = this.sessions.get(this.sessionKey(input.projectRoot, input.roleId, input.runtime));
+    if (entry === undefined) {
+      return { ok: false, reason: "closed", message: mainT("main.session.releaseNoSession", { roleId: input.roleId }) };
+    }
+    const stop = entry.handle.stopBackgroundTask;
+    if (stop === undefined) {
+      return { ok: false, reason: "unavailable", message: mainT("main.backgroundTasks.unavailable") };
+    }
+    const options: BackgroundTaskStopOptions | undefined = input.force === true ? { force: true } : undefined;
+    try {
+      return await stop.call(entry.handle, input.taskId, options);
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.session", projectRoot: input.projectRoot, roleId: input.roleId }).error(
+        "background-tasks.stop.failed",
+        error,
+        { runtime: input.runtime, taskId: input.taskId },
+      );
+      return { ok: false, reason: "unavailable", message: error instanceof Error ? error.message : String(error) };
+    }
+  }
   private contextInfo(handle: RoleSessionHandle): Pick<OpenResult, "contextSource" | "contextWarning"> {
     if (handle.contextSource === "resumed") return { contextSource: "recovered", contextWarning: handle.contextWarning };
     if (handle.contextSource === "recovered") return { contextSource: "fresh", contextWarning: handle.contextWarning ?? mainT("main.session.contextRecoveryFailed") };
@@ -1056,6 +1254,9 @@ export class SessionManager {
         if (origin.turnId === undefined) {
           origin.turnId = metadata.turnId;
           entry.origins.byTurn.set(metadata.turnId, origin);
+          // **ACK 即已投递**（2026-10-25）：应用任务的稳定键在运行时同步开轮回执时即记「已投递」——
+          // 之后即便发送 promise 因重建/收尾阶段报错，同一任务也不会被重投（at-most-once）。
+          this.rememberAppTaskDelivered(origin.clientMessageId);
         }
         opts?.onTurnStarted?.(metadata);
       };
@@ -1391,13 +1592,28 @@ export class SessionManager {
    * **后台投递**（2026-10-18 客户修正）：与 `send` 共用同一投递机/队列/忙态/真实状态外推，
    * 但**不抢活动角色**（边界陈旧重建按非用户发起；即使 `activeRoleId` 为空也不因本消息复位）。
    * 返回 `send` 的如实结果（失败不吞、不重试循环）。
+   *
+   * **2026-10-25 真机重复投递修复**：本方法是**应用代客户推进**的唯一入口，默认给任务生成
+   * **内容稳定 `clientMessageId`**（见 `APP_TASK_CLIENT_MESSAGE_ID_PREFIX`）——同一任务在重建
+   * 前后、或两条应用链路各发一次时**至多投递一次**（已投递/已入队 ⇒ 回 `duplicate:true`）。
+   * `identitySeed`：调用方已有**语义去重键**（如 flow revision/交付集合指纹）时传入——同 content
+   * 但新 revision 的任务仍会作为新任务投递（文本未带 revision 的场景，如 delivered 唤醒）。
+   * `stableIdentity:false` 只用于非任务的治理反馈镜像（同文可在不同轮次重复，保持既有语义）。
+   * 真实客户消息不经本方法，不受影响（同文重复发送仍是两个意图）。
    */
-  async sendBackground(input: { projectRoot: string; roleId: string; runtime: RuntimeKind; text: string }): Promise<SendResult> {
+  async sendBackground(input: { projectRoot: string; roleId: string; runtime: RuntimeKind; text: string; clientMessageId?: string; identitySeed?: string; stableIdentity?: boolean }): Promise<SendResult> {
+    const clientMessageId =
+      input.clientMessageId ??
+      (input.stableIdentity === false
+        ? undefined
+        : input.identitySeed !== undefined
+          ? this.appTaskClientMessageIdFromSeed(input.identitySeed)
+          : this.appTaskClientMessageId(input.projectRoot, input.roleId, input.runtime, input.text));
     return this.send(
       input.text,
       undefined,
       { projectRoot: input.projectRoot, roleId: input.roleId, runtime: input.runtime },
-      { background: true },
+      { background: true, ...(clientMessageId !== undefined ? { clientMessageId } : {}) },
     );
   }
 
@@ -1887,6 +2103,26 @@ export class SessionManager {
     // 桌面只接线、不另写一份）。
     const customerInput = role.builtIn === true ? this.deps.customerInput : undefined;
 
+    // ——— 写盘确认的应用层兜底（客户 2026-10-25 新规则：「写自己角色权限内的路径，直接放行」）———
+    // 预解析本会话的 Section 1 边界快照（含接受证据）：与 `openRoleSession` 内部的 `setupRole`
+    // **同一解析源**（Service `resolveBoundary` → 门禁 `resolveBoundarySection`；入参是本会话同一份
+    // `ProjectConfig`，`governanceBoundary` 的接受证据与开会话时一致）。customer-input 只在**呈现卡片/
+    // 调用判断之前**用它对写盘确认做边界判定（`write-preauthorization.ts`；边界判定唯一来源仍是
+    // 门禁 `resolveWrite`）。解析失败/非确认制会话 ⇒ 缺省 ⇒ 预授权不生效（保持既有卡片/判断路径；
+    // fail-closed 方向不变——绝不「不知道边界就放行」）。
+    let writeBoundary: BoundarySection1 | undefined;
+    if (customerInput !== undefined) {
+      try {
+        writeBoundary = await resolveBoundary(req.roleId, project);
+      } catch (error) {
+        createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId }).error(
+          "write-preauthorization.boundary.unavailable",
+          error,
+        );
+        writeBoundary = undefined;
+      }
+    }
+
     // W6-B（四角色评审 §6.1）：**决定卡镜像面** = 主入口（`primaryRoleId`，trio 下恒为 liaison）。
     // 仅 trio、仅治理决定卡（`isMirroredGovernanceCard`）且来源角色 ≠ 主入口时给出；single/普通写盘/
     // 无 cardKind 旧卡不镜像。镜像只是**呈现路由**：同一请求 id、同一份 pending、只结算一次。
@@ -1905,6 +2141,13 @@ export class SessionManager {
     const dispatchTask: DispatchTaskFn | undefined =
       canSchedule || canLiaise
         ? (d: DispatchTaskPayload) => this.routeDispatch(req.projectRoot, req.runtime, req.roleId, d) // Promise<DispatchReceipt>——契约允许（工具侧 await）
+        : undefined;
+    // 2026-10-25 独立复核请求（request_acceptance）：**仅内置治理角色会话注入**（`role.builtIn === true`；
+    // 项目角色即便 deps 提供也不注入——外部调用方误给也拿不到工具）。编排再按 builtInGovernance 收口。
+    // 项目绑定交给能力实现（工具载荷只有 flowId?/note?）；未注入 ⇒ 工具不注册（结构性 fail-closed）。
+    const requestAcceptance: RequestAcceptanceFn | undefined =
+      role.builtIn === true && this.deps.requestAcceptance !== undefined
+        ? (input: RequestAcceptanceInput) => this.deps.requestAcceptance!(req.projectRoot, input)
         : undefined;
     // W6-B（四角色评审 §5.3）：**意图交接投递端**——仅 Liaison。编排已校验/去重/每轮一次并写
     // `intent.handed-off`；本层只后台开 Rapporteur、投递唯一一条任务、落成功/失败系统行，**不重试**。
@@ -2096,6 +2339,9 @@ export class SessionManager {
                     ...(mirrorRoleId !== undefined ? { mirrorRoleId } : {}),
                     ...(judge !== undefined ? { governanceJudge: judge } : {}),
                     ...(typeof turnText === "string" && turnText !== "" ? { turnText } : {}),
+                    // 写盘确认的应用层兜底（2026-10-25 客户新规则）：本会话的 Section 1 快照 +
+                    // resolveWrite 的 skill 根（同一份 ProjectConfig）。缺省 ⇒ 通道不做预授权判定。
+                    ...(writeBoundary !== undefined ? { writeBoundary, skillRoot: project.skillRoot } : {}),
                   },
                   metadata,
                 );
@@ -2103,6 +2349,9 @@ export class SessionManager {
             : {}),
           // H-1：派发能力（仅 su 会话注入；契约字段名 `dispatchTask`——编排落地后由其转发给适配器）。
           ...(dispatchTask ? { dispatchTask } : {}),
+          // 2026-10-25 独立复核请求（request_acceptance，仅内置治理角色会话注入；项目角色不注入）。
+          // 「未注入即不注册」——编排/运行时核心据此不注册工具（结构性 fail-closed）。请求复核 ≠ 客户批准。
+          ...(requestAcceptance ? { requestAcceptance } : {}),
           // W6-B（四角色评审 §5.3/§5.4）：意图交接投递端（仅 Liaison）与澄清送达端（仅 Rapporteur）。
           // 「未注入即不注册」——其余角色拿不到对应工具（fail-closed）。
           ...(handOffIntent ? { handOffIntent } : {}),
@@ -2219,7 +2468,15 @@ export class SessionManager {
             if (outcome === 'completed' || outcome === 'failed' || outcome === 'aborted' || outcome === 'timed_out') origin.outcome ??= outcome;
           }
           const envelope: SessionEventEnvelope = { roleId, projectRoot, runtime, event: ev.kind === 'handback' ? this.displayHandback(ev) : ev };
-          if (ev.kind !== "handback" && typeof ev.turnId === "string" && ev.turnId !== "" && origin?.clientMessageId !== undefined) {
+          // `clientMessageId` 的对外语义是**客户消息显示关联**（渲染侧乐观行 ACK 用）；应用任务的稳定
+          // 身份（`ans-app-task:`）只在投递层去重使用，不冒充客户消息 ID 外推（匿名派发的事件仍匿名）。
+          if (
+            ev.kind !== "handback" &&
+            typeof ev.turnId === "string" &&
+            ev.turnId !== "" &&
+            origin?.clientMessageId !== undefined &&
+            !isAppTaskClientMessageId(origin.clientMessageId)
+          ) {
             envelope.clientMessageId = origin.clientMessageId;
           }
           // E-1/H-1：settled ⇒ 该会话离开「忙」，并尝试按序放行**本项目各队列**的积压投递。
@@ -2416,6 +2673,14 @@ export class SessionManager {
     const selectionVersion = this.selectionVersion;
     const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot: this.activeEntry()?.projectRoot, roleId: targetRoleId ?? undefined });
     diagnostic.record("session.send.start");
+    // **2026-10-25 重复投递修复**：应用任务的稳定键已投递过（ACK/成功）⇒ 本次调用不再发送。
+    // 判据只认应用后台投递（`sendBackground`）生成的 `ans-app-task:` 键；真实客户消息（渲染侧 UUID、
+    // 无 background 标记）不会命中——「同文重复发送是两个意图」的语义不受影响。
+    const appTaskId = background && isAppTaskClientMessageId(clientMessageId) ? clientMessageId : undefined;
+    if (appTaskId !== undefined && this.deliveredAppTaskIds.has(appTaskId)) {
+      diagnostic.record("session.send.duplicate", { reasonCode: "delivered" });
+      return { ok: true, clientMessageId: appTaskId, duplicate: true };
+    }
     // O-1（2026-10-12）：发言前先查**边界快照**——陈旧 ⇒ 先作废重建（本条发言直接落到新边界会话上；
     // 重建失败 ⇒ 如实回错、本条不发送）。在跑的轮次由 rebuild 内部跳过（不打断）。
     if (targetRoleId !== null) {
@@ -2429,6 +2694,22 @@ export class SessionManager {
     if (!entry) {
       diagnostic.record("session.send.failed", { reasonCode: "session-not-open" });
       return { ok: false, error: mainT("main.session.notOpen") };
+    }
+    // **同一应用任务已在队列/在途（含直接 send 开跑的那一轮）⇒ 不重复入队/发送**——重建前后、两条应用
+    // 链路各调一次时，客户侧只看到一条 user 消息（重复调用方拿到 `duplicate:true`，仍视为已受理）。
+    if (appTaskId !== undefined) {
+      const pending =
+        this.pendingAppTaskDelivery(entry.projectRoot, entry.roleId, entry.runtime, appTaskId) ??
+        (entry.origins.running?.clientMessageId === appTaskId ? { queued: false } : undefined);
+      if (pending !== undefined) {
+        diagnostic.record("session.send.duplicate", { reasonCode: pending.queued ? "queued" : "in-flight" });
+        return {
+          ok: true,
+          clientMessageId: appTaskId,
+          duplicate: true,
+          ...(pending.queued ? { queued: true, ...(pending.position !== undefined ? { position: pending.position } : {}) } : {}),
+        };
+      }
     }
     // 并发重建可能把活动指针清掉（dispose 置 null、后台重开不抢位）——用户意图仍指向 targetRoleId：复位。
     // （若用户期间开了**别的**角色，activeRoleId 非 null，不动它——不抢位。）
@@ -2452,7 +2733,7 @@ export class SessionManager {
       });
       const q = this.deliveryQueues.get(this.queueKey(entry.projectRoot, roleId, entry.runtime));
       diagnostic.record("session.send.queued", { queueDepth: q?.length ?? 0 });
-      return { ok: true, queued: true, position: q ? q.length : 1 };
+      return { ok: true, queued: true, position: q ? q.length : 1, ...(clientMessageId !== undefined ? { clientMessageId } : {}) };
     }
     const roleId = entry.roleId;
     // L-1 顺序修正（与投递机同款，防竞态）：**先置忙再 await**——快适配器（如演示 runtime）的事件
@@ -2472,11 +2753,15 @@ export class SessionManager {
     try {
       // P0-1：组合聊天来源与 ACK；图片数组保持原引用。
       await this.sendDelivery(entry, origin, text, opts);
+      this.rememberAppTaskDelivered(clientMessageId); // 投递成功 ⇒ 应用任务记「已投递」（同任务不再重发）
       this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime); // 状态准确性：真开跑即外推「工作中」（繁忙与否以会话条目为准）
       diagnostic.record("session.send.end", { ok: true });
       return { ok: true, ...this.sendFacts(entry, origin) };
     } catch (err) {
       diagnostic.error("session.send.failed", err);
+      // **已 ACK（turnId 已绑定）后再失败：输入已交给运行时，不再当未投递**——记「已投递」标记，
+      // 应用侧同一任务的重试调用会被 `duplicate` 拦下（at-most-once；失败重试只对未 ACK 的成立）。
+      if (origin.turnId !== undefined) this.rememberAppTaskDelivered(clientMessageId);
       const ownsRunningDelivery = entry.origins.running === origin;
       this.failDeliveryOrigin(entry, origin);
       if (ownsRunningDelivery) {
@@ -2802,7 +3087,9 @@ export class SessionManager {
         diagnostic.error("governance.feedback.open.failed", new Error(opened.error ?? "无法开启主入口会话"), { targetRoleId: primaryRoleId });
         return;
       }
-      const sent = await this.sendBackground({ projectRoot, roleId: primaryRoleId, runtime, text: task });
+      // 治理反馈是**轮次状态镜像**而非应用任务：同文可在不同轮次重复出现（既有语义不变）——
+      // 不生成稳定任务键，不参与「同一应用任务至多投递一次」的去重。
+      const sent = await this.sendBackground({ projectRoot, roleId: primaryRoleId, runtime, text: task, stableIdentity: false });
       if (!sent.ok) {
         diagnostic.error("governance.feedback.dispatch.failed", new Error(sent.error ?? "治理反馈投递失败"), { targetRoleId: primaryRoleId });
         return;
@@ -2871,6 +3158,54 @@ export class SessionManager {
     return `${projectRoot}\u0000${targetRoleId}\u0000${runtime}`;
   }
 
+  /** 应用任务的**内容稳定键**（2026-10-25）：同项目×目标×引擎×正文 ⇒ 同键；任一变化 ⇒ 新键。 */
+  private appTaskClientMessageId(projectRoot: string, roleId: string, runtime: RuntimeKind, text: string): string {
+    const digest = createHash("sha256")
+      .update(`${projectRoot}\u0000${roleId}\u0000${runtime}\u0000${text}`, "utf8")
+      .digest("hex");
+    return `${APP_TASK_CLIENT_MESSAGE_ID_PREFIX}${digest}`;
+  }
+
+  /** 调用方自带**语义去重键**（如 flow revision 指纹）时的稳定键：同键同任务，键变 ⇒ 新任务。 */
+  private appTaskClientMessageIdFromSeed(seed: string): string {
+    const digest = createHash("sha256").update(`seed\u0000${seed}`, "utf8").digest("hex");
+    return `${APP_TASK_CLIENT_MESSAGE_ID_PREFIX}${digest}`;
+  }
+
+  /** 派发条目的稳定键：既有内容 `dedupKey`（含 project/runtime/target/正文/reason/flowId/stepId）的 sha256。 */
+  private appDispatchClientMessageId(dedupKey: string): string {
+    const digest = createHash("sha256").update(`dispatch\u0000${dedupKey}`, "utf8").digest("hex");
+    return `${APP_TASK_CLIENT_MESSAGE_ID_PREFIX}${digest}`;
+  }
+
+  /** 记「已投递」标记（仅应用任务；有界 FIFO）。重复记录只刷新存在性（不重排）。 */
+  private rememberAppTaskDelivered(clientMessageId: string | undefined): void {
+    if (!isAppTaskClientMessageId(clientMessageId) || this.deliveredAppTaskIds.has(clientMessageId)) return;
+    this.deliveredAppTaskIds.add(clientMessageId);
+    while (this.deliveredAppTaskIds.size > MAX_DELIVERED_APP_TASK_IDS) {
+      const oldest = this.deliveredAppTaskIds.values().next().value;
+      if (oldest === undefined) break;
+      this.deliveredAppTaskIds.delete(oldest);
+    }
+  }
+
+  /** 同一应用任务是否已在内存队列/在途（队列键内）——返回排队位次（1 起；在途 ⇒ queued:false）。 */
+  private pendingAppTaskDelivery(
+    projectRoot: string,
+    targetRoleId: string,
+    runtime: RuntimeKind,
+    clientMessageId: string,
+  ): { queued: boolean; position?: number } | undefined {
+    const key = this.queueKey(projectRoot, targetRoleId, runtime);
+    const queue = this.deliveryQueues.get(key);
+    if (queue !== undefined) {
+      const idx = queue.findIndex((item) => item.clientMessageId === clientMessageId);
+      if (idx >= 0) return { queued: true, position: idx + 1 };
+    }
+    if (this.activeDeliveries.get(key)?.clientMessageId === clientMessageId) return { queued: false };
+    return undefined;
+  }
+
   private enqueueDelivery(projectRoot: string, targetRoleId: string, item: Omit<DeliveryItem, "enqueuedAt">): void {
     const key = this.queueKey(projectRoot, targetRoleId, item.runtime);
     const q = this.deliveryQueues.get(key) ?? [];
@@ -2882,6 +3217,9 @@ export class SessionManager {
     this.notifyRoleState(projectRoot, targetRoleId, item.runtime); // L-1：入队即外推（队列行/徽标如实可见）
     // 2026-10-20 重启续跑：入队即持久化（原子写；失败只诊断，不影响内存投递）。
     this.deliveredDeliveryKeys.delete(`${this.queueKey(projectRoot, targetRoleId, item.runtime)}\u0000${item.dedupKey}`);
+    // 2026-10-25：显式重新入队＝新的一次派发意图（返工同文再派仍放行）——清除该应用任务的「已投递」标记；
+    // 重建续投/应用侧重复调用不经本函数（它们在发送前被 stable id 去重拦下），所以不会被这一次清除误放行。
+    if (item.clientMessageId !== undefined) this.deliveredAppTaskIds.delete(item.clientMessageId);
     this.persistDeliveryQueues();
   }
 
@@ -2901,6 +3239,7 @@ export class SessionManager {
         enqueuedAt: item.enqueuedAt,
         ...(typeof item.flowId === "string" && item.flowId !== "" ? { flowId: item.flowId } : {}),
         ...(typeof item.deliveryId === "string" ? { deliveryId: item.deliveryId } : {}),
+        ...(isAppTaskClientMessageId(item.clientMessageId) ? { clientMessageId: item.clientMessageId } : {}),
         ...(item.handback !== undefined ? { handback: item.handback } : {}),
         ...(item.report !== undefined ? { report: item.report } : {}),
         ...(item.liveReport !== undefined ? { liveReport: item.liveReport } : {}),
@@ -2996,6 +3335,7 @@ export class SessionManager {
           : new Date(this.now()).toISOString(),
       ...(typeof rawItem.flowId === "string" && rawItem.flowId !== "" ? { flowId: rawItem.flowId } : {}),
       ...(typeof rawItem.deliveryId === "string" ? { deliveryId: rawItem.deliveryId } : {}),
+      ...(isAppTaskClientMessageId(rawItem.clientMessageId) ? { clientMessageId: rawItem.clientMessageId } : {}),
       ...(rawItem.handback !== undefined && rawItem.handback !== null && typeof rawItem.handback === "object"
         ? { handback: rawItem.handback as TaskHandback }
         : {}),
@@ -3078,6 +3418,10 @@ export class SessionManager {
         report.skipped += 1; // 本次运行已投递成功（防御：同 manager 重复恢复）
         continue;
       }
+      if (isAppTaskClientMessageId(item.clientMessageId) && this.deliveredAppTaskIds.has(item.clientMessageId)) {
+        report.skipped += 1; // 同一应用任务本次运行已 ACK/投递成功：恢复不重投（2026-10-25）
+        continue;
+      }
       if (this.activeDeliveries.get(queueKey)?.dedupKey === item.dedupKey) {
         report.skipped += 1;
         continue;
@@ -3101,6 +3445,7 @@ export class SessionManager {
         summary: item.summary || mainT("main.session.recoveryDelivery", { role: item.sourceRoleId }),
         dedupKey: item.dedupKey,
         ...(item.flowId !== undefined ? { flowId: item.flowId } : {}),
+        ...(item.clientMessageId !== undefined ? { clientMessageId: item.clientMessageId } : {}),
         ...(item.handback !== undefined ? { handback: item.handback } : {}),
         ...(item.report !== undefined ? { report: item.report } : {}),
         ...(item.liveReport !== undefined ? { liveReport: item.liveReport } : {}),
@@ -3536,6 +3881,10 @@ export class SessionManager {
         ? mainT("main.session.dispatchSummaryCoordinate", { from: this.roleDisplayName(projectRoot, fromRoleId), to: this.roleDisplayName(projectRoot, targetRoleId), text: shortenText(task, 40) })
         : mainT("main.session.dispatchSummary", { from: this.roleDisplayName(projectRoot, fromRoleId), text: shortenText(task, 40) }),
       dedupKey,
+      // 2026-10-25：派发任务的**内容稳定身份**（含 project/runtime/target/正文/reason/flowId/stepId）——
+      // 重建续投/恢复项与新的同任务调用相认；ACK/送达后记「已投递」。显式重新入队（返工同文再派）
+      // 由 `enqueueDelivery` 清除标记 ⇒ 返工回路不受影响。
+      clientMessageId: this.appDispatchClientMessageId(dedupKey),
     });
     // 账本 `dispatch.accepted`（评审 §5.6/§5.7）：**成功入队后**写；门禁/投递失败不写。
     // 仅 trio（single 旧项目不产生 `.ans/governance` 记录——行为逐字不变）。账本失败**不翻转**派发
@@ -4524,6 +4873,18 @@ export class SessionManager {
       return;
     }
 
+    // **2026-10-25 重复投递修复——重建后续投只重发未投递成功的消息**：同一应用任务（稳定
+    // `clientMessageId`）已 ACK/投递成功 ⇒ 队列里残留的同键条目直接丢弃（不重开会话、不再发第二遍）。
+    // 显式重新入队（返工同文再派）已在 `enqueueDelivery` 清掉标记，不会走到这里。
+    if (isAppTaskClientMessageId(item.clientMessageId) && this.deliveredAppTaskIds.has(item.clientMessageId)) {
+      q.splice(headIndex, 1);
+      if (q.length === 0) this.deliveryQueues.delete(key);
+      diagnostic.record("delivery.skip.delivered", { state: item.kind, queueDepth: q.length });
+      this.notifyRoleState(projectRoot, resolvedTarget, runtime);
+      this.persistDeliveryQueues();
+      return;
+    }
+
     let entry = this.sessions.get(this.sessionKey(projectRoot, resolvedTarget, runtime));
     if (!entry || entry.projectRoot !== projectRoot) {
       // 目标会话**未开**（或属于别的项目）→ 自动开启再投（su=治理主入口；派发目标=被派角色）。
@@ -4632,6 +4993,8 @@ export class SessionManager {
       diagnostic.record("delivery.end", { ok: true, count: batchCount, state: sent.kind });
       // 2026-10-20 重启续跑：投递成功（delivery.end）即从持久队列移除——崩溃重启不重投已完成项。
       this.deliveredDeliveryKeys.add(`${key}\u0000${sent.dedupKey}`);
+      // 2026-10-25：应用任务投递成功 ⇒ 记「已投递」（重建续投/应用侧同任务调用不再发第二遍）。
+      this.rememberAppTaskDelivered(sent.clientMessageId);
       this.persistDeliveryQueues();
       this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 立即外推（running 行即时可见）
       if (sent.kind === "dispatch") this.activeDispatchKeys.delete(sent.dedupKey); // 送达即释放窗口去重（返工可再派）
@@ -4650,7 +5013,15 @@ export class SessionManager {
       const receipt = err instanceof RuntimeDeliveryError ? err.receipt : sent.attemptId ? this.attemptStates.get(this.persistenceKey(this.persistenceScope(entry), sent.attemptId))?.receipt : undefined;
       if (receipt) this.rememberReceipt(entry, receipt);
       const cAttempt = sent.kind === 'handback' && !!sent.attemptId;
-      const canRetry = !cAttempt || !!receipt && !receipt.providerMayHaveStarted && receipt.retryDeliveryAllowed;
+      // **2026-10-25 重复投递修复：已 ACK 的不再按「未投递」重试**。
+      // `origin.turnId` 由运行时**同步开轮回执**（onTurnStarted）绑定；`inputAccepted` 是 prompt-input
+      // 真实回显。任一成立 ⇒ 输入已交给运行时，失败（如会话在收尾窗口被重建 dispose）不得回队重投，
+      // 否则同一任务会在重建后以第二条 user 消息再出现（客户真机缺陷）。未 ACK 的失败仍按既有语义
+      // 放回队首保留重试（失败重试仍允许）；回交保留 receipt 判据（providerMayHaveStarted）不变。
+      const acked = origin.turnId !== undefined || origin.inputAccepted === true;
+      const canRetry = cAttempt
+        ? !!receipt && !receipt.providerMayHaveStarted && receipt.retryDeliveryAllowed
+        : !acked;
       const mayBeActive = cAttempt && (!receipt || receipt.providerMayHaveStarted);
       const ownsRunningDelivery = entry.origins.running === origin;
       if (!mayBeActive) this.failDeliveryOrigin(entry, origin);
@@ -4669,9 +5040,17 @@ export class SessionManager {
       }
       this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 放回队首：队列快照恢复（如实）
       // 2026-10-20 重启续跑：失败重试项保持 queued（下次重启可再重投）；清除可能残留的「已完成」标记。
-      if (canRetry) this.deliveredDeliveryKeys.delete(`${key}\u0000${sent.dedupKey}`);
+      // 2026-10-25：已 ACK 的失败**不重投** ⇒ 记「已完成」键（持久快照排除该在途项；重启也不重投）。
+      if (canRetry) {
+        this.deliveredDeliveryKeys.delete(`${key}\u0000${sent.dedupKey}`);
+      } else if (acked) {
+        this.deliveredDeliveryKeys.add(`${key}\u0000${sent.dedupKey}`);
+        this.rememberAppTaskDelivered(sent.clientMessageId);
+      }
       this.persistDeliveryQueues();
       const base = sent.kind === "handback" && cAttempt ? !canRetry ? mainT("main.session.delivery.maybeProcessed") : mainT("main.session.delivery.retained") : err instanceof Error ? err.message : String(err);
+      // 已 ACK 的非回交失败：如实说明「可能已处理，未自动重发」——绝不沿用「已保留待重试」的假话。
+      const ackedNote = `${base}——${mainT("main.session.delivery.maybeProcessed")}`;
       this.emitDeliveryNote(projectRoot, runtime,
         sent.kind === "handback" ? resolvedTarget : sent.sourceRoleId,
         sent.sourceRoleId,
@@ -4679,11 +5058,13 @@ export class SessionManager {
           ? (cAttempt
               ? mainT("main.session.delivery.handbackFailedShort", { sourceRoleId: sent.sourceRoleId, detail: base })
               : mainT("main.session.delivery.handbackFailed", { sourceRoleId: sent.sourceRoleId, detail: base }))
-          : sent.kind === "dispatch"
-            ? mainT("main.session.delivery.dispatchFailed", { target: resolvedTarget, detail: base })
-            : sent.kind === "system"
-              ? mainT("main.session.delivery.systemFailed", { target: resolvedTarget, detail: base })
-              : mainT("main.session.delivery.queuedFailed", { target: resolvedTarget, detail: base })
+          : acked
+            ? ackedNote
+            : sent.kind === "dispatch"
+              ? mainT("main.session.delivery.dispatchFailed", { target: resolvedTarget, detail: base })
+              : sent.kind === "system"
+                ? mainT("main.session.delivery.systemFailed", { target: resolvedTarget, detail: base })
+                : mainT("main.session.delivery.queuedFailed", { target: resolvedTarget, detail: base })
       );
     }
     })().catch((err) => {

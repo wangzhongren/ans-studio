@@ -14,6 +14,7 @@ import assert from "node:assert/strict";
 import { parse as parseYaml } from "yaml";
 
 import {
+  BOUNDARY_WRITE_PREAUTHORIZATION_PRINCIPLE,
   BUILT_IN_GOVERNANCE_ROLES,
   ENGINEERING_QUALITY_BASELINE,
   governanceRoleOf,
@@ -22,7 +23,7 @@ import { GOVERNANCE_SLUG_PATTERN } from "../../src/model/runtime.ts";
 
 /** 逐字取自 `governance-roles.ts` 的单一来源常量（本测试钉住五卡保留原文）。 */
 const SHELL_APPROVAL_CARD_LINE =
-  "shell 审批档——只读白名单直接执行，其余（含读写与任意命令）逐条提交客户/判断 agent 审批；审批不改变你的职责与写边界，写文件仍优先用 write_file 并经写盘确认。拒绝、超时、通道不可用一律不放行。";
+  "shell 审批档——只读白名单直接执行，其余（含读写与任意命令）逐条提交客户/判断 agent 审批；审批不改变你的职责与写边界：Section 1 边界内的写入是预授权，直接用 `write_file` / `edit_file`（不逐次 `request_confirmation`），边界外与治理敏感写入仍按本卡与既有规则拒绝或需确认。拒绝、超时、通道不可用一律不放行。";
 
 /** 治理 slug 正则：唯一来源为 Model 常量（2026-10-22 收紧，禁止尾连字符；设计 S4）。 */
 const GOVERNANCE_SLUG_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
@@ -461,7 +462,7 @@ test("标准工作流：写卡被 declined——Crew/Steward 按 reason 修正�
     [
       "写卡被拒（declined）时（必须）",
       "`request_confirmation` 返回 `declined`（含自动审批 deny 的原因）",
-      "修正流程状态 YAML（初始创建）或排程内容",
+      "修正流程状态 YAML（初始创建）等内容",
       "重新发确认卡",
       "不得绕过确认",
       "不得直接 `write_file`",
@@ -732,6 +733,57 @@ test("标准工作流：五卡保留既有 shell 审批档、质量基线、写�
       `${spec.id} 卡既有纪律`,
     );
   }
+});
+
+test("标准工作流：2026-10-25 写入预授权——五卡边界内直接写、不逐次确认；request_confirmation 仅限治理敏感与客户决定", () => {
+  // 客户新规则原文：「写自己角色权限内的路径，直接放行。」本批只改卡文本：Section 1 边界内的
+  // 写入是预授权（write_file / edit_file 直接写），request_confirmation 只保留给治理敏感写入
+  // （角色卡/边界、共享目录或他人写集、流程 YAML/账本、发布/变更包等按既有规则）与客户决定。
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    const t = spec.cardText;
+    // 单一来源常量逐字复用，且不得被逐卡改写分叉。
+    assert.ok(t.includes(BOUNDARY_WRITE_PREAUTHORIZATION_PRINCIPLE), `${spec.id} 卡须逐字包含写入预授权总则`);
+    assert.equal(
+      t.split(BOUNDARY_WRITE_PREAUTHORIZATION_PRINCIPLE).length - 1,
+      1,
+      `${spec.id} 写入预授权总则须恰出现一次`,
+    );
+    assert.ok(t.includes(SHELL_APPROVAL_CARD_LINE), `${spec.id} 卡须逐字保留 shell 审批档`);
+    // 旧的「写文件一律经写盘确认」口径必须消失。
+    assert.doesNotMatch(t, /写文件仍优先用 write_file 并经写盘确认/, `${spec.id} 不得残留逐次写盘确认旧口径`);
+    assert.doesNotMatch(t, /写盘（write_file \/ edit_file 等）一律先经/, `${spec.id} 不得保留一律先确认旧口径`);
+  }
+  // 治理敏感确认场景逐卡保留（未把预授权扩到治理写入）：
+  assert.match(
+    governanceRoleOf("nominator")!.cardText,
+    /角色卡 \/ 边界属治理敏感写入，按既有规则仍逐路径确认/,
+    "Crew 写角色卡 / 边界仍须 appointment-write 确认",
+  );
+  assert.match(
+    governanceRoleOf("nominator")!.cardText,
+    /不得绕过确认或直接写盘/,
+    "Crew declined 后仍不得绕过确认",
+  );
+  assert.match(
+    governanceRoleOf("convener")!.cardText,
+    /流程 YAML \*\*初始创建\*\*仍按 `schedule-write` 确认/,
+    "Steward 流程 YAML 初始创建仍 schedule-write",
+  );
+  assert.match(
+    governanceRoleOf("liaison")!.cardText,
+    /不使用 `request_confirmation` 做治理写盘/,
+    "Lead 仍不做治理写盘确认",
+  );
+  assert.match(
+    governanceRoleOf("rapporteur")!.cardText,
+    /每次 `request_confirmation` 必须带 `flowId` \+ `cardKind`（只用 `write`）/,
+    "Draft 确认卡参数纪律保留",
+  );
+  assert.match(
+    governanceRoleOf("verifier")!.cardText,
+    /每次 `request_confirmation` 必须带 `flowId` \+ `cardKind`（只用 `write`）/,
+    "Proof 确认卡参数纪律保留",
+  );
 });
 
 test("注册表：按 2026-10-22 治理分工只调整 Convener/Crew/Verifier 写权，其他角色与 shell 档不变", () => {

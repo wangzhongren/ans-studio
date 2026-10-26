@@ -33,6 +33,15 @@ export interface DesktopBridge {
   abortSession?: (...args: unknown[]) => Promise<unknown>;
   getSessionHistory?: (input: unknown) => Promise<unknown>;
   listLiveSessionViews?: () => Promise<unknown>;
+  // —— 会话级后台任务（2026-10-25；定义/实现属桌面窗口，此处只按名消费）——
+  listBackgroundTasks?: (
+    projectRoot: string,
+    runtime: string,
+  ) => Promise<unknown>;
+  readBackgroundTask?: (input: unknown) => Promise<unknown>;
+  stopBackgroundTask?: (input: unknown) => Promise<unknown>;
+  // —— 流程状态只读（2026-10-25；定义/实现属桌面窗口，此处只按名消费）——
+  getFlowStatus?: (projectRoot: string) => Promise<unknown>;
   onSessionEvent?: (callback: (payload: unknown) => void) => () => void;
   onRoleState?: (callback: (payload: unknown) => void) => () => void;
   onSessionHistory?: (callback: (payload: unknown) => void) => () => void;

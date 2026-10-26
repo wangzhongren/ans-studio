@@ -210,6 +210,21 @@
   left: 6px;
   z-index: 9;
 }
+/* 侧栏折叠时仍能看到「有角色在工作中」：展开按钮加工作态绿色圆点 + 文本 aria。 */
+.sidebar-expand.has-working {
+  border-color: var(--working-border);
+  color: var(--working);
+}
+.sidebar-working-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--working);
+  box-shadow: 0 0 0 2px var(--background);
+}
 .project-summary {
   display: flex;
   align-items: center;
@@ -294,6 +309,10 @@
 .tree-item.active .ti-name {
   font-weight: 600;
 }
+/* 工作态只用状态 chip + 头像环；左侧竖条仅属于选中态。等待确认保留琥珀底色。 */
+.tree-item.is-awaiting:not(.active) {
+  background: var(--warning-bg);
+}
 .ti-avatar {
   width: 28px;
   height: 28px;
@@ -310,6 +329,30 @@
   background: var(--success-bg);
   color: var(--primary);
   border-color: var(--success-bg);
+}
+/* 工作态：绿色描边 + 低幅度呼吸环；reduced-motion 降级为静态环。 */
+.ti-avatar.is-working {
+  border-color: var(--working);
+  color: var(--foreground);
+  animation: ti-working-breathe 1.8s var(--ease-standard) infinite;
+}
+.ti-avatar.is-awaiting {
+  border-color: var(--warning);
+}
+@keyframes ti-working-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px var(--working), 0 0 0 3px var(--working-bg);
+  }
+  50% {
+    box-shadow: 0 0 0 1px var(--working), 0 0 0 5px var(--working-bg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ti-avatar.is-working {
+    animation: none;
+    box-shadow: 0 0 0 1px var(--working), 0 0 0 3px var(--working-bg);
+  }
 }
 .ti-main {
   min-width: 0;
@@ -655,8 +698,12 @@
   background: var(--card);
 }
 .capsule:focus-within {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 1px var(--primary);
+  border-color: var(--info);
+  box-shadow: 0 0 0 2px var(--info-border);
+}
+/* 输入框自身不再叠第二圈焦点环；视觉焦点统一由 capsule 的冷色环承担。 */
+#inp-message:focus-visible {
+  outline: none;
 }
 /* 拖入反馈（UIUX 3B 评审 §六.3；旧基线同义，令牌化）：拖拽经过胶囊时显示落点。 */
 .capsule.is-dropping {
@@ -1682,11 +1729,25 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 22px;
+  min-height: 24px;
+  flex-wrap: nowrap;
   color: var(--text-3);
   font-size: 11px;
   cursor: pointer;
   list-style: none;
+}
+.tool-call-record > summary > .tool-call-time {
+  flex: 0 0 42px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.tool-call-record > summary > strong {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .tool-records > summary::-webkit-details-marker,
 .tool-call-record > summary::-webkit-details-marker {
@@ -1732,10 +1793,14 @@ details[open] > summary > .disclosure-chevron {
 .activity-target {
   display: block;
   margin-top: 1px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 11px;
   line-height: 1.55;
   color: var(--text-3);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .activity-state {
   display: inline-flex;
@@ -1759,6 +1824,11 @@ details[open] > summary > .disclosure-chevron {
   font-variant-numeric: tabular-nums;
 }
 .tool-call-status {
+  flex: 0 0 auto;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-2);
 }
 .tool-call-status.failed,
@@ -1768,10 +1838,82 @@ details[open] > summary > .disclosure-chevron {
   color: var(--danger);
 }
 .tool-call-target {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow-wrap: normal;
   color: var(--text-3);
-  overflow-wrap: anywhere;
 }
-.tool-call-details pre {
+/* 工具失败卡片（2026-10-25）：summary 只留工具名/失败徽标/一行原因，完整原文在展开区。
+   只引用 index.css 令牌；徽标用小面积 danger-bg，不做大面积红底。 */
+.tool-call-record[data-failed="true"] > summary {
+  flex-wrap: nowrap;
+  min-height: 24px;
+}
+.tool-call-record[data-failed="true"] .tool-call-target {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 30%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-call-record[data-failed="true"] .tool-call-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  max-width: 45%;
+  min-width: 0;
+  padding: 1px 7px;
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-micro);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.tool-call-record[data-failed="true"] .tool-call-status > svg {
+  flex: 0 0 auto;
+}
+.tool-call-status-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-error-reason {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+.tool-error-full {
+  margin: 4px 0 2px;
+}
+.tool-error-full > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 20px;
+  color: var(--text-2);
+  font-size: 11px;
+  cursor: pointer;
+  list-style: none;
+}
+.tool-error-full > summary::-webkit-details-marker {
+  display: none;
+}
+.tool-error-full-label {
+  color: var(--text-2);
+}
+.tool-error-full-text {
   margin: 6px 0 0;
   padding: 8px 10px;
   overflow-x: auto;
@@ -1780,6 +1922,18 @@ details[open] > summary > .disclosure-chevron {
   font: 12px/1.5 var(--font-mono);
   color: var(--text-2);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tool-call-details pre {
+  margin: 0;
+  padding: 7px 9px;
+  background: var(--background);
+  border-radius: var(--radius-control);
+  font: 11px/1.55 var(--font-mono);
+  color: var(--text-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 .reasoning-text {
   margin: 6px 0 0;
@@ -2026,8 +2180,26 @@ details[open] > summary > .disclosure-chevron {
 }
 
 /* 判断结果行（shell:judge-result / session:operator-judge）：行包裹同时带 .sys/.shell-judge-row，
-   使 e2e 可直接以 pane 子元素取行；这里补齐行内排版与折叠详情。 */
-.chat-row.shell-judge-row {
+   使 e2e 可直接以 pane 子元素取行；shell 结果行渲染为与治理代批卡同语言的紧凑卡片。 */
+.chat-row.shell-judge-row:not(.governance-judge-row) {
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  max-width: min(760px, 100%);
+  margin: 8px auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.chat-row.shell-judge-row:not(.governance-judge-row).is-deny {
+  border-left-color: var(--danger);
+}
+.chat-row.shell-judge-row:not(.governance-judge-row).is-deny-override {
+  border-left-color: var(--warning);
+}
+.chat-row.shell-judge-row.governance-judge-row {
   flex-direction: row;
   align-items: flex-start;
 }
@@ -2039,9 +2211,136 @@ details[open] > summary > .disclosure-chevron {
   font-size: 11.5px;
   line-height: 1.65;
 }
-.shell-judge-row.is-deny-override {
-  border-left: 2px solid var(--warning);
-  padding-left: 8px;
+.shell-judge-row:not(.governance-judge-row) .sj-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.shell-judge-row:not(.governance-judge-row) .sj-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.sj-verdict-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+.sj-verdict-icon.is-allow {
+  background: var(--success-bg);
+  color: var(--primary);
+}
+.sj-verdict-icon.is-deny {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.sj-auto-badge {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-micro);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.sj-auto-badge.is-allow {
+  border-color: var(--primary);
+  background: var(--success-bg);
+  color: var(--primary);
+}
+.sj-auto-badge.is-deny {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.shell-judge-row:not(.governance-judge-row) .sj-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+  font-weight: 600;
+}
+.sj-title-main {
+  color: var(--foreground);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+.sj-title-meta {
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+.sj-tier-badge {
+  margin-left: auto;
+  padding: 0 5px;
+  flex: 0 0 auto;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-micro);
+  color: var(--warning);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.shell-judge-row:not(.governance-judge-row) .sj-cmd {
+  display: block;
+  width: 100%;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-micro);
+  background: var(--background);
+  color: var(--text-2);
+  font: 11.5px/1.6 var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.shell-judge-row:not(.governance-judge-row) .sj-cmd.is-reason {
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+.shell-judge-row:not(.governance-judge-row) .sj-meta {
+  color: var(--text-3);
+  font-size: 11.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.shell-judge-row:not(.governance-judge-row) .sj-foot {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-width: 0;
+}
+.shell-judge-row:not(.governance-judge-row) .sj-foot .sj-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.shell-judge-row:not(.governance-judge-row) .sj-foot .sj-details {
+  flex: 0 0 auto;
+}
+.shell-judge-row:not(.governance-judge-row) .sj-foot .sj-details[open] {
+  flex: 1 1 100%;
+}
+.shell-judge-row:not(.governance-judge-row) .sj-details {
+  margin-top: 0;
+}
+.shell-judge-row:not(.governance-judge-row) .sj-details > summary {
+  width: max-content;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.shell-judge-row:not(.governance-judge-row) .sj-exit {
+  font-size: 11px;
 }
 .sj-head {
   display: flex;
@@ -2052,12 +2351,6 @@ details[open] > summary > .disclosure-chevron {
 .sj-title {
   font-weight: 600;
   color: var(--foreground);
-}
-.shell-judge-row.is-allow .sj-title {
-  color: var(--success);
-}
-.shell-judge-row.is-deny .sj-title {
-  color: var(--danger);
 }
 .sj-badge {
   flex: 0 0 auto;
@@ -2105,24 +2398,160 @@ details[open] > summary > .disclosure-chevron {
   display: none;
 }
 .sj-details-body {
-  padding: 4px 0 0 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 4px 2px 0;
 }
 .sj-details-body p {
-  margin: 3px 0;
+  margin: 0;
+}
+.sj-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.sj-detail-section p,
+.sj-callout p {
+  margin: 0;
 }
 .sj-d-label {
+  font-size: 10.5px;
   font-weight: 600;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+.sj-d-value {
+  margin: 0;
   color: var(--text-2);
+  font-size: 11.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .sj-pre {
-  margin: 0 0 4px;
+  margin: 0;
   padding: 7px 9px;
   border: 1px solid var(--border);
   border-radius: var(--radius-micro);
+  background: var(--background);
+  color: var(--text-2);
+  font: 11px/1.55 var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.sj-pre code {
+  font: inherit;
+  color: inherit;
+  white-space: inherit;
+  word-break: inherit;
+}
+.sj-list {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.sj-list li {
+  margin: 2px 0;
+}
+.sj-callout {
+  padding: 6px 8px;
+  border-left: 2px solid var(--border-strong);
+  border-radius: var(--radius-micro);
   background: var(--card);
-  font: 11px/1.5 var(--font-mono);
-  white-space: pre;
-  overflow-x: auto;
+}
+.sj-kv-grid {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 3px 10px;
+  font-size: 11px;
+  line-height: 1.55;
+}
+.sj-kv-grid > div {
+  display: contents;
+}
+.sj-kv-grid dt {
+  color: var(--text-3);
+}
+.sj-kv-grid dd {
+  margin: 0;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.sj-detail-note {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.tool-detail-timeline {
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.tool-process-meta {
+  color: var(--text-3);
+  font-size: 11px;
+}
+.tool-output {
+  gap: 4px;
+}
+.tool-output .sj-d-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tool-line-count {
+  display: inline-flex;
+  align-items: center;
+  height: 15px;
+  padding: 0 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-micro);
+  color: var(--text-3);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+}
+.tool-output.is-stderr .sj-d-label {
+  color: var(--danger);
+}
+.tool-output.is-stderr .sj-pre,
+.tool-error-block {
+  border-color: var(--danger-border);
+  border-left: 2px solid var(--danger);
+  background: var(--background);
+}
+.tool-output-more > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: max-content;
+  color: var(--text-3);
+  font-size: 10.5px;
+  cursor: pointer;
+  list-style: none;
+}
+.tool-output-more > summary::-webkit-details-marker {
+  display: none;
+}
+.tool-output-more-count {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.tool-output-more .sj-pre {
+  margin-top: 4px;
 }
 .sj-kv {
   white-space: pre-wrap;
@@ -2365,6 +2794,45 @@ details[open] > summary > .disclosure-chevron {
 }
 .ti-status.st-stopped {
   color: var(--text-2);
+}
+/* 工作态 chip（2026-10-25）：小圆点 + 「工作中」，11.5px/600/绿色令牌；其它状态沿用原样式。 */
+.role-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 15px;
+  padding: 0 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-micro);
+  background: var(--card);
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.ti-status.role-status-chip.is-working {
+  border-color: var(--working-border);
+  background: var(--working-bg);
+  color: var(--working);
+}
+.chat-role-working {
+  height: 18px;
+  padding: 0 7px;
+  border-color: var(--working-border);
+  background: var(--working-bg);
+  color: var(--working);
+}
+.role-status-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+}
+.role-status-label {
+  min-width: 0;
 }
 .ti-badge {
   align-self: flex-start;

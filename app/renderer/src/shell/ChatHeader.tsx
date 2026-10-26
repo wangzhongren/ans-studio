@@ -8,11 +8,21 @@
  *   「打开 X 设置」为上下文入口（键盘可聚焦，不遮聊天、不抢焦点）。
  */
 
-import type { MouseEvent } from "react";
+import { useEffect, type MouseEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { findRole, roleDisplayName } from "@/chat/role-view";
 import { useChatStore } from "@/chat/chat-store";
 import { switchRuntime } from "@/chat/ipc";
+import {
+  backgroundRunningCount,
+  loadBackgroundTasks,
+} from "@/chat/background-tasks";
+import {
+  flowBadgeView,
+  loadFlowStatus,
+  startFlowStatusPolling,
+} from "@/chat/flow-status";
+import { getDesktopBridge } from "@/lib/platform";
 import {
   badgeText,
   pendingCountFor,
@@ -23,17 +33,22 @@ import {
 } from "@/chat/work-view";
 import { openEngineSettingsLabel, runtimeLabel } from "@/chat/runtime-config";
 import {
+  chatWorkingChipView,
+  RoleStatusChip,
+} from "@/chat/role-status-view";
+import {
   openSettingsDrawer,
   setDrawerInvoker,
   useDrawerStore,
 } from "@/stores/drawer-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useBackgroundTasksStore } from "@/stores/background-tasks-store";
+import { useFlowStatusStore } from "@/stores/flow-status-store";
 import { useUiStore } from "@/stores/ui-store";
 import { EngineSelect } from "@/shell/EngineSelect";
 import { GovernancePanel } from "@/shell/GovernancePanel";
 import { useLocaleState, useT } from "@/i18n";
 import "@/shell/phase4b.css";
-
 export interface ChatHeaderProps {
   onOpenDrawer: () => void;
 }
@@ -53,6 +68,91 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
   const queueByRole = useChatStore((s) => s.queueByRole);
   const pendingOperator = useChatStore((s) => s.pendingOperator);
   const notice = useSettingsStore((s) => s.notice);
+  const backgroundRunning = useBackgroundTasksStore((s) => s.runningCount);
+  const flowBadgeVisible = useFlowStatusStore((s) => s.visible);
+  const flowBadgeText = useFlowStatusStore((s) => s.text);
+  const flowBadgeTitle = useFlowStatusStore((s) => s.title);
+  const anyRoleBusy = Object.values(roleBusy).some((busy) => busy === true);
+  // 入口徽标的一次性读取（不是轮询）：面板未打开时也能显示最近运行中任务数。
+  useEffect(() => {
+    let cancelled = false;
+    if (!projectRoot) {
+      useBackgroundTasksStore.getState().setRunningCount(0);
+      return () => {
+        cancelled = true;
+      };
+    }
+    const bridge = getDesktopBridge();
+    if (typeof bridge?.listBackgroundTasks !== "function") {
+      useBackgroundTasksStore.getState().setRunningCount(0);
+      return () => {
+        cancelled = true;
+      };
+    }
+    void loadBackgroundTasks(
+      bridge,
+      projectRoot,
+      runtime,
+      locale,
+    ).then((model) => {
+      if (!cancelled) {
+        useBackgroundTasksStore
+          .getState()
+          .setRunningCount(backgroundRunningCount(model));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectRoot, runtime, locale, anyRoleBusy]);
+
+  // 流程进度徽标：30s 拉一次（窗口隐藏跳过）；方法缺失/失败只隐藏徽标，不报错。
+  useEffect(() => {
+    let cancelled = false;
+    if (!projectRoot) {
+      useFlowStatusStore.getState().setBadge({ visible: false });
+      return () => {
+        cancelled = true;
+      };
+    }
+    const refresh = async () => {
+      const model = await loadFlowStatus(
+        getDesktopBridge(),
+        projectRoot,
+        locale,
+      );
+      if (!cancelled) {
+        useFlowStatusStore
+          .getState()
+          .setBadge(flowBadgeView(model, locale));
+      }
+    };
+    const stop = startFlowStatusPolling(
+      () => {
+        void refresh();
+      },
+      30000,
+      {
+        isHidden: () =>
+          typeof document !== "undefined" &&
+          document.visibilityState === "hidden",
+      },
+    );
+    const onVisibility = () => {
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState !== "hidden"
+      ) {
+        void refresh();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      cancelled = true;
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [projectRoot, locale]);
 
   const role = findRole(roles, selectedRoleId);
   const roleName = roleDisplayName(role, locale);
@@ -70,7 +170,30 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
     !!selectedRoleId && roleBusy[selectedRoleId] === true,
     selectedRoleId ? (queueByRole[selectedRoleId] || []).length : 0,
   );
+  const workingChip = chatWorkingChipView(
+    {
+      busy: !!selectedRoleId && roleBusy[selectedRoleId] === true,
+      queueDepth: selectedRoleId ? (queueByRole[selectedRoleId] || []).length : 0,
+    },
+    locale,
+  );
   const noticeVisible = !!projectRoot && notice.visible;
+  const workAriaParts: string[] = [];
+  if (pendingCount > 0) workAriaParts.push(workBadgeAria(pendingCount, locale));
+  if (backgroundRunning > 0) {
+    workAriaParts.push(
+      t("ui.background.runningSummary", { count: backgroundRunning }),
+    );
+  }
+  if (flowBadgeVisible) {
+    workAriaParts.push(t("ui.flow.title") + " " + flowBadgeText);
+  }
+  const workAriaLabel =
+    workAriaParts.length === 0
+      ? t("ui.chatHeader.tabWork")
+      : pendingCount > 0
+        ? workAriaParts.join(" · ")
+        : t("ui.chatHeader.tabWork") + " · " + workAriaParts.join(" · ");
 
   const openWork = (event: MouseEvent<HTMLButtonElement>) => {
     setDrawerInvoker(event.currentTarget);
@@ -93,6 +216,15 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
               <span id="chat-role" className="chat-role">
                 {role ? roleName : t("ui.role.noneSelected")}
               </span>
+              {workingChip.visible ? (
+                <RoleStatusChip
+                  className="chat-role-working role-status-chip is-working"
+                  label={workingChip.label}
+                  title={workingChip.title}
+                  dot
+                  status="working"
+                />
+              ) : null}
               <span id="chat-role-sub" className="chat-role-sub" hidden={!!role}>
                 {role ? "" : t("ui.chatHeader.selectRoleHint")}
               </span>
@@ -122,15 +254,33 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
               className={drawerOpen && drawerTab === "work" ? "active" : undefined}
               aria-haspopup="dialog"
               aria-expanded={drawerOpen && drawerTab === "work"}
-              aria-label={
-                pendingCount > 0 ? workBadgeAria(pendingCount, locale) : t("ui.chatHeader.tabWork")
-              }
+              aria-label={workAriaLabel}
               onClick={openWork}
             >
               {t("ui.chatHeader.tabWork")}
               {workBadgeCount(pendingCount) > 0 ? (
                 <span className="tab-badge" aria-hidden="true">
                   {badgeText(pendingCount)}
+                </span>
+              ) : null}
+              {backgroundRunning > 0 ? (
+                <span
+                  className="tab-badge is-background"
+                  aria-hidden="true"
+                  title={t("ui.background.runningSummary", {
+                    count: backgroundRunning,
+                  })}
+                >
+                  {badgeText(backgroundRunning)}
+                </span>
+              ) : null}
+              {flowBadgeVisible ? (
+                <span
+                  className="tab-badge is-flow"
+                  aria-hidden="true"
+                  title={flowBadgeTitle || undefined}
+                >
+                  {flowBadgeText}
                 </span>
               ) : null}
             </Button>

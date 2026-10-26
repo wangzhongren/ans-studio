@@ -225,6 +225,87 @@ export const zhCN = {
   "ui.work.origin.system": "系统按终态记录：",
   "ui.work.origin.unconfirmed": "来源未确认：",
 
+  // ---- 后台任务面板（渲染层；运行时 BackgroundTaskCapability: list/read/stop）----
+  "ui.background.title": "后台任务",
+  "ui.background.count": "后台任务 {count}",
+  "ui.background.empty": "当前没有后台任务",
+  "ui.background.runningSummary": "{count} 个运行中",
+  "ui.background.role": "角色",
+  "ui.background.command": "命令",
+  "ui.background.startedAt": "启动时间",
+  "ui.background.pid": "进程号",
+  "ui.background.duration": "已运行",
+  "ui.background.exitCode": "退出码 {code}",
+  "ui.background.state.running": "运行中",
+  "ui.background.state.exited": "已退出",
+  "ui.background.state.stopped": "已停止",
+  "ui.background.state.failed": "启动失败",
+  "ui.background.state.killTimeout": "停止超时",
+  "ui.background.viewLog": "查看日志",
+  "ui.background.hideLog": "收起日志",
+  "ui.background.logEmpty": "暂无输出",
+  "ui.background.logTruncated": "日志过长，只显示最近部分",
+  "ui.background.stop": "停止",
+  "ui.background.stopConfirm": "停止这个后台任务？",
+  "ui.background.stopFailed": "停止失败：{detail}",
+  "ui.background.readFailed": "读取日志失败：{detail}",
+  "ui.background.loadFailed": "读取后台任务失败：{detail}",
+  "ui.background.refresh": "刷新",
+
+  // ---- 流程状态面板（渲染层；展示 docs/flows/<flowId>.yaml 的步骤进度）----
+  "ui.flow.title": "流程状态",
+  "ui.flow.progress": "{done}/{total} 步",
+  "ui.flow.current": "当前步骤",
+  "ui.flow.owner": "负责",
+  "ui.flow.updatedAt": "更新时间",
+  "ui.flow.empty": "暂无流程状态",
+  "ui.flow.loadFailed": "读取流程状态失败：{detail}",
+  "ui.flow.parseError": "{file} 解析失败：{detail}",
+  "ui.flow.showAll": "显示全部步骤",
+  "ui.flow.hideAll": "收起未完成步骤",
+  "ui.flow.state.pending": "待处理",
+  "ui.flow.state.dispatched": "已派发",
+  "ui.flow.state.delivered": "已交付",
+  "ui.flow.state.done": "已完成",
+  "ui.flow.state.failed": "失败",
+  "ui.flow.state.blocked": "阻塞",
+  "ui.flow.state.superseded": "已替代",
+  "ui.flow.kind.artifact": "产物",
+  "ui.flow.kind.dispatch": "派工",
+  "ui.flow.kind.customerDecision": "客户决定",
+  "ui.flow.kind.acceptance": "验收",
+  "ui.flow.refresh": "刷新",
+
+  // ---- 验收分诊卡（验收分诊：结论/严重度/建议/来源/汇报文本；桌面UI 接线）----
+  "ui.triage.title": "验收分诊",
+  "ui.triage.question": "对本次验收结果如何处理？",
+  "ui.triage.option.rework": "下发统筹修改",
+  "ui.triage.option.reportOnly": "仅汇报不返工",
+  "ui.triage.advice.rework": "建议下发统筹修改（{blockers} 个阻断、{majors} 个重要项，改进方案可执行）",
+  "ui.triage.advice.reportOnly": "建议仅汇报不返工（仅 {minors} 个次要/风格项）",
+  "ui.triage.advice.none": "无法自动建议，请人工判断",
+  "ui.triage.conclusion.pass": "通过",
+  "ui.triage.conclusion.fail": "不通过",
+  "ui.triage.conclusion.conditional": "有条件通过",
+  "ui.triage.severity.blocker": "阻断",
+  "ui.triage.severity.major": "重要",
+  "ui.triage.severity.minor": "次要",
+  "ui.triage.severity.nit": "风格建议",
+  "ui.triage.section.summary": "验收结论",
+  "ui.triage.section.failures": "不通过原因",
+  "ui.triage.section.improvements": "改进方案",
+  "ui.triage.section.source": "决定来源",
+  "ui.triage.source.judge": "判断代批（替我决策）",
+  "ui.triage.source.customer": "客户选择",
+  "ui.triage.warn.blockingReportOnly": "报告含阻断项，仅汇报将不修复",
+  "ui.triage.report.head": "验收结论：{conclusion}",
+  "ui.triage.report.reasonLine": "{id} · {severity}：{reason}",
+  "ui.triage.report.actionLine": "改进建议：{action}",
+  "ui.triage.report.pathLine": "报告：{path}",
+  "ui.triage.report.noRework": "本次不返工（{source}）",
+  "ui.triage.returnedToVerifier": "验收报告缺少分诊结构，已退回验收补充",
+  "ui.triage.missingReport": "验收报告不可读：{detail}",
+
   // ---- 抽屉（shell/Drawer.tsx）----
   "ui.drawer.collapseTitle": "收起（Esc）",
 
@@ -926,6 +1007,13 @@ export const zhCN = {
   "main.common.recoveryPageHeading": "界面暂时无法显示",
   "main.common.recoveryPageBody": "点击重新加载可恢复界面，已有任务不会自动重发。",
 
+  // ---- 后台任务服务（background tasks）----
+  "main.backgroundTasks.unavailable": "后台任务服务不可用",
+
+  // ---- 流程状态服务（flow status；docs/flows/<flowId>.yaml 读取）----
+  "main.flowStatus.unavailable": "流程状态服务不可用",
+  "main.flowStatus.invalidProject": "无效的项目目录",
+
   // ---- 会话主流程（session.ts）----
   "main.session.contextRecoveryFailed": "原生上下文恢复失败，已重建上下文。",
   "main.session.rebuiltBoundary":
@@ -1481,6 +1569,16 @@ export const zhCN = {
   "main.customerInput.rework.head": "{label}拒绝：{reason}。本次自动判断未通过/未完成，已拒绝；请按上述原因修正后重新提交确认。",
   "main.customerInput.autoApprovalLabel": "自动审批",
   "main.customerInput.autoDecisionLabel": "自动决策",
+  // ---- 写入预授权系统行（write-preauthorization.ts；2026-10-25 客户规则：边界内直接放行、边界外直接拒绝）----
+  "main.customerInput.writePreauthorization.accepted": "边界内写入预授权，已直接放行：{paths}",
+  "main.customerInput.writePreauthorization.rejected":
+    "系统预授权拒绝写入：{paths}（边界外不给写；未向客户呈现确认卡、未调用判断 agent）",
+  "main.customerInput.writePreauthorization.reason.boundary":
+    "目标路径未匹配任何边界或不在可写范围内",
+  "main.customerInput.writePreauthorization.reason.unresolved":
+    "无法解析声明路径（绝对路径/../空段）",
+  "main.customerInput.writePreauthorization.reason.mixed": "请求包含边界外路径，整单拒绝",
+  "main.customerInput.writePreauthorization.noPaths": "写确认缺少可解析的声明路径",
   "main.judgeReason.readDeniedPrefix": "判断读取被拒：",
   "main.judgeReason.readDeniedDetail": "读取被拒：",
   "main.judgeReason.readDeniedFallback": "所需项目文件无法读取（未记录具体路径）",

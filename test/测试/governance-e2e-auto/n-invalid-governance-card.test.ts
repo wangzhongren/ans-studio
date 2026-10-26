@@ -5,7 +5,9 @@
 //   T15：脚本化 convener 发缺 flowId 的 confirm（双开关全开）⇒
 //        raw 客户通道 0 次、无 request id / pending / queued / judging、无 presenter 呈现/镜像行、
 //        无判断启动（judge 0 次、无结果行）、工具回执 ok:false 且可操作（缺什么、本角色允许什么、
-//        未写账本/未发行路径），账本无 customer.decision，写集未发行（后续 write_file 仍被 F4 拒）。
+//        未写账本/未发行路径），账本无 customer.decision；同轮后续写入按 2026-10-25 新语义：
+//        Section 1 边界内（docs/workflow.md）为预授权、直接放行且不弹确认卡；边界外/他人写集/
+//        治理敏感路径（.ans/、角色卡/、src/）仍拒绝。
 //   T16：同一轮补齐 flowId+cardKind 重发 ⇒ 合法卡到达通道；判断启动并自动代批；恰一条结果行；
 //        账本 decisionEvidence.kind="judge"；不因前一次拒绝被去重拦截。
 //   T17（零回归）：合法 write / schedule-write / appointment-write 卡仍可用；liaison 的 confirm 被拒；
@@ -177,7 +179,7 @@ function validWriteConfirm(toolCallId: string) {
 
 // —————————————————————— T15：无效卡零副作用 ——————————————————————
 
-test("T15：convener 缺 flowId 的 confirm（双开关全开）⇒ 零通道/零呈现/零判断/零记账/写集未发行", async () => {
+test("T15：convener 缺 flowId 的 confirm（双开关全开）⇒ 零通道/零呈现/零判断/零记账；边界内写入按预授权放行（不弹卡），边界外/他人写集/治理敏感仍拒绝", async () => {
   let judgeCalls = 0;
   const h = await makeHarness({
     tag: "invalid-card-t15",
@@ -193,7 +195,14 @@ test("T15：convener 缺 flowId 的 confirm（双开关全开）⇒ 零通道/�
       ctx.roleId === "convener" && ctx.prompt.includes("请据提案写出工作流")
         ? [
             missingFlowIdConfirm("tc-invalid-confirm"),
+            // ① Section 1 边界内（docs/workflow.md）：客户 2026-10-25 新规则 = 预授权，直接写、不弹卡。
             { name: "write_file", args: { path: WORKFLOW_REL, content: WORKFLOW_BODY } },
+            // ② 治理敏感（应用独占 .ans/）⇒ 仍拒绝。
+            { name: "write_file", args: { path: ".ans/project.json", content: "{}" } },
+            // ③ 他人写集（Crew 的角色卡写区）⇒ 仍拒绝。
+            { name: "write_file", args: { path: "角色卡/executor/role-card.md", content: "# probe\n" } },
+            // ④ 边界外（src/）⇒ 仍拒绝。
+            { name: "write_file", args: { path: "src/owned-executor/probe.ts", content: "export const x = 1;\n" } },
           ]
         : [],
   });
@@ -236,13 +245,24 @@ test("T15：convener 缺 flowId 的 confirm（双开关全开）⇒ 零通道/�
     assert.equal(judgeStartedCount(diagRows), 0, "诊断中不得出现 governance-judge.started");
     assert.equal(h.judgeInvocations, 0, "判断驱动 0 次调用（started 后立即调用）");
 
-    // 写集未发行：同轮后续 write_file 仍被 F4 拒，文件不存在。
-    const writeResult = h.results.find((result) => result.name === "write_file")!;
-    assert.equal(writeResult.ok, false, "未确认路径必须被门禁拒绝");
-    assert.match(writeResult.message, /写入被拒绝/, "须给出拒绝文案");
-    assert.match(writeResult.message, /（F4）/, "拒绝须来自 F4（未发行写集）");
-    assert.match(writeResult.message, /docs\/workflow\.md/, "拒绝须点名目标路径");
-    assert.equal(exists(h.root, WORKFLOW_REL), false, "文件不得落盘");
+    // 2026-10-25 客户新规则：Section 1 边界内的写入是预授权——无效卡不发行写集，但边界内路径
+    // 不依赖发行也可以直接写（不弹确认卡）；边界外/他人写集/治理敏感路径仍拒绝。
+    const writes = h.results.filter((result) => result.name === "write_file");
+    assert.equal(writes.length, 4, "同轮四处写入都应产生工具回执");
+    // ① Section 1 边界内（confirmationMode 下亦按预授权直接写）。
+    assert.equal(writes[0]!.ok, true, `边界内预授权写入应放行：${writes[0]!.message}`);
+    assert.equal(exists(h.root, WORKFLOW_REL), true, "边界内文件应落盘");
+    // ② 应用独占 .ans/：仍拒绝（治理敏感）。
+    assert.equal(writes[1]!.ok, false, "治理敏感路径必须仍拒绝");
+    assert.match(writes[1]!.message, /只能由应用写/, "拒绝须说明 .ans/ 仅应用可写");
+    // ③ 他人写集（角色卡/ = Crew）：仍拒绝。
+    assert.equal(writes[2]!.ok, false, "他人写集必须仍拒绝");
+    assert.match(writes[2]!.message, /Crew（Nominator）的写区/, "拒绝须说明他人写区归属");
+    // ④ 边界外 src/：仍拒绝（不再以 F4 文案为主，边界不匹配）。
+    assert.equal(writes[3]!.ok, false, "边界外路径必须仍拒绝");
+    assert.match(writes[3]!.message, /未匹配任何边界条目/, "拒绝须说明边界外");
+    // 整轮零客户卡：预授权写入不触发 request_confirmation（invalid 卡亦未呈现）。
+    assert.equal(h.presented.length, 0, "整轮不得呈现任何确认/分诊卡");
 
     // 账本：无 customer.decision（未写入任何决定）。
     const ledger = await h.waitForLedger(() => true);
