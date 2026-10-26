@@ -261,7 +261,8 @@ test("B-2 切换并存：A→B→A 不 dispose 旧会话，切回直接续（ope
 });
 
 test("B-2 LRU 上限：第 MAX_LIVE_SESSIONS+1 个会话淘汰最久未用者；被淘汰者切回是新建", async () => {
-  const listing = fakeListing(["A", "B", "C", "D"], "A");
+  // 主理（primaryRoleId）另有专测；本基线用例让主理 P 不参与 open 序列，保持纯 LRU 语义。
+  const listing = fakeListing(["A", "B", "C", "D", "P"], "P");
   const disposed: string[] = [];
   let opened = 0;
   const mgr = new SessionManager({
@@ -295,6 +296,160 @@ test("B-2 LRU 上限：第 MAX_LIVE_SESSIONS+1 个会话淘汰最久未用者；
   assert.equal(opened, 5, "被淘汰者切回应重新 open（不是续接）");
   assert.deepEqual(disposed, ["A", "B"], "越限后淘汰当时的 LRU（B）");
   await mgr.stop(null);
+});
+
+// ————— 2026-10-26 客户指令：主理（Lead，`primaryRoleId`）的会话设计为不关闭 —————
+//
+// 淘汰仍按既有 LRU/busy 语义，仅把**各项目当前主理**从候选集中排除；主理 id 逐项目由门禁枚举
+// （`primaryRoleId`）解析，不硬编码 liaison/su。项目关闭/切换、边界陈旧重建等显式生命周期不走 LRU。
+
+/** 主理 pin 用例夹具：句柄记录 send、可推 settled；open/dispose 记名（键含项目根，支持多项目）。 */
+function makeLeadPinHarness(listings: ProjectListing[]) {
+  const byRoot = new Map(listings.map((l) => [l.projectRoot, l]));
+  const disposed: string[] = [];
+  const opened: string[] = [];
+  const sent = new Map<string, string[]>();
+  const streams = new Map<string, OrchestrationEvent[]>();
+  const stopped = new Set<string>();
+  const keyOf = (projectRoot: string, roleId: string) => `${projectRoot}\u0000${roleId}`;
+  const streamOf = (key: string): OrchestrationEvent[] => {
+    let arr = streams.get(key);
+    if (arr === undefined) {
+      arr = [];
+      streams.set(key, arr);
+    }
+    return arr;
+  };
+  const makeHandle = (projectRoot: string, roleId: string): RoleSessionHandle => {
+    const key = keyOf(projectRoot, roleId);
+    sent.set(key, []);
+    let i = 0;
+    return {
+      async send(text: string): Promise<void> {
+        sent.get(key)!.push(text);
+      },
+      events(): AsyncIterable<OrchestrationEvent> {
+        return {
+          [Symbol.asyncIterator]() {
+            return {
+              async next(): Promise<IteratorResult<OrchestrationEvent>> {
+                for (let tries = 0; tries < 2000; tries += 1) {
+                  if (stopped.has(key)) return { value: undefined as unknown as OrchestrationEvent, done: true };
+                  const arr = streamOf(key);
+                  if (i < arr.length) return { value: arr[i++], done: false };
+                  await new Promise((r) => setTimeout(r, 5));
+                }
+                return { value: undefined as unknown as OrchestrationEvent, done: true };
+              },
+            };
+          },
+        };
+      },
+      async dispose(): Promise<void> {
+        stopped.add(key);
+        disposed.push(key);
+      },
+    };
+  };
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      const projectRoot = input.project.projectRoot;
+      opened.push(keyOf(projectRoot, input.roleId));
+      return makeHandle(projectRoot, input.roleId);
+    },
+    createPiAdapterFactory: () => {
+      throw new Error("本用例不应构造 pi 适配器");
+    },
+    createDemoAdapter: () => {
+      throw new Error("本用例不应构造 demo 适配器");
+    },
+    buildProjectConfig,
+    getListing: (root) => byRoot.get(root),
+    emitEvent: () => {},
+  });
+  return { mgr, disposed, opened, sent, streamOf };
+}
+
+test("主理应 pin：保活超过上限时主理即使最久未用也不淘汰；非主理最久未用者仍被淘汰；主理仍可多轮使用", async () => {
+  const listing = fakeListing(["liaison", "A", "B", "C"], "liaison");
+  const h = makeLeadPinHarness([listing]);
+  const open = (roleId: string) => h.mgr.open({ projectRoot: "/proj", roleId, runtime: "demo" });
+
+  await open("liaison");
+  await open("A");
+  await open("B");
+  assert.deepEqual(h.disposed, [], `满 ${MAX_LIVE_SESSIONS} 个（含主理）不淘汰`);
+
+  // 开第 4 个：最久未用者是主理 liaison——被 pin 跳过，淘汰次旧的非主理 A。
+  await open("C");
+  assert.deepEqual(h.mgr.liveRoleIds().sort(), ["B", "C", "liaison"], "主理即使最久未用也不淘汰；其余照旧 LRU");
+  assert.deepEqual(h.disposed, ["/proj\u0000A"], "淘汰的是最久未用的非主理（A）");
+
+  // 主理会话仍可正常多轮使用：同一保活句柄、不重建。
+  const liaisonKey = "/proj\u0000liaison";
+  const target = { projectRoot: "/proj", roleId: "liaison", runtime: "demo" as const };
+  const r1 = await h.mgr.send("主理第一轮", undefined, target);
+  assert.equal(r1.ok, true, r1.error ?? "");
+  await tick(30);
+  h.streamOf(liaisonKey).push({ kind: "settled", summary: "主理一轮结束" });
+  await tick(120);
+  const r2 = await h.mgr.send("主理第二轮", undefined, target);
+  assert.equal(r2.ok, true, r2.error ?? "");
+  await tick(30);
+  assert.deepEqual(h.sent.get(liaisonKey), ["主理第一轮", "主理第二轮"], "两轮都投到同一保活句柄（主理未被淘汰/重建）");
+  assert.equal(h.opened.filter((k) => k === liaisonKey).length, 1, "主理只 open 一次（多轮不重建）");
+
+  const resumed = await h.mgr.open({ projectRoot: "/proj", roleId: "liaison", runtime: "demo" });
+  assert.equal(resumed.resumed, true, "主理切回是续接而非新建");
+  await h.mgr.stop(null);
+});
+
+test("多项目并存：各项目按自己的 primaryRoleId 保留主理，互不误 pin", async () => {
+  const listingA: ProjectListing = { ...fakeListing(["leadA", "X"], "leadA"), projectRoot: "/projA" };
+  const listingB: ProjectListing = { ...fakeListing(["leadB", "Y", "Z"], "leadB"), projectRoot: "/projB" };
+  const h = makeLeadPinHarness([listingA, listingB]);
+  const open = (projectRoot: string, roleId: string) => h.mgr.open({ projectRoot, roleId, runtime: "demo" });
+
+  await open("/projA", "leadA");
+  await open("/projA", "X");
+  await open("/projB", "leadB");
+  // 开第 4 个：最久未用是 A 项目主理（跳过）⇒ 淘汰 A 项目最久未用的非主理 X。
+  await open("/projB", "Y");
+  assert.deepEqual(h.disposed, ["/projA\u0000X"], "先淘汰 A 项目最久未用的非主理（不是任何主理）");
+  assert.ok(
+    h.mgr.liveRoleIds().includes("leadA") && h.mgr.liveRoleIds().includes("leadB"),
+    "两项目主理都保留（主理常驻 ⇒ 可暂时超限）",
+  );
+
+  // 再开 Z：leadA（A 项目主理）与 leadB（B 项目主理）分别被各自项目 pin，只淘汰 B 项目非主理 Y。
+  await open("/projB", "Z");
+  assert.deepEqual(h.disposed, ["/projA\u0000X", "/projB\u0000Y"], "不同项目的主理分别 pin；只淘汰各项目非主理");
+  assert.deepEqual(h.mgr.liveRoleIds().sort(), ["Z", "leadA", "leadB"], "live = 两项目主理 + 新开的非主理");
+  await h.mgr.stop(null);
+});
+
+test("主理 pin 不改变 busy 语义：非主理全忙 ⇒ 暂超限；settled 后下一时机只收已空闲的非主理", async () => {
+  const listing = fakeListing(["liaison", "A", "B", "C"], "liaison");
+  const h = makeLeadPinHarness([listing]);
+  const open = (roleId: string) => h.mgr.open({ projectRoot: "/proj", roleId, runtime: "demo" });
+
+  for (const id of ["A", "B", "C"]) {
+    await open(id);
+    const sent = await h.mgr.send(`${id} 的后台任务`, undefined, { projectRoot: "/proj", roleId: id, runtime: "demo" });
+    assert.equal(sent.ok, true, sent.error ?? "");
+    await tick(15);
+  }
+  // 开主理 = 第 4 个：主理 pin + 其余全忙 ⇒ 暂超限（不掐断任何在跑任务）。
+  await open("liaison");
+  assert.deepEqual(h.mgr.liveRoleIds().sort(), ["A", "B", "C", "liaison"], "全忙 + 主理 ⇒ 暂超限");
+  assert.deepEqual(h.disposed, [], "暂超限期间零 dispose");
+
+  // A 空闲 ⇒ 下一时机（settled 收口）只收最久未用的非 busy 非主理者 A。
+  h.streamOf("/proj\u0000A").push({ kind: "settled", summary: "A 一轮结束" });
+  await tick(300);
+  assert.deepEqual(h.mgr.liveRoleIds().sort(), ["B", "C", "liaison"], "settled 后收 A（主理与仍在跑的 B/C 不受影响）");
+  assert.deepEqual(h.disposed, ["/proj\u0000A"]);
+  await h.mgr.stop(null);
 });
 
 test("B-2 事件信封：每会话事件带自己的 roleId；切走/在别的会话期间，后台仍持续拉取（不串消息）", async () => {

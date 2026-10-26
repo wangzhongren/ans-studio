@@ -1,0 +1,49 @@
+✔ firstProjectFilePath：取边界内首个项目根 file 条目 (38.8506ms)
+✔ 点角色即开：open 直接建会话（无摘要/nonce），多轮 send、越界被拒且含按根分组 (162.2842ms)
+✔ 同一角色重复点击：续接当前会话，不重建 (118.7281ms)
+✔ open 旧缓存缺角色：强制刷新一次 listing 后找到即成功；仍缺则如实报错、不循环 (1.1679ms)
+✔ B-2 切换并存：A→B→A 不 dispose 旧会话，切回直接续（open 计数=2） (1.4489ms)
+✔ B-2 LRU 上限：第 MAX_LIVE_SESSIONS+1 个会话淘汰最久未用者；被淘汰者切回是新建 (1.9394ms)
+✔ 主理应 pin：保活超过上限时主理即使最久未用也不淘汰；非主理最久未用者仍被淘汰；主理仍可多轮使用 (203.8707ms)
+✔ 多项目并存：各项目按自己的 primaryRoleId 保留主理，互不误 pin (2.028ms)
+✔ 主理 pin 不改变 busy 语义：非主理全忙 ⇒ 暂超限；settled 后下一时机只收已空闲的非主理 (364.3558ms)
+✔ B-2 事件信封：每会话事件带自己的 roleId；切走/在别的会话期间，后台仍持续拉取（不串消息） (97.2208ms)
+✔ 未导入项目就点角色：open 如实失败 (16.1858ms)
+✔ 未知角色：open 如实失败 (14.0037ms)
+✔ send 在未开启会话时如实失败 (14.9852ms)
+✔ 运行期同意：登记的非-pin 例外——accepted:true 且不带 pin，来源如实标注（行为不变） (15.2031ms)
+[watchdog] tick 失败（已暂停本 tick，下个 tick 重试）：替身：快照读取爆炸
+✔ T20 handback 事件被外推：会话句柄产出的回交事件经 emitEvent 原样送达（§10.8） (57.1256ms)
+✔ G-2 配置：tick 仅 env 可调（非法/缺失回退默认 30s）；阈值表取 §3.2 默认 (0.2492ms)
+✔ G-2/W1 #1：轮次**到点检查**（demo 检查时限 120s → 120s 边界，只提示不中止）；每轮一次；正常完成自动解除 (1.1657ms)
+✔ 2026-10-20 看护自动中止：内置 Convener 超时 + 开关开 ⇒ onTurnDeadline 恰一次（同一 role+turnId 去重）＋ Lead 系统行 (0.21ms)
+✔ 2026-10-20 看护自动中止：开关关闭 ⇒ 不调用 onTurnDeadline（旧语义：只告警、1h 最后兜底，不中止） (0.1382ms)
+✔ 2026-10-21 看护自动中止默认禁用：未配置时限 + 开关开 ⇒ 只到点提示，不调用 onTurnDeadline (0.1489ms)
+✔ 2026-10-21 看护自动中止显式 env：ANS_PI_PROMPT_TIMEOUT_MS 配置时开关开 ⇒ 到点恰一次，开关关 ⇒ 只告警 (0.1813ms)
+✔ G-2/W1 「正确等待不报」：#1 对带挂起确认卡的角色排除；su 自身忙不触发任何告警 (0.1357ms)
+✔ G-2/W1 #2：投递排队积压（age ≥10min 或深度 ≥5）；冷却 10min；队列清空投恢复行 (0.2798ms)
+✔ G-2/W1 #3：命令超时（F-1 事实）单次即报；10min 冷却内抑制；无恢复行 (0.111ms)
+✔ G-2/W1 #4：15min 窗口 failed/timed_out ≥3 才报；窗口滑出投恢复行；aborted/completed 不计 (0.1633ms)
+✔ G-2/W1 风暴护栏：15min 窗口 ≤5 条；超限投一条抑制通告（不占额度、每风暴期恰一条）＋诊断 (0.3361ms)
+✔ G-2/W1 看护器自身故障：快照抛错 ⇒ 只记诊断、不炸、不投递；下个 tick 自动恢复 (0.2312ms)
+✔ G-2/W3 已移除：完成静默不再投 `[系统·收束]`（验收通过即收束） (0.0711ms)
+✔ su 审批档注入：内置角色收到 shellOperatorOnly（(c) 实件 + (a) 通道），项目角色仍走三层链，su 不再用只读档 (1.8205ms)
+✔ W6-B 能力路由：liaison=handOffIntent+协调派发；rapporteur=提案+clarification；nominator=install；convener=dispatch/看护；single/su 不变 (2.6288ms)
+✔ 治理协调（session）：内置 settle→Lead；Proof 只发状态+报告指针；内置回交→Lead 且同轮 settle 不双发；worker 回交→Steward (437.2818ms)
+✔ 2026-10-25 A3/A4 客户投影：治理反馈 prompt-input 附带结构化投影与稳定指纹；内部原文保留、未登记文本不变 (333.3246ms)
+✔ Liaison 客户通道：intent-confirm 正常呈现/手答；proposal 被编排白名单拒绝且不弹卡 (28.7543ms)
+✔ W6-B 意图交接：后台开 Rapporteur、当前 pane 不变、只投一条任务、系统行如实 (46.2791ms)
+✔ W6-B 意图交接失败：不重试、只落失败系统行、当前 pane 不变 (3.5162ms)
+✔ W6-B 澄清送达：主入口 Liaison 系统行；不弹决定卡（客户通道零调用） (0.7666ms)
+✔ W6-B 交接审计：投递成功写 dispatch.accepted(app, trigger=intent-handoff)；失败不写、不重复写 intent.handed-off (13.9728ms)
+✔ i18n B3 session：未开会话的 send 回执按 en-US 生成；切回 zh-CN 逐字不变 (14.4236ms)
+✔ 后台任务聚合：按项目×引擎聚合多角色、跳过无能力句柄、unavailable 区分「没有任务」与「不支持」 (1.3666ms)
+✔ 后台任务读/停：read 透传选项与未知任务失败；stop 原样返回底层失败且不改写为成功 (1.9502ms)
+ℹ tests 40
+ℹ suites 0
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9812.0233

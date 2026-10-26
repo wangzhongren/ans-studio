@@ -59,8 +59,8 @@ B 的每窗口 grant 只来自原生选目录，renderer root/recovery/evidence 
 ## 关键实现点（拆分时承接，详见归档）
 
 - **授权链唯一实现** `project.ts::buildEffectiveProjectConfig`（fallback 运行期同意 → 共享载入器 → 采纳 `.ans` 治理边界路径）；会话语义与界面共用，杜绝漂移。
-- **点角色即开**：`SessionManager.open` 一次调用经 `openRoleSession`（`scope: undefined`）；多会话保活 LRU（跳过 busy）；切换角色不 dispose 切回续。
-- **投递机**（E-1/H-1/L-1/P0/P1）：三类条目（客户消息/派发/回交）同一队列；失败如实+放回队首；去重键/撤回/`full` 定格；「排队≠已执行」。
+- **点角色即开**：`SessionManager.open` 一次调用经 `openRoleSession`（`scope: undefined`）；多会话保活 LRU（跳过 busy 与各项目主理 `primaryRoleId`——主理会话不关闭）；切换角色不 dispose 切回续。
+- **投递机**（E-1/H-1/L-1/P0/P1/G-2）：四类条目（客户消息/派发/回交/系统）同一队列；失败如实+放回队首；去重键/撤回/`full` 定格；「排队≠已执行」；治理唤醒按 `system` 入队（显示「系统」、不可撤回）。
 - **边界陈旧重建**（O-1）：读盘 sha256 三来源快照指纹；陈旧 ⇒ 串行化作废重建 + 身份守卫 + TOCTOU 重校验；在跑轮次不打断。
 - **shell 两档**：项目角色 (c)/(b)/(a) 三层链；su 只读档（给出 `shellReadonly` 即 arm，不带 `!suppressHandback` 前缀）。
 - **诊断**：唯一共享 logger 滚动 24h；`app:reload-interface` 显式重载；`replayPending` 同 id 重推不代答。

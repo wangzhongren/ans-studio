@@ -4181,8 +4181,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   //
   // 现场：flow 的 integration-e2e / verification-evidence 已 delivered，但 Steward 空闲——没人叫它核证。
   // 本层在 acceptance check（settle/ledger/导入同一入口）里读 flow YAML：delivered 且 owner 无活会话/
-  // busy/队列/在途投递、且 flow 没有已接受的验收决定 ⇒ 向 Convener 后台投一条去重核证任务 + Lead 一条
-  // 去重系统行。**不伪造 done、不自动改 flow、不弹客户卡**；Steward 用 flow 工具自行核证。
+  // busy/队列/在途投递、**且统筹（convener）空闲**、且 flow 没有已接受的验收决定 ⇒ 向 Convener 后台投一条
+  // 去重核证任务。**不伪造 done、不自动改 flow、不弹客户卡**；Steward 用 flow 工具自行核证。
+  // 2026-10-26 客户真机（统筹侧多条重复「等待核证」）：统筹忙/有排队/在途时**不逐条发**——新步骤留在
+  // 「未通知」集合，等统筹空闲的下一次验收检查**合并成一条**消息（一次列出全部待核证步骤）。交付核证
+  // **只走统筹通道**，不再向主理落「等待统筹核证」系统行（主理只保留 failed/blocked/aborted 协调）。
   /**
    * 步骤 delivered 唤醒去重（2026-10-26 客户真机修复）：
    * `projectRoot\0flowId` → **已通知 stepId 集合**（内存，不持久化）。
@@ -4191,6 +4194,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
    * revision 变化，就会把**已通知过**的步骤再通知一遍（01:56:18 {scaffold-test-config, delivery-art-pipeline}
    * → 01:56:44 {scaffold-test-config} → 01:56:50 {scaffold-test-config}）。现语义：
    *  · 新消息只含「本次新 delivered 且**从未通知过**」的步骤；全部已通知 ⇒ 不发消息；
+   *  · **统筹忙 ⇒ 本次不发、也不标已通知**——新步骤自然累积，统筹空闲后的下一次检查合并为一条；
    *  · 先占位（`deliveredWakePendingSteps`）再跨 await：settle/账本/导入多路径并发触发**同一批只发一条**；
    *    发送失败回滚占位 ⇒ 下一次真实事件仍会补发（绝不因去重漏掉新步骤）；
    *  · 已通知集合在进程内**单调保留**（步骤 delivered→done→再次 delivered、同名 flow 重跑都不重复通知）；
@@ -4203,31 +4207,26 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const wakeStewardForDeliveredSteps = async (
     projectRoot: string,
     flowId: string,
-    note: (summary: string) => void,
     diagnostic: ReturnType<typeof createDiagnosticLogger>,
-  ): Promise<string | undefined> => {
+  ): Promise<void> => {
     const key = acceptanceFlowKey(projectRoot, flowId);
     let bytes: Buffer;
     try {
       bytes = await readFile(path.join(projectRoot, governanceFlowStatePath(flowId)));
     } catch {
-      return undefined; // 无 YAML/不可读：不在此处理（验收门另有 reason）
+      return; // 无 YAML/不可读：不在此处理（验收门另有 reason）
     }
     const parsed = parseFlowStateYaml(bytes.toString("utf8"), flowId);
-    if (!parsed.ok) return undefined; // 解析失败交给验收门，不猜
+    if (!parsed.ok) return; // 解析失败交给验收门，不猜
     const delivered = parsed.flow.steps.filter(
       (step) => step.status === "delivered" && typeof step.owner === "string" && step.owner.trim() !== "",
     );
-    if (delivered.length === 0) return undefined;
-    const revision = createHash("sha256").update(bytes).digest("hex");
-    const deliveredIds = delivered.map((step) => step.id).sort();
-    // 治理协调唤醒共享的「本 revision+当前 delivered 集合」指纹（只用于 Lead 系统行的同状态去重）。
-    const deliveredHash = createHash("sha256").update(`${revision}\u0000${deliveredIds.join("\u0000")}`).digest("hex");
+    if (delivered.length === 0) return;
     const notified = deliveredWakeNotifiedSteps.get(key) ?? new Set<string>();
     const pending = deliveredWakePendingSteps.get(key) ?? new Set<string>();
     const newSteps = delivered.filter((step) => !notified.has(step.id) && !pending.has(step.id));
-    // 全部已通知（或同批正在发送中）⇒ 不发消息；返回共享指纹，避免 Lead 对同一状态重复提示。
-    if (newSteps.length === 0) return deliveredHash;
+    // 全部已通知（或同批正在发送中）⇒ 不发消息。
+    if (newSteps.length === 0) return;
     // 只对新步骤做「owner 有活会话/busy/队列/在途投递 ⇒ 等下一次事件」护栏（已通知步骤不再阻塞新步骤）。
     const waitingForOwner = newSteps.some((step) => {
       const owner = (step.owner ?? "").trim();
@@ -4238,7 +4237,16 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
       return false;
     });
-    if (waitingForOwner) return undefined;
+    if (waitingForOwner) return;
+    // 2026-10-26 客户真机：目标统筹忙/有排队/在途 ⇒ **不发也不标已通知**（不逐条刷「等待核证」）。
+    // 新步骤累积在「未通知」集合，统筹空闲后的下一次验收检查合并成**一条**（一次列出当前全部待核证步骤）。
+    const stewardBusy = RUNTIME_KINDS.some(
+      (runtime) => manager.isRoleBusy(projectRoot, "convener", runtime) || manager.hasPendingDelivery(projectRoot, "convener", runtime),
+    );
+    if (stewardBusy) {
+      diagnostic.record("acceptance.delivered-wake.skip", { flowId, reasonCode: "steward-busy" });
+      return;
+    }
     const newIds = newSteps.map((step) => step.id).sort();
     // **先占位再跨 await**（含 runtime 解析之后的 open/send）：同批多路径并发触发只发一条；
     // 失败/异常回滚，下一次真实事件补发（绝不因去重漏掉新步骤）。
@@ -4252,10 +4260,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     if (runtime === undefined) {
       rollback();
       diagnostic.record("acceptance.delivered-wake.runtime-unresolved", { flowId });
-      return undefined;
+      return;
     }
     const task = [
-      `流程 ${flowId}：以下步骤已 delivered，等待统筹核证：`,
+      `[系统·治理核证] 流程 ${flowId}：以下步骤已 delivered，等待统筹核证：`,
       ...newSteps.map(
         (step) =>
           `- 步骤 ${step.id} 已 delivered（owner=${step.owner}），请核对账本/产物证据，用 flow_step_update 标 done 或退回修正；不要直接写 flow YAML。`,
@@ -4267,25 +4275,27 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       if (!opened.ok) {
         rollback();
         diagnostic.error("acceptance.delivered-wake.open.failed", new Error(opened.error ?? "unknown"), { flowId });
-        return undefined; // 失败只诊断（下一次真实事件可再试；不循环）
+        return; // 失败只诊断（下一次真实事件可再试；不循环）
       }
       // 稳定身份＝本批新步骤集合（不含 revision）：同一批重试同键；不同批（新增步骤）新键。
+      // kind:"system"：治理唤醒按系统条目录入（UI 显示「系统」、不可撤回），不冒充客户消息。
       const sent = await manager.sendBackground({
         projectRoot,
         roleId: "convener",
         runtime,
         text: task,
         identitySeed: `${projectRoot}\u0000${flowId}\u0000${newIds.join("\u0000")}`,
+        kind: "system",
       });
       if (!sent.ok) {
         rollback();
         diagnostic.error("acceptance.delivered-wake.send.failed", new Error(sent.error ?? "unknown"), { flowId });
-        return undefined;
+        return;
       }
     } catch (error) {
       rollback();
       diagnostic.error("acceptance.delivered-wake.failed", error, { flowId });
-      return undefined;
+      return;
     }
     // 提交：本批步骤记入「已通知」（单调，不再重复通知）；占位清空。
     const committed = deliveredWakeNotifiedSteps.get(key) ?? new Set<string>();
@@ -4293,20 +4303,18 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     deliveredWakeNotifiedSteps.set(key, committed);
     rollback();
     diagnostic.record("acceptance.delivered-wake.sent", { flowId, count: newSteps.length });
-    note(mainT("main.interface.deliveredWaitNote", { flowId, steps: newIds.join("、") }));
-    // 返回「本 revision+当前 delivered 集合」指纹：治理协调唤醒与它共享，避免同一状态再向 Lead 发第二条消息。
-    return deliveredHash;
   };
 
   // —————— 2026-10-24 治理协调唤醒（设计 v1 §6.3；S3）——————
   //
   // 触发面复用既有验收检查入口（任意角色 settle / 回交到达/settle / 账本追加 / 导入/启动补齐）。
-  // 只做**唤醒**：读 flow 机器状态，把「阻塞」「交付待核证」两类阶段交给 Lead（`primaryRoleId`）
-  // 协调；**不自动推进步骤、不派项目角色、不写 flow/账本、不弹客户卡、不轮询**。
+  // 只做**唤醒**：读 flow 机器状态，把「阻塞」阶段交给 Lead（`primaryRoleId`）协调；
+  // **不自动推进步骤、不派项目角色、不写 flow/账本、不弹客户卡、不轮询**。
   // （验收/Proof 由既有验收检查入口按流程完成度自动派发，不用协调任务重复。）
+  // 2026-10-26 客户真机：**交付待核证阶段不再交给主理**（避免主理再派统筹造成双份）——delivered 只走
+  // `wakeStewardForDeliveredSteps` 的统筹通道；主理只保留 failed / blocked / aborted 协调。
   // · 复用既有投递机（openBackground/sendBackground）：Lead 忙/有在途 ⇒ 不并发注入，等下一次真实事件；
-  // · 独立去重键（projectRoot+flowId+revision+stage）；delivered 阶段与 `wakeStewardForDeliveredSteps`
-  //   共享「本 revision 已通知」指纹（同一 revision 不双发）；
+  // · 独立去重键（projectRoot+flowId+revision+stage）；
   // · 内存预算：每 flow 24 次、同一阶段 2 次、连续 2 次无进展即停（只停协调唤醒；
   //   真实回交/状态行/验收系统行不经此预算，绝不丢弃）；应用重启不持久化预算——按当前 flow/账本重建；
   // · 不新增 IPC/卡片种类/UI/账本 kind。
@@ -4331,7 +4339,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     details: string[];
   }
 
-  /** 从 flow 机器状态派生「需要主理协调」的阶段；无 = 不唤醒（不猜、不轮询）。 */
+  /** 从 flow 机器状态派生「需要主理协调」的阶段；无 = 不唤醒（不猜、不轮询）。
+   *  **只含阻塞**（failed/blocked/aborted）；交付待核证只走统筹通道（2026-10-26 客户真机，不向主理双发）。 */
   const coordinationStageOf = (flow: FlowState): CoordinationStage | undefined => {
     const execution = flow.steps.filter((step) => step.kind !== "acceptance");
     const blocked = execution.filter(
@@ -4345,16 +4354,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         details: sorted.slice(0, 10).map((step) => `- 步骤 ${step.id} 当前状态 ${step.status}（owner=${step.owner ?? "未标注"}）`),
       };
     }
-    const delivered = execution.filter((step) => step.status === "delivered");
-    if (delivered.length > 0) {
-      const sorted = [...delivered].sort((a, b) => a.id.localeCompare(b.id));
-      return {
-        key: `delivered:${sorted.map((step) => step.id).join(",")}`,
-        description: "步骤已交付，等待统筹核证",
-        details: sorted.slice(0, 10).map((step) => `- 步骤 ${step.id} 已 delivered（owner=${step.owner ?? "未标注"}）`),
-      };
-    }
-    // 无阻塞/交付待核证阶段 ⇒ 不唤醒（验收由验收检查入口按完成度自动派发，不在此重复）。
+    // 无阻塞阶段 ⇒ 不唤醒（交付核证交统筹；验收由验收检查入口按完成度自动派发）。
     return undefined;
   };
 
@@ -4363,7 +4363,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     flowId: string,
     flow: FlowState,
     revision: string,
-    context: { deliveredNotifiedHash?: string; diagnostic: ReturnType<typeof createDiagnosticLogger> },
+    context: { diagnostic: ReturnType<typeof createDiagnosticLogger> },
   ): Promise<void> => {
     const { diagnostic } = context;
     const listing = listingCache.get(projectRoot);
@@ -4373,19 +4373,6 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     const stage = coordinationStageOf(flow);
     if (stage === undefined) return;
     const key = acceptanceFlowKey(projectRoot, flowId);
-    const deliveredIds = flow.steps
-      .filter((step) => step.status === "delivered" && typeof step.owner === "string" && step.owner.trim() !== "")
-      .map((step) => step.id)
-      .sort();
-    const deliveredHash =
-      stage.key.startsWith("delivered:") && deliveredIds.length > 0
-        ? createHash("sha256").update(`${revision}\u0000${deliveredIds.join("\u0000")}`).digest("hex")
-        : undefined;
-    // 与 wakeStewardForDeliveredSteps 共享「本 revision 已通知」：同一 delivered 集合不再向 Lead 双发。
-    if (deliveredHash !== undefined && context.deliveredNotifiedHash === deliveredHash) {
-      diagnostic.record("governance.coordination.skip", { flowId, reasonCode: "delivered-wake-shared" });
-      return;
-    }
     const dedupe = `${revision}\u0000${stage.key}`;
     if (coordinationWakeNotified.get(key) === dedupe) return;
     // Lead 忙 / 有排队或在途投递 ⇒ 不并发注入；等下一次真实事件（不轮询、不抢跑）。
@@ -4427,7 +4414,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       diagnostic.error("governance.coordination.open.failed", new Error(opened.error ?? "unknown"), { flowId });
       return;
     }
-    const sent = await manager.sendBackground({ projectRoot, roleId: leadRoleId, runtime, text: task });
+    // kind:"system"：治理唤醒按系统条目录入（UI 显示「系统」、不可撤回），不冒充客户消息。
+    const sent = await manager.sendBackground({ projectRoot, roleId: leadRoleId, runtime, text: task, kind: "system" });
     if (!sent.ok) {
       diagnostic.error("governance.coordination.send.failed", new Error(sent.error ?? "unknown"), { flowId });
       return;
@@ -4445,7 +4433,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     diagnostic.record("governance.coordination.sent", {
       flowId,
       count: state.total,
-      reasonCode: stage.key.startsWith("delivered:") ? "delivered" : "blocked",
+      reasonCode: "blocked",
     });
   };
 
@@ -4527,16 +4515,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     revision: string;
     ledgerEntries: readonly GovernanceLedgerEntry[];
     listing: ProjectListing;
-    deliveredNotifiedHash?: string;
     diagnostic: ReturnType<typeof createDiagnosticLogger>;
   }): Promise<string | undefined> => {
     const { projectRoot, flowId, flow, revision, diagnostic } = info;
     const key = acceptanceFlowKey(projectRoot, flowId);
-    // 有 delivered 待核证 ⇒ 本轮先等 Steward 核证（与 delivered 唤醒共享同一 revision 指纹，不双发）。
+    // 有 delivered 待核证 ⇒ 本轮先等 Steward 核证（delivered 核证优先，不向 Steward 双发）。
     const deliveredPending = flow.steps.some(
       (step) => step.status === "delivered" && typeof step.owner === "string" && step.owner.trim() !== "",
     );
-    if (deliveredPending || info.deliveredNotifiedHash !== undefined) {
+    if (deliveredPending) {
       diagnostic.record("flow.ready-wake.skip", { flowId, reasonCode: "delivered-pending" });
       return undefined;
     }
@@ -4593,7 +4580,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       diagnostic.error("flow.ready-wake.open.failed", new Error(opened.error ?? "unknown"), { flowId });
       return undefined;
     }
-    const sent = await manager.sendBackground({ projectRoot, roleId: "convener", runtime, text: task });
+    // kind:"system"：治理唤醒按系统条目录入（UI 显示「系统」、不可撤回），不冒充客户消息。
+    const sent = await manager.sendBackground({ projectRoot, roleId: "convener", runtime, text: task, kind: "system" });
     if (!sent.ok) {
       diagnostic.error("flow.ready-wake.send.failed", new Error(sent.error ?? "unknown"), { flowId });
       return undefined;
@@ -4778,7 +4766,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       if (reworkBranch) {
         // delivered 核证 / artifact 补登仍是独立时机（返工步骤 delivered 也要唤醒 Steward）。
         await backfillFlowArtifacts(info.projectRoot, info.flowId, diagnostic);
-        await wakeStewardForDeliveredSteps(info.projectRoot, info.flowId, note, diagnostic);
+        await wakeStewardForDeliveredSteps(info.projectRoot, info.flowId, diagnostic);
         if (latest.kind === "rejected") {
           const evidence = latest.entry.decisionEvidence;
           const judgeAudit = evidence?.kind === "judge" ? evidence.judge : undefined;
@@ -4898,19 +4886,18 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // 2026-10-20 真机：先把 flow artifact 证据补登（幂等；旧扫描规则写下的 evidence.ref 文件），
       // 再唤醒 Steward / 跑验收判定——Steward 的 flow_step_update done 才能通过 insufficient-evidence。
       await backfillFlowArtifacts(info.projectRoot, info.flowId, diagnostic);
-      // 2026-10-20 真机：步骤 delivered 后唤醒 Steward 核证（无活会话/队列才投；同 revision+集合去重）。
+      // 2026-10-20 真机：步骤 delivered 后唤醒 Steward 核证（无活会话/队列、统筹空闲才投；按 stepId 去重）。
       // 放在 verifier 去重之前——即使本次不派 verifier，也必须评估 delivered 核证。
-      // 2026-10-24：返回「本 revision+delivered 集合已通知」指纹，供治理协调唤醒共享（同一 revision 不双发）。
-      const deliveredNotifiedHash = await wakeStewardForDeliveredSteps(info.projectRoot, info.flowId, note, diagnostic);
-      // 2026-10-24 治理协调唤醒（S3）：只把阻塞/交付待核证阶段交给 Lead；不自动推进、不派项目角色。
+      await wakeStewardForDeliveredSteps(info.projectRoot, info.flowId, diagnostic);
+      // 2026-10-24 治理协调唤醒（S3）：只把阻塞阶段（failed/blocked/aborted）交给 Lead；不自动推进、不派项目角色。
+      // 交付待核证只走上面的统筹通道（2026-10-26 客户真机：主理不再对 delivered 落系统行/派协调）。
       if (parsedFlowForGate !== undefined && flowRevisionForGate !== undefined) {
         await noteGovernanceCoordination(info.projectRoot, info.flowId, parsedFlowForGate, flowRevisionForGate, {
-          ...(deliveredNotifiedHash !== undefined ? { deliveredNotifiedHash } : {}),
           diagnostic,
         });
         // 2026-10-24 P0-2：就绪步骤继续调度唤醒。读同一份 flow/revision + 账本已派发集合，只对
         // Steward 可执行的 ready 投一条 `[自动推进]` 提示；不派发、不标 done、不写 flow/账本。
-        // 有 delivered 待核证时本轮不唤醒（delivered 核证优先；与 delivered 唤醒共享同一 revision 指纹）。
+        // 有 delivered 待核证时本轮不唤醒（delivered 核证优先）。
         await wakeStewardForReadySteps({
           projectRoot: info.projectRoot,
           flowId: info.flowId,
@@ -4918,7 +4905,6 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           revision: flowRevisionForGate,
           ledgerEntries: ledger.entries,
           listing,
-          ...(deliveredNotifiedHash !== undefined ? { deliveredNotifiedHash } : {}),
           diagnostic,
         });
       }

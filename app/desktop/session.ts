@@ -14,7 +14,8 @@ import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, Repo
 //  - 聊天是多轮的：会话经编排 openRoleSession 建立，send 反复调；同一角色重复点击 = 续接当前会话（不重建）。
 //  - **切换保留历史（B-2，2026-10-12 设计：路线 a「并存会话」）**：每角色各持一个保活句柄（`sessions` Map）,
 //    **切走不 stop、切回直接续**（句柄与模型上下文天然保留）；同时保活数上限 `MAX_LIVE_SESSIONS`（LRU，
-//    淘汰者 dispose、界面侧历史由渲染层自持）；事件外推带 **`roleId` 信封**（多会话并存不串消息）；
+//    淘汰者 dispose、界面侧历史由渲染层自持；**跳过 busy 与各项目主理 `primaryRoleId`**——主理会话不关闭）；
+//    事件外推带 **`roleId` 信封**（多会话并存不串消息）；
 //    `stop(roleId)` **定向**关闭（缺省=全部，供换项目/退出）。
 //  - **回交自动投递 su 验收 + su 派发任务路由（E-1 / H-1，2026-10-12 设计；客户裁定全自动、无开关）**：
 //    E-1——某角色（≠su）的回交事件到达时，经编排的 `renderHandbackPrompt`（**单一来源**）自动投递进 su 的
@@ -254,6 +255,7 @@ export interface GovernanceClientProjectionV1 {
 /**
  * 同时**保活**的会话数上限（B-2 路线 a 的 LRU 上限；设计建议 3）。超出即淘汰**最久未用**者
  * （dispose；界面侧历史由渲染层自持——切回时恢复并明示「模型上下文已重启」）。
+ * 淘汰候选不含 busy 会话（P1-2），也不含各项目的主理（`primaryRoleId`，2026-10-26 客户指令）。
  */
 export const MAX_LIVE_SESSIONS = 3;
 
@@ -286,6 +288,12 @@ export interface SessionMessageMetadata {
   /** **应用代客户推进治理流程**（2026-10-18 客户修正）：后台投递标记——不抢 `activeRoleId`/当前 pane，
    *  边界陈旧重建也按「非用户发起」处理。仅桌面主进程内部使用（渲染侧传了也不构成任何权限）。 */
   background?: boolean;
+  /**
+   * **投递类别**（2026-10-26 客户真机反馈）：`system` = 治理唤醒（交付核证/协调/自动推进）——入队时按
+   * `DeliveryItem kind:"system"` 记类（UI 队列显示「系统」、不可撤回），不再冒充客户消息。缺省 `message`
+   * （真实客户消息语义逐字不变）。仅桌面主进程内部使用；渲染侧/客户输入不构成权限。
+   */
+  kind?: "system";
 }
 
 export interface SessionTarget { projectRoot?: string; roleId: string; runtime?: RuntimeKind }
@@ -1374,7 +1382,11 @@ export class SessionManager {
    *  待某会话 settled（下一时机＝consume 的 settled 收口处）再收。切回被淘汰者的提示链路（D-1
    *  recovered/rebuilt 文案）逐字未动——不出现第二套文案。
    *  `keepRoleId`：本次**正在开启**的那个不淘汰（用户刚点的会话不能被自己的开启动作回收——
-   *  「全忙暂超限」的子情形：除它之外全忙 ⇒ 暂超限）。 */
+   *  「全忙暂超限」的子情形：除它之外全忙 ⇒ 暂超限）。
+   *  **2026-10-26 客户指令：主理（Lead，`primaryRoleId`）的会话不按容量淘汰**——主理会话设计为不关闭，
+   *  即使它是最久未用者。主理 id **逐会话按其所属项目**经 `deps.getListing` 解析（single/su 同口径；
+   *  多项目并存时各认各的主理，不硬编码角色 id）。显式生命周期（项目关闭/切换、边界陈旧重建、定向 stop）
+   *  不经本方法，行为不变；其余角色仍按既有 busy/LRU 规则淘汰。 */
   private async evictBeyondLimit(keepRoleId?: string): Promise<void> {
     while (this.sessions.size > MAX_LIVE_SESSIONS) {
       let oldestId: string | null = null;
@@ -1382,6 +1394,7 @@ export class SessionManager {
       for (const [id, s] of this.sessions) {
         if (s.busy) continue; // 正在跑轮次的不淘汰（暂超限等它 settled——绝不静默掐断后台任务）
         if (keepRoleId !== undefined && id === keepRoleId) continue; // 正在开启的那一个也不淘汰
+        if (this.isPrimarySession(s)) continue; // 主理（Lead）常驻：不按容量淘汰
         if (s.lastUsed < oldestUsed) {
           oldestUsed = s.lastUsed;
           oldestId = id;
@@ -1392,6 +1405,17 @@ export class SessionManager {
       if (!entry) return;
       await this.disposeEntry(oldestId, entry);
     }
+  }
+
+  /**
+   * 该会话是否为其**所属项目**的主入口（主理 Lead；single/su 同口径，`primaryRoleId` 由门禁枚举给出，
+   * 不硬编码角色 id）。多项目并存时逐会话按各自 `projectRoot` 解析——A 项目的主理不会被 B 项目误 pin。
+   * listing 精确 miss 时按斜杠变体兜底（同 `findListingForFeedback` 先例）；listing 暂不可得 ⇒ false
+   * （无主理信息，维持既有淘汰语义）。
+   */
+  private isPrimarySession(entry: LiveSession): boolean {
+    const listing = this.findListingForFeedback(entry.projectRoot);
+    return typeof listing?.primaryRoleId === "string" && listing.primaryRoleId !== "" && entry.roleId === listing.primaryRoleId;
   }
 
   // —————— O-1（2026-10-12）：边界快照检查与作废重建 ——————
@@ -1620,8 +1644,10 @@ export class SessionManager {
    * 但新 revision 的任务仍会作为新任务投递（文本未带 revision 的场景，如 delivered 唤醒）。
    * `stableIdentity:false` 只用于非任务的治理反馈镜像（同文可在不同轮次重复，保持既有语义）。
    * 真实客户消息不经本方法，不受影响（同文重复发送仍是两个意图）。
+   * `kind:"system"`（2026-10-26）：仅**治理唤醒**使用——目标忙时入队为 `DeliveryItem kind:"system"`
+   * （UI 显示「系统」、不可撤回）；缺省是客户消息类别（既有语义逐字不变）。
    */
-  async sendBackground(input: { projectRoot: string; roleId: string; runtime: RuntimeKind; text: string; clientMessageId?: string; identitySeed?: string; stableIdentity?: boolean }): Promise<SendResult> {
+  async sendBackground(input: { projectRoot: string; roleId: string; runtime: RuntimeKind; text: string; clientMessageId?: string; identitySeed?: string; stableIdentity?: boolean; kind?: "system" }): Promise<SendResult> {
     const clientMessageId =
       input.clientMessageId ??
       (input.stableIdentity === false
@@ -1633,7 +1659,7 @@ export class SessionManager {
       input.text,
       undefined,
       { projectRoot: input.projectRoot, roleId: input.roleId, runtime: input.runtime },
-      { background: true, ...(clientMessageId !== undefined ? { clientMessageId } : {}) },
+      { background: true, ...(input.kind !== undefined ? { kind: input.kind } : {}), ...(clientMessageId !== undefined ? { clientMessageId } : {}) },
     );
   }
 
@@ -2700,6 +2726,9 @@ export class SessionManager {
     if (typeof metadata?.clientMessageId === "string" && metadata.clientMessageId !== "") clientMessageId = metadata.clientMessageId;
     // 应用代客户推送（2026-10-18）：后台投递——不抢 activeRoleId、不把「当前为空」复位成目标角色。
     const background = metadata?.background === true;
+    // 2026-10-26 客户真机：治理唤醒按 `system` 入队（UI 显示「系统」、不可撤回）；缺省仍是客户消息类别。
+    // 只认可 `background` 投递上的 system 标记——渲染侧即便伪造 metadata 也不会把客户消息伪装成系统条目。
+    const deliveryKind: "message" | "system" = background && metadata?.kind === "system" ? "system" : "message";
     let targetRoleId = this.activeRoleId;
     if (target !== undefined) targetRoleId = this.targetKey(target) ?? null;
     const selectionVersion = this.selectionVersion;
@@ -2751,13 +2780,14 @@ export class SessionManager {
     if (entry.busy || (entry.runtime === "pi" && entry.profileRevision !== this.profileRevision("pi") && this.hasBusyRuntime("pi"))) {
       const roleId = entry.roleId;
       this.enqueueDelivery(entry.projectRoot, roleId, {
-        kind: "message",
+        kind: deliveryKind,
         clientMessageId,
         runtime: entry.runtime,
         targetRoleId: roleId,
         sourceRoleId: roleId,
         text,
-        summary: mainT("main.session.youMessage", { text: shortenText(text, 40) }),
+        // 系统条目摘要不写「你：」（队列行已按 kind 显示「系统」）；客户消息文案逐字不变。
+        summary: deliveryKind === "system" ? shortenText(text, 40) : mainT("main.session.youMessage", { text: shortenText(text, 40) }),
         // 客户消息逐条独立（**不去重**——同文重复发送是两个意图）：键含自增序号+时间。
         dedupKey: `msg\u0000${++this.messageSeq}\u0000${Date.now()}`,
         // P0-1：**入队即定格**——原包存进条目；投递组合来源和 ACK，图片引用不变。
@@ -2772,6 +2802,8 @@ export class SessionManager {
     // （含 `settled`）可能在 `send` 返回前就被消费循环处理完；若此刻才置忙，settled 的复位会被反向覆盖，
     // 忙态将**永不复位**（队列也永不放行）。失败 ⇒ 复位 + 外推（并没有在跑，如实）。
     const origin = this.beginDeliveryOrigin(entry, clientMessageId);
+    // 直接投出的治理唤醒同样带 system 类别（与入队条目同口径；客户消息不设，既有语义不变）。
+    if (deliveryKind === "system") origin.kind = "system";
     entry.interactionState.turn = new AbortController();
     entry.busy = true;
     entry.busySince = this.now(); // G-2/W1：本轮起点定格（看护信号 #1 的 elapsed 基准；busy 期间才被读取）

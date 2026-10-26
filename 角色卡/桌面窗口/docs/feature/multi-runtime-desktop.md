@@ -36,7 +36,7 @@ flowchart TD
   replay --> render[IPC 带三元身份 UI 按身份消费]
 ```
 
-窗口在开会话、发言和队列投递前检查实际边界文件指纹及 profile revision。忙轮次不被配置重建打断；新输入入队时固定身份、图片包及可选clientMessageId。每次原prompt调用通过Core真实onTurnStarted回执绑定actualturn，事件只查该原记录；匿名派发/回交也有独立来源，未知或缺ACK不借客户ID。settled先捕获来源再清忙/启动队列，旧轮次拒绝不清新busy。该客户端ID只作原气泡显示关联，不持久化、不授予权限。派发、回交与客户消息共用 FIFO；失败回到队首，并保留其间新到的消息。LRU 只回收空闲句柄。旧句柄流经过身份守卫，不得清除新句柄的状态。
+窗口在开会话、发言和队列投递前检查实际边界文件指纹及 profile revision。忙轮次不被配置重建打断；新输入入队时固定身份、图片包及可选clientMessageId。每次原prompt调用通过Core真实onTurnStarted回执绑定actualturn，事件只查该原记录；匿名派发/回交也有独立来源，未知或缺ACK不借客户ID。settled先捕获来源再清忙/启动队列，旧轮次拒绝不清新busy。该客户端ID只作原气泡显示关联，不持久化、不授予权限。派发、回交与客户消息共用 FIFO；失败回到队首，并保留其间新到的消息。LRU 只回收空闲句柄，且不回收各项目主理（`primaryRoleId`，主理会话不关闭）。旧句柄流经过身份守卫，不得清除新句柄的状态。治理唤醒（交付核证/主理阻塞协调/自动推进）按 `system` 条目录入——UI 显示「系统」、不可撤回；统筹忙时 delivered 核证合并为一条，交付核证只走统筹通道。
 
 设置字段来自共享 `RUNTIME_SETTINGS`。视图反映文件、环境、明确 fallback 或默认来源；秘密字段永远是空 value 加 isSet。空白认证和模型不算已设置，Codex 可按真实适配器约定使用 OPENAI_API_KEY fallback。提交只接受选定引擎字段里的字符串，拒绝含用户名/密码的地址。文件经共享原子写成功后才增加 revision；失败保持原 revision。
 

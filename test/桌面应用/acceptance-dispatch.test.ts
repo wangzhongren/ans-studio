@@ -1989,7 +1989,7 @@ function deliveredFlowSteps(flowId: string): FlowYamlStepInput[] {
   ];
 }
 
-test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任务 + Lead 恰一条系统行、无客户卡；同 revision 不刷屏、同集合 revision 变化不重发、新步骤再评估", async () => {
+test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任务、不向主理落等待核证系统行、无客户卡；同 revision 不刷屏、同集合 revision 变化不重发、新步骤再评估", async () => {
   const root = makeTempProjectRoot("ans-delivered-wake-");
   try {
     const flowId = "flow-delivered";
@@ -2007,14 +2007,15 @@ test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任
       await waitFor(() => (harness.sendsByRole.get("convener")?.length ?? 0) > 0);
       const sends = harness.sendsByRole.get("convener")!;
       assert.equal(sends.length, 1, "delivered + 无活会话 ⇒ Convener 恰一条核证任务");
+      assert.match(sends[0]!, /^\[系统·治理核证\]/, "治理唤醒带系统前缀（渲染侧按 system 行呈现）");
       assert.match(sends[0]!, /integration-e2e 已 delivered（owner=executor）/);
       assert.match(sends[0]!, /verification-evidence 已 delivered/);
       assert.match(sends[0]!, /flow_step_update/, "要求用 flow_step_update 核证");
       assert.match(sends[0]!, /不要直接写 flow YAML/, "禁止直接写 flow YAML");
-      const wakeNotes = () =>
+      // 2026-10-26 客户真机：交付核证只走统筹通道——主理不再落「已 delivered，等待统筹核证」系统行。
+      const leadDeliveredNotes = () =>
         deliveryNotes(harness.events, "liaison").filter((note) => note.includes("已 delivered，等待统筹"));
-      assert.equal(wakeNotes().length, 1, "Lead 恰一条「已 delivered，等待 Steward 核证」系统行");
-      assert.ok(wakeNotes()[0]!.includes("integration-e2e") && wakeNotes()[0]!.includes("verification-evidence"));
+      assert.equal(leadDeliveredNotes().length, 0, "主理不落等待核证系统行");
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "流程未齐备 ⇒ 不派 verifier");
       assert.equal(customerCalls.length, 0, "全程零客户卡");
       // 不伪造 done、不自动改 flow：文件仍是 delivered/pending。
@@ -2024,11 +2025,11 @@ test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任
         assert.equal(unchanged.flow.steps.find((step) => step.id === "integration-e2e")?.status, "delivered", "不伪造 done");
         assert.equal(unchanged.flow.steps.find((step) => step.kind === "acceptance")?.status, "pending", "验收步骤不动");
       }
-      // 同 revision + 同一 delivered 集合：重复 settle 不刷屏。
+      // 同一 delivered 集合：重复 settle 不刷屏。
       harness.controls.get("convener")!.settle();
       await sleep(300);
-      assert.equal(harness.sendsByRole.get("convener")!.length, 1, "同 revision 不重复派");
-      assert.equal(wakeNotes().length, 1, "同 revision 不重复提示");
+      assert.equal(harness.sendsByRole.get("convener")!.length, 1, "同一集合不重复派");
+      assert.equal(leadDeliveredNotes().length, 0, "主理始终不落等待核证系统行");
       // 2026-10-26 客户真机修复：delivered 唤醒按 **stepId 已通知集合**去重。同集合仅 revision
       //（title/字节）变化 ⇒ 已通知过的步骤不再重发（真机 01:56:44/50 同一步骤 6 秒内重复的根因）。
       await sleep(30);
@@ -2047,7 +2048,7 @@ test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任
       harness.controls.get("convener")!.settle();
       await sleep(400);
       assert.equal(harness.sendsByRole.get("convener")!.length, 1, "同集合 revision 变化：已通知步骤不重复派");
-      assert.equal(wakeNotes().length, 1, "同集合 revision 变化：Lead 不重复提示");
+      assert.equal(leadDeliveredNotes().length, 0, "同集合 revision 变化：主理仍不落行");
       assert.equal(customerCalls.length, 0, "仍零客户卡");
 
       // 新 delivered 步骤 ⇒ 重新评估、恰再派一次；第二条只含**本次新步骤**（不重复已通知的两步）。
@@ -2066,7 +2067,7 @@ test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任
       assert.match(secondSend, /verification-evidence-2/, "新步骤在场");
       assert.ok(!secondSend.includes("- 步骤 integration-e2e "), "不重复已通知的 integration-e2e");
       assert.ok(!secondSend.includes("- 步骤 verification-evidence "), "不重复已通知的 verification-evidence（前缀同名不误判）");
-      assert.equal(wakeNotes().length, 2, "Lead 只为新步骤再提示一次");
+      assert.equal(leadDeliveredNotes().length, 0, "主理仍不落行");
       assert.equal(customerCalls.length, 0, "仍零客户卡");
     } finally {
       await harness.iface.stopSession();
@@ -2093,6 +2094,69 @@ test("2026-10-20 delivered 唤醒：owner 有活会话 ⇒ 不抢跑（等下一
         deliveryNotes(harness.events, "liaison").filter((note) => note.includes("已 delivered，等待 Steward")).length,
         0,
         "owner 有活会话 ⇒ 不发等待核证系统行",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-26 客户真机：统筹忙 ⇒ 多个 delivered 步骤不逐条发；空闲后的下一次检查合并为一条；不向主理双发", async () => {
+  const root = makeTempProjectRoot("ans-delivered-wake-merge-");
+  try {
+    const flowId = "flow-delivered-merge";
+    // 初始：无 delivered 步骤（先让统筹进入忙态，期间再来 delivered）。
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(root, flowId, []);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      // 让统筹处于忙态（真实 send 开跑、未 settle）。
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "pi" })).ok, true);
+      const convenerSends = (): string[] => harness.sendsByRole.get("convener") ?? [];
+      const hold = harness.iface.sendSession({ text: "统筹占位轮次", target: { projectRoot: root, roleId: "convener", runtime: "pi" } });
+      assert.equal((await hold).ok, true, "占位轮次已投出");
+      const baseline = convenerSends().length;
+      assert.equal(baseline, 1);
+
+      // 第一条 delivered 出现并触发检查——统筹忙 ⇒ 不发。
+      writeFlowStateFile(root, flowId, flowStateYaml(flowId, deliveredFlowSteps(flowId)));
+      await harness.iface.listProject({ projectRoot: root });
+      await sleep(350);
+      assert.equal(convenerSends().length, baseline, "统筹忙 ⇒ 第一条 delivered 不投递（不逐条发）");
+
+      // 又一条 delivered（并触发一次检查）——仍忙 ⇒ 也不发，步骤留在待通知集合。
+      writeFlowStateFile(
+        root,
+        flowId,
+        flowStateYaml(flowId, [...deliveredFlowSteps(flowId), { id: "verification-evidence-2", kind: "dispatch", status: "delivered", owner: "executor" }]),
+      );
+      await harness.iface.listProject({ projectRoot: root });
+      await sleep(350);
+      assert.equal(convenerSends().length, baseline, "统筹忙 ⇒ 第二条也不投递");
+
+      // 统筹空闲 ⇒ 下一次验收检查把**全部待核证步骤合并为一条**消息。
+      harness.controls.get("convener")!.settle();
+      await waitFor(() => convenerSends().length === baseline + 1, 4000);
+      const merged = convenerSends()[baseline]!;
+      assert.match(merged, /^\[系统·治理核证\]/, "治理唤醒带系统前缀（渲染侧按 system 行呈现）");
+      assert.match(merged, /integration-e2e 已 delivered/);
+      assert.match(merged, /verification-evidence 已 delivered/);
+      assert.match(merged, /verification-evidence-2 已 delivered/);
+      assert.equal(convenerSends().length, baseline + 1, "只投一条合并消息（不是每条一步一条）");
+      await sleep(200);
+
+      // 交付核证只走统筹通道：主理既不收「等待统筹核证」系统行，也不收 delivered 阶段协调任务。
+      assert.equal(
+        deliveryNotes(harness.events, "liaison").filter((note) => note.includes("已 delivered，等待统筹")).length,
+        0,
+        "主理不落等待核证系统行",
+      );
+      assert.ok(
+        !(harness.sendsByRole.get("liaison") ?? []).some((text) => text.startsWith("[系统·治理协调]")),
+        "delivered 阶段不唤醒主理协调",
       );
     } finally {
       await harness.iface.stopSession();
@@ -3272,9 +3336,6 @@ test("2026-10-25 request_acceptance：acceptance-criteria pending ⇒ 经编排�
 
     // 已 done：不调用收口助手，直接继续派发（幂等）。
     const doneFlowId = "flow-request-criteria-done";
-    writeFlowStateFile(root, doneFlowId, flowStateYaml(doneFlowId, newContractSteps(doneFlowId, { criteria: true, change: true })));
-    writeNewContractEvidenceFiles(root, doneFlowId, { criteria: true, change: "T2" });
-    await appendNewContractLedger(root, doneFlowId, { criteria: true, change: true });
     let doneCalls = 0;
     const doneHarness = await makeHarness(root, { ...trioListing(), projectRoot: root }, {
       completeAcceptanceCriteriaStep: async (input) => {
@@ -3283,6 +3344,12 @@ test("2026-10-25 request_acceptance：acceptance-criteria pending ⇒ 经编排�
       },
     });
     try {
+      // 夹具在 harness 初始化（含导入补齐检查）**之后**落盘：本用例只验证 request_acceptance 路径，
+      // 避免 listProject 的 40ms 合并检查在并行负载下抢先自动派发 verifier（既有门禁语义不变）。
+      await sleep(150);
+      writeFlowStateFile(root, doneFlowId, flowStateYaml(doneFlowId, newContractSteps(doneFlowId, { criteria: true, change: true })));
+      writeNewContractEvidenceFiles(root, doneFlowId, { criteria: true, change: "T2" });
+      await appendNewContractLedger(root, doneFlowId, { criteria: true, change: true });
       assert.equal((await doneHarness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
       const result = await requestAcceptanceOf(doneHarness, "convener")({ flowId: doneFlowId });
       assert.equal(result.ok, true, result.message);

@@ -325,3 +325,43 @@ test("G-2/W2：`system` 类（看护告警/收束/回执）不可撤回——归
   await send;
   await h.mgr.stop(null);
 });
+
+test("2026-10-26 治理唤醒 sendBackground kind=system：入队为系统条目（UI 显示「系统」、不可撤回）；缺省仍为客户消息类别", async () => {
+  const l = listing(["A"], "A");
+  const h = makeHarness(l);
+  await h.mgr.open({ projectRoot: l.projectRoot, roleId: "A", runtime: "demo" });
+  await tick(30);
+  const release = h.hangNext("A");
+  const running = h.mgr.send("占住本轮");
+  await tick(40);
+  assert.equal(h.latest("A")?.busy, true, "A 在跑（队列放行条件）");
+
+  // 治理唤醒（delivered 核证/协调等）显式声明 system 类别。
+  const wake = await h.mgr.sendBackground({
+    projectRoot: "/proj",
+    roleId: "A",
+    runtime: "demo",
+    text: "[系统·治理核证] 流程 flow-x：以下步骤已 delivered，等待统筹核证：",
+    kind: "system",
+  });
+  assert.equal(wake.ok, true, wake.error ?? "");
+  assert.equal(wake.queued, true, "目标忙 ⇒ 入队");
+
+  // 真实客户消息缺省仍是 message 类别（既有语义不变）。
+  const customer = await h.mgr.send("普通客户消息", undefined, { projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  assert.equal(customer.queued, true);
+  await tick(40);
+
+  const q = h.latest("A")?.queue ?? [];
+  assert.deepEqual(q.map((item) => item.kind), ["system", "message"], "治理唤醒=system；客户消息=message");
+  const wdSystem = h.mgr.withdraw("A", q[0].id);
+  assert.equal(wdSystem.ok, false, "system 唤醒不可撤回（UI 不出现撤回）");
+  assert.match(wdSystem.error ?? "", /只读|不可撤回/);
+  const wdCustomer = h.mgr.withdraw("A", q[1].id);
+  assert.equal(wdCustomer.ok, true, "客户消息撤回语义不变");
+
+  release();
+  await running;
+  await h.mgr.stop(null);
+});
+
