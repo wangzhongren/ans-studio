@@ -1,0 +1,5 @@
+positive checks: 39/39
+legacy phrases absent: 12/12
+convener entries: ["docs/flows/","docs/workflow.md","docs/scheduling/","docs/governance/convener/"]
+convener preauthorizedDirs: ["docs/flows/","docs/scheduling/","docs/governance/convener/"]
+convener capabilities: {"customerInput":true,"handOffIntent":false,"requestClarification":false,"dispatchTask":true,"roleStatus":true,"sessionTail":true,"proposeRecovery":true,"installSkill":false,"installMcp":false,"shell":"operator-approve"}

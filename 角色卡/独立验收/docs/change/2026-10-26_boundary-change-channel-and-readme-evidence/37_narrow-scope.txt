@@ -1,0 +1,6 @@
+ .../governance-roles.ts"                           |  31 ++++--
+ .../governance-trio.test.ts"                       | 117 ++++++++++++---------
+ 2 files changed, 87 insertions(+), 61 deletions(-)
+20	11	"src/common/\351\227\250\347\246\201\345\274\225\346\223\216/governance-roles.ts"
+67	50	"test/\351\227\250\347\246\201\345\274\225\346\223\216/governance-trio.test.ts"
+check: exit 0
