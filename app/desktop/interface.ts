@@ -4147,8 +4147,23 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // 本层在 acceptance check（settle/ledger/导入同一入口）里读 flow YAML：delivered 且 owner 无活会话/
   // busy/队列/在途投递、且 flow 没有已接受的验收决定 ⇒ 向 Convener 后台投一条去重核证任务 + Lead 一条
   // 去重系统行。**不伪造 done、不自动改 flow、不弹客户卡**；Steward 用 flow 工具自行核证。
-  /** 步骤 delivered 唤醒去重：`projectRoot\0flowId` → revision+delivered ids 排序哈希。 */
-  const deliveredWakeNotified = new Map<string, string>();
+  /**
+   * 步骤 delivered 唤醒去重（2026-10-26 客户真机修复）：
+   * `projectRoot\0flowId` → **已通知 stepId 集合**（内存，不持久化）。
+   *
+   * 真机：原实现以「revision + 当前 delivered 全集」哈希去重——集合稍变（某步 done/新步 delivered）或仅
+   * revision 变化，就会把**已通知过**的步骤再通知一遍（01:56:18 {scaffold-test-config, delivery-art-pipeline}
+   * → 01:56:44 {scaffold-test-config} → 01:56:50 {scaffold-test-config}）。现语义：
+   *  · 新消息只含「本次新 delivered 且**从未通知过**」的步骤；全部已通知 ⇒ 不发消息；
+   *  · 先占位（`deliveredWakePendingSteps`）再跨 await：settle/账本/导入多路径并发触发**同一批只发一条**；
+   *    发送失败回滚占位 ⇒ 下一次真实事件仍会补发（绝不因去重漏掉新步骤）；
+   *  · 已通知集合在进程内**单调保留**（步骤 delivered→done→再次 delivered、同名 flow 重跑都不重复通知）；
+   *  · **跨重启语义**：集合只在内存；重启后已 delivered 的步骤会按当前状态再通知一次，之后按新集合去重。
+   *    通知去重不参与任何判定、不写 flow/账本；进度事实始终以 flow/账本为准。
+   */
+  const deliveredWakeNotifiedSteps = new Map<string, Set<string>>();
+  /** 正在发送中的新步骤占位（同批并发触发只发一条；失败回滚，下一次事件补发）。 */
+  const deliveredWakePendingSteps = new Map<string, Set<string>>();
   const wakeStewardForDeliveredSteps = async (
     projectRoot: string,
     flowId: string,
@@ -4167,13 +4182,19 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     const delivered = parsed.flow.steps.filter(
       (step) => step.status === "delivered" && typeof step.owner === "string" && step.owner.trim() !== "",
     );
-    if (delivered.length === 0) {
-      deliveredWakeNotified.delete(key); // 状态已变化：清除，允许后续真实 delivered 再唤醒
-      return undefined;
-    }
-    // owner 有活会话/busy/队列/在途投递 ⇒ 等下一次事件（不抢跑）。
-    const waitingForOwner = delivered.some((step) => {
-      const owner = step.owner.trim();
+    if (delivered.length === 0) return undefined;
+    const revision = createHash("sha256").update(bytes).digest("hex");
+    const deliveredIds = delivered.map((step) => step.id).sort();
+    // 治理协调唤醒共享的「本 revision+当前 delivered 集合」指纹（只用于 Lead 系统行的同状态去重）。
+    const deliveredHash = createHash("sha256").update(`${revision}\u0000${deliveredIds.join("\u0000")}`).digest("hex");
+    const notified = deliveredWakeNotifiedSteps.get(key) ?? new Set<string>();
+    const pending = deliveredWakePendingSteps.get(key) ?? new Set<string>();
+    const newSteps = delivered.filter((step) => !notified.has(step.id) && !pending.has(step.id));
+    // 全部已通知（或同批正在发送中）⇒ 不发消息；返回共享指纹，避免 Lead 对同一状态重复提示。
+    if (newSteps.length === 0) return deliveredHash;
+    // 只对新步骤做「owner 有活会话/busy/队列/在途投递 ⇒ 等下一次事件」护栏（已通知步骤不再阻塞新步骤）。
+    const waitingForOwner = newSteps.some((step) => {
+      const owner = (step.owner ?? "").trim();
       const liveViews = manager.liveSessionViews().filter((view) => view.projectRoot === projectRoot && view.roleId === owner);
       if (liveViews.length > 0) return true;
       for (const runtime of RUNTIME_KINDS) {
@@ -4182,46 +4203,63 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       return false;
     });
     if (waitingForOwner) return undefined;
-    const revision = createHash("sha256").update(bytes).digest("hex");
-    const deliveredIds = delivered.map((step) => step.id).sort();
-    const notifyHash = createHash("sha256").update(`${revision}\u0000${deliveredIds.join("\u0000")}`).digest("hex");
-    if (deliveredWakeNotified.get(key) === notifyHash) return notifyHash; // 同 revision+同一 delivered 集合只派/提示一次
+    const newIds = newSteps.map((step) => step.id).sort();
+    // **先占位再跨 await**（含 runtime 解析之后的 open/send）：同批多路径并发触发只发一条；
+    // 失败/异常回滚，下一次真实事件补发（绝不因去重漏掉新步骤）。
+    for (const step of newSteps) pending.add(step.id);
+    deliveredWakePendingSteps.set(key, pending);
+    const rollback = (): void => {
+      for (const step of newSteps) pending.delete(step.id);
+      if (pending.size === 0) deliveredWakePendingSteps.delete(key);
+    };
     const runtime = await resolveNoteRuntime(projectRoot);
     if (runtime === undefined) {
+      rollback();
       diagnostic.record("acceptance.delivered-wake.runtime-unresolved", { flowId });
       return undefined;
     }
     const task = [
       `流程 ${flowId}：以下步骤已 delivered，等待统筹核证：`,
-      ...delivered.map(
+      ...newSteps.map(
         (step) =>
           `- 步骤 ${step.id} 已 delivered（owner=${step.owner}），请核对账本/产物证据，用 flow_step_update 标 done 或退回修正；不要直接写 flow YAML。`,
       ),
       "核证要求：先核对账本与产物证据再更新步骤状态；未达 done 条件请退回修正；不要直接 write_file 流程 YAML。",
     ].join("\n");
-    const opened = await manager.openBackground({ projectRoot, roleId: "convener", runtime });
-    if (!opened.ok) {
-      diagnostic.error("acceptance.delivered-wake.open.failed", new Error(opened.error ?? "unknown"), { flowId });
-      return undefined; // 失败只诊断（下一次真实事件可再试；不循环）
-    }
-    // 2026-10-25：任务文本不含 revision ⇒ 用本 revision+delivered 集合的**语义指纹**作稳定身份：
-    // 同一 revision 不重投；revision 变化（即使文本相同）仍是新任务，照常唤醒。
-    const sent = await manager.sendBackground({
-      projectRoot,
-      roleId: "convener",
-      runtime,
-      text: task,
-      identitySeed: `${projectRoot}\u0000${flowId}\u0000${notifyHash}`,
-    });
-    if (!sent.ok) {
-      diagnostic.error("acceptance.delivered-wake.send.failed", new Error(sent.error ?? "unknown"), { flowId });
+    try {
+      const opened = await manager.openBackground({ projectRoot, roleId: "convener", runtime });
+      if (!opened.ok) {
+        rollback();
+        diagnostic.error("acceptance.delivered-wake.open.failed", new Error(opened.error ?? "unknown"), { flowId });
+        return undefined; // 失败只诊断（下一次真实事件可再试；不循环）
+      }
+      // 稳定身份＝本批新步骤集合（不含 revision）：同一批重试同键；不同批（新增步骤）新键。
+      const sent = await manager.sendBackground({
+        projectRoot,
+        roleId: "convener",
+        runtime,
+        text: task,
+        identitySeed: `${projectRoot}\u0000${flowId}\u0000${newIds.join("\u0000")}`,
+      });
+      if (!sent.ok) {
+        rollback();
+        diagnostic.error("acceptance.delivered-wake.send.failed", new Error(sent.error ?? "unknown"), { flowId });
+        return undefined;
+      }
+    } catch (error) {
+      rollback();
+      diagnostic.error("acceptance.delivered-wake.failed", error, { flowId });
       return undefined;
     }
-    deliveredWakeNotified.set(key, notifyHash);
-    diagnostic.record("acceptance.delivered-wake.sent", { flowId, count: delivered.length });
-    note(mainT("main.interface.deliveredWaitNote", { flowId, steps: deliveredIds.join("、") }));
-    // 返回「本 revision 已通知」指纹：治理协调唤醒与它共享，避免同一 revision 再向 Lead 发第二条消息。
-    return notifyHash;
+    // 提交：本批步骤记入「已通知」（单调，不再重复通知）；占位清空。
+    const committed = deliveredWakeNotifiedSteps.get(key) ?? new Set<string>();
+    for (const step of newSteps) committed.add(step.id);
+    deliveredWakeNotifiedSteps.set(key, committed);
+    rollback();
+    diagnostic.record("acceptance.delivered-wake.sent", { flowId, count: newSteps.length });
+    note(mainT("main.interface.deliveredWaitNote", { flowId, steps: newIds.join("、") }));
+    // 返回「本 revision+当前 delivered 集合」指纹：治理协调唤醒与它共享，避免同一状态再向 Lead 发第二条消息。
+    return deliveredHash;
   };
 
   // —————— 2026-10-24 治理协调唤醒（设计 v1 §6.3；S3）——————

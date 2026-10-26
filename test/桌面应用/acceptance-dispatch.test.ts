@@ -1969,7 +1969,7 @@ function deliveredFlowSteps(flowId: string): FlowYamlStepInput[] {
   ];
 }
 
-test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任务 + Lead 恰一条系统行、无客户卡；同 revision 不刷屏、revision 变化再评估", async () => {
+test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任务 + Lead 恰一条系统行、无客户卡；同 revision 不刷屏、同集合 revision 变化不重发、新步骤再评估", async () => {
   const root = makeTempProjectRoot("ans-delivered-wake-");
   try {
     const flowId = "flow-delivered";
@@ -2009,7 +2009,8 @@ test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任
       await sleep(300);
       assert.equal(harness.sendsByRole.get("convener")!.length, 1, "同 revision 不重复派");
       assert.equal(wakeNotes().length, 1, "同 revision 不重复提示");
-      // revision 变化（仍是 delivered）⇒ 重新评估、再派一次。
+      // 2026-10-26 客户真机修复：delivered 唤醒按 **stepId 已通知集合**去重。同集合仅 revision
+      //（title/字节）变化 ⇒ 已通知过的步骤不再重发（真机 01:56:44/50 同一步骤 6 秒内重复的根因）。
       await sleep(30);
       const changedAt = new Date();
       writeFlowStateFile(
@@ -2024,9 +2025,28 @@ test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任
       );
       utimesSync(path.join(root, "docs", "flows", `${flowId}.yaml`), changedAt, changedAt);
       harness.controls.get("convener")!.settle();
+      await sleep(400);
+      assert.equal(harness.sendsByRole.get("convener")!.length, 1, "同集合 revision 变化：已通知步骤不重复派");
+      assert.equal(wakeNotes().length, 1, "同集合 revision 变化：Lead 不重复提示");
+      assert.equal(customerCalls.length, 0, "仍零客户卡");
+
+      // 新 delivered 步骤 ⇒ 重新评估、恰再派一次；第二条只含**本次新步骤**（不重复已通知的两步）。
+      writeFlowStateFile(
+        root,
+        flowId,
+        flowStateYaml(flowId, [
+          ...deliveredFlowSteps(flowId),
+          { id: "verification-evidence-2", kind: "dispatch", status: "delivered", owner: "executor" },
+        ]),
+      );
+      harness.controls.get("convener")!.settle();
       await waitFor(() => (harness.sendsByRole.get("convener")?.length ?? 0) > 1);
-      assert.equal(harness.sendsByRole.get("convener")!.length, 2, "revision 变化后再次评估（再派一次）");
-      assert.equal(wakeNotes().length, 2, "Lead 再提示一次");
+      assert.equal(harness.sendsByRole.get("convener")!.length, 2, "新 delivered 步骤再评估（再派一次）");
+      const secondSend = harness.sendsByRole.get("convener")![1]!;
+      assert.match(secondSend, /verification-evidence-2/, "新步骤在场");
+      assert.ok(!secondSend.includes("- 步骤 integration-e2e "), "不重复已通知的 integration-e2e");
+      assert.ok(!secondSend.includes("- 步骤 verification-evidence "), "不重复已通知的 verification-evidence（前缀同名不误判）");
+      assert.equal(wakeNotes().length, 2, "Lead 只为新步骤再提示一次");
       assert.equal(customerCalls.length, 0, "仍零客户卡");
     } finally {
       await harness.iface.stopSession();
@@ -2056,6 +2076,86 @@ test("2026-10-20 delivered 唤醒：owner 有活会话 ⇒ 不抢跑（等下一
       );
     } finally {
       await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-26 delivered 唤醒去重：按 stepId 已通知集合——同一步骤不重复、A→A+B 只报 B、revision 变化不重发、不同 flow 独立、重启内存清空重发一次", async () => {
+  const root = makeTempProjectRoot("ans-delivered-wake-step-dedupe-");
+  try {
+    const flowId = "flow-delivered-steps";
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    /** 同一 flow 的 delivered 步骤集合（`tag` 只改 title ⇒ 只变 revision、不变集合）。 */
+    const writeDelivered = (ids: readonly string[], tag = "", targetFlow = flowId): void => {
+      const steps: FlowYamlStepInput[] = [
+        ...yamlAcceptanceSteps(targetFlow).filter((step) => step.id !== "delivery-server"),
+        ...ids.map((id) => ({ id, kind: "dispatch", status: "delivered", owner: "executor", title: `${id} ${tag}` })),
+      ];
+      writeFlowStateFile(root, targetFlow, flowStateYaml(targetFlow, steps));
+    };
+    writeDelivered(["integration-e2e"]);
+    await seedGovernanceEvidence(root, flowId, []);
+    const h = await makeHarness(root, listing);
+    try {
+      await waitFor(() => (h.sendsByRole.get("convener")?.length ?? 0) === 1);
+      assert.match(h.sendsByRole.get("convener")![0]!, /integration-e2e/);
+      assert.ok(!h.sendsByRole.get("convener")![0]!.includes("verification-evidence"));
+      // 放行 Convener 本轮（测试桩：settled 才离开 busy；settle 也会触发一次新检查）。
+      h.controls.get("convener")!.settle();
+      await sleep(150);
+
+      // ① 只改 revision（title），delivered 集合不变 ⇒ 已通知过的步骤不再通知（真机 01:56:44/50 形态）。
+      writeDelivered(["integration-e2e"], "v2");
+      h.controls.get("convener")!.settle();
+      await sleep(400);
+      assert.equal(h.sendsByRole.get("convener")!.length, 1, "同一步骤已通知：revision 变化不重发");
+
+      // ② 先通知 A，再 A+B ⇒ 第二条只含 B（不重复已通知过的 A）。
+      writeDelivered(["integration-e2e", "verification-evidence"]);
+      h.controls.get("convener")!.settle();
+      await waitFor(() => (h.sendsByRole.get("convener")?.length ?? 0) === 2);
+      const second = h.sendsByRole.get("convener")![1]!;
+      assert.match(second, /verification-evidence/, "新 delivered 步骤 B 一定通知");
+      assert.ok(!second.includes("integration-e2e"), "第二条只含本次新步骤 B（未重复 A）");
+      h.controls.get("convener")!.settle();
+      await sleep(150);
+
+      // ③ 同一集合再次 delivered（revision 变化）⇒ 不发第三条。
+      writeDelivered(["integration-e2e", "verification-evidence"], "v3");
+      h.controls.get("convener")!.settle();
+      await sleep(400);
+      assert.equal(h.sendsByRole.get("convener")!.length, 2, "同一集合重复 delivered 事件不再通知");
+
+      // ④ 不同 flow 的已通知集合独立：另一个 flow 的 delivered 步骤照常通知。
+      const otherFlow = "flow-delivered-other";
+      writeDelivered(["integration-e2e"], "", otherFlow);
+      h.controls.get("convener")!.settle();
+      await waitFor(() => (h.sendsByRole.get("convener")?.length ?? 0) === 3);
+      assert.ok(h.sendsByRole.get("convener")![2]!.includes(`流程 ${otherFlow}`), "不同 flow 各自维护已通知集合");
+    } finally {
+      await h.iface.stopSession();
+    }
+
+    // ⑤ 重启语义（内存集合清空）：新的 Interface 实例会把已 delivered 的步骤按当前状态**再通知一次**，
+    // 之后仍按新实例的集合去重。通知去重不落盘，进度事实以 flow/账本为准。
+    const h2 = await makeHarness(root, listing);
+    try {
+      await waitFor(() => (h2.sendsByRole.get("convener")?.length ?? 0) >= 1);
+      h2.controls.get("convener")?.settle();
+      await waitFor(() => (h2.sendsByRole.get("convener") ?? []).some((text) => text.includes(`流程 ${flowId}`)), 5000);
+      const afterRestart = h2.sendsByRole.get("convener") ?? [];
+      assert.ok(afterRestart.some((text) => text.includes(`流程 ${flowId}`)), "重启后已 delivered 步骤按当前状态再通知一次（内存去重清空）");
+      h2.controls.get("convener")?.settle();
+      await sleep(400);
+      assert.equal(
+        afterRestart.filter((text) => text.includes(`流程 ${flowId}`)).length,
+        1,
+        "重启后的同一实例内仍按 stepId 集合去重（不再重复）",
+      );
+    } finally {
+      await h2.iface.stopSession();
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
