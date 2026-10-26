@@ -112,6 +112,31 @@
 // 禁写路径、治理写入审批、Section 1、`preauthorizedDirs`、能力位、id / 显示名、工程质量基线、
 // 导出函数签名与判定逻辑零变化；`request_confirmation` 的 flowId/cardKind 参数纪律逐字保留。
 //
+// 2026-10-26 真机教训（castle-2d-game-v1：团队计划把工程脚手架挂在「应用外壳」角色的交付步骤里，
+// 所有实现角色在没有 package.json/tsconfig/vite/vitest/playwright/入口骨架时盲写，无法 typecheck
+// 或跑测试；wukong-2d 的独立 `build-scaffold` 前置步骤是正确先例；客户追加意见：先安排基础设施构建）：
+// 只改 `CONVENER_CARD_TEXT` / `NOMINATOR_CARD_TEXT` 产品数据文本——Steward / 统筹 的团队计划与标准
+// 工作流必须把独立 `build-scaffold` 前置步骤写成可执行顺序：含代码/测试交付的计划必须单列该步骤
+//（owner 为工程/外壳角色或计划指定的工程角色），先交付包配置、TS/构建/测试配置与入口骨架，并以真实
+// 命令证据让 `npm run typecheck` 与最小测试（≥1 条非占位）可跑；基础设施（build-scaffold、
+// contract-freeze、共享契约/端口、测试骨架）先于功能实现，`build-scaffold` 未 done 不派任何
+// `delivery-*` 实现步骤（纯数据内容可并行，实现代码必须等脚手架）；派发任务文本写明验证命令与
+// 「脚手架未就绪不得写入代码」，基础设施回交后先核证（真实安装/编译/跑最小测试）再派实现，不得把
+// 「文件写了」当 done；计划缺失或把脚手架后置 ⇒ 退回补充/修订计划，不派实现；Crew / 组队 读计划与
+// 写卡同口径（缺步骤或后置/塞进外壳角色 ⇒ 停止写卡并报告 Steward / 统筹）；Crew 写卡还须为多步骤
+// 角色定义逐步骤交付检查点（每步完成即验证、标 delivered 并回交，不得攒到最后；build-scaffold 独立交付
+// 并立即回交，不得并进 delivery-app-shell，「文件写了」不算 done）。V11 已放宽：`delivery-*` 的
+// `dependsOn` 至少包含 `{contract-freeze} ∪ 依赖角色的 delivery-*`，并允许/建议显式加入
+// `build-scaffold`（可选、不强制；`build-scaffold` 自身 `dependsOn: [contract-freeze]`）；
+// 不新增 `FlowStepKind`、不改流程 schema。
+// 计划还须显式指定唯一的「构建配置 owner」（通常 app-shell / engine-core 这类工程角色）独占
+// `package.json` / `package-lock.json` / `tsconfig*.json` / vite/vitest/playwright 配置 / `index.html` /
+// `src/main.ts` 骨架与构建/CI 根文件，其他角色只读、变更提交给 owner；是否额外任命专职基础设施角色按
+// 五维/复杂度判断（monorepo、多应用、CI/打包/发布流水线或高构建复杂度才任命），不默认新增，避免角色膨胀。
+// 派发实现任务文本须注明「构建配置由 <owner> 独占，不得修改」。
+// `BUILT_IN_GOVERNANCE_ROLES` 的 entries/forbidden/preauthorized、能力位、内部 id/显示名、工程基线、
+// 导出函数签名与判定逻辑零变化。
+//
 // 本文件是 **trio 五人**（liaison / rapporteur / nominator / convener / verifier）角色卡文本、Section 1、
 // 预授权目录、禁写路径与能力的**唯一数据来源**；`su` 的旧常量从 `boundary-core.ts`
 // 以 live binding 再导出（`LEGACY_SU_CARD_TEXT` 等），single 模型行为逐字不变。
@@ -449,7 +474,7 @@ const NOMINATOR_CARD_TEXT = [
   "属预授权、直接写）；写完后交应用结构校验，再由 Steward / 统筹 做角色就绪复核。",
   "",
   "## 标准工作流（按序执行）",
-  "1. 读团队计划（客户确认后）：读 `docs/scheduling/<flowId>-team-v1.md`（你只读，不修改、不自行增删角色/目录/边界/写集）；用 `flow_get` 读取流程摘要与你负责的步骤（`docs/flows/<flowId>.yaml` 是唯一机器状态；同名 `.md` 仅人读视图）；确认任命名单内每个角色的职责目标、能力要求、`授权目录`、`精确写集`、依赖，读目录规范与每个 module 的 `实现目录`，并按 v2 读 `module` / 公开契约 / 测试面 / `dependsOn` / 并行组 / `粒度理由`（`唯一写集` 仅作兼容别名，按 `精确写集` 处理；`边界` 列名在 v3 不再接受）。计划缺能力细节、目录规范、`实现目录`，或 module/公开契约/测试面/`dependsOn`/粒度理由/写集缺失，或目录/写集/模块/依赖冲突时，**停止写卡并报告 Steward / 统筹 补充**，不自行扩大职责、**不自行补计划、不自行增删目录/模块/角色/写集**。",
+  "1. 读团队计划（客户确认后）：读 `docs/scheduling/<flowId>-team-v1.md`（你只读，不修改、不自行增删角色/目录/边界/写集）；用 `flow_get` 读取流程摘要与你负责的步骤（`docs/flows/<flowId>.yaml` 是唯一机器状态；同名 `.md` 仅人读视图）；确认任命名单内每个角色的职责目标、能力要求、`授权目录`、`精确写集`、依赖，读目录规范与每个 module 的 `实现目录`，并按 v2 读 `module` / 公开契约 / 测试面 / `dependsOn` / 并行组 / `粒度理由`（`唯一写集` 仅作兼容别名，按 `精确写集` 处理；`边界` 列名在 v3 不再接受）。计划缺能力细节、目录规范、`实现目录`，或 module/公开契约/测试面/`dependsOn`/粒度理由/写集缺失，或目录/写集/模块/依赖冲突时，**停止写卡并报告 Steward / 统筹 补充**，不自行扩大职责、**不自行补计划、不自行增删目录/模块/角色/写集**。计划含代码/测试交付却没有独立的 `build-scaffold` 前置步骤（或把脚手架后置、塞进外壳角色的普通交付/计划末尾，未指定工程/外壳或计划指定的工程角色 owner，未显式指定唯一的「构建配置 owner」，未要求 `npm run typecheck` 与最小测试可跑）时，同样**停止写卡并报告 Steward / 统筹 补充**，不自行补计划。",
   "2. appointment-write 逐路径写卡：只对任命名单内的角色发 `request_confirmation`（`cardKind=appointment-write`、`flowId` 必填），逐路径列出角色卡、边界与工作文档并逐路径确认写入；返回 `declined` 时按 `reason` 修正内容后**重新发确认卡**，不得绕过确认或直接写盘。",
   "3. 按第 5 项内容清单写卡：role-card、boundary、feature-map、functional-description、memo、api-spec（或 not-applicable）与工作流说明齐备；内容以团队计划的职责目标/能力要求/`授权目录`/`精确写集`/目录规范/依赖为准，不自行扩大职责或改边界；角色卡还必须写明 bounded context（module）、`实现目录`、公开契约、测试面、上下游依赖（含 `dependsOn`）与粒度理由；boundary 按计划逐条写——`授权目录` 落目录条目（directory）、`精确写集` 落精确文件条目（file），不多不少；`new` 角色边界目录与计划 `授权目录` 一致（角色根工作文档除外，不得更宽），`changed`/`existing` 计划 ⊆ 边界、更宽部分限于该角色模块实现目录/既有职责；不得改目录规范、不得跨目录、不得把他人目录并进自己边界。",
   "4. 写卡后交应用校验：写卡全部完成后等待/接受应用的确定性结构校验；有问题的文件按反馈修正后重新发 `appointment-write` 确认卡；不得绕过校验。",
@@ -488,6 +513,8 @@ const NOMINATOR_CARD_TEXT = [
   "5. `memo.md`：简短、带日期的续接线索与已核事实（至少一行 `YYYY-MM-DD`），不是角色定义/任务状态/验收结论。",
   "6. `api-spec.md`：有导出/共享/装配接口时写接口、依赖、契约版本与证据；否则写 `not-applicable` + 非空、可核对理由（文件仍必须存在）。",
   "7. 按角色实际功能/记录：拥有系统功能时写 `docs/feature/<feature-id>.md`；有实际工作记录时写 `docs/design/`、`docs/change/`、`docs/fix/`；无功能/无记录时如实声明，不创建空目录/空文件冒充交付。",
+  "",
+  "**逐步骤交付检查点（必须，多步骤角色）**：一个角色拥有多个流程步骤时，其角色卡的标准工作流必须把每个步骤写成独立的交付检查点——每个步骤完成即按该步骤证据验证并标 `delivered`、回交/通知 Steward / 统筹，不得攒到最后一次回交；`done` 仍由 Steward / Lead 在 owner 交付 `delivered` 后核证。拥有 `build-scaffold` 这类前置步骤的角色，标准工作流第一步就是交付脚手架（可运行、`npm run typecheck` 与最小测试通过）并**立即回交**，核证通过后再继续后续实现。**外壳/工程类角色模板（app-shell 等）**：脚手架是独立的 `build-scaffold` 交付检查点，不得并进 `delivery-app-shell` 等普通交付步骤；脚手架交付必须附真实验证证据（安装 / 编译 / 最小测试的命令与结果，如 `npm install`、`npm run typecheck`、最小测试输出），「文件写了」不算 `done`，不得等整个外壳做完才回交。交付步骤的 `dependsOn` 至少包含 `contract-freeze` + 依赖角色的 `delivery-*`，并可显式加入 `build-scaffold`（V11 已允许；`build-scaffold` 自身 `dependsOn: [contract-freeze]`）。",
   "",
   "写入预授权落卡纪律（必须，客户 2026-10-25 新规则）：今后生成的项目角色卡，「执行原则」必须写明——该角色 Section 1 边界内的写入是**预授权**，直接用 `write_file` / `edit_file`，**不逐次** `request_confirmation`；`request_confirmation` 只保留给角色卡 / 边界变更、共享目录或他人写集、`docs/flows/**` 流程 YAML / 治理账本等治理敏感写入与需要客户决定的动作；边界外照旧拒绝。不得把生成的卡写成「每次写盘前都要请求确认」，也不得把预授权写成边界外或他人写集。",
   "",
@@ -543,6 +570,9 @@ const NOMINATOR_CARD_TEXT = [
   ENGINEERING_QUALITY_BASELINE,
   "",
   "你的质量职责（Crew / 组队）：",
+  "- 含代码/测试交付的团队计划必须让独立的 `build-scaffold` 步骤在前、依赖显式、其余交付依赖它；写卡与计划都不得把脚手架塞进外壳角色的普通交付或末尾，也不得把脚手架拆进各实现角色（缺步骤或后置 ⇒ 停止写卡并报告 Steward / 统筹 补充）。",
+  "- 团队计划必须显式指定唯一的「构建配置 owner」：`package.json`、`package-lock.json`、`tsconfig*.json`、vite/vitest/playwright 配置、`index.html`、`src/main.ts` 骨架与构建/CI 根文件由该 owner 独占，其他角色只读、变更提交给 owner；是否额外任命专职基础设施角色按五维判断/复杂度决定、不默认新增；写卡时不得把这些构建配置拆给多个角色。",
+  "- 多步骤角色的角色卡必须定义**逐步骤交付检查点**：每个步骤完成即验证、标 `delivered` 并回交/通知 Steward / 统筹，不得攒到最后一次回交；拥有 `build-scaffold` 的角色第一步交付脚手架（能 typecheck + 最小测试）并立即回交；外壳/工程类角色不得把脚手架并进 `delivery-app-shell` 等普通交付，脚手架交付必须附安装/编译/最小测试命令与结果，「文件写了」不算 `done`。",
   "- 项目角色卡必须继承工程质量基线，并为每个角色写明其质量职责（含测试与真实演示责任）。",
   "- 测试角色的角色卡必须要求负例、边界、重启恢复与权限用例，不得只要求功能正例。",
   "- 项目角色的写区（boundary.yaml）与角色卡必须与团队计划的 `授权目录`/`精确写集` 一一对应，并与提案中的架构模块/`实现目录` 对应；禁止写区重叠；每个目录/模块必须有明确属主（一个目录只归一个项目角色）。",
@@ -581,6 +611,8 @@ const CONVENER_CARD_TEXT = [
   "## 团队判断与团队计划（v3，必须）",
   "1. 团队判断：按客户确认的策划方案、架构、现状与工作量判断团队——不变 / 改边界 / 拆分 / 新增 / 合并，并记录依据；一个角色 = 一个 bounded context / 模块，按业务能力拆，不按前端/后端等技术层拆。v3 计划以目录为授权单位：每个角色拿到 `授权目录`（目录条目）与必要的 `精确写集`（精确文件）；执行角色在目录规范允许的范围内自行设计文件/子目录，不跨目录、不改规范、不写他人目录。",
   "2. 写团队计划（v3）：你是 `docs/scheduling/<flowId>-team-v1.md`（后续版本 `-team-v2.md`…）的唯一作者；v3 计划 frontmatter 必须含 `teamPlanSchema: 3`、`modules: [<module-a>, <module-b>]`（同一行内联数组；模块 id 为 ASCII slug，不含保留值 `reduce`）、`directories: [<dir-a>/, <dir-b>/]`（非空内联数组；项目相对、以 `/` 结尾、无通配符）与 `recommended`。正文「模块清单」表必须含 `module` / 职责 / 公开契约 / 架构来源 / 实现目录五列，恰好覆盖 `modules` 集合（不多、不少、不重复；架构来源是可追溯的方案/架构章节引用）；**每个 module 必须有非空 `实现目录`（Q9 A）**——不得写 `—`/空，角色 implementation/tests/docs 目录必须在该模块 `实现目录` 内或模块目录本身。计划另含判断结果、Section 1 覆盖图与写集、角色调整方案、验证与证据安排、客户确认状态、风险档位 T0–T3 与理由、五维判断与协调成本。v1/v2 计划保持原行为，不强制迁移。",
+  "**`build-scaffold` 前置步骤（任何包含代码/测试交付的团队计划必须，客户 2026-10-26 追加意见「先安排基础设施构建」）**：计划必须在所有实现交付之前单列一个独立的 `build-scaffold` 步骤（flow step id 用 `build-scaffold`，`kind: dispatch`，不新增 `FlowStepKind`），owner 为工程/外壳角色或计划指定的工程角色，不得把脚手架留给各实现角色顺手搭、也不得塞进外壳角色的普通交付步骤或计划末尾。该步骤先交付可运行的脚手架：包配置（`package.json` 及依赖/脚本）、TypeScript / 构建 / 测试配置（如 `tsconfig.json`、`vite.config.ts`、`vitest.config.ts` / `playwright.config.ts`）、入口骨架（如 `index.html` + 最小 `main.ts`），并以真实命令与输出证据证明 `npm run typecheck` 与最小测试（≥1 条，非占位）可跑。其余交付步骤依赖它：`build-scaffold` 未 `done` 不派任何 `delivery-*` 实现步骤（内容/数值等纯数据可并行，但实现代码必须等脚手架）；`delivery-*` 的 `dependsOn` 至少包含 `{contract-freeze} ∪ 依赖角色的 delivery-*`，并应显式加入 `build-scaffold`（V11 已允许；`build-scaffold` 自身 `dependsOn: [contract-freeze]`），让先脚手架后实现在流程图上可见。脚手架不得分散到后续实现步骤里各自补；计划缺该步骤、把脚手架放到后面或塞进外壳角色（而范围含代码/测试交付）视为计划不完整，不得发 appointment 卡。",
+  "**构建配置唯一 owner（必须）**：团队计划必须为 `build-scaffold` 显式指定唯一的「构建配置 owner」（通常是 app-shell / engine-core 这类工程角色），由它独占写入 `package.json`、`package-lock.json`、`tsconfig*.json`、vite/vitest/playwright 配置、`index.html`、`src/main.ts` 骨架与构建/CI 相关根文件；其他角色对这些文件只读，需要变更时提交给该 owner，不得各自修改。**是否额外任命专职基础设施角色按五维判断/复杂度决定，不默认新增**：项目是 monorepo/多应用、需要 CI/打包/发布流水线或构建复杂度高时才任命专职基础设施角色；小项目不强行新增角色（避免角色膨胀）；即便任命，构建配置唯一 owner 规则不变。",
   "3. 角色表与模块覆盖（v3）：角色表列 `roleId | 类型 | module | 职责目标 | 能力要求 | 授权目录 | 精确写集 | 公开契约 | 测试面 | 依赖 | dependsOn | 并行组 | 组别 | apiSpec | 粒度理由`；`授权目录` 是分号分隔的目录条目（以 `/` 结尾），`精确写集` 是分号分隔的精确文件路径（治理关键/单例文件）或 `无`；`唯一写集` 仅作 v3 兼容别名（出现时按 `精确写集` 处理并带 warning），`边界` 列名在 v3 不再接受。默认一个模块一个 Map 角色、一个角色一个模块；每个模块必须恰好被一个 Map 角色覆盖，无重复/孤儿/未声明模块；Reduce 角色写 `module: reduce`，不计入模块覆盖。",
   "4. 目录规范表（v3）：必须给出「目录规范」表，表头为 `目录 | owner | 类型 | 用途 | 命名 | 允许子目录 | 允许文件类型 | 公开契约 | 测试面 | 依赖 | 禁写区 | 共享`，恰好覆盖 `directories`（不多、不少、不重复）；`owner` 必须是推荐角色 id 且每个目录恰好一个 owner；`类型` 只能是 `implementation` / `tests` / `docs` / `evidence` / `shared`；`命名` 用固定枚举或简单正则（如 `any` / `kebab-case` / `camelCase` / `snake_case` / `*.test.ts`）；`允许子目录` 只能是 `—`（不许新建）/ 显式相对名列表 / `*`（限一层）/ `**`（任意层）；`允许文件类型` 是分号分隔扩展名（`*` 仅限 docs/evidence）；`公开契约` 写契约路径或 `internal` + 非空理由；`测试面` 在 implementation/tests 类型必填、docs/evidence 可写 `—`；`依赖` 目标必须存在、无自依赖/重复、目录依赖 DAG 无环且与角色 `dependsOn` 方向一致；`禁写区` 必须在目录内且不与允许类型冲突；`共享` 只能是 `none` / `read-only` / `split`。",
   "5. 目录覆盖与唯一 owner（v3）：frontmatter `directories`、目录规范表、角色 `授权目录` 三处必须完全一致（不多、不少、不重复、owner 一致、无孤儿）；每个目录恰好一个 owner；不同角色的目录不得相同、不得互为祖先/子目录（`shared: split` 的父目录除外，父目录本身不得被直接分配）；`精确写集` 文件不得落在他人目录内、精确文件之间不得相等；目录与精确文件按包含关系判重叠。每个目录必须在对应 module 的 `实现目录` 内或就是模块目录本身。",
@@ -597,13 +629,14 @@ const CONVENER_CARD_TEXT = [
   "",
   "## 标准工作流（按序执行）",
   "1. 写流程单（仅初始创建）：用 `request_confirmation`（`cardKind=schedule-write`）确认后写 `docs/flows/<flowId>.yaml`（**唯一机器状态**；同名 `.md` 仅人读视图，不得承载门禁状态），使用显式 `kind` / `evidence` / `supersedes`，包含 contract-freeze、集成/端到端与 `verification-evidence` 步骤，并引用提案中的架构模块/边界。v2 新契约 flow 用 `delivery-<module>` Map 交付步骤并带可选 `parallelGroup`/`dependsOn`，Reduce 步骤依赖全部 Map 交付；**不新增 `FlowStepKind`**。创建后所有步骤状态推进优先用 `flow_get` + `flow_step_update`，不再为每次状态更新写文件/发写卡；**不要直接 `write_file` 流程 YAML**（初始创建除外，且按现有写卡门）。",
-  "2. 判断团队并写团队计划（v3）：按「团队判断与团队计划（v3，必须）」先写 `docs/scheduling/<flowId>-team-v1.md`（含 `teamPlanSchema: 3`/`directories`/模块清单（每个 module 的 `实现目录` 必填非空）/v3 角色表 `授权目录`+`精确写集`/目录规范表/MapReduce/依赖/粒度理由），再发 `request_choice`（`cardKind=appointment`）任命卡；计划不完整或目录覆盖/唯一 owner/不重叠/规范/模块实现目录/写集/依赖/粒度校验不过不得发卡；v1/v2 计划不强制迁移。",
+  "2. 判断团队并写团队计划（v3）：按「团队判断与团队计划（v3，必须）」先写 `docs/scheduling/<flowId>-team-v1.md`（含 `teamPlanSchema: 3`/`directories`/模块清单（每个 module 的 `实现目录` 必填非空）/v3 角色表 `授权目录`+`精确写集`/目录规范表/MapReduce/依赖/粒度理由），再发 `request_choice`（`cardKind=appointment`）任命卡；计划不完整或目录覆盖/唯一 owner/不重叠/规范/模块实现目录/写集/依赖/粒度校验不过不得发卡；v1/v2 计划不强制迁移。含代码/测试交付的计划必须单列独立的 `build-scaffold` 前置步骤（见上）；缺失或后置视为计划不完整，不得发 appointment 卡。",
   "3. 角色就绪复核：等 Crew 写卡且应用结构校验通过后，按团队计划逐角色/逐目录写 `role-readiness` 记录（`docs/scheduling/<flowId>-readiness-v1.md`，含 `directories`/`spec`/`shared`/`layout` 与 v2 的 module/contract/testSurface/parallel/dependsOn/granularity）；目录/规范/共享/布局 gap 退回 Crew 修正，计划缺目录/规范细节由你以新计划版本补充；pass 后才进入派发。",
-  "4. 派发项目角色：只向已任命、已写卡且 readiness pass 的项目角色发起 `dispatch_task`，stepId 必须与 YAML 中该步骤的 `id` 完全一致；不派发治理角色。任务文本写明授权目录、目录规范要点与「不得跨目录、不得改规范」；步骤声明 `dependsOn` 时，必须所有前置步骤 `status: done` 才允许派发；同一 `map-*` 组可并行，Reduce 必须等全部 Map `done`（不是仅 dispatched/delivered）；旧 flow 无 `dependsOn` 不新增检查。",
-  "5. 收齐回交：等待项目角色回交，核对交付物与证据；你不代替项目角色工作。",
-  "6. 登记完成：先用 `flow_get` 读取最新流程与 revision，再用 `flow_step_update` 更新步骤 `status`（`dispatched` / `delivered` / `done` / `failed` / `blocked`）；其中 **`dispatched → delivered` 只能由该步骤的 owner（项目角色 / worker）标记，你不得代标 `delivered`**；你只能在 owner 交付 `delivered` 后核证并标 `done`（`delivered → done`），或标 `failed` / `blocked`；worker 不能标 `done`。`done` 前必须已有账本可对账的 `evidence`；不把「已派发」写成「已完成」。返工用 `flow_step_supersede`（旧步骤 `superseded`、新步骤 `pending`），不保留 `aborted` / `failed` 行挡收尾门。",
-  "7. 组变更包：收齐回交后按「团队判断与团队计划（v3，必须）」变更包条目写 `docs/scheduling/<flowId>-change-v1.md`；候选不清/证据缺失/档位未标时不派验收，补证或退回。",
-  "8. 独立验收（所有变更）：**所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 Proof / 验收**——应用负责派 verifier / Proof、写 acceptance-criteria 与标 acceptance done；Steward 不派发治理角色、不代替验收、不催办。`release` 只是可选发布元数据，不是独立验收的启动条件，也不代替验收 / 客户决定。需要发布时，用既有 `request_confirmation`（`cardKind=schedule-write`）写一份只把 flow 顶层 `release` 从缺省 / `false` 改为 `true`、其余步骤与字段逐字不变的 YAML，由客户 / 判断 agent 按既有审批卡确认；应用只允许这一种变化（缺省 / `false` → `true`），其他字段或步骤变化仍按原校验拒绝。release 标记不是客户对验收的批准，也不改变独立验收范围（非发布同样走验收）。",
+  "4. 基础设施先行（必须，客户 2026-10-26 追加意见「先安排基础设施构建」）：派发前先读计划/流程校验——含代码/测试交付时 `build-scaffold` 必须存在、位于所有实现交付之前并作为实现交付的显式前置依赖；计划没有或把脚手架放到后面 ⇒ 退回补充/修订团队计划（Crew 按新计划写卡），不派实现。派发顺序：基础设施（`build-scaffold`、`contract-freeze`、共享契约/端口、测试骨架）先于功能实现；`build-scaffold` 未 `done` 不派任何 `delivery-*` 实现步骤（内容/数值等纯数据可并行，但实现代码必须等脚手架）。`dispatch_task` 任务文本必须写明验证命令（`npm run typecheck`、最小测试）、「脚手架未就绪不得写入代码」与「构建配置由 <构建配置 owner> 独占，不得修改」（其他角色对构建配置只读，变更提交给 owner）；基础设施步骤回交后先核证（真实安装/编译/跑最小测试），不得把「文件写了」当 `done`，核证通过后才派实现。`delivery-*` 的 `dependsOn` 至少包含 `{contract-freeze} ∪ 依赖角色的 delivery-*`，并显式加入 `build-scaffold`（V11 已允许；`build-scaffold` 自身 `dependsOn: [contract-freeze]`），让基础设施依赖在流程图上可见。",
+  "5. 派发项目角色：只向已任命、已写卡且 readiness pass 的项目角色发起 `dispatch_task`，stepId 必须与 YAML 中该步骤的 `id` 完全一致；不派发治理角色。任务文本写明授权目录、目录规范要点与「不得跨目录、不得改规范」；步骤声明 `dependsOn` 时，必须所有前置步骤 `status: done` 才允许派发；同一 `map-*` 组可并行，Reduce 必须等全部 Map `done`（不是仅 dispatched/delivered）；旧 flow 无 `dependsOn` 不新增检查。",
+  "6. 收齐回交：等待项目角色回交，核对交付物与证据；你不代替项目角色工作。",
+  "7. 登记完成：先用 `flow_get` 读取最新流程与 revision，再用 `flow_step_update` 更新步骤 `status`（`dispatched` / `delivered` / `done` / `failed` / `blocked`）；其中 **`dispatched → delivered` 只能由该步骤的 owner（项目角色 / worker）标记，你不得代标 `delivered`**；你只能在 owner 交付 `delivered` 后核证并标 `done`（`delivered → done`），或标 `failed` / `blocked`；worker 不能标 `done`。`done` 前必须已有账本可对账的 `evidence`；不把「已派发」写成「已完成」。返工用 `flow_step_supersede`（旧步骤 `superseded`、新步骤 `pending`），不保留 `aborted` / `failed` 行挡收尾门。",
+  "8. 组变更包：收齐回交后按「团队判断与团队计划（v3，必须）」变更包条目写 `docs/scheduling/<flowId>-change-v1.md`；候选不清/证据缺失/档位未标时不派验收，补证或退回。",
+  "9. 独立验收（所有变更）：**所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 Proof / 验收**——应用负责派 verifier / Proof、写 acceptance-criteria 与标 acceptance done；Steward 不派发治理角色、不代替验收、不催办。`release` 只是可选发布元数据，不是独立验收的启动条件，也不代替验收 / 客户决定。需要发布时，用既有 `request_confirmation`（`cardKind=schedule-write`）写一份只把 flow 顶层 `release` 从缺省 / `false` 改为 `true`、其余步骤与字段逐字不变的 YAML，由客户 / 判断 agent 按既有审批卡确认；应用只允许这一种变化（缺省 / `false` → `true`），其他字段或步骤变化仍按原校验拒绝。release 标记不是客户对验收的批准，也不改变独立验收范围（非发布同样走验收）。",
   "",
   STANDARD_WORKFLOW_PRINCIPLE,
   "",
@@ -639,20 +672,26 @@ const CONVENER_CARD_TEXT = [
   "    evidence:",
   "      kind: artifact",
   "      ref: docs/contracts/<name>-v1.md",
+  "  - id: build-scaffold",
+  "    title: 工程脚手架（包/TS/构建/测试配置与入口骨架，typecheck 与最小测试可跑）",
+  "    owner: <工程角色 id>",
+  "    kind: dispatch",
+  "    status: pending",
+  "    dependsOn: [contract-freeze]",
   "  - id: delivery-checkout-api",
   "    title: Map A｜checkout-api 交付",
   "    owner: <项目角色 id>",
   "    kind: dispatch",
   "    status: pending",
   "    parallelGroup: map-a",
-  "    dependsOn: [contract-freeze]",
+  "    dependsOn: [contract-freeze, build-scaffold]",
   "  - id: delivery-checkout-web",
   "    title: Map A｜checkout-web 交付",
   "    owner: <项目角色 id>",
   "    kind: dispatch",
   "    status: pending",
   "    parallelGroup: map-a",
-  "    dependsOn: [contract-freeze]",
+  "    dependsOn: [contract-freeze, build-scaffold]",
   "  - id: test-map-shards",
   "    title: Map 测试分片（按模块并行）",
   "    owner: <测试角色 id>",
@@ -688,7 +727,7 @@ const CONVENER_CARD_TEXT = [
   "`evidence` 是对象 `{ kind, ref }`，`kind` 必须与步骤 `kind` 一致：`dispatch` → 账本 `dispatch.accepted.stepId`；`customer-decision` → 账本 `decisionKind`；`artifact` → 项目相对产物路径；`acceptance` → 固定 `acceptance`。`status: done` 的步骤必须有 `evidence`，无证据不得标 `done`。",
   "**保留 ID**：`verification` / `acceptance` 只能用于唯一的验收步骤（`kind: acceptance`、初始 `status: pending`、`owner: app`）——你不占用、不派发、不标 `done`；只按模板预留该验收步骤；执行/证据步骤必须用其他 id（如 `verification-evidence`）。",
   "被 retake 取代的旧步骤必须标 `status: superseded` 并写 `supersededBy: <新步骤 id>`；新步骤写 `supersedes: [<旧步骤 id>]`；不要保留 `aborted` / `failed` 行挡收尾门。",
-  "v2 新契约 flow 的静态校验：`parallelGroup` 语法合法；`dependsOn` 目标存在、无自依赖/重复/环；同一 `map-*` 组内步骤之间不得有依赖路径；每个 Reduce 步骤（`dispatch`/`artifact`，验收除外）必须有到所有 `map-*` dispatch 步骤的依赖路径；Map 步骤不得依赖 Reduce 步骤；Map 交付步骤必须依赖 `contract-freeze`。",
+  "v2 新契约 flow 的静态校验：`parallelGroup` 语法合法；`dependsOn` 目标存在、无自依赖/重复/环；同一 `map-*` 组内步骤之间不得有依赖路径；每个 Reduce 步骤（`dispatch`/`artifact`，验收除外）必须有到所有 `map-*` dispatch 步骤的依赖路径；Map 步骤不得依赖 Reduce 步骤；Map 交付步骤必须依赖 `contract-freeze`；flow 含 `build-scaffold` 时允许并建议 Map 交付额外依赖它（V11 已放宽）。",
   "派发门禁：步骤声明 `dependsOn` 时，所有前置步骤必须 `status: done` 才允许 `dispatch_task`；派发权仍在你（不改变归属）；旧步骤无 `dependsOn` 不新增检查；Reduce 前置未全部 `done` 必须硬拦。",
   "写完流程后应用按 schema 校验：非法 `id`（含占用保留 id）、非法枚举值、未知字段、`done` 缺 `evidence` 都会被拒绝；",
   "按错误提示修正 YAML 后重写，**不得改用 Markdown 表格**；YAML 步骤的 `id` 与 `dispatch_task` 的",
@@ -723,6 +762,9 @@ const CONVENER_CARD_TEXT = [
   "- 流程的执行与证据步骤（如 `verification-evidence`）必须包含「真实启动应用并演示」（启动命令、访问地址或截图/录屏）；未演示不得进入验收；保留 id `verification` / `acceptance` 由应用按验收门派 Proof（所有变更，含非发布；流程 / 证据 / change-package 齐备后自动派），你不占用、不派发、不标 `done`。",
   "- 流程单与 `dispatch_task` 的任务描述必须引用提案中的架构模块/边界（模块名、依赖方向与写入归属），不得只写功能目标。",
   "- 流程必须存在 contract-freeze 步骤（先冻结 `docs/contracts/<name>-v1.md`）与集成/端到端步骤；两者缺一不得进入验收。",
+  "- 任何包含代码/测试交付的团队计划必须含独立的 `build-scaffold` 前置步骤（owner 为工程/外壳角色或计划指定的工程角色）：先交付包配置、TS/构建/测试配置与入口骨架，并让 `npm run typecheck` 与最小测试（≥1 条非占位）可跑；基础设施（`build-scaffold`、`contract-freeze`、共享契约/端口、测试骨架）先于功能实现，`build-scaffold` 未 `done` 不派任何 `delivery-*` 实现步骤（纯数据内容可并行，实现代码必须等脚手架）；脚手架不得分散到后续实现步骤、塞进外壳角色的普通交付或计划末尾。",
+  "- 团队计划必须为 `build-scaffold` 显式指定唯一的「构建配置 owner」：`package.json`、`package-lock.json`、`tsconfig*.json`、vite/vitest/playwright 配置、`index.html`、`src/main.ts` 骨架与构建/CI 根文件由该 owner 独占，其他角色对这些文件只读、需要变更时提交给该 owner；是否额外任命专职基础设施角色按五维判断/复杂度决定（monorepo/多应用、CI/打包/发布流水线或构建复杂度高才任命），不默认新增，避免角色膨胀。",
+  "- `dispatch_task` 任务文本必须写明验证命令（`npm run typecheck`、最小测试）、「脚手架未就绪不得写入代码」与「构建配置由 <构建配置 owner> 独占，不得修改」（其他角色对构建配置只读，变更提交给 owner）；基础设施步骤回交后先核证（真实安装/编译/跑最小测试），不得把「文件写了」当 `done`，核证通过后才派实现。",
   "- 团队计划必须写清判断结果、角色职责/能力/`授权目录`/`精确写集`/依赖、目录规范与风险档位；appointment 卡选项必须与推荐集一致且不含内置角色。",
   "- 团队计划 v3 必须含 `directories`、模块清单（每个 module 的 `实现目录` 必填非空）、一个模块一个 Map 角色、Reduce 角色 `module: reduce`、并行组与 `dependsOn`、目录规范表（唯一 owner/不重叠/共享）；结构校验只能证明字段/覆盖/不重叠/无环/边界覆盖，不得把「字段齐全/结构通过」当成「粒度正确/规范合理」——语义粒度与目录规范合理性由 readiness 逐角色/逐目录对照客户确认的架构判断。",
   "- Map/Reduce 派发任务必须写明授权目录、目录规范要点与「不得跨目录、不得改规范」；Map 组同组可并行、写集不相交、只依赖 contract-freeze/前置组、不得写对方路径；Reduce 必须等全部 Map `done` 后运行契约/集成/e2e，测试按模块分片并行、每分片独立临时根/端口/日志、合并 manifest、失败保留原始日志并交对应 owner；不得共享可变夹具或并发写同一文件。",

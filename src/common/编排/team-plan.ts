@@ -2805,7 +2805,8 @@ function flowReachable(steps: Map<string, FlowStateStep>, fromId: string, target
 /**
  * V11：flow 已写时的计划-流程一致性（确定性）：
  *   · 每个 Map 角色的交付步骤 id = `delivery-<主模块>`，owner=roleId、parallelGroup=计划组，
- *     dependsOn 精确等于 `{contract-freeze} ∪ 依赖角色的 delivery-*`；
+ *     dependsOn 必须包含 `{contract-freeze} ∪ 依赖角色的 delivery-*`，并仅可额外包含
+ *     flow 中存在的 `build-scaffold` 前置步骤（可选，不强制；先脚手架后实现）；
  *   · `contract-freeze` 存在且被每个 Map 交付直接/传递依赖；
  *   · 每个 Reduce 步骤（dispatch/artifact，验收除外）直接/传递依赖全部 Map 交付。
  * 不改变任何派发权；只返回问题列表（空 = 一致）。
@@ -2861,16 +2862,22 @@ export function validateTeamPlanFlowConsistency(
         message: `V11：步骤 ${deliveryId} 的 parallelGroup=${String(step.parallelGroup)}，应为 ${row.parallelGroup}`,
       });
     }
-    const expected = new Set<string>(["contract-freeze"]);
+    // 必需集合：contract-freeze ∪ 依赖角色的 delivery-*。
+    const required = new Set<string>(["contract-freeze"]);
     for (const dependency of row.dependsOn) {
       const dependencyRow = plan.roleRows.find((candidate) => candidate.roleId === dependency);
       if (dependencyRow?.isMap && dependencyRow.primaryModule !== undefined) {
-        expected.add(`delivery-${dependencyRow.primaryModule}`);
+        required.add(`delivery-${dependencyRow.primaryModule}`);
       }
     }
+    // 允许集合：必需集合 + flow 中存在的独立 build-scaffold 前置步骤（可选，不强制）。
+    // 2026-10-26 真机教训：先脚手架后实现需要 delivery-* 能显式依赖 build-scaffold。
+    const scaffoldPresent = steps.has("build-scaffold");
+    const allowed = new Set(required);
+    if (scaffoldPresent) allowed.add("build-scaffold");
     const actual = new Set(step.dependsOn ?? []);
-    const missing = [...expected].filter((id) => !actual.has(id));
-    const extra = [...actual].filter((id) => !expected.has(id));
+    const missing = [...required].filter((id) => !actual.has(id));
+    const extra = [...actual].filter((id) => !allowed.has(id));
     if (missing.length > 0 || extra.length > 0) {
       issues.push({
         code: "V11",
@@ -2879,7 +2886,8 @@ export function validateTeamPlanFlowConsistency(
         path: `steps.${deliveryId}.dependsOn`,
         message:
           `V11：步骤 ${deliveryId} 的 dependsOn 必须精确等于 {contract-freeze} ∪ 依赖角色的 delivery-*；` +
-          `缺：${missing.length > 0 ? missing.join("、") : "无"}；多：${extra.length > 0 ? extra.join("、") : "无"}`,
+          `缺：${missing.length > 0 ? missing.join("、") : "无"}；多：${extra.length > 0 ? extra.join("、") : "无"}` +
+          (scaffoldPresent ? "（flow 已含 build-scaffold 步骤，允许额外依赖 build-scaffold）" : ""),
       });
     }
     if (!flowReachable(steps, deliveryId, "contract-freeze")) {

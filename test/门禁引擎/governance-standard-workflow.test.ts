@@ -235,8 +235,8 @@ test("标准工作流：Steward / 统筹——写团队计划→发 appointment 
       "登记完成",
       "内置治理角色的状态 / 回交向 Lead / 主理 汇总",
       "返工由 Lead / 主理 协调",
-      // 2026-10-24 客户修订（撤销 release-only）：第 8 步改为「独立验收（所有变更）」。
-      "8. 独立验收（所有变更）",
+      // 2026-10-24 客户修订（撤销 release-only）：独立验收（所有变更）；2026-10-26 基础设施先行插入新第 4 步，顺延为第 9 步。
+      "9. 独立验收（所有变更）",
       "所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 Proof / 验收",
       "`release` 只是可选发布元数据，不是独立验收的启动条件，也不代替验收 / 客户决定",
       "`cardKind=schedule-write`",
@@ -930,13 +930,27 @@ test("标准工作流：MapReduce flow 模板（P6）——delivery-<module>/par
   const doc = parseYaml(match![1]) as { steps?: Array<Record<string, unknown>> };
   assert.ok(Array.isArray(doc.steps), "模板须解析出 steps 数组");
   const byId = new Map(doc.steps!.map((step) => [String(step.id), step]));
-  for (const id of ["contract-freeze", "delivery-checkout-api", "delivery-checkout-web", "test-map-shards", "integration-e2e", "verification-evidence"]) {
+  for (const id of ["contract-freeze", "build-scaffold", "delivery-checkout-api", "delivery-checkout-web", "test-map-shards", "integration-e2e", "verification-evidence"]) {
     assert.ok(byId.has(id), `模板须含步骤 ${id}`);
   }
+  // 2026-10-26：build-scaffold 是独立的 dispatch 前置步骤（不新增 FlowStepKind）；V11 已放宽，
+  // 交付 dependsOn = {contract-freeze} ∪ 依赖角色的 delivery-* + 可选 build-scaffold。
+  assert.equal(byId.get("build-scaffold")?.kind, "dispatch", "脚手架步骤须用既有 dispatch kind");
+  assert.equal(byId.get("build-scaffold")?.owner, "<工程角色 id>", "脚手架步骤须指定工程角色 owner");
+  assert.deepEqual(byId.get("build-scaffold")?.dependsOn, ["contract-freeze"], "脚手架在契约冻结后、实现交付前");
+  assert.equal(byId.get("build-scaffold")?.parallelGroup, undefined, "脚手架不属于 Map/Reduce 组");
   assert.equal(byId.get("delivery-checkout-api")?.parallelGroup, "map-a", "Map 交付步骤须标 map 组");
   assert.equal(byId.get("delivery-checkout-web")?.parallelGroup, "map-a", "同组 Map 步骤须标同一 map 组");
-  assert.deepEqual(byId.get("delivery-checkout-api")?.dependsOn, ["contract-freeze"], "Map 交付须依赖 contract-freeze");
-  assert.deepEqual(byId.get("delivery-checkout-web")?.dependsOn, ["contract-freeze"], "Map 交付须依赖 contract-freeze");
+  assert.deepEqual(
+    byId.get("delivery-checkout-api")?.dependsOn,
+    ["contract-freeze", "build-scaffold"],
+    "Map 交付须依赖 contract-freeze 与 build-scaffold",
+  );
+  assert.deepEqual(
+    byId.get("delivery-checkout-web")?.dependsOn,
+    ["contract-freeze", "build-scaffold"],
+    "Map 交付须依赖 contract-freeze 与 build-scaffold",
+  );
   for (const id of ["test-map-shards", "integration-e2e", "verification-evidence"]) {
     assert.equal(byId.get(id)?.parallelGroup, "reduce", `${id} 须标 reduce 组`);
   }
@@ -947,6 +961,142 @@ test("标准工作流：MapReduce flow 模板（P6）——delivery-<module>/par
   assert.deepEqual(byId.get("integration-e2e")?.dependsOn, ["test-map-shards"]);
   assert.deepEqual(byId.get("verification-evidence")?.dependsOn, ["integration-e2e"]);
   assert.equal(byId.get("contract-freeze")?.status, "done", "contract-freeze 是 Map 入口条件");
+});
+
+// —————————————————————— 2026-10-26 基础设施先行：build-scaffold 前置与构建配置唯一 owner ——————————————————————
+
+test("2026-10-26 基础设施先行（真机教训）：Steward 团队计划必须含独立 build-scaffold 前置步骤与唯一构建配置 owner；专职基础设施角色按复杂度决定、不默认新增", () => {
+  // 真机教训 castle-2d-game-v1：脚手架被挂在「应用外壳」角色的交付步骤里，所有实现角色在没有
+  // package.json/tsconfig/vite/vitest/playwright/入口骨架时盲写，无法 typecheck/跑测试。wukong-2d 的
+  // 独立 build-scaffold 前置步骤是正确先例；客户 2026-10-26 追加意见「先安排基础设施构建」并要求
+  // 固定「步骤 + 唯一 owner」而不是新增固定角色。
+  const c = cardTextOf("convener");
+  assertIncludesAll(
+    c,
+    [
+      "`build-scaffold` 前置步骤（任何包含代码/测试交付的团队计划必须",
+      "owner 为工程/外壳角色或计划指定的工程角色",
+      "不得把脚手架留给各实现角色顺手搭",
+      "不得塞进外壳角色的普通交付步骤或计划末尾",
+      "包配置（`package.json` 及依赖/脚本）",
+      "TypeScript / 构建 / 测试配置",
+      "`tsconfig.json`、`vite.config.ts`、`vitest.config.ts` / `playwright.config.ts`",
+      "入口骨架（如 `index.html` + 最小 `main.ts`）",
+      "`npm run typecheck` 与最小测试（≥1 条，非占位）可跑",
+      "其余交付步骤依赖它",
+      "`build-scaffold` 未 `done` 不派任何 `delivery-*` 实现步骤",
+      "内容/数值等纯数据可并行，但实现代码必须等脚手架",
+      "`delivery-*` 的 `dependsOn` 至少包含 `{contract-freeze} ∪ 依赖角色的 delivery-*`，并应显式加入 `build-scaffold`（V11 已允许；`build-scaffold` 自身 `dependsOn: [contract-freeze]`）",
+      "计划缺该步骤、把脚手架放到后面或塞进外壳角色（而范围含代码/测试交付）视为计划不完整，不得发 appointment 卡",
+      // 构建配置唯一 owner（客户 2026-10-26 追加）。
+      "**构建配置唯一 owner（必须）**",
+      "唯一的「构建配置 owner」",
+      "app-shell / engine-core 这类工程角色",
+      "`package.json`、`package-lock.json`、`tsconfig*.json`、vite/vitest/playwright 配置、`index.html`、`src/main.ts` 骨架与构建/CI 相关根文件",
+      "其他角色对这些文件只读，需要变更时提交给该 owner，不得各自修改",
+      "**是否额外任命专职基础设施角色按五维判断/复杂度决定，不默认新增**",
+      "monorepo/多应用、需要 CI/打包/发布流水线或构建复杂度高时才任命",
+      "小项目不强行新增角色（避免角色膨胀）",
+      "即便任命，构建配置唯一 owner 规则不变",
+      // 质量职责同步。
+      "你的质量职责（Steward / 统筹）",
+      "团队计划必须为 `build-scaffold` 显式指定唯一的「构建配置 owner」",
+    ],
+    "Steward build-scaffold 前置与构建配置 owner",
+  );
+
+  // 标准工作流新增「基础设施先行」步骤，顺序可执行：校验 → 退回 → 先派基础设施 → 未 done 不派实现 → 核证。
+  assertIncludesAll(
+    c,
+    [
+      "4. 基础设施先行（必须，客户 2026-10-26 追加意见「先安排基础设施构建」）",
+      "派发前先读计划/流程校验",
+      "`build-scaffold` 必须存在、位于所有实现交付之前并作为实现交付的显式前置依赖",
+      "计划没有或把脚手架放到后面 ⇒ 退回补充/修订团队计划",
+      "不派实现",
+      "基础设施（`build-scaffold`、`contract-freeze`、共享契约/端口、测试骨架）先于功能实现",
+      "`build-scaffold` 未 `done` 不派任何 `delivery-*` 实现步骤",
+      "内容/数值等纯数据可并行，但实现代码必须等脚手架",
+      "`dispatch_task` 任务文本必须写明验证命令（`npm run typecheck`、最小测试）",
+      "「脚手架未就绪不得写入代码」",
+      "「构建配置由 <构建配置 owner> 独占，不得修改」",
+      "基础设施步骤回交后先核证（真实安装/编译/跑最小测试）",
+      "不得把「文件写了」当 `done`",
+      "核证通过后才派实现",
+      "`delivery-*` 的 `dependsOn` 至少包含 `{contract-freeze} ∪ 依赖角色的 delivery-*`，并显式加入 `build-scaffold`",
+    ],
+    "Steward 基础设施先行工作流",
+  );
+
+  // 流程 YAML 模板：build-scaffold 是独立 dispatch 步骤（不新增 FlowStepKind）；交付 dependsOn
+  // 显式含 build-scaffold（V11 已允许），build-scaffold 自身仍只依赖 contract-freeze。
+  const match = /```yaml\n([\s\S]*?)```/.exec(c);
+  assert.ok(match, "Convener 卡须含 ```yaml 模板块");
+  const doc = parseYaml(match![1]) as { steps?: Array<Record<string, unknown>> };
+  assert.ok(Array.isArray(doc.steps), "模板须解析出 steps 数组");
+  const byId = new Map(doc.steps!.map((step) => [String(step.id), step]));
+  const scaffold = byId.get("build-scaffold");
+  assert.ok(scaffold, "模板须含 build-scaffold 步骤");
+  assert.equal(scaffold!.kind, "dispatch", "build-scaffold 用既有 dispatch kind（不新增 FlowStepKind）");
+  assert.equal(scaffold!.owner, "<工程角色 id>", "build-scaffold 须指定工程角色 owner");
+  assert.equal(scaffold!.status, "pending", "模板中脚手架是待派发的前置步骤");
+  assert.deepEqual(scaffold!.dependsOn, ["contract-freeze"], "build-scaffold 在 contract-freeze 之后、实现交付之前");
+  for (const id of ["delivery-checkout-api", "delivery-checkout-web"]) {
+    assert.deepEqual(
+      byId.get(id)?.dependsOn,
+      ["contract-freeze", "build-scaffold"],
+      `${id} 的 dependsOn 须显式包含 build-scaffold（V11 已允许额外依赖）`,
+    );
+  }
+
+  // Crew / 组队 同口径：计划缺脚手架/唯一 owner 时停止写卡报告，不自行补计划；写卡不得拆分构建配置。
+  const n = cardTextOf("nominator");
+  assertIncludesAll(
+    n,
+    [
+      "计划含代码/测试交付却没有独立的 `build-scaffold` 前置步骤",
+      "未显式指定唯一的「构建配置 owner」",
+      "同样**停止写卡并报告 Steward / 统筹 补充**，不自行补计划",
+      "团队计划必须让独立的 `build-scaffold` 步骤在前、依赖显式、其余交付依赖它",
+      "团队计划必须显式指定唯一的「构建配置 owner」",
+      "`package.json`、`package-lock.json`、`tsconfig*.json`、vite/vitest/playwright 配置、`index.html`、`src/main.ts` 骨架与构建/CI 根文件由该 owner 独占",
+      "写卡时不得把这些构建配置拆给多个角色",
+      // 多步骤角色的逐步骤交付检查点（客户 2026-10-26 追加：顺序之外还要有独立交付检查点）。
+      "**逐步骤交付检查点（必须，多步骤角色）**",
+      "每个步骤完成即按该步骤证据验证并标 `delivered`、回交/通知 Steward / 统筹，不得攒到最后一次回交",
+      "标准工作流第一步就是交付脚手架（可运行、`npm run typecheck` 与最小测试通过）并**立即回交**",
+      "外壳/工程类角色模板（app-shell 等）",
+      "脚手架是独立的 `build-scaffold` 交付检查点，不得并进 `delivery-app-shell` 等普通交付步骤",
+      "脚手架交付必须附真实验证证据",
+      "`npm install`、`npm run typecheck`、最小测试输出",
+      "「文件写了」不算 `done`，不得等整个外壳做完才回交",
+      "多步骤角色的角色卡必须定义**逐步骤交付检查点**",
+      "外壳/工程类角色不得把脚手架并进 `delivery-app-shell` 等普通交付",
+      "交付步骤的 `dependsOn` 至少包含 `contract-freeze` + 依赖角色的 `delivery-*`，并可显式加入 `build-scaffold`（V11 已允许；`build-scaffold` 自身 `dependsOn: [contract-freeze]`）",
+    ],
+    "Crew build-scaffold 同口径",
+  );
+
+  // 权限/边界/能力位零变化：本批只改卡文本，不新增固定基础设施角色或能力。
+  const steward = governanceRoleOf("convener")!;
+  assert.deepEqual(steward.entries.map((entry) => entry.path), [
+    "docs/flows/",
+    "docs/workflow.md",
+    "docs/scheduling/",
+    "docs/governance/convener/",
+  ]);
+  assert.deepEqual(steward.preauthorizedDirs, [
+    "docs/flows/",
+    "docs/scheduling/",
+    "docs/governance/convener/",
+  ]);
+  assert.equal(steward.capabilities.dispatchTask, true);
+  assert.equal(steward.capabilities.shell, "operator-approve");
+  assert.deepEqual(
+    BUILT_IN_GOVERNANCE_ROLES.map((spec) => spec.id),
+    ["liaison", "rapporteur", "nominator", "convener", "verifier"],
+    "不得新增固定基础设施角色",
+  );
 });
 
 test("标准工作流：Crew v3（P10/P13）——读授权目录/精确写集/目录规范/实现目录；角色卡写目录与契约/测试面/上下游/粒度；boundary 按计划逐条落盘", () => {

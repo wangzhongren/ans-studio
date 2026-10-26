@@ -717,6 +717,152 @@ test("V11：Reduce 未覆盖全部 Map / 缺 Reduce 步骤 / 缺 contract-freeze
   );
 });
 
+// —————————————————————— V11：build-scaffold 前置步骤（2026-10-26 真机教训） ——————————————————————
+
+const SCAFFOLD_FLOW = `flowId: flow-a
+version: 1
+qualityTier: production
+steps:
+  - id: contract-freeze
+    title: 冻结契约
+    owner: convener
+    kind: artifact
+    status: done
+    evidence: { kind: artifact, ref: docs/contracts/api-v1.md }
+  - id: build-scaffold
+    title: 工程脚手架
+    owner: api
+    kind: dispatch
+    status: pending
+    dependsOn: [contract-freeze]
+  - id: delivery-api
+    title: Map A｜api
+    owner: api
+    kind: dispatch
+    status: pending
+    parallelGroup: map-a
+    dependsOn: [contract-freeze, build-scaffold]
+  - id: delivery-storefront
+    title: Map B｜storefront
+    owner: storefront
+    kind: dispatch
+    status: pending
+    parallelGroup: map-b
+    dependsOn: [contract-freeze, delivery-api, build-scaffold]
+  - id: test-map-shards
+    title: Map 测试分片
+    owner: integration
+    kind: dispatch
+    status: pending
+    parallelGroup: reduce
+    dependsOn: [delivery-api, delivery-storefront]
+  - id: verification-evidence
+    title: 证据合并
+    owner: integration
+    kind: artifact
+    status: pending
+    parallelGroup: reduce
+    dependsOn: [test-map-shards]
+  - id: acceptance
+    title: 验收
+    owner: verifier
+    kind: acceptance
+    status: pending
+`;
+
+function scaffoldFlowOf(text = SCAFFOLD_FLOW) {
+  const parsed = parseFlowStateYaml(text, "flow-a");
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.error);
+  return parsed.ok ? parsed.flow : undefined!;
+}
+
+test("V11：flow 含 build-scaffold 时 delivery-* 可额外依赖它（可选，不强制）", () => {
+  const plan = parseTeamPlan(planDoc());
+  assert.equal(plan.ok, true, teamPlanIssueMessages(plan).join("；"));
+  const scaffoldFlow = scaffoldFlowOf();
+  assert.deepEqual(validateTeamPlanFlowConsistency(plan, scaffoldFlow), []);
+
+  // 可选：同一 flow 中不依赖 build-scaffold 的 delivery 仍合法。
+  const optional = {
+    ...scaffoldFlow,
+    steps: scaffoldFlow.steps.map((step) =>
+      step.id === "delivery-api" ? { ...step, dependsOn: ["contract-freeze"] } : step,
+    ),
+  };
+  assert.deepEqual(validateTeamPlanFlowConsistency(plan, optional), []);
+
+  // 无 build-scaffold 的既有 flow 不回归。
+  assert.deepEqual(validateTeamPlanFlowConsistency(plan, flowOf()), []);
+});
+
+test("V11：build-scaffold 放宽不放过其他约束——仍拒缺 contract-freeze/漏依赖角色/多余 id", () => {
+  const plan = parseTeamPlan(planDoc());
+  assert.equal(plan.ok, true);
+  const baseFlow = scaffoldFlowOf();
+  const withSteps = (steps: FlowStateStep[]) => ({ ...baseFlow, steps });
+
+  const missingDependency = withSteps(
+    baseFlow.steps.map((step) =>
+      step.id === "delivery-storefront"
+        ? { ...step, dependsOn: ["contract-freeze", "build-scaffold"] }
+        : step,
+    ),
+  );
+  assert.ok(
+    validateTeamPlanFlowConsistency(plan, missingDependency).some((issue) => /缺：delivery-api/.test(issue.message)),
+  );
+
+  // 只依赖 build-scaffold（传递到 contract-freeze）仍不算直接满足，必须显式含 contract-freeze。
+  const missingContractFreeze = withSteps(
+    baseFlow.steps.map((step) =>
+      step.id === "delivery-api" ? { ...step, dependsOn: ["build-scaffold"] } : step,
+    ),
+  );
+  assert.ok(
+    validateTeamPlanFlowConsistency(plan, missingContractFreeze).some((issue) =>
+      /缺：contract-freeze/.test(issue.message),
+    ),
+  );
+
+  const extraUnknown = withSteps([
+    ...baseFlow.steps.map((step) =>
+      step.id === "delivery-api"
+        ? { ...step, dependsOn: ["contract-freeze", "build-scaffold", "peer-review"] }
+        : step,
+    ),
+    { id: "peer-review", title: "同行复核", owner: "integration", kind: "artifact", status: "pending" },
+  ]);
+  assert.ok(
+    validateTeamPlanFlowConsistency(plan, extraUnknown).some((issue) => /多：peer-review/.test(issue.message)),
+  );
+
+  // flow 中没有 build-scaffold 步骤时，它仍属「多余 id」。
+  const noScaffoldFlow = flowOf();
+  const scaffoldWithoutStep = {
+    ...noScaffoldFlow,
+    steps: noScaffoldFlow.steps.map((step) =>
+      step.id === "delivery-storefront"
+        ? { ...step, dependsOn: ["contract-freeze", "delivery-api", "build-scaffold"] }
+        : step,
+    ),
+  };
+  assert.ok(
+    validateTeamPlanFlowConsistency(plan, scaffoldWithoutStep).some((issue) =>
+      /多：build-scaffold/.test(issue.message),
+    ),
+  );
+});
+
+test("V11：build-scaffold 放宽不影响依赖环检测", () => {
+  // build-scaffold ⇄ delivery-api 互指：flow 静态解析（与 V11 无关）仍拒绝。
+  const cyclic = SCAFFOLD_FLOW.replace("dependsOn: [contract-freeze]", "dependsOn: [delivery-api]");
+  const parsed = parseFlowStateYaml(cyclic, "flow-a");
+  assert.equal(parsed.ok, false);
+  if (!parsed.ok) {
+    assert.ok(parsed.errors.some((error) => /dependsOn 形成环/.test(error.message)));
+  }
+});
+
 // —————————————————————— v3：目录级授权（2026-10-23） ——————————————————————
 
 interface V3RoleSpec extends RoleSpec {
