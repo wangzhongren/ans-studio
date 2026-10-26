@@ -178,14 +178,17 @@
 //
 // 2026-10-26 Gate 规划规则（lead-governance-coordination；门禁引擎任务）：客户口径——**只给规则，不实现
 // `request_gate_review` / `gateKind` / 账本 / 新工具**；客户可能做其他业务，统筹只需在规划时知道哪些地方
-// 要设 gate。只改 `CONVENER_CARD_TEXT` 产品数据文本，新增「Gate 规划（规则，必须）」：按产品类型与风险
-// 识别垂直切片 gate（脚手架后：首个可玩 / 可用切片，真实素材 / 运行 / 关 DEBUG 截图或输出）、视觉基线
-// gate（UI / 游戏：每关 / 关键页 golden 截图、像素规格 / 比例 / 图层）、集成与性能 gate（多模块 / 发布：
-// 全量测试、e2e、性能采样）与最终客户验收（沿用现有 `verification` / `acceptance`，语义不变）；T0 / 纯
-// 文档类可显式说明不设额外 gate，不得默默省略。计划中每个 gate 写清 gate id、验收标准指针、证据要求
-// （截图 / 运行输出 / 测试报告）与下游依赖 `dependsOn`；gate 未完成不得派下游实现（沿用现有 dependsOn
-// 门禁）；**独立判断只由 Proof / 验收做**——统筹只检查证据是否齐备、按现有应用通道提交复核（最终验收用
-// `request_acceptance`；提前 gate 没有通道时如实上报 Lead / 主理 与客户，不得自查代替、不得自己标 gate
+// 要设 gate。只改 `CONVENER_CARD_TEXT` 产品数据文本，新增「Gate 规划（规则，必须）」：固定四类 gate——
+// 垂直切片（脚手架后首个可玩 / 可用切片，真实素材 / 运行 / 关 DEBUG 截图或输出）、视觉基线（UI / 游戏：
+// 每关 / 关键页 golden 截图、像素规格 / 比例 / 图层）、集成 / 性能（全量测试、e2e、性能采样）与最终客户
+// 验收（沿用现有 `verification` / `acceptance`，语义不变）。卡内新增适用矩阵（原型档：垂直切片 + 最终，
+// UI / 游戏加视觉，多模块 / 多端加集成 / 性能；生产档：UI / 游戏四类，CLI / 后端垂直切片 + 集成 / 性能 +
+// 最终，纯库集成 / 性能 + 最终；T0 / 纯文档只保留最终或显式说明不设额外 gate 并写理由，不得默默省略）、
+// 每个 gate 的必填模板（gate id / 验收标准指针 / 证据清单（含 UI / 游戏关 DEBUG）/ 负责人 / 独立判定 =
+// Proof / 下游 `dependsOn`）与 game 项目示例（垂直切片在脚手架后、每关 / Boss 视觉基线、集成 / 性能、最终
+// 验收），并写死失败与返工（gate fail 走现有返工路由、返工后重新复核、未 done 下游不得派发、不得用后续
+// 验收补跳）。**独立判断只由 Proof / 验收做**——统筹只检查证据是否齐备、按现有应用通道提交复核（最终验收
+// 用 `request_acceptance`；提前 gate 没有通道时如实上报 Lead / 主理 与客户，不得自查代替、不得自己标 gate
 // 通过、不得把自查写成 Proof 结论）；不新增 `FlowStepKind` / 工具 / 账本 kind（不引入
 // `request_gate_review`、`gateKind` 等），gate 用现有步骤（`artifact` / `acceptance` 等）表达，不改变
 // 现有验收语义。能力位、Section 1、预授权、禁写、内部 id / 显示名、工程基线、导出函数签名与判定逻辑零变化。
@@ -687,13 +690,25 @@ const CONVENER_CARD_TEXT = [
   "13. 变更包：收齐回交后写 `docs/scheduling/<flowId>-change-v1.md`（frontmatter `flowId`/`version`/`riskTier`/`candidate`/`changedPaths`/`evidence`；正文含候选与范围、任务节点、证据链接、档位依据、复用证据与失效说明）。团队计划档位是下限；变更包按当前候选复核，两者不一致时取更高档并记录理由，不得降档。",
   "",
   "## Gate 规划（规则，必须）",
-  "规划团队计划 / 流程时，按产品类型与风险先识别要设哪些 gate（**只做规划规则**，不新增工具 / schema / 账本 kind）：",
-  "- **脚手架后**：垂直切片 gate——软件 / UI 的首个可玩 / 可用切片，要求真实素材、真实运行、关 DEBUG 截图 / 输出；通过后才铺后续模块。",
-  "- **UI / 游戏**：视觉基线 gate——每个关卡 / 关键页面建立 golden 截图与像素规格 / 比例 / 图层基线，逐项对照。",
-  "- **多模块 / 发布**：集成与性能 gate——全量测试、e2e、性能采样与阈值，按风险档位 T0–T3 决定范围。",
-  "- **最终**：客户验收——沿用现有 `verification` / `acceptance` 步骤与应用验收门，语义不变。",
-  "- T0 / 纯文档类可**显式说明不设额外 gate**；不得默默省略——计划里写明「本计划不设额外 gate」及理由。",
-  "计划里每个 gate 必须写清：**gate id**、**验收标准指针**、**证据要求**（截图 / 运行输出 / 测试报告）、**下游依赖 `dependsOn`**；gate 未完成不得派下游实现步骤（沿用现有 `dependsOn` 门禁，不新增检查）。",
+  "四个固定 gate 节点：**垂直切片、视觉基线、集成 / 性能、最终客户验收**；按风险档与产品类型启用（T0 / 纯文档可不设额外 gate）。本卡只给规划规则，**不新增工具 / schema / `FlowStepKind` / 账本 kind**。",
+  "**适用矩阵（按风险档 × 产品类型启用；不得默默省略）**：",
+  "| 风险档 / 产品类型 | 垂直切片 | 视觉基线 | 集成 / 性能 | 最终客户验收 |",
+  "| --- | --- | --- | --- | --- |",
+  "| 原型档（任意产品） | 必设 | 仅 UI / 游戏设 | 仅多模块 / 多端设 | 必设 |",
+  "| 生产档 · UI / 游戏 | 必设 | 必设 | 必设 | 必设 |",
+  "| 生产档 · CLI / 后端 | 必设 | 不设（写明理由） | 必设 | 必设 |",
+  "| 生产档 · 纯库 | 不设（写明理由） | 不设（写明理由） | 必设 | 必设 |",
+  "| T0 / 纯文档 | 可不设 | 可不设 | 可不设 | 只保留最终验收，或**显式说明不设额外 gate 并写理由** |",
+  "四类 gate 的证据口径：**垂直切片 gate**＝脚手架后的首个可玩 / 可用切片（真实素材、真实运行、关 DEBUG 截图 / 输出；通过后才铺后续模块）；**视觉基线 gate**＝UI / 游戏每个关卡 / 关键页面（含每关 / Boss）的 golden 截图与像素规格 / 比例 / 图层基线，逐项对照；**集成与性能 gate**＝全量测试、e2e、性能采样与阈值（按风险档位决定范围）；**最终客户验收**＝沿用现有 `verification` / `acceptance` 步骤与应用验收门，语义不变。",
+  "**每个 gate 的模板（必须字段）**：",
+  "- `gate id`：固定语义 id，如 `gate-vertical-slice`、`gate-visual-level-01`、`gate-integration`、`gate-final-acceptance`；",
+  "- `验收标准指针`：指向验收标准 / 提案 / 计划中的可核对条目；",
+  "- `证据清单`：截图 / 运行输出 / 测试报告 / 性能数据（UI / 游戏注明关 DEBUG）；",
+  "- `负责人`：证据产出的 owner（项目角色），不是 Proof；",
+  "- `独立判定`：Proof / 验收（你只提交复核请求并检查证据完整性）；",
+  "- `下游 dependsOn`：依赖该 gate 的步骤 id 列表；gate 未 `done` 下游不得派发（沿用现有 `dependsOn` 门禁，不新增检查）。",
+  "**game 项目示例（计划里照此落 gate）**：`gate-vertical-slice`（脚手架后首个可玩切片：真实素材、真实运行、关 DEBUG 截图 / 输出；owner=游戏 / UI 角色，dependsOn=[build-scaffold]）→ 每关 / Boss 各一个 `gate-visual-level-01`…（golden 截图与像素规格 / 比例 / 图层；owner=视觉角色，dependsOn=[gate-vertical-slice, 对应 delivery-*]）→ `gate-integration`（集成 / e2e / 性能采样；owner=测试角色，dependsOn=[全部视觉基线 gate + delivery-*]）→ `gate-final-acceptance`（最终客户验收，沿用 `verification` / `acceptance`；owner=app / Proof，dependsOn=[gate-integration]）。",
+  "**失败与返工**：gate `fail` 必须走现有返工路由（`flow_step_supersede` / 退回 owner 返工）；返工完成后**重新复核该 gate**，不得直接标记通过；gate 未 `done` 下游不得派发；不允许用「后续验收再补」跳过 gate。",
   "**独立判断只由 Proof / 验收做**：你只检查证据是否齐备、按现有应用通道提交复核——最终验收用 `request_acceptance`；提前 gate 若当前没有通道，**如实上报 Lead / 主理 与客户**，不得自查代替、不得自己标 gate 通过、不得把自查写成 Proof 结论。",
   "**不新增 `FlowStepKind` / 工具 / 账本 kind**（例如不引入 `request_gate_review`、`gateKind` 等新工具 / 字段）：gate 用现有步骤表达（如 `artifact` / `acceptance`），不改变现有验收语义；不为 gate 引入图 schema。",
   "",

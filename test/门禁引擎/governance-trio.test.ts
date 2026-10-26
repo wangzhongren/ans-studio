@@ -2251,53 +2251,89 @@ test("2026-10-26 独立复核时机：Steward 在脚手架/首个垂直切片/�
 
 // —————————————————————— 15) 2026-10-26 Gate 规划（只给规则，不实现新工具） ——————————————————————
 
-test("2026-10-26 Gate 规划：Steward 按产品类型/风险在计划中写清 gate id/标准指针/证据/dependsOn，Proof 独判、统筹不自审，不新增工具/schema", () => {
+test("2026-10-26 Gate 规划：Steward 卡含适用矩阵/必填模板/game 示例/失败返工，Proof 独判、统筹不自审，不新增工具/schema", () => {
   // 客户口径：只给规则，不实现 request_gate_review / gateKind / 账本 / 新工具；客户可能做其他业务，
   // 统筹只需在规划时知道哪些地方要设 gate。本批只改 Convener 卡文本 + 测试。
   const c = governanceRoleOf("convener")!.cardText;
 
-  // 1) 章节与 gate 类型：垂直切片、视觉基线、集成与性能、最终客户验收；T0/纯文档可显式不设但不得默默省略。
+  // 1) 四个固定 gate 节点 + 适用矩阵（原型档 / 生产档 × 产品类型 / T0 纯文档），不得默默省略。
   assertCardIncludes(
     c,
     [
       "## Gate 规划（规则，必须）",
-      "按产品类型与风险先识别要设哪些 gate",
-      "**只做规划规则**",
-      "垂直切片 gate",
-      "首个可玩 / 可用切片",
-      "真实素材、真实运行、关 DEBUG 截图 / 输出",
-      "视觉基线 gate",
-      "golden 截图与像素规格 / 比例 / 图层基线",
-      "集成与性能 gate",
-      "全量测试、e2e、性能采样与阈值",
-      "**最终**：客户验收",
-      "沿用现有 `verification` / `acceptance`",
-      "语义不变",
-      "T0 / 纯文档类",
-      "**显式说明不设额外 gate**",
+      "四个固定 gate 节点：**垂直切片、视觉基线、集成 / 性能、最终客户验收**",
+      "**适用矩阵（按风险档 × 产品类型启用；不得默默省略）**",
+      "| 风险档 / 产品类型 | 垂直切片 | 视觉基线 | 集成 / 性能 | 最终客户验收 |",
+      "| 原型档（任意产品） | 必设 | 仅 UI / 游戏设 | 仅多模块 / 多端设 | 必设 |",
+      "| 生产档 · UI / 游戏 | 必设 | 必设 | 必设 | 必设 |",
+      "| 生产档 · CLI / 后端 | 必设 | 不设（写明理由） | 必设 | 必设 |",
+      "| 生产档 · 纯库 | 不设（写明理由） | 不设（写明理由） | 必设 | 必设 |",
+      "| T0 / 纯文档 | 可不设 | 可不设 | 可不设 | 只保留最终验收，或**显式说明不设额外 gate 并写理由** |",
       "不得默默省略",
     ],
-    "Steward Gate 规划类型",
+    "Steward Gate 适用矩阵",
   );
 
-  // 2) 计划要素与下游依赖：gate id、验收标准指针、证据要求、dependsOn；未完成不派下游实现。
+  // 2) 四类 gate 的证据口径。
   assertCardIncludes(
     c,
     [
-      "**gate id**",
-      "**验收标准指针**",
-      "**证据要求**（截图 / 运行输出 / 测试报告）",
-      "**下游依赖 `dependsOn`**",
-      "gate 未完成不得派下游实现步骤",
-      "沿用现有 `dependsOn` 门禁",
-      "不新增检查",
-      "按「Gate 规划（规则，必须）」用现有步骤表达所需 gate",
-      "按「Gate 规划（规则，必须）」识别并按产品类型 / 风险写清每个 gate",
+      "**垂直切片 gate**＝脚手架后的首个可玩 / 可用切片",
+      "真实素材、真实运行、关 DEBUG 截图 / 输出",
+      "**视觉基线 gate**＝UI / 游戏每个关卡 / 关键页面（含每关 / Boss）的 golden 截图与像素规格 / 比例 / 图层基线",
+      "**集成与性能 gate**＝全量测试、e2e、性能采样与阈值",
+      "**最终客户验收**＝沿用现有 `verification` / `acceptance`",
+      "语义不变",
     ],
-    "Steward Gate 计划要素与工作流指针",
+    "Steward Gate 类型与证据口径",
   );
 
-  // 3) 独立判断只由 Proof/验收做；统筹只查证据齐备、走现有通道；提前 gate 无通道时如实上报，不自审。
+  // 3) 每个 gate 的必填模板字段：gate id / 验收标准指针 / 证据清单 / 负责人 / 独立判定 = Proof / dependsOn。
+  assertCardIncludes(
+    c,
+    [
+      "**每个 gate 的模板（必须字段）**",
+      "`gate id`：固定语义 id，如 `gate-vertical-slice`、`gate-visual-level-01`、`gate-integration`、`gate-final-acceptance`",
+      "`验收标准指针`：指向验收标准 / 提案 / 计划中的可核对条目",
+      "`证据清单`：截图 / 运行输出 / 测试报告 / 性能数据（UI / 游戏注明关 DEBUG）",
+      "`负责人`：证据产出的 owner（项目角色），不是 Proof",
+      "`独立判定`：Proof / 验收",
+      "`下游 dependsOn`：依赖该 gate 的步骤 id 列表",
+      "gate 未 `done` 下游不得派发（沿用现有 `dependsOn` 门禁，不新增检查）",
+    ],
+    "Steward Gate 模板字段",
+  );
+
+  // 4) game 项目示例：垂直切片在脚手架后、每关/Boss 视觉基线、集成/性能、最终验收。
+  assertCardIncludes(
+    c,
+    [
+      "**game 项目示例（计划里照此落 gate）**",
+      "`gate-vertical-slice`（脚手架后首个可玩切片",
+      "每关 / Boss 各一个 `gate-visual-level-01`",
+      "`gate-integration`（集成 / e2e / 性能采样",
+      "`gate-final-acceptance`（最终客户验收",
+      "dependsOn=[gate-integration]",
+    ],
+    "Steward Gate game 示例",
+  );
+
+  // 5) 失败与返工：走现有返工路由、返工后重新复核、未 done 不派下游、不得用后续验收补跳。
+  assertCardIncludes(
+    c,
+    [
+      "**失败与返工**",
+      "gate `fail` 必须走现有返工路由",
+      "`flow_step_supersede` / 退回 owner 返工",
+      "返工完成后**重新复核该 gate**",
+      "不得直接标记通过",
+      "gate 未 `done` 下游不得派发",
+      "不允许用「后续验收再补」跳过 gate",
+    ],
+    "Steward Gate 失败与返工",
+  );
+
+  // 6) 独立判断只由 Proof/验收做；统筹只查证据齐备、走现有通道；提前 gate 无通道时如实上报，不自审。
   assertCardIncludes(
     c,
     [
@@ -2310,11 +2346,13 @@ test("2026-10-26 Gate 规划：Steward 按产品类型/风险在计划中写清 
       "不得自查代替",
       "不得自己标 gate 通过",
       "不得把自查写成 Proof 结论",
+      "按「Gate 规划（规则，必须）」用现有步骤表达所需 gate",
+      "按「Gate 规划（规则，必须）」识别并按产品类型 / 风险写清每个 gate",
     ],
-    "Steward Gate 独立判断与不自审",
+    "Steward Gate 独立判断与工作流指针",
   );
 
-  // 4) 不实现新工具/schema：无新 FlowStepKind、无 request_gate_review/gateKind、无账本 kind、不引入图 schema。
+  // 7) 不实现新工具/schema：无新 FlowStepKind、无 request_gate_review/gateKind、无账本 kind、不引入图 schema。
   assertCardIncludes(
     c,
     [
@@ -2327,7 +2365,7 @@ test("2026-10-26 Gate 规划：Steward 按产品类型/风险在计划中写清 
     "Steward Gate 无新工具/schema",
   );
 
-  // 5) 注册表数据面零变化：本批只改卡文本，不加能力位、不改写权。
+  // 8) 注册表数据面零变化：本批只改卡文本，不加能力位、不改写权。
   const convener = governanceRoleOf("convener")!;
   assert.deepEqual(convener.entries.map((e) => e.path), [
     "docs/flows/",
