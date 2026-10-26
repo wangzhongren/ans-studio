@@ -1898,3 +1898,139 @@ test("2026-10-25 写入预授权：五卡写明 Section 1 边界内直接写、�
     assert.equal(spec.capabilities.shell, "operator-approve", `${spec.id} shell 档零变化`);
   }
 });
+
+// —————————————————————— 12) 2026-10-26 独立验收主动提交（request_acceptance） ——————————————————————
+
+test("2026-10-26 完成即主动 request_acceptance：Steward 卡在交付/证据齐备后主动提交独立复核，回执如实处理、不等于验收通过", () => {
+  // 应用已提供 `request_acceptance`（交付就绪后由统筹直接提交；应用校验验收标准/变更包/风险档并把
+  // acceptance-criteria 收口后派 Proof，60s 有界超时）。本批只改 Convener 卡文本：把「完成即主动提交」
+  // 固化为标准流程，防止仍等应用事件 / 客户催办 / 主理转达。
+  const c = governanceRoleOf("convener")!.cardText;
+
+  // 1) 完成即主动提交：前置条件（交付 done / verification-evidence / change-package 含 riskTier / 验收标准）
+  //    与调用形状必须写死。
+  assertCardIncludes(
+    c,
+    [
+      "## 完成即主动 request_acceptance（独立复核提交，必须）",
+      "全部实现/交付步骤都已核证 `done`",
+      "`verification-evidence`（真实启动/演示证据）",
+      "change-package（`docs/scheduling/<flowId>-change-vN.md`，含 `riskTier`）",
+      "验收标准（`docs/acceptance/<flowId>-criteria-vN.md`）存在",
+      "**主动调用 `request_acceptance({flowId})`**",
+      "不得等待应用事件（settle / 回交 / 账本）、客户催办或主理转达",
+      "不得以「应用会自动派」为由省略主动提交",
+      "request_acceptance 是统筹的主动通道",
+      // 标准工作流第 9 步与专属章节同口径（不只藏在一处）。
+      "9. 独立验收（所有变更）",
+      "**完成即主动提交**",
+    ],
+    "Steward 完成即主动 request_acceptance",
+  );
+
+  // 2) 时机与边界：不提前、不替 Proof 判定、不写客户决定；分诊由应用执行。
+  assertCardIncludes(
+    c,
+    [
+      "只在交付与证据齐备后提交——不得提前提交",
+      "不得用提交代替缺步骤/缺证据",
+      "提交 ≠ 验收通过",
+      "不得替 Proof / 验收判定",
+      "不得写客户决定",
+      "不得把 flow / 账本状态当客户批准",
+      "`acceptance-triage/v1`",
+      "`blocker` / `major` 由应用按返工路由退回",
+      "`minor` / `nit` 仅汇报",
+      "你不改判验收结论、不自行宣告通过",
+    ],
+    "Steward request_acceptance 时机与边界",
+  );
+
+  // 3) 回执处理：dispatched 只是「已提交」不等于通过；already-dispatched 不重复提交；
+  //    各类缺口按回执如实报告并修正，不得伪造/绕过/当成功；不可用/超时可能已派发，用 flow_get 核对。
+  assertCardIncludes(
+    c,
+    [
+      "回执处理（必须如实，不得伪造 / 绕过 / 当成功）",
+      "`dispatched`：如实记录 / 汇报「已提交独立复核」——**不等于验收通过**",
+      "也不代表客户批准",
+      "`already-dispatched`：不重复提交",
+      "已有在途复核",
+      "`criteria-missing` / `change-package-missing` / `change-package-no-risk` / `flow-incomplete` / `flow-not-found` / `runtime-unresolved`",
+      "按回执 `code` / `message` 如实报告并修正对应缺口",
+      "验收标准缺失交 Proof / 验收 按标准流程补写",
+      "变更包或 `riskTier` 缺失按变更包规则补齐",
+      "流程 / 证据缺口按 `flow_step_update` 与返工规则修正",
+      "`flowId` 错误用正确 `flowId` 重交",
+      "引擎无法解析如实报告并按应用提示处理",
+      "不得把失败当成功",
+      "不得伪造验收标准 / 变更包 / 流程状态",
+      "不得绕过应用校验",
+      "工具不可用 / 超时（`unavailable` 或回执称可能已派发）",
+      "**可能已派发、以应用核对为准**",
+      "用 `flow_get` 核对流程与派发记录",
+      "不谎报已派发，不盲目重复请求",
+    ],
+    "Steward request_acceptance 回执处理",
+  );
+
+  // 4) 与自动验收门的关系：主动通道 + 应用自动门并存且幂等，already-dispatched 不重复派发。
+  assertCardIncludes(
+    c,
+    [
+      "request_acceptance 是统筹的主动通道",
+      "应用自动验收门（settle / 回交 / 账本等事件）仍可触发",
+      "二者**幂等**",
+      "已有在途 / 已派发记录时应用返回 `already-dispatched`、不重复派发",
+      "不要为「确保验收」反复重试",
+      "也不要因自动门存在而省略主动提交",
+    ],
+    "Steward request_acceptance 与自动验收门",
+  );
+
+  // 5) 不弱化既有验收口径：应用自动门（所有变更，含非发布）逐字保留。
+  assertCardIncludes(
+    c,
+    [
+      "所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 Proof / 验收",
+      "Steward 不派发治理角色、不代替验收、不催办",
+      "`release` 只是可选发布元数据，不是独立验收的启动条件",
+    ],
+    "Steward request_acceptance 不弱化自动验收门",
+  );
+
+  // 6) 提交通道只归 Steward / 统筹（其余四卡不得另行定义，避免第二份口径）。
+  for (const id of ["liaison", "rapporteur", "nominator", "verifier"] as const) {
+    assert.equal(
+      governanceRoleOf(id)!.cardText.includes("request_acceptance"),
+      false,
+      `${id} 卡不得定义 request_acceptance 提交通道`,
+    );
+  }
+
+  // 7) 注册表数据面零变化：本批只改卡文本，不加能力位、不改写权。
+  const convener = governanceRoleOf("convener")!;
+  assert.deepEqual(convener.entries.map((e) => e.path), [
+    "docs/flows/",
+    "docs/workflow.md",
+    "docs/scheduling/",
+    "docs/governance/convener/",
+  ]);
+  assert.deepEqual(convener.preauthorizedDirs, [
+    "docs/flows/",
+    "docs/scheduling/",
+    "docs/governance/convener/",
+  ]);
+  assert.deepEqual(convener.forbiddenWritePaths, [
+    ".ans/",
+    "docs/bootstrap-manifest.md",
+    "角色卡/governance-boundary.yaml",
+    "角色卡/",
+    "docs/proposals/",
+    "docs/nominations/",
+    "docs/skills/",
+    "docs/mcp/",
+  ]);
+  assert.equal(convener.capabilities.dispatchTask, true);
+  assert.equal(convener.capabilities.shell, "operator-approve");
+});
