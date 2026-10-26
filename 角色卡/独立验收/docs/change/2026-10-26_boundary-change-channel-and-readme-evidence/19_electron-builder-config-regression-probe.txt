@@ -1,0 +1,7 @@
+electron-builder.config.ts {"currentFunction":false,"oldConfigPattern":true,"newConfigPattern":false,"ymlPattern":false}
+electron-builder.config.js {"currentFunction":false,"oldConfigPattern":true,"newConfigPattern":false,"ymlPattern":false}
+electron-builder.config.mjs {"currentFunction":false,"oldConfigPattern":true,"newConfigPattern":false,"ymlPattern":false}
+electron-builder.yml {"currentFunction":true,"oldConfigPattern":false,"newConfigPattern":false,"ymlPattern":true}
+electron-builder.yaml {"currentFunction":true,"oldConfigPattern":false,"newConfigPattern":false,"ymlPattern":true}
+electron-builder.json {"currentFunction":false,"oldConfigPattern":false,"newConfigPattern":false,"ymlPattern":false}
+vite.config.ts {"currentFunction":true,"oldConfigPattern":true,"newConfigPattern":true,"ymlPattern":false}

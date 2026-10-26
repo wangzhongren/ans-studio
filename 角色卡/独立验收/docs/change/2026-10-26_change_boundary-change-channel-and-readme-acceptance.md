@@ -11,11 +11,14 @@ events:
   - date: "2026-10-26"
     kind: verified
     summary: 对 HEAD 6b7ef38（对比 ea0fff0）按交接口径 A1–A7 独立判定；typecheck 0、runtime-core 工具 9/9、编排 3/3、门禁引擎 326+1skip/327、桌面全量三次 645/645、644/645、645/645（中间一次为既有重派门用例账本写入时序竞态，隔离 72/72×2）、治理 e2e 155/155×2；README 结构/链接/围栏/Mermaid 独立解析通过；纯函数探针发现 README「无通配符」与确定性校验不一致、卡文本「目录以 / 结尾」与校验器冲突；总体有条件通过，无行为性 FAIL
+  - date: "2026-10-26"
+    kind: verified
+    summary: 补充验收 2eeeeb6（对比 6b7ef38；产品/测试 5 文件 +160/−35）：F1 通配符、F3 请求的治理敏感路径、F4 瞬时/终态票据、F5 README 恢复与结构均 PASS；typecheck 0、桌面全量 646/646、runtime-core 9/9、编排 3/3、治理 e2e 155/155×2（首跑 154/155 为既有 R2 request_acceptance 并发 flaky）；发现两项 FAIL——F3a：同一编辑移除 electron-builder.config.* 拦截；F6（高）：尾斜杠使 package.json/、.env/ 等发布根文件绕过确定性拦截且目录条目可覆盖同名文件；补充验收不通过（needs-work），两项修复后需重新补充验收
 ---
 
 # 边界变更门禁通道（request_boundary_change）与治理优先 README 独立验收
 
-**总体结论：有条件通过。** 被验收提交 `6b7ef38` 在 A1–A7 上未发现行为性 FAIL：工具仅对统筹（convener）注入、确定性校验与 AI 门禁的分层、幂等与票据恢复、组队仍走 appointment-write、README 版本/能力分层与状态语义均与代码一致。条件与未阻断问题见 §五、§六、§七：
+**总体结论：有条件通过。** 被验收提交 `6b7ef38` 在 A1–A7 上未发现行为性 FAIL：工具仅对统筹（convener）注入、确定性校验与 AI 门禁的分层、幂等与票据恢复、组队仍走 appointment-write、README 版本/能力分层与状态语义均与代码一致。条件与未阻断问题见 §五、§六、§七 与 §十（补充验收 `2eeeeb6` **不通过**：F3a 窄回归、F6 尾斜杠绕过发布根拦截，均需返工）：
 
 1. README 两语言版均声称确定性校验「无通配符」，但实际 `src/*.ts` 可通过校验（独立探针实证）；需改文档或补校验。
 2. 统筹/组队卡文本要求「目录条目以 `/` 结尾」，但应用校验器明确拒绝尾斜杠（含测试断言）；需对齐二者（目录增删的表达方式）。
@@ -195,3 +198,43 @@ events:
 5. F5：补本批各角色 change 记录（过程项）。归属：门禁引擎/编排/桌面窗口实现角色。
 
 本报告不授予提交、推送、合并、部署或发布；实现与测试仍以各所有者为准。建议在修复 F1/F2 文本/校验后，于下一轮独立复核中复验对应行为；真实模型 AI 门禁与真机 Electron 验证建议在下次发布前补做。
+
+## 十、补充验收：2eeeeb6（F1–F5 修复）
+
+**对象与范围**：`2eeeeb63ee832da9aee8d4482e120ab9a17a9902`（`fix(governance): tighten boundary-change validation and restore README references`），对比 `6b7ef38`。产品/测试范围 5 文件 **+160/−35**：README 中英 +20/−4、`app/desktop/boundary-change.ts` +56/−22、`app/desktop/interface.ts` +27/−5、`test/桌面应用/acceptance-dispatch.test.ts` +57/−4。其余 +2508（−0）为本角色上一轮验收报告/证据与导航（纯文档，随该提交入库）；**不属于产品/测试范围**。产品/测试范围 `git diff --check` exit 0；补充验收开始时工作树仅 `?? demos/`（本补充报告与 `10_`–`20_` 证据为验收后写入的未提交文件）。全量 `--check` 仅在证据原始日志报空白字符（`01_typecheck.txt` 末尾空行、`05b` 堆栈行尾空格），非产品/测试。
+
+**实测（Node v24.22.1，Windows 11）**：
+
+| 命令 | 结果 | 证据 |
+| --- | --- | --- |
+| `npm run typecheck` | exit 0 | `10_typecheck.txt` |
+| `node --test "test/桌面应用/**/*.test.ts"` | **646/646** 通过（较上轮 +1 目录条目用例） | `11_desktop-full.txt` |
+| `node --test test/runtime-core/request-boundary-change-tool.test.ts` | 9/9 | `12_runtime-core-tool-test.txt` |
+| `node --test test/编排/request-boundary-change.test.ts` | 3/3 | `13_orchestration-test.txt` |
+| `node --test "test/测试/governance-e2e-auto/*.test.ts"` | 首跑 154/155（既有 R2 request_acceptance 去重 flaky，疑似与桌面全量并发负载有关；上一轮已记录同类 flake）；**单独复跑两次均 155/155** | `14_governance-e2e-first.txt`、`14b_governance-e2e-rerun.txt`、`14c_governance-e2e-rerun2.txt` |
+| README 结构/Mermaid | 中英各 26 标题、14 围栏；`parseGraph=ok`、`render=ok`、零 warnings；截图文件存在 | `16_readme-mermaid-check.txt`、`17_readme-structure.txt` |
+| 独立纯函数探针 | 见下表明细 | `15_boundary-fix-probe.txt` / `.mjs` |
+
+**逐项判定（补充要求）**：
+
+| 项 | 结论 | 核实要点 |
+| --- | --- | --- |
+| F1 通配符 `* ? [ ] { }` | **PASS** | `normalizeBoundaryChangePath` 对 `* ? [ ] { }` 一律返回 undefined；桌面测试新增 `src/*.ts`、`src/?.ts`、`src/[a].ts`、`src/{a,b}.ts` 四例均 `invalid-path`；独立探针复核 `src/a*.ts` 等亦拒。工具层仍会先转发到能力层，由能力层确定性拒绝并回执（与请求形状校验分层一致） |
+| F2 目录尾斜杠 | **PASS** | 恰好一个末尾 `/` 被接受并在 `addPaths/removePaths` 中保留；`config//x.ts`、`config/newdir//`、`config/newdir///`、`./x`、`../x`、`x/.`、`x/..`、`/abs/`、`C:/abs/` 均拒。票据 `addPaths` 保留 `config/newdir/`；组队任务与 AI 证据均带「（目录条目）」标注（测试 + 探针）。`x` 与 `x/` 在去重、同增同删重叠、`boundaryEntryIsExact` 上按同一路径处理；覆盖判断按条目 kind 区分——既有目录条目覆盖 `x`/`x/`，既有 **file** 条目 `x` 不覆盖目录请求 `x/`（目录语义属实际扩权，不能视为 no-change）。README 中英「目录条目以 `/` 结尾；不得通配符、`..`、绝对路径」与实现一致。**但尾斜杠形状与发布根拦截组合出 F6 绕过（见下），F2 需随 F6 一并返工** |
+| F3 治理敏感路径 | **PASS（请求集合）** | `docs/scheduling`、`docs/acceptance`、`docs/contracts`、`docs/governance`、`bin`、`.github`、`electron-builder.yml`（及 `.yaml`）均已加入拒绝集；**新增与移除都拒绝**（桌面测试覆盖 add 全量与 remove 两例；独立探针逐项复核 add/remove）。原有 `.ans`、`角色卡`、`docs/flows`、共享目录、发布根保持拒绝 |
+| **F3a 回归（需返工）** | **FAIL（窄）** | 同一 diff 把 `electron-builder` 从 `...\.config\.[^/]+` 交替组中移除，只新增 `^electron-builder\.ya?ml$`；结果 `electron-builder.config.ts/js/mjs/yml/...` 在 `6b7ef38` 被拒、在 `2eeeeb6` 通过确定性校验（独立探针 `19_…`：`currentFunction=false`、`oldConfigPattern=true`）。这是相对基线的**边界拦截收窄**（仍受 AI 门禁 + Crew appointment-write 约束，但确定性层少拦一类发布配置）。建议恢复 `electron-builder` 到 `\.config\.` 交替组并保留 yml 模式 |
+| **F6 尾斜杠绕过发布根（需返工）** | **FAIL（高）** | F2 允许单个尾斜杠后，`boundaryChangePathIsGovernanceCritical` 未先去尾斜杠再跑 `RELEASE_ROOT_PATTERNS`：`package.json/`、`package-lock.json/`、`tsconfig.node.json/`、`vite.config.ts/`、`electron-builder.yml/`、`.env/`、`index.html/` 均 `critical=false` 且 `assess` 返回 ok（`effectiveAdds` 保留尾斜杠）；而 `section1EntryCovers`（`run-role.ts:1918`）对目录条目用 `normalizeLexical`（会去掉尾斜杠）后 `isUnderOrEqual`，因此目录条目 `package.json/` 会覆盖 `package.json` 文件（独立探针 `20_…`：`covers=true`）——即确定性发布根拦截可被尾斜杠绕过，写入权仍由 AI 门禁 + Crew 确认兜底但不能依赖。建议在 critical 检查前对路径去尾斜杠（或让 release 正则接受可选 `/?$`），并补 `package.json/`、`.env/`、`vite.config.ts/`、`tsconfig.node.json/`、`electron-builder.yml/` 测试 |
+| F4 瞬时 vs 终态 | **PASS** | 门禁基础设施类（引擎解析失败、账本不可读/坏行、judge 构造失败、判断抛错、超时、`judge` 返回 `timeout`/`unavailable`/`ledger-unavailable`）写票据 `status:"failed"`、回执 `rejected` 且 message 明确「可修复后重试」；重试读 `failed` 票据并**重新过门禁**（测试：unavailable 重试后 judgeCalls=2）。`deny`/`manual`（判断结论）写终态 `rejected`，同请求不重跑门禁（deny 用例断言 judgeCalls 不增；manual 同走终态路径）。两类均**零派发**；fail-closed 方向不变 |
+| F5 README 恢复与结构 | **PASS** | 中英均恢复「研究与引用 / Research and citation」RFSG 论文 DOI（10.5281/zenodo.22824700）与 canonical 截图 `角色卡/桌面UI/docs/change/2026-10-20_readme-v1.4-screenshot/desktop-intent-confirm.png`（文件存在）；路径措辞与实现一致；26/26 标题、14/14 围栏、Mermaid 解析通过 |
+| 测试无弱化 / 无权限扩大 | **测试：PASS；边界：FAIL（F3a + F6）** | 测试 diff +57/−4：被替换的仅「尾斜杠从拒绝改为目录允许」「治理移除用例扩展」「票据状态断言按 retryable 区分」，新增用例覆盖原语义。产品 diff 除 F3a 的发布配置拦截收窄与 F6 的尾斜杠旁路外，仅收紧校验/保留目录语义/增加治理前缀与瞬时票据状态；未改注入面（仍仅 convener）、未新增依赖/新增写权/capability，`package.json` 未动 |
+
+**未验证 / 残余风险（F3a/F6 之外不阻断；两项需返工）**：
+
+- 真实 AI judge 行为、真实 Crew appointment-write 写卡、运行中 Electron（旧代码）、非 Windows 仍未验证（与主报告 §七 相同）。
+- 瞬时票据 `failed` 的重试只以桩件覆盖 `unavailable`；真实引擎故障/超时后的重试未实测（代码路径已审查：`failed` 不短路，重试重新过门禁）。
+- 真实 judge 的 `aborted` reasonCode 不在 transient 集合，仍会记终态 `rejected`；若由外部中止触发，理论上可重试（罕见）。
+- 确定性治理清单仍不含 `docs/proposals/**`、`docs/intents/**`、`docs/skills/**`、`docs/mcp/**`、`docs/verification/**`、`docs/workflow.md`（本轮只要求新增的集合；其余仍依赖 AI 门禁 + Crew 确认）。
+- 瞬时路径回执 code 仍为 `rejected`（message 写「可修复后重试」），而 Convener 卡的回执处理列表未列 `rejected`（既有文本）；建议后续在卡文本中区分 transient 与 deny。
+- 既有 `2026-10-23 重派门` 账本时序 flaky 仍存在（本轮桌面全量 646/646 通过，未触发）；既有 R2 request_acceptance e2e flaky 在本轮并发负载下首跑触发、两次单独复跑均通过。
+
+**补充结论：不通过（needs-work；FAIL 2：F3a、F6）。** 请求的 F1、F3 请求集合、F4、F5 均 PASS，测试无弱化；但 F3 同一次编辑移除了 `electron-builder.config.*` 拦截（F3a），F2 的尾斜杠接受又使 `package.json/`、`.env/` 等发布根文件绕过确定性拦截（F6，高）。两项都构成相对 `6b7ef38` 的边界拦截收窄/旁路，须修复后重新补充验收。原报告 F1/F2/F3 条件在修复后关闭；F4（既有 flaky）与 F5（change 记录过程项）仍为非阻断；整体候选（`6b7ef38` + `2eeeeb6`）维持 **有条件通过**，剩余条件为 F3a/F6 修复、真实模型/Electron/非 Windows 未验证与既有 flaky/过程项。上述证据文件（`10_`–`20_`）位于同一证据目录。

@@ -4247,6 +4247,28 @@ test("边界变更请求：确定性校验各失败 code（invalid-role / invali
       ["空理由", { roleId: "executor", addPaths: ["config/new.ts"], rationale: "   " }, "invalid-path"],
       ["同增同删", { roleId: "executor", addPaths: ["config/new.ts"], removePaths: ["config/new.ts"], rationale }, "invalid-path"],
     ];
+    // 验收 F3a：electron-builder 的 `.config.*` 变体与 yml 配置都必须拒绝（不能只挡 yml）。
+    for (const path of ["electron-builder.config.ts", "electron-builder.config.js", "electron-builder.config.mjs"]) {
+      cases.push([`打包配置 ${path}`, { roleId: "executor", addPaths: [path], rationale }, "invalid-path"]);
+    }
+    // 验收 F6：发布根/治理关键路径带**单个末尾 `/`** 时不得绕过（增删两侧都测；票据仍保留原路径）。
+    const slashSensitivePaths = [
+      "package.json/",
+      "package-lock.json/",
+      "tsconfig.node.json/",
+      "vite.config.ts/",
+      "electron-builder.yml/",
+      ".env/",
+      "index.html/",
+      "docs/scheduling/",
+      "docs/acceptance/",
+      "角色卡/executor/",
+      ".ans/",
+    ];
+    for (const path of slashSensitivePaths) {
+      cases.push([`尾斜杠新增 ${path}`, { roleId: "executor", addPaths: [path], rationale }, "invalid-path"]);
+      cases.push([`尾斜杠移除 ${path}`, { roleId: "executor", removePaths: [path], rationale }, "invalid-path"]);
+    }
     for (const [label, input, code] of cases) {
       const result = await capability(input);
       assert.equal(result.ok, false, label);

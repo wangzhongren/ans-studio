@@ -1,0 +1,55 @@
+=== F1 wildcard / characters ===
+normalize src/*.ts undefined
+normalize src/?.ts undefined
+normalize src/[a].ts undefined
+normalize src/{a,b}.ts undefined
+normalize src/a*.ts undefined
+normalize src/a?.ts undefined
+normalize src/a[b].ts undefined
+normalize src/a{b}.ts undefined
+assess wildcard {"ok":false,"code":"invalid-path","message":"addPaths 含非法路径：\"src/*.ts\"（须为项目相对精确路径：不能是绝对路径、不能含 ..、不能含通配符/空段；目录条目可带单个末尾 /）。"}
+=== F2 trailing slash ===
+normalize config/newdir "config/newdir"
+normalize config/newdir/ "config/newdir/"
+normalize config/newdir// undefined
+normalize config/newdir/// undefined
+normalize config//x.ts undefined
+normalize ./x undefined
+normalize ../x undefined
+normalize x/. undefined
+normalize x/.. undefined
+normalize x/ "x/"
+normalize /abs/ undefined
+normalize C:/abs/ undefined
+covers dir by directory entry x/ true
+covers dir by file entry false
+exact x vs x/ true
+assess add dir {"ok":true,"addPaths":["config/newdir/"],"removePaths":[],"effectiveAdds":["config/newdir/"],"effectiveRemoves":[]}
+assess add dir covered {"ok":false,"code":"no-change","message":"与当前角色边界比较没有实际变化（新增路径已被现有条目覆盖/移除路径本来就不在边界内）；未派发给组队。"}
+assess dedupe x & x/ {"ok":true,"addPaths":["config/newdir"],"removePaths":[],"effectiveAdds":["config/newdir"],"effectiveRemoves":[]}
+assess dedupe x/ & x {"ok":true,"addPaths":["config/newdir/"],"removePaths":[],"effectiveAdds":["config/newdir/"],"effectiveRemoves":[]}
+assess overlap x add / x/ remove {"ok":false,"code":"invalid-path","message":"同一路径不能同时新增与移除：config/newdir/。"}
+assess remove x/ exact dir {"ok":true,"addPaths":[],"removePaths":["src/executor/"],"effectiveAdds":[],"effectiveRemoves":["src/executor/"]}
+assess remove file with slash {"ok":true,"addPaths":[],"removePaths":["src/executor/legacy.ts/"],"effectiveAdds":[],"effectiveRemoves":["src/executor/legacy.ts/"]}
+=== F3 governance paths (add & remove) ===
+add docs/scheduling/x.md {"ok":false,"code":"invalid-path"}
+remove docs/scheduling/x.md {"ok":false,"code":"invalid-path"}
+add docs/acceptance/x.md {"ok":false,"code":"invalid-path"}
+remove docs/acceptance/x.md {"ok":false,"code":"invalid-path"}
+add docs/contracts/x.md {"ok":false,"code":"invalid-path"}
+remove docs/contracts/x.md {"ok":false,"code":"invalid-path"}
+add docs/governance/x.md {"ok":false,"code":"invalid-path"}
+remove docs/governance/x.md {"ok":false,"code":"invalid-path"}
+add bin/ans.js {"ok":false,"code":"invalid-path"}
+remove bin/ans.js {"ok":false,"code":"invalid-path"}
+add .github/workflows/ci.yml {"ok":false,"code":"invalid-path"}
+remove .github/workflows/ci.yml {"ok":false,"code":"invalid-path"}
+add electron-builder.yml {"ok":false,"code":"invalid-path"}
+remove electron-builder.yml {"ok":false,"code":"invalid-path"}
+add electron-builder.yaml {"ok":false,"code":"invalid-path"}
+remove electron-builder.yaml {"ok":false,"code":"invalid-path"}
+=== task/preview directory semantics ===
+task has dir marker true
+task has file path plain true
+preview has dir marker true
+ticket id differs file vs dir {"file":"bnd-31237d0f9f0fe5e9","dir":"bnd-c74c28d06fcb6503"}

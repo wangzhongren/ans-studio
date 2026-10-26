@@ -66,7 +66,7 @@ const RELEASE_ROOT_PATTERNS: readonly RegExp[] = [
   /^package(-lock)?\.json$/i,
   /^(pnpm-lock\.yaml|yarn\.lock)$/i,
   /^tsconfig(?:\.[^/]+)?\.json$/i,
-  /^(?:vite|vitest|playwright|forge|webpack|rollup|eslint|prettier)\.config\.[^/]+$/i,
+  /^(?:vite|vitest|playwright|electron-builder|forge|webpack|rollup|eslint|prettier)\.config\.[^/]+$/i,
   /^electron-builder\.ya?ml$/i,
   /^index\.html$/i,
   /^\.github(?:\/|$)/,
@@ -125,12 +125,20 @@ function boundaryPathKey(path: string): string {
   return compareKey(path.replace(/\/+$/, ""));
 }
 
-/** 路径是否触碰治理关键/发布打包路径（祖先覆盖或后代覆盖均拒绝；增删共用）。 */
+/**
+ * 路径是否触碰治理关键/发布打包路径（祖先覆盖或后代覆盖均拒绝；增删共用）。
+ *
+ * **尾斜杠旁路修复（验收 F6）**：目录条目允许末尾 `/`，但敏感/发布判定必须按**去掉恰好一个末尾 `/`**
+ * 后的路径做——否则 `package.json/`、`vite.config.ts/`、`.env/` 等会绕过 `RELEASE_ROOT_PATTERNS`，
+ * 而门禁的目录条目覆盖语义又会把 `package.json/` 当成覆盖 `package.json` 文件。票据/任务仍用原路径。
+ */
 export function boundaryChangePathIsGovernanceCritical(path: string): boolean {
-  if (GOVERNANCE_CRITICAL_PREFIXES.some((prefix) => isUnderOrEqual(path, prefix) || isUnderOrEqual(prefix, path))) {
+  const requested = path.endsWith("/") ? path.slice(0, -1) : path;
+  if (requested === "") return true;
+  if (GOVERNANCE_CRITICAL_PREFIXES.some((prefix) => isUnderOrEqual(requested, prefix) || isUnderOrEqual(prefix, requested))) {
     return true;
   }
-  return RELEASE_ROOT_PATTERNS.some((pattern) => pattern.test(path));
+  return RELEASE_ROOT_PATTERNS.some((pattern) => pattern.test(requested));
 }
 
 /** 边界条目的项目根相对路径（去掉尾斜杠；非 project 根条目返回 undefined）。 */

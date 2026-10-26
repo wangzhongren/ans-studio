@@ -1,0 +1,12 @@
+package.json {"normalized":"package.json","critical":true,"assessment":{"ok":false,"code":"invalid-path"}}
+package.json/ {"normalized":"package.json/","critical":false,"assessment":{"ok":true,"effectiveAdds":["package.json/"]}}
+package-lock.json/ {"normalized":"package-lock.json/","critical":false,"assessment":{"ok":true,"effectiveAdds":["package-lock.json/"]}}
+tsconfig.node.json/ {"normalized":"tsconfig.node.json/","critical":false,"assessment":{"ok":true,"effectiveAdds":["tsconfig.node.json/"]}}
+vite.config.ts/ {"normalized":"vite.config.ts/","critical":false,"assessment":{"ok":true,"effectiveAdds":["vite.config.ts/"]}}
+electron-builder.yml/ {"normalized":"electron-builder.yml/","critical":false,"assessment":{"ok":true,"effectiveAdds":["electron-builder.yml/"]}}
+.env/ {"normalized":".env/","critical":false,"assessment":{"ok":true,"effectiveAdds":[".env/"]}}
+.env.local/ {"normalized":".env.local/","critical":true,"assessment":{"ok":false,"code":"invalid-path"}}
+index.html/ {"normalized":"index.html/","critical":false,"assessment":{"ok":true,"effectiveAdds":["index.html/"]}}
+release/ {"normalized":"release/","critical":true,"assessment":{"ok":false,"code":"invalid-path"}}
+docs/flows/ {"normalized":"docs/flows/","critical":true,"assessment":{"ok":false,"code":"invalid-path"}}
+impact: directory entry package.json/ covers file package.json = true

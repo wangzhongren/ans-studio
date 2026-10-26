@@ -2079,8 +2079,9 @@ test("2026-10-26 边界变更请求：Steward 卡在写集/边界不足时调用
     "Steward 不得 dispatch_task 派组队 / 不得自改卡",
   );
 
-  // 3) 回执处理：dispatched 等待不重提；already-dispatched 有在途；invalid-* / no-change 修正后重交；
-  //    unavailable 如实报告不绕过。
+  // 3) 回执处理：dispatched 等待不重提；already-dispatched 有在途；rejected 是应用门禁退回
+  //    （未派发、不自动放行、不是客户拒绝，按 message 区分内容被拒与门禁不可用/超时）；
+  //    invalid-* / no-change 修正后重交；unavailable 如实报告不绕过。
   assertCardIncludes(
     c,
     [
@@ -2089,6 +2090,11 @@ test("2026-10-26 边界变更请求：Steward 卡在写集/边界不足时调用
       "等待 Crew 完成边界变更并回执",
       "不重复提交",
       "`already-dispatched`：已有在途变更",
+      "`rejected`：中间 AI 门禁或确定性校验拒绝 / 不确定",
+      "**未派发组队、不自动放行、不代表客户拒绝**",
+      "按 `message` 区分「内容被拒」（终态：修正请求内容后重新提交）",
+      "「门禁不可用 / 超时」（可修复后重试）",
+      "不得对同一 ticket / 同一请求原样重复提交、反复试探",
       "`invalid-role` / `invalid-path` / `no-change`",
       "按回执 `code` / `message` 修正**具体的角色或路径**后重交",
       "不得原样死循环重试",

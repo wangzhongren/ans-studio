@@ -1,0 +1,7 @@
+ README.en.md                                       | 12 +++-
+ README.md                                          | 12 +++-
+ app/desktop/boundary-change.ts                     | 78 ++++++++++++++++------
+ app/desktop/interface.ts                           | 32 +++++++--
+ .../acceptance-dispatch.test.ts"                   | 61 +++++++++++++++--
+ 5 files changed, 160 insertions(+), 35 deletions(-)
+product-check (--check, product/test scope): exit 0
