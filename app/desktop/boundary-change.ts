@@ -39,7 +39,7 @@ export const BOUNDARY_CHANGE_UNASSIGNED_FLOW_ID = "unassigned";
 
 /**
  * 治理关键路径：增删写权**都不得**经由本通道触碰这些根（按路径段比较，覆盖祖先/后代都拒绝）。
- * 与 `governance-judge-verdict.ts::isHardForbiddenPath` 同口径的治理关键项 + 本仓共享目录/发布根。
+ * 与 `governance-judge-verdict.ts::isHardForbiddenPath` 同口径的治理关键项 + 本仓治理/共享/发布产物。
  * 移除误授权虽然收窄权限，但同样属治理/共享/Role-Card 层变更：应走团队计划/边界任命流程，
  * 不在运行期请求通道里处理（也避免借移除请求探测治理文件）。
  */
@@ -47,8 +47,14 @@ const GOVERNANCE_CRITICAL_PREFIXES: readonly string[] = [
   ".ans",
   "角色卡",
   "docs/flows",
+  "docs/scheduling",
+  "docs/acceptance",
+  "docs/contracts",
+  "docs/governance",
   "common/shared",
   "src/common/shared",
+  "bin",
+  ".github",
   "docs/bootstrap-manifest.md",
 ];
 
@@ -60,7 +66,8 @@ const RELEASE_ROOT_PATTERNS: readonly RegExp[] = [
   /^package(-lock)?\.json$/i,
   /^(pnpm-lock\.yaml|yarn\.lock)$/i,
   /^tsconfig(?:\.[^/]+)?\.json$/i,
-  /^(?:vite|vitest|playwright|electron-builder|forge|webpack|rollup|eslint|prettier)\.config\.[^/]+$/i,
+  /^(?:vite|vitest|playwright|forge|webpack|rollup|eslint|prettier)\.config\.[^/]+$/i,
+  /^electron-builder\.ya?ml$/i,
   /^index\.html$/i,
   /^\.github(?:\/|$)/,
   /^(?:release|packaging|dist|build|bin)(?:\/|$)/,
@@ -90,18 +97,32 @@ export interface BoundaryChangeAssessmentFailure {
  * 项目相对路径归一化（**词法**；不触碰文件系统）：
  *  - 反斜杠统一为 `/`（Windows 录入友好）；
  *  - 拒绝绝对路径（POSIX 前导 `/`、盘符 `C:`、UNC 归一后以 `/` 开头）；
- *  - 拒绝空串、空段（含尾斜杠 `src/`）、`.`、`..` 段与 NUL。
+ *  - 拒绝空串、空段（含 `//`、多个尾斜杠）、`.`、`..` 段与 NUL；
+ *  - 拒绝通配符/字符类（`*` `?` `[` `]` `{` `}`）：只接受**精确**路径；
+ *  - **允许单个末尾 `/`**：表示目录条目（角色卡约定「目录条目以 `/` 结尾」），规范化后保留该单个斜杠，
+ *    票据/组队任务/证据摘要都保留目录语义；不带尾斜杠的路径按精确条目提交（由 Crew 按计划决定 kind）。
  * 合法返回去首尾空白后的 posix 相对路径；否则 undefined。
  */
 export function normalizeBoundaryChangePath(raw: unknown): string | undefined {
   if (typeof raw !== "string") return undefined;
   const text = raw.trim();
   if (text === "" || text.includes("\0")) return undefined;
+  if (text.includes("*") || text.includes("?") || text.includes("[") || text.includes("]") || text.includes("{") || text.includes("}")) {
+    return undefined; // 通配符/字符类：只接受精确路径
+  }
   const posix = toPosix(text);
   if (posix.startsWith("/") || /^[a-zA-Z]:/.test(posix)) return undefined; // 绝对路径/盘符/UNC
-  const segments = posix.split("/");
+  const directory = posix.endsWith("/");
+  const body = directory ? posix.slice(0, -1) : posix;
+  if (body === "") return undefined;
+  const segments = body.split("/");
   if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) return undefined;
-  return segments.join("/");
+  return segments.join("/") + (directory ? "/" : "");
+}
+
+/** 路径比较键：忽略单个末尾 `/`（目录语义只影响提交形状，不影响「是否同一路径」判断）+ 平台大小写口径。 */
+function boundaryPathKey(path: string): string {
+  return compareKey(path.replace(/\/+$/, ""));
 }
 
 /** 路径是否触碰治理关键/发布打包路径（祖先覆盖或后代覆盖均拒绝；增删共用）。 */
@@ -123,15 +144,22 @@ function projectEntryPath(entry: BoundaryEntry): string | undefined {
 export function boundaryEntryCoversPath(entry: BoundaryEntry, path: string): boolean {
   const base = projectEntryPath(entry);
   if (base === undefined) return false;
-  if (entry.kind === "file") return compareKey(base) === compareKey(path);
-  if (entry.kind === "directory") return isUnderOrEqual(path, base);
+  if (entry.kind === "file") {
+    // 目录形状的请求（末尾 `/`）不可能被同名 file 条目覆盖。
+    return !path.endsWith("/") && compareKey(base) === compareKey(path);
+  }
+  if (entry.kind === "directory") {
+    const requested = path.endsWith("/") ? path.slice(0, -1) : path;
+    return requested !== "" && isUnderOrEqual(requested, base);
+  }
   return false;
 }
 
-/** 当前边界是否有与路径**完全相等**的条目（移除只能针对独立条目，不能切目录条目的一部分）。 */
+/** 当前边界是否有与路径**完全相等**的条目（移除只能针对独立条目，不能切目录条目的一部分）。
+ *  单个末尾 `/` 仅表达目录语义，不影响「同一路径」判断。 */
 export function boundaryEntryIsExact(entry: BoundaryEntry, path: string): boolean {
   const base = projectEntryPath(entry);
-  return base !== undefined && compareKey(base) === compareKey(path);
+  return base !== undefined && compareKey(base) === boundaryPathKey(path);
 }
 
 function pathListOf(raw: unknown, label: string): { ok: true; paths: string[] } | { ok: false; message: string } {
@@ -144,10 +172,10 @@ function pathListOf(raw: unknown, label: string): { ok: true; paths: string[] } 
     if (normalized === undefined) {
       return {
         ok: false,
-        message: `${label} 含非法路径：${typeof item === "string" ? JSON.stringify(item) : String(item)}（须为项目相对路径，不能是绝对路径、不能含 ..、空段或尾斜杠）。`,
+        message: `${label} 含非法路径：${typeof item === "string" ? JSON.stringify(item) : String(item)}（须为项目相对精确路径：不能是绝对路径、不能含 ..、不能含通配符/空段；目录条目可带单个末尾 /）。`,
       };
     }
-    const key = compareKey(normalized);
+    const key = boundaryPathKey(normalized);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(normalized);
@@ -158,7 +186,8 @@ function pathListOf(raw: unknown, label: string): { ok: true; paths: string[] } 
 /**
  * 确定性校验（应用侧；工具层已先做一次形状拒绝，这里是**能力入口的第二道**）：
  *  1. add/remove 至少一个非空；rationale 非空；
- *  2. 路径项目相对、无绝对/`..`/空段，去重；同一路径不得同时新增与移除；
+ *  2. 路径项目相对、无绝对/`..`/空段/通配符，去重；单个末尾 `/` = 目录条目（保留语义）；
+ *     同一路径不得同时新增与移除（`x` 与 `x/` 视为同一路径）；
  *  3. 增删路径都不得触碰治理关键/发布打包根（治理/共享/Role-Card 层变更走团队计划/边界任命流程）；
  *  4. 与当前角色边界比较：已覆盖的新增、非独立条目的移除都不会产生实际变化；全部无变化 ⇒ `no-change`。
  *
@@ -182,8 +211,8 @@ export function assessBoundaryChangeRequest(input: {
   if (adds.paths.length === 0 && removes.paths.length === 0) {
     return { ok: false, code: "no-change", message: "请求没有任何增删路径（addPaths/removePaths 至少一个非空）。" };
   }
-  const addKeys = new Set(adds.paths.map((path) => compareKey(path)));
-  const overlap = removes.paths.find((path) => addKeys.has(compareKey(path)));
+  const addKeys = new Set(adds.paths.map((path) => boundaryPathKey(path)));
+  const overlap = removes.paths.find((path) => addKeys.has(boundaryPathKey(path)));
   if (overlap !== undefined) {
     return { ok: false, code: "invalid-path", message: `同一路径不能同时新增与移除：${overlap}。` };
   }
@@ -194,8 +223,9 @@ export function assessBoundaryChangeRequest(input: {
       code: "invalid-path",
       message:
         `路径触碰治理关键/发布打包路径：${critical}。` +
-        "`.ans/**`、`角色卡/**`、`docs/flows/**`、共享目录与 release/packaging 根文件不能经由边界变更请求增删；" +
-        "请改用团队计划/边界任命流程。",
+        "`.ans/**`、`角色卡/**`、`docs/flows/**`、`docs/scheduling/**`、`docs/acceptance/**`、`docs/contracts/**`、" +
+        "`docs/governance/**`、共享目录、`bin/**`、`.github/**` 与 release/packaging 根文件（含 electron-builder 配置）" +
+        "不能经由边界变更请求增删；请改用团队计划/边界任命流程。",
     };
   }
 
@@ -315,11 +345,11 @@ export function buildBoundaryChangeCrewTaskText(input: {
   ];
   if (input.addPaths.length > 0) {
     lines.push("需新增写权限的路径（逐条）：");
-    for (const path of input.addPaths) lines.push(`- ${path}`);
+    for (const path of input.addPaths) lines.push(`- ${path}${path.endsWith("/") ? "（目录条目）" : ""}`);
   }
   if (input.removePaths.length > 0) {
     lines.push("需移除写权限的路径（逐条）：");
-    for (const path of input.removePaths) lines.push(`- ${path}`);
+    for (const path of input.removePaths) lines.push(`- ${path}${path.endsWith("/") ? "（目录条目）" : ""}`);
   }
   lines.push(`理由：${input.rationale}`);
   lines.push("要求：");
@@ -382,12 +412,16 @@ function buildJudgePreview(ev: BoundaryChangeJudgeEvidence): string {
     `发起治理角色：${ev.requesterRoleId}`,
     `flowId：${ev.flowId}｜ticketId：${ev.ticketId}`,
     `请求新增路径：${ev.addPaths.length === 0 ? "（无）" : ""}`,
-    ...ev.addPaths.map((path) => `- ${path}`),
+    ...ev.addPaths.map((path) => `- ${path}${path.endsWith("/") ? "（目录条目）" : ""}`),
     `请求移除路径：${ev.removePaths.length === 0 ? "（无）" : ""}`,
-    ...ev.removePaths.map((path) => `- ${path}`),
+    ...ev.removePaths.map((path) => `- ${path}${path.endsWith("/") ? "（目录条目）" : ""}`),
     "与当前边界比较后的实际变化：",
-    ...(ev.effectiveAdds.length === 0 ? ["- 新增：无（已被现有条目覆盖）"] : ev.effectiveAdds.map((path) => `- 新增：${path}`)),
-    ...(ev.effectiveRemoves.length === 0 ? ["- 移除：无"] : ev.effectiveRemoves.map((path) => `- 移除：${path}`)),
+    ...(ev.effectiveAdds.length === 0
+      ? ["- 新增：无（已被现有条目覆盖）"]
+      : ev.effectiveAdds.map((path) => `- 新增：${path}${path.endsWith("/") ? "（目录条目）" : ""}`)),
+    ...(ev.effectiveRemoves.length === 0
+      ? ["- 移除：无"]
+      : ev.effectiveRemoves.map((path) => `- 移除：${path}${path.endsWith("/") ? "（目录条目）" : ""}`)),
     `理由：${ev.rationale}`,
     "",
     "目标角色角色卡摘录：",

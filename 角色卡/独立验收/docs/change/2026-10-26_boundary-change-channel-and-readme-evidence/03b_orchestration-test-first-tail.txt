@@ -1,0 +1,13 @@
+✔ request_boundary_change：convener 提供能力 ⇒ 同一引用透传、工具注册；载荷原样路由并如实转达回执 (9.9636ms)
+✔ request_boundary_change：convener 未提供 ⇒ provider options 缺席、工具不注册 (2.1326ms)
+✔ request_boundary_change：项目角色与其他内置治理角色即便误给也不注入（只给 convener） (16.4603ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 213.2981
+
+[exited with code 0]

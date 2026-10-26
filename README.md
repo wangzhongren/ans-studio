@@ -8,6 +8,8 @@
 
 **版本状态**：当前公开运行包为 **v1.7.0**（2026-10-24）。`main` 已合入 `request_acceptance`、验收分诊与后台任务/流程状态面板；本分支在 `main` 之上新增 `request_boundary_change`（含中间 AI 门禁）、脚手架先行治理与「统筹完成即主动提交验收」。main 与本分支的新增能力都将随下一次发布进入运行包，文中逐项标注。
 
+![ANS Studio 桌面：五角色导航与需求确认卡](角色卡/桌面UI/docs/change/2026-10-20_readme-v1.4-screenshot/desktop-intent-confirm.png)
+
 ## 三层结构：意图、组织、规则
 
 | 层 | 角色或机制 | 职责 | 权力与边界 |
@@ -178,8 +180,8 @@ steps:                        # 必填；非空
 `统筹发现边界缺口 → request_boundary_change → 应用确定性校验 + 中间 AI 门禁 →（通过才）组队 appointment-write → 角色卡/边界生效`
 
 1. **发现缺口。** 项目角色报告写集/边界不足，或 Steward 在核证、readiness、派发前检查中发现角色边界覆盖不了任务所需路径。
-2. **提交请求。** 调用 `request_boundary_change({ roleId, addPaths, removePaths, rationale, flowId })`，只提交**精确的项目相对路径/目录条目**与理由；不重写整个边界、不扩大其它路径，也不用 `dispatch_task` 直接派 Crew（内置治理角色不可被派发）。
-3. **应用确定性校验。** 校验路径形状（无通配符、`..`、绝对路径）、治理关键路径/发布根不得新增、必须产生实际变化、同一请求幂等；应用票据写入 `.ans/governance/boundary-requests/<flowId>/<ticketId>.json`。
+2. **提交请求。** 调用 `request_boundary_change({ roleId, addPaths, removePaths, rationale, flowId })`，只提交**精确的项目相对路径**（目录条目以 `/` 结尾；不得通配符、`..`、绝对路径）与理由；不重写整个边界、不扩大其它路径，也不用 `dispatch_task` 直接派 Crew（内置治理角色不可被派发）。
+3. **应用确定性校验。** 校验路径形状（无通配符；目录条目末尾 `/`；拒绝绝对路径、`..`、空段等非法形式）、治理关键路径/发布根不得新增、必须产生实际变化、同一请求幂等；应用票据写入 `.ans/governance/boundary-requests/<flowId>/<ticketId>.json`。
 4. **中间 AI 门禁。** 只读证据（治理账本、团队计划、流程摘要、目标角色卡/边界），deny-all 写权，只判断请求的精确路径与理由是否与角色卡、当前边界、团队计划及流程一致，是否顺带扩权或触碰治理关键路径。`deny` / `manual` / 超时 / 不可用一律 `rejected`，**不派发、不自动放行**，回执给 Steward。
 5. **组队写卡。** 通过后才由应用后台派 Crew。Crew 逐项核对 `roleId`、增删路径与理由，按 `appointment-write` 逐路径取得客户/判断 agent 确认，写后交应用边界校验。**请求来自统筹不等于客户批准**；确认与校验完成前，不得按新路径写入。
 6. **生效与复核。** 边界变更完成且校验通过后才生效；Steward 按新边界重新核对 readiness / 派发条件。变更未完成前不得派实现写入该路径。
@@ -234,6 +236,12 @@ items:
 - **判断代批不冒充客户。** 成功代批会标明「judge 代批」，不写成客户本人点击；开关关闭、未接入自动判断或不适用的请求仍走手动卡；治理判断期间关闭开关，原卡可恢复。
 
 技术结构与跨角色接口见[项目架构](角色卡/项目管理/docs/architecture.md)。
+
+## 研究与引用
+
+ANS Studio 的 Role-First 治理模型受 Role-First Software Governance（RFSG）研究启发；ANS 是名称，不作缩写展开。角色优先、非对称权限边界与独立验证的设计讨论见：
+
+Wang, Zhongren. 2026. *Role-First Software Governance: Asymmetric Authority Boundaries for AI-Native Agent Systems*. [DOI: 10.5281/zenodo.22824700](https://zenodo.org/records/22824700).
 
 ## 安装与运行
 

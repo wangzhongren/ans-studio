@@ -5890,15 +5890,22 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         attempt: attempts,
       });
 
-      /** AI 门禁未通过/无法完成：写 rejected 票据并如实回执（不派发、不自动放行）。 */
+      /**
+       * AI 门禁未通过/无法完成：写票据并如实回执（不派发、不自动放行）。
+       * `retryable` = **门禁不可用/超时**（引擎解析失败、判断闭包构造失败、判断抛错、账本暂不可读等），
+       * 票据记 `failed`（可重试，重试会重新过门禁）；真正被判断退回（deny/manual）记终态 `rejected`，
+       * 同一请求不重跑门禁（防反复试探）。两种情形都**不派发**，fail-closed 方向不变。
+       */
       const rejectByJudge = async (
         outcome: Pick<GovernanceJudgeOutcome, "verdict" | "reasonCode" | "reason" | "engine">,
         fallbackReason: string,
+        options: { retryable?: boolean } = {},
       ): Promise<RequestBoundaryChangeResult> => {
         const reason = boundaryChangeSummaryText(outcome.reason ?? fallbackReason);
+        const retryable = options.retryable === true;
         const record: BoundaryChangeTicketRecord = {
           ...baseRecord,
-          status: "rejected",
+          status: retryable ? "failed" : "rejected",
           updatedAt: boundaryChangeNow(),
           judge: {
             verdict: outcome.verdict,
@@ -5906,7 +5913,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             ...(reason !== "" ? { reason } : {}),
             ...(outcome.engine !== undefined ? { engine: outcome.engine } : {}),
           },
-          error: null,
+          error: retryable ? reason : null,
         };
         try {
           await writeBoundaryChangeTicket(root, ticketRel, record);
@@ -5918,13 +5925,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           flowId,
           verdict: outcome.verdict,
           reasonCode: outcome.reasonCode ?? "unknown",
+          retryable,
         });
         return {
           ok: false,
           code: "rejected",
           message:
             `AI 门禁未通过（${outcome.verdict}${outcome.reasonCode !== undefined ? `/${outcome.reasonCode}` : ""}）：` +
-            `${reason === "" ? "未给出理由" : reason}；本次未派发给组队，不自动放行（不代表客户拒绝）。`,
+            `${reason === "" ? "未给出理由" : reason}；本次未派发给组队，不自动放行（不代表客户拒绝）` +
+            `${retryable ? "；这是门禁不可用/超时（可修复后重试），不是请求内容被拒" : ""}。`,
           roleId: target.roleId,
           ticketId,
         };
@@ -5969,6 +5978,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         return await rejectByJudge(
           { verdict: "manual", reasonCode: "runtime-unresolved", reason: "无法解析项目引擎，AI 门禁无法执行", engine: "demo" },
           "无法解析项目引擎，AI 门禁无法执行",
+          { retryable: true },
         );
       }
 
@@ -5985,6 +5995,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             engine: "demo",
           },
           "治理账本不可读，AI 门禁无法无损判断",
+          { retryable: true },
         );
       }
       const facts = boundaryChangeJudgeFacts({ flowId, ledgerEntries: ledger.entries, ledgerErrors: ledger.errors.length });
@@ -5997,6 +6008,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             engine: "demo",
           },
           "治理账本存在坏行",
+          { retryable: true },
         );
       }
       let teamPlan:
@@ -6060,6 +6072,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             engine: "demo",
           },
           "AI 门禁初始化失败",
+          { retryable: true },
         );
       }
       let judge: GovernanceJudgeFn | undefined;
@@ -6078,6 +6091,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         return await rejectByJudge(
           { verdict: "manual", reasonCode: "judge-unavailable", reason: "AI 门禁不可用（判断闭包构造失败）", engine: "demo" },
           "AI 门禁不可用",
+          { retryable: true },
         );
       }
       const judgeRequest = buildBoundaryChangeJudgeRequest({
@@ -6117,6 +6131,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
               engine: runtime,
             },
             "AI 门禁超时",
+            { retryable: true },
           );
         }
         outcome = judgedRace.value;
@@ -6129,10 +6144,17 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             engine: runtime,
           },
           "AI 门禁不可用",
+          { retryable: true },
         );
       }
       if (outcome.verdict !== "approve") {
-        return await rejectByJudge(outcome, "AI 门禁未通过");
+        // 驱动侧的超时/不可用（busy/引擎不支持等）是**门禁基础设施**问题：票据记 failed（可重试）；
+        // deny/manual（含意图/证据类 manual）是判断结论：票据记终态 rejected，同一请求不重跑。
+        const transient =
+          outcome.reasonCode === "timeout" ||
+          outcome.reasonCode === "unavailable" ||
+          outcome.reasonCode === "ledger-unavailable";
+        return await rejectByJudge(outcome, "AI 门禁未通过", { retryable: transient });
       }
       const judgeRecord: BoundaryChangeTicketRecord["judge"] = {
         verdict: outcome.verdict,

@@ -1,0 +1,19 @@
+normalize ok "src/new/file.ts"
+normalize absolute undefined
+normalize drive undefined
+normalize dotdot undefined
+normalize trailing slash undefined
+normalize wildcard accepted? "src/*.ts"
+assess wildcard {"ok":true,"addPaths":["src/*.ts"],"removePaths":[],"effectiveAdds":["src/*.ts"],"effectiveRemoves":[]}
+assess trailing slash {"ok":false,"code":"invalid-path","message":"addPaths 含非法路径：\"src/newdir/\"（须为项目相对路径，不能是绝对路径、不能含 ..、空段或尾斜杠）。"}
+assess governance .ans {"ok":false,"code":"invalid-path","message":"路径触碰治理关键/发布打包路径：.ans/governance/ledger.jsonl。`.ans/**`、`角色卡/**`、`docs/flows/**`、共享目录与 release/packaging 根文件不能经由边界变更请求增删；请改用团队计划/边界任命流程。"}
+assess remove covered file under dir {"ok":true,"addPaths":[],"removePaths":["src/executor/legacy.ts"],"effectiveAdds":[],"effectiveRemoves":["src/executor/legacy.ts"]}
+assess remove child of dir {"ok":false,"code":"invalid-path","message":"移除路径 src/executor/sub.ts 当前被更宽的目录条目覆盖，边界模型无法只移除其中一项；请改为调整目录条目（属团队计划/边界任命变更）或保持现状。"}
+assess unchanged add {"ok":false,"code":"no-change","message":"与当前角色边界比较没有实际变化（新增路径已被现有条目覆盖/移除路径本来就不在边界内）；未派发给组队。"}
+assess valid {"ok":true,"addPaths":["config/site.ts"],"removePaths":["src/executor/legacy.ts"],"effectiveAdds":["config/site.ts"],"effectiveRemoves":["src/executor/legacy.ts"]}
+ticket stable (order/trim) {"t1":"bnd-0d477058c091db88","t2":"bnd-0d477058c091db88","equal":true}
+task has customer-approval phrase? false
+task has appointment-write? true
+task has ticketId? true
+ticket rel path ".ans/governance/boundary-requests/flow-x/bnd-0d477058c091db88.json"
+clientMessageId "ans-app-task:3c57f5f9d384dbd7b81ab923e51dce13"

@@ -1,0 +1,27 @@
+✔ r3 legacy 不变：无 parallelGroup/dependsOn 的旧 flow 不新增前置检查；FLOW_STEP_KINDS 仍四值 (46.2528ms)
+✔ r4 Provider 口径：v2 初始 flow YAML 携带 parallelGroup/dependsOn 可解析，不需要 flow_step_supersede 扩参 (2.0392ms)
+✔ r5 测试分片独立根/日志/输出、失败隔离、只重跑失败分片、manifest 合并 (165.0867ms)
+✔ r6 v3 计划：Map 并行组/Reduce dependsOn 硬前置不回归（目录授权不改变 flow 行为） (85.8027ms)
+✔ r7 v3 测试分片隔离：各自临时根/输出/日志；共享只读 v3 计划哈希不变；失败隔离 (326.1298ms)
+✔ r8 P1-4 owner==target：错派给非 owner 被拒（owner-mismatch、不写账本）；派给 owner 受理 (34.8836ms)
+✔ r9 P0-3：前置 superseded ⇒ 沿 supersededBy 解析到 done；缺失替代/未知/成环 fail-closed；并行组不退化 (54.6713ms)
+✔ S7-A 客户 reject 全链路：路由 Lead（报告+清单+决定）→ 零 Proof 返工 → rework/flow 更新 → 恰一次重派（非发布同样重派）→ accepted 收口；重复/同内容不重派 (1106.4287ms)
+✔ S7-B 客户 reject 后无 flow 进展 ⇒ 仍不重派 Proof（所有变更同一门，非发布不例外）；重复事件仍只一条路由、零热循环 (442.8832ms)
+✔ S7-C judge auto-rework（真实卡 + 判断未完成）：路由 Lead、自动决策系统行/回执不写「客户拒绝」、零 customer.decision、零 Proof 返工；flow 更新后恰一次重派（release 元数据不影响） (479.1006ms)
+✔ S7-D 报告缺段/坏段：只发「报告不完整」任务（无 items、不建 flow 步骤、不解析自由文本）；不伪造决定 (153.9919ms)
+✔ S7-E owner 归属：未知/不可派发逐项 blocked、有效项先行；verifier=报告修正、convener=治理项，不向 Proof/内置角色派产品返工 (80.5401ms)
+✔ S7-F 无可 supersede 旧步骤 gap（Q5 A）：任务要求 fail-closed，应用不凭空建步骤、flow 不变 (77.4891ms)
+✔ S7-G verification dispatched/delivered：app-only 重开为 pending（清旧证据、保留 dependsOn）后恰一次重派 Proof（release 元数据不影响） (214.3145ms)
+✔ S7-H accepted 不重开：最新 accepted + verification dispatched ⇒ 按 accepted 收口（done + acceptance 证据）、不路由/不重派 (101.4978ms)
+✔ S7-I legacy Markdown（Q6 A）：历史 rejected 保持旧行为（不路由/不重派/不写 record）；无决定且门通过 ⇒ legacy 无 YAML 也自动派 Proof (160.2208ms)
+✔ S7-J routing record：审计失败可见且不伪造账本；发送失败 failed 后下一次事件重试成功；重启去重不重复路由 (842.5209ms)
+ℹ tests 155
+ℹ suites 0
+ℹ pass 155
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11764.3395
+
+[exited with code 0]

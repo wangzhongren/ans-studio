@@ -8,6 +8,8 @@ It puts "who decides, who dispatches, who writes, who accepts" into the runtime 
 
 **Version status:** the current public runtime bundle is **v1.7.0** (released 2026-10-24). `main` already contains `request_acceptance`, acceptance triage, and the background-task / flow-status panels. This branch adds `request_boundary_change` (including the intermediate AI gate), scaffold-first governance, and the rule that Steward proactively requests acceptance on completion. Everything on `main` and on this branch will reach the runtime bundle in the next release; each item is marked inline below.
 
+![ANS Studio desktop: five-role navigation and intent confirmation card](角色卡/桌面UI/docs/change/2026-10-20_readme-v1.4-screenshot/desktop-intent-confirm.png)
+
 ## Three layers: intent, organization, rules
 
 | Layer | Role or mechanism | Responsibility | Power and limits |
@@ -178,8 +180,8 @@ steps:                        # required; non-empty
 `Steward finds a boundary gap → request_boundary_change → application deterministic checks + intermediate AI gate → (only if approved) Crew appointment-write → role card/boundary takes effect`
 
 1. **Find the gap.** A project role reports that its write set or boundary is insufficient, or Steward finds during verification, readiness, or pre-dispatch checks that the boundary cannot cover the paths the task needs.
-2. **Submit the request.** Call `request_boundary_change({ roleId, addPaths, removePaths, rationale, flowId })` with **exact project-relative paths/directory entries** and a rationale. Do not rewrite the whole boundary, do not expand unrelated paths, and do not try to dispatch Crew with `dispatch_task` (built-in governance roles cannot be dispatched).
-3. **Application deterministic checks.** Validate path shape (no wildcards, `..`, or absolute paths), forbid additions to governance-critical paths and release roots, require an actual change, and deduplicate by request. The application writes a ticket to `.ans/governance/boundary-requests/<flowId>/<ticketId>.json`.
+2. **Submit the request.** Call `request_boundary_change({ roleId, addPaths, removePaths, rationale, flowId })` with **exact project-relative paths** (directory entries end with `/`; no wildcards, `..`, or absolute paths) and a rationale. Do not rewrite the whole boundary, do not expand unrelated paths, and do not try to dispatch Crew with `dispatch_task` (built-in governance roles cannot be dispatched).
+3. **Application deterministic checks.** Validate path shape (no wildcards; directory entries end with `/`; reject absolute paths, `..`, empty segments, and other invalid forms), forbid additions to governance-critical paths and release roots, require an actual change, and deduplicate by request. The application writes a ticket to `.ans/governance/boundary-requests/<flowId>/<ticketId>.json`.
 4. **Intermediate AI gate.** The gate reads only evidence (governance ledger, team plan, flow summary, target role card/boundary), has deny-all write access, and checks only whether the exact paths and rationale are consistent with the role card, current boundary, team plan, and flow — and whether the request smuggles in extra permissions or touches governance-critical paths. `deny` / `manual` / timeout / unavailable all become `rejected`: **nothing is dispatched and nothing is auto-approved**; the receipt goes back to Steward.
 5. **Crew writes the card.** Only after approval does the application dispatch Crew in the background. Crew verifies `roleId`, added/removed paths, and rationale, then obtains customer/judge confirmation path by path through `appointment-write` and submits the result to the application's boundary validation. **A request from Steward is not customer approval**; no implementation may write to those paths until confirmation and validation complete.
 6. **Take effect and re-check.** The new boundary takes effect only after the change and validation complete; Steward re-checks readiness and dispatch conditions against it. No implementation is dispatched to the new paths before that.
@@ -234,6 +236,12 @@ Application gates and AI gates are complementary: the former makes deterministic
 - **Delegated approval does not impersonate the customer.** Successful delegation is marked "judge delegated," never as the customer's own click. Requests with the switch off, no automatic judgment connected, or not applicable still use the manual card; turning the switch off during governance judgment restores the original card.
 
 Technical structure and cross-role interfaces are in [project architecture](角色卡/项目管理/docs/architecture.md).
+
+## Research and citation
+
+ANS Studio's Role-First governance model is inspired by the Role-First Software Governance (RFSG) line of work; ANS is a name, not an acronym. The design discussion of role-first responsibility, asymmetric authority boundaries, and independent verification appears in:
+
+Wang, Zhongren. 2026. *Role-First Software Governance: Asymmetric Authority Boundaries for AI-Native Agent Systems*. [DOI: 10.5281/zenodo.22824700](https://zenodo.org/records/22824700).
 
 ## Install and run
 

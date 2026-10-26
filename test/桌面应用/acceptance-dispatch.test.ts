@@ -4220,14 +4220,28 @@ test("边界变更请求：确定性校验各失败 code（invalid-role / invali
       ["绝对路径", { roleId: "executor", addPaths: ["/etc/passwd"], rationale }, "invalid-path"],
       ["盘符路径", { roleId: "executor", addPaths: ["C:/abs/a.ts"], rationale }, "invalid-path"],
       [".. 逃逸", { roleId: "executor", addPaths: ["../outside.ts"], rationale }, "invalid-path"],
-      ["尾斜杠空段", { roleId: "executor", addPaths: ["config/"], rationale }, "invalid-path"],
+      ["双斜杠空段", { roleId: "executor", addPaths: ["config//x.ts"], rationale }, "invalid-path"],
+      ["多个尾斜杠", { roleId: "executor", addPaths: ["config/newdir///"], rationale }, "invalid-path"],
+      ["通配符 *", { roleId: "executor", addPaths: ["src/*.ts"], rationale }, "invalid-path"],
+      ["通配符 ?", { roleId: "executor", addPaths: ["src/?.ts"], rationale }, "invalid-path"],
+      ["字符类 []", { roleId: "executor", addPaths: ["src/[a].ts"], rationale }, "invalid-path"],
+      ["花括号 {}", { roleId: "executor", addPaths: ["src/{a,b}.ts"], rationale }, "invalid-path"],
       ["治理账本", { roleId: "executor", addPaths: [".ans/governance/ledger.jsonl"], rationale }, "invalid-path"],
       ["角色卡", { roleId: "executor", addPaths: ["角色卡/executor/boundary.yaml"], rationale }, "invalid-path"],
       ["流程 YAML", { roleId: "executor", addPaths: ["docs/flows/flow-boundary.yaml"], rationale }, "invalid-path"],
-      ["移除治理路径", { roleId: "executor", removePaths: ["角色卡/executor/boundary.yaml"], rationale }, "invalid-path"],
+      ["团队计划", { roleId: "executor", addPaths: ["docs/scheduling/flow-boundary-team-v1.md"], rationale }, "invalid-path"],
+      ["验收标准", { roleId: "executor", addPaths: ["docs/acceptance/flow-boundary-criteria-v1.md"], rationale }, "invalid-path"],
+      ["共享契约", { roleId: "executor", addPaths: ["docs/contracts/api.md"], rationale }, "invalid-path"],
+      ["治理记录", { roleId: "executor", addPaths: ["docs/governance/convener/note.md"], rationale }, "invalid-path"],
       ["共享目录", { roleId: "executor", addPaths: ["src/common/shared/paths.ts"], rationale }, "invalid-path"],
       ["发布根文件", { roleId: "executor", addPaths: ["package.json"], rationale }, "invalid-path"],
+      ["打包配置", { roleId: "executor", addPaths: ["electron-builder.yml"], rationale }, "invalid-path"],
+      ["CI 配置", { roleId: "executor", addPaths: [".github/workflows/ci.yml"], rationale }, "invalid-path"],
+      ["bin 目录", { roleId: "executor", addPaths: ["bin/ans.js"], rationale }, "invalid-path"],
       ["已被目录覆盖", { roleId: "executor", addPaths: ["src/executor/already-covered.ts"], rationale }, "no-change"],
+      ["目录已覆盖（末尾 /）", { roleId: "executor", addPaths: ["src/executor/"], rationale }, "no-change"],
+      ["移除治理路径", { roleId: "executor", removePaths: ["角色卡/executor/boundary.yaml"], rationale }, "invalid-path"],
+      ["移除团队计划", { roleId: "executor", removePaths: ["docs/scheduling/x.md"], rationale }, "invalid-path"],
       ["移除不存在", { roleId: "executor", removePaths: ["src/not-listed.ts"], rationale }, "no-change"],
       ["空增删", { roleId: "executor", addPaths: [], removePaths: [], rationale }, "no-change"],
       ["空理由", { roleId: "executor", addPaths: ["config/new.ts"], rationale: "   " }, "invalid-path"],
@@ -4349,7 +4363,36 @@ test("边界变更请求：AI approve ⇒ 恰一条组队任务（精确路径 +
   }
 });
 
-test("边界变更请求：AI deny/manual/超时/不可用 ⇒ rejected、零派发、票据 rejected", async () => {
+test("边界变更请求：目录条目允许单个末尾 /，票据/任务/证据保留目录语义", async () => {
+  const root = makeTempProjectRoot("ans-boundary-directory-");
+  const flowId = "flow-boundary";
+  let judgeRequest: GovernanceJudgeRequest | undefined;
+  const harness = await makeHarness(root, boundaryChangeListing(root), {
+    createGovernanceJudgeFn: governanceJudgeFactory(async (request) => {
+      judgeRequest = request;
+      return approveOutcome();
+    }),
+  });
+  try {
+    const capability = await boundaryChangeCapability(harness, root);
+    const input = { roleId: "executor", addPaths: ["config/newdir/"], rationale: "需要整个配置目录", flowId };
+    const result = await capability(input);
+    assert.equal(result.ok, true, result.message);
+    const task = (harness.sendsByRole.get("nominator") ?? [])[0]!;
+    assert.ok(task.includes("config/newdir/"), "任务保留目录路径");
+    assert.ok(task.includes("（目录条目）"), "任务标注目录语义");
+    const ticketRel = boundaryChangeTicketRelPath(flowId, result.ticketId!);
+    const ticket = JSON.parse(readFileSync(path.join(root, ...ticketRel.split("/")), "utf8")) as { addPaths?: string[] };
+    assert.deepEqual(ticket.addPaths, ["config/newdir/"], "票据保留单个末尾 /");
+    const preview = judgeRequest!.card.kind === "choice" ? (judgeRequest!.card.preview ?? "") : "";
+    assert.ok(preview.includes("config/newdir/"), "AI 证据保留目录路径");
+  } finally {
+    await harness.iface.stopSession();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("边界变更请求：AI deny/manual ⇒ 终态 rejected；超时/不可用 ⇒ rejected 且票据 failed 可重试；零派发", async () => {
   const root = makeTempProjectRoot("ans-boundary-reject-");
   const flowId = "flow-boundary";
   const cases: Array<{
@@ -4417,7 +4460,9 @@ test("边界变更请求：AI deny/manual/超时/不可用 ⇒ rejected、零派
           status?: string;
           judge?: { verdict?: string; reasonCode?: string };
         };
-        assert.equal(ticket.status, "rejected", `${item.label} 票据必须标 rejected`);
+        // 门禁不可用/超时 = 基础设施问题 ⇒ failed（可重试，fail-closed 不变）；deny/manual = 判断结论 ⇒ 终态 rejected。
+        const retryable = item.label === "unavailable" || item.label === "timeout";
+        assert.equal(ticket.status, retryable ? "failed" : "rejected", `${item.label} 票据状态`);
         assert.equal(ticket.judge?.verdict, item.label === "deny" ? "deny" : "manual");
         if (item.label === "timeout") assert.equal(ticket.judge?.reasonCode, "timeout");
         if (item.label === "deny") {
@@ -4426,6 +4471,14 @@ test("边界变更请求：AI deny/manual/超时/不可用 ⇒ rejected、零派
           assert.equal(repeat.code, "rejected");
           assert.match(repeat.message, /此前已被 AI 门禁退回/);
           assert.equal(judgeCalls, 1, "同一请求退回后不得重跑 AI 门禁");
+        }
+        if (item.label === "unavailable") {
+          // 门禁瞬时不可用 ⇒ failed，可在修复后重试（重试会重新过门禁；仍不派发）。
+          const repeat = await capability(input);
+          assert.equal(repeat.code, "rejected");
+          assert.match(repeat.message, /可修复后重试/);
+          assert.equal(judgeCalls, 2, "门禁不可用写 failed，重试应重跑门禁");
+          assert.equal(harness.sendsByRole.get("nominator"), undefined);
         }
       } finally {
         await harness.iface.stopSession();

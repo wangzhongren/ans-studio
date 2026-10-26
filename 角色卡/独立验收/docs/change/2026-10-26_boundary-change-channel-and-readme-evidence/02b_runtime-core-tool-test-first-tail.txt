@@ -1,0 +1,19 @@
+✔ 未注入 requestBoundaryChange ⇒ request_boundary_change 不注册（结构性 fail-closed） (1.0162ms)
+✔ 注入后注册 request_boundary_change；参数 roleId/rationale 必填，路径数组与 flowId 可选 (0.6546ms)
+✔ 载荷原样交给注入能力：增删数组去重、缺省键不造键 (0.5418ms)
+✔ 非法参数在触达能力前拒绝（空 roleId/rationale、无增删、绝对路径/`..`、非数组元素） (0.3968ms)
+✔ 回执原样转达 ok/code/message（成功不夸大、失败不伪装） (0.4405ms)
+✔ rejected 回执原样转达：AI 门禁退回统筹、不自动放行、不代表客户拒绝 (0.1728ms)
+✔ 能力抛错 / 契约外回执 ⇒ fail-closed，绝不说成已派发 (0.3781ms)
+✔ 会话中止：不假设已派发（能力不触达，文案如实） (0.1877ms)
+✔ Service 透传：注入 requestBoundaryChange 后 provider 工具面包含 request_boundary_change；未注入则不出现 (7.0676ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 149.9233
+
+[exited with code 0]
