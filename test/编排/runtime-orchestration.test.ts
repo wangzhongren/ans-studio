@@ -157,6 +157,9 @@ test("O1 original confirmation waits → abort → old yes → next turn actual 
     results.push(await call(options, text === "confirm" ? "request_confirmation" : "write_file", text === "confirm" ? { title: "允许写入", preview: "src/a.ts\n\n## src/a.ts\n// 预览正文\n" } : { path: "src/a.ts", content: "late permission must fail" }, signal));
   });
   const handle = await openRoleSession({ roleId: "X", project, runtime: "codex", persistSession: false,
+    // 2026-10-25 客户规则后：项目角色**无任务收窄**时 Section 1 写入是预授权（不依赖确认发行）。
+    // 本用例验证「中止后迟到的客户同意不得生效」，故显式给出空任务 writeSet 保持确认制收窄路径。
+    scope: { writeSet: [], conditions: [] },
     customerInput: (_req, context) => { metadata = context; entered(); return new Promise<CustomerInputOutcome>((resolve) => { answer = resolve; }); },
   }, { runtimeOptions: optionsFor("codex", provider.factory) });
   try {

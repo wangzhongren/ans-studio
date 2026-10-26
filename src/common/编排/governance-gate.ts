@@ -239,7 +239,7 @@ export function acceptanceCriteriaRelPath(flowId: string, version = 1): string {
  * ⇒ `undefined`（调用方按缺失处理）。只认后缀为正整数（>=1）的 `.md`；v2 存在时不再回退 v1
  * （v2 不合格即拒绝）。
  */
-function latestAcceptanceCriteriaRelPath(projectRoot: string, flowId: string): string | undefined {
+export function latestAcceptanceCriteriaRelPath(projectRoot: string, flowId: string): string | undefined {
   const dir = path.join(projectRoot, "docs", "acceptance");
   const prefix = `${flowId}-criteria-v`;
   const suffix = ".md";

@@ -376,7 +376,7 @@ test("判断请求超上限：命令 >16KB 直接 manual/context-too-large ⇒ �
   }
 });
 
-test("模型自报 manual：按拒绝处理、理由「判断 agent 自报无法判断」", async () => {
+test("模型自报 manual：按拒绝处理、理由「自动代理自报无法判断」", async () => {
   const project = await makeTempProject();
   try {
     const { judge } = makeJudge({
@@ -387,8 +387,10 @@ test("模型自报 manual：按拒绝处理、理由「判断 agent 自报无法
     const chain = makeChain({ root: project.root, runtime: "pi", judge, classify: "risky", operatorOnly: true });
     setJudgeEnabled(chain, true);
     const result = await chain.gate(REQUEST("model-manual"));
+    // 文案来源：共享 i18n `main.operator.judgeReason.modelManual` + `main.operator.manualDenyAdvice.retry`
+    // （2026-10 B1 起「判断 agent 自报无法判断」→「自动代理自报无法判断」）。
     assertManualDenied(result, chain, {
-      reason: "判断 agent 自报无法判断，无法完成自动审查，已拒绝；请重试，如持续失败请关闭「替我审批」后手动确认。",
+      reason: "自动代理自报无法判断，无法完成自动审查，已拒绝；请重试，如持续失败请关闭「替我审批」后手动确认。",
       reasonCode: "model-manual",
       engine: "pi",
       tier: "risky",
@@ -439,7 +441,8 @@ test("对照：judge allow/deny 正常路径不变（manual 改造未波及模�
 
     const result = await chain.gate(REQUEST("normal-deny"));
     assert.equal(result.allow, false, "judge deny 照常拒绝");
-    assert.match(result.reason, /^判断 agent 未放行该命令。/);
+    // 文案来源：共享 i18n `main.operator.judgeDeniedHead`。
+    assert.match(result.reason, /^自动代理未放行该命令。/);
     assert.match(result.reason, /原因：该系统风险不可接受/);
     assert.equal(chain.displays.length, 0, "judge deny 不弹卡");
     assert.equal(chain.rows.length, 1);

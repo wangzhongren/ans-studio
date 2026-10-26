@@ -916,6 +916,47 @@ export function dedupeHistoryRows(
   return keptRows;
 }
 
+/** 历史行在界面上实际呈现的行身份（system-notice 会拆成两行，见 historyRenderParts）。 */
+export interface HistoryRenderPart {
+  kind: RowKind;
+  text: string;
+}
+
+/**
+ * 历史行的呈现分片：`system-notice` 注入行由 `appendDescriptor` 拆成
+ * 「通知行（injected）+ 用户正文行（user）」；其余行只有自身一条。
+ *
+ * 实时/历史合并必须按**呈现分片**比较：历史原文带 `【系统通知·…】` 前缀，
+ * 而实时行（或已被拆分的用户行）只持有通知正文/用户正文，按原始正文比较会漏判，
+ * 同一 turn 的同一输入就会以 live + replay 两条出现（真机 row-355/row-358）。
+ */
+export function historyRenderParts(
+  descriptor: NewRowDescriptor,
+): HistoryRenderPart[] {
+  const data =
+    descriptor.data && typeof descriptor.data === "object"
+      ? (descriptor.data as Record<string, unknown>)
+      : {};
+  const body = typeof data.body === "string" ? data.body : "";
+  const text = typeof data.text === "string" ? data.text : "";
+  if (descriptor.kind === "injected" && data.kind === "system-notice") {
+    const notice =
+      typeof data.displayBody === "string" && data.displayBody !== ""
+        ? data.displayBody
+        : body;
+    const parts: HistoryRenderPart[] = [];
+    if (notice !== "") parts.push({ kind: "injected", text: notice });
+    const remainder = typeof data.remainder === "string" ? data.remainder : "";
+    if (remainder !== "") parts.push({ kind: "user", text: remainder });
+    return parts;
+  }
+  const content =
+    descriptor.kind === "injected" || descriptor.kind === "delivery"
+      ? body || text
+      : text || body;
+  return content === "" ? [] : [{ kind: descriptor.kind, text: content }];
+}
+
 export function historyRowToDescriptor(row: Record<string, unknown>): NewRowDescriptor;
 export function historyRowToDescriptor(
   row: Record<string, unknown>,

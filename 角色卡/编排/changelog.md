@@ -1,5 +1,36 @@
 # 编排 变更记录
 
+## 2026-10-25 — 写入预授权 `system:` 结算与客户/judge 证据分离
+
+**来源**：本轮编排任务。桌面「写入预授权」前闸：边界内写确认由系统直接放行、边界外直接拒绝，结算 `operatorId` 恒为 `system:write-preauthorization`（不是客户、不是 judge）。此前 `recordCustomerDecision` 把任何非 judge 的 answered/declined 都按客户输入记账（接受写 `customer-input`，拒绝写 `unclassified/none`），污染账本语义。
+
+**改了什么**
+- `recordCustomerDecision`（`src/pipeline/orchestration/run-role.ts`）新增 `operatorId` 以 `system:` 开头的分支：
+  - **接受**（answered + `confirmed:true`）：写 `decisionEvidence.kind:"system-preauthorization"` + `operatorId`，**不写** `decisionKind`（门禁键）与 `targetRoleIds`，`customerDecision` 只记结算结果 `accepted`；`actorRoleId`/`power`/`paths`/`messageSummary` 照旧，不伪造客户手批。
+  - **拒绝**（declined）：**不写** `customer.decision`（无 unclassified/none 污染、不挡收尾门），只记诊断 `governance.preauthorization.declined`。
+  - 真实客户（`operation-*`/`cli`）与 `judge:<engine>` 路径逐字不变。
+- `governance-ledger.ts` 最小扩展：`decisionEvidence.kind` 增 `"system-preauthorization"`；`decisionEvidence.operatorId?: string`；写入/读取校验要求该 kind 的 operatorId 为 `system:` 前缀、禁止 `decisionKind`/`judge`、`customerDecision` 必须为 `accepted`——`latestAcceptanceDecision`/`evaluateFlowCompletion` 等收口门不可能把系统预授权读成客户决定或未结算决定。
+
+**测试**：`test/编排/governance-session.test.ts` 新增 3 例（系统接受形状与 latest 不污染、系统拒绝不写账本、客户/judge 回归），`test/编排/governance-ledger.test.ts` 新增 1 例（系统预授权 evidence 写入校验）；`node --test test/编排/*.test.ts` → 963 计 / 961 过 / 1 skip / 1 红（唯一红＝既有 Windows symlink EPERM 基线）；`npm run typecheck` exit 0。
+
+**未做**：桌面侧接线（已由桌面角色完成/在途，本批只读消费其 `operatorId` 约定）、跨角色 e2e、独立验收、commit/push。
+
+## 2026-10-25 — 独立复核能力透传（`request_acceptance`）+ 验收标准步骤收口助手
+
+**来源**：本轮编排任务。运行时核心已新增 `request_acceptance` 工具与冻结类型；桌面需要编排层（A）把能力透传到运行时选项、（B）提供 `acceptance-criteria` 步骤的公共收口出口，否则应用验收门因该步骤 pending 永远判「流程未完成」。
+
+**改了什么**
+- `AdapterCapabilities` / `openRoleSession` 输入新增 `requestAcceptance?: RequestAcceptanceFn`（类型单一来源 `model/runtime.ts`）；只给内置治理角色会话并入 capabilities，未提供 ⇒ 工具结构性不注册。
+- `createRuntimeAdapterFactory` 把 `capabilities.requestAcceptance` 并入运行时选项（与 `flowGet`/`flowStepUpdate` 同形）。
+- 新增 app-only `completeAcceptanceCriteriaStep({projectRoot,flowId})`（`src/common/编排/flow-service.ts`，经 `src/pipeline/orchestration/flow-state.ts` 公共出口）：只处理精确 id `acceptance-criteria`；已 done 幂等（`already-done`）；标准取最新 `<flowId>-criteria-vN.md`；补 `artifact.observed`（app/app）后 pending/dispatched → done；证据/候选 YAML 校验沿用 flow-service 内部原语；不改其它步骤、不写 `customer.decision`、不注册为角色工具。
+- `governance-gate.ts` 仅把既有 `latestAcceptanceCriteriaRelPath` 改为导出，供同角色私有 `flow-service.ts` 复用，不复制版本扫描。
+
+**测试**：新增 `test/编排/request-acceptance.test.ts` 2 例；`flow-service.test.ts` 追加 7 例。`npm run typecheck` exit 0；`node --test "test/编排/**/*.test.ts"` → 908 tests / 906 pass / 1 fail / 1 skip（唯一红＝既有 Windows symlink EPERM 基线）；定向 `flow-service` 84（83 pass + 1 既有 skip）、`request-acceptance` 2/2。
+
+**未做**：桌面 IPC/UI 接线、跨角色 e2e、独立验收、commit/push（均归相应角色/后续任务）。
+
+详见[变更记录](docs/change/2026-10-25_change_request-acceptance-and-acceptance-criteria-step.md)。
+
 ## 2026-10-23 — 补登 `flow-state.ts` 至权威 `boundary.md` Section 1（Markdown/YAML 漂移校正）
 
 **来源**：客户闸门 2（[记录](../../docs/communication/2026-10-23_intent_governance-advance-redispatch.md)「闸门 2 确认与实施授权」）明确选择「**授权人事补边界条目**」。团队计划 §4.5 核对：`src/pipeline/orchestration/flow-state.ts` 只在 `角色卡/编排/boundary.yaml`，未在权威 `角色卡/编排/boundary.md` Section 1。

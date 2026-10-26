@@ -20,6 +20,11 @@ import { mkdir, open, readFile } from "node:fs/promises";
 import path from "node:path";
 import type { GovernanceJudgeAudit, HandOffIntentKind, RuntimeKind } from "../../model/runtime.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
+import type {
+  AcceptanceTriageConclusion,
+  AcceptanceTriageDisposition,
+  AcceptanceTriageRecommendationBasis,
+} from "./acceptance-triage.ts";
 
 /** 账本的项目相对路径（评审 §5.7 固定值）。 */
 export const GOVERNANCE_LEDGER_REL = ".ans/governance/ledger.jsonl";
@@ -77,6 +82,41 @@ export type GovernanceDecisionKind =
  */
 export type GovernanceLedgerTrigger = "customer-decision" | "intent-handoff" | "settle";
 
+/** 账本 `acceptance.triage` 条目的分诊决定 schema（2026-10-25 验收分诊设计 §9.2）。 */
+export const ACCEPTANCE_TRIAGE_DECISION_SCHEMA = "acceptance-triage-decision/v1" as const;
+
+/**
+ * 账本 `acceptance.triage` 的分诊决定审计（2026-10-25 验收分诊设计 §9.2）。
+ *
+ * **不是 `customer.decision`**：`latestAcceptanceDecision`、`evaluateFlowCompletion`、收口门都**不读**
+ * 它；它只用于审计、幂等（`triageId` 扫描去重）与汇报。分诊决定不伪造客户接受/拒绝：
+ * 客户在分诊卡上的选择仍走既有 `customer.decision{decisionKind:"acceptance"}` 结算路径。
+ * `flowId` 在条目顶层（`GovernanceLedgerEntry.flowId`）。
+ */
+export interface AcceptanceTriageLedgerDecision {
+  schema: typeof ACCEPTANCE_TRIAGE_DECISION_SCHEMA;
+  /** 稳定分诊 id（= `triage-<flowId>-<reportSha 前 8 位>`；与 `.ans` 记录 `triageId` 同值）。 */
+  triageId: string;
+  disposition: "rework" | "report-only";
+  source: "judge" | "customer";
+  /**
+   * 更细来源（上层约定）：v1 判断代批 = `"judge-rule"`（按确定性建议确认）；客户分诊卡 =
+   * `"triage-customer"`；判断无法完成转客户卡可记 `"judge-manual"`。仅审计，不参与任何门禁。
+   */
+  sourceDetail?: string;
+  reportPath: string;
+  reportSha256: string;
+  conclusion: AcceptanceTriageConclusion;
+  /** 决定时间（ISO）。 */
+  decidedAt: string;
+  /** 当时确定性建议（审计；override = 决定与建议不同）。 */
+  recommendation?: AcceptanceTriageDisposition;
+  recommendationBasis?: AcceptanceTriageRecommendationBasis;
+  override?: boolean;
+  /** 分诊卡 / 请求 id（可空）。 */
+  requestId?: string | null;
+}
+
 /** 账本条目（评审 §5.7 逐字形状；只增不改，未知字段读取时原样保留）。 */
 export interface GovernanceLedgerEntry {
   at: string; // ISO
@@ -89,7 +129,12 @@ export interface GovernanceLedgerEntry {
     | "governance.migrated"
     // W6-A（四角色评审 §7.1）：意图交接与澄清。两者都**不是**客户批准，任何门禁不读。
     | "intent.handed-off"
-    | "clarification.requested";
+    | "clarification.requested"
+    /**
+     * 2026-10-25 验收分诊：只审计「返工 / 仅汇报」的分诊决定，**不是客户决定**；
+     * 收口门与 `latestAcceptanceDecision` 不读它（设计 §9.2）。
+     */
+    | "acceptance.triage";
   flowId?: string;
   /** 流程步骤 id。`dispatch.accepted` 的去重键是 flowId+stepId（与 targetRoleId 无关）。 */
   stepId?: string;
@@ -118,13 +163,24 @@ export interface GovernanceLedgerEntry {
    */
   turnId?: string;
   customerDecision?: "accepted" | "accepted-quick" | "appointed" | "rejected" | "changes-requested" | "none";
+  /**
+   * 2026-10-25 验收分诊：仅 `kind:"acceptance.triage"` 条目携带的分诊决定审计。
+   * **不是**客户决定；`decisionKind` / `customerDecision` 不得与它同时出现（写入校验拒绝）。
+   */
+  acceptanceTriage?: AcceptanceTriageLedgerDecision;
   decisionEvidence?: {
     /**
      * 2026-10-18 双开关评审 §7.4/§10.1：`"judge"` 表示该决定由客户委托的判断 agent 代批；
      * `judge` 子对象是**有界审计证据**。`actorRoleId`/`power` 照旧（仍是发起治理角色/职能），
      * 绝不写 `actorRoleId:"judge"`；`kind` 不参与任何门禁（门禁只读 `decisionKind`/`customerDecision`）。
+     *
+     * 2026-10-25 写入预授权：`"system-preauthorization"` 表示该写盘确认由系统按角色 Section 1 边界
+     * 直接放行（`operatorId` 以 `system:` 开头，如 `system:write-preauthorization`）——**不是客户
+     * 手批、不是 judge 代批**。此类条目只做审计：**不携带 `decisionKind`**（门禁键），
+     * `customerDecision` 只记结算结果 `"accepted"`；收口门/`latestAcceptanceDecision` 不据此推进
+     * 任何治理决定（写入校验强制，见 `systemPreauthorizationEvidenceShapeError`）。
      */
-    kind: "customer-input" | "judge" | "desktop-governance-record" | "customer-message";
+    kind: "customer-input" | "judge" | "system-preauthorization" | "desktop-governance-record" | "customer-message";
     toolCallId?: string;
     turnId?: string;
     sessionId?: string;
@@ -132,6 +188,8 @@ export interface GovernanceLedgerEntry {
     previewDigest?: string;
     /** 仅 `kind:"judge"`：有界判断审计（reason ≤1KB、evidence ≤10 条、pathDecisions ≤50 条）。 */
     judge?: GovernanceJudgeAudit;
+    /** 仅 `kind:"system-preauthorization"`：系统预授权操作者（`system:` 前缀；不是客户/judge 身份）。 */
+    operatorId?: string;
   };
   messageSummary?: string;
   runtime?: RuntimeKind;
@@ -183,12 +241,81 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * `acceptance.triage` 条目的最小写入校验（设计 §9.2）：字段齐全、枚举合法、且**绝不携带**
+ * 客户决定字段（`decisionKind` / `customerDecision`），避免把分诊审计误当 `customer.decision`。
+ */
+function acceptanceTriageEntryShapeError(value: Record<string, unknown>): string | undefined {
+  if (typeof value.flowId !== "string" || value.flowId.trim() === "") {
+    return "kind=acceptance.triage 时缺少字符串字段 flowId";
+  }
+  const triage = value.acceptanceTriage;
+  if (!isPlainObject(triage)) return "kind=acceptance.triage 时缺少对象字段 acceptanceTriage";
+  if (triage.schema !== ACCEPTANCE_TRIAGE_DECISION_SCHEMA) {
+    return `acceptanceTriage.schema 必须是 ${ACCEPTANCE_TRIAGE_DECISION_SCHEMA}（当前 ${JSON.stringify(triage.schema)}）`;
+  }
+  for (const key of ["triageId", "reportPath", "decidedAt"] as const) {
+    if (typeof triage[key] !== "string" || triage[key].trim() === "") {
+      return `acceptanceTriage 缺少字符串字段 ${key}`;
+    }
+  }
+  if (typeof triage.reportSha256 !== "string" || !/^[a-f0-9]{64}$/.test(triage.reportSha256)) {
+    return "acceptanceTriage.reportSha256 必须是 64 位小写十六进制 sha256";
+  }
+  if (Number.isNaN(Date.parse(triage.decidedAt as string))) {
+    return "acceptanceTriage.decidedAt 必须是 ISO 时间字符串";
+  }
+  if (triage.disposition !== "rework" && triage.disposition !== "report-only") {
+    return "acceptanceTriage.disposition 必须是 rework / report-only";
+  }
+  if (triage.source !== "judge" && triage.source !== "customer") {
+    return "acceptanceTriage.source 必须是 judge / customer";
+  }
+  if (triage.conclusion !== "pass" && triage.conclusion !== "fail" && triage.conclusion !== "conditional") {
+    return "acceptanceTriage.conclusion 必须是 pass / fail / conditional";
+  }
+  if (value.decisionKind !== undefined || value.customerDecision !== undefined) {
+    return "acceptance.triage 不是客户决定，不得携带 decisionKind / customerDecision";
+  }
+  return undefined;
+}
+
+/**
+ * `decisionEvidence.kind="system-preauthorization"` 的最小写入校验（2026-10-25 写入预授权）：
+ * 它**不是客户决定**——强制 `operatorId` 为 `system:` 前缀、禁止 `decisionKind`（门禁只读该键）、
+ * 只记放行结果 `customerDecision:"accepted"`、禁止夹带 judge 审计。这样 `latestAcceptanceDecision`、
+ * `evaluateFlowCompletion` 等收口门不可能把系统预授权读成客户决定/未结算决定。
+ */
+function systemPreauthorizationEvidenceShapeError(value: Record<string, unknown>): string | undefined {
+  const evidence = value.decisionEvidence;
+  if (!isPlainObject(evidence) || evidence.kind !== "system-preauthorization") return undefined;
+  if (typeof evidence.operatorId !== "string" || !evidence.operatorId.startsWith("system:")) {
+    return "decisionEvidence.kind=system-preauthorization 时 operatorId 必须是 system: 前缀字符串";
+  }
+  if (value.decisionKind !== undefined) {
+    return "system-preauthorization 不是客户决定，不得携带 decisionKind（收口门只读客户决定）";
+  }
+  if (value.customerDecision !== "accepted") {
+    return "system-preauthorization 只记录放行结果，customerDecision 必须是 accepted";
+  }
+  if (evidence.judge !== undefined) {
+    return "system-preauthorization 不是判断代批，不得携带 judge";
+  }
+  return undefined;
+}
+
 function entryShapeError(value: unknown): string | undefined {
   if (!isPlainObject(value)) return "不是 JSON 对象";
   for (const key of ["at", "kind", "actorRoleId", "power"] as const) {
     if (typeof value[key] !== "string" || value[key].trim() === "") return `缺少字符串字段 ${key}`;
   }
-  return undefined;
+  if (value.kind === "acceptance.triage") {
+    return acceptanceTriageEntryShapeError(value);
+  }
+  if (value.acceptanceTriage !== undefined) {
+    return "acceptanceTriage 仅允许出现在 kind=acceptance.triage 条目";
+  }
+  return systemPreauthorizationEvidenceShapeError(value);
 }
 
 /**

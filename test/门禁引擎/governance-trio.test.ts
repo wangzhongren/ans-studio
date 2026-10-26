@@ -51,6 +51,7 @@ import {
 } from "../../src/common/门禁引擎/boundary-core.ts";
 import {
   APP_GOVERNANCE_SOURCE,
+  BOUNDARY_WRITE_PREAUTHORIZATION_PRINCIPLE,
   BUILT_IN_GOVERNANCE_ROLES,
   ENGINEERING_QUALITY_BASELINE,
   LEGACY_GOVERNANCE_ROLE_ID,
@@ -277,7 +278,8 @@ test("客户 2026-10-19：五内置角色统一 shell 审批档（operator-appro
     assert.match(spec.cardText, /逐条提交客户\/判断 agent 审批/, `${spec.id} 卡文本须写明逐条审批`);
     assert.match(spec.cardText, /含读写与任意命令/, `${spec.id} 卡文本须含读写语义`);
     assert.match(spec.cardText, /审批不改变你的职责与写边界/, `${spec.id} 卡文本须写明审批不改变职责与写边界`);
-    assert.match(spec.cardText, /写文件仍优先用 write_file 并经写盘确认/, `${spec.id} 卡文本须保留写盘确认纪律`);
+    assert.match(spec.cardText, /Section 1 边界内的写入是预授权/, `${spec.id} 卡文本须写明边界内写入预授权`);
+    assert.match(spec.cardText, /不需要逐次发 `request_confirmation` 写卡/, `${spec.id} 卡文本须写明不逐次确认`);
     assert.match(spec.cardText, /拒绝、超时、通道不可用一律不放行/, `${spec.id} 卡文本须写明 fail-closed`);
     // 旧表述不得残留（特别防 Convener 的「只读档」与其余角色的「不接 shell」）。
     assert.doesNotMatch(spec.cardText, /shell 面 `none`/, `${spec.id} 不得残留无 shell 表述`);
@@ -1653,4 +1655,240 @@ test("2026-10-24 P1-7：Steward/Lead 卡写明 dispatched→delivered 仅步骤 
     ["liaison", "convener"],
     "dispatch_task 仍只给 Lead 与 Steward",
   );
+});
+
+// —————————————————————— 10) 2026-10-25 验收分诊：Proof 卡要求 acceptance-triage/v1 ——————————————————————
+
+test("2026-10-25 验收分诊：Proof 卡要求验收报告含恰好一个 acceptance-triage/v1 段（三档结论 + 四档 severity + fail/conditional 必有 items + reason/action 必填）", () => {
+  // 依据：`角色卡/项目管理/docs/design/2026-10-25_design_acceptance-triage.md` §4.2（schema）、
+  // §4.3（严重度定义）、§4.4（缺结构退回 Proof、不猜）、§12.1（门禁引擎只改 verifier 卡文本）。
+  // 分诊只在报告结构可解析时进行；卡文本必须让 Proof 知道缺段/坏段会被退回补报告。
+  const v = governanceRoleOf("verifier")!.cardText;
+
+  // 新段落与 schema：恰好一个 fenced YAML 段，逐字写 schema。
+  assertCardIncludes(
+    v,
+    [
+      "## 验收报告分诊结构（`acceptance-triage/v1`，必须）",
+      "**恰好一个** fenced YAML 代码块",
+      "多个候选段 ⇒ 整段 invalid",
+      "schema: acceptance-triage/v1",
+    ],
+    "Proof 分诊段/schema",
+  );
+
+  // §4.2 字段：conclusion 三选一 + items 字段与可选指针。
+  assertCardIncludes(
+    v,
+    [
+      "`conclusion` 只能是 `pass` / `fail` / `conditional`",
+      "`items` 每项必填 `id`（唯一）、`severity`、`owner`",
+      "`targets` / `criteria` / `evidence` 是可选指针",
+      "`pass` 允许空 items",
+    ],
+    "Proof 分诊字段",
+  );
+
+  // §4.3 严重度四档：四档齐全且定义逐条写死，不得自造档位。
+  assertCardIncludes(
+    v,
+    [
+      "严重度四档（照 §4.3 定义写，不得自造档位）",
+      "- `blocker`：交付不可用 / 安全 / 数据损坏 / 验收标准的关键项未满足",
+      "- `major`：关键功能或契约不满足，但可通过返工修复；不修复不能视为达标",
+      "- `minor`：非关键缺陷 / 一致性问题，可后续修复",
+      "- `nit`：风格 / 措辞 / 个人偏好，不影响验收结论",
+    ],
+    "Proof 四档 severity",
+  );
+
+  // fail / conditional 必须有 items；reason（为什么不通过）与 action（改进方案）必填，
+  // action 需带 targets 或 criteria 指针（只有 evidence 不算改进方案指针）。
+  assertCardIncludes(
+    v,
+    [
+      "`fail` / `conditional` 必须至少有一个 item",
+      "`reason`（为什么不通过，非空）",
+      "`action`（改进方案，非空，并给出 `targets` 文件 / 模块指针或 `criteria` 验收标准指针）",
+      "`targets` / `criteria` / `evidence` 是可选指针，不能替代 `action`",
+    ],
+    "Proof fail/conditional 与 reason/action",
+  );
+
+  // 报告写得漂亮不能掩盖 blocker；pass 不得残留 blocker/major（R5 矛盾 ⇒ invalid）。
+  assertCardIncludes(
+    v,
+    [
+      "报告写得漂亮不能掩盖 blocker",
+      "`pass` 不得残留 `blocker` / `major` 项",
+      "不读文风",
+    ],
+    "Proof 结论纪律",
+  );
+
+  // §4.4 缺结构 / 坏结构 / 旧 rework 段：应用退回 Proof 补报告，不进入分诊。
+  assertCardIncludes(
+    v,
+    [
+      "或只有旧 `acceptance-rework/v1` 段时",
+      "退回 Proof 补报告",
+      "**不进入分诊、不弹客户卡、不写返工路由**",
+      "补齐 `acceptance-triage/v1` 段后重新发卡",
+    ],
+    "Proof 缺结构退回",
+  );
+
+  // 分诊段不改变验收权与既有验收卡：选项仍 accept/reject，首行五项要求不变。
+  assertCardIncludes(
+    v,
+    [
+      "验收卡选项仍固定为 `accept` / `reject`",
+      "分诊段不改变验收权、客户决定权与既有首行五项要求",
+    ],
+    "Proof 验收卡不变",
+  );
+
+  // 质量职责段同步该要求（不只藏在工作流步骤里）。
+  assert.match(
+    v,
+    /你的质量职责（Proof \/ 验收）：[\s\S]*acceptance-triage\/v1[\s\S]*报告写得漂亮不能掩盖 blocker/,
+    "Proof 质量职责须同步分诊结构要求",
+  );
+
+  // 能力位零变化：分诊要求只改卡文本，不新增工具/能力。
+  const spec = governanceRoleOf("verifier")!;
+  assert.deepEqual(spec.preauthorizedDirs, [
+    "docs/acceptance/",
+    "docs/verification/",
+    "docs/governance/verifier/",
+  ]);
+  assert.equal(spec.capabilities.dispatchTask, false, "Proof 仍不可派发");
+  assert.equal(spec.capabilities.shell, "operator-approve", "Proof 仍为 shell 审批档");
+});
+
+// —————————————————————— 11) 2026-10-25 写入预授权：边界内直接写、确认仅限治理敏感 ——————————————————————
+
+test("2026-10-25 写入预授权：五卡写明 Section 1 边界内直接写、不逐次 request_confirmation；确认只保留给治理敏感写入与客户决定", () => {
+  // 客户新规则原文：「写自己角色权限内的路径，直接放行。」——边界内写入预授权、直接写；
+  // 写权上界仍由 WriteGate 判定（边界外照旧拒绝）；request_confirmation 只保留给治理敏感写入
+  // （角色卡/边界、共享目录或他人写集、流程 YAML/账本、发布/变更包等按既有规则）与客户决定。
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    const t = spec.cardText;
+    // 单一来源常量逐字复用（恰出现一次），不各卡手写分叉。
+    assert.ok(t.includes(BOUNDARY_WRITE_PREAUTHORIZATION_PRINCIPLE), `${spec.id} 卡须逐字包含写入预授权总则`);
+    assert.equal(
+      t.split(BOUNDARY_WRITE_PREAUTHORIZATION_PRINCIPLE).length - 1,
+      1,
+      `${spec.id} 写入预授权总则须恰出现一次`,
+    );
+    assertCardIncludes(
+      t,
+      [
+        "Section 1 边界内的写入是预授权的",
+        "直接用 `write_file` / `edit_file` 写入",
+        "不需要逐次发 `request_confirmation` 写卡",
+        "写权上界仍由 WriteGate 的边界判定保证（边界外照旧拒绝）",
+        "`request_confirmation` 只保留给治理敏感写入与需要客户决定的动作",
+        "角色卡 / 边界变更",
+        "共享 i18n 等共享目录或他人写集",
+        "`docs/flows/**` 流程 YAML / 治理账本",
+        "发布 / 变更包等按既有禁止与审批规则处理",
+        "不得把边界内预授权扩展到边界外或他人写集",
+        "不得削弱边界外拒绝、禁写路径与治理写入审批等既有规则",
+      ],
+      `${spec.id} 写入预授权总则`,
+    );
+    // 旧「一切写盘都要先确认」总口径必须消失（不得让预授权与逐次确认并存互相矛盾）。
+    assert.doesNotMatch(
+      t,
+      /写文件仍优先用 write_file 并经写盘确认|写盘（write_file \/ edit_file 等）一律先经/,
+      `${spec.id} 不得残留「一切写盘逐次确认」旧口径`,
+    );
+    // 既有安全纪律不因新规则削弱：禁写路径、应用独占写路径与确认卡参数纪律仍在。
+    assertCardIncludes(
+      t,
+      ["禁写路径", ".ans/**", "只能由应用写", "必须带 `flowId` + `cardKind`"],
+      `${spec.id} 既有禁写/参数纪律保留`,
+    );
+  }
+
+  // 各卡按真实治理敏感场景保留确认（不把预授权扩到治理写入）：
+  const liaison = governanceRoleOf("liaison")!.cardText;
+  assert.match(liaison, /不使用 `request_confirmation` 做治理写盘/, "Lead 仍不做治理写盘确认");
+  assert.match(liaison, /意图文件属 Section 1 内预授权/, "Lead 意图文件直接写");
+
+  const rapporteur = governanceRoleOf("rapporteur")!.cardText;
+  assert.match(rapporteur, /提案 \/ 契约 \/ 治理记录直接写、不逐次确认/, "Draft 提案区直接写");
+  assert.match(rapporteur, /提案卡是客户对方案的决定，不是写盘确认/, "提案卡是客户决定，不是写盘确认");
+  assert.match(rapporteur, /只用 `proposal`/, "Draft 仍只出 proposal 选择卡");
+
+  const nominator = governanceRoleOf("nominator")!.cardText;
+  assert.match(nominator, /角色卡 \/ 边界属治理敏感写入，按既有规则仍逐路径确认/, "Crew 角色卡/边界仍确认");
+  assert.match(
+    nominator,
+    /写任何项目角色卡 \/ 边界（治理敏感写入）都必须按 `appointment-write` 逐路径取得客户确认/,
+    "Crew appointment-write 保留",
+  );
+  assert.match(
+    nominator,
+    /写入预授权落卡纪律（必须，客户 2026-10-25 新规则）/,
+    "Crew 卡须给生成角色卡的预授权落卡纪律",
+  );
+  assertCardIncludes(
+    nominator,
+    [
+      "今后生成的项目角色卡，「执行原则」必须写明",
+      "该角色 Section 1 边界内的写入是**预授权**",
+      "不逐次** `request_confirmation`",
+      "不得把生成的卡写成「每次写盘前都要请求确认」",
+      "不得把预授权写成边界外或他人写集",
+    ],
+    "Crew 生成角色卡的写入预授权指引",
+  );
+  // 预授权不绕过 appointment-write：declined 与校验失败纪律逐字保留。
+  assert.match(nominator, /不得绕过确认或直接写盘/, "Crew 仍不得绕过 appointment-write 确认");
+  assert.match(nominator, /不得绕过校验、不得直接 `write_file`/, "Crew 仍不得绕过校验直接写");
+
+  const convener = governanceRoleOf("convener")!.cardText;
+  assert.match(
+    convener,
+    /流程 YAML \*\*初始创建\*\*仍按 `schedule-write` 确认（治理敏感写入）/,
+    "Steward 流程 YAML 初始创建仍 schedule-write",
+  );
+  assert.match(
+    convener,
+    /团队计划 \/ readiness 与治理记录属 Section 1 内预授权，直接写、不逐次确认/,
+    "Steward 排程内容直接写",
+  );
+  assert.match(convener, /不得绕过确认、不得直接 `write_file` 流程 YAML/, "Steward declined 后仍须重发确认卡");
+
+  const verifier = governanceRoleOf("verifier")!.cardText;
+  assert.match(
+    verifier,
+    /验收标准 \/ 报告与证据附件在你的 Section 1 内，属预授权——直接写、不逐次确认/,
+    "Proof 验收产物直接写",
+  );
+  assert.match(
+    verifier,
+    /`request_confirmation` 仅用于治理敏感写入或需要客户决定的动作/,
+    "Proof 确认仅限治理敏感/客户决定",
+  );
+  assert.match(
+    verifier,
+    /每次 `request_confirmation` 必须带 `flowId` \+ `cardKind`（只用 `write`）/,
+    "Proof 确认卡参数纪律保留",
+  );
+
+  // 注册表数据面（预授权目录 / 能力位）零变化：本批只改卡文本。
+  const expectedPreauthorized: Record<string, string[]> = {
+    liaison: ["docs/intents/"],
+    rapporteur: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
+    nominator: ["docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
+    convener: ["docs/flows/", "docs/scheduling/", "docs/governance/convener/"],
+    verifier: ["docs/acceptance/", "docs/verification/", "docs/governance/verifier/"],
+  };
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    assert.deepEqual(spec.preauthorizedDirs, expectedPreauthorized[spec.id], `${spec.id} 预授权目录零变化`);
+    assert.equal(spec.capabilities.shell, "operator-approve", `${spec.id} shell 档零变化`);
+  }
 });

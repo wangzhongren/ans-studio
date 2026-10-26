@@ -127,15 +127,19 @@ interface Harness {
   uninstallMcpOf: (roleId: string) => UninstallMcpFn | undefined;
   /** G-2/W4：各角色 abort 被调次数（恢复桥「恰一次执行」判据）。 */
   aborts: Record<string, number>;
+  /** 2026-10-25：各角色 send 被调次数（ACK 后失败不重投 / 未 ACK 失败可重试的判据）。 */
+  sendAttempts: Record<string, number>;
   /** 三权（评审 §5.6）：打开会话时收到的完整能力面（矩阵断言用）。 */
   capabilitiesOf: (roleId: string) => OpenCapabilities | undefined;
 }
 
-function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: number; projectRoot?: string; recoveryConfirm?: ReturnType<typeof createRecoveryConfirmPresenter>; autoDecisionEnabled?: (projectRoot: string, proposerRoleId: string) => boolean; unsupportedAbort?: string[]; failOpensAfter?: Record<string, number>; customListing?: ProjectListing; customerInput?: DesktopCustomerInputFn; shellArming?: DesktopShellArming; shellOperatorChannel?: DesktopOperatorChannelFn; getListing?: (projectRoot: string) => ProjectListing | undefined } = {}): Harness {
+function makeHarness(opts: { failSends?: Record<string, number>; failOnText?: Record<string, string[]>; ackThenFail?: Record<string, number>; ackThenFailOnText?: Record<string, string[]>; openDelayMs?: number; projectRoot?: string; recoveryConfirm?: ReturnType<typeof createRecoveryConfirmPresenter>; autoDecisionEnabled?: (projectRoot: string, proposerRoleId: string) => boolean; unsupportedAbort?: string[]; failOpensAfter?: Record<string, number>; customListing?: ProjectListing; customerInput?: DesktopCustomerInputFn; shellArming?: DesktopShellArming; shellOperatorChannel?: DesktopOperatorChannelFn; getListing?: (projectRoot: string) => ProjectListing | undefined } = {}): Harness {
   const root = opts.projectRoot ?? "/proj";
   const l = opts.customListing ?? listing(root);
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [], B: [] };
   const sent: Record<string, string[]> = { su: [], A: [], B: [] };
+  /** 2026-10-25：各角色 `send` 被调次数（区分「投递尝试」与「成功落文本」——ACK 后失败的 at-most-once 判据）。 */
+  const sendAttempts: Record<string, number> = { su: 0, A: 0, B: 0 };
   const sendOptions: Record<string, RoleSessionSendOptions[]> = {};
   const envelopes: import("../../app/desktop/session.ts").SessionEventEnvelope[] = [];
   const roleStates: { roleId: string; summaries: string[] }[] = [];
@@ -148,6 +152,11 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
   // 若按 roleId 共享，重开后的新迭代器会继承「已停」标记、consume 循环即时退出（重建后的事件全丢）。
   // 生产语义：每句柄各有一条独立事件流（旧句柄停、新句柄活）——本夹具按生产语义建模。
   const failLeft: Record<string, number> = { ...(opts.failSends ?? {}) };
+  /** 2026-10-25：模拟「运行时已同步开轮 ACK，随后发送 promise 失败」（重建在收尾窗口 dispose 的真机形态）。 */
+  const ackFailLeft: Record<string, number> = { ...(opts.ackThenFail ?? {}) };
+  /** 按**正文**定向的失败（占位消息不受影响）：`failOnText` 未 ACK 失败；`ackThenFailOnText` 已 ACK 后失败。 */
+  const failTextLeft: Record<string, string[]> = Object.fromEntries(Object.entries(opts.failOnText ?? {}).map(([k, v]) => [k, [...v]]));
+  const ackFailTextLeft: Record<string, string[]> = Object.fromEntries(Object.entries(opts.ackThenFailOnText ?? {}).map(([k, v]) => [k, [...v]]));
   const nextGate: Record<string, Promise<void> | undefined> = {};
   const activeSends: Record<string, number> = {};
   const maxConcurrent: Record<string, number> = {};
@@ -163,6 +172,7 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
     return {
       async send(text: string, options?: RoleSessionSendOptions): Promise<void> {
         activeSends[roleId] = (activeSends[roleId] ?? 0) + 1;
+        sendAttempts[roleId] = (sendAttempts[roleId] ?? 0) + 1;
         maxConcurrent[roleId] = Math.max(maxConcurrent[roleId] ?? 0, activeSends[roleId]);
         try {
           (sendOptions[roleId] ??= []).push(options ?? {});
@@ -170,6 +180,21 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
           if (gate) {
             nextGate[roleId] = undefined;
             await gate; // F-2 夹具：可控挂起——release 前 promise 不 resolve（模拟整轮在跑）
+          }
+          if ((ackFailTextLeft[roleId]?.indexOf(text) ?? -1) >= 0) {
+            ackFailTextLeft[roleId].splice(ackFailTextLeft[roleId].indexOf(text), 1);
+            options?.onTurnStarted?.({ turnId: `ack-fail-${roleId}-${sendAttempts[roleId]}`, roleId, runtime: "demo" });
+            throw new Error(`演示：${roleId} 已开轮后投递失败（${text.slice(0, 12)}）`);
+          }
+          if ((ackFailLeft[roleId] ?? 0) > 0) {
+            ackFailLeft[roleId] = (ackFailLeft[roleId] ?? 0) - 1;
+            // 已 ACK（真实运行时同步开轮回执）后再失败——输入已交给运行时，不得按「未投递」重试。
+            options?.onTurnStarted?.({ turnId: `ack-fail-${roleId}-${sendAttempts[roleId]}`, roleId, runtime: "demo" });
+            throw new Error(`演示：${roleId} 已开轮后投递失败`);
+          }
+          if ((failTextLeft[roleId]?.indexOf(text) ?? -1) >= 0) {
+            failTextLeft[roleId].splice(failTextLeft[roleId].indexOf(text), 1);
+            throw new Error(`演示：${roleId} 投递通道瞬时失败（${text.slice(0, 12)}）`);
           }
           if ((failLeft[roleId] ?? 0) > 0) {
             failLeft[roleId] = (failLeft[roleId] ?? 0) - 1;
@@ -265,7 +290,7 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
     uninstallSkillOf: (roleId) => openInputs[roleId]?.uninstallSkill,
     installMcpOf: (roleId) => openInputs[roleId]?.installMcp,
     uninstallMcpOf: (roleId) => openInputs[roleId]?.uninstallMcp,
-    hangNext, maxConcurrent, roleStates, aborts,
+    hangNext, maxConcurrent, roleStates, aborts, sendAttempts,
     capabilitiesOf: (roleId) => openInputs[roleId],
   };
 }
@@ -386,6 +411,151 @@ test("H-1 去重：同一派发在**队列期**重复调用 → 去重（只投�
   assert.deepEqual(h.sendOptions.A.map(o => o.handback?.required), [false, true, true]);
   assert.equal(h.sent.A.filter((t) => t === dispatchTemplate("返工：改 X")).length, 2, "返工可再派（共两次投递）");
   await h.mgr.stop(null);
+});
+
+// ————— 2026-10-25 真机重复投递修复：应用任务稳定身份 + 「已投递」标记 —————
+// 客户真机：todo-cli-v1 的 Convener 聊天里同一条「role-readiness 派发任务…」出现两条 user 消息，
+// 账本却只有一条 `dispatch.accepted`。复核：应用侧同一任务经 `sendBackground` 两次（或重建后续投）
+// 时没有稳定身份，每次都算独立消息。修复：应用任务生成内容稳定 `clientMessageId`；ACK/送达即记
+// 「已投递」（内存）；同任务在队列期/送达后/重建前后至多投一次。真实客户消息不走此判据。
+
+test("2026-10-25 应用任务稳定 clientMessageId：同文队列期/送达后只投一次；不同文照投；客户同文仍两条", async () => {
+  const h = makeHarness();
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  // A 忙：占位轮挂起（release 前 send promise 不 resolve、busy=true）。
+  const release = h.hangNext("A");
+  const placeholder = h.mgr.send("占位", undefined, { projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+
+  const taskText = "role-readiness 派发任务：组队写卡已通过结构校验";
+  const r1 = await h.mgr.sendBackground({ projectRoot: "/proj", roleId: "A", runtime: "demo", text: taskText });
+  const r2 = await h.mgr.sendBackground({ projectRoot: "/proj", roleId: "A", runtime: "demo", text: taskText });
+  assert.equal(r1.ok, true);
+  assert.equal(r1.queued, true, "忙时入队（既有语义）");
+  assert.match(String(r1.clientMessageId), /^ans-app-task:[0-9a-f]{64}$/, "应用任务生成内容稳定键");
+  assert.equal(r2.ok, true);
+  assert.equal(r2.duplicate, true, "同文应用任务在队列期不重复入队");
+  assert.equal(r2.position, 1, "重复调用如实回报既有排队位次");
+  assert.equal(r2.clientMessageId, r1.clientMessageId, "同项目×目标×引擎×正文 ⇒ 同键（稳定）");
+
+  release();
+  await placeholder;
+  h.streams.A.push({ kind: "settled", summary: "一轮结束" });
+  await tick(200);
+  assert.equal(h.sent.A.filter((t) => t === taskText).length, 1, "队列期重复调用只投一次");
+  h.streams.A.push({ kind: "settled", summary: "任务轮结束" });
+  await tick(80);
+
+  // 送达后再调同一任务（重建后/另一应用链路的重复调用）⇒ 不重投（不产生第二条 user 消息）。
+  const r3 = await h.mgr.sendBackground({ projectRoot: "/proj", roleId: "A", runtime: "demo", text: taskText });
+  assert.equal(r3.ok, true);
+  assert.equal(r3.duplicate, true, "已 ACK/已投递的任务不重投");
+  await tick(100);
+  assert.equal(h.sent.A.filter((t) => t === taskText).length, 1);
+
+  // 不同文＝不同任务 ⇒ 照常投递（稳定键随正文变化）。
+  const r4 = await h.mgr.sendBackground({ projectRoot: "/proj", roleId: "A", runtime: "demo", text: "另一条应用任务" });
+  assert.equal(r4.ok, true);
+  assert.equal(r4.duplicate, undefined);
+  assert.notEqual(r4.clientMessageId, r1.clientMessageId);
+  await tick(120);
+  assert.ok(h.sent.A.includes("另一条应用任务"));
+  h.streams.A.push({ kind: "settled", summary: "另一轮结束" });
+  await tick(80);
+
+  // 真实客户消息：同文重复发送仍是两个意图（不回归）。
+  await h.mgr.send("客户同文", undefined, { projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(60);
+  h.streams.A.push({ kind: "settled", summary: "客户一轮结束" });
+  await tick(80);
+  await h.mgr.send("客户同文", undefined, { projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(60);
+  h.streams.A.push({ kind: "settled", summary: "客户二轮结束" });
+  await tick(80);
+  assert.equal(h.sent.A.filter((t) => t === "客户同文").length, 2, "客户同文两条 → 两条投递（既有语义不变）");
+  await h.mgr.stop(null);
+});
+
+test("2026-10-25 应用任务稳定身份：identitySeed（语义去重键）变化 ⇒ 同文新 revision 仍作为新任务投递；同 seed 不重投", async () => {
+  const h = makeHarness();
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  const text = "流程 flow-x：以下步骤已 delivered，等待统筹核证：";
+
+  const first = await h.mgr.sendBackground({ projectRoot: "/proj", roleId: "A", runtime: "demo", text, identitySeed: "flow-x\u0000rev-1" });
+  assert.equal(first.ok, true);
+  assert.match(String(first.clientMessageId), /^ans-app-task:/, "语义 seed 同样生成稳定键");
+  await tick(80);
+  assert.equal(h.sent.A.filter((t) => t === text).length, 1);
+  h.streams.A.push({ kind: "settled", summary: "一轮结束" });
+  await tick(80);
+
+  // revision 变化（文本未带 revision）⇒ 新任务，必须照常投递（delivered 唤醒的既有语义）。
+  const second = await h.mgr.sendBackground({ projectRoot: "/proj", roleId: "A", runtime: "demo", text, identitySeed: "flow-x\u0000rev-2" });
+  assert.equal(second.ok, true);
+  assert.equal(second.duplicate, undefined, "新 revision 不是重复投递");
+  assert.notEqual(second.clientMessageId, first.clientMessageId);
+  await tick(120);
+  assert.equal(h.sent.A.filter((t) => t === text).length, 2, "同文但新 revision ⇒ 再投一次");
+  h.streams.A.push({ kind: "settled", summary: "又一轮结束" });
+  await tick(80);
+
+  // 同一 revision 再次调用 ⇒ 已投递去重。
+  const third = await h.mgr.sendBackground({ projectRoot: "/proj", roleId: "A", runtime: "demo", text, identitySeed: "flow-x\u0000rev-2" });
+  assert.equal(third.ok, true);
+  assert.equal(third.duplicate, true, "同 revision 不重投");
+  await tick(100);
+  assert.equal(h.sent.A.filter((t) => t === text).length, 2);
+  await h.mgr.stop(null);
+});
+
+test("2026-10-25 已 ACK 后失败不重投（重建收尾窗口）；未 ACK 失败仍保留重试（at-most-once 与失败重试并存）", async () => {
+  // ① 运行时已同步开轮 ACK、随后 send promise 失败（真机形态：重建在 settle/收尾窗口 dispose 旧句柄）。
+  const h = makeHarness({ ackThenFailOnText: { A: ["ACK 后失败任务"] } });
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  const release = h.hangNext("A");
+  const placeholder = h.mgr.send("占位", undefined, { projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  const q = await h.mgr.sendBackground({ projectRoot: "/proj", roleId: "A", runtime: "demo", text: "ACK 后失败任务" });
+  assert.equal(q.ok, true);
+  assert.equal(q.queued, true);
+  release();
+  await placeholder;
+  h.streams.A.push({ kind: "settled", summary: "一轮结束" });
+  await tick(250);
+  assert.equal(h.sendAttempts.A, 2, "占位 + 任务各一次投递尝试（任务在 ACK 后失败）");
+  assert.equal(h.mgr.hasPendingDelivery("/proj", "A", "demo"), false, "已 ACK 的失败不回队（不重投）");
+  assert.ok(
+    h.envelopes.some((e) => e.event.kind === "message" && /未自动重发/.test(String(e.event.summary))),
+    "如实系统行说明「未自动重发」——不谎称已保留待重试",
+  );
+  await h.mgr.redeliverNudge({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(150);
+  assert.equal(h.sendAttempts.A, 2, "重试 nudge 不产生第二次投递尝试（队列已空）");
+  await h.mgr.stop(null);
+
+  // ② 未 ACK 的失败：既有语义保留队首，下一次时机（redeliver）成功投递恰一次。
+  const h2 = makeHarness({ failOnText: { A: ["未 ACK 失败任务"] } });
+  await h2.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  const release2 = h2.hangNext("A");
+  const placeholder2 = h2.mgr.send("占位", undefined, { projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  const q2 = await h2.mgr.sendBackground({ projectRoot: "/proj", roleId: "A", runtime: "demo", text: "未 ACK 失败任务" });
+  assert.equal(q2.queued, true);
+  release2();
+  await placeholder2;
+  h2.streams.A.push({ kind: "settled", summary: "一轮结束" });
+  await tick(250);
+  assert.equal(h2.sendAttempts.A, 2, "占位 + 第一次（未 ACK）失败尝试");
+  assert.equal(h2.mgr.hasPendingDelivery("/proj", "A", "demo"), true, "未 ACK 失败：如实保留待重试");
+  await h2.mgr.redeliverNudge({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(250);
+  assert.equal(h2.sent.A.filter((t) => t === "未 ACK 失败任务").length, 1, "重试成功且恰一次");
+  assert.equal(h2.sendAttempts.A, 3, "失败重试仍允许（第二次尝试成功）");
+  await h2.mgr.stop(null);
 });
 
 test("真机崩溃修复（钉子）：派发条目**不走 handback 渲染**；坏回交并入同一机也不炸、零未捕获拒绝", async () => {

@@ -23,7 +23,7 @@ import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { createChatDemoAdapter, firstProjectFilePath } from "../../app/desktop/chat-adapter.ts";
 import { SessionManager, MAX_LIVE_SESSIONS, type SessionEventEnvelope, type GovernanceClientProjectionV1 } from "../../app/desktop/session.ts";
 import { createCustomerInputChannel } from "../../app/desktop/customer-input.ts";
-import type { CustomerInputFn } from "../../src/model/runtime.ts";
+import type { CustomerInputFn, BackgroundTaskSnapshot, BackgroundTaskReadOptions, BackgroundTaskReadResult, BackgroundTaskStopOptions, BackgroundTaskStopResult } from "../../src/model/runtime.ts";
 // W6-B（2026-10-18）：四角色能力矩阵与意图交接/澄清的桌面投递端。
 import { buildIntentHandoffMessage } from "../../app/desktop/governance-advance.ts";
 import { createMainI18n, mainT } from "../../app/desktop/i18n.ts";
@@ -1776,5 +1776,181 @@ test("i18n B3 session：未开会话的 send 回执按 en-US 生成；切回 zh-
     assert.equal(zh.error, "会话尚未开启（点击左侧角色即可开启）。");
   } finally {
     createMainI18n("zh-CN");
+  }
+});
+
+// —————————————— 会话级后台任务聚合（2026-10-25，桌面任务面板 B） ——————————————
+// 契约：任务表/日志只在各会话内存；桌面只按 projectRoot+runtime 聚合与精确寻址，**不缓存、不持久化、不伪造**。
+function fakeTaskSnapshot(over: Partial<BackgroundTaskSnapshot> & Pick<BackgroundTaskSnapshot, "taskId">): BackgroundTaskSnapshot {
+  return {
+    state: "running",
+    command: "npm run dev",
+    startedAt: "2026-10-25T00:00:00.000Z",
+    durationMs: 1234,
+    ...over,
+  };
+}
+
+test("后台任务聚合：按项目×引擎聚合多角色、跳过无能力句柄、unavailable 区分「没有任务」与「不支持」", async () => {
+  const listing = fakeListing(["A", "B", "C"], "A");
+  const disposed: string[] = [];
+  const snapA = fakeTaskSnapshot({ taskId: "bg-a", pid: 42 });
+  let tasksA: BackgroundTaskSnapshot[] = [snapA];
+  const handles: Record<string, RoleSessionHandle> = {
+    // A：具备能力且有任务；B：具备能力但当前为空；C：句柄无 list 能力（必须跳过）。
+    A: { ...fakeQuietHandle("A", disposed), listBackgroundTasks: () => tasksA },
+    B: { ...fakeQuietHandle("B", disposed), listBackgroundTasks: () => [] },
+    C: fakeQuietHandle("C", disposed),
+  };
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => handles[input.roleId]!,
+    createPiAdapterFactory,
+    createDemoAdapter: createChatDemoAdapter,
+    buildProjectConfig,
+    getListing: (root) => (root === "/proj" ? listing : undefined),
+    emitEvent: () => {},
+  });
+  try {
+    assert.equal((await mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" })).ok, true);
+    assert.equal((await mgr.open({ projectRoot: "/proj", roleId: "B", runtime: "demo" })).ok, true);
+    assert.equal((await mgr.open({ projectRoot: "/proj", roleId: "C", runtime: "pi" })).ok, true);
+
+    const demo = mgr.listBackgroundTasks("/proj", "demo");
+    assert.ok(demo.ok);
+    assert.deepEqual(demo.tasks, [{ ...snapA, roleId: "A", runtime: "demo" }], "只聚合具备能力会话的任务，并带角色/引擎");
+    assert.equal(demo.unavailable, false, "B 具备能力但当前无任务 ⇒ 仍为 available（不是「不支持」）");
+
+    // 直接读句柄、不缓存：句柄下真实数组变化立即反映。
+    tasksA = [];
+    const again = mgr.listBackgroundTasks("/proj", "demo");
+    assert.ok(again.ok);
+    assert.deepEqual(again.tasks, [], "聚合不缓存跨调用");
+
+    // 不同引擎互不混入；C 无能力 ⇒ 空列表 + unavailable:true。
+    const pi = mgr.listBackgroundTasks("/proj", "pi");
+    assert.ok(pi.ok);
+    assert.deepEqual(pi.tasks, [], "不得把 demo 任务混入 pi");
+    assert.equal(pi.unavailable, true, "C 的句柄没有 listBackgroundTasks ⇒ 该引擎 unavailable");
+
+    // 完全没有会话的引擎同样 unavailable（「没有任务」不可与「不支持」混淆）。
+    const none = mgr.listBackgroundTasks("/proj", "codex");
+    assert.ok(none.ok);
+    assert.deepEqual(none.tasks, []);
+    assert.equal(none.unavailable, true);
+  } finally {
+    await mgr.stop(null);
+  }
+});
+
+test("后台任务读/停：read 透传选项与未知任务失败；stop 原样返回底层失败且不改写为成功", async () => {
+  const listing = fakeListing(["A", "B", "C"], "A");
+  const disposed: string[] = [];
+  const task = fakeTaskSnapshot({ taskId: "bg-1" });
+  const readResult: BackgroundTaskReadResult = {
+    task,
+    tailLines: 5,
+    tailClamped: false,
+    stdout: { text: "line-1\nline-2", truncated: false },
+  };
+  const stopFailure: BackgroundTaskStopResult = { ok: false, reason: "unknown-task", message: "未知任务「bg-404」" };
+  const stopSuccess: BackgroundTaskStopResult = { ok: true, task, alreadyEnded: false };
+  const capturedReads: { taskId: string; options?: BackgroundTaskReadOptions }[] = [];
+  const capturedStops: { taskId: string; options?: BackgroundTaskStopOptions }[] = [];
+  const handleA: RoleSessionHandle = {
+    ...fakeQuietHandle("A", disposed),
+    readBackgroundTask: (taskId, options) => {
+      capturedReads.push({ taskId, ...(options !== undefined ? { options } : {}) });
+      return taskId === task.taskId ? readResult : undefined;
+    },
+    stopBackgroundTask: async (taskId, options) => {
+      capturedStops.push({ taskId, ...(options !== undefined ? { options } : {}) });
+      if (taskId === "bg-boom") throw new Error("boom");
+      return taskId === task.taskId ? stopSuccess : stopFailure;
+    },
+  };
+  const handles: Record<string, RoleSessionHandle> = {
+    A: handleA,
+    B: fakeQuietHandle("B", disposed), // 无 read/stop 能力
+    C: fakeQuietHandle("C", disposed),
+  };
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => handles[input.roleId]!,
+    createPiAdapterFactory,
+    createDemoAdapter: createChatDemoAdapter,
+    buildProjectConfig,
+    getListing: (root) => (root === "/proj" ? listing : undefined),
+    emitEvent: () => {},
+  });
+  try {
+    assert.equal((await mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" })).ok, true);
+    assert.equal((await mgr.open({ projectRoot: "/proj", roleId: "B", runtime: "demo" })).ok, true);
+    assert.equal((await mgr.open({ projectRoot: "/proj", roleId: "C", runtime: "pi" })).ok, true);
+
+    // read：选项透传，底层结果同一引用。
+    const read = mgr.readBackgroundTask({
+      projectRoot: "/proj",
+      runtime: "demo",
+      roleId: "A",
+      taskId: task.taskId,
+      stream: "stdout",
+      tailLines: 5,
+    });
+    assert.ok(read.ok);
+    assert.equal(read.result, readResult, "read 结果原样透传（同一引用）");
+    assert.deepEqual(capturedReads[0], { taskId: task.taskId, options: { stream: "stdout", tailLines: 5 } });
+
+    // 未给 stream/tailLines ⇒ options 参数缺席（保持底层默认 both/40）。
+    mgr.readBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "A", taskId: task.taskId });
+    assert.equal("options" in capturedReads[1]!, false, "无选项时不得伪造 options");
+
+    // 未知任务：底层 undefined ⇒ 如实失败。
+    const unknownRead = mgr.readBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "A", taskId: "bg-404" });
+    assert.equal(unknownRead.ok, false);
+    if (!unknownRead.ok) assert.equal(unknownRead.error, mainT("main.backgroundTasks.unavailable"));
+
+    // 找不到会话（C 只在 pi 打开，demo 无此三元身份）。
+    const missingRead = mgr.readBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "C", taskId: "bg-1" });
+    assert.equal(missingRead.ok, false);
+    if (!missingRead.ok) assert.equal(missingRead.error, mainT("main.session.releaseNoSession", { roleId: "C" }));
+
+    // 句柄无能力（B 没有 readBackgroundTask）。
+    const noCapRead = mgr.readBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "B", taskId: "bg-1" });
+    assert.equal(noCapRead.ok, false);
+    if (!noCapRead.ok) assert.equal(noCapRead.error, mainT("main.backgroundTasks.unavailable"));
+
+    // stop：成功/失败结果原样返回，绝不改写为成功。
+    const stopOk = await mgr.stopBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "A", taskId: task.taskId });
+    assert.equal(stopOk, stopSuccess, "ok:true 原样透传（同一引用）");
+    const stopUnknown = await mgr.stopBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "A", taskId: "bg-404" });
+    assert.equal(stopUnknown, stopFailure, "unknown-task 原样返回（同一引用）");
+    assert.equal(stopUnknown.ok, false, "失败不得改写成成功");
+
+    // force 透传；false/缺席不伪造。
+    await mgr.stopBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "A", taskId: task.taskId, force: true });
+    assert.deepEqual(capturedStops[2], { taskId: task.taskId, options: { force: true } });
+
+    // 底层抛错：如实失败并带原始消息（不吞异常、不假装已停止）。
+    const stopThrown = await mgr.stopBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "A", taskId: "bg-boom" });
+    assert.equal(stopThrown.ok, false);
+    if (!stopThrown.ok) {
+      assert.equal(stopThrown.reason, "unavailable");
+      assert.equal(stopThrown.message, "boom");
+    }
+
+    // 找不到会话 ⇒ closed；句柄无能力 ⇒ unavailable。
+    const stopMissing = await mgr.stopBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "C", taskId: "bg-1" });
+    assert.deepEqual(stopMissing, {
+      ok: false,
+      reason: "closed",
+      message: mainT("main.session.releaseNoSession", { roleId: "C" }),
+    });
+    const stopNoCap = await mgr.stopBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "B", taskId: "bg-1" });
+    assert.deepEqual(stopNoCap, {
+      ok: false,
+      reason: "unavailable",
+      message: mainT("main.backgroundTasks.unavailable"),
+    });
+  } finally {
+    await mgr.stop(null);
   }
 });

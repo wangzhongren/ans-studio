@@ -54,7 +54,8 @@ test("judge deny + 替代方案：0 卡、结果行、请求角色收到原因+�
     assert.equal(chain.displays.length, 0, "deny 必须 0 张确认卡");
     assert.equal(fake.seen.binds, 1);
 
-    assert.match(result.reason, /^判断 agent 未放行该命令。/);
+    // 文案来源：共享 i18n `main.operator.judgeDeniedHead`（2026-10 B1 起为「自动代理」）。
+    assert.match(result.reason, /^自动代理未放行该命令。/);
     assert.match(result.reason, /请向客户说明：这一步没有必要/);
     assert.match(result.reason, /原因：全量测试会修改共享数据/);
     assert.match(result.reason, /替代方案（command）：npm run test:unit/);
@@ -89,7 +90,8 @@ test("judge deny + 替代方案：0 卡、结果行、请求角色收到原因+�
     const UL = await loadUiLabels();
     const view = UL.shellJudgeResultView(row);
     assert.ok(view !== null);
-    assert.equal(view.title, "未放行（判断 agent · 代审批）");
+    // 文案来源：共享 i18n `ui.judge.notApproved`。
+    assert.equal(view.title, "未放行（自动代理 · 代审批）");
     assert.equal(view.operatorText, "operator:judge:pi");
     assert.ok(view.lines.some((line) => line.includes("替代方案：npm run test:unit")));
     assert.ok(view.lines.some((line) => line.includes("建议先跑单元测试")));
@@ -122,11 +124,14 @@ test("judge deny 无替代方案：0 卡、合成 customerMessage + 标准出路
     const result = await chain.gate(REQUEST("deny-noalt-1"));
     assert.equal(result.allow, false);
     assert.equal(chain.displays.length, 0, "无替代方案也必须 0 卡");
-    assert.match(result.reason, /判断 agent 未放行该命令。/);
+    // 文案来源：共享 i18n `main.operator.judgeDeniedHead`。
+    assert.match(result.reason, /自动代理未放行该命令。/);
     // 2026-10-19 编排把 shell 判断定位为「系统风险审查」（客户修正：不审业务必要性），
     // 合成 customerMessage 的前缀随之改为「存在系统风险或无法确认安全」；仍要求同一句话
     // 说明风险来源并给出下一步（语义与强度不变）。
-    assert.match(result.reason, /请向客户说明：判断 agent 认为该命令存在系统风险或无法确认安全/);
+    // 文案来源：`src/common/编排/shell-judge-verdict.ts` 的 synthesizeCustomerMessage
+    //（2026-10-25 客户可见文案统一：「判断 agent」→「自动代理」）。
+    assert.match(result.reason, /请向客户说明：自动代理认为该命令存在系统风险或无法确认安全/);
     assert.match(result.reason, EXIT_LINE);
 
     assert.equal(chain.rows.length, 1);
@@ -146,7 +151,8 @@ test("judge deny 无替代方案：0 卡、合成 customerMessage + 标准出路
     const UL = await loadUiLabels();
     const view = UL.shellJudgeResultView(row);
     assert.ok(view !== null);
-    assert.equal(view.title, "未放行（判断 agent · 代审批）");
+    // 文案来源：共享 i18n `ui.judge.notApproved`。
+    assert.equal(view.title, "未放行（自动代理 · 代审批）");
     assert.ok(view.lines.some((line) => EXIT_LINE.test(line)), "结果行必须显示同一说明与出路");
   } finally {
     await project.cleanup();

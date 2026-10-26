@@ -380,13 +380,13 @@ test("T12 request_confirmation：declined + notPresented:true 返回「卡片未
   assert.doesNotMatch(notPresented.message, /^request_confirmation：未获客户同意/);
   assert.doesNotMatch(notPresented.message, /未获客户同意/, "不得把「卡片未发出」说成客户拒绝");
 
-  // 其他工具不受影响：request_choice 的 declined 分支（即使带 notPresented）文案逐字不变（O1 未授权）。
+  // 2026-10-25 验收分诊：request_choice 也识别 notPresented（不得把「卡片未发出/分诊退回」说成客户拒绝）。
   const choiceWithFlag = await byName.get("request_choice")!.handler(toolArgs("request_choice", { title: "选择", options: [{ id: "a", label: "A" }] }));
   assert.equal(choiceWithFlag.ok, false);
-  assert.equal(
-    choiceWithFlag.message,
-    "request_choice：未获客户同意（原因：客户拒绝（缺少 cardKind。治理角色的 request_confirmation 必须同时携带 flowId 与 cardKind（本角色允许：write）；本次未发行任何写入路径、未写入账本。））→ 不要写盘；如实告知客户，不得假设同意。",
-  );
+  assert.match(choiceWithFlag.message, /治理确认卡未发出/);
+  assert.match(choiceWithFlag.message, /未向客户呈现/);
+  assert.match(choiceWithFlag.message, /缺少 cardKind/);
+  assert.doesNotMatch(choiceWithFlag.message, /客户拒绝|未获客户同意/);
 
   mode = "customer-declined";
   const declined = await confirm.handler(toolArgs("request_confirmation", { title: "写工作记录" }));

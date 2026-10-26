@@ -7,7 +7,9 @@
 //   - su 预授权（客户裁定 2026-10-16）：docs/su/**、docs/contracts/** 与 docs/skills/**
 //     （第三棵＝G-4 角色能力安装 V1 裁定扩列）与 docs/mcp/**（第四棵＝G-4 V2 裁定扩列，
 //     2026-10-16 批准）属**初始 writeSet**——确认制下开局即可写（免确认，含子路径/绝对路径）、
-//     会话重建后仍可写；其余路径（docs/ 其它、角色卡/ …）与其它角色**无**此预授权（未确认 = F4 拒）。
+//     会话重建后仍可写；su 边界内其余路径（docs/ 其它、角色卡/ …）未确认仍被 F4 拒。
+//   - Section 1 写入预授权（客户 2026-10-25）按**各角色自己的边界**生效：项目角色边界内直接放行，
+//     边界外照拒；任务 writeSet 收窄时不扩张——详见 section1-write-preauthorization.test.ts。
 // 全程用桩适配器，不触网。
 
 import { test } from "node:test";
@@ -18,6 +20,13 @@ import path from "node:path";
 
 import type { ProjectConfig } from "../../src/model/role.ts";
 import type { TaskScope } from "../../src/model/decision.ts";
+import type {
+  BackgroundTaskReadOptions,
+  BackgroundTaskReadResult,
+  BackgroundTaskSnapshot,
+  BackgroundTaskStopOptions,
+  BackgroundTaskStopResult,
+} from "../../src/model/runtime.ts";
 import type { CustomerInputFn, RuntimeAdapter, RoleSession, SessionEvent, WriteGate } from "../../src/provider/pi/session.ts";
 import {
   openRoleSession,
@@ -352,32 +361,49 @@ test("su 预授权严格边界：docs/ 其它路径与 角色卡/ 仍走确认�
   }
 });
 
-test("非 su 角色无预授权：同为确认制会话，docs/su/memo.md 在角色 X 的边界内仍被 F4 拒", async () => {
-  // 角色 X 的边界**覆盖 docs/**（目录）——控住变量：若预授权不判角色，本用例会误放行。
+test("项目角色按自己的 Section 1 预授权（不借用 su 四棵）：边界内直接放行、边界外照拒", async () => {
+  // 2026-10-25 客户规则：「写自己角色权限内的路径，直接放行。」项目角色无任务收窄时，其边界条目
+  // 就是初始可写集——不再需要 request_confirmation 逐路径发行；边界外仍然拒绝。
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-docsrole-"));
-  const dir = path.join(root, "角色卡", "X");
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, "role-card.md"), "# 角色 X\n");
+  // X 的边界覆盖 docs/：docs/su/** 等路径属 X 自己的 Section 1 ⇒ 直接放行。
+  const dirX = path.join(root, "角色卡", "X");
+  fs.mkdirSync(dirX, { recursive: true });
+  fs.writeFileSync(path.join(dirX, "role-card.md"), "# 角色 X\n");
   fs.writeFileSync(
-    path.join(dir, "boundary.yaml"),
+    path.join(dirX, "boundary.yaml"),
     `role: X\nentries:\n  - kind: directory\n    path: docs/\n    purpose: 测试：docs 目录\n`
+  );
+  // Y 的边界只覆盖 src/：docs/su/** 不在其 Section 1 ⇒ 不因 su 的旧预授权目录而被放行。
+  const dirY = path.join(root, "角色卡", "Y");
+  fs.mkdirSync(dirY, { recursive: true });
+  fs.writeFileSync(path.join(dirY, "role-card.md"), "# 角色 Y\n");
+  fs.writeFileSync(
+    path.join(dirY, "boundary.yaml"),
+    `role: Y\nentries:\n  - kind: directory\n    path: src/\n    purpose: 测试：src 目录\n`
   );
   const project: ProjectConfig = {
     projectRoot: root,
     skillRoot: root,
-    roles: { X: { card: "角色卡/X/role-card.md", boundary: "角色卡/X/boundary.yaml" } },
+    roles: {
+      X: { card: "角色卡/X/role-card.md", boundary: "角色卡/X/boundary.yaml" },
+      Y: { card: "角色卡/Y/role-card.md", boundary: "角色卡/Y/boundary.yaml" },
+    },
     governanceBoundary: { path: "角色卡/X/boundary.yaml", acceptance: { accepted: true, source: "test:fixture" } },
   };
-  const { deps, state } = makeDeps();
   const calls = { n: 0 };
   try {
+    const { deps, state } = makeDeps();
     await openRoleSession({ roleId: "X", project, customerInput: decliningChannel(calls) }, deps);
-    const d = state.gate!("docs/su/memo.md");
-    assert.equal(d.allowed, false, "非 su 角色不得获得 su 预授权");
-    assert.match((d as { reason: string }).reason, /不在任务 writeSet 内/);
-    assert.equal(state.gate!("docs/contracts/x.md").allowed, false, "docs/contracts 同样只给 su");
-    assert.equal(state.gate!("docs/skills/x/install.md").allowed, false, "docs/skills 同样只给 su");
-    assert.equal(state.gate!("docs/mcp/echo.md").allowed, false, "docs/mcp 同样只给 su");
+    assert.equal(calls.n, 0, "Section 1 写入无需请求确认");
+    assert.equal(state.gate!("docs/su/memo.md").allowed, true, "X 的 Section 1（docs/）直接放行");
+    assert.equal(state.gate!("docs/contracts/x.md").allowed, true);
+    assert.equal(state.gate!("docs/sub/deep.md").allowed, true, "目录条目含子路径");
+    assert.equal(state.gate!("src/evil.ts").allowed, false, "X 边界外照拒（预授权不扩大边界）");
+
+    const y = makeDeps();
+    await openRoleSession({ roleId: "Y", project, customerInput: decliningChannel(calls) }, y.deps);
+    assert.equal(y.state.gate!("src/ok.ts").allowed, true, "Y 的 Section 1 直接放行");
+    assert.equal(y.state.gate!("docs/su/memo.md").allowed, false, "su 的旧预授权目录不泄漏给其他角色");
   } finally {
     cleanup(project);
   }
@@ -424,6 +450,158 @@ test("会话重建（新开会话）后预授权仍然生效——初始集合�
     assert.equal(rebuilt.state.gate!("docs/other.md").allowed, false, "重建后其余路径照旧：发行为空、F4 拒");
     assert.equal(calls.n, 0, "全程未发起任何客户确认");
     await h2.dispose();
+  } finally {
+    cleanup(project);
+  }
+});
+
+// —— 会话级后台任务访问面（2026-10-25）：编排句柄对 RoleSession 三个可选方法的**纯透传** ——
+// 契约来源 `src/model/runtime.ts` 的 `RoleSession.listBackgroundTasks?/readBackgroundTask?/stopBackgroundTask?`：
+// 底层实现 ⇒ 同名同签名原样转发（结果不重造）；底层缺席 ⇒ 句柄属性保持 undefined（不伪造空实现）；
+// stop 的 `ok:false`（如 unknown-task）与抛错原样返回（不吞失败语义）。
+
+const taskSnapshot = (
+  taskId: string,
+  state: BackgroundTaskSnapshot["state"] = "running",
+): BackgroundTaskSnapshot => ({
+  taskId,
+  state,
+  command: 'node -e "setInterval(() => {}, 1000)"',
+  startedAt: "2026-10-25T00:00:00.000Z",
+  durationMs: 1234,
+  pid: 4242,
+});
+
+interface BackgroundProbe {
+  lists: number;
+  reads: Array<{ taskId: string; options?: BackgroundTaskReadOptions }>;
+  stops: Array<{ taskId: string; options?: BackgroundTaskStopOptions }>;
+}
+
+/** 实现后台任务三方法的桩会话：记录 list/read/stop 的调用与参数，结果引用可断言。 */
+function makeBackgroundDeps(
+  stopImpl: (taskId: string, options?: BackgroundTaskStopOptions) => Promise<BackgroundTaskStopResult>,
+): {
+  deps: { createAdapter: (gate: WriteGate) => RuntimeAdapter };
+  probe: BackgroundProbe;
+  tasks: BackgroundTaskSnapshot[];
+  readResult: BackgroundTaskReadResult;
+} {
+  const probe: BackgroundProbe = { lists: 0, reads: [], stops: [] };
+  const tasks = [taskSnapshot("bg-1")];
+  const readResult: BackgroundTaskReadResult = {
+    task: tasks[0]!,
+    tailLines: 3,
+    tailClamped: true,
+    stdout: { text: "out", truncated: false },
+  };
+  const session: RoleSession = {
+    async prompt(): Promise<void> {},
+    events(): AsyncIterable<SessionEvent> {
+      return (async function* () {
+        /* 桩不产出事件 */
+      })();
+    },
+    async dispose(): Promise<void> {},
+    listBackgroundTasks(): BackgroundTaskSnapshot[] {
+      probe.lists += 1;
+      return tasks;
+    },
+    readBackgroundTask(taskId: string, options?: BackgroundTaskReadOptions): BackgroundTaskReadResult | undefined {
+      probe.reads.push(options === undefined ? { taskId } : { taskId, options });
+      return taskId === "bg-1" ? readResult : undefined;
+    },
+    stopBackgroundTask(taskId: string, options?: BackgroundTaskStopOptions): Promise<BackgroundTaskStopResult> {
+      probe.stops.push(options === undefined ? { taskId } : { taskId, options });
+      return stopImpl(taskId, options);
+    },
+  };
+  return {
+    probe,
+    tasks,
+    readResult,
+    deps: {
+      createAdapter: () => ({
+        async composeContext() {
+          return { systemPrompt: "" };
+        },
+        async bindRole() {
+          return session;
+        },
+      }),
+    },
+  };
+}
+
+test("openRoleSession：底层实现后台任务三方法 → 句柄原样透传 list/read/stop（结果不重造）", async () => {
+  const project = makeTempProject();
+  const stopResult: BackgroundTaskStopResult = {
+    ok: true,
+    task: taskSnapshot("bg-1", "stopped"),
+    alreadyEnded: false,
+  };
+  const { deps, probe, tasks, readResult } = makeBackgroundDeps(async () => stopResult);
+  try {
+    const handle = await openRoleSession({ roleId: "X", project }, deps);
+    assert.equal(typeof handle.listBackgroundTasks, "function", "底层实现 ⇒ 句柄具备 listBackgroundTasks");
+    assert.equal(handle.listBackgroundTasks!(), tasks, "list 原样返回底层快照数组（同一引用，不复制/不重造）");
+    assert.equal(probe.lists, 1);
+
+    const read = handle.readBackgroundTask!("bg-1", { stream: "stdout", tailLines: 3 });
+    assert.equal(read, readResult, "read 原样返回底层结果对象（同一引用）");
+    assert.deepEqual(
+      probe.reads[0],
+      { taskId: "bg-1", options: { stream: "stdout", tailLines: 3 } },
+      "taskId/options 原样转发",
+    );
+    assert.equal(handle.readBackgroundTask!("bg-x"), undefined, "底层对未知任务返回 undefined ⇒ 句柄如实保留 undefined");
+    assert.deepEqual(probe.reads[1], { taskId: "bg-x" }, "缺省 options 不额外伪造");
+
+    const stopped = await handle.stopBackgroundTask!("bg-1", { force: true });
+    assert.equal(stopped, stopResult, "stop 原样返回底层结果对象");
+    assert.deepEqual(probe.stops[0], { taskId: "bg-1", options: { force: true } }, "stop 参数原样转发");
+    await handle.stopBackgroundTask!("bg-1");
+    assert.deepEqual(probe.stops[1], { taskId: "bg-1" }, "缺省 options 不额外伪造");
+    await handle.dispose();
+  } finally {
+    cleanup(project);
+  }
+});
+
+test("openRoleSession：底层未实现后台任务三方法 → 句柄对应属性保持 undefined（不伪造空实现）", async () => {
+  const project = makeTempProject();
+  const { deps } = makeDeps(); // 旧替身：只有 prompt/events/dispose，不实现三个可选方法
+  try {
+    const handle = await openRoleSession({ roleId: "X", project }, deps);
+    assert.equal(handle.listBackgroundTasks, undefined, "listBackgroundTasks 保持缺席（不是空数组）");
+    assert.equal(handle.readBackgroundTask, undefined, "readBackgroundTask 保持缺席（不是恒 undefined 的函数）");
+    assert.equal(handle.stopBackgroundTask, undefined, "stopBackgroundTask 保持缺席（不是伪造失败结果的函数）");
+    await handle.dispose();
+  } finally {
+    cleanup(project);
+  }
+});
+
+test("openRoleSession：stop 的 ok:false（unknown-task）与抛错原样返回——不吞失败语义", async () => {
+  const project = makeTempProject();
+  const unknown: BackgroundTaskStopResult = { ok: false, reason: "unknown-task", message: "未知任务：bg-404" };
+  const thrown = new Error("终止失败：SIGKILL 不可用");
+  const { deps } = makeBackgroundDeps(async () => unknown);
+  try {
+    const handle = await openRoleSession({ roleId: "X", project }, deps);
+    const result = await handle.stopBackgroundTask!("bg-404");
+    assert.equal(result, unknown, "ok:false 结果对象原样返回（同一引用，不改写 reason/message）");
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.reason, "unknown-task");
+    await handle.dispose();
+
+    // 底层直接 reject ⇒ 句柄不 catch、不把抛错改写成失败结果（同一错误对象向上传播）。
+    const rejecting = makeBackgroundDeps(async () => {
+      throw thrown;
+    });
+    const handle2 = await openRoleSession({ roleId: "X", project }, rejecting.deps);
+    await assert.rejects(handle2.stopBackgroundTask!("bg-1"), (err) => err === thrown);
+    await handle2.dispose();
   } finally {
     cleanup(project);
   }

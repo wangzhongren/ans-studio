@@ -42,6 +42,7 @@ import {
   type FlowStateStep,
 } from "./flow-state.ts";
 import { appendGovernanceLedger, readGovernanceLedger, type GovernanceLedgerEntry, type GovernancePower } from "./governance-ledger.ts";
+import { latestAcceptanceCriteriaRelPath } from "./governance-gate.ts";
 import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 import type {
   FlowGetFn,
@@ -2038,6 +2039,279 @@ export async function completeRoleCardsStep(
       log,
     };
     return step.kind === "artifact" ? completeRoleCardsArtifact(context) : completeRoleCardsDispatch(context);
+  }).catch(internalError);
+}
+
+// —————————————————————— 应用专用：completeAcceptanceCriteriaStep ——————————————————————
+
+/** `acceptance-criteria` 步骤的精确 id（本函数的唯一目标；不做前缀/相似匹配）。 */
+const ACCEPTANCE_CRITERIA_STEP_ID = "acceptance-criteria";
+/** 允许由应用收口到 done 的步骤状态（应用自身派发后直接收口，不经过 delivered）。 */
+const ACCEPTANCE_CRITERIA_CLOSABLE_STATUSES: ReadonlySet<string> = new Set(["pending", "dispatched"]);
+
+/** `completeAcceptanceCriteriaStep` 输入（应用专用，不是角色工具参数）。 */
+export interface CompleteAcceptanceCriteriaStepInput {
+  projectRoot: string;
+  flowId: string;
+}
+
+/**
+ * `completeAcceptanceCriteriaStep` 结果：复用 `FlowToolResult` 形状，并补充本次证据/标准路径。
+ *
+ * 错误码（桌面据此分流）：
+ *   · 输入：`invalid-input` / `missing-flow-id`；
+ *   · flow：`acceptance-criteria-step-missing` / `acceptance-criteria-step-terminal` /
+ *     `acceptance-criteria-kind-unsupported`（以及读取既有码 `not-found`/`read-failed`/`invalid-flow`）；
+ *   · 标准：`acceptance-criteria-missing`（最新 `<flowId>-criteria-vN.md` 不存在/不可读）/
+ *     `acceptance-criteria-unobservable`（存在但不可安全观察：超大/二进制/路径非法）；
+ *   · 证据/写入：`ledger-unavailable` / `ledger-write-failed` / `insufficient-evidence` / `write-failed`。
+ */
+export interface CompleteAcceptanceCriteriaStepResult extends FlowToolResult {
+  /** 成功完成时实际写入 flow 的证据。 */
+  evidence?: { kind: "artifact"; ref: string };
+  /** 本次使用的最新验收标准（项目相对路径）。 */
+  criteriaPath?: string;
+  /** 步骤已是 done（幂等命中；本次未写盘）。 */
+  alreadyDone?: boolean;
+}
+
+/**
+ * **应用专用**：验收标准工件就绪后把 flow YAML 的 `id:"acceptance-criteria"` 步骤置 `done`。
+ *
+ * 背景：`acceptance-criteria` 是应用自身执行的步骤（owner=app）；应用验收门
+ * `evaluateFlowCompletion` 会因它 pending 判「流程未完成」，导致验收永远派不出去。本函数是它的
+ * 公共收口出口（与 `completeRoleCardsStep` 同形），**不注册为角色工具**。
+ *
+ * 契约（钉死）：
+ *   · **只处理精确 id `acceptance-criteria`**；缺该步骤 ⇒ `acceptance-criteria-step-missing`；
+ *     步骤 kind 非 `artifact` ⇒ `acceptance-criteria-kind-unsupported`。
+ *   · **已 done ⇒ 幂等成功**（`{ok:true,idempotent:true,alreadyDone:true,code:"already-done"}`），
+ *     不读标准、不写账本/flow；只从 `pending`/`dispatched` 收口到 `done`，其它状态 ⇒
+ *     `acceptance-criteria-step-terminal`（不覆盖）。
+ *   · **标准必须真实存在**：按既有版本扫描取最新 `docs/acceptance/<flowId>-criteria-vN.md`
+ *     （`latestAcceptanceCriteriaRelPath`，不回退旧版本）；不存在/不可读 ⇒ `acceptance-criteria-missing`，
+ *     存在但不可安全观察 ⇒ `acceptance-criteria-unobservable`（不猜、不伪造）。
+ *   · **按现有 artifact 观测规则补 `artifact.observed`**：同 path+sha（flowId 缺省或相等）不重复追加；
+ *     新追加条目固定 `actorRoleId:"app"`、`power:"app"`、`artifactPath`/`artifactSha256`/`flowId`；
+ *     **不写** `customer.decision`、不伪造客户批准。
+ *   · **证据校验沿用 FlowService 同一套内部原语**：候选 YAML 复核 + `validateFlowEvidence` 账本对账
+ *     （只过滤目标 stepId 的 issue）；冲突/对账失败返回既有 `insufficient-evidence` 语义。
+ *   · 只改目标步骤的 `status`/`evidence`，**不改其它步骤、owner、kind、flow schema**；不新增
+ *     `FlowStepKind`、不改步骤权限规则。
+ *   · 与 `createFlowService`/`completeRoleCardsStep` 共用 per-project 串行队列与原子写；写事件
+ *     `flow.acceptance-criteria.completed`，view actor `app/app`；写失败不破坏原文件。
+ */
+export async function completeAcceptanceCriteriaStep(
+  input: CompleteAcceptanceCriteriaStepInput,
+): Promise<CompleteAcceptanceCriteriaStepResult> {
+  if (typeof input?.projectRoot !== "string" || input.projectRoot.trim() === "") {
+    return { ok: false, code: "invalid-input", error: "缺少 projectRoot。" };
+  }
+  const projectRoot = path.resolve(input.projectRoot);
+  const flowId = input.flowId;
+  if (typeof flowId !== "string" || !FLOW_ID_RE.test(flowId)) {
+    return { ok: false, code: "missing-flow-id", error: "缺少合法 flowId（应形如 todo-list-v1）。" };
+  }
+  const log = createDiagnosticLogger({ component: "orchestration.flow-service", projectRoot });
+
+  return serialize(projectRoot, async () => {
+    const read = await readFlowState(projectRoot, flowId);
+    if (!read.ok) return read.result;
+    const view = viewOf(read.flow, read.revision, "app", "app");
+    const index = read.flow.steps.findIndex((step) => step.id === ACCEPTANCE_CRITERIA_STEP_ID);
+    if (index === -1) {
+      return {
+        ok: false,
+        code: "acceptance-criteria-step-missing",
+        revision: read.revision,
+        flow: view,
+        error: `流程缺少 id 为 "${ACCEPTANCE_CRITERIA_STEP_ID}" 的步骤（无法完成验收标准步骤）。`,
+      };
+    }
+    const step = read.flow.steps[index]!;
+    if (step.status === "done") {
+      const existingEvidence =
+        step.evidence !== undefined && step.evidence.kind === "artifact"
+          ? { kind: "artifact" as const, ref: step.evidence.ref }
+          : undefined;
+      log.record("flow.acceptance-criteria.already-done", { flowId, stepId: step.id });
+      return {
+        ok: true,
+        idempotent: true,
+        alreadyDone: true,
+        code: "already-done",
+        revision: read.revision,
+        flow: view,
+        ...(existingEvidence !== undefined
+          ? { evidence: existingEvidence, criteriaPath: existingEvidence.ref }
+          : {}),
+      };
+    }
+    if (!ACCEPTANCE_CRITERIA_CLOSABLE_STATUSES.has(step.status)) {
+      return {
+        ok: false,
+        code: "acceptance-criteria-step-terminal",
+        revision: read.revision,
+        flow: view,
+        error:
+          `步骤 ${ACCEPTANCE_CRITERIA_STEP_ID} 当前状态为 ${step.status}；` +
+          "应用只从 pending/dispatched 收口到 done，不覆盖其它状态。",
+      };
+    }
+    if (step.kind !== "artifact") {
+      return {
+        ok: false,
+        code: "acceptance-criteria-kind-unsupported",
+        revision: read.revision,
+        flow: view,
+        error: `步骤 ${ACCEPTANCE_CRITERIA_STEP_ID} 的 kind=${step.kind} 不受支持（只支持 artifact）。`,
+      };
+    }
+
+    // 1) 最新验收标准必须真实存在（版本扫描取最高 N；不回退旧版本）。
+    const criteriaPath = latestAcceptanceCriteriaRelPath(projectRoot, flowId);
+    if (criteriaPath === undefined) {
+      log.record("flow.acceptance-criteria.missing", { flowId, stepId: step.id });
+      return {
+        ok: false,
+        code: "acceptance-criteria-missing",
+        revision: read.revision,
+        flow: view,
+        error:
+          `流程 ${flowId} 缺少最新验收标准 docs/acceptance/${flowId}-criteria-vN.md（不存在或目录不可读）；` +
+          `未完成 ${ACCEPTANCE_CRITERIA_STEP_ID}。`,
+      };
+    }
+    const inspected = await inspectObservableArtifact(projectRoot, criteriaPath);
+    if (!inspected.ok) {
+      log.record("flow.acceptance-criteria.unobservable", {
+        flowId,
+        stepId: step.id,
+        criteriaPath,
+        reason: inspected.reason,
+      });
+      const code =
+        inspected.reason === "missing" || inspected.reason === "read-failed"
+          ? "acceptance-criteria-missing"
+          : "acceptance-criteria-unobservable";
+      return {
+        ok: false,
+        code,
+        revision: read.revision,
+        flow: view,
+        error:
+          `最新验收标准 ${criteriaPath} 不可用于收口（${inspected.reason}）；` +
+          `未完成 ${ACCEPTANCE_CRITERIA_STEP_ID}，不伪造标准存在。`,
+      };
+    }
+
+    // 2) 账本可读；按既有 artifact 观测规则补 app/app 的 artifact.observed（同 path+sha 不重复追加）。
+    let ledger;
+    try {
+      ledger = await readGovernanceLedger(projectRoot);
+    } catch (err) {
+      return {
+        ok: false,
+        code: "ledger-unavailable",
+        revision: read.revision,
+        flow: view,
+        error: `治理账本不可读：${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+    if (ledger.errors.length > 0) {
+      return {
+        ok: false,
+        code: "ledger-unavailable",
+        revision: read.revision,
+        flow: view,
+        error: `治理账本不可读或存在坏行：${ledger.errors[0]}`,
+      };
+    }
+
+    let entries: GovernanceLedgerEntry[] = ledger.entries;
+    const alreadyObserved = entries.some(
+      (entry) =>
+        entry.kind === "artifact.observed" &&
+        typeof entry.artifactPath === "string" &&
+        normalizeObservedRelPath(entry.artifactPath) === inspected.rel &&
+        entry.artifactSha256 === inspected.sha256 &&
+        (entry.flowId === undefined || entry.flowId === flowId),
+    );
+    if (!alreadyObserved) {
+      const observedEntry: GovernanceLedgerEntry = {
+        at: new Date().toISOString(),
+        kind: "artifact.observed",
+        actorRoleId: "app",
+        power: "app",
+        artifactPath: inspected.rel,
+        artifactSha256: inspected.sha256,
+        flowId,
+      };
+      const appended = await appendGovernanceLedger(projectRoot, observedEntry);
+      if (!appended.ok) {
+        log.error("flow.acceptance-criteria.ledger.failed", new Error(appended.message), {
+          flowId,
+          criteriaPath: inspected.rel,
+        });
+        return {
+          ok: false,
+          code: "ledger-write-failed",
+          revision: read.revision,
+          flow: view,
+          error: appended.message,
+        };
+      }
+      entries = [...entries, observedEntry];
+      log.record("flow.acceptance-criteria.observed", { flowId, stepId: step.id, criteriaPath: inspected.rel });
+    }
+
+    // 3) 候选 YAML 复核 + 账本对账（沿用 flow-service 同一套内部原语；只过滤目标步骤的 issue）。
+    const candidate: FlowState = {
+      ...read.flow,
+      steps: read.flow.steps.map((item, itemIndex) =>
+        itemIndex === index
+          ? { ...item, status: "done" as const, evidence: { kind: "artifact" as const, ref: inspected.rel } }
+          : item,
+      ),
+    };
+    const parsedCandidate = parseFlowStateYaml(serializeFlow(candidate), flowId);
+    if (!parsedCandidate.ok) {
+      return {
+        ok: false,
+        code: "invalid-flow",
+        revision: read.revision,
+        flow: view,
+        error: `候选流程 YAML 校验失败：${parsedCandidate.error}`,
+      };
+    }
+    const evidenceResult = validateFlowEvidence(parsedCandidate.flow, entries);
+    if (!evidenceResult.ok) {
+      const issues = evidenceResult.issues.filter((issue) => issue.stepId === ACCEPTANCE_CRITERIA_STEP_ID);
+      if (issues.length > 0) {
+        return {
+          ok: false,
+          code: "insufficient-evidence",
+          revision: read.revision,
+          flow: view,
+          error: issues.map((issue) => issue.message).join("；"),
+          issues: issues.map((issue) => `${issue.path}: ${issue.message}`),
+        };
+      }
+    }
+
+    const written = await writeFlowState({
+      projectRoot,
+      flowId,
+      flow: parsedCandidate.flow,
+      event: "flow.acceptance-criteria.completed",
+      fields: { flowId, stepId: step.id, criteriaPath: inspected.rel },
+      writeFile: (absPath, data) => atomicWrite(absPath, data),
+      log,
+      viewActorRoleId: "app",
+      viewActorPower: "app",
+    });
+    if (!written.ok) return written;
+    return { ...written, evidence: { kind: "artifact" as const, ref: inspected.rel }, criteriaPath: inspected.rel };
   }).catch(internalError);
 }
 

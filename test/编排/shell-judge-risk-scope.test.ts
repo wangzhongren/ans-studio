@@ -160,11 +160,16 @@ test("明确排除业务必要性：不因看不懂业务/看不出必要而拦�
 test("客户文案不再出现「业务不必要」：默认合成说明改为系统风险口径", () => {
   const synthesized = synthesizeCustomerMessage({ verdict: "deny" });
   assert.match(synthesized, /系统风险或无法确认安全/);
+  // B1 术语批次：客户可见文案统一为「自动代理」，不得再出现旧称「判断 agent」。
+  assert.match(synthesized, /^自动代理认为该命令存在系统风险或无法确认安全/);
+  assert.doesNotMatch(synthesized, /判断 agent/);
   assert.doesNotMatch(synthesized, /不必要/);
   assert.ok(synthesized.includes(SHELL_JUDGE_EXIT_LINE));
 
   // 模型自带 reason 时原样转述（reason 本身仍由判断 agent 按风险口径给出）。
   const withReason = synthesizeCustomerMessage({ verdict: "deny", reason: "会长期驻留并阻塞终端" });
+  assert.match(withReason, /^自动代理认为该命令存在系统风险或无法确认安全：会长期驻留并阻塞终端/);
+  assert.doesNotMatch(withReason, /判断 agent/);
   assert.match(withReason, /会长期驻留并阻塞终端/);
   assert.doesNotMatch(withReason, /不必要/);
 });

@@ -142,8 +142,8 @@ export function synthesizeCustomerMessage(verdict: ShellJudgeVerdict): string {
   }
   const reason = verdict.reason?.trim();
   const core = reason !== undefined && reason !== "" && !hasInternalJargon(reason)
-    ? `判断 agent 认为该命令存在系统风险或无法确认安全：${reason}`
-    : "判断 agent 认为该命令存在系统风险或无法确认安全。";
+    ? `自动代理认为该命令存在系统风险或无法确认安全：${reason}`
+    : "自动代理认为该命令存在系统风险或无法确认安全。";
   return withSynthesizedExitLine(core);
 }
 

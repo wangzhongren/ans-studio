@@ -32,12 +32,17 @@ import {
   readGovernanceLedger,
   type GovernanceLedgerEntry,
 } from "../../src/common/编排/governance-ledger.ts";
-import { parseFlowStateYaml, validateFlowEvidence } from "../../src/common/编排/flow-state.ts";
+import { latestAcceptanceDecision, parseFlowStateYaml, validateFlowEvidence } from "../../src/common/编排/flow-state.ts";
 import { EXIT_OK, EXIT_USAGE } from "../../src/common/编排/exit-codes.ts";
 import { parseGovernArgs } from "../../src/common/编排/args.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import { governCommand } from "../../src/interface/cli/govern.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
+import type {
+  BackgroundTaskReadResult,
+  BackgroundTaskSnapshot,
+  BackgroundTaskStopResult,
+} from "../../src/model/runtime.ts";
 import type {
   CustomerInputFn,
   CustomerInputMetadata,
@@ -305,6 +310,59 @@ test("openGovernanceSession：trio 缺省 rapporteur；--function 选 nominator/
         ),
       /不一致/,
     );
+  });
+});
+
+test("openGovernanceSession：会话级后台任务访问面从底层句柄透传（未实现则保持 undefined）", async () => {
+  await withRoot(async (root) => {
+    const project = trioProject(root);
+    const task: BackgroundTaskSnapshot = {
+      taskId: "bg-gov-1",
+      state: "running",
+      command: 'node -e "setInterval(() => {}, 1000)"',
+      startedAt: "2026-10-25T00:00:00.000Z",
+      durationMs: 10,
+    };
+    const listed = [task];
+    const readResult: BackgroundTaskReadResult = {
+      task,
+      tailLines: 1,
+      tailClamped: false,
+      stdout: { text: "x", truncated: false },
+    };
+    const stopResult: BackgroundTaskStopResult = { ok: false, reason: "unknown-task", message: "未知任务：bg-gov-1" };
+    const adapter: RuntimeAdapter = {
+      async composeContext() {
+        return { systemPrompt: "" };
+      },
+      async bindRole(): Promise<RoleSession> {
+        return {
+          async prompt(): Promise<void> {},
+          events(): AsyncIterable<SessionEvent> {
+            return (async function* () {
+              /* 桩不产出事件 */
+            })();
+          },
+          async dispose(): Promise<void> {},
+          listBackgroundTasks: () => listed,
+          readBackgroundTask: (taskId) => (taskId === task.taskId ? readResult : undefined),
+          stopBackgroundTask: async () => stopResult,
+        };
+      },
+    };
+    const handle = await openGovernanceSession({ taskId: "T", project }, { createAdapter: () => adapter });
+    assert.equal(handle.listBackgroundTasks!(), listed, "list 原样透传（同一引用）");
+    assert.equal(handle.readBackgroundTask!(task.taskId), readResult, "read 原样透传（同一引用）");
+    assert.equal(await handle.stopBackgroundTask!(task.taskId), stopResult, "stop 的 ok:false 结果原样返回");
+    assert.equal(await handle.stopBackgroundTask!("bg-other"), stopResult, "底层结果不重造");
+    await handle.dispose();
+
+    // 底层句柄未实现（旧替身）⇒ 治理句柄同名属性保持缺席，不伪造空实现。
+    const plain = await openGovernanceSession({ taskId: "T", project }, { createAdapter: () => okAdapter() });
+    assert.equal(plain.listBackgroundTasks, undefined);
+    assert.equal(plain.readBackgroundTask, undefined);
+    assert.equal(plain.stopBackgroundTask, undefined);
+    await plain.dispose();
   });
 });
 
@@ -1928,6 +1986,199 @@ test("judge deny 以 declined 回投：不写 customer.decision（不污染账�
         "judge deny 不是客户决定，不得写 customer.decision",
       );
       assert.equal(ledger.errors.length, 0);
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+// —————————————————————— ⑨ 系统写入预授权（2026-10-25） ——————————————————————
+//
+// 桌面「写入预授权」前闸的结算 `operatorId` 恒为 `system:write-preauthorization`（不是客户、不是 judge）。
+// 编排记账必须把它与客户/判断路径区分开：接受只写独立 evidence 审计（不写门禁键 `decisionKind`），
+// 拒绝不写 `customer.decision`（不写 unclassified/none）。
+
+const SYSTEM_PREAUTH_OPERATOR = "system:write-preauthorization";
+
+/** 等指定账本条目落盘（recordCustomerDecision 为 fire-and-forget：先 flush，再轮询）。 */
+async function waitForLedgerEntry(
+  root: string,
+  predicate: (entry: GovernanceLedgerEntry) => boolean,
+): Promise<GovernanceLedgerEntry> {
+  const deadline = Date.now() + 3000;
+  while (Date.now() < deadline) {
+    await flushGovernanceLedger(root);
+    const { entries } = await readGovernanceLedger(root);
+    const found = entries.find(predicate);
+    if (found !== undefined) return found;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error("等待账本条目超时");
+}
+
+test("系统写入预授权：接受 → evidence=system-preauthorization（非 customer-input），无 decisionKind、不污染 latest 验收决定", async () => {
+  await withRoot(async (root) => {
+    const captured = {} as Captured;
+    const handle = await openRoleSession(
+      {
+        roleId: "rapporteur",
+        project: withBuiltIn(trioProject(root), "rapporteur"),
+        customerInput: () => ({
+          outcome: "answered",
+          value: { confirmed: true },
+          operatorId: SYSTEM_PREAUTH_OPERATOR,
+        }),
+        autoRepin: false,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!(
+        {
+          kind: "confirm",
+          title: "写入提案",
+          preview: "## docs/proposals/flow-a-v2.md\n# 提案 v2\n",
+          paths: ["docs/proposals/flow-a-v2.md"],
+          flowId: "flow-a",
+          cardKind: "write",
+        },
+        { toolCallId: "call-sys-accept", turnId: "turn-sys-accept" },
+      );
+      assert.equal(out?.outcome, "answered", "系统预授权接受照常结算给工具");
+
+      const entry = await waitForLedgerEntry(root, (candidate) => candidate.kind === "customer.decision");
+      assert.equal(entry.decisionEvidence?.kind, "system-preauthorization", "不得写成 customer-input");
+      assert.equal(entry.decisionEvidence?.operatorId, SYSTEM_PREAUTH_OPERATOR);
+      assert.equal(entry.decisionEvidence?.toolCallId, "call-sys-accept");
+      assert.equal(entry.decisionEvidence?.turnId, "turn-sys-accept");
+      assert.equal(entry.decisionKind, undefined, "系统预授权不是客户决定：不写门禁键 decisionKind");
+      assert.equal(entry.customerDecision, "accepted", "只记放行结果");
+      assert.equal(entry.actorRoleId, "rapporteur", "actor 仍是发起治理角色（不伪装成 system 角色）");
+      assert.equal(entry.power, "proposal");
+      assert.equal(entry.flowId, "flow-a");
+      assert.deepEqual(entry.paths, ["docs/proposals/flow-a-v2.md"]);
+      assert.equal(entry.messageSummary, "写入提案");
+
+      const ledger = await readGovernanceLedger(root);
+      assert.deepEqual(ledger.errors, []);
+      assert.equal(
+        latestAcceptanceDecision("flow-a", ledger).kind,
+        "none",
+        "系统预授权不得被收口门读成验收决定",
+      );
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("系统写入预授权：拒绝 → 不写 customer.decision（无 unclassified/none 污染）", async () => {
+  await withRoot(async (root) => {
+    const captured = {} as Captured;
+    const handle = await openRoleSession(
+      {
+        roleId: "rapporteur",
+        project: withBuiltIn(trioProject(root), "rapporteur"),
+        customerInput: () => ({
+          outcome: "declined",
+          operatorId: SYSTEM_PREAUTH_OPERATOR,
+          reason: "系统预授权拒绝：docs/outside.md 不在角色 Section 1 边界内。",
+          notPresented: true,
+        }),
+        autoRepin: false,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!({
+        kind: "confirm",
+        title: "写入边界外文件",
+        preview: "## docs/outside.md\n# 越界\n",
+        paths: ["docs/outside.md"],
+        flowId: "flow-a",
+        cardKind: "write",
+      });
+      assert.equal(out?.outcome, "declined");
+      await flushGovernanceLedger(root);
+      const { entries, errors } = await readGovernanceLedger(root);
+      assert.deepEqual(errors, []);
+      assert.equal(
+        entries.filter((entry) => entry.kind === "customer.decision").length,
+        0,
+        "系统拒绝不是客户决定，不得写 customer.decision",
+      );
+      assert.equal(
+        entries.filter(
+          (entry) => entry.decisionKind === "unclassified" || entry.customerDecision === "none",
+        ).length,
+        0,
+        "不得写 unclassified/none 污染账本",
+      );
+      assert.equal(latestAcceptanceDecision("flow-a", { entries, errors }).kind, "none");
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("回归：真实客户（operation-*）→ customer-input；judge 代批 → judge（系统分支不劫持）", async () => {
+  await withRoot(async (root) => {
+    const captured = {} as Captured;
+    const customerInput: CustomerInputFn = (req) =>
+      req.cardKind === "proposal"
+        ? {
+            outcome: "answered",
+            value: { selected: ["accept"] },
+            operatorId: "judge:claude",
+            judge: { group: "decision", cardKind: "proposal", engine: "claude", reasonCode: "sufficient" },
+          }
+        : { outcome: "answered", value: { confirmed: true }, operatorId: "operation-1" };
+    const handle = await openRoleSession(
+      {
+        roleId: "rapporteur",
+        project: withBuiltIn(trioProject(root), "rapporteur"),
+        customerInput,
+        autoRepin: false,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const customerOut = await captured.caps!.customerInput!({
+        kind: "confirm",
+        title: "客户手批写入",
+        preview: "## docs/proposals/flow-a-v2.md\n# 提案 v2\n",
+        paths: ["docs/proposals/flow-a-v2.md"],
+        flowId: "flow-a",
+        cardKind: "write",
+      });
+      assert.equal(customerOut?.outcome, "answered");
+      await waitForLedgerEntry(root, (entry) => entry.flowId === "flow-a");
+
+      const judgeOut = await captured.caps!.customerInput!({
+        kind: "choice",
+        title: "提案决定",
+        flowId: "flow-b",
+        cardKind: "proposal",
+        options: [
+          { id: "accept", label: "接受" },
+          { id: "reject", label: "拒绝" },
+        ],
+      });
+      assert.equal(judgeOut?.outcome, "answered");
+      const judgeEntry = await waitForLedgerEntry(root, (entry) => entry.flowId === "flow-b");
+
+      const ledger = await readGovernanceLedger(root);
+      assert.deepEqual(ledger.errors, []);
+      const customerEntry = ledger.entries.find((entry) => entry.flowId === "flow-a");
+      assert.ok(customerEntry, "客户手批决定必须照旧写账本");
+      assert.equal(customerEntry.decisionEvidence?.kind, "customer-input", "客户手批不得被系统分支劫持");
+      assert.equal(customerEntry.decisionKind, undefined);
+      assert.equal(customerEntry.customerDecision, "accepted");
+
+      assert.equal(judgeEntry.decisionEvidence?.kind, "judge", "judge 代批仍写 judge 证据");
+      assert.equal(judgeEntry.decisionKind, "proposal-accept");
+      assert.equal(judgeEntry.customerDecision, "accepted");
+      assert.equal(judgeEntry.decisionEvidence?.judge?.engine, "claude");
     } finally {
       await handle.dispose();
     }

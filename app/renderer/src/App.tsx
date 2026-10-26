@@ -18,6 +18,7 @@ import {
 import { ChatStream } from "@/chat/ChatStream";
 import { installChatRuntime } from "@/chat/ipc";
 import { useChatStore } from "@/chat/chat-store";
+import { workingRolesSummary } from "@/chat/role-status-view";
 import { ChatHeader } from "@/shell/ChatHeader";
 import { Composer } from "@/shell/Composer";
 import { ConfirmCard } from "@/shell/ConfirmCard";
@@ -39,6 +40,16 @@ export default function App() {
   const selectedRoleId = useUiStore((s) => s.selectedRoleId);
   const hint = useChatStore((s) => s.hint);
   const paneMeta = useChatStore((s) => s.paneMeta);
+  const roleBusy = useChatStore((s) => s.roleBusy);
+  const queueByRole = useChatStore((s) => s.queueByRole);
+  const working = workingRolesSummary(roleBusy, queueByRole);
+  const workingLabel =
+    working.count > 0
+      ? t("ui.sidebar.busyAria", {
+          busy: working.count,
+          queued: working.queued,
+        })
+      : "";
   // A1：历史投影诊断与上下文状态分开；这里只显示投影文本（没有就不显示）。
   const projectionText = selectedRoleId
     ? paneMeta[selectedRoleId]?.projectionText || ""
@@ -108,14 +119,25 @@ export default function App() {
               <main className="col-mid">
                 <button
                   id="sidebar-expand"
-                  className="sidebar-toggle sidebar-expand"
+                  className={
+                    "sidebar-toggle sidebar-expand" +
+                    (working.count > 0 ? " has-working" : "")
+                  }
                   type="button"
-                  aria-label={t("ui.app.expandSidebar")}
-                  title={t("ui.app.expandSidebar")}
+                  aria-label={
+                    workingLabel
+                      ? t("ui.app.expandSidebar") + " · " + workingLabel
+                      : t("ui.app.expandSidebar")
+                  }
+                  title={workingLabel || t("ui.app.expandSidebar")}
                   aria-expanded={!collapsed}
+                  data-working-count={working.count > 0 ? working.count : undefined}
                   hidden={!collapsed}
                   onClick={expandSidebar}
                 >
+                  {working.count > 0 ? (
+                    <span className="sidebar-working-dot" aria-hidden="true" />
+                  ) : null}
                   <PanelLeftOpen
                     size={14}
                     strokeWidth={1.5}

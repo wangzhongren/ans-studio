@@ -131,3 +131,11 @@ Service 为每轮提供一个 ID，归一事件的顶层和 `detail.turnId`，�
 - `GovernanceJudgeFacts.teamPlanSchema?` 由 `1 | 2` 扩展为 `1 | 2 | 3`（`1`=legacy 缺省、`2`=角色粒度/MapReduce v2、`3`=目录级授权 v3）；v3 值可原样进入 judge facts，不伪装成 v2。
 - 可选增 `teamPlanDirectories?: string[]`（v3 授权目录摘要；有界、去重；长度/内容由生产方裁剪；只作 judge 事实摘要，不构成写权、授权或语义结论）。缺失＝应用未提供，不得据此假定 v3。
 - **不变**：物证仍沿用 `artifacts.teamPlanPath`，不新增 artifact kind；`GovernanceStepKind`/`cardKind`/`GovernancePower`/`GovernanceDecisionKind`/`FlowToolStepKind` 值不变；Provider `tools.ts`/`schema.ts` 未改。v3 解析/V-D/V12/布局核对在编排/桌面/测试，本层不复制。证据见 [本次 change 记录](docs/change/2026-10-23_change_directory-ownership.md)。
+
+**会话级后台任务访问面（2026-10-25，桌面展示用；`implemented-unverified`）：** `RoleSession` 新增三个**可选**方法，由 Service 绑定会话提供，只转调该会话已有的同一个 `BackgroundTaskCapability`；不新建管理器、不改变四工具/门禁/模型协议，也不增加任何写权或审核绕过。Service 返回的绑定会话**恒实现**这三个方法（即使没有管理器也返回下面写明的空/失败结果）；旧第三方 `RoleSession` 替身可不实现，消费方应以方法是否存在区分。
+
+- `listBackgroundTasks(): BackgroundTaskSnapshot[]` —— 无管理器（未注入 `ShellGate`、`shellJudge`/`governanceJudge` 判断会话）或会话已关闭（含 `dispose()` 开始后）返回 `[]`；否则返回当前保留任务的快照数组。
+- `readBackgroundTask(taskId: string, options?: BackgroundTaskReadOptions): BackgroundTaskReadResult | undefined` —— 同上条件或 taskId 未知/已过期时返回 `undefined`；否则沿用管理器 `read` 语义（默认 both / 40 行，上限 200，`tailClamped` 如实，UTF-8 安全截断）。
+- `stopBackgroundTask(taskId: string, options?: BackgroundTaskStopOptions): Promise<BackgroundTaskStopResult>` —— 无管理器或会话已关闭时**不抛异常**，返回 `{ ok:false, reason:"closed", message:… }`；未知 taskId 交给管理器返回 `unknown-task`；已知任务沿用管理器停止语义（观察到 `close` 才 `stopped`；`alreadyEnded`、`kill-timeout` 如实）。
+
+生命周期与展示约束：管理器与四工具是同一实例（`providerFor` 创建），`dispose()` 统一终止并失效；这三个方法在 dispose 后**不重新创建**管理器。任务表/日志/pid 只在内存、只存在于会话生命周期内；应用重启或会话关闭后 `list` 为空、旧任务号只返回「未知任务」。返回快照是只读副本；桌面不得把 `kill-timeout` 或 `unknown-task` 显示成「已停止」。证据见 [本次 change 记录](docs/change/2026-10-25_change_background-task-session-access.md)。

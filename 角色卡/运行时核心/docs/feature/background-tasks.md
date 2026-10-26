@@ -3,7 +3,7 @@ id: background-tasks
 type: feature
 title: 会话级后台任务：启动开发服务器后立即把回合还给模型
 created: "2026-10-22"
-updated: "2026-10-22"
+updated: "2026-10-25"
 timezone: Asia/Shanghai
 status: implemented-unverified
 related: [background-tasks-acceptance]
@@ -11,6 +11,9 @@ events:
   - date: "2026-10-22"
     kind: implemented
     summary: 按客户确认的 B1–B4 实施四工具、会话级管理器、同源审核与诊断；新增测试与类型检查通过，独立验收未进行
+  - date: "2026-10-25"
+    kind: implemented
+    summary: 绑定会话新增 list/read/stop 三个后台任务访问方法（桌面展示用），只转调同一管理器；新增测试通过，独立验收未进行
 ---
 
 # 会话级后台任务：启动开发服务器后立即把回合还给模型
@@ -72,6 +75,18 @@ flowchart TD
 
 **显示规则**：`start_background_task` 使用 `core-command-v1`（和 `run_shell` 一样把命令作为展示目标、走同一套凭据脱敏）；`list/read/stop` 使用 `none`。
 
+## 会话访问面（桌面任务面板，2026-10-25）
+
+桌面应用展示后台任务时，不必也不应绕到模型工具面。绑定会话（`RoleSession`）新增三个可选方法，直接转调**当前会话同一个**后台任务管理器：
+
+| 方法 | 有管理器 | 无管理器 / 会话已关闭 |
+| --- | --- | --- |
+| `listBackgroundTasks()` | 当前保留任务的快照数组（运行中/已结束都列出） | `[]` |
+| `readBackgroundTask(taskId, options?)` | 与管理器 `read` 同语义：默认 both / 40 行、上限 200、`tailClamped` 如实、UTF-8 安全截断 | `undefined`（未知/已过期 taskId 也是 `undefined`） |
+| `stopBackgroundTask(taskId, options?)` | 已有任务沿用管理器语义：观察到 `close` 才 `stopped`；已结束返回 `alreadyEnded:true`；预算内未收口返回 `kill-timeout`；未知 taskId 返回 `unknown-task` | `{ ok:false, reason:"closed", message:… }`，**不抛异常、不伪造“已停止”** |
+
+这些方法只读/受控，不新增写权、不绕过审核，也不改变四个模型工具的行为。管理器仍由 `providerFor` 在「普通受治理会话 + `ShellGate`」时创建一次；`dispose()` 统一终止任务并让管理器失效。`dispose()` 开始后调用这三个方法会立即得到关闭语义（空/未找到/失败），且**不会重新创建**管理器。任务表、日志、pid 都只在内存，因此任务只存在于会话生命周期内；应用重启或会话关闭后旧任务号只会返回「未知任务」。桌面展示必须如实区分 `kill-timeout`（可能仍在运行）与 `stopped`（观察到真实退出），不能把前者写成已停止。
+
 ## 管理器行为（当前上限与预算）
 
 - 状态只由真实事件驱动：`running` → `exited`（自然退出）/ `stopped`（stop/dispose 终止并观察到 close）/ `failed`（启动后运行错误）/ `kill-timeout`（终止预算内未观察到 close）。启动失败**不产生任务**。
@@ -95,7 +110,7 @@ flowchart TD
 3. **应用直接退出可能残留进程**：正常关闭/淘汰会话会 dispose 清理；应用崩溃、被强杀、断电或桌面退出流程不逐个 dispose 会话时，后台进程可能存活。Windows 上 `taskkill` 不可用时只回退终止直接子进程，孙进程可能残留；POSIX 上程序自行 `setsid`/双 fork 也可能逃出清理。
 4. **轮次结束/停止本轮不杀后台任务**：这是功能本身；停止只由显式 `stop_background_task` 或会话 `dispose` 触发。
 5. **后台任务不受 10 分钟命令级时限约束**：这正是功能目的；以并发上限、显式停止和会话清理控制风险。
-6. 应用退出兜底（O5）、桌面任务面板（O1）、日志落盘（O2）、增量读取（O3）、审核卡标注后台任务（O4）均**未获授权、未实施**。
+6. 应用退出兜底（O5）、日志落盘（O2）、增量读取（O3）、审核卡标注后台任务（O4）均**未获授权、未实施**。桌面任务面板 UI（O1）本身也**未实施**；2026-10-25 只在绑定会话上提供了供桌面消费的 `list/read/stop` 访问面（见上节），Pipeline/桌面接线仍待各自属主。
 7. **`bindRole` 失败后的同 adapter 重试（已知边缘，未修复）**：失败路径当前只释放后台任务管理器、未清除 provider 缓存；同一 adapter 对同一角色重试会复用已关闭的管理器，四个工具仍注册但 `start_background_task` 一律 fail-closed「会话已关闭，未启动」。每次新建 adapter 的正常入口（如 `openRoleSession`）不受影响。后续建议在失败 catch 中删除 provider 缓存并补重试测试。
 
 ## 从哪里继续看
@@ -103,7 +118,8 @@ flowchart TD
 - 设计与取舍（项目管理，权威）：[后台任务设计](../../../项目管理/docs/design/2026-10-22_design_background-tasks.md)
 - 独立验收标准 A1：[验收标准](../../../独立验收/docs/design/2026-10-22_design_background-tasks-acceptance.md)
 - 本次实施记录（改动路径、验证命令与结果、偏差）：[change 记录](../change/2026-10-22_change_background-tasks.md)
-- 代码入口：`src/provider/runtime/tools.ts`（四工具与注册条件）、`src/provider/runtime/schema.ts`（schema 与说明）、`src/common/runtime-core/background-tasks.ts`（管理器）、`src/common/runtime-core/process-tree.ts`（进程树终止单一实现）、`src/service/runtime/session.ts`（创建/注入/释放）。
+- 会话访问面（桌面展示）改动与验证：[change 记录](../change/2026-10-25_change_background-task-session-access.md)
+- 代码入口：`src/provider/runtime/tools.ts`（四工具与注册条件）、`src/provider/runtime/schema.ts`（schema 与说明）、`src/common/runtime-core/background-tasks.ts`（管理器）、`src/common/runtime-core/process-tree.ts`（进程树终止单一实现）、`src/service/runtime/session.ts`（创建/注入/释放与会话访问方法）。
 
 ## 演变历史
 
@@ -111,3 +127,4 @@ flowchart TD
 | --- | --- | --- | --- | --- |
 | 2026-10-22 | design | draft（客户已确认实施 B1–B4） | 项目管理产出后台任务方案；su 审核后派发运行时核心实施必需项 | [设计](../../../项目管理/docs/design/2026-10-22_design_background-tasks.md) |
 | 2026-10-22 | change | implemented-unverified | 四工具、会话级管理器、同源审核、诊断与 Service 接线落地；新增测试与类型检查通过，待独立验收与真实入口联调 | [change](../change/2026-10-22_change_background-tasks.md) |
+| 2026-10-25 | change | implemented-unverified | 绑定会话新增 `listBackgroundTasks` / `readBackgroundTask` / `stopBackgroundTask`；只转调同一管理器，无管理器/关闭后行为明确且不复活；新增 3 例测试通过 | [change](../change/2026-10-25_change_background-task-session-access.md) |

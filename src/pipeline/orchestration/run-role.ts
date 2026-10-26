@@ -20,9 +20,18 @@
 //     每一条路径给出可核对正文/结构；不完整 ⇒ **不发卡**、不发行任何路径，`request_confirmation`
 //     直接返回失败并列出缺正文的路径（`common/编排/confirmed-writes.ts::validateConfirmPreviewCompleteness`）。
 //     非写盘确认（无路径）与选择卡行为不变。
+//   · **Section 1 写入预授权（客户 2026-10-25 规则，原文「写自己角色权限内的路径，直接放行。」）**：
+//     角色会话**没有任务级 writeSet 收窄**（`scope === undefined`）时，其 Section 1 白名单即初始
+//     可写集——内置治理五角色（trio）按注册表 Section 1 条目、项目角色按自己的边界条目（含
+//     `docs/workflow.md` 这类精确文件）；写入直接经 gate 放行，不要求逐路径
+//     `request_confirmation`。判定仍是同一个 resolveWrite：边界外、禁写路径、跨根/逃逸、F6 接受门
+//     与治理门禁（角色卡 appointment-write、`docs/flows/**` schedule-write 等，由 trio gate 包装
+//     先行判定）逐字不变。有任务 writeSet 时保持 F4 收窄（不并入 Section 1）。
+//     见 scopeWithPreauthorizedWrites。
 //   · **例外（客户裁定 2026-10-16）**：内置治理角色（su）的**初始** writeSet 恒含 `docs/su/**`、
 //     `docs/contracts/**`、`docs/skills/**` 与 `docs/mcp/**`（预授权写目录，不经发行器、随会话初始化
-//     计算；见 scopeWithBuiltInPreauthorization）——对其余一切路径以上四条逐字适用。
+//     计算；见 scopeWithPreauthorizedWrites）——对其余一切路径以上四条逐字适用。su 的卡未声明
+//     2026-10-25 预授权规则，故其 Section 1 其余条目仍走确认发行（旧行为逐字不变）。
 // 【已登记的残余漏洞：内容漂移】本机制只保证「**路径**已预览且已确认」；「预览内容 ≠ 写出内容」
 // 关不住（O-A1 内容比对经客户 2026-10-12 裁定不采纳——如实登记，不实现）。
 // 未给 `customerInput` 的会话（无客户通道）保持旧语义：scope 原样传递（可为 undefined = 不收窄）。
@@ -36,9 +45,11 @@
 //
 // scope 可选（客户端裁决）：scope === undefined 表示"没有预先存在的任务"（chat / 一次性无收窄），
 // 此时**不做任务级收窄**，只用角色边界；编排把 undefined 原样传给 resolveWrite，绝不伪造全量 writeSet。
-// （确认制会话例外：其 writeSet 由发行器动态持有，见上。）
+// （确认制会话例外：其 writeSet 由发行器动态持有；其中 Section 1 预授权/旧 su 预授权目录见上。）
 
 import type { GovernanceFunction, ProjectConfig, ResolvedRole } from "../../model/role.ts";
+import type { BoundaryEntry } from "../../model/boundary.ts";
+import { isValidConditionSlug } from "../../model/boundary.ts";
 import type { TaskScope, WriteDecision } from "../../model/decision.ts";
 import { createHash } from "node:crypto";
 import { lstat, readdir, readFile, stat } from "node:fs/promises";
@@ -71,6 +82,7 @@ import type {
   GovernanceCardKind,
   DispatchTaskFn,
   DispatchTaskPayload,
+  RequestAcceptanceFn,
   HandOffIntentFn,
   RequestClarificationFn,
   RoleStatusFn,
@@ -91,6 +103,11 @@ import type {
   DeliverySaveResultV1,
   DeliveryReceiptQueryV1,
   RuntimePersistenceChangeV1,
+  BackgroundTaskSnapshot,
+  BackgroundTaskReadOptions,
+  BackgroundTaskReadResult,
+  BackgroundTaskStopOptions,
+  BackgroundTaskStopResult,
   RuntimeLiveReportDraftV1,
   RuntimeLegacyHistoryEntryV1,
   RuntimeLegacyHistoryProjectionV1,
@@ -198,7 +215,7 @@ import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 // 跨角色共享路径原语（**单一来源** = pm 属主 `src/common/shared/path-primitives.ts`；工程法案 §一.5
 // 消费方名单已含编排；同 `confirmed-writes.ts` 先例）——用于 su 预授权目录的**词法**归属判定：
 // 与 resolveWrite 同源取值规则，不从门禁引擎私有 common 另行导入/复制。
-import { absRel, isAbsoluteAny, isUnderOrEqual, normalizeLexical } from "../../common/shared/path-primitives.ts";
+import { absRel, compareKey, isAbsoluteAny, isUnderOrEqual, normalizeLexical } from "../../common/shared/path-primitives.ts";
 
 /**
  * **适配器能力面**：编排构造、随 `deps.createAdapter(gate, capabilities)` 交给适配器工厂——
@@ -250,6 +267,13 @@ export interface AdapterCapabilities {
   runtime?: RuntimeKind;
   persistSession?: boolean;
   dispatchTask?: DispatchTaskFn;
+  /**
+   * 独立复核请求（`request_acceptance`，2026-10-25 客户要求）：交付/证据/变更包就绪后，由统筹直接
+   * 请应用派 Proof / 验收做独立复核。**只给内置治理角色会话注入**（运行时核心契约：判据在编排/
+   * 桌面注入端，本层按 `builtInGovernance` 收口）；应用实现派发/校验/flow/账本写入，编排只透传。
+   * 未提供 ⇒ 不注入（运行时核心据此不注册工具，结构性 fail-closed）。**请求复核 ≠ 客户批准**。
+   */
+  requestAcceptance?: RequestAcceptanceFn;
   /**
    * W6-A：`hand_off_intent` 能力（四角色评审 §5.1/§5.2）。**只给联络官 Liaison**（能力矩阵
    * `handOffIntent`）；本编排层已在校验/去重/每轮一次/账本成功后才调到这里——本字段是**投递端**
@@ -491,6 +515,19 @@ export interface RoleSessionHandle {
    */
   queueModelNotice?(text: string): void;
   /**
+   * **会话级后台任务访问面（2026-10-25，桌面任务面板）**：与契约
+   * `RoleSession.listBackgroundTasks?` / `readBackgroundTask?` / `stopBackgroundTask?` **同名同签名**，
+   * 原样转发底层会话（`src/model/runtime.ts`；任务表/日志只存在于本会话生命周期，编排不另立一套状态）。
+   *
+   * **三者均为可选方法**（同 `abort?` / `queueModelNotice?` 先例）：底层 `RoleSession` 未实现时，
+   * 句柄上对应属性**保持缺席（undefined）**——**不伪造空实现**（伪造 `[]`/`undefined`/「已停止」会误导
+   * 消费方）；`stopBackgroundTask` 的失败结果（`ok:false`，如 `unknown-task`/`closed`/`timeout`）与抛错
+   * 均**原样返回**，不吞、不改写。`openRoleSession` 返回的句柄是否具备取决于底层会话。
+   */
+  listBackgroundTasks?(): BackgroundTaskSnapshot[];
+  readBackgroundTask?(taskId: string, options?: BackgroundTaskReadOptions): BackgroundTaskReadResult | undefined;
+  stopBackgroundTask?(taskId: string, options?: BackgroundTaskStopOptions): Promise<BackgroundTaskStopResult>;
+  /**
    * 持续的事件流；跨多轮累积。产出 `OrchestrationEvent`（既有 `SessionEvent` + 编排在 `settled` 时
    * 追加的 `handback` 回交事件，设计 §10.8）——**治理角色（su）不自我回交**，故其会话只产出 SessionEvent。
    */
@@ -513,6 +550,9 @@ export async function openRoleSession(
      * **给出** ⇒ 本会话进入**确认制收窄**：编排在此之上包一层「确认 → 发行 writeSet」的发行器
      * （`common/编排/confirmed-writes.ts`），并经 `deps.createAdapter(gate, {customerInput})` 注入适配器
      * ——`request_confirmation`/`request_choice` 两工具据此注册（「注入才注册」）。
+     * **Section 1 预授权（2026-10-25 客户规则）**：无任务 scope 收窄时，Section 1 内写入直接放行
+     * （trio 五角色与项目角色；旧 su 保留四棵预授权目录），不需要逐路径确认；边界外/F4 收窄/
+     * 治理门禁照旧。发行器仍存在，用于其余既有确认流程。
      * **缺省** ⇒ 无客户通道：工具不注册、scope 原样传递（旧语义，逐字不变）。
      */
     customerInput?: CustomerInputFn;
@@ -531,6 +571,15 @@ export async function openRoleSession(
      * `common/编排/handback.ts::isDispatchableRoleId`（单一来源）；**派发 ≠ 授权**。
      */
     dispatchTask?: DispatchTaskFn;
+    /**
+     * **独立复核请求能力（`request_acceptance`「注入才注册」，2026-10-25 客户要求）**：前端（桌面
+     * 窗口）提供的实现——交付/证据/变更包就绪后，统筹直接请应用派 Proof / 验收做独立复核；派发、
+     * 验收标准/变更包/风险档/流程完整性校验与 flow/账本写入全部由该能力实现。**只对内置治理角色
+     * 会话转交**（项目角色即便调用方误给也不注入，工具不注册）；未给出 ⇒ 不注入（结构性 fail-closed）。
+     * 形状单一来源＝契约家 `model/runtime.ts`（`RequestAcceptanceFn`/`RequestAcceptanceResult`）。
+     * **请求复核 ≠ 客户决定，不代表客户批准**（工具层原样转达回执）。
+     */
+    requestAcceptance?: RequestAcceptanceFn;
     /**
      * **W6-A 意图交接的投递能力（`hand_off_intent`「注入才注册」）**：前端（桌面窗口）提供的实现——
      * 校验通过后把**一条**任务投给 Rapporteur（后台开/发、不打开/不切换、系统行、写
@@ -674,22 +723,40 @@ export async function openRoleSession(
       : setup.role.boundary;
   const cap = builtInGovernance ? governanceCapabilitiesOf(setup.role.id) : undefined;
   // 预授权目录（评审 §5.6）：trio 按注册表；su 用既有四棵；项目角色没有预授权。
+  // 2026-10-25 起 trio 的写盘预授权改由 **Section 1 条目**给出（含 `docs/workflow.md` 这类精确文件；
+  // 见下方 section1PreauthorizedEntries），本表只保留 su 的四棵与 artifact 观察目录用途。
   const preauthorizedDirs: readonly string[] = builtInGovernance
     ? trioSpec?.preauthorizedDirs ??
       (setup.role.id === "su" ? LEGACY_SU_PREAUTHORIZED_DIRS : [])
     : [];
 
-  // gate（A-3）：有 `customerInput` ⇒ 确认制动态 writeSet（发行器追加；内置治理角色的初始集额外含
-  // 预授权写目录）；无 ⇒ 原样传 input.scope（可为 undefined = 不收窄，旧语义逐字不变）。
+  // gate（A-3）：有 `customerInput` ⇒ 确认制动态 writeSet（发行器追加；Section 1 预授权/内置 su 预授权
+  // 目录并入初始集）；无 ⇒ 原样传 input.scope（可为 undefined = 不收窄，旧语义逐字不变）。
   // W6-A（四角色评审 §4.4）：**能力矩阵收窄**——Liaison 的 `customerInput=false`，即便调用方误给
   // 通道也不进入确认制（`request_confirmation`/`request_choice` 结构性不注册；走静态边界/预授权）。
-  // 项目角色（cap undefined）与 su/其余 trio 角色（cap.customerInput=true）行为逐字不变。
   const confirmationMode =
     input.customerInput !== undefined && (cap === undefined || cap.customerInput);
   const issued = new Set<string>();
   const conditions = conditionSlugsOf(setup.role.boundary);
   const gateCtx = { skillRoot: input.project.skillRoot, projectRoot: input.project.projectRoot };
   const staticScope = input.scope;
+
+  // **Section 1 写入预授权（客户 2026-10-25 规则）**——初始可写集覆盖角色 Section 1 白名单：
+  //   · 无任务级 writeSet 收窄（`scope === undefined`，桌面聊天即此形态）：trio 五角色与项目角色
+  //     都按各自 Section 1 条目预授权（含精确文件条目，如 Convener 的 `docs/workflow.md`，它不在
+  //     `preauthorizedDirs` 目录清单内）。
+  //   · 有任务 writeSet / 治理 scope 时：保持 F4 收窄，**不**把 Section 1 并入（不扩大）；trio 的既有
+  //     `preauthorizedDirs` 子集照旧并入（2026-10-16 起的既有预授权，行为不变）。
+  //   · 旧 su（single）：卡未声明该规则，保留 `preauthorizedDirs` 四棵（A-3 确认制逐字不变）。
+  // 预授权只影响 F4：边界匹配、F6 接受门、F7 逃逸复核、forbiddenWritePaths 与三权治理门禁全部先行/
+  // 照旧；`request_confirmation` 仍可为边界内路径发行（无副作用），治理敏感写入仍按既有规则确认。
+  const section1PreauthorizedEntries: readonly BoundaryEntry[] =
+    !(builtInGovernance && !isTrio) && staticScope === undefined ? setup.role.boundary.entries : [];
+  const preauthorization: PreauthorizedWriteSources = {
+    entries: section1PreauthorizedEntries,
+    dirs: builtInGovernance ? preauthorizedDirs : [],
+  };
+  const hasPreauthorization = preauthorization.entries.length > 0 || preauthorization.dirs.length > 0;
 
   // 账本快照（评审 §5.7）：open 时读一次；每次 send 前刷新；客户决定后**同步更新内存快照**并异步落盘。
   // `local` 保存本会话已作出但可能尚未落盘的决定，刷新时按签名去重合并——避免「刷新读到旧盘面」把
@@ -709,27 +776,31 @@ export async function openRoleSession(
   };
   if (isTrio) await refreshLedger();
 
+  // 确认制的初始动态集：**任务级 writeSet（若声明）∪ 已发行集**。任务 writeSet 即「收窄」本身
+  // （客户 2026-10-25 规则只把**无任务收窄**时的 Section 1 全量并入预授权，不会扩大任务写集）；
+  // 旧 su（single）不并入静态 scope（A-3 逐字不变——其写权只来自确认发行与四棵预授权目录）。
+  const confinedWriteSet: readonly string[] =
+    builtInGovernance && !isTrio ? [] : (staticScope?.writeSet ?? []);
+
   const baseGate: WriteGate = confirmationMode
     ? (p) =>
         resolveWrite(
           p,
           setup.role.boundary,
-          preauthorizedDirs.length > 0
-            ? scopeWithBuiltInPreauthorization(
-                { writeSet: [...issued], conditions },
-                p,
-                input.project.projectRoot,
-                preauthorizedDirs,
-              )
-            : { writeSet: [...issued], conditions },
+          scopeWithPreauthorizedWrites(
+            { writeSet: [...confinedWriteSet, ...issued], conditions },
+            p,
+            input.project.projectRoot,
+            preauthorization,
+          ),
           gateCtx,
         )
-    : preauthorizedDirs.length > 0 && staticScope !== undefined
+    : hasPreauthorization && staticScope !== undefined
       ? (p) =>
           resolveWrite(
             p,
             setup.role.boundary,
-            scopeWithBuiltInPreauthorization(staticScope, p, input.project.projectRoot, preauthorizedDirs),
+            scopeWithPreauthorizedWrites(staticScope, p, input.project.projectRoot, preauthorization),
             gateCtx,
           )
       : buildGate(setup.role, input.project, input.scope);
@@ -1258,6 +1329,12 @@ export async function openRoleSession(
   const sessionTail = cap?.sessionTail === true ? input.sessionTail : undefined;
   const proposeRecovery = cap?.proposeRecovery === true ? input.proposeRecovery : undefined;
 
+  // 2026-10-25 独立复核请求（request_acceptance）：只给内置治理角色会话注入；项目角色即便调用方
+  // 误给也不注入（工具不注册）。判据放在编排注入端（运行时核心只声明能力位名；不硬编码角色 id）；
+  // 未提供 ⇒ 不注入（能力缺席 = 最强 fail-closed，同 dispatch_task 先例）。
+  const requestAcceptance: RequestAcceptanceFn | undefined =
+    builtInGovernance && input.requestAcceptance !== undefined ? input.requestAcceptance : undefined;
+
   // G-4 技能安装/卸载两能力（I1/I2）：能力矩阵驱动——仅 `capabilities.installSkill`
   // （trio=Nominator；su 旧行为）。字段名**逐字**＝契约家能力名（错一名 ⇒ 工具静默零注册）。
   const installSkill = cap?.installSkill === true ? input.installSkill : undefined;
@@ -1350,6 +1427,7 @@ export async function openRoleSession(
     ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
     ...(input.persistSession !== undefined ? { persistSession: input.persistSession } : {}),
     ...(dispatchTask !== undefined ? { dispatchTask } : {}),
+    ...(requestAcceptance !== undefined ? { requestAcceptance } : {}),
     ...(handOffIntent !== undefined ? { handOffIntent } : {}),
     ...(requestClarification !== undefined ? { requestClarification } : {}),
     ...(roleStatus !== undefined ? { roleStatus } : {}),
@@ -1598,6 +1676,29 @@ export async function openRoleSession(
       pendingModelNotice = text;
       log.record("session.notice.queued");
     },
+    // 会话级后台任务访问面（2026-10-25，桌面任务面板）：**纯透传**底层 RoleSession 的三个可选方法。
+    // 底层缺席 ⇒ 句柄属性缺席（条件展开，不伪造空实现——空数组/undefined/「已停止」都会误导消费方）。
+    // stop 的结果与异常**原样返回**（不 catch、不改写 ok:false 的 reason/message）。不在此处另存任务状态，
+    // 会话生命周期后的行为由底层实现回答（Service 实现在 dispose 后返回 []/undefined/closed）。
+    ...(session.listBackgroundTasks !== undefined
+      ? { listBackgroundTasks: (): BackgroundTaskSnapshot[] => session.listBackgroundTasks!() }
+      : {}),
+    ...(session.readBackgroundTask !== undefined
+      ? {
+          readBackgroundTask: (
+            taskId: string,
+            readOptions?: BackgroundTaskReadOptions
+          ): BackgroundTaskReadResult | undefined => session.readBackgroundTask!(taskId, readOptions),
+        }
+      : {}),
+    ...(session.stopBackgroundTask !== undefined
+      ? {
+          stopBackgroundTask: (
+            taskId: string,
+            stopOptions?: BackgroundTaskStopOptions
+          ): Promise<BackgroundTaskStopResult> => session.stopBackgroundTask!(taskId, stopOptions),
+        }
+      : {}),
     events(): AsyncIterable<OrchestrationEvent> {
       const stream = session.events();
       const wrapped = suppressHandback
@@ -1743,22 +1844,30 @@ function buildGate(
 }
 
 /**
- * **内置角色预授权写目录**（评审 §5.2/§5.6）——会话**初始 writeSet 恒含**的「项目根相对、含子路径」
- * 目录树：
- *   · trio：注册表 `preauthorizedDirs`（Rapporteur `docs/proposals|contracts|governance/rapporteur`；
- *     Nominator `docs/nominations|skills|mcp|governance/nominator`；Convener `docs/flows|governance/convener`）；
- *   · su（single）：既有四棵 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp`（客户裁定 2026-10-16；
- *     单一来源改为门禁引擎 `LEGACY_SU_PREAUTHORIZED_DIRS`，本文件不再另写一份）；
- *   · 项目角色：无预授权。
+ * **会话初始预授权的路径来源**——「初始 writeSet 恒含」的写权，不经确认发行器：
+ *   · `entries`：角色 Section 1 条目（2026-10-25 客户规则「写自己角色权限内的路径，直接放行」）：
+ *     trio 五角色与项目角色在**无任务级 writeSet 收窄**时使用（含精确文件条目，如 Convener 的
+ *     `docs/workflow.md`）；有任务 scope 时保持 F4 收窄，不并入。
+ *   · `dirs`：内置治理角色的既有预授权目录——trio 注册表 `preauthorizedDirs`（2026-10-16 起；目录
+ *     子集，有/无任务 scope 都生效）与旧 su（single）四棵 `docs/su`、`docs/contracts`、`docs/skills`、
+ *     `docs/mcp`（客户裁定 2026-10-16；单一来源 `LEGACY_SU_PREAUTHORIZED_DIRS`），行为逐字保留。
  *
  * 语义与边界（钉死）：
  * - 它是**初始集合的一部分**——不依赖确认发行器；每次开会话/会话重建都生效。
  * - 实现口径（F4 为**精确匹配**）：求值时把「目标路径本身」的项目根相对词法路径并入本次 writeSet
  *   ——等价于该路径初始就在已发行集中。判定链其余环节（F6 接受门、F7 真实路径逃逸复核、边界条目
- *   匹配、条件激活）**逐字不变**：不在边界内/未接受/逃逸的路径照拒，fail-closed 不放松。
+ *   匹配、条件激活、forbiddenWritePaths 与 trio 三道治理门禁）**逐字不变**：不在边界内/未接受/逃逸/
+ *   治理门禁未放行的路径照拒，fail-closed 不放松。
  * - 其余一切路径照旧只认已发行集：未确认 = F4 拒。
- * 背景：`角色卡/编排/docs/fix/2026-10-16_fix_su-notes-preauth.md` 与 G-4 两批变更记录。
+ * 背景：`角色卡/编排/docs/fix/2026-10-16_fix_su-notes-preauth.md`、G-4 两批变更记录与
+ * 2026-10-25 客户写入预授权规则。
  */
+interface PreauthorizedWriteSources {
+  /** Section 1 条目（仅 `root === "project"` 可经 writeSet 表达；见 section1EntryCovers）。 */
+  entries: readonly BoundaryEntry[];
+  /** 旧 su 预授权目录树（项目根相对、含子路径；按段比较）。 */
+  dirs: readonly string[];
+}
 
 /** 目标路径 → **项目根相对词法路径**（取值规则与 resolveWrite 同源）；空/根外 → undefined。 */
 function projectRelativeLexical(targetPath: string, projectRoot: string): string | undefined {
@@ -1770,31 +1879,51 @@ function projectRelativeLexical(targetPath: string, projectRoot: string): string
 }
 
 /**
- * 目标路径落在预授权目录树内 → 返回其项目根相对词法路径；否则 `undefined`。
- * `isUnderOrEqual` 按**段**比较（`docs/mcp2` 不被 `docs/mcp` 覆盖），大小写口径沿用共享原语。
+ * Section 1 条目是否覆盖项目根相对路径 `rel`——与 `resolveWrite` 的 `pathCovers`/`isActive` 同口径：
+ * `file` 精确匹配；`directory` 按**段**前缀（`docs/mcp2` 不被 `docs/mcp` 覆盖）；`conditional-directory`
+ * 还须其 slug 出现在本次 scope 的 `conditions` 中（缺 slug/非法 slug ⇒ 不激活，fail-closed）。
+ * 只处理 `root === "project"` 条目：writeSet 契约为项目根相对路径，skill 根条目无法经此表达（当前
+ * 可写角色边界均以项目根条目给出；skill 根条目只出现在未接受的内置回退边界）。
+ */
+function section1EntryCovers(e: BoundaryEntry, rel: string, conditions: readonly string[]): boolean {
+  if (e.root !== "project") return false;
+  if (e.kind === "conditional-directory") {
+    const slug = e.condition;
+    if (!isValidConditionSlug(slug) || !conditions.includes(slug)) return false;
+  }
+  const entryPath = normalizeLexical(e.path);
+  if (e.kind === "file") return compareKey(entryPath) === compareKey(rel);
+  return isUnderOrEqual(rel, entryPath);
+}
+
+/**
+ * 目标路径落在预授权来源内 → 返回其项目根相对词法路径；否则 `undefined`。
+ * 目录树按**段**比较（`docs/mcp2` 不被 `docs/mcp` 覆盖），大小写口径沿用共享原语。
  */
 function preauthorizedRelOf(
   targetPath: string,
   projectRoot: string,
-  dirs: readonly string[],
+  sources: PreauthorizedWriteSources,
+  conditions: readonly string[],
 ): string | undefined {
   const rel = projectRelativeLexical(targetPath, projectRoot);
   if (rel === undefined) return undefined;
-  return dirs.some((dir) => isUnderOrEqual(rel, dir)) ? rel : undefined;
+  if (sources.dirs.some((dir) => isUnderOrEqual(rel, dir))) return rel;
+  return sources.entries.some((e) => section1EntryCovers(e, rel, conditions)) ? rel : undefined;
 }
 
 /**
- * 内置角色会话 gate 求值入口：目标在预授权树内 ⇒ 把其项目根相对路径**并入本次 writeSet**（不经发行器）；
+ * 会话 gate 求值入口：目标在预授权来源内 ⇒ 把其项目根相对路径**并入本次 writeSet**（不经发行器）；
  * 其余 ⇒ **原样返回 base**（零行为变化）。base 由调用方保证非 undefined（确认制动态集或静态 scope）；
- * `scope === undefined` 的「不做任务收窄」会话**不经过本函数**。
+ * `scope === undefined` 且无预授权的「不做任务收窄」会话**不经过本函数**。
  */
-function scopeWithBuiltInPreauthorization(
+function scopeWithPreauthorizedWrites(
   base: TaskScope,
   targetPath: string,
   projectRoot: string,
-  dirs: readonly string[],
+  sources: PreauthorizedWriteSources,
 ): TaskScope {
-  const rel = preauthorizedRelOf(targetPath, projectRoot, dirs);
+  const rel = preauthorizedRelOf(targetPath, projectRoot, sources, base.conditions);
   if (rel === undefined) return base;
   return { writeSet: [...base.writeSet, rel], conditions: base.conditions };
 }
@@ -2462,7 +2591,39 @@ async function recordCustomerDecision(args: {
   ) {
     return;
   }
-  const classification = classifyCustomerDecision(cardKind, args.out);
+  // 2026-10-25 桌面「写入预授权」前闸（`operatorId = system:write-preauthorization`）：边界内写确认由
+  // 系统直接放行、边界外直接拒绝——两条都**不是客户决定**，也不是 judge 代批。
+  //   · 接受：写一条审计账本（`decisionEvidence.kind:"system-preauthorization"` + operatorId），但
+  //     **不写 `decisionKind`**（门禁键；`latestAcceptanceDecision` 等收口门只认客户决定），不派生
+  //     客户选择（不伪造客户手批）；`customerDecision` 只记结算结果 `"accepted"`。
+  //   · 拒绝：**不写 `customer.decision`**（不写 unclassified/none 污染账本、不挡收尾门），只记诊断。
+  // 判定只认 `system:` 前缀：真实客户（`operation-…`/`cli`）与 `judge:<engine>` 路径逐字不变。
+  const systemOperatorId =
+    args.out !== null &&
+    args.out !== undefined &&
+    args.out.outcome !== "unavailable" &&
+    typeof args.out.operatorId === "string" &&
+    args.out.operatorId.startsWith("system:")
+      ? args.out.operatorId
+      : undefined;
+  if (systemOperatorId !== undefined) {
+    // 系统预授权只结算写盘确认的放行（answered + confirmed:true）；其余形状不写账本。
+    if (args.out?.outcome !== "answered" || args.out.value.confirmed !== true) {
+      if (args.out?.outcome === "declined") {
+        args.log.record("governance.preauthorization.declined", {
+          authorizationSource: systemOperatorId,
+          reasonCode: "system-preauthorization",
+          count: args.issuedPaths.length,
+          toolCallId: args.metadata?.toolCallId,
+        });
+      }
+      return;
+    }
+  }
+  // 系统预授权接受不采信客户分类（不派生 decisionKind/targetRoleIds）：只记结算结果 accepted。
+  const classification = systemOperatorId !== undefined
+    ? { customerDecision: "accepted" as const }
+    : classifyCustomerDecision(cardKind, args.out);
   if (classification === undefined) return;
 
   const stepId = args.req.stepId ?? args.metadata?.stepId;
@@ -2477,9 +2638,10 @@ async function recordCustomerDecision(args: {
       expectedGroup: derivedGroup,
     });
   }
-  const evidence: GovernanceLedgerEntry["decisionEvidence"] = judge !== undefined
+  const evidence: GovernanceLedgerEntry["decisionEvidence"] = systemOperatorId !== undefined
     ? {
-        kind: "judge",
+        kind: "system-preauthorization",
+        operatorId: systemOperatorId,
         ...(typeof args.metadata?.toolCallId === "string" && args.metadata.toolCallId !== ""
           ? { toolCallId: args.metadata.toolCallId }
           : {}),
@@ -2489,20 +2651,33 @@ async function recordCustomerDecision(args: {
         ...(typeof args.sessionId === "string" && args.sessionId !== ""
           ? { sessionId: args.sessionId }
           : {}),
-        judge: boundedGovernanceJudgeAudit(judge),
       }
-    : {
-        kind: "customer-input",
-        ...(typeof args.metadata?.toolCallId === "string" && args.metadata.toolCallId !== ""
-          ? { toolCallId: args.metadata.toolCallId }
-          : {}),
-        ...(typeof args.metadata?.turnId === "string" && args.metadata.turnId !== ""
-          ? { turnId: args.metadata.turnId }
-          : {}),
-        ...(typeof args.sessionId === "string" && args.sessionId !== ""
-          ? { sessionId: args.sessionId }
-          : {}),
-      };
+    : judge !== undefined
+      ? {
+          kind: "judge",
+          ...(typeof args.metadata?.toolCallId === "string" && args.metadata.toolCallId !== ""
+            ? { toolCallId: args.metadata.toolCallId }
+            : {}),
+          ...(typeof args.metadata?.turnId === "string" && args.metadata.turnId !== ""
+            ? { turnId: args.metadata.turnId }
+            : {}),
+          ...(typeof args.sessionId === "string" && args.sessionId !== ""
+            ? { sessionId: args.sessionId }
+            : {}),
+          judge: boundedGovernanceJudgeAudit(judge),
+        }
+      : {
+          kind: "customer-input",
+          ...(typeof args.metadata?.toolCallId === "string" && args.metadata.toolCallId !== ""
+            ? { toolCallId: args.metadata.toolCallId }
+            : {}),
+          ...(typeof args.metadata?.turnId === "string" && args.metadata.turnId !== ""
+            ? { turnId: args.metadata.turnId }
+            : {}),
+          ...(typeof args.sessionId === "string" && args.sessionId !== ""
+            ? { sessionId: args.sessionId }
+            : {}),
+        };
   const entry: GovernanceLedgerEntry = {
     at: new Date().toISOString(),
     kind: "customer.decision",
@@ -3160,6 +3335,9 @@ export function createRuntimeAdapterFactory(
     customerInput: capabilities?.customerInput,
     reportHandback: capabilities?.reportHandback,
     dispatchTask: capabilities?.dispatchTask,
+    // 2026-10-25 独立复核请求（request_acceptance）：运行时核心 `GovernedToolsOptions` 同名能力位
+    // （形状同源 `model/runtime.ts`）；`undefined` ⇒ 工具不注册（同 dispatch_task 先例）。
+    requestAcceptance: capabilities?.requestAcceptance,
     // W6-A：意图交接/澄清两能力并入适配器选项——**契约字段名** `handOffIntent` /
     // `requestClarification`（运行时核心 `GovernedToolsOptions` 同名能力位，形状同源
     // `model/runtime.ts`）；`undefined` ⇒ 对应工具不注册（最弱接触面，同 dispatch_task 先例）。

@@ -1170,6 +1170,12 @@ export interface AdapterOptions {
   scriptForRole?: (ctx: ScriptContext) => ToolCall[];
   onPrompt?: (ctx: ScriptContext) => void | Promise<void>;
   onResult?: (record: ToolResultRecord) => void;
+  /**
+   * 2026-10-25 验收分诊/独立复核 e2e（本角色新增，**默认 false ⇒ 既有用例工具面逐字不变**）：
+   * 把编排透传的 `caps.requestAcceptance` 原样转交 `buildGovernedTools`——脚本角色才能调用
+   * `request_acceptance`。未开启时该工具不注册（与产品「未注入即不注册」同口径）。
+   */
+  forwardRequestAcceptance?: boolean;
 }
 
 function createEventQueue<T>(): { push(value: T): void; close(): void; stream: AsyncIterable<T> } {
@@ -1239,6 +1245,10 @@ export function scriptedAdapterFactory(options: AdapterOptions): (gate: WriteGat
           ...(caps?.flowGet !== undefined ? { flowGet: caps.flowGet } : {}),
           ...(caps?.flowStepUpdate !== undefined ? { flowStepUpdate: caps.flowStepUpdate } : {}),
           ...(caps?.flowStepSupersede !== undefined ? { flowStepSupersede: caps.flowStepSupersede } : {}),
+          // 2026-10-25 request_acceptance e2e（opt-in）：仅显式开启时透传，既有用例零变化。
+          ...(options.forwardRequestAcceptance === true && caps?.requestAcceptance !== undefined
+            ? { requestAcceptance: caps.requestAcceptance }
+            : {}),
         });
         const byName = new Map(tools.map((tool) => [tool.name, tool]));
         const queue = createEventQueue<SessionEvent>();
@@ -1524,6 +1534,13 @@ export interface HarnessOptions {
   resolveRuntime?: DesktopDeps["resolveRuntimeFn"];
   /** 注入审计账本追加（缺省真实 `appendGovernanceLedger`；用于「审计失败可见、不伪造」用例）。 */
   appendGovernanceLedger?: DesktopDeps["appendGovernanceLedgerFn"];
+  /**
+   * 2026-10-25 验收分诊 e2e（opt-in，缺省 false ⇒ 既有用例零变化）：把客户交互通道的
+   * `acceptanceTriage` 呈现前闸接到 `desktop.evaluateAcceptanceTriage`（与 `app/main.ts` 同模式，仅接线）。
+   */
+  wireAcceptanceTriage?: boolean;
+  /** 同 `AdapterOptions.forwardRequestAcceptance`（脚本会话可调用 `request_acceptance`；缺省 false）。 */
+  forwardRequestAcceptance?: boolean;
 }
 
 export async function makeHarness(options: HarnessOptions): Promise<Harness> {
@@ -1594,6 +1611,12 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
           },
         }
       : {}),
+    // 2026-10-25 验收分诊（opt-in）：与 `app/main.ts` 同模式只接线；缺省不注册（既有用例零变化）。
+    ...(options.wireAcceptanceTriage === true
+      ? {
+          acceptanceTriage: (facts) => iface!.evaluateAcceptanceTriage(facts),
+        }
+      : {}),
   });
 
   const adapterFactory = scriptedAdapterFactory({
@@ -1604,6 +1627,7 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
     },
     onResult: (record) => results.push(record),
     ...(options.scriptForRole !== undefined ? { scriptForRole: options.scriptForRole } : {}),
+    ...(options.forwardRequestAcceptance === true ? { forwardRequestAcceptance: true } : {}),
   });
 
   // 观测「编排 guardedInput → 原始客户通道」的调用（2026-10-22 守卫验证）：

@@ -33,7 +33,7 @@ import type { ProjectConfig } from "../../src/model/role.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import type { OrchestrationEvent, TaskHandback } from "../../src/common/编排/handback.ts";
 import type { RuntimeAdapter, SessionEvent, WriteGate, CustomerInputFn } from "../../src/provider/pi/session.ts";
-import type { DispatchTaskFn } from "../../src/model/runtime.ts";
+import type { DispatchTaskFn, BackgroundTaskSnapshot, BackgroundTaskReadResult, BackgroundTaskStopResult } from "../../src/model/runtime.ts";
 import type { RoleStatusFn } from "../../src/common/编排/watchdog.ts";
 import type {
   EstablishGovernanceResult,
@@ -7915,4 +7915,267 @@ test("2026-10-23 验收返工路由：routeAcceptanceAutoRework 接线（judge �
     rmSync(customerRoot, { recursive: true, force: true });
     rmSync(acceptedRoot, { recursive: true, force: true });
   }
+});
+
+// —————————————— 会话级后台任务 IPC/Interface（2026-10-25，桌面任务面板 B） ——————————————
+test("后台任务 Interface：参数校验与 read/stop 透传/失败语义（不伪造、不改写成功）", async () => {
+  const task: BackgroundTaskSnapshot = {
+    taskId: "bg-1",
+    state: "running",
+    pid: 7,
+    command: "npm run dev",
+    startedAt: "2026-10-25T00:00:00.000Z",
+    durationMs: 12,
+  };
+  const readResult: BackgroundTaskReadResult = { task, tailLines: 40, tailClamped: false, stdout: { text: "ok", truncated: false } };
+  const stopFailure: BackgroundTaskStopResult = { ok: false, reason: "unknown-task", message: "未知任务「bg-404」" };
+  const reads: string[] = [];
+  const handle: RoleSessionHandle = {
+    async send(): Promise<void> {},
+    events(): AsyncIterable<SessionEvent> {
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            async next(): Promise<IteratorResult<SessionEvent>> {
+              return { value: undefined as unknown as SessionEvent, done: true };
+            },
+          };
+        },
+      };
+    },
+    async dispose(): Promise<void> {},
+    listBackgroundTasks: () => [task],
+    readBackgroundTask: (taskId) => {
+      reads.push(taskId);
+      return taskId === task.taskId ? readResult : undefined;
+    },
+    stopBackgroundTask: async (taskId) => (taskId === task.taskId ? { ok: true, task, alreadyEnded: false } : stopFailure),
+  };
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: () => {},
+    listProjectFn: async () => FAKE_LISTING,
+    openRoleSessionFn: async () => handle,
+    createDemoAdapterFn: (_opts: { gate: WriteGate }) => ({}) as unknown as RuntimeAdapter,
+    buildProjectConfigFn: buildProjectConfig,
+  });
+  await iface.pickProject();
+  await iface.listProject({ projectRoot: "/proj" });
+
+  // 参数校验：缺 projectRoot/runtime/roleId/taskId 或非法值 ⇒ ok:false（不调会话、不抛）。
+  const invalidList = await iface.listBackgroundTasks({ projectRoot: "", runtime: "demo" });
+  assert.equal(invalidList.ok, false);
+  const invalidListRuntime = await iface.listBackgroundTasks({ projectRoot: "/proj", runtime: "bogus" as never });
+  assert.equal(invalidListRuntime.ok, false);
+  const invalidRead = await iface.readBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "A" } as never);
+  assert.equal(invalidRead.ok, false);
+  const invalidReadRole = await iface.readBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "", taskId: "bg-1" });
+  assert.equal(invalidReadRole.ok, false);
+  const invalidStream = await iface.readBackgroundTask({
+    projectRoot: "/proj",
+    runtime: "demo",
+    roleId: "A",
+    taskId: "bg-1",
+    stream: "bad" as never,
+  });
+  assert.equal(invalidStream.ok, false);
+  const invalidStop = await iface.stopBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "A" } as never);
+  assert.equal(invalidStop.ok, false);
+  if (!invalidStop.ok) assert.equal(invalidStop.reason, "unavailable");
+  assert.equal(reads.length, 0, "参数非法不得调用底层会话");
+
+  // 会话打开前：空列表 + unavailable:true（区别于「有会话但没有任务」）。
+  const before = await iface.listBackgroundTasks({ projectRoot: "/proj", runtime: "demo" });
+  assert.ok(before.ok);
+  assert.deepEqual(before.tasks, []);
+  assert.equal(before.unavailable, true);
+
+  const opened = await iface.openSession({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  assert.equal(opened.ok, true, opened.error ?? "");
+
+  const listed = await iface.listBackgroundTasks({ projectRoot: "/proj", runtime: "demo" });
+  assert.ok(listed.ok);
+  assert.deepEqual(listed.tasks, [{ ...task, roleId: "A", runtime: "demo" }], "列表带来源角色/引擎");
+  assert.equal(listed.unavailable, false);
+
+  const read = await iface.readBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "A", taskId: "bg-1" });
+  assert.ok(read.ok);
+  assert.equal(read.result, readResult, "read 结果原样透传");
+  const unknownRead = await iface.readBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "A", taskId: "bg-404" });
+  assert.equal(unknownRead.ok, false, "未知任务如实失败（不伪造任务/日志）");
+
+  const stoppedUnknown = await iface.stopBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "A", taskId: "bg-404" });
+  assert.equal(stoppedUnknown, stopFailure, "底层 unknown-task 原样返回（同一引用）");
+  const stoppedOk = await iface.stopBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "A", taskId: "bg-1" });
+  assert.equal(stoppedOk.ok, true);
+
+  // 未打开的会话 ⇒ 如实失败（不自动建会话）。
+  const missing = await iface.readBackgroundTask({ projectRoot: "/proj", runtime: "demo", roleId: "B", taskId: "bg-1" });
+  assert.equal(missing.ok, false);
+
+  await iface.stopSession({ roleId: null });
+});
+
+test("后台任务 preload/main（2026-10-25）：三个白名单方法与 IPC 通道存在、来源校验且不暴露 Node", () => {
+  const preload = readFileSync(path.join(REPO_ROOT, "app", "preload.cjs"), "utf8");
+  assert.match(preload, /listBackgroundTasks:\s*\(projectRoot,\s*runtime\)\s*=>/);
+  assert.match(preload, /"background-tasks:list"/);
+  assert.match(preload, /readBackgroundTask:\s*\(input\)\s*=>/);
+  assert.match(preload, /"background-tasks:read"/);
+  assert.match(preload, /stopBackgroundTask:\s*\(input\)\s*=>/);
+  assert.match(preload, /"background-tasks:stop"/);
+  assert.doesNotMatch(preload, /require\(["'](?:node:)?fs["']\)/);
+  assert.doesNotMatch(preload, /require\(["']node:(?:path|child_process|process)["']\)/);
+
+  const main = readFileSync(path.join(REPO_ROOT, "app", "main.ts"), "utf8");
+  for (const channel of ["background-tasks:list", "background-tasks:read", "background-tasks:stop"]) {
+    const idx = main.indexOf(`registerHandler("${channel}"`);
+    assert.notEqual(idx, -1, `main.ts 应注册 ${channel}`);
+    assert.match(main.slice(idx, idx + 400), /event\.sender !== win\.webContents/, `${channel} 必须有来源校验`);
+  }
+});
+
+// —————————————— 2026-10-25：流程状态只读 IPC（flow:status） ——————————————
+
+/** 一个完整流程：覆盖 done/delivered/dispatched/pending/superseded/failed/blocked 七种计数键。 */
+const FLOW_STATUS_GOOD_YAML = `flowId: alpha-flow
+version: 1
+qualityTier: production
+steps:
+  - id: impl
+    title: 实现
+    owner: dev
+    kind: dispatch
+    status: done
+    evidence: { kind: dispatch, ref: impl }
+  - id: impl-evidence
+    title: 实施证据
+    owner: dev
+    kind: artifact
+    status: delivered
+  - id: review
+    title: 复核
+    owner: reviewer
+    kind: dispatch
+    status: dispatched
+  - id: verification
+    title: 验收
+    owner: verifier
+    kind: acceptance
+    status: pending
+  - id: old-work
+    title: 旧工作
+    owner: dev
+    kind: dispatch
+    status: superseded
+  - id: broken
+    title: 失败工作
+    owner: dev
+    kind: dispatch
+    status: failed
+  - id: blocked-work
+    title: 阻塞工作
+    owner: dev
+    kind: dispatch
+    status: blocked
+`;
+
+test("flowStatus：解析 docs/flows/*.yaml 的 steps/counts/current，坏文件进 errors 且不影响其他文件", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "ans-flow-status-"));
+  try {
+    const flowsDir = path.join(root, "docs", "flows");
+    mkdirSync(flowsDir, { recursive: true });
+    const goodPath = path.join(flowsDir, "alpha-flow.yaml");
+    const badPath = path.join(flowsDir, "broken-flow.yaml");
+    writeFileSync(goodPath, FLOW_STATUS_GOOD_YAML, "utf8");
+    // 坏 YAML：语法不完整，parseFlowStateYaml 必然失败。
+    writeFileSync(badPath, "flowId: [unclosed\nversion: 1\n", "utf8");
+    const fixedTime = new Date("2026-01-02T03:04:05.000Z");
+    utimesSync(goodPath, fixedTime, fixedTime);
+    const listedBefore = readdirSync(flowsDir).sort();
+
+    const iface = createDesktopInterface({ pickDirectory: async () => null, emitEvent: () => {} });
+    const reply = await iface.flowStatus(root);
+    assert.equal(reply.ok, true);
+    if (!reply.ok) return;
+
+    // 好文件照常返回；坏文件只在 errors 中，不阻断。
+    assert.equal(reply.flows.length, 1);
+    const flow = reply.flows[0]!;
+    assert.equal(flow.flowId, "alpha-flow");
+    assert.match(flow.revision ?? "", /^[0-9a-f]{64}$/, "revision 为文件内容 sha256");
+    assert.deepEqual(
+      flow.steps.map((step) => step.id),
+      ["impl", "impl-evidence", "review", "verification", "old-work", "broken", "blocked-work"],
+      "步骤按 YAML 顺序原样返回",
+    );
+    assert.deepEqual(flow.steps[0], { id: "impl", title: "实现", kind: "dispatch", owner: "dev", status: "done" });
+    assert.deepEqual(flow.counts, {
+      total: 7,
+      done: 1,
+      delivered: 1,
+      dispatched: 1,
+      pending: 1,
+      failed: 1,
+      blocked: 1,
+      superseded: 1,
+    });
+    assert.deepEqual(flow.current, ["impl-evidence", "review"], "current = dispatched/delivered，按步骤顺序");
+    assert.equal(flow.updatedAt, fixedTime.toISOString(), "updatedAt 取文件 mtime ISO");
+
+    assert.equal(reply.errors.length, 1);
+    assert.equal(reply.errors[0]!.file, "docs/flows/broken-flow.yaml");
+    assert.ok(reply.errors[0]!.error.length > 0, "坏文件错误原文非空");
+
+    // 只读：目录未增删文件、好文件内容不变、未创建 .ans。
+    assert.deepEqual(readdirSync(flowsDir).sort(), listedBefore);
+    assert.equal(readFileSync(goodPath, "utf8"), FLOW_STATUS_GOOD_YAML);
+    assert.equal(existsSync(path.join(root, ".ans")), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("flowStatus：无 docs/flows 目录 ⇒ 空列表不是错误", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "ans-flow-status-empty-"));
+  try {
+    const iface = createDesktopInterface({ pickDirectory: async () => null, emitEvent: () => {} });
+    const reply = await iface.flowStatus(root);
+    assert.deepEqual(reply, { ok: true, flows: [], errors: [] });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("flowStatus：projectRoot 非空且必须是已存在目录，否则 invalidProject 回执", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "ans-flow-status-invalid-"));
+  try {
+    const filePath = path.join(root, "not-a-dir");
+    writeFileSync(filePath, "x", "utf8");
+    const iface = createDesktopInterface({ pickDirectory: async () => null, emitEvent: () => {} });
+    const cases = ["", "   ", path.join(root, "missing-dir"), filePath];
+    for (const projectRoot of cases) {
+      const reply = await iface.flowStatus(projectRoot);
+      assert.equal(reply.ok, false, `非法 projectRoot 应失败：${JSON.stringify(projectRoot)}`);
+      if (!reply.ok) assert.equal(reply.error, mainT("main.flowStatus.invalidProject"));
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("flow 状态 preload/main（2026-10-25）：getFlowStatus 白名单方法与 flow:status 通道存在、来源校验且只传字符串", () => {
+  const preload = readFileSync(path.join(REPO_ROOT, "app", "preload.cjs"), "utf8");
+  assert.match(preload, /getFlowStatus:\s*\(projectRoot\)\s*=>/);
+  assert.match(preload, /"flow:status"/);
+  assert.match(preload, /typeof projectRoot === "string" \? projectRoot : ""/);
+  assert.doesNotMatch(preload, /require\(["'](?:node:)?fs["']\)/);
+  assert.doesNotMatch(preload, /require\(["']node:(?:path|child_process|process)["']\)/);
+
+  const main = readFileSync(path.join(REPO_ROOT, "app", "main.ts"), "utf8");
+  const idx = main.indexOf('registerHandler("flow:status"');
+  assert.notEqual(idx, -1, "main.ts 应注册 flow:status");
+  const handler = main.slice(idx, idx + 700);
+  assert.match(handler, /event\.sender !== win\.webContents/, "flow:status 必须有来源校验");
+  assert.match(handler, /desktop\.flowStatus\(projectRoot\)/, "校验后只透传字符串给 Interface");
 });

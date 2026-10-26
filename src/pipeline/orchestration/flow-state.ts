@@ -38,8 +38,10 @@ export {
 // 2026-10-23 应用专用：结构校验通过后把 flow YAML 的 `role-cards` 步骤置 done。
 // 2026-10-23 应用专用：返工前把保留验收步骤从 dispatched/delivered 安全重开为 pending。
 // 2026-10-24 应用专用：账本客户决定已结算后把 `kind:customer-decision` 步骤置 done（appointment 收口）。
+// 2026-10-25 应用专用：验收标准工件就绪后把 `acceptance-criteria` 步骤置 done（应用验收门前置）。
 // 桌面只经本公共出口消费；均不注册为角色工具。
 export {
+  completeAcceptanceCriteriaStep,
   completeAcceptanceStep,
   completeCustomerDecisionStep,
   completeRoleCardsStep,
@@ -47,6 +49,8 @@ export {
   reopenAcceptanceStepForRework,
 } from "../../common/编排/flow-service.ts";
 export type {
+  CompleteAcceptanceCriteriaStepInput,
+  CompleteAcceptanceCriteriaStepResult,
   CompleteCustomerDecisionStepInput,
   CompleteRoleCardsEvidence,
   CompleteRoleCardsStepInput,
@@ -66,6 +70,76 @@ export type {
   AcceptanceReworkParseResult,
   AcceptanceReworkSection,
 } from "../../common/编排/acceptance-rework.ts";
+
+// 2026-10-25 验收分诊（设计 `2026-10-25_design_acceptance-triage.md` §4/§5/§8.1/§9.1）：
+// 报告 fenced YAML `acceptance-triage/v1` 解析、§5.1 R1–R7 默认建议、triage→rework 映射、
+// `.ans/governance/acceptance/<flowId>/triage-v1.json` 分诊记录读写（原子写 / 幂等 / 恢复）。
+// 解析与建议是纯函数；记录读写只碰 `.ans`（app-only 写域）。桌面只经本公共出口消费。
+export {
+  parseAcceptanceTriageReport,
+  recommendAcceptanceTriage,
+  isBlockingAcceptanceTriageSeverity,
+  acceptanceTriageItemHasReworkPointers,
+  acceptanceTriageToReworkItems,
+  ACCEPTANCE_TRIAGE_SCHEMA,
+  ACCEPTANCE_TRIAGE_MAX_ITEMS,
+  ACCEPTANCE_TRIAGE_MAX_BLOCK_BYTES,
+  ACCEPTANCE_TRIAGE_ITEM_ID_PATTERN,
+  ACCEPTANCE_TRIAGE_MAX_REASON_LENGTH,
+  ACCEPTANCE_TRIAGE_MAX_ACTION_LENGTH,
+  ACCEPTANCE_TRIAGE_MAX_OWNER_LENGTH,
+  ACCEPTANCE_TRIAGE_MAX_POINTER_ITEMS,
+  ACCEPTANCE_TRIAGE_MAX_POINTER_LENGTH,
+  ACCEPTANCE_TRIAGE_CONCLUSIONS,
+  ACCEPTANCE_TRIAGE_SEVERITIES,
+} from "../../common/编排/acceptance-triage.ts";
+export type {
+  AcceptanceTriageConclusion,
+  AcceptanceTriageSeverity,
+  AcceptanceTriageError,
+  AcceptanceTriageItem,
+  AcceptanceTriageSection,
+  AcceptanceTriageParseFailureCode,
+  AcceptanceTriageParseResult,
+  AcceptanceTriageDisposition,
+  AcceptanceTriageRecommendationBasis,
+  AcceptanceTriageItemExecutability,
+  AcceptanceTriageExecutabilityCheck,
+  AcceptanceTriageRecommendation,
+  AcceptanceTriageRecommendOptions,
+  AcceptanceTriageReworkItem,
+} from "../../common/编排/acceptance-triage.ts";
+
+export {
+  ACCEPTANCE_TRIAGE_RECORD_SCHEMA,
+  ACCEPTANCE_TRIAGE_RECORD_REL_DIR,
+  ACCEPTANCE_TRIAGE_RECORD_FILENAME,
+  ACCEPTANCE_TRIAGE_RECORD_STATUSES,
+  acceptanceTriageRecordRelPath,
+  acceptanceTriageRecordAbsPath,
+  acceptanceTriageIdempotencyKey,
+  acceptanceTriageIdForReport,
+  acceptanceTriageRecordMatchesReport,
+  acceptanceTriageSeverityCounts,
+  acceptanceTriageItemsDigest,
+  buildAcceptanceTriageRecord,
+  validateAcceptanceTriageRecord,
+  isAcceptanceTriageStatusTransitionAllowed,
+  readAcceptanceTriageRecord,
+  writeAcceptanceTriageRecord,
+} from "../../common/编排/acceptance-triage-record.ts";
+export type {
+  AcceptanceTriageRecordStatus,
+  AcceptanceTriageDecisionSource,
+  AcceptanceTriageRecordDisposition,
+  AcceptanceTriageRecord,
+  AcceptanceTriageRecordReadResult,
+  AcceptanceTriageRecordReadOptions,
+  AcceptanceTriageRecordWriteOptions,
+  AcceptanceTriageRecordWriteResult,
+  AcceptanceTriageRecordValidation,
+  AcceptanceTriageRecordInput,
+} from "../../common/编排/acceptance-triage-record.ts";
 
 export type {
   FlowState,

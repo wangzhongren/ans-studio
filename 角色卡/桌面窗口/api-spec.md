@@ -408,3 +408,40 @@ A4 legacy provenance窄修：protected工具t.statusSource/target.source分别�
 - `fingerprint`：`sha256(canonical{kind, sourceRoleId, statusCode, flowIds(排序), reportPath, governancePath, textHash})`——同来源/同状态/同流程/同指针/同正文相同，供 UI 合并连续状态行（×N）。
 - 非目标：不持久化投影（恢复/回放回退文本归类）；不改 renderer；不参与任何判定、不自动验收。
 - 验收证据（实施后）：`test/桌面应用/session.test.ts` 新增投影用例；桌面套件与 typecheck 结果见变更记录。
+
+## 会话级后台任务 IPC（2026-10-25，任务 background-task-session-access）
+
+运行时核心已实现 `RoleSession` 三个**可选**方法（`listBackgroundTasks?/readBackgroundTask?/stopBackgroundTask?`，类型在 `src/model/runtime.ts`），编排 `RoleSessionHandle`（`src/pipeline/orchestration/run-role.ts`）原样透传。本批把能力暴露到桌面 IPC/preload；**任务表/日志/pid 只在各会话内存**，桌面不缓存、不持久化、不伪造。
+
+**聚合与寻址（`app/desktop/session.ts::SessionManager`）**：
+
+- `listBackgroundTasks(projectRoot, runtime)`：遍历**当前已打开会话**中 `projectRoot+runtime` 匹配者，直接读 `handle.listBackgroundTasks?.()`；每项 = `BackgroundTaskSnapshot` + `roleId` + `runtime`。句柄无该方法 ⇒ 跳过该角色；**没有任何会话具备能力**（含无会话）⇒ `tasks:[]` + `unavailable:true`（区别于「有会话但当前没有任务」）。单会话读取异常只记诊断并跳过，不伪造任务。
+- `readBackgroundTask({projectRoot,runtime,roleId,taskId,stream?,tailLines?})`：精确寻址活会话句柄；成功返回底层 `BackgroundTaskReadResult`（同一引用；`tailLines` 上限 200 与 `tailClamped/truncated` 由底层如实标注）。找不到会话 ⇒ `{ok:false,error}`（`main.session.releaseNoSession`）；句柄无能力 ⇒ `{ok:false,error}`（`main.backgroundTasks.unavailable`）；未知/已过期 taskId（底层 `undefined`）⇒ `{ok:false,error}`——不造任务、不造日志。
+- `stopBackgroundTask({projectRoot,runtime,roleId,taskId,force?})`：底层 `BackgroundTaskStopResult` **原样返回**（成功 `{ok:true,task,alreadyEnded}`；失败 `{ok:false,reason:"unknown-task"|"closed"|"timeout",message,task?}`）——不改写成成功、不吞异常（底层抛错 ⇒ 如实失败并带原始消息）。找不到会话 ⇒ `reason:"closed"`；句柄无能力/底层抛错 ⇒ 桌面级 `reason:"unavailable"`（唯一新增 reason，其余值沿用运行时契约）。
+
+| preload 方法 | IPC / 参数 | 返回 |
+| --- | --- | --- |
+| listBackgroundTasks(projectRoot, runtime) | background-tasks:list `{projectRoot,runtime}` | `{ok:true,projectRoot,runtime,tasks:[BackgroundTaskSnapshot+{roleId,runtime}],unavailable}` \| `{ok:false,error}` |
+| readBackgroundTask(input) | background-tasks:read `{projectRoot,runtime,roleId,taskId,stream?,tailLines?}` | `{ok:true,result:BackgroundTaskReadResult}` \| `{ok:false,error}` |
+| stopBackgroundTask(input) | background-tasks:stop `{projectRoot,runtime,roleId,taskId,force?}` | `BackgroundTaskStopResult`（原样）\| `{ok:false,reason:"unavailable",message}` |
+
+- `app/main.ts` 三个 handler 各自校验 `event.sender === win.webContents`（不匹配回 `{ok:false,error:"请求来源无效。"}`），随后只透传；参数校验（非空 projectRoot/roleId/taskId、已知 runtime、`stream` 枚举、`tailLines` 正整数）在 `DesktopInterface`，非法即 `{ok:false,...}`，**不调用会话、不抛**。`app/preload.cjs` 只暴露上述三个白名单方法（不暴露 Node 能力；本批无主→渲推送/订阅，列表为拉取式）。
+- 渲染层注意：`unavailable` 只表示「没有具备能力的活会话」，不能当作「没有任务」；任务仅会话内存（关闭会话/重启即消失，旧任务号读/停如实失败）；`state:"kill-timeout"` 表示**可能仍在运行**，不得显示成「已停止」；`stop` 的 `reason` 必须按 `unknown-task/closed/timeout/unavailable` 如实映射，`ok:false` 不得渲染成成功。
+- 证据（实施后）：`test/桌面应用/session.test.ts` 新增聚合/读/停用例；`test/桌面应用/interface.test.ts` 新增参数校验、read/stop 透传与 preload/main 源级断言；`npm run typecheck` 0 错。
+
+## 流程状态只读 IPC（2026-10-25，任务 flow-status-ipc）
+
+把 `<projectRoot>/docs/flows/*.yaml` 的步骤进度暴露给渲染侧（流程状态面板）。**只读**：只做目录列举 + 读取 + 既有编排公共出口 `parseFlowStateYaml` 解析；不写任何文件、不碰治理账本、不改变 flow 的 revision。
+
+| preload 方法 | IPC / 参数 | 返回 |
+| --- | --- | --- |
+| getFlowStatus(projectRoot) | flow:status `{projectRoot}`（桥内仅传字符串） | `{ok:true, flows:FlowStatusFlowView[], errors:{file,error}[]}` \| `{ok:false,error}` |
+
+`FlowStatusFlowView = { flowId, revision?, steps: {id,title,kind,owner,status}[], counts: {total,done,delivered,dispatched,pending,failed,blocked,superseded}, current: string[], updatedAt }`。
+
+- **方法**：`DesktopInterface.flowStatus(projectRoot)`（`app/desktop/interface.ts`）。`projectRoot` 非空字符串且为已存在目录，否则 `{ok:false,error: main.flowStatus.invalidProject}`；`docs/flows` 不存在（ENOENT/ENOTDIR）⇒ `{ok:true, flows:[], errors:[]}`（不是错误）；其余目录扫描失败 ⇒ `{ok:false,error}`（不抛）。
+- **扫描与解析**：只认顶层 `*.yaml`（按文件名排序，回执顺序稳定）；`flowId` = 文件名去 `.yaml`；`parseFlowStateYaml(text, flowId)` 的解析/校验失败**逐文件**进 `errors`（`file` 为项目相对路径 `docs/flows/<name>.yaml`，`error` 为解析器摘要），不阻断其他文件；读取/stat 失败同样只进该文件 error。
+- **字段**：`steps` 只保留 `id/title/kind/owner/status`；`counts` 由 `steps[].status` 计数（`total = steps.length`；`aborted` 不在计数键内、只计入 `total`）；`current` = `dispatched`/`delivered` 步骤 id，**按 YAML 步骤顺序**，可能为空数组；`updatedAt` = 文件 mtime 的 ISO 8601；`revision` = 文件内容 sha256（与编排 flow 工具 revision 同口径，只读派生）。
+- **IPC/preload**：`app/main.ts` 的 `flow:status` handler 先校验 `event.sender === win.webContents`（不匹配回 `{ok:false,error:"请求来源无效。"}`），再从 `{projectRoot}` 取字符串透传 Interface；`app/preload.cjs` 只新增 `getFlowStatus(projectRoot)` 白名单方法（非字符串置空串，由 Interface 回 invalidProject；不暴露 Node 能力）。无主→渲推送/订阅，面板按需拉取刷新。
+- **渲染层注意**：`current` 可能为空（没有在途步骤）；坏文件在 `errors` 单独列出而不是让整个调用失败（可展示「部分流程不可读」）；`revision` 是内容哈希、不是写者版本号；本调用是只读快照，不触发任何自动推进/验收。
+- 证据（实施后）：`test/桌面应用/interface.test.ts` 新增 4 例（2 个 flow YAML——完整 + 坏 YAML——解析、counts/current、errors 隔离、无 `docs/flows`、非法 projectRoot、preload/main 通道与来源校验）；`npm run typecheck` 0 错；`node --test --test-concurrency=1 "test/桌面应用/**/*.test.ts"` 602/602 通过。

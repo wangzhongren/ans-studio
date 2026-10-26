@@ -30,6 +30,12 @@ import type {
   GovernanceCardKind,
   HandOffIntentPayload,
 } from "../../src/model/runtime.ts";
+// 2026-10-25 验收分诊：只读消费编排 Pipeline 公共出口的**类型**（解析/建议/记录实现在编排；本模块只做文案）。
+import type {
+  AcceptanceTriageRecommendation,
+  AcceptanceTriageSection,
+  AcceptanceTriageSeverity,
+} from "../../src/pipeline/orchestration/flow-state.ts";
 import type { RuntimeKind } from "../../src/common/shared/runtime-shared.ts";
 import { mainT } from "./i18n.ts";
 
@@ -567,9 +573,18 @@ export function buildAcceptanceTaskMessage(
   const riskText = options.riskTier !== undefined ? `（当前档位：${options.riskTier}）` : "";
   // 2026-10-23 验收返工路由（方案 §5.2.3 / Q2 A）：报告结构化返工段硬要求。只在调用方传入报告路径
   // （`reportPath`/`previousReportPath`）时追加——旧调用（不传新参数）逐字不变；生产调用总会传 reportPath。
+  // 2026-10-25 验收分诊（设计 `2026-10-25_design_acceptance-triage.md` §4 / §12.1）：⑨ 改为要求
+  // `acceptance-triage/v1`（items 为旧 rework v1 的超集：增加结论/严重度/失败原因/改进方案指针）。
   const reworkSectionRequirement =
     options.reportPath !== undefined || options.previousReportPath !== undefined
-      ? `⑨ 结论为不通过/返工时，报告必须包含**恰好一个** fenced YAML 段（schema: acceptance-rework/v1；coordinator: convener；items: [{id, owner, action, evidence}]）：每项**恰好一个** owner，跨 owner 必须拆项（如 F6a/F6b），id 唯一，action 非空，evidence 写路径或可核对说明；缺段/坏段视为报告不完整（应用不会解析自由文本、不会生成返工项）。结论为通过时可省略。`
+      ? `⑨ 报告必须包含**恰好一个** fenced YAML 段（schema: acceptance-triage/v1），供应用做验收分诊与返工路由：` +
+        `顶层 conclusion: pass|fail|conditional，items: [{id, severity, owner, reason, action, targets?, criteria?, evidence?}]；` +
+        `每项 id 唯一、owner 恰好一个角色（跨 owner 必须拆项），reason（不通过原因）与 action（改进方案）必填，` +
+        `action 至少带 targets 或 criteria 之一（指改进方案的文件/模块或验收标准指针；只有 evidence 不算改进方案）；` +
+        `严重度四档：blocker=交付不可用/安全/数据损坏/验收标准关键项未满足；major=关键功能或契约不满足、返工可修；` +
+        `minor=非关键缺陷、可后续修复；nit=风格/措辞/个人偏好（吹毛求疵）。` +
+        `fail/conditional 必须至少一个 item，pass 允许空 items；缺段/坏段/越界/矛盾视为报告不完整，` +
+        `应用会把验收卡退回你补报告（不弹客户卡、不返工、不解析自由文本）。`
       : "";
   const previousReportNote =
     options.previousReportPath !== undefined
@@ -615,6 +630,13 @@ export interface AcceptanceReworkTaskItem {
   owner: string;
   action: string;
   evidence?: readonly string[];
+  /** 2026-10-25 验收分诊：严重度 / 失败原因 / 验收标准指针 / 原始 targets（随返工任务带给统筹）。 */
+  severity?: "blocker" | "major" | "minor" | "nit";
+  reason?: string;
+  criteria?: string | null;
+  targets?: readonly string[];
+  /** `false` = minor/nit（非阻断，可选后续）；`undefined` = 旧路径不标注。 */
+  blocking?: boolean;
 }
 
 /** 未知/不可派发 owner 的 blocked 项（逐项列出；不猜、不改 owner）。 */
@@ -650,6 +672,11 @@ export interface BuildAcceptanceReworkTaskMessageOptions {
   governanceItems?: readonly AcceptanceReworkTaskItem[];
   /** 解析错误（`path: message`；有界）。 */
   itemErrors?: readonly string[];
+  /**
+   * 2026-10-25 验收分诊：清单来自 `acceptance-triage/v1`（items 含 severity/reason/targets/criteria）。
+   * 只影响结构化清单标题与非阻断说明；缺省 ⇒ 旧 `acceptance-rework/v1` 文案逐字不变。
+   */
+  triageSchema?: boolean;
   /** 流程状态 YAML 路径（缺省按 flowId 派生）。 */
   flowPath?: string;
   /**
@@ -669,8 +696,11 @@ export interface BuildAcceptanceReworkTaskMessageOptions {
 /** 来源措辞（Q7 A）：judge 来源绝不出现「客户拒绝」；客户手拒才写「客户拒绝」。 */
 function acceptanceReworkSourceText(source: "customer" | "judge", sourceDetail?: string): string {
   if (source === "customer") {
-    return sourceDetail === "judge" ? "自动决策未通过（判断代批）" : "客户拒绝（客户手拒）";
+    if (sourceDetail === "judge") return "自动决策未通过（判断代批）";
+    if (sourceDetail === "triage-customer") return "客户验收分诊选择（下发统筹修改）";
+    return "客户拒绝（客户手拒）";
   }
+  if (sourceDetail === "judge-rule") return "验收分诊判断代批（确定性规则 judge-rule）";
   return sourceDetail === "judge-deny"
     ? "自动决策未通过（自动退回/判断拒绝）"
     : "自动决策未完成（自动退回）";
@@ -678,7 +708,13 @@ function acceptanceReworkSourceText(source: "customer" | "judge", sourceDetail?:
 
 function formatAcceptanceReworkItem(item: AcceptanceReworkTaskItem): string {
   const evidence = (item.evidence ?? []).filter((entry) => nonEmptyString(entry));
-  return `id=${item.id} | owner=${item.owner} | action=${item.action}${evidence.length > 0 ? ` | evidence=${evidence.join("、")}` : ""}`;
+  const severity =
+    item.severity !== undefined
+      ? ` | severity=${item.severity}${item.blocking === false ? "（非阻断，可选后续）" : ""}`
+      : "";
+  const reason = nonEmptyString(item.reason) ? ` | reason=${item.reason}` : "";
+  const criteria = nonEmptyString(item.criteria) ? ` | criteria=${item.criteria}` : "";
+  return `id=${item.id} | owner=${item.owner} | action=${item.action}${severity}${reason}${criteria}${evidence.length > 0 ? ` | evidence=${evidence.join("、")}` : ""}`;
 }
 
 function acceptanceReworkItemsByOwner(items: readonly AcceptanceReworkTaskItem[]): string[] {
@@ -691,7 +727,17 @@ function acceptanceReworkItemsByOwner(items: readonly AcceptanceReworkTaskItem[]
     }
     grouped.get(item.owner)!.push(item);
   }
-  return owners.map((owner) => `· owner=${owner}：${grouped.get(owner)!.map((item) => `${item.id}（${item.action}）`).join("；")}`);
+  return owners.map(
+    (owner) =>
+      `· owner=${owner}：${grouped
+        .get(owner)!
+        .map(
+          (item) =>
+            `${item.id}（${item.action}）` +
+            (item.severity !== undefined ? `[${item.severity}${item.blocking === false ? "·非阻断" : ""}]` : ""),
+        )
+        .join("；")}`,
+  );
 }
 
 /**
@@ -726,9 +772,14 @@ export function buildAcceptanceReworkTaskMessage(input: BuildAcceptanceReworkTas
       : `验收报告：${input.reportPath}${reportVersionText}${reportShaText}${reportStateText}（coordinator 建议：${input.coordinator ?? "convener"}；实际接收方固定统筹）。`;
   const structuredText = input.structured
     ? [
-        `结构化返工清单（acceptance-rework/v1；逐项 id | owner | action | evidence）：`,
+        input.triageSchema === true
+          ? `结构化返工清单（acceptance-triage/v1；逐项 id | owner | action | severity | reason | criteria | evidence；severity=minor/nit 为非阻断、可选后续）：`
+          : `结构化返工清单（acceptance-rework/v1；逐项 id | owner | action | evidence）：`,
         ...items.map((item) => `- ${formatAcceptanceReworkItem(item)}`),
         ...(items.length === 0 ? ["- （无可派发项：见下方 blocked / 报告修正 / 治理项）"] : []),
+        ...(input.triageSchema === true && items.some((item) => item.blocking === false)
+          ? ["- minor/nit 项为非阻断（可选后续）：不要因它们重开验收或阻塞返工完成。"]
+          : []),
       ]
     : [
         `结构化返工段缺失或不可解析${errors.length > 0 ? `（${errors.slice(0, 10).join("；")}）` : ""}：应用**未生成返工项、未创建流程步骤**，也不解析报告自由文本。`,
@@ -1426,4 +1477,135 @@ export function buildAcceptanceCriteriaTaskMessage(
 /** 实施前标准任务派发成功的系统行（应用派发 ≠ 客户批准）。 */
 export function governanceAcceptanceCriteriaNote(flowId: string): string {
   return mainT("main.governance.criteriaDispatched", { flowId });
+}
+
+// —————————————— 2026-10-25 验收分诊：卡面 / 汇报 / 退回文案（纯函数，无 IO） ——————————————
+//
+// 设计 `2026-10-25_design_acceptance-triage.md` §7.2 / §8.2 / §10。所有用户可见文本走共享 `ui.triage.*`；
+// 本模块不解析报告、不做建议（编排纯函数负责），只把解析结果拼成有界、确定性的文本。
+
+/** 严重度标签（四档固定；未知值回落原文——解析器已保证枚举，这里只防御）。 */
+export function acceptanceTriageSeverityLabel(severity: AcceptanceTriageSeverity | string): string {
+  switch (severity) {
+    case "blocker":
+      return mainT("ui.triage.severity.blocker");
+    case "major":
+      return mainT("ui.triage.severity.major");
+    case "minor":
+      return mainT("ui.triage.severity.minor");
+    case "nit":
+      return mainT("ui.triage.severity.nit");
+    default:
+      return String(severity);
+  }
+}
+
+/** 结论标签（pass / fail / conditional）。 */
+export function acceptanceTriageConclusionLabel(conclusion: "pass" | "fail" | "conditional" | string): string {
+  switch (conclusion) {
+    case "pass":
+      return mainT("ui.triage.conclusion.pass");
+    case "fail":
+      return mainT("ui.triage.conclusion.fail");
+    case "conditional":
+      return mainT("ui.triage.conclusion.conditional");
+    default:
+      return String(conclusion);
+  }
+}
+
+/** 默认建议一句（附依据码；`authoritative:false` ⇒ 「无法自动建议」）。 */
+function acceptanceTriageAdviceText(recommendation: AcceptanceTriageRecommendation): string {
+  if (recommendation.authoritative !== true) return mainT("ui.triage.advice.none");
+  if (recommendation.disposition === "report-only") {
+    return mainT("ui.triage.advice.reportOnly", {
+      minors: recommendation.severityCounts.minor + recommendation.severityCounts.nit,
+    });
+  }
+  if (recommendation.disposition === "rework") {
+    return mainT("ui.triage.advice.rework", {
+      blockers: recommendation.severityCounts.blocker,
+      majors: recommendation.severityCounts.major,
+    });
+  }
+  return mainT("ui.triage.advice.none");
+}
+
+/** 单条失败原因（`id · severity：reason`）。 */
+function acceptanceTriageReasonLine(item: AcceptanceTriageSection["items"][number]): string {
+  return mainT("ui.triage.report.reasonLine", {
+    id: item.id,
+    severity: acceptanceTriageSeverityLabel(item.severity),
+    reason: item.reason,
+  });
+}
+
+/** 单条改进方案（action + targets/criteria 指针；证据不是改进方案，不在此列）。 */
+function acceptanceTriageActionLine(item: AcceptanceTriageSection["items"][number]): string {
+  const pointers = [...item.targets, ...(item.criteria !== null ? [item.criteria] : [])];
+  const action =
+    pointers.length > 0 ? `${item.action}（${pointers.join("；")}）` : item.action;
+  return mainT("ui.triage.report.actionLine", { action });
+}
+
+/** 分诊卡 preview：结论摘要 + 失败项/原因 + 改进方案 + 默认建议与依据 + 阻断警示（§7.2）。 */
+export function buildAcceptanceTriageCardLines(input: {
+  triage: AcceptanceTriageSection;
+  recommendation: AcceptanceTriageRecommendation;
+  reportPath: string;
+  reportVersion: number;
+}): string[] {
+  const { triage, recommendation, reportPath, reportVersion } = input;
+  const shown = triage.items.slice(0, 10);
+  const lines: string[] = [
+    `${mainT("ui.triage.section.summary")}：${acceptanceTriageConclusionLabel(triage.conclusion)}`,
+    mainT("ui.triage.report.pathLine", { path: `${reportPath}（v${reportVersion}）` }),
+    "",
+    `${mainT("ui.triage.section.failures")}：`,
+    ...shown.map((item) => `- ${acceptanceTriageReasonLine(item)}`),
+  ];
+  if (triage.items.length > shown.length) {
+    lines.push(`- ……（另有 ${triage.items.length - shown.length} 项，详见报告）`);
+  }
+  lines.push("", `${mainT("ui.triage.section.improvements")}：`);
+  lines.push(...shown.map((item) => `- ${acceptanceTriageActionLine(item)}`));
+  lines.push("", acceptanceTriageAdviceText(recommendation));
+  if (recommendation.blockingCount > 0) {
+    lines.push(`⚠ ${mainT("ui.triage.warn.blockingReportOnly")}`);
+  }
+  return lines;
+}
+
+/**
+ * 「仅汇报不返工」的主理确定性汇报（§8.2）：结论、逐项 severity/reason、逐项 action+指针、
+ * 决定来源、报告路径。不调用模型、不写客户决定。
+ */
+export function buildAcceptanceTriageReportText(input: {
+  triage: AcceptanceTriageSection;
+  source: "judge" | "customer";
+  reportPath: string;
+  reportVersion: number;
+}): string {
+  const { triage, source, reportPath, reportVersion } = input;
+  const sourceText = source === "judge" ? mainT("ui.triage.source.judge") : mainT("ui.triage.source.customer");
+  const lines: string[] = [
+    mainT("ui.triage.report.head", { conclusion: acceptanceTriageConclusionLabel(triage.conclusion) }),
+    mainT("ui.triage.report.pathLine", { path: `${reportPath}（v${reportVersion}）` }),
+    `${mainT("ui.triage.section.failures")}：`,
+    ...triage.items.map((item) => `- ${acceptanceTriageReasonLine(item)}`),
+    `${mainT("ui.triage.section.improvements")}：`,
+    ...triage.items.map((item) => `- ${acceptanceTriageActionLine(item)}`),
+    mainT("ui.triage.report.noRework", { source: sourceText }),
+  ];
+  return lines.join("\n");
+}
+
+/** 报告缺/坏分诊结构 ⇒ 退回 Proof 补报告的系统行（不弹卡、不返工、不写客户决定）。 */
+export function governanceAcceptanceTriageReturnedNote(detail: string): string {
+  return `${mainT("ui.triage.returnedToVerifier")}（${detail}）`;
+}
+
+/** 验收报告不可读时的系统行（含具体错误；调用方去重）。 */
+export function governanceAcceptanceTriageMissingReportNote(detail: string): string {
+  return mainT("ui.triage.missingReport", { detail });
 }

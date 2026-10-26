@@ -39,6 +39,15 @@ contextBridge.exposeInMainWorld("desktop", {
   /** 枚举项目下的角色（含角色卡正文、边界条目、文档与变更记录索引）。 */
   listProject: (projectRoot) => ipcRenderer.invoke("app:list-project", { projectRoot }),
 
+  // —— 流程状态只读（2026-10-25）：docs/flows/<flowId>.yaml 的步骤进度（拉取式；无主→渲推送）——
+  /**
+   * 扫描 `<projectRoot>/docs/flows/*.yaml` 并返回 `{ok:true, flows:[...], errors:[{file,error}]}`
+   * 或 `{ok:false, error}`。`docs/flows` 不存在 ⇒ 空列表（不是错误）；坏文件只进 `errors`，不影响其他文件；
+   * 每个 flow 的 `current` 可能为空数组。**只读**：不写文件、不碰治理账本。只传字符串，不暴露 Node 能力。
+   */
+  getFlowStatus: (projectRoot) =>
+    ipcRenderer.invoke("flow:status", { projectRoot: typeof projectRoot === "string" ? projectRoot : "" }),
+
   /**
    * I2（existing-project-compat V1，PM 评审 §四.2）：预览「建立治理记录」——**只读**，不写文件。
    * 主进程守卫：projectRoot 必须是当前导入项目；`governanceModel`（可选，single|trio）由 Interface
@@ -132,6 +141,55 @@ contextBridge.exposeInMainWorld("desktop", {
   listLiveSessions: () => ipcRenderer.invoke("session:live"),
   listLiveSessionViews: () => ipcRenderer.invoke("session:live-views"),
   getSessionHistory: (input) => ipcRenderer.invoke("session:history-get", input),
+
+  // —— 会话级后台任务（2026-10-25，桌面任务面板；只读/受控，任务表与日志只在各会话内存）——
+  /**
+   * 聚合列表：按 `projectRoot + runtime` 聚合当前所有已打开会话的后台任务。
+   * 返回 `{ok:true, projectRoot, runtime, tasks:[{...BackgroundTaskSnapshot, roleId, runtime}], unavailable}`
+   * 或 `{ok:false, error}`。`unavailable:true` = 没有任何活会话具备后台任务能力（区别于「有会话但没有任务」）；
+   * 任务不跨重启、不持久化。**不暴露 Node 能力。**
+   */
+  listBackgroundTasks: (projectRoot, runtime) =>
+    ipcRenderer.invoke("background-tasks:list", {
+      projectRoot: typeof projectRoot === "string" ? projectRoot : "",
+      runtime: typeof runtime === "string" ? runtime : "",
+    }),
+
+  /**
+   * 读取某个后台任务的状态与日志尾部：入参 `{projectRoot, runtime, roleId, taskId, stream?, tailLines?}`
+   * （`stream`=stdout|stderr|both，默认 both；`tailLines` 默认 40、上限 200，超出由主进程如实钳制并标
+   * `tailClamped`）。会话不存在/句柄无能力/未知任务（已过期或属于其他会话）⇒ `{ok:false, error}`——
+   * 绝不伪造任务状态或日志内容（`truncated` 表示更早输出已被环形缓冲丢弃）。
+   */
+  readBackgroundTask: (input) => {
+    const value = input && typeof input === "object" ? input : {};
+    return ipcRenderer.invoke("background-tasks:read", {
+      projectRoot: value.projectRoot,
+      runtime: value.runtime,
+      roleId: value.roleId,
+      taskId: value.taskId,
+      ...(value.stream !== undefined ? { stream: value.stream } : {}),
+      ...(value.tailLines !== undefined ? { tailLines: value.tailLines } : {}),
+    });
+  },
+
+  /**
+   * 停止某个后台任务：入参 `{projectRoot, runtime, roleId, taskId, force?}`。
+   * 底层结果**原样**返回：`{ok:true, task, alreadyEnded}` 或
+   * `{ok:false, reason:"unknown-task"|"closed"|"timeout", message, task?}`；桌面层不可用为
+   * `reason:"unavailable"`。**绝不把失败显示成「已停止」**；`kill-timeout` 表示可能仍在运行。
+   */
+  stopBackgroundTask: (input) => {
+    const value = input && typeof input === "object" ? input : {};
+    return ipcRenderer.invoke("background-tasks:stop", {
+      projectRoot: value.projectRoot,
+      runtime: value.runtime,
+      roleId: value.roleId,
+      taskId: value.taskId,
+      ...(typeof value.force === "boolean" ? { force: value.force } : {}),
+    });
+  },
+
   getRuntimeConfig: (runtime) => ipcRenderer.invoke("runtime-config:get", { runtime }),
   saveRuntimeConfig: (input) => ipcRenderer.invoke("runtime-config:save", input),
   onOperatorExpired: (cb) => {

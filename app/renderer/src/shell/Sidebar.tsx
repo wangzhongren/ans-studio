@@ -25,6 +25,10 @@ import {
   roleDisplayName,
 } from "@/chat/role-view";
 import { deriveRoleStatus, statusBadge } from "@/chat/status";
+import {
+  RoleStatusChip,
+  roleStatusChipView,
+} from "@/chat/role-status-view";
 import { BusySpinner } from "@/chat/BusySpinner";
 import type { RoleView } from "@/chat/types";
 import {
@@ -42,9 +46,6 @@ import { useLocaleState, useT } from "@/i18n";
 import type { Locale } from "@/i18n";
 
 function statusIcon(kind: string) {
-  if (kind === "st-working") {
-    return <BusySpinner />;
-  }
   if (kind === "st-error") {
     return <CircleAlert size={12} strokeWidth={1.5} aria-hidden="true" />;
   }
@@ -99,6 +100,7 @@ function RoleRow({
   const badge = statusBadge(status, 0, locale);
   const statusLabel =
     status === "awaiting-confirm" && pendingKind ? pendingKind : badge.label;
+  const statusView = roleStatusChipView(status, locale, statusLabel);
   const workCount = roleBadgeCount(
     roleBusy[role.roleId] === true,
     (queueByRole[role.roleId] || []).length,
@@ -117,12 +119,14 @@ function RoleRow({
         "tree-item" +
         (role.builtIn ? " builtin" : "") +
         (primary ? " primary" : "") +
-        (active ? " active" : "")
+        (active ? " active" : "") +
+        (statusView.rowClass ? " " + statusView.rowClass : "")
       }
       data-role-id={role.roleId}
       data-tab={tabbable ? "0" : "-1"}
       data-primary={primary ? "true" : undefined}
       data-builtin={role.builtIn ? "true" : undefined}
+      data-status={status}
       tabIndex={tabbable ? 0 : -1}
       aria-current={active ? "true" : undefined}
       aria-description={description || undefined}
@@ -130,7 +134,7 @@ function RoleRow({
       onClick={onSelect}
     >
       <span className="ti-icon" aria-hidden="true">
-        <span className="ti-avatar">
+        <span className={"ti-avatar" + (statusView.avatarClass ? " " + statusView.avatarClass : "")}>
           {Array.from(displayName).slice(0, 1).join("")}
         </span>
       </span>
@@ -159,10 +163,20 @@ function RoleRow({
         {role.groupDuty ? <span className="ti-group-duty">{role.groupDuty}</span> : null}
         <span className="ti-sub">
           <span>{runtimeLabel}</span>
-          <span className={"ti-status " + badge.className} title={badge.title}>
-            {statusIcon(badge.className)}
-            {statusLabel}
-          </span>
+          <RoleStatusChip
+            className={statusView.chipClass}
+            label={statusView.label}
+            title={statusView.title}
+            dot={statusView.dot}
+            status={status}
+            icon={
+              statusView.working ? (
+                <BusySpinner />
+              ) : (
+                statusIcon(badge.className)
+              )
+            }
+          />
         </span>
         {gov || role.builtIn ? (
           <span className="ti-builtin">{gov?.builtinNote || t("ui.sidebar.builtinRoleNote")}</span>

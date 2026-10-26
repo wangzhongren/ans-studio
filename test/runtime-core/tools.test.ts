@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { buildGovernedTools, buildShellEnv } from "../../src/provider/runtime/tools.ts";
 import { describeTool } from "../../src/provider/runtime/schema.ts";
-import type { GovernedToolsOptions, WriteGate } from "../../src/model/runtime.ts";
+import type { CustomerInputOutcome, GovernedToolsOptions, WriteGate } from "../../src/model/runtime.ts";
 import { allow, deny, until } from "./fixtures.ts";
 
 const tools = (gate: WriteGate, options?: GovernedToolsOptions) => new Map(buildGovernedTools(gate, options).map((tool) => [tool.name, tool]));
@@ -30,14 +30,14 @@ test("Model/schema: required write/edit fields, optionals, unknown names and inj
   assert.equal(all.get("request_confirmation")?.executionMode, "sequential");
 });
 
-test("schema 文案（客户 2026-10-16 su 预置裁定配套）：request_confirmation 写明 su 专属例外，写盘确认必备语义保留", () => {
+test("schema 文案（客户 2026-10-16 su 预置裁定 + 2026-10-25 边界直写新规则）：request_confirmation 写明 su 专属预授权例外与治理敏感场景，写盘确认必备语义保留", () => {
   const confirm = describeTool("request_confirmation");
   const text = [confirm.description, ...(confirm.promptGuidelines ?? [])].join("\n");
   // 例外与门禁引擎卡文本口径一致：仅内置治理角色 su；`docs/su/**`、`docs/contracts/**`、
   // `docs/skills/**`（G-4 扩列，2026-10-16 批准）与 `docs/mcp/**`（G-4 V2 扩列，2026-10-16
   // 「按推荐批准，开始实施」——编排预授权同批已落）已预置、免逐次确认、开会话与重建后均生效；
-  // 四棵树之外的一切写盘仍须逐条确认——正向钉住「仅 su」限定句，防把非 su 角色带歪。
-  assert.match(text, /唯一例外（仅内置治理角色 su）/);
+  // 四棵树之外的治理敏感写盘仍须逐条确认——正向钉住「仅 su」限定句，防把非 su 角色带歪。
+  assert.match(text, /治理写盘的预授权例外（仅内置治理角色 su）/);
   assert.match(text, /docs\/su\/\*\*/);
   assert.match(text, /docs\/contracts\/\*\*/);
   assert.match(text, /docs\/skills\/\*\*/, "G-4 扩列第三棵须点名");
@@ -46,11 +46,19 @@ test("schema 文案（客户 2026-10-16 su 预置裁定配套）：request_confi
   assert.match(text, /写入这四棵目录树\*\*无需逐次确认\*\*/, "写入句须按四棵计数（与门禁引擎新卡文本同口径）");
   assert.match(text, /无需逐次确认/);
   assert.match(text, /开会话与重建后均生效/);
-  assert.match(text, /四棵树之外的一切写盘仍须逐条确认/);
+  assert.match(text, /四棵树之外的\*\*治理敏感写盘\*\*仍按既有规则逐条确认/);
   assert.equal(/写入这三棵目录树|三棵树之外|两棵/.test(text), false, "旧「三棵/两棵」计数不得复现（防回退漂移）");
-  // 必备语义逐字保留：写盘一律先经本工具确认 / preview 逐条列路径 / confirmed:true 唯一凭据 /
+  // 2026-10-25 客户新规则：边界（Section 1）内普通写盘是预授权、直接写；本工具**不是**每次写盘的
+  // 前置步骤，只用于治理敏感写入 / 需要客户决定的动作。反向钉住旧的全量措辞不得复现。
+  assert.match(text, /不是边界内普通写盘的前置步骤/);
+  assert.match(text, /治理敏感写入/);
+  assert.match(text, /角色卡 \/ 边界 \/ 共享目录 \/ 治理写集/, "须点名保留确认的治理敏感场景");
+  assert.match(text, /需要客户决定的动作/);
+  assert.match(text, /边界（Section 1 白名单）内的写入是预授权/);
+  assert.match(text, /不需要\*\*本工具逐次确认/);
+  assert.equal(/写盘一律先经本工具确认|每次写盘必经|写盘前必须先用 `request_confirmation`/.test(text), false, "旧「每次写盘必经确认」措辞不得复现");
+  // 必备语义逐字保留：preview 逐条列路径 / confirmed:true 唯一凭据 /
   // 未获同意不写盘 / 列出路径≠获准（后者即「列了不等于获准」，防反向措辞）。
-  assert.match(text, /写盘一律先经本工具确认/);
   assert.match(text, /必须列出.*路径/);
   assert.match(text, /未列出的路径/);
   assert.match(text, /获准的唯一凭据是 `confirmed:true`/);
@@ -67,6 +75,25 @@ test("schema 文案（客户 2026-10-16 su 预置裁定配套）：request_confi
   assert.match(text, /写入内容须与.*一致/, "写入内容须与预览正文一致");
   assert.match(text, /呈现前拒绝该卡/, "缺失逐路径正文须在呈现前拒绝该卡");
   assert.match(text, /不会先给客户看半张卡/, "不得把半张卡先给客户看");
+});
+
+test("schema 文案（客户 2026-10-25 新规则）：write_file / edit_file 写明边界内直接写、无需 request_confirmation，边界外被 WriteGate 拒绝", () => {
+  for (const [name, verb] of [["write_file", "直接写入"], ["edit_file", "直接编辑"]] as const) {
+    const description = describeTool(name).description;
+    assert.match(description, /角色边界（Section 1 白名单）内时/, `${name} 描述须点明角色边界（Section 1 白名单）`);
+    assert.ok(description.includes(`**${verb}**`), `${name} 描述须写明边界内${verb}`);
+    assert.match(description, /这是预授权/, `${name} 描述须写明边界内写入是预授权`);
+    assert.match(description, /不需要 request_confirmation/, `${name} 描述须写明不需要 request_confirmation`);
+    assert.match(description, /边界外的写入会被 WriteGate 拒绝/, `${name} 描述须写明边界外写入被 WriteGate 拒绝`);
+    assert.match(description, /治理敏感写入/, `${name} 描述须保留治理敏感写入的确认提示`);
+    assert.equal(/写盘一律|每次写盘必经|写盘前必须.*request_confirmation/.test(description), false, `${name} 不得再要求每次写盘必经确认`);
+    // 只改文案：参数、必填与顺序执行模式均不变。
+    assert.deepEqual(
+      describeTool(name).parameters.required,
+      name === "write_file" ? ["path", "content"] : ["path", "old_string", "new_string"],
+    );
+    assert.equal(describeTool(name).executionMode, "sequential");
+  }
 });
 
 test("schema 文案（G-1/A4）：dispatch_task 钉住「先落盘再派发」与「必读（按序）」按地址引用；必备语义逐字保留", () => {
@@ -334,6 +361,50 @@ test("declined 措辞按 operatorId / cardKind 区分 judge 与客户/通道（2
   assert.match(channel.message, /未获客户同意（原因：客户拒绝（通道返回拒绝））/);
 });
 
+test("验收分诊回执：仅汇报不返工不得说成客户直接 accept（2026-10-25）", async () => {
+  const triaged = await tools(allow, {
+    customerInput: () => ({
+      outcome: "answered" as const,
+      value: { selected: ["accept"] },
+      operatorId: "customer-1",
+      triage: { disposition: "report-only" as const, source: "customer" as const, conclusion: "fail" as const, triageId: "triage-flow-abcdef12" },
+    }),
+  }).get("request_choice")!.handler({ name: "request_choice", args: { title: "验收", options: [{ id: "accept", label: "通过" }, { id: "reject", label: "退回" }] } });
+  assert.equal(triaged.ok, true);
+  assert.match(triaged.message, /仅汇报不返工/);
+  assert.match(triaged.message, /不是客户在验收卡上直接选择 accept/);
+  assert.match(triaged.message, /验收结论仍为 fail/);
+  assert.doesNotMatch(triaged.message, /^request_choice：客户已选择/);
+  // 分诊返工：说明按验收 reject 结算并交统筹，但不是客户放弃验收。
+  const rework = await tools(allow, {
+    customerInput: () => ({
+      outcome: "answered" as const,
+      value: { selected: ["reject"] },
+      operatorId: "customer-1",
+      triage: { disposition: "rework" as const, source: "customer" as const, conclusion: "conditional" as const, triageId: "triage-flow-abcdef12" },
+    }),
+  }).get("request_choice")!.handler({ name: "request_choice", args: { title: "验收", options: [{ id: "accept", label: "通过" }, { id: "reject", label: "退回" }] } });
+  assert.match(rework.message, /下发统筹修改/);
+  assert.match(rework.message, /不是客户放弃验收/);
+
+  // 自动处置（declined + triage，卡未呈现）：不得说成客户拒绝/同意。
+  const autoTriage = await tools(allow, {
+    customerInput: () => ({
+      outcome: "declined" as const,
+      operatorId: "judge:triage",
+      notPresented: true as const,
+      reason: "验收分诊（判断代批 judge-rule）：已下发统筹修改",
+      triage: { disposition: "rework" as const, source: "judge" as const, conclusion: "fail" as const, triageId: "triage-flow-abcdef12" },
+    }),
+  }).get("request_choice")!.handler({ name: "request_choice", args: { title: "验收", options: [{ id: "accept", label: "通过" }, { id: "reject", label: "退回" }] } });
+  assert.equal(autoTriage.ok, false);
+  assert.match(autoTriage.message, /下发统筹修改/);
+  assert.match(autoTriage.message, /验收卡未向客户呈现/);
+  assert.match(autoTriage.message, /不是客户拒绝/);
+  assert.match(autoTriage.message, /flow_get/);
+  assert.doesNotMatch(autoTriage.message, /客户拒绝（|未获客户同意/);
+});
+
 test("declined 边界：notPresented/unavailable 与 judgeReceipt 代批措辞不变", async () => {
   // request_confirmation + notPresented：即使来源是 judge 也走「卡片未发出」，不得说客户拒绝/自动退回。
   const notPresented = await tools(allow, {
@@ -346,15 +417,15 @@ test("declined 边界：notPresented/unavailable 与 judgeReceipt 代批措辞�
   assert.match(notPresented.message, /请补齐后重新调用/);
   assert.doesNotMatch(notPresented.message, /客户拒绝|自动决策未通过|未获客户同意/);
 
-  // request_choice 的 notPresented 既有行为不变（O1 未授权）：仍按 declined 分支处理。
+  // request_choice 的 notPresented（2026-10-25 验收分诊授权）：同样返回「卡片未发出」，不得说成客户拒绝。
   const choiceNotPresented = await tools(allow, {
     customerInput: () => ({ outcome: "declined" as const, notPresented: true as const, reason: "缺少 cardKind" }),
   }).get("request_choice")!.handler({ name: "request_choice", args: { title: "选择", options: [{ id: "a", label: "A" }] } });
-  assert.equal(
-    choiceNotPresented.message,
-    "request_choice：未获客户同意（原因：客户拒绝（缺少 cardKind））→ 不要写盘；如实告知客户，不得假设同意。",
-    "request_choice 的 notPresented 既有文案不变",
-  );
+  assert.equal(choiceNotPresented.ok, false);
+  assert.match(choiceNotPresented.message, /治理确认卡未发出/);
+  assert.match(choiceNotPresented.message, /未向客户呈现/);
+  assert.match(choiceNotPresented.message, /缺少 cardKind/);
+  assert.doesNotMatch(choiceNotPresented.message, /客户拒绝|未获客户同意/);
 
   // unavailable：既有「未获客户同意（原因：…）」不变。
   const unavailable = await tools(allow, { customerInput: () => ({ outcome: "unavailable" as const, reason: "客户通道不可用" }) })
@@ -377,4 +448,71 @@ test("declined 边界：notPresented/unavailable 与 judgeReceipt 代批措辞�
   assert.match(approved.message, /客户委托的判断 agent（替我审批）已代批（代审批；operator:judge:claude）/);
   assert.match(approved.message, /这不是客户本人点击/);
   assert.doesNotMatch(approved.message, /自动决策未通过|客户拒绝/);
+});
+
+test("写入预授权 system 回执（2026-10-25）：放行不说成客户确认，拒绝不说成客户拒绝且不引导重试", async () => {
+  const systemId = "system:write-preauthorization";
+  const call = (outcome: CustomerInputOutcome, args: Record<string, unknown>) =>
+    tools(allow, { customerInput: () => outcome })
+      .get("request_confirmation")!
+      .handler({ name: "request_confirmation", args });
+
+  // 系统接受（边界内写入）：明确系统预授权直接放行，不是客户确认；confirmed:true 技术凭据保留。
+  const accepted = await call(
+    { outcome: "answered", value: { confirmed: true }, operatorId: systemId },
+    { title: "写入 docs/scheduling/layout.md", paths: ["docs/scheduling/layout.md"], preview: "docs/scheduling/layout.md\n布局正文" },
+  );
+  assert.equal(accepted.ok, true);
+  assert.match(accepted.message, /系统预授权已直接放行/);
+  assert.match(accepted.message, /边界内写入/);
+  assert.match(accepted.message, /不是客户确认/);
+  assert.match(accepted.message, /confirmed:true/);
+  assert.match(accepted.message, /操作者：system:write-preauthorization/);
+  assert.doesNotMatch(accepted.message, /客户已确认/, "系统放行不得说成客户确认");
+
+  // 系统拒绝（边界外/不可写）：桌面同时置 notPresented:true；回执必须先按 system 前缀识别，
+  // 明确「不是客户拒绝、不是客户未同意」，且不得出现「卡未发出/请补齐后重新调用」这类误导重试文案。
+  const reason =
+    "系统预授权拒绝：以下声明写入路径不在角色 Section 1 边界内或不可写：src/impl/main.ts（越界）。" +
+    "边界外不给写；本次未向客户呈现确认卡、未调用判断 agent。";
+  const rejected = await call(
+    { outcome: "declined", operatorId: systemId, notPresented: true, reason },
+    { title: "写入 src/impl/main.ts", paths: ["src/impl/main.ts"], cardKind: "write", flowId: "demo-flow" },
+  );
+  assert.equal(rejected.ok, false, "系统拒绝仍 fail-closed（无写盘许可）");
+  assert.match(rejected.message, /系统预授权拒绝/);
+  assert.match(rejected.message, /边界外或不可写/);
+  assert.match(rejected.message, /不是客户拒绝/);
+  assert.match(rejected.message, /不是客户未同意/);
+  assert.match(rejected.message, /src\/impl\/main\.ts/, "须保留系统给出的具体拒绝原因");
+  assert.match(rejected.message, /不要改写参数或重复调用本工具重试/);
+  assert.match(rejected.message, /不会因重试而获准/);
+  assert.doesNotMatch(rejected.message, /治理确认卡未发出|请补齐|重新调用/, "系统拒绝不得被误报成发卡缺项/引导重试");
+  assert.doesNotMatch(rejected.message, /未获客户同意|客户明确未同意|自动决策未通过/, "系统拒绝不得套用客户/judge 措辞");
+
+  // 回归：真实客户路径逐字不变（system 分支不得截走非 system 来源）。
+  const customer = await tools(allow, {
+    customerInput: () => ({ outcome: "answered" as const, value: { confirmed: true as const }, operatorId: "alice" }),
+  }).get("request_confirmation")!.handler({ name: "request_confirmation", args: { title: "写入 docs/a.md" } });
+  assert.equal(customer.ok, true);
+  assert.equal(
+    customer.message,
+    "request_confirmation：客户已确认「写入 docs/a.md」（confirmed:true；操作者：alice）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。",
+    "客户 answered 文案逐字不变",
+  );
+  const customerDeclined = await tools(allow, {
+    customerInput: () => ({ outcome: "declined" as const, operatorId: "alice", reason: "内容还没看够" }),
+  }).get("request_confirmation")!.handler({ name: "request_confirmation", args: { title: "写入 docs/a.md" } });
+  assert.equal(
+    customerDeclined.message,
+    "request_confirmation：未获客户同意（原因：客户拒绝（内容还没看够））→ 不要写盘；如实告知客户，不得假设同意。",
+    "客户 declined 文案逐字不变",
+  );
+  // 回归：真实「未呈现」场景（非 system 来源）仍走既有「卡片未发出」回执。
+  const notPresented = await tools(allow, {
+    customerInput: () => ({ outcome: "declined" as const, operatorId: "judge:claude", notPresented: true as const, reason: "缺少 cardKind" }),
+  }).get("request_confirmation")!.handler({ name: "request_confirmation", args: { title: "写入 docs/a.md" } });
+  assert.match(notPresented.message, /治理确认卡未发出/);
+  assert.match(notPresented.message, /请补齐后重新调用/);
+  assert.doesNotMatch(notPresented.message, /系统预授权/);
 });

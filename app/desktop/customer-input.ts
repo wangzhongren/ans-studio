@@ -36,6 +36,7 @@ import type {
   CustomerInputOutcome,
   CustomerInputFn,
   CustomerInputMetadata,
+  CustomerInputOption,
   GovernanceCardKind,
   GovernanceJudgeAudit,
   GovernanceJudgeFn,
@@ -44,6 +45,18 @@ import type {
   GovernanceJudgeRequest,
   RuntimeKind,
 } from "../../src/model/runtime.ts";
+import type { BoundarySection1 } from "../../src/model/boundary.ts";
+// 边界内写入预授权（2026-10-25 客户新规则）：判定纯逻辑在 `write-preauthorization.ts`（本通道只在
+// **呈现卡片/调用判断之前**执行其结果）。边界判定唯一来源仍是门禁引擎 resolveWrite——本模块不做第二套。
+import {
+  WRITE_PREAUTHORIZATION_OPERATOR_ID,
+  evaluateWritePreauthorization,
+  writePreauthorizationSummary,
+  type WritePreauthorizationDecision,
+  type WritePreauthorizationEvent,
+  type WritePreauthorizationFacts,
+} from "./write-preauthorization.ts";
+export { WRITE_PREAUTHORIZATION_OPERATOR_ID } from "./write-preauthorization.ts";
 // 分组映射（`cardKind → approval/decision`）的**单一来源**（2026-10-18 双开关评审 §3.1）：
 // 本模块与 UI/编排/测试都读同一张表，绝不在这里写第二份。
 import { governanceCardGroup } from "../../src/model/runtime.ts";
@@ -109,6 +122,85 @@ export type OperatorDecisionPayload =
 
 /** 主进程注入的推送端点：把请求如实送到界面（electron webContents.send；测试注入收集器）。 */
 export type OperatorRequestPresenter = (payload: OperatorRequestPayload) => void;
+
+// ———————————————— 2026-10-25 验收分诊：呈现前闸（设计 §3.2 / §7.1 / §7.4） ————————————————
+//
+// 触发位置：verifier 的 `request_choice(cardKind=acceptance)` 到达、**任何客户卡呈现/判断代批之前**。
+// 本模块只提供**通用前闸**：把「验收卡 + 应用事实」交给主进程注入的 gate；gate 决定
+//   · `proceed`      —— 维持既有验收卡路径（pass 报告 / legacy / 非 trio / 记录损坏回落）；
+//   · `settle`       —— 不向客户呈现验收卡，直接以给定结果结算（缺结构退回 / 判断代批处置）；
+//   · `triage-card`  —— 用一张应用自有 choice 卡替换验收卡（同槽位、稳定 id），客户作答后再结算。
+// 分诊的业务判定（解析/建议/记录/路由/汇报）**全部在 Interface**；本模块不读盘、不评价报告。
+
+/** gate 可见的应用事实（原样来自请求、会话上下文与 `judgeContext`；本模块不重算）。 */
+export interface AcceptanceTriageGateFacts {
+  /** 被拦住的验收请求 id（`op-…`；审计用）。 */
+  requestId: string;
+  roleId: string;
+  projectRoot?: string;
+  runtime?: RuntimeKind;
+  /** 原始验收 choice 请求（原样；gate 不修改它）。 */
+  request: CustomerInputRequest;
+  /** 编排计算并透传的元数据（含 `judgeContext.flowId` 与物证路径；本模块只透传）。 */
+  metadata?: CustomerInputMetadata;
+  governanceModel?: "single" | "trio";
+}
+
+/** 应用自有分诊卡（复用 operator choice 卡；不新增 cardKind）。 */
+export interface AcceptanceTriageCardSpec {
+  /** 稳定分诊卡 id：`triage-<flowId>-<reportSha 前 8 位>`（同一报告只接受一次作答）。 */
+  id: string;
+  /** 呈现面：主入口主理角色 id（由 Interface 按 `primaryRoleId` 决定）。 */
+  roleId: string;
+  projectRoot?: string;
+  runtime?: RuntimeKind;
+  title: string;
+  question: string;
+  preview?: string;
+  options: CustomerInputOption[];
+}
+
+/** 客户对分诊卡的原始作答（取消/关窗 ⇒ declined）。 */
+export type AcceptanceTriageAnswer =
+  | { outcome: "answered"; selected: string[] }
+  | { outcome: "declined"; reason?: string };
+
+/**
+ * 分诊作答后的处置：`settlement` 用于结算**被拦住的验收请求**（`null` = 无活请求/重启恢复，
+ * 只执行处置、不伪造客户决定）；`run` 是处置执行（写记录/路由/汇报；失败只诊断，不翻转已完成的结算）。
+ */
+export interface AcceptanceTriageAnswerResult {
+  settlement: CustomerInputOutcome | null;
+  run?: () => Promise<void> | void;
+}
+
+/** gate 结果（见上方注释）。 */
+export type AcceptanceTriageGateResult =
+  | { action: "proceed" }
+  | { action: "settle"; outcome: CustomerInputOutcome; run?: () => Promise<void> | void }
+  | {
+      action: "triage-card";
+      card: AcceptanceTriageCardSpec;
+      onAnswer: (
+        answer: AcceptanceTriageAnswer,
+      ) => Promise<AcceptanceTriageAnswerResult> | AcceptanceTriageAnswerResult;
+    };
+
+/** 呈现前闸（主进程接线到 Interface `evaluateAcceptanceTriage`；缺省 ⇒ 不分诊、旧行为零变化）。 */
+export type AcceptanceTriageGate = (
+  facts: AcceptanceTriageGateFacts,
+) => Promise<AcceptanceTriageGateResult> | AcceptanceTriageGateResult;
+
+/**
+ * 外部（重启恢复）呈现一张分诊卡的入口：同一稳定 id 幂等（已在队列/已呈现 ⇒ 不重复呈现）。
+ * 返回 `{ok:true}` 表示卡已被受理/已在队列；呈现失败的 fail-closed 由通道既有语义处理。
+ */
+export type PresentAcceptanceTriageCardFn = (
+  card: AcceptanceTriageCardSpec,
+  onAnswer: (
+    answer: AcceptanceTriageAnswer,
+  ) => Promise<AcceptanceTriageAnswerResult> | AcceptanceTriageAnswerResult,
+) => { ok: boolean; error?: string };
 
 export interface OperatorExpiredPayload { id: string; roleId: string; projectRoot?: string; runtime?: CustomerInputMetadata["runtime"]; reason: string }
 
@@ -245,6 +337,27 @@ export interface CreateCustomerInputChannelOptions {
    * 三态/账本语义或后续排队；本模块自身不路由、不开会话、不写盘。
    */
   onAutoRework?: (info: AutoReworkCallbackInfo) => void;
+  /**
+   * **验收分诊呈现前闸（2026-10-25 设计 `2026-10-25_design_acceptance-triage.md` §3.2 / §7）**：
+   * 只对 `cardKind==="acceptance"` 的请求调用，且在**任何呈现/判断代批之前**。缺省 ⇒ 不分诊
+   * （旧行为逐字不变）。gate 抛错/未知结果 ⇒ 按 `proceed` 回落既有验收卡路径（fail-safe）。
+   * 本模块只执行 gate 结果；解析/记录/路由/汇报全在 Interface。
+   */
+  acceptanceTriage?: AcceptanceTriageGate;
+  /**
+   * **边界内写入预授权（2026-10-25 客户新规则）**：写盘确认请求在**呈现卡片/调用判断之前**求值。
+   *  · `accept`：全部声明写入路径在角色 Section 1 内且非治理敏感 ⇒ 直接以同意结算（不弹卡、不调 judge）；
+   *  · `reject`：任一路径越界/不可解析（含混合）⇒ 直接拒绝（不弹卡、不调 judge，原因列出路径与可写边界）；
+   *  · `confirm`：治理敏感类别或未声明写入路径 ⇒ 走**既有**卡片/判断路径（零行为变化）。
+   * 结算 `operatorId` 恰为 `WRITE_PREAUTHORIZATION_OPERATOR_ID`（system 前缀）——不是客户、不是 judge。
+   * 缺省（或会话未提供 `ctx.writeBoundary`）⇒ 不做预授权判定，旧行为逐字不变。
+   */
+  writePreauthorization?: (facts: WritePreauthorizationFacts) => WritePreauthorizationDecision;
+  /**
+   * 预授权结算后的**可见系统行**（主进程接线到既有事件流；抛错只记诊断，绝不影响已完成的结算）。
+   * 缺省 ⇒ 只记诊断。
+   */
+  onWritePreauthorization?: (event: WritePreauthorizationEvent) => void;
 }
 
 export interface CustomerInputChannel {
@@ -279,6 +392,12 @@ export interface CustomerInputChannel {
    * `pendingCount`/`queuedCount`/`pendingRoles`（看护把它视为角色忙碌，不点亮「等待你确认」徽标）。
    */
   judgingCount(): number;
+  /**
+   * **重启恢复：呈现一张应用自有分诊卡**（2026-10-25 验收分诊设计 §9.4 `awaiting-decision`）。
+   * 稳定 `card.id` 幂等：已在队列/已呈现 ⇒ 直接返回 `{ok:true}`（不重复弹卡）。没有活体验收请求时
+   * 客户作答只执行处置（由 `onAnswer` 返回 `settlement:null` 表达），**不伪造 customer.decision**。
+   */
+  presentAcceptanceTriageCard: PresentAcceptanceTriageCardFn;
 }
 
 /**
@@ -301,6 +420,13 @@ export type DesktopCustomerInputFn = (
     governanceJudge?: GovernanceJudgeFn;
     /** 当前轮投递给该角色的文本（≤4KB；判断 agent 的 `turnText` 输入）。缺省不猜。 */
     turnText?: string;
+    /**
+     * **本会话的 Section 1 边界快照（含接受证据）**（2026-10-25 客户新规则；`SessionManager.open`
+     * 按门禁同一解析源给出）。仅用于写盘确认的边界预授权判定；缺省 ⇒ 不判定（旧行为逐字不变）。
+     */
+    writeBoundary?: BoundarySection1;
+    /** `resolveWrite` 的 skill 根（与开会话同一份 ProjectConfig；`writeBoundary` 给出时才使用）。 */
+    skillRoot?: string;
   },
   metadata?: CustomerInputMetadata,
 ) => Promise<CustomerInputOutcome | null | undefined> | CustomerInputOutcome | null | undefined;
@@ -367,8 +493,10 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     /**
      * `queued` → `judging`（判断 agent 正在看卡；**不是**在等客户）→ `active`（卡片已呈现）/`done`。
      * 只有 `active` 进 `pending`；`judging` 占住一项目一卡，但**不点亮**「等待你确认」。
+     * `triaging`（2026-10-25 验收分诊）：验收请求正被前闸求值/已被分诊卡替换——不呈现原卡、
+     * 不进 pending，但**占住一项目一卡槽位**。
      */
-    state: "active" | "queued" | "judging" | "done";
+    state: "active" | "queued" | "judging" | "triaging" | "done";
     /** 同一请求只判断一次（§4.2）：进入 `judging` 即定格；`replay`/`drain` 永不再次判断。 */
     judged?: boolean;
     /** 判断所需的会话上下文（调用当刻快照；不含任何判定）。 */
@@ -391,6 +519,19 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     presented?: boolean;
     /** 已发过 `onExpired`（rejectAllPending / cancel / 结算补发共用；防重复通知）。 */
     expiredNotified?: boolean;
+    /** 验收分诊前闸是否已求值（同一请求只过闸一次；`replay`/`drain` 永不重判——同 `judged`）。 */
+    triageEvaluated?: boolean;
+    /** 应用自有卡（分诊卡）：作答后的处置与被它拦住/挂靠的验收请求。 */
+    appCard?: AppCardState;
+  }
+
+  /** 应用自有 choice 卡（分诊卡）的通道状态：不是角色工具请求、不写账本、不推导下一步。 */
+  interface AppCardState {
+    onAnswer: (
+      answer: AcceptanceTriageAnswer,
+    ) => Promise<AcceptanceTriageAnswerResult> | AcceptanceTriageAnswerResult;
+    /** 被这张分诊卡拦住（或重启后需在作答时补齐结算）的验收请求。 */
+    held: ChannelEntry[];
   }
   const pending = new Map<string, ChannelEntry>();
   /** 判断中的卡（不呈现、不计入 pending/queued/pendingRoles；中止时一并结算）。 */
@@ -399,6 +540,11 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   const waiting = new Map<string, ChannelEntry[]>();
   /** projectKey → 当前占位请求 id（未呈现时不存在）。 */
   const activeByProject = new Map<string, string>();
+  /**
+   * 分诊前闸求值中/已替换为分诊卡的验收请求（`payload.id → entry`）：不呈现、不计入 pending，
+   * 但**占住一项目一卡槽位**（分诊卡或被拦验收卡同一时刻只有一张可见卡）。中止/关窗时一并结算。
+   */
+  const triagingHolds = new Map<string, ChannelEntry>();
   const diagnostic = createDiagnosticLogger({ component: "desktop.customer-input" });
 
   const projectKeyOf = (ctx: { projectRoot?: string } | undefined): string =>
@@ -527,6 +673,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     entry.cleanup();
     entry.resolve(outcome);
     notifyNextStep(entry, outcome);
+    // 分诊卡结算：把客户作答应用到被拦验收请求，再执行 Interface 的处置（不阻塞 drain）。
+    if (entry.appCard !== undefined) finishAppCard(entry, outcome);
     drainProject(entry.projectKey);
   };
 
@@ -549,6 +697,185 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       // 推不达（窗口已关等）→ 未获同意（fail-closed），不留悬案；继续呈现同项目下一张。
       settleActive(entry, { outcome: "declined", operatorId, reason: mainT("main.customerInput.deliveryFailed", { detail: reasonOf(err) }) });
     }
+  };
+
+  // —————————————— 2026-10-25 验收分诊：呈现前闸 / 应用自有分诊卡 ——————————————
+  //
+  // 纪律：本模块只执行 gate 的**决定**（proceed / settle / triage-card），不做解析、不读报告、不写记录、
+  // 不路由返工、不写客户决定。分诊卡不是角色工具请求（无 cardKind ⇒ 不判断、不推导下一步、不写账本）；
+  // 被拦住的验收请求不进 pending（客户看不到它），但占住「一项目一卡」槽位直到结算。
+
+  /** 卡种（显式 cardKind 优先；与 `planJudge`/run-role 同口径）。 */
+  const cardKindOf = (entry: ChannelEntry): GovernanceCardKind | undefined =>
+    entry.request.cardKind ?? entry.metadata?.cardKind;
+
+  /** `operatorId` 补齐：客户手点分诊卡的结算仍归属客户；gate 已给出的（如 judge）不覆盖。 */
+  const withOperator = (outcome: CustomerInputOutcome): CustomerInputOutcome => {
+    if (outcome.outcome === "unavailable") return outcome;
+    const resolved =
+      typeof outcome.operatorId === "string" && outcome.operatorId !== "" ? outcome.operatorId : operatorId;
+    if (outcome.outcome === "answered") {
+      return {
+        outcome: "answered",
+        value: outcome.value,
+        operatorId: resolved,
+        ...(outcome.judge !== undefined ? { judge: outcome.judge } : {}),
+        ...(outcome.triage !== undefined ? { triage: outcome.triage } : {}),
+      };
+    }
+    return {
+      outcome: "declined",
+      operatorId: resolved,
+      ...(outcome.reason !== undefined ? { reason: outcome.reason } : {}),
+      ...(outcome.notPresented === true ? { notPresented: true as const } : {}),
+      ...(outcome.triage !== undefined ? { triage: outcome.triage } : {}),
+    };
+  };
+
+  /** 结算一张被分诊拦住的验收请求（不作为客户卡呈现；三态原样，绝不改写成 approve）。 */
+  const settleHeldAcceptance = (entry: ChannelEntry, outcome: CustomerInputOutcome): void => {
+    if (entry.state !== "triaging") return; // 已中止/已结算：丢弃（防双结算）
+    triagingHolds.delete(entry.payload.id);
+    entry.state = "done";
+    const normalized = withOperator(outcome);
+    entry.cleanup();
+    entry.resolve(normalized);
+    notifyNextStep(entry, normalized);
+  };
+
+  const findAppCard = (id: string): ChannelEntry | undefined =>
+    pending.get(id) ??
+    judging.get(id) ??
+    [...waiting.values()].flat().find((candidate) => candidate.payload.id === id);
+
+  const answerOfOutcome = (outcome: CustomerInputOutcome): AcceptanceTriageAnswer =>
+    outcome.outcome === "answered"
+      ? { outcome: "answered", selected: Array.isArray(outcome.value.selected) ? [...outcome.value.selected] : [] }
+      : { outcome: "declined", ...(typeof outcome.reason === "string" ? { reason: outcome.reason } : {}) };
+
+  /** 分诊卡结算后的处置：先结算被拦验收请求（同步部分），再异步执行处置（失败只诊断）。 */
+  const finishAppCard = (cardEntry: ChannelEntry, outcome: CustomerInputOutcome): void => {
+    const app = cardEntry.appCard;
+    if (app === undefined) return;
+    const held = app.held.splice(0);
+    const answer = answerOfOutcome(outcome);
+    const fallbackReason = mainT("main.customerInput.deliveryFailed", { detail: mainT("shared.common.unknownReason") });
+    let result: AcceptanceTriageAnswerResult | Promise<AcceptanceTriageAnswerResult>;
+    try {
+      result = app.onAnswer(answer);
+    } catch (error) {
+      diagnostic.error("acceptance.triage.answer.failed", error, { requestId: cardEntry.payload.id });
+      result = { settlement: { outcome: "declined", operatorId, reason: fallbackReason } };
+    }
+    const runSafely = (settled: AcceptanceTriageAnswerResult): void => {
+      if (settled.run === undefined) return;
+      void Promise.resolve()
+        .then(() => settled.run!())
+        .catch((error) => diagnostic.error("acceptance.triage.run.failed", error, { requestId: cardEntry.payload.id }));
+    };
+    const apply = (settled: AcceptanceTriageAnswerResult): void => {
+      for (const heldEntry of held) {
+        settleHeldAcceptance(
+          heldEntry,
+          settled.settlement ?? { outcome: "declined", operatorId, reason: fallbackReason },
+        );
+      }
+      runSafely(settled);
+    };
+    if (!(result instanceof Promise)) {
+      apply(result); // 同步结算：`settleEntry` 随后 drain，无需占位
+      return;
+    }
+    // 异步处置：用占位保持「一项目一卡」，直到被拦请求结算完毕（不让下一张卡插队）。
+    const placeholder = held[0]?.payload.id ?? `triage-settle-${cardEntry.payload.id}`;
+    activeByProject.set(cardEntry.projectKey, placeholder);
+    void result
+      .then(apply)
+      .catch((error) => {
+        diagnostic.error("acceptance.triage.answer.failed", error, { requestId: cardEntry.payload.id });
+        apply({ settlement: { outcome: "declined", operatorId, reason: fallbackReason } });
+      })
+      .finally(() => {
+        if (activeByProject.get(cardEntry.projectKey) === placeholder) activeByProject.delete(cardEntry.projectKey);
+        drainProject(cardEntry.projectKey);
+      });
+  };
+
+  /** 把一张被拦验收请求挂到分诊卡（若卡已在队列，摘出队列；状态 `triaging` 不入 pending）。 */
+  const attachHeld = (cardEntry: ChannelEntry, heldEntry: ChannelEntry): void => {
+    removeQueued(heldEntry);
+    heldEntry.state = "triaging";
+    triagingHolds.set(heldEntry.payload.id, heldEntry);
+    cardEntry.appCard?.held.push(heldEntry);
+  };
+
+  /** 找出挂着某张被拦请求的分诊卡（取消路径用；无 ⇒ undefined）。 */
+  const appCardHolding = (heldEntry: ChannelEntry): ChannelEntry | undefined =>
+    [...pending.values(), ...judging.values(), ...[...waiting.values()].flat()].find(
+      (cardEntry) => cardEntry.appCard?.held.includes(heldEntry) === true,
+    );
+
+  /**
+   * 呈现（或幂等复用）一张应用自有分诊卡。稳定 id ⇒ 同一报告只呈现一张、只答一次；
+   * 卡从不在呈现前调用判断 agent（无 cardKind），也不进入 `notifyNextStep` 的治理推导。
+   */
+  const presentTriageCardInternal = (
+    card: AcceptanceTriageCardSpec,
+    onAnswer: (
+      answer: AcceptanceTriageAnswer,
+    ) => Promise<AcceptanceTriageAnswerResult> | AcceptanceTriageAnswerResult,
+    heldEntry?: ChannelEntry,
+  ): { ok: boolean; error?: string } => {
+    if (opts.presenter === undefined) {
+      return { ok: false, error: mainT("main.customerInput.presenterMissing") };
+    }
+    const existing = findAppCard(card.id);
+    if (existing !== undefined) {
+      if (heldEntry !== undefined && existing.appCard !== undefined && !existing.appCard.held.includes(heldEntry)) {
+        attachHeld(existing, heldEntry);
+      }
+      return { ok: true };
+    }
+    const request: CustomerInputRequest = {
+      kind: "choice",
+      title: card.title,
+      question: card.question,
+      options: card.options,
+      ...(card.preview !== undefined ? { preview: card.preview } : {}),
+    };
+    const payload: OperatorRequestPayload = {
+      id: card.id,
+      roleId: card.roleId,
+      request,
+      anchorKey: interactionAnchorKey(request.kind, request.title),
+      ...(card.projectRoot !== undefined ? { projectRoot: card.projectRoot } : {}),
+      ...(card.runtime !== undefined ? { runtime: card.runtime } : {}),
+    };
+    const entry: ChannelEntry = {
+      payload,
+      request,
+      projectKey: typeof card.projectRoot === "string" && card.projectRoot !== "" ? card.projectRoot : "",
+      signals: [],
+      cleanup: () => {},
+      resolve: () => {}, // 应用自有卡没有角色 promise
+      state: "queued",
+      ctx: {},
+      appCard: { onAnswer, held: [] },
+    };
+    if (heldEntry !== undefined) attachHeld(entry, heldEntry);
+    // 正常路径：被拦验收请求已占位（activeByProject = held id），允许本轮替换；否则若项目已有别的占位，
+    // 按「一项目一卡」排队（重启恢复时极少数情况）。
+    const occupying = activeByProject.get(entry.projectKey);
+    if (occupying !== undefined && (heldEntry === undefined || occupying !== heldEntry.payload.id)) {
+      const queue = waiting.get(entry.projectKey) ?? [];
+      queue.push(entry);
+      waiting.set(entry.projectKey, queue);
+      diagnostic.record("acceptance.triage.card.queued", { requestId: card.id });
+      return { ok: true };
+    }
+    presentNow(entry);
+    diagnostic.record("acceptance.triage.card.presented", { requestId: card.id, heldCount: entry.appCard?.held.length ?? 0 });
+    return { ok: true };
   };
 
   /** 一次判断的定格计划（`shouldJudge` 全部满足才生成；只读事实，不含判定）。 */
@@ -907,8 +1234,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     settleJudgeOutcome(entry, plan, outcome);
   };
 
-  /** 呈现队首（只在项目无占位时调用）：先过判断门；`judging` 占住一项目一卡并异步判断，否则原路径呈现。 */
-  const presentEntry = (entry: ChannelEntry): void => {
+  /** 既有呈现路径（判断门 → judging / 直接呈现）；**不分诊**——分诊前闸在 `presentEntry`。 */
+  const presentEntryNow = (entry: ChannelEntry): void => {
     const plan = planJudge(entry);
     if (plan === undefined) {
       presentNow(entry);
@@ -956,6 +1283,93 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     void runJudge(entry, plan);
   };
 
+  /**
+   * 呈现队首（只在项目无占位时调用）：**先过验收分诊前闸**（2026-10-25；只对 acceptance 卡、只一次），
+   * 再走既有判断/呈现路径。旧调用（未注入 gate / 非验收卡）行为逐字不变。
+   */
+  const presentEntry = (entry: ChannelEntry): void => {
+    if (
+      opts.acceptanceTriage !== undefined &&
+      entry.triageEvaluated !== true &&
+      cardKindOf(entry) === "acceptance"
+    ) {
+      entry.triageEvaluated = true;
+      entry.state = "triaging";
+      activeByProject.set(entry.projectKey, entry.payload.id); // 占住一项目一卡槽位
+      triagingHolds.set(entry.payload.id, entry);
+      void runAcceptanceTriageGate(entry);
+      return;
+    }
+    presentEntryNow(entry);
+  };
+
+  /**
+   * 求值验收分诊前闸。任何不确定（gate 抛错 / 未知结果）都按 `proceed` 回落既有验收卡路径
+   * （fail-safe：更坏的情况只是保持旧行为，不伪造任何处置）。请求在等待期间被中止 ⇒ 丢弃结果。
+   */
+  const runAcceptanceTriageGate = async (entry: ChannelEntry): Promise<void> => {
+    const gate = opts.acceptanceTriage!;
+    let result: AcceptanceTriageGateResult;
+    try {
+      result = await gate({
+        requestId: entry.payload.id,
+        roleId: entry.payload.roleId,
+        ...(entry.payload.projectRoot !== undefined ? { projectRoot: entry.payload.projectRoot } : {}),
+        ...(entry.payload.runtime !== undefined ? { runtime: entry.payload.runtime } : {}),
+        request: entry.request,
+        ...(entry.metadata !== undefined ? { metadata: entry.metadata } : {}),
+        ...(entry.ctx.governanceModel !== undefined ? { governanceModel: entry.ctx.governanceModel } : {}),
+      });
+    } catch (error) {
+      diagnostic.error("acceptance.triage.gate.failed", error, { requestId: entry.payload.id });
+      result = { action: "proceed" };
+    }
+    if (entry.state !== "triaging") return; // 求值期间已中止/关窗：丢弃（已按 unavailable 结算）
+    if (result === null || typeof result !== "object" || typeof (result as { action?: unknown }).action !== "string") {
+      diagnostic.record("acceptance.triage.gate.unknown", { requestId: entry.payload.id });
+      result = { action: "proceed" };
+    }
+    if (result.action === "proceed") {
+      triagingHolds.delete(entry.payload.id);
+      entry.state = "queued";
+      presentEntryNow(entry); // 占位仍为本请求 id（presentNow/planJudge 会重设同一 id）
+      return;
+    }
+    if (result.action === "settle") {
+      settleHeldAcceptance(entry, result.outcome);
+      if (activeByProject.get(entry.projectKey) === entry.payload.id) activeByProject.delete(entry.projectKey);
+      if (result.run !== undefined) {
+        void Promise.resolve()
+          .then(() => result.action === "settle" ? result.run!() : undefined)
+          .catch((error) => diagnostic.error("acceptance.triage.run.failed", error, { requestId: entry.payload.id }));
+      }
+      drainProject(entry.projectKey);
+      return;
+    }
+    if (result.action === "triage-card") {
+      // 被拦请求保持 state=triaging（若卡呈现失败，`finishAppCard` 会以 declined 结算它——fail-closed）。
+      const presented = presentTriageCardInternal(result.card, result.onAnswer, entry);
+      if (!presented.ok) {
+        diagnostic.error("acceptance.triage.card.failed", new Error(presented.error ?? "present-failed"), {
+          requestId: result.card.id,
+        });
+        settleHeldAcceptance(entry, {
+          outcome: "declined",
+          operatorId,
+          reason: mainT("main.customerInput.deliveryFailed", { detail: presented.error ?? mainT("shared.common.unknownReason") }),
+        });
+        if (activeByProject.get(entry.projectKey) === entry.payload.id) activeByProject.delete(entry.projectKey);
+        drainProject(entry.projectKey);
+      }
+      return;
+    }
+    // 未知 action：按 proceed 回落（不猜、不执行）
+    diagnostic.record("acceptance.triage.gate.unknown", { requestId: entry.payload.id });
+    triagingHolds.delete(entry.payload.id);
+    entry.state = "queued";
+    presentEntryNow(entry);
+  };
+
   /** 同项目下一张：无占位且队列非空 ⇒ 按到达序呈现（绝不并发/合并/批准）。 */
   function drainProject(projectKey: string): void {
     if (activeByProject.has(projectKey)) return;
@@ -987,8 +1401,113 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     return count;
   }
 
-  const customerInput: DesktopCustomerInputFn = (req, ctx, metadata) =>
-    new Promise<CustomerInputOutcome>((resolve) => {
+  /**
+   * **边界内写入预授权（2026-10-25 客户新规则）**：在**呈现卡片/调用判断之前**结算写盘确认请求。
+   *
+   * 返回 `undefined` ＝ 不拦（走既有卡片/判断路径）；否则直接返回结算结果——不登记 pending、
+   * 不占「一项目一卡」、不调用 presenter、不调用判断 agent、不推导下一步（写盘卡本无下一步）。
+   * fail-closed 方向：只有「全部声明路径经门禁 resolveWrite 允许且非治理敏感」才 accept；
+   * 任一路径越界/无法解析 ⇒ reject；治理敏感或未声明路径 ⇒ 交回既有路径（零行为变化）。
+   * 结算 `operatorId` 恒为 `WRITE_PREAUTHORIZATION_OPERATOR_ID`——不是客户手批、不是 judge 代批。
+   */
+  const preauthorizeWrite = (
+    req: CustomerInputRequest,
+    ctx: Parameters<DesktopCustomerInputFn>[1],
+    metadata: CustomerInputMetadata | undefined,
+  ): CustomerInputOutcome | undefined => {
+    if (opts.presenter === undefined) return undefined; // 保留既有「未接线 → unavailable」语义
+    if (opts.writePreauthorization === undefined) return undefined;
+    if (req.kind !== "confirm") return undefined;
+    const boundary = ctx.writeBoundary;
+    const projectRoot = ctx.projectRoot;
+    const skillRoot = ctx.skillRoot;
+    if (
+      boundary === undefined ||
+      typeof projectRoot !== "string" ||
+      projectRoot === "" ||
+      typeof skillRoot !== "string" ||
+      skillRoot === ""
+    ) {
+      return undefined; // 无边界快照 ⇒ 不判定（旧行为；绝不「不知道边界就放行」）
+    }
+    // 已中止：交给既有取消语义（unavailable）；不在预授权里伪造结果。
+    if ([metadata?.signal, ctx.sessionSignal].some((signal) => signal?.aborted === true)) return undefined;
+    // 审计诊断带本请求的项目/角色上下文（字段仍走共享 logger 的白名单与脱敏）。
+    const writeLog = createDiagnosticLogger({
+      component: "desktop.write-preauthorization",
+      projectRoot,
+      ...(typeof ctx.roleId === "string" && ctx.roleId !== "" ? { roleId: ctx.roleId } : {}),
+    });
+    let decision: WritePreauthorizationDecision;
+    try {
+      decision = opts.writePreauthorization({
+        request: req,
+        boundary,
+        projectRoot,
+        skillRoot,
+        ...(metadata !== undefined ? { metadata } : {}),
+      });
+    } catch (error) {
+      // 判定异常 ⇒ 不拦（走既有卡片/判断路径）；绝不因异常而放行。
+      writeLog.error("write-preauthorization.evaluate.failed", error, {
+        toolCallId: metadata?.toolCallId,
+      });
+      return undefined;
+    }
+    if (decision.action === "confirm") {
+      // 只有治理敏感（有声明写入路径但保留既有专用流程）值得留痕；普通非写盘确认不刷诊断。
+      if (decision.reason === "governance-sensitive") {
+        writeLog.record("write-preauthorization.sensitive", {
+          reasonCode: decision.reason,
+          count: decision.sensitivePaths?.length ?? 0,
+          path: decision.sensitivePaths?.join("\n"),
+          toolCallId: metadata?.toolCallId,
+        });
+      }
+      return undefined;
+    }
+    const event: WritePreauthorizationEvent = {
+      action: decision.action,
+      roleId: String(ctx.roleId || ""),
+      projectRoot,
+      ...(ctx.runtime !== undefined ? { runtime: ctx.runtime } : {}),
+      paths: decision.paths,
+      summary: writePreauthorizationSummary(decision),
+    };
+    try {
+      opts.onWritePreauthorization?.(event);
+    } catch (error) {
+      writeLog.error("write-preauthorization.notice.failed", error, {});
+    }
+    if (decision.action === "accept") {
+      writeLog.record("write-preauthorization.accept", {
+        outcome: "accept",
+        count: decision.paths.length,
+        path: decision.paths.join("\n"),
+        toolCallId: metadata?.toolCallId,
+      });
+      return { outcome: "answered", value: { confirmed: true }, operatorId: WRITE_PREAUTHORIZATION_OPERATOR_ID };
+    }
+    writeLog.record("write-preauthorization.reject", {
+      outcome: "reject",
+      count: decision.paths.length + decision.unresolvedPaths.length,
+      path: [...decision.paths, ...decision.unresolvedPaths].join("\n"),
+      reasonCode: "boundary-preauthorization",
+      toolCallId: metadata?.toolCallId,
+    });
+    return {
+      outcome: "declined",
+      operatorId: WRITE_PREAUTHORIZATION_OPERATOR_ID,
+      reason: decision.reason,
+      // 卡片从未呈现：与既有「呈现前拒绝发卡」同义——工具回执不得说成客户拒绝。
+      notPresented: true,
+    };
+  };
+
+  const customerInput: DesktopCustomerInputFn = (req, ctx, metadata) => {
+    const preauthorized = preauthorizeWrite(req, ctx, metadata);
+    if (preauthorized !== undefined) return preauthorized;
+    return new Promise<CustomerInputOutcome>((resolve) => {
       // 退路：通道未配置 → 不可用（能力缺席即 fail-closed；绝不当「没人问、那就放行」）。
       if (opts.presenter === undefined) {
         resolve({ outcome: "unavailable", reason: mainT("main.customerInput.presenterMissing") });
@@ -1023,13 +1542,22 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         },
         ...(metadata !== undefined ? { metadata } : {}),
       };
-      /** 取消（轮次停止 / 会话重建）：active/judging ⇒ 结算并放行下一张；queued ⇒ 出队结算（从不呈现）。 */
+      /** 取消（轮次停止 / 会话重建）：active/judging/triaging ⇒ 结算并放行下一张；queued ⇒ 出队结算（从不呈现）。 */
       const cancel = () => {
         if (entry.state === "done") return;
-        const wasOccupying = entry.state === "active" || entry.state === "judging";
+        const wasOccupying =
+          entry.state === "active" || entry.state === "judging" || entry.state === "triaging";
         if (entry.state === "active") pending.delete(id);
         else if (entry.state === "judging") judging.delete(id);
-        else removeQueued(entry);
+        else if (entry.state === "triaging") {
+          triagingHolds.delete(id);
+          // 只摘除挂靠：分诊卡保留（客户再作答时只执行处置，无活请求可结算——不伪造客户决定）。
+          const cardEntry = appCardHolding(entry);
+          if (cardEntry?.appCard !== undefined) {
+            const index = cardEntry.appCard.held.indexOf(entry);
+            if (index >= 0) cardEntry.appCard.held.splice(index, 1);
+          }
+        } else removeQueued(entry);
         if (wasOccupying && activeByProject.get(projectKey) === id) activeByProject.delete(projectKey);
         entry.state = "done";
         entry.cleanup();
@@ -1063,6 +1591,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       }
       presentEntry(entry);
     });
+  };
 
   function respondUnsafe(input: { id?: unknown; decision?: unknown }): { ok: boolean; error?: string; expired?: boolean } {
     const id = input && typeof input.id === "string" ? input.id : "";
@@ -1124,8 +1653,18 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     diagnostic.record("interaction.closed", { pendingCount: pending.size, queuedCount: queuedCount() });
     // 已呈现的卡、判断中的卡与排队中的请求都归 declined（窗关/项目关闭 = 未获同意，fail-closed）；
     // 排队者从未呈现，仍经 onExpired 让界面清掉「等待前一个决定」行；判断中的卡迟到结果被丢弃（state=done）。
+    // 分诊中被拦的验收请求先结算（它们不在 pending），随后清空合成卡的挂靠列表（防重复结算/误执行处置）。
+    for (const heldEntry of triagingHolds.values()) {
+      if (heldEntry.state === "done") continue;
+      heldEntry.state = "done";
+      notifyExpired(heldEntry, reason);
+      heldEntry.cleanup();
+      heldEntry.resolve({ outcome: "declined", operatorId, reason });
+    }
+    triagingHolds.clear();
     for (const entry of [...pending.values(), ...judging.values(), ...[...waiting.values()].flat()]) {
       if (entry.state === "done") continue;
+      if (entry.appCard !== undefined) entry.appCard.held.splice(0);
       entry.state = "done";
       notifyExpired(entry, reason);
       entry.cleanup();
@@ -1192,6 +1731,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     pendingRoles,
     replayPending,
     judgingCount: () => judging.size,
+    presentAcceptanceTriageCard: (card, onAnswer) => presentTriageCardInternal(card, onAnswer),
   };
 }
 

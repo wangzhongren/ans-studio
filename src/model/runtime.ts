@@ -66,6 +66,26 @@ export interface RoleSession {
   prompt(text: string, opts?: PromptOptions): Promise<void>;
   events(): AsyncIterable<SessionEvent>;
 
+  /**
+   * 当前会话保留的后台任务快照（桌面任务面板展示用；2026-10-25）。
+   * 服务会话直接转调本会话唯一的管理器；无管理器（未注入 `ShellGate`、判断会话）或会话已关闭
+   * （含 `dispose()` 开始后）返回 `[]`。只读：任务表/日志/pid 只在内存，且只存在于本会话生命周期内；
+   * 不授予写权、不绕过审核，也不改变四工具与门禁语义。
+   */
+  listBackgroundTasks?(): BackgroundTaskSnapshot[];
+  /**
+   * 读取当前会话某个后台任务的状态与 stdout/stderr 尾部（默认 both / 40 行、上限 200，与
+   * `read_background_task` 同源）。无管理器、会话已关闭或 taskId 未知/已过期时返回 `undefined`；
+   * 不抛异常、不猜测任务状态。
+   */
+  readBackgroundTask?(taskId: string, options?: BackgroundTaskReadOptions): BackgroundTaskReadResult | undefined;
+  /**
+   * 按会话管理器的既有终止语义停止任务（`force` 同 `stop_background_task`）。无管理器或会话已关闭时
+   * 返回明确失败（`{ok:false, reason:"closed", …}`），**不抛异常、不伪造“已停止”**；未知 taskId 交给
+   * 管理器返回 `unknown-task`；`kill-timeout` 必须如实展示为“可能仍在运行”。
+   */
+  stopBackgroundTask?(taskId: string, options?: BackgroundTaskStopOptions): Promise<BackgroundTaskStopResult>;
+
   abort?(): Promise<void> | void;
   dispose(): Promise<void>;
 }
@@ -322,6 +342,28 @@ export type CustomerInputRequest = (
 ) &
   GovernanceCardMetadata;
 
+/**
+ * 验收分诊卡上客户实际选择的**结构化归因**（2026-10-25 验收分诊设计 §7.3 / §12.3）。
+ *
+ * 只在桌面把被拦住的验收请求按分诊结果结算时出现：它说明这次结算来自「下发统筹修改 / 仅汇报不返工」
+ * 的分诊卡，而不是客户在验收卡上直接选择了 accept/reject。可选、向后兼容——旧生产者不置位，
+ * 工具回执文案逐字不变。`report-only` 按既有 accepted 结算，但**不得**被回执说成「客户选择了 accept」。
+ */
+export interface CustomerInputTriageOutcome {
+  disposition: "rework" | "report-only";
+  /** `judge` = 判断代批（v1 为确定性规则 `judge-rule`）；`customer` = 客户在分诊卡上选择。 */
+  source: "judge" | "customer";
+  /** 报告结论（原样；分诊不改变验收结论）。 */
+  conclusion: "pass" | "fail" | "conditional";
+  /** 稳定分诊 id（`triage-<flowId>-<reportSha 前 8 位>`）。 */
+  triageId: string;
+}
+
+/**
+ * 客户输入结算结果。`operatorId` 前缀是工具回执分流依据（2026-10-25）：`judge:<engine>` = 判断
+ * agent 代批；`system:<机制>` = 系统裁决（如 `system:write-preauthorization` 边界内写入预授权，
+ * **不是客户手批**，也不是判断代批）；其余/缺席 = 客户或旧通道来源（既有语义逐字不变）。
+ */
 export type CustomerInputOutcome =
   | {
       outcome: "answered";
@@ -332,6 +374,8 @@ export type CustomerInputOutcome =
        * 客户手批不带本字段（仍是 `decisionEvidence.kind:"customer-input"`）。`declined`/`unavailable` 不加。
        */
       judge?: GovernanceJudgeAudit;
+      /** 验收分诊归因（2026-10-25；仅分诊结算置位；不是客户在验收卡上的直接选择）。 */
+      triage?: CustomerInputTriageOutcome;
     }
   | {
       outcome: "declined";
@@ -344,6 +388,8 @@ export type CustomerInputOutcome =
        * 工具处理器据此区分「系统拒绝发卡」与「客户拒绝」：不得回报「未获客户同意」。
        */
       notPresented?: true;
+      /** 验收分诊归因（2026-10-25；自动处置/退回等不呈现验收卡时的来源说明）。 */
+      triage?: CustomerInputTriageOutcome;
     }
   | { outcome: "unavailable"; reason?: string };
 
@@ -879,6 +925,35 @@ export type FlowStepSupersedeFn = (input: {
   /** 新步骤的前置 step id 列表（可选；仅承载，存在性/环/前置 `done` 校验在编排）。 */
   dependsOn?: string[];
 }) => Promise<FlowToolResult>;
+
+// —————————————— 独立复核请求（2026-10-25 客户要求；request_acceptance） ——————————————
+//
+// 背景：统筹（Steward）在交付完成后应能**直接提交独立复核**，而不是等应用的一次 settle/账本事件
+// 才派 Proof。为此新增内置治理角色可用的 `request_acceptance` 工具：**工具面只路由载荷并如实转达
+// 回执**——真正的派发（Proof/验收）、验收标准/变更包/风险档/流程完整性校验、flow/账本写入全部由
+// **应用注入的能力**实现（本层不实现业务、不写 flow/账本、不做治理判定）。
+// 纪律：请求复核 ≠ 客户决定、不代表客户批准；能力未注入 ⇒ 工具不注册（沿 flowGet 先例，最强 fail-closed）。
+
+/** `request_acceptance` 载荷：`flowId` 缺席＝当前/默认流程（由应用归一）；`note` 为可选说明。 */
+export interface RequestAcceptanceInput {
+  flowId?: string;
+  note?: string;
+}
+
+/**
+ * `request_acceptance` 的如实回执（形状冻结；工具层**原样**转达，不解释为客户批准）。
+ * `ok:true`＋`code:"dispatched"`＝应用已派发独立复核；其余 code 为如实的未派发/已派发原因。
+ */
+export interface RequestAcceptanceResult {
+  ok: boolean;
+  code: "dispatched" | "flow-not-found" | "criteria-missing" | "change-package-missing" | "change-package-no-risk" | "flow-incomplete" | "runtime-unresolved" | "already-dispatched" | "unavailable";
+  message: string;
+  flowId?: string;
+  runtime?: RuntimeKind;
+}
+
+/** `request_acceptance` 注入能力（派发/校验/flow/账本由应用实现；未注入 ⇒ 工具不注册）。 */
+export type RequestAcceptanceFn = (input: RequestAcceptanceInput) => Promise<RequestAcceptanceResult>;
 
 // —————————————— 推理与推理强度（G-5 wave 1 契约层；冻结符号，单一来源＝本模块） ——————————————
 //
@@ -1599,6 +1674,14 @@ export interface GovernedToolsOptions {
   flowStepUpdate?: FlowStepUpdateFn;
   /** `flow_step_supersede` 能力（仅 Steward/Lead 可成功，服务端校验）；未注入 ⇒ 工具不注册。 */
   flowStepSupersede?: FlowStepSupersedeFn;
+  /**
+   * 独立复核请求（2026-10-25 客户要求）：`request_acceptance` 能力——交付/证据/变更包已就绪后，
+   * 由统筹直接请应用派 Proof / 验收做**独立复核**，不再等待应用的一次 settle/账本事件。
+   * **只给内置治理角色 注入**（判据在编排/桌面注入端，本层不硬编码角色 id）；
+   * 未注入 ⇒ 工具不注册（结构性 fail-closed，沿 flowGet 先例）。派发/校验/flow/账本由能力实现；
+   * 本层只路由载荷并如实转达回执——**请求复核 ≠ 客户决定，不代表客户批准**。
+   */
+  requestAcceptance?: RequestAcceptanceFn;
   /**
    * 判断 agent（「替我审」）只读能力注入。**这是能力注入，不是工具注入**：注入后 Service 必须走
    * `buildShellJudgeTools`（`src/common/runtime-core/shell-judge/`），**不得**走 `buildGovernedTools`——

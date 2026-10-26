@@ -12,6 +12,11 @@ import type {
   DeliveryReceiptQueryV1, RuntimePersistenceErrorCode, RuntimeDeliveryProgressV1,
   RuntimeReasoningEventDetailV1,
   BackgroundTaskCapability,
+  BackgroundTaskReadOptions,
+  BackgroundTaskReadResult,
+  BackgroundTaskSnapshot,
+  BackgroundTaskStopOptions,
+  BackgroundTaskStopResult,
 } from "../../model/runtime.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import { buildGovernedTools, createDemoRuntimeAdapter } from "../../provider/runtime/tools.ts";
@@ -377,6 +382,24 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           if (failure) throw failure;
         },
         events: () => queue.stream,
+        // 会话级后台任务访问面（2026-10-25，桌面展示用）：只转调 providerFor 创建的同一个管理器，
+        // 不新建第二套状态；无管理器与会话关闭后的行为在方法内明确，且绝不重新创建管理器。
+        // 管理器自身在 dispose 时已置 closed 并清空任务，这里的 disposed 前置检查让 dispose 开始后的
+        // 调用也立即得到确定结果，不把清理中的任务当成仍可管理。
+        listBackgroundTasks(): BackgroundTaskSnapshot[] {
+          if (disposed) return [];
+          return provider.backgroundTasks?.list() ?? [];
+        },
+        readBackgroundTask(taskId: string, readOptions?: BackgroundTaskReadOptions): BackgroundTaskReadResult | undefined {
+          if (disposed) return undefined;
+          return provider.backgroundTasks?.read(taskId, readOptions);
+        },
+        async stopBackgroundTask(taskId: string, stopOptions?: BackgroundTaskStopOptions): Promise<BackgroundTaskStopResult> {
+          const manager = provider.backgroundTasks;
+          if (disposed) return { ok: false, reason: "closed", message: "会话已关闭，未停止任何任务；后台任务已随会话清理，不要当它仍在运行或已由本次调用停止" };
+          if (manager === undefined) return { ok: false, reason: "closed", message: "当前会话未启用后台任务能力（未注入 ShellGate 或属于判断会话），未停止任何任务" };
+          return manager.stop(taskId, stopOptions);
+        },
         ...(inner.abort ? { async abort() {
           if (!active) return;
           const turn = active;

@@ -756,7 +756,7 @@ export function createGovernanceJudge(opts: CreateGovernanceJudgeOptions): Gover
     }
     if (busy) {
       return {
-        ...manualOutcome("unavailable", "判断 agent 正忙（已有一次判断在进行）；请稍后重试。"),
+        ...manualOutcome("unavailable", "自动代理正忙（已有一次判断在进行）；请稍后重试。"),
         group: request.group,
         cardKind: request.cardKind,
         engine: requestRuntime,

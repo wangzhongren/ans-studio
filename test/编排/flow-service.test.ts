@@ -19,6 +19,7 @@ import {
   type FlowToolViewWithRelease,
 } from "../../src/common/编排/flow-service.ts";
 import {
+  completeAcceptanceCriteriaStep,
   completeAcceptanceStep,
   completeCustomerDecisionStep,
   completeRoleCardsStep,
@@ -2970,4 +2971,200 @@ test("completeCustomerDecisionStep 不注册为角色工具：AdapterCapabilitie
   assert.match(runRoleSource, /flowStepUpdate\?: FlowStepUpdateFn/);
   assert.match(runRoleSource, /flowStepSupersede\?: FlowStepSupersedeFn/);
 });
+
+// —————————————————————— 2026-10-25 应用专用：completeAcceptanceCriteriaStep ——————————————————————
+
+function acceptanceCriteriaFlow(
+  over: {
+    status?: string;
+    kind?: string;
+    includeCriteria?: boolean;
+    criteriaId?: string;
+  } = {},
+): string {
+  const status = over.status ?? "pending";
+  const kind = over.kind ?? "artifact";
+  const criteriaId = over.criteriaId ?? "acceptance-criteria";
+  return [
+    "flowId: flow-a",
+    "version: 1",
+    "qualityTier: production",
+    "status: in-progress",
+    "steps:",
+    ...(over.includeCriteria === false
+      ? []
+      : [
+          `  - id: ${criteriaId}`,
+          "    title: 实施前完成标准",
+          "    owner: app",
+          `    kind: ${kind}`,
+          `    status: ${status}`,
+          ...(status === "done" ? ["    evidence: { kind: artifact, ref: docs/acceptance/flow-a-criteria-v1.md }"] : []),
+        ]),
+    "  - id: role-readiness",
+    "    title: 角色就绪复核",
+    "    owner: convener",
+    "    kind: artifact",
+    "    status: pending",
+    "  - id: verification",
+    "    title: 验收",
+    "    owner: verifier",
+    "    kind: acceptance",
+    "    status: pending",
+    "",
+  ].join("\n");
+}
+
+test("completeAcceptanceCriteriaStep：最新标准存在 ⇒ done + app/app artifact.observed；只改目标步骤、不写 customer.decision", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, acceptanceCriteriaFlow());
+    writeFile(root, "docs/acceptance/flow-a-criteria-v1.md", "# v1\n");
+    writeFile(root, "docs/acceptance/flow-a-criteria-v2.md", "# v2\n");
+    const beforeRevision = (await steward(root).get({ flowId: "flow-a" })).revision!;
+
+    const result = await completeAcceptanceCriteriaStep({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(result.ok, true, result.error ?? "");
+    assert.deepEqual(result.evidence, { kind: "artifact", ref: "docs/acceptance/flow-a-criteria-v2.md" });
+    assert.equal(result.criteriaPath, "docs/acceptance/flow-a-criteria-v2.md", "最高版本优先（不回退 v1）");
+    assert.notEqual(result.revision, beforeRevision);
+
+    const flow = readFlow(root).flow;
+    const step = stepOf(flow, "acceptance-criteria");
+    assert.equal(step.status, "done");
+    assert.deepEqual(step.evidence, { kind: "artifact", ref: "docs/acceptance/flow-a-criteria-v2.md" });
+    assert.equal(step.owner, "app", "不改 owner");
+    assert.equal(step.kind, "artifact", "不改 kind");
+    assert.equal(stepOf(flow, "role-readiness").status, "pending", "其它步骤保持不变");
+    assert.equal(stepOf(flow, "verification").status, "pending");
+
+    const ledger = await readGovernanceLedger(root);
+    const observed = ledger.entries.filter((entry) => entry.kind === "artifact.observed");
+    assert.equal(observed.length, 1, "artifact.observed 恰一条");
+    assert.equal(observed[0]?.actorRoleId, "app");
+    assert.equal(observed[0]?.power, "app");
+    assert.equal(observed[0]?.artifactPath, "docs/acceptance/flow-a-criteria-v2.md");
+    assert.equal(observed[0]?.artifactSha256, sha256("# v2\n"), "账本 sha256 = 标准文件实际 sha256");
+    assert.equal(observed[0]?.flowId, "flow-a");
+    assert.equal(ledger.entries.filter((entry) => entry.kind === "customer.decision").length, 0, "不写客户决定");
+  });
+});
+
+test("completeAcceptanceCriteriaStep：已 done ⇒ ok/idempotent/already-done，不读标准、不写账本/flow", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, acceptanceCriteriaFlow({ status: "done" }));
+    const before = flowBytes(root);
+    const beforeRevision = (await steward(root).get({ flowId: "flow-a" })).revision!;
+
+    const first = await completeAcceptanceCriteriaStep({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(first.ok, true, first.error ?? "");
+    assert.equal(first.idempotent, true);
+    assert.equal(first.alreadyDone, true);
+    assert.equal(first.code, "already-done");
+    assert.equal(first.revision, beforeRevision);
+    assert.deepEqual(first.evidence, { kind: "artifact", ref: "docs/acceptance/flow-a-criteria-v1.md" });
+    assert.equal(flowBytes(root), before, "幂等命中不得重写文件");
+
+    const second = await completeAcceptanceCriteriaStep({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(second.ok, true);
+    assert.equal(second.idempotent, true);
+    assert.equal(second.revision, beforeRevision);
+    const ledger = await readGovernanceLedger(root);
+    assert.equal(ledger.entries.length, 0, "已 done 不读/写账本");
+  });
+});
+
+test("completeAcceptanceCriteriaStep：标准缺失 ⇒ acceptance-criteria-missing，flow/账本零写入", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, acceptanceCriteriaFlow());
+    const before = flowBytes(root);
+
+    const result = await completeAcceptanceCriteriaStep({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "acceptance-criteria-missing");
+    assert.match(result.error ?? "", /flow-a-criteria-vN\.md/);
+    assert.equal(flowBytes(root), before, "flow 不变");
+    assert.equal(stepOf(readFlow(root).flow, "acceptance-criteria").status, "pending");
+    assert.equal((await readGovernanceLedger(root)).entries.length, 0, "不补观测");
+  });
+});
+
+test("completeAcceptanceCriteriaStep：非 acceptance-criteria flow/步骤 ⇒ 明确失败且零写入", async () => {
+  await withRoot(async (root) => {
+    // 1) 流程没有 acceptance-criteria 步骤。
+    writeFile(root, FLOW_REL, acceptanceCriteriaFlow({ includeCriteria: false }));
+    writeFile(root, "docs/acceptance/flow-a-criteria-v1.md", "# v1\n");
+    const missingBefore = flowBytes(root);
+    const missing = await completeAcceptanceCriteriaStep({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(missing.ok, false);
+    assert.equal(missing.code, "acceptance-criteria-step-missing");
+    assert.equal(flowBytes(root), missingBefore);
+    assert.equal((await readGovernanceLedger(root)).entries.length, 0);
+
+    // 2) 有同名步骤但 kind 不是 artifact。
+    writeFile(root, FLOW_REL, acceptanceCriteriaFlow({ kind: "customer-decision" }));
+    const kindBefore = flowBytes(root);
+    const unsupported = await completeAcceptanceCriteriaStep({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(unsupported.ok, false);
+    assert.equal(unsupported.code, "acceptance-criteria-kind-unsupported");
+    assert.equal(flowBytes(root), kindBefore);
+    assert.equal((await readGovernanceLedger(root)).entries.length, 0);
+  });
+});
+
+test("completeAcceptanceCriteriaStep：非 pending/dispatched（delivered）⇒ 终态拒绝，不覆盖状态", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, acceptanceCriteriaFlow({ status: "delivered" }));
+    writeFile(root, "docs/acceptance/flow-a-criteria-v1.md", "# v1\n");
+    const before = flowBytes(root);
+    const result = await completeAcceptanceCriteriaStep({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "acceptance-criteria-step-terminal");
+    assert.match(result.error ?? "", /delivered/);
+    assert.equal(flowBytes(root), before);
+    assert.equal((await readGovernanceLedger(root)).entries.length, 0);
+  });
+});
+
+test("completeAcceptanceCriteriaStep：已有同 path+sha 观测 ⇒ 不重复追加；flow 复位后可重试收口", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, acceptanceCriteriaFlow());
+    writeFile(root, "docs/acceptance/flow-a-criteria-v1.md", "# v1\n");
+    writeLedger(root, [
+      ledgerEntry({
+        kind: "artifact.observed",
+        actorRoleId: "app",
+        power: "app",
+        artifactPath: "docs/acceptance/flow-a-criteria-v1.md",
+        artifactSha256: sha256("# v1\n"),
+        flowId: "flow-a",
+      }),
+    ]);
+
+    const result = await completeAcceptanceCriteriaStep({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(result.ok, true, result.error ?? "");
+    const ledger = await readGovernanceLedger(root);
+    assert.equal(
+      ledger.entries.filter((entry) => entry.kind === "artifact.observed").length,
+      1,
+      "同 path+sha 不重复追加",
+    );
+    assert.equal(stepOf(readFlow(root).flow, "acceptance-criteria").status, "done");
+  });
+});
+
+test("completeAcceptanceCriteriaStep 不注册为角色工具：run-role/model/provider 无该能力，公共出口再导出", () => {
+  const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
+  const runRoleSource = readFileSync(join(repoRoot, "src", "pipeline", "orchestration", "run-role.ts"), "utf8");
+  const runtimeSource = readFileSync(join(repoRoot, "src", "model", "runtime.ts"), "utf8");
+  const providerToolsSource = readFileSync(join(repoRoot, "src", "provider", "runtime", "tools.ts"), "utf8");
+  const publicExit = readFileSync(join(repoRoot, "src", "pipeline", "orchestration", "flow-state.ts"), "utf8");
+
+  assert.doesNotMatch(runRoleSource, /completeAcceptanceCriteriaStep/, "run-role 不得注册/引用应用专用收口函数");
+  assert.doesNotMatch(runtimeSource, /completeAcceptanceCriteriaStep/, "model/runtime 不得承载该能力");
+  assert.doesNotMatch(providerToolsSource, /completeAcceptanceCriteriaStep/, "provider 工具不得暴露该能力");
+  assert.match(publicExit, /completeAcceptanceCriteriaStep/, "桌面公共出口必须再导出");
+  assert.match(publicExit, /CompleteAcceptanceCriteriaStepInput/);
+  assert.match(publicExit, /CompleteAcceptanceCriteriaStepResult/);
+});
+
 

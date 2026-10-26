@@ -588,15 +588,429 @@ test("B1–B4 key 分区：ui/main/shared 计数与总 key 数符合契约（漏
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
   assert.deepEqual(prefixes, {
-    ui: 708, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7 + 2026-10-25 chat-panel 10
-    main: 486, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6
+    ui: 783, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7 + 2026-10-25 chat-panel 10 + background tasks 25 + flow status 22 + acceptance triage 28
+    main: 495, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6 + backgroundTasks 1 + flowStatus 2 + write preauthorization 6
     shared: 62, // B4 元数据 + 跨层通用短词
     preferences: 3, // B0
   });
-  assert.equal(keys.length, 1259);
+  assert.equal(keys.length, 1343);
   // B1/B2 与 B3 分区（扣除 B0 的 5 个 ui.* / 5 个 main.*）。
-  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 703);
-  assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 481);
+  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 778);
+  assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 490);
+});
+
+/**
+ * 2026-10-25 后台任务 UI key（运行时 `BackgroundTaskCapability`: list/read/stop）。
+ * 契约：26 个 key（`ui.background.*` 25 + `main.backgroundTasks.unavailable` 1）成对存在；
+ * 状态文案与 `BackgroundTaskState` 五态一一对应；占位符 zh/en 一致；
+ * `ui.background.count` 英文走复数 one/other。
+ */
+const BACKGROUND_TASK_KEYS = [
+  "ui.background.title",
+  "ui.background.count",
+  "ui.background.empty",
+  "ui.background.runningSummary",
+  "ui.background.role",
+  "ui.background.command",
+  "ui.background.startedAt",
+  "ui.background.pid",
+  "ui.background.duration",
+  "ui.background.exitCode",
+  "ui.background.state.running",
+  "ui.background.state.exited",
+  "ui.background.state.stopped",
+  "ui.background.state.failed",
+  "ui.background.state.killTimeout",
+  "ui.background.viewLog",
+  "ui.background.hideLog",
+  "ui.background.logEmpty",
+  "ui.background.logTruncated",
+  "ui.background.stop",
+  "ui.background.stopConfirm",
+  "ui.background.stopFailed",
+  "ui.background.readFailed",
+  "ui.background.loadFailed",
+  "ui.background.refresh",
+  "main.backgroundTasks.unavailable",
+] as const satisfies readonly MessageKey[];
+
+test("后台任务 key：26 个 key 在 zh-CN/en-US 均存在，状态五态与占位符符合契约", () => {
+  assert.equal(BACKGROUND_TASK_KEYS.length, 26);
+  for (const key of BACKGROUND_TASK_KEYS) {
+    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
+    assert.ok(key in enUS, `en-US 缺 ${key}`);
+  }
+  assert.deepEqual(
+    [
+      "ui.background.state.running",
+      "ui.background.state.exited",
+      "ui.background.state.stopped",
+      "ui.background.state.failed",
+      "ui.background.state.killTimeout",
+    ].map((key) => zhCN[key as MessageKey]),
+    ["运行中", "已退出", "已停止", "启动失败", "停止超时"],
+  );
+  const expectedPlaceholders: Record<string, string[]> = {
+    "ui.background.count": ["count"],
+    "ui.background.runningSummary": ["count"],
+    "ui.background.exitCode": ["code"],
+    "ui.background.stopFailed": ["detail"],
+    "ui.background.readFailed": ["detail"],
+    "ui.background.loadFailed": ["detail"],
+  };
+  for (const [key, expected] of Object.entries(expectedPlaceholders)) {
+    assert.deepEqual(placeholdersOf(zhCN[key as MessageKey]), expected, `zh-CN 占位符不符契约：${key}`);
+    assert.deepEqual(placeholdersOf(enUS[key as MessageKey]), expected, `en-US 占位符不符契约：${key}`);
+  }
+  assert.equal(translate("zh-CN", "ui.background.count", { count: 3 }), "后台任务 3");
+  assert.equal(translate("en-US", "ui.background.count", { count: 1 }), "1 background task");
+  assert.equal(translate("en-US", "ui.background.count", { count: 3 }), "3 background tasks");
+});
+
+/**
+ * 2026-10-25 流程状态界面 key（`docs/flows/<flowId>.yaml` 步骤进度）。
+ * 契约：`ui.flow.*` 22 个 + `main.flowStatus.*` 2 个成对存在；
+ * 七态（pending/dispatched/delivered/done/failed/blocked/superseded）与四类步骤
+ * kind（artifact/dispatch/customerDecision/acceptance）文案固定；
+ * `ui.flow.progress` 占位符 {done}/{total}，`loadFailed`/`parseError` 占位符
+ * {detail}、{file}+{detail}，zh/en 一致；`hideAll` 语义为收起未完成步骤。
+ */
+const FLOW_STATUS_KEYS = [
+  "ui.flow.title",
+  "ui.flow.progress",
+  "ui.flow.current",
+  "ui.flow.owner",
+  "ui.flow.updatedAt",
+  "ui.flow.empty",
+  "ui.flow.loadFailed",
+  "ui.flow.parseError",
+  "ui.flow.showAll",
+  "ui.flow.hideAll",
+  "ui.flow.state.pending",
+  "ui.flow.state.dispatched",
+  "ui.flow.state.delivered",
+  "ui.flow.state.done",
+  "ui.flow.state.failed",
+  "ui.flow.state.blocked",
+  "ui.flow.state.superseded",
+  "ui.flow.kind.artifact",
+  "ui.flow.kind.dispatch",
+  "ui.flow.kind.customerDecision",
+  "ui.flow.kind.acceptance",
+  "ui.flow.refresh",
+  "main.flowStatus.unavailable",
+  "main.flowStatus.invalidProject",
+] as const satisfies readonly MessageKey[];
+
+test("流程状态 key：22 个 ui.flow.* + 2 个 main.flowStatus.* 在 zh-CN/en-US 均存在", () => {
+  assert.equal(FLOW_STATUS_KEYS.length, 24);
+  assert.equal(
+    FLOW_STATUS_KEYS.filter((key) => key.startsWith("ui.flow.")).length,
+    22,
+  );
+  assert.equal(
+    FLOW_STATUS_KEYS.filter((key) => key.startsWith("main.flowStatus.")).length,
+    2,
+  );
+  for (const key of FLOW_STATUS_KEYS) {
+    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
+    assert.ok(key in enUS, `en-US 缺 ${key}`);
+  }
+});
+
+test("流程状态 key：七态与四类 kind 文案符合契约，占位符 zh-en 一致", () => {
+  const stateKeys = [
+    "ui.flow.state.pending",
+    "ui.flow.state.dispatched",
+    "ui.flow.state.delivered",
+    "ui.flow.state.done",
+    "ui.flow.state.failed",
+    "ui.flow.state.blocked",
+    "ui.flow.state.superseded",
+  ] as const satisfies readonly MessageKey[];
+  assert.deepEqual(
+    stateKeys.map((key) => zhCN[key]),
+    ["待处理", "已派发", "已交付", "已完成", "失败", "阻塞", "已替代"],
+  );
+  assert.deepEqual(
+    stateKeys.map((key) => enUS[key]),
+    ["Pending", "Dispatched", "Delivered", "Done", "Failed", "Blocked", "Superseded"],
+  );
+  const kindKeys = [
+    "ui.flow.kind.artifact",
+    "ui.flow.kind.dispatch",
+    "ui.flow.kind.customerDecision",
+    "ui.flow.kind.acceptance",
+  ] as const satisfies readonly MessageKey[];
+  assert.deepEqual(
+    kindKeys.map((key) => zhCN[key]),
+    ["产物", "派工", "客户决定", "验收"],
+  );
+  assert.deepEqual(
+    kindKeys.map((key) => enUS[key]),
+    ["Artifact", "Dispatch", "Customer decision", "Acceptance"],
+  );
+  const expectedPlaceholders: Record<string, string[]> = {
+    "ui.flow.progress": ["done", "total"],
+    "ui.flow.loadFailed": ["detail"],
+    "ui.flow.parseError": ["detail", "file"],
+  };
+  for (const [key, expected] of Object.entries(expectedPlaceholders)) {
+    assert.deepEqual(placeholdersOf(zhCN[key as MessageKey]), expected, `zh-CN 占位符不符契约：${key}`);
+    assert.deepEqual(placeholdersOf(enUS[key as MessageKey]), expected, `en-US 占位符不符契约：${key}`);
+  }
+});
+
+test("流程状态 key：标题/空态/展开收起/刷新/主进程错误取值固定，en-US 不含中文", () => {
+  const expectedZh: Record<string, string> = {
+    "ui.flow.title": "流程状态",
+    "ui.flow.current": "当前步骤",
+    "ui.flow.owner": "负责",
+    "ui.flow.updatedAt": "更新时间",
+    "ui.flow.empty": "暂无流程状态",
+    "ui.flow.showAll": "显示全部步骤",
+    "ui.flow.hideAll": "收起未完成步骤",
+    "ui.flow.refresh": "刷新",
+    "main.flowStatus.unavailable": "流程状态服务不可用",
+    "main.flowStatus.invalidProject": "无效的项目目录",
+  };
+  const expectedEn: Record<string, string> = {
+    "ui.flow.title": "Flow status",
+    "ui.flow.current": "Current step",
+    "ui.flow.owner": "Owner",
+    "ui.flow.updatedAt": "Updated",
+    "ui.flow.empty": "No flow status",
+    "ui.flow.showAll": "Show all steps",
+    "ui.flow.hideAll": "Hide unfinished steps",
+    "ui.flow.refresh": "Refresh",
+    "main.flowStatus.unavailable": "Flow status service unavailable",
+    "main.flowStatus.invalidProject": "Invalid project directory",
+  };
+  for (const [key, value] of Object.entries(expectedZh)) {
+    assert.equal(zhCN[key as MessageKey], value, `zh-CN 取值不符契约：${key}`);
+    assert.equal(enUS[key as MessageKey], expectedEn[key], `en-US 取值不符契约：${key}`);
+  }
+  for (const key of FLOW_STATUS_KEYS) {
+    const value = enUS[key];
+    const text = typeof value === "string" ? value : Object.values(value).join("");
+    assert.equal(valueContainsHan(text), false, `en-US 含中文：${key}`);
+  }
+});
+
+test("流程状态 key：进度/读取失败/解析失败插值", () => {
+  assert.equal(translate("zh-CN", "ui.flow.progress", { done: 5, total: 18 }), "5/18 步");
+  assert.equal(translate("en-US", "ui.flow.progress", { done: 5, total: 18 }), "5/18 steps");
+  assert.equal(
+    translate("zh-CN", "ui.flow.loadFailed", { detail: "ENOENT" }),
+    "读取流程状态失败：ENOENT",
+  );
+  assert.equal(
+    translate("en-US", "ui.flow.loadFailed", { detail: "ENOENT" }),
+    "Failed to load flow status: ENOENT",
+  );
+  assert.equal(
+    translate("zh-CN", "ui.flow.parseError", {
+      file: "docs/flows/flow-a.yaml",
+      detail: "bad indentation",
+    }),
+    "docs/flows/flow-a.yaml 解析失败：bad indentation",
+  );
+  assert.equal(
+    translate("en-US", "ui.flow.parseError", {
+      file: "docs/flows/flow-a.yaml",
+      detail: "bad indentation",
+    }),
+    "Failed to parse docs/flows/flow-a.yaml: bad indentation",
+  );
+});
+
+/**
+ * 2026-10-25 验收分诊卡 key（设计 `2026-10-25_design_acceptance-triage.md` §十三 语义；
+ * 本批只补共享目录，桌面UI 接线在后续批次）。
+ * 契约：`ui.triage.*` 28 个成对存在；结论三态、严重度四级、区块四段、来源两类、
+ * 选项两项与建议三型文案固定；严重度中文采用设计术语（阻断/重要/次要/风格建议）；
+ * zh-CN 的角色名沿用目录既有译名「验收」（对应 en-US `Proof`）；
+ * 汇报文本占位符 zh/en 一致。
+ */
+const TRIAGE_KEYS = [
+  "ui.triage.title",
+  "ui.triage.question",
+  "ui.triage.option.rework",
+  "ui.triage.option.reportOnly",
+  "ui.triage.advice.rework",
+  "ui.triage.advice.reportOnly",
+  "ui.triage.advice.none",
+  "ui.triage.conclusion.pass",
+  "ui.triage.conclusion.fail",
+  "ui.triage.conclusion.conditional",
+  "ui.triage.severity.blocker",
+  "ui.triage.severity.major",
+  "ui.triage.severity.minor",
+  "ui.triage.severity.nit",
+  "ui.triage.section.summary",
+  "ui.triage.section.failures",
+  "ui.triage.section.improvements",
+  "ui.triage.section.source",
+  "ui.triage.source.judge",
+  "ui.triage.source.customer",
+  "ui.triage.warn.blockingReportOnly",
+  "ui.triage.report.head",
+  "ui.triage.report.reasonLine",
+  "ui.triage.report.actionLine",
+  "ui.triage.report.pathLine",
+  "ui.triage.report.noRework",
+  "ui.triage.returnedToVerifier",
+  "ui.triage.missingReport",
+] as const satisfies readonly MessageKey[];
+
+test("验收分诊 key：28 个 ui.triage.* 在 zh-CN/en-US 均存在且成对", () => {
+  assert.equal(TRIAGE_KEYS.length, 28);
+  assert.equal(TRIAGE_KEYS.filter((key) => key.startsWith("ui.triage.")).length, 28);
+  for (const key of TRIAGE_KEYS) {
+    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
+    assert.ok(key in enUS, `en-US 缺 ${key}`);
+  }
+});
+
+test("验收分诊 key：标题/问题/选项/结论/严重度/区块/来源文案符合契约", () => {
+  const expectedZh: Record<string, string> = {
+    "ui.triage.title": "验收分诊",
+    "ui.triage.question": "对本次验收结果如何处理？",
+    "ui.triage.option.rework": "下发统筹修改",
+    "ui.triage.option.reportOnly": "仅汇报不返工",
+    "ui.triage.conclusion.pass": "通过",
+    "ui.triage.conclusion.fail": "不通过",
+    "ui.triage.conclusion.conditional": "有条件通过",
+    "ui.triage.severity.blocker": "阻断",
+    "ui.triage.severity.major": "重要",
+    "ui.triage.severity.minor": "次要",
+    "ui.triage.severity.nit": "风格建议",
+    "ui.triage.section.summary": "验收结论",
+    "ui.triage.section.failures": "不通过原因",
+    "ui.triage.section.improvements": "改进方案",
+    "ui.triage.section.source": "决定来源",
+    "ui.triage.source.judge": "判断代批（替我决策）",
+    "ui.triage.source.customer": "客户选择",
+    "ui.triage.advice.none": "无法自动建议，请人工判断",
+  };
+  const expectedEn: Record<string, string> = {
+    "ui.triage.title": "Acceptance triage",
+    "ui.triage.question": "How should this acceptance result be handled?",
+    "ui.triage.option.rework": "Send to coordinator for fixes",
+    "ui.triage.option.reportOnly": "Report only, no rework",
+    "ui.triage.conclusion.pass": "Pass",
+    "ui.triage.conclusion.fail": "Fail",
+    "ui.triage.conclusion.conditional": "Conditional pass",
+    "ui.triage.severity.blocker": "Blocker",
+    "ui.triage.severity.major": "Major",
+    "ui.triage.severity.minor": "Minor",
+    "ui.triage.severity.nit": "Nit",
+    "ui.triage.section.summary": "Result",
+    "ui.triage.section.failures": "Failures",
+    "ui.triage.section.improvements": "Improvements",
+    "ui.triage.section.source": "Decision source",
+    "ui.triage.source.judge": "Judge delegation",
+    "ui.triage.source.customer": "Customer choice",
+    "ui.triage.advice.none": "No automatic recommendation; please decide manually",
+  };
+  for (const [key, value] of Object.entries(expectedZh)) {
+    assert.equal(zhCN[key as MessageKey], value, `zh-CN 取值不符契约：${key}`);
+    assert.equal(enUS[key as MessageKey], expectedEn[key], `en-US 取值不符契约：${key}`);
+  }
+  // 两个选项必须可区分，避免 UI 无法区分返工与仅汇报。
+  assert.notEqual(zhCN["ui.triage.option.rework"], zhCN["ui.triage.option.reportOnly"]);
+  assert.notEqual(enUS["ui.triage.option.rework"], enUS["ui.triage.option.reportOnly"]);
+});
+
+test("验收分诊 key：建议/覆盖提示/汇报文本占位符与插值符合契约，en-US 不含中文", () => {
+  const expectedPlaceholders: Record<string, string[]> = {
+    "ui.triage.advice.rework": ["blockers", "majors"],
+    "ui.triage.advice.reportOnly": ["minors"],
+    "ui.triage.warn.blockingReportOnly": [],
+    "ui.triage.report.head": ["conclusion"],
+    "ui.triage.report.reasonLine": ["id", "reason", "severity"],
+    "ui.triage.report.actionLine": ["action"],
+    "ui.triage.report.pathLine": ["path"],
+    "ui.triage.report.noRework": ["source"],
+    "ui.triage.returnedToVerifier": [],
+    "ui.triage.missingReport": ["detail"],
+  };
+  for (const [key, expected] of Object.entries(expectedPlaceholders)) {
+    assert.deepEqual(placeholdersOf(zhCN[key as MessageKey]), expected, `zh-CN 占位符不符契约：${key}`);
+    assert.deepEqual(placeholdersOf(enUS[key as MessageKey]), expected, `en-US 占位符不符契约：${key}`);
+  }
+  for (const key of TRIAGE_KEYS) {
+    const value = enUS[key];
+    const text = typeof value === "string" ? value : Object.values(value).join("");
+    assert.equal(valueContainsHan(text), false, `en-US 含中文：${key}`);
+  }
+  assert.equal(
+    translate("zh-CN", "ui.triage.advice.rework", { blockers: 1, majors: 2 }),
+    "建议下发统筹修改（1 个阻断、2 个重要项，改进方案可执行）",
+  );
+  assert.equal(
+    translate("en-US", "ui.triage.advice.rework", { blockers: 1, majors: 2 }),
+    "Recommend sending to the coordinator for fixes — blockers: 1, major items: 2; the improvement plan is actionable",
+  );
+  assert.equal(
+    translate("zh-CN", "ui.triage.advice.reportOnly", { minors: 3 }),
+    "建议仅汇报不返工（仅 3 个次要/风格项）",
+  );
+  assert.equal(
+    translate("en-US", "ui.triage.advice.reportOnly", { minors: 3 }),
+    "Recommend reporting only, without rework — minor/style items: 3",
+  );
+  assert.equal(
+    translate("zh-CN", "ui.triage.report.head", {
+      conclusion: translate("zh-CN", "ui.triage.conclusion.conditional"),
+    }),
+    "验收结论：有条件通过",
+  );
+  assert.equal(
+    translate("en-US", "ui.triage.report.head", {
+      conclusion: translate("en-US", "ui.triage.conclusion.fail"),
+    }),
+    "Acceptance result: Fail",
+  );
+  assert.equal(
+    translate("zh-CN", "ui.triage.report.reasonLine", {
+      id: "F-2",
+      severity: translate("zh-CN", "ui.triage.severity.blocker"),
+      reason: "写入路径越界",
+    }),
+    "F-2 · 阻断：写入路径越界",
+  );
+  assert.equal(
+    translate("en-US", "ui.triage.report.reasonLine", {
+      id: "F-2",
+      severity: translate("en-US", "ui.triage.severity.blocker"),
+      reason: "write path out of bounds",
+    }),
+    "F-2 · Blocker: write path out of bounds",
+  );
+  assert.equal(
+    translate("zh-CN", "ui.triage.report.noRework", {
+      source: translate("zh-CN", "ui.triage.source.customer"),
+    }),
+    "本次不返工（客户选择）",
+  );
+  assert.equal(
+    translate("en-US", "ui.triage.report.noRework", {
+      source: translate("en-US", "ui.triage.source.judge"),
+    }),
+    "No rework this time (Judge delegation)",
+  );
+  assert.equal(
+    translate("zh-CN", "ui.triage.missingReport", { detail: "ENOENT" }),
+    "验收报告不可读：ENOENT",
+  );
+  assert.equal(
+    translate("en-US", "ui.triage.missingReport", { detail: "ENOENT" }),
+    "Acceptance report unreadable: ENOENT",
+  );
+  // 退回补充指向验证角色：zh-CN 用目录既有译名「验收」，en-US 用角色名 Proof。
+  assert.ok(zhCN["ui.triage.returnedToVerifier"].includes("验收"));
+  assert.ok(enUS["ui.triage.returnedToVerifier"].includes("Proof"));
 });
 
 test("B1–B4 锚点 key：每个组件/来源文件的代表 key 全部存在（zh + en）", () => {
@@ -1266,6 +1680,96 @@ test("验收返工路由 key：zh-CN/en-US 取值与插值（客户/自动/等�
   assert.ok(auditEn.includes("writing the audit record failed"));
   assert.ok(auditEn.includes("sent fact is not reversed"));
   assert.ok(auditEn.includes("does not fabricate ledger entries"));
+});
+
+/**
+ * 2026-10-25 写入预授权系统行 key（`app/desktop/write-preauthorization.ts`；客户 2026-10-25 规则：
+ * `request_confirmation` 前闸对边界内写入直接放行、对边界外/混合/不可解析直接拒绝，不呈现确认卡、
+ * 不调用判断 agent）。
+ * 契约：`main.customerInput.writePreauthorization.*` 6 个 key 成对存在；
+ * accepted/rejected 占位符 {paths}，reason.boundary/unresolved/mixed 与 noPaths 无占位符；
+ * 拒绝措辞必须写明「边界外不给写、未呈现确认卡、未调用判断 agent」；en-US 不含中文。
+ */
+const WRITE_PREAUTHORIZATION_KEYS = [
+  "main.customerInput.writePreauthorization.accepted",
+  "main.customerInput.writePreauthorization.rejected",
+  "main.customerInput.writePreauthorization.reason.boundary",
+  "main.customerInput.writePreauthorization.reason.unresolved",
+  "main.customerInput.writePreauthorization.reason.mixed",
+  "main.customerInput.writePreauthorization.noPaths",
+] as const satisfies readonly MessageKey[];
+
+test("写入预授权 key：6 个 key 在 zh-CN/en-US 均存在，占位符集合符合契约", () => {
+  assert.equal(WRITE_PREAUTHORIZATION_KEYS.length, 6);
+  const expectedPlaceholders: Record<(typeof WRITE_PREAUTHORIZATION_KEYS)[number], string[]> = {
+    "main.customerInput.writePreauthorization.accepted": ["paths"],
+    "main.customerInput.writePreauthorization.rejected": ["paths"],
+    "main.customerInput.writePreauthorization.reason.boundary": [],
+    "main.customerInput.writePreauthorization.reason.unresolved": [],
+    "main.customerInput.writePreauthorization.reason.mixed": [],
+    "main.customerInput.writePreauthorization.noPaths": [],
+  };
+  for (const key of WRITE_PREAUTHORIZATION_KEYS) {
+    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
+    assert.ok(key in enUS, `en-US 缺 ${key}`);
+    assert.deepEqual(placeholdersOf(zhCN[key]), expectedPlaceholders[key], `zh-CN 占位符不符契约：${key}`);
+    assert.deepEqual(placeholdersOf(enUS[key]), expectedPlaceholders[key], `en-US 占位符不符契约：${key}`);
+  }
+});
+
+test("写入预授权 key：zh-CN/en-US 取值与插值；拒绝措辞不冒充客户/判断决定；en-US 不含中文", () => {
+  assert.equal(
+    translate("zh-CN", "main.customerInput.writePreauthorization.accepted", { paths: "docs/a.md" }),
+    "边界内写入预授权，已直接放行：docs/a.md",
+  );
+  assert.equal(
+    translate("en-US", "main.customerInput.writePreauthorization.accepted", { paths: "docs/a.md" }),
+    "Boundary write pre-authorized; allowed: docs/a.md",
+  );
+  const rejectedZh = translate("zh-CN", "main.customerInput.writePreauthorization.rejected", {
+    paths: "docs/a.md、secret/key.pem",
+  });
+  assert.equal(
+    rejectedZh,
+    "系统预授权拒绝写入：docs/a.md、secret/key.pem（边界外不给写；未向客户呈现确认卡、未调用判断 agent）",
+  );
+  // 拒绝是系统预授权，不是客户拒绝/判断代批：必须写明未呈现确认卡、未调用判断 agent。
+  assert.ok(rejectedZh.includes("未向客户呈现确认卡"));
+  assert.ok(rejectedZh.includes("未调用判断 agent"));
+  const rejectedEn = translate("en-US", "main.customerInput.writePreauthorization.rejected", {
+    paths: "docs/a.md, secret/key.pem",
+  });
+  assert.equal(
+    rejectedEn,
+    "System pre-authorization rejected: docs/a.md, secret/key.pem (outside the role boundary; no customer card, no judge call)",
+  );
+  assert.ok(rejectedEn.includes("no customer card"));
+  assert.ok(rejectedEn.includes("no judge call"));
+  const reasonExpectedZh: Record<string, string> = {
+    "main.customerInput.writePreauthorization.reason.boundary": "目标路径未匹配任何边界或不在可写范围内",
+    "main.customerInput.writePreauthorization.reason.unresolved": "无法解析声明路径（绝对路径/../空段）",
+    "main.customerInput.writePreauthorization.reason.mixed": "请求包含边界外路径，整单拒绝",
+    "main.customerInput.writePreauthorization.noPaths": "写确认缺少可解析的声明路径",
+  };
+  const reasonExpectedEn: Record<string, string> = {
+    "main.customerInput.writePreauthorization.reason.boundary":
+      "Target path is outside the role's writable boundary",
+    "main.customerInput.writePreauthorization.reason.unresolved":
+      "Declared path cannot be resolved",
+    "main.customerInput.writePreauthorization.reason.mixed":
+      "Request contains out-of-boundary paths; rejected as a whole",
+    "main.customerInput.writePreauthorization.noPaths":
+      "Write confirmation has no resolvable declared paths",
+  };
+  for (const [key, value] of Object.entries(reasonExpectedZh)) {
+    assert.equal(zhCN[key as MessageKey], value, `zh-CN 取值不符契约：${key}`);
+    assert.equal(enUS[key as MessageKey], reasonExpectedEn[key], `en-US 取值不符契约：${key}`);
+  }
+  for (const key of WRITE_PREAUTHORIZATION_KEYS) {
+    const value = enUS[key];
+    const text = typeof value === "string" ? value : Object.values(value).join("");
+    assert.equal(valueContainsHan(text), false, `en-US 含中文：${key}`);
+  }
 });
 
 test("B1–B4 key 规范：ASCII 字母开头、点分隔、允许 camelCase/数字/连字符；不含中文", () => {
