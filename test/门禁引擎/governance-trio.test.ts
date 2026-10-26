@@ -2154,3 +2154,192 @@ test("2026-10-26 边界变更请求：Steward 卡在写集/边界不足时调用
   assert.equal(convener.capabilities.dispatchTask, true);
   assert.equal(convener.capabilities.shell, "operator-approve");
 });
+
+// —————————————————————— 14) 2026-10-26 独立复核时机（早而持续） ——————————————————————
+
+test("2026-10-26 独立复核时机：Steward 在脚手架/首个垂直切片/每个 delivery/验收前亲自核对产物，不只看状态/账本，UI/游戏须关 DEBUG 截图，不符合立即退回", () => {
+  // 客户结论：团队计划不需要引入图 schema；统筹本来就有独立复核职责，问题是复核太晚。本批只改
+  // Convener 卡文本，把「早而持续的证据复核」固化到执行过程，避免只在变更包/验收阶段才第一次看产物。
+  const c = governanceRoleOf("convener")!.cardText;
+
+  // 1) 章节与总口径：复核太晚才是问题；亲自看产物与证据，不只看步骤状态/账本/文件存在；
+  //    复核只做判断与退回，不代替 Proof/客户。
+  assertCardIncludes(
+    c,
+    [
+      "## 独立复核时机（必须）",
+      "复核太晚",
+      "亲自看产物与证据",
+      "不是只看步骤状态 / 账本",
+      "复核只做判断与退回，不代替 Proof / 客户决定",
+      "也不写客户批准",
+    ],
+    "Steward 独立复核时机总口径",
+  );
+
+  // 2) 四个检查点：脚手架交付后、首个垂直切片/首个可玩交付后、每个 delivery 后/标 done 前/派下游前、
+  //    变更包/验收最后一关（但不得成为第一次看产物）。
+  assertCardIncludes(
+    c,
+    [
+      "1. **脚手架交付后**",
+      "真实执行安装、`npm run typecheck` 与最小测试",
+      "应用能启动或最小运行",
+      "不能只看文件存在",
+      "未通过不派任何实现交付",
+      "2. **首个垂直切片 / 首个可玩交付后**",
+      "真实运行截图 / 录屏（关 DEBUG）",
+      "DOM / CLI 输出与验收标准逐条对照",
+      "通过后才允许铺后续模块",
+      "不合格立即退回返工",
+      "3. **每个 delivery 交付后、标 `done` 前、派后续依赖前**",
+      "核对交付物、截图、测试输出、证据路径与验收标准",
+      "而不是只看步骤状态或账本记录",
+      "不得先标 `done`、不得先派下游",
+      "4. **变更包 / 验收阶段仍是最后一关，但不得成为第一次看产物**",
+      "不是只在验收阶段才看产物",
+      "若你此时才第一次看产物，视为复核失职",
+      "验收由 Proof / 应用门禁负责，你不代替",
+    ],
+    "Steward 独立复核四个检查点",
+  );
+
+  // 3) UI/游戏/视觉类派发：关 DEBUG 真实截图/录屏 + 验收标准指针；派下游前亲自核对，不符合立即退回，
+  //    不等 Proof。
+  assertCardIncludes(
+    c,
+    [
+      "**UI / 游戏 / 视觉类派发（必须）**",
+      "`dispatch_task` 任务文本必须要求交付附「真实运行截图 / 录屏（关 DEBUG）+ 验收标准指针 + 关 DEBUG 说明」",
+      "亲自核对画面 / 输出是否符合验收标准",
+      "不符合立即退回返工",
+      "不等 Proof 才发现",
+    ],
+    "Steward UI/游戏派发复核要求",
+  );
+
+  // 4) 记录纪律与标准工作流指针：写入 scheduling/治理记录、不伪造 done；第 6/7 步同口径。
+  assertCardIncludes(
+    c,
+    [
+      "写入 `docs/scheduling/**` 或你的治理工作记录",
+      "不得伪造 `done` 证据",
+      "不得把复核写成客户批准或验收通过",
+      "6. 收齐回交",
+      "核对按「独立复核时机（必须）」执行",
+      "标 `done` 前必须完成「独立复核时机（必须）」的逐产物核对",
+    ],
+    "Steward 独立复核记录与工作流指针",
+  );
+
+  // 5) 注册表数据面零变化：本批只改卡文本，不加能力位、不改写权。
+  const convener = governanceRoleOf("convener")!;
+  assert.deepEqual(convener.entries.map((e) => e.path), [
+    "docs/flows/",
+    "docs/workflow.md",
+    "docs/scheduling/",
+    "docs/governance/convener/",
+  ]);
+  assert.deepEqual(convener.preauthorizedDirs, [
+    "docs/flows/",
+    "docs/scheduling/",
+    "docs/governance/convener/",
+  ]);
+  assert.equal(convener.capabilities.dispatchTask, true);
+  assert.equal(convener.capabilities.shell, "operator-approve");
+});
+
+// —————————————————————— 15) 2026-10-26 Gate 规划（只给规则，不实现新工具） ——————————————————————
+
+test("2026-10-26 Gate 规划：Steward 按产品类型/风险在计划中写清 gate id/标准指针/证据/dependsOn，Proof 独判、统筹不自审，不新增工具/schema", () => {
+  // 客户口径：只给规则，不实现 request_gate_review / gateKind / 账本 / 新工具；客户可能做其他业务，
+  // 统筹只需在规划时知道哪些地方要设 gate。本批只改 Convener 卡文本 + 测试。
+  const c = governanceRoleOf("convener")!.cardText;
+
+  // 1) 章节与 gate 类型：垂直切片、视觉基线、集成与性能、最终客户验收；T0/纯文档可显式不设但不得默默省略。
+  assertCardIncludes(
+    c,
+    [
+      "## Gate 规划（规则，必须）",
+      "按产品类型与风险先识别要设哪些 gate",
+      "**只做规划规则**",
+      "垂直切片 gate",
+      "首个可玩 / 可用切片",
+      "真实素材、真实运行、关 DEBUG 截图 / 输出",
+      "视觉基线 gate",
+      "golden 截图与像素规格 / 比例 / 图层基线",
+      "集成与性能 gate",
+      "全量测试、e2e、性能采样与阈值",
+      "**最终**：客户验收",
+      "沿用现有 `verification` / `acceptance`",
+      "语义不变",
+      "T0 / 纯文档类",
+      "**显式说明不设额外 gate**",
+      "不得默默省略",
+    ],
+    "Steward Gate 规划类型",
+  );
+
+  // 2) 计划要素与下游依赖：gate id、验收标准指针、证据要求、dependsOn；未完成不派下游实现。
+  assertCardIncludes(
+    c,
+    [
+      "**gate id**",
+      "**验收标准指针**",
+      "**证据要求**（截图 / 运行输出 / 测试报告）",
+      "**下游依赖 `dependsOn`**",
+      "gate 未完成不得派下游实现步骤",
+      "沿用现有 `dependsOn` 门禁",
+      "不新增检查",
+      "按「Gate 规划（规则，必须）」用现有步骤表达所需 gate",
+      "按「Gate 规划（规则，必须）」识别并按产品类型 / 风险写清每个 gate",
+    ],
+    "Steward Gate 计划要素与工作流指针",
+  );
+
+  // 3) 独立判断只由 Proof/验收做；统筹只查证据齐备、走现有通道；提前 gate 无通道时如实上报，不自审。
+  assertCardIncludes(
+    c,
+    [
+      "**独立判断只由 Proof / 验收做**",
+      "只检查证据是否齐备",
+      "按现有应用通道提交复核",
+      "最终验收用 `request_acceptance`",
+      "提前 gate 若当前没有通道",
+      "**如实上报 Lead / 主理 与客户**",
+      "不得自查代替",
+      "不得自己标 gate 通过",
+      "不得把自查写成 Proof 结论",
+    ],
+    "Steward Gate 独立判断与不自审",
+  );
+
+  // 4) 不实现新工具/schema：无新 FlowStepKind、无 request_gate_review/gateKind、无账本 kind、不引入图 schema。
+  assertCardIncludes(
+    c,
+    [
+      "**不新增 `FlowStepKind` / 工具 / 账本 kind**",
+      "不引入 `request_gate_review`、`gateKind`",
+      "gate 用现有步骤表达（如 `artifact` / `acceptance`）",
+      "不改变现有验收语义",
+      "不为 gate 引入图 schema",
+    ],
+    "Steward Gate 无新工具/schema",
+  );
+
+  // 5) 注册表数据面零变化：本批只改卡文本，不加能力位、不改写权。
+  const convener = governanceRoleOf("convener")!;
+  assert.deepEqual(convener.entries.map((e) => e.path), [
+    "docs/flows/",
+    "docs/workflow.md",
+    "docs/scheduling/",
+    "docs/governance/convener/",
+  ]);
+  assert.deepEqual(convener.preauthorizedDirs, [
+    "docs/flows/",
+    "docs/scheduling/",
+    "docs/governance/convener/",
+  ]);
+  assert.equal(convener.capabilities.dispatchTask, true);
+  assert.equal(convener.capabilities.shell, "operator-approve");
+});
