@@ -1,0 +1,8 @@
+card checks: 51/51
+nominator card has Gate 规划: false
+nominator card has 独立复核时机: false
+convener entries: ["docs/flows/","docs/workflow.md","docs/scheduling/","docs/governance/convener/"]
+convener preauthorizedDirs: ["docs/flows/","docs/scheduling/","docs/governance/convener/"]
+convener capabilities: {"customerInput":true,"handOffIntent":false,"requestClarification":false,"dispatchTask":true,"roleStatus":true,"sessionTail":true,"proposeRecovery":true,"installSkill":false,"installMcp":false,"shell":"operator-approve"}
+convener forbiddenWritePaths: [".ans/","docs/bootstrap-manifest.md","角色卡/governance-boundary.yaml","角色卡/","docs/proposals/","docs/nominations/","docs/skills/","docs/mcp/"]
+design checks: 5/5

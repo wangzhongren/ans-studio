@@ -17,11 +17,14 @@ events:
   - date: "2026-10-26"
     kind: verified
     summary: 补充验收（第三轮）fb40368（对比 2eeeeb6；产品/测试/卡文本 4 文件 +47/−7）：F3a（electron-builder.config.* 恢复拦截且 yml/yaml 仍拒）、F6（关键路径先剥一个尾斜杠，发布根/治理路径带斜杠新增与移除均 invalid-path，正常目录 config/newdir/ 保留目录语义）、统筹卡 rejected 回执语义均 PASS；typecheck 0、桌面全量 646/646、runtime-core 9/9、编排 3/3、门禁 327（326+1skip）；治理 e2e 首跑 154/155（既有 R2 flake）、复跑 155/155；F3a/F6 关闭，第三轮补充验收 PASS，整体维持有条件通过（真实模型/Electron/非 Windows 未验证）
+  - date: "2026-10-26"
+    kind: verified
+    summary: 规则批独立验收 cdbf1aa..c843bd6（Gate 规划与早复核规则，rules-only；3 文件 +947/−4）：四类 gate 固定、适用矩阵、每 gate 模板（id/验收标准指针/证据清单/owner/Proof 独立判定/dependsOn）、game 示例、失败返工与下游门禁、统筹不自审、无新工具/schema、四个早复核检查点与 UI/游戏关 DEBUG 证据要求均 PASS；typecheck 0、门禁 329（328+1skip）；卡文本探针 51/51、设计声明 5/5、注册表数据面零变化；非阻断观察：设计文档「未改角色卡」为设计阶段声明、Steward/Crew 措辞与仅改 Steward 卡需确认、规则为文本约束未在线验证
 ---
 
 # 边界变更门禁通道（request_boundary_change）与治理优先 README 独立验收
 
-**总体结论：有条件通过。** 被验收提交 `6b7ef38` 在 A1–A7 上未发现行为性 FAIL：工具仅对统筹（convener）注入、确定性校验与 AI 门禁的分层、幂等与票据恢复、组队仍走 appointment-write、README 版本/能力分层与状态语义均与代码一致。条件与未阻断问题见 §五、§六、§七 与 §十/§十一（补充验收两轮：§十 `2eeeeb6` 不通过—F3a/F6；§十一 `fb40368` 修复后 PASS，F3a/F6 关闭）：
+**总体结论：有条件通过。** 被验收提交 `6b7ef38` 在 A1–A7 上未发现行为性 FAIL：工具仅对统筹（convener）注入、确定性校验与 AI 门禁的分层、幂等与票据恢复、组队仍走 appointment-write、README 版本/能力分层与状态语义均与代码一致。条件与未阻断问题见 §五、§六、§七 与 §十/§十一（补充验收两轮：§十 `2eeeeb6` 不通过—F3a/F6；§十一 `fb40368` 修复后 PASS，F3a/F6 关闭）；§十二 为规则批 `cdbf1aa..c843bd6` 独立验收：PASS（rules-only，附 2 项非阻断文档/口径观察）：
 
 1. README 两语言版均声称确定性校验「无通配符」，但实际 `src/*.ts` 可通过校验（独立探针实证）；需改文档或补校验。
 2. 统筹/组队卡文本要求「目录条目以 `/` 结尾」，但应用校验器明确拒绝尾斜杠（含测试断言）；需对齐二者（目录增删的表达方式）。
@@ -277,3 +280,36 @@ events:
 - 既有 `2026-10-23 重派门` 账本时序 flaky 与 R2 request_acceptance e2e flaky 仍存在（后者本轮首跑 154/155、复跑 155/155；与 fb40368 无关）。
 
 **补充结论（第三轮）：PASS；FAIL：无。** F3a/F6 两项关闭；请求的卡文本 `rejected` 语义已落地；测试无弱化、无新权限/边界扩大。整体候选（`6b7ef38` + `2eeeeb6` + `fb40368`）维持 **有条件通过**，剩余条件为真实模型/Electron/非 Windows 未验证与既有 flaky/过程项（F4/F5）。上述证据文件（`21_`–`28_`）位于同一证据目录。
+
+## 十二、规则批独立验收：cdbf1aa..c843bd6（Gate 规划与早复核规则，rules-only）
+
+**对象与范围**：HEAD `c843bd61e7580f750c83767b11aa133e54141248`，范围 `cdbf1aa..c843bd6`（两笔：`cd6d042` 规则批 + `c843bd6` 适用矩阵/模板补全）。**3 文件 +947/−4**：`src/common/门禁引擎/governance-roles.ts` +66/−4（仅注释与 `CONVENER_CARD_TEXT` 文本）、`test/门禁引擎/governance-trio.test.ts` +227/−0（纯新增）、`角色卡/项目管理/docs/design/2026-10-26_design_proof-gate-reviews.md` +654/−0（新增设计文档）。`git diff --check` exit 0；无 app/src 其它代码、无 `FlowStepKind`/工具/账本 kind 变更、无 `package.json`/依赖变化。候选期曾观察到工作树中未提交的同内容草稿（后成为 `c843bd6`）；本报告最终测试与探针在 **干净 HEAD `c843bd6`** 上重新采集。
+
+**实测（Node v24.22.1，Windows 11）**：
+
+| 命令 | 结果 | 证据 |
+| --- | --- | --- |
+| `npm run typecheck` | exit 0 | `30_rules-typecheck.txt` |
+| `node --test "test/门禁引擎/**/*.test.ts"` | 329（328 过 / 1 Windows 平台权限 skip） | `31_rules-gate-engine-tests.txt` |
+| 独立卡文本/注册表探针 | 卡规则 51/51 命中；设计文档声明 5/5；注册表数据面与变更前一致 | `32_rules-card-probe.txt` / `.mjs` |
+
+**逐项判定**：
+
+| 项 | 结论 | 核实要点 |
+| --- | --- | --- |
+| 1. 范围与 rules-only | **PASS** | 仅 3 文件；`governance-roles.ts` 只改注释与 Steward 卡文本，无能力位/预授权/禁写/entries 变化；无新 `FlowStepKind`/工具/账本 kind。设计文档 `status: rules-only` 明说 `request_gate_review`、`gateKind`、账本 `gate.review` 等**未实施、未授权**、不新增 `FlowStepKind`/工具、不引入图 schema |
+| 2. 四类 gate 固定 | **PASS** | Steward 卡「Gate 规划（规则，必须）」：四个固定 gate 节点＝**垂直切片、视觉基线、集成 / 性能、最终客户验收**；四类证据口径逐项写明（垂直切片＝脚手架后首个可玩/可用 + 关 DEBUG 截图/输出；视觉基线＝每关/关键页 golden 截图与像素规格/比例/图层；集成/性能＝全量测试/e2e/性能采样/阈值；最终验收＝沿用现有 `verification`/`acceptance`） |
+| 3. 适用矩阵 | **PASS** | 卡内含风险档×产品类型矩阵：原型档（垂直切片+最终；UI/游戏加视觉；多模块/多端加集成/性能）、生产档（UI/游戏四类；CLI/后端垂直切片+集成/性能+最终；纯库集成/性能+最终）、T0/纯文档（只保留最终或**显式说明不设额外 gate 并写理由**，不得默默省略）。测试逐行断言，探针 51/51 |
+| 4. gate 模板与 game 示例 | **PASS** | 每个 gate 必填：`gate id`、`验收标准指针`、`证据清单`（截图/运行输出/测试报告/性能数据，UI/游戏注明关 DEBUG）、`负责人`（证据 owner，不是 Proof）、`独立判定`＝Proof/验收、`下游 dependsOn`；含 game 示例（垂直切片在脚手架后 → 每关/Boss 视觉基线 → 集成/性能 → 最终验收，dependsOn 链完整） |
+| 5. 失败返工与下游门禁 | **PASS** | gate `fail` 走现有返工路由（`flow_step_supersede`/退回 owner 返工）；返工后**重新复核该 gate**、不得直接标记通过；gate 未 `done` 下游不得派发（沿用现有 `dependsOn` 门禁，不新增检查）；不允许「后续验收再补」跳过 gate |
+| 6. 独立判定/不自审/无新工具 | **PASS** | 「独立判断只由 Proof / 验收做」；统筹只检查证据齐备、走现有通道（最终 `request_acceptance`；提前 gate 无通道时如实上报 Lead/客户）；不得自查代替、不得自己标 gate 通过、不得把自查写成 Proof 结论；卡文本明确**不新增 `FlowStepKind`/工具/账本 kind**（不引入 `request_gate_review`、`gateKind`），gate 用现有 `artifact`/`acceptance` 步骤，不改变验收语义 |
+| 7. 早复核检查点（第一笔规则） | **PASS** | 「独立复核时机（必须）」四检查点齐备：脚手架后（真实安装/typecheck/最小测试/可启动，不只看文件存在）、首个垂直切片/可玩交付后（关 DEBUG 截图/录屏 + DOM/CLI 对照）、每个 delivery 后/标 `done` 前/派下游前、变更包/验收阶段不得成为第一次看产物；明确「不是只看步骤状态 / 账本」「不是只在验收阶段才看产物」；UI/游戏派发必须附真实截图/录屏（关 DEBUG）+ 验收标准指针 + 关 DEBUG 说明，不符合立即退回、不等 Proof |
+| 8. 测试与数据面 | **PASS** | 测试 diff 相对基线 +227/−0（纯新增；`c843bd6` 内部替换了 `cd6d042` 自己新增的较弱断言为更强的矩阵/模板/示例断言，非弱化）；门禁 329（328 过/1 平台 skip）、typecheck 0；探针确认 convener entries/preauthorizedDirs/capabilities/forbiddenWritePaths 与变更前一致，其他角色卡未动（Crew 卡见观察 2） |
+
+**观察（非阻断，建议确认/修正）**：
+
+1. **设计文档状态行与提交范围不一致（文档）**：设计文档 §十三 写「未做的：未改任何产品代码、测试、角色卡」——这是设计阶段的声明；同一范围的两笔提交已把规则写入 Steward 卡并新增测试。建议在设计文档中注明「设计阶段声明；后续由 `cd6d042`/`c843bd6` 落卡」，避免读者误读为本次未改卡。
+2. **「Steward/Crew 卡」措辞与实现范围（待确认）**：交付说明与设计文档摘要均写「统筹/组队（Steward / Crew）角色卡」，但实际只改 `CONVENER_CARD_TEXT`；`NOMINATOR_CARD_TEXT` 不含「Gate 规划」「独立复核时机」（探针确认）。若 v1 只要求 Steward 规则，建议把说明/设计摘要改为 Steward-only；若 Crew 也需要规则，则本批缺 Crew 部分，需补。请协调端确认口径。
+3. **规则是文本约束，非确定性执行**：rules-only 不新增工具/检查，gate 规划与早复核依赖 Steward 遵守卡文本；应用只按现有 `dependsOn`/验收门执行。真实模型对新增规则的遵守未在线验证。
+
+**补充结论（规则批）：PASS；FAIL：无。** 规则内容、rules-only 边界、测试与注册表数据面均符合要求；观察 1/2 为非阻断文档/口径确认项，观察 3 为 rules-only 的固有限制。证据文件 `30_`–`33_` 位于同一证据目录。

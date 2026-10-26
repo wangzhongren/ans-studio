@@ -1,0 +1,8 @@
+ .../governance-roles.ts"                           |  70 ++-
+ .../governance-trio.test.ts"                       | 227 +++++++
+ .../2026-10-26_design_proof-gate-reviews.md"       | 654 +++++++++++++++++++++
+ 3 files changed, 947 insertions(+), 4 deletions(-)
+66	4	"src/common/\351\227\250\347\246\201\345\274\225\346\223\216/governance-roles.ts"
+227	0	"test/\351\227\250\347\246\201\345\274\225\346\223\216/governance-trio.test.ts"
+654	0	"\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/design/2026-10-26_design_proof-gate-reviews.md"
+product/card --check: exit 0
