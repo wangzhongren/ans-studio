@@ -11,7 +11,10 @@
 //     `app/desktop/runtime-config.ts`（`"演示"` 兜底已改用语言中性标签）均已零 Han，从清单移除；
 //     当前保留 **18** 条仍含中文的文件。
 //   · 2026-10-26：新增 `app/desktop/boundary-change.ts`（治理关键路径机器常量、agent-facing 校验
-//     回执/任务正文、AI 门禁 judge prompt；classification §4，非用户可见 UI）——当前保留 **20** 条。
+//     回执/任务正文、AI 门禁 judge prompt；classification §4，非用户可见 UI）——保留 **20** 条。
+//   · 2026-10-26：新增 `app/desktop/view-image.ts`（下一轮用户提示的 agent-facing 图片提示文本、
+//     `ViewImageFn` 投递失败回执；用户可见回执/附件标签已入共享目录 `main.viewImage.*` /
+//     `ui.viewImage.attachmentLabel`；classification §4，非用户可见 UI）——当前保留 **21** 条。
 // 规则：
 //   · **新增条目必须写明理由**；只允许「明确不翻译」的文件（classification §4/§5）。
 //   · B1–B4 每完成一批就从本清单移除对应文件；守卫测试会拒绝
@@ -60,6 +63,11 @@ export const I18N_GUARD_ALLOWLIST: readonly string[] = [
   // 工具输出、诊断兜底、agent-facing `{action}`（PM 分类 #7）、账本 `[协调]` 前缀；
   // 用户可见文本已 key 化——classification §4。
   "app/desktop/session.ts",
+  // `view_image` 桌面投递能力：下一轮用户提示的 agent-facing 图片提示文本（`buildViewImagePrompt`，
+  // 发给模型，不是 UI 文案）与 `ViewImageFn` 投递失败/非法载荷回执（tool output，交工具层转达模型）；
+  // 用户可见排队/失败回执与附件标签已入共享目录（`main.viewImage.*` / `ui.viewImage.attachmentLabel`，
+  // 2026-10-26）——classification §4。
+  "app/desktop/view-image.ts",
   // 技能路径「编排」+ `[watchdog] tick 失败…` stderr 日志行（日志不翻译）——classification §4。
   "app/desktop/watchdog.ts",
   // 技能路径「编排」出现在 import specifier（机器路径）——classification §4。写入预授权系统行/拒绝

@@ -18,6 +18,7 @@ app/
     navigation-policy.ts      导航兜底纯策略（同 URL/允许入口、http(s) 外开、恶意协议阻止、外开去重闸；PM §17.12）
     navigation-guard.ts       will-navigate/setWindowOpenHandler 接线（真实主进程窗口安装；可假件测试）
     session.ts                会话管理器（点角色即开、多轮 send、投递机/队列、边界重建、shell 闸两档分发）
+    view-image.ts             view_image 桌面侧投递（工具读取的图片 → 下一轮同角色后台系统提示；能力注入）
     project.ts                由枚举构造 ProjectConfig（含创世态判定）；读变更记录/docs 索引（展示用）
     session-history.ts        旧 Pi 展示兼容：只读解析 JSONL → 界面行；不推断原生上下文
     request-anchor.ts         交互请求锚点键单一算法（kind+title；两侧同源拼键）
@@ -61,6 +62,7 @@ B 的每窗口 grant 只来自原生选目录，renderer root/recovery/evidence 
 - **授权链唯一实现** `project.ts::buildEffectiveProjectConfig`（fallback 运行期同意 → 共享载入器 → 采纳 `.ans` 治理边界路径）；会话语义与界面共用，杜绝漂移。
 - **点角色即开**：`SessionManager.open` 一次调用经 `openRoleSession`（`scope: undefined`）；多会话保活 LRU（跳过 busy 与各项目主理 `primaryRoleId`——主理会话不关闭）；切换角色不 dispose 切回续。
 - **投递机**（E-1/H-1/L-1/P0/P1/G-2）：四类条目（客户消息/派发/回交/系统）同一队列；失败如实+放回队首；去重键/撤回/`full` 定格；「排队≠已执行」；治理唤醒按 `system` 入队（显示「系统」、不可撤回）。
+- **view_image 桌面投递**（2026-10-26，两轮附件）：开会话/重建时构造 `viewImage: ViewImageFn`（契约全家 `src/model/runtime.ts`）并随 `openRoleSession` 注入（全部角色）；工具本轮内调用 ⇒ 经既有 `send` 以 `background:true`+`kind:"system"` 排队，settle 后按序投给**同一角色**，`PromptOptions.images` 装入工具生成的 `PromptImage` 原引用；成功回执 `{ok:true}`，失败/会话不可用/非法载荷如实 `{ok:false,message}`。目标在开会话时定格（不按 `activeRoleId`）。见[功能说明](docs/feature/view-image-delivery.md)。
 - **边界陈旧重建**（O-1）：读盘 sha256 三来源快照指纹；陈旧 ⇒ 串行化作废重建 + 身份守卫 + TOCTOU 重校验；在跑轮次不打断。
 - **shell 两档**：项目角色 (c)/(b)/(a) 三层链；su 只读档（给出 `shellReadonly` 即 arm，不带 `!suppressHandback` 前缀）。
 - **诊断**：唯一共享 logger 滚动 24h；`app:reload-interface` 显式重载；`replayPending` 同 id 重推不代答。

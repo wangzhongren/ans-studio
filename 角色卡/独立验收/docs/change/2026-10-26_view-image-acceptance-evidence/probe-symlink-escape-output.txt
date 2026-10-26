@@ -1,0 +1,16 @@
+# 独立验收 2026-10-26 view_image symlink/junction escape probe
+# command: node probe-symlink-escape.mjs <worktree-root>
+# repo HEAD: 5d21fd89db7667d27e4a411a5d0a831a384990c7
+# node: v24.22.1  platform: win32
+junctionMade=true fileSymlinkMade=false
+SKIP	file-symlink-create	EPERM
+PASS	inside file	true calls+1 :: view_image: ok.png 已读取并排队；下一轮以图片附件提供；本轮不要假装已看到。
+PASS	junction escape	false calls+0 :: view_image 拒绝读取：escape/evil.png 在读取根之外（已拒绝）——未读取、未排队
+PASS	root as path	false calls+0 :: view_image 拒绝读取：. 是目录——请用 list_dir 定位后选择图片文件；未读取、未排队
+PASS	dot segment traversal	false calls+0 :: view_image 拒绝读取：不得包含 `..` 路径段——未读取、未排队
+PASS	trailing-dot file	false calls+0 :: view_image 读取失败：ok.png. 不存在或不可访问——未读取、未排队
+PASS	absolute posix	false calls+0 :: view_image 拒绝读取：必须是项目相对路径（不得为绝对路径/盘符路径）——未读取、未排队
+PASS	encoded NUL	false calls+0 :: view_image 拒绝读取：path 含 NUL 字符——未读取、未排队
+PASS	empty	false calls+0 :: view_image 拒绝读取：path 为空——未读取、未排队
+PASS	spaces	false calls+0 :: view_image 拒绝读取：path 为空——未读取、未排队
+# probe_exit=0

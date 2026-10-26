@@ -1,5 +1,40 @@
 # 门禁引擎 变更记录
 
+## 2026-10-26 — view_image 图片证据两轮纪律：Proof 必看真实附件、不得假看；Steward / Lead 简短规则
+
+任务：为新增的 `view_image` 工具补角色卡使用规则（lead-governance-coordination；门禁引擎任务）。
+工具语义：**两轮附件**——本轮只回「已排队」，图片在**下一轮以附件提供**。本批只做本角色卡文本 + 测试侧
+（卡文本是行为约束，不是工具实现证据）。完整记录见
+[变更记录](docs/change/2026-10-26_change_view-image-cards.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`（`LIAISON_CARD_TEXT` / `CONVENER_CARD_TEXT` /
+  `VERIFIER_CARD_TEXT` 产品数据文本 + 文件头注）、`test/门禁引擎/view-image-cards.test.ts`（新）、本文件、
+  `memo.md`、`feature-map.md`、`docs/change/2026-10-26_change_view-image-cards.md`（新）。未改
+  `src/model/**`、`src/provider/**`、`src/common/编排/**`、`src/pipeline/**`、`app/**`、共享 i18n、
+  桌面 / 模型实现或 `demos/`；未读 `.env`、未跑真实模型 / 凭据 / 网络；未 commit / push；未重启应用。
+- **Proof 卡**：新增「## 图片证据核对（view_image，两轮附件，必须）」——gate 复核 / 验收需要看真实截图 /
+  录屏画面时**必须对项目内证据图片调用 `view_image`**；**本轮只回「已排队」**、图片**下一轮以附件提供**，
+  收到排队回执后**等下一轮图片附件再判断**，**图片尚未提供时不得假装已看**、不得据此判 pass / fail；
+  附件到达后 UI / 游戏截图仍必须关 DEBUG（DEBUG 覆盖层 / 旧候选 / 无法对应候选 ⇒ `insufficient evidence`）；
+  看到的内容与文件哈希（sha256）/ 候选版本 / flow revision / 附件路径一起记录；工具不可用 / 回执失败 /
+  未收到附件时写 `insufficient evidence`，**不得用「文件存在」冒充看过图**。标准工作流第 4 步、Gate 复核
+  第 2 步与质量职责同步指针；既有 gate 复核 / 分诊 / 禁写规则逐字保留。
+- **Steward 卡**：「证据完整性与 gate 协调（必须）」新增「画面证据（view_image，必须）」——需要核对画面时
+  用 `view_image`（两轮、附件到达前不下画面结论），**不得把「截图路径存在」说成「已核对画面」**；文件存在
+  只是证据完整性，画面 / 实现质量仍只由 Proof 的 gate 复核判定（统筹不自审、不做实质性复核不变）。
+- **Lead 卡**：「治理协调」新增「画面证据（view_image，必须）」——需要核对画面时用 `view_image`（两轮、
+  附件到达前不下结论），**不得把「存在截图」说成「已核对画面」**；本条不改变「系统消息只汇报、不派任务」
+  规则（该规则逐字保留）。
+- **测试**：新增 `view-image-cards.test.ts` 5 例（Proof 两轮 / 不得假看、附件后 DEBUG + 记录 + 不可用时
+  insufficient evidence、Steward 简短规则、Lead 简短规则 + 系统消息纪律、通道归属与数据面零变化）；
+  既有测试文件与断言未改、未放宽。
+- **验证**：定向 `view-image-cards.test.ts` ⇒ **5 计 / 5 过 / 0 失败 / 0 skip，exit 0**；本角色全套
+  `node --test "test/门禁引擎/**/*.test.ts"` ⇒ **340 计 / 339 过 / 0 失败 / 1 Windows 既有 skip，exit 0**
+  （基线 335/334/0/1，本批 +5）；`npm run typecheck` ⇒ **exit 0，0 错**。
+- **跨角色待办（未越界）**：`view_image` 的排队回执 / 下一轮附件投递 / 附件与路径·哈希对应由运行时核心 /
+  编排 / 桌面角色实施与验证；工具名 / 参数形态若变化须同批回改卡文本与本批测试。**卡文本是行为约束，
+  不是实现证据；未做跨角色端到端与真机验证，未独立验收。** 来源：任务派发规则。
+
 ## 2026-10-26 — Decision 卡（材料性选择）：Steward 必须发卡 + 恰好一个 recommended；Lead 不得聊天自定、交统筹发卡
 
 客户新规则（经任务派发转达）：主理发现**材料性选择**（真实启动演示方式、验收证据方式、范围、标准 / 契约偏离、

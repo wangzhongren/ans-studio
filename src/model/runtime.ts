@@ -39,6 +39,26 @@ export interface PromptImage {
   mimeType: string;
 }
 
+// —————————————— 图片查看：两轮附件设计（2026-10-26 客户要求） ——————————————
+//
+// `view_image` 工具读取项目内图片后，**不把图片塞进本轮工具结果**（各引擎对工具结果附图的支持不一致），
+// 而是调用注入的 `ViewImageFn` 把图片排队为**同一角色下一轮用户提示的图片附件**。因此工具本轮只返回
+// 文本回执（「已读取并排队，下一轮以附件提供，不要假装本轮已看到」）；能力未注入 ⇒ 工具不注册
+// （结构性 fail-closed，沿 dispatch_task/flowGet 先例）。路径/类型/大小校验在工具层；能力侧只负责
+// 排队并如实回执（`ok:false` 或抛错 ⇒ 不谎报已提供）。本类型不授予任何写权。
+
+/** `view_image` 的注入能力入参：项目内图片路径（原样回显）+ 已转好的 `PromptImage`（base64 + MIME）。 */
+export interface ViewImageInput {
+  path: string;
+  image: PromptImage;
+}
+
+/**
+ * `view_image` 的注入能力：把图片排队为**下一轮**用户提示的图片附件，并如实回执是否受理。
+ * `ok:false` 的 `message` 会原样转达给模型；能力抛错/契约外回执由工具层按「未排队」fail-closed 处理。
+ */
+export type ViewImageFn = (input: ViewImageInput) => Promise<{ ok: boolean; message?: string }>;
+
 export interface PromptTurnStartedMetadata {
   readonly turnId: string;
   readonly roleId: string;
@@ -1816,6 +1836,14 @@ export interface GovernedToolsOptions {
    * 判断会话不经过 `buildGovernedTools`，天然看不到这四个工具。未注入 ⇒ 工具不存在（fail-closed）。
    */
   backgroundTasks?: BackgroundTaskCapability;
+  /**
+   * 图片查看能力（2026-10-26 客户要求；两轮附件设计）：工具 `view_image` 读取项目内图片并调用本能力，
+   * 把图片排队为**同一角色下一轮用户提示的图片附件**——工具本轮只返回文本，不依赖各引擎「工具结果附图」
+   * 支持不一致的问题。**未注入 ⇒ 工具不注册**（能力缺席 = 最强 fail-closed，沿 dispatch_task 先例）；
+   * 路径/类型/大小校验在工具层，能力侧只负责排队并**如实回执**（`ok:false`/抛错 ⇒ 不谎报已提供）。
+   * 本能力不写盘、不联网、不改变任何写权。
+   */
+  viewImage?: ViewImageFn;
 }
 
 export interface RuntimeSessionRecord {

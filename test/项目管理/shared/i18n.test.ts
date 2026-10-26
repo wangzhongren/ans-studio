@@ -588,15 +588,15 @@ test("B1–B4 key 分区：ui/main/shared 计数与总 key 数符合契约（漏
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
   assert.deepEqual(prefixes, {
-    ui: 786, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7 + 2026-10-25 chat-panel 10 + background tasks 25 + flow status 22 + acceptance triage 28 + 2026-10-26 decision card 3
-    main: 514, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6 + backgroundTasks 1 + flowStatus 2 + write preauthorization 6 + 2026-10-26 gate review 13 + 2026-10-26 decision card 6
+    ui: 787, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7 + 2026-10-25 chat-panel 10 + background tasks 25 + flow status 22 + acceptance triage 28 + 2026-10-26 decision card 3 + 2026-10-26 view_image 1
+    main: 516, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6 + backgroundTasks 1 + flowStatus 2 + write preauthorization 6 + 2026-10-26 gate review 13 + 2026-10-26 decision card 6 + 2026-10-26 view_image 2
     shared: 62, // B4 元数据 + 跨层通用短词
     preferences: 3, // B0
   });
-  assert.equal(keys.length, 1365);
+  assert.equal(keys.length, 1368);
   // B1/B2 与 B3 分区（扣除 B0 的 5 个 ui.* / 5 个 main.*）。
-  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 781);
-  assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 509);
+  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 782);
+  assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 511);
 });
 
 /**
@@ -1923,6 +1923,88 @@ test("decision 卡 key：zh-CN/en-US 取值与插值（选推荐项/非推荐项
   assert.equal(
     translate("zh-CN", "main.decisionCard.invalid", { detail: "重复的推荐项" }),
     "decision 卡参数非法（重复的推荐项）；未向客户发卡（fail-closed），请修正后重试。",
+  );
+});
+
+/**
+ * 2026-10-26 view_image 共享 key（客户要求：角色可查看项目内图片证据）。
+ * 设计：工具只读项目内图片，作为**下一轮用户提示的图片附件**排队给同一角色；
+ * 本轮工具结果只确认「已读取并排队」，不得让模型假装本轮已看到；
+ * 路径/类型/大小 fail-closed（失败不提供图片）；能力未注入时不注册该工具。
+ * 契约：2 个 `main.viewImage.*` + 1 个 `ui.viewImage.*` 成对存在；
+ * queued 占位符 {path}，failed 占位符 {detail}，attachmentLabel 占位符 {path}；
+ * en-US 不含中文。
+ */
+const VIEW_IMAGE_KEYS = [
+  "main.viewImage.queued",
+  "main.viewImage.failed",
+  "ui.viewImage.attachmentLabel",
+] as const satisfies readonly MessageKey[];
+
+test("view_image key：2 个 main.viewImage.* + 1 个 ui.viewImage.* 在 zh-CN/en-US 均存在，占位符逐 key 一致", () => {
+  assert.equal(VIEW_IMAGE_KEYS.length, 3);
+  assert.equal(VIEW_IMAGE_KEYS.filter((key) => key.startsWith("main.viewImage.")).length, 2);
+  assert.equal(VIEW_IMAGE_KEYS.filter((key) => key.startsWith("ui.viewImage.")).length, 1);
+  const expectedPlaceholders: Record<(typeof VIEW_IMAGE_KEYS)[number], string[]> = {
+    "main.viewImage.queued": ["path"],
+    "main.viewImage.failed": ["detail"],
+    "ui.viewImage.attachmentLabel": ["path"],
+  };
+  for (const key of VIEW_IMAGE_KEYS) {
+    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
+    assert.ok(key in enUS, `en-US 缺 ${key}`);
+    assert.deepEqual(placeholdersOf(zhCN[key]), expectedPlaceholders[key], `zh-CN 占位符不符契约：${key}`);
+    assert.deepEqual(placeholdersOf(enUS[key]), expectedPlaceholders[key], `en-US 占位符不符契约：${key}`);
+    assert.deepEqual(placeholdersOf(enUS[key]), placeholdersOf(zhCN[key]), `占位符不一致：${key}`);
+  }
+});
+
+test("view_image key：两轮附件语义（下一轮以附件提供、本轮未看到、不得假装）与 fail-closed；en-US 不含中文", () => {
+  // queued：下一轮才以图片附件送达；本轮未看到图片内容；不得假装已看到。
+  const queuedZh = zhCN["main.viewImage.queued"];
+  assert.ok(queuedZh.includes("下一轮"), "zh-CN queued 必须写明下一轮提供");
+  assert.ok(queuedZh.includes("图片附件"), "zh-CN queued 必须写明以图片附件提供");
+  assert.ok(queuedZh.includes("尚未看到图片内容"), "zh-CN queued 必须写明本轮未看到图片内容");
+  assert.ok(queuedZh.includes("不要假装"), "zh-CN queued 必须写明不得假装本轮已看到");
+  const queuedEn = enUS["main.viewImage.queued"];
+  assert.ok(queuedEn.includes("next user prompt"), "en-US queued 必须写明随下一轮用户提示送达");
+  assert.ok(queuedEn.includes("image attachment"), "en-US queued 必须写明以图片附件提供");
+  assert.ok(queuedEn.includes("have not seen the image content"), "en-US queued 必须写明本轮未看到图片内容");
+  assert.ok(queuedEn.includes("do not pretend"), "en-US queued 必须写明不得假装本轮已看到");
+  // failed：读取/排队失败时如实报告，且未提供图片（fail-closed，不发部分附件）。
+  assert.ok(zhCN["main.viewImage.failed"].includes("未提供图片"), "zh-CN failed 必须写明未提供图片");
+  assert.ok(enUS["main.viewImage.failed"].includes("no image was provided"), "en-US failed 必须写明未提供图片");
+  for (const key of VIEW_IMAGE_KEYS) {
+    const value = enUS[key];
+    const text = typeof value === "string" ? value : Object.values(value).join("");
+    assert.equal(valueContainsHan(text), false, `en-US 含中文：${key}`);
+  }
+});
+
+test("view_image key：zh-CN/en-US 取值与插值（已读取并排队 / 失败 / 附件标签）", () => {
+  assert.equal(
+    translate("zh-CN", "main.viewImage.queued", { path: "docs/images/screenshot.png" }),
+    "已读取项目图片 docs/images/screenshot.png 并排队：下一轮将以图片附件提供（随下一轮用户提示送达）；本轮你尚未看到图片内容，不要假装本轮已看到。",
+  );
+  assert.equal(
+    translate("en-US", "main.viewImage.queued", { path: "docs/images/screenshot.png" }),
+    "Read project image docs/images/screenshot.png and queued it: it will be provided as an image attachment with the next user prompt; you have not seen the image content this turn — do not pretend you have.",
+  );
+  assert.equal(
+    translate("zh-CN", "main.viewImage.failed", { detail: "图片类型不支持：bmp" }),
+    "读取或排队项目图片失败（图片类型不支持：bmp）；未提供图片。",
+  );
+  assert.equal(
+    translate("en-US", "main.viewImage.failed", { detail: "unsupported image type: bmp" }),
+    "Failed to read or queue the project image (unsupported image type: bmp); no image was provided.",
+  );
+  assert.equal(
+    translate("zh-CN", "ui.viewImage.attachmentLabel", { path: "docs/images/screenshot.png" }),
+    "view_image 附件：docs/images/screenshot.png",
+  );
+  assert.equal(
+    translate("en-US", "ui.viewImage.attachmentLabel", { path: "docs/images/screenshot.png" }),
+    "view_image attachment: docs/images/screenshot.png",
   );
 });
 

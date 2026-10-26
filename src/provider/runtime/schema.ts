@@ -984,6 +984,39 @@ export function describeTool(name: string): ToolDescription {
       ],
     };
   }
+  if (name === "view_image") {
+    // 图片查看（2026-10-26 客户要求；两轮附件设计；只给注入了 viewImage 能力的会话，注入才注册）。
+    // 文案纪律：本轮只是排队、下一轮才是图片附件、不要假装本轮已看到；路径必须项目相对、拒绝越界/
+    // 目录；仅 5 种扩展名 + 10 MB；失败不谎报已提供；不写盘、不联网、不过写门禁。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description:
+              "Project-relative path of an image inside the read root; absolute paths, `..` segments and directories are rejected",
+          },
+        },
+        required: ["path"],
+        additionalProperties: false,
+      },
+      description:
+        "读取项目内的一张图片，并把它**排队为下一轮的图片附件**（两轮附件设计）。" +
+        "**本工具本轮只返回文本回执，不会在本轮让你看到图片内容**：成功回执表示图片已读取并排队，" +
+        "下一轮用户提示才会以图片附件提供——**不要假装本轮已看到图片**，也不要凭文件名/回执猜测图片内容。" +
+        "本工具**仅在运行环境注入了图片能力时才存在**（未注入 ⇒ 工具不存在，fail-closed）。" +
+        "路径必须是**项目相对路径**：绝对路径、盘符路径、含 `..` 的越界路径、读取根之外的真实路径与目录一律拒绝。" +
+        "仅支持 `.png` / `.jpg` / `.jpeg` / `.webp` / `.gif`（按扩展名映射 MIME），单文件上限 **10 MB**。" +
+        "路径/类型/大小不合法时工具直接失败且**不会排队**；能力侧拒绝或失败时如实返回「未排队」，**绝不谎报已提供**。" +
+        "本工具不写盘、不联网、不过写门禁，也不改变任何写权。",
+      promptGuidelines: [
+        "需要查看项目内的图片时调用 view_image；成功回执只表示**已排队**——图片在**下一轮**才作为附件提供，本轮不要假装已看到。",
+        "路径用项目相对路径（如 `docs/assets/shot.png`）；绝对路径、`..`/越界路径与目录会被拒绝；仅支持 .png/.jpg/.jpeg/.webp/.gif 且单文件不超过 10 MB。",
+        "失败回执（路径/类型/大小/能力侧拒绝）表示**下一轮不会收到图片附件**——不要猜测图片内容，按回执如实告知客户。",
+      ],
+    };
+  }
   if (name === "list_dir") {
     // 普通角色只读目录列举（真机噪声修复）：只列一层、目录带 `/`、最多 200 项、敏感项不列名。
     // 与 judge 的 `judge_list_dir` 口径同源但**工具名独立**；只读、不写盘、不执行。

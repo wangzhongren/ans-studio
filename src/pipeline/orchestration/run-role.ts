@@ -85,6 +85,7 @@ import type {
   RequestAcceptanceFn,
   RequestGateReviewFn,
   RequestBoundaryChangeFn,
+  ViewImageFn,
   HandOffIntentFn,
   RequestClarificationFn,
   RoleStatusFn,
@@ -238,6 +239,11 @@ import { absRel, compareKey, isAbsoluteAny, isUnderOrEqual, normalizeLexical } f
  * **适配器能力面**：编排构造、随 `deps.createAdapter(gate, capabilities)` 交给适配器工厂——
  * 适配器把其中的能力注册为对应工具（「注入才注册」先例），或按其选项接线。三项：
  * · `customerInput`（A-3 客户确认制交互；未注入 ⇒ `request_confirmation`/`request_choice` 不注册）。
+ * · `viewImage`（2026-10-26 图片查看；未注入 ⇒ `view_image` 不注册）——**通用只读能力**：项目角色与
+ *   内置治理角色在调用方提供时**都注入**（不按角色收窄）。形状单一来源＝契约家 `model/runtime.ts`
+ *   （`ViewImageFn`）；工具读取项目内图片并把图片排队为**同一角色下一轮用户提示的图片附件**（两轮
+ *   附件设计，本轮工具结果只回「已排队」）。不写盘、不联网、不改变任何写权，也**不改变其他能力的
+ *   注入矩阵**（与 `requestAcceptance`/`requestGateReview` 等互不隐含）。
  * · `reportHandback`（C-1 交报告；未注入 ⇒ `submit_report` 不注册）——**只给项目角色会话**注入
  *   （治理角色 su 不自我回交，不注入）。能力形状 = `submit_report{ status, summary, evidence? }`
  *   的载荷（结构对齐，见 `common/编排/handback.ts::TaskReport`）。
@@ -283,6 +289,15 @@ export interface AdapterCapabilities {
   sessionDir?: string;
   runtime?: RuntimeKind;
   persistSession?: boolean;
+  /**
+   * 图片查看能力（`view_image`「注入才注册」，2026-10-26 客户要求；两轮附件设计）——**通用只读能力**：
+   * 项目角色与内置治理角色在调用方提供时**都注入**（不按角色收窄；与只给 su 的安装/看护类能力不同）。
+   * 形状单一来源＝契约家 `model/runtime.ts`（`ViewImageFn`/`ViewImageInput`/`PromptImage`）。工具读取
+   * 项目内图片（路径/类型/≤10 MB 校验在工具层）并调用本能力把图片排队为**同一角色下一轮用户提示的
+   * 图片附件**；本轮工具结果只说明「已排队」。未提供 ⇒ 不注入（运行时核心据此不注册工具，结构性
+   * fail-closed）。本能力不写盘、不联网、不改变任何写权，也**不改变其他能力的注入矩阵**。
+   */
+  viewImage?: ViewImageFn;
   dispatchTask?: DispatchTaskFn;
   /**
    * 独立复核请求（`request_acceptance`，2026-10-25 客户要求）：交付/证据/变更包就绪后，由统筹直接
@@ -740,6 +755,15 @@ export async function openRoleSession(
      * `pm-reviewer` 注入；一般调用方不传。
      */
     shellVerdict?: ShellVerdictFn;
+    /**
+     * **图片查看能力（`view_image`「注入才注册」，2026-10-26 客户要求；两轮附件设计）**：前端（桌面）
+     * 提供的实现——工具读取项目内图片并调用本能力，把图片排队为**同一角色下一轮用户提示的图片附件**
+     * （本轮工具结果只回「已排队」，不依赖各引擎「工具结果附图」支持）。**通用只读能力**：项目角色与
+     * 内置治理角色**都转交**（不按角色收窄）；未给出 ⇒ 不注入（工具不注册，结构性 fail-closed）。
+     * 形状单一来源＝契约家 `model/runtime.ts`（`ViewImageFn`/`ViewImageInput`/`PromptImage`）。
+     * 本能力不写盘、不联网、不改变任何写权；**不改变其他能力的注入矩阵**。
+     */
+    viewImage?: ViewImageFn;
     /**
      * **D-1 覆盖位**：`false` ⇒ 本会话**不持久化**（不传 `sessionDir`，适配器走 in-memory）。
      * 审读会话固定用 `false`（不恢复用户 su 会话的可能损坏历史、不污染其聊天记录）；缺省/`true` 行为不变。
@@ -1539,6 +1563,10 @@ export async function openRoleSession(
   const capabilities: AdapterCapabilities = {
     ...(governedInput !== undefined ? { customerInput: governedInput } : {}),
     ...(reportHandback !== undefined ? { reportHandback } : {}),
+    // 2026-10-26 图片查看（view_image）：**通用只读能力**——项目角色与内置治理角色都注入（只要调用方
+    // 提供；不按角色收窄）；未提供 ⇒ 字段缺席、工具不注册（同 dispatch_task 的「注入才注册」先例）。
+    // 不影响其他能力的注入矩阵。
+    ...(input.viewImage !== undefined ? { viewImage: input.viewImage } : {}),
     ...(sessionDir !== undefined ? { sessionDir } : {}),
     ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
     ...(input.persistSession !== undefined ? { persistSession: input.persistSession } : {}),
@@ -3542,6 +3570,11 @@ export function createRuntimeAdapterFactory(
     persistSession: capabilities?.persistSession ?? options.persistSession ?? (capabilities?.sessionDir !== undefined),
     customerInput: capabilities?.customerInput,
     reportHandback: capabilities?.reportHandback,
+    // 2026-10-26 图片查看（view_image）：运行时核心 `GovernedToolsOptions.viewImage` 同名能力位
+    // （形状同源 `model/runtime.ts` `ViewImageFn`）；Service 以 `...options` 透传给
+    // `buildGovernedTools`，`undefined` ⇒ 工具不注册（同 dispatch_task 先例）。本层纯透传——路径/
+    // 类型/大小校验在工具层，能力侧只负责排队并如实回执；不改变任何写权。
+    viewImage: capabilities?.viewImage,
     dispatchTask: capabilities?.dispatchTask,
     // 2026-10-25 独立复核请求（request_acceptance）：运行时核心 `GovernedToolsOptions` 同名能力位
     // （形状同源 `model/runtime.ts`）；`undefined` ⇒ 工具不注册（同 dispatch_task 先例）。

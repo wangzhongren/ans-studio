@@ -467,3 +467,19 @@ A4 legacy provenance窄修：protected工具t.statusSource/target.source分别�
 - 报告处置（settle/导入/账本事件经 `runAcceptanceCheck` → `processGateReviewsForFlow`）：pass ⇒ `completeGateStep` + `artifact.observed` + `gate.review` 审计 + pass 系统行；fail 含 blocker/major ⇒ 记录 `failed` + `gate.review(fail)` + `.ans/.../gates/<gateId>-rework-routing.json`（`gate-rework-routing/v1`）独立返工路由，gate 保持 pending；仅 minor/nit 的 fail ⇒ `returned-to-proof`、不返工；缺/坏/版本或候选不符 ⇒ `returned-to-proof`。**不写 `customer.decision`、不发验收卡、不标 done（pass 由 `completeGateStep` 应用收口）**；重启按记录幂等补处置，不自动重派/不自动通过。
 - 面元：`DesktopDeps.completeGateStepFn`（缺省编排公共出口 `completeGateStep`）、`requestGateReviewLimits`（总/单阶段预算，缺省 60s/20s）、`appendGovernanceLedgerFn`（测试注入审计失败）。
 - 证据（实施后）：`test/桌面应用/acceptance-dispatch.test.ts` gate 组 12 例（派发/幂等/校验矩阵/注入/visual&integration/pass/fail/nit-only/缺坏报告/重启恢复）；`npm run typecheck` 0 错；`node --test "test/桌面应用/**/*.test.ts"` 663/663。
+
+## 图片查看投递能力（`view_image`，2026-10-26 客户要求）
+
+**不是 IPC/preload 通道**：这是注入会话的运行时工具能力 `view_image` 的桌面侧实现。契约形状单一来源＝`src/model/runtime.ts`（`ViewImageInput { path: string; image: PromptImage }`、`ViewImageFn = (input) => Promise<{ok:boolean;message?:string}>`）；桌面只读导入、不复制第二份。运行时核心工具已读取/校验项目内图片（路径句柄、realpath 根内、png/jpg/jpeg/webp/gif、≤10 MB）并给出 base64+MIME；桌面只负责**排队投递**。
+
+| 能力位（`SessionManagerDeps.openRoleSession` 入参） | 注入判据 | 实现 |
+| --- | --- | --- |
+| `viewImage?: ViewImageFn` | **全部角色会话**（项目角色与内置治理角色；通用只读能力，不按角色收窄）；未注入 ⇒ 运行时核心不注册 `view_image` | `app/desktop/view-image.ts::createViewImageDelivery({target, send})`，`openInternal` 构造并在 `openRoleSession` 入参注入 |
+
+- 目标定格：`target = { projectRoot, roleId, runtime }` 在开会话/重建时绑定；**不按 `activeRoleId` 改投**，不接受调用方指定别的角色。
+- 投递：调用既有 `SessionManager.send(text, { images: [input.image] }, target, { background: true, kind: "system" })`——同一投递机：工具在本轮内（角色忙）⇒ 按到达序入队，settle 后按序投递；空闲 ⇒ 直发下一轮。`PromptImage` 对象原引用进入 `PromptOptions.images`。
+- 文本（单一来源 `buildViewImagePrompt`）：`这是 view_image 请求的图片：<path>；请查看后判断`。
+- 回执：直发/入队成功 ⇒ `{ok:true}`；会话不可用、传输失败 ⇒ `{ok:false,message}`（带底层原因）；空路径/无图片/图片结构非法 ⇒ `{ok:false,message}` 且**零投递**。绝不谎称已提供。
+- 零回归：不冒充客户消息（`kind:"system"`，UI 显示「系统」、不可撤回）；不抢 pane；真实客户消息与 handback/dispatch 的 `images` 引用/语义逐字不变；不改变其他能力的注入矩阵。
+- 不持久化排队中的图片载荷：应用在「已入队、未投递」之间重启 ⇒ 该条按文本恢复、图片丢失（P0-1 既有语义，本批未扩张）。
+- 证据（实施后）：`test/桌面应用/message-queue.test.ts` 新增 4 例（system 入队/同角色/settle 按序/图片原引用；失败与非法载荷如实；客户消息图片零回归；真实 `openRoleSession` + 真实 `view_image` 工具集成）；`npm run typecheck` 0 错；`node --test "test/桌面应用/**/*.test.ts"` 675/675。

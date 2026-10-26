@@ -1,0 +1,73 @@
+# 独立验收 2026-10-26 view_image 测试复跑汇总
+# HEAD 5d21fd89db7667d27e4a411a5d0a831a384990c7 / Node v24.22.1 / win32
+
+== /tmp/tc-root.log ==
+== /tmp/tc-renderer.log ==
+== /tmp/runtime-full.log ==
+ℹ tests 344
+ℹ pass 337
+ℹ fail 3
+ℹ skipped 4
+✖ D3 linked workspace root remains usable; linked target itself is not replaced (21.8287ms)
+✖ store: traversal, mismatched scope and symlinked runtime directories rejected (6.0798ms)
+✖ store: native validation stays lazy and native symlink is rejected before effects (7.8104ms)
+✖ failing tests:
+✖ D3 linked workspace root remains usable; linked target itself is not replaced (21.8287ms)
+✖ store: traversal, mismatched scope and symlinked runtime directories rejected (6.0798ms)
+== /tmp/orch-full.log ==
+ℹ tests 1007
+ℹ pass 1005
+ℹ fail 1
+ℹ skipped 1
+✖ node test外指符号链接路径不获委托；项目内测试路径获委托 (5.514ms)
+✖ failing tests:
+✖ node test外指符号链接路径不获委托；项目内测试路径获委托 (5.514ms)
+== /tmp/desktop-full.log ==
+ℹ tests 675
+ℹ pass 675
+ℹ fail 0
+ℹ skipped 0
+== /tmp/gate-full.log ==
+ℹ tests 340
+ℹ pass 339
+ℹ fail 0
+ℹ skipped 1
+== /tmp/i18n-full.log ==
+ℹ tests 206
+ℹ pass 201
+ℹ fail 0
+ℹ skipped 5
+== /tmp/ui-full.log ==
+ℹ tests 296
+ℹ pass 296
+ℹ fail 0
+ℹ skipped 0
+== /tmp/assembly.log ==
+ℹ tests 85
+ℹ pass 85
+ℹ fail 0
+ℹ skipped 0
+== /tmp/test-dir.log ==
+ℹ tests 848
+ℹ pass 838
+ℹ fail 4
+ℹ skipped 6
+✖ 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛 (14.8061ms)
+✖ T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (196.4943ms)
+✖ T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (96.8727ms)
+✖ T1 claude: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (69.0049ms)
+✖ failing tests:
+✖ 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛 (14.8061ms)
+== /tmp/t1-single.log ==
+ℹ tests 8
+ℹ pass 5
+ℹ fail 3
+ℹ skipped 0
+✖ T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (53.9962ms)
+✖ T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (32.7805ms)
+✖ T1 claude: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (34.1142ms)
+✖ failing tests:
+✖ T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (53.9962ms)
+✖ T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (32.7805ms)
+(npm run typecheck 与 npm run typecheck:renderer 均为 exit 0、无输出；见报告 §五)
+(runtime-core 3 红与编排 1 红均为既有 Windows symlink EPERM；test/测试 4 红中 3 个 T1 已在 HEAD 基线复现，见 baseline-t1-head-5d21fd8.txt)

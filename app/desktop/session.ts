@@ -142,7 +142,7 @@ import {
 // 形状为**桌面侧暂定契约**（设计 §6.1 的 propose_recovery 载荷 / §6.2 的确认流）——编排 O1 透传与
 // 运行时核心 R2 handler 落树后按需重定向（interface 点见 api-spec；本层不复制第二份判定）。
 import { isRecoveryAction, type RecoveryConfirmPresenter } from "./recovery-channel.ts";
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn } from "../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn } from "../../src/model/runtime.ts";
 // 2026-10-25 独立复核请求（request_acceptance）：能力/回执形状唯一来源＝契约家 `model/runtime.ts`
 // （只读导入、不复制；注入端只做项目绑定，校验/派发由 Interface 能力实现）。
 import type { RequestAcceptanceFn, RequestAcceptanceInput, RequestAcceptanceResult, RequestGateReviewFn, RequestGateReviewInput, RequestGateReviewResult } from "../../src/model/runtime.ts";
@@ -189,6 +189,9 @@ import type { AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions
 // 桌面客户交互通道（A-5）：请求/裁决的冻结形状在 §4 冻结契约家（model/runtime.ts），
 // 本模块只读导入转出；`DesktopCustomerInputFn` 是本层对「带角色上下文」的窄扩展（请求本体不带 roleId）。
 import type { DesktopCustomerInputFn } from "./customer-input.ts";
+// 2026-10-26 view_image：工具读取的图片 → 下一轮同角色后台提示（投递经既有投递机）。契约形状
+// （`ViewImageFn`/`ViewImageInput`）只读导入契约家；桌面本地只保留投递工厂与提示文本。
+import { createViewImageDelivery } from "./view-image.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 // 跨角色共享组件：`.ans` 有效配置载入器（**属主：项目管理**；本角色**只读导入，不复制第二份**，
 // 规则见 `角色卡/项目管理/docs/architecture/shared-components.md`）。它是「有 `.ans` 优先加载、
@@ -421,6 +424,13 @@ export interface SessionManagerDeps {
       customerInput?: CustomerInputFn;
       /** **派发任务能力**（H-1）：仅内置治理角色（su）会话注入（见 SessionManager.open 与 routeDispatch）。 */
       dispatchTask?: DispatchTaskFn;
+      /**
+       * **view_image 投递能力**（2026-10-26）：工具读取的图片作为**下一轮用户提示的图片附件**排队给
+       * 同一角色（全部角色会话注入；目标在开会话时定格）。实现经既有 `SessionManager.send`：角色忙
+       * （工具在本轮内）⇒ 按到达序入队，settle 后投递；失败如实回执。编排原样转交运行时核心；
+       * 未注入 ⇒ `view_image` 工具不注册（结构性 fail-closed）。
+       */
+      viewImage?: ViewImageFn;
       /** **独立复核请求能力**（2026-10-25 request_acceptance）：仅内置治理角色会话注入（见 SessionManager.open）。 */
       requestAcceptance?: RequestAcceptanceFn;
       /** **gate 复核请求能力**（2026-10-26 request_gate_review）：仅统筹（convener）会话注入（见 SessionManager.open）。 */
@@ -2199,6 +2209,14 @@ export class SessionManager {
       canSchedule || canLiaise
         ? (d: DispatchTaskPayload) => this.routeDispatch(req.projectRoot, req.runtime, req.roleId, d) // Promise<DispatchReceipt>——契约允许（工具侧 await）
         : undefined;
+    // 2026-10-26 `view_image`（全部角色）：工具读取的图片作为**下一轮用户提示的图片附件**排队给**同一角色**。
+    // 目标在开会话时定格（不认 `activeRoleId`，也不接受调用方改投）；投递经既有 `send` → 同一投递机——
+    // 工具本轮内角色必然 busy ⇒ 按到达序入队，settle 后投递；直发失败/会话不可用如实回执。
+    // 后台系统提示（`background:true`+`kind:"system"`）：不冒充客户消息、不抢 pane；`images` 原引用。
+    const viewImage: ViewImageFn = createViewImageDelivery({
+      target: { projectRoot: req.projectRoot, roleId: req.roleId, runtime: req.runtime },
+      send: (text, opts, target, metadata) => this.send(text, opts, target, metadata),
+    });
     // 2026-10-25 独立复核请求（request_acceptance）：**仅内置治理角色会话注入**（`role.builtIn === true`；
     // 项目角色即便 deps 提供也不注入——外部调用方误给也拿不到工具）。编排再按 builtInGovernance 收口。
     // 项目绑定交给能力实现（工具载荷只有 flowId?/note?）；未注入 ⇒ 工具不注册（结构性 fail-closed）。
@@ -2422,6 +2440,8 @@ export class SessionManager {
             : {}),
           // H-1：派发能力（仅 su 会话注入；契约字段名 `dispatchTask`——编排落地后由其转发给适配器）。
           ...(dispatchTask ? { dispatchTask } : {}),
+          // 2026-10-26 view_image：全部角色会话注入（目标已定格＝本会话）；编排原样转交运行时核心。
+          viewImage,
           // 2026-10-25 独立复核请求（request_acceptance，仅内置治理角色会话注入；项目角色不注入）。
           // 「未注入即不注册」——编排/运行时核心据此不注册工具（结构性 fail-closed）。请求复核 ≠ 客户批准。
           ...(requestAcceptance ? { requestAcceptance } : {}),

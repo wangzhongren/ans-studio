@@ -1,0 +1,11 @@
+# 基线复现：HEAD 5d21fd8 的临时 worktree（不含本批 view_image 改动，node_modules 以 junction 提供），运行 test/测试/t1-pipeline-integration.test.ts
+✖ T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (55.542ms)
+✖ T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (33.8925ms)
+✖ T1 claude: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (33.4551ms)
+ℹ tests 8
+ℹ pass 5
+ℹ fail 3
+ℹ skipped 0
+✖ failing tests:
+✖ T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (55.542ms)
+✖ T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (33.8925ms)

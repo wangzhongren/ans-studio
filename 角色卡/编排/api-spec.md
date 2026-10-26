@@ -877,3 +877,54 @@ export function validateDecisionCardRequest(input: {
 - 未做：桌面卡面/默认推荐/系统行、桌面改用共享 `validateDecisionCardRequest`、跨角色 e2e、真实
   Electron、修复后的再次独立验收、commit/push。字面偏差（设计原文「不写 customer.decision」）见
   [变更记录](docs/change/2026-10-26_change_decision-card-orchestration.md) §七。
+
+## 2026-10-26 图片查看能力透传（`view_image`，编排侧）
+
+来源：客户 2026-10-26 要求（角色可查看项目内图片证据）；运行时核心已交付 `view_image` 工具与冻结契约
+（两轮附件：工具本轮只回「已排队」，图片在**同一角色下一轮用户提示**以附件提供）。编排只做能力透传，
+不读文件、不校验图片、不改任何写权。
+
+### 公开面（`src/pipeline/orchestration/run-role.ts`）
+
+```ts
+// 契约家（src/model/runtime.ts；本角色只读导入，不复制第二份）
+export interface ViewImageInput { path: string; image: PromptImage; }
+export type ViewImageFn = (input: ViewImageInput) => Promise<{ ok: boolean; message?: string }>;
+
+// 编排
+export interface AdapterCapabilities {
+  ...
+  viewImage?: ViewImageFn;
+}
+
+openRoleSession(input: {
+  roleId: string;
+  ...
+  /** 图片查看（view_image「注入才注册」）；通用只读能力，项目角色与内置治理角色都转交。 */
+  viewImage?: ViewImageFn;
+}, deps?: RoleSessionDeps): Promise<RoleSessionHandle>;
+```
+
+- **注入才注册**：`viewImage` 给出 ⇒ 并入 capabilities ⇒ `createRuntimeAdapterFactory` 同名透传 ⇒
+  Service `...options` ⇒ `buildGovernedTools` 注册 `view_image`；未给出 ⇒ 字段缺席、工具不注册
+  （结构性 fail-closed，沿 `dispatch_task` 先例）。`createRuntimeAdapterFactory` 显式写
+  `viewImage: capabilities?.viewImage`，工厂 options 里即便误带同名字段也不会在能力缺席时注册。
+- **通用只读**：不按角色收窄——项目角色与内置治理角色在调用方提供时都可用；与只给 su/统筹的
+  `dispatchTask`/`requestAcceptance`/`requestGateReview` 等**不同**。本批**不改变**这些能力的注入矩阵。
+- **两轮附件**：工具层校验项目相对路径、扩展名（png/jpg/jpeg/webp/gif）、≤10 MB、realpath 根内；
+  通过后调用能力把 `PromptImage`（base64+MIME）排队为下一轮用户提示附件；工具本轮只返回文本
+  「已读取并排队…本轮不要假装已看到」。能力 `ok:false`/抛错/契约外回执 ⇒ 工具按「未排队」如实转达。
+- 本能力不写盘、不联网、不改变任何写权；一次性 `ans role run` 路径不涉及（不传 capabilities）。
+
+### 证据（2026-10-26，win32 / Node v24.22.1）
+
+- 新增 `test/编排/view-image.test.ts` **3/3**：项目角色能力同引用 + 工具注册 + handler 读取临时
+  1×1 PNG 并把 `path`/`PromptImage` 原样交给能力；su 同样可用、未提供 ⇒ 零注册；与
+  `requestAcceptance` 互不隐含/同给各自同引用/项目角色矩阵不变。
+- `node --test "test/编排/**/*.test.ts"` → **1007 tests / 1005 pass / 1 fail / 1 skip**（唯一红＝既有
+  Windows symlink `shell-authorized-routine.test.ts:103` EPERM）。
+- `npm run typecheck` → **本批文件零错**；全仓 12 红均在桌面窗口属主文件（`app/desktop/interface.ts` 1、
+  `test/桌面应用/*` 5、`test/测试/*` 6），根因＝桌面 `app/desktop/view-image.ts` 仍用临时本地
+  `ViewImageFn`（`{path, images[]}`）与契约家 `ViewImageInput {path, image}` 不兼容；待桌面窗口收敛
+  （其文件注释已登记「契约落树后改从契约家只读导入」）。本角色边界不允许改 `app/**`。
+- 未做：桌面类型收敛/投递端到端、真实模型两轮附件、跨角色 e2e、独立验收、commit/push。

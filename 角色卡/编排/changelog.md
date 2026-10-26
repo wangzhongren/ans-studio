@@ -1,5 +1,20 @@
 # 编排 变更记录
 
+## 2026-10-26 — `view_image` 接入角色会话（两轮附件设计，编排侧能力透传）
+
+**来源**：客户要求「角色可查看项目内图片证据」；运行时核心已落 `view_image` 工具与冻结契约（`src/model/runtime.ts` `ViewImageInput`/`ViewImageFn`；`src/provider/runtime/tools.ts`）。两轮附件语义：工具本轮只回「已排队」，图片在**同一角色下一轮用户提示**以附件提供。本批只做编排注入面，未改 `src/model/**`、`src/provider/**`、`app/**`、i18n、门禁引擎；未 commit/push、未重启应用。
+
+**改了什么**
+- `run-role.ts`：`AdapterCapabilities` 与 `openRoleSession` 输入新增可选 `viewImage?: ViewImageFn`（类型单一来源＝契约家 `model/runtime.ts`，字段名逐字）；`openRoleSession` **无条件**（不按角色收窄）并入 capabilities——`view_image` 是**通用只读能力**，项目角色与内置治理角色在调用方提供时都可用；未提供 ⇒ 字段缺席、工具不注册（沿 `dispatch_task`「注入才注册」先例）。`createRuntimeAdapterFactory` 同名透传 `viewImage`，Service 以 `...options` 传给 `buildGovernedTools`（`undefined` ⇒ 零注册）。**不改变** `requestAcceptance`/`requestGateReview`/其他能力的注入矩阵；一次性 `runRole` 路径不涉及。
+- 新增 `test/编排/view-image.test.ts` **3 例**（真实 `openRoleSession` + 假 provider，离线）：① 项目角色提供能力 ⇒ capabilities 同引用、provider 注册 `view_image`、handler 在 prompt 轮内读取临时项目 1×1 PNG 并把 `path`/`PromptImage`（base64+image/png）原样交给能力、回执如实含「已读取并排队/下一轮」；② su 同样可用；su/项目角色未提供 ⇒ 能力缺席且工具不注册；③ 与 `requestAcceptance` 互不隐含、两能力同给各自同引用、项目角色仍不注入 `requestAcceptance`（矩阵零放宽）。
+- 文档：本记录、`api-spec.md`、`feature-map.md`、`memo.md`。
+
+**测试**：`node --test "test/编排/view-image.test.ts"` → 3/3；`node --test "test/编排/**/*.test.ts"` → **1007 tests / 1005 pass / 1 fail / 1 skip**（唯一红＝既有 Windows symlink `shell-authorized-routine.test.ts:103` EPERM 基线）。`npm run typecheck` → **本批文件零错**；全仓 **12 处红全在桌面窗口属主文件**（`app/desktop/interface.ts` 1、`test/桌面应用/*` 5、`test/测试/*` 6）——根因是桌面 `app/desktop/view-image.ts` 仍用本地 `ViewImageFn`（`{path, images[]}`），与本批按契约家落地的 `ViewImageInput {path, image}` 不兼容；其文件注释已自述「契约落树后改从契约家只读导入」。本角色边界不允许改 `app/**`，未修。
+
+**跨角色待办（请 pm 转达）**：① 桌面窗口把 `ViewImageFn` 改为从 `src/model/runtime.ts` 只读导入并改收单张 `input.image`、返回 `Promise<{ok,message?}>`（`interface.ts`/`session.ts` 同名字段同步）；完成后 typecheck 回绿。② 桌面投递端确认把图片放入下一轮 `PromptOptions.images`（原引用），排队/失败如实回执，不得改写成「本轮已看到」。③ 真实模型两轮附件、跨角色 e2e、独立验收未做。
+
+详见[变更记录](docs/change/2026-10-26_change_view-image-orchestration-wiring.md)。
+
 ## 2026-10-26 — decision 卡（material-choice）编排分类与账本 + 判断 agent 合法 decision 分支
 
 **来源**：客户 2026-10-26 规则（经主控任务转达；PM 设计登记 `2026-10-26_design_decision-card.md`，`rules-only`）——材料性选择由统筹发 `request_choice(cardKind="decision")`，卡内恰一个推荐项，「替我决策」开启默认推荐；decision 卡独立于提案/任命/验收，不是客户批准，不触发 gate/验收。运行时核心已交付 `GovernanceChoiceCardKind."decision"`、`GOVERNANCE_CARD_GROUP.decision="decision"`、`CustomerInputOption.recommended`；本批补编排分类/账本与判断 agent 分支（协调补遗：原 verdict 无 `case "decision"` 会回落 unknown/manual）。

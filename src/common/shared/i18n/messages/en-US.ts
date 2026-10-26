@@ -371,6 +371,11 @@ export const enUS = {
   "ui.composer.writeBoundaryNote":
     "Writes go to the imported project; writes outside the role boundary are rejected.",
 
+  // view_image attachment label (project image attachment in the next user prompt; desktop UI optional wiring).
+  // Customer requirement: roles can view project image evidence. view_image only confirms the image was read
+  // and queued this turn; the image reaches the same role as an image attachment on the next user prompt.
+  "ui.viewImage.attachmentLabel": "view_image attachment: {path}",
+
   "ui.confirm.shellDenyNote":
     "Clicking Reject, pressing Esc, or closing this box = no approval (nothing runs).",
   "ui.confirm.shellApproveNote":
@@ -1691,6 +1696,16 @@ export const enUS = {
   "main.composerImages.notBase64": "Image data is not valid base64.",
   "main.composerImages.tooLarge": "Image too large (> {max}) — compress it and try again.",
   "main.composerImages.decodeFailed": "Image data decoding failed.",
+
+  // view_image project image tool (customer requirement: roles can view project image evidence).
+  // Two-turn attachment semantics: this turn's tool result only confirms the image was read and queued;
+  // the image is provided to the same role as an image attachment with the next user prompt. The model has
+  // not seen the image content this turn and must not pretend otherwise. Path/type/size are fail-closed;
+  // the tool is not registered when the capability is not injected.
+  "main.viewImage.queued":
+    "Read project image {path} and queued it: it will be provided as an image attachment with the next user prompt; you have not seen the image content this turn — do not pretend you have.",
+  "main.viewImage.failed":
+    "Failed to read or queue the project image ({detail}); no image was provided.",
 
   "main.confirm.expiredTimeout": "Confirmation timed out; the old confirmation is no longer valid.",
   "main.confirm.expiredStopped":

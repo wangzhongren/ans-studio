@@ -23,8 +23,22 @@ import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { renderHandbackPrompt, type TaskHandback } from "../../src/common/编排/handback.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
-import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+import type { RoleSessionHandle, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
+import {
+  createRuntimeAdapterFactory as createRuntimeAdapterFactoryReal,
+  openRoleSession as openRoleSessionReal,
+} from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
+import type {
+  PromptImage,
+  PromptOptions,
+  RuntimeProviderFactory,
+  SessionEvent,
+  ToolResult,
+  ViewImageFn,
+} from "../../src/model/runtime.ts";
+// 2026-10-26 view_image（桌面侧投递能力）：正式文本来自实现模块（单一来源，不另写第二份）。
+import { buildViewImagePrompt } from "../../app/desktop/view-image.ts";
 // G-2（2026-10-16 客户批准）：W2 `system` 第四类投递（快照/队列视图/撤回/投递机复用）＋ W3 完成态收束的
 // **SessionManager 集成**（真看护服务＋注入时钟＋同源快照——不起真实模型）。
 import { createWatchdogService, type WatchdogObservation } from "../../app/desktop/watchdog.ts";
@@ -698,6 +712,382 @@ test("2026-10-20 重启续跑：in-flight 未完成 ⇒ 重启后重投；delive
     const h2 = makeHarness({ deliveryQueueStorePath: storePath });
     assert.equal((await h2.mgr.restorePersistedDeliveries()).restored, 0, "已投递成功的条目不再重投");
     await h2.mgr.stop(null);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ————————————————— view_image 桌面投递（2026-10-26） —————————————————
+//
+// 客户端要求：工具读取的图片作为**下一轮用户提示的图片附件**排队给**同一角色**——不是客户消息、
+// 不冒充客户消息、不按当前活动角色改投。桌面侧能力在开会话时注入（`openRoleSession` 入参
+// `viewImage`），实现只经既有 `send` → 同一投递机（忙 ⇒ 入队、settle 后按序投递）。
+
+interface ViewImageHarness {
+  mgr: SessionManager;
+  streams: Record<string, OrchestrationEvent[]>;
+  /** handle.send 的真实入参（含 images 引用——断言「原引用、不丢」）。 */
+  delivered: { roleId: string; text: string; images?: PromptImage[] }[];
+  roleStates: {
+    roleId: string;
+    busy: boolean;
+    summaries: string[];
+    queue: { kind: string; sourceRoleId: string; summary: string; at: string; id: string; full: string }[];
+    running: { kind: string; sourceRoleId: string; summary: string; at: string } | null;
+  }[];
+  /** 每次 open 注入的能力形（验证既有能力不因本接线丢失）。 */
+  openInputs: { roleId: string; viewImage?: ViewImageFn; dispatchTask?: unknown }[];
+  /** 指定角色的图片投递通道故障（仅带 images 的 send 抛错）。 */
+  failImageDeliveries: Set<string>;
+  /** 该角色**最近一次**开会话时注入的 viewImage（模拟工具调用它的入口）。 */
+  viewImageFor: (roleId: string) => ViewImageFn;
+  latest: (roleId: string) => ViewImageHarness["roleStates"][number] | undefined;
+}
+
+function makeViewImageHarness(): ViewImageHarness {
+  const l = listing();
+  const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
+  const delivered: ViewImageHarness["delivered"] = [];
+  const roleStates: ViewImageHarness["roleStates"] = [];
+  const openInputs: ViewImageHarness["openInputs"] = [];
+  const failImageDeliveries = new Set<string>();
+  const stopped: Record<string, boolean> = {};
+
+  const makeHandle = (roleId: string): RoleSessionHandle => {
+    let i = 0;
+    return {
+      async send(text: string, opts?: RoleSessionSendOptions): Promise<void> {
+        if (opts?.images !== undefined && failImageDeliveries.has(roleId)) {
+          throw new Error("演示：图片投递通道不可用");
+        }
+        delivered.push({ roleId, text, ...(opts?.images !== undefined ? { images: opts.images } : {}) });
+      },
+      events(): AsyncIterable<OrchestrationEvent> {
+        return {
+          [Symbol.asyncIterator]() {
+            return {
+              async next(): Promise<IteratorResult<OrchestrationEvent>> {
+                for (let tries = 0; tries < 120; tries += 1) {
+                  if (stopped[roleId]) return { value: undefined as unknown as OrchestrationEvent, done: true };
+                  const arr = streams[roleId] || [];
+                  if (i < arr.length) return { value: arr[i++], done: false };
+                  await new Promise((r) => setTimeout(r, 5));
+                }
+                return { value: undefined as unknown as OrchestrationEvent, done: true };
+              },
+            };
+          },
+        };
+      },
+      async dispose(): Promise<void> {
+        stopped[roleId] = true;
+      },
+    };
+  };
+
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      openInputs.push({ roleId: input.roleId, ...(input.viewImage ? { viewImage: input.viewImage } : {}), ...(input.dispatchTask ? { dispatchTask: input.dispatchTask } : {}) });
+      return makeHandle(input.roleId);
+    },
+    createPiAdapterFactory: () => {
+      throw new Error("本用例不应构造 pi 适配器");
+    },
+    createDemoAdapter: () => {
+      throw new Error("本用例不应构造 demo 适配器");
+    },
+    buildProjectConfig,
+    getListing: (root) => (root === "/proj" ? l : undefined),
+    emitEvent: (env) => {
+      // 事件流本身不参与本组断言；保留入口以便 consume 循环存在。
+      void env;
+    },
+    emitRoleState: (info) =>
+      roleStates.push({
+        roleId: info.roleId,
+        busy: info.busy,
+        summaries: [...info.summaries],
+        queue: (info.queue ?? []).map((x) => ({ ...x })),
+        running: info.running ? { ...info.running } : null,
+      }),
+  });
+
+  return {
+    mgr,
+    streams,
+    delivered,
+    roleStates,
+    openInputs,
+    failImageDeliveries,
+    viewImageFor: (roleId) => {
+      for (let i = openInputs.length - 1; i >= 0; i -= 1) {
+        const input = openInputs[i];
+        if (input.roleId === roleId && input.viewImage !== undefined) return input.viewImage;
+      }
+      throw new Error(`角色 ${roleId} 开会话时未注入 viewImage`);
+    },
+    latest: (roleId) => {
+      for (let i = roleStates.length - 1; i >= 0; i -= 1) if (roleStates[i].roleId === roleId) return roleStates[i];
+      return undefined;
+    },
+  };
+}
+
+test("2026-10-26 view_image：工具本轮调用 ⇒ 后台 system 提示入队；settle 后按序投递给同一角色（图片原引用）", async () => {
+  const h = makeViewImageHarness();
+  const image: PromptImage = { type: "image", data: "aGVsbG8=", mimeType: "image/png" };
+  const prompt = buildViewImagePrompt("docs/设计/界面 截图.png");
+
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(20);
+  const viewImage = h.viewImageFor("A");
+
+  // 既有能力不受影响：A（项目角色）无派发能力、但有 view_image；su（内置）两条都在。
+  assert.equal(h.openInputs.find((x) => x.roleId === "A")?.dispatchTask, undefined, "既有能力路由不变（项目角色无派发）");
+  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  assert.equal(typeof h.openInputs.find((x) => x.roleId === "su")?.dispatchTask, "function", "su 既有派发能力保留");
+  assert.equal(typeof h.openInputs.find((x) => x.roleId === "su")?.viewImage, "function", "view_image 对内置角色同样注入");
+
+  // A 真开跑一轮（工具在本轮内调用 ⇒ 角色忙）。显式寻址 A（当前活动角色已切到 su）。
+  assert.equal((await h.mgr.send("客户消息：看一下图", undefined, { projectRoot: "/proj", roleId: "A", runtime: "demo" })).ok, true);
+  assert.equal(h.mgr.isRoleBusy("/proj", "A", "demo"), true, "客户消息开跑后 A 忙");
+  // 用户切到 su：view_image 必须仍投给**开会话时定格的 A**（不按 activeRoleId 改投）。
+  assert.equal(h.mgr.openForRoleId(), "su");
+  assert.equal(h.delivered.length, 1, "此时只有客户消息已投出");
+
+  const receipt = await viewImage({ path: "docs/设计/界面 截图.png", image });
+  assert.deepEqual(receipt, { ok: true }, "入队成功 ⇒ ok:true（已交给投递机）");
+  assert.equal(h.delivered.length, 1, "角色忙：不并发投递图片提示");
+  const q = h.latest("A");
+  assert.equal(q?.queue.length, 1, "图片提示进入 A 的既有队列");
+  assert.equal(q?.queue[0].kind, "system", "后台系统提示（不冒充客户消息）");
+  assert.equal(q?.queue[0].sourceRoleId, "A", "来源＝本角色（系统投递）");
+  assert.equal(q?.queue[0].full, prompt, "正文含图片路径与原指令");
+  assert.ok(!q!.queue[0].summary.startsWith("你："), "系统条目摘要不写「你：」");
+  assert.equal(h.latest("su")?.queue.length ?? 0, 0, "不投给当前活动角色 su");
+
+  // settle ⇒ 既有投递机按到达序送达：客户消息在前，图片系统提示在后。
+  h.streams.A.push({ kind: "settled", summary: "A 一轮结束" });
+  await tick(150);
+  assert.deepEqual(
+    h.delivered.map((d) => [d.roleId, d.text]),
+    [
+      ["A", "客户消息：看一下图"],
+      ["A", prompt],
+    ],
+    "settle 后按序投递到同一角色",
+  );
+  assert.equal(h.delivered[1].images?.length, 1, "PromptOptions.images 恰一张（工具读取的那张）");
+  assert.equal(h.delivered[1].images?.[0], image, "工具给的 PromptImage 保持对象原引用（不重新编码/不复制）");
+  assert.equal(h.latest("A")?.running?.kind, "system", "出队投递的进行中条目类别仍为 system");
+  await h.mgr.stop(null);
+});
+
+test("2026-10-26 view_image：发送失败/会话不可用/非法载荷都如实失败，不谎称已提供", async () => {
+  const h = makeViewImageHarness();
+  const image: PromptImage = { type: "image", data: "aGVsbG8=", mimeType: "image/png" };
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(20);
+  const viewImage = h.viewImageFor("A");
+
+  // 非法载荷：不投文本、不制造「说了有图、实际无图」的假消息。
+  const noImage = await viewImage({ path: "docs/a.png", image: undefined as unknown as PromptImage });
+  assert.equal(noImage.ok, false);
+  assert.match(noImage.message ?? "", /不含可投递的图片数据/);
+  const badImage = await viewImage({ path: "docs/a.png", image: { type: "image", data: "", mimeType: "image/png" } });
+  assert.equal(badImage.ok, false, "空 data 不投递");
+  const noPath = await viewImage({ path: "   ", image });
+  assert.equal(noPath.ok, false);
+  assert.match(noPath.message ?? "", /缺少图片路径/);
+  assert.equal(h.delivered.length, 0, "非法载荷零投递");
+
+  // 传输失败：如实回执失败 + 底层原始原因（不吞、不假装已提供）。
+  h.failImageDeliveries.add("A");
+  const failed = await viewImage({ path: "docs/a.png", image });
+  assert.equal(failed.ok, false, "发送失败 ⇒ ok:false");
+  assert.match(failed.message ?? "", /投递失败/);
+  assert.match(failed.message ?? "", /图片投递通道不可用/, "带底层原始原因");
+  assert.equal(h.delivered.length, 0);
+  assert.equal(h.mgr.isRoleBusy("/proj", "A", "demo"), false, "直发失败后忙态如实复位");
+
+  // 会话已释放：能力仍被调用时如实报「会话尚未开启」。
+  await h.mgr.stop("A");
+  const closed = await viewImage({ path: "docs/a.png", image });
+  assert.equal(closed.ok, false, "会话不可用 ⇒ ok:false");
+  assert.match(closed.message ?? "", /尚未开启/, "如实回执不可用原因");
+  await h.mgr.stop(null);
+});
+
+test("2026-10-26 view_image：真实客户消息与后台投递的图片语义不变（原引用透传，不额外改写）", async () => {
+  const h = makeViewImageHarness();
+  const customerImages: PromptImage[] = [{ type: "image", data: "Y3VzdG9tZXI=", mimeType: "image/jpeg" }];
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(20);
+
+  const sent = await h.mgr.send("客户带图消息", { images: customerImages });
+  assert.equal(sent.ok, true);
+  assert.equal(h.delivered.length, 1);
+  assert.equal(h.delivered[0].images, customerImages, "客户消息的 images 同一引用（既有 P0-1 语义逐字不变）");
+  assert.equal(h.latest("A")?.running ?? null, null, "真实客户消息仍按既有路径直发（不属于排队系统条目）");
+  await h.mgr.stop(null);
+});
+
+test("2026-10-26 view_image 集成：真实 openRoleSession + 真实 view_image 工具 ⇒ 本轮内排队、settle 后把同一 PromptImage 投给同一角色", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ans-desktop-view-image-"));
+  try {
+    // 1×1 透明 PNG（工具按真实文件读取/扩展名校验；base64 由工具自己生成交给能力）。
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "docs", "shot.png"), png);
+    // 真实 openRoleSession 会读角色卡与边界文件（枚举只提供路径；内容以盘上为准）。
+    fs.mkdirSync(path.join(dir, "角色卡", "A"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "角色卡", "A", "role-card.md"), "# 角色 A\n\nview_image 集成测试。\n");
+    fs.writeFileSync(
+      path.join(dir, "角色卡", "A", "boundary.yaml"),
+      "role: A\nentries:\n  - kind: file\n    path: docs/shot.png\n    purpose: view_image 测试图片\n",
+    );
+
+    const projectListing: ProjectListing = {
+      projectRoot: dir,
+      roles: [
+        {
+          roleId: "A",
+          cardPath: "角色卡/A/role-card.md",
+          boundaryPath: "角色卡/A/boundary.yaml",
+          cardText: "角色 A",
+          boundary: {
+            entries: [{ root: "project", path: "docs/shot.png", kind: "file", purpose: "view_image 测试图片" }],
+            boundarySource: "角色卡/A/boundary.yaml",
+            acceptance: { accepted: false, source: "" },
+          },
+        },
+      ],
+      warnings: [],
+      hasRoles: true,
+      primaryRoleId: "A",
+    };
+
+    // 假 provider（不触网、不跑真实模型）：只在**第一轮**客户端提示里真实调用注册的 view_image 工具，
+    // 然后照常发 settled（驱动既有投递机放行排队项）。
+    const engineEvents: SessionEvent[] = [];
+    let wake: (() => void) | undefined;
+    let closed = false;
+    const pushEvent = (event: SessionEvent): void => {
+      engineEvents.push(event);
+      wake?.();
+      wake = undefined;
+    };
+    const delivered: { text: string; images?: PromptImage[] }[] = [];
+    const toolResults: ToolResult[] = [];
+    let toolCalls = 0;
+    const providerFactory: RuntimeProviderFactory = (options) => {
+      assert.equal(options.toolDisplayMode, "required-v1", "真实编排按 required-v1 装配工具展示");
+      options.registerToolDisplayProfile?.({ credentials: [] });
+      return {
+        async composeContext() {
+          return { systemPrompt: "" };
+        },
+        async bindRole() {
+          return {
+            runtime: options.runtime,
+            async prompt(text: string, opts?: PromptOptions): Promise<void> {
+              if (toolCalls === 0) {
+                const tool = options.tools.find((item) => item.name === "view_image");
+                assert.ok(tool, "桌面注入 viewImage ⇒ 真实编排/运行时核心注册 view_image");
+                toolCalls += 1;
+                toolResults.push(
+                  await tool!.handler({ name: "view_image", args: { path: "docs/shot.png" }, toolCallId: "call-view-image-1", signal: new AbortController().signal }),
+                );
+              } else if (text.startsWith("这是 view_image 请求的图片：")) {
+                delivered.push({ text, ...(opts?.images !== undefined ? { images: opts.images } : {}) });
+              }
+              pushEvent({ kind: "settled", summary: "engine settled", runtime: options.runtime });
+            },
+            events(): AsyncIterable<SessionEvent> {
+              return {
+                [Symbol.asyncIterator]() {
+                  return {
+                    async next(): Promise<IteratorResult<SessionEvent>> {
+                      while (true) {
+                        if (engineEvents.length > 0) return { value: engineEvents.shift()!, done: false };
+                        if (closed) return { value: undefined as unknown as SessionEvent, done: true };
+                        await new Promise<void>((resolve) => {
+                          wake = resolve;
+                        });
+                      }
+                    },
+                  };
+                },
+              };
+            },
+            async dispose(): Promise<void> {
+              closed = true;
+              wake?.();
+            },
+          };
+        },
+      };
+    };
+
+    const roleStates: ViewImageHarness["roleStates"] = [];
+    const openInputs: { roleId: string; viewImage?: ViewImageFn }[] = [];
+    const mgr = new SessionManager({
+      openRoleSession: (input, deps) => {
+        openInputs.push({ roleId: input.roleId, ...(input.viewImage !== undefined ? { viewImage: input.viewImage } : {}) });
+        return openRoleSessionReal(input, deps);
+      },
+      createRuntimeAdapterFactory: (project, runtime, options) =>
+        createRuntimeAdapterFactoryReal(project, runtime, {
+          ...options,
+          providerFactories: { demo: providerFactory },
+          persistSession: false,
+        }),
+      createPiAdapterFactory: () => {
+        throw new Error("本用例不应构造 pi 适配器");
+      },
+      createDemoAdapter: () => {
+        throw new Error("本用例不应构造 demo 适配器");
+      },
+      buildProjectConfig,
+      getListing: (root) => (root === dir ? projectListing : undefined),
+      emitEvent: () => {},
+      emitRoleState: (info) =>
+        roleStates.push({
+          roleId: info.roleId,
+          busy: info.busy,
+          summaries: [...info.summaries],
+          queue: (info.queue ?? []).map((x) => ({ ...x })),
+          running: info.running ? { ...info.running } : null,
+        }),
+    });
+
+    const opened = await mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+    assert.equal(opened.ok, true, opened.error ?? "");
+    assert.equal(typeof openInputs[0]?.viewImage, "function", "开会话时向真实编排注入 viewImage");
+
+    const sent = await mgr.send("请查看 docs/shot.png");
+    assert.equal(sent.ok, true);
+    await tick(250);
+
+    assert.equal(toolCalls, 1, "工具在本轮内被调用一次");
+    assert.equal(toolResults[0]?.ok, true, "能力受理（排队）⇒ 工具回执 ok");
+    assert.match(toolResults[0]?.message ?? "", /已读取并排队/, "工具本轮只回「已排队」（两轮附件语义）");
+    assert.equal(delivered.length, 1, "settle 后图片提示按既有投递机送达一次");
+    assert.equal(delivered[0].text, buildViewImagePrompt("docs/shot.png"), "文本含路径与原指令");
+    assert.equal(delivered[0].images?.length, 1, "带恰一张图片附件");
+    assert.deepEqual(
+      delivered[0].images?.[0],
+      { type: "image", data: png.toString("base64"), mimeType: "image/png" },
+      "工具读取的真实字节（base64 + MIME）原样进入下一轮 PromptOptions.images",
+    );
+    assert.ok(
+      roleStates.some((s) => s.roleId === "A" && s.queue[0]?.kind === "system" && s.queue[0].full === buildViewImagePrompt("docs/shot.png")),
+      "本轮内（角色忙）以 system 类别入队，settle 后放行",
+    );
+    await mgr.stop(null);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

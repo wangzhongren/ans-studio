@@ -363,6 +363,11 @@ export const zhCN = {
   "ui.composer.footerIdle": "选择角色并开启会话后可发送。",
   "ui.composer.writeBoundaryNote": "实际写入导入项目，角色边界外的写入会被拒绝。",
 
+  // ---- view_image 附件标签（下一轮用户提示中的项目图片附件；桌面UI 可选接线）----
+  // 客户要求：角色可查看项目内图片证据。view_image 本轮只确认已读取并排队，
+  // 图片作为**下一轮用户提示的图片附件**送达同一角色；此标签供该附件展示。
+  "ui.viewImage.attachmentLabel": "view_image 附件：{path}",
+
   // ---- 确认卡（shell/ConfirmCard.tsx + chat/confirm-logic.ts）----
   "ui.confirm.shellDenyNote": "点「拒绝」、按 Esc 或关闭本框 = 不放行（不会执行）。",
   "ui.confirm.shellApproveNote":
@@ -1502,6 +1507,14 @@ export const zhCN = {
   "main.composerImages.notBase64": "图片数据不是合法的 base64。",
   "main.composerImages.tooLarge": "图片过大（> {max}）——请压缩后再发。",
   "main.composerImages.decodeFailed": "图片数据解码失败。",
+
+  // ---- 项目图片查看工具（view_image；客户要求：角色可查看项目内图片证据）----
+  // 两轮附件语义：本轮工具结果只确认「已读取并排队」，图片作为**下一轮用户提示的
+  // 图片附件**提供给同一角色；本轮模型并未看到图片内容，不得假装已看到。
+  // 路径/类型/大小 fail-closed：失败时如实报告且不提供图片；能力未注入时不注册该工具。
+  "main.viewImage.queued":
+    "已读取项目图片 {path} 并排队：下一轮将以图片附件提供（随下一轮用户提示送达）；本轮你尚未看到图片内容，不要假装本轮已看到。",
+  "main.viewImage.failed": "读取或排队项目图片失败（{detail}）；未提供图片。",
 
   // ---- 确认卡/恢复通道（confirm-card.ts / recovery-channel.ts / operator-channel.ts）----
   "main.confirm.expiredTimeout": "确认已超时，旧确认失效。",

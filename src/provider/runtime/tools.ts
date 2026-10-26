@@ -3,8 +3,8 @@ import { coreToolTarget, utf8Prefix } from "../../common/runtime-core/tool-displ
 import { createEventQueue } from "../../common/runtime-core/event-queue.ts";
 import { resolveProjectList } from "../../common/runtime-core/list-dir.ts";
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
+import { readFile, realpath, stat } from "node:fs/promises";
+import { extname, isAbsolute, relative, resolve } from "node:path";
 import type {
   WriteGate,
   ShellGate,
@@ -61,6 +61,7 @@ import type {
   ToolDefinition, ToolResult, GovernedToolsOptions,
   GovernanceCardKind, GovernanceCardMetadata, GovernanceChoiceCardKind, GovernanceConfirmCardKind, GovernanceFlowMetadata,
   BackgroundTaskCapability, BackgroundTaskSnapshot,
+  ViewImageFn, ViewImageInput, PromptImage,
 } from "../../model/runtime.ts";
 import { GOVERNANCE_SLUG_PATTERN, FLOW_TOOL_STATUSES, FLOW_TOOL_STEP_KINDS } from "../../model/runtime.ts";
 import type { WriteDecision } from "../../model/decision.ts";
@@ -89,7 +90,7 @@ import {
 } from "../../common/runtime-core/background-tasks.ts";
 import { killProcessTree } from "../../common/runtime-core/process-tree.ts";
 import { PI_CREDENTIAL_ENV_VARS, RUNTIME_CREDENTIAL_ENV_VARS } from "../../common/shared/runtime-shared.ts";
-import { isAbsoluteAny } from "../../common/shared/path-primitives.ts";
+import { isAbsoluteAny, isWithinReal } from "../../common/shared/path-primitives.ts";
 import {
   atomicWriteFile,
   ensureParentDir,
@@ -169,6 +170,12 @@ export const REQUEST_GATE_REVIEW_TOOL_NAME = "request_gate_review";
 
 /** request_boundary_change 工具名（2026-10-26；项目角色写集/边界不足时由统筹请应用派组队修改）。 */
 export const REQUEST_BOUNDARY_CHANGE_TOOL_NAME = "request_boundary_change";
+
+/** view_image 工具名（2026-10-26；读取项目内图片并排队为下一轮用户提示的图片附件——注入才注册）。 */
+export const VIEW_IMAGE_TOOL_NAME = "view_image";
+
+/** `view_image` 单文件大小上限（10 MB，按字节；超过即拒绝，不截断、不缩图）。 */
+export const VIEW_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
 /** 扩展层对 run_shell 的能力级判定结果：非 undefined 即阻断（默认拒绝）。 */
 export interface ShellKillSwitchDecision {
@@ -545,6 +552,172 @@ function makeListDirTool(projectRoot: string): ExecutableTool {
       }
       const body = result.entries.length > 0 ? result.entries.join("\n") : "（空目录或无可列条目）";
       return { ok: true, message: `list_dir: ${result.rel}\n\n${body}${result.truncated ? "\n\n[已截断：条目超过上限]" : ""}` };
+    },
+  };
+}
+
+// —————————————— 图片查看：两轮附件设计（2026-10-26 客户要求；view_image） ——————————————
+//
+// 客户要求「让角色能看项目里的图片」，但各引擎对**工具结果附图**的支持不一致。本工具采用**两轮附件**：
+// 工具只读取/校验图片，并调用注入的 `ViewImageFn` 把图片排队为**同一角色下一轮用户提示的图片附件**；
+// 本轮工具结果只返回文本（明确「已排队，下一轮以附件提供，不要假装本轮已看到」）。能力未注入 ⇒ 工具
+// 不注册（结构性 fail-closed）。路径/类型/大小校验全部在触达能力之前完成：非法 ⇒ 工具失败且**不调用
+// 能力**；能力 `ok:false`/抛错/契约外回执 ⇒ 如实报「未排队」，绝不谎报已提供。
+// 本工具不写盘、不联网、不过写门禁，也不改变 read_file / 其它工具的任何行为。
+
+/** `view_image` 支持的扩展名 → MIME（匹配时小写化；按**真实文件**扩展名判定）。 */
+const VIEW_IMAGE_MIME: Readonly<Record<string, string>> = Object.freeze({
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+});
+
+/**
+ * `view_image` 的路径句法拒绝集（与 `read_file` 同一 `readTargetPath`/`readRoot` 口径，但更严格）：
+ * 空串、NUL、绝对路径/盘符路径（含盘符相对 `C:foo`）与任何 `..` 段 ⇒ 在触碰文件系统前拒绝。
+ * 真实路径越界（符号链接/junction 逃逸）由 `isWithinReal` 在 realpath 之后复核。
+ */
+function viewImagePathSyntaxError(path: string): string | undefined {
+  if (path.trim() === "") return "path 为空";
+  if (path.includes("\u0000")) return "path 含 NUL 字符";
+  if (isAbsolute(path) || isAbsoluteAny(path) || /^[A-Za-z]:/.test(path)) return "必须是项目相对路径（不得为绝对路径/盘符路径）";
+  if (path.replace(/\\/g, "/").split("/").some((segment) => segment === "..")) return "不得包含 `..` 路径段";
+  return undefined;
+}
+
+/** 能力回执归一（契约外 → undefined，由调用方按「未排队」fail-closed，不把不明结果当成功）。 */
+function viewImageReceiptOf(value: unknown): { ok: boolean; message?: string } | undefined {
+  if (value === null || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  if (record["ok"] !== true && record["ok"] !== false) return undefined;
+  const message = typeof record["message"] === "string" && record["message"].trim() !== "" ? record["message"] : undefined;
+  return { ok: record["ok"] === true, ...(message !== undefined ? { message } : {}) };
+}
+
+/**
+ * view_image：读取项目内一张图片并排队为**下一轮**用户提示的图片附件（两轮附件设计）。
+ *
+ * 顺序：取 path（`readTargetPath`，与 read_file 同口径）→ 路径句法校验 → realpath 根内复核（拒绝越界/
+ * 符号链接逃逸）→ 必须是普通文件（目录明确指路 list_dir）→ 扩展名/MIME（.png/.jpg/.jpeg/.webp/.gif）→
+ * 大小 ≤10 MB → 读二进制并 base64 → 调用注入能力。任一校验失败都**不调用能力**、不写盘、不联网。
+ * 成功回执逐字说明「本轮只是排队」；能力拒绝/抛错/契约外回执一律按**未排队**如实转达。
+ */
+function makeViewImageTool(fn: ViewImageFn, readRoot: string): ExecutableTool {
+  const name = VIEW_IMAGE_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const path = readTargetPath(call.args);
+      if (path === undefined) {
+        return { ok: false, message: `${name}: 缺少 path 参数（项目内图片路径），无法读取` };
+      }
+      const syntax = viewImagePathSyntaxError(path);
+      if (syntax !== undefined) {
+        return { ok: false, message: `${name} 拒绝读取：${syntax}——未读取、未排队` };
+      }
+
+      let rootReal: string;
+      try {
+        rootReal = await realpath(readRoot);
+      } catch (err) {
+        return { ok: false, message: `${name} 读取失败：读取根不可用（${reasonOf(err)}）——未排队` };
+      }
+      let real: string;
+      try {
+        real = await realpath(resolve(readRoot, path));
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException | undefined)?.code;
+        const why = code === "ENOENT" ? "不存在或不可访问" : reasonOf(err);
+        return { ok: false, message: `${name} 读取失败：${path} ${why}——未读取、未排队` };
+      }
+      if (!isWithinReal(rootReal, real)) {
+        return { ok: false, message: `${name} 拒绝读取：${path} 在读取根之外（已拒绝）——未读取、未排队` };
+      }
+
+      let info;
+      try {
+        info = await stat(real);
+      } catch (err) {
+        return { ok: false, message: `${name} 读取失败：${path}（${reasonOf(err)}）——未读取、未排队` };
+      }
+      if (info.isDirectory()) {
+        return { ok: false, message: `${name} 拒绝读取：${path} 是目录——请用 list_dir 定位后选择图片文件；未读取、未排队` };
+      }
+      if (!info.isFile()) {
+        return { ok: false, message: `${name} 拒绝读取：${path} 不是普通文件——未读取、未排队` };
+      }
+
+      const ext = extname(real).toLowerCase();
+      const mimeType = VIEW_IMAGE_MIME[ext];
+      if (mimeType === undefined) {
+        return {
+          ok: false,
+          message: `${name} 拒绝读取：不支持的图片类型「${ext === "" ? "无扩展名" : ext}」（仅支持 .png / .jpg / .jpeg / .webp / .gif）——未读取、未排队`,
+        };
+      }
+      if (info.size > VIEW_IMAGE_MAX_BYTES) {
+        return {
+          ok: false,
+          message: `${name} 拒绝读取：${path} 大小 ${info.size} 字节，超过上限 ${VIEW_IMAGE_MAX_BYTES} 字节（10 MB）——未读取、未排队`,
+        };
+      }
+
+      let raw: Buffer;
+      try {
+        raw = await readFile(real);
+      } catch (err) {
+        return { ok: false, message: `${name} 读取失败：${path}（${reasonOf(err)}）——未排队` };
+      }
+      // 读取与 stat 之间文件可能被替换/增长：以实际字节数复核，绝不超限排队。
+      if (raw.length > VIEW_IMAGE_MAX_BYTES) {
+        return {
+          ok: false,
+          message: `${name} 拒绝读取：${path} 实际读取 ${raw.length} 字节，超过上限 ${VIEW_IMAGE_MAX_BYTES} 字节（10 MB）——未读取、未排队`,
+        };
+      }
+      if (call.signal?.aborted) {
+        return { ok: false, message: `${name}：本轮已中止，图片附件未排队——不要当它已提供；本轮不要假装已看到。` };
+      }
+
+      const image: PromptImage = { type: "image", data: raw.toString("base64"), mimeType };
+      const input: ViewImageInput = { path, image };
+
+      let receipt: unknown;
+      try {
+        receipt = await raceAbort(
+          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(input); }),
+          call.signal,
+          `${name} 排队图片附件`,
+        );
+      } catch (err) {
+        // 中止时能力可能已经受理（raceAbort 不取消底层 promise）——不谎称失败，也不谎称已提供。
+        if (call.signal?.aborted) {
+          return {
+            ok: false,
+            message: `${name}：本轮已中止，图片附件排队**未获确认**——**不要当它已提供**；下一轮是否收到图片以系统为准，本轮不要假装已看到。`,
+          };
+        }
+        return { ok: false, message: `${name}：图片**未能排队**（原因：${reasonOf(err)}）——下一轮不会收到该图片附件；本轮不要假装已看到。` };
+      }
+      const normalized = viewImageReceiptOf(receipt);
+      if (normalized === undefined) {
+        return {
+          ok: false,
+          message: `${name}：能力未返回明确回执（回执缺失或非法）——按**未排队**处理；下一轮不会收到该图片附件；本轮不要假装已看到。`,
+        };
+      }
+      if (!normalized.ok) {
+        return {
+          ok: false,
+          message: `${name}：图片**未能排队**（回执：${normalized.message ?? "能力侧被拒且未提供原因"}）——下一轮不会收到该图片附件；本轮不要假装已看到。`,
+        };
+      }
+      return {
+        ok: true,
+        message: `${name}: ${path} 已读取并排队；下一轮以图片附件提供；本轮不要假装已看到。${normalized.message !== undefined ? ` ${normalized.message}` : ""}`,
+      };
     },
   };
 }
@@ -1345,6 +1518,10 @@ function abortedToolResult(name: string): ToolResult {
   // 边界变更请求（2026-10-26）：中止时**不假设已派发/已修改**（零副作用面如实）。
   if (name === REQUEST_BOUNDARY_CHANGE_TOOL_NAME) {
     return { ok: false, message: `${name}：边界变更请求**未获结果**（原因：会话已中止）——**不要当已派发/已修改**；如实告知客户。` };
+  }
+  // 图片查看（2026-10-26）：中止时不谎称「已提供/未提供」——排队结果未确认，下一轮以系统为准。
+  if (name === VIEW_IMAGE_TOOL_NAME) {
+    return { ok: false, message: `${name}：本轮已中止，图片附件排队**未获确认**——**不要当它已提供**；下一轮是否收到图片以系统为准，本轮不要假装已看到。` };
   }
   // 2026-10-22 后台任务（B1）：中止时**不假设已启动/已停止**（零副作用面如实）。
   if (name === START_BACKGROUND_TASK_TOOL_NAME) {
@@ -3136,6 +3313,12 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     makeListDirTool(readRoot),
   ];
 
+  // 结构性保证（2026-10-26 图片查看，沿 dispatch_task 先例）：**未注入 viewImage 能力时
+  // `view_image` 不存在**（能力缺席 = 最强 fail-closed）。工具层负责路径/类型/大小校验与
+  // PromptImage 转换；能力侧只负责把图片排队为下一轮附件并如实回执。
+  const viewImage = options?.viewImage;
+  if (viewImage !== undefined) tools.push(makeViewImageTool(viewImage, readRoot));
+
   // 结构性保证（设计 §7.5.1）：**未注入 ShellGate 时 run_shell 根本不存在**。
   // 「能力缺席」是最强的 fail-closed——不是「注册了再在 execute 里判空」，而是工具压根不在集合里，
   // 模型无法请求、扩展层也无需守它。这是与本模式（写类工具在 execute 内判空）刻意的不同处理。
@@ -3273,7 +3456,7 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   // Observe customer waits without storing titles, previews or selected values.
   return tools.map((tool) => {
     const { parameters, ...description } = describeTool(tool.name);
-    const defined: ToolDefinition = { ...tool, ...description, displayInputRule: ["read_file","write_file","edit_file"].includes(tool.name) ? "core-path-v1" : tool.name === "run_shell" || tool.name === START_BACKGROUND_TASK_TOOL_NAME ? "core-command-v1" : "none", inputSchema: parameters, async handler(call) {
+    const defined: ToolDefinition = { ...tool, ...description, displayInputRule: ["read_file","write_file","edit_file",VIEW_IMAGE_TOOL_NAME].includes(tool.name) ? "core-path-v1" : tool.name === "run_shell" || tool.name === START_BACKGROUND_TASK_TOOL_NAME ? "core-command-v1" : "none", inputSchema: parameters, async handler(call) {
       if (call.signal?.aborted) return abortedToolResult(tool.name);
       const result = await tool.handler(call);
       // 后台任务成功结果带结构化事实（任务已启动/已停止是已发生的真实事件）：即使信号在 handler 返回前
