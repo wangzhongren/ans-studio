@@ -45,10 +45,10 @@ function fixture(root: string, report: (raw: unknown) => void = () => {}) {
 
 const call = (name: string, args: Record<string, unknown>) => ({ name, args });
 
-test("cardKind → group 单一映射：七个卡种全覆盖；未知/缺席永不判断", () => {
+test("cardKind → group 单一映射：八个卡种全覆盖；未知/缺席永不判断", () => {
   assert.deepEqual(
     [...Object.keys(GOVERNANCE_CARD_GROUP)].sort(),
-    ["acceptance", "appointment", "appointment-write", "intent-confirm", "proposal", "schedule-write", "write"],
+    ["acceptance", "appointment", "appointment-write", "decision", "intent-confirm", "proposal", "schedule-write", "write"],
   );
   assert.equal(governanceCardGroup("write"), "approval");
   assert.equal(governanceCardGroup("appointment-write"), "approval");
@@ -62,6 +62,10 @@ test("cardKind → group 单一映射：七个卡种全覆盖；未知/缺席永
   // 判断 agent 可代批 `confirm`；`revise` 仍交回客户/发起角色（不替客户修改）。
   assert.equal(governanceCardGroup("intent-confirm"), "decision", "需求确认卡由 decision 开关代批");
   assert.equal(Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, "intent-confirm"), true, "映射必须包含 intent-confirm 键");
+  // 2026-10-26 客户要求：材料性选择卡（decision）纳入 decision 组——「替我决策」开启时默认选推荐项；
+  // 组只表达开关分组，不表达权限，也不触发门禁/验收。
+  assert.equal(governanceCardGroup("decision"), "decision", "材料性选择卡由 decision 开关代批");
+  assert.equal(Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, "decision"), true, "映射必须包含 decision 键");
   assert.equal(Object.isFrozen(GOVERNANCE_CARD_GROUP), true, "映射冻结，禁止第二份/就地改写");
 });
 

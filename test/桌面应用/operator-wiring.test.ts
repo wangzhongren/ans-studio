@@ -8,10 +8,14 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { SessionManager } from "../../app/desktop/session.ts";
 import {
   createCustomerInputChannel,
+  evaluateDecisionCardRequest,
   judgeResultSummary,
   resolveChannelJudgeTimeoutMs,
   formatJudgeTimeoutMs,
@@ -36,6 +40,7 @@ import {
   buildAcceptanceTaskMessage,
   buildGovernanceAdvanceMessage,
   buildRoleReadinessTaskMessage,
+  deriveGovernanceNextStep,
   flowCompletionIssue,
   normalizeFlowStepStatus,
   parseFlowStepStatuses,
@@ -50,8 +55,18 @@ import type {
   GovernanceJudgeGroup,
   GovernanceJudgeOutcome,
   GovernanceJudgeRequest,
+  RoleSession,
+  RuntimeAdapter,
+  WriteGate,
 } from "../../src/model/runtime.ts";
-import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+import type { ProjectConfig } from "../../src/model/role.ts";
+import {
+  openRoleSession,
+  validateDecisionCardRequest,
+  type AdapterCapabilities,
+  type RoleSessionHandle,
+} from "../../src/pipeline/orchestration/run-role.ts";
+import { flushGovernanceLedger, readGovernanceLedger } from "../../src/common/编排/governance-ledger.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 
 // ————— ① 通道本体（纯逻辑）：confirm / choice / 快照校验 / fail-closed 四条 —————
@@ -2909,4 +2924,698 @@ test("写盘预授权接线（SessionManager）：确认制会话把已接受的
     "convener 的 Section 1 含 docs/scheduling/",
   );
   await mgr.stop(null);
+});
+
+// ————— ⑫ decision 卡（2026-10-26 客户新增）：发卡前校验 + 「替我决策」确定性默认推荐 —————
+//
+// 客户要求：主理发现**材料性选择**时不自定，交统筹（convener）发
+// `request_choice(cardKind="decision")`；卡内恰有一个 `recommended: true` 推荐项；开启「替我决策」
+// 时应用**确定性**默认选推荐项（不调用模型做选择题），以 judge 代批审计（group=decision），不得
+// 伪装成客户本人；decision 卡独立于提案/任命/验收——不触发 gate/验收、不推导治理下一步、不写
+// acceptance/proposal/appointment 决定。开关关闭/异常 ⇒ 原卡交客户，绝不擅自代选。
+
+const DECISION_CTX = {
+  roleId: "convener",
+  projectRoot: "/p",
+  runtime: "claude" as const,
+  governanceModel: "trio" as const,
+};
+
+function decisionCardRequest(over: {
+  kind?: "choice" | "confirm";
+  cardKind?: string | undefined;
+  flowId?: string | undefined;
+  options?: Array<{ id: string; label: string; recommended?: boolean }>;
+  multiple?: boolean;
+  title?: string;
+} = {}): CustomerInputRequest {
+  const request: Record<string, unknown> = {
+    kind: over.kind ?? "choice",
+    title: over.title ?? "材料性选择",
+    ...(over.kind === "confirm" ? { preview: "材料性选择预览", detail: "材料性选择细节" } : {}),
+    flowId: "flow-a",
+    cardKind: "decision",
+    options: [
+      { id: "option-a", label: "方案 A", recommended: true },
+      { id: "option-b", label: "方案 B" },
+    ],
+  };
+  if (over.kind === "confirm") delete request["options"];
+  if ("cardKind" in over) request["cardKind"] = over.cardKind;
+  if ("flowId" in over) request["flowId"] = over.flowId;
+  if (over.options !== undefined) request["options"] = over.options;
+  if (over.multiple !== undefined) request["multiple"] = over.multiple;
+  return request as unknown as CustomerInputRequest;
+}
+
+test("decision 卡发卡前校验：仅 convener 可发；缺 flowId/cardKind、选项不足/重复、推荐项不为恰一个 ⇒ 拒发卡", () => {
+  // 合法：convener + trio + 合法 flowId + 2 选项 + 恰一个推荐项。
+  const allow = evaluateDecisionCardRequest({
+    request: decisionCardRequest(),
+    roleId: "convener",
+    governanceModel: "trio",
+  });
+  assert.equal(allow.action, "allow");
+  if (allow.action === "allow") {
+    assert.equal(allow.flowId, "flow-a");
+    assert.equal(allow.recommendedOptionId, "option-a", "唯一推荐项在发卡前定格");
+  }
+
+  // 角色：除 convener 外一律拒（含其他内置治理角色、legacy su、项目角色与空 id）。
+  for (const roleId of ["liaison", "rapporteur", "nominator", "verifier", "su", "project-role", ""]) {
+    const result = evaluateDecisionCardRequest({
+      request: decisionCardRequest(),
+      roleId,
+      governanceModel: "trio",
+    });
+    assert.equal(result.action, "reject", `${roleId === "" ? "(empty)" : roleId} 不得发 decision 卡`);
+    if (result.action === "reject") {
+      assert.equal(result.reasonCode, "role-not-allowed");
+      assert.match(result.reason, /未向客户发卡/, "拒发卡必须说明卡片未发出");
+      assert.match(result.reason, /fail-closed/);
+    }
+  }
+
+  // flowId：缺失/空串/非法 slug ⇒ 拒；可由 metadata.flowId 合法补齐。
+  for (const flowId of [undefined, "", "Bad Flow", "flow-", "-flow"]) {
+    const result = evaluateDecisionCardRequest({
+      request: decisionCardRequest({ flowId }),
+      roleId: "convener",
+      governanceModel: "trio",
+    });
+    assert.equal(result.action, "reject", `flowId=${JSON.stringify(flowId)} 必须拒`);
+    if (result.action === "reject") assert.equal(result.reasonCode, "missing-flow-id");
+  }
+  assert.equal(
+    evaluateDecisionCardRequest({
+      request: decisionCardRequest({ flowId: undefined }),
+      roleId: "convener",
+      governanceModel: "trio",
+      metadata: { flowId: "flow-a" },
+    }).action,
+    "allow",
+    "编排在 metadata 透传的 flowId 合法时允许",
+  );
+
+  // 选项数量（至少 2）。
+  for (const options of [[], [{ id: "only", label: "唯一", recommended: true }]]) {
+    const result = evaluateDecisionCardRequest({
+      request: decisionCardRequest({ options }),
+      roleId: "convener",
+      governanceModel: "trio",
+    });
+    assert.equal(result.action, "reject");
+    if (result.action === "reject") assert.equal(result.reasonCode, "not-enough-options");
+  }
+
+  // 推荐项必须恰一个：0 个 / 多个都拒（noRecommended 文案）。
+  for (const options of [
+    [{ id: "a", label: "A" }, { id: "b", label: "B" }],
+    [
+      { id: "a", label: "A", recommended: true },
+      { id: "b", label: "B", recommended: true },
+    ],
+  ]) {
+    const result = evaluateDecisionCardRequest({
+      request: decisionCardRequest({ options }),
+      roleId: "convener",
+      governanceModel: "trio",
+    });
+    assert.equal(result.action, "reject");
+    if (result.action === "reject") {
+      assert.equal(result.reasonCode, "recommended-count");
+      assert.match(result.reason, /缺少唯一推荐项/);
+      assert.match(result.reason, /未向客户发卡/);
+    }
+  }
+
+  // 选项 id 重复 / 缺失/非字符串 ⇒ 拒。
+  const duplicate = evaluateDecisionCardRequest({
+    request: decisionCardRequest({
+      options: [
+        { id: "same", label: "A", recommended: true },
+        { id: "same", label: "B" },
+      ],
+    }),
+    roleId: "convener",
+    governanceModel: "trio",
+  });
+  assert.equal(duplicate.action, "reject");
+  if (duplicate.action === "reject") assert.equal(duplicate.reasonCode, "duplicate-option-id");
+
+  const missingId = evaluateDecisionCardRequest({
+    request: decisionCardRequest({
+      options: [{ id: "", label: "A", recommended: true }, { id: "b", label: "B" }],
+    }),
+    roleId: "convener",
+    governanceModel: "trio",
+  });
+  assert.equal(missingId.action, "reject");
+  if (missingId.action === "reject") assert.equal(missingId.reasonCode, "invalid-option-id");
+
+  // decision 必须是 choice 卡。
+  const confirmDecision = evaluateDecisionCardRequest({
+    request: decisionCardRequest({ kind: "confirm" }),
+    roleId: "convener",
+    governanceModel: "trio",
+  });
+  assert.equal(confirmDecision.action, "reject");
+  if (confirmDecision.action === "reject") assert.equal(confirmDecision.reasonCode, "not-choice");
+
+  // 缺 cardKind：内置治理角色发出的「decision 形状」卡 fail-closed 拒发；项目角色的普通选择卡忽略 recommended。
+  const missingCardKind = evaluateDecisionCardRequest({
+    request: decisionCardRequest({ cardKind: undefined }),
+    roleId: "convener",
+    governanceModel: "trio",
+  });
+  assert.equal(missingCardKind.action, "reject");
+  if (missingCardKind.action === "reject") {
+    assert.equal(missingCardKind.reasonCode, "missing-card-kind");
+    assert.match(missingCardKind.reason, /未向客户发卡/);
+  }
+  assert.equal(
+    evaluateDecisionCardRequest({
+      request: decisionCardRequest({ cardKind: undefined }),
+      roleId: "project-role",
+      governanceModel: "single",
+    }).action,
+    "ignore",
+    "项目角色的非 decision 卡忽略 recommended（零行为变化）",
+  );
+
+  // 显式非 decision 卡：忽略 recommended（非 decision 卡不得被本语义拦截）。
+  for (const cardKind of ["proposal", "appointment", "acceptance", "intent-confirm", "write"]) {
+    assert.equal(
+      evaluateDecisionCardRequest({
+        request: decisionCardRequest({ cardKind }),
+        roleId: "convener",
+        governanceModel: "trio",
+      }).action,
+      "ignore",
+      `cardKind=${cardKind} 忽略 recommended`,
+    );
+  }
+});
+
+test("decision 卡校验单一来源：桌面包装的拒绝原因与 Pipeline validateDecisionCardRequest 逐项一致", () => {
+  // 桌面只保留 notPresented/文案/operator 映射；结构判定必须与共享函数同码同 detail。
+  const cases: Array<{ label: string; request: CustomerInputRequest; roleId: string }> = [
+    { label: "非 convener", request: decisionCardRequest(), roleId: "rapporteur" },
+    { label: "缺 flowId", request: decisionCardRequest({ flowId: undefined }), roleId: "convener" },
+    {
+      label: "选项不足",
+      request: decisionCardRequest({ options: [{ id: "only", label: "唯一", recommended: true }] }),
+      roleId: "convener",
+    },
+    {
+      label: "缺推荐项",
+      request: decisionCardRequest({ options: [{ id: "a", label: "A" }, { id: "b", label: "B" }] }),
+      roleId: "convener",
+    },
+    {
+      label: "多个推荐项",
+      request: decisionCardRequest({
+        options: [
+          { id: "a", label: "A", recommended: true },
+          { id: "b", label: "B", recommended: true },
+        ],
+      }),
+      roleId: "convener",
+    },
+    {
+      label: "重复选项 id",
+      request: decisionCardRequest({
+        options: [
+          { id: "same", label: "A", recommended: true },
+          { id: "same", label: "B" },
+        ],
+      }),
+      roleId: "convener",
+    },
+    {
+      label: "非法选项 id",
+      request: decisionCardRequest({
+        options: [{ id: "", label: "A", recommended: true }, { id: "b", label: "B" }],
+      }),
+      roleId: "convener",
+    },
+    { label: "非 choice", request: decisionCardRequest({ kind: "confirm" }), roleId: "convener" },
+  ];
+  for (const item of cases) {
+    const shared = validateDecisionCardRequest({
+      request: item.request,
+      roleId: item.roleId,
+      governanceModel: "trio",
+    });
+    const desktop = evaluateDecisionCardRequest({
+      request: item.request,
+      roleId: item.roleId,
+      governanceModel: "trio",
+    });
+    assert.equal(shared.ok, false, `${item.label}: 共享校验应拒绝`);
+    assert.equal(desktop.action, "reject", `${item.label}: 桌面包装应拒绝`);
+    if (!shared.ok && desktop.action === "reject") {
+      assert.equal(desktop.reasonCode, shared.reasonCode, `${item.label}: 拒绝原因码与共享一致`);
+      assert.ok(
+        desktop.reason.includes(shared.detail),
+        `${item.label}: 桌面文案应带共享 detail（${shared.detail}）`,
+      );
+    }
+  }
+
+  // single/非 trio：共享函数同样拒绝 convener decision 卡（桌面按同一结果 fail-closed）。
+  const sharedSingle = validateDecisionCardRequest({
+    request: decisionCardRequest(),
+    roleId: "convener",
+    governanceModel: "single",
+  });
+  const desktopSingle = evaluateDecisionCardRequest({
+    request: decisionCardRequest(),
+    roleId: "convener",
+    governanceModel: "single",
+  });
+  assert.equal(sharedSingle.ok, false);
+  assert.equal(desktopSingle.action, "reject");
+  if (!sharedSingle.ok && desktopSingle.action === "reject") {
+    assert.equal(desktopSingle.reasonCode, sharedSingle.reasonCode);
+  }
+
+  // 共享函数 applicable:false（非 decision）⇒ 桌面包装 ignore（零行为变化），不再重复判定。
+  const nonDecision = validateDecisionCardRequest({
+    request: decisionCardRequest({ cardKind: "proposal" }),
+    roleId: "convener",
+    governanceModel: "trio",
+  });
+  assert.deepEqual(nonDecision, { ok: true, applicable: false });
+  assert.equal(
+    evaluateDecisionCardRequest({
+      request: decisionCardRequest({ cardKind: "proposal" }),
+      roleId: "convener",
+      governanceModel: "trio",
+    }).action,
+    "ignore",
+  );
+});
+
+test("decision 卡校验接线：合法卡呈现且 recommended 不丢；非法卡不呈现、不占 pending、不冒充客户拒绝", async () => {
+  const pushed: OperatorRequestPayload[] = [];
+  let n = 0;
+  const channel = createCustomerInputChannel({
+    presenter: (payload) => pushed.push(payload),
+    operatorId: "customer-op",
+    nextId: () => `op-${++n}`,
+  });
+
+  // 合法：presenter 收到原样请求（选项对象含 recommended，不被重建/丢失）。
+  const valid = channel.customerInput(decisionCardRequest(), DECISION_CTX);
+  assert.equal(pushed.length, 1, "合法 decision 卡应呈现");
+  const presentedRequest = pushed[0]!.request;
+  assert.equal(presentedRequest.kind, "choice");
+  if (presentedRequest.kind === "choice") {
+    assert.deepEqual(presentedRequest.options, [
+      { id: "option-a", label: "方案 A", recommended: true },
+      { id: "option-b", label: "方案 B" },
+    ]);
+  }
+  assert.equal(channel.pendingCount(), 1);
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["option-b"] } }).ok, true);
+  const validOut = await valid;
+  assert.equal(validOut!.outcome, "answered");
+  assert.equal(validOut!.operatorId, "customer-op", "客户手点仍是客户来源");
+
+  // 非法（角色/推荐项/选项/flowId）：直接 declined + notPresented，不呈现、不排队、不占 pending。
+  // 原因文案必须带**共享校验的 detail**（证明桌面通道复用 Pipeline 单一来源，而非私有第二份）。
+  const invalidCases: Array<{
+    label: string;
+    request: CustomerInputRequest;
+    roleId: string;
+    expectedDetail: string;
+  }> = [
+    { label: "角色", request: decisionCardRequest(), roleId: "rapporteur", expectedDetail: "role=rapporteur" },
+    {
+      label: "缺 flowId",
+      request: decisionCardRequest({ flowId: undefined }),
+      roleId: "convener",
+      expectedDetail: "flowId missing or invalid",
+    },
+    {
+      label: "缺推荐项",
+      request: decisionCardRequest({ options: [{ id: "a", label: "A" }, { id: "b", label: "B" }] }),
+      roleId: "convener",
+      expectedDetail: "recommended=0",
+    },
+    {
+      label: "重复选项",
+      request: decisionCardRequest({
+        options: [
+          { id: "same", label: "A", recommended: true },
+          { id: "same", label: "B" },
+        ],
+      }),
+      roleId: "convener",
+      expectedDetail: "duplicate option id: same",
+    },
+    {
+      label: "缺 cardKind",
+      request: decisionCardRequest({ cardKind: undefined }),
+      roleId: "convener",
+      expectedDetail: "cardKind missing (role=convener)",
+    },
+  ];
+  const pushedBefore = pushed.length;
+  for (const item of invalidCases) {
+    const out = await channel.customerInput(item.request, { ...DECISION_CTX, roleId: item.roleId });
+    assert.equal(out!.outcome, "declined", `${item.label}: 拒发卡`);
+    assert.equal(out!.notPresented, true, `${item.label}: 必须标记未呈现（不冒充客户拒绝）`);
+    assert.equal((out as { operatorId?: string }).operatorId, undefined, `${item.label}: 不带客户/判断归因`);
+    assert.match(
+      (out as { reason?: string }).reason ?? "",
+      new RegExp(item.expectedDetail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      `${item.label}: 拒绝原因应带共享 detail（${item.expectedDetail}）`,
+    );
+  }
+  assert.equal(pushed.length, pushedBefore, "非法 decision 卡不得呈现给客户");
+  assert.equal(channel.pendingCount(), 0, "非法 decision 卡不得占用一项目一卡/挂起");
+  assert.equal(channel.queuedCount(), 0);
+});
+
+test("decision 卡「替我决策」：确定性默认选推荐项，judge 代批（非客户），不调模型/不触发验收/无下一步", async () => {
+  const pushed: OperatorRequestPayload[] = [];
+  const results: OperatorJudgeResultPayload[] = [];
+  const next: { payload: GovernanceNextStepPayload; context: GovernanceNextStepContext }[] = [];
+  const judgeCalls: GovernanceJudgeRequest[] = [];
+  let triageCalls = 0;
+  const channel = createCustomerInputChannel({
+    presenter: (payload) => pushed.push(payload),
+    operatorId: "customer-op",
+    nextId: () => "op-1",
+    judge: {
+      isGroupEnabled: (group) => group === "decision",
+      // 决定性默认推荐不得调用模型做选择题；若被调用则用例失败。
+      fn: async (request) => {
+        judgeCalls.push(request);
+        throw new Error("decision 卡不应调用模型判断");
+      },
+    },
+    emitJudgeResult: (payload) => results.push(payload),
+    onNextStep: (payload, context) => next.push({ payload, context }),
+    // decision 卡不是验收卡：验收分诊前闸不得被调用。
+    acceptanceTriage: () => {
+      triageCalls += 1;
+      return { action: "proceed" };
+    },
+  });
+
+  const out = (await channel.customerInput(decisionCardRequest(), DECISION_CTX))!;
+  assert.equal(judgeCalls.length, 0, "decision 卡不调用模型做选择题（确定性默认推荐）");
+  assert.equal(triageCalls, 0, "decision 卡不进入验收分诊");
+  assert.equal(pushed.length, 0, "开关开启时直接代选，不呈现客户卡");
+  assert.equal(channel.pendingCount(), 0);
+  assert.equal(channel.judgingCount(), 0);
+  assert.equal(out.outcome, "answered");
+  assert.deepEqual(out.value, { selected: ["option-a"] }, "默认选中唯一推荐项");
+  assert.equal(out.operatorId, "judge:claude", "judge 代批归因（不是客户）");
+  assert.notEqual(out.operatorId, "customer-op");
+  assert.equal(out.judge?.group, "decision");
+  assert.equal(out.judge?.cardKind, "decision");
+  assert.equal(out.judge?.engine, "claude");
+  assert.equal(out.judge?.reasonCode, "recommended-default");
+  assert.deepEqual(out.judge?.selected, ["option-a"]);
+
+  // 结果行（可见性条件）：group=decision、cardKind=decision、选中推荐项。
+  assert.equal(results.length, 1);
+  assert.equal(results[0]!.group, "decision");
+  assert.equal(results[0]!.cardKind, "decision");
+  assert.equal(results[0]!.flowId, "flow-a");
+  assert.deepEqual(results[0]!.selected, ["option-a"]);
+  assert.equal(results[0]!.reasonCode, "recommended-default");
+
+  // 系统行如实：judge/自动代理、不是客户本人；决策卡不是验收、不是客户批准，
+  // 也不构成验收/提案/任命决定，不触发 gate/验收。
+  const summary = judgeResultSummary(results[0]!);
+  assert.match(summary, /自动代理/);
+  assert.match(summary, /不是客户本人选择/);
+  assert.match(summary, /不是验收/);
+  assert.match(summary, /不是客户批准/);
+  assert.match(summary, /不构成验收\/提案\/任命决定/);
+  assert.match(summary, /不触发 gate\/验收/);
+  assert.doesNotMatch(summary, /验收通过（accept）/, "不得把 decision 卡说成验收通过");
+
+  // 不触发治理下一步（不写 acceptance/proposal/appointment 决定）。
+  assert.equal(next.length, 0, "decision 卡不调用 onNextStep");
+  assert.equal(
+    deriveGovernanceNextStep(decisionCardRequest(), out),
+    null,
+    "桌面推导：decision 卡无 proposal/appointment/acceptance 下一步",
+  );
+});
+
+test("decision 卡开关关闭：不代选、不调模型、原卡呈现；客户手选（含非推荐项）如实结算且无 judge 审计", async () => {
+  const pushed: OperatorRequestPayload[] = [];
+  const results: OperatorJudgeResultPayload[] = [];
+  let judgeCalls = 0;
+  const channel = createCustomerInputChannel({
+    presenter: (payload) => pushed.push(payload),
+    operatorId: "customer-op",
+    nextId: () => "op-1",
+    judge: {
+      isGroupEnabled: () => false,
+      fn: async () => {
+        judgeCalls += 1;
+        throw new Error("开关关闭不得调用判断");
+      },
+    },
+    emitJudgeResult: (payload) => results.push(payload),
+  });
+
+  const pending = channel.customerInput(decisionCardRequest(), DECISION_CTX);
+  assert.equal(pushed.length, 1, "开关关闭 ⇒ 原卡呈现给客户");
+  assert.equal(results.length, 0);
+  assert.equal(judgeCalls, 0);
+  assert.equal(channel.pendingCount(), 1);
+
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["option-b"] } }).ok, true);
+  const out = (await pending)!;
+  assert.equal(out.outcome, "answered");
+  assert.deepEqual(out.value, { selected: ["option-b"] }, "客户可选非推荐项");
+  assert.equal(out.operatorId, "customer-op", "客户手点不是 judge 代批");
+  assert.equal(out.judge, undefined, "客户手选不带 judge 审计");
+  assert.equal(results.length, 0, "客户手选不发 judge 结果行");
+});
+
+test("decision 卡「替我决策」异常回落：结果行通道缺失/投达失败 ⇒ 不擅自代选，原卡交客户", async () => {
+  // ① 未配置 emitJudgeResult（结果行不可见）⇒ 不代选。
+  const pushed1: OperatorRequestPayload[] = [];
+  let n1 = 0;
+  const channel1 = createCustomerInputChannel({
+    presenter: (payload) => pushed1.push(payload),
+    operatorId: "customer-op",
+    nextId: () => `op-${++n1}`,
+    judge: { isGroupEnabled: (group) => group === "decision" },
+  });
+  const pending1 = channel1.customerInput(decisionCardRequest(), DECISION_CTX);
+  assert.equal(pushed1.length, 1, "结果行通道缺失 ⇒ 回落客户卡");
+  assert.equal(channel1.respond({ id: "op-1", decision: { kind: "choice", selected: ["option-a"] } }).ok, true);
+  const out1 = (await pending1)!;
+  assert.equal(out1.outcome, "answered");
+  if (out1.outcome === "answered") {
+    assert.equal(out1.operatorId, "customer-op");
+    assert.equal(out1.judge, undefined);
+  }
+
+  // ② emitJudgeResult 抛错（窗口已关等）⇒ 不代选、不产生半截 approve。
+  const pushed2: OperatorRequestPayload[] = [];
+  let n2 = 0;
+  const channel2 = createCustomerInputChannel({
+    presenter: (payload) => pushed2.push(payload),
+    operatorId: "customer-op",
+    nextId: () => `op-${++n2}`,
+    judge: { isGroupEnabled: (group) => group === "decision" },
+    emitJudgeResult: () => {
+      throw new Error("窗口已关闭");
+    },
+  });
+  const pending2 = channel2.customerInput(decisionCardRequest(), DECISION_CTX);
+  assert.equal(pushed2.length, 1, "结果行投达失败 ⇒ 回落客户卡");
+  assert.equal(channel2.pendingCount(), 1, "卡仍可被客户作答（未被悄悄结算）");
+  assert.equal(channel2.respond({ id: "op-1", decision: { kind: "choice", selected: ["option-a"] } }).ok, true);
+  const out2 = (await pending2)!;
+  assert.equal(out2.outcome, "answered");
+  if (out2.outcome === "answered") {
+    assert.equal(out2.operatorId, "customer-op");
+    assert.equal(out2.judge, undefined);
+  }
+
+  // ③ 运行时尚不可用（无法写 judge 审计引擎）⇒ 不代选。
+  const pushed3: OperatorRequestPayload[] = [];
+  let n3 = 0;
+  const channel3 = createCustomerInputChannel({
+    presenter: (payload) => pushed3.push(payload),
+    operatorId: "customer-op",
+    nextId: () => `op-${++n3}`,
+    judge: { isGroupEnabled: (group) => group === "decision" },
+    emitJudgeResult: () => assert.fail("缺运行时不得发 judge 结果行"),
+  });
+  const pending3 = channel3.customerInput(decisionCardRequest(), { roleId: "convener", projectRoot: "/p", governanceModel: "trio" });
+  assert.equal(pushed3.length, 1, "运行时缺失 ⇒ 回落客户卡");
+  assert.equal(channel3.respond({ id: "op-1", decision: { kind: "choice", selected: ["option-a"] } }).ok, true);
+  await pending3;
+});
+
+test("非 decision 卡带 recommended 零回归：proposal/普通 choice 仍按既有路径呈现，不代选", async () => {
+  const pushed: OperatorRequestPayload[] = [];
+  const results: OperatorJudgeResultPayload[] = [];
+  let n = 0;
+  const channel = createCustomerInputChannel({
+    presenter: (payload) => pushed.push(payload),
+    operatorId: "customer-op",
+    nextId: () => `op-${++n}`,
+    judge: { isGroupEnabled: (group) => group === "decision" },
+    emitJudgeResult: (payload) => results.push(payload),
+  });
+
+  const proposal: CustomerInputRequest = {
+    kind: "choice",
+    title: "提案",
+    cardKind: "proposal",
+    flowId: "flow-a",
+    options: [
+      { id: "accept", label: "接受", recommended: true },
+      { id: "reject", label: "拒绝" },
+    ],
+  };
+  const proposalPending = channel.customerInput(proposal, {
+    roleId: "rapporteur",
+    projectRoot: "/p",
+    runtime: "claude",
+    governanceModel: "trio",
+  });
+  assert.equal(pushed.length, 1, "非 decision 卡忽略 recommended，仍呈现原卡");
+  assert.equal(results.length, 0, "非 decision 卡不触发 decision 默认推荐");
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+  await proposalPending;
+
+  const plain: CustomerInputRequest = {
+    kind: "choice",
+    title: "普通协调选择",
+    options: [
+      { id: "a", label: "A", recommended: true },
+      { id: "b", label: "B" },
+    ],
+  };
+  const plainPending = channel.customerInput(plain, {
+    roleId: "project-role",
+    projectRoot: "/p",
+    runtime: "claude",
+    governanceModel: "single",
+  });
+  assert.equal(pushed.length, 2, "项目角色/无 cardKind 的选择卡照旧呈现（recommended 被忽略）");
+  assert.equal(results.length, 0);
+  assert.equal(channel.respond({ id: "op-2", decision: { kind: "choice", selected: ["b"] } }).ok, true);
+  await plainPending;
+});
+
+test("decision 卡端到端（桌面通道 + 编排包装）：默认推荐按 material-choice 入账；不写 acceptance/proposal/appointment/gate", async () => {
+  const root = mkdtempSync(join(tmpdir(), "ans-desktop-decision-"));
+  try {
+    mkdirSync(join(root, ".ans"), { recursive: true });
+    writeFileSync(join(root, ".ans", "project.json"), JSON.stringify({ governanceModel: "trio" }));
+    const project: ProjectConfig = {
+      projectRoot: root,
+      skillRoot: root,
+      roles: {},
+      governanceModel: "trio",
+      builtInRoles: ["convener"],
+      governanceBoundary: {
+        path: "角色卡/governance-boundary.yaml",
+        acceptance: { accepted: true, source: "test:desktop-decision" },
+      },
+    };
+    const channel = createCustomerInputChannel({
+      presenter: () => {
+        throw new Error("「替我决策」开启时 decision 卡应确定性代选，不呈现客户卡");
+      },
+      operatorId: "customer-op",
+      nextId: () => "op-decision-e2e-1",
+      judge: { isGroupEnabled: (group) => group === "decision" },
+      emitJudgeResult: () => {},
+    });
+    const raw: CustomerInputFn = (req, metadata) =>
+      channel.customerInput(
+        req,
+        { roleId: "convener", projectRoot: root, runtime: "demo", governanceModel: "trio" },
+        metadata,
+      );
+    const adapter: RuntimeAdapter = {
+      async composeContext() {
+        return { systemPrompt: "" };
+      },
+      async bindRole(): Promise<RoleSession> {
+        return {
+          async prompt(): Promise<void> {},
+          events(): AsyncIterable<SessionEvent> {
+            return (async function* () {
+              yield { kind: "settled", summary: "完成" } as SessionEvent;
+            })();
+          },
+          async dispose(): Promise<void> {},
+        };
+      },
+    };
+    let caps: AdapterCapabilities | undefined;
+    const handle = await openRoleSession(
+      { roleId: "convener", project, customerInput: raw, autoRepin: false },
+      {
+        createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities): RuntimeAdapter => {
+          void gate;
+          caps = capabilities;
+          return adapter;
+        },
+      },
+    );
+    try {
+      const out = await caps!.customerInput!(decisionCardRequest(), {
+        toolCallId: "call-decision-e2e",
+        turnId: "turn-decision-e2e",
+      });
+      assert.equal(out?.outcome, "answered");
+      if (out?.outcome !== "answered") return;
+      assert.deepEqual(out.value.selected, ["option-a"], "编排包装原样收到推荐项");
+      assert.equal(out.operatorId, "judge:demo");
+      assert.equal(out.judge?.group, "decision");
+      assert.equal(out.judge?.cardKind, "decision");
+
+      await flushGovernanceLedger(root);
+      const { entries, errors } = await readGovernanceLedger(root);
+      assert.deepEqual(errors, []);
+      const decisions = entries.filter((entry) => entry.kind === "customer.decision");
+      assert.equal(decisions.length, 1);
+      const entry = decisions[0]!;
+      assert.equal(entry.actorRoleId, "convener");
+      assert.equal(entry.power, "schedule", "power=发起角色职能（convener=schedule），不是客户/验收");
+      assert.equal(entry.flowId, "flow-a");
+      assert.equal(entry.decisionKind, "material-choice", "decision 卡按编排 material-choice 记录");
+      assert.equal(entry.customerDecision, "accepted");
+      assert.deepEqual(entry.selectedOptions, ["option-a"], "只记选中选项（审计）");
+      assert.equal(entry.targetRoleIds, undefined, "不写 targetRoleIds（不伪装成任命）");
+      assert.equal(entry.decisionEvidence?.kind, "judge", "judge 代批审计（不是客户本人）");
+      assert.equal(entry.decisionEvidence?.toolCallId, "call-decision-e2e");
+      assert.equal(
+        entries.some(
+          (candidate) =>
+            candidate.decisionKind === "acceptance" ||
+            candidate.decisionKind === "proposal-accept" ||
+            candidate.decisionKind === "proposal-accept-quick" ||
+            candidate.decisionKind === "appointment",
+        ),
+        false,
+        "不得写 acceptance/proposal/appointment 决定",
+      );
+      assert.equal(entries.some((candidate) => candidate.kind === "gate.review"), false, "不触发 gate 复核");
+    } finally {
+      await handle.dispose();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

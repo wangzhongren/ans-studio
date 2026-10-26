@@ -679,3 +679,201 @@ interface CompleteAcceptanceCriteriaStepResult extends FlowToolResult {
   symlink `shell-authorized-routine.test.ts` 创建链接 `EPERM`（基线一致，本批未触碰）。
 - 定向：`flow-service.test.ts` 84（83 pass + 1 既有 skip；含新增 7 例）、`request-acceptance.test.ts` 2/2。
 - 桌面消费：`app/desktop/interface.ts` 从本公共出口 import；本角色未改 `app/**`、未 commit/push。
+
+## 2026-10-26 gate 复核编排/Flow 核心
+
+状态：**implemented-unverified**（编排定向测试与 typecheck 通过；桌面接线、跨角色 e2e、独立验收未做）。
+设计：`角色卡/项目管理/docs/design/2026-10-26_design_proof-gate-reviews.md` §4/§8/§9/§10/§12（方案 C）。
+
+### Flow 契约（`src/common/编排/flow-state.ts`）
+
+```ts
+FLOW_GATE_KINDS = ["vertical-slice", "visual-baseline", "integration-performance"] as const;
+type FlowGateKind = (typeof FLOW_GATE_KINDS)[number];
+FLOW_GATE_STEP_ID_PATTERN = "^gate-[a-z0-9]+(?:-[a-z0-9]+)*$";
+isFlowGateKind(value: unknown): value is FlowGateKind;
+isFlowGateStepId(value: unknown): boolean;
+```
+
+- `FlowStateStep.gateKind?: FlowGateKind`（可选；**不是**新的 `FlowStepKind`）。只允许 `kind: artifact`；
+  id 匹配 `gate-<slug>`；`owner` 必须是 `verifier`；`evidence` 必须存在且 `kind: artifact`；未知值/未知字段
+  fail-closed。旧 flow 不含该字段 ⇒ 解析/序列化/ready/收尾门/证据对账逐字不变。
+- `listReadyFlowSteps` 新增 skip 原因 `awaiting-gate`（gate 步骤永不进入 ready）。
+
+### Gate 报告路径/版本（`src/common/编排/governance-gate.ts`）
+
+```ts
+gateReviewReportRelPath(flowId, gateId, version = 1): string; // docs/acceptance/<flowId>-<gateId>-report-vN.md
+latestGateReviewReport(projectRoot, flowId, gateId): { relPath: string; version: number } | undefined;
+latestGateReviewReportRelPath(projectRoot, flowId, gateId): string | undefined;
+```
+
+版本化不覆盖；只认 `.md` 与正整数版本；与最终验收报告 `<flowId>-report-vN.md` 命名不冲突。
+
+### 应用专用 `completeGateStep`（公共出口 `src/pipeline/orchestration/flow-state.ts`）
+
+```ts
+completeGateStep(input: { projectRoot: string; flowId: string; gateId: string }):
+  Promise<CompleteGateStepResult>;
+
+interface CompleteGateStepResult extends FlowToolResult {
+  evidence?: { kind: "artifact"; ref: string };
+  reportPath?: string;
+  reportVersion?: number;
+  reportSha256?: string;
+  alreadyDone?: boolean;
+  gateKind?: FlowGateKind;
+  verdict?: "pass";
+  severityCounts?: { blocker: number; major: number; minor: number; nit: number };
+  itemCount?: number;
+}
+
+classifyGateReviewTriage(triage: AcceptanceTriageSection): GateReviewVerdict;
+gateReportSeverityCounts(items: readonly AcceptanceTriageItem[]): GateReportSeverityCounts;
+```
+
+- 只收口含 `gateKind` 的 artifact 步骤；已 done 幂等；`pending`/`dispatched`/`delivered` 可收口，其它状态
+  `gate-step-terminal`。缺失步骤 `gate-step-missing`；非 gate 步骤 `gate-step-kind-unsupported`；
+  非法 gateId `invalid-gate-id`。
+- 报告复用 `acceptance-triage/v1`：缺/坏/矛盾 ⇒ `gate-report-invalid`；缺报告 `gate-report-missing`；
+  不可安全观察 `gate-report-unobservable`。
+- **防吹毛求疵**：fail/conditional 含至少一个 blocker/major ⇒ `gate-report-failed`（不标 done）；
+  只有 minor/nit ⇒ `gate-report-nonblocking-fail`（按结构不符退回 Proof，不触发返工）；pass 可带
+  minor/nit 备注并收口（补 app/app `artifact.observed` + gate 步骤 done）。
+- 不写 `customer.decision`、不写 `gate.review`、不覆盖终态、不改其它步骤/owner/kind/gateKind。
+
+### 角色工具面（`src/common/编排/flow-service.ts` / `src/pipeline/orchestration/run-role.ts`）
+
+- `flow_step_update(status:"done")` 对含 `gateKind` 的步骤 ⇒ 新 code `gate-review-required`（manager/owner
+  均不能代标；检查先于 revision 冲突）。
+- `observeFlowArtifacts` 跳过含 `gateKind` 的步骤（失败/坏结构报告不得被观测成 done 证据）。
+- `flow_step_supersede`：新 id 为 `gate-<slug>` 且 `kind: artifact` 时继承旧 gate 的 `gateKind`，并按约定
+  派生新 gate v1 报告 evidence（工具载荷无这两个字段）；非 gate 形态新 id 不继承。
+- `AdapterCapabilities.requestGateReview?: RequestGateReviewFn`、`openRoleSession` 同名可选输入；
+  **只对内置治理角色中的统筹/Steward（trio convener）注入**；其他内置角色/项目角色即便误给也不注入；
+  未提供 ⇒ 工具结构性不注册。类型单一来源 `src/model/runtime.ts`；本层纯透传。
+
+### 账本 `gate.review`（`src/common/编排/governance-ledger.ts`）
+
+- `GovernanceLedgerEntry.kind` 增 `"gate.review"`；可选 `gateReview`（`gate-review-decision/v1`）：
+  `gateId` / `gateKind` / `reportPath` / `reportVersion` / `reportSha256` / `conclusion` /
+  `severityCounts{blocker,major,minor,nit}` / `itemCount` / `requestId` / `flowRevision` / `decidedAt`。
+- 写入校验：只允许 app 记录（`actorRoleId`/`power` 均 `app`）；枚举/版本/sha/时间严格；不得携带
+  `decisionKind`/`customerDecision`/`acceptanceTriage`；fail/conditional 必须至少一个 blocker/major，
+  pass 不得带 blocker/major（通过只允许 minor/nit 备注）。
+- `latestAcceptanceDecision`、`evaluateFlowCompletion`、分诊/最终验收**不读**它；gate 完成事实以 flow 步骤
+  `done` + `artifact.observed` 为准。
+
+### 证据（2026-10-26，win32 / Node v24.22.1）
+
+- `npm run typecheck` → exit 0。
+- `node --test "test/编排/**/*.test.ts"` → 985 tests / 983 pass / 1 fail / 1 skip；唯一红＝既有 Windows
+  symlink `shell-authorized-routine.test.ts:103` EPERM（基线一致）。
+- 定向：`flow-gate.test.ts` 13/13、`request-gate-review.test.ts` 2/2、`governance-gate.test.ts` 28/28
+  （含新增 gate 依赖硬拦 1 例）。
+- 未做：桌面 `requestGateReviewForProject`/gate 记录/返工路由/重启恢复/系统行、`app/**`、`src/model/**`、
+  `src/provider/**`、门禁角色卡/i18n、跨角色 e2e、真实界面 gate 复核、独立验收、commit/push。
+
+## 2026-10-26 decision 卡（material-choice）编排分类与账本
+
+来源：客户 2026-10-26 规则（PM 设计登记 `2026-10-26_design_decision-card.md`）+ 运行时核心已交付
+`GovernanceChoiceCardKind."decision"` / `GOVERNANCE_CARD_GROUP.decision` / `CustomerInputOption.recommended`。
+公开面仍是 `openRoleSession`（`src/pipeline/orchestration/run-role.ts`）与账本类型；**未新增冻结契约**。
+
+### 编排分类（`src/pipeline/orchestration/run-role.ts`）
+
+- `TRIO_CARD_KINDS.convener = ["appointment", "decision", "schedule-write", "write"]`；其余角色不含
+  `"decision"`（liaison 仍只有 `intent-confirm`）。越权卡在触达客户通道前 `declined`，不弹卡/不写账本。
+- `classifyCustomerDecision(cardKind, out, optionIds?)`（私有）：`case "decision"`——
+  `answered` 且 `selected` 恰好一个**本卡选项 id** ⇒
+  `{ decisionKind: "material-choice", customerDecision: "accepted", selectedOptions: [id] }`；
+  多选/空选/未知选项 ⇒ `{ decisionKind: "unclassified", customerDecision: "none" }`。
+  不产生 `targetRoleIds`，不进入 proposal/appointment/acceptance 语义。
+- 账本条目（仅 flowId 合法时）：`kind:"customer.decision"`、`actorRoleId` = 发起角色（convener）、
+  `power` = 发起角色职能（convener → `"schedule"`）、`decisionEvidence.kind:"customer-input"`、
+  `messageSummary` = 卡标题；`selectedOptions` 见下。
+- `judgeArtifactsForCard("decision")` ⇒ `{}`（decision 卡不挂 proposal/团队计划/flow 物证）。
+- **默认兜底安全守卫**：choice 卡出现任一 `recommended:true` 时**不进入** choice 默认逻辑（Convener 的
+  appointment 默认会把非保留选项 id 的卡当任命卡）；缺 `cardKind` ⇒ `declined + notPresented`
+  （`governance.card.rejected{reasonCode:"missing-card-kind"}`），不触达客户/不写账本；与桌面
+  `evaluateDecisionCardRequest` 的 `missing-card-kind` 同向。无 recommended 的 appointment 默认零回归。
+
+### 账本（`src/common/编排/governance-ledger.ts`）
+
+```ts
+type GovernanceDecisionKind = ... | "material-choice" | "unclassified";
+
+interface GovernanceLedgerEntry {
+  ...
+  /**
+   * 仅 customer.decision{decisionKind:"material-choice"}：客户恰好选中的一个选项 id（审计）。
+   * 不是 targetRoleIds（不伪装任命），不是写盘 paths；任何门禁/验收/收口判定都不读。可选、向后兼容。
+   */
+  selectedOptions?: string[];
+}
+```
+
+- `material-choice` **不满足任何 gate/验收门**：`PROPOSAL_DECISION_KINDS`/`ACCEPTED_DECISION_KINDS` 不含它；
+  `latestAcceptanceDecision` 只认 `"acceptance"`；`flow-state` 的 `CUSTOMER_DECISION_KIND_REFS` 不接受它
+  作为 flow 的 `customer-decision` 证据；`hasUnresolvedDecision` 只把 `unclassified/none` 视为未结算。
+- 写入校验不新增 `decisionKind` 值域校验（现状无枚举校验）；未知字段原样保留的兼容性不变。
+
+### 判断 agent（「替我决策」）
+
+- `evaluateGovernanceJudgeVerdict`（`governance-judge-verdict.ts`）approve 门槛新增 `case "decision"`：
+  choice 卡 + **恰一个** `recommended:true` 选项 + `selected` 恰为该推荐项 ⇒ approve（`value.selected`）；
+  其余 ⇒ `manual`（`insufficient-evidence`/`not-recommended`，可操作返工）；decision 组 `deny` 仍转
+  `manual`。审计沿用 `governanceJudgeAuditFromOutcome`（group/cardKind/selected/reasonCode）。
+- `requiredArtifactPaths`（`governance-judge-facts.ts`）：`case "decision"` ⇒ `{ paths: [], missing: false }`
+  （不要求意图/提案/流程等规范物证）。
+- 证据包（`governance-judge-evidence.ts`）：`requesterStatement.options` 透传
+  `recommended?: boolean`（仅 true 时出现；旧卡种包体逐字不变）；新 decision 卡不读意图文件
+  （`isDecisionCardKind` 仍只覆盖 proposal/appointment/acceptance）。
+- 判断提示（`governance-judge-prompt.ts`）：卡片 options 透传 `recommended`；系统提示新增 decision rubric
+  （只能按唯一推荐项代批、不得发明/改选；独立于意图/gate/验收）。推荐项的**默认执行**归桌面策略
+  （`tryAutoSelectDecision`），编排不补默认值。
+
+### 独立验收修复（F1/F2）
+
+- **F1（账本）**：`recordCustomerDecision` 对 `outcome:"declined"` 且 `notPresented === true` **不写账本**
+  （「无呈现 = 无决定」；与 judge 退回、system 预授权拒绝同口径）。避免 `unclassified/none` 成为
+  `hasUnresolvedDecision` 的未结算决定、永久挡住 flow 收尾/最终验收。该早退位于 **`system:` 预授权分支
+  之后**：`operatorId="system:write-preauthorization"` 的拒绝仍先记 `governance.preauthorization.declined`
+  诊断（账本/行为不变）。
+- **F2（共享结构校验）**，实现于 `src/common/编排/decision-card.ts`，经 `run-role.ts` 公共出口再导出：
+
+```ts
+export const DECISION_CARD_MIN_OPTIONS = 2;
+
+export type DecisionCardRejectReason =
+  | "role-not-allowed" | "not-choice" | "missing-flow-id" | "not-enough-options"
+  | "invalid-option-id" | "duplicate-option-id" | "recommended-count";
+
+export type DecisionCardValidation =
+  | { ok: true; applicable: boolean; flowId?: string; recommendedOptionId?: string }
+  | { ok: false; reasonCode: DecisionCardRejectReason; detail: string };
+
+export function validateDecisionCardRequest(input: {
+  request: CustomerInputRequest;
+  roleId: string;
+  governanceModel: "single" | "trio";
+  metadata?: Pick<CustomerInputMetadata, "cardKind" | "flowId">;
+}): DecisionCardValidation;
+```
+
+- 校验顺序：卡种解析（`request.cardKind ?? metadata.cardKind`；非 decision ⇒ `applicable:false`）→
+  **仅 trio convener** → choice → 合法 flowId → ≥2 选项 → id 非空唯一 → **恰一个** `recommended:true`。
+- `run-role.ts::governedInput` 在触达 raw 客户通道**之前**调用；失败 ⇒ `declined + notPresented:true`
+  （不调 raw、不写账本、不带 operatorId）。覆盖 CLI/single/su/项目角色（它们没有桌面卡校验）。
+  桌面窗口后续应从 `src/pipeline/orchestration/run-role.ts` 导入本函数/类型，不复制第二份。
+
+### 证据（2026-10-26，win32 / Node v24.22.1）
+
+- 新增 `test/编排/decision-card.test.ts` **19/19**。
+- `node --test "test/编排/**/*.test.ts"` → **1004 tests / 1002 pass / 1 fail / 1 skip**（唯一红＝既有
+  Windows symlink `shell-authorized-routine.test.ts:103` EPERM）。
+- 定向桌面只读：`test/桌面应用/operator-wiring.test.ts` → **73/73**。
+- `npm run typecheck` → **exit 0**（本批期间桌面角色并行编辑的临时错误随其收口消失；本批未改 `app/**`）。
+- 未做：桌面卡面/默认推荐/系统行、桌面改用共享 `validateDecisionCardRequest`、跨角色 e2e、真实
+  Electron、修复后的再次独立验收、commit/push。字面偏差（设计原文「不写 customer.decision」）见
+  [变更记录](docs/change/2026-10-26_change_decision-card-orchestration.md) §七。

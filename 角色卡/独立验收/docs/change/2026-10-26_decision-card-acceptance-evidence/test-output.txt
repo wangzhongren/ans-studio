@@ -1,0 +1,54 @@
+== typecheck root ==
+> tsc --noEmit
+
+== typecheck renderer ==
+> tsc -p app/renderer/tsconfig.json
+
+== runtime-core request-choice-decision-card ==
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 141.1516
+== 编排 decision-card ==
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 304.4617
+== 桌面应用 operator-wiring ==
+ℹ pass 72
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 519.8843
+== 桌面UI decision-card-view ==
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 106.1802
+== 门禁引擎 decision-card ==
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 98.914
+== 门禁引擎 full ==
+ℹ pass 334
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 512.445
+== typecheck root ==
+
+exit=0
+== typecheck renderer ==
+
+exit=0

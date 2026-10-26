@@ -262,6 +262,13 @@ export function describeTool(name: string): ToolDescription {
                 id: { type: "string", description: "Stable option id returned in the selection" },
                 label: { type: "string", description: "Text shown to the customer" },
                 description: { type: "string", description: "Optional extra explanation" },
+                recommended: {
+                  type: "boolean",
+                  description:
+                    "Optional for cardKind \"decision\": mark the recommended option. A decision card must have exactly one " +
+                    "option with `recommended: true` (validated by the application); when the customer has enabled " +
+                    "\"decide for me\", the judging agent selects that recommended option by default. Other card kinds ignore this field.",
+                },
               },
               required: ["id", "label"],
               additionalProperties: true,
@@ -283,12 +290,18 @@ export function describeTool(name: string): ToolDescription {
           },
           cardKind: {
             type: "string",
-            enum: ["proposal", "appointment", "acceptance", "intent-confirm"],
+            enum: ["proposal", "appointment", "acceptance", "intent-confirm", "decision"],
             description:
               "Optional governance card kind for this choice; a missing or foreign kind cannot unlock any governance gate. " +
               "Kinds: `proposal` = accept a proposal; `appointment` = appoint the recommended team (sent by Convener from the " +
               "customer-confirmed team plan; the old `nomination` flow is legacy); `acceptance` = accept a delivery; " +
-              "`intent-confirm` = customer requirement confirmation (Lead/liaison, before hand_off_intent only). " +
+              "`intent-confirm` = customer requirement confirmation (Lead/liaison, before hand_off_intent only); " +
+              "`decision` = material-choice card, sent ONLY by the Steward/统筹 — use it when the Lead finds a material choice " +
+              "(demo/acceptance evidence method, scope, deviation from standards/contracts, cost, or customer-visible behavior) " +
+              "instead of deciding unilaterally. A decision card must mark exactly one option `recommended: true`; when the " +
+              "customer has enabled \"decide for me\", the judging agent selects that recommended option by default. A decision " +
+              "card is independent of proposal/appointment/acceptance: it is NOT acceptance and NOT customer approval, and it " +
+              "does NOT trigger any gate or acceptance. `pass` is not applicable (a decision card has no pass option). " +
               "Which kinds a role may send is decided by the application — this field alone grants nothing",
           },
         },
@@ -305,11 +318,16 @@ export function describeTool(name: string): ToolDescription {
         "卡种须属于该角色允许的卡种，由应用校验）；" +
         "这些字段只用于卡片显示与账本分类，**字段本身不构成任何授权**——治理门禁只认应用签发的客户决定。" +
         "`intent-confirm`（需求确认）**仅主理（Lead/liaison）在 `hand_off_intent` 前发出**：选项 id 固定 `confirm` / `revise`；" +
-        "由客户本人回答，或在其开启「替我决策」时由判断 agent 代批 `confirm`（`revise` 仍交回客户/发起角色，判断 agent 不替客户修改）。",
+        "由客户本人回答，或在其开启「替我决策」时由判断 agent 代批 `confirm`（`revise` 仍交回客户/发起角色，判断 agent 不替客户修改）。" +
+        "`cardKind=decision`（材料性选择卡）**仅统筹（Steward）使用**：主理发现材料性选择（演示/验收证据方式、范围、标准/契约偏离、成本或客户可见行为）时**不自行决定**，交统筹发本卡；" +
+        "卡内必须有**恰一个** `recommended: true` 推荐项；客户开启「替我决策」时判断 agent 默认选推荐项。" +
+        "decision 卡**独立于提案/任命/验收**——**不等于验收/客户批准，不触发门禁/验收**；`pass` 选项不适用（不设）。",
       promptGuidelines: [
         "需要客户在若干选项中做选择时用 request_choice；未获明确回答 → 不要据此写盘，也不得假设客户的选择。",
         "`cardKind=appointment` 是**任命**卡：由 Convener 依客户确认的团队计划发起；Crew 收到客户任命后才按名单写卡（appointment-write），不自行任命、不自行选角色。",
         "request_choice 的回答**不构成写盘同意**或扩张写权；已接受边界内的已授权任务无需重复确认，新建或扩张角色边界、治理写集仍由 su 经 request_confirmation 请求确认。",
+        "`cardKind=decision` 仅统筹使用：主理发现材料性选择时不自行决定，交统筹发 decision 卡；卡内必须恰有一个 `recommended: true` 推荐项；" +
+          "开启「替我决策」时判断 agent 默认选推荐项；decision 卡不等于验收/客户批准，不触发门禁/验收，且没有 `pass` 选项（不适用）。",
       ],
       executionMode: "sequential",
     };
@@ -1129,6 +1147,52 @@ export function describeTool(name: string): ToolDescription {
         "只在交付/证据/变更包**已就绪后**调用；它是请应用派独立复核（Proof/验收），不是客户决定、不是验收结论。",
         "`flowId` 省略＝当前流程，`note` 可选；按回执的 `code`/`message` 如实向客户说明——非 `dispatched` 时不要宣称已派发、不要反复重试。",
         "请求复核 ≠ 客户批准：本工具不改客户决定、不写 flow/账本；`dispatched` 也不代表验收已通过。",
+      ],
+    };
+  }
+  if (name === "request_gate_review") {
+    // Gate 复核请求（2026-10-26 客户授权；只给统筹 convener 注入，注入才注册）。
+    // 文案纪律：gate 复核是**独立于最终验收**的通道；`dispatched` 只表示已派 Proof——不等于 gate 通过、
+    // 不等于验收通过、不代表客户批准；gate fail 只按 blocker/major 判失败，只有 minor/nit 不返工；
+    // 回执如实转达 ok/code/message，失败不伪装成功；本工具不写 flow/账本（由应用实现）。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          flowId: {
+            type: "string",
+            description: "Flow id containing the gate step; omit for the current/default flow (resolved by the application)",
+          },
+          gateId: {
+            type: "string",
+            description:
+              "Gate step id (required; slug matching the governance slug pattern, e.g. gate-vertical-slice) — existence/state/dependencies are validated by the application",
+          },
+          note: {
+            type: "string",
+            description: "Optional bounded note for the gate review request (at most 2000 characters; not written to the ledger, not used for judgement)",
+          },
+        },
+        required: ["gateId"],
+        additionalProperties: false,
+      },
+      description:
+        "请应用**派发一次 gate（关键节点验收门禁）复核**（Proof 独立判定）——这是**独立于最终验收**的通道：" +
+        "`request_acceptance` 仍只用于最终验收，二者不能互相替代。**仅统筹（Steward）使用**：" +
+        "先做证据完整性检查（依赖步骤是否 done、证据是否与账本对得上、gate 标准节是否存在），再调用本工具请 Proof 复核；" +
+        "`flowId` 缺省＝当前/默认流程；`gateId` 必填（gate 步骤 id，如 `gate-vertical-slice`）；`note` 为可选有界说明。" +
+        "应用会校验 gate 存在且待复核、前置与证据齐备、标准含该 gate，并按回执如实告知是否已派发。" +
+        "**gate 复核 ≠ 验收通过 ≠ 客户批准**：`dispatched` 只表示已派 Proof，不代表 gate 已通过、不代表最终验收通过、不代表客户批准；" +
+        "gate 结论只由 Proof 报告给出，统筹不得自行宣告 gate 通过、不得代标 gate 步骤 done。" +
+        "**gate fail 只按 blocker/major 判失败**：只有 minor/nit 的意见不构成返工依据（防吹毛求疵），作为非阻断备注记录即可。" +
+        "回执的 `ok` / `code` / `message` **原样如实转达**（`code` 如 `dispatched` / `already-dispatched` / `gate-not-found` / " +
+        "`criteria-missing` / `flow-incomplete` / `unavailable` / `rejected`），**失败绝不伪装成功**；" +
+        "本工具只校验参数形状并转达回执，**不写 flow/账本**（派发与记录由应用实现）。",
+      promptGuidelines: [
+        "只给统筹使用：先核对 gate 的依赖步骤与证据是否齐备（齐不齐），再请求复核；**不要**自行判断 gate 是否达标、不要代写 gate 报告。",
+        "`gateId` 必填（如 gate-vertical-slice），`flowId` 省略＝当前流程；按回执的 `code`/`message` 如实向客户说明——非 `dispatched` 时不要宣称已派发、不要反复重试。",
+        "gate 复核 ≠ 验收通过 ≠ 客户批准：`dispatched` 只表示已派 Proof；结论以 Proof 报告与 flow 步骤状态为准。",
+        "gate 失败只按 blocker/major 判定；只有 minor/nit 不构成返工依据——不要为 nit 反复开启返工或重新请求。",
       ],
     };
   }

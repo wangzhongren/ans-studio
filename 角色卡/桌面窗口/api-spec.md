@@ -123,7 +123,7 @@ Customer callback 第二参保留 O1 的原 CustomerInputMetadata.signal；sessi
 
 ## 双开关「替我审批」/「替我决策」（P4，2026-10-18；PM 评审 §三/§四/§八/§九/§十二）
 
-**两个开关是两套独立状态**（同一 `createShellJudgeSwitch()` 实现，**不同实例**）：都默认 `false`、只在主进程内存、启动/渲染重载 `loadInterface()` 复位、不持久化、互不影响。组映射唯一来源＝`src/model/runtime.ts::GOVERNANCE_CARD_GROUP`/`governanceCardGroup`（桌面不再写第二张表）：`write`/`appointment-write`/`schedule-write`→`approval`；`proposal`/`appointment`/`acceptance`→`decision`。
+**两个开关是两套独立状态**（同一 `createShellJudgeSwitch()` 实现，**不同实例**）：都默认 `false`、只在主进程内存、启动/渲染重载 `loadInterface()` 复位、不持久化、互不影响。组映射唯一来源＝`src/model/runtime.ts::GOVERNANCE_CARD_GROUP`/`governanceCardGroup`（桌面不再写第二张表）：`write`/`appointment-write`/`schedule-write`→`approval`；`proposal`/`appointment`/`acceptance`/`intent-confirm`/`decision`→`decision`。
 
 | preload 方法 | IPC / 参数 | 返回 |
 | --- | --- | --- |
@@ -143,13 +143,20 @@ Customer callback 第二参保留 O1 的原 CustomerInputMetadata.signal；sessi
 - `approve`：结算前**再查开关**（关 ⇒ `manual/switch-off`）→ 防御复核 group/cardKind/value（选项 ⊆ 卡片、单选恰一、confirm 恰 `confirmed:true`）→ **先** `emitJudgeResult`（缺失/抛错 ⇒ `manual/row-failed`）→ 同一 `settleEntry` 结算为 `{outcome:"answered", value:{selected}|{confirmed:true}, operatorId:"judge:<engine>", judge}` → `notifyNextStep`/`drainProject` 恰一次（**0 卡、1 行**）。
 - `manual`（负向/证据不足/读取失败/超时/引擎不可用/group 不符/`judgeContext.unavailableReason`/开关关闭/中止/结果行失败）：原卡 + `OperatorRequestPayload.judgeNotice`（`row-failed` 单列；带「代审批/代决策」）。不写账本决定；客户手答仍归 `customer-input`。回落**按组、按卡、整卡**，另一组不受影响；判断中关开关不追溯已挂起卡（结算前再查一次）。
 - **治理 judge 通道层防御超时**（2026-10-18 真机修正；同日 driver 默认上调后再次同步）：driver 超时（`ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`，默认 **120s**，编排解析）**+15s 余量**，缺省 **135s**；非法/缺失回 135s；显式 `judge.timeoutMs` 原样使用（测试/宿主）。用 `AbortSignal.timeout`（不引入 `setTimeout/setInterval`）；超时提示带**实际时长**（`判断超时（>135s）`/`（>20ms）`）。**shell judge 的通道超时独立派生**（`ANS_SHELL_JUDGE_TIMEOUT_MS`，driver 默认 120s + 15s 余量 ⇒ 135s，见 §「替我审」），两套互不影响。`rejectAllPending`/`cancel` 把 `judging` 一并结算，迟到结果见 `state !== "judging"` 丢弃。
-- 结果行人话摘要 `judgeResultSummary(payload)`：`judge 代批 · 代决策：接受提案（accept）/任命 <ids>/验收通过（accept）· 流程 <flowId>`；写盘族 `judge 代批 · 代审批：确认写入 <n> 个路径（…）`。
+- 结果行人话摘要 `judgeResultSummary(payload)`：`judge 代批 · 代决策：接受提案（accept）/任命 <ids>/验收通过（accept）· 流程 <flowId>`；写盘族 `judge 代批 · 代审批：确认写入 <n> 个路径（…）`；`cardKind=decision` 的结果行为「judge 代批 · 代决策（自动代理）：已按唯一推荐项…不是客户本人选择」+ `main.decisionCard.notApproval`（决策卡不是验收、不是客户批准，也不构成验收/提案/任命决定，不触发 gate/验收）。
 
 **会话装配（`app/desktop/session.ts`）**：`LiveSession.governanceJudge`；仅在 `governanceModel === "trio"` 且客户交互通道已接时，用**同一份** `runtimeOptions`/`createAdapter` 经 `SessionManagerDeps.createGovernanceJudge`（Interface 缺省真实实现，经 `govern-session.ts` 薄再导出）构造；构造失败 ⇒ 不注入。`customerInput` 闭包 ctx 增 `governanceModel/governanceJudge/turnText`（调用当刻读活会话），`metadata`（含编排计算的 `judgeContext`）**原样透传**；dispose 清空。single/su/Liaison 不注入。
 
 **主进程（`app/main.ts`）**：客户通道 `judge.isGroupEnabled = group === "approval" ? shellJudgeSwitch.isEnabled() : decisionJudgeSwitch.isEnabled()`；`emitJudgeResult` 推 `session:operator-judge`（窗口已关时**抛错** ⇒ 通道降级 `row-failed`），并经 `desktop.emitJudgeProgress(payload)` best-effort 落主入口 Liaison 进度行（`emitSessionEvent` 的 `message`，`detail.source:"judge-decision"`；来源即主入口不重复、失败只诊断）。`advanceGovernanceFlow` **零改动**（代批成功仍经 `notifyNextStep` 触发）。
 
-## 其他能力与装配
+## decision 卡应用侧校验与「替我决策」默认推荐（2026-10-26 客户新增）
+
+**发卡前校验（`customer-input.ts::evaluateDecisionCardRequest`，在任何 presenter/判断 agent/排队之前）**：结构规则（仅 trio convener、`kind:"choice"`、合法 `flowId`、至少 `DECISION_CARD_MIN_OPTIONS` 个选项、选项 `id` 非空且不重复、**恰好一个** `recommended: true`）**单一来源＝编排 `common/编排/decision-card.ts::validateDecisionCardRequest`，经 Pipeline 公共出口 `src/pipeline/orchestration/run-role.ts` 只读导入**；桌面包装不复制第二份判定，只做：① 共享 `applicable:false`（非 decision 卡）⇒ `ignore`（旧行为零变化）；② 共享 `ok:false` ⇒ 按 `reasonCode` 选 `main.decisionCard.invalid`/`noRecommended` 并以共享 `detail` 组文案；③ 桌面特有防线——内置治理角色发出「有 `recommended: true` 但完全没有 `cardKind`」的 choice 卡 ⇒ `missing-card-kind` 拒发（共享函数对缺 cardKind 返回 not-applicable；编排 trio 路径已有同向守卫，桌面覆盖 direct/legacy/single 通道）。任一拒绝由调用方返回 `{outcome:"declined", reason, notPresented:true}`：不调用 presenter、不排队、不占「一项目一卡」、不写账本、不带 `operatorId`——**不冒充客户拒绝**。请求对象原样透传，`options[].recommended` 不重建/不丢失；显式其他 `cardKind`/项目角色的 `recommended` 忽略。校验通过后 `ChannelEntry.decisionCard={flowId, recommendedOptionId}` 定格推荐项。`DECISION_CARD_MIN_OPTIONS`/`DecisionCardRejectReason`/`DecisionCardValidation` 由本模块再导出。
+
+**「替我决策」确定性默认推荐（`tryAutoSelectDecision`）**：`presentEntryNow` 先于判断门调用。条件全部满足才代选——发卡前校验通过、「替我决策」开关开（主进程权威 `isGroupEnabled("decision")`）、会话信号未中止、有可用运行时（审计 engine）、推荐项仍在卡上、`emitJudgeResult` 已注入且投达成功。满足 ⇒ **不调模型、不呈现客户卡**，直接结算 `{outcome:"answered", value:{selected:[推荐项]}, operatorId:"judge:<engine>", judge:{group:"decision", cardKind:"decision", engine, reasonCode:"recommended-default", selected}}`（**judge 代批，不是客户本人**），并发一条 `session:operator-judge` 结果行（`group/cardKind=decision`）。任一不满足/异常（开关关、结果行缺失或抛错、运行时缺失、推荐项被改写、中止）⇒ 返回 false，走既有 `presentNow` 客户卡路径，**绝不擅自代选**；`planJudge` 对 decision 卡显式返回 `undefined`（永不交给模型 judge）。
+
+**结果/账本/下一步**：编排据 outcome 写 `customer.decision{decisionKind:"material-choice", customerDecision:"accepted", selectedOptions:[选中项]}`（judge 代选 `decisionEvidence.kind="judge"`；客户手选 `"customer-input"`），独立于提案/任命/验收：不写 `acceptance`/`proposal-*`/`appointment`/`targetRoleIds`，不被 gate/`latestAcceptanceDecision`/flow `customer-decision` 证据识别；桌面 `deriveGovernanceNextStep` 对 decision 返回 `null`（`onNextStep` 零调用），验收分诊前闸只对 `acceptance` 卡。**客户手选系统行**（`main.decisionCard.selectedRecommended`/`selectedOther`）本批未新增 IPC，由既有 `request_choice` tool 回执与卡面 `ui.decisionCard.notApprovalBadge` 承担（见变更记录 §五-1）。
+
 
 项目 pickProject/listProject；listProject roles 原样转可选 readonly group/groupDuty，窗口不解析组别。外开、选图/附件、诊断/显式恢复、窗口控制保留已有白名单方法。`app:recovery-state` 增 runtime。所有订阅均返回取消订阅函数；preload 不暴露 Node 能力。未改动通道的完整历史表见[冻结归档](../桌面应用/api-spec.md)。
 
@@ -445,3 +452,18 @@ A4 legacy provenance窄修：protected工具t.statusSource/target.source分别�
 - **IPC/preload**：`app/main.ts` 的 `flow:status` handler 先校验 `event.sender === win.webContents`（不匹配回 `{ok:false,error:"请求来源无效。"}`），再从 `{projectRoot}` 取字符串透传 Interface；`app/preload.cjs` 只新增 `getFlowStatus(projectRoot)` 白名单方法（非字符串置空串，由 Interface 回 invalidProject；不暴露 Node 能力）。无主→渲推送/订阅，面板按需拉取刷新。
 - **渲染层注意**：`current` 可能为空（没有在途步骤）；坏文件在 `errors` 单独列出而不是让整个调用失败（可展示「部分流程不可读」）；`revision` 是内容哈希、不是写者版本号；本调用是只读快照，不触发任何自动推进/验收。
 - 证据（实施后）：`test/桌面应用/interface.test.ts` 新增 4 例（2 个 flow YAML——完整 + 坏 YAML——解析、counts/current、errors 隔离、无 `docs/flows`、非法 projectRoot、preload/main 通道与来源校验）；`npm run typecheck` 0 错；`node --test --test-concurrency=1 "test/桌面应用/**/*.test.ts"` 602/602 通过。
+
+## Gate 复核能力（`request_gate_review`，2026-10-26 客户追加授权）
+
+**不是 IPC/preload 通道**：这是注入 convener 会话的运行时工具能力（工具、契约与编排注入属运行时核心/编排；本角色只提供应用侧实现）。设计依据 `角色卡/项目管理/docs/design/2026-10-26_design_proof-gate-reviews.md` §5.3–§8。
+
+| 能力位（`SessionManagerDeps` / `openRoleSession` 入参） | 注入判据 | 实现 |
+| --- | --- | --- |
+| `requestGateReview?: (projectRoot, RequestGateReviewInput) => Promise<RequestGateReviewResult>` | `role.builtIn === true && governanceFunction === "schedule"`（仅 convener；项目角色与其他治理角色不注入） | `DesktopDeps.requestGateReview ?? requestGateReviewForProject`（`app/desktop/interface.ts`） |
+
+- 冻结回执 code：`dispatched | already-dispatched | gate-not-found | criteria-missing | flow-incomplete | unavailable | rejected`（载荷/回执形状＝契约家 `src/model/runtime.ts`；桌面不复制）。
+- 校验顺序：flowId 归一（唯一 YAML 才采用）→ flow 解析 → gate 存在且 `kind:artifact`+合法 `gateKind` → `pending` → gate 记录/flow revision/在途幂等 → dependsOn（supersededBy 链）done + `validateFlowEvidence` 对账 → 最新 criteria 含精确 gateId 的 Gate 标准节 → visual/integration 证据完整性 → 无在途 → 引擎解析 → 派 Proof。
+- 持久化（app-only 写域，原子写）：`.ans/governance/acceptance/<flowId>/gates/<gateId>.json`（`gate-review-record/v1`，先写）+ 账本 `dispatch.accepted{stepId=<gateId>, targetRoleId:"verifier", trigger:"settle"}`。
+- 报告处置（settle/导入/账本事件经 `runAcceptanceCheck` → `processGateReviewsForFlow`）：pass ⇒ `completeGateStep` + `artifact.observed` + `gate.review` 审计 + pass 系统行；fail 含 blocker/major ⇒ 记录 `failed` + `gate.review(fail)` + `.ans/.../gates/<gateId>-rework-routing.json`（`gate-rework-routing/v1`）独立返工路由，gate 保持 pending；仅 minor/nit 的 fail ⇒ `returned-to-proof`、不返工；缺/坏/版本或候选不符 ⇒ `returned-to-proof`。**不写 `customer.decision`、不发验收卡、不标 done（pass 由 `completeGateStep` 应用收口）**；重启按记录幂等补处置，不自动重派/不自动通过。
+- 面元：`DesktopDeps.completeGateStepFn`（缺省编排公共出口 `completeGateStep`）、`requestGateReviewLimits`（总/单阶段预算，缺省 60s/20s）、`appendGovernanceLedgerFn`（测试注入审计失败）。
+- 证据（实施后）：`test/桌面应用/acceptance-dispatch.test.ts` gate 组 12 例（派发/幂等/校验矩阵/注入/visual&integration/pass/fail/nit-only/缺坏报告/重启恢复）；`npm run typecheck` 0 错；`node --test "test/桌面应用/**/*.test.ts"` 663/663。

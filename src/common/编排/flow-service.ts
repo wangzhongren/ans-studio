@@ -33,16 +33,19 @@ import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 import {
   flowStatePath,
   isCustomerDecisionKindRef,
+  isFlowGateStepId,
   isReservedAcceptanceStepId,
   latestAcceptanceDecision,
   latestCustomerDecision,
   parseFlowStateYaml,
   validateFlowEvidence,
+  type FlowGateKind,
   type FlowState,
   type FlowStateStep,
 } from "./flow-state.ts";
 import { appendGovernanceLedger, readGovernanceLedger, type GovernanceLedgerEntry, type GovernancePower } from "./governance-ledger.ts";
-import { latestAcceptanceCriteriaRelPath } from "./governance-gate.ts";
+import { gateReviewReportRelPath, latestAcceptanceCriteriaRelPath, latestGateReviewReport } from "./governance-gate.ts";
+import { parseAcceptanceTriageReport, type AcceptanceTriageItem, type AcceptanceTriageSection } from "./acceptance-triage.ts";
 import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 import type {
   FlowGetFn,
@@ -51,6 +54,7 @@ import type {
   FlowToolEvidence,
   FlowToolResult,
   FlowToolStepKind,
+  FlowToolStepView,
   FlowToolStatus,
   FlowToolView,
 } from "../../model/runtime.ts";
@@ -149,6 +153,13 @@ export interface FlowToolViewWithRelease extends FlowToolView {
    * 所有变更（含非发布）在流程齐备后都由应用按验收门派 Proof / 验收（2026-10-24 客户修订）。
    */
   release: boolean;
+  /** 步骤视图原样携带可选 `gateKind`（缺省 ⇒ 字段缺席；旧 flow 视图形状逐字不变）。 */
+  steps: FlowToolStepViewWithGate[];
+}
+
+/** flow 回执步骤视图：运行时契约 `FlowToolStepView` + 可选 `gateKind`（仅新增字段，旧 flow 不带）。 */
+export interface FlowToolStepViewWithGate extends FlowToolStepView {
+  gateKind?: FlowGateKind;
 }
 
 function viewOf(flow: FlowState, revision: string, actorRoleId: string, actorPower: string): FlowToolViewWithRelease {
@@ -168,6 +179,7 @@ function viewOf(flow: FlowState, revision: string, actorRoleId: string, actorPow
       owner: step.owner,
       kind: step.kind,
       status: step.status,
+      ...(step.gateKind !== undefined ? { gateKind: step.gateKind } : {}),
       ...(step.evidence !== undefined ? { evidence: { kind: step.evidence.kind, ref: step.evidence.ref } } : {}),
       ...(step.supersedes !== undefined ? { supersedes: [...step.supersedes] } : {}),
       ...(step.supersededBy !== undefined ? { supersededBy: step.supersededBy } : {}),
@@ -192,6 +204,7 @@ function serializeFlow(flow: FlowState): string {
       owner: step.owner,
       kind: step.kind,
       status: step.status,
+      ...(step.gateKind !== undefined ? { gateKind: step.gateKind } : {}),
       ...(step.evidence !== undefined ? { evidence: { kind: step.evidence.kind, ref: step.evidence.ref } } : {}),
       ...(step.supersedes !== undefined ? { supersedes: [...step.supersedes] } : {}),
       ...(step.supersededBy !== undefined ? { supersededBy: step.supersededBy } : {}),
@@ -546,6 +559,23 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
         const { flow, revision } = read;
         const flowView = viewOf(flow, revision, actorRoleId, actorPower);
         const isManager = isManagerPower(actorPower);
+
+        // 2026-10-26 gate 复核（客户授权；设计 §7.4/§8.4）：含 gateKind 的步骤 `done` **只能由应用**
+        // 按 Proof gate 报告收口（`completeGateStep`）；角色 `flow_step_update(done)` 一律拒绝——
+        // manager（统筹/Lead）也不例外，防止「自查代替独立复核」。放在 revision 校验之前：即使调用方
+        // 持有旧 revision，也得到确定的新 code（不落回 revision-conflict 掩盖真实原因）。
+        const gateTarget = flow.steps.find((step) => step.id === input.stepId);
+        if (gateTarget !== undefined && gateTarget.gateKind !== undefined && input.status === "done") {
+          return {
+            ok: false,
+            code: "gate-review-required",
+            revision,
+            flow: flowView,
+            error:
+              `步骤 ${gateTarget.id} 是 gate 步骤（gateKind=${gateTarget.gateKind}）：done 只能由应用按 Proof ` +
+              "gate 报告收口（completeGateStep），角色不能代标通过；gate 未通过时下游派发与最终验收保持被拦。",
+          };
+        }
         if (input.expectedRevision !== revision) {
           log.record("flow.conflict", {
             flowId,
@@ -791,6 +821,20 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
         }
 
         const existingNew = flow.steps.find((step) => step.id === input.newStepId);
+        // 2026-10-26 gate 复核：用既有 supersede 换新 gate id 时**继承旧 gate 的 gateKind**（工具载荷不含
+        // gateKind；旧 gate 被 supersede、新 id 走新 gate 记录，符合设计 §4.5 的「gate 定义变化」路径）。
+        // 只在新 id 形如 gate-<slug> 且 kind=artifact 时继承；否则是普通 artifact 取代（新步骤不是 gate）。
+        // 继承后仍由候选 YAML 复核强制 owner=verifier/evidence 等 gate 约束（不满足 ⇒ invalid-flow）。
+        const inheritedGateKind =
+          oldStep.gateKind !== undefined && input.kind === "artifact" && isFlowGateStepId(input.newStepId)
+            ? oldStep.gateKind
+            : undefined;
+        // 新 gate 的 evidence 约定路径（工具载荷无 evidence 字段）：按同一路径规则派生 v1 报告路径，
+        // 解析器据此满足「gate 步骤必须有 artifact 证据」；Proof 产出报告后 completeGateStep 再按最新版本收口。
+        const inheritedGateEvidence =
+          inheritedGateKind !== undefined
+            ? { kind: "artifact" as const, ref: gateReviewReportRelPath(flowId, input.newStepId, 1) }
+            : undefined;
         if (existingNew !== undefined) {
           const idempotent =
             oldStep.status === "superseded" &&
@@ -799,6 +843,9 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
             existingNew.kind === input.kind &&
             existingNew.title === input.title.trim() &&
             existingNew.owner === input.owner.trim() &&
+            existingNew.gateKind === inheritedGateKind &&
+            existingNew.evidence?.kind === inheritedGateEvidence?.kind &&
+            existingNew.evidence?.ref === inheritedGateEvidence?.ref &&
             existingNew.parallelGroup === input.parallelGroup &&
             sameOptionalStringList(existingNew.dependsOn, input.dependsOn) &&
             (existingNew.supersedes ?? []).includes(oldStep.id);
@@ -824,6 +871,8 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
           kind: input.kind,
           status: "pending",
           supersedes: [oldStep.id],
+          ...(inheritedGateKind !== undefined ? { gateKind: inheritedGateKind } : {}),
+          ...(inheritedGateEvidence !== undefined ? { evidence: inheritedGateEvidence } : {}),
           ...(input.parallelGroup !== undefined ? { parallelGroup: input.parallelGroup } : {}),
           ...(input.dependsOn !== undefined ? { dependsOn: [...input.dependsOn] } : {}),
         };
@@ -2315,6 +2364,499 @@ export async function completeAcceptanceCriteriaStep(
   }).catch(internalError);
 }
 
+// —————————————————————— 应用专用：gate 报告处置与 completeGateStep ——————————————————————
+//
+// 2026-10-26 客户授权 `request_gate_review`（设计 `2026-10-26_design_proof-gate-reviews.md` §6.3/§8.1）：
+// gate 报告复用 `acceptance-triage/v1` 结构（同一解析器/严重度/上限）；应用只做**机械判定**：
+//   · `pass`（可带 minor/nit 备注）⇒ 可收口；
+//   · `fail`/`conditional` 且至少一个 blocker/major ⇒ 失败（gate 保持 pending；返工路由归应用侧）；
+//   · `fail`/`conditional` **只有** minor/nit ⇒ 结构不符，退回 Proof（防吹毛求疵；不触发返工）；
+//   · 缺报告/坏结构/矛盾 ⇒ 退回 Proof（解析器 R5 已拒绝 pass+blocker/major 与 fail 空 items）。
+// gate 结论**不是**客户决定：不写 `customer.decision`、不进入 `latestAcceptanceDecision`/分诊/最终验收。
+
+/** gate 报告的严重度计数（与 `acceptance-triage/v1` 同一组枚举）。 */
+export interface GateReportSeverityCounts {
+  blocker: number;
+  major: number;
+  minor: number;
+  nit: number;
+}
+
+/**
+ * gate 报告结论的机械处置：
+ *   · `pass`             可收口 gate 步骤（可带 minor/nit 备注）；
+ *   · `fail`             至少一个 blocker/major ⇒ 失败（不标 done；返工路由由应用侧按 gate 记录处置）；
+ *   · `return-to-proof`  只有 minor/nit 的 fail/conditional（或解析失败时由调用方另行处理）⇒ 按结构不符
+ *                        退回 Proof，**不触发返工**（客户防吹毛求疵要求）。
+ */
+export type GateReviewVerdict =
+  | {
+      outcome: "pass";
+      conclusion: "pass";
+      severityCounts: GateReportSeverityCounts;
+      items: AcceptanceTriageItem[];
+    }
+  | {
+      outcome: "fail";
+      conclusion: "fail" | "conditional";
+      severityCounts: GateReportSeverityCounts;
+      items: AcceptanceTriageItem[];
+    }
+  | {
+      outcome: "return-to-proof";
+      reason: "nonblocking-fail";
+      conclusion: "fail" | "conditional";
+      severityCounts: GateReportSeverityCounts;
+      items: AcceptanceTriageItem[];
+    };
+
+/** 统计 gate 报告严重度（纯函数）。 */
+export function gateReportSeverityCounts(items: readonly AcceptanceTriageItem[]): GateReportSeverityCounts {
+  const counts: GateReportSeverityCounts = { blocker: 0, major: 0, minor: 0, nit: 0 };
+  for (const item of items) counts[item.severity] += 1;
+  return counts;
+}
+
+/**
+ * gate 报告结论处置（纯函数；客户 2026-10-26 追加要求）：
+ * `fail` 必须至少一个 blocker/major；只有 minor/nit 的 fail 按结构不符退回 Proof、不触发返工；
+ * `pass` 可带 minor/nit 备注（不因非阻断建议反复开 gate）。
+ */
+export function classifyGateReviewTriage(triage: AcceptanceTriageSection): GateReviewVerdict {
+  const severityCounts = gateReportSeverityCounts(triage.items);
+  if (triage.conclusion === "pass") {
+    return { outcome: "pass", conclusion: "pass", severityCounts, items: [...triage.items] };
+  }
+  const blocking = severityCounts.blocker + severityCounts.major;
+  if (blocking > 0) {
+    return {
+      outcome: "fail",
+      conclusion: triage.conclusion,
+      severityCounts,
+      items: [...triage.items],
+    };
+  }
+  return {
+    outcome: "return-to-proof",
+    reason: "nonblocking-fail",
+    conclusion: triage.conclusion,
+    severityCounts,
+    items: [...triage.items],
+  };
+}
+
+/** 允许由应用按 Proof gate 报告收口到 done 的步骤状态（gate 正常保持 pending）。 */
+const GATE_STEP_CLOSABLE_STATUSES: ReadonlySet<string> = new Set(["pending", "dispatched", "delivered"]);
+
+/** `completeGateStep` 输入（应用专用，不是角色工具参数；`gateId` 为 gate 步骤 id）。 */
+export interface CompleteGateStepInput {
+  projectRoot: string;
+  flowId: string;
+  gateId: string;
+}
+
+/**
+ * `completeGateStep` 结果：复用 `FlowToolResult` 形状，并补充本次证据/报告信息。
+ *
+ * 错误码（桌面据此分流；**不覆盖其它状态、不伪造通过**）：
+ *   · 输入：`invalid-input` / `missing-flow-id` / `invalid-gate-id`；
+ *   · flow：`gate-step-missing` / `gate-step-kind-unsupported` / `gate-step-terminal`
+ *     （以及读取既有码 `not-found` / `read-failed` / `invalid-flow`）；
+ *   · 报告：`gate-report-missing`（最新 `<flowId>-<gateId>-report-vN.md` 不存在/不可读）/
+ *     `gate-report-unobservable`（存在但不可安全观察：超大/二进制/路径非法）/
+ *     `gate-report-invalid`（缺 `acceptance-triage/v1` / 段坏 / 矛盾——退回 Proof，不标 done）/
+ *     `gate-report-nonblocking-fail`（fail/conditional 只有 minor/nit——结构不符退回 Proof，不返工）/
+ *     `gate-report-failed`（fail/conditional 含 blocker/major——不标 done，等待返工后重新复核）；
+ *   · 证据/写入：`ledger-unavailable` / `ledger-write-failed` / `insufficient-evidence` / `write-failed`。
+ */
+export interface CompleteGateStepResult extends FlowToolResult {
+  /** 成功完成时实际写入 flow 的证据（最新 gate 报告路径）。 */
+  evidence?: { kind: "artifact"; ref: string };
+  /** 本次使用的最新 gate 报告（项目相对路径）。 */
+  reportPath?: string;
+  /** 最新 gate 报告版本号 N。 */
+  reportVersion?: number;
+  /** 最新 gate 报告 sha256（应用侧写 `gate.review` 审计时可直接使用；不做二次猜测）。 */
+  reportSha256?: string;
+  /** 步骤已是 done（幂等命中；本次未写盘）。 */
+  alreadyDone?: boolean;
+  /** gate 种类（原样返回，便于调用方记录 gate.review 审计）。 */
+  gateKind?: FlowGateKind;
+  /** 仅成功收口且报告为 pass 时给出。 */
+  verdict?: "pass";
+  severityCounts?: GateReportSeverityCounts;
+  itemCount?: number;
+}
+
+/**
+ * **应用专用**：Proof 已产出 gate 报告且结论为 `pass` 时，把 flow YAML 的 gate 步骤置 `done`。
+ *
+ * 背景（设计 §8.1）：gate 步骤是 `kind: artifact` + `gateKind`；`done` **只能由应用**按 Proof 报告
+ * 收口，角色 `flow_step_update(done)` 一律拒绝（`gate-review-required`）。本函数与
+ * `completeAcceptanceCriteriaStep` 同构，**不注册为角色工具**。
+ *
+ * 契约（钉死）：
+ *   · 目标步骤必须存在且含 `gateKind`（否则 `gate-step-missing` / `gate-step-kind-unsupported`）；
+ *     步骤 kind 非 artifact ⇒ `gate-step-kind-unsupported`（防御；解析器已保证）。
+ *   · **已 done ⇒ 幂等成功**（`{ok:true,idempotent:true,alreadyDone:true,code:"already-done"}`），
+ *     不读报告、不写账本/flow；只从 pending/dispatched/delivered 收口，其它状态 ⇒
+ *     `gate-step-terminal`（不覆盖 failed/blocked/aborted/superseded）。
+ *   · **最新 gate 报告必须真实存在**：扫描 `docs/acceptance/<flowId>-<gateId>-report-vN.md` 取最高 N
+ *     （`latestGateReviewReport`，不回退旧版本）；不存在/不可读 ⇒ `gate-report-missing`；不可安全
+ *     观察 ⇒ `gate-report-unobservable`。
+ *   · **报告结构**：复用 `acceptance-triage/v1`（`parseAcceptanceTriageReport`）；缺段/段坏/矛盾 ⇒
+ *     `gate-report-invalid`（退回 Proof，不标 done、不返工）。
+ *   · **防吹毛求疵**：`fail`/`conditional` 必须至少一个 blocker/major；只有 minor/nit 的 fail ⇒
+ *     `gate-report-nonblocking-fail`（结构不符退回 Proof，**不触发返工**）；含 blocker/major 的 fail ⇒
+ *     `gate-report-failed`（不标 done；返工后由统筹重新请求 gate 复核）。
+ *   · **按现有 artifact 观测规则补 `artifact.observed`**：同 path+sha（flowId 缺省或相等）不重复追加；
+ *     新条目固定 `actorRoleId:"app"`、`power:"app"`；**不写** `customer.decision`、不写 `gate.review`
+ *     审计（由应用侧在 settle/导入处置时写）、不伪造客户批准。
+ *   · **证据校验沿用 FlowService 同一套内部原语**：候选 YAML 复核 + `validateFlowEvidence` 账本对账
+ *     （只过滤目标 stepId 的 issue）。
+ *   · 只改目标步骤的 `status`/`evidence`，**不改其它步骤、owner、kind、gateKind、flow schema**。
+ *   · 与 `createFlowService` 共用 per-project 串行队列与原子写；写事件 `flow.gate.completed`，
+ *     view actor `app/app`；写失败不破坏原文件。
+ */
+export async function completeGateStep(input: CompleteGateStepInput): Promise<CompleteGateStepResult> {
+  if (typeof input?.projectRoot !== "string" || input.projectRoot.trim() === "") {
+    return { ok: false, code: "invalid-input", error: "缺少 projectRoot。" };
+  }
+  const projectRoot = path.resolve(input.projectRoot);
+  const flowId = input.flowId;
+  if (typeof flowId !== "string" || !FLOW_ID_RE.test(flowId)) {
+    return { ok: false, code: "missing-flow-id", error: "缺少合法 flowId（应形如 todo-list-v1）。" };
+  }
+  const gateId = input.gateId;
+  if (typeof gateId !== "string" || !isFlowGateStepId(gateId)) {
+    return {
+      ok: false,
+      code: "invalid-gate-id",
+      error: `缺少合法 gateId（含 gateKind 的步骤 id 必须匹配 gate-<slug>，如 gate-vertical-slice；当前 ${JSON.stringify(gateId)}）。`,
+    };
+  }
+  const log = createDiagnosticLogger({ component: "orchestration.flow-service", projectRoot });
+
+  return serialize(projectRoot, async () => {
+    const read = await readFlowState(projectRoot, flowId);
+    if (!read.ok) return read.result;
+    const view = viewOf(read.flow, read.revision, "app", "app");
+    const index = read.flow.steps.findIndex((step) => step.id === gateId);
+    if (index === -1) {
+      return {
+        ok: false,
+        code: "gate-step-missing",
+        revision: read.revision,
+        flow: view,
+        error: `流程中没有 gate 步骤 ${gateId}（无法完成 gate 复核）。`,
+      };
+    }
+    const step = read.flow.steps[index]!;
+    if (step.gateKind === undefined) {
+      return {
+        ok: false,
+        code: "gate-step-kind-unsupported",
+        revision: read.revision,
+        flow: view,
+        error: `步骤 ${step.id} 不含 gateKind（不是 gate 步骤）；本函数只收口 gate 步骤。`,
+      };
+    }
+    if (step.kind !== "artifact") {
+      return {
+        ok: false,
+        code: "gate-step-kind-unsupported",
+        revision: read.revision,
+        flow: view,
+        error: `gate 步骤 ${step.id} 的 kind=${step.kind} 不受支持（只支持 artifact）。`,
+      };
+    }
+    if (step.status === "done") {
+      const existingEvidence =
+        step.evidence !== undefined && step.evidence.kind === "artifact"
+          ? { kind: "artifact" as const, ref: step.evidence.ref }
+          : undefined;
+      log.record("flow.gate.already-done", { flowId, gateId, gateKind: step.gateKind });
+      return {
+        ok: true,
+        idempotent: true,
+        alreadyDone: true,
+        code: "already-done",
+        revision: read.revision,
+        flow: view,
+        gateKind: step.gateKind,
+        ...(existingEvidence !== undefined
+          ? { evidence: existingEvidence, reportPath: existingEvidence.ref }
+          : {}),
+      };
+    }
+    if (!GATE_STEP_CLOSABLE_STATUSES.has(step.status)) {
+      return {
+        ok: false,
+        code: "gate-step-terminal",
+        revision: read.revision,
+        flow: view,
+        error:
+          `gate 步骤 ${step.id} 当前状态为 ${step.status}；应用只从 pending/dispatched/delivered 收口到 done，` +
+          "不覆盖其它状态。",
+      };
+    }
+
+    // 1) 最新 gate 报告必须真实存在（版本扫描取最高 N；不回退旧版本）。
+    const latestReport = latestGateReviewReport(projectRoot, flowId, gateId);
+    if (latestReport === undefined) {
+      log.record("flow.gate.report.missing", { flowId, gateId, gateKind: step.gateKind });
+      return {
+        ok: false,
+        code: "gate-report-missing",
+        revision: read.revision,
+        flow: view,
+        gateKind: step.gateKind,
+        error:
+          `流程 ${flowId} 的 gate ${gateId} 缺少最新报告 docs/acceptance/${flowId}-${gateId}-report-vN.md` +
+          "（不存在或目录不可读）；未完成 gate 步骤，不伪造通过。",
+      };
+    }
+    const inspected = await inspectObservableArtifact(projectRoot, latestReport.relPath);
+    if (!inspected.ok) {
+      log.record("flow.gate.report.unobservable", {
+        flowId,
+        gateId,
+        reportPath: latestReport.relPath,
+        reason: inspected.reason,
+      });
+      const code =
+        inspected.reason === "missing" || inspected.reason === "read-failed"
+          ? "gate-report-missing"
+          : "gate-report-unobservable";
+      return {
+        ok: false,
+        code,
+        revision: read.revision,
+        flow: view,
+        gateKind: step.gateKind,
+        reportPath: latestReport.relPath,
+        reportVersion: latestReport.version,
+        error:
+          `最新 gate 报告 ${latestReport.relPath} 不可用于收口（${inspected.reason}）；` +
+          "未完成 gate 步骤，不伪造报告存在。",
+      };
+    }
+    let reportText: string;
+    try {
+      reportText = await readFile(path.join(projectRoot, ...inspected.rel.split("/")), "utf8");
+    } catch (err) {
+      return {
+        ok: false,
+        code: "gate-report-unobservable",
+        revision: read.revision,
+        flow: view,
+        gateKind: step.gateKind,
+        reportPath: latestReport.relPath,
+        reportVersion: latestReport.version,
+        error: `最新 gate 报告 ${latestReport.relPath} 不可读：${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+
+    // 2) `acceptance-triage/v1` 结构 + 结论处置（机械判定；语义判定归 Proof）。
+    const parsed = parseAcceptanceTriageReport(reportText);
+    if (!parsed.ok) {
+      log.record("flow.gate.report.invalid", {
+        flowId,
+        gateId,
+        reportPath: latestReport.relPath,
+        parseCode: parsed.code,
+      });
+      return {
+        ok: false,
+        code: "gate-report-invalid",
+        revision: read.revision,
+        flow: view,
+        gateKind: step.gateKind,
+        reportPath: latestReport.relPath,
+        reportVersion: latestReport.version,
+        reportSha256: inspected.sha256,
+        error:
+          `gate 报告 ${latestReport.relPath} 缺少合格 acceptance-triage/v1 结构（${parsed.code}）：` +
+          `${parsed.errors.map((item) => `${item.path}: ${item.message}`).join("；")}；` +
+          "按结构不符退回 Proof 补报告，不标 done、不路由返工、不猜结论。",
+        issues: parsed.errors.map((item) => `${item.path}: ${item.message}`),
+      };
+    }
+    const verdict = classifyGateReviewTriage(parsed.triage);
+    if (verdict.outcome === "return-to-proof") {
+      log.record("flow.gate.report.nonblocking-fail", {
+        flowId,
+        gateId,
+        reportPath: latestReport.relPath,
+        conclusion: verdict.conclusion,
+      });
+      return {
+        ok: false,
+        code: "gate-report-nonblocking-fail",
+        revision: read.revision,
+        flow: view,
+        gateKind: step.gateKind,
+        reportPath: latestReport.relPath,
+        reportVersion: latestReport.version,
+        reportSha256: inspected.sha256,
+        severityCounts: verdict.severityCounts,
+        itemCount: verdict.items.length,
+        error:
+          `gate 报告 ${latestReport.relPath} 结论为 ${verdict.conclusion}，但没有任何 blocker/major` +
+          `（blocker=0，major=0，minor=${verdict.severityCounts.minor}，nit=${verdict.severityCounts.nit}）；` +
+          "按结构不符退回 Proof——只有 minor/nit 不构成返工依据，gate 保持 pending。",
+      };
+    }
+    if (verdict.outcome === "fail") {
+      log.record("flow.gate.report.failed", {
+        flowId,
+        gateId,
+        reportPath: latestReport.relPath,
+        severityCounts: verdict.severityCounts,
+      });
+      return {
+        ok: false,
+        code: "gate-report-failed",
+        revision: read.revision,
+        flow: view,
+        gateKind: step.gateKind,
+        reportPath: latestReport.relPath,
+        reportVersion: latestReport.version,
+        reportSha256: inspected.sha256,
+        severityCounts: verdict.severityCounts,
+        itemCount: verdict.items.length,
+        error:
+          `gate 报告 ${latestReport.relPath} 结论为 ${verdict.conclusion}（blocker=${verdict.severityCounts.blocker}，` +
+          `major=${verdict.severityCounts.major}）；gate 未通过，不标 done；等待返工后重新请求 gate 复核。`,
+      };
+    }
+
+    // 3) 账本可读；按既有 artifact 观测规则补 app/app 的 artifact.observed（同 path+sha 不重复追加）。
+    let ledger;
+    try {
+      ledger = await readGovernanceLedger(projectRoot);
+    } catch (err) {
+      return {
+        ok: false,
+        code: "ledger-unavailable",
+        revision: read.revision,
+        flow: view,
+        gateKind: step.gateKind,
+        error: `治理账本不可读：${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+    if (ledger.errors.length > 0) {
+      return {
+        ok: false,
+        code: "ledger-unavailable",
+        revision: read.revision,
+        flow: view,
+        gateKind: step.gateKind,
+        error: `治理账本不可读或存在坏行：${ledger.errors[0]}`,
+      };
+    }
+
+    let entries: GovernanceLedgerEntry[] = ledger.entries;
+    const alreadyObserved = entries.some(
+      (entry) =>
+        entry.kind === "artifact.observed" &&
+        typeof entry.artifactPath === "string" &&
+        normalizeObservedRelPath(entry.artifactPath) === inspected.rel &&
+        entry.artifactSha256 === inspected.sha256 &&
+        (entry.flowId === undefined || entry.flowId === flowId),
+    );
+    if (!alreadyObserved) {
+      const observedEntry: GovernanceLedgerEntry = {
+        at: new Date().toISOString(),
+        kind: "artifact.observed",
+        actorRoleId: "app",
+        power: "app",
+        artifactPath: inspected.rel,
+        artifactSha256: inspected.sha256,
+        flowId,
+      };
+      const appended = await appendGovernanceLedger(projectRoot, observedEntry);
+      if (!appended.ok) {
+        log.error("flow.gate.ledger.failed", new Error(appended.message), {
+          flowId,
+          gateId,
+          reportPath: inspected.rel,
+        });
+        return {
+          ok: false,
+          code: "ledger-write-failed",
+          revision: read.revision,
+          flow: view,
+          gateKind: step.gateKind,
+          error: appended.message,
+        };
+      }
+      entries = [...entries, observedEntry];
+      log.record("flow.gate.observed", { flowId, gateId, reportPath: inspected.rel });
+    }
+
+    // 4) 候选 YAML 复核 + 账本对账（沿用 flow-service 同一套内部原语；只过滤目标步骤的 issue）。
+    const candidate: FlowState = {
+      ...read.flow,
+      steps: read.flow.steps.map((item, itemIndex) =>
+        itemIndex === index
+          ? { ...item, status: "done" as const, evidence: { kind: "artifact" as const, ref: inspected.rel } }
+          : item,
+      ),
+    };
+    const parsedCandidate = parseFlowStateYaml(serializeFlow(candidate), flowId);
+    if (!parsedCandidate.ok) {
+      return {
+        ok: false,
+        code: "invalid-flow",
+        revision: read.revision,
+        flow: view,
+        gateKind: step.gateKind,
+        error: `候选流程 YAML 校验失败：${parsedCandidate.error}`,
+      };
+    }
+    const evidenceResult = validateFlowEvidence(parsedCandidate.flow, entries);
+    if (!evidenceResult.ok) {
+      const issues = evidenceResult.issues.filter((issue) => issue.stepId === gateId);
+      if (issues.length > 0) {
+        return {
+          ok: false,
+          code: "insufficient-evidence",
+          revision: read.revision,
+          flow: view,
+          gateKind: step.gateKind,
+          error: issues.map((issue) => issue.message).join("；"),
+          issues: issues.map((issue) => `${issue.path}: ${issue.message}`),
+        };
+      }
+    }
+
+    const written = await writeFlowState({
+      projectRoot,
+      flowId,
+      flow: parsedCandidate.flow,
+      event: "flow.gate.completed",
+      fields: { flowId, gateId, gateKind: step.gateKind, reportPath: inspected.rel, reportVersion: latestReport.version },
+      writeFile: (absPath, data) => atomicWrite(absPath, data),
+      log,
+      viewActorRoleId: "app",
+      viewActorPower: "app",
+    });
+    if (!written.ok) return written;
+    return {
+      ...written,
+      evidence: { kind: "artifact" as const, ref: inspected.rel },
+      reportPath: inspected.rel,
+      reportVersion: latestReport.version,
+      reportSha256: inspected.sha256,
+      gateKind: step.gateKind,
+      verdict: "pass" as const,
+      severityCounts: verdict.severityCounts,
+      itemCount: verdict.items.length,
+    };
+  }).catch(internalError);
+}
+
 // —————————————————————— 应用专用：observeFlowArtifacts ——————————————————————
 
 /** 观察路径排除的段（应用私有/治理产物/依赖/版本库）。 */
@@ -2536,6 +3078,10 @@ export async function observeFlowArtifacts(input: {
 
     for (const step of read.flow.steps) {
       if (step.kind !== "artifact") continue;
+      // 2026-10-26 gate 复核（设计 §8.4）：含 gateKind 的步骤**必须跳过**自动观测——gate 报告存在
+      // 不等于通过；失败/坏结构报告若被观测成 artifact.observed，会被误当成 done 证据。gate 证据只经
+      // `completeGateStep` 在结论为 pass 时观察。
+      if (step.gateKind !== undefined) continue;
       const ref = step.evidence?.ref;
       if (typeof ref !== "string" || ref.trim() === "") continue;
       const inspected = await inspectObservableArtifact(projectRoot, ref);

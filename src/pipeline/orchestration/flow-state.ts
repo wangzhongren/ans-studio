@@ -11,14 +11,36 @@ export {
   validateFlowEvidence,
   flowStatePath,
   isReservedAcceptanceStepId,
+  isFlowGateKind,
+  isFlowGateStepId,
   latestAcceptanceDecision,
   listReadyFlowSteps,
   FLOW_QUALITY_TIERS,
   FLOW_STEP_KINDS,
   FLOW_STEP_STATUSES,
   FLOW_EVIDENCE_KINDS,
+  FLOW_GATE_KINDS,
+  FLOW_GATE_STEP_ID_PATTERN,
   RESERVED_ACCEPTANCE_STEP_IDS,
 } from "../../common/编排/flow-state.ts";
+
+// 2026-10-26 gate 复核（客户授权 `request_gate_review`；设计 §4.3/§6.2/§8.1/§8.4）：
+// gate 报告路径/版本扫描（`docs/acceptance/<flowId>-<gateId>-report-vN.md`，不覆盖、不与最终验收报告
+// 冲突）与 app-only `completeGateStep` 收口出口。桌面窗口只经本公共出口消费；均不注册为角色工具。
+export {
+  gateReviewReportRelPath,
+  latestGateReviewReport,
+  latestGateReviewReportRelPath,
+} from "../../common/编排/governance-gate.ts";
+export type { LatestGateReviewReport } from "../../common/编排/governance-gate.ts";
+
+// 2026-10-26 gate.review 账本审计（设计 §8.4）：桌面窗口按 gate 报告处置时写审计条目，
+// 只经本公共出口消费 schema/类型（不直接 import 编排私有 common；`customer.decision` 字段被写入校验禁止）。
+export { GATE_REVIEW_DECISION_SCHEMA } from "../../common/编排/governance-ledger.ts";
+export type {
+  GateReviewLedgerDecision,
+  GateReviewSeverityCounts,
+} from "../../common/编排/governance-ledger.ts";
 
 // 2026-10-23 验收返工路由（方案 v1 / Q2 A）：报告 fenced YAML `acceptance-rework/v1` 解析。
 // 纯函数（无 IO）；桌面只经本公共出口消费，不直接 import 编排私有模块。
@@ -44,22 +66,31 @@ export {
   completeAcceptanceCriteriaStep,
   completeAcceptanceStep,
   completeCustomerDecisionStep,
+  completeGateStep,
   completeRoleCardsStep,
   observeFlowArtifacts,
   reopenAcceptanceStepForRework,
+  classifyGateReviewTriage,
+  gateReportSeverityCounts,
 } from "../../common/编排/flow-service.ts";
 export type {
   CompleteAcceptanceCriteriaStepInput,
   CompleteAcceptanceCriteriaStepResult,
   CompleteCustomerDecisionStepInput,
+  CompleteGateStepInput,
+  CompleteGateStepResult,
   CompleteRoleCardsEvidence,
   CompleteRoleCardsStepInput,
   CompleteRoleCardsStepResult,
   CompleteRoleCardsValidatedFile,
+  GateReportSeverityCounts,
+  GateReviewVerdict,
   ObserveFlowArtifactsResult,
   ReopenAcceptanceStepForReworkInput,
   /** 2026-10-24 P0-1：flow 回执视图携带 `release`（缺省 false）；桌面只经本公共出口消费。 */
   FlowToolViewWithRelease,
+  /** 2026-10-26：flow 回执步骤视图可选携带 `gateKind`（旧 flow 字段缺席）。 */
+  FlowToolStepViewWithGate,
   /** 2026-10-24 P0-1：受控扩展（release 标记）校验结果。 */
   ReleaseExtensionValidation,
 } from "../../common/编排/flow-service.ts";
@@ -148,6 +179,7 @@ export type {
   FlowStepKind,
   FlowStepStatus,
   FlowEvidenceKind,
+  FlowGateKind,
   FlowQualityTier,
   FlowStateError,
   FlowEvidenceIssue,

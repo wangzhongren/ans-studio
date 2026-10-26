@@ -66,6 +66,7 @@ app/renderer/
 
 - 窗口控制/会话/历史/确认/判断/设置/治理通道均按名接入；渲染进程不做边界判定、不 import Node。
 - 契约面与三态见 [ui-contract-surface](docs/feature/ui-contract-surface.md)；5B 变更/证据见 [5B 变更记录](docs/change/2026-10-21_change_ui-platform-phase5b-cutover.md) 与 [5B 证据](docs/change/2026-10-21-phase5b-evidence/)。
+- decision 卡（2026-10-26）：`src/chat/decision-card.ts` 是卡面标识的单一映射（固定标题 / 「非客户批准」/「推荐」），`ChatRow::OperatorRow` 只消费该映射；`cardKind="decision"` 才显示，普通 choice/提案/任命/验收零变化；推荐标识仅 `recommended === true`（严格布尔）且不改变选项 id/交互；渲染侧不做发卡校验（主进程 fail-closed）。
 - Phase 2/3A/3B/4A/4B 段落保留为历史实现记录；旧文件/旧测试已删除，不再作为现行代码位置。
 
 

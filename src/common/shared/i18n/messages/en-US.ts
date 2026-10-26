@@ -309,6 +309,14 @@ export const enUS = {
     "Acceptance report lacks the triage structure; returned to Proof to fill it in",
   "ui.triage.missingReport": "Acceptance report unreadable: {detail}",
 
+  // Decision card (material choice, single recommended option, separate from acceptance; desktop UI wiring).
+  // A decision card records a material choice only: it is not a proposal/appointment/acceptance, not
+  // customer approval, and triggers no gate or acceptance. The judge result must be attributed to the
+  // automatic agent, never presented as the customer in person.
+  "ui.decisionCard.title": "Decision card · material choice",
+  "ui.decisionCard.notApprovalBadge": "Not customer approval",
+  "ui.decisionCard.recommended": "Recommended",
+
   "ui.drawer.collapseTitle": "Collapse (Esc)",
 
   "ui.engineSelect.aria": "Session engine",
@@ -1608,6 +1616,59 @@ export const enUS = {
     "Flow {flowId}: rework routing failed ({detail}); the app does not claim delivery and will not dispatch acceptance review; the next event retries automatically after the issue is fixed.",
   "main.governance.acceptanceReworkAuditFailed":
     "Flow {flowId}: the rework task was routed, but writing the audit record failed ({detail}); the sent fact is not reversed, the app does not fabricate ledger entries; check the ledger and diagnostics.",
+
+  // Gate review receipts and system lines (2026-10-26 request_gate_review; design §5–§8/§12).
+  // Placeholders: {flowId} flow id; {gateId} gate step id; {reportPath} gate report path;
+  // {detail} bounded diagnostic/missing-item note; {severity} failure severity summary (blocker/major).
+  // A gate review is not an acceptance pass and not customer approval; gate decisions never write
+  // customer.decision or enter acceptance triage. A gate fail must rest on a blocker/major; a fail
+  // with only minor/nit items is returned to Proof as structurally invalid and triggers no rework.
+  "main.gateReview.dispatched":
+    "Flow {flowId}: gate {gateId} review submitted to Proof (working); this is not an acceptance pass and not customer approval.",
+  "main.gateReview.alreadyDispatched":
+    "Flow {flowId}: gate {gateId} review was already submitted (in flight or passed); not dispatched again. Check the gate step status with flow_get.",
+  "main.gateReview.gateNotFound":
+    "Flow {flowId}: gate {gateId} not found (the step does not exist or is not a gate); check the flow YAML and submit again.",
+  "main.gateReview.criteriaMissing":
+    "Flow {flowId}: the acceptance criteria have no gate review section for {gateId}; have Proof add it to the latest criteria and submit again (Steward does not write docs/acceptance/).",
+  "main.gateReview.flowIncomplete":
+    "Flow {flowId}: gate {gateId} prerequisites or evidence are incomplete ({detail}); complete them and submit again — do not submit early or use submission to stand in for missing steps.",
+  "main.gateReview.unavailable":
+    "Flow {flowId}: the gate {gateId} review channel is unavailable ({detail}); it may already have been dispatched — check with flow_get. The app does not claim dispatch and never decides a pass on its own.",
+  "main.gateReview.rejected":
+    "Flow {flowId}: the gate {gateId} review request was rejected ({detail}); fix the cause and resubmit instead of retrying unchanged.",
+  "main.gateReview.passNote":
+    "Flow {flowId}: gate {gateId} passed (report {reportPath}); downstream work may continue, and final customer acceptance is still required.",
+  "main.gateReview.failNote":
+    "Flow {flowId}: gate {gateId} did not pass ({severity}; report {reportPath}); the gate stays pending, and review must be requested again after rework.",
+  "main.gateReview.returnedToProof":
+    "Flow {flowId}: the gate {gateId} report is missing or structurally invalid ({detail}); returned to Proof to complete — not passed and no rework routed.",
+  "main.gateReview.nitOnly":
+    "Flow {flowId}: the gate {gateId} fail contains only minor/nit items; a gate failure must rest on a blocker/major, so it was returned to Proof as structurally invalid and no rework was triggered.",
+  "main.gateReview.reportMissing":
+    "Flow {flowId}: the gate {gateId} report is missing or unreadable ({reportPath}); the gate stays pending while waiting for Proof to submit it — a timeout never counts as a pass.",
+  "main.gateReview.reworkTask":
+    "Gate rework task | {gateId}: fix the {severity} items in gate report {reportPath}; minor/nit items are non-blocking and optional follow-ups.",
+
+  // Decision-card receipts and system lines (2026-10-26 customer rule; request_choice(cardKind="decision")).
+  // Placeholders: {option} selected option label; {detail} bounded diagnostic/missing-item note.
+  // A decision card is independent of proposal/appointment/acceptance, is not customer approval, and
+  // triggers no gate or acceptance. The app audits the choice separately as decisionKind="material-choice"
+  // (internal ledger vocabulary is not exposed in user-facing text). Judge delegation must be attributed
+  // to the automatic agent, never presented as the customer in person. A missing unique recommended option
+  // or an invalid card is fail-closed: no card is sent to the customer.
+  "main.decisionCard.selectedRecommended":
+    "Decision card: you selected the recommended option “{option}”; this material choice has been recorded as-is.",
+  "main.decisionCard.selectedOther":
+    "Decision card: you selected “{option}” (not the recommended option); this material choice has been recorded as-is.",
+  "main.decisionCard.judgeSelectedRecommended":
+    "Judge delegation · decision (automatic agent): recorded the single recommended option “{option}”; this is not a selection by the customer.",
+  "main.decisionCard.notApproval":
+    "A decision card is not acceptance and not customer approval, and does not constitute an acceptance/proposal/appointment decision: this choice is recorded only as a separate material-choice audit trail and triggers no gate or acceptance; final acceptance and customer approval still follow the existing path.",
+  "main.decisionCard.noRecommended":
+    "Decision card has no unique recommended option ({detail}); no card was sent to the customer (fail-closed). Fix and retry.",
+  "main.decisionCard.invalid":
+    "Decision card parameters are invalid ({detail}); no card was sent to the customer (fail-closed). Fix and retry.",
 
   "main.history.invalidRequest":
     "History requests must specify the project, role, and runtime.",

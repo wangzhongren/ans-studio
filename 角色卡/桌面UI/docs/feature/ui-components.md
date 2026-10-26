@@ -79,6 +79,7 @@ events:
 | `GovernanceQueueAggregate` | `app/renderer/src/chat/ChatRow.tsx`（`QueueAggregateRow`） | sys 行 + Clock 图标 | trio 主入口唯一 `.op-queue-aggregate`；原位更新、不可聚焦、无按钮、无请求内容；切引擎/项目清空，主进程重推重建 | 无 queued 隐藏（不显示 0）；数量变化原位更新；清空移除 | 桌面UI；只信 `operator-queued` 事实 |
 | `op-chip` 待确认 chip | `app/renderer/src/chat/ChatStream.tsx` | 项目组合（button + ShieldCheck） | 当前角色未决请求的常驻定位入口（同 `pendingOperator` 状态源；点击关抽屉→滚到原卡→聚焦） | 无 pending 隐藏；有 pending 显示「有 N 条待确认 · 定位」；抽屉覆盖时 chat 卡 `inert`、`.op-actions` visibility hidden | 桌面UI；UIUX 复核 |
 | 治理卡镜像/元信息/预览 | `app/renderer/src/chat/ChatRow.tsx`（`OperatorRow`） | 既有 operator 卡变体（不新增卡组件） | `.op-gov-badge/.op-meta/.op-mirror-*`、同 `data-request-id` 双面、只答一次/双面冻结、`.op-queued`、`.op-preview`（受控 Markdown） | open/submitting（双面禁用+「已提交，等待主进程受理…」）/decided（双面 hidden+finalNote）/expired（定格+原因）/retry（解冻+失败原因）/queued（无动作+「等待前一个决定」） | 桌面UI；镜像不是第二张审批 |
+| decision 卡（材料性选择）标识 | `app/renderer/src/chat/ChatRow.tsx`（`OperatorRow`）+ `chat/decision-card.ts` | 既有 operator 卡变体（不新增卡组件） | `cardKind="decision"`：标题 `ui.decisionCard.title`、`.op-decision-badge`「非客户批准」、`.op-question` 原问题（`request.title/question`）、`.op-recommended-badge`「推荐」（仅 `recommended === true`） | 其它卡种标题/徽标/选项/交互零变化；选项 id 与选择交互不变；渲染侧不校验收发卡、不代选（主进程 fail-closed） | 桌面UI；契约 [decision-card-renderer](../change/2026-10-26_change_decision-card-renderer.md) |
 
 **纯逻辑模块（无 DOM，`test/桌面UI/` 单测）**：`chat/governance-view.ts`（治理动作/状态/预览/迁移/失败 phase）、`chat/operator-view.ts`（镜像面/同 id 去重/排队计数/终态文案）、`chat/report-view.ts`（报告身份/声明/预览/flags/persistence 矩阵/交付事实/安全副本/投影摘要）、`chat/anchor-view.ts`（回放锚点表/插入位/索引右移）。
 

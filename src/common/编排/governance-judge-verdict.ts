@@ -345,7 +345,7 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
       return manualOutcome(
         args,
         "model-manual",
-        "决策卡不能由自动代理拒绝（decision 组只判断意图漂移）；请修正后重新提交。",
+        "决策卡不能由自动代理拒绝（decision 组只做正向代批：意图漂移判断或按唯一推荐项代决策）；请修正后重新提交。",
       );
     }
     // 防御性一致性（与 approve 同口径）；**不执行** approve 的逐路径/读取/证据机械门槛。
@@ -455,6 +455,33 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
       }
       if (!sameSet(verdict.selected ?? [], ["confirm"])) {
         return manualOutcome(args, "not-recommended", "需求确认卡只能代批 confirm（revise 交回客户）；请按意图修正后重新提交。");
+      }
+      break;
+    }
+    case "decision": {
+      // 2026-10-26 客户 decision 卡（材料性选择，仅统筹可发）：纳入 decision 组，但**不是**提案/
+      // 任命/验收——不读 packet.intent 与任何提案/任命/验收事实，也不设 gate/验收门槛。
+      // 卡面要求**恰有一个** `recommended:true` 推荐项；判断只能按该推荐项代批（不得自行发明/改动
+      // 推荐；「替我决策」开启时的默认推荐由桌面策略按同一推荐项发起）。推荐项缺失/多个/选中不符
+      // ⇒ manual（可操作返工），绝不回落「未知卡种」。
+      if (request.card.kind !== "choice") {
+        return manualOutcome(args, "insufficient-evidence", "decision 卡形状非法（必须是 choice 卡）；请修正后重新提交。");
+      }
+      const recommendedOptions = request.card.options.filter((option) => option.recommended === true);
+      if (recommendedOptions.length !== 1) {
+        return manualOutcome(
+          args,
+          "insufficient-evidence",
+          `decision 卡必须恰有一个推荐项（当前 ${recommendedOptions.length} 个 recommended:true）；请修正后重新提交。`,
+        );
+      }
+      const recommendedId = recommendedOptions[0]!.id;
+      if (!sameSet(verdict.selected ?? [], [recommendedId])) {
+        return manualOutcome(
+          args,
+          "not-recommended",
+          `decision 卡只能代批卡内唯一推荐项「${recommendedId}」；不得自行发明选项或改动推荐，请修正后重新提交。`,
+        );
       }
       break;
     }

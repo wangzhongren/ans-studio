@@ -83,6 +83,7 @@ import type {
   DispatchTaskFn,
   DispatchTaskPayload,
   RequestAcceptanceFn,
+  RequestGateReviewFn,
   RequestBoundaryChangeFn,
   HandOffIntentFn,
   RequestClarificationFn,
@@ -142,6 +143,11 @@ import {
   type GovernanceLedgerEntry,
   type GovernanceLedgerSnapshot,
 } from "../../common/编排/governance-ledger.ts";
+import {
+  DECISION_CARD_MIN_OPTIONS,
+  validateDecisionCardRequest,
+  type DecisionCardValidation,
+} from "../../common/编排/decision-card.ts";
 import { evaluateGovernanceGate, type GovernanceGateAction } from "../../common/编排/governance-gate.ts";
 import {
   buildGovernanceJudgeFacts,
@@ -212,6 +218,16 @@ export type {
   TeamPlanRoleRow,
   WritesetEntry,
 } from "../../common/编排/team-plan.ts";
+// 2026-10-26 decision 卡结构校验：**单一共享实现**在 `common/编排/decision-card.ts`；
+// 经本 Pipeline 公共出口供桌面窗口后续复用（桌面不得再复制第二份校验）。
+export {
+  DECISION_CARD_MIN_OPTIONS,
+  validateDecisionCardRequest,
+} from "../../common/编排/decision-card.ts";
+export type {
+  DecisionCardRejectReason,
+  DecisionCardValidation,
+} from "../../common/编排/decision-card.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 // 跨角色共享路径原语（**单一来源** = pm 属主 `src/common/shared/path-primitives.ts`；工程法案 §一.5
 // 消费方名单已含编排；同 `confirmed-writes.ts` 先例）——用于 su 预授权目录的**词法**归属判定：
@@ -275,6 +291,14 @@ export interface AdapterCapabilities {
    * 未提供 ⇒ 不注入（运行时核心据此不注册工具，结构性 fail-closed）。**请求复核 ≠ 客户批准**。
    */
   requestAcceptance?: RequestAcceptanceFn;
+  /**
+   * Gate 复核请求（`request_gate_review`，2026-10-26 客户授权）：gate 证据完整性检查通过后，由统筹
+   * 直接请应用派 Proof 做**独立 gate 复核**；与最终验收（`requestAcceptance`）是两条独立通道，互不替代。
+   * **只给内置治理角色中的统筹/Steward（convener）注入**（项目角色、其他内置治理角色即便调用方误给
+   * 也不注入）；未提供 ⇒ 不注入（运行时核心据此不注册工具，结构性 fail-closed）。**gate 复核 ≠ 验收
+   * 通过 ≠ 客户批准**；`dispatched` 只表示已派 Proof；gate fail 只按 blocker/major 判失败。
+   */
+  requestGateReview?: RequestGateReviewFn;
   /**
    * 边界变更请求（`request_boundary_change`，2026-10-26 客户要求）：项目角色写集/边界不足时，由统筹
    * 直接请应用把**精确增删路径**派发给组队（Crew）修改角色卡/边界，不绕过 appointment-write 与
@@ -591,6 +615,15 @@ export async function openRoleSession(
      */
     requestAcceptance?: RequestAcceptanceFn;
     /**
+     * **Gate 复核请求能力（`request_gate_review`「注入才注册」，2026-10-26 客户授权）**：前端（桌面
+     * 窗口）提供的实现——gate 证据完整性检查通过后，统筹直接请应用派 Proof 做独立 gate 复核；gate
+     * 校验/派发/gate 记录/账本全部由该能力实现。**只对内置治理角色中的统筹/Steward（convener）
+     * 转交**（项目角色、其他内置治理角色即便调用方误给也不注入，工具不注册）；未给出 ⇒ 不注入
+     * （结构性 fail-closed）。形状单一来源＝契约家 `model/runtime.ts`（`RequestGateReviewFn`）。
+     * **gate 复核 ≠ 验收通过 ≠ 客户批准**（工具层原样转达回执）。
+     */
+    requestGateReview?: RequestGateReviewFn;
+    /**
      * **边界变更请求能力（`request_boundary_change`「注入才注册」，2026-10-26 客户要求）**：前端
      * （桌面窗口）提供的实现——项目角色写集/边界不足时，统筹直接请应用把**精确增删路径**派发给
      * 组队（Crew）修改角色卡/边界；确定性校验、AI 门禁审核、派发与 appointment-write 确认全部由该
@@ -888,7 +921,10 @@ export async function openRoleSession(
           // 不发行写集/不占 pending-queued；工具回执据 `notPresented` 如实说明「卡片未发出」。
           // 2026-10-20 的 confirm `cardKind` 机械兜底已由本严格口径取代并删除（choice 兜底保持不变）。
           // 2026-10-20：choice 卡同样按内置治理角色默认（Lead 的 intent-confirm 等）；显式 cardKind 优先。
-          if (isTrio && cardKind === undefined && req.kind === "choice") {
+          // 2026-10-26 安全缺口（协调）：卡内出现任一 `recommended:true` ⇒ 很可能是**漏传 cardKind 的
+          // decision 卡**，**不得**走 choice 默认兜底——尤其 Convener 的 appointment 默认会把材料性选择
+          // 误当任命卡（发生在桌面校验之前，并可能写 appointment 账本）。识别必须在默认逻辑之前。
+          if (isTrio && cardKind === undefined && req.kind === "choice" && !hasRecommendedOption(req)) {
             const defaulted = defaultGovernanceChoiceCardKind(
               trioSpec!.id,
               req.options.map((option) => option.id),
@@ -902,6 +938,48 @@ export async function openRoleSession(
                 cardKind: defaulted,
                 kind: "choice",
               });
+            }
+          }
+          // 2026-10-26 decision 卡 fail-closed（与桌面 `evaluateDecisionCardRequest` 的 `missing-card-kind`
+          // 同向，且对 CLI 通道同样生效）：内置治理角色发出的 choice 卡带 `recommended:true` 却没有
+          // `cardKind` ⇒ 卡种不明；不默认、不触达客户、不写账本，要求显式携带 cardKind（如 decision）重试。
+          if (isTrio && req.kind === "choice" && cardKind === undefined && hasRecommendedOption(req)) {
+            log.record("governance.card.rejected", {
+              state: "not-presented",
+              reasonCode: "missing-card-kind",
+              ok: false,
+            });
+            return {
+              outcome: "declined",
+              notPresented: true,
+              reason:
+                "choice 卡包含 recommended 推荐项但缺少 cardKind，无法确定为 decision 卡" +
+                "（不会默认成 appointment/提案/验收等任何卡种）；本次未向客户发卡、未写账本。" +
+                "请显式携带 cardKind（如 decision）后重试。",
+            };
+          }
+          // 2026-10-26（独立验收 F2）：decision 卡结构校验的**单一共享实现**（`common/编排/decision-card.ts`）。
+          // 在触达客户通道**之前**执行——CLI、single su 与项目角色没有桌面卡校验，必须由编排兜住；
+          // 不通过 ⇒ declined + notPresented（不调 raw、不写账本、不带 operatorId）。桌面窗口后续经本文件
+          // （Pipeline 公共出口）复用同一函数，不复制第二份。
+          if (cardKind === "decision") {
+            const validation = validateDecisionCardRequest({
+              request: effectiveReq,
+              roleId: setup.role.id,
+              governanceModel,
+              metadata: effectiveMetadata,
+            });
+            if (!validation.ok) {
+              log.record("governance.card.rejected", {
+                state: "not-presented",
+                reasonCode: validation.reasonCode,
+                ok: false,
+              });
+              return {
+                outcome: "declined",
+                notPresented: true,
+                reason: decisionCardRejectionReason(setup.role.id, validation),
+              };
             }
           }
           // 2026-10-20 真机：Lead 的通用 choice（如 keep-v1/do-v2/lead-decide）没有 confirm 选项，属于
@@ -1355,6 +1433,15 @@ export async function openRoleSession(
   const requestAcceptance: RequestAcceptanceFn | undefined =
     builtInGovernance && input.requestAcceptance !== undefined ? input.requestAcceptance : undefined;
 
+  // 2026-10-26 gate 复核请求（request_gate_review）：**只给内置治理角色中的统筹/Steward（trio convener）**
+  // 注入；项目角色、其他内置治理角色（含 single 模型的旧 su 与主理 liaison）即便调用方误给也不注入
+  // （工具不注册，结构性 fail-closed）。判据在编排注入端（运行时核心只声明能力位名，不硬编码角色 id）；
+  // 未提供 ⇒ 不注入（同 request_acceptance 先例）。本层纯透传。**gate 复核 ≠ 验收通过 ≠ 客户批准**。
+  const requestGateReview: RequestGateReviewFn | undefined =
+    builtInGovernance && trioSpec?.id === "convener" && input.requestGateReview !== undefined
+      ? input.requestGateReview
+      : undefined;
+
   // 2026-10-26 边界变更请求（request_boundary_change）：**只给内置治理角色中的统筹/Steward（trio
   // convener）**注入；项目角色、其他内置治理角色（含 single 模型的旧 su 与主理 liaison）即便调用方
   // 误给也不注入（工具不注册，结构性 fail-closed）。判据在编排注入端（运行时核心只声明能力位名，
@@ -1457,6 +1544,7 @@ export async function openRoleSession(
     ...(input.persistSession !== undefined ? { persistSession: input.persistSession } : {}),
     ...(dispatchTask !== undefined ? { dispatchTask } : {}),
     ...(requestAcceptance !== undefined ? { requestAcceptance } : {}),
+    ...(requestGateReview !== undefined ? { requestGateReview } : {}),
     ...(requestBoundaryChange !== undefined ? { requestBoundaryChange } : {}),
     ...(handOffIntent !== undefined ? { handOffIntent } : {}),
     ...(requestClarification !== undefined ? { requestClarification } : {}),
@@ -2120,6 +2208,8 @@ function flowYamlTargetsOf(paths: readonly string[]): Array<{ rel: string; flowI
  *   nominator → 不默认（Crew 只写卡，不再发任命卡）；verifier → acceptance（须含 accept）；
  *   其他/项目角色不猜。
  * 选项形状守卫避免把「普通选择卡」误判为治理决定卡（沿用旧行为）。
+ * **调用点前置守卫（2026-10-26）**：`hasRecommendedOption(req)` 为真（带 `recommended:true`）时
+ * **不进入本函数**——缺 cardKind 的 decision 形状卡必须 fail-closed，不得默认成 appointment 等。
  */
 const APPOINTMENT_RESERVED_OPTION_IDS: ReadonlySet<string> = new Set([
   "accept",
@@ -2132,6 +2222,43 @@ const APPOINTMENT_RESERVED_OPTION_IDS: ReadonlySet<string> = new Set([
 /** 任命形状：非空选项、且不含任何治理卡保留选项 id（角色 id 列表）。 */
 function looksLikeAppointmentChoice(optionIds: readonly string[]): boolean {
   return optionIds.length > 0 && optionIds.every((id) => !APPOINTMENT_RESERVED_OPTION_IDS.has(id));
+}
+
+/**
+ * 2026-10-26 decision 卡安全识别（**默认逻辑之前**）：choice 卡是否出现任一 `recommended:true` 选项。
+ * 该字段只属于 decision 卡（客户规则：每张 decision 卡恰有一个推荐项）；出现它却缺 `cardKind` ⇒
+ * 卡种不明——任何 choice 默认兜底都可能把材料性选择误当 appointment/proposal/acceptance 卡。
+ * 结果：不默认（调用方随后 fail-closed 拒发），旧卡种（无 recommended）零行为变化。
+ */
+function hasRecommendedOption(req: CustomerInputRequest): boolean {
+  return req.kind === "choice" && req.options.some((option) => option.recommended === true);
+}
+
+/**
+ * decision 卡校验失败的可操作文案（2026-10-26 独立验收 F2）：机器码在 `reasonCode`（诊断/桌面可映射
+ * 自己的 i18n），本函数只拼给模型/CLI 看的人话；统一以「本次未向客户发卡、未写账本」收尾。
+ */
+function decisionCardRejectionReason(
+  roleId: string,
+  validation: Extract<DecisionCardValidation, { ok: false }>,
+): string {
+  const suffix = "本次未向客户发卡、未写账本。请修正后重试。";
+  switch (validation.reasonCode) {
+    case "role-not-allowed":
+      return `decision 卡只能由统筹/Steward（trio convener）发起（当前角色：${roleId === "" ? "unknown" : roleId}）；${suffix}`;
+    case "not-choice":
+      return `decision 卡必须是 request_choice（choice）卡；${suffix}`;
+    case "missing-flow-id":
+      return `decision 卡缺少合法的 flowId（须为非空小写 slug，匹配 ${GOVERNANCE_SLUG_PATTERN}）；${suffix}`;
+    case "not-enough-options":
+      return `decision 卡至少需要 ${DECISION_CARD_MIN_OPTIONS} 个选项；${suffix}`;
+    case "invalid-option-id":
+      return `decision 卡的每个选项都必须有非空字符串 id；${suffix}`;
+    case "duplicate-option-id":
+      return `decision 卡的选项 id 不得重复（${validation.detail}）；${suffix}`;
+    case "recommended-count":
+      return `decision 卡必须恰有一个 recommended:true 的推荐项（${validation.detail}）；${suffix}`;
+  }
 }
 
 function defaultGovernanceChoiceCardKind(
@@ -2467,7 +2594,15 @@ function serializeGovernanceTask<T>(
   return run;
 }
 
-/** 每角色允许的 `cardKind` 白名单（评审 §5.8 表；越权不弹卡，由 customerInput 包装器直接拒绝）。 */
+/**
+ * 每角色允许的 `cardKind` 白名单（评审 §5.8 表；越权不弹卡，由 customerInput 包装器直接拒绝）。
+ *
+ * 2026-10-26 客户新增 **decision 卡**（`request_choice(cardKind="decision")`，运行时核心已在
+ * Model 契约登记）：事务性选择卡（卡内含**恰一个**推荐项；桌面「替我决策」开启时默认选中推荐项），
+ * 由统筹（trio convener）发起。它与提案/任命/验收相互独立：不触发任何 gate/验收、不产生
+ * appointment/proposal 决定、不进入 `latestAcceptanceDecision`、也不能充当 flow 的
+ * `customer-decision` 证据；分类只写 `decisionKind:"material-choice"`，**不得被当成客户批准**。
+ */
 const TRIO_CARD_KINDS: Record<BuiltInGovernanceRoleSpec["id"], readonly GovernanceCardKind[]> = {
   // 2026-10-18 客户拍板：Liaison（Lead/主理）开通客户通道，只用于 hand_off_intent 前的
   // `intent-confirm` 需求确认卡（判断 agent 永不介入）；其它治理卡仍结构性拒绝。
@@ -2477,7 +2612,8 @@ const TRIO_CARD_KINDS: Record<BuiltInGovernanceRoleSpec["id"], readonly Governan
   // `appointment-write`（写角色卡/边界）保留。
   nominator: ["appointment-write", "write"],
   // 2026-10-22 第 1 项：Convener（Steward/统筹）依团队计划发起 appointment 卡。
-  convener: ["appointment", "schedule-write", "write"],
+  // 2026-10-26 客户新增：**仅统筹**可发 decision 卡（事务性选择；卡内含推荐项）。
+  convener: ["appointment", "decision", "schedule-write", "write"],
   // 验收权归 Proof / 验收（verifier）；Draft / 提案不再发 acceptance。
   verifier: ["acceptance", "write"],
 };
@@ -2508,6 +2644,7 @@ function ledgerEntrySignature(entry: GovernanceLedgerEntry): string {
     entry.decisionKind ?? "",
     entry.artifactPath ?? "",
     (entry.targetRoleIds ?? []).join(","),
+    (entry.selectedOptions ?? []).join(","),
     entry.customerDecision ?? "",
   ].join("\u0000");
 }
@@ -2520,6 +2657,11 @@ type CustomerDecisionClassification = {
   decisionKind?: GovernanceDecisionKind;
   customerDecision?: GovernanceLedgerEntry["customerDecision"];
   targetRoleIds?: string[];
+  /**
+   * 仅 decision 卡：客户恰好选中的一个**卡上选项 id**（审计留痕；选中项同时出现在 tool 回执/会话）。
+   * 不是 `targetRoleIds`（不伪装成任命），也不是写盘 `paths`；任何门禁都不读本字段。
+   */
+  selectedOptions?: string[];
 };
 
 /**
@@ -2527,10 +2669,12 @@ type CustomerDecisionClassification = {
  *   · `unavailable`/null → `undefined`（没有客户决定，不写账本）；
  *   · `declined` → `unclassified`（fail-closed：后续依赖该 flow 决定的门禁拒，直至客户重新决定）；
  *   · `answered` + 标准选项 id → 评审 §5.8 映射；非标准/多选冲突 → `unclassified`。
+ * `optionIds`（可选）= 本卡 `options` 的 id 集（仅 choice 卡）：decision 卡据此判定「未知选项」。
  */
 function classifyCustomerDecision(
   cardKind: GovernanceCardKind | undefined,
   out: CustomerInputOutcome | null | undefined,
+  optionIds?: readonly string[],
 ): CustomerDecisionClassification | undefined {
   if (out === null || out === undefined) return undefined;
   if (out.outcome === "unavailable") return undefined;
@@ -2583,6 +2727,19 @@ function classifyCustomerDecision(
     case "write":
       // 普通写盘确认：不解锁任何治理门禁（无 decisionKind）；仍留痕客户是否同意。
       return { customerDecision: out.value.confirmed === true ? "accepted" : "rejected" };
+    case "decision": {
+      // 2026-10-26 decision 卡（事务性选择；仅统筹可发）：**恰好选中一个卡上存在的选项**才分类；
+      // 多选/空选/未知选项 ⇒ unclassified/none（fail-closed，客户可重新选择/重发卡）。
+      // 分类只写审计的 `material-choice`：不进入 proposal-*/appointment/acceptance 任何语义，
+      // 不写 `targetRoleIds`（不伪装成任命），不满足任何 gate/acceptance 门，也不得被当成客户批准。
+      // 选中项以 tool 回执/会话为准；账本仅按 `selectedOptions` 留审计（门禁不读）。
+      if (selected.length !== 1) return { decisionKind: "unclassified", customerDecision: "none" };
+      const chosen = selected[0];
+      if (optionIds === undefined || !optionIds.includes(chosen)) {
+        return { decisionKind: "unclassified", customerDecision: "none" };
+      }
+      return { decisionKind: "material-choice", customerDecision: "accepted", selectedOptions: [chosen] };
+    }
     default:
       return { decisionKind: "unclassified", customerDecision: "none" };
   }
@@ -2650,15 +2807,28 @@ async function recordCustomerDecision(args: {
       return;
     }
   }
+  // 2026-10-26（独立验收 F1）：卡片**从未呈现**（应用 fail-closed：`declined + notPresented:true`）不是
+  // 客户决定——不写 `customer.decision`（否则 unclassified/none 会成为未结算决定，永久挡住收尾门/
+  // 最终验收）。与 judge 退回、system 预授权拒绝同口径：无呈现 = 无决定。
+  // 位置在 **system 预授权分支之后**（2026-10-26 复验收据）：`system:` 拒绝仍须先记
+  // `governance.preauthorization.declined` 诊断，本早退不得把它吞掉（账本行为不变）。
+  if (args.out?.outcome === "declined" && args.out.notPresented === true) return;
   // 系统预授权接受不采信客户分类（不派生 decisionKind/targetRoleIds）：只记结算结果 accepted。
+  // decision 卡以**本卡选项 id** 判定「未知选项」（仅 choice 卡有 options；confirm 卡不适用）。
   const classification = systemOperatorId !== undefined
     ? { customerDecision: "accepted" as const }
-    : classifyCustomerDecision(cardKind, args.out);
+    : classifyCustomerDecision(
+        cardKind,
+        args.out,
+        args.req.kind === "choice" ? args.req.options.map((option) => option.id) : undefined,
+      );
   if (classification === undefined) return;
 
   const stepId = args.req.stepId ?? args.metadata?.stepId;
   // 2026-10-18 双开关评审 §7.4：judge 只是**审计证据**；`actorRoleId`/`power` 照旧，绝不伪装成客户。
   const judge = args.out?.outcome === "answered" ? args.out.judge : undefined;
+  // 2026-10-26：decision 卡在 `GOVERNANCE_CARD_GROUP` 中属 decision 组（判断可正向代批唯一推荐项）；
+  // 映射单一来源仍是 Model 契约，本层不维护第二张表。
   const derivedGroup = cardKind !== undefined ? governanceCardGroup(cardKind) : undefined;
   if (judge !== undefined && derivedGroup !== undefined && judge.group !== derivedGroup) {
     // 交叉校验：不翻转已发生的决定、不改成 customer-input（那会错误归因给客户），只记诊断。
@@ -2722,6 +2892,10 @@ async function recordCustomerDecision(args: {
       : {}),
     ...(classification.targetRoleIds !== undefined
       ? { targetRoleIds: classification.targetRoleIds }
+      : {}),
+    // 2026-10-26 decision 卡：只记客户选中的选项 id（审计）；不是 targetRoleIds、不参与任何门禁。
+    ...(classification.selectedOptions !== undefined
+      ? { selectedOptions: [...classification.selectedOptions] }
       : {}),
     ...(classification.customerDecision !== undefined
       ? { customerDecision: classification.customerDecision }
@@ -2934,6 +3108,10 @@ async function judgeArtifactsForCard(args: {
       };
     case "schedule-write":
       return onlyFlow(flowPath);
+    case "decision":
+      // 2026-10-26 客户 decision 卡（材料性选择）：与提案/任命/验收独立——不挂任何规范物证，
+      // 判断只需卡片选项（含唯一推荐项）；不得借用 proposal/team-plan/flow 物证制造额外门槛。
+      return {};
     case "write":
       // 来源角色相关的最新物证（评审 §5.4 表最后一行）。
       switch (args.governanceFunction) {
@@ -3368,6 +3546,10 @@ export function createRuntimeAdapterFactory(
     // 2026-10-25 独立复核请求（request_acceptance）：运行时核心 `GovernedToolsOptions` 同名能力位
     // （形状同源 `model/runtime.ts`）；`undefined` ⇒ 工具不注册（同 dispatch_task 先例）。
     requestAcceptance: capabilities?.requestAcceptance,
+    // 2026-10-26 gate 复核请求（request_gate_review）：运行时核心 `GovernedToolsOptions` 同名能力位
+    // （形状同源 `model/runtime.ts` `RequestGateReviewFn`）；`undefined` ⇒ 工具不注册
+    // （同 request_acceptance 先例）。本层纯透传，不做 gate 校验/派发/记录。
+    requestGateReview: capabilities?.requestGateReview,
     // 2026-10-26 边界变更请求（request_boundary_change）：运行时核心 `GovernedToolsOptions` 同名能力位
     // （形状同源 `model/runtime.ts`）；条件展开透传，缺省/未注入 ⇒ 字段缺席、工具不注册
     // （同 flow_get 先例）。本层纯透传，不做确定性校验/AI 门禁/派发。

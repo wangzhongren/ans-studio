@@ -5,8 +5,8 @@ title: Proof 关键节点复核（gate 门禁）——独立复核权归验收�
 created: "2026-10-26"
 updated: "2026-10-26"
 timezone: Asia/Shanghai
-status: rules-only
-revision: 2
+status: approved-implementing
+revision: 3
 related: [acceptance-triage, judge-governance-cards-review, invalid-governance-card-guard]
 events:
   - date: "2026-10-26"
@@ -14,25 +14,29 @@ events:
     summary: 客户确认「独立复核的权威只放在验收角色（Proof）；统筹只协调与检查证据完整性，不再做实质性独立复核；对关键节点设置验收门禁，由 Proof 独立判定」；只读核对 team-plan v2/v3、flow-state/flow-service、interface 的 request_acceptance/验收派发、governance-roles 的 Steward/Proof 卡与 castle-2d 真实流程；给出 gate 节点类型、flow 表达、request_gate_review 通道、Proof/统筹卡变更、应用行为、兼容与 A1–A8；只写设计，未改代码/测试/i18n
   - date: "2026-10-26"
     kind: decided
-    summary: 客户决定 v1 **只落规则、不实现工具/新 schema**——只把「何时设 gate、gate 计划要素、Proof 独判、统筹不自审」写进 Steward / 统筹角色卡（v1 不含 Crew）；request_gate_review、gateKind、账本 gate.review、多 gate 幂等机制保留为未来可选方案（未实施、未授权）；当前实现只用现有步骤与 request_acceptance（最终验收），不新增 FlowStepKind/工具；其他业务项目按规则在计划里设 gate，不要求迁移
+    summary: 客户曾决定 v1 **只落规则、不实现工具/新 schema**——只把「何时设 gate、gate 计划要素、Proof 独判、统筹不自审」写进 Steward / 统筹角色卡（v1 不含 Crew）；request_gate_review、gateKind、账本 gate.review、多 gate 幂等机制保留为未来可选方案（当时未实施、未授权）；当前实现只用现有步骤与 request_acceptance（最终验收），不新增 FlowStepKind/工具；其他业务项目按规则在计划里设 gate，不要求迁移
+  - date: "2026-10-26"
+    kind: authorized
+    summary: 客户追加授权实现 `request_gate_review`（§5–§8、§12），并要求 gate 复核独立于最终验收、防吹毛求疵——gate fail 必须有 blocker/major，只有 minor/nit 的 fail 退回 Proof、不返工；pass 可带 minor/nit。实现由各能力角色分工进行（**实现中，未验证、未验收**）；项目管理本批只补共享 i18n（13 个 `main.gateReview.*` key）、变更记录与规则同步，未改 flow/桌面/model/provider/门禁卡
 ---
 
 # Proof 关键节点复核（gate 门禁）：独立复核权归验收
 
-> **状态更新（2026-10-26，客户已决定：`rules-only`）。** 客户决定本项目 v1 **只落规则、不实现工具 / 新 schema**：
+> **状态更新（2026-10-26，客户已授权实施：`approved-implementing`）。** 客户在 v1 `rules-only` 落卡后**追加授权实现** `request_gate_review` 与本设计 §4–§8、§12 的 gate 机制，并追加要求：
 >
-> - 只把「**何时设 gate、gate 计划要素、Proof 独判、统筹不自审**」写进 **Steward / 统筹** 角色卡（v1）；**Crew 的 gate 相关规则未在 v1 实施**（`NOMINATOR_CARD_TEXT` 不含 gate 规划/独立复核时机），如后续需要，再单独授权；
-> - 本文档中的 `request_gate_review`、`gateKind`、账本 `gate.review`、多 gate 幂等机制全部保留为**未来可选方案**，**未实施、未授权**；
-> - 当前实现**只使用现有 flow 步骤与 `request_acceptance`（最终验收）**，不新增 `FlowStepKind`、不新增角色工具、不新增账本 kind；
-> - 其他业务项目只需按规则在团队计划 / 流程计划里设 gate，**不要求迁移**。
+> - **gate 复核独立于最终验收**：gate 复核 ≠ 验收通过 ≠ 客户批准；gate 结论不写 `customer.decision`、不进入验收分诊；最终验收仍走既有 `request_acceptance`/验收卡链路。
+> - **防吹毛求疵**：gate `fail` 必须有 `blocker`/`major` 依据；只有 `minor`/`nit` 的 `fail` 按结构不符**退回 Proof、不触发返工**；gate `pass` 可带 `minor`/`nit` 备注，不因非阻断建议反复开 gate。
+> - **范围不变**：不新增治理角色、不新增 `FlowStepKind`、不新增 cardKind；`request_gate_review` 只注入统筹会话，`request_acceptance` 保持最终验收唯一主动通道；无 gate 的旧 flow 行为不变。
 >
-> 因此本文以下章节（尤其 §4–§8 的 flow 表达、`request_gate_review` 通道、gate 记录/账本、幂等恢复）是**规则落卡之外的备选设计材料**，不构成实施授权；v1 实施范围以本状态说明为准。
+> **实施状态：实现中，未验证、未验收。** 实现由各能力角色按各自边界分工进行；项目管理本批只补共享 i18n、变更记录与规则同步（`docs/change/2026-10-26_change_request-gate-review.md`），未改 flow/桌面/model/provider/门禁卡。实施完成并经独立验收后另记状态。
+>
+> **历史状态（2026-10-26 早前，`rules-only`）**：客户曾决定 v1 只落规则、不实现工具/新 schema；`request_gate_review`、`gateKind`、账本 `gate.review`、多 gate 幂等机制当时保留为未来可选方案（**当时未实施、未授权**）。该历史决定已被上述实施授权取代；历史原文保留在下方事件与 §十三。
 
-**本轮性质：设计文档（`rules-only`：规则已获客户确认，工具/新 schema 未授权）。** 本文只记录方案与代码事实，**未改任何代码、测试、角色卡或共享 i18n**；未实施、未运行测试、未提交。按项目规则「方案确认不等于实施授权」，客户确认后仍需另行走团队计划、闸门 2 与实施授权。
+**本轮性质：设计文档（`approved-implementing`：客户已授权实现，实施进行中）。** 本文记录方案与代码事实。2026-10-26 客户在 `rules-only` 落卡后追加授权实现 `request_gate_review` 与 §4–§8 的 gate 机制（含上述独立性/防吹毛求疵要求）。实现由各能力角色按各自边界分工进行；**本文与相关变更记录不声称已实现、已验证或已验收**。项目管理本批只补共享 i18n key、变更记录与规则同步，未改 `app/**`、`src/common/编排/**`、`src/model/**`、`src/provider/**`、`src/common/门禁引擎/governance-roles.ts`。
 
 ## 〇、一分钟摘要
 
-> **v1 范围（客户 2026-10-26 决定：`rules-only`）**：只落规则——把「何时设 gate、gate 计划要素、Proof 独判、统筹不自审」写进 **Steward / 统筹** 角色卡（v1；Crew 的 gate 相关规则未在 v1 实施，如后续需要再单独授权）；下面提到的 `request_gate_review`、`gateKind`、`gate.review` 账本与多 gate 机制均为**未来可选方案，未实施、未授权**。当前只用现有步骤与 `request_acceptance`（最终验收），不新增 `FlowStepKind`/工具。
+> **当前范围（2026-10-26，客户已授权实施：`approved-implementing`）**：客户在 v1 `rules-only` 落卡后**追加授权实现** `request_gate_review`、`gateKind`、`gate.review` 账本与多 gate 幂等机制（§4–§8、§12），并追加「gate 复核独立于最终验收」与「防吹毛求疵」要求。实现由各能力角色分工进行，**实现中、未验证、未验收**；不新增角色/`FlowStepKind`/cardKind，`request_acceptance`（最终验收）语义不变。历史 `rules-only` 决定见下方事件与 §十三。
 
 - 在流程的**关键节点**增加「验收门禁」（gate）：脚手架后的首个可玩/可用切片、视觉基线、集成/性能，以及保持不变的最终客户验收。gate 由 **Proof 独立复核并给结论**；应用只做确定性记录与硬拦。
 - gate 在 Flow YAML 中用**现有 `kind: artifact` + 新增可选 `gateKind` 元数据**表达（**不新增 `FlowStepKind`**）；下游实现步骤把 gate 写进 `dependsOn`，应用既有派发门禁会在 gate 未 `done` 时硬拒下游派发。
@@ -631,7 +635,7 @@ export interface RequestGateReviewResult {
 | 桌面窗口 | `app/desktop/governance-advance.ts` | gate 任务文案；gate 报告路径/版本；gate 返工任务追加 gateId |
 | 桌面窗口 | `app/main.ts` | 能力接线（与 request_acceptance 同模式） |
 | 门禁引擎 | `src/common/门禁引擎/governance-roles.ts` | Proof 卡 gate 复核职责；Steward 卡职责收缩 + `request_gate_review` 回执；gate 默认矩阵 |
-| 项目管理 | `src/common/shared/i18n/messages/{zh-CN,en-US}.ts` | gate 系统行/回执文案 key（**本任务不写**） |
+| 项目管理 | `src/common/shared/i18n/messages/{zh-CN,en-US}.ts` | gate 系统行/回执文案 key（**2026-10-26 已补 13 个 `main.gateReview.*` key；桌面/编排消费方接线在各自实现批次完成**） |
 | 测试 | `test/编排/flow-state.test.ts`、`test/编排/governance-gate.test.ts`、`test/runtime-core/tools.test.ts`、`test/桌面应用/`、`test/测试/governance-e2e-auto/` | 见 §10 |
 
 **默认不新增角色、不新增 `FlowStepKind`、不新增 cardKind。**
@@ -639,11 +643,12 @@ export interface RequestGateReviewResult {
 ## 十三、状态与下一步
 
 - **已做的**：只读核对 FlowStepKind/保留验收 id/证据对账、dependsOn 派发硬拦、request_acceptance 与验收派发、验收分诊、Steward/Proof 卡与 castle-2d 真实流程与 v5 报告；完成本设计（`rules-only`）。
-- **客户决定（2026-10-26）**：v1 **只落规则、不实现工具/新 schema**——只把「何时设 gate、gate 计划要素、Proof 独判、统筹不自审」写进 **Steward / 统筹** 角色卡（v1）；`request_gate_review`、`gateKind`、账本 `gate.review`、多 gate 幂等机制保留为未来可选方案，**未实施、未授权**；当前仅用现有步骤与 `request_acceptance`（最终验收），不新增 `FlowStepKind`/工具；其他业务项目按规则在计划里设 gate，不要求迁移。
+- **状态更新（2026-10-26，客户已授权实施，实现中）**：客户在 `rules-only` 落卡后**追加授权实现 `request_gate_review`** 与 §4–§8、§12 的 gate 机制；同时追加两条客户要求：**gate 复核独立于最终验收**（gate ≠ 验收通过 ≠ 客户批准）、**防吹毛求疵**（gate fail 必须有 blocker/major；只有 minor/nit 的 fail 退回 Proof、不返工；pass 可带 minor/nit）。实现由各能力角色分工进行，**当前实现中、未验证、未验收**；项目管理本批只补 13 个共享 i18n key 与变更记录/规则同步，未改 flow/桌面/model/provider/门禁卡。详见 [`docs/change/2026-10-26_change_request-gate-review.md`](../change/2026-10-26_change_request-gate-review.md)。
+- **历史（2026-10-26 早前，已被上述授权实施取代）——客户决定（2026-10-26）**：v1 **只落规则、不实现工具/新 schema**——只把「何时设 gate、gate 计划要素、Proof 独判、统筹不自审」写进 **Steward / 统筹** 角色卡（v1）；`request_gate_review`、`gateKind`、账本 `gate.review`、多 gate 幂等机制保留为未来可选方案，**当时未实施、未授权**；当时仅用现有步骤与 `request_acceptance`（最终验收），不新增 `FlowStepKind`/工具；其他业务项目按规则在计划里设 gate，不要求迁移。
 - **后续落卡关系（2026-10-26）**：本设计文档本身**未改任何代码、测试或角色卡**（上述「设计阶段未做的」是设计时点声明）；规则已按 `rules-only` 在后续提交 `cd6d042` + `c843bd6` 落成——实际只改 `CONVENER_CARD_TEXT`（Steward / 统筹）与门禁测试；**`NOMINATOR_CARD_TEXT`（Crew / 组队）不含 gate 规划/独立复核时机，v1 范围不含 Crew**，如后续需要，再单独授权。
 - **设计阶段未做的**：未改任何产品代码、测试、角色卡、边界、共享 i18n；未运行测试 / typecheck；未 commit / push；未实施、未验证。
-- **下一步**：按客户决定，另行走授权的角色卡变更流程，把 gate 规则写入 **Steward / 统筹** 卡（v1；Crew 不在本轮范围，如后续需要再单独授权；团队计划 → 闸门 2 → 独立验收）；Q1–Q8 与 §4–§8 的工具/新 schema 设计留作未来备选，客户另行授权前不实施。
-- **版本**：`2026-10-26 v2（rules-only）`（本文件写盘即冻结为待确认版本；实质变更递增版本并重新确认）。
+- **下一步**：按客户授权，由各能力角色在各自边界内实现 `request_gate_review`、`gateKind` 解析/门禁/收口、gate 记录与返工路由、卡文本与桌面系统行接线；实现完成后**另走独立验收**（本文件届时再更新实现/验收状态）。Q1–Q8 中未随本次授权明确覆盖的取舍仍按实现方案与独立验收证据判定。
+- **版本**：`2026-10-26 v3（approved-implementing）`（v2 `rules-only` 保留在事件历史；实质变更递增版本并重新确认）。
 
 ## 附：客户摘要（5–8 句）
 
@@ -652,4 +657,4 @@ export interface RequestGateReviewResult {
 3. 统筹还能做什么：只做证据完整性检查（依赖是否 done、证据是否与账本对得上、标准节是否存在）、调用新通道 `request_gate_review` 请 Proof 复核、失败后协调返工；不能再自己核证通过，也不能代标 gate done。
 4. Flow 上不新增步骤类型：gate 用现有 artifact + `gateKind` 表达，下游步骤把 gate 写进 `dependsOn`；应用已有派发门禁会在 gate 未通过时直接拒绝派下游，最终验收也自动不可达。
 5. 对 castle 的影响：现有流程本轮完全不动、行为不变；如果以后新版本加 gate，像「窄窗截图缺失、DEBUG 旧截图、Boss 打不死」这类问题会更早被 Proof 拦下，而不是拖到第五轮验收。
-6. 需要确认的点：Q1 gate 默认矩阵、Q3 gate 报告是否复用现有验收报告结构、Q4 返工后是否由统筹显式重新请求、Q5 视觉 gate 里 nit 不算失败、Q8 castle 是否暂不迁移；确认后仍需另行走团队计划、闸门 2 与独立验收。
+6. 客户已于 2026-10-26 授权实现（Q1 gate 默认矩阵、Q3 报告复用、Q4 返工后显式重新请求、Q5 nit 不算失败、Q8 castle 暂不迁移等取舍按本设计与实现方案执行）；**当前实现中、未验证、未验收**，完成后走独立验收。

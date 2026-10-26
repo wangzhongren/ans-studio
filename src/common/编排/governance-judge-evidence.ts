@@ -205,7 +205,7 @@ export interface DecisionEvidencePacket {
     trust: "untrusted";
     title: string;
     question?: string;
-    options?: Array<{ id: string; label: string; description?: string }>;
+    options?: Array<{ id: string; label: string; description?: string; recommended?: boolean }>;
     multiple?: boolean;
     preview?: string;
     previewTruncated?: boolean;
@@ -771,7 +771,9 @@ function isWriteCardKind(cardKind: string): boolean {
   return cardKind === "write" || cardKind === "appointment-write" || cardKind === "schedule-write";
 }
 
-/** decision 组（只判意图漂移）：proposal / appointment / acceptance。 */
+/** decision 组（只判意图漂移）：proposal / appointment / acceptance。
+ *  2026-10-26 新增的 `decision`（材料性选择）卡虽同属判断开关的 decision 组，但**不在本列**：
+ *  它不读意图文件/提案事实（推荐项在卡内，判断只按唯一推荐项代批），也不触发 gate/验收。 */
 function isDecisionCardKind(cardKind: string): boolean {
   return cardKind === "proposal" || cardKind === "appointment" || cardKind === "acceptance";
 }
@@ -824,12 +826,15 @@ function chooseReason(conflicts: readonly Conflict[], problems: readonly Problem
   return { reasonCode: code, reason: `${details.join("；")}；请按上述原因修正后重新提交。` };
 }
 
-function requesterOptions(card: CustomerInputRequest): Array<{ id: string; label: string; description?: string }> | undefined {
+function requesterOptions(card: CustomerInputRequest): Array<{ id: string; label: string; description?: string; recommended?: boolean }> | undefined {
   if (card.kind !== "choice") return undefined;
   return card.options.map((option) => ({
     id: truncateUtf8(option.id, 128),
     label: truncateUtf8(option.label, 256),
     ...(option.description !== undefined ? { description: truncateUtf8(option.description, 512) } : {}),
+    // 2026-10-26 decision 卡：唯一推荐项标记必须进入证据包，判断 agent 才能「按推荐项代批」；
+    // 其余卡种不带该字段时包体与旧版逐字一致（向后兼容）。
+    ...(option.recommended === true ? { recommended: true } : {}),
   }));
 }
 
@@ -1522,7 +1527,8 @@ async function buildInner(input: {
       contentSourceOfTruth: "request_confirmation",
       note:
         "decision 组以意图文件（docs/intents/<intentId>.md）的 goal/scope/acceptance/非目标/客户原话为唯一意图基准，" +
-        "客户确认态来自账本 intent-confirm 决定；写盘内容以 request_confirmation 的结构化载荷（显式 paths + 逐路径正文）为准；" +
+        "客户确认态来自账本 intent-confirm 决定（`decision` 材料性选择卡例外：不读意图文件，只按卡内唯一推荐项代批）；" +
+        "写盘内容以 request_confirmation 的结构化载荷（显式 paths + 逐路径正文）为准；" +
         "preview 自由文本只是请求方陈述。写出内容与声明内容的一致性（内容漂移 O-A1）不在本包保证范围内。",
     },
   };

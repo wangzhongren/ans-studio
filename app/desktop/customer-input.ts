@@ -60,6 +60,20 @@ export { WRITE_PREAUTHORIZATION_OPERATOR_ID } from "./write-preauthorization.ts"
 // 分组映射（`cardKind → approval/decision`）的**单一来源**（2026-10-18 双开关评审 §3.1）：
 // 本模块与 UI/编排/测试都读同一张表，绝不在这里写第二份。
 import { governanceCardGroup } from "../../src/model/runtime.ts";
+// 内置治理角色判据的**单一来源**（Service 公共出口；本模块不复制角色 id 表/注册表）：
+// 仅用于桌面特有的「有推荐项但缺 cardKind」防线（不属于共享结构校验）。
+import { isBuiltInGovernanceRoleId } from "../../src/service/boundary/resolve-boundary.ts";
+// decision 卡结构校验的**单一共享实现**：经编排 Pipeline 公共出口只读导入（实现恒在
+// `src/common/编排/decision-card.ts`）。桌面只保留 notPresented/文案/operator 映射与卡面默认推荐，
+// 不再复制选项数/id/推荐项/flowId/角色校验。
+import {
+  DECISION_CARD_MIN_OPTIONS,
+  validateDecisionCardRequest,
+  type DecisionCardRejectReason,
+  type DecisionCardValidation,
+} from "../../src/pipeline/orchestration/run-role.ts";
+export { DECISION_CARD_MIN_OPTIONS };
+export type { DecisionCardRejectReason, DecisionCardValidation };
 export type { CustomerInputRequest, CustomerInputOutcome, CustomerInputFn };
 // 锚点键的**唯一算法**（真机缺陷修复 2026-10-12：已决卡切走再切回跑到聊天流最末尾——卡的（重）物化
 // 须按其时序锚点落位）。请求本体（kind/title）与回放侧（session-history.ts 解析的 toolCall 块）两侧
@@ -237,6 +251,111 @@ export interface OperatorJudgeResultPayload {
   readBytes?: number;
 }
 
+// ———————————————— 2026-10-26 decision 卡（材料性选择；客户新增） ————————————————
+//
+// 客户要求：主理发现**材料性选择**（演示/验收证据方式、范围、标准/契约偏离、成本或客户可见行为等）
+// 时不自定，交统筹（convener）发 `request_choice(cardKind="decision")`；卡内**恰有一个**
+// `recommended: true` 推荐项。客户开启「替我决策」时，应用**确定性**默认选中推荐项（不调用模型做
+// 选择题），并以 **judge 代批**审计记录（`group=decision`），不得伪装成客户本人；开关关闭/无推荐项/
+// 结果行投达失败等异常 ⇒ 走既有客户卡路径，绝不擅自代选。
+//
+// 本模块只做**发卡前校验 + 卡面默认推荐**；选中项的账本分类在编排：
+// `customer.decision{decisionKind:"material-choice", selectedOptions:[选项 id]}`，独立于
+// 提案/任命/验收——不触发 gate/验收、不写 targetRoleIds、不构成客户批准。卡片自身与 tool 回执
+// 由既有链路如实标注（`main.decisionCard.notApproval` / judge 回执「自动代理」）。
+
+/** decision 卡种（`GovernanceChoiceCardKind` 的 2026-10-26 成员）。 */
+export const DECISION_CARD_KIND = "decision" as const;
+
+/** 发卡前校验结论：allow＝可呈现/可代选；ignore＝非 decision 卡（零行为变化）；reject＝拒发卡。 */
+export type DecisionCardGateRejectReason =
+  | DecisionCardRejectReason
+  | "missing-card-kind"
+  | "shared-validation-invalid";
+export type DecisionCardGateResult =
+  | { action: "allow"; flowId: string; recommendedOptionId: string }
+  | { action: "ignore" }
+  | { action: "reject"; reasonCode: DecisionCardGateRejectReason; reason: string };
+
+/** 结构化读取 option.recommended（请求来自模型工具，运行时一律按不可信处理）。 */
+function optionIsRecommended(option: unknown): boolean {
+  return (
+    typeof option === "object" &&
+    option !== null &&
+    (option as { recommended?: unknown }).recommended === true
+  );
+}
+
+/** 卡内是否出现 `recommended: true`（用于识别「decision 形状」但缺 cardKind 的内置治理卡）。 */
+function hasRecommendedOption(request: CustomerInputRequest): boolean {
+  if (request.kind !== "choice") return false;
+  const options = (request as { options?: unknown }).options;
+  return Array.isArray(options) && options.some(optionIsRecommended);
+}
+
+/**
+ * decision 卡发卡前校验的**桌面薄包装**（fail-closed；**在触达 presenter / 判断 agent / 排队之前**）：
+ *
+ * 结构校验（仅 convener/trio、choice、合法 flowId、≥2 选项、id 非空不重复、恰一个 recommended）
+ * **全部委托** Pipeline 公共出口的 `validateDecisionCardRequest`（单一来源
+ * `common/编排/decision-card.ts`）；本函数只保留桌面特有部分：
+ *   · `notPresented`/`operator` 映射在调用方（`customerInput`）；
+ *   · 失败文案按共享 `reasonCode` 选 `main.decisionCard.invalid`/`noRecommended` 并带共享 `detail`；
+ *   · 共享函数返回 `applicable:false`（非 decision 卡）⇒ `ignore`（旧卡零行为变化）；
+ *   · 桌面特有防线：内置治理角色发出「有 `recommended: true` 但缺 cardKind」的 choice 卡 ⇒
+ *     `missing-card-kind` 拒发（共享函数对缺 cardKind 返回 `applicable:false`；编排 trio 路径已有
+ *     同向守卫，桌面保留此检查覆盖 direct/legacy 通道与 single）。
+ */
+export function evaluateDecisionCardRequest(input: {
+  request: CustomerInputRequest;
+  roleId: string;
+  /** 会话治理模型；缺省按 `"single"`（共享校验对 single 的 decision 卡一律 role-not-allowed）。 */
+  governanceModel?: "single" | "trio";
+  metadata?: Pick<CustomerInputMetadata, "cardKind" | "flowId">;
+}): DecisionCardGateResult {
+  const { request, roleId } = input;
+  const rawCardKind = (request as { cardKind?: unknown }).cardKind ?? input.metadata?.cardKind;
+  const cardKind = typeof rawCardKind === "string" ? rawCardKind : undefined;
+  if (cardKind === undefined && hasRecommendedOption(request) && isBuiltInGovernanceRoleId(roleId)) {
+    return {
+      action: "reject",
+      reasonCode: "missing-card-kind",
+      reason: mainT("main.decisionCard.invalid", {
+        detail: `cardKind missing (role=${roleId === "" ? "unknown" : roleId})`,
+      }),
+    };
+  }
+  const validation = validateDecisionCardRequest({
+    request,
+    roleId,
+    governanceModel: input.governanceModel ?? "single",
+    ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
+  });
+  if (!validation.ok) {
+    const reason =
+      validation.reasonCode === "recommended-count"
+        ? mainT("main.decisionCard.noRecommended", { detail: validation.detail })
+        : mainT("main.decisionCard.invalid", { detail: validation.detail });
+    return { action: "reject", reasonCode: validation.reasonCode, reason };
+  }
+  if (validation.applicable !== true) return { action: "ignore" };
+  if (typeof validation.flowId !== "string" || typeof validation.recommendedOptionId !== "string") {
+    // 共享契约保证 applicable:true 时二者存在；防御性 fail-closed（不猜推荐项）。
+    return {
+      action: "reject",
+      reasonCode: "shared-validation-invalid",
+      reason: mainT("main.decisionCard.invalid", {
+        detail: "shared validation missing flowId/recommendedOptionId",
+      }),
+    };
+  }
+  return {
+    action: "allow",
+    flowId: validation.flowId,
+    recommendedOptionId: validation.recommendedOptionId,
+  };
+}
+
 /**
  * 结果行的一句人话（评审 §9.3 的文案口径）：渲染侧与主入口进度行共用，只做展示拼接、不做判定。
  * 路径多时显示前 3 个 + 「等 n 个」。
@@ -245,6 +364,19 @@ export function judgeResultSummary(
   payload: Pick<OperatorJudgeResultPayload, "group" | "cardKind" | "selected" | "confirmed" | "paths" | "flowId">,
 ): string {
   const flow = typeof payload.flowId === "string" && payload.flowId !== "" ? mainT("ui.judge.flowSuffix", { flowId: payload.flowId }) : "";
+  // decision 卡（2026-10-26）：judge 默认推荐的结果行必须如实标「自动代理」且不是客户本人；
+  // 同一行附不变量「决策卡不是验收、不是客户批准，也不构成验收/提案/任命决定」（不触发 gate/验收，
+  // 最终验收仍走既有链路）。
+  if (payload.cardKind === DECISION_CARD_KIND) {
+    const selected = Array.isArray(payload.selected) ? payload.selected : [];
+    const option = selected.length > 0 ? selected.join("、") : mainT("shared.common.unknownReason");
+    return (
+      mainT("main.decisionCard.judgeSelectedRecommended", { option }) +
+      " " +
+      mainT("main.decisionCard.notApproval") +
+      flow
+    );
+  }
   if (payload.cardKind === "proposal") return mainT("main.customerInput.judgeDecisionHead") + flow;
   if (payload.cardKind === "acceptance") return mainT("main.customerInput.judgeAcceptanceHead") + flow;
   if (payload.cardKind === "appointment") {
@@ -499,6 +631,11 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     state: "active" | "queued" | "judging" | "triaging" | "done";
     /** 同一请求只判断一次（§4.2）：进入 `judging` 即定格；`replay`/`drain` 永不再次判断。 */
     judged?: boolean;
+    /**
+     * decision 卡发卡前校验的定格结果（2026-10-26）：仅 `cardKind="decision"` 且校验通过时存在。
+     * 推荐项在**呈现/代选之前**定格；「替我决策」默认推荐只读本字段，不再重复解析选项。
+     */
+    decisionCard?: { flowId: string; recommendedOptionId: string };
     /** 判断所需的会话上下文（调用当刻快照；不含任何判定）。 */
     ctx: {
       runtime?: CustomerInputMetadata["runtime"];
@@ -906,6 +1043,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     if (judgeContext === undefined) return undefined;
     const cardKind = entry.request.cardKind ?? entry.metadata?.cardKind;
     if (cardKind === undefined) return undefined;
+    // decision 卡（2026-10-26）：只做**确定性**默认推荐（「替我决策」开启时），绝不调用模型做选择题。
+    // 未代选（开关关闭/结果行异常）⇒ 原卡交客户手动选择；不进入模型 judge，也不产生 judge 退回。
+    if (cardKind === DECISION_CARD_KIND) return undefined;
     const group = governanceCardGroup(cardKind);
     if (group === undefined) return undefined; // 无 cardKind/未知 kind 的旧卡永不判断
     if (opts.judge?.isGroupEnabled(group) !== true) return undefined;
@@ -1234,8 +1374,86 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     settleJudgeOutcome(entry, plan, outcome);
   };
 
+  /**
+   * decision 卡「替我决策」**确定性默认推荐**（2026-10-26 客户要求）：
+   *
+   * 条件全部满足才代选：① 发卡前校验已定格推荐项；② 「替我决策」开关开启（主进程权威
+   * `isGroupEnabled("decision")`）；③ 会话信号未中止；④ 可用运行时可作审计引擎；
+   * ⑤ 判断结果行能如实投达（`emitJudgeResult` 是代批的可见性条件）。
+   *
+   * 结算为 `answered{selected:[推荐项]}` + `operatorId:"judge:<engine>"` + `judge` 审计
+   * （`group:"decision"`）——**judge 代批，不是客户本人**；编排据此写
+   * `customer.decision{decisionKind:"material-choice", selectedOptions:[推荐项]}`（审计，门禁不读）。
+   * 不调用模型、不呈现客户卡、不推导治理下一步（decision 卡无 proposal/appointment/acceptance 语义）。
+   *
+   * 任一条件不满足/异常（开关关闭、无推荐项、结果行通道缺失/投达失败、运行时缺失等）⇒ 返回 false，
+   * 由既有客户卡路径（`presentNow`）交客户决定——**绝不擅自代选**，也不把异常伪装成 approve。
+   */
+  const tryAutoSelectDecision = (entry: ChannelEntry): boolean => {
+    const decision = entry.decisionCard;
+    if (decision === undefined) return false;
+    if (entry.ctx.governanceModel !== "trio") return false; // single/su 不代批（与判断门同口径）
+    if (opts.judge?.isGroupEnabled("decision") !== true) return false;
+    if (entry.signals.some((signal) => signal.aborted)) return false;
+    const runtime = entry.ctx.runtime ?? entry.metadata?.runtime;
+    if (runtime === undefined) return false;
+    // 防御：定格推荐项必须仍在卡上选项内（请求快照被意外改写 ⇒ 不代选，回落客户卡）。
+    const requestOptions = (entry.request as { options?: CustomerInputOption[] }).options ?? [];
+    const offered = new Set(requestOptions.map((option) => option.id));
+    if (!offered.has(decision.recommendedOptionId)) return false;
+    const selected = [decision.recommendedOptionId];
+    const judge: GovernanceJudgeAudit = {
+      group: "decision",
+      cardKind: DECISION_CARD_KIND,
+      engine: runtime,
+      reasonCode: "recommended-default",
+      selected,
+    };
+    const result: OperatorJudgeResultPayload = {
+      version: 1,
+      id: `gj-${++judgeResultSeq}`,
+      requestId: entry.payload.id,
+      anchorKey: entry.payload.anchorKey,
+      toolCallId: entry.payload.toolCallId ?? "",
+      roleId: entry.payload.roleId,
+      at: new Date().toISOString(),
+      group: "decision",
+      cardKind: DECISION_CARD_KIND,
+      flowId: decision.flowId,
+      engine: runtime,
+      ...(entry.payload.projectRoot !== undefined ? { projectRoot: entry.payload.projectRoot } : {}),
+      ...(entry.payload.runtime !== undefined ? { runtime: entry.payload.runtime } : {}),
+      reasonCode: "recommended-default",
+      selected,
+    };
+    try {
+      if (opts.emitJudgeResult === undefined) return false;
+      opts.emitJudgeResult(result);
+    } catch (error) {
+      // 结果行是代批的可见性条件：投达失败 ⇒ 不代选，回落客户卡（fail-closed，绝不悄悄放行）。
+      diagnostic.error("decision-card.result.failed", error, { requestId: entry.payload.id });
+      return false;
+    }
+    diagnostic.record("decision-card.auto-selected", {
+      requestId: entry.payload.id,
+      flowId: decision.flowId,
+      optionId: decision.recommendedOptionId,
+    });
+    entry.judged = true;
+    entry.state = "active";
+    settleActive(entry, {
+      outcome: "answered",
+      value: { selected },
+      operatorId: `judge:${runtime}`,
+      judge,
+    });
+    return true;
+  };
+
   /** 既有呈现路径（判断门 → judging / 直接呈现）；**不分诊**——分诊前闸在 `presentEntry`。 */
   const presentEntryNow = (entry: ChannelEntry): void => {
+    // decision 卡先尝试「替我决策」确定性默认；未代选 ⇒ 原卡照旧呈现给客户。
+    if (tryAutoSelectDecision(entry)) return;
     const plan = planJudge(entry);
     if (plan === undefined) {
       presentNow(entry);
@@ -1505,6 +1723,21 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   };
 
   const customerInput: DesktopCustomerInputFn = (req, ctx, metadata) => {
+    // decision 卡发卡前校验（2026-10-26）：在**呈现/判断/排队之前** fail-closed。
+    // 拒发卡 ⇒ declined + notPresented:true（卡片从未呈现；不冒充客户拒绝、不写账本、不占一项目一卡）。
+    const decisionGate = evaluateDecisionCardRequest({
+      request: req,
+      roleId: String((ctx && ctx.roleId) || ""),
+      ...(ctx?.governanceModel !== undefined ? { governanceModel: ctx.governanceModel } : {}),
+      ...(metadata !== undefined ? { metadata } : {}),
+    });
+    if (decisionGate.action === "reject") {
+      diagnostic.record("decision-card.rejected", {
+        reasonCode: decisionGate.reasonCode,
+        ok: false,
+      });
+      return { outcome: "declined", reason: decisionGate.reason, notPresented: true };
+    }
     const preauthorized = preauthorizeWrite(req, ctx, metadata);
     if (preauthorized !== undefined) return preauthorized;
     return new Promise<CustomerInputOutcome>((resolve) => {
@@ -1541,6 +1774,14 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
           ...(typeof ctx.turnText === "string" && ctx.turnText !== "" ? { turnText: ctx.turnText } : {}),
         },
         ...(metadata !== undefined ? { metadata } : {}),
+        ...(decisionGate.action === "allow"
+          ? {
+              decisionCard: {
+                flowId: decisionGate.flowId,
+                recommendedOptionId: decisionGate.recommendedOptionId,
+              },
+            }
+          : {}),
       };
       /** 取消（轮次停止 / 会话重建）：active/judging/triaging ⇒ 结算并放行下一张；queued ⇒ 出队结算（从不呈现）。 */
       const cancel = () => {

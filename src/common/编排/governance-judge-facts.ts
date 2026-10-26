@@ -290,6 +290,10 @@ export function requiredArtifactPaths(request: GovernanceJudgeRequest): {
     case "intent-confirm":
       // 2026-10-20：需求确认卡本身是意图基准（判断它与客户当前要求是否一致），不要求独立 intent 文件/物证。
       return { paths: [], missing: false };
+    case "decision":
+      // 2026-10-26 客户 decision 卡（材料性选择）：与提案/任命/验收独立——不要求任何规范物证；
+      // 判断只需卡内选项（含唯一推荐项）。绝不能落 default 的 `missing:true`（那会把合法卡误判 manual）。
+      return { paths: [], missing: false };
     default:
       return { paths: [], missing: true };
   }

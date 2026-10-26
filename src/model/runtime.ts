@@ -177,8 +177,12 @@ export interface GovernanceFlowMetadata {
  * `intent-confirm`（2026-10-18 客户拍板）：主理（Lead/liaison）在 `hand_off_intent` 前发给客户的
  * **需求确认卡**，选项 id 固定 `confirm`/`revise`。**2026-10-20 客户新要求「勾了替我决策就不用我管」**：
  * 该卡纳入 `decision` 组，判断 agent 可代批 `confirm`；`revise` 仍交回客户/发起角色（不替客户修改）。
+ * `decision`（2026-10-26 客户要求）：**材料性选择卡**——主理发现材料性选择（如演示/验收证据方式、
+ * 范围、标准/契约偏离、成本或客户可见行为）时**不自行决定**，交统筹（Steward）发本卡；卡内**恰有一个**
+ * `recommended: true` 推荐项（校验在应用/角色侧）。**独立于提案/任命/验收**：不触发门禁、不触发验收，
+ * 也不等于验收/客户批准；纳入 `decision` 组——客户开启「替我决策」时判断 agent 默认选推荐项。
  */
-export type GovernanceChoiceCardKind = "proposal" | "appointment" | "acceptance" | "intent-confirm";
+export type GovernanceChoiceCardKind = "proposal" | "appointment" | "acceptance" | "intent-confirm" | "decision";
 
 /** `request_confirmation` 允许的治理卡片种类（评审 §5.8）。 */
 export type GovernanceConfirmCardKind = "write" | "appointment-write" | "schedule-write";
@@ -193,7 +197,7 @@ export type GovernanceCardKind = GovernanceChoiceCardKind | GovernanceConfirmCar
 // 组只表达「哪一类卡由哪个开关代批」，不表达任何权限；approval 组可 `deny`（写卡不合规退回重做），
 // decision 组正向代批，`manual` 由桌面作为返工原因回投发起角色（见 `GovernanceJudgeOutcome`）。
 
-/** 治理卡判断开关分组：`approval`＝shell＋写盘族；`decision`＝提案/任命/验收。 */
+/** 治理卡判断开关分组：`approval`＝shell＋写盘族；`decision`＝提案/任命/验收/需求确认/材料性选择。 */
 export type GovernanceJudgeGroup = "approval" | "decision";
 
 /**
@@ -202,6 +206,10 @@ export type GovernanceJudgeGroup = "approval" | "decision";
  * **`intent-confirm`**：2026-10-18 客户曾拍板「需求确认卡由客户本人回答、判断 agent 永不介入」；
  * **2026-10-20 客户新要求「勾了替我决策就不用我管」**推翻该口径——需求确认卡纳入 `decision` 组，
  * 判断 agent 可在开关开启时代批 `confirm`（`revise` 仍交回客户/发起角色）。此处是唯一映射来源。
+ *
+ * **`decision`（材料性选择，2026-10-26 客户要求）**：纳入 `decision` 组，客户开启「替我决策」时
+ * 判断 agent 默认选卡内**唯一** `recommended: true` 的推荐项。组只表达开关分组，**不表达权限**——
+ * decision 卡独立于提案/任命/验收，不触发门禁/验收，也不构成客户批准。
  */
 export const GOVERNANCE_CARD_GROUP: Readonly<Partial<Record<GovernanceCardKind, GovernanceJudgeGroup>>> = Object.freeze({
   write: "approval",
@@ -211,6 +219,7 @@ export const GOVERNANCE_CARD_GROUP: Readonly<Partial<Record<GovernanceCardKind, 
   appointment: "decision",
   acceptance: "decision",
   "intent-confirm": "decision",
+  decision: "decision",
 });
 
 /**
@@ -311,6 +320,13 @@ export interface CustomerInputOption {
   label: string;
 
   description?: string;
+
+  /**
+   * `decision`（材料性选择）卡的推荐项标记（2026-10-26 客户要求）：每张 decision 卡**至多一个**
+   * `recommended: true`（decision 卡整体要求**恰有一个**）；客户开启「替我决策」时判断 agent
+   * 默认选推荐项。类型层只提供字段——推荐项数量等校验在应用/角色侧完成，本层不代选、不补默认值。
+   */
+  recommended?: boolean;
 }
 
 export type CustomerInputRequest = (
@@ -954,6 +970,46 @@ export interface RequestAcceptanceResult {
 
 /** `request_acceptance` 注入能力（派发/校验/flow/账本由应用实现；未注入 ⇒ 工具不注册）。 */
 export type RequestAcceptanceFn = (input: RequestAcceptanceInput) => Promise<RequestAcceptanceResult>;
+
+// —————————————— Gate 复核请求（2026-10-26 客户授权；request_gate_review） ——————————————
+//
+// 依据：客户 2026-10-26 确认「独立复核的权威只放在验收角色（Proof）；统筹只协调与检查证据完整性；
+// 对关键节点设置验收门禁（gate），由 Proof 独立判定」，授权在运行时核心落 Model/Provider 契约与工具
+// （设计 `2026-10-26_design_proof-gate-reviews.md` §5.2/§5.5/§10-A4/§12）。
+// gate 复核是**独立于最终验收**的通道：`request_acceptance` 保持原义（最终验收唯一主动通道），
+// `request_gate_review` 只用于关键节点 gate。本层只路由载荷并**如实转达回执**——gate 步骤查找、
+// 前置/证据/标准校验、Proof 派发、gate 记录与账本写入全部由**应用注入的能力**实现（本层不写
+// flow/账本、不做治理判定）。纪律：**gate 复核 ≠ 验收通过 ≠ 客户批准**；`dispatched` 只表示已派
+// Proof；gate fail 只按 blocker/major 判失败，只有 minor/nit 不构成返工依据（防吹毛求疵）。
+// 能力未注入 ⇒ 工具不注册（沿 requestAcceptance 先例，能力缺席＝最强 fail-closed）。
+
+/**
+ * `request_gate_review` 载荷：`flowId` 缺席＝当前/默认流程（由应用归一）；`gateId` 必填
+ * （gate 步骤 id，匹配 `GOVERNANCE_SLUG_PATTERN` 的 slug，如 `gate-vertical-slice`）；
+ * `note` 为可选有界说明（工具层有上限，不写账本、不参与判定）。
+ */
+export interface RequestGateReviewInput {
+  flowId?: string;
+  gateId: string;
+  note?: string;
+}
+
+/**
+ * `request_gate_review` 的如实回执（形状冻结；工具层**原样**转达）。
+ * `ok:true`＋`code:"dispatched"`＝应用已派 Proof 做 gate 复核——**不等于 gate 通过、不代表验收通过、
+ * 不代表客户批准**；其余 code 为如实的未派发/已派发原因（`rejected`＝应用在派发前退回统筹）。
+ */
+export interface RequestGateReviewResult {
+  ok: boolean;
+  code: "dispatched" | "already-dispatched" | "gate-not-found" | "criteria-missing" | "flow-incomplete" | "unavailable" | "rejected";
+  message: string;
+  flowId?: string;
+  gateId?: string;
+  runtime?: RuntimeKind;
+}
+
+/** `request_gate_review` 注入能力（gate 校验/派发/记录/账本由应用实现；未注入 ⇒ 工具不注册）。 */
+export type RequestGateReviewFn = (input: RequestGateReviewInput) => Promise<RequestGateReviewResult>;
 
 // —————————————— 边界变更请求（2026-10-26 客户要求；request_boundary_change） ——————————————
 //
@@ -1720,6 +1776,16 @@ export interface GovernedToolsOptions {
    * 本层只路由载荷并如实转达回执——**请求复核 ≠ 客户决定，不代表客户批准**。
    */
   requestAcceptance?: RequestAcceptanceFn;
+  /**
+   * Gate 复核请求（2026-10-26 客户授权）：`request_gate_review` 能力——关键节点验收门禁（gate）的
+   * 证据完整性检查通过后，由统筹直接请应用派 Proof 做**独立 gate 复核**；与最终验收
+   * （`requestAcceptance`）是两条独立通道，互不替代。**只给统筹（convener）会话注入**（判据在
+   * 编排/桌面注入端，本层不硬编码角色 id）；未注入 ⇒ 工具不注册（结构性 fail-closed，沿
+   * requestAcceptance 先例）。gate 校验/派发/gate 记录/账本由能力实现；本层只做参数形状校验并如实
+   * 转达回执——**gate 复核 ≠ 验收通过 ≠ 客户批准**；`dispatched` 只表示已派 Proof；gate fail 只按
+   * blocker/major 判失败，只有 minor/nit 不返工。
+   */
+  requestGateReview?: RequestGateReviewFn;
   /**
    * 边界变更请求（2026-10-26 客户要求）：`request_boundary_change` 能力——项目角色写集/边界不足时，
    * 由统筹直接请应用把**精确增删路径**派发给组队（Crew）修改角色卡/边界，不绕过 appointment-write

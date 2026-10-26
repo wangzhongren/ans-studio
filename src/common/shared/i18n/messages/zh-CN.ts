@@ -306,6 +306,13 @@ export const zhCN = {
   "ui.triage.returnedToVerifier": "验收报告缺少分诊结构，已退回验收补充",
   "ui.triage.missingReport": "验收报告不可读：{detail}",
 
+  // ---- 决策卡（decision card；2026-10-26 客户规则：材料性选择、唯一推荐项、与验收分离；桌面UI 接线）----
+  // 语义：decision 卡只记录材料性选择，不是提案/任命/验收，不是客户批准，不触发 gate/验收。
+  // 「推荐」只标在唯一推荐项上；judge 代批必须标「自动代理」，不得写成客户本人。
+  "ui.decisionCard.title": "决策卡 · 材料性选择",
+  "ui.decisionCard.notApprovalBadge": "非客户批准",
+  "ui.decisionCard.recommended": "推荐",
+
   // ---- 抽屉（shell/Drawer.tsx）----
   "ui.drawer.collapseTitle": "收起（Esc）",
 
@@ -1424,6 +1431,57 @@ export const zhCN = {
     "流程 {flowId}：返工路由失败（{detail}）；应用不声称已送达，也不会派发验收复核；修正后下一次事件会自动重试。",
   "main.governance.acceptanceReworkAuditFailed":
     "流程 {flowId}：返工任务已按路由规则转交，但审计记录写入失败（{detail}）；已发送事实不翻转，应用不会伪造账本，请检查账本与诊断。",
+
+  // ---- Gate 复核回执与系统行（2026-10-26 request_gate_review；设计 §5–§8/§12）----
+  // 参数契约：{flowId} 流程 id；{gateId} gate 步骤 id；{reportPath} gate 报告相对路径；
+  // {detail} 有界诊断/缺项说明；{severity} 失败严重度摘要（blocker/major）。
+  // 语义：gate 复核 ≠ 验收通过 ≠ 客户批准；gate 结论不写 customer.decision、不进入验收分诊。
+  // 防吹毛求疵：gate fail 必须有 blocker/major；只有 minor/nit 的 fail 按结构不符退回验收，不触发返工；
+  // gate pass 可带 minor/nit 备注，不因非阻断建议反复开 gate。
+  "main.gateReview.dispatched":
+    "流程 {flowId}：已提交 gate {gateId} 复核给验收（工作中）；gate 复核 ≠ 验收通过 ≠ 客户批准。",
+  "main.gateReview.alreadyDispatched":
+    "流程 {flowId}：gate {gateId} 复核已提交过（在途或已通过），未重复派发；请用 flow_get 核对 gate 步骤状态。",
+  "main.gateReview.gateNotFound":
+    "流程 {flowId}：未找到 gate {gateId}（步骤不存在或不是 gate）；请核对 flow YAML 后重新提交。",
+  "main.gateReview.criteriaMissing":
+    "流程 {flowId}：验收标准缺少 gate {gateId} 的复核标准节；请验收补齐最新标准后再提交（统筹不写 docs/acceptance/）。",
+  "main.gateReview.flowIncomplete":
+    "流程 {flowId}：gate {gateId} 的前置步骤或证据不齐（{detail}）；补齐后再提交，不得提前提交或用提交代替缺步骤。",
+  "main.gateReview.unavailable":
+    "流程 {flowId}：gate {gateId} 复核通道不可用（{detail}）；可能已派发，请用 flow_get 核对；应用未声称已派发，不自行判定通过。",
+  "main.gateReview.rejected":
+    "流程 {flowId}：gate {gateId} 复核请求被拒（{detail}）；请按原因修正后重交，不原样重试。",
+  "main.gateReview.passNote":
+    "流程 {flowId}：gate {gateId} 已通过（报告 {reportPath}）；可继续下游，仍须最终客户验收。",
+  "main.gateReview.failNote":
+    "流程 {flowId}：gate {gateId} 未通过（{severity}；报告 {reportPath}）；gate 保持 pending，返工后需重新请求复核。",
+  "main.gateReview.returnedToProof":
+    "流程 {flowId}：gate {gateId} 报告缺失或结构不合规（{detail}）；已退回验收补充，未判通过、未路由返工。",
+  "main.gateReview.nitOnly":
+    "流程 {flowId}：gate {gateId} 的 fail 只含 minor/nit；gate 失败必须以 blocker/major 为依据，已按结构不符退回验收，不触发返工。",
+  "main.gateReview.reportMissing":
+    "流程 {flowId}：gate {gateId} 报告不存在或不可读（{reportPath}）；gate 保持 pending，等待验收补交报告，不按超时判通过。",
+  "main.gateReview.reworkTask":
+    "Gate 返工任务｜{gateId}：按 gate 报告 {reportPath} 的 {severity} 项修复；minor/nit 为非阻断、可选后续。",
+
+  // ---- 决策卡回执与系统行（2026-10-26 客户规则；request_choice(cardKind="decision")）----
+  // 参数契约：{option} 选中项标签；{detail} 有界诊断/缺项说明。
+  // 语义：decision 卡独立于提案/任命/验收，不是客户批准、不等于验收通过、不是 gate，不触发 gate/验收；
+  // 应用按 decisionKind="material-choice" 单独审计留痕（不在用户文案暴露内部账本词）。
+  // judge 代批必须标「自动代理」，不得写成客户本人；无唯一推荐项/非法卡一律 fail-closed（未发卡）。
+  "main.decisionCard.selectedRecommended":
+    "决策卡：你选择了推荐项「{option}」；已如实记录本次材料性选择。",
+  "main.decisionCard.selectedOther":
+    "决策卡：你选择了「{option}」（非推荐项）；已如实记录本次材料性选择。",
+  "main.decisionCard.judgeSelectedRecommended":
+    "judge 代批 · 代决策（自动代理）：已按唯一推荐项「{option}」记录；不是客户本人选择。",
+  "main.decisionCard.notApproval":
+    "决策卡不是验收、不是客户批准，也不构成验收/提案/任命决定：本次选择仅作材料性选择的单独审计留痕，不触发 gate/验收；最终验收与客户批准仍走既有链路。",
+  "main.decisionCard.noRecommended":
+    "decision 卡缺少唯一推荐项（{detail}）；未向客户发卡（fail-closed），请修正后重试。",
+  "main.decisionCard.invalid":
+    "decision 卡参数非法（{detail}）；未向客户发卡（fail-closed），请修正后重试。",
 
   // ---- 会话历史（runtime-history.ts / session-history.ts）----
   "main.history.invalidRequest": "历史请求须指定项目、角色与运行时。",

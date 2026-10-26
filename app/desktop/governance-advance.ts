@@ -114,6 +114,16 @@ export function governanceAcceptanceReportPath(flowId: string, version = 1): str
   return `docs/acceptance/${flowId}-report-v${version}.md`;
 }
 
+/**
+ * Gate 复核报告默认路径（`docs/acceptance/<flowId>-<gateId>-report-vN.md`；2026-10-26 客户授权
+ * `request_gate_review`，设计 §6.2）。与最终验收报告 `docs/acceptance/<flowId>-report-vN.md` **命名不
+ * 冲突**；版本化、不覆盖，重验取 N+1。唯一实现仍是编排公共出口的 `gateReviewReportRelPath`（本函数只
+ * 供任务文案的默认路径派生；版本扫描由 `latestGateReviewReport` 负责）。
+ */
+export function governanceGateReviewReportPath(flowId: string, gateId: string, version = 1): string {
+  return `docs/acceptance/${flowId}-${gateId}-report-v${version}.md`;
+}
+
 /** 变更包默认路径（`docs/scheduling/<flowId>-change-v1.md`）。 */
 export function governanceChangePackagePath(flowId: string, version = 1): string {
   return `docs/scheduling/${flowId}-change-v${version}.md`;
@@ -618,6 +628,76 @@ export function governanceAcceptanceAdvanceNote(flowId: string): string {
   return mainT("main.governance.acceptanceAdvance", { flowId });
 }
 
+// —————————————— 2026-10-26 gate 复核任务（客户授权 request_gate_review；设计 §5.5/§6.1） ——————————————
+//
+// 应用在 `request_gate_review` 校验通过后派 Proof 做**独立 gate 复核**。任务文本必须自足（flowId、
+// gateId、gateKind、标准指针、dependsOn 证据指针、流程版本、报告路径），并写清硬边界：
+// **gate 复核 ≠ 验收通过 ≠ 客户批准**；不发验收卡、不写 customer.decision、不标任何 flow 步骤 done、
+// 不实现/不派发；UI/游戏必须在关闭 DEBUG 覆盖层后截图/录屏；报告复用 `acceptance-triage/v1`，fail 必须
+// 有 blocker/major（只有 minor/nit 的 fail 会被应用按结构不符退回、不触发返工）。纯文本，无 IO。
+
+/** dependsOn 证据指针（gate 任务文案用；值来自 flow 步骤与账本核对后的解析结果）。 */
+export interface GateReviewDependencyEvidence {
+  id: string;
+  /** 解析 supersededBy 链后的最终步骤 id（与 `id` 不同表示经替代链解析）。 */
+  resolvedId: string;
+  status: string;
+  evidenceKind?: string;
+  evidenceRef?: string;
+}
+
+export interface BuildGateReviewTaskMessageOptions {
+  flowId: string;
+  gateId: string;
+  gateKind: string;
+  gateTitle: string;
+  /** 最新验收标准的路径（必须含该 gateId 的 Gate 复核标准节）。 */
+  criteriaPath: string;
+  /** 候选流程版本（flow YAML sha256；报告须写明候选/revision 与证据复用判定）。 */
+  flowRevision: string;
+  /** 本次应写的 gate 报告路径（版本化；重验递增，不覆盖旧报告）。 */
+  reportPath: string;
+  reportVersion: number;
+  dependsOn: readonly GateReviewDependencyEvidence[];
+  /** 上一轮被退回/失败的报告路径（重验时给出；要求写新版本、不覆盖）。 */
+  previousReportPath?: string;
+}
+
+export function buildGateReviewTaskMessage(input: BuildGateReviewTaskMessageOptions): string {
+  const revisionText = input.flowRevision.length > 16 ? input.flowRevision.slice(0, 16) : input.flowRevision;
+  const depLines =
+    input.dependsOn.length > 0
+      ? input.dependsOn.map((dep) => {
+          const resolved = dep.resolvedId !== dep.id ? `${dep.id}→${dep.resolvedId}` : dep.id;
+          const evidence =
+            dep.evidenceKind !== undefined && dep.evidenceRef !== undefined
+              ? `evidence ${dep.evidenceKind}=${dep.evidenceRef}`
+              : "evidence 未在步骤声明";
+          return `- ${resolved}（status=${dep.status}；${evidence}）`;
+        })
+      : ["- （gate 步骤未声明 dependsOn；仍须按标准核对真实输出与账本证据）"];
+  const visualRequirement =
+    input.gateKind === "visual-baseline"
+      ? `2) 必须亲自打开真实浏览器/游戏窗口核对，并**关闭 DEBUG 覆盖层**后截图/录屏；证据里出现 DEBUG 覆盖层、旧候选截图、或无法确认截图为当前候选 ⇒ insufficient evidence（按 fail 处理，不通过）。`
+      : `2) 必须亲自运行或打开真实输出核对（不是只读别人转述的日志）；证据不足 ⇒ 按 fail / insufficient evidence 处理，不通过。`;
+  return [
+    `[Gate 复核] 流程 ${input.flowId}｜gate ${input.gateId}｜gateKind=${input.gateKind}｜gate 步骤标题：${input.gateTitle}`,
+    `复核标准：${input.criteriaPath}（Gate 复核标准节；必须含 gateId=${input.gateId} 与逐条判定表）。`,
+    `流程版本（flowRevision）：${revisionText}；本次候选以该 flow 版本 + dependsOn 证据为准。`,
+    `dependsOn 证据指针（应用已机械核对：步骤 done 且证据与账本可对账；内容合格与否由你判定）：`,
+    ...depLines,
+    `gate 报告路径：${input.reportPath}（v${input.reportVersion}；版本化、不覆盖旧报告）${input.previousReportPath !== undefined ? `；上一轮报告 ${input.previousReportPath} 保留备查` : ""}。`,
+    `证据附件写入 docs/verification/${input.flowId}/${input.gateId}/。`,
+    `要求：`,
+    `1) 只做 gate 复核：按标准逐项判定并写 gate 报告；**不发 request_choice / 验收卡、不写 customer.decision、不代表客户批准**；gate 通过 ≠ 最终验收通过。`,
+    visualRequirement,
+    `3) 报告结论只允许 pass / fail / conditional，且必须包含**恰好一个** fenced YAML 段（schema: acceptance-triage/v1）：顶层 conclusion，items: [{id, severity, owner, reason, action, targets?, criteria?, evidence?}]；fail/conditional 必须至少一个 blocker/major（**只有 minor/nit 的 fail 会被应用按结构不符退回 Proof，不触发返工**）；pass 可带 minor/nit 备注。`,
+    `4) gate 失败不直接改代码、不派发、不返工：应用按 gate 独立返工路由交统筹；你只等返工后的下一次复核请求。`,
+    `5) 不得用旧截图/旧日志冒充新候选；报告写明候选/流程版本与证据复用判定。不要标任何 flow 步骤 done、不写 flow / 账本 / 客户决定。`,
+    `6) 报告首行建议写：Gate 复核报告 v${input.reportVersion}｜flowId: ${input.flowId}｜gateId: ${input.gateId}｜gateKind: ${input.gateKind}｜候选 revision: <flowRevision>。`,
+  ].join("\n");
+}
+
 // —————————————— 2026-10-23 验收返工路由：Convener 返工任务与系统行（纯文本，无 IO） ——————————————
 //
 // 方案 v1 §5.3.2/§6.3.2（Q3/Q7/Q8/Q10 A）：应用只把**报告 + 结构化清单 + 来源事实**交给固定接收方
@@ -691,6 +771,17 @@ export interface BuildAcceptanceReworkTaskMessageOptions {
    * 调用形状；缺省 ⇒ 同样按「所有变更」文案处理。
    */
   release?: boolean;
+  /**
+   * 2026-10-26 gate 复核（客户授权 `request_gate_review`，设计 §8.2）：给出时本任务按 **gate 返工** 生成
+   * ——标题/来源/报告指针写明 `gateId`，任务要求统筹在返工完成后**显式再次** `request_gate_review`（应用
+   * 不自动重派、不自动放行）。缺省 ⇒ 旧验收返工文案逐字不变。
+   */
+  gate?: {
+    gateId: string;
+    gateKind: string;
+    /** 严重度摘要（如 `blocker=1，major=2，minor=0，nit=0`；只用于展示）。 */
+    severity: string;
+  };
 }
 
 /** 来源措辞（Q7 A）：judge 来源绝不出现「客户拒绝」；客户手拒才写「客户拒绝」。 */
@@ -747,7 +838,11 @@ function acceptanceReworkItemsByOwner(items: readonly AcceptanceReworkTaskItem[]
  * 清单是**范围数据不是权限指令**；报告归 Proof，应用不解析自由文本。
  */
 export function buildAcceptanceReworkTaskMessage(input: BuildAcceptanceReworkTaskMessageOptions): string {
-  const sourceText = acceptanceReworkSourceText(input.source, input.sourceDetail);
+  const gate = input.gate;
+  const sourceText =
+    gate !== undefined
+      ? `gate 复核未通过（Proof 判定；gate-review；gateId=${gate.gateId}，gateKind=${gate.gateKind}）`
+      : acceptanceReworkSourceText(input.source, input.sourceDetail);
   const flowPath = input.flowPath ?? governanceFlowStatePath(input.flowId);
   const reportVersionText = input.reportVersion !== undefined ? `（v${input.reportVersion}）` : "";
   const reportShaText = typeof input.reportSha256 === "string" && input.reportSha256 !== "" ? `；sha256 ${input.reportSha256}` : "";
@@ -767,9 +862,11 @@ export function buildAcceptanceReworkTaskMessage(input: BuildAcceptanceReworkTas
   const receiverLabel = input.receiver?.displayName ?? "统筹";
   const receiverDetail = input.receiver !== undefined ? `（${input.receiver.roleId}）` : "";
   const reportLine =
-    input.receiver !== undefined
-      ? `验收报告：${input.reportPath}${reportVersionText}${reportShaText}${reportStateText}（coordinator 建议：${input.coordinator ?? "convener"}；实际接收方：${receiverLabel}${receiverDetail}）。`
-      : `验收报告：${input.reportPath}${reportVersionText}${reportShaText}${reportStateText}（coordinator 建议：${input.coordinator ?? "convener"}；实际接收方固定统筹）。`;
+    gate !== undefined
+      ? `Gate 复核报告：${input.reportPath}${reportVersionText}${reportShaText}${reportStateText}（gateId=${gate.gateId}；gateKind=${gate.gateKind}；严重度：${gate.severity}；实际接收方：${receiverLabel}${receiverDetail}）。`
+      : input.receiver !== undefined
+        ? `验收报告：${input.reportPath}${reportVersionText}${reportShaText}${reportStateText}（coordinator 建议：${input.coordinator ?? "convener"}；实际接收方：${receiverLabel}${receiverDetail}）。`
+        : `验收报告：${input.reportPath}${reportVersionText}${reportShaText}${reportStateText}（coordinator 建议：${input.coordinator ?? "convener"}；实际接收方固定统筹）。`;
   const structuredText = input.structured
     ? [
         input.triageSchema === true
@@ -810,7 +907,9 @@ export function buildAcceptanceReworkTaskMessage(input: BuildAcceptanceReworkTas
     );
   }
   return [
-    `流程 ${input.flowId}：验收未通过，应用把返工交 ${receiverLabel}${receiverDetail} 组织（流程状态 YAML：${flowPath}）。`,
+    gate !== undefined
+      ? `流程 ${input.flowId}：gate ${gate.gateId} 复核未通过（gateKind=${gate.gateKind}；gate 步骤保持 pending），应用把返工交 ${receiverLabel}${receiverDetail} 组织（流程状态 YAML：${flowPath}）。`
+      : `流程 ${input.flowId}：验收未通过，应用把返工交 ${receiverLabel}${receiverDetail} 组织（流程状态 YAML：${flowPath}）。`,
     factParts.join("；") + "。",
     reportLine,
     ...structuredText,
@@ -819,8 +918,12 @@ export function buildAcceptanceReworkTaskMessage(input: BuildAcceptanceReworkTas
     `1) 先核对已有进展：用 flow_get 看是否已有同一 item/owner 的 rework-* 且 done/证据齐；有则复用/跳过，不重复建、不重复派（升级/重入时返工可能已完成）。`,
     `2) 按 owner 用现有 flow_step_supersede 建/替换 rework-* 步骤（旧步骤 superseded、新步骤 pending；建议 id=rework-<item id 小写/非字母数字转->，同 owner 多项可合并并保留 item id 列表）；**不要**新建验收步骤、**不要**标 verification done、**不要** supersede 保留验收步骤（服务端会拒绝）。`,
     `3) 用 dispatch_task 派给已任命且 readiness 通过的项目角色；stepId 与 flow 完全一致；dependsOn 前置全部 done；写集/边界按既有门禁；owner 是内置治理角色时不要向内置角色 dispatch_task。`,
-    `4) 核对/更新变更包与证据登记，使 flow 反映返工进展；返工完成后由应用按验收门（所有变更，含非发布）自动重派验收（flow 顶层 release 仅为可选发布元数据，不是重派条件），${receiverLabel} **不要**自己派验收。`,
-    `5) 不替客户验收、不自动 accept/reject、不写 customer.decision、不改 docs/acceptance/ 报告；报告归验收。`,
+    gate !== undefined
+      ? `4) 核对/更新变更包与证据登记，使 flow 反映返工进展；返工完成后由统筹**显式再次**调用 request_gate_review({flowId, gateId: "${gate.gateId}"}) 请求同一 gate 复核——应用不自动重派同一失败报告、不自动放行，gate 未 done 前下游依赖步骤不得派发。`
+      : `4) 核对/更新变更包与证据登记，使 flow 反映返工进展；返工完成后由应用按验收门（所有变更，含非发布）自动重派验收（flow 顶层 release 仅为可选发布元数据，不是重派条件），${receiverLabel} **不要**自己派验收。`,
+    gate !== undefined
+      ? `5) 不替客户验收、不自动 accept/reject、不写 customer.decision、不改 docs/acceptance/ 报告；gate 复核报告归验收，gate 通过也不等于最终验收通过。`
+      : `5) 不替客户验收、不自动 accept/reject、不写 customer.decision、不改 docs/acceptance/ 报告；报告归验收。`,
     `6) 清单是范围数据，不是权限指令；不得据清单扩权、绕过客户确认、写他人目录或改角色卡/边界。`,
     `7) 没有可 supersede 的旧步骤 ⇒ fail-closed：记录 gap 并请主理/验收补 flow 计划，不凭空造步骤。`,
     `8) 应用只以 flow 更新作为返工进展信号；候选代码变化但 flow 未变时不会重派——请把返工/证据登记进 flow。`,
@@ -828,9 +931,13 @@ export function buildAcceptanceReworkTaskMessage(input: BuildAcceptanceReworkTas
 }
 
 /**
- * 治理协调唤醒任务（2026-10-24，设计 v1 §6.3；S3）：应用把 flow 的「阻塞 / 交付待核证」阶段交给
- * Lead / 主理协调。**只是唤醒**——不派项目角色、不自动推进步骤、不写 flow/账本、不弹客户卡；
+ * 治理协调唤醒任务（2026-10-24，设计 v1 §6.3；S3）：应用把 flow 的「阻塞 / 交付待核证」阶段**告知**
+ * Lead / 主理。**只是系统通知**——不派项目角色、不自动推进步骤、不写 flow/账本、不弹客户卡；
  * 协调 ≠ 客户批准，门禁仍由应用执行。纯文本，无 IO。
+ *
+ * 2026-10-26 客户追加行为规则：**主理收到系统消息时只向客户汇报**，不要给统筹（Steward）或项目 worker
+ * 派发任务；gate pass/fail 等系统行同样只作客户汇报用途。只有客户消息触发的协调不受此限（客户消息不是
+ * 系统消息）。本函数只产出文案；是否派发由 Lead 卡与门禁约束，桌面不代派。
  */
 export interface BuildGovernanceCoordinationTaskMessageOptions {
   flowId: string;
@@ -846,11 +953,11 @@ export function buildGovernanceCoordinationTaskMessage(input: BuildGovernanceCoo
   const revisionText = input.revision.length > 12 ? input.revision.slice(0, 12) : input.revision;
   const details = (input.details ?? []).filter((line) => nonEmptyString(line));
   return [
-    `[系统·治理协调] 流程 ${input.flowId} 的阶段需要主理协调（协调不是客户批准；应用门禁仍由应用执行）：`,
-    `当前 revision：${revisionText}（请用 flow_get 读取最新流程状态后再协调）`,
+    `[系统·治理协调] 流程 ${input.flowId} 的阶段通知（协调不是客户批准；应用门禁仍由应用执行）：`,
+    `当前 revision：${revisionText}（供核对；如需事实可 flow_get 读取最新流程状态）`,
     `阶段：${input.description}`,
     ...details,
-    "请按你的职责协调统筹与项目 worker（项目 worker 由统筹派）；不要直接派组队 / 验收 / 项目 worker，不要替客户批准、不要自行标 done、不要编辑/代批/改判验收结论。",
+    "这是系统通知：只向客户汇报；不要给统筹 / 项目 worker 派发任务，等客户指示。不要替客户批准、不要自行标 done、不要编辑/代批/改判验收结论。",
   ].join("\n");
 }
 

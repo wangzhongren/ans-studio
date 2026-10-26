@@ -234,14 +234,10 @@ export function acceptanceCriteriaRelPath(flowId: string, version = 1): string {
 }
 
 /**
- * 最新验收标准（2026-10-24 修订：适用于所有声明 `acceptance-criteria` 步骤的新契约 flow）：
- * 扫描 `docs/acceptance/` 下 `<flowId>-criteria-vN.md`，取 N 最高的文件；目录不可读/无匹配
- * ⇒ `undefined`（调用方按缺失处理）。只认后缀为正整数（>=1）的 `.md`；v2 存在时不再回退 v1
- * （v2 不合格即拒绝）。
+ * 扫描目录下 `<prefix><N>.md`（N 为正整数），取 N 最高的文件名（只返回文件名）。
+ * 目录不可读/无匹配 ⇒ `undefined`（调用方按缺失处理；不回退旧版本）。
  */
-export function latestAcceptanceCriteriaRelPath(projectRoot: string, flowId: string): string | undefined {
-  const dir = path.join(projectRoot, "docs", "acceptance");
-  const prefix = `${flowId}-criteria-v`;
+function latestVersionedMarkdownName(dir: string, prefix: string): string | undefined {
   const suffix = ".md";
   let names: string[];
   try {
@@ -258,7 +254,66 @@ export function latestAcceptanceCriteriaRelPath(projectRoot: string, flowId: str
     if (!Number.isSafeInteger(version) || version < 1) continue;
     if (latest === undefined || version > latest.version) latest = { version, name };
   }
-  return latest === undefined ? undefined : `docs/acceptance/${latest.name}`;
+  return latest?.name;
+}
+
+/**
+ * 最新验收标准（2026-10-24 修订：适用于所有声明 `acceptance-criteria` 步骤的新契约 flow）：
+ * 扫描 `docs/acceptance/` 下 `<flowId>-criteria-vN.md`，取 N 最高的文件；目录不可读/无匹配
+ * ⇒ `undefined`（调用方按缺失处理）。只认后缀为正整数（>=1）的 `.md`；v2 存在时不再回退 v1
+ * （v2 不合格即拒绝）。
+ */
+export function latestAcceptanceCriteriaRelPath(projectRoot: string, flowId: string): string | undefined {
+  const name = latestVersionedMarkdownName(
+    path.join(projectRoot, "docs", "acceptance"),
+    `${flowId}-criteria-v`,
+  );
+  return name === undefined ? undefined : `docs/acceptance/${name}`;
+}
+
+// —————————————————————— Gate 复核报告路径/版本（2026-10-26 客户授权） ——————————————————————
+//
+// 路径规则（设计 `2026-10-26_design_proof-gate-reviews.md` §6.2）：`docs/acceptance/<flowId>-<gateId>-report-vN.md`。
+//   · 版本化、不覆盖：重验取 N+1，旧报告保留；
+//   · `gateId` 段在 `<flowId>-` 与 `-report-v` 之间 ⇒ 既有最终验收报告扫描 `${flowId}-report-v` 不会匹配
+//     gate 报告，验收分诊/最终验收不会被 gate 报告污染；
+//   · 本模块只做**词法/版本扫描**（同步只读），不读写报告内容。
+
+/** Gate 复核报告的项目相对路径（`docs/acceptance/<flowId>-<gateId>-report-vN.md`；version 缺省 1）。 */
+export function gateReviewReportRelPath(flowId: string, gateId: string, version = 1): string {
+  return `docs/acceptance/${flowId}-${gateId}-report-v${version}.md`;
+}
+
+/** 最新 gate 复核报告（项目相对路径 + 版本号 N）。 */
+export interface LatestGateReviewReport {
+  relPath: string;
+  version: number;
+}
+
+/**
+ * 扫描 `docs/acceptance/` 下 `<flowId>-<gateId>-report-vN.md`，取 N 最高的文件；
+ * 目录不可读/无匹配 ⇒ `undefined`（调用方按缺失处理；**不回退旧版本**，不猜）。
+ */
+export function latestGateReviewReport(
+  projectRoot: string,
+  flowId: string,
+  gateId: string,
+): LatestGateReviewReport | undefined {
+  const prefix = `${flowId}-${gateId}-report-v`;
+  const name = latestVersionedMarkdownName(path.join(projectRoot, "docs", "acceptance"), prefix);
+  if (name === undefined) return undefined;
+  const version = Number(name.slice(prefix.length, name.length - ".md".length));
+  if (!Number.isSafeInteger(version) || version < 1) return undefined;
+  return { relPath: `docs/acceptance/${name}`, version };
+}
+
+/** 最新 gate 复核报告的相对路径（`latestGateReviewReport` 的薄封装）。 */
+export function latestGateReviewReportRelPath(
+  projectRoot: string,
+  flowId: string,
+  gateId: string,
+): string | undefined {
+  return latestGateReviewReport(projectRoot, flowId, gateId)?.relPath;
 }
 
 export interface AcceptanceCriteriaCheck {

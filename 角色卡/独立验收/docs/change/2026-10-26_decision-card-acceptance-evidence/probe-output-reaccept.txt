@@ -1,0 +1,8 @@
+== F1/F2 path probe (post-fix) ==
+{"label":"F1a desktop reject zero-recommended (valid flowId)","channel":"desktop","rawCalls":0,"presented":0,"outcome":"declined","notPresented":true,"ledgerEntries":[],"ledgerErrors":[]}
+{"label":"F1b desktop reject two-recommended (valid flowId)","channel":"desktop","rawCalls":0,"presented":0,"outcome":"declined","notPresented":true,"ledgerEntries":[],"ledgerErrors":[]}
+{"label":"F2a orchestration→raw convener zero-recommended","channel":"raw(orchestration->CLI-like)","rawCalls":0,"presented":0,"outcome":"declined","notPresented":true,"ledgerEntries":[],"ledgerErrors":[]}
+{"label":"F2b orchestration→raw convener missing flowId","channel":"raw(orchestration->CLI-like)","rawCalls":0,"presented":0,"outcome":"declined","notPresented":true,"ledgerEntries":[],"ledgerErrors":[]}
+{"label":"F2c single su decision card (role check only in desktop)","channel":"raw(orchestration->CLI-like)","rawCalls":0,"presented":0,"outcome":"declined","notPresented":true,"ledgerEntries":[],"ledgerErrors":[]}
+== F1 skip probe (valid card -> raw declined+notPresented) ==
+{"rawCalls":1,"outcome":"declined","notPresented":true,"operatorId":null,"ledgerEntries":[],"ledgerErrors":[],"flowCompletion":{"ready":true}}

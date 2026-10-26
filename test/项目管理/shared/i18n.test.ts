@@ -588,15 +588,15 @@ test("B1–B4 key 分区：ui/main/shared 计数与总 key 数符合契约（漏
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
   assert.deepEqual(prefixes, {
-    ui: 783, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7 + 2026-10-25 chat-panel 10 + background tasks 25 + flow status 22 + acceptance triage 28
-    main: 495, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6 + backgroundTasks 1 + flowStatus 2 + write preauthorization 6
+    ui: 786, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7 + 2026-10-25 chat-panel 10 + background tasks 25 + flow status 22 + acceptance triage 28 + 2026-10-26 decision card 3
+    main: 514, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6 + backgroundTasks 1 + flowStatus 2 + write preauthorization 6 + 2026-10-26 gate review 13 + 2026-10-26 decision card 6
     shared: 62, // B4 元数据 + 跨层通用短词
     preferences: 3, // B0
   });
-  assert.equal(keys.length, 1343);
+  assert.equal(keys.length, 1365);
   // B1/B2 与 B3 分区（扣除 B0 的 5 个 ui.* / 5 个 main.*）。
-  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 778);
-  assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 490);
+  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 781);
+  assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 509);
 });
 
 /**
@@ -1680,6 +1680,250 @@ test("验收返工路由 key：zh-CN/en-US 取值与插值（客户/自动/等�
   assert.ok(auditEn.includes("writing the audit record failed"));
   assert.ok(auditEn.includes("sent fact is not reversed"));
   assert.ok(auditEn.includes("does not fabricate ledger entries"));
+});
+
+/**
+ * 2026-10-26 gate 复核回执/系统行 key（客户授权实现 `request_gate_review`；设计
+ * `2026-10-26_design_proof-gate-reviews.md` §5–§8、§12；客户追加要求）。
+ * 契约：13 个 `main.gateReview.*` key 成对存在；gate 复核独立于最终验收
+ * （≠ 验收通过 ≠ 客户批准）；防吹毛求疵——gate fail 必须有 blocker/major，
+ * 只有 minor/nit 的 fail 退回 Proof、不触发返工；pass 可带 minor/nit 备注。
+ * 占位符：dispatched/alreadyDispatched/gateNotFound/criteriaMissing/nitOnly =
+ * {flowId}/{gateId}；flowIncomplete/unavailable/rejected/returnedToProof =
+ * {flowId}/{gateId}/{detail}；passNote/reportMissing = {flowId}/{gateId}/{reportPath}；
+ * failNote = {flowId}/{gateId}/{reportPath}/{severity}；reworkTask = {gateId}/{reportPath}/{severity}。
+ */
+const GATE_REVIEW_KEYS = [
+  "main.gateReview.dispatched",
+  "main.gateReview.alreadyDispatched",
+  "main.gateReview.gateNotFound",
+  "main.gateReview.criteriaMissing",
+  "main.gateReview.flowIncomplete",
+  "main.gateReview.unavailable",
+  "main.gateReview.rejected",
+  "main.gateReview.passNote",
+  "main.gateReview.failNote",
+  "main.gateReview.returnedToProof",
+  "main.gateReview.nitOnly",
+  "main.gateReview.reportMissing",
+  "main.gateReview.reworkTask",
+] as const satisfies readonly MessageKey[];
+
+test("gate 复核 key：13 个 main.gateReview.* 在 zh-CN/en-US 均存在，占位符逐 key 一致且符合契约", () => {
+  assert.equal(GATE_REVIEW_KEYS.length, 13);
+  const expectedPlaceholders: Record<(typeof GATE_REVIEW_KEYS)[number], string[]> = {
+    "main.gateReview.dispatched": ["flowId", "gateId"],
+    "main.gateReview.alreadyDispatched": ["flowId", "gateId"],
+    "main.gateReview.gateNotFound": ["flowId", "gateId"],
+    "main.gateReview.criteriaMissing": ["flowId", "gateId"],
+    "main.gateReview.flowIncomplete": ["detail", "flowId", "gateId"],
+    "main.gateReview.unavailable": ["detail", "flowId", "gateId"],
+    "main.gateReview.rejected": ["detail", "flowId", "gateId"],
+    "main.gateReview.passNote": ["flowId", "gateId", "reportPath"],
+    "main.gateReview.failNote": ["flowId", "gateId", "reportPath", "severity"],
+    "main.gateReview.returnedToProof": ["detail", "flowId", "gateId"],
+    "main.gateReview.nitOnly": ["flowId", "gateId"],
+    "main.gateReview.reportMissing": ["flowId", "gateId", "reportPath"],
+    "main.gateReview.reworkTask": ["gateId", "reportPath", "severity"],
+  };
+  for (const key of GATE_REVIEW_KEYS) {
+    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
+    assert.ok(key in enUS, `en-US 缺 ${key}`);
+    assert.deepEqual(placeholdersOf(zhCN[key]), expectedPlaceholders[key], `zh-CN 占位符不符契约：${key}`);
+    assert.deepEqual(placeholdersOf(enUS[key]), expectedPlaceholders[key], `en-US 占位符不符契约：${key}`);
+  }
+});
+
+test("gate 复核 key：独立于最终验收、防吹毛求疵；en-US 不含中文", () => {
+  // gate 复核 ≠ 验收通过 ≠ 客户批准（dispatched），且 gate 通过后仍须最终客户验收。
+  assert.ok(
+    zhCN["main.gateReview.dispatched"].includes("gate 复核 ≠ 验收通过 ≠ 客户批准"),
+    "zh-CN dispatched 必须写明 gate 复核 ≠ 验收通过 ≠ 客户批准",
+  );
+  const dispatchedEn = enUS["main.gateReview.dispatched"];
+  assert.ok(dispatchedEn.includes("not an acceptance pass"), "en-US dispatched 必须说明非验收通过");
+  assert.ok(dispatchedEn.includes("not customer approval"), "en-US dispatched 必须说明非客户批准");
+  assert.ok(zhCN["main.gateReview.passNote"].includes("最终客户验收"), "zh-CN passNote 必须保留最终客户验收");
+  assert.ok(
+    enUS["main.gateReview.passNote"].includes("final customer acceptance is still required"),
+    "en-US passNote 必须保留最终客户验收",
+  );
+  // 防吹毛求疵：只有 minor/nit 的 fail 退回验收、不触发返工；失败依据必须是 blocker/major。
+  assert.ok(zhCN["main.gateReview.nitOnly"].includes("blocker/major"), "zh-CN nitOnly 必须写明 blocker/major 依据");
+  assert.ok(zhCN["main.gateReview.nitOnly"].includes("不触发返工"), "zh-CN nitOnly 必须写明不触发返工");
+  const nitOnlyEn = enUS["main.gateReview.nitOnly"];
+  assert.ok(nitOnlyEn.includes("blocker/major"), "en-US nitOnly 必须写明 blocker/major 依据");
+  assert.ok(nitOnlyEn.includes("no rework"), "en-US nitOnly 必须写明不触发返工");
+  assert.ok(zhCN["main.gateReview.reworkTask"].includes("minor/nit 为非阻断"), "zh-CN reworkTask 必须把 minor/nit 标为非阻断");
+  assert.ok(
+    enUS["main.gateReview.reworkTask"].includes("minor/nit items are non-blocking"),
+    "en-US reworkTask 必须把 minor/nit 标为非阻断",
+  );
+  for (const key of GATE_REVIEW_KEYS) {
+    const value = enUS[key];
+    const text = typeof value === "string" ? value : Object.values(value).join("");
+    assert.equal(valueContainsHan(text), false, `en-US 含中文：${key}`);
+  }
+});
+
+test("gate 复核 key：zh-CN/en-US 取值与插值（已提交/已通过/失败/退回/防吹毛求疵）", () => {
+  assert.equal(
+    translate("zh-CN", "main.gateReview.dispatched", {
+      flowId: "flow-a",
+      gateId: "gate-vertical-slice",
+    }),
+    "流程 flow-a：已提交 gate gate-vertical-slice 复核给验收（工作中）；gate 复核 ≠ 验收通过 ≠ 客户批准。",
+  );
+  assert.equal(
+    translate("en-US", "main.gateReview.dispatched", {
+      flowId: "flow-a",
+      gateId: "gate-vertical-slice",
+    }),
+    "Flow flow-a: gate gate-vertical-slice review submitted to Proof (working); this is not an acceptance pass and not customer approval.",
+  );
+  assert.equal(
+    translate("zh-CN", "main.gateReview.failNote", {
+      flowId: "flow-a",
+      gateId: "gate-visual-level-01",
+      severity: "1 blocker / 2 major",
+      reportPath: "docs/acceptance/flow-a-gate-visual-level-01-report-v1.md",
+    }),
+    "流程 flow-a：gate gate-visual-level-01 未通过（1 blocker / 2 major；报告 docs/acceptance/flow-a-gate-visual-level-01-report-v1.md）；gate 保持 pending，返工后需重新请求复核。",
+  );
+  assert.equal(
+    translate("en-US", "main.gateReview.reportMissing", {
+      flowId: "flow-a",
+      gateId: "gate-integration-performance",
+      reportPath: "docs/acceptance/flow-a-gate-integration-performance-report-v1.md",
+    }),
+    "Flow flow-a: the gate gate-integration-performance report is missing or unreadable (docs/acceptance/flow-a-gate-integration-performance-report-v1.md); the gate stays pending while waiting for Proof to submit it — a timeout never counts as a pass.",
+  );
+  assert.equal(
+    translate("zh-CN", "main.gateReview.reworkTask", {
+      gateId: "gate-vertical-slice",
+      severity: "1 blocker",
+      reportPath: "docs/acceptance/flow-a-gate-vertical-slice-report-v1.md",
+    }),
+    "Gate 返工任务｜gate-vertical-slice：按 gate 报告 docs/acceptance/flow-a-gate-vertical-slice-report-v1.md 的 1 blocker 项修复；minor/nit 为非阻断、可选后续。",
+  );
+});
+
+/**
+ * 2026-10-26 decision 卡 key（客户规则：主理发现材料性选择不得自定，交统筹发
+ * `request_choice(cardKind="decision")`；卡内恰好一个推荐项；开启「替我决策」时判断 agent
+ * 默认推荐；decision 卡独立于提案/任命/验收，不是客户批准，不触发 gate/验收）。
+ * 契约：3 个 `ui.decisionCard.*` + 6 个 `main.decisionCard.*` 成对存在；
+ * selectedRecommended/selectedOther/judgeSelectedRecommended 占位符 {option}；
+ * noRecommended/invalid 占位符 {detail}；notApproval 与 UI key 无占位符；
+ * judge 代批必须标「自动代理」且不得写成客户本人；en-US 不含中文。
+ */
+const DECISION_CARD_KEYS = [
+  "ui.decisionCard.title",
+  "ui.decisionCard.notApprovalBadge",
+  "ui.decisionCard.recommended",
+  "main.decisionCard.selectedRecommended",
+  "main.decisionCard.selectedOther",
+  "main.decisionCard.judgeSelectedRecommended",
+  "main.decisionCard.notApproval",
+  "main.decisionCard.noRecommended",
+  "main.decisionCard.invalid",
+] as const satisfies readonly MessageKey[];
+
+test("decision 卡 key：3 个 ui.decisionCard.* + 6 个 main.decisionCard.* 在 zh-CN/en-US 均存在，占位符逐 key 一致", () => {
+  assert.equal(DECISION_CARD_KEYS.length, 9);
+  const expectedPlaceholders: Record<(typeof DECISION_CARD_KEYS)[number], string[]> = {
+    "ui.decisionCard.title": [],
+    "ui.decisionCard.notApprovalBadge": [],
+    "ui.decisionCard.recommended": [],
+    "main.decisionCard.selectedRecommended": ["option"],
+    "main.decisionCard.selectedOther": ["option"],
+    "main.decisionCard.judgeSelectedRecommended": ["option"],
+    "main.decisionCard.notApproval": [],
+    "main.decisionCard.noRecommended": ["detail"],
+    "main.decisionCard.invalid": ["detail"],
+  };
+  for (const key of DECISION_CARD_KEYS) {
+    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
+    assert.ok(key in enUS, `en-US 缺 ${key}`);
+    assert.deepEqual(placeholdersOf(zhCN[key]), expectedPlaceholders[key], `zh-CN 占位符不符契约：${key}`);
+    assert.deepEqual(placeholdersOf(enUS[key]), expectedPlaceholders[key], `en-US 占位符不符契约：${key}`);
+  }
+});
+
+test("decision 卡 key：独立于提案/任命/验收，不是客户批准；judge 代批不得写成客户本人；en-US 不含中文", () => {
+  assert.ok(zhCN["ui.decisionCard.title"].includes("材料性选择"), "zh-CN 决策卡标题必须写明材料性选择");
+  assert.equal(zhCN["ui.decisionCard.recommended"], "推荐");
+  assert.equal(enUS["ui.decisionCard.recommended"], "Recommended");
+  assert.ok(zhCN["ui.decisionCard.notApprovalBadge"].includes("非客户批准"), "zh-CN 徽标必须写明非客户批准");
+  // 决策卡不是验收/客户批准、不构成验收/提案/任命决定、不触发 gate/验收；
+  // 账本按 decisionKind="material-choice" 单独审计，禁止在文案里说「不写 customer.decision」。
+  const notApprovalZh = zhCN["main.decisionCard.notApproval"];
+  assert.ok(notApprovalZh.includes("不是验收"), "zh-CN notApproval 必须写明不是验收");
+  assert.ok(notApprovalZh.includes("不是客户批准"), "zh-CN notApproval 必须写明不是客户批准");
+  assert.ok(
+    notApprovalZh.includes("不构成验收/提案/任命决定"),
+    "zh-CN notApproval 必须写明不构成验收/提案/任命决定",
+  );
+  assert.ok(notApprovalZh.includes("不触发 gate/验收"), "zh-CN notApproval 必须写明不触发 gate/验收");
+  assert.equal(notApprovalZh.includes("不写 customer.decision"), false, "zh-CN notApproval 不得声称不写 customer.decision");
+  const notApprovalEn = enUS["main.decisionCard.notApproval"];
+  assert.ok(notApprovalEn.includes("not acceptance"), "en-US notApproval 必须写明 not acceptance");
+  assert.ok(notApprovalEn.includes("not customer approval"), "en-US notApproval 必须写明 not customer approval");
+  assert.ok(
+    notApprovalEn.includes("does not constitute an acceptance/proposal/appointment decision"),
+    "en-US notApproval 必须写明不构成验收/提案/任命决定",
+  );
+  assert.ok(notApprovalEn.includes("triggers no gate or acceptance"), "en-US notApproval 必须写明不触发 gate/验收");
+  assert.equal(
+    notApprovalEn.includes("does not write customer.decision"),
+    false,
+    "en-US notApproval 不得声称不写 customer.decision",
+  );
+  // judge 代批：必须标自动代理，明确不是客户本人选择。
+  assert.ok(zhCN["main.decisionCard.judgeSelectedRecommended"].includes("自动代理"), "zh-CN judge 行必须标自动代理");
+  assert.ok(zhCN["main.decisionCard.judgeSelectedRecommended"].includes("不是客户本人选择"), "zh-CN judge 行不得写成客户本人");
+  const judgeEn = enUS["main.decisionCard.judgeSelectedRecommended"];
+  assert.ok(judgeEn.includes("automatic agent"), "en-US judge 行必须标 automatic agent");
+  assert.ok(judgeEn.includes("not a selection by the customer"), "en-US judge 行不得写成客户本人");
+  // 无唯一推荐项/非法卡：fail-closed，未向客户发卡。
+  for (const key of ["main.decisionCard.noRecommended", "main.decisionCard.invalid"] as const) {
+    assert.ok(zhCN[key].includes("fail-closed"), `zh-CN ${key} 必须写明 fail-closed`);
+    assert.ok(zhCN[key].includes("未向客户发卡"), `zh-CN ${key} 必须写明未向客户发卡`);
+    assert.ok(enUS[key].includes("fail-closed"), `en-US ${key} 必须写明 fail-closed`);
+    assert.ok(enUS[key].includes("no card was sent to the customer"), `en-US ${key} 必须写明未向客户发卡`);
+  }
+  for (const key of DECISION_CARD_KEYS) {
+    const value = enUS[key];
+    const text = typeof value === "string" ? value : Object.values(value).join("");
+    assert.equal(valueContainsHan(text), false, `en-US 含中文：${key}`);
+  }
+});
+
+test("decision 卡 key：zh-CN/en-US 取值与插值（选推荐项/非推荐项/judge 代批/非法卡）", () => {
+  assert.equal(
+    translate("zh-CN", "main.decisionCard.selectedRecommended", { option: "方案 A" }),
+    "决策卡：你选择了推荐项「方案 A」；已如实记录本次材料性选择。",
+  );
+  assert.equal(
+    translate("en-US", "main.decisionCard.selectedRecommended", { option: "Option A" }),
+    "Decision card: you selected the recommended option “Option A”; this material choice has been recorded as-is.",
+  );
+  assert.equal(
+    translate("zh-CN", "main.decisionCard.selectedOther", { option: "方案 B" }),
+    "决策卡：你选择了「方案 B」（非推荐项）；已如实记录本次材料性选择。",
+  );
+  assert.equal(
+    translate("zh-CN", "main.decisionCard.judgeSelectedRecommended", { option: "方案 A" }),
+    "judge 代批 · 代决策（自动代理）：已按唯一推荐项「方案 A」记录；不是客户本人选择。",
+  );
+  assert.equal(
+    translate("en-US", "main.decisionCard.noRecommended", { detail: "recommended option missing" }),
+    "Decision card has no unique recommended option (recommended option missing); no card was sent to the customer (fail-closed). Fix and retry.",
+  );
+  assert.equal(
+    translate("zh-CN", "main.decisionCard.invalid", { detail: "重复的推荐项" }),
+    "decision 卡参数非法（重复的推荐项）；未向客户发卡（fail-closed），请修正后重试。",
+  );
 });
 
 /**

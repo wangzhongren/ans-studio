@@ -291,6 +291,40 @@
   border-color: var(--ring);
   color: var(--ring);
 }
+/* decision 卡（材料性选择）：「非客户批准」身份标识与推荐项标识（2026-10-26）。
+   非 decision 卡不渲染这两个类；推荐标识只随 recommended === true 的选项出现。 */
+.op-decision-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-micro);
+  color: var(--text-2);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.op-recommended-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  margin-left: auto;
+  padding: 0 6px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-micro);
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+/* decision 卡的原问题（request.title）：固定标题之外不丢「要决定什么」。 */
+.op-question {
+  margin: 4px 0 0;
+  color: var(--foreground);
+  font-size: 12.5px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
 .op-mirror-source {
   margin: 2px 0 4px;
   color: var(--text-2);

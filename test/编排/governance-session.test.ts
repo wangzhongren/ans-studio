@@ -412,7 +412,7 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
 
     const trio = trioProject(root);
     const expectations: Array<["liaison" | "proposal" | "nomination" | "schedule" | "verification", RegExp[]]> = [
-      ["liaison", [/沟通权纪律（主理/, /docs\/intents\//, /hand_off_intent/, /交接 ≠ 客户批准/, /intent-confirm/, /质量档位/, /原型档/, /治理协调（2026-10-24）/, /不直接派 Crew\/Proof/, /Proof 只收状态\+报告指针/]],
+      ["liaison", [/沟通权纪律（主理/, /docs\/intents\//, /hand_off_intent/, /交接 ≠ 客户批准/, /intent-confirm/, /质量档位/, /原型档/, /治理协调（2026-10-24）/, /不直接派 Crew\/Proof/, /Proof 只收状态\+报告指针/, /系统消息只汇报、不派活（2026-10-26 客户规则）/, /不得据此给统筹（Steward）发任务、不得 `dispatch_task`（也不得派项目 worker）/, /客户明确要求或由客户消息触发的协调仍按原规则/]],
       ["proposal", [/提案权纪律（提案/, /docs\/proposals\//, /cardKind=proposal/, /不拥有最终批准权/, /证据计划/, /工程质量基线/, /架构方案/, /架构影响分析/, /扩展点/, /模块分解与职责/]],
       ["nomination", [/组队\/写卡纪律（组队/, /docs\/scheduling\//, /appointment-write/, /不再发任命卡/, /团队计划/]],
       ["schedule", [/编排权纪律（统筹/, /docs\/flows\//, /docs\/scheduling\//, /cardKind=appointment/, /dispatch_task/, /flowId.*stepId/, /真实启动/, /演示/, /架构与边界/, /契约冻结/, /扩展点必须有覆盖步骤/, /发布标记（2026-10-24，P0-1）/, /cardKind=schedule-write/, /不是发布版本保持缺省/, /所有变更（含非发布）[^\n]*验收门派 Proof/]],
@@ -524,6 +524,14 @@ test("标准工作流（2026-10-24 修订：所有变更）：trio 与 single/su
       [/`release` 仅可选发布元数据，\*\*不是独立验收的启动条件\*\*/, "release 仅可选元数据、不是启动条件"],
       [/Steward 用既有 `request_confirmation`（`cardKind=schedule-write`）[^\n]*`release`/, "Steward 用 schedule-write 写 release 元数据"],
       [/验收派发不是验收决定/, "验收派发不是验收决定"],
+      // 2026-10-26 客户规则：主理收到系统消息（治理协调/gate pass/fail/交付阻塞通知）只向客户汇报，
+      // 不得据此给 Steward 发任务/dispatch_task；客户明确要求或客户消息触发的协调仍按原规则。
+      [/主理收到系统消息时只向客户汇报（2026-10-26 客户规则）/, "主理系统消息只汇报标题"],
+      [/`\[系统·治理协调\]`、gate pass\/fail 系统行、交付\/阻塞通知等/, "系统消息范围"],
+      [/不得据此给统筹（Steward）发任务、不得 `dispatch_task`（也不得派项目 worker）/, "不得据系统消息派统筹/项目 worker"],
+      [/不得把系统通知改写成协调任务/, "不得把系统通知改写成协调任务"],
+      [/只有客户明确要求、或由客户消息触发的协调，才按原规则协调\/派发/, "客户消息触发的协调保持原规则"],
+      [/系统消息不代表客户批准、不构成新任务/, "系统消息不是客户指令"],
       // 2026-10-24 修订：标准门对所有声明 acceptance-criteria 步骤的新契约 flow（含非发布）生效，读取最新 vN；
       // legacy（无 YAML 或无该步骤）保留原放行。
       [/声明了 `acceptance-criteria` 步骤的新契约 flow YAML/, "criteria 门覆盖所有新契约 flow"],

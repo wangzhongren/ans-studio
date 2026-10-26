@@ -145,7 +145,7 @@ import { isRecoveryAction, type RecoveryConfirmPresenter } from "./recovery-chan
 import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn } from "../../src/model/runtime.ts";
 // 2026-10-25 独立复核请求（request_acceptance）：能力/回执形状唯一来源＝契约家 `model/runtime.ts`
 // （只读导入、不复制；注入端只做项目绑定，校验/派发由 Interface 能力实现）。
-import type { RequestAcceptanceFn, RequestAcceptanceInput, RequestAcceptanceResult } from "../../src/model/runtime.ts";
+import type { RequestAcceptanceFn, RequestAcceptanceInput, RequestAcceptanceResult, RequestGateReviewFn, RequestGateReviewInput, RequestGateReviewResult } from "../../src/model/runtime.ts";
 // 2026-10-26 边界变更请求（request_boundary_change）：同源契约；仅统筹（convener）会话注入。
 import type {
   RequestBoundaryChangeFn,
@@ -423,6 +423,8 @@ export interface SessionManagerDeps {
       dispatchTask?: DispatchTaskFn;
       /** **独立复核请求能力**（2026-10-25 request_acceptance）：仅内置治理角色会话注入（见 SessionManager.open）。 */
       requestAcceptance?: RequestAcceptanceFn;
+      /** **gate 复核请求能力**（2026-10-26 request_gate_review）：仅统筹（convener）会话注入（见 SessionManager.open）。 */
+      requestGateReview?: RequestGateReviewFn;
       /** **边界变更请求能力**（2026-10-26 request_boundary_change）：仅统筹（convener）会话注入（见 SessionManager.open）。 */
       requestBoundaryChange?: RequestBoundaryChangeFn;
       /**
@@ -623,6 +625,15 @@ export interface SessionManagerDeps {
    * 编排再按 `builtInGovernance` 收口。缺省 ⇒ 不注入 ⇒ 工具不注册（结构性 fail-closed）。
    */
   requestAcceptance?: (projectRoot: string, input: RequestAcceptanceInput) => Promise<RequestAcceptanceResult>;
+  /**
+   * **gate 复核请求能力**（2026-10-26 `request_gate_review`，客户授权）：绑定项目的应用侧实现
+   * （`projectRoot` 由本层按会话补入，工具载荷只带 `flowId?`/`gateId`/`note?`）。gate 查找/状态/记录幂等/
+   * 前置与证据完整性/标准节/引擎解析/Proof 派发/账本与记录全在实现内。
+   * **仅统筹（`governanceFunction === "schedule"`，convener）会话注入**——项目角色与其它内置治理角色不注入；
+   * 编排再按治理职能/内置角色收口。缺省 ⇒ 不注入 ⇒ 工具不注册（结构性 fail-closed）。
+   * **gate 复核 ≠ 验收通过 ≠ 客户批准**。
+   */
+  requestGateReview?: (projectRoot: string, input: RequestGateReviewInput) => Promise<RequestGateReviewResult>;
   /**
    * **边界变更请求能力**（2026-10-26 `request_boundary_change`）：绑定项目的应用侧实现（`projectRoot` 与
    * 发起治理角色 `requesterRoleId` 由本层按会话补入，工具载荷只带 roleId/addPaths/removePaths/rationale/flowId）。
@@ -2195,6 +2206,13 @@ export class SessionManager {
       role.builtIn === true && this.deps.requestAcceptance !== undefined
         ? (input: RequestAcceptanceInput) => this.deps.requestAcceptance!(req.projectRoot, input)
         : undefined;
+    // 2026-10-26 gate 复核请求（request_gate_review）：**仅统筹（convener）会话注入**（判据＝治理职能
+    // `governanceFunction === "schedule"`，数据驱动，不硬编码角色 id）。项目角色、其他内置治理角色、
+    // single/su 一律不注入（能力缺席＝最强 fail-closed）。**gate 复核 ≠ 验收通过 ≠ 客户批准**。
+    const requestGateReview: RequestGateReviewFn | undefined =
+      governanceFunction === "schedule" && this.deps.requestGateReview !== undefined
+        ? (input: RequestGateReviewInput) => this.deps.requestGateReview!(req.projectRoot, input)
+        : undefined;
     // 2026-10-26 边界变更请求（request_boundary_change）：**仅统筹（convener）会话注入**。
     // 判据是治理职能（`governanceFunction === "schedule"`，数据驱动，不硬编码角色 id）；项目角色、
     // 其他内置治理角色、single/su 一律不注入（su 无组队可派，工具不注册 = 结构性 fail-closed）。
@@ -2407,6 +2425,7 @@ export class SessionManager {
           // 2026-10-25 独立复核请求（request_acceptance，仅内置治理角色会话注入；项目角色不注入）。
           // 「未注入即不注册」——编排/运行时核心据此不注册工具（结构性 fail-closed）。请求复核 ≠ 客户批准。
           ...(requestAcceptance ? { requestAcceptance } : {}),
+          ...(requestGateReview ? { requestGateReview } : {}),
           // 2026-10-26 边界变更请求（request_boundary_change，仅统筹/convener 会话注入；其余角色不注入）。
           // 「未注入即不注册」——编排/运行时核心据此不注册工具（结构性 fail-closed）。请求变更 ≠ 客户批准。
           ...(requestBoundaryChange ? { requestBoundaryChange } : {}),

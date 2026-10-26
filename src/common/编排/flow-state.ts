@@ -48,6 +48,36 @@ export const FLOW_STEP_KINDS = ["dispatch", "customer-decision", "artifact", "ac
 export type FlowStepKind = (typeof FLOW_STEP_KINDS)[number];
 
 /**
+ * Gate 复核种类（2026-10-26 客户授权 `request_gate_review`；设计
+ * `2026-10-26_design_proof-gate-reviews.md` §3.1/§4.3，方案 C）：
+ *   · `vertical-slice`          垂直切片门（脚手架 + 首个端到端可玩/可用切片）；
+ *   · `visual-baseline`         视觉基线门（UI/游戏真实窗口；DEBUG 关闭截图由 Proof 判）；
+ *   · `integration-performance` 集成/性能门（e2e/契约/性能证据齐备后、最终验收前）。
+ *
+ * **不是新的 `FlowStepKind`**：gate 步骤仍表达为 `kind: artifact` + 可选 `gateKind`；最终客户验收仍是
+ * `kind: acceptance` 的保留步骤，**不是** gate。旧 flow 不含 `gateKind` ⇒ 解析/序列化/行为逐字不变。
+ */
+export const FLOW_GATE_KINDS = ["vertical-slice", "visual-baseline", "integration-performance"] as const;
+export type FlowGateKind = (typeof FLOW_GATE_KINDS)[number];
+
+/**
+ * 含 `gateKind` 的步骤 id 形状（`gate-<slug>`；允许 `gate-visual-level-01` 这类多实例）。
+ * 只对含 `gateKind` 的步骤生效；保留验收 id（verification/acceptance）天然不匹配。
+ */
+export const FLOW_GATE_STEP_ID_PATTERN = "^gate-[a-z0-9]+(?:-[a-z0-9]+)*$";
+const FLOW_GATE_STEP_ID_RE = new RegExp(FLOW_GATE_STEP_ID_PATTERN);
+
+/** 是否为受支持的 gate 种类（严格枚举；未知值 fail-closed，不猜）。 */
+export function isFlowGateKind(value: unknown): value is FlowGateKind {
+  return typeof value === "string" && (FLOW_GATE_KINDS as readonly string[]).includes(value);
+}
+
+/** 是否为 gate 步骤 id（`gate-<slug>`；仅用于含 `gateKind` 的步骤形状与收口入口校验）。 */
+export function isFlowGateStepId(value: unknown): boolean {
+  return typeof value === "string" && FLOW_GATE_STEP_ID_RE.test(value);
+}
+
+/**
  * 步骤状态。`superseded` 是唯一「不参与完成判定」的状态：被 retake/重派取代的旧步骤必须显式标
  * `superseded`（旧 Markdown 的 `cancelled` 迁移时映射为此值）；`failed/blocked/aborted` 未标
  * `superseded` 时仍 fail-closed（挡住收尾门）。
@@ -150,6 +180,18 @@ export interface FlowStateStep {
    * 目标必须存在、不得自依赖/重复/成环；旧 flow 不填 ⇒ 不新增任何检查。
    */
   dependsOn?: string[];
+  /**
+   * Gate 复核种类（可选；2026-10-26 客户授权，方案 C：`kind: artifact` + 可选 `gateKind`）。
+   *
+   * 含该字段的步骤是**验收门禁（gate）**，不是最终验收：
+   *   · 只允许 `kind: artifact`；id 必须匹配 `FLOW_GATE_STEP_ID_PATTERN`；owner 必须是 `verifier`；
+   *     evidence 必须存在且 `kind: artifact`（报告路径 `docs/acceptance/<flowId>-<stepId>-report-vN.md`）；
+   *   · `done` **只能由应用**按 Proof gate 报告收口（`completeGateStep`）；角色
+   *     `flow_step_update(done)` 一律拒绝（`gate-review-required`）；
+   *   · `observeFlowArtifacts` 跳过含 `gateKind` 的步骤（失败报告不得被自动观测成 done 证据）；
+   *   · 旧 flow 不含该字段 ⇒ 解析/序列化/门禁/ready/证据对账逐字不变。
+   */
+  gateKind?: FlowGateKind;
 }
 
 /**
@@ -243,6 +285,7 @@ const STEP_KEYS = new Set([
   "supersededBy",
   "parallelGroup",
   "dependsOn",
+  "gateKind",
 ]);
 const EVIDENCE_KEYS = new Set(["kind", "ref"]);
 
@@ -557,6 +600,47 @@ export function parseFlowStateYaml(text: string, flowId: string): ParseFlowState
       }
     }
 
+    // —— gateKind（可选；2026-10-26 客户授权，方案 C） ——
+    //
+    // 含 gateKind 的步骤是验收门禁：只允许 kind: artifact；id 匹配 gate-<slug>；owner=verifier；
+    // evidence 必须存在且 kind=artifact。所有约束只对**声明了 gateKind 的步骤**生效——旧 flow 不含
+    // 该字段时零新增检查、零行为变化。未知值/未知字段 fail-closed（不猜、不静默忽略）。
+    let gateKind: FlowGateKind | undefined;
+    if (rawStep.gateKind !== undefined) {
+      if (!isFlowGateKind(rawStep.gateKind)) {
+        push(
+          `${base}.gateKind`,
+          `gateKind 必须是 ${enumList(FLOW_GATE_KINDS)}（当前 ${JSON.stringify(rawStep.gateKind)}）`,
+        );
+      } else {
+        gateKind = rawStep.gateKind;
+        if (kindValid && kind !== "artifact") {
+          push(
+            `${base}.gateKind`,
+            `gateKind 只允许出现在 kind: artifact 的步骤上（当前 kind=${String(kind)}）；gate 不是新的 FlowStepKind。`,
+          );
+        }
+        if (id !== undefined && isSlug(id) && !FLOW_GATE_STEP_ID_RE.test(id)) {
+          push(
+            `${base}.id`,
+            `含 gateKind 的步骤 id 必须匹配 ${FLOW_GATE_STEP_ID_PATTERN}` +
+              `（如 gate-vertical-slice / gate-visual-level-01；当前 "${id}"）`,
+          );
+        }
+        if (owner !== undefined && owner !== "verifier") {
+          push(`${base}.owner`, `含 gateKind 的步骤 owner 必须是 verifier（当前 "${owner}"）`);
+        }
+        if (rawStep.evidence === undefined) {
+          push(
+            `${base}.evidence`,
+            `含 gateKind 的步骤必须提供 evidence{kind: "artifact", ref: "docs/acceptance/<flowId>-<stepId>-report-vN.md"}（当前缺失）`,
+          );
+        } else if (evidence !== undefined && evidence.kind !== "artifact") {
+          push(`${base}.evidence.kind`, `含 gateKind 的步骤 evidence.kind 必须是 artifact（当前 ${evidence.kind}）`);
+        }
+      }
+    }
+
     steps.push({
       id: id ?? "",
       title: title ?? "",
@@ -568,6 +652,7 @@ export function parseFlowStateYaml(text: string, flowId: string): ParseFlowState
       ...(supersededBy !== undefined ? { supersededBy } : {}),
       ...(parallelGroup !== undefined ? { parallelGroup } : {}),
       ...(dependsOn !== undefined ? { dependsOn } : {}),
+      ...(gateKind !== undefined ? { gateKind } : {}),
     });
   });
 
@@ -1266,6 +1351,7 @@ export interface ReadyFlowStep {
  *   · `already-dispatched`    账本已有 dispatch.accepted（该 stepId 已派发过）；
  *   · `awaiting-customer`     `kind: customer-decision`（待客户决定，人工闸门）；
  *   · `awaiting-acceptance`   `kind: acceptance`（验收出口，永不自动）；
+ *   · `awaiting-gate`         含 `gateKind` 的 gate 步骤（只能由应用按 Proof 报告收口，永不进入 ready）；
  *   · `app-owned`             `owner` 为 `app`（应用自身执行，不交角色调度）；
  *   · `owner-missing`         `owner` 为空（无法确定调度对象，fail-closed）；
  *   · `dependency-missing`    dependsOn 引用的步骤不存在；
@@ -1279,6 +1365,7 @@ export interface SkippedFlowStep {
     | "already-dispatched"
     | "awaiting-customer"
     | "awaiting-acceptance"
+    | "awaiting-gate"
     | "app-owned"
     | "owner-missing"
     | "dependency-missing"
@@ -1377,6 +1464,12 @@ export function listReadyFlowSteps(
     }
     if (step.kind === "customer-decision") {
       skipped.push({ id: step.id, reason: "awaiting-customer" });
+      continue;
+    }
+    // gate 步骤永不进入 ready：done 只能由应用按 Proof gate 报告收口（completeGateStep），
+    // 角色不能派发/代标（否则「统筹自查当复核」会绕过独立复核权威）。
+    if (step.gateKind !== undefined) {
+      skipped.push({ id: step.id, reason: "awaiting-gate" });
       continue;
     }
 

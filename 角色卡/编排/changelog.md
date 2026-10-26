@@ -1,5 +1,56 @@
 # 编排 变更记录
 
+## 2026-10-26 — decision 卡（material-choice）编排分类与账本 + 判断 agent 合法 decision 分支
+
+**来源**：客户 2026-10-26 规则（经主控任务转达；PM 设计登记 `2026-10-26_design_decision-card.md`，`rules-only`）——材料性选择由统筹发 `request_choice(cardKind="decision")`，卡内恰一个推荐项，「替我决策」开启默认推荐；decision 卡独立于提案/任命/验收，不是客户批准，不触发 gate/验收。运行时核心已交付 `GovernanceChoiceCardKind."decision"`、`GOVERNANCE_CARD_GROUP.decision="decision"`、`CustomerInputOption.recommended`；本批补编排分类/账本与判断 agent 分支（协调补遗：原 verdict 无 `case "decision"` 会回落 unknown/manual）。
+
+**改了什么**
+- `run-role.ts`：`TRIO_CARD_KINDS.convener` 增 `"decision"`（**仅统筹**；Lead 仍只有 intent-confirm，其他内置角色不发）；`classifyCustomerDecision` 增 `case "decision"`——恰好选中一个**卡上选项** ⇒ `decisionKind:"material-choice"` + `customerDecision:"accepted"` + `selectedOptions:[选中项]`（不写 `targetRoleIds`，不伪装任命/提案/验收）；多选/空选/未知选项 ⇒ `unclassified/none`；`ledgerEntrySignature` 纳入 `selectedOptions`；`judgeArtifactsForCard` 的 decision 卡不挂任何规范物证。**默认兜底安全缺口（协调抓出）**：`hasRecommendedOption` 在 choice 默认之前识别任一 `recommended:true`——缺 `cardKind` 的 decision 形状卡不再被默认成 appointment（Convener），直接 `declined + notPresented`、不触达客户/不写账本（CLI 同样 fail-closed）；无 recommended 的 appointment 默认零回归。
+- `governance-ledger.ts`：`GovernanceDecisionKind` 增 `"material-choice"`（审计值：不满足任何 gate/验收门、不进入 `latestAcceptanceDecision`、不能充当 flow `customer-decision` 证据）；`GovernanceLedgerEntry.selectedOptions?: string[]` 可选新增（仅 material-choice 携带；门禁不读；向后兼容）。
+- `governance-judge-verdict.ts`：approve switch 增 `case "decision"`（不再落未知卡种 manual）——choice 卡、**恰一个** `recommended:true`、`selected` 恰为该推荐项才 approve；否则 manual（`insufficient-evidence`/`not-recommended`）；审计经既有 `governanceJudgeAuditFromOutcome`。
+- `governance-judge-facts.ts`：`requiredArtifactPaths` 增 decision ⇒ `{paths:[],missing:false}`（避免误判 artifact-missing）。
+- `governance-judge-evidence.ts`/`governance-judge-prompt.ts`：证据包/卡面 options 透传 `recommended`（旧卡种包体逐字不变）；系统提示新增 decision rubric（只能按唯一推荐项代批、不得发明/改选，独立于意图/gate/验收）。
+- **独立验收修复（F1/F2）**：F1——`recordCustomerDecision` 对 `declined + notPresented:true` 不再写账本（「无呈现 = 无决定」；避免 `unclassified/none` 成为未结算决定永久挡收尾门/最终验收）；早退位于 **`system:` 预授权分支之后**，`system:write-preauthorization` 拒绝仍记 `governance.preauthorization.declined` 诊断（复验收口）。F2——新增 `src/common/编排/decision-card.ts::validateDecisionCardRequest`（纯函数：仅 trio convener、choice、合法 flowId、≥2 选项、id 非空唯一、**恰一个** `recommended`），在 `governedInput` 触达 raw 客户通道之前执行（CLI/single/su/项目角色同样 fail-closed；失败 ⇒ `declined + notPresented`、不调 raw/不写账本/不带 operatorId），并经 `run-role.ts` Pipeline 公共出口再导出（含 `DECISION_CARD_MIN_OPTIONS`/两类型）供桌面窗口复用，不复制第二份。
+
+**测试**：新增 `test/编排/decision-card.test.ts` 19 例（统筹可发/其余角色不可发；选中一个→material-choice 账本；缺 cardKind 带 recommended 不被默认 appointment 且不写任命账本；无 recommended 的 appointment 默认零回归；多选/空选/未知→unclassified；不影响 proposal/appointment/acceptance/gate；判断 approve/manual/unknown 分支；证据包推荐项；**F1 未呈现零账本 + 收尾门不被挡 + system 预授权拒绝仍记诊断；F2 共享校验正反例、缺 flowId、single/su/项目角色拒发**）。`node --test "test/编排/decision-card.test.ts"` 19/19；`node --test "test/编排/**/*.test.ts"` → **1004 tests / 1002 pass / 1 fail / 1 skip**（唯一红＝既有 Windows symlink EPERM 基线）；定向 judge/session/gate/证据包 169/169；定向桌面只读 `operator-wiring` 73/73。`npm run typecheck` → **exit 0**（本批期间桌面并行编辑的临时错误随其收口消失）。
+
+**偏差/风险**：`rules-only` 设计原文第 4 条写「不写 `customer.decision`」；本批按主控任务与运行时核心/桌面同批约定以 `customer.decision{decisionKind:"material-choice"}` 作**审计留痕**（机械保证不触发任何门禁/验收、不是客户批准）——字面冲突如实登记，独立验收若按原文机械核对需客户/治理裁决。推荐项唯一性由桌面卡校验与 judge 分支保证（编排包装器不重复校验）；无 flowId 的卡不入账；未做桌面卡面/系统行/e2e/独立验收/commit。
+
+详见[变更记录](docs/change/2026-10-26_change_decision-card-orchestration.md)。
+
+## 2026-10-26 — 主理收到系统消息只向客户汇报、不派统筹（Lead/liaison prompt 规则）
+
+**来源**：客户追加行为规则——主理（Lead/liaison）收到系统消息时只向客户汇报，**不要给统筹（Steward）发任务 / 不要 `dispatch_task`**。系统消息包括 `[系统·治理协调]`、gate pass/fail 系统行、交付/阻塞通知；客户明确要求或客户消息触发的协调仍按原规则。
+
+**改了什么**
+- `govern-session.ts::STANDARD_WORKFLOW_PROMPT` 新增「主理收到系统消息时只向客户汇报（2026-10-26 客户规则）」条：系统消息不是客户指令，不得据此给 Steward 发任务/`dispatch_task`（也不得派项目 worker）/改写成协调任务；只有客户明确要求或客户消息触发的协调才按原规则；系统消息不代表客户批准、不构成新任务。
+- `governanceFunctionDiscipline` 的 liaison（主理）分支新增对应纪律；`buildGovernPrompt` 注释同步。
+- `test/编排/governance-session.test.ts` 在标准工作流（trio 五角色 + single/su）与 liaison 分角色断言中补充该规则的正向 prompt 断言；既有断言未弱化。
+
+**未改**：门禁角色卡（`governance-roles.ts`，由门禁引擎属主同步）、`app/desktop/**` 系统行/投递文案、`run-role.ts`（无 Lead 专用 prompt 文案）；未 commit/push。
+
+**验证**：`npm run typecheck` exit 0；`node --test "test/编排/governance-session.test.ts"` 39/39；`node --test "test/编排/**/*.test.ts"` → 985 tests / 983 pass / 1 fail / 1 skip（唯一红＝既有 Windows symlink EPERM 基线）。
+
+详见[变更记录](docs/change/2026-10-26_change_lead-system-message-report-only.md)。
+
+## 2026-10-26 — gate 复核（`request_gate_review`）编排/Flow 核心：gateKind、completeGateStep、gate.review 账本
+
+**来源**：客户 2026-10-26 追加授权 `request_gate_review` 与设计 `2026-10-26_design_proof-gate-reviews.md` §4/§8/§9/§10/§12（方案 C：`kind: artifact` + 可选 `gateKind`，不新增 `FlowStepKind`）。追加要求：gate 是独立于最终验收的通道；**防吹毛求疵**——fail 必须至少一个 blocker/major，只有 minor/nit 的 fail 按结构不符退回 Proof、不触发返工；pass 可带 minor/nit 备注。本批只做编排/Flow 侧核心；运行时核心契约/工具、门禁角色卡、桌面窗口由各自角色负责（同工作树并行）。
+
+**改了什么**
+- `flow-state.ts`：`FLOW_GATE_KINDS`/`FlowGateKind`/`FLOW_GATE_STEP_ID_PATTERN`/`isFlowGateKind`/`isFlowGateStepId`；`FlowStateStep.gateKind?` 解析与静态校验（只允许 artifact、`gate-<slug>` id、owner=verifier、evidence 存在且 kind=artifact、未知值/未知字段 fail-closed）；`listReadyFlowSteps` 新增 `awaiting-gate`（gate 永不 ready）。旧 flow 解析/序列化/ready/收尾门/证据对账逐字不变。
+- `flow-service.ts`：序列化/视图条件携带 `gateKind`；`flow_step_update(done)` 对 gate 步骤拒绝（新 code `gate-review-required`）；`observeFlowArtifacts` 跳过含 `gateKind` 的步骤；`flow_step_supersede` 新 gate id 继承 `gateKind` 并派生约定报告 evidence；新增 app-only `completeGateStep`（最新 gate 报告 `acceptance-triage/v1`：pass 收口 done + app/app `artifact.observed`、幂等；fail 含 blocker/major ⇒ `gate-report-failed`；**只有 minor/nit 的 fail ⇒ `gate-report-nonblocking-fail` 退回 Proof、不返工**；缺/坏报告退回；不覆盖终态、不写 `customer.decision`）。
+- `governance-gate.ts`：`gateReviewReportRelPath` / `latestGateReviewReport(RelPath)`（`docs/acceptance/<flowId>-<gateId>-report-vN.md`，版本化不覆盖、不与最终验收报告 `<flowId>-report-vN.md` 冲突）；criteria 扫描改为共用同一版本 helper（行为不变）。
+- `governance-ledger.ts`：新增 `kind:"gate.review"` + `gateReview`（`gate-review-decision/v1`）审计字段与严格写入校验：只允许 app 记录、枚举/版本/sha/时间合法、不得携带 `decisionKind`/`customerDecision`/`acceptanceTriage`、fail/conditional 必须至少一个 blocker/major；`latestAcceptanceDecision`/收口门/分诊不读它。
+- `run-role.ts`：`AdapterCapabilities`/`openRoleSession` 新增 `requestGateReview?: RequestGateReviewFn`（类型单一来源 `model/runtime.ts`），**只给内置治理角色中的 convener 注入**，其他内置角色/项目角色即便误给也不注入；工厂同名透传。
+- `src/pipeline/orchestration/flow-state.ts`：公共出口再导出 gate 常量/类型、报告路径 helper、`completeGateStep` 与 `classifyGateReviewTriage`/`gateReportSeverityCounts`。
+
+**测试**：新增 `test/编排/flow-gate.test.ts` 13 例、`test/编排/request-gate-review.test.ts` 2 例，`test/编排/governance-gate.test.ts` 追加 gate 依赖硬拦 1 例；`npm run typecheck` exit 0；`node --test "test/编排/**/*.test.ts"` → 985 tests / 983 pass / 1 fail / 1 skip（唯一红＝既有 Windows symlink EPERM 基线）；既有断言未弱化。
+
+**未做**：`app/desktop/**`（gate 能力注入、`requestGateReviewForProject`、gate 记录/返工路由/重启恢复/系统行）、`src/model/runtime.ts` 与 `src/provider/runtime/**`、门禁角色卡/i18n、跨角色 e2e、真实界面 gate 复核、独立验收、commit/push。
+
+详见[变更记录](docs/change/2026-10-26_change_request-gate-review-orchestration-core.md)。
+
 ## 2026-10-25 — 写入预授权 `system:` 结算与客户/judge 证据分离
 
 **来源**：本轮编排任务。桌面「写入预授权」前闸：边界内写确认由系统直接放行、边界外直接拒绝，结算 `operatorId` 恒为 `system:write-preauthorization`（不是客户、不是 judge）。此前 `recordCustomerDecision` 把任何非 judge 的 answered/declined 都按客户输入记账（接受写 `customer-input`，拒绝写 `unclassified/none`），污染账本语义。

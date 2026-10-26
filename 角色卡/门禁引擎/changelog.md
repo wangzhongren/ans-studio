@@ -1,5 +1,92 @@
 # 门禁引擎 变更记录
 
+## 2026-10-26 — Decision 卡（材料性选择）：Steward 必须发卡 + 恰好一个 recommended；Lead 不得聊天自定、交统筹发卡
+
+客户新规则（经任务派发转达）：主理发现**材料性选择**（真实启动演示方式、验收证据方式、范围、标准 / 契约偏离、
+成本、客户可见行为等）时不得在聊天里自己定，应给统筹派协调任务，由统筹发
+`request_choice(cardKind="decision")` 客户确认卡；内部实现细节仍可自决、不弹卡。统筹收到此类请求或自己发现
+材料性选择时必须发 decision 卡：卡内提供选项且**恰好一个 `recommended: true`**；不得自决、不得把选择说成
+客户批准；「替我决策」时判断 agent 默认选推荐项；收到结果后按选项执行并记录，不触发 gate / 最终验收。
+decision 卡独立于提案 / 任命 / 验收，不是客户批准，不写 `customer.decision` 的验收 / 提案语义。本批只做
+本角色卡文本 + 测试侧。完整记录见[变更记录](docs/change/2026-10-26_change_decision-card.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`（`LIAISON_CARD_TEXT` / `CONVENER_CARD_TEXT` 产品数据
+  文本）、`test/门禁引擎/decision-card.test.ts`（新）、`test/门禁引擎/governance-trio.test.ts`（一处
+  cardKind 纪律断言按新契约更新）、本文件、`memo.md`、`feature-map.md`、
+  `docs/change/2026-10-26_change_decision-card.md`（新）。未改 `src/model/**`、`src/provider/**`、
+  `src/common/编排/**`、`src/pipeline/**`、`app/**`、共享 i18n、桌面 / 模型实现或 `demos/`；未读 `.env`、
+  未跑真实模型 / 凭据 / 网络；未 commit / push；未重启应用。
+- **Lead 卡**：「治理协调」新增「材料性选择交统筹发 decision 卡（必须）」——不得在聊天里自己定 / 自行按某方案
+  推进 / 说成客户已同意或内部选择；按现有门禁给 Steward / 统筹 派协调任务（带 `flowId`、问题、候选方案、
+  影响与建议），由统筹发 `request_choice`（`cardKind=decision`）；Lead 仍只发 `intent-confirm`，decision 卡
+  由统筹发。「内部决策纪律（必须）」保留并明确「材料性选择不属于内部决策」；「系统消息只汇报、不派任务」
+  逐字保留。
+- **Steward 卡**：新增「Decision 卡（材料性选择，必须）」——何时发（Lead 请求或自己发现；内部实现细节不弹卡）、
+  卡形态（`cardKind=decision` + `flowId`、真实可区分选项、恰好一个 `recommended: true`）、不得自决、未获选择
+  不按推荐继续、「替我决策」判断默认选推荐项（`judge 代批`）、收到结果后按选项执行并记录、与 gate / 验收
+  分离（不是客户批准 / 提案 / 任命 / 验收，不写 `customer.decision` 的验收 / 提案语义，不触发
+  `request_gate_review` / `request_acceptance`、不进入验收分诊）。标准工作流加指针；治理卡参数纪律改为
+  `appointment` / `decision`；确认卡约定补 decision 卡。
+- **测试**：新增 `decision-card.test.ts` 5 例（Steward 发卡 / recommended / 回执与代选 / 与 gate·验收分离 /
+  Lead 交统筹 + 通道归属 + 数据面零变化）；`governance-trio.test.ts` 的 Steward cardKind 纪律断言更新为
+  `appointment` / `decision`（同等严格）。既有断言未删除未放宽。
+- **验证**：定向三文件 **81 计 / 81 过 / 0 失败 / 0 skip，exit 0**；本角色全套
+  `node --test "test/门禁引擎/**/*.test.ts"` ⇒ **335 计 / 334 过 / 0 失败 / 1 Windows 既有 skip，exit 0**
+  （本批 +5 例）；`npm run typecheck` 本批首次 **exit 0**，中间并行在飞时曾出现边界外
+  `run-role.ts(2654,16)` 诊断（`"material-choice"` 未加入 `GovernanceDecisionKind`，已由属主修复），
+  写文档后**最终复跑 exit 0、0 错**，本批文件 0 诊断。
+- **跨角色待办（未越界）**：`cardKind=decision` 白名单 / 恰好一个 `recommended` 应用校验 / 判断 agent 默认
+  选推荐项 / `decisionKind: "material-choice"` 记账 / 桌面推荐标记与 i18n 由运行时核心、编排、桌面角色实施
+  与验证；`GovernanceDecisionKind` 类型需其属主同步。**卡文本是行为约束，不是实现证据；未做跨角色端到端与
+  真机验证，未独立验收。** 来源：客户新规则（经任务派发转达）。
+
+## 2026-10-26 — Gate 复核角色卡：Steward 证据完整性 + request_gate_review；Proof gate 复核与报告（客户追加授权实现）
+
+客户 2026-10-26 在 `rules-only` 落卡后**追加授权实现** `request_gate_review` 与设计
+`2026-10-26_design_proof-gate-reviews.md` v3（`approved-implementing`）§4–§8、§12 的 gate 机制，并追加
+**gate 复核独立于最终验收**与**防吹毛求疵**要求。本批只做本角色卡文本 + 测试侧（设计 §6/§7/§10 A1/A2/A5/A6）。
+完整记录见[变更记录](docs/change/2026-10-26_change_gate-review-cards.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`（`CONVENER_CARD_TEXT` / `VERIFIER_CARD_TEXT` 产品数据
+  文本）、`test/门禁引擎/governance-trio.test.ts`、本文件、`memo.md`、`feature-map.md`、
+  `docs/change/2026-10-26_change_gate-review-cards.md`（新）。未改 `src/common/编排/**`、`app/**`、
+  `src/model/**`、`src/provider/**`、共享 i18n、flow/桌面/模型实现或 `demos/`；未读 `.env`、未跑真实
+  模型/凭据/网络；未 commit / push；未重启应用。
+- **Steward 卡**：新增/改写「Gate 规划（必须）」——三类 gate（`vertical-slice` / `visual-baseline` /
+  `integration-performance`）用现有 `kind: artifact` + 可选 `gateKind` 在 flow YAML 声明（不新增
+  `FlowStepKind`）、`owner: verifier`、id `gate-*`、evidence 指向
+  `docs/acceptance/<flowId>-<gateId>-report-vN.md`；T0–T3 × 产品类型默认矩阵（不足默认 gate 需客户书面
+  豁免并记录；prototype 不豁免）；gate 标准节写在最新 criteria（缺节 ⇒ `criteria-missing`，Proof 补）；
+  下游 `dependsOn` 写 gate（未 done ⇒ `dependencies-not-done` / ready 不提示 / 最终验收不可达）。
+  「证据完整性与 gate 协调（必须）」收缩为证据完整性机械清单（依赖 done / 账本对账 / 标准节 / 运行与截图
+  路径 / 无在途）→ 主动 `request_gate_review({ flowId, gateId })` → 冻结回执逐项如实处理（`dispatched` ≠
+  通过、`already-dispatched` 不重复等）→ fail 含 blocker/major 才协调返工并重新请求；**只有 minor/nit 的 fail
+  属结构不符、退回 Proof、不触发返工**。不得自标 gate done / `delivered` / `dispatched`
+  （`gate-review-required`）、不得代写 gate 报告、不写 `docs/acceptance/**`；gate 复核 ≠ 验收通过 ≠ 客户批准，
+  `request_acceptance` 仍只用于最终验收；gate 未 done 不派下游。
+- **Proof 卡**：新增「Gate 复核（gate 任务，必须）」——读 gate 标准节 + `dependsOn` 证据、亲自跑 / 看真实
+  输出；UI / 游戏必须关 DEBUG 截图，旧截图 / DEBUG 覆盖层 = insufficient evidence；gate 报告复用
+  `acceptance-triage/v1`、路径 `docs/acceptance/<flowId>-<gateId>-report-vN.md` 版本化不覆盖；`pass` 可带
+  minor/nit，`fail` / `conditional` 必须至少一个 blocker/major，只有 minor/nit 的 fail 属结构不符、退回补
+  报告、不返工；不发验收卡、不写 `customer.decision`、不实现、不派发、不标 flow 步骤 done；gate 报告 ≠ 最终
+  验收报告、gate 失败 ≠ 客户拒绝。分诊章节与质量职责同步；Proof 卡仍不含 `request_acceptance`。
+- **Lead 卡（客户同日追加规则）**：「工作流管理」与「治理协调」章节写死「**系统消息只汇报、不派任务
+  （必须）**」——收到 `[系统·治理协调]`、gate pass / fail 系统行、交付 / 阻塞通知等系统消息时，只向客户
+  如实汇报，**不得给 Steward / 统筹 发任务、不得调用 `dispatch_task`**，不得把系统消息当成客户指令；
+  客户明确要求或客户消息触发的协调仍按原规则（客户消息不是系统消息）。测试同步断言（`liaison-role` +
+  `governance-trio`），客户消息路径与 `dispatchTask` 能力不回归。
+- **测试**：重写 Gate 规划用例（含 rules-only 旧口径反向断言与 `request_gate_review` 仅统筹卡定义）、扩展
+  证据完整性用例、新增 Proof gate 复核用例；既有断言未删除未放宽。
+- **验证**：`node --test test/门禁引擎/governance-trio.test.ts` ⇒ **50 计 / 50 过 / 0 失败 / 0 skip，exit 0**；
+  本角色全套 `node --test "test/门禁引擎/**/*.test.ts"` ⇒ **330 计 / 329 过 / 0 失败 / 1 Windows 既有
+  skip，exit 0**；`npm run typecheck` ⇒ **exit 0，0 错**（中间复跑曾出现 6 条边界外 untracked 在飞文件
+  `test/编排/flow-gate.test.ts` 的诊断，编排属主修复后最终全仓通过）。
+- **跨角色待办（未越界）**：`request_gate_review` 应用实现（校验 / 派发 / gate 记录 / 账本）、
+  `completeGateStep`、`observeFlowArtifacts` 跳过 gate、`flow_step_update` 的 `gate-review-required`、
+  gate 返工路由 / 重启恢复、仅统筹会话注入与桌面系统行 / i18n 消费接线均由编排 / 运行时核心 / 桌面角色
+  实施与验证；`gateKind` 解析 / 静态校验 / 派发硬拦属编排。**卡文本是行为约束，不是实现证据；未做跨角色
+  端到端与真机 Electron / 浏览器验证，未独立验收。** 来源：客户追加授权（经任务派发转达）与设计 v3。
+
 ## 2026-10-22（二）— 共享治理 slug 契约收紧 S4：门禁引擎测试改引用 Model 常量并补尾连字符负例（客户确认 S4）
 
 客户 2026-10-22 确认按设计 `2026-10-22_design_governance-slug-no-trailing-hyphen.md` 的 **S1–S5**

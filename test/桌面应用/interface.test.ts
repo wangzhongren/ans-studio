@@ -7139,7 +7139,7 @@ function reworkReport(items: ReadonlyArray<{ id: string; owner: string; action: 
   ].join("\n");
 }
 
-test("2026-10-24 治理协调唤醒：阻塞阶段→Lead；同 revision/阶段去重；Lead busy 不并发注入；同阶段预算 2 次；不派 Proof", async () => {
+test("2026-10-24 治理协调唤醒：阻塞阶段→Lead（2026-10-26 系统通知只向客户汇报、不派任务）；同 revision/阶段去重；Lead busy 不并发注入；同阶段预算 2 次；不派 Proof", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "ans-coordination-wake-"));
   try {
     const flowId = "flow-coordination";
@@ -7192,11 +7192,13 @@ test("2026-10-24 治理协调唤醒：阻塞阶段→Lead；同 revision/阶段�
       await iface.listProject({ projectRoot: root });
       await waitForTest(() => coordinationSends("rapporteur").length === 1, 4000);
       const first = coordinationSends("rapporteur")[0]!;
-      assert.match(first, /流程 flow-coordination 的阶段需要主理协调/, "协调任务投 Lead（primaryRoleId）");
+      assert.match(first, /流程 flow-coordination 的阶段通知/, "协调任务投 Lead（primaryRoleId）");
       assert.match(first, /阶段：存在 failed \/ blocked \/ aborted 步骤/, "阻塞阶段被识别");
       assert.match(first, /impl 当前状态 failed/, "带具体步骤事实");
       assert.match(first, /协调不是客户批准/, "协调 ≠ 客户批准");
-      assert.match(first, /不要直接派组队 \/ 验收 \/ 项目 worker/, "不越权");
+      assert.match(first, /这是系统通知：只向客户汇报/, "2026-10-26：系统消息只向客户汇报");
+      assert.match(first, /不要给统筹 \/ 项目 worker 派发任务，等客户指示/, "2026-10-26：不给统筹/项目 worker 派任务");
+      assert.doesNotMatch(first, /请按你的职责协调统筹与项目 worker/, "旧「请协调」措辞已撤下");
       assert.equal((sendsByRole.get("verifier") ?? []).length, 0, "协调唤醒不派 Proof");
       assert.equal((sendsByRole.get("convener") ?? []).length, 0, "协调唤醒不派 Steward");
 

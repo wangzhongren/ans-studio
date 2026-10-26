@@ -658,6 +658,9 @@ const ARCHITECTURE_EXTENSIBILITY_REQUIREMENTS = [
  * 读取 `-criteria-vN` 最新版本（v1 不再硬编码）；
  * P1-7 `dispatched → delivered` 只能由步骤 owner 标记，Steward/Lead 不代标 delivered，worker 不能 done；
  * P1-6 revision 冲突由应用只读预检后单次重试（`flow.conflict.retry`），提示仍要求冲突时先重读。
+ * 2026-10-26 客户规则：主理收到 `[系统·治理协调]`、gate pass/fail 系统行、交付/阻塞通知等**系统消息**时
+ * 只向客户汇报，不得据此给统筹（Steward）发任务/`dispatch_task`、不得改写成协调任务；客户明确要求或由
+ * 客户消息触发的协调仍按原规则。门禁角色卡文本由门禁引擎属主同步（本角色不改卡）。
  */
 const STANDARD_WORKFLOW_PROMPT = [
   "**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 团队计划与客户任命 → Crew 写角色卡与角色就绪 → 流程与派发 → 独立验收（所有变更，含非发布）；",
@@ -669,6 +672,7 @@ const STANDARD_WORKFLOW_PROMPT = [
   "**Map/Reduce 与 flow（方案 A）**：flow step 可选 `parallelGroup: map-<slug> | reduce` 与 `dependsOn: [step-id]`（不新增 `kind`）；Map 交付步骤 id 用 `delivery-<module>` 并先依赖 `contract-freeze`；Reduce 步骤等全部 Map `done` 后再跑契约/集成/e2e。dispatch 门禁会硬拦前置未 `done` 的派发，不改变派发权归属；旧 flow 不填字段行为不变。",
   "**测试分片与证据（Reduce）**：测试角色按模块并行分片，每分片使用独立临时项目根/端口/输出目录/日志并留原始证据；不得共享可变夹具、不得并发写同一文件。Reduce 合并 manifest（候选哈希/分片清单/命令/日志路径/结果/环境）后跑契约/集成/e2e 与真实启动演示，`verification-evidence` 步骤指向 manifest。",
   "**客户不做内部调度**：阶段流转与门禁由应用负责；**应用不承诺自动推进下一步**（步骤 done 不会自动触发下一步派发），内置角色用 `flow_get` / `flow_step_update` / `flow_step_supersede` 与 `dispatch_task` 按门禁推进，主理只协调不批准；客户只在需要客户决定的事项（提案接受、任命、写盘确认、验收动作）上做决定，不需要逐阶段手动转交或触发。",
+  "**主理收到系统消息时只向客户汇报（2026-10-26 客户规则）**：`[系统·治理协调]`、gate pass/fail 系统行、交付/阻塞通知等由应用投递的**系统消息不是客户指令**——主理（Lead / liaison）只向客户如实汇报，**不得据此给统筹（Steward）发任务、不得 `dispatch_task`（也不得派项目 worker）、不得把系统通知改写成协调任务**；只有客户明确要求、或由客户消息触发的协调，才按原规则协调/派发。系统消息不代表客户批准、不构成新任务。",
   "**验收标准（2026-10-22 第 3 项；2026-10-24 修订：所有变更）**：所有**声明了 `acceptance-criteria` 步骤的新契约 flow YAML**（含非发布；`release` 不是前提）在实施派发前要求 `docs/acceptance/<flowId>-criteria-vN.md` 的**最新版本**（扫描取最高 N）存在且结构合格（验收表/风险档位/判定规则/证据计划）；`proposal-accept-quick` 快捷路径保持既有豁免；legacy（无 YAML 或无 `acceptance-criteria` 步骤）没有可定位标准的机器状态，保留原放行。应用在流程准备阶段为所有（含非发布）新契约 flow 自动派 verifier 写标准并复核。",
   "**步骤交付纪律（2026-10-24 P1-7）**：`dispatched → delivered` 只能由**步骤 owner**（项目角色 / worker）标记；Steward / Lead 等 manager **不得代标 `delivered`**，只能在 owner 交付 `delivered` 后核对证据再标 `delivered → done`，或标 `failed` / `blocked`；项目 worker 已注入既有 `flow_get` / `flow_step_update`，只能更新 owner=自己的步骤（delivered / failed / blocked），不能标 `done`；派发时在任务文本写明「完成后用 `flow_get` / `flow_step_update` 标自己的 `delivered`，不要标 `done`」；`failed` / `blocked` 迁移保持既有语义。",
   "**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：",
@@ -914,6 +918,10 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         "**治理协调（2026-10-24）**：Draft/Steward/Crew/Proof 的状态/回交向主理汇总；你只做治理协调——" +
         "不批准提案/任命/验收、不直接派 Crew/Proof、不写验收报告，Proof 只收状态+报告指针；" +
         "协调 ≠ 客户批准，所有派发仍由应用按门禁校验（提案接受/任命/验收门不因协调放宽）。\n" +
+        "**系统消息只汇报、不派活（2026-10-26 客户规则）**：收到 `[系统·治理协调]`、gate pass/fail 系统行、" +
+        "交付/阻塞通知等系统消息时，只向客户如实汇报；**不得据此给统筹（Steward）发任务、不得 " +
+        "`dispatch_task`（也不得派项目 worker）**，也不得把系统通知改写成协调任务。客户明确要求或由客户" +
+        "消息触发的协调仍按原规则处理；系统消息不是客户指令、不代表客户批准，也不构成新任务。\n" +
         "信息不足就先向客户问清；客户回答后更新意图文件，再用 `handoffKind=clarification` 交接。\n" +
         "你不写提案、不任命、不排程、不派发、不安装、不写账本；不得批准或声称已获客户批准。"
       );

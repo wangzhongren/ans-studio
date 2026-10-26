@@ -42,6 +42,10 @@ import {
   operatorQueued,
   operatorSubmittingNote,
 } from "@/chat/operator-view";
+import {
+  decisionCardView,
+  decisionOptionBadge,
+} from "@/chat/decision-card";
 import { metadataLabel, textFlags } from "@/chat/report-view";
 import { ReportCard, DeliveryCard } from "@/shell/ReportCard";
 import {
@@ -567,6 +571,7 @@ function OperatorRow({ row, roleId }: { row: ChatRow; roleId: string }) {
   const surfaceRoleId = asString(data.surfaceRoleId) || roleId;
   const queued = data.queued === true || operatorQueued(payload);
   const meta = governanceCardMetaView(request, locale);
+  const decisionCard = decisionCardView(request, locale);
   const toolLifecycle = asRecord(data.toolLifecycle);
   const lifecycleStages = asRecord(toolLifecycle.stages);
   const lifecycleText = ["start", "blocked", "result"]
@@ -609,9 +614,12 @@ function OperatorRow({ row, roleId }: { row: ChatRow; roleId: string }) {
       aria-label={asString(request.title) || t("ui.work.requestFallback")}
       inert={drawerOpen ? true : undefined}
     >
-      {meta.governance || isMirror ? (
+      {meta.governance || decisionCard.decision || isMirror ? (
         <div className="op-badges">
           {meta.governance ? <span className="op-gov-badge">{meta.badge}</span> : null}
+          {decisionCard.notApprovalBadge ? (
+            <span className="op-decision-badge">{decisionCard.notApprovalBadge}</span>
+          ) : null}
           {isMirror ? (
             <span className="op-mirror-badge">{governanceMirrorBadge(locale)}</span>
           ) : null}
@@ -633,9 +641,20 @@ function OperatorRow({ row, roleId }: { row: ChatRow; roleId: string }) {
         </div>
       ) : null}
       <div className="op-title">
-        {asString(request.title) ||
+        {decisionCard.title ||
+          asString(request.title) ||
           (kind === "choice" ? t("ui.chatRow.choose") : t("ui.chatRow.confirm"))}
       </div>
+      {decisionCard.decision && (decisionCard.question || decisionCard.questionNote) ? (
+        <>
+          {decisionCard.question ? (
+            <p className="op-question">{decisionCard.question}</p>
+          ) : null}
+          {decisionCard.questionNote ? (
+            <p className="op-note">{decisionCard.questionNote}</p>
+          ) : null}
+        </>
+      ) : null}
       {lifecycleText ? <div className="op-tool-lifecycle">{lifecycleText}</div> : null}
       {request.detail ? <p className="op-note">{asString(request.detail)}</p> : null}
       {preview ? (
@@ -651,6 +670,7 @@ function OperatorRow({ row, roleId }: { row: ChatRow; roleId: string }) {
         <div className="op-options">
           {options.map((option, index) => {
             const optionId = asString(option.id) || String(index);
+            const recommendedBadge = decisionOptionBadge(decisionCard, option);
             return (
               <label
                 key={optionId}
@@ -675,6 +695,9 @@ function OperatorRow({ row, roleId }: { row: ChatRow; roleId: string }) {
                   }}
                 />
                 <span>{asString(option.label) || optionId}</span>
+                {recommendedBadge ? (
+                  <span className="op-recommended-badge">{recommendedBadge}</span>
+                ) : null}
               </label>
             );
           })}

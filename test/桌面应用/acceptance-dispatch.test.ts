@@ -15,6 +15,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 
@@ -39,6 +40,7 @@ import {
   flowStepHasEvidence,
   governanceAcceptanceBlockedNote,
   governanceFlowStatePath,
+  governanceGateReviewReportPath,
   type FlowCompletionLedgerEntryLike,
 } from "../../app/desktop/governance-advance.ts";
 import { createCustomerInputChannel, type AcceptanceTriageGateFacts } from "../../app/desktop/customer-input.ts";
@@ -47,8 +49,11 @@ import {
   buildAcceptanceTriageRecord,
   completeAcceptanceCriteriaStep,
   evaluateFlowCompletion,
+  FLOW_STEP_KINDS,
   flowStatePath,
+  gateReviewReportRelPath,
   latestAcceptanceDecision,
+  listReadyFlowSteps,
   parseAcceptanceTriageReport,
   parseFlowStateYaml,
   readAcceptanceTriageRecord,
@@ -894,6 +899,10 @@ interface FlowYamlStepInput {
   evidence?: FlowYamlEvidenceInput;
   supersedes?: readonly string[];
   supersededBy?: string;
+  /** 2026-10-26 gate 复核：`kind: artifact` + 可选 gateKind（不新增 FlowStepKind）。 */
+  gateKind?: string;
+  /** 2026-10-26 gate 复核：下游依赖（派发门/ready 规划/gate 校验共用）。 */
+  dependsOn?: readonly string[];
 }
 
 /** 构造块状 YAML（机器状态；手写而非 JSON，覆盖真实文件形状）。`release` 仅供参考元数据（2026-10-24 修订后不再作为独立验收门）。 */
@@ -911,10 +920,14 @@ function flowStateYaml(flowId: string, steps: readonly FlowYamlStepInput[], opti
     lines.push(`    owner: ${step.owner ?? "executor"}`);
     lines.push(`    kind: ${step.kind}`);
     lines.push(`    status: ${step.status}`);
+    if (step.gateKind !== undefined) lines.push(`    gateKind: ${step.gateKind}`);
     if (step.evidence !== undefined) {
       lines.push("    evidence:");
       lines.push(`      kind: ${step.evidence.kind}`);
       lines.push(`      ref: ${step.evidence.ref}`);
+    }
+    if (step.dependsOn !== undefined && step.dependsOn.length > 0) {
+      lines.push(`    dependsOn: [${step.dependsOn.join(", ")}]`);
     }
     if (step.supersedes !== undefined && step.supersedes.length > 0) {
       lines.push(`    supersedes: [${step.supersedes.join(", ")}]`);
@@ -4651,6 +4664,748 @@ test("边界变更请求注入矩阵：仅 convener 有；项目角色与其他�
       assert.deepEqual(received, [{ projectRoot: root, requesterRoleId: "convener", input: payload }]);
     } finally {
       await fake.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————————————— 2026-10-26 gate 复核（request_gate_review；客户授权） ——————————————
+//
+// 契约（设计 `2026-10-26_design_proof-gate-reviews.md` §5.3–§8 / §9.3 / §10 A3/A4/A6/A7/A8）：
+//   · 只注入统筹（convener）；项目角色与其他治理角色不注册；gate 复核 ≠ 验收通过 ≠ 客户批准；
+//   · 应用校验：flow/gate/gateKind/pending → gate 记录与 revision 幂等 → dependsOn done + 账本对账 →
+//     最新 criteria 的 Gate 标准节 → visual/integration 证据完整性 → 无在途 → 引擎 → 派 Proof →
+//     `dispatch.accepted{stepId=gateId}` + `.ans/.../gates/<gateId>.json`（原子写）；
+//   · 报告处置：pass ⇒ completeGateStep + gate.review + 下游放行；fail(blocker/major) ⇒ 独立返工路由、
+//     **不标 done**；fail 仅 minor/nit ⇒ returned-to-proof、**不返工**；缺/坏报告 ⇒ returned-to-proof；
+//   · 重启/导入恢复按记录幂等补处置；不自动重派、不自动通过；gate 结论不写 customer.decision。
+
+const GATE_FLOW_ID = "flow-gate-review";
+const GATE_STEP_ID = "gate-vertical-slice";
+
+function gateFlowSteps(
+  flowId: string,
+  options: { gateKind?: string; gateStatus?: string; gateDependsOn?: readonly string[]; evidenceStepStatus?: string; integrationStep?: boolean } = {},
+): FlowYamlStepInput[] {
+  return [
+    {
+      id: "delivery-server",
+      kind: "dispatch",
+      status: "done",
+      owner: "executor",
+      evidence: { kind: "dispatch", ref: "delivery-server" },
+    },
+    {
+      id: "verification-evidence",
+      kind: "artifact",
+      status: options.evidenceStepStatus ?? "done",
+      owner: "executor",
+      evidence: { kind: "artifact", ref: `docs/verification/${flowId}-demo.md` },
+    },
+    ...(options.integrationStep === false
+      ? []
+      : [{ id: "integration-e2e", kind: "dispatch" as const, status: "done", owner: "executor", evidence: { kind: "dispatch" as const, ref: "integration-e2e" } }]),
+    {
+      id: GATE_STEP_ID,
+      kind: "artifact",
+      status: options.gateStatus ?? "pending",
+      owner: "verifier",
+      gateKind: options.gateKind ?? "vertical-slice",
+      evidence: { kind: "artifact", ref: `docs/acceptance/${flowId}-${GATE_STEP_ID}-report-v1.md` },
+      dependsOn: options.gateDependsOn ?? ["delivery-server"],
+    },
+    {
+      id: "delivery-after-gate",
+      kind: "dispatch",
+      status: "pending",
+      owner: "executor",
+      dependsOn: [GATE_STEP_ID],
+    },
+    { id: "verification", kind: "acceptance", status: "pending", owner: "app" },
+  ];
+}
+
+function writeGateCriteria(root: string, flowId: string, gateId = GATE_STEP_ID, options: { includeSection?: boolean } = {}): void {
+  const acceptance = path.join(root, "docs", "acceptance");
+  mkdirSync(acceptance, { recursive: true });
+  const section = options.includeSection === false
+    ? []
+    : [
+        `## Gate 复核标准：${gateId}（vertical-slice）`,
+        "| ID | 标准 | 需要的证据 | 判定 |",
+        "| --- | --- | --- | --- |",
+        "| GV-1 | 脚手架可真实运行/最小测试通过 | 命令、日志、退出码 | pass / fail / insufficient evidence |",
+      ];
+  writeFileSync(
+    path.join(acceptance, `${flowId}-criteria-v1.md`),
+    [
+      "---",
+      `flowId: ${flowId}`,
+      "version: 1",
+      "riskTier: T2",
+      "---",
+      `# 验收标准：${flowId}`,
+      "| ID | 标准 | 需要的证据 | 判定 |",
+      "| --- | --- | --- | --- |",
+      "| A1 | 交付 | 测试输出 | pass / fail / insufficient evidence |",
+      "风险档位：T2。判定规则：pass / fail / insufficient evidence。证据计划：单测。版本：v1 冻结。",
+      ...section,
+      "",
+    ].join("\n"),
+  );
+}
+
+function writeGateEvidenceFile(root: string, flowId: string): void {
+  const dir = path.join(root, "docs", "verification");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, `${flowId}-demo.md`), "# 真实运行/演示证据\n");
+}
+
+async function seedGateLedger(root: string, flowId: string): Promise<void> {
+  await appendLedger(root, [
+    { kind: "dispatch.accepted", flowId, stepId: "delivery-server", actorRoleId: "convener", power: "schedule", targetRoleId: "executor" },
+    { kind: "artifact.observed", artifactPath: `docs/verification/${flowId}-demo.md`, actorRoleId: "executor", power: "project" },
+    { kind: "dispatch.accepted", flowId, stepId: "integration-e2e", actorRoleId: "convener", power: "schedule", targetRoleId: "executor" },
+  ]);
+}
+
+function gateRecordAbsPath(root: string, flowId: string, gateId = GATE_STEP_ID): string {
+  return path.join(root, ".ans", "governance", "acceptance", flowId, "gates", `${gateId}.json`);
+}
+
+function gateReworkRoutingAbsPath(root: string, flowId: string, gateId = GATE_STEP_ID): string {
+  return path.join(root, ".ans", "governance", "acceptance", flowId, "gates", `${gateId}-rework-routing.json`);
+}
+
+function flowRevisionOf(root: string, flowId: string): string {
+  return createHash("sha256").update(readFileSync(path.join(root, "docs", "flows", `${flowId}.yaml`))).digest("hex");
+}
+
+function writeGateRecord(
+  root: string,
+  flowId: string,
+  record: Partial<Record<string, unknown>> & { status: string },
+  gateId = GATE_STEP_ID,
+): void {
+  const dir = path.dirname(gateRecordAbsPath(root, flowId, gateId));
+  mkdirSync(dir, { recursive: true });
+  const now = new Date().toISOString();
+  writeFileSync(
+    gateRecordAbsPath(root, flowId, gateId),
+    `${JSON.stringify(
+      {
+        schema: "gate-review-record/v1",
+        flowId,
+        gateId,
+        gateKind: "vertical-slice",
+        flowRevision: flowRevisionOf(root, flowId),
+        reportPath: `docs/acceptance/${flowId}-${gateId}-report-v1.md`,
+        reportVersion: 1,
+        reportSha256: null,
+        conclusion: null,
+        severityCounts: { blocker: 0, major: 0, minor: 0, nit: 0 },
+        itemCount: 0,
+        itemsDigest: null,
+        requestId: `gate-${gateId}-test`,
+        dispatchedAt: now,
+        decidedAt: null,
+        error: null,
+        at: now,
+        ...record,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
+function writeGateReport(
+  root: string,
+  flowId: string,
+  gateId: string,
+  version: number,
+  conclusion: "pass" | "fail" | "conditional",
+  items: TriageItemInput[] = [],
+): void {
+  const acceptance = path.join(root, "docs", "acceptance");
+  mkdirSync(acceptance, { recursive: true });
+  writeFileSync(
+    path.join(acceptance, `${flowId}-${gateId}-report-v${version}.md`),
+    triageReportBody({
+      conclusion,
+      items,
+      extra: [`Gate 复核报告 v${version}｜flowId: ${flowId}｜gateId: ${gateId}｜gateKind: vertical-slice`],
+    }),
+  );
+}
+
+function readGateRecordFile(root: string, flowId: string, gateId = GATE_STEP_ID): Record<string, unknown> {
+  return JSON.parse(readFileSync(gateRecordAbsPath(root, flowId, gateId), "utf8")) as Record<string, unknown>;
+}
+
+function gateTaskSends(harness: Harness): string[] {
+  return harness.sendsByRole.get("verifier") ?? [];
+}
+
+async function openConvenerAndSettle(harness: Harness, root: string): Promise<void> {
+  if (!harness.controls.has("convener")) {
+    assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+  }
+  harness.controls.get("convener")!.settle();
+}
+
+function requestGateReviewOf(harness: Harness): import("../../src/model/runtime.ts").RequestGateReviewFn {
+  const fn = harness.openInputs.get("convener")?.requestGateReview;
+  assert.ok(fn, "convener 会话应注入 requestGateReview");
+  return fn;
+}
+
+test("2026-10-26 gate 路径单一来源：桌面 governanceGateReviewReportPath 与编排 gateReviewReportRelPath 一致；不新增 FlowStepKind", () => {
+  assert.equal(governanceGateReviewReportPath("flow-gate-review", "gate-vertical-slice", 2), gateReviewReportRelPath("flow-gate-review", "gate-vertical-slice", 2));
+  assert.equal(governanceGateReviewReportPath("flow-gate-review", "gate-vertical-slice"), "docs/acceptance/flow-gate-review-gate-vertical-slice-report-v1.md");
+  assert.equal(FLOW_STEP_KINDS.includes("gate" as never), false, "gate 不得成为新的 FlowStepKind");
+});
+
+test("2026-10-26 request_gate_review：派发成功（任务自足/账本 dispatch.accepted{stepId}/gate 记录原子写）；重复请求幂等", async () => {
+  const root = makeTempProjectRoot("ans-gate-request-dispatch-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      const requestGateReview = requestGateReviewOf(harness);
+      const first = await requestGateReview({ flowId: GATE_FLOW_ID, gateId: GATE_STEP_ID });
+      assert.equal(first.ok, true, first.message);
+      assert.equal(first.code, "dispatched");
+      assert.equal(first.flowId, GATE_FLOW_ID);
+      assert.equal(first.gateId, GATE_STEP_ID);
+      assert.equal(first.runtime, "pi");
+      assert.match(first.message, /gate 复核 ≠ 验收通过 ≠ 客户批准/, "回执必须写清 gate ≠ 验收/客户批准");
+
+      const tasks = gateTaskSends(harness);
+      assert.equal(tasks.length, 1, "恰一条 gate 复核任务");
+      const task = tasks[0]!;
+      for (const needle of [
+        `gate ${GATE_STEP_ID}`,
+        "gateKind=vertical-slice",
+        `docs/acceptance/${GATE_FLOW_ID}-criteria-v1.md`,
+        `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`,
+        "delivery-server",
+        "acceptance-triage/v1",
+        "不发 request_choice / 验收卡、不写 customer.decision、不代表客户批准",
+        "只有 minor/nit 的 fail 会被应用按结构不符退回 Proof，不触发返工",
+        "不要标任何 flow 步骤 done",
+      ]) {
+        assert.ok(task.includes(needle), `gate 任务必须自足包含「${needle}」`);
+      }
+
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(
+        ledger.entries.filter(
+          (entry) =>
+            entry.kind === "dispatch.accepted" &&
+            entry.flowId === GATE_FLOW_ID &&
+            entry.stepId === GATE_STEP_ID &&
+            entry.targetRoleId === "verifier",
+        ).length,
+        1,
+        "账本恰一条 gate 派发记录（stepId=gateId）",
+      );
+      const record = readGateRecordFile(root, GATE_FLOW_ID);
+      assert.equal(record.schema, "gate-review-record/v1");
+      assert.equal(record.status, "dispatched");
+      assert.equal(record.gateKind, "vertical-slice");
+      assert.equal(record.reportVersion, 1);
+      assert.equal(record.reportPath, `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`);
+      assert.equal(record.flowRevision, flowRevisionOf(root, GATE_FLOW_ID));
+
+      const second = await requestGateReview({ flowId: GATE_FLOW_ID, gateId: GATE_STEP_ID });
+      assert.equal(second.ok, false, "重复请求不得说成 dispatched");
+      assert.equal(second.code, "already-dispatched");
+      assert.equal(gateTaskSends(harness).length, 1, "同 flow revision 不重复派发");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-26 request_gate_review：flow/gate/状态校验矩阵（归一、gate-not-found、done/superseded、criteria-missing、flow-incomplete、runtime）", async () => {
+  const root = makeTempProjectRoot("ans-gate-request-matrix-");
+  try {
+    const doneFlow = "flow-gate-done";
+    const supersededFlow = "flow-gate-superseded";
+    const depFlow = "flow-gate-dep-pending";
+    const evidenceFlow = "flow-gate-evidence-missing";
+    const criteriaFlow = "flow-gate-criteria-missing";
+    const runtimeFlow = "flow-gate-runtime";
+    writeFlowStateFile(root, doneFlow, flowStateYaml(doneFlow, gateFlowSteps(doneFlow, { gateStatus: "done" })));
+    writeFlowStateFile(root, supersededFlow, flowStateYaml(supersededFlow, gateFlowSteps(supersededFlow, { gateStatus: "superseded", gateDependsOn: [] })));
+    writeFlowStateFile(root, depFlow, flowStateYaml(depFlow, gateFlowSteps(depFlow).map((step) => (step.id === "delivery-server" ? { ...step, status: "pending" } : step))));
+    writeFlowStateFile(root, evidenceFlow, flowStateYaml(evidenceFlow, gateFlowSteps(evidenceFlow)));
+    writeFlowStateFile(root, criteriaFlow, flowStateYaml(criteriaFlow, gateFlowSteps(criteriaFlow)));
+    writeFlowStateFile(root, runtimeFlow, flowStateYaml(runtimeFlow, gateFlowSteps(runtimeFlow)));
+    writeGateCriteria(root, doneFlow);
+    writeGateCriteria(root, supersededFlow);
+    writeGateCriteria(root, depFlow);
+    writeGateCriteria(root, evidenceFlow);
+    writeGateCriteria(root, runtimeFlow);
+    writeGateCriteria(root, criteriaFlow, GATE_STEP_ID, { includeSection: false });
+    // runtimeFlow 前置证据齐备；evidenceFlow 故意不写 ledger（依赖证据无法对账）。
+    await seedGateLedger(root, runtimeFlow);
+    await seedGateLedger(root, criteriaFlow);
+    let runtimeOk = true;
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root }, {
+      resolveRuntime: async () =>
+        runtimeOk
+          ? { ok: true, runtime: "pi", source: "credentials", skipped: [] }
+          : { ok: false, message: "无法确定项目引擎（gate 测试）", skipped: [] },
+    });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      const requestGateReview = requestGateReviewOf(harness);
+
+      const done = await requestGateReview({ flowId: doneFlow, gateId: GATE_STEP_ID });
+      assert.equal(done.code, "already-dispatched", "done gate ⇒ already-dispatched（重验需新 gate id）");
+      const superseded = await requestGateReview({ flowId: supersededFlow, gateId: GATE_STEP_ID });
+      assert.equal(superseded.code, "rejected", "superseded gate ⇒ rejected");
+      assert.match(superseded.message, /superseded/i);
+
+      const missing = await requestGateReview({ flowId: GATE_FLOW_ID, gateId: GATE_STEP_ID });
+      assert.equal(missing.code, "gate-not-found", "flow 不存在 ⇒ gate-not-found");
+      const notGate = await requestGateReview({ flowId: depFlow, gateId: "delivery-server" });
+      assert.equal(notGate.code, "gate-not-found", "非 gate 步骤 ⇒ gate-not-found");
+      const badShape = await requestGateReview({ flowId: depFlow, gateId: "gate_bad" });
+      assert.equal(badShape.code, "gate-not-found", "gateId 形状不符 ⇒ gate-not-found");
+
+      const depPending = await requestGateReview({ flowId: depFlow, gateId: GATE_STEP_ID });
+      assert.equal(depPending.code, "flow-incomplete", "dependsOn 未 done ⇒ flow-incomplete");
+      assert.match(depPending.message, /delivery-server/);
+
+      const evidenceMissing = await requestGateReview({ flowId: evidenceFlow, gateId: GATE_STEP_ID });
+      assert.equal(evidenceMissing.code, "flow-incomplete", "依赖证据未对账 ⇒ flow-incomplete");
+      assert.match(evidenceMissing.message, /依赖证据无法对账/);
+
+      const criteriaMissing = await requestGateReview({ flowId: criteriaFlow, gateId: GATE_STEP_ID });
+      assert.equal(criteriaMissing.code, "criteria-missing", "criteria 缺 Gate 标准节 ⇒ criteria-missing");
+      assert.match(criteriaMissing.message, /Gate 复核标准节/);
+
+      // 多流程且省略 flowId ⇒ 不猜，要求显式 flowId。
+      const ambiguous = await requestGateReview({ gateId: GATE_STEP_ID });
+      assert.equal(ambiguous.code, "gate-not-found");
+      assert.match(ambiguous.message, /指定 flowId/);
+
+      // runtime 无法解析 ⇒ unavailable（不派发）。
+      runtimeOk = false;
+      const runtime = await requestGateReview({ flowId: runtimeFlow, gateId: GATE_STEP_ID });
+      assert.equal(runtime.code, "unavailable");
+      assert.match(runtime.message, /无法确定项目引擎/);
+      assert.equal(gateTaskSends(harness).length, 0, "任何失败 code 都不派发");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-26 request_gate_review：注入矩阵——仅 convener 有；项目角色与其他治理角色没有", async () => {
+  const root = makeTempProjectRoot("ans-gate-injection-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      for (const roleId of ["convener", "liaison", "rapporteur", "nominator", "verifier", "executor"]) {
+        assert.equal((await harness.iface.openSession({ projectRoot: root, roleId, runtime: "demo" })).ok, true);
+      }
+      assert.equal(typeof harness.openInputs.get("convener")?.requestGateReview, "function", "convener 注入 gate 请求能力");
+      for (const roleId of ["liaison", "rapporteur", "nominator", "verifier", "executor"]) {
+        assert.equal(harness.openInputs.get(roleId)?.requestGateReview, undefined, `${roleId} 不注入 gate 请求能力`);
+      }
+      // request_acceptance 的既有注入语义不变（内置治理角色有、项目角色无）。
+      assert.equal(typeof harness.openInputs.get("verifier")?.requestAcceptance, "function");
+      assert.equal(harness.openInputs.get("executor")?.requestAcceptance, undefined);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-26 request_gate_review：visual gate 需真实运行/演示证据步骤 done 且证据文件存在；任务要求关闭 DEBUG", async () => {
+  const root = makeTempProjectRoot("ans-gate-visual-");
+  try {
+    const visualFlow = "flow-gate-visual";
+    const missingEvidenceFlow = "flow-gate-visual-missing";
+    writeFlowStateFile(root, visualFlow, flowStateYaml(visualFlow, gateFlowSteps(visualFlow, { gateKind: "visual-baseline" })));
+    writeFlowStateFile(root, missingEvidenceFlow, flowStateYaml(missingEvidenceFlow, gateFlowSteps(missingEvidenceFlow, { gateKind: "visual-baseline", evidenceStepStatus: "pending" })));
+    writeGateCriteria(root, visualFlow);
+    writeGateCriteria(root, missingEvidenceFlow);
+    await seedGateLedger(root, visualFlow);
+    await seedGateLedger(root, missingEvidenceFlow);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      const requestGateReview = requestGateReviewOf(harness);
+      // 证据步骤 pending ⇒ flow-incomplete。
+      const missing = await requestGateReview({ flowId: missingEvidenceFlow, gateId: GATE_STEP_ID });
+      assert.equal(missing.code, "flow-incomplete");
+      assert.match(missing.message, /verification-evidence/);
+      // 证据步骤 done 但索引文件不存在 ⇒ flow-incomplete（只核对路径存在）。
+      const fileMissing = await requestGateReview({ flowId: visualFlow, gateId: GATE_STEP_ID });
+      assert.equal(fileMissing.code, "flow-incomplete");
+      assert.match(fileMissing.message, /证据索引文件不存在/);
+      // 补上真实文件 ⇒ 派发，任务强调关闭 DEBUG。
+      writeGateEvidenceFile(root, visualFlow);
+      const ok = await requestGateReview({ flowId: visualFlow, gateId: GATE_STEP_ID });
+      assert.equal(ok.code, "dispatched", ok.message);
+      assert.match(gateTaskSends(harness)[0]!, /关闭 DEBUG 覆盖层/);
+      assert.match(gateTaskSends(harness)[0]!, /insufficient evidence/);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-26 request_gate_review：integration gate 需集成/e2e 步骤 done", async () => {
+  const root = makeTempProjectRoot("ans-gate-integration-");
+  try {
+    const flowId = "flow-gate-integration";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, gateFlowSteps(flowId, { gateKind: "integration-performance", integrationStep: false })));
+    writeGateCriteria(root, flowId);
+    await appendLedger(root, [{ kind: "dispatch.accepted", flowId, stepId: "delivery-server", actorRoleId: "convener", power: "schedule", targetRoleId: "executor" }]);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      const result = await requestGateReviewOf(harness)({ flowId, gateId: GATE_STEP_ID });
+      assert.equal(result.code, "flow-incomplete");
+      assert.match(result.message, /集成\/e2e 或 Reduce 步骤/);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-26 gate 处置：报告 pass ⇒ completeGateStep + artifact.observed + gate.review(pass) + 下游放行；不写 customer.decision", async () => {
+  const root = makeTempProjectRoot("ans-gate-pass-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120); // 让导入补齐检查先跑完（此时无 gate 记录）
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "pass", [{ id: "G1", severity: "minor", owner: "executor", reason: "建议改进", action: "后续优化", targets: ["src/x.ts"] }]);
+      await openConvenerAndSettle(harness, root);
+
+      await waitFor(() => {
+        try {
+          return readGateRecordFile(root, GATE_FLOW_ID).status === "passed";
+        } catch {
+          return false;
+        }
+      });
+
+      const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
+      assert.ok(parsed.ok);
+      const gateStep = parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)!;
+      assert.equal(gateStep.status, "done", "pass 报告由应用收口 gate 步骤");
+      assert.deepEqual(gateStep.evidence, { kind: "artifact", ref: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md` });
+
+      const ledger = await readGovernanceLedger(root);
+      const observed = ledger.entries.filter((entry) => entry.kind === "artifact.observed" && entry.artifactPath === `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`);
+      assert.equal(observed.length, 1, "gate 报告按 artifact 观测规则补登（app/app）");
+      assert.equal(observed[0]!.actorRoleId, "app");
+      const reviews = ledger.entries.filter((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID);
+      assert.equal(reviews.length, 1, "恰一条 gate.review 审计");
+      assert.equal(reviews[0]!.gateReview?.conclusion, "pass");
+      assert.equal(reviews[0]!.gateReview?.gateId, GATE_STEP_ID);
+      assert.equal(reviews[0]!.gateReview?.severityCounts.minor, 1);
+      assert.deepEqual(latestAcceptanceDecision(GATE_FLOW_ID, ledger), { kind: "none" }, "gate 结论不写 customer.decision");
+      assert.equal(
+        ledger.entries.some((entry) => entry.kind === "customer.decision" && entry.flowId === GATE_FLOW_ID),
+        false,
+        "账本零客户决定",
+      );
+
+      const notes = deliveryNotes(harness.events, "liaison");
+      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("已通过")), "主理收到 pass 系统行");
+
+      // 下游放行：delivery-after-gate 依赖 gate 已 done ⇒ 进入 ready（应用不自动派发）。
+      const ready = listReadyFlowSteps(parsed.flow);
+      assert.ok(ready.ready.some((step) => step.id === "delivery-after-gate"), "gate done 后下游依赖步骤可派");
+      assert.equal(
+        ledger.entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "delivery-after-gate"),
+        false,
+        "应用不自动派下游",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-26 gate 处置：fail 含 blocker/major ⇒ 独立返工路由、gate 保持 pending、不标 done、不写 customer.decision", async () => {
+  const root = makeTempProjectRoot("ans-gate-fail-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "fail", [
+        { id: "G1", severity: "blocker", owner: "executor", reason: "脚手架无法启动", action: "修复启动脚本", targets: ["scripts/start.sh"] },
+        { id: "G2", severity: "major", owner: "executor", reason: "最小测试失败", action: "修复测试", targets: ["test/a.test.ts"] },
+        { id: "G3", severity: "nit", owner: "executor", reason: "措辞", action: "可选润色", targets: ["README.md"] },
+      ]);
+      await openConvenerAndSettle(harness, root);
+
+      await waitFor(() => {
+        try {
+          return (
+            readGateRecordFile(root, GATE_FLOW_ID).status === "failed" &&
+            JSON.parse(readFileSync(gateReworkRoutingAbsPath(root, GATE_FLOW_ID), "utf8")).status === "sent"
+          );
+        } catch {
+          return false;
+        }
+      });
+      const routing = JSON.parse(readFileSync(gateReworkRoutingAbsPath(root, GATE_FLOW_ID), "utf8")) as Record<string, unknown>;
+      assert.equal(routing.schema, "gate-rework-routing/v1");
+      assert.equal(routing.gateId, GATE_STEP_ID);
+      assert.equal(routing.source, "proof");
+      assert.equal(routing.sourceDetail, "gate-review");
+      assert.equal(routing.status, "sent");
+      assert.equal(typeof routing.reportSha256, "string");
+
+      const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
+      assert.ok(parsed.ok);
+      assert.equal(parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status, "pending", "fail 不标 gate done（保持 pending）");
+
+      const ledger = await readGovernanceLedger(root);
+      const reviews = ledger.entries.filter((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID);
+      assert.equal(reviews.length, 1);
+      assert.equal(reviews[0]!.gateReview?.conclusion, "fail");
+      assert.equal(reviews[0]!.gateReview?.severityCounts.blocker, 1);
+      assert.equal(latestAcceptanceDecision(GATE_FLOW_ID, ledger).kind, "none");
+      assert.equal(ledger.entries.some((entry) => entry.kind === "customer.decision" && entry.flowId === GATE_FLOW_ID), false);
+      assert.equal(
+        ledger.entries.some((entry) => entry.kind === "artifact.observed" && entry.artifactPath === `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`),
+        false,
+        "失败报告不得被观测成 done 证据",
+      );
+
+      const reworkTasks = harness.sendsByRole.get("liaison") ?? [];
+      const gateTask = reworkTasks.find((text) => text.includes("gate 复核未通过") && text.includes(GATE_STEP_ID));
+      assert.ok(gateTask, "主理收到 gate 独立返工任务");
+      assert.match(gateTask, /Gate 返工任务｜gate-vertical-slice/, "返工任务首行含 gateId 与报告指针（i18n reworkTask）");
+      assert.match(gateTask, new RegExp(`docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1\\.md`));
+      assert.match(gateTask, /request_gate_review/, "返工完成后要求显式重新请求 gate 复核");
+      assert.match(gateTask, /minor\/nit 项为非阻断/);
+
+      const notes = deliveryNotes(harness.events, "liaison");
+      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("未通过")), "主理收到 fail 系统行");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-26 gate 处置：fail 仅 minor/nit ⇒ returned-to-proof、不返工（防吹毛求疵）；gate 保持 pending", async () => {
+  const root = makeTempProjectRoot("ans-gate-nit-only-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "fail", [
+        { id: "G1", severity: "minor", owner: "executor", reason: "非关键缺陷", action: "后续修复", targets: ["src/x.ts"] },
+        { id: "G2", severity: "nit", owner: "executor", reason: "风格", action: "可选", targets: ["README.md"] },
+      ]);
+      await openConvenerAndSettle(harness, root);
+
+      await waitFor(() => readGateRecordFile(root, GATE_FLOW_ID).status === "returned-to-proof");
+      const record = readGateRecordFile(root, GATE_FLOW_ID);
+      assert.equal(record.reportSha256 !== null, true);
+      assert.equal(existsSync(gateReworkRoutingAbsPath(root, GATE_FLOW_ID)), false, "只有 minor/nit 不触发返工路由");
+      assert.equal((harness.sendsByRole.get("liaison") ?? []).some((text) => text.includes("gate 复核未通过")), false, "不生成返工任务");
+
+      const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
+      assert.ok(parsed.ok);
+      assert.equal(parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status, "pending");
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.some((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID), false, "非阻断 fail 不作为判定审计");
+      assert.equal(ledger.entries.some((entry) => entry.kind === "customer.decision" && entry.flowId === GATE_FLOW_ID), false);
+
+      const notes = deliveryNotes(harness.events, "liaison");
+      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("只含 minor/nit")), "主理收到 nitOnly 系统行");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-26 gate 处置：报告缺失/坏结构 ⇒ returned-to-proof；不通过、不返工、不猜", async () => {
+  const root = makeTempProjectRoot("ans-gate-report-bad-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      await openConvenerAndSettle(harness, root);
+
+      // 缺报告：记录保持 dispatched，主理如实系统行；不按超时判通过。
+      await waitFor(() =>
+        deliveryNotes(harness.events, "liaison").some((note) => note.includes(GATE_STEP_ID) && note.includes("报告不存在或不可读")),
+      );
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "dispatched");
+
+      // 陈旧阈值（设计 §5.7）：派发超过 30 分钟仍无报告 ⇒ 记录转 returned-to-proof（允许统筹重新请求）。
+      writeGateRecord(root, GATE_FLOW_ID, {
+        status: "dispatched",
+        dispatchedAt: new Date(Date.now() - 31 * 60_000).toISOString(),
+      });
+      harness.controls.get("convener")!.settle();
+      await waitFor(() => readGateRecordFile(root, GATE_FLOW_ID).status === "returned-to-proof");
+      assert.equal(existsSync(gateReworkRoutingAbsPath(root, GATE_FLOW_ID)), false, "陈旧无报告不返工");
+
+      // 补一份结构坏的 acceptance-triage/v1 报告 ⇒ returned-to-proof（不解析自由文本、不猜结论）。
+      mkdirSync(path.join(root, "docs", "acceptance"), { recursive: true });
+      writeFileSync(
+        path.join(root, "docs", "acceptance", `${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`),
+        ["# Gate 复核报告", "", "```yaml", "schema: acceptance-triage/v1", "conclusion: maybe", "items: []", "```", ""].join("\n"),
+      );
+      harness.controls.get("convener")!.settle();
+      await waitFor(() => readGateRecordFile(root, GATE_FLOW_ID).status === "returned-to-proof");
+      assert.equal(existsSync(gateReworkRoutingAbsPath(root, GATE_FLOW_ID)), false, "坏报告不返工");
+      const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
+      assert.ok(parsed.ok);
+      assert.equal(parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status, "pending");
+      const notes = deliveryNotes(harness.events, "liaison");
+      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("报告缺失或结构不合规")), "主理收到 returnedToProof 系统行");
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.some((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID), false, "坏报告不写判定审计");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-26 gate 重启恢复：passed + 步骤 pending ⇒ 导入时幂等收口一次；不重复 gate.review", async () => {
+  const root = makeTempProjectRoot("ans-gate-recover-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    await seedGateLedger(root, GATE_FLOW_ID);
+    writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "pass", []);
+    const reportSha = createHash("sha256")
+      .update(readFileSync(path.join(root, "docs", "acceptance", `${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`)))
+      .digest("hex");
+    writeGateRecord(root, GATE_FLOW_ID, {
+      status: "passed",
+      reportSha256: reportSha,
+      conclusion: "pass",
+      decidedAt: new Date().toISOString(),
+    });
+
+    // 新进程等价：导入即恢复（模拟「记录已 passed、flow 步骤仍 pending」的崩溃窗口）。
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      await waitFor(() => {
+        try {
+          const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
+          return parsed.ok && parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status === "done";
+        } catch {
+          return false;
+        }
+      });
+      await openConvenerAndSettle(harness, root);
+      await sleep(200);
+      await openConvenerAndSettle(harness, root);
+      await sleep(200);
+
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(
+        ledger.entries.filter((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID).length,
+        1,
+        "同一 gateId + reportSha 幂等：恰好一次 gate.review",
+      );
+      assert.equal(
+        ledger.entries.filter((entry) => entry.kind === "artifact.observed" && entry.artifactPath === `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`).length,
+        1,
+        "artifact.observed 幂等",
+      );
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "passed");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "恢复不自动重派 Proof");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-26 gate 重启恢复：failed 且返工路由未发送 ⇒ 补发一次；已发送后重启不重复", async () => {
+  const root = makeTempProjectRoot("ans-gate-recover-rework-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    await seedGateLedger(root, GATE_FLOW_ID);
+    writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "fail", [
+      { id: "G1", severity: "blocker", owner: "executor", reason: "不可用", action: "修复", targets: ["src/x.ts"] },
+    ]);
+    const reportSha = createHash("sha256")
+      .update(readFileSync(path.join(root, "docs", "acceptance", `${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`)))
+      .digest("hex");
+    writeGateRecord(root, GATE_FLOW_ID, {
+      status: "failed",
+      reportSha256: reportSha,
+      conclusion: "fail",
+      severityCounts: { blocker: 1, major: 0, minor: 0, nit: 0 },
+      itemCount: 1,
+      decidedAt: new Date().toISOString(),
+    });
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      await waitFor(() => existsSync(gateReworkRoutingAbsPath(root, GATE_FLOW_ID)));
+      await waitFor(() => JSON.parse(readFileSync(gateReworkRoutingAbsPath(root, GATE_FLOW_ID), "utf8")).status === "sent");
+      const sentCount = (harness.sendsByRole.get("liaison") ?? []).filter((text) => text.includes("gate 复核未通过")).length;
+      assert.equal(sentCount, 1, "补发恰一条 gate 返工任务");
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.filter((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID).length, 1);
+
+      await openConvenerAndSettle(harness, root);
+      await sleep(250);
+      const after = (harness.sendsByRole.get("liaison") ?? []).filter((text) => text.includes("gate 复核未通过")).length;
+      assert.equal(after, 1, "路由已 sent：重启/再检查不重复任务");
+      assert.equal(ledger.entries.some((entry) => entry.kind === "customer.decision" && entry.flowId === GATE_FLOW_ID), false);
+    } finally {
+      await harness.iface.stopSession();
     }
   } finally {
     rmSync(root, { recursive: true, force: true });

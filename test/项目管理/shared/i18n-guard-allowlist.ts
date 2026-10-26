@@ -10,6 +10,8 @@
 //   · 2026-10-23 B4 完成后：`src/common/shared/runtime-settings.ts`（元数据已 key 化）与
 //     `app/desktop/runtime-config.ts`（`"演示"` 兜底已改用语言中性标签）均已零 Han，从清单移除；
 //     当前保留 **18** 条仍含中文的文件。
+//   · 2026-10-26：新增 `app/desktop/boundary-change.ts`（治理关键路径机器常量、agent-facing 校验
+//     回执/任务正文、AI 门禁 judge prompt；classification §4，非用户可见 UI）——当前保留 **20** 条。
 // 规则：
 //   · **新增条目必须写明理由**；只允许「明确不翻译」的文件（classification §4/§5）。
 //   · B1–B4 每完成一批就从本清单移除对应文件；守卫测试会拒绝
@@ -23,6 +25,12 @@
 // 本文件是测试夹具，不是产品代码；路径相对仓库根、POSIX 分隔符、按字典序排列。
 
 export const I18N_GUARD_ALLOWLIST: readonly string[] = [
+  // `request_boundary_change` 桌面纯逻辑：治理关键路径机器常量（`角色卡`、`docs/**`）、
+  // agent-facing 校验失败回执（tool output，交治理 agent，不直接作为 UI 文案）、发给 Crew 的
+  // 边界变更任务正文，以及 AI 门禁判定请求卡（title/question/options/preview 仅进 judge prompt，
+  // 不是客户卡）——均为 classification §4 机器/agent-facing 文本，非用户可见 UI；
+  // 用户可见系统行由调用方按 i18n key 生成（2026-10-26 分类核对）。
+  "app/desktop/boundary-change.ts",
   // 演示运行时 agent-facing `systemPrompt`（demo 演示提示词，不面向客户）——classification §4。
   "app/desktop/chat-adapter.ts",
   // 发给 Convener/Crew/Lead 的任务正文/提示词（build*TaskMessage）、flow 收口原因常量

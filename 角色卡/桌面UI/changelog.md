@@ -548,3 +548,11 @@
 
 - `test/桌面UI/source-guard.test.ts`：`rel()` 统一 `relative(...).replaceAll("\\","/")`；平台桥判断改 `rel(file).endsWith("lib/platform.ts")`。修复 Windows 上 platform.ts 误报、Markdown 路径 deepEqual 差异、ui-store 持久化误报；断言未放宽。
 - macOS `node --test test/桌面UI/source-guard.test.ts` 9/9 pass；Windows 归一化后应通过（路径比较与 POSIX 字面量一致）。记录 [windows-paths](docs/change/2026-10-22_fix_source-guard-windows-paths.md)。
+
+## 2026-10-26：decision 卡（材料性选择）卡面标识接线
+
+- 客户 2026-10-26 decision 卡规则（PM 设计 `2026-10-26_design_decision-card.md`）：`cardKind="decision"` 时 `OperatorRow` 标题用共享 `ui.decisionCard.title`，顶部显示 `ui.decisionCard.notApprovalBadge`「非客户批准」；原 `request.title/question` 作为问题行保留（不丢材料性选择内容）；选项 `recommended === true` 显示 `ui.decisionCard.recommended`「推荐」。其它卡种标题/徽标/选项/交互零变化（非 decision 卡即使带 `recommended` 也忽略）。
+- 新增单点 `app/renderer/src/chat/decision-card.ts`（`decisionCardView` / `decisionOptionBadge`）；`ChatRow.tsx` 只消费该映射；`.op-decision-badge` / `.op-recommended-badge` / `.op-question` 样式在 `phase4b.css`。选项 `input` 的 `name/value/checked/onChange` 未动，渲染侧不做发卡校验。
+- 契约核对：`options[].recommended` 从工具层 → `customer-input.ts`（`request: req` 原样）→ `webContents.send` → preload `cb(payload)` → store 原样保存，**IPC 未丢字段**；渲染层此前只是未消费。preload 注释未列 `recommended` 属文档滞后（桌面窗口属主，未改）。
+- 测试：新增 `test/桌面UI/decision-card-view.test.ts` **9/9**；桌面UI 套件 **296/296**；`npm run typecheck:renderer` **0 错**。未跑真实 Electron e2e/截图；应用未重启（运行中仍是旧构建）；客户手选回执 key `main.decisionCard.selectedRecommended/selectedOther` 仍未接线（任务允许的残余，主进程未改）。
+- 记录：[decision-card-renderer](docs/change/2026-10-26_change_decision-card-renderer.md)

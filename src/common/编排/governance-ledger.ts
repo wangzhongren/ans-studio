@@ -25,6 +25,7 @@ import type {
   AcceptanceTriageDisposition,
   AcceptanceTriageRecommendationBasis,
 } from "./acceptance-triage.ts";
+import { FLOW_GATE_KINDS, type FlowGateKind } from "./flow-state.ts";
 
 /** 账本的项目相对路径（评审 §5.7 固定值）。 */
 export const GOVERNANCE_LEDGER_REL = ".ans/governance/ledger.jsonl";
@@ -68,6 +69,20 @@ export type GovernanceDecisionKind =
   /** 需求确认（Liaison 在 hand_off_intent 前的客户专属卡；判断 agent 永不代批）。 */
   | "intent-confirm"
   | "migration"
+  /**
+   * 2026-10-26 客户新增 decision 卡（`request_choice(cardKind="decision")`，**仅统筹可发**）：
+   * 客户对**事务性选择**的作答（卡内含推荐项；桌面「替我决策」开启时默认选中推荐项）。
+   *
+   * **不是**提案/任命/验收决定：
+   *   · `governance-gate.ts` 的 `PROPOSAL_DECISION_KINDS` / `ACCEPTED_DECISION_KINDS` 与任命写入
+   *     门都不包含它——不满足任何 gate 门；
+   *   · `latestAcceptanceDecision` 只认 `decisionKind:"acceptance"`——不进入验收判定；
+   *   · flow 的 `customer-decision` 证据枚举（`flow-state.ts::CUSTOMER_DECISION_KIND_REFS`）不接受
+   *     它——不能充当任何步骤的完成证据；
+   *   · 也不得被当成客户批准。
+   * 只作审计留痕（选中项见 `GovernanceLedgerEntry.selectedOptions`；门禁不读该字段）。
+   */
+  | "material-choice"
   | "unclassified"; // 缺 cardKind 或选项 id 非标准：门禁一律拒绝，提示重发
 
 /**
@@ -117,6 +132,44 @@ export interface AcceptanceTriageLedgerDecision {
   requestId?: string | null;
 }
 
+/** 账本 `gate.review` 条目的 gate 复核决定 schema（2026-10-26 客户授权；设计 §8.4）。 */
+export const GATE_REVIEW_DECISION_SCHEMA = "gate-review-decision/v1" as const;
+
+/** gate 报告的严重度计数（与 `acceptance-triage/v1` 同一组枚举）。 */
+export interface GateReviewSeverityCounts {
+  blocker: number;
+  major: number;
+  minor: number;
+  nit: number;
+}
+
+/**
+ * 账本 `gate.review` 的 gate 复核判定审计（2026-10-26 客户授权；设计
+ * `2026-10-26_design_proof-gate-reviews.md` §8.4）。
+ *
+ * **不是 `customer.decision`**：`latestAcceptanceDecision`、`evaluateFlowCompletion`、收口门、验收分诊都
+ * **不读**它；它只用于审计、幂等（`gateId + reportSha256` 去重）与汇报。gate 完成事实仍以 flow 步骤
+ * `done` + `artifact.observed` 为准；本审计不是完成证据的替代。
+ *
+ * **防吹毛求疵**（客户追加要求）：`conclusion=fail/conditional` 必须至少一个 `blocker`/`major`；只有
+ * `minor`/`nit` 的 fail 按结构不符退回 Proof、不得触发返工；`pass` 可带 `minor`/`nit` 备注。
+ * `flowId` 在条目顶层（`GovernanceLedgerEntry.flowId`）。
+ */
+export interface GateReviewLedgerDecision {
+  schema: typeof GATE_REVIEW_DECISION_SCHEMA;
+  gateId: string;
+  gateKind: FlowGateKind;
+  reportPath: string;
+  reportVersion: number;
+  reportSha256: string;
+  conclusion: AcceptanceTriageConclusion;
+  severityCounts: GateReviewSeverityCounts;
+  itemCount: number;
+  requestId: string;
+  flowRevision: string;
+  decidedAt: string;
+}
+
 /** 账本条目（评审 §5.7 逐字形状；只增不改，未知字段读取时原样保留）。 */
 export interface GovernanceLedgerEntry {
   at: string; // ISO
@@ -134,14 +187,20 @@ export interface GovernanceLedgerEntry {
      * 2026-10-25 验收分诊：只审计「返工 / 仅汇报」的分诊决定，**不是客户决定**；
      * 收口门与 `latestAcceptanceDecision` 不读它（设计 §9.2）。
      */
-    | "acceptance.triage";
+    | "acceptance.triage"
+    /**
+     * 2026-10-26 gate 复核（客户授权 `request_gate_review`）：只审计独立 gate 复核结论，
+     * **不是客户决定**、不进入验收分诊/最终验收；收口门与 `latestAcceptanceDecision` 不读它
+     * （设计 `2026-10-26_design_proof-gate-reviews.md` §8.4）。
+     */
+    | "gate.review";
   flowId?: string;
   /** 流程步骤 id。`dispatch.accepted` 的去重键是 flowId+stepId（与 targetRoleId 无关）。 */
   stepId?: string;
   /** 本事件的动作人（角色 id，或 "app"/"customer"）。 */
   actorRoleId: string;
   power: GovernancePower;
-  /** 仅 customer.decision：决定类型（门禁判定用）。 */
+  /** 仅 customer.decision：决定类型（门禁判定用；`material-choice` 仅供审计，门禁不认）。 */
   decisionKind?: GovernanceDecisionKind;
   artifactPath?: string; // 项目相对路径
   artifactVersion?: number;
@@ -151,6 +210,13 @@ export interface GovernanceLedgerEntry {
   /** 本次事件的目标角色（派发/写卡/验收）。应用自动派发 Proof / 验收时 = `"verifier"`。 */
   targetRoleId?: string;
   targetRoleIds?: string[];
+  /**
+   * 2026-10-26 decision 卡：仅 `customer.decision{decisionKind:"material-choice"}` 条目携带——
+   * 客户在卡上恰好选中的一个选项 id（同一选择同时出现在 tool 回执/会话，账本只作审计）。
+   * 可选、向后兼容（旧条目/旧读取方零变化）。**不是** `targetRoleIds`（不伪装成任命），也不是
+   * 写盘 `paths`；任何门禁/验收/收口判定都**不读**本字段。
+   */
+  selectedOptions?: string[];
   /** W6-A：意图交接/澄清所引用的意图记录（`docs/intents/<intentId>.md` 的 slug）。 */
   intentId?: string;
   /** W6-A：仅 intent.handed-off——交接种类（initial 每个 intentId 仅一次）。 */
@@ -168,6 +234,11 @@ export interface GovernanceLedgerEntry {
    * **不是**客户决定；`decisionKind` / `customerDecision` 不得与它同时出现（写入校验拒绝）。
    */
   acceptanceTriage?: AcceptanceTriageLedgerDecision;
+  /**
+   * 2026-10-26 gate 复核：仅 `kind:"gate.review"` 条目携带的 gate 复核判定审计。
+   * **不是**客户决定；`decisionKind` / `customerDecision` 不得与它同时出现（写入校验拒绝）。
+   */
+  gateReview?: GateReviewLedgerDecision;
   decisionEvidence?: {
     /**
      * 2026-10-18 双开关评审 §7.4/§10.1：`"judge"` 表示该决定由客户委托的判断 agent 代批；
@@ -281,6 +352,81 @@ function acceptanceTriageEntryShapeError(value: Record<string, unknown>): string
 }
 
 /**
+ * `gate.review` 条目的最小写入校验（2026-10-26 客户授权；设计 §8.4）：
+ *   · 只允许应用记录（`actorRoleId`/`power` 均为 `app`）；
+ *   · `gateReview` 字段齐全、枚举合法、sha256/版本/时间形状合法；
+ *   · **绝不携带**客户决定字段（`decisionKind` / `customerDecision`）或验收分诊字段；
+ *   · **防吹毛求疵**：`fail`/`conditional` 必须至少一个 `blocker`/`major`——只有 `minor`/`nit` 的 fail
+ *     按结构不符退回 Proof、不得作为返工依据；`pass` 可带 `minor`/`nit` 备注。
+ */
+function gateReviewEntryShapeError(value: Record<string, unknown>): string | undefined {
+  if (typeof value.flowId !== "string" || value.flowId.trim() === "") {
+    return "kind=gate.review 时缺少字符串字段 flowId";
+  }
+  if (value.actorRoleId !== "app" || value.power !== "app") {
+    return "kind=gate.review 只能由应用记录（actorRoleId/power 必须是 app）";
+  }
+  const review = value.gateReview;
+  if (!isPlainObject(review)) return "kind=gate.review 时缺少对象字段 gateReview";
+  if (review.schema !== GATE_REVIEW_DECISION_SCHEMA) {
+    return `gateReview.schema 必须是 ${GATE_REVIEW_DECISION_SCHEMA}（当前 ${JSON.stringify(review.schema)}）`;
+  }
+  if (typeof review.gateId !== "string" || review.gateId.trim() === "") {
+    return "gateReview 缺少字符串字段 gateId";
+  }
+  if (typeof review.gateKind !== "string" || !(FLOW_GATE_KINDS as readonly string[]).includes(review.gateKind)) {
+    return `gateReview.gateKind 必须是 ${FLOW_GATE_KINDS.join(" / ")}（当前 ${JSON.stringify(review.gateKind)}）`;
+  }
+  for (const key of ["reportPath", "requestId", "flowRevision", "decidedAt"] as const) {
+    if (typeof review[key] !== "string" || review[key].trim() === "") {
+      return `gateReview 缺少字符串字段 ${key}`;
+    }
+  }
+  if (
+    typeof review.reportVersion !== "number" ||
+    !Number.isSafeInteger(review.reportVersion) ||
+    review.reportVersion < 1
+  ) {
+    return "gateReview.reportVersion 必须是正整数";
+  }
+  if (typeof review.reportSha256 !== "string" || !/^[a-f0-9]{64}$/.test(review.reportSha256)) {
+    return "gateReview.reportSha256 必须是 64 位小写十六进制 sha256";
+  }
+  if (Number.isNaN(Date.parse(review.decidedAt as string))) {
+    return "gateReview.decidedAt 必须是 ISO 时间字符串";
+  }
+  if (review.conclusion !== "pass" && review.conclusion !== "fail" && review.conclusion !== "conditional") {
+    return "gateReview.conclusion 必须是 pass / fail / conditional";
+  }
+  const counts = review.severityCounts;
+  if (!isPlainObject(counts)) return "gateReview 缺少对象字段 severityCounts";
+  const severities = ["blocker", "major", "minor", "nit"] as const;
+  for (const severity of severities) {
+    const count = counts[severity];
+    if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0) {
+      return `gateReview.severityCounts.${severity} 必须是非负整数`;
+    }
+  }
+  if (typeof review.itemCount !== "number" || !Number.isSafeInteger(review.itemCount) || review.itemCount < 0) {
+    return "gateReview.itemCount 必须是非负整数";
+  }
+  const blocking = (counts.blocker as number) + (counts.major as number);
+  if (review.conclusion === "pass" && blocking > 0) {
+    return "gateReview.conclusion=pass 不得包含 blocker/major（通过报告只允许 minor/nit 备注）";
+  }
+  if (review.conclusion !== "pass" && blocking === 0) {
+    return "gateReview.conclusion=fail/conditional 必须至少有一个 blocker/major（只有 minor/nit 的 fail 按结构不符退回 Proof，不构成返工依据）";
+  }
+  if (value.decisionKind !== undefined || value.customerDecision !== undefined) {
+    return "gate.review 不是客户决定，不得携带 decisionKind / customerDecision";
+  }
+  if (value.acceptanceTriage !== undefined) {
+    return "gate.review 不是验收分诊，不得携带 acceptanceTriage";
+  }
+  return undefined;
+}
+
+/**
  * `decisionEvidence.kind="system-preauthorization"` 的最小写入校验（2026-10-25 写入预授权）：
  * 它**不是客户决定**——强制 `operatorId` 为 `system:` 前缀、禁止 `decisionKind`（门禁只读该键）、
  * 只记放行结果 `customerDecision:"accepted"`、禁止夹带 judge 审计。这样 `latestAcceptanceDecision`、
@@ -308,6 +454,12 @@ function entryShapeError(value: unknown): string | undefined {
   if (!isPlainObject(value)) return "不是 JSON 对象";
   for (const key of ["at", "kind", "actorRoleId", "power"] as const) {
     if (typeof value[key] !== "string" || value[key].trim() === "") return `缺少字符串字段 ${key}`;
+  }
+  if (value.kind === "gate.review") {
+    return gateReviewEntryShapeError(value);
+  }
+  if (value.gateReview !== undefined) {
+    return "gateReview 仅允许出现在 kind=gate.review 条目";
   }
   if (value.kind === "acceptance.triage") {
     return acceptanceTriageEntryShapeError(value);

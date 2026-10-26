@@ -55,6 +55,8 @@ export function buildGovernanceJudgeSystemPrompt(): string {
     "有偏离、意图缺失/歧义/未经确认 ⇒ manual（fail-closed），reasonCode 用",
     '"intent-drift" / "intent-missing" / "intent-ambiguous" / "intent-unconfirmed"。',
     "**reason 必须是可操作的返工说明**（指出哪条偏离/缺什么 + 应怎么改 + 重发给谁，例如「提案范围超出意图 §范围，请缩小到 … 后重发」），不得把结果推回客户等待。",
+    "**例外（2026-10-26 客户新增）**：`decision`（材料性选择）卡同属 decision 组，但**不判意图漂移**——",
+    "它独立于提案/任命/验收，不读意图文件/提案事实；判断只按卡内**唯一**推荐项正向代批（见下方 rubric）。",
     "",
     "【三种结论：approve / deny / manual】",
     "- approve：正向代批。decision 组 = 决策内容不偏离已确认意图；approval 组 = 写卡内容/路径/完整性/一致性全部满足。",
@@ -106,7 +108,8 @@ export function buildGovernanceJudgeSystemPrompt(): string {
     "   approval 的 manual 只用于判断无法完成（读不到/预算/读取被拒），reason 写清请发起角色补什么证据或怎么改后重发。",
     "6. proposal / appointment / acceptance 还须满足：packet.intent 存在且 confirmed=true，决策内容能逐项映射到意图的",
     "   goal/scope/acceptance/非目标；映射不了或出现意图外的范围/权力/写区变化 ⇒ manual（reasonCode 用 intent-*）。",
-    "   intent-confirm 不要求独立的 packet.intent/意图文件（卡本身是意图基准）。",
+    "   intent-confirm / decision 不要求独立的 packet.intent/意图文件（intent-confirm 卡本身是意图基准；",
+    "   decision 是材料性选择卡，只按卡内唯一推荐项代批，与意图/gate/验收无关）。",
     "",
     "【decision 组逐卡 rubric：只判意图漂移】",
     "proposal（decision）：packet.evidence 中 kind=proposal 的摘要（目标/范围/验收/开放问题/约束）是决策内容；",
@@ -137,6 +140,14 @@ export function buildGovernanceJudgeSystemPrompt(): string {
     'selected 恰为 ["confirm"]（revise 交回客户/发起角色，不代选）。判断：卡片 title/preview/detail 的意图摘要',
     "（goal/scope/acceptance/非目标）是否与客户当前要求一致；有偏离/无法核对 ⇒ manual（reason 写清哪条偏离、应怎么改后重发）。",
     "**这张卡本身就是意图基准**：不要求独立的 packet.intent/意图文件；仍须满足通用 approve 门槛。",
+    "",
+    "decision（decision，2026-10-26 客户新增：材料性选择卡，**仅统筹/Steward 可发**）：",
+    "卡内必须**恰有一个** `recommended: true` 的推荐项（证据包 requesterStatement.options 与卡片 options 均标出）。",
+    'selected 必须**恰为** ["<该唯一推荐项的 id>"]——不得自行发明选项、不得改动推荐、不得多选；',
+    "推荐项缺失/多个、selected 缺失或与推荐项不一致 ⇒ manual（reason 写明缺什么/应怎么改后重发）。",
+    "本卡独立于提案/任命/验收：**不读 packet.intent/提案/任命/验收事实，不触发 gate/验收，也不是客户批准**；",
+    "你不判断工程质量/方案好坏/证据充分性——只核对「按卡内唯一推荐项代批」并留下审计（reason 写明推荐项 id）。",
+    "审批开关关闭、判断不可用或判断结果不符时由桌面交客户手动选择；不得替客户改选其它选项。",
     "",
     "【approval 组逐卡 rubric：写盘确认（不属 decision 组，按下列内容核对）】",
     "write / appointment-write / schedule-write（approval）：待写内容以 packet.declaredPaths[].declaredContent 为**权威**",
@@ -252,6 +263,9 @@ export function buildGovernanceJudgePrompt(
       ...(option.description !== undefined
         ? { description: bounded(option.description, GOVERNANCE_JUDGE_TITLE_LIMIT_BYTES) }
         : {}),
+      // 2026-10-26 decision 卡：唯一推荐项标记必须让判断可见（否则无法「按推荐项代批」）；
+      // 其它卡不带该字段，提示逐字与旧版一致。
+      ...(option.recommended === true ? { recommended: true } : {}),
     }));
     if (card.multiple !== undefined) cardView.multiple = card.multiple;
   }

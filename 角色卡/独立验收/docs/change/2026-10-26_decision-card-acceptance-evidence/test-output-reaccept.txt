@@ -1,0 +1,31 @@
+decision 卡批次 F1/F2 修复后复验（2026-10-26，本角色独立执行；Windows 11 / Node v24.22.1）
+
+== typecheck ==
+npm run typecheck          -> exit 0
+npm run typecheck:renderer -> exit 0
+
+== 定向/全目录测试 ==
+node --test test/编排/decision-card.test.ts
+  tests 18 / pass 18 / fail 0 / skipped 0
+node --test "test/编排/**/*.test.ts"
+  tests 1003 / pass 1001 / fail 1 / skipped 1
+  唯一红：test/编排/shell-authorized-routine.test.ts:103 Windows symlink EPERM（既有环境问题；文件零 diff）
+node --test "test/桌面应用/**/*.test.ts"
+  tests 671 / pass 671 / fail 0 / skipped 0
+  （含 operator-wiring.test.ts 73/73、interface.test.ts 137/137、acceptance-dispatch.test.ts 86/86）
+node --test "test/runtime-core/**/*.test.ts"
+  tests 334 / pass 327 / fail 3 / skipped 4
+  3 红：file-write-safety ×1 + session-store ×2，均 Windows symlink EPERM（既有环境问题；文件零 diff）
+node --test "test/门禁引擎/**/*.test.ts"
+  tests 335 / pass 334 / fail 0 / skipped 1
+node --test "test/项目管理/shared/**/*.test.ts"
+  tests 203 / pass 198 / fail 0 / skipped 5
+node --test test/runtime-core/request-choice-decision-card.test.ts \
+           test/runtime-core/request-gate-review-tool.test.ts \
+           test/runtime-core/request-acceptance-tool.test.ts
+  tests 24 / pass 24 / fail 0 / skipped 0
+
+== F1/F2 探针（见 probe-output-reaccept.txt）==
+F1a/F1b/F2a/F2b/F2c: rawCalls=0, presented=0, outcome=declined, notPresented=true, ledgerEntries=[]
+F1 skip probe（合法卡 + raw 模拟 declined+notPresented）:
+  rawCalls=1, ledgerEntries=[], ledgerErrors=[], flowCompletion={ready:true}

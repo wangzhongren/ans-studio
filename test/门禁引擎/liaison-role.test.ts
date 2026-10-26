@@ -274,6 +274,35 @@ test("Lead 卡文本：治理协调（2026-10-24）——接报内置状态/回�
   assert.match(t, /协调 ≠ 客户批准/, "协调 ≠ 客户批准");
   assert.match(t, /应用仍执行闸门 0\/1\/2/, "应用门禁仍执行");
   assert.match(t, /你的协调不替代任何门禁/, "协调不替代门禁");
+  // 2026-10-26 客户追加规则：系统消息（[系统·治理协调]、gate pass/fail 系统行、交付/阻塞通知）
+  // 只向客户汇报，不得据此 dispatch_task 派 Steward；客户消息 / 客户明确要求触发的协调不回归。
+  assert.match(t, /\*\*系统消息只汇报、不派任务（必须）\*\*/, "Lead 卡须写死系统消息只汇报、不派任务");
+  assert.match(
+    t,
+    /`\[系统·治理协调\]`、gate pass \/ fail 系统行、交付 \/ 阻塞通知等系统消息/,
+    "系统消息种类须列明（[系统·治理协调]、gate 系统行、交付/阻塞通知）",
+  );
+  assert.match(t, /只向客户如实汇报/, "Lead 收到系统消息只向客户如实汇报");
+  assert.match(
+    t,
+    /不得给 Steward \/ 统筹 发任务、不得调用 `dispatch_task`/,
+    "Lead 收到系统消息不得派 Steward / 不得 dispatch_task",
+  );
+  assert.match(t, /不得把系统消息当成客户指令/, "系统消息不得当客户指令");
+  assert.match(t, /客户明确要求或客户消息触发的协调仍按原规则/, "客户消息路径不回归");
+  assert.match(t, /客户消息不是系统消息/, "客户消息与系统消息须区分");
+  // 工作流管理章节同样写死；闸门 1 后的客户消息 coordinate 路径仍保留，dispatchTask 能力不变。
+  assert.match(
+    t,
+    /系统消息（`\[系统·治理协调\]`、gate pass \/ fail 系统行、交付 \/ 阻塞通知等）只向客户汇报/,
+    "工作流管理章节须同步系统消息纪律",
+  );
+  assert.match(t, /只有客户明确要求或客户消息触发的协调才可派发/, "只有客户触发才可派发");
+  assert.equal(
+    governanceRoleOf("liaison")!.capabilities.dispatchTask,
+    true,
+    "dispatch_task 仍保留（客户消息触发才可派）",
+  );
   // 2026-10-24 P1-7：Lead 作为 manager（与 Steward 同权限）不得代标 delivered；
   // 只能在 owner 交付 delivered 后核证 done，或标 failed/blocked；worker 不能 done。
   assert.match(t, /与 Steward \/ 统筹 同权限/, "Lead 管理工作流的管理权限描述保留");

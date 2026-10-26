@@ -434,14 +434,14 @@ test("schema：三个治理元数据字段可选、slug pattern 单点、cardKin
     assert.equal(properties.stepId.pattern, GOVERNANCE_SLUG_PATTERN);
   }
   assert.deepEqual(confirm.cardKind.enum, ["write", "appointment-write", "schedule-write"]);
-  assert.deepEqual(choice.cardKind.enum, ["proposal", "appointment", "acceptance", "intent-confirm"]);
+  assert.deepEqual(choice.cardKind.enum, ["proposal", "appointment", "acceptance", "intent-confirm", "decision"]);
   for (const name of ["request_confirmation", "request_choice", "dispatch_task"]) {
     const required = (describeTool(name).parameters as { required?: string[] }).required ?? [];
     for (const field of ["flowId", "stepId", "cardKind"]) assert.equal(required.includes(field), false, `${name}.${field} 必须可选`);
   }
 });
 
-test("schema 文案（2026-10-22）：任命/提名语义与角色允许卡种写明；不新增 cardKind、形状不变", () => {
+test("schema 文案（2026-10-22）：任命/提名语义与角色允许卡种写明；2026-10-26 仅按客户要求新增 decision", () => {
   const propertiesOf = (name: string) => (describeTool(name).parameters as { properties: Record<string, { enum?: string[]; description?: string }> }).properties;
 
   const choice = describeTool("request_choice");
@@ -450,7 +450,7 @@ test("schema 文案（2026-10-22）：任命/提名语义与角色允许卡种�
   assert.match(choiceText, /由 Convener 依客户确认的团队计划发起/, "任命卡由 Convener 依团队计划发起");
   assert.match(choiceText, /旧流程的「提名」卡为 legacy/, "旧提名语义标注 legacy");
   assert.match(choiceText, /Crew 收到客户任命后才按名单写卡/, "Crew 任命后才写卡（不自行任命）");
-  assert.deepEqual(propertiesOf("request_choice").cardKind.enum, ["proposal", "appointment", "acceptance", "intent-confirm"], "不新增 cardKind");
+  assert.deepEqual(propertiesOf("request_choice").cardKind.enum, ["proposal", "appointment", "acceptance", "intent-confirm", "decision"], "仅新增 decision，原有卡种顺序/取值不变");
   assert.match(propertiesOf("request_choice").cardKind.description ?? "", /appointment.*appoint the recommended team/, "字段说明写明任命语义");
 
   const confirm = describeTool("request_confirmation");

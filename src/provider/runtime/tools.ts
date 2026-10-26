@@ -42,6 +42,9 @@ import type {
   RequestAcceptanceFn,
   RequestAcceptanceInput,
   RequestAcceptanceResult,
+  RequestGateReviewFn,
+  RequestGateReviewInput,
+  RequestGateReviewResult,
   RequestBoundaryChangeFn,
   RequestBoundaryChangeInput,
   RequestBoundaryChangeResult,
@@ -161,6 +164,9 @@ export const FLOW_STEP_SUPERSEDE_TOOL_NAME = "flow_step_supersede";
 /** request_acceptance 工具名（2026-10-25；交付就绪后由统筹直接请应用派独立复核/Proof）。 */
 export const REQUEST_ACCEPTANCE_TOOL_NAME = "request_acceptance";
 
+/** request_gate_review 工具名（2026-10-26 客户授权；gate 证据齐备后由统筹请应用派 Proof 独立复核——与最终验收独立）。 */
+export const REQUEST_GATE_REVIEW_TOOL_NAME = "request_gate_review";
+
 /** request_boundary_change 工具名（2026-10-26；项目角色写集/边界不足时由统筹请应用派组队修改）。 */
 export const REQUEST_BOUNDARY_CHANGE_TOOL_NAME = "request_boundary_change";
 
@@ -230,7 +236,9 @@ const GOVERNANCE_SLUG = new RegExp(GOVERNANCE_SLUG_PATTERN);
 // 判断 agent 可代批 `confirm`；`revise` 仍交回客户/发起角色（不替客户修改）。
 // 2026-10-22 治理分工第 1 项：`appointment` 语义改为「任命」（由 Convener 依客户确认的团队计划发起；
 // Crew 收到任命后才写卡）。角色→允许卡种的映射由编排判定（本层不硬编码角色 id）；白名单形状不变、不新增卡种。
-const CHOICE_CARD_KINDS: readonly GovernanceChoiceCardKind[] = ["proposal", "appointment", "acceptance", "intent-confirm"];
+// 2026-10-26 客户要求：`decision`（材料性选择卡，仅统筹使用；卡内恰一个 `recommended: true`）加入
+// choice 白名单。本层只做 enumerate 校验——不另立卡种表、不校验推荐项个数（应用/角色侧校验）。
+const CHOICE_CARD_KINDS: readonly GovernanceChoiceCardKind[] = ["proposal", "appointment", "acceptance", "intent-confirm", "decision"];
 const CONFIRM_CARD_KINDS: readonly GovernanceConfirmCardKind[] = ["write", "appointment-write", "schedule-write"];
 
 type GovernanceArgs<T> = { ok: true; value: T } | { ok: false; result: ToolResult };
@@ -1330,6 +1338,10 @@ function abortedToolResult(name: string): ToolResult {
   if (name === REQUEST_ACCEPTANCE_TOOL_NAME) {
     return { ok: false, message: `${name}：独立复核请求**未获结果**（原因：会话已中止）——**不要当已派发**；如实告知客户。` };
   }
+  // Gate 复核请求（2026-10-26）：中止时**不假设已派发、更不假设 gate 已通过**（零副作用面如实）。
+  if (name === REQUEST_GATE_REVIEW_TOOL_NAME) {
+    return { ok: false, message: `${name}：gate 复核请求**未获结果**（原因：会话已中止）——**不要当已派发，更不要当 gate 已通过**；如实告知客户。` };
+  }
   // 边界变更请求（2026-10-26）：中止时**不假设已派发/已修改**（零副作用面如实）。
   if (name === REQUEST_BOUNDARY_CHANGE_TOOL_NAME) {
     return { ok: false, message: `${name}：边界变更请求**未获结果**（原因：会话已中止）——**不要当已派发/已修改**；如实告知客户。` };
@@ -1500,7 +1512,11 @@ function makeRequestConfirmationTool(
   };
 }
 
-/** 校验并读出 options：非空数组、每项含**非空且唯一**的 id 与非空 label、可选字符串 description。非法 → undefined。 */
+/**
+ * 校验并读出 options：非空数组、每项含**非空且唯一**的 id 与非空 label、可选字符串 description、
+ * 可选布尔 recommended（decision 卡推荐项；**只透传**——不代选、不补默认值、不校验推荐项个数，
+ * 卡种语义在应用/角色侧）。非法 → undefined。
+ */
 function readOptions(args: Record<string, unknown>): CustomerInputOption[] | undefined {
   const raw = args["options"];
   if (!Array.isArray(raw) || raw.length === 0) return undefined;
@@ -1514,8 +1530,16 @@ function readOptions(args: Record<string, unknown>): CustomerInputOption[] | und
     if (typeof id !== "string" || id.trim() === "" || seen.has(id)) return undefined;
     if (typeof label !== "string" || label.trim() === "") return undefined;
     const description = typeof rec["description"] === "string" ? rec["description"] : undefined;
+    const recommendedRaw = rec["recommended"];
+    if (recommendedRaw !== undefined && typeof recommendedRaw !== "boolean") return undefined;
+    const recommended = typeof recommendedRaw === "boolean" ? recommendedRaw : undefined;
     seen.add(id);
-    options.push({ id, label, ...(description !== undefined ? { description } : {}) });
+    options.push({
+      id,
+      label,
+      ...(description !== undefined ? { description } : {}),
+      ...(recommended !== undefined ? { recommended } : {}),
+    });
   }
   return options;
 }
@@ -2806,6 +2830,134 @@ function makeRequestAcceptanceTool(fn: RequestAcceptanceFn): ExecutableTool {
   };
 }
 
+// —————————————— Gate 复核请求（2026-10-26 客户授权；request_gate_review） ——————————————
+//
+// 背景：客户 2026-10-26 确认独立复核权威只归验收（Proof），统筹只做证据完整性检查并**请求**复核；
+// 关键节点验收门禁（gate）的复核是**独立于最终验收**的通道，`request_acceptance` 语义不变（只用于
+// 最终验收）。本层只做两件事：**参数形状校验**（`gateId` 必填且为 slug；`note` 有界；非法在触达
+// 能力前拒绝，不猜测、不截断、不静默丢弃）＋**调用注入能力并如实转达回执**（`ok`/`code`/`message`；
+// 失败不伪装成功）。gate 查找/前置/证据/标准校验、Proof 派发、gate 记录与账本写入全部在**应用注入的
+// 能力**侧——本工具不写 flow/账本、不做治理判定。`dispatched` 只表示已派 Proof：**gate 复核 ≠ 验收
+// 通过 ≠ 客户批准**；gate fail 只按 blocker/major 判失败，只有 minor/nit 不返工（防吹毛求疵）。
+// 未注入能力 ⇒ 工具不注册（沿 request_acceptance 先例，能力缺席＝最强 fail-closed）。
+
+/** `request_gate_review` 回执 code 的冻结枚举（与 `RequestGateReviewResult` 同一契约；契约外回执 fail-closed）。 */
+const REQUEST_GATE_REVIEW_CODES: readonly RequestGateReviewResult["code"][] = Object.freeze([
+  "dispatched",
+  "already-dispatched",
+  "gate-not-found",
+  "criteria-missing",
+  "flow-incomplete",
+  "unavailable",
+  "rejected",
+]);
+const REQUEST_GATE_REVIEW_CODE_SET: ReadonlySet<string> = new Set(REQUEST_GATE_REVIEW_CODES);
+
+/** `note` 长度上限（按 Unicode 码点计；有界文本——超长拒绝，不静默截断；不写账本、不参与判定）。 */
+const REQUEST_GATE_REVIEW_NOTE_MAX_CHARS = 2000;
+
+/** 可选 `note`：缺席保持缺席（不造键）；给出时须为非空字符串且 ≤ 上限（超长拒绝，不截断）。 */
+function readGateReviewNote(args: Record<string, unknown>, name: string): { ok: true; value: string | undefined } | { ok: false; result: ToolResult } {
+  const value = args["note"];
+  if (value === undefined || value === null) return { ok: true, value: undefined };
+  if (typeof value !== "string" || value.trim() === "") {
+    return { ok: false, result: flowArgumentError(name, "note 参数非法（须为非空字符串；可省略）") };
+  }
+  const length = Array.from(value).length;
+  if (length > REQUEST_GATE_REVIEW_NOTE_MAX_CHARS) {
+    return { ok: false, result: flowArgumentError(name, `note 超过 ${REQUEST_GATE_REVIEW_NOTE_MAX_CHARS} 字（${length} 字；有界文本）`) };
+  }
+  return { ok: true, value };
+}
+
+/**
+ * 回执 → 工具结果：**原样**转达 `ok`/`code`/`message`（可选 `flowId`/`gateId`/`runtime` 一并如实呈现）。
+ * 契约外回执（缺失/非对象/缺 ok/code/message/未知 code）⇒ fail-closed「未获明确结果」，按未派发/失败
+ * 处理，**绝不说成已派发或 gate 已通过**。`dispatched` 只表示已派 Proof——不等于 gate 通过、不等于
+ * 验收通过、不代表客户批准（见文案纪律）。
+ */
+function requestGateReviewResultMessage(name: string, value: unknown): ToolResult {
+  const contractExternal = (): ToolResult => ({
+    ok: false,
+    message: `${name}：应用未返回明确结果（回执缺失或非法）——按**未派发/失败**处理；**不要当已派发，更不要当 gate 已通过**，如实告知客户。`,
+  });
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return contractExternal();
+  const receipt = value as Partial<RequestGateReviewResult>;
+  if (
+    typeof receipt.ok !== "boolean" ||
+    typeof receipt.code !== "string" ||
+    !REQUEST_GATE_REVIEW_CODE_SET.has(receipt.code) ||
+    typeof receipt.message !== "string" ||
+    receipt.message.trim() === ""
+  ) {
+    return contractExternal();
+  }
+  const parts = [`ok=${receipt.ok}`, `code=${receipt.code}`];
+  if (typeof receipt.flowId === "string" && receipt.flowId !== "") parts.push(`flowId=${receipt.flowId}`);
+  if (typeof receipt.gateId === "string" && receipt.gateId !== "") parts.push(`gateId=${receipt.gateId}`);
+  if (typeof receipt.runtime === "string" && receipt.runtime.length > 0) parts.push(`runtime=${receipt.runtime}`);
+  const detail = `（${parts.join("；")}）：${receipt.message}`;
+  if (receipt.ok) {
+    const headline = receipt.code === "dispatched" ? "gate 复核已派发（已请 Proof 独立复核）" : "请求已受理";
+    return {
+      ok: true,
+      message:
+        `${name}：${headline}${detail}。` +
+        `注意：**gate 复核 ≠ 验收通过 ≠ 客户批准**——\`dispatched\` 只表示已派 Proof，不代表 gate 已通过、` +
+        `不代表最终验收通过，也不代表客户批准；结论以 Proof 报告与 flow 步骤状态为准，不要宣称已通过。` +
+        `gate 失败只按 blocker/major 判定；只有 minor/nit 不构成返工依据。`,
+    };
+  }
+  if (receipt.code === "rejected") {
+    return {
+      ok: false,
+      message:
+        `${name}：gate 复核请求被应用**退回**（rejected）${detail}——**不要当已派发，更不要当 gate 已通过**；` +
+        `按 message 区分「gate 已 done / 已 superseded / 返工未完成」，协调修复后重交，如实告知客户。`,
+    };
+  }
+  return { ok: false, message: `${name}：gate 复核请求**未成功**${detail}——**不要当已派发，更不要当 gate 已通过**；如实告知客户。` };
+}
+
+/** request_gate_review：gate 证据齐备后请应用派 Proof 做独立复核（参数 `flowId?`/`gateId`/`note?`；回执如实转达）。 */
+function makeRequestGateReviewTool(fn: RequestGateReviewFn): ExecutableTool {
+  const name = REQUEST_GATE_REVIEW_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      // gateId 必填：须为匹配 GOVERNANCE_SLUG_PATTERN 的 gate 步骤 id；非法在触达能力前拒绝（不猜测、不截断）。
+      const rawGateId = call.args["gateId"];
+      if (typeof rawGateId !== "string" || !GOVERNANCE_SLUG.test(rawGateId)) {
+        return flowArgumentError(name, `缺少或非法的 gateId 参数（必填，须为匹配 ${GOVERNANCE_SLUG_PATTERN} 的 gate 步骤 id，如 gate-vertical-slice）`);
+      }
+      // flowId 可选：缺省/空白＝当前流程（由应用归一）；非字符串 ⇒ 在触达能力前拒绝。
+      const rawFlowId = call.args["flowId"];
+      if (rawFlowId !== undefined && rawFlowId !== null && typeof rawFlowId !== "string") {
+        return flowArgumentError(name, "flowId 参数非法（应为字符串；可省略＝当前流程）");
+      }
+      const flowId = typeof rawFlowId === "string" && rawFlowId.trim() !== "" ? rawFlowId : undefined;
+      const note = readGateReviewNote(call.args, name);
+      if (!note.ok) return note.result;
+      const input: RequestGateReviewInput = {
+        gateId: rawGateId,
+        ...(flowId !== undefined ? { flowId } : {}),
+        ...(note.value !== undefined ? { note: note.value } : {}),
+      };
+      let result: unknown;
+      try {
+        result = await raceAbort(
+          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(input); }),
+          call.signal,
+          `${name} 派发 gate 复核`,
+        );
+      } catch (err) {
+        return { ok: false, message: `${name}：gate 复核请求**未完成**（原因：${reasonOf(err)}）——**不要当已派发，更不要当 gate 已通过**；如实告知客户。` };
+      }
+      return requestGateReviewResultMessage(name, result);
+    },
+  };
+}
+
 // —————————————— 边界变更请求（2026-10-26 客户要求；request_boundary_change） ——————————————
 //
 // 真机缺口：治理门禁规定「内置治理角色不可被派发、治理角色之间不 dispatch」，统筹无法让组队（Crew）
@@ -3106,6 +3258,12 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   // （能力缺席 = 最强 fail-closed）。派发/校验/flow/账本由能力实现，本层只路由并如实转达回执。
   const requestAcceptance = options?.requestAcceptance;
   if (requestAcceptance !== undefined) tools.push(makeRequestAcceptanceTool(requestAcceptance));
+  // 结构性保证（2026-10-26 gate 复核请求，沿 requestAcceptance 先例）：**未注入能力时
+  // `request_gate_review` 不存在**。只给统筹（convener）——由调用方（编排/桌面注入端）决定注入；
+  // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。gate 校验/派发/记录/账本由能力实现，
+  // 本层只做参数形状校验并如实转达回执——gate 复核 ≠ 验收通过 ≠ 客户批准。
+  const requestGateReview = options?.requestGateReview;
+  if (requestGateReview !== undefined) tools.push(makeRequestGateReviewTool(requestGateReview));
   // 结构性保证（2026-10-26 边界变更请求，沿 requestAcceptance 先例）：**未注入能力时
   // `request_boundary_change` 不存在**。只给内置治理角色——由调用方（编排/桌面注入端）决定注入；
   // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。派发/appointment-write/客户确认/写盘

@@ -523,12 +523,13 @@ test("卡文本：五人均写明职能/不拥有最终批准权/可写与禁写
   assert.match(governanceRoleOf("convener")!.cardText, /shell 审批档——只读白名单直接执行/);
   assert.match(governanceRoleOf("convener")!.cardText, /schedule-write/);
   assert.match(governanceRoleOf("convener")!.cardText, /应用后台派发/, "客户 appointment 决定后由应用后台派发写卡任务给 Crew");
-  // Steward：可发 appointment 选择卡（仅此一种治理选择卡）；确认卡 schedule-write / write。
+  // Steward：可发 appointment 与 decision 两类治理选择卡；确认卡 schedule-write / write。
+  // 2026-10-26 决策卡批次：decision（材料性选择）加入统筹 request_choice 白名单，appointment 口径保留。
   assert.match(governanceRoleOf("convener")!.cardText, /`schedule-write` \/ `write`/);
   assert.match(
     governanceRoleOf("convener")!.cardText,
-    /每次 `request_choice` 必须带 `flowId` \+ `cardKind`（只用 `appointment`）/,
-    "Steward 仅 appointment 一种治理选择卡",
+    /每次 `request_choice` 必须带 `flowId` \+ `cardKind`（只用 `appointment` \/ `decision`）/,
+    "Steward 可发 appointment / decision 两类治理选择卡",
   );
   assert.doesNotMatch(governanceRoleOf("convener")!.cardText, /不用 `request_choice` 出治理卡/);
   // 派发拒绝清单统一为五个内置 id（含 verifier）。
@@ -1543,6 +1544,16 @@ test("2026-10-24 治理协调（S2a）：Lead 卡接报内置状态/回交、闸
     "协调 ≠ 客户批准",
     "应用仍执行闸门 0/1/2",
     "你的协调不替代任何门禁",
+    // 2026-10-26 客户追加规则：系统消息只向客户汇报，不得据此给 Steward 派任务 / dispatch_task；
+    // 客户明确要求或客户消息触发的协调仍按原规则（客户消息不是系统消息）。
+    "**系统消息只汇报、不派任务（必须）**",
+    "`[系统·治理协调]`、gate pass / fail 系统行、交付 / 阻塞通知等系统消息",
+    "只向客户如实汇报",
+    "不得给 Steward / 统筹 发任务、不得调用 `dispatch_task`",
+    "不得把系统消息当成客户指令",
+    "客户明确要求或客户消息触发的协调仍按原规则（客户消息不是系统消息）",
+    "系统消息（`[系统·治理协调]`、gate pass / fail 系统行、交付 / 阻塞通知等）只向客户汇报",
+    "只有客户明确要求或客户消息触发的协调才可派发",
   ]) {
     assert.ok(l.includes(needle), `Lead 治理协调卡文本须含「${needle}」`);
   }
@@ -2169,7 +2180,8 @@ test("2026-10-26 证据完整性与 gate 协调：Steward 只查 gate 步骤/证
     [
       "## 证据完整性与 gate 协调（必须）",
       "统筹**不再做实质性独立复核**（重复且越权）",
-      "只做**证据完整性检查与 gate 协调**",
+      "只做**证据完整性检查、gate 复核请求与返工协调**",
+      "只判「齐不齐」、不判「好不好」",
       "不对画面 / 实现质量下结论",
       "质量判断只由 Proof 的 gate 复核做",
       "不能只看步骤状态 / 账本",
@@ -2213,9 +2225,12 @@ test("2026-10-26 证据完整性与 gate 协调：Steward 只查 gate 步骤/证
   assertCardIncludes(
     c,
     [
-      "3. **最终验收**",
-      "仍由 Proof / 客户决定",
+      "7. **最终验收与 gate 分开**",
+      "gate 复核不走 `request_acceptance`",
       "最终验收用 `request_acceptance`",
+      "gate 未 `done` 时调用会因 `evaluateFlowCompletion` 返回 `flow-incomplete`",
+      "**gate 通过 ≠ 验收通过 ≠ 客户批准**",
+      "gate 失败也**不等于客户拒绝**",
       "不代替 Proof、不写客户决定",
       "**UI / 游戏 / 视觉类派发（必须）**",
       "`dispatch_task` 任务文本必须要求交付附「真实运行截图 / 录屏（关 DEBUG）+ 验收标准指针 + 关 DEBUG 说明」",
@@ -2223,7 +2238,7 @@ test("2026-10-26 证据完整性与 gate 协调：Steward 只查 gate 步骤/证
       "画面 / 实现质量由 Proof 的 gate 复核判定",
       "不得自查代替 Proof",
       "不得伪造 `done` 证据",
-      "不得把检查写成客户批准或验收通过",
+      "不得把检查 / 请求写成客户批准或验收通过",
       "6. 收齐回交",
       "核对按「证据完整性与 gate 协调（必须）」执行",
       "标 `done` 前必须完成「证据完整性与 gate 协调（必须）」的证据清单核对",
@@ -2231,7 +2246,42 @@ test("2026-10-26 证据完整性与 gate 协调：Steward 只查 gate 步骤/证
     "Steward 最终验收、派发与记录",
   );
 
-  // 5) 反向断言：实质性复核口径必须消失（不再由统筹亲自判断质量/立即退回/不等 Proof）。
+  // 5) 主动 request_gate_review：清单齐备后完成即主动提交；gate done 只由应用收口，
+  //    不得代写 gate 报告 / 不得自标 done；冻结回执如实处理（dispatched ≠ 通过）。
+  assertCardIncludes(
+    c,
+    [
+      "4. **主动请求 gate 复核**",
+      "**完成即主动**调用 `request_gate_review({ flowId, gateId })`",
+      "不等客户催办、不等主理转达",
+      "不得提前提交、不得用提交代替缺步骤 / 缺证据",
+      "gate 步骤的 `done` **只能由应用按 Proof 报告收口**",
+      "你不得用 `flow_step_update` 标 gate `done`",
+      "`gate-review-required`",
+      "不得代写 gate 报告",
+      "`docs/acceptance/**` 是你的禁写路径",
+      "`dispatched`：如实记录 / 汇报「已提交 gate 复核」——**不等于通过**",
+      "`already-dispatched`：不重复提交",
+      "`gate-not-found`",
+      "`criteria-missing`",
+      "`flow-incomplete`",
+      "`unavailable`",
+      "`rejected`",
+      "gate 步骤 `done` ⇒ 已通过；否则在途，等待",
+      "不绕过、不自己判、不伪造通过、不盲目重复请求",
+      "不原样死循环",
+      // 防吹毛求疵：只有 minor/nit 的 fail 是结构不符，退回 Proof、不返工；
+      // minor/nit 是非阻断备注，不因非阻断建议反复开 gate。
+      "只有 `minor` / `nit` 的 fail 是结构不符",
+      "应用退回 Proof 补报告、不触发返工",
+      "`minor` / `nit` 是非阻断备注，不因非阻断建议反复开 gate",
+      "返工完成后重新 `request_gate_review` 同一 gate",
+      "应用不自动重判、不自动放行",
+    ],
+    "Steward 主动 request_gate_review 与回执",
+  );
+
+  // 6) 反向断言：实质性复核口径必须消失（不再由统筹亲自判断质量/立即退回/不等 Proof）。
   for (const legacy of [
     "## 独立复核时机（必须）",
     "亲自看产物与证据",
@@ -2266,123 +2316,190 @@ test("2026-10-26 证据完整性与 gate 协调：Steward 只查 gate 步骤/证
   assert.equal(convener.capabilities.shell, "operator-approve");
 });
 
-// —————————————————————— 15) 2026-10-26 Gate 规划（只给规则，不实现新工具） ——————————————————————
+// —————————————————————— 15) 2026-10-26 Gate 规划与复核（request_gate_review 已授权实现） ——————————————————————
 
-test("2026-10-26 Gate 规划：Steward 卡含适用矩阵/必填模板/game 示例/失败返工，Proof 独判、统筹不自审，不新增工具/schema", () => {
-  // 客户口径：只给规则，不实现 request_gate_review / gateKind / 账本 / 新工具；客户可能做其他业务，
-  // 统筹只需在规划时知道哪些地方要设 gate。本批只改 Convener 卡文本 + 测试。
+test("2026-10-26 Gate 规划：Steward 卡按风险档 × 产品类型声明 kind: artifact + gateKind、写入下游 dependsOn，主动 request_gate_review，Proof 独判、统筹不自审", () => {
+  // 客户 2026-10-26 追加授权实现 `request_gate_review` 与设计 §4–§8、§12 的 gate 机制
+  // （`2026-10-26_design_proof-gate-reviews.md` v3 `approved-implementing`）；本批只改
+  // Convener / Verifier 卡文本 + 测试。A1/A2/A6：三类 gate、默认矩阵不减少、gate 用现有
+  // `kind: artifact` + `gateKind`、gate 写进下游 dependsOn、统筹只做证据完整性检查与请求。
   const c = governanceRoleOf("convener")!.cardText;
 
-  // 1) 四个固定 gate 节点 + 适用矩阵（原型档 / 生产档 × 产品类型 / T0 纯文档），不得默默省略。
+  // 1) 章节与 flow 表达：现有 artifact + 可选 gateKind，不是新 FlowStepKind；
+  //    最终客户验收不属于 gateKind、不写成 gate 步骤。
   assertCardIncludes(
     c,
     [
-      "## Gate 规划（规则，必须）",
-      "四个固定 gate 节点：**垂直切片、视觉基线、集成 / 性能、最终客户验收**",
-      "**适用矩阵（按风险档 × 产品类型启用；不得默默省略）**",
-      "| 风险档 / 产品类型 | 垂直切片 | 视觉基线 | 集成 / 性能 | 最终客户验收 |",
-      "| 原型档（任意产品） | 必设 | 仅 UI / 游戏设 | 仅多模块 / 多端设 | 必设 |",
-      "| 生产档 · UI / 游戏 | 必设 | 必设 | 必设 | 必设 |",
-      "| 生产档 · CLI / 后端 | 必设 | 不设（写明理由） | 必设 | 必设 |",
-      "| 生产档 · 纯库 | 不设（写明理由） | 不设（写明理由） | 必设 | 必设 |",
-      "| T0 / 纯文档 | 可不设 | 可不设 | 可不设 | 只保留最终验收，或**显式说明不设额外 gate 并写理由** |",
-      "不得默默省略",
+      "## Gate 规划（必须）",
+      "gate 是**现有 `kind: artifact` 步骤 + 可选 `gateKind` 元数据**",
+      "不是新 `FlowStepKind`",
+      "`gateKind` 只能是 `vertical-slice` / `visual-baseline` / `integration-performance`",
+      "未知值应用会拒绝",
+      "最终客户验收仍沿用现有 `verification` / `acceptance` 步骤（`kind: acceptance`）",
+      "**不属于 `gateKind`，不写成 gate 步骤**",
+      "步骤 id 用 `gate-<slug>`",
+      "`owner` 固定 `verifier`",
+      "内置治理角色不可被 `dispatch_task`，gate 复核由应用派 Proof",
+      "`kind: artifact`",
+      "`status: pending`",
+      "`gateKind: <三类之一>`",
+      "`evidence` 为 `{ kind: artifact, ref: docs/acceptance/<flowId>-<gateId>-report-v1.md }`",
+      "应用按最新 gate 报告版本收口并重写 ref",
+    ],
+    "Steward Gate flow 表达",
+  );
+
+  // 2) 适用矩阵（按风险档 T0–T3 × 产品类型；默认不减少、不得默默省略；
+  //    prototype 质量档不豁免 gate）。
+  assertCardIncludes(
+    c,
+    [
+      "**适用矩阵（按风险档 × 产品类型启用；默认不减少）**",
+      "| 项目类型 \\ 风险档 | T0 | T1 | T2 | T3 |",
+      "| 纯文档 / 数据 / 配置（无代码） | 无 | 无（最终验收即可） | 可选集成门 | 集成门 |",
+      "| 后端 / 服务 / CLI（无视觉面） | 无 | 垂直切片门 | 垂直切片门 + 集成 / 性能门 | 全部（含集成 / 性能门） |",
+      "| UI / 桌面 / Web（有视觉面） | 无 | 垂直切片门 + 视觉基线门（至少 1 次） | 两者 + 集成 / 性能门；视觉按关键页面 | 全部；视觉按关键页面 / 状态 |",
+      "| 游戏（如 castle-2d） | 无 | 垂直切片门 + 视觉基线门（首关） | 三者；视觉按关 | 全部；视觉按关 + 错误态 / 窄窗 |",
+      "档位取团队计划 / 变更包中**较高**者",
+      "gate 数量只增不减",
+      "**不得减少默认 gate**",
+      "除非客户书面豁免并记录",
+      "`qualityTier: prototype` **不豁免** gate",
+      "原型档放宽的是实现完备度，不是「真实运行 / 真实截图」的独立复核",
     ],
     "Steward Gate 适用矩阵",
   );
 
-  // 2) 四类 gate 的证据口径。
+  // 3) 三类 gate 的复核口径（vertical-slice / visual-baseline / integration-performance）；
+  //    UI / 游戏必须关 DEBUG。
   assertCardIncludes(
     c,
     [
-      "**垂直切片 gate**＝脚手架后的首个可玩 / 可用切片",
-      "真实素材、真实运行、关 DEBUG 截图 / 输出",
-      "**视觉基线 gate**＝UI / 游戏每个关卡 / 关键页面（含每关 / Boss）的 golden 截图与像素规格 / 比例 / 图层基线",
-      "**集成与性能 gate**＝全量测试、e2e、性能采样与阈值",
-      "**最终客户验收**＝沿用现有 `verification` / `acceptance`",
-      "语义不变",
+      "**三类 gate 的复核口径**",
+      "**垂直切片 gate**（`vertical-slice`）",
+      "`build-scaffold` 完成 + 首个端到端可玩 / 可用切片后",
+      "脚手架真实可跑",
+      "切片真实贯通（不是 mock / 占位）",
+      "**视觉基线 gate**（`visual-baseline`）",
+      "Proof 亲自打开真实浏览器 / 游戏核对布局、像素 / 缩放、可读性、错误态",
+      "**UI / 游戏必须关闭 DEBUG 覆盖层后截图 / 录屏**",
+      "**集成 / 性能 gate**（`integration-performance`）",
+      "e2e / 契约测试真实通过",
+      "Reduce manifest 与分片原始日志可对账",
     ],
-    "Steward Gate 类型与证据口径",
+    "Steward Gate 三类复核口径",
   );
 
-  // 3) 每个 gate 的必填模板字段：gate id / 验收标准指针 / 证据清单 / 负责人 / 独立判定 = Proof / dependsOn。
+  // 4) gate 复核标准节写在最新 criteria（单一来源）；缺节 ⇒ criteria-missing，Proof 补、
+  //    统筹不写 docs/acceptance/**。
   assertCardIncludes(
     c,
     [
-      "**每个 gate 的模板（必须字段）**",
-      "`gate id`：固定语义 id，如 `gate-vertical-slice`、`gate-visual-level-01`、`gate-integration`、`gate-final-acceptance`",
-      "`验收标准指针`：指向验收标准 / 提案 / 计划中的可核对条目",
-      "`证据清单`：截图 / 运行输出 / 测试报告 / 性能数据（UI / 游戏注明关 DEBUG）",
-      "`负责人`：证据产出的 owner（项目角色），不是 Proof",
-      "`独立判定`：Proof / 验收",
-      "`下游 dependsOn`：依赖该 gate 的步骤 id 列表",
-      "gate 未 `done` 下游不得派发（沿用现有 `dependsOn` 门禁，不新增检查）",
+      "**gate 复核标准写进验收标准（单一来源）**",
+      "标题必须包含精确 `gateId`",
+      "## Gate 复核标准：gate-vertical-slice（vertical-slice）",
+      "应用只做机械检查（最新 criteria 存在、结构合格、标题含该 `gateId`）",
+      "缺节时 `request_gate_review` 返回 `criteria-missing`",
+      "由 Proof 递增 criteria 版本补齐",
+      "**你不写 `docs/acceptance/**`**",
     ],
-    "Steward Gate 模板字段",
+    "Steward Gate 标准节",
   );
 
-  // 4) game 项目示例：垂直切片在脚手架后、每关/Boss 视觉基线、集成/性能、最终验收。
+  // 5) 下游 dependsOn 与硬拦：gate 未 done ⇒ dependencies-not-done / ready 不提示 /
+  //    最终验收不可达；不为 gate 引入图 schema。
   assertCardIncludes(
     c,
     [
-      "**game 项目示例（计划里照此落 gate）**",
-      "`gate-vertical-slice`（脚手架后首个可玩切片",
-      "每关 / Boss 各一个 `gate-visual-level-01`",
-      "`gate-integration`（集成 / e2e / 性能采样",
-      "`gate-final-acceptance`（最终客户验收",
-      "dependsOn=[gate-integration]",
+      "**下游依赖（必须写进 flow YAML）**",
+      "下游 `delivery-*` / Reduce / 证据步骤把相关 gate 写进自己的 `dependsOn`",
+      "gate 未 `done` 时应用派发门禁会对下游返回 `dependencies-not-done`",
+      "`ready` 不提示继续调度",
+      "最终验收也不可达（`evaluateFlowCompletion`）",
+      "这是应用硬拦，不靠角色自觉",
+      "不为 gate 引入图 schema",
     ],
-    "Steward Gate game 示例",
+    "Steward Gate 下游依赖硬拦",
   );
 
-  // 5) 失败与返工：走现有返工路由、返工后重新复核、未 done 不派下游、不得用后续验收补跳。
+  // 6) 失败与返工：fail 含 blocker/major 走返工路由、返工后重新请求；防吹毛求疵——
+  //    只有 minor/nit 的 fail 属结构不符、退回 Proof、不触发返工。
   assertCardIncludes(
     c,
     [
       "**失败与返工**",
-      "gate `fail` 必须走现有返工路由",
-      "`flow_step_supersede` / 退回 owner 返工",
-      "返工完成后**重新复核该 gate**",
-      "不得直接标记通过",
+      "gate `fail` / `conditional` 含 `blocker` / `major` 时应用记录失败并按返工路由交你协调",
+      "`flow_step_supersede` / 新版本步骤建返工",
+      "任务带 gate 报告的 severity / reason / targets",
+      "返工完成后**重新请求该 gate 的复核**",
+      "不得直接标记通过、不得自动循环重派",
+      "**只有 `minor` / `nit` 的 fail 属结构不符**",
+      "应用退回 Proof 补报告、**不触发返工**",
+      "`minor` / `nit` 是非阻断备注，不因非阻断建议反复开 gate",
       "gate 未 `done` 下游不得派发",
       "不允许用「后续验收再补」跳过 gate",
     ],
-    "Steward Gate 失败与返工",
+    "Steward Gate 失败与返工（防吹毛求疵）",
   );
 
-  // 6) 独立判断只由 Proof/验收做；统筹只查证据齐备、走现有通道；提前 gate 无通道时如实上报，不自审。
+  // 7) 独立判断只由 Proof/验收做；统筹只做证据完整性检查 + 主动 request_gate_review；
+  //    gate ≠ 验收通过 ≠ 客户批准；不新增 FlowStepKind / 治理角色 / cardKind。
   assertCardIncludes(
     c,
     [
       "**独立判断只由 Proof / 验收做**",
-      "只检查证据是否齐备",
-      "按现有应用通道提交复核",
-      "最终验收用 `request_acceptance`",
-      "提前 gate 若当前没有通道",
-      "**如实上报 Lead / 主理 与客户**",
-      "不得自查代替",
-      "不得自己标 gate 通过",
-      "不得把自查写成 Proof 结论",
-      "按「Gate 规划（规则，必须）」用现有步骤表达所需 gate",
-      "按「Gate 规划（规则，必须）」识别并按产品类型 / 风险写清每个 gate",
+      "你只做证据完整性检查",
+      "调用 `request_gate_review({ flowId, gateId })` 请求复核",
+      "gate 结论只由 Proof 产出",
+      "**不得自查代替 Proof、不得自己标 gate 通过、不得代写 gate 报告**",
+      "**gate 复核 ≠ 验收通过 ≠ 客户批准**",
+      "gate 通过只表示该节点允许继续",
+      "最终验收仍走 `request_acceptance` 与客户决定",
+      "**不新增 `FlowStepKind` / 治理角色 / cardKind**",
+      "`request_gate_review` 只注入统筹会话",
+      "`request_acceptance` 仍是最终验收唯一主动通道",
+      "无 gate 的旧 flow 解析 / 派发 / 验收行为逐字不变",
+      // 标准工作流指针同步（不只藏在 Gate 规划章节里）。
+      "按「Gate 规划（必须）」在 flow YAML 声明所需 gate 步骤",
+      "按「Gate 规划（必须）」识别并按风险档 × 产品类型写清每个 gate",
     ],
     "Steward Gate 独立判断与工作流指针",
   );
 
-  // 7) 不实现新工具/schema：无新 FlowStepKind、无 request_gate_review/gateKind、无账本 kind、不引入图 schema。
+  // 8) 反向断言：rules-only 时期「没有通道 / 不引入工具」与「gate-final-acceptance」
+  //    口径必须消失（客户已授权实现 request_gate_review / gateKind）。
+  for (const legacy of [
+    "## Gate 规划（规则，必须）",
+    "提前 gate 若当前没有通道",
+    "不引入 `request_gate_review`、`gateKind`",
+    "本卡只给规划规则",
+    "gate-final-acceptance",
+    "原型档（任意产品）",
+  ]) {
+    assert.equal(c.includes(legacy), false, `Steward 卡不得保留 rules-only 旧口径「${legacy}」`);
+  }
+
+  // 9) 通道归属：`request_gate_review` 只由统筹（convener）卡定义；其余四卡不得定义该通道
+  //    （工具只注入统筹会话 = 能力缺席即 fail-closed）。统筹仍不得自标 gate done、不得自查代替 Proof。
+  assert.ok(c.includes("request_gate_review"), "Steward 卡须定义 request_gate_review 请求通道");
+  for (const id of ["liaison", "rapporteur", "nominator", "verifier"] as const) {
+    assert.equal(
+      governanceRoleOf(id)!.cardText.includes("request_gate_review"),
+      false,
+      `${id} 卡不得定义 request_gate_review 通道（只注入统筹会话）`,
+    );
+  }
   assertCardIncludes(
     c,
     [
-      "**不新增 `FlowStepKind` / 工具 / 账本 kind**",
-      "不引入 `request_gate_review`、`gateKind`",
-      "gate 用现有步骤表达（如 `artifact` / `acceptance`）",
-      "不改变现有验收语义",
-      "不为 gate 引入图 schema",
+      "不得自己标 gate 通过",
+      "gate 步骤的 `done` **只能由应用按 Proof 报告收口**",
+      "**gate 复核 ≠ 验收通过 ≠ 客户批准**",
     ],
-    "Steward Gate 无新工具/schema",
+    "Steward 不自标 gate done / 不自审",
   );
 
-  // 8) 注册表数据面零变化：本批只改卡文本，不加能力位、不改写权。
+  // 10) 注册表数据面零变化：本批只改卡文本，不加能力位、不改写权。
   const convener = governanceRoleOf("convener")!;
   assert.deepEqual(convener.entries.map((e) => e.path), [
     "docs/flows/",
@@ -2397,4 +2514,128 @@ test("2026-10-26 Gate 规划：Steward 卡含适用矩阵/必填模板/game 示�
   ]);
   assert.equal(convener.capabilities.dispatchTask, true);
   assert.equal(convener.capabilities.shell, "operator-approve");
+});
+
+// —————————————————————— 16) 2026-10-26 Proof gate 复核与报告（A5） ——————————————————————
+
+test("2026-10-26 Proof gate 复核：读标准+证据、亲自看真实输出、UI/游戏关 DEBUG 截图；报告复用 acceptance-triage/v1 且版本化不覆盖；防吹毛求疵、独判、不越权", () => {
+  // 设计 §6/§10 A5：gate 复核独立于最终验收；Proof 亲自跑/看真实输出；gate 报告
+  // `docs/acceptance/<flowId>-<gateId>-report-vN.md` 版本化不覆盖；pass 可带 minor/nit，
+  // fail/conditional 必须至少一个 blocker/major；只有 minor/nit 的 fail 属结构不符、退回补报告、
+  // 不触发返工；不发验收卡、不写 customer.decision、不实现、不派发、不标 flow 步骤 done。
+  const v = governanceRoleOf("verifier")!.cardText;
+
+  // 1) 章节、独立性、gate 任务识别与亲自取证。
+  assertCardIncludes(
+    v,
+    [
+      "## Gate 复核（gate 任务，必须）",
+      "gate 复核**独立于最终验收**：gate 通过 ≠ 验收通过 ≠ 客户批准",
+      "`stepId` 为 `gate-*`",
+      "带 `flowId` / `gateId` / `gateKind`、复核标准与证据指针",
+      "它不是验收卡任务，不要发验收卡",
+      "**读标准与证据，亲自看真实输出**",
+      "标题含该 `gateId` 的 Gate 复核标准节",
+      "gate 的 `dependsOn` 各步骤证据指针与候选 / 流程版本",
+      "**亲自运行或打开真实输出**",
+      "不是只读别人转述的日志、截图或摘要",
+    ],
+    "Proof Gate 复核取证",
+  );
+
+  // 2) UI / 游戏视觉核对：关 DEBUG 截图；旧截图 / DEBUG 覆盖层 = insufficient evidence，
+  //    不得判 pass。
+  assertCardIncludes(
+    v,
+    [
+      "**UI / 游戏视觉核对**",
+      "必须打开真实浏览器 / 游戏窗口逐项核对",
+      "**截图 / 录屏必须关闭 DEBUG 覆盖层**",
+      "发现 DEBUG 覆盖层、旧候选截图、或无法确认截图为当前候选 ⇒ `insufficient evidence`",
+      "按 fail 处理，不通过",
+      "证据里出现 DEBUG 覆盖层不得判 pass",
+    ],
+    "Proof Gate 视觉与 DEBUG 证据",
+  );
+
+  // 3) gate 报告路径 / 版本化 / 结构与候选绑定。
+  assertCardIncludes(
+    v,
+    [
+      "**写 gate 报告（版本化，不覆盖）**",
+      "报告写 `docs/acceptance/<flowId>-<gateId>-report-vN.md`",
+      "首次 v1，重验递增 vN+1，不覆盖历史报告",
+      "证据附件写 `docs/verification/<flowId>/<gateId>/`",
+      "报告首行写清 flowId / gateId / gateKind / 候选 flow revision",
+      "结构复用 `acceptance-triage/v1`",
+      "结论只允许 `pass` / `fail` / `conditional`",
+    ],
+    "Proof Gate 报告路径与结构",
+  );
+
+  // 4) 防吹毛求疵：pass 可带 minor/nit；fail/conditional 必须 blocker/major；
+  //    只有 minor/nit 的 fail 按结构不符退回、不触发返工。
+  assertCardIncludes(
+    v,
+    [
+      "**结论与 items 纪律（防吹毛求疵）**",
+      "`pass` 允许空 items，也**允许带 `minor` / `nit` 备注**",
+      "非阻断建议，不因非阻断建议反复开 gate",
+      "`fail` / `conditional` **必须至少一个 `blocker` 或 `major`**",
+      "**只有 `minor` / `nit` 的 fail 属结构不符**",
+      "应用会退回你补报告，**不触发返工**",
+      "禁止用 `nit` 开 fail",
+    ],
+    "Proof Gate 防吹毛求疵",
+  );
+
+  // 5) 禁止事项：不发卡、不写客户决定、不实现、不派发、不标任何 flow 步骤 done；
+  //    gate 失败 ≠ 客户拒绝；gate 报告 ≠ 最终验收报告。
+  assertCardIncludes(
+    v,
+    [
+      "**禁止事项**",
+      "不发 `request_choice`、不发验收卡、不写 `customer.decision`",
+      "不实现修复、不派发任务、不标任何 flow 步骤 `done`",
+      "gate 步骤的 `done` 只能由应用按你的 gate 报告收口",
+      "你不对 gate 步骤做 `flow_step_update`",
+      "不改 flow / 账本 / 统筹的返工范围",
+      "**失败与重验**",
+      "gate 失败后不实现、不派发、不返工",
+      "应用按返工路由交统筹",
+      "返工完成后由统筹重新请求复核，你写新版本报告",
+      "**不是最终验收报告**",
+      "gate 失败**不等于客户拒绝**",
+      "不得在 gate 失败时直接建议客户接受",
+      // 质量职责段同步（不只藏在工作流章节）。
+      "gate 复核必须读 gate 标准节 + `dependsOn` 证据、亲自跑 / 看真实输出",
+      "旧截图 / DEBUG 覆盖层 = insufficient evidence",
+      "gate 报告用 `acceptance-triage/v1`、路径 `docs/acceptance/<flowId>-<gateId>-report-vN.md` 版本化不覆盖",
+      "`pass` 可带 `minor` / `nit`",
+      "只有 `minor` / `nit` 的 fail 属结构不符，退回补报告、不触发返工",
+      "gate 复核独立于最终验收：gate 通过 ≠ 验收通过 ≠ 客户批准",
+      "不发验收卡、不写 `customer.decision`、不实现、不派发、不标 flow 步骤 done",
+    ],
+    "Proof Gate 禁止事项与质量职责",
+  );
+
+  // 6) 反向断言：旧口径（把 gate 当验收卡 / 只读转述就 pass）不得出现；Proof 卡仍不定义
+  //    request_acceptance 通道（gate 与最终验收通道分开）。
+  for (const legacy of [
+    "只读别人转述的日志就 pass",
+    "DEBUG 覆盖层截图被判 pass",
+  ]) {
+    assert.equal(v.includes(legacy), false, `Proof 卡不得保留旧口径「${legacy}」`);
+  }
+  assert.equal(v.includes("request_acceptance"), false, "Proof 卡不得定义 request_acceptance 提交通道");
+
+  // 7) 注册表数据面零变化：只改卡文本，不加能力位、不改写权。
+  const verifier = governanceRoleOf("verifier")!;
+  assert.deepEqual(verifier.entries.map((e) => e.path), [
+    "docs/acceptance/",
+    "docs/verification/",
+    "docs/governance/verifier/",
+  ]);
+  assert.equal(verifier.capabilities.dispatchTask, false, "Proof 仍不可派发");
+  assert.equal(verifier.capabilities.shell, "operator-approve", "Proof 仍为 shell 审批档");
 });

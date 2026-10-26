@@ -64,3 +64,9 @@
 | 功能 | 一句话用途 | 状态 | 文档 |
 | --- | --- | --- | --- |
 | 思考行显示（G-5 呈现面） | 实时与回放共用核心投影正文（`detail.reasoning.text.text`）；同一回合合并为一个折叠行、正文按到达序；有真实时长才显示「已思考 N 秒」；平台省略/空正文/坏件如实说明；默认折叠不变 | 已实现并验证本角色证据（单测 15/15、桌面UI 162/162、旧基线 506/506、Electron 离线冒烟 14/14、typecheck 0/0、build 成功）；真实 Pi 真机重建复核待下一构建 | [变更记录](docs/change/2026-10-22_change_reasoning-display-fix.md)、[证据](docs/change/2026-10-22-reasoning-display-evidence/)、[设计 R1–R5](../项目管理/docs/design/2026-10-22_design_reasoning-display-fix.md) |
+
+## decision 卡呈现（2026-10-26）
+
+| 功能 | 一句话用途 | 状态 | 文档 |
+| --- | --- | --- | --- |
+| decision 卡（材料性选择）标识 | `cardKind="decision"`：标题「决策卡 · 材料性选择」＋「非客户批准」徽标（明确不是客户批准/验收），统筹写入的原问题（`request.title/question`）在卡面保留；唯一 `recommended: true` 选项显示「推荐」；普通 choice / 提案 / 任命 / 验收等卡种标题/徽标/选项/交互零变化；选项 id 与选择交互不变 | 已实现本角色证据（单测 9/9、桌面UI 296/296、typecheck:renderer 0 错）；真实 Electron/e2e 与视觉核验未跑、未独立验收 | [变更记录](docs/change/2026-10-26_change_decision-card-renderer.md)、[契约面](docs/feature/ui-contract-surface.md) |

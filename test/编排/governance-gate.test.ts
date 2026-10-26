@@ -715,6 +715,54 @@ test("dispatch dependsOn：前置全部 done ⇒ 放行；前置未 done ⇒ 拒
   });
 });
 
+test("dispatch dependsOn：gate 步骤未 done ⇒ dependencies-not-done；gate done 后才放行下游（2026-10-26 gate 复核）", () => {
+  const gateDependencyFlow = (gateStatus: "pending" | "done"): string => [
+    "flowId: flow-a",
+    "version: 1",
+    "qualityTier: production",
+    "steps:",
+    "  - id: contract-freeze",
+    "    title: 冻结契约",
+    "    owner: convener",
+    "    kind: artifact",
+    "    status: done",
+    "    evidence: { kind: artifact, ref: docs/contracts/flow-a-v1.md }",
+    "  - id: gate-vertical-slice",
+    "    title: 垂直切片门",
+    "    owner: verifier",
+    "    kind: artifact",
+    `    status: ${gateStatus}`,
+    "    gateKind: vertical-slice",
+    "    evidence: { kind: artifact, ref: docs/acceptance/flow-a-gate-vertical-slice-report-v1.md }",
+    "    dependsOn: [contract-freeze]",
+    "  - id: delivery-sim",
+    "    title: 模拟核心交付",
+    "    owner: A",
+    "    kind: dispatch",
+    "    status: pending",
+    "    dependsOn: [gate-vertical-slice]",
+    "",
+  ].join("\n");
+
+  withRoot((root) => {
+    writeAcceptanceCriteria(root);
+    writeYamlFlow(root, gateDependencyFlow("pending"));
+    const blockedResult = evaluateGovernanceGate(
+      dispatchInput(root, { stepId: "delivery-sim" }),
+      snapshot([ACCEPT, APPOINT_A]),
+    );
+    assert.equal(blocked(blockedResult), "dependencies-not-done", "gate 未 done 时下游派发被应用硬拦");
+    assert.match((blockedResult as { message: string }).message, /gate-vertical-slice（pending）/);
+
+    writeYamlFlow(root, gateDependencyFlow("done"));
+    assert.deepEqual(
+      evaluateGovernanceGate(dispatchInput(root, { stepId: "delivery-sim" }), snapshot([ACCEPT, APPOINT_A])),
+      { allowed: true },
+      "gate done 后依赖满足，下游可派",
+    );
+  });
+});
+
 test("dispatch dependsOn：旧 flow（无 dependsOn）不新增检查；YAML 坏行仍 fail-closed", () => {
   withRoot((root) => {
     writeAcceptanceCriteria(root);
