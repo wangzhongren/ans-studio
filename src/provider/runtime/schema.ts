@@ -1132,6 +1132,63 @@ export function describeTool(name: string): ToolDescription {
       ],
     };
   }
+  if (name === "request_boundary_change") {
+    // 边界变更请求（2026-10-26 客户要求；只给内置治理角色注入，注入才注册）。
+    // 真机缺口：内置治理角色不可被派发、治理角色之间不 dispatch，统筹无法让组队修改项目角色边界；
+    // 本工具是统筹可用的专用请求通道。文案纪律：只提交精确增删路径＋理由；实际修改由组队走
+    // appointment-write 与客户/判断确认；本工具不代表客户批准、不代表边界已修改；回执如实转达。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          roleId: {
+            type: "string",
+            description:
+              "Project role id whose write set/boundary is insufficient (the role card/boundary is changed by Crew, not by this tool)",
+          },
+          addPaths: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Exact project-relative paths to add to the role boundary (no absolute paths, no `..`); submit only what is missing, do not restate the whole boundary",
+          },
+          removePaths: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Exact project-relative paths to remove from the role boundary (no absolute paths, no `..`); optional unless the role no longer needs them",
+          },
+          rationale: {
+            type: "string",
+            description: "Why the current write set/boundary is insufficient (include the task/path that was blocked)",
+          },
+          flowId: {
+            type: "string",
+            description: "Optional flow id for audit; omit for the current/default flow (resolved by the application)",
+          },
+        },
+        required: ["roleId", "rationale"],
+        additionalProperties: false,
+      },
+      description:
+        "请求**修改某个项目角色的写集/边界**——只用于该角色当前边界**不足以完成已授权任务**时" +
+        "（例如缺少某个配置文件的写权）。只提交**精确的增删路径**（`addPaths` / `removePaths`，至少一个非空）" +
+        "与理由（`rationale`）：**不要重写整个边界、不要顺带扩其它路径**；数组元素会去重，绝对路径与 `..` 会被拒绝。" +
+        "真正的修改由应用把请求**派发给组队（Crew）**，仍走 appointment-write 与客户/判断确认——" +
+        "**本工具只提交请求，不代表客户批准、不代表边界已修改**。" +
+        "应用会在派发给组队前做**确定性校验 + AI 门禁审核**；拒绝或不确定（deny/manual/超时）会以 " +
+        "`rejected` 退回统筹（message 写明原因，**不自动放行**），**不代表客户拒绝**。" +
+        "回执的 `ok` / `code` / `message` **原样如实转达**（`code` 如 `dispatched` / `already-dispatched` / " +
+        "`rejected` / `invalid-role` / `invalid-path` / `no-change` / `unavailable`），" +
+        "**失败绝不伪装成功**；非 `dispatched` 时不要宣称已派发或已修改。",
+      promptGuidelines: [
+        "只在项目角色因**写集/边界不足**确实无法完成任务时使用；先确认缺的是**精确路径**，不要猜测、不要请求整个目录。",
+        "只提交精确的 addPaths/removePaths 与 rationale；不要重写整个边界、不要顺带扩其它路径；绝对路径与 `..` 会被拒绝。",
+        "请求变更 ≠ 客户批准：实际修改由组队走 appointment-write 与客户/判断确认；`rejected` 是应用门禁退回统筹（不自动放行），不代表客户拒绝。",
+        "按回执的 code/message 如实转达，失败不要谎称已派发。",
+      ],
+    };
+  }
   if (!["write_file", "edit_file", "read_file"].includes(name)) throw new Error(`未知 ANS 工具：${name}`);
   const parameters = {
     type: "object",

@@ -145,6 +145,12 @@ import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerI
 // 2026-10-25 独立复核请求（request_acceptance）：能力/回执形状唯一来源＝契约家 `model/runtime.ts`
 // （只读导入、不复制；注入端只做项目绑定，校验/派发由 Interface 能力实现）。
 import type { RequestAcceptanceFn, RequestAcceptanceInput, RequestAcceptanceResult } from "../../src/model/runtime.ts";
+// 2026-10-26 边界变更请求（request_boundary_change）：同源契约；仅统筹（convener）会话注入。
+import type {
+  RequestBoundaryChangeFn,
+  RequestBoundaryChangeInput,
+  RequestBoundaryChangeResult,
+} from "../../src/model/runtime.ts";
 // W6-B（四角色评审 §5.3/§5.4）：意图交接与澄清的冻结形状（§4 契约家）——只读导入、不复制。
 // 编排（run-role）已完成校验/去重/每轮一次/两轮上限并在成功回执后写账本；本层只是**投递端**。
 import type {
@@ -409,6 +415,8 @@ export interface SessionManagerDeps {
       dispatchTask?: DispatchTaskFn;
       /** **独立复核请求能力**（2026-10-25 request_acceptance）：仅内置治理角色会话注入（见 SessionManager.open）。 */
       requestAcceptance?: RequestAcceptanceFn;
+      /** **边界变更请求能力**（2026-10-26 request_boundary_change）：仅统筹（convener）会话注入（见 SessionManager.open）。 */
+      requestBoundaryChange?: RequestBoundaryChangeFn;
       /**
        * **意图交接投递端**（W6-B，四角色评审 §5.3）：仅 trio 联络官（`governanceFunction === "liaison"`）
        * 会话注入。编排（run-role）先做文件/去重/每轮一次校验，成功回执后写 `intent.handed-off`；
@@ -607,6 +615,18 @@ export interface SessionManagerDeps {
    * 编排再按 `builtInGovernance` 收口。缺省 ⇒ 不注入 ⇒ 工具不注册（结构性 fail-closed）。
    */
   requestAcceptance?: (projectRoot: string, input: RequestAcceptanceInput) => Promise<RequestAcceptanceResult>;
+  /**
+   * **边界变更请求能力**（2026-10-26 `request_boundary_change`）：绑定项目的应用侧实现（`projectRoot` 与
+   * 发起治理角色 `requesterRoleId` 由本层按会话补入，工具载荷只带 roleId/addPaths/removePaths/rationale/flowId）。
+   * 确定性校验/AI 门禁/组队派发/票据全部在实现内。**仅统筹（`governanceFunction === "schedule"`，convener）
+   * 会话注入**——项目角色与其他内置治理角色不注入；编排再按内置治理角色收口。缺省 ⇒ 不注入 ⇒ 工具不注册
+   * （结构性 fail-closed）。**请求变更 ≠ 客户批准、≠ 边界已修改**。
+   */
+  requestBoundaryChange?: (
+    projectRoot: string,
+    requesterRoleId: string,
+    input: RequestBoundaryChangeInput,
+  ) => Promise<RequestBoundaryChangeResult>;
   /**
    * **实时重枚举并刷新共享角色缓存（2026-10-13 首轮寻址修复）**：`routeDispatch` 缓存 miss 时调用一次——
    * 实现应为「与界面 `listProject` **同一路径**读盘枚举 + 更新**同一份**共享缓存」（Interface 层给出）。
@@ -2149,6 +2169,15 @@ export class SessionManager {
       role.builtIn === true && this.deps.requestAcceptance !== undefined
         ? (input: RequestAcceptanceInput) => this.deps.requestAcceptance!(req.projectRoot, input)
         : undefined;
+    // 2026-10-26 边界变更请求（request_boundary_change）：**仅统筹（convener）会话注入**。
+    // 判据是治理职能（`governanceFunction === "schedule"`，数据驱动，不硬编码角色 id）；项目角色、
+    // 其他内置治理角色、single/su 一律不注入（su 无组队可派，工具不注册 = 结构性 fail-closed）。
+    // 发起角色一并绑定，供审计票据/AI 门禁事实记录；未注入 ⇒ 工具不注册。
+    const requestBoundaryChange: RequestBoundaryChangeFn | undefined =
+      governanceFunction === "schedule" && this.deps.requestBoundaryChange !== undefined
+        ? (input: RequestBoundaryChangeInput) =>
+            this.deps.requestBoundaryChange!(req.projectRoot, req.roleId, input)
+        : undefined;
     // W6-B（四角色评审 §5.3）：**意图交接投递端**——仅 Liaison。编排已校验/去重/每轮一次并写
     // `intent.handed-off`；本层只后台开 Rapporteur、投递唯一一条任务、落成功/失败系统行，**不重试**。
     const handOffIntent: HandOffIntentFn | undefined = canLiaise
@@ -2352,6 +2381,9 @@ export class SessionManager {
           // 2026-10-25 独立复核请求（request_acceptance，仅内置治理角色会话注入；项目角色不注入）。
           // 「未注入即不注册」——编排/运行时核心据此不注册工具（结构性 fail-closed）。请求复核 ≠ 客户批准。
           ...(requestAcceptance ? { requestAcceptance } : {}),
+          // 2026-10-26 边界变更请求（request_boundary_change，仅统筹/convener 会话注入；其余角色不注入）。
+          // 「未注入即不注册」——编排/运行时核心据此不注册工具（结构性 fail-closed）。请求变更 ≠ 客户批准。
+          ...(requestBoundaryChange ? { requestBoundaryChange } : {}),
           // W6-B（四角色评审 §5.3/§5.4）：意图交接投递端（仅 Liaison）与澄清送达端（仅 Rapporteur）。
           // 「未注入即不注册」——其余角色拿不到对应工具（fail-closed）。
           ...(handOffIntent ? { handOffIntent } : {}),

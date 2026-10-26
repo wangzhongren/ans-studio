@@ -24,8 +24,23 @@ import type { GovernanceFunction, GovernanceModel, ProjectConfig } from "../../s
 import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputOutcome, CustomerInputTriageOutcome, DispatchTaskFn, PromptImage, PromptOptions, FinalizeResult } from "../../src/model/runtime.ts";
 // 2026-10-25 独立复核请求（`request_acceptance`）：能力回执/载荷形状唯一来源＝契约家 `model/runtime.ts`
 // （只读导入，不复制形状）；flowId 形状同样复用运行时核心导出的 slug 常量（不另写正则）。
-import type { RequestAcceptanceFn, RequestAcceptanceInput, RequestAcceptanceResult } from "../../src/model/runtime.ts";
+import type { RequestAcceptanceFn, RequestAcceptanceInput, RequestAcceptanceResult, RequestBoundaryChangeFn, RequestBoundaryChangeInput, RequestBoundaryChangeResult, GovernanceJudgeFn, GovernanceJudgeOutcome } from "../../src/model/runtime.ts";
 import { GOVERNANCE_SLUG_PATTERN } from "../../src/model/runtime.ts";
+// 2026-10-26 边界变更请求（request_boundary_change）：确定性校验/票据/组队任务/AI 门禁请求的纯逻辑
+// 在 `boundary-change.ts`（不写盘、不发会话）；本层只做 IO/派发/判断闭包装配。
+import {
+  BOUNDARY_CHANGE_TICKET_SCHEMA,
+  BOUNDARY_CHANGE_UNASSIGNED_FLOW_ID,
+  assessBoundaryChangeRequest,
+  boundaryChangeClientMessageId,
+  boundaryChangeJudgeFacts,
+  boundaryChangeTicketId,
+  boundaryChangeTicketRelPath,
+  buildBoundaryChangeCrewTaskText,
+  buildBoundaryChangeJudgeRequest,
+  type BoundaryChangeTicketRecord,
+} from "./boundary-change.ts";
+import { atomicWrite } from "../../src/common/shared/atomic-write.ts";
 
 import { listProject as realListProject } from "../../src/service/role/resolve-role.ts";
 import {
@@ -546,6 +561,8 @@ export interface DesktopDeps {
       dispatchTask?: DispatchTaskFn;
       /** 独立复核请求能力（2026-10-25 request_acceptance）：仅内置治理角色会话注入（见 session.ts）。 */
       requestAcceptance?: RequestAcceptanceFn;
+      /** 边界变更请求能力（2026-10-26 request_boundary_change）：仅统筹（convener）会话注入（见 session.ts）。 */
+      requestBoundaryChange?: RequestBoundaryChangeFn;
       /** W6-B：意图交接投递端（仅 Liaison 注入；编排已校验/写账本，桌面只后台投递）。 */
       handOffIntent?: import("../../src/model/runtime.ts").HandOffIntentFn;
       /** W6-B：澄清送达端（仅 Rapporteur 注入；编排已判两轮上限/写账本，桌面只落主入口系统行）。 */
@@ -781,6 +798,25 @@ export interface DesktopDeps {
    * 测试注入更短时限（不得为 0/负数）。
    */
   requestAcceptanceLimits?: { totalMs?: number; stageMs?: number };
+  /**
+   * **边界变更请求能力**（2026-10-26 `request_boundary_change`；客户确认的分层门禁）：桌面 Interface
+   * 提供的应用侧实现（按项目绑定；`requesterRoleId` 由会话注入端补入）。SessionManager 仅对**统筹
+   * （convener）**会话注入；项目角色不注入。缺省不注入 ⇒ 运行时工具不注册（结构性 fail-closed）。
+   * 语义：确定性校验 → 只读 AI 门禁（`createGovernanceJudge`，deny-all 写权）→ 通过才把唯一一条任务
+   * 后台派给组队（Crew）；AI deny/manual/超时/不可用一律 `rejected`（不自动放行）；打开/发送失败
+   * ⇒ `unavailable`（票据 failed，可重试）。**请求 ≠ 客户批准、≠ 边界已修改**。
+   */
+  requestBoundaryChange?: (
+    projectRoot: string,
+    requesterRoleId: string,
+    input: RequestBoundaryChangeInput,
+  ) => Promise<RequestBoundaryChangeResult>;
+  /**
+   * **边界变更请求的时限**：AI 门禁总预算（缺省 130s，覆盖判断驱动的 120s 硬超时）；派发（后台打开 +
+   * 投递组队）单阶段预算（缺省 60s）。超时按语义如实返回（AI 阶段 rejected；派发阶段 unavailable），
+   * **绝不让工具调用无限挂起**，也不谎称已派发。
+   */
+  requestBoundaryChangeLimits?: { judgeMs?: number; dispatchMs?: number };
   /**
    * **role-cards 步骤收口**（2026-10-23 可重入门禁 A4/A5）：结构校验通过后把 flow YAML 的
    * `id:"role-cards"` 步骤标为 done（应用专用；不注册为角色工具、不写客户决定）。缺省经 Pipeline 公共
@@ -5587,6 +5623,663 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // 能力注入：缺省用本层实现；测试/宿主可整体替换（签名与 SessionManagerDeps 同形，项目根由会话补入）。
   const requestAcceptanceCapability = deps.requestAcceptance ?? requestAcceptanceForProject;
 
+  // —————— 2026-10-26 边界变更请求（`request_boundary_change`）：应用侧能力实现 ——————
+  //
+  // 客户确认的分层门禁：统筹**不能**直接派组队（治理角色不可被派发），因此：
+  //   `request_boundary_change`（结构化请求）→ 应用确定性校验 → 中间 AI 门禁（只读、deny-all 写权）
+  //   → 通过才后台派组队（appointment-write + 判断/客户确认仍在组队侧）→ 审计票据/幂等。
+  //
+  // 纪律（与 request_acceptance 同款）：
+  //  · AI 门禁 deny/manual/超时/不可用 ⇒ **不派发**，返回 `rejected` 并写明原因与「不自动放行」；
+  //  · 打开/发送失败 ⇒ `unavailable`（票据标 failed，可重试）；不谎报任何一步；
+  //  · 不写客户决定、不写 `customer.decision`、不伪造治理账本——审计只写应用自有
+  //    `.ans/governance/boundary-requests/<flowId>/<ticketId>.json`（原子写、重启可读）；
+  //  · 请求 ≠ 客户批准：组队任务只要求「按 appointment-write 逐路径确认」，绝不夹带已获批准字样。
+  /** 同 project+ticket 的请求在途去重（并发/重复请求不重复派发；进程内，不持久化）。 */
+  const requestBoundaryChangeInFlight = new Set<string>();
+  const boundaryChangeJudgeTimeoutMs = (() => {
+    const raw = deps.requestBoundaryChangeLimits?.judgeMs;
+    return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 130_000;
+  })();
+  const boundaryChangeDispatchTimeoutMs = (() => {
+    const raw = deps.requestBoundaryChangeLimits?.dispatchMs;
+    return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 60_000;
+  })();
+  /** 票据里的短摘要（不写全文；不使用 JSON 之外的格式）。 */
+  const boundaryChangeSummaryText = (text: unknown, max = 500): string => {
+    const value = typeof text === "string" ? text.trim() : "";
+    const chars = Array.from(value);
+    return chars.length <= max ? value : `${chars.slice(0, max - 1).join("")}…`;
+  };
+  const boundaryChangeNow = (): string => new Date().toISOString();
+
+  /**
+   * 票据读取（重启恢复/幂等）：缺失 ⇒ missing；schema 不识别/IO 失败 ⇒ corrupt（调用方只记诊断，
+   * **不把坏票据当已派发**——继续按新请求走取证与门禁，最终覆盖写新票据）。
+   */
+  const readBoundaryChangeTicket = async (
+    projectRoot: string,
+    relPath: string,
+  ): Promise<{ state: "missing" } | { state: "corrupt"; error: string } | { state: "ok"; record: BoundaryChangeTicketRecord }> => {
+    try {
+      const text = await readFile(path.join(projectRoot, ...relPath.split("/")), "utf8");
+      const parsed = JSON.parse(text) as unknown;
+      if (
+        parsed === null ||
+        typeof parsed !== "object" ||
+        (parsed as { schema?: unknown }).schema !== BOUNDARY_CHANGE_TICKET_SCHEMA ||
+        typeof (parsed as { ticketId?: unknown }).ticketId !== "string" ||
+        typeof (parsed as { status?: unknown }).status !== "string"
+      ) {
+        return { state: "corrupt", error: "票据 schema 不识别" };
+      }
+      return { state: "ok", record: parsed as BoundaryChangeTicketRecord };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return { state: "missing" };
+      return { state: "corrupt", error: error instanceof Error ? error.message : String(error) };
+    }
+  };
+  /** 原子写票据；失败抛错（调用方决定 unavailable / 如实标注）。 */
+  const writeBoundaryChangeTicket = async (
+    projectRoot: string,
+    relPath: string,
+    record: BoundaryChangeTicketRecord,
+  ): Promise<void> => {
+    const abs = path.join(projectRoot, ...relPath.split("/"));
+    await mkdir(path.dirname(abs), { recursive: true });
+    await atomicWrite(abs, `${JSON.stringify(record, null, 2)}\n`);
+  };
+
+  /** flowId 归一：显式优先（须合法 slug）；省略时仅当 `docs/flows` 恰有一个 YAML 才采用；无则 unassigned。 */
+  const resolveBoundaryChangeFlowId = async (
+    projectRoot: string,
+    raw: unknown,
+  ): Promise<{ ok: true; flowId: string } | { ok: false; message: string }> => {
+    const explicit = typeof raw === "string" ? raw.trim() : "";
+    if (explicit !== "") {
+      if (!new RegExp(GOVERNANCE_SLUG_PATTERN).test(explicit)) {
+        return { ok: false, message: `flowId 非法：${explicit}；须匹配 ${GOVERNANCE_SLUG_PATTERN}，未派发。` };
+      }
+      return { ok: true, flowId: explicit };
+    }
+    let yamlIds: string[] = [];
+    try {
+      const names = await readdir(path.join(projectRoot, "docs", "flows"));
+      yamlIds = [
+        ...new Set(
+          names
+            .filter((name) => name.endsWith(".yaml") && name.length > ".yaml".length)
+            .map((name) => name.slice(0, -".yaml".length)),
+        ),
+      ];
+    } catch {
+      yamlIds = [];
+    }
+    if (yamlIds.length === 1) return { ok: true, flowId: yamlIds[0]! };
+    if (yamlIds.length > 1) {
+      return {
+        ok: false,
+        message: `无法确定要关联的流程：docs/flows 下有 ${yamlIds.length} 个流程 YAML（${yamlIds.slice(0, 5).join("、")}）；请显式指定 flowId，未派发。`,
+      };
+    }
+    return { ok: true, flowId: BOUNDARY_CHANGE_UNASSIGNED_FLOW_ID };
+  };
+
+  /** 刷新并返回项目枚举（边界可能刚被组队改过；失败回退共享缓存，不猜）。 */
+  const refreshBoundaryChangeListing = async (projectRoot: string): Promise<ProjectListing | undefined> => {
+    try {
+      const fresh = await listProjectFn(projectRoot);
+      listingCache.set(fresh.projectRoot, fresh);
+      return fresh;
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.boundary-change", projectRoot }).error("boundary-change.listing.refresh.failed", error);
+      return listingCache.get(projectRoot);
+    }
+  };
+
+  /**
+   * `request_boundary_change` 能力的项目入口（`requesterRoleId` 由会话注入端补入）。
+   * 顺序：载荷/flowId → 项目角色 → 确定性校验 → 幂等/票据 → 引擎解析 → AI 门禁 → 组队派发 → 票据收口。
+   */
+  const requestBoundaryChangeForProject = async (
+    projectRoot: string,
+    requesterRoleId: string,
+    input: RequestBoundaryChangeInput,
+  ): Promise<RequestBoundaryChangeResult> => {
+    const root = typeof projectRoot === "string" ? projectRoot.trim() : "";
+    const roleIdRaw = typeof input?.roleId === "string" ? input.roleId.trim() : "";
+    const diagnostic = createDiagnosticLogger({ component: "desktop.boundary-change", projectRoot: root, roleId: requesterRoleId });
+    if (root === "") {
+      diagnostic.record("boundary-change.invalid", { reasonCode: "missing-project-root" });
+      return { ok: false, code: "unavailable", message: "缺少项目根，无法提交边界变更请求；未派发。" };
+    }
+    if (roleIdRaw === "") {
+      diagnostic.record("boundary-change.invalid", { reasonCode: "missing-role-id" });
+      return { ok: false, code: "invalid-role", message: "缺少项目角色 id；未派发。" };
+    }
+    const flowResolved = await resolveBoundaryChangeFlowId(root, input?.flowId);
+    if (!flowResolved.ok) {
+      diagnostic.record("boundary-change.invalid", { reasonCode: "flow-unresolved", roleId: roleIdRaw });
+      return { ok: false, code: "unavailable", message: flowResolved.message };
+    }
+    const flowId = flowResolved.flowId;
+    const listing = await refreshBoundaryChangeListing(root);
+    if (listing === undefined) {
+      return { ok: false, code: "unavailable", message: "项目角色枚举不可用（未导入或枚举失败）；未派发。" };
+    }
+    if (listing.governanceModel !== "trio") {
+      return {
+        ok: false,
+        code: "invalid-role",
+        message: "当前项目不是三权治理模型（没有组队 Crew 角色）；边界变更请求不可用，未派发。",
+      };
+    }
+    const target = listing.roles.find((candidate) => candidate.roleId === roleIdRaw);
+    if (target === undefined || target.builtIn === true) {
+      const what =
+        target?.builtIn === true
+          ? `内置治理角色 ${roleIdRaw} 不接受边界变更请求（治理角色不可被派发、不持有项目写集）`
+          : `未知项目角色 ${roleIdRaw}`;
+      diagnostic.record("boundary-change.rejected", { reasonCode: "invalid-role", roleId: roleIdRaw, flowId });
+      return { ok: false, code: "invalid-role", message: `${what}；只能在真实项目角色上请求边界变更，未派发。`, roleId: roleIdRaw };
+    }
+    if (target.boundary.parseError !== undefined) {
+      return {
+        ok: false,
+        code: "unavailable",
+        message: `角色 ${target.roleId} 的边界当前不可解析（${target.boundary.parseError}）；无法比较实际变化，请先修复边界；未派发。`,
+        roleId: target.roleId,
+      };
+    }
+    const assessment = assessBoundaryChangeRequest({
+      boundary: target.boundary,
+      addPaths: input?.addPaths,
+      removePaths: input?.removePaths,
+      rationale: input?.rationale,
+    });
+    if (!assessment.ok) {
+      diagnostic.record("boundary-change.rejected", { reasonCode: assessment.code, roleId: target.roleId, flowId });
+      return { ok: false, code: assessment.code, message: assessment.message, roleId: target.roleId };
+    }
+    const rationale = String(input.rationale).trim();
+    const ticketId = boundaryChangeTicketId({
+      roleId: target.roleId,
+      addPaths: assessment.addPaths,
+      removePaths: assessment.removePaths,
+      rationale,
+    });
+    const ticketRel = boundaryChangeTicketRelPath(flowId, ticketId);
+    const inFlightKey = `${canonicalProjectRoot(root)}\u0000${ticketId}`;
+    if (requestBoundaryChangeInFlight.has(inFlightKey)) {
+      return {
+        ok: false,
+        code: "already-dispatched",
+        message: `同一请求正在处理中（ticket ${ticketId}）；未重复派发。`,
+        roleId: target.roleId,
+        ticketId,
+      };
+    }
+    const existing = await readBoundaryChangeTicket(root, ticketRel);
+    if (existing.state === "ok" && existing.record.status === "dispatched") {
+      diagnostic.record("boundary-change.idempotent", { ticketId, flowId, roleId: target.roleId });
+      return {
+        ok: false,
+        code: "already-dispatched",
+        message: `同一请求此前已派发（ticket ${ticketId}，flow ${flowId}）；未重复派发。`,
+        roleId: target.roleId,
+        ticketId,
+      };
+    }
+    if (existing.state === "ok" && existing.record.status === "rejected") {
+      // AI 门禁已退回：同一请求不重跑判断（防止反复试探直到某次通过）；修改请求（新理由/路径）会生成新票据。
+      const reason = boundaryChangeSummaryText(existing.record.judge?.reason ?? existing.record.error ?? "此前已被 AI 门禁退回");
+      diagnostic.record("boundary-change.already-rejected", { ticketId, flowId, roleId: target.roleId });
+      return {
+        ok: false,
+        code: "rejected",
+        message:
+          `同一请求此前已被 AI 门禁退回（ticket ${ticketId}）：${reason}；未派发、不自动放行。` +
+          "如已修改请求，请以新的理由/路径重新提交（会生成新票据）。",
+        roleId: target.roleId,
+        ticketId,
+      };
+    }
+    if (existing.state === "corrupt") {
+      // 坏票据不当已派发；继续走门禁，最终覆盖写新票据（诊断保留原错误）。
+      diagnostic.error("boundary-change.ticket.corrupt", new Error(existing.error), { ticketId, flowId });
+    }
+
+    requestBoundaryChangeInFlight.add(inFlightKey);
+    try {
+      const attempts = (existing.state === "ok" ? existing.record.attempts : 0) + 1;
+      const baseRecord: BoundaryChangeTicketRecord = {
+        schema: BOUNDARY_CHANGE_TICKET_SCHEMA,
+        ticketId,
+        roleId: target.roleId,
+        requestedBy: requesterRoleId,
+        flowId,
+        addPaths: assessment.addPaths,
+        removePaths: assessment.removePaths,
+        rationale,
+        status: "requested",
+        at: existing.state === "ok" ? existing.record.at : boundaryChangeNow(),
+        updatedAt: boundaryChangeNow(),
+        attempts,
+        judge: null,
+        dispatch: null,
+        error: null,
+      };
+      try {
+        await writeBoundaryChangeTicket(root, ticketRel, baseRecord);
+      } catch (error) {
+        diagnostic.error("boundary-change.ticket.write.failed", error, { ticketId, flowId });
+        return {
+          ok: false,
+          code: "unavailable",
+          message: `审计票据写入失败（${ticketRel}）：${error instanceof Error ? error.message : String(error)}；未派发，可修复后重试。`,
+          roleId: target.roleId,
+          ticketId,
+        };
+      }
+      diagnostic.record("boundary-change.requested", {
+        ticketId,
+        flowId,
+        roleId: target.roleId,
+        addCount: assessment.addPaths.length,
+        removeCount: assessment.removePaths.length,
+        attempt: attempts,
+      });
+
+      /** AI 门禁未通过/无法完成：写 rejected 票据并如实回执（不派发、不自动放行）。 */
+      const rejectByJudge = async (
+        outcome: Pick<GovernanceJudgeOutcome, "verdict" | "reasonCode" | "reason" | "engine">,
+        fallbackReason: string,
+      ): Promise<RequestBoundaryChangeResult> => {
+        const reason = boundaryChangeSummaryText(outcome.reason ?? fallbackReason);
+        const record: BoundaryChangeTicketRecord = {
+          ...baseRecord,
+          status: "rejected",
+          updatedAt: boundaryChangeNow(),
+          judge: {
+            verdict: outcome.verdict,
+            ...(outcome.reasonCode !== undefined ? { reasonCode: outcome.reasonCode } : {}),
+            ...(reason !== "" ? { reason } : {}),
+            ...(outcome.engine !== undefined ? { engine: outcome.engine } : {}),
+          },
+          error: null,
+        };
+        try {
+          await writeBoundaryChangeTicket(root, ticketRel, record);
+        } catch (error) {
+          diagnostic.error("boundary-change.ticket.write.failed", error, { ticketId, flowId });
+        }
+        diagnostic.record("boundary-change.ai-rejected", {
+          ticketId,
+          flowId,
+          verdict: outcome.verdict,
+          reasonCode: outcome.reasonCode ?? "unknown",
+        });
+        return {
+          ok: false,
+          code: "rejected",
+          message:
+            `AI 门禁未通过（${outcome.verdict}${outcome.reasonCode !== undefined ? `/${outcome.reasonCode}` : ""}）：` +
+            `${reason === "" ? "未给出理由" : reason}；本次未派发给组队，不自动放行（不代表客户拒绝）。`,
+          roleId: target.roleId,
+          ticketId,
+        };
+      };
+
+      /** 派发失败（打开/投递）：票据标 failed（可重试），回执 unavailable，不谎报。 */
+      const failDispatch = async (errorText: string, judge: BoundaryChangeTicketRecord["judge"]): Promise<RequestBoundaryChangeResult> => {
+        const record: BoundaryChangeTicketRecord = {
+          ...baseRecord,
+          status: "failed",
+          updatedAt: boundaryChangeNow(),
+          judge,
+          error: boundaryChangeSummaryText(errorText),
+        };
+        try {
+          await writeBoundaryChangeTicket(root, ticketRel, record);
+        } catch (error) {
+          diagnostic.error("boundary-change.ticket.write.failed", error, { ticketId, flowId });
+        }
+        diagnostic.record("boundary-change.dispatch-failed", { ticketId, flowId, error: boundaryChangeSummaryText(errorText, 160) });
+        return {
+          ok: false,
+          code: "unavailable",
+          message: `${errorText}（ticket ${ticketId}）；未确认已派发，可稍后重试（同一请求不会重复投递）。`,
+          roleId: target.roleId,
+          ticketId,
+        };
+      };
+
+      // —— 引擎解析（AI 门禁与组队派发共用；无法确定 ⇒ 不猜、不派发）——
+      let runtime: RuntimeKind | undefined;
+      try {
+        const resolvedRace = await withRequestAcceptanceDeadline(
+          resolveAcceptanceRuntime(root, manager.activeRuntimeFor(root) ?? manager.governanceRuntimeFor(root)),
+          boundaryChangeDispatchTimeoutMs,
+        );
+        if (!resolvedRace.timedOut && resolvedRace.value.ok) runtime = resolvedRace.value.runtime;
+      } catch (error) {
+        diagnostic.error("boundary-change.runtime.failed", error, { ticketId, flowId });
+      }
+      if (runtime === undefined) {
+        return await rejectByJudge(
+          { verdict: "manual", reasonCode: "runtime-unresolved", reason: "无法解析项目引擎，AI 门禁无法执行", engine: "demo" },
+          "无法解析项目引擎，AI 门禁无法执行",
+        );
+      }
+
+      // —— 只读证据包事实（账本 + 团队计划 + flow 摘要；不读取/不外传客户聊天）——
+      let ledger: Awaited<ReturnType<typeof readGovernanceLedger>>;
+      try {
+        ledger = await readGovernanceLedger(root);
+      } catch (error) {
+        return await rejectByJudge(
+          {
+            verdict: "manual",
+            reasonCode: "ledger-unavailable",
+            reason: `治理账本不可读，AI 门禁无法无损判断：${error instanceof Error ? error.message : String(error)}`,
+            engine: "demo",
+          },
+          "治理账本不可读，AI 门禁无法无损判断",
+        );
+      }
+      const facts = boundaryChangeJudgeFacts({ flowId, ledgerEntries: ledger.entries, ledgerErrors: ledger.errors.length });
+      if (ledger.errors.length > 0) {
+        return await rejectByJudge(
+          {
+            verdict: "manual",
+            reasonCode: "ledger-unavailable",
+            reason: `治理账本存在 ${ledger.errors.length} 条坏行/不可读记录，AI 门禁无法无损判断`,
+            engine: "demo",
+          },
+          "治理账本存在坏行",
+        );
+      }
+      let teamPlan:
+        | {
+            relPath: string;
+            version: number;
+            recommended?: readonly string[];
+            roleRow?: { duty: string; ability: string; writes: string; deps: string };
+            planIssues?: readonly string[];
+          }
+        | undefined;
+      try {
+        const plan = await readTeamPlanInfo(root, flowId);
+        if (plan !== undefined) {
+          const row = plan.rows.get(target.roleId);
+          teamPlan = {
+            relPath: plan.relPath,
+            version: plan.version,
+            ...(plan.recommended !== undefined ? { recommended: plan.recommended } : {}),
+            ...(row !== undefined
+              ? { roleRow: { duty: row.duty, ability: row.ability, writes: row.writes, deps: row.deps } }
+              : {}),
+            ...(plan.planIssues.length > 0 ? { planIssues: plan.planIssues } : {}),
+          };
+        }
+      } catch (error) {
+        diagnostic.error("boundary-change.team-plan.failed", error, { ticketId, flowId });
+      }
+      let flowEvidence: { relPath: string; summaryLines: string[] } | undefined;
+      try {
+        const flowRel = governanceFlowStatePath(flowId);
+        const flowText = await readFile(path.join(root, ...flowRel.split("/")), "utf8");
+        const parsedFlow = parseFlowStateYaml(flowText, flowId);
+        if (parsedFlow.ok) {
+          flowEvidence = {
+            relPath: flowRel,
+            summaryLines: parsedFlow.flow.steps
+              .slice(0, 30)
+              .map((step) => `${step.id}=${step.status}${step.owner !== undefined && step.owner !== "" ? `（owner=${step.owner}）` : ""}`),
+          };
+        }
+      } catch {
+        // flow 不存在/不可读：证据包如实标「未纳入」，不据此拒绝（请求不依赖流程存在）。
+      }
+
+      // —— 中间 AI 门禁（只读工具、deny-all 写权；不向客户呈现卡片、不写 customer.decision）——
+      let project: ProjectConfig;
+      try {
+        project = (
+          await buildEffectiveProjectConfig(listing, {
+            buildProjectConfig: buildProjectConfigFn,
+            loadEffectiveConfig: loadEffectiveConfigFn,
+          })
+        ).project;
+      } catch (error) {
+        return await rejectByJudge(
+          {
+            verdict: "manual",
+            reasonCode: "judge-init-failed",
+            reason: `AI 门禁初始化失败：${error instanceof Error ? error.message : String(error)}`,
+            engine: "demo",
+          },
+          "AI 门禁初始化失败",
+        );
+      }
+      let judge: GovernanceJudgeFn | undefined;
+      try {
+        judge = createGovernanceJudgeFn({
+          project,
+          runtime,
+          runtimeOptions: deps.runtimeOptions,
+          timeoutMs: boundaryChangeJudgeTimeoutMs,
+        });
+      } catch (error) {
+        diagnostic.error("boundary-change.judge.create.failed", error, { ticketId, flowId });
+        judge = undefined;
+      }
+      if (judge === undefined) {
+        return await rejectByJudge(
+          { verdict: "manual", reasonCode: "judge-unavailable", reason: "AI 门禁不可用（判断闭包构造失败）", engine: "demo" },
+          "AI 门禁不可用",
+        );
+      }
+      const judgeRequest = buildBoundaryChangeJudgeRequest({
+        projectRoot: root,
+        requesterRoleId,
+        runtime,
+        flowId,
+        ticketId,
+        targetRole: {
+          roleId: target.roleId,
+          cardPath: target.cardPath,
+          cardText: target.cardText,
+          boundarySource: target.boundary.boundarySource,
+          boundaryEntries: target.boundary.entries,
+        },
+        addPaths: assessment.addPaths,
+        removePaths: assessment.removePaths,
+        effectiveAdds: assessment.effectiveAdds,
+        effectiveRemoves: assessment.effectiveRemoves,
+        rationale,
+        facts,
+        ...(teamPlan !== undefined ? { teamPlan } : {}),
+        ...(flowEvidence !== undefined ? { flow: flowEvidence } : {}),
+      });
+      let outcome: GovernanceJudgeOutcome;
+      try {
+        const judgedRace = await withRequestAcceptanceDeadline(
+          judge(judgeRequest),
+          boundaryChangeJudgeTimeoutMs + 2_000,
+        );
+        if (judgedRace.timedOut) {
+          return await rejectByJudge(
+            {
+              verdict: "manual",
+              reasonCode: "timeout",
+              reason: `AI 门禁超时（约 ${Math.round((boundaryChangeJudgeTimeoutMs + 2_000) / 1000)}s 未返回）`,
+              engine: runtime,
+            },
+            "AI 门禁超时",
+          );
+        }
+        outcome = judgedRace.value;
+      } catch (error) {
+        return await rejectByJudge(
+          {
+            verdict: "manual",
+            reasonCode: "judge-unavailable",
+            reason: `AI 门禁不可用：${error instanceof Error ? error.message : String(error)}`,
+            engine: runtime,
+          },
+          "AI 门禁不可用",
+        );
+      }
+      if (outcome.verdict !== "approve") {
+        return await rejectByJudge(outcome, "AI 门禁未通过");
+      }
+      const judgeRecord: BoundaryChangeTicketRecord["judge"] = {
+        verdict: outcome.verdict,
+        ...(outcome.reasonCode !== undefined ? { reasonCode: outcome.reasonCode } : {}),
+        ...(boundaryChangeSummaryText(outcome.reason) !== "" ? { reason: boundaryChangeSummaryText(outcome.reason) } : {}),
+        ...(outcome.engine !== undefined ? { engine: outcome.engine } : {}),
+      };
+
+      // —— 派给组队（Crew / nominator）：后台打开 + 唯一一条结构化任务 ——
+      const crew = listing.roles.find((candidate) => candidate.roleId === "nominator");
+      if (crew === undefined || crew.builtIn !== true || crew.governanceFunction !== "nomination") {
+        return await failDispatch("未枚举到组队（Crew/nominator）角色，无法派发", judgeRecord);
+      }
+      const taskText = buildBoundaryChangeCrewTaskText({
+        ticketId,
+        roleId: target.roleId,
+        flowId,
+        addPaths: assessment.addPaths,
+        removePaths: assessment.removePaths,
+        rationale,
+      });
+      const clientMessageId = boundaryChangeClientMessageId(ticketId);
+      let opened: OpenResult;
+      try {
+        const openedRace = await withRequestAcceptanceDeadline(
+          manager.openBackground({ projectRoot: root, roleId: "nominator", runtime }),
+          boundaryChangeDispatchTimeoutMs,
+        );
+        if (openedRace.timedOut) {
+          return await failDispatch("后台打开组队会话超时", judgeRecord);
+        }
+        opened = openedRace.value;
+      } catch (error) {
+        return await failDispatch(`后台打开组队会话失败：${error instanceof Error ? error.message : String(error)}`, judgeRecord);
+      }
+      if (!opened.ok) {
+        return await failDispatch(`后台打开组队会话失败：${opened.error ?? "未知错误"}`, judgeRecord);
+      }
+      let sent: SendResult;
+      try {
+        const sentRace = await withRequestAcceptanceDeadline(
+          manager.sendBackground({ projectRoot: root, roleId: "nominator", runtime, text: taskText, clientMessageId }),
+          boundaryChangeDispatchTimeoutMs,
+        );
+        if (sentRace.timedOut) {
+          // 可能已入队/已投递：不标 dispatched（无法确认），也不重复投递（同一 clientMessageId）。
+          const record: BoundaryChangeTicketRecord = {
+            ...baseRecord,
+            status: "requested",
+            updatedAt: boundaryChangeNow(),
+            judge: judgeRecord,
+            error: "投递回执超时（可能已入队/已投递）",
+          };
+          try {
+            await writeBoundaryChangeTicket(root, ticketRel, record);
+          } catch (error) {
+            diagnostic.error("boundary-change.ticket.write.failed", error, { ticketId, flowId });
+          }
+          return {
+            ok: false,
+            code: "unavailable",
+            message:
+              `组队任务投递回执超时（ticket ${ticketId}，可能已入队/已投递）；` +
+              "未确认已派发，请用 flow_get 或组队会话核对；同一请求重试不会重复投递。",
+            roleId: target.roleId,
+            ticketId,
+          };
+        }
+        sent = sentRace.value;
+      } catch (error) {
+        return await failDispatch(`投递组队任务失败：${error instanceof Error ? error.message : String(error)}`, judgeRecord);
+      }
+      if (!sent.ok) {
+        return await failDispatch(`投递组队任务失败：${sent.error ?? "未知错误"}`, judgeRecord);
+      }
+      const dispatchRecord: NonNullable<BoundaryChangeTicketRecord["dispatch"]> = {
+        clientMessageId,
+        sentAt: boundaryChangeNow(),
+        runtime,
+        messageSha256: createHash("sha256").update(taskText).digest("hex"),
+        ...(sent.queued === true ? { queued: true } : {}),
+      };
+      const dispatchedRecord: BoundaryChangeTicketRecord = {
+        ...baseRecord,
+        status: "dispatched",
+        updatedAt: boundaryChangeNow(),
+        judge: judgeRecord,
+        dispatch: dispatchRecord,
+        error: null,
+      };
+      try {
+        await writeBoundaryChangeTicket(root, ticketRel, dispatchedRecord);
+      } catch (error) {
+        diagnostic.error("boundary-change.ticket.write.failed", error, { ticketId, flowId });
+        return {
+          ok: true,
+          code: "dispatched",
+          message:
+            `已把边界变更请求投递给组队（ticket ${ticketId}），但审计票据写入失败：` +
+            `${error instanceof Error ? error.message : String(error)}；派发 ≠ 边界已修改，组队仍需按 appointment-write 逐路径确认。`,
+          roleId: target.roleId,
+          ticketId,
+        };
+      }
+      diagnostic.record("boundary-change.dispatched", {
+        ticketId,
+        flowId,
+        roleId: target.roleId,
+        runtime,
+        queued: sent.queued === true,
+      });
+      if (sent.duplicate === true) {
+        return {
+          ok: false,
+          code: "already-dispatched",
+          message: `同一请求此前已投递（ticket ${ticketId}）；本次未重复投递。`,
+          roleId: target.roleId,
+          ticketId,
+        };
+      }
+      return {
+        ok: true,
+        code: "dispatched",
+        message:
+          `已把边界变更请求派发给组队（ticket ${ticketId}，flow ${flowId}）；` +
+          "派发 ≠ 边界已修改，组队仍需按 appointment-write 逐路径确认后才写入。",
+        roleId: target.roleId,
+        ticketId,
+      };
+    } catch (error) {
+      diagnostic.error("boundary-change.failed", error, { flowId });
+      return {
+        ok: false,
+        code: "unavailable",
+        message:
+          `边界变更请求执行失败：${error instanceof Error ? error.message : String(error)}；` +
+          "**可能已部分执行**，请核对组队会话与票据文件，不要重复请求。",
+        roleId: roleIdRaw,
+      };
+    } finally {
+      requestBoundaryChangeInFlight.delete(inFlightKey);
+    }
+  };
+
+  // 能力注入：缺省用本层实现；测试/宿主可整体替换（签名与 SessionManagerDeps 同形，项目根/发起角色由会话补入）。
+  const requestBoundaryChangeCapability = deps.requestBoundaryChange ?? requestBoundaryChangeForProject;
+
   const manager = new SessionManager({
     openRoleSession: openRoleSessionFn,
     createPiAdapterFactory: createPiAdapterFactoryFn,
@@ -5634,6 +6327,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // 2026-10-25 独立复核请求（request_acceptance）：应用侧能力（SessionManager 仅对内置治理角色会话
     // 注入；项目角色不注入；编排再按 builtInGovernance 收口）。**请求复核 ≠ 客户批准**。
     requestAcceptance: requestAcceptanceCapability,
+    // 2026-10-26 边界变更请求（request_boundary_change）：应用侧能力（SessionManager 仅对统筹/convener
+    // 会话注入；项目角色不注入；编排再按治理职能/内置角色收口）。**请求变更 ≠ 客户批准**。
+    requestBoundaryChange: requestBoundaryChangeCapability,
     // G-2/W5：恢复确认卡通道（缺省 ⇒ 恢复提议「未接线、未获执行」如实回执——fail-closed）。
     recoveryConfirm: deps.recoveryConfirm,
     // 2026-10-20（客户总原则「我勾选了替我决策就不用我来管了」）：决策开关开启 ⇒ 恢复提议不弹客户卡、

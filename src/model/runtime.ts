@@ -955,6 +955,44 @@ export interface RequestAcceptanceResult {
 /** `request_acceptance` 注入能力（派发/校验/flow/账本由应用实现；未注入 ⇒ 工具不注册）。 */
 export type RequestAcceptanceFn = (input: RequestAcceptanceInput) => Promise<RequestAcceptanceResult>;
 
+// —————————————— 边界变更请求（2026-10-26 客户要求；request_boundary_change） ——————————————
+//
+// 真机缺口：治理门禁规定「内置治理角色不可被派发、治理角色之间不 dispatch」，统筹无法让组队（Crew）
+// 修改项目角色的写集/边界（例：castle 项目 app-shell 缺 `tsconfig.node.json` 写权，只能上报等客户手动
+// 触发组队）。为此新增内置治理角色可用的 `request_boundary_change` 工具：**工具面只提交精确增删路径
+// 与理由并如实转达回执**——真正的 Crew 派发、确定性校验、AI 门禁审核、appointment-write 与客户/判断确认
+// 全部由**应用注入的能力**实现（本层不派发、不写盘、不做治理判定）。
+// 纪律：本工具只提交请求 ≠ 客户批准、不代表边界已修改；能力未注入 ⇒ 工具不注册（沿 requestAcceptance 先例）。
+
+/**
+ * `request_boundary_change` 载荷：只提交**精确增删路径**与理由（不重写整个边界、不扩其它路径）。
+ * `addPaths`/`removePaths` 至少一个非空；`flowId` 缺席＝当前/默认流程（由应用归一）。
+ */
+export interface RequestBoundaryChangeInput {
+  roleId: string;
+  addPaths?: string[];
+  removePaths?: string[];
+  rationale: string;
+  flowId?: string;
+}
+
+/**
+ * `request_boundary_change` 的如实回执（形状冻结；工具层**原样**转达）。
+ * `ok:true`＋`code:"dispatched"`＝应用已把精确修改请求派发给组队；其余 code 为如实的未派发/已派发原因。
+ * `code:"rejected"`＝应用在派发给组队前的确定性校验／AI 门禁审核未通过（deny/manual/超时）——请求被退回
+ * 统筹，**不自动放行**，也不代表客户拒绝（message 写明原因）。
+ */
+export interface RequestBoundaryChangeResult {
+  ok: boolean;
+  code: "dispatched" | "already-dispatched" | "rejected" | "invalid-role" | "invalid-path" | "no-change" | "unavailable";
+  message: string;
+  roleId?: string;
+  ticketId?: string;
+}
+
+/** `request_boundary_change` 注入能力（派发/确定性校验/AI 门禁/客户确认/appointment-write 由应用实现；未注入 ⇒ 工具不注册）。 */
+export type RequestBoundaryChangeFn = (input: RequestBoundaryChangeInput) => Promise<RequestBoundaryChangeResult>;
+
 // —————————————— 推理与推理强度（G-5 wave 1 契约层；冻结符号，单一来源＝本模块） ——————————————
 //
 // 依据：客户 2026-10-16「按推荐批准，开始实施」＝ G-5（推理与推理强度）；评估
@@ -1682,6 +1720,14 @@ export interface GovernedToolsOptions {
    * 本层只路由载荷并如实转达回执——**请求复核 ≠ 客户决定，不代表客户批准**。
    */
   requestAcceptance?: RequestAcceptanceFn;
+  /**
+   * 边界变更请求（2026-10-26 客户要求）：`request_boundary_change` 能力——项目角色写集/边界不足时，
+   * 由统筹直接请应用把**精确增删路径**派发给组队（Crew）修改角色卡/边界，不绕过 appointment-write
+   * 与客户/判断确认。**只给内置治理角色 注入**（判据在编排/桌面注入端，本层不硬编码角色 id）；
+   * 未注入 ⇒ 工具不注册（结构性 fail-closed，沿 requestAcceptance 先例）。派发/角色/路径校验/
+   * AI 门禁审核/确认/写入由能力实现；本层只做参数形状校验并如实转达回执——**请求变更 ≠ 客户批准**。
+   */
+  requestBoundaryChange?: RequestBoundaryChangeFn;
   /**
    * 判断 agent（「替我审」）只读能力注入。**这是能力注入，不是工具注入**：注入后 Service 必须走
    * `buildShellJudgeTools`（`src/common/runtime-core/shell-judge/`），**不得**走 `buildGovernedTools`——

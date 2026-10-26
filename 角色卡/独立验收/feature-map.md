@@ -3,6 +3,7 @@
 本角色无产品系统功能，不实现业务代码、测试或共享 API。维护范围是验收标准、证据核对与独立结论。
 
 - [职责与交接](functional-description.md)
+- [脚手架先行治理 / delivered 唤醒去重 / 主动 request_acceptance 独立验收报告](docs/change/2026-10-26_change_scaffold-governance-and-wake-dedupe-acceptance.md)：对 HEAD `ea0fff0` 三笔提交（`c7c3f0e`+`4d415db`+`ea0fff0`，对比 main `182a631`）按客户交接与协调端追加口径固定 A1–A8（事后标准）判定；**总体有条件通过**——无 FAIL；独立实测 typecheck 0、门禁 325（324 过/1 Windows skip）、team-plan 32/32、acceptance-dispatch 67/67、桌面全量 640/640、治理 e2e 155/155×2（首跑 1 例既有 request_acceptance 并发 flaky）；V11 探针 6/6、A8 九回执枚举与注册表结构对比通过；**未验证**：运行中 Electron 仍旧代码、真实模型对卡文本遵守、A5 并发/失败回滚（仅代码审查）、城堡项目现场。证据见同目录 `2026-10-26_scaffold-governance-and-wake-dedupe-evidence/`。
 - [D3 轻量修复验收标准 C2](docs/design/2026-10-21_design_d3-acceptance-criteria.md)：按用户指令将 UI 实施/测试撤出，仅交接意见；最终分项结论见下。
 - [工作线索](memo.md)
 - [思考等级轻量兼容标准 R2](docs/design/2026-10-21_design_reasoning-light-criteria.md)：保留 D1 八条验证，追加已批准 E1 目录内模型兼容；真实 SDK/CLI localhost 必需，UI 仅意见；待实施证据。

@@ -2034,3 +2034,117 @@ test("2026-10-26 完成即主动 request_acceptance：Steward 卡在交付/证�
   assert.equal(convener.capabilities.dispatchTask, true);
   assert.equal(convener.capabilities.shell, "operator-approve");
 });
+
+// —————————————————————— 13) 2026-10-26 边界变更请求（request_boundary_change） ——————————————————————
+
+test("2026-10-26 边界变更请求：Steward 卡在写集/边界不足时调用 request_boundary_change，提交精确增删路径与理由，不得 dispatch_task 派组队、不得自改卡", () => {
+  // 运行时核心新增统筹专用工具 `request_boundary_change({roleId, addPaths?, removePaths?, rationale,
+  // flowId?})`，由应用负责把任务派给 Crew / 组队。真机缺口（castle `tsconfig.node.json`）：项目角色
+  // 写集/边界不足时，治理角色之间禁止 dispatch，统筹必须走专用通道而不是直接派 Crew。
+  const c = governanceRoleOf("convener")!.cardText;
+
+  // 1) 使用时机与调用形状：项目角色报告或统筹核证发现缺口；精确增删路径、理由与 flowId 必须写死。
+  assertCardIncludes(
+    c,
+    [
+      "## 边界变更请求（request_boundary_change，必须）",
+      "项目角色报告写集 / 边界不足",
+      "核证 / readiness / 派发前检查",
+      "边界覆盖不了任务所需路径",
+      "request_boundary_change({ roleId, addPaths?, removePaths?, rationale, flowId? })",
+      "**精确的项目相对路径 / 目录条目**",
+      "目录以 `/` 结尾",
+      "不得通配、`..`、绝对路径或散文",
+      "只列这次缺口真正需要的增删",
+      "不顺手扩大其它路径",
+      "`rationale`：为什么现有写集不够",
+      "`flowId`：关联到产生缺口的流程",
+      // 标准工作流第 5 步与「角色卡归属」段同口径（不只藏在一处）。
+      "5. 派发项目角色",
+      "按「边界变更请求（request_boundary_change，必须）」一节处理",
+      "角色卡归属",
+    ],
+    "Steward request_boundary_change 使用时机与调用形状",
+  );
+
+  // 2) 明确禁止：不得用 dispatch_task 派 Crew（治理角色不可被派发，必然被拒），不得自己改角色卡/边界。
+  assertCardIncludes(
+    c,
+    [
+      "不得用 `dispatch_task` 直接派 Crew / 组队",
+      "内置治理角色不可被派发，必然被拒",
+      "不得自己改角色卡 / 边界",
+      "`角色卡/**` 是你的禁写路径",
+    ],
+    "Steward 不得 dispatch_task 派组队 / 不得自改卡",
+  );
+
+  // 3) 回执处理：dispatched 等待不重提；already-dispatched 有在途；invalid-* / no-change 修正后重交；
+  //    unavailable 如实报告不绕过。
+  assertCardIncludes(
+    c,
+    [
+      "回执处理（必须如实，不得绕过）",
+      "`dispatched`：请求已由应用派给组队",
+      "等待 Crew 完成边界变更并回执",
+      "不重复提交",
+      "`already-dispatched`：已有在途变更",
+      "`invalid-role` / `invalid-path` / `no-change`",
+      "按回执 `code` / `message` 修正**具体的角色或路径**后重交",
+      "不得原样死循环重试",
+      "`unavailable`：如实报告",
+      "不绕过",
+      "不得改用 `dispatch_task` 派 Crew",
+      "不得让实现角色先写边界外路径",
+    ],
+    "Steward request_boundary_change 回执处理",
+  );
+
+  // 4) 确认与门禁：只有 Crew 经 appointment-write 与客户/判断确认落地；请求不等于批准；
+  //    变更未完成前不得派实现写入该路径。
+  assertCardIncludes(
+    c,
+    [
+      "边界变更只能由 Crew / 组队经 `appointment-write` 与客户 / 判断 agent 的确认卡落地",
+      "**你的请求不等于客户批准**",
+      "也不解锁任何写权",
+      "变更完成（Crew 回执 + 应用校验通过）前，**不得派任何实现写入该路径**",
+    ],
+    "Steward request_boundary_change 确认与门禁",
+  );
+
+  // 5) 通道只归 Steward / 统筹：其余卡不得另行定义 request_boundary_change（Crew 只接收应用派发的任务）。
+  for (const id of ["liaison", "rapporteur", "nominator", "verifier"] as const) {
+    assert.equal(
+      governanceRoleOf(id)!.cardText.includes("request_boundary_change"),
+      false,
+      `${id} 卡不得定义 request_boundary_change 通道`,
+    );
+  }
+
+  // 6) 注册表数据面零变化：本批只改卡文本，不加能力位、不改写权。
+  const convener = governanceRoleOf("convener")!;
+  assert.deepEqual(convener.entries.map((e) => e.path), [
+    "docs/flows/",
+    "docs/workflow.md",
+    "docs/scheduling/",
+    "docs/governance/convener/",
+  ]);
+  assert.deepEqual(convener.preauthorizedDirs, [
+    "docs/flows/",
+    "docs/scheduling/",
+    "docs/governance/convener/",
+  ]);
+  assert.deepEqual(convener.forbiddenWritePaths, [
+    ".ans/",
+    "docs/bootstrap-manifest.md",
+    "角色卡/governance-boundary.yaml",
+    "角色卡/",
+    "docs/proposals/",
+    "docs/nominations/",
+    "docs/skills/",
+    "docs/mcp/",
+  ]);
+  assert.equal(convener.capabilities.dispatchTask, true);
+  assert.equal(convener.capabilities.shell, "operator-approve");
+});

@@ -518,6 +518,63 @@ test("标准工作流：Crew appointment-write 后应用校验——role-card �
   );
 });
 
+test("边界变更请求：Crew 核对 roleId/精确增删路径/理由/flowId，只增删列出路径，按 appointment-write 确认，declined 修正重发，报告并留证", () => {
+  // 2026-10-26 真机缺口：治理门禁禁止治理角色之间 dispatch，统筹发现项目角色写集/边界不足时无法让
+  // Crew 改边界（castle `tsconfig.node.json` 卡住）。运行时核心新增统筹专用 request_boundary_change，
+  // 由应用把任务派给 Crew；本卡文本固定 Crew 侧的核对、精确路径、appointment-write 与回执纪律。
+  const crew = cardTextOf("nominator");
+  assertIncludesAll(
+    crew,
+    [
+      "## 边界变更请求（来自应用/统筹经应用）",
+      "由 Steward / 统筹 提出边界变更请求",
+      "应用把任务派给你",
+      "**不自行发起边界变更**",
+      "本工作流只调整任务指定那一个 `roleId` 的 `角色卡/<roleId>/boundary.yaml` 边界条目",
+      // 先核对：角色、精确路径、理由、flowId 四要素。
+      "收到任务后逐项核对 `roleId`、`addPaths` / `removePaths`、`rationale` 与 `flowId`",
+      "必须是已任命 / 已存在的项目角色",
+      "内置治理角色、未知角色或目录 id 不符时停止并报告 Steward / 统筹",
+      "必须是**精确的项目相对路径**",
+      "不得通配符、`..`、绝对路径或散文",
+      // 只增删列出路径：不重写整个边界、不扩大其它路径、不动计划/规范/他人资料。
+      "只对列出的路径做增删",
+      "**不重写整个边界、不扩大其它路径**",
+      "不顺手改目录规范、团队计划或其它角色资料",
+      "增删后仍不得含治理关键路径 / 他人写集 / 禁写路径",
+      // appointment-write 逐路径确认；declined 修正重发；写后应用校验。
+      "`request_confirmation`（`cardKind=appointment-write`、`flowId` 必填）",
+      "逐路径列出将写 / 删的 `角色卡/<roleId>/boundary.yaml` 与条目差异",
+      "返回 `declined` 时按 `reason` 修正内容后**重新发确认卡**",
+      "不得绕过确认、不得直接 `write_file`、不得把原因当客户已同意",
+      "写后交应用边界 / 结构校验",
+      // 完成后回执与留证；请求来自统筹不等于客户批准。
+      "向 Steward / 统筹（并汇总 Lead / 主理）报告",
+      "实际增删的精确路径、确认卡与校验结果",
+      "变更记录与证据（diff / 校验输出）保留在 `docs/governance/nominator/`",
+      "**请求来自统筹不等于客户批准**",
+      "确认与校验完成前不得声称边界已变更、不得按新路径写入",
+      // 显式禁止：来源是统筹也不跳过确认；不越出职责/能力/写集改内容。
+      "不因请求来自统筹就跳过确认",
+      "不修改角色职责 / 能力 / 写集之外的内容",
+      "不借机改职责 / 能力描述",
+      "请求要求改职责 / 能力时停止并报告 Steward / 统筹",
+    ],
+    "Crew 边界变更请求工作流",
+  );
+
+  // 既有 appointment-write 与写卡校验纪律逐字保留（新工作流不得弱化）。
+  assertIncludesAll(
+    crew,
+    [
+      "写任何项目角色卡 / 边界（治理敏感写入）都必须按 `appointment-write` 逐路径取得客户确认",
+      "不得绕过确认或直接写盘",
+      "不得绕过校验、不得直接 `write_file`",
+    ],
+    "Crew 既有 appointment-write 纪律保留",
+  );
+});
+
 test("标准工作流：流程工具——Steward 初始创建例外 + flow_get/flow_step_update/flow_step_supersede；Crew/Draft/Proof 只读流程并用工具记录状态", () => {
   // 客户 2026-10-20 拍板「按这个方案做吧」：流程文件改为方法化工具。初始创建仍走
   // request_confirmation(schedule-write)；创建后步骤状态推进用 flow_get + flow_step_update，

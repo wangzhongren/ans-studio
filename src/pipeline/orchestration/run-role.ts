@@ -83,6 +83,7 @@ import type {
   DispatchTaskFn,
   DispatchTaskPayload,
   RequestAcceptanceFn,
+  RequestBoundaryChangeFn,
   HandOffIntentFn,
   RequestClarificationFn,
   RoleStatusFn,
@@ -274,6 +275,15 @@ export interface AdapterCapabilities {
    * 未提供 ⇒ 不注入（运行时核心据此不注册工具，结构性 fail-closed）。**请求复核 ≠ 客户批准**。
    */
   requestAcceptance?: RequestAcceptanceFn;
+  /**
+   * 边界变更请求（`request_boundary_change`，2026-10-26 客户要求）：项目角色写集/边界不足时，由统筹
+   * 直接请应用把**精确增删路径**派发给组队（Crew）修改角色卡/边界，不绕过 appointment-write 与
+   * 客户/判断确认。**只给内置治理角色中的统筹/Steward（convener）注入**（项目角色、其他内置治理角色
+   * 即便调用方误给也不注入）；判据在编排注入端，运行时核心不硬编码角色 id。未提供 ⇒ 不注入
+   * （运行时核心据此不注册工具，结构性 fail-closed）。应用实现确定性校验、AI 门禁审核与派发；本层
+   * **纯透传**，只把同一引用交给适配器。**请求变更 ≠ 客户批准、不代表边界已修改**。
+   */
+  requestBoundaryChange?: RequestBoundaryChangeFn;
   /**
    * W6-A：`hand_off_intent` 能力（四角色评审 §5.1/§5.2）。**只给联络官 Liaison**（能力矩阵
    * `handOffIntent`）；本编排层已在校验/去重/每轮一次/账本成功后才调到这里——本字段是**投递端**
@@ -580,6 +590,16 @@ export async function openRoleSession(
      * **请求复核 ≠ 客户决定，不代表客户批准**（工具层原样转达回执）。
      */
     requestAcceptance?: RequestAcceptanceFn;
+    /**
+     * **边界变更请求能力（`request_boundary_change`「注入才注册」，2026-10-26 客户要求）**：前端
+     * （桌面窗口）提供的实现——项目角色写集/边界不足时，统筹直接请应用把**精确增删路径**派发给
+     * 组队（Crew）修改角色卡/边界；确定性校验、AI 门禁审核、派发与 appointment-write 确认全部由该
+     * 能力实现。**只对内置治理角色中的统筹/Steward（convener）转交**（项目角色、其他内置治理角色
+     * 即便调用方误给也不注入，工具不注册）；未给出 ⇒ 不注入（结构性 fail-closed）。
+     * 形状单一来源＝契约家 `model/runtime.ts`（`RequestBoundaryChangeFn`/`RequestBoundaryChangeResult`）。
+     * **请求变更 ≠ 客户批准**（工具层原样转达回执）。
+     */
+    requestBoundaryChange?: RequestBoundaryChangeFn;
     /**
      * **W6-A 意图交接的投递能力（`hand_off_intent`「注入才注册」）**：前端（桌面窗口）提供的实现——
      * 校验通过后把**一条**任务投给 Rapporteur（后台开/发、不打开/不切换、系统行、写
@@ -1335,6 +1355,15 @@ export async function openRoleSession(
   const requestAcceptance: RequestAcceptanceFn | undefined =
     builtInGovernance && input.requestAcceptance !== undefined ? input.requestAcceptance : undefined;
 
+  // 2026-10-26 边界变更请求（request_boundary_change）：**只给内置治理角色中的统筹/Steward（trio
+  // convener）**注入；项目角色、其他内置治理角色（含 single 模型的旧 su 与主理 liaison）即便调用方
+  // 误给也不注入（工具不注册，结构性 fail-closed）。判据在编排注入端（运行时核心只声明能力位名，
+  // 不硬编码角色 id）；未提供 ⇒ 不注入（同 request_acceptance 先例）。本层纯透传，不做任何校验/判定。
+  const requestBoundaryChange: RequestBoundaryChangeFn | undefined =
+    builtInGovernance && trioSpec?.id === "convener" && input.requestBoundaryChange !== undefined
+      ? input.requestBoundaryChange
+      : undefined;
+
   // G-4 技能安装/卸载两能力（I1/I2）：能力矩阵驱动——仅 `capabilities.installSkill`
   // （trio=Nominator；su 旧行为）。字段名**逐字**＝契约家能力名（错一名 ⇒ 工具静默零注册）。
   const installSkill = cap?.installSkill === true ? input.installSkill : undefined;
@@ -1428,6 +1457,7 @@ export async function openRoleSession(
     ...(input.persistSession !== undefined ? { persistSession: input.persistSession } : {}),
     ...(dispatchTask !== undefined ? { dispatchTask } : {}),
     ...(requestAcceptance !== undefined ? { requestAcceptance } : {}),
+    ...(requestBoundaryChange !== undefined ? { requestBoundaryChange } : {}),
     ...(handOffIntent !== undefined ? { handOffIntent } : {}),
     ...(requestClarification !== undefined ? { requestClarification } : {}),
     ...(roleStatus !== undefined ? { roleStatus } : {}),
@@ -3338,6 +3368,12 @@ export function createRuntimeAdapterFactory(
     // 2026-10-25 独立复核请求（request_acceptance）：运行时核心 `GovernedToolsOptions` 同名能力位
     // （形状同源 `model/runtime.ts`）；`undefined` ⇒ 工具不注册（同 dispatch_task 先例）。
     requestAcceptance: capabilities?.requestAcceptance,
+    // 2026-10-26 边界变更请求（request_boundary_change）：运行时核心 `GovernedToolsOptions` 同名能力位
+    // （形状同源 `model/runtime.ts`）；条件展开透传，缺省/未注入 ⇒ 字段缺席、工具不注册
+    // （同 flow_get 先例）。本层纯透传，不做确定性校验/AI 门禁/派发。
+    ...(capabilities?.requestBoundaryChange !== undefined
+      ? { requestBoundaryChange: capabilities.requestBoundaryChange }
+      : {}),
     // W6-A：意图交接/澄清两能力并入适配器选项——**契约字段名** `handOffIntent` /
     // `requestClarification`（运行时核心 `GovernedToolsOptions` 同名能力位，形状同源
     // `model/runtime.ts`）；`undefined` ⇒ 对应工具不注册（最弱接触面，同 dispatch_task 先例）。

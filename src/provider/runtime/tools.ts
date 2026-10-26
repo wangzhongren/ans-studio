@@ -42,6 +42,9 @@ import type {
   RequestAcceptanceFn,
   RequestAcceptanceInput,
   RequestAcceptanceResult,
+  RequestBoundaryChangeFn,
+  RequestBoundaryChangeInput,
+  RequestBoundaryChangeResult,
   FlowToolEvidence,
   FlowToolResult,
   FlowToolStatus,
@@ -83,6 +86,7 @@ import {
 } from "../../common/runtime-core/background-tasks.ts";
 import { killProcessTree } from "../../common/runtime-core/process-tree.ts";
 import { PI_CREDENTIAL_ENV_VARS, RUNTIME_CREDENTIAL_ENV_VARS } from "../../common/shared/runtime-shared.ts";
+import { isAbsoluteAny } from "../../common/shared/path-primitives.ts";
 import {
   atomicWriteFile,
   ensureParentDir,
@@ -156,6 +160,9 @@ export const FLOW_STEP_SUPERSEDE_TOOL_NAME = "flow_step_supersede";
 
 /** request_acceptance 工具名（2026-10-25；交付就绪后由统筹直接请应用派独立复核/Proof）。 */
 export const REQUEST_ACCEPTANCE_TOOL_NAME = "request_acceptance";
+
+/** request_boundary_change 工具名（2026-10-26；项目角色写集/边界不足时由统筹请应用派组队修改）。 */
+export const REQUEST_BOUNDARY_CHANGE_TOOL_NAME = "request_boundary_change";
 
 /** 扩展层对 run_shell 的能力级判定结果：非 undefined 即阻断（默认拒绝）。 */
 export interface ShellKillSwitchDecision {
@@ -1322,6 +1329,10 @@ function abortedToolResult(name: string): ToolResult {
   // 独立复核请求（2026-10-25）：中止时**不假设已派发**（零副作用面如实）。
   if (name === REQUEST_ACCEPTANCE_TOOL_NAME) {
     return { ok: false, message: `${name}：独立复核请求**未获结果**（原因：会话已中止）——**不要当已派发**；如实告知客户。` };
+  }
+  // 边界变更请求（2026-10-26）：中止时**不假设已派发/已修改**（零副作用面如实）。
+  if (name === REQUEST_BOUNDARY_CHANGE_TOOL_NAME) {
+    return { ok: false, message: `${name}：边界变更请求**未获结果**（原因：会话已中止）——**不要当已派发/已修改**；如实告知客户。` };
   }
   // 2026-10-22 后台任务（B1）：中止时**不假设已启动/已停止**（零副作用面如实）。
   if (name === START_BACKGROUND_TASK_TOOL_NAME) {
@@ -2795,6 +2806,167 @@ function makeRequestAcceptanceTool(fn: RequestAcceptanceFn): ExecutableTool {
   };
 }
 
+// —————————————— 边界变更请求（2026-10-26 客户要求；request_boundary_change） ——————————————
+//
+// 真机缺口：治理门禁规定「内置治理角色不可被派发、治理角色之间不 dispatch」，统筹无法让组队（Crew）
+// 修改项目角色边界（例：castle 项目 app-shell 缺 `tsconfig.node.json` 写权）。本工具是统筹可用的
+// 专用请求通道：本层只做**参数形状校验**（roleId/rationale 非空；至少一个非空增删数组；元素去重；
+// 禁绝对路径与 `..`——存在性/项目内校验由注入能力负责）＋**调用注入能力并如实转达回执**
+// （`ok`/`code`/`message`；失败不伪装成功）。真正的 Crew 派发、appointment-write 与客户/判断确认
+// 全部在应用侧——本工具不派发、不写盘、不做治理判定、不代表客户批准。未注入 ⇒ 工具不注册。
+
+/** `request_boundary_change` 回执 code 的冻结枚举（与 `RequestBoundaryChangeResult` 同一契约；契约外回执 fail-closed）。 */
+const REQUEST_BOUNDARY_CHANGE_CODES: readonly RequestBoundaryChangeResult["code"][] = Object.freeze([
+  "dispatched",
+  "already-dispatched",
+  "rejected",
+  "invalid-role",
+  "invalid-path",
+  "no-change",
+  "unavailable",
+]);
+const REQUEST_BOUNDARY_CHANGE_CODE_SET: ReadonlySet<string> = new Set(REQUEST_BOUNDARY_CHANGE_CODES);
+
+/**
+ * 精确路径的**句法层**校验：只接受项目相对路径。绝对路径/盘符路径/UNC 与任何 `..` 段一律拒绝；
+ * 存在性、是否在项目内、是否与被修改角色相关等语义校验由注入能力负责（本层不访问文件系统）。
+ */
+function boundaryPathSyntaxError(value: string): string | undefined {
+  if (value.trim() === "") return "路径为空";
+  if (isAbsolute(value) || isAbsoluteAny(value) || /^[A-Za-z]:/.test(value)) return "不得为绝对路径/盘符路径";
+  if (value.split(/[\\/]+/).includes("..")) return "不得包含 `..` 段";
+  return undefined;
+}
+
+/**
+ * 可选路径数组：缺席保持缺席（不造键）；空数组等价于未提供。给出时逐项校验非空字符串与路径句法，
+ * 并按**原字符串**去重（保留首次出现顺序）。数组元素不去空白——路径按提交值精确转达。
+ */
+function readBoundaryPathList(
+  args: Record<string, unknown>,
+  key: string,
+  name: string,
+): { ok: true; value: string[] | undefined } | { ok: false; result: ToolResult } {
+  const raw = args[key];
+  if (raw === undefined || raw === null) return { ok: true, value: undefined };
+  if (!Array.isArray(raw)) {
+    return { ok: false, result: flowArgumentError(name, `${key} 参数非法（须为非空字符串数组；可省略）`) };
+  }
+  const paths: string[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (typeof item !== "string" || item.trim() === "") {
+      return { ok: false, result: flowArgumentError(name, `${key} 含空或非字符串元素（须为非空字符串）`) };
+    }
+    const syntaxError = boundaryPathSyntaxError(item);
+    if (syntaxError !== undefined) {
+      return { ok: false, result: flowArgumentError(name, `${key} 含非法路径 ${JSON.stringify(item)}（${syntaxError}）`) };
+    }
+    if (seen.has(item)) continue;
+    seen.add(item);
+    paths.push(item);
+  }
+  return { ok: true, value: paths.length > 0 ? paths : undefined };
+}
+
+/**
+ * 回执 → 工具结果：**原样**转达 `ok`/`code`/`message`（可选 `roleId`/`ticketId` 一并如实呈现）。
+ * 契约外回执（缺失/非对象/缺 ok/code/message/未知 code）⇒ fail-closed「未获明确结果」，按未派发处理，
+ * **绝不说成已派发**。`dispatched` 也不代表客户批准或边界已修改（见文案纪律）。
+ */
+function requestBoundaryChangeResultMessage(name: string, value: unknown): ToolResult {
+  const contractExternal = (): ToolResult => ({
+    ok: false,
+    message: `${name}：应用未返回明确结果（回执缺失或非法）——按**未派发**处理；**不要当已派发/已修改**，如实告知客户。`,
+  });
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return contractExternal();
+  const receipt = value as Partial<RequestBoundaryChangeResult>;
+  if (
+    typeof receipt.ok !== "boolean" ||
+    typeof receipt.code !== "string" ||
+    !REQUEST_BOUNDARY_CHANGE_CODE_SET.has(receipt.code) ||
+    typeof receipt.message !== "string" ||
+    receipt.message.trim() === ""
+  ) {
+    return contractExternal();
+  }
+  const parts = [`ok=${receipt.ok}`, `code=${receipt.code}`];
+  if (typeof receipt.roleId === "string" && receipt.roleId !== "") parts.push(`roleId=${receipt.roleId}`);
+  if (typeof receipt.ticketId === "string" && receipt.ticketId !== "") parts.push(`ticketId=${receipt.ticketId}`);
+  const detail = `（${parts.join("；")}）：${receipt.message}`;
+  if (receipt.ok) {
+    const headline =
+      receipt.code === "dispatched"
+        ? "边界变更请求已派发给组队"
+        : receipt.code === "already-dispatched"
+          ? "此前已派发，未重复派发"
+          : "请求已受理";
+    return {
+      ok: true,
+      message:
+        `${name}：${headline}${detail}。` +
+        `注意：**请求变更 ≠ 客户批准**——实际修改仍由组队走 appointment-write 与客户/判断确认；` +
+        `本工具不代表客户批准，也不代表边界已修改。`,
+    };
+  }
+  // 分层门禁退回（2026-10-26 客户确认）：确定性校验/AI 门禁 deny/manual/超时 ⇒ 未派给组队、不自动放行；
+  // 这是应用门禁的判断，**不代表客户拒绝**——如实转达原因，不要诱导改写后反复重试。
+  if (receipt.code === "rejected") {
+    return {
+      ok: false,
+      message:
+        `${name}：边界变更请求被应用门禁**退回**（rejected）${detail}——**不自动放行**，**不代表客户拒绝**；` +
+        `**不要当已派发/已修改**，如实告知客户。`,
+    };
+  }
+  return { ok: false, message: `${name}：边界变更请求**未成功**${detail}——**不要当已派发/已修改**；如实告知客户。` };
+}
+
+/** request_boundary_change：提交精确的边界增删路径与理由（派发/确认/写入由应用实现；回执如实转达）。 */
+function makeRequestBoundaryChangeTool(fn: RequestBoundaryChangeFn): ExecutableTool {
+  const name = REQUEST_BOUNDARY_CHANGE_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const roleId = readFlowRequiredText(call.args, "roleId", name);
+      if (!roleId.ok) return roleId.result;
+      const rationale = readFlowRequiredText(call.args, "rationale", name);
+      if (!rationale.ok) return rationale.result;
+      const addPaths = readBoundaryPathList(call.args, "addPaths", name);
+      if (!addPaths.ok) return addPaths.result;
+      const removePaths = readBoundaryPathList(call.args, "removePaths", name);
+      if (!removePaths.ok) return removePaths.result;
+      if (addPaths.value === undefined && removePaths.value === undefined) {
+        return flowArgumentError(name, "addPaths/removePaths 至少提供一个非空路径数组（无变更的请求不要提交）");
+      }
+      // flowId 可选：缺省/空白＝当前流程（由应用归一）；非字符串 ⇒ 在触达能力前拒绝。
+      const rawFlowId = call.args["flowId"];
+      if (rawFlowId !== undefined && rawFlowId !== null && typeof rawFlowId !== "string") {
+        return flowArgumentError(name, "flowId 参数非法（应为字符串；可省略＝当前流程）");
+      }
+      const flowId = typeof rawFlowId === "string" && rawFlowId.trim() !== "" ? rawFlowId : undefined;
+      const input: RequestBoundaryChangeInput = {
+        roleId: roleId.value,
+        ...(addPaths.value !== undefined ? { addPaths: addPaths.value } : {}),
+        ...(removePaths.value !== undefined ? { removePaths: removePaths.value } : {}),
+        rationale: rationale.value,
+        ...(flowId !== undefined ? { flowId } : {}),
+      };
+      let result: unknown;
+      try {
+        result = await raceAbort(
+          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(input); }),
+          call.signal,
+          `${name} 派发边界变更`,
+        );
+      } catch (err) {
+        return { ok: false, message: `${name}：边界变更请求**未完成**（原因：${reasonOf(err)}）——**不要当已派发/已修改**；如实告知客户。` };
+      }
+      return requestBoundaryChangeResultMessage(name, result);
+    },
+  };
+}
+
 /**
  * 构造受治理工具集：
  * - 写入类 write_file / edit_file（先 gate，获准且配置了 writeRoot 时落盘）；
@@ -2934,6 +3106,12 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   // （能力缺席 = 最强 fail-closed）。派发/校验/flow/账本由能力实现，本层只路由并如实转达回执。
   const requestAcceptance = options?.requestAcceptance;
   if (requestAcceptance !== undefined) tools.push(makeRequestAcceptanceTool(requestAcceptance));
+  // 结构性保证（2026-10-26 边界变更请求，沿 requestAcceptance 先例）：**未注入能力时
+  // `request_boundary_change` 不存在**。只给内置治理角色——由调用方（编排/桌面注入端）决定注入；
+  // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。派发/appointment-write/客户确认/写盘
+  // 由能力实现，本层只校验精确增删路径与理由并如实转达回执。
+  const requestBoundaryChange = options?.requestBoundaryChange;
+  if (requestBoundaryChange !== undefined) tools.push(makeRequestBoundaryChangeTool(requestBoundaryChange));
   // Observe customer waits without storing titles, previews or selected values.
   return tools.map((tool) => {
     const { parameters, ...description } = describeTool(tool.name);

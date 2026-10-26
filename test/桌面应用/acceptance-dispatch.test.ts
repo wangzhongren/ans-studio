@@ -19,6 +19,15 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, uti
 import { tmpdir } from "node:os";
 
 import { createDesktopInterface, type DesktopDeps } from "../../app/desktop/interface.ts";
+// 2026-10-26 边界变更请求（request_boundary_change）：票据路径/摘要纯逻辑与 AI 门禁请求形状。
+import {
+  boundaryChangeClientMessageId,
+  boundaryChangeTicketRelPath,
+} from "../../app/desktop/boundary-change.ts";
+import type {
+  GovernanceJudgeOutcome,
+  GovernanceJudgeRequest,
+} from "../../src/model/runtime.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { RUNTIME_UNRESOLVED_MESSAGE } from "../../app/desktop/runtime-resolution.ts";
 import {
@@ -236,6 +245,12 @@ async function makeHarness(
     decisionJudgeSwitch?: DesktopDeps["decisionJudgeSwitch"];
     /** 2026-10-25 request_acceptance 有界超时（测试注入短预算）。 */
     requestAcceptanceLimits?: DesktopDeps["requestAcceptanceLimits"];
+    /** 2026-10-26 request_boundary_change：AI 门禁判断闭包工厂（缺省真实实现；测试注入桩件）。 */
+    createGovernanceJudgeFn?: DesktopDeps["createGovernanceJudgeFn"];
+    /** 2026-10-26 request_boundary_change：整体能力注入面（测试可替换为假实现）。 */
+    requestBoundaryChange?: DesktopDeps["requestBoundaryChange"];
+    /** 2026-10-26 request_boundary_change：AI/派发时限（测试注入短预算）。 */
+    requestBoundaryChangeLimits?: DesktopDeps["requestBoundaryChangeLimits"];
     /** 2026-10-25 request_acceptance 真机挂起复现：会话开启永不 resolve。 */
     hangOpenRoleSession?: boolean;
   } = {},
@@ -285,6 +300,11 @@ async function makeHarness(
     ...(options.presentAcceptanceTriageCard !== undefined ? { presentAcceptanceTriageCard: options.presentAcceptanceTriageCard } : {}),
     ...(options.decisionJudgeSwitch !== undefined ? { decisionJudgeSwitch: options.decisionJudgeSwitch } : {}),
     ...(options.requestAcceptanceLimits !== undefined ? { requestAcceptanceLimits: options.requestAcceptanceLimits } : {}),
+    ...(options.createGovernanceJudgeFn !== undefined ? { createGovernanceJudgeFn: options.createGovernanceJudgeFn } : {}),
+    ...(options.requestBoundaryChange !== undefined ? { requestBoundaryChange: options.requestBoundaryChange } : {}),
+    ...(options.requestBoundaryChangeLimits !== undefined
+      ? { requestBoundaryChangeLimits: options.requestBoundaryChangeLimits }
+      : {}),
   });
   await iface.listProject({ projectRoot });
   return { iface, sendsByRole, events, controls, openInputs };
@@ -4111,6 +4131,384 @@ test("request_acceptance：派发阶段 openBackground 永不 resolve ⇒ 阶段
       assert.ok(elapsed < 3000, `派发阶段挂起也必须按超时返回（实际 ${elapsed}ms）`);
     } finally {
       await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ————————————————— 2026-10-26 边界变更请求（request_boundary_change） —————————————————
+//
+// 客户确认的分层门禁：统筹不能直接派组队。能力入口 = 确定性校验 → 只读 AI 门禁 → 通过才后台派 Crew；
+// AI deny/manual/超时/不可用 ⇒ rejected、零派发；打开/发送失败 ⇒ unavailable（票据 failed，可重试）；
+// 同请求幂等（ticketId + clientMessageId），重启读票据恢复。
+
+/** trio 内置角色 + 一个真实项目角色（带当前边界条目）。 */
+function boundaryChangeListing(projectRoot: string): ProjectListing {
+  const base = trioListing();
+  return {
+    ...base,
+    projectRoot,
+    hasRoles: true,
+    roles: [
+      ...base.roles,
+      {
+        roleId: "executor",
+        cardPath: "角色卡/executor/role-card.md",
+        boundaryPath: "角色卡/executor/boundary.yaml",
+        cardText: "# executor\n负责实现 app-shell 与配置读取。",
+        boundary: {
+          entries: [
+            { root: "project", path: "src/executor", kind: "directory", purpose: "实现目录" },
+            { root: "project", path: "src/executor/legacy.ts", kind: "file", purpose: "旧入口" },
+          ],
+          boundarySource: "角色卡/executor/boundary.yaml",
+          acceptance: { accepted: true, source: "test" },
+        },
+      },
+    ],
+  };
+}
+
+type JudgeScript = (request: GovernanceJudgeRequest) => Promise<GovernanceJudgeOutcome>;
+
+/** 治理判断闭包工厂桩件：返回同一脚本驱动的 `GovernanceJudgeFn`（不建真实引擎）。 */
+function governanceJudgeFactory(script: JudgeScript): NonNullable<DesktopDeps["createGovernanceJudgeFn"]> {
+  return (() => script) as unknown as NonNullable<DesktopDeps["createGovernanceJudgeFn"]>;
+}
+
+function approveOutcome(): GovernanceJudgeOutcome {
+  return {
+    verdict: "approve",
+    group: "decision",
+    cardKind: "intent-confirm",
+    reasonCode: "sufficient",
+    reason: "请求路径与团队计划/流程一致，未顺带扩权",
+    engine: "pi",
+    evidence: ["docs/scheduling/flow-boundary-team-v1.md"],
+  };
+}
+
+/** 打开指定治理角色会话并取回注入的 request_boundary_change 能力（未注入即失败）。 */
+async function boundaryChangeCapability(
+  harness: Harness,
+  projectRoot: string,
+  roleId = "convener",
+): Promise<import("../../src/model/runtime.ts").RequestBoundaryChangeFn> {
+  const opened = await harness.iface.openSession({ projectRoot, roleId, runtime: "pi" });
+  assert.equal(opened.ok, true, opened.ok ? "" : (opened.error ?? "打开会话失败"));
+  const fn = harness.openInputs.get(roleId)?.requestBoundaryChange;
+  assert.ok(fn, `${roleId} 会话应注入 requestBoundaryChange`);
+  return fn;
+}
+
+test("边界变更请求：确定性校验各失败 code（invalid-role / invalid-path / no-change；零 AI、零派发）", async () => {
+  const root = makeTempProjectRoot("ans-boundary-validation-");
+  let judgeCalls = 0;
+  const harness = await makeHarness(root, boundaryChangeListing(root), {
+    createGovernanceJudgeFn: governanceJudgeFactory(async () => {
+      judgeCalls += 1;
+      return approveOutcome();
+    }),
+  });
+  try {
+    const capability = await boundaryChangeCapability(harness, root);
+    const rationale = "缺少写权";
+    const cases: Array<[string, Parameters<typeof capability>[0], string]> = [
+      ["未知角色", { roleId: "ghost", addPaths: ["config/new.ts"], rationale }, "invalid-role"],
+      ["内置治理角色", { roleId: "convener", addPaths: ["config/new.ts"], rationale }, "invalid-role"],
+      ["绝对路径", { roleId: "executor", addPaths: ["/etc/passwd"], rationale }, "invalid-path"],
+      ["盘符路径", { roleId: "executor", addPaths: ["C:/abs/a.ts"], rationale }, "invalid-path"],
+      [".. 逃逸", { roleId: "executor", addPaths: ["../outside.ts"], rationale }, "invalid-path"],
+      ["尾斜杠空段", { roleId: "executor", addPaths: ["config/"], rationale }, "invalid-path"],
+      ["治理账本", { roleId: "executor", addPaths: [".ans/governance/ledger.jsonl"], rationale }, "invalid-path"],
+      ["角色卡", { roleId: "executor", addPaths: ["角色卡/executor/boundary.yaml"], rationale }, "invalid-path"],
+      ["流程 YAML", { roleId: "executor", addPaths: ["docs/flows/flow-boundary.yaml"], rationale }, "invalid-path"],
+      ["移除治理路径", { roleId: "executor", removePaths: ["角色卡/executor/boundary.yaml"], rationale }, "invalid-path"],
+      ["共享目录", { roleId: "executor", addPaths: ["src/common/shared/paths.ts"], rationale }, "invalid-path"],
+      ["发布根文件", { roleId: "executor", addPaths: ["package.json"], rationale }, "invalid-path"],
+      ["已被目录覆盖", { roleId: "executor", addPaths: ["src/executor/already-covered.ts"], rationale }, "no-change"],
+      ["移除不存在", { roleId: "executor", removePaths: ["src/not-listed.ts"], rationale }, "no-change"],
+      ["空增删", { roleId: "executor", addPaths: [], removePaths: [], rationale }, "no-change"],
+      ["空理由", { roleId: "executor", addPaths: ["config/new.ts"], rationale: "   " }, "invalid-path"],
+      ["同增同删", { roleId: "executor", addPaths: ["config/new.ts"], removePaths: ["config/new.ts"], rationale }, "invalid-path"],
+    ];
+    for (const [label, input, code] of cases) {
+      const result = await capability(input);
+      assert.equal(result.ok, false, label);
+      assert.equal(result.code, code, `${label} => ${result.code}（${result.message}）`);
+    }
+    assert.equal(judgeCalls, 0, "确定性校验失败不得调用 AI 门禁");
+    assert.equal(harness.sendsByRole.get("nominator"), undefined, "确定性校验失败不得派发组队");
+  } finally {
+    await harness.iface.stopSession();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("边界变更请求：AI approve ⇒ 恰一条组队任务（精确路径 + ticketId，无「客户批准」字样）与 dispatched 票据", async () => {
+  const root = makeTempProjectRoot("ans-boundary-approve-");
+  const flowId = "flow-boundary";
+  writeFlowStateFile(
+    root,
+    flowId,
+    flowStateYaml(flowId, [{ id: "role-cards", kind: "dispatch", status: "pending", owner: "executor" }]),
+  );
+  mkdirSync(path.join(root, "docs", "scheduling"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs", "scheduling", `${flowId}-team-v1.md`),
+    ["---", `flowId: ${flowId}`, "version: 1", "riskTier: T1", "recommended: [executor]", "---", "", "# 团队计划", ""].join("\n"),
+  );
+  let judgeRequest: GovernanceJudgeRequest | undefined;
+  const harness = await makeHarness(root, boundaryChangeListing(root), {
+    createGovernanceJudgeFn: governanceJudgeFactory(async (request) => {
+      judgeRequest = request;
+      return approveOutcome();
+    }),
+  });
+  try {
+    const capability = await boundaryChangeCapability(harness, root);
+    const input = {
+      roleId: "executor",
+      addPaths: ["config/executor.config.ts"],
+      removePaths: ["src/executor/legacy.ts"],
+      rationale: "实现配置读取缺少写权",
+      flowId,
+    };
+    const result = await capability(input);
+    assert.equal(result.ok, true, result.message);
+    assert.equal(result.code, "dispatched");
+    assert.equal(result.roleId, "executor");
+    const ticketId = result.ticketId!;
+    assert.match(ticketId, /^bnd-[0-9a-f]{16}$/);
+
+    const sends = harness.sendsByRole.get("nominator") ?? [];
+    assert.equal(sends.length, 1, "AI approve 后必须恰一条组队任务");
+    const task = sends[0]!;
+    assert.ok(task.includes("config/executor.config.ts"), "任务含精确新增路径");
+    assert.ok(task.includes("src/executor/legacy.ts"), "任务含精确移除路径");
+    assert.ok(task.includes(ticketId), "任务含 ticketId");
+    assert.ok(task.includes("appointment-write"), "任务要求按 appointment-write 逐路径确认");
+    assert.equal(task.includes("客户批准"), false, "任务文本不得夹带「客户批准」字样");
+    assert.match(task, /未获确认不得写入/);
+
+    assert.ok(judgeRequest !== undefined, "AI 门禁必须被调用");
+    assert.equal(judgeRequest!.group, "decision");
+    assert.equal(judgeRequest!.cardKind, "intent-confirm");
+    assert.equal(judgeRequest!.roleId, "convener");
+    assert.equal(judgeRequest!.flowId, flowId);
+    assert.equal(judgeRequest!.card.kind, "choice");
+    const preview = judgeRequest!.card.kind === "choice" ? (judgeRequest!.card.preview ?? "") : "";
+    assert.ok(preview.includes("config/executor.config.ts"), "证据包含请求新增路径");
+    assert.ok(preview.includes("src/executor/legacy.ts"), "证据包含请求移除路径");
+    assert.ok(preview.includes("角色卡摘录"), "证据包含角色卡证据");
+    assert.ok(preview.includes("src/executor"), "证据包含当前边界条目");
+    assert.equal(judgeRequest!.artifacts?.teamPlanPath, `docs/scheduling/${flowId}-team-v1.md`);
+    assert.equal(judgeRequest!.artifacts?.flowPath, `docs/flows/${flowId}.yaml`);
+
+    const ticketRel = boundaryChangeTicketRelPath(flowId, ticketId);
+    const ticketPath = path.join(root, ...ticketRel.split("/"));
+    assert.equal(existsSync(ticketPath), true, "必须写审计票据");
+    const ticket = JSON.parse(readFileSync(ticketPath, "utf8")) as {
+      status?: string;
+      roleId?: string;
+      requestedBy?: string;
+      judge?: { verdict?: string };
+      dispatch?: { clientMessageId?: string; messageSha256?: string };
+    };
+    assert.equal(ticket.status, "dispatched");
+    assert.equal(ticket.roleId, "executor");
+    assert.equal(ticket.requestedBy, "convener");
+    assert.equal(ticket.judge?.verdict, "approve");
+    assert.equal(ticket.dispatch?.clientMessageId, boundaryChangeClientMessageId(ticketId));
+    assert.match(ticket.dispatch?.messageSha256 ?? "", /^[0-9a-f]{64}$/);
+
+    // 幂等（同进程）：再次调用 ⇒ already-dispatched，不重复派发。
+    const again = await capability(input);
+    assert.equal(again.ok, false);
+    assert.equal(again.code, "already-dispatched");
+    assert.equal((harness.sendsByRole.get("nominator") ?? []).length, 1);
+
+    // 重启恢复：新 Interface 实例从票据读到 dispatched，不再调用 AI/不再派发。
+    const restarted = await makeHarness(root, boundaryChangeListing(root), {
+      createGovernanceJudgeFn: governanceJudgeFactory(async () => {
+        throw new Error("重启后同请求不得再次调用 AI 门禁");
+      }),
+    });
+    try {
+      const restartedCapability = await boundaryChangeCapability(restarted, root);
+      const afterRestart = await restartedCapability(input);
+      assert.equal(afterRestart.code, "already-dispatched");
+      assert.equal(restarted.sendsByRole.get("nominator"), undefined, "重启后不得重复派发");
+    } finally {
+      await restarted.iface.stopSession();
+    }
+  } finally {
+    await harness.iface.stopSession();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("边界变更请求：AI deny/manual/超时/不可用 ⇒ rejected、零派发、票据 rejected", async () => {
+  const root = makeTempProjectRoot("ans-boundary-reject-");
+  const flowId = "flow-boundary";
+  const cases: Array<{
+    label: string;
+    limits?: DesktopDeps["requestBoundaryChangeLimits"];
+    script: JudgeScript;
+  }> = [
+    {
+      label: "deny",
+      script: async () => ({
+        verdict: "deny",
+        group: "decision",
+        cardKind: "intent-confirm",
+        reasonCode: "model-deny",
+        reason: "新增路径与申请理由不匹配",
+        engine: "pi",
+      }),
+    },
+    {
+      label: "manual",
+      script: async () => ({
+        verdict: "manual",
+        group: "decision",
+        cardKind: "intent-confirm",
+        reasonCode: "insufficient-evidence",
+        reason: "证据不足，无法判断",
+        engine: "pi",
+      }),
+    },
+    {
+      label: "unavailable",
+      script: async () => {
+        throw new Error("判断引擎不可用");
+      },
+    },
+    {
+      label: "timeout",
+      limits: { judgeMs: 60, dispatchMs: 500 },
+      script: async () => new Promise<GovernanceJudgeOutcome>(() => {}),
+    },
+  ];
+  try {
+    for (const item of cases) {
+      let judgeCalls = 0;
+      const harness = await makeHarness(root, boundaryChangeListing(root), {
+        createGovernanceJudgeFn: governanceJudgeFactory(async (request) => {
+          judgeCalls += 1;
+          return item.script(request);
+        }),
+        ...(item.limits !== undefined ? { requestBoundaryChangeLimits: item.limits } : {}),
+      });
+      try {
+        const capability = await boundaryChangeCapability(harness, root);
+        const input = { roleId: "executor", addPaths: [`config/${item.label}.config.ts`], rationale: `测试 ${item.label}`, flowId };
+        const started = Date.now();
+        const result = await capability(input);
+        const elapsed = Date.now() - started;
+        assert.equal(result.ok, false, `${item.label} 不得回执成功`);
+        assert.equal(result.code, "rejected", `${item.label} => ${result.code}（${result.message}）`);
+        assert.match(result.message, /不自动放行/);
+        assert.equal(harness.sendsByRole.get("nominator"), undefined, `${item.label} 不得派发组队`);
+        if (item.label === "timeout") assert.ok(elapsed < 5000, `超时必须有界返回（实际 ${elapsed}ms）`);
+        const ticketRel = boundaryChangeTicketRelPath(flowId, result.ticketId!);
+        const ticket = JSON.parse(readFileSync(path.join(root, ...ticketRel.split("/")), "utf8")) as {
+          status?: string;
+          judge?: { verdict?: string; reasonCode?: string };
+        };
+        assert.equal(ticket.status, "rejected", `${item.label} 票据必须标 rejected`);
+        assert.equal(ticket.judge?.verdict, item.label === "deny" ? "deny" : "manual");
+        if (item.label === "timeout") assert.equal(ticket.judge?.reasonCode, "timeout");
+        if (item.label === "deny") {
+          // 同一请求被退回后不重跑 AI 门禁（防止反复试探直到某次通过）；修改请求会生成新票据。
+          const repeat = await capability(input);
+          assert.equal(repeat.code, "rejected");
+          assert.match(repeat.message, /此前已被 AI 门禁退回/);
+          assert.equal(judgeCalls, 1, "同一请求退回后不得重跑 AI 门禁");
+        }
+      } finally {
+        await harness.iface.stopSession();
+      }
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("边界变更请求：打开组队失败 ⇒ unavailable + 票据 failed；重试成功且 ticketId 稳定", async () => {
+  const root = makeTempProjectRoot("ans-boundary-retry-");
+  const flowId = "flow-boundary";
+  try {
+    const failing = await makeHarness(root, boundaryChangeListing(root), {
+      createGovernanceJudgeFn: governanceJudgeFactory(async () => approveOutcome()),
+      failOpenRoles: new Set(["nominator"]),
+    });
+    const input = { roleId: "executor", addPaths: ["config/retry.config.ts"], rationale: "缺少写权", flowId };
+    let ticketId: string;
+    try {
+      const capability = await boundaryChangeCapability(failing, root);
+      const first = await capability(input);
+      assert.equal(first.ok, false);
+      assert.equal(first.code, "unavailable", first.message);
+      assert.match(first.message, /重试/);
+      assert.equal(failing.sendsByRole.get("nominator"), undefined, "打开失败不得投递");
+      ticketId = first.ticketId!;
+      const ticketRel = boundaryChangeTicketRelPath(flowId, ticketId);
+      const ticket = JSON.parse(readFileSync(path.join(root, ...ticketRel.split("/")), "utf8")) as { status?: string };
+      assert.equal(ticket.status, "failed", "打开失败票据标 failed（可重试）");
+    } finally {
+      await failing.iface.stopSession();
+    }
+
+    const healthy = await makeHarness(root, boundaryChangeListing(root), {
+      createGovernanceJudgeFn: governanceJudgeFactory(async () => approveOutcome()),
+    });
+    try {
+      const retry = await (await boundaryChangeCapability(healthy, root))(input);
+      assert.equal(retry.ok, true, retry.message);
+      assert.equal(retry.code, "dispatched");
+      assert.equal(retry.ticketId, ticketId, "同一请求 ticketId 必须稳定");
+      assert.equal((healthy.sendsByRole.get("nominator") ?? []).length, 1);
+    } finally {
+      await healthy.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("边界变更请求注入矩阵：仅 convener 有；项目角色与其他内置治理角色没有；deps 可整体替换", async () => {
+  const root = makeTempProjectRoot("ans-boundary-injection-");
+  try {
+    const harness = await makeHarness(root, boundaryChangeListing(root));
+    try {
+      await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "pi" });
+      await harness.iface.openSession({ projectRoot: root, roleId: "verifier", runtime: "pi" });
+      await harness.iface.openSession({ projectRoot: root, roleId: "executor", runtime: "pi" });
+      assert.equal(typeof harness.openInputs.get("convener")?.requestBoundaryChange, "function", "convener 注入");
+      assert.equal(harness.openInputs.get("verifier")?.requestBoundaryChange, undefined, "非 convener 治理角色不注入");
+      assert.equal(harness.openInputs.get("executor")?.requestBoundaryChange, undefined, "项目角色不注入");
+    } finally {
+      await harness.iface.stopSession();
+    }
+
+    // DesktopDeps.requestBoundaryChange 可整体替换（测试接缝）：会话闭包应补入 projectRoot/发起角色。
+    const received: Array<{ projectRoot: string; requesterRoleId: string; input: unknown }> = [];
+    const fake = await makeHarness(root, boundaryChangeListing(root), {
+      requestBoundaryChange: async (projectRoot, requesterRoleId, input) => {
+        received.push({ projectRoot, requesterRoleId, input });
+        return { ok: true, code: "dispatched", message: "fake 能力已受理" };
+      },
+    });
+    try {
+      const capability = await boundaryChangeCapability(fake, root);
+      const payload = { roleId: "executor", addPaths: ["config/x.ts"], rationale: "缺少写权" };
+      const result = await capability(payload);
+      assert.equal(result.code, "dispatched");
+      assert.deepEqual(received, [{ projectRoot: root, requesterRoleId: "convener", input: payload }]);
+    } finally {
+      await fake.iface.stopSession();
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
