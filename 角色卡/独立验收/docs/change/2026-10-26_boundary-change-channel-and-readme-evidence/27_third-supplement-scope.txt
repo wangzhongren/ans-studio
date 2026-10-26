@@ -1,0 +1,10 @@
+ app/desktop/boundary-change.ts                     | 16 ++++++++++++----
+ .../governance-roles.ts"                           |  6 +++++-
+ .../acceptance-dispatch.test.ts"                   | 22 ++++++++++++++++++++++
+ .../governance-trio.test.ts"                       | 10 ++++++++--
+ 4 files changed, 47 insertions(+), 7 deletions(-)
+12	4	app/desktop/boundary-change.ts
+5	1	"src/common/\351\227\250\347\246\201\345\274\225\346\223\216/governance-roles.ts"
+22	0	"test/\346\241\214\351\235\242\345\272\224\347\224\250/acceptance-dispatch.test.ts"
+8	2	"test/\351\227\250\347\246\201\345\274\225\346\223\216/governance-trio.test.ts"
+product/test/card --check: exit 0

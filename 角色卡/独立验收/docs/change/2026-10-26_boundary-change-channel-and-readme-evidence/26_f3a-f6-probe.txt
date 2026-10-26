@@ -1,0 +1,28 @@
+=== F3a electron-builder config ===
+electron-builder.config.ts {"critical":true,"add":"invalid-path","remove":"invalid-path"}
+electron-builder.config.js {"critical":true,"add":"invalid-path","remove":"invalid-path"}
+electron-builder.config.mjs {"critical":true,"add":"invalid-path","remove":"invalid-path"}
+electron-builder.yml {"critical":true,"add":"invalid-path","remove":"invalid-path"}
+electron-builder.yaml {"critical":true,"add":"invalid-path","remove":"invalid-path"}
+=== F6 slash-sensitive (add & remove) ===
+package.json/ {"normalized":"package.json/","critical":true,"add":"invalid-path","remove":"invalid-path"}
+package-lock.json/ {"normalized":"package-lock.json/","critical":true,"add":"invalid-path","remove":"invalid-path"}
+tsconfig.node.json/ {"normalized":"tsconfig.node.json/","critical":true,"add":"invalid-path","remove":"invalid-path"}
+vite.config.ts/ {"normalized":"vite.config.ts/","critical":true,"add":"invalid-path","remove":"invalid-path"}
+electron-builder.yml/ {"normalized":"electron-builder.yml/","critical":true,"add":"invalid-path","remove":"invalid-path"}
+.env/ {"normalized":".env/","critical":true,"add":"invalid-path","remove":"invalid-path"}
+index.html/ {"normalized":"index.html/","critical":true,"add":"invalid-path","remove":"invalid-path"}
+docs/scheduling/ {"normalized":"docs/scheduling/","critical":true,"add":"invalid-path","remove":"invalid-path"}
+docs/acceptance/ {"normalized":"docs/acceptance/","critical":true,"add":"invalid-path","remove":"invalid-path"}
+docs/contracts/ {"normalized":"docs/contracts/","critical":true,"add":"invalid-path","remove":"invalid-path"}
+docs/governance/ {"normalized":"docs/governance/","critical":true,"add":"invalid-path","remove":"invalid-path"}
+角色卡/executor/ {"normalized":"角色卡/executor/","critical":true,"add":"invalid-path","remove":"invalid-path"}
+.ans/ {"normalized":".ans/","critical":true,"add":"invalid-path","remove":"invalid-path"}
+bin/ {"normalized":"bin/","critical":true,"add":"invalid-path","remove":"invalid-path"}
+.github/ {"normalized":".github/","critical":true,"add":"invalid-path","remove":"invalid-path"}
+=== normal directory still usable ===
+assess config/newdir/ {"ok":true,"addPaths":["config/newdir/"],"removePaths":[],"effectiveAdds":["config/newdir/"],"effectiveRemoves":[]}
+critical config/newdir/ false
+task has config/newdir/（目录条目） true
+preview has config/newdir/（目录条目） true
+ticketId stable {"a":"bnd-c74c28d06fcb6503","b":"bnd-c74c28d06fcb6503"}
