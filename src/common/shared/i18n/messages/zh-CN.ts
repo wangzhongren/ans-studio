@@ -1461,6 +1461,8 @@ export const zhCN = {
     "流程 {flowId}：验收标准缺少 gate {gateId} 的复核标准节；请质检补齐最新标准后再提交（运营不写 docs/acceptance/）。",
   "main.gateReview.flowIncomplete":
     "流程 {flowId}：gate {gateId} 的前置步骤或证据不齐（{detail}）；补齐后再提交，不得提前提交或用提交代替缺步骤。",
+  "main.gateReview.flowBusy":
+    "流程仍有在途交付/轮次/回交，gate 暂不派发；这是可重试状态，不是故障或 gate 失败；请在在途工作结束后重试。",
   "main.gateReview.unavailable":
     "流程 {flowId}：gate {gateId} 复核通道不可用（{detail}）；可能已派发，请用 flow_get 核对；应用未声称已派发，不自行判定通过。",
   "main.gateReview.rejected":

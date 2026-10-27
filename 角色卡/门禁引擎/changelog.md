@@ -1,5 +1,30 @@
 # 门禁引擎 变更记录
 
+## 2026-10-27 — gate 复核 `flow-busy` 可重试：在途交付/轮次/回交稍后重试，不当失败/已派发/验收失败
+
+任务：客户要求——gate 复核「流程仍有在途工作」返回**可重试**的 `flow-busy`（不是 `unavailable`）并告知
+原因；运营 / Convener 收到后视为「暂时有在途交付 / 运行轮次 / 回交」，稍后重试，不得当 gate 失败 / 已派发 /
+验收失败，不得反复刷请求；在途工作结束后再请求同一 gate；保留 gate 独立性 / 不代批 / 不改状态
+（lead-governance-coordination；门禁引擎任务）。完整记录见
+[变更记录](docs/change/2026-10-27_change_gate-review-flow-busy.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`（仅 `CONVENER_CARD_TEXT` 产品数据文本 + 文件头注）、
+  `test/门禁引擎/governance-trio.test.ts`（既有 gate 回执断言更新）、`test/门禁引擎/gate-review-flow-busy.test.ts`
+  （新增 3 例）、本文件、变更记录（新）。未改工具 / 桌面 / 运行时 / 编排 / PM / i18n / 游戏项目；未新增
+  角色 / `FlowStepKind` / cardKind / 写权 / 能力位；未 commit / push；未重启应用。
+- **Convener 卡**：主动请求 gate 复核步骤提示「在途工作返回可重试的 `flow-busy`，稍后重试、不刷请求、
+  在途结束后再请求同一 gate」；回执处理新增 `flow-busy`——可重试，表示有在途交付 / 运行轮次 / 回交，
+  **不是 `unavailable` / gate 失败 / 已派发 / 验收失败**；按 `message` 了解原因、稍后重试、不反复刷请求、
+  在途结束后再请求同一 gate、不标 `done` / `failed` / `delivered`、不代批、不改 flow 状态。`flow-incomplete`
+  移除「有在途工作」缺口示例并指向 `flow-busy`；其余回执语义与 gate 独立性逐字保留。
+- **测试**：新增 `gate-review-flow-busy.test.ts` 3 例（可重试语义、`flow-incomplete` / `flow-busy` 分离、
+  只有 Convener 定义且数据面零变化）；`governance-trio.test.ts` gate 回执断言加入 flow-busy 相关断言；
+  原有 `unavailable` / `rejected` / gate 独立性断言保留。
+- **验证**：定向 3 计 / 3 过；本角色全套 `node --test "test/门禁引擎/**/*.test.ts"` ⇒ **365 计 / 364 过 /
+  0 失败 / 1 Windows 既有 skip，exit 0**（写前 362 计）；`npm run typecheck` ⇒ **exit 0，0 诊断**。
+- **跨角色待办（未越界）**：`flow-busy` 返回条件 / 原因文案 / 返回码由运行时核心 / 编排 / 桌面角色实现；
+  卡文本是行为约束，不是实现证据；未做跨角色端到端 / 真机验证，未独立验收。
+
 ## 2026-10-27 — 验收证据截图-only：内置治理卡移除录屏要求 / 选项（最多截图，缺录屏不失败）
 
 任务：客户新 ANS 系统规则——**验收标准最多要求截图，不能要求录屏**。内置治理角色卡与共享原则中，凡把

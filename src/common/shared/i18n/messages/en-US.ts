@@ -1647,6 +1647,8 @@ export const enUS = {
     "Flow {flowId}: the acceptance criteria have no gate review section for {gateId}; have QA add it to the latest criteria and submit again (Operations does not write docs/acceptance/).",
   "main.gateReview.flowIncomplete":
     "Flow {flowId}: gate {gateId} prerequisites or evidence are incomplete ({detail}); complete them and submit again — do not submit early or use submission to stand in for missing steps.",
+  "main.gateReview.flowBusy":
+    "The flow still has in-flight deliveries, runs, or handbacks, so the gate is not dispatched yet; this is a retryable state, not a failure or a gate failure — retry after the in-flight work finishes.",
   "main.gateReview.unavailable":
     "Flow {flowId}: the gate {gateId} review channel is unavailable ({detail}); it may already have been dispatched — check with flow_get. The app does not claim dispatch and never decides a pass on its own.",
   "main.gateReview.rejected":

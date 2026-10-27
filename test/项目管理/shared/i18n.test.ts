@@ -589,14 +589,14 @@ test("B1–B4 key 分区：ui/main/shared 计数与总 key 数符合契约（漏
   };
   assert.deepEqual(prefixes, {
     ui: 792, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7 + 2026-10-25 chat-panel 10 + background tasks 25 + flow status 22 + acceptance triage 28 + 2026-10-26 decision card 3 + 2026-10-26 view_image 1 + 2026-10-27 view_image preview 3 + 2026-10-27 view_image lightbox 2
-    main: 530, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6 + backgroundTasks 1 + flowStatus 2 + write preauthorization 6 + 2026-10-26 gate review 13 + 2026-10-26 decision card 6 + 2026-10-26 view_image 2 + 2026-10-27 view_image same-turn 1 + 2026-10-26 requirement change 13
+    main: 531, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6 + backgroundTasks 1 + flowStatus 2 + write preauthorization 6 + 2026-10-26 gate review 13 + 2026-10-27 gate review flow-busy 1 + 2026-10-26 decision card 6 + 2026-10-26 view_image 2 + 2026-10-27 view_image same-turn 1 + 2026-10-26 requirement change 13
     shared: 62, // B4 元数据 + 跨层通用短词
     preferences: 3, // B0
   });
-  assert.equal(keys.length, 1387);
+  assert.equal(keys.length, 1388);
   // B1/B2 与 B3 分区（扣除 B0 的 5 个 ui.* / 5 个 main.*）。
   assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 787);
-  assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 525);
+  assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 526);
 });
 
 /**
@@ -1685,13 +1685,15 @@ test("验收返工路由 key：zh-CN/en-US 取值与插值（客户/自动/等�
 /**
  * 2026-10-26 gate 复核回执/系统行 key（客户授权实现 `request_gate_review`；设计
  * `2026-10-26_design_proof-gate-reviews.md` §5–§8、§12；客户追加要求）。
- * 契约：13 个 `main.gateReview.*` key 成对存在；gate 复核独立于最终验收
+ * 契约：14 个 `main.gateReview.*` key 成对存在；gate 复核独立于最终验收
  * （≠ 验收通过 ≠ 客户批准）；防吹毛求疵——gate fail 必须有 blocker/major，
- * 只有 minor/nit 的 fail 退回 Proof、不触发返工；pass 可带 minor/nit 备注。
+ * 只有 minor/nit 的 fail 退回 Proof、不触发返工；pass 可带 minor/nit 备注；
+ * flow 仍有在途工作（交付/轮次/回交）时 `flowBusy` 暂不派发：可重试、不是故障/gate 失败。
  * 占位符：dispatched/alreadyDispatched/gateNotFound/criteriaMissing/nitOnly =
  * {flowId}/{gateId}；flowIncomplete/unavailable/rejected/returnedToProof =
  * {flowId}/{gateId}/{detail}；passNote/reportMissing = {flowId}/{gateId}/{reportPath}；
- * failNote = {flowId}/{gateId}/{reportPath}/{severity}；reworkTask = {gateId}/{reportPath}/{severity}。
+ * failNote = {flowId}/{gateId}/{reportPath}/{severity}；reworkTask = {gateId}/{reportPath}/{severity}；
+ * flowBusy = 无。
  */
 const GATE_REVIEW_KEYS = [
   "main.gateReview.dispatched",
@@ -1699,6 +1701,7 @@ const GATE_REVIEW_KEYS = [
   "main.gateReview.gateNotFound",
   "main.gateReview.criteriaMissing",
   "main.gateReview.flowIncomplete",
+  "main.gateReview.flowBusy",
   "main.gateReview.unavailable",
   "main.gateReview.rejected",
   "main.gateReview.passNote",
@@ -1709,14 +1712,15 @@ const GATE_REVIEW_KEYS = [
   "main.gateReview.reworkTask",
 ] as const satisfies readonly MessageKey[];
 
-test("gate 复核 key：13 个 main.gateReview.* 在 zh-CN/en-US 均存在，占位符逐 key 一致且符合契约", () => {
-  assert.equal(GATE_REVIEW_KEYS.length, 13);
+test("gate 复核 key：14 个 main.gateReview.* 在 zh-CN/en-US 均存在，占位符逐 key 一致且符合契约", () => {
+  assert.equal(GATE_REVIEW_KEYS.length, 14);
   const expectedPlaceholders: Record<(typeof GATE_REVIEW_KEYS)[number], string[]> = {
     "main.gateReview.dispatched": ["flowId", "gateId"],
     "main.gateReview.alreadyDispatched": ["flowId", "gateId"],
     "main.gateReview.gateNotFound": ["flowId", "gateId"],
     "main.gateReview.criteriaMissing": ["flowId", "gateId"],
     "main.gateReview.flowIncomplete": ["detail", "flowId", "gateId"],
+    "main.gateReview.flowBusy": [],
     "main.gateReview.unavailable": ["detail", "flowId", "gateId"],
     "main.gateReview.rejected": ["detail", "flowId", "gateId"],
     "main.gateReview.passNote": ["flowId", "gateId", "reportPath"],
@@ -1734,7 +1738,7 @@ test("gate 复核 key：13 个 main.gateReview.* 在 zh-CN/en-US 均存在，占
   }
 });
 
-test("gate 复核 key：独立于最终验收、防吹毛求疵；en-US 不含中文", () => {
+test("gate 复核 key：独立于最终验收、防吹毛求疵、在途忙碌可重试；en-US 不含中文", () => {
   // gate 复核 ≠ 验收通过 ≠ 客户批准（dispatched），且 gate 通过后仍须最终客户验收。
   assert.ok(
     zhCN["main.gateReview.dispatched"].includes("gate 复核 ≠ 验收通过 ≠ 客户批准"),
@@ -1748,6 +1752,21 @@ test("gate 复核 key：独立于最终验收、防吹毛求疵；en-US 不含�
     enUS["main.gateReview.passNote"].includes("final customer acceptance is still required"),
     "en-US passNote 必须保留最终客户验收",
   );
+  // flow-busy：在途工作未结束 ⇒ gate 暂不派发；可重试、不是故障/gate 失败、结束后重试。
+  const flowBusyZh = zhCN["main.gateReview.flowBusy"];
+  assert.ok(flowBusyZh.includes("在途"), "zh-CN flowBusy 必须写明在途工作");
+  assert.ok(flowBusyZh.includes("暂不派发"), "zh-CN flowBusy 必须写明 gate 暂不派发");
+  assert.ok(flowBusyZh.includes("可重试"), "zh-CN flowBusy 必须写明可重试状态");
+  assert.ok(flowBusyZh.includes("不是故障"), "zh-CN flowBusy 必须写明不是故障");
+  assert.ok(flowBusyZh.includes("gate 失败"), "zh-CN flowBusy 必须写明不是 gate 失败");
+  assert.ok(flowBusyZh.includes("结束后重试"), "zh-CN flowBusy 必须写明在途结束后重试");
+  const flowBusyEn = enUS["main.gateReview.flowBusy"];
+  assert.ok(flowBusyEn.includes("in-flight"), "en-US flowBusy 必须写明在途工作");
+  assert.ok(flowBusyEn.includes("not dispatched"), "en-US flowBusy 必须写明 gate 暂不派发");
+  assert.ok(flowBusyEn.includes("retryable"), "en-US flowBusy 必须写明可重试状态");
+  assert.ok(flowBusyEn.includes("not a failure"), "en-US flowBusy 必须写明不是故障");
+  assert.ok(flowBusyEn.includes("gate failure"), "en-US flowBusy 必须写明不是 gate 失败");
+  assert.ok(flowBusyEn.includes("retry after"), "en-US flowBusy 必须写明在途结束后重试");
   // 防吹毛求疵：只有 minor/nit 的 fail 退回验收、不触发返工；失败依据必须是 blocker/major。
   assert.ok(zhCN["main.gateReview.nitOnly"].includes("blocker/major"), "zh-CN nitOnly 必须写明 blocker/major 依据");
   assert.ok(zhCN["main.gateReview.nitOnly"].includes("不触发返工"), "zh-CN nitOnly 必须写明不触发返工");
@@ -1766,7 +1785,15 @@ test("gate 复核 key：独立于最终验收、防吹毛求疵；en-US 不含�
   }
 });
 
-test("gate 复核 key：zh-CN/en-US 取值与插值（已提交/已通过/失败/退回/防吹毛求疵）", () => {
+test("gate 复核 key：zh-CN/en-US 取值与插值（已提交/已通过/失败/退回/在途忙碌/防吹毛求疵）", () => {
+  assert.equal(
+    translate("zh-CN", "main.gateReview.flowBusy"),
+    "流程仍有在途交付/轮次/回交，gate 暂不派发；这是可重试状态，不是故障或 gate 失败；请在在途工作结束后重试。",
+  );
+  assert.equal(
+    translate("en-US", "main.gateReview.flowBusy"),
+    "The flow still has in-flight deliveries, runs, or handbacks, so the gate is not dispatched yet; this is a retryable state, not a failure or a gate failure — retry after the in-flight work finishes.",
+  );
   assert.equal(
     translate("zh-CN", "main.gateReview.dispatched", {
       flowId: "flow-a",

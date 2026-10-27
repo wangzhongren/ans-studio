@@ -1220,12 +1220,13 @@ export function describeTool(name: string): ToolDescription {
         "**gate 复核 ≠ 验收通过 ≠ 客户批准**：`dispatched` 只表示已派 Proof，不代表 gate 已通过、不代表最终验收通过、不代表客户批准；" +
         "gate 结论只由 Proof 报告给出，运营不得自行宣告 gate 通过、不得代标 gate 步骤 done。" +
         "**gate fail 只按 blocker/major 判失败**：只有 minor/nit 的意见不构成返工依据（防吹毛求疵），作为非阻断备注记录即可。" +
-        "回执的 `ok` / `code` / `message` **原样如实转达**（`code` 如 `dispatched` / `already-dispatched` / `gate-not-found` / " +
+        "回执的 `ok` / `code` / `message` **原样如实转达**（`code` 如 `dispatched` / `already-dispatched` / `flow-busy` / `gate-not-found` / " +
         "`criteria-missing` / `flow-incomplete` / `unavailable` / `rejected`），**失败绝不伪装成功**；" +
+        "`flow-busy` 表示流程仍有在途工作（交付/轮次/回交），gate **暂不派发**、**可稍后重试**——不是故障、不是 gate 失败、不代表已派发；" +
         "本工具只校验参数形状并转达回执，**不写 flow/账本**（派发与记录由应用实现）。",
       promptGuidelines: [
         "只给运营使用：先核对 gate 的依赖步骤与证据是否齐备（齐不齐），再请求复核；**不要**自行判断 gate 是否达标、不要代写 gate 报告。",
-        "`gateId` 必填（如 gate-vertical-slice），`flowId` 省略＝当前流程；按回执的 `code`/`message` 如实向客户说明——非 `dispatched` 时不要宣称已派发、不要反复重试。",
+        "`gateId` 必填（如 gate-vertical-slice），`flowId` 省略＝当前流程；按回执的 `code`/`message` 如实向客户说明——非 `dispatched` 时不要宣称已派发；`flow-busy` 是流程在途、可稍后重试，不是故障也不是 gate 失败；其它失败不要无脑重复请求。",
         "gate 复核 ≠ 验收通过 ≠ 客户批准：`dispatched` 只表示已派 Proof；结论以 Proof 报告与 flow 步骤状态为准。",
         "gate 失败只按 blocker/major 判定；只有 minor/nit 不构成返工依据——不要为 nit 反复开启返工或重新请求。",
       ],

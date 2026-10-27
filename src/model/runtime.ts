@@ -1068,10 +1068,13 @@ export interface RequestGateReviewInput {
  * `request_gate_review` 的如实回执（形状冻结；工具层**原样**转达）。
  * `ok:true`＋`code:"dispatched"`＝应用已派 Proof 做 gate 复核——**不等于 gate 通过、不代表验收通过、
  * 不代表客户批准**；其余 code 为如实的未派发/已派发原因（`rejected`＝应用在派发前退回统筹）。
+ *
+ * **`flow-busy`（2026-10-27 客户要求）**：流程仍有在途工作（在途交付/轮次/回交等），gate **暂不派发**，
+ * 可稍后重试——这是**可重试的独立返回码**，不是故障、不是 gate 失败，也不代表已派发；`message` 必须带原因。
  */
 export interface RequestGateReviewResult {
   ok: boolean;
-  code: "dispatched" | "already-dispatched" | "gate-not-found" | "criteria-missing" | "flow-incomplete" | "unavailable" | "rejected";
+  code: "dispatched" | "already-dispatched" | "flow-busy" | "gate-not-found" | "criteria-missing" | "flow-incomplete" | "unavailable" | "rejected";
   message: string;
   flowId?: string;
   gateId?: string;

@@ -310,6 +310,14 @@
 // 不新增治理角色 / `FlowStepKind` / cardKind / 写权。`report_artifact_ready` 工具实现与应用自动派发文案
 // 由运行时核心 / 编排 / 桌面角色实施，本批只改卡文本与测试，未越界、未验证。
 //
+// 2026-10-27 gate 复核 `flow-busy`（lead-governance-coordination；门禁引擎任务）：客户要求——gate 复核
+// 遇到「流程仍有在途工作」返回**可重试**的 `flow-busy`（不是 `unavailable`）并告知原因；运营 / Convener
+// 收到后视为「暂时有在途交付 / 运行轮次 / 回交」，稍后重试，不得当 gate 失败 / 已派发 / 验收失败，不得
+// 反复刷请求；在途工作结束后再请求同一 gate。只改 `CONVENER_CARD_TEXT` 卡文本与测试；gate 独立性、
+// 不代批、不改状态等规则逐字保留；能力位、Section 1、预授权、禁写、内部 id / 显示名、工程基线、导出
+// 函数签名与判定逻辑零变化；不新增治理角色 / `FlowStepKind` / cardKind。运行时返回码实现由运行时核心 /
+// 编排 / 桌面角色负责，本批只改卡文本与测试，未越界、未验证。
+//
 // 本文件是 **trio 五人**（liaison / rapporteur / nominator / convener / verifier）角色卡文本、Section 1、
 // 预授权目录、禁写路径与能力的**唯一数据来源**；`su` 的旧常量从 `boundary-core.ts`
 // 以 live binding 再导出（`LEGACY_SU_CARD_TEXT` 等），single 模型行为逐字不变。
@@ -912,13 +920,14 @@ const CONVENER_CARD_TEXT = [
   "1. **脚手架后**：检查证据是否齐——安装 / `npm run typecheck` / 最小测试日志、应用能启动的记录（启动命令 / 访问地址 / 关键输出）；**不判断质量**；证据缺失退回补证，不派实现。",
   "2. **首个垂直切片 / 每个 delivery / 派下游前**：检查 gate 步骤是否存在、是否 `done`，证据清单（关 DEBUG 截图 / 运行输出 / 测试报告 / 性能数据）是否齐、路径是否有效；**不对画面 / 实现质量下结论**——质量判断只由 Proof 的 gate 复核做；证据缺失退回补证，gate 未 `done` 不派下游。",
   "3. **gate 证据完整性清单（机械检查）**：gate 的每个 `dependsOn` 步骤 `status: done` 且证据在账本可对账（`dispatch` → `dispatch.accepted{stepId}`；`artifact` → `artifact.observed{artifactPath}`；`customer-decision` → `customer.decision`）；最新 `docs/acceptance/<flowId>-criteria-vN.md` 含该 `gateId` 的 Gate 复核标准节；`visual-baseline` 需真实运行 / 演示证据步骤已 `done` 且证据索引路径存在（截图是否关闭 DEBUG 由 Proof 判定，你只查路径存在；只要求截图，不要求录屏）；`integration-performance` 需集成 / e2e（或 Reduce）步骤 `done` 且性能证据路径存在（内容判定归 Proof）；该 flow 无在途派发 / 回交 / 运行轮次。**不把「文件存在」当「内容合格」，也不把「运营自查」当 Proof 复核。**",
-  "4. **主动请求 gate 复核**：清单齐备后**完成即主动**调用 `request_gate_review({ flowId, gateId })` 请 Proof 独立复核——不等客户催办、不等产品转达；不得提前提交、不得用提交代替缺步骤 / 缺证据。gate 步骤的 `done` **只能由应用按 Proof 报告收口**：你不得用 `flow_step_update` 标 gate `done`（应用会以 `gate-review-required` 拒绝），也不得标 `dispatched` / `delivered` 等状态、不得代写 gate 报告（`docs/acceptance/**` 是你的禁写路径）。",
+  "4. **主动请求 gate 复核**：清单齐备后**完成即主动**调用 `request_gate_review({ flowId, gateId })` 请 Proof 独立复核——不等客户催办、不等产品转达；不得提前提交、不得用提交代替缺步骤 / 缺证据。gate 步骤的 `done` **只能由应用按 Proof 报告收口**：你不得用 `flow_step_update` 标 gate `done`（应用会以 `gate-review-required` 拒绝），也不得标 `dispatched` / `delivered` 等状态、不得代写 gate 报告（`docs/acceptance/**` 是你的禁写路径）。**若流程仍有在途交付 / 运行轮次 / 回交，应用会返回可重试的 `flow-busy`——稍后重试，不反复刷请求；在途工作结束后再请求同一 gate。**",
   "5. **回执处理（必须如实，不得伪造 / 绕过 / 当成功）**：",
   "- `dispatched`：如实记录 / 汇报「已提交 gate 复核」——**不等于通过**；等应用的 gate 结果，不重复提交。",
   "- `already-dispatched`：不重复提交；用 `flow_get` 核对——gate 步骤 `done` ⇒ 已通过；否则在途，等待。",
+  "- `flow-busy`：**可重试**——表示流程仍有在途交付 / 运行轮次 / 回交，gate 复核暂不受理（**不是 `unavailable`、不是 gate 失败、不是已派发、不是验收失败**）；按 `message` 了解原因，**稍后重试**，不得反复刷请求；等在途工作结束后再 `request_gate_review` 同一 gate，不据此标 gate `done` / `failed` / `delivered`、不代批、不改 flow 状态。",
   "- `gate-not-found`：核对 flow YAML 与 gate step id（必须是含合法 `gateKind` 的 `gate-*` 步骤）；修正 / 新建 gate（新 id；旧 gate 用 `flow_step_supersede`）后重交。",
   "- `criteria-missing`：通知 Proof 补 / 递增 criteria 的 Gate 复核标准节（**你不写 `docs/acceptance/**`**），补齐后重交。",
-  "- `flow-incomplete`：按 `message` 补齐前置 / 证据（依赖未 `done`、账本对不上、证据路径缺失、有在途工作）；不得提前提交、不得用提交代替缺步骤。",
+  "- `flow-incomplete`：按 `message` 补齐前置 / 证据（依赖未 `done`、账本对不上、证据路径缺失）；不得提前提交、不得用提交代替缺步骤；在途工作属 `flow-busy`，按该条稍后重试。",
   "- `unavailable`：如实说明「通道不可用 / 可能已派发，以 `flow_get` 核对为准」；不绕过、不自己判、不伪造通过、不盲目重复请求。",
   "- `rejected`：按 `message` 区分「gate 已 `done` / 已 `superseded` / 返工未完成 / 状态异常」；协调修复后重交，不原样死循环。",
   "6. **gate 失败后协调返工**：gate `fail` / `conditional` 含 `blocker` / `major` 时，应用按返工路由把 gate 报告交你；你按既有返工门禁建返工步骤（`flow_step_supersede` / 新版本步骤），任务带 gate 报告的 severity / reason / targets；`minor` / `nit` 标非阻断、可选后续；**只有 `minor` / `nit` 的 fail 是结构不符，应用退回 Proof 补报告、不触发返工**；返工完成后重新 `request_gate_review` 同一 gate（应用不自动重判、不自动放行）。",

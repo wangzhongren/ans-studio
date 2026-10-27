@@ -3177,6 +3177,7 @@ function makeRequestAcceptanceTool(fn: RequestAcceptanceFn): ExecutableTool {
 const REQUEST_GATE_REVIEW_CODES: readonly RequestGateReviewResult["code"][] = Object.freeze([
   "dispatched",
   "already-dispatched",
+  "flow-busy",
   "gate-not-found",
   "criteria-missing",
   "flow-incomplete",
@@ -3229,6 +3230,18 @@ function requestGateReviewResultMessage(name: string, value: unknown): ToolResul
   if (typeof receipt.gateId === "string" && receipt.gateId !== "") parts.push(`gateId=${receipt.gateId}`);
   if (typeof receipt.runtime === "string" && receipt.runtime.length > 0) parts.push(`runtime=${receipt.runtime}`);
   const detail = `（${parts.join("；")}）：${receipt.message}`;
+  // `flow-busy`（2026-10-27 客户要求）：流程仍有在途工作⇒gate 暂不派发——**可稍后重试**的独立状态。
+  // 无论应用把 ok 写成什么，都不得当作成功/已派发（防止矛盾回执伪造成功）。
+  if (receipt.code === "flow-busy") {
+    return {
+      ok: false,
+      message:
+        `${name}：流程仍有在途工作（交付/轮次/回交），gate **暂不派发**${detail}——` +
+        `这是**可重试**的独立状态：**不是故障、不是 gate 失败**，也**不要当已派发**；` +
+        `请等当前在途工作结束后**稍后重试**，并如实告知客户；不要据此判断 gate 通过或失败。` +
+        (receipt.ok ? `（应用回执 ok=true 与 flow-busy 矛盾，按“暂未派发”处理，不视为成功。）` : ""),
+    };
+  }
   if (receipt.ok) {
     const headline = receipt.code === "dispatched" ? "gate 复核已派发（已请 Proof 独立复核）" : "请求已受理";
     return {

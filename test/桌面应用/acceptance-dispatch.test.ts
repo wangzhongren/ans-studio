@@ -4986,6 +4986,99 @@ test("2026-10-26 request_gate_review：派发成功（任务自足/账本 dispat
   }
 });
 
+test("2026-10-27 request_gate_review：flow 有在途工作 ⇒ flow-busy（可重试、原因可见），不写 gate 记录/账本；在途结束后重试正常派发", async () => {
+  const root = makeTempProjectRoot("ans-gate-flow-busy-");
+  const flowId = "flow-gate-busy";
+  try {
+    // gate 流程 + 一个可派发步骤（制造该 flow 的在途交付）。
+    writeFlowStateFile(
+      root,
+      flowId,
+      flowStateYaml(flowId, [
+        ...gateFlowSteps(flowId),
+        { id: "impl", kind: "dispatch", status: "pending", owner: "executor" },
+      ]),
+    );
+    writeGateCriteria(root, flowId);
+    await seedGateLedger(root, flowId);
+    await appendLedger(root, [
+      {
+        kind: "customer.decision",
+        flowId,
+        decisionKind: "proposal-accept",
+        customerDecision: "accepted",
+        actorRoleId: "rapporteur",
+        power: "proposal",
+      },
+      {
+        kind: "customer.decision",
+        flowId,
+        decisionKind: "appointment",
+        customerDecision: "appointed",
+        actorRoleId: "nominator",
+        power: "nomination",
+        targetRoleIds: ["executor"],
+      },
+    ]);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      const dispatch = harness.openInputs.get("convener")?.dispatchTask;
+      assert.ok(dispatch, "convener 会话应注入 dispatchTask");
+      const receipt = await dispatch({ roleId: "executor", task: "实现 impl 步骤", flowId, stepId: "impl" });
+      assert.equal(receipt?.ok, true, receipt?.message ?? "派发应受理");
+      await waitFor(() => harness.controls.has("executor"), 3000);
+
+      const requestGateReview = requestGateReviewOf(harness);
+      const busy = await requestGateReview({ flowId, gateId: GATE_STEP_ID });
+      assert.equal(busy.ok, false, "在途不派发");
+      assert.equal(busy.code, "flow-busy", "在途 ⇒ 可重试 flow-busy（不是 unavailable）");
+      assert.equal(busy.flowId, flowId);
+      assert.equal(busy.gateId, GATE_STEP_ID);
+      // 原因必须直接给运营（不只 code；文案来自 PM `main.gateReview.flowBusy`，身份由回执字段携带）。
+      assert.ok(
+        busy.message.length > 0,
+        "message 必须给出可见原因（不能只有 code）",
+      );
+      for (const needle of ["在途", "重试", "不是故障"]) {
+        assert.ok(busy.message.includes(needle), `原因须含「${needle}」：${busy.message}`);
+      }
+      // flow-busy 是“暂不派发”，零副作用：不写 gate 记录/审计、不派任务。
+      assert.equal(existsSync(gateRecordAbsPath(root, flowId)), false, "flow-busy 不写 gate 记录");
+      assert.equal(gateTaskSends(harness).length, 0, "flow-busy 不派 gate 复核任务");
+      const ledgerAfterBusy = await readGovernanceLedger(root);
+      assert.equal(
+        ledgerAfterBusy.entries.some((entry) => entry.kind === "gate.review" && entry.flowId === flowId),
+        false,
+        "flow-busy 不写 gate.review 审计",
+      );
+      assert.equal(
+        ledgerAfterBusy.entries.some(
+          (entry) => entry.kind === "dispatch.accepted" && entry.flowId === flowId && entry.stepId === GATE_STEP_ID,
+        ),
+        false,
+        "flow-busy 不写 gate 派发账本",
+      );
+
+      // 在途结束后重试 ⇒ 正常派发（可重试语义成立）。
+      harness.controls.get("executor")?.settle();
+      let retried: import("../../src/model/runtime.ts").RequestGateReviewResult | undefined;
+      await waitForAsync(async () => {
+        const probe = await requestGateReview({ flowId, gateId: GATE_STEP_ID });
+        if (probe.code === "flow-busy") return false;
+        retried = probe;
+        return true;
+      }, 5000);
+      assert.equal(retried?.code, "dispatched", retried?.message ?? "在途结束后重试应派发");
+      assert.equal(gateTaskSends(harness).length, 1, "重试派发恰一条 gate 复核任务");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("2026-10-26 request_gate_review：flow/gate/状态校验矩阵（归一、gate-not-found、done/superseded、criteria-missing、flow-incomplete、runtime）", async () => {
   const root = makeTempProjectRoot("ans-gate-request-matrix-");
   try {

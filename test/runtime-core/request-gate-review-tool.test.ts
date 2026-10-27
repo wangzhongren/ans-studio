@@ -80,6 +80,8 @@ test("注入后注册 request_gate_review；参数 gateId 必填 slug，flowId/n
     /原样如实转达/,
     /不写 flow\/账本/,
     /绝不伪装成功/,
+    /flow-busy/,
+    /可稍后重试/,
   ]) {
     assert.match(description, need);
   }
@@ -194,6 +196,41 @@ test("回执原样转达 ok/code/message（成功不夸大、失败不伪装、�
   assert.match(alreadyResult.message, /同 flow revision 已派发/);
 });
 
+test("flow-busy：可重试的独立返回码——暂不派发、不是故障/gate 失败、原因原样可见、不伪造 dispatched", async () => {
+  const receipt: RequestGateReviewResult = {
+    ok: false,
+    code: "flow-busy",
+    flowId: "flow-a",
+    gateId: "gate-vertical-slice",
+    message: "流程仍有在途交付：delivery-engine-core 轮次运行中",
+  };
+  const tool = toolMap({ requestGateReview: async () => receipt }).get(REQUEST_GATE_REVIEW_TOOL_NAME)!;
+  const result = await tool.handler(call({ gateId: "gate-vertical-slice", flowId: "flow-a" }));
+  assert.equal(result.ok, false, "flow-busy 不得回执成功");
+  assert.match(result.message, /code=flow-busy/);
+  assert.match(result.message, /流程仍有在途工作（交付\/轮次\/回交）/);
+  assert.match(result.message, /暂不派发/);
+  assert.match(result.message, /可重试/);
+  assert.match(result.message, /不是故障/);
+  assert.match(result.message, /不是 gate 失败/);
+  assert.match(result.message, /不要当已派发/);
+  assert.ok(result.message.includes(receipt.message), "回执 message（原因）必须原样可见");
+  assert.match(result.message, /flowId=flow-a/);
+  assert.match(result.message, /gateId=gate-vertical-slice/);
+  assert.doesNotMatch(result.message, /gate 复核已派发/, "flow-busy 不得说成已派发");
+  assert.doesNotMatch(result.message, /请求已受理/, "flow-busy 不得说成已受理");
+
+  // 矛盾回执（ok:true + flow-busy）不得伪造成功/已派发。
+  const contradictory = toolMap({
+    requestGateReview: async () => ({ ok: true, code: "flow-busy", message: "流程在途" }),
+  }).get(REQUEST_GATE_REVIEW_TOOL_NAME)!;
+  const contradiction = await contradictory.handler(call({ gateId: "gate-vertical-slice" }));
+  assert.equal(contradiction.ok, false, "ok:true + flow-busy 按未派发处理，不视为成功");
+  assert.match(contradiction.message, /ok=true 与 flow-busy 矛盾/);
+  assert.match(contradiction.message, /暂未派发/);
+  assert.doesNotMatch(contradiction.message, /gate 复核已派发|请求已受理/);
+});
+
 test("有界超时回执：ok:false + unavailable 不伪装成功；提示 flow_get 核对", async () => {
   const timeoutReceipt: RequestGateReviewResult = {
     ok: false,
@@ -231,6 +268,9 @@ test("能力抛错 / 契约外回执（含看似通过的未知 code）⇒ fail-
     { ok: true, code: "passed", message: "x" },
     { ok: true, code: "done", message: "x" },
     { ok: true, code: "unknown-code", message: "x" },
+    // 形近但非契约码（flow_busy / FLOW-BUSY）同样 fail-closed，不得被猜成 flow-busy。
+    { ok: false, code: "flow_busy", message: "x" },
+    { ok: false, code: "FLOW-BUSY", message: "x" },
     { ok: true, code: "dispatched", message: "" },
     { ok: true, code: "dispatched" },
   ];

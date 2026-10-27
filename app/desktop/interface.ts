@@ -6733,6 +6733,17 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     return undefined;
   };
 
+  /**
+   * **gate 在途 = 可重试 `flow-busy`**（2026-10-27 客户规则）：gate 复核因该 flow 仍有在途交付/轮次/回交
+   * 未派发时，回执必须是可重试语义——**不是故障，也不是 gate 复核失败**；原因直接给运营看到。
+   *
+   * 契约：运行时核心 `RequestGateReviewResult["code"]` 与 Provider 冻结 code 集已含 `flow-busy`；
+   * Provider 对该 code 有专门转达（可重试、不是故障/gate 失败、不要当已派发）。文案单一来源＝PM
+   * `main.gateReview.flowBusy`（zh-CN/en-US 已落地；{flowId}/{gateId} 供模板未来加占位时使用）。
+   */
+  const gateReviewFlowBusyMessage = (flowId: string, gateId: string): string =>
+    mainT("main.gateReview.flowBusy", { flowId, gateId });
+
   const performRequestGateReview = async (
     projectRoot: string,
     flowId: string,
@@ -6944,13 +6955,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       return result("flow-incomplete", mainT("main.gateReview.flowIncomplete", { flowId, gateId, detail: kindIssue }));
     }
 
-    // 9) 在途工作：该 flow 仍有派发/回交/运行轮次 ⇒ unavailable（不抢跑）。
+    // 9) 在途工作：该 flow 仍有派发/回交/运行轮次 ⇒ flow-busy（可重试；不抢跑）。
+    //    2026-10-27 客户规则：这不是故障、也不是 gate 失败；原因必须直接给运营，不得只说 unavailable。
     if (manager.hasActiveWorkForFlow(projectRoot, flowId)) {
-      return result("unavailable", mainT("main.gateReview.unavailable", {
-        flowId,
-        gateId,
-        detail: "该流程仍有在途工作；本次未派发 gate 复核，请稍后重试",
-      }));
+      return result("flow-busy", gateReviewFlowBusyMessage(flowId, gateId));
     }
 
     // 10) 引擎解析：无法确定 ⇒ unavailable（绝不回退桌面默认引擎）。
