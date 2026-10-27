@@ -26,6 +26,29 @@ export const GOVERNANCE_JUDGE_FACT_ARRAY_LIMIT = 50;
 export const GOVERNANCE_JUDGE_LATEST_DECISIONS_LIMIT = 20;
 
 /**
+ * 提案卡的「需求变更申请」指引（2026-10-26 客户要求 + 同日客户纠正/补充；**提示词文案的单一来源**，
+ * 本模块只导出常量，不参与事实提炼/裁决，也不改变任何机械权限）。
+ *
+ * 背景：Draft / 报告员需要新的客户授权/范围（或约束/成本变化）时，不得把未获授权的诉求塞进提案卡
+ * 「顺带获批」；正确通道是先发 `request_requirement_change`，进入**独立审批**：审批卡由统筹
+ * （Convener/Steward）或提案角色（Rapporteur/Draft）发起的 `cardKind="decision"` 决策卡承载；
+ * 审批人是独立判断 agent（客户勾选「替我决策」时按卡内唯一推荐项代批）或客户本人（未勾选时手选）；
+ * **发起方不得自批**；主理（Lead）不审批，只在批准后执行意图变更（更新 `docs/intents/**`），Draft
+ * 再修订提案。申请 ≠ 授权：申请提交/受理/意图文件已改都不解锁任何门禁。
+ *
+ * 判断 agent 的机械权限不变：decision 组仍只能 approve 或 manual（**不得 deny**），approval 组仍
+ * 只能 deny/manual；判断 agent 不能在提案卡上代批任何新授权。这类提案卡一律不得 approve：
+ * decision 组 ⇒ manual/intent-drift，理由必须指向专用通道，并说明不得通过代批或删除需求绕过。
+ */
+export const GOVERNANCE_JUDGE_REQUIREMENT_CHANGE_GUIDANCE =
+  "提案卡若包含**未获意图授权**的新联网/外部目录访问/范围扩张/成本授权（或其它新授权诉求），一律不得 approve：" +
+  "decision 组不能 deny ⇒ manual（reasonCode 用 intent-drift；approval 组写卡夹带同类诉求 ⇒ deny）。" +
+  "reason 必须写明：「Draft 应先发 request_requirement_change；需求变更审批卡由运营（Convener）或策划角色" +
+  "（Rapporteur）发起，发起方不得自批；审批由独立判断 agent（客户勾选「替我决策」时按卡内唯一推荐项代批）" +
+  "或客户本人（未勾选时手动选择）完成；产品不审批，只在批准后执行意图变更；不得通过在提案卡上代批或" +
+  "将需求删掉绕过」——申请 ≠ 客户批准，也不是产品批准；提案卡上判断 agent 不能代批任何新授权。";
+
+/**
  * 治理 flowId 形状（**单一来源**：运行时核心 `src/model/runtime.ts` 的 `GOVERNANCE_SLUG_PATTERN`；
  * 2026-10-22 收紧为禁止首/尾连字符）。本地只编译判定用 RegExp，不保留同值副本。
  */

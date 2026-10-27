@@ -79,7 +79,7 @@ test("B1 纯逻辑 en-US：状态/角色/工作概览/确认/治理/设置", () 
 
   assert.equal(roleDisplayName(null, "en-US"), "No role selected");
   const lead = governanceView("liaison", "en-US");
-  assert.equal(lead?.name, "Lead");
+  assert.equal(lead?.name, "Product");
   assert.equal(lead?.power, "Customer communication · no final approval power");
   assert.equal(lead?.builtinNote, "Built-in role: shipped with the app, no role directory");
   assert.equal(
@@ -239,7 +239,7 @@ test("B2 纯逻辑 en-US：报告/文档/工具/推理/操作者/判断/事件",
   assert.equal(shellConfirmTitle("project", "A", "en-US"), "shell command request");
   assert.equal(
     shellConfirmTitle("su-approval", "verifier", "en-US"),
-    "Command approval · Proof",
+    "Command approval · QA",
   );
   const overflow = governanceJudgeResultView(
     {

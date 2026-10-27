@@ -4,6 +4,7 @@
 - 角色：桌面窗口
 - 依据：客户 2026-10-26 追加授权实现 `request_gate_review`；设计 `角色卡/项目管理/docs/design/2026-10-26_design_proof-gate-reviews.md` §5.3–§8、§9.3、§10（A3/A4/A6/A7/A8）；客户追加要求：gate 复核独立于最终验收、防吹毛求疵（fail 必须有 blocker/major；只有 minor/nit 的 fail 退回 Proof、不返工；pass 可带 minor/nit）。
 - 状态：实现完成，桌面套件全绿；**未独立验收、未运行真实 Electron e2e、未 commit/push、未重启应用**（代码改动下次启动生效）。
+- 后续修正（2026-10-27）：投递超时对账（缺省总/阶段 45s）、账本失败不翻转回执、以及“有 pass 报告但缺 gate 记录”的恢复扫描，见[修复记录](../fix/2026-10-27_fix_gate-review-timeout-and-recovery.md)。
 
 ## 一、范围与写集
 

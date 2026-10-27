@@ -1,0 +1,28 @@
+PASS  created:true — {"ok":true,"created":true,"revision":"b92cef71e2bcad44a83eb270dca0189746c9214d520ba47a74120390af3e21e2"}
+PASS  revision=sha256(bytes)
+PASS  parseFlowStateYaml ok
+PASS  八步 owner/kind/status/dependsOn 与设计一致 — [["contract-freeze","artifact","rapporteur","pending",[]],["team-plan","artifact","convener","pending",["contract-freeze"]],["appointment","customer-decision","convener","pending",["team-plan"]],["role-cards","dispatch","nominator","pending",["appointment"]],["role-readiness","artifact","convener","pending",["role-cards"]],["acceptance-criteria","artifact","verifier","pending",["role-readiness"]],["change-package","artifact","convener","pending",["acceptance-criteria"]],["verification","acceptance","app","pending",[]]]
+PASS  顶层 status=skeleton
+PASS  version=1 / qualityTier 原样
+PASS  无项目交付步骤/gate/build-scaffold
+PASS  不创建 .ans
+PASS  docs 下仅 flows
+PASS  二次调用 created:false 且字节不变
+PASS  完整流程不覆盖
+PASS  非法 YAML 不覆盖
+PASS  非法输入拒绝 "../evil"/production
+PASS  非法输入拒绝 "Flow-A"/production
+PASS  非法输入拒绝 "probe-b"/fast
+PASS  非法输入拒绝 "probe-b"/production
+PASS  非法输入零落盘
+PASS  同进程并发恰一 created
+PASS  并发后文件可解析
+PASS  替换后完整流程可解析（含项目角色/交付/gate、contract-freeze 证据、无 status）
+PASS  替换后无 status: skeleton
+PASS  contract-freeze 证据保留
+PASS  release-only 校验不误拦骨架替换（双方均非 release） — {"ok":true}
+PASS  骨架文案：识别 skeleton + 一次性替换 + 保留证据 + 去掉 skeleton + 不要求初始创建
+PASS  完整 flow 文案：既有 flow 工具推进、无 skeleton 字样
+PASS  无 flow 文案：初始创建、无 skeleton 字样
+
+26/26 probes passed

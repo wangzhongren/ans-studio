@@ -96,9 +96,9 @@
 | **名称与用途** | 为应用、会话、工具、审核和回交提供同一条可追溯的本地诊断链，避免各角色自造存储/清理规则。 |
 | **代码与公共入口** | `src/common/shared/diagnostics.ts`：`configureDiagnostics`、`createDiagnosticLogger`、`getDiagnosticsStatus`、`flushDiagnostics`、`disposeDiagnostics`；常量 `DIAGNOSTIC_RETENTION_MS=86400000`。 |
 | **属主与消费方** | **项目管理**维护实现和专属测试。桌面 main 初始化目录；桌面、编排、Pi适配器只读消费 logger。消费者已接线并完成独立组合验证。 |
-| **契约与示例** | `createDiagnosticLogger({component:'session',roleId:'A'}).record('send.start',{turnId:'t1'})`；未配置时 no-op。元数据（落盘白名单，2026-10-16 起含 `timeoutMs`）JSONL 串行落盘，未知字段丢弃、凭据净化；命令原文/argv/prompt 等正文依设计契约禁入。异常用 `.error(event,error,fields)`。IO失败通过 status.lastError 如实反馈，不让业务抛错。 |
+| **契约与示例** | `createDiagnosticLogger({component:'session',roleId:'A'}).record('send.start',{turnId:'t1'})`；未配置时 no-op。元数据（落盘白名单，2026-10-16 起含 `timeoutMs`，2026-10-27 起含 `mimeType`/`bytes` 并做字段级校验）JSONL 串行落盘，未知字段丢弃、凭据净化；命令原文/argv/prompt、图片字节/base64/`data:` URL 等正文依设计契约禁入。异常用 `.error(event,error,fields)`。IO失败通过 status.lastError 如实反馈，不让业务抛错。 |
 | **留存与目录** | 桌面目录 `app.getPath('userData')/ans/diagnostics`。记录按时间滚动保留24小时，启动清理、写入检查维护期限、每分钟维护清理；扫描最多每分钟一次，避免每条记录扫描整天日志。只处理本模块诊断文件，不修改会话历史、治理审计或用户文件。维护 timer 不阻止正常退出。 |
-| **测试与影响** | `test/项目管理/shared/diagnostics.test.ts` 9/9：精确过期边界、维护自动清理、有序追加、白名单元数据（`timeoutMs` 落盘、非有限数值丢弃、正文摘要 `excerpt` 不入）、敏感字段净化、IO失败及正常退出。共享接口变动需重跑桌面/编排/Pi消费方；不记录 prompt、源码、原始工具/API正文。依据[统一方案](../design/2026-10-13_design_runtime-diagnostics-and-reporting.md)。 |
+| **测试与影响** | `test/项目管理/shared/diagnostics.test.ts` 10/10：精确过期边界、维护自动清理、有序追加、白名单元数据（`timeoutMs` 落盘、非有限数值丢弃、正文摘要 `excerpt` 不入）、`view_image` 审计字段（`mimeType`/`bytes`/`mode` 落盘，非法 MIME、负数字节、图片 base64/`data:` URL 丢弃）、敏感字段净化、IO失败及正常退出。共享接口变动需重跑桌面/编排/Pi消费方；不记录 prompt、源码、原始工具/API正文。依据[统一方案](../design/2026-10-13_design_runtime-diagnostics-and-reporting.md)。 |
 
 ## 组件 8：运行时设置目录（`runtime-settings`）
 
@@ -119,6 +119,8 @@
 ---
 
 ## 变更（本文件）
+
+- 2026-10-27：组件 7 `diagnostics` 落盘白名单增列 **`mimeType`/`bytes`**（`view_image` 审计事实；运行时核心反馈二者此前被白名单丢弃，实际只落 path/ok/mode/reasonCode/turnId）。新增**字段级校验**：`mimeType` 仅接受标准 MIME token（拒绝 data URL/base64/带参数/控制字符），`bytes` 仅接受有限非负整数；图片内容（base64/`data:` URL）仍不入白名单。交付方式 `mode`（delivery）已在白名单，无需变更。测试 `test/项目管理/shared/diagnostics.test.ts` **9→10**（新增 view_image 字段落盘与泄漏防护例）；本组 210/205/0/5；`npm run typecheck` 0 错。未改运行时/适配器/桌面/门禁代码，未 commit。
 
 - 2026-10-23：**组件 8 `runtime-settings` / 组件 3 `runtime-shared` 完成 i18n B4 key 化**（客户闸门 0/1/2 确认与实施授权；方案 §4.9/§7.1 B4、团队计划 §4.3/§5 I8）。`RuntimeSettingField` 的 `label/help/choiceLabels` → `labelKey/helpKey/choiceLabelKeys`（`MessageKey` 类型，编译期校验）；机器语义/字段集/顺序零变化（迁移前快照锁定）。`RUNTIME_LABELS.demo` `"演示"` → 语言中性 `"demo"`，新增 `RUNTIME_LABEL_KEYS`（demo → `shared.runtimeSettings.runtime.demo`，品牌名 `null`）。主进程 B4 解析职责与渲染层不变契约见 [实现报告](../../api-spec.md)。本组 181/176/0/5；`npm run typecheck` 19 处消费方旧字段错误待桌面窗口/测试角色 B4 接线消除（本批未改 `app/**`）。详见[变更记录](../change/2026-10-23_change_i18n-b4-metadata.md)。
 

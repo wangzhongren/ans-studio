@@ -1,5 +1,34 @@
 # 编排 变更记录
 
+## 2026-10-26 — 意图交接时由应用创建通用流程骨架（`ensureFlowSkeleton`，幂等、不覆盖）
+
+**来源**：客户反馈「意图确认/交接后、提案/团队计划前 `flow_get` 报 not-found，角色无法登记 contract-freeze」。裁定：应用在**意图交接成功后、报告员开始前**按 intent 的 flowId 自动创建 `docs/flows/<flowId>.yaml` 的**通用骨架**（顶层 `status: skeleton`）；不新增 `FlowStepKind`、不预设项目角色/交付步骤。本批只改编排 `common/编排` 与应用侧公共出口，未改 `app/**`、`src/model/**`、`src/provider/**`、门禁引擎、共享 i18n；未 commit/push、未重启运行中的应用、未碰 `.claude/` 与 `demos/`。
+
+**改了什么**
+- `flow-service.ts` 新增骨架段：`FLOW_SKELETON_STATUS="skeleton"`、`buildFlowSkeletonSteps()`（八步全部 `pending`：contract-freeze/artifact/rapporteur → team-plan/artifact/convener → appointment/customer-decision/convener → role-cards/dispatch/nominator → role-readiness/artifact/convener → acceptance-criteria/artifact/verifier → change-package/artifact/convener → verification/acceptance/app；`dependsOn` 只表达标准顺序）、`ensureFlowSkeleton({projectRoot,flowId,qualityTier})`。
+- `ensureFlowSkeleton` 语义：**已存在任何文件（骨架/完整流程/非法 YAML）⇒ `{ok:true,created:false}` 绝不覆盖**；存在性检查在 **per-project 串行队列**内（与 flow-service/应用专用收口同一队列，同进程并发恰一个 `created:true`）；不存在 ⇒ 候选过 `parseFlowStateYaml` 后 `mkdir -p` + 共享 `atomicWrite`（失败不触碰目标、不抛）；非法输入（projectRoot/flowId/qualityTier）fail-closed 且零落盘；不写账本/客户决定/.ans。
+- `govern-session.ts` 公共出口薄再导出 `ensureFlowSkeleton`/`FLOW_SKELETON_STATUS`/`EnsureFlowSkeletonInput`/`EnsureFlowSkeletonResult`，W6-A 块补 `parseIntentFrontmatter`（桌面取意图 flowId/qualityTier）；`buildFlowSkeletonSteps` 不经公共出口暴露。
+- `govern-session.ts::STANDARD_WORKFLOW_PROMPT` 补「**流程骨架与一次性替换（2026-10-26）**」一句（与门禁引擎运营卡同节成对，两处物理副本注释互指）：应用可能已建 `status: skeleton` 通用骨架；运营 / Steward 写团队计划后用一次 `cardKind=schedule-write` **一次性替换**为完整流程（含项目角色、交付步骤与 gate；保留 contract-freeze 证据）；无骨架时同一确认初始创建；替换后改用 flow 工具，其他角色不得直接写流程 YAML。不改变任何门禁判定。
+
+**测试**：`test/编排/flow-service.test.ts` 新增 5 例（创建形状/revision=文件 sha256/不含 delivery-/gate；骨架、完整流程、非法 YAML 均不覆盖；三类非法输入零落盘；目标被目录占用或 `docs/flows` 为文件时明确失败且不破坏现场；并发恰一个 created）；`test/编排/governance-session.test.ts` 标准工作流用例补 4 条提示断言（trio 五职能 + single/su 均须含骨架/一次性替换；不成对即红）。定向 `flow-service.test.ts` + `flow-state.test.ts` **153 计/152 过/0 红/1 skipped**；`governance-session.test.ts` **39/39**；`test/编排/**` **1021 计/1019 过/1 红/1 skipped**（唯一红＝既有 Windows symlink EPERM）；`npm run typecheck` **exit 0**。
+
+**跨角色待办**：① 桌面窗口已按本契约在 `app/desktop/session.ts::ensureIntentFlowSkeleton` 在途接线（未由本批修改）；其 `interface.ts` 用字面量 `"skeleton"` 识别骨架，建议改从公共出口只读导入 `FLOW_SKELETON_STATUS` 防漂移；② 运营 / Steward 写团队计划后用一次 `schedule-write` 把骨架替换为完整流程（保留 contract-freeze 证据）；③ 跨角色 e2e 与独立验收未做。**残余风险**：存在性检查与 rename 之间为 check-then-rename——同进程已串行化，跨进程同窗口创建同一 flow 时仍可能被覆盖（正常路径不触发；绝对保证需 `src/common/shared/` 的 no-clobber 原语）。详见[变更记录](docs/change/2026-10-26_change_intent-flow-skeleton.md)。
+
+## 2026-10-26 — `request_requirement_change` 接入编排（报告员/统筹）+ 判断 agent 需求变更指引
+
+**来源**：客户 2026-10-26 要求 + 同日纠正/补充（经主控任务转达；PM 规则 §二.15 与共享 i18n 已登记）。Draft / 报告员需要新授权/范围（联网、外部目录/仓库、范围、验收/技术标准、成本）时，不得写进提案卡「顺带获批」，应发 `request_requirement_change`。**需求变更审批卡由统筹（Convener）或提案角色（Rapporteur）发起**（decision 卡；发起方不得自批）；**审批人只有独立判断 agent（勾选「替我决策」时按唯一推荐项代批）或客户（未勾选时手选）**；**主理不审批，只在批准后执行意图变更**；**申请 ≠ 客户批准 ≠ 意图已变更**；不得删需求绕过闸门 0。本批只改编排注入面、decision 卡白名单/共享校验与 judge 文案，未改 `src/model/**`、`src/provider/**`、`app/**`、i18n、门禁卡，未新增 cardKind/FlowStepKind；未 commit/push、未重启应用、未碰 `demos/`。
+
+**改了什么**
+- `run-role.ts`：`AdapterCapabilities` 与 `openRoleSession` 输入新增可选 `requestRequirementChange?: RequestRequirementChangeFn`（类型单一来源＝契约家 `model/runtime.ts`，字段名逐字）；注入判据 **只给内置治理角色中的报告员 Rapporteur 与统筹 Convener**（其他内置角色、single 模型的旧 su、主理、Crew/Proof 与项目角色即便误给也不注入；工具结构性不注册）；未提供 ⇒ 字段缺席、工具不注册。`createRuntimeAdapterFactory` 同名显式透传 → Service `...options` → `buildGovernedTools`。`TRIO_CARD_KINDS.rapporteur` 增 `"decision"`（**仅限需求变更审批**；convener 原有 `"decision"` 保持）；拒绝文案同步为「统筹/Steward 或提案角色/Draft 发起」。本层**纯透传**（意图校验/去重/派发/账本/系统行由应用能力实现），**不改变** `requestClarification`/`handOffIntent`/`viewImage` 等既有能力矩阵。
+- `decision-card.ts`：允许发起 decision 卡的角色收敛为 `DECISION_CARD_ALLOWED_ROLES = ["convener", "rapporteur"]`（其他内置/项目角色仍 fail-closed）；「rapporteur 仅需求变更用途」由 judge 指引/角色纪律约束（运行时契约无用途字段，机械上限只到角色）。
+- `governance-judge-facts.ts`：新增并导出文案常量 `GOVERNANCE_JUDGE_REQUIREMENT_CHANGE_GUIDANCE`（**只作文案单一来源，不参与事实提炼/裁决**）：提案卡若含**未获意图授权**的新联网/外部目录/范围/成本授权 ⇒ 不得 approve；decision 组不能 deny ⇒ **manual/intent-drift**（approval 组夹带 ⇒ deny）；reason 必须写明「Draft 应先发 request_requirement_change；需求变更审批卡由统筹（Convener）或提案角色（Rapporteur）发起，发起方不得自批；审批由独立判断 agent（勾选「替我决策」时按唯一推荐项代批）或客户（未勾选时手选）完成；主理不审批，只在批准后执行意图变更；不得通过在提案卡上代批或将需求删掉绕过」。文案不再写「主理改意图 + intent-confirm 作为审批」。
+- `governance-judge-prompt.ts`：系统提示新增「【提案卡与需求变更申请（2026-10-26 客户要求）】」节并逐字引用上述常量；decision rubric 由「仅统筹可发」改为「统筹/Steward 发起；报告员 Rapporteur 仅可为需求变更审批发起，发起方不得自批」；在「不判断（明确排除）」节补一句「未授权新授权属于意图漂移，不属工程质量/证据充分性排除项」。**机械权限零变化**（decision 组仍不得 deny、approval 组 deny 规则不变；`governance-judge-verdict.ts` 判定未改；`GovernanceJudgeFacts` 无新字段）。
+- 新增 `test/编排/request-requirement-change.test.ts` **5 例**（rapporteur 提供 ⇒ 同引用/工具注册/载荷原样路由/回执如实；convener 同样注入；未提供 ⇒ 零注册；项目角色+旧 su+liaison/nominator/verifier 均不注入；不隐含/不改既有矩阵）；新增 `test/编排/requirement-change-judge-guidance.test.ts` **3 例**（指引文案、系统提示引用与机械权限表述、无新 cardKind/facts 字段）；`test/编排/decision-card.test.ts` 增 rapporteur 正向 1 例并把拒绝集合改为 Lead/Crew/Proof（共享校验增 rapporteur 正向与 Crew/Proof 反向）。
+
+**测试**：定向 3 文件 **28/28**；`node --test "test/编排/**/*.test.ts"` → **1016 tests / 1014 pass / 1 fail / 1 skip**（唯一红＝既有 Windows symlink `shell-authorized-routine.test.ts:103` EPERM 基线）；`npm run typecheck` → **exit 0**。
+
+**跨角色待办**：① 桌面窗口把 `requestRequirementChange` 注入扩展到统筹，并按新审批通道由统筹/报告员发 decision 卡（当前桌面在飞实现仍按旧口径投递主理任务，属桌面窗口属主）；② 运行时核心 model/schema 文案是否同步「统筹与报告员都可发起」以属主为准（本批未改）；③ judge 指引是提示词约束，不构成机械拦截（本批按任务要求不改机械权限）；④ 真实 Electron/e2e、独立验收、commit/push 未做。详见[变更记录](docs/change/2026-10-26_change_request-requirement-change-orchestration.md)。
+
 ## 2026-10-26 — `view_image` 接入角色会话（两轮附件设计，编排侧能力透传）
 
 **来源**：客户要求「角色可查看项目内图片证据」；运行时核心已落 `view_image` 工具与冻结契约（`src/model/runtime.ts` `ViewImageInput`/`ViewImageFn`；`src/provider/runtime/tools.ts`）。两轮附件语义：工具本轮只回「已排队」，图片在**同一角色下一轮用户提示**以附件提供。本批只做编排注入面，未改 `src/model/**`、`src/provider/**`、`app/**`、i18n、门禁引擎；未 commit/push、未重启应用。

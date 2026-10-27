@@ -559,6 +559,11 @@ export type DesktopCustomerInputFn = (
     writeBoundary?: BoundarySection1;
     /** `resolveWrite` 的 skill 根（与开会话同一份 ProjectConfig；`writeBoundary` 给出时才使用）。 */
     skillRoot?: string;
+    /**
+     * **卡片已呈现回调**（仅需求变更审批卡使用）：presenter 成功推达后调用一次；用于把「已提交审批」
+     * 与「尚未呈现/立即失败」区分开（工具回执不得谎称已提交）。排队中的卡在真正呈现时才回调。
+     */
+    onPresented?: () => void;
   },
   metadata?: CustomerInputMetadata,
 ) => Promise<CustomerInputOutcome | null | undefined> | CustomerInputOutcome | null | undefined;
@@ -643,6 +648,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       governanceModel?: "single" | "trio";
       governanceJudge?: GovernanceJudgeFn;
       turnText?: string;
+      /** 卡片呈现成功回调（仅需求变更审批卡携带；presenter 成功后才调用一次）。 */
+      onPresented?: () => void;
     };
     /** `run-role` 计算的应用事实（`judgeContext`）与卡片元数据；原样透传、不重算。 */
     metadata?: CustomerInputMetadata;
@@ -828,6 +835,12 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     try {
       opts.presenter!(entry.payload);
       entry.presented = true; // 2026-10-20：真正呈现成功后才算「呈现过」（推达失败按未呈现处理）
+      // 2026-10-26 需求变更审批卡：呈现成功回调（仅应用发起的卡携带；异常不影响呈现/结算）。
+      try {
+        entry.ctx.onPresented?.();
+      } catch (error) {
+        diagnostic.error("interaction.presented-callback.failed", error, { requestId: entry.payload.id });
+      }
       diagnostic.record("interaction.presented", { requestId: entry.payload.id, pendingCount: pending.size, queuedCount: queuedCount() });
     } catch (err) {
       diagnostic.error("interaction.present.failed", err, { requestId: entry.payload.id });
@@ -1772,6 +1785,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
           ...(ctx.governanceModel !== undefined ? { governanceModel: ctx.governanceModel } : {}),
           ...(ctx.governanceJudge !== undefined ? { governanceJudge: ctx.governanceJudge } : {}),
           ...(typeof ctx.turnText === "string" && ctx.turnText !== "" ? { turnText: ctx.turnText } : {}),
+          ...(ctx.onPresented !== undefined ? { onPresented: ctx.onPresented } : {}),
         },
         ...(metadata !== undefined ? { metadata } : {}),
         ...(decisionGate.action === "allow"

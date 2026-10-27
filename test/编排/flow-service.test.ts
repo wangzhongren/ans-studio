@@ -7,13 +7,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
   createFlowService,
+  ensureFlowSkeleton,
   validateReleaseOnlyExtension,
   type FlowService,
   type FlowToolViewWithRelease,
@@ -3167,4 +3168,135 @@ test("completeAcceptanceCriteriaStep 不注册为角色工具：run-role/model/p
   assert.match(publicExit, /CompleteAcceptanceCriteriaStepResult/);
 });
 
+test("ensureFlowSkeleton：意图交接时创建通用流程骨架（status: skeleton；全部 pending；不含项目角色/交付步骤）", async () => {
+  await withRoot(async (root) => {
+    const result = await ensureFlowSkeleton({ projectRoot: root, flowId: "flow-a", qualityTier: "prototype" });
+    assert.equal(result.ok, true, result.error ?? "");
+    assert.equal(result.created, true);
+    const text = readFileSync(join(root, ...FLOW_REL.split("/")), "utf8");
+    assert.equal(
+      result.revision,
+      createHash("sha256").update(text).digest("hex"),
+      "revision 与文件字节 sha256 同口径",
+    );
+    const parsed = parseFlowStateYaml(text, "flow-a");
+    assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.error);
+    if (!parsed.ok) return;
+    assert.equal(parsed.flow.version, 1);
+    assert.equal(parsed.flow.qualityTier, "prototype");
+    assert.equal(parsed.flow.status, "skeleton");
+    assert.deepEqual(
+      parsed.flow.steps.map((step) => [step.id, step.kind, step.owner, step.status]),
+      [
+        ["contract-freeze", "artifact", "rapporteur", "pending"],
+        ["team-plan", "artifact", "convener", "pending"],
+        ["appointment", "customer-decision", "convener", "pending"],
+        ["role-cards", "dispatch", "nominator", "pending"],
+        ["role-readiness", "artifact", "convener", "pending"],
+        ["acceptance-criteria", "artifact", "verifier", "pending"],
+        ["change-package", "artifact", "convener", "pending"],
+        ["verification", "acceptance", "app", "pending"],
+      ],
+    );
+    // 不预写项目角色 / 交付步骤 / gate：骨架只保证「文件已存在、通用步骤可登记」
+    assert.equal(text.includes("delivery-"), false, "骨架不得预写项目交付步骤");
+    assert.equal(text.includes("gateKind"), false, "骨架不得预写 gate");
+    assert.equal(text.includes("build-scaffold"), false, "骨架不得预写项目脚手架步骤");
+    // dependsOn 只表达标准工作流顺序（通用，不猜项目信息）；保留验收步骤无额外依赖
+    assert.deepEqual(
+      parsed.flow.steps.filter((step) => step.dependsOn !== undefined).map((step) => [step.id, step.dependsOn]),
+      [
+        ["team-plan", ["contract-freeze"]],
+        ["appointment", ["team-plan"]],
+        ["role-cards", ["appointment"]],
+        ["role-readiness", ["role-cards"]],
+        ["acceptance-criteria", ["role-readiness"]],
+        ["change-package", ["acceptance-criteria"]],
+      ],
+    );
+    // 只写 YAML：不写账本、不写客户决定、不预建 .ans
+    assert.equal(existsSync(join(root, ".ans")), false, "骨架创建不得触碰 .ans");
+  });
+});
 
+test("ensureFlowSkeleton：已存在任何流程（骨架 / 完整流程 / 非法 YAML）绝不覆盖", async () => {
+  await withRoot(async (root) => {
+    const first = await ensureFlowSkeleton({ projectRoot: root, flowId: "flow-a", qualityTier: "production" });
+    assert.equal(first.ok, true, first.error ?? "");
+    assert.equal(first.created, true);
+    const skeletonText = readFileSync(join(root, ...FLOW_REL.split("/")), "utf8");
+    const again = await ensureFlowSkeleton({ projectRoot: root, flowId: "flow-a", qualityTier: "prototype" });
+    assert.equal(again.ok, true, again.error ?? "");
+    assert.equal(again.created, false);
+    assert.equal(again.revision, undefined, "未新建时不给 revision");
+    assert.equal(readFileSync(join(root, ...FLOW_REL.split("/")), "utf8"), skeletonText, "已存在骨架不得改写（含 qualityTier）");
+
+    const fullFlow = flowYaml();
+    writeFile(root, FLOW_REL, fullFlow);
+    const onFullFlow = await ensureFlowSkeleton({ projectRoot: root, flowId: "flow-a", qualityTier: "prototype" });
+    assert.equal(onFullFlow.ok, true, onFullFlow.error ?? "");
+    assert.equal(onFullFlow.created, false);
+    assert.equal(readFileSync(join(root, ...FLOW_REL.split("/")), "utf8"), fullFlow, "完整流程不得被骨架覆盖");
+
+    const broken = "flowId: [unterminated";
+    writeFile(root, FLOW_REL, broken);
+    const onBroken = await ensureFlowSkeleton({ projectRoot: root, flowId: "flow-a", qualityTier: "prototype" });
+    assert.equal(onBroken.ok, true, onBroken.error ?? "");
+    assert.equal(onBroken.created, false);
+    assert.equal(readFileSync(join(root, ...FLOW_REL.split("/")), "utf8"), broken, "非法既有内容也不覆盖（交既有校验报错）");
+  });
+});
+
+test("ensureFlowSkeleton：flowId / qualityTier / projectRoot 非法 ⇒ fail-closed 且零写盘", async () => {
+  await withRoot(async (root) => {
+    for (const flowId of ["", "../evil", "Flow-A", "flow-", "flow a", "a"]) {
+      const result = await ensureFlowSkeleton({ projectRoot: root, flowId, qualityTier: "production" });
+      assert.equal(result.ok, false, `flowId=${JSON.stringify(flowId)} 应拒绝`);
+      assert.equal(result.created, false);
+      assert.match(result.error ?? "", /flowId 非法/);
+    }
+    const badTier = await ensureFlowSkeleton({ projectRoot: root, flowId: "flow-a", qualityTier: "fast" as never });
+    assert.equal(badTier.ok, false);
+    assert.equal(badTier.created, false);
+    assert.match(badTier.error ?? "", /qualityTier/);
+    const noRoot = await ensureFlowSkeleton({ projectRoot: "  ", flowId: "flow-a", qualityTier: "production" });
+    assert.equal(noRoot.ok, false);
+    assert.equal(noRoot.created, false);
+    assert.match(noRoot.error ?? "", /projectRoot/);
+    assert.equal(existsSync(join(root, "docs/flows/flow-a.yaml")), false, "非法输入不得落盘");
+  });
+});
+
+test("ensureFlowSkeleton：目标被目录占用 / docs/flows 不可建 ⇒ 明确失败、不抛、不破坏现场", async () => {
+  await withRoot(async (root) => {
+    const target = join(root, ...FLOW_REL.split("/"));
+    mkdirSync(target, { recursive: true });
+    const blocked = await ensureFlowSkeleton({ projectRoot: root, flowId: "flow-a", qualityTier: "production" });
+    assert.equal(blocked.ok, false);
+    assert.equal(blocked.created, false);
+    assert.match(blocked.error ?? "", /流程骨架检查失败/);
+    assert.equal(lstatSync(target).isDirectory(), true, "占位目录不得被文件替换");
+  });
+  await withRoot(async (root) => {
+    const flowsPath = join(root, "docs", "flows");
+    writeFile(root, "docs/flows", "not a directory");
+    const result = await ensureFlowSkeleton({ projectRoot: root, flowId: "flow-a", qualityTier: "production" });
+    assert.equal(result.ok, false);
+    assert.equal(result.created, false);
+    assert.equal(readFileSync(flowsPath, "utf8"), "not a directory", "既有文件不得被破坏");
+  });
+});
+
+test("ensureFlowSkeleton：同一项目并发调用恰一个 created（与 flow 写入共用串行队列）", async () => {
+  await withRoot(async (root) => {
+    const [first, second] = await Promise.all([
+      ensureFlowSkeleton({ projectRoot: root, flowId: "flow-a", qualityTier: "production" }),
+      ensureFlowSkeleton({ projectRoot: root, flowId: "flow-a", qualityTier: "prototype" }),
+    ]);
+    assert.equal(first.ok, true, first.error ?? "");
+    assert.equal(second.ok, true, second.error ?? "");
+    assert.equal([first.created, second.created].filter(Boolean).length, 1, "并发下恰一个新建，另一个视为已存在");
+    const parsed = parseFlowStateYaml(readFileSync(join(root, ...FLOW_REL.split("/")), "utf8"), "flow-a");
+    assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.error);
+  });
+});

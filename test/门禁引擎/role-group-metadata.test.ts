@@ -68,7 +68,7 @@ test("listProject：实际已接受的四份运行时组卡返回组别，15 个
   assertAbsent(legacy);
 });
 
-test("listProject：新增独立验收角色仅声明自身工作文档，不获得产品或同伴写权", async () => {
+test("listProject：新增独立质检角色仅声明自身工作文档，不获得产品或同伴写权", async () => {
   const listing = await listProject(REPO_ROOT);
   const acceptance = listing.roles.find((item) => item.roleId === "独立验收");
   assert.ok(acceptance, "独立验收必须实际被枚举");

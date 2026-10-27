@@ -179,16 +179,16 @@ test("Liaison 越界拒绝文案（AC3）：指回正确归属——提案找 Dr
   );
   const ctx = { projectRoot: ROOT, skillRoot: SKILL };
   const cases: Array<[string, RegExp]> = [
-    ["docs/proposals/p-v1.md", /Draft \/ 提案/],
-    ["docs/contracts/c-v1.md", /Draft \/ 提案/],
-    ["角色卡/实现者/boundary.yaml", /Crew \/ 组队/],
-    ["docs/skills/s/SKILL.md", /Crew \/ 组队/],
-    ["docs/scheduling/f-team-v1.md", /Steward \/ 统筹/],
-    ["docs/flows/f.md", /Steward \/ 统筹/],
-    ["docs/workflow.md", /Steward \/ 统筹/],
-    ["docs/acceptance/criteria-v1.md", /Proof \/ 验收/],
-    ["docs/verification/r-v1.md", /Proof \/ 验收/],
-    ["docs/governance/verifier/notes.md", /Proof \/ 验收/],
+    ["docs/proposals/p-v1.md", /策划 \/ Draft/],
+    ["docs/contracts/c-v1.md", /策划 \/ Draft/],
+    ["角色卡/实现者/boundary.yaml", /人事 \/ Crew/],
+    ["docs/skills/s/SKILL.md", /人事 \/ Crew/],
+    ["docs/scheduling/f-team-v1.md", /运营 \/ Steward/],
+    ["docs/flows/f.md", /运营 \/ Steward/],
+    ["docs/workflow.md", /运营 \/ Steward/],
+    ["docs/acceptance/criteria-v1.md", /质检 \/ Proof/],
+    ["docs/verification/r-v1.md", /质检 \/ Proof/],
+    ["docs/governance/verifier/notes.md", /质检 \/ Proof/],
     [".ans/project.json", /只能由应用写/],
     ["docs/bootstrap-manifest.md", /只能由应用写/],
     ["角色卡/governance-boundary.yaml", /只能由应用写/],
@@ -207,7 +207,7 @@ test("Liaison 越界拒绝文案（AC3）：指回正确归属——提案找 Dr
   assert.equal(legacy.allowed, false);
   if (!legacy.allowed) {
     assert.match(legacy.reason, /目标路径未匹配任何边界条目/);
-    assert.doesNotMatch(legacy.reason, /Crew \/ 组队/, "legacy nominations 不再指引 Crew 写区");
+    assert.doesNotMatch(legacy.reason, /人事 \/ Crew/, "legacy nominations 不再指引 Crew 写区");
   }
   // 非 Liaison 边界不追加该指引（既有角色拒绝文案不变）。
   const rapporteur = await resolveBoundarySection(
@@ -250,10 +250,10 @@ test("Liaison 能力：customerInput=true（仅 intent-confirm）、handOffInten
 
 test("Lead 卡文本：治理协调（2026-10-24）——接报内置状态/回交、闸门 0/1 后才交接/coordinate、不直派 Crew/Proof/项目 worker、Proof 只收状态+指针、协调≠批准", () => {
   const t = governanceRoleOf("liaison")!.cardText;
-  assert.match(t, /## 治理协调（Lead \/ 主理）/);
+  assert.match(t, /## 治理协调（产品 \/ Lead）/);
   assert.match(
     t,
-    /Draft \/ 提案、Steward \/ 统筹、Crew \/ 组队、Proof \/ 验收 的状态与回交向\*\*你\*\*汇总/,
+    /策划 \/ Draft、运营 \/ Steward、人事 \/ Crew、质检 \/ Proof 的状态与回交向\*\*你\*\*汇总/,
     "Lead 接报 Draft/Steward/Crew/Proof 的状态与回交",
   );
   assert.match(t, /维护「阶段 \/ 阻塞 \/ 下一步」视图/, "Lead 维护阶段/阻塞/下一步视图");
@@ -264,11 +264,11 @@ test("Lead 卡文本：治理协调（2026-10-24）——接报内置状态/回�
   );
   assert.match(
     t,
-    /客户已接受提案（闸门 1 已结算）后，才用 `dispatch_task` 的 coordinate 向 Steward \/ 统筹 派/,
+    /客户已接受提案（闸门 1 已结算）后，才用 `dispatch_task` 的 coordinate 向 运营 \/ Steward 派/,
     "闸门 1 结算后才 coordinate 给 Steward",
   );
   assert.match(t, /不直接派 Crew \/ Proof \/ 项目 worker/, "Lead 不直接派 Crew/Proof/项目 worker");
-  assert.match(t, /项目 worker（Map \/ Reduce）由 Steward \/ 统筹 派/, "项目 worker 由 Steward 派");
+  assert.match(t, /项目 worker（Map \/ Reduce）由 运营 \/ Steward 派/, "项目 worker 由 Steward 派");
   assert.match(t, /只收 Proof 的状态与报告指针/, "Proof 只给 Lead 状态+报告指针");
   assert.match(t, /不批准提案、任命、验收/, "Lead 不批准提案/任命/验收");
   assert.match(t, /协调 ≠ 客户批准/, "协调 ≠ 客户批准");
@@ -285,7 +285,7 @@ test("Lead 卡文本：治理协调（2026-10-24）——接报内置状态/回�
   assert.match(t, /只向客户如实汇报/, "Lead 收到系统消息只向客户如实汇报");
   assert.match(
     t,
-    /不得给 Steward \/ 统筹 发任务、不得调用 `dispatch_task`/,
+    /不得给 运营 \/ Steward 发任务、不得调用 `dispatch_task`/,
     "Lead 收到系统消息不得派 Steward / 不得 dispatch_task",
   );
   assert.match(t, /不得把系统消息当成客户指令/, "系统消息不得当客户指令");
@@ -305,7 +305,7 @@ test("Lead 卡文本：治理协调（2026-10-24）——接报内置状态/回�
   );
   // 2026-10-24 P1-7：Lead 作为 manager（与 Steward 同权限）不得代标 delivered；
   // 只能在 owner 交付 delivered 后核证 done，或标 failed/blocked；worker 不能 done。
-  assert.match(t, /与 Steward \/ 统筹 同权限/, "Lead 管理工作流的管理权限描述保留");
+  assert.match(t, /与 运营 \/ Steward 同权限/, "Lead 管理工作流的管理权限描述保留");
   assert.match(
     t,
     /`dispatched → delivered` 只能由该步骤的 owner（项目角色 \/ worker）标记/,
@@ -320,8 +320,8 @@ test("Lead 卡文本：治理协调（2026-10-24）——接报内置状态/回�
   assert.match(t, /或标 `failed` \/ `blocked`/, "Lead 仍可标 failed/blocked");
   assert.match(t, /worker 不能标 `done`/, "worker 不能 done");
   // 旧「向项目角色派发协调任务」必须消失（Q1：项目 worker 由 Steward 派）。
-  assert.doesNotMatch(t, /向 Steward \/ 统筹 与项目角色派发协调任务/);
-  assert.doesNotMatch(t, /向 Steward \/ 统筹与项目角色派发协调任务/);
+  assert.doesNotMatch(t, /向 运营 \/ Steward 与项目角色派发协调任务/);
+  assert.doesNotMatch(t, /向 运营 \/ Steward与项目角色派发协调任务/);
   assert.doesNotMatch(t, /派给 Steward \/ 项目角色/);
   assert.doesNotMatch(t, /向项目角色派发协调任务/);
   // 能力位不变：治理协调不新增工具/能力位。

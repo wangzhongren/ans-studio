@@ -794,13 +794,13 @@ test("提示词：Liaison 沟通权纪律（数据驱动名称），不写「已
     );
     assert.equal(result.code, EXIT_OK);
     assert.ok(captured.prompt !== undefined);
-    assert.match(captured.prompt!, /沟通权纪律（主理/);
+    assert.match(captured.prompt!, /沟通权纪律（产品/);
     assert.match(captured.prompt!, /docs\/intents\//);
     assert.match(captured.prompt!, /hand_off_intent/);
     assert.match(captured.prompt!, /交接 ≠ 客户批准/);
     assert.doesNotMatch(captured.prompt!, /已批准|已授权/);
     // 数据驱动：标题必须来自注册表 displayName（纯中文「主理」），而不是写死英文角色名。
-    assert.match(captured.prompt!, /你是内置治理角色「主理」/);
+    assert.match(captured.prompt!, /你是内置治理角色「产品」/);
   });
 });
 

@@ -147,16 +147,16 @@ export const enUS = {
   "ui.role.group.governance": "Governance functions (built-in)",
   "ui.role.group.default": "Work roles",
   "ui.role.governance.builtinNote": "Built-in role: shipped with the app, no role directory",
-  "ui.role.governance.liaison.name": "Lead",
+  "ui.role.governance.liaison.name": "Product",
   "ui.role.governance.liaison.power": "Customer communication · no final approval power",
-  "ui.role.governance.draft.name": "Draft",
+  "ui.role.governance.draft.name": "Planner",
   "ui.role.governance.draft.power": "Proposal power · no final approval power",
-  "ui.role.governance.crew.name": "Crew",
+  "ui.role.governance.crew.name": "People Ops",
   "ui.role.governance.crew.power":
     "Card-writing power (after customer appointment) · no final approval power",
-  "ui.role.governance.steward.name": "Steward",
+  "ui.role.governance.steward.name": "Operations",
   "ui.role.governance.steward.power": "Scheduling power · no final approval power",
-  "ui.role.governance.verifier.name": "Proof",
+  "ui.role.governance.verifier.name": "QA",
   "ui.role.governance.verifier.power": "Acceptance power · no final approval power",
 
   "ui.sidebar.primaryHint": "Primary entry: default entry point and main path",
@@ -306,7 +306,7 @@ export const enUS = {
   "ui.triage.report.pathLine": "Report: {path}",
   "ui.triage.report.noRework": "No rework this time ({source})",
   "ui.triage.returnedToVerifier":
-    "Acceptance report lacks the triage structure; returned to Proof to fill it in",
+    "Acceptance report lacks the triage structure; returned to QA to fill it in",
   "ui.triage.missingReport": "Acceptance report unreadable: {detail}",
 
   // Decision card (material choice, single recommended option, separate from acceptance; desktop UI wiring).
@@ -375,6 +375,15 @@ export const enUS = {
   // Customer requirement: roles can view project image evidence. view_image only confirms the image was read
   // and queued this turn; the image reaches the same role as an image attachment on the next user prompt.
   "ui.viewImage.attachmentLabel": "view_image attachment: {path}",
+  // Chat-stream thumbnail (customer request 2026-10-27: show the image the role viewed).
+  // Invalid path / missing project root / load failure keeps the tool row and states the reason; no broken image.
+  "ui.viewImage.previewNoProject": "No project is loaded; the image cannot be previewed.",
+  "ui.viewImage.previewPathUnsafe":
+    "The target is not a project image path; the image cannot be previewed.",
+  "ui.viewImage.previewLoadFailed": "The image failed to load; it cannot be previewed.",
+  // Lightbox (customer follow-up 2026-10-27: enlarge in-app; no file:// navigation, no CSP change).
+  "ui.viewImage.openPreview": "Open larger preview: {path}",
+  "ui.viewImage.lightboxLabel": "Image preview: {path}",
 
   "ui.confirm.shellDenyNote":
     "Clicking Reject, pressing Esc, or closing this box = no approval (nothing runs).",
@@ -518,9 +527,9 @@ export const enUS = {
   "ui.governance.establishHint":
     "Before talking to {roleName}, create the governance record; you can also run ans govern <project-dir> in a terminal.",
   "ui.governance.roleIntro.liaison":
-    "Default customer entry: you say what to do, and I first confirm goal, scope, and acceptance, then hand it to Draft to form a proposal. I neither write proposals nor approve. From this version the default entry is Lead; Draft and historical proposals are unchanged.",
+    "Default customer entry: you say what to do, and I first confirm goal, scope, and acceptance, then hand it to Planner to form a proposal. I neither write proposals nor approve. From this version the default entry is Product; Planner and historical proposals are unchanged.",
   "ui.governance.roleIntro.proposal":
-    "Usually opened via a handoff from Lead; customers may also come to me directly. I only write proposals and do not approve.",
+    "Usually opened via a handoff from Product; customers may also come to me directly. I only write proposals and do not approve.",
   "ui.governance.roleIntro.nomination":
     "Opened after customer appointment to write cards; writes role cards and boundaries only per the team plan and appointment list; does not select roles or approve.",
   "ui.governance.roleIntro.schedule":
@@ -996,8 +1005,8 @@ export const enUS = {
   "ui.judge.mode.approval": "Approval delegation",
   "ui.judge.mode.decision": "Decision delegation",
   "ui.judge.titleWithRole": "Command approval · {roleName}",
-  "ui.judge.roleName.liaison": "Lead",
-  "ui.judge.roleName.verifier": "Proof",
+  "ui.judge.roleName.liaison": "Product",
+  "ui.judge.roleName.verifier": "QA",
   "ui.judge.titleSu": "SU command approval",
   "ui.judge.titleShell": "shell command request",
   "ui.judge.tier.risky": "Risky command (risky)",
@@ -1139,19 +1148,19 @@ export const enUS = {
   "main.session.rebuildFailed":
     "Could not reopen the session against the new boundary: {detail} (retry or click the role on the left).",
   "main.session.intentHandoffFailed":
-    "The app could not hand the intent to Draft: {detail}; no retry",
-  "main.session.openProposalFailed": "Could not open the Draft session ({detail})",
-  "main.session.sendProposalFailed": "Could not send the task to Draft ({detail})",
-  "main.session.proposalQueued": "Draft is working; the task is queued",
-  "main.session.proposalWorking": "Handed to Draft (working)",
+    "The app could not hand the intent to Planner: {detail}; no retry",
+  "main.session.openProposalFailed": "Could not open the Planner session ({detail})",
+  "main.session.sendProposalFailed": "Could not send the task to Planner ({detail})",
+  "main.session.proposalQueued": "Planner is working; the task is queued",
+  "main.session.proposalWorking": "Handed to Planner (working)",
   "main.session.intentHandedOff":
-    "Intent “{intentId}” handed to Draft (handoffKind={handoffKind}) — handoff ≠ customer approval.",
+    "Intent “{intentId}” handed to Planner (handoffKind={handoffKind}) — handoff ≠ customer approval.",
   "main.session.clarificationEmpty": "The clarification question cannot be empty; not submitted.",
   "main.session.clarificationDisplayFailed":
     "Could not display the clarification request in the primary entry; not submitted.",
   "main.session.clarificationShown":
-    "Shown in the primary entry ({roleId}); after the customer answers, Lead updates the intent and hands it off.",
-  "main.session.clarificationDelivery": "Draft (proposal) needs clarification: {question}",
+    "Shown in the primary entry ({roleId}); after the customer answers, Product updates the intent and hands it off.",
+  "main.session.clarificationDelivery": "Planner (proposal) needs clarification: {question}",
   "main.session.missingProjectOrRole": "Missing project root or role id.",
   "main.session.readyContinue": "Session ready; continuing the current session.",
   "main.session.closedClickRole": "The session is closed; click the role again.",
@@ -1199,10 +1208,10 @@ export const enUS = {
   "main.session.dispatchRejectedEmpty":
     "Dispatch not accepted: roleId and task must both be non-empty.",
   "main.session.dispatchNoDispatcher":
-    "Dispatch not accepted: could not find the dispatch owner for this project's governance model (trio=Steward / single=primary entry) — **not delivered**.",
+    "Dispatch not accepted: could not find the dispatch owner for this project's governance model (trio=Operations / single=primary entry) — **not delivered**.",
   "main.session.dispatchNoDispatcherShort":
     "Dispatch not accepted: no dispatch owner found — **not delivered** (not silent).",
-  "main.session.dispatchModelNote": " (trio: Steward or Lead)",
+  "main.session.dispatchModelNote": " (trio: Operations or Product)",
   "main.session.dispatchWrongSource":
     "Dispatch not accepted: source role {from} is not this project's dispatch owner {dispatcher}{modelNote}.",
   "main.session.dispatchWrongSourceShort":
@@ -1226,7 +1235,7 @@ export const enUS = {
   "main.session.dispatchSummary": "Dispatch · from {from}: {text}",
   "main.session.sessionWillAutoOpen": " (its session is not open — it will open automatically)",
   "main.session.acceptedCoordinate":
-    "Accepted: the coordination message will be delivered to {to}{openNote} (source {from} → Steward; coordination ≠ customer approval and does not clear any dispatch/acceptance gate; accepted ≠ completed).",
+    "Accepted: the coordination message will be delivered to {to}{openNote} (source {from} → Operations; coordination ≠ customer approval and does not clear any dispatch/acceptance gate; accepted ≠ completed).",
   "main.session.acceptedTask":
     "Accepted: the task will be delivered to role {to}'s session{openNote}; delivery results/failures are shown honestly in its chat stream and in {from}'s chat stream (accepted ≠ completed).",
   "main.session.recoveryNoMatch": "No matching session found; specify the project and runtime.",
@@ -1390,19 +1399,19 @@ export const enUS = {
   "main.interface.teamPlanNoRecommended":
     "The team plan lacks a unique machine-readable recommendation set (a recommended inline array or a “Recommended:” line; empty/duplicate/ambiguous sets are not accepted)",
   "main.interface.verifierFinished":
-    "Proof / acceptance review finished (flowId={flowId}); report at {report} (attachments under docs/verification/) and {governance}; the acceptance card/customer decision continues in the app (this line is not an acceptance conclusion or customer approval).",
+    "QA / acceptance review finished (flowId={flowId}); report at {report} (attachments under docs/verification/) and {governance}; the acceptance card/customer decision continues in the app (this line is not an acceptance conclusion or customer approval).",
   "main.interface.acceptanceCloseFailed":
-    "Acceptance passed but flow closing failed (flow {flowId}): {detail}; no verifier dispatched, the flow remains pending closure (check the flow YAML).",
+    "Acceptance passed but flow closing failed (flow {flowId}): {detail}; no QA dispatched, the flow remains pending closure (check the flow YAML).",
   "main.interface.acceptanceClosed":
     "Acceptance passed (judge delegation or manual customer approval, per the ledger's customer.decision); flow {flowId} is closed (the acceptance step remains marked done).",
   "main.interface.deliveredStepsHeader":
-    "Flow {flowId}: the following steps are delivered, awaiting Steward verification:",
+    "Flow {flowId}: the following steps are delivered, awaiting Operations verification:",
   "main.interface.deliveredStepLine":
     "- Step {stepId} is delivered (owner={owner}); verify the ledger/artifact evidence, then mark it done with flow_step_update or return it for rework; do not write the flow YAML directly.",
   "main.interface.deliveredVerificationNote":
     "Verification requirements: check ledger and artifact evidence before updating step status; return for rework when done conditions are not met; do not write the flow YAML directly with write_file.",
   "main.interface.deliveredWaitNote":
-    "Flow {flowId}: steps {steps} are delivered, awaiting Steward verification (verification task dispatched).",
+    "Flow {flowId}: steps {steps} are delivered, awaiting Operations verification (verification task dispatched).",
   "main.interface.criteriaMissing":
     "Pre-implementation acceptance criteria missing or empty ({path}); acceptance decision not dispatched",
   "main.interface.changePackageMissing":
@@ -1411,15 +1420,15 @@ export const enUS = {
     "Change package is missing riskTier (T0–T3): {path}; acceptance decision not dispatched",
   "main.interface.flowValidationFailed": "Flow state YAML validation failed: {detail}",
   "main.interface.advanceOpenFailed":
-    "Closing advance failed: could not open the Proof session: {detail}; no automatic retry.",
+    "Closing advance failed: could not open the QA session: {detail}; no automatic retry.",
   "main.interface.advanceSendFailed":
-    "Closing advance failed: sending the acceptance task to Proof failed: {detail}; no automatic retry.",
+    "Closing advance failed: sending the acceptance task to QA failed: {detail}; no automatic retry.",
   "main.interface.piBusy":
     "Pi's previous turn is still running; the new configuration applies after it ends. Messages can keep queueing.",
   "main.interface.readFileNotFound": "File not found",
   "main.interface.readFileFailed": "Read failed: {detail}",
   "main.interface.teamPlanMissingUnreadable":
-    "The team plan is missing or unreadable (the ledger appointment is bound to it); have Steward rewrite the plan before validating again",
+    "The team plan is missing or unreadable (the ledger appointment is bound to it); have Operations rewrite the plan before validating again",
   "main.interface.teamPlanMissingLegacy":
     "Team plan missing: only the minimum structural checks are performed for legacy flows (migrating to the team-plan / role-cards flow is recommended)",
   "main.interface.teamPlanRoleMissing":
@@ -1447,23 +1456,23 @@ export const enUS = {
   "main.interface.boundaryOnlyRootDocs":
     "entries only contains role root work-document entries; no actual writeset entries from the team plan were found (check the plan writeset)",
   "main.interface.directorySpecMissing":
-    "The authorized directory “{path}” for team plan role {roleId} has no directory-spec row (plan issue: ask Convener to add the directory spec)",
+    "The authorized directory “{path}” for team plan role {roleId} has no directory-spec row (plan issue: ask Operations to add the directory spec)",
   "main.interface.moduleImplMissing":
-    "Team plan module “{module}” has no implementation directory, so wider boundary parts cannot be checked (plan issue: ask Convener to add implementation directories)",
+    "Team plan module “{module}” has no implementation directory, so wider boundary parts cannot be checked (plan issue: ask Operations to add implementation directories)",
   "main.interface.authorizedDirNotCoveredExisting":
     "Authorized directory “{path}” is not covered by boundary.yaml entries (existing: warning only, not blocking; migration note: add the directory entry at the next substantive change)",
   "main.interface.authorizedDirNotCovered":
-    "Authorized directory “{path}” is not covered by boundary.yaml entries (Crew: add the directory to Section 1 per the team plan; if the plan directory itself is wrong, report it to Convener for correction)",
+    "Authorized directory “{path}” is not covered by boundary.yaml entries (People Ops: add the directory to Section 1 per the team plan; if the plan directory itself is wrong, report it to Operations for correction)",
   "main.interface.precisePathNotCoveredExisting":
     "Precise write path “{path}” from the plan is not covered by boundary.yaml entries (existing: warning only, not blocking; migration note: add it at the next substantive change)",
   "main.interface.precisePathNotCovered":
-    "Precise write path “{path}” from the plan is not covered by boundary.yaml entries (Crew: add the file to Section 1 per the team plan; if the plan is wrong, report it to Convener for correction)",
+    "Precise write path “{path}” from the plan is not covered by boundary.yaml entries (People Ops: add the file to Section 1 per the team plan; if the plan is wrong, report it to Operations for correction)",
   "main.interface.boundaryDirWider":
-    "boundary.yaml directory entry “{path}” {wider} (new role boundary directories must match the plan's authorized directories, neither wider nor narrower; Crew narrows the boundary or reports it to Convener for plan correction)",
+    "boundary.yaml directory entry “{path}” {wider} (new role boundary directories must match the plan's authorized directories, neither wider nor narrower; People Ops narrows the boundary or reports it to Operations for plan correction)",
   "main.interface.boundaryDirWiderWord": "is wider than the authorized directory",
   "main.interface.boundaryDirNotInPlan": "is not in the authorized directory set",
   "main.interface.boundaryMissingAuthorizedDir":
-    "boundary.yaml is missing a directory entry for authorized directory “{path}” (new role boundary directories must match the plan's authorized directories, neither wider nor narrower; Crew adds the entry)",
+    "boundary.yaml is missing a directory entry for authorized directory “{path}” (new role boundary directories must match the plan's authorized directories, neither wider nor narrower; People Ops adds the entry)",
   "main.interface.boundaryDirWiderExisting":
     "boundary.yaml directory entry “{path}” is wider than the authorized directory (existing: warning only, not blocking; migration note: narrow/migrate per v3 at the next substantive change{extra})",
   "main.interface.boundaryDirWiderExistingExtra":
@@ -1475,7 +1484,7 @@ export const enUS = {
   "main.interface.writesetNotCoveredExisting":
     "Plan writeset “{path}” is not covered by boundary.yaml entries (existing: warning only, not blocking; add it at the next substantive change)",
   "main.interface.writesetNotCovered":
-    "Plan writeset “{path}” is not covered by boundary.yaml entries (Crew: add the path to Section 1 per the team plan; if the plan writeset itself is wrong, report it to Convener for correction)",
+    "Plan writeset “{path}” is not covered by boundary.yaml entries (People Ops: add the path to Section 1 per the team plan; if the plan writeset itself is wrong, report it to Operations for correction)",
   "main.interface.docEmptyExisting": "File is empty (existing/legacy: warning only)",
   "main.interface.docEmpty": "File is empty (body required)",
   "main.interface.readErrorExistingSuffix": " (existing/legacy: warning only)",
@@ -1493,7 +1502,7 @@ export const enUS = {
     "api-spec.md is marked not-applicable but gives no non-empty reason",
   "main.interface.projectListWarning": "listProject warning: {warning}",
   "main.interface.writeValidationFailed":
-    "Flow {flowId}: the role-card/write artifacts failed validation (the appointment step cannot continue; Steward was not dispatched for role-readiness and the step was not marked done).",
+    "Flow {flowId}: the role-card/write artifacts failed validation (the appointment step cannot continue; Operations was not dispatched for role-readiness and the step was not marked done).",
   "main.interface.specificProblems": "Specific problems:",
   "main.interface.warningsHeader": "Warnings (non-blocking, existing/legacy roles):",
   "main.interface.fixWriteCard":
@@ -1503,13 +1512,13 @@ export const enUS = {
   "main.interface.fixTeamPlanLegacy":
     "Fix/complete the team plan (frontmatter flowId/version/riskTier/recommended; per-role type new/changed/existing, responsibility goals, capability requirements, unique writeset, dependencies), bump it to v2 if needed, and resend the appointment card; the app re-validates after the fix.",
   "main.interface.teamPlanValidationFailed":
-    "Flow {flowId}: the team plan failed structural validation (the appointment's card-writing step is paused; Crew does not fix plans on its own, and the app did not dispatch role-readiness or mark the step done).",
+    "Flow {flowId}: the team plan failed structural validation (the appointment's card-writing step is paused; People Ops does not fix plans on its own, and the app did not dispatch role-readiness or mark the step done).",
   "main.interface.roleCardsStepMissing":
-    "The flow is missing the step with id \"{stepId}\" (the team plan exists but the flow does not declare role-cards, so closure cannot complete; ask the Convener to add the flow step).",
-  "main.interface.crewBlocking": "Crew fixes {count}",
-  "main.interface.planBlocking": "Steward completes plan items {count}",
+    "The flow is missing the step with id \"{stepId}\" (the team plan exists but the flow does not declare role-cards, so closure cannot complete; ask Operations to add the flow step).",
+  "main.interface.crewBlocking": "People Ops fixes {count}",
+  "main.interface.planBlocking": "Operations completes plan items {count}",
   "main.interface.writeBlockingSummary":
-    "The write artifacts failed validation (flow {flowId}): {count} issues — routed {routed}; Steward was not dispatched for role-readiness and the appointment step was not marked done. First issue: {path}: {issue}",
+    "The write artifacts failed validation (flow {flowId}): {count} issues — routed {routed}; Operations was not dispatched for role-readiness and the appointment step was not marked done. First issue: {path}: {issue}",
   "main.interface.queueKind.handback": "Delivery",
   "main.interface.queueKind.dispatch": "Dispatch",
   "main.interface.queueKind.system": "System",
@@ -1555,27 +1564,27 @@ export const enUS = {
     "Missing team plan/appointment list; card-writing task not dispatched",
   "main.interface.teamPlanMissingBoundHint": " (appointment ledger bound to {plan})",
   "main.interface.teamPlanMissingBound":
-    "Flow {flowId}: team plan missing (docs/scheduling/{flowId}-team-vN.md){bound}; Crew card-writing not dispatched and the flow did not advance. Have Steward write the team plan first.",
+    "Flow {flowId}: team plan missing (docs/scheduling/{flowId}-team-vN.md){bound}; People Ops card-writing not dispatched and the flow did not advance. Have Operations write the team plan first.",
   "main.interface.teamPlanMissingShort":
-    "Team plan missing{bound}; Crew card-writing not dispatched (no guessing plans, no unilateral scope expansion)",
+    "Team plan missing{bound}; People Ops card-writing not dispatched (no guessing plans, no unilateral scope expansion)",
   "main.interface.appointmentVsPlanMismatch":
-    "The customer's actual appointment list ({appointed}) differs from the team plan's recommended set ({recommended}); have Steward revise the team plan to {version} to reflect the actual appointment (Crew writes cards only for the actual list).",
+    "The customer's actual appointment list ({appointed}) differs from the team plan's recommended set ({recommended}); have Operations revise the team plan to {version} to reflect the actual appointment (People Ops writes cards only for the actual list).",
   "main.interface.missingFlowOrList":
     "Missing flow information (flowId/appointment list); automatic dispatch not performed",
   "main.interface.missingFlowIdNomination":
     "Missing flow information (flowId); nomination task not dispatched",
   "main.interface.flowYamlTimeout":
-    "Steward did not finish within the time limit; flow state YAML {path} is unconfirmed; nomination task not dispatched",
+    "Operations did not finish within the time limit; flow state YAML {path} is unconfirmed; nomination task not dispatched",
   "main.interface.flowYamlMissing":
-    "Steward did not write flow state YAML {path}; nomination task not dispatched (a same-named human-readable .md does not count as written state)",
+    "Operations did not write flow state YAML {path}; nomination task not dispatched (a same-named human-readable .md does not count as written state)",
   "main.interface.flowYamlInvalid":
     "Flow state YAML validation failed ({path}): {detail}; nomination task not dispatched",
   "main.interface.flowYamlUnreadable":
     "Flow state YAML {path} is unreadable: {detail}; nomination task not dispatched",
   "main.interface.missingFlowInfoNomination":
     "Missing flow information; nomination task not dispatched",
-  "main.interface.openCrewFailed": "Could not open the Crew session: {detail}",
-  "main.interface.sendNominationFailed": "Sending the nomination task to Crew failed: {detail}",
+  "main.interface.openCrewFailed": "Could not open the People Ops session: {detail}",
+  "main.interface.sendNominationFailed": "Sending the nomination task to People Ops failed: {detail}",
   "main.interface.linkScheme": "Only http/https links can be opened.",
   "main.interface.linkTooLong": "The link is too long and was rejected.",
   "main.interface.externalOpenUnwired": "External opening not wired (fail-closed).",
@@ -1587,36 +1596,36 @@ export const enUS = {
     "The content is not a supported image (the real format is not among {mimes}).",
 
   "main.governance.acceptanceAdvance":
-    "Flow {flowId}: all steps are complete; acceptance review was dispatched to Proof automatically (working)",
+    "Flow {flowId}: all steps are complete; acceptance review was dispatched to QA automatically (working)",
   "main.governance.acceptanceBlocked":
     "Automatic acceptance not dispatched: flow {flowId} did not pass the closing gate. Reason: {issue}. {advice}",
   "main.governance.acceptanceBlockedTerminal":
     "No action needed: the flow is already closed; the app will not dispatch acceptance review again.",
   "main.governance.acceptanceBlockedAdvice":
-    "Suggestion: if old steps were replaced by a retake, mark the corresponding aborted/failed steps as superseded (or cancelled) in the flow state file {path}; or dispatch a new task with a new stepId and update the status and evidence in the flow state file. The next event re-checks automatically after the fix; the app does not rewrite the flow state file and does not automatically dispatch Proof.",
+    "Suggestion: if old steps were replaced by a retake, mark the corresponding aborted/failed steps as superseded (or cancelled) in the flow state file {path}; or dispatch a new task with a new stepId and update the status and evidence in the flow state file. The next event re-checks automatically after the fix; the app does not rewrite the flow state file and does not automatically dispatch QA.",
   "main.governance.nominationDispatched":
-    "Nomination task dispatched to Crew (working)",
+    "Nomination task dispatched to People Ops (working)",
   "main.governance.roleCardDispatched":
-    "Card-writing task dispatched to Crew (working)",
+    "Card-writing task dispatched to People Ops (working)",
   "main.governance.flowTaskDispatched":
-    "Flow task dispatched to Steward (working)",
+    "Flow task dispatched to Operations (working)",
   "main.governance.flowYamlAndNomination":
-    "Flow state YAML written; nomination task dispatched to Crew (working)",
+    "Flow state YAML written; nomination task dispatched to People Ops (working)",
   "main.governance.roleReadinessDispatched":
-    "Card structure validation passed; role-readiness review dispatched to Steward (working)",
+    "Card structure validation passed; role-readiness review dispatched to Operations (working)",
   "main.governance.criteriaDispatched":
-    "Flow {flowId}: pre-implementation criteria-writing task dispatched to Proof (working)",
+    "Flow {flowId}: pre-implementation criteria-writing task dispatched to QA (working)",
   "main.governance.nominationAlreadyDone":
-    "Nomination already complete; not dispatched again. Steward has been asked to continue with the next step.",
+    "Nomination already complete; not dispatched again. Operations has been asked to continue with the next step.",
 
   "main.governance.acceptanceReworkRoutedCustomer":
-    "Flow {flowId}: the customer rejected the acceptance result; the app routed the rework to Steward (Convener) under the routing rules.",
+    "Flow {flowId}: the customer rejected the acceptance result; the app routed the rework to Operations (Operations) under the routing rules.",
   "main.governance.acceptanceReworkRoutedAutomatic":
-    "Flow {flowId}: the automatic decision did not pass or did not complete (judge proxy approval / automatic return); the app routed the rework to Steward (Convener) under the routing rules.",
+    "Flow {flowId}: the automatic decision did not pass or did not complete (judge proxy approval / automatic return); the app routed the rework to Operations (Operations) under the routing rules.",
   "main.governance.acceptanceReworkPending":
     "Flow {flowId}: rework routing is not complete yet (waiting to send or waiting for the next event to retry); the app is not dispatching acceptance review for now and will not notify repeatedly.",
   "main.governance.acceptanceReworkReportIncomplete":
-    "Flow {flowId}: the acceptance report has no parseable acceptance-rework/v1 structured rework section ({detail}); the app passed report path {reportPath} and the parse error to Steward (Convener) for manual rework; no rework items were generated and no flow steps were created.",
+    "Flow {flowId}: the acceptance report has no parseable acceptance-rework/v1 structured rework section ({detail}); the app passed report path {reportPath} and the parse error to Operations (Operations) for manual rework; no rework items were generated and no flow steps were created.",
   "main.governance.acceptanceReworkFailed":
     "Flow {flowId}: rework routing failed ({detail}); the app does not claim delivery and will not dispatch acceptance review; the next event retries automatically after the issue is fixed.",
   "main.governance.acceptanceReworkAuditFailed":
@@ -1629,13 +1638,13 @@ export const enUS = {
   // customer.decision or enter acceptance triage. A gate fail must rest on a blocker/major; a fail
   // with only minor/nit items is returned to Proof as structurally invalid and triggers no rework.
   "main.gateReview.dispatched":
-    "Flow {flowId}: gate {gateId} review submitted to Proof (working); this is not an acceptance pass and not customer approval.",
+    "Flow {flowId}: gate {gateId} review submitted to QA (working); this is not an acceptance pass and not customer approval.",
   "main.gateReview.alreadyDispatched":
     "Flow {flowId}: gate {gateId} review was already submitted (in flight or passed); not dispatched again. Check the gate step status with flow_get.",
   "main.gateReview.gateNotFound":
     "Flow {flowId}: gate {gateId} not found (the step does not exist or is not a gate); check the flow YAML and submit again.",
   "main.gateReview.criteriaMissing":
-    "Flow {flowId}: the acceptance criteria have no gate review section for {gateId}; have Proof add it to the latest criteria and submit again (Steward does not write docs/acceptance/).",
+    "Flow {flowId}: the acceptance criteria have no gate review section for {gateId}; have QA add it to the latest criteria and submit again (Operations does not write docs/acceptance/).",
   "main.gateReview.flowIncomplete":
     "Flow {flowId}: gate {gateId} prerequisites or evidence are incomplete ({detail}); complete them and submit again — do not submit early or use submission to stand in for missing steps.",
   "main.gateReview.unavailable":
@@ -1647,11 +1656,11 @@ export const enUS = {
   "main.gateReview.failNote":
     "Flow {flowId}: gate {gateId} did not pass ({severity}; report {reportPath}); the gate stays pending, and review must be requested again after rework.",
   "main.gateReview.returnedToProof":
-    "Flow {flowId}: the gate {gateId} report is missing or structurally invalid ({detail}); returned to Proof to complete — not passed and no rework routed.",
+    "Flow {flowId}: the gate {gateId} report is missing or structurally invalid ({detail}); returned to QA to complete — not passed and no rework routed.",
   "main.gateReview.nitOnly":
-    "Flow {flowId}: the gate {gateId} fail contains only minor/nit items; a gate failure must rest on a blocker/major, so it was returned to Proof as structurally invalid and no rework was triggered.",
+    "Flow {flowId}: the gate {gateId} fail contains only minor/nit items; a gate failure must rest on a blocker/major, so it was returned to QA as structurally invalid and no rework was triggered.",
   "main.gateReview.reportMissing":
-    "Flow {flowId}: the gate {gateId} report is missing or unreadable ({reportPath}); the gate stays pending while waiting for Proof to submit it — a timeout never counts as a pass.",
+    "Flow {flowId}: the gate {gateId} report is missing or unreadable ({reportPath}); the gate stays pending while waiting for QA to submit it — a timeout never counts as a pass.",
   "main.gateReview.reworkTask":
     "Gate rework task | {gateId}: fix the {severity} items in gate report {reportPath}; minor/nit items are non-blocking and optional follow-ups.",
 
@@ -1698,14 +1707,59 @@ export const enUS = {
   "main.composerImages.decodeFailed": "Image data decoding failed.",
 
   // view_image project image tool (customer requirement: roles can view project image evidence).
-  // Two-turn attachment semantics: this turn's tool result only confirms the image was read and queued;
-  // the image is provided to the same role as an image attachment with the next user prompt. The model has
-  // not seen the image content this turn and must not pretend otherwise. Path/type/size are fail-closed;
-  // the tool is not registered when the capability is not injected.
+  // Delivery semantics (customer request 2026-10-27 "same-turn image fix"): same-turn tool-result
+  // images are preferred — the image travels with this turn's tool result to the same model turn, so
+  // the next model call can see and judge it; no queue entry or system line is produced. Engines
+  // without same-turn support fall back to a next-user-prompt image attachment for the same role.
+  // The per-engine policy is decided by the runtime core. Either way, never pretend to have seen an
+  // image that was not delivered. Path/type/size are fail-closed; the tool is not registered when
+  // the capability is not injected.
+  "main.viewImage.sameTurn":
+    "Read project image {path}; the image is attached to this turn's tool result (visible within the same turn), so you can view and judge it now. If your context does not include the image, state clearly that you have not seen it — do not pretend you have.",
   "main.viewImage.queued":
     "Read project image {path} and queued it: it will be provided as an image attachment with the next user prompt; you have not seen the image content this turn — do not pretend you have.",
   "main.viewImage.failed":
     "Failed to read or queue the project image ({detail}); no image was provided.",
+
+  // Requirement change request receipts/tickets/system line/approval results (2026-10-26
+  // request_requirement_change; customer requirement). Scenario: when a Draft proposal needs new
+  // authorization/scope, it must not be written into the proposal card; the request and the
+  // requirement-change approval card may be initiated by the Steward or the proposer role
+  // (Rapporteur) — no other role may initiate them, and the initiator must not approve its own
+  // request. Approval is completed on the decision card by the independent judge agent (with
+  // “decide for me” enabled, defaulting to the unique recommended option) or by the customer when
+  // it is not enabled. The Lead does not approve: it only executes the intent change after approval
+  // and notifies Draft to revise. Placeholders: {flowId} flow id; {intentId} intent id;
+  // {requestId} request ticket id; {detail} bounded diagnostic/missing-item note; {source}
+  // approval source (judge delegation “decide for me”, or customer choice). A request is not
+  // approval; proposal cards must not carry unconfirmed new authorization; never present a request
+  // or approval result as the customer's own approval.
+  "main.requirementChange.dispatched":
+    "Flow {flowId}: requirement change request {requestId} (intent {intentId}) submitted for independent approval: the request may be initiated by Operations or the proposer role (Planner), and the approval card is presented automatically by the app through the initiator's session after a successful request — no other role may initiate them, and the initiator must not approve its own request; approval is completed on the decision card by the judge agent (with “decide for me” enabled, defaulting to the recommended option) or by the customer when it is not enabled; a request is not approval — Product does not approve and only executes the intent change after approval and notifies Planner to revise; proposal cards must not carry unconfirmed new authorization.",
+  "main.requirementChange.alreadyDispatched":
+    "Flow {flowId}: a pending requirement change request {requestId} already exists (intent {intentId}); not submitted again — wait for the independent approval result (the request may be initiated by Operations or the proposer role, and the approval card is presented automatically by the app through the initiator's session; the initiator must not self-approve).",
+  "main.requirementChange.invalid":
+    "Requirement change request parameters are invalid ({detail}); not submitted (fail-closed). Fix and retry.",
+  "main.requirementChange.intentNotFound":
+    "Flow {flowId}: intent {intentId} not found; the requirement change request was not submitted. Check and retry.",
+  "main.requirementChange.flowNotFound":
+    "Flow {flowId}: flow not found; the requirement change request was not submitted. Check and retry.",
+  "main.requirementChange.unavailable":
+    "Flow {flowId}: the requirement change request channel is unavailable ({detail}); it may already have been submitted — check. The app does not claim submission.",
+  "main.requirementChange.rejected":
+    "Flow {flowId}: the requirement change request submission was rejected ({detail}); it did not enter independent approval — fix the cause and resubmit instead of retrying unchanged.",
+  "main.requirementChange.taskLabel":
+    "[Requirement change request · independent approval pending]",
+  "main.requirementChange.ticket":
+    "Requirement change request {requestId} | flow {flowId} | intent {intentId} | pending independent approval (the request may be initiated by Operations or the proposer role, and the approval card is presented automatically by the app through the initiator's session; the initiator must not self-approve; a request is not approval): {detail}",
+  "main.requirementChange.systemLine":
+    "System·Requirement change · requirement change request {requestId} (flow {flowId} · intent {intentId}) submitted for independent approval: the request may be initiated by Operations or the proposer role (Planner), and the approval card is presented automatically by the app through the initiator's session after a successful request — no other role may initiate them, and the initiator must not self-approve; approval is completed on the decision card by the judge agent (decide-for-me → default recommendation) or by the customer when not enabled; a request is not approval — Product does not approve and only executes the intent change after approval and notifies Planner to revise; proposal cards must not carry unconfirmed new authorization.",
+  "main.requirementChange.approved":
+    "Flow {flowId}: requirement change request {requestId} (intent {intentId}) passed independent approval ({source}); Product does not approve and will execute the intent change within the approved scope and notify Planner to revise; proposal cards must not carry unapproved new authorization.",
+  "main.requirementChange.approvalRejected":
+    "Flow {flowId}: requirement change request {requestId} (intent {intentId}) did not pass independent approval ({detail}); Product does not approve and does not execute the intent change; a request is not approval — do not revise the proposal on that request; adjust per the approval feedback and submit again.",
+  "main.requirementChange.leadExecuteTask":
+    "Requirement change execution task | flow {flowId} | intent {intentId} | request {requestId}: independent approval passed ({source}); Product does not approve and only executes the intent change (docs/intents/**) within the approved scope and notifies Planner to revise; do not expand scope, do not put new authorization into proposal cards, and do not delete requirements to bypass gate 0.",
 
   "main.confirm.expiredTimeout": "Confirmation timed out; the old confirmation is no longer valid.",
   "main.confirm.expiredStopped":

@@ -210,7 +210,7 @@ test("P1-1 撤回：忙时入队两条 → 撤第 2 条（ok+摘要、位次前�
 });
 
 test("P1-2 LRU 避开 busy：挑最久未用的非 busy 者；全忙暂超限；settled 后下一时机再收；在跑的全程不被掐断", async () => {
-  assert.equal(MAX_LIVE_SESSIONS, 3, "上限值前提（提案按 3 论述）");
+  assert.equal(MAX_LIVE_SESSIONS, 3, "上限值前提（策划按 3 论述）");
   const l = listing(["B", "A", "C", "D"], "");
   const h = makeHarness(l);
 
@@ -341,7 +341,7 @@ test("2026-10-26 治理唤醒 sendBackground kind=system：入队为系统条目
     projectRoot: "/proj",
     roleId: "A",
     runtime: "demo",
-    text: "[系统·治理核证] 流程 flow-x：以下步骤已 delivered，等待统筹核证：",
+    text: "[系统·治理核证] 流程 flow-x：以下步骤已 delivered，等待运营核证：",
     kind: "system",
   });
   assert.equal(wake.ok, true, wake.error ?? "");

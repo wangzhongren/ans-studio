@@ -71,7 +71,7 @@ test("注入后注册 request_gate_review；参数 gateId 必填 slug，flowId/n
   for (const need of [
     /独立于最终验收/,
     /request_acceptance/,
-    /仅统筹/,
+    /仅运营/,
     /gate 复核 ≠ 验收通过 ≠ 客户批准/,
     /dispatched.*只表示已派 Proof/,
     /blocker\/major/,
@@ -84,7 +84,7 @@ test("注入后注册 request_gate_review；参数 gateId 必填 slug，flowId/n
     assert.match(description, need);
   }
   const guidelines = (desc.promptGuidelines ?? []).join("\n");
-  assert.match(guidelines, /只给统筹/);
+  assert.match(guidelines, /只给运营/);
   assert.match(guidelines, /不要.*自行判断 gate 是否达标/);
   assert.match(guidelines, /minor\/nit/);
   assert.match(guidelines, /客户批准/);

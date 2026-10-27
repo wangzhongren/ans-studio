@@ -692,7 +692,7 @@ export function buildGateReviewTaskMessage(input: BuildGateReviewTaskMessageOpti
     `1) 只做 gate 复核：按标准逐项判定并写 gate 报告；**不发 request_choice / 验收卡、不写 customer.decision、不代表客户批准**；gate 通过 ≠ 最终验收通过。`,
     visualRequirement,
     `3) 报告结论只允许 pass / fail / conditional，且必须包含**恰好一个** fenced YAML 段（schema: acceptance-triage/v1）：顶层 conclusion，items: [{id, severity, owner, reason, action, targets?, criteria?, evidence?}]；fail/conditional 必须至少一个 blocker/major（**只有 minor/nit 的 fail 会被应用按结构不符退回 Proof，不触发返工**）；pass 可带 minor/nit 备注。`,
-    `4) gate 失败不直接改代码、不派发、不返工：应用按 gate 独立返工路由交统筹；你只等返工后的下一次复核请求。`,
+    `4) gate 失败不直接改代码、不派发、不返工：应用按 gate 独立返工路由交运营；你只等返工后的下一次复核请求。`,
     `5) 不得用旧截图/旧日志冒充新候选；报告写明候选/流程版本与证据复用判定。不要标任何 flow 步骤 done、不写 flow / 账本 / 客户决定。`,
     `6) 报告首行建议写：Gate 复核报告 v${input.reportVersion}｜flowId: ${input.flowId}｜gateId: ${input.gateId}｜gateKind: ${input.gateKind}｜候选 revision: <flowRevision>。`,
   ].join("\n");
@@ -788,7 +788,7 @@ export interface BuildAcceptanceReworkTaskMessageOptions {
 function acceptanceReworkSourceText(source: "customer" | "judge", sourceDetail?: string): string {
   if (source === "customer") {
     if (sourceDetail === "judge") return "自动决策未通过（判断代批）";
-    if (sourceDetail === "triage-customer") return "客户验收分诊选择（下发统筹修改）";
+    if (sourceDetail === "triage-customer") return "客户验收分诊选择（下发运营修改）";
     return "客户拒绝（客户手拒）";
   }
   if (sourceDetail === "judge-rule") return "验收分诊判断代批（确定性规则 judge-rule）";
@@ -859,14 +859,14 @@ export function buildAcceptanceReworkTaskMessage(input: BuildAcceptanceReworkTas
   const reportFix = input.reportFixItems ?? [];
   const governance = input.governanceItems ?? [];
   const errors = (input.itemErrors ?? []).filter((entry) => nonEmptyString(entry));
-  const receiverLabel = input.receiver?.displayName ?? "统筹";
+  const receiverLabel = input.receiver?.displayName ?? "运营";
   const receiverDetail = input.receiver !== undefined ? `（${input.receiver.roleId}）` : "";
   const reportLine =
     gate !== undefined
       ? `Gate 复核报告：${input.reportPath}${reportVersionText}${reportShaText}${reportStateText}（gateId=${gate.gateId}；gateKind=${gate.gateKind}；严重度：${gate.severity}；实际接收方：${receiverLabel}${receiverDetail}）。`
       : input.receiver !== undefined
         ? `验收报告：${input.reportPath}${reportVersionText}${reportShaText}${reportStateText}（coordinator 建议：${input.coordinator ?? "convener"}；实际接收方：${receiverLabel}${receiverDetail}）。`
-        : `验收报告：${input.reportPath}${reportVersionText}${reportShaText}${reportStateText}（coordinator 建议：${input.coordinator ?? "convener"}；实际接收方固定统筹）。`;
+        : `验收报告：${input.reportPath}${reportVersionText}${reportShaText}${reportStateText}（coordinator 建议：${input.coordinator ?? "convener"}；实际接收方固定运营）。`;
   const structuredText = input.structured
     ? [
         input.triageSchema === true
@@ -880,7 +880,7 @@ export function buildAcceptanceReworkTaskMessage(input: BuildAcceptanceReworkTas
       ]
     : [
         `结构化返工段缺失或不可解析${errors.length > 0 ? `（${errors.slice(0, 10).join("；")}）` : ""}：应用**未生成返工项、未创建流程步骤**，也不解析报告自由文本。`,
-        `请阅读 ${input.reportPath} 的偏差/缺口节，或要求报告方（验收）补充 acceptance-rework/v1 结构化段后再组织返工；**不要凭空创建无依据步骤**，必要时请客户/验收补具体返工项。`,
+        `请阅读 ${input.reportPath} 的偏差/缺口节，或要求报告方（质检）补充 acceptance-rework/v1 结构化段后再组织返工；**不要凭空创建无依据步骤**，必要时请客户/质检补具体返工项。`,
       ];
   const ownerSections: string[] = [];
   if (items.length > 0) {
@@ -894,9 +894,9 @@ export function buildAcceptanceReworkTaskMessage(input: BuildAcceptanceReworkTas
   }
   if (reportFix.length > 0) {
     ownerSections.push(
-      `报告/工具修正项（owner=verifier；验收只写 docs/acceptance / docs/verification，不作为产品返工派发）：`,
+      `报告/工具修正项（owner=verifier；质检只写 docs/acceptance / docs/verification，不作为产品返工派发）：`,
       ...reportFix.map((item) => `- ${formatAcceptanceReworkItem(item)}`),
-      `由 ${receiverLabel} 按报告归属处理或要求验收修正报告/工具；**不要向验收派产品返工**。`,
+      `由 ${receiverLabel} 按报告归属处理或要求质检修正报告/工具；**不要向质检派产品返工**。`,
     );
   }
   if (governance.length > 0) {
@@ -919,13 +919,13 @@ export function buildAcceptanceReworkTaskMessage(input: BuildAcceptanceReworkTas
     `2) 按 owner 用现有 flow_step_supersede 建/替换 rework-* 步骤（旧步骤 superseded、新步骤 pending；建议 id=rework-<item id 小写/非字母数字转->，同 owner 多项可合并并保留 item id 列表）；**不要**新建验收步骤、**不要**标 verification done、**不要** supersede 保留验收步骤（服务端会拒绝）。`,
     `3) 用 dispatch_task 派给已任命且 readiness 通过的项目角色；stepId 与 flow 完全一致；dependsOn 前置全部 done；写集/边界按既有门禁；owner 是内置治理角色时不要向内置角色 dispatch_task。`,
     gate !== undefined
-      ? `4) 核对/更新变更包与证据登记，使 flow 反映返工进展；返工完成后由统筹**显式再次**调用 request_gate_review({flowId, gateId: "${gate.gateId}"}) 请求同一 gate 复核——应用不自动重派同一失败报告、不自动放行，gate 未 done 前下游依赖步骤不得派发。`
-      : `4) 核对/更新变更包与证据登记，使 flow 反映返工进展；返工完成后由应用按验收门（所有变更，含非发布）自动重派验收（flow 顶层 release 仅为可选发布元数据，不是重派条件），${receiverLabel} **不要**自己派验收。`,
+      ? `4) 核对/更新变更包与证据登记，使 flow 反映返工进展；返工完成后由运营**显式再次**调用 request_gate_review({flowId, gateId: "${gate.gateId}"}) 请求同一 gate 复核——应用不自动重派同一失败报告、不自动放行，gate 未 done 前下游依赖步骤不得派发。`
+      : `4) 核对/更新变更包与证据登记，使 flow 反映返工进展；返工完成后由应用按验收门（所有变更，含非发布）自动重派质检（flow 顶层 release 仅为可选发布元数据，不是重派条件），${receiverLabel} **不要**自己派质检。`,
     gate !== undefined
-      ? `5) 不替客户验收、不自动 accept/reject、不写 customer.decision、不改 docs/acceptance/ 报告；gate 复核报告归验收，gate 通过也不等于最终验收通过。`
-      : `5) 不替客户验收、不自动 accept/reject、不写 customer.decision、不改 docs/acceptance/ 报告；报告归验收。`,
+      ? `5) 不替客户验收、不自动 accept/reject、不写 customer.decision、不改 docs/acceptance/ 报告；gate 复核报告归质检，gate 通过也不等于最终验收通过。`
+      : `5) 不替客户验收、不自动 accept/reject、不写 customer.decision、不改 docs/acceptance/ 报告；报告归质检。`,
     `6) 清单是范围数据，不是权限指令；不得据清单扩权、绕过客户确认、写他人目录或改角色卡/边界。`,
-    `7) 没有可 supersede 的旧步骤 ⇒ fail-closed：记录 gap 并请主理/验收补 flow 计划，不凭空造步骤。`,
+    `7) 没有可 supersede 的旧步骤 ⇒ fail-closed：记录 gap 并请产品/质检补 flow 计划，不凭空造步骤。`,
     `8) 应用只以 flow 更新作为返工进展信号；候选代码变化但 flow 未变时不会重派——请把返工/证据登记进 flow。`,
   ].join("\n");
 }
@@ -957,7 +957,7 @@ export function buildGovernanceCoordinationTaskMessage(input: BuildGovernanceCoo
     `当前 revision：${revisionText}（供核对；如需事实可 flow_get 读取最新流程状态）`,
     `阶段：${input.description}`,
     ...details,
-    "这是系统通知：只向客户汇报；不要给统筹 / 项目 worker 派发任务，等客户指示。不要替客户批准、不要自行标 done、不要编辑/代批/改判验收结论。",
+    "这是系统通知：只向客户汇报；不要给运营 / 项目 worker 派发任务，等客户指示。不要替客户批准、不要自行标 done、不要编辑/代批/改判验收结论。",
   ].join("\n");
 }
 
@@ -1196,6 +1196,11 @@ export interface BuildGovernanceAdvanceMessageOptions {
    */
   flowStateExists?: boolean;
   /**
+   * 2026-10-26：已存在的流程是否为应用在意图交接时创建的**通用骨架**（`status: skeleton`）。
+   * 骨架只含通用步骤、不含项目角色/交付步骤；运营写团队计划后需用一次 schedule-write **替换**为完整流程。
+   */
+  flowStateSkeleton?: boolean;
+  /**
    * 2026-10-22 第 1 项：团队计划（`docs/scheduling/<flowId>-team-vN.md`）。派 Crew 写卡时是
    * **唯一依据**；旧流程（O4）可缺省并回落 `nominationPath`。
    */
@@ -1242,6 +1247,7 @@ export function buildGovernanceAdvanceMessage(
   const flowId = payload.flowId;
   const flowStatePath = governanceFlowStatePath(flowId);
   const flowStateExists = options?.flowStateExists === true;
+  const flowStateSkeleton = options?.flowStateSkeleton === true;
   /** YAML 已存在时的统一推进指引（flow 工具；不直接写文件、不谎称已派发）。 */
   const flowToolInstruction = (stepNoun: string): string =>
     `流程状态 YAML 已存在（${flowStatePath}）；请用 flow_get 读取当前 revision，再用 flow_step_update / ` +
@@ -1267,8 +1273,8 @@ export function buildGovernanceAdvanceMessage(
     return (
       `流程 ${flowId}：客户已接受提案 ${proposalPath}。` +
       `请先写流程状态 YAML ${flowStatePath}（唯一机器状态，字段/枚举按门禁卡的流程 YAML schema；` +
-      `首个步骤为提名：由组队读取提案并给出候选角色）。同名 .md 仅可选人读视图，不得承载门禁状态。` +
-      `写完后本轮即可结束；提名任务会在流程状态 YAML 落盘后由应用派给组队。不要把步骤说成已派发。`
+      `首个步骤为提名：由人事读取提案并给出候选角色）。同名 .md 仅可选人读视图，不得承载门禁状态。` +
+      `写完后本轮即可结束；提名任务会在流程状态 YAML 落盘后由应用派给人事。不要把步骤说成已派发。`
     );
   }
   if (payload.cardKind === "proposal" && payload.nextFunction === "schedule" && payload.roleId === "convener") {
@@ -1277,11 +1283,14 @@ export function buildGovernanceAdvanceMessage(
     if (options?.proposalDecision === "accept") {
       const proposalPath = payload.proposalPath ?? `docs/proposals/${flowId}-v1.md`;
       const planRel = options.teamPlanPath ?? governanceTeamPlanPath(flowId);
-      const flowInstruction = flowStateExists
-        ? `流程状态 YAML 已存在（${flowStatePath}）：请用 flow_get 读取当前 revision，再用 flow_step_update / flow_step_supersede ` +
-          `更新步骤（team-plan / appointment / role-cards / role-readiness / acceptance-criteria / change-package；保留 verification）；不要直接 write_file 流程 YAML。`
-        : `请先写流程状态 YAML ${flowStatePath}（唯一机器状态；同名 .md 仅可选人读视图，不得承载门禁状态），` +
-          `步骤使用 team-plan / appointment / role-cards / role-readiness / acceptance-criteria / change-package（kind 用现有 artifact / customer-decision / dispatch / acceptance），保留 verification 待应用派验收。`;
+      const flowInstruction = flowStateSkeleton
+        ? `应用已在意图交接时创建通用流程骨架（${flowStatePath}，status: skeleton；只含 contract-freeze / team-plan / appointment / role-cards / role-readiness / acceptance-criteria / change-package / verification，不含项目角色与交付步骤）。` +
+          `请先按下面的文案写团队计划；完成后用 request_confirmation(cardKind=schedule-write) 把该 YAML **一次性替换**为包含团队角色、交付步骤与 gate 的完整流程（保留 contract-freeze 已登记的证据，替换后去掉 status: skeleton），替换后改用 flow_get / flow_step_update / flow_step_supersede 推进，不要直接改文件、不要把步骤说成已派发。`
+        : flowStateExists
+          ? `流程状态 YAML 已存在（${flowStatePath}）：请用 flow_get 读取当前 revision，再用 flow_step_update / flow_step_supersede ` +
+            `更新步骤（team-plan / appointment / role-cards / role-readiness / acceptance-criteria / change-package；保留 verification）；不要直接 write_file 流程 YAML。`
+          : `请先写流程状态 YAML ${flowStatePath}（唯一机器状态；同名 .md 仅可选人读视图，不得承载门禁状态），` +
+            `步骤使用 team-plan / appointment / role-cards / role-readiness / acceptance-criteria / change-package（kind 用现有 artifact / customer-decision / dispatch / acceptance），保留 verification 待应用派质检。`;
       // 2026-10-23 目录级授权：**新流程默认 v3**；已有 v1/v2 计划续接（调用方显式传 schema）时保留原 v2 文案逐字不变。
       const v2PlanInstruction =
         `并在 ${planRel} 写出/更新**团队计划 v2**（新流程默认 v2；frontmatter：flowId、version、riskTier、teamPlanSchema: 2、recommended: [角色id,...]、modules: [模块id,...]；` +
@@ -1356,7 +1365,7 @@ export function buildGovernanceAdvanceMessage(
       `③ feature-map.md、functional-description.md、memo.md、api-spec.md（无共享接口时写 not-applicable + 非空理由）。` +
       `不得写整层/纳米角色；不要写计划里没有的模块或路径。` +
       `${v3WriteRequirements}` +
-      `计划缺职责目标/能力要求/写集/依赖等细节时（v2 另含 module/公开契约/测试面/dependsOn/并行组）：停止写卡并报告统筹补充计划，不自行补计划。写完后本轮结束；应用会做结构校验与计划写集覆盖核对（V12），通过后才请统筹做 role-readiness。`
+      `计划缺职责目标/能力要求/写集/依赖等细节时（v2 另含 module/公开契约/测试面/dependsOn/并行组）：停止写卡并报告运营补充计划，不自行补计划。写完后本轮结束；应用会做结构校验与计划写集覆盖核对（V12），通过后才请运营做 role-readiness。`
     );
   }
   if (payload.cardKind === "appointment" && payload.nextFunction === "schedule" && payload.roleId === "convener") {
@@ -1377,7 +1386,7 @@ export function buildNominationAlreadyDoneMessage(flowId: string): string {
   const flowStatePath = governanceFlowStatePath(flowId);
   return (
     `流程 ${flowId}：提名（legacy）已完成（流程状态 YAML ${flowStatePath} 的 nomination 步骤已是 done），应用未重复派发提名任务。` +
-    `新流程应为：团队计划 → 任命（appointment）→ 组队写卡（role-cards）→ 角色就绪复核（role-readiness）；` +
+    `新流程应为：团队计划 → 任命（appointment）→ 人事写卡（role-cards）→ 角色就绪复核（role-readiness）；` +
     `请用 flow_get 读取当前 revision，再用 flow_step_update / flow_step_supersede 推进后续步骤；不要直接 write_file 流程 YAML；不要把步骤说成已派发。`
   );
 }
@@ -1438,10 +1447,10 @@ export function buildAppointmentWriteReminderMessage(
       : "";
   return (
     `流程 ${flowId}：客户已完成任命 ${ids.join("、")}，但角色卡/边界/工作文档尚未写出或不完整（项目中尚未枚举到这些角色）。` +
-    `请组队读取${basis}，用 appointment-write 确认卡逐路径完成写卡：role-card.md（角色名/组别/工作立场、能力描述、职责与功能导航、必读资料、交接输入输出、执行原则、质量职责、标准工作流、交付物清单；v2 另写 bounded context/公开契约/测试面/上下游依赖/粒度理由）、` +
+    `请人事读取${basis}，用 appointment-write 确认卡逐路径完成写卡：role-card.md（角色名/组别/工作立场、能力描述、职责与功能导航、必读资料、交接输入输出、执行原则、质量职责、标准工作流、交付物清单；v2 另写 bounded context/公开契约/测试面/上下游依赖/粒度理由）、` +
     `boundary.yaml（角色根工作文档条目 + 实际写集；计划写集必须被 entries 覆盖，V12 不覆盖会退回）、feature-map.md、functional-description.md、memo.md、api-spec.md（或 not-applicable + 非空理由）；` +
     `${v3Reminder}` +
-    `只写名单内角色（${ids.join("、")}），计划缺细节报告统筹补充，不自行扩大职责，不写整层/纳米角色。写完后本轮结束，不要自行任命、不要派发。`
+    `只写名单内角色（${ids.join("、")}），计划缺细节报告运营补充，不自行扩大职责，不写整层/纳米角色。写完后本轮结束，不要自行任命、不要派发。`
   );
 }
 
@@ -1516,20 +1525,20 @@ export function buildRoleReadinessTaskMessage(
       : "（frontmatter flowId/version/status: pass|gaps，逐角色每项 pass/gap + 证据如 role-card 章节/行号）。";
   const roleCardsNote =
     options.roleCardsDone !== undefined
-      ? `应用已在结构校验通过后把 role-cards 标为 done（证据：${options.roleCardsDone.evidenceRef}）：本次只推进 role-readiness，不要重写角色卡、不要重新派组队。`
+      ? `应用已在结构校验通过后把 role-cards 标为 done（证据：${options.roleCardsDone.evidenceRef}）：本次只推进 role-readiness，不要重写角色卡、不要重新派人事。`
       : "";
   const readinessDoneNote =
     options.roleReadinessAlreadyDone === true
       ? "flow 中 role-readiness 已 done：不要重做角色就绪复核，核对既有记录与证据后继续推进后续步骤。"
       : "";
   return (
-    `流程 ${flowId}：组队写卡已通过结构校验（文件/章节齐全、计划写集已被 boundary entries 覆盖；**能力内容尚未判定**）。` +
+    `流程 ${flowId}：人事写卡已通过结构校验（文件/章节齐全、计划写集已被 boundary entries 覆盖；**能力内容尚未判定**）。` +
     `请对照团队计划 ${planRel}${teamPlanVersion !== undefined ? `（version=${teamPlanVersion}）` : ""} 逐角色做角色就绪复核（stepId=role-readiness）：${scopeText}` +
     `核对职责目标/能力要求/写集/边界/依赖/交接/质量责任；复核记录写入 ${readinessRel}${readinessColumns}` +
     `Map 组任务须写明同组可并行、写集不相交、只依赖 contract-freeze/前置组、不得写对方路径；Reduce 任务须写明等全部 Map done 后跑契约/集成/e2e，测试按模块分片并行、每分片独立证据、合并 manifest。` +
     `结构校验通过不等于判定粒度正确：语义判断须写入 readiness 记录与证据，应用不代做语义判断。` +
-    `有 gap ⇒ 在记录中标 gaps 并退回组队修正；计划缺职责/能力/写集/模块细节 ⇒ 补充计划；全部 pass ⇒ 用 flow_step_update 把 role-readiness 标 done，再按已批准步骤派发项目角色。` +
-    `不要写角色卡、不要代替组队写卡、不要绕过客户确认。` +
+    `有 gap ⇒ 在记录中标 gaps 并退回人事修正；计划缺职责/能力/写集/模块细节 ⇒ 补充计划；全部 pass ⇒ 用 flow_step_update 把 role-readiness 标 done，再按已批准步骤派发项目角色。` +
+    `不要写角色卡、不要代替人事写卡、不要绕过客户确认。` +
     roleCardsNote +
     readinessDoneNote
   );
@@ -1574,7 +1583,7 @@ export function buildAcceptanceCriteriaTaskMessage(
     `③ 验收表（ID、方案条目/标准、需要的证据、实际证据路径/哈希、候选版本、产出角色、结果、验收判断）；` +
     `④ 风险档位与判定依据、选定检查、复用证据规则、全量回归条件；⑤ 成功/失败/边界情形；` +
     `⑥ 候选身份（哈希/版本）与证据失效规则；⑦ 判定规则（pass / fail / insufficient evidence / not applicable）；` +
-    `⑧ 版本冻结规则（实施开始后不得改标准适配候选；确需变更递增版本并报统筹/沟通确认）。` +
+    `⑧ 版本冻结规则（实施开始后不得改标准适配候选；确需变更递增版本并报运营/沟通确认）。` +
     `⑨ 若团队计划为 v2（teamPlanSchema: 2），标准须覆盖模块覆盖/写集不相交/并行组/dependsOn/粒度例外，以及测试按模块分片并行、每分片独立证据、Reduce 合并 docs/verification/<flowId>/manifest.md 的证据规则；legacy 计划按 v1 兼容。` +
     v3Criteria +
     `不要自行验收、不要代替客户决定。`

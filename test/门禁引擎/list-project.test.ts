@@ -138,7 +138,7 @@ test("T14/五角色：导入空目录（新空项目）→ 不抛错、trio 五�
   );
   assert.deepEqual(
     listing.roles.map((r) => r.displayName),
-    ["主理", "提案", "组队", "统筹", "验收"],
+    ["产品", "策划", "人事", "运营", "质检"],
     "内置角色须由注册表填入统一显示名",
   );
   for (const builtIn of listing.roles) {

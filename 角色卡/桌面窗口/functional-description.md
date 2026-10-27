@@ -19,6 +19,7 @@ app/
     navigation-guard.ts       will-navigate/setWindowOpenHandler 接线（真实主进程窗口安装；可假件测试）
     session.ts                会话管理器（点角色即开、多轮 send、投递机/队列、边界重建、shell 闸两档分发）
     view-image.ts             view_image 桌面侧投递（工具读取的图片 → 下一轮同角色后台系统提示；能力注入）
+    requirement-change.ts     request_requirement_change 桌面侧纯逻辑（载荷二次校验/稳定 requestId/票据形状/审批卡与已批准执行任务文本）
     project.ts                由枚举构造 ProjectConfig（含创世态判定）；读变更记录/docs 索引（展示用）
     session-history.ts        旧 Pi 展示兼容：只读解析 JSONL → 界面行；不推断原生上下文
     request-anchor.ts         交互请求锚点键单一算法（kind+title；两侧同源拼键）
@@ -62,7 +63,11 @@ B 的每窗口 grant 只来自原生选目录，renderer root/recovery/evidence 
 - **授权链唯一实现** `project.ts::buildEffectiveProjectConfig`（fallback 运行期同意 → 共享载入器 → 采纳 `.ans` 治理边界路径）；会话语义与界面共用，杜绝漂移。
 - **点角色即开**：`SessionManager.open` 一次调用经 `openRoleSession`（`scope: undefined`）；多会话保活 LRU（跳过 busy 与各项目主理 `primaryRoleId`——主理会话不关闭）；切换角色不 dispose 切回续。
 - **投递机**（E-1/H-1/L-1/P0/P1/G-2）：四类条目（客户消息/派发/回交/系统）同一队列；失败如实+放回队首；去重键/撤回/`full` 定格；「排队≠已执行」；治理唤醒按 `system` 入队（显示「系统」、不可撤回）。
+- **意图交接有界 + 流程骨架**（2026-10-26 客户反馈）：`deliverIntentHandoff` 的打开/投递各有总预算（缺省 45s；阶段缺省=总预算，可由 `handOffIntentLimits` 注入）；投递回执超时后对账目标会话——目标在跑/有排队 ⇒ `ok:true`（工作中，写一次 `dispatch.accepted` 审计，晚到失败只补诊断/系统行）；目标既不在跑也无排队 ⇒ `ok:false`。交接前按 `docs/intents/<id>.md` frontmatter 的 `flowId`/`qualityTier`（缺失回落 `intentId`/`production`）幂等创建 `docs/flows/<flowId>.yaml` 通用骨架（`status: skeleton`，已存在不覆盖）；失败只诊断不阻断、不写 `.ans`/账本。提案接受后的 Convener 文案由 `interface.ts` 只读识别骨架（`FLOW_SKELETON_STATUS`）后改为 schedule-write 一次性替换。
+- **gate 复核超时对账 + 缺记录恢复**（2026-10-27 客户真机）：`requestGateReviewLimits` 缺省总/阶段均为 45s；投递超时先对账质检在跑/排队——有证据 ⇒ 写 gate 记录（dispatched）+ `dispatch.accepted{stepId=gateId}` 并回 `dispatched`（文案标注“超时但在途”），无证据 ⇒ `unavailable` 且零假记录；账本失败只诊断不翻转。`runAcceptanceCheck` 的 gate 扫描在读取既有记录前先补建“pending gate + 合法 pass 报告 + 无记录”的恢复记录，并走既有 `completeGateStep` 收口（幂等、系统行标注恢复；缺失/坏/fail 不恢复、不返工）。见[修复记录](docs/fix/2026-10-27_fix_gate-review-timeout-and-recovery.md)。
+- **治理唤醒引擎择路**（2026-10-27 客户真机）：`resolveNoteRuntime` 优先级＝显式 runtime → 当前角色会话 → 本进程治理会话 → 持久化选择/磁盘证据/凭据（`resolveAcceptanceRuntime`）→ 真实事件弱提示；`acceptanceRuntimeHints` 不再吸收应用 `delivery-note` 系统行（其 `"claude"` UI 兜底曾导致导入后 ready-wake 误用 Claude、缺 `ANTHROPIC_API_KEY` 失败）。项目已选 Pi 时所有治理唤醒/系统行用 Pi；无可用引擎才 `runtime-unresolved`。见[修复记录](docs/fix/2026-10-27_fix_ready-wake-runtime-selection.md)。
 - **view_image 桌面投递**（2026-10-26，两轮附件）：开会话/重建时构造 `viewImage: ViewImageFn`（契约全家 `src/model/runtime.ts`）并随 `openRoleSession` 注入（全部角色）；工具本轮内调用 ⇒ 经既有 `send` 以 `background:true`+`kind:"system"` 排队，settle 后按序投给**同一角色**，`PromptOptions.images` 装入工具生成的 `PromptImage` 原引用；成功回执 `{ok:true}`，失败/会话不可用/非法载荷如实 `{ok:false,message}`。目标在开会话时定格（不按 `activeRoleId`）。见[功能说明](docs/feature/view-image-delivery.md)。
+- **需求变更申请**（2026-10-26，`request_requirement_change`，仅统筹/提案注入）：纯逻辑在 `requirement-change.ts`（载荷二次校验/稳定 requestId/票据路径与形状/审批卡文本/已批准执行任务文本）；`interface.ts` 做发起方白名单、意图/流程存在性、同 flow `requested`/`dispatched`/`approved` 幂等、`.ans/governance/requirement-changes/<flowId>/<requestId>.json` 原子写（`requirement-change-request/v2`）、经**发起方会话客户卡通道**呈现 `decision` 审批卡（`session.ts::requestRequirementChangeDecision`；`onPresented` 区分已呈现/未呈现，卡校验仍用共享 `validateDecisionCardRequest`）；批准后向主理投递已批准执行任务（有界、忙则入队）与系统行，拒绝/未获结果回执发起方；失败 `unavailable`/`rejected`+票据 `failed`。**申请 ≠ 批准**：审批由客户/判断 agent 在 decision 卡完成、发起方不得自批；主理不审批、不接收原始申请任务；不写 `customer.decision`/账本、不改写权。见[功能说明](docs/feature/requirement-change-request.md)。
 - **边界陈旧重建**（O-1）：读盘 sha256 三来源快照指纹；陈旧 ⇒ 串行化作废重建 + 身份守卫 + TOCTOU 重校验；在跑轮次不打断。
 - **shell 两档**：项目角色 (c)/(b)/(a) 三层链；su 只读档（给出 `shellReadonly` 即 arm，不带 `!suppressHandback` 前缀）。
 - **诊断**：唯一共享 logger 滚动 24h；`app:reload-interface` 显式重载；`replayPending` 同 id 重推不代答。

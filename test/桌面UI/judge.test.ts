@@ -193,7 +193,7 @@ test("开关回包：ok 采用主进程值；失败保持原状态并给出错�
 test("确认卡标题/档位/恢复动作：逐字沿用旧文案；未知不编语义", () => {
   assert.equal(shellConfirmTitle("su-approval", "A"), "SU 命令审批");
   assert.equal(shellConfirmTitle("project", "A"), "shell 命令请求");
-  assert.equal(shellConfirmTitle("su-approval", "verifier"), "命令审批 · 验收");
+  assert.equal(shellConfirmTitle("su-approval", "verifier"), "命令审批 · 质检");
   assert.equal(suApprovalTierLabel("deny"), "硬拒类（deny）");
   assert.equal(suApprovalTierLabel("risky"), "风险命令（risky）");
   assert.equal(suApprovalTierLabel("review"), "未自动判定（review）");

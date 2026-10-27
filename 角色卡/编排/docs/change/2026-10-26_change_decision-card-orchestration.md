@@ -42,6 +42,12 @@ events:
 
 ## 一、编排分类与白名单（`run-role.ts`）
 
+> **后续变更（2026-10-26，客户纠正/补充，见
+> [`2026-10-26_change_request-requirement-change-orchestration.md`](2026-10-26_change_request-requirement-change-orchestration.md)）**：
+> 本记录下文「仅统筹可发」的**角色白名单已被扩展**——报告员 Rapporteur 也可发 decision 卡，但**仅限
+> 需求变更审批**；`DECISION_CARD_ALLOWED_ROLES = ["convener", "rapporteur"]`，Lead/Crew/Proof 与项目
+> 角色仍不可发。分类/账本语义（`material-choice`、不触发 gate/验收）不变。
+
 - `TRIO_CARD_KINDS.convener` 增 `"decision"`：**仅统筹（Steward/Convener）**可发；Lead（liaison）仍只有
   `intent-confirm`，rapporteur/nominator/verifier 均不含 `decision`；越权在触达客户通道之前
   `declined`（既有白名单文案 `/不允许 cardKind=decision/`），不弹卡、不写账本。

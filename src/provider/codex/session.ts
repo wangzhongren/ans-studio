@@ -6,11 +6,16 @@ import path from "node:path";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
 import type { ResolvedRole } from "../../model/role.ts";
-import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, ToolDefinition, ToolResult, RuntimeTurnOutcome, RuntimeToolEventFactsV1, RuntimeToolErrorFactsV1, InstalledMcpServerV1 } from "../../model/runtime.ts";
+import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, ToolDefinition, ToolResult, RuntimeTurnOutcome, RuntimeToolEventFactsV1, RuntimeToolResultFactsV1, RuntimeToolErrorFactsV1, InstalledMcpServerV1 } from "../../model/runtime.ts";
 import { object, deferred, eventQueue, pausedDeadline, bounded, webSearchRow, mcpToolName, mcpToolCallNative, reasoningRejection } from "../../common/codex-adapter/protocol.ts";
 import type { CodexRpcConnection, CodexEngineInput, CodexEngineFactory } from "../../common/codex-adapter/protocol.ts";
-import { settings, safetyConfig, safetyOverrides, effectiveConfig, verifyThread, reasoningEffortOverride } from "../../common/codex-adapter/config.ts";
+import { settings, safetyConfig, safetyOverrides, effectiveConfig, verifyThread, reasoningEffortOverride, chatCompletionsEndpoint, type CodexWireApi } from "../../common/codex-adapter/config.ts";
 import { prepareReasoningCatalog, type TemporaryReasoningCatalog } from "../../common/codex-adapter/reasoning-catalog.ts";
+// 工具结果同轮附图（2026-10-27 设计 §5.3/§6.4）：`ToolResult.images` → MCP image block →
+// 动态工具 `inputImage` data URL。图片字节绝不经过 redact/日志/诊断（映射纪律见该模块头注释）。
+import { mapCodexToolResultImages, mapCodexDynamicContent, CODEX_IMAGE_UNAVAILABLE_NOTE } from "../../common/codex-adapter/tool-result-images.ts";
+// 最小 Chat Completions 兼容传输（2026-10-27 客户补充约束；显式 opt-in，默认仍走 app-server Responses）。
+import { createCodexChatSession } from "../../common/codex-adapter/chat-transport.ts";
 // G-5：推理事实通道（适配器只产事实；投影单点在 Service）。事件 summary
 // 用核心定格常量（Service 在投影单点强制覆盖——适配器不随载荷携带自由文本上 summary 位）。
 import { REASONING_EVENT_SUMMARY } from "../../common/runtime-core/reasoning.ts";
@@ -39,7 +44,7 @@ interface McpServer extends McpPeer {
   setRequestHandler(schema: unknown, handler: (request: { params?: Record<string, unknown> }) => Promise<unknown> | unknown): void;
 }
 interface McpClient extends McpPeer {
-  callTool(params: Record<string, unknown>, schema?: unknown, options?: Record<string, unknown>): Promise<{ content: Array<{ type: string; text?: string }>; isError?: boolean }>;
+  callTool(params: Record<string, unknown>, schema?: unknown, options?: Record<string, unknown>): Promise<{ content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>; isError?: boolean }>;
   listTools(): Promise<{ tools: Array<Record<string, unknown>> }>;
 }
 /** Allows tests to load the real MCP package from an isolated package harness. */
@@ -99,6 +104,13 @@ export interface CodexRuntimeAdapterOptions extends RuntimeProviderOptions {
   env?: Record<string, string | undefined>;
   /** Explicit executable override; default resolves the pinned @openai/codex package lazily. */
   cliPath?: string;
+  /**
+   * Wire protocol override: `responses` (default; pinned app-server) or `chat` (minimal Chat Completions
+   * transport, 2026-10-27 customer constraint). Hosts usually set `ANS_CODEX_WIRE_API=chat` instead.
+   */
+  wireApi?: CodexWireApi;
+  /** Test/embedding seam for the chat transport; defaults to global fetch. */
+  chatFetch?: typeof fetch;
   /**
    * Server-side web search capability (R1). Fail-closed default off; explicit value overrides
    * ANS_CODEX_WEB_SEARCH (on|off). Gates only the request declaration — the webSearch item
@@ -378,6 +390,28 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
       // 判断模式：外来 MCP 一律不装配（即使上游误传声明也置空——PM 评审 §6.1/A35）。
       const installedServers = prepareInstalledMcpServers(judgeMode ? [] : options.installedMcpServers ?? [], environmentSnapshot);
       const allowedServers = new Set(installedServers.map(server => server.name));
+      // 最小 Chat Completions 兼容传输（客户 2026-10-27 补充约束；显式 `wireApi:"chat"` 或
+      // `ANS_CODEX_WIRE_API=chat`）。不启动原生 app-server；原生 MCP/联网搜索在 chat 模式
+      // 结构性缺席 ⇒ 非空声明/开启即 fail-closed，不静默丢弃。默认路径（responses）逐字不变。
+      if (config.wireApi === "chat") {
+        if (installedServers.length > 0) throw new Error("Codex chat transport does not support installed MCP servers");
+        if (config.webSearch) throw new Error("Codex chat transport does not support server-side web search");
+        const context = await composeContext(role);
+        return createCodexChatSession({
+          role,
+          systemPrompt: context.systemPrompt,
+          tools: options.tools,
+          model: config.model,
+          endpoint: chatCompletionsEndpoint(config.baseUrl),
+          apiKey: config.key,
+          redact: config.redact,
+          interactionGate: options.interactionGate,
+          currentTurnId: options.currentTurnId,
+          projectToolEvent: options.projectToolEvent,
+          turnLastResortMs: options.turnLastResortMs ?? DEFAULT_TURN_LAST_RESORT_MS,
+          fetchImpl: options.chatFetch,
+        });
+      }
       // Only completed compatibility turns commit a new strategy. Every ordinary turn explicitly
       // reapplies a confirmed effort, undoing native turn/start settings left by a failed attempt.
       let confirmedEffort: string | undefined = config.reasoningEffort === "off" ? undefined : config.reasoningEffort;
@@ -530,13 +564,21 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
           const result = turn.controller.signal.aborted || turn.completed
             ? { ok: false, message: "ANS refused a result from a stopped turn" }
             : returned;
+          // 工具结果附图（同轮设计 §6.4）：只映射 `ok:true` 的 images；任一载荷非法 ⇒ 整批
+          // fail-closed（无图 + isError + 诚实注记）。图片 data/base64 绝不进入事件事实
+          // （resultFacts 只保留共享契约字段）也绝不经过 redact；只有文本走 redact。
+          const imageMapping = mapCodexToolResultImages(result);
+          const deliveredOk = result.ok && !imageMapping.invalid;
+          const modelMessage = imageMapping.invalid ? `${result.message}${CODEX_IMAGE_UNAVAILABLE_NOTE}` : result.message;
+          const resultFacts: RuntimeToolResultFactsV1 = { ok: deliveredOk, message: modelMessage, ...(result.execution !== undefined ? { execution: result.execution } : {}) };
           // A late callback cannot append an apparent success after that turn's settled event.
           if (!turn.completed && active === turn && (handlerStarted || !options.projectToolEvent)) {
-            let source: RuntimeToolEventFactsV1 = { ...facts, phase: "result", origin: "handler-result", result };
+            let source: RuntimeToolEventFactsV1 = { ...facts, phase: "result", origin: "handler-result", result: resultFacts };
             if (displayError && result === returned) source = { ...facts, phase: "result", origin: "handler-result", error: displayError };
-            emitTool(turn, source, result.ok ? "accepted" : "denied", result.message, { toolName: name, name, toolCallId: callId, ok: result.ok });
+            emitTool(turn, source, deliveredOk ? "accepted" : "denied", modelMessage, { toolName: name, name, toolCallId: callId, ok: deliveredOk });
           }
-          return { isError: !result.ok, content: [{ type: "text", text: config.redact(result.message) }] };
+          // MCP image block 只携带 base64 与 MIME（无 data: 前缀）；动态工具层统一转 data URL。
+          return { isError: !deliveredOk, content: [{ type: "text", text: config.redact(modelMessage) }, ...imageMapping.images] };
         });
         const [serverTransport, clientTransport] = modules.InMemoryTransport.createLinkedPair();
         await server.connect(serverTransport);
@@ -576,7 +618,12 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
           if (requestContext?.signal.aborted) cancelledUpstream();
           try {
             const result = await client!.callTool({ name, arguments: object(params.arguments ?? {}, "dynamic arguments"), _meta: { ansCallToken: token } }, undefined, { signal: original.controller.signal, timeout: 2147483647 });
-            return { success: !result.isError, contentItems: result.content.filter(item => item.type === "text").map(item => ({ type: "inputText", text: config.redact(item.text ?? "") })) };
+            // 同轮附图：MCP image block → `{type:"inputImage",imageUrl:"data:<mime>;base64,<data>"}`
+            // （0.162.1 只接受 data URL；图片字节绝不经过 redact、绝不落临时文件/远程 URL）。
+            // 未知块/非法图片 ⇒ 整个动态响应 fail-closed（success:false + 诚实注记，不部分交付）。
+            const mapped = mapCodexDynamicContent(result.content, config.redact, { includeImages: !result.isError });
+            if (mapped.invalid) return { success: false, contentItems: [{ type: "inputText", text: config.redact(CODEX_IMAGE_UNAVAILABLE_NOTE) }] };
+            return { success: !result.isError, contentItems: mapped.items };
           } catch (error) { return denied(error); }
           finally { calls.delete(token); requestContext?.signal.removeEventListener("abort", cancelledUpstream); }
         };

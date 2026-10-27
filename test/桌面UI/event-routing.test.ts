@@ -9,6 +9,7 @@ import {
   describeEvent,
   envelopeMatches,
   historyRowToDescriptor,
+  isSpecialTool,
   normalizeEnvelopes,
   toolStatus,
 } from "../../app/renderer/src/chat/events.ts";
@@ -90,6 +91,112 @@ test("事件→行：prompt-input→user；assistant；settled→turn-terminal�
   });
   assert.equal(deniedTool?.kind, "denied");
   assert.equal(deniedTool?.callId, "call-2");
+});
+
+test("view_image：实时与历史都成为独立生命周期行，其余工具仍在折叠组", () => {
+  const imagePath = "docs/verification/pixel-snake/gate-vertical-slice/vs-ready.png";
+  const liveStart = describeEvent({
+    kind: "tool_call",
+    turnId: "t1",
+    summary: "调用工具 view_image",
+    detail: {
+      toolName: "view_image",
+      toolCallId: "img-1",
+      phase: "start",
+      args: { path: imagePath },
+    },
+  });
+  assert.equal(liveStart?.kind, "tool-lifecycle");
+  const startActivity = (liveStart?.data as {
+    activity: { toolName: string; target: string; status: string; callId?: string };
+  }).activity;
+  assert.equal(startActivity.toolName, "view_image");
+  assert.equal(startActivity.target, imagePath);
+  assert.equal(startActivity.status, "running");
+  assert.equal(startActivity.callId, "img-1");
+
+  const liveResult = describeEvent({
+    kind: "accepted",
+    turnId: "t1",
+    summary: "view_image: 已读取并排队",
+    detail: {
+      toolName: "view_image",
+      toolCallId: "img-1",
+      phase: "result",
+      ok: true,
+      status: "completed",
+    },
+  });
+  assert.equal(liveResult?.kind, "tool-lifecycle");
+
+  const liveDenied = describeEvent({
+    kind: "denied",
+    turnId: "t1",
+    summary: "view_image 未放行",
+    detail: { toolName: "view_image", toolCallId: "img-2", phase: "blocked" },
+  });
+  assert.equal(liveDenied?.kind, "tool-lifecycle");
+
+  const historyCall = historyRowToDescriptor({
+    kind: "tool",
+    text: "调用工具 view_image",
+    turnId: "t1",
+    activity: {
+      toolName: "view_image",
+      target: imagePath,
+      phase: "call",
+      status: "call",
+      toolCallId: "img-3",
+    },
+  });
+  assert.equal(historyCall.kind, "tool-lifecycle");
+  const historyActivity = (historyCall.data as { activity: { target: string; status: string } })
+    .activity;
+  assert.equal(historyActivity.target, imagePath);
+  assert.equal(historyActivity.status, "running");
+
+  const historyResult = historyRowToDescriptor({
+    kind: "tool",
+    text: "view_image：已读取并排队",
+    turnId: "t1",
+    activity: {
+      toolName: "view_image",
+      target: imagePath,
+      phase: "result",
+      status: "completed",
+      toolCallId: "img-3",
+    },
+  });
+  assert.equal(historyResult.kind, "tool-lifecycle");
+  assert.equal(
+    (historyResult.data as { activity: { status: string } }).activity.status,
+    "completed",
+  );
+
+  const historyDenied = historyRowToDescriptor({
+    kind: "denied",
+    text: "view_image 未放行",
+    turnId: "t1",
+    activity: {
+      toolName: "view_image",
+      target: imagePath,
+      phase: "blocked",
+      status: "denied",
+      toolCallId: "img-4",
+    },
+  });
+  assert.equal(historyDenied.kind, "tool-lifecycle");
+
+  assert.equal(isSpecialTool("view_image"), true);
+  assert.equal(isSpecialTool("read_file"), false);
+
+  const read = describeEvent({
+    kind: "tool_call",
+    turnId: "t1",
+    summary: "调用工具 read_file",
+    detail: { toolName: "read_file", toolCallId: "r1", phase: "start", args: { path: "a.md" } },
+  });
+  assert.equal(read?.kind, "activities");
 });
 
 test("工具事实：timedOut > exitCode≠0 > failed > phase", () => {

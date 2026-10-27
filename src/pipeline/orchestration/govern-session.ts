@@ -129,6 +129,9 @@ export type {
   FlowToolViewWithRelease,
   ReleaseExtensionValidation,
 } from "../../common/编排/flow-service.ts";
+// 2026-10-26：意图交接时由应用创建通用流程骨架（客户反馈：提案前 flow 文件不应缺失）。
+export { ensureFlowSkeleton, FLOW_SKELETON_STATUS } from "../../common/编排/flow-service.ts";
+export type { EnsureFlowSkeletonInput, EnsureFlowSkeletonResult } from "../../common/编排/flow-service.ts";
 
 // ── W6-A（2026-10-18）：意图交接/澄清的 Pipeline 公共出口 ──────────────────────────────────
 // 四角色评审 §5.2：桌面窗口只依赖 Pipeline 公共出口，**不直接导入**编排私有 `common/`。
@@ -141,6 +144,7 @@ export {
   intentArtifactPath,
   intentHandoffDedupeKey,
   validateIntentHandoff,
+  parseIntentFrontmatter,
   countClarificationRounds,
 } from "../../common/编排/governance-handoff.ts";
 export type {
@@ -661,18 +665,21 @@ const ARCHITECTURE_EXTENSIBILITY_REQUIREMENTS = [
  * 2026-10-26 客户规则：主理收到 `[系统·治理协调]`、gate pass/fail 系统行、交付/阻塞通知等**系统消息**时
  * 只向客户汇报，不得据此给统筹（Steward）发任务/`dispatch_task`、不得改写成协调任务；客户明确要求或由
  * 客户消息触发的协调仍按原规则。门禁角色卡文本由门禁引擎属主同步（本角色不改卡）。
+ * 2026-10-26 流程骨架：应用在意图交接时可能已创建 `status: skeleton` 的通用骨架；本提示的单行与门禁引擎
+ * 运营卡「流程骨架与完整流程（仅初始创建 / 骨架替换）」成对（物理副本，改文案须同批）。
  */
 const STANDARD_WORKFLOW_PROMPT = [
   "**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 团队计划与客户任命 → Crew 写角色卡与角色就绪 → 流程与派发 → 独立验收（所有变更，含非发布）；",
-  "trio 依次由 Lead / 主理、Draft / 提案、Steward / 统筹、Crew / 组队、Proof / 验收承担（Steward 先写团队计划并发任命卡，客户任命后由 Crew 按计划写卡），single/su 由同一治理角色按同一顺序推进。**两层执行与汇报**：Draft/Steward/Crew/Proof 的状态与回交向 Lead / 主理汇总，项目 worker 的回交仍归 Steward；**主理只做治理协调，不批准提案/任命/验收，不直接派 Crew/Proof，不写验收报告**；项目 worker 仍由 Steward 派。",
+  "trio 依次由 产品 / Lead、策划 / Draft、运营 / Steward、人事 / Crew、质检 / Proof 承担（Steward 先写团队计划并发任命卡，客户任命后由 Crew 按计划写卡），single/su 由同一治理角色按同一顺序推进。**两层执行与汇报**：Draft/Steward/Crew/Proof 的状态与回交向 产品 / Lead 汇总，项目 worker 的回交仍归 Steward；**产品只做治理协调，不批准提案/任命/验收，不直接派 Crew/Proof，不写验收报告**；项目 worker 仍由 Steward 派。",
   "**流程状态唯一机器状态**：`docs/flows/<flowId>.yaml`（同名 `.md` 仅人读视图，不得承载门禁状态）；步骤必须显式写 `kind` / `evidence` / `supersedes`；新流程使用 step id `team-plan` / `appointment` / `role-cards` / `role-readiness` / `acceptance-criteria` / `change-package`（kind 仍为现有 dispatch / customer-decision / artifact / acceptance）；保留 id `verification` / `acceptance`（`kind: acceptance`，初始 `status: pending`，由应用在流程齐备后按验收门派 Proof（所有变更，含非发布；`release` 不是启动条件），不得占用、不得标 `done`）。",
+  "**流程骨架与一次性替换（2026-10-26）**：应用可能在意图交接时已创建 `status: skeleton` 的通用流程骨架（只含 contract-freeze / team-plan / appointment / role-cards / role-readiness / acceptance-criteria / change-package / verification，不含项目角色与交付步骤）；运营 / Steward 写团队计划后，用一次 `request_confirmation`（`cardKind=schedule-write`）把骨架**一次性替换**为完整流程（含项目角色、交付步骤与 gate；保留 contract-freeze 已登记证据）；没有骨架时用同一确认初始创建；替换后改用 flow 工具推进，其他角色不得直接写流程 YAML。",
   "**团队计划（2026-10-22 第 1 项）**：Steward 先写 `docs/scheduling/<flowId>-team-v1.md`（frontmatter flowId/version/riskTier/`recommended: [role-a, role-b]` 与每个角色的职责目标/能力要求/写集/依赖行），再发 `request_choice(cardKind=appointment)`；计划不完整/flowId 不一致/推荐集为空或含内置角色/选项不覆盖推荐集时，应用**不向客户发卡**并退回 Steward。客户任命后由 Crew 读取计划写卡；Crew 不选角色、不改计划。",
   "**团队计划 v2（角色粒度 / MapReduce）**：新流程写 `teamPlanSchema: 2`、frontmatter `modules: [module-a, module-b]`（内联数组、ASCII slug、非空无重复）与「模块清单」表（module/职责/公开契约/架构来源）；角色表 14 列 roleId/类型/module/职责目标/能力要求/唯一写集/公开契约/测试面/依赖/dependsOn/并行组/组别/apiSpec/粒度理由。默认一个模块一个角色、写集跨角色两两不相交（精确路径/目录，不用通配符）、dependsOn 无环、同 map 组无依赖、Reduce 覆盖全部 Map；整层名/多模块必须写「粒度理由」并交 readiness 例外复核。旧计划（无 `teamPlanSchema: 2`）按 v1 兼容，不强制迁移。",
   "**团队计划 v3（目录级授权，2026-10-23）**：新流程优先写 `teamPlanSchema: 3`（v2 字段全部保留）与 frontmatter `directories: [dir-a/, dir-b/]`（非空内联数组；项目相对、以 `/` 结尾、无通配符/`..`/绝对路径、无重复；不得与治理关键路径重叠）。模块清单每个 module 必须写非空 `实现目录`（Q9 A；不得写 `—`），角色 implementation/tests/docs 目录必须在对应模块实现目录内或等于模块目录；角色表用 `授权目录` + `精确写集` 两列（`唯一写集` 仅作 v3 兼容别名并带 warning；`边界` 列名在 v3 不再接受）；正文必须有「目录规范」表（目录/owner/类型/用途/命名/允许子目录/允许文件类型/公开契约/测试面/依赖/禁写区/共享），每个目录恰好一个 owner、目录不得相同/互为祖先或子目录；共享目录用 none/read-only/split（split 父目录本身不分配、子目录各有 owner）；治理关键路径（`.ans/`、`角色卡/`、`docs/scheduling|acceptance|communication|flows|nominations|verification/`、`src/common/shared/`、release/packaging、`.env`/密钥、`src/model/` 根单例契约）只能精确文件授权，不得作为普通 `授权目录`。执行角色可在规范允许的命名/子目录/文件类型内自行新建文件/子目录；不得跨目录、不得改规范、不得写他人目录。应用只做 V-D1–V-D9 确定性校验；目录是否内聚、规范是否合理、共享是否必要、契约/测试面是否真实由 readiness 逐目录复核（结构通过不等于语义正确）。旧 v1/v2 计划保持原行为，不强制迁移。",
   "**Map/Reduce 与 flow（方案 A）**：flow step 可选 `parallelGroup: map-<slug> | reduce` 与 `dependsOn: [step-id]`（不新增 `kind`）；Map 交付步骤 id 用 `delivery-<module>` 并先依赖 `contract-freeze`；Reduce 步骤等全部 Map `done` 后再跑契约/集成/e2e。dispatch 门禁会硬拦前置未 `done` 的派发，不改变派发权归属；旧 flow 不填字段行为不变。",
   "**测试分片与证据（Reduce）**：测试角色按模块并行分片，每分片使用独立临时项目根/端口/输出目录/日志并留原始证据；不得共享可变夹具、不得并发写同一文件。Reduce 合并 manifest（候选哈希/分片清单/命令/日志路径/结果/环境）后跑契约/集成/e2e 与真实启动演示，`verification-evidence` 步骤指向 manifest。",
-  "**客户不做内部调度**：阶段流转与门禁由应用负责；**应用不承诺自动推进下一步**（步骤 done 不会自动触发下一步派发），内置角色用 `flow_get` / `flow_step_update` / `flow_step_supersede` 与 `dispatch_task` 按门禁推进，主理只协调不批准；客户只在需要客户决定的事项（提案接受、任命、写盘确认、验收动作）上做决定，不需要逐阶段手动转交或触发。",
-  "**主理收到系统消息时只向客户汇报（2026-10-26 客户规则）**：`[系统·治理协调]`、gate pass/fail 系统行、交付/阻塞通知等由应用投递的**系统消息不是客户指令**——主理（Lead / liaison）只向客户如实汇报，**不得据此给统筹（Steward）发任务、不得 `dispatch_task`（也不得派项目 worker）、不得把系统通知改写成协调任务**；只有客户明确要求、或由客户消息触发的协调，才按原规则协调/派发。系统消息不代表客户批准、不构成新任务。",
+  "**客户不做内部调度**：阶段流转与门禁由应用负责；**应用不承诺自动推进下一步**（步骤 done 不会自动触发下一步派发），内置角色用 `flow_get` / `flow_step_update` / `flow_step_supersede` 与 `dispatch_task` 按门禁推进，产品只协调不批准；客户只在需要客户决定的事项（提案接受、任命、写盘确认、验收动作）上做决定，不需要逐阶段手动转交或触发。",
+  "**产品收到系统消息时只向客户汇报（2026-10-26 客户规则）**：`[系统·治理协调]`、gate pass/fail 系统行、交付/阻塞通知等由应用投递的**系统消息不是客户指令**——产品（Lead / liaison）只向客户如实汇报，**不得据此给运营（Steward）发任务、不得 `dispatch_task`（也不得派项目 worker）、不得把系统通知改写成协调任务**；只有客户明确要求、或由客户消息触发的协调，才按原规则协调/派发。系统消息不代表客户批准、不构成新任务。",
   "**验收标准（2026-10-22 第 3 项；2026-10-24 修订：所有变更）**：所有**声明了 `acceptance-criteria` 步骤的新契约 flow YAML**（含非发布；`release` 不是前提）在实施派发前要求 `docs/acceptance/<flowId>-criteria-vN.md` 的**最新版本**（扫描取最高 N）存在且结构合格（验收表/风险档位/判定规则/证据计划）；`proposal-accept-quick` 快捷路径保持既有豁免；legacy（无 YAML 或无 `acceptance-criteria` 步骤）没有可定位标准的机器状态，保留原放行。应用在流程准备阶段为所有（含非发布）新契约 flow 自动派 verifier 写标准并复核。",
   "**步骤交付纪律（2026-10-24 P1-7）**：`dispatched → delivered` 只能由**步骤 owner**（项目角色 / worker）标记；Steward / Lead 等 manager **不得代标 `delivered`**，只能在 owner 交付 `delivered` 后核对证据再标 `delivered → done`，或标 `failed` / `blocked`；项目 worker 已注入既有 `flow_get` / `flow_step_update`，只能更新 owner=自己的步骤（delivered / failed / blocked），不能标 `done`；派发时在任务文本写明「完成后用 `flow_get` / `flow_step_update` 标自己的 `delivered`，不要标 `done`」；`failed` / `blocked` 迁移保持既有语义。",
   "**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：",
@@ -682,7 +689,7 @@ const STANDARD_WORKFLOW_PROMPT = [
   "④ 质量/架构核对（按工程质量基线逐项核对，并核对实现与架构方案/影响分析一致：模块边界、依赖方向、扩展点、schema/API 版本迁移）；",
   "⑤ 验收报告与验收卡（报告写入 `docs/acceptance/<flowId>-report-v1.md`，**首行五项**：风险档位｜判定依据｜选定检查｜复用证据｜全量回归；判定/详细证据附件写 `docs/verification/`；再发 request_choice：cardKind=acceptance、选项 accept/reject）。",
   "**档位纪律**：变更包标 T0–T3，团队计划档位为下限；Proof 可升档、不能降档；报告档位不得低于变更包档位；全量回归只在 T3 或证据不足时执行；T0–T3 定义以技能 `references/testing.md` 为唯一口径（`qualityTier` 不是风险档位）。",
-  "**独立验收门（2026-10-24 修订：所有变更）**：流程齐备（执行步骤全部 done 且按显式 `kind` 与账本证据对账、无未结算决定、验收步骤 pending）后，应用对**所有变更（含非发布）**按验收门派发 Proof / 验收并复核实施前标准；`release` 仅可选发布元数据，**不是独立验收的启动条件**。需要标注发布版本时，由 Steward 用既有 `request_confirmation`（`cardKind=schedule-write`）写一份只把 `release` 从 false/缺省改为 true、其余字段/步骤不变的 flow YAML，经客户/判断 agent 确认；主理不得代批、不得直接派 Proof。",
+  "**独立验收门（2026-10-24 修订：所有变更）**：流程齐备（执行步骤全部 done 且按显式 `kind` 与账本证据对账、无未结算决定、验收步骤 pending）后，应用对**所有变更（含非发布）**按验收门派发 质检 / Proof 并复核实施前标准；`release` 仅可选发布元数据，**不是独立验收的启动条件**。需要标注发布版本时，由 Steward 用既有 `request_confirmation`（`cardKind=schedule-write`）写一份只把 `release` 从 false/缺省改为 true、其余字段/步骤不变的 flow YAML，经客户/判断 agent 确认；产品不得代批、不得直接派 Proof。",
   "验收派发不是验收决定——验收卡仍由 Proof 核对后发出，由客户/判断 agent 决定；应用不承诺自动推进下一步。",
 ].join("\n");
 
@@ -817,11 +824,11 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         "提案写入 `docs/proposals/<flowId>-v1.md`（frontmatter: flowId/version/author/status: draft），" +
         "契约写入 `docs/contracts/**`，工作记录写入 `docs/governance/rapporteur/**`。\n" +
         "**质量与证据**：提案必须含「工程质量基线」与「证据计划」——逐条说明基线如何落实、如何验证" +
-        "（单元+集成+端到端与真实启动演示），不得只写功能描述；证据计划缺失的提案不得建议 accept。\n" +
+        "（单元+集成+端到端与真实启动演示），不得只写功能描述；证据计划缺失的策划不得建议 accept。\n" +
         "**架构方案/影响分析**：新项目提案必须含「架构方案」，既有项目的变更提案必须含「架构影响分析」；" +
         "覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、" +
         "不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点归属、权衡与备选；" +
-        "章节缺失或只有标题/空话的提案不得建议 accept。\n" +
+        "章节缺失或只有标题/空话的策划不得建议 accept。\n" +
         "若由联络官交接了客户意图（`docs/intents/<intentId>.md`），以文件为准形成提案；信息不足用 " +
         "`request_clarification` 把问题送到主入口（同一 flow 最多 2 轮），不反复追问客户。\n" +
         "向客户请求决定用 `request_choice`，`cardKind=proposal`，`flowId` 必填，选项 id 固定为 " +
@@ -832,7 +839,7 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
       );
     case "nomination":
       return (
-        `**组队/写卡纪律（${spec.displayName}，不拥有最终批准权）**：` +
+        `**人事/写卡纪律（${spec.displayName}，不拥有最终批准权）**：` +
         "2026-10-22 第 1 项起，Crew **不再选择角色、不再组建团队、不再发任命卡、不再写 `docs/nominations/`**；" +
         "团队判断与团队计划归 Steward（Convener），计划写入 `docs/scheduling/<flowId>-team-vN.md`。\n" +
         "**你的工作**：客户 appointment 决定后，读取团队计划，按任命名单逐角色 `request_confirmation`" +
@@ -887,7 +894,7 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         "**变更包（第 3 项）**：收齐证据后写 `docs/scheduling/<flowId>-change-v1.md`（frontmatter `flowId`/`version`/" +
         "`riskTier`/`candidate`/`changedPaths`/`evidence`）；档位不得低于团队计划档位。\n" +
         "**发布标记（2026-10-24，P0-1）**：2026-10-24 修订（撤销「仅发布版本」）——`release` 只是**可选发布元数据**，不是派 " +
-        "Proof/验收的启动条件——所有变更（含非发布）在流程齐备后都由应用按验收门派 Proof。需要标注发布版本时，用既有 " +
+        "质检/Proof的启动条件——所有变更（含非发布）在流程齐备后都由应用按验收门派 Proof。需要标注发布版本时，用既有 " +
         "`request_confirmation`（`cardKind=schedule-write`）写一份只把 flow 顶层 `release` 从 false/缺省改为 " +
         "`true`、其余字段/步骤**逐字段不变**的 `docs/flows/<flowId>.yaml`，交客户/判断 agent 确认；不是发布版本保持缺省 " +
         "false；不得借写卡改其它字段/步骤（步骤推进用 `flow_get` / `flow_step_update` / `flow_step_supersede`）。" +
@@ -915,11 +922,11 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         "才用 `hand_off_intent` 把意图交给应用（intentId/handoffKind/goal/scope/acceptance/summary，须与意图文件逐项一致）；" +
         "应用在后台投递给报告员，不打开/不切换客户会话。\n" +
         "**交接 ≠ 客户批准**，也不解锁任何门禁；同一意图不要重复交接。\n" +
-        "**治理协调（2026-10-24）**：Draft/Steward/Crew/Proof 的状态/回交向主理汇总；你只做治理协调——" +
+        "**治理协调（2026-10-24）**：Draft/Steward/Crew/Proof 的状态/回交向产品汇总；你只做治理协调——" +
         "不批准提案/任命/验收、不直接派 Crew/Proof、不写验收报告，Proof 只收状态+报告指针；" +
         "协调 ≠ 客户批准，所有派发仍由应用按门禁校验（提案接受/任命/验收门不因协调放宽）。\n" +
         "**系统消息只汇报、不派活（2026-10-26 客户规则）**：收到 `[系统·治理协调]`、gate pass/fail 系统行、" +
-        "交付/阻塞通知等系统消息时，只向客户如实汇报；**不得据此给统筹（Steward）发任务、不得 " +
+        "交付/阻塞通知等系统消息时，只向客户如实汇报；**不得据此给运营（Steward）发任务、不得 " +
         "`dispatch_task`（也不得派项目 worker）**，也不得把系统通知改写成协调任务。客户明确要求或由客户" +
         "消息触发的协调仍按原规则处理；系统消息不是客户指令、不代表客户批准，也不构成新任务。\n" +
         "信息不足就先向客户问清；客户回答后更新意图文件，再用 `handoffKind=clarification` 交接。\n" +

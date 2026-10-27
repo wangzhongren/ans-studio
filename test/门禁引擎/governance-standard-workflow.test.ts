@@ -57,17 +57,17 @@ test("标准工作流：五卡各恰有一个「标准工作流」章节，并�
       [
         "阶段流转由应用负责",
         "你按本角色的标准工作流执行",
-        "内置角色（Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收）的状态与回交向主理（Lead / 主理）汇总",
-        "主理只做治理协调，不批准提案、任命或验收",
+        "内置角色（策划 / Draft、人事 / Crew、运营 / Steward、质检 / Proof）的状态与回交向产品（Lead）汇总",
+        "产品只做治理协调，不批准提案、任命或验收",
         "客户只在需求确认、提案/任命/写卡、验收卡上做决定",
         "不承担内部角色调度",
         "应用仍负责门禁（闸门 0/1/2、验收门）与阶段流转",
-        "**所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 Proof / 验收**",
+        "**所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 质检 / Proof**",
         "`release` 只是可选发布元数据，不是独立验收的启动条件",
         // 2026-10-24 P1-7：delivered 由步骤 owner 标，manager 只核 done；worker 不能 done。
         "**步骤状态权限（必须）**",
         "`dispatched → delivered` 只能由该步骤的 owner（项目角色 / worker）标记",
-        "manager（Steward / 统筹、Lead / 主理）不得代标 `delivered`",
+        "manager（运营 / Steward、产品 / Lead）不得代标 `delivered`",
         "只能在 owner 交付 `delivered` 后核证并标 `done`（`delivered → done`）",
         "worker 不能标 `done`",
         "不要等客户催办",
@@ -82,7 +82,7 @@ test("标准工作流：五卡各恰有一个「标准工作流」章节，并�
   }
 });
 
-test("标准工作流：Lead / 主理——需求→质量档位→写意图→意图确认卡→hand_off_intent；信息不足先问、不自行降档", () => {
+test("标准工作流：产品 / Lead——需求→质量档位→写意图→意图确认卡→hand_off_intent；信息不足先问、不自行降档", () => {
   const t = cardTextOf("liaison");
   assertIncludesAll(
     t,
@@ -99,13 +99,13 @@ test("标准工作流：Lead / 主理——需求→质量档位→写意图→�
       "客户开启「替我决策」时，判断 agent 可代批 `confirm`",
       "`revise` 永远不由判断代选",
       "代批不是客户逐项批准、不改写客户意图",
-      "由应用在后台投递给 Draft / 提案",
+      "由应用在后台投递给 策划 / Draft",
     ],
     "Lead 标准工作流",
   );
 });
 
-test("标准工作流：Draft / 提案——读意图→提案（架构/质量齐备才出卡）→提案卡→接受后冻结契约", () => {
+test("标准工作流：策划 / Draft——读意图→提案（架构/质量齐备才出卡）→提案卡→接受后冻结契约", () => {
   const t = cardTextOf("rapporteur");
   assertIncludesAll(
     t,
@@ -119,13 +119,13 @@ test("标准工作流：Draft / 提案——读意图→提案（架构/质量�
       "提案卡",
       "接受后冻结契约",
       "docs/contracts/<name>-v1.md",
-      "由应用推进到组队阶段",
+      "由应用推进到人事阶段",
     ],
     "Draft 标准工作流",
   );
 });
 
-test("标准工作流：Crew / 组队——读客户确认后的团队计划→appointment-write 逐路径写卡→应用结构校验→角色就绪；不提名/不发 appointment", () => {
+test("标准工作流：人事 / Crew——读客户确认后的团队计划→appointment-write 逐路径写卡→应用结构校验→角色就绪；不提名/不发 appointment", () => {
   const t = cardTextOf("nominator");
   assertIncludesAll(
     t,
@@ -137,7 +137,7 @@ test("标准工作流：Crew / 组队——读客户确认后的团队计划→a
       "读目录规范与每个 module 的 `实现目录`",
       "`唯一写集` 仅作兼容别名，按 `精确写集` 处理",
       "`边界` 列名在 v3 不再接受",
-      "**停止写卡并报告 Steward / 统筹 补充**",
+      "**停止写卡并报告 运营 / Steward 补充**",
       "只对任命名单内的角色发 `request_confirmation`",
       "appointment-write 逐路径写卡",
       "第 5 项内容清单",
@@ -152,7 +152,7 @@ test("标准工作流：Crew / 组队——读客户确认后的团队计划→a
   // 2026-10-22 治理分工：旧「读提案→提名→任命卡」流程与推荐集口径必须从 Crew 卡消失。
   assert.doesNotMatch(t, /1\. 读提案与流程/, "Crew 不再以提名流程起步");
   assert.doesNotMatch(t, /2\. 提名：/, "Crew 不再写提名文件");
-  assert.doesNotMatch(t, /推荐集只列项目角色/, "推荐集口径已移交 Steward / 统筹");
+  assert.doesNotMatch(t, /推荐集只列项目角色/, "推荐集口径已移交 运营 / Steward");
 });
 
 test("第 5 项内容清单（P7）：Crew 卡逐项列出 role-card 章节、boundary、工作文档与 api-spec not-applicable", () => {
@@ -215,12 +215,12 @@ test("第 5 项 readiness（P8）：Steward 写 pass/gaps 记录，gap 退回 Cr
   );
 });
 
-test("标准工作流：Steward / 统筹——写团队计划→发 appointment 卡→readiness→派发项目角色→收齐回交→登记完成→组变更包；独立验收覆盖所有变更（含非发布）", () => {
+test("标准工作流：运营 / Steward——写团队计划→发 appointment 卡→readiness→派发项目角色→收齐回交→登记完成→组变更包；独立验收覆盖所有变更（含非发布）", () => {
   const t = cardTextOf("convener");
   assertIncludesAll(
     t,
     [
-      "写流程单",
+      "流程骨架与完整流程",
       "判断团队",
       "docs/scheduling/<flowId>-team-v1.md",
       "`recommended: [role-a, role-b]`",
@@ -233,11 +233,11 @@ test("标准工作流：Steward / 统筹——写团队计划→发 appointment 
       "派发项目角色",
       "收齐回交",
       "登记完成",
-      "内置治理角色的状态 / 回交向 Lead / 主理 汇总",
-      "返工由 Lead / 主理 协调",
+      "内置治理角色的状态 / 回交向 产品 / Lead 汇总",
+      "返工由 产品 / Lead 协调",
       // 2026-10-24 客户修订（撤销 release-only）：独立验收（所有变更）；2026-10-26 基础设施先行插入新第 4 步，顺延为第 9 步。
       "9. 独立验收（所有变更）",
-      "所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 Proof / 验收",
+      "所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 质检 / Proof",
       "`release` 只是可选发布元数据，不是独立验收的启动条件，也不代替验收 / 客户决定",
       "`cardKind=schedule-write`",
       "flow 顶层 `release`",
@@ -259,7 +259,7 @@ test("标准工作流：Steward / 统筹——写团队计划→发 appointment 
   // 2026-10-24 客户修订：所有变更（含非发布）流程齐备后应用派 Proof；旧发布独占口径必须消失。
   assert.match(
     t,
-    /所有变更（含非发布）[^。]*由应用按验收门自动派 Proof \/ 验收/,
+    /所有变更（含非发布）[^。]*由应用按验收门自动派 质检 \/ Proof/,
     "所有变更（含非发布）流程齐备后应用派 Proof",
   );
   assert.doesNotMatch(t, /非发布不派/, "Steward 不得再写非发布不派");
@@ -268,7 +268,7 @@ test("标准工作流：Steward / 统筹——写团队计划→发 appointment 
   assert.doesNotMatch(t, /发布验收门/, "Steward 不得再保留发布验收门旧口径");
 });
 
-test("标准工作流：Steward / 统筹——流程机器状态改为 docs/flows/<flowId>.yaml（schema/保留 ID/evidence/superseded）", () => {
+test("标准工作流：运营 / Steward——流程机器状态改为 docs/flows/<flowId>.yaml（schema/保留 ID/evidence/superseded）", () => {
   // 客户 2026-10-19 决定（原文：「这些全部改成yaml。」）：流程状态唯一机器来源是 YAML，
   // Markdown 仅人读视图；Steward 必须按 schema 写 YAML，显式 kind/evidence/supersedes，
   // 保留 id verification/acceptance 归应用自动派 Proof，被 retake 取代的步骤标 superseded。
@@ -462,7 +462,7 @@ test("标准工作流：写卡被 declined——Crew/Steward 按 reason 修正�
     [
       "写卡被拒（declined）时（必须）",
       "`request_confirmation` 返回 `declined`（含自动审批 deny 的原因）",
-      "修正流程状态 YAML（初始创建）等内容",
+      "修正流程状态 YAML（初始创建 / 骨架一次性替换）等内容",
       "重新发确认卡",
       "不得绕过确认",
       "不得直接 `write_file`",
@@ -526,15 +526,15 @@ test("边界变更请求：Crew 核对 roleId/精确增删路径/理由/flowId�
   assertIncludesAll(
     crew,
     [
-      "## 边界变更请求（来自应用/统筹经应用）",
-      "由 Steward / 统筹 提出边界变更请求",
+      "## 边界变更请求（来自应用/运营经应用）",
+      "由 运营 / Steward 提出边界变更请求",
       "应用把任务派给你",
       "**不自行发起边界变更**",
       "本工作流只调整任务指定那一个 `roleId` 的 `角色卡/<roleId>/boundary.yaml` 边界条目",
       // 先核对：角色、精确路径、理由、flowId 四要素。
       "收到任务后逐项核对 `roleId`、`addPaths` / `removePaths`、`rationale` 与 `flowId`",
       "必须是已任命 / 已存在的项目角色",
-      "内置治理角色、未知角色或目录 id 不符时停止并报告 Steward / 统筹",
+      "内置治理角色、未知角色或目录 id 不符时停止并报告 运营 / Steward",
       "必须是**精确的项目相对路径**",
       "不得通配符、`..`、绝对路径或散文",
       // 只增删列出路径：不重写整个边界、不扩大其它路径、不动计划/规范/他人资料。
@@ -549,16 +549,16 @@ test("边界变更请求：Crew 核对 roleId/精确增删路径/理由/flowId�
       "不得绕过确认、不得直接 `write_file`、不得把原因当客户已同意",
       "写后交应用边界 / 结构校验",
       // 完成后回执与留证；请求来自统筹不等于客户批准。
-      "向 Steward / 统筹（并汇总 Lead / 主理）报告",
+      "向 运营 / Steward（并汇总 产品 / Lead）报告",
       "实际增删的精确路径、确认卡与校验结果",
       "变更记录与证据（diff / 校验输出）保留在 `docs/governance/nominator/`",
-      "**请求来自统筹不等于客户批准**",
+      "**请求来自运营不等于客户批准**",
       "确认与校验完成前不得声称边界已变更、不得按新路径写入",
       // 显式禁止：来源是统筹也不跳过确认；不越出职责/能力/写集改内容。
-      "不因请求来自统筹就跳过确认",
+      "不因请求来自运营就跳过确认",
       "不修改角色职责 / 能力 / 写集之外的内容",
       "不借机改职责 / 能力描述",
-      "请求要求改职责 / 能力时停止并报告 Steward / 统筹",
+      "请求要求改职责 / 能力时停止并报告 运营 / Steward",
     ],
     "Crew 边界变更请求工作流",
   );
@@ -608,7 +608,7 @@ test("标准工作流：流程工具——Steward 初始创建例外 + flow_get/
     "Steward 流程工具纪律",
   );
   // 初始创建仍走既有写卡门；创建后的步骤推进走工具。
-  assert.match(steward, /写流程单（仅初始创建）[\s\S]{0,220}schedule-write/, "Steward 初始创建须保留 schedule-write");
+  assert.match(steward, /流程骨架与完整流程（仅初始创建 \/ 骨架一次性替换）[\s\S]{0,400}schedule-write/, "Steward 初始创建/骨架一次性替换须保留 schedule-write");
   assert.match(steward, /登记完成：先用 `flow_get`[\s\S]{0,160}flow_step_update/, "Steward 登记完成须先 get 再 update");
   assert.doesNotMatch(steward, /`flow_step_supersede`（仅 Steward）/, "supersede 归 Steward/Lead 工作流管理者，不得再写仅 Steward");
 
@@ -638,6 +638,71 @@ test("标准工作流：流程工具——Steward 初始创建例外 + flow_get/
   assert.match(cardTextOf("verifier"), /不用 `flow_step_update` 代替客户验收决定/, "Proof 不得用工具代替验收决定");
 });
 
+test("2026-10-26 流程骨架：应用可建 skeleton、Steward 写团队计划后一次性替换、保留 contract-freeze 证据；之后只能用 flow 工具", () => {
+  // 客户要求（经任务转达）：意图交接时应用自动创建 docs/flows/<flowId>.yaml 通用骨架
+  // （status: skeleton）；运营写团队计划后用一次 request_confirmation(cardKind=schedule-write)
+  // 把骨架替换为完整流程（含项目角色/交付步骤/gate，保留 contract-freeze 已登记证据）；
+  // 之后只能用 flow 工具推进，不得反复直接写流程 YAML。
+  const t = cardTextOf("convener");
+  assertIncludesAll(
+    t,
+    [
+      // 三态之一：应用已建骨架（skeleton，通用步骤，无项目角色/交付步骤/gate）。
+      // 步骤清单与编排 `src/common/编排/flow-service.ts::buildFlowSkeletonSteps` 对齐；本角色测试
+      // 不导入编排私有模块，故硬编码钉住卡文本（清单变化须两处同批）。
+      "应用可能在意图交接时已创建 `status: skeleton` 的通用流程骨架",
+      "contract-freeze / team-plan / appointment / role-cards / role-readiness / acceptance-criteria / change-package / verification",
+      "不含项目角色、交付步骤与 gate",
+      // 三态之二：写团队计划后一次性替换；保留 contract-freeze 证据、去掉 skeleton 标记。
+      "你写完团队计划后",
+      "用**一次** `request_confirmation`（`cardKind=schedule-write`）",
+      "**一次性替换**",
+      "**保留 contract-freeze 已登记证据**",
+      "去掉 `status: skeleton`",
+      // 三态之二（无骨架）：同一确认卡初始创建。
+      "流程 YAML 不存在时用同一确认卡**初始创建**完整流程",
+      // 顺序：写团队计划 → 一次性替换骨架 → 发 appointment 卡。
+      "写盘后先按第 1 步把骨架**一次性替换**为完整流程（无骨架时同卡初始创建）",
+      // 三态之三：完整流程后只能用 flow 工具；只保留有限的治理写卡例外。
+      "**创建/替换完成后，流程步骤只能通过 flow 工具推进**",
+      "`flow_get` + `flow_step_update` / `flow_step_supersede`",
+      "**不得再为状态更新或反复调整直接 `write_file` 流程 YAML**",
+      "仅以下治理写卡例外",
+      "本卡「独立验收」的 `release` 标记",
+      "写卡被拒后的修正重发",
+      "团队计划 / 范围**实质变化**时以**新 flow 版本**补 gate / 角色",
+      "整文件必须重新通过 schema 校验并经确认卡确认",
+      "骨架替换只在写团队计划后执行一次",
+      "完整流程落盘后不得把整文件重写当作日常状态更新手段",
+      // 三处配套措辞一致：可写目录 / 确认卡约定 / 状态推进段。
+      "以及经确认的新 flow 版本",
+      "及经确认的新 flow 版本、迁移兼容",
+      "创建/替换后的步骤状态推进**只能**用 `flow_get` + `flow_step_update` / `flow_step_supersede`",
+    ],
+    "Steward 流程骨架三态",
+  );
+  // 旧「写流程单（仅初始创建）」口径不得复现；不得把骨架替换写成可反复直接写 YAML。
+  assert.doesNotMatch(t, /1\. 写流程单（仅初始创建）/, "Steward 不得保留旧初始创建单态口径");
+  assert.doesNotMatch(t, /骨架替换[^。]{0,40}(每次|反复|随时)/, "Steward 不得把骨架替换写成可反复执行");
+  assert.doesNotMatch(t, /(每次|反复|随时)[^。]{0,40}骨架替换/, "Steward 不得把骨架替换写成可反复执行");
+  assert.match(
+    t,
+    /写盘后先按第 1 步把骨架\*\*一次性替换\*\*为完整流程[\s\S]{0,40}再发 `request_choice`（`cardKind=appointment`）任命卡/,
+    "Steward 须在写团队计划后先替换骨架、再发 appointment 卡",
+  );
+  // 注册表数据面不因卡文本变化（写权 / 预授权 / 能力位 / 内部 id 不变）。
+  const convener = BUILT_IN_GOVERNANCE_ROLES.find((spec) => spec.id === "convener");
+  assert.ok(convener);
+  assert.deepEqual(convener!.entries.map((entry) => entry.path), [
+    "docs/flows/",
+    "docs/workflow.md",
+    "docs/scheduling/",
+    "docs/governance/convener/",
+  ]);
+  assert.deepEqual(convener!.preauthorizedDirs, ["docs/flows/", "docs/scheduling/", "docs/governance/convener/"]);
+  assert.equal(convener!.capabilities.shell, "operator-approve");
+});
+
 test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/flow_step_supersede + dispatch_task；Steward 接受 Lead 协调任务；Crew/Draft/Proof 向 Lead 回交", () => {
   // 客户 2026-10-20 拍板：Lead / 主理 设为工作流管理者，可与所有职能角色沟通/派发协调任务。
   const lead = cardTextOf("liaison");
@@ -649,8 +714,8 @@ test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/f
       "flow_step_update",
       "flow_step_supersede",
       "dispatch_task",
-      "向 Steward / 统筹 派协调任务",
-      "项目 worker 由 Steward / 统筹 派，你不直接派项目角色",
+      "向 运营 / Steward 派协调任务",
+      "项目 worker 由 运营 / Steward 派，你不直接派项目角色",
       "不直接派 Crew / Proof / 项目 worker",
       "闸门 0 已结算",
       "闸门 1 已结算",
@@ -674,7 +739,7 @@ test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/f
     "Lead 工作流管理",
   );
   // 旧「可向项目角色派发协调任务」口径必须消失（Q1：项目 worker 由 Steward 派）。
-  assert.doesNotMatch(lead, /向 Steward \/ 统筹 与项目角色派发协调任务/);
+  assert.doesNotMatch(lead, /向 运营 \/ Steward 与项目角色派发协调任务/);
   assert.doesNotMatch(lead, /派给 Steward \/ 项目角色/);
   // 能力位：dispatchTask=true；其余能力不变。
   const leadCaps = governanceRoleOf("liaison")!.capabilities;
@@ -687,7 +752,7 @@ test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/f
   assertIncludesAll(
     steward,
     [
-      "Lead / 主理 也是工作流管理者",
+      "产品 / Lead 也是工作流管理者",
       "不因来源是 Lead 就跳过证据/门禁",
       "你仍是流程/排程执行者",
     ],
@@ -698,7 +763,7 @@ test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/f
     assertIncludesAll(
       cardTextOf(id),
       [
-        "可向 Lead / 主理 回交/协调",
+        "可向 产品 / Lead 回交/协调",
         "不得直接写 `docs/flows/**`",
         "flow_step_update",
         "证据不足",
@@ -714,7 +779,7 @@ test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/f
   }
 });
 
-test("标准工作流：Proof / 验收——实施前写标准→核对档位/复用证据→核对真实启动演示→逐条核对→报告+验收卡；不依赖客户催办", () => {
+test("标准工作流：质检 / Proof——实施前写标准→核对档位/复用证据→核对真实启动演示→逐条核对→报告+验收卡；不依赖客户催办", () => {
   const t = cardTextOf("verifier");
   assertIncludesAll(
     t,
@@ -823,8 +888,8 @@ test("标准工作流：2026-10-25 写入预授权——五卡边界内直接写
   );
   assert.match(
     governanceRoleOf("convener")!.cardText,
-    /流程 YAML \*\*初始创建\*\*仍按 `schedule-write` 确认/,
-    "Steward 流程 YAML 初始创建仍 schedule-write",
+    /流程 YAML \*\*初始创建 \/ 骨架一次性替换\*\*（以及经确认的新 flow 版本）仍按 `schedule-write` 确认/,
+    "Steward 流程 YAML 初始创建 / 骨架一次性替换仍 schedule-write",
   );
   assert.match(
     governanceRoleOf("liaison")!.cardText,
@@ -1056,7 +1121,7 @@ test("2026-10-26 基础设施先行（真机教训）：Steward 团队计划必�
       "小项目不强行新增角色（避免角色膨胀）",
       "即便任命，构建配置唯一 owner 规则不变",
       // 质量职责同步。
-      "你的质量职责（Steward / 统筹）",
+      "你的质量职责（运营 / Steward）",
       "团队计划必须为 `build-scaffold` 显式指定唯一的「构建配置 owner」",
     ],
     "Steward build-scaffold 前置与构建配置 owner",
@@ -1113,14 +1178,14 @@ test("2026-10-26 基础设施先行（真机教训）：Steward 团队计划必�
     [
       "计划含代码/测试交付却没有独立的 `build-scaffold` 前置步骤",
       "未显式指定唯一的「构建配置 owner」",
-      "同样**停止写卡并报告 Steward / 统筹 补充**，不自行补计划",
+      "同样**停止写卡并报告 运营 / Steward 补充**，不自行补计划",
       "团队计划必须让独立的 `build-scaffold` 步骤在前、依赖显式、其余交付依赖它",
       "团队计划必须显式指定唯一的「构建配置 owner」",
       "`package.json`、`package-lock.json`、`tsconfig*.json`、vite/vitest/playwright 配置、`index.html`、`src/main.ts` 骨架与构建/CI 根文件由该 owner 独占",
       "写卡时不得把这些构建配置拆给多个角色",
       // 多步骤角色的逐步骤交付检查点（客户 2026-10-26 追加：顺序之外还要有独立交付检查点）。
       "**逐步骤交付检查点（必须，多步骤角色）**",
-      "每个步骤完成即按该步骤证据验证并标 `delivered`、回交/通知 Steward / 统筹，不得攒到最后一次回交",
+      "每个步骤完成即按该步骤证据验证并标 `delivered`、回交/通知 运营 / Steward，不得攒到最后一次回交",
       "标准工作流第一步就是交付脚手架（可运行、`npm run typecheck` 与最小测试通过）并**立即回交**",
       "外壳/工程类角色模板（app-shell 等）",
       "脚手架是独立的 `build-scaffold` 交付检查点，不得并进 `delivery-app-shell` 等普通交付步骤",
@@ -1178,7 +1243,7 @@ test("标准工作流：Crew v3（P10/P13）——读授权目录/精确写集/�
       "不得写整层角色",
       "纳米角色",
       "计划缺 module/公开契约/测试面/`dependsOn`/粒度理由/`授权目录`/`精确写集`/目录规范/`实现目录`",
-      "只报告 Steward / 统筹",
+      "只报告 运营 / Steward",
       "不自行补计划",
       "不自行增删目录/模块/角色/写集",
     ],

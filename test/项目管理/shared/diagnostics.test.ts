@@ -54,6 +54,38 @@ test("执行时限元数据落盘：timeoutMs 有限数值保留、非有限丢�
   assert.equal(data[4]?.timeoutMs, undefined);
 }));
 
+test("view_image 审计字段落盘：mimeType/bytes/mode 保留；图片内容与非法字段值丢弃", async () => fixture(async (root) => {
+  configureDiagnostics({ directory: root });
+  const log = createDiagnosticLogger({ component: "test" });
+  const base64Sentinel = "BASE64-SENTINEL-MUST-NOT-LEAK";
+  log.record("view_image.result", {
+    turnId: "turn-1", toolName: "view_image", path: "docs/shot.png", ok: true, mode: "tool-result",
+    mimeType: "image/png", bytes: 1234,
+    // 图片内容字段不在白名单：即使被误传也不落盘。
+    image: { type: "image", data: base64Sentinel, mimeType: "image/png" },
+    data: base64Sentinel,
+    dataUrl: "data:image/png;base64," + base64Sentinel,
+  });
+  // 非法 mimeType（data URL 载荷）与非法 bytes（负数）必须丢弃，避免借白名单字段把 base64 带进日志。
+  log.record("view_image.result", {
+    turnId: "turn-2", toolName: "view_image", path: "missing.png", ok: false, mode: "tool-result",
+    reasonCode: "read-failed", mimeType: "data:image/png;base64," + base64Sentinel, bytes: -1,
+  });
+  await flushDiagnostics();
+  const data = await rows(root);
+  assert.equal(data[0]?.toolName, "view_image");
+  assert.equal(data[0]?.path, "docs/shot.png");
+  assert.equal(data[0]?.mode, "tool-result");
+  assert.equal(data[0]?.mimeType, "image/png");
+  assert.equal(data[0]?.bytes, 1234);
+  assert.equal(data[1]?.reasonCode, "read-failed");
+  assert.equal(data[1]?.mimeType, undefined);
+  assert.equal(data[1]?.bytes, undefined);
+  const text = JSON.stringify(data);
+  assert.equal(text.includes(base64Sentinel), false, "图片 base64 绝不落盘");
+  assert.equal(text.includes("data:image"), false, "data URL 绝不落盘");
+}));
+
 test("精确滚动24h边界：旧行清除，边界行保留，不碰非诊断文件", async () => fixture(async (root) => {
   const now = Date.parse("2026-10-13T12:00:00Z");
   const at = (offset: number) => new Date(now - DIAGNOSTIC_RETENTION_MS + offset).toISOString();

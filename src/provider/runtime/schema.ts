@@ -296,9 +296,9 @@ export function describeTool(name: string): ToolDescription {
               "Kinds: `proposal` = accept a proposal; `appointment` = appoint the recommended team (sent by Convener from the " +
               "customer-confirmed team plan; the old `nomination` flow is legacy); `acceptance` = accept a delivery; " +
               "`intent-confirm` = customer requirement confirmation (Lead/liaison, before hand_off_intent only); " +
-              "`decision` = material-choice card, sent ONLY by the Steward/统筹 — use it when the Lead finds a material choice " +
+              "`decision` = material-choice card, sent ONLY by the 运营/Steward when calling request_choice directly — use it when the Lead finds a material choice " +
               "(demo/acceptance evidence method, scope, deviation from standards/contracts, cost, or customer-visible behavior) " +
-              "instead of deciding unilaterally. A decision card must mark exactly one option `recommended: true`; when the " +
+              "instead of deciding unilaterally. A requirement-change approval decision card is presented automatically by the app after `request_requirement_change` succeeds; the initiator must not call request_choice again. A decision card must mark exactly one option `recommended: true`; when the " +
               "customer has enabled \"decide for me\", the judging agent selects that recommended option by default. A decision " +
               "card is independent of proposal/appointment/acceptance: it is NOT acceptance and NOT customer approval, and it " +
               "does NOT trigger any gate or acceptance. `pass` is not applicable (a decision card has no pass option). " +
@@ -317,16 +317,16 @@ export function describeTool(name: string): ToolDescription {
         "`appointment` 为**任命**卡——由 Convener 依客户确认的团队计划发起、任命 Crew，旧流程的「提名」卡为 legacy；" +
         "卡种须属于该角色允许的卡种，由应用校验）；" +
         "这些字段只用于卡片显示与账本分类，**字段本身不构成任何授权**——治理门禁只认应用签发的客户决定。" +
-        "`intent-confirm`（需求确认）**仅主理（Lead/liaison）在 `hand_off_intent` 前发出**：选项 id 固定 `confirm` / `revise`；" +
+        "`intent-confirm`（需求确认）**仅产品（Lead/liaison）在 `hand_off_intent` 前发出**：选项 id 固定 `confirm` / `revise`；" +
         "由客户本人回答，或在其开启「替我决策」时由判断 agent 代批 `confirm`（`revise` 仍交回客户/发起角色，判断 agent 不替客户修改）。" +
-        "`cardKind=decision`（材料性选择卡）**仅统筹（Steward）使用**：主理发现材料性选择（演示/验收证据方式、范围、标准/契约偏离、成本或客户可见行为）时**不自行决定**，交统筹发本卡；" +
+        "`cardKind=decision`（材料性选择卡）**仅运营（Steward）直接调用 `request_choice` 发出**：产品发现材料性选择（演示/验收证据方式、范围、标准/契约偏离、成本或客户可见行为）时**不自行决定**，交运营发本卡；需求变更审批 decision 卡由应用在 `request_requirement_change` 成功后自动经发起方会话呈现，发起方不得再调用 `request_choice` 重复发卡；" +
         "卡内必须有**恰一个** `recommended: true` 推荐项；客户开启「替我决策」时判断 agent 默认选推荐项。" +
         "decision 卡**独立于提案/任命/验收**——**不等于验收/客户批准，不触发门禁/验收**；`pass` 选项不适用（不设）。",
       promptGuidelines: [
         "需要客户在若干选项中做选择时用 request_choice；未获明确回答 → 不要据此写盘，也不得假设客户的选择。",
         "`cardKind=appointment` 是**任命**卡：由 Convener 依客户确认的团队计划发起；Crew 收到客户任命后才按名单写卡（appointment-write），不自行任命、不自行选角色。",
         "request_choice 的回答**不构成写盘同意**或扩张写权；已接受边界内的已授权任务无需重复确认，新建或扩张角色边界、治理写集仍由 su 经 request_confirmation 请求确认。",
-        "`cardKind=decision` 仅统筹使用：主理发现材料性选择时不自行决定，交统筹发 decision 卡；卡内必须恰有一个 `recommended: true` 推荐项；" +
+        "`cardKind=decision` 直接调用仅限运营（材料性选择）；需求变更审批卡由应用在 `request_requirement_change` 成功后自动呈现，发起方不要重复发卡；卡内必须恰有一个 `recommended: true` 推荐项；" +
           "开启「替我决策」时判断 agent 默认选推荐项；decision 卡不等于验收/客户批准，不触发门禁/验收，且没有 `pass` 选项（不适用）。",
       ],
       executionMode: "sequential",
@@ -425,24 +425,24 @@ export function describeTool(name: string): ToolDescription {
         "向目标角色**派发任务**（经编排路由成对方会话的一条输入；前端负责自动开会话/排队/去重）。" +
         "**派发 ≠ 授权**——你只能转移「任务与上下文」，**不能**授予或改变对方的写权：对方写入仍只来自它自己的" +
         "已接受边界和已授权任务；普通操作无需逐次确认，新建或扩张边界、治理写集仍由 su 请求客户确认。任务文本必须**自足**（对方看不到你的上下文）：" +
-        "写清要做什么、依据哪份文档、完成标准（治理派发带 `flowId`；主理向 Steward 协调时可省 `stepId`）；**返工**时把要求与证据一并写进任务文本。" +
+        "写清要做什么、依据哪份文档、完成标准（治理派发带 `flowId`；产品向 Steward 协调时可省 `stepId`）；**返工**时把要求与证据一并写进任务文本。" +
         "多角色/跨角色协作时**先落盘再派发**：先把冻结契约落盘到 `docs/contracts/<name>-v<N>.md`" +
         "（写盘许可已预置、直接写即可），工作流落盘到 `docs/workflow.md`（写盘经确认制：把路径列入规划确认的 preview），**再**派发任务。" +
         "任务文本**按地址引用**契约与工作流——「依据哪份文档」给项目内路径即可（如 `docs/contracts/<name>-v1.md`），**不内嵌契约全文**；" +
         "投递时系统会据此自动附上「**必读（按序）**」块（先读完再动手），其中的 sha256 由投递系统在投递当刻计算——**不要自己算或转抄哈希**。" +
         "引用的契约文件不存在时投递会被**拒绝**（回执如实报错；补落盘后重派）；`docs/workflow.md` 缺失（旧项目过渡期）不拒投、必读块如实标注「未提供」。" +
-        "roleId 通常是本项目角色；**主理（Lead/Liaison）还可把 `convener`（Steward）作为协调目标**——其余内置治理角色不可作为目标，也不能派发给调用者自己。" +
-        "主理向 Steward 派发属**内部协调**，**不是客户批准**；Steward/项目角色仍按自己的已接受边界与门禁执行。" +
+        "roleId 通常是本项目角色；**产品（Lead/Liaison）还可把 `convener`（Steward）作为协调目标**——其余内置治理角色不可作为目标，也不能派发给调用者自己。" +
+        "产品向 Steward 派发属**内部协调**，**不是客户批准**；Steward/项目角色仍按自己的已接受边界与门禁执行。" +
         "本工具**不写盘、不做治理判定、不改变任何角色的写权**。" +
-        "治理会话可附可选 `flowId`/`stepId`：治理角色派发须同时给出（用于派发范围门与去重）；**主理向 Steward 协调时带 `flowId`、`stepId` 可省**；旧 su 调用可缺席＝旧行为——" +
+        "治理会话可附可选 `flowId`/`stepId`：治理角色派发须同时给出（用于派发范围门与去重）；**产品向 Steward 协调时带 `flowId`、`stepId` 可省**；旧 su 调用可缺席＝旧行为——" +
         "**字段本身不构成任何授权**，派发范围门只认应用签发的客户决定与已任命名单。",
       promptGuidelines: [
         "派发的是**任务与上下文**；**派发 ≠ 授权**——目标角色只在自己的已接受边界内执行已授权任务，普通操作无需逐次确认；" +
           "不得在任务文本里代授写权；真正新建或扩张边界、治理写集仍由 su 请求客户确认。",
-        "主理（Lead/Liaison）可向 Steward（`convener`）派发任务做**内部协调**——**不是客户批准**，也不代表 Steward 已同意；" +
+        "产品（Lead/Liaison）可向 Steward（`convener`）派发任务做**内部协调**——**不是客户批准**，也不代表 Steward 已同意；" +
           "Steward/项目角色仍按自己的边界与门禁执行。**不要**把这条理解为可向任意内置治理角色派发。",
         "dispatch_task 的任务文本要**自足**：目标角色看不到你的上下文——写清要做什么、依据哪份文档、完成标准；" +
-          "治理派发带 `flowId`（主理向 Steward 协调时可省 `stepId`）。",
+          "治理派发带 `flowId`（产品向 Steward 协调时可省 `stepId`）。",
         "**多角色/跨角色协作先落盘再派发**：契约落盘到 `docs/contracts/<name>-v<N>.md`（预置写盘目录、直接写即可）、" +
           "工作流落盘到 `docs/workflow.md`（路径列入规划确认的 preview），**再**派发。" +
           "任务文本**按地址引用**契约与工作流（给项目内路径），**不内嵌契约全文**——投递时系统会自动附上「**必读（按序）**」块并计算其中的 sha256；" +
@@ -985,9 +985,10 @@ export function describeTool(name: string): ToolDescription {
     };
   }
   if (name === "view_image") {
-    // 图片查看（2026-10-26 客户要求；两轮附件设计；只给注入了 viewImage 能力的会话，注入才注册）。
-    // 文案纪律：本轮只是排队、下一轮才是图片附件、不要假装本轮已看到；路径必须项目相对、拒绝越界/
-    // 目录；仅 5 种扩展名 + 10 MB；失败不谎报已提供；不写盘、不联网、不过写门禁。
+    // 图片查看（2026-10-26 客户要求；2026-10-27 同轮设计修订；只给注入了 viewImage 能力的会话，注入才注册）。
+    // 文案纪律：同轮工具结果附图优先；引擎回退时图片在下一轮才作为附件提供；未收到图片不得假装已看到；
+    // 路径必须项目相对、拒绝越界/目录；仅 5 种扩展名 + 10 MB（同轮模式还受运行时上限与每轮预算约束）；
+    // 失败不谎报已提供；不写盘、不联网、不过写门禁。
     return {
       parameters: {
         type: "object",
@@ -1002,18 +1003,19 @@ export function describeTool(name: string): ToolDescription {
         additionalProperties: false,
       },
       description:
-        "读取项目内的一张图片，并把它**排队为下一轮的图片附件**（两轮附件设计）。" +
-        "**本工具本轮只返回文本回执，不会在本轮让你看到图片内容**：成功回执表示图片已读取并排队，" +
-        "下一轮用户提示才会以图片附件提供——**不要假装本轮已看到图片**，也不要凭文件名/回执猜测图片内容。" +
+        "读取项目内的一张图片并把图片提供给你：运行时支持时，图片随**本次工具结果同轮附上**（你紧接着的下一次调用即可看到）；" +
+        "引擎回退为**下一轮附件**时，本工具本轮只返回文本回执，图片在下一轮用户提示才作为附件提供。" +
+        "无论哪种方式，**以你实际收到的内容为准：未收到图片就不要假装已看到**，也不要凭文件名/回执猜测图片内容。" +
         "本工具**仅在运行环境注入了图片能力时才存在**（未注入 ⇒ 工具不存在，fail-closed）。" +
         "路径必须是**项目相对路径**：绝对路径、盘符路径、含 `..` 的越界路径、读取根之外的真实路径与目录一律拒绝。" +
-        "仅支持 `.png` / `.jpg` / `.jpeg` / `.webp` / `.gif`（按扩展名映射 MIME），单文件上限 **10 MB**。" +
-        "路径/类型/大小不合法时工具直接失败且**不会排队**；能力侧拒绝或失败时如实返回「未排队」，**绝不谎报已提供**。" +
+        "仅支持 `.png` / `.jpg` / `.jpeg` / `.webp` / `.gif`（按扩展名映射 MIME），单文件上限 **10 MB**" +
+        "（同轮模式还可能受运行时更严格的上限与每轮图片预算约束）。" +
+        "路径/类型/大小不合法时工具直接失败且**不会提供图片**；能力侧拒绝或失败时如实返回「未提供图片」，**绝不谎报已提供**。" +
         "本工具不写盘、不联网、不过写门禁，也不改变任何写权。",
       promptGuidelines: [
-        "需要查看项目内的图片时调用 view_image；成功回执只表示**已排队**——图片在**下一轮**才作为附件提供，本轮不要假装已看到。",
+        "需要查看项目内的图片时调用 view_image；图片随工具结果同轮附上时可直接核对；回退模式下图片在**下一轮**才作为附件提供——**以实际收到的内容为准，未收到图片不得假装已看到**。",
         "路径用项目相对路径（如 `docs/assets/shot.png`）；绝对路径、`..`/越界路径与目录会被拒绝；仅支持 .png/.jpg/.jpeg/.webp/.gif 且单文件不超过 10 MB。",
-        "失败回执（路径/类型/大小/能力侧拒绝）表示**下一轮不会收到图片附件**——不要猜测图片内容，按回执如实告知客户。",
+        "失败回执（路径/类型/大小/每轮预算/能力侧拒绝）表示**本次没有提供图片**——不要猜测图片内容，按回执如实告知客户。",
       ],
     };
   }
@@ -1169,15 +1171,15 @@ export function describeTool(name: string): ToolDescription {
         additionalProperties: false,
       },
       description:
-        "请应用**派发一次独立复核**（Proof / 验收）——只用于交付物、证据与变更包**已就绪之后**，" +
-        "由统筹（Steward）在交付完成后**直接提交**，不依赖应用的事件（settle/账本）触发。" +
+        "请应用**派发一次独立复核**（质检 / Proof）——只用于交付物、证据与变更包**已就绪之后**，" +
+        "由运营（Steward）在交付完成后**直接提交**，不依赖应用的事件（settle/账本）触发。" +
         "`flowId` 缺省＝当前/默认流程；`note` 为可选说明。应用会校验验收标准、变更包与风险档等前置条件，并按回执如实告知是否已派发。" +
         "**本工具不改变任何客户决定、不代表客户批准、不写 flow/账本**——派发与状态写入由应用实现；" +
         "回执的 `ok` / `code` / `message` **原样如实转达**（`code` 如 `dispatched` / `criteria-missing` / `change-package-missing` / " +
         "`change-package-no-risk` / `flow-incomplete` / `runtime-unresolved` / `already-dispatched` / `unavailable`），" +
         "**失败绝不伪装成功**。",
       promptGuidelines: [
-        "只在交付/证据/变更包**已就绪后**调用；它是请应用派独立复核（Proof/验收），不是客户决定、不是验收结论。",
+        "只在交付/证据/变更包**已就绪后**调用；它是请应用派独立复核（质检/Proof），不是客户决定、不是验收结论。",
         "`flowId` 省略＝当前流程，`note` 可选；按回执的 `code`/`message` 如实向客户说明——非 `dispatched` 时不要宣称已派发、不要反复重试。",
         "请求复核 ≠ 客户批准：本工具不改客户决定、不写 flow/账本；`dispatched` 也不代表验收已通过。",
       ],
@@ -1211,18 +1213,18 @@ export function describeTool(name: string): ToolDescription {
       },
       description:
         "请应用**派发一次 gate（关键节点验收门禁）复核**（Proof 独立判定）——这是**独立于最终验收**的通道：" +
-        "`request_acceptance` 仍只用于最终验收，二者不能互相替代。**仅统筹（Steward）使用**：" +
+        "`request_acceptance` 仍只用于最终验收，二者不能互相替代。**仅运营（Steward）使用**：" +
         "先做证据完整性检查（依赖步骤是否 done、证据是否与账本对得上、gate 标准节是否存在），再调用本工具请 Proof 复核；" +
         "`flowId` 缺省＝当前/默认流程；`gateId` 必填（gate 步骤 id，如 `gate-vertical-slice`）；`note` 为可选有界说明。" +
         "应用会校验 gate 存在且待复核、前置与证据齐备、标准含该 gate，并按回执如实告知是否已派发。" +
         "**gate 复核 ≠ 验收通过 ≠ 客户批准**：`dispatched` 只表示已派 Proof，不代表 gate 已通过、不代表最终验收通过、不代表客户批准；" +
-        "gate 结论只由 Proof 报告给出，统筹不得自行宣告 gate 通过、不得代标 gate 步骤 done。" +
+        "gate 结论只由 Proof 报告给出，运营不得自行宣告 gate 通过、不得代标 gate 步骤 done。" +
         "**gate fail 只按 blocker/major 判失败**：只有 minor/nit 的意见不构成返工依据（防吹毛求疵），作为非阻断备注记录即可。" +
         "回执的 `ok` / `code` / `message` **原样如实转达**（`code` 如 `dispatched` / `already-dispatched` / `gate-not-found` / " +
         "`criteria-missing` / `flow-incomplete` / `unavailable` / `rejected`），**失败绝不伪装成功**；" +
         "本工具只校验参数形状并转达回执，**不写 flow/账本**（派发与记录由应用实现）。",
       promptGuidelines: [
-        "只给统筹使用：先核对 gate 的依赖步骤与证据是否齐备（齐不齐），再请求复核；**不要**自行判断 gate 是否达标、不要代写 gate 报告。",
+        "只给运营使用：先核对 gate 的依赖步骤与证据是否齐备（齐不齐），再请求复核；**不要**自行判断 gate 是否达标、不要代写 gate 报告。",
         "`gateId` 必填（如 gate-vertical-slice），`flowId` 省略＝当前流程；按回执的 `code`/`message` 如实向客户说明——非 `dispatched` 时不要宣称已派发、不要反复重试。",
         "gate 复核 ≠ 验收通过 ≠ 客户批准：`dispatched` 只表示已派 Proof；结论以 Proof 报告与 flow 步骤状态为准。",
         "gate 失败只按 blocker/major 判定；只有 minor/nit 不构成返工依据——不要为 nit 反复开启返工或重新请求。",
@@ -1271,18 +1273,96 @@ export function describeTool(name: string): ToolDescription {
         "请求**修改某个项目角色的写集/边界**——只用于该角色当前边界**不足以完成已授权任务**时" +
         "（例如缺少某个配置文件的写权）。只提交**精确的增删路径**（`addPaths` / `removePaths`，至少一个非空）" +
         "与理由（`rationale`）：**不要重写整个边界、不要顺带扩其它路径**；数组元素会去重，绝对路径与 `..` 会被拒绝。" +
-        "真正的修改由应用把请求**派发给组队（Crew）**，仍走 appointment-write 与客户/判断确认——" +
+        "真正的修改由应用把请求**派发给人事（Crew）**，仍走 appointment-write 与客户/判断确认——" +
         "**本工具只提交请求，不代表客户批准、不代表边界已修改**。" +
-        "应用会在派发给组队前做**确定性校验 + AI 门禁审核**；拒绝或不确定（deny/manual/超时）会以 " +
-        "`rejected` 退回统筹（message 写明原因，**不自动放行**），**不代表客户拒绝**。" +
+        "应用会在派发给人事前做**确定性校验 + AI 门禁审核**；拒绝或不确定（deny/manual/超时）会以 " +
+        "`rejected` 退回运营（message 写明原因，**不自动放行**），**不代表客户拒绝**。" +
         "回执的 `ok` / `code` / `message` **原样如实转达**（`code` 如 `dispatched` / `already-dispatched` / " +
         "`rejected` / `invalid-role` / `invalid-path` / `no-change` / `unavailable`），" +
         "**失败绝不伪装成功**；非 `dispatched` 时不要宣称已派发或已修改。",
       promptGuidelines: [
         "只在项目角色因**写集/边界不足**确实无法完成任务时使用；先确认缺的是**精确路径**，不要猜测、不要请求整个目录。",
         "只提交精确的 addPaths/removePaths 与 rationale；不要重写整个边界、不要顺带扩其它路径；绝对路径与 `..` 会被拒绝。",
-        "请求变更 ≠ 客户批准：实际修改由组队走 appointment-write 与客户/判断确认；`rejected` 是应用门禁退回统筹（不自动放行），不代表客户拒绝。",
+        "请求变更 ≠ 客户批准：实际修改由人事走 appointment-write 与客户/判断确认；`rejected` 是应用门禁退回运营（不自动放行），不代表客户拒绝。",
         "按回执的 code/message 如实转达，失败不要谎称已派发。",
+      ],
+    };
+  }
+  if (name === "request_requirement_change") {
+    // 需求变更申请（2026-10-26 客户要求；只给报告员 Draft/rapporteur 注入，注入才注册）。
+    // 文案纪律：提案需要新授权/范围时不塞进提案卡；申请≠批准；需求变更审批卡可由**提案角色
+    // （Rapporteur）或统筹**发起/持有（decision 卡；「替我决策」开启时判断 agent 按推荐项决定，
+    // 未开启时客户手选）；**发起方不得自批**；主理不审批、只在批准后执行意图变更；`dispatched`
+    // 只表示已提交、不代表通过；`proposedIntentPatch` 只是建议；回执如实转达、失败不伪装。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          flowId: {
+            type: "string",
+            pattern: GOVERNANCE_SLUG_PATTERN,
+            description: "Governance flow id (slug); give this or intentId (at least one is required)",
+          },
+          intentId: {
+            type: "string",
+            pattern: GOVERNANCE_SLUG_PATTERN,
+            description:
+              "Intent record id (slug) whose requirement/scope may need to change; give this or flowId (at least one is required)",
+          },
+          changeKind: {
+            type: "string",
+            enum: ["scope", "authorization", "constraint", "cost", "other"],
+            description:
+              "scope = new/changed scope; authorization = new authorization/approval needed; constraint = new/removed constraint; cost = cost impact; other",
+          },
+          summary: {
+            type: "string",
+            minLength: 1,
+            maxLength: 500,
+            description: "One-line summary of the requirement change, 1..500 characters; over-long values are rejected, never truncated",
+          },
+          rationale: {
+            type: "string",
+            minLength: 1,
+            maxLength: 4000,
+            description: "Why the requirement change is needed, 1..4000 characters; over-long values are rejected, never truncated",
+          },
+          impact: {
+            type: "string",
+            minLength: 1,
+            maxLength: 2000,
+            description: "Optional impact assessment (scope/schedule/cost/risk), at most 2000 characters",
+          },
+          proposedIntentPatch: {
+            type: "string",
+            minLength: 1,
+            maxLength: 4000,
+            description:
+              "Optional suggested intent patch for the Lead to consider after approval (at most 4000 characters); a suggestion only — it does not change the intent on the customer's behalf",
+          },
+        },
+        required: ["changeKind", "summary", "rationale"],
+        additionalProperties: false,
+      },
+      description:
+        "在起草提案时发现需要**新的客户授权/范围**（或约束/成本变化）时，提交**需求变更审批**" +
+        "（本工具供报告员 Draft/rapporteur 起草提案时使用，注入才注册、未注入即不存在；需求变更申请也可由运营发起）。" +
+        "**不要把未获授权的诉求塞进提案卡「顺带获批」**——" +
+        "本工具把变更要点交给应用，由应用校验/去重后登记申请并进入**需求变更审批**：审批卡由应用在登记成功后经发起方会话的客户卡通道自动呈现（decision 卡；策划角色（Rapporteur）或运营均可发起，发起方持有该卡但不得再调用 `request_choice` 重复发卡）；「替我决策」开启时由判断 agent 按推荐项决定，未开启时由客户手选；" +
+        "**发起方不得自批**；**产品不审批，只在批准后执行意图变更**。" +
+        "`flowId` 与 `intentId` **至少给一个**；`changeKind` 必填" +
+        "（scope / authorization / constraint / cost / other）；`summary`（≤500 字）与 `rationale`（≤4000 字）必填，" +
+        "`impact`（≤2000 字）/ `proposedIntentPatch`（≤4000 字）可选；超长拒绝、不截断。" +
+        "`proposedIntentPatch` 只是**建议**，本工具**不替客户修改意图**。" +
+        "**申请≠批准，也不代表意图已变更**；`dispatched` 只表示已提交、不代表通过；" +
+        "不要把新授权写进提案卡；本工具不写盘、不改变任何权力或写权；审批卡由应用自动呈现，不由本工具或发起方另行调用 `request_choice` 发卡。" +
+        "回执的 `ok` / `code` / `message` **原样如实转达**（`code` 如 `dispatched` / `already-dispatched` / " +
+        "`invalid` / `intent-not-found` / `flow-not-found` / `unavailable` / `rejected`），**失败绝不伪装成功**。",
+      promptGuidelines: [
+        "只在起草提案发现需要**新的授权/范围/约束/成本**变化时使用；不要把这些诉求塞进提案卡、不要替客户假设同意。",
+        "`flowId`/`intentId` 至少一个；`changeKind` 必填；`summary`/`rationale` 必填且有界；`proposedIntentPatch` 只是建议，不代表客户已同意该修改。",
+        "申请≠批准：需求变更审批卡由应用在登记成功后自动经发起方会话呈现（decision 卡；策划角色（Rapporteur）或运营均可发起，发起方不得自批、不得再调用 `request_choice` 重复发卡；「替我决策」开启时判断 agent 按推荐项决定，未开启时客户手选）；产品不审批，只在批准后执行意图变更；不要把新授权写进提案卡。",
+        "按回执的 code/message 如实转达；`dispatched` 只表示已提交、不代表通过；非 dispatched 时不要宣称已提交或已获批准。",
       ],
     };
   }

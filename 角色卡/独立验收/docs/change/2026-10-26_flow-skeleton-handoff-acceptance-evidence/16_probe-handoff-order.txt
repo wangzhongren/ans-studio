@@ -1,0 +1,13 @@
+PASS  打开 Liaison
+PASS  交接回执 ok:true — {"ok":true,"message":"已把意图「intent-order」交给策划（handoffKind=initial）——交接 ≠ 客户批准。"}
+PASS  只投递一次（不重试） — 1
+PASS  send() 时骨架已存在（先建骨架、后投递） — true
+PASS  骨架可解析且 status=skeleton
+PASS  账本恰一条 dispatch.accepted{intent-handoff} — 1
+PASS  桌面不写 intent.handed-off
+PASS  桌面不写 customer.decision
+PASS  .ans 仅含 governance（审计账本） — ["governance"]
+PASS  .ans 无 project.json
+PASS  已存在完整流程不被覆盖
+
+11/11 probes passed

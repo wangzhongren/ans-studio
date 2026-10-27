@@ -928,3 +928,148 @@ openRoleSession(input: {
   `ViewImageFn`（`{path, images[]}`）与契约家 `ViewImageInput {path, image}` 不兼容；待桌面窗口收敛
   （其文件注释已登记「契约落树后改从契约家只读导入」）。本角色边界不允许改 `app/**`。
 - 未做：桌面类型收敛/投递端到端、真实模型两轮附件、跨角色 e2e、独立验收、commit/push。
+
+## 2026-10-26 需求变更申请能力透传（`request_requirement_change`，报告员/统筹）+ judge 指引
+
+来源：客户 2026-10-26 要求 + 同日纠正/补充。Draft / 报告员需要新授权/范围（联网、外部目录/仓库、范围、
+验收/技术标准、成本）时，不得写进提案卡「顺带获批」；应发 `request_requirement_change`。需求变更审批卡由
+统筹（Convener）或提案角色（Rapporteur）发起（decision 卡，发起方不得自批）；审批人只有独立判断 agent
+（勾选「替我决策」时按唯一推荐项代批）或客户（未勾选时手选）；主理不审批，只在批准后执行意图变更。
+**申请 ≠ 客户批准，也不代表意图已变更**；判断 agent 不能在提案卡上代批任何新授权。
+
+### 公开面（`src/pipeline/orchestration/run-role.ts`）
+
+```ts
+// 契约家（src/model/runtime.ts；本角色只读导入，不复制第二份）
+export interface RequestRequirementChangeInput {
+  flowId?: string; intentId?: string;
+  changeKind: "scope" | "authorization" | "constraint" | "cost" | "other";
+  summary: string; rationale: string; impact?: string; proposedIntentPatch?: string;
+}
+export interface RequestRequirementChangeResult {
+  ok: boolean;
+  code: "dispatched" | "already-dispatched" | "invalid" | "intent-not-found" | "flow-not-found" | "unavailable" | "rejected";
+  message: string; flowId?: string; intentId?: string; requestId?: string;
+}
+export type RequestRequirementChangeFn = (input: RequestRequirementChangeInput) => Promise<RequestRequirementChangeResult>;
+
+// 编排
+export interface AdapterCapabilities {
+  ...
+  requestRequirementChange?: RequestRequirementChangeFn;
+}
+
+openRoleSession(input: {
+  roleId: string;
+  ...
+  /** 需求变更申请（request_requirement_change「注入才注册」）；只给报告员/统筹（trio rapporteur/convener）。 */
+  requestRequirementChange?: RequestRequirementChangeFn;
+}, deps?: RoleSessionDeps): Promise<RoleSessionHandle>;
+```
+
+- **注入矩阵**：仅 `isTrio && (trioSpec?.id === "rapporteur" || trioSpec?.id === "convener")` 注入
+  （2026-10-26 客户纠正/补充：需求变更审批卡这两类角色都可发起；发起方不得自批）；其他内置治理角色
+  （liaison/nominator/verifier、single 模型的旧 su）与项目角色即便调用方误给也不注入。未提供 ⇒ 不注入
+  ⇒ 运行时核心不注册工具（能力缺席＝结构性 fail-closed）。
+- **透传**：`capabilities.requestRequirementChange` → `createRuntimeAdapterFactory` 显式同名透传 →
+  Service `...options` → `buildGovernedTools` 注册 `request_requirement_change`。编排**纯透传**，不做
+  意图校验/去重/派发/账本/系统行。**不改变**其他能力位（含 `requestClarification`/`handOffIntent`/
+  `viewImage`）的注入矩阵。
+- **一次性 `ans role run`** 不涉及（不传 capabilities）。
+
+### 判断 agent 指引（`src/common/编排/`）
+
+- `governance-judge-facts.ts::GOVERNANCE_JUDGE_REQUIREMENT_CHANGE_GUIDANCE`（文案单一来源，不参与裁决）：
+  提案卡含未获意图授权的新联网/外部目录访问/范围扩张/成本授权 ⇒ 不得 approve；decision 组不能 deny
+  ⇒ manual/intent-drift（approval 组夹带 ⇒ deny）；reason 必须写明「Draft 应先发
+  request_requirement_change；需求变更审批卡由统筹（Convener）或提案角色（Rapporteur）发起，发起方不得自批；
+  审批由独立判断 agent（替我决策时按唯一推荐项代批）或客户（未勾选时手选）完成；主理不审批，只在批准后
+  执行意图变更；不得通过在提案卡上代批或将需求删掉绕过」。
+- `governance-judge-prompt.ts` 系统提示逐字引用该常量（proposal rubric + 排除项例外）；decision rubric
+  同步为「统筹/Steward 发起；报告员 Rapporteur 仅可为需求变更审批发起，发起方不得自批」；**机械权限零变化**：
+  decision 组仍不得 deny、approval 组 deny 规则不变、`governance-judge-verdict.ts` 判定未改、未新增
+  cardKind/FlowStepKind、`GovernanceJudgeFacts` 无新字段。
+- `decision-card.ts`：`DECISION_CARD_ALLOWED_ROLES = ["convener", "rapporteur"]`——报告员仅限需求变更审批
+  （运行时契约无用途字段，机械上限只到角色；用途由 judge 指引/角色纪律约束）；Lead/Crew/Proof/single/项目
+  角色仍 `role-not-allowed`（不弹卡、不写账本）。
+
+### 证据（2026-10-26，win32 / Node v24.22.1）
+
+- 新增 `test/编排/request-requirement-change.test.ts` **5/5**（rapporteur 同引用+工具注册+载荷原样；
+  convener 同样注入；未提供零注册；项目角色/旧 su/liaison/nominator/verifier 不注入；不隐含/不改既有矩阵）。
+- 新增 `test/编排/requirement-change-judge-guidance.test.ts` **3/3**（指引文案；系统提示引用且机械权限
+  表述不变；无新 cardKind、facts 键集不变）。
+- `test/编排/decision-card.test.ts` 增报告员正向 1 例，拒绝集合改为 Lead/Crew/Proof，共享校验增
+  rapporteur 正向与 Crew/Proof 反向（原有断言未弱化）。
+- `node --test "test/编排/**/*.test.ts"` → **1016 tests / 1014 pass / 1 fail / 1 skip**（唯一红＝既有
+  Windows symlink `shell-authorized-routine.test.ts:103` EPERM 基线）。
+- `npm run typecheck` → **exit 0**。
+- 未做：桌面注入扩展到统筹与 decision 卡审批通道端到端、主理执行意图变更链路、跨角色 e2e、真实 Electron、
+  独立验收、commit/push。
+
+## 2026-10-26 意图交接流程骨架（`ensureFlowSkeleton`，应用侧）
+
+**来源**：客户反馈「意图确认/交接后、提案/团队计划前 `flow_get` 报 not-found」。应用在意图交接成功后、
+报告员开始前按 intent 的 flowId 创建 `docs/flows/<flowId>.yaml` 通用骨架（顶层 `status: skeleton`）。
+**应用专用，不是角色工具**。
+
+### 公共出口（`src/pipeline/orchestration/govern-session.ts` 薄再导出）
+
+```ts
+export { ensureFlowSkeleton, FLOW_SKELETON_STATUS } from "../../common/编排/flow-service.ts";
+export type { EnsureFlowSkeletonInput, EnsureFlowSkeletonResult } from "../../common/编排/flow-service.ts";
+// W6-A 块补：export { parseIntentFrontmatter }（桌面从意图 frontmatter 取 flowId/qualityTier）
+
+// 输入 / 输出（与桌面 session.ts::ensureIntentFlowSkeleton 的调用契约稳定）
+interface EnsureFlowSkeletonInput { projectRoot: string; flowId: string; qualityTier: "prototype" | "production" }
+interface EnsureFlowSkeletonResult {
+  ok: boolean;
+  created: boolean;      // true = 本次新建；false = 已存在（不覆盖）
+  revision?: string;     // 仅 created:true：文件字节 sha256（与 flow-service revision 同口径）
+  error?: string;        // ok:false 时可读原因（不抛）
+}
+```
+
+### 骨架（`buildFlowSkeletonSteps()`，不经公共出口）
+
+八步全部 `pending`；`kind` 只取既有 `FlowStepKind`（**不新增枚举**）；owner 仅为内置治理角色 id 或
+`app`；不含项目角色 / `delivery-*` / gate / `build-scaffold`：
+
+| stepId | kind | owner | dependsOn |
+| --- | --- | --- | --- |
+| contract-freeze | artifact | rapporteur | — |
+| team-plan | artifact | convener | contract-freeze |
+| appointment | customer-decision | convener | team-plan |
+| role-cards | dispatch | nominator | appointment |
+| role-readiness | artifact | convener | role-cards |
+| acceptance-criteria | artifact | verifier | role-readiness |
+| change-package | artifact | convener | acceptance-criteria |
+| verification | acceptance（保留 id） | app | — |
+
+`role-cards` 取 `dispatch`（与 `flow-state.ts` 步骤约定及桌面任命后写
+`dispatch.accepted{stepId:"role-cards"}` 一致；`completeRoleCardsStep` 同时支持 `artifact`，替换时由团队
+计划决定）。顶层 `status` 仅供人读/桌面识别，不参与机器判定。
+
+### 语义（钉死）
+
+- **已存在任何文件（骨架 / 完整流程 / 非法 YAML）⇒ `{ok:true, created:false}`，绝不覆盖**；存在性
+  检查在 **per-project 串行队列**（与 `createFlowService` / 应用专用收口同一 `serialize` 队列）内执
+  行，同进程并发恰一个 `created:true`。
+- 不存在 ⇒ 生成骨架、`serializeFlow` 后用 `parseFlowStateYaml` 复核、`mkdir -p docs/flows`、共享
+  `atomicWrite`（tmp + fsync + rename；失败不触碰目标）；读取失败非 ENOENT（目标被目录占用/无权限）
+  或写盘失败 ⇒ `{ok:false, created:false, error}`，不抛。
+- 输入 fail-closed：空 `projectRoot` / 不匹配 `GOVERNANCE_SLUG_PATTERN` 的 `flowId` / 非法
+  `qualityTier` ⇒ `ok:false` 且零落盘。
+- **零副作用**：不写治理账本、不写客户决定、不写 `.ans`。
+- 残余：存在性检查与 rename 之间为 check-then-rename——同进程已串行化；跨进程同窗口创建同一 flow
+  时仍可能被覆盖（应用是骨架唯一写者，正常路径不触发；绝对保证需 `src/common/shared/` no-clobber 原语）。
+
+### 证据（2026-10-26，win32 / Node v24.22.1）
+
+- `test/编排/flow-service.test.ts` 新增骨架 **5 例**（形状/revision=文件 sha256/不含 delivery-/gate；
+  骨架、完整流程、非法 YAML 均不覆盖；非法输入零落盘；目录占用或 `docs/flows` 为文件时失败不破坏现场；
+  并发恰一个 `created`）。
+- `node --test "test/编排/flow-service.test.ts" "test/编排/flow-state.test.ts"` → **153 / 152 pass /
+  1 skip**；`test/编排/**` → **1021 / 1019 pass / 1 fail / 1 skip**（唯一红＝既有 Windows symlink EPERM）。
+- `npm run typecheck` → **exit 0**。
+- 未做：桌面字面量收敛（`interface.ts` 仍写 `"skeleton"`，建议导入常量）、跨角色 e2e、独立验收、commit/push。

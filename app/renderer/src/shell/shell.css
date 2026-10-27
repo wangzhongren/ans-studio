@@ -1846,6 +1846,144 @@ details[open] > summary > .disclosure-chevron {
   overflow-wrap: normal;
   color: var(--text-3);
 }
+/* view_image 缩略图（2026-10-27 客户要求）：独立工具行下方显示角色查看的项目图片。
+   像素化渲染保留证据截图/像素图细节；最大 420×240、contain，不参与工具行摘要布局。
+   img 自身也带 `view-image-preview` class（e2e/探针既可按 img 也可按容器定位）。 */
+div.view-image-preview {
+  margin: 0 0 4px 12px;
+  width: fit-content;
+  max-width: min(420px, calc(100% - 12px));
+  padding: 2px 0;
+}
+img.view-image-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 240px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  image-rendering: pixelated;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-micro);
+  background: var(--card);
+}
+/* 缩略图按钮（客户追加：点击应用内放大）：不改变图片尺寸，只加可点击视觉。 */
+.view-image-preview-trigger {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  line-height: 0;
+  border-radius: var(--radius-micro);
+  cursor: zoom-in;
+}
+/* 选中态只保留一层绿色（2026-10-27 客户反馈「选中多了一层绿色的框」）：
+   focus-visible 只显示贴合图片的 2px 焦点环，不再同时把 1px 图片边框染绿；
+   悬停反馈保留，但已处于 focus-visible 时不叠加边框高亮，聚焦+悬停也只有一层。 */
+.view-image-preview-trigger:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.view-image-preview-trigger:hover:not(:focus-visible) img.view-image-preview {
+  border-color: var(--primary);
+}
+.view-image-preview-trigger img.view-image-preview {
+  pointer-events: none;
+}
+.view-image-note {
+  margin: 0 0 4px 12px;
+  color: var(--text-3);
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+/* view_image 放大层：fixed 遮罩 + portal 到 body，不参与聊天行/虚拟窗口布局。
+   大图最大约 90vw×80vh、像素化、contain；Esc/点击遮罩/关闭按钮关闭。 */
+.view-image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--backdrop-strong);
+}
+.view-image-lightbox-dialog {
+  display: flex;
+  flex-direction: column;
+  max-width: 90vw;
+  max-height: 80vh;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow-popover);
+}
+.view-image-lightbox-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.view-image-lightbox-path {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-size: 12px;
+}
+.view-image-lightbox-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-micro);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.view-image-lightbox-close:hover {
+  color: var(--foreground);
+  background: var(--hover);
+}
+.view-image-lightbox-close:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.view-image-lightbox-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 8px 12px 12px;
+}
+.view-image-lightbox-image {
+  display: block;
+  max-width: calc(90vw - 26px);
+  max-height: calc(80vh - 60px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  image-rendering: pixelated;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-micro);
+  background: var(--card);
+}
+.view-image-lightbox .view-image-note {
+  margin: 0;
+  padding: 8px 4px;
+}
 /* 工具失败卡片（2026-10-25）：summary 只留工具名/失败徽标/一行原因，完整原文在展开区。
    只引用 index.css 令牌；徽标用小面积 danger-bg，不做大面积红底。 */
 .tool-call-record[data-failed="true"] > summary {

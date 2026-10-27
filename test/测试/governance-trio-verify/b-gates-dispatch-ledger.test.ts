@@ -404,7 +404,7 @@ test("账本坏 fail-closed：坏行 ⇒ 门禁拒一切（含派发）；append
 
 // —————————————————————— 3) 账本字段/顺序 + 完整 flow 还原 ——————————————————————
 
-test("账本契约：customer.decision / artifact.observed / dispatch.accepted 字段与顺序；完整 flow 可还原谁提案/组队/排程/客户批了什么", async () => {
+test("账本契约：customer.decision / artifact.observed / dispatch.accepted 字段与顺序；完整 flow 可还原谁提案/人事/排程/客户批了什么", async () => {
   const { root, cleanup } = makeRoot("ledger-e2e");
   try {
     writeProjectRole(root, "A");
@@ -539,7 +539,7 @@ test("账本契约：customer.decision / artifact.observed / dispatch.accepted �
       (e) => e.kind === "artifact.observed" && e.artifactPath === TEAM_PLAN_REL,
     );
     assert.ok(planSeen, "应有团队计划 artifact.observed");
-    assert.equal(planSeen!.actorRoleId, "convener", "谁组队/写团队计划 = Convener");
+    assert.equal(planSeen!.actorRoleId, "convener", "谁人事/写团队计划 = Convener");
     assert.equal(planSeen!.power, "schedule");
     // 团队计划不在 `docs/proposals|nominations` 的 `-vN` 观察口径内：artifact.observed 只带路径/哈希。
 
@@ -650,7 +650,7 @@ test("账本契约：customer.decision / artifact.observed / dispatch.accepted �
     assert.equal(proposer?.actorRoleId, "rapporteur");
     // 2026-10-22 第 1 项：团队判断/团队计划归 Convener（原「谁提名 = Nominator」改为「谁组队/写团队计划」）。
     const teamPlanner = entries.find((e) => e.kind === "artifact.observed" && e.artifactPath === TEAM_PLAN_REL);
-    assert.equal(teamPlanner?.actorRoleId, "convener", "谁组队/写团队计划 = Convener");
+    assert.equal(teamPlanner?.actorRoleId, "convener", "谁人事/写团队计划 = Convener");
     const scheduler = entries.find((e) => e.kind === "artifact.observed" && e.artifactPath === `docs/flows/${FLOW}.md`);
     assert.equal(scheduler?.actorRoleId, "convener");
     assert.ok(entries.some((e) => e.kind === "dispatch.accepted" && e.actorRoleId === "convener"));

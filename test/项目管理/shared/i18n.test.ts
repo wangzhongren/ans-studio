@@ -588,15 +588,15 @@ test("B1–B4 key 分区：ui/main/shared 计数与总 key 数符合契约（漏
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
   assert.deepEqual(prefixes, {
-    ui: 787, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7 + 2026-10-25 chat-panel 10 + background tasks 25 + flow status 22 + acceptance triage 28 + 2026-10-26 decision card 3 + 2026-10-26 view_image 1
-    main: 516, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6 + backgroundTasks 1 + flowStatus 2 + write preauthorization 6 + 2026-10-26 gate review 13 + 2026-10-26 decision card 6 + 2026-10-26 view_image 2
+    ui: 792, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7 + 2026-10-25 chat-panel 10 + background tasks 25 + flow status 22 + acceptance triage 28 + 2026-10-26 decision card 3 + 2026-10-26 view_image 1 + 2026-10-27 view_image preview 3 + 2026-10-27 view_image lightbox 2
+    main: 530, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6 + backgroundTasks 1 + flowStatus 2 + write preauthorization 6 + 2026-10-26 gate review 13 + 2026-10-26 decision card 6 + 2026-10-26 view_image 2 + 2026-10-27 view_image same-turn 1 + 2026-10-26 requirement change 13
     shared: 62, // B4 元数据 + 跨层通用短词
     preferences: 3, // B0
   });
-  assert.equal(keys.length, 1368);
+  assert.equal(keys.length, 1387);
   // B1/B2 与 B3 分区（扣除 B0 的 5 个 ui.* / 5 个 main.*）。
-  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 782);
-  assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 511);
+  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 787);
+  assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 525);
 });
 
 /**
@@ -876,7 +876,7 @@ test("验收分诊 key：标题/问题/选项/结论/严重度/区块/来源文�
   const expectedZh: Record<string, string> = {
     "ui.triage.title": "验收分诊",
     "ui.triage.question": "对本次验收结果如何处理？",
-    "ui.triage.option.rework": "下发统筹修改",
+    "ui.triage.option.rework": "下发运营修改",
     "ui.triage.option.reportOnly": "仅汇报不返工",
     "ui.triage.conclusion.pass": "通过",
     "ui.triage.conclusion.fail": "不通过",
@@ -946,7 +946,7 @@ test("验收分诊 key：建议/覆盖提示/汇报文本占位符与插值符�
   }
   assert.equal(
     translate("zh-CN", "ui.triage.advice.rework", { blockers: 1, majors: 2 }),
-    "建议下发统筹修改（1 个阻断、2 个重要项，改进方案可执行）",
+    "建议下发运营修改（1 个阻断、2 个重要项，改进方案可执行）",
   );
   assert.equal(
     translate("en-US", "ui.triage.advice.rework", { blockers: 1, majors: 2 }),
@@ -1010,7 +1010,7 @@ test("验收分诊 key：建议/覆盖提示/汇报文本占位符与插值符�
   );
   // 退回补充指向验证角色：zh-CN 用目录既有译名「验收」，en-US 用角色名 Proof。
   assert.ok(zhCN["ui.triage.returnedToVerifier"].includes("验收"));
-  assert.ok(enUS["ui.triage.returnedToVerifier"].includes("Proof"));
+  assert.ok(enUS["ui.triage.returnedToVerifier"].includes("QA"));
 });
 
 test("B1–B4 锚点 key：每个组件/来源文件的代表 key 全部存在（zh + en）", () => {
@@ -1062,8 +1062,8 @@ test("B1/B2 key 增补：10 个 key 全部存在（zh + en），zh 逐字取当�
     "此确认已失效，未获放行——请让角色重新发起。",
   );
   assert.equal(zhCN["ui.governanceStore.stepFallback"], "治理步骤");
-  assert.equal(zhCN["ui.judge.roleName.liaison"], "主理");
-  assert.equal(zhCN["ui.judge.roleName.verifier"], "验收");
+  assert.equal(zhCN["ui.judge.roleName.liaison"], "产品");
+  assert.equal(zhCN["ui.judge.roleName.verifier"], "质检");
   assert.deepEqual(zhCN["ui.judge.headline.writeConfirmOverflow"], {
     other: "确认写入 {count} 个路径（{paths} 等 {count} 个）",
   });
@@ -1083,16 +1083,16 @@ test("B1/B2 key 增补：en-US 自然英文；judge 复用 3 个既有治理角�
     "This confirmation has expired and was not approved — ask the role to initiate it again.",
   );
   assert.equal(enUS["ui.governanceStore.stepFallback"], "Governance step");
-  assert.equal(enUS["ui.judge.roleName.liaison"], "Lead");
-  assert.equal(enUS["ui.judge.roleName.verifier"], "Proof");
+  assert.equal(enUS["ui.judge.roleName.liaison"], "Product");
+  assert.equal(enUS["ui.judge.roleName.verifier"], "QA");
   assert.equal(enUS["ui.reportView.savingHistory"], "Saving history…");
   // 顺序相同的三个内置治理角色名不重复收录，复用既有 ui.role.governance.*.name。
-  assert.equal(zhCN["ui.role.governance.draft.name"], "提案");
-  assert.equal(zhCN["ui.role.governance.crew.name"], "组队");
-  assert.equal(zhCN["ui.role.governance.steward.name"], "统筹");
-  assert.equal(enUS["ui.role.governance.draft.name"], "Draft");
-  assert.equal(enUS["ui.role.governance.crew.name"], "Crew");
-  assert.equal(enUS["ui.role.governance.steward.name"], "Steward");
+  assert.equal(zhCN["ui.role.governance.draft.name"], "策划");
+  assert.equal(zhCN["ui.role.governance.crew.name"], "人事");
+  assert.equal(zhCN["ui.role.governance.steward.name"], "运营");
+  assert.equal(enUS["ui.role.governance.draft.name"], "Planner");
+  assert.equal(enUS["ui.role.governance.crew.name"], "People Ops");
+  assert.equal(enUS["ui.role.governance.steward.name"], "Operations");
 });
 
 test("zh-CN 内置角色名：治理角色与 judge 角色名为纯中文；目录值不含英文角色别名", () => {
@@ -1107,7 +1107,7 @@ test("zh-CN 内置角色名：治理角色与 judge 角色名为纯中文；目�
   ] as const satisfies readonly MessageKey[];
   assert.deepEqual(
     roleNameKeys.map((key) => zhCN[key]),
-    ["主理", "提案", "组队", "统筹", "验收", "主理", "验收"],
+    ["产品", "策划", "人事", "运营", "质检", "产品", "质检"],
   );
   for (const key of roleNameKeys) {
     assert.match(String(zhCN[key]), /^[\p{Script=Han}]+$/u, `zh-CN 角色名必须为纯中文：${key}`);
@@ -1327,7 +1327,7 @@ test("B3 key 增补：23 个 key 全部存在（zh + en），zh 逐字取当前�
     assert.ok(key in enUS, `en-US 缺增补 key：${key}`);
   }
   assert.equal(zhCN["main.session.releaseNoSession"], "角色 {roleId} 没有打开的会话。");
-  assert.equal(zhCN["main.session.clarificationDelivery"], "提案需要澄清：{question}");
+  assert.equal(zhCN["main.session.clarificationDelivery"], "策划需要澄清：{question}");
   assert.equal(
     zhCN["main.session.delivery.receivedDispatch"],
     "已接收来自 {role} 的派发任务——请按任务文本执行，完成后交回报告。",
@@ -1338,7 +1338,7 @@ test("B3 key 增补：23 个 key 全部存在（zh + en），zh 逐字取当前�
   );
   assert.equal(
     zhCN["main.session.dispatchModelNote"],
-    "（trio：统筹或主理）",
+    "（trio：运营或产品）",
   );
   assert.equal(zhCN["main.session.rebuildChangedRuntimeConfig"], "运行时配置");
   assert.equal(zhCN["main.session.install.verbInstall"], "安装");
@@ -1364,7 +1364,7 @@ test("B3 key 增补：23 个 key 全部存在（zh + en），zh 逐字取当前�
   assert.equal(zhCN["main.interface.teamPlanMissingBoundHint"], "（账本 appointment 绑定 {plan}）");
   assert.equal(
     zhCN["main.interface.roleCardsStepMissing"],
-    "流程缺少 id 为 \"{stepId}\" 的步骤（团队计划存在但 flow 未声明 role-cards，无法完成收口；请统筹补齐 flow 步骤）。",
+    "流程缺少 id 为 \"{stepId}\" 的步骤（团队计划存在但 flow 未声明 role-cards，无法完成收口；请运营补齐 flow 步骤）。",
   );
   assert.equal(zhCN["main.interface.readErrorExistingSuffix"], "（existing/legacy：仅提醒）");
   assert.equal(zhCN["main.interface.queueRecoveredLine"], "- [{kind}] {summary}（角色 {roleId} · {runtime}）");
@@ -1375,7 +1375,7 @@ test("B3 key 增补：en-US 自然英文；三个缺口复用既有同文案 key
   assert.equal(enUS["main.session.releaseNoSession"], "Role {roleId} has no open session.");
   assert.equal(
     enUS["main.session.clarificationDelivery"],
-    "Draft (proposal) needs clarification: {question}",
+    "Planner (proposal) needs clarification: {question}",
   );
   assert.equal(
     enUS["main.session.delivery.receivedDispatch"],
@@ -1386,7 +1386,7 @@ test("B3 key 增补：en-US 自然英文；三个缺口复用既有同文案 key
     "Delivery failed (from {sourceRoleId}): {detail}",
   );
   // 前导空格：拼接在 `... dispatch owner {dispatcher}{modelNote}.` 之后自然成句。
-  assert.equal(enUS["main.session.dispatchModelNote"], " (trio: Steward or Lead)");
+  assert.equal(enUS["main.session.dispatchModelNote"], " (trio: Operations or Product)");
   assert.equal(enUS["main.session.rebuildChangedRuntimeConfig"], "runtime configuration");
   assert.equal(enUS["main.session.install.verbInstall"], "install");
   assert.equal(enUS["main.session.install.verbUninstall"], "uninstall");
@@ -1422,7 +1422,7 @@ test("B3 key 增补：en-US 自然英文；三个缺口复用既有同文案 key
   );
   assert.equal(
     enUS["main.interface.roleCardsStepMissing"],
-    "The flow is missing the step with id \"{stepId}\" (the team plan exists but the flow does not declare role-cards, so closure cannot complete; ask the Convener to add the flow step).",
+    "The flow is missing the step with id \"{stepId}\" (the team plan exists but the flow does not declare role-cards, so closure cannot complete; ask Operations to add the flow step).",
   );
   assert.equal(enUS["main.interface.readErrorExistingSuffix"], " (existing/legacy: warning only)");
   assert.equal(
@@ -1454,7 +1454,7 @@ test("B3 key 增补：插值与复数（overflow 按 count 选 one/other；队�
         plan: "docs/scheduling/x-team-v2.md",
       }),
     }),
-    "团队计划缺失（账本 appointment 绑定 docs/scheduling/x-team-v2.md）；未派组队写卡（不猜计划、不自行扩大职责）",
+    "团队计划缺失（账本 appointment 绑定 docs/scheduling/x-team-v2.md）；未派人事写卡（不猜计划、不自行扩大职责）",
   );
   assert.equal(
     translate("en-US", "main.interface.teamPlanMissingShort", {
@@ -1462,23 +1462,23 @@ test("B3 key 增补：插值与复数（overflow 按 count 选 one/other；队�
         plan: "docs/scheduling/x-team-v2.md",
       }),
     }),
-    "Team plan missing (appointment ledger bound to docs/scheduling/x-team-v2.md); Crew card-writing not dispatched (no guessing plans, no unilateral scope expansion)",
+    "Team plan missing (appointment ledger bound to docs/scheduling/x-team-v2.md); People Ops card-writing not dispatched (no guessing plans, no unilateral scope expansion)",
   );
   assert.equal(
     translate("zh-CN", "main.session.dispatchWrongSource", {
-      from: "组队",
-      dispatcher: "统筹",
+      from: "人事",
+      dispatcher: "运营",
       modelNote: translate("zh-CN", "main.session.dispatchModelNote"),
     }),
-    "派发未受理：来源角色 组队 不是本项目派发主人 统筹（trio：统筹或主理）。",
+    "派发未受理：来源角色 人事 不是本项目派发主人 运营（trio：运营或产品）。",
   );
   assert.equal(
     translate("en-US", "main.session.dispatchWrongSource", {
-      from: "Crew",
-      dispatcher: "Steward",
+      from: "People Ops",
+      dispatcher: "Operations",
       modelNote: translate("en-US", "main.session.dispatchModelNote"),
     }),
-    "Dispatch not accepted: source role Crew is not this project's dispatch owner Steward (trio: Steward or Lead).",
+    "Dispatch not accepted: source role People Ops is not this project's dispatch owner Operations (trio: Operations or Product).",
   );
   assert.equal(
     translate("zh-CN", "main.customerInput.judgeWriteHeadOverflow", {
@@ -1519,10 +1519,10 @@ test("B3 key 增补：插值与复数（overflow 按 count 选 one/other；队�
     translate("en-US", "main.interface.queueRecoveredLine", {
       kind: "Handback",
       summary: "report handed back",
-      roleId: "Lead",
+      roleId: "Product",
       runtime: "claude",
     }),
-    "- [Handback] report handed back (role Lead · claude)",
+    "- [Handback] report handed back (role Product · claude)",
   );
   assert.equal(
     translate("zh-CN", "main.interface.staleStepFact", {
@@ -1535,9 +1535,9 @@ test("B3 key 增补：插值与复数（overflow 按 count 选 one/other；队�
   assert.equal(
     translate("en-US", "main.watchdog.signalSummary", {
       signal: translate("en-US", "main.watchdog.signal.cmdTimeout"),
-      roleId: "Lead",
+      roleId: "Product",
     }),
-    "System·Watchdog · Command timeout · role Lead",
+    "System·Watchdog · Command timeout · role Product",
   );
 });
 
@@ -1587,8 +1587,8 @@ test("验收返工路由 key：客户来源写「客户拒绝」；judge/自动�
 
   assert.ok(customerZh.includes("客户拒绝"), "客户来源必须写明「客户拒绝」");
   assert.ok(customerEn.includes("customer rejected"), "en-US 客户来源必须写明 customer rejected");
-  assert.ok(customerZh.includes("统筹"), "zh-CN 系统行必须写明接收方统筹");
-  assert.ok(customerEn.includes("Convener"), "en-US 系统行必须写明接收方 Convener");
+  assert.ok(customerZh.includes("运营"), "zh-CN 系统行必须写明接收方运营");
+  assert.ok(customerEn.includes("Operations"), "en-US 系统行必须写明接收方 Operations");
 
   assert.ok(
     automaticZh.includes("自动决策未通过/未完成（判断代批/自动退回）"),
@@ -1606,19 +1606,19 @@ test("验收返工路由 key：客户来源写「客户拒绝」；judge/自动�
 test("验收返工路由 key：zh-CN/en-US 取值与插值（客户/自动/等待/缺段/失败/审计失败）", () => {
   assert.equal(
     translate("zh-CN", "main.governance.acceptanceReworkRoutedCustomer", { flowId: "flow-a" }),
-    "流程 flow-a：验收结果为客户拒绝；应用已按路由规则把返工交统筹组织。",
+    "流程 flow-a：验收结果为客户拒绝；应用已按路由规则把返工交运营组织。",
   );
   assert.equal(
     translate("en-US", "main.governance.acceptanceReworkRoutedCustomer", { flowId: "flow-a" }),
-    "Flow flow-a: the customer rejected the acceptance result; the app routed the rework to Steward (Convener) under the routing rules.",
+    "Flow flow-a: the customer rejected the acceptance result; the app routed the rework to Operations (Operations) under the routing rules.",
   );
   assert.equal(
     translate("zh-CN", "main.governance.acceptanceReworkRoutedAutomatic", { flowId: "flow-a" }),
-    "流程 flow-a：自动决策未通过/未完成（判断代批/自动退回）；应用已按路由规则把返工交统筹组织。",
+    "流程 flow-a：自动决策未通过/未完成（判断代批/自动退回）；应用已按路由规则把返工交运营组织。",
   );
   assert.equal(
     translate("en-US", "main.governance.acceptanceReworkRoutedAutomatic", { flowId: "flow-a" }),
-    "Flow flow-a: the automatic decision did not pass or did not complete (judge proxy approval / automatic return); the app routed the rework to Steward (Convener) under the routing rules.",
+    "Flow flow-a: the automatic decision did not pass or did not complete (judge proxy approval / automatic return); the app routed the rework to Operations (Operations) under the routing rules.",
   );
   assert.equal(
     translate("zh-CN", "main.governance.acceptanceReworkPending", { flowId: "flow-a" }),
@@ -1772,14 +1772,14 @@ test("gate 复核 key：zh-CN/en-US 取值与插值（已提交/已通过/失败
       flowId: "flow-a",
       gateId: "gate-vertical-slice",
     }),
-    "流程 flow-a：已提交 gate gate-vertical-slice 复核给验收（工作中）；gate 复核 ≠ 验收通过 ≠ 客户批准。",
+    "流程 flow-a：已提交 gate gate-vertical-slice 复核给质检（工作中）；gate 复核 ≠ 验收通过 ≠ 客户批准。",
   );
   assert.equal(
     translate("en-US", "main.gateReview.dispatched", {
       flowId: "flow-a",
       gateId: "gate-vertical-slice",
     }),
-    "Flow flow-a: gate gate-vertical-slice review submitted to Proof (working); this is not an acceptance pass and not customer approval.",
+    "Flow flow-a: gate gate-vertical-slice review submitted to QA (working); this is not an acceptance pass and not customer approval.",
   );
   assert.equal(
     translate("zh-CN", "main.gateReview.failNote", {
@@ -1796,7 +1796,7 @@ test("gate 复核 key：zh-CN/en-US 取值与插值（已提交/已通过/失败
       gateId: "gate-integration-performance",
       reportPath: "docs/acceptance/flow-a-gate-integration-performance-report-v1.md",
     }),
-    "Flow flow-a: the gate gate-integration-performance report is missing or unreadable (docs/acceptance/flow-a-gate-integration-performance-report-v1.md); the gate stays pending while waiting for Proof to submit it — a timeout never counts as a pass.",
+    "Flow flow-a: the gate gate-integration-performance report is missing or unreadable (docs/acceptance/flow-a-gate-integration-performance-report-v1.md); the gate stays pending while waiting for QA to submit it — a timeout never counts as a pass.",
   );
   assert.equal(
     translate("zh-CN", "main.gateReview.reworkTask", {
@@ -1928,24 +1928,28 @@ test("decision 卡 key：zh-CN/en-US 取值与插值（选推荐项/非推荐项
 
 /**
  * 2026-10-26 view_image 共享 key（客户要求：角色可查看项目内图片证据）。
- * 设计：工具只读项目内图片，作为**下一轮用户提示的图片附件**排队给同一角色；
- * 本轮工具结果只确认「已读取并排队」，不得让模型假装本轮已看到；
- * 路径/类型/大小 fail-closed（失败不提供图片）；能力未注入时不注册该工具。
- * 契约：2 个 `main.viewImage.*` + 1 个 `ui.viewImage.*` 成对存在；
- * queued 占位符 {path}，failed 占位符 {detail}，attachmentLabel 占位符 {path}；
+ * 2026-10-27 客户要求「同轮看图修复」：同轮工具结果附图优先，下一轮附件回退。
+ * 设计：图片作为**本轮工具结果的图片**（同一轮内可见，模型下一次调用即可判断）
+ * 或**下一轮用户提示的图片附件**（回退）送达同一角色；回执必须写清交付方式；
+ * 未收到图片不得假装已看到；路径/类型/大小 fail-closed（失败不提供图片）；
+ * 能力未注入时不注册该工具。
+ * 契约：3 个 `main.viewImage.*` + 1 个 `ui.viewImage.*` 成对存在；
+ * sameTurn/queued/attachmentLabel 占位符 {path}，failed 占位符 {detail}；
  * en-US 不含中文。
  */
 const VIEW_IMAGE_KEYS = [
+  "main.viewImage.sameTurn",
   "main.viewImage.queued",
   "main.viewImage.failed",
   "ui.viewImage.attachmentLabel",
 ] as const satisfies readonly MessageKey[];
 
-test("view_image key：2 个 main.viewImage.* + 1 个 ui.viewImage.* 在 zh-CN/en-US 均存在，占位符逐 key 一致", () => {
-  assert.equal(VIEW_IMAGE_KEYS.length, 3);
-  assert.equal(VIEW_IMAGE_KEYS.filter((key) => key.startsWith("main.viewImage.")).length, 2);
+test("view_image key：3 个 main.viewImage.* + 1 个 ui.viewImage.* 在 zh-CN/en-US 均存在，占位符逐 key 一致", () => {
+  assert.equal(VIEW_IMAGE_KEYS.length, 4);
+  assert.equal(VIEW_IMAGE_KEYS.filter((key) => key.startsWith("main.viewImage.")).length, 3);
   assert.equal(VIEW_IMAGE_KEYS.filter((key) => key.startsWith("ui.viewImage.")).length, 1);
   const expectedPlaceholders: Record<(typeof VIEW_IMAGE_KEYS)[number], string[]> = {
+    "main.viewImage.sameTurn": ["path"],
     "main.viewImage.queued": ["path"],
     "main.viewImage.failed": ["detail"],
     "ui.viewImage.attachmentLabel": ["path"],
@@ -1959,8 +1963,19 @@ test("view_image key：2 个 main.viewImage.* + 1 个 ui.viewImage.* 在 zh-CN/e
   }
 });
 
-test("view_image key：两轮附件语义（下一轮以附件提供、本轮未看到、不得假装）与 fail-closed；en-US 不含中文", () => {
-  // queued：下一轮才以图片附件送达；本轮未看到图片内容；不得假装已看到。
+test("view_image key：同轮附图与回退语义（同一轮工具结果附图 / 下一轮以附件提供、不得假装）与 fail-closed；en-US 不含中文", () => {
+  // sameTurn：图片随本轮工具结果附图（同一轮可见），现在可直接查看判断；未包含图片不得假装。
+  const sameTurnZh = zhCN["main.viewImage.sameTurn"];
+  assert.ok(sameTurnZh.includes("随本轮工具结果"), "zh-CN sameTurn 必须写明随本轮工具结果附图");
+  assert.ok(sameTurnZh.includes("同一轮"), "zh-CN sameTurn 必须写明同一轮可见");
+  assert.ok(sameTurnZh.includes("可直接查看"), "zh-CN sameTurn 必须写明可直接查看判断");
+  assert.ok(sameTurnZh.includes("不要假装"), "zh-CN sameTurn 必须写明不得假装已看到");
+  const sameTurnEn = enUS["main.viewImage.sameTurn"];
+  assert.ok(sameTurnEn.includes("this turn's tool result"), "en-US sameTurn 必须写明随本轮工具结果附图");
+  assert.ok(sameTurnEn.includes("same turn"), "en-US sameTurn 必须写明同一轮可见");
+  assert.ok(sameTurnEn.includes("view and judge"), "en-US sameTurn 必须写明可直接查看判断");
+  assert.ok(sameTurnEn.includes("do not pretend"), "en-US sameTurn 必须写明不得假装已看到");
+  // queued（下一轮回退）：下一轮才以图片附件送达；本轮未看到图片内容；不得假装已看到。
   const queuedZh = zhCN["main.viewImage.queued"];
   assert.ok(queuedZh.includes("下一轮"), "zh-CN queued 必须写明下一轮提供");
   assert.ok(queuedZh.includes("图片附件"), "zh-CN queued 必须写明以图片附件提供");
@@ -1981,7 +1996,15 @@ test("view_image key：两轮附件语义（下一轮以附件提供、本轮未
   }
 });
 
-test("view_image key：zh-CN/en-US 取值与插值（已读取并排队 / 失败 / 附件标签）", () => {
+test("view_image key：zh-CN/en-US 取值与插值（同轮附图 / 已读取并排队 / 失败 / 附件标签）", () => {
+  assert.equal(
+    translate("zh-CN", "main.viewImage.sameTurn", { path: "docs/images/screenshot.png" }),
+    "已读取项目图片 docs/images/screenshot.png；图片已随本轮工具结果附图提供（同一轮可见），现在可直接查看并判断。若你的上下文未包含图片，请明确说明未看到，不要假装已看到。",
+  );
+  assert.equal(
+    translate("en-US", "main.viewImage.sameTurn", { path: "docs/images/screenshot.png" }),
+    "Read project image docs/images/screenshot.png; the image is attached to this turn's tool result (visible within the same turn), so you can view and judge it now. If your context does not include the image, state clearly that you have not seen it — do not pretend you have.",
+  );
   assert.equal(
     translate("zh-CN", "main.viewImage.queued", { path: "docs/images/screenshot.png" }),
     "已读取项目图片 docs/images/screenshot.png 并排队：下一轮将以图片附件提供（随下一轮用户提示送达）；本轮你尚未看到图片内容，不要假装本轮已看到。",
@@ -2005,6 +2028,304 @@ test("view_image key：zh-CN/en-US 取值与插值（已读取并排队 / 失败
   assert.equal(
     translate("en-US", "ui.viewImage.attachmentLabel", { path: "docs/images/screenshot.png" }),
     "view_image attachment: docs/images/screenshot.png",
+  );
+});
+
+/**
+ * 2026-10-26 需求变更申请 key（客户要求：Draft 提案需要新授权/范围时，不写进提案卡，
+ * 经 `request_requirement_change` 提交申请；申请不由主理审批——需求变更申请与审批卡**统筹或提案
+ * 角色都可以发起**（其他角色不可，发起方不得自批）；审批由开启「替我决策」时的独立判断 agent
+ * （默认选唯一推荐项）或未开启时的客户在 decision 卡上完成；主理只在批准后执行意图变更并通知
+ * 提案修订）。
+ * 契约：13 个 `main.requirementChange.*` key 成对存在；key 后缀对齐在飞回执枚举
+ * （dispatched / already-dispatched / invalid / intent-not-found / flow-not-found / unavailable / rejected）
+ * 与审批结果/执行任务（approved / approvalRejected / leadExecuteTask）；
+ * dispatched/alreadyDispatched 占位符 {flowId}/{intentId}/{requestId}；
+ * invalid 占位符 {detail}；intentNotFound 占位符 {flowId}/{intentId}；
+ * flowNotFound 占位符 {flowId}；unavailable/rejected 占位符 {flowId}/{detail}；
+ * taskLabel 无占位符且逐字为 `[需求变更申请·待独立审批]`；
+ * ticket 占位符 {flowId}/{intentId}/{requestId}/{detail}；
+ * systemLine 占位符 {flowId}/{intentId}/{requestId}；
+ * approved/leadExecuteTask 占位符 {flowId}/{intentId}/{requestId}/{source}；
+ * approvalRejected 占位符 {flowId}/{intentId}/{requestId}/{detail}；
+ * 语义：申请 ≠ 批准、主理不审批/只执行、发起方不得自批、提案卡不得承载未确认的新授权、
+ * 不得删除需求绕过 gate 0、不新增 FlowStepKind/cardKind；en-US 不含中文。
+ */
+const REQUIREMENT_CHANGE_KEYS = [
+  "main.requirementChange.dispatched",
+  "main.requirementChange.alreadyDispatched",
+  "main.requirementChange.invalid",
+  "main.requirementChange.intentNotFound",
+  "main.requirementChange.flowNotFound",
+  "main.requirementChange.unavailable",
+  "main.requirementChange.rejected",
+  "main.requirementChange.taskLabel",
+  "main.requirementChange.ticket",
+  "main.requirementChange.systemLine",
+  "main.requirementChange.approved",
+  "main.requirementChange.approvalRejected",
+  "main.requirementChange.leadExecuteTask",
+] as const satisfies readonly MessageKey[];
+
+test("需求变更申请 key：13 个 main.requirementChange.* 在 zh-CN/en-US 均存在，占位符逐 key 一致", () => {
+  assert.equal(REQUIREMENT_CHANGE_KEYS.length, 13);
+  const expectedPlaceholders: Record<(typeof REQUIREMENT_CHANGE_KEYS)[number], string[]> = {
+    "main.requirementChange.dispatched": ["flowId", "intentId", "requestId"],
+    "main.requirementChange.alreadyDispatched": ["flowId", "intentId", "requestId"],
+    "main.requirementChange.invalid": ["detail"],
+    "main.requirementChange.intentNotFound": ["flowId", "intentId"],
+    "main.requirementChange.flowNotFound": ["flowId"],
+    "main.requirementChange.unavailable": ["detail", "flowId"],
+    "main.requirementChange.rejected": ["detail", "flowId"],
+    "main.requirementChange.taskLabel": [],
+    "main.requirementChange.ticket": ["detail", "flowId", "intentId", "requestId"],
+    "main.requirementChange.systemLine": ["flowId", "intentId", "requestId"],
+    "main.requirementChange.approved": ["flowId", "intentId", "requestId", "source"],
+    "main.requirementChange.approvalRejected": ["detail", "flowId", "intentId", "requestId"],
+    "main.requirementChange.leadExecuteTask": ["flowId", "intentId", "requestId", "source"],
+  };
+  for (const key of REQUIREMENT_CHANGE_KEYS) {
+    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
+    assert.ok(key in enUS, `en-US 缺 ${key}`);
+    assert.deepEqual(placeholdersOf(zhCN[key]), expectedPlaceholders[key], `zh-CN 占位符不符契约：${key}`);
+    assert.deepEqual(placeholdersOf(enUS[key]), expectedPlaceholders[key], `en-US 占位符不符契约：${key}`);
+  }
+});
+
+test("需求变更申请 key：申请 ≠ 批准、运营/提案均可发起且不得自批、产品只执行；en-US 不含中文", () => {
+  // 已提交：进入独立审批；审批卡可由统筹或提案角色发起（其他角色不可、发起方不得自批）；
+  // 审批由判断 agent（替我决策）或客户在 decision 卡完成；申请 ≠ 批准；主理不审批、只执行。
+  const dispatchedZh = zhCN["main.requirementChange.dispatched"];
+  assert.ok(dispatchedZh.includes("独立审批"), "zh-CN dispatched 必须写明独立审批");
+  assert.ok(
+    dispatchedZh.includes("申请由运营或策划角色发起，审批卡由应用在申请成功后自动经发起方会话呈现（其他角色不可，发起方不得自批）"),
+    "zh-CN dispatched 必须写明运营/提案均可发起、其他角色不可、发起方不得自批",
+  );
+  assert.ok(
+    dispatchedZh.includes("未开启时由客户在 decision 卡上完成"),
+    "zh-CN dispatched 必须写明判断 agent 与客户在 decision 卡上的审批路径",
+  );
+  assert.ok(dispatchedZh.includes("申请 ≠ 批准"), "zh-CN dispatched 必须写明申请 ≠ 批准");
+  assert.ok(dispatchedZh.includes("产品不审批"), "zh-CN dispatched 必须写明产品不审批");
+  assert.ok(dispatchedZh.includes("只在批准后执行意图变更"), "zh-CN dispatched 必须写明产品只在批准后执行");
+  assert.ok(dispatchedZh.includes("通知策划修订"), "zh-CN dispatched 必须写明通知策划修订");
+  assert.ok(dispatchedZh.includes("提案卡不得承载未确认的新授权"), "zh-CN dispatched 必须写明提案卡不得承载新授权");
+  // 旧口径（主理作为审批人 / intent-confirm 审批 / 仅单一发起方）不得回归。
+  assert.equal(dispatchedZh.includes("intent-confirm"), false, "zh-CN dispatched 不得再把 intent-confirm 作为审批");
+  assert.equal(dispatchedZh.includes("给产品"), false, "zh-CN dispatched 不得写成申请交产品审批");
+  assert.equal(dispatchedZh.includes("仅提案"), false, "zh-CN dispatched 不得写成仅提案发起");
+  assert.equal(dispatchedZh.includes("仅运营"), false, "zh-CN dispatched 不得写成仅运营发起");
+  const dispatchedEn = enUS["main.requirementChange.dispatched"];
+  assert.ok(dispatchedEn.includes("independent approval"), "en-US dispatched 必须写明 independent approval");
+  assert.ok(
+    dispatchedEn.includes("the request may be initiated by Operations or the proposer role (Planner), and the approval card is presented automatically by the app through the initiator's session"),
+    "en-US dispatched 必须写明运营或提案均可发起",
+  );
+  assert.ok(dispatchedEn.includes("no other role may initiate them"), "en-US dispatched 必须写明其他角色不可发起");
+  assert.ok(dispatchedEn.includes("initiator must not approve its own request"), "en-US dispatched 必须写明发起方不得自批");
+  assert.ok(dispatchedEn.includes("judge agent"), "en-US dispatched 必须写明判断 agent 审批路径");
+  assert.ok(dispatchedEn.includes("decision card"), "en-US dispatched 必须写明 decision 卡");
+  assert.ok(dispatchedEn.includes("a request is not approval"), "en-US dispatched 必须写明 request is not approval");
+  assert.ok(dispatchedEn.includes("Product does not approve"), "en-US dispatched 必须写明产品不审批");
+  assert.ok(dispatchedEn.includes("only executes the intent change after approval"), "en-US dispatched 必须写明产品只在批准后执行");
+  assert.ok(dispatchedEn.includes("notifies Planner to revise"), "en-US dispatched 必须写明通知策划修订");
+  assert.ok(dispatchedEn.includes("proposal cards must not carry unconfirmed new authorization"), "en-US dispatched 必须写明提案卡不得承载新授权");
+  assert.equal(dispatchedEn.includes("intent-confirm"), false, "en-US dispatched 不得再把 intent-confirm 作为审批");
+  // 主理任务标签：待独立审批（不再承担审批语义），供任务文本前缀使用。
+  assert.equal(zhCN["main.requirementChange.taskLabel"], "[需求变更申请·待独立审批]");
+  assert.equal(enUS["main.requirementChange.taskLabel"], "[Requirement change request · independent approval pending]");
+  // 重复申请：幂等，不重复提交，等待独立审批；发起方不得自批。
+  assert.ok(zhCN["main.requirementChange.alreadyDispatched"].includes("未重复提交"), "zh-CN alreadyDispatched 必须写明未重复提交");
+  assert.ok(zhCN["main.requirementChange.alreadyDispatched"].includes("发起方不得自批"), "zh-CN alreadyDispatched 必须写明发起方不得自批");
+  assert.ok(enUS["main.requirementChange.alreadyDispatched"].includes("not submitted again"), "en-US alreadyDispatched 必须写明未重复提交");
+  assert.ok(enUS["main.requirementChange.alreadyDispatched"].includes("must not self-approve"), "en-US alreadyDispatched 必须写明发起方不得自批");
+  // 结构/查找失败：一律如实写「未提交」，不谎报已提交。
+  for (const key of [
+    "main.requirementChange.invalid",
+    "main.requirementChange.intentNotFound",
+    "main.requirementChange.flowNotFound",
+  ] as const) {
+    assert.ok(zhCN[key].includes("未提交"), `zh-CN ${key} 必须写明未提交`);
+    assert.ok(enUS[key].includes("not submitted"), `en-US ${key} 必须写明未提交`);
+  }
+  // 通道不可用：可能已提交，应用不声称已提交（fail-closed）。
+  assert.ok(zhCN["main.requirementChange.unavailable"].includes("未声称已提交"), "zh-CN unavailable 必须写明未声称已提交");
+  assert.ok(
+    enUS["main.requirementChange.unavailable"].includes("does not claim submission"),
+    "en-US unavailable 必须写明未声称已提交",
+  );
+  // 提交被拒：未进入独立审批，按原因修正后重交，不原样重试。
+  assert.ok(zhCN["main.requirementChange.rejected"].includes("未进入独立审批"), "zh-CN rejected 必须写明未进入独立审批");
+  assert.ok(zhCN["main.requirementChange.rejected"].includes("按原因修正后重交"), "zh-CN rejected 必须写明修正后重交");
+  assert.ok(enUS["main.requirementChange.rejected"].includes("did not enter independent approval"), "en-US rejected 必须写明未进入独立审批");
+  assert.ok(enUS["main.requirementChange.rejected"].includes("fix the cause and resubmit"), "en-US rejected 必须写明修正后重交");
+  // 系统行同样承载独立审批主体、发起方不得自批、申请 ≠ 批准与提案卡禁令。
+  assert.ok(zhCN["main.requirementChange.systemLine"].includes("申请由运营或策划角色发起，审批卡由应用在申请成功后自动经发起方会话呈现"), "zh-CN systemLine 必须写明运营/提案均可发起");
+  assert.ok(zhCN["main.requirementChange.systemLine"].includes("发起方不得自批"), "zh-CN systemLine 必须写明发起方不得自批");
+  assert.ok(zhCN["main.requirementChange.systemLine"].includes("申请 ≠ 批准"), "zh-CN systemLine 必须写明申请 ≠ 批准");
+  assert.ok(
+    zhCN["main.requirementChange.systemLine"].includes("提案卡不得承载未确认的新授权"),
+    "zh-CN systemLine 必须写明提案卡禁止承载新授权",
+  );
+  assert.ok(
+    enUS["main.requirementChange.systemLine"].includes("a request is not approval"),
+    "en-US systemLine 必须写明 request is not approval",
+  );
+  assert.ok(
+    enUS["main.requirementChange.systemLine"].includes("proposal cards must not carry unconfirmed new authorization"),
+    "en-US systemLine 必须写明提案卡禁止承载新授权",
+  );
+  // 审批通过：主理只按批准范围执行并通知提案修订；审批未通过：主理不执行、提案不得按该申请修订。
+  const approvedZh = zhCN["main.requirementChange.approved"];
+  assert.ok(approvedZh.includes("已通过独立审批"), "zh-CN approved 必须写明已通过独立审批");
+  assert.ok(approvedZh.includes("产品不审批"), "zh-CN approved 必须写明产品不审批");
+  assert.ok(approvedZh.includes("按批准范围执行意图变更"), "zh-CN approved 必须写明产品按批准范围执行");
+  assert.ok(approvedZh.includes("通知策划修订"), "zh-CN approved 必须写明通知策划修订");
+  const approvedEn = enUS["main.requirementChange.approved"];
+  assert.ok(approvedEn.includes("passed independent approval"), "en-US approved 必须写明 passed independent approval");
+  assert.ok(approvedEn.includes("Product does not approve"), "en-US approved 必须写明产品不审批");
+  assert.ok(approvedEn.includes("within the approved scope"), "en-US approved 必须写明产品按批准范围执行");
+  assert.ok(approvedEn.includes("notify Planner to revise"), "en-US approved 必须写明通知策划修订");
+  const approvalRejectedZh = zhCN["main.requirementChange.approvalRejected"];
+  assert.ok(approvalRejectedZh.includes("未通过独立审批"), "zh-CN approvalRejected 必须写明未通过独立审批");
+  assert.ok(approvalRejectedZh.includes("产品不审批"), "zh-CN approvalRejected 必须写明产品不审批");
+  assert.ok(approvalRejectedZh.includes("不执行意图变更"), "zh-CN approvalRejected 必须写明产品不执行意图变更");
+  assert.ok(approvalRejectedZh.includes("申请 ≠ 批准"), "zh-CN approvalRejected 必须写明申请 ≠ 批准");
+  const approvalRejectedEn = enUS["main.requirementChange.approvalRejected"];
+  assert.ok(approvalRejectedEn.includes("did not pass independent approval"), "en-US approvalRejected 必须写明未通过独立审批");
+  assert.ok(approvalRejectedEn.includes("does not execute the intent change"), "en-US approvalRejected 必须写明产品不执行意图变更");
+  // 执行任务：仅在批准后下发；主理不审批、不扩大范围、不删需求绕过 gate 0。
+  const leadExecuteTaskZh = zhCN["main.requirementChange.leadExecuteTask"];
+  assert.ok(leadExecuteTaskZh.includes("独立审批已通过"), "zh-CN leadExecuteTask 必须写明独立审批已通过");
+  assert.ok(leadExecuteTaskZh.includes("产品不审批"), "zh-CN leadExecuteTask 必须写明产品不审批");
+  assert.ok(leadExecuteTaskZh.includes("按本次批准范围执行意图变更"), "zh-CN leadExecuteTask 必须写明按批准范围执行");
+  assert.ok(leadExecuteTaskZh.includes("通知策划修订"), "zh-CN leadExecuteTask 必须写明通知策划修订");
+  assert.ok(leadExecuteTaskZh.includes("不得删除需求绕过 gate 0"), "zh-CN leadExecuteTask 必须保留不得删需求绕过 gate 0");
+  const leadExecuteTaskEn = enUS["main.requirementChange.leadExecuteTask"];
+  assert.ok(leadExecuteTaskEn.includes("independent approval passed"), "en-US leadExecuteTask 必须写明独立审批已通过");
+  assert.ok(leadExecuteTaskEn.includes("Product does not approve"), "en-US leadExecuteTask 必须写明产品不审批");
+  assert.ok(leadExecuteTaskEn.includes("within the approved scope"), "en-US leadExecuteTask 必须写明按批准范围执行");
+  assert.ok(leadExecuteTaskEn.includes("notifies Planner to revise"), "en-US leadExecuteTask 必须写明通知策划修订");
+  assert.ok(leadExecuteTaskEn.includes("do not delete requirements to bypass gate 0"), "en-US leadExecuteTask 必须保留不得删需求绕过 gate 0");
+  for (const key of REQUIREMENT_CHANGE_KEYS) {
+    const value = enUS[key];
+    const text = typeof value === "string" ? value : Object.values(value).join("");
+    assert.equal(valueContainsHan(text), false, `en-US 含中文：${key}`);
+  }
+});
+
+test("需求变更申请 key：zh-CN/en-US 取值与插值（已提交/非法/票据/系统行/审批结果/执行任务）", () => {
+  assert.equal(
+    translate("zh-CN", "main.requirementChange.dispatched", {
+      flowId: "flow-a",
+      intentId: "flow-a",
+      requestId: "req-20261026-01",
+    }),
+    "流程 flow-a：已提交需求变更申请 req-20261026-01（意图 flow-a），进入独立审批：申请由运营或策划角色发起，审批卡由应用在申请成功后自动经发起方会话呈现（其他角色不可，发起方不得自批）；审批由开启「替我决策」时的判断 agent 默认选推荐项、未开启时由客户在 decision 卡上完成；申请 ≠ 批准——产品不审批，只在批准后执行意图变更并通知策划修订；提案卡不得承载未确认的新授权。",
+  );
+  assert.equal(
+    translate("en-US", "main.requirementChange.dispatched", {
+      flowId: "flow-a",
+      intentId: "flow-a",
+      requestId: "req-20261026-01",
+    }),
+    "Flow flow-a: requirement change request req-20261026-01 (intent flow-a) submitted for independent approval: the request may be initiated by Operations or the proposer role (Planner), and the approval card is presented automatically by the app through the initiator's session after a successful request — no other role may initiate them, and the initiator must not approve its own request; approval is completed on the decision card by the judge agent (with “decide for me” enabled, defaulting to the recommended option) or by the customer when it is not enabled; a request is not approval — Product does not approve and only executes the intent change after approval and notifies Planner to revise; proposal cards must not carry unconfirmed new authorization.",
+  );
+  assert.equal(
+    translate("zh-CN", "main.requirementChange.ticket", {
+      flowId: "flow-a",
+      intentId: "flow-a",
+      requestId: "req-20261026-01",
+      detail: "新增导出格式授权",
+    }),
+    "需求变更申请 req-20261026-01｜流程 flow-a｜意图 flow-a｜待独立审批（申请由运营或策划角色发起，审批卡由应用在申请成功后自动经发起方会话呈现；发起方不得自批；申请 ≠ 批准）：新增导出格式授权",
+  );
+  assert.equal(
+    translate("en-US", "main.requirementChange.ticket", {
+      flowId: "flow-a",
+      intentId: "flow-a",
+      requestId: "req-20261026-01",
+      detail: "new export-format authorization",
+    }),
+    "Requirement change request req-20261026-01 | flow flow-a | intent flow-a | pending independent approval (the request may be initiated by Operations or the proposer role, and the approval card is presented automatically by the app through the initiator's session; the initiator must not self-approve; a request is not approval): new export-format authorization",
+  );
+  assert.equal(
+    translate("zh-CN", "main.requirementChange.invalid", { detail: "缺少 intentId" }),
+    "需求变更申请参数非法（缺少 intentId）；未提交（fail-closed），请修正后重试。",
+  );
+  assert.equal(
+    translate("en-US", "main.requirementChange.invalid", { detail: "missing intentId" }),
+    "Requirement change request parameters are invalid (missing intentId); not submitted (fail-closed). Fix and retry.",
+  );
+  assert.equal(
+    translate("zh-CN", "main.requirementChange.systemLine", {
+      flowId: "flow-a",
+      intentId: "flow-a",
+      requestId: "req-20261026-01",
+    }),
+    "系统·需求变更 · 提交了需求变更申请 req-20261026-01（流程 flow-a · 意图 flow-a），进入独立审批：申请由运营或策划角色发起，审批卡由应用在申请成功后自动经发起方会话呈现（其他角色不可，发起方不得自批）；审批由替我决策→判断 agent 默认推荐、未开启→客户在 decision 卡上完成；申请 ≠ 批准——产品不审批，只在批准后执行意图变更并通知策划修订；提案卡不得承载未确认的新授权。",
+  );
+  assert.equal(
+    translate("en-US", "main.requirementChange.systemLine", {
+      flowId: "flow-a",
+      intentId: "flow-a",
+      requestId: "req-20261026-01",
+    }),
+    "System·Requirement change · requirement change request req-20261026-01 (flow flow-a · intent flow-a) submitted for independent approval: the request may be initiated by Operations or the proposer role (Planner), and the approval card is presented automatically by the app through the initiator's session after a successful request — no other role may initiate them, and the initiator must not self-approve; approval is completed on the decision card by the judge agent (decide-for-me → default recommendation) or by the customer when not enabled; a request is not approval — Product does not approve and only executes the intent change after approval and notifies Planner to revise; proposal cards must not carry unconfirmed new authorization.",
+  );
+  assert.equal(
+    translate("zh-CN", "main.requirementChange.approved", {
+      flowId: "flow-a",
+      intentId: "flow-a",
+      requestId: "req-20261026-01",
+      source: "判断代批（替我决策）",
+    }),
+    "流程 flow-a：需求变更申请 req-20261026-01（意图 flow-a）已通过独立审批（判断代批（替我决策））；产品不审批，将按批准范围执行意图变更并通知策划修订；提案卡不得承载未获批准的新授权。",
+  );
+  assert.equal(
+    translate("en-US", "main.requirementChange.approved", {
+      flowId: "flow-a",
+      intentId: "flow-a",
+      requestId: "req-20261026-01",
+      source: "judge delegation (decide for me)",
+    }),
+    "Flow flow-a: requirement change request req-20261026-01 (intent flow-a) passed independent approval (judge delegation (decide for me)); Product does not approve and will execute the intent change within the approved scope and notify Planner to revise; proposal cards must not carry unapproved new authorization.",
+  );
+  assert.equal(
+    translate("zh-CN", "main.requirementChange.approvalRejected", {
+      flowId: "flow-a",
+      intentId: "flow-a",
+      requestId: "req-20261026-01",
+      detail: "审批意见：范围过大",
+    }),
+    "流程 flow-a：需求变更申请 req-20261026-01（意图 flow-a）未通过独立审批（审批意见：范围过大）；产品不审批、不执行意图变更；申请 ≠ 批准，策划不得按该申请修订，请按审批意见调整后重新申请。",
+  );
+  assert.equal(
+    translate("en-US", "main.requirementChange.approvalRejected", {
+      flowId: "flow-a",
+      intentId: "flow-a",
+      requestId: "req-20261026-01",
+      detail: "approval feedback: scope too broad",
+    }),
+    "Flow flow-a: requirement change request req-20261026-01 (intent flow-a) did not pass independent approval (approval feedback: scope too broad); Product does not approve and does not execute the intent change; a request is not approval — do not revise the proposal on that request; adjust per the approval feedback and submit again.",
+  );
+  assert.equal(
+    translate("zh-CN", "main.requirementChange.leadExecuteTask", {
+      flowId: "flow-a",
+      intentId: "flow-a",
+      requestId: "req-20261026-01",
+      source: "客户选择",
+    }),
+    "需求变更执行任务｜流程 flow-a｜意图 flow-a｜申请 req-20261026-01：独立审批已通过（客户选择）；产品不审批，只按本次批准范围执行意图变更（docs/intents/**）并通知策划修订；不得扩大范围、不得把新授权写进提案卡、不得删除需求绕过 gate 0。",
+  );
+  assert.equal(
+    translate("en-US", "main.requirementChange.leadExecuteTask", {
+      flowId: "flow-a",
+      intentId: "flow-a",
+      requestId: "req-20261026-01",
+      source: "customer choice",
+    }),
+    "Requirement change execution task | flow flow-a | intent flow-a | request req-20261026-01: independent approval passed (customer choice); Product does not approve and only executes the intent change (docs/intents/**) within the approved scope and notifies Planner to revise; do not expand scope, do not put new authorization into proposal cards, and do not delete requirements to bypass gate 0.",
   );
 });
 

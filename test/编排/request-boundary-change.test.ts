@@ -134,7 +134,7 @@ test("request_boundary_change：convener 提供能力 ⇒ 同一引用透传、�
   let toolResult: { ok: boolean; message: string } | undefined;
   const requestBoundaryChange: RequestBoundaryChangeFn = async (input) => {
     seen.push(input);
-    return { ok: true, code: "dispatched", message: "已派组队修改边界", roleId: input.roleId, ticketId: "ticket-1" };
+    return { ok: true, code: "dispatched", message: "已派人事修改边界", roleId: input.roleId, ticketId: "ticket-1" };
   };
   const provider = fakeProvider(async (options) => {
     const tool = options.tools.find((item) => item.name === "request_boundary_change");
@@ -278,7 +278,7 @@ test("request_boundary_change：项目角色与其他内置治理角色即便误
       },
     );
     try {
-      assert.equal(liaisonCaps?.requestBoundaryChange, undefined, "liaison（主理）不注入（默认只有 convener）");
+      assert.equal(liaisonCaps?.requestBoundaryChange, undefined, "liaison（产品）不注入（默认只有 convener）");
       assert.ok(!hasBoundaryChangeTool(liaisonProvider.calls[0]!), "liaison ⇒ 工具不注册");
     } finally {
       await liaisonHandle.dispose();

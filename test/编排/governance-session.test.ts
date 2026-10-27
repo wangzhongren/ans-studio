@@ -412,11 +412,11 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
 
     const trio = trioProject(root);
     const expectations: Array<["liaison" | "proposal" | "nomination" | "schedule" | "verification", RegExp[]]> = [
-      ["liaison", [/沟通权纪律（主理/, /docs\/intents\//, /hand_off_intent/, /交接 ≠ 客户批准/, /intent-confirm/, /质量档位/, /原型档/, /治理协调（2026-10-24）/, /不直接派 Crew\/Proof/, /Proof 只收状态\+报告指针/, /系统消息只汇报、不派活（2026-10-26 客户规则）/, /不得据此给统筹（Steward）发任务、不得 `dispatch_task`（也不得派项目 worker）/, /客户明确要求或由客户消息触发的协调仍按原规则/]],
-      ["proposal", [/提案权纪律（提案/, /docs\/proposals\//, /cardKind=proposal/, /不拥有最终批准权/, /证据计划/, /工程质量基线/, /架构方案/, /架构影响分析/, /扩展点/, /模块分解与职责/]],
-      ["nomination", [/组队\/写卡纪律（组队/, /docs\/scheduling\//, /appointment-write/, /不再发任命卡/, /团队计划/]],
-      ["schedule", [/编排权纪律（统筹/, /docs\/flows\//, /docs\/scheduling\//, /cardKind=appointment/, /dispatch_task/, /flowId.*stepId/, /真实启动/, /演示/, /架构与边界/, /契约冻结/, /扩展点必须有覆盖步骤/, /发布标记（2026-10-24，P0-1）/, /cardKind=schedule-write/, /不是发布版本保持缺省/, /所有变更（含非发布）[^\n]*验收门派 Proof/]],
-      ["verification", [/验收权纪律（验收/, /docs\/acceptance\//, /docs\/verification\//, /cardKind=acceptance/, /验收 ≠ 批准/, /未被真实启动.*不得建议 accept/, /架构核对/, /模块边界与依赖方向未被破坏/, /schema\/API 版本与/, /风险档位/, /T0–T3/, /独立验收门（2026-10-24 修订：所有变更）/, /所有变更（含非发布）/]],
+      ["liaison", [/沟通权纪律（产品/, /docs\/intents\//, /hand_off_intent/, /交接 ≠ 客户批准/, /intent-confirm/, /质量档位/, /原型档/, /治理协调（2026-10-24）/, /不直接派 Crew\/Proof/, /Proof 只收状态\+报告指针/, /系统消息只汇报、不派活（2026-10-26 客户规则）/, /不得据此给运营（Steward）发任务、不得 `dispatch_task`（也不得派项目 worker）/, /客户明确要求或由客户消息触发的协调仍按原规则/]],
+      ["proposal", [/提案权纪律（策划/, /docs\/proposals\//, /cardKind=proposal/, /不拥有最终批准权/, /证据计划/, /工程质量基线/, /架构方案/, /架构影响分析/, /扩展点/, /模块分解与职责/]],
+      ["nomination", [/人事\/写卡纪律（人事/, /docs\/scheduling\//, /appointment-write/, /不再发任命卡/, /团队计划/]],
+      ["schedule", [/编排权纪律（运营/, /docs\/flows\//, /docs\/scheduling\//, /cardKind=appointment/, /dispatch_task/, /flowId.*stepId/, /真实启动/, /演示/, /架构与边界/, /契约冻结/, /扩展点必须有覆盖步骤/, /发布标记（2026-10-24，P0-1）/, /cardKind=schedule-write/, /不是发布版本保持缺省/, /所有变更（含非发布）[^\n]*验收门派 Proof/]],
+      ["verification", [/验收权纪律（质检/, /docs\/acceptance\//, /docs\/verification\//, /cardKind=acceptance/, /验收 ≠ 批准/, /未被真实启动.*不得建议 accept/, /架构核对/, /模块边界与依赖方向未被破坏/, /schema\/API 版本与/, /风险档位/, /T0–T3/, /独立验收门（2026-10-24 修订：所有变更）/, /所有变更（含非发布）/]],
     ];
     for (const [fn, patterns] of expectations) {
       const { captured, factory } = promptCapturing();
@@ -480,7 +480,7 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
   });
 });
 
-test("标准工作流（2026-10-24 修订：所有变更）：trio 与 single/su 提示均含阶段流转/所有变更独立验收/主理协调/Proof 标准复核流程", async () => {
+test("标准工作流（2026-10-24 修订：所有变更）：trio 与 single/su 提示均含阶段流转/所有变更独立验收/产品协调/Proof 标准复核流程", async () => {
   await withRoot(async (root) => {
     const promptCapturing = () => {
       const captured: { prompt?: string } = {};
@@ -516,19 +516,25 @@ test("标准工作流（2026-10-24 修订：所有变更）：trio 与 single/su
       [/docs\/flows\/<flowId>\.yaml`（同名 `\.md` 仅人读视图/, "YAML 唯一机器状态 + .md 仅人读视图"],
       [/显式写 `kind` \/ `evidence` \/ `supersedes`/, "显式 kind/evidence/supersedes"],
       [/保留 id `verification` \/ `acceptance`/, "保留验收 id"],
+      // 2026-10-26：应用在意图交接时可能创建 status: skeleton 通用骨架；运营写团队计划后用一次
+      // schedule-write 替换为完整流程（保留 contract-freeze 证据）。与门禁引擎运营卡文本成对。
+      [/流程骨架与一次性替换（2026-10-26）/, "流程骨架与一次性替换标题"],
+      [/`status: skeleton` 的通用流程骨架/, "status: skeleton 通用骨架"],
+      [/把骨架\*\*一次性替换\*\*为完整流程（含项目角色、交付步骤与 gate；保留 contract-freeze 已登记证据）/, "一次性替换为完整流程并保留证据"],
+      [/没有骨架时用同一确认初始创建/, "无骨架时用同一确认初始创建"],
       [/客户不做内部调度/, "客户不做内部调度"],
-      [/回交向 Lead \/ 主理汇总/, "内置状态/回交向主理汇总"],
-      [/主理只做治理协调，不批准提案\/任命\/验收/, "主理只协调不批准"],
+      [/回交向 产品 \/ Lead 汇总/, "内置状态/回交向产品汇总"],
+      [/产品只做治理协调，不批准提案\/任命\/验收/, "产品只协调不批准"],
       [/应用不承诺自动推进下一步/, "不承诺未实现的自动推进"],
-      [/应用对\*\*所有变更（含非发布）\*\*按验收门派发 Proof/, "所有变更（含非发布）流程齐备后派 Proof"],
+      [/应用对\*\*所有变更（含非发布）\*\*按验收门派发 质检 \/ Proof/, "所有变更（含非发布）流程齐备后派 质检 / Proof"],
       [/`release` 仅可选发布元数据，\*\*不是独立验收的启动条件\*\*/, "release 仅可选元数据、不是启动条件"],
       [/Steward 用既有 `request_confirmation`（`cardKind=schedule-write`）[^\n]*`release`/, "Steward 用 schedule-write 写 release 元数据"],
       [/验收派发不是验收决定/, "验收派发不是验收决定"],
       // 2026-10-26 客户规则：主理收到系统消息（治理协调/gate pass/fail/交付阻塞通知）只向客户汇报，
       // 不得据此给 Steward 发任务/dispatch_task；客户明确要求或客户消息触发的协调仍按原规则。
-      [/主理收到系统消息时只向客户汇报（2026-10-26 客户规则）/, "主理系统消息只汇报标题"],
+      [/产品收到系统消息时只向客户汇报（2026-10-26 客户规则）/, "产品系统消息只汇报标题"],
       [/`\[系统·治理协调\]`、gate pass\/fail 系统行、交付\/阻塞通知等/, "系统消息范围"],
-      [/不得据此给统筹（Steward）发任务、不得 `dispatch_task`（也不得派项目 worker）/, "不得据系统消息派统筹/项目 worker"],
+      [/不得据此给运营（Steward）发任务、不得 `dispatch_task`（也不得派项目 worker）/, "不得据系统消息派运营/项目 worker"],
       [/不得把系统通知改写成协调任务/, "不得把系统通知改写成协调任务"],
       [/只有客户明确要求、或由客户消息触发的协调，才按原规则协调\/派发/, "客户消息触发的协调保持原规则"],
       [/系统消息不代表客户批准、不构成新任务/, "系统消息不是客户指令"],
@@ -1315,7 +1321,7 @@ test("无 cardKind 的 Lead 选择/确认卡在呈现前被拒，不写治理账
   });
 });
 
-test("customer.decision：Proof / 验收（verifier）可发 acceptance，power=acceptance", async () => {
+test("customer.decision：质检 / Proof（verifier）可发 acceptance，power=acceptance", async () => {
   await withRoot(async (root) => {
     const script: ToolCall[] = [{
       name: "request_choice",

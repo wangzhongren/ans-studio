@@ -459,8 +459,9 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
       break;
     }
     case "decision": {
-      // 2026-10-26 客户 decision 卡（材料性选择，仅统筹可发）：纳入 decision 组，但**不是**提案/
-      // 任命/验收——不读 packet.intent 与任何提案/任命/验收事实，也不设 gate/验收门槛。
+      // 2026-10-26 客户 decision 卡（材料性选择；统筹或报告员可发，报告员仅限需求变更审批）：纳入
+      // decision 组，但**不是**提案/任命/验收——不读 packet.intent 与任何提案/任命/验收事实，也不设
+      // gate/验收门槛。
       // 卡面要求**恰有一个** `recommended:true` 推荐项；判断只能按该推荐项代批（不得自行发明/改动
       // 推荐；「替我决策」开启时的默认推荐由桌面策略按同一推荐项发起）。推荐项缺失/多个/选中不符
       // ⇒ manual（可操作返工），绝不回落「未知卡种」。

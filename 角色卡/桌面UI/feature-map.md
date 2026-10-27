@@ -70,3 +70,10 @@
 | 功能 | 一句话用途 | 状态 | 文档 |
 | --- | --- | --- | --- |
 | decision 卡（材料性选择）标识 | `cardKind="decision"`：标题「决策卡 · 材料性选择」＋「非客户批准」徽标（明确不是客户批准/验收），统筹写入的原问题（`request.title/question`）在卡面保留；唯一 `recommended: true` 选项显示「推荐」；普通 choice / 提案 / 任命 / 验收等卡种标题/徽标/选项/交互零变化；选项 id 与选择交互不变 | 已实现本角色证据（单测 9/9、桌面UI 296/296、typecheck:renderer 0 错）；真实 Electron/e2e 与视觉核验未跑、未独立验收 | [变更记录](docs/change/2026-10-26_change_decision-card-renderer.md)、[契约面](docs/feature/ui-contract-surface.md) |
+
+## view_image 缩略图（2026-10-27）
+
+| 功能 | 一句话用途 | 状态 | 文档 |
+| --- | --- | --- | --- |
+| view_image 独立工具行与缩略图 | `view_image` 在聊天流中为独立工具行（工具名 + 项目相对路径 + 状态，实时与历史一致）；行下方按「项目根 + target」显示安全 file URL 缩略图（`img.view-image-preview`、`alt=路径`、`loading=lazy`、像素化、≤420×240 contain）；工具组兜底路径 `ActivityRow` 同样显示；路径非法/项目根缺失/加载失败保留命令行并如实标注、不显示破图；未放行/失败调用不显示缩略图；不提供点击放大 | 已实现本角色证据（新增单测 13、路由 9、桌面UI 套件 310/310、typecheck:renderer/根 typecheck 0 错、build 成功）；真实 Electron 视觉核验未跑、应用未重启/未重载 | [变更记录](docs/change/2026-10-27_change_view-image-row-preview.md) |
+| view_image 点击放大（lightbox） | 点击缩略图（button，非 `<a href>`）在应用内弹出 fixed portal 放大层：同一安全 file URL 大图（≤90vw×80vh、pixelated、contain）+ 路径 + 关闭按钮；Esc/点击遮罩/关闭按钮关闭；`role="dialog"`/`aria-modal="true"`/可读 aria-label；关闭后焦点回到触发按钮；同一时刻只开一个，切换角色/项目/缩略图卸载时关闭；不导航 file://、不改 CSP；ToolLifecycleRow 与 ActivityRow 共用同一组件 | 已实现本角色证据（lightbox 单测 8/8、桌面UI 套件 318/318、i18n 62/62 + guard 6/6、typecheck 0/0、build 成功）；真实点击截图核验待主上下文 | [变更记录](docs/change/2026-10-27_change_view-image-row-preview.md#八客户追加点击缩略图应用内放大lightbox2026-10-27) |

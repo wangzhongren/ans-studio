@@ -262,7 +262,7 @@ export function assessBoundaryChangeRequest(input: {
       code: "no-change",
       message:
         "与当前角色边界比较没有实际变化（新增路径已被现有条目覆盖/移除路径本来就不在边界内）；" +
-        "未派发给组队。",
+        "未派发给人事。",
     };
   }
   return { ok: true, addPaths: adds.paths, removePaths: removes.paths, effectiveAdds, effectiveRemoves };
@@ -348,7 +348,7 @@ export function buildBoundaryChangeCrewTaskText(input: {
 }): string {
   const lines: string[] = [
     `[边界变更请求] ticketId=${input.ticketId}｜目标项目角色=${input.roleId}｜flowId=${input.flowId}`,
-    "统筹（convener）报告该角色的写集/边界不足以完成已授权任务，请求你按任命写卡流程修改角色边界。",
+    "运营（convener）报告该角色的写集/边界不足以完成已授权任务，请求你按任命写卡流程修改角色边界。",
     "本次只做下列精确增删（不得重写整个边界、不得顺带扩大其它路径、不得修改角色职责/能力/写集之外的内容）：",
   ];
   if (input.addPaths.length > 0) {
@@ -363,9 +363,9 @@ export function buildBoundaryChangeCrewTaskText(input: {
   lines.push("要求：");
   lines.push("1) 只对上方列出的路径增删；其余条目原样保留。");
   lines.push("2) 仍按 appointment-write 逐路径提交确认；未获确认不得写入，也不得先写后补。");
-  lines.push("3) 确认被拒或无法按请求修改时，按拒绝原因修正后重发，并向统筹报告。");
-  lines.push(`4) 完成后向统筹（并汇总主理）报告，保留证据；审计票据：${BOUNDARY_CHANGE_TICKET_ROOT_REL}/${input.flowId}/${input.ticketId}.json。`);
-  lines.push("本请求只是统筹提交的边界变更请求，是否落地以你按 appointment-write 取得的逐路径确认为准。");
+  lines.push("3) 确认被拒或无法按请求修改时，按拒绝原因修正后重发，并向运营报告。");
+  lines.push(`4) 完成后向运营（并汇总产品）报告，保留证据；审计票据：${BOUNDARY_CHANGE_TICKET_ROOT_REL}/${input.flowId}/${input.ticketId}.json。`);
+  lines.push("本请求只是运营提交的边界变更请求，是否落地以你按 appointment-write 取得的逐路径确认为准。");
   return lines.join("\n");
 }
 
@@ -467,7 +467,7 @@ function buildJudgePreview(ev: BoundaryChangeJudgeEvidence): string {
   lines.push("");
   lines.push(
     "审核口径：只读核对请求的精确路径/理由是否与角色卡、当前边界、团队计划与流程一致，" +
-      "是否顺带扩权或触碰治理关键路径。approve 只表示同意把请求交给组队，组队仍按 appointment-write 逐路径确认；" +
+      "是否顺带扩权或触碰治理关键路径。approve 只表示同意把请求交给人事，人事仍按 appointment-write 逐路径确认；" +
       "deny/manual/超时/不可用一律不派发、不自动放行。",
   );
   return truncateUtf8(lines.join("\n"), JUDGE_PREVIEW_MAX_BYTES);
@@ -486,8 +486,8 @@ export function buildBoundaryChangeJudgeRequest(ev: BoundaryChangeJudgeEvidence)
       `请求为项目角色「${ev.targetRole.roleId}」新增 ${ev.effectiveAdds.length} 条、移除 ${ev.effectiveRemoves.length} 条写路径。` +
       "该变更是否与当前流程/团队计划和角色卡一致、且没有顺带扩权？",
     options: [
-      { id: "confirm", label: "确认：同意交给组队按 appointment-write 逐路径确认" },
-      { id: "revise", label: "退回统筹修改请求" },
+      { id: "confirm", label: "确认：同意交给人事按 appointment-write 逐路径确认" },
+      { id: "revise", label: "退回运营修改请求" },
     ],
     cardKind: "intent-confirm",
     flowId: ev.flowId,

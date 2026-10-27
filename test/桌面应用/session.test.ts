@@ -7,7 +7,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
@@ -370,7 +370,7 @@ function makeLeadPinHarness(listings: ProjectListing[]) {
   return { mgr, disposed, opened, sent, streamOf };
 }
 
-test("主理应 pin：保活超过上限时主理即使最久未用也不淘汰；非主理最久未用者仍被淘汰；主理仍可多轮使用", async () => {
+test("产品应 pin：保活超过上限时产品即使最久未用也不淘汰；非产品最久未用者仍被淘汰；产品仍可多轮使用", async () => {
   const listing = fakeListing(["liaison", "A", "B", "C"], "liaison");
   const h = makeLeadPinHarness([listing]);
   const open = (roleId: string) => h.mgr.open({ projectRoot: "/proj", roleId, runtime: "demo" });
@@ -378,33 +378,33 @@ test("主理应 pin：保活超过上限时主理即使最久未用也不淘汰�
   await open("liaison");
   await open("A");
   await open("B");
-  assert.deepEqual(h.disposed, [], `满 ${MAX_LIVE_SESSIONS} 个（含主理）不淘汰`);
+  assert.deepEqual(h.disposed, [], `满 ${MAX_LIVE_SESSIONS} 个（含产品）不淘汰`);
 
   // 开第 4 个：最久未用者是主理 liaison——被 pin 跳过，淘汰次旧的非主理 A。
   await open("C");
-  assert.deepEqual(h.mgr.liveRoleIds().sort(), ["B", "C", "liaison"], "主理即使最久未用也不淘汰；其余照旧 LRU");
-  assert.deepEqual(h.disposed, ["/proj\u0000A"], "淘汰的是最久未用的非主理（A）");
+  assert.deepEqual(h.mgr.liveRoleIds().sort(), ["B", "C", "liaison"], "产品即使最久未用也不淘汰；其余照旧 LRU");
+  assert.deepEqual(h.disposed, ["/proj\u0000A"], "淘汰的是最久未用的非产品（A）");
 
   // 主理会话仍可正常多轮使用：同一保活句柄、不重建。
   const liaisonKey = "/proj\u0000liaison";
   const target = { projectRoot: "/proj", roleId: "liaison", runtime: "demo" as const };
-  const r1 = await h.mgr.send("主理第一轮", undefined, target);
+  const r1 = await h.mgr.send("产品第一轮", undefined, target);
   assert.equal(r1.ok, true, r1.error ?? "");
   await tick(30);
-  h.streamOf(liaisonKey).push({ kind: "settled", summary: "主理一轮结束" });
+  h.streamOf(liaisonKey).push({ kind: "settled", summary: "产品一轮结束" });
   await tick(120);
-  const r2 = await h.mgr.send("主理第二轮", undefined, target);
+  const r2 = await h.mgr.send("产品第二轮", undefined, target);
   assert.equal(r2.ok, true, r2.error ?? "");
   await tick(30);
-  assert.deepEqual(h.sent.get(liaisonKey), ["主理第一轮", "主理第二轮"], "两轮都投到同一保活句柄（主理未被淘汰/重建）");
-  assert.equal(h.opened.filter((k) => k === liaisonKey).length, 1, "主理只 open 一次（多轮不重建）");
+  assert.deepEqual(h.sent.get(liaisonKey), ["产品第一轮", "产品第二轮"], "两轮都投到同一保活句柄（产品未被淘汰/重建）");
+  assert.equal(h.opened.filter((k) => k === liaisonKey).length, 1, "产品只 open 一次（多轮不重建）");
 
   const resumed = await h.mgr.open({ projectRoot: "/proj", roleId: "liaison", runtime: "demo" });
-  assert.equal(resumed.resumed, true, "主理切回是续接而非新建");
+  assert.equal(resumed.resumed, true, "产品切回是续接而非新建");
   await h.mgr.stop(null);
 });
 
-test("多项目并存：各项目按自己的 primaryRoleId 保留主理，互不误 pin", async () => {
+test("多项目并存：各项目按自己的 primaryRoleId 保留产品，互不误 pin", async () => {
   const listingA: ProjectListing = { ...fakeListing(["leadA", "X"], "leadA"), projectRoot: "/projA" };
   const listingB: ProjectListing = { ...fakeListing(["leadB", "Y", "Z"], "leadB"), projectRoot: "/projB" };
   const h = makeLeadPinHarness([listingA, listingB]);
@@ -415,20 +415,20 @@ test("多项目并存：各项目按自己的 primaryRoleId 保留主理，互�
   await open("/projB", "leadB");
   // 开第 4 个：最久未用是 A 项目主理（跳过）⇒ 淘汰 A 项目最久未用的非主理 X。
   await open("/projB", "Y");
-  assert.deepEqual(h.disposed, ["/projA\u0000X"], "先淘汰 A 项目最久未用的非主理（不是任何主理）");
+  assert.deepEqual(h.disposed, ["/projA\u0000X"], "先淘汰 A 项目最久未用的非产品（不是任何产品）");
   assert.ok(
     h.mgr.liveRoleIds().includes("leadA") && h.mgr.liveRoleIds().includes("leadB"),
-    "两项目主理都保留（主理常驻 ⇒ 可暂时超限）",
+    "两项目产品都保留（产品常驻 ⇒ 可暂时超限）",
   );
 
   // 再开 Z：leadA（A 项目主理）与 leadB（B 项目主理）分别被各自项目 pin，只淘汰 B 项目非主理 Y。
   await open("/projB", "Z");
-  assert.deepEqual(h.disposed, ["/projA\u0000X", "/projB\u0000Y"], "不同项目的主理分别 pin；只淘汰各项目非主理");
-  assert.deepEqual(h.mgr.liveRoleIds().sort(), ["Z", "leadA", "leadB"], "live = 两项目主理 + 新开的非主理");
+  assert.deepEqual(h.disposed, ["/projA\u0000X", "/projB\u0000Y"], "不同项目的产品分别 pin；只淘汰各项目非产品");
+  assert.deepEqual(h.mgr.liveRoleIds().sort(), ["Z", "leadA", "leadB"], "live = 两项目产品 + 新开的非产品");
   await h.mgr.stop(null);
 });
 
-test("主理 pin 不改变 busy 语义：非主理全忙 ⇒ 暂超限；settled 后下一时机只收已空闲的非主理", async () => {
+test("产品 pin 不改变 busy 语义：非产品全忙 ⇒ 暂超限；settled 后下一时机只收已空闲的非产品", async () => {
   const listing = fakeListing(["liaison", "A", "B", "C"], "liaison");
   const h = makeLeadPinHarness([listing]);
   const open = (roleId: string) => h.mgr.open({ projectRoot: "/proj", roleId, runtime: "demo" });
@@ -441,13 +441,13 @@ test("主理 pin 不改变 busy 语义：非主理全忙 ⇒ 暂超限；settled
   }
   // 开主理 = 第 4 个：主理 pin + 其余全忙 ⇒ 暂超限（不掐断任何在跑任务）。
   await open("liaison");
-  assert.deepEqual(h.mgr.liveRoleIds().sort(), ["A", "B", "C", "liaison"], "全忙 + 主理 ⇒ 暂超限");
+  assert.deepEqual(h.mgr.liveRoleIds().sort(), ["A", "B", "C", "liaison"], "全忙 + 产品 ⇒ 暂超限");
   assert.deepEqual(h.disposed, [], "暂超限期间零 dispose");
 
   // A 空闲 ⇒ 下一时机（settled 收口）只收最久未用的非 busy 非主理者 A。
   h.streamOf("/proj\u0000A").push({ kind: "settled", summary: "A 一轮结束" });
   await tick(300);
-  assert.deepEqual(h.mgr.liveRoleIds().sort(), ["B", "C", "liaison"], "settled 后收 A（主理与仍在跑的 B/C 不受影响）");
+  assert.deepEqual(h.mgr.liveRoleIds().sort(), ["B", "C", "liaison"], "settled 后收 A（产品与仍在跑的 B/C 不受影响）");
   assert.deepEqual(h.disposed, ["/proj\u0000A"]);
   await h.mgr.stop(null);
 });
@@ -1671,7 +1671,7 @@ test("W6-B 意图交接：后台开 Rapporteur、当前 pane 不变、只投一�
       (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
   );
   assert.equal(notes.length, 1, "成功系统行恰一条，落 Liaison 聊天流");
-  assert.equal(notes[0].event.summary, "已交给提案（工作中）");
+  assert.equal(notes[0].event.summary, "已交给策划（工作中）");
 
   // 当前 pane 仍可正常对 Liaison 发言（活动角色没有被改）。
   await mgr.send("客户继续说话");
@@ -1735,7 +1735,7 @@ test("W6-B 意图交接失败：不重试、只落失败系统行、当前 pane 
   };
   const receipt = await liaisonInput!.handOffIntent!(payload, { turnId: "turn-2" });
   assert.equal(receipt.ok, false, "投递失败如实回执（不假装成功）");
-  assert.match(receipt.message ?? "", /发送任务给提案失败/);
+  assert.match(receipt.message ?? "", /发送任务给策划失败/);
   assert.equal(rapporteurSendCalls, 1, "失败不重试（恰好一次投递尝试）");
   const notes = events.filter(
     (envelope) =>
@@ -1744,7 +1744,7 @@ test("W6-B 意图交接失败：不重试、只落失败系统行、当前 pane 
       (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
   );
   assert.equal(notes.length, 1, "失败恰一条系统行（不循环重试）");
-  assert.match(notes[0].event.summary ?? "", /应用无法把意图交给提案：.*；未重试/);
+  assert.match(notes[0].event.summary ?? "", /应用无法把意图交给策划：.*；未重试/);
   assert.equal(mgr.openForRoleId(), "liaison", "失败不切 pane");
   await mgr.stop(null);
 });
@@ -1794,7 +1794,7 @@ test("W6-B 澄清送达：主入口 Liaison 系统行；不弹决定卡（客户
       (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
   );
   assert.equal(notes.length, 1, "系统行落主入口 Liaison");
-  assert.equal(notes[0].event.summary, "提案需要澄清：验收标准是否包含离线场景？");
+  assert.equal(notes[0].event.summary, "策划需要澄清：验收标准是否包含离线场景？");
   assert.equal(customerInputCalls, 0, "澄清不弹客户决定卡、不占「一项目一卡」队列");
   await mgr.stop(null);
 });
@@ -1917,10 +1917,10 @@ test("i18n B3 session：未开会话的 send 回执按 en-US 生成；切回 zh-
       mainT("main.session.delivery.handbackFailedShort", { sourceRoleId: "A", detail: "x" }),
       "Delivery failed (from A): x",
     );
-    assert.equal(mainT("main.session.dispatchModelNote"), " (trio: Steward or Lead)");
+    assert.equal(mainT("main.session.dispatchModelNote"), " (trio: Operations or Product)");
     createMainI18n("zh-CN");
     assert.equal(mainT("main.session.releaseNoSession", { roleId: "A" }), "角色 A 没有打开的会话。");
-    assert.equal(mainT("main.session.dispatchModelNote"), "（trio：统筹或主理）");
+    assert.equal(mainT("main.session.dispatchModelNote"), "（trio：运营或产品）");
     assert.equal(
       mainT("main.session.delivery.handbackFailedShort", { sourceRoleId: "A", detail: "x" }),
       "交付投递失败（来自 A）：x",
@@ -2107,5 +2107,532 @@ test("后台任务读/停：read 透传选项与未知任务失败；stop 原样
     });
   } finally {
     await mgr.stop(null);
+  }
+});
+
+// ————— 2026-10-26 客户阻塞：意图交接有界（主理调度提案时不得「卡住自己」） —————
+//
+// 真机：tiny-breakout 空项目（0 项目角色、无 `.ans/project.json`）里 `hand_off_intent` 的后台打开/
+// 投递无法确认时，Lead 会一直等。修复：open/send 各有总预算+阶段预算（沿用 requestAcceptance 模式），
+// 超时/不可用 ⇒ `ok:false` 如实回执 + 系统行，不谎称已交接、不重试；目标忙 ⇒ 入队成功，不等待空闲。
+
+function controllableHandle(sends: string[], events: SessionEvent[]): {
+  handle: RoleSessionHandle;
+  settle: () => void;
+} {
+  return {
+    handle: {
+      async send(text: string): Promise<void> {
+        sends.push(text);
+      },
+      events(): AsyncIterable<SessionEvent> {
+        return {
+          [Symbol.asyncIterator]() {
+            return {
+              async next(): Promise<IteratorResult<SessionEvent>> {
+                for (let i = 0; i < 400 && events.length === 0; i += 1) {
+                  await new Promise((resolve) => setTimeout(resolve, 5));
+                }
+                const event = events.shift();
+                return event !== undefined
+                  ? { value: event, done: false }
+                  : { value: undefined as unknown as SessionEvent, done: true };
+              },
+            };
+          },
+        };
+      },
+      async dispose(): Promise<void> {},
+    },
+    settle: () => events.push({ kind: "settled", summary: "一轮结束（测试替身）" } as SessionEvent),
+  };
+}
+
+async function waitUntil(check: () => boolean, timeoutMs = 3000): Promise<void> {
+  const started = Date.now();
+  while (!check()) {
+    if (Date.now() - started > timeoutMs) throw new Error("等待测试条件超时");
+    await tick(10);
+  }
+}
+
+function handoffPayload(intentId: string): HandOffIntentPayload {
+  return {
+    intentId,
+    handoffKind: "initial",
+    goal: "客户要一份提案",
+    scope: "只读分析",
+    acceptance: "客户接受提案",
+    summary: "客户要提案流程",
+    flowId: "flow-a",
+  };
+}
+
+test("W6-B 意图交接有界：打开策划会话挂起 ⇒ 阶段超时 ok:false + 系统行（不挂起、不重试、不谎称已交接）", async () => {
+  const listing = governanceListing();
+  const events: SessionEventEnvelope[] = [];
+  type HandOffFn = (payload: HandOffIntentPayload, metadata?: { turnId?: string }) => Promise<{ ok: boolean; message?: string }>;
+  let liaisonInput: { handOffIntent?: HandOffFn } | undefined;
+  let rapporteurOpenCalls = 0;
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      if (input.roleId === "liaison") {
+        liaisonInput = input as unknown as { handOffIntent?: HandOffFn };
+        return fakeQuietHandle(input.roleId, []);
+      }
+      if (input.roleId === "rapporteur") {
+        rapporteurOpenCalls += 1;
+        return new Promise<RoleSessionHandle>(() => {}); // 真机：空项目/无 ACK，打开永不返回
+      }
+      return fakeQuietHandle(input.roleId, []);
+    },
+    createPiAdapterFactory: () => {
+      throw new Error("本用例不应构造 pi 适配器");
+    },
+    createDemoAdapter: () => {
+      throw new Error("本用例不应构造 demo 适配器");
+    },
+    buildProjectConfig,
+    getListing: (root) => (root === listing.projectRoot ? listing : undefined),
+    emitEvent: (envelope) => {
+      events.push(envelope);
+    },
+    handOffIntentLimits: { totalMs: 300, stageMs: 120 },
+  });
+  assert.equal((await mgr.open({ projectRoot: "/proj", roleId: "liaison", runtime: "demo" })).ok, true);
+  assert.ok(liaisonInput?.handOffIntent, "Liaison 会话应拿到 handOffIntent 投递端");
+  const started = Date.now();
+  const receipt = await liaisonInput!.handOffIntent!(handoffPayload("intent-timeout-open"), { turnId: "turn-open-timeout" });
+  assert.equal(receipt.ok, false, "超时不得谎称已交接");
+  assert.match(receipt.message ?? "", /打开策划会话超时/);
+  assert.ok(Date.now() - started < 3000, "有界返回（不挂起 Lead）");
+  assert.equal(rapporteurOpenCalls, 1, "只尝试一次、不重试");
+  const notes = events.filter(
+    (envelope) =>
+      envelope.roleId === "liaison" &&
+      envelope.event.kind === "message" &&
+      (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
+  );
+  assert.equal(notes.length, 1, "失败恰一条系统行");
+  assert.match(notes[0]!.event.summary ?? "", /打开策划会话超时/);
+  assert.match(notes[0]!.event.summary ?? "", /未重试/);
+  await mgr.stop(null);
+});
+
+test("W6-B 意图交接有界：投递确认挂起但目标已忙/在途 ⇒ ok:true（已入队/在途，不谎称失败、不重试）", async () => {
+  const listing = governanceListing();
+  const events: SessionEventEnvelope[] = [];
+  type HandOffFn = (payload: HandOffIntentPayload, metadata?: { turnId?: string }) => Promise<{ ok: boolean; message?: string }>;
+  let liaisonInput: { handOffIntent?: HandOffFn } | undefined;
+  let rapporteurSendCalls = 0;
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      if (input.roleId === "liaison") {
+        liaisonInput = input as unknown as { handOffIntent?: HandOffFn };
+        return fakeQuietHandle(input.roleId, []);
+      }
+      if (input.roleId === "rapporteur") {
+        return {
+          async send(): Promise<void> {
+            rapporteurSendCalls += 1;
+            return new Promise<void>(() => {}); // 真机：适配器写入无 ACK，send 永不返回
+          },
+          events(): AsyncIterable<SessionEvent> {
+            return {
+              [Symbol.asyncIterator]() {
+                return {
+                  async next(): Promise<IteratorResult<SessionEvent>> {
+                    return { value: undefined as unknown as SessionEvent, done: true };
+                  },
+                };
+              },
+            };
+          },
+          async dispose(): Promise<void> {},
+        } as RoleSessionHandle;
+      }
+      return fakeQuietHandle(input.roleId, []);
+    },
+    createPiAdapterFactory: () => {
+      throw new Error("本用例不应构造 pi 适配器");
+    },
+    createDemoAdapter: () => {
+      throw new Error("本用例不应构造 demo 适配器");
+    },
+    buildProjectConfig,
+    getListing: (root) => (root === listing.projectRoot ? listing : undefined),
+    emitEvent: (envelope) => {
+      events.push(envelope);
+    },
+    handOffIntentLimits: { totalMs: 300, stageMs: 120 },
+  });
+  assert.equal((await mgr.open({ projectRoot: "/proj", roleId: "liaison", runtime: "demo" })).ok, true);
+  const started = Date.now();
+  const receipt = await liaisonInput!.handOffIntent!(handoffPayload("intent-timeout-send"), { turnId: "turn-send-timeout" });
+  assert.equal(receipt.ok, true, "确认超时但目标已忙/在途 ⇒ 任务已受理，不能报未交接");
+  assert.match(receipt.message ?? "", /交给策划（工作中）/, "回执按已受理/在途措辞");
+  assert.ok(Date.now() - started < 3000, "有界返回");
+  assert.equal(rapporteurSendCalls, 1, "只尝试一次、不重试");
+  const notes = events.filter(
+    (envelope) =>
+      envelope.roleId === "liaison" &&
+      envelope.event.kind === "message" &&
+      (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
+  );
+  assert.equal(notes.length, 1);
+  assert.match(notes[0]!.event.summary ?? "", /交给策划（工作中）/);
+  await mgr.stop(null);
+});
+
+test("W6-B 意图交接有界：目标忙 ⇒ 入队成功（queued），settle 后按序投递（不等待空闲）", async () => {
+  const listing = governanceListing();
+  const events: SessionEventEnvelope[] = [];
+  type HandOffFn = (payload: HandOffIntentPayload, metadata?: { turnId?: string }) => Promise<{ ok: boolean; message?: string }>;
+  let liaisonInput: { handOffIntent?: HandOffFn } | undefined;
+  const rapporteurSends: string[] = [];
+  const rapporteurEvents: SessionEvent[] = [];
+  const liaisonSends: string[] = [];
+  const rapporteur = controllableHandle(rapporteurSends, rapporteurEvents);
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      if (input.roleId === "liaison") {
+        liaisonInput = input as unknown as { handOffIntent?: HandOffFn };
+        return controllableHandle(liaisonSends, []).handle;
+      }
+      if (input.roleId === "rapporteur") return rapporteur.handle;
+      return fakeQuietHandle(input.roleId, []);
+    },
+    createPiAdapterFactory: () => {
+      throw new Error("本用例不应构造 pi 适配器");
+    },
+    createDemoAdapter: () => {
+      throw new Error("本用例不应构造 demo 适配器");
+    },
+    buildProjectConfig,
+    getListing: (root) => (root === listing.projectRoot ? listing : undefined),
+    emitEvent: (envelope) => {
+      events.push(envelope);
+    },
+    handOffIntentLimits: { totalMs: 2000, stageMs: 1000 },
+  });
+  assert.equal((await mgr.open({ projectRoot: "/proj", roleId: "rapporteur", runtime: "demo" })).ok, true);
+  const hold = await mgr.send("占位轮次", undefined, { projectRoot: "/proj", roleId: "rapporteur", runtime: "demo" });
+  assert.equal(hold.ok, true);
+  assert.equal(mgr.isRoleBusy("/proj", "rapporteur", "demo"), true, "目标忙态已建立");
+  assert.equal((await mgr.open({ projectRoot: "/proj", roleId: "liaison", runtime: "demo" })).ok, true);
+  const payload = handoffPayload("intent-busy-queued");
+  const receipt = await liaisonInput!.handOffIntent!(payload, { turnId: "turn-busy" });
+  assert.equal(receipt.ok, true, "目标忙 ⇒ 入队即成功，不等待空闲");
+  assert.deepEqual(rapporteurSends, ["占位轮次"], "忙时任务只在队列，不并发直发");
+  rapporteur.settle();
+  await waitUntil(() => rapporteurSends.length === 2);
+  assert.equal(rapporteurSends[1], buildIntentHandoffMessage(payload), "settle 后按序投出唯一一条任务");
+  await mgr.stop(null);
+});
+
+type HandOffIntentFn = (
+  payload: HandOffIntentPayload,
+  metadata?: { turnId?: string },
+) => Promise<{ ok: boolean; message?: string }>;
+
+/** 句柄：send 永不返回（模拟适配器没有 ACK），事件流仍可推 settled（模拟本轮真实结束）。 */
+function hangingSendHandle(onSend: () => void, events: SessionEvent[]): RoleSessionHandle {
+  return {
+    async send(): Promise<void> {
+      onSend();
+      return new Promise<void>(() => {});
+    },
+    events(): AsyncIterable<SessionEvent> {
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            async next(): Promise<IteratorResult<SessionEvent>> {
+              for (let i = 0; i < 400 && events.length === 0; i += 1) {
+                await new Promise((resolve) => setTimeout(resolve, 5));
+              }
+              const event = events.shift();
+              return event !== undefined
+                ? { value: event, done: false }
+                : { value: undefined as unknown as SessionEvent, done: true };
+            },
+          };
+        },
+      };
+    },
+    async dispose(): Promise<void> {},
+  };
+}
+
+function handoffDeliveryNotes(events: SessionEventEnvelope[], roleId = "liaison"): string[] {
+  return events
+    .filter(
+      (envelope) =>
+        envelope.roleId === roleId &&
+        envelope.event.kind === "message" &&
+        (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
+    )
+    .map((envelope) => envelope.event.summary ?? "");
+}
+
+test("W6-B 意图交接有界：投递超时且目标已空闲、无排队 ⇒ ok:false（没有在途证据不谎称成功）", async () => {
+  const listing = governanceListing();
+  const events: SessionEventEnvelope[] = [];
+  let liaisonInput: { handOffIntent?: HandOffIntentFn } | undefined;
+  const rapporteurEvents: SessionEvent[] = [];
+  let rapporteurSendStarted = false;
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      if (input.roleId === "liaison") {
+        liaisonInput = input as unknown as { handOffIntent?: HandOffIntentFn };
+        return fakeQuietHandle(input.roleId, []);
+      }
+      if (input.roleId === "rapporteur") {
+        return hangingSendHandle(() => {
+          rapporteurSendStarted = true;
+        }, rapporteurEvents);
+      }
+      return fakeQuietHandle(input.roleId, []);
+    },
+    createPiAdapterFactory: () => {
+      throw new Error("本用例不应构造 pi 适配器");
+    },
+    createDemoAdapter: () => {
+      throw new Error("本用例不应构造 demo 适配器");
+    },
+    buildProjectConfig,
+    getListing: (root) => (root === listing.projectRoot ? listing : undefined),
+    emitEvent: (envelope) => {
+      events.push(envelope);
+    },
+    handOffIntentLimits: { totalMs: 400, stageMs: 150 },
+  });
+  assert.equal((await mgr.open({ projectRoot: "/proj", roleId: "liaison", runtime: "demo" })).ok, true);
+  const receiptPromise = liaisonInput!.handOffIntent!(handoffPayload("intent-timeout-idle"), { turnId: "turn-idle" });
+  await waitUntil(() => rapporteurSendStarted);
+  // 目标本轮已真实结束（settled），且没有排队/在途投递 ⇒ 超时后没有任何「已受理」证据，不得回 ok。
+  rapporteurEvents.push({ kind: "settled", summary: "一轮结束（测试替身）" } as SessionEvent);
+  const receipt = await receiptPromise;
+  assert.equal(receipt.ok, false, "无在途证据时不得谎称已交接");
+  assert.match(receipt.message ?? "", /投递任务给策划确认超时/);
+  assert.match(receipt.message ?? "", /目标会话无在途任务/);
+  const notes = handoffDeliveryNotes(events);
+  assert.equal(notes.length, 1, "失败恰一条系统行");
+  assert.match(notes[0] ?? "", /未重试/);
+  await mgr.stop(null);
+});
+
+test("W6-B 意图交接有界：超时对账为在途后晚到失败 ⇒ 只补一条失败系统行、账本恰一条、无未捕获拒绝", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "ans-handoff-late-"));
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown): void => {
+    unhandled.push(reason);
+  };
+  process.on("unhandledRejection", onUnhandled);
+  let mgr: SessionManager | undefined;
+  try {
+    const listing = { ...governanceListing(), projectRoot: root };
+    const events: SessionEventEnvelope[] = [];
+    let liaisonInput: { handOffIntent?: HandOffIntentFn } | undefined;
+    let rapporteurSendCalls = 0;
+    mgr = new SessionManager({
+      openRoleSession: async (input) => {
+        if (input.roleId === "liaison") {
+          liaisonInput = input as unknown as { handOffIntent?: HandOffIntentFn };
+          return fakeQuietHandle(input.roleId, []);
+        }
+        if (input.roleId === "rapporteur") {
+          return {
+            async send(): Promise<void> {
+              rapporteurSendCalls += 1;
+              // 超时后（≈120ms）才以失败收尾：输入从未 ACK ⇒ 晚到失败应如实补一条失败系统行。
+              await new Promise<void>((_resolve, reject) => {
+                setTimeout(() => reject(new Error("运行时晚到失败")), 220);
+              });
+            },
+            events(): AsyncIterable<SessionEvent> {
+              return {
+                [Symbol.asyncIterator]() {
+                  return {
+                    async next(): Promise<IteratorResult<SessionEvent>> {
+                      return { value: undefined as unknown as SessionEvent, done: true };
+                    },
+                  };
+                },
+              };
+            },
+            async dispose(): Promise<void> {},
+          } as RoleSessionHandle;
+        }
+        return fakeQuietHandle(input.roleId, []);
+      },
+      createPiAdapterFactory: () => {
+        throw new Error("本用例不应构造 pi 适配器");
+      },
+      createDemoAdapter: () => {
+        throw new Error("本用例不应构造 demo 适配器");
+      },
+      buildProjectConfig,
+      getListing: (r) => (r === root ? listing : undefined),
+      emitEvent: (envelope) => {
+        events.push(envelope);
+      },
+      handOffIntentLimits: { totalMs: 400, stageMs: 120 },
+    });
+    assert.equal((await mgr.open({ projectRoot: root, roleId: "liaison", runtime: "demo" })).ok, true);
+    const receipt = await liaisonInput!.handOffIntent!(handoffPayload("intent-late-failure"), { turnId: "turn-late" });
+    assert.equal(receipt.ok, true, "超时时有在途投递 ⇒ 回执 ok（工作/已入队）");
+    assert.equal(rapporteurSendCalls, 1, "不重试");
+    await waitUntil(() => handoffDeliveryNotes(events).length >= 2);
+    const notes = handoffDeliveryNotes(events);
+    assert.equal(notes.length, 2, "先「工作中」、晚到失败再补一条；不多不少");
+    assert.match(notes[0] ?? "", /交给策划（工作中）/);
+    assert.match(notes[1] ?? "", /发送任务给策划失败/);
+    assert.match(notes[1] ?? "", /运行时晚到失败/);
+    const ledger = await readGovernanceLedger(root);
+    assert.equal(
+      ledger.entries.filter((entry) => entry.kind === "dispatch.accepted" && entry.trigger === "intent-handoff").length,
+      1,
+      "在途对账路径只写一次 dispatch.accepted（晚到失败不追加账本）",
+    );
+    assert.deepEqual(unhandled, [], "晚到失败处理器不得造成未捕获拒绝");
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+    await mgr?.stop(null);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("意图交接自动创建流程骨架：按 intent frontmatter 的 flowId/qualityTier 幂等创建，已存在不覆盖", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "ans-handoff-skeleton-"));
+  let mgr: SessionManager | undefined;
+  try {
+    mkdirSync(path.join(root, "docs", "intents"), { recursive: true });
+    writeFileSync(
+      path.join(root, "docs", "intents", "intent-skel.md"),
+      [
+        "---",
+        "intentId: intent-skel",
+        "handoffKind: initial",
+        "flowId: flow-skel",
+        "qualityTier: prototype",
+        "goal: 客户要一份提案",
+        "scope: 只读分析",
+        "acceptance: 客户接受提案",
+        "---",
+        "",
+        "# 意图记录",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const listing = { ...governanceListing(), projectRoot: root };
+    let liaisonInput: { handOffIntent?: HandOffIntentFn } | undefined;
+    mgr = new SessionManager({
+      openRoleSession: async (input) => {
+        if (input.roleId === "liaison") liaisonInput = input as unknown as { handOffIntent?: HandOffIntentFn };
+        return fakeQuietHandle(input.roleId, []);
+      },
+      createPiAdapterFactory: () => {
+        throw new Error("本用例不应构造 pi 适配器");
+      },
+      createDemoAdapter: () => {
+        throw new Error("本用例不应构造 demo 适配器");
+      },
+      buildProjectConfig,
+      getListing: (r) => (r === root ? listing : undefined),
+      emitEvent: () => {},
+    });
+    assert.equal((await mgr.open({ projectRoot: root, roleId: "liaison", runtime: "demo" })).ok, true);
+    // payload 不带 flowId：必须从 intent frontmatter 读；qualityTier 也从文件读。
+    const payload: HandOffIntentPayload = {
+      intentId: "intent-skel",
+      handoffKind: "initial",
+      goal: "客户要一份提案",
+      scope: "只读分析",
+      acceptance: "客户接受提案",
+      summary: "客户要提案流程",
+    };
+    const receipt = await liaisonInput!.handOffIntent!(payload, { turnId: "turn-skel" });
+    assert.equal(receipt.ok, true);
+    const flowPath = path.join(root, "docs", "flows", "flow-skel.yaml");
+    assert.equal(existsSync(flowPath), true, "意图交接后流程骨架已创建（docs/flows/<flowId>.yaml）");
+    const skeleton = readFileSync(flowPath, "utf8");
+    assert.match(skeleton, /flowId: flow-skel/);
+    assert.match(skeleton, /qualityTier: prototype/, "qualityTier 取 intent frontmatter");
+    assert.match(skeleton, /status: skeleton/, "状态标记为骨架，供提案接受后的 Convener 识别");
+    assert.match(skeleton, /id: contract-freeze/, "骨架包含通用步骤（不含项目角色/交付步骤）");
+    // 幂等：再次交接（同 flow 已存在）不覆盖原文件。
+    const before = readFileSync(flowPath, "utf8");
+    const second = await liaisonInput!.handOffIntent!(payload, { turnId: "turn-skel-2" });
+    assert.equal(second.ok, true, "骨架已存在不阻断交接");
+    assert.equal(readFileSync(flowPath, "utf8"), before, "已存在的流程（无论是否骨架）原样保留、不覆盖");
+  } finally {
+    await mgr?.stop(null);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("意图交接骨架：intent 缺失/坏 frontmatter 回落 intentId+production；骨架失败只诊断、不阻断交接", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "ans-handoff-skeleton-fallback-"));
+  let mgr: SessionManager | undefined;
+  try {
+    mkdirSync(path.join(root, "docs", "intents"), { recursive: true });
+    // 坏 frontmatter：flowId 不是合法 slug（大写/下划线）⇒ 骨架创建失败，但交接必须继续。
+    writeFileSync(
+      path.join(root, "docs", "intents", "intent-bad.md"),
+      ["---", "intentId: intent-bad", "flowId: Bad_ID", "goal: 目标", "scope: 范围", "acceptance: 验收", "---", ""].join("\n"),
+      "utf8",
+    );
+    const listing = { ...governanceListing(), projectRoot: root };
+    let liaisonInput: { handOffIntent?: HandOffIntentFn } | undefined;
+    mgr = new SessionManager({
+      openRoleSession: async (input) => {
+        if (input.roleId === "liaison") liaisonInput = input as unknown as { handOffIntent?: HandOffIntentFn };
+        return fakeQuietHandle(input.roleId, []);
+      },
+      createPiAdapterFactory: () => {
+        throw new Error("本用例不应构造 pi 适配器");
+      },
+      createDemoAdapter: () => {
+        throw new Error("本用例不应构造 demo 适配器");
+      },
+      buildProjectConfig,
+      getListing: (r) => (r === root ? listing : undefined),
+      emitEvent: () => {},
+    });
+    assert.equal((await mgr.open({ projectRoot: root, roleId: "liaison", runtime: "demo" })).ok, true);
+
+    // (a) 意图文件缺失、payload 也无 flowId ⇒ 回落 flowId=intentId、qualityTier=production。
+    const noFile: HandOffIntentPayload = {
+      intentId: "intent-nofile",
+      handoffKind: "initial",
+      goal: "目标",
+      scope: "范围",
+      acceptance: "验收",
+      summary: "摘要",
+    };
+    const noFileReceipt = await liaisonInput!.handOffIntent!(noFile, { turnId: "turn-nofile" });
+    assert.equal(noFileReceipt.ok, true, "意图文件缺失不阻断桌面投递（缺失由编排校验负责）");
+    const fallbackPath = path.join(root, "docs", "flows", "intent-nofile.yaml");
+    assert.equal(existsSync(fallbackPath), true);
+    const fallback = readFileSync(fallbackPath, "utf8");
+    assert.match(fallback, /flowId: intent-nofile/, "缺 flowId 时回落 intentId");
+    assert.match(fallback, /qualityTier: production/, "缺 qualityTier 时回落 production");
+
+    // (b) 坏 frontmatter 的 flowId 非法 ⇒ ensureFlowSkeleton 失败，但回执仍成功、不写非法文件。
+    const bad: HandOffIntentPayload = {
+      intentId: "intent-bad",
+      handoffKind: "initial",
+      goal: "目标",
+      scope: "范围",
+      acceptance: "验收",
+      summary: "摘要",
+    };
+    const badReceipt = await liaisonInput!.handOffIntent!(bad, { turnId: "turn-bad" });
+    assert.equal(badReceipt.ok, true, "骨架创建失败只诊断、不阻断交接");
+    assert.equal(existsSync(path.join(root, "docs", "flows", "Bad_ID.yaml")), false, "非法 flowId 不落盘");
+  } finally {
+    await mgr?.stop(null);
+    rmSync(root, { recursive: true, force: true });
   }
 });

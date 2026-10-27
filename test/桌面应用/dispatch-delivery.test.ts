@@ -428,7 +428,7 @@ test("2026-10-25 应用任务稳定 clientMessageId：同文队列期/送达后�
   const placeholder = h.mgr.send("占位", undefined, { projectRoot: "/proj", roleId: "A", runtime: "demo" });
   await tick(30);
 
-  const taskText = "role-readiness 派发任务：组队写卡已通过结构校验";
+  const taskText = "role-readiness 派发任务：人事写卡已通过结构校验";
   const r1 = await h.mgr.sendBackground({ projectRoot: "/proj", roleId: "A", runtime: "demo", text: taskText });
   const r2 = await h.mgr.sendBackground({ projectRoot: "/proj", roleId: "A", runtime: "demo", text: taskText });
   assert.equal(r1.ok, true);
@@ -481,7 +481,7 @@ test("2026-10-25 应用任务稳定身份：identitySeed（语义去重键）变
   const h = makeHarness();
   await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
   await tick(30);
-  const text = "流程 flow-x：以下步骤已 delivered，等待统筹核证：";
+  const text = "流程 flow-x：以下步骤已 delivered，等待运营核证：";
 
   const first = await h.mgr.sendBackground({ projectRoot: "/proj", roleId: "A", runtime: "demo", text, identitySeed: "flow-x\u0000rev-1" });
   assert.equal(first.ok, true);

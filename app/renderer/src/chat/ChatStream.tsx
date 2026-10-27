@@ -8,12 +8,14 @@
  * 待确认 chip（同状态源 pendingOperator；定位原卡）、chip 可见时尾行让位。
  */
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MessageSquareText, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getRowModel, useChatStore } from "@/chat/chat-store";
 import { BusySpinner } from "@/chat/BusySpinner";
 import { VirtualPane } from "@/chat/VirtualPane";
+import { ViewImageLightbox } from "@/chat/ViewImageLightbox";
+import { useViewImageLightbox } from "@/chat/view-image-lightbox";
 import { roleDisplayName } from "@/chat/role-view";
 import {
   queueItemViews,
@@ -205,6 +207,11 @@ export function ChatStream() {
   const selectRole = useChatStore((s) => s.selectRole);
   const chatRef = useRef<HTMLDivElement>(null);
 
+  // 切换角色/项目时关闭 view_image 放大层（缩略图/弹层卸载清理再兜底一次）。
+  useEffect(() => {
+    useViewImageLightbox.getState().close();
+  }, [selectedRoleId, projectRoot]);
+
   const role = roles.find((item) => item.roleId === selectedRoleId) || null;
   const meta = selectedRoleId ? paneMeta[selectedRoleId] : undefined;
   const version = selectedRoleId ? paneVersions[selectedRoleId] || 0 : 0;
@@ -383,6 +390,9 @@ export function ChatStream() {
       ) : (
         <button id="op-chip" className="op-chip" type="button" hidden aria-hidden="true" />
       )}
+
+      {/* view_image 放大层：fixed + portal 到 body，不占聊天流布局。 */}
+      <ViewImageLightbox />
     </div>
   );
 }

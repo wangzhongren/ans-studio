@@ -1,10 +1,14 @@
 // src/common/编排/decision-card.ts
 // decision 卡（`request_choice(cardKind="decision")`）的**结构校验单一共享实现**（2026-10-26）。
 //
-// 客户规则（经主控任务转达；PM 设计登记 `2026-10-26_design_decision-card.md`，rules-only）：
+// 客户规则（经主控任务转达；PM 设计登记 `2026-10-26_design_decision-card.md`，rules-only；
+// 2026-10-26 客户纠正/补充）：
 //   · 材料性选择由主理交统筹（Steward/Convener）发 `request_choice(cardKind="decision")`；
+//   · **需求变更审批卡**由统筹（Convener）或提案角色（Rapporteur）发起；发起方不得自批，
+//     审批人只有独立判断 agent（「替我决策」开启时按唯一推荐项）或客户（未开启时手选）；
+//     主理不审批、只在批准后执行意图变更；
 //   · 卡内**恰有一个** `recommended: true` 推荐项；「替我决策」开启时默认选推荐项；
-//   · decision 卡独立于提案/任命/验收：不是客户批准、不触发 gate/验收。
+//   · decision 卡独立于提案/任命/验收：不是提案/验收批准、不触发 gate/验收。
 //
 // 本模块是「卡是否可发」的唯一确定性校验（纯函数：不读盘、不写盘、不调用模型）：
 //   · 编排 `run-role.ts::governedInput` 在触达 raw 客户通道**之前**调用——覆盖 CLI、single su 与
@@ -19,6 +23,17 @@ import type { CustomerInputMetadata, CustomerInputRequest } from "../../model/ru
 
 /** decision 卡最少选项数（0/1 个选项无法构成材料性选择）。 */
 export const DECISION_CARD_MIN_OPTIONS = 2;
+
+/**
+ * 允许发起 decision 卡的内置治理角色（2026-10-26 客户要求 + 同日纠正/补充）：
+ *   · `convener`（统筹/Steward）：材料性选择卡（既有通道）；
+ *   · `rapporteur`（提案角色/Draft）：**仅限需求变更审批**（`request_requirement_change` 对应卡）。
+ * Crew（nominator）/Proof（verifier）/Lead（liaison）/single 的 su 与项目角色一律不可发。
+ *
+ * 运行时契约没有「用途」字段：本函数只做**角色机械上限**；「rapporteur 仅需求变更用途」由 judge
+ * 指引与角色纪律约束（若需机械拦截，需契约新增用途字段，属跨角色变更）。
+ */
+export const DECISION_CARD_ALLOWED_ROLES: readonly string[] = Object.freeze(["convener", "rapporteur"]);
 
 /** 校验失败原因（机器码；文案由调用方按自己的 i18n/面向对象拼）。 */
 export type DecisionCardRejectReason =
@@ -57,7 +72,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * 规则（顺序即拒绝原因优先级）：
  *   1. 卡种解析 `request.cardKind ?? metadata.cardKind`；不是 `"decision"` ⇒ `applicable:false`（通过，
  *      调用方按原卡种逻辑处理）；
- *   2. **仅 trio 统筹（convener）**可发（single/su、项目角色、其他内置治理角色一律拒）；
+ *   2. **仅 trio 统筹（convener）或提案角色（rapporteur）**可发（single/su、项目角色、Lead/Crew/Proof
+ *      等其它内置治理角色一律拒；rapporteur 的用途限制见 `DECISION_CARD_ALLOWED_ROLES` 注释）；
  *   3. 必须是 `request_choice`（choice）卡；
  *   4. `flowId`（request 或 metadata）必须存在且为合法 slug（decision 选择要按 flow 审计/定位）；
  *   5. 至少 `DECISION_CARD_MIN_OPTIONS` 个选项；
@@ -70,7 +86,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function validateDecisionCardRequest(input: {
   request: CustomerInputRequest;
   roleId: string;
-  /** 会话治理模型：只有 `trio` 的 convener 可发 decision 卡。 */
+  /** 会话治理模型：只有 `trio` 的 convener/rapporteur 可发 decision 卡。 */
   governanceModel: "single" | "trio";
   metadata?: Pick<CustomerInputMetadata, "cardKind" | "flowId">;
 }): DecisionCardValidation {
@@ -79,7 +95,7 @@ export function validateDecisionCardRequest(input: {
   const cardKind = typeof rawCardKind === "string" ? rawCardKind : undefined;
   if (cardKind !== "decision") return { ok: true, applicable: false };
 
-  if (input.governanceModel !== "trio" || roleId !== "convener") {
+  if (input.governanceModel !== "trio" || !DECISION_CARD_ALLOWED_ROLES.includes(roleId)) {
     return {
       ok: false,
       reasonCode: "role-not-allowed",

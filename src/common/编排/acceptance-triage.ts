@@ -857,7 +857,7 @@ export function recommendAcceptanceTriage(
       disposition: "rework",
       reasons: [
         `R2?/R4?: 存在 ${blockingCount} 个 blocker/major，但无法核对改进方案可执行性（${unavailableReason}）；` +
-          "不做权威自动建议，转客户决策卡（参考建议：下发统筹修改）。",
+          "不做权威自动建议，转客户决策卡（参考建议：下发运营修改）。",
       ],
       authoritative: false,
       basis: "feasibility-unavailable",
@@ -871,7 +871,7 @@ export function recommendAcceptanceTriage(
     disposition: "rework",
     reasons: [
       `R2: conclusion=${triage.conclusion}，存在 ${blockingCount} 个 blocker/major 且改进方案可执行` +
-        "（owner 可派发、action 与 targets/criteria 齐全）⇒ 建议下发统筹修改。",
+        "（owner 可派发、action 与 targets/criteria 齐全）⇒ 建议下发运营修改。",
       "R6: 文风/篇幅/措辞不参与判定——存在可执行的 blocker/major 时不得判 pass、不得建议仅汇报。",
     ],
     authoritative: true,

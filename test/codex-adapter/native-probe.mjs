@@ -92,7 +92,12 @@ try {
   for (const name of ['threadId', 'turnId', 'callId', 'tool', 'arguments']) assert.match(fields, new RegExp(`${name}:`));
   const functionSpec = await readFile(path.join(schema, 'v2/DynamicToolFunctionSpec.ts'), 'utf8');
   for (const name of ['name', 'description', 'inputSchema']) assert.match(functionSpec, new RegExp(`${name}:`));
+  // 2026-10-27 同轮工具结果附图：动态工具输出内容项必须支持 inputImage data URL
+  // （Codex 只接受 data URL；远程 HTTP(S) 图片 URL 会被上游拒绝）。
+  const contentItem = await readFile(path.join(schema, 'v2/DynamicToolCallOutputContentItem.ts'), 'utf8');
+  assert.match(contentItem, /"type": "inputImage", imageUrl: string/);
+  assert.match(contentItem, /"type": "inputText", text: string/);
   assert.match(await readFile(path.join(schema, 'v2/DynamicToolSpec.ts'), 'utf8'), /"type": "function"/);
   assert.match(await readFile(path.join(schema, 'InitializeCapabilities.ts'), 'utf8'), /experimentalApi: boolean/);
-  console.log(JSON.stringify({ version, mode: 'no model or auth calls', nativeMcpEnabled: second.enabled, projectConfigExcluded: true, foreignMcpStarted: launched, sandbox: second.config.sandbox_mode, approval: second.config.approval_policy, shellTool: second.config.features.shell_tool, dynamicRequestIdentities: ['threadId', 'turnId', 'callId'], experimentalApi: 'initialize accepted and schema verified', whitelistMap: { enabledAfter: third.enabled, disabledForeign: third.servers.foreign_user.enabled, approvalMode: entry.default_tools_approval_mode, toolTimeoutSec: entry.tool_timeout_sec, argsRoundTrip: entry.args.length } }));
+  console.log(JSON.stringify({ version, mode: 'no model or auth calls', nativeMcpEnabled: second.enabled, projectConfigExcluded: true, foreignMcpStarted: launched, sandbox: second.config.sandbox_mode, approval: second.config.approval_policy, shellTool: second.config.features.shell_tool, dynamicRequestIdentities: ['threadId', 'turnId', 'callId'], experimentalApi: 'initialize accepted and schema verified', dynamicToolImage: 'inputImage imageUrl schema verified', whitelistMap: { enabledAfter: third.enabled, disabledForeign: third.servers.foreign_user.enabled, approvalMode: entry.default_tools_approval_mode, toolTimeoutSec: entry.tool_timeout_sec, argsRoundTrip: entry.args.length } }));
 } finally { await rm(root, { recursive: true, force: true }); }

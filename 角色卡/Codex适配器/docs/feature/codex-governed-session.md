@@ -3,7 +3,7 @@ id: codex-governed-session
 type: feature
 title: 使用 Codex 执行受治理角色会话
 created: "2026-10-14"
-updated: "2026-10-21"
+updated: "2026-10-27"
 timezone: Asia/Shanghai
 status: implemented-unverified
 related: [codex-governed-transport-design, codex-governed-session-implementation, multi-runtime-integration-v2]
@@ -14,6 +14,9 @@ events:
   - date: "2026-10-14"
     kind: implemented
     summary: 适配器及自有测试完成，稳定 CLI/用户入口联调待接续
+  - date: "2026-10-27"
+    kind: changed
+    summary: 工具结果附图映射（inputImage data URL）；policy 仍 next-turn，真实模型探针 blocked-config
 ---
 
 # 使用 Codex 执行受治理角色会话
@@ -111,3 +114,24 @@ flowchart TD
 原 D1 回归发现 CLI 对目录内模型自动补默认 effort，保留了 gpt-5.5 的真实红日志。用户批准 E1 后，无 effort 候选会在确有必要时使用当前模型的临时 SDK 元数据副本；只改变默认 level、默认 summary 和两个 summary 能力标志，其他工具能力、上下文和模型说明保持。文件位于会话 workRoot、权限0600，恢复原目录或dispose时清理，普通路径不生成。元数据来源绑定已安装 CLI 0.162.1 二进制内嵌格式，有界读取，不接受项目目录或用户文本作为模型定义；这不是稳定公共 API。目录默认也被值拒绝时，同一无 effort 候选亦走 E1，不增加第三候选。
 
 整个reasoning对象拒绝、非持久后续轮历史恢复及已有工具副作用边界仍未被此实现绕过。最终实际验证与历史红转绿记录见[修复及验证记录](../fix/2026-10-21_fix_reasoning-compatibility.md)。
+
+## 工具结果同轮附图（2026-10-27）
+
+运行时核心若以 `tool-result` 方式交付 `view_image`（`ToolResult.images`），适配器把图片映射为 Codex 原生动态工具内容，模型在**同一次工具循环的下一次请求**即可看到图片，不产生下一轮附件队列。
+
+```mermaid
+flowchart TD
+  call[工具 handler 返回 ToolResult] --> ok{ok 且 images 非空?}
+  ok -->|否| text[只回 inputText：message 经 redact]
+  ok -->|是| valid{每条 data 为 base64 形态且 MIME 在白名单?}
+  valid -->|否| failclosed[整批不附图 + isError/success:false + 未提供图片注记]
+  valid -->|是| image[MCP image block → 动态 contentItems inputImage data URL]
+  text --> model[模型收到工具结果]
+  failclosed --> model
+  image --> model
+```
+
+- MIME 白名单 `image/png|jpeg|gif|webp`；失败/中止/无图/非法载荷绝不附图；图片 `data`/data URL 绝不经过 `redact`、日志、诊断或事件。
+- 只用 data URL，不写临时文件、不用远程图片 URL；客户带图消息的 `localImage` 路径未改动。
+- **当前政策仍是 `next-turn`**（`RUNTIME_VIEW_IMAGE_POLICY.codex.delivery`，运行时核心属主）：工具层不会产生 `images`，客户可见行为不变。
+- **两条传输路径的证据**：Responses/app-server 用 0.162.1 真实回环证明 `inputImage` data URL 被接受并进入同轮下一请求（4/4）；Pi 网关无 Responses 路由，真实模型探针 blocked-config。客户补充约束后新增**显式 opt-in** 的最小 Chat Completions 传输（`ANS_CODEX_WIRE_API=chat`；产品需显式 Codex/OpenAI 配置，**Pi 仅临时测试显式注入，不做自动回退**）：真实 Chat 探针 3/3，工具消息内 `image_url` data URL 图片被模型实际看到。chat 模式无原生线程恢复/MCP/联网搜索/思考等级，非空声明 fail-closed。详见[本次修改](../change/2026-10-27_change_tool-result-images-codex.md)。

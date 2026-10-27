@@ -16,7 +16,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 import { createDesktopInterface, type DesktopDeps } from "../../app/desktop/interface.ts";
@@ -25,9 +25,18 @@ import {
   boundaryChangeClientMessageId,
   boundaryChangeTicketRelPath,
 } from "../../app/desktop/boundary-change.ts";
+// 2026-10-26 需求变更申请（request_requirement_change）：票据路径/形状纯逻辑。
+import {
+  requirementChangeTicketRelPath,
+  type RequirementChangeTicketRecord,
+} from "../../app/desktop/requirement-change.ts";
 import type {
+  CustomerInputOutcome,
+  CustomerInputRequest,
   GovernanceJudgeOutcome,
   GovernanceJudgeRequest,
+  RequestRequirementChangeFn,
+  RequestRequirementChangeInput,
 } from "../../src/model/runtime.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { RUNTIME_UNRESOLVED_MESSAGE } from "../../app/desktop/runtime-resolution.ts";
@@ -256,8 +265,18 @@ async function makeHarness(
     requestBoundaryChange?: DesktopDeps["requestBoundaryChange"];
     /** 2026-10-26 request_boundary_change：AI/派发时限（测试注入短预算）。 */
     requestBoundaryChangeLimits?: DesktopDeps["requestBoundaryChangeLimits"];
+    /** 2026-10-26 request_requirement_change：整体能力注入面（测试可替换为假实现）。 */
+    requestRequirementChange?: DesktopDeps["requestRequirementChange"];
+    /** 2026-10-26 request_requirement_change：审批卡/主理执行任务投递时限（测试注入短预算）。 */
+    requestRequirementChangeLimits?: DesktopDeps["requestRequirementChangeLimits"];
+    /** 2026-10-26 意图交接投递时限（测试注入短预算）。 */
+    handOffIntentLimits?: DesktopDeps["handOffIntentLimits"];
     /** 2026-10-25 request_acceptance 真机挂起复现：会话开启永不 resolve。 */
     hangOpenRoleSession?: boolean;
+    /** 2026-10-27 gate 复核投递真机挂起复现：verifier 收到任务但 send 永不返回（无 ACK）。 */
+    hangVerifierSend?: boolean;
+    /** 2026-10-27 request_gate_review 有界超时（测试注入短预算）。 */
+    requestGateReviewLimits?: DesktopDeps["requestGateReviewLimits"];
   } = {},
 ): Promise<Harness> {
   const sendsByRole = new Map<string, string[]>();
@@ -281,6 +300,13 @@ async function makeHarness(
       const sends: string[] = [];
       sendsByRole.set(input.roleId, sends);
       const made = scriptedHandle(sends);
+      if (options.hangVerifierSend === true && input.roleId === "verifier") {
+        const originalSend = made.handle.send.bind(made.handle);
+        made.handle.send = async (text: string): Promise<void> => {
+          await originalSend(text);
+          return new Promise<void>(() => {}); // 真机：适配器写入无 ACK，send 永不返回
+        };
+      }
       controls.set(input.roleId, made);
       return made.handle;
     },
@@ -310,6 +336,14 @@ async function makeHarness(
     ...(options.requestBoundaryChangeLimits !== undefined
       ? { requestBoundaryChangeLimits: options.requestBoundaryChangeLimits }
       : {}),
+    ...(options.requestRequirementChange !== undefined
+      ? { requestRequirementChange: options.requestRequirementChange }
+      : {}),
+    ...(options.requestRequirementChangeLimits !== undefined
+      ? { requestRequirementChangeLimits: options.requestRequirementChangeLimits }
+      : {}),
+    ...(options.handOffIntentLimits !== undefined ? { handOffIntentLimits: options.handOffIntentLimits } : {}),
+    ...(options.requestGateReviewLimits !== undefined ? { requestGateReviewLimits: options.requestGateReviewLimits } : {}),
   });
   await iface.listProject({ projectRoot });
   return { iface, sendsByRole, events, controls, openInputs };
@@ -595,7 +629,7 @@ test("自动验收（导入补齐）：门通过 ⇒ 自动派 Proof 一条复�
 
       // 可见性：Lead（主入口）系统行说明「自动派发」，不冒充客户批准；客户决定不再发 Convener。
       const notes = deliveryNotes(harness.events, "liaison");
-      assert.ok(notes.some((note) => /已自动派发验收复核给验收（工作中）/.test(note)), "Lead 系统行如实告知自动派发");
+      assert.ok(notes.some((note) => /已自动派发验收复核给质检（工作中）/.test(note)), "Lead 系统行如实告知自动派发");
       assert.equal(deliveryNotes(harness.events, "convener").length, 0, "自动验收反馈不再发 Convener");
       assert.ok(notes.every((note) => !/客户已批准|验收通过/.test(note)), "不得冒充客户批准");
 
@@ -781,7 +815,7 @@ test("自动验收阻塞可见性：门未通过 ⇒ Lead 恰一条系统行（�
       assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "门通过后仍按原路径恰派一条验收任务");
       assert.equal(blockerNotes(harness.events, "liaison").length, 2, "门通过：不发新的阻塞行");
       assert.ok(
-        deliveryNotes(harness.events, "liaison").some((note) => /已自动派发验收复核给验收/.test(note)),
+        deliveryNotes(harness.events, "liaison").some((note) => /已自动派发验收复核给质检/.test(note)),
         "成功路径的既有系统行（发给 Lead）不变",
       );
       assert.equal(deliveryNotes(harness.events, "convener").length, 0, "成功行也不发 Convener");
@@ -1146,7 +1180,7 @@ test("自动验收 YAML：机器状态齐备 ⇒ 自动派 Proof；Markdown 人�
     try {
       await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0);
       await waitFor(() =>
-        deliveryNotes(harness.events, "liaison").some((note) => /已自动派发验收复核给验收（工作中）/.test(note)),
+        deliveryNotes(harness.events, "liaison").some((note) => /已自动派发验收复核给质检（工作中）/.test(note)),
       );
       assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "YAML 齐备 ⇒ 恰一条验收复核任务");
       await waitForAsync(async () => (await verifierDispatches(root, flowId)).length > 0);
@@ -1179,7 +1213,7 @@ test("2026-10-24 所有变更独立验收：非发布新契约流程同样派 ve
       assert.match(criteriaMessage, /不要发验收卡/);
       await waitForAsync(async () => (await criteriaDispatches(root, flowId)).length > 0);
       assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "判定未派（只有写标准任务）");
-      assert.equal((await verifierDispatches(root, flowId)).length, 0, "标准缺失：不派验收判定");
+      assert.equal((await verifierDispatches(root, flowId)).length, 0, "标准缺失：不派质检判定");
       assert.equal(existsSync(path.join(root, "docs", "acceptance", `${flowId}-criteria-v1.md`)), false, "应用不代写 acceptance-criteria");
       const awaitingNotes = () =>
         deliveryNotes(harness.events, "liaison").filter((note) => note.includes("awaiting-release-acceptance"));
@@ -1626,7 +1660,7 @@ test("2026-10-23 验收返工路由（客户拒绝）：最新 rejected ⇒ 路�
       assert.match(task, /id=F1 \| owner=executor \| action=修复交付并补证据 \| evidence=docs\/verification\/f1\.log/);
       assert.match(task, /flow_step_supersede/);
       assert.match(task, /不要.*supersede 保留验收步骤/);
-      assert.match(task, /返工完成后由应用按验收门（所有变更，含非发布）自动重派验收/, "返工后由应用按验收门自动重派（release 不是条件）");
+      assert.match(task, /返工完成后由应用按验收门（所有变更，含非发布）自动重派质检/, "返工后由应用按验收门自动重派（release 不是条件）");
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "Proof 不接收返工派发");
       assert.equal(completeCalls.length, 0, "rejected ⇒ 不收口");
       // routed 系统行在 record sent 写之后发出：先等它，再断言任务/记录（避免发送可见早于系统行的竞态）。
@@ -2002,7 +2036,7 @@ function deliveredFlowSteps(flowId: string): FlowYamlStepInput[] {
   ];
 }
 
-test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任务、不向主理落等待核证系统行、无客户卡；同 revision 不刷屏、同集合 revision 变化不重发、新步骤再评估", async () => {
+test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任务、不向产品落等待核证系统行、无客户卡；同 revision 不刷屏、同集合 revision 变化不重发、新步骤再评估", async () => {
   const root = makeTempProjectRoot("ans-delivered-wake-");
   try {
     const flowId = "flow-delivered";
@@ -2027,8 +2061,8 @@ test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任
       assert.match(sends[0]!, /不要直接写 flow YAML/, "禁止直接写 flow YAML");
       // 2026-10-26 客户真机：交付核证只走统筹通道——主理不再落「已 delivered，等待统筹核证」系统行。
       const leadDeliveredNotes = () =>
-        deliveryNotes(harness.events, "liaison").filter((note) => note.includes("已 delivered，等待统筹"));
-      assert.equal(leadDeliveredNotes().length, 0, "主理不落等待核证系统行");
+        deliveryNotes(harness.events, "liaison").filter((note) => note.includes("已 delivered，等待运营"));
+      assert.equal(leadDeliveredNotes().length, 0, "产品不落等待核证系统行");
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "流程未齐备 ⇒ 不派 verifier");
       assert.equal(customerCalls.length, 0, "全程零客户卡");
       // 不伪造 done、不自动改 flow：文件仍是 delivered/pending。
@@ -2042,7 +2076,7 @@ test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任
       harness.controls.get("convener")!.settle();
       await sleep(300);
       assert.equal(harness.sendsByRole.get("convener")!.length, 1, "同一集合不重复派");
-      assert.equal(leadDeliveredNotes().length, 0, "主理始终不落等待核证系统行");
+      assert.equal(leadDeliveredNotes().length, 0, "产品始终不落等待核证系统行");
       // 2026-10-26 客户真机修复：delivered 唤醒按 **stepId 已通知集合**去重。同集合仅 revision
       //（title/字节）变化 ⇒ 已通知过的步骤不再重发（真机 01:56:44/50 同一步骤 6 秒内重复的根因）。
       await sleep(30);
@@ -2061,7 +2095,7 @@ test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任
       harness.controls.get("convener")!.settle();
       await sleep(400);
       assert.equal(harness.sendsByRole.get("convener")!.length, 1, "同集合 revision 变化：已通知步骤不重复派");
-      assert.equal(leadDeliveredNotes().length, 0, "同集合 revision 变化：主理仍不落行");
+      assert.equal(leadDeliveredNotes().length, 0, "同集合 revision 变化：产品仍不落行");
       assert.equal(customerCalls.length, 0, "仍零客户卡");
 
       // 新 delivered 步骤 ⇒ 重新评估、恰再派一次；第二条只含**本次新步骤**（不重复已通知的两步）。
@@ -2080,7 +2114,7 @@ test("2026-10-20 delivered 唤醒：无活会话 ⇒ Convener 恰一条核证任
       assert.match(secondSend, /verification-evidence-2/, "新步骤在场");
       assert.ok(!secondSend.includes("- 步骤 integration-e2e "), "不重复已通知的 integration-e2e");
       assert.ok(!secondSend.includes("- 步骤 verification-evidence "), "不重复已通知的 verification-evidence（前缀同名不误判）");
-      assert.equal(leadDeliveredNotes().length, 0, "主理仍不落行");
+      assert.equal(leadDeliveredNotes().length, 0, "产品仍不落行");
       assert.equal(customerCalls.length, 0, "仍零客户卡");
     } finally {
       await harness.iface.stopSession();
@@ -2116,7 +2150,7 @@ test("2026-10-20 delivered 唤醒：owner 有活会话 ⇒ 不抢跑（等下一
   }
 });
 
-test("2026-10-26 客户真机：统筹忙 ⇒ 多个 delivered 步骤不逐条发；空闲后的下一次检查合并为一条；不向主理双发", async () => {
+test("2026-10-26 客户真机：运营忙 ⇒ 多个 delivered 步骤不逐条发；空闲后的下一次检查合并为一条；不向产品双发", async () => {
   const root = makeTempProjectRoot("ans-delivered-wake-merge-");
   try {
     const flowId = "flow-delivered-merge";
@@ -2129,7 +2163,7 @@ test("2026-10-26 客户真机：统筹忙 ⇒ 多个 delivered 步骤不逐条�
       // 让统筹处于忙态（真实 send 开跑、未 settle）。
       assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "pi" })).ok, true);
       const convenerSends = (): string[] => harness.sendsByRole.get("convener") ?? [];
-      const hold = harness.iface.sendSession({ text: "统筹占位轮次", target: { projectRoot: root, roleId: "convener", runtime: "pi" } });
+      const hold = harness.iface.sendSession({ text: "运营占位轮次", target: { projectRoot: root, roleId: "convener", runtime: "pi" } });
       assert.equal((await hold).ok, true, "占位轮次已投出");
       const baseline = convenerSends().length;
       assert.equal(baseline, 1);
@@ -2138,7 +2172,7 @@ test("2026-10-26 客户真机：统筹忙 ⇒ 多个 delivered 步骤不逐条�
       writeFlowStateFile(root, flowId, flowStateYaml(flowId, deliveredFlowSteps(flowId)));
       await harness.iface.listProject({ projectRoot: root });
       await sleep(350);
-      assert.equal(convenerSends().length, baseline, "统筹忙 ⇒ 第一条 delivered 不投递（不逐条发）");
+      assert.equal(convenerSends().length, baseline, "运营忙 ⇒ 第一条 delivered 不投递（不逐条发）");
 
       // 又一条 delivered（并触发一次检查）——仍忙 ⇒ 也不发，步骤留在待通知集合。
       writeFlowStateFile(
@@ -2148,7 +2182,7 @@ test("2026-10-26 客户真机：统筹忙 ⇒ 多个 delivered 步骤不逐条�
       );
       await harness.iface.listProject({ projectRoot: root });
       await sleep(350);
-      assert.equal(convenerSends().length, baseline, "统筹忙 ⇒ 第二条也不投递");
+      assert.equal(convenerSends().length, baseline, "运营忙 ⇒ 第二条也不投递");
 
       // 统筹空闲 ⇒ 下一次验收检查把**全部待核证步骤合并为一条**消息。
       harness.controls.get("convener")!.settle();
@@ -2163,13 +2197,13 @@ test("2026-10-26 客户真机：统筹忙 ⇒ 多个 delivered 步骤不逐条�
 
       // 交付核证只走统筹通道：主理既不收「等待统筹核证」系统行，也不收 delivered 阶段协调任务。
       assert.equal(
-        deliveryNotes(harness.events, "liaison").filter((note) => note.includes("已 delivered，等待统筹")).length,
+        deliveryNotes(harness.events, "liaison").filter((note) => note.includes("已 delivered，等待运营")).length,
         0,
-        "主理不落等待核证系统行",
+        "产品不落等待核证系统行",
       );
       assert.ok(
         !(harness.sendsByRole.get("liaison") ?? []).some((text) => text.startsWith("[系统·治理协调]")),
-        "delivered 阶段不唤醒主理协调",
+        "delivered 阶段不唤醒产品协调",
       );
     } finally {
       await harness.iface.stopSession();
@@ -2704,7 +2738,7 @@ test("2026-10-22 第 3 项：新契约流程标准缺失 ⇒ 派 Verifier 写标
       assert.match(criteriaMessage, /不要发验收卡/);
       await waitForAsync(async () => (await criteriaDispatches(root, flowId)).length > 0);
       assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "判定未派（只有写标准任务）");
-      assert.equal((await verifierDispatches(root, flowId)).length, 0, "标准缺失：不派验收判定");
+      assert.equal((await verifierDispatches(root, flowId)).length, 0, "标准缺失：不派质检判定");
       assert.ok(
         deliveryNotes(harness.events, "liaison").some((note) => note.includes("实施前验收标准缺失")),
         "Lead 可见阻塞原因",
@@ -2755,7 +2789,7 @@ test("2026-10-22 第 3 项：新契约流程变更包缺失/缺 riskTier ⇒ 不
     const harness = await makeHarness(root, listing);
     try {
       await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes("变更包缺失")));
-      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "变更包缺失：不派验收判定");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "变更包缺失：不派质检判定");
       assert.equal((await verifierDispatches(root, flowId)).length, 0);
 
       // 无 riskTier 的变更包：仍不派，原因如实更新。
@@ -3029,7 +3063,7 @@ test("2026-10-23 报告兜底：缺段/坏段只发「报告不完整」任务�
       assert.match(task, /ghost-role/);
       assert.match(task, /id=F12 \| owner=app/);
       assert.match(task, /报告\/工具修正项（owner=verifier/);
-      assert.match(task, /不要向验收派产品返工/);
+      assert.match(task, /不要向质检派产品返工/);
       assert.match(task, /治理文档\/变更包项/);
       assert.match(task, /不要向内置治理角色 dispatch_task/);
       assert.match(task, /实际接收方：liaison/, "实际接收方 = Lead（coordinator 只是建议）");
@@ -3041,7 +3075,7 @@ test("2026-10-23 报告兜底：缺段/坏段只发「报告不完整」任务�
         (text) =>
           /可派发项（按 owner 分组/.test(text) ||
           /报告\/工具修正项（owner=verifier/.test(text) ||
-          /不要向验收派产品返工/.test(text) ||
+          /不要向质检派产品返工/.test(text) ||
           /\bid=[^\s|]+\s*\|\s*owner=/.test(text),
       );
       assert.equal(productReworkToVerifier.length, 0, "不向 Proof 派产品返工（自动验收/返工复核任务不算）");
@@ -3659,7 +3693,7 @@ test("验收分诊：pass 报告不分诊（proceed，不写 triage 记录）", 
   }
 });
 
-test("验收分诊：只有 minor/nit ⇒ judge-rule 自动仅汇报（report-only），主理确定性汇报，账本不污染 latestAcceptanceDecision", async () => {
+test("验收分诊：只有 minor/nit ⇒ judge-rule 自动仅汇报（report-only），产品确定性汇报，账本不污染 latestAcceptanceDecision", async () => {
   const root = makeTempProjectRoot("ans-triage-report-only-");
   try {
     const flowId = "flow-triage-report-only";
@@ -3688,7 +3722,7 @@ test("验收分诊：只有 minor/nit ⇒ judge-rule 自动仅汇报（report-on
       assert.equal(read.record?.sourceDetail, "judge-rule");
       assert.equal(read.record?.reportedAt !== null, true, "汇报后记录 reportedAt");
       const notes = deliveryNotes(harness.events, "liaison");
-      assert.ok(notes.some((note) => note.includes("验收结论：不通过")), "主理汇报含结论");
+      assert.ok(notes.some((note) => note.includes("验收结论：不通过")), "产品汇报含结论");
       assert.ok(notes.some((note) => note.includes("F1") && note.includes("风格建议") && note.includes("命名风格不统一")), "逐项 severity/reason");
       assert.ok(notes.some((note) => note.includes("改进建议：统一命名")), "逐项 action+指针");
       assert.ok(notes.some((note) => note.includes("本次不返工") && note.includes("判断代批")), "决定来源");
@@ -3741,7 +3775,7 @@ test("验收分诊：blocker/major 可执行 ⇒ judge-rule 自动返工（任�
       assert.equal(routing.source, "judge");
       assert.equal(routing.sourceDetail, "judge-rule");
       const tasks = harness.sendsByRole.get("liaison") ?? [];
-      assert.equal(tasks.length, 1, "唯一一条统筹任务");
+      assert.equal(tasks.length, 1, "唯一一条运营任务");
       const task = tasks[0]!;
       assert.match(task, /severity=blocker/);
       assert.match(task, /reason=入口不可用/);
@@ -3819,7 +3853,7 @@ test("验收分诊客户卡：结论/失败项/改进方案/建议/警示 + 仅�
       assert.match(result.card.preview ?? "", /验收结论：不通过/);
       assert.match(result.card.preview ?? "", /F1 · 阻断：入口不可用/);
       assert.match(result.card.preview ?? "", /改进建议：修复入口/);
-      assert.match(result.card.preview ?? "", /建议下发统筹修改/);
+      assert.match(result.card.preview ?? "", /建议下发运营修改/);
       assert.match(result.card.preview ?? "", /报告含阻断项，仅汇报将不修复/);
       assert.deepEqual(result.card.options.map((option) => option.id), ["rework", "report-only"]);
       const awaiting = await readAcceptanceTriageRecord(root, flowId);
@@ -3850,7 +3884,7 @@ test("验收分诊客户卡：结论/失败项/改进方案/建议/警示 + 仅�
   }
 });
 
-test("验收分诊客户卡：下发统筹修改映射为 reject 结算 + 客户来源返工路由", async () => {
+test("验收分诊客户卡：下发运营修改映射为 reject 结算 + 客户来源返工路由", async () => {
   const root = makeTempProjectRoot("ans-triage-customer-rework-");
   try {
     const flowId = "flow-triage-customer-rework";
@@ -3906,7 +3940,7 @@ test("验收分诊通道：分诊卡替换验收卡（稳定 id）；gate settle
         title: "验收分诊 · flow",
         question: "如何处理？",
         options: [
-          { id: "rework", label: "下发统筹修改" },
+          { id: "rework", label: "下发运营修改" },
           { id: "report-only", label: "仅汇报不返工" },
         ],
       },
@@ -3962,7 +3996,7 @@ test("验收分诊通道：分诊卡替换验收卡（稳定 id）；gate settle
   channelSettle.rejectAllPending("done");
 });
 
-test("验收分诊 T3 回归：客户选「下发统筹修改」后旧 latest-rejected 路由不得抢跑——恰一条 triage 任务（有 severity/reason，来源 triage-customer）", async () => {
+test("验收分诊 T3 回归：客户选「下发运营修改」后旧 latest-rejected 路由不得抢跑——恰一条 triage 任务（有 severity/reason，来源 triage-customer）", async () => {
   const root = makeTempProjectRoot("ans-triage-t3-race-");
   try {
     const flowId = "flow-triage-t3";
@@ -4355,14 +4389,14 @@ test("边界变更请求：确定性校验各失败 code（invalid-role / invali
       assert.equal(result.code, code, `${label} => ${result.code}（${result.message}）`);
     }
     assert.equal(judgeCalls, 0, "确定性校验失败不得调用 AI 门禁");
-    assert.equal(harness.sendsByRole.get("nominator"), undefined, "确定性校验失败不得派发组队");
+    assert.equal(harness.sendsByRole.get("nominator"), undefined, "确定性校验失败不得派发人事");
   } finally {
     await harness.iface.stopSession();
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("边界变更请求：AI approve ⇒ 恰一条组队任务（精确路径 + ticketId，无「客户批准」字样）与 dispatched 票据", async () => {
+test("边界变更请求：AI approve ⇒ 恰一条人事任务（精确路径 + ticketId，无「客户批准」字样）与 dispatched 票据", async () => {
   const root = makeTempProjectRoot("ans-boundary-approve-");
   const flowId = "flow-boundary";
   writeFlowStateFile(
@@ -4399,7 +4433,7 @@ test("边界变更请求：AI approve ⇒ 恰一条组队任务（精确路径 +
     assert.match(ticketId, /^bnd-[0-9a-f]{16}$/);
 
     const sends = harness.sendsByRole.get("nominator") ?? [];
-    assert.equal(sends.length, 1, "AI approve 后必须恰一条组队任务");
+    assert.equal(sends.length, 1, "AI approve 后必须恰一条人事任务");
     const task = sends[0]!;
     assert.ok(task.includes("config/executor.config.ts"), "任务含精确新增路径");
     assert.ok(task.includes("src/executor/legacy.ts"), "任务含精确移除路径");
@@ -4555,7 +4589,7 @@ test("边界变更请求：AI deny/manual ⇒ 终态 rejected；超时/不可用
         assert.equal(result.ok, false, `${item.label} 不得回执成功`);
         assert.equal(result.code, "rejected", `${item.label} => ${result.code}（${result.message}）`);
         assert.match(result.message, /不自动放行/);
-        assert.equal(harness.sendsByRole.get("nominator"), undefined, `${item.label} 不得派发组队`);
+        assert.equal(harness.sendsByRole.get("nominator"), undefined, `${item.label} 不得派发人事`);
         if (item.label === "timeout") assert.ok(elapsed < 5000, `超时必须有界返回（实际 ${elapsed}ms）`);
         const ticketRel = boundaryChangeTicketRelPath(flowId, result.ticketId!);
         const ticket = JSON.parse(readFileSync(path.join(root, ...ticketRel.split("/")), "utf8")) as {
@@ -4591,7 +4625,7 @@ test("边界变更请求：AI deny/manual ⇒ 终态 rejected；超时/不可用
   }
 });
 
-test("边界变更请求：打开组队失败 ⇒ unavailable + 票据 failed；重试成功且 ticketId 稳定", async () => {
+test("边界变更请求：打开人事失败 ⇒ unavailable + 票据 failed；重试成功且 ticketId 稳定", async () => {
   const root = makeTempProjectRoot("ans-boundary-retry-");
   const flowId = "flow-boundary";
   try {
@@ -5140,7 +5174,7 @@ test("2026-10-26 gate 处置：报告 pass ⇒ completeGateStep + artifact.obser
       );
 
       const notes = deliveryNotes(harness.events, "liaison");
-      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("已通过")), "主理收到 pass 系统行");
+      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("已通过")), "产品收到 pass 系统行");
 
       // 下游放行：delivery-after-gate 依赖 gate 已 done ⇒ 进入 ready（应用不自动派发）。
       const ready = listReadyFlowSteps(parsed.flow);
@@ -5212,14 +5246,14 @@ test("2026-10-26 gate 处置：fail 含 blocker/major ⇒ 独立返工路由、g
 
       const reworkTasks = harness.sendsByRole.get("liaison") ?? [];
       const gateTask = reworkTasks.find((text) => text.includes("gate 复核未通过") && text.includes(GATE_STEP_ID));
-      assert.ok(gateTask, "主理收到 gate 独立返工任务");
+      assert.ok(gateTask, "产品收到 gate 独立返工任务");
       assert.match(gateTask, /Gate 返工任务｜gate-vertical-slice/, "返工任务首行含 gateId 与报告指针（i18n reworkTask）");
       assert.match(gateTask, new RegExp(`docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1\\.md`));
       assert.match(gateTask, /request_gate_review/, "返工完成后要求显式重新请求 gate 复核");
       assert.match(gateTask, /minor\/nit 项为非阻断/);
 
       const notes = deliveryNotes(harness.events, "liaison");
-      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("未通过")), "主理收到 fail 系统行");
+      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("未通过")), "产品收到 fail 系统行");
     } finally {
       await harness.iface.stopSession();
     }
@@ -5258,7 +5292,7 @@ test("2026-10-26 gate 处置：fail 仅 minor/nit ⇒ returned-to-proof、不返
       assert.equal(ledger.entries.some((entry) => entry.kind === "customer.decision" && entry.flowId === GATE_FLOW_ID), false);
 
       const notes = deliveryNotes(harness.events, "liaison");
-      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("只含 minor/nit")), "主理收到 nitOnly 系统行");
+      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("只含 minor/nit")), "产品收到 nitOnly 系统行");
     } finally {
       await harness.iface.stopSession();
     }
@@ -5307,7 +5341,7 @@ test("2026-10-26 gate 处置：报告缺失/坏结构 ⇒ returned-to-proof；�
       assert.ok(parsed.ok);
       assert.equal(parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status, "pending");
       const notes = deliveryNotes(harness.events, "liaison");
-      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("报告缺失或结构不合规")), "主理收到 returnedToProof 系统行");
+      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("报告缺失或结构不合规")), "产品收到 returnedToProof 系统行");
       const ledger = await readGovernanceLedger(root);
       assert.equal(ledger.entries.some((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID), false, "坏报告不写判定审计");
     } finally {
@@ -5406,6 +5440,844 @@ test("2026-10-26 gate 重启恢复：failed 且返工路由未发送 ⇒ 补发�
       assert.equal(ledger.entries.some((entry) => entry.kind === "customer.decision" && entry.flowId === GATE_FLOW_ID), false);
     } finally {
       await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 request_gate_review：投递回执超时但质检在途 ⇒ 仍写 gate 记录 + dispatch.accepted 并回 dispatched；重复请求不重复", async () => {
+  const root = makeTempProjectRoot("ans-gate-timeout-pending-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root }, {
+      hangVerifierSend: true,
+      requestGateReviewLimits: { totalMs: 700, stageMs: 150 },
+    });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      const requestGateReview = requestGateReviewOf(harness);
+      const first = await requestGateReview({ flowId: GATE_FLOW_ID, gateId: GATE_STEP_ID });
+      assert.equal(first.ok, true, first.message);
+      assert.equal(first.code, "dispatched", "回执超时但有在途证据 ⇒ dispatched");
+      assert.match(first.message ?? "", /确认回执超时/);
+      assert.match(first.message ?? "", /仍在工作|已入队/);
+      assert.match(first.message ?? "", /勿重复请求|不重复请求/);
+      assert.equal(gateTaskSends(harness).length, 1, "任务已投出（恰一条）");
+
+      const record = readGateRecordFile(root, GATE_FLOW_ID);
+      assert.equal(record.status, "dispatched", "超时对账仍写 gate 记录（重启恢复的扫描源）");
+      assert.equal(record.reportPath, `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`);
+      assert.equal(record.reportVersion, 1);
+      assert.equal(record.flowRevision, flowRevisionOf(root, GATE_FLOW_ID));
+      const ledger = await readGovernanceLedger(root);
+      const gateDispatches = (): number =>
+        ledger.entries.filter(
+          (entry) =>
+            entry.kind === "dispatch.accepted" &&
+            entry.flowId === GATE_FLOW_ID &&
+            entry.stepId === GATE_STEP_ID &&
+            entry.targetRoleId === "verifier",
+        ).length;
+      assert.equal(gateDispatches(), 1, "账本恰一条 gate 派发记录（stepId=gateId）");
+
+      const second = await requestGateReview({ flowId: GATE_FLOW_ID, gateId: GATE_STEP_ID });
+      assert.equal(second.ok, false);
+      assert.equal(second.code, "already-dispatched", "记录已落盘 ⇒ 重复请求幂等");
+      assert.equal(gateTaskSends(harness).length, 1, "不重复派发");
+      const ledgerAfter = await readGovernanceLedger(root);
+      assert.equal(
+        ledgerAfter.entries.filter(
+          (entry) =>
+            entry.kind === "dispatch.accepted" &&
+            entry.flowId === GATE_FLOW_ID &&
+            entry.stepId === GATE_STEP_ID &&
+            entry.targetRoleId === "verifier",
+        ).length,
+        1,
+        "不重复写账本",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 request_gate_review：投递回执超时且目标已空闲、无排队 ⇒ unavailable，零 gate 记录/账本", async () => {
+  const root = makeTempProjectRoot("ans-gate-timeout-idle-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root }, {
+      hangVerifierSend: true,
+      requestGateReviewLimits: { totalMs: 900, stageMs: 200 },
+    });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      const pending = requestGateReviewOf(harness)({ flowId: GATE_FLOW_ID, gateId: GATE_STEP_ID });
+      await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0);
+      // 目标本轮已真实结束（settled），且没有排队/在途投递 ⇒ 没有任何“已受理”证据。
+      harness.controls.get("verifier")!.settle();
+      const result = await pending;
+      assert.equal(result.ok, false, "无在途证据时不得谎称已派发");
+      assert.equal(result.code, "unavailable");
+      assert.match(result.message ?? "", /确认回执超时/);
+      assert.equal(existsSync(gateRecordAbsPath(root, GATE_FLOW_ID)), false, "不得写假 gate 记录");
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(
+        ledger.entries.some(
+          (entry) =>
+            entry.kind === "dispatch.accepted" &&
+            entry.flowId === GATE_FLOW_ID &&
+            entry.stepId === GATE_STEP_ID &&
+            entry.targetRoleId === "verifier",
+        ),
+        false,
+        "不得写假派发审计",
+      );
+      const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
+      assert.ok(parsed.ok);
+      assert.equal(parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status, "pending", "gate 保持 pending");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 恢复：pass 报告已存在但 gate 记录缺失 ⇒ 导入恢复补建并收口一次；不重派、不重复审计", async () => {
+  const root = makeTempProjectRoot("ans-gate-recovery-missing-record-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    await seedGateLedger(root, GATE_FLOW_ID);
+    writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "pass", [
+      { id: "G1", severity: "minor", owner: "executor", reason: "建议改进", action: "后续优化", targets: ["src/x.ts"] },
+    ]);
+    const reportSha = createHash("sha256")
+      .update(readFileSync(path.join(root, "docs", "acceptance", `${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`)))
+      .digest("hex");
+    // 新进程等价：只有 pass 报告、没有 gate 记录（客户真机 pixel-snake 状态）。
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      await waitFor(() => {
+        try {
+          const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
+          return parsed.ok && parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status === "done";
+        } catch {
+          return false;
+        }
+      });
+
+      const record = readGateRecordFile(root, GATE_FLOW_ID);
+      assert.equal(record.status, "passed");
+      assert.equal(record.conclusion, "pass");
+      assert.equal(record.reportSha256, reportSha);
+      assert.match(String(record.requestId), /-recovery-/, "记录标记恢复来源");
+      const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
+      assert.ok(parsed.ok);
+      const gateStep = parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)!;
+      assert.deepEqual(gateStep.evidence, { kind: "artifact", ref: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md` });
+
+      // gate.review 在 completeGateStep 之后异步追加：有界等待审计落盘（不改断言语义）。
+      await waitForAsync(async () => {
+        const ledger = await readGovernanceLedger(root);
+        return ledger.entries.filter((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID).length === 1;
+      });
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(
+        ledger.entries.filter(
+          (entry) => entry.kind === "artifact.observed" && entry.artifactPath === `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`,
+        ).length,
+        1,
+        "artifact.observed 恰一条",
+      );
+      assert.equal(
+        ledger.entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === GATE_STEP_ID),
+        false,
+        "恢复不重派 Proof",
+      );
+      assert.equal(ledger.entries.some((entry) => entry.kind === "customer.decision" && entry.flowId === GATE_FLOW_ID), false);
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "恢复不向质检派任务");
+      const notes = deliveryNotes(harness.events, "liaison");
+      assert.ok(
+        notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("已通过") && note.includes("应用恢复")),
+        "系统行如实标注恢复",
+      );
+
+      // 幂等：再触发真实事件（convener settle）两次，不重复 gate.review/artifact.observed/系统行。
+      await openConvenerAndSettle(harness, root);
+      await sleep(200);
+      await openConvenerAndSettle(harness, root);
+      await sleep(200);
+      const after = await readGovernanceLedger(root);
+      assert.equal(after.entries.filter((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID).length, 1);
+      assert.equal(
+        after.entries.filter(
+          (entry) => entry.kind === "artifact.observed" && entry.artifactPath === `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`,
+        ).length,
+        1,
+      );
+      assert.equal(
+        deliveryNotes(harness.events, "liaison").filter((note) => note.includes(GATE_STEP_ID) && note.includes("已通过")).length,
+        1,
+        "pass 系统行不重复",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 恢复：报告缺失/结构坏/fail 不恢复（不建记录、不收口、不返工）", async () => {
+  const root = makeTempProjectRoot("ans-gate-recovery-negative-");
+  try {
+    const passFlow = "flow-recovery-pass-control";
+    const failFlow = "flow-recovery-fail";
+    const badFlow = "flow-recovery-bad";
+    const missingFlow = "flow-recovery-missing";
+    for (const flowId of [passFlow, failFlow, badFlow, missingFlow]) {
+      writeFlowStateFile(root, flowId, flowStateYaml(flowId, gateFlowSteps(flowId)));
+      await seedGateLedger(root, flowId);
+    }
+    writeGateReport(root, passFlow, GATE_STEP_ID, 1, "pass", []);
+    writeGateReport(root, failFlow, GATE_STEP_ID, 1, "fail", [
+      { id: "G1", severity: "blocker", owner: "executor", reason: "不可用", action: "修复", targets: ["src/x.ts"] },
+    ]);
+    mkdirSync(path.join(root, "docs", "acceptance"), { recursive: true });
+    writeFileSync(
+      path.join(root, "docs", "acceptance", `${badFlow}-${GATE_STEP_ID}-report-v1.md`),
+      ["# Gate 复核报告", "", "```yaml", "schema: acceptance-triage/v1", "conclusion: maybe", "items: []", "```", ""].join("\n"),
+    );
+    // missingFlow：不写报告。
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      // 正向对照：pass 流程被恢复 ⇒ 证明扫描确实执行过。
+      await waitFor(() => {
+        try {
+          const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${passFlow}.yaml`), "utf8"), passFlow);
+          return parsed.ok && parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status === "done";
+        } catch {
+          return false;
+        }
+      });
+      for (const flowId of [failFlow, badFlow, missingFlow]) {
+        assert.equal(existsSync(gateRecordAbsPath(root, flowId)), false, `${flowId}：不得补建 gate 记录`);
+        const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${flowId}.yaml`), "utf8"), flowId);
+        assert.ok(parsed.ok);
+        assert.equal(parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status, "pending", `${flowId}：gate 保持 pending`);
+        assert.equal(existsSync(gateReworkRoutingAbsPath(root, flowId)), false, `${flowId}：不路由返工`);
+      }
+      const ledger = await readGovernanceLedger(root);
+      for (const flowId of [failFlow, badFlow, missingFlow]) {
+        assert.equal(
+          ledger.entries.some((entry) => entry.kind === "gate.review" && entry.flowId === flowId),
+          false,
+          `${flowId}：不写 gate.review`,
+        );
+        assert.equal(
+          ledger.entries.some((entry) => entry.kind === "artifact.observed" && entry.flowId === flowId),
+          false,
+          `${flowId}：不观测坏/失败报告为 done 证据`,
+        );
+        assert.equal(
+          ledger.entries.some((entry) => entry.kind === "customer.decision" && entry.flowId === flowId),
+          false,
+          `${flowId}：不写客户决定`,
+        );
+      }
+      assert.equal((harness.sendsByRole.get("verifier") ?? []).length, 0, "恢复不派质检");
+      assert.equal(
+        (harness.sendsByRole.get("liaison") ?? []).some((text) => text.includes("gate 复核未通过")),
+        false,
+        "fail 不恢复 ⇒ 不路由返工任务",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————————————— 2026-10-26 需求变更申请（request_requirement_change；客户纠正） ——————————————
+//
+// 客户纠正（2026-10-26）：需求变更**不由主理审批**。发起方（统筹/提案）调用工具后，应用经**发起方
+// 会话的客户卡通道**呈现 `request_choice(cardKind="decision")` 审批卡：
+//   · 选项 approve / reject（带 flowId），**恰好一个** recommended=approve；
+//   · 审批人＝客户（未勾选「替我决策」）或独立判断 agent（勾选时默认选推荐项）；发起方不得自批；
+//   · 批准后应用把「已批准需求变更执行任务」交给主理（主理不审批，只执行意图变更并通知提案修订）；
+//   · 拒绝/未获明确结果 ⇒ 回执给发起方；
+//   · 工具回执 `dispatched` = 已提交独立审批，**不是批准**；不写 customer.decision/治理账本、不改写权；
+//     主理不再收到原始申请任务（只在批准后收到执行任务）。
+//
+// 覆盖：载荷/存在性校验、审批卡形状与通道、批准→主理执行任务、拒绝回执、幂等、失败重试、忙时入队、
+// 注入矩阵（统筹+提案；其他角色不可）与 requestClarification/viewImage 零回归。
+
+/** trio 内置角色 + 一个真实项目角色（需求变更申请只该注入统筹/提案）。 */
+function requirementChangeListing(projectRoot: string): ProjectListing {
+  return listingWithProjectRoles({ ...trioListing(), projectRoot }, ["executor"]);
+}
+
+function seedIntentFile(projectRoot: string, intentId: string, body = "# 意图\n\n- goal: 示例\n"): void {
+  mkdirSync(path.join(projectRoot, "docs", "intents"), { recursive: true });
+  writeFileSync(path.join(projectRoot, "docs", "intents", `${intentId}.md`), body);
+}
+
+/**
+ * 只用于「流程存在」的最小 flow：单步 pending（不会触发自动验收派发，避免测试被旁路账本/任务污染）。
+ */
+function seedRequirementChangeFlow(projectRoot: string, flowId: string): void {
+  writeFlowStateFile(
+    projectRoot,
+    flowId,
+    flowStateYaml(flowId, [{ id: "delivery-server", kind: "dispatch", status: "pending", owner: "executor" }]),
+  );
+}
+
+/** 打开发起方会话并取回注入的 request_requirement_change 能力（未注入即失败）。 */
+async function requirementChangeCapability(
+  harness: Harness,
+  projectRoot: string,
+  roleId = "rapporteur",
+): Promise<RequestRequirementChangeFn> {
+  const opened = await harness.iface.openSession({ projectRoot, roleId, runtime: "demo" });
+  assert.equal(opened.ok, true, opened.ok ? "" : (opened.error ?? "打开会话失败"));
+  const fn = harness.openInputs.get(roleId)?.requestRequirementChange;
+  assert.ok(fn, `${roleId} 会话应注入 requestRequirementChange`);
+  return fn;
+}
+
+function readRequirementChangeTicketFile(root: string, flowId: string, requestId: string): RequirementChangeTicketRecord {
+  const rel = requirementChangeTicketRelPath(flowId, requestId);
+  return JSON.parse(readFileSync(path.join(root, ...rel.split("/")), "utf8")) as RequirementChangeTicketRecord;
+}
+
+/**
+ * 可控客户卡通道替身：记录卡片；默认模拟 presenter 成功（微任务里回调 `onPresented`）；
+ * 由测试用 `card.resolve(...)` 给出客户/判断 agent 的裁决。`present:false` 表示卡片从未呈现
+ * （用于模拟卡校验拒发/通道不可用后立即结算）。
+ */
+interface DeferredRequirementCard {
+  request: CustomerInputRequest;
+  ctx: Parameters<NonNullable<DesktopDeps["customerInput"]>>[1];
+  presented: boolean;
+  resolve: (outcome: CustomerInputOutcome) => void;
+}
+
+function deferredCustomerChannel(options: { present?: boolean } = {}): {
+  customerInput: NonNullable<DesktopDeps["customerInput"]>;
+  cards: DeferredRequirementCard[];
+} {
+  const cards: DeferredRequirementCard[] = [];
+  const customerInput: NonNullable<DesktopDeps["customerInput"]> = (request, ctx) => {
+    const card: DeferredRequirementCard = {
+      request,
+      ctx,
+      presented: false,
+      resolve: () => {},
+    };
+    const promise = new Promise<CustomerInputOutcome>((resolve) => {
+      card.resolve = resolve;
+    });
+    cards.push(card);
+    if (options.present !== false) {
+      queueMicrotask(() => {
+        card.presented = true;
+        ctx?.onPresented?.();
+      });
+    }
+    return promise;
+  };
+  return { customerInput, cards };
+}
+
+function cardOptions(request: CustomerInputRequest): Array<{ id: string; recommended?: boolean }> {
+  assert.equal(request.kind, "choice");
+  return (request as { options: Array<{ id: string; recommended?: boolean }> }).options;
+}
+
+test("需求变更申请：载荷二次校验与意图/流程存在性（invalid / intent-not-found / flow-not-found，零票据/零卡）", async () => {
+  const root = makeTempProjectRoot("ans-requirement-validation-");
+  const flowId = "flow-req-validation";
+  const intentId = "intent-req-validation";
+  try {
+    seedRequirementChangeFlow(root, flowId);
+    seedIntentFile(root, intentId);
+    const { customerInput, cards } = deferredCustomerChannel();
+    const harness = await makeHarness(root, requirementChangeListing(root), { customerInput });
+    try {
+      const capability = await requirementChangeCapability(harness, root);
+      const base = { changeKind: "authorization" as const, summary: "需要新授权", rationale: "策划需要访问外部服务" };
+      const cases: Array<[string, unknown, string]> = [
+        ["缺 flowId/intentId", base, "invalid"],
+        ["flowId 非法 slug", { ...base, flowId: "../escape" }, "invalid"],
+        ["intentId 非法 slug", { ...base, intentId: "Bad_ID" }, "invalid"],
+        ["changeKind 非法", { ...base, flowId, changeKind: "bogus" }, "invalid"],
+        ["summary 空", { ...base, flowId, summary: "   " }, "invalid"],
+        ["rationale 空", { ...base, flowId, rationale: "" }, "invalid"],
+        ["summary 超长", { ...base, flowId, summary: "x".repeat(501) }, "invalid"],
+        ["rationale 超长", { ...base, flowId, rationale: "x".repeat(4001) }, "invalid"],
+        ["impact 超长", { ...base, flowId, impact: "x".repeat(2001) }, "invalid"],
+        ["proposedIntentPatch 超长", { ...base, flowId, proposedIntentPatch: "x".repeat(4001) }, "invalid"],
+        ["流程不存在", { ...base, flowId: "no-such-flow" }, "flow-not-found"],
+        ["意图不存在", { ...base, intentId: "no-such-intent" }, "intent-not-found"],
+        ["流程存在但意图不存在", { ...base, flowId, intentId: "no-such-intent" }, "intent-not-found"],
+      ];
+      for (const [label, input, code] of cases) {
+        const result = await capability(input as RequestRequirementChangeInput);
+        assert.equal(result.ok, false, `${label} 应失败`);
+        assert.equal(result.code, code, `${label}: ${result.message}`);
+        assert.match(result.message, /未提交/, `${label} 必须明确未提交`);
+      }
+      assert.equal(cards.length, 0, "非法/不存在 ⇒ 零审批卡（不触达客户通道）");
+      assert.equal(
+        existsSync(path.join(root, ".ans", "governance", "requirement-changes")),
+        false,
+        "非法/不存在 ⇒ 零票据（不建目录）",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("需求变更申请：应用经发起方会话呈现 decision 审批卡；批准后交产品执行意图变更（不写账本/不写 customer.decision）", async () => {
+  const root = makeTempProjectRoot("ans-requirement-approval-");
+  const flowId = "flow-req-approval";
+  const intentId = "intent-req-approval";
+  try {
+    seedRequirementChangeFlow(root, flowId);
+    seedIntentFile(root, intentId);
+    const { customerInput, cards } = deferredCustomerChannel();
+    const harness = await makeHarness(root, requirementChangeListing(root), { customerInput });
+    try {
+      const capability = await requirementChangeCapability(harness, root);
+      const input: RequestRequirementChangeInput = {
+        flowId,
+        intentId,
+        changeKind: "authorization",
+        summary: "需要联网访问外部服务",
+        rationale: "策划需要调用第三方 API，超出当前意图授权",
+        impact: "增加一项外部依赖与凭据配置",
+        proposedIntentPatch: "acceptance 增加外部服务可用性检查",
+      };
+      const result = await capability(input);
+      assert.equal(result.ok, true, result.message);
+      assert.equal(result.code, "dispatched", "提交后进入独立审批");
+      assert.match(result.message, /独立审批/, "回执语义＝已提交独立审批");
+      assert.match(result.message, /申请 ≠ 批准/);
+      assert.match(result.message, /产品不审批/);
+      assert.match(result.requestId ?? "", /^req-[0-9a-f]{16}$/, "requestId 为稳定哈希形状");
+
+      assert.equal(cards.length, 1, "恰呈现一张审批卡");
+      const card = cards[0]!;
+      assert.equal(card.request.kind, "choice");
+      assert.equal((card.request as { cardKind?: string }).cardKind, "decision", "审批卡 cardKind=decision");
+      assert.equal((card.request as { flowId?: string }).flowId, flowId, "审批卡带 flowId");
+      const options = cardOptions(card.request);
+      assert.deepEqual(options.map((option) => option.id), ["approve", "reject"], "选项至少 approve/reject");
+      assert.equal(options.filter((option) => option.recommended === true).length, 1, "恰好一个推荐项");
+      assert.equal(options.find((option) => option.recommended === true)?.id, "approve", "推荐 approve");
+      assert.equal(card.ctx.roleId, "rapporteur", "卡落发起方会话通道");
+      assert.equal(card.ctx.governanceModel, "trio");
+      assert.equal(card.presented, true, "presenter 成功后才算已提交");
+
+      const ticket = readRequirementChangeTicketFile(root, flowId, result.requestId!);
+      assert.equal(ticket.schema, "requirement-change-request/v2");
+      assert.equal(ticket.requestId, result.requestId);
+      assert.equal(ticket.requestedBy, "rapporteur", "票据记录发起方");
+      assert.equal(ticket.status, "dispatched", "已提交独立审批（不是批准）");
+      assert.equal(ticket.submission?.cardRoleId, "rapporteur");
+      assert.equal(ticket.submission?.cardKind, "decision");
+      assert.deepEqual(ticket.submission?.options, ["approve", "reject"]);
+      assert.equal(ticket.submission?.recommended, "approve");
+      assert.equal(ticket.approval, null);
+      assert.equal(ticket.leadDispatch, null);
+      assert.equal(harness.sendsByRole.get("liaison"), undefined, "产品不接收原始申请任务");
+
+      card.resolve({ outcome: "answered", value: { selected: ["approve"] }, operatorId: "judge:pi" });
+      await waitForAsync(async () => {
+        const current = readRequirementChangeTicketFile(root, flowId, result.requestId!);
+        return current.status === "approved" && current.leadDispatch !== null;
+      }, 4000);
+      const approvedTicket = readRequirementChangeTicketFile(root, flowId, result.requestId!);
+      assert.equal(approvedTicket.approval?.outcome, "approved");
+      assert.equal(approvedTicket.approval?.source, "judge", "判断代批如实归因");
+      assert.equal(typeof approvedTicket.leadDispatch?.clientMessageId, "string");
+      assert.equal(approvedTicket.leadDispatch?.error, undefined);
+
+      const sends = harness.sendsByRole.get("liaison") ?? [];
+      assert.equal(sends.length, 1, "批准后恰一条产品执行任务");
+      const task = sends[0]!;
+      assert.ok(task.startsWith("需求变更执行任务"), "执行任务标签");
+      assert.match(task, /不审批/);
+      assert.match(task, /hand_off_intent/);
+      assert.match(task, /判断 agent（「替我决策」）代批/, "执行任务带审批来源");
+      assert.ok(task.includes(flowId) && task.includes(intentId) && task.includes(result.requestId!), "执行任务带 ids");
+      assert.ok(task.includes(input.summary) && task.includes(input.rationale), "执行任务自足（摘要/理由）");
+      assert.ok(task.includes(requirementChangeTicketRelPath(flowId, result.requestId!)), "附票据路径");
+
+      const notes = deliveryNotes(harness.events, "rapporteur");
+      assert.ok(
+        notes.some((note) => note.includes("系统·需求变更") && note.includes(result.requestId!)),
+        "发起方聊天流落提交系统行",
+      );
+      assert.ok(
+        notes.some((note) => note.includes("已通过独立审批") && note.includes(result.requestId!)),
+        "批准后落审批结果系统行",
+      );
+      assert.equal(
+        existsSync(path.join(root, ".ans", "governance", "ledger.jsonl")),
+        false,
+        "不写治理账本（审批结果不是验收/派发证据）",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("需求变更申请：独立审批 reject ⇒ 票据 rejected + 回执发起方；不向产品投任何任务", async () => {
+  const root = makeTempProjectRoot("ans-requirement-reject-");
+  const flowId = "flow-req-reject";
+  const intentId = "intent-req-reject";
+  try {
+    seedRequirementChangeFlow(root, flowId);
+    seedIntentFile(root, intentId);
+    const { customerInput, cards } = deferredCustomerChannel();
+    const harness = await makeHarness(root, requirementChangeListing(root), { customerInput });
+    try {
+      const capability = await requirementChangeCapability(harness, root);
+      const result = await capability({
+        flowId,
+        intentId,
+        changeKind: "scope",
+        summary: "范围增加外部服务",
+        rationale: "客户目标需要外部服务",
+      });
+      assert.equal(result.code, "dispatched");
+      assert.equal(cards.length, 1);
+      cards[0]!.resolve({ outcome: "answered", value: { selected: ["reject"] }, operatorId: "desktop-op" });
+      await waitForAsync(async () => readRequirementChangeTicketFile(root, flowId, result.requestId!).status === "rejected", 4000);
+      const ticket = readRequirementChangeTicketFile(root, flowId, result.requestId!);
+      assert.equal(ticket.approval?.outcome, "rejected");
+      assert.equal(ticket.approval?.source, "customer");
+      assert.deepEqual(ticket.approval?.selected, ["reject"]);
+      assert.equal(ticket.leadDispatch, null, "拒绝不产生产品执行任务");
+      assert.equal(harness.sendsByRole.get("liaison"), undefined, "产品零任务");
+
+      await waitFor(
+        () => (harness.sendsByRole.get("rapporteur") ?? []).some((text) => text.includes("未通过独立审批")),
+        4000,
+      );
+      const receipt = (harness.sendsByRole.get("rapporteur") ?? []).find((text) => text.includes("未通过独立审批"))!;
+      assert.ok(receipt.includes(result.requestId!), "回执带申请 id");
+      assert.match(receipt, /产品不审批/, "回执说明产品不审批");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("需求变更申请：卡校验拒发/未呈现 ⇒ rejected + 票据 failed（不冒充客户拒绝）", async () => {
+  const root = makeTempProjectRoot("ans-requirement-gate-reject-");
+  const flowId = "flow-req-gate-reject";
+  const intentId = "intent-req-gate-reject";
+  try {
+    seedRequirementChangeFlow(root, flowId);
+    seedIntentFile(root, intentId);
+    let calls = 0;
+    const customerInput: NonNullable<DesktopDeps["customerInput"]> = () => {
+      calls += 1;
+      return { outcome: "declined", reason: "决策卡缺少唯一推荐项（测试）", notPresented: true };
+    };
+    const harness = await makeHarness(root, requirementChangeListing(root), { customerInput });
+    try {
+      const capability = await requirementChangeCapability(harness, root);
+      const result = await capability({ flowId, intentId, changeKind: "cost", summary: "增加付费服务", rationale: "需要预算" });
+      assert.equal(result.ok, false);
+      assert.equal(result.code, "rejected", "应用拒发卡 ≠ 客户拒绝");
+      assert.match(result.message, /提交被拒/);
+      assert.equal(calls, 1, "触达通道一次（应用侧拒发）");
+      const ticket = readRequirementChangeTicketFile(root, flowId, result.requestId!);
+      assert.equal(ticket.status, "failed");
+      assert.equal(ticket.submission, null, "卡片从未呈现");
+      assert.equal(ticket.approval, null);
+      assert.match(ticket.error ?? "", /缺少唯一推荐项/);
+      assert.equal(harness.sendsByRole.get("liaison"), undefined);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("需求变更申请：同一 flow 有待处理/已批准申请 ⇒ already-dispatched；同内容 requestId 稳定", async () => {
+  const root = makeTempProjectRoot("ans-requirement-idempotent-");
+  const flowId = "flow-req-idempotent";
+  const intentId = "intent-req-idempotent";
+  try {
+    seedRequirementChangeFlow(root, flowId);
+    seedIntentFile(root, intentId);
+    const { customerInput, cards } = deferredCustomerChannel();
+    const harness = await makeHarness(root, requirementChangeListing(root), { customerInput });
+    try {
+      const capability = await requirementChangeCapability(harness, root);
+      const firstInput: RequestRequirementChangeInput = {
+        flowId,
+        intentId,
+        changeKind: "scope",
+        summary: "范围增加外部服务",
+        rationale: "客户目标需要外部服务",
+      };
+      const first = await capability(firstInput);
+      assert.equal(first.code, "dispatched");
+      assert.equal(cards.length, 1);
+
+      const same = await capability(firstInput);
+      assert.equal(same.ok, true, "此前已提交属于幂等成功");
+      assert.equal(same.code, "already-dispatched");
+      assert.equal(same.requestId, first.requestId, "同内容 requestId 稳定");
+
+      const different = await capability({
+        flowId,
+        intentId,
+        changeKind: "cost",
+        summary: "范围再增加一项",
+        rationale: "另一项外部依赖",
+      });
+      assert.equal(different.ok, true);
+      assert.equal(different.code, "already-dispatched");
+      assert.equal(different.requestId, first.requestId, "同一 flow 待处理申请挡住新内容");
+      assert.equal(cards.length, 1, "不重复呈现审批卡");
+      const ticketNames = readdirSync(path.join(root, ".ans", "governance", "requirement-changes", flowId));
+      assert.equal(ticketNames.filter((name) => name.endsWith(".json")).length, 1, "不新增第二张票据");
+
+      cards[0]!.resolve({ outcome: "answered", value: { selected: ["approve"] }, operatorId: "judge:pi" });
+      await waitForAsync(async () => readRequirementChangeTicketFile(root, flowId, first.requestId!).status === "approved", 4000);
+      await waitFor(() => (harness.sendsByRole.get("liaison") ?? []).length === 1, 4000);
+      const afterApproval = await capability(firstInput);
+      assert.equal(afterApproval.code, "already-dispatched");
+      assert.match(afterApproval.message, /已通过独立审批/, "已批准状态如实说明（不是仍在审批）");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("需求变更申请：审批通道不可用 ⇒ unavailable + 票据 failed；修复后重试成功且 requestId/at 稳定", async () => {
+  const root = makeTempProjectRoot("ans-requirement-retry-");
+  const flowId = "flow-req-retry";
+  const intentId = "intent-req-retry";
+  const input: RequestRequirementChangeInput = {
+    flowId,
+    intentId,
+    changeKind: "constraint",
+    summary: "新增部署约束",
+    rationale: "客户环境要求离线部署",
+  };
+  try {
+    seedRequirementChangeFlow(root, flowId);
+    seedIntentFile(root, intentId);
+    const failing = await makeHarness(root, requirementChangeListing(root));
+    let requestId: string;
+    let ticketAt: string;
+    try {
+      const capability = await requirementChangeCapability(failing, root);
+      const first = await capability(input);
+      assert.equal(first.ok, false);
+      assert.equal(first.code, "unavailable", first.message);
+      assert.match(first.message, /未提交独立审批/);
+      requestId = first.requestId!;
+      const ticket = readRequirementChangeTicketFile(root, flowId, requestId);
+      assert.equal(ticket.status, "failed", "未呈现审批卡 ⇒ 票据如实 failed（可重试）");
+      assert.ok(ticket.error !== null && ticket.error !== "", "failed 票据写明原因");
+      assert.equal(ticket.submission, null);
+      ticketAt = ticket.at;
+    } finally {
+      await failing.iface.stopSession();
+    }
+
+    const { customerInput, cards } = deferredCustomerChannel();
+    const healthy = await makeHarness(root, requirementChangeListing(root), { customerInput });
+    try {
+      const retry = await (await requirementChangeCapability(healthy, root))(input);
+      assert.equal(retry.ok, true, retry.message);
+      assert.equal(retry.code, "dispatched");
+      assert.equal(retry.requestId, requestId, "同一请求 requestId 稳定");
+      const ticket = readRequirementChangeTicketFile(root, flowId, requestId);
+      assert.equal(ticket.status, "dispatched");
+      assert.equal(ticket.at, ticketAt, "重试保留首次登记时间");
+      assert.ok(ticket.attempts >= 2, "票据记录尝试次数");
+      assert.equal(cards.length, 1, "重试成功恰一张审批卡");
+      cards[0]!.resolve({ outcome: "answered", value: { selected: ["approve"] }, operatorId: "judge:pi" });
+      await waitForAsync(async () => readRequirementChangeTicketFile(root, flowId, requestId).status === "approved", 4000);
+      await waitFor(() => (healthy.sendsByRole.get("liaison") ?? []).length === 1, 4000);
+    } finally {
+      await healthy.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("需求变更申请：产品忙碌 ⇒ 已批准执行任务入队（queued 仍成功），settle 后按序投递", async () => {
+  const root = makeTempProjectRoot("ans-requirement-busy-");
+  const flowId = "flow-req-busy";
+  const intentId = "intent-req-busy";
+  try {
+    seedRequirementChangeFlow(root, flowId);
+    seedIntentFile(root, intentId);
+    const { customerInput, cards } = deferredCustomerChannel();
+    const harness = await makeHarness(root, requirementChangeListing(root), { customerInput });
+    try {
+      const opened = await harness.iface.openSession({ projectRoot: root, roleId: "liaison", runtime: "demo" });
+      assert.equal(opened.ok, true);
+      const hold = await harness.iface.sendSession({
+        text: "产品占位轮次",
+        target: { projectRoot: root, roleId: "liaison", runtime: "demo" },
+      });
+      assert.equal(hold.ok, true, "占位轮次已投出");
+      assert.equal((harness.sendsByRole.get("liaison") ?? []).length, 1);
+
+      const capability = await requirementChangeCapability(harness, root);
+      const result = await capability({
+        flowId,
+        intentId,
+        changeKind: "other",
+        summary: "产品忙时批准",
+        rationale: "验证排队语义",
+      });
+      assert.equal(result.code, "dispatched");
+      cards[0]!.resolve({ outcome: "answered", value: { selected: ["approve"] }, operatorId: "judge:pi" });
+      await waitForAsync(async () => readRequirementChangeTicketFile(root, flowId, result.requestId!).leadDispatch?.queued === true, 4000);
+      const ticket = readRequirementChangeTicketFile(root, flowId, result.requestId!);
+      assert.equal(ticket.status, "approved");
+      assert.equal(ticket.leadDispatch?.queued, true, "票据如实记录 queued");
+      assert.equal((harness.sendsByRole.get("liaison") ?? []).length, 1, "忙时先入队、不并发直发");
+
+      harness.controls.get("liaison")!.settle();
+      await waitFor(() => (harness.sendsByRole.get("liaison") ?? []).length === 2, 4000);
+      const task = (harness.sendsByRole.get("liaison") ?? [])[1]!;
+      assert.ok(task.startsWith("需求变更执行任务"), "settle 后按序投出已批准执行任务");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("需求变更申请：运营也可发起/持有审批卡（拒绝回执给运营）；其他角色不注入", async () => {
+  const root = makeTempProjectRoot("ans-requirement-convener-");
+  const flowId = "flow-req-convener";
+  const intentId = "intent-req-convener";
+  try {
+    seedRequirementChangeFlow(root, flowId);
+    seedIntentFile(root, intentId);
+    const { customerInput, cards } = deferredCustomerChannel();
+    const harness = await makeHarness(root, requirementChangeListing(root), { customerInput });
+    try {
+      for (const roleId of ["rapporteur", "liaison", "nominator", "convener", "verifier", "executor"]) {
+        const opened = await harness.iface.openSession({ projectRoot: root, roleId, runtime: "demo" });
+        assert.equal(opened.ok, true, `${roleId}: ${opened.ok ? "" : (opened.error ?? "")}`);
+      }
+      for (const roleId of ["rapporteur", "convener"]) {
+        assert.equal(
+          typeof harness.openInputs.get(roleId)?.requestRequirementChange,
+          "function",
+          `${roleId}（运营/提案）注入 requestRequirementChange`,
+        );
+      }
+      for (const roleId of ["liaison", "nominator", "verifier", "executor"]) {
+        assert.equal(
+          harness.openInputs.get(roleId)?.requestRequirementChange,
+          undefined,
+          `${roleId} 不注入 requestRequirementChange（其他内置角色/项目角色不可发起）`,
+        );
+      }
+      // 零回归：requestClarification 仍仅报告员；viewImage 仍全部角色。
+      assert.equal(typeof harness.openInputs.get("rapporteur")?.requestClarification, "function");
+      for (const roleId of ["liaison", "nominator", "convener", "verifier", "executor"]) {
+        assert.equal(harness.openInputs.get(roleId)?.requestClarification, undefined, `${roleId} 澄清注入零回归`);
+      }
+      for (const roleId of ["rapporteur", "liaison", "nominator", "convener", "verifier", "executor"]) {
+        assert.equal(typeof harness.openInputs.get(roleId)?.viewImage, "function", `${roleId} viewImage 零回归`);
+      }
+
+      const convenerCapability = await requirementChangeCapability(harness, root, "convener");
+      const result = await convenerCapability({
+        flowId,
+        intentId,
+        changeKind: "authorization",
+        summary: "运营发现新授权需求",
+        rationale: "核证时发现需要外部访问",
+      });
+      assert.equal(result.code, "dispatched");
+      assert.equal(cards.length, 1);
+      assert.equal(cards[0]!.ctx.roleId, "convener", "卡落运营会话通道");
+      cards[0]!.resolve({ outcome: "answered", value: { selected: ["reject"] }, operatorId: "desktop-op" });
+      await waitForAsync(async () => readRequirementChangeTicketFile(root, flowId, result.requestId!).status === "rejected", 4000);
+      const ticket = readRequirementChangeTicketFile(root, flowId, result.requestId!);
+      assert.equal(ticket.requestedBy, "convener");
+      await waitFor(
+        () => (harness.sendsByRole.get("convener") ?? []).some((text) => text.includes("未通过独立审批")),
+        4000,
+      );
+      assert.equal((harness.sendsByRole.get("liaison") ?? []).length, 0, "拒绝不向产品投任务");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("需求变更申请：DesktopDeps.requestRequirementChange 可整体替换（测试接缝，补入 projectRoot/发起角色/引擎）", async () => {
+  const root = makeTempProjectRoot("ans-requirement-injection-");
+  try {
+    const { customerInput } = deferredCustomerChannel();
+    const received: Array<{ projectRoot: string; requesterRoleId: string; runtime: string; input: unknown }> = [];
+    // 通过会话注入端替换：验证闭包补参，不依赖本层实现。
+    const fake = await makeHarness(root, requirementChangeListing(root), {
+      customerInput,
+      requestRequirementChange: async (projectRoot, requesterRoleId, runtime, input) => {
+        received.push({ projectRoot, requesterRoleId, runtime, input });
+        return { ok: true, code: "dispatched", message: "fake 能力已受理" };
+      },
+    });
+    try {
+      const capability = await requirementChangeCapability(fake, root);
+      const payload: RequestRequirementChangeInput = {
+        flowId: "flow-fake",
+        changeKind: "other",
+        summary: "假能力",
+        rationale: "接缝验证",
+      };
+      const result = await capability(payload);
+      assert.equal(result.code, "dispatched");
+      assert.deepEqual(received, [
+        { projectRoot: root, requesterRoleId: "rapporteur", runtime: "demo", input: payload },
+      ]);
+    } finally {
+      await fake.iface.stopSession();
     }
   } finally {
     rmSync(root, { recursive: true, force: true });

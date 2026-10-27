@@ -86,17 +86,13 @@ export function GovernancePanel() {
     } else if (modelKnown) {
       core = governanceModelStatusText(governanceModel, locale);
     }
-    // 正常模型态：模型文本单独成 chip，流程/下一步详情另起一段（窄屏可换行）；
-    // 异常态保持原来的单行完整文案（含下一步），不改变既有 textContent 契约。
-    if (!statusWarn) {
-      statusChip = core;
-      statusDetail = nextStep;
-    } else {
-      statusChip = core;
-      if (nextStep) statusChip = statusChip ? statusChip + " · " + nextStep : nextStep;
-    }
+    // 正常/异常态同一语义：核心文本进可收缩的 chip，流程/下一步说明统一进
+    // 可换行的 detail——长告警不再被 chip 的 nowrap 撑破状态行。完整文案
+    // （chip · detail）仍整体保留在 #governance-status 的 textContent 与 title 中。
+    statusChip = core;
+    statusDetail = nextStep;
   }
-  const statusText = statusChip + statusDetail;
+  const statusText = [statusChip, statusDetail].filter(Boolean).join(" · ");
   const statusVisible = projectRoot !== null && statusText !== "";
 
   const openPreview = (event: MouseEvent<HTMLElement>) => {
@@ -153,7 +149,10 @@ export function GovernancePanel() {
         <span className="gov-shield" aria-hidden="true">
           <ShieldCheck size={13} strokeWidth={1.5} />
         </span>
-        <span className={"gov-text" + (statusWarn ? " is-warn" : "")}>
+        <span
+          className={"gov-text" + (statusWarn ? " is-warn" : "")}
+          title={statusVisible ? statusText : undefined}
+        >
           {statusVisible ? (
             <>
               {statusChip ? <span className="gov-chip">{statusChip}</span> : null}

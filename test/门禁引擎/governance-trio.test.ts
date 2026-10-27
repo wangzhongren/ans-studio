@@ -142,7 +142,7 @@ test("注册表：五内置顺序 liaison→rapporteur→nominator→convener→
   );
   assert.deepEqual(
     BUILT_IN_GOVERNANCE_ROLES.map((s) => s.displayName),
-    ["主理", "提案", "组队", "统筹", "验收"],
+    ["产品", "策划", "人事", "运营", "质检"],
   );
   for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
     assert.equal(governanceRoleOf(spec.id)?.id, spec.id);
@@ -502,7 +502,7 @@ test("卡文本：五人均写明职能/不拥有最终批准权/可写与禁写
   // cardKind 白名单收窄：Draft 只出 proposal 选择卡与 write 写盘卡；验收卡已归 Proof。
   assert.match(r, /只用 `proposal`/);
   assert.match(r, /只用 `write`/);
-  assert.doesNotMatch(r, /cardKind=acceptance/, "验收卡归 Proof / 验收，Draft 不得发起");
+  assert.doesNotMatch(r, /cardKind=acceptance/, "验收卡归 质检 / Proof，Draft 不得发起");
   const n = governanceRoleOf("nominator")!.cardText;
   assert.match(n, /写卡权（客户任命后）/);
   assert.match(n, /appointment/);
@@ -656,7 +656,7 @@ test("治理卡参数纪律（2026-10-22 客户严格口径，N5/T14）：五卡
   }
 });
 
-test("卡文本：Steward / 统筹 团队计划机器可读推荐集（appointment 卡选项来源，P1/P2）", () => {
+test("卡文本：运营 / Steward 团队计划机器可读推荐集（appointment 卡选项来源，P1/P2）", () => {
   const t = governanceRoleOf("convener")!.cardText;
   assert.match(t, /`recommended:`/, "团队计划须给机器可读推荐集");
   assert.match(t, /`recommended: \[role-a, role-b\]`/, "推荐集必须写成同一行内联数组");
@@ -666,8 +666,14 @@ test("卡文本：Steward / 统筹 团队计划机器可读推荐集（appointme
   assert.match(t, /推荐集只列项目角色，不得含五个内置治理角色 id/);
   assert.match(t, /每个推荐角色必须有 roleId、职责目标、能力要求、授权目录、精确写集、依赖行/);
   // 推荐集约定只属 Steward / 统筹（团队计划作者）；其余四张卡不得定义（避免第二份口径）。
+  // 2026-10-26 客户纠正：Draft 的需求变更审批 decision 卡使用 `recommended: true`（恰一个推荐项），
+  // 与 appointment 的机器可读推荐集 `recommended: [role-a, role-b]` 不是同一口径——此处按 appointment
+  // 推荐集形态精确断言，仍禁止其它卡定义团队计划推荐集；Steward 的正式断言见上。
   for (const id of ["liaison", "rapporteur", "nominator", "verifier"] as const) {
-    assert.doesNotMatch(governanceRoleOf(id)!.cardText, /recommended:/, `${id} 不定义推荐集`);
+    const t = governanceRoleOf(id)!.cardText;
+    assert.doesNotMatch(t, /`recommended: \[/, `${id} 不定义 appointment 推荐集内联数组`);
+    assert.doesNotMatch(t, /推荐：role-a、role-b/, `${id} 不定义 appointment 推荐集固定行`);
+    assert.doesNotMatch(t, /推荐集与卡选项一致/, `${id} 不定义 appointment 推荐集口径`);
   }
 });
 
@@ -675,7 +681,7 @@ test("卡文本：角色卡写入归属——Crew 按团队计划 appointment-wr
   const n = governanceRoleOf("nominator")!.cardText;
   assert.match(n, /读团队计划（客户确认后）/);
   assert.match(n, /只对任命名单内的角色发 `request_confirmation`/);
-  assert.match(n, /计划缺能力细节、目录规范、`实现目录`[\s\S]{0,120}\*\*停止写卡并报告 Steward \/ 统筹 补充\*\*/);
+  assert.match(n, /计划缺能力细节、目录规范、`实现目录`[\s\S]{0,120}\*\*停止写卡并报告 运营 \/ Steward 补充\*\*/);
   assert.match(n, /不自行扩大职责/);
   assert.match(n, /写卡全部完成且应用结构校验通过后/);
   // 2026-10-22：Crew 不再先写提名文件再弹 appointment 卡，也不再以提名文件为物证。
@@ -685,7 +691,7 @@ test("卡文本：角色卡写入归属——Crew 按团队计划 appointment-wr
 
   const c = governanceRoleOf("convener")!.cardText;
   assert.match(c, /你不写角色卡、不创建角色/, "Steward 不写角色卡、不创建角色");
-  assert.match(c, /角色由 Crew \/ 组队 在任命决定后经 `appointment-write`/, "写卡归属 Crew / 组队");
+  assert.match(c, /角色由 人事 \/ Crew 在任命决定后经 `appointment-write`/, "写卡归属 人事 / Crew");
   assert.match(c, /角色不存在时不得派发/, "角色不存在时不得派发");
   assert.match(c, /不得代写角色卡/, "Steward 不得代写角色卡");
   assert.match(c, /你是 `docs\/scheduling\/<flowId>-team-v1\.md`（后续版本 `-team-v2\.md`…）的唯一作者/, "Steward 是团队计划唯一作者");
@@ -856,7 +862,7 @@ test("trio：listProject 不返回 su；resolveRole 五人返回内置卡文本�
   // ProjectRoleSummary.displayName：内置角色由注册表填入统一显示名；项目角色不填。
   assert.deepEqual(
     listing.roles.map((r) => r.displayName),
-    ["主理", "提案", "组队", "统筹", "验收"],
+    ["产品", "策划", "人事", "运营", "质检"],
   );
   assert.equal(listing.primaryRoleId, "liaison");
   assert.equal(listing.roles.some((r) => r.roleId === "su"), false, "trio 下 su 隐藏");
@@ -1351,7 +1357,7 @@ test("2026-10-22 角色粒度/MapReduce：注册表 entries/预授权/禁写/能
   );
   assert.deepEqual(
     BUILT_IN_GOVERNANCE_ROLES.map((s) => s.displayName),
-    ["主理", "提案", "组队", "统筹", "验收"],
+    ["产品", "策划", "人事", "运营", "质检"],
     "显示名按 2026-10-24 客户要求改为纯中文（去掉英文别名）",
   );
   assert.deepEqual(
@@ -1532,13 +1538,13 @@ test("2026-10-23 目录授权负例（P10/P12）：Proof 核对布局报告+原�
 test("2026-10-24 治理协调（S2a）：Lead 卡接报内置状态/回交、闸门 0/1 后才交接/coordinate、不直派 Crew/Proof/项目 worker、Proof 只收状态+指针、协调≠批准", () => {
   const l = governanceRoleOf("liaison")!.cardText;
   for (const needle of [
-    "## 治理协调（Lead / 主理）",
-    "Draft / 提案、Steward / 统筹、Crew / 组队、Proof / 验收 的状态与回交向**你**汇总",
+    "## 治理协调（产品 / Lead）",
+    "策划 / Draft、运营 / Steward、人事 / Crew、质检 / Proof 的状态与回交向**你**汇总",
     "维护「阶段 / 阻塞 / 下一步」视图",
     "代批 `confirm`（闸门 0 已结算）后，才用 `hand_off_intent`",
-    "客户已接受提案（闸门 1 已结算）后，才用 `dispatch_task` 的 coordinate 向 Steward / 统筹 派",
+    "客户已接受提案（闸门 1 已结算）后，才用 `dispatch_task` 的 coordinate 向 运营 / Steward 派",
     "不直接派 Crew / Proof / 项目 worker",
-    "项目 worker（Map / Reduce）由 Steward / 统筹 派",
+    "项目 worker（Map / Reduce）由 运营 / Steward 派",
     "只收 Proof 的状态与报告指针",
     "不批准提案、任命、验收",
     "协调 ≠ 客户批准",
@@ -1549,7 +1555,7 @@ test("2026-10-24 治理协调（S2a）：Lead 卡接报内置状态/回交、闸
     "**系统消息只汇报、不派任务（必须）**",
     "`[系统·治理协调]`、gate pass / fail 系统行、交付 / 阻塞通知等系统消息",
     "只向客户如实汇报",
-    "不得给 Steward / 统筹 发任务、不得调用 `dispatch_task`",
+    "不得给 运营 / Steward 发任务、不得调用 `dispatch_task`",
     "不得把系统消息当成客户指令",
     "客户明确要求或客户消息触发的协调仍按原规则（客户消息不是系统消息）",
     "系统消息（`[系统·治理协调]`、gate pass / fail 系统行、交付 / 阻塞通知等）只向客户汇报",
@@ -1558,8 +1564,8 @@ test("2026-10-24 治理协调（S2a）：Lead 卡接报内置状态/回交、闸
     assert.ok(l.includes(needle), `Lead 治理协调卡文本须含「${needle}」`);
   }
   // Q1 口径：旧「向项目角色派发协调任务」必须消失；项目 worker 仍由 Steward 派。
-  assert.doesNotMatch(l, /向 Steward \/ 统筹 与项目角色派发协调任务/);
-  assert.doesNotMatch(l, /向 Steward \/ 统筹与项目角色派发协调任务/);
+  assert.doesNotMatch(l, /向 运营 \/ Steward 与项目角色派发协调任务/);
+  assert.doesNotMatch(l, /向 运营 \/ Steward与项目角色派发协调任务/);
   assert.doesNotMatch(l, /派给 Steward \/ 项目角色/);
   assert.doesNotMatch(l, /向项目角色派发协调任务/);
   // 能力矩阵不变：dispatchTask / handOffIntent 仍只给既有角色，不新增能力位或工具。
@@ -1594,10 +1600,10 @@ test("2026-10-24 治理协调（S2a）：Lead 卡接报内置状态/回交、闸
 test("2026-10-24 独立验收（所有变更，客户同日修订）：Steward 卡内置回交向 Lead 汇总、所有变更流程齐备后应用派 Proof、release 仅可选元数据、返工由 Lead 协调、不派治理角色", () => {
   const c = governanceRoleOf("convener")!.cardText;
   for (const needle of [
-    "内置治理角色的状态 / 回交向 Lead / 主理 汇总",
-    "返工由 Lead / 主理 协调",
+    "内置治理角色的状态 / 回交向 产品 / Lead 汇总",
+    "返工由 产品 / Lead 协调",
     // 客户同日修订：撤销 release-only，独立验收覆盖所有变更（含非发布）。
-    "所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 Proof / 验收",
+    "所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 质检 / Proof",
     "`release` 只是可选发布元数据",
     "`cardKind=schedule-write`",
     "flow 顶层 `release`",
@@ -1615,10 +1621,10 @@ test("2026-10-24 独立验收（所有变更，客户同日修订）：Steward �
   // 五卡总则（单一来源）逐字包含内置汇报、主理只协调、应用门禁与所有变更独立验收。
   for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
     for (const needle of [
-      "内置角色（Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收）的状态与回交向主理（Lead / 主理）汇总",
-      "主理只做治理协调，不批准提案、任命或验收",
+      "内置角色（策划 / Draft、人事 / Crew、运营 / Steward、质检 / Proof）的状态与回交向产品（Lead）汇总",
+      "产品只做治理协调，不批准提案、任命或验收",
       "应用仍负责门禁（闸门 0/1/2、验收门）与阶段流转",
-      "**所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 Proof / 验收**",
+      "**所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 质检 / Proof**",
       "`release` 只是可选发布元数据，不是独立验收的启动条件",
     ]) {
       assert.ok(spec.cardText.includes(needle), `${spec.id} 卡标准工作流总则须含「${needle}」`);
@@ -1768,7 +1774,7 @@ test("2026-10-25 验收分诊：Proof 卡要求验收报告含恰好一个 accep
   // 质量职责段同步该要求（不只藏在工作流步骤里）。
   assert.match(
     v,
-    /你的质量职责（Proof \/ 验收）：[\s\S]*acceptance-triage\/v1[\s\S]*报告写得漂亮不能掩盖 blocker/,
+    /你的质量职责（质检 \/ Proof）：[\s\S]*acceptance-triage\/v1[\s\S]*报告写得漂亮不能掩盖 blocker/,
     "Proof 质量职责须同步分诊结构要求",
   );
 
@@ -1869,8 +1875,8 @@ test("2026-10-25 写入预授权：五卡写明 Section 1 边界内直接写、�
   const convener = governanceRoleOf("convener")!.cardText;
   assert.match(
     convener,
-    /流程 YAML \*\*初始创建\*\*仍按 `schedule-write` 确认（治理敏感写入）/,
-    "Steward 流程 YAML 初始创建仍 schedule-write",
+    /流程 YAML \*\*初始创建 \/ 骨架一次性替换\*\*（以及经确认的新 flow 版本）仍按 `schedule-write` 确认（治理敏感写入）/,
+    "Steward 流程 YAML 初始创建 / 骨架一次性替换仍 schedule-write",
   );
   assert.match(
     convener,
@@ -1929,9 +1935,9 @@ test("2026-10-26 完成即主动 request_acceptance：Steward 卡在交付/证�
       "change-package（`docs/scheduling/<flowId>-change-vN.md`，含 `riskTier`）",
       "验收标准（`docs/acceptance/<flowId>-criteria-vN.md`）存在",
       "**主动调用 `request_acceptance({flowId})`**",
-      "不得等待应用事件（settle / 回交 / 账本）、客户催办或主理转达",
+      "不得等待应用事件（settle / 回交 / 账本）、客户催办或产品转达",
       "不得以「应用会自动派」为由省略主动提交",
-      "request_acceptance 是统筹的主动通道",
+      "request_acceptance 是运营的主动通道",
       // 标准工作流第 9 步与专属章节同口径（不只藏在一处）。
       "9. 独立验收（所有变更）",
       "**完成即主动提交**",
@@ -1946,7 +1952,7 @@ test("2026-10-26 完成即主动 request_acceptance：Steward 卡在交付/证�
       "只在交付与证据齐备后提交——不得提前提交",
       "不得用提交代替缺步骤/缺证据",
       "提交 ≠ 验收通过",
-      "不得替 Proof / 验收判定",
+      "不得替 质检 / Proof 判定",
       "不得写客户决定",
       "不得把 flow / 账本状态当客户批准",
       "`acceptance-triage/v1`",
@@ -1969,7 +1975,7 @@ test("2026-10-26 完成即主动 request_acceptance：Steward 卡在交付/证�
       "已有在途复核",
       "`criteria-missing` / `change-package-missing` / `change-package-no-risk` / `flow-incomplete` / `flow-not-found` / `runtime-unresolved`",
       "按回执 `code` / `message` 如实报告并修正对应缺口",
-      "验收标准缺失交 Proof / 验收 按标准流程补写",
+      "验收标准缺失交 质检 / Proof 按标准流程补写",
       "变更包或 `riskTier` 缺失按变更包规则补齐",
       "流程 / 证据缺口按 `flow_step_update` 与返工规则修正",
       "`flowId` 错误用正确 `flowId` 重交",
@@ -1989,7 +1995,7 @@ test("2026-10-26 完成即主动 request_acceptance：Steward 卡在交付/证�
   assertCardIncludes(
     c,
     [
-      "request_acceptance 是统筹的主动通道",
+      "request_acceptance 是运营的主动通道",
       "应用自动验收门（settle / 回交 / 账本等事件）仍可触发",
       "二者**幂等**",
       "已有在途 / 已派发记录时应用返回 `already-dispatched`、不重复派发",
@@ -2003,7 +2009,7 @@ test("2026-10-26 完成即主动 request_acceptance：Steward 卡在交付/证�
   assertCardIncludes(
     c,
     [
-      "所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 Proof / 验收",
+      "所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 质检 / Proof",
       "Steward 不派发治理角色、不代替验收、不催办",
       "`release` 只是可选发布元数据，不是独立验收的启动条件",
     ],
@@ -2048,7 +2054,7 @@ test("2026-10-26 完成即主动 request_acceptance：Steward 卡在交付/证�
 
 // —————————————————————— 13) 2026-10-26 边界变更请求（request_boundary_change） ——————————————————————
 
-test("2026-10-26 边界变更请求：Steward 卡在写集/边界不足时调用 request_boundary_change，提交精确增删路径与理由，不得 dispatch_task 派组队、不得自改卡", () => {
+test("2026-10-26 边界变更请求：Steward 卡在写集/边界不足时调用 request_boundary_change，提交精确增删路径与理由，不得 dispatch_task 派人事、不得自改卡", () => {
   // 运行时核心新增统筹专用工具 `request_boundary_change({roleId, addPaths?, removePaths?, rationale,
   // flowId?})`，由应用负责把任务派给 Crew / 组队。真机缺口（castle `tsconfig.node.json`）：项目角色
   // 写集/边界不足时，治理角色之间禁止 dispatch，统筹必须走专用通道而不是直接派 Crew。
@@ -2082,12 +2088,12 @@ test("2026-10-26 边界变更请求：Steward 卡在写集/边界不足时调用
   assertCardIncludes(
     c,
     [
-      "不得用 `dispatch_task` 直接派 Crew / 组队",
+      "不得用 `dispatch_task` 直接派 人事 / Crew",
       "内置治理角色不可被派发，必然被拒",
       "不得自己改角色卡 / 边界",
       "`角色卡/**` 是你的禁写路径",
     ],
-    "Steward 不得 dispatch_task 派组队 / 不得自改卡",
+    "Steward 不得 dispatch_task 派人事 / 不得自改卡",
   );
 
   // 3) 回执处理：dispatched 等待不重提；already-dispatched 有在途；rejected 是应用门禁退回
@@ -2097,12 +2103,12 @@ test("2026-10-26 边界变更请求：Steward 卡在写集/边界不足时调用
     c,
     [
       "回执处理（必须如实，不得绕过）",
-      "`dispatched`：请求已由应用派给组队",
+      "`dispatched`：请求已由应用派给人事",
       "等待 Crew 完成边界变更并回执",
       "不重复提交",
       "`already-dispatched`：已有在途变更",
       "`rejected`：中间 AI 门禁或确定性校验拒绝 / 不确定",
-      "**未派发组队、不自动放行、不代表客户拒绝**",
+      "**未派发人事、不自动放行、不代表客户拒绝**",
       "按 `message` 区分「内容被拒」（终态：修正请求内容后重新提交）",
       "「门禁不可用 / 超时」（可修复后重试）",
       "不得对同一 ticket / 同一请求原样重复提交、反复试探",
@@ -2122,7 +2128,7 @@ test("2026-10-26 边界变更请求：Steward 卡在写集/边界不足时调用
   assertCardIncludes(
     c,
     [
-      "边界变更只能由 Crew / 组队经 `appointment-write` 与客户 / 判断 agent 的确认卡落地",
+      "边界变更只能由 人事 / Crew 经 `appointment-write` 与客户 / 判断 agent 的确认卡落地",
       "**你的请求不等于客户批准**",
       "也不解锁任何写权",
       "变更完成（Crew 回执 + 应用校验通过）前，**不得派任何实现写入该路径**",
@@ -2179,7 +2185,7 @@ test("2026-10-26 证据完整性与 gate 协调：Steward 只查 gate 步骤/证
     c,
     [
       "## 证据完整性与 gate 协调（必须）",
-      "统筹**不再做实质性独立复核**（重复且越权）",
+      "运营**不再做实质性独立复核**（重复且越权）",
       "只做**证据完整性检查、gate 复核请求与返工协调**",
       "只判「齐不齐」、不判「好不好」",
       "不对画面 / 实现质量下结论",
@@ -2253,7 +2259,7 @@ test("2026-10-26 证据完整性与 gate 协调：Steward 只查 gate 步骤/证
     [
       "4. **主动请求 gate 复核**",
       "**完成即主动**调用 `request_gate_review({ flowId, gateId })`",
-      "不等客户催办、不等主理转达",
+      "不等客户催办、不等产品转达",
       "不得提前提交、不得用提交代替缺步骤 / 缺证据",
       "gate 步骤的 `done` **只能由应用按 Proof 报告收口**",
       "你不得用 `flow_step_update` 标 gate `done`",
@@ -2291,7 +2297,7 @@ test("2026-10-26 证据完整性与 gate 协调：Steward 只查 gate 步骤/证
     "复核只做判断与退回",
     "不等 Proof",
     "复核太晚",
-    "统筹本来就有独立复核职责",
+    "运营本来就有独立复核职责",
     "视为复核失职",
     "DOM / CLI 输出与验收标准逐条对照",
     "确认真实可玩 / 可用",
@@ -2318,7 +2324,7 @@ test("2026-10-26 证据完整性与 gate 协调：Steward 只查 gate 步骤/证
 
 // —————————————————————— 15) 2026-10-26 Gate 规划与复核（request_gate_review 已授权实现） ——————————————————————
 
-test("2026-10-26 Gate 规划：Steward 卡按风险档 × 产品类型声明 kind: artifact + gateKind、写入下游 dependsOn，主动 request_gate_review，Proof 独判、统筹不自审", () => {
+test("2026-10-26 Gate 规划：Steward 卡按风险档 × 产品类型声明 kind: artifact + gateKind、写入下游 dependsOn，主动 request_gate_review，Proof 独判、运营不自审", () => {
   // 客户 2026-10-26 追加授权实现 `request_gate_review` 与设计 §4–§8、§12 的 gate 机制
   // （`2026-10-26_design_proof-gate-reviews.md` v3 `approved-implementing`）；本批只改
   // Convener / Verifier 卡文本 + 测试。A1/A2/A6：三类 gate、默认矩阵不减少、gate 用现有
@@ -2447,7 +2453,7 @@ test("2026-10-26 Gate 规划：Steward 卡按风险档 × 产品类型声明 kin
   assertCardIncludes(
     c,
     [
-      "**独立判断只由 Proof / 验收做**",
+      "**独立判断只由 质检 / Proof 做**",
       "你只做证据完整性检查",
       "调用 `request_gate_review({ flowId, gateId })` 请求复核",
       "gate 结论只由 Proof 产出",
@@ -2456,7 +2462,7 @@ test("2026-10-26 Gate 规划：Steward 卡按风险档 × 产品类型声明 kin
       "gate 通过只表示该节点允许继续",
       "最终验收仍走 `request_acceptance` 与客户决定",
       "**不新增 `FlowStepKind` / 治理角色 / cardKind**",
-      "`request_gate_review` 只注入统筹会话",
+      "`request_gate_review` 只注入运营会话",
       "`request_acceptance` 仍是最终验收唯一主动通道",
       "无 gate 的旧 flow 解析 / 派发 / 验收行为逐字不变",
       // 标准工作流指针同步（不只藏在 Gate 规划章节里）。
@@ -2486,7 +2492,7 @@ test("2026-10-26 Gate 规划：Steward 卡按风险档 × 产品类型声明 kin
     assert.equal(
       governanceRoleOf(id)!.cardText.includes("request_gate_review"),
       false,
-      `${id} 卡不得定义 request_gate_review 通道（只注入统筹会话）`,
+      `${id} 卡不得定义 request_gate_review 通道（只注入运营会话）`,
     );
   }
   assertCardIncludes(
@@ -2599,11 +2605,11 @@ test("2026-10-26 Proof gate 复核：读标准+证据、亲自看真实输出、
       "不实现修复、不派发任务、不标任何 flow 步骤 `done`",
       "gate 步骤的 `done` 只能由应用按你的 gate 报告收口",
       "你不对 gate 步骤做 `flow_step_update`",
-      "不改 flow / 账本 / 统筹的返工范围",
+      "不改 flow / 账本 / 运营的返工范围",
       "**失败与重验**",
       "gate 失败后不实现、不派发、不返工",
-      "应用按返工路由交统筹",
-      "返工完成后由统筹重新请求复核，你写新版本报告",
+      "应用按返工路由交运营",
+      "返工完成后由运营重新请求复核，你写新版本报告",
       "**不是最终验收报告**",
       "gate 失败**不等于客户拒绝**",
       "不得在 gate 失败时直接建议客户接受",

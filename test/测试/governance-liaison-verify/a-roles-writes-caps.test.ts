@@ -43,7 +43,7 @@ test("五角色枚举：新空项目恰 5 个 builtIn（liaison→rapporteur→n
       ["liaison", "proposal", "nomination", "schedule", "verification"],
       "职能与角色一一对应（含验收权 verification）",
     );
-    assert.equal(listing.primaryRoleId, "liaison", "主入口 = Lead / 主理");
+    assert.equal(listing.primaryRoleId, "liaison", "主入口 = 产品 / Lead");
     assert.equal(listing.governanceModel, "trio", "治理模型仍叫 trio（三权 · 五角色）");
     assert.equal(listing.hasRoles, false);
     assert.equal(listing.roles.some((r) => r.roleId === "su"), false, "trio 下不枚举 su");

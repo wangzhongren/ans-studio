@@ -48,6 +48,9 @@ import type {
   RequestBoundaryChangeFn,
   RequestBoundaryChangeInput,
   RequestBoundaryChangeResult,
+  RequestRequirementChangeFn,
+  RequestRequirementChangeInput,
+  RequestRequirementChangeResult,
   FlowToolEvidence,
   FlowToolResult,
   FlowToolStatus,
@@ -61,11 +64,13 @@ import type {
   ToolDefinition, ToolResult, GovernedToolsOptions,
   GovernanceCardKind, GovernanceCardMetadata, GovernanceChoiceCardKind, GovernanceConfirmCardKind, GovernanceFlowMetadata,
   BackgroundTaskCapability, BackgroundTaskSnapshot,
-  ViewImageFn, ViewImageInput, PromptImage,
+  ViewImageFn, ViewImageInput, PromptImage, ViewImageReceipt, ViewImageDeliveryMode, RuntimeViewImagePolicy,
 } from "../../model/runtime.ts";
 import { GOVERNANCE_SLUG_PATTERN, FLOW_TOOL_STATUSES, FLOW_TOOL_STEP_KINDS } from "../../model/runtime.ts";
 import type { WriteDecision } from "../../model/decision.ts";
 import type { DiagnosticLog } from "../../model/runtime.ts";
+import { DEFAULT_LOCALE, translate } from "../../common/shared/i18n/index.ts";
+import type { MessageKey } from "../../common/shared/i18n/keys.ts";
 import { describeTool } from "./schema.ts";
 import { formatDenialMessage } from "../../common/runtime-core/format-denial.ts";
 // 2026-10-18 真机修复：写前校验角色 boundary.yaml 内容（**只经 Service 公共出口**——Provider 不直接
@@ -171,11 +176,28 @@ export const REQUEST_GATE_REVIEW_TOOL_NAME = "request_gate_review";
 /** request_boundary_change 工具名（2026-10-26；项目角色写集/边界不足时由统筹请应用派组队修改）。 */
 export const REQUEST_BOUNDARY_CHANGE_TOOL_NAME = "request_boundary_change";
 
-/** view_image 工具名（2026-10-26；读取项目内图片并排队为下一轮用户提示的图片附件——注入才注册）。 */
+/** request_requirement_change 工具名（2026-10-26；报告员提交需求变更审批（提案/统筹 decision 卡）——申请≠批准，发起方不得自批）。 */
+export const REQUEST_REQUIREMENT_CHANGE_TOOL_NAME = "request_requirement_change";
+
+/** view_image 工具名（2026-10-26；读取项目内图片并按运行时策略交付——同轮附图优先 / 下一轮附件回退；注入才注册）。 */
 export const VIEW_IMAGE_TOOL_NAME = "view_image";
 
 /** `view_image` 单文件大小上限（10 MB，按字节；超过即拒绝，不截断、不缩图）。 */
 export const VIEW_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+
+/** `view_image` 每轮图片数预算缺省（2026-10-27 同轮设计建议 4 张；仅 `tool-result` 交付计数）。 */
+export const VIEW_IMAGE_MAX_IMAGES_PER_TURN = 4;
+
+/** `view_image` 每轮图片原始字节总预算缺省（20 MB；仅 `tool-result` 交付计数）。 */
+export const VIEW_IMAGE_MAX_BYTES_PER_TURN = 20 * 1024 * 1024;
+
+/** 工具层缺省策略（未注入 `viewImagePolicy` 时）：下一轮附件 + 全局 10 MB——与 2026-10-26 行为零变化。 */
+export const VIEW_IMAGE_DEFAULT_POLICY: RuntimeViewImagePolicy = Object.freeze({
+  delivery: "next-turn",
+  maxImageBytes: VIEW_IMAGE_MAX_BYTES,
+  maxImagesPerTurn: VIEW_IMAGE_MAX_IMAGES_PER_TURN,
+  maxBytesPerTurn: VIEW_IMAGE_MAX_BYTES_PER_TURN,
+});
 
 /** 扩展层对 run_shell 的能力级判定结果：非 undefined 即阻断（默认拒绝）。 */
 export interface ShellKillSwitchDecision {
@@ -556,14 +578,21 @@ function makeListDirTool(projectRoot: string): ExecutableTool {
   };
 }
 
-// —————————————— 图片查看：两轮附件设计（2026-10-26 客户要求；view_image） ——————————————
+// —————————————— 图片查看：同轮工具结果附图优先 + 下一轮附件回退（2026-10-26/2026-10-27；view_image） ——————————————
 //
-// 客户要求「让角色能看项目里的图片」，但各引擎对**工具结果附图**的支持不一致。本工具采用**两轮附件**：
-// 工具只读取/校验图片，并调用注入的 `ViewImageFn` 把图片排队为**同一角色下一轮用户提示的图片附件**；
-// 本轮工具结果只返回文本（明确「已排队，下一轮以附件提供，不要假装本轮已看到」）。能力未注入 ⇒ 工具
-// 不注册（结构性 fail-closed）。路径/类型/大小校验全部在触达能力之前完成：非法 ⇒ 工具失败且**不调用
-// 能力**；能力 `ok:false`/抛错/契约外回执 ⇒ 如实报「未排队」，绝不谎报已提供。
-// 本工具不写盘、不联网、不过写门禁，也不改变 read_file / 其它工具的任何行为。
+// 2026-10-26 客户要求「让角色能看项目里的图片」。因各引擎对**工具结果附图**的支持不一致，先落地**两轮附件**：
+// 工具只读取/校验图片，并调用注入的 `ViewImageFn` 把图片排队为同一角色下一轮用户提示的图片附件。
+// 2026-10-27 客户要求并授权「同轮看图修复」：工具结果可直接携带模型可见图片（`ToolResult.images`），
+// 交付方式由 `viewImagePolicy.delivery` 单一决定（Service 按 `RUNTIME_VIEW_IMAGE_POLICY` 注入）；工具层
+// **不写引擎分支**，适配器负责把 `ToolResult.images` 映射为各引擎原生工具结果内容。
+//
+// 两阶段共同纪律：
+// - 能力未注入 ⇒ 工具不注册（结构性 fail-closed）；路径句法/realpath 根内/普通文件/扩展名/≤10 MB/
+//   回读字节复核全部在触达交付前完成，非法 ⇒ 工具失败且**不调用能力**、不交付任何图片。
+// - 回执必须如实：`ok:false`/抛错/契约外回执/交付方式与策略不一致 ⇒ fail-closed（无图，明确「未提供
+//   图片，不要假装已看到」）；成功文案逐字区分同轮附图与下一轮排队。
+// - 审计只记 path/mime/bytes/delivery/reason 等元数据，**绝不**记录 base64、`data:` URL 或图片字节。
+// - 本工具不写盘、不联网、不过写门禁，也不改变 read_file / 其它工具的任何行为。
 
 /** `view_image` 支持的扩展名 → MIME（匹配时小写化；按**真实文件**扩展名判定）。 */
 const VIEW_IMAGE_MIME: Readonly<Record<string, string>> = Object.freeze({
@@ -587,42 +616,118 @@ function viewImagePathSyntaxError(path: string): string | undefined {
   return undefined;
 }
 
-/** 能力回执归一（契约外 → undefined，由调用方按「未排队」fail-closed，不把不明结果当成功）。 */
-function viewImageReceiptOf(value: unknown): { ok: boolean; message?: string } | undefined {
+/**
+ * 能力回执归一（契约外 → undefined，由调用方按「未提供图片」fail-closed，不把不明结果当成功）。
+ * `mode` 只接受 `"tool-result"` / `"next-turn"`；其它值＝契约外回执（不猜测交付方式）。
+ * `mode` 缺省＝`"next-turn"`（旧能力实现零破坏）。
+ */
+function viewImageReceiptOf(value: unknown): ViewImageReceipt | undefined {
   if (value === null || typeof value !== "object") return undefined;
   const record = value as Record<string, unknown>;
   if (record["ok"] !== true && record["ok"] !== false) return undefined;
+  const mode = record["mode"];
+  if (mode !== undefined && mode !== "tool-result" && mode !== "next-turn") return undefined;
   const message = typeof record["message"] === "string" && record["message"].trim() !== "" ? record["message"] : undefined;
-  return { ok: record["ok"] === true, ...(message !== undefined ? { message } : {}) };
+  return {
+    ok: record["ok"] === true,
+    ...(mode !== undefined ? { mode: mode as ViewImageDeliveryMode } : {}),
+    ...(message !== undefined ? { message } : {}),
+  };
+}
+
+/** i18n 共享 key（同轮附图成功文案；项目管理在 `src/common/shared/i18n/messages/*.ts` 添加，本角色只引用）。 */
+const VIEW_IMAGE_SAME_TURN_KEY_NAME: string = "main.viewImage.sameTurn";
+
+/** 同轮附图成功文案：共享 i18n key 单一来源；key 缺失时 `translate` 按既有缺失语义回退为 key 本身。 */
+function viewImageSameTurnMessage(path: string): string {
+  return translate(DEFAULT_LOCALE, VIEW_IMAGE_SAME_TURN_KEY_NAME as MessageKey, { path });
+}
+
+/** 策略数值防御：非有限正数回落缺省（Service 是唯一生产注入方；坏策略 fail-closed，不放大预算）。 */
+function viewImagePolicyLimit(value: number, fallback: number): number {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 /**
- * view_image：读取项目内一张图片并排队为**下一轮**用户提示的图片附件（两轮附件设计）。
+ * view_image：读取项目内一张图片并按运行时策略交付（`tool-result` 同轮附图 / `next-turn` 下一轮附件）。
  *
  * 顺序：取 path（`readTargetPath`，与 read_file 同口径）→ 路径句法校验 → realpath 根内复核（拒绝越界/
  * 符号链接逃逸）→ 必须是普通文件（目录明确指路 list_dir）→ 扩展名/MIME（.png/.jpg/.jpeg/.webp/.gif）→
- * 大小 ≤10 MB → 读二进制并 base64 → 调用注入能力。任一校验失败都**不调用能力**、不写盘、不联网。
- * 成功回执逐字说明「本轮只是排队」；能力拒绝/抛错/契约外回执一律按**未排队**如实转达。
+ * 大小 ≤ min(10 MB, policy.maxImageBytes) → [tool-result] 每轮预算预留 → 读二进制并 base64 →
+ * 调用注入能力（tool-result 时为 Service 注入的内联受理回执）→ 按回执归一交付。
+ * 任一校验失败都不触达交付、不写盘、不联网；失败一律 fail-closed（不交付图片，文案如实）。
  */
-function makeViewImageTool(fn: ViewImageFn, readRoot: string): ExecutableTool {
+function makeViewImageTool(fn: ViewImageFn, readRoot: string, options?: GovernedToolsOptions): ExecutableTool {
   const name = VIEW_IMAGE_TOOL_NAME;
+  const policy = options?.viewImagePolicy ?? VIEW_IMAGE_DEFAULT_POLICY;
+  const delivery = policy.delivery;
+  const maxImageBytes = Math.min(VIEW_IMAGE_MAX_BYTES, Math.floor(viewImagePolicyLimit(policy.maxImageBytes, VIEW_IMAGE_MAX_BYTES)));
+  const maxImagesPerTurn = Math.floor(viewImagePolicyLimit(policy.maxImagesPerTurn, VIEW_IMAGE_MAX_IMAGES_PER_TURN));
+  const maxBytesPerTurn = viewImagePolicyLimit(policy.maxBytesPerTurn, VIEW_IMAGE_MAX_BYTES_PER_TURN);
+  // 每轮预算（仅 tool-result 交付计数；next-turn 保持 2026-10-26 既有排队行为不变）。
+  // 按 `currentTurnId()` 变化重置；turnId 缺省按会话级单桶处理（避免无界）。
+  const budget = { turnKey: undefined as string | undefined, count: 0, bytes: 0 };
+  const budgetFor = (turnId: string | undefined): void => {
+    if (budget.turnKey !== turnId) { budget.turnKey = turnId; budget.count = 0; budget.bytes = 0; }
+  };
+  /** 预留一个名额与 stat 大小字节；超限返回拒绝原因且不预留。 */
+  const reserveBudget = (bytes: number): string | undefined => {
+    if (budget.count + 1 > maxImagesPerTurn) return `超出本轮图片数量预算（每轮最多 ${maxImagesPerTurn} 张）`;
+    if (budget.bytes + bytes > maxBytesPerTurn) {
+      return `超出本轮图片总字节预算（每轮最多 ${maxBytesPerTurn} 字节；已用 ${budget.bytes} 字节，本次 ${bytes} 字节）`;
+    }
+    budget.count += 1;
+    budget.bytes += bytes;
+    return undefined;
+  };
+  const releaseBudget = (bytes: number): void => {
+    budget.count = Math.max(0, budget.count - 1);
+    budget.bytes = Math.max(0, budget.bytes - bytes);
+  };
+  /** 结构化审计（只记元数据，绝不落 base64/图片字节/`data:` URL）。 */
+  const record = (fields: { ok: boolean; turnId?: string; path?: string; mimeType?: string; bytes?: number; delivery?: ViewImageDeliveryMode; reasonCode?: string }): void => {
+    try {
+      options?.diagnostics?.record("view_image.result", {
+        toolName: name,
+        ok: fields.ok,
+        ...(fields.turnId !== undefined ? { turnId: fields.turnId } : {}),
+        ...(fields.path !== undefined ? { path: fields.path } : {}),
+        // 说明：共享诊断落盘白名单（`src/common/shared/diagnostics.ts`，项目管理属主）当前只保留
+        // path/ok/mode/reasonCode/turnId 等字段；mimeType/bytes 待其扩白名单后才会真正落盘。此处按设计
+        // §6.2/§6.7 如实组装，且不含任何图片字节。
+        ...(fields.mimeType !== undefined ? { mimeType: fields.mimeType } : {}),
+        ...(fields.bytes !== undefined ? { bytes: fields.bytes } : {}),
+        ...(fields.delivery !== undefined ? { mode: fields.delivery } : {}),
+        ...(fields.reasonCode !== undefined ? { reasonCode: fields.reasonCode } : {}),
+      });
+    } catch { /* 诊断是观测，绝不能改变执行 */ }
+  };
+  const limitNote = maxImageBytes === VIEW_IMAGE_MAX_BYTES ? `${VIEW_IMAGE_MAX_BYTES} 字节（10 MB）` : `${maxImageBytes} 字节`;
   return {
     name,
     async handler(call) {
+      const turnId = options?.currentTurnId?.();
+      // 失败文案：next-turn 逐字保持 2026-10-26 原文（零行为变化）；tool-result 如实写「未提供图片」。
+      const notQueued = delivery === "tool-result" ? "未提供图片" : "未排队";
+      const notReadNotQueued = delivery === "tool-result" ? "未读取、未提供图片" : "未读取、未排队";
+      const fail = (reasonCode: string, message: string, extra?: { path?: string; mimeType?: string; bytes?: number }): ToolResult => {
+        record({ ok: false, turnId, reasonCode, delivery, ...extra });
+        return { ok: false, message };
+      };
       const path = readTargetPath(call.args);
       if (path === undefined) {
-        return { ok: false, message: `${name}: 缺少 path 参数（项目内图片路径），无法读取` };
+        return fail("missing-path", `${name}: 缺少 path 参数（项目内图片路径），无法读取`);
       }
       const syntax = viewImagePathSyntaxError(path);
       if (syntax !== undefined) {
-        return { ok: false, message: `${name} 拒绝读取：${syntax}——未读取、未排队` };
+        return fail("path-syntax", `${name} 拒绝读取：${syntax}——${notReadNotQueued}`, { path });
       }
 
       let rootReal: string;
       try {
         rootReal = await realpath(readRoot);
       } catch (err) {
-        return { ok: false, message: `${name} 读取失败：读取根不可用（${reasonOf(err)}）——未排队` };
+        return fail("root-unavailable", `${name} 读取失败：读取根不可用（${reasonOf(err)}）——${notQueued}`);
       }
       let real: string;
       try {
@@ -630,93 +735,125 @@ function makeViewImageTool(fn: ViewImageFn, readRoot: string): ExecutableTool {
       } catch (err) {
         const code = (err as NodeJS.ErrnoException | undefined)?.code;
         const why = code === "ENOENT" ? "不存在或不可访问" : reasonOf(err);
-        return { ok: false, message: `${name} 读取失败：${path} ${why}——未读取、未排队` };
+        return fail("read-failed", `${name} 读取失败：${path} ${why}——${notReadNotQueued}`, { path });
       }
       if (!isWithinReal(rootReal, real)) {
-        return { ok: false, message: `${name} 拒绝读取：${path} 在读取根之外（已拒绝）——未读取、未排队` };
+        return fail("outside-root", `${name} 拒绝读取：${path} 在读取根之外（已拒绝）——${notReadNotQueued}`, { path });
       }
 
       let info;
       try {
         info = await stat(real);
       } catch (err) {
-        return { ok: false, message: `${name} 读取失败：${path}（${reasonOf(err)}）——未读取、未排队` };
+        return fail("read-failed", `${name} 读取失败：${path}（${reasonOf(err)}）——${notReadNotQueued}`, { path });
       }
       if (info.isDirectory()) {
-        return { ok: false, message: `${name} 拒绝读取：${path} 是目录——请用 list_dir 定位后选择图片文件；未读取、未排队` };
+        return fail("not-a-file", `${name} 拒绝读取：${path} 是目录——请用 list_dir 定位后选择图片文件；${notReadNotQueued}`, { path });
       }
       if (!info.isFile()) {
-        return { ok: false, message: `${name} 拒绝读取：${path} 不是普通文件——未读取、未排队` };
+        return fail("not-a-file", `${name} 拒绝读取：${path} 不是普通文件——${notReadNotQueued}`, { path });
       }
 
       const ext = extname(real).toLowerCase();
       const mimeType = VIEW_IMAGE_MIME[ext];
       if (mimeType === undefined) {
-        return {
-          ok: false,
-          message: `${name} 拒绝读取：不支持的图片类型「${ext === "" ? "无扩展名" : ext}」（仅支持 .png / .jpg / .jpeg / .webp / .gif）——未读取、未排队`,
-        };
+        return fail("unsupported-type", `${name} 拒绝读取：不支持的图片类型「${ext === "" ? "无扩展名" : ext}」（仅支持 .png / .jpg / .jpeg / .webp / .gif）——${notReadNotQueued}`, { path });
       }
-      if (info.size > VIEW_IMAGE_MAX_BYTES) {
-        return {
-          ok: false,
-          message: `${name} 拒绝读取：${path} 大小 ${info.size} 字节，超过上限 ${VIEW_IMAGE_MAX_BYTES} 字节（10 MB）——未读取、未排队`,
-        };
+      if (info.size > maxImageBytes) {
+        return fail("too-large", `${name} 拒绝读取：${path} 大小 ${info.size} 字节，超过上限 ${limitNote}——${notReadNotQueued}`, { path, mimeType, bytes: info.size });
+      }
+
+      // 每轮预算（仅同轮附图交付；next-turn 不引入新拒绝，保持既有排队行为）。
+      let charged = 0;
+      if (delivery === "tool-result") {
+        budgetFor(turnId);
+        const overBudget = reserveBudget(info.size);
+        if (overBudget !== undefined) {
+          return fail("budget", `${name} 拒绝读取：${path} ${overBudget}——${notReadNotQueued}`, { path, mimeType, bytes: info.size });
+        }
+        charged = info.size;
       }
 
       let raw: Buffer;
       try {
         raw = await readFile(real);
       } catch (err) {
-        return { ok: false, message: `${name} 读取失败：${path}（${reasonOf(err)}）——未排队` };
+        if (charged > 0) releaseBudget(charged);
+        return fail("read-failed", `${name} 读取失败：${path}（${reasonOf(err)}）——${notQueued}`, { path, mimeType });
       }
-      // 读取与 stat 之间文件可能被替换/增长：以实际字节数复核，绝不超限排队。
-      if (raw.length > VIEW_IMAGE_MAX_BYTES) {
-        return {
-          ok: false,
-          message: `${name} 拒绝读取：${path} 实际读取 ${raw.length} 字节，超过上限 ${VIEW_IMAGE_MAX_BYTES} 字节（10 MB）——未读取、未排队`,
-        };
+      // 读取与 stat 之间文件可能被替换/增长：以实际字节数复核，绝不超限交付。
+      if (raw.length > maxImageBytes) {
+        if (charged > 0) releaseBudget(charged);
+        return fail("too-large", `${name} 拒绝读取：${path} 实际读取 ${raw.length} 字节，超过上限 ${limitNote}——${notReadNotQueued}`, { path, mimeType, bytes: raw.length });
+      }
+      if (charged > 0 && raw.length !== charged) {
+        // 按实际字节调整预算占用；增长超出本轮总预算 ⇒ fail-closed。
+        const delta = raw.length - charged;
+        if (delta > 0 && budget.bytes + delta > maxBytesPerTurn) {
+          releaseBudget(charged);
+          return fail("budget", `${name} 拒绝读取：${path} 实际读取 ${raw.length} 字节，超出本轮图片总字节预算（每轮最多 ${maxBytesPerTurn} 字节）——${notReadNotQueued}`, { path, mimeType, bytes: raw.length });
+        }
+        budget.bytes += delta;
+        charged = raw.length;
       }
       if (call.signal?.aborted) {
-        return { ok: false, message: `${name}：本轮已中止，图片附件未排队——不要当它已提供；本轮不要假装已看到。` };
+        if (charged > 0) releaseBudget(charged);
+        return fail("aborted", delivery === "tool-result"
+          ? `${name}：本轮已中止，图片未提供——不要当它已提供；本轮不要假装已看到。`
+          : `${name}：本轮已中止，图片附件未排队——不要当它已提供；本轮不要假装已看到。`, { path, mimeType, bytes: raw.length });
       }
 
       const image: PromptImage = { type: "image", data: raw.toString("base64"), mimeType };
-      const input: ViewImageInput = { path, image };
+      const input: ViewImageInput = { path, image, ...(turnId !== undefined ? { turnId } : {}) };
 
       let receipt: unknown;
       try {
         receipt = await raceAbort(
           Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(input); }),
           call.signal,
-          `${name} 排队图片附件`,
+          `${name} ${delivery === "tool-result" ? "确认图片交付" : "排队图片附件"}`,
         );
       } catch (err) {
+        if (charged > 0) releaseBudget(charged);
         // 中止时能力可能已经受理（raceAbort 不取消底层 promise）——不谎称失败，也不谎称已提供。
         if (call.signal?.aborted) {
-          return {
-            ok: false,
-            message: `${name}：本轮已中止，图片附件排队**未获确认**——**不要当它已提供**；下一轮是否收到图片以系统为准，本轮不要假装已看到。`,
-          };
+          return fail("aborted", delivery === "tool-result"
+            ? `${name}：本轮已中止，图片交付**未获确认**——**不要当它已提供**；本轮不要假装已看到。`
+            : `${name}：本轮已中止，图片附件排队**未获确认**——**不要当它已提供**；下一轮是否收到图片以系统为准，本轮不要假装已看到。`, { path, mimeType, bytes: raw.length });
         }
-        return { ok: false, message: `${name}：图片**未能排队**（原因：${reasonOf(err)}）——下一轮不会收到该图片附件；本轮不要假装已看到。` };
+        return fail("capability-error", delivery === "tool-result"
+          ? `${name}：图片**未提供**（原因：${reasonOf(err)}）——本轮不要假装已看到。`
+          : `${name}：图片**未能排队**（原因：${reasonOf(err)}）——下一轮不会收到该图片附件；本轮不要假装已看到。`, { path, mimeType, bytes: raw.length });
       }
       const normalized = viewImageReceiptOf(receipt);
       if (normalized === undefined) {
-        return {
-          ok: false,
-          message: `${name}：能力未返回明确回执（回执缺失或非法）——按**未排队**处理；下一轮不会收到该图片附件；本轮不要假装已看到。`,
-        };
+        if (charged > 0) releaseBudget(charged);
+        return fail("invalid-receipt", delivery === "tool-result"
+          ? `${name}：能力未返回明确回执（回执缺失或非法）——按**未提供图片**处理；本轮不要假装已看到。`
+          : `${name}：能力未返回明确回执（回执缺失或非法）——按**未排队**处理；下一轮不会收到该图片附件；本轮不要假装已看到。`, { path, mimeType, bytes: raw.length });
       }
       if (!normalized.ok) {
-        return {
-          ok: false,
-          message: `${name}：图片**未能排队**（回执：${normalized.message ?? "能力侧被拒且未提供原因"}）——下一轮不会收到该图片附件；本轮不要假装已看到。`,
-        };
+        if (charged > 0) releaseBudget(charged);
+        return fail("capability-rejected", delivery === "tool-result"
+          ? `${name}：图片**未提供**（回执：${normalized.message ?? "能力侧被拒且未提供原因"}）——本轮不要假装已看到。`
+          : `${name}：图片**未能排队**（回执：${normalized.message ?? "能力侧被拒且未提供原因"}）——下一轮不会收到该图片附件；本轮不要假装已看到。`, { path, mimeType, bytes: raw.length });
       }
+      const receiptMode = normalized.mode ?? "next-turn";
+      if (receiptMode === "tool-result" && delivery !== "tool-result") {
+        // 契约不一致（能力声称同轮附图，但运行时策略仍是下一轮附件）⇒ fail-closed：不交付、不谎称。
+        return fail("delivery-mismatch", `${name}：能力回执声明同轮附图，但当前运行时策略为下一轮附件（交付契约不一致）——按**未提供图片**处理；本轮不要假装已看到。`, { path, mimeType, bytes: raw.length });
+      }
+      if (receiptMode === "tool-result") {
+        record({ ok: true, turnId, path, mimeType, bytes: raw.length, delivery: "tool-result" });
+        return { ok: true, message: viewImageSameTurnMessage(path), images: [image], imageDelivery: "tool-result" };
+      }
+      // 回退为下一轮附件（或策略本就是 next-turn）：本轮不交付图片；释放同轮预算占用（若已预留）。
+      if (charged > 0) releaseBudget(charged);
+      record({ ok: true, turnId, path, mimeType, bytes: raw.length, delivery: "next-turn" });
       return {
         ok: true,
         message: `${name}: ${path} 已读取并排队；下一轮以图片附件提供；本轮不要假装已看到。${normalized.message !== undefined ? ` ${normalized.message}` : ""}`,
+        imageDelivery: "next-turn",
       };
     },
   };
@@ -1401,7 +1538,7 @@ function isSystemOperator(operatorId: string | undefined): boolean {
 function judgeDeclined(name: string, reason: string | undefined, acceptanceRework: boolean): ToolResult {
   const detail = reason !== undefined && reason.trim() !== "" ? `（原因：${reason}）` : "";
   const handling = acceptanceRework
-    ? `应用会把本次退回交 Steward/统筹（Convener）组织返工；请等待返工后重新提交验收。`
+    ? `应用会把本次退回交 运营/Steward（Convener）组织返工；请等待返工后重新提交验收。`
     : `应用会按治理规则处理本次退回。`;
   return {
     ok: false,
@@ -1455,7 +1592,7 @@ function acceptanceTriageReceipt(
   const headline =
     triage.disposition === "report-only"
       ? "按验收分诊卡选择「仅汇报不返工」处理（不是客户在验收卡上直接选择 accept）"
-      : "按验收分诊卡选择「下发统筹修改」处理（以验收 reject 结算并交统筹组织返工；不是客户放弃验收）";
+      : "按验收分诊卡选择「下发运营修改」处理（以验收 reject 结算并交运营组织返工；不是客户放弃验收）";
   return {
     ok: true,
     message:
@@ -1474,7 +1611,7 @@ function acceptanceTriageDeclinedReceipt(
   triage: { disposition: "rework" | "report-only"; source: "judge" | "customer"; conclusion: string },
   reason: string | undefined,
 ): ToolResult {
-  const label = triage.disposition === "report-only" ? "仅汇报不返工" : "下发统筹修改";
+  const label = triage.disposition === "report-only" ? "仅汇报不返工" : "下发运营修改";
   const source = triage.source === "judge" ? "判断代批（替我决策）" : "客户分诊选择";
   const detail = reason !== undefined && reason.trim() !== "" ? `；说明：${reason}` : "";
   return {
@@ -1486,7 +1623,7 @@ function acceptanceTriageDeclinedReceipt(
   };
 }
 
-function abortedToolResult(name: string): ToolResult {
+function abortedToolResult(name: string, viewImageDelivery?: ViewImageDeliveryMode): ToolResult {
   if (name === REQUEST_CONFIRMATION_TOOL_NAME || name === REQUEST_CHOICE_TOOL_NAME) return notConsented(name, "会话已中止");
   if (name === SUBMIT_REPORT_TOOL_NAME) return { ok: false, message: `${name}：报告**未能交回**（原因：会话已中止）` };
   if (name === SHELL_VERDICT_TOOL_NAME) return { ok: false, message: `${name}：审读结论**未能交回**（原因：会话已中止）` };
@@ -1519,9 +1656,17 @@ function abortedToolResult(name: string): ToolResult {
   if (name === REQUEST_BOUNDARY_CHANGE_TOOL_NAME) {
     return { ok: false, message: `${name}：边界变更请求**未获结果**（原因：会话已中止）——**不要当已派发/已修改**；如实告知客户。` };
   }
-  // 图片查看（2026-10-26）：中止时不谎称「已提供/未提供」——排队结果未确认，下一轮以系统为准。
+  // 需求变更申请（2026-10-26）：中止时**不假设已提交/已获批准**（零副作用面如实）。
+  if (name === REQUEST_REQUIREMENT_CHANGE_TOOL_NAME) {
+    return { ok: false, message: `${name}：需求变更申请**未获结果**（原因：会话已中止）——**不要当已提交/已获批准**；如实告知客户。` };
+  }
+  // 图片查看（2026-10-26；2026-10-27 同轮设计）：中止时不谎称「已提供/未提供」。
+  // 文案按当前交付方式分支：next-turn 保持「排队未获确认；下一轮以系统为准」原意；
+  // tool-result 不得声称排队或下一轮附件，只如实说交付未获确认。
   if (name === VIEW_IMAGE_TOOL_NAME) {
-    return { ok: false, message: `${name}：本轮已中止，图片附件排队**未获确认**——**不要当它已提供**；下一轮是否收到图片以系统为准，本轮不要假装已看到。` };
+    return viewImageDelivery === "tool-result"
+      ? { ok: false, message: `${name}：本轮已中止，图片交付**未获确认**——**不要当它已提供**；本轮不要假装已看到。` }
+      : { ok: false, message: `${name}：本轮已中止，图片附件排队**未获确认**——**不要当它已提供**；下一轮是否收到图片以系统为准，本轮不要假装已看到。` };
   }
   // 2026-10-22 后台任务（B1）：中止时**不假设已启动/已停止**（零副作用面如实）。
   if (name === START_BACKGROUND_TASK_TOOL_NAME) {
@@ -3226,7 +3371,7 @@ function requestBoundaryChangeResultMessage(name: string, value: unknown): ToolR
   if (receipt.ok) {
     const headline =
       receipt.code === "dispatched"
-        ? "边界变更请求已派发给组队"
+        ? "边界变更请求已派发给人事"
         : receipt.code === "already-dispatched"
           ? "此前已派发，未重复派发"
           : "请求已受理";
@@ -3234,7 +3379,7 @@ function requestBoundaryChangeResultMessage(name: string, value: unknown): ToolR
       ok: true,
       message:
         `${name}：${headline}${detail}。` +
-        `注意：**请求变更 ≠ 客户批准**——实际修改仍由组队走 appointment-write 与客户/判断确认；` +
+        `注意：**请求变更 ≠ 客户批准**——实际修改仍由人事走 appointment-write 与客户/判断确认；` +
         `本工具不代表客户批准，也不代表边界已修改。`,
     };
   }
@@ -3296,6 +3441,203 @@ function makeRequestBoundaryChangeTool(fn: RequestBoundaryChangeFn): ExecutableT
   };
 }
 
+// —————————————— 需求变更申请（2026-10-26 客户要求；request_requirement_change） ——————————————
+//
+// 背景：报告员（Draft/rapporteur）起草提案时若发现需要新的客户授权/范围/约束/成本变化，不应把
+// 未获授权的诉求塞进提案卡「顺带获批」，而应提交需求变更审批。**审批不由主理完成**（2026-10-26
+// 客户纠正）：申请由**提案角色（Rapporteur）或统筹**发起；审批卡由应用在申请成功后自动经发起方会话呈现
+// （decision 卡）——「替我决策」开启时由判断 agent 按推荐项决定、未开启时由客户手选；**发起方不得自批、
+// 不得重复发卡**；主理不审批，只在批准后执行意图变更。本层只做两件事：**参数形状校验**（flowId/intentId 至少一个；changeKind
+// 枚举；summary/rationale 非空有界；impact/proposedIntentPatch 可选有界；未知参数拒绝；非法在触达
+// 能力前拒绝，不猜测、不截断、不静默丢弃）＋**调用注入能力并如实转达回执**（`ok`/`code`/`message`；
+// 失败不伪装成功）。意图记录校验、去重/派发、账本/系统行与 decision 卡触发全部在**应用注入的能力**
+// 侧——本工具不写盘、不弹客户卡、不做治理判定、不改变任何写权。
+// 纪律：**申请≠批准，也不代表意图已变更**；`dispatched` 只表示已提交、不代表通过；
+// 不要把新授权写进提案卡；`proposedIntentPatch` 只是建议。
+// 未注入能力 ⇒ 工具不注册（沿 request_acceptance 先例，能力缺席＝最强 fail-closed）。
+
+const REQUEST_REQUIREMENT_CHANGE_ARG_KEYS: ReadonlySet<string> = new Set([
+  "flowId",
+  "intentId",
+  "changeKind",
+  "summary",
+  "rationale",
+  "impact",
+  "proposedIntentPatch",
+]);
+
+/** `request_requirement_change` 回执 code 的冻结枚举（与 `RequestRequirementChangeResult` 同一契约；契约外回执 fail-closed）。 */
+const REQUEST_REQUIREMENT_CHANGE_CODES: readonly RequestRequirementChangeResult["code"][] = Object.freeze([
+  "dispatched",
+  "already-dispatched",
+  "invalid",
+  "intent-not-found",
+  "flow-not-found",
+  "unavailable",
+  "rejected",
+]);
+const REQUEST_REQUIREMENT_CHANGE_CODE_SET: ReadonlySet<string> = new Set(REQUEST_REQUIREMENT_CHANGE_CODES);
+
+/** changeKind 冻结枚举（与 Model 同一契约；非法值在触达能力前拒绝）。 */
+const REQUEST_REQUIREMENT_CHANGE_KINDS: readonly RequestRequirementChangeInput["changeKind"][] = Object.freeze([
+  "scope",
+  "authorization",
+  "constraint",
+  "cost",
+  "other",
+]);
+
+/** 有界文本上限（按 Unicode 码点计；超长拒绝、绝不静默截断；数值在 schema 描述中公开）。 */
+const REQUEST_REQUIREMENT_CHANGE_LIMITS = Object.freeze({
+  summary: 500,
+  rationale: 4000,
+  impact: 2000,
+  proposedIntentPatch: 4000,
+});
+type RequirementChangeTextField = keyof typeof REQUEST_REQUIREMENT_CHANGE_LIMITS;
+
+/** 必填有界文本：非空字符串且 ≤ 该字段上限（超长拒绝，不截断）。不改写载荷值。 */
+function readRequirementChangeRequiredText(
+  args: Record<string, unknown>,
+  key: RequirementChangeTextField,
+  name: string,
+): { ok: true; value: string } | { ok: false; result: ToolResult } {
+  const value = args[key];
+  if (typeof value !== "string" || value.trim() === "") {
+    return { ok: false, result: flowArgumentError(name, `缺少或非法的 ${key} 参数（须为非空字符串）`) };
+  }
+  const length = Array.from(value).length;
+  const max = REQUEST_REQUIREMENT_CHANGE_LIMITS[key];
+  if (length > max) {
+    return { ok: false, result: flowArgumentError(name, `${key} 超过 ${max} 字（${length} 字；有界文本）`) };
+  }
+  return { ok: true, value };
+}
+
+/** 可选有界文本：缺席/`null` 保持缺席（不造键）；给出时须为非空字符串且 ≤ 该字段上限（超长拒绝，不截断）。 */
+function readRequirementChangeOptionalText(
+  args: Record<string, unknown>,
+  key: RequirementChangeTextField,
+  name: string,
+): { ok: true; value: string | undefined } | { ok: false; result: ToolResult } {
+  const value = args[key];
+  if (value === undefined || value === null) return { ok: true, value: undefined };
+  if (typeof value !== "string" || value.trim() === "") {
+    return { ok: false, result: flowArgumentError(name, `${key} 参数非法（须为非空字符串；可省略）`) };
+  }
+  const length = Array.from(value).length;
+  const max = REQUEST_REQUIREMENT_CHANGE_LIMITS[key];
+  if (length > max) {
+    return { ok: false, result: flowArgumentError(name, `${key} 超过 ${max} 字（${length} 字；有界文本）`) };
+  }
+  return { ok: true, value };
+}
+
+/**
+ * 回执 → 工具结果：**原样**转达 `ok`/`code`/`message`（可选 `flowId`/`intentId`/`requestId` 一并如实呈现）。
+ * 契约外回执（缺失/非对象/缺 ok/code/message/未知 code）⇒ fail-closed「未获明确结果」，按未提交处理，
+ * **绝不说成已提交**。`dispatched` 只表示已提交、不代表通过，申请≠批准（见文案纪律）。
+ */
+function requestRequirementChangeResultMessage(name: string, value: unknown): ToolResult {
+  const contractExternal = (): ToolResult => ({
+    ok: false,
+    message: `${name}：应用未返回明确结果（回执缺失或非法）——按**未提交**处理；**不要当已提交/已获批准**，如实告知客户。`,
+  });
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return contractExternal();
+  const receipt = value as Partial<RequestRequirementChangeResult>;
+  if (
+    typeof receipt.ok !== "boolean" ||
+    typeof receipt.code !== "string" ||
+    !REQUEST_REQUIREMENT_CHANGE_CODE_SET.has(receipt.code) ||
+    typeof receipt.message !== "string" ||
+    receipt.message.trim() === ""
+  ) {
+    return contractExternal();
+  }
+  const parts = [`ok=${receipt.ok}`, `code=${receipt.code}`];
+  if (typeof receipt.flowId === "string" && receipt.flowId !== "") parts.push(`flowId=${receipt.flowId}`);
+  if (typeof receipt.intentId === "string" && receipt.intentId !== "") parts.push(`intentId=${receipt.intentId}`);
+  if (typeof receipt.requestId === "string" && receipt.requestId !== "") parts.push(`requestId=${receipt.requestId}`);
+  const detail = `（${parts.join("；")}）：${receipt.message}`;
+  if (receipt.ok) {
+    // 2026-10-26 客户纠正：审批**不由主理完成**——需求变更审批卡可由**提案角色（Rapporteur）或统筹**
+    // 发起/持有：decision 卡上「替我决策」开启时由判断 agent 按推荐项决定、未开启时由客户手选；
+    // **发起方不得自批**；主理不审批，只在批准后执行意图变更。`dispatched` 只表示已提交，申请≠批准。
+    const headline =
+      receipt.code === "dispatched"
+        ? "已提交需求变更审批（应用自动呈现 decision 卡；替我决策→判断 agent，未开启→客户手选）；申请≠批准；产品只在批准后执行意图变更，不审批；发起方不得自批、不得再调用 request_choice 重复发卡"
+        : receipt.code === "already-dispatched"
+          ? "此前已提交需求变更审批，未重复提交（应用自动呈现 decision 卡；替我决策→判断 agent，未开启→客户手选）；申请≠批准；产品只在批准后执行意图变更，不审批；发起方不得自批、不得再调用 request_choice 重复发卡"
+          : "请求已受理（需求变更审批由应用自动呈现 decision 卡；申请≠批准；产品只在批准后执行意图变更，不审批；发起方不得自批、不得再调用 request_choice 重复发卡）";
+    return {
+      ok: true,
+      message: `${name}：${headline}${detail}。\`proposedIntentPatch\` 只是建议，不要宣称意图已改。`,
+    };
+  }
+  // 应用在派发前退回（如去重/归属/形状校验不通过）：**不代表客户拒绝**——如实转达原因，不要粉饰。
+  if (receipt.code === "rejected") {
+    return {
+      ok: false,
+      message:
+        `${name}：需求变更申请被应用**退回**（rejected）${detail}——**不代表客户拒绝**；` +
+        `**不要当已提交/已获批准**，按 message 修正后如实告知客户。`,
+    };
+  }
+  return { ok: false, message: `${name}：需求变更申请**未成功**${detail}——**不要当已提交/已获批准**；如实告知客户。` };
+}
+
+/** request_requirement_change：把需求变更要点提交给应用（归属/去重/派发/账本由应用实现；回执如实转达）。 */
+function makeRequestRequirementChangeTool(fn: RequestRequirementChangeFn): ExecutableTool {
+  const name = REQUEST_REQUIREMENT_CHANGE_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const unknown = unknownGovernanceArg(call.args, REQUEST_REQUIREMENT_CHANGE_ARG_KEYS, name);
+      if (unknown !== undefined) return unknown;
+      // flowId/intentId 均按治理 slug 校验（intentId 对应 docs/intents/<intentId>.md）；至少一个。
+      const flowId = readGovernanceSlugArg(call.args, "flowId", name);
+      if (!flowId.ok) return flowId.result;
+      const intentId = readGovernanceSlugArg(call.args, "intentId", name);
+      if (!intentId.ok) return intentId.result;
+      if (flowId.value === undefined && intentId.value === undefined) {
+        return flowArgumentError(name, "缺少 flowId/intentId 参数（至少给出一个，用于归属校验/去重）");
+      }
+      const changeKind = call.args["changeKind"];
+      if (typeof changeKind !== "string" || !(REQUEST_REQUIREMENT_CHANGE_KINDS as readonly string[]).includes(changeKind)) {
+        return flowArgumentError(name, `changeKind 参数非法（须为 ${REQUEST_REQUIREMENT_CHANGE_KINDS.join(" / ")} 之一）`);
+      }
+      const summary = readRequirementChangeRequiredText(call.args, "summary", name);
+      if (!summary.ok) return summary.result;
+      const rationale = readRequirementChangeRequiredText(call.args, "rationale", name);
+      if (!rationale.ok) return rationale.result;
+      const impact = readRequirementChangeOptionalText(call.args, "impact", name);
+      if (!impact.ok) return impact.result;
+      const proposedIntentPatch = readRequirementChangeOptionalText(call.args, "proposedIntentPatch", name);
+      if (!proposedIntentPatch.ok) return proposedIntentPatch.result;
+      const input: RequestRequirementChangeInput = {
+        ...(flowId.value !== undefined ? { flowId: flowId.value } : {}),
+        ...(intentId.value !== undefined ? { intentId: intentId.value } : {}),
+        changeKind: changeKind as RequestRequirementChangeInput["changeKind"],
+        summary: summary.value,
+        rationale: rationale.value,
+        ...(impact.value !== undefined ? { impact: impact.value } : {}),
+        ...(proposedIntentPatch.value !== undefined ? { proposedIntentPatch: proposedIntentPatch.value } : {}),
+      };
+      let result: unknown;
+      try {
+        result = await raceAbort(
+          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(input); }),
+          call.signal,
+          `${name} 提交需求变更申请`,
+        );
+      } catch (err) {
+        return { ok: false, message: `${name}：需求变更申请**未完成**（原因：${reasonOf(err)}）——**不要当已提交/已获批准**；如实告知客户。` };
+      }
+      return requestRequirementChangeResultMessage(name, result);
+    },
+  };
+}
+
 /**
  * 构造受治理工具集：
  * - 写入类 write_file / edit_file（先 gate，获准且配置了 writeRoot 时落盘）；
@@ -3314,10 +3656,11 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   ];
 
   // 结构性保证（2026-10-26 图片查看，沿 dispatch_task 先例）：**未注入 viewImage 能力时
-  // `view_image` 不存在**（能力缺席 = 最强 fail-closed）。工具层负责路径/类型/大小校验与
-  // PromptImage 转换；能力侧只负责把图片排队为下一轮附件并如实回执。
+  // `view_image` 不存在**（能力缺席 = 最强 fail-closed；即便 policy 为 tool-result 也不注册）。
+  // 工具层负责路径/类型/大小校验、PromptImage 转换与每轮预算；交付方式由注入的
+  // `viewImagePolicy`（Service 按 `RUNTIME_VIEW_IMAGE_POLICY` 注入）单一决定，工具层不写引擎分支。
   const viewImage = options?.viewImage;
-  if (viewImage !== undefined) tools.push(makeViewImageTool(viewImage, readRoot));
+  if (viewImage !== undefined) tools.push(makeViewImageTool(viewImage, readRoot, options));
 
   // 结构性保证（设计 §7.5.1）：**未注入 ShellGate 时 run_shell 根本不存在**。
   // 「能力缺席」是最强的 fail-closed——不是「注册了再在 execute 里判空」，而是工具压根不在集合里，
@@ -3453,15 +3796,25 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   // 由能力实现，本层只校验精确增删路径与理由并如实转达回执。
   const requestBoundaryChange = options?.requestBoundaryChange;
   if (requestBoundaryChange !== undefined) tools.push(makeRequestBoundaryChangeTool(requestBoundaryChange));
+  // 结构性保证（2026-10-26 需求变更申请，沿 requestAcceptance 先例）：**未注入能力时
+  // `request_requirement_change` 不存在**。只给报告员（Draft/rapporteur）——由调用方（编排/桌面注入端）
+  // 决定注入；未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。意图校验/去重/派发/账本/系统行
+  // 由能力实现，本层只做参数形状校验并如实转达回执——申请≠批准；审批卡可由提案角色（Rapporteur）或
+  // 统筹发起/持有（decision 卡；判断 agent 按推荐项或客户手选），**发起方不得自批**；主理不审批，
+  // 只在批准后执行意图变更。
+  const requestRequirementChange = options?.requestRequirementChange;
+  if (requestRequirementChange !== undefined) tools.push(makeRequestRequirementChangeTool(requestRequirementChange));
   // Observe customer waits without storing titles, previews or selected values.
+  // 中止兜底文案需要知道 view_image 的交付方式（tool-result 不得声称排队/下一轮附件）。
+  const viewImageDelivery = (options?.viewImagePolicy ?? VIEW_IMAGE_DEFAULT_POLICY).delivery;
   return tools.map((tool) => {
     const { parameters, ...description } = describeTool(tool.name);
     const defined: ToolDefinition = { ...tool, ...description, displayInputRule: ["read_file","write_file","edit_file",VIEW_IMAGE_TOOL_NAME].includes(tool.name) ? "core-path-v1" : tool.name === "run_shell" || tool.name === START_BACKGROUND_TASK_TOOL_NAME ? "core-command-v1" : "none", inputSchema: parameters, async handler(call) {
-      if (call.signal?.aborted) return abortedToolResult(tool.name);
+      if (call.signal?.aborted) return abortedToolResult(tool.name, viewImageDelivery);
       const result = await tool.handler(call);
       // 后台任务成功结果带结构化事实（任务已启动/已停止是已发生的真实事件）：即使信号在 handler 返回前
       // 恰好中止，也不能把它改写成「未启动/未停止」的谎言（B4 诚实面）。
-      return call.signal?.aborted && result.ok && result.backgroundTask === undefined ? abortedToolResult(tool.name) : result;
+      return call.signal?.aborted && result.ok && result.backgroundTask === undefined ? abortedToolResult(tool.name, viewImageDelivery) : result;
     } };
     if (tool.name !== REQUEST_CONFIRMATION_TOOL_NAME && tool.name !== REQUEST_CHOICE_TOOL_NAME) return defined;
     return { ...defined, async handler(call) {

@@ -121,7 +121,7 @@ function reconstruct(entries: readonly GovernanceLedgerEntry[]) {
   };
 }
 
-test("审计还原：意图→提案→组队（团队计划）→任命→派程→验收，账本可还原谁沟通/谁提案/谁组队/谁排程/客户批了什么", async () => {
+test("审计还原：意图→提案→人事（团队计划）→任命→派程→验收，账本可还原谁沟通/谁提案/谁人事/谁排程/客户批了什么", async () => {
   const { root, cleanup } = makeRoot("audit-chain");
   try {
     writeProjectRole(root, "A");
@@ -336,7 +336,7 @@ test("审计还原：意图→提案→组队（团队计划）→任命→派�
     assert.equal(audit.intent?.artifactPath, `docs/intents/${INTENT}.md`);
     assert.equal(audit.proposedBy, "rapporteur", "谁提案 = Rapporteur");
     assert.equal(audit.proposalPath, `docs/proposals/${FLOW}-v1.md`);
-    assert.equal(audit.teamPlannedBy, "convener", "谁组队/写团队计划 = Convener");
+    assert.equal(audit.teamPlannedBy, "convener", "谁人事/写团队计划 = Convener");
     assert.equal(audit.teamPlanPath, TEAM_PLAN_REL);
     assert.equal(audit.scheduledBy, "convener", "谁排程 = Convener");
     assert.equal(audit.flowPath, `docs/flows/${FLOW}.md`);

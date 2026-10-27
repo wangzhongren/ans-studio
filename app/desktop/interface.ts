@@ -21,10 +21,10 @@ import type { GovernanceFunction, GovernanceModel, ProjectConfig } from "../../s
 // 会话事件流类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。外推时套上 `roleId` 信封
 // （`SessionEventEnvelope`，B-2）——**类型从编排/本角色只读导入、不复制形状**。
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputOutcome, CustomerInputTriageOutcome, DispatchTaskFn, PromptImage, PromptOptions, FinalizeResult } from "../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputOutcome, CustomerInputTriageOutcome, DispatchTaskFn, PromptImage, PromptOptions, FinalizeResult, ViewImageFn } from "../../src/model/runtime.ts";
 // 2026-10-25 独立复核请求（`request_acceptance`）：能力回执/载荷形状唯一来源＝契约家 `model/runtime.ts`
 // （只读导入，不复制形状）；flowId 形状同样复用运行时核心导出的 slug 常量（不另写正则）。
-import type { RequestAcceptanceFn, RequestAcceptanceInput, RequestAcceptanceResult, RequestBoundaryChangeFn, RequestBoundaryChangeInput, RequestBoundaryChangeResult, RequestGateReviewFn, RequestGateReviewInput, RequestGateReviewResult, GovernanceJudgeFn, GovernanceJudgeOutcome } from "../../src/model/runtime.ts";
+import type { RequestAcceptanceFn, RequestAcceptanceInput, RequestAcceptanceResult, RequestBoundaryChangeFn, RequestBoundaryChangeInput, RequestBoundaryChangeResult, RequestGateReviewFn, RequestGateReviewInput, RequestGateReviewResult, RequestRequirementChangeFn, RequestRequirementChangeInput, RequestRequirementChangeResult, GovernanceJudgeFn, GovernanceJudgeOutcome } from "../../src/model/runtime.ts";
 import { GOVERNANCE_SLUG_PATTERN } from "../../src/model/runtime.ts";
 // 2026-10-26 边界变更请求（request_boundary_change）：确定性校验/票据/组队任务/AI 门禁请求的纯逻辑
 // 在 `boundary-change.ts`（不写盘、不发会话）；本层只做 IO/派发/判断闭包装配。
@@ -40,6 +40,24 @@ import {
   buildBoundaryChangeJudgeRequest,
   type BoundaryChangeTicketRecord,
 } from "./boundary-change.ts";
+// 2026-10-26 需求变更申请（request_requirement_change）：载荷二次校验/稳定 requestId/票据形状/审批卡
+// 与已批准执行任务文本的纯逻辑在 `requirement-change.ts`（不写盘、不发会话）；本层只做 IO/客户卡通道/
+// 主理执行任务投递/系统行。
+import {
+  REQUIREMENT_CHANGE_TICKET_ROOT_REL,
+  REQUIREMENT_CHANGE_TICKET_SCHEMA,
+  assessRequirementChangeRequest,
+  buildRequirementChangeApprovalCard,
+  buildRequirementChangeLeadExecutionTaskText,
+  isPendingRequirementChangeStatus,
+  requirementChangeApprovalSourceText,
+  requirementChangeClientMessageId,
+  requirementChangeDetailText,
+  requirementChangeRequestId,
+  requirementChangeTicketRelPath,
+  type RequirementChangeApprovalRecord,
+  type RequirementChangeTicketRecord,
+} from "./requirement-change.ts";
 import { atomicWrite } from "../../src/common/shared/atomic-write.ts";
 
 import { listProject as realListProject } from "../../src/service/role/resolve-role.ts";
@@ -78,6 +96,11 @@ import {
   // W6-B（四角色评审 §7.2）：应用后台推进成功后写 `dispatch.accepted(app, trigger=customer-decision)`——
   // 账本只经 Pipeline 公共出口（薄再导出）使用，不直接导入编排私有 `common/`。
   appendGovernanceLedger,
+  // 2026-10-26：流程骨架状态常量经 Pipeline 公共出口只读导入（不复制字面量，防与编排漂移）。
+  FLOW_SKELETON_STATUS,
+  // 2026-10-26 需求变更申请：意图记录路径的单一来源（Pipeline 公共出口，薄再导出）——桌面不另写
+  // `docs/intents/<intentId>.md` 规则。
+  intentArtifactPath,
   type GovernancePreviewResult,
   type EstablishGovernanceResult,
   type GovernanceRecordInput,
@@ -583,6 +606,10 @@ export interface DesktopDeps {
       requestGateReview?: RequestGateReviewFn;
       /** 边界变更请求能力（2026-10-26 request_boundary_change）：仅统筹（convener）会话注入（见 session.ts）。 */
       requestBoundaryChange?: RequestBoundaryChangeFn;
+      /** 需求变更申请能力（2026-10-26 request_requirement_change）：仅统筹/提案会话注入（见 session.ts）。 */
+      requestRequirementChange?: RequestRequirementChangeFn;
+      /** 图片查看投递能力（2026-10-26 view_image）：全部角色会话注入（目标在开会话时定格）。 */
+      viewImage?: ViewImageFn;
       /** W6-B：意图交接投递端（仅 Liaison 注入；编排已校验/写账本，桌面只后台投递）。 */
       handOffIntent?: import("../../src/model/runtime.ts").HandOffIntentFn;
       /** W6-B：澄清送达端（仅 Rapporteur 注入；编排已判两轮上限/写账本，桌面只落主入口系统行）。 */
@@ -829,9 +856,10 @@ export interface DesktopDeps {
    */
   requestGateReview?: (projectRoot: string, input: RequestGateReviewInput) => Promise<RequestGateReviewResult>;
   /**
-   * **gate 复核请求的时限**（与 `requestAcceptanceLimits` 同模式）：总预算缺省 ≤60s；单阶段（引擎解析/
-   * 派发/记录）缺省 ≤20s。超时如实返回 `unavailable` 并提示「可能已派发，请用 flow_get 核对」，
-   * **绝不让工具无限挂起**，也不谎报已派发。
+   * **gate 复核请求的时限**（与 `requestAcceptanceLimits` 同模式）：总预算缺省 45s；单阶段（引擎解析/
+   * 派发/记录）缺省 = 总预算。投递回执超时后对账质检会话：在跑/有排队 ⇒ 继续写 gate 记录 + 账本并回
+   * `dispatched`（如实说明“确认超时但在途”）；无在途证据 ⇒ 如实返回 `unavailable`。**绝不让工具无限
+   * 挂起**，也不谎报已派发。
    */
   requestGateReviewLimits?: { totalMs?: number; stageMs?: number };
   /**
@@ -860,6 +888,37 @@ export interface DesktopDeps {
    * **绝不让工具调用无限挂起**，也不谎称已派发。
    */
   requestBoundaryChangeLimits?: { judgeMs?: number; dispatchMs?: number };
+  /**
+   * **需求变更申请能力**（2026-10-26 `request_requirement_change`；客户纠正）：桌面 Interface 提供的
+   * 应用侧实现（按项目绑定；`requesterRoleId`/`runtime` 由会话注入端补入）。SessionManager 仅对
+   * **统筹（schedule）与提案（proposal）**会话注入；其他内置治理角色、项目角色不注入（缺省不注入 ⇒
+   * 工具不注册，结构性 fail-closed）。语义：载荷二次校验 → 发起方白名单 → 意图/流程存在性 → 同 flow
+   * 待处理/已批准去重 → 原子写 `.ans/governance/requirement-changes/<flowId>/<requestId>.json`
+   * （`requirement-change-request/v2`）→ 经**发起方会话客户卡通道**呈现 `request_choice(cardKind=
+   * "decision")` 审批卡（approve/reject，恰好一个 recommended=approve）→ 票据 dispatched。
+   * 审批由客户（未勾选「替我决策」）或独立判断 agent（勾选时默认推荐项）完成；发起方不得自批。
+   * 批准 ⇒ 应用把「已批准执行任务」交给主理（主理不审批，只执行意图变更并通知提案修订）；
+   * 拒绝/未获明确结果 ⇒ 回执给发起方。**申请 ≠ 批准**：不写 `customer.decision`/治理账本、不改写权；
+   * 不向主理投原始申请任务。失败如实 `unavailable`/`rejected`（票据 failed，可重试）。
+   */
+  requestRequirementChange?: (
+    projectRoot: string,
+    requesterRoleId: string,
+    runtime: RuntimeKind,
+    input: RequestRequirementChangeInput,
+  ) => Promise<RequestRequirementChangeResult>;
+  /**
+   * **需求变更审批卡/主理执行任务投递的时限**（与 requestAcceptanceLimits 同模式）：总预算缺省 ≤60s；
+   * 单阶段（主理执行任务的打开/投递、审批回执投递）缺省 ≤20s。超时如实回执/记票据，绝不无限挂起。
+   */
+  requestRequirementChangeLimits?: { totalMs?: number; stageMs?: number };
+  /**
+   * **意图交接投递的时限**（2026-10-26 真机：主理调度提案时卡住自己）：总预算缺省 45s；单阶段
+   * （后台打开提案会话 / 投递任务）缺省 = 总预算（45s）。超时后对账目标会话，在跑/有排队 ⇒
+   * `ok:true`（工作中）；目标既不在跑也无排队 ⇒ `ok:false` 如实回执 + 系统行；目标忙时入队
+   * （`queued:true`）仍成功。透传给 SessionManager。
+   */
+  handOffIntentLimits?: { totalMs?: number; stageMs?: number };
   /**
    * **role-cards 步骤收口**（2026-10-23 可重入门禁 A4/A5）：结构校验通过后把 flow YAML 的
    * `id:"role-cards"` 步骤标为 done（应用专用；不注册为角色工具、不写客户决定）。缺省经 Pipeline 公共
@@ -2634,7 +2693,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     const receiverRoleId = (listingCache.get(projectRoot)?.primaryRoleId ?? "").trim();
     if (receiverRoleId === "") {
       diagnostic.record("acceptance.rework.receiver.missing", { flowId });
-      noteReworkOnce(projectRoot, flowId, "failed", "receiver-missing", note, governanceAcceptanceReworkFailedNote(flowId, "项目主入口（主理）未枚举到；不猜、不改投，等待重新枚举后重试。"));
+      noteReworkOnce(projectRoot, flowId, "failed", "receiver-missing", note, governanceAcceptanceReworkFailedNote(flowId, "项目主入口（产品）未枚举到；不猜、不改投，等待重新枚举后重试。"));
       return "failed";
     }
     const receiverLabel = reworkReceiverLabel(projectRoot, receiverRoleId);
@@ -2847,7 +2906,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       acceptanceStep.status === "aborted" ||
       acceptanceStep.status === "superseded"
     ) {
-      blocked(`验收步骤状态为 ${acceptanceStep.status}（终态）；不自动重开，请人工 / 统筹 处理。`);
+      blocked(`验收步骤状态为 ${acceptanceStep.status}（终态）；不自动重开，请人工 / 运营 处理。`);
       return;
     }
     if (
@@ -3085,7 +3144,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           return { status: "not-executable", reasons: ["应用/客户不是可派发的返工 owner"] };
         }
         if (item.owner === "verifier") {
-          return { status: "executable", reasons: ["报告/工具修正项归验收（不作为产品返工派发）"] };
+          return { status: "executable", reasons: ["报告/工具修正项归质检（不作为产品返工派发）"] };
         }
         if (item.owner === "convener" || isBuiltInGovernanceRoleId(item.owner)) {
           return { status: "executable", reasons: ["内置治理角色（治理文档/变更包项）"] };
@@ -3159,7 +3218,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         flowId: record.flowId,
         actorRoleId: "app",
         power: "app",
-        messageSummary: `验收分诊：${record.disposition === "rework" ? "下发统筹修改" : "仅汇报不返工"}（来源 ${record.source}/${sourceDetail}；报告 ${record.reportPath}）`,
+        messageSummary: `验收分诊：${record.disposition === "rework" ? "下发运营修改" : "仅汇报不返工"}（来源 ${record.source}/${sourceDetail}；报告 ${record.reportPath}）`,
         acceptanceTriage: decision,
         ...(record.reportSha256 !== null ? { artifactPath: record.reportPath, artifactSha256: record.reportSha256, ...(record.reportVersion >= 1 ? { artifactVersion: record.reportVersion } : {}) } : {}),
       });
@@ -3455,7 +3514,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         if (!liveOptions.has("accept") || !liveOptions.has("reject")) {
           return {
             outcome: "declined",
-            reason: picked === "rework" ? "分诊选择：下发统筹修改" : "分诊选择：仅汇报不返工",
+            reason: picked === "rework" ? "分诊选择：下发运营修改" : "分诊选择：仅汇报不返工",
             triage: triageField(picked),
           };
         }
@@ -3551,7 +3610,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     if (record.status === "dispatched") {
       diagnostic.record("acceptance.triage.idempotent", { flowId, status: record.status });
       return settleDeclined(
-        `验收分诊：已下发统筹修改（同一报告不重复分诊；报告 ${record.reportPath}）。`,
+        `验收分诊：已下发运营修改（同一报告不重复分诊；报告 ${record.reportPath}）。`,
         record.conclusion !== null && record.source !== null
           ? { disposition: "rework", source: record.source, conclusion: record.conclusion, triageId: record.triageId }
           : undefined,
@@ -3852,7 +3911,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           outcome: "declined",
           operatorId: "judge:triage",
           notPresented: true,
-          reason: `验收分诊（判断代批 judge-rule）：已下发统筹修改；报告 ${snapshot.relPath}（v${snapshot.version}）。`,
+          reason: `验收分诊（判断代批 judge-rule）：已下发运营修改；报告 ${snapshot.relPath}（v${snapshot.version}）。`,
           triage: { disposition: "rework", source: "judge", conclusion: parsed.triage.conclusion, triageId: plan.triageId },
         },
         run: async () => {
@@ -4142,7 +4201,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const emitSessionEvent = (envelope: SessionEventEnvelope): void => {
     deps.emitEvent(envelope);
     if (typeof envelope.projectRoot === "string" && envelope.projectRoot !== "") {
-      acceptanceRuntimeHints.set(envelope.projectRoot, envelope.runtime);
+      // 2026-10-27 真机（tiny-snake 导入后 ready-wake 误用 Claude）：应用自己产生的系统行
+      // （`delivery-note`）为 UI 展示常用兜底 runtime="claude"，它不代表项目真实引擎。不得把它写进
+      // `acceptanceRuntimeHints`，否则会覆盖项目已选的 Pi（无 ANTHROPIC_API_KEY 时直接失败）。
+      const isAppNote =
+        envelope.event.kind === "message" &&
+        (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note";
+      if (!isAppNote) acceptanceRuntimeHints.set(envelope.projectRoot, envelope.runtime);
     }
     if (envelope.event.kind === "settled") {
       // 2026-10-19：任意角色 settle 都是流程可能推进的真实时机（治理步骤不产生回交，旧挂点永远等不到）。
@@ -4444,7 +4509,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       return;
     }
     const task = [
-      `[系统·治理核证] 流程 ${flowId}：以下步骤已 delivered，等待统筹核证：`,
+      `[系统·治理核证] 流程 ${flowId}：以下步骤已 delivered，等待运营核证：`,
       ...newSteps.map(
         (step) =>
           `- 步骤 ${step.id} 已 delivered（owner=${step.owner}），请核对账本/产物证据，用 flow_step_update 标 done 或退回修正；不要直接写 flow YAML。`,
@@ -4531,7 +4596,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       const sorted = [...blocked].sort((a, b) => a.id.localeCompare(b.id));
       return {
         key: `blocked:${sorted.map((step) => `${step.id}:${step.status}`).join(",")}`,
-        description: "存在 failed / blocked / aborted 步骤，需要主理协调返工或修正",
+        description: "存在 failed / blocked / aborted 步骤，需要产品协调返工或修正",
         details: sorted.slice(0, 10).map((step) => `- 步骤 ${step.id} 当前状态 ${step.status}（owner=${step.owner ?? "未标注"}）`),
       };
     }
@@ -4683,8 +4748,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       "要求：",
       "1) 先 flow_get 读取当前流程与账本状态（含 revision），核对依赖与已派发记录后再动作。",
       "2) 项目 worker 的 dispatch / artifact 步骤用 dispatch_task 按 owner 派发（stepId 与 flow 完全一致；同一 parallelGroup 可并行；账本已有 dispatch.accepted 的步骤不要重复派）。",
-      "3) owner 为统筹（convener）自身的 artifact 步骤请继续执行并回交。",
-      "4) 不要把这些步骤直接标 done（done 由证据核证决定）；不要派 acceptance / 验收（验收由应用按流程完成度自动派发 Proof）。",
+      "3) owner 为运营（convener）自身的 artifact 步骤请继续执行并回交。",
+      "4) 不要把这些步骤直接标 done（done 由证据核证决定）；不要派 acceptance / 质检（验收由应用按流程完成度自动派发 Proof）。",
       "本消息只是继续调度提示：应用未自动派发、未改 flow/账本、未替客户决定。",
     ].join("\n");
   };
@@ -5802,11 +5867,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const requestGateReviewInFlight = new Set<string>();
   const requestGateReviewTotalMs = (() => {
     const raw = deps.requestGateReviewLimits?.totalMs;
-    return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 60_000;
+    return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 45_000;
   })();
   const requestGateReviewStageMs = (() => {
     const raw = deps.requestGateReviewLimits?.stageMs;
-    const fallback = Math.max(1, Math.min(20_000, requestGateReviewTotalMs));
+    // 2026-10-27 客户反馈：阶段缺省 = 总预算（45s）。旧 20s 会在质检写入无 ACK 时误报 unavailable，
+    // 任务其实已投递；超时后由 `performRequestGateReview` 对账在途（见投递段）。
+    const fallback = Math.max(1, requestGateReviewTotalMs);
     return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : fallback;
   })();
   /** 有界等待（与 request_acceptance 同一实现；底层 promise 不取消、不伪造结果）。 */
@@ -6311,20 +6378,45 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       manager.openBackground({ projectRoot, roleId: "verifier", runtime: resolution.runtime }),
       stageBudgetMs(),
     );
-    if (opened.timedOut) return gateReviewTimeoutResult(flowId, gateId, "打开验收会话", Date.now() - startedAtMs);
+    if (opened.timedOut) return gateReviewTimeoutResult(flowId, gateId, "打开质检会话", Date.now() - startedAtMs);
     if (!opened.value.ok) {
       return result("unavailable", mainT("main.gateReview.unavailable", {
         flowId,
         gateId,
-        detail: `打开验收会话失败：${opened.value.error ?? mainT("shared.common.unknownReason")}`,
+        detail: `打开质检会话失败：${opened.value.error ?? mainT("shared.common.unknownReason")}`,
       }));
     }
-    const sent = await withGateReviewDeadline(
-      manager.sendBackground({ projectRoot, roleId: "verifier", runtime: resolution.runtime, text: task }),
-      stageBudgetMs(),
-    );
-    if (sent.timedOut) return gateReviewTimeoutResult(flowId, gateId, "gate 复核任务投递", Date.now() - startedAtMs);
-    if (!sent.value.ok) {
+    const sendPromise = manager.sendBackground({ projectRoot, roleId: "verifier", runtime: resolution.runtime, text: task });
+    const sent = await withGateReviewDeadline(sendPromise, stageBudgetMs());
+    // 2026-10-27 客户反馈（与 handoff 同源）：投递回执超时 ≠ 未投递。先对账质检会话：在跑/有排队 ⇒
+    // 任务已受理，继续写 gate 记录 + 派发审计并回 dispatched（不重复请求）；只有既不在跑也无排队才失败。
+    let confirmationTimedOut = false;
+    if (sent.timedOut) {
+      const pending =
+        manager.isRoleBusy(projectRoot, "verifier", resolution.runtime) ||
+        manager.hasPendingDelivery(projectRoot, "verifier", resolution.runtime);
+      if (!pending) return gateReviewTimeoutResult(flowId, gateId, "gate 复核任务投递", Date.now() - startedAtMs);
+      confirmationTimedOut = true;
+      diagnostic.record("request-gate-review.timeout-pending", {
+        flowId,
+        gateId,
+        stage: "gate 复核任务投递",
+        elapsedMs: Date.now() - startedAtMs,
+      });
+      // 晚到结果只记诊断（不翻转已回执的“在途”结论、不重复写记录/账本、不重试）；处理器自带 catch。
+      void sendPromise
+        .then((late) => {
+          if (late.ok) return;
+          diagnostic.record("request-gate-review.late.failed", {
+            flowId,
+            gateId,
+            error: late.error ?? mainT("shared.common.unknownReason"),
+          });
+        })
+        .catch((lateError: unknown) => {
+          diagnostic.error("request-gate-review.late.failed", lateError, { flowId, gateId });
+        });
+    } else if (!sent.value.ok) {
       return result("unavailable", mainT("main.gateReview.unavailable", {
         flowId,
         gateId,
@@ -6333,7 +6425,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     }
 
     // 12) 持久化：**先原子写 gate 记录**（重启恢复的唯一扫描源），再写账本审计。
-    // 任一写失败 ⇒ unavailable（不声称已派发；任务可能已投递，请用 flow_get 核对）。
+    // 记录写失败 ⇒ unavailable（不声称已派发；任务可能已投递，请用 flow_get 核对）；账本失败只诊断、
+    // 不翻转回执（记录已落盘，2026-10-27 客户真机：审计失败不应把已派发误报成未派发）。
     const dispatchedAt = new Date().toISOString();
     const record: GateReviewRecord = {
       schema: GATE_REVIEW_RECORD_SCHEMA,
@@ -6378,18 +6471,34 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       messageSummary: ledgerSummary(task),
       runtime: resolution.runtime,
     });
+    // 2026-10-27：gate 记录已先落盘（重启/事件恢复的唯一扫描源）⇒ 账本失败只诊断、不翻转回执；
+    // 但必须在回执里如实说明审计未落盘。记录写入失败仍 fail-closed（见上，不声称已派发）。
+    let ledgerAuditError: string | undefined;
     if (!appended.ok) {
+      ledgerAuditError = appended.message;
       diagnostic.error("request-gate-review.ledger.failed", new Error(appended.message), { flowId, gateId });
-      return result("unavailable", mainT("main.gateReview.unavailable", {
-        flowId,
-        gateId,
-        detail: `gate 记录已写但账本审计失败：${appended.message}；任务可能已投递，请用 flow_get 核对`,
-      }), { runtime: resolution.runtime });
     }
-    diagnostic.record("request-gate-review.dispatched", { flowId, gateId, gateKind: gateStep.gateKind, reportVersion });
+    diagnostic.record("request-gate-review.dispatched", {
+      flowId,
+      gateId,
+      gateKind: gateStep.gateKind,
+      reportVersion,
+      confirmation: confirmationTimedOut ? "timeout-pending" : "confirmed",
+      ledgerAuditFailed: ledgerAuditError ?? null,
+    });
+    const timeoutSuffix = confirmationTimedOut
+      ? "（质检确认回执超时，但目标会话仍在工作/已入队；gate 记录与派发审计已补写，请勿重复请求）"
+      : "";
+    const auditSuffix =
+      ledgerAuditError !== undefined
+        ? `（账本审计写入失败：${ledgerAuditError}；gate 记录已落盘，恢复扫描会补收口，请用 flow_get 核对）`
+        : "";
     return result(
       "dispatched",
-      mainT("main.gateReview.dispatched", { flowId, gateId }) + `（gateKind=${gateStep.gateKind}；报告 ${reportPath}；引擎 ${resolution.runtime}）`,
+      mainT("main.gateReview.dispatched", { flowId, gateId }) +
+        `（gateKind=${gateStep.gateKind}；报告 ${reportPath}；引擎 ${resolution.runtime}）` +
+        timeoutSuffix +
+        auditSuffix,
       { runtime: resolution.runtime },
     );
   };
@@ -6616,7 +6725,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       noteGateOnce(projectRoot, flowId, record.gateId, "unavailable", "receiver-missing", note, mainT("main.gateReview.unavailable", {
         flowId,
         gateId: record.gateId,
-        detail: "项目主入口（主理）未枚举到；不猜、不改投，等待重新枚举后重试",
+        detail: "项目主入口（产品）未枚举到；不猜、不改投，等待重新枚举后重试",
       }));
       diagnostic.record("gate.rework.receiver.missing", { flowId, gateId: record.gateId });
       return;
@@ -6743,8 +6852,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     listing: ProjectListing;
     note: (summary: string) => void;
     diagnostic: ReturnType<typeof createDiagnosticLogger>;
+    /** 2026-10-27：`recovery` = 由「有 pass 报告但无 gate 记录」的恢复扫描补建并处置。 */
+    origin?: "recovery";
   }): Promise<void> => {
-    const { projectRoot, flowId, record, flowRevision, listing, note, diagnostic } = args;
+    const { projectRoot, flowId, record, flowRevision, listing, note, diagnostic, origin } = args;
     const gateId = record.gateId;
     const now = (): string => new Date().toISOString();
     const latest = latestGateReviewReport(projectRoot, flowId, gateId);
@@ -6754,7 +6865,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       const dispatchedAtMs = Date.parse(record.dispatchedAt);
       const stale = Number.isFinite(dispatchedAtMs) && Date.now() - dispatchedAtMs >= GATE_REVIEW_STALE_MS;
       if (stale) {
-        const detail = `派发后超过 ${Math.round(GATE_REVIEW_STALE_MS / 60_000)} 分钟仍无 gate 报告（陈旧）；记录转 returned-to-proof，请统筹核对后重新请求`;
+        const detail = `派发后超过 ${Math.round(GATE_REVIEW_STALE_MS / 60_000)} 分钟仍无 gate 报告（陈旧）；记录转 returned-to-proof，请运营核对后重新请求`;
         const returned: GateReviewRecord = {
           ...record,
           status: "returned-to-proof",
@@ -6920,8 +7031,12 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         flowId,
         gateId,
         reportPath: latest.relPath,
-      }));
-      diagnostic.record("gate.review.passed", { flowId, gateId, reportVersion: latest.version });
+      }) + (origin === "recovery" ? "（应用恢复：此前已有通过报告但缺少 gate 记录，已补建记录并收口）" : ""));
+      diagnostic.record(origin === "recovery" ? "gate.review.recovered-pass" : "gate.review.passed", {
+        flowId,
+        gateId,
+        reportVersion: latest.version,
+      });
       return;
     }
     const code = completed.code ?? "unknown";
@@ -7048,6 +7163,102 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   };
 
   /**
+   * **恢复：有通过报告但缺 gate 记录**（2026-10-27 客户反馈：`request_gate_review` 回执超时被误报为
+   * `unavailable`，记录/账本未落盘，而质检实际已写出 pass 报告）。仅当以下条件全部满足时补建记录：
+   *   · flow 的 gate 步骤仍 pending、id 形如 `gate-<slug>`、`kind:artifact` 且 gateKind 合法；
+   *   · gate 记录缺失（已存在/损坏交给既有扫描，不在本函数覆盖）；
+   *   · 最新 gate 报告存在、可读、`acceptance-triage/v1` 结构合格且结论为 `pass`。
+   * 补建记录（status dispatched + 当前 flowRevision + 报告 path/version/sha）后立即走既有
+   * `processGateReportAttempt`（`completeGateStep` 唯一收口；写 passed 记录 + gate.review + artifact.observed）。
+   * 幂等：记录一旦存在就不再补建；重复扫描由 passed 分支的 completeGateStep/审计去重兜住。
+   * 报告缺失/结构坏/fail 一律跳过——不改 flow、不写记录、不伪造 pass、不路由返工。
+   */
+  const recoverMissingGateRecordsForFlow = async (args: {
+    projectRoot: string;
+    flowId: string;
+    flowRevision: string;
+    flow: FlowState;
+    listing: ProjectListing;
+    note: (summary: string) => void;
+    diagnostic: ReturnType<typeof createDiagnosticLogger>;
+  }): Promise<void> => {
+    const { projectRoot, flowId, flowRevision, flow, listing, note, diagnostic } = args;
+    for (const step of flow.steps) {
+      const gateId = step.id;
+      if (!/^gate-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(gateId)) continue;
+      if (step.kind !== "artifact" || step.gateKind === undefined || !isFlowGateKind(step.gateKind)) continue;
+      if (step.status !== "pending") continue;
+      const existing = await readGateReviewRecord(projectRoot, flowId, gateId);
+      if (existing.state !== "missing") continue; // 已存在（含损坏）由既有扫描处置
+      const latest = latestGateReviewReport(projectRoot, flowId, gateId);
+      if (latest === undefined) continue;
+      let bytes: Buffer;
+      try {
+        bytes = await readFile(path.join(projectRoot, ...latest.relPath.split("/")));
+      } catch {
+        continue;
+      }
+      const parsedReport = parseAcceptanceTriageReport(bytes.toString("utf8"));
+      if (!parsedReport.ok) {
+        diagnostic.record("gate.review.recovery.report-invalid", {
+          flowId,
+          gateId,
+          reportPath: latest.relPath,
+          code: parsedReport.code,
+        });
+        continue;
+      }
+      if (parsedReport.triage.conclusion !== "pass") {
+        diagnostic.record("gate.review.recovery.report-not-pass", {
+          flowId,
+          gateId,
+          reportPath: latest.relPath,
+          conclusion: parsedReport.triage.conclusion,
+        });
+        continue;
+      }
+      const severityCounts = gateReportSeverityCounts(parsedReport.triage.items);
+      const itemCount = parsedReport.triage.items.length;
+      const itemsDigest = acceptanceTriageItemsDigest(parsedReport.triage.items);
+      const now = new Date().toISOString();
+      const record: GateReviewRecord = {
+        schema: GATE_REVIEW_RECORD_SCHEMA,
+        flowId,
+        gateId,
+        gateKind: step.gateKind,
+        flowRevision,
+        reportPath: latest.relPath,
+        reportVersion: latest.version,
+        reportSha256: createHash("sha256").update(bytes).digest("hex"),
+        conclusion: "pass",
+        severityCounts,
+        itemCount,
+        itemsDigest,
+        status: "dispatched",
+        requestId: `gate-${gateId}-recovery-${Date.now()}`,
+        dispatchedAt: now,
+        decidedAt: null,
+        error: null,
+        at: now,
+      };
+      try {
+        await writeGateJson(projectRoot, gateRecordRelPath(flowId, gateId), record);
+      } catch (error) {
+        diagnostic.error("gate.review.recovery.record-failed", error, { flowId, gateId });
+        continue;
+      }
+      diagnostic.record("gate.review.recovered", {
+        flowId,
+        gateId,
+        gateKind: step.gateKind,
+        reportPath: latest.relPath,
+        reportVersion: latest.version,
+      });
+      await processGateReportAttempt({ projectRoot, flowId, flowRevision, record, listing, note, diagnostic, origin: "recovery" });
+    }
+  };
+
+  /**
    * 扫描并幂等处置一个 flow 的 gate 记录（设计 §5.7）。**不自动重派 Proof、不自动通过**；
    * 只在 trio 项目执行（gate 通道仅注入统筹；记录由 `request_gate_review` 应用侧创建）。
    */
@@ -7064,12 +7275,6 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       ...(typeof listing.primaryRoleId === "string" && listing.primaryRoleId !== "" ? { roleId: listing.primaryRoleId } : {}),
     });
     try {
-      let names: string[];
-      try {
-        names = await readdir(path.join(projectRoot, ...gateRecordDirRel(flowId).split("/")));
-      } catch {
-        return; // 无 gates 目录（或不可读）：没有可处置记录
-      }
       const flowRel = governanceFlowStatePath(flowId);
       let flowBytes: Buffer;
       try {
@@ -7099,6 +7304,23 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           diagnostic.error("gate.review.note.failed", error, { flowId });
         }
       };
+      // 2026-10-27：先恢复「有 pass 报告但缺 gate 记录」的 gate（不依赖 gates 目录存在——该状态下目录
+      // 往往为空/不存在）。已存在记录交下面的既有扫描幂等处置。
+      await recoverMissingGateRecordsForFlow({
+        projectRoot,
+        flowId,
+        flowRevision,
+        flow: parsedFlow.flow,
+        listing,
+        note,
+        diagnostic,
+      });
+      let names: string[];
+      try {
+        names = await readdir(path.join(projectRoot, ...gateRecordDirRel(flowId).split("/")));
+      } catch {
+        return; // 无 gates 目录（或不可读）：没有其他可处置记录
+      }
       for (const name of names) {
         if (!name.endsWith(".json") || name.endsWith("-rework-routing.json")) continue;
         const gateId = name.slice(0, -".json".length);
@@ -7399,7 +7621,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       return {
         ok: false,
         code: "invalid-role",
-        message: "当前项目不是三权治理模型（没有组队 Crew 角色）；边界变更请求不可用，未派发。",
+        message: "当前项目不是三权治理模型（没有人事 Crew 角色）；边界变更请求不可用，未派发。",
       };
     }
     const target = listing.roles.find((candidate) => candidate.roleId === roleIdRaw);
@@ -7560,7 +7782,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           code: "rejected",
           message:
             `AI 门禁未通过（${outcome.verdict}${outcome.reasonCode !== undefined ? `/${outcome.reasonCode}` : ""}）：` +
-            `${reason === "" ? "未给出理由" : reason}；本次未派发给组队，不自动放行（不代表客户拒绝）` +
+            `${reason === "" ? "未给出理由" : reason}；本次未派发给人事，不自动放行（不代表客户拒绝）` +
             `${retryable ? "；这是门禁不可用/超时（可修复后重试），不是请求内容被拒" : ""}。`,
           roleId: target.roleId,
           ticketId,
@@ -7794,7 +8016,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // —— 派给组队（Crew / nominator）：后台打开 + 唯一一条结构化任务 ——
       const crew = listing.roles.find((candidate) => candidate.roleId === "nominator");
       if (crew === undefined || crew.builtIn !== true || crew.governanceFunction !== "nomination") {
-        return await failDispatch("未枚举到组队（Crew/nominator）角色，无法派发", judgeRecord);
+        return await failDispatch("未枚举到人事（Crew/nominator）角色，无法派发", judgeRecord);
       }
       const taskText = buildBoundaryChangeCrewTaskText({
         ticketId,
@@ -7812,14 +8034,14 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           boundaryChangeDispatchTimeoutMs,
         );
         if (openedRace.timedOut) {
-          return await failDispatch("后台打开组队会话超时", judgeRecord);
+          return await failDispatch("后台打开人事会话超时", judgeRecord);
         }
         opened = openedRace.value;
       } catch (error) {
-        return await failDispatch(`后台打开组队会话失败：${error instanceof Error ? error.message : String(error)}`, judgeRecord);
+        return await failDispatch(`后台打开人事会话失败：${error instanceof Error ? error.message : String(error)}`, judgeRecord);
       }
       if (!opened.ok) {
-        return await failDispatch(`后台打开组队会话失败：${opened.error ?? "未知错误"}`, judgeRecord);
+        return await failDispatch(`后台打开人事会话失败：${opened.error ?? "未知错误"}`, judgeRecord);
       }
       let sent: SendResult;
       try {
@@ -7845,18 +8067,18 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             ok: false,
             code: "unavailable",
             message:
-              `组队任务投递回执超时（ticket ${ticketId}，可能已入队/已投递）；` +
-              "未确认已派发，请用 flow_get 或组队会话核对；同一请求重试不会重复投递。",
+              `人事任务投递回执超时（ticket ${ticketId}，可能已入队/已投递）；` +
+              "未确认已派发，请用 flow_get 或人事会话核对；同一请求重试不会重复投递。",
             roleId: target.roleId,
             ticketId,
           };
         }
         sent = sentRace.value;
       } catch (error) {
-        return await failDispatch(`投递组队任务失败：${error instanceof Error ? error.message : String(error)}`, judgeRecord);
+        return await failDispatch(`投递人事任务失败：${error instanceof Error ? error.message : String(error)}`, judgeRecord);
       }
       if (!sent.ok) {
-        return await failDispatch(`投递组队任务失败：${sent.error ?? "未知错误"}`, judgeRecord);
+        return await failDispatch(`投递人事任务失败：${sent.error ?? "未知错误"}`, judgeRecord);
       }
       const dispatchRecord: NonNullable<BoundaryChangeTicketRecord["dispatch"]> = {
         clientMessageId,
@@ -7881,8 +8103,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           ok: true,
           code: "dispatched",
           message:
-            `已把边界变更请求投递给组队（ticket ${ticketId}），但审计票据写入失败：` +
-            `${error instanceof Error ? error.message : String(error)}；派发 ≠ 边界已修改，组队仍需按 appointment-write 逐路径确认。`,
+            `已把边界变更请求投递给人事（ticket ${ticketId}），但审计票据写入失败：` +
+            `${error instanceof Error ? error.message : String(error)}；派发 ≠ 边界已修改，人事仍需按 appointment-write 逐路径确认。`,
           roleId: target.roleId,
           ticketId,
         };
@@ -7907,8 +8129,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         ok: true,
         code: "dispatched",
         message:
-          `已把边界变更请求派发给组队（ticket ${ticketId}，flow ${flowId}）；` +
-          "派发 ≠ 边界已修改，组队仍需按 appointment-write 逐路径确认后才写入。",
+          `已把边界变更请求派发给人事（ticket ${ticketId}，flow ${flowId}）；` +
+          "派发 ≠ 边界已修改，人事仍需按 appointment-write 逐路径确认后才写入。",
         roleId: target.roleId,
         ticketId,
       };
@@ -7919,7 +8141,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         code: "unavailable",
         message:
           `边界变更请求执行失败：${error instanceof Error ? error.message : String(error)}；` +
-          "**可能已部分执行**，请核对组队会话与票据文件，不要重复请求。",
+          "**可能已部分执行**，请核对人事会话与票据文件，不要重复请求。",
         roleId: roleIdRaw,
       };
     } finally {
@@ -7929,6 +8151,828 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
 
   // 能力注入：缺省用本层实现；测试/宿主可整体替换（签名与 SessionManagerDeps 同形，项目根/发起角色由会话补入）。
   const requestBoundaryChangeCapability = deps.requestBoundaryChange ?? requestBoundaryChangeForProject;
+
+  // —————— 2026-10-26 需求变更申请（`request_requirement_change`）：应用侧能力实现 ——————
+  //
+  // 客户纠正（2026-10-26）：**需求变更不由主理审批**。发起方（统筹/提案）调用工具后，应用经**发起方
+  // 会话的客户卡通道**呈现 `request_choice(cardKind="decision")` 审批卡（选项 approve / reject，恰好
+  // 一个 recommended=approve，带 flowId）；审批人＝客户（未勾选「替我决策」）或独立判断 agent（勾选时
+  // 默认选推荐项）；发起方不得自批。批准后应用把「已批准需求变更执行任务」交给主理（主理不审批，只执行
+  // 意图变更并通知提案修订）；拒绝/未获明确结果 ⇒ 回执给发起方。本能力的边界：
+  //  · 不弹主理原始申请任务、不写 `customer.decision`、不写治理账本、不改变任何角色的文件写权；
+  //  · 参数非法 / 发起角色不在白名单 / 意图或流程不存在 ⇒ `invalid` / `rejected` / `intent-not-found` /
+  //    `flow-not-found`：零票据、零卡、零投递（fail-closed）；
+  //  · 同一 flow 已有待处理/已批准申请（票据 `requested`/`dispatched`/`approved`）⇒ `already-dispatched`；
+  //  · 审批卡未呈现（通道不可用/卡校验拒发）⇒ `unavailable`/`rejected`，票据如实 failed；
+  //  · 卡片已呈现 ⇒ `dispatched`（**已提交独立审批，不是批准**）；票据先 `requested` 再 `dispatched`，
+  //    审批结果异步落 `approved`/`rejected`/`failed` 并回执发起方；批准后执行任务投递主理（忙则入队）。
+  /** 同 project+flow 的在途申请（并发/重复请求不重复投递；进程内，不持久化）：scopeKey → requestId。 */
+  const requirementChangeInFlight = new Map<string, string>();
+  const requirementChangeNow = (): string => new Date().toISOString();
+  /**
+   * **审批卡/执行任务投递的时限**（与 `requestAcceptanceLimits` 同模式）：总预算缺省 ≤60s；单阶段
+   * （呈现审批卡的前置检查由通道自身负责；主理执行任务的打开/投递）缺省 ≤20s。超时如实回执/记票据，
+   * **绝不让工具或后台任务无限挂起**，也不谎称已提交/已交接。
+   */
+  const requirementChangeTotalMs = (() => {
+    const raw = deps.requestRequirementChangeLimits?.totalMs;
+    return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 60_000;
+  })();
+  const requirementChangeStageMs = (() => {
+    const raw = deps.requestRequirementChangeLimits?.stageMs;
+    const fallback = Math.max(1, Math.min(20_000, requirementChangeTotalMs));
+    return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : fallback;
+  })();
+
+  /** 解析项目枚举（共享缓存；miss 时实时枚举一次——与界面 listProject 同一路径）。失败 ⇒ undefined。 */
+  const requirementChangeListing = async (
+    root: string,
+    diagnostic: ReturnType<typeof createDiagnosticLogger>,
+  ): Promise<ProjectListing | undefined> => {
+    let listing = listingCache.get(root);
+    if (listing !== undefined) return listing;
+    try {
+      listing = await listProjectFn(root);
+      listingCache.set(listing.projectRoot, listing);
+      return listing;
+    } catch (error) {
+      diagnostic.error("requirement-change.listing.failed", error);
+      return undefined;
+    }
+  };
+
+  /** 发起方白名单（数据驱动：仅内置治理角色且治理职能为 schedule/proposal；其他角色不可发起）。 */
+  const isRequirementChangeInitiator = (listing: ProjectListing | undefined, roleId: string): boolean => {
+    const role = listing?.roles.find((item) => item.roleId === roleId);
+    const fn = role?.governanceFunction;
+    return role?.builtIn === true && (fn === "schedule" || fn === "proposal");
+  };
+
+  /** 可见系统行（只落发起方聊天流；不弹卡、不写账本、不改写权）。 */
+  const emitRequirementChangeNote = (root: string, roleId: string, runtime: RuntimeKind, summary: string): void => {
+    if (roleId === "") return;
+    try {
+      emitSessionEvent({
+        roleId,
+        projectRoot: root,
+        runtime,
+        event: { kind: "message", summary, detail: { source: "delivery-note" } },
+      });
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.requirement-change", projectRoot: root, roleId }).error(
+        "requirement-change.note.failed",
+        error,
+      );
+    }
+  };
+
+  const requirementChangeFileIsFile = async (absPath: string): Promise<boolean> => {
+    try {
+      const info = await stat(absPath);
+      return info.isFile();
+    } catch {
+      return false;
+    }
+  };
+
+  /**
+   * 票据读取（重启恢复/幂等）：缺失 ⇒ missing；schema 不识别/IO 失败 ⇒ corrupt（调用方只记诊断，
+   * **不把坏票据当已派发**——继续按新请求处理并覆盖写新票据）。
+   */
+  const readRequirementChangeTicket = async (
+    root: string,
+    relPath: string,
+  ): Promise<
+    | { state: "missing" }
+    | { state: "corrupt"; error: string }
+    | { state: "ok"; record: RequirementChangeTicketRecord }
+  > => {
+    try {
+      const text = await readFile(path.join(root, ...relPath.split("/")), "utf8");
+      const parsed = JSON.parse(text) as unknown;
+      if (
+        parsed === null ||
+        typeof parsed !== "object" ||
+        (parsed as { schema?: unknown }).schema !== REQUIREMENT_CHANGE_TICKET_SCHEMA ||
+        typeof (parsed as { requestId?: unknown }).requestId !== "string" ||
+        typeof (parsed as { status?: unknown }).status !== "string"
+      ) {
+        return { state: "corrupt", error: "票据 schema 不识别" };
+      }
+      return { state: "ok", record: parsed as RequirementChangeTicketRecord };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return { state: "missing" };
+      return { state: "corrupt", error: error instanceof Error ? error.message : String(error) };
+    }
+  };
+
+  /** 原子写票据；失败抛错（调用方决定 unavailable / rejected / 如实标注）。 */
+  const writeRequirementChangeTicket = async (
+    root: string,
+    relPath: string,
+    record: RequirementChangeTicketRecord,
+  ): Promise<void> => {
+    const abs = path.join(root, ...relPath.split("/"));
+    await mkdir(path.dirname(abs), { recursive: true });
+    await atomicWrite(abs, `${JSON.stringify(record, null, 2)}\n`);
+  };
+
+  /**
+   * 同一 flow（scopeKey）下**未关闭**的申请：`requested`/`dispatched`。坏票据只记诊断、不当已派发，
+   * 也不阻塞新请求（fail-open 到「重新取证/重新投递」，但稳定 requestId 仍让同一请求至多投递一次）。
+   */
+  const findPendingRequirementChange = async (
+    root: string,
+    scopeKey: string,
+    diagnostic: ReturnType<typeof createDiagnosticLogger>,
+  ): Promise<RequirementChangeTicketRecord | undefined> => {
+    const dir = path.join(root, ...`${REQUIREMENT_CHANGE_TICKET_ROOT_REL}/${scopeKey}`.split("/"));
+    let names: string[];
+    try {
+      names = (await readdir(dir)).filter((name) => name.endsWith(".json")).sort();
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "ENOENT" && code !== "ENOTDIR") {
+        diagnostic.error("requirement-change.ticket.list.failed", error, { scopeKey });
+      }
+      return undefined;
+    }
+    for (const name of names) {
+      const read = await readRequirementChangeTicket(root, `${REQUIREMENT_CHANGE_TICKET_ROOT_REL}/${scopeKey}/${name}`);
+      if (read.state === "ok" && isPendingRequirementChangeStatus(read.record.status)) return read.record;
+      if (read.state === "corrupt") {
+        diagnostic.error("requirement-change.ticket.corrupt", new Error(read.error), { scopeKey, file: name });
+      }
+    }
+    return undefined;
+  };
+
+  /**
+   * 独立审批结算（客户/判断 agent 在 decision 卡上的结果）：
+   *  · approved ⇒ 票据 `approved` + 立即可见系统行 + 把「已批准执行任务」交给主理（有界；失败如实记票据）；
+   *  · rejected ⇒ 票据 `rejected`（终态）；未获明确结果 ⇒ 票据 `failed`（终态）；
+   *    两者在卡片已呈现时把回执投给发起方（agent 可见的系统消息；失败回落可见系统行）。
+   * 本函数不写治理账本、不写 `customer.decision`、不改写权。
+   */
+  type RequirementChangeSettlement = {
+    outcome: RequirementChangeApprovalRecord["outcome"];
+    approval: RequirementChangeApprovalRecord;
+    /** 人话 detail（rejected/no-decision 回执用；approved 为空串）。 */
+    detail: string;
+  };
+
+  const deliverRequirementChangeReceipt = async (input: {
+    root: string;
+    requester: string;
+    runtime: RuntimeKind;
+    text: string;
+  }): Promise<void> => {
+    const diagnostic = createDiagnosticLogger({ component: "desktop.requirement-change", projectRoot: input.root, roleId: input.requester });
+    const startedAt = Date.now();
+    const budget = (): number => Math.min(requirementChangeStageMs, Math.max(1, requirementChangeTotalMs - (Date.now() - startedAt)));
+    try {
+      const openedRace = await withRequestAcceptanceDeadline(
+        manager.openBackground({ projectRoot: input.root, roleId: input.requester, runtime: input.runtime }),
+        budget(),
+      );
+      if (openedRace.timedOut) throw new Error(`打开发起方会话超时（约 ${Math.round((Date.now() - startedAt) / 1000)}s）`);
+      if (!openedRace.value.ok) throw new Error(openedRace.value.error ?? mainT("shared.common.unknownReason"));
+      const sentRace = await withRequestAcceptanceDeadline(
+        manager.sendBackground({
+          projectRoot: input.root,
+          roleId: input.requester,
+          runtime: input.runtime,
+          text: input.text,
+          kind: "system",
+        }),
+        budget(),
+      );
+      if (sentRace.timedOut) throw new Error(`投递回执超时（约 ${Math.round((Date.now() - startedAt) / 1000)}s；可能已入队/已投递）`);
+      if (!sentRace.value.ok) throw new Error(sentRace.value.error ?? mainT("shared.common.unknownReason"));
+      return;
+    } catch (error) {
+      diagnostic.error("requirement-change.receipt.failed", error);
+    }
+    // 后台消息不可用/超时：退回发起方聊天流的可见系统行（不谎称已送达 agent）。
+    emitRequirementChangeNote(input.root, input.requester, input.runtime, input.text);
+  };
+
+  /**
+   * 已批准执行任务 → 主理（`primaryRoleId`）。主理**不审批**：任务只带独立审批证据与执行范围。
+   * 有界（打开/投递各 ≤ 单阶段预算）；目标忙时 `sendBackground` 入队（`queued:true` 仍成功），
+   * 不等待空闲；失败/超时如实写票据 `leadDispatch.error` 并返回失败（调用方追加可见行，不谎称已交接）。
+   */
+  const dispatchRequirementChangeLeadExecution = async (input: {
+    root: string;
+    requester: string;
+    runtime: RuntimeKind;
+    requestId: string;
+    ticketRel: string;
+    baseRecord: RequirementChangeTicketRecord;
+    submission: RequirementChangeTicketRecord["submission"];
+    flowId: string;
+    intentId: string;
+    approval: RequirementChangeApprovalRecord;
+  }): Promise<{ ok: true } | { ok: false; detail: string }> => {
+    const diagnostic = createDiagnosticLogger({ component: "desktop.requirement-change", projectRoot: input.root, roleId: input.requester });
+    const clientMessageId = requirementChangeClientMessageId(input.requestId);
+    const fail = async (detail: string): Promise<{ ok: false; detail: string }> => {
+      const record: RequirementChangeTicketRecord = {
+        ...input.baseRecord,
+        status: "approved",
+        updatedAt: requirementChangeNow(),
+        submission: input.submission,
+        approval: input.approval,
+        leadDispatch: {
+          clientMessageId,
+          sentAt: requirementChangeNow(),
+          runtime: input.runtime,
+          error: requirementChangeDetailText(detail),
+        },
+        error: null,
+      };
+      try {
+        await writeRequirementChangeTicket(input.root, input.ticketRel, record);
+      } catch (error) {
+        diagnostic.error("requirement-change.ticket.write.failed", error, { requestId: input.requestId });
+      }
+      diagnostic.record("requirement-change.lead-dispatch-failed", {
+        requestId: input.requestId,
+        detail: requirementChangeDetailText(detail, 160),
+      });
+      return { ok: false, detail };
+    };
+    const listing = await requirementChangeListing(input.root, diagnostic);
+    const leadRoleId = typeof listing?.primaryRoleId === "string" ? listing.primaryRoleId.trim() : "";
+    if (leadRoleId === "") return fail("无法确定产品角色（primaryRoleId），已批准执行任务未投递");
+    const text = buildRequirementChangeLeadExecutionTaskText({
+      requestId: input.requestId,
+      flowId: input.flowId,
+      intentId: input.intentId,
+      changeKind: input.baseRecord.changeKind,
+      summary: input.baseRecord.summary,
+      rationale: input.baseRecord.rationale,
+      ...(input.baseRecord.impact !== null ? { impact: input.baseRecord.impact } : {}),
+      ...(input.baseRecord.proposedIntentPatch !== null ? { proposedIntentPatch: input.baseRecord.proposedIntentPatch } : {}),
+      ticketRelPath: input.ticketRel,
+      approvalSource: input.approval.source,
+      approvedAt: input.approval.decidedAt,
+    });
+    const startedAt = Date.now();
+    const budget = (): number => Math.min(requirementChangeStageMs, Math.max(1, requirementChangeTotalMs - (Date.now() - startedAt)));
+    let opened: Awaited<ReturnType<typeof manager.openBackground>>;
+    try {
+      const race = await withRequestAcceptanceDeadline(
+        manager.openBackground({ projectRoot: input.root, roleId: leadRoleId, runtime: input.runtime }),
+        budget(),
+      );
+      if (race.timedOut) return fail(`后台打开产品会话超时（约 ${Math.round((Date.now() - startedAt) / 1000)}s；可能仍在启动）`);
+      opened = race.value;
+    } catch (error) {
+      return fail(`后台打开产品会话失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (!opened.ok) return fail(`后台打开产品会话失败：${opened.error ?? mainT("shared.common.unknownReason")}`);
+    let sent: Awaited<ReturnType<typeof manager.sendBackground>>;
+    try {
+      const race = await withRequestAcceptanceDeadline(
+        manager.sendBackground({
+          projectRoot: input.root,
+          roleId: leadRoleId,
+          runtime: input.runtime,
+          text,
+          clientMessageId,
+        }),
+        budget(),
+      );
+      if (race.timedOut) return fail(`投递产品执行任务超时（约 ${Math.round((Date.now() - startedAt) / 1000)}s；可能已入队/已投递，请核对）`);
+      sent = race.value;
+    } catch (error) {
+      return fail(`投递产品执行任务失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (!sent.ok) return fail(`投递产品执行任务失败：${sent.error ?? mainT("shared.common.unknownReason")}`);
+    const record: RequirementChangeTicketRecord = {
+      ...input.baseRecord,
+      status: "approved",
+      updatedAt: requirementChangeNow(),
+      submission: input.submission,
+      approval: input.approval,
+      leadDispatch: {
+        clientMessageId,
+        sentAt: requirementChangeNow(),
+        runtime: input.runtime,
+        ...(sent.queued === true ? { queued: true } : {}),
+        messageSha256: createHash("sha256").update(text).digest("hex"),
+      },
+      error: null,
+    };
+    try {
+      await writeRequirementChangeTicket(input.root, input.ticketRel, record);
+    } catch (error) {
+      diagnostic.error("requirement-change.ticket.write.failed", error, { requestId: input.requestId });
+    }
+    diagnostic.record("requirement-change.lead-dispatched", {
+      requestId: input.requestId,
+      leadRoleId,
+      queued: sent.queued === true,
+    });
+    return { ok: true };
+  };
+
+  const settleRequirementChangeDecision = async (input: {
+    root: string;
+    requester: string;
+    runtime: RuntimeKind;
+    requestId: string;
+    ticketRel: string;
+    baseRecord: RequirementChangeTicketRecord;
+    submission: RequirementChangeTicketRecord["submission"];
+    flowId: string;
+    intentId: string;
+    outcome: CustomerInputOutcome;
+    /** 卡片已呈现（true ⇒ 审批结果需回执发起方；false ⇒ 工具回执即结果，不重复投递）。 */
+    notifyInitiator: boolean;
+  }): Promise<RequirementChangeSettlement> => {
+    const diagnostic = createDiagnosticLogger({ component: "desktop.requirement-change", projectRoot: input.root, roleId: input.requester });
+    const outcome = input.outcome;
+    const selected =
+      outcome.outcome === "answered" && Array.isArray(outcome.value.selected)
+        ? [...outcome.value.selected]
+        : [];
+    // 判断代批如实归因：`judge:<engine>` 或 outcome.judge 审计出现 ⇒ `judge`；其余按客户（含旧通道）。
+    const source: "customer" | "judge" =
+      outcome.outcome === "answered" &&
+      (outcome.judge !== undefined ||
+        (typeof outcome.operatorId === "string" && outcome.operatorId.startsWith("judge:")))
+        ? "judge"
+        : "customer";
+    const approved = outcome.outcome === "answered" && selected.includes("approve");
+    const rejected = outcome.outcome === "answered" && selected.includes("reject");
+    const reason =
+      outcome.outcome === "answered"
+        ? null
+        : typeof outcome.reason === "string" && outcome.reason !== ""
+          ? outcome.reason
+          : null;
+    const approval: RequirementChangeApprovalRecord = {
+      outcome: approved ? "approved" : rejected ? "rejected" : "no-decision",
+      source,
+      selected,
+      operatorId:
+        outcome.outcome !== "unavailable" && typeof outcome.operatorId === "string" && outcome.operatorId !== ""
+          ? outcome.operatorId
+          : null,
+      decidedAt: requirementChangeNow(),
+      reason,
+    };
+    if (approved) {
+      const record: RequirementChangeTicketRecord = {
+        ...input.baseRecord,
+        status: "approved",
+        updatedAt: requirementChangeNow(),
+        submission: input.submission,
+        approval,
+        leadDispatch: null,
+        error: null,
+      };
+      try {
+        await writeRequirementChangeTicket(input.root, input.ticketRel, record);
+      } catch (error) {
+        diagnostic.error("requirement-change.ticket.write.failed", error, { requestId: input.requestId });
+      }
+      diagnostic.record("requirement-change.approved", { requestId: input.requestId, source });
+      const approvedText = mainT("main.requirementChange.approved", {
+        flowId: input.flowId,
+        intentId: input.intentId,
+        requestId: input.requestId,
+        source: requirementChangeApprovalSourceText(source),
+      });
+      emitRequirementChangeNote(input.root, input.requester, input.runtime, approvedText);
+      const dispatched = await dispatchRequirementChangeLeadExecution({
+        root: input.root,
+        requester: input.requester,
+        runtime: input.runtime,
+        requestId: input.requestId,
+        ticketRel: input.ticketRel,
+        baseRecord: input.baseRecord,
+        submission: input.submission,
+        flowId: input.flowId,
+        intentId: input.intentId,
+        approval,
+      });
+      if (!dispatched.ok) {
+        emitRequirementChangeNote(
+          input.root,
+          input.requester,
+          input.runtime,
+          `${approvedText}（已批准执行任务投递失败：${requirementChangeDetailText(dispatched.detail, 300)}；产品未确认收到，请核对后重试。）`,
+        );
+      }
+      return { outcome: "approved", approval, detail: "" };
+    }
+    const detail = rejected
+      ? `独立审批选择 reject（${requirementChangeApprovalSourceText(source)}）`
+      : (reason ?? "未获明确结果（卡片取消/会话结束/通道不可用）");
+    // 卡片从未呈现（应用拒发/通道不可用）：没有「审批结果」可记——票据只记失败原因；
+    // 已呈现后的取消/未获结果则如实记录 no-decision（仍未批准）。
+    const recordApproval = input.outcome.outcome === "answered" || input.notifyInitiator;
+    const record: RequirementChangeTicketRecord = {
+      ...input.baseRecord,
+      status: rejected ? "rejected" : "failed",
+      updatedAt: requirementChangeNow(),
+      submission: input.submission,
+      approval: recordApproval ? approval : null,
+      leadDispatch: null,
+      error: rejected ? null : requirementChangeDetailText(detail),
+    };
+    try {
+      await writeRequirementChangeTicket(input.root, input.ticketRel, record);
+    } catch (error) {
+      diagnostic.error("requirement-change.ticket.write.failed", error, { requestId: input.requestId });
+    }
+    diagnostic.record("requirement-change.approval-failed", {
+      requestId: input.requestId,
+      outcome: approval.outcome,
+      source,
+    });
+    if (input.notifyInitiator) {
+      const receipt = mainT("main.requirementChange.approvalRejected", {
+        flowId: input.flowId,
+        intentId: input.intentId,
+        requestId: input.requestId,
+        detail,
+      });
+      void deliverRequirementChangeReceipt({
+        root: input.root,
+        requester: input.requester,
+        runtime: input.runtime,
+        text: receipt,
+      });
+    }
+    return { outcome: approval.outcome, approval, detail };
+  };
+
+  /**
+   * `request_requirement_change` 能力的项目入口（`requesterRoleId`/`runtime` 由会话注入端补入）。
+   * 顺序：载荷二次校验 → 发起方白名单（统筹/提案）→ 意图/流程存在性 → 同 flow 待处理/在途去重 →
+   * 票据 requested → 经发起方会话客户卡通道呈现 decision 审批卡 → 票据 dispatched + 系统行；
+   * 审批结果异步结算（approved → 主理执行任务；rejected/未获结果 → 回执发起方）。
+   * 任何一步失败都如实回执、不伪造；**提交 ≠ 批准**。
+   */
+  const requestRequirementChangeForProject = async (
+    projectRoot: string,
+    requesterRoleId: string,
+    runtime: RuntimeKind,
+    input: RequestRequirementChangeInput,
+  ): Promise<RequestRequirementChangeResult> => {
+    const root = typeof projectRoot === "string" ? projectRoot.trim() : "";
+    const requester = typeof requesterRoleId === "string" ? requesterRoleId.trim() : "";
+    const diagnostic = createDiagnosticLogger({ component: "desktop.requirement-change", projectRoot: root, roleId: requester });
+    if (root === "") {
+      diagnostic.record("requirement-change.invalid", { reasonCode: "missing-project-root" });
+      return {
+        ok: false,
+        code: "unavailable",
+        message: mainT("main.requirementChange.unavailable", { flowId: "?", detail: "缺少项目根，无法提交需求变更申请" }),
+      };
+    }
+    const assessment = assessRequirementChangeRequest(input);
+    if (!assessment.ok) {
+      diagnostic.record("requirement-change.invalid", { reasonCode: "payload" });
+      return { ok: false, code: "invalid", message: mainT("main.requirementChange.invalid", { detail: assessment.detail }) };
+    }
+    const flowId = assessment.flowId;
+    const intentId = assessment.intentId;
+    // 显示/文案用有效 id（只给一个时按本仓约定互为对方；票据仍如实记录显式给出的那个）。
+    const effectiveFlowId = flowId ?? intentId!;
+    const effectiveIntentId = intentId ?? flowId!;
+    // 发起方白名单（客户纠正：仅统筹/提案可发起/持有审批卡；其他内置治理角色、项目角色不可）——
+    // 在写任何票据/呈现任何卡之前 fail-closed（零票据、零卡、零投递）。
+    const initiatorListing = await requirementChangeListing(root, diagnostic);
+    if (initiatorListing === undefined) {
+      diagnostic.record("requirement-change.rejected", { reasonCode: "listing-unavailable" });
+      return {
+        ok: false,
+        code: "unavailable",
+        message: mainT("main.requirementChange.unavailable", {
+          flowId: effectiveFlowId,
+          detail: "无法枚举项目角色，无法确认发起方；未提交、未呈现审批卡",
+        }),
+      };
+    }
+    if (!isRequirementChangeInitiator(initiatorListing, requester)) {
+      diagnostic.record("requirement-change.rejected", { reasonCode: "initiator-not-allowed" });
+      return {
+        ok: false,
+        code: "rejected",
+        message: mainT("main.requirementChange.rejected", {
+          flowId: effectiveFlowId,
+          detail: "发起角色不在允许范围（仅运营/提案可发起需求变更审批卡）；未提交、未呈现审批卡",
+        }),
+      };
+    }
+    if (flowId !== undefined) {
+      const flowRel = governanceFlowStatePath(flowId);
+      if (!(await requirementChangeFileIsFile(path.join(root, ...flowRel.split("/"))))) {
+        diagnostic.record("requirement-change.flow-not-found", { flowId });
+        return {
+          ok: false,
+          code: "flow-not-found",
+          message: mainT("main.requirementChange.flowNotFound", { flowId }),
+          flowId,
+          ...(intentId !== undefined ? { intentId } : {}),
+        };
+      }
+    }
+    if (intentId !== undefined) {
+      const intentRel = intentArtifactPath(intentId);
+      if (!(await requirementChangeFileIsFile(path.join(root, ...intentRel.split("/"))))) {
+        diagnostic.record("requirement-change.intent-not-found", { intentId });
+        return {
+          ok: false,
+          code: "intent-not-found",
+          message: mainT("main.requirementChange.intentNotFound", { flowId: effectiveFlowId, intentId }),
+          flowId: effectiveFlowId,
+          intentId,
+        };
+      }
+    }
+    const requestId = requirementChangeRequestId({
+      requestedBy: requester,
+      ...(flowId !== undefined ? { flowId } : {}),
+      ...(intentId !== undefined ? { intentId } : {}),
+      changeKind: assessment.changeKind,
+      summary: assessment.summary,
+      rationale: assessment.rationale,
+      ...(assessment.impact !== undefined ? { impact: assessment.impact } : {}),
+      ...(assessment.proposedIntentPatch !== undefined ? { proposedIntentPatch: assessment.proposedIntentPatch } : {}),
+    });
+    const ticketRel = requirementChangeTicketRelPath(assessment.scopeKey, requestId);
+    const alreadyDispatched = (existing: { requestId: string; status?: string }): RequestRequirementChangeResult => {
+      diagnostic.record("requirement-change.already-dispatched", {
+        requestId: existing.requestId,
+        scopeKey: assessment.scopeKey,
+      });
+      // 已批准（主理正在执行意图变更）与仍在审批中分开说，避免「等待审批结果」误导。
+      const suffix =
+        existing.status === "approved"
+          ? "（该申请已通过独立审批，产品正在执行意图变更；请等待修订通知，不重复提交。）"
+          : "";
+      return {
+        ok: true,
+        code: "already-dispatched",
+        message:
+          mainT("main.requirementChange.alreadyDispatched", {
+            flowId: effectiveFlowId,
+            intentId: effectiveIntentId,
+            requestId: existing.requestId,
+          }) + suffix,
+        requestId: existing.requestId,
+        flowId: effectiveFlowId,
+        intentId: effectiveIntentId,
+      };
+    };
+    const pending = await findPendingRequirementChange(root, assessment.scopeKey, diagnostic);
+    if (pending !== undefined) return alreadyDispatched(pending);
+    const inFlightKey = `${canonicalProjectRoot(root)}\u0000${assessment.scopeKey}`;
+    const inFlightId = requirementChangeInFlight.get(inFlightKey);
+    if (inFlightId !== undefined) return alreadyDispatched({ requestId: inFlightId });
+    requirementChangeInFlight.set(inFlightKey, requestId);
+    try {
+      const existing = await readRequirementChangeTicket(root, ticketRel);
+      const attempts =
+        (existing.state === "ok" && typeof existing.record.attempts === "number" && Number.isFinite(existing.record.attempts)
+          ? existing.record.attempts
+          : 0) + 1;
+      const at =
+        existing.state === "ok" && typeof existing.record.at === "string" && existing.record.at !== ""
+          ? existing.record.at
+          : requirementChangeNow();
+      const baseRecord: RequirementChangeTicketRecord = {
+        schema: REQUIREMENT_CHANGE_TICKET_SCHEMA,
+        requestId,
+        requestedBy: requester,
+        flowId: flowId ?? null,
+        intentId: intentId ?? null,
+        changeKind: assessment.changeKind,
+        summary: assessment.summary,
+        rationale: assessment.rationale,
+        impact: assessment.impact ?? null,
+        proposedIntentPatch: assessment.proposedIntentPatch ?? null,
+        status: "requested",
+        at,
+        updatedAt: requirementChangeNow(),
+        attempts,
+        submission: null,
+        approval: null,
+        leadDispatch: null,
+        error: null,
+      };
+      /** 审批卡/票据前置失败：写 failed 票据（可重试），如实回执；不呈现卡、不投递主理。 */
+      const failBeforeCard = async (
+        detail: string,
+        code: "unavailable" | "rejected",
+      ): Promise<RequestRequirementChangeResult> => {
+        const record: RequirementChangeTicketRecord = {
+          ...baseRecord,
+          status: "failed",
+          updatedAt: requirementChangeNow(),
+          error: requirementChangeDetailText(detail),
+        };
+        try {
+          await writeRequirementChangeTicket(root, ticketRel, record);
+        } catch (error) {
+          diagnostic.error("requirement-change.ticket.write.failed", error, { requestId, scopeKey: assessment.scopeKey });
+        }
+        diagnostic.record("requirement-change.failed", { requestId, code, scopeKey: assessment.scopeKey });
+        return {
+          ok: false,
+          code,
+          message:
+            code === "rejected"
+              ? mainT("main.requirementChange.rejected", { flowId: effectiveFlowId, detail })
+              : mainT("main.requirementChange.unavailable", { flowId: effectiveFlowId, detail }),
+          requestId,
+          flowId: effectiveFlowId,
+          intentId: effectiveIntentId,
+        };
+      };
+      if (existing.state === "corrupt") {
+        // 坏票据不当已提交；继续按新请求覆盖写（诊断保留原错误）。
+        diagnostic.error("requirement-change.ticket.corrupt", new Error(existing.error), { requestId, scopeKey: assessment.scopeKey });
+      }
+      try {
+        await writeRequirementChangeTicket(root, ticketRel, baseRecord);
+      } catch (error) {
+        diagnostic.error("requirement-change.ticket.write.failed", error, { requestId, scopeKey: assessment.scopeKey });
+        return await failBeforeCard(
+          `审计票据写入失败（${ticketRel}）：${error instanceof Error ? error.message : String(error)}；未提交、未呈现审批卡，可修复后重试`,
+          "rejected",
+        );
+      }
+      diagnostic.record("requirement-change.requested", {
+        requestId,
+        scopeKey: assessment.scopeKey,
+        attempt: attempts,
+      });
+      const card = buildRequirementChangeApprovalCard({
+        requestId,
+        flowId: effectiveFlowId,
+        intentId: effectiveIntentId,
+        changeKind: assessment.changeKind,
+        summary: assessment.summary,
+        rationale: assessment.rationale,
+        ...(assessment.impact !== undefined ? { impact: assessment.impact } : {}),
+        ...(assessment.proposedIntentPatch !== undefined ? { proposedIntentPatch: assessment.proposedIntentPatch } : {}),
+      });
+      const decision = manager.requestRequirementChangeDecision({
+        projectRoot: root,
+        roleId: requester,
+        runtime,
+        request: card,
+        metadata: { flowId: effectiveFlowId, cardKind: "decision", runtime, roleId: requester },
+      });
+      if (!decision.ok) {
+        return await failBeforeCard(`需求变更审批卡通道不可用（${decision.error}）；未提交独立审批`, "unavailable");
+      }
+      const first = await decision.first;
+      if (first.kind === "outcome") {
+        // 未呈现即已结算（卡校验拒发 / 通道不可用 / 「替我决策」在呈现前代选）：工具回执即结果。
+        const settlement = await settleRequirementChangeDecision({
+          root,
+          requester,
+          runtime,
+          requestId,
+          ticketRel,
+          baseRecord,
+          submission: null,
+          flowId: effectiveFlowId,
+          intentId: effectiveIntentId,
+          outcome: first.outcome,
+          notifyInitiator: false,
+        });
+        if (settlement.outcome === "approved") {
+          return {
+            ok: true,
+            code: "dispatched",
+            message: mainT("main.requirementChange.approved", {
+              flowId: effectiveFlowId,
+              intentId: effectiveIntentId,
+              requestId,
+              source: requirementChangeApprovalSourceText(settlement.approval.source),
+            }),
+            requestId,
+            flowId: effectiveFlowId,
+            intentId: effectiveIntentId,
+          };
+        }
+        const code = first.outcome.outcome === "unavailable" ? "unavailable" : "rejected";
+        return {
+          ok: false,
+          code,
+          message:
+            code === "unavailable"
+              ? mainT("main.requirementChange.unavailable", { flowId: effectiveFlowId, detail: settlement.detail })
+              : mainT("main.requirementChange.rejected", { flowId: effectiveFlowId, detail: settlement.detail }),
+          requestId,
+          flowId: effectiveFlowId,
+          intentId: effectiveIntentId,
+        };
+      }
+      // 审批卡已呈现 ⇒ 进入独立审批（**不是批准**）：票据 dispatched + 系统行；审批结果异步结算。
+      const submission: RequirementChangeTicketRecord["submission"] = {
+        cardRoleId: requester,
+        cardKind: "decision",
+        options: ["approve", "reject"],
+        recommended: "approve",
+        submittedAt: requirementChangeNow(),
+      };
+      const dispatchedRecord: RequirementChangeTicketRecord = {
+        ...baseRecord,
+        status: "dispatched",
+        updatedAt: requirementChangeNow(),
+        submission,
+      };
+      let ticketWriteError: string | undefined;
+      try {
+        await writeRequirementChangeTicket(root, ticketRel, dispatchedRecord);
+      } catch (error) {
+        ticketWriteError = error instanceof Error ? error.message : String(error);
+        diagnostic.error("requirement-change.ticket.write.failed", error, { requestId, scopeKey: assessment.scopeKey });
+      }
+      diagnostic.record("requirement-change.dispatched", {
+        requestId,
+        scopeKey: assessment.scopeKey,
+        cardRoleId: requester,
+      });
+      // 用户可见系统行只落发起方聊天流；不弹客户卡、不写账本、不改写权。
+      emitRequirementChangeNote(
+        root,
+        requester,
+        runtime,
+        mainT("main.requirementChange.systemLine", {
+          flowId: effectiveFlowId,
+          intentId: effectiveIntentId,
+          requestId,
+        }),
+      );
+      void decision.outcome
+        .then((outcome) =>
+          settleRequirementChangeDecision({
+            root,
+            requester,
+            runtime,
+            requestId,
+            ticketRel,
+            baseRecord,
+            submission,
+            flowId: effectiveFlowId,
+            intentId: effectiveIntentId,
+            outcome,
+            notifyInitiator: true,
+          }),
+        )
+        .catch((error) => {
+          diagnostic.error("requirement-change.approval-handler.failed", error, {
+            requestId,
+            scopeKey: assessment.scopeKey,
+          });
+        });
+      const dispatchedMessage = mainT("main.requirementChange.dispatched", {
+        flowId: effectiveFlowId,
+        intentId: effectiveIntentId,
+        requestId,
+      });
+      return {
+        ok: true,
+        code: "dispatched",
+        message:
+          ticketWriteError !== undefined
+            ? `${dispatchedMessage}（审计票据写入失败：${requirementChangeDetailText(ticketWriteError)}；审批卡已提交，请核对票据 ${ticketRel}。）`
+            : dispatchedMessage,
+        requestId,
+        flowId: effectiveFlowId,
+        intentId: effectiveIntentId,
+      };
+    } catch (error) {
+      diagnostic.error("requirement-change.failed", error, { requestId, scopeKey: assessment.scopeKey });
+      return {
+        ok: false,
+        code: "unavailable",
+        message: mainT("main.requirementChange.unavailable", {
+          flowId: effectiveFlowId,
+          detail: `执行失败：${requirementChangeDetailText(error instanceof Error ? error.message : String(error))}；可能已部分执行，请核对票据 ${requestId}，不要重复请求`,
+        }),
+        requestId,
+        flowId: effectiveFlowId,
+        intentId: effectiveIntentId,
+      };
+    } finally {
+      if (requirementChangeInFlight.get(inFlightKey) === requestId) requirementChangeInFlight.delete(inFlightKey);
+    }
+  };
+
+  // 能力注入：缺省用本层实现；测试/宿主可整体替换（签名与 SessionManagerDeps 同形，项目根/发起角色/引擎由会话补入）。
+  const requestRequirementChangeCapability = deps.requestRequirementChange ?? requestRequirementChangeForProject;
 
   const manager = new SessionManager({
     openRoleSession: openRoleSessionFn,
@@ -7983,6 +9027,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // 2026-10-26 边界变更请求（request_boundary_change）：应用侧能力（SessionManager 仅对统筹/convener
     // 会话注入；项目角色不注入；编排再按治理职能/内置角色收口）。**请求变更 ≠ 客户批准**。
     requestBoundaryChange: requestBoundaryChangeCapability,
+    // 2026-10-26 需求变更申请（request_requirement_change）：应用侧能力（SessionManager 仅对统筹/提案
+    // 会话注入；其他内置治理角色、项目角色不注入；编排再按治理职能收口）。
+    // **申请 ≠ 批准**：应用经发起方会话客户卡通道呈现 decision 审批卡（客户/判断 agent 审批）；
+    // 主理不审批、只在批准后执行意图变更；不写 customer.decision/账本、不改写权。
+    requestRequirementChange: requestRequirementChangeCapability,
+    // 2026-10-26 真机：意图交接投递的有界时限（超时/不可用如实回执 + 系统行，不谎称已交接）。
+    handOffIntentLimits: deps.handOffIntentLimits,
     // G-2/W5：恢复确认卡通道（缺省 ⇒ 恢复提议「未接线、未获执行」如实回执——fail-closed）。
     recoveryConfirm: deps.recoveryConfirm,
     // 2026-10-20（客户总原则「我勾选了替我决策就不用我来管了」）：决策开关开启 ⇒ 恢复提议不弹客户卡、
@@ -8499,7 +9550,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       APPOINTMENT_WRITE_FEEDBACK_PREFIX,
       flowDefect
         ? `流程 ${flowId}：流程状态 YAML 未通过结构校验（任命的写卡步骤暂停；应用未派 role-readiness、未把步骤标为 done）。`
-        : `流程 ${flowId}：团队计划未通过结构校验（任命的写卡步骤暂停；组队不自行补计划，应用未派 role-readiness、未把步骤标为 done）。`,
+        : `流程 ${flowId}：团队计划未通过结构校验（任命的写卡步骤暂停；人事不自行补计划，应用未派 role-readiness、未把步骤标为 done）。`,
       "具体问题：",
       ...planIssues.map((issue) => `- ${issue.path}：${issue.issue}`),
       ...(flowDefect
@@ -8659,17 +9710,25 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   };
 
   /** 系统行择路 runtime：提示/活跃/治理会话 → 持久化/磁盘/凭据解析；无法确定 ⇒ undefined（不猜）。 */
+  /**
+   * 治理唤醒/系统行要用的引擎（2026-10-27 客户真机修复）：优先级＝显式 preferred → **当前角色会话
+   * runtime** → **本进程治理会话 runtime** → 持久化选择/磁盘会话证据/凭据可用性
+   * （`resolveAcceptanceRuntime`，绝不无凭据回退 claude）→ 最后才用真实会话事件留下的弱提示
+   * （`acceptanceRuntimeHints`；应用系统行不再写入，避免 UI 兜底 claude 覆盖项目已选的 Pi）。
+   */
   const resolveNoteRuntime = async (projectRoot: string, preferred?: RuntimeKind): Promise<RuntimeKind | undefined> => {
     if (preferred !== undefined) return preferred;
-    const hinted =
-      acceptanceRuntimeHints.get(projectRoot) ?? manager.activeRuntimeFor(projectRoot) ?? manager.governanceRuntimeFor(projectRoot);
-    if (hinted !== undefined) return hinted;
+    const active = manager.activeRuntimeFor(projectRoot);
+    if (active !== undefined) return active;
+    const selected = manager.governanceRuntimeFor(projectRoot);
+    if (selected !== undefined) return selected;
     try {
       const resolution = await resolveAcceptanceRuntime(projectRoot);
-      return resolution.ok ? resolution.runtime : undefined;
+      if (resolution.ok) return resolution.runtime;
     } catch {
-      return undefined;
+      // 解析器异常：退回弱提示（下面）——不伪造成功
     }
+    return acceptanceRuntimeHints.get(projectRoot);
   };
 
   // —————— 2026-10-24 P0：appointment（客户决定步骤）收口 ——————
@@ -9166,7 +10225,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
                 {
                   roleId: "流程",
                   path: `docs/flows/${flowId}.yaml`,
-                  issue: `流程缺少 id 为 "${ROLE_CARDS_STEP_ID}" 的步骤（团队计划存在但 flow 未声明 role-cards，无法完成收口；请统筹补齐 flow 步骤）。`,
+                  issue: `流程缺少 id 为 "${ROLE_CARDS_STEP_ID}" 的步骤（团队计划存在但 flow 未声明 role-cards，无法完成收口；请运营补齐 flow 步骤）。`,
                   userVisibleIssue: mainT("main.interface.roleCardsStepMissing", { stepId: ROLE_CARDS_STEP_ID }),
                   source: "convener",
                 },
@@ -10359,12 +11418,26 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         proposalPlan !== undefined && payload.flowId !== undefined
           ? await readTeamPlanInfo(projectRoot, payload.flowId, proposalPlan.relPath)
           : undefined;
+      // 2026-10-26：应用在意图交接时创建通用流程骨架（status: skeleton）；提案接受后的 Convener
+      // 任务需要知道「已存在但只是骨架」，从而写团队计划后用一次 schedule-write 替换为完整流程。
+      const flowStateExists =
+        typeof payload.flowId === "string" &&
+        payload.flowId !== "" &&
+        existsSync(path.join(projectRoot, governanceFlowStatePath(payload.flowId)));
+      let flowStateSkeleton = false;
+      if (flowStateExists && typeof payload.flowId === "string" && payload.flowId !== "") {
+        try {
+          const flowText = await readFile(path.join(projectRoot, governanceFlowStatePath(payload.flowId)), "utf8");
+          const parsedFlow = parseFlowStateYaml(flowText, payload.flowId);
+          flowStateSkeleton = parsedFlow.ok && parsedFlow.flow.status === FLOW_SKELETON_STATUS;
+        } catch {
+          flowStateSkeleton = false;
+        }
+      }
       const message = buildGovernanceAdvanceMessage(payload, context.targetRoleIds, {
         // 2026-10-20 真机：流程状态 YAML 已存在 ⇒ Convener 任务改用 flow 工具推进（不直接写 YAML）。
-        flowStateExists:
-          typeof payload.flowId === "string" &&
-          payload.flowId !== "" &&
-          existsSync(path.join(projectRoot, governanceFlowStatePath(payload.flowId))),
+        flowStateExists,
+        ...(flowStateSkeleton ? { flowStateSkeleton: true } : {}),
         ...(proposalDecision !== undefined ? { proposalDecision } : {}),
         ...(proposalPlanInfo !== undefined
           ? { teamPlanPath: proposalPlanInfo.relPath, teamPlanSchema: proposalPlanInfo.teamPlanSchema }

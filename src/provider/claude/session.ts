@@ -13,6 +13,7 @@ import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 import { REASONING_EVENT_SUMMARY } from "../../common/runtime-core/reasoning.ts";
 import { toClaudeSchema } from "../../common/claude-adapter/schema.ts";
 import { CLAUDE_JUDGE_DISALLOWED_TOOLS, CLAUDE_JUDGE_TOOL_NAMES, assertClaudeJudgeToolSet, claudeJudgeReportToolName, claudeJudgeSystemPromptLine } from "../../common/claude-adapter/judge.ts";
+import { isClaudeImageMimeType, mapClaudeToolResultImages, type ClaudeImageMimeType } from "../../common/claude-adapter/tool-result-images.ts";
 import { abortError, createQueue, isQueryClosedError, waitForTurn } from "../../common/claude-adapter/lifecycle.ts";
 import { DEFAULT_TURN_LAST_RESORT_MS } from "../../common/runtime-core/timeout.ts";
 import { renderInstalledSkillsSection } from "../../common/编排/installed-skills.ts";
@@ -373,9 +374,23 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
               try {
                 const result = await tool.handler({ name: tool.name, args: publicArgs, signal, toolCallId });
                 if (signal.aborted || current.closed) return { content: [{ type: "text" as const, text: "本轮已中止，工具结果已丢弃" }], isError: true };
+                // 工具结果附图（同轮设计 §6.4）：仅 ok:true 且载荷合法时映射为 MCP image 块；
+                // 图片 data/base64 原引用透传，绝不经过 redact。事件 facts 只带白名单标量：
+                // 剔除 images（潜在 base64）后才交给 projector/diagnostics。
+                const imageMapping = mapClaudeToolResultImages(result);
                 const message = redact(result.message);
-                emitTool(callTurn, { ...facts, phase: "result", origin: "handler-result", result }, result.ok ? "accepted" : "denied", message);
-                return { content: [{ type: "text" as const, text: message }], isError: !result.ok };
+                const text = imageMapping.invalid
+                  ? `${message}（Claude 适配器：工具结果中的图片数据非法，未向模型提供任何图片；本轮不要假装已看到。）`
+                  : message;
+                const effectiveOk = result.ok && !imageMapping.invalid;
+                const { images: _toolResultImages, ...resultFacts } = result;
+                const eventResult = imageMapping.invalid
+                  ? { ...resultFacts, ok: false, message: `${result.message}（Claude 适配器：工具结果中的图片数据非法，未向模型提供任何图片；本轮不要假装已看到。）` }
+                  : resultFacts;
+                emitTool(callTurn, { ...facts, phase: "result", origin: "handler-result", result: eventResult }, effectiveOk ? "accepted" : "denied", text);
+                const content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> = [{ type: "text", text }];
+                if (effectiveOk) for (const image of imageMapping.images) content.push(image);
+                return { content, isError: !effectiveOk };
               } catch (error) {
                 const message = `${tool.name} 执行失败；ANS 治理能力未返回成功`;
                 if (!signal.aborted && !current.closed) emitTool(callTurn, { ...facts, phase: "result", origin: "handler-result",
@@ -571,7 +586,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           let compatibleAttempt = reasoningCompatible;
           try {
             const images = promptOptions?.images ?? [];
-            if (images.some((image) => !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(image.mimeType))) throw new Error("Claude 不支持此输入图片类型");
+            if (images.some((image) => !isClaudeImageMimeType(image.mimeType))) throw new Error("Claude 不支持此输入图片类型");
             if (!reasoningConfigReported) {
               emitReasoningSystem(turn, "configured", `本会话向 Claude SDK 请求的思考配置：${options.reasoningEffort ?? "SDK 默认"}；模型可能忽略或限制档位，服务端实际采纳未验证。`);
               reasoningConfigReported = true;
@@ -592,7 +607,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                 current.pendingInputs.set(turn.sdkUuid, turn);
                 const wireText = `[ANS_INPUT_CONTEXT:${turn.sdkUuid}]\n${text}`;
                 current.input.push({ type: "user", uuid: turn.sdkUuid, session_id: nativeId ?? "", parent_tool_use_id: null, message: {
-                  role: "user", content: images.length ? [{ type: "text", text: wireText }, ...images.map((image) => ({ type: "image" as const, source: { type: "base64" as const, media_type: image.mimeType as "image/png" | "image/jpeg" | "image/gif" | "image/webp", data: image.data } }))] : wireText,
+                  role: "user", content: images.length ? [{ type: "text", text: wireText }, ...images.map((image) => ({ type: "image" as const, source: { type: "base64" as const, media_type: image.mimeType as ClaudeImageMimeType, data: image.data } }))] : wireText,
                 } });
                 try {
                   await waitForTurn(attemptDone.then(() => current.toolTail), turn.controller.signal, turnLastResortMs, options.interactionGate);

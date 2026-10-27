@@ -18,3 +18,5 @@
 - 2026-10-21 E1 已由用户批准：在同一个无effort候选内，按固定SDK当前模型元数据生成临时0600副本，解决目录内模型自动补默认；普通路径零覆盖，失败/取消下一轮先恢复原目录。原D1红日志保留，E1结果见同一修复记录。
 
 - D1+E1 所有者最终结果：80/80自有回归、20/20真实CLI localhost矩阵、全仓typecheck0；原gpt-5.5红例与最终绿例分开保留。固定版本内嵌目录来源及既有限制见[同一修复记录](docs/fix/2026-10-21_fix_reasoning-compatibility.md)，独立验收由对应角色继续。
+
+- [工具结果同轮附图映射 + 最小 Chat Completions 传输（2026-10-27）](docs/change/2026-10-27_change_tool-result-images-codex.md)：`ToolResult.images` → Responses 动态工具 `inputImage` data URL；MIME 白名单、失败/非法载荷 fail-closed、图片不过 redact/日志/事件。0.162.1 Responses 回环 4/4 绿；客户补充约束后新增显式 `ANS_CODEX_WIRE_API=chat` 最小传输（产品需显式 Codex/OpenAI 配置；Pi 仅临时测试显式注入、**不做自动回退**），真实 Chat 探针 3/3（工具消息 `image_url` data URL 图片被模型实际看到）。policy 仍 `next-turn`（翻表属运行时核心）；chat 模式无原生线程恢复/MCP/联网搜索/思考等级。

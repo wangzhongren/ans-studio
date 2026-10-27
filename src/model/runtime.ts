@@ -39,25 +39,75 @@ export interface PromptImage {
   mimeType: string;
 }
 
-// —————————————— 图片查看：两轮附件设计（2026-10-26 客户要求） ——————————————
+// —————————————— 图片查看：同轮工具结果附图优先 + 下一轮附件回退（2026-10-27 客户要求） ——————————————
 //
-// `view_image` 工具读取项目内图片后，**不把图片塞进本轮工具结果**（各引擎对工具结果附图的支持不一致），
-// 而是调用注入的 `ViewImageFn` 把图片排队为**同一角色下一轮用户提示的图片附件**。因此工具本轮只返回
-// 文本回执（「已读取并排队，下一轮以附件提供，不要假装本轮已看到」）；能力未注入 ⇒ 工具不注册
-// （结构性 fail-closed，沿 dispatch_task/flowGet 先例）。路径/类型/大小校验在工具层；能力侧只负责
-// 排队并如实回执（`ok:false` 或抛错 ⇒ 不谎报已提供）。本类型不授予任何写权。
+// `view_image` 工具读取项目内图片后，交付方式由 `RUNTIME_VIEW_IMAGE_POLICY` 单一决定（不在工具层写引擎分支）：
+// · `tool-result`：图片随**本次工具结果**进入同一模型工具循环（模型紧接着的下一次调用即可看到），
+//   不产生队列/系统行；适配器负责映射为各引擎原生工具结果内容。
+// · `next-turn`：图片由注入的 `ViewImageFn` 排队为**同一角色下一轮用户提示的图片附件**，工具本轮只回文本
+//   （2026-10-26 两轮附件设计；作为不支持同轮引擎的兼容回退）。
+// **初始落地四个运行时全部 `next-turn`**（零行为变化）；各适配器完成映射并经真实探针验证后，才逐引擎翻为
+// `tool-result`。**2026-10-27 Gate 3：Pi、Claude、Codex 已翻为 `tool-result`**（真实探针证据：
+// `角色卡/Pi适配器/docs/change/2026-10-27_probe_pi-tool-result-images.md`、
+// `角色卡/Claude适配器/docs/change/2026-10-27_change_tool-result-images-claude.md`、
+// `角色卡/Codex适配器/docs/change/2026-10-27_change_tool-result-images-codex.md`——Codex 以客户确认的
+// Chat Completions/Pi 网关为主路径；Responses 真实模型证据仍缺，属同 runtime 单开关的已知限制）；
+// demo 仍为 `next-turn`。翻表是唯一开关，也是回滚开关。能力未注入 ⇒ 工具不注册（结构性 fail-closed）。
+// 路径/类型/大小校验在工具层；能力侧只负责受理并如实回执。本类型不授予任何写权。
+
+/** `view_image` 的交付方式：工具结果同轮附图 / 下一轮用户提示附件（回退）。 */
+export type ViewImageDeliveryMode = "tool-result" | "next-turn";
+
+/** `view_image` 能力回执。`ok:false` 的 `message` 原样转达；契约外回执由工具层 fail-closed。 */
+export interface ViewImageReceipt {
+  ok: boolean;
+  /** 本次实际采用的交付方式；缺省按 `"next-turn"` 处理（旧能力实现零破坏）。非法值按契约外回执处理。 */
+  mode?: ViewImageDeliveryMode;
+  message?: string;
+}
 
 /** `view_image` 的注入能力入参：项目内图片路径（原样回显）+ 已转好的 `PromptImage`（base64 + MIME）。 */
 export interface ViewImageInput {
   path: string;
   image: PromptImage;
+  /** 当前模型轮次 id（工具从 `options.currentTurnId()` 取；回退批量按轮分组用；可选）。 */
+  turnId?: string;
 }
 
 /**
- * `view_image` 的注入能力：把图片排队为**下一轮**用户提示的图片附件，并如实回执是否受理。
- * `ok:false` 的 `message` 会原样转达给模型；能力抛错/契约外回执由工具层按「未排队」fail-closed 处理。
+ * `view_image` 的注入能力：按回执声明的 `mode` 交付图片并如实回执是否受理。
+ * 旧实现可只返回 `{ok:true}`（＝`next-turn`）；能力抛错/契约外回执由工具层按「未提供图片」fail-closed 处理。
  */
-export type ViewImageFn = (input: ViewImageInput) => Promise<{ ok: boolean; message?: string }>;
+export type ViewImageFn = (input: ViewImageInput) => Promise<ViewImageReceipt>;
+
+/**
+ * 每个运行时的有效图片策略（单一来源；工具层只消费，不写引擎分支）。
+ * `delivery` 是唯一开关：`RUNTIME_VIEW_IMAGE_POLICY[runtime].delivery`。
+ */
+export interface RuntimeViewImagePolicy {
+  delivery: ViewImageDeliveryMode;
+  /** 有效单图上限（字节）；`tool-result` 交付时工具取 `min(VIEW_IMAGE_MAX_BYTES, maxImageBytes)`。 */
+  maxImageBytes: number;
+  /** 每模型轮次最多图片数（仅 `tool-result` 交付计数；`next-turn` 保持既有排队行为不变）。 */
+  maxImagesPerTurn: number;
+  /** 每模型轮次图片原始字节总预算（仅 `tool-result` 交付计数）。 */
+  maxBytesPerTurn: number;
+}
+
+/**
+ * 运行时图片策略表（**目标态**见设计 §6.1）。逐引擎启用（Gate 3）由适配器真实探针证据驱动：
+ * **Pi、Claude、Codex 已于 2026-10-27 翻为 `tool-result`**（证据见上方注释）；demo 仍为 `next-turn`。
+ * Claude 启用时已按设计 §5.2 把 `maxImageBytes` 收紧为 5 MB（更严格的引擎上限提前 fail-closed）。
+ * Codex 以客户确认的 Chat Completions/Pi 网关为主路径启用；Responses 真实模型证据仍缺——本表是
+ * **runtime 级单开关**（不区分 wire），应用需配置 `ANS_CODEX_WIRE_API=chat` 才走已验证路径。
+ * 翻表是唯一开关，也是回滚开关。
+ */
+export const RUNTIME_VIEW_IMAGE_POLICY: Readonly<Record<RuntimeKind, RuntimeViewImagePolicy>> = Object.freeze({
+  demo: Object.freeze({ delivery: "next-turn", maxImageBytes: 10 * 1024 * 1024, maxImagesPerTurn: 4, maxBytesPerTurn: 20 * 1024 * 1024 }),
+  pi: Object.freeze({ delivery: "tool-result", maxImageBytes: 10 * 1024 * 1024, maxImagesPerTurn: 4, maxBytesPerTurn: 20 * 1024 * 1024 }),
+  claude: Object.freeze({ delivery: "tool-result", maxImageBytes: 5 * 1024 * 1024, maxImagesPerTurn: 4, maxBytesPerTurn: 20 * 1024 * 1024 }),
+  codex: Object.freeze({ delivery: "tool-result", maxImageBytes: 10 * 1024 * 1024, maxImagesPerTurn: 4, maxBytesPerTurn: 20 * 1024 * 1024 }),
+});
 
 export interface PromptTurnStartedMetadata {
   readonly turnId: string;
@@ -1069,6 +1119,57 @@ export interface RequestBoundaryChangeResult {
 /** `request_boundary_change` 注入能力（派发/确定性校验/AI 门禁/客户确认/appointment-write 由应用实现；未注入 ⇒ 工具不注册）。 */
 export type RequestBoundaryChangeFn = (input: RequestBoundaryChangeInput) => Promise<RequestBoundaryChangeResult>;
 
+// —————————————— 需求变更申请（2026-10-26 客户要求；request_requirement_change） ——————————————
+//
+// 背景：报告员（Draft/rapporteur）起草提案时若发现需要**新的客户授权/范围**（或约束/成本变化），
+// 不应把未获授权的诉求塞进提案卡「顺带获批」；应提交**需求变更审批**，进入**独立审批**。
+// **审批不由主理完成**（2026-10-26 客户纠正）：申请由**提案角色（Rapporteur）或统筹**发起；审批卡由
+// 应用在申请成功后自动经发起方会话呈现（decision 卡）——「替我决策」开启时由判断 agent 按推荐项决定，
+// 未开启时由客户手选；**发起方不得自批、不得重复发卡**；主理不审批，只在批准后执行意图变更。本工具是报告员可用的专用申请通道：本层只做参数形状
+// 校验并**如实转达回执**——意图记录校验、去重/派发、账本/系统行与 decision 卡触发全部由**应用注入
+// 的能力**实现（本层不写盘、不弹客户卡、不做治理判定、不改变任何写权）。
+// 纪律：**申请≠批准，也不代表意图已变更**；`dispatched` 只表示已提交、不代表通过；
+// 不要把新授权写进提案卡；`proposedIntentPatch` 只是建议，绝不替客户改意图；能力未注入 ⇒ 工具不注册
+// （沿 requestAcceptance / requestClarification 先例）。
+
+/** 需求变更种类：范围 / 授权 / 约束 / 成本 / 其它。 */
+export type RequestRequirementChangeKind = "scope" | "authorization" | "constraint" | "cost" | "other";
+
+/**
+ * `request_requirement_change` 载荷：`flowId` 与 `intentId` **至少给一个**（归属校验/去重由应用判定）。
+ * `summary`/`rationale` 必填非空且有界；`impact`/`proposedIntentPatch` 可选有界（工具层上限见 schema）。
+ * `proposedIntentPatch` 只是给主理的**建议**文本——本工具不替客户修改意图文件，也不产生客户确认。
+ */
+export interface RequestRequirementChangeInput {
+  flowId?: string;
+  intentId?: string;
+  changeKind: RequestRequirementChangeKind;
+  summary: string;
+  rationale: string;
+  impact?: string;
+  proposedIntentPatch?: string;
+}
+
+/**
+ * `request_requirement_change` 的如实回执（形状冻结；工具层**原样**转达）。
+ * `ok:true`＋`code:"dispatched"`＝应用已登记申请并进入**需求变更审批**（审批卡可由**提案角色
+ * Rapporteur 或统筹**发起/持有；「替我决策」开启时由判断 agent 按推荐项决定，未开启时客户手选）——
+ * **`dispatched` 只表示已提交、不代表通过**，申请≠批准，也不代表意图已变更；**发起方不得自批**；
+ * 主理不审批，只在批准后执行意图变更。其余 code 为如实的未提交/已提交原因（`rejected`＝应用在派发
+ * 前退回报告员，不代表客户拒绝）。
+ */
+export interface RequestRequirementChangeResult {
+  ok: boolean;
+  code: "dispatched" | "already-dispatched" | "invalid" | "intent-not-found" | "flow-not-found" | "unavailable" | "rejected";
+  message: string;
+  flowId?: string;
+  intentId?: string;
+  requestId?: string;
+}
+
+/** `request_requirement_change` 注入能力（意图校验/去重/派发/账本/系统行由应用实现；未注入 ⇒ 工具不注册）。 */
+export type RequestRequirementChangeFn = (input: RequestRequirementChangeInput) => Promise<RequestRequirementChangeResult>;
+
 // —————————————— 推理与推理强度（G-5 wave 1 契约层；冻结符号，单一来源＝本模块） ——————————————
 //
 // 依据：客户 2026-10-16「按推荐批准，开始实施」＝ G-5（推理与推理强度）；评估
@@ -1701,6 +1802,14 @@ export interface ToolExecutionCall extends ToolCall {
 export interface ToolResult {
   ok: boolean;
   message: string;
+  /**
+   * 本轮工具结果附带的**模型可见**图片（2026-10-27 同轮设计；可选、向后兼容）。
+   * 仅 `view_image` 在 `ok:true` 且交付方式为 `tool-result` 时非空；适配器负责映射为原生工具结果内容。
+   * **不得**进入 `details`、诊断、工具展示事件或 ANS 回放（只允许计数/字节/MIME 摘要等元数据）。
+   */
+  images?: readonly PromptImage[];
+  /** 审计/展示用的交付方式（同轮附图 / 下一轮附件回退）；不携带图片字节。 */
+  imageDelivery?: ViewImageDeliveryMode;
   execution?: RuntimeToolExecutionFactsV1;
   /**
    * 后台任务结构化事实（2026-10-22 B4；可选、向后兼容）：任务号/状态/pid/退出码。
@@ -1815,6 +1924,19 @@ export interface GovernedToolsOptions {
    */
   requestBoundaryChange?: RequestBoundaryChangeFn;
   /**
+   * 需求变更申请（2026-10-26 客户要求）：`request_requirement_change` 能力——报告员（Draft/rapporteur）
+   * 起草提案时发现需要**新的客户授权/范围**（或约束/成本变化）时，**不把未获授权的诉求塞进提案卡**，
+   * 而是提交需求变更审批，进入**独立审批**：申请由**提案角色（Rapporteur）或统筹**发起；审批卡由应用
+   * 在申请成功后自动经发起方会话呈现（decision 卡）——「替我决策」开启时由判断 agent 按推荐项决定，
+   * 未开启时由客户手选；**发起方不得自批、不得重复发卡**；**主理不审批，只在批准后执行意图变更**。
+   * **只给报告员（Draft/rapporteur）与统筹（Convener）会话注入**（判据在编排/桌面注入端，本层不硬编码角色 id）；
+   * 未注入 ⇒ 工具不注册（结构性 fail-closed，沿 requestAcceptance/requestClarification 先例）。
+   * 意图校验/去重/派发/账本/系统行由能力实现；本层只做参数形状校验并如实转达回执——
+   * **申请≠批准，也不代表意图已变更**；`dispatched` 只表示已提交、不代表通过；
+   * 不要把新授权写进提案卡；`proposedIntentPatch` 只是建议，不替客户改意图。
+   */
+  requestRequirementChange?: RequestRequirementChangeFn;
+  /**
    * 判断 agent（「替我审」）只读能力注入。**这是能力注入，不是工具注入**：注入后 Service 必须走
    * `buildShellJudgeTools`（`src/common/runtime-core/shell-judge/`），**不得**走 `buildGovernedTools`——
    * 判断会话结构性不构造写/编辑/shell/客户交互/回交/派发/MCP 工具。未注入 ⇒ 判断模式不成立。
@@ -1837,13 +1959,20 @@ export interface GovernedToolsOptions {
    */
   backgroundTasks?: BackgroundTaskCapability;
   /**
-   * 图片查看能力（2026-10-26 客户要求；两轮附件设计）：工具 `view_image` 读取项目内图片并调用本能力，
-   * 把图片排队为**同一角色下一轮用户提示的图片附件**——工具本轮只返回文本，不依赖各引擎「工具结果附图」
-   * 支持不一致的问题。**未注入 ⇒ 工具不注册**（能力缺席 = 最强 fail-closed，沿 dispatch_task 先例）；
-   * 路径/类型/大小校验在工具层，能力侧只负责排队并**如实回执**（`ok:false`/抛错 ⇒ 不谎报已提供）。
+   * 图片查看能力（2026-10-26 客户要求；2026-10-27 同轮设计修订）：工具 `view_image` 读取项目内图片后，
+   * 按 `viewImagePolicy.delivery` 交付——`tool-result` 时图片随本次工具结果同轮附图（不触达本能力，
+   * Service 注入内联受理回执）；`next-turn` 时调用本能力把图片排队为**同一角色下一轮用户提示的图片附件**，
+   * 工具本轮只返回文本。**未注入 ⇒ 工具不注册**（能力缺席 = 最强 fail-closed，沿 dispatch_task 先例）；
+   * 路径/类型/大小校验在工具层，能力侧只负责受理并**如实回执**（`ok:false`/抛错 ⇒ 不谎报已提供）。
    * 本能力不写盘、不联网、不改变任何写权。
    */
   viewImage?: ViewImageFn;
+  /**
+   * `view_image` 的运行时图片策略（2026-10-27 同轮设计）：由 Service 按 `RUNTIME_VIEW_IMAGE_POLICY`
+   * 单一注入（`RuntimeSessionOptions` 以 `Omit` 排除本字段，外部调用方不能自行改策略——与
+   * `backgroundTasks` 同款）。缺省＝`next-turn` + 10 MB / 4 张 / 20 MB（工具层 fallback，零行为变化）。
+   */
+  viewImagePolicy?: RuntimeViewImagePolicy;
 }
 
 export interface RuntimeSessionRecord {

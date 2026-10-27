@@ -5,7 +5,9 @@
 //   ① 统筹（convener）可发 decision 卡：恰好选中一个**卡上选项** → `customer.decision{
 //      decisionKind:"material-choice", customerDecision:"accepted", selectedOptions:[选中项]}`，
 //      `power=schedule`、`decisionEvidence.kind:"customer-input"`；不写 `targetRoleIds`（不伪装成任命）；
-//   ② Lead（liaison）与其余内置角色（rapporteur/nominator/verifier）不可发：越权在触达客户前
+//      报告员（rapporteur，2026-10-26 客户纠正/补充）同样可为**需求变更审批**发起 decision 卡
+//      （actorRoleId=rapporteur、power=proposal）；
+//   ② Lead（liaison）/ Crew（nominator）/ Proof（verifier）与项目角色不可发：越权在触达客户前
 //      `declined`，客户通道零调用、账本零写入；
 //   ③ 多选 / 空选 / 未知选项 → `unclassified/none`（fail-closed）；
 //   ④ 不影响 proposal/appointment/acceptance/gate：`material-choice` 不满足写流程门/任命写入门、
@@ -338,7 +340,7 @@ async function waitForLedgerEntry(
 
 // —————————————————————— ① 统筹可发；选中一个 → material-choice ——————————————————————
 
-test("decision 卡：统筹恰好选中一个卡上选项 → customer.decision{material-choice, accepted, selectedOptions}", async () => {
+test("decision 卡：运营恰好选中一个卡上选项 → customer.decision{material-choice, accepted, selectedOptions}", async () => {
   await withRoot(async (root) => {
     const raw: CustomerInputFn = () => ({
       outcome: "answered",
@@ -378,11 +380,46 @@ test("decision 卡：统筹恰好选中一个卡上选项 → customer.decision{
   });
 });
 
-// —————————————————————— ② 仅统筹可发（Lead/其余内置角色拒绝） ——————————————————————
-
-test("decision 卡：Lead 与其余内置角色不可发 —— 不弹卡、不写账本", async () => {
+test("decision 卡：报告员（rapporteur）可为需求变更审批发起 —— 选中推荐项落 material-choice 审计", async () => {
   await withRoot(async (root) => {
-    for (const roleId of ["liaison", "rapporteur", "nominator", "verifier"] as const) {
+    const raw: CustomerInputFn = () => ({
+      outcome: "answered",
+      value: { selected: ["option-a"] },
+      operatorId: "judge:claude",
+      judge: {
+        group: "decision",
+        cardKind: "decision",
+        engine: "claude",
+        reasonCode: "recommended",
+        reason: "按唯一推荐项代批（需求变更审批）",
+        evidence: ["card:需求变更审批"],
+        selected: ["option-a"],
+      },
+    });
+    const { handle, captured } = await openCapturing(root, "rapporteur", raw);
+    try {
+      const out = await captured.caps!.customerInput!(decisionCard({ title: "需求变更审批" }));
+      assert.equal(out?.outcome, "answered", "报告员发起的需求变更审批卡可呈现并发起（不是越权拒绝）");
+      const entry = await waitForLedgerEntry(root, (candidate) => candidate.kind === "customer.decision");
+      assert.equal(entry.actorRoleId, "rapporteur");
+      assert.equal(entry.power, "proposal", "power = 发起角色职能（Rapporteur=proposal），不是客户/验收");
+      assert.equal(entry.flowId, "flow-a");
+      assert.equal(entry.decisionKind, "material-choice");
+      assert.equal(entry.customerDecision, "accepted");
+      assert.deepEqual(entry.selectedOptions, ["option-a"]);
+      assert.equal(entry.targetRoleIds, undefined, "不写 targetRoleIds（不伪装成任命）");
+      assert.equal(entry.decisionEvidence?.kind, "judge", "审批来自独立判断 agent（发起方不得自批）");
+      assert.equal(entry.decisionEvidence?.judge?.reasonCode, "recommended");
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+// —————————————————————— ② 仅报告员/统筹可发（Lead/Crew/Proof 拒绝） ——————————————————————
+test("decision 卡：Lead、Crew、Proof 不可发 —— 不弹卡、不写账本", async () => {
+  await withRoot(async (root) => {
+    for (const roleId of ["liaison", "nominator", "verifier"] as const) {
       let rawCalls = 0;
       const raw: CustomerInputFn = () => {
         rawCalls += 1;
@@ -395,8 +432,8 @@ test("decision 卡：Lead 与其余内置角色不可发 —— 不弹卡、不�
         assert.equal((out as { notPresented?: unknown }).notPresented, true, `${roleId} 卡片从未呈现`);
         assert.match(
           (out as { reason?: string }).reason ?? "",
-          /decision 卡只能由统筹\/Steward/,
-          `${roleId} 的拒绝文案应指出仅统筹可发`,
+          /decision 卡只能由运营\/Steward/,
+          `${roleId} 的拒绝文案应指出仅运营/策划角色可发`,
         );
         assert.equal(rawCalls, 0, `${roleId} 的越权卡不得触达客户通道`);
       } finally {
@@ -786,6 +823,18 @@ test("F2：validateDecisionCardRequest 是单一共享校验——角色/卡形/
     assert.equal(ok.recommendedOptionId, "option-a");
   }
 
+  // 2026-10-26 客户纠正/补充：报告员为需求变更审批发 decision 卡同样通过共享校验。
+  const rapporteurOk = validateDecisionCardRequest({
+    request: decisionCard({ title: "需求变更审批" }),
+    roleId: "rapporteur",
+    governanceModel: "trio",
+  });
+  assert.equal(rapporteurOk.ok, true);
+  if (rapporteurOk.ok) {
+    assert.equal(rapporteurOk.applicable, true);
+    assert.equal(rapporteurOk.recommendedOptionId, "option-a");
+  }
+
   // 非 decision 卡：不适用（调用方按原卡种逻辑处理，旧卡零变化）。
   const notApplicable = validateDecisionCardRequest({
     request: { kind: "choice", title: "普通选择", options: [{ id: "a", label: "A" }], flowId: "flow-a" },
@@ -802,10 +851,22 @@ test("F2：validateDecisionCardRequest 是单一共享校验——角色/卡形/
     detail?: RegExp;
   }> = [
     {
-      label: "非统筹内置角色",
+      label: "Lead（liaison）不可发",
       input: { request: decisionCard(), roleId: "liaison", governanceModel: "trio" },
       reasonCode: "role-not-allowed",
       detail: /role=liaison/,
+    },
+    {
+      label: "Crew（nominator）不可发",
+      input: { request: decisionCard(), roleId: "nominator", governanceModel: "trio" },
+      reasonCode: "role-not-allowed",
+      detail: /role=nominator/,
+    },
+    {
+      label: "Proof（verifier）不可发",
+      input: { request: decisionCard(), roleId: "verifier", governanceModel: "trio" },
+      reasonCode: "role-not-allowed",
+      detail: /role=verifier/,
     },
     {
       label: "single/su",
@@ -1044,7 +1105,7 @@ test("F2：single/su 与项目角色发 decision 卡 ⇒ 不触达客户、零�
       const out = await su.captured.caps!.customerInput!(decisionCard());
       assert.equal(out?.outcome, "declined");
       assert.equal((out as { notPresented?: unknown }).notPresented, true);
-      assert.match((out as { reason?: string }).reason ?? "", /只能由统筹\/Steward/);
+      assert.match((out as { reason?: string }).reason ?? "", /只能由运营\/Steward/);
     } finally {
       await su.handle.dispose();
     }
@@ -1064,7 +1125,7 @@ test("F2：single/su 与项目角色发 decision 卡 ⇒ 不触达客户、零�
       const out = await worker.captured.caps!.customerInput!(decisionCard());
       assert.equal(out?.outcome, "declined");
       assert.equal((out as { notPresented?: unknown }).notPresented, true);
-      assert.match((out as { reason?: string }).reason ?? "", /只能由统筹\/Steward/);
+      assert.match((out as { reason?: string }).reason ?? "", /只能由运营\/Steward/);
     } finally {
       await worker.handle.dispose();
     }

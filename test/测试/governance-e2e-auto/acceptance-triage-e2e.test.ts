@@ -420,7 +420,7 @@ test("R2 request_acceptance：pending 标准步骤收口为 done（artifact 证�
 
 // —————————————————————— 二、验收分诊 ——————————————————————
 
-test("T1 仅 nit/minor + 判断代批：不返工、记录 report-only、主理汇报；账本 acceptance.triage 不污染 latestAcceptanceDecision", async () => {
+test("T1 仅 nit/minor + 判断代批：不返工、记录 report-only、产品汇报；账本 acceptance.triage 不污染 latestAcceptanceDecision", async () => {
   const temp = await seedProject("triage-nit-report-only", { report: triageReport("fail", NIT_ONLY_ITEMS) });
   const root = temp.root;
   const h = await makeHarness({
@@ -464,7 +464,7 @@ test("T1 仅 nit/minor + 判断代批：不返工、记录 report-only、主理�
     assert.equal(record!.itemCount, 2);
     assert.equal(record!.reportSha256, sha256(read(root, REPORT_REL)));
     assert.equal(record!.triageId, `triage-${FLOW}-${sha256(read(root, REPORT_REL)).slice(0, 8)}`);
-    assert.equal(typeof record!.reportedAt, "string", "主理汇报后应置 reportedAt");
+    assert.equal(typeof record!.reportedAt, "string", "产品汇报后应置 reportedAt");
 
     // 主理确定性汇报：结论 + 逐项原因 + 改进建议 + 决定来源 + 报告路径。
     await h.waitFor(
@@ -530,7 +530,7 @@ test("T2 可执行 blocker + 判断代批：返工任务含 id/severity/reason/a
     assert.match(task, /id=M1 .*severity=minor（非阻断，可选后续）/, "minor 标非阻断");
     assert.match(task, /id=N1 .*severity=nit（非阻断，可选后续）/, "nit 标非阻断");
     assert.match(task, /minor\/nit 项为非阻断（可选后续）/, "任务应显式声明非阻断");
-    assert.match(task, /实际接收方：主理（liaison）/, "trio 实际接收方 = 主理");
+    assert.match(task, /实际接收方：产品（liaison）/, "trio 实际接收方 = 产品");
 
     // routing record：结构化 triage 清单（不依赖旧 acceptance-rework 段）。
     // 说明：acceptance.triage 账本条目在「routing 记录 sent + 分诊记录 dispatched」之后追加，
@@ -563,7 +563,7 @@ test("T2 可执行 blocker + 判断代批：返工任务含 id/severity/reason/a
   }
 });
 
-test("T3 客户分诊卡：稳定 id/卡面齐全；选择「下发统筹修改」⇒ reject 结算 + triage-customer 唯一一条返工任务", async () => {
+test("T3 客户分诊卡：稳定 id/卡面齐全；选择「下发运营修改」⇒ reject 结算 + triage-customer 唯一一条返工任务", async () => {
   const temp = await seedProject("triage-customer-card", { report: triageReport("fail", BLOCKER_ITEMS) });
   const root = temp.root;
   const h = await makeHarness({
@@ -582,19 +582,19 @@ test("T3 客户分诊卡：稳定 id/卡面齐全；选择「下发统筹修改�
     const expectedCardId = `triage-${FLOW}-${reportSha.slice(0, 8)}`;
     const card = h.presented.find((entry) => entry.id === expectedCardId);
     assert.ok(card, `分诊卡应使用稳定 id ${expectedCardId}（实际 ${h.presented.map((entry) => entry.id).join("、")}）`);
-    assert.equal(card!.roleId, "liaison", "分诊卡呈现面 = 主入口主理");
+    assert.equal(card!.roleId, "liaison", "分诊卡呈现面 = 主入口产品");
     const request = card!.request;
     if (request.kind !== "choice") throw new Error("分诊卡必须是 choice 卡");
     assert.deepEqual(
       request.options.map((option) => option.id),
       ["rework", "report-only"],
-      "分诊卡恰两选项：下发统筹修改 / 仅汇报不返工",
+      "分诊卡恰两选项：下发运营修改 / 仅汇报不返工",
     );
     const preview = card!.request.preview ?? "";
     assert.match(preview, /验收结论：不通过/, "卡面含结论摘要");
     assert.match(preview, /B1 · 阻断：干净安装失败/, "卡面含逐项 severity + reason");
     assert.match(preview, /改进建议：修复依赖锁定并保留完整日志（package-lock\.json；docs\/acceptance\/flow-a-criteria-v1\.md#P1）/, "卡面含改进方案与指针");
-    assert.match(preview, /建议下发统筹修改（1 个阻断、0 个重要项，改进方案可执行）/, "卡面含默认建议与依据");
+    assert.match(preview, /建议下发运营修改（1 个阻断、0 个重要项，改进方案可执行）/, "卡面含默认建议与依据");
     assert.match(preview, /报告含阻断项，仅汇报将不修复/, "blocker 报告含覆盖警示");
 
     h.answer(card!.id, { kind: "choice", selected: ["rework"] });
@@ -602,7 +602,7 @@ test("T3 客户分诊卡：稳定 id/卡面齐全；选择「下发统筹修改�
     assert.equal(sent.ok, true, sent.error ?? "");
     const receipt = h.results.find((record) => record.name === "request_choice");
     assert.match(receipt!.message, /客户在验收分诊卡上的选择/, "回执应区分分诊卡选择与验收卡 accept/reject");
-    assert.match(receipt!.message, /下发统筹修改/);
+    assert.match(receipt!.message, /下发运营修改/);
     assert.doesNotMatch(receipt!.message, /客户已选择（.*accept/, "不得把分诊选择说成直接 accept");
 
     // 客户选择「下发统筹修改」按 reject 结算（customer-input 证据）+ triage 账本。
@@ -631,7 +631,7 @@ test("T3 客户分诊卡：稳定 id/卡面齐全；选择「下发统筹修改�
     await h.waitFor(() => reworkPrompts(h).length > 0, 8000);
     assert.equal(reworkPrompts(h).length, 1, "客户分诊只发唯一一条返工任务（不得被 settle 自动路由抢先/重复）");
     const task = reworkPrompts(h)[0]!;
-    assert.match(task, /来源：客户验收分诊选择（下发统筹修改）/, "任务来源应为 triage-customer，而不是「客户拒绝（客户手拒）」");
+    assert.match(task, /来源：客户验收分诊选择（下发运营修改）/, "任务来源应为 triage-customer，而不是「客户拒绝（客户手拒）」");
     assert.match(task, /结构化返工清单（acceptance-triage\/v1；/);
     assert.match(task, /id=B1 .*severity=blocker .*reason=干净安装失败/, "任务必须携带 triage 的 severity/reason/action");
   } finally {
@@ -672,7 +672,7 @@ test("T4 缺 triage 段（只有旧 acceptance-rework/v1）⇒ 退回 Proof 补�
 
     // 主理如实系统行；零返工/零客户决定/零 Proof 重派。
     await h.waitFor(
-      () => deliveryNotes(h, "liaison").some((note) => note.includes("验收报告缺少分诊结构，已退回验收补充")),
+      () => deliveryNotes(h, "liaison").some((note) => note.includes("验收报告缺少分诊结构，已退回质检补充")),
       5000,
     );
     assert.equal(reworkPrompts(h).length, 0, "缺结构不得返工");

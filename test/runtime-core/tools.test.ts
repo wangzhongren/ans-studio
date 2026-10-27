@@ -134,7 +134,7 @@ test("schema 文案（G-1/A4）：dispatch_task 钉住「先落盘再派发」�
   assert.match(roleIdDescription, /`convener` \(Steward\)/, "Lead 可把 convener（Steward）作为协调目标");
   assert.match(roleIdDescription, /Other built-in governance roles are never valid targets/, "其余内置治理角色不可作为目标");
   assert.match(roleIdDescription, /cannot dispatch to yourself/, "不得派发给调用者自己");
-  assert.match(text, /主理（Lead\/Liaison）/, "description/guideline 须写明主理 Lead");
+  assert.match(text, /产品（Lead\/Liaison）/, "description/guideline 须写明产品 Lead");
   assert.match(text, /内部协调/, "Lead→Steward 须写明是内部协调");
   assert.match(text, /不是客户批准/, "Lead 派发不是客户批准");
   assert.match(text, /Steward\/项目角色仍按自己的.*边界与门禁执行/, "目标角色仍按自己的边界与门禁执行");
@@ -306,7 +306,7 @@ test("declined 措辞按 operatorId / cardKind 区分 judge 与客户/通道（2
     );
   };
   const assertAcceptanceRework = (result: { message: string }, label: string) => {
-    assert.match(result.message, /应用会把本次退回交 Steward\/统筹（Convener）组织返工/, `${label}：验收卡须写退回 Convener 组织返工`);
+    assert.match(result.message, /应用会把本次退回交 运营\/Steward（Convener）组织返工/, `${label}：验收卡须写退回 Convener 组织返工`);
     assert.match(result.message, /请等待返工后重新提交验收/, `${label}：验收卡须等待返工后重新提交验收`);
   };
 
@@ -384,7 +384,7 @@ test("验收分诊回执：仅汇报不返工不得说成客户直接 accept（2
       triage: { disposition: "rework" as const, source: "customer" as const, conclusion: "conditional" as const, triageId: "triage-flow-abcdef12" },
     }),
   }).get("request_choice")!.handler({ name: "request_choice", args: { title: "验收", options: [{ id: "accept", label: "通过" }, { id: "reject", label: "退回" }] } });
-  assert.match(rework.message, /下发统筹修改/);
+  assert.match(rework.message, /下发运营修改/);
   assert.match(rework.message, /不是客户放弃验收/);
 
   // 自动处置（declined + triage，卡未呈现）：不得说成客户拒绝/同意。
@@ -393,12 +393,12 @@ test("验收分诊回执：仅汇报不返工不得说成客户直接 accept（2
       outcome: "declined" as const,
       operatorId: "judge:triage",
       notPresented: true as const,
-      reason: "验收分诊（判断代批 judge-rule）：已下发统筹修改",
+      reason: "验收分诊（判断代批 judge-rule）：已下发运营修改",
       triage: { disposition: "rework" as const, source: "judge" as const, conclusion: "fail" as const, triageId: "triage-flow-abcdef12" },
     }),
   }).get("request_choice")!.handler({ name: "request_choice", args: { title: "验收", options: [{ id: "accept", label: "通过" }, { id: "reject", label: "退回" }] } });
   assert.equal(autoTriage.ok, false);
-  assert.match(autoTriage.message, /下发统筹修改/);
+  assert.match(autoTriage.message, /下发运营修改/);
   assert.match(autoTriage.message, /验收卡未向客户呈现/);
   assert.match(autoTriage.message, /不是客户拒绝/);
   assert.match(autoTriage.message, /flow_get/);

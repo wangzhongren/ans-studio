@@ -25,8 +25,39 @@ export function webSearchEnabled(option: unknown, environment: string | undefine
   throw new Error("Codex ANS_CODEX_WEB_SEARCH must be on or off");
 }
 
-export function settings(options: RuntimeProviderOptions & { webSearch?: boolean }, env: Record<string, string | undefined>) {
+/** Wire protocol of the configured endpoint: app-server Responses (default) or the minimal Chat Completions transport. */
+export type CodexWireApi = "responses" | "chat";
+
+/** `ANS_CODEX_WIRE_API` / explicit option: responses (default) | chat. No other values are accepted. */
+export function wireApiOf(option: unknown, environment: string | undefined): CodexWireApi {
+  const value = option ?? environment?.trim();
+  if (value === undefined || value === "" || value === "responses") return "responses";
+  if (value === "chat") return "chat";
+  throw new Error("Codex ANS_CODEX_WIRE_API must be responses or chat");
+}
+
+/**
+ * Chat Completions endpoint from the configured base URL (2026-10-27 客户约束：Codex 复用 Pi 网关
+ * 的 OpenAI Chat Completions 面). `…/v1` ⇒ `…/v1/chat/completions`；已有 `/chat/completions` 原样；
+ * 其他（如 Pi 的 `…/deepseek`）⇒ `…/v1/chat/completions`（真机探针实测该形状可用）。
+ */
+export function chatCompletionsEndpoint(baseUrl: string): string {
+  const url = new URL(baseUrl);
+  let pathname = url.pathname.replace(/\/+$/, "");
+  if (!pathname.endsWith("/chat/completions")) {
+    pathname = pathname.endsWith("/v1") ? `${pathname}/chat/completions` : `${pathname}/v1/chat/completions`;
+  }
+  url.pathname = pathname;
+  url.hash = "";
+  return url.toString();
+}
+
+export function settings(options: RuntimeProviderOptions & { webSearch?: boolean; wireApi?: CodexWireApi }, env: Record<string, string | undefined>) {
   if (options.runtime !== "codex") throw new Error("Codex adapter requires runtime codex");
+  const wireApi = wireApiOf(options.wireApi, env.ANS_CODEX_WIRE_API);
+  // 客户 2026-10-27 裁定：Pi 只能作为临时测试配置，**不得**做成“Codex 缺配置自动回退 Pi”的
+  // 长期产品行为。产品路径只读 Codex/OpenAI 自己的配置；测试/探针必须把临时基址/模型/凭据
+  // 显式传给适配器（options.modelId/baseUrl/apiKeyEnvVar），这里不做任何 ANS_PI_* 回退。
   const model = (options.modelId ?? env.ANS_CODEX_MODEL)?.trim();
   if (!model) throw new Error("Codex requires ANS_CODEX_MODEL or modelId");
   const keyName = options.apiKeyEnvVar ?? (env.CODEX_API_KEY ? "CODEX_API_KEY" : "OPENAI_API_KEY");
@@ -55,7 +86,7 @@ export function settings(options: RuntimeProviderOptions & { webSearch?: boolean
     });
     return result;
   };
-  return { model, key, keyName, baseUrl: url.toString().replace(/\/$/, ""), redact, webSearch: webSearchEnabled(options.webSearch, env.ANS_CODEX_WEB_SEARCH), reasoningEffort: effort };
+  return { model, key, keyName, baseUrl: url.toString().replace(/\/$/, ""), redact, webSearch: webSearchEnabled(options.webSearch, env.ANS_CODEX_WEB_SEARCH), reasoningEffort: effort, wireApi };
 }
 
 /**

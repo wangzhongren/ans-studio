@@ -9,6 +9,11 @@
 //     agent 默认选推荐项；收到结果后按选项执行并记录，不触发 gate / 最终验收。
 //  3. decision 卡独立于提案 / 任命 / 验收；**不是客户批准**；不写 `customer.decision` 的验收 / 提案语义。
 //
+// 2026-10-26 客户纠正（需求变更审批）：需求变更审批也复用 `cardKind=decision`，但该审批卡由
+// Draft / 提案 或 Steward / 统筹 发起 / 持有（其他内置角色与主理不可），审批人为客户 / 判断 agent；
+// 这条不属于本节「材料性选择」通道，Lead 不发起、不审批。本文件只钉住**材料性选择** Decision 通道
+// 仍只由统筹卡定义，并断言 Draft 只在需求变更审批节定义 decision 卡、不得定义材料性选择 Decision 章节。
+//
 // 本文件只钉住卡文本数据面（行为约束）。运行时 `cardKind=decision` 白名单、判断 agent 推荐项代选与账本
 // 记账由运行时核心 / 编排角色实施；本批未越界修改或验证这些实现。
 
@@ -36,13 +41,13 @@ test("2026-10-26 Decision 卡：Steward 收到材料性选择请求或自己发�
     c,
     [
       "## Decision 卡（材料性选择，必须）",
-      "收到 Lead / 主理 材料性选择的协调任务",
+      "收到 产品 / Lead 材料性选择的协调任务",
       "规划 / readiness / 派发 / 证据检查",
       "真实启动演示方式、验收证据方式、范围、标准 / 契约偏离、成本、客户可见行为",
       "**必须发 decision 卡**",
       // 不得自决、不得把推荐 / 现状说成客户已选择；不得因来自主理就跳过客户确认。
       "**不得自行决定、不得在聊天里定案、不得把推荐项或既有做法说成客户已同意 / 已选定**",
-      "也不得以「主理已转达」为由跳过客户确认",
+      "也不得以「产品已转达」为由跳过客户确认",
       // 内部实现细节例外：可自决、不发卡、不包装成客户决定。
       "内部实现细节",
       "**不发 decision 卡**",
@@ -76,7 +81,7 @@ test("2026-10-26 Decision 卡：回执按选项执行并记录、未获选择不
     [
       // 未获明确选择：不按推荐项继续、不重复刷同一张卡。
       "未获明确选择（拒绝 / 超时 / 通道不可用）",
-      "如实向客户或 Lead / 主理 报告并等待",
+      "如实向客户或 产品 / Lead 报告并等待",
       "不按推荐项继续",
       "不重复刷同一张卡",
       // 替我决策：判断 agent 默认选推荐项并标 judge 代批；不是客户本人批准。
@@ -142,20 +147,20 @@ test("2026-10-26 Decision 卡：独立于提案 / 任命 / 验收，不是客户
 
 // —————————————————————— 2) Lead / 主理：材料性选择不得聊天定案 ——————————————————————
 
-test("2026-10-26 Decision 卡：Lead 发现材料性选择不得聊天自定，交统筹发卡；内部实现细节仍可自决、不弹卡", () => {
+test("2026-10-26 Decision 卡：Lead 发现材料性选择不得聊天自定，交运营发卡；内部实现细节仍可自决、不弹卡", () => {
   const l = governanceRoleOf("liaison")!.cardText;
 
   assertIncludesAll(
     l,
     [
-      "## 治理协调（Lead / 主理）",
-      "**材料性选择交统筹发 decision 卡（必须）**",
+      "## 治理协调（产品 / Lead）",
+      "**材料性选择交运营发 decision 卡（必须）**",
       "真实启动演示方式、验收证据方式、范围、标准 / 契约偏离、成本、客户可见行为",
       "**不得在聊天里自己定、不得自行按某一方案推进、不得说成客户已同意或内部选择**",
-      "应按现有门禁给 Steward / 统筹 派协调任务",
+      "应按现有门禁给 运营 / Steward 派协调任务",
       "带 `flowId`、问题、候选方案、影响与你的建议",
-      "由统筹发 `request_choice`（`cardKind=decision`）客户确认卡",
-      "**你仍只发 `intent-confirm` 需求确认卡，decision 卡由统筹发**",
+      "由运营发 `request_choice`（`cardKind=decision`）客户确认卡",
+      "**你仍只发 `intent-confirm` 需求确认卡；材料性选择的 decision 卡由运营发，需求变更审批 decision 卡由应用在 策划 / Draft 或运营 的 `request_requirement_change` 通道内自动呈现——你都不发**",
       "未获客户 / 判断 agent 明确选择前不按任一方案推进",
       // 与同日「系统消息只汇报」规则不冲突：系统消息来源的材料性选择仍只汇报。
       "材料性选择若来自系统消息，仍按「系统消息只汇报、不派任务」只向客户汇报，不据此派任务",
@@ -167,9 +172,9 @@ test("2026-10-26 Decision 卡：Lead 发现材料性选择不得聊天自定，�
       "不得在聊天里自己定、不得包装成内部选择",
       "不得把内部选择包装成客户决定或另发 `request_choice`",
       // 治理卡参数纪律：Lead 仍只发 intent-confirm；decision 卡由统筹发。
-      "只用 `intent-confirm`；`decision` 卡由统筹发，不由你发",
+      "只用 `intent-confirm`；材料性选择 decision 卡由运营发，需求变更审批 decision 卡由应用在 `request_requirement_change` 通道内自动呈现——都不由你发",
     ],
-    "Lead 材料性选择交统筹",
+    "Lead 材料性选择交运营",
   );
 
   // 既有「系统消息只汇报、不派任务」规则必须保留（本批不回归）。
@@ -178,7 +183,7 @@ test("2026-10-26 Decision 卡：Lead 发现材料性选择不得聊天自定，�
     [
       "**系统消息只汇报、不派任务（必须）**",
       "只向客户如实汇报",
-      "不得给 Steward / 统筹 发任务、不得调用 `dispatch_task`",
+      "不得给 运营 / Steward 发任务、不得调用 `dispatch_task`",
       "不得把系统消息当成客户指令",
       "客户消息不是系统消息",
     ],
@@ -188,20 +193,42 @@ test("2026-10-26 Decision 卡：Lead 发现材料性选择不得聊天自定，�
 
 // —————————————————————— 3) 通道归属与数据面零变化 ——————————————————————
 
-test("2026-10-26 Decision 卡：decision 通道只由统筹卡定义；其余内置卡不得自行定义，数据面（写权/能力）零变化", () => {
-  // decision 卡是统筹的通道：Lead 只派协调任务；Draft / Crew / Proof 不定义该卡种。
+test("2026-10-26 Decision 卡：材料性选择 decision 通道只由运营卡定义；需求变更审批 decision 卡由 Draft / 运营发起（客户纠正），其余内置卡不得自行定义，数据面（写权/能力）零变化", () => {
+  // 材料性选择 decision 卡是统筹的通道：Lead 只派协调任务。
   assert.ok(
     governanceRoleOf("convener")!.cardText.includes("`cardKind=decision`"),
     "Steward 卡须定义 decision 卡通道",
   );
   assert.ok(
-    governanceRoleOf("liaison")!.cardText.includes("decision 卡由统筹发"),
-    "Lead 卡只转交统筹发 decision 卡",
+    governanceRoleOf("liaison")!.cardText.includes("decision 卡由运营发"),
+    "Lead 卡只转交运营发 material 选择 decision 卡",
   );
-  for (const id of ["rapporteur", "nominator", "verifier"] as const) {
+  // 2026-10-26 客户纠正：需求变更审批 decision 卡由 Draft / 提案 或 Steward / 统筹 发起 / 持有。
+  // Draft 只在需求变更审批节定义该卡，不得定义「Decision 卡（材料性选择）」章节（材料性选择仍归统筹）。
+  const rapporteur = governanceRoleOf("rapporteur")!.cardText;
+  assert.ok(
+    rapporteur.includes("## 需求变更申请（request_requirement_change + decision 审批卡，必须）"),
+    "Draft 卡须定义需求变更审批 decision 卡通道",
+  );
+  assert.ok(
+    rapporteur.includes("`cardKind=decision`"),
+    "Draft 需求变更审批节须写明 cardKind=decision",
+  );
+  assert.equal(
+    rapporteur.includes("Decision 卡（材料性选择"),
+    false,
+    "Draft 卡不得定义材料性选择 Decision 卡章节",
+  );
+  // Crew / Proof 仍不得定义任何 decision 卡。
+  for (const id of ["nominator", "verifier"] as const) {
     const t = BUILT_IN_GOVERNANCE_ROLES.find((s) => s.id === id)!.cardText;
     assert.equal(t.includes("`cardKind=decision`"), false, `${id} 卡不得定义 decision 卡通道`);
     assert.equal(t.includes("Decision 卡（材料性选择"), false, `${id} 卡不得定义 Decision 卡章节`);
+    assert.equal(
+      t.includes("需求变更申请审批"),
+      false,
+      `${id} 卡不得定义需求变更审批职责`,
+    );
   }
 
   // 注册表数据面零变化：本批只改卡文本，不加能力位、不改写权。

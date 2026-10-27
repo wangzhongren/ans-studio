@@ -18,7 +18,7 @@ import {
 
 const TURN = "8c0aadef-2c3a-4602-8ea0-8fb7d08dd539";
 const NOTICE = "此前经确认发行的写权不会自动保留，如需写入请重新经 request_confirmation 确认。";
-const BODY = "流程 todo-cli-v1：组队写卡已通过结构校验（文件/章节齐全）。";
+const BODY = "流程 todo-cli-v1：人事写卡已通过结构校验（文件/章节齐全）。";
 const RAW = `【系统通知·会话重建】${NOTICE}\n\n${BODY}`;
 
 const noticeHistoryRow = () => ({

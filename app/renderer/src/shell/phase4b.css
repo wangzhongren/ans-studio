@@ -34,11 +34,15 @@
   gap: 8px;
   flex-wrap: wrap;
 }
-/* C1：模型文本单独 chip；流程/下一步详情可换行，不再把机器标识挤成一行。 */
+/* C1：模型/告警核心文本单独 chip；流程/下一步详情另起可换行 detail。
+   chip 允许收缩与内部换行（长告警/长 reason 不再以 nowrap 撑破状态行），
+   状态行高度随内容自适应；“ · ” 分隔由组件 title/textContent 保留。 */
 .gov-chip {
   display: inline-flex;
   align-items: center;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
   padding: 0 6px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-micro);
@@ -46,7 +50,8 @@
   color: var(--text-2);
   font-size: 11.5px;
   line-height: 1.6;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .gov-text.is-warn .gov-chip,
 .governance-status[data-governance-state="missing"] .gov-chip {
@@ -939,6 +944,12 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  /* 480 极窄档保持单行紧凑：基础规则允许 chip/detail 换行，这里收回裁剪。 */
+  .governance-status .gov-chip,
+  .governance-status .gov-detail {
+    white-space: nowrap;
+    overflow: hidden;
   }
   .governance-status .gov-action {
     flex: 0 0 auto;

@@ -370,6 +370,8 @@ interface ChatStore {
     key: string,
     open: boolean,
   ) => void;
+  /** 行内异步内容（view_image 缩略图）加载/失败后通知 pane 重新测量行高；只 bump 版本。 */
+  touchPane: (roleId: string) => void;
   setOperatorSelected: (
     roleId: string,
     rowId: string,
@@ -1335,6 +1337,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         [key]: open === true,
       },
     };
+    set({ paneVersions: bumpVersions(get().paneVersions, [roleId]) });
+  },
+
+  touchPane: (roleId) => {
+    if (!roleId) return;
     set({ paneVersions: bumpVersions(get().paneVersions, [roleId]) });
   },
 

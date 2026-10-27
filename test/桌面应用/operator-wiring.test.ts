@@ -1915,7 +1915,7 @@ test("流程步骤状态首词规范化：done 变体（含 Markdown 强调/代�
   ]) {
     assert.equal(normalizeFlowStepStatus(status), "done", `${status} 应规范化为 done`);
   }
-  for (const status of ["pending（…）", "pending（不由统筹派发）", "delivered（…）", "in-progress（…）", "blocked", "", "   ", "**", "``", "__"]) {
+  for (const status of ["pending（…）", "pending（不由运营派发）", "delivered（…）", "in-progress（…）", "blocked", "", "   ", "**", "``", "__"]) {
     assert.notEqual(normalizeFlowStepStatus(status), "done", `${status === "" || status.trim() === "" ? "（空）" : status} 不应视为 done`);
   }
   assert.equal(normalizeFlowStepStatus("**pending**（等待回交）"), "pending", "强调标记不改变 pending 的判定");
@@ -1930,11 +1930,11 @@ test("收尾触发门：状态按首词判定（done（…）/Done/done：xxx �
   assert.equal(
     flowCompletionIssue(
       "flow-a",
-      flowMarkdown([["impl", "done（有落盘/回交证据）"], ["verify", "Done"], ["acceptance", "pending（不由统筹批）"]]),
+      flowMarkdown([["impl", "done（有落盘/回交证据）"], ["verify", "Done"], ["acceptance", "pending（不由运营批）"]]),
       ledger,
     ),
     undefined,
-    "执行步骤写 done（…）/Done + 验收 pending（…）⇒ 可派验收",
+    "执行步骤写 done（…）/Done + 验收 pending（…）⇒ 可派质检",
   );
   assert.equal(
     flowCompletionIssue(
@@ -1976,11 +1976,11 @@ test("收尾触发门：Markdown 强调/代码标记状态（**done**/__done__/`
   assert.equal(
     flowCompletionIssue(
       "flow-a",
-      flowMarkdown([["impl", "**done**（有落盘/回交证据）"], ["verify", "__done__"], ["acceptance", "pending（不由统筹批）"]]),
+      flowMarkdown([["impl", "**done**（有落盘/回交证据）"], ["verify", "__done__"], ["acceptance", "pending（不由运营批）"]]),
       ledger,
     ),
     undefined,
-    "**done**（…）/__done__ ⇒ 可派验收（旧解析会得到 **done**/__done__ 而全判未完成）",
+    "**done**（…）/__done__ ⇒ 可派质检（旧解析会得到 **done**/__done__ 而全判未完成）",
   );
   assert.equal(
     flowCompletionIssue(
@@ -2010,7 +2010,7 @@ test("收尾触发门：superseded/cancelled 执行步骤不阻塞、不要求�
       flowMarkdown([
         ["impl", "**done**（有落盘/回交证据）"],
         ["frontend-evidence", "**superseded**：并入 integration-e2e-v2"],
-        ["acceptance", "pending（不由统筹批）"],
+        ["acceptance", "pending（不由运营批）"],
       ]),
       ledger,
     ),
@@ -2061,11 +2061,11 @@ test("收尾触发门：superseded/cancelled 执行步骤不阻塞、不要求�
 const LIBRARY_V2_FLOW_ID = "library-lending-v2";
 
 const LIBRARY_V2_STEP_TABLE: ReadonlyArray<readonly [id: string, description: string, executor: string, status: string]> = [
-  ["nomination", "提名：Crew 读提案给出候选角色 → 客户任命", "Crew / 组队（应用派发）＋ 客户", "**done**（客户已任命 backend / frontend / test）"],
+  ["nomination", "提名：Crew 读提案给出候选角色 → 客户任命", "人事 / Crew（应用派发）＋ 客户", "**done**（客户已任命 backend / frontend / test）"],
   [
     "contract-freeze-v2",
     "契约冻结 `docs/contracts/library-lending-api-v2.md`",
-    "Draft / 提案（治理角色）",
+    "策划 / Draft（治理角色）",
     "**done**（`contractVersion: 2` · `schemaVersion: 2` · `status: frozen-v2`，含 §1 schema、§2 预约、§3 续借、§4 搜索分页、§5 CSV、§7 错误码 30、§9 迁移/回滚、§11 并发、§12 负例清单）",
   ],
   [
@@ -2144,7 +2144,7 @@ function libraryV2Ledger(omitDispatchStepId?: string): { errors: string[]; entri
   };
 }
 
-test("真实 R2 流程单（**done**（…）+ superseded）：新解析下可派验收，不再把所有 done 判未完成", () => {
+test("真实 R2 流程单（**done**（…）+ superseded）：新解析下可派质检，不再把所有 done 判未完成", () => {
   const markdown = libraryV2FlowMarkdown();
   const parsed = parseFlowStepStatuses(markdown);
   assert.equal(parsed.wellFormed, true);
@@ -2162,7 +2162,7 @@ test("真实 R2 流程单（**done**（…）+ superseded）：新解析下可�
   assert.equal(
     flowCompletionIssue(LIBRARY_V2_FLOW_ID, markdown, libraryV2Ledger()),
     undefined,
-    "执行步骤全部 **done**（…）+ superseded 作废步骤 + verification/acceptance pending ⇒ 可派验收（缺陷现场应放行）",
+    "执行步骤全部 **done**（…）+ superseded 作废步骤 + verification/acceptance pending ⇒ 可派质检（缺陷现场应放行）",
   );
   const withoutFrontendDispatch = flowCompletionIssue(LIBRARY_V2_FLOW_ID, markdown, libraryV2Ledger("delivery-frontend-v2")) ?? "";
   assert.match(
@@ -2178,16 +2178,16 @@ test("真实 R2 流程单（**done**（…）+ superseded）：新解析下可�
 // done，本夹具保留缺陷现场快照以覆盖「状态带说明 + 待派验收」这一回归面）。
 // 状态列全部是「状态 + 说明」写法。
 const REAL_R2_STEP_TABLE: ReadonlyArray<readonly [id: string, description: string, status: string]> = [
-  ["nomination", "提名：Crew / 组队 读取提案并给出候选角色", "done（`docs/nominations/ticket-desk-r2-v1.md`；推荐集 = 既有三角色，不新增角色）"],
+  ["nomination", "提名：人事 / Crew 读取提案并给出候选角色", "done（`docs/nominations/ticket-desk-r2-v1.md`；推荐集 = 既有三角色，不新增角色）"],
   ["role-readiness", "角色就绪：客户任命决定 + 角色卡就绪确认", "done（客户经任命卡确认沿用 backend / frontend / test；本轮不新增角色、不改卡）"],
   ["contract-freeze-v2", "冻结 API 契约 v2 到 `docs/contracts/ticket-desk-api-v2.md`", "done（frozen-v2 / supersedes v1）"],
   ["delivery-backend", "服务端增量：`sort`/`order`/`assignee`、`deadline`、`overdue`、`GET /api/tickets/export`（CSV+BOM）、`canExport`、store 补全、README 同步（backend-engineer）", "done（有落盘/回交证据；125/125 + 自检 73 项为角色自报，独立复核仍待 `verification`）"],
   ["delivery-frontend", "前端增量：排序/负责人筛选控件、截止时间列与逾期高亮、创建与 PATCH deadline 表单、导出按钮（`fetch`+`Blob`）（frontend-engineer）", "done（有落盘/回交证据；e2e 后 0 处修正）"],
   ["delivery-test", "测试增量：`sorting-filtering` / `overdue` / `export` 三文件 + `persistence` 增补；既有 75 用例不得弱化（test-engineer）", "done（有落盘/回交证据；125/125 为角色自报，独立复核仍待 `verification`）"],
-  ["cleanup-selfcheck", "清理 `data/selfcheck-r2.mjs` 临时自检脚本（backend-engineer 自己的写区）", "done（已删；`data/` 仅剩 `tickets.json`，统筹 `list_dir` 复核）"],
+  ["cleanup-selfcheck", "清理 `data/selfcheck-r2.mjs` 临时自检脚本（backend-engineer 自己的写区）", "done（已删；`data/` 仅剩 `tickets.json`，运营 `list_dir` 复核）"],
   ["r2-e2e", "R2 端到端联调：真起服务核对前端查询串/静态托管/导出链路（frontend-engineer）", "done（真起服 curl 实测 37 个请求；浏览器渲染未验证）"],
-  ["verification", "独立复核：按提案 §11 八条逐条出结论（内置 Proof / verifier）", "pending（不由统筹派发）"],
-  ["acceptance", "客户验收", "pending（不由统筹批）"],
+  ["verification", "独立复核：按提案 §11 八条逐条出结论（内置 Proof / verifier）", "pending（不由运营派发）"],
+  ["acceptance", "客户验收", "pending（不由运营批）"],
 ];
 
 function realR2FlowMarkdown(overrides: Readonly<Record<string, string>> = {}): string {
@@ -2218,7 +2218,7 @@ const REAL_R2_LEDGER = {
   ],
 };
 
-test("真实 R2 流程单（状态带说明）+ 同形账本：可派验收；改一个执行步骤为 pending（…）则不放行", () => {
+test("真实 R2 流程单（状态带说明）+ 同形账本：可派质检；改一个执行步骤为 pending（…）则不放行", () => {
   const parsed = parseFlowStepStatuses(realR2FlowMarkdown());
   assert.equal(parsed.wellFormed, true);
   assert.deepEqual(
@@ -2231,7 +2231,7 @@ test("真实 R2 流程单（状态带说明）+ 同形账本：可派验收；�
   assert.equal(
     flowCompletionIssue("ticket-desk-r2", realR2FlowMarkdown(), REAL_R2_LEDGER),
     undefined,
-    "执行步骤全部 done（…）+ 验收 pending（…）⇒ 可派验收",
+    "执行步骤全部 done（…）+ 验收 pending（…）⇒ 可派质检",
   );
   assert.match(
     flowCompletionIssue("ticket-desk-r2", realR2FlowMarkdown({ "delivery-backend": "pending（等待回交）" }), REAL_R2_LEDGER) ?? "",
@@ -2968,21 +2968,24 @@ function decisionCardRequest(over: {
   return request as unknown as CustomerInputRequest;
 }
 
-test("decision 卡发卡前校验：仅 convener 可发；缺 flowId/cardKind、选项不足/重复、推荐项不为恰一个 ⇒ 拒发卡", () => {
-  // 合法：convener + trio + 合法 flowId + 2 选项 + 恰一个推荐项。
-  const allow = evaluateDecisionCardRequest({
-    request: decisionCardRequest(),
-    roleId: "convener",
-    governanceModel: "trio",
-  });
-  assert.equal(allow.action, "allow");
-  if (allow.action === "allow") {
-    assert.equal(allow.flowId, "flow-a");
-    assert.equal(allow.recommendedOptionId, "option-a", "唯一推荐项在发卡前定格");
+test("decision 卡发卡前校验：运营/提案可发；缺 flowId/cardKind、选项不足/重复、推荐项不为恰一个 ⇒ 拒发卡", () => {
+  // 合法：convener/rapporteur（2026-10-26 客户纠正：需求变更审批卡由统筹/提案发起）+ trio +
+  // 合法 flowId + 2 选项 + 恰一个推荐项。
+  for (const roleId of ["convener", "rapporteur"]) {
+    const allow = evaluateDecisionCardRequest({
+      request: decisionCardRequest(),
+      roleId,
+      governanceModel: "trio",
+    });
+    assert.equal(allow.action, "allow", `${roleId} 可发 decision 卡`);
+    if (allow.action === "allow") {
+      assert.equal(allow.flowId, "flow-a");
+      assert.equal(allow.recommendedOptionId, "option-a", "唯一推荐项在发卡前定格");
+    }
   }
 
-  // 角色：除 convener 外一律拒（含其他内置治理角色、legacy su、项目角色与空 id）。
-  for (const roleId of ["liaison", "rapporteur", "nominator", "verifier", "su", "project-role", ""]) {
+  // 角色：除统筹/提案外一律拒（含其他内置治理角色、legacy su、项目角色与空 id）。
+  for (const roleId of ["liaison", "nominator", "verifier", "su", "project-role", ""]) {
     const result = evaluateDecisionCardRequest({
       request: decisionCardRequest(),
       roleId,
@@ -3120,7 +3123,7 @@ test("decision 卡发卡前校验：仅 convener 可发；缺 flowId/cardKind、
 test("decision 卡校验单一来源：桌面包装的拒绝原因与 Pipeline validateDecisionCardRequest 逐项一致", () => {
   // 桌面只保留 notPresented/文案/operator 映射；结构判定必须与共享函数同码同 detail。
   const cases: Array<{ label: string; request: CustomerInputRequest; roleId: string }> = [
-    { label: "非 convener", request: decisionCardRequest(), roleId: "rapporteur" },
+    { label: "非运营/策划角色", request: decisionCardRequest(), roleId: "liaison" },
     { label: "缺 flowId", request: decisionCardRequest({ flowId: undefined }), roleId: "convener" },
     {
       label: "选项不足",
@@ -3251,7 +3254,7 @@ test("decision 卡校验接线：合法卡呈现且 recommended 不丢；非法�
     roleId: string;
     expectedDetail: string;
   }> = [
-    { label: "角色", request: decisionCardRequest(), roleId: "rapporteur", expectedDetail: "role=rapporteur" },
+    { label: "角色", request: decisionCardRequest(), roleId: "liaison", expectedDetail: "role=liaison" },
     {
       label: "缺 flowId",
       request: decisionCardRequest({ flowId: undefined }),
@@ -3618,4 +3621,82 @@ test("decision 卡端到端（桌面通道 + 编排包装）：默认推荐按 m
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("decision 卡：运营/提案均为合法发起角色，其他角色仍拒；桌面包装结构校验不放松", () => {
+  for (const roleId of ["rapporteur", "convener"]) {
+    const allowed = evaluateDecisionCardRequest({
+      request: decisionCardRequest(),
+      roleId,
+      governanceModel: "trio",
+    });
+    assert.equal(allowed.action, "allow", `${roleId} 可发起/持有需求变更审批卡（共享角色白名单）`);
+    if (allowed.action === "allow") {
+      assert.equal(allowed.flowId, "flow-a");
+      assert.equal(allowed.recommendedOptionId, "option-a", "结构校验仍定格唯一推荐项");
+    }
+  }
+  const liaison = evaluateDecisionCardRequest({
+    request: decisionCardRequest(),
+    roleId: "liaison",
+    governanceModel: "trio",
+  });
+  assert.equal(liaison.action, "reject", "其他治理角色仍不得发 decision 卡");
+  if (liaison.action === "reject") assert.equal(liaison.reasonCode, "role-not-allowed");
+  // 结构校验不放松：缺 flowId / 推荐项 0 个或 2 个仍拒。
+  for (const request of [
+    decisionCardRequest({ flowId: undefined }),
+    decisionCardRequest({ options: [
+      { id: "a", label: "A" },
+      { id: "b", label: "B" },
+    ] }),
+    decisionCardRequest({ options: [
+      { id: "a", label: "A", recommended: true },
+      { id: "b", label: "B", recommended: true },
+    ] }),
+  ]) {
+    const result = evaluateDecisionCardRequest({
+      request,
+      roleId: "rapporteur",
+      governanceModel: "trio",
+    });
+    assert.equal(result.action, "reject", "角色白名单不放松结构校验");
+  }
+});
+
+test("需求变更审批卡通道：发起方会话真实客户通道呈现 decision 卡并回调 onPresented 恰一次；其他角色拒发", async () => {
+  const pushed: OperatorRequestPayload[] = [];
+  let n = 0;
+  const channel = createCustomerInputChannel({
+    presenter: (payload) => pushed.push(payload),
+    operatorId: "tester",
+    nextId: () => `op-${++n}`,
+  });
+  let presented = 0;
+  const pending = channel.customerInput(decisionCardRequest(), {
+    roleId: "rapporteur",
+    runtime: "demo",
+    projectRoot: "/p",
+    governanceModel: "trio",
+    onPresented: () => {
+      presented += 1;
+    },
+  });
+  assert.equal(pushed.length, 1, "发起方会话 decision 卡正常呈现");
+  assert.equal(presented, 1, "presenter 成功后回调 onPresented 恰一次");
+  assert.equal(
+    channel.respond({ id: pushed[0]!.id, decision: { kind: "choice", selected: ["option-a"] } }).ok,
+    true,
+  );
+  const outcome = await pending;
+  assert.equal(outcome?.outcome, "answered");
+  if (outcome?.outcome === "answered") assert.deepEqual(outcome.value.selected, ["option-a"]);
+
+  // 其他角色（Liaison）：decision 卡仍被角色门拒发（不呈现、notPresented）。
+  const liaisonPushed: OperatorRequestPayload[] = [];
+  const liaison = createCustomerInputChannel({ presenter: (payload) => liaisonPushed.push(payload), operatorId: "tester" });
+  const declined = await liaison.customerInput(decisionCardRequest(), { roleId: "liaison", governanceModel: "trio" });
+  assert.equal(liaisonPushed.length, 0, "其他角色 decision 卡不呈现");
+  assert.equal(declined?.outcome, "declined");
+  if (declined?.outcome === "declined") assert.equal(declined.notPresented, true);
 });

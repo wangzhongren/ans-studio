@@ -263,7 +263,7 @@ test("桌面澄清：系统行落主入口 Liaison，客户确认通道零调用
         (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
     );
     assert.equal(notes.length, 1, "系统行恰一条，落主入口 Liaison");
-    assert.equal(notes[0].event.summary, "提案需要澄清：验收标准是否包含离线场景？");
+    assert.equal(notes[0].event.summary, "策划需要澄清：验收标准是否包含离线场景？");
     assert.equal(customerInputCalls, 0, "澄清不弹客户决定卡");
     await manager.stop(null);
   } finally {

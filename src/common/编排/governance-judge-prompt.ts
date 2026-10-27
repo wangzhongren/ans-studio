@@ -12,6 +12,9 @@
 
 import type { GovernanceJudgeRequest } from "../../model/runtime.ts";
 import type { DecisionEvidencePacket } from "./governance-judge-evidence.ts";
+// 2026-10-26 客户要求：「需求变更申请」指引的单一来源放在 facts 模块（文案常量，不参与裁决）；
+// 本提示词只引用，不复制第二份。
+import { GOVERNANCE_JUDGE_REQUIREMENT_CHANGE_GUIDANCE } from "./governance-judge-facts.ts";
 
 /** 当前轮任务文本上限（与 shell judge 同口径：≤4KB；超出截断，不据此 manual）。 */
 export const GOVERNANCE_JUDGE_TURN_TEXT_LIMIT_BYTES = 4 * 1024;
@@ -68,6 +71,8 @@ export function buildGovernanceJudgeSystemPrompt(): string {
     "工程质量、架构章节是否存在或合格、测试覆盖、证据是否充分、实现细节、代码风格、性能数字**都不归你判断**。",
     "即使提案缺少「架构方案」/「架构影响分析」或「工程质量基线」，即使验收证据看起来不完整，也**不得**以此为由",
     "manual 或拒绝决策卡；这些不是意图漂移。只在决策内容与已确认意图/已接受决定发生范围或约束冲突时 manual。",
+    "**例外**：未获意图授权的新联网/外部目录访问/范围扩张/成本授权属于**意图漂移**（见 proposal rubric 与",
+    "「提案卡与需求变更申请」节），不属上述排除项——不得以「工程质量/证据充分性」为名放行。",
     "",
     "【判断输入：系统生成的证据包】",
     "编排在调用你之前，已从实际物证生成结构化、有界的 DecisionEvidencePacket（见本次请求中的「证据包」段）。",
@@ -118,7 +123,14 @@ export function buildGovernanceJudgeSystemPrompt(): string {
     "边界改动或凭据访问；是否与账本中已接受的决定/契约冲突。任一偏离 ⇒ manual/intent-drift（reason 写明偏离哪条意图字段、应缩小/补充什么后重发）。",
     "**提案缺少架构章节不是拒绝理由**（架构由 Draft 产出、由 Proof 核对）；只有意图漂移才 manual。",
     "",
-    "appointment（decision，2026-10-22 第 1 项：由 Convener/统筹依团队计划发起）：",
+    "【提案卡与需求变更申请（2026-10-26 客户要求）】",
+    GOVERNANCE_JUDGE_REQUIREMENT_CHANGE_GUIDANCE,
+    "要点：新授权/新范围必须先发 request_requirement_change，再由运营（Convener）或策划角色（Rapporteur）",
+    "发起 decision 卡独立审批——客户勾选「替我决策」时判断 agent 按卡内唯一推荐项代批，未勾选时由客户手选；",
+    "发起方不得自批；产品不审批，只在批准后执行意图变更；批准后才可修订提案。",
+    "Draft 不得把未批准的新授权包装成「方案细节」塞进提案卡，也不得删掉需求来规避 gate 0；提案卡上判断 agent 也不能代批任何新授权。",
+    "",
+    "appointment（decision，2026-10-22 第 1 项：由 运营/Convener依团队计划发起）：",
     "packet.evidence 中 kind=team-plan 的关键片段（判断结果/角色行/写集/依赖/风险档位）是决策内容；",
     "packet.mechanicalFacts.roles.recommendedRoleIds 是应用解析**团队计划**的推荐集，",
     "selected 必须**恰等于**它：不得多选、不得发明 id、不得选内置治理角色（liaison/rapporteur/nominator/convener/verifier/su）。",
@@ -141,11 +153,14 @@ export function buildGovernanceJudgeSystemPrompt(): string {
     "（goal/scope/acceptance/非目标）是否与客户当前要求一致；有偏离/无法核对 ⇒ manual（reason 写清哪条偏离、应怎么改后重发）。",
     "**这张卡本身就是意图基准**：不要求独立的 packet.intent/意图文件；仍须满足通用 approve 门槛。",
     "",
-    "decision（decision，2026-10-26 客户新增：材料性选择卡，**仅统筹/Steward 可发**）：",
+    "decision（decision，2026-10-26 客户新增：材料性选择卡，**由运营/Steward 发起**；报告员 Rapporteur 仅可为",
+    "**需求变更审批**发起本卡，发起方不得自批）：",
     "卡内必须**恰有一个** `recommended: true` 的推荐项（证据包 requesterStatement.options 与卡片 options 均标出）。",
     'selected 必须**恰为** ["<该唯一推荐项的 id>"]——不得自行发明选项、不得改动推荐、不得多选；',
     "推荐项缺失/多个、selected 缺失或与推荐项不一致 ⇒ manual（reason 写明缺什么/应怎么改后重发）。",
-    "本卡独立于提案/任命/验收：**不读 packet.intent/提案/任命/验收事实，不触发 gate/验收，也不是客户批准**；",
+    "本卡独立于提案/任命/验收：**不读 packet.intent/提案/任命/验收事实，不触发 gate/验收**，也不是提案/验收批准；",
+    "decision 卡（含需求变更审批卡）只能按唯一推荐项代批（且仅在客户开启「替我决策」时），**发起方不得自批**；",
+    "需求变更审批卡的批准人只有判断 agent（开启「替我决策」时）或客户（未开启时手选），产品不审批、只在批准后执行意图变更；",
     "你不判断工程质量/方案好坏/证据充分性——只核对「按卡内唯一推荐项代批」并留下审计（reason 写明推荐项 id）。",
     "审批开关关闭、判断不可用或判断结果不符时由桌面交客户手动选择；不得替客户改选其它选项。",
     "",

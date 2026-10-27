@@ -14,7 +14,10 @@
 //     回执/任务正文、AI 门禁 judge prompt；classification §4，非用户可见 UI）——保留 **20** 条。
 //   · 2026-10-26：新增 `app/desktop/view-image.ts`（下一轮用户提示的 agent-facing 图片提示文本、
 //     `ViewImageFn` 投递失败回执；用户可见回执/附件标签已入共享目录 `main.viewImage.*` /
-//     `ui.viewImage.attachmentLabel`；classification §4，非用户可见 UI）——当前保留 **21** 条。
+//     `ui.viewImage.attachmentLabel`；classification §4，非用户可见 UI）——保留 **21** 条。
+//   · 2026-10-26：新增 `app/desktop/requirement-change.ts`（需求变更申请的载荷二次校验 detail、
+//     票据 error/主理任务正文；用户可见回执/系统行已入共享目录 `main.requirementChange.*`；
+//     classification §4，非用户可见 UI）——当前保留 **22** 条。
 // 规则：
 //   · **新增条目必须写明理由**；只允许「明确不翻译」的文件（classification §4/§5）。
 //   · B1–B4 每完成一批就从本清单移除对应文件；守卫测试会拒绝
@@ -54,6 +57,12 @@ export const I18N_GUARD_ALLOWLIST: readonly string[] = [
   "app/desktop/packaged-smoke.ts",
   // `source:` 授权来源审计元数据（机器/审计，不展示给客户）——classification §4。
   "app/desktop/project.ts",
+  // `request_requirement_change` 桌面纯逻辑：`assessRequirementChangeRequest` 的结构校验 detail
+  // （作为 `{detail}` 参数拼进工具回执，或写入应用自有票据 `error`——tool output/审计，交治理 agent，
+  // 不直接作为客户 UI 文案）、`buildRequirementChangeLeadTaskText` 发给 Lead / 主理的任务正文、
+  // 票据状态/路径机器常量；均为 classification §4 agent-facing/机器文本。用户可见回执与系统行由
+  // `interface.ts` 按共享 i18n `main.requirementChange.*` 生成（2026-10-26 分类核对）。
+  "app/desktop/requirement-change.ts",
   // 未注入 `t` 时的逐字兜底常量（真实路径已用 `main.runtimeResolution.noRuntime`）；持久化错误文本
   // 仅进诊断日志（不翻译）——B3 记录 §7。
   "app/desktop/runtime-resolution.ts",

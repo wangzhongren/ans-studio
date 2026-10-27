@@ -39,7 +39,7 @@ test("新空项目：listProject 恰 5 个 builtIn（顺序 liaison→rapporteur
       "恰 5 个内置、顺序固定（2026-10-18 客户拍板「三权 · 五角色」）",
     );
     assert.deepEqual(builtIns.map((r) => r.governanceFunction), ["liaison", "proposal", "nomination", "schedule", "verification"]);
-    assert.equal(listing.primaryRoleId, "liaison", "主入口 = Lead / 主理");
+    assert.equal(listing.primaryRoleId, "liaison", "主入口 = 产品 / Lead");
     assert.equal(listing.governanceModel, "trio", "新空项目默认 trio");
     assert.equal(listing.hasRoles, false, "尚无项目角色");
     assert.equal(listing.roles.some((r) => r.roleId === "su"), false, "trio 下不枚举 su");

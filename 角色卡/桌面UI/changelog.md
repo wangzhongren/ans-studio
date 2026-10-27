@@ -556,3 +556,19 @@
 - 契约核对：`options[].recommended` 从工具层 → `customer-input.ts`（`request: req` 原样）→ `webContents.send` → preload `cb(payload)` → store 原样保存，**IPC 未丢字段**；渲染层此前只是未消费。preload 注释未列 `recommended` 属文档滞后（桌面窗口属主，未改）。
 - 测试：新增 `test/桌面UI/decision-card-view.test.ts` **9/9**；桌面UI 套件 **296/296**；`npm run typecheck:renderer` **0 错**。未跑真实 Electron e2e/截图；应用未重启（运行中仍是旧构建）；客户手选回执 key `main.decisionCard.selectedRecommended/selectedOther` 仍未接线（任务允许的残余，主进程未改）。
 - 记录：[decision-card-renderer](docs/change/2026-10-26_change_decision-card-renderer.md)
+
+## 2026-10-27：view_image 独立工具行与缩略图预览
+
+- 客户反馈：聊天流里 `view_image` 被折叠在工具组里，且看不到角色实际查看的图片。`events.ts` 的 `SPECIAL_TOOLS` 增加 `view_image`——实时事件与历史回放都成为独立 `tool-lifecycle` 行（工具名 + 项目相对路径 + 状态），其他工具分组与工具生命周期语义不变。
+- 新增纯逻辑 `app/renderer/src/chat/view-image-preview.ts`：`isSafeProjectImagePath`（拒绝绝对/盘符/UNC/协议、`..`/`.`/空段/NUL/控制字符/ADS、非 png/jpeg/jpg/webp/gif；反斜杠归一）与 `viewImagePreviewUrl`（项目根为空返回 null；盘符/POSIX/UNC 三形态、逐段百分号编码）。`ChatRow.tsx` 在 `view_image` 行下方按 `projectRoot + target` 显示 `<img className="view-image-preview" alt=path loading=lazy>`；项目根缺失/路径非法/加载失败分别显示共享 `ui.viewImage.preview*` 文案，不显示破图；未放行/失败调用不显示缩略图；不做点击放大（file 导航不安全，不造假入口）。主路径为 `.tool-call-record`（`ToolLifecycleRow`，历史/实时同一行类型）；`ActivityRow` 工具组兜底路径同样接入（`ActivitiesRow` 从 `useChatStore` 取 projectRoot 传入，展开组内显示）。
+- `chat-store.ts` 新增 `touchPane(roleId)`（只 bump pane 版本），缩略图 `onLoad/onError` 后触发 `VirtualPane` 重测行高；行模型/虚拟窗口算法不变。`shell.css` 新增 `div.view-image-preview`（≤420×240、`object-fit:contain`、`image-rendering:pixelated`、描边）与 `img.view-image-preview` / `.view-image-note`，不改既有工具行布局。
+- 共享 i18n 新增 3 个 `ui.viewImage.preview*` key（成对，en-US 无中文），并按该测试自身约定更新 `test/项目管理/shared/i18n.test.ts` 计数（1381→1384）；属任务明确要求的最小跨角色配合。
+- 测试：新增 `view-image-preview.test.ts` **13/13**（10 纯逻辑 + 3 接线/CSS 守卫）、`event-routing.test.ts` **9/9**（含 view_image 实时/历史/denied 路由）；桌面UI 套件 **310/310**；i18n/i18n-guard **62/62 + 6/6（合并 68/68）**；`typecheck:renderer` 与根 `typecheck` 均 0 错；`npm run build:renderer` 成功（新 dist 含容器+img class、i18n key 与 ActivityRow 兜底接线）。应用未重启/未重载（运行中仍是旧构建）。
+- 记录：[view-image-row-preview](docs/change/2026-10-27_change_view-image-row-preview.md)
+
+### view_image 点击放大（lightbox，2026-10-27 客户追加）
+
+- 客户追加：缩略图要能点击弹出应用内放大层。新增纯状态 `app/renderer/src/chat/view-image-lightbox.ts`（zustand 单例：open 替换、close(owner) 只关自己的、非法载荷 fail-closed、`isLightboxCloseKey` 只认未处理的 Escape）与组件 `app/renderer/src/chat/ViewImageLightbox.tsx`（`createPortal` 到 body + fixed 遮罩；`role="dialog"`/`aria-modal="true"`/路径 aria-label；路径 + 关闭按钮；Esc/点击遮罩/关闭按钮关闭；打开记录触发元素并把焦点移到关闭按钮，关闭/卸载归还）。
+- `ChatRow.tsx::ViewImagePreview` 缩略图改为 `<button type="button" class="view-image-preview-trigger" aria-haspopup="dialog" aria-label=ui.viewImage.openPreview>`，点击 `open({src,target,ownerId})`，`ownerId=useId()`，卸载 cleanup 关闭自己的弹层；ToolLifecycleRow 与 ActivityRow 共用同一组件。`ChatStream.tsx` 挂载唯一 `<ViewImageLightbox />`，切换角色/项目时关闭。`shell.css` 新增触发按钮（zoom-in/hover/focus 可见）与遮罩/大图样式（90vw×80vh、pixelated、contain、`--backdrop-strong`、z-index 80）；不改 CSP、不导航 file://、不打开新窗口。
+- 共享 i18n 新增 `ui.viewImage.openPreview` / `ui.viewImage.lightboxLabel`（{path}），关闭复用 `shared.common.close`；计数 1384→1386（ui 790→792）。
+- 测试：新增 `test/桌面UI/view-image-lightbox.test.ts` **8/8**（单例替换/owner 关闭/非法载荷/Esc 判定/按钮-无 href/portal-dialog-aria-焦点/遮罩/CSS 守卫）；桌面UI 套件 **318/318**；i18n 62/62 + guard 6/6（scanned=130 violations=0）；`typecheck:renderer`/根 `typecheck` 0 错；`npm run build:renderer` 成功（`index-CH9TC3N_.js` / `index-CcOIDUh5.css` 含 lightbox 接线）。应用未重启/未重载；真实点击截图核验待主上下文用新 dist 执行。

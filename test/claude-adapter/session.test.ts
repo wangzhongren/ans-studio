@@ -19,7 +19,7 @@ import { toClaudeSchema } from "../../src/common/claude-adapter/schema.ts";
 import { buildShellJudgeTools, SHELL_JUDGE_TOOL_NAMES } from "../../src/common/runtime-core/shell-judge/tools.ts";
 import { ALL_JUDGE_TOOL_NAMES, GOVERNANCE_JUDGE_TOOL_NAMES, buildGovernanceJudgeTools } from "../../src/common/runtime-core/governance-judge/tools.ts";
 import type { ResolvedRole } from "../../src/model/role.ts";
-import type { RuntimeProviderOptions, InteractionGate, ToolDefinition, SessionEvent, WriteGate, ShellJudgeReadStats } from "../../src/model/runtime.ts";
+import type { RuntimeProviderOptions, InteractionGate, ToolDefinition, SessionEvent, WriteGate, ShellJudgeReadStats, RuntimeToolEventSource } from "../../src/model/runtime.ts";
 
 const role: ResolvedRole = { id: "claude-fixture", kind: "project", cardText: "# Claude fixture", boundary: { entries: [], boundarySource: "fixture", acceptance: { accepted: true, source: "fixture" } }, boundarySource: "fixture", location: { card: "fixture", boundary: "fixture" } };
 const allow: WriteGate = (path) => ({ allowed: true, matchedEntry: { kind: "file", root: "project", path, purpose: "fixture" } });
@@ -1651,5 +1651,84 @@ test("normal role sessions keep the pre-judge surface: no disallowedTools and th
   const reading = collect(session, 1);
   await session.prompt("normal surface");
   await reading;
+  await session.dispose();
+}));
+
+test("tool-result images ride the real MCP transport; failures and invalid payloads never attach images", async () => fixture(async (root) => {
+  // 1×1 PNG（真实字节）与最小 JPEG SOI/EOI；适配器只映射、不重编码/不解码。
+  const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+  const jpeg = "/9j/2Q==";
+  const tool = (name: string, handler: ToolDefinition["handler"]): ToolDefinition => ({ name, description: "fixture", inputSchema: { type: "object", properties: {} }, handler });
+  const tools: ToolDefinition[] = [
+    tool("view_image_ok", async () => ({ ok: true, message: "图片已随本工具结果附上（同一轮可见）", images: [{ type: "image", data: png, mimeType: "image/png" }], imageDelivery: "tool-result" })),
+    tool("view_image_multi", async () => ({ ok: true, message: "两张图片", images: [{ type: "image", data: png, mimeType: "image/png" }, { type: "image", data: jpeg, mimeType: "image/jpeg" }], imageDelivery: "tool-result" })),
+    tool("view_image_fail", async () => ({ ok: false, message: "读取失败", images: [{ type: "image", data: png, mimeType: "image/png" }], imageDelivery: "tool-result" })),
+    tool("view_image_invalid", async () => ({ ok: true, message: "已附上", images: [{ type: "image", data: "not base64!", mimeType: "image/png" }] })),
+    tool("view_image_bad_mime", async () => ({ ok: true, message: "已附上", images: [{ type: "image", data: png, mimeType: "image/svg+xml" }] })),
+    tool("view_image_mixed", async () => ({ ok: true, message: "已附上", images: [{ type: "image", data: png, mimeType: "image/png" }, { type: "image", data: "", mimeType: "image/png" }] })),
+  ];
+  const engine = fake(async (client) => {
+    const ok = await client.callTool({ name: "view_image_ok", arguments: {} });
+    assert.equal(ok.isError, false);
+    // 文本与 image 块并列；data 与源字符串逐字相同（原引用、未重编码）。
+    assert.deepEqual(ok.content, [
+      { type: "text", text: "图片已随本工具结果附上（同一轮可见）" },
+      { type: "image", data: png, mimeType: "image/png" },
+    ]);
+    const multi = await client.callTool({ name: "view_image_multi", arguments: {} });
+    assert.equal(multi.isError, false);
+    const multiContent = multi.content as Array<{ type: string; data?: string; mimeType?: string }>;
+    assert.equal(multiContent.length, 3);
+    assert.deepEqual(multiContent[1], { type: "image", data: png, mimeType: "image/png" });
+    assert.deepEqual(multiContent[2], { type: "image", data: jpeg, mimeType: "image/jpeg" });
+    const failed = await client.callTool({ name: "view_image_fail", arguments: {} });
+    assert.equal(failed.isError, true);
+    // 失败绝不附图（即使 payload 意外带 images）。
+    assert.deepEqual(failed.content, [{ type: "text", text: "读取失败" }]);
+    for (const name of ["view_image_invalid", "view_image_bad_mime", "view_image_mixed"]) {
+      const invalid = await client.callTool({ name, arguments: {} });
+      const invalidContent = invalid.content as Array<{ type: string; text?: string }>;
+      assert.equal(invalid.isError, true, name);
+      // 非法载荷整批不交付：只有诚实注记文本，没有任何 image 块。
+      assert.equal(invalidContent.length, 1, name);
+      assert.equal(invalidContent[0]!.type, "text", name);
+      assert.match(invalidContent[0]!.text ?? "", /图片数据非法，未向模型提供任何图片/, name);
+      assert.equal(JSON.stringify(invalid).includes(png), false, name);
+      assert.equal(JSON.stringify(invalid).includes("not base64"), false, name);
+    }
+  });
+  const sources: RuntimeToolEventSource[] = [];
+  const adapterOptions: RuntimeProviderOptions = {
+    ...options(root, tools),
+    // 事件 facts 在投影前由适配器清洗：图片 base64 不得进入 projector/diagnostics。
+    projectToolEvent: (source) => {
+      sources.push(source);
+      const phase = "phase" in source ? source.phase : "result";
+      return { kind: "tool_call", summary: "fixture", detail: { toolName: "fixture", phase } };
+    },
+  };
+  const session = await createClaudeRuntimeAdapter(adapterOptions, engine.dependencies).bindRole(role);
+  const reading = collect(session, 1);
+  await session.prompt("probe tool-result images");
+  const rows = await reading;
+  type HandlerResultSource = { toolName: string; result?: { ok: boolean; message: string; imageDelivery?: string } & Record<string, unknown> };
+  const results = sources.filter((source) => source.origin === "handler-result") as unknown as HandlerResultSource[];
+  assert.equal(results.length, tools.length);
+  const byName = new Map(results.map((source) => [source.toolName, source]));
+  const okFacts = byName.get("view_image_ok")!;
+  assert.equal(okFacts.result!.ok, true);
+  assert.equal(okFacts.result!["images"], undefined);
+  assert.equal(okFacts.result!.imageDelivery, "tool-result");
+  assert.equal(byName.get("view_image_fail")!.result!.ok, false);
+  assert.equal(byName.get("view_image_fail")!.result!["images"], undefined);
+  for (const name of ["view_image_invalid", "view_image_bad_mime", "view_image_mixed"]) {
+    assert.equal(byName.get(name)!.result!.ok, false, name);
+    assert.match(byName.get(name)!.result!.message, /图片数据非法，未向模型提供任何图片/, name);
+  }
+  // 会话事件与投影 facts 均不得出现图片字节（sentinel 断言）。
+  const everything = JSON.stringify({ rows, sources });
+  assert.equal(everything.includes(png), false);
+  assert.equal(everything.includes(jpeg), false);
+  assert.equal(everything.includes("not base64"), false);
   await session.dispose();
 }));

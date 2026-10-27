@@ -78,7 +78,7 @@ import {
   withPausableTimeout,
   withTimeout,
 } from "./timeout.ts";
-import type { Api, Model, ProviderStreams } from "@earendil-works/pi-ai";
+import type { Api, ImageContent, Model, ProviderStreams } from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
   McpServerEntry,
@@ -386,6 +386,74 @@ function displayInput(rule: ToolDisplayInputRuleV1 | undefined, args: unknown): 
   return { rule, args: selected };
 }
 
+// —————————————————————— 工具结果附图（2026-10-27 同轮看图设计 §6.4） ——————————————————————
+//
+// 运行时核心在 `tool-result` 交付方式下把 `view_image` 读到的图片放进 `ToolResult.images`
+// （`PromptImage[]`，仅 `ok:true` 时非空）；本适配器把每条图片映射为 Pi 原生工具结果内容块
+// `ImageContent`（`{type:"image",data,mimeType}`，与 `PromptImage` 逐字同形）——Pi 的 agent loop
+// 会把工具结果消息 push 进上下文，模型在**同一次调用**的下一次模型请求即看到图片。
+//
+// fail-closed 纪律（设计 §9.2）：
+// - 工具失败（`ok:false`）⇒ **绝不**附图，即使 `images` 意外非空；
+// - 图片画像非法（非数组/缺 data/空 data/非白名单 MIME）⇒ **一张都不交付**（不做部分交付），
+//   本次结果标 `isError:true` 并追加「图片未提供」的诚实注记，绝不自称「已附上」；
+// - `details`/诊断只记 `{count,bytes,mimeTypes}` 与交付方式，**绝不**记录 base64 / `data:` URL；
+// - 图片数据**原引用**透传（不重编码、不重新 base64、不缩放——缩放/校验属引擎侧，未实测前不代偿）。
+
+/** Pi 工具结果附图的 MIME 白名单（与工具层 `view_image` 同一集合；白名单外按非法处理）。 */
+const PI_TOOL_RESULT_IMAGE_MIMES: ReadonlySet<string> = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+
+/** base64 解码后的字节数（按长度推算；不解码、不重编码——只用于 details 元数据）。 */
+function base64ByteLength(data: string): number {
+  const padding = data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((data.length * 3) / 4) - padding);
+}
+
+/** 工具结果附图的 details 元数据（无字节；`bytes` 为原始图片字节数）。 */
+interface PiToolResultImageFacts {
+  count: number;
+  bytes: number;
+  mimeTypes: string[];
+}
+
+interface PiToolResultImageMapping {
+  /** 可交付给模型的 Pi 图片内容块（原引用；空数组＝不附图）。 */
+  images: ImageContent[];
+  /** 图片载荷非法 ⇒ 本次结果必须 fail-closed（无图 + isError + 诚实注记）。 */
+  invalid: boolean;
+}
+
+/** 单条图片载荷 → Pi `ImageContent`；形态非法/非白名单 MIME 返回 undefined（fail-closed 判据）。 */
+function piImageContentOf(value: unknown): ImageContent | undefined {
+  if (value === null || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  const data = record["data"];
+  const mimeType = record["mimeType"];
+  if (typeof data !== "string" || data === "") return undefined;
+  if (typeof mimeType !== "string" || !PI_TOOL_RESULT_IMAGE_MIMES.has(mimeType)) return undefined;
+  return { type: "image", data, mimeType };
+}
+
+/**
+ * `ToolResult.images` → Pi `ImageContent[]`（纯映射；policy/交付方式仍由运行时核心决定）。
+ * 只信任 `ok:true` 的结果；`images` 缺省或空数组＝不附图；任一条非法 ⇒ 整批不交付。
+ */
+function mapToolResultImages(result: { ok: boolean; images?: unknown }): PiToolResultImageMapping {
+  if (!result.ok || result.images === undefined) return { images: [], invalid: false };
+  if (!Array.isArray(result.images)) return { images: [], invalid: true };
+  if (result.images.length === 0) return { images: [], invalid: false };
+  const images: ImageContent[] = [];
+  for (const entry of result.images) {
+    const image = piImageContentOf(entry);
+    if (image === undefined) return { images: [], invalid: true };
+    images.push(image);
+  }
+  return { images, invalid: false };
+}
+
+/** Pi 工具结果内容块：文本（`result.message`）与可选图片（Pi `ImageContent`）。 */
+type PiToolResultContent = { type: "text"; text: string } | ImageContent;
+
 /**
  * 把受治理工具转成 Pi 的 customTools 条目。
  * - parameters 用普通 JSON-Schema 形状（不引入 TypeBox 依赖）；
@@ -411,7 +479,7 @@ export function toPiTool(tool: Pick<GovernedTool, "name" | "handler"> & Partial<
       toolCallId: string,
       args: unknown,
       signal?: AbortSignal,
-    ): Promise<{ content: Array<{ type: string; text: string }>; details: unknown; isError: boolean }> {
+    ): Promise<{ content: PiToolResultContent[]; details: unknown; isError: boolean }> {
       const record = (args !== null && typeof args === "object" ? args : {}) as Record<string, unknown>;
       const turnId = context?.currentTurnId?.();
       const path = extractCallPath(record);
@@ -427,13 +495,30 @@ export function toPiTool(tool: Pick<GovernedTool, "name" | "handler"> & Partial<
         throw error;
       }
       if (facts) facts.result = { ok: result.ok, message: result.message, ...(result.execution ? { execution: { ...result.execution } } : {}) };
+      // 工具结果附图（同轮设计 §6.4）：只在运行时核心给出 ok + images 时映射；details 只记元数据。
+      const imageMapping = mapToolResultImages(result);
+      const imageFacts: PiToolResultImageFacts | undefined = imageMapping.images.length > 0
+        ? {
+            count: imageMapping.images.length,
+            bytes: imageMapping.images.reduce((sum, image) => sum + base64ByteLength(image.data), 0),
+            mimeTypes: [...new Set(imageMapping.images.map((image) => image.mimeType))],
+          }
+        : undefined;
+      // 图片映射失败 ⇒ 不交付任何图片、标 isError，并追加「未提供图片」注记（不保留「已附上」的假象）。
+      const text = imageMapping.invalid
+        ? `${result.message}（Pi 适配器：工具结果中的图片数据非法，未向模型提供任何图片；本轮不要假装已看到。）`
+        : result.message;
+      const isError = !result.ok || imageMapping.invalid;
       const details = {
         turnId, toolCallId, toolName: tool.name, path, ok: result.ok,
-        status: result.ok ? "completed" : "failed", durationMs: Date.now() - began,
+        status: isError ? "failed" : "completed", durationMs: Date.now() - began,
         ...(!result.ok ? { errorCode: signal?.aborted ? "ABORTED" : "TOOL_FAILED" } : {}),
+        ...(result.ok && !imageMapping.invalid && result.imageDelivery !== undefined ? { imageDelivery: result.imageDelivery } : {}),
+        ...(imageFacts !== undefined ? { images: imageFacts } : {}),
+        ...(imageMapping.invalid ? { errorCode: "IMAGE_MAPPING_FAILED" } : {}),
       };
       context?.diagnostics?.record("tool.result", details);
-      return { content: [{ type: "text", text: result.message }], details, isError: !result.ok };
+      return { content: [{ type: "text", text }, ...imageMapping.images], details, isError };
     },
   } as unknown as ToolDefinition;
 }

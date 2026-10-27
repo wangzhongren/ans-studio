@@ -1,5 +1,21 @@
 # Pi适配器 变更记录
 
+## 2026-10-27 — 工具结果附图映射（同轮看图：`ToolResult.images` → Pi `ImageContent`）
+
+**来源**：客户 2026-10-27 要求并授权「同轮看图修复」；设计文档 `角色卡/编排/docs/design/2026-10-27_design_view-image-same-turn.md` §五.1 / §六（方案 A：工具结果同轮附图）；运行时核心已落地 `ToolResult.images?` / `imageDelivery?` / `RUNTIME_VIEW_IMAGE_POLICY`（当前四项全部 `next-turn`，未启用同轮交付）。本角色只做 Pi 适配器映射，不改 policy/运行时核心/工具实现。
+
+**改动（全部本角色 Section 1 内）**
+- `src/common/pi-adapter/real-adapter.ts`：`toPiTool.execute` 在 `result.ok && images` 合法时把 `ToolResult.images` 逐条映射为 Pi `ImageContent`（`{type:"image",data,mimeType}`，与原 `PromptImage` **原引用**，不重编码）追加到 text 块之后；`details` 仅增补 `images:{count,bytes,mimeTypes}` 与 `imageDelivery`（**绝不含 base64**）。fail-closed：`ok:false` 绝不附图；`images` 非数组/缺 data/空 data/非白名单 MIME（png/jpeg/webp/gif）⇒ 整批不交付、`isError:true` 并追加「未向模型提供任何图片；本轮不要假装已看到」诚实注记（设计 §9.2）。
+- `test/pi-adapter/tool-result-images.test.ts`（新增 12 例）：成功单图/多图映射与 details 元数据；next-turn/空图只有 text；失败携带 images 也不附图；非法载荷矩阵 fail-closed；诊断 sentinel 无 base64；faux provider 离线结构回环证明工具结果消息（text+image）进入同一 `session.prompt()` 的下一次模型请求。
+- 详细记录：[2026-10-27_change_tool-result-images-pi.md](docs/change/2026-10-27_change_tool-result-images-pi.md)；Gate 3 真实探针证据：[2026-10-27_probe_pi-tool-result-images.md](docs/change/2026-10-27_probe_pi-tool-result-images.md)。
+
+**验证（真实输出）**
+- `node --test test/pi-adapter/tool-result-images.test.ts` → **12 项：12 pass / 0 fail**（含 faux SDK 回环）。
+- `node --test "test/pi-adapter/**/*.test.ts"` → **343 项：340 pass / 2 fail / 1 skip**；两 fail 均为 `injected-runtime.test.ts` 的 Windows `EPERM: symlink` 环境限制（本机无符号链接权限，独立探针复现，与本改动无关）。
+- `npm run typecheck`（`tsc --noEmit`）→ 通过，无错误输出。
+- **Gate 3 真实模型探针通过**（客户现有 `.env` 配置，未打印任何密钥/base64）：png/jpeg/webp 三种 MIME 各一轮，模型均调用 `view_image`，同一 `prompt` 的下一次请求携带哈希一致的图片块，回答（棋盘格、蓝/黄）与图一致，单轮 1.8–2.1s；SDK 1.1.0 另证实工具结果图会经 `normalizeToolResultImages` 归一（2000×2000 / 4.5MB base64 上限，离线大图验证 17.3MB→2.88MB）。**建议运行时核心翻 `RUNTIME_VIEW_IMAGE_POLICY.pi` 为 `tool-result`**；GIF 未探（无编码器）、大图未发真实模型等剩余缺口见探针记录。
+- 未 git 提交；未读 `.env` 值；未重启应用。
+
 ## 2026-10-20 — flow 文件方法化三工具（`flow_get` / `flow_step_update` / `flow_step_supersede`）能力透传
 
 **来源**：运行时核心新增 flow 工具注入面（`GovernedToolsOptions.flowGet?` / `flowStepUpdate?` / `flowStepSupersede?`，类型 `FlowGetFn` / `FlowStepUpdateFn` / `FlowStepSupersedeFn` 在 `src/model/runtime.ts`）；生产 Service 路径已透传，本角色补齐 legacy/假适配器路径，使真机 Pi 角色可见三工具。**只做能力透传**：权限/状态迁移/证据/revision 裁决归编排 flow-service，本层不实现；未注入 ⇒ 工具不注册（沿 `dispatch_task` / `shellGate` 先例）。

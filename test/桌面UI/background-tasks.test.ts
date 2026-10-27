@@ -78,13 +78,13 @@ test("列表：ready/unavailable/empty/error 与运行中计数、角色名、�
     "pi",
     "zh-CN",
     now,
-    (roleId) => (roleId === "liaison" ? "主理" : roleId),
+    (roleId) => (roleId === "liaison" ? "产品" : roleId),
   );
   assert.equal(model.kind, "ready");
   if (model.kind !== "ready") return;
   assert.equal(model.tasks.length, 2);
   assert.equal(model.runningCount, 1);
-  assert.equal(model.tasks[0].roleName, "主理");
+  assert.equal(model.tasks[0].roleName, "产品");
   assert.equal(model.tasks[0].durationText, "0:05");
   assert.equal(model.tasks[1].stateLabel, "停止超时");
   assert.equal(model.tasks[1].canStop, true);

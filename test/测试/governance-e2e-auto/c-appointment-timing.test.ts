@@ -451,7 +451,7 @@ test("场景3d（v2）：计划写集未被 Crew boundary 覆盖 ⇒ V12 退回 
     );
     const feedback = (h.prompts.get("nominator") ?? []).find((prompt) => /计划写集.*未被 boundary\.yaml entries 覆盖/.test(prompt))!;
     assert.match(feedback, /计划写集「src\/owned-other\/」未被 boundary\.yaml entries 覆盖/);
-    assert.match(feedback, /报告统筹修正计划/);
+    assert.match(feedback, /报告运营修正计划/);
     assert.equal(
       (h.prompts.get("convener") ?? []).filter((prompt) => /角色就绪复核|role-readiness/.test(prompt)).length,
       0,

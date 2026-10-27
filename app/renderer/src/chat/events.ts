@@ -571,13 +571,18 @@ export function classifyInjected(
   return null;
 }
 
-/** 交互/派发类工具（旧 SPECIAL_TOOLS）：独立生命周期行，不进入工具折叠组。 */
+/**
+ * 交互/派发/图片查看类工具（旧 SPECIAL_TOOLS）：独立生命周期行，不进入工具折叠组。
+ * `view_image`（2026-10-27 客户要求）：聊天流里直接显示角色查看的图片命令与路径，
+ * 缩略图由 ChatRow 的 `ViewImagePreview` 呈现；历史回放与实时事件同一判定。
+ */
 const SPECIAL_TOOLS = new Set([
   "request_confirmation",
   "request_choice",
   "submit_report",
   "dispatch_task",
   "report_shell_verdict",
+  "view_image",
 ]);
 
 export function isSpecialTool(toolName: unknown): boolean {

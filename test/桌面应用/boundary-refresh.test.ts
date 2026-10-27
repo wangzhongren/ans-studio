@@ -238,7 +238,7 @@ test("O-1 × 应用任务稳定身份（重建在投递后）：已投递任务�
   await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
   await tick(30);
 
-  const task = "role-readiness 派发任务：组队写卡已通过结构校验";
+  const task = "role-readiness 派发任务：人事写卡已通过结构校验";
   const first = await h.mgr.sendBackground({ projectRoot: dir, roleId: "A", runtime: "demo", text: task });
   assert.equal(first.ok, true);
   assert.match(String(first.clientMessageId), /^ans-app-task:/, "应用任务带稳定身份");
@@ -273,7 +273,7 @@ test("O-1 × 应用任务稳定身份（重建在投递前）：排队任务经�
   // A 忙（占位轮未 settle）⇒ 应用任务排队；排队期间边界变化 ⇒ settle 放行时先重建、再投递恰一次。
   const busy = await h.mgr.send("占位（让 A 忙）");
   assert.equal(busy.ok, true);
-  const task = "role-readiness 派发任务：组队写卡已通过结构校验（重建前排队）";
+  const task = "role-readiness 派发任务：人事写卡已通过结构校验（重建前排队）";
   const queued = await h.mgr.sendBackground({ projectRoot: dir, roleId: "A", runtime: "demo", text: task });
   assert.equal(queued.ok, true);
   assert.equal(queued.queued, true, "A 忙 ⇒ 任务排队（不并发）");

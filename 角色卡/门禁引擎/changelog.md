@@ -1,5 +1,189 @@
 # 门禁引擎 变更记录
 
+## 2026-10-27 — view_image 同轮附图优先 + 下一轮回退：删除“两轮附件 / 本轮只回已排队”绝对口径
+
+任务：客户 2026-10-27 要求“同轮看图修复”；按设计 `角色卡/编排/docs/design/2026-10-27_design_view-image-same-turn.md`
+推荐方案（工具结果同轮附图优先、下一轮附件回退），同步 Proof / Steward / Lead 卡文本与测试
+（lead-governance-coordination；门禁引擎任务）。本批只改角色卡文本 + 测试，不改工具实现；运行时同轮尚未启用
+（`RUNTIME_VIEW_IMAGE_POLICY` 初始全部 `next-turn`）。完整记录见
+[变更记录](docs/change/2026-10-27_change_view-image-same-turn-cards.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`（`LIAISON_CARD_TEXT` / `CONVENER_CARD_TEXT` /
+  `VERIFIER_CARD_TEXT` 产品数据文本 + 文件头注）、`test/门禁引擎/view-image-cards.test.ts`（改写）、本文件、
+  `memo.md`、`feature-map.md`、变更记录（新）。未改 `src/provider/**`、`src/model/**`、`app/desktop/**`、
+  共享 i18n、PM 文档、`src/common/编排/**`、`src/pipeline/**` 或 `demos/`；未 commit / push；未重启应用。
+- **Proof 卡**：「## 图片证据核对（view_image，必须）」——**同轮附图优先，下一轮回退**：工具结果返回图片时
+  模型应直接查看并据此判断；引擎不支持同轮时回退为下一轮用户提示附件；**排队回执不算已看**、等图片附件到达
+  再判断；图片尚未提供 / 未返回时不得假装已看、不得判 pass / fail。保留：必须对项目内证据图片调用
+  `view_image`、不得只凭文件存在下结论、UI / 游戏截图关 DEBUG、看到的内容与文件哈希（sha256）/ 候选版本 /
+  flow revision / 图片来源路径一起记录、工具不可用 / 未收到图片写 `insufficient evidence`、不得用「文件存在」
+  冒充看过图。标准工作流第 4 步、Gate 复核第 2 步与质量职责同步指针。
+- **Steward 卡**：「画面证据（view_image，必须）」改为同轮优先 / 下一轮回退（排队回执不算已看、附件到达前
+  不下画面结论），**不得把「截图路径存在」说成「已核对画面」**；证据完整性分工逐字保留。
+- **Lead 卡**：「画面证据（view_image，必须）」改为同轮优先 / 下一轮回退（排队回执不算已看、附件到达前不下
+  结论），**不得把「存在截图」说成「已核对画面」**；「系统消息只汇报、不派任务」逐字保留。
+- **测试**：`view-image-cards.test.ts` 5 例改写为双语义正向断言 + 旧「两轮附件 / 本轮只回已排队」绝对表述
+  反向断言；原有安全检查（不得假看、DEBUG、哈希 / 候选记录、`insufficient evidence`、注册表数据面零变化）
+  全部保留；未修改其他测试文件。
+- **验证**：定向 `view-image-cards.test.ts` ⇒ **5 计 / 5 过 / 0 失败 / 0 skip，exit 0**；本角色全套
+  `node --test "test/门禁引擎/**/*.test.ts"` ⇒ **347 计 / 346 过 / 0 失败 / 1 Windows 既有 skip，exit 0**
+  （与写前同数，5 例为改写）；`npm run typecheck` ⇒ **exit 0，0 诊断**。
+- **跨角色待办（未越界）**：`view_image` 同轮附图契约（`ToolResult.images` / `ViewImageReceipt.mode` /
+  `RUNTIME_VIEW_IMAGE_POLICY`）与适配器映射由运行时核心 / Pi / Claude / Codex 适配器角色实施；运行时同轮尚未
+  启用，客户可见行为仍是下一轮附件。边界外旧“两轮”文案（`src/model/runtime.ts` 注释、`src/provider/runtime/
+  {tools,schema}.ts`、`test/runtime-core/view-image-tool.test.ts`、`test/编排/view-image.test.ts`、PM
+  `project-rules.md` §二.14、i18n 测试、设计历史与 `demos/` 文档）由各自属主按设计 Gate 0–2 同步。**卡文本是
+  行为约束，不是实现证据；未做跨角色端到端与真机验证，未独立验收。**
+
+## 2026-10-26（六）— 流程骨架与完整流程：应用可建 skeleton；Steward 写团队计划后一次性替换、保留 contract-freeze 证据；之后只能用 flow 工具
+
+任务：客户要求意图交接时应用自动创建 `docs/flows/<flowId>.yaml` 通用骨架（`status: skeleton`），运营写团队计划后用一次
+`request_confirmation(cardKind=schedule-write)` 把骨架替换为完整流程（含项目角色 / 交付步骤 / gate，保留 contract-freeze
+已登记证据）；角色卡文本由本角色独立核对并修正（lead-governance-coordination；门禁引擎任务）。完整记录见
+[变更记录](docs/change/2026-10-26_change_flow-skeleton-convener-card.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`（仅 `CONVENER_CARD_TEXT` 产品数据文本 + 文件头注）、
+  `test/门禁引擎/governance-standard-workflow.test.ts`（3 处既有断言更新 + 新增 1 例三态测试）、
+  `test/门禁引擎/governance-trio.test.ts`（1 处 schedule-write 正则按新文案更新）、本文件、`memo.md`、
+  `feature-map.md`、变更记录（新）。未改 `BUILT_IN_GOVERNANCE_ROLES` entries / forbidden / 预授权 / 能力位 /
+  内部 id / 显示名、其他角色卡、`src/model/**`、`src/provider/**`、`src/common/编排/**`、`src/pipeline/**`、
+  `app/**`、共享 i18n 或 `demos/`；未 commit / push；未重启应用。
+- **三态口径（标准工作流第 1 步）**：① **无 flow** ⇒ 同一 `schedule-write` 确认卡**初始创建**完整流程；② **skeleton**
+  ⇒ 应用可能在意图交接时已创建通用骨架（只含 contract-freeze / team-plan / appointment / role-cards /
+  role-readiness / acceptance-criteria / change-package / verification；不含项目角色 / 交付步骤 / gate），运营写完
+  团队计划后用**一次**确认卡**一次性替换**为完整流程（**保留 contract-freeze 已登记证据**、去掉 `status: skeleton`）；
+  ③ **完整 flow** ⇒ 流程步骤**只能通过 flow 工具推进**（`flow_get` + `flow_step_update` / `flow_step_supersede`）；
+  **不得再为状态更新或反复调整直接 `write_file` 流程 YAML**，仅保留有限治理写卡例外（`release` 标记——仅缺省 /
+  false → true、其余逐字不变；declined 修正重发；团队计划 / 范围实质变化时以新 flow 版本补 gate / 角色，整文件须重新
+  通过 schema 校验并经确认卡确认）。骨架替换只在写团队计划后执行一次，完整流程落盘后不得把整文件重写当作日常状态
+  更新手段。
+- **同步措辞**：标准工作流第 2 步补顺序「团队计划写盘后先按第 1 步一次性替换骨架（无骨架时同卡初始创建），再发
+  appointment 卡」；流程工具段、可写目录段、确认卡约定、declined 段统一写 `初始创建 / 骨架一次性替换`（经确认的新
+  flow 版本按同一 `schedule-write` 规则），状态推进句改为**只能**用 flow 工具；文件头新增 2026-10-26 变更注记，
+  声明能力位 / Section 1 / 预授权 / 禁写 / 内部 id / 工程基线 / 判定逻辑零变化。
+- **测试**：新增流程骨架三态用例（正向钉住三态、contract-freeze 证据保留、`status: skeleton` 去掉、只能 flow 工具、
+  release / declined 两个既有例外、只执行一次、计划写盘后先替换骨架再发 appointment 卡；负向钉住旧「写流程单
+  （仅初始创建）」单态口径与可反复写 YAML 表述不得复现；注册表 entries / preauthorizedDirs / shell 档不变）；更新标准
+  工作流第 1 步、declined、可写目录三处既有断言与 `governance-trio` 一处正则，未删除未放宽其他断言。
+- **验证**：定向 `governance-standard-workflow` + `governance-trio` **77 计 / 77 过 / 0 失败 / 0 skip，exit 0**；本角色
+  全套 `node --test "test/门禁引擎/**/*.test.ts"` ⇒ **347 计 / 346 过 / 0 失败 / 1 Windows 既有 skip，exit 0**
+  （上批 346/345/0/1；本批 +1 计）；`npm run typecheck` ⇒ **exit 0，0 错**。
+- **跨角色核对（只读，未改）**：编排 `src/common/编排/flow-service.ts::ensureFlowSkeleton` 已按 intent 的 flowId
+  幂等创建 `status: skeleton` 骨架，步骤清单与卡文本逐项一致；`src/common/编排/flow-state.ts` 明确顶层 `status`
+  仅人读、不参与机器判定；桌面 `app/desktop/governance-advance.ts` 的提案接受任务文案已写「一次性替换、保留
+  contract-freeze 证据、替换后改用 flow 工具」，`app/desktop/interface.ts` 以 `status === "skeleton"` 识别骨架。
+  卡文本是行为约束，不是这些实现的证据；未做跨角色端到端 / 真机验证 / 独立验收。
+
+## 2026-10-26（五）— 客户纠正：需求变更审批不由主理；Draft / Steward 发起 decision 审批卡，主理只执行
+
+任务：按客户两次纠正更新需求变更角色卡（lead-governance-coordination；门禁引擎任务）。
+最终口径：需求变更申请**不由主理审批**；申请 / 审批卡由 **Draft / 提案 或 Steward / 统筹** 发起 / 持有
+（其他内置治理角色与主理不可）；审批由**客户**（未勾选「替我决策」）或**判断 agent**（勾选时默认选推荐项）
+在 `request_choice(cardKind="decision")` 卡上以 `approve` / `reject` 完成（恰好一个
+`recommended: true`，推荐 `approve`）；**发起方不得自批 / 代选**。批准后应用把「已批准的需求变更执行
+任务」交给主理：主理只按批准范围执行意图变更（更新 `docs/intents/**`）并按 `hand_off_intent` 通知 Draft
+修订提案；拒绝时 Draft 修订或撤回提案。审批卡不是提案接受 / 任命 / 验收，不触发 gate，不写提案卡授权；
+不得删需求绕过审批。完整记录见[变更记录](docs/change/2026-10-26_change_requirement-change-cards.md)
+（§0 为本次纠正的最终口径）。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`（`RAPPORTEUR_CARD_TEXT` / `LIAISON_CARD_TEXT` /
+  `CONVENER_CARD_TEXT` 产品数据文本 + 文件头注）、`test/门禁引擎/requirement-change-cards.test.ts`（重写为
+  6 例）、`test/门禁引擎/decision-card.test.ts`（通道归属断言按纠正更新）、
+  `test/门禁引擎/governance-trio.test.ts`（appointment 推荐集断言收窄为内联数组/固定行，避免误伤
+  decision 卡 `recommended: true`）、本文件、`memo.md`、变更记录。未改 `src/model/**`、`src/provider/**`、
+  `src/common/编排/**`、`src/pipeline/**`、`src/common/shared/**`、`app/**`、共享 i18n、桌面 / 模型实现或
+  `demos/`；未 commit / push；未重启应用。
+- **Draft 卡**：新增「## 需求变更申请（request_requirement_change + decision 审批卡，必须）」——五类新授权
+  不得写进提案卡；`request_requirement_change` 工具契约不变（`flowId` / `intentId` 至少一个、`changeKind`
+  五值、`summary` / `rationale` 必填、`impact` / `proposedIntentPatch` 可选）；申请登记后**必须**由 Draft
+  发 `request_choice(cardKind=decision)`（`flowId`、`approve` / `reject`、恰好一个 `recommended: true`
+  推荐 `approve`）并等独立审批；**不得自批 / 代选**；「替我决策」开启时判断 agent 默认推荐、未开启时客户
+  手选；批准后等主理执行意图变更并通知，再出 v2 提案、重发提案卡；`reject` 则修订或撤回；审批卡不是新门禁/
+  不写提案卡授权；不得删需求绕过审批；回执如实处理；治理卡参数纪律补「需求变更审批另用 `decision`」。
+- **Lead 卡**：原「需求变更申请（[需求变更申请] 任务）」改写为「## 需求变更执行（已批准，必须）」——只接收
+  应用投递的**已批准的需求变更执行任务**，核验 decision `approve` 与批准来源（客户 / `judge 代批`）、对应
+  flowId / `requestId`；**未获独立审批证据不得执行意图变更**；更新 `docs/intents/**`（保留客户原话与原需求）
+  后按 `hand_off_intent` 通知 Draft；**不得自行批准 / 拒绝、不得代批 / 代选、不得再发 `intent-confirm`
+  充当需求变更审批**；原始申请（`[需求变更申请·待独立审批]`）误投时不得审批 / 执行、如实报告；不得在提案卡
+  上代批新授权、不得把删需求当合规；「系统消息只汇报、不派任务」逐字保留；需求确认段改为「需求变更不走
+  intent-confirm 审批」。
+- **Steward 卡**：新增「## 需求变更申请审批（request_requirement_change + decision 审批卡，必须）」——
+  Steward 也可发起 / 持有（客户纠正明确不排除统筹）；必须发 decision 审批卡（`approve` / `reject`、恰好一个
+  `recommended: true` 推荐 `approve`）、不得自批 / 代选；批准后通知主理执行意图变更并通知 Draft，**自己不
+  改意图 / 不改提案 / 不执行**；拒绝通知 Draft；不是新门禁 / 不写提案卡授权；不得删需求绕过审批；回执如实
+  处理。既有「Decision 卡（材料性选择，必须）」职责逐字保留（材料性选择仍由其发卡）；确认卡约定补需求变更
+  审批 decision 卡。
+- **测试**：`requirement-change-cards.test.ts` 重写 6 例——Draft 申请 + 审批卡 + 不得自批；Draft 批准后等
+  主理 / 拒绝后修订撤回 / 不删需求；Lead 只执行已批准任务、核验审批证据、原始申请不接收 / 不审批；Lead 不
+  自行批准 / 不代批新授权 / 不删需求 / 系统消息规则；Steward 可发起且不自批、批准后通知主理与 Draft、材料性
+  选择 Decision 卡保留；通道归属（Draft + Steward 发起、Lead 只执行、Crew / Proof 不定义）+ 数据面零变化。
+  `decision-card.test.ts` 的通道归属断言按纠正更新：材料性选择 Decision 章节仍只由统筹定义，Draft 只在需求
+  变更审批节定义 `cardKind=decision`；`governance-trio.test.ts` 的「其余卡不定义 appointment 推荐集」由
+  `/recommended:/` 收窄为 `recommended: [` / 固定行 / 推荐集口径（Draft 的 decision 卡合法使用
+  `recommended: true`）。其余既有断言未删除、未放宽（`liaison-role.test.ts` 非 Liaison 卡不得写
+  `intent-confirm`、既有 gate / 验收 / 系统消息断言均保留）。
+- **验证**：本角色全套 `node --test "test/门禁引擎/**/*.test.ts"` ⇒ **346 计 / 345 过 / 0 失败 /
+  1 Windows 既有 skip，exit 0**（上一批次 345/344/0/1；本批 +1 计）；`npm run typecheck` ⇒ **exit 0，0 错**。
+- **跨角色核对（只读，未改）**：工作树内并行角色已把运行时 / 编排 / i18n 对齐到纠正口径——
+  `src/common/编排/decision-card.ts` 允许 `convener` / `rapporteur` 发 decision 卡（rapporteur 仅需求变更
+  用途）、`governance-judge-{facts,prompt,verdict}.ts` 写明发起方不得自批 / 主理只执行、
+  `src/model/runtime.ts` / `src/provider/runtime/{schema,tools}.ts` 工具契约、共享 i18n
+  `main.requirementChange.*`（`[需求变更申请·待独立审批]`、批准 / 执行任务文案）。**桌面侧已由并行角色对齐
+  （只读核对）**：`app/desktop/requirement-change.ts` 提供审批卡与「已批准执行任务」文本，
+  `app/desktop/interface.ts` 走申请登记 → 审批卡 → 批准后投递执行任务，`app/desktop/session.ts` 已把
+  `request_requirement_change` 注入与 `requirementChangeCard` 通道扩到 `proposal` / `schedule`
+  （Draft / Steward）。**残余**：`app/desktop/session.ts` 部分 JSDoc 仍写「仅报告员注入」，与实现不一致，
+  需桌面角色顺手校正。卡文本是行为约束，不是这些实现的证据；未做跨角色端到端 / 真机 Electron / 浏览器
+  验证；未独立验收；未提交。
+
+## 2026-10-26 — 需求变更申请通道（`request_requirement_change`）：Draft 不得把新授权写进提案卡；Lead 更新意图 + intent-confirm 后再修订（口径已被同日客户纠正取代，见上条）
+
+任务：为新增的 `request_requirement_change` 通道更新报告员 / 主理角色卡（lead-governance-coordination；门禁引擎任务）。
+规则：Draft / 提案 需要新的联网 / 外部目录 / 范围 / 标准 / 成本授权时，**不得写进提案卡**，必须调用
+`request_requirement_change` 发起需求变更申请；申请只是请求，不是客户批准；等主理完成意图变更 +
+`intent-confirm`（闸门 0）后再修订提案；不得删需求绕过闸门 0。Lead / 主理 收到 `[需求变更申请]` 任务时读
+意图 / 申请票据、按需更新 `docs/intents/**`、发 `request_choice(cardKind=intent-confirm)` 请客户 / 判断 agent
+确认；确认后通知 Draft 修订提案；不得在提案卡上代批新授权、不得把删需求当合规；系统消息只汇报规则保留。
+本批只做本角色卡文本 + 测试侧（卡文本是行为约束，不是工具实现证据）。完整记录见
+[变更记录](docs/change/2026-10-26_change_requirement-change-cards.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`（`RAPPORTEUR_CARD_TEXT` / `LIAISON_CARD_TEXT` 产品数据
+  文本 + 文件头注）、`test/门禁引擎/requirement-change-cards.test.ts`（新）、本文件、`memo.md`、
+  `docs/change/2026-10-26_change_requirement-change-cards.md`（新）。未改 `src/model/**`、`src/provider/**`、
+  `src/common/编排/**`、`src/pipeline/**`、`src/common/shared/**`、`app/**`、共享 i18n、桌面 / 模型实现或
+  `demos/`；未读 `.env`、未跑真实模型 / 凭据 / 网络；未 commit / push；未重启应用。
+- **Draft 卡**：标准工作流第 2 步加指针；新增「## 需求变更申请（request_requirement_change，必须）」——
+  五类新授权（联网 / 外部服务、外部目录 / 仓库、范围、验收 / 技术标准、成本）**不得写进提案卡**
+  （不得作为提案 / 提案卡内容或选项、不得只在会话口头说明），必须调用 `request_requirement_change`
+  （`flowId` / `intentId` 至少一个；`changeKind`：`scope` / `authorization` / `constraint` / `cost` / `other`；
+  `summary` / `rationale` 必填，`impact` / `proposedIntentPatch` 可选、后者只是建议）；申请只是请求（不是客户批准、
+  不是提案接受、不解锁门禁、不授权实施）；`dispatched` / `already-dispatched` / `invalid` /
+  `intent-not-found` / `flow-not-found` / `rejected` / `unavailable` 回执如实处理（`rejected` 不代表客户拒绝、
+  失败不伪装）；等主理完成意图变更并经客户 / 判断 agent 确认（闸门 0）后再出 v2 提案、重发提案卡；
+  **不得删需求绕过闸门 0**；「确认卡约定」补「提案卡不得承载新的授权」。
+- **Lead 卡**：治理协调「交 Draft」加指针；新增「## 需求变更申请（[需求变更申请] 任务，必须）」——收到应用
+  投递的 `[需求变更申请]` 任务（含 `requestId` / `flowId` / `intentId` / `changeKind` / `summary` /
+  `rationale` / 可选 `impact` / `proposedIntentPatch`）时读意图与票据、按需更新 `docs/intents/**`（保留客户
+  原话与原需求，不静默扩权、不改写原话、不借机删减）、发 `request_choice`（`cardKind=intent-confirm`、
+  `flowId=<intentId>`、`confirm` / `revise`）请客户 / 判断 agent 确认；`revise` 先改意图再重发；确认前不得
+  通知 Draft 修订、不得按新授权推进；确认后按既有 `hand_off_intent`（`clarification` / `revision`）交 Draft
+  修订；**不得在提案卡上代批新授权**（提案卡 `accept` 不得替代需求确认、不得让 Draft 把新授权写进提案卡）、
+  **不得把删需求当合规**；`proposedIntentPatch` 只是 Draft 建议、不照抄当客户意图；「系统消息只汇报、
+  不派任务」规则逐字保留；需求确认段补同一确认路径。
+- **测试**：新增 `requirement-change-cards.test.ts` 5 例（Draft 申请通道 / 工具契约 / 回执；Draft 确认前
+  不修订 + 不得删需求 + 白名单不扩散；Lead 意图变更 + intent-confirm + 交 Draft；Lead 不代批新授权 /
+  不删需求 / 系统消息规则；通道归属 + 数据面零变化）；既有测试文件与断言未改、未删除、未放宽（含
+  `liaison-role.test.ts` 非 Liaison 卡不得写 `intent-confirm` 的守卫）。
+- **验证**：定向四文件 **90 计 / 90 过 / 0 失败 / 0 skip，exit 0**；本角色全套
+  `node --test "test/门禁引擎/**/*.test.ts"` ⇒ **345 计 / 344 过 / 0 失败 / 1 Windows 既有 skip，exit 0**
+  （基线 340/339/0/1，本批 +5）；`npm run typecheck` ⇒ **exit 0，0 错**。
+- **跨角色待办（未越界）**：`request_requirement_change` 工具注册 / 参数校验 / 去重票据 / 主理任务投递 /
+  系统行 / 账本 / 与 `intent-confirm` 衔接由运行时核心、编排、桌面角色实施与验证；本批只读核对了工作树内
+  在飞契约（`src/model/runtime.ts`、`src/provider/runtime/{schema,tools}.ts`、共享 i18n、项目管理工程法案 /
+  变更记录）**未修改未验证**；工具名 / 参数 / 枚举 / 回执 code / `[需求变更申请]` 标签若最终变化须同批回改
+  卡文本与本批测试。**卡文本是行为约束，不是实现证据；未做跨角色端到端与真机验证，未独立验收。**
+  来源：任务派发转达的客户要求。
+
 ## 2026-10-26 — view_image 图片证据两轮纪律：Proof 必看真实附件、不得假看；Steward / Lead 简短规则
 
 任务：为新增的 `view_image` 工具补角色卡使用规则（lead-governance-coordination；门禁引擎任务）。
@@ -2067,3 +2251,4 @@ SHA-256 pin 钉死，篡改即失效、fail-closed。方案出处：设计 §3.3
 ## 2026-10-14：G1 角色协作组摘要
 
 按已批准 ANS-RUNTIME-V2 revision 1 的必要范围，在既有角色结果增加可选只读 group/groupDuty，卡正文单一解析；旧卡缺值不添加属性，归档/内置/角色kind/接受/写权保持既有语义。Model与两处Service结果使用同一 RoleGroupMetadata，未改权限或角色卡。新增8例通过，门禁168通过/0失败/1 Windows专属跳过，完整typecheck通过。当前用法见[功能说明](docs/feature/role-group-metadata.md)，实际契约见[API](api-spec.md)，候选及原始检查摘要见[变更记录](docs/change/2026-10-14_change_role-group-metadata.md)。桌面透传和呈现由对应属主继续验证。
+- 2026-10-26（显示名）：按客户批准的两字公司职务名，五内置治理角色显示名改为 产品 / 策划 / 运营 / 人事 / 质检；同步角色卡标题/正文与提示词中的角色名，保留内部 id、能力位、边界、账本与判定逻辑。详见 `角色卡/项目管理/docs/change/2026-10-26_change_role-display-names.md`。

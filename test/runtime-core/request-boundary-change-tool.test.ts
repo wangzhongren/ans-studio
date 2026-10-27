@@ -22,7 +22,7 @@ const call = (args: Record<string, unknown>) => ({ name: REQUEST_BOUNDARY_CHANGE
 const dispatched: RequestBoundaryChangeResult = {
   ok: true,
   code: "dispatched",
-  message: "已派发给组队 Crew",
+  message: "已派发给人事 Crew",
   roleId: "worker-a",
   ticketId: "ticket-1",
 };
@@ -72,7 +72,7 @@ test("注入后注册 request_boundary_change；参数 roleId/rationale 必填�
     /精确/,
     /至少一个非空/,
     /不要重写整个边界/,
-    /组队/,
+    /人事/,
     /appointment-write/,
     /AI 门禁/,
     /rejected/,
@@ -173,7 +173,7 @@ test("回执原样转达 ok/code/message（成功不夸大、失败不伪装）"
   assert.equal(ok.ok, true);
   assert.match(ok.message, /ok=true/);
   assert.match(ok.message, /code=dispatched/);
-  assert.match(ok.message, /已派发给组队 Crew/);
+  assert.match(ok.message, /已派发给人事 Crew/);
   assert.match(ok.message, /roleId=worker-a/);
   assert.match(ok.message, /ticketId=ticket-1/);
   assert.match(ok.message, /≠ 客户批准/, "成功文案必须重申请求变更 ≠ 客户批准");
@@ -182,11 +182,11 @@ test("回执原样转达 ok/code/message（成功不夸大、失败不伪装）"
 
   const failures: RequestBoundaryChangeResult[] = [
     { ok: false, code: "already-dispatched", message: "此前已派发（ticket-1）" },
-    { ok: false, code: "rejected", message: "AI 门禁审核拒绝（deny）：未派发给组队，不自动放行" },
+    { ok: false, code: "rejected", message: "AI 门禁审核拒绝（deny）：未派发给人事，不自动放行" },
     { ok: false, code: "invalid-role", message: "未知项目角色 worker-x" },
     { ok: false, code: "invalid-path", message: "路径不在项目内：../outside.ts" },
     { ok: false, code: "no-change", message: "边界已包含这些路径" },
-    { ok: false, code: "unavailable", message: "组队派发通道不可用" },
+    { ok: false, code: "unavailable", message: "人事派发通道不可用" },
   ];
   for (const receipt of failures) {
     const tool = toolMap({ requestBoundaryChange: async () => receipt }).get(REQUEST_BOUNDARY_CHANGE_TOOL_NAME)!;
@@ -209,11 +209,11 @@ test("回执原样转达 ok/code/message（成功不夸大、失败不伪装）"
   assert.match(alreadyResult.message, /未重复派发/);
 });
 
-test("rejected 回执原样转达：AI 门禁退回统筹、不自动放行、不代表客户拒绝", async () => {
+test("rejected 回执原样转达：AI 门禁退回运营、不自动放行、不代表客户拒绝", async () => {
   const receipt: RequestBoundaryChangeResult = {
     ok: false,
     code: "rejected",
-    message: "AI 门禁审核拒绝（deny）：新增路径与申请理由不匹配，未派发给组队；不自动放行。",
+    message: "AI 门禁审核拒绝（deny）：新增路径与申请理由不匹配，未派发给人事；不自动放行。",
     roleId: "worker-a",
   };
   const tool = toolMap({ requestBoundaryChange: async () => receipt }).get(REQUEST_BOUNDARY_CHANGE_TOOL_NAME)!;
@@ -230,12 +230,12 @@ test("rejected 回执原样转达：AI 门禁退回统筹、不自动放行、�
 
 test("能力抛错 / 契约外回执 ⇒ fail-closed，绝不说成已派发", async () => {
   const thrown = toolMap({
-    requestBoundaryChange: async () => { throw new Error("组队派发 handler 不可用"); },
+    requestBoundaryChange: async () => { throw new Error("人事派发 handler 不可用"); },
   }).get(REQUEST_BOUNDARY_CHANGE_TOOL_NAME)!;
   const failed = await thrown.handler(call({ roleId: "worker-a", addPaths: ["src/a.ts"], rationale: "理由" }));
   assert.equal(failed.ok, false);
   assert.match(failed.message, /未完成/);
-  assert.match(failed.message, /组队派发 handler 不可用/);
+  assert.match(failed.message, /人事派发 handler 不可用/);
   assert.match(failed.message, /不要当已派发/);
 
   const invalidReceipts: unknown[] = [

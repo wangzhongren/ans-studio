@@ -1201,7 +1201,7 @@ test("流程步骤状态首词规范化：done 变体视为完成；pending/deli
   for (const status of ["done", "done（证据）", "done(evidence)", "Done", "DONE", "done：xxx", "done 有落盘/回交证据"]) {
     assert.equal(normalizeFlowStepStatus(status), "done", `${status} 应规范化为 done`);
   }
-  for (const status of ["pending（…）", "pending（不由统筹派发）", "delivered（…）", "in-progress（…）", "blocked", "", "   "]) {
+  for (const status of ["pending（…）", "pending（不由运营派发）", "delivered（…）", "in-progress（…）", "blocked", "", "   "]) {
     assert.notEqual(
       normalizeFlowStepStatus(status),
       "done",
@@ -1214,13 +1214,13 @@ test("流程步骤状态首词规范化：done 变体视为完成；pending/deli
 // 的步骤表，2026-10-19 v8 收口快照：10 步全部是 `done（…）` 写法）。此前编排 `parseFlowSteps` 取「步骤」
 // 描述列当 id、精确比较状态，会把本表解析成描述文本 id 且全部判为未完成。
 const REAL_R2_STEP_TABLE: ReadonlyArray<readonly [id: string, description: string, status: string]> = [
-  ["nomination", "提名：Crew / 组队 读取提案并给出候选角色", "done（`docs/nominations/ticket-desk-r2-v1.md`；推荐集 = 既有三角色，不新增角色）"],
+  ["nomination", "提名：人事 / Crew 读取提案并给出候选角色", "done（`docs/nominations/ticket-desk-r2-v1.md`；推荐集 = 既有三角色，不新增角色）"],
   ["role-readiness", "角色就绪：客户任命决定 + 角色卡就绪确认", "done（客户经任命卡确认沿用 backend / frontend / test；本轮不新增角色、不改卡）"],
   ["contract-freeze-v2", "冻结 API 契约 v2 到 `docs/contracts/ticket-desk-api-v2.md`", "done（frozen-v2 / supersedes v1）"],
   ["delivery-backend", "服务端增量：`sort`/`order`/`assignee`、`deadline`、`overdue`、`GET /api/tickets/export`（CSV+BOM）、`canExport`、store 补全、README 同步（backend-engineer）", "done（有落盘/回交证据；125/125 + 自检 73 项为角色自报，独立复核仍待 `verification`）"],
   ["delivery-frontend", "前端增量：排序/负责人筛选控件、截止时间列与逾期高亮、创建与 PATCH deadline 表单、导出按钮（`fetch`+`Blob`）（frontend-engineer）", "done（有落盘/回交证据；e2e 后 0 处修正）"],
   ["delivery-test", "测试增量：`sorting-filtering` / `overdue` / `export` 三文件 + `persistence` 增补；既有 75 用例不得弱化（test-engineer）", "done（有落盘/回交证据；125/125 为角色自报，独立复核仍待 `verification`）"],
-  ["cleanup-selfcheck", "清理 `data/selfcheck-r2.mjs` 临时自检脚本（backend-engineer 自己的写区）", "done（已删；`data/` 仅剩 `tickets.json`，统筹 `list_dir` 复核）"],
+  ["cleanup-selfcheck", "清理 `data/selfcheck-r2.mjs` 临时自检脚本（backend-engineer 自己的写区）", "done（已删；`data/` 仅剩 `tickets.json`，运营 `list_dir` 复核）"],
   ["r2-e2e", "R2 端到端联调：真起服务核对前端查询串/静态托管/导出链路（frontend-engineer）", "done（真起服 curl 实测 37 个请求；浏览器渲染未验证）"],
   ["verification", "独立复核：按提案 §11 八条逐条出结论（内置 Proof / verifier）", "done（报告 `docs/verification/ticket-desk-r2-v1.md`；§11 八条均有证据，建议 accept）"],
   ["acceptance", "客户验收", "done（客户在验收卡选择 **accept**；决定登记于 `docs/governance/verifier/ticket-desk-r2.md`）"],
@@ -1391,8 +1391,8 @@ test("验收完成判定：superseded/cancelled 步骤视为作废（不判未�
 // 边缘的 `**`，行内剩 `done**（…）`，`normalizeFlowStepStatus` 取首词得 `done**` ⇒ 七个 done 步骤全判
 // 未完成；`superseded**：…` 也被当成未知状态。
 const REAL_LIBRARY_LENDING_R2_STEP_TABLE: ReadonlyArray<readonly [id: string, description: string, executor: string, status: string]> = [
-  ["nomination", "提名：Crew 读提案给出候选角色 → 客户任命", "Crew / 组队（应用派发）＋ 客户", "**done**（客户已任命 backend / frontend / test）"],
-  ["contract-freeze-v2", "契约冻结 `docs/contracts/library-lending-api-v2.md`", "Draft / 提案（治理角色）", "**done**（`contractVersion: 2` · `schemaVersion: 2` · `status: frozen-v2`，含 §1 schema、§2 预约、§3 续借、§4 搜索分页、§5 CSV、§7 错误码 30、§9 迁移/回滚、§11 并发、§12 负例清单）"],
+  ["nomination", "提名：Crew 读提案给出候选角色 → 客户任命", "人事 / Crew（应用派发）＋ 客户", "**done**（客户已任命 backend / frontend / test）"],
+  ["contract-freeze-v2", "契约冻结 `docs/contracts/library-lending-api-v2.md`", "策划 / Draft（治理角色）", "**done**（`contractVersion: 2` · `schemaVersion: 2` · `status: frozen-v2`，含 §1 schema、§2 预约、§3 续借、§4 搜索分页、§5 CSV、§7 错误码 30、§9 迁移/回滚、§11 并发、§12 负例清单）"],
   ["delivery-server-v2", "服务端（M2）：模块/迁移/配置/路由/日志/README", "backend", "**done**（回执齐备：6 新增 + 14 修订；迁移 v1→v2 含 `.bak.1.<ts>`；真实启动 18092/18093；预约队列/续借/搜索分页/CSV/并发/负例实测；**既有 155 用例 151 pass / 4 fail，4 项均为 test 侧 v1 版本断言，非行为回归**）"],
   ["delivery-frontend-v2", "前端（M3）：预约/续借/搜索分页/导出 UI", "frontend", "**done**（回执：`public/assets/{api,app,styles}` + `index.html` 全在 `public/**`，无根路径文件；四段浏览器实测 17/17、16/17、30/32、17/17，**3 处 FAIL 均为其自身断言写法错误并已打印实际值**；静态门 8/8、6/6；截图在 `/tmp`，不可久留）"],
   ["delivery-tests-v2", "测试（M4）：矩阵/负例/并发/回滚演练；既有 155 保持全绿", "test", "**done**（回执 + 我方核对新增文件在盘：**308 tests / 308 pass / fail 0 / exit 0**，新增 153 条；4 处版本断言改为派生 `CURRENT_SCHEMA_VERSION`；TEST-MATRIX 增 §10–§13）"],

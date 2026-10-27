@@ -10,12 +10,26 @@ const FILE_PATTERN = /^ans-diagnostics-\d{4}-\d{2}-\d{2}\.jsonl$/;
 // （如守卫命令摘要 excerpt 不列入）——字符串经 scrub 净化并限长，数值须为有限数。
 const FIELD_NAMES = new Set([
   "turnId", "toolCallId", "toolName", "path", "outcome", "durationMs", "timeoutMs", "ok",
+  // view_image 审计（2026-10-27）：图片 MIME 与字节数属元数据；图片内容（base64/`data:` URL）不入白名单。
+  "mimeType", "bytes",
   "errorType", "errorCode", "errorMessage", "requestId", "decision", "reasonCode",
   "state", "count", "queueDepth", "reportSource", "pid", "sourceRoleId", "targetRoleId",
   "sessionId", "phase", "mode", "replayPlan", "rowCount", "firstRow", "lastRow",
   "visibleCount", "pendingCount", "exitCode", "signal", "authorizationSource",
   "attempt", "supported", "busy", "resumed", "contextSource", "eventKind", "url",
 ]);
+
+// 字段级校验：新字段若可能承载外部文本/数值，必须在此收窄，防止把正文/base64 带进白名单。
+// 仅对声明了的字段生效；其余字段沿用「字符串 scrub+限长 / 有限数值 / 布尔」的通用规则。
+const FIELD_VALUE_GUARDS: Readonly<Record<string, (value: string | number | boolean) => boolean>> = {
+  // 只接受标准 MIME token（如 `image/png`）；data URL、base64 载荷、带参数或控制字符的字符串一律丢弃。
+  mimeType: (value) =>
+    typeof value === "string" &&
+    value.length <= 100 &&
+    /^[A-Za-z0-9][A-Za-z0-9.+-]*\/[A-Za-z0-9][A-Za-z0-9.+-]*$/.test(value),
+  // 字节计数：有限非负整数（view_image 图片字节数等）。
+  bytes: (value) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0,
+};
 
 export interface DiagnosticContext { component: string; projectRoot?: string; roleId?: string }
 export interface DiagnosticLogger {
@@ -57,9 +71,14 @@ function safeFields(input?: Record<string, unknown>): Record<string, string | nu
   if (!input) return fields;
   for (const name of FIELD_NAMES) {
     const value = input[name];
-    if (typeof value === "string") fields[name] = scrub(value);
-    else if (typeof value === "number" && Number.isFinite(value)) fields[name] = value;
-    else if (typeof value === "boolean") fields[name] = value;
+    let safe: string | number | boolean;
+    if (typeof value === "string") safe = scrub(value);
+    else if (typeof value === "number" && Number.isFinite(value)) safe = value;
+    else if (typeof value === "boolean") safe = value;
+    else continue;
+    const guard = FIELD_VALUE_GUARDS[name];
+    if (guard && !guard(safe)) continue;
+    fields[name] = safe;
   }
   return fields;
 }

@@ -225,7 +225,7 @@ test("迁移后：listProject 无 su、五内置顺序不变（liaison 首位）
 
     const listing = await listProject(root);
     assert.equal(listing.governanceModel, "trio");
-    assert.equal(listing.primaryRoleId, "liaison", "迁移后默认主入口 = Lead / 主理（2026-10-18 五角色）");
+    assert.equal(listing.primaryRoleId, "liaison", "迁移后默认主入口 = 产品 / Lead（2026-10-18 五角色）");
     assert.deepEqual(
       listing.roles.map((r) => r.roleId),
       ["liaison", "rapporteur", "nominator", "convener", "verifier", "A", "B"],

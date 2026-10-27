@@ -9,7 +9,7 @@
  * task-request/reply-original 折叠。不改变虚拟窗口/行高口径。
  */
 
-import { type SyntheticEvent, memo, type ReactNode } from "react";
+import { type SyntheticEvent, memo, type ReactNode, useEffect, useId, useState } from "react";
 import {
   AlertTriangle,
   Bot,
@@ -69,6 +69,11 @@ import {
 import { ShellJudgeRowCard } from "@/chat/judge-row-view";
 import { toolRowTextDisplay } from "@/chat/tool-row-text";
 import { ToolDetailsView } from "@/chat/tool-details-view";
+import {
+  isSafeProjectImagePath,
+  viewImagePreviewUrl,
+} from "@/chat/view-image-preview";
+import { useViewImageLightbox } from "@/chat/view-image-lightbox";
 import { useUiStore } from "@/stores/ui-store";
 import {
   reasoningEmptyNote,
@@ -197,7 +202,15 @@ function AssistantRow({ row, roleId }: { row: ChatRow; roleId: string }) {
   );
 }
 
-function ActivityRow({ phaseRow }: { phaseRow: ActivityPhaseRow }) {
+function ActivityRow({
+  phaseRow,
+  roleId,
+  projectRoot,
+}: {
+  phaseRow: ActivityPhaseRow;
+  roleId: string;
+  projectRoot: string | null;
+}) {
   const t = useT();
   const locale = useLocaleState((s) => s.locale);
   const view = phaseRowView(phaseRow, locale);
@@ -208,28 +221,44 @@ function ActivityRow({ phaseRow }: { phaseRow: ActivityPhaseRow }) {
     .join(" → ");
   const fullTarget = view.target || t("ui.chatRow.noFileTarget");
   const targetView = toolRowTextDisplay(fullTarget);
+  // view_image 兜底：若历史/旧数据仍把它归入工具组，展开后同样显示缩略图；
+  // 未放行/失败的调用角色并未看到图片，不显示。
+  const terminal = view.items[view.items.length - 1] || view.items[0];
+  const previewable =
+    view.toolName === "view_image" &&
+    view.target !== "" &&
+    view.status !== "denied" &&
+    view.status !== "failed" &&
+    view.status !== "timed-out" &&
+    terminal?.denied !== true &&
+    terminal?.failed !== true;
   return (
-    <div
-      className="tool-activity"
-      data-call-id={view.callId || undefined}
-      data-activity-index={phaseRow.index}
-      data-activity-phases={phaseRow.phases.join(" ")}
-    >
-      <span className="activity-time" title={view.at || undefined}>
-        {shortTime(view.at) || t("ui.chatRow.timeNotRecorded")}
-      </span>
-      <div>
-        <span className="activity-op">{view.toolName}</span>
-        <span className="activity-target" title={targetView.title}>{targetView.display}</span>
+    <>
+      <div
+        className="tool-activity"
+        data-call-id={view.callId || undefined}
+        data-activity-index={phaseRow.index}
+        data-activity-phases={phaseRow.phases.join(" ")}
+      >
+        <span className="activity-time" title={view.at || undefined}>
+          {shortTime(view.at) || t("ui.chatRow.timeNotRecorded")}
+        </span>
+        <div>
+          <span className="activity-op">{view.toolName}</span>
+          <span className="activity-target" title={targetView.title}>{targetView.display}</span>
+        </div>
+        <span className={"activity-state " + (running ? "running" : view.status)} title={label || undefined}>
+          {running ? <LoaderCircle size={12} strokeWidth={1.5} aria-hidden="true" /> : null}
+          {view.status === "failed" || view.status === "timed-out" ? (
+            <AlertTriangle size={12} strokeWidth={1.5} aria-hidden="true" />
+          ) : null}
+          {label}
+        </span>
       </div>
-      <span className={"activity-state " + (running ? "running" : view.status)} title={label || undefined}>
-        {running ? <LoaderCircle size={12} strokeWidth={1.5} aria-hidden="true" /> : null}
-        {view.status === "failed" || view.status === "timed-out" ? (
-          <AlertTriangle size={12} strokeWidth={1.5} aria-hidden="true" />
-        ) : null}
-        {label}
-      </span>
-    </div>
+      {previewable ? (
+        <ViewImagePreview roleId={roleId} projectRoot={projectRoot} target={view.target} />
+      ) : null}
+    </>
   );
 }
 
@@ -239,6 +268,7 @@ const DEFER_TOOL_ROWS_WHEN_CLOSED = 40;
 
 function ActivitiesRow({ row, roleId }: { row: ChatRow; roleId: string }) {
   const locale = useLocaleState((s) => s.locale);
+  const projectRoot = useChatStore((s) => s.projectRoot);
   const data = asRecord(row.data);
   const items = asArray<ActivityItem>(data.items);
   const open = data.open === true;
@@ -274,6 +304,8 @@ function ActivitiesRow({ row, roleId }: { row: ChatRow; roleId: string }) {
             <ActivityRow
               key={(phaseRow.callId || "a") + ":" + phaseRow.index}
               phaseRow={phaseRow}
+              roleId={roleId}
+              projectRoot={projectRoot}
             />
           ))}
         </div>
@@ -282,9 +314,78 @@ function ActivitiesRow({ row, roleId }: { row: ChatRow; roleId: string }) {
   );
 }
 
+/** view_image 缩略图（2026-10-27 客户要求：看到角色查看的那张图；点击应用内放大）。
+ *  只按「项目根 + 项目相对路径」构造 file URL；路径非法/项目根缺失/加载失败时
+ *  不显示破图，保留工具行并按原因如实标注。点击缩略图打开 app 内 lightbox（不导航、
+ *  不打开 file:// 页面、不改 CSP）；放大层是 fixed portal，不参与虚拟窗口行高。 */
+function ViewImagePreview({
+  roleId,
+  projectRoot,
+  target,
+}: {
+  roleId: string;
+  projectRoot: string | null;
+  target: string;
+}) {
+  const t = useT();
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const ownerId = useId();
+  // 缩略图卸载（虚拟窗口/切换角色）时关闭自己打开的放大层，避免弹层悬空。
+  useEffect(
+    () => () => {
+      useViewImageLightbox.getState().close(ownerId);
+    },
+    [ownerId],
+  );
+  // 缩略图异步加载会改变行高；通知 pane 重新测量（贴底/滚动偏好仍由 VirtualPane 既有规则决定）。
+  const remeasure = () => useChatStore.getState().touchPane(roleId);
+  if (target === "") return null;
+  if (!projectRoot) {
+    return <div className="view-image-note">{t("ui.viewImage.previewNoProject")}</div>;
+  }
+  const src = isSafeProjectImagePath(target)
+    ? viewImagePreviewUrl(projectRoot, target)
+    : null;
+  if (!src) {
+    return <div className="view-image-note">{t("ui.viewImage.previewPathUnsafe")}</div>;
+  }
+  if (failedSrc === src) {
+    return <div className="view-image-note">{t("ui.viewImage.previewLoadFailed")}</div>;
+  }
+  return (
+    <div className="view-image-preview">
+      <button
+        type="button"
+        className="view-image-preview-trigger"
+        aria-label={t("ui.viewImage.openPreview", { path: target })}
+        aria-haspopup="dialog"
+        onClick={() =>
+          useViewImageLightbox.getState().open({ src, target, ownerId })
+        }
+      >
+        <img
+          className="view-image-preview"
+          src={src}
+          alt={target}
+          loading="lazy"
+          decoding="async"
+          onLoad={remeasure}
+          onError={() => {
+            setFailedSrc(src);
+            remeasure();
+          }}
+        />
+      </button>
+    </div>
+  );
+}
+
+/** 工具生命周期行（`.tool-call-record`；旧文档/探针也称 ToolCallRecord）：start/result/blocked
+ *  按 callId 合并展示，`view_image` 的缩略图在该 `<details>` 之外。 */
 function ToolLifecycleRow({ row, roleId }: { row: ChatRow; roleId: string }) {
   const t = useT();
   const locale = useLocaleState((s) => s.locale);
+  const projectRoot = useChatStore((s) => s.projectRoot);
   const data = asRecord(row.data);
   const stages = asRecord(data.stages);
   const order = ["start", "blocked", "result"]
@@ -293,11 +394,11 @@ function ToolLifecycleRow({ row, roleId }: { row: ChatRow; roleId: string }) {
   const activity = order.length > 0
     ? order[order.length - 1]
     : (asRecord(data.activity) as unknown as ActivityItem);
-  const target =
+  const rawTarget =
     asString(activity.fullTarget) ||
     asString(asRecord(stages.start).fullTarget) ||
-    asString(activity.target) ||
-    t("ui.chatRow.noFileTarget");
+    asString(activity.target);
+  const target = rawTarget || t("ui.chatRow.noFileTarget");
   const labelText =
     order.length > 0
       ? order.map((item) => asString(item.label) || asString(item.statusText)).join(" → ")
@@ -316,41 +417,47 @@ function ToolLifecycleRow({ row, roleId }: { row: ChatRow; roleId: string }) {
     toolDetailsContainText(detailItems, fullErrorText, errorReason);
   const statusClass = asString(activity.status) || "recorded";
   return (
-    <details
-      className="tool-call-record"
-      data-failed={failed ? "true" : undefined}
-      {...detailProps(row, roleId, "details")}
-    >
-      {failed ? (
-        <ToolErrorSummary
-          timeText={shortTime(asString(activity.at))}
-          timeTitle={asString(activity.at) || t("ui.chatRow.timeNotSaved")}
-          toolName={toolName}
-          target={targetView.display}
-          targetTitle={targetView.title}
-          statusLabel={labelText || t("ui.tool.status.failed")}
-          statusClass={statusClass}
-          reason={errorReason}
-        />
-      ) : (
-        <summary>
-          <span className="tool-call-time" title={asString(activity.at) || t("ui.chatRow.timeNotSaved")}>
-            {shortTime(asString(activity.at))}
-          </span>
-          <strong>{toolName}</strong>
-          <span className="tool-call-target" title={targetView.title}>{targetView.display}</span>
-          <span className={"tool-call-status " + statusClass} title={labelText || undefined}>
-            {labelText}
-          </span>
-        </summary>
-      )}
-      <div className="tool-call-details">
-        {failed && fullErrorText !== "" && !detailsHaveFullText ? (
-          <ToolErrorFullEntry label={t("ui.chatRow.error")} text={fullErrorText} />
-        ) : null}
-        <ToolDetailsView items={detailItems} t={t} locale={locale} />
-      </div>
-    </details>
+    <>
+      <details
+        className="tool-call-record"
+        data-failed={failed ? "true" : undefined}
+        {...detailProps(row, roleId, "details")}
+      >
+        {failed ? (
+          <ToolErrorSummary
+            timeText={shortTime(asString(activity.at))}
+            timeTitle={asString(activity.at) || t("ui.chatRow.timeNotSaved")}
+            toolName={toolName}
+            target={targetView.display}
+            targetTitle={targetView.title}
+            statusLabel={labelText || t("ui.tool.status.failed")}
+            statusClass={statusClass}
+            reason={errorReason}
+          />
+        ) : (
+          <summary>
+            <span className="tool-call-time" title={asString(activity.at) || t("ui.chatRow.timeNotSaved")}>
+              {shortTime(asString(activity.at))}
+            </span>
+            <strong>{toolName}</strong>
+            <span className="tool-call-target" title={targetView.title}>{targetView.display}</span>
+            <span className={"tool-call-status " + statusClass} title={labelText || undefined}>
+              {labelText}
+            </span>
+          </summary>
+        )}
+        <div className="tool-call-details">
+          {failed && fullErrorText !== "" && !detailsHaveFullText ? (
+            <ToolErrorFullEntry label={t("ui.chatRow.error")} text={fullErrorText} />
+          ) : null}
+          <ToolDetailsView items={detailItems} t={t} locale={locale} />
+        </div>
+      </details>
+      {/* 未放行/失败的调用角色并未看到图片：不显示缩略图，只保留命令行与状态。 */}
+      {toolName === "view_image" && !failed && activity.denied !== true ? (
+        <ViewImagePreview roleId={roleId} projectRoot={projectRoot} target={rawTarget} />
+      ) : null}
+    </>
   );
 }
 

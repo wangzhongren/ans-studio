@@ -39,7 +39,9 @@ import {
   latestCustomerDecision,
   parseFlowStateYaml,
   validateFlowEvidence,
+  FLOW_QUALITY_TIERS,
   type FlowGateKind,
+  type FlowQualityTier,
   type FlowState,
   type FlowStateStep,
 } from "./flow-state.ts";
@@ -482,6 +484,195 @@ async function writeFlowState(args: {
     revision,
     flow: viewOf(parsed.flow, revision, args.viewActorRoleId, args.viewActorPower),
   };
+}
+
+// —————————————————————— 应用侧流程骨架（2026-10-26） ——————————————————————
+//
+// 客户反馈：意图确认后、提案/团队计划之前 `flow_get` 报 not-found，角色无法登记 contract-freeze，
+// 也让「流程文件不存在」看起来像流程故障。应用在**意图交接成功后、报告员开始前**按 intent 的
+// flowId 幂等创建一份**通用步骤骨架**（顶层 `status: skeleton`）：contract-freeze / team-plan /
+// appointment / role-cards / role-readiness / acceptance-criteria / change-package / verification。
+//
+// 骨架的边界（与桌面 `governance-advance.ts` 的 skeleton 分支同一口径）：
+//   · **只保证「流程文件已存在、通用步骤可登记」**——不猜项目角色、不预写 `delivery-*` / gate 等
+//     项目交付步骤；这些由运营在团队计划后用一次 schedule-write 把骨架**替换**为完整流程；
+//   · 步骤全部 `pending`，`kind` 只取既有 `FlowStepKind`（**不新增枚举**）；owner 只用内置治理角色
+//     id 或 `app`（应用收口的 customer-decision / acceptance 步骤），不写入任何项目角色；
+//   · 顶层 `status` 仅供人读（`flow-state.ts` 约定：不参与机器判定）；桌面据 `status === "skeleton"`
+//     识别「已存在但只是骨架」，从而在提案接受后提示替换，而不是直接写文件或误判为完整流程。
+//
+// 幂等与安全：
+//   · **已存在任何文件（骨架 / 完整流程 / 非法 YAML）⇒ 原样保留、绝不覆盖**；
+//   · 写前用 `parseFlowStateYaml` 复核候选；`atomicWrite`（tmp + fsync + rename，写失败不替换目标）；
+//   · 与 flow-service / 应用专用收口共用**同一 per-project 串行队列**，避免与同进程的流程写入交错；
+//     跨进程并发写同一 flow 文件不在本函数的保证范围（应用是骨架的唯一写者，角色改用 flow 工具）。
+
+/** 骨架流程的顶层 `status` 标记（人读；桌面据此识别「已存在但只是骨架」）。 */
+export const FLOW_SKELETON_STATUS = "skeleton";
+
+/**
+ * 通用流程骨架步骤（全部 `pending`；不含项目角色 / `delivery-*` / gate）。
+ *
+ * owner 取内置治理角色 id（rapporteur / convener / nominator / verifier）或 `app`；`dependsOn` 只表达
+ * 标准工作流顺序（更细的依赖由团队计划替换为完整流程时给出）。每次返回新数组/新对象，调用方可安全持有。
+ */
+export function buildFlowSkeletonSteps(): FlowStateStep[] {
+  return [
+    {
+      id: "contract-freeze",
+      title: "冻结跨角色契约（docs/contracts/<name>-v1.md）",
+      owner: "rapporteur",
+      kind: "artifact",
+      status: "pending",
+    },
+    {
+      id: "team-plan",
+      title: "团队计划（角色、写集、依赖与风险档）",
+      owner: "convener",
+      kind: "artifact",
+      status: "pending",
+      dependsOn: ["contract-freeze"],
+    },
+    {
+      id: "appointment",
+      title: "客户在任命卡上决定团队任命",
+      owner: "convener",
+      kind: "customer-decision",
+      status: "pending",
+      dependsOn: ["team-plan"],
+    },
+    {
+      id: "role-cards",
+      title: "人事按任命名单逐路径写角色卡",
+      owner: "nominator",
+      kind: "dispatch",
+      status: "pending",
+      dependsOn: ["appointment"],
+    },
+    {
+      id: "role-readiness",
+      title: "角色就绪复核",
+      owner: "convener",
+      kind: "artifact",
+      status: "pending",
+      dependsOn: ["role-cards"],
+    },
+    {
+      id: "acceptance-criteria",
+      title: "实施前验收标准",
+      owner: "verifier",
+      kind: "artifact",
+      status: "pending",
+      dependsOn: ["role-readiness"],
+    },
+    {
+      id: "change-package",
+      title: "变更包与证据登记",
+      owner: "convener",
+      kind: "artifact",
+      status: "pending",
+      dependsOn: ["acceptance-criteria"],
+    },
+    {
+      id: "verification",
+      title: "最终验收（应用按验收门派质检 / Proof）",
+      owner: "app",
+      kind: "acceptance",
+      status: "pending",
+    },
+  ];
+}
+
+/** `ensureFlowSkeleton` 输入（与桌面 `session.ts::ensureIntentFlowSkeleton` 的调用契约稳定）。 */
+export interface EnsureFlowSkeletonInput {
+  projectRoot: string;
+  flowId: string;
+  /** 由意图 frontmatter 给出（缺省 production）；非法值 fail-closed（不猜）。 */
+  qualityTier: FlowQualityTier;
+}
+
+/** `ensureFlowSkeleton` 结果：`ok:false` 时 `created` 恒为 false，`error` 为可读原因。 */
+export interface EnsureFlowSkeletonResult {
+  ok: boolean;
+  /** true = 本次新建；false = 已存在（不覆盖）。 */
+  created: boolean;
+  /** 本次新建文件字节的 sha256（与 flow-service 的 revision 同口径）；`created:false` 时不给。 */
+  revision?: string;
+  error?: string;
+}
+
+/**
+ * 幂等创建通用流程骨架（应用专用；不是角色工具）。
+ *
+ * 契约（钉死）：
+ *   · 文件已存在（骨架 / 完整流程 / 非法内容，无论可解析与否）⇒ `{ok:true, created:false}`，**不覆盖**；
+ *   · 不存在 ⇒ 生成骨架、写前 `parseFlowStateYaml` 复核、`mkdir -p docs/flows` 后原子写，返回
+ *     `{ok:true, created:true, revision}`；
+ *   · 读取失败非 ENOENT（权限 / 目标是目录等）或写盘失败 ⇒ `{ok:false, created:false, error}`，不抛；
+ *   · 不写治理账本、不写客户决定、不写 `.ans`。
+ */
+export async function ensureFlowSkeleton(input: EnsureFlowSkeletonInput): Promise<EnsureFlowSkeletonResult> {
+  if (typeof input?.projectRoot !== "string" || input.projectRoot.trim() === "") {
+    return { ok: false, created: false, error: "缺少 projectRoot。" };
+  }
+  const projectRoot = path.resolve(input.projectRoot);
+  const flowId = input.flowId;
+  if (typeof flowId !== "string" || !FLOW_ID_RE.test(flowId)) {
+    return { ok: false, created: false, error: `flowId 非法：${JSON.stringify(flowId)}（应形如 todo-list-v1）` };
+  }
+  if (
+    typeof input.qualityTier !== "string" ||
+    !(FLOW_QUALITY_TIERS as readonly string[]).includes(input.qualityTier)
+  ) {
+    return {
+      ok: false,
+      created: false,
+      error: `qualityTier 必须是 ${FLOW_QUALITY_TIERS.join(" / ")}（当前 ${JSON.stringify(input.qualityTier)}）`,
+    };
+  }
+  const qualityTier = input.qualityTier;
+  const abs = flowAbsPath(projectRoot, flowId);
+  return serialize(projectRoot, async (): Promise<EnsureFlowSkeletonResult> => {
+    // 1) 已存在任何文件 ⇒ 原样保留（不解析、不比较、绝不覆盖）。
+    try {
+      await readFile(abs);
+      return { ok: true, created: false };
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== "ENOENT") {
+        return {
+          ok: false,
+          created: false,
+          error: `流程骨架检查失败：${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+    }
+    const flow: FlowState = {
+      flowId,
+      version: 1,
+      qualityTier,
+      status: FLOW_SKELETON_STATUS,
+      steps: buildFlowSkeletonSteps(),
+    };
+    const serialized = serializeFlow(flow);
+    const parsed = parseFlowStateYaml(serialized, flowId);
+    if (!parsed.ok) return { ok: false, created: false, error: `流程骨架校验失败：${parsed.error}` };
+    try {
+      await mkdir(path.dirname(abs), { recursive: true });
+      await atomicWrite(abs, serialized);
+    } catch (err) {
+      return {
+        ok: false,
+        created: false,
+        error: `流程骨架写盘失败（原文件未被替换）：${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+    return { ok: true, created: true, revision: sha256(serialized) };
+  }).catch((err) => ({
+    ok: false,
+    created: false,
+    error: `流程骨架创建失败：${err instanceof Error ? err.message : String(err)}`,
+  }));
 }
 
 // —————————————————————— 工厂 ——————————————————————

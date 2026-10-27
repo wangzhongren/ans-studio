@@ -166,7 +166,7 @@ export function evaluateCoordinateGate(
   snapshot: GovernanceLedgerSnapshot,
 ): GovernanceGateDecision {
   if (input.roleId !== "liaison") {
-    return deny("forbidden", "治理门禁：协调消息（coordinate）只能由主理 Lead 发起。");
+    return deny("forbidden", "治理门禁：协调消息（coordinate）只能由产品 Lead 发起。");
   }
   if (input.targetRoleId !== "convener") {
     return deny("forbidden", "治理门禁：Lead 的协调消息目标只能是 Steward/Convener。");
@@ -465,7 +465,7 @@ function evaluateRoleCardGate(
     return deny(
       "appointment-required",
       `治理门禁：角色 ${target} 尚未取得客户任命${input.flowId ? `（流程 ${input.flowId}）` : ""}；` +
-        "请先由 Convener（Steward/统筹）依团队计划发起任命卡并把该角色列入客户选择。",
+        "请先由 Convener（运营/Steward）依团队计划发起任命卡并把该角色列入客户选择。",
     );
   }
   return { allowed: true };
@@ -511,7 +511,7 @@ function evaluateDispatchGate(
       return deny(
         "appointment-required",
         `治理门禁：目标 ${target} 不在流程 ${input.flowId} 的客户任命名单内；` +
-          "请先由 Convener（Steward/统筹）依团队计划取得客户任命（或由客户选择 accept-quick 复用既有角色）。",
+          "请先由 Convener（运营/Steward）依团队计划取得客户任命（或由客户选择 accept-quick 复用既有角色）。",
       );
     }
     if (!isExistingProjectRole(input.projectRoot, target)) {

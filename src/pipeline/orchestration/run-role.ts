@@ -85,6 +85,7 @@ import type {
   RequestAcceptanceFn,
   RequestGateReviewFn,
   RequestBoundaryChangeFn,
+  RequestRequirementChangeFn,
   ViewImageFn,
   HandOffIntentFn,
   RequestClarificationFn,
@@ -260,6 +261,11 @@ import { absRel, compareKey, isAbsoluteAny, isUnderOrEqual, normalizeLexical } f
  * · `handOffIntent` / `requestClarification`（W6-A 意图交接/澄清；未注入 ⇒ 对应工具不注册）——
  *   **只给** Liaison / Rapporteur（能力矩阵 `handOffIntent`/`requestClarification`）。编排先做文件/
  *   去重/每轮一次/两轮澄清上限与账本；能力实现方只负责投递/呈现。**交接 ≠ 客户批准；澄清 ≠ 客户已回答**。
+ * · `requestRequirementChange`（2026-10-26 需求变更申请 `request_requirement_change`；未注入 ⇒ 工具不
+ *   注册）——**只给内置治理角色中的报告员 Rapporteur 与统筹 Convener**（2026-10-26 客户纠正/补充；
+ *   其他内置角色与项目角色不注入）；意图校验/去重/派发/账本/系统行由应用能力实现，编排**纯透传**。
+ *   **提交申请 ≠ 客户批准，也不代表意图已变更**——需求变更审批卡由统筹或报告员发起、发起方不得自批，
+ *   审批人只有判断 agent/客户；主理不审批、只在批准后执行意图变更；提案卡不得承载未批准的新授权。
  * · `shellGate`（I-1 开放 shell + 审批档/只读档；未注入 ⇒ `run_shell` 不注册）——**项目角色**经三层链注入
  *   （`openRoleSession` 收到 `shellOperatorChannel` 时经 `assembleProjectShellGate` 装配）；**内置治理角色**
  *   （客户 2026-10-19 新规则：五个角色＋su 的能力位统一 `shell: "operator-approve"`）经 **审批档**
@@ -337,6 +343,17 @@ export interface AdapterCapabilities {
    * 未注入 ⇒ 工具不注册（结构性 fail-closed）。**澄清 ≠ 客户已回答，不弹决定卡**。
    */
   requestClarification?: RequestClarificationFn;
+  /**
+   * 需求变更申请能力（`request_requirement_change`「注入才注册」，2026-10-26 客户要求 + 同日纠正/补充）。
+   * **只给内置治理角色中的报告员 Rapporteur 与统筹 Convener 注入**（其他内置治理角色、single 的 su 与
+   * 项目角色即便调用方误给也不注入，工具不注册，结构性 fail-closed）。形状单一来源＝契约家
+   * `model/runtime.ts`（`RequestRequirementChangeFn`/`RequestRequirementChangeInput`/
+   * `RequestRequirementChangeResult`）。意图校验/去重/派发/账本/系统行由能力实现，本层**纯透传**。
+   * **提交申请 ≠ 客户批准，也不代表意图已变更**；需求变更审批卡由统筹或提案角色发起，发起方不得自批，
+   * 审批人只有独立判断 agent（「替我决策」开启时）或客户；主理不审批、只在批准后执行意图变更；
+   * 提案卡不得承载未批准的新授权，也不得删除需求绕过。
+   */
+  requestRequirementChange?: RequestRequirementChangeFn;
   shellGate?: ShellGate;
   shellVerdict?: ShellVerdictFn;
   roleStatus?: RoleStatusFn;
@@ -663,6 +680,17 @@ export async function openRoleSession(
      * `clarification.requested`。未给出 ⇒ 工具不注册。**澄清不弹决定卡、不改变任何权力/写权**。
      */
     requestClarification?: RequestClarificationFn;
+    /**
+     * **需求变更申请能力（`request_requirement_change`「注入才注册」，2026-10-26 客户要求 + 同日纠正/补充）**：
+     * 前端（桌面窗口）提供的实现——报告员起草提案时若需要**新的客户授权/范围**（或约束/成本变化），
+     * 不应把未获授权的诉求塞进提案卡「顺带获批」，而应发起需求变更申请。**只对内置治理角色中的
+     * 报告员 Rapporteur 与统筹 Convener 注入**；其它内置治理角色、single 的 su 与项目角色即便调用方
+     * 误给也不注入（工具不注册，结构性 fail-closed）。需求变更审批卡由统筹或报告员发起，发起方不得自批，
+     * 审批人只有独立判断 agent（「替我决策」开启时）或客户；主理不审批、只在批准后执行意图变更。
+     * 意图校验/去重/派发/账本/系统行全部由该能力实现；本层**纯透传**。**提交申请 ≠ 客户批准，
+     * 也不代表意图已变更**。
+     */
+    requestRequirementChange?: RequestRequirementChangeFn;
     /**
      * **G-2 看护自查能力（R1；`role_status`「注入才注册」）**：前端提供的实现（主进程读同源快照＋
      * 诊断尾部 → 结构化文本）。**只对治理角色会话（su）转交**（判据同 `dispatchTask`）；形状单一来源
@@ -1444,6 +1472,17 @@ export async function openRoleSession(
         })
       : undefined;
 
+  // 2026-10-26 需求变更申请（request_requirement_change）：**只给内置治理角色中的报告员 Rapporteur
+  // 与统筹 Convener** 注入（2026-10-26 客户纠正/补充：需求变更审批卡这两个角色都可以发起，发起方不得
+  // 自批）；其它内置治理角色（含 single 模型的旧 su、主理 liaison、Crew/Proof）与项目角色即便调用方
+  // 误给也不注入（工具不注册，结构性 fail-closed）。判据在编排注入端（运行时核心只声明能力位名，不硬
+  // 编码角色 id）；未提供 ⇒ 不注入（同 request_acceptance 先例）。本层纯透传，不做意图校验/去重/派发；
+  // **提交申请 ≠ 客户批准，也不代表意图已变更**。
+  const requestRequirementChange: RequestRequirementChangeFn | undefined =
+    isTrio && (trioSpec?.id === "rapporteur" || trioSpec?.id === "convener") && input.requestRequirementChange !== undefined
+      ? input.requestRequirementChange
+      : undefined;
+
   // G-2 看护三能力（R1/R2）：能力矩阵驱动——仅 `capabilities.roleStatus/sessionTail/proposeRecovery`
   // （trio=Convener；su 旧行为）。未注入 ⇒ 不注入（能力缺席 = 最强 fail-closed）。
   // 承载契约（字段名/形状）单一来源：`common/编排/watchdog.ts`。
@@ -1576,6 +1615,7 @@ export async function openRoleSession(
     ...(requestBoundaryChange !== undefined ? { requestBoundaryChange } : {}),
     ...(handOffIntent !== undefined ? { handOffIntent } : {}),
     ...(requestClarification !== undefined ? { requestClarification } : {}),
+    ...(requestRequirementChange !== undefined ? { requestRequirementChange } : {}),
     ...(roleStatus !== undefined ? { roleStatus } : {}),
     ...(sessionTail !== undefined ? { sessionTail } : {}),
     ...(proposeRecovery !== undefined ? { proposeRecovery } : {}),
@@ -2103,7 +2143,7 @@ function governanceWriteOwnerHint(rel: string): string {
     },
     {
       prefixes: ["docs/acceptance/", "docs/verification/", "docs/governance/verifier/"],
-      guidance: "该路径属 Proof / 验收（Verifier）的写区（实施前标准/验收报告/证据附件）；请交给验收角色。",
+      guidance: "该路径属 质检 / Proof（Verifier）的写区（实施前标准/验收报告/证据附件）；请交给质检角色。",
     },
   ];
   for (const hint of hints) {
@@ -2273,7 +2313,7 @@ function decisionCardRejectionReason(
   const suffix = "本次未向客户发卡、未写账本。请修正后重试。";
   switch (validation.reasonCode) {
     case "role-not-allowed":
-      return `decision 卡只能由统筹/Steward（trio convener）发起（当前角色：${roleId === "" ? "unknown" : roleId}）；${suffix}`;
+      return `decision 卡只能由运营/Steward（trio convener）或策划角色/Draft（trio rapporteur，仅需求变更审批）发起（当前角色：${roleId === "" ? "unknown" : roleId}）；${suffix}`;
     case "not-choice":
       return `decision 卡必须是 request_choice（choice）卡；${suffix}`;
     case "missing-flow-id":
@@ -2627,20 +2667,24 @@ function serializeGovernanceTask<T>(
  *
  * 2026-10-26 客户新增 **decision 卡**（`request_choice(cardKind="decision")`，运行时核心已在
  * Model 契约登记）：事务性选择卡（卡内含**恰一个**推荐项；桌面「替我决策」开启时默认选中推荐项），
- * 由统筹（trio convener）发起。它与提案/任命/验收相互独立：不触发任何 gate/验收、不产生
+ * 由统筹（trio convener）发起；**需求变更审批卡**则由统筹或提案角色（trio rapporteur）发起
+ * （2026-10-26 客户纠正/补充；发起方不得自批，审批人只有判断 agent/客户，主理只执行）。
+ * 它与提案/任命/验收相互独立：不触发任何 gate/验收、不产生
  * appointment/proposal 决定、不进入 `latestAcceptanceDecision`、也不能充当 flow 的
- * `customer-decision` 证据；分类只写 `decisionKind:"material-choice"`，**不得被当成客户批准**。
+ * `customer-decision` 证据；分类只写 `decisionKind:"material-choice"`，**不得被当成提案/验收批准**。
  */
 const TRIO_CARD_KINDS: Record<BuiltInGovernanceRoleSpec["id"], readonly GovernanceCardKind[]> = {
   // 2026-10-18 客户拍板：Liaison（Lead/主理）开通客户通道，只用于 hand_off_intent 前的
   // `intent-confirm` 需求确认卡（判断 agent 永不介入）；其它治理卡仍结构性拒绝。
   liaison: ["intent-confirm"],
-  rapporteur: ["proposal", "write"],
+  // 2026-10-26 客户纠正/补充：报告员可发 **decision 卡，仅限需求变更审批**（发起方不得自批；
+  // 审批人是判断 agent/客户，主理只执行）；提案与写盘卡不变。
+  rapporteur: ["proposal", "write", "decision"],
   // 2026-10-22 第 1 项：Crew（Nominator）只按客户任命的团队计划写卡，不再发 appointment 卡；
   // `appointment-write`（写角色卡/边界）保留。
   nominator: ["appointment-write", "write"],
   // 2026-10-22 第 1 项：Convener（Steward/统筹）依团队计划发起 appointment 卡。
-  // 2026-10-26 客户新增：**仅统筹**可发 decision 卡（事务性选择；卡内含推荐项）。
+  // 2026-10-26 客户新增：统筹可发 decision 卡（材料性选择；需求变更审批卡统筹也可发起）。
   convener: ["appointment", "decision", "schedule-write", "write"],
   // 验收权归 Proof / 验收（verifier）；Draft / 提案不再发 acceptance。
   verifier: ["acceptance", "write"],
@@ -2756,7 +2800,7 @@ function classifyCustomerDecision(
       // 普通写盘确认：不解锁任何治理门禁（无 decisionKind）；仍留痕客户是否同意。
       return { customerDecision: out.value.confirmed === true ? "accepted" : "rejected" };
     case "decision": {
-      // 2026-10-26 decision 卡（事务性选择；仅统筹可发）：**恰好选中一个卡上存在的选项**才分类；
+      // 2026-10-26 decision 卡（事务性选择；统筹或报告员可发，报告员仅限需求变更审批）：**恰好选中一个卡上存在的选项**才分类；
       // 多选/空选/未知选项 ⇒ unclassified/none（fail-closed，客户可重新选择/重发卡）。
       // 分类只写审计的 `material-choice`：不进入 proposal-*/appointment/acceptance 任何语义，
       // 不写 `targetRoleIds`（不伪装成任命），不满足任何 gate/acceptance 门，也不得被当成客户批准。
@@ -3594,6 +3638,11 @@ export function createRuntimeAdapterFactory(
     // `model/runtime.ts`）；`undefined` ⇒ 对应工具不注册（最弱接触面，同 dispatch_task 先例）。
     handOffIntent: capabilities?.handOffIntent,
     requestClarification: capabilities?.requestClarification,
+    // 2026-10-26 需求变更申请（request_requirement_change）：运行时核心 `GovernedToolsOptions` 同名
+    // 能力位（形状同源 `model/runtime.ts` `RequestRequirementChangeFn`）；`undefined` ⇒ 工具不注册
+    // （能力缺席 = 最强 fail-closed，同 request_clarification 先例）。本层纯透传——意图校验/去重/
+    // 派发/账本由能力实现；**提交申请 ≠ 客户批准 ≠ 意图已变更**。
+    requestRequirementChange: capabilities?.requestRequirementChange,
     // G-2/R1-R2：看护三能力并入适配器选项——**契约字段名** `roleStatus` / `sessionTail` /
     // `proposeRecovery`（运行时核心 `GovernedToolsOptions` 同名能力位，形状同源 `model/runtime.ts`）；
     // `undefined` ⇒ 对应工具不注册（能力缺席 = 最强 fail-closed，同 dispatch_task 先例）。

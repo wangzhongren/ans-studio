@@ -70,8 +70,9 @@ export type GovernanceDecisionKind =
   | "intent-confirm"
   | "migration"
   /**
-   * 2026-10-26 客户新增 decision 卡（`request_choice(cardKind="decision")`，**仅统筹可发**）：
-   * 客户对**事务性选择**的作答（卡内含推荐项；桌面「替我决策」开启时默认选中推荐项）。
+   * 2026-10-26 客户新增 decision 卡（`request_choice(cardKind="decision")`；统筹可发，报告员
+   * **仅限需求变更审批**）：客户对**事务性选择**的作答（卡内含推荐项；桌面「替我决策」开启时默认选中
+   * 推荐项）。
    *
    * **不是**提案/任命/验收决定：
    *   · `governance-gate.ts` 的 `PROPOSAL_DECISION_KINDS` / `ACCEPTED_DECISION_KINDS` 与任命写入

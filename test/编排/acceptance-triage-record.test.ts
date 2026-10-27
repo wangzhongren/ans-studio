@@ -499,7 +499,7 @@ function triageLedgerEntry(overrides: Partial<GovernanceLedgerEntry> = {}): Gove
     flowId: FLOW_ID,
     actorRoleId: "app",
     power: "app",
-    messageSummary: "验收分诊：下发统筹修改（blocker 1 / major 0；来源 judge）",
+    messageSummary: "验收分诊：下发运营修改（blocker 1 / major 0；来源 judge）",
     acceptanceTriage: {
       schema: ACCEPTANCE_TRIAGE_DECISION_SCHEMA,
       triageId: `triage-${FLOW_ID}-${REPORT_SHA.slice(0, 8)}`,

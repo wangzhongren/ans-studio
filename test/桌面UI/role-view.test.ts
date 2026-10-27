@@ -19,11 +19,11 @@ const role = (extra: Partial<RoleView> & { roleId: string }): RoleView =>
 
 test("W4/W6-C：五角色纯中文名/权力副标题/内置标识按 governanceFunction 派生", () => {
   const cases: Array<[string, string, string]> = [
-    ["liaison", "主理", "客户沟通 · 不拥有最终批准权"],
-    ["proposal", "提案", "提案权 · 不拥有最终批准权"],
-    ["nomination", "组队", "写卡权（客户任命后） · 不拥有最终批准权"],
-    ["schedule", "统筹", "排期权 · 不拥有最终批准权"],
-    ["verification", "验收", "验收权 · 不拥有最终批准权"],
+    ["liaison", "产品", "客户沟通 · 不拥有最终批准权"],
+    ["proposal", "策划", "提案权 · 不拥有最终批准权"],
+    ["nomination", "人事", "写卡权（客户任命后） · 不拥有最终批准权"],
+    ["schedule", "运营", "排期权 · 不拥有最终批准权"],
+    ["verification", "质检", "验收权 · 不拥有最终批准权"],
   ];
   for (const [fn, name, power] of cases) {
     const view = governanceView(fn);

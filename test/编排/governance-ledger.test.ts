@@ -218,7 +218,7 @@ test("自动派发去重兼容：dispatch.accepted(targetRoleId=verifier, stepId
       flowId: "flow-a",
       stepId: "verification",
       targetRoleId: "verifier",
-      messageSummary: "流程齐备，自动派发 Proof / 验收",
+      messageSummary: "流程齐备，自动派发 质检 / Proof",
     };
     // 旧条目（2026-10-18 前）：无 trigger、actorRoleId=convener——读回必须原样保留、不得报错。
     const legacyDispatch: GovernanceLedgerEntry = {

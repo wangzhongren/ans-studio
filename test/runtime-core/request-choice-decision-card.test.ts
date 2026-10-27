@@ -45,14 +45,16 @@ test("schema（2026-10-26）：request_choice 仅新增 cardKind=decision 与 op
   assert.equal(propertiesOf("request_gate_review")["cardKind"], undefined);
 });
 
-test("schema 文案：decision 卡写明仅统筹、材料性选择范围、恰一个 recommended、替我决策默认推荐、不等于验收/批准、不触发 gate、无 pass", () => {
+test("schema 文案：decision 卡写明仅运营、材料性选择范围、恰一个 recommended、替我决策默认推荐、不等于验收/批准、不触发 gate、无 pass", () => {
   const choice = describeTool("request_choice");
   const description = propertiesOf("request_choice")["cardKind"]!.description ?? "";
   const optionDescription = propertiesOf("request_choice")["options"]!.items!.properties["recommended"]!.description ?? "";
   const text = [choice.description, ...(choice.promptGuidelines ?? []), description, optionDescription].join("\n");
 
-  assert.match(text, /仅统筹（Steward）使用/, "必须写明仅统筹使用");
-  assert.match(text, /主理发现材料性选择/, "必须写明主理不自行决定、交统筹发卡");
+  assert.match(text, /仅运营（Steward）直接调用/, "必须写明仅运营可直接发 decision 卡");
+  assert.match(text, /需求变更审批 decision 卡由应用在 `request_requirement_change` 成功后自动经发起方会话呈现/, "必须写明需求变更审批卡由应用自动呈现");
+  assert.match(text, /不得再调用 `request_choice` 重复发卡/, "必须禁止发起方重复发卡");
+  assert.match(text, /产品发现材料性选择/, "必须写明产品不自行决定、交运营发卡");
   for (const scene of ["演示\/验收证据方式", "范围", "标准\/契约偏离", "成本", "客户可见行为"]) {
     assert.match(text, new RegExp(scene), `材料性选择场景须点名：${scene}`);
   }

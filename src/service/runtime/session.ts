@@ -1,6 +1,6 @@
 // Public Service composition entry. Pipeline selects runtime and injects policy; Providers execute it.
 import { randomUUID, createHash } from "node:crypto";
-import { RuntimeDeliveryError } from "../../model/runtime.ts";
+import { RuntimeDeliveryError, RUNTIME_VIEW_IMAGE_POLICY } from "../../model/runtime.ts";
 import type { ResolvedRole } from "../../model/role.ts";
 import type {
   GovernedToolsOptions, PromptInputEventDetail, PromptOptions, RoleSession, RuntimeAdapter, RuntimeKind, RuntimeProviderFactory,
@@ -17,6 +17,7 @@ import type {
   BackgroundTaskSnapshot,
   BackgroundTaskStopOptions,
   BackgroundTaskStopResult,
+  ViewImageFn,
 } from "../../model/runtime.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import { buildGovernedTools, createDemoRuntimeAdapter } from "../../provider/runtime/tools.ts";
@@ -31,7 +32,7 @@ import { DEFAULT_TURN_LAST_RESORT_MS, createInteractionGate, isAbortError, isTim
 import { REASONING_DIAGNOSTIC_SUMMARY, REASONING_EVENT_SUMMARY, resolveReasoningEffort } from "../../common/runtime-core/reasoning.ts";
 import { createBackgroundTaskManager } from "../../common/runtime-core/background-tasks.ts";
 
-export interface RuntimeSessionOptions extends Omit<GovernedToolsOptions, "currentTurnId" | "roleId" | "runtime" | "interactionGate" | "backgroundTasks"> {
+export interface RuntimeSessionOptions extends Omit<GovernedToolsOptions, "currentTurnId" | "roleId" | "runtime" | "interactionGate" | "backgroundTasks" | "viewImagePolicy"> {
   runtime: RuntimeKind;
   gate: WriteGate;
   projectRoot: string;
@@ -135,6 +136,16 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
       const backgroundTasks = judgeTools === undefined && options.shellGate !== undefined
         ? createBackgroundTaskManager({ diagnostics: options.diagnostics })
         : undefined;
+      // 2026-10-27 同轮看图设计：按运行时策略决定 `view_image` 的交付方式（唯一开关＝
+      // `RUNTIME_VIEW_IMAGE_POLICY[runtime].delivery`）。初始四项均 `next-turn` ⇒ 桌面能力原引用透传、
+      // 工具行为零变化；翻为 `tool-result` 时**不再触达桌面能力**，工具结果直接带图（内联受理回执），
+      // 同轮模式不依赖桌面能力实现。注册门不变：外部未注入 `viewImage` ⇒ 工具不注册（最强 fail-closed）。
+      const viewImagePolicy = RUNTIME_VIEW_IMAGE_POLICY[options.runtime];
+      const toolViewImage: ViewImageFn | undefined = options.viewImage === undefined
+        ? undefined
+        : viewImagePolicy.delivery === "tool-result"
+          ? async () => ({ ok: true, mode: "tool-result" as const })
+          : options.viewImage;
       try {
         // 判断 agent：**能力注入，不是工具注入**——注入 `shellJudge` 时只走 `buildShellJudgeTools`
         // （恰三只只读工具）；注入 `governanceJudge` 时只走 `buildGovernanceJudgeTools`
@@ -149,6 +160,9 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
               ...options,
               // 运行时也覆盖为 Service 自己的管理器（类型已 Omit；JS 调用方即便夹带同名字段也不会被采用）。
               backgroundTasks,
+              // 图片策略同理由 Service 单一决定（RuntimeSessionOptions 已 Omit viewImagePolicy）。
+              viewImage: toolViewImage,
+              viewImagePolicy,
               readRoot: options.readRoot ?? options.projectRoot,
               writeRoot: options.writeRoot,
               shellCwd: options.shellCwd ?? options.projectRoot,

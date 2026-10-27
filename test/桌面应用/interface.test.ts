@@ -287,7 +287,7 @@ test("2026-10-20 看护自动中止接线：内置 Convener 超时 + 决策开�
     const open = await iface.openSession({ projectRoot: "/proj", roleId: "Convener", runtime: "demo" });
     assert.equal(open.ok, true);
     // 让 Convener busy（busySince = 注入时钟）；不推 settled ⇒ 回合持续。
-    assert.equal((await iface.sendSession({ text: "统筹推进" })).ok, true);
+    assert.equal((await iface.sendSession({ text: "运营推进" })).ok, true);
     nowMs += 1_500; // 超过中止时限 1s
     iface.startWatchdog();
     await new Promise((r) => setTimeout(r, 120));
@@ -2105,7 +2105,7 @@ test("治理自动推进：接受提案 → 后台派发提名任务给 Nominato
   // 成功系统行落**当前**聊天流（Rapporteur），措辞按客户要求。
   const notes = events.filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note");
   assert.equal(notes.length, 1);
-  assert.equal(notes[0].event.summary, "已派发提名任务给组队（工作中）");
+  assert.equal(notes[0].event.summary, "已派发提名任务给人事（工作中）");
   await iface.stopSession();
 });
 
@@ -2181,8 +2181,8 @@ test("治理自动推进（真机修正）：accept 先派 Convener 写流程状
     assert.equal(sendsByRole.get("nominator")?.length ?? 0, 0, "流程状态 YAML 落盘前绝不派 Nominator");
     assert.deepEqual(sendsByRole.get("convener"), [
       "流程 flow-a：客户已接受提案 docs/proposals/flow-a-v1.md。" +
-        "请先写流程状态 YAML docs/flows/flow-a.yaml（唯一机器状态，字段/枚举按门禁卡的流程 YAML schema；首个步骤为提名：由组队读取提案并给出候选角色）。" +
-        "同名 .md 仅可选人读视图，不得承载门禁状态。写完后本轮即可结束；提名任务会在流程状态 YAML 落盘后由应用派给组队。不要把步骤说成已派发。",
+        "请先写流程状态 YAML docs/flows/flow-a.yaml（唯一机器状态，字段/枚举按门禁卡的流程 YAML schema；首个步骤为提名：由人事读取提案并给出候选角色）。" +
+        "同名 .md 仅可选人读视图，不得承载门禁状态。写完后本轮即可结束；提名任务会在流程状态 YAML 落盘后由应用派给人事。不要把步骤说成已派发。",
     ], "第一段任务明确要求先写流程状态 YAML、首步提名");
 
     settleConvener!();
@@ -2201,8 +2201,8 @@ test("治理自动推进（真机修正）：accept 先派 Convener 写流程状
       // （2026-10-19 阻塞可见性，落 Lead）。本断言只钉治理推进链的系统行，不把该独立系统行混进来（其内容另测）。
       .filter((summary) => !summary.startsWith("自动验收未派发"));
     assert.deepEqual(notes, [
-      "已派发流程任务给统筹（工作中）",
-      "流程状态 YAML 已落盘，已派发提名任务给组队（工作中）",
+      "已派发流程任务给运营（工作中）",
+      "流程状态 YAML 已落盘，已派发提名任务给人事（工作中）",
     ]);
     await iface.stopSession();
   } finally {
@@ -2249,6 +2249,177 @@ test("2026-10-20 flow 工具文案：YAML 不存在 ⇒ 旧初始创建文案；
   const appointmentExists = buildGovernanceAdvanceMessage(appointment, ["role-a"], { flowStateExists: true })!;
   assert.ok(appointmentExists.includes("flow_step_update") && appointmentExists.includes("推进已批准步骤"), "appointment 已存在 ⇒ flow 工具推进");
   assert.equal(appointmentExists.includes("并派发已批准步骤"), false, "不再让 Convener 直接写 YAML");
+});
+
+test("2026-10-26 流程骨架文案：skeleton / 完整 flow / 无 flow 三态各自正确，既有 flow 工具纪律不变", () => {
+  const accept: GovernanceNextStepPayload = {
+    version: 1,
+    flowId: "flow-sk",
+    cardKind: "proposal",
+    nextFunction: "schedule",
+    roleId: "convener",
+    proposalPath: "docs/proposals/flow-sk-v1.md",
+  };
+  // ① skeleton：应用在意图交接时创建 ⇒ 写团队计划后用一次 schedule-write 替换为完整流程。
+  const skeleton = buildGovernanceAdvanceMessage(accept, undefined, {
+    proposalDecision: "accept",
+    flowStateExists: true,
+    flowStateSkeleton: true,
+  })!;
+  assert.match(skeleton, /status: skeleton/, "文案点明当前只是通用骨架");
+  assert.match(skeleton, /request_confirmation\(cardKind=schedule-write\)/, "替换走既有 schedule-write 确认卡");
+  assert.match(skeleton, /一次性替换/, "替换是一次性的（不是逐步 flow_step_update）");
+  assert.match(skeleton, /保留 contract-freeze 已登记的证据/, "替换必须保留已登记证据");
+  assert.match(skeleton, /替换后去掉 status: skeleton/, "替换后的完整流程不得保留骨架状态");
+  assert.match(skeleton, /不要直接改文件/, "仍禁止绕过写卡直接改文件");
+  assert.doesNotMatch(skeleton, /请先写流程状态 YAML/, "骨架已存在，不再要求初始创建");
+  assert.doesNotMatch(skeleton, /请用 flow_get 读取当前 revision/, "骨架阶段不要求用 flow 工具（会被替换）");
+  // ② 完整 flow：既有 flow 工具纪律逐字不变。
+  const full = buildGovernanceAdvanceMessage(accept, undefined, {
+    proposalDecision: "accept",
+    flowStateExists: true,
+  })!;
+  assert.match(full, /请用 flow_get 读取当前 revision/);
+  assert.match(full, /flow_step_update/);
+  assert.match(full, /不要直接 write_file 流程 YAML/);
+  assert.doesNotMatch(full, /status: skeleton/);
+  assert.doesNotMatch(full, /一次性替换/);
+  // ③ 无 flow：初始创建文案（schedule-write 路径）。
+  const missing = buildGovernanceAdvanceMessage(accept, undefined, { proposalDecision: "accept" })!;
+  assert.match(missing, /请先写流程状态 YAML docs\/flows\/flow-sk\.yaml/);
+  assert.doesNotMatch(missing, /status: skeleton|一次性替换/);
+});
+
+test("2026-10-26 提案接受（Interface）：磁盘上 status: skeleton ⇒ Convener 收到「写团队计划后一次性替换」；文件不被应用改写", async () => {
+  const flowId = "flow-sk";
+  const root = makeTempProjectRoot("ans-advance-skeleton-");
+  try {
+    const skeletonYaml = [
+      `flowId: ${flowId}`,
+      "version: 1",
+      "qualityTier: production",
+      "status: skeleton",
+      "steps:",
+      "  - id: contract-freeze",
+      "    title: 冻结跨角色契约",
+      "    owner: rapporteur",
+      "    kind: artifact",
+      "    status: pending",
+      "  - id: verification",
+      "    title: 最终验收",
+      "    owner: app",
+      "    kind: acceptance",
+      "    status: pending",
+      "",
+    ].join("\n");
+    mkdirSync(path.join(root, "docs", "flows"), { recursive: true });
+    const flowPath = path.join(root, "docs", "flows", `${flowId}.yaml`);
+    writeFileSync(flowPath, skeletonYaml);
+    await appendGovernanceLedger(root, {
+      at: new Date().toISOString(),
+      kind: "customer.decision",
+      flowId,
+      decisionKind: "proposal-accept",
+      customerDecision: "accepted",
+      actorRoleId: "rapporteur",
+      power: "proposal",
+    });
+    const listing: ProjectListing = { ...trioListing(), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: () => {},
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        const sends: string[] = [];
+        sendsByRole.set(input.roleId, sends);
+        return quietGovernanceHandle(sends);
+      },
+      buildProjectConfigFn: buildProjectConfig,
+    });
+    try {
+      await iface.listProject({ projectRoot: root });
+      const result = await iface.advanceGovernanceFlow({
+        payload: {
+          version: 1,
+          flowId,
+          cardKind: "proposal",
+          nextFunction: "schedule",
+          roleId: "convener",
+          proposalPath: `docs/proposals/${flowId}-v1.md`,
+        },
+        context: { sourceRoleId: "rapporteur", projectRoot: root, runtime: "demo" },
+      });
+      assert.equal(result.ok, true, result.error ?? "");
+      const convenerSends = sendsByRole.get("convener") ?? [];
+      assert.equal(convenerSends.length, 1, "Convener 恰收到一条任务");
+      assert.match(convenerSends[0]!, /status: skeleton/);
+      assert.match(convenerSends[0]!, /schedule-write/);
+      assert.match(convenerSends[0]!, /一次性替换/);
+      assert.match(convenerSends[0]!, /保留 contract-freeze 已登记的证据/);
+      assert.match(convenerSends[0]!, /替换后去掉 status: skeleton/);
+      assert.equal(readFileSync(flowPath, "utf8"), skeletonYaml, "应用只读判定骨架，不改写流程 YAML");
+    } finally {
+      await iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-26 提案接受（Interface）：完整 flow（无 skeleton 状态）仍走既有 flow 工具文案", async () => {
+  const flowId = "flow-full";
+  const root = makeTempProjectRoot("ans-advance-fullflow-");
+  try {
+    mkdirSync(path.join(root, "docs", "flows"), { recursive: true });
+    writeFileSync(path.join(root, "docs", "flows", `${flowId}.yaml`), validFlowStateYaml(flowId));
+    await appendGovernanceLedger(root, {
+      at: new Date().toISOString(),
+      kind: "customer.decision",
+      flowId,
+      decisionKind: "proposal-accept",
+      customerDecision: "accepted",
+      actorRoleId: "rapporteur",
+      power: "proposal",
+    });
+    const listing: ProjectListing = { ...trioListing(), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: () => {},
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        const sends: string[] = [];
+        sendsByRole.set(input.roleId, sends);
+        return quietGovernanceHandle(sends);
+      },
+      buildProjectConfigFn: buildProjectConfig,
+    });
+    try {
+      await iface.listProject({ projectRoot: root });
+      const result = await iface.advanceGovernanceFlow({
+        payload: {
+          version: 1,
+          flowId,
+          cardKind: "proposal",
+          nextFunction: "schedule",
+          roleId: "convener",
+          proposalPath: `docs/proposals/${flowId}-v1.md`,
+        },
+        context: { sourceRoleId: "rapporteur", projectRoot: root, runtime: "demo" },
+      });
+      assert.equal(result.ok, true, result.error ?? "");
+      const convenerSends = sendsByRole.get("convener") ?? [];
+      assert.equal(convenerSends.length, 1);
+      assert.match(convenerSends[0]!, /请用 flow_get 读取当前 revision/);
+      assert.match(convenerSends[0]!, /不要直接 write_file 流程 YAML/);
+      assert.doesNotMatch(convenerSends[0]!, /status: skeleton|一次性替换/);
+    } finally {
+      await iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("2026-10-20 flow 工具推进（真机修正）：YAML 已存在且提名已 done ⇒ Convener 拿 flow 工具文案、Nominator 零派发、系统行如实", async () => {
@@ -2338,8 +2509,8 @@ test("2026-10-20 flow 工具推进（真机修正）：YAML 已存在且提名�
     const notes = events
       .filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note")
       .map((e) => e.event.summary);
-    assert.ok(notes.includes("提名已完成，未重复派发；已请统筹继续下一步"), "系统行说明提名已完成、未重复派发");
-    assert.ok(!notes.some((summary) => summary.includes("已派发提名任务给组队")), "不刷「已派发提名任务」的系统行");
+    assert.ok(notes.includes("提名已完成，未重复派发；已请运营继续下一步"), "系统行说明提名已完成、未重复派发");
+    assert.ok(!notes.some((summary) => summary.includes("已派发提名任务给人事")), "不刷「已派发提名任务」的系统行");
     await iface.stopSession();
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -2395,7 +2566,7 @@ test("治理自动推进（真机修正）：Convener 未写流程状态 YAML �
       .filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note")
       .map((e) => e.event.summary);
     assert.equal(notes.length, 2);
-    assert.match(notes[1] ?? "", /自动推进停住：统筹未写出流程状态 YAML/);
+    assert.match(notes[1] ?? "", /自动推进停住：运营未写出流程状态 YAML/);
     // 不循环：再等一拍，Convener 不再收到第二条任务。
     await new Promise((resolve) => setTimeout(resolve, 150));
     assert.equal(sendsByRole.get("convener")?.length, 1, "不重试、不循环派发");
@@ -2659,11 +2830,11 @@ test("任命→Crew 写卡主路径（2026-10-22 第 1 项）：只派 Crew 写�
     const sourceNotes = events
       .filter((e) => e.roleId === "convener" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note")
       .map((e) => e.event.summary);
-    assert.ok(sourceNotes.includes("已派发写卡任务给组队（工作中）"), "写卡派发系统行");
+    assert.ok(sourceNotes.includes("已派发写卡任务给人事（工作中）"), "写卡派发系统行");
     const leadNotes = events
       .filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note")
       .map((e) => e.event.summary);
-    assert.ok(leadNotes.includes("写卡结构校验通过，已派发角色就绪复核给统筹（工作中）"), "readiness 派发系统行（Lead 可见）");
+    assert.ok(leadNotes.includes("写卡结构校验通过，已派发角色就绪复核给运营（工作中）"), "readiness 派发系统行（Lead 可见）");
     const ledger = await readGovernanceLedger(root);
     const dispatches = ledger.entries.filter((entry) => entry.kind === "dispatch.accepted" && entry.flowId === "flow-e");
     assert.ok(dispatches.some((entry) => entry.targetRoleId === "nominator" && entry.stepId === "role-cards"), "账本写卡派发 stepId=role-cards");
@@ -2824,8 +2995,8 @@ test("链式推进（真机 5ms 误报）：派发后会话立即释放、YAML �
     assert.deepEqual(openRoles, ["convener", "nominator"], "YAML 落盘后继续派 Nominator（会话释放不判死）");
     assert.equal(sendsByRole.get("nominator")?.length, 1, "提名任务恰一次");
     assert.deepEqual(advanceChainNotes(events, "rapporteur"), [
-      "已派发流程任务给统筹（工作中）",
-      "流程状态 YAML 已落盘，已派发提名任务给组队（工作中）",
+      "已派发流程任务给运营（工作中）",
+      "流程状态 YAML 已落盘，已派发提名任务给人事（工作中）",
     ], "无「自动推进停住」假错误");
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -2878,7 +3049,7 @@ test("链式推进：一直不落盘 ⇒ 到时限如实失败一次、不派 No
     assert.ok(!openRoles.includes("nominator"), "YAML 未落盘绝不派 Nominator");
     const notes = advanceChainNotes(events, "rapporteur");
     assert.equal(notes.length, 2, "成功一行 + 失败恰一行");
-    assert.match(notes[1] ?? "", /自动推进停住：统筹未写出流程状态 YAML/);
+    assert.match(notes[1] ?? "", /自动推进停住：运营未写出流程状态 YAML/);
     await new Promise((resolve) => setTimeout(resolve, 120));
     assert.equal(advanceChainNotes(events, "rapporteur").length, 2, "失败系统行不刷屏");
     assert.equal(sendsByRole.get("convener")?.length, 1, "不重试、不循环派发");
@@ -2923,7 +3094,7 @@ test("链式推进：Convener 回合一直在跑（busy）到时限仍无 YAML �
     assert.match(result.error ?? "", /本轮未在时限内结束，流程状态 YAML docs\/flows\/flow-a\.yaml 未确认/);
     const notes = advanceChainNotes(events, "rapporteur");
     assert.equal(notes.length, 2);
-    assert.match(notes[1] ?? "", /自动推进停住：统筹本轮未在时限内结束/);
+    assert.match(notes[1] ?? "", /自动推进停住：运营本轮未在时限内结束/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -2988,8 +3159,8 @@ test("链式推进：回合结束后轮询继续等（看护中止/下一投递�
     assert.deepEqual(openRoles, ["convener", "nominator"]);
     assert.equal(sendsByRole.get("nominator")?.length, 1);
     assert.deepEqual(advanceChainNotes(events, "rapporteur"), [
-      "已派发流程任务给统筹（工作中）",
-      "流程状态 YAML 已落盘，已派发提名任务给组队（工作中）",
+      "已派发流程任务给运营（工作中）",
+      "流程状态 YAML 已落盘，已派发提名任务给人事（工作中）",
     ], "中止后恢复：只有成功行，无失败/重复系统行");
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -3054,9 +3225,9 @@ test("任命→Crew 写卡（会话立即释放）：写卡任务不判死；角
     assert.match(sendsByRole.get("convener")![0]!, /role-readiness/);
     // 无「本轮未在时限内结束」假错误；写卡成功行 + readiness 行如实（readiness 系统行落 Lead 主入口）。
     const sourceNotes = advanceChainNotes(events, "convener");
-    assert.ok(sourceNotes.includes("已派发写卡任务给组队（工作中）"));
+    assert.ok(sourceNotes.includes("已派发写卡任务给人事（工作中）"));
     const leadNotes = deliveryNotes(events, "rapporteur");
-    assert.ok(leadNotes.includes("写卡结构校验通过，已派发角色就绪复核给统筹（工作中）"));
+    assert.ok(leadNotes.includes("写卡结构校验通过，已派发角色就绪复核给运营（工作中）"));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -3208,7 +3379,7 @@ async function runHandbackAcceptanceScenario(status: string) {
   };
 }
 
-test("收尾推进：回交送达 Convener 且流程全部完成 ⇒ 派 Proof / 验收 恰一次；重复 settle 不重派", async () => {
+test("收尾推进：回交送达 Convener 且流程全部完成 ⇒ 派 质检 / Proof 恰一次；重复 settle 不重派", async () => {
   const scenario = await runHandbackAcceptanceScenario("done");
   try {
     // 2026-10-20 CI run 39389502551（三平台）：并发负载下 verifier 会话可能晚于夹具返回才打开；
@@ -3223,13 +3394,13 @@ test("收尾推进：回交送达 Convener 且流程全部完成 ⇒ 派 Proof /
     assert.match(verifierSends[0] ?? "", /不要自行验收或代替客户决定/);
     // 系统行在投递成功的同一异步链里 emit；CI 负载下仍可能晚于 send 可见一拍——有界等待，不改文案断言。
     await waitForTest(
-      () => deliveryNoteSummaries(scenario.events, scenario.primaryRoleId).some((note) => /已自动派发验收复核给验收（工作中）/.test(note)),
+      () => deliveryNoteSummaries(scenario.events, scenario.primaryRoleId).some((note) => /已自动派发验收复核给质检（工作中）/.test(note)),
       2000,
     );
     const notes = deliveryNoteSummaries(scenario.events, scenario.primaryRoleId);
     // 2026-10-19 客户反馈：验收复核是标准流程——系统行须说明「自动派发」且不冒充客户批准。
     // 2026-10-19 客户决定：自动验收门反馈统一发给 Lead（主入口 primaryRoleId），不再发 Convener。
-    assert.ok(notes.some((note) => /已自动派发验收复核给验收（工作中）/.test(note)), "Lead 系统行如实告知已自动派发");
+    assert.ok(notes.some((note) => /已自动派发验收复核给质检（工作中）/.test(note)), "Lead 系统行如实告知已自动派发");
     // 2026-10-19 客户决定：自动验收门反馈统一发给 Lead（主入口 primaryRoleId），不再发 Convener。
     // 该场景中 Convener 仍会收到回交/派发类系统行；这里只钉「自动验收反馈」不落 Convener。
     const acceptanceNoteOnConvener = deliveryNoteSummaries(scenario.events, "convener")
@@ -3253,7 +3424,7 @@ test("收尾推进：回交送达 Convener 且流程全部完成 ⇒ 派 Proof /
   }
 });
 
-test("收尾推进：步骤未完成/阻塞 ⇒ 不派 Proof / 验收（保持现状）", async () => {
+test("收尾推进：步骤未完成/阻塞 ⇒ 不派 质检 / Proof（保持现状）", async () => {
   const pending = await runHandbackAcceptanceScenario("pending");
   try {
     // 同类竞态（2026-10-20 CI）：先有界等待本轮收尾门的阻塞系统行——它证明检查已执行完毕；
@@ -3329,7 +3500,7 @@ test("治理自动推进失败：目标角色缺失/发送失败 → 如实错�
   });
   assert.equal(missing.ok, false);
   assert.equal(missing.dispatched, false);
-  assert.match(missing.error ?? "", /组队/);
+  assert.match(missing.error ?? "", /人事/);
   const failureNotes = events.filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note");
   assert.equal(failureNotes.length, 1, "失败如实落一行系统行");
   assert.match(failureNotes[0].event.summary ?? "", /自动推进失败/);
@@ -3367,7 +3538,7 @@ test("治理自动推进失败：目标角色缺失/发送失败 → 如实错�
     context: { sourceRoleId: "rapporteur", projectRoot: "/proj", runtime: "demo" },
   });
   assert.equal(sendFailed.ok, false);
-  assert.match(sendFailed.error ?? "", /发送任务给 组队 失败/);
+  assert.match(sendFailed.error ?? "", /发送任务给 人事 失败/);
   const notes2 = events2.filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note");
   assert.equal(notes2.length, 1);
   assert.match(notes2[0].event.summary ?? "", /自动推进失败/);
@@ -4424,7 +4595,7 @@ test("写卡后推进：appointment-write answered 后 listing 出现目标角�
     const notes = made.events
       .filter((envelope) => envelope.roleId === "rapporteur" && envelope.event.kind === "message" && (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note")
       .map((envelope) => envelope.event.summary);
-    assert.ok(notes.includes("已派发流程任务给统筹（工作中）"), "Lead 看到自动推进系统行");
+    assert.ok(notes.includes("已派发流程任务给运营（工作中）"), "Lead 看到自动推进系统行");
 
     // 去重：重复 appointment-write 触发 + 治理角色 settle 都不重派。
     await made.iface.advanceGovernanceFlow({
@@ -4485,7 +4656,7 @@ test("2026-10-20 写卡产物门控：重试耗尽仍缺文件 ⇒ 反馈 Crew �
       assert.equal(notes.length, 1, "Lead 恰一条系统行（写卡产物未通过校验）");
       assert.equal(notes[0].roleId, "rapporteur", "系统行落 Lead（主入口）");
       assert.match(notes[0].event.summary ?? "", /写卡产物未通过校验/);
-      assert.match(notes[0].event.summary ?? "", /未派统筹/);
+      assert.match(notes[0].event.summary ?? "", /未派运营/);
 
       // 重复 settle + 再次 appointment-write answered：同 flow+问题哈希不重复反馈、仍不派 Convener。
       harness.settles.get("nominator")?.();
@@ -4802,8 +4973,8 @@ test("2026-10-22 写卡校验分流：Crew 文件问题反馈 Crew；团队计�
         .map((e) => e.event.summary)
         .find((summary) => summary.includes("写卡产物未通过校验"));
       assert.ok(leadNote !== undefined, "Lead 可见");
-      assert.match(leadNote!, /组队修正/);
-      assert.match(leadNote!, /统筹补充计划/);
+      assert.match(leadNote!, /人事修正/);
+      assert.match(leadNote!, /运营补充计划/);
     } finally {
       await harness.iface.stopSession();
     }
@@ -5050,7 +5221,7 @@ test("2026-10-22 V12：new 角色计划写集未被 boundary 覆盖 ⇒ 退回 C
       await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) > 0, 5000);
       const feedback = harness.sendsByRole.get("nominator")![0]!;
       assert.match(feedback, /计划写集「src\/other\/」未被 boundary\.yaml entries 覆盖/, "V12 指出未覆盖的计划写集");
-      assert.match(feedback, /报告统筹修正计划/, "Crew 文案给出计划有误时的回归路径");
+      assert.match(feedback, /报告运营修正计划/, "Crew 文案给出计划有误时的回归路径");
       assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "不派 readiness");
       assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "不写 readiness 派发账本");
     } finally {
@@ -5338,7 +5509,7 @@ test("2026-10-23 V12 v3：new 角色授权目录未被 boundary 覆盖 ⇒ 退�
       const feedback = harness.sendsByRole.get("nominator")![0]!;
       assert.match(feedback, /计划授权目录「src\/module-a\/」未被 boundary\.yaml entries 覆盖/, "V12 指出未覆盖的计划授权目录");
       assert.match(feedback, /计划授权目录「src\/module-a\/tests\/」未被 boundary\.yaml entries 覆盖/, "嵌套计划目录同样需要目录条目覆盖");
-      assert.match(feedback, /报告统筹修正计划/, "Crew 文案给出计划有误时的回归路径");
+      assert.match(feedback, /报告运营修正计划/, "Crew 文案给出计划有误时的回归路径");
       assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "V12 失败不派 readiness");
       assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "不写 readiness 派发账本");
     } finally {
@@ -6739,7 +6910,7 @@ test("2026-10-23 readiness 文案兼容：未传新选项时 v1/v2/v3 逐字不�
     });
     assert.ok(extended.startsWith(base), "传入新选项只追加、不改写既有文案");
     assert.match(extended, /应用已在结构校验通过后把 role-cards 标为 done/);
-    assert.match(extended, /只推进 role-readiness，不要重写角色卡、不要重新派组队/);
+    assert.match(extended, /只推进 role-readiness，不要重写角色卡、不要重新派人事/);
     assert.match(extended, /role-readiness 已 done：不要重做角色就绪复核，核对既有记录与证据后继续推进后续步骤/);
   }
 });
@@ -6868,7 +7039,7 @@ test("i18n B3：主进程生成点按当前 locale 取词（en-US）；切回 zh
 
     assert.equal(
       governanceAcceptanceAdvanceNote("f"),
-      "Flow f: all steps are complete; acceptance review was dispatched to Proof automatically (working)",
+      "Flow f: all steps are complete; acceptance review was dispatched to QA automatically (working)",
     );
 
     const saved = await saveRuntimeConfig({ runtime: "demo", updates: {} });
@@ -6884,7 +7055,7 @@ test("i18n B3：主进程生成点按当前 locale 取词（en-US）；切回 zh
     assert.equal(mainT("main.session.releaseNoSession", { roleId: "A" }), "Role A has no open session.");
     assert.equal(
       mainT("main.session.clarificationDelivery", { question: "q" }),
-      "Draft (proposal) needs clarification: q",
+      "Planner (proposal) needs clarification: q",
     );
     assert.equal(
       mainT("main.session.delivery.receivedDispatch", { role: "Crew" }),
@@ -6939,13 +7110,13 @@ test("i18n B3：主进程生成点按当前 locale 取词（en-US）；切回 zh
       "- Step s1 (owner: A, status: dispatched)",
     );
     // 最后两项补 key + 复用角色名：en/zh 逐字。
-    assert.equal(mainT("main.session.dispatchModelNote"), " (trio: Steward or Lead)");
+    assert.equal(mainT("main.session.dispatchModelNote"), " (trio: Operations or Product)");
     assert.equal(
       mainT("main.interface.teamPlanMissingBoundHint", { plan: "docs/scheduling/f-team-v1.md" }),
       " (appointment ledger bound to docs/scheduling/f-team-v1.md)",
     );
-    assert.equal(mainT("ui.role.governance.crew.name"), "Crew");
-    assert.equal(mainT("ui.role.governance.steward.name"), "Steward");
+    assert.equal(mainT("ui.role.governance.crew.name"), "People Ops");
+    assert.equal(mainT("ui.role.governance.steward.name"), "Operations");
     // 复用项的生成点：未知图片类型 → (unknown)；空文件名 → Image。
     const unknownImage = validateImage("", 10);
     assert.equal(unknownImage.ok, false);
@@ -6980,7 +7151,7 @@ test("i18n B3：主进程生成点按当前 locale 取词（en-US）；切回 zh
     );
     assert.equal(
       governanceAcceptanceAdvanceNote("f"),
-      "流程 f 步骤已全部完成，已自动派发验收复核给验收（工作中）",
+      "流程 f 步骤已全部完成，已自动派发验收复核给质检（工作中）",
     );
     assert.equal(mainT("main.session.releaseNoSession", { roleId: "A" }), "角色 A 没有打开的会话。");
     assert.equal(
@@ -6999,13 +7170,13 @@ test("i18n B3：主进程生成点按当前 locale 取词（en-US）；切回 zh
       mainT("main.watchdog.signalSummary", { signal: "命令超时", roleId: "A" }),
       "系统·看护 · 命令超时 · 角色 A",
     );
-    assert.equal(mainT("main.session.dispatchModelNote"), "（trio：统筹或主理）");
+    assert.equal(mainT("main.session.dispatchModelNote"), "（trio：运营或产品）");
     assert.equal(
       mainT("main.interface.teamPlanMissingBoundHint", { plan: "docs/scheduling/f-team-v1.md" }),
       "（账本 appointment 绑定 docs/scheduling/f-team-v1.md）",
     );
-    assert.equal(mainT("ui.role.governance.crew.name"), "组队");
-    assert.equal(mainT("ui.role.governance.steward.name"), "统筹");
+    assert.equal(mainT("ui.role.governance.crew.name"), "人事");
+    assert.equal(mainT("ui.role.governance.steward.name"), "运营");
     const unknownImageZh = validateImage("", 10);
     assert.equal(unknownImageZh.ok, false);
     if (!unknownImageZh.ok) assert.match(unknownImageZh.error, /^图片类型不支持：（未知）——只支持 /);
@@ -7197,8 +7368,8 @@ test("2026-10-24 治理协调唤醒：阻塞阶段→Lead（2026-10-26 系统通
       assert.match(first, /impl 当前状态 failed/, "带具体步骤事实");
       assert.match(first, /协调不是客户批准/, "协调 ≠ 客户批准");
       assert.match(first, /这是系统通知：只向客户汇报/, "2026-10-26：系统消息只向客户汇报");
-      assert.match(first, /不要给统筹 \/ 项目 worker 派发任务，等客户指示/, "2026-10-26：不给统筹/项目 worker 派任务");
-      assert.doesNotMatch(first, /请按你的职责协调统筹与项目 worker/, "旧「请协调」措辞已撤下");
+      assert.match(first, /不要给运营 \/ 项目 worker 派发任务，等客户指示/, "2026-10-26：不给运营/项目 worker 派任务");
+      assert.doesNotMatch(first, /请按你的职责协调运营与项目 worker/, "旧「请协调」措辞已撤下");
       assert.equal((sendsByRole.get("verifier") ?? []).length, 0, "协调唤醒不派 Proof");
       assert.equal((sendsByRole.get("convener") ?? []).length, 0, "协调唤醒不派 Steward");
 
@@ -7570,6 +7741,139 @@ test("2026-10-24 P0-2 ready 唤醒：有 delivered 待核证 ⇒ 本轮只发 de
   }
 });
 
+test("2026-10-27 重启/导入：项目已选 Pi ⇒ gate 恢复系统行不得污染 runtime 提示，ready-wake 必须用 Pi（不得回退 Claude 缺 key）", async () => {
+  const root = makeTempProjectRoot("ans-ready-runtime-");
+  try {
+    const flowId = "flow-ready-runtime";
+    const gateId = "gate-slice";
+    writeReadyWakeFlow(
+      root,
+      flowId,
+      [
+        `flowId: ${flowId}`,
+        "version: 1",
+        "qualityTier: production",
+        "steps:",
+        "  - id: setup",
+        "    title: 准备",
+        "    owner: executor",
+        "    kind: dispatch",
+        "    status: done",
+        "    evidence: { kind: dispatch, ref: setup }",
+        "  - id: contract-freeze",
+        "    title: 契约冻结",
+        "    owner: rapporteur",
+        "    kind: artifact",
+        "    status: done",
+        "    evidence: { kind: artifact, ref: docs/contracts/flow-ready-runtime-api-v1.md }",
+        "  - id: build",
+        "    title: 构建",
+        "    owner: executor",
+        "    kind: dispatch",
+        "    status: pending",
+        "    dependsOn: [contract-freeze, setup]",
+        `  - id: ${gateId}`,
+        "    title: Gate 复核",
+        "    owner: verifier",
+        "    kind: artifact",
+        "    status: pending",
+        "    gateKind: vertical-slice",
+        `    evidence: { kind: artifact, ref: docs/acceptance/${flowId}-${gateId}-report-v1.md }`,
+        "    dependsOn: [setup]",
+        "  - id: verification",
+        "    title: 验收",
+        "    owner: app",
+        "    kind: acceptance",
+        "    status: pending",
+        "",
+      ].join("\n"),
+    );
+    // gate 恢复的先决条件：pass 报告已存在、记录缺失。恢复会先落一条 runtime=claude 的系统行（UI 兜底）。
+    mkdirSync(path.join(root, "docs", "acceptance"), { recursive: true });
+    writeFileSync(
+      path.join(root, "docs", "acceptance", `${flowId}-${gateId}-report-v1.md`),
+      ["# Gate 复核报告", "", "```yaml", "schema: acceptance-triage/v1", "conclusion: pass", "items: []", "```", ""].join("\n"),
+    );
+    // 持久化 runtime-selection：项目已选 Pi（生产路径；不注入 resolveRuntimeFn 的固定结果）。
+    const runtimeStatePath = path.join(root, "runtime-selection.json");
+    writeFileSync(
+      runtimeStatePath,
+      `${JSON.stringify({ version: 1, projects: { [root]: { runtime: "pi", updatedAt: new Date().toISOString() } } }, null, 2)}\n`,
+    );
+    const listing: ProjectListing = { ...listingWithProjectRoles({ ...trioListing(), projectRoot: root }, ["executor"]), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const events: SessionEventEnvelope[] = [];
+    const openAttempts: Array<{ roleId: string; runtime: string }> = [];
+    const resolvedPersisted: Array<string | undefined> = [];
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: (envelope) => { events.push(envelope); },
+      listProjectFn: async () => listing,
+      runtimeStatePath,
+      openRoleSessionFn: async (input) => {
+        openAttempts.push({ roleId: input.roleId, runtime: input.runtime ?? "unknown" });
+        if (input.runtime === "claude") {
+          // 生产真机症状：Claude 无 ANTHROPIC_API_KEY ⇒ 会话打开直接失败。
+          throw new Error("Claude SDK 运行失败：Claude 缺少 API key：ANTHROPIC_API_KEY");
+        }
+        const sends = sendsByRole.get(input.roleId) ?? [];
+        sendsByRole.set(input.roleId, sends);
+        return scriptedGovernanceHandle(sends).handle;
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      // 模拟生产解析器的优先级（活跃/已选/持久化），而非无条件返回 Pi——否则测不出回归。
+      resolveRuntimeFn: async (request) => {
+        resolvedPersisted.push(request.persistedRuntime);
+        if (request.activeRuntime === "pi" || request.selectedRuntime === "pi" || request.persistedRuntime === "pi") {
+          return { ok: true, runtime: "pi", source: "persisted", skipped: [] };
+        }
+        return { ok: true, runtime: "claude", source: "credentials", skipped: [] };
+      },
+    });
+    try {
+      await iface.listProject({ projectRoot: root });
+      // ready-wake 必须成功投出 [自动推进]；gate 恢复也在同一次导入扫描中完成。
+      await waitForTest(() => (sendsByRole.get("convener") ?? []).some((text) => text.startsWith("[自动推进]")), 5000);
+      const gateRecordPath = path.join(root, ".ans", "governance", "acceptance", flowId, "gates", `${gateId}.json`);
+      await waitForTest(() => {
+        try {
+          return (JSON.parse(readFileSync(gateRecordPath, "utf8")) as { status?: string }).status === "passed";
+        } catch {
+          return false;
+        }
+      }, 5000);
+
+      assert.ok(
+        openAttempts.some((attempt) => attempt.roleId === "convener" && attempt.runtime === "pi"),
+        "ready-wake 的运营会话必须开在项目已选的 Pi 上",
+      );
+      assert.equal(
+        openAttempts.some((attempt) => attempt.runtime === "claude"),
+        false,
+        "项目已选 Pi 时不得用 Claude 开会话（真机会因缺 ANTHROPIC_API_KEY 失败）",
+      );
+      assert.ok(
+        resolvedPersisted.includes("pi"),
+        "解析器必须收到持久化的 Pi 选择（而不是被 UI 系统行的 claude 兜底抢先）",
+      );
+      // 复现污染源：gate 恢复系统行确实以 UI 兜底 runtime=claude 发出，但不得写入引擎提示。
+      assert.ok(
+        events.some(
+          (envelope) =>
+            envelope.runtime === "claude" &&
+            envelope.event.kind === "message" &&
+            (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
+        ),
+        "夹具包含 runtime=claude 的 delivery-note 系统行（回归场景）",
+      );
+    } finally {
+      await iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("2026-10-24 所有变更独立验收（Interface）：非发布流程同样派 verifier/Proof；release 仅为元数据", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "ans-interface-release-gate-"));
   try {
@@ -7689,7 +7993,7 @@ test("2026-10-24 所有变更独立验收（Interface）：非发布流程同样
         "release 标记不产生等待行",
       );
       await waitForTest(
-        () => deliveryNoteSummaries(events, "rapporteur").some((note) => /已自动派发验收复核给验收/.test(note)),
+        () => deliveryNoteSummaries(events, "rapporteur").some((note) => /已自动派发验收复核给质检/.test(note)),
         4000,
       );
       // flow 不被应用改写：release 保持、验收步骤保持 pending（不自动标 done）。
