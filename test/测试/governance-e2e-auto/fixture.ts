@@ -1171,6 +1171,12 @@ export interface AdapterOptions {
   onPrompt?: (ctx: ScriptContext) => void | Promise<void>;
   onResult?: (record: ToolResultRecord) => void;
   /**
+   * 2026-10-27 gate 退回路由 e2e（本角色新增，**默认 false ⇒ 既有用例工具面逐字不变**）：
+   * 把编排透传的 `caps.requestGateReview` 原样转交 `buildGovernedTools`——脚本角色（统筹）才能调用
+   * `request_gate_review`。未开启时该工具不注册（与产品「未注入即不注册」同口径）。
+   */
+  forwardRequestGateReview?: boolean;
+  /**
    * 2026-10-25 验收分诊/独立复核 e2e（本角色新增，**默认 false ⇒ 既有用例工具面逐字不变**）：
    * 把编排透传的 `caps.requestAcceptance` 原样转交 `buildGovernedTools`——脚本角色才能调用
    * `request_acceptance`。未开启时该工具不注册（与产品「未注入即不注册」同口径）。
@@ -1248,6 +1254,10 @@ export function scriptedAdapterFactory(options: AdapterOptions): (gate: WriteGat
           // 2026-10-25 request_acceptance e2e（opt-in）：仅显式开启时透传，既有用例零变化。
           ...(options.forwardRequestAcceptance === true && caps?.requestAcceptance !== undefined
             ? { requestAcceptance: caps.requestAcceptance }
+            : {}),
+          // 2026-10-27 gate 退回路由 e2e（opt-in）：仅显式开启时透传，既有用例零变化。
+          ...(options.forwardRequestGateReview === true && caps?.requestGateReview !== undefined
+            ? { requestGateReview: caps.requestGateReview }
             : {}),
         });
         const byName = new Map(tools.map((tool) => [tool.name, tool]));
@@ -1541,6 +1551,8 @@ export interface HarnessOptions {
   wireAcceptanceTriage?: boolean;
   /** 同 `AdapterOptions.forwardRequestAcceptance`（脚本会话可调用 `request_acceptance`；缺省 false）。 */
   forwardRequestAcceptance?: boolean;
+  /** 同 `AdapterOptions.forwardRequestGateReview`（脚本会话可调用 `request_gate_review`；缺省 false）。 */
+  forwardRequestGateReview?: boolean;
 }
 
 export async function makeHarness(options: HarnessOptions): Promise<Harness> {
@@ -1628,6 +1640,7 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
     onResult: (record) => results.push(record),
     ...(options.scriptForRole !== undefined ? { scriptForRole: options.scriptForRole } : {}),
     ...(options.forwardRequestAcceptance === true ? { forwardRequestAcceptance: true } : {}),
+    ...(options.forwardRequestGateReview === true ? { forwardRequestGateReview: true } : {}),
   });
 
   // 观测「编排 guardedInput → 原始客户通道」的调用（2026-10-22 守卫验证）：

@@ -1468,11 +1468,27 @@ export const zhCN = {
   "main.gateReview.rejected":
     "流程 {flowId}：gate {gateId} 复核请求被拒（{detail}）；请按原因修正后重交，不原样重试。",
   "main.gateReview.passNote":
-    "流程 {flowId}：gate {gateId} 已通过（报告 {reportPath}）；可继续下游，仍须最终客户验收。",
+    "流程 {flowId}：gate {gateId} 已通过（报告 {reportPath}），已按路由转交统筹（投递结果另行如实说明）；可继续下游，仍须最终客户验收。",
   "main.gateReview.failNote":
     "流程 {flowId}：gate {gateId} 未通过（{severity}；报告 {reportPath}）；gate 保持 pending，返工后需重新请求复核。",
   "main.gateReview.returnedToProof":
-    "流程 {flowId}：gate {gateId} 报告缺失或结构不合规（{detail}）；已退回质检补充，未判通过、未路由返工。",
+    "流程 {flowId}：gate {gateId} 报告缺失或结构不合规（{detail}）；已退回质检补充并通知统筹，投递结果另行如实说明；未判通过、未路由返工。",
+  // 2026-10-27 gate 退回/通过路由（方案 v3.2 §3.1/§3.2/§3.6、Q10 A）：投递结果键。
+  // {detail} = 有界接收方/错误摘要（不附报告正文、凭据、命令原文）；排队视为已投递。
+  "main.gateReview.returnedRouted":
+    "流程 {flowId}：gate {gateId} 的退回通知已投递或已排队（排队视为已投递）；应用未判通过、未路由返工，将在新报告版本出现或统筹重新请求后继续处置。",
+  "main.gateReview.returnedRouteFailed":
+    "流程 {flowId}：gate {gateId} 的退回通知未完全送达（{detail}）；应用未声称已通知，稍后自动重试，超过上限需人工核对；未判通过、未路由返工。",
+  "main.gateReview.reportUnreadable":
+    "流程 {flowId}：gate {gateId} 报告存在但当前不可读（{reportPath}）；已提醒质检检查可读性并通知统筹，记录保持已派发（未退回、未判通过）。",
+  "main.gateReview.reportUnreadableDeliveryFailed":
+    "流程 {flowId}：gate {gateId} 报告存在但当前不可读（{reportPath}）；提醒或知情通知未完全送达（{detail}）；记录保持已派发，稍后自动重试，超过上限需人工核对。",
+  "main.gateReview.passHandoffSent":
+    "流程 {flowId}：gate {gateId} 已通过，通过转交已投递或已排队给统筹（排队视为已投递）；下游派发仍由统筹执行，gate 通过 ≠ 最终验收 ≠ 客户批准。",
+  "main.gateReview.passHandoffFailed":
+    "流程 {flowId}：gate {gateId} 已通过，但向统筹的通过转交未送达（{detail}）；应用未声称已转交，稍后自动重试，超过上限需人工核对；通用自动推进仍可兜底。",
+  "main.gateReview.routingRecordUnusable":
+    "流程 {flowId}：gate {gateId} 的路由记录损坏且无法重建（{detail}）；应用已停止自动通知（fail-closed），未声称已送达，请人工核对 gate 记录与报告。",
   "main.gateReview.nitOnly":
     "流程 {flowId}：gate {gateId} 的 fail 只含 minor/nit；gate 失败必须以 blocker/major 为依据，已按结构不符退回质检，不触发返工。",
   "main.gateReview.reportMissing":

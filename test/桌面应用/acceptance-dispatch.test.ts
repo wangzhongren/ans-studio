@@ -44,13 +44,19 @@ import {
   acceptanceDispatchRecorded,
   acceptanceLastDispatchAtMs,
   buildAcceptanceTaskMessage,
+  buildGatePassHandoffTaskMessage,
+  buildGateReportCorrectionTaskMessage,
+  buildGateReportReminderTaskMessage,
+  buildGateReturnConvenerTaskMessage,
   flowCompletionIssue,
   flowStepEvidenceKind,
   flowStepHasEvidence,
+  GATE_REPORT_FORMAT_REQUIREMENTS,
   governanceAcceptanceBlockedNote,
   governanceFlowStatePath,
   governanceGateReviewReportPath,
   type FlowCompletionLedgerEntryLike,
+  type GateReportCorrectionTaskInput,
 } from "../../app/desktop/governance-advance.ts";
 import { createCustomerInputChannel, type AcceptanceTriageGateFacts } from "../../app/desktop/customer-input.ts";
 // 2026-10-27 report_artifact_ready：契约单一来源＝运行时核心（ReportArtifactFn/Input/Receipt）；
@@ -72,6 +78,7 @@ import {
   readAcceptanceTriageRecord,
   recommendAcceptanceTriage,
   writeAcceptanceTriageRecord,
+  type ReadyFlowStep,
 } from "../../src/pipeline/orchestration/flow-state.ts";
 import {
   appendGovernanceLedger,
@@ -283,6 +290,10 @@ async function makeHarness(
     requestGateReviewLimits?: DesktopDeps["requestGateReviewLimits"];
     /** 2026-10-27 report_artifact_ready：整体能力注入面（缺省真实桌面实现；测试可替换）。 */
     reportArtifact?: DesktopDeps["reportArtifact"];
+    /** 2026-10-27 gate 复核：`completeGateStep` 收口出口（测试可注入桩件，模拟 missing/unobservable 等 code）。 */
+    completeGateStep?: DesktopDeps["completeGateStepFn"];
+    /** 2026-10-27 S6 返工：路由记录写失败故障注入（生产缺省 = writeGateJson）。 */
+    gateHandoffWriteJsonFn?: DesktopDeps["gateHandoffWriteJsonFn"];
     /** 2026-10-27 流程推进/停滞看护：watchdog tick 配置（测试驱动 tick）。 */
     watchdogOptions?: DesktopDeps["watchdogOptions"];
     /** 2026-10-27 停滞兜底阈值（测试注入短值）。 */
@@ -307,7 +318,7 @@ async function makeHarness(
       if (options.failOpenRoles?.has(input.roleId) === true) {
         throw new Error(`模拟打开 ${input.roleId} 会话失败`);
       }
-      const sends: string[] = [];
+      const sends = sendsByRole.get(input.roleId) ?? [];
       sendsByRole.set(input.roleId, sends);
       const made = scriptedHandle(sends);
       if (options.hangVerifierSend === true && input.roleId === "verifier") {
@@ -354,6 +365,8 @@ async function makeHarness(
       : {}),
     ...(options.handOffIntentLimits !== undefined ? { handOffIntentLimits: options.handOffIntentLimits } : {}),
     ...(options.requestGateReviewLimits !== undefined ? { requestGateReviewLimits: options.requestGateReviewLimits } : {}),
+    ...(options.completeGateStep !== undefined ? { completeGateStepFn: options.completeGateStep } : {}),
+    ...(options.gateHandoffWriteJsonFn !== undefined ? { gateHandoffWriteJsonFn: options.gateHandoffWriteJsonFn } : {}),
     // 2026-10-27 report_artifact_ready：能力替换与 flow tick 触发面（缺省真实实现）。
     ...(options.reportArtifact !== undefined ? { reportArtifact: options.reportArtifact } : {}),
     ...(options.watchdogOptions !== undefined ? { watchdogOptions: options.watchdogOptions } : {}),
@@ -5684,7 +5697,8 @@ test("2026-10-27 gate 恢复：pass 报告已存在但 gate 记录缺失 ⇒ 导
       await waitFor(() => {
         try {
           const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
-          return parsed.ok && parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status === "done";
+          const rec = readGateRecordFile(root, GATE_FLOW_ID);
+          return parsed.ok && parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status === "done" && rec.status === "passed";
         } catch {
           return false;
         }
@@ -5741,8 +5755,8 @@ test("2026-10-27 gate 恢复：pass 报告已存在但 gate 记录缺失 ⇒ 导
       );
       assert.equal(
         deliveryNotes(harness.events, "liaison").filter((note) => note.includes(GATE_STEP_ID) && note.includes("已通过")).length,
-        1,
-        "pass 系统行不重复",
+        2,
+        "pass 事实行 + 通过转交结果行各一条（重复 settle 不重复）",
       );
     } finally {
       await harness.iface.stopSession();
@@ -6748,6 +6762,1945 @@ test("2026-10-27 停滞看护：无 current + pending>0 + 全空闲持续超阈�
       const ledger = await readGovernanceLedger(root);
       assert.equal(ledger.entries.some((entry) => entry.kind === "dispatch.accepted"), false, "不替客户/统筹派发");
       harness.iface.stopWatchdog();
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————————————— 2026-10-27 gate 退回重报 / 报告不可读提醒 / 通过转交：纯文案构建器单测 ——————————————
+// 方案 v3.2 §3.1.2/§3.1.3/§3.2/§4.3：任务文本是 agent 任务文本（不是客户 UI 文案）；应用只做机械校验与
+// 路由，不判通过、不改报告、不写 flow/账本/customer.decision。任务只带错误摘要与路径指针——不附报告
+// 正文、凭据或命令原文。本段只测纯函数（无 IO、无会话）。
+
+const GATE_HANDOFF_REVISION = "0123456789abcdef".repeat(4);
+
+function gateCorrectionInput(overrides: Partial<GateReportCorrectionTaskInput> = {}): GateReportCorrectionTaskInput {
+  return {
+    flowId: GATE_FLOW_ID,
+    gateId: GATE_STEP_ID,
+    gateKind: "vertical-slice",
+    gateTitle: "垂直切片 gate",
+    criteriaPath: "docs/acceptance/flow-gate-review-criteria-v1.md",
+    flowRevision: GATE_HANDOFF_REVISION,
+    requestId: "req-gate-001",
+    cause: "report-invalid",
+    previousReportPath: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`,
+    previousReportVersion: 1,
+    previousReportSha256: "a".repeat(64),
+    nextReportPath: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v2.md`,
+    nextReportVersion: 2,
+    errors: [{ path: "$", message: "YAML 语法错误：Plain value cannot start with reserved character `，line 26, column 13" }],
+    ...overrides,
+  };
+}
+
+test("2026-10-27 gate 补正任务：字段齐全（身份/标准/候选/上一报告/可执行错误/格式要求/下一版本）且无禁止表述", () => {
+  const task = buildGateReportCorrectionTaskMessage(gateCorrectionInput());
+  assert.match(task, /^\[Gate 报告补正\]/);
+  for (const needle of [
+    `流程 ${GATE_FLOW_ID}`,
+    `gate ${GATE_STEP_ID}`,
+    "gateKind=vertical-slice",
+    "垂直切片 gate",
+    "docs/acceptance/flow-gate-review-criteria-v1.md",
+    "Gate 复核标准节",
+    GATE_HANDOFF_REVISION,
+    `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md（v1）`,
+    `sha256 ${"a".repeat(64)}`,
+    "$: YAML 语法错误",
+    "line 26, column 13",
+    `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v2.md（v2`,
+    "acceptance-triage/v1",
+    "恰好一个 fenced YAML 段",
+    "conclusion",
+    "blocker/major",
+    "requestId req-gate-001",
+    "同一轮 gate 复核",
+    "不是统筹的新请求、不是客户消息、不是新一轮复核",
+    "不要标任何 flow 步骤 done",
+    "不写 flow / 账本 / customer.decision",
+    "不附报告正文、凭据或命令原文",
+  ]) {
+    assert.ok(task.includes(needle), `补正任务必须包含「${needle}」`);
+  }
+  assert.ok(GATE_REPORT_FORMAT_REQUIREMENTS.length >= 6, "通用格式要求清单应覆盖结构要点");
+  for (const forbidden of ["应用已接受", "应用已通过", "要求改判 pass"]) {
+    assert.equal(task.includes(forbidden), false, `补正任务不得包含「${forbidden}」`);
+  }
+  // 不附报告正文/凭据/命令原文：即使调用方误塞入这类字段，构建器也不渲染。
+  const withLeak = buildGateReportCorrectionTaskMessage({
+    ...gateCorrectionInput(),
+    reportBody: "报告正文标记-BODY",
+    credentials: "sk-test-SECRET",
+    command: "curl -H Authorization",
+  } as GateReportCorrectionTaskInput);
+  for (const leak of ["报告正文标记-BODY", "sk-test-SECRET", "curl -H Authorization"]) {
+    assert.equal(withLeak.includes(leak), false, "补正任务不得附带报告正文/凭据/命令原文");
+  }
+});
+
+test("2026-10-27 gate 补正任务：可执行原因最多渲染 5 条（其余有界省略，不静默）", () => {
+  const errors = Array.from({ length: 7 }, (_, index) => ({
+    path: `items[${index}].reason`,
+    message: `错误 ${index}`,
+  }));
+  const task = buildGateReportCorrectionTaskMessage(gateCorrectionInput({ errors }));
+  for (let index = 0; index < 5; index += 1) {
+    assert.ok(task.includes(`items[${index}].reason: 错误 ${index}`), `前 5 条错误必须逐条列出（第 ${index} 条）`);
+  }
+  assert.equal(task.includes("items[5].reason: 错误 5"), false, "第 6 条不展开");
+  assert.ok(task.includes("另有 2 条错误未展开"), "省略必须如实说明条数");
+});
+
+test("2026-10-27 gate 补正任务（R5 版本偏旧）：按 expectedReportVersion 写，不是“最新+1”", () => {
+  const task = buildGateReportCorrectionTaskMessage(
+    gateCorrectionInput({
+      cause: "version-older",
+      expectedReportVersion: 3,
+      nextReportPath: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v3.md`,
+      nextReportVersion: 3,
+    }),
+  );
+  assert.ok(task.includes("派发要求版本：v3"), "R5 必须渲染派发要求的版本");
+  assert.ok(task.includes("不是“最新+1”"), "R5 必须明确不是最新+1");
+  assert.ok(task.includes(`report-v3.md（v3`), "下一份报告按 expectedReportVersion");
+  assert.equal(task.includes("report-v4"), false, "不得写成最新+1");
+});
+
+test("2026-10-27 gate 补正任务（R4 仅 minor/nit）：要求按标准重判，应用不替质检做结论", () => {
+  const task = buildGateReportCorrectionTaskMessage(gateCorrectionInput({ cause: "nonblocking-fail", errors: [] }));
+  for (const needle of [
+    "若确实没有 blocker/major，可改为 pass 并保留 minor/nit 备注",
+    "若确有 blocker/major，必须如实列明依据并保持 fail",
+    "应用不替你做结论",
+  ]) {
+    assert.ok(task.includes(needle), `R4 补正任务必须包含「${needle}」`);
+  }
+  assert.equal(task.includes("应用已接受"), false);
+});
+
+test("2026-10-27 gate 报告提醒：R2b/O1 cause 不同（标题/指令不同）；声明记录仍 dispatched、未判退回/通过", () => {
+  const common = {
+    flowId: GATE_FLOW_ID,
+    gateId: GATE_STEP_ID,
+    gateKind: "vertical-slice",
+    reportPath: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`,
+    reportVersion: 1,
+  };
+  const unreadable = buildGateReportReminderTaskMessage({
+    ...common,
+    cause: "report-unreadable",
+    detail: "EISDIR: illegal operation on a directory, read",
+  });
+  const early = buildGateReportReminderTaskMessage({
+    ...common,
+    cause: "report-missing-early",
+    detail: "派发后尚未发现请求版本报告",
+  });
+  assert.match(unreadable, /^\[Gate 报告不可读提醒\]/);
+  assert.match(early, /^\[Gate 报告提醒\]/, "O1 与 R2b 标题必须区分");
+  assert.ok(unreadable.includes("读取权限"), "R2b 要求检查可读性");
+  assert.ok(unreadable.includes("重写为可读报告"));
+  assert.ok(early.includes("补交"), "O1 要求按请求版本补交");
+  assert.equal(unreadable.includes("若你仍在撰写"), false, "R2b 不套用缺报告文案");
+  assert.equal(early.includes("读取权限"), false, "O1 不套用不可读文案");
+  for (const task of [unreadable, early]) {
+    for (const needle of [
+      "仍为 dispatched",
+      "未判退回",
+      "也未判通过",
+      "gate 步骤保持 pending",
+      "不是退回记录",
+      "不要标任何 flow 步骤 done",
+      "不写 flow / 账本 / customer.decision",
+    ]) {
+      assert.ok(task.includes(needle), `提醒任务必须包含「${needle}」`);
+    }
+    for (const forbidden of ["应用已接受", "应用已通过"]) {
+      assert.equal(task.includes(forbidden), false, `提醒任务不得包含「${forbidden}」`);
+    }
+  }
+});
+
+test("2026-10-27 统筹退回任务：四类动作标题/下一步正确，质检投递结果如实，声明未替统筹派发", () => {
+  const base = {
+    flowId: GATE_FLOW_ID,
+    gateId: GATE_STEP_ID,
+    gateKind: "vertical-slice",
+    reasonSummary: "报告缺少 acceptance-triage/v1 段",
+  };
+  const monitor = buildGateReturnConvenerTaskMessage({
+    ...base,
+    cause: "report-invalid",
+    action: "monitor",
+    reportPath: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`,
+    reportVersion: 1,
+    verifierDeliveryOutcome: { status: "sent" },
+  });
+  assert.match(monitor, /^\[Gate 退回\]/);
+  for (const needle of [
+    `流程 ${GATE_FLOW_ID}`,
+    `gate ${GATE_STEP_ID}`,
+    "报告缺少 acceptance-triage/v1 段",
+    "质检补正任务投递结果：已投递",
+    "gate 记录已置 returned-to-proof",
+    "不需要重新派发质检",
+    "不要标 gate done",
+    "应用未替统筹派发任何 flow 步骤",
+  ]) {
+    assert.ok(monitor.includes(needle), `统筹退回任务必须包含「${needle}」`);
+  }
+  const queued = buildGateReturnConvenerTaskMessage({
+    ...base,
+    cause: "report-invalid",
+    action: "monitor",
+    verifierDeliveryOutcome: { status: "queued", detail: "质检忙" },
+  });
+  assert.ok(queued.includes("已排队"));
+  assert.ok(queued.includes("排队 ≠ 已执行"));
+  const failed = buildGateReturnConvenerTaskMessage({
+    ...base,
+    cause: "report-invalid",
+    action: "monitor",
+    verifierDeliveryOutcome: { status: "failed", detail: "打开质检会话失败" },
+  });
+  assert.ok(failed.includes("未送达"));
+  assert.ok(failed.includes("有界重试"), "失败必须如实并说明重试");
+
+  const rerequest = buildGateReturnConvenerTaskMessage({
+    ...base,
+    cause: "candidate-changed",
+    action: "re-request",
+    detail: "旧候选 revision=aaa；当前 revision=bbb",
+  });
+  assert.match(rerequest, /^\[Gate 退回·需重新请求\]/);
+  assert.ok(rerequest.includes(`request_gate_review({ flowId: "${GATE_FLOW_ID}", gateId: "${GATE_STEP_ID}" })`));
+  assert.ok(rerequest.includes("flow-busy"));
+  assert.ok(rerequest.includes("本次未向质检发送任务"), "R6 不向质检发送");
+  assert.ok(rerequest.includes("旧报告不用于放行"));
+
+  const human = buildGateReturnConvenerTaskMessage({ ...base, cause: "report-invalid", action: "human", rounds: 3 });
+  assert.match(human, /^\[Gate 退回·需人工\]/);
+  assert.ok(human.includes("连续 3 轮"));
+  assert.ok(human.includes("已停止自动补正"));
+  assert.ok(human.includes("flow_step_supersede"));
+  assert.ok(human.includes("不会自动通过"));
+
+  const legacy = buildGateReturnConvenerTaskMessage({
+    ...base,
+    cause: "legacy",
+    action: "legacy",
+    reasonSummary: "旧记录 error 摘要",
+  });
+  assert.match(legacy, /^\[Gate 退回·历史记录\]/);
+  assert.ok(legacy.includes("旧记录 error 摘要"));
+  assert.ok(legacy.includes("不自动派质检"));
+
+  const reminderNotice = buildGateReturnConvenerTaskMessage({
+    ...base,
+    cause: "report-unreadable",
+    action: "monitor",
+    verifierDeliveryOutcome: { status: "sent" },
+  });
+  assert.match(reminderNotice, /^\[Gate 报告不可读提醒\]/, "R2b 统筹知情标题与退回区分");
+  assert.ok(reminderNotice.includes("仍为 dispatched"));
+  assert.ok(reminderNotice.includes("未判退回、未判通过"));
+  assert.ok(reminderNotice.includes("质检提醒投递结果：已投递"));
+
+  for (const task of [monitor, queued, failed, rerequest, human, legacy, reminderNotice]) {
+    for (const forbidden of ["应用已接受", "应用已通过"]) {
+      assert.equal(task.includes(forbidden), false, `统筹任务不得包含「${forbidden}」`);
+    }
+    assert.ok(task.includes("本消息由应用按 gate 记录机械发送"), "统筹任务必须声明应用来源");
+    assert.ok(task.includes("gate 未收口前不要派下游依赖步骤、不要标 gate done"), "统筹任务必须提醒不要派下游/标 gate done");
+  }
+});
+
+test("2026-10-27 gate 通过转交：你可派发/仅知情分组、行动要求与「gate 通过 ≠ 验收 ≠ 客户批准」声明", () => {
+  const dispatchable: ReadyFlowStep[] = [
+    { id: "delivery-api", title: "交付 API", owner: "executor", kind: "dispatch", dependsOn: [GATE_STEP_ID] },
+    { id: "change-package", title: "变更包", owner: "convener", kind: "artifact", dependsOn: [], parallelGroup: "reduce" },
+  ];
+  const informational: ReadyFlowStep[] = [
+    { id: "gate-visual-baseline", title: "视觉基线 gate", owner: "verifier", kind: "artifact", dependsOn: [], parallelGroup: "gates" },
+  ];
+  const task = buildGatePassHandoffTaskMessage({
+    flowId: GATE_FLOW_ID,
+    gateId: GATE_STEP_ID,
+    gateKind: "vertical-slice",
+    reportPath: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`,
+    reportVersion: 1,
+    reportSha256: "b".repeat(64),
+    flowRevision: GATE_HANDOFF_REVISION,
+    stewardDispatchable: dispatchable,
+    informational,
+    readyDedupeIds: ["delivery-api", "change-package", "gate-visual-baseline"],
+  });
+  assert.match(task, /^\[Gate 通过\]/);
+  for (const needle of [
+    `流程 ${GATE_FLOW_ID}`,
+    `gate ${GATE_STEP_ID}`,
+    "gateKind=vertical-slice",
+    `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md（v1`,
+    `sha256 ${"b".repeat(64)}`,
+    `收口后的 flow revision：${GATE_HANDOFF_REVISION}`,
+    "gate 通过 ≠ 最终验收通过 ≠ 客户批准",
+    "你可派发",
+    "仅知情",
+    "owner=executor",
+    "owner=convener",
+    "owner=verifier",
+    "parallelGroup=reduce",
+    "先 flow_get 读取当前流程与账本",
+    "用既有 dispatch_task 按 owner 派发",
+    "同一 parallelGroup 可并行",
+    "账本已有 dispatch.accepted 的步骤不要重复派",
+    "不要标 gate done、不要派 acceptance / 质检",
+    "应用未派发任何 worker、未改 flow（除 gate 收口）",
+  ]) {
+    assert.ok(task.includes(needle), `通过转交必须包含「${needle}」`);
+  }
+  const dispatchSection = task.split("仅知情")[0]!;
+  assert.ok(dispatchSection.includes("delivery-api"));
+  assert.ok(dispatchSection.includes("change-package"));
+  assert.equal(dispatchSection.includes("gate-visual-baseline"), false, "仅知情步骤不得列入你可派发");
+  const infoSection = task.split("仅知情")[1]!;
+  assert.ok(infoSection.includes("gate-visual-baseline"));
+  assert.equal(infoSection.includes("delivery-api"), false, "你可派发步骤不得混入仅知情");
+});
+
+test("2026-10-27 gate 通过转交：无统筹可执行步骤 ⇒ 明确原因（含 stopReason），仍如实发送不伪造 ready", () => {
+  const task = buildGatePassHandoffTaskMessage({
+    flowId: GATE_FLOW_ID,
+    gateId: GATE_STEP_ID,
+    gateKind: "vertical-slice",
+    reportPath: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`,
+    reportVersion: 1,
+    reportSha256: "c".repeat(64),
+    flowRevision: GATE_HANDOFF_REVISION,
+    stewardDispatchable: [],
+    informational: [],
+    readyDedupeIds: [],
+    stopReason: "awaiting-customer",
+  });
+  assert.match(task, /^\[Gate 通过\]/, "无 ready 也必须显式转交");
+  assert.ok(task.includes("无统筹可执行步骤"));
+  assert.ok(task.includes("stopReason: awaiting-customer"));
+  assert.ok(task.includes("（空）"), "仅知情列表为空时如实说明");
+  assert.ok(task.includes("不要标 gate done"));
+});
+
+// —————————————— 2026-10-27 gate 退回路由（S3）：集成行为单测（fake 会话/fake flow/账本） ——————————————
+// 方案 v3.2 §3.1/§3.3–§3.5/§4.3–§4.5；P1–P4、P7–P8、P13、P15–P18。只经既有触发面（settle/导入）扫描。
+
+interface GateHandoffRoutingFile {
+  schema?: string;
+  consecutiveReturns?: number;
+  reminderCount?: number;
+  latestReturn?: {
+    cause?: string;
+    requestId?: string;
+    reportPath?: string;
+    reportVersion?: number;
+    reportSha256?: string | null;
+    expectedReportVersion?: number | null;
+    rejectedIdentity?: { reportPath?: string; reportVersion?: number; reportSha256?: string | null; size?: number | null; mtimeMs?: number | null } | null;
+    deliveries?: Array<{ kind?: string; recipientRoleId?: string; status?: string; attempts?: number; error?: string | null }>;
+    humanNoticeAt?: string | null;
+  } | null;
+  latestReminder?: {
+    cause?: string;
+    requestId?: string;
+    reportPath?: string;
+    reportVersion?: number;
+    deliveries?: Array<{ kind?: string; recipientRoleId?: string; status?: string; attempts?: number; error?: string | null }>;
+    humanNoticeAt?: string | null;
+  } | null;
+  passHandoff?: {
+    reportPath?: string;
+    reportVersion?: number;
+    reportSha256?: string;
+    flowRevision?: string;
+    stewardDispatchableStepIds?: string[];
+    informationalStepIds?: string[];
+    readyDedupeIds?: string[];
+    delivery?: { kind?: string; recipientRoleId?: string; status?: string; attempts?: number; error?: string | null };
+  } | null;
+  rebuiltAt?: string | null;
+  rebuiltGuard?: {
+    reportPath?: string;
+    reportVersion?: number;
+    reportSha256?: string | null;
+    size?: number | null;
+    mtimeMs?: number | null;
+  } | null;
+}
+
+function gateHandoffRoutingAbsPath(root: string, flowId: string, gateId = GATE_STEP_ID): string {
+  return path.join(root, ".ans", "governance", "acceptance", flowId, "gates", `${gateId}-handoff-routing.json`);
+}
+
+function readHandoffRoutingFile(root: string, flowId: string, gateId = GATE_STEP_ID): GateHandoffRoutingFile {
+  return JSON.parse(readFileSync(gateHandoffRoutingAbsPath(root, flowId, gateId), "utf8")) as GateHandoffRoutingFile;
+}
+
+/** 路由记录可能尚未落盘（首个退回事件处理中）：轮询辅助读取不抛错。 */
+function safeConsecutiveReturns(root: string, flowId = GATE_FLOW_ID): number {
+  try {
+    return readHandoffRoutingFile(root, flowId).consecutiveReturns ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeRawGateReport(root: string, flowId: string, gateId: string, version: number, body: string): void {
+  const acceptance = path.join(root, "docs", "acceptance");
+  mkdirSync(acceptance, { recursive: true });
+  writeFileSync(path.join(acceptance, `${flowId}-${gateId}-report-v${version}.md`), body);
+}
+
+/** 现场形状：`reason` 以反引号开头的 YAML 普通标量 ⇒ 整段解析失败（line/column）。 */
+function syntaxBadGateReport(): string {
+  return [
+    "# Gate 复核报告",
+    "```yaml",
+    "schema: acceptance-triage/v1",
+    "conclusion: fail",
+    "items:",
+    "  - id: G1",
+    "    severity: major",
+    "    owner: executor",
+    "    reason: `反引号开头的普通标量",
+    "    action: 修复启动脚本",
+    "```",
+    "",
+  ].join("\n");
+}
+
+/** 语义错误：未知字段 ⇒ 解析器给出字段路径（items[0].unknownField）。 */
+function semanticBadGateReport(): string {
+  return [
+    "# Gate 复核报告",
+    "```yaml",
+    "schema: acceptance-triage/v1",
+    "conclusion: fail",
+    "items:",
+    "  - id: G1",
+    "    severity: major",
+    "    owner: executor",
+    "    reason: 脚手架无法启动",
+    "    action: 修复启动脚本",
+    "    unknownField: x",
+    "```",
+    "",
+  ].join("\n");
+}
+
+async function waitGateStatus(root: string, status: string, flowId = GATE_FLOW_ID): Promise<void> {
+  await waitFor(() => {
+    try {
+      return readGateRecordFile(root, flowId).status === status;
+    } catch {
+      return false;
+    }
+  });
+}
+
+/** 写序：gate 记录先落、随后异步发送任务 ⇒ 断言任务计数前有界等待（不改语义）。 */
+async function waitGateHandoffSends(harness: Harness, verifierCount: number, convenerCount: number): Promise<void> {
+  await waitFor(
+    () => gateTaskSends(harness).length === verifierCount && gateConvenerTasks(harness).length === convenerCount,
+  );
+}
+
+/** 统筹收到的 gate 路由任务（排除既有 `[自动推进]`/停滞等通用唤醒）。 */
+function gateConvenerTasks(harness: Harness): string[] {
+  return (harness.sendsByRole.get("convener") ?? []).filter((text) => text.startsWith("[Gate "));
+}
+
+/** 路由记录的 deliveries 在发送完成后才更新 ⇒ 读取前有界等待。 */
+async function waitHandoffDeliveriesSent(root: string, flowId: string): Promise<void> {
+  await waitFor(() => {
+    try {
+      const deliveries = readHandoffRoutingFile(root, flowId).latestReturn?.deliveries ?? [];
+      return deliveries.length > 0 && deliveries.every((delivery) => delivery.status === "sent");
+    } catch {
+      return false;
+    }
+  });
+}
+
+/** 触发扫描直到条件成立（重复 settle 是合法真实事件；路由记录应保证不重复发送）。 */
+async function settleConvenerUntil(harness: Harness, check: () => boolean, attempts = 6, intervalMs = 150): Promise<void> {
+  for (let index = 0; index < attempts; index += 1) {
+    harness.controls.get("convener")!.settle();
+    await sleep(intervalMs);
+    if (check()) return;
+  }
+}
+
+test("2026-10-27 gate 退回（R3 语法错误）：质检补正 + 统筹知情各一条；记录 returned、gate 保持 pending、无判定审计/客户决定/下游派发", async () => {
+  const root = makeTempProjectRoot("ans-gate-return-r3-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      writeRawGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, syntaxBadGateReport());
+      harness.controls.get("convener")!.settle();
+      await waitGateStatus(root, "returned-to-proof");
+      await waitGateHandoffSends(harness, 1, 1);
+      await waitHandoffDeliveriesSent(root, GATE_FLOW_ID);
+
+      const record = readGateRecordFile(root, GATE_FLOW_ID);
+      assert.equal(record.status, "returned-to-proof");
+      assert.match(String(record.reportSha256), /^[a-f0-9]{64}$/, "退回记录保存被拒报告真实 sha");
+      assert.match(String(record.error), /line \d+, column \d+/, "退回记录保留 YAML 行列信息");
+
+      const verifierTasks = gateTaskSends(harness);
+      assert.equal(verifierTasks.length, 1, "恰一条质检补正任务");
+      const correction = verifierTasks[0]!;
+      for (const needle of [
+        "[Gate 报告补正]",
+        `流程 ${GATE_FLOW_ID}`,
+        `gate ${GATE_STEP_ID}`,
+        "gate 步骤标题：",
+        `docs/acceptance/${GATE_FLOW_ID}-criteria-v1.md`,
+        `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v2.md`,
+        "line ",
+        "column ",
+        "格式要求清单",
+        "同一轮 gate 复核",
+        "不是统筹的新请求",
+        "不要标任何 flow 步骤 done",
+      ]) {
+        assert.ok(correction.includes(needle), `补正任务必须包含「${needle}」`);
+      }
+      assert.equal(correction.includes("应用已接受"), false);
+      assert.equal(correction.includes("应用已通过"), false);
+
+      const convenerTasks = gateConvenerTasks(harness);
+      assert.equal(convenerTasks.length, 1, "恰一条统筹知情任务");
+      const notice = convenerTasks[0]!;
+      for (const needle of [
+        "[Gate 退回]",
+        "原因：报告结构不合规",
+        "质检补正任务投递结果：已投递",
+        "不需要重新派发质检",
+        "不要标 gate done",
+        "应用未替统筹派发任何 flow 步骤",
+      ]) {
+        assert.ok(notice.includes(needle), `统筹任务必须包含「${needle}」`);
+      }
+
+      const routing = readHandoffRoutingFile(root, GATE_FLOW_ID);
+      assert.equal(routing.schema, "gate-handoff-routing/v1");
+      assert.equal(routing.latestReturn?.cause, "report-invalid");
+      assert.equal(routing.consecutiveReturns, 1);
+      assert.equal(routing.latestReturn?.rejectedIdentity?.reportSha256, record.reportSha256);
+      assert.equal(routing.latestReturn?.deliveries?.length, 2);
+      assert.ok(routing.latestReturn?.deliveries?.every((delivery) => delivery.status === "sent"));
+
+      const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
+      assert.ok(parsed.ok);
+      assert.equal(parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status, "pending", "gate 保持 pending");
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.some((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID), false, "退回不写判定审计");
+      assert.equal(ledger.entries.some((entry) => entry.kind === "customer.decision" && entry.flowId === GATE_FLOW_ID), false, "不写客户决定");
+      assert.equal(
+        ledger.entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "delivery-after-gate"),
+        false,
+        "不派下游",
+      );
+      await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes("报告缺失或结构不合规")));
+      assert.ok(deliveryNotes(harness.events, "liaison").some((note) => note.includes(GATE_STEP_ID) && note.includes("报告缺失或结构不合规")), "主理事实行");
+      await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes("退回通知已投递或已排队")));
+      assert.ok(deliveryNotes(harness.events, "liaison").some((note) => note.includes(GATE_STEP_ID) && note.includes("退回通知已投递或已排队")), "主理投递结果行");
+
+      // 重复扫描同一报告：不重复任务、不重复告知。
+      harness.controls.get("convener")!.settle();
+      await sleep(300);
+      assert.equal(gateTaskSends(harness).length, 1, "同一被拒报告不重复补正");
+      assert.equal(gateConvenerTasks(harness).length, 1, "同一被拒报告不重复告知");
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "returned-to-proof", "同一旧报告不转 dispatched");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 退回（语义错误）：可执行原因给字段路径（items[0]），补正任务仍恰一条", async () => {
+  const root = makeTempProjectRoot("ans-gate-return-semantic-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      writeRawGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, semanticBadGateReport());
+      harness.controls.get("convener")!.settle();
+      await waitGateStatus(root, "returned-to-proof");
+      await waitGateHandoffSends(harness, 1, 1);
+      const tasks = gateTaskSends(harness);
+      assert.equal(tasks.length, 1);
+      assert.match(tasks[0]!, /items\[0\]/, "语义错误必须给字段路径");
+      assert.equal(readHandoffRoutingFile(root, GATE_FLOW_ID).latestReturn?.cause, "report-invalid");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 退回（R4 仅 minor/nit）：补正任务要求按标准重判，不触发返工路由", async () => {
+  const root = makeTempProjectRoot("ans-gate-return-r4-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "fail", [
+        { id: "G1", severity: "nit", owner: "executor", reason: "措辞", action: "可选润色", targets: ["README.md"] },
+      ]);
+      harness.controls.get("convener")!.settle();
+      await waitGateStatus(root, "returned-to-proof");
+      await waitGateHandoffSends(harness, 1, 1);
+      const tasks = gateTaskSends(harness);
+      assert.equal(tasks.length, 1);
+      const correction = tasks[0]!;
+      assert.ok(correction.includes("若确实没有 blocker/major，可改为 pass 并保留 minor/nit 备注"));
+      assert.ok(correction.includes("若确有 blocker/major，必须如实列明依据并保持 fail"));
+      assert.ok(correction.includes("应用不替你做结论"));
+      assert.equal(existsSync(gateReworkRoutingAbsPath(root, GATE_FLOW_ID)), false, "R4 不触发返工路由");
+      assert.equal(readHandoffRoutingFile(root, GATE_FLOW_ID).latestReturn?.cause, "nonblocking-fail");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 退回（R1 陈旧缺报告）：按请求路径/版本补交，统筹知情；记录 returned", async () => {
+  const root = makeTempProjectRoot("ans-gate-return-r1-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, {
+        status: "dispatched",
+        dispatchedAt: new Date(Date.now() - 31 * 60_000).toISOString(),
+      });
+      harness.controls.get("convener")!.settle();
+      await waitGateStatus(root, "returned-to-proof");
+      await waitGateHandoffSends(harness, 1, 1);
+      const tasks = gateTaskSends(harness);
+      assert.equal(tasks.length, 1);
+      assert.ok(tasks[0]!.includes("补交报告"), "R1 要求补交报告");
+      assert.ok(tasks[0]!.includes(`docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`), "按记录请求版本写");
+      const routing = readHandoffRoutingFile(root, GATE_FLOW_ID);
+      assert.equal(routing.latestReturn?.cause, "stale-missing");
+      assert.equal(routing.latestReturn?.rejectedIdentity, null);
+      assert.equal(routing.latestReturn?.expectedReportVersion, 1);
+      assert.equal(gateConvenerTasks(harness).length, 1, "统筹知情一条");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 退回（R5 版本偏旧）：expectedReportVersion 机械复核；同版本改写不绕过；新版本 pass 收口", async () => {
+  const root = makeTempProjectRoot("ans-gate-return-r5-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "pass");
+      writeGateRecord(root, GATE_FLOW_ID, {
+        status: "dispatched",
+        reportVersion: 2,
+        reportPath: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v2.md`,
+      });
+      harness.controls.get("convener")!.settle();
+      await waitGateStatus(root, "returned-to-proof");
+      await waitGateHandoffSends(harness, 1, 1);
+      await waitHandoffDeliveriesSent(root, GATE_FLOW_ID);
+      const record = readGateRecordFile(root, GATE_FLOW_ID);
+      assert.equal(record.reportVersion, 1, "退回记录指向被拒的旧报告");
+      assert.match(String(record.reportSha256), /^[a-f0-9]{64}$/, "被拒报告保存真实 sha（不是 null）");
+      const correction = gateTaskSends(harness)[0]!;
+      assert.ok(correction.includes("派发要求版本：v2"), "R5 使用派发要求版本");
+      assert.ok(correction.includes(`${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v2.md（v2`), "下一份报告按要求版本");
+      const routing = readHandoffRoutingFile(root, GATE_FLOW_ID);
+      assert.equal(routing.latestReturn?.cause, "version-older");
+      assert.equal(routing.latestReturn?.expectedReportVersion, 2);
+      assert.equal(routing.latestReturn?.rejectedIdentity?.reportSha256, record.reportSha256);
+
+      // 同版本号改写（v1 内容不同 ⇒ 新 sha）：机械复核仍按 expected v2 判版本偏旧，不按新 sha 放行。
+      writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "pass", [
+        { id: "G1", severity: "minor", owner: "executor", reason: "建议", action: "后续优化", targets: ["src/x.ts"] },
+      ]);
+      await settleConvenerUntil(harness, () => {
+        try {
+          return readHandoffRoutingFile(root, GATE_FLOW_ID).consecutiveReturns === 2;
+        } catch {
+          return false;
+        }
+      });
+      // 质检忙时第二次补正经既有投递队列排队（queued 视为已投递）；settle 后按序落到会话。
+      harness.controls.get("verifier")!.settle();
+      await waitFor(() => gateTaskSends(harness).length === 2);
+      assert.equal(gateTaskSends(harness).length, 2, "同版本改写触发第二次补正");
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "returned-to-proof");
+      assert.equal(readHandoffRoutingFile(root, GATE_FLOW_ID).latestReturn?.expectedReportVersion, 2, "expected 版本保持 2");
+      assert.equal(readHandoffRoutingFile(root, GATE_FLOW_ID).consecutiveReturns, 2);
+
+      // 写 v2 pass ⇒ 新报告版本达到 expected ⇒ 机械复核通过并收口。
+      writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 2, "pass");
+      await settleConvenerUntil(harness, () => {
+        try {
+          return readGateRecordFile(root, GATE_FLOW_ID).status === "passed";
+        } catch {
+          return false;
+        }
+      });
+      await waitGateStatus(root, "passed");
+      const passed = readGateRecordFile(root, GATE_FLOW_ID);
+      assert.equal(passed.reportVersion, 2);
+      const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
+      assert.ok(parsed.ok);
+      assert.equal(parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status, "done");
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.filter((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID).length, 1);
+      assert.equal(gateTaskSends(harness).length, 2, "通过后不再发补正");
+      assert.equal(readHandoffRoutingFile(root, GATE_FLOW_ID).consecutiveReturns, 0, "通过归零连续退回");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 退回（R5 同 sha 不同版本）：v2 内容与 v1 相同也视为新报告并按新版本收口", async () => {
+  const root = makeTempProjectRoot("ans-gate-return-same-sha-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "pass");
+      const v1Bytes = readFileSync(path.join(root, "docs", "acceptance", `${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`));
+      writeGateRecord(root, GATE_FLOW_ID, {
+        status: "dispatched",
+        reportVersion: 2,
+        reportPath: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v2.md`,
+      });
+      harness.controls.get("convener")!.settle();
+      await waitGateStatus(root, "returned-to-proof");
+      await waitGateHandoffSends(harness, 1, 1);
+      // v2 与 v1 字节完全相同（同 sha 不同版本）⇒ 新报告，必须按 v2 处置（内容 pass ⇒ 收口）。
+      writeFileSync(path.join(root, "docs", "acceptance", `${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v2.md`), v1Bytes);
+      await settleConvenerUntil(harness, () => {
+        try {
+          return readGateRecordFile(root, GATE_FLOW_ID).status === "passed";
+        } catch {
+          return false;
+        }
+      });
+      await waitGateStatus(root, "passed");
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).reportVersion, 2);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 退回（R6 候选变化）：不向质检发送；统筹需重新 request_gate_review；旧报告不放行", async () => {
+  const root = makeTempProjectRoot("ans-gate-return-r6-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "pass");
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched", flowRevision: "old-candidate-revision" });
+      harness.controls.get("convener")!.settle();
+      await waitGateStatus(root, "returned-to-proof");
+      await waitGateHandoffSends(harness, 0, 1);
+      assert.equal(gateTaskSends(harness).length, 0, "候选变化不向质检发送补正");
+      const convenerTasks = gateConvenerTasks(harness);
+      assert.equal(convenerTasks.length, 1, "统筹恰一条重新请求任务");
+      const notice = convenerTasks[0]!;
+      assert.match(notice, /^\[Gate 退回·需重新请求\]/);
+      assert.ok(notice.includes(`request_gate_review({ flowId: "${GATE_FLOW_ID}", gateId: "${GATE_STEP_ID}" })`));
+      assert.ok(notice.includes("旧报告不用于放行"));
+      const record = readGateRecordFile(root, GATE_FLOW_ID);
+      assert.match(String(record.reportSha256), /^[a-f0-9]{64}$/, "候选变化也保存被拒报告真实 sha");
+      assert.equal(readHandoffRoutingFile(root, GATE_FLOW_ID).latestReturn?.cause, "candidate-changed");
+
+      // 即便出现新版本 pass 报告，R6 也不自动开启新一轮（等统筹重新请求）。
+      writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 2, "pass");
+      harness.controls.get("convener")!.settle();
+      await sleep(300);
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "returned-to-proof", "R6 不被新报告自动放行");
+      assert.equal(gateConvenerTasks(harness).length, 1, "R6 不重复通知");
+      const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
+      assert.ok(parsed.ok);
+      assert.equal(parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status, "pending");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 退回（R2 报告不可观察）：补正任务按请求路径/版本；记录 returned、不猜", async () => {
+  const root = makeTempProjectRoot("ans-gate-return-r2-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(
+      root,
+      { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root },
+      {
+        completeGateStep: async () => ({
+          ok: false,
+          code: "gate-report-unobservable",
+          error: "模拟：报告存在但不可安全观察",
+        }),
+      },
+    );
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "pass");
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      harness.controls.get("convener")!.settle();
+      await waitGateStatus(root, "returned-to-proof");
+      await waitGateHandoffSends(harness, 1, 1);
+      const tasks = gateTaskSends(harness);
+      assert.equal(tasks.length, 1);
+      assert.ok(tasks[0]!.includes("不可安全读取"), "R2 说明报告不可观察");
+      const routing = readHandoffRoutingFile(root, GATE_FLOW_ID);
+      assert.equal(routing.latestReturn?.cause, "report-unobservable");
+      assert.equal(routing.latestReturn?.expectedReportVersion, 1);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————————————— S3 第二批：R2b/O1 提醒、R7 历史退回、R8 多轮、损坏 fail-closed、失败/重试/耗尽 ——————————————
+
+function makeUnreadableGateReport(root: string, flowId: string, gateId: string, version: number): void {
+  const target = path.join(root, "docs", "acceptance", `${flowId}-${gateId}-report-v${version}.md`);
+  mkdirSync(target, { recursive: true });
+}
+
+test("2026-10-27 gate 报告不可读（R2b）：一次提醒 + 统筹知情；记录保持 dispatched；同版本不重复；提醒上限 3 后停并人工提示", async () => {
+  const root = makeTempProjectRoot("ans-gate-r2b-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      makeUnreadableGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1);
+      harness.controls.get("convener")!.settle();
+      await waitFor(() => {
+        try {
+          return readHandoffRoutingFile(root, GATE_FLOW_ID).latestReminder?.cause === "report-unreadable";
+        } catch {
+          return false;
+        }
+      });
+      harness.controls.get("verifier")?.settle();
+      await waitGateHandoffSends(harness, 1, 1);
+      const reminder = gateTaskSends(harness)[0]!;
+      assert.match(reminder, /^\[Gate 报告不可读提醒\]/);
+      assert.ok(reminder.includes("仍为 dispatched"));
+      assert.ok(reminder.includes("未判退回"));
+      assert.ok(reminder.includes("读取权限"));
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "dispatched", "提醒不转退回");
+      assert.equal(readHandoffRoutingFile(root, GATE_FLOW_ID).reminderCount, 1);
+      assert.equal(readHandoffRoutingFile(root, GATE_FLOW_ID).consecutiveReturns, 0, "R2b 提醒不进入退回轮次计数");
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.some((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID), false);
+      await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes("报告存在但当前不可读")));
+      assert.ok(deliveryNotes(harness.events, "liaison").some((note) => note.includes("报告存在但当前不可读")), "主理可见不可读事实");
+
+      // 同一版本（同身份）：不重复提醒。
+      harness.controls.get("convener")!.settle();
+      await sleep(300);
+      assert.equal(gateTaskSends(harness).length, 1, "同版本不重复提醒");
+      assert.equal(gateConvenerTasks(harness).length, 1);
+
+      // v2、v3 不可读 ⇒ 提醒 2、3。
+      makeUnreadableGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 2);
+      harness.controls.get("convener")!.settle();
+      await waitFor(() => readHandoffRoutingFile(root, GATE_FLOW_ID).reminderCount === 2);
+      harness.controls.get("verifier")!.settle();
+      await waitFor(() => gateTaskSends(harness).length === 2);
+      makeUnreadableGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 3);
+      harness.controls.get("convener")!.settle();
+      await waitFor(() => readHandoffRoutingFile(root, GATE_FLOW_ID).reminderCount === 3);
+      harness.controls.get("verifier")!.settle();
+      await waitFor(() => gateTaskSends(harness).length === 3);
+      assert.equal(gateConvenerTasks(harness).length, 3);
+
+      // v4 ⇒ 达到上限：停止提醒，给统筹一次人工提示（不再向质检发送）。
+      makeUnreadableGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 4);
+      harness.controls.get("convener")!.settle();
+      await waitFor(() => gateConvenerTasks(harness).length === 4);
+      const capNotice = gateConvenerTasks(harness)[3]!;
+      assert.ok(capNotice.includes("提醒次数已达上限"), "达到上限必须给统筹人工提示");
+      assert.ok(capNotice.includes("请人工核对"));
+      assert.equal(gateTaskSends(harness).length, 3, "达到上限后不再提醒质检");
+      assert.equal(readHandoffRoutingFile(root, GATE_FLOW_ID).reminderCount, 3);
+      assert.notEqual(readHandoffRoutingFile(root, GATE_FLOW_ID).latestReminder?.humanNoticeAt, null);
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "dispatched", "记录保持 dispatched");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 缺报告提前提醒（O1）：质检空闲一次提醒 + 统筹知情；记录保持 dispatched；重复扫描不重复", async () => {
+  const root = makeTempProjectRoot("ans-gate-o1-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      harness.controls.get("convener")!.settle();
+      await waitFor(() => {
+        try {
+          return readHandoffRoutingFile(root, GATE_FLOW_ID).latestReminder?.cause === "report-missing-early";
+        } catch {
+          return false;
+        }
+      });
+      await waitGateHandoffSends(harness, 1, 1);
+      const reminder = gateTaskSends(harness)[0]!;
+      assert.match(reminder, /^\[Gate 报告提醒\]/);
+      assert.ok(reminder.includes("补交"));
+      assert.ok(reminder.includes("仍为 dispatched"));
+      const notice = gateConvenerTasks(harness)[0]!;
+      assert.match(notice, /^\[Gate 报告提醒\]/);
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "dispatched");
+      assert.equal(readHandoffRoutingFile(root, GATE_FLOW_ID).reminderCount, 1);
+      await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes("报告不存在或不可读")));
+      assert.ok(deliveryNotes(harness.events, "liaison").some((note) => note.includes(GATE_STEP_ID) && note.includes("报告不存在或不可读")));
+
+      harness.controls.get("convener")!.settle();
+      await sleep(300);
+      assert.equal(gateTaskSends(harness).length, 1, "同身份不重复提醒");
+      assert.equal(gateConvenerTasks(harness).length, 1);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 路由记录写失败（可读/合法但写入失败）：gate 保持 dispatched、零任务、主理如实、下一次事件重试", async () => {
+  const root = makeTempProjectRoot("ans-gate-handoff-writefail-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const failing = await makeHarness(
+      root,
+      { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root },
+      {
+        gateHandoffWriteJsonFn: async () => {
+          throw new Error("注入：路由记录写入失败");
+        },
+      },
+    );
+    try {
+      assert.equal((await failing.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      writeRawGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, syntaxBadGateReport());
+      failing.controls.get("convener")!.settle();
+      await waitFor(() => deliveryNotes(failing.events, "liaison").some((note) => note.includes("路由记录写入失败")));
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "dispatched", "路由记录失败不写 gate 记录");
+      assert.equal(gateTaskSends(failing).length, 0, "零发送（不发送质检补正）");
+      assert.equal(gateConvenerTasks(failing).length, 0, "零发送（不发送统筹知情）");
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.some((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID), false);
+    } finally {
+      await failing.iface.stopSession();
+    }
+
+    // 下一次真实事件（修复后重启）：正常路由一次（有界重试语义）。
+    const healthy = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await healthy.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      healthy.controls.get("convener")!.settle();
+      await waitGateStatus(root, "returned-to-proof");
+      await waitGateHandoffSends(healthy, 1, 1);
+      const routing = readHandoffRoutingFile(root, GATE_FLOW_ID);
+      assert.equal(routing.latestReturn?.cause, "report-invalid");
+      assert.ok(routing.latestReturn?.deliveries?.every((delivery) => delivery.status === "sent"));
+    } finally {
+      await healthy.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 历史退回（R7）：一次统筹提示（跨重启不重复）、不重派质检、不转 dispatched、不改 gate 记录", async () => {
+  const root = makeTempProjectRoot("ans-gate-r7-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, {
+        status: "returned-to-proof",
+        error: "历史坏报告（实现前退回）",
+        decidedAt: new Date().toISOString(),
+      });
+      const before = readFileSync(gateRecordAbsPath(root, GATE_FLOW_ID), "utf8");
+      harness.controls.get("convener")!.settle();
+      await waitFor(() => gateConvenerTasks(harness).length === 1);
+      const legacyNotice = gateConvenerTasks(harness)[0]!;
+      assert.match(legacyNotice, /^\[Gate 退回·历史记录\]/);
+      assert.ok(legacyNotice.includes("历史坏报告（实现前退回）"));
+      assert.ok(legacyNotice.includes("不自动派质检"));
+      assert.equal(gateTaskSends(harness).length, 0, "历史退回不重派质检");
+      assert.equal(readFileSync(gateRecordAbsPath(root, GATE_FLOW_ID), "utf8"), before, "gate 记录不变");
+      assert.equal(readHandoffRoutingFile(root, GATE_FLOW_ID).latestReturn?.cause, "legacy");
+
+      // 重复扫描不重复提示。
+      harness.controls.get("convener")!.settle();
+      await sleep(300);
+      assert.equal(gateConvenerTasks(harness).length, 1);
+      await harness.iface.stopSession();
+
+      // 重启（新 Interface、同项目根）：持久 legacy 标记防止重复提示。
+      const restarted = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+      try {
+        assert.equal((await restarted.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+        restarted.controls.get("convener")!.settle();
+        await sleep(300);
+        assert.equal(gateConvenerTasks(restarted).length, 0, "重启后不重复历史提示");
+        assert.equal(readFileSync(gateRecordAbsPath(root, GATE_FLOW_ID), "utf8"), before, "gate 记录仍不变");
+      } finally {
+        await restarted.iface.stopSession();
+      }
+    } finally {
+      // 已在上面停止；finally 幂等。
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 多轮耗尽（R8）：连续 3 轮报告侧退回后停止补正并给统筹人工任务；gate 始终 pending", async () => {
+  const root = makeTempProjectRoot("ans-gate-r8-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      writeRawGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, syntaxBadGateReport());
+      await settleConvenerUntil(
+        harness,
+        () => safeConsecutiveReturns(root) === 1 && gateConvenerTasks(harness).length === 1,
+      );
+      harness.controls.get("verifier")?.settle();
+      await waitFor(() => gateTaskSends(harness).length === 1);
+
+      writeRawGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 2, syntaxBadGateReport());
+      await settleConvenerUntil(
+        harness,
+        () => safeConsecutiveReturns(root) === 2 && gateConvenerTasks(harness).length === 2,
+      );
+      harness.controls.get("verifier")!.settle();
+      await waitFor(() => gateTaskSends(harness).length === 2);
+
+      writeRawGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 3, syntaxBadGateReport());
+      await settleConvenerUntil(
+        harness,
+        () => safeConsecutiveReturns(root) === 3 && gateConvenerTasks(harness).length === 3,
+      );
+      const convenerTasks = gateConvenerTasks(harness);
+      assert.equal(convenerTasks.length, 3, "三轮各一条统筹任务");
+      assert.match(convenerTasks[2]!, /^\[Gate 退回·需人工\]/);
+      assert.ok(convenerTasks[2]!.includes("连续 3 轮"));
+      assert.ok(convenerTasks[2]!.includes("flow_step_supersede"));
+      assert.ok(convenerTasks[2]!.includes("不会自动通过"));
+      assert.equal(gateTaskSends(harness).length, 2, "第 3 轮起停止自动补正（不再发质检）");
+
+      // 第 4 个坏版本：不再重复人工提示、不再补正。
+      writeRawGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 4, syntaxBadGateReport());
+      harness.controls.get("convener")!.settle();
+      await sleep(300);
+      assert.equal(gateConvenerTasks(harness).length, 3, "人力提示只发一次");
+      assert.equal(gateTaskSends(harness).length, 2);
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "returned-to-proof");
+      const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
+      assert.ok(parsed.ok);
+      assert.equal(parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status, "pending", "多轮期间 gate 始终 pending");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 路由记录损坏（returned 扫描）：按 gate 记录+报告身份重建；原因不可安全推断 ⇒ 零发送、不转 dispatched、不收口", async () => {
+  const root = makeTempProjectRoot("ans-gate-handoff-corrupt-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "returned-to-proof", error: "旧退回" });
+      const routingPath = gateHandoffRoutingAbsPath(root, GATE_FLOW_ID);
+      mkdirSync(path.dirname(routingPath), { recursive: true });
+      writeFileSync(routingPath, "{ not-json");
+      harness.controls.get("convener")!.settle();
+      await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes("已按 gate 记录与报告身份重建")));
+      assert.equal(gateTaskSends(harness).length, 0, "原因不可安全推断时不发送质检任务");
+      assert.equal(gateConvenerTasks(harness).length, 0, "原因不可安全推断时不发送统筹任务");
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "returned-to-proof", "不转 dispatched");
+      const rebuilt = readHandoffRoutingFile(root, GATE_FLOW_ID);
+      assert.equal(rebuilt.schema, "gate-handoff-routing/v1");
+      assert.notEqual(rebuilt.rebuiltAt, null, "重建标记");
+      assert.equal(rebuilt.latestReturn, null, "不猜测 cause");
+      assert.equal(rebuilt.rebuiltGuard?.reportPath, `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`);
+      assert.equal(rebuilt.rebuiltGuard?.reportVersion, 1);
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.some((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID), false);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 退回投递部分失败：只重试失败方；失败如实（不声称已送达）", async () => {
+  const root = makeTempProjectRoot("ans-gate-handoff-partial-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const failing = await makeHarness(
+      root,
+      { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root },
+      { failOpenRoles: new Set(["verifier"]) },
+    );
+    try {
+      assert.equal((await failing.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      writeRawGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, syntaxBadGateReport());
+      failing.controls.get("convener")!.settle();
+      await waitFor(() => {
+        try {
+          return readHandoffRoutingFile(root, GATE_FLOW_ID).latestReturn?.cause === "report-invalid";
+        } catch {
+          return false;
+        }
+      });
+      await waitFor(() => gateConvenerTasks(failing).length === 1);
+      await waitFor(() => {
+        try {
+          const delivery = readHandoffRoutingFile(root, GATE_FLOW_ID).latestReturn?.deliveries?.find(
+            (candidate) => candidate.kind === "verifier-correction",
+          );
+          return delivery !== undefined && delivery.status !== "pending";
+        } catch {
+          return false;
+        }
+      });
+      const routing = readHandoffRoutingFile(root, GATE_FLOW_ID);
+      const verifierDelivery = routing.latestReturn?.deliveries?.find((delivery) => delivery.kind === "verifier-correction");
+      assert.equal(verifierDelivery?.status, "failed");
+      assert.equal(verifierDelivery?.attempts, 1);
+      const convenerNotice = gateConvenerTasks(failing)[0]!;
+      assert.ok(convenerNotice.includes("未送达"), "统筹任务如实写质检未送达");
+      const notes = deliveryNotes(failing.events, "liaison");
+      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("退回通知未完全送达")));
+      assert.equal(failing.sendsByRole.get("verifier"), undefined, "打开失败时不谎称已投递");
+    } finally {
+      await failing.iface.stopSession();
+    }
+
+    // 修复后重启：只重试失败的质检接收方，不重复已送达的统筹。
+    const healthy = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await healthy.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      healthy.controls.get("convener")!.settle();
+      await waitFor(() => gateTaskSends(healthy).length === 1);
+      await waitFor(() => {
+        try {
+          const delivery = readHandoffRoutingFile(root, GATE_FLOW_ID).latestReturn?.deliveries?.find(
+            (candidate) => candidate.kind === "verifier-correction",
+          );
+          return delivery?.status === "sent";
+        } catch {
+          return false;
+        }
+      });
+      assert.equal(gateConvenerTasks(healthy).length, 0, "不重复已送达的统筹");
+      const routing = readHandoffRoutingFile(root, GATE_FLOW_ID);
+      const verifierDelivery = routing.latestReturn?.deliveries?.find((delivery) => delivery.kind === "verifier-correction");
+      assert.equal(verifierDelivery?.status, "sent");
+      assert.equal(verifierDelivery?.attempts, 2, "只对失败方做第 2 次尝试");
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "returned-to-proof");
+    } finally {
+      await healthy.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 新报告出现时旧补正不再补发：不触发人工升级，按新报告机械复核", async () => {
+  const root = makeTempProjectRoot("ans-gate-new-report-skip-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(
+      root,
+      { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root },
+      { failOpenRoles: new Set(["verifier"]) },
+    );
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      writeRawGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, syntaxBadGateReport());
+      harness.controls.get("convener")!.settle();
+      await waitFor(() => {
+        try {
+          return readHandoffRoutingFile(root, GATE_FLOW_ID).latestReturn?.cause === "report-invalid";
+        } catch {
+          return false;
+        }
+      });
+      await waitFor(() => gateConvenerTasks(harness).length === 1);
+      assert.equal(gateTaskSends(harness).length, 0, "质检打开失败：补正未送达");
+
+      // 新版本 pass 报告出现：旧补正不再补发（标记过时），按新报告机械复核通过。
+      writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 2, "pass");
+      await settleConvenerUntil(harness, () => {
+        try {
+          return readGateRecordFile(root, GATE_FLOW_ID).status === "passed";
+        } catch {
+          return false;
+        }
+      });
+      await waitGateStatus(root, "passed");
+      assert.equal(gateTaskSends(harness).length, 0, "过时补正不补发");
+      const gateTasks = gateConvenerTasks(harness);
+      assert.equal(gateTasks.length, 2, "退回知情 + 通过转交各一条");
+      assert.ok(gateTasks[1]!.startsWith("[Gate 通过]"));
+      assert.equal(gateTasks.some((task) => task.includes("需人工")), false, "不因过时补发而升级人工");
+      const routing = readHandoffRoutingFile(root, GATE_FLOW_ID);
+      const verifierDelivery = routing.latestReturn?.deliveries?.find((delivery) => delivery.kind === "verifier-correction");
+      assert.equal(verifierDelivery?.status, "exhausted");
+      assert.equal(verifierDelivery?.error, "新报告已出现，过时补正不再发送");
+      const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
+      assert.ok(parsed.ok);
+      assert.equal(parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status, "done");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————————————— 2026-10-27 gate 通过转交（S4）：分组/空原因/去重/恢复/历史 passed ——————————————
+
+function convenerAdvanceTasks(harness: Harness): string[] {
+  return (harness.sendsByRole.get("convener") ?? []).filter((text) => text.includes("[自动推进]") && !text.includes("停滞"));
+}
+
+async function waitPassHandoffSent(root: string, flowId = GATE_FLOW_ID): Promise<void> {
+  await waitFor(() => {
+    try {
+      return readHandoffRoutingFile(root, flowId).passHandoff?.delivery?.status === "sent";
+    } catch {
+      return false;
+    }
+  });
+}
+
+test("2026-10-27 gate 通过转交（P5）：恰一条 [Gate 通过]，可派发/仅知情分组正确；应用未派 worker、未标其它步骤 done", async () => {
+  const root = makeTempProjectRoot("ans-gate-pass-handoff-");
+  try {
+    // 附加一个 verifier-owned 的 ready 步骤：它是内置治理角色（非统筹可派），应进「仅知情」。
+    const steps = [
+      ...gateFlowSteps(GATE_FLOW_ID),
+      { id: "verifier-followup", kind: "artifact" as const, status: "pending", owner: "verifier", dependsOn: [GATE_STEP_ID] },
+    ];
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, steps));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "pass");
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      harness.controls.get("convener")!.settle();
+      await waitGateStatus(root, "passed");
+      await waitFor(() => gateConvenerTasks(harness).some((task) => task.startsWith("[Gate 通过]")));
+      await waitPassHandoffSent(root);
+
+      const passTasks = gateConvenerTasks(harness).filter((task) => task.startsWith("[Gate 通过]"));
+      assert.equal(passTasks.length, 1, "恰一条 [Gate 通过]");
+      const task = passTasks[0]!;
+      for (const needle of [
+        `流程 ${GATE_FLOW_ID}`,
+        `gate ${GATE_STEP_ID}`,
+        `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md（v1`,
+        "sha256 ",
+        "收口后的 flow revision：",
+        "gate 通过 ≠ 最终验收通过 ≠ 客户批准",
+        "你可派发",
+        "delivery-after-gate",
+        "owner=executor",
+        "仅知情",
+        "verifier-followup",
+        "owner=verifier",
+        "先 flow_get 读取当前流程与账本",
+        "用既有 dispatch_task 按 owner 派发",
+        "账本已有 dispatch.accepted 的步骤不要重复派",
+        "不要标 gate done、不要派 acceptance / 质检",
+        "应用未派发任何 worker、未改 flow（除 gate 收口）",
+      ]) {
+        assert.ok(task.includes(needle), `通过转交必须包含「${needle}」`);
+      }
+      assert.equal(task.includes("无统筹可执行步骤"), false, "有可派发步骤时不写空原因");
+
+      const routing = readHandoffRoutingFile(root, GATE_FLOW_ID);
+      const passHandoff = routing.passHandoff!;
+      assert.equal(passHandoff.reportVersion, 1);
+      assert.match(String(passHandoff.reportSha256), /^[a-f0-9]{64}$/);
+      assert.equal(passHandoff.flowRevision, flowRevisionOf(root, GATE_FLOW_ID), "收口后 revision");
+      assert.deepEqual(passHandoff.stewardDispatchableStepIds, ["delivery-after-gate"]);
+      assert.ok(passHandoff.informationalStepIds?.includes("verifier-followup"), "其它内置 owner 仅知情");
+      assert.ok(passHandoff.readyDedupeIds?.includes("delivery-after-gate"));
+      assert.ok(passHandoff.readyDedupeIds?.includes("verifier-followup"));
+      assert.equal(passHandoff.delivery?.status, "sent");
+
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(
+        ledger.entries.some((entry) => entry.kind === "dispatch.accepted" && entry.stepId === "delivery-after-gate"),
+        false,
+        "应用不直接派发下游",
+      );
+      assert.equal(ledger.entries.filter((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID).length, 1);
+      assert.equal(ledger.entries.some((entry) => entry.kind === "customer.decision" && entry.flowId === GATE_FLOW_ID), false);
+      const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
+      assert.ok(parsed.ok);
+      assert.equal(parsed.flow.steps.find((step) => step.id === "delivery-after-gate")?.status, "pending");
+      assert.equal(parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status, "done");
+
+      const notes = deliveryNotes(harness.events, "liaison");
+      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("已通过")), "passNote 事实行");
+      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("通过转交已投递或已排队")), "转交结果行");
+
+      // P6：gate-pass 成功登记 readyWakeNotified ⇒ 同一周期的通用 [自动推进] 不重复发送。
+      await sleep(300);
+      assert.equal(convenerAdvanceTasks(harness).length, 0, "gate-pass 与 [自动推进] 同周期最多一条");
+
+      // P7：重复 settle 不重复转交。
+      harness.controls.get("convener")!.settle();
+      await sleep(300);
+      assert.equal(gateConvenerTasks(harness).filter((text) => text.startsWith("[Gate 通过]")).length, 1, "重复扫描不重复转交");
+
+      // P7：重启（新 Interface、同项目根）不重复转交。
+      await harness.iface.stopSession();
+      const restarted = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+      try {
+        assert.equal((await restarted.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+        restarted.controls.get("convener")!.settle();
+        await sleep(300);
+        assert.equal(gateConvenerTasks(restarted).filter((text) => text.startsWith("[Gate 通过]")).length, 0, "重启不重复转交");
+      } finally {
+        await restarted.iface.stopSession();
+      }
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 通过转交：无可派发步骤时给「无统筹可执行步骤」原因（仅知情/空列表如实）", async () => {
+  const root = makeTempProjectRoot("ans-gate-pass-empty-");
+  try {
+    const flowId = "flow-gate-pass-empty";
+    const steps = [
+      {
+        id: "delivery-server",
+        kind: "dispatch" as const,
+        status: "done",
+        owner: "executor",
+        evidence: { kind: "dispatch" as const, ref: "delivery-server" },
+      },
+      {
+        id: GATE_STEP_ID,
+        kind: "artifact" as const,
+        status: "pending",
+        owner: "verifier",
+        gateKind: "vertical-slice",
+        evidence: { kind: "artifact" as const, ref: `docs/acceptance/${flowId}-${GATE_STEP_ID}-report-v1.md` },
+        dependsOn: ["delivery-server"],
+      },
+      { id: "verification", kind: "acceptance" as const, status: "pending", owner: "app" },
+    ];
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, steps));
+    writeGateCriteria(root, flowId);
+    await appendLedger(root, [
+      { kind: "dispatch.accepted", flowId, stepId: "delivery-server", actorRoleId: "convener", power: "schedule", targetRoleId: "executor" },
+    ]);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateReport(root, flowId, GATE_STEP_ID, 1, "pass");
+      writeGateRecord(root, flowId, { status: "dispatched" });
+      harness.controls.get("convener")!.settle();
+      await waitFor(() => {
+        try {
+          return readGateRecordFile(root, flowId).status === "passed";
+        } catch {
+          return false;
+        }
+      });
+      await waitFor(() => gateConvenerTasks(harness).some((task) => task.startsWith("[Gate 通过]")));
+      const task = gateConvenerTasks(harness).find((text) => text.startsWith("[Gate 通过]"))!;
+      assert.ok(task.includes("无统筹可执行步骤"), "空列表必须给原因");
+      assert.ok(task.includes("stopReason: awaiting-acceptance"), "附 stopReason");
+      assert.ok(task.includes("（空）"), "仅知情列表为空时如实说明");
+      const routing = readHandoffRoutingFile(root, flowId);
+      assert.deepEqual(routing.passHandoff?.stewardDispatchableStepIds, []);
+      assert.deepEqual(routing.passHandoff?.informationalStepIds, []);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 通过转交失败 + 重启恢复：只重试转交并重算两组（不发陈旧列表）", async () => {
+  const root = makeTempProjectRoot("ans-gate-pass-retry-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const failing = await makeHarness(
+      root,
+      { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root },
+      { failOpenRoles: new Set(["convener"]) },
+    );
+    try {
+      // 用 verifier 会话 settle 触发扫描；统筹会话不预开 ⇒ 转交 openBackground 走 failOpenRoles 失败。
+      assert.equal((await failing.iface.openSession({ projectRoot: root, roleId: "verifier", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "pass");
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      failing.controls.get("verifier")!.settle();
+      await waitFor(() => {
+        try {
+          return readHandoffRoutingFile(root, GATE_FLOW_ID).passHandoff?.delivery?.status === "failed";
+        } catch {
+          return false;
+        }
+      });
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "passed", "投递失败不回滚 gate 通过");
+      const notes = deliveryNotes(failing.events, "liaison");
+      assert.ok(notes.some((note) => note.includes(GATE_STEP_ID) && note.includes("未送达")), "主理如实说明失败");
+    } finally {
+      await failing.iface.stopSession();
+    }
+
+    // 当前 flow 增加一个新 ready 步骤（新 revision）⇒ 重试必须重算两组，不发送陈旧列表。
+    const revisedFlow = flowStateYaml(GATE_FLOW_ID, [
+      ...gateFlowSteps(GATE_FLOW_ID).map((step) =>
+        step.id === GATE_STEP_ID ? { ...step, status: "done", evidence: { kind: "artifact" as const, ref: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md` } } : step,
+      ),
+      { id: "delivery-after-gate-2", kind: "dispatch", status: "pending", owner: "executor", dependsOn: [GATE_STEP_ID] },
+    ]);
+    writeFlowStateFile(root, GATE_FLOW_ID, revisedFlow);
+    const healthy = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await healthy.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      healthy.controls.get("convener")!.settle();
+      await waitFor(() => gateConvenerTasks(healthy).some((task) => task.startsWith("[Gate 通过]")));
+      await waitPassHandoffSent(root);
+      const task = gateConvenerTasks(healthy).find((text) => text.startsWith("[Gate 通过]"))!;
+      assert.ok(task.includes("delivery-after-gate-2"), "重试重算两组（新步骤可见）");
+      assert.ok(task.includes(`收口后的 flow revision：${flowRevisionOf(root, GATE_FLOW_ID)}`), "使用当前 revision");
+      const passHandoff = readHandoffRoutingFile(root, GATE_FLOW_ID).passHandoff!;
+      assert.equal(passHandoff.delivery?.attempts, 2, "只重试转交一次");
+      assert.ok(passHandoff.stewardDispatchableStepIds?.includes("delivery-after-gate-2"));
+      assert.equal(passHandoff.flowRevision, flowRevisionOf(root, GATE_FLOW_ID));
+      // 不重复 passNote 事实行以外的判定/审计。
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.filter((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID).length, 1);
+    } finally {
+      await healthy.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 历史 passed（无 passHandoff）：不追溯转交、只诊断", async () => {
+  const root = makeTempProjectRoot("ans-gate-pass-legacy-");
+  try {
+    writeFlowStateFile(
+      root,
+      GATE_FLOW_ID,
+      flowStateYaml(
+        GATE_FLOW_ID,
+        gateFlowSteps(GATE_FLOW_ID).map((step) =>
+          step.id === GATE_STEP_ID
+            ? { ...step, status: "done", evidence: { kind: "artifact" as const, ref: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md` } }
+            : step,
+        ),
+      ),
+    );
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "pass");
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, {
+        status: "passed",
+        conclusion: "pass",
+        reportSha256: createHash("sha256")
+          .update(readFileSync(path.join(root, "docs", "acceptance", `${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`)))
+          .digest("hex"),
+        decidedAt: new Date().toISOString(),
+      });
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      harness.controls.get("convener")!.settle();
+      await sleep(400);
+      assert.equal(gateConvenerTasks(harness).length, 0, "历史 passed 不追溯转交");
+      assert.equal(existsSync(gateHandoffRoutingAbsPath(root, GATE_FLOW_ID)), false, "不补写 passHandoff 路由记录");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————————————— 2026-10-27 S5b：O3 看护 tick 扫描 + O1 质检忙跳过 ——————————————
+
+test("2026-10-27 O3 看护 tick：无真实事件也能扫描 gate 记录（机械退回）；重复 tick 不刷屏", async () => {
+  const root = makeTempProjectRoot("ans-o3-tick-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root }, {
+      watchdogOptions: { config: { tickMs: 20 } },
+    });
+    try {
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      writeRawGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, syntaxBadGateReport());
+      harness.iface.startWatchdog();
+      await waitGateStatus(root, "returned-to-proof");
+      await waitGateHandoffSends(harness, 1, 1);
+      // 多个 tick：同一被拒报告/同身份不重复补正、不重复告知。
+      await sleep(500);
+      assert.equal(gateTaskSends(harness).length, 1, "重复 tick 不重复补正");
+      assert.equal(gateConvenerTasks(harness).length, 1, "重复 tick 不重复告知");
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "returned-to-proof");
+      harness.iface.stopWatchdog();
+    } finally {
+      harness.iface.stopWatchdog();
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 O1 收尾：质检忙/有排队时跳过缺报告提醒（不并发注入）", async () => {
+  const root = makeTempProjectRoot("ans-o1-busy-");
+  try {
+    const busyFlow = "flow-o1-busy";
+    // 先让质检忙：flow A 的「请汇报」提醒经 manager.sendBackground 发出后，脚本会话不 settle ⇒ busy。
+    writeFlowStateFile(
+      root,
+      busyFlow,
+      flowStateYaml(busyFlow, [
+        { id: "acceptance-criteria", kind: "artifact", status: "pending", owner: "verifier" },
+        { id: "verification", kind: "acceptance", status: "pending", owner: "app" },
+      ]),
+    );
+    writeGateCriteria(root, busyFlow);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "liaison", runtime: "demo" })).ok, true);
+      harness.controls.get("liaison")!.settle();
+      await waitFor(() => (harness.sendsByRole.get("verifier") ?? []).some((text) => text.includes("[请汇报]")));
+      // 质检已忙；再放一个 dispatched + 无报告的 gate 记录。
+      writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+      writeGateCriteria(root, GATE_FLOW_ID);
+      await seedGateLedger(root, GATE_FLOW_ID);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      harness.controls.get("liaison")!.settle();
+      await sleep(500);
+      assert.equal(
+        (harness.sendsByRole.get("verifier") ?? []).some((text) => text.startsWith("[Gate 报告提醒]")),
+        false,
+        "质检忙时不发缺报告提醒",
+      );
+      assert.equal(
+        gateConvenerTasks(harness).some((text) => text.startsWith("[Gate 报告提醒]")),
+        false,
+        "质检忙时不发统筹提醒知情",
+      );
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "dispatched", "提醒跳过不改变记录");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 gate 退回投递耗尽：3 次后 exhausted、停止自动发送并给统筹人工任务", async () => {
+  const root = makeTempProjectRoot("ans-gate-handoff-exhaust-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(
+      root,
+      { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root },
+      { failOpenRoles: new Set(["verifier"]) },
+    );
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      writeRawGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, syntaxBadGateReport());
+      await settleConvenerUntil(harness, () => {
+        const deliveries = readHandoffRoutingFile(root, GATE_FLOW_ID).latestReturn?.deliveries ?? [];
+        return deliveries.some((delivery) => delivery.kind === "verifier-correction" && delivery.status === "exhausted");
+      });
+      const routing = readHandoffRoutingFile(root, GATE_FLOW_ID);
+      const verifierDelivery = routing.latestReturn?.deliveries?.find((delivery) => delivery.kind === "verifier-correction");
+      assert.equal(verifierDelivery?.status, "exhausted");
+      assert.equal(verifierDelivery?.attempts, 3);
+      const convenerTasks = gateConvenerTasks(harness);
+      assert.ok(
+        convenerTasks.some((task) => task.includes("[Gate 退回·需人工]") && task.includes("耗尽")),
+        "耗尽后给统筹人工任务",
+      );
+      assert.equal(harness.sendsByRole.get("verifier"), undefined);
+      // 继续扫描：exhausted 不再自动发送。
+      const before = gateConvenerTasks(harness).length;
+      harness.controls.get("convener")!.settle();
+      await sleep(300);
+      assert.equal(gateConvenerTasks(harness).length, before, "exhausted 后不再自动发送");
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "returned-to-proof");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————————————— 2026-10-27 S6 返工：P16 路由记录重建 / P18 不可读身份 ——————————————
+
+test("2026-10-27 P16 重建（returned 事件）：路由记录损坏但可重建 ⇒ 按已知 cause 正常补正/知情；同一旧报告不重开", async () => {
+  const root = makeTempProjectRoot("ans-gate-rebuild-return-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched" });
+      writeRawGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, syntaxBadGateReport());
+      const routingPath = gateHandoffRoutingAbsPath(root, GATE_FLOW_ID);
+      mkdirSync(path.dirname(routingPath), { recursive: true });
+      writeFileSync(routingPath, "{ not-json");
+      harness.controls.get("convener")!.settle();
+      await waitGateStatus(root, "returned-to-proof");
+      await waitGateHandoffSends(harness, 1, 1);
+      await waitHandoffDeliveriesSent(root, GATE_FLOW_ID);
+
+      const routing = readHandoffRoutingFile(root, GATE_FLOW_ID);
+      assert.notEqual(routing.rebuiltAt, null, "重建标记");
+      assert.equal(routing.latestReturn?.cause, "report-invalid", "cause 来自分支机械判定，不是猜测");
+      assert.match(String(routing.latestReturn?.rejectedIdentity?.reportSha256), /^[a-f0-9]{64}$/);
+      assert.ok(routing.latestReturn?.deliveries?.every((delivery) => delivery.status === "sent"));
+      const record = readGateRecordFile(root, GATE_FLOW_ID);
+      assert.equal(record.status, "returned-to-proof");
+      assert.match(String(record.reportSha256), /^[a-f0-9]{64}$/, "不覆盖为 null");
+      const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${GATE_FLOW_ID}.yaml`), "utf8"), GATE_FLOW_ID);
+      assert.ok(parsed.ok);
+      assert.equal(parsed.flow.steps.find((step) => step.id === GATE_STEP_ID)?.status, "pending");
+
+      // 同一旧报告重复扫描：不重开、不重复任务。
+      harness.controls.get("convener")!.settle();
+      await sleep(300);
+      assert.equal(gateTaskSends(harness).length, 1);
+      assert.equal(gateConvenerTasks(harness).length, 1);
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "returned-to-proof", "同一旧报告不转 dispatched");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 P16 重建（passed 扫描）：路由记录损坏但报告身份/收口状态可重建 ⇒ 重建 passHandoff 并转交", async () => {
+  const root = makeTempProjectRoot("ans-gate-rebuild-pass-");
+  try {
+    writeFlowStateFile(
+      root,
+      GATE_FLOW_ID,
+      flowStateYaml(GATE_FLOW_ID, [
+        ...gateFlowSteps(GATE_FLOW_ID)
+          .filter((step) => step.id !== "delivery-after-gate")
+          .map((step) =>
+            step.id === GATE_STEP_ID
+              ? { ...step, status: "done", evidence: { kind: "artifact" as const, ref: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md` } }
+              : step,
+          ),
+        // 仅知情 ready（verifier）⇒ 通用 [自动推进] 不触发，避免抢先占用统筹会话。
+        { id: "verifier-followup", kind: "artifact" as const, status: "pending", owner: "verifier", dependsOn: [GATE_STEP_ID] },
+      ]),
+    );
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      await sleep(120);
+      writeGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1, "pass");
+      const reportSha = createHash("sha256")
+        .update(readFileSync(path.join(root, "docs", "acceptance", `${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md`)))
+        .digest("hex");
+      writeGateRecord(root, GATE_FLOW_ID, {
+        status: "passed",
+        conclusion: "pass",
+        reportSha256: reportSha,
+        decidedAt: new Date().toISOString(),
+      });
+      const routingPath = gateHandoffRoutingAbsPath(root, GATE_FLOW_ID);
+      mkdirSync(path.dirname(routingPath), { recursive: true });
+      writeFileSync(routingPath, "{ not-json");
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      harness.controls.get("convener")!.settle();
+      await waitFor(() => gateConvenerTasks(harness).some((task) => task.startsWith("[Gate 通过]")));
+      await waitPassHandoffSent(root);
+
+      const routing = readHandoffRoutingFile(root, GATE_FLOW_ID);
+      assert.notEqual(routing.rebuiltAt, null, "重建标记");
+      assert.equal(routing.passHandoff?.reportSha256, reportSha);
+      assert.equal(routing.passHandoff?.delivery?.status, "sent");
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "passed");
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.filter((entry) => entry.kind === "gate.review" && entry.flowId === GATE_FLOW_ID).length, 1);
+
+      // 重复扫描：sent ⇒ 不重复转交。
+      harness.controls.get("convener")!.settle();
+      await sleep(300);
+      assert.equal(gateConvenerTasks(harness).filter((text) => text.startsWith("[Gate 通过]")).length, 1);
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 P16 不可重建（报告身份缺失）：passed 记录无 sha + 路由损坏 ⇒ 零发送、主理如实、记录不变", async () => {
+  const root = makeTempProjectRoot("ans-gate-rebuild-unrebuildable-");
+  try {
+    writeFlowStateFile(
+      root,
+      GATE_FLOW_ID,
+      flowStateYaml(
+        GATE_FLOW_ID,
+        gateFlowSteps(GATE_FLOW_ID).map((step) =>
+          step.id === GATE_STEP_ID
+            ? { ...step, status: "done", evidence: { kind: "artifact" as const, ref: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v1.md` } }
+            : step,
+        ),
+      ),
+    );
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "passed", conclusion: "pass", reportSha256: null, decidedAt: new Date().toISOString() });
+      const routingPath = gateHandoffRoutingAbsPath(root, GATE_FLOW_ID);
+      mkdirSync(path.dirname(routingPath), { recursive: true });
+      writeFileSync(routingPath, "{ not-json");
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      harness.controls.get("convener")!.settle();
+      await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes("无法按报告身份重建通过转交")));
+      assert.equal(gateConvenerTasks(harness).length, 0, "不可重建不发统筹任务");
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "passed", "记录不变");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 P18 不可读 R5：rejectedIdentity 用 size/mtime 判同一报告，不重复退回", async () => {
+  const root = makeTempProjectRoot("ans-gate-unreadable-r5-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    makeUnreadableGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, {
+        status: "dispatched",
+        reportVersion: 2,
+        reportPath: `docs/acceptance/${GATE_FLOW_ID}-${GATE_STEP_ID}-report-v2.md`,
+      });
+      harness.controls.get("convener")!.settle();
+      await waitGateStatus(root, "returned-to-proof");
+      await waitGateHandoffSends(harness, 1, 1);
+      const routing = readHandoffRoutingFile(root, GATE_FLOW_ID);
+      assert.equal(routing.latestReturn?.cause, "version-older");
+      assert.equal(routing.latestReturn?.rejectedIdentity?.reportSha256, null, "不可读：sha 为 null");
+      assert.equal(typeof routing.latestReturn?.rejectedIdentity?.size, "number", "size 已记录");
+      assert.equal(typeof routing.latestReturn?.rejectedIdentity?.mtimeMs, "number", "mtime 已记录");
+
+      // 同一目录（同 size/mtime）重复扫描：不重复退回、不重复任务。
+      harness.controls.get("convener")!.settle();
+      await sleep(300);
+      assert.equal(gateTaskSends(harness).length, 1);
+      assert.equal(gateConvenerTasks(harness).length, 1);
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "returned-to-proof");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 P18 不可读 R6：候选变化 rejectedIdentity 用 size/mtime；新版本也不自动放行", async () => {
+  const root = makeTempProjectRoot("ans-gate-unreadable-r6-");
+  try {
+    writeFlowStateFile(root, GATE_FLOW_ID, flowStateYaml(GATE_FLOW_ID, gateFlowSteps(GATE_FLOW_ID)));
+    writeGateCriteria(root, GATE_FLOW_ID);
+    await seedGateLedger(root, GATE_FLOW_ID);
+    makeUnreadableGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 1);
+    const harness = await makeHarness(root, { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root });
+    try {
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+      await sleep(120);
+      writeGateRecord(root, GATE_FLOW_ID, { status: "dispatched", flowRevision: "old-candidate-revision" });
+      harness.controls.get("convener")!.settle();
+      await waitGateStatus(root, "returned-to-proof");
+      await waitGateHandoffSends(harness, 0, 1);
+      const routing = readHandoffRoutingFile(root, GATE_FLOW_ID);
+      assert.equal(routing.latestReturn?.cause, "candidate-changed");
+      assert.equal(routing.latestReturn?.rejectedIdentity?.reportSha256, null);
+      assert.equal(typeof routing.latestReturn?.rejectedIdentity?.size, "number");
+      assert.equal(typeof routing.latestReturn?.rejectedIdentity?.mtimeMs, "number");
+
+      // 新版本不可读报告：R6 仍不自动开启新一轮（等统筹重新请求）。
+      makeUnreadableGateReport(root, GATE_FLOW_ID, GATE_STEP_ID, 2);
+      harness.controls.get("convener")!.settle();
+      await sleep(300);
+      assert.equal(gateTaskSends(harness).length, 0);
+      assert.equal(gateConvenerTasks(harness).length, 1);
+      assert.equal(readGateRecordFile(root, GATE_FLOW_ID).status, "returned-to-proof");
     } finally {
       await harness.iface.stopSession();
     }

@@ -9,6 +9,9 @@
 // 本文件只钉住 `VERIFIER_CARD_TEXT` 的文本语义与注册表数据面；`report_artifact_ready` 的工具实现、
 // 应用自动派发文案与运行时/桌面/编排改动不在门禁引擎边界内。既有验收标准结构、证据、风险档位、
 // 版本冻结、`view_image` 不得假看、gate 复核与验收分诊等安全检查必须保留。
+// 2026-10-27 O2（gate-review-return-routing）：Proof 卡补充同一轮复核的 `[Gate 报告补正]` 与
+// `[Gate 报告不可读提醒]` 系统任务（应用机械发送、不是客户消息/新复核轮次/改判要求；补正只改
+// 报告结构、不标 flow done、不改写客户决定、不重开返工）；基线 gate 纪律逐字保留。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -190,4 +193,60 @@ test("2026-10-27 工件就绪汇报：只改卡文本——注册表数据面（
   assert.ok(verifier.forbiddenWritePaths.includes("docs/flows/"), "Proof 仍禁写 docs/flows/");
   assert.ok(verifier.forbiddenWritePaths.includes("角色卡/verifier/"), "Proof 仍禁写 角色卡/verifier/");
   assert.ok(verifier.forbiddenWritePaths.includes(".ans/"), "Proof 仍禁写 .ans/");
+});
+
+// —————————————————————— 2026-10-27 O2：Proof 卡 gate 报告补正 / 报告不可读提醒（gate-review-return-routing） ——————————————————————
+
+test("2026-10-27 O2：Proof 卡补充同轮复核的 Gate 报告补正与报告不可读提醒（应用机械任务、不是新复核轮次、不要求改判；补正不越权）", () => {
+  // 闸门 1 已选 O2（Q9 A，范围收窄）：Proof 卡说明会收到应用同一轮复核的
+  // `[Gate 报告补正]` 与 `[Gate 报告不可读提醒]` 系统任务——来源是应用、不是客户消息 / 新复核
+  // 轮次 / 改判要求；补正只改报告结构、按标准重核，不标 flow done、不改写客户决定、不重开返工。
+  const v = governanceRoleOf("verifier")!.cardText;
+
+  assertIncludesAll(
+    v,
+    [
+      "## Gate 报告补正与报告不可读提醒（应用系统任务，必须）",
+      "`[Gate 报告补正]`",
+      "`[Gate 报告不可读提醒]`",
+      // 来源：应用机械发送，不是客户 / 主理 / 统筹重新发起的复核请求。
+      "由**应用**机械发送",
+      "不是客户消息",
+      "不是产品 / Lead 的发言",
+      "也不是运营 / Steward 重新发起的复核请求",
+      // 同一轮复核的机械补正：不是新复核轮次、不改复核对象、不要求改判 pass。
+      "属于**同一轮**复核（`requestId` 未变、候选未变）的机械补正",
+      "**不是新一轮复核、不改变复核对象，也不要求你改判 `pass`**",
+      "内容判定仍由你按 gate 复核标准独立做出",
+      "按错误清单修正报告结构、按标准重新核对",
+      "不得为迎合任务改判",
+      "不得把补正提醒当成客户批准",
+      // 补正边界：只改报告结构、版本化不覆盖；不标 flow done、不写账本/客户决定、不重开返工。
+      "只补正 gate 报告结构 / 按标准重新核对并写版本化新报告",
+      "不覆盖旧版本",
+      "不标任何 flow 步骤 `done`",
+      "不写 flow / 账本 / `customer.decision`",
+      "不改写客户决定",
+      "不替运营 / Steward 重开返工或改变返工范围",
+      "提醒本身不创建退回状态",
+      "应用会在观测到新报告版本时机械复核",
+      // 基线 1465833 的既有 gate 纪律保留（不触发返工、minor/nit fail 属结构不符）。
+      "应用会退回你补报告，**不触发返工**",
+      "只有 `minor` / `nit` 的 fail 属结构不符",
+    ],
+    "Proof O2 gate 报告补正与不可读提醒",
+  );
+
+  // 通道归属与越权边界不变：Proof 不定义统筹专用工具，也不出现 flow-busy / 自动通过 / 派 worker 表述。
+  for (const forbidden of [
+    "request_gate_review",
+    "request_acceptance",
+    "flow-busy",
+    "应用会自动通过",
+    "应用可自动通过",
+    "应用可派 worker",
+    "质检可以标 gate done",
+  ]) {
+    assert.equal(v.includes(forbidden), false, `Proof 卡不得出现越权/越界表述「${forbidden}」`);
+  }
 });

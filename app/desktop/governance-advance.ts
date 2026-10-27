@@ -35,6 +35,7 @@ import type {
   AcceptanceTriageRecommendation,
   AcceptanceTriageSection,
   AcceptanceTriageSeverity,
+  ReadyFlowStep,
 } from "../../src/pipeline/orchestration/flow-state.ts";
 import type { RuntimeKind } from "../../src/common/shared/runtime-shared.ts";
 import { mainT } from "./i18n.ts";
@@ -1792,4 +1793,398 @@ export function governanceAcceptanceTriageReturnedNote(detail: string): string {
 /** 验收报告不可读时的系统行（含具体错误；调用方去重）。 */
 export function governanceAcceptanceTriageMissingReportNote(detail: string): string {
   return mainT("ui.triage.missingReport", { detail });
+}
+
+// —————————————— 2026-10-27 gate 退回重报 / 报告不可读提醒 / 通过转交（方案 v3.2 §3.1.2/§3.1.3/§3.2/§4.3） ——————————————
+//
+// 四个**纯文本构建器**（无 IO、无判定）：应用在 gate 记录转入 `returned-to-proof`（报告侧 R1–R5）、
+// 报告存在但不可读（R2b）/缺报告提前提醒（O1）、以及 gate 通过收口（`passed`）后，把可执行的下一步
+// 交给质检（verifier）与统筹（convener）。任务文本是 **agent 任务文本**，不是客户 UI 文案（用户可见
+// 系统行走 PM 属主的 i18n `main.gateReview.*`，不在本模块）。
+//
+// 硬边界（方案 §3.7/§5.5）：
+//  · 判定权仍只属于 Proof 报告与 `completeGateStep` 机械校验：本模块**不判通过、不改报告、不引号化**；
+//  · 补正任务是**同一轮复核**（同一 requestId、同一候选）的机械补正：不是统筹的新请求、不是新复核轮次；
+//  · 通过转交只是通知：应用不调用 `dispatch_task`、不打开 worker、不派生下游任务；
+//  · 不写 flow/账本/`customer.decision`；任务只带错误摘要与路径指针，**不附报告正文、凭据或命令原文**。
+
+/**
+ * gate 退回原因（app 私有；方案 §4.3）。只用于应用内路由记录/诊断/任务文案，
+ * **不是**共享枚举，不进入 flow/账本/角色契约。
+ */
+export type GateReturnCause =
+  | "stale-missing"
+  | "report-missing"
+  | "report-unobservable"
+  | "report-invalid"
+  | "nonblocking-fail"
+  | "version-older"
+  | "candidate-changed"
+  | "legacy";
+
+/** 报告不可读/缺报告的提醒原因（R2b / O1；提醒不转退回，方案 §4.3）。 */
+export type GateReminderCause = "report-unreadable" | "report-missing-early";
+
+/** 报告侧缺陷（R1–R5）：应用在同一轮复核内直接给质检发补正任务，不换候选。 */
+export type GateReportCorrectionCause = Exclude<GateReturnCause, "candidate-changed" | "legacy">;
+
+export const GATE_RETURN_CAUSE_LABELS: Readonly<Record<GateReturnCause, string>> = {
+  "stale-missing": "派发后超过陈旧阈值仍无报告",
+  "report-missing": "报告缺失",
+  "report-unobservable": "报告不可安全读取",
+  "report-invalid": "报告结构不合规（acceptance-triage/v1）",
+  "nonblocking-fail": "fail/conditional 只有 minor/nit",
+  "version-older": "报告版本早于派发要求版本",
+  "candidate-changed": "候选已变化（flow revision 不符）",
+  legacy: "历史退回记录（无路由记录）",
+};
+
+export const GATE_REMINDER_CAUSE_LABELS: Readonly<Record<GateReminderCause, string>> = {
+  "report-unreadable": "最新报告存在但读取失败",
+  "report-missing-early": "尚未观测到请求版本的报告",
+};
+
+/**
+ * 通用**格式要求清单**（方案 §3.1.2 第 3 点）：补正任务缺省渲染本清单；调用方可传入
+ * 与本次错误相关的补充/定制清单（空数组仍回落到本清单，避免「请修正格式」的空话）。
+ */
+export const GATE_REPORT_FORMAT_REQUIREMENTS: readonly string[] = [
+  "报告必须包含恰好一个 fenced YAML 段（```yaml），不要多个、不要嵌在其它代码块里；",
+  "段内 `schema` 必须为 `acceptance-triage/v1`；",
+  "顶层 `conclusion` 只允许 `pass` / `fail` / `conditional`；",
+  "`items` 每项必填 `id` / `severity` / `owner` / `reason` / `action`；id 唯一、owner 恰好一个角色、reason（不通过原因）与 action（改进方案）非空；action 至少带 `targets` 或 `criteria` 之一；",
+  "`fail` / `conditional` 必须至少一个 blocker/major；`pass` 不得带 blocker/major（可保留 minor/nit 备注）；",
+  "`severity` 只允许 `blocker` / `major` / `minor` / `nit` 四档；",
+  "字符串含 YAML 保留字符时必须加引号或使用块标量：尤其不要以反引号、`:`、`#`、`{`、`[`、`*`、`&`、`!`、`|`、`>`、`%`、`@` 等字符开头的裸标量；",
+  "遵守应用的长度/条数上限（单条 reason/action 与 items 数量有界）；超限会被按结构不符退回；",
+];
+
+/** 单条可执行错误（语义错误给字段路径；YAML 语法错误给 `$` + 行/列与原始原因）。 */
+export interface GateReportCorrectionError {
+  path: string;
+  message: string;
+}
+
+/** `buildGateReportCorrectionTaskMessage` 输入（方案 §4.3；纯值对象）。 */
+export interface GateReportCorrectionTaskInput {
+  flowId: string;
+  gateId: string;
+  gateKind: string;
+  /** gate 步骤标题（flow 中的步骤标题原文）。 */
+  gateTitle: string;
+  /** 最新验收标准中含该 gateId 的 Gate 复核标准节路径。 */
+  criteriaPath: string;
+  /** 候选流程版本（flow YAML sha256）。 */
+  flowRevision: string;
+  /** 同一轮 gate 复核的请求 id（gate 记录 `requestId`；缺省不渲染）。 */
+  requestId?: string;
+  cause: GateReportCorrectionCause;
+  /** 被退回/需要补正的上一份报告（若有；保留备查、不覆盖）。 */
+  previousReportPath?: string;
+  previousReportVersion?: number;
+  /** 被拒报告的真实 sha256（可读时由调用方给出；不可读时缺省）。 */
+  previousReportSha256?: string;
+  /**
+   * R5（version-older）的**派发要求版本**（在覆盖 `record.reportVersion` 前捕获）；
+   * 渲染在任务里，明确「按该版本写，不是最新+1」。缺省回落 `nextReportVersion`。
+   */
+  expectedReportVersion?: number;
+  /** 应用要求质检写的下一份报告路径（版本化、不覆盖旧报告）。 */
+  nextReportPath: string;
+  nextReportVersion: number;
+  /** 可执行原因（`path: message`；最多渲染 5 条）。 */
+  errors: readonly GateReportCorrectionError[];
+  /** 格式要求清单；缺省/空 ⇒ `GATE_REPORT_FORMAT_REQUIREMENTS`。 */
+  formatRequirements?: readonly string[];
+}
+
+function gateCorrectionCauseInstruction(input: GateReportCorrectionTaskInput): string {
+  switch (input.cause) {
+    case "stale-missing":
+    case "report-missing":
+      return "本轮没有可安全读取的上一份报告：请按 gate 记录要求的路径与版本补交报告（不覆盖任何既有版本）。";
+    case "report-unobservable":
+      return "上一份报告不可安全读取：请按 gate 记录要求的路径与版本补交/重写为可读报告（不覆盖任何既有版本）。";
+    case "report-invalid":
+      return "上一份报告结构不合规：请按下方错误清单补正结构，并写新版本报告（不覆盖旧报告）。";
+    case "nonblocking-fail":
+      return "上一份报告结论为 fail/conditional，但没有任何 blocker/major：请按标准重新判定并写新版本报告（不覆盖旧报告）。";
+    case "version-older":
+      return "最新报告版本早于派发要求的版本：请按派发要求的版本写报告，不是在最新版本上 +1。";
+  }
+}
+
+/**
+ * 质检「补正任务」（方案 §3.1.2；R1–R5 同一轮机械退回）：标题 `[Gate 报告补正]`，含 gate 身份/标准/
+ * 候选 revision/上一份报告 path/version/sha、可执行原因（最多 5 条）、格式要求清单、下一份版本化报告；
+ * 边界：只补正结构/按标准重核，不改判结论、不标 flow done、不写 flow/账本/customer.decision。
+ * 纯函数，无 IO；任务文本不含任何“已接受/已通过”式结论字样，不附报告正文、凭据或命令原文。
+ */
+export function buildGateReportCorrectionTaskMessage(input: GateReportCorrectionTaskInput): string {
+  const previousReportLine =
+    input.previousReportPath !== undefined
+      ? `上一份报告：${input.previousReportPath}${input.previousReportVersion !== undefined ? `（v${input.previousReportVersion}）` : ""}${typeof input.previousReportSha256 === "string" && input.previousReportSha256 !== "" ? `；sha256 ${input.previousReportSha256}` : ""}；保留备查，不要覆盖。`
+      : "上一份报告：无（本轮无可安全读取的报告；不要覆盖任何既有版本）。";
+  const errorLines = input.errors
+    .slice(0, 5)
+    .map((item) => `- ${item.path}: ${item.message}`);
+  if (input.errors.length > 5) {
+    errorLines.push(`- ……（另有 ${input.errors.length - 5} 条错误未展开；见 gate 记录 error 摘要与应用诊断）`);
+  }
+  if (errorLines.length === 0) {
+    errorLines.push("- $: acceptance-triage/v1 段缺失或不可解析（按下方格式要求清单补正）");
+  }
+  const formatRequirements =
+    input.formatRequirements !== undefined && input.formatRequirements.length > 0
+      ? input.formatRequirements
+      : GATE_REPORT_FORMAT_REQUIREMENTS;
+  const expectedNote =
+    input.cause === "version-older"
+      ? `派发要求版本：v${input.expectedReportVersion ?? input.nextReportVersion}（按该版本写，不是“最新+1”）。`
+      : "";
+  const r4Note =
+    input.cause === "nonblocking-fail"
+      ? "R4（仅 minor/nit 的 fail）判定要求：按标准重新判定——若确实没有 blocker/major，可改为 pass 并保留 minor/nit 备注；若确有 blocker/major，必须如实列明依据并保持 fail。应用不替你做结论。"
+      : "";
+  return [
+    `[Gate 报告补正] 流程 ${input.flowId}｜gate ${input.gateId}｜gateKind=${input.gateKind}｜gate 步骤标题：${input.gateTitle}`,
+    `这是应用按 gate 记录对同一轮 gate 复核${input.requestId !== undefined ? `（requestId ${input.requestId}）` : ""}的机械退回补正通知：不是统筹的新请求、不是客户消息、不是新一轮复核；requestId 与候选不变，只补正报告结构/按标准重新核对。`,
+    `复核标准：${input.criteriaPath}（Gate 复核标准节；必须含 gateId=${input.gateId}）。`,
+    `候选 flowRevision：${input.flowRevision}`,
+    previousReportLine,
+    `退回原因：${GATE_RETURN_CAUSE_LABELS[input.cause]}（cause=${input.cause}）。`,
+    gateCorrectionCauseInstruction(input),
+    "可执行原因（path: message；最多 5 条）：",
+    ...errorLines,
+    "格式要求清单：",
+    ...formatRequirements.map((line) => `- ${line}`),
+    `要写的下一份报告：${input.nextReportPath}（v${input.nextReportVersion}；版本化、不覆盖任何既有版本）。`,
+    ...(expectedNote !== "" ? [expectedNote] : []),
+    ...(r4Note !== "" ? [r4Note] : []),
+    "边界与要求：",
+    "1) 只补正 gate 报告结构/按标准重新核对；内容判定仍由你按标准独立作出，应用不要求你改判结论、不检查结论是否符合期望、不代写报告。",
+    "2) 不要标任何 flow 步骤 done、不写 flow / 账本 / customer.decision；完成后正常结束回合，应用会在观测到新版本报告时机械复核。",
+    "3) 本任务只带错误摘要与路径指针：不附报告正文、凭据或命令原文；不要伪造客户批准，也不要把本补正通知当成任何决定或批准。",
+  ].join("\n");
+}
+
+/** `buildGateReportReminderTaskMessage` 输入（R2b / O1；提醒不转退回，方案 §4.3）。 */
+export interface GateReportReminderTaskInput {
+  flowId: string;
+  gateId: string;
+  gateKind: string;
+  /** gate 步骤标题（可选；flow 中步骤标题原文）。 */
+  gateTitle?: string;
+  /** 同一轮 gate 复核的请求 id（gate 记录 `requestId`；缺省不渲染）。 */
+  requestId?: string;
+  cause: GateReminderCause;
+  /** gate 记录要求的报告路径。 */
+  reportPath: string;
+  /** gate 记录要求的报告版本。 */
+  reportVersion: number;
+  /** 可执行细节（读取错误/派发时间等；有界，不含报告正文/凭据/命令原文）。 */
+  detail: string;
+}
+
+/**
+ * 质检「报告不可读/补交提醒」（方案 §3.1.1 R2b、Q3 A/O1）：**一次性提醒，不是退回**——声明 gate 记录
+ * 仍为 `dispatched`、应用未判退回/未判通过；R2b 检查可读性/按请求版本重写可读版本，O1 按请求版本补交。
+ * 纯函数，无 IO。
+ */
+export function buildGateReportReminderTaskMessage(input: GateReportReminderTaskInput): string {
+  const title = input.cause === "report-unreadable" ? "[Gate 报告不可读提醒]" : "[Gate 报告提醒]";
+  const instruction =
+    input.cause === "report-unreadable"
+      ? "请检查该报告路径是否存在、是否为目录、读取权限/编码是否正常；可修复 ⇒ 按请求版本重写为可读报告（不要覆盖无关版本）；无法修复 ⇒ 如实说明原因，不要伪造可读。"
+      : "应用尚未观测到请求版本的 gate 报告：若你仍在撰写，请继续并按 gate 记录要求的路径/版本写报告；若已完成，请核对路径与版本后补交（不覆盖任何既有版本）。";
+  return [
+    `${title} 流程 ${input.flowId}｜gate ${input.gateId}｜gateKind=${input.gateKind}${input.gateTitle !== undefined ? `｜gate 步骤标题：${input.gateTitle}` : ""}`,
+    `这是应用发出的一次性提醒（${GATE_REMINDER_CAUSE_LABELS[input.cause]}；cause=${input.cause}）${input.requestId !== undefined ? `；requestId ${input.requestId}` : ""}：gate 记录仍为 dispatched——应用未判退回、也未判通过，gate 步骤保持 pending；本条不是退回记录、不是客户/统筹催促。`,
+    `报告路径：${input.reportPath}（请求版本 v${input.reportVersion}）。`,
+    `细节：${input.detail}`,
+    "要求：",
+    `1) ${instruction}`,
+    "2) 只处理报告可读性/补交与本轮结构要求；内容判定仍由你按标准做，应用不要求你改判结论。",
+    "3) 不要标任何 flow 步骤 done、不写 flow / 账本 / customer.decision；本任务不附报告正文、凭据或命令原文。完成后正常结束回合，应用会在观测到可读报告时机械复核。",
+  ].join("\n");
+}
+
+/** 质检补正/提醒的**实际投递结果**（如实：已投递/已排队/未送达；排队 ≠ 已执行）。 */
+export interface GateHandoffDeliveryOutcome {
+  status: "sent" | "queued" | "failed";
+  /** 失败原因/排队说明（有界；不含命令原文/凭据）。 */
+  detail?: string;
+}
+
+/** 统筹退回任务的下一步动作（与消息标题一一对应）。 */
+export type GateReturnConvenerAction = "monitor" | "re-request" | "human" | "legacy";
+
+/** `buildGateReturnConvenerTaskMessage` 输入（方案 §4.3；纯值对象）。 */
+export interface GateReturnConvenerTaskInput {
+  flowId: string;
+  gateId: string;
+  gateKind: string;
+  /** 退回原因（报告侧 R1–R5 / 候选变化 R6 / 历史 R7）或提醒原因（R2b/O1 知情）。 */
+  cause: GateReturnCause | GateReminderCause;
+  /** 原因摘要（gate 记录 error / 解析错误摘要；有界）。 */
+  reasonSummary: string;
+  reportPath?: string;
+  reportVersion?: number;
+  /** 质检补正/提醒的投递结果（如实）；无质检任务时缺省（R6/R7/R8 不向质检发送）。 */
+  verifierDeliveryOutcome?: GateHandoffDeliveryOutcome;
+  action: GateReturnConvenerAction;
+  /** R8：同一 gate 连续报告侧退回轮次（human 任务展示用；缺省不写具体轮次）。 */
+  rounds?: number;
+  /** 附加事实（如 R6 的旧/新 revision 对比；有界）。 */
+  detail?: string;
+}
+
+function isGateReminderCause(cause: GateReturnCause | GateReminderCause): cause is GateReminderCause {
+  return cause === "report-unreadable" || cause === "report-missing-early";
+}
+
+function gateReturnConvenerTitle(input: GateReturnConvenerTaskInput): string {
+  if (input.action === "re-request") return "[Gate 退回·需重新请求]";
+  if (input.action === "human") return "[Gate 退回·需人工]";
+  if (input.action === "legacy") return "[Gate 退回·历史记录]";
+  if (input.cause === "report-unreadable") return "[Gate 报告不可读提醒]";
+  if (input.cause === "report-missing-early") return "[Gate 报告提醒]";
+  return "[Gate 退回]";
+}
+
+function gateReturnConvenerDeliveryText(input: GateReturnConvenerTaskInput): string {
+  const noun = isGateReminderCause(input.cause) ? "质检提醒" : "质检补正任务";
+  if (input.verifierDeliveryOutcome === undefined) {
+    return input.action === "monitor"
+      ? `${noun}投递结果：未记录（应用不声称已送达；见 gate 路由记录与诊断）`
+      : "本次未向质检发送任务（应用不自动重派、不猜原因）。";
+  }
+  const statusText =
+    input.verifierDeliveryOutcome.status === "sent"
+      ? "已投递"
+      : input.verifierDeliveryOutcome.status === "queued"
+        ? "已排队（质检忙，经既有投递队列排队；排队 ≠ 已执行）"
+        : "未送达（下一次真实事件/看护 tick 将有界重试）";
+  return `${noun}投递结果：${statusText}${input.verifierDeliveryOutcome.detail !== undefined ? `（${input.verifierDeliveryOutcome.detail}）` : ""}。`;
+}
+
+function gateReturnConvenerStateText(input: GateReturnConvenerTaskInput): string {
+  if (input.action === "monitor" && isGateReminderCause(input.cause)) {
+    return "gate 记录仍为 dispatched：应用未判退回、未判通过；gate 步骤保持 pending。";
+  }
+  if (input.action === "monitor") {
+    return "gate 记录已置 returned-to-proof；gate 步骤保持 pending，未判通过。";
+  }
+  if (input.action === "re-request") {
+    return "旧报告基于旧候选/版本不符，不用于放行；应用未自动重派质检、未替统筹决定复核对象。";
+  }
+  if (input.action === "human") {
+    return `多轮耗尽：同一 gate 已连续 ${input.rounds !== undefined ? `${input.rounds} 轮` : "多轮"}报告侧退回仍未通过机械校验；应用已停止自动补正，且不会自动通过。`;
+  }
+  return "这是实现前已存在的历史退回记录（无路由记录）：应用不自动派质检、不猜具体原因、不把记录转回 dispatched。";
+}
+
+function gateReturnConvenerNextStep(input: GateReturnConvenerTaskInput): string {
+  if (input.action === "monitor") {
+    return "下一步：应用会在观测到新报告版本时机械复核；你不需要重新派发质检，但可核对。";
+  }
+  if (input.action === "re-request") {
+    return `下一步：请在确认新候选后调用 request_gate_review({ flowId: "${input.flowId}", gateId: "${input.gateId}" }) 重新请求复核；旧报告不用于放行。重新请求若遇 flow 在途工作会收到可重试的 flow-busy，按既有卡稍后重试，不要当成失败或已派发。`;
+  }
+  if (input.action === "human") {
+    return "下一步：请人工核对 gate 记录与报告，用既有 flow_step_supersede 换新 gate id 或修订计划；应用不会自动通过，也不会继续自动补正。";
+  }
+  return "下一步：请核对记录后按现有通道（request_gate_review）重新请求复核；应用不自动派质检、不猜具体原因。";
+}
+
+/**
+ * 统筹「退回知情/行动任务」（方案 §3.1.3）：标题按动作分 `[Gate 退回]` / `[Gate 退回·需重新请求]` /
+ * `[Gate 退回·需人工]` / `[Gate 退回·历史记录]`（R2b/O1 知情为不可读提醒标题）；含 gate 身份、原因摘要、
+ * 质检投递结果（如实）、下一步；声明应用机械通知、未替统筹派发、不要派下游/标 gate done。
+ * 纯函数，无 IO。
+ */
+export function buildGateReturnConvenerTaskMessage(input: GateReturnConvenerTaskInput): string {
+  const title = gateReturnConvenerTitle(input);
+  const causeLabel = isGateReminderCause(input.cause)
+    ? GATE_REMINDER_CAUSE_LABELS[input.cause]
+    : GATE_RETURN_CAUSE_LABELS[input.cause];
+  return [
+    `${title} 流程 ${input.flowId}｜gate ${input.gateId}｜gateKind=${input.gateKind}`,
+    `原因：${causeLabel}（cause=${input.cause}）${input.reasonSummary !== "" ? `；摘要：${input.reasonSummary}` : ""}`,
+    ...(input.reportPath !== undefined
+      ? [`报告：${input.reportPath}${input.reportVersion !== undefined ? `（v${input.reportVersion}）` : ""}`]
+      : []),
+    ...(input.detail !== undefined && input.detail !== "" ? [`附加事实：${input.detail}`] : []),
+    gateReturnConvenerDeliveryText(input),
+    gateReturnConvenerStateText(input),
+    gateReturnConvenerNextStep(input),
+    "gate 未收口前不要派下游依赖步骤、不要标 gate done、不要把它当成客户决定或验收通过。",
+    "本消息由应用按 gate 记录机械发送，不是客户/主理/统筹的发言；应用未替统筹派发任何 flow 步骤、未改 flow、未替客户决定。",
+  ].join("\n");
+}
+
+/** `buildGatePassHandoffTaskMessage` 输入（方案 §4.3；纯值对象）。 */
+export interface GatePassHandoffTaskInput {
+  flowId: string;
+  gateId: string;
+  gateKind: string;
+  /** 收口用的 gate 报告路径/版本/sha256（passed 记录）。 */
+  reportPath: string;
+  reportVersion: number;
+  reportSha256: string;
+  /** gate 步骤收口 done **之后**的 flow revision（flow YAML sha256）。 */
+  flowRevision: string;
+  /**
+   * 「你可派发」：调用方已按 `isStewardExecutableReadyStep` 过滤（owner=convener 的 artifact 或
+   * listing 中非内置项目角色）；本模块不重复判据、不再过滤。
+   */
+  stewardDispatchable: readonly ReadyFlowStep[];
+  /** 「仅知情」：其它内置 owner 的 ready 步骤（不交统筹派）。 */
+  informational: readonly ReadyFlowStep[];
+  /**
+   * 全部 `plan.ready` 排除应用管理步骤的 id（与 `wakeStewardForReadySteps` 同口径去重键；
+   * 供调用方在成功投递后登记 `readyWakeNotified`，本模块不渲染/不判重）。
+   */
+  readyDedupeIds: readonly string[];
+  /** 规划器给出的人工闸门（awaiting-customer / awaiting-acceptance）。 */
+  stopReason?: string;
+}
+
+function formatGateReadyStepLine(step: ReadyFlowStep): string {
+  return `- ${step.id}｜owner=${step.owner}｜kind=${step.kind}｜parallelGroup=${step.parallelGroup ?? "无"}｜dependsOn=${step.dependsOn.length > 0 ? step.dependsOn.join("、") : "无"}｜title=${step.title}`;
+}
+
+/**
+ * 统筹「通过转交任务」（方案 §3.2）：标题 `[Gate 通过]`，含 gate 身份/报告 path/version/sha/收口后
+ * revision、「你可派发」（已由调用方按 `isStewardExecutableReadyStep` 过滤）与「仅知情」列表，或
+ * 「无统筹可执行步骤」+ stopReason 的空原因；行动要求 flow_get → dispatch_task，不重复派已
+ * `dispatch.accepted` 的步骤、不派 acceptance/质检、不替客户决定；声明 gate 通过 ≠ 最终验收 ≠ 客户批准，
+ * 应用未派 worker、未改 flow（除 gate 收口）。纯函数，无 IO。
+ */
+export function buildGatePassHandoffTaskMessage(input: GatePassHandoffTaskInput): string {
+  const dispatchableLines =
+    input.stewardDispatchable.length > 0
+      ? input.stewardDispatchable.map(formatGateReadyStepLine)
+      : [
+          `- 无统筹可执行步骤${input.stopReason !== undefined ? `（stopReason: ${input.stopReason}）` : ""}：当前没有你可派发的就绪步骤。`,
+        ];
+  const informationalLines =
+    input.informational.length > 0
+      ? input.informational.map(formatGateReadyStepLine)
+      : ["- （空）其它内置 owner 当前没有 ready 步骤。"];
+  return [
+    `[Gate 通过] 流程 ${input.flowId}｜gate ${input.gateId}｜gateKind=${input.gateKind}`,
+    `事实：gate 步骤已由应用按 Proof 报告收口 done（gate 记录 passed）；报告：${input.reportPath}（v${input.reportVersion}；sha256 ${input.reportSha256}）。`,
+    `收口后的 flow revision：${input.flowRevision}`,
+    "注意：gate 通过 ≠ 最终验收通过 ≠ 客户批准；最终验收与客户决定仍按既有流程由客户/独立验收作出。",
+    "你可派发（已按既有 isStewardExecutableReadyStep 口径过滤；由你用 dispatch_task 派发）：",
+    ...dispatchableLines,
+    "仅知情（其它内置 owner 的 ready 步骤，由既有应用/治理路径处理；你不要派）：",
+    ...informationalLines,
+    "行动要求：",
+    "1) 先 flow_get 读取当前流程与账本（含 revision），核对依赖与已派发记录后再动作。",
+    "2) 用既有 dispatch_task 按 owner 派发你可派发的步骤（stepId 与 flow 完全一致；同一 parallelGroup 可并行）。",
+    "3) 账本已有 dispatch.accepted 的步骤不要重复派；不要标 gate done、不要派 acceptance / 质检、不要替客户决定。",
+    "本消息是应用机械通知：应用未派发任何 worker、未改 flow（除 gate 收口）、未替统筹判断。",
+  ].join("\n");
 }

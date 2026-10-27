@@ -7741,7 +7741,7 @@ test("2026-10-24 P0-2 ready 唤醒：有 delivered 待核证 ⇒ 本轮只发 de
   }
 });
 
-test("2026-10-27 重启/导入：项目已选 Pi ⇒ gate 恢复系统行不得污染 runtime 提示，ready-wake 必须用 Pi（不得回退 Claude 缺 key）", async () => {
+test("2026-10-27 重启/导入：项目已选 Pi ⇒ gate 恢复系统行不得污染 runtime 提示，通过转交/ready 唤醒必须用 Pi（同周期不重复 [自动推进]）", async () => {
   const root = makeTempProjectRoot("ans-ready-runtime-");
   try {
     const flowId = "flow-ready-runtime";
@@ -7832,8 +7832,9 @@ test("2026-10-27 重启/导入：项目已选 Pi ⇒ gate 恢复系统行不得�
     });
     try {
       await iface.listProject({ projectRoot: root });
-      // ready-wake 必须成功投出 [自动推进]；gate 恢复也在同一次导入扫描中完成。
-      await waitForTest(() => (sendsByRole.get("convener") ?? []).some((text) => text.startsWith("[自动推进]")), 5000);
+      // 设计 §3.2/Q7：gate 通过转交与 [自动推进] 共用 readyWakeNotified 去重 ⇒ 同一事件周期统筹收到
+      // 覆盖「gate 通过 + ready」的 [Gate 通过]（含可派步骤），通用 [自动推进] 跳过。
+      await waitForTest(() => (sendsByRole.get("convener") ?? []).some((text) => text.startsWith("[Gate 通过]")), 5000);
       const gateRecordPath = path.join(root, ".ans", "governance", "acceptance", flowId, "gates", `${gateId}.json`);
       await waitForTest(() => {
         try {
@@ -7842,6 +7843,17 @@ test("2026-10-27 重启/导入：项目已选 Pi ⇒ gate 恢复系统行不得�
           return false;
         }
       }, 5000);
+      const gatePassSends = (sendsByRole.get("convener") ?? []).filter((text) => text.startsWith("[Gate 通过]"));
+      assert.equal(gatePassSends.length, 1, "gate 通过转交恰一条");
+      assert.ok(gatePassSends[0]!.includes("build"), "通过转交携带可派 ready 步骤");
+      assert.ok(gatePassSends[0]!.includes("owner=executor"));
+      // 同 revision + 同一 ready 集合已由 gate-pass 登记 ⇒ 通用 [自动推进] 不再重复发送。
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      assert.equal(
+        (sendsByRole.get("convener") ?? []).filter((text) => text.startsWith("[自动推进]") && !text.includes("停滞")).length,
+        0,
+        "gate-pass 成功登记去重后，同一周期不再发 [自动推进]",
+      );
 
       assert.ok(
         openAttempts.some((attempt) => attempt.roleId === "convener" && attempt.runtime === "pi"),

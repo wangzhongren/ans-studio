@@ -187,6 +187,10 @@ import {
   buildAcceptanceTriageCardLines,
   buildAcceptanceTriageReportText,
   buildFlowStallTaskMessage,
+  buildGatePassHandoffTaskMessage,
+  buildGateReportCorrectionTaskMessage,
+  buildGateReportReminderTaskMessage,
+  buildGateReturnConvenerTaskMessage,
   buildGateReviewTaskMessage,
   buildGovernanceAdvanceMessage,
   buildGovernanceCoordinationTaskMessage,
@@ -216,6 +220,11 @@ import {
   governanceTeamPlanPath,
   type AcceptanceReworkBlockedItem,
   type AcceptanceReworkTaskItem,
+  type GateHandoffDeliveryOutcome,
+  type GateReminderCause,
+  type GateReportCorrectionCause,
+  type GateReportCorrectionError,
+  type GateReturnCause,
   type GovernanceAdvanceResult,
   type GovernanceNextStepContext,
   type GovernanceNextStepPayload,
@@ -993,6 +1002,12 @@ export interface DesktopDeps {
    * 仅测试注入审计失败用（不影响其他账本写入路径）。
    */
   appendGovernanceLedgerFn?: typeof appendGovernanceLedger;
+  /**
+   * 2026-10-27 S6 返工（P8/P16）：`gate-handoff-routing/v1` 的**测试专用故障注入**写入口。
+   * 缺省 = 生产实现 `writeGateJson`；仅供定向单测注入“路由记录可读/合法但写入失败”。
+   * 不改变生产行为、不进入共享契约。
+   */
+  gateHandoffWriteJsonFn?: (projectRoot: string, relPath: string, value: unknown) => Promise<void>;
   /**
    * **恢复确认卡通道（G-2/W5，2026-10-16 客户批准）**：主进程用 `recovery-channel.ts` 构造后注入
    * （`present` 推 `recovery:confirm-request`、回包 `recovery:confirm-response` 走 `respond`）。
@@ -1930,6 +1945,9 @@ function ledgerSummary(text: string): string {
 
 const GATE_REVIEW_RECORD_SCHEMA = "gate-review-record/v1";
 const GATE_REWORK_ROUTING_SCHEMA = "gate-rework-routing/v1";
+// 2026-10-27 gate 退回/提醒/通过路由（方案 v3.2 §4.3/§4.4）：app 私有投递状态记录，用于跨重启幂等与
+// 有界重试。**不是判定证据**，不进入 flow/账本/共享运行时契约；gate 记录仍是唯一的判定状态。
+const GATE_HANDOFF_ROUTING_SCHEMA = "gate-handoff-routing/v1";
 const GATE_RECORD_ROOT_REL = ".ans/governance/acceptance";
 /**
  * `dispatched` 记录长期无报告的**陈旧阈值**（设计 §5.7：允许转 `returned-to-proof`，让统筹可重新请求；
@@ -1947,6 +1965,11 @@ function gateRecordRelPath(flowId: string, gateId: string): string {
 
 function gateReworkRoutingRelPath(flowId: string, gateId: string): string {
   return `${gateRecordDirRel(flowId)}/${gateId}-rework-routing.json`;
+}
+
+/** gate 退回/提醒/通过的路由投递状态记录（app 私有；扫描枚举时必须跳过该后缀）。 */
+function gateHandoffRoutingRelPath(flowId: string, gateId: string): string {
+  return `${gateRecordDirRel(flowId)}/${gateId}-handoff-routing.json`;
 }
 
 type GateReviewRecordStatus = "dispatched" | "passed" | "failed" | "returned-to-proof" | "superseded" | "unavailable";
@@ -2000,6 +2023,109 @@ interface GateReworkRoutingRecord {
   status: "pending" | "sent" | "failed";
   sentAt: string | null;
   error: string | null;
+  at: string;
+}
+
+// —————————————— 2026-10-27 gate 退回/提醒/通过路由记录（方案 v3.2 §4.3–§4.5） ——————————————
+// 每个接收方独立 delivery（部分失败只重试失败方）；`queued:true` 视为已投递（记录为 sent）。
+// 记录只承载**投递状态**（不是判定证据）；gate 记录仍是唯一判定状态，flow/账本不写路由事件。
+
+type GateHandoffStatus = "pending" | "sent" | "failed" | "exhausted";
+type GateHandoffDeliveryKind = "verifier-correction" | "convener-notice" | "convener-pass" | "verifier-reminder";
+
+interface GateHandoffDelivery {
+  kind: GateHandoffDeliveryKind;
+  /** 实际接收角色（verifier / convener；失败/耗尽时记录实际尝试对象）。 */
+  recipientRoleId: string;
+  status: GateHandoffStatus;
+  attempts: number;
+  sentAt: string | null;
+  error: string | null;
+}
+
+/**
+ * 被拒报告的稳定身份（方案 §3.1.1 身份稳定性）：可读时 sha 必须为真实值；不可读时 sha=null，
+ * 用 path+version+size+mtime 判同一性。**同 sha 不同版本视为新报告**。
+ */
+interface GateRejectedReportIdentity {
+  reportPath: string;
+  reportVersion: number;
+  reportSha256: string | null;
+  size: number | null;
+  mtimeMs: number | null;
+}
+
+/** 提醒身份（F10）：只用 requestId + reportPath + reportVersion；不用 size/mtime。 */
+interface GateReminderIdentity {
+  reportPath: string;
+  reportVersion: number;
+}
+
+interface GateHandoffReturnRoute {
+  cause: GateReturnCause;
+  requestId: string;
+  /** 被拒/要求的报告身份（R1/R2 无报告时用 gate 记录请求路径/版本）。 */
+  reportPath: string;
+  reportVersion: number;
+  reportSha256: string | null;
+  /** R5 的派发要求版本（在覆盖 `record.reportVersion` 前捕获；机械复核按它判版本）。 */
+  expectedReportVersion: number | null;
+  /** 被拒报告稳定身份（可读时含真实 sha；不可读时 size/mtime）。 */
+  rejectedIdentity: GateRejectedReportIdentity | null;
+  /** error 文本摘要的 sha256（只用于去重，不存正文）。 */
+  reasonDigest: string;
+  deliveries: GateHandoffDelivery[];
+  at: string;
+  /** S3 补充（app 私有）：投递耗尽后的人工提示已发送时刻（跨重启防重复）。 */
+  humanNoticeAt?: string | null;
+}
+
+interface GateHandoffReminderRoute {
+  cause: GateReminderCause;
+  requestId: string;
+  reportPath: string;
+  reportVersion: number;
+  identity: GateReminderIdentity;
+  /** 提醒细节（R2b 读取错误/ O1 派发时间；有界，不含报告正文/凭据/命令原文）。 */
+  detail?: string;
+  deliveries: GateHandoffDelivery[];
+  at: string;
+  /** S3 补充（app 私有）：提醒达到上限后的人工提示已发送时刻（跨重启防重复）。 */
+  humanNoticeAt?: string | null;
+}
+
+/** 通过转交（S4 使用；S3 只保持 null，形状先固定，避免 S4 改读方兼容面）。 */
+interface GateHandoffPassRoute {
+  reportPath: string;
+  reportVersion: number;
+  reportSha256: string;
+  flowRevision: string;
+  stewardDispatchableStepIds: string[];
+  informationalStepIds: string[];
+  readyDedupeIds: string[];
+  delivery: GateHandoffDelivery;
+  at: string;
+}
+
+interface GateHandoffRoutingRecord {
+  schema: typeof GATE_HANDOFF_ROUTING_SCHEMA;
+  flowId: string;
+  gateId: string;
+  gateKind: FlowGateKind;
+  /** 同一 gate 连续报告侧退回（R1–R5）轮次；pass、候选变化或新 requestId 时归零。 */
+  consecutiveReturns: number;
+  /** 同一 requestId 的提醒次数（R2b + O1 合计，上限 3；新 requestId 归零）。 */
+  reminderCount: number;
+  latestReturn: GateHandoffReturnRoute | null;
+  latestReminder: GateHandoffReminderRoute | null;
+  passHandoff: GateHandoffPassRoute | null;
+  /**
+   * S6 返工（P16）：路由记录损坏后按 gate 记录 + 报告身份重建的标记（app 私有）。
+   * 重建不猜测 cause/报告正文；事件路径带已知 cause 正常路由，扫描路径只恢复身份防重开。
+   */
+  rebuiltAt?: string | null;
+  /** 扫描路径重建时仅恢复的稳定身份（防止同一被拒报告被重新放行）；无安全动作时 deliveries 为空。 */
+  rebuiltGuard?: GateRejectedReportIdentity | null;
   at: string;
 }
 
@@ -4958,7 +5084,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     notified: boolean;
   }
   const flowStallStates = new Map<string, FlowStallState>();
-  let runFlowAdvanceTick: ((projectRoot: string) => Promise<void>) | undefined;
+  let runFlowAdvanceTick:
+    | ((projectRoot: string, options?: { skipGateScan?: boolean }) => Promise<void>)
+    | undefined;
   /** 同项目串行 + 突发合并（看护 tick 与验收检查可能同刻到达；不堆积、不丢信号）。 */
   const flowTickRunning = new Set<string>();
   const flowTickDirty = new Set<string>();
@@ -4981,11 +5109,19 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     })();
   };
 
-  runFlowAdvanceTick = async (projectRoot: string): Promise<void> => {
+  runFlowAdvanceTick = async (projectRoot: string, options?: { skipGateScan?: boolean }): Promise<void> => {
     const listing = listingCache.get(projectRoot);
     if (listing?.governanceModel !== "trio") return;
     const flowIds = await listGovernanceFlowIds(projectRoot);
     if (flowIds.length === 0) return;
+    // O3（客户已选）：看护 tick 在同一有界窗口内追加一次 gate 记录扫描（只做 gate 处置：dispatched/
+    // returned/passed 的机械复核与路由重试；不触发验收派发、不新增第二套定时器）。真实事件路径在
+    // `runAcceptanceCheck` 已先扫描过 gate（`skipGateScan: true`），同一轮不重复扫描。
+    if (options?.skipGateScan !== true) {
+      for (const flowId of flowIds) {
+        await processGateReviewsForFlow({ projectRoot, flowId });
+      }
+    }
     const diagnostic = createDiagnosticLogger({ component: "desktop.flow-tick", projectRoot });
     let ledger: Awaited<ReturnType<typeof readGovernanceLedger>>;
     try {
@@ -6524,6 +6660,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     await mkdir(path.dirname(abs), { recursive: true });
     await atomicWrite(abs, `${JSON.stringify(value, null, 2)}\n`);
   };
+  /** 路由记录写入口（生产 = `writeGateJson`；测试可注入故障，见 `DesktopDeps.gateHandoffWriteJsonFn`）。 */
+  const writeGateHandoffJson = deps.gateHandoffWriteJsonFn ?? writeGateJson;
 
   /**
    * 读 gate 记录（`.ans/governance/acceptance/<flowId>/gates/<gateId>.json`）：
@@ -7319,6 +7457,1478 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     }
   };
 
+  // —————————————— 2026-10-27 gate 退回 / 报告不可读提醒 / 通过路由（方案 v3.2 §3.1/§4.3–§4.5） ——————————————
+  //
+  // 写序（钉死，§4.5）：路由记录 pending → gate 记录新状态 → 发质检补正/提醒 → 再发统筹知情（携带质检实际
+  // 投递结果）→ 各 delivery sent/failed。路由记录写失败 ⇒ 不写 gate 记录、不发送任何任务。
+  // 每个接收方独立 delivery（pending/sent/failed/exhausted，attempts≤3）；部分失败只重试失败方；
+  // `queued:true` 视为已投递（记录 sent）。投递复用 `sendReworkTaskToReceiver`（RF-01：运行时解析 fail-closed，
+  // 不猜默认引擎）。提醒（R2b/O1）不改变 gate 记录状态、不进入 consecutiveReturns。
+  const GATE_HANDOFF_MAX_ATTEMPTS = 3;
+  const GATE_HANDOFF_MAX_REMINDERS = 3;
+  /** 扫描时已出现新报告：旧补正不再发送（不是投递失败，不触发人工升级）。 */
+  const GATE_HANDOFF_STALE_SKIP_ERROR = "新报告已出现，过时补正不再发送";
+  const GATE_RETURN_CAUSES: ReadonlySet<string> = new Set([
+    "stale-missing",
+    "report-missing",
+    "report-unobservable",
+    "report-invalid",
+    "nonblocking-fail",
+    "version-older",
+    "candidate-changed",
+    "legacy",
+  ]);
+  const GATE_REMINDER_CAUSES: ReadonlySet<string> = new Set(["report-unreadable", "report-missing-early"]);
+  const GATE_HANDOFF_DELIVERY_KINDS: ReadonlySet<string> = new Set([
+    "verifier-correction",
+    "convener-notice",
+    "convener-pass",
+    "verifier-reminder",
+  ]);
+  const GATE_HANDOFF_STATUSES: ReadonlySet<string> = new Set(["pending", "sent", "failed", "exhausted"]);
+
+  const isGateReportCorrectionCause = (cause: GateReturnCause): cause is GateReportCorrectionCause =>
+    cause === "stale-missing" ||
+    cause === "report-missing" ||
+    cause === "report-unobservable" ||
+    cause === "report-invalid" ||
+    cause === "nonblocking-fail" ||
+    cause === "version-older";
+
+  const emptyGateHandoffRoutingRecord = (
+    record: GateReviewRecord,
+    rebuiltAt: string | null = null,
+  ): GateHandoffRoutingRecord => ({
+    schema: GATE_HANDOFF_ROUTING_SCHEMA,
+    flowId: record.flowId,
+    gateId: record.gateId,
+    gateKind: record.gateKind,
+    consecutiveReturns: 0,
+    reminderCount: 0,
+    latestReturn: null,
+    latestReminder: null,
+    passHandoff: null,
+    rebuiltAt,
+    rebuiltGuard: null,
+    at: new Date().toISOString(),
+  });
+
+  /** 读路由记录：缺失 ⇒ missing；schema/身份/形状不符 ⇒ corrupt（调用方 fail-closed，不猜、不发送）。 */
+  const readGateHandoffRoutingRecord = async (
+    projectRoot: string,
+    flowId: string,
+    gateId: string,
+  ): Promise<{ state: "missing" } | { state: "corrupt"; error: string } | { state: "ok"; record: GateHandoffRoutingRecord }> => {
+    let text: string;
+    try {
+      text = await readFile(path.join(projectRoot, ...gateHandoffRoutingRelPath(flowId, gateId).split("/")), "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return { state: "missing" };
+      return { state: "corrupt", error: error instanceof Error ? error.message : String(error) };
+    }
+    let raw: unknown;
+    try {
+      raw = JSON.parse(text) as unknown;
+    } catch (error) {
+      return { state: "corrupt", error: `不是合法 JSON（${error instanceof Error ? error.message : String(error)}）` };
+    }
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+      return { state: "corrupt", error: "记录不是 JSON 对象" };
+    }
+    const value = raw as Record<string, unknown>;
+    if (value.schema !== GATE_HANDOFF_ROUTING_SCHEMA) return { state: "corrupt", error: `未知 schema=${String(value.schema)}` };
+    if (value.flowId !== flowId || value.gateId !== gateId) return { state: "corrupt", error: "flowId/gateId 与路径不符" };
+    if (!isFlowGateKind(value.gateKind)) return { state: "corrupt", error: "gateKind 非法" };
+    const countField = (rawCount: unknown): rawCount is number =>
+      typeof rawCount === "number" && Number.isSafeInteger(rawCount) && rawCount >= 0;
+    if (!countField(value.consecutiveReturns) || !countField(value.reminderCount)) {
+      return { state: "corrupt", error: "consecutiveReturns/reminderCount 非法" };
+    }
+    if (!Array.isArray(value.deliveries) && value.deliveries !== undefined) {
+      return { state: "corrupt", error: "deliveries 非法" };
+    }
+    const isDelivery = (candidate: unknown): candidate is GateHandoffDelivery => {
+      if (candidate === null || typeof candidate !== "object" || Array.isArray(candidate)) return false;
+      const delivery = candidate as Record<string, unknown>;
+      return (
+        typeof delivery.kind === "string" &&
+        GATE_HANDOFF_DELIVERY_KINDS.has(delivery.kind) &&
+        typeof delivery.recipientRoleId === "string" &&
+        delivery.recipientRoleId.trim() !== "" &&
+        typeof delivery.status === "string" &&
+        GATE_HANDOFF_STATUSES.has(delivery.status) &&
+        countField(delivery.attempts) &&
+        (delivery.sentAt === null || typeof delivery.sentAt === "string") &&
+        (delivery.error === null || typeof delivery.error === "string")
+      );
+    };
+    const isRouteTime = (candidate: unknown): boolean =>
+      candidate === undefined || candidate === null || typeof candidate === "string";
+    const isRejectedIdentity = (candidate: unknown): boolean => {
+      if (candidate === null) return true;
+      if (candidate === undefined || typeof candidate !== "object" || Array.isArray(candidate)) return false;
+      const identity = candidate as Record<string, unknown>;
+      return (
+        typeof identity.reportPath === "string" &&
+        countField(identity.reportVersion) &&
+        identity.reportVersion >= 1 &&
+        (identity.reportSha256 === null || (typeof identity.reportSha256 === "string" && /^[a-f0-9]{64}$/.test(identity.reportSha256))) &&
+        (identity.size === null || countField(identity.size)) &&
+        (identity.mtimeMs === null || (typeof identity.mtimeMs === "number" && Number.isFinite(identity.mtimeMs)))
+      );
+    };
+    const latestReturn = value.latestReturn;
+    if (latestReturn !== null) {
+      if (latestReturn === undefined || typeof latestReturn !== "object" || Array.isArray(latestReturn)) {
+        return { state: "corrupt", error: "latestReturn 非法" };
+      }
+      const route = latestReturn as Record<string, unknown>;
+      if (typeof route.cause !== "string" || !GATE_RETURN_CAUSES.has(route.cause)) return { state: "corrupt", error: "latestReturn.cause 非法" };
+      if (typeof route.requestId !== "string" || typeof route.reportPath !== "string") return { state: "corrupt", error: "latestReturn 身份字段缺失" };
+      if (!countField(route.reportVersion) || route.reportVersion < 1) return { state: "corrupt", error: "latestReturn.reportVersion 非法" };
+      if (route.reportSha256 !== null && (typeof route.reportSha256 !== "string" || !/^[a-f0-9]{64}$/.test(route.reportSha256))) {
+        return { state: "corrupt", error: "latestReturn.reportSha256 非法" };
+      }
+      if (route.expectedReportVersion !== null && (!countField(route.expectedReportVersion) || route.expectedReportVersion < 1)) {
+        return { state: "corrupt", error: "latestReturn.expectedReportVersion 非法" };
+      }
+      if (!isRejectedIdentity(route.rejectedIdentity)) return { state: "corrupt", error: "latestReturn.rejectedIdentity 非法" };
+      if (typeof route.reasonDigest !== "string") return { state: "corrupt", error: "latestReturn.reasonDigest 非法" };
+      if (!Array.isArray(route.deliveries) || !route.deliveries.every(isDelivery)) return { state: "corrupt", error: "latestReturn.deliveries 非法" };
+      if (typeof route.at !== "string" || !isRouteTime(route.humanNoticeAt)) return { state: "corrupt", error: "latestReturn.at/humanNoticeAt 非法" };
+    }
+    const latestReminder = value.latestReminder;
+    if (latestReminder !== null) {
+      if (latestReminder === undefined || typeof latestReminder !== "object" || Array.isArray(latestReminder)) {
+        return { state: "corrupt", error: "latestReminder 非法" };
+      }
+      const route = latestReminder as Record<string, unknown>;
+      if (typeof route.cause !== "string" || !GATE_REMINDER_CAUSES.has(route.cause)) return { state: "corrupt", error: "latestReminder.cause 非法" };
+      if (typeof route.requestId !== "string" || typeof route.reportPath !== "string") return { state: "corrupt", error: "latestReminder 身份字段缺失" };
+      if (!countField(route.reportVersion) || route.reportVersion < 1) return { state: "corrupt", error: "latestReminder.reportVersion 非法" };
+      const identity = route.identity;
+      if (identity === null || typeof identity !== "object" || Array.isArray(identity)) return { state: "corrupt", error: "latestReminder.identity 非法" };
+      const identityValue = identity as Record<string, unknown>;
+      if (typeof identityValue.reportPath !== "string" || !countField(identityValue.reportVersion)) {
+        return { state: "corrupt", error: "latestReminder.identity 形状非法" };
+      }
+      if (!Array.isArray(route.deliveries) || !route.deliveries.every(isDelivery)) return { state: "corrupt", error: "latestReminder.deliveries 非法" };
+      if (typeof route.at !== "string" || !isRouteTime(route.humanNoticeAt)) return { state: "corrupt", error: "latestReminder.at/humanNoticeAt 非法" };
+    }
+    if (!isRouteTime(value.rebuiltAt)) return { state: "corrupt", error: "rebuiltAt 非法" };
+    if (!isRejectedIdentity(value.rebuiltGuard)) return { state: "corrupt", error: "rebuiltGuard 非法" };
+    if (value.passHandoff !== null && (value.passHandoff === undefined || typeof value.passHandoff !== "object" || Array.isArray(value.passHandoff))) {
+      return { state: "corrupt", error: "passHandoff 非法" };
+    }
+    return { state: "ok", record: value as unknown as GateHandoffRoutingRecord };
+  };
+
+  const gateHandoffRecipients = (listing: ProjectListing): { verifierRoleId: string; convenerRoleId: string } => {
+    const verifier = listing.roles.find((role) => role.builtIn === true && role.governanceFunction === "verification");
+    const convener = listing.roles.find((role) => role.builtIn === true && role.governanceFunction === "schedule");
+    return { verifierRoleId: verifier?.roleId ?? "verifier", convenerRoleId: convener?.roleId ?? "convener" };
+  };
+
+  const sendGateHandoffTask = async (
+    projectRoot: string,
+    recipientRoleId: string,
+    text: string,
+  ): Promise<{ status: "sent" | "queued" | "failed"; error: string | null }> => {
+    const sent = await sendReworkTaskToReceiver(projectRoot, recipientRoleId, undefined, text);
+    if (sent.ok !== true) return { status: "failed", error: sent.error ?? mainT("shared.common.unknownReason") };
+    return { status: sent.queued === true ? "queued" : "sent", error: null };
+  };
+
+  const gateHandoffDeliveryOutcome = (outcome: {
+    status: "sent" | "queued" | "failed";
+    error: string | null;
+  }): GateHandoffDeliveryOutcome =>
+    outcome.status === "failed"
+      ? { status: "failed", ...(outcome.error !== null ? { detail: outcome.error } : {}) }
+      : { status: outcome.status };
+
+  const markGateHandoffDelivery = (
+    delivery: GateHandoffDelivery,
+    outcome: { status: "sent" | "queued" | "failed"; error: string | null },
+    at: string,
+  ): void => {
+    delivery.attempts += 1;
+    if (outcome.status === "failed") {
+      delivery.error = outcome.error;
+      delivery.status = delivery.attempts >= GATE_HANDOFF_MAX_ATTEMPTS ? "exhausted" : "failed";
+      return;
+    }
+    delivery.status = "sent";
+    delivery.sentAt = at;
+    delivery.error = null;
+  };
+
+  const gateHandoffOutcomeDetail = (deliveries: readonly GateHandoffDelivery[]): string =>
+    deliveries
+      .map(
+        (delivery) =>
+          `${delivery.kind}→${delivery.recipientRoleId}: ${delivery.status}${delivery.error !== null ? `（${delivery.error}）` : ""}`,
+      )
+      .join("；");
+
+  /** 读被拒报告的稳定身份：可读 ⇒ 真实 sha；不可读 ⇒ path/version/size/mtime（sha=null）。 */
+  const readGateReportIdentity = async (
+    projectRoot: string,
+    latest: { relPath: string; version: number },
+  ): Promise<GateRejectedReportIdentity> => {
+    const abs = path.join(projectRoot, ...latest.relPath.split("/"));
+    try {
+      const bytes = await readFile(abs);
+      return {
+        reportPath: latest.relPath,
+        reportVersion: latest.version,
+        reportSha256: createHash("sha256").update(bytes).digest("hex"),
+        size: bytes.length,
+        mtimeMs: null,
+      };
+    } catch {
+      let size: number | null = null;
+      let mtimeMs: number | null = null;
+      try {
+        const info = await stat(abs);
+        size = info.size;
+        mtimeMs = info.mtimeMs;
+      } catch {
+        // 不可观察：保留 null（同一性判定按 path+version 退化）
+      }
+      return { reportPath: latest.relPath, reportVersion: latest.version, reportSha256: null, size, mtimeMs };
+    }
+  };
+
+  /** 同一被拒报告的判定（F2/F13）：path+version 必须相同；可读时比较 sha（同 sha 不同版本 ⇒ 新报告）。 */
+  const isSameRejectedReport = (
+    rejected: GateRejectedReportIdentity | null,
+    identity: GateRejectedReportIdentity,
+  ): boolean => {
+    if (rejected === null) return false;
+    if (rejected.reportPath !== identity.reportPath || rejected.reportVersion !== identity.reportVersion) return false;
+    if (rejected.reportSha256 !== null && identity.reportSha256 !== null) {
+      return rejected.reportSha256 === identity.reportSha256;
+    }
+    return rejected.size === identity.size && rejected.mtimeMs === identity.mtimeMs;
+  };
+
+  /**
+   * S6 返工（P16）：路由记录损坏时，从 **gate 记录 + 报告身份** 重建稳定身份（不猜测 cause/报告正文）。
+   * 可读报告 ⇒ 真实 sha；不可读 ⇒ path/version/size/mtime；至少保留 path+version。
+   */
+  const rebuildGateHandoffIdentity = async (
+    projectRoot: string,
+    record: GateReviewRecord,
+  ): Promise<GateRejectedReportIdentity> => {
+    if (record.reportSha256 !== null) {
+      return {
+        reportPath: record.reportPath,
+        reportVersion: record.reportVersion,
+        reportSha256: record.reportSha256,
+        size: null,
+        mtimeMs: null,
+      };
+    }
+    return readGateReportIdentity(projectRoot, { relPath: record.reportPath, version: record.reportVersion });
+  };
+
+  /** 从路由记录重建质检补正任务输入（重启/重试时不需要重存任务正文）。 */
+  const rebuildGateCorrectionInput = async (args: {
+    projectRoot: string;
+    flowId: string;
+    record: GateReviewRecord;
+    route: GateHandoffReturnRoute;
+    gateTitle: string;
+  }): Promise<Parameters<typeof buildGateReportCorrectionTaskMessage>[0] | undefined> => {
+    const { projectRoot, flowId, record, route } = args;
+    if (!isGateReportCorrectionCause(route.cause)) return undefined;
+    const gateId = record.gateId;
+    const criteria = await readAcceptanceCriteriaInfo(projectRoot, flowId);
+    const criteriaPath = criteria?.relPath ?? governanceAcceptanceCriteriaPath(flowId);
+    const rejected = route.rejectedIdentity;
+    let nextReportVersion: number;
+    let nextReportPath: string;
+    if (route.cause === "version-older") {
+      nextReportVersion = route.expectedReportVersion ?? record.reportVersion;
+      nextReportPath = governanceGateReviewReportPath(flowId, gateId, nextReportVersion);
+    } else if (
+      route.cause === "stale-missing" ||
+      route.cause === "report-missing" ||
+      route.cause === "report-unobservable"
+    ) {
+      nextReportVersion = route.expectedReportVersion ?? record.reportVersion;
+      nextReportPath = governanceGateReviewReportPath(flowId, gateId, nextReportVersion);
+    } else {
+      nextReportVersion = Math.max(record.reportVersion, rejected?.reportVersion ?? 0) + 1;
+      nextReportPath = governanceGateReviewReportPath(flowId, gateId, nextReportVersion);
+    }
+    let errors: GateReportCorrectionError[] = [];
+    if (route.cause === "report-invalid" && rejected?.reportPath !== undefined) {
+      try {
+        const bytes = await readFile(path.join(projectRoot, ...rejected.reportPath.split("/")));
+        const parsed = parseAcceptanceTriageReport(bytes.toString("utf8"));
+        if (!parsed.ok) errors = parsed.errors.slice(0, 5);
+      } catch {
+        // 报告已不可读：退回记录 error 摘要兜底
+      }
+    }
+    if (errors.length === 0 && record.error !== null) {
+      errors = [{ path: route.cause === "nonblocking-fail" ? "items" : "$", message: record.error }];
+    }
+    return {
+      flowId,
+      gateId,
+      gateKind: record.gateKind,
+      gateTitle: args.gateTitle,
+      criteriaPath,
+      flowRevision: record.flowRevision,
+      requestId: route.requestId,
+      cause: route.cause,
+      ...(rejected !== null
+        ? {
+            previousReportPath: rejected.reportPath,
+            previousReportVersion: rejected.reportVersion,
+            ...(rejected.reportSha256 !== null ? { previousReportSha256: rejected.reportSha256 } : {}),
+          }
+        : {}),
+      ...(route.expectedReportVersion !== null ? { expectedReportVersion: route.expectedReportVersion } : {}),
+      nextReportPath,
+      nextReportVersion,
+      errors,
+    };
+  };
+
+  const gateHandoffReturnAction = (route: GateHandoffReturnRoute): "monitor" | "re-request" | "human" | "legacy" => {
+    if (route.cause === "candidate-changed") return "re-request";
+    if (route.cause === "legacy") return "legacy";
+    const hasVerifier = route.deliveries.some((delivery) => delivery.kind === "verifier-correction");
+    if (!hasVerifier && isGateReportCorrectionCause(route.cause)) return "human";
+    return "monitor";
+  };
+
+  /**
+   * 路由一次 gate 退回（R1–R8）：写路由记录 pending → 写 gate 记录（legacy 不写）→ 先发质检补正、
+   * 再发统筹知情（携带质检实际投递结果）→ 更新 deliveries。失败如实：路由记录写失败零发送、gate 记录
+   * 保持原状态；任一接收方失败只影响该接收方（下一次真实事件/看护 tick 有界重试）。
+   */
+  const routeGateReturnHandoff = async (args: {
+    projectRoot: string;
+    flowId: string;
+    record: GateReviewRecord;
+    nextRecord: GateReviewRecord;
+    listing: ProjectListing;
+    note: (summary: string) => void;
+    diagnostic: ReturnType<typeof createDiagnosticLogger>;
+    gateTitle: string;
+    cause: GateReturnCause;
+    reasonSummary: string;
+    rejectedIdentity: GateRejectedReportIdentity | null;
+    expectedReportVersion: number | null;
+    nextReportPath: string;
+    nextReportVersion: number;
+    errors: readonly GateReportCorrectionError[];
+    /** 上一份被拒报告（补正任务展示用；可读时带真实 sha）。 */
+    previousReportPath?: string;
+    previousReportVersion?: number;
+    previousReportSha256?: string;
+    /** legacy（R7）：gate 记录保持不变、不写事实行。 */
+    writeGateRecord?: boolean;
+    factNote?: { kind: string; detail: string; text: string };
+  }): Promise<void> => {
+    const { projectRoot, flowId, record, nextRecord, listing, note, diagnostic } = args;
+    const gateId = record.gateId;
+    const routingRead = await readGateHandoffRoutingRecord(projectRoot, flowId, gateId);
+    let previous: GateHandoffRoutingRecord;
+    if (routingRead.state === "corrupt") {
+      // P16：按 gate 记录 + 报告身份重建；本路径 cause 来自分支机械判定（非猜测），可正常路由。
+      const rebuiltAt = new Date().toISOString();
+      const identity = await rebuildGateHandoffIdentity(projectRoot, record);
+      previous = { ...emptyGateHandoffRoutingRecord(record, rebuiltAt), rebuiltGuard: identity };
+      diagnostic.record("gate.handoff.record.rebuilt", {
+        flowId,
+        gateId,
+        state: "return",
+        detail: routingRead.error,
+        identityKind: identity.reportSha256 !== null ? "sha" : "path-version-size-mtime",
+      });
+    } else {
+      previous = routingRead.state === "ok" ? routingRead.record : emptyGateHandoffRoutingRecord(record);
+    }
+    const sameRequest = previous.latestReturn !== null && previous.latestReturn.requestId === record.requestId;
+    const isReportSide = isGateReportCorrectionCause(args.cause);
+    const consecutiveReturns = isReportSide ? (sameRequest ? previous.consecutiveReturns + 1 : 1) : 0;
+    const returnsExhausted = isReportSide && consecutiveReturns >= GATE_HANDOFF_MAX_ATTEMPTS;
+    // 连续退回已达上限且已给过统筹人工提示：记录事实但不再重复发送（直到统筹改计划/重新请求）。
+    const humanAlreadyNotified = returnsExhausted && sameRequest && previous.latestReturn?.humanNoticeAt != null;
+    const { verifierRoleId, convenerRoleId } = gateHandoffRecipients(listing);
+    const now = new Date().toISOString();
+    const deliveries: GateHandoffDelivery[] = [];
+    if (isReportSide && !returnsExhausted) {
+      deliveries.push({
+        kind: "verifier-correction",
+        recipientRoleId: verifierRoleId,
+        status: "pending",
+        attempts: 0,
+        sentAt: null,
+        error: null,
+      });
+    }
+    if (!humanAlreadyNotified) {
+      deliveries.push({
+        kind: "convener-notice",
+        recipientRoleId: convenerRoleId,
+        status: "pending",
+        attempts: 0,
+        sentAt: null,
+        error: null,
+      });
+    }
+    const route: GateHandoffReturnRoute = {
+      cause: args.cause,
+      requestId: record.requestId,
+      reportPath: args.rejectedIdentity?.reportPath ?? nextRecord.reportPath,
+      reportVersion: args.rejectedIdentity?.reportVersion ?? nextRecord.reportVersion,
+      reportSha256: args.rejectedIdentity?.reportSha256 ?? nextRecord.reportSha256,
+      expectedReportVersion: args.expectedReportVersion,
+      rejectedIdentity: args.rejectedIdentity,
+      reasonDigest: createHash("sha256").update(args.reasonSummary).digest("hex"),
+      deliveries,
+      at: now,
+      humanNoticeAt: humanAlreadyNotified ? previous.latestReturn?.humanNoticeAt ?? now : null,
+    };
+    const routing: GateHandoffRoutingRecord = {
+      ...previous,
+      schema: GATE_HANDOFF_ROUTING_SCHEMA,
+      flowId,
+      gateId,
+      gateKind: nextRecord.gateKind,
+      consecutiveReturns,
+      latestReturn: route,
+      rebuiltGuard: null,
+      at: now,
+    };
+    try {
+      await writeGateHandoffJson(projectRoot, gateHandoffRoutingRelPath(flowId, gateId), routing);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      diagnostic.error("gate.handoff.record.write.failed", error, { flowId, gateId });
+      noteGateOnce(projectRoot, flowId, gateId, "handoff-record", `write:${detail}`, note, mainT("main.gateReview.routingRecordUnusable", {
+        flowId,
+        gateId,
+        detail: `路由记录写入失败：${detail}；未写 gate 记录、未发送任何任务，等待下一次真实事件重试`,
+      }));
+      return;
+    }
+    if (args.writeGateRecord !== false) {
+      try {
+        await writeGateJson(projectRoot, gateRecordRelPath(flowId, gateId), nextRecord);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        diagnostic.error("gate.handoff.gate-record.write.failed", error, { flowId, gateId });
+        noteGateOnce(projectRoot, flowId, gateId, "unavailable", `handoff-gate-record:${detail}`, note, mainT("main.gateReview.unavailable", {
+          flowId,
+          gateId,
+          detail: `gate 记录写入失败：${detail}；路由记录保持 pending、未发送任何任务，下一次真实事件重试`,
+        }));
+        return;
+      }
+    }
+    if (args.factNote !== undefined) {
+      noteGateOnce(projectRoot, flowId, gateId, args.factNote.kind, args.factNote.detail, note, args.factNote.text);
+    }
+    // 先质检、再统筹（统筹消息携带质检实际投递结果）。
+    let verifierOutcome: GateHandoffDeliveryOutcome | undefined;
+    const verifierDelivery = deliveries.find((delivery) => delivery.kind === "verifier-correction");
+    if (verifierDelivery !== undefined && isGateReportCorrectionCause(args.cause)) {
+      const correctionInput = await rebuildGateCorrectionInput({
+        projectRoot,
+        flowId,
+        record: nextRecord,
+        route,
+        gateTitle: args.gateTitle,
+      });
+      if (correctionInput === undefined) {
+        verifierDelivery.attempts += 1;
+        verifierDelivery.status = "failed";
+        verifierDelivery.error = "无法重建补正任务";
+      } else {
+        const text = buildGateReportCorrectionTaskMessage(correctionInput);
+        const outcome = await sendGateHandoffTask(projectRoot, verifierDelivery.recipientRoleId, text);
+        markGateHandoffDelivery(verifierDelivery, outcome, new Date().toISOString());
+        verifierOutcome = gateHandoffDeliveryOutcome(outcome);
+        diagnostic.record(outcome.status === "failed" ? "gate.return.route.failed" : "gate.return.route.sent", {
+          flowId,
+          gateId,
+          cause: args.cause,
+          recipient: verifierDelivery.recipientRoleId,
+          attempts: verifierDelivery.attempts,
+          error: outcome.error,
+        });
+      }
+    }
+    const convenerDelivery = deliveries.find((delivery) => delivery.kind === "convener-notice");
+    if (convenerDelivery !== undefined) {
+      const convenerText = buildGateReturnConvenerTaskMessage({
+        flowId,
+        gateId,
+        gateKind: nextRecord.gateKind,
+        cause: args.cause,
+        reasonSummary: args.reasonSummary,
+        reportPath: route.reportPath,
+        reportVersion: route.reportVersion,
+        ...(verifierOutcome !== undefined ? { verifierDeliveryOutcome: verifierOutcome } : {}),
+        action: returnsExhausted ? "human" : gateHandoffReturnAction(route),
+        ...(returnsExhausted ? { rounds: consecutiveReturns } : {}),
+      });
+      const convenerOutcome = await sendGateHandoffTask(projectRoot, convenerDelivery.recipientRoleId, convenerText);
+      markGateHandoffDelivery(convenerDelivery, convenerOutcome, new Date().toISOString());
+      if (returnsExhausted && convenerOutcome.status !== "failed") {
+        route.humanNoticeAt = new Date().toISOString();
+      }
+      diagnostic.record(convenerOutcome.status === "failed" ? "gate.return.route.failed" : "gate.return.route.sent", {
+        flowId,
+        gateId,
+        cause: args.cause,
+        recipient: convenerDelivery.recipientRoleId,
+        attempts: convenerDelivery.attempts,
+        error: convenerOutcome.error,
+        exhausted: returnsExhausted,
+      });
+    }
+    try {
+      await writeGateHandoffJson(projectRoot, gateHandoffRoutingRelPath(flowId, gateId), routing);
+    } catch (error) {
+      diagnostic.error("gate.handoff.record.update.failed", error, { flowId, gateId });
+    }
+    if (deliveries.length === 0) return;
+    if (deliveries.every((delivery) => delivery.status === "sent")) {
+      noteGateOnce(
+        projectRoot,
+        flowId,
+        gateId,
+        "handoff-route",
+        `sent:${route.requestId}:${route.reportPath}:${route.reportVersion}:${route.reasonDigest}`,
+        note,
+        mainT("main.gateReview.returnedRouted", { flowId, gateId }),
+      );
+    } else {
+      const detail = gateHandoffOutcomeDetail(deliveries);
+      noteGateOnce(
+        projectRoot,
+        flowId,
+        gateId,
+        "handoff-route",
+        `failed:${route.requestId}:${route.reportPath}:${route.reportVersion}:${route.reasonDigest}`,
+        note,
+        mainT("main.gateReview.returnedRouteFailed", { flowId, gateId, detail }),
+      );
+    }
+  };
+
+  /** 重置路由记录的成功计数（pass / 候选变化 / 新 requestId 时归零；S4 通过转交也复用）。 */
+  const resetGateHandoffConsecutiveReturns = async (
+    projectRoot: string,
+    flowId: string,
+    gateId: string,
+    diagnostic: ReturnType<typeof createDiagnosticLogger>,
+  ): Promise<void> => {
+    const routingRead = await readGateHandoffRoutingRecord(projectRoot, flowId, gateId);
+    if (routingRead.state !== "ok" || routingRead.record.consecutiveReturns === 0) return;
+    try {
+      await writeGateHandoffJson(projectRoot, gateHandoffRoutingRelPath(flowId, gateId), {
+        ...routingRead.record,
+        consecutiveReturns: 0,
+        at: new Date().toISOString(),
+      } satisfies GateHandoffRoutingRecord);
+    } catch (error) {
+      diagnostic.error("gate.handoff.reset.write.failed", error, { flowId, gateId });
+    }
+  };
+
+  /**
+   * 路由一次报告不可读/缺报告提醒（R2b / O1）：**不写 gate 记录状态**（保持 dispatched）；
+   * 身份固定 requestId+reportPath+reportVersion；同一 requestId 提醒总上限 3（R2b+O1 合计），
+   * 达到后停止提醒并给统筹一次人工提示（持久 humanNoticeAt）。
+   */
+  const routeGateReminderHandoff = async (args: {
+    projectRoot: string;
+    flowId: string;
+    record: GateReviewRecord;
+    listing: ProjectListing;
+    note: (summary: string) => void;
+    diagnostic: ReturnType<typeof createDiagnosticLogger>;
+    gateTitle: string;
+    cause: GateReminderCause;
+    reportPath: string;
+    reportVersion: number;
+    detail: string;
+  }): Promise<void> => {
+    const { projectRoot, flowId, record, listing, note, diagnostic } = args;
+    const gateId = record.gateId;
+    const routingRead = await readGateHandoffRoutingRecord(projectRoot, flowId, gateId);
+    let previous: GateHandoffRoutingRecord;
+    if (routingRead.state === "corrupt") {
+      // P16：按 gate 记录 + 报告身份重建；提醒 cause 来自分支机械判定，可正常提醒/重试。
+      const rebuiltAt = new Date().toISOString();
+      const identity = await rebuildGateHandoffIdentity(projectRoot, record);
+      previous = { ...emptyGateHandoffRoutingRecord(record, rebuiltAt), rebuiltGuard: identity };
+      diagnostic.record("gate.handoff.record.rebuilt", {
+        flowId,
+        gateId,
+        state: "reminder",
+        detail: routingRead.error,
+        identityKind: identity.reportSha256 !== null ? "sha" : "path-version-size-mtime",
+      });
+    } else {
+      previous = routingRead.state === "ok" ? routingRead.record : emptyGateHandoffRoutingRecord(record);
+    }
+    const previousReminder = previous.latestReminder;
+    const sameRequest = previousReminder !== null && previousReminder.requestId === record.requestId;
+    const sameIdentity =
+      sameRequest &&
+      previousReminder.identity.reportPath === args.reportPath &&
+      previousReminder.identity.reportVersion === args.reportVersion;
+    if (sameIdentity && previousReminder.deliveries.every((delivery) => delivery.status === "sent")) return;
+    const currentCount = sameRequest ? previous.reminderCount : 0;
+    const now = new Date().toISOString();
+    const { verifierRoleId, convenerRoleId } = gateHandoffRecipients(listing);
+    // 上限（F10）：同一 requestId 的 R2b+O1 提醒合计达到 3 次 ⇒ 停止提醒，一次人工提示（持久标记）。
+    if (currentCount >= GATE_HANDOFF_MAX_REMINDERS) {
+      if (sameRequest && previousReminder?.humanNoticeAt != null) return;
+      const reminderRoute: GateHandoffReminderRoute = {
+        cause: args.cause,
+        requestId: record.requestId,
+        reportPath: args.reportPath,
+        reportVersion: args.reportVersion,
+        identity: { reportPath: args.reportPath, reportVersion: args.reportVersion },
+        detail: args.detail,
+        deliveries: [
+          {
+            kind: "convener-notice",
+            recipientRoleId: convenerRoleId,
+            status: "pending",
+            attempts: 0,
+            sentAt: null,
+            error: null,
+          },
+        ],
+        at: now,
+        humanNoticeAt: null,
+      };
+      const routing: GateHandoffRoutingRecord = { ...previous, latestReminder: reminderRoute, rebuiltGuard: null, at: now };
+      try {
+        await writeGateHandoffJson(projectRoot, gateHandoffRoutingRelPath(flowId, gateId), routing);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        diagnostic.error("gate.handoff.record.write.failed", error, { flowId, gateId });
+        noteGateOnce(projectRoot, flowId, gateId, "handoff-record", `write:${detail}`, note, mainT("main.gateReview.routingRecordUnusable", {
+          flowId,
+          gateId,
+          detail: `路由记录写入失败：${detail}；未发送任何提醒`,
+        }));
+        return;
+      }
+      const convenerDelivery = reminderRoute.deliveries[0]!;
+      const text = buildGateReturnConvenerTaskMessage({
+        flowId,
+        gateId,
+        gateKind: record.gateKind,
+        cause: args.cause,
+        reasonSummary: `同一 requestId 的提醒已达上限（${currentCount}/${GATE_HANDOFF_MAX_REMINDERS}）`,
+        reportPath: args.reportPath,
+        reportVersion: args.reportVersion,
+        action: "monitor",
+        detail:
+          "提醒次数已达上限：应用已停止自动提醒，请人工核对报告可读性/补交情况，必要时按既有通道重新请求；记录保持 dispatched，未判退回、未判通过。",
+      });
+      const outcome = await sendGateHandoffTask(projectRoot, convenerDelivery.recipientRoleId, text);
+      markGateHandoffDelivery(convenerDelivery, outcome, new Date().toISOString());
+      if (outcome.status !== "failed") reminderRoute.humanNoticeAt = new Date().toISOString();
+      try {
+        await writeGateHandoffJson(projectRoot, gateHandoffRoutingRelPath(flowId, gateId), routing);
+      } catch (error) {
+        diagnostic.error("gate.handoff.record.update.failed", error, { flowId, gateId });
+      }
+      diagnostic.record(outcome.status === "failed" ? "gate.route.exhausted" : "gate.route.exhausted.notified", {
+        flowId,
+        gateId,
+        reminderCount: currentCount,
+        recipient: convenerDelivery.recipientRoleId,
+      });
+      if (outcome.status === "failed") {
+        noteGateOnce(projectRoot, flowId, gateId, "reminder-route", `cap-failed:${record.requestId}`, note, mainT("main.gateReview.reportUnreadableDeliveryFailed", {
+          flowId,
+          gateId,
+          reportPath: args.reportPath,
+          detail: `提醒已达上限且人工提示未送达（${outcome.error ?? "unknown"}）；请人工核对`,
+        }));
+      }
+      return;
+    }
+    // 正常提醒：同一身份复用 deliveries（只重试 pending/failed）；新身份计数 +1。
+    const deliveries: GateHandoffDelivery[] = sameIdentity
+      ? previousReminder.deliveries.map((delivery) => ({ ...delivery }))
+      : [
+          {
+            kind: "verifier-reminder",
+            recipientRoleId: verifierRoleId,
+            status: "pending",
+            attempts: 0,
+            sentAt: null,
+            error: null,
+          },
+          {
+            kind: "convener-notice",
+            recipientRoleId: convenerRoleId,
+            status: "pending",
+            attempts: 0,
+            sentAt: null,
+            error: null,
+          },
+        ];
+    for (const kind of ["verifier-reminder", "convener-notice"] as const) {
+      if (!deliveries.some((delivery) => delivery.kind === kind)) {
+        deliveries.push({
+          kind,
+          recipientRoleId: kind === "verifier-reminder" ? verifierRoleId : convenerRoleId,
+          status: "pending",
+          attempts: 0,
+          sentAt: null,
+          error: null,
+        });
+      }
+    }
+    const reminderRoute: GateHandoffReminderRoute = {
+      cause: args.cause,
+      requestId: record.requestId,
+      reportPath: args.reportPath,
+      reportVersion: args.reportVersion,
+      identity: { reportPath: args.reportPath, reportVersion: args.reportVersion },
+      detail: args.detail,
+      deliveries,
+      at: now,
+      humanNoticeAt: sameRequest ? (previousReminder?.humanNoticeAt ?? null) : null,
+    };
+    const routing: GateHandoffRoutingRecord = {
+      ...previous,
+      latestReminder: reminderRoute,
+      reminderCount: sameIdentity ? previous.reminderCount : currentCount + 1,
+      rebuiltGuard: null,
+      at: now,
+    };
+    try {
+      await writeGateHandoffJson(projectRoot, gateHandoffRoutingRelPath(flowId, gateId), routing);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      diagnostic.error("gate.handoff.record.write.failed", error, { flowId, gateId });
+      noteGateOnce(projectRoot, flowId, gateId, "handoff-record", `write:${detail}`, note, mainT("main.gateReview.routingRecordUnusable", {
+        flowId,
+        gateId,
+        detail: `路由记录写入失败：${detail}；未发送任何提醒`,
+      }));
+      return;
+    }
+    let verifierOutcome: GateHandoffDeliveryOutcome | undefined;
+    const verifierDelivery = deliveries.find((delivery) => delivery.kind === "verifier-reminder")!;
+    if (verifierDelivery.status === "pending" || verifierDelivery.status === "failed") {
+      const text = buildGateReportReminderTaskMessage({
+        flowId,
+        gateId,
+        gateKind: record.gateKind,
+        gateTitle: args.gateTitle,
+        requestId: record.requestId,
+        cause: args.cause,
+        reportPath: args.reportPath,
+        reportVersion: args.reportVersion,
+        detail: args.detail,
+      });
+      const outcome = await sendGateHandoffTask(projectRoot, verifierDelivery.recipientRoleId, text);
+      markGateHandoffDelivery(verifierDelivery, outcome, new Date().toISOString());
+      verifierOutcome = gateHandoffDeliveryOutcome(outcome);
+      diagnostic.record(outcome.status === "failed" ? "gate.return.route.failed" : "gate.return.route.sent", {
+        flowId,
+        gateId,
+        cause: args.cause,
+        recipient: verifierDelivery.recipientRoleId,
+        attempts: verifierDelivery.attempts,
+        error: outcome.error,
+        reminder: true,
+      });
+    } else {
+      verifierOutcome =
+        verifierDelivery.status === "sent" ? { status: "sent" } : { status: "failed", ...(verifierDelivery.error !== null ? { detail: verifierDelivery.error } : {}) };
+    }
+    const convenerDelivery = deliveries.find((delivery) => delivery.kind === "convener-notice")!;
+    let convenerSentThisRun = false;
+    if (convenerDelivery.status === "pending" || convenerDelivery.status === "failed") {
+      const verifierExhausted = verifierDelivery.status === "exhausted";
+      const convenerText = buildGateReturnConvenerTaskMessage({
+        flowId,
+        gateId,
+        gateKind: record.gateKind,
+        cause: args.cause,
+        reasonSummary: args.detail,
+        reportPath: args.reportPath,
+        reportVersion: args.reportVersion,
+        ...(verifierOutcome !== undefined ? { verifierDeliveryOutcome: verifierOutcome } : {}),
+        action: "monitor",
+        ...(verifierExhausted
+          ? { detail: "质检提醒重试已耗尽：应用已停止自动提醒，请人工核对报告可读性/补交情况；记录保持 dispatched，未判退回、未判通过。" }
+          : {}),
+      });
+      const outcome = await sendGateHandoffTask(projectRoot, convenerDelivery.recipientRoleId, convenerText);
+      markGateHandoffDelivery(convenerDelivery, outcome, new Date().toISOString());
+      convenerSentThisRun = outcome.status !== "failed";
+      diagnostic.record(outcome.status === "failed" ? "gate.return.route.failed" : "gate.return.route.sent", {
+        flowId,
+        gateId,
+        cause: args.cause,
+        recipient: convenerDelivery.recipientRoleId,
+        attempts: convenerDelivery.attempts,
+        error: outcome.error,
+        reminder: true,
+      });
+    }
+    // 质检提醒投递重试耗尽且统筹知情早已送达 ⇒ 补一次人工提示（持久 humanNoticeAt；不重复）。
+    if (verifierDelivery.status === "exhausted" && reminderRoute.humanNoticeAt == null && !convenerSentThisRun) {
+      const humanText = buildGateReturnConvenerTaskMessage({
+        flowId,
+        gateId,
+        gateKind: record.gateKind,
+        cause: args.cause,
+        reasonSummary: `质检提醒投递重试已耗尽（attempts=${verifierDelivery.attempts}）；${args.detail}`,
+        reportPath: args.reportPath,
+        reportVersion: args.reportVersion,
+        verifierDeliveryOutcome: {
+          status: "failed",
+          ...(verifierDelivery.error !== null ? { detail: verifierDelivery.error } : {}),
+        },
+        action: "monitor",
+        detail: "质检提醒投递重试已耗尽：应用已停止自动提醒，请人工核对报告可读性/补交情况；记录保持 dispatched，未判退回、未判通过。",
+      });
+      const humanOutcome = await sendGateHandoffTask(projectRoot, convenerRoleId, humanText);
+      if (humanOutcome.status !== "failed") {
+        reminderRoute.humanNoticeAt = new Date().toISOString();
+        diagnostic.record("gate.handoff.human-notice.sent", { flowId, gateId, reasonCode: "verifier-reminder-exhausted" });
+      } else {
+        diagnostic.record("gate.handoff.human-notice.failed", { flowId, gateId, error: humanOutcome.error });
+      }
+    }
+    try {
+      await writeGateHandoffJson(projectRoot, gateHandoffRoutingRelPath(flowId, gateId), routing);
+    } catch (error) {
+      diagnostic.error("gate.handoff.record.update.failed", error, { flowId, gateId });
+    }
+    const allSent = deliveries.every((delivery) => delivery.status === "sent");
+    if (args.cause === "report-unreadable") {
+      if (allSent) {
+        noteGateOnce(projectRoot, flowId, gateId, "reminder-route", `sent:${record.requestId}:${args.reportPath}:${args.reportVersion}`, note, mainT("main.gateReview.reportUnreadable", {
+          flowId,
+          gateId,
+          reportPath: args.reportPath,
+        }));
+      } else {
+        noteGateOnce(projectRoot, flowId, gateId, "reminder-route", `failed:${record.requestId}:${args.reportPath}:${args.reportVersion}`, note, mainT("main.gateReview.reportUnreadableDeliveryFailed", {
+          flowId,
+          gateId,
+          reportPath: args.reportPath,
+          detail: gateHandoffOutcomeDetail(deliveries),
+        }));
+      }
+    } else if (!allSent) {
+      noteGateOnce(projectRoot, flowId, gateId, "reminder-route", `failed:${record.requestId}:${args.reportPath}:${args.reportVersion}`, note, mainT("main.gateReview.returnedRouteFailed", {
+        flowId,
+        gateId,
+        detail: gateHandoffOutcomeDetail(deliveries),
+      }));
+    }
+  };
+
+  /**
+   * 扫描恢复：只重试路由记录中 pending/failed 的接收方（有界 ≤3，超过 ⇒ exhausted）；已 sent 不重复。
+   * 若扫描时已出现新报告版本，不补发过时的质检补正（标记 exhausted + 诊断），统筹知情附带「已观测新版本」。
+   */
+  const retryGateHandoffReturnDeliveries = async (args: {
+    projectRoot: string;
+    flowId: string;
+    record: GateReviewRecord;
+    route: GateHandoffReturnRoute;
+    routing: GateHandoffRoutingRecord;
+    listing: ProjectListing;
+    gateTitle: string;
+    note: (summary: string) => void;
+    diagnostic: ReturnType<typeof createDiagnosticLogger>;
+    newReportDetail?: string;
+  }): Promise<void> => {
+    const { projectRoot, flowId, record, route, routing, listing, gateTitle, note, diagnostic } = args;
+    const gateId = record.gateId;
+    const { convenerRoleId } = gateHandoffRecipients(listing);
+    let changed = false;
+    for (const delivery of route.deliveries) {
+      if (delivery.status !== "pending" && delivery.status !== "failed") continue;
+      if (delivery.attempts >= GATE_HANDOFF_MAX_ATTEMPTS) {
+        delivery.status = "exhausted";
+        changed = true;
+        diagnostic.record("gate.route.exhausted", { flowId, gateId, recipient: delivery.recipientRoleId, kind: delivery.kind });
+        continue;
+      }
+      if (delivery.kind === "verifier-correction") {
+        if (args.newReportDetail !== undefined) {
+          delivery.status = "exhausted";
+          delivery.error = GATE_HANDOFF_STALE_SKIP_ERROR;
+          changed = true;
+          diagnostic.record("gate.return.route.skip", { flowId, gateId, reasonCode: "new-report" });
+          continue;
+        }
+        const correctionInput = await rebuildGateCorrectionInput({ projectRoot, flowId, record, route, gateTitle });
+        if (correctionInput === undefined) {
+          delivery.attempts += 1;
+          delivery.status = delivery.attempts >= GATE_HANDOFF_MAX_ATTEMPTS ? "exhausted" : "failed";
+          delivery.error = "无法重建补正任务";
+          changed = true;
+          continue;
+        }
+        const outcome = await sendGateHandoffTask(
+          projectRoot,
+          delivery.recipientRoleId,
+          buildGateReportCorrectionTaskMessage(correctionInput),
+        );
+        markGateHandoffDelivery(delivery, outcome, new Date().toISOString());
+        changed = true;
+        diagnostic.record(outcome.status === "failed" ? "gate.return.route.failed" : "gate.return.route.sent", {
+          flowId,
+          gateId,
+          cause: route.cause,
+          recipient: delivery.recipientRoleId,
+          attempts: delivery.attempts,
+          error: outcome.error,
+          retry: true,
+        });
+        continue;
+      }
+      if (delivery.kind === "convener-notice") {
+        const verifierDelivery = route.deliveries.find((candidate) => candidate.kind === "verifier-correction");
+        const verifierOutcome: GateHandoffDeliveryOutcome | undefined =
+          verifierDelivery === undefined
+            ? undefined
+            : verifierDelivery.status === "sent"
+              ? { status: "sent" }
+              : { status: "failed", ...(verifierDelivery.error !== null ? { detail: verifierDelivery.error } : {}) };
+        const convenerText = buildGateReturnConvenerTaskMessage({
+          flowId,
+          gateId,
+          gateKind: record.gateKind,
+          cause: route.cause,
+          reasonSummary: record.error ?? "gate 退回通知",
+          reportPath: route.reportPath,
+          reportVersion: route.reportVersion,
+          ...(verifierOutcome !== undefined ? { verifierDeliveryOutcome: verifierOutcome } : {}),
+          action: gateHandoffReturnAction(route),
+          ...(gateHandoffReturnAction(route) === "human" ? { rounds: routing.consecutiveReturns } : {}),
+          ...(args.newReportDetail !== undefined ? { detail: args.newReportDetail } : {}),
+        });
+        const outcome = await sendGateHandoffTask(projectRoot, delivery.recipientRoleId, convenerText);
+        markGateHandoffDelivery(delivery, outcome, new Date().toISOString());
+        changed = true;
+        diagnostic.record(outcome.status === "failed" ? "gate.return.route.failed" : "gate.return.route.sent", {
+          flowId,
+          gateId,
+          cause: route.cause,
+          recipient: delivery.recipientRoleId,
+          attempts: delivery.attempts,
+          error: outcome.error,
+          retry: true,
+        });
+      }
+    }
+    // 质检补正投递重试耗尽 ⇒ 给统筹一次人工提示（持久 humanNoticeAt；不重复）。放在逐 delivery 重试之后，
+    // 因为统筹知情可能已在首次路由送达（此时循环不会进入 convener-notice 的重试分支）。
+    const exhaustedVerifier = route.deliveries.find(
+      (delivery) => delivery.kind === "verifier-correction" && delivery.status === "exhausted",
+    );
+    if (
+      exhaustedVerifier !== undefined &&
+      exhaustedVerifier.error !== GATE_HANDOFF_STALE_SKIP_ERROR &&
+      route.humanNoticeAt == null &&
+      isGateReportCorrectionCause(route.cause)
+    ) {
+      const humanText = buildGateReturnConvenerTaskMessage({
+        flowId,
+        gateId,
+        gateKind: record.gateKind,
+        cause: route.cause,
+        reasonSummary: `质检补正投递重试已耗尽（attempts=${exhaustedVerifier.attempts}）；${record.error ?? "gate 退回"}`,
+        reportPath: route.reportPath,
+        reportVersion: route.reportVersion,
+        verifierDeliveryOutcome: {
+          status: "failed",
+          ...(exhaustedVerifier.error !== null ? { detail: exhaustedVerifier.error } : {}),
+        },
+        action: "human",
+        rounds: routing.consecutiveReturns,
+      });
+      const humanOutcome = await sendGateHandoffTask(projectRoot, convenerRoleId, humanText);
+      if (humanOutcome.status !== "failed") {
+        route.humanNoticeAt = new Date().toISOString();
+        changed = true;
+        diagnostic.record("gate.handoff.human-notice.sent", { flowId, gateId, reasonCode: "verifier-exhausted" });
+      } else {
+        diagnostic.record("gate.handoff.human-notice.failed", { flowId, gateId, error: humanOutcome.error });
+      }
+    }
+    // 统一人工提示的防重复检查（同一退回事件一次；record.humanNoticeAt 持久在路由记录中）。
+    if (changed) {
+      routing.at = new Date().toISOString();
+      try {
+        await writeGateHandoffJson(projectRoot, gateHandoffRoutingRelPath(flowId, gateId), routing);
+      } catch (error) {
+        diagnostic.error("gate.handoff.record.update.failed", error, { flowId, gateId });
+      }
+    }
+    // 耗尽/失败可见性（幂等去重）。
+    const failed = route.deliveries.filter(
+      (delivery) => delivery.status !== "sent" && delivery.error !== GATE_HANDOFF_STALE_SKIP_ERROR,
+    );
+    if (failed.length > 0) {
+      noteGateOnce(
+        projectRoot,
+        flowId,
+        gateId,
+        "handoff-route",
+        `retry:${route.requestId}:${route.reportPath}:${route.reportVersion}:${gateHandoffOutcomeDetail(route.deliveries)}`,
+        note,
+        mainT("main.gateReview.returnedRouteFailed", {
+          flowId,
+          gateId,
+          detail: gateHandoffOutcomeDetail(route.deliveries),
+        }),
+      );
+    }
+  };
+
+  // —————————————— 2026-10-27 gate 通过转交（S4；方案 §3.2/§4.3/§4.5；标准 P5–P7） ——————————————
+  //
+  // `completeGateStep` 成功（含 already-done）后：重读**新 revision** 的 flow + 账本 → `listReadyFlowSteps`
+  // → 排除 app 管理步骤（role-cards/role-readiness）→ 按 `isStewardExecutableReadyStep` 拆「你可派发」与
+  // 「仅知情」；写 passHandoff pending → 写 gate 记录 passed → 投递 `[Gate 通过]` → delivery sent/failed。
+  // 应用不调用 `dispatch_task`、不打开 worker、不派验收；与 `[自动推进]` 共用 `readyWakeNotified` 去重。
+
+  /** 重算通过转交所需的两组 ready（不发送、不写盘；失败如实返回原因）。 */
+  const buildGatePassReadyPlan = async (args: {
+    projectRoot: string;
+    flowId: string;
+    listing: ProjectListing;
+  }): Promise<
+    | {
+        ok: true;
+        flowRevision: string;
+        stewardDispatchable: ReadyFlowStep[];
+        informational: ReadyFlowStep[];
+        readyDedupeIds: string[];
+        stopReason?: string;
+      }
+    | { ok: false; error: string }
+  > => {
+    let bytes: Buffer;
+    try {
+      bytes = await readFile(path.join(args.projectRoot, ...flowStatePath(args.flowId).split("/")));
+    } catch (error) {
+      return { ok: false, error: `流程状态 YAML 不可读：${error instanceof Error ? error.message : String(error)}` };
+    }
+    const parsed = parseFlowStateYaml(bytes.toString("utf8"), args.flowId);
+    if (!parsed.ok) {
+      return { ok: false, error: `流程校验失败：${parsed.errors.slice(0, 3).map((item) => `${item.path}: ${item.message}`).join("；")}` };
+    }
+    const flowRevision = createHash("sha256").update(bytes).digest("hex");
+    let ledger: Awaited<ReturnType<typeof readGovernanceLedger>>;
+    try {
+      ledger = await readGovernanceLedger(args.projectRoot);
+    } catch (error) {
+      return { ok: false, error: `治理账本不可读：${error instanceof Error ? error.message : String(error)}` };
+    }
+    if (ledger.errors.length > 0) return { ok: false, error: `治理账本存在坏行：${ledger.errors[0]}` };
+    const dispatchedStepIds = new Set<string>();
+    for (const entry of ledger.entries) {
+      if (entry.kind !== "dispatch.accepted" || entry.flowId !== args.flowId) continue;
+      const stepId = typeof entry.stepId === "string" ? entry.stepId.trim() : "";
+      if (stepId !== "") dispatchedStepIds.add(stepId);
+    }
+    const plan = listReadyFlowSteps(parsed.flow, dispatchedStepIds);
+    // 与 wakeStewardForReadySteps 完全同口径：先排除 app 管理步骤，其余（含仅知情）都进去重键。
+    const ready = plan.ready.filter((step) => !APP_MANAGED_READY_STEP_IDS.has(step.id));
+    const stewardDispatchable = ready.filter((step) => isStewardExecutableReadyStep(step, args.listing));
+    const informational = ready.filter((step) => !isStewardExecutableReadyStep(step, args.listing));
+    return {
+      ok: true,
+      flowRevision,
+      stewardDispatchable,
+      informational,
+      readyDedupeIds: ready.map((step) => step.id).sort(),
+      ...(plan.stopReason !== undefined ? { stopReason: plan.stopReason } : {}),
+    };
+  };
+
+  /** 与 `wakeStewardForReadySteps` 同口径的去重键值（revision + 排序后的非 app ready ids）。 */
+  const gatePassReadyDedupe = (revision: string, readyIds: readonly string[]): string =>
+    createHash("sha256").update(`${revision}\u0000${[...readyIds].sort().join("\u0000")}`).digest("hex");
+
+  const buildGatePassTaskFromPlan = (args: {
+    flowId: string;
+    gateId: string;
+    gateKind: FlowGateKind;
+    record: GateReviewRecord;
+    plan: {
+      flowRevision: string;
+      stewardDispatchable: ReadyFlowStep[];
+      informational: ReadyFlowStep[];
+      readyDedupeIds: string[];
+      stopReason?: string;
+    };
+  }): string =>
+    buildGatePassHandoffTaskMessage({
+      flowId: args.flowId,
+      gateId: args.gateId,
+      gateKind: args.gateKind,
+      reportPath: args.record.reportPath,
+      reportVersion: args.record.reportVersion,
+      reportSha256: args.record.reportSha256 ?? "",
+      flowRevision: args.plan.flowRevision,
+      stewardDispatchable: args.plan.stewardDispatchable,
+      informational: args.plan.informational,
+      readyDedupeIds: args.plan.readyDedupeIds,
+      ...(args.plan.stopReason !== undefined ? { stopReason: args.plan.stopReason } : {}),
+    });
+
+  /**
+   * 通过转交主路径（写序钉死）：路由记录 passHandoff pending → gate 记录 passed → 审计 → passNote 事实行 →
+   * 投递 `[Gate 通过]` → delivery sent/failed → 结果行；成功（含排队）后登记 `readyWakeNotified` 同口径去重。
+   * 路由记录/flow+账本读取失败 ⇒ 不写 passed、不发送，保持 dispatched 等下一次事件（completeGateStep 幂等）。
+   */
+  const completeGatePassWithHandoff = async (args: {
+    projectRoot: string;
+    flowId: string;
+    record: GateReviewRecord;
+    listing: ProjectListing;
+    note: (summary: string) => void;
+    diagnostic: ReturnType<typeof createDiagnosticLogger>;
+    origin?: "recovery";
+  }): Promise<void> => {
+    const { projectRoot, flowId, record, listing, note, diagnostic } = args;
+    const gateId = record.gateId;
+    if (record.reportSha256 === null) {
+      diagnostic.record("gate.pass.handoff.skip", { flowId, gateId, reasonCode: "no-report-sha" });
+      noteGateOnce(projectRoot, flowId, gateId, "unavailable", "pass-no-sha", note, mainT("main.gateReview.unavailable", {
+        flowId,
+        gateId,
+        detail: "passed 记录缺少报告 sha，无法重建/执行通过转交；未发送任何任务，请人工核对",
+      }));
+      return;
+    }
+    const routingRead = await readGateHandoffRoutingRecord(projectRoot, flowId, gateId);
+    let previous: GateHandoffRoutingRecord;
+    if (routingRead.state === "corrupt") {
+      // P16：按 gate 记录 + 报告身份重建；pass 状态可安全重建 pHandoff（cause 无需猜测）。
+      const rebuiltAt = new Date().toISOString();
+      const identity = await rebuildGateHandoffIdentity(projectRoot, record);
+      previous = { ...emptyGateHandoffRoutingRecord(record, rebuiltAt), rebuiltGuard: identity };
+      diagnostic.record("gate.handoff.record.rebuilt", {
+        flowId,
+        gateId,
+        state: "pass",
+        detail: routingRead.error,
+        identityKind: identity.reportSha256 !== null ? "sha" : "path-version-size-mtime",
+      });
+    } else {
+      previous = routingRead.state === "ok" ? routingRead.record : emptyGateHandoffRoutingRecord(record);
+    }
+    const plan = await buildGatePassReadyPlan({ projectRoot, flowId, listing });
+    if (!plan.ok) {
+      diagnostic.record("gate.pass.handoff.plan-failed", { flowId, gateId, detail: plan.error });
+      noteGateOnce(projectRoot, flowId, gateId, "unavailable", `pass-plan:${plan.error}`, note, mainT("main.gateReview.unavailable", {
+        flowId,
+        gateId,
+        detail: `通过转交暂不可用（${plan.error}）；gate 记录保持 dispatched，下一次真实事件重试`,
+      }));
+      return;
+    }
+    const { convenerRoleId } = gateHandoffRecipients(listing);
+    const now = new Date().toISOString();
+    const passRoute: GateHandoffPassRoute = {
+      reportPath: record.reportPath,
+      reportVersion: record.reportVersion,
+      reportSha256: record.reportSha256,
+      flowRevision: plan.flowRevision,
+      stewardDispatchableStepIds: plan.stewardDispatchable.map((step) => step.id),
+      informationalStepIds: plan.informational.map((step) => step.id),
+      readyDedupeIds: plan.readyDedupeIds,
+      delivery: {
+        kind: "convener-pass",
+        recipientRoleId: convenerRoleId,
+        status: "pending",
+        attempts: 0,
+        sentAt: null,
+        error: null,
+      },
+      at: now,
+    };
+    const routing: GateHandoffRoutingRecord = {
+      ...previous,
+      schema: GATE_HANDOFF_ROUTING_SCHEMA,
+      flowId,
+      gateId,
+      gateKind: record.gateKind,
+      consecutiveReturns: 0,
+      passHandoff: passRoute,
+      rebuiltGuard: null,
+      at: now,
+    };
+    try {
+      await writeGateHandoffJson(projectRoot, gateHandoffRoutingRelPath(flowId, gateId), routing);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      diagnostic.error("gate.handoff.record.write.failed", error, { flowId, gateId });
+      noteGateOnce(projectRoot, flowId, gateId, "handoff-record", `pass-write:${detail}`, note, mainT("main.gateReview.routingRecordUnusable", {
+        flowId,
+        gateId,
+        detail: `通过转交路由记录写入失败：${detail}；未写 passed、未发送任何任务，等待下一次事件重试`,
+      }));
+      return;
+    }
+    try {
+      await writeGateJson(projectRoot, gateRecordRelPath(flowId, gateId), record);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      diagnostic.error("gate.handoff.gate-record.write.failed", error, { flowId, gateId });
+      noteGateOnce(projectRoot, flowId, gateId, "unavailable", `pass-gate-record:${detail}`, note, mainT("main.gateReview.unavailable", {
+        flowId,
+        gateId,
+        detail: `gate 记录写入失败：${detail}；passHandoff 保持 pending、未发送，下一次事件重试`,
+      }));
+      return;
+    }
+    await appendGateReviewAudit(projectRoot, record, record.severityCounts, record.itemCount, diagnostic);
+    noteGateOnce(
+      projectRoot,
+      flowId,
+      gateId,
+      "pass",
+      record.reportSha256,
+      note,
+      mainT("main.gateReview.passNote", { flowId, gateId, reportPath: record.reportPath }) +
+        (args.origin === "recovery" ? "（应用恢复：此前已有通过报告但缺少 gate 记录，已补建记录并收口）" : ""),
+    );
+    diagnostic.record(args.origin === "recovery" ? "gate.review.recovered-pass" : "gate.review.passed", {
+      flowId,
+      gateId,
+      reportVersion: record.reportVersion,
+    });
+    const task = buildGatePassTaskFromPlan({ flowId, gateId, gateKind: record.gateKind, record, plan });
+    const outcome = await sendGateHandoffTask(projectRoot, passRoute.delivery.recipientRoleId, task);
+    markGateHandoffDelivery(passRoute.delivery, outcome, new Date().toISOString());
+    try {
+      await writeGateHandoffJson(projectRoot, gateHandoffRoutingRelPath(flowId, gateId), routing);
+    } catch (error) {
+      diagnostic.error("gate.handoff.record.update.failed", error, { flowId, gateId });
+    }
+    if (outcome.status !== "failed") {
+      // P6：成功投递（含排队）后登记同一 revision + sortedReadyIds（含仅知情），通用唤醒跳过。
+      readyWakeNotified.set(
+        acceptanceFlowKey(projectRoot, flowId),
+        gatePassReadyDedupe(plan.flowRevision, plan.readyDedupeIds),
+      );
+      noteGateOnce(projectRoot, flowId, gateId, "pass-handoff", `sent:${record.reportSha256}:${plan.flowRevision}`, note, mainT("main.gateReview.passHandoffSent", {
+        flowId,
+        gateId,
+      }));
+      diagnostic.record("gate.pass.handoff.sent", {
+        flowId,
+        gateId,
+        queued: outcome.status === "queued",
+        stewardDispatchable: plan.stewardDispatchable.length,
+        informational: plan.informational.length,
+      });
+    } else {
+      const detail = outcome.error ?? mainT("shared.common.unknownReason");
+      noteGateOnce(projectRoot, flowId, gateId, "pass-handoff", `failed:${record.reportSha256}:${detail}`, note, mainT("main.gateReview.passHandoffFailed", {
+        flowId,
+        gateId,
+        detail,
+      }));
+      diagnostic.record("gate.pass.handoff.failed", { flowId, gateId, error: detail });
+    }
+  };
+
+  /**
+   * 重启/扫描恢复（passed 分支）：passHandoff pending/failed ⇒ 重读当前 flow+账本、重算两组后只重试转交
+   * （≤3，不发送陈旧列表）；sent ⇒ 只补审计不重复；无 passHandoff/无路由记录（历史 passed）⇒ 不追溯、
+   * 只诊断（RF-02）。
+   */
+  const retryGatePassHandoff = async (args: {
+    projectRoot: string;
+    flowId: string;
+    record: GateReviewRecord;
+    listing: ProjectListing;
+    note: (summary: string) => void;
+    diagnostic: ReturnType<typeof createDiagnosticLogger>;
+  }): Promise<void> => {
+    const { projectRoot, flowId, record, listing, note, diagnostic } = args;
+    const gateId = record.gateId;
+    if (record.reportSha256 === null) {
+      diagnostic.record("gate.pass.handoff.skip", { flowId, gateId, reasonCode: "no-report-sha" });
+      noteGateOnce(projectRoot, flowId, gateId, "unavailable", "pass-retry-no-sha", note, mainT("main.gateReview.unavailable", {
+        flowId,
+        gateId,
+        detail: "passed 记录缺少报告 sha，无法按报告身份重建通过转交；未发送任何任务，请人工核对",
+      }));
+      return;
+    }
+    let routingRead = await readGateHandoffRoutingRecord(projectRoot, flowId, gateId);
+    if (routingRead.state === "corrupt") {
+      // P16：passed 记录 + 报告 sha 足以安全重建 passHandoff（pending，待重试）；重算两组后再发送。
+      const rebuiltAt = new Date().toISOString();
+      const plan = await buildGatePassReadyPlan({ projectRoot, flowId, listing });
+      if (!plan.ok) {
+        diagnostic.record("gate.pass.handoff.rebuild.plan-failed", { flowId, gateId, detail: plan.error });
+        noteGateOnce(projectRoot, flowId, gateId, "handoff-record", `rebuild-plan:${plan.error}`, note, mainT("main.gateReview.unavailable", {
+          flowId,
+          gateId,
+          detail: `路由记录损坏，按 gate 记录重建时无法重算 ready 计划（${plan.error}）；未发送转交，请人工核对`,
+        }));
+        return;
+      }
+      const { convenerRoleId } = gateHandoffRecipients(listing);
+      const rebuiltRoute: GateHandoffPassRoute = {
+        reportPath: record.reportPath,
+        reportVersion: record.reportVersion,
+        reportSha256: record.reportSha256,
+        flowRevision: plan.flowRevision,
+        stewardDispatchableStepIds: plan.stewardDispatchable.map((step) => step.id),
+        informationalStepIds: plan.informational.map((step) => step.id),
+        readyDedupeIds: plan.readyDedupeIds,
+        delivery: {
+          kind: "convener-pass",
+          recipientRoleId: convenerRoleId,
+          status: "pending",
+          attempts: 0,
+          sentAt: null,
+          error: null,
+        },
+        at: rebuiltAt,
+      };
+      const rebuiltRecord: GateHandoffRoutingRecord = {
+        ...emptyGateHandoffRoutingRecord(record, rebuiltAt),
+        passHandoff: rebuiltRoute,
+        rebuiltGuard: null,
+      };
+      try {
+        await writeGateHandoffJson(projectRoot, gateHandoffRoutingRelPath(flowId, gateId), rebuiltRecord);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        diagnostic.error("gate.handoff.record.rebuild-write.failed", error, { flowId, gateId });
+        noteGateOnce(projectRoot, flowId, gateId, "handoff-record", `rebuild-write:${detail}`, note, mainT("main.gateReview.routingRecordUnusable", {
+          flowId,
+          gateId,
+          detail: `路由记录损坏且重建写入失败：${detail}；未发送转交，请人工核对`,
+        }));
+        return;
+      }
+      diagnostic.record("gate.handoff.record.rebuilt", { flowId, gateId, state: "pass-retry", detail: routingRead.error });
+      routingRead = { state: "ok", record: rebuiltRecord };
+    }
+    if (routingRead.state === "missing") {
+      diagnostic.record("gate.pass.handoff.skip", { flowId, gateId, reasonCode: "legacy-passed" });
+      return;
+    }
+    const routing = routingRead.record;
+    const passRoute = routing.passHandoff;
+    if (passRoute === null) {
+      diagnostic.record("gate.pass.handoff.skip", { flowId, gateId, reasonCode: "legacy-passed" });
+      return;
+    }
+    if (passRoute.reportSha256 !== record.reportSha256) {
+      diagnostic.record("gate.pass.handoff.skip", { flowId, gateId, reasonCode: "identity-mismatch" });
+      return;
+    }
+    if (passRoute.delivery.status === "sent" || passRoute.delivery.status === "exhausted") {
+      diagnostic.record("gate.pass.handoff.skip", {
+        flowId,
+        gateId,
+        reasonCode: passRoute.delivery.status === "sent" ? "already-sent" : "exhausted",
+      });
+      return;
+    }
+    if (passRoute.delivery.attempts >= GATE_HANDOFF_MAX_ATTEMPTS) {
+      passRoute.delivery.status = "exhausted";
+      routing.at = new Date().toISOString();
+      try {
+        await writeGateHandoffJson(projectRoot, gateHandoffRoutingRelPath(flowId, gateId), routing);
+      } catch (error) {
+        diagnostic.error("gate.handoff.record.update.failed", error, { flowId, gateId });
+      }
+      diagnostic.record("gate.pass.handoff.failed", { flowId, gateId, error: "attempts-exhausted" });
+      return;
+    }
+    const plan = await buildGatePassReadyPlan({ projectRoot, flowId, listing });
+    if (!plan.ok) {
+      markGateHandoffDelivery(passRoute.delivery, { status: "failed", error: plan.error }, new Date().toISOString());
+      routing.at = new Date().toISOString();
+      try {
+        await writeGateHandoffJson(projectRoot, gateHandoffRoutingRelPath(flowId, gateId), routing);
+      } catch (error) {
+        diagnostic.error("gate.handoff.record.update.failed", error, { flowId, gateId });
+      }
+      noteGateOnce(projectRoot, flowId, gateId, "pass-handoff", `retry-plan:${plan.error}`, note, mainT("main.gateReview.passHandoffFailed", {
+        flowId,
+        gateId,
+        detail: plan.error,
+      }));
+      diagnostic.record("gate.pass.handoff.failed", { flowId, gateId, error: plan.error, retry: true });
+      return;
+    }
+    // 重试时重算两组（不使用陈旧列表）；身份（reportSha256）不变。
+    passRoute.flowRevision = plan.flowRevision;
+    passRoute.stewardDispatchableStepIds = plan.stewardDispatchable.map((step) => step.id);
+    passRoute.informationalStepIds = plan.informational.map((step) => step.id);
+    passRoute.readyDedupeIds = plan.readyDedupeIds;
+    passRoute.at = new Date().toISOString();
+    const task = buildGatePassTaskFromPlan({ flowId, gateId, gateKind: record.gateKind, record, plan });
+    const outcome = await sendGateHandoffTask(projectRoot, passRoute.delivery.recipientRoleId, task);
+    markGateHandoffDelivery(passRoute.delivery, outcome, new Date().toISOString());
+    routing.at = new Date().toISOString();
+    try {
+      await writeGateHandoffJson(projectRoot, gateHandoffRoutingRelPath(flowId, gateId), routing);
+    } catch (error) {
+      diagnostic.error("gate.handoff.record.update.failed", error, { flowId, gateId });
+    }
+    if (outcome.status !== "failed") {
+      readyWakeNotified.set(
+        acceptanceFlowKey(projectRoot, flowId),
+        gatePassReadyDedupe(plan.flowRevision, plan.readyDedupeIds),
+      );
+      noteGateOnce(projectRoot, flowId, gateId, "pass-handoff", `sent:${record.reportSha256}:${plan.flowRevision}`, note, mainT("main.gateReview.passHandoffSent", {
+        flowId,
+        gateId,
+      }));
+      diagnostic.record("gate.pass.handoff.sent", {
+        flowId,
+        gateId,
+        queued: outcome.status === "queued",
+        stewardDispatchable: plan.stewardDispatchable.length,
+        informational: plan.informational.length,
+        retry: true,
+      });
+    } else {
+      const detail = outcome.error ?? mainT("shared.common.unknownReason");
+      noteGateOnce(projectRoot, flowId, gateId, "pass-handoff", `retry-failed:${detail}`, note, mainT("main.gateReview.passHandoffFailed", {
+        flowId,
+        gateId,
+        detail,
+      }));
+      diagnostic.record("gate.pass.handoff.failed", { flowId, gateId, error: detail, retry: true });
+    }
+  };
+
   /**
    * 按 gate 独立的返工路由（设计 §8.2；复用验收返工的任务构建/接收方语义，但记录独立，避免与最终验收的
    * `rework-routing.json` 互相覆盖）。失败如实：记录 failed + 主理系统行；下一次真实事件重试一次。
@@ -7477,12 +9087,20 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     listing: ProjectListing;
     note: (summary: string) => void;
     diagnostic: ReturnType<typeof createDiagnosticLogger>;
+    /** gate 步骤标题（flow 原文；补正任务文案用）。 */
+    gateTitle: string;
+    /**
+     * R5/RF-03：机械复核使用的**派发要求版本**（来自路由记录 `expectedReportVersion`；缺省用
+     * `record.reportVersion`）。仅用于版本比较，不改变 `gate-review-record/v1` 形状。
+     */
+    expectedReportVersion?: number;
     /** 2026-10-27：`recovery` = 由「有 pass 报告但无 gate 记录」的恢复扫描补建并处置。 */
     origin?: "recovery";
   }): Promise<void> => {
     const { projectRoot, flowId, record, flowRevision, listing, note, diagnostic, origin } = args;
     const gateId = record.gateId;
     const now = (): string => new Date().toISOString();
+    const expectedReportVersion = args.expectedReportVersion ?? record.reportVersion;
     const latest = latestGateReviewReport(projectRoot, flowId, gateId);
     if (latest === undefined) {
       diagnostic.record("gate.review.report.missing", { flowId, gateId, expected: record.reportPath });
@@ -7498,17 +9116,24 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           error: detail,
           at: now(),
         };
-        try {
-          await writeGateJson(projectRoot, gateRecordRelPath(flowId, gateId), returned);
-        } catch (error) {
-          diagnostic.error("gate.review.record.write.failed", error, { flowId, gateId });
-          return;
-        }
-        noteGateOnce(projectRoot, flowId, gateId, "stale", record.reportPath, note, mainT("main.gateReview.returnedToProof", {
+        await routeGateReturnHandoff({
+          projectRoot,
           flowId,
-          gateId,
-          detail,
-        }));
+          record,
+          nextRecord: returned,
+          listing,
+          note,
+          diagnostic,
+          gateTitle: args.gateTitle,
+          cause: "stale-missing",
+          reasonSummary: detail,
+          rejectedIdentity: null,
+          expectedReportVersion: record.reportVersion,
+          nextReportPath: governanceGateReviewReportPath(flowId, gateId, record.reportVersion),
+          nextReportVersion: record.reportVersion,
+          errors: [],
+          factNote: { kind: "stale", detail: record.reportPath, text: mainT("main.gateReview.returnedToProof", { flowId, gateId, detail }) },
+        });
         return;
       }
       noteGateOnce(projectRoot, flowId, gateId, "report-missing", record.reportPath, note, mainT("main.gateReview.reportMissing", {
@@ -7516,16 +9141,46 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         gateId,
         reportPath: record.reportPath,
       }));
+      // O1（客户已选）：dispatched + 无报告 + 质检空闲且无排队 ⇒ 一次「请补交报告」提醒（不转退回、30 分钟兜底保留）。
+      const { verifierRoleId } = gateHandoffRecipients(listing);
+      const verifierBusy = RUNTIME_KINDS.some(
+        (runtime) =>
+          manager.isRoleBusy(projectRoot, verifierRoleId, runtime) ||
+          manager.hasPendingDelivery(projectRoot, verifierRoleId, runtime),
+      );
+      const reminderRuntime = await resolveNoteRuntime(projectRoot);
+      if (verifierBusy || reminderRuntime === undefined) {
+        diagnostic.record("gate.reminder.skip", {
+          flowId,
+          gateId,
+          reasonCode: verifierBusy ? "verifier-busy" : "runtime-unresolved",
+        });
+      } else {
+        await routeGateReminderHandoff({
+          projectRoot,
+          flowId,
+          record,
+          listing,
+          note,
+          diagnostic,
+          gateTitle: args.gateTitle,
+          cause: "report-missing-early",
+          reportPath: record.reportPath,
+          reportVersion: record.reportVersion,
+          detail: `派发后尚未观测到请求版本报告（${record.reportPath} v${record.reportVersion}）`,
+        });
+      }
       return; // 不自动通过、不循环轮询；等 Proof 补报告或 Steward 重新请求
     }
-    if (latest.version < record.reportVersion) {
-      const detail = `最新 gate 报告 v${latest.version} 早于派发要求的 v${record.reportVersion}；不按旧报告判通过`;
+    if (latest.version < expectedReportVersion) {
+      const identity = await readGateReportIdentity(projectRoot, latest);
+      const detail = `最新 gate 报告 v${latest.version} 早于派发要求的 v${expectedReportVersion}；不按旧报告判通过`;
       const updated: GateReviewRecord = {
         ...record,
         status: "returned-to-proof",
         reportPath: latest.relPath,
         reportVersion: latest.version,
-        reportSha256: null,
+        reportSha256: identity.reportSha256,
         conclusion: null,
         severityCounts: emptyGateSeverityCounts(),
         itemCount: 0,
@@ -7534,23 +9189,42 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         error: detail,
         at: now(),
       };
-      try {
-        await writeGateJson(projectRoot, gateRecordRelPath(flowId, gateId), updated);
-      } catch (error) {
-        diagnostic.error("gate.review.record.write.failed", error, { flowId, gateId });
-        return;
-      }
-      noteGateOnce(projectRoot, flowId, gateId, "returned", detail, note, mainT("main.gateReview.returnedToProof", { flowId, gateId, detail }));
+      await routeGateReturnHandoff({
+        projectRoot,
+        flowId,
+        record,
+        nextRecord: updated,
+        listing,
+        note,
+        diagnostic,
+        gateTitle: args.gateTitle,
+        cause: "version-older",
+        reasonSummary: detail,
+        rejectedIdentity: identity,
+        expectedReportVersion,
+        nextReportPath: governanceGateReviewReportPath(flowId, gateId, expectedReportVersion),
+        nextReportVersion: expectedReportVersion,
+        errors: [],
+        ...(identity.reportSha256 !== null
+          ? {
+              previousReportPath: identity.reportPath,
+              previousReportVersion: identity.reportVersion,
+              previousReportSha256: identity.reportSha256,
+            }
+          : {}),
+        factNote: { kind: "returned", detail, text: mainT("main.gateReview.returnedToProof", { flowId, gateId, detail }) },
+      });
       return;
     }
     if (record.flowRevision !== flowRevision) {
+      const identity = await readGateReportIdentity(projectRoot, latest);
       const detail = "流程 revision 已在派发后变化（候选不符）；不按旧候选报告放行，请对新候选重新请求 gate 复核";
       const updated: GateReviewRecord = {
         ...record,
         status: "returned-to-proof",
         reportPath: latest.relPath,
         reportVersion: latest.version,
-        reportSha256: null,
+        reportSha256: identity.reportSha256,
         conclusion: null,
         severityCounts: emptyGateSeverityCounts(),
         itemCount: 0,
@@ -7559,24 +9233,46 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         error: detail,
         at: now(),
       };
-      try {
-        await writeGateJson(projectRoot, gateRecordRelPath(flowId, gateId), updated);
-      } catch (error) {
-        diagnostic.error("gate.review.record.write.failed", error, { flowId, gateId });
-        return;
-      }
-      noteGateOnce(projectRoot, flowId, gateId, "returned", detail, note, mainT("main.gateReview.returnedToProof", { flowId, gateId, detail }));
+      await routeGateReturnHandoff({
+        projectRoot,
+        flowId,
+        record,
+        nextRecord: updated,
+        listing,
+        note,
+        diagnostic,
+        gateTitle: args.gateTitle,
+        cause: "candidate-changed",
+        reasonSummary: detail,
+        rejectedIdentity: identity,
+        expectedReportVersion: null,
+        nextReportPath: governanceGateReviewReportPath(flowId, gateId, latest.version + 1),
+        nextReportVersion: latest.version + 1,
+        errors: [],
+        factNote: { kind: "returned", detail, text: mainT("main.gateReview.returnedToProof", { flowId, gateId, detail }) },
+      });
       return;
     }
     let bytes: Buffer;
     try {
       bytes = await readFile(path.join(projectRoot, ...latest.relPath.split("/")));
-    } catch {
-      noteGateOnce(projectRoot, flowId, gateId, "report-missing", latest.relPath, note, mainT("main.gateReview.reportMissing", {
+    } catch (error) {
+      // R2b（必做提醒）：报告存在但读取失败。记录保持 dispatched（不转退回、不判通过），
+      // 一次性可执行提醒 + 统筹知情；同一 requestId 提醒总上限 3（R2b+O1 合计）。
+      const detail = error instanceof Error ? error.message : String(error);
+      await routeGateReminderHandoff({
+        projectRoot,
         flowId,
-        gateId,
+        record,
+        listing,
+        note,
+        diagnostic,
+        gateTitle: args.gateTitle,
+        cause: "report-unreadable",
         reportPath: latest.relPath,
-      }));
+        reportVersion: latest.version,
+        detail: `读取报告失败：${detail}`,
+      });
       return;
     }
     const reportSha256 = createHash("sha256").update(bytes).digest("hex");
@@ -7602,17 +9298,38 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         decidedAt: now(),
         error: detail,
       };
-      try {
-        await writeGateJson(projectRoot, gateRecordRelPath(flowId, gateId), updated);
-      } catch (error) {
-        diagnostic.error("gate.review.record.write.failed", error, { flowId, gateId });
-        return;
-      }
       diagnostic.record("gate.review.returned", { flowId, gateId, code: parsed.code });
+      const identity: GateRejectedReportIdentity = {
+        reportPath: latest.relPath,
+        reportVersion: latest.version,
+        reportSha256,
+        size: bytes.length,
+        mtimeMs: null,
+      };
       const text = parsed.code === "missing"
         ? mainT("main.gateReview.reportMissing", { flowId, gateId, reportPath: latest.relPath })
         : mainT("main.gateReview.returnedToProof", { flowId, gateId, detail });
-      noteGateOnce(projectRoot, flowId, gateId, parsed.code === "missing" ? "report-missing" : "returned", detail, note, text);
+      await routeGateReturnHandoff({
+        projectRoot,
+        flowId,
+        record,
+        nextRecord: updated,
+        listing,
+        note,
+        diagnostic,
+        gateTitle: args.gateTitle,
+        cause: "report-invalid",
+        reasonSummary: detail,
+        rejectedIdentity: identity,
+        expectedReportVersion: null,
+        nextReportPath: governanceGateReviewReportPath(flowId, gateId, latest.version + 1),
+        nextReportVersion: latest.version + 1,
+        errors: parsed.errors,
+        previousReportPath: latest.relPath,
+        previousReportVersion: latest.version,
+        previousReportSha256: reportSha256,
+        factNote: { kind: parsed.code === "missing" ? "report-missing" : "returned", detail, text },
+      });
       return;
     }
     const severityCounts = gateReportSeverityCounts(parsed.triage.items);
@@ -7645,22 +9362,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         decidedAt: now(),
         error: null,
       };
-      try {
-        await writeGateJson(projectRoot, gateRecordRelPath(flowId, gateId), passed);
-      } catch (error) {
-        diagnostic.error("gate.review.record.write.failed", error, { flowId, gateId });
-        return;
-      }
-      await appendGateReviewAudit(projectRoot, passed, severityCounts, itemCount, diagnostic);
-      noteGateOnce(projectRoot, flowId, gateId, "pass", reportSha256, note, mainT("main.gateReview.passNote", {
+      // S4：写序 passHandoff pending → passed → 审计 → `[Gate 通过]` 投递 → 结果行；失败保持 dispatched。
+      await completeGatePassWithHandoff({
+        projectRoot,
         flowId,
-        gateId,
-        reportPath: latest.relPath,
-      }) + (origin === "recovery" ? "（应用恢复：此前已有通过报告但缺少 gate 记录，已补建记录并收口）" : ""));
-      diagnostic.record(origin === "recovery" ? "gate.review.recovered-pass" : "gate.review.passed", {
-        flowId,
-        gateId,
-        reportVersion: latest.version,
+        record: passed,
+        listing,
+        note,
+        diagnostic,
+        ...(origin !== undefined ? { origin } : {}),
       });
       return;
     }
@@ -7701,14 +9411,35 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         decidedAt: now(),
         error: detail,
       };
-      try {
-        await writeGateJson(projectRoot, gateRecordRelPath(flowId, gateId), returned);
-      } catch (error) {
-        diagnostic.error("gate.review.record.write.failed", error, { flowId, gateId });
-        return;
-      }
-      noteGateOnce(projectRoot, flowId, gateId, "nit-only", reportSha256, note, mainT("main.gateReview.nitOnly", { flowId, gateId }));
       diagnostic.record("gate.review.nonblocking-fail", { flowId, gateId, severityCounts });
+      const identity: GateRejectedReportIdentity = {
+        reportPath: latest.relPath,
+        reportVersion: latest.version,
+        reportSha256,
+        size: bytes.length,
+        mtimeMs: null,
+      };
+      await routeGateReturnHandoff({
+        projectRoot,
+        flowId,
+        record,
+        nextRecord: returned,
+        listing,
+        note,
+        diagnostic,
+        gateTitle: args.gateTitle,
+        cause: "nonblocking-fail",
+        reasonSummary: detail,
+        rejectedIdentity: identity,
+        expectedReportVersion: null,
+        nextReportPath: governanceGateReviewReportPath(flowId, gateId, latest.version + 1),
+        nextReportVersion: latest.version + 1,
+        errors: [],
+        previousReportPath: latest.relPath,
+        previousReportVersion: latest.version,
+        previousReportSha256: reportSha256,
+        factNote: { kind: "nit-only", detail: reportSha256, text: mainT("main.gateReview.nitOnly", { flowId, gateId }) },
+      });
       return;
     }
     if (code === "gate-report-missing" || code === "gate-report-unobservable") {
@@ -7719,17 +9450,39 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         decidedAt: now(),
         error: completed.error ?? code,
       };
-      try {
-        await writeGateJson(projectRoot, gateRecordRelPath(flowId, gateId), returned);
-      } catch (error) {
-        diagnostic.error("gate.review.record.write.failed", error, { flowId, gateId });
-        return;
-      }
-      noteGateOnce(projectRoot, flowId, gateId, "report-missing", latest.relPath, note, mainT("main.gateReview.reportMissing", {
-        flowId,
-        gateId,
+      const detail = completed.error ?? code;
+      const identity: GateRejectedReportIdentity = {
         reportPath: latest.relPath,
-      }));
+        reportVersion: latest.version,
+        reportSha256,
+        size: bytes.length,
+        mtimeMs: null,
+      };
+      await routeGateReturnHandoff({
+        projectRoot,
+        flowId,
+        record,
+        nextRecord: returned,
+        listing,
+        note,
+        diagnostic,
+        gateTitle: args.gateTitle,
+        cause: code === "gate-report-missing" ? "report-missing" : "report-unobservable",
+        reasonSummary: detail,
+        rejectedIdentity: identity,
+        expectedReportVersion: record.reportVersion,
+        nextReportPath: governanceGateReviewReportPath(flowId, gateId, record.reportVersion),
+        nextReportVersion: record.reportVersion,
+        errors: [],
+        previousReportPath: latest.relPath,
+        previousReportVersion: latest.version,
+        previousReportSha256: reportSha256,
+        factNote: {
+          kind: "report-missing",
+          detail: latest.relPath,
+          text: mainT("main.gateReview.reportMissing", { flowId, gateId, reportPath: latest.relPath }),
+        },
+      });
       return;
     }
     if (code === "gate-report-invalid") {
@@ -7740,17 +9493,35 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         decidedAt: now(),
         error: completed.error ?? code,
       };
-      try {
-        await writeGateJson(projectRoot, gateRecordRelPath(flowId, gateId), returned);
-      } catch (error) {
-        diagnostic.error("gate.review.record.write.failed", error, { flowId, gateId });
-        return;
-      }
-      noteGateOnce(projectRoot, flowId, gateId, "returned", completed.error ?? code, note, mainT("main.gateReview.returnedToProof", {
+      const detail = completed.error ?? code;
+      const identity: GateRejectedReportIdentity = {
+        reportPath: latest.relPath,
+        reportVersion: latest.version,
+        reportSha256,
+        size: bytes.length,
+        mtimeMs: null,
+      };
+      await routeGateReturnHandoff({
+        projectRoot,
         flowId,
-        gateId,
-        detail: completed.error ?? code,
-      }));
+        record,
+        nextRecord: returned,
+        listing,
+        note,
+        diagnostic,
+        gateTitle: args.gateTitle,
+        cause: "report-invalid",
+        reasonSummary: detail,
+        rejectedIdentity: identity,
+        expectedReportVersion: null,
+        nextReportPath: governanceGateReviewReportPath(flowId, gateId, latest.version + 1),
+        nextReportVersion: latest.version + 1,
+        errors: [],
+        previousReportPath: latest.relPath,
+        previousReportVersion: latest.version,
+        previousReportSha256: reportSha256,
+        factNote: { kind: "returned", detail, text: mainT("main.gateReview.returnedToProof", { flowId, gateId, detail }) },
+      });
       return;
     }
     if (
@@ -7879,7 +9650,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         reportPath: latest.relPath,
         reportVersion: latest.version,
       });
-      await processGateReportAttempt({ projectRoot, flowId, flowRevision, record, listing, note, diagnostic, origin: "recovery" });
+      await processGateReportAttempt({ projectRoot, flowId, flowRevision, record, listing, note, diagnostic, gateTitle: step.title, origin: "recovery" });
     }
   };
 
@@ -7947,7 +9718,14 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         return; // 无 gates 目录（或不可读）：没有其他可处置记录
       }
       for (const name of names) {
-        if (!name.endsWith(".json") || name.endsWith("-rework-routing.json")) continue;
+        // 跳过本模块自己的路由记录（返工/退回-提醒-通过路由），避免被当成 gate 记录解析失败。
+        if (
+          !name.endsWith(".json") ||
+          name.endsWith("-rework-routing.json") ||
+          name.endsWith("-handoff-routing.json")
+        ) {
+          continue;
+        }
         const gateId = name.slice(0, -".json".length);
         if (!/^gate-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(gateId)) {
           diagnostic.record("gate.review.record.unknown-file", { flowId, file: name });
@@ -7993,7 +9771,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           continue;
         }
         if (record.status === "dispatched") {
-          await processGateReportAttempt({ projectRoot, flowId, flowRevision, record, listing, note, diagnostic });
+          await processGateReportAttempt({ projectRoot, flowId, flowRevision, record, listing, note, diagnostic, gateTitle: step.title });
           continue;
         }
         if (record.status === "passed") {
@@ -8029,6 +9807,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             }
           }
           await appendGateReviewAudit(projectRoot, record, record.severityCounts, record.itemCount, diagnostic);
+          await resetGateHandoffConsecutiveReturns(projectRoot, flowId, gateId, diagnostic);
+          // S4 恢复：passHandoff pending/failed 只重试转交（重算 current flow+账本）；sent 跳过；历史 passed 不追溯。
+          await retryGatePassHandoff({ projectRoot, flowId, record, listing, note, diagnostic });
           continue;
         }
         if (record.status === "failed") {
@@ -8052,27 +9833,115 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           continue;
         }
         if (record.status === "returned-to-proof") {
-          // 新报告（新版本/新路径/新 sha）⇒ 作为新一轮处置；同一报告不重复退回/不猜。
-          const latest = latestGateReviewReport(projectRoot, flowId, gateId);
-          if (latest === undefined) continue;
-          let bytes: Buffer;
-          try {
-            bytes = await readFile(path.join(projectRoot, ...latest.relPath.split("/")));
-          } catch {
+          // 先读路由记录（跨重启幂等）：missing ⇒ R7 历史退回（实现前已有）；corrupt ⇒ 按 gate 记录 +
+          // 报告身份重建（身份 guard；原因不可安全推断时不发送，只恢复防重开）；ok ⇒ 只重试 pending/failed
+          // 接收方，再按被拒报告稳定身份判定「新报告」。
+          let routingRead = await readGateHandoffRoutingRecord(projectRoot, flowId, gateId);
+          if (routingRead.state === "corrupt") {
+            const rebuiltAt = new Date().toISOString();
+            const guard = await rebuildGateHandoffIdentity(projectRoot, record);
+            const rebuilt: GateHandoffRoutingRecord = {
+              ...emptyGateHandoffRoutingRecord(record, rebuiltAt),
+              rebuiltGuard: guard,
+            };
+            try {
+              await writeGateHandoffJson(projectRoot, gateHandoffRoutingRelPath(flowId, gateId), rebuilt);
+            } catch (error) {
+              const detail = error instanceof Error ? error.message : String(error);
+              diagnostic.error("gate.handoff.record.rebuild-write.failed", error, { flowId, gateId });
+              noteGateOnce(projectRoot, flowId, gateId, "handoff-record", `rebuild-write:${detail}`, note, mainT("main.gateReview.routingRecordUnusable", {
+                flowId,
+                gateId,
+                detail: `路由记录损坏且无法重建写入（${detail}）；fail-closed：不自动通知、不转 dispatched、不收口，请人工核对`,
+              }));
+              continue;
+            }
+            diagnostic.record("gate.handoff.record.rebuilt", {
+              flowId,
+              gateId,
+              state: "returned-scan",
+              detail: routingRead.error,
+              identityKind: guard.reportSha256 !== null ? "sha" : "path-version-size-mtime",
+            });
+            noteGateOnce(projectRoot, flowId, gateId, "handoff-record", `rebuilt:${record.requestId}`, note, mainT("main.gateReview.unavailable", {
+              flowId,
+              gateId,
+              detail:
+                "路由记录损坏，已按 gate 记录与报告身份重建（身份已恢复）；原退回原因不可安全推断，未发送任何任务（fail-closed）；" +
+                "同一被拒报告不会重开，等待新报告版本或统筹重新 request_gate_review。",
+            }));
+            routingRead = { state: "ok", record: rebuilt };
+          }
+          if (routingRead.state === "missing") {
+            // R7：不猜原因、不重派质检、不转 dispatched；写持久 legacy 标记后再一次性通知统筹（RF-02）。
+            await routeGateReturnHandoff({
+              projectRoot,
+              flowId,
+              record,
+              nextRecord: record,
+              listing,
+              note,
+              diagnostic,
+              gateTitle: step.title,
+              cause: "legacy",
+              reasonSummary: record.error ?? "历史退回记录（实现前已存在，无路由记录）",
+              rejectedIdentity:
+                record.reportSha256 !== null
+                  ? {
+                      reportPath: record.reportPath,
+                      reportVersion: record.reportVersion,
+                      reportSha256: record.reportSha256,
+                      size: null,
+                      mtimeMs: null,
+                    }
+                  : null,
+              expectedReportVersion: null,
+              nextReportPath: record.reportPath,
+              nextReportVersion: record.reportVersion,
+              errors: [],
+              writeGateRecord: false,
+            });
             continue;
           }
-          const sha = createHash("sha256").update(bytes).digest("hex");
-          const isNew =
-            latest.version > record.reportVersion ||
-            latest.relPath !== record.reportPath ||
-            sha !== (record.reportSha256 ?? "");
-          if (!isNew) continue;
+          const routing = routingRead.record;
+          const latest = latestGateReviewReport(projectRoot, flowId, gateId);
+          const latestIdentity = latest !== undefined ? await readGateReportIdentity(projectRoot, latest) : undefined;
+          const rejectedIdentity = routing.latestReturn?.rejectedIdentity ?? routing.rebuiltGuard ?? null;
+          const sameRejected =
+            latestIdentity !== undefined && isSameRejectedReport(rejectedIdentity, latestIdentity);
+          const newReportObserved = latestIdentity !== undefined && !sameRejected;
+          const newReportDetail = newReportObserved
+            ? `已观测到新报告版本（${latestIdentity.reportPath} v${latestIdentity.reportVersion}），应用将按既有扫描机械复核`
+            : undefined;
+          if (routing.latestReturn !== null) {
+            await retryGateHandoffReturnDeliveries({
+              projectRoot,
+              flowId,
+              record,
+              route: routing.latestReturn,
+              routing,
+              listing,
+              gateTitle: step.title,
+              note,
+              diagnostic,
+              ...(newReportDetail !== undefined ? { newReportDetail } : {}),
+            });
+          }
+          // R6/R7：应用不自动开启新一轮；等统筹确认新候选后重新 request_gate_review / 人工核对。
+          if (routing.latestReturn !== null && (routing.latestReturn.cause === "candidate-changed" || routing.latestReturn.cause === "legacy")) {
+            continue;
+          }
+          if (latestIdentity === undefined) continue;
+          // 同一被拒报告（path+version+sha；不可读时 path+version+size+mtime）⇒ 不转 dispatched、不覆盖
+          // revision、不调用 completeGateStep、不收口。同 sha 不同版本 ⇒ 新报告（F13）。
+          if (sameRejected) continue;
+          const expected = routing.latestReturn?.expectedReportVersion ?? record.reportVersion;
           const attempt: GateReviewRecord = {
             ...record,
             status: "dispatched",
             flowRevision,
-            reportPath: latest.relPath,
-            reportVersion: latest.version,
+            reportPath: latestIdentity.reportPath,
+            reportVersion: latestIdentity.reportVersion,
             reportSha256: null,
             conclusion: null,
             severityCounts: emptyGateSeverityCounts(),
@@ -8088,7 +9957,17 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             diagnostic.error("gate.review.record.write.failed", error, { flowId, gateId });
             continue;
           }
-          await processGateReportAttempt({ projectRoot, flowId, flowRevision, record: attempt, listing, note, diagnostic });
+          await processGateReportAttempt({
+            projectRoot,
+            flowId,
+            flowRevision,
+            record: attempt,
+            listing,
+            note,
+            diagnostic,
+            gateTitle: step.title,
+            expectedReportVersion: expected,
+          });
           continue;
         }
         // superseded / unavailable：不执行旧处置（新 gate id 走新记录 / 人工核对）。
@@ -9704,7 +11583,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // 2026-10-27 流程推进/停滞看护（客户新设计第 3 项）：settle / 账本变化 / 导入同一入口跑一遍只读 flow
     // tick——「请汇报」提醒、无 current 的 ready 推进唤醒（复用既有去重）、停滞兜底。不新增第二套状态机。
     try {
-      await runFlowAdvanceTick?.(projectRoot);
+      // 真实事件路径：gate 记录已在上面扫描过 ⇒ 同一轮 tick 跳过重复 gate 扫描（O3 只在看护 tick 触发）。
+      await runFlowAdvanceTick?.(projectRoot, { skipGateScan: true });
     } catch (error) {
       createDiagnosticLogger({ component: "desktop.flow-tick", projectRoot }).error("flow.tick.failed", error);
     }

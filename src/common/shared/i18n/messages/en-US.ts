@@ -1654,11 +1654,28 @@ export const enUS = {
   "main.gateReview.rejected":
     "Flow {flowId}: the gate {gateId} review request was rejected ({detail}); fix the cause and resubmit instead of retrying unchanged.",
   "main.gateReview.passNote":
-    "Flow {flowId}: gate {gateId} passed (report {reportPath}); downstream work may continue, and final customer acceptance is still required.",
+    "Flow {flowId}: gate {gateId} passed (report {reportPath}) and was handed off to the convener (delivery results are reported separately); downstream work may continue, and final customer acceptance is still required.",
   "main.gateReview.failNote":
     "Flow {flowId}: gate {gateId} did not pass ({severity}; report {reportPath}); the gate stays pending, and review must be requested again after rework.",
   "main.gateReview.returnedToProof":
-    "Flow {flowId}: the gate {gateId} report is missing or structurally invalid ({detail}); returned to QA to complete — not passed and no rework routed.",
+    "Flow {flowId}: the gate {gateId} report is missing or structurally invalid ({detail}); returned to QA with a correction request and the convener was informed — delivery results are reported separately; not passed and no rework routed.",
+  // 2026-10-27 gate return/pass routing (design v3.2 §3.1/§3.2/§3.6, Q10 A): delivery-result keys.
+  // {detail} = bounded recipient/error summary (no report body, credentials, or command text);
+  // queued counts as delivered.
+  "main.gateReview.returnedRouted":
+    "Flow {flowId}: the gate {gateId} return notifications were delivered or queued (queued counts as delivered); the app did not pass the gate and routed no rework — it continues when a new report version appears or the convener requests again.",
+  "main.gateReview.returnedRouteFailed":
+    "Flow {flowId}: the gate {gateId} return notifications were not fully delivered ({detail}); the app does not claim notification, retries automatically later, and needs manual checking after the retry limit; not passed and no rework routed.",
+  "main.gateReview.reportUnreadable":
+    "Flow {flowId}: the gate {gateId} report exists but is currently unreadable ({reportPath}); QA was reminded to check readability and the convener was informed; the record stays dispatched (not returned, not passed).",
+  "main.gateReview.reportUnreadableDeliveryFailed":
+    "Flow {flowId}: the gate {gateId} report exists but is currently unreadable ({reportPath}); the reminder or notification was not fully delivered ({detail}); the record stays dispatched — the app retries later and manual checking is required after the retry limit.",
+  "main.gateReview.passHandoffSent":
+    "Flow {flowId}: gate {gateId} passed and the handoff was delivered or queued to the convener (queued counts as delivered); downstream dispatch remains with the convener — a gate pass is not final acceptance and not customer approval.",
+  "main.gateReview.passHandoffFailed":
+    "Flow {flowId}: gate {gateId} passed, but the handoff to the convener was not delivered ({detail}); the app does not claim handoff, retries automatically later, and needs manual checking after the retry limit; the general auto-advance can still fall back.",
+  "main.gateReview.routingRecordUnusable":
+    "Flow {flowId}: the routing record for gate {gateId} is corrupt and cannot be rebuilt ({detail}); the app stopped automatic notifications (fail-closed), does not claim delivery, and manual checking of the gate record and report is required.",
   "main.gateReview.nitOnly":
     "Flow {flowId}: the gate {gateId} fail contains only minor/nit items; a gate failure must rest on a blocker/major, so it was returned to QA as structurally invalid and no rework was triggered.",
   "main.gateReview.reportMissing":

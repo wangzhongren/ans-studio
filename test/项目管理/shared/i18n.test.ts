@@ -589,14 +589,14 @@ test("B1–B4 key 分区：ui/main/shared 计数与总 key 数符合契约（漏
   };
   assert.deepEqual(prefixes, {
     ui: 792, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7 + 2026-10-25 chat-panel 10 + background tasks 25 + flow status 22 + acceptance triage 28 + 2026-10-26 decision card 3 + 2026-10-26 view_image 1 + 2026-10-27 view_image preview 3 + 2026-10-27 view_image lightbox 2
-    main: 531, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6 + backgroundTasks 1 + flowStatus 2 + write preauthorization 6 + 2026-10-26 gate review 13 + 2026-10-27 gate review flow-busy 1 + 2026-10-26 decision card 6 + 2026-10-26 view_image 2 + 2026-10-27 view_image same-turn 1 + 2026-10-26 requirement change 13
+    main: 538, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6 + backgroundTasks 1 + flowStatus 2 + write preauthorization 6 + 2026-10-26 gate review 13 + 2026-10-27 gate review flow-busy 1 + 2026-10-26 decision card 6 + 2026-10-26 view_image 2 + 2026-10-27 view_image same-turn 1 + 2026-10-26 requirement change 13 + 2026-10-27 gate review return routing 7
     shared: 62, // B4 元数据 + 跨层通用短词
     preferences: 3, // B0
   });
-  assert.equal(keys.length, 1388);
+  assert.equal(keys.length, 1395);
   // B1/B2 与 B3 分区（扣除 B0 的 5 个 ui.* / 5 个 main.*）。
   assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 787);
-  assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 526);
+  assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 533);
 });
 
 /**
@@ -1832,6 +1832,187 @@ test("gate 复核 key：zh-CN/en-US 取值与插值（已提交/已通过/失败
       reportPath: "docs/acceptance/flow-a-gate-vertical-slice-report-v1.md",
     }),
     "Gate 返工任务｜gate-vertical-slice：按 gate 报告 docs/acceptance/flow-a-gate-vertical-slice-report-v1.md 的 1 blocker 项修复；minor/nit 为非阻断、可选后续。",
+  );
+});
+
+/**
+ * 2026-10-27 gate 退回/通过路由投递结果 key（方案 v3.2 §3.1/§3.2/§3.6、Q10 A；
+ * 验收标准 P12/P14/P17；团队计划 S2a）。
+ * 契约：7 个新增 `main.gateReview.*` key 成对存在；`returnedToProof` / `passNote`
+ * 文案扩展为「投递结果另行如实说明」，但占位符与既有「报告缺失或结构不合规」「最终客户验收」
+ * 语义保持不变；投递结果键区分已投递/已排队（排队视为已投递）与未送达（稍后重试/需人工），
+ * 不得把失败写成成功；`flowBusy` 与既有 14 个 gate 复核 key 的断言保持原样（RF-05）。
+ * 占位符：returnedRouted/passHandoffSent = {flowId}/{gateId}；
+ * returnedRouteFailed/passHandoffFailed/routingRecordUnusable = {flowId}/{gateId}/{detail}；
+ * reportUnreadable = {flowId}/{gateId}/{reportPath}；
+ * reportUnreadableDeliveryFailed = {flowId}/{gateId}/{reportPath}/{detail}。
+ */
+const GATE_ROUTING_KEYS = [
+  "main.gateReview.returnedRouted",
+  "main.gateReview.returnedRouteFailed",
+  "main.gateReview.reportUnreadable",
+  "main.gateReview.reportUnreadableDeliveryFailed",
+  "main.gateReview.passHandoffSent",
+  "main.gateReview.passHandoffFailed",
+  "main.gateReview.routingRecordUnusable",
+] as const satisfies readonly MessageKey[];
+
+test("gate 路由结果 key：7 个新增 main.gateReview.* 在 zh-CN/en-US 均存在，占位符一致且符合契约", () => {
+  assert.equal(GATE_ROUTING_KEYS.length, 7);
+  const expectedPlaceholders: Record<(typeof GATE_ROUTING_KEYS)[number], string[]> = {
+    "main.gateReview.returnedRouted": ["flowId", "gateId"],
+    "main.gateReview.returnedRouteFailed": ["detail", "flowId", "gateId"],
+    "main.gateReview.reportUnreadable": ["flowId", "gateId", "reportPath"],
+    "main.gateReview.reportUnreadableDeliveryFailed": ["detail", "flowId", "gateId", "reportPath"],
+    "main.gateReview.passHandoffSent": ["flowId", "gateId"],
+    "main.gateReview.passHandoffFailed": ["detail", "flowId", "gateId"],
+    "main.gateReview.routingRecordUnusable": ["detail", "flowId", "gateId"],
+  };
+  for (const key of GATE_ROUTING_KEYS) {
+    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
+    assert.ok(key in enUS, `en-US 缺 ${key}`);
+    assert.deepEqual(placeholdersOf(zhCN[key]), expectedPlaceholders[key], `zh-CN 占位符不符契约：${key}`);
+    assert.deepEqual(placeholdersOf(enUS[key]), expectedPlaceholders[key], `en-US 占位符不符契约：${key}`);
+    assert.deepEqual(placeholdersOf(enUS[key]), placeholdersOf(zhCN[key]), `占位符不一致：${key}`);
+  }
+});
+
+test("gate 路由结果 key：如实区分已投递/排队/未送达/需人工；既有 returnedToProof/passNote 语义保留（RF-05）", () => {
+  // 既有事实行：保留报告缺陷判定与最终客户验收语义，并明确投递结果另行说明。
+  assert.ok(
+    zhCN["main.gateReview.returnedToProof"].includes("报告缺失或结构不合规"),
+    "zh-CN returnedToProof 必须保留报告缺陷判定",
+  );
+  assert.ok(
+    zhCN["main.gateReview.returnedToProof"].includes("投递结果另行如实说明"),
+    "zh-CN returnedToProof 必须说明投递结果另行如实说明",
+  );
+  const returnedToProofEn = enUS["main.gateReview.returnedToProof"];
+  assert.ok(returnedToProofEn.includes("structurally invalid"), "en-US returnedToProof 必须保留报告缺陷判定");
+  assert.ok(
+    returnedToProofEn.includes("delivery results are reported separately"),
+    "en-US returnedToProof 必须说明投递结果另行说明",
+  );
+  assert.ok(zhCN["main.gateReview.passNote"].includes("最终客户验收"), "zh-CN passNote 必须保留最终客户验收");
+  assert.ok(
+    zhCN["main.gateReview.passNote"].includes("投递结果另行如实说明"),
+    "zh-CN passNote 必须说明投递结果另行如实说明",
+  );
+  const passNoteEn = enUS["main.gateReview.passNote"];
+  assert.ok(
+    passNoteEn.includes("final customer acceptance is still required"),
+    "en-US passNote 必须保留最终客户验收",
+  );
+  assert.ok(passNoteEn.includes("delivery results are reported separately"), "en-US passNote 必须说明投递结果另行说明");
+
+  // 已投递/已排队（排队视为已投递）：不得声称通过或路由返工。
+  const routedZh = zhCN["main.gateReview.returnedRouted"];
+  assert.ok(routedZh.includes("已投递或已排队"), "zh-CN returnedRouted 必须写明已投递或已排队");
+  assert.ok(routedZh.includes("排队视为已投递"), "zh-CN returnedRouted 必须写明排队视为已投递");
+  assert.ok(routedZh.includes("未判通过"), "zh-CN returnedRouted 必须写明未判通过");
+  assert.ok(routedZh.includes("未路由返工"), "zh-CN returnedRouted 必须写明未路由返工");
+  const routedEn = enUS["main.gateReview.returnedRouted"];
+  assert.ok(routedEn.includes("delivered or queued"), "en-US returnedRouted 必须写明已投递或已排队");
+  assert.ok(routedEn.includes("queued counts as delivered"), "en-US returnedRouted 必须写明排队视为已投递");
+  assert.ok(routedEn.includes("did not pass"), "en-US returnedRouted 必须写明未判通过");
+  assert.ok(routedEn.includes("routed no rework"), "en-US returnedRouted 必须写明未路由返工");
+
+  // 未送达：如实说明、稍后重试、需人工；不得声称已通知。
+  const failedZh = zhCN["main.gateReview.returnedRouteFailed"];
+  assert.ok(failedZh.includes("未完全送达"), "zh-CN returnedRouteFailed 必须写明未完全送达");
+  assert.ok(failedZh.includes("未声称已通知"), "zh-CN returnedRouteFailed 不得声称已通知");
+  assert.ok(failedZh.includes("稍后自动重试"), "zh-CN returnedRouteFailed 必须写明稍后自动重试");
+  assert.ok(failedZh.includes("需人工核对"), "zh-CN returnedRouteFailed 必须写明需人工核对");
+  const failedEn = enUS["main.gateReview.returnedRouteFailed"];
+  assert.ok(failedEn.includes("not fully delivered"), "en-US returnedRouteFailed 必须写明未完全送达");
+  assert.ok(failedEn.includes("does not claim notification"), "en-US returnedRouteFailed 不得声称已通知");
+  assert.ok(failedEn.includes("retries automatically later"), "en-US returnedRouteFailed 必须写明稍后自动重试");
+  assert.ok(failedEn.includes("manual checking"), "en-US returnedRouteFailed 必须写明需人工核对");
+
+  // R2b 报告不可读：记录保持已派发，不转退回、不判通过；投递失败也如实。
+  const unreadableZh = zhCN["main.gateReview.reportUnreadable"];
+  assert.ok(unreadableZh.includes("不可读"), "zh-CN reportUnreadable 必须写明不可读");
+  assert.ok(unreadableZh.includes("记录保持已派发"), "zh-CN reportUnreadable 必须写明记录保持已派发");
+  assert.ok(unreadableZh.includes("未退回"), "zh-CN reportUnreadable 必须写明未退回");
+  assert.ok(unreadableZh.includes("未判通过"), "zh-CN reportUnreadable 必须写明未判通过");
+  const unreadableEn = enUS["main.gateReview.reportUnreadable"];
+  assert.ok(unreadableEn.includes("unreadable"), "en-US reportUnreadable 必须写明不可读");
+  assert.ok(unreadableEn.includes("stays dispatched"), "en-US reportUnreadable 必须写明记录保持已派发");
+  assert.ok(unreadableEn.includes("not returned"), "en-US reportUnreadable 必须写明未退回");
+  assert.ok(unreadableEn.includes("not passed"), "en-US reportUnreadable 必须写明未判通过");
+  const unreadableFailedZh = zhCN["main.gateReview.reportUnreadableDeliveryFailed"];
+  assert.ok(unreadableFailedZh.includes("未完全送达"), "zh-CN reportUnreadableDeliveryFailed 必须写明未完全送达");
+  assert.ok(unreadableFailedZh.includes("记录保持已派发"), "zh-CN reportUnreadableDeliveryFailed 必须写明记录保持已派发");
+  assert.ok(unreadableFailedZh.includes("需人工核对"), "zh-CN reportUnreadableDeliveryFailed 必须写明需人工核对");
+  const unreadableFailedEn = enUS["main.gateReview.reportUnreadableDeliveryFailed"];
+  assert.ok(unreadableFailedEn.includes("not fully delivered"), "en-US reportUnreadableDeliveryFailed 必须写明未完全送达");
+  assert.ok(unreadableFailedEn.includes("stays dispatched"), "en-US reportUnreadableDeliveryFailed 必须写明记录保持已派发");
+  assert.ok(unreadableFailedEn.includes("manual checking"), "en-US reportUnreadableDeliveryFailed 必须写明需人工核对");
+
+  // 通过转交：gate 通过 ≠ 最终验收 ≠ 客户批准；失败不声称已转交。
+  const handoffZh = zhCN["main.gateReview.passHandoffSent"];
+  assert.ok(handoffZh.includes("已通过"), "zh-CN passHandoffSent 必须写明已通过");
+  assert.ok(handoffZh.includes("已投递或已排队"), "zh-CN passHandoffSent 必须写明已投递或已排队");
+  assert.ok(handoffZh.includes("最终验收"), "zh-CN passHandoffSent 必须写明不等于最终验收");
+  assert.ok(handoffZh.includes("客户批准"), "zh-CN passHandoffSent 必须写明不等于客户批准");
+  const handoffEn = enUS["main.gateReview.passHandoffSent"];
+  assert.ok(handoffEn.includes("passed"), "en-US passHandoffSent 必须写明已通过");
+  assert.ok(handoffEn.includes("delivered or queued"), "en-US passHandoffSent 必须写明已投递或已排队");
+  assert.ok(handoffEn.includes("final acceptance"), "en-US passHandoffSent 必须写明不等于最终验收");
+  assert.ok(handoffEn.includes("customer approval"), "en-US passHandoffSent 必须写明不等于客户批准");
+  const handoffFailedZh = zhCN["main.gateReview.passHandoffFailed"];
+  assert.ok(handoffFailedZh.includes("未送达"), "zh-CN passHandoffFailed 必须写明未送达");
+  assert.ok(handoffFailedZh.includes("未声称已转交"), "zh-CN passHandoffFailed 不得声称已转交");
+  assert.ok(handoffFailedZh.includes("稍后自动重试"), "zh-CN passHandoffFailed 必须写明稍后自动重试");
+  assert.ok(handoffFailedZh.includes("需人工核对"), "zh-CN passHandoffFailed 必须写明需人工核对");
+  const handoffFailedEn = enUS["main.gateReview.passHandoffFailed"];
+  assert.ok(handoffFailedEn.includes("not delivered"), "en-US passHandoffFailed 必须写明未送达");
+  assert.ok(handoffFailedEn.includes("does not claim handoff"), "en-US passHandoffFailed 不得声称已转交");
+  assert.ok(handoffFailedEn.includes("retries automatically later"), "en-US passHandoffFailed 必须写明稍后自动重试");
+  assert.ok(handoffFailedEn.includes("manual checking"), "en-US passHandoffFailed 必须写明需人工核对");
+
+  // 路由记录损坏：fail-closed，不发送、不声称送达，交人工核对。
+  const unusableZh = zhCN["main.gateReview.routingRecordUnusable"];
+  assert.ok(unusableZh.includes("损坏且无法重建"), "zh-CN routingRecordUnusable 必须写明损坏且无法重建");
+  assert.ok(unusableZh.includes("fail-closed"), "zh-CN routingRecordUnusable 必须写明 fail-closed");
+  assert.ok(unusableZh.includes("未声称已送达"), "zh-CN routingRecordUnusable 不得声称已送达");
+  assert.ok(unusableZh.includes("人工核对"), "zh-CN routingRecordUnusable 必须写明人工核对");
+  const unusableEn = enUS["main.gateReview.routingRecordUnusable"];
+  assert.ok(unusableEn.includes("corrupt and cannot be rebuilt"), "en-US routingRecordUnusable 必须写明损坏且无法重建");
+  assert.ok(unusableEn.includes("fail-closed"), "en-US routingRecordUnusable 必须写明 fail-closed");
+  assert.ok(unusableEn.includes("does not claim delivery"), "en-US routingRecordUnusable 不得声称已送达");
+  assert.ok(unusableEn.includes("manual checking"), "en-US routingRecordUnusable 必须写明人工核对");
+
+  for (const key of GATE_ROUTING_KEYS) {
+    const value = enUS[key];
+    const text = typeof value === "string" ? value : Object.values(value).join("");
+    assert.equal(valueContainsHan(text), false, `en-US 含中文：${key}`);
+  }
+});
+
+test("gate 路由结果 key：zh-CN/en-US 取值与插值（已投递/队列、报告不可读、通过转交失败）", () => {
+  assert.equal(
+    translate("zh-CN", "main.gateReview.returnedRouted", {
+      flowId: "flow-a",
+      gateId: "gate-vertical-slice",
+    }),
+    "流程 flow-a：gate gate-vertical-slice 的退回通知已投递或已排队（排队视为已投递）；应用未判通过、未路由返工，将在新报告版本出现或统筹重新请求后继续处置。",
+  );
+  assert.equal(
+    translate("zh-CN", "main.gateReview.reportUnreadable", {
+      flowId: "flow-a",
+      gateId: "gate-vertical-slice",
+      reportPath: "docs/acceptance/flow-a-gate-vertical-slice-report-v1.md",
+    }),
+    "流程 flow-a：gate gate-vertical-slice 报告存在但当前不可读（docs/acceptance/flow-a-gate-vertical-slice-report-v1.md）；已提醒质检检查可读性并通知统筹，记录保持已派发（未退回、未判通过）。",
+  );
+  assert.equal(
+    translate("en-US", "main.gateReview.passHandoffFailed", {
+      flowId: "flow-a",
+      gateId: "gate-vertical-slice",
+      detail: "convener session unavailable",
+    }),
+    "Flow flow-a: gate gate-vertical-slice passed, but the handoff to the convener was not delivered (convener session unavailable); the app does not claim handoff, retries automatically later, and needs manual checking after the retry limit; the general auto-advance can still fall back.",
   );
 });
 
