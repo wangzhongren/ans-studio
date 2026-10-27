@@ -93,6 +93,7 @@ Service 外层已经确定的失败、中止或超时结果具有优先级；随
 | 2026-10-26 | 新增 | 契约/工具已实施待验证；应用与注入端未接线 | Gate 复核请求 `request_gate_review`（独立于最终验收；`dispatched` 只表示已派 Proof；gate fail 只按 blocker/major） | [变更记录](../change/2026-10-26_change_request-gate-review-contract.md) |
 | 2026-10-26 | 新增 | 契约/schema/工具已实施待验证；角色白名单/判断默认推荐/桌面呈现未接线 | 材料性选择卡 `cardKind=decision`（仅统筹；恰一个 `recommended`；替我决策默认推荐；不等于验收/批准；不触发 gate） | [变更记录](../change/2026-10-26_change_decision-card-contract.md) |
 | 2026-10-26 | 新增 | 契约/schema/工具已实施待验证；应用与注入端未接线 | 需求变更申请 `request_requirement_change`（报告员发现新授权/范围时不塞提案卡；审批卡由提案/统筹发起、判断 agent/客户在 decision 卡上决定；申请≠批准；发起方不得自批；主理只在批准后执行意图变更） | [变更记录](../change/2026-10-26_change_request-requirement-change-contract.md) |
+| 2026-10-27 | 新增 | 契约/schema/工具已实施待验证；应用侧校验/收口与注入端未接线 | 验收标准产物汇报 `report_artifact_ready`（质检只向应用汇报、应用校验后决定是否收口；工具不写盘/不写 flow/不假装已接受；成功不等于自动完成；未声明 accepted 按未接受 fail-closed） | [变更记录](../change/2026-10-27_change_report-artifact-ready-contract.md) |
 
 实际输入由 Core 在开始确认、原输入持久化及取消检查后统一发一次 message，detail.source 为 prompt-input、text 为原文，非空图片只记 imageCount。top/detail.turnId 都为该实际轮次；Pi 注入与 demo Core 路径不再另发输入回声。消费者凭标记与轮次合并同一输入的历史/live表示，真实助手前缀文字和同文不同轮均保留。确认/选择回调另外收到入口原 toolCallId（可选），供实际请求卡关联；它不增加写权。run_shell 说明明确一次 argv 程序调用、不解释 shell operators/展开，多命令分开调用，原审核与执行不变。
 
@@ -145,4 +146,8 @@ flowchart TD
 ## 图片查看 `view_image`（2026-10-26，两轮附件）
 
 客户要求让角色能看项目里的图片。因各引擎对「工具结果附图」支持不一致，采用**两轮附件**：`view_image` 读取项目内图片并调用注入的 `ViewImageFn`，把图片排队为**同一角色下一轮用户提示的图片附件**；工具本轮只返回文本，成功句固定为「已读取并排队；下一轮以图片附件提供；本轮不要假装已看到」。能力未注入 ⇒ 工具不注册（fail-closed）；路径/类型/大小非法 ⇒ 工具失败且不调用能力；能力拒绝/抛错/契约外回执 ⇒ 如实说明「未排队」，绝不谎报已提供。校验口径：项目相对路径（拒绝 NUL/绝对/盘符/`..`，realpath 复核读取根，目录拒绝）、`.png/.jpg/.jpeg/.webp/.gif`（真实扩展名 → MIME）、单文件 ≤10 MB；读二进制后 base64 成 `PromptImage`。本工具不写盘、不联网、不过写门禁，也不改变 `read_file` 等既有工具行为。**接线状态**：契约/schema/工具/测试已落；Service/编排/桌面把图片实际排入下一轮 `PromptOptions.images`、注入判据与聊天呈现未接线（未注入 ⇒ 工具不存在）。实现与验证见 [change](../change/2026-10-26_change_view-image-two-round-attachment.md)。
+
+## 验收标准产物汇报 `report_artifact_ready`（2026-10-27，应用中介）
+
+客户新设计要求：验收标准由质检写完后，**质检只向应用汇报，应用校验后决定是否收口**——不要让应用盯文件自动勾卡，也不要让质检自己改 flow 状态。运行时核心提供应用中介的汇报工具 `report_artifact_ready`：参数 `{flowId, stepId, path, summary?, sha256?}`（`flowId`/`stepId`/`path` 必填、只做基本非空字符串校验；未知参数拒绝且不触达能力），handler 把载荷原样交给注入的 `ReportArtifactFn` 能力并**如实转达**回执 `ok`/`accepted`/`message`。工具**不写盘、不读写 flow、不做治理判定、不假装应用已接受**：路径是否存在、步骤是否属于该 flow、摘要/哈希是否与文件一致、是否收口全部由应用能力校验。**汇报成功不等于自动完成**——`accepted:true` 只表示应用已收到并接受该产物，收口/推进 flow 由应用决定并写入；`accepted:false`、`ok:false`、`accepted` 缺席（`accepted=未声明`字段）或契约外回执一律按**未接受** fail-closed，绝不宣称已收口。能力未注入 ⇒ 工具不注册（fail-closed）。**接线状态**：契约/schema/工具/测试已落；应用侧校验/收口实现与编排/桌面注入（应为内置质检/Proof 会话）未接线 ⇒ 当前生产会话不注册（fail-safe toward 现状）。实现与验证见 [change](../change/2026-10-27_change_report-artifact-ready-contract.md)。
 

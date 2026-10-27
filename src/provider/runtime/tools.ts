@@ -51,6 +51,9 @@ import type {
   RequestRequirementChangeFn,
   RequestRequirementChangeInput,
   RequestRequirementChangeResult,
+  ReportArtifactFn,
+  ReportArtifactInput,
+  ReportArtifactReceipt,
   FlowToolEvidence,
   FlowToolResult,
   FlowToolStatus,
@@ -178,6 +181,9 @@ export const REQUEST_BOUNDARY_CHANGE_TOOL_NAME = "request_boundary_change";
 
 /** request_requirement_change 工具名（2026-10-26；报告员提交需求变更审批（提案/统筹 decision 卡）——申请≠批准，发起方不得自批）。 */
 export const REQUEST_REQUIREMENT_CHANGE_TOOL_NAME = "request_requirement_change";
+
+/** report_artifact_ready 工具名（2026-10-27 客户要求；质检把写好的验收标准产物汇报给应用，应用校验后决定是否收口）。 */
+export const REPORT_ARTIFACT_READY_TOOL_NAME = "report_artifact_ready";
 
 /** view_image 工具名（2026-10-26；读取项目内图片并按运行时策略交付——同轮附图优先 / 下一轮附件回退；注入才注册）。 */
 export const VIEW_IMAGE_TOOL_NAME = "view_image";
@@ -1659,6 +1665,10 @@ function abortedToolResult(name: string, viewImageDelivery?: ViewImageDeliveryMo
   // 需求变更申请（2026-10-26）：中止时**不假设已提交/已获批准**（零副作用面如实）。
   if (name === REQUEST_REQUIREMENT_CHANGE_TOOL_NAME) {
     return { ok: false, message: `${name}：需求变更申请**未获结果**（原因：会话已中止）——**不要当已提交/已获批准**；如实告知客户。` };
+  }
+  // 验收标准产物汇报（2026-10-27）：中止时**不假设应用已收到/已接受**，更不假设已收口。
+  if (name === REPORT_ARTIFACT_READY_TOOL_NAME) {
+    return { ok: false, message: `${name}：产物汇报**未获结果**（原因：会话已中止）——**不要当应用已收到/已接受**；如实告知客户，也不要自行修改 flow 状态。` };
   }
   // 图片查看（2026-10-26；2026-10-27 同轮设计）：中止时不谎称「已提供/未提供」。
   // 文案按当前交付方式分支：next-turn 保持「排队未获确认；下一轮以系统为准」原意；
@@ -3638,6 +3648,110 @@ function makeRequestRequirementChangeTool(fn: RequestRequirementChangeFn): Execu
   };
 }
 
+// —————————————— 验收标准产物汇报（2026-10-27 客户要求；report_artifact_ready） ——————————————
+//
+// 客户新设计：验收标准由质检写完后，**质检只向应用汇报，应用校验后决定是否收口**——质检不盯文件
+// 自动勾卡、也不自行修改 flow 状态。本层只做两件事：**参数形状校验**（flowId/stepId/path 必填非空
+// 字符串；summary/sha256 可选非空字符串；未知参数拒绝；非法在触达能力前拒绝，不猜测、不截断、不
+// 静默丢弃）＋**调用注入能力并如实转达回执**（`ok`/`accepted`/`message`）。路径是否存在、步骤是否
+// 属于该 flow、摘要/哈希是否与文件一致、是否收口全部由**应用注入的能力**校验——本工具不读文件、
+// 不写盘、不写 flow、不做治理判定。**汇报成功 ≠ 自动完成**：`accepted:true` 只表示应用已收到并接受
+// 该产物，收口由应用决定；`ok:true` 但 `accepted` 缺席/为 false 时按**未接受** fail-closed 转达，
+// 绝不宣称已收口。未注入能力 ⇒ 工具不注册（沿 request_acceptance 先例，能力缺席＝最强 fail-closed）。
+
+/** `report_artifact_ready` 的参数面（严格；未知参数在触达能力前拒绝）。 */
+const REPORT_ARTIFACT_READY_ARG_KEYS: ReadonlySet<string> = new Set(["flowId", "stepId", "path", "summary", "sha256"]);
+
+/**
+ * 回执 → 工具结果：**原样**转达应用的 `ok`/`accepted`/`message`。
+ * - `ok:false` → 未获受理/未通过校验，按**未接受**处理；
+ * - `ok:true` + `accepted:true` → 已接受（仍须重申「不等于自动完成/不自行修改 flow」）；
+ * - `ok:true` 但 `accepted` 为 false/缺席 → 按**未接受** fail-closed（不得宣称已接受）；
+ * - 契约外回执（缺失/非对象/`ok` 非布尔/`accepted` 给出但非布尔）→ fail-closed「未返回明确结果」，
+ *   按未受理/未接受处理。
+ */
+function reportArtifactResultMessage(name: string, value: unknown, toolInput: ReportArtifactInput): ToolResult {
+  const contractExternal = (): ToolResult => ({
+    ok: false,
+    message: `${name}：应用未返回明确结果（回执缺失或非法）——按**未受理/未接受**处理；**不要当应用已接受**，更不要自行修改 flow 状态；如实告知客户。`,
+  });
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return contractExternal();
+  const receipt = value as Partial<ReportArtifactReceipt>;
+  if (typeof receipt.ok !== "boolean") return contractExternal();
+  if (receipt.accepted !== undefined && typeof receipt.accepted !== "boolean") return contractExternal();
+  const message = typeof receipt.message === "string" && receipt.message.trim() !== "" ? receipt.message : undefined;
+  const parts = [
+    `ok=${receipt.ok}`,
+    `accepted=${receipt.accepted === undefined ? "未声明" : receipt.accepted}`,
+    `flowId=${toolInput.flowId}`,
+    `stepId=${toolInput.stepId}`,
+    `path=${toolInput.path}`,
+  ];
+  const detail = `（${parts.join("；")}）${message !== undefined ? `：${message}` : ""}`;
+  if (!receipt.ok) {
+    return { ok: false, message: `${name}：产物汇报**未获受理/未通过应用校验**${detail}——**不要当应用已接受**，更不要自行修改 flow 状态（是否收口由应用决定）；按回执原因修正后重试或如实告知客户。` };
+  }
+  if (receipt.accepted === true) {
+    return {
+      ok: true,
+      message:
+        `${name}：应用已收到并**接受**该产物汇报${detail}。` +
+        `注意：**汇报成功不等于自动完成**——是否收口/推进 flow 步骤由应用校验后决定并写入；` +
+        `**不要自行修改 flow 状态**，也不要把 accepted 说成验收已通过。`,
+    };
+  }
+  return {
+    ok: false,
+    message: `${name}：应用已收到汇报但**未接受该产物**${detail}——**不要当已收口/已完成**，更不要自行修改 flow 状态；按回执原因修正后重试或如实告知客户。`,
+  };
+}
+
+/**
+ * report_artifact_ready：质检把写好的验收标准产物**汇报给应用**（客户 2026-10-27 新设计）。
+ * handler 只做基本参数形状校验，把 `ReportArtifactInput` 原样交给注入能力并**如实**转达回执：
+ * 不写盘、不读写 flow、不做治理判定、不假装应用已接受；汇报成功只表示应用已收到并决定，
+ * **不等于自动完成**（收口由应用校验后决定）。能力抛错/中止 ⇒ 如实「未获结果」，不假设已接受。
+ */
+function makeReportArtifactReadyTool(fn: ReportArtifactFn): ExecutableTool {
+  const name = REPORT_ARTIFACT_READY_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const unknown = unknownGovernanceArg(call.args, REPORT_ARTIFACT_READY_ARG_KEYS, name);
+      if (unknown !== undefined) return unknown;
+      // flowId/stepId/path：工具层只做**基本非空字符串**校验（slug/归属/存在性/路径语义由能力侧校验）。
+      const flowId = readFlowRequiredText(call.args, "flowId", name);
+      if (!flowId.ok) return flowId.result;
+      const stepId = readFlowRequiredText(call.args, "stepId", name);
+      if (!stepId.ok) return stepId.result;
+      const path = readFlowRequiredText(call.args, "path", name);
+      if (!path.ok) return path.result;
+      const summary = readFlowOptionalText(call.args, "summary", name);
+      if (!summary.ok) return summary.result;
+      const sha256 = readFlowOptionalText(call.args, "sha256", name);
+      if (!sha256.ok) return sha256.result;
+      const input: ReportArtifactInput = {
+        flowId: flowId.value,
+        stepId: stepId.value,
+        path: path.value,
+        ...(summary.value !== undefined ? { summary: summary.value } : {}),
+        ...(sha256.value !== undefined ? { sha256: sha256.value } : {}),
+      };
+      let result: unknown;
+      try {
+        result = await raceAbort(
+          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(input); }),
+          call.signal,
+          `${name} 汇报产物`,
+        );
+      } catch (err) {
+        return { ok: false, message: `${name}：产物汇报**未获结果**（原因：${reasonOf(err)}）——**不要当应用已收到/已接受**，更不要自行修改 flow 状态；如实告知客户。` };
+      }
+      return reportArtifactResultMessage(name, result, input);
+    },
+  };
+}
+
 /**
  * 构造受治理工具集：
  * - 写入类 write_file / edit_file（先 gate，获准且配置了 writeRoot 时落盘）；
@@ -3804,6 +3918,12 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   // 只在批准后执行意图变更。
   const requestRequirementChange = options?.requestRequirementChange;
   if (requestRequirementChange !== undefined) tools.push(makeRequestRequirementChangeTool(requestRequirementChange));
+  // 结构性保证（2026-10-27 验收标准产物汇报，沿 requestAcceptance 先例）：**未注入能力时
+  // `report_artifact_ready` 不存在**。只给质检（内置 verifier）——由调用方（编排/桌面注入端）决定注入；
+  // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。工具只转交载荷并如实转达回执：不写盘、
+  // 不写 flow、不假装应用已接受；**汇报成功 ≠ 自动完成**，是否收口由应用校验后决定。
+  const reportArtifact = options?.reportArtifact;
+  if (reportArtifact !== undefined) tools.push(makeReportArtifactReadyTool(reportArtifact));
   // Observe customer waits without storing titles, previews or selected values.
   // 中止兜底文案需要知道 view_image 的交付方式（tool-result 不得声称排队/下一轮附件）。
   const viewImageDelivery = (options?.viewImagePolicy ?? VIEW_IMAGE_DEFAULT_POLICY).delivery;

@@ -24,7 +24,7 @@ import type { GovernanceFunction, GovernanceModel, ProjectConfig } from "../../s
 import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputOutcome, CustomerInputTriageOutcome, DispatchTaskFn, PromptImage, PromptOptions, FinalizeResult, ViewImageFn } from "../../src/model/runtime.ts";
 // 2026-10-25 独立复核请求（`request_acceptance`）：能力回执/载荷形状唯一来源＝契约家 `model/runtime.ts`
 // （只读导入，不复制形状）；flowId 形状同样复用运行时核心导出的 slug 常量（不另写正则）。
-import type { RequestAcceptanceFn, RequestAcceptanceInput, RequestAcceptanceResult, RequestBoundaryChangeFn, RequestBoundaryChangeInput, RequestBoundaryChangeResult, RequestGateReviewFn, RequestGateReviewInput, RequestGateReviewResult, RequestRequirementChangeFn, RequestRequirementChangeInput, RequestRequirementChangeResult, GovernanceJudgeFn, GovernanceJudgeOutcome } from "../../src/model/runtime.ts";
+import type { RequestAcceptanceFn, RequestAcceptanceInput, RequestAcceptanceResult, RequestBoundaryChangeFn, RequestBoundaryChangeInput, RequestBoundaryChangeResult, RequestGateReviewFn, RequestGateReviewInput, RequestGateReviewResult, RequestRequirementChangeFn, RequestRequirementChangeInput, RequestRequirementChangeResult, GovernanceJudgeFn, GovernanceJudgeOutcome, ReportArtifactFn, ReportArtifactInput, ReportArtifactReceipt } from "../../src/model/runtime.ts";
 import { GOVERNANCE_SLUG_PATTERN } from "../../src/model/runtime.ts";
 // 2026-10-26 边界变更请求（request_boundary_change）：确定性校验/票据/组队任务/AI 门禁请求的纯逻辑
 // 在 `boundary-change.ts`（不写盘、不发会话）；本层只做 IO/派发/判断闭包装配。
@@ -180,11 +180,13 @@ import {
 import {
   acceptanceDispatchRecorded,
   acceptanceLastDispatchAtMs,
+  buildAcceptanceCriteriaReportReminderMessage,
   buildAcceptanceCriteriaTaskMessage,
   buildAcceptanceReworkTaskMessage,
   buildAcceptanceTaskMessage,
   buildAcceptanceTriageCardLines,
   buildAcceptanceTriageReportText,
+  buildFlowStallTaskMessage,
   buildGateReviewTaskMessage,
   buildGovernanceAdvanceMessage,
   buildGovernanceCoordinationTaskMessage,
@@ -219,6 +221,15 @@ import {
   type GovernanceNextStepPayload,
   type GovernanceRiskTier,
 } from "./governance-advance.ts";
+// 2026-10-27 验收标准工件汇报（report_artifact_ready）：契约单一来源＝运行时核心
+// `ReportArtifactFn`/`ReportArtifactInput`/`ReportArtifactReceipt`（上方只读导入）；本文件只承载应用侧
+// 校验/收口实现，桌面诊断扩展回执与路径规范化在 artifact-report.ts。
+import {
+  ACCEPTANCE_CRITERIA_STEP_ID,
+  normalizeReportedArtifactPath,
+  type DesktopReportArtifactReceipt,
+  type ReportArtifactRejectCode,
+} from "./artifact-report.ts";
 // 流程**机器状态**（2026-10-19 客户决定「这些全部改成yaml。」）：自动验收门读 `docs/flows/<flowId>.yaml`，
 // 用编排的 `parseFlowStateYaml` + `evaluateFlowCompletion` 判定；Markdown 仅人读视图（YAML 缺失时才
 // legacy 回退）。**只经 Pipeline 公共出口**消费（`src/pipeline/orchestration/flow-state.ts` 薄再导出），
@@ -602,6 +613,8 @@ export interface DesktopDeps {
       dispatchTask?: DispatchTaskFn;
       /** 独立复核请求能力（2026-10-25 request_acceptance）：仅内置治理角色会话注入（见 session.ts）。 */
       requestAcceptance?: RequestAcceptanceFn;
+      /** 验收标准工件汇报能力（2026-10-27 report_artifact_ready）：仅 verifier 会话注入（见 session.ts）。 */
+      reportArtifact?: ReportArtifactFn;
       /** gate 复核请求能力（2026-10-26 request_gate_review）：仅统筹（convener）会话注入（见 session.ts）。 */
       requestGateReview?: RequestGateReviewFn;
       /** 边界变更请求能力（2026-10-26 request_boundary_change）：仅统筹（convener）会话注入（见 session.ts）。 */
@@ -846,6 +859,16 @@ export interface DesktopDeps {
    */
   requestAcceptance?: (projectRoot: string, input: RequestAcceptanceInput) => Promise<RequestAcceptanceResult>;
   /**
+   * **验收标准工件汇报能力**（2026-10-27 客户新设计 `report_artifact_ready`）：桌面 Interface 提供的
+   * 应用侧实现（按项目绑定）。SessionManager **仅对 verifier（`governanceFunction === "verification"`）
+   * 会话注入**；其它治理角色与项目角色不注入（能力缺席 ⇒ 工具不注册 = 结构性 fail-closed）。
+   * 语义：flowId 归一 → flow 可解析 → `stepId` 必须 `acceptance-criteria` → `path` 必须是该项目最新
+   * 验收标准（存在/可读/非空）→ 只在校验通过后调编排应用专用 `completeAcceptanceCriteriaStep`
+   * （幂等、原子、失败 fail-closed）→ 回报 `{ok, accepted, message}`。**汇报 ≠ 验收通过 ≠ 客户批准**；
+   * 应用不因文件存在自动勾卡，质检也不能自行改 flow 状态。收口成功立即触发一次流程检查。
+   */
+  reportArtifact?: (projectRoot: string, input: ReportArtifactInput) => Promise<ReportArtifactReceipt>;
+  /**
    * **gate 复核请求能力**（2026-10-26 客户授权 `request_gate_review`；设计 §5/§8）：桌面 Interface 提供的
    * 应用侧实现（按项目绑定）。SessionManager 仅对**统筹（convener）**会话注入；项目角色与其它治理角色
    * 不注入。语义：flowId 归一 → gate 存在/`gateKind` 合法/状态 pending → gate 记录/flow revision/在途幂等
@@ -987,6 +1010,12 @@ export interface DesktopDeps {
    * 项目 ∪ 有会话语/队列的项目。
    */
   watchdogOptions?: { now?: () => number; config?: Partial<WatchdogConfig> };
+  /**
+   * **流程推进/停滞看护注入项**（2026-10-27）：`stallMs`＝「无 current + pending>0 + 全部相关角色空闲/
+   * 无 pending 卡」持续多久后向运营（convener）告警一次（缺省 10 分钟；测试注入短值）。
+   * 复用既有 `wakeStewardForReadySteps`/验收检查入口与看护 tick，不新增第二套状态机。
+   */
+  governanceTickOptions?: { stallMs?: number };
   /**
    * **链式治理推进的目标事实轮询（2026-10-20 真机假错误修复；测试可缩短）**：
    * `advanceGovernanceFlow` 的 followUp 链不再用「角色当前是否 idle」判完成（刚投递/会话被释放时会立即
@@ -4256,6 +4285,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       projects: () => [...new Set([...listingCache.keys(), ...manager.projectRootsWithActivity()])],
       snapshot: (root) => manager.watchdogSnapshot(root),
       deliver: (root, message) => manager.watchdogDeliver(root, message),
+      // 2026-10-27 流程推进/停滞看护：看护 tick 只提供时机；读取 flow/去重/投递复用既有验收检查入口
+      // （同项目串行 + 突发合并；看护不读 flow、不做治理判定）。
+      onTickProject: (root) => scheduleFlowAdvanceTick(root),
       // 2026-10-20 真机（Convener 卡 1h、队列 24）：看护覆盖**所有角色**（含内置治理角色）——
       // 自动开关按角色映射：内置治理角色 ↑「替我决策」、项目角色 ↑「替我审批」；关闭或未配置自动中止时限 ⇒ 只告警。
       autoRecoveryEnabled: (root, roleId) => {
@@ -4846,6 +4878,267 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     return dedupe;
   };
 
+  // —————— 2026-10-27 验收标准「请汇报」唤醒（客户新设计：应用不盯文件自动勾卡） ——————
+  //
+  // 标准文件已存在但 flow 的 `acceptance-criteria` 仍 pending/dispatched ⇒ 给 verifier 发**一次**「请汇报」
+  // 系统唤醒（去重：同一 flow + 同一最新标准路径 + 同一状态只发一次；verifier 忙/有排队 ⇒ 等下一次真实
+  // 事件/看护 tick 再试）。**不**据此收口、不改 flow；收口只走 `report_artifact_ready` 的应用能力。
+  const criteriaReportReminded = new Map<string, string>();
+  const remindVerifierToReportArtifact = async (info: {
+    projectRoot: string;
+    flowId: string;
+    criteriaPath: string;
+    stepStatus: string;
+    diagnostic: ReturnType<typeof createDiagnosticLogger>;
+  }): Promise<boolean> => {
+    const key = acceptanceFlowKey(info.projectRoot, info.flowId);
+    const dedupe = `${info.criteriaPath}\u0000${info.stepStatus}`;
+    if (criteriaReportReminded.get(key) === dedupe) return false;
+    const verifierBusy = RUNTIME_KINDS.some(
+      (runtime) =>
+        manager.isRoleBusy(info.projectRoot, "verifier", runtime) ||
+        manager.hasPendingDelivery(info.projectRoot, "verifier", runtime),
+    );
+    if (verifierBusy) {
+      info.diagnostic.record("acceptance.criteria-report.skip", { flowId: info.flowId, reasonCode: "verifier-busy" });
+      return false;
+    }
+    const runtime = await resolveNoteRuntime(info.projectRoot);
+    if (runtime === undefined) {
+      info.diagnostic.record("acceptance.criteria-report.skip", { flowId: info.flowId, reasonCode: "runtime-unresolved" });
+      return false;
+    }
+    const message = buildAcceptanceCriteriaReportReminderMessage({
+      flowId: info.flowId,
+      criteriaPath: info.criteriaPath,
+      stepStatus: info.stepStatus,
+    });
+    const opened = await manager.openBackground({ projectRoot: info.projectRoot, roleId: "verifier", runtime });
+    if (!opened.ok) {
+      info.diagnostic.error("acceptance.criteria-report.open.failed", new Error(opened.error ?? "unknown"), { flowId: info.flowId });
+      return false;
+    }
+    // kind:"system"：治理唤醒按系统条目录入（不是客户消息、不冒充质检发言）。
+    const sent = await manager.sendBackground({
+      projectRoot: info.projectRoot,
+      roleId: "verifier",
+      runtime,
+      text: message,
+      kind: "system",
+    });
+    if (!sent.ok) {
+      info.diagnostic.error("acceptance.criteria-report.send.failed", new Error(sent.error ?? "unknown"), { flowId: info.flowId });
+      return false;
+    }
+    // 账目只在成功投递后去重：失败保留下一次真实事件/看护 tick 重试（不循环）。
+    criteriaReportReminded.set(key, dedupe);
+    info.diagnostic.record("acceptance.criteria-report.sent", { flowId: info.flowId, stepStatus: info.stepStatus });
+    return true;
+  };
+
+  // —————— 2026-10-27 流程推进/停滞看护（客户新设计第 3 项） ——————
+  //
+  // 触发面：既有验收检查（角色 settle / 账本变化 / 导入补齐）+ 看护 tick（watchdog 周期）。只读 flow/账本
+  // 与同源看护快照；**复用** `listReadyFlowSteps` + `wakeStewardForReadySteps`（按 revision+ready 集合去重、
+  // 有预算），不新增第二套状态机、不直接派 worker、不标 done、不写 flow/账本、不伪造状态。
+  //   · 无 current（无 dispatched/delivered 步骤）+ 全部相关角色空闲/无 pending 卡 + 有 ready pending 步骤
+  //     ⇒ 既有 `wakeStewardForReadySteps` 给运营（convener）发推进唤醒（账本 dispatch.accepted 已去重）；
+  //   · 无 current + pending>0 + 上述空闲持续约 10 分钟 ⇒ 向运营发**一次**停滞提示（按 revision+pending
+  //     签名去重；条件变化/出现真实工作即重置，不刷屏）。标准收口 accepted 后由能力立即触发一次检查。
+  const FLOW_STALL_DEFAULT_MS = 10 * 60 * 1000;
+  const flowStallMs = (() => {
+    const raw = deps.governanceTickOptions?.stallMs;
+    return typeof raw === "number" && Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : FLOW_STALL_DEFAULT_MS;
+  })();
+  interface FlowStallState {
+    signature: string;
+    /** 本轮「空闲且无 current」起始时刻；出现任何真实工作/状态变化即重置。 */
+    idleSince: number | null;
+    /** 同一 pending 签名只告警一次（流程后续有进展才开启新回合）。 */
+    notified: boolean;
+  }
+  const flowStallStates = new Map<string, FlowStallState>();
+  let runFlowAdvanceTick: ((projectRoot: string) => Promise<void>) | undefined;
+  /** 同项目串行 + 突发合并（看护 tick 与验收检查可能同刻到达；不堆积、不丢信号）。 */
+  const flowTickRunning = new Set<string>();
+  const flowTickDirty = new Set<string>();
+  const scheduleFlowAdvanceTick = (projectRoot: string): void => {
+    if (typeof projectRoot !== "string" || projectRoot.trim() === "") return;
+    if (flowTickRunning.has(projectRoot)) {
+      flowTickDirty.add(projectRoot);
+      return;
+    }
+    flowTickRunning.add(projectRoot);
+    void (async () => {
+      try {
+        await runFlowAdvanceTick?.(projectRoot);
+      } catch (error) {
+        createDiagnosticLogger({ component: "desktop.flow-tick", projectRoot }).error("flow.tick.failed", error);
+      } finally {
+        flowTickRunning.delete(projectRoot);
+        if (flowTickDirty.delete(projectRoot)) scheduleFlowAdvanceTick(projectRoot);
+      }
+    })();
+  };
+
+  runFlowAdvanceTick = async (projectRoot: string): Promise<void> => {
+    const listing = listingCache.get(projectRoot);
+    if (listing?.governanceModel !== "trio") return;
+    const flowIds = await listGovernanceFlowIds(projectRoot);
+    if (flowIds.length === 0) return;
+    const diagnostic = createDiagnosticLogger({ component: "desktop.flow-tick", projectRoot });
+    let ledger: Awaited<ReturnType<typeof readGovernanceLedger>>;
+    try {
+      ledger = await readGovernanceLedger(projectRoot);
+    } catch (error) {
+      diagnostic.error("flow.tick.ledger.failed", error);
+      return;
+    }
+    // 「无 current」= flow 无 dispatched/delivered 步骤；「全部相关角色空闲/无 pending 卡」直接取同源看护
+    // 快照（busy/队列/在途/链/挂起确认），不造第二数据源、不猜。
+    const snapshot = manager.watchdogSnapshot(projectRoot);
+    const idle =
+      snapshot === undefined ||
+      (snapshot.roles.every((role) => role.busy !== true) &&
+        snapshot.queues.every((queue) => queue.items.length === 0) &&
+        snapshot.activeDeliveries === 0 &&
+        snapshot.chainsActive === false &&
+        snapshot.pendingConfirmationsTotal === 0);
+    const nowMs = Date.now();
+    if (ledger.errors.length > 0) {
+      // 账本坏行/不可读：无法按 `dispatch.accepted` 去重 ⇒ 只做「请汇报」提醒，不做 ready 唤醒与停滞判定。
+      diagnostic.record("flow.tick.ledger-degraded", { count: ledger.errors.length });
+    }
+    for (const flowId of flowIds) {
+      const key = acceptanceFlowKey(projectRoot, flowId);
+      let bytes: Buffer;
+      try {
+        bytes = await readFile(path.join(projectRoot, ...governanceFlowStatePath(flowId).split("/")));
+      } catch {
+        flowStallStates.delete(key); // legacy（无 YAML）：不参与机器状态推进
+        continue;
+      }
+      const parsed = parseFlowStateYaml(bytes.toString("utf8"), flowId);
+      if (!parsed.ok) {
+        diagnostic.record("flow.tick.parse-failed", { flowId, count: parsed.errors.length });
+        flowStallStates.delete(key);
+        continue;
+      }
+      const flow = parsed.flow;
+      const revision = createHash("sha256").update(bytes).digest("hex");
+      // ① 标准文件已存在但步骤仍 pending/dispatched ⇒ 请汇报唤醒（不自动勾卡、不改 flow）。
+      const criteriaStep = flow.steps.find((step) => step.id === ACCEPTANCE_CRITERIA_STEP_ID);
+      if (criteriaStep !== undefined && (criteriaStep.status === "pending" || criteriaStep.status === "dispatched")) {
+        const criteria = await readAcceptanceCriteriaInfo(projectRoot, flowId);
+        if (criteria !== undefined && criteria.text.trim() !== "") {
+          await remindVerifierToReportArtifact({
+            projectRoot,
+            flowId,
+            criteriaPath: criteria.relPath,
+            stepStatus: criteriaStep.status,
+            diagnostic,
+          });
+        }
+      }
+      const pendingSteps = flow.steps.filter((step) => step.status === "pending");
+      if (pendingSteps.length === 0) {
+        flowStallStates.delete(key);
+        continue;
+      }
+      const hasCurrent = flow.steps.some((step) => step.status === "dispatched" || step.status === "delivered");
+      const dispatchedStepIds = new Set<string>();
+      for (const entry of ledger.entries) {
+        if (entry.kind !== "dispatch.accepted" || entry.flowId !== flowId) continue;
+        const stepId = typeof entry.stepId === "string" ? entry.stepId.trim() : "";
+        if (stepId !== "") dispatchedStepIds.add(stepId);
+      }
+      if (ledger.errors.length > 0) {
+        flowStallStates.delete(key);
+        continue;
+      }
+      // 停滞状态按「revision + 排序后的 pending id」签名维护：**同一签名只告警一次**；短暂忙碌（例如应用
+      // 刚给 convener 发过推进唤醒、convener 正在处理）只暂停计时，不清除已告警记忆——避免唤醒本身把
+      // 「已告警」重置成下一次刷屏。签名变化（任何 flow 写盘/步骤变动）才开启新回合。
+      const signature = `${revision}\u0000${pendingSteps.map((step) => step.id).sort().join(",")}`;
+      const idleNow = idle && !hasCurrent;
+      let state = flowStallStates.get(key);
+      if (state === undefined || state.signature !== signature) {
+        state = { signature, idleSince: idleNow ? nowMs : null, notified: false };
+        flowStallStates.set(key, state);
+      }
+      if (!idleNow) {
+        state.idleSince = null;
+        continue;
+      }
+      // ② 无 current + 出现 ready pending ⇒ 复用既有推进唤醒（内部按 revision+ready 集合去重、按账本去重、
+      //    遵守 convener 忙闲与预算；只提示、不派发）。
+      await wakeStewardForReadySteps({
+        projectRoot,
+        flowId,
+        flow: flow,
+        revision,
+        ledgerEntries: ledger.entries,
+        listing,
+        diagnostic,
+      });
+      // ③ 停滞兜底：同一 pending 签名持续空闲 ≥ stallMs ⇒ 向运营发一次（不刷屏）。
+      if (state.idleSince === null) state.idleSince = nowMs;
+      if (state.notified) continue;
+      if (nowMs - state.idleSince < flowStallMs) continue;
+      const convenerBusy = RUNTIME_KINDS.some(
+        (runtime) => manager.isRoleBusy(projectRoot, "convener", runtime) || manager.hasPendingDelivery(projectRoot, "convener", runtime),
+      );
+      if (convenerBusy) {
+        // 运营正忙：本次不投；重置计时，下一次尝试至少再等一个 stallMs（避免逐 tick 热循环）。
+        state.idleSince = nowMs;
+        diagnostic.record("flow.stall.skip", { flowId, reasonCode: "convener-busy" });
+        continue;
+      }
+      const runtime = await resolveNoteRuntime(projectRoot);
+      if (runtime === undefined) {
+        state.idleSince = nowMs;
+        diagnostic.record("flow.stall.skip", { flowId, reasonCode: "runtime-unresolved" });
+        continue;
+      }
+      const plan = listReadyFlowSteps(flow, dispatchedStepIds);
+      const task = buildFlowStallTaskMessage({
+        flowId,
+        revision,
+        pending: pendingSteps.map((step) => ({
+          id: step.id,
+          status: step.status,
+          ...(typeof step.owner === "string" ? { owner: step.owner } : {}),
+          ...(typeof step.kind === "string" ? { kind: step.kind } : {}),
+        })),
+        idleMs: nowMs - (state.idleSince ?? nowMs),
+        readyIds: plan.ready.map((step) => step.id),
+        ...(plan.stopReason !== undefined ? { stopReason: plan.stopReason } : {}),
+      });
+      const opened = await manager.openBackground({ projectRoot, roleId: "convener", runtime });
+      if (!opened.ok) {
+        state.idleSince = nowMs;
+        diagnostic.error("flow.stall.open.failed", new Error(opened.error ?? "unknown"), { flowId });
+        continue;
+      }
+      const sent = await manager.sendBackground({
+        projectRoot,
+        roleId: "convener",
+        runtime,
+        text: task,
+        kind: "system",
+      });
+      if (!sent.ok) {
+        state.idleSince = nowMs;
+        diagnostic.error("flow.stall.send.failed", new Error(sent.error ?? "unknown"), { flowId });
+        continue;
+      }
+      // 账目只在成功投递后记：失败已把 idleSince 重置为当前时刻——下一次尝试至少再等一个 stallMs（不刷屏、
+      // 不逐 tick 重试）。
+      state.notified = true;
+      diagnostic.record("flow.stall.sent", { flowId, pending: pendingSteps.length });
+    }
+  };
+
   // —————— 收尾推进（2026-10-18 真机缺口；2026-10-19 客户反馈「独立核准应该是标准流程」）——————
   // 触发面：**任意角色 settle**、回交到达/settle、桌面侧治理账本追加（dispatch.accepted）、导入项目/启动
   // 后的补齐检查。本层只读流程状态与账本做**触发门**检查，全部完成且证据按步骤类型齐备才后台派 Proof /
@@ -5258,6 +5551,36 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             }
             acceptanceDispatchedFlows.delete(key);
             return dispatchOutcome({ status: "blocked", code: "criteria-missing", message: criteriaReason });
+          }
+          // 2026-10-27 客户新设计：标准文件已存在但 `acceptance-criteria` 步骤仍未收口 ⇒ **不自动勾卡**、
+          // 不继续派验收判定；给 verifier 发一次「请汇报」唤醒（去重），收口只走 `report_artifact_ready`。
+          const criteriaStepForReport = parsedFlowForGate?.steps.find(
+            (step) => step.id === ACCEPTANCE_CRITERIA_STEP_ID,
+          );
+          if (
+            criteriaStepForReport !== undefined &&
+            (criteriaStepForReport.status === "pending" || criteriaStepForReport.status === "dispatched")
+          ) {
+            await remindVerifierToReportArtifact({
+              projectRoot: info.projectRoot,
+              flowId: info.flowId,
+              criteriaPath: criteria.relPath,
+              stepStatus: criteriaStepForReport.status,
+              diagnostic,
+            });
+            acceptanceDispatchedFlows.delete(key);
+            diagnostic.record("acceptance.criteria.report-pending", {
+              flowId: info.flowId,
+              stepStatus: criteriaStepForReport.status,
+            });
+            return dispatchOutcome({
+              status: "blocked",
+              code: "flow-incomplete",
+              message:
+                `验收标准文件已存在（${criteria.relPath}），但步骤 ${ACCEPTANCE_CRITERIA_STEP_ID} 仍为 ` +
+                `${criteriaStepForReport.status}；应用不盯文件自动勾卡，已提醒质检调用 report_artifact_ready 汇报；` +
+                `本次未派发验收复核。`,
+            });
           }
           const changePackage = await readChangePackageInfo(info.projectRoot, info.flowId);
           if (changePackage === undefined || changePackage.text.trim() === "" || changePackage.riskTier === undefined) {
@@ -5766,20 +6089,17 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   };
 
   /**
-   * `request_acceptance` 能力的项目入口：**flowId 归一**（显式优先；省略时仅当 `docs/flows` 恰有一个
-   * YAML 才采用，多流程/无流程一律 `flow-not-found` 并提示指定 flowId，**不猜**）+ 同 flow 在途去重。
+   * **flowId 归一（应用能力共用；不猜）**：显式 flowId 优先；省略时仅当 `docs/flows` 恰有一个 YAML
+   * 才采用，多流程/无流程一律 `flow-not-found` 并提示显式指定。`request_acceptance` 与
+   * `report_artifact_ready` 共用同一归一（不复制第二份；行为与原 requestAcceptance 内联实现逐字一致）。
    */
-  const requestAcceptanceForProject = async (
-    projectRoot: string,
-    input: RequestAcceptanceInput,
-  ): Promise<RequestAcceptanceResult> => {
-    const root = typeof projectRoot === "string" ? projectRoot.trim() : "";
-    if (root === "") {
-      return { ok: false, code: "unavailable", message: "缺少项目根，无法提交独立复核请求。" };
-    }
+  const resolveGovernanceFlowIdForProject = async (
+    root: string,
+    requested: unknown,
+  ): Promise<{ ok: true; flowId: string } | { ok: false; message: string; flowId?: string }> => {
     let flowId: string | undefined;
-    if (typeof input?.flowId === "string" && input.flowId.trim() !== "") {
-      flowId = input.flowId.trim();
+    if (typeof requested === "string" && requested.trim() !== "") {
+      flowId = requested.trim();
     } else {
       let yamlIds: string[] = [];
       try {
@@ -5801,21 +6121,37 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           yamlIds.length === 0
             ? "docs/flows 下没有流程 YAML"
             : `docs/flows 下有 ${yamlIds.length} 个流程 YAML（${yamlIds.slice(0, 5).join("、")}）`;
-        return { ok: false, code: "flow-not-found", message: `无法确定要复核的流程：${detail}；请显式指定 flowId。` };
+        return { ok: false, message: `无法确定流程：${detail}；请显式指定 flowId。` };
       }
     }
-    const resolvedFlowId = flowId;
-    if (resolvedFlowId === undefined) {
-      return { ok: false, code: "flow-not-found", message: "无法确定要复核的流程；请显式指定 flowId。" };
+    if (!new RegExp(GOVERNANCE_SLUG_PATTERN).test(flowId)) {
+      return { ok: false, message: `flowId 非法：${flowId}；须匹配 ${GOVERNANCE_SLUG_PATTERN}。`, flowId };
     }
-    if (!new RegExp(GOVERNANCE_SLUG_PATTERN).test(resolvedFlowId)) {
+    return { ok: true, flowId };
+  };
+
+  /**
+   * `request_acceptance` 能力的项目入口：**flowId 归一**（显式优先；省略时仅当 `docs/flows` 恰有一个
+   * YAML 才采用，多流程/无流程一律 `flow-not-found` 并提示指定 flowId，**不猜**）+ 同 flow 在途去重。
+   */
+  const requestAcceptanceForProject = async (
+    projectRoot: string,
+    input: RequestAcceptanceInput,
+  ): Promise<RequestAcceptanceResult> => {
+    const root = typeof projectRoot === "string" ? projectRoot.trim() : "";
+    if (root === "") {
+      return { ok: false, code: "unavailable", message: "缺少项目根，无法提交独立复核请求。" };
+    }
+    const resolved = await resolveGovernanceFlowIdForProject(root, input?.flowId);
+    if (!resolved.ok) {
       return {
         ok: false,
         code: "flow-not-found",
-        message: `flowId 非法：${resolvedFlowId}；须匹配 ${GOVERNANCE_SLUG_PATTERN}。`,
-        flowId: resolvedFlowId,
+        message: resolved.message,
+        ...(resolved.flowId !== undefined ? { flowId: resolved.flowId } : {}),
       };
     }
+    const resolvedFlowId = resolved.flowId;
     const key = `${canonicalProjectRoot(root)}\u0000${resolvedFlowId}`;
     if (requestAcceptanceInFlight.has(key)) {
       return {
@@ -5854,6 +6190,287 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
 
   // 能力注入：缺省用本层实现；测试/宿主可整体替换（签名与 SessionManagerDeps 同形，项目根由会话补入）。
   const requestAcceptanceCapability = deps.requestAcceptance ?? requestAcceptanceForProject;
+
+  // —————— 2026-10-27 验收标准工件汇报（`report_artifact_ready`）：应用侧能力实现 ——————
+  //
+  // 客户新设计：质检写完验收标准后**调用 `report_artifact_ready` 汇报给应用；应用校验后决定是否收口**。
+  // 纪律（钉死）：
+  //   · **不允许应用盯文件自动勾卡**——文件存在不等于步骤完成，只有本能力收到汇报并通过校验才收口；
+  //   · **不允许质检自己改状态**——本能力不写 flow 其它步骤、不写客户决定；收口只经编排应用专用
+  //     `completeAcceptanceCriteriaStep`（幂等、原子、失败 fail-closed）；
+  //   · `accepted` 只表示应用校验通过并已收口（或已 done 的幂等命中），绝不把拒收/失败说成 accepted；
+  //   · 汇报 ≠ 验收通过 ≠ 客户批准。
+  const reportArtifactRejectCodeOf = (detailCode: string | undefined): ReportArtifactRejectCode => {
+    switch (detailCode) {
+      case "acceptance-criteria-missing":
+        return "criteria-missing";
+      case "acceptance-criteria-unobservable":
+        return "criteria-unreadable";
+      case "acceptance-criteria-step-missing":
+        return "step-missing";
+      case "acceptance-criteria-step-terminal":
+        return "step-terminal";
+      case "acceptance-criteria-kind-unsupported":
+        return "kind-unsupported";
+      case "not-found":
+      case "invalid-flow":
+      case "read-failed":
+        return "flow-not-found";
+      default:
+        return "rejected";
+    }
+  };
+
+  const reportArtifactForProject = async (
+    projectRoot: string,
+    input: ReportArtifactInput,
+  ): Promise<DesktopReportArtifactReceipt> => {
+    const root = typeof projectRoot === "string" ? projectRoot.trim() : "";
+    if (root === "") {
+      return { ok: false, accepted: false, code: "invalid-input", message: "缺少项目根，无法处理工件汇报。" };
+    }
+    // 1) 步骤校验：当前只接受 `acceptance-criteria`（其它步骤一律明确拒绝，不猜、不收口）。
+    const stepId = typeof input?.stepId === "string" ? input.stepId.trim() : "";
+    if (stepId !== ACCEPTANCE_CRITERIA_STEP_ID) {
+      return {
+        ok: false,
+        accepted: false,
+        code: "unsupported-step",
+        stepId,
+        message:
+          `不支持的汇报步骤：${stepId === "" ? "（空）" : stepId}；` +
+          `当前只接受 stepId="${ACCEPTANCE_CRITERIA_STEP_ID}"（验收标准）。未收口任何步骤。`,
+      };
+    }
+    // 2) flowId 归一（与 request_acceptance 同一实现；多流程/非法一律拒绝）。
+    const resolved = await resolveGovernanceFlowIdForProject(root, input?.flowId);
+    if (!resolved.ok) {
+      return {
+        ok: false,
+        accepted: false,
+        code: "flow-not-found",
+        stepId,
+        message: resolved.message,
+        ...(resolved.flowId !== undefined ? { flowId: resolved.flowId } : {}),
+      };
+    }
+    const flowId = resolved.flowId;
+    // 3) 当前项目/flow 必须存在且可解析（只读校验；不据此勾卡）。
+    const flowRel = governanceFlowStatePath(flowId);
+    let flowText: string;
+    try {
+      flowText = await readFile(path.join(root, ...flowRel.split("/")), "utf8");
+    } catch {
+      return {
+        ok: false,
+        accepted: false,
+        code: "flow-not-found",
+        flowId,
+        stepId,
+        message: `流程状态 YAML 不存在或不可读：${flowRel}；未收口验收标准步骤。`,
+      };
+    }
+    const parsed = parseFlowStateYaml(flowText, flowId);
+    if (!parsed.ok) {
+      const detail = parsed.errors.slice(0, 10).map((item) => `${item.path}: ${item.message}`).join("；");
+      return {
+        ok: false,
+        accepted: false,
+        code: "flow-not-found",
+        flowId,
+        stepId,
+        message: `流程状态 YAML 校验失败：${detail}；未收口验收标准步骤。`,
+      };
+    }
+    const criteriaStep = parsed.flow.steps.find((step) => step.id === ACCEPTANCE_CRITERIA_STEP_ID);
+    if (criteriaStep === undefined) {
+      return {
+        ok: false,
+        accepted: false,
+        code: "step-missing",
+        flowId,
+        stepId,
+        message: `流程 ${flowId} 缺少 id="${ACCEPTANCE_CRITERIA_STEP_ID}" 的步骤；未收口（请先修流程，不伪造步骤）。`,
+      };
+    }
+    if (criteriaStep.kind !== "artifact") {
+      return {
+        ok: false,
+        accepted: false,
+        code: "kind-unsupported",
+        flowId,
+        stepId,
+        message: `步骤 ${ACCEPTANCE_CRITERIA_STEP_ID} 的 kind=${criteriaStep.kind} 不受支持（只支持 artifact）；未收口。`,
+      };
+    }
+    if (criteriaStep.status !== "pending" && criteriaStep.status !== "dispatched" && criteriaStep.status !== "done") {
+      return {
+        ok: false,
+        accepted: false,
+        code: "step-terminal",
+        flowId,
+        stepId,
+        message:
+          `步骤 ${ACCEPTANCE_CRITERIA_STEP_ID} 当前状态为 ${criteriaStep.status}；` +
+          `应用只从 pending/dispatched 收口到 done（已 done 幂等接受），不覆盖其它状态；未收口。`,
+      };
+    }
+    // 4) path 必须等于该项目该流程**最新**验收标准路径，且文件存在/可读/非空。
+    const criteria = await readAcceptanceCriteriaInfo(root, flowId);
+    if (criteria === undefined) {
+      return {
+        ok: false,
+        accepted: false,
+        code: "criteria-missing",
+        flowId,
+        stepId,
+        message:
+          `最新验收标准不存在或不可读（按 docs/acceptance/${flowId}-criteria-vN.md 版本扫描）；` +
+          `请先写完标准并确认可读再汇报；未收口。`,
+      };
+    }
+    const reportedPath = normalizeReportedArtifactPath(input?.path);
+    if (reportedPath === "") {
+      return {
+        ok: false,
+        accepted: false,
+        code: "invalid-input",
+        flowId,
+        stepId,
+        path: criteria.relPath,
+        message: `缺少汇报路径 path；最新验收标准为 ${criteria.relPath}；未收口。`,
+      };
+    }
+    if (criteria.text.trim() === "") {
+      return {
+        ok: false,
+        accepted: false,
+        code: "criteria-empty",
+        flowId,
+        stepId,
+        path: criteria.relPath,
+        message: `最新验收标准文件为空：${criteria.relPath}（空文件按缺失处理，不把「待补」当就绪）；未收口。`,
+      };
+    }
+    if (reportedPath !== normalizeReportedArtifactPath(criteria.relPath)) {
+      return {
+        ok: false,
+        accepted: false,
+        code: "path-not-latest",
+        flowId,
+        stepId,
+        path: reportedPath,
+        message: `汇报路径不是该项目最新验收标准：${reportedPath}；最新为 ${criteria.relPath}；未收口（写新版本后请汇报最新路径）。`,
+      };
+    }
+    // 4b) 可选 `sha256`（运行时契约字段）：给出即必须与最新标准文件的**真实字节哈希**一致；
+    // 格式非法/不一致一律拒收（工具层只校验非空字符串，内容一致性由应用能力负责）。
+    const reportedSha256 = typeof input?.sha256 === "string" ? input.sha256.trim().toLowerCase() : "";
+    if (reportedSha256 !== "") {
+      if (!/^[0-9a-f]{64}$/.test(reportedSha256)) {
+        return {
+          ok: false,
+          accepted: false,
+          code: "invalid-input",
+          flowId,
+          stepId,
+          path: criteria.relPath,
+          message: "汇报 sha256 格式非法（应为 64 位十六进制字符串）；未收口。",
+        };
+      }
+      let criteriaBytes: Buffer;
+      try {
+        criteriaBytes = await readFile(path.join(root, ...criteria.relPath.split("/")));
+      } catch {
+        return {
+          ok: false,
+          accepted: false,
+          code: "criteria-unreadable",
+          flowId,
+          stepId,
+          path: criteria.relPath,
+          message: `最新验收标准在校验期变得不可读：${criteria.relPath}；未收口。`,
+        };
+      }
+      const actualSha256 = createHash("sha256").update(criteriaBytes).digest("hex");
+      if (actualSha256 !== reportedSha256) {
+        return {
+          ok: false,
+          accepted: false,
+          code: "content-mismatch",
+          flowId,
+          stepId,
+          path: criteria.relPath,
+          message:
+            `汇报 sha256 与最新标准文件不一致（汇报 ${reportedSha256}；实际 ${actualSha256}）；` +
+            `未收口（请以真实文件重新计算后汇报）。`,
+        };
+      }
+    }
+    // 5) 校验全部通过 ⇒ 才调编排应用专用收口助手（幂等/原子/fail-closed；只改 acceptance-criteria）。
+    let completed: CompleteAcceptanceCriteriaStepResult;
+    try {
+      completed = await completeAcceptanceCriteriaStepFn({ projectRoot: root, flowId });
+    } catch (error) {
+      return {
+        ok: false,
+        accepted: false,
+        code: "unavailable",
+        flowId,
+        stepId,
+        path: criteria.relPath,
+        message:
+          `验收标准步骤收口助手异常：${error instanceof Error ? error.message : String(error)}；` +
+          `本次不声称已收口，请用 flow_get 核对；未伪造 accepted。`,
+      };
+    }
+    if (!completed.ok) {
+      const detail = completed.error ?? completed.issues?.join("；") ?? mainT("shared.common.unknownReason");
+      return {
+        ok: false,
+        accepted: false,
+        code: reportArtifactRejectCodeOf(completed.code),
+        detailCode: completed.code,
+        flowId,
+        stepId,
+        path: criteria.relPath,
+        message: `验收标准步骤未收口：${detail}；应用未收口该步骤，修正后可再次汇报。`,
+      };
+    }
+    // 6) 收口成功（含幂等已 done）⇒ 立即触发一次流程检查（40ms 有界合并、幂等；与既有事件同一入口）。
+    scheduleAcceptanceCheck(root, "ledger");
+    const observedPath = normalizeReportedArtifactPath(completed.criteriaPath ?? criteria.relPath) || criteria.relPath;
+    if (completed.alreadyDone === true) {
+      return {
+        ok: true,
+        accepted: true,
+        code: "already-accepted",
+        alreadyDone: true,
+        detailCode: completed.code,
+        flowId,
+        stepId,
+        path: observedPath,
+        message:
+          `验收标准步骤已是 done（幂等重复汇报，未重复写盘）；已触发一次流程检查。` +
+          `汇报不等于验收通过/客户批准。`,
+      };
+    }
+    return {
+      ok: true,
+      accepted: true,
+      code: "accepted",
+      detailCode: completed.code,
+      flowId,
+      stepId,
+      path: observedPath,
+      message:
+        `已校验并收口验收标准步骤 ${ACCEPTANCE_CRITERIA_STEP_ID}（${observedPath}）；已触发一次流程检查。` +
+        `汇报不等于验收通过/客户批准。`,
+    };
+  };
+
+  // 能力注入：缺省用本层实现；测试/宿主可整体替换（签名与 SessionManagerDeps 同形，项目根由会话补入）。
+  const reportArtifactCapability = deps.reportArtifact ?? reportArtifactForProject;
 
   // —————— 2026-10-26 gate 复核请求（`request_gate_review`）：应用侧能力实现 ——————
   //
@@ -9021,6 +9638,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // 2026-10-25 独立复核请求（request_acceptance）：应用侧能力（SessionManager 仅对内置治理角色会话
     // 注入；项目角色不注入；编排再按 builtInGovernance 收口）。**请求复核 ≠ 客户批准**。
     requestAcceptance: requestAcceptanceCapability,
+    // 2026-10-27 验收标准工件汇报（report_artifact_ready）：应用侧能力（SessionManager 仅对 verifier 会话
+    // 注入；其它治理角色与项目角色不注入）。**汇报 ≠ 验收通过 ≠ 客户批准**；应用校验通过才收口。
+    reportArtifact: reportArtifactCapability,
     // 2026-10-26 gate 复核请求（request_gate_review）：应用侧能力（SessionManager 仅对统筹/convener
     // 会话注入；项目角色与其他治理角色不注入；编排再按治理职能收口）。**gate 复核 ≠ 验收通过 ≠ 客户批准**。
     requestGateReview: requestGateReviewCapability,
@@ -9072,6 +9692,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // 无法确定则该 flow 不派并落系统行）。
     for (const flowId of flowIds) {
       await dispatchAcceptanceForFlow({ projectRoot, flowId, evidence: [], trigger });
+    }
+    // 2026-10-27 流程推进/停滞看护（客户新设计第 3 项）：settle / 账本变化 / 导入同一入口跑一遍只读 flow
+    // tick——「请汇报」提醒、无 current 的 ready 推进唤醒（复用既有去重）、停滞兜底。不新增第二套状态机。
+    try {
+      await runFlowAdvanceTick?.(projectRoot);
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.flow-tick", projectRoot }).error("flow.tick.failed", error);
     }
   };
 

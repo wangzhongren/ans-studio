@@ -57,6 +57,10 @@ import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, Repo
 
 import type { Acceptance, BoundarySection1 } from "../../src/model/boundary.ts";
 import type { GovernanceModel, ProjectConfig } from "../../src/model/role.ts";
+// 2026-10-27 验收标准工件汇报（report_artifact_ready）：契约单一来源＝运行时核心
+// `ReportArtifactFn`/`ReportArtifactInput`/`ReportArtifactReceipt`；本层只绑定项目根并把能力交给编排
+// （编排再按 trio verifier 收口）；校验/收口/回执在 Interface（应用侧）。
+import type { ReportArtifactFn, ReportArtifactInput, ReportArtifactReceipt } from "../../src/model/runtime.ts";
 // 三权（评审 §5.1/§5.6）：内置治理角色 id 判定 / 注册表统一来自门禁引擎的 Service 公开出口
 // （桌面**不复制**第二份 id 列表，也不直接导入 `src/common/门禁引擎/` 私有模块）。
 import { isBuiltInGovernanceRoleId, resolveBoundary } from "../../src/service/boundary/resolve-boundary.ts";
@@ -443,6 +447,8 @@ export interface SessionManagerDeps {
       viewImage?: ViewImageFn;
       /** **独立复核请求能力**（2026-10-25 request_acceptance）：仅内置治理角色会话注入（见 SessionManager.open）。 */
       requestAcceptance?: RequestAcceptanceFn;
+      /** **验收标准工件汇报能力**（2026-10-27 report_artifact_ready）：仅 verifier 会话注入（见 SessionManager.open）。 */
+      reportArtifact?: ReportArtifactFn;
       /** **gate 复核请求能力**（2026-10-26 request_gate_review）：仅统筹（convener）会话注入（见 SessionManager.open）。 */
       requestGateReview?: RequestGateReviewFn;
       /** **边界变更请求能力**（2026-10-26 request_boundary_change）：仅统筹（convener）会话注入（见 SessionManager.open）。 */
@@ -652,6 +658,14 @@ export interface SessionManagerDeps {
    * 编排再按 `builtInGovernance` 收口。缺省 ⇒ 不注入 ⇒ 工具不注册（结构性 fail-closed）。
    */
   requestAcceptance?: (projectRoot: string, input: RequestAcceptanceInput) => Promise<RequestAcceptanceResult>;
+  /**
+   * **验收标准工件汇报能力**（2026-10-27 `report_artifact_ready`，客户新设计）：绑定项目的应用侧实现
+   * （`projectRoot` 由本层按会话补入，工具载荷只带 `flowId?`/`stepId`/`path`/`note?`）。flow/步骤/最新
+   * 标准路径校验与 `completeAcceptanceCriteriaStep` 收口全在实现内；**汇报 ≠ 验收通过 ≠ 客户批准**。
+   * **仅 verifier（`governanceFunction === "verification"`）会话注入**——其它治理角色与项目角色不注入
+   * （能力缺席 ⇒ 工具不注册 = 结构性 fail-closed）。缺省 ⇒ 不注入。
+   */
+  reportArtifact?: (projectRoot: string, input: ReportArtifactInput) => Promise<ReportArtifactReceipt>;
   /**
    * **gate 复核请求能力**（2026-10-26 `request_gate_review`，客户授权）：绑定项目的应用侧实现
    * （`projectRoot` 由本层按会话补入，工具载荷只带 `flowId?`/`gateId`/`note?`）。gate 查找/状态/记录幂等/
@@ -2500,6 +2514,13 @@ export class SessionManager {
       role.builtIn === true && this.deps.requestAcceptance !== undefined
         ? (input: RequestAcceptanceInput) => this.deps.requestAcceptance!(req.projectRoot, input)
         : undefined;
+    // 2026-10-27 验收标准工件汇报（report_artifact_ready）：**仅 verifier 会话注入**（判据＝治理职能
+    // `governanceFunction === "verification"`，数据驱动、不硬编码角色 id）。项目角色、其他内置治理角色、
+    // single/su 一律不注入（能力缺席＝最强 fail-closed）。应用不盯文件自动勾卡；汇报经应用校验后才收口。
+    const reportArtifact: ReportArtifactFn | undefined =
+      role.builtIn === true && governanceFunction === "verification" && this.deps.reportArtifact !== undefined
+        ? (input: ReportArtifactInput) => this.deps.reportArtifact!(req.projectRoot, input)
+        : undefined;
     // 2026-10-26 gate 复核请求（request_gate_review）：**仅统筹（convener）会话注入**（判据＝治理职能
     // `governanceFunction === "schedule"`，数据驱动，不硬编码角色 id）。项目角色、其他内置治理角色、
     // single/su 一律不注入（能力缺席＝最强 fail-closed）。**gate 复核 ≠ 验收通过 ≠ 客户批准**。
@@ -2733,6 +2754,9 @@ export class SessionManager {
           // 2026-10-25 独立复核请求（request_acceptance，仅内置治理角色会话注入；项目角色不注入）。
           // 「未注入即不注册」——编排/运行时核心据此不注册工具（结构性 fail-closed）。请求复核 ≠ 客户批准。
           ...(requestAcceptance ? { requestAcceptance } : {}),
+          // 2026-10-27 验收标准工件汇报（report_artifact_ready，仅 verifier 会话注入；其余角色不注入）。
+          // 「未注入即不注册」——编排/运行时核心据此不注册工具（结构性 fail-closed）。汇报 ≠ 客户批准。
+          ...(reportArtifact ? { reportArtifact } : {}),
           ...(requestGateReview ? { requestGateReview } : {}),
           // 2026-10-26 边界变更请求（request_boundary_change，仅统筹/convener 会话注入；其余角色不注入）。
           // 「未注入即不注册」——编排/运行时核心据此不注册工具（结构性 fail-closed）。请求变更 ≠ 客户批准。

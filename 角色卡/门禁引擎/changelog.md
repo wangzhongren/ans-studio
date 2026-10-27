@@ -1,5 +1,96 @@
 # 门禁引擎 变更记录
 
+## 2026-10-27 — 验收证据截图-only：内置治理卡移除录屏要求 / 选项（最多截图，缺录屏不失败）
+
+任务：客户新 ANS 系统规则——**验收标准最多要求截图，不能要求录屏**。内置治理角色卡与共享原则中，凡把
+「录屏」作为验收要求、证据形式、decision 选项或 M1 例子的措辞全部改为只使用截图；不得要求 / 提供录屏
+选项；缺少录屏不得判 fail / insufficient evidence；`view_image` 只核对截图；M1 示例改为「截图采集范围 /
+截图清单」；未来客户明确要求录屏属独立需求变更（lead-governance-coordination；门禁引擎任务）。完整记录见
+[变更记录](docs/change/2026-10-27_change_screenshot-only-acceptance-evidence.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`（共享 `ENGINEERING_QUALITY_BASELINE` + 产品 / 运营 /
+  质检三卡专属文本 + 文件头注）、`test/门禁引擎/` 的 `view-image-cards.test.ts` / `governance-trio.test.ts` /
+  `governance-standard-workflow.test.ts` / `customer-card-rules.test.ts`（既有断言更新）与
+  `screenshot-only-evidence.test.ts`（新增 5 例）、本文件、变更记录（新）。未改 `app/**`、
+  `src/provider/**`、`src/pipeline/**`、`src/common/编排/**`、PM 文档、共享 i18n、其他角色资料或 `demos/`；
+  未新增角色 / `FlowStepKind` / cardKind / 写权 / 能力位；未 commit / push；未重启应用。
+- **共享基线**：交付证据改为「启动命令、访问地址与真实运行截图（关 DEBUG；sha256 / 候选 / 命令；日志 /
+  输出 / 哈希可辅助）」；新增「验收证据最多截图」——不得把录屏列为验收要求 / 证据形式 / decision 选项，
+  缺少录屏不得判 fail / insufficient evidence，未来录屏属独立需求变更、不进入默认验收标准。
+- **产品 / 运营 / 质检**：M1 示例改为截图采集范围 / 截图清单；运营 gate / 派发 / 证据清单改为只要求
+  真实运行截图；质检验收 / gate / `view_image` 只核对截图；缺录屏不是缺证 / 不构成缺失证据、不判失败；
+  `view_image` 明确不核对 / 不要求录屏画面。
+- **测试**：新增 `screenshot-only-evidence.test.ts` 5 例（共享基线、质检、运营、产品 / M1、数据面零变化）；
+  更新既有 view_image / 工程质量基线 / 派发 / gate / 标准工作流 / M1 断言为截图-only，并反向禁止旧
+  「截图 / 录屏」并列要求与录屏选项短语；原有安全 / 风险 / 证据断言保留。
+- **验证**：定向 5 计 / 5 过；本角色全套 `node --test "test/门禁引擎/**/*.test.ts"` ⇒ **362 计 / 361 过 /
+  0 失败 / 1 Windows 既有 skip，exit 0**（写前 357 计）；`npm run typecheck` ⇒ **exit 0，0 诊断**。
+- **active 录屏核对**：五张内置治理卡已无「录屏作为要求 / 选项」的肯定式措辞，所有「录屏」句均为否定 /
+  限制语境；历史文档保留旧措辞作为历史。边界外 `app/desktop`、`src/pipeline/orchestration` 已由各自属主
+  并发改为截图-only；`test/桌面应用` 仍有旧断言，由桌面 / 编排属主同步。卡文本是行为约束，不是实现证据；
+  未做跨角色端到端 / 真机验证，未独立验收。
+
+## 2026-10-27 — 客户确认 / 选择必须卡片化 + 代理开关语义 + M1 前卡（五张内置治理卡）
+
+任务：客户新规则——任何需要客户确认 / 选择的问题都必须以卡呈现，不能在聊天里让客户口头回答；
+`request_confirmation` 由「替我审批」代理、`request_choice` / decision 卡由「替我决策」代理，两者都关
+为客户本人；代理只能按卡内唯一推荐项 / 已发选项处理，失败回落客户 fail-closed；产品 / 运营发现未决
+材料缺口（如提案 §5 M1 截图采集范围 / 截图清单）必须在依赖步骤前发 decision 卡（唯一推荐项），没有卡 / 客户未决
+不得推进；质检的 `report_artifact_ready` 是向应用汇报，不是客户确认卡（lead-governance-coordination；
+门禁引擎任务）。完整记录见[变更记录](docs/change/2026-10-27_change_customer-cardification.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`（新增单一来源 `CUSTOMER_CARDIFICATION_PRINCIPLE`
+  并插入五卡；产品 / 运营 / 质检三卡角色专属补充）、`test/门禁引擎/customer-card-rules.test.ts`（新增
+  6 例）、本文件、变更记录（新）。未改 `src/model/**`、`src/provider/**`、`src/pipeline/**`、
+  `src/common/编排/**`、`app/**`、共享 i18n、PM 文档或 `demos/`；未新增角色 / `FlowStepKind` / cardKind /
+  写权 / 判定逻辑；未 commit / push；未重启应用。
+- **五卡共享总则**：客户确认 / 选择必须用 `request_confirmation` / `request_choice` 卡；禁止「请回复」
+  「请口头选」「回复 1/2」「不选默认同意」；沉默 / 未回复 / 默认勾选 / 既有做法 / 其他角色转述 / 推荐项
+  都不是客户确认；代理开关按应用现状分工（`request_confirmation` ←「替我审批」、`request_choice` /
+  decision ←「替我决策」，都关 = 客户本人）；代理只能按卡内唯一 `recommended: true` / 已发选项处理，
+  不可用 / 失败 / 超时 / deny ⇒ 回落客户 fail-closed；白名单外交有权限角色发卡。
+- **产品 / 运营**：新增「未决材料缺口卡片先行（M1 等）」——提案 §5 M1 截图采集范围 / 截图清单未决时，必须在依赖
+  步骤前交运营 / 运营自己发 decision 卡（`options` 真实可选、唯一推荐项）；没有卡 / 客户未决不得推进 /
+  派发该依赖步骤；运营标准工作流第 5 步补派发前核对。
+- **质检**：`report_artifact_ready` 是向应用汇报工件就绪，不是客户确认 / 选择卡，不代替客户决定；
+  `accepted` 不是客户确认；需要客户确认 / 选择仍走本卡白名单。
+- **测试**：新增 `customer-card-rules.test.ts` 6 例，覆盖卡化、代理开关、唯一推荐、不得默认同意、M1 前卡、
+  `report_artifact_ready` 非客户卡、数据面零变化（角色顺序 / 能力位 / cardKind 白名单 / Proof 写权）；
+  原有卡文本测试全部保留。
+- **验证**：定向 6 计 / 6 过；本角色全套 `node --test "test/门禁引擎/**/*.test.ts"` ⇒ **357 计 / 356 过 /
+  0 失败 / 1 Windows 既有 skip，exit 0**（写前 351 计）；`npm run typecheck` ⇒ **exit 0，0 诊断**。
+- **跨角色待办（未越界）**：代理开关的实际路由 / 判定与「无卡不推进依赖步骤」的机械拦截由运行时核心 /
+  编排 / 桌面角色实现；卡文本是行为约束，不是实现证据；未做跨角色端到端 / 真机验证，未独立验收。
+
+## 2026-10-27 — 质检验收标准「工件就绪汇报」（report_artifact_ready）：不自行改 flow 状态、不自批
+
+任务：客户新设计——质检 / Proof 写完实施前验收标准后**只向应用汇报**（新工具 `report_artifact_ready`：
+flowId / stepId / path / summary），由应用校验并决定是否收口；等待应用 `accepted`，被拒绝 / 缺失时修正后
+重报；不自行 `flow_step_update` 改状态、不自批；应用决定后仍未继续则报告产品 / 运营，不伪造完成
+（lead-governance-coordination；门禁引擎任务）。完整记录见
+[变更记录](docs/change/2026-10-27_change_report-artifact-ready-verifier-card.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`（仅 `VERIFIER_CARD_TEXT` 产品数据文本 + 文件头注）、
+  `test/门禁引擎/governance-standard-workflow.test.ts`（Crew/Draft 与 Proof 断言拆分 + Proof 新语义）、
+  `test/门禁引擎/verifier-artifact-report.test.ts`（新增 4 例）、本文件、变更记录（新）。未改
+  `src/model/**`、`src/provider/**`、`src/pipeline/**`、`src/common/编排/**`、`app/**`、共享 i18n、PM 文档或
+  `demos/`；未 commit / push；未重启应用。
+- **Proof 卡**：标准工作流第 2 步从「标准落盘且结构合格后才允许实施派发」改为「写完调用
+  `report_artifact_ready({ flowId, stepId, path, summary })` 汇报 → 等待应用 `accepted` → 拒绝 / 缺失修正后
+  重报」；**不自行用 `flow_step_update` 改步骤状态、不自批**；应用决定后仍未继续时报告 产品 / Lead 与
+  运营 / Steward，不伪造完成。流程工具纪律同步收紧为「`done` 只能由应用收口」；gate 步骤例外逐字保留。
+  验收标准结构 / 证据 / 风险档位 T0–T3 / 版本冻结 / 真实启动演示 / `view_image` 不得假看 / gate / 分诊
+  等安全检查全部保留。
+- **测试**：既有 Proof 流程工具断言按新语义拆分并反向禁止旧「自己标 `delivered` / `done` 由 Steward 标记」；
+  新增 `verifier-artifact-report.test.ts` 锁定工具名与四参数、等待 `accepted`、拒绝 / 缺失重报、不自行改
+  状态 / 不自批、旧绝对句不复现、安全检查保留、注册表数据面零变化。
+- **验证**：定向 31 计 / 31 过；本角色全套 `node --test "test/门禁引擎/**/*.test.ts"` ⇒ **351 计 /
+  350 过 / 0 失败 / 1 Windows 既有 skip，exit 0**（写前 347 计）；`npm run typecheck` ⇒ **exit 0，0 诊断**。
+- **跨角色待办（未越界）**：`report_artifact_ready` 的契约 / 工具注册 / 回执转达由运行时核心实施，应用
+  注入端（编排 / 桌面）负责校验、决定收口并写 flow；应用自动派发文案（`buildAcceptanceCriteriaTaskMessage`
+  / `buildAcceptanceCriteriaReportReminderMessage`）已由桌面 / 编排属主在工作树内并发更新为提示汇报，
+  本批只读核对、未改未验证。卡文本是行为约束，不是实现证据；未做跨角色端到端 / 真机验证，未独立验收。
+
 ## 2026-10-27 — view_image 同轮附图优先 + 下一轮回退：删除“两轮附件 / 本轮只回已排队”绝对口径
 
 任务：客户 2026-10-27 要求“同轮看图修复”；按设计 `角色卡/编排/docs/design/2026-10-27_design_view-image-same-turn.md`

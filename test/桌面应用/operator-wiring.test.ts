@@ -2267,7 +2267,11 @@ test("收尾任务消息（客户批准）：必须真实启动应用向客户�
   assert.match(message, /必须真实启动应用并向客户演示/);
   assert.match(message, /启动命令/);
   assert.match(message, /访问地址/);
-  assert.match(message, /截图或录屏/);
+  assert.match(message, /真实运行截图/);
+  assert.match(message, /最多截图/);
+  assert.match(message, /不得要求录屏/);
+  assert.match(message, /缺录屏不判失败/);
+  assert.doesNotMatch(message, /截图或录屏|截图\/录屏/, "验收任务不得把录屏作为要求/选项");
   assert.match(message, /审批档 shell/);
   assert.match(message, /未真实启动\/演示/);
   // 2026-10-22 第 3 项（方案 §7.1/§7.6）：报告进 docs/acceptance/，详细证据附件留在 docs/verification/。
@@ -2300,7 +2304,7 @@ test("收尾任务消息（客户批评）：按架构方案/架构影响分析�
   // 既有硬要求①–③与⑤逐字保留；④按 2026-10-22 第 3 项改为 acceptance 报告 + verification 附件。
   for (const requirement of [
     "① 按工程质量基线逐项核对并给出结论与证据：正确性、健壮性、安全、可维护性、可观测性、性能、前端可访问性、测试矩阵；",
-    "② 必须真实启动应用并向客户演示：给出启动命令与访问地址，附截图或录屏（你已有审批档 shell，可执行启动命令，命令逐条提交审批）；",
+    "② 必须真实启动应用并向客户演示：给出启动命令与访问地址，附真实运行截图（最多截图；不得要求录屏；缺录屏不判失败；你已有审批档 shell，可执行启动命令，命令逐条提交审批）；",
     "③ 未真实启动/演示、或质量基线某项无证据，不得建议 accept（只能建议退回或补充证据）；",
     "④ 验收报告写入 docs/acceptance/flow-a-report-v1.md（首行五项：风险档位、判定依据、选定检查、复用证据、全量回归），详细证据附件写入 docs/verification/；报告须引用实施前标准 docs/acceptance/flow-a-criteria-v1.md 与变更包 docs/scheduling/flow-a-change-v1.md 的版本/哈希。",
     "⑤ 按提案/变更的「架构方案或架构影响分析」核对实现：模块边界、依赖方向、扩展点、数据 schema/API 版本迁移与声明一致；缺失架构章节或实现偏离声明时不得建议 accept（只能建议退回或补充证据）。",

@@ -86,6 +86,7 @@ import type {
   RequestGateReviewFn,
   RequestBoundaryChangeFn,
   RequestRequirementChangeFn,
+  ReportArtifactFn,
   ViewImageFn,
   HandOffIntentFn,
   RequestClarificationFn,
@@ -354,6 +355,16 @@ export interface AdapterCapabilities {
    * 提案卡不得承载未批准的新授权，也不得删除需求绕过。
    */
   requestRequirementChange?: RequestRequirementChangeFn;
+  /**
+   * 验收标准产物汇报能力（`report_artifact_ready`「注入才注册」，2026-10-27 客户新设计）：质检写完
+   * 实施前验收标准后**只向应用汇报**，由应用校验路径/步骤/产物一致性并决定是否收口（质检不盯文件
+   * 自动勾卡、不自行修改 flow 状态、不自批）。**只给内置治理角色中的质检/Proof（trio verifier）
+   * 注入**（其他内置治理角色、single 模型的旧 su 与项目角色即便调用方误给也不注入，工具不注册，
+   * 结构性 fail-closed）。形状单一来源＝契约家 `model/runtime.ts`（`ReportArtifactFn`/
+   * `ReportArtifactInput`/`ReportArtifactReceipt`）。本层**纯透传**，不写盘、不读写 flow、不做治理
+   * 判定、不伪造接受或决定。**汇报成功 ≠ 自动完成**（`accepted:true` 只表示应用已接受该产物）。
+   */
+  reportArtifact?: ReportArtifactFn;
   shellGate?: ShellGate;
   shellVerdict?: ShellVerdictFn;
   roleStatus?: RoleStatusFn;
@@ -691,6 +702,16 @@ export async function openRoleSession(
      * 也不代表意图已变更**。
      */
     requestRequirementChange?: RequestRequirementChangeFn;
+    /**
+     * **验收标准产物汇报能力（`report_artifact_ready`「注入才注册」，2026-10-27 客户新设计）**：前端
+     * （桌面窗口）提供的实现——质检写完实施前验收标准后**只向应用汇报**，由应用校验路径/步骤/产物
+     * 一致性并决定是否收口（质检不盯文件自动勾卡、不自行修改 flow 状态、不自批）。**只对内置治理
+     * 角色中的质检/Proof（trio verifier）转交**；其他内置治理角色、single 模型的旧 su 与项目角色即便
+     * 调用方误给也不注入（工具不注册，结构性 fail-closed）。形状单一来源＝契约家 `model/runtime.ts`
+     * （`ReportArtifactFn`/`ReportArtifactInput`/`ReportArtifactReceipt`）。本层纯透传，不写盘、
+     * 不写 flow、不伪造接受或决定；未给出 ⇒ 不注入。**汇报成功 ≠ 自动完成**。
+     */
+    reportArtifact?: ReportArtifactFn;
     /**
      * **G-2 看护自查能力（R1；`role_status`「注入才注册」）**：前端提供的实现（主进程读同源快照＋
      * 诊断尾部 → 结构化文本）。**只对治理角色会话（su）转交**（判据同 `dispatchTask`）；形状单一来源
@@ -1514,6 +1535,16 @@ export async function openRoleSession(
       ? input.requestBoundaryChange
       : undefined;
 
+  // 2026-10-27 验收标准产物汇报（report_artifact_ready）：**只给内置治理角色中的质检/Proof（trio
+  // verifier）**注入；项目角色、其他内置治理角色（含 single 模型的旧 su）即便调用方误给也不注入
+  // （工具不注册，结构性 fail-closed）。判据在编排注入端（运行时核心只声明能力位名，不硬编码角色 id）；
+  // 未提供 ⇒ 不注入（同 request_acceptance 先例）。本层纯透传——路径/步骤归属/哈希一致性与是否收口
+  // 由能力实现校验并决定；质检不得自批 flow 状态。**汇报成功 ≠ 自动完成**。
+  const reportArtifact: ReportArtifactFn | undefined =
+    builtInGovernance && trioSpec?.id === "verifier" && input.reportArtifact !== undefined
+      ? input.reportArtifact
+      : undefined;
+
   // G-4 技能安装/卸载两能力（I1/I2）：能力矩阵驱动——仅 `capabilities.installSkill`
   // （trio=Nominator；su 旧行为）。字段名**逐字**＝契约家能力名（错一名 ⇒ 工具静默零注册）。
   const installSkill = cap?.installSkill === true ? input.installSkill : undefined;
@@ -1616,6 +1647,10 @@ export async function openRoleSession(
     ...(handOffIntent !== undefined ? { handOffIntent } : {}),
     ...(requestClarification !== undefined ? { requestClarification } : {}),
     ...(requestRequirementChange !== undefined ? { requestRequirementChange } : {}),
+    // 2026-10-27 验收标准产物汇报（report_artifact_ready）：只给质检/Proof（trio verifier）注入；
+    // 未注入 ⇒ 字段缺席、工具不注册（能力缺席 = 最强 fail-closed）。本层只透传同一引用，不包装、
+    // 不调用、不写盘/flow、不伪造接受或决定。
+    ...(reportArtifact !== undefined ? { reportArtifact } : {}),
     ...(roleStatus !== undefined ? { roleStatus } : {}),
     ...(sessionTail !== undefined ? { sessionTail } : {}),
     ...(proposeRecovery !== undefined ? { proposeRecovery } : {}),
@@ -3643,6 +3678,12 @@ export function createRuntimeAdapterFactory(
     // （能力缺席 = 最强 fail-closed，同 request_clarification 先例）。本层纯透传——意图校验/去重/
     // 派发/账本由能力实现；**提交申请 ≠ 客户批准 ≠ 意图已变更**。
     requestRequirementChange: capabilities?.requestRequirementChange,
+    // 2026-10-27 验收标准产物汇报（report_artifact_ready）：运行时核心 `GovernedToolsOptions` 同名
+    // 能力位（形状同源 `model/runtime.ts` `ReportArtifactFn`）；**显式字段**（非条件展开）——未注入时
+    // 置 undefined，覆盖 `deps.runtimeOptions` 可能残留的同名值，保证非 verifier 会话不能经依赖选项
+    // 旁路拿到能力。未注入 ⇒ 工具不注册（能力缺席 = 最强 fail-closed，同 request_acceptance 先例）。
+    // 本层纯透传——路径/步骤/哈希校验与是否收口由能力实现；**汇报成功 ≠ 自动完成**。
+    reportArtifact: capabilities?.reportArtifact,
     // G-2/R1-R2：看护三能力并入适配器选项——**契约字段名** `roleStatus` / `sessionTail` /
     // `proposeRecovery`（运行时核心 `GovernedToolsOptions` 同名能力位，形状同源 `model/runtime.ts`）；
     // `undefined` ⇒ 对应工具不注册（能力缺席 = 最强 fail-closed，同 dispatch_task 先例）。

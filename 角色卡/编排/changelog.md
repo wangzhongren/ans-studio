@@ -1,5 +1,29 @@
 # 编排 变更记录
 
+## 2026-10-27 — 验收标准/交付演示证据改为截图 only（不得要求录屏）
+
+**来源**：客户 2026-10-27 新规则（**ANS 系统，不是 demo**）——**策划的验收标准最多截图，不能要求录屏**；视觉证据最多真实运行截图，**不得要求录屏，缺录屏不得判失败**。本批只改编排边界内的治理会话提示词与测试；未改 `src/model/**`、`src/service/**`、`src/provider/**`、`app/**`、门禁引擎、角色卡、i18n、PM、skill、游戏项目；未新增角色/`FlowStepKind`/cardKind/权限；未 commit/push、未重启、未碰 `demos/`。
+
+**改了什么**
+- `govern-session.ts` 共 7 处 active 文案：①工程质量基线「交付」条；②标准工作流「验收标准」证据计划；③Proof 复核流程 ③；④Steward「质量与演示」；⑤Verifier「质量与演示核对」；⑥Draft「质量与证据」证据计划；⑦single/su 质量阶段要求。统一为「启动命令/访问地址 + 真实运行截图；视觉证据最多截图，不得要求录屏，缺录屏不得判失败」，保留日志/校验输出/哈希/关 DEBUG/真实启动/质量基线/架构核对/验收卡纪律。`flow-service.ts::ensureFlowSkeleton` 与 `flow-state.ts` 无录屏要求，未改。
+- `test/编排/governance-session.test.ts`：trio 五角色与 single/su 提示均断言含 `真实运行截图`/`不得要求录屏`/`缺录屏不得判失败` 且不再出现 `截图/录屏`；标准工作流新增两条截图 only 断言。
+
+**测试**：`governance-session.test.ts` **39/39**；`node --test "test/编排/**/*.test.ts"` → **1024 计/1022 过/1 红/1 skip**（唯一红＝既有 Windows symlink EPERM）；`npm run typecheck` → **exit 0**。
+
+**跨角色待办**：① 门禁引擎角色卡 `governance-roles.ts` 仍有「截图/录屏」（质量基线/Convener/Verifier）且测试按旧文本断言，需其属主同步（本批按边界未改，两份基线暂不逐字一致）；② 桌面 `buildAcceptanceTaskMessage`/自动验收任务仍要求「截图或录屏」，需桌面属主改截图 only；③ 跨角色 e2e 与独立验收未做。详见[变更记录](docs/change/2026-10-27_change_screenshot-only-acceptance-evidence.md)。
+
+## 2026-10-27 — 验收标准产物汇报能力透传（`report_artifact_ready`，仅质检/verifier）
+
+**来源**：客户 2026-10-27 新设计——验收标准由质检写完后**只向应用汇报**，由应用校验并决定是否收口；质检不再盯文件自动勾卡、不得自批 flow 状态。运行时核心已交付冻结契约 `ReportArtifactFn`/`ReportArtifactInput`/`ReportArtifactReceipt` 与 `report_artifact_ready` 工具（`GovernedToolsOptions.reportArtifact`），门禁引擎同批只改 verifier 卡文本（未新增能力位）。本批只接线编排注入端；未改 `src/model/**`、`src/service/**`、`src/provider/**`、`app/**`、门禁引擎、i18n；未 commit/push、未重启应用、未碰 `demos/`。
+
+**改了什么**
+- `run-role.ts`：`AdapterCapabilities` 与 `openRoleSession` 输入新增可选 `reportArtifact?: ReportArtifactFn`（类型单一来源＝契约家 `model/runtime.ts`，字段名逐字）；注入判据 **只给内置治理角色中的质检/Proof（trio verifier）**——liaison/rapporteur/nominator/convener、single 旧 su 与项目角色即便误给也不注入（工具结构性不注册）；未提供 ⇒ 字段缺席。`createRuntimeAdapterFactory` 同名能力位显式透传 → Service `...options`（`RuntimeSessionOptions` 经 `Omit<GovernedToolsOptions,…>` 继承）→ `buildGovernedTools` 注册工具。编排**纯透传**（同一引用、不包装、不预调用），不写盘、不写 flow、不伪造接受或决定；**汇报成功 ≠ 自动完成**；不改变任何既有能力矩阵。
+- 新增 `test/编排/report-artifact.test.ts` **3 例**：verifier 同引用透传 + 工具注册 + 载荷原样路由 + 回执原样转达 + 打开/开轮/settle 全程零 flow/账本写入；`deps.runtimeOptions` 残留同名能力也不能旁路给非 verifier；verifier 未提供、liaison/convener/旧 su/项目角色误给 ⇒ 不注入、工具不注册。
+
+**测试**：定向 **3/3**；`node --test "test/编排/**/*.test.ts"` → **1024 计/1022 过/1 红/1 skip**（唯一红＝既有 Windows symlink EPERM）；`npm run typecheck` → **exit 0**（桌面属主并发补齐 `SessionManagerDeps.reportArtifact` 后全仓零错；本批编排文件始终零类型错误）。
+
+**跨角色待办**：① 桌面窗口实现应用侧校验/收口（flowId/stepId 归属、path、sha256 一致性；按仅 verifier 注入）并补 `SessionManagerDeps` 字段；② 真实 Electron/模型端到端、跨角色 e2e 与独立验收未做。详见[变更记录](docs/change/2026-10-27_change_report-artifact-orchestration.md)。
+
 ## 2026-10-26 — 意图交接时由应用创建通用流程骨架（`ensureFlowSkeleton`，幂等、不覆盖）
 
 **来源**：客户反馈「意图确认/交接后、提案/团队计划前 `flow_get` 报 not-found，角色无法登记 contract-freeze」。裁定：应用在**意图交接成功后、报告员开始前**按 intent 的 flowId 自动创建 `docs/flows/<flowId>.yaml` 的**通用骨架**（顶层 `status: skeleton`）；不新增 `FlowStepKind`、不预设项目角色/交付步骤。本批只改编排 `common/编排` 与应用侧公共出口，未改 `app/**`、`src/model/**`、`src/provider/**`、门禁引擎、共享 i18n；未 commit/push、未重启运行中的应用、未碰 `.claude/` 与 `demos/`。

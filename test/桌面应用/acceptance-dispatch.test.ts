@@ -53,6 +53,10 @@ import {
   type FlowCompletionLedgerEntryLike,
 } from "../../app/desktop/governance-advance.ts";
 import { createCustomerInputChannel, type AcceptanceTriageGateFacts } from "../../app/desktop/customer-input.ts";
+// 2026-10-27 report_artifact_ready：契约单一来源＝运行时核心（ReportArtifactFn/Input/Receipt）；
+// 桌面诊断扩展回执（code/alreadyDone 等）仅在测试断言里使用。
+import type { ReportArtifactInput } from "../../src/model/runtime.ts";
+import type { DesktopReportArtifactReceipt } from "../../app/desktop/artifact-report.ts";
 import {
   acceptanceTriageIdForReport,
   buildAcceptanceTriageRecord,
@@ -277,6 +281,12 @@ async function makeHarness(
     hangVerifierSend?: boolean;
     /** 2026-10-27 request_gate_review 有界超时（测试注入短预算）。 */
     requestGateReviewLimits?: DesktopDeps["requestGateReviewLimits"];
+    /** 2026-10-27 report_artifact_ready：整体能力注入面（缺省真实桌面实现；测试可替换）。 */
+    reportArtifact?: DesktopDeps["reportArtifact"];
+    /** 2026-10-27 流程推进/停滞看护：watchdog tick 配置（测试驱动 tick）。 */
+    watchdogOptions?: DesktopDeps["watchdogOptions"];
+    /** 2026-10-27 停滞兜底阈值（测试注入短值）。 */
+    governanceTickOptions?: DesktopDeps["governanceTickOptions"];
   } = {},
 ): Promise<Harness> {
   const sendsByRole = new Map<string, string[]>();
@@ -344,6 +354,10 @@ async function makeHarness(
       : {}),
     ...(options.handOffIntentLimits !== undefined ? { handOffIntentLimits: options.handOffIntentLimits } : {}),
     ...(options.requestGateReviewLimits !== undefined ? { requestGateReviewLimits: options.requestGateReviewLimits } : {}),
+    // 2026-10-27 report_artifact_ready：能力替换与 flow tick 触发面（缺省真实实现）。
+    ...(options.reportArtifact !== undefined ? { reportArtifact: options.reportArtifact } : {}),
+    ...(options.watchdogOptions !== undefined ? { watchdogOptions: options.watchdogOptions } : {}),
+    ...(options.governanceTickOptions !== undefined ? { governanceTickOptions: options.governanceTickOptions } : {}),
   });
   await iface.listProject({ projectRoot });
   return { iface, sendsByRole, events, controls, openInputs };
@@ -617,7 +631,11 @@ test("自动验收（导入补齐）：门通过 ⇒ 自动派 Proof 一条复�
       assert.match(sends[0]!, /必须真实启动应用并向客户演示/);
       assert.match(sends[0]!, /启动命令/);
       assert.match(sends[0]!, /访问地址/);
-      assert.match(sends[0]!, /截图或录屏/);
+      assert.match(sends[0]!, /真实运行截图/);
+      assert.match(sends[0]!, /最多截图/);
+      assert.match(sends[0]!, /不得要求录屏/);
+      assert.match(sends[0]!, /缺录屏不判失败/);
+      assert.doesNotMatch(sends[0]!, /截图或录屏|截图\/录屏/, "验收任务不得把录屏作为要求/选项");
       assert.match(sends[0]!, /架构方案或架构影响分析/);
       assert.match(sends[0]!, /模块边界/);
       assert.match(sends[0]!, /依赖方向/);
@@ -5101,6 +5119,11 @@ test("2026-10-26 request_gate_review：visual gate 需真实运行/演示证据�
       assert.equal(ok.code, "dispatched", ok.message);
       assert.match(gateTaskSends(harness)[0]!, /关闭 DEBUG 覆盖层/);
       assert.match(gateTaskSends(harness)[0]!, /insufficient evidence/);
+      // 2026-10-27 客户规则：证据最多截图，不得要求/提供录屏；缺录屏不判失败。
+      assert.match(gateTaskSends(harness)[0]!, /真实运行截图/);
+      assert.match(gateTaskSends(harness)[0]!, /不得要求录屏/);
+      assert.match(gateTaskSends(harness)[0]!, /缺录屏不判失败/);
+      assert.doesNotMatch(gateTaskSends(harness)[0]!, /截图或录屏|截图\/录屏/);
     } finally {
       await harness.iface.stopSession();
     }
@@ -6278,6 +6301,362 @@ test("需求变更申请：DesktopDeps.requestRequirementChange 可整体替换�
       ]);
     } finally {
       await fake.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————————————— 2026-10-27 report_artifact_ready（客户新设计：质检汇报、应用校验后收口） ——————————————
+//
+// 客户原话：质检写完验收标准后**调用 `report_artifact_ready` 汇报给应用；应用校验后决定是否收口**。
+// 不允许应用盯文件自动勾卡，也不允许质检自己改状态。本组覆盖：
+//   · 汇报校验（flow/stepId/path/文件存在可读/最新版本）与 accepted/rejected 如实回执；
+//   · 校验通过才调编排 `completeAcceptanceCriteriaStep`（幂等/原子/fail-closed），accepted 后立即触发检查；
+//   · 只给 verifier 会话注入；标准存在但步骤 pending ⇒ 一次「请汇报」唤醒（去重）；
+//   · 流程推进/停滞看护：ready tick 去重、停滞兜底去重（不派 worker、不伪造状态）。
+
+/** 取出 verifier 会话捕获到的 reportArtifact 能力（未注入即失败；诊断扩展字段供断言）。 */
+function reportArtifactOf(
+  harness: Harness,
+  roleId: string,
+): (input: ReportArtifactInput) => Promise<DesktopReportArtifactReceipt> {
+  const fn = harness.openInputs.get(roleId)?.reportArtifact;
+  assert.ok(fn, `${roleId} 会话应注入 reportArtifact`);
+  return fn as (input: ReportArtifactInput) => Promise<DesktopReportArtifactReceipt>;
+}
+
+/** 读 flow 并返回指定步骤（解析失败即测试失败）。 */
+function flowStepOf(root: string, flowId: string, stepId: string) {
+  const parsed = parseFlowStateYaml(readFileSync(path.join(root, "docs", "flows", `${flowId}.yaml`), "utf8"), flowId);
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parseErrorText(parsed));
+  if (!parsed.ok) throw new Error("unreachable");
+  const step = parsed.flow.steps.find((candidate) => candidate.id === stepId);
+  assert.ok(step, `flow 应含步骤 ${stepId}`);
+  return step!;
+}
+
+test("2026-10-27 report_artifact_ready：verifier 汇报最新标准 ⇒ 校验通过、收口 acceptance-criteria、立即触发验收检查", async () => {
+  const root = makeTempProjectRoot("ans-report-artifact-accept-");
+  const flowId = "flow-report-artifact";
+  const criteriaPath = `docs/acceptance/${flowId}-criteria-v1.md`;
+  try {
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractStepsWithCriteriaStatus(flowId, "pending")));
+    writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "T2" });
+    await appendNewContractLedger(root, flowId, { criteria: false, change: true });
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      // 先让导入补齐检查跑完（它可能已给 verifier 发「请汇报」并开过会话），再取得能力。
+      await sleep(200);
+      harness.controls.get("verifier")?.settle();
+      await sleep(50);
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "verifier", runtime: "demo" })).ok, true);
+      const reportArtifact = reportArtifactOf(harness, "verifier");
+      const before = await readGovernanceLedger(root);
+      assert.equal(before.entries.some((entry) => entry.kind === "dispatch.accepted" && entry.flowId === flowId && entry.stepId === "verification"), false);
+
+      // 运行时契约的可选 sha256：与真实文件一致 ⇒ 校验通过（格式/一致性由应用校验）。
+      const criteriaSha256 = createHash("sha256").update(readFileSync(path.join(root, ...criteriaPath.split("/")))).digest("hex");
+      const result = await reportArtifact({ flowId, stepId: "acceptance-criteria", path: criteriaPath, sha256: criteriaSha256 });
+      assert.equal(result.ok, true, result.message);
+      assert.equal(result.accepted, true);
+      assert.equal(result.flowId, flowId);
+      assert.equal(result.stepId, "acceptance-criteria");
+      assert.equal(result.code, "accepted");
+
+      // 收口：步骤 done + artifact 证据；账本恰一条 app/app artifact.observed（不写客户决定）。
+      const step = flowStepOf(root, flowId, "acceptance-criteria");
+      assert.equal(step.status, "done");
+      assert.deepEqual(step.evidence, { kind: "artifact", ref: criteriaPath });
+      const ledger = await readGovernanceLedger(root);
+      const observed = ledger.entries.filter((entry) => entry.kind === "artifact.observed" && entry.artifactPath === criteriaPath);
+      assert.equal(observed.length, 1, "收口补登恰一条 artifact.observed");
+      assert.equal(observed[0]!.actorRoleId, "app");
+      assert.equal(observed[0]!.power, "app");
+      assert.equal(
+        ledger.entries.some(
+          (entry) => entry.kind === "customer.decision" && entry.flowId === flowId && entry.decisionKind === "acceptance",
+        ),
+        false,
+        "不写客户验收决定（appointment 决定是夹具预置，不属本次汇报）",
+      );
+
+      // accepted 后立即触发一次检查：验收复核（verification）被派发（账本可见），不是伪造收口。
+      await waitForAsync(async () => (await verifierDispatches(root, flowId)).length > 0, 5000);
+      assert.equal((await verifierDispatches(root, flowId)).length, 1, "收口 accepted ⇒ 立即检查并派验收复核恰一次");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 report_artifact_ready：拒绝路径 fail-closed（stepId/path/缺失/空文件/终态/流程缺失）且不写 flow/账本", async () => {
+  const root = makeTempProjectRoot("ans-report-artifact-reject-");
+  const flowPending = "flow-report-reject-pending";
+  const flowMissing = "flow-report-reject-missing";
+  const flowEmpty = "flow-report-reject-empty";
+  const flowTerminal = "flow-report-reject-terminal";
+  const flowNoStep = "flow-report-reject-nostep";
+  try {
+    writeFlowStateFile(root, flowPending, flowStateYaml(flowPending, newContractStepsWithCriteriaStatus(flowPending, "pending")));
+    writeNewContractEvidenceFiles(root, flowPending, { criteria: true, change: "T2" });
+    writeFlowStateFile(root, flowMissing, flowStateYaml(flowMissing, newContractStepsWithCriteriaStatus(flowMissing, "pending")));
+    writeFlowStateFile(root, flowEmpty, flowStateYaml(flowEmpty, newContractStepsWithCriteriaStatus(flowEmpty, "pending")));
+    writeNewContractEvidenceFiles(root, flowEmpty, { criteria: true, change: "T2" });
+    writeFileSync(path.join(root, "docs", "acceptance", `${flowEmpty}-criteria-v1.md`), "", "utf8");
+    writeFlowStateFile(root, flowTerminal, flowStateYaml(flowTerminal, newContractStepsWithCriteriaStatus(flowTerminal, "delivered")));
+    writeNewContractEvidenceFiles(root, flowTerminal, { criteria: true, change: "T2" });
+    // 无 acceptance-criteria 步骤，但标准文件存在。
+    writeFlowStateFile(root, flowNoStep, flowStateYaml(flowNoStep, newContractSteps(flowNoStep, { criteria: false, change: true })));
+    writeNewContractEvidenceFiles(root, flowNoStep, { criteria: true, change: "T2" });
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      await sleep(150);
+      harness.controls.get("verifier")?.settle();
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "verifier", runtime: "demo" })).ok, true);
+      const reportArtifact = reportArtifactOf(harness, "verifier");
+      const beforeLedger = await readGovernanceLedger(root);
+      const beforeFlow = readFileSync(path.join(root, "docs", "flows", `${flowPending}.yaml`), "utf8");
+
+      const unsupported = await reportArtifact({ flowId: flowPending, stepId: "verification", path: `docs/acceptance/${flowPending}-criteria-v1.md` });
+      assert.equal(unsupported.accepted, false);
+      assert.equal(unsupported.code, "unsupported-step");
+
+      // 存在 v2 ⇒ v1 不是最新：拒收（不猜旧版本）。
+      writeFileSync(path.join(root, "docs", "acceptance", `${flowPending}-criteria-v2.md`), "# 标准 v2\n", "utf8");
+      const stale = await reportArtifact({ flowId: flowPending, stepId: "acceptance-criteria", path: `docs/acceptance/${flowPending}-criteria-v1.md` });
+      assert.equal(stale.accepted, false);
+      assert.equal(stale.code, "path-not-latest");
+      assert.match(stale.message, new RegExp(`${flowPending}-criteria-v2\\.md`), "回执给出最新路径");
+
+      // 可选 sha256（运行时契约字段）：格式非法/与真实文件不一致一律拒收（内容一致性由应用校验）。
+      const badShaFormat = await reportArtifact({
+        flowId: flowPending,
+        stepId: "acceptance-criteria",
+        path: `docs/acceptance/${flowPending}-criteria-v2.md`,
+        sha256: "not-a-sha",
+      });
+      assert.equal(badShaFormat.accepted, false);
+      assert.equal(badShaFormat.code, "invalid-input");
+      const badShaValue = await reportArtifact({
+        flowId: flowPending,
+        stepId: "acceptance-criteria",
+        path: `docs/acceptance/${flowPending}-criteria-v2.md`,
+        sha256: "0".repeat(64),
+      });
+      assert.equal(badShaValue.accepted, false);
+      assert.equal(badShaValue.code, "content-mismatch");
+
+      const missingFile = await reportArtifact({ flowId: flowMissing, stepId: "acceptance-criteria", path: `docs/acceptance/${flowMissing}-criteria-v1.md` });
+      assert.equal(missingFile.accepted, false);
+      assert.equal(missingFile.code, "criteria-missing");
+
+      const emptyFile = await reportArtifact({ flowId: flowEmpty, stepId: "acceptance-criteria", path: `docs/acceptance/${flowEmpty}-criteria-v1.md` });
+      assert.equal(emptyFile.accepted, false);
+      assert.equal(emptyFile.code, "criteria-empty");
+
+      const terminal = await reportArtifact({ flowId: flowTerminal, stepId: "acceptance-criteria", path: `docs/acceptance/${flowTerminal}-criteria-v1.md` });
+      assert.equal(terminal.accepted, false);
+      assert.equal(terminal.code, "step-terminal");
+
+      const noStep = await reportArtifact({ flowId: flowNoStep, stepId: "acceptance-criteria", path: `docs/acceptance/${flowNoStep}-criteria-v1.md` });
+      assert.equal(noStep.accepted, false);
+      assert.equal(noStep.code, "step-missing");
+
+      const noFlow = await reportArtifact({ flowId: "no-such-flow", stepId: "acceptance-criteria", path: "docs/acceptance/no-such-flow-criteria-v1.md" });
+      assert.equal(noFlow.accepted, false);
+      assert.equal(noFlow.code, "flow-not-found");
+
+      // 全部拒绝均不收口：flow 原文不变、无 app 观测。
+      assert.equal(readFileSync(path.join(root, "docs", "flows", `${flowPending}.yaml`), "utf8"), beforeFlow, "拒绝路径不改 flow");
+      const afterLedger = await readGovernanceLedger(root);
+      assert.equal(
+        afterLedger.entries.filter((entry) => entry.kind === "artifact.observed").length,
+        beforeLedger.entries.filter((entry) => entry.kind === "artifact.observed").length,
+        "拒绝路径不写 artifact.observed",
+      );
+      assert.equal(flowStepOf(root, flowPending, "acceptance-criteria").status, "pending");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 report_artifact_ready：重复汇报幂等（alreadyDone、不重复写盘/观测）", async () => {
+  const root = makeTempProjectRoot("ans-report-artifact-idempotent-");
+  const flowId = "flow-report-idempotent";
+  const criteriaPath = `docs/acceptance/${flowId}-criteria-v1.md`;
+  try {
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractStepsWithCriteriaStatus(flowId, "pending")));
+    writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "T2" });
+    await appendNewContractLedger(root, flowId, { criteria: false, change: true });
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      await sleep(150);
+      harness.controls.get("verifier")?.settle();
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "verifier", runtime: "demo" })).ok, true);
+      const reportArtifact = reportArtifactOf(harness, "verifier");
+      const first = await reportArtifact({ flowId, stepId: "acceptance-criteria", path: criteriaPath });
+      assert.equal(first.accepted, true, first.message);
+      const second = await reportArtifact({ flowId, stepId: "acceptance-criteria", path: criteriaPath });
+      assert.equal(second.ok, true, second.message);
+      assert.equal(second.accepted, true, "已收口步骤的重复汇报按幂等 accepted");
+      assert.equal(second.alreadyDone, true);
+      assert.equal(second.code, "already-accepted");
+      assert.equal(flowStepOf(root, flowId, "acceptance-criteria").status, "done");
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(
+        ledger.entries.filter((entry) => entry.kind === "artifact.observed" && entry.artifactPath === criteriaPath).length,
+        1,
+        "幂等汇报不重复追加观测",
+      );
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 report_artifact_ready：注入矩阵——仅 verifier 注入（requestAcceptance/view_image 零回归）", async () => {
+  const root = makeTempProjectRoot("ans-report-artifact-injection-");
+  try {
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      for (const roleId of ["liaison", "rapporteur", "nominator", "convener", "verifier", "executor"]) {
+        assert.equal((await harness.iface.openSession({ projectRoot: root, roleId, runtime: "demo" })).ok, true);
+      }
+      assert.equal(typeof harness.openInputs.get("verifier")?.reportArtifact, "function", "verifier 注入工件汇报能力");
+      for (const roleId of ["liaison", "rapporteur", "nominator", "convener", "executor"]) {
+        assert.equal(harness.openInputs.get(roleId)?.reportArtifact, undefined, `${roleId} 不注入工件汇报能力`);
+      }
+      assert.equal(typeof harness.openInputs.get("convener")?.requestAcceptance, "function", "requestAcceptance 零回归");
+      assert.equal(typeof harness.openInputs.get("executor")?.viewImage, "function", "viewImage 零回归");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 report_artifact_ready：标准已存在但 acceptance-criteria 仍 pending ⇒ 给 verifier 发一次「请汇报」唤醒（去重），应用不自动勾卡", async () => {
+  const root = makeTempProjectRoot("ans-report-artifact-reminder-");
+  const flowId = "flow-report-reminder";
+  const criteriaPath = `docs/acceptance/${flowId}-criteria-v1.md`;
+  try {
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, newContractStepsWithCriteriaStatus(flowId, "pending")));
+    writeNewContractEvidenceFiles(root, flowId, { criteria: true, change: "T2" });
+    await appendNewContractLedger(root, flowId, { criteria: false, change: true });
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      await waitFor(() => (harness.sendsByRole.get("verifier") ?? []).some((text) => text.includes("[请汇报]")), 5000);
+      const reminders = () => (harness.sendsByRole.get("verifier") ?? []).filter((text) => text.includes("[请汇报]"));
+      assert.equal(reminders().length, 1);
+      assert.match(reminders()[0]!, /report_artifact_ready/);
+      assert.ok(reminders()[0]!.includes(criteriaPath), "提醒带最新标准路径");
+      // 应用不盯文件自动勾卡：步骤仍 pending，验收复核未派。
+      assert.equal(flowStepOf(root, flowId, "acceptance-criteria").status, "pending", "应用不自动勾卡");
+      assert.equal((await verifierDispatches(root, flowId)).length, 0, "未收口 ⇒ 不派验收复核");
+
+      // 重复事件（settle/listProject/看护 tick 语义）不重复提醒（同一路径+状态去重）。
+      harness.controls.get("verifier")?.settle();
+      await harness.iface.listProject({ projectRoot: root });
+      await sleep(300);
+      assert.equal(reminders().length, 1, "同一 flow/路径/状态只提醒一次");
+      assert.equal(flowStepOf(root, flowId, "acceptance-criteria").status, "pending");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 流程推进看护：无 current + ready pending ⇒ convener 收一次「自动推进」唤醒；看护 tick 去重", async () => {
+  const root = makeTempProjectRoot("ans-flow-ready-tick-");
+  const flowId = "flow-ready-tick";
+  try {
+    writeFlowStateFile(
+      root,
+      flowId,
+      flowStateYaml(flowId, [
+        { id: "nomination", kind: "customer-decision", status: "done", evidence: { kind: "customer-decision", ref: "appointment" } },
+        { id: "contract-freeze", kind: "artifact", status: "done", evidence: { kind: "artifact", ref: `docs/contracts/${flowId}-api-v1.md` } },
+        { id: "delivery-server", kind: "dispatch", status: "done", evidence: { kind: "dispatch", ref: "delivery-server" } },
+        { id: "delivery-api", kind: "dispatch", status: "pending", owner: "executor", dependsOn: ["delivery-server"] },
+        { id: "verification", kind: "acceptance", status: "pending", owner: "app" },
+      ]),
+    );
+    await appendLedger(root, [
+      { kind: "customer.decision", flowId, stepId: "nomination", decisionKind: "appointment", customerDecision: "appointed", actorRoleId: "nominator", power: "nomination" },
+      { kind: "artifact.observed", artifactPath: `docs/contracts/${flowId}-api-v1.md`, actorRoleId: "author", power: "project" },
+      { kind: "dispatch.accepted", flowId, stepId: "delivery-server", actorRoleId: "convener", power: "schedule", targetRoleId: "executor" },
+    ]);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing, { watchdogOptions: { config: { tickMs: 20 } } });
+    try {
+      await waitFor(() => (harness.sendsByRole.get("convener") ?? []).some((text) => text.includes("[自动推进]")), 5000);
+      const advances = () => (harness.sendsByRole.get("convener") ?? []).filter((text) => text.includes("[自动推进]") && !text.includes("停滞"));
+      assert.equal(advances().length, 1);
+      assert.match(advances()[0]!, /delivery-api/, "就绪步骤进推进任务");
+      assert.equal(harness.sendsByRole.get("executor"), undefined, "应用不直接派 worker");
+      // 看护 tick 重复触发：同 revision+ready 集合只唤醒一次。
+      harness.iface.startWatchdog();
+      await sleep(250);
+      harness.iface.stopWatchdog();
+      assert.equal(advances().length, 1, "看护 tick 不重复唤醒（同 ready 集合去重）");
+      // 流程状态未被应用改写。
+      assert.equal(flowStepOf(root, flowId, "delivery-api").status, "pending");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-27 停滞看护：无 current + pending>0 + 全空闲持续超阈值 ⇒ convener 收一次停滞提示（去重、不派 worker、不伪造状态）", async () => {
+  const root = makeTempProjectRoot("ans-flow-stall-");
+  const flowId = "flow-stall";
+  try {
+    const stallSteps = (): FlowYamlStepInput[] => [
+      { id: "nomination", kind: "customer-decision", status: "pending", owner: "convener" },
+      { id: "delivery-server", kind: "dispatch", status: "pending", owner: "executor", dependsOn: ["nomination"] },
+      { id: "verification", kind: "acceptance", status: "pending", owner: "app" },
+    ];
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, stallSteps()));
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing, {
+      watchdogOptions: { config: { tickMs: 15 } },
+      governanceTickOptions: { stallMs: 50 },
+    });
+    try {
+      harness.iface.startWatchdog();
+      await waitFor(() => (harness.sendsByRole.get("convener") ?? []).some((text) => text.includes("[自动推进·停滞]")), 5000);
+      const stalls = () => (harness.sendsByRole.get("convener") ?? []).filter((text) => text.includes("[自动推进·停滞]"));
+      assert.equal(stalls().length, 1);
+      assert.match(stalls()[0]!, /nomination/, "停滞提示列出 pending 步骤");
+      assert.equal(harness.sendsByRole.get("executor"), undefined, "应用不直接派 worker");
+      // 多个 tick 不再刷屏（同一 pending 签名只告警一次；convener 忙碌只暂停计时）。
+      harness.controls.get("convener")?.settle();
+      await sleep(300);
+      assert.equal(stalls().length, 1, "同 pending 签名不重复告警");
+      assert.equal(flowStepOf(root, flowId, "nomination").status, "pending", "不伪造状态");
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.some((entry) => entry.kind === "dispatch.accepted"), false, "不替客户/统筹派发");
+      harness.iface.stopWatchdog();
+    } finally {
+      await harness.iface.stopSession();
     }
   } finally {
     rmSync(root, { recursive: true, force: true });

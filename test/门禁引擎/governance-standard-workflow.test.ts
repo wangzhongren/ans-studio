@@ -612,7 +612,7 @@ test("标准工作流：流程工具——Steward 初始创建例外 + flow_get/
   assert.match(steward, /登记完成：先用 `flow_get`[\s\S]{0,160}flow_step_update/, "Steward 登记完成须先 get 再 update");
   assert.doesNotMatch(steward, /`flow_step_supersede`（仅 Steward）/, "supersede 归 Steward/Lead 工作流管理者，不得再写仅 Steward");
 
-  for (const id of ["nominator", "rapporteur", "verifier"] as const) {
+  for (const id of ["nominator", "rapporteur"] as const) {
     const t = cardTextOf(id);
     assertIncludesAll(
       t,
@@ -632,6 +632,35 @@ test("标准工作流：流程工具——Steward 初始创建例外 + flow_get/
       `${id} 流程工具纪律`,
     );
   }
+  // 2026-10-27 客户新设计：Proof 写完验收标准后只向应用汇报（report_artifact_ready），
+  // 由应用校验并决定是否收口；Proof 不自行用 flow_step_update 改步骤状态、不自批。
+  const verifierFlow = cardTextOf("verifier");
+  assertIncludesAll(
+    verifierFlow,
+    [
+      "flow_get",
+      "flow_step_update",
+      "不得直接写 `docs/flows/**`",
+      "证据不足",
+      "insufficient-evidence",
+      "`report_artifact_ready({ flowId, stepId, path, summary })`",
+      "等待应用 `accepted`",
+      "拒绝 / 缺失时按回执修正后重新汇报",
+      "不得自行用 `flow_step_update` 改步骤状态",
+      "不自批",
+      "不要自己标 `done`",
+      "应用决定后流程仍未继续时",
+      "如实报告 产品 / Lead 与 运营 / Steward",
+      "不伪造完成",
+      "你不对 gate 步骤做 `flow_step_update`",
+      "步骤推进不等于客户决定/同意",
+    ],
+    "Proof 流程工具纪律（工件就绪汇报）",
+  );
+  // 旧「自己把步骤标 delivered / 等 Steward 收口」口径不得残留。
+  assert.doesNotMatch(verifierFlow, /你只能把 owner=自己的步骤更新到 `delivered`/, "Proof 不得自行更新步骤状态");
+  assert.doesNotMatch(verifierFlow, /核对完成且账本证据齐备时，用 `flow_step_update` 记录 `delivered`/, "Proof 不得自行记录 delivered");
+  assert.doesNotMatch(verifierFlow, /`done` 由 Steward \/ Lead 核对账本证据后标记/, "Proof 的步骤 done 由应用按汇报收口");
   // 交付/回交后由步骤 owner 或 Steward 记录状态；三张卡各有落点。
   assert.match(cardTextOf("rapporteur"), /contract-freeze[\s\S]{0,160}flow_step_update/, "Draft 契约冻结后须用工具记录");
   assert.match(cardTextOf("nominator"), /role-cards[\s\S]{0,160}flow_step_update/, "Crew 完成写卡步骤后须用工具记录");
@@ -758,8 +787,8 @@ test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/f
     ],
     "Steward 接受 Lead 协调",
   );
-  // Crew/Draft/Proof：可向 Lead 回交/协调；不得直接写 docs/flows；步骤更新仍按工具与证据。
-  for (const id of ["nominator", "rapporteur", "verifier"] as const) {
+  // Crew/Draft：可向 Lead 回交/协调；不得直接写 docs/flows；步骤更新仍按工具与证据。
+  for (const id of ["nominator", "rapporteur"] as const) {
     assertIncludesAll(
       cardTextOf(id),
       [
@@ -777,6 +806,21 @@ test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/f
       `${id} 不得写「记录 delivered / done」式越权指令`,
     );
   }
+  // 2026-10-27：Proof 只向应用汇报工件就绪（report_artifact_ready），不自行改步骤状态、不自批；
+  // 仍可向 Lead 回交/协调、不得直接写 docs/flows。
+  const verifierCard = cardTextOf("verifier");
+  assertIncludesAll(
+    verifierCard,
+    [
+      "可向 产品 / Lead 回交/协调",
+      "不得直接写 `docs/flows/**`",
+      "report_artifact_ready",
+      "证据不足",
+    ],
+    "Proof 向 Lead 回交（工件就绪汇报）",
+  );
+  assert.doesNotMatch(verifierCard, /记录 `delivered` \/ `done`/, "Proof 不得写「记录 delivered / done」式越权指令");
+  assert.doesNotMatch(verifierCard, /你只能把 owner=自己的步骤更新到 `delivered`/, "Proof 不得自行更新步骤状态");
 });
 
 test("标准工作流：质检 / Proof——实施前写标准→核对档位/复用证据→核对真实启动演示→逐条核对→报告+验收卡；不依赖客户催办", () => {
@@ -798,7 +842,7 @@ test("标准工作流：质检 / Proof——实施前写标准→核对档位/�
       "真实启动应用并演示",
       "启动命令",
       "访问地址",
-      "关键输出与截图或录屏",
+      "关键输出与真实运行截图（关 DEBUG；记录 sha256 / 候选 / 命令）",
       "逐条核对",
       "质量基线",
       "架构声明",

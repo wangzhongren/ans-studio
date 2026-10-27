@@ -1170,6 +1170,51 @@ export interface RequestRequirementChangeResult {
 /** `request_requirement_change` 注入能力（意图校验/去重/派发/账本/系统行由应用实现；未注入 ⇒ 工具不注册）。 */
 export type RequestRequirementChangeFn = (input: RequestRequirementChangeInput) => Promise<RequestRequirementChangeResult>;
 
+// —————————————— 验收标准产物汇报（2026-10-27 客户要求；report_artifact_ready） ——————————————
+//
+// 背景（客户 2026-10-27 新设计）：验收标准由质检写完后，**质检只向应用汇报，应用校验后决定是否收口**；
+// 质检不再盯文件自动勾卡、也不自行修改 flow 状态。本层只定义中立形状与工具路由：
+// `report_artifact_ready` 工具仅在 `GovernedToolsOptions.reportArtifact` 注入时注册（未注入 ⇒ 工具不
+// 存在，最强 fail-closed，沿 request_acceptance 先例）；工具**不写盘、不读写 flow、不做治理判定、
+// 不假装应用已接受**——只把输入原样交给注入能力并如实转达回执。**汇报成功不等于自动完成**：
+// `accepted:true` 只表示应用已收到并接受该产物；是否收口/推进 flow 步骤由应用校验后决定并写入
+// （不由本工具或质检代做）。能力实现（路径/步骤/哈希/收口校验与 flow 写入）属编排/桌面注入端。
+
+/**
+ * `report_artifact_ready` 载荷（2026-10-27 客户要求）：质检把已写好的验收标准产物汇报给应用。
+ * `flowId`/`stepId`/`path` 由工具层做**基本非空字符串**校验；路径是否存在、步骤是否属于该 flow、
+ * 摘要/哈希与文件内容是否一致、是否满足收口条件等**全部由应用注入的能力校验**（本层不读文件、
+ * 不判 flow、不写盘）。`sha256` 为可选的内容摘要（十六进制字符串；**格式与是否与文件一致由能力侧
+ * 校验**，本层不重算）。
+ */
+export interface ReportArtifactInput {
+  flowId: string;
+  stepId: string;
+  path: string;
+  summary?: string;
+  sha256?: string;
+}
+
+/**
+ * `report_artifact_ready` 的如实回执（形状冻结；工具层原样转达）。
+ * - `ok`：应用是否已受理本次汇报并给出明确结果（false＝未受理/校验失败/应用不可用）；
+ * - `accepted`：应用对产物的校验决定——`true`＝已接受（**是否收口/推进 flow 仍由应用决定**）、
+ *   `false`＝明确拒绝、缺席＝未声明接受（工具层**不得**宣称已接受）；
+ * - `message`：一句如实说明（拒绝原因/已接受细节），工具层原样转达。
+ */
+export interface ReportArtifactReceipt {
+  ok: boolean;
+  accepted?: boolean;
+  message?: string;
+}
+
+/**
+ * `report_artifact_ready` 注入能力（校验/收口/flow 写入由应用实现；未注入 ⇒ 工具不注册）。
+ * 纪律：能力侧必须自行校验路径/步骤/flow 与产物一致性后再决定是否收口；**接受 ≠ 已完成**——
+ * 能力不得因本调用授予任何写权，也不得跳过既有门禁/验收标准规则。
+ */
+export type ReportArtifactFn = (input: ReportArtifactInput) => Promise<ReportArtifactReceipt>;
+
 // —————————————— 推理与推理强度（G-5 wave 1 契约层；冻结符号，单一来源＝本模块） ——————————————
 //
 // 依据：客户 2026-10-16「按推荐批准，开始实施」＝ G-5（推理与推理强度）；评估
@@ -1936,6 +1981,15 @@ export interface GovernedToolsOptions {
    * 不要把新授权写进提案卡；`proposedIntentPatch` 只是建议，不替客户改意图。
    */
   requestRequirementChange?: RequestRequirementChangeFn;
+  /**
+   * 验收标准产物汇报（2026-10-27 客户要求）：`report_artifact_ready` 能力——质检写完验收标准后
+   * **只向应用汇报**，由应用校验路径/步骤/产物一致性后**决定是否收口**（质检不盯文件自动勾卡、
+   * 不自行修改 flow 状态）。**只给质检（内置 verifier）会话注入**（判据在编排/桌面注入端，本层不
+   * 硬编码角色 id）；未注入 ⇒ 工具不注册（结构性 fail-closed，沿 requestAcceptance 先例）。
+   * 工具层只做基本参数形状校验并**原样转达**回执（`ok`/`accepted`/`message`）——不写盘、不写 flow、
+   * 不做治理判定、不假装应用已接受；**汇报成功 ≠ 自动完成**（是否收口由应用决定）。
+   */
+  reportArtifact?: ReportArtifactFn;
   /**
    * 判断 agent（「替我审」）只读能力注入。**这是能力注入，不是工具注入**：注入后 Service 必须走
    * `buildShellJudgeTools`（`src/common/runtime-core/shell-judge/`），**不得**走 `buildGovernedTools`——

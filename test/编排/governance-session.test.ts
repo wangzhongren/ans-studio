@@ -415,8 +415,8 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
       ["liaison", [/沟通权纪律（产品/, /docs\/intents\//, /hand_off_intent/, /交接 ≠ 客户批准/, /intent-confirm/, /质量档位/, /原型档/, /治理协调（2026-10-24）/, /不直接派 Crew\/Proof/, /Proof 只收状态\+报告指针/, /系统消息只汇报、不派活（2026-10-26 客户规则）/, /不得据此给运营（Steward）发任务、不得 `dispatch_task`（也不得派项目 worker）/, /客户明确要求或由客户消息触发的协调仍按原规则/]],
       ["proposal", [/提案权纪律（策划/, /docs\/proposals\//, /cardKind=proposal/, /不拥有最终批准权/, /证据计划/, /工程质量基线/, /架构方案/, /架构影响分析/, /扩展点/, /模块分解与职责/]],
       ["nomination", [/人事\/写卡纪律（人事/, /docs\/scheduling\//, /appointment-write/, /不再发任命卡/, /团队计划/]],
-      ["schedule", [/编排权纪律（运营/, /docs\/flows\//, /docs\/scheduling\//, /cardKind=appointment/, /dispatch_task/, /flowId.*stepId/, /真实启动/, /演示/, /架构与边界/, /契约冻结/, /扩展点必须有覆盖步骤/, /发布标记（2026-10-24，P0-1）/, /cardKind=schedule-write/, /不是发布版本保持缺省/, /所有变更（含非发布）[^\n]*验收门派 Proof/]],
-      ["verification", [/验收权纪律（质检/, /docs\/acceptance\//, /docs\/verification\//, /cardKind=acceptance/, /验收 ≠ 批准/, /未被真实启动.*不得建议 accept/, /架构核对/, /模块边界与依赖方向未被破坏/, /schema\/API 版本与/, /风险档位/, /T0–T3/, /独立验收门（2026-10-24 修订：所有变更）/, /所有变更（含非发布）/]],
+      ["schedule", [/编排权纪律（运营/, /docs\/flows\//, /docs\/scheduling\//, /cardKind=appointment/, /dispatch_task/, /flowId.*stepId/, /真实启动/, /演示/, /真实运行截图/, /不得要求录屏/, /缺录屏不得判失败/, /架构与边界/, /契约冻结/, /扩展点必须有覆盖步骤/, /发布标记（2026-10-24，P0-1）/, /cardKind=schedule-write/, /不是发布版本保持缺省/, /所有变更（含非发布）[^\n]*验收门派 Proof/]],
+      ["verification", [/验收权纪律（质检/, /docs\/acceptance\//, /docs\/verification\//, /cardKind=acceptance/, /验收 ≠ 批准/, /未被真实启动.*不得建议 accept/, /真实运行截图/, /不得要求录屏/, /缺录屏不得判失败/, /架构核对/, /模块边界与依赖方向未被破坏/, /schema\/API 版本与/, /风险档位/, /T0–T3/, /独立验收门（2026-10-24 修订：所有变更）/, /所有变更（含非发布）/]],
     ];
     for (const [fn, patterns] of expectations) {
       const { captured, factory } = promptCapturing();
@@ -446,6 +446,11 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
       assert.match(captured.prompt!, /Draft（提案）[^\n]*「架构方案」/, `${fn} 提示词必须含 Draft 架构职责`);
       assert.match(captured.prompt!, /Steward（流程 \/ 派发）/, `${fn} 提示词必须含 Steward 架构职责`);
       assert.match(captured.prompt!, /Proof（验收）/, `${fn} 提示词必须含 Proof 架构职责`);
+      // 2026-10-27 客户规则：验收标准/交付演示证据最多截图——不得要求录屏，缺录屏不得判失败。
+      assert.match(captured.prompt!, /真实运行截图/, `${fn} 提示词必须要求真实运行截图`);
+      assert.match(captured.prompt!, /不得要求录屏/, `${fn} 提示词必须明确不得要求录屏`);
+      assert.match(captured.prompt!, /缺录屏不得判失败/, `${fn} 提示词必须明确缺录屏不得判失败`);
+      assert.doesNotMatch(captured.prompt!, /截图\/录屏/, `${fn} 提示词不得再把录屏写成证据选项`);
       assert.doesNotMatch(captured.prompt!, /已批准|已授权/, `${fn} 提示词不得写「已批准/已授权」`);
     }
 
@@ -477,6 +482,11 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
     assert.match(captured.prompt!, /Draft（提案）[^\n]*「架构方案」/, "single/su 必须含 Draft 架构职责");
     assert.match(captured.prompt!, /Steward（流程 \/ 派发）/, "single/su 必须含 Steward 架构职责");
     assert.match(captured.prompt!, /Proof（验收）/, "single/su 必须含 Proof 架构职责");
+    // 2026-10-27 客户规则：验收标准/交付演示证据最多截图——不得要求录屏，缺录屏不得判失败。
+    assert.match(captured.prompt!, /真实运行截图/, "single/su 提示词必须要求真实运行截图");
+    assert.match(captured.prompt!, /不得要求录屏/, "single/su 提示词必须明确不得要求录屏");
+    assert.match(captured.prompt!, /缺录屏不得判失败/, "single/su 提示词必须明确缺录屏不得判失败");
+    assert.doesNotMatch(captured.prompt!, /截图\/录屏/, "single/su 提示词不得再把录屏写成证据选项");
   });
 });
 
@@ -554,6 +564,9 @@ test("标准工作流（2026-10-24 修订：所有变更）：trio 与 single/su
         /读证据[\s\S]*跑测试[\s\S]*真实启动演示[\s\S]*质量\/架构核对[\s\S]*验收卡/,
         "Proof 复核顺序（读证据 → 跑测试 → 真实启动演示 → 质量/架构核对 → 验收卡）",
       ],
+      // 2026-10-27 客户规则：验收标准/交付演示证据最多截图——不得要求录屏，缺录屏不得判失败。
+      [/最多真实运行截图，不得要求录屏，缺录屏不得判失败/, "验收标准证据最多截图、不得要求录屏"],
+      [/③ 真实启动演示[\s\S]*?真实运行截图[\s\S]*?不得要求录屏，缺录屏不得判失败/, "Proof 演示证据为真实运行截图"],
     ];
 
     const trio = trioProject(root);

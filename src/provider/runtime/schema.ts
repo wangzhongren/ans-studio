@@ -1366,6 +1366,53 @@ export function describeTool(name: string): ToolDescription {
       ],
     };
   }
+  if (name === "report_artifact_ready") {
+    // 验收标准产物汇报（2026-10-27 客户要求；只给注入了 reportArtifact 能力的质检会话，注入才注册）。
+    // 文案纪律：质检只向应用汇报、应用校验后决定是否收口；工具不改 flow/不写盘/不假装已接受；
+    // 汇报成功不等于自动完成；回执 ok/accepted/message 原样如实转达；未注入 ⇒ 工具不存在。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          flowId: { type: "string", description: "Flow id that owns the acceptance-criteria step (required, non-empty)" },
+          stepId: {
+            type: "string",
+            description:
+              "Acceptance-criteria step id in that flow (required, non-empty) — the step your report may close; the application validates that the step exists in this flow",
+          },
+          path: {
+            type: "string",
+            description:
+              "Project-relative path of the artifact you just wrote (e.g. docs/acceptance/<flow>-criteria-v1.md). The application validates the path and whether it may close the step",
+          },
+          summary: {
+            type: "string",
+            description: "Optional one-line summary of the artifact (non-empty when provided; the application may display it)",
+          },
+          sha256: {
+            type: "string",
+            description:
+              "Optional sha256 digest of the artifact content (non-empty when provided); the application verifies the digest — this tool does not compute or trust it",
+          },
+        },
+        required: ["flowId", "stepId", "path"],
+        additionalProperties: false,
+      },
+      description:
+        "验收标准写完后，把产物**汇报给应用**（客户设计：**质检只向应用汇报，应用校验后决定是否收口**）。" +
+        "本工具**只转交汇报**：`flowId`/`stepId`/`path` 必填（基本非空字符串），`summary`/`sha256` 可选；" +
+        "路径是否存在、步骤是否属于该 flow、摘要/哈希与文件是否一致、是否收口**全部由应用校验**。" +
+        "**本工具不写盘、不读写/不修改 flow 状态、不做治理判定**——**不要**自行修改 flow 状态，也不要盯文件自动勾卡；收口只由应用决定。" +
+        "回执的 `ok` / `accepted` / `message` **原样如实转达**：`accepted:true` 只表示应用已收到并接受该产物，" +
+        "**汇报成功不等于自动完成**（是否收口/推进步骤由应用决定）；`accepted:false`、`ok:false` 或契约外回执一律按**未接受**处理，" +
+        "**绝不宣称已收口/已完成**。本工具**仅在运行环境注入了该能力时才存在**（未注入 ⇒ 工具不存在，fail-closed）。",
+      promptGuidelines: [
+        "验收标准写完后用 report_artifact_ready 向应用汇报（flowId/stepId/path 必填）；**不要自行修改 flow 状态**、不要盯文件自动勾卡——是否收口由应用校验后决定。",
+        "回执按 ok/accepted/message 如实转达：accepted:true 只表示应用已收到并接受，不等于自动完成，也不等于验收已通过；未接受或失败时不要宣称已收口。",
+        "路径用项目相对路径；可选 summary 与 sha256 只是随汇报附带，是否与文件一致由应用校验（本工具不读文件、不重算哈希）。",
+      ],
+    };
+  }
   if (!["write_file", "edit_file", "read_file"].includes(name)) throw new Error(`未知 ANS 工具：${name}`);
   const parameters = {
     type: "object",

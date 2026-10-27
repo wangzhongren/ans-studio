@@ -279,6 +279,12 @@ export interface WatchdogServiceDeps {
   now?: () => number;
   /** 配置覆盖（测试注入；生产走 env＋默认常量）。 */
   config?: Partial<WatchdogConfig>;
+  /**
+   * **流程推进/停滞看护钩子**（2026-10-27 客户新设计第 3 项）：每项目 tick 末回调一次（同步返回；
+   * 异步检查由调用方自行合并/去抖）。看护**只提供 tick 时机**，不读 flow、不做治理判定；回调抛错
+   * 只记 `watchdog.tick-hook.failed` 诊断，不影响本 tick 其他信号与下个 tick。
+   */
+  onTickProject?: (projectRoot: string, at: number) => void;
 }
 
 /** 看护的只读统计（`role_status` 用；全部来自看护内存态——不触盘、不改任何东西）。 */
@@ -648,6 +654,14 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
     for (const [full, st] of instantStates) {
       if (!full.startsWith(`${projectRoot}\u0000`)) continue;
       if (st.lastDeliveredAt !== undefined && at - st.lastDeliveredAt > config.cmdTimeoutCooldownMs * 4 && st.suppressedSinceDelivered === 0) instantStates.delete(full);
+    }
+
+    // 2026-10-27 流程推进/停滞看护钩子（客户新设计第 3 项）：看护只提供 tick 时机；flow 读取/去重/投递
+    // 全在 Interface 的既有验收检查入口（不新增第二套状态机）。回调异常如实记诊断，不影响本 tick。
+    try {
+      deps.onTickProject?.(projectRoot, at);
+    } catch (err) {
+      loggerFor(projectRoot).error("watchdog.tick-hook.failed", err);
     }
 
     // 2026-10-18 客户新要求：**验收通过即收束**——看护不再在静默 30s 后投 `[系统·收束]`；

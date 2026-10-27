@@ -611,7 +611,7 @@ export function buildAcceptanceTaskMessage(
     `请汇总证据并出验收卡（不要自行验收或代替客户决定）。` +
     `验收前必须满足以下硬要求：` +
     `① 按工程质量基线逐项核对并给出结论与证据：正确性、健壮性、安全、可维护性、可观测性、性能、前端可访问性、测试矩阵；` +
-    `② 必须真实启动应用并向客户演示：给出启动命令与访问地址，附截图或录屏（你已有审批档 shell，可执行启动命令，命令逐条提交审批）；` +
+    `② 必须真实启动应用并向客户演示：给出启动命令与访问地址，附真实运行截图（最多截图；不得要求录屏；缺录屏不判失败；你已有审批档 shell，可执行启动命令，命令逐条提交审批）；` +
     `③ 未真实启动/演示、或质量基线某项无证据，不得建议 accept（只能建议退回或补充证据）；` +
     `④ 验收报告写入 ${reportPath}（首行五项：风险档位、判定依据、选定检查、复用证据、全量回归），详细证据附件写入 docs/verification/；报告须引用实施前标准 ${criteriaPath} 与变更包 ${changePackagePath} 的版本/哈希。` +
     `⑤ 按提案/变更的「架构方案或架构影响分析」核对实现：模块边界、依赖方向、扩展点、数据 schema/API 版本迁移与声明一致；缺失架构章节或实现偏离声明时不得建议 accept（只能建议退回或补充证据）。` +
@@ -633,7 +633,7 @@ export function governanceAcceptanceAdvanceNote(flowId: string): string {
 // 应用在 `request_gate_review` 校验通过后派 Proof 做**独立 gate 复核**。任务文本必须自足（flowId、
 // gateId、gateKind、标准指针、dependsOn 证据指针、流程版本、报告路径），并写清硬边界：
 // **gate 复核 ≠ 验收通过 ≠ 客户批准**；不发验收卡、不写 customer.decision、不标任何 flow 步骤 done、
-// 不实现/不派发；UI/游戏必须在关闭 DEBUG 覆盖层后截图/录屏；报告复用 `acceptance-triage/v1`，fail 必须
+// 不实现/不派发；UI/游戏必须在关闭 DEBUG 覆盖层后截图（真实运行截图；最多截图；不得要求录屏；缺录屏不判失败）；报告复用 `acceptance-triage/v1`，fail 必须
 // 有 blocker/major（只有 minor/nit 的 fail 会被应用按结构不符退回、不触发返工）。纯文本，无 IO。
 
 /** dependsOn 证据指针（gate 任务文案用；值来自 flow 步骤与账本核对后的解析结果）。 */
@@ -678,7 +678,7 @@ export function buildGateReviewTaskMessage(input: BuildGateReviewTaskMessageOpti
       : ["- （gate 步骤未声明 dependsOn；仍须按标准核对真实输出与账本证据）"];
   const visualRequirement =
     input.gateKind === "visual-baseline"
-      ? `2) 必须亲自打开真实浏览器/游戏窗口核对，并**关闭 DEBUG 覆盖层**后截图/录屏；证据里出现 DEBUG 覆盖层、旧候选截图、或无法确认截图为当前候选 ⇒ insufficient evidence（按 fail 处理，不通过）。`
+      ? `2) 必须亲自打开真实浏览器/游戏窗口核对，并**关闭 DEBUG 覆盖层**后截图（真实运行截图；最多截图；不得要求录屏；缺录屏不判失败）；证据里出现 DEBUG 覆盖层、旧候选截图、或无法确认截图为当前候选 ⇒ insufficient evidence（按 fail 处理，不通过）。`
       : `2) 必须亲自运行或打开真实输出核对（不是只读别人转述的日志）；证据不足 ⇒ 按 fail / insufficient evidence 处理，不通过。`;
   return [
     `[Gate 复核] 流程 ${input.flowId}｜gate ${input.gateId}｜gateKind=${input.gateKind}｜gate 步骤标题：${input.gateTitle}`,
@@ -1586,6 +1586,11 @@ export function buildAcceptanceCriteriaTaskMessage(
     `⑧ 版本冻结规则（实施开始后不得改标准适配候选；确需变更递增版本并报运营/沟通确认）。` +
     `⑨ 若团队计划为 v2（teamPlanSchema: 2），标准须覆盖模块覆盖/写集不相交/并行组/dependsOn/粒度例外，以及测试按模块分片并行、每分片独立证据、Reduce 合并 docs/verification/<flowId>/manifest.md 的证据规则；legacy 计划按 v1 兼容。` +
     v3Criteria +
+    // 2026-10-27 客户新设计：写完标准后必须**汇报给应用**，由应用校验后收口 acceptance-criteria 步骤。
+    // 应用不盯文件自动勾卡；质检也不得自行改 flow 状态。
+    `写完后必须调用 report_artifact_ready({ flowId: "${flowId}", stepId: "acceptance-criteria", path: "${criteriaRel}" }) 汇报给应用；` +
+    `应用会校验 flow/步骤/最新标准路径与文件是否可读，校验通过后才把 acceptance-criteria 步骤收口为 done（幂等）。` +
+    `不要自行调用 flow_step_update 标 done、不要改 flow 其它状态；汇报被拒时按回执原因修正后再次汇报（不要伪造已收口）。` +
     `不要自行验收、不要代替客户决定。`
   );
 }
@@ -1594,6 +1599,69 @@ export function buildAcceptanceCriteriaTaskMessage(
 export function governanceAcceptanceCriteriaNote(flowId: string): string {
   return mainT("main.governance.criteriaDispatched", { flowId });
 }
+
+/**
+ * **「标准文件已存在但步骤仍 pending」时给 verifier 的汇报唤醒**（2026-10-27 客户新设计）。
+ *
+ * 应用**不**盯文件自动勾卡；标准落盘后需要质检自己调用 `report_artifact_ready`。本消息只提醒「请汇报」，
+ * 由应用能力校验/收口；消息本身不改 flow、不标 done、不冒充客户消息。
+ */
+export function buildAcceptanceCriteriaReportReminderMessage(input: {
+  flowId: string;
+  criteriaPath: string;
+  stepStatus: string;
+}): string {
+  return [
+    `[请汇报] 流程 ${input.flowId}：实施前验收标准文件已存在（${input.criteriaPath}），但 flow 中 acceptance-criteria 步骤仍为 ${input.stepStatus}。`,
+    `应用不会根据文件存在自动勾卡，也不会代改 flow。请核对标准写完后调用 ` +
+      `report_artifact_ready({ flowId: "${input.flowId}", stepId: "acceptance-criteria", path: "${input.criteriaPath}" }) 汇报；` +
+      `应用校验通过（flow/步骤/最新路径/文件可读）才会收口该步骤。`,
+    `若标准尚未写完，请继续写完再汇报；不要自行 flow_step_update 标 done、不要改其它步骤状态。`,
+  ].join("\n");
+}
+
+/**
+ * **流程停滞看护任务**（2026-10-27）：无 current 步骤 + 仍有 pending + 全部相关角色空闲/无 pending 卡
+ * 持续约 10 分钟时，向运营（convener）投**一条**系统唤醒（按 pending 签名去重，不刷屏）。
+ *
+ * 只提示 `flow_get` 核对与按职责协调；**不**直接派项目 worker、不标 done、不写 flow/账本、不伪造状态。
+ */
+export interface BuildFlowStallTaskMessageInput {
+  flowId: string;
+  /** 当前 flow YAML revision（sha256；只展示前 12 位）。 */
+  revision: string;
+  /** pending 步骤摘要（id/status/owner/kind；有界）。 */
+  pending: ReadonlyArray<{ id: string; status: string; owner?: string; kind?: string }>;
+  /** 已持续空闲的时长（毫秒；文案换算为分钟）。 */
+  idleMs: number;
+  /** 规划器的 ready 步骤 id（只作事实；不在此派发）。 */
+  readyIds?: readonly string[];
+  /** 规划器给出的人工闸门（awaiting-customer / awaiting-acceptance）。 */
+  stopReason?: string;
+}
+
+export function buildFlowStallTaskMessage(input: BuildFlowStallTaskMessageInput): string {
+  const revisionText = input.revision.length > 12 ? input.revision.slice(0, 12) : input.revision;
+  const minutes = Math.max(1, Math.round(input.idleMs / 60_000));
+  const pendingLines = input.pending
+    .slice(0, 10)
+    .map((step) => `- ${step.id}（status=${step.status}${step.owner !== undefined ? `，owner=${step.owner}` : ""}${step.kind !== undefined ? `，kind=${step.kind}` : ""}）`);
+  if (input.pending.length > 10) pendingLines.push(`- ……（另有 ${input.pending.length - 10} 个 pending 步骤，详见 flow_get）`);
+  return [
+    `[自动推进·停滞] 流程 ${input.flowId} 已约 ${minutes} 分钟没有在途工作，但仍存在 pending 步骤（当前 revision：${revisionText}）。`,
+    `pending 步骤（按 flow 原顺序）：`,
+    ...pendingLines,
+    ...(input.readyIds !== undefined && input.readyIds.length > 0
+      ? [`规划器就绪步骤：${input.readyIds.slice(0, 10).join("、")}`]
+      : []),
+    ...(input.stopReason !== undefined
+      ? [`当前人工闸门：${input.stopReason}（如确在等待客户决定，请如实向客户汇报，不要伪造推进）。`]
+      : []),
+    `请用 flow_get 读取当前 revision 与账本后按职责协调：需要项目角色返工/交付的用既有 dispatch_task 门禁派发；等待客户决定/验收的如实汇报；`,
+    `不要替应用标 done、不要改 flow/账本、不要越过 gate/客户决定。本消息只是停滞提示：应用未自动派发、未改任何状态。`,
+  ].join("\n");
+}
+
 
 // —————————————— 2026-10-25 验收分诊：卡面 / 汇报 / 退回文案（纯函数，无 IO） ——————————————
 //
