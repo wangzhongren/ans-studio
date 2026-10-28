@@ -44,7 +44,7 @@ export interface GovernanceCapabilities {
 
 /** 一个 trio 内置治理角色的完整规格（评审 §5.2；2026-10-18 增 liaison/verifier）。
  *  2026-10-28 批次 A（方案 v9.2）：六角色 `chief`/`product`/`rapporteur`/`nominator`/`convener`/
- *  `verifier`；`liaison` 退休，仅保留 `DeprecatedLiaisonRoleSpec` 只读别名（D 批删除）。 */
+ *  `verifier`；`liaison` 已退休（不再有别名/规格）。 */
 export interface BuiltInGovernanceRoleSpec {
   id: "chief" | "product" | "rapporteur" | "nominator" | "convener" | "verifier";
   displayName: string;
@@ -454,14 +454,14 @@ export function governanceCapabilitiesOf(id: string): GovernanceCapabilities | u
 }
 
 /**
- * 是否为内置治理角色 id（trio 六角色 + 旧 su + 旧 liaison 只读别名）。
+ * 是否为内置治理角色 id（trio 六角色 + 旧 su）。
  * 用途：`dispatch_task` 目标拒绝、角色目录保留 id、技能/MCP 安装与恢复提议的目标守卫。
  */
 export function isBuiltInGovernanceRoleId(id: string): boolean {
   return id === "su" || governanceRoleOf(id) !== undefined;
 }
 
-/** 是否为 trio 的六个内置角色 id（不含 su 与退体的旧 liaison）。 */
+/** 是否为 trio 的六个内置角色 id（不含 su 与已退休的旧 liaison）。 */
 export function isTrioGovernanceRoleId(id: string): boolean {
   return BUILT_IN_GOVERNANCE_ROLES.some((spec) => spec.id === id);
 }
@@ -565,14 +565,14 @@ function underHintPrefix(relPath: string, prefix: string): boolean {
 }
 
 /**
- * trio 内置角色越界写入的归属指引（AC3）。当前对**主入口（chief / 旧 liaison 别名）**给出：它是
- * 客户最常来的入口。其他角色/项目角色返回 undefined（既有拒绝文案逐字不变）。
+ * trio 内置角色越界写入的归属指引（AC3）。当前对**主入口（chief）**给出：它是客户最常来的入口。
+ * 其他角色/项目角色返回 undefined（既有拒绝文案逐字不变）。
  */
 export function governanceWriteOwnerGuidance(
   boundarySource: string,
   relPath: string,
 ): string | undefined {
-  const coordinatorSources = [trioGovernanceSource("chief"), trioGovernanceSource("liaison")];
+  const coordinatorSources = [trioGovernanceSource("chief")];
   if (!coordinatorSources.includes(boundarySource)) return undefined;
   for (const hint of GOVERNANCE_WRITE_OWNER_HINTS) {
     if (hint.prefixes.some((p) => underHintPrefix(relPath, p))) return hint.guidance;

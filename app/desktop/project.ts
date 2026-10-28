@@ -97,12 +97,6 @@ export function buildProjectConfig(
     }
     roles[r.roleId] = { card: r.cardPath, boundary: r.boundaryPath };
   }
-  // 批次 A（2026-10-28，方案 §16.3 只读别名）：旧 `liaison` 已退休、不进入列表，但存量旧会话/旧测试
-  // 仍可能按 id 打开。trio 下把该**只读别名**登记进 builtInRoles（不进入 roles/列表；D 批删除）。
-  if ((listing.governanceModel ?? "single") === "trio" && !builtInRoles.includes("liaison")) {
-    builtInRoles.push("liaison");
-  }
-
   // ——— 冷启动「有界创世例外」的触发（设计 §10.1 / §12.2，任务 T30）———
   //
   // 未 bootstrap 的项目（`hasRoles === false`：尚无任何**项目角色**）上，「**操作者导入空文件夹并开启

@@ -75,6 +75,7 @@ function harness(root: string) {
   const sent: Record<string, string[]> = {};
   const sendOptions: Record<string, RoleSessionSendOptions[]> = {};
   const caps: Record<string, DispatchTaskFn | undefined> = {};
+  const streams: Record<string, OrchestrationEvent[]> = {};
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
       caps[input.roleId] = (input as { dispatchTask?: DispatchTaskFn }).dispatchTask;
@@ -90,7 +91,7 @@ function harness(root: string) {
               return {
                 async next(): Promise<IteratorResult<OrchestrationEvent>> {
                   for (let tries = 0; tries < 100; tries += 1) {
-                    const arr: OrchestrationEvent[] = [];
+                    const arr = streams[input.roleId] ?? [];
                     if (i < arr.length) return { value: arr[i++], done: false };
                     await tick(5);
                   }
@@ -110,7 +111,7 @@ function harness(root: string) {
     getListing: (r) => (r === root ? listing(root) : undefined),
     emitEvent: () => {},
   });
-  return { mgr, sent, sendOptions, caps };
+  return { mgr, sent, sendOptions, caps, streams };
 }
 
 test("D 最小系统全链：六角色枚举 + 幕僚派发落 tasks.jsonl + 无 flow/gate/ledger", async () => {
@@ -150,6 +151,50 @@ test("D 最小系统全链：六角色枚举 + 幕僚派发落 tasks.jsonl + 无
     await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
     await tick(30);
     assert.equal(h.caps.convener, undefined, "convener 不再注入 dispatch_task");
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-f-full-chain-"));
+  const h = harness(root);
+  try {
+    await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
+    await tick(30);
+    const dispatch = h.caps.chief!;
+    const receipt = (await dispatch({
+      roleId: "verifier",
+      task: "复核交付：核对 worker.ts 与验收标准",
+      reason: "终态验收可选调度",
+      sideEffect: "read-only",
+      expectedOutput: "复核结论",
+    })) as DispatchReceipt;
+    assert.equal(receipt.ok, true, receipt.message ?? "");
+    await waitUntil(() => (h.sent.verifier?.length ?? 0) > 0);
+    const state = await readTaskState(root);
+    const task = [...state.records.values()][0]!;
+    assert.equal(task.created?.to, "verifier");
+
+    // 质检回交（taskId 已知）→ 只投幕僚 [工作结果]；任务状态记 task.reported。
+    (h.streams.verifier ??= []).push({
+      kind: "handback",
+      summary: "复核完成",
+      handback: { roleId: "verifier", taskId: task.taskId, status: "completed", summary: "复核通过", evidence: ["src/worker.ts"], at: "2026-10-29T00:00:01.000Z", turnId: "turn-v" },
+    } as OrchestrationEvent);
+    await waitUntil(() => (h.sent.chief ?? []).some((text) => text.includes("复核通过")));
+    assert.match(h.sent.chief.find((text) => text.includes("复核通过"))!, /^\[工作结果\]/);
+
+    // F-03：验收由幕僚调度，不自动——回交/settle 后无新任务、无自动验收派发、无 flow/账本文件。
+    (h.streams.verifier ??= []).push({ kind: "settled", summary: "质检一轮结束" } as OrchestrationEvent);
+    (h.streams.chief ??= []).push({ kind: "settled", summary: "幕僚一轮结束" } as OrchestrationEvent);
+    await tick(250);
+    const after = await readTaskState(root);
+    assert.equal(after.records.size, 1, "回交/settle 不产生自动验收任务");
+    assert.equal(await fs.stat(path.join(root, "docs", "flows")).then(() => true, () => false), false);
+    assert.equal(await fs.stat(path.join(root, ".ans", "governance", "ledger.jsonl")).then(() => true, () => false), false);
+    assert.equal((h.sent.verifier ?? []).filter((text) => !text.includes("任务编号")).length, 0, "无自动验收派发到质检");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true });
