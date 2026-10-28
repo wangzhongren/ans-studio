@@ -11,7 +11,7 @@
 - **F 文档提交**：见本文档所在提交（change-F/终态报告/属主记录/处置记录）；change-F 自身行数/SHA-256 与最终 HEAD 由验收/最终记录复算。
 - **最终组合候选（含 F 文档）：HEAD `044811f48cba849556ce76ca9cef9cd7c623b005`**，整树 `8dcbdb8d4df197388ad284ec534e62289d40a974`；**`8fc673e..044811f4` = 308 files = 87 A + 125 D + 96 M，+13594 / −131336**；`git diff --binary` sha256 `34b5d22189fae51f5182f6b929297c61dfd49d588f14e333a3bdc0eda5e6f408`。
 - 口径说明：`8fc673e..e008187` 的 294 files（79 A / 125 D / 90 M，+13112/−131336）是 **F 代码/测试候选**统计（不含 F 文档/owner 记录）；最终组合候选补入 F 文档 14 files（8 A + 6 M，+482）后为 308 files（87 A / 125 D / 96 M，+13594/−131336）。F 范围 `9a23b88..044811f4` = 21 files = 9 A + 12 M，+1125/−12501。
-- 完整差异集：见 **change-F §10 的最终组合候选 308 文件逐文件 `git hash-object` + `sha256sum` 表**（A/M 取 candidate blob；D 取基线 8fc673e blob）；完整 diff 集合与状态计数如上。隔离核对：未使用 `.claude/worktrees/refactor-b1`/`gate-review-flow-busy`，未吸收主检出未提交改动（主检出前后快照 status/HEAD/diff/index/stash 全同）；未 push/合并 main。
+- 完整差异集：见 **change-F §10 的最终组合候选 308 文件逐文件 `git hash-object` + `sha256sum` 表**（A/M 取 candidate blob；D 取基线 8fc673e blob）；完整 diff 集合与状态计数如上。隔离核对：未使用 `.claude/worktrees/refactor-b1`/`gate-review-flow-busy`，未吸收主检出未提交改动（主检出前后快照 status/HEAD/diff/index/stash 全同；唯一后续 delta 为独立验收角色在 `docs/acceptance/entry-role-minimal-final-acceptance-report-v1.md` 写下的验收报告，非本实现上下文写入——实现侧零写入/零吸收）；未 push/合并 main。
 - 批次链：A `f4aa073`→返工 `e5a533d`；B `e5a533d`→`f151a86`；C `d364ea6`；D `c2b6cf9`/`98d3fe2`/`4c24149`→返工 `e8e5c1f`；E `e7ac5b2`→返工 `d30f648`；E 文档 `9a23b88`；F `e008187`。
 - 候选身份/逐文件哈希：本报告 §8（F）与 `change-D` §10（74 文件）、`change-E` §8（44 文件）、A/B/C change-package 附录（各自候选）。所有哈希可按 `git hash-object` + `git cat-file blob | sha256sum` 复算。
 

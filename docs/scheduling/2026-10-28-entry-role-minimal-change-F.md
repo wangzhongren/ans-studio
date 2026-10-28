@@ -223,7 +223,7 @@ E 批计划写「重写」的 `operator-view`/`history-dedupe`/`role-status-view
 - `rg`（D-04 口径，`src/`+`app/`，排除 `dist`/`node_modules`）：`governance-gate|governance-ledger|flow_get|flow_step_update|flow_step_supersede|flow-service|flow-state|team-plan|acceptance-triage|acceptance-rework|request_acceptance|request_gate_review|request_boundary_change|hand_off_intent|request_clarification|schedule-write|report_artifact_ready|docs/flows/|ledger\.jsonl` ⇒ **0 命中**。
 - liaison 运行期别名：`governanceRoleOf("liaison")`/`builtInRoles.push("liaison")`/legacy alias 分支 ⇒ **0**；保留 id 冲突跳过仅为旧目录防御（非别名）。
 - 心跳/`report_progress`：无工具/机制；源码仅两处「不得当心跳/无心跳」负向说明。
-- **目标项目/主检出零写入**：主检出 `C:\Users\51054\Desktop\work\ans-studio` 前后快照一致（`git status --porcelain=v2 -uall`、`HEAD`、`git diff | sha256sum`、`git ls-files -s | sha256sum`、stash 列表；diff 0 行）；worktree 仅 F 写集文件变更；未打开/未枚举 `demos/`/`dragonball-*`（工作树无该目录；E2E 用独立临时夹具）。
+- **目标项目/主检出零写入**：主检出 `C:\Users\51054\Desktop\work\ans-studio` 前后快照 status/HEAD/diff/index/stash 全同（实现侧零写入/零吸收；唯一后续 delta 为独立验收角色写入的 `docs/acceptance/entry-role-minimal-final-acceptance-report-v1.md`，非本实现上下文）；worktree 仅 F 写集文件变更；未打开/未枚举 `demos/`/`dragonball-*`（工作树无该目录；E2E 用独立临时夹具）。
 - `package.json`/`package-lock.json` 零 diff；无新依赖/目录；不 push、不合并 main、不发布。
 
 ## 6. 三条在办方案处置（F-06）
