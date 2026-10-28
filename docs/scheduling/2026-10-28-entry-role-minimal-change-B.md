@@ -152,11 +152,12 @@ B 批把任务/汇报主链切到应用独占的最小状态，同时保留旧 g
 
 ## 10. 证据与回滚
 
-- 本文件行数：`194`；SHA-256：自引用限制——本行占位符替换前字节为 `c0268b7e26d49b0081961af72cd6ec8a2335caf6356509f13410441c3fd75697`（最终以 `git show <证据提交>:docs/scheduling/2026-10-28-entry-role-minimal-change-B.md | sha256sum` 为准；最终报告给出复算值）。
+- 本文件行数：`195`；SHA-256：见最终报告/证据提交复算（自引用限制；占位符替换前字节为 `c0268b7e26d49b0081961af72cd6ec8a2335caf6356509f13410441c3fd75697`）。
 - 全量日志：`%TEMP%\ans-b-final3-tests.log`（sha256 `752d908a22470ec81cf666c37d64729066e1092f4902df050a53e8cebcd72458`）。
 - 专项日志：`%TEMP%\ans-b-special-tests.log`（403/403；sha256 `8538dfd4bd9c9000787ff602d3a8eb2a9df6cb22e69076e934bcefc9cbc74396`）。
 - Electron 报告：`%TEMP%\ans-e2e-b-out-13865\report.txt`（sha256 `76f9d072fe1d4630dfa24161804734a12cbb19115fa65830fe0fdf19098871a7`）。
 - 整树哈希（候选）：`4fdb955b99beca19cbce985d4ff6031eadec6599bcba85759a3ccc3fcab20146`；逐文件哈希：
+| 文件 | git blob | sha256 |
 | --- | --- | --- |
 | `app/desktop/governance-advance.ts` | `13a04b9f1580898404b7f9d0e43a0ce4ef8acbde` | `b66dbaea4607d31a132e87e27143ea996820e9a666b6b34840f7ce27f1b44bed` |
 | `app/desktop/interface.ts` | `f0afce64a3aee173a8707d54bfcd807d38bbf883` | `0aa38780ccd1ca174879c223f4cd5ac8fe7e4c8848f41db4e3027a24bdcfff6d` |
