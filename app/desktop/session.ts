@@ -486,8 +486,14 @@ export interface TerminateRoleRunResult {
   childProcesses: number;
   childProcessesStopped: number;
   /** 后台任务终止的底层结果（如实；`kill-timeout` 不得当已停止）。 */
-  childResults: { taskId: string; ok: boolean; reason?: string }[];
+  childResults: { taskId: string; ok: boolean; reason?: string; exitCode?: number; signal?: string }[];
   partialArtifacts: string[];
+  /** B-08：已从 `temp/<role>/` 物理移入 `temp/<role>/staging/<隔离批次>/` 的产物（项目相对路径）。 */
+  isolatedArtifacts: string[];
+  /** B-08：隔离根（项目相对路径；无部分产物时不创建）。 */
+  stagingDir?: string;
+  /** B-07：是否已确保目标角色使用 fresh 会话（重建/新会话）；重派前置。 */
+  sessionFresh: boolean;
   /** 轮次中止回执（运行时不支持/失败如实）。 */
   abort: { ok: boolean; supported: boolean; error?: string };
   message?: string;
@@ -509,6 +515,12 @@ export interface RedispatchTaskResult {
   autoAllowed: boolean;
   reasons: string[];
   message: string;
+  /** B-07：目标是否已 fresh 会话（重建或首次自动新开）。 */
+  sessionFresh?: boolean;
+  /** 连续 2 次仍卡死：是否已提交应用申请/决策卡（唯一推荐）。 */
+  escalated?: boolean;
+  requestId?: string;
+  selected?: string;
 }
 
 /** 幕僚收口任务（accepted/rework/rejected；B-03 `task.closed`）。 */
@@ -1242,6 +1254,8 @@ export class SessionManager {
   private readonly starTaskIds = new Set<string>();
   /** B 批：已写入 `task.reported` 的键（`taskId\0turnId|摘要`；防同轮重复事件）。 */
   private readonly reportedTaskKeys = new Set<string>();
+  /** B-07：连续卡死升级卡（按链根去重；同一链只提交一次）。 */
+  private readonly escalationRequests = new Map<string, Promise<{ escalated: boolean; requestId?: string; selected?: string; message: string }>>();
   /** B 批：每角色最近运行日志的内存摘要（看护巡检/日志静默用；真实日志在 `.ans/state/logs/`）。 */
   private readonly lastRoleActivity = new Map<string, { at: number; kind: string; summary: string }>();
   private readonly reportStates = new Map<string, { owner?: LiveSession; event?: HandbackEvent; state?: ReportSaveStateV1; queued: boolean }>();
@@ -3697,10 +3711,116 @@ export class SessionManager {
     if (!log.ok) return [];
     const writeTool = /^(write_file|edit_file|write|edit)$/i;
     return log.entries
-      .filter((entry) => typeof entry.tool === "string" && writeTool.test(entry.tool))
+      .filter((entry) => entry.kind === "task.partial-artifacts" || (typeof entry.tool === "string" && writeTool.test(entry.tool)))
       .filter((entry) => taskId === undefined || entry.taskId === undefined || entry.taskId === taskId)
       .map((entry) => entry.ref ?? entry.summary)
       .slice(0, 20);
+  }
+
+  /** 角色临时区（项目相对 `temp/<role>/`；非法角色 id/逃逸 ⇒ undefined）。 */
+  private roleTempDir(projectRoot: string, roleId: string): { abs: string; rel: string } | undefined {
+    if (typeof roleId !== "string" || roleId === "" || /[\\/]/.test(roleId) || roleId === "." || roleId === "..") return undefined;
+    const rel = `temp/${roleId}`;
+    const abs = path.resolve(projectRoot, ...rel.split("/"));
+    const root = path.resolve(projectRoot);
+    if (abs !== root && !abs.startsWith(`${root}${path.sep}`)) return undefined;
+    return { abs, rel };
+  }
+
+  /**
+   * B-08：把 `temp/<role>/` 中属于本次任务的产物**物理隔离**到 `temp/<role>/staging/<批次>/`。
+   * 只移动任务开始后修改的文件（无 createdAt 时移动当前 temp 下全部，保守）；原子 rename；跨卷失败回退 copy+unlink。
+   * 失败只记诊断并保留原文件（不丢证据），不阻塞终止回执。
+   */
+  private async isolatePartialArtifacts(
+    projectRoot: string,
+    roleId: string,
+    taskId: string | undefined,
+    since?: string,
+  ): Promise<{ artifacts: string[]; stagingDir?: string }> {
+    const temp = this.roleTempDir(projectRoot, roleId);
+    if (temp === undefined) return { artifacts: [] };
+    const sinceMs = typeof since === "string" && !Number.isNaN(Date.parse(since)) ? Date.parse(since) : undefined;
+    const candidates: { abs: string; rel: string }[] = [];
+    const walk = async (dir: string, relDir: string): Promise<void> => {
+      let entries;
+      try {
+        entries = await fs.promises.readdir(dir, { withFileTypes: true });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+        throw error;
+      }
+      for (const entry of entries) {
+        if (relDir === temp.rel && entry.name === "staging") continue; // 隔离区不再搬
+        const abs = path.join(dir, entry.name);
+        const rel = `${relDir}/${entry.name}`;
+        if (entry.isDirectory()) {
+          await walk(abs, rel);
+          continue;
+        }
+        if (!entry.isFile()) continue;
+        try {
+          const st = await fs.promises.stat(abs);
+          if (sinceMs !== undefined && st.mtimeMs < sinceMs) continue;
+          candidates.push({ abs, rel });
+        } catch { /* 文件消失/不可读：跳过（不猜） */ }
+      }
+    };
+    try {
+      await walk(temp.abs, temp.rel);
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("role.terminate.staging.scan.failed", error);
+      return { artifacts: [] };
+    }
+    if (candidates.length === 0) return { artifacts: [] };
+    const batch = `terminated-${String(taskId ?? "unknown").replace(/[^A-Za-z0-9._-]/g, "_")}-${this.now()}`;
+    const stagingRel = `${temp.rel}/staging/${batch}`;
+    const stagingAbs = path.resolve(projectRoot, ...stagingRel.split("/"));
+    try {
+      await fs.promises.mkdir(stagingAbs, { recursive: true });
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("role.terminate.staging.mkdir.failed", error);
+      return { artifacts: [] };
+    }
+    const isolated: string[] = [];
+    for (const candidate of candidates) {
+      const dest = path.join(stagingAbs, path.relative(temp.abs, candidate.abs));
+      try {
+        await fs.promises.mkdir(path.dirname(dest), { recursive: true });
+        try {
+          await fs.promises.rename(candidate.abs, dest);
+        } catch {
+          await fs.promises.copyFile(candidate.abs, dest);
+          await fs.promises.unlink(candidate.abs);
+        }
+        isolated.push(candidate.rel);
+      } catch (error) {
+        createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("role.terminate.staging.move.failed", error, { ref: candidate.rel });
+      }
+    }
+    return { artifacts: isolated, ...(isolated.length > 0 ? { stagingDir: stagingRel } : {}) };
+  }
+
+  /** B-07：确保目标角色使用 fresh 会话（现有会话重建；无会话则交由投递自动新开）。 */
+  private async ensureFreshRoleSession(projectRoot: string, roleId: string, runtime: RuntimeKind): Promise<{ ok: boolean; rebuilt: boolean; error?: string }> {
+    const key = this.sessionKey(projectRoot, roleId, runtime);
+    const entry = this.sessions.get(key);
+    if (entry === undefined) return { ok: true, rebuilt: false };
+    const deadline = this.now() + 5000;
+    while (entry.busy && this.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
+    if (this.sessions.get(key) !== entry) return { ok: true, rebuilt: false };
+    if (entry.busy) return { ok: false, rebuilt: false, error: "目标会话仍在运行，未能建立 fresh 会话" };
+    const rebuilt = await this.rebuildSession({ projectRoot, roleId, runtime });
+    return rebuilt.ok ? { ok: true, rebuilt: true } : { ok: false, rebuilt: false, error: rebuilt.error ?? "fresh 会话重建失败" };
+  }
+
+  /** B-07：连续卡死时的替代角色（优先同项目非内置 worker；无则同角色 fresh）。 */
+  private chooseRedispatchTarget(projectRoot: string, currentRoleId: string, attempts: number): string {
+    if (attempts < 1) return currentRoleId;
+    const listing = this.deps.getListing(projectRoot);
+    const chief = this.chiefTaskRoleIdOf(projectRoot);
+    const candidate = listing?.roles.find((role) => role.builtIn !== true && role.roleId !== currentRoleId && role.roleId !== chief);
+    return candidate?.roleId ?? currentRoleId;
   }
 
   /**
@@ -3720,17 +3840,21 @@ export class SessionManager {
       childProcessesStopped: 0,
       childResults: [],
       partialArtifacts: [],
+      isolatedArtifacts: [],
+      sessionFresh: false,
       abort: { ok: false, supported: false },
     };
     if (entry === undefined) {
-      return { ...base, message: "会话未开，未执行终止。" };
+      return { ...base, sessionFresh: true, message: "会话未开，未执行终止。" };
     }
     const taskState = input.taskId !== undefined ? await this.readTasks(projectRoot) : undefined;
     const createdAt = input.taskId !== undefined ? taskState?.records.get(input.taskId)?.created?.at : undefined;
-    const partialArtifacts = await this.partialArtifactsFor(projectRoot, roleId, input.taskId, createdAt);
+    const logPartials = await this.partialArtifactsFor(projectRoot, roleId, input.taskId, createdAt);
+    const isolation = await this.isolatePartialArtifacts(projectRoot, roleId, input.taskId, createdAt);
+    const partialArtifacts = [...new Set([...logPartials, ...isolation.artifacts])].slice(0, 50);
     let childProcesses = 0;
     let childProcessesStopped = 0;
-    const childResults: { taskId: string; ok: boolean; reason?: string }[] = [];
+    const childResults: TerminateRoleRunResult["childResults"] = [];
     try {
       const tasks = entry.handle.listBackgroundTasks?.() ?? [];
       const running = tasks.filter((task) => task.state === "running");
@@ -3742,7 +3866,14 @@ export class SessionManager {
         }
         try {
           const stopped = await entry.handle.stopBackgroundTask(task.taskId, { force: true });
-          childResults.push({ taskId: task.taskId, ok: stopped.ok, ...(stopped.ok ? {} : { reason: stopped.reason }) });
+          const snapshot = stopped.ok ? stopped.task : stopped.task;
+          childResults.push({
+            taskId: task.taskId,
+            ok: stopped.ok,
+            ...(stopped.ok ? {} : { reason: stopped.reason }),
+            ...(snapshot?.exitCode !== undefined ? { exitCode: snapshot.exitCode } : {}),
+            ...(snapshot?.signal !== undefined ? { signal: snapshot.signal } : {}),
+          });
           if (stopped.ok) childProcessesStopped += 1;
         } catch (error) {
           childResults.push({ taskId: task.taskId, ok: false, reason: error instanceof Error ? error.message : String(error) });
@@ -3773,24 +3904,45 @@ export class SessionManager {
       childProcessesStopped,
       childResults,
       partialArtifacts,
+      isolatedArtifacts: isolation.artifacts,
+      ...(isolation.stagingDir !== undefined ? { stagingDir: isolation.stagingDir } : {}),
+      sessionFresh: false,
       abort,
       ...(terminationConfirmed ? {} : { message: abort.error ?? (childProcessesStopped !== childProcesses ? "子进程未能全部确认退出。" : "终止未确认。") }),
     };
+    const exits = childResults
+      .map((entry) => {
+        const bits: string[] = [];
+        if (entry.exitCode !== undefined) bits.push(`exitCode=${entry.exitCode}`);
+        if (entry.signal !== undefined) bits.push(`signal=${entry.signal}`);
+        return bits.length > 0 ? `${entry.taskId}:${bits.join("/")}` : undefined;
+      })
+      .filter((value): value is string => value !== undefined);
     this.appendRoleActivity(projectRoot, roleId, {
       kind: "role.terminated",
-      summary: `终止：子进程 ${childProcessesStopped}/${childProcesses} 已停；abort=${abort.ok ? "ok" : abort.error ?? "unsupported"}；部分写入 ${partialArtifacts.length} 项`,
+      summary: `终止：子进程 ${childProcessesStopped}/${childProcesses} 已停${exits.length > 0 ? `（${exits.join("；")}）` : ""}；abort=${abort.ok ? "ok" : abort.error ?? "unsupported"}；部分写入 ${partialArtifacts.length} 项；隔离 ${isolation.artifacts.length} 项`,
       status: terminationConfirmed ? "confirmed" : "unsafe",
       ...(input.taskId !== undefined ? { taskId: input.taskId } : {}),
       ...(entry.origins.running?.turnId !== undefined ? { turnId: entry.origins.running.turnId } : {}),
-      ref: partialArtifacts[0],
+      ref: isolation.artifacts[0] ?? partialArtifacts[0],
     });
+    // B-08：把隔离事实落角色日志（后续重派/核对读同一事实，不依赖当次内存回执）。
+    if (isolation.artifacts.length > 0) {
+      this.appendRoleActivity(projectRoot, roleId, {
+        kind: "task.partial-artifacts",
+        summary: `${isolation.artifacts.length} 项部分产物已隔离到 ${isolation.stagingDir ?? "staging"}`,
+        status: "needs-review",
+        ...(input.taskId !== undefined ? { taskId: input.taskId } : {}),
+        ...(isolation.stagingDir !== undefined ? { ref: isolation.stagingDir } : {}),
+      });
+    }
     // B-07：终止成功 ⇒ 标记任务失败（保留未收口，供幕僚决定重派/升级；不伪造角色提交的报告）。
     if (terminationConfirmed && input.taskId !== undefined) {
       await this.appendTaskState(projectRoot, taskEvent("task.reported", {
         taskId: input.taskId,
         from: "chief",
         status: "failed",
-        summary: shortenSummary(`执行终止（stuck）：子进程 ${childProcessesStopped}/${childProcesses} 已停；部分写入 ${partialArtifacts.length} 项`),
+        summary: shortenSummary(`执行终止（stuck）：子进程 ${childProcessesStopped}/${childProcesses} 已停${exits.length > 0 ? `（${exits.join("；")}）` : ""}；部分写入 ${partialArtifacts.length} 项`),
         ...(entry.origins.running?.turnId !== undefined ? { turnId: entry.origins.running.turnId } : {}),
       }, () => new Date(this.now())));
     }
@@ -3831,17 +3983,30 @@ export class SessionManager {
     const maxRaw = Number(process.env["ANS_LOG_REDISPATCH_MAX"]);
     const redispatchMax = Number.isFinite(maxRaw) && maxRaw > 0 ? Math.floor(maxRaw) : 2;
     if (attempts >= redispatchMax) {
-      this.appendRoleActivity(projectRoot, "chief", { kind: "task.redispatch.escalated", summary: `任务 #${record.taskId} 已重派 ${attempts} 次仍卡死：升级申请/决策（不自动重派）`, taskId: record.taskId, status: "escalated" });
+      const escalation = await this.escalateStuckTask(
+        projectRoot,
+        record.taskId,
+        root,
+        attempts,
+        created.flowId,
+        created.to,
+        this.findLiveRuntime(projectRoot, created.to) ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo",
+      );
       return {
         ok: false,
         safety: "needs-review",
         autoAllowed: false,
-        reasons: [`同链已重派 ${attempts} 次（上限 ${redispatchMax}）；下一次升级，不自动重派`],
-        message: `重派未执行：已达 ${redispatchMax} 次重派上限，升级幕僚/客户裁决（继续/重派/换人/终止）。`,
+        reasons: [`同链已重派 ${attempts} 次（上限 ${redispatchMax}）；已提交升级卡（继续/重派/换人/终止，唯一推荐）`],
+        message: escalation.message,
+        escalated: escalation.escalated,
+        ...(escalation.requestId !== undefined ? { requestId: escalation.requestId } : {}),
+        ...(escalation.selected !== undefined ? { selected: escalation.selected } : {}),
       };
     }
-    const runtime = this.findLiveRuntime(projectRoot, created.to) ?? "demo";
-    const termination = await this.terminateRoleRun({ projectRoot, roleId: created.to, runtime, taskId: record.taskId });
+    const requestedTarget = typeof input.to === "string" && input.to.trim() !== "" ? input.to.trim() : undefined;
+    const to = requestedTarget ?? this.chooseRedispatchTarget(projectRoot, created.to, attempts);
+    const originalRuntime = this.findLiveRuntime(projectRoot, created.to) ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo";
+    const termination = await this.terminateRoleRun({ projectRoot, roleId: created.to, runtime: originalRuntime, taskId: record.taskId });
     const partialArtifacts = termination.partialArtifacts;
     const completedReport = record.reports.some((entry) => entry.status === "done");
     // B-08：应用按角色日志升类（shell/后台外部命令 ⇒ 至少 external；不得降类），并检查未完成工具调用。
@@ -3867,10 +4032,27 @@ export class SessionManager {
         taskId: record.taskId,
         status: safety.safety,
       });
-      this.emitDeliveryNote(projectRoot, runtime, "chief", "chief", `[系统·重派] 任务 #${record.taskId} 不自动重派（${safety.safety}）：${safety.reasons.join("；")}`);
+      this.emitDeliveryNote(projectRoot, originalRuntime, "chief", "chief", `[系统·重派] 任务 #${record.taskId} 不自动重派（${safety.safety}）：${safety.reasons.join("；")}`);
       return { ok: false, safety: safety.safety, autoAllowed: false, reasons: safety.reasons, message: `重派未执行：${safety.reasons.join("；")}` };
     }
-    const to = typeof input.to === "string" && input.to.trim() !== "" ? input.to.trim() : created.to;
+    const targetRuntime = this.findLiveRuntime(projectRoot, to) ?? originalRuntime;
+    const fresh = await this.ensureFreshRoleSession(projectRoot, to, targetRuntime);
+    if (!fresh.ok) {
+      this.appendRoleActivity(projectRoot, "chief", {
+        kind: "task.redispatch.fresh-session-failed",
+        summary: `任务 #${record.taskId} 未能建立 fresh 会话：${fresh.error ?? "未知原因"}`,
+        taskId: record.taskId,
+        status: "needs-review",
+      });
+      return {
+        ok: false,
+        safety: "needs-review",
+        autoAllowed: false,
+        reasons: [`fresh 会话未建立：${fresh.error ?? "未知原因"}`],
+        message: "重派未执行：目标角色 fresh 会话未建立（不自动重派）。",
+        sessionFresh: false,
+      };
+    }
     const newId = redispatchTaskId(record.taskId, attempts + 1);
     this.starTaskIds.add(newId);
     const now = () => new Date(this.now());
@@ -3925,11 +4107,11 @@ export class SessionManager {
       }, now));
       return { ok: false, safety: "unsafe", autoAllowed: false, reasons: [plan.message], message: plan.message };
     }
-    const dedupKey = `${projectRoot}\u0000${runtime}\u0000task\u0000${newId}`;
+    const dedupKey = `${projectRoot}\u0000${targetRuntime}\u0000task\u0000${newId}`;
     this.activeDispatchKeys.add(dedupKey);
     this.enqueueDelivery(projectRoot, to, {
       kind: "dispatch",
-      runtime,
+      runtime: targetRuntime,
       targetRoleId: to,
       sourceRoleId: "chief",
       taskId: newId,
@@ -3940,7 +4122,7 @@ export class SessionManager {
     });
     this.appendRoleActivity(projectRoot, "chief", { kind: "task.redispatch", summary: `重派任务 #${record.taskId} → #${newId}（${to}；safe）`, taskId: newId, status: "safe" });
     this.appendRoleActivity(projectRoot, to, { kind: "task.delivered", summary: `收到重派任务 #${newId}（retryOf ${record.taskId}）`, taskId: newId, status: "delivered" });
-    void this.drainQueue(projectRoot, to, runtime);
+    void this.drainQueue(projectRoot, to, targetRuntime);
     return {
       ok: true,
       taskId: newId,
@@ -3948,7 +4130,8 @@ export class SessionManager {
       safety: "safe",
       autoAllowed: true,
       reasons: safety.reasons,
-      message: `已终止并重派：新任务 #${newId}（retryOf #${record.taskId}）→ ${to}；第 ${attempts + 1} 次重派。`,
+      message: `已终止并重派：新任务 #${newId}（retryOf #${record.taskId}）→ ${to}；第 ${attempts + 1} 次重派；fresh 会话=${fresh.rebuilt ? "已重建" : "新开/未开"}。`,
+      sessionFresh: fresh.ok,
     };
   }
 
@@ -3975,6 +4158,113 @@ export class SessionManager {
     if (!appended) return { ok: false, taskId: input.taskId, message: "收口未执行：任务状态写入失败。" };
     this.appendRoleActivity(input.projectRoot, "chief", { kind: "task.closed", summary: `任务 #${input.taskId} 收口：${input.outcome}${note !== undefined ? `（${note}）` : ""}`, taskId: input.taskId, status: input.outcome });
     return { ok: true, taskId: input.taskId, outcome: input.outcome, message: `任务 #${input.taskId} 已收口：${input.outcome}。` };
+  }
+
+  /**
+   * B-07：连续 2 次重派仍卡死 ⇒ 经应用既有客户交互/决策通道提交「继续 / 重派 / 换人 / 终止」唯一推荐卡。
+   * 不伪造客户决定：通道不可用/被取消 ⇒ 如实返回未执行；同一链只提交一次（watchdog 重复 tick 不刷屏）。
+   */
+  private escalateStuckTask(
+    projectRoot: string,
+    taskId: string,
+    rootTaskId: string,
+    attempts: number,
+    taskFlowId?: string,
+    targetRoleId?: string,
+    targetRuntime?: RuntimeKind,
+  ): Promise<{ escalated: boolean; requestId?: string; selected?: string; message: string }> {
+    const key = `${projectRoot}\u0000${rootTaskId}`;
+    const existing = this.escalationRequests.get(key);
+    if (existing !== undefined) return existing;
+    const listing = this.deps.getListing(projectRoot);
+    // 应用申请/决策卡走既有 decision 卡种；该卡种的机械发行槽位是 convener/rapporteur（单一来源
+    // `DECISION_CARD_ALLOWED_ROLES`）。本卡由应用发起、经既有客户通道发行，judge 开关开启时按唯一推荐代选。
+    const issuerRoleId = listing?.roles.find((role) => role.governanceFunction === "schedule")?.roleId
+      ?? listing?.roles.find((role) => role.governanceFunction === "proposal")?.roleId
+      ?? null;
+    const chiefRoleId = this.chiefTaskRoleIdOf(projectRoot);
+    const runtime = this.findLiveRuntime(projectRoot, chiefRoleId ?? "") ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo";
+    const requestId = `task-escalation-${rootTaskId}-${attempts}`;
+    const promise = (async () => {
+      const channel = this.deps.customerInput;
+      if (channel === undefined || issuerRoleId === null) {
+        this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
+          kind: "task.escalation.unavailable",
+          summary: `任务 #${taskId} 连续卡死升级卡未提交：${channel === undefined ? "客户交互/决策通道未接线" : "缺少 decision 卡发行槽位（convener/rapporteur）"}`,
+          taskId,
+          status: "unavailable",
+        });
+        return { escalated: false, requestId, message: "升级未提交：客户交互/决策通道不可用（不伪造卡）。" };
+      }
+      const flowId = typeof taskFlowId === "string" && taskFlowId !== "" ? taskFlowId : "task-escalation";
+      const request: CustomerInputRequest = {
+        kind: "choice",
+        cardKind: "decision",
+        flowId,
+        title: `应用·任务升级：任务连续卡死 ${taskId}`,
+        question: "任务已连续 2 次重派仍卡死。请选择处置（唯一推荐：终止）。",
+        options: [
+          { id: "continue", label: "继续等待/观察" },
+          { id: "redispatch", label: "再重派一次（同角色 fresh 会话）" },
+          { id: "replace", label: "换人执行（替代角色）" },
+          { id: "terminate", label: "终止任务", recommended: true },
+        ],
+      };
+      let outcome: CustomerInputOutcome | null | undefined;
+      try {
+        outcome = await channel(request, {
+          roleId: issuerRoleId,
+          runtime,
+          projectRoot,
+          governanceModel: "trio",
+          ...(chiefRoleId !== null ? { mirrorRoleId: chiefRoleId } : {}),
+        });
+      } catch (error) {
+        this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
+          kind: "task.escalation.failed",
+          summary: `任务 #${taskId} 升级卡提交失败：${error instanceof Error ? error.message : String(error)}`,
+          taskId,
+          status: "failed",
+        });
+        return { escalated: false, requestId, message: "升级卡提交失败（未获客户裁决）。" };
+      }
+      const selected = outcome?.outcome === "answered"
+        ? (outcome.value.selected ?? []).find((id) => ["continue", "redispatch", "replace", "terminate"].includes(id))
+        : undefined;
+      this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
+        kind: "task.escalation",
+        summary: `任务 #${taskId} 连续卡死升级：${outcome?.outcome ?? "unavailable"}${selected !== undefined ? `（${selected}）` : ""}`,
+        taskId,
+        status: selected ?? outcome?.outcome ?? "unavailable",
+      });
+      if (selected === "terminate") {
+        if (targetRoleId !== undefined && targetRoleId !== "") {
+          await this.terminateRoleRun({
+            projectRoot,
+            roleId: targetRoleId,
+            runtime: targetRuntime ?? runtime,
+            taskId,
+          });
+        }
+        await this.appendTaskState(projectRoot, taskEvent("task.closed", {
+          taskId,
+          by: "chief",
+          outcome: "rejected",
+          note: "stuck-escalation:terminate",
+        }, () => new Date(this.now())));
+      }
+      return {
+        escalated: true,
+        requestId,
+        ...(selected !== undefined ? { selected } : {}),
+        message: selected !== undefined
+          ? `升级卡已提交并获得裁决：${selected}。`
+          : "升级卡已提交，未获明确裁决（不代选）。",
+      };
+    })();
+    this.escalationRequests.set(key, promise);
+    // 同一链只提交一次（watchdog 重复 tick 直接返回同一结果，不重复弹卡）。
+    return promise;
   }
 
   /**

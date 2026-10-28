@@ -30,6 +30,12 @@ test("needs-review：部分写入/未完成工具调用/已有完成报告 ⇒ �
   assert.match(partial.reasons.join("；"), /部分写入/);
   const inFlight = evaluateRedispatchSafety({ sideEffect: "docs", terminationConfirmed: true, inFlightTool: true });
   assert.equal(inFlight.safety, "needs-review");
+  // B-08：in-flight shell/external/destructive 一律 needs-review（不是 unsafe）。
+  for (const sideEffect of ["external", "destructive"]) {
+    const decision = evaluateRedispatchSafety({ sideEffect, terminationConfirmed: true, inFlightTool: true });
+    assert.equal(decision.safety, "needs-review", sideEffect);
+    assert.equal(decision.autoAllowed, false);
+  }
   const done = evaluateRedispatchSafety({ sideEffect: "read-only", terminationConfirmed: true, completedReport: true });
   assert.equal(done.safety, "needs-review");
   assert.equal(done.autoAllowed, false);

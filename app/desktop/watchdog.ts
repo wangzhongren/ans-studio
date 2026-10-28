@@ -414,6 +414,11 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
   const autoAbortFired = new Map<string, string>();
   /** B 批：巡检状态（每项目：上次运行/未结算/连续跳过）；`stuck` 自动终止去重按角色活跃期。 */
   const patrolStates = new Map<string, { lastRunAt?: number; pending: boolean; skipped: number }>();
+  /**
+   * B-07：log-silence 与 10 分钟巡检共享的**角色活跃期**（identity/state/最近告警）。
+   * `evaluateEpisode` 仍是告警去重/冷却作者；本表是巡检读取的同一事实（不另造第二套状态）。
+   */
+  const logSilenceEpisodes = new Map<string, { identity: string; state: LogSilenceState; lastSeenAt: number; alertedAt?: number }>();
   const stuckFired = new Map<string, string>();
   let seq = 0;
   let timer: ReturnType<typeof setInterval> | undefined;
@@ -721,6 +726,7 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
 
     // —— B 批：`log-silence`（slow≥5min / stuck≥10min / hard-cap≥30min；仅 busy 且有活动任务的内置角色）——
     // 与 10 分钟巡检共享同一活跃期/去重/冷却；slow 只提醒、不终止。默认只告警，env `auto-terminate` 才回调终止。
+    const seenLogSilence = new Set<string>();
     for (const role of snapshot.roles) {
       if (role.busy !== true || role.builtIn !== true || role.taskId === undefined || role.taskId === "") continue;
       const key = `log-silence:${role.roleId}`;
@@ -734,6 +740,16 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
       });
       const positive = state !== "normal" && pendingFor(role.roleId) === 0 && !govSuppressed(role.roleId);
       const identity = `${role.turnId ?? role.turnStartedAt ?? "?"}:${role.taskId}`;
+      const episodeKey = `${projectRoot}\u0000${role.roleId}`;
+      seenLogSilence.add(episodeKey);
+      const previousEpisode = logSilenceEpisodes.get(episodeKey);
+      // 同一角色同一活跃期共享 state/identity；新轮次/新任务 ⇒ 新活跃期（巡检与信号同步重置）。
+      logSilenceEpisodes.set(episodeKey, {
+        identity,
+        state,
+        lastSeenAt: at,
+        ...(previousEpisode?.identity === identity && previousEpisode.alertedAt !== undefined ? { alertedAt: previousEpisode.alertedAt } : {}),
+      });
       if ((state === "stuck" || state === "hard-cap") && config.autoTerminateOnStuck && deps.onStuckRole !== undefined) {
         const fireKey = `${projectRoot}\u0000${role.roleId}`;
         if (stuckFired.get(fireKey) !== identity) {
@@ -767,6 +783,16 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
           summary: mainT("main.watchdog.signalSummary", { signal: signalShortLabel("log-silence"), roleId: role.roleId }),
         }),
       });
+      // 告警确实投出 ⇒ 在共享活跃期记 alertedAt（巡检读取同一事实；冷却由 evaluateEpisode 执行）。
+      const signalState = states.get(`${projectRoot}\u0000${key}`);
+      if (signalState?.alerted === true) {
+        const current = logSilenceEpisodes.get(episodeKey);
+        if (current !== undefined) logSilenceEpisodes.set(episodeKey, { ...current, alertedAt: signalState.lastDeliveredAt ?? at });
+      }
+    }
+    // 清扫共享活跃期：本轮不再在岗/无任务的角色（避免巡检读到陈旧状态）。
+    for (const episodeKey of logSilenceEpisodes.keys()) {
+      if (episodeKey.startsWith(`${projectRoot}\u0000`) && !seenLogSilence.has(episodeKey)) logSilenceEpisodes.delete(episodeKey);
     }
 
     // 清扫：本轮没评估到的活跃期（队列清空/会话消失/记录过期等）按「条件已不再成立」解除。
@@ -803,16 +829,21 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
           if (role.busy !== true || role.builtIn !== true || role.taskId === undefined || role.taskId === "") continue;
           const lastAt = role.lastActivityAt ?? role.turnStartedAt ?? at;
           const silentMs = Math.max(0, at - lastAt);
-          const state = logSilenceState(silentMs, {
+          const computedState = logSilenceState(silentMs, {
             slowMs: config.logSlowSilenceMs,
             stuckMs: config.logStuckSilenceMs,
             hardCapMs: config.logHardCapMs,
           });
+          // B-07：巡检读取与 log-silence 同一活跃期（identity/state/alertedAt），不另算冷却/去重。
+          const episode = logSilenceEpisodes.get(`${projectRoot}\u0000${role.roleId}`);
+          const identity = `${role.turnId ?? role.turnStartedAt ?? "?"}:${role.taskId}`;
+          const state = episode?.identity === identity ? episode.state : computedState;
+          const alerted = episode?.identity === identity && episode.alertedAt !== undefined;
           roleLines.push({
             roleId: role.roleId,
             taskId: role.taskId,
             ...(role.lastActivityAt !== undefined ? { lastLogAt: new Date(role.lastActivityAt).toISOString() } : {}),
-            ...(role.lastAction !== undefined ? { lastAction: role.lastAction } : {}),
+            lastAction: `${role.lastAction ?? "（无最近动作）"}${alerted ? `（已告警：${state}）` : ""}`,
             silentMs,
             state,
           });

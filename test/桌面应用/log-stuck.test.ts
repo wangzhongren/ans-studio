@@ -139,3 +139,32 @@ test("正确等待不报：有挂起确认卡时不发 log-silence；高硬顶 h
 
 // 常量取自 env 名（测试内联避免依赖导出顺序）。
 const LogAutoTerminateEnv = "ANS_LOG_AUTO_TERMINATE";
+
+test("B-07 共享 episode：log-silence 与 10 分钟巡检读取同一活跃期/告警状态（不重复告警）", () => {
+  let now = 0;
+  const delivered: string[] = [];
+  let current = worker;
+  const svc = createWatchdogService({
+    projects: () => ["/proj"],
+    snapshot: () => snapshot(current),
+    deliver: (_root, message) => { delivered.push(message.text); },
+    now: () => now,
+    config: { env: {}, patrolIntervalMs: LOG_STUCK_SILENCE_MS },
+  });
+  svc.tick();
+  now = LOG_STUCK_SILENCE_MS;
+  svc.tick();
+  const silence = () => delivered.filter((text) => text.includes("运行日志静默"));
+  assert.equal(silence().length, 1, "首次 stuck 告警");
+  const patrol = delivered.find((text) => text.startsWith("[系统·巡检]"));
+  assert.ok(patrol, "同一 tick 发出巡检");
+  assert.match(patrol!, /状态=stuck/);
+  assert.match(patrol!, /已告警：stuck/, "巡检读取共享活跃期的已告警状态");
+
+  // 幕僚结算清除 pending；角色仍 busy 卡死 ⇒ 下一巡检窗口只汇总，不重复告警。
+  svc.observe("/proj", { kind: "settled", roleId: "chief", outcome: "completed", at: now, fromSystemDelivery: true });
+  now = LOG_STUCK_SILENCE_MS * 2;
+  svc.tick();
+  assert.equal(silence().length, 1, "同一活跃期不重复告警（共享 episode）");
+  svc.stop();
+});

@@ -227,13 +227,14 @@ export interface RedispatchSafetyDecision {
 export function evaluateRedispatchSafety(input: RedispatchSafetyInput): RedispatchSafetyDecision {
   const reasons: string[] = [];
   const sideEffect = typeof input.sideEffect === "string" ? input.sideEffect : "unknown";
-  if (sideEffect === "external" || sideEffect === "destructive" || sideEffect === "unknown") {
-    reasons.push(`副作用分类 ${sideEffect}：0 次自动重派`);
-  }
+  const highRisk = sideEffect === "external" || sideEffect === "destructive" || sideEffect === "unknown";
   if (!input.terminationConfirmed) reasons.push("终止未确认（子进程树/轮次未确认退出）");
   if (input.externalSideEffects === true) reasons.push("已发生外部副作用（推送/发布/支付/删除等）");
+  // 高风险副作用（已完成）：0 次自动重派。若命中它的是**未完成工具调用**（shell/外部/破坏性仍在跑），
+  // B-08 要求 needs-review（先核对/清理，而非 unsafe 定性）；两者都不自动重派。
+  if (highRisk && input.inFlightTool !== true) reasons.push(`副作用分类 ${sideEffect}：0 次自动重派`);
   if (reasons.length > 0) return { safety: "unsafe", autoAllowed: false, reasons };
-  if (input.inFlightTool === true) reasons.push("存在未完成工具调用");
+  if (input.inFlightTool === true) reasons.push("存在未完成工具调用（shell/外部/破坏性）——需核对/清理");
   if ((input.partialArtifacts?.length ?? 0) > 0) reasons.push(`存在部分写入/临时产物 ${input.partialArtifacts!.length} 项`);
   if (input.completedReport === true) reasons.push("原任务已有成功报告（已完成部分不得重跑）");
   if (reasons.length > 0) return { safety: "needs-review", autoAllowed: false, reasons };

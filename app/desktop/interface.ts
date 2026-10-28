@@ -14229,6 +14229,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           childProcessesStopped: 0,
           childResults: [],
           partialArtifacts: [],
+          isolatedArtifacts: [],
+          sessionFresh: false,
           abort: { ok: false, supported: false },
           message: mainT("main.interface.sessionRequestInvalid"),
         };
