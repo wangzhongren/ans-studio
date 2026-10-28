@@ -156,13 +156,14 @@ B 批把任务/汇报主链切到应用独占的最小状态，同时保留旧 g
 
 ## 10. 证据与回滚
 
-- 本文件行数：`211`；SHA-256：见最终报告/证据提交复算（自引用：表中该行为本行替换前字节；最终文件哈希以 `sha256sum` 复算并在最终报告给出）。
-- 环境：Windows 11 Pro 10.0.26300（win32 x64）；Node v24.22.0；npm（`npm -v` 见命令日志）；Electron 44.7.0（`node_modules/electron/dist/electron.exe`）；worktree `.claude/worktrees/entry-role-minimal`；分支 `feat/entry-role-minimal`；全量/专项命令 `node --test --test-concurrency=1 ...`（排除 `write-sequencing.test.ts`）。
+- 本文件行数：`212`；SHA-256：见最终报告/证据提交复算（自引用：表中该行为本行替换前字节；最终文件哈希以 `sha256sum` 复算并在最终报告给出）。
+- 环境：Windows 11 Pro 10.0.26300（win32 x64）；Node v24.22.1；npm（`npm -v` 见命令日志）；Electron 44.7.0（`node_modules/electron/dist/electron.exe`）；worktree `.claude/worktrees/entry-role-minimal`；分支 `feat/entry-role-minimal`；全量/专项命令 `node --test --test-concurrency=1 ...`（排除 `write-sequencing.test.ts`）。
 - 全量日志：`%TEMP%\ans-b-rework-final-tests.log`（sha256 `ea21065a540073baa933dec62356eeb37a3a767a3f0201b58d83e7657ef5b23a`；4552/4518/15/19）。
 - 专项日志：`%TEMP%\ans-b-rework-special-tests.log`（407/407；sha256 `bdadd9fb9eee331b8229164c1d5a5ac690ab8687c40fba8bf6f83e8cb98bfd00`）。
 - 静态日志：`%TEMP%\ans-b-rework-typecheck.log`（sha256 `aee168652259817d015b93dfeec328925fe0dc72c59b689ed06560ab0abe6cbd`）、`ans-b-rework-typecheck-renderer.log`（`914780f65ceb172dd3e1640d8c55a7cc6911a6dc8cd7d5680f1d5f35f46fad72`）、`ans-b-rework-build-renderer.log`（`ec9b3d6f0c0b223408ced9330617111bbc1beb0be0e6cfeae49ef0e448c1ca5a`）；均 exit 0。
 - Electron 报告：`%TEMP%\ans-e2e-b-rework-out-21763\report.txt`（sha256 `ef9ff6160dd51ad712693e83c90782c90d649409ba5e3450c57f7c534df2e4b1`；17/17、E2E_PASS=true、BOOTSTRAP_PRIMARY=chief、ROLE_COUNT=2、PRIMARY_ROLE_ID=su）。
 - 整树哈希：初版候选 `4fdb955b99beca19cbce985d4ff6031eadec6599bcba85759a3ccc3fcab20146`；本返工候选 `e1a5158391584590b59fa1caf9998f489e804a5e922797825aa572b5576a9971`（`git diff --binary 778a7f2 f151a865 | sha256sum`）；逐文件哈希见下表：
+- **C5 整树哈希（C 批随修，2026-10-28）**：`1c31d9264d218c6a4685c2b451b56ff81ec980fc07d111de0376501064aa87b0`（`git diff --binary 778a7f2 c4ee7ade | sha256sum`）——覆盖 B 实施 + 返工 + 证据提交的最终 B 候选树。
 - **口径**：`git blob` = `git hash-object`（提交 blob 口径）；`sha256` = 工作区字节 `sha256sum`（worktree 口径，提交后可由 `git show <commit>:<path>` 复算）。change-B 自引用行按表外最终字节复算（见最终报告）。
 | 文件 | git blob | sha256 |
 | --- | --- | --- |
