@@ -262,3 +262,37 @@ test("planDispatchDelivery（G-1）：提取与整理保序——workflow 在文
   assert.equal(lines[3], `  2. docs/contracts/kanban-api-v1.md（sha256:${CT}）`);
   assert.equal(lines[4], `  3. docs/contracts/other-v1.md（sha256:${CT2}）`);
 });
+
+// —————————————— B 批（2026-10-28）：星形任务卡字段 / 任务编号 / 期望产出 / 证据提示 ——————————————
+
+test("renderDispatchPrompt（B）：任务编号/期望产出/可选证据作为固定字段；旧调用逐字不变", () => {
+  const r = req("实现 X");
+  const base = renderDispatchPrompt(r);
+  assert.equal(base, renderDispatchPrompt(r, {}), "空选项 = 旧格式");
+  const star = renderDispatchPrompt(r, {
+    sourceRoleId: "幕僚",
+    taskId: "t-123",
+    expectedOutput: "src/x.ts",
+    requestedEvidence: ["src/x.ts", "test/x.test.ts"],
+  });
+  assert.match(star, /^\[派发\] 来自 幕僚 的任务/);
+  assert.match(star, /任务编号：#t-123/);
+  assert.match(star, /期望产出：src\/x\.ts/);
+  assert.match(star, /可选证据：src\/x\.ts；test\/x\.test\.ts/);
+  assert.match(star, /实现 X/);
+  assert.doesNotMatch(star, /授权|批准|customer\.decision/, "派发文本不夹带授权语义");
+});
+
+test("planDispatchDelivery（B）：任务卡字段透传；契约缺失仍 fail-closed 拒投（不因 taskId 放行）", () => {
+  const r = req("按 docs/contracts/missing-v1.md 实现 X");
+  const rejected = planDispatchDelivery(r, new Map(), { sourceRoleId: "幕僚", taskId: "t-1", expectedOutput: "src/x.ts" });
+  assert.equal(rejected.action, "reject");
+  const r2 = req("实现 X");
+  const delivered = planDispatchDelivery(r2, new Map(), { sourceRoleId: "幕僚", taskId: "t-1", expectedOutput: "src/x.ts", requestedEvidence: ["src/x.ts"] });
+  assert.equal(delivered.action, "deliver");
+  if (delivered.action === "deliver") {
+    assert.match(delivered.text, /任务编号：#t-1/);
+    assert.match(delivered.text, /期望产出：src\/x\.ts/);
+    assert.match(delivered.text, /可选证据：src\/x\.ts/);
+  }
+});

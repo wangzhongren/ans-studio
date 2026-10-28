@@ -2497,3 +2497,45 @@ test("旧 single 不回归：派发仍投主入口 su，且不产生 .ans/govern
   await assert.rejects(fs.stat(path.join(dir, ".ans", "governance", "ledger.jsonl")), "single 不创建治理账本文件");
   await h.mgr.stop(null);
 });
+
+// —————————————— B 批（2026-10-28）：幕僚星形派发（新任务链，不写旧账本） ——————————————
+test("B 星形派发：chief→worker 受理、tasks.jsonl 记录、投递带任务编号、不写 dispatch 账本", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-star-dispatch-"));
+  const custom: ProjectListing = {
+    projectRoot: dir,
+    roles: [
+      { roleId: "chief", cardPath: "", boundaryPath: "", cardText: "chief", boundary: { entries: [], boundarySource: "<built-in:chief>", acceptance: { accepted: false, source: "" } }, builtIn: true, governanceFunction: "chief" },
+      { roleId: "convener", cardPath: "", boundaryPath: "", cardText: "convener", boundary: { entries: [], boundarySource: "<built-in:convener>", acceptance: { accepted: false, source: "" } }, builtIn: true, governanceFunction: "schedule" },
+      { roleId: "worker", cardPath: "角色卡/worker/role-card.md", boundaryPath: "角色卡/worker/boundary.yaml", cardText: "worker", boundary: { entries: [{ root: "project", path: "src/w.ts", kind: "file", purpose: "p" }], boundarySource: "角色卡/worker/boundary.yaml", acceptance: { accepted: false, source: "" } } },
+    ],
+    warnings: [],
+    hasRoles: true,
+    primaryRoleId: "chief",
+    governanceModel: "trio",
+  };
+  const h = makeHarness({ projectRoot: dir, customListing: custom });
+  try {
+    await h.mgr.open({ projectRoot: dir, roleId: "chief", runtime: "demo" });
+    await tick(30);
+    const receipt = (await h.capabilitiesOf("chief")!.dispatchTask!({ roleId: "worker", task: "实现星形任务", sideEffect: "code", expectedOutput: "src/w.ts" }))!;
+    assert.equal(receipt.ok, true, receipt.message ?? "");
+    await tick(150);
+    assert.equal(h.sent.worker.length, 1);
+    assert.match(h.sent.worker[0] ?? "", /任务编号：#t-/);
+    assert.match(h.sent.worker[0] ?? "", /期望产出：src\/w\.ts/);
+    const { readTaskState } = await import("../../src/common/编排/task-state.ts");
+    const state = await readTaskState(dir);
+    assert.equal(state.records.size, 1);
+    const task = [...state.records.values()][0];
+    assert.equal(task.created?.from, "chief");
+    assert.equal(task.created?.sideEffect, "code");
+    assert.equal(task.delivered?.to, "worker");
+    // 旧账本不产生 dispatch.accepted（新主链不写 docs/flows/ledger）。
+    const ledgerPath = path.join(dir, ".ans", "governance", "ledger.jsonl");
+    const ledgerText = await fs.readFile(ledgerPath, "utf8").catch(() => "");
+    assert.doesNotMatch(ledgerText, /dispatch\.accepted/, "星形新链不写旧 dispatch 账本");
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});

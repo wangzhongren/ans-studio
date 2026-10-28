@@ -57,8 +57,8 @@ export const WATCHDOG_DEFAULT_SILENT_MINUTES = 0.5;
 
 // —————————————— 支柱一 a)：异常告警（设计 §3.2/§3.3） ——————————————
 
-/** 看护信号（阈值表 §3.2 的四信号；检测/去重/冷却在桌面看护器，本层只渲染）。 */
-export type WatchdogSignalKind = "turn-deadline" | "queue-stuck" | "cmd-timeout" | "repeat-fail";
+/** 看护信号（阈值表 §3.2 的四信号 + B 批 `log-silence`；检测/去重/冷却在桌面看护器，本层只渲染）。 */
+export type WatchdogSignalKind = "turn-deadline" | "queue-stuck" | "cmd-timeout" | "repeat-fail" | "log-silence";
 
 const SIGNAL_LABELS: Record<WatchdogSignalKind, string> = {
   // PM 评审 `2026-10-17_design_turn-watch-and-recover-review.md`（approved）：信号 kind 仍为
@@ -68,6 +68,9 @@ const SIGNAL_LABELS: Record<WatchdogSignalKind, string> = {
   "queue-stuck": "投递排队积压",
   "cmd-timeout": "命令超时",
   "repeat-fail": "重复失败",
+  // B 批（2026-10-28）：日志静默（slow≥5min / stuck≥10min）。仅对「工作中且有活动任务」的角色；
+  // slow 只提醒、不终止；stuck 经幕僚确认后应用才终止/重派（默认只告警）。
+  "log-silence": "运行日志静默",
 };
 
 /** 每信号的建议动作（单一来源；与设计 §3.2 告警口径一致——#3 明确「通常无需动作」）。 */
@@ -78,6 +81,7 @@ const SIGNAL_SUGGESTIONS: Record<WatchdogSignalKind, string> = {
   "queue-stuck": "先用 role_status（必要时 session_tail）核对；若确认卡死，可 propose_recovery（开关开启时桌面自动执行，关闭时需客户一键确认）。",
   "cmd-timeout": "F-1 已自动终止该命令、轮次继续——通常无需动作，本告警仅告知。",
   "repeat-fail": "先用 role_status（必要时 session_tail）排查失败原因；确认卡死可 propose_recovery（开关开启时桌面自动执行，关闭时需客户一键确认）。",
+  "log-silence": "先用 role_activity_log（必要时 session_tail）核对最后活动；slow 只提醒、不终止。确认卡死后由你决定终止并按副作用安全分类重派；应用默认只告警，不自动终止。",
 };
 
 export interface WatchdogAlertInput {
@@ -136,6 +140,104 @@ export function renderWatchdogRecovery(input: WatchdogRecoveryInput): string {
 export function renderWatchdogStormGuard(suppressedCount: number): string {
   const n = Number.isFinite(suppressedCount) && suppressedCount > 0 ? Math.floor(suppressedCount) : 0;
   return `${WATCHDOG_ALERT_PREFIX} 看护告警已抑制 ${n} 条（风暴护栏）。`;
+}
+
+// —————————————— B 批：10 分钟巡检 / 终止重派安全（2026-10-28） ——————————————
+
+/** 巡检统一文首（与 `[系统·看护]` 同形态；桌面UI 按前缀归类 system）。 */
+export const PATROL_PREFIX = "[系统·巡检]";
+
+/** 单个角色的巡检行（事实由桌面看护器从同源快照 + 角色日志如实产出）。 */
+export interface PatrolRoleLine {
+  roleId: string;
+  taskId?: string;
+  lastLogAt?: string;
+  lastAction?: string;
+  silentMs: number;
+  state: "normal" | "slow" | "stuck" | "hard-cap" | "waiting";
+}
+
+export interface PatrolPromptInput {
+  /** 巡检时刻（ISO 8601）。 */
+  at: string;
+  /** 在岗且有活动任务的内置角色行（按角色 id 稳定排序由调用方保证）。 */
+  roles: readonly PatrolRoleLine[];
+  /** 上一轮未结算被跳过时的次数（如实呈现；0/缺省不显示）。 */
+  skipped?: number;
+}
+
+/**
+ * **`[系统·巡检]` 文案——单一来源**（B-06）：固定字段（在岗角色/taskId/最后日志/最近动作/静默时长/状态）。
+ * 巡检**不是**裁决卡、不构成授权/验收结论；动作入口由幕僚按纪律判断（读日志/提醒/终止并重派）。
+ */
+export function renderPatrolPrompt(input: PatrolPromptInput): string {
+  const duration = (ms: number): string => {
+    const seconds = Math.max(0, Math.round(ms / 1000));
+    return seconds < 60 ? `${seconds} 秒` : `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
+  };
+  const lines = [`${PATROL_PREFIX} 项目巡检（${input.at}）`];
+  if (input.roles.length === 0) {
+    lines.push("在岗角色：无（没有正在工作且有活动任务的内置角色）。");
+  } else {
+    lines.push(`在岗角色：${input.roles.length} 个`);
+    for (const role of input.roles) {
+      lines.push(
+        `- ${role.roleId}｜task=${role.taskId ?? "未关联"}｜最后日志=${role.lastLogAt ?? "无"}｜` +
+        `最近动作=${role.lastAction ?? "无"}｜静默=${duration(role.silentMs)}｜状态=${role.state}`,
+      );
+    }
+  }
+  if (input.skipped !== undefined && input.skipped > 0) lines.push(`上一轮巡检未结算，已跳过 ${input.skipped} 次。`);
+  lines.push(
+    "可用动作：读日志（role_activity_log）、提醒（普通消息）、终止并重派（仅在确认卡死时；应用按副作用分类校验，external/destructive/unknown 不自动重派）。",
+    "巡检仅如实汇总，不构成任何授权、验收结论或客户决定；不得据此假设写权。",
+  );
+  return lines.join("\n");
+}
+
+/** 终止/重派安全结论的输入（B-08；事实由桌面窗口从终止回执/角色日志/任务状态产出）。 */
+export interface RedispatchSafetyInput {
+  /** 幕僚声明经应用升类后的副作用。 */
+  sideEffect: string;
+  /** 当前轮次已停止且子进程树已确认退出。 */
+  terminationConfirmed: boolean;
+  /** 外部副作用是否已发生（推送/发布/支付/删除等）。 */
+  externalSideEffects?: boolean;
+  /** 终止时仍有未完成工具调用。 */
+  inFlightTool?: boolean;
+  /** 部分写入/临时区产物（路径或稳定引用；非空 ⇒ needs-review）。 */
+  partialArtifacts?: readonly string[];
+  /** 原任务是否已有成功报告（已完成部分不得重跑）。 */
+  completedReport?: boolean;
+}
+
+export interface RedispatchSafetyDecision {
+  safety: "safe" | "unsafe" | "needs-review";
+  /** true **仅**当 `safety==="safe"`。 */
+  autoAllowed: boolean;
+  /** 如实原因（有序）。 */
+  reasons: string[];
+}
+
+/**
+ * **重派安全判定——单一来源**（B-08）：仅 `read-only|docs|code` 且终止确认、无部分写入/未完成调用、
+ * 无外部副作用时 `safe`；`external|destructive|unknown`、终止未确认或已发生外部副作用 ⇒ `unsafe`；
+ * 部分写入/未完成工具调用/已有完成报告 ⇒ `needs-review`（需核对/缩窄，不自动重派）。
+ */
+export function evaluateRedispatchSafety(input: RedispatchSafetyInput): RedispatchSafetyDecision {
+  const reasons: string[] = [];
+  const sideEffect = typeof input.sideEffect === "string" ? input.sideEffect : "unknown";
+  if (sideEffect === "external" || sideEffect === "destructive" || sideEffect === "unknown") {
+    reasons.push(`副作用分类 ${sideEffect}：0 次自动重派`);
+  }
+  if (!input.terminationConfirmed) reasons.push("终止未确认（子进程树/轮次未确认退出）");
+  if (input.externalSideEffects === true) reasons.push("已发生外部副作用（推送/发布/支付/删除等）");
+  if (reasons.length > 0) return { safety: "unsafe", autoAllowed: false, reasons };
+  if (input.inFlightTool === true) reasons.push("存在未完成工具调用");
+  if ((input.partialArtifacts?.length ?? 0) > 0) reasons.push(`存在部分写入/临时产物 ${input.partialArtifacts!.length} 项`);
+  if (input.completedReport === true) reasons.push("原任务已有成功报告（已完成部分不得重跑）");
+  if (reasons.length > 0) return { safety: "needs-review", autoAllowed: false, reasons };
+  return { safety: "safe", autoAllowed: true, reasons: [`副作用分类 ${sideEffect}，终止已确认，无部分写入`] };
 }
 
 // —————————————— 旧兼容：完成态收束提示（设计 §7.3；2026-10-18 已停用） ——————————————

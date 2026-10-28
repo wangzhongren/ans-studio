@@ -38,6 +38,8 @@ import type {
   ReadyFlowStep,
 } from "../../src/pipeline/orchestration/flow-state.ts";
 import type { RuntimeKind } from "../../src/common/shared/runtime-shared.ts";
+import type { TaskCardView } from "../../src/common/编排/task-state.ts";
+import type { TaskReportStatus } from "../../src/model/runtime.ts";
 import { mainT } from "./i18n.ts";
 
 /**
@@ -2187,4 +2189,22 @@ export function buildGatePassHandoffTaskMessage(input: GatePassHandoffTaskInput)
     "3) 账本已有 dispatch.accepted 的步骤不要重复派；不要标 gate done、不要派 acceptance / 质检、不要替客户决定。",
     "本消息是应用机械通知：应用未派发任何 worker、未改 flow（除 gate 收口）、未替统筹判断。",
   ].join("\n");
+}
+
+// —————————————— B 批（2026-10-28）：任务卡 / 工作结果固定字段（纯文案；阶段流转仍保留到 D） ——————————————
+
+/** 任务卡的一句话摘要（目标/期望产出/状态/时间；受理 ≠ 完成）。 */
+export function buildTaskCardSummary(card: TaskCardView): string {
+  const bits = [`[任务] #${card.taskId}`, `→ ${card.targetRoleId}`, `状态 ${card.status}`];
+  if (card.retryOf !== undefined) bits.push(`重派自 #${card.retryOf}`);
+  if (card.expectedOutput !== undefined) bits.push(`期望产出：${card.expectedOutput}`);
+  bits.push(card.createdAt);
+  return bits.join("｜");
+}
+
+/** `[工作结果]` 状态标签（done/blocked/failed；未报告不得当完成）。 */
+export function workReportStatusLabel(status: TaskReportStatus | "completed" | "unreported" | "aborted"): string {
+  if (status === "completed") return "done";
+  if (status === "unreported" || status === "aborted") return "blocked";
+  return status;
 }

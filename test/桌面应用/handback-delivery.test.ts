@@ -9,10 +9,14 @@ import { RuntimeDeliveryError, type RuntimePersistenceChangeV1, type RuntimeRepo
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
-import { renderHandbackPrompt, renderHandbackBatchPrompt, type TaskHandback } from "../../src/common/编排/handback.ts";
+import { renderHandbackPrompt, renderHandbackBatchPrompt, renderWorkReportPrompt, type TaskHandback } from "../../src/common/编排/handback.ts";
+import { appendTaskEvent, readTaskState, taskEvent } from "../../src/common/编排/task-state.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
@@ -208,7 +212,7 @@ function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: numb
       throw new Error("本用例不应构造 demo 适配器");
     },
     buildProjectConfig,
-    getListing: (root) => (root === "/proj" ? listing : undefined),
+    getListing: (root) => (root === listing.projectRoot ? listing : undefined),
     emitEvent: (env) => envelopes.push(env),
   });
   return { mgr, streams, sent, sendOptions, envelopes, openCalls, policies, dispatchOf: (roleId) => openInputs[roleId]?.dispatchTask, hangNext };
@@ -613,5 +617,60 @@ test("2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来�
     assert.ok(!h.sent.liaison.some((text) => text.startsWith("[系统·治理反馈] 来自 convener")), "不重复投递内置反馈");
   } finally {
     await h.mgr.stop(null);
+  }
+});
+
+// —————————————— B 批（2026-10-28）：星形任务回交 → 幕僚（[工作结果] + task.reported） ——————————————
+test("B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-handback-star-"));
+  const custom: ProjectListing = {
+    projectRoot: root,
+    roles: [
+      { roleId: "chief", cardPath: "", boundaryPath: "", cardText: "chief", boundary: { entries: [], boundarySource: "<built-in:chief>", acceptance: { accepted: false, source: "" } }, builtIn: true, governanceFunction: "chief" },
+      { roleId: "convener", cardPath: "", boundaryPath: "", cardText: "convener", boundary: { entries: [], boundarySource: "<built-in:convener>", acceptance: { accepted: false, source: "" } }, builtIn: true, governanceFunction: "schedule" },
+      { roleId: "A", cardPath: "角色卡/A/role-card.md", boundaryPath: "角色卡/A/boundary.yaml", cardText: "A", boundary: { entries: [{ root: "project", path: "src/a.ts", kind: "file", purpose: "p" }], boundarySource: "角色卡/A/boundary.yaml", acceptance: { accepted: false, source: "" } } },
+    ],
+    warnings: [],
+    hasRoles: true,
+    primaryRoleId: "chief",
+    governanceModel: "trio",
+  };
+  const h = makeHarness({ customListing: custom });
+  try {
+    await appendTaskEvent(root, taskEvent("task.created", {
+      taskId: "t-star",
+      from: "chief",
+      to: "A",
+      text: "实现星形任务",
+      sideEffect: "code",
+      idempotencyKey: "key-star",
+    }));
+    await h.mgr.listTasks(root); // 登记星形任务 id（真实恢复路径同源）
+    const opened = await h.mgr.open({ projectRoot: root, roleId: "A", runtime: "demo" });
+    assert.equal(opened.ok, true, opened.error ?? "");
+    await tick(30);
+    const handback: TaskHandback = {
+      roleId: "A",
+      taskId: "t-star",
+      status: "completed",
+      summary: "实现完成",
+      evidence: ["src/a.ts", "test/a.test.ts"],
+      at: "2026-10-28T00:00:02.000Z",
+      turnId: "turn-star",
+    };
+    h.streams.A.push({ kind: "handback", summary: "星形回交", handback } as OrchestrationEvent);
+    await waitUntil(() => h.sent.chief.includes(renderWorkReportPrompt(handback)));
+    assert.equal(h.sent.convener.some((text) => text.includes("实现完成")), false, "旧 Steward 不再接收星形工作结果");
+    const text = h.sent.chief.find((entry) => entry.includes("实现完成"))!;
+    assert.match(text, /^\[工作结果\]/);
+    assert.match(text, /任务：#t-star/);
+    assert.match(text, /状态：done/);
+    assert.match(text, /证据：/);
+    const state = await readTaskState(root);
+    assert.equal(state.records.get("t-star")?.reports[0]?.status, "done");
+    assert.equal(state.records.get("t-star")?.reports[0]?.turnId, "turn-star");
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true });
   }
 });

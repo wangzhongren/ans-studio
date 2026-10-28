@@ -153,6 +153,14 @@ import {
   type BackgroundTaskReadReply,
   type BackgroundTaskStopInput,
   type BackgroundTaskStopReply,
+  type TaskListView,
+  type TaskRestoreReport,
+  type TerminateRoleRunInput,
+  type TerminateRoleRunResult,
+  type RedispatchTaskInput,
+  type RedispatchTaskResult,
+  type CloseTaskInput,
+  type CloseTaskResult,
 } from "./session.ts";
 // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状与构造（**只读转出**——形状 `Omit` 自编排
 // `AssembleShellGateOptions`，见 operator-channel.ts；本层不另立第二份）。
@@ -1217,6 +1225,19 @@ export interface DesktopInterface {
    * （无会话/无能力/底层抛错）为 `reason:"closed"`/`"unavailable"` 的如实失败。
    */
   stopBackgroundTask(input: BackgroundTaskStopInput): Promise<BackgroundTaskStopReply>;
+  // —————— B 批（2026-10-28）：任务/短报/运行日志/终止重派数据面（只读或应用独占动作；不新增客户裁决卡）——————
+  /** 任务列表（`tasks.jsonl` 重放；只读；坏行数如实）。 */
+  listTasks(input: { projectRoot: string }): Promise<TaskListView>;
+  /** 重启恢复：未投递任务重新入队（不伪造成功）；已投递/已报告未收口只展示。 */
+  restoreTasks(input: { projectRoot: string }): Promise<TaskRestoreReport>;
+  /** 幕僚运行日志只读（脱敏/项目相对路径；其他角色不可经此读取）。 */
+  readRoleActivityLog(input: { projectRoot: string; roleId: string; since?: string; limit?: number }): Promise<{ ok: boolean; text?: string; message?: string }>;
+  /** 终止当前轮次 + 后台子进程树；`terminationConfirmed=false` ⇒ 调用方不得自动重派。 */
+  terminateRoleRun(input: TerminateRoleRunInput): Promise<TerminateRoleRunResult>;
+  /** 卡死终止后的安全重派（仅 safe；external/destructive/unknown 0 次自动重派；≤2 次）。 */
+  redispatchTask(input: RedispatchTaskInput): Promise<RedispatchTaskResult>;
+  /** 幕僚收口任务（accepted/rework/rejected；写 task.closed）。 */
+  closeTask(input: CloseTaskInput): Promise<CloseTaskResult>;
   getSessionHistory(input: SessionOpenRequest): Promise<SessionHistoryView>;
   getRuntimeConfig(runtime: RuntimeKind): Promise<RuntimeConfigView>;
   saveRuntimeConfig(input: { runtime: RuntimeKind; updates: unknown }): Promise<RuntimeConfigSaveResult>;
@@ -4414,6 +4435,21 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // 2026-10-27 流程推进/停滞看护：看护 tick 只提供时机；读取 flow/去重/投递复用既有验收检查入口
       // （同项目串行 + 突发合并；看护不读 flow、不做治理判定）。
       onTickProject: (root) => scheduleFlowAdvanceTick(root),
+      // B 批（2026-10-28；仅 env `ANS_LOG_AUTO_TERMINATE=auto-terminate` 时看护才回调）：
+      // 终止当前轮次/子进程树；确认退出且任务已知 ⇒ 交给安全重派（外部/破坏性/未知副作用 0 次自动重派）。
+      onStuckRole: (root, roleId, runtime, info) => {
+        const diagnostic = createDiagnosticLogger({ component: "desktop.watchdog", projectRoot: root, roleId });
+        void manager.terminateRoleRun({ projectRoot: root, roleId, runtime, ...(info.taskId !== undefined ? { taskId: info.taskId } : {}) })
+          .then((result) => {
+            diagnostic.record("watchdog.stuck.terminated", { state: info.state, confirmed: result.terminationConfirmed, childProcesses: result.childProcesses, stopped: result.childProcessesStopped });
+            if (result.terminationConfirmed && info.taskId !== undefined) {
+              void manager.redispatchTask({ projectRoot: root, taskId: info.taskId }).then((redispatched) => {
+                diagnostic.record("watchdog.stuck.redispatch", { safety: redispatched.safety, ok: redispatched.ok, taskId: redispatched.taskId });
+              });
+            }
+          })
+          .catch((error) => diagnostic.error("watchdog.stuck.terminate.failed", error));
+      },
       // 2026-10-20 真机（Convener 卡 1h、队列 24）：看护覆盖**所有角色**（含内置治理角色）——
       // 自动开关按角色映射：内置治理角色 ↑「替我决策」、项目角色 ↑「替我审批」；关闭或未配置自动中止时限 ⇒ 只告警。
       autoRecoveryEnabled: (root, roleId) => {
@@ -12973,6 +13009,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // 2026-10-20 客户要求（重启后任务自动续跑）：启动/项目导入恢复持久投递队列并自动重投；
       // listProject 刷新后做一次**僵尸步骤自检**（有界、fire-and-forget、去重；不阻塞导入）。
       void restoreDeliveryQueuesOnce();
+      // B 批（2026-10-28）：重放 tasks.jsonl——未投递任务重新入队（同 taskId/去重键；已投递/已报告只展示）。
+      // 与投递队列恢复同属启动/导入时机；失败只诊断，不阻塞导入。
+      void manager.restoreTasks(listing.projectRoot).then((report) => {
+        if (report.restored > 0) {
+          createDiagnosticLogger({ component: "desktop.interface", projectRoot: listing.projectRoot }).record("tasks.restored", { count: report.restored });
+        }
+      }).catch((error) => {
+        createDiagnosticLogger({ component: "desktop.interface", projectRoot: listing.projectRoot }).error("tasks.restore.failed", error);
+      });
       scheduleZombieStepCheck(listing.projectRoot);
       // 2026-10-23 可重入门禁 A1/Q2：刷新探针——只读账本/flow/锚点，只有「待校验/待派发」才排完整检查；
       // 250ms 合窗与既有 running/pending 合并逻辑共用（不吞信号）。手工改文件后刷新即可重新校验。
@@ -14152,6 +14197,75 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         return { ok: false, reason: "unavailable", message: mainT("main.interface.sessionRequestInvalid") };
       }
       return manager.stopBackgroundTask({ ...target, ...(force === true ? { force: true } : {}) });
+    },
+    // —————— B 批（2026-10-28）：任务/日志/终止重派（参数校验在本层；执行/持久化在 SessionManager）——————
+    async listTasks(input): Promise<TaskListView> {
+      const projectRoot = input && typeof input.projectRoot === "string" ? input.projectRoot : "";
+      if (projectRoot === "") return { projectRoot: "", tasks: [], errors: 0, unclosed: 0 };
+      return manager.listTasks(projectRoot);
+    },
+    async restoreTasks(input): Promise<TaskRestoreReport> {
+      const projectRoot = input && typeof input.projectRoot === "string" ? input.projectRoot : "";
+      if (projectRoot === "") return { restored: 0, skipped: 0, taskIds: [] };
+      return manager.restoreTasks(projectRoot);
+    },
+    async readRoleActivityLog(input): Promise<{ ok: boolean; text?: string; message?: string }> {
+      const projectRoot = input && typeof input.projectRoot === "string" ? input.projectRoot : "";
+      const roleId = input && typeof input.roleId === "string" ? input.roleId.trim() : "";
+      const since = input && typeof input.since === "string" ? input.since : undefined;
+      const limit = input && typeof input.limit === "number" && Number.isInteger(input.limit) && input.limit >= 1 ? input.limit : undefined;
+      if (projectRoot === "" || roleId === "") return { ok: false, message: mainT("main.interface.sessionRequestInvalid") };
+      return manager.readRoleActivityLog(projectRoot, { roleId, ...(since !== undefined ? { since } : {}), ...(limit !== undefined ? { limit } : {}) });
+    },
+    async terminateRoleRun(input): Promise<TerminateRoleRunResult> {
+      const projectRoot = input && typeof input.projectRoot === "string" ? input.projectRoot : "";
+      const roleId = input && typeof input.roleId === "string" ? input.roleId : "";
+      if (projectRoot === "" || roleId === "" || !isRuntimeKind(input?.runtime)) {
+        return {
+          ok: false,
+          roleId,
+          terminationConfirmed: false,
+          childProcesses: 0,
+          childProcessesStopped: 0,
+          childResults: [],
+          partialArtifacts: [],
+          abort: { ok: false, supported: false },
+          message: mainT("main.interface.sessionRequestInvalid"),
+        };
+      }
+      return manager.terminateRoleRun({
+        projectRoot,
+        roleId,
+        runtime: input.runtime,
+        ...(typeof input.taskId === "string" && input.taskId !== "" ? { taskId: input.taskId } : {}),
+        ...(input.force === true ? { force: true } : {}),
+      });
+    },
+    async redispatchTask(input): Promise<RedispatchTaskResult> {
+      const projectRoot = input && typeof input.projectRoot === "string" ? input.projectRoot : "";
+      const taskId = input && typeof input.taskId === "string" ? input.taskId : "";
+      if (projectRoot === "" || taskId === "") {
+        return { ok: false, safety: "unsafe", autoAllowed: false, reasons: ["参数非法"], message: mainT("main.interface.sessionRequestInvalid") };
+      }
+      return manager.redispatchTask({
+        projectRoot,
+        taskId,
+        ...(typeof input.to === "string" && input.to !== "" ? { to: input.to } : {}),
+      });
+    },
+    async closeTask(input): Promise<CloseTaskResult> {
+      const projectRoot = input && typeof input.projectRoot === "string" ? input.projectRoot : "";
+      const taskId = input && typeof input.taskId === "string" ? input.taskId : "";
+      const outcome = input && (input.outcome === "accepted" || input.outcome === "rework" || input.outcome === "rejected") ? input.outcome : undefined;
+      if (projectRoot === "" || taskId === "" || outcome === undefined) {
+        return { ok: false, taskId, message: mainT("main.interface.sessionRequestInvalid") };
+      }
+      return manager.closeTask({
+        projectRoot,
+        taskId,
+        outcome,
+        ...(typeof input.note === "string" && input.note !== "" ? { note: input.note } : {}),
+      });
     },
     async getSessionHistory(input) { const history = await getSessionHistory(input, { credentialEnvNames: [...(deps.runtimeOptions?.extraCredentialEnvVars ?? []), ...(deps.runtimeOptions?.apiKeyEnvVar ? [deps.runtimeOptions.apiKeyEnvVar] : [])] }); manager.registerPersistenceHistory(history); return history; },
     async getRuntimeConfig(runtime) {

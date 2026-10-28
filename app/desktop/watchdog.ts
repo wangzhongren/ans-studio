@@ -41,9 +41,11 @@ import type { RuntimeKind } from "../../src/common/shared/runtime-shared.ts";
 // 2026-10-18 客户新要求：**移除完成态「收束」提示**（验收通过即收束；看护不再静默 30s 后投 `[系统·收束]`）。
 import {
   WATCHDOG_ALERT_PREFIX,
+  renderPatrolPrompt,
   renderWatchdogAlert,
   renderWatchdogRecovery,
   renderWatchdogStormGuard,
+  type PatrolRoleLine,
   type WatchdogSignalKind,
 } from "../../src/common/编排/watchdog.ts";
 import { mainT } from "./i18n.ts";
@@ -71,6 +73,37 @@ export const REPEAT_FAIL_COOLDOWN_MS = 30 * 60 * 1000;
 /** 风暴护栏：全项目 15 min 窗口内告警/恢复投递 ≤ 5 条。 */
 export const STORM_WINDOW_MS = 15 * 60 * 1000;
 export const STORM_LIMIT = 5;
+
+// —————————————— B 批（2026-10-28）：日志静默 / 10 分钟巡检参数（全部 env 可调） ——————————————
+export const PATROL_INTERVAL_MS = 10 * 60 * 1000;
+export const PATROL_PENDING_MAX = 1;
+export const LOG_SLOW_SILENCE_MS = 5 * 60 * 1000;
+export const LOG_STUCK_SILENCE_MS = 10 * 60 * 1000;
+export const LOG_HARD_CAP_MS = 30 * 60 * 1000;
+export const LOG_REDISPATCH_MAX = 2;
+export const LOG_COOLDOWN_MS = 10 * 60 * 1000;
+export const PATROL_INTERVAL_ENV = "ANS_PATROL_INTERVAL_MS";
+export const LOG_SLOW_SILENCE_ENV = "ANS_LOG_SLOW_SILENCE_MS";
+export const LOG_STUCK_SILENCE_ENV = "ANS_LOG_STUCK_SILENCE_MS";
+export const LOG_HARD_CAP_ENV = "ANS_LOG_HARD_CAP_MS";
+export const LOG_REDISPATCH_MAX_ENV = "ANS_LOG_REDISPATCH_MAX";
+export const LOG_COOLDOWN_ENV = "ANS_LOG_COOLDOWN_MS";
+/** 仅显式值 `auto-terminate` 才自动终止（默认只告警；B-07）。 */
+export const LOG_AUTO_TERMINATE_ENV = "ANS_LOG_AUTO_TERMINATE";
+export const LOG_AUTO_TERMINATE_VALUE = "auto-terminate";
+/** 信号状态（巡检事实行/角色徽标共用）。 */
+export type LogSilenceState = "normal" | "slow" | "stuck" | "hard-cap";
+
+/** 按静默时长求状态（5/10/30 分钟默认；阈值可注入）。`hard-cap` 仍只告警，除非 env 显式自动终止。 */
+export function logSilenceState(silentMs: number, opts?: { slowMs?: number; stuckMs?: number; hardCapMs?: number }): LogSilenceState {
+  const slow = opts?.slowMs ?? LOG_SLOW_SILENCE_MS;
+  const stuck = opts?.stuckMs ?? LOG_STUCK_SILENCE_MS;
+  const hard = opts?.hardCapMs ?? LOG_HARD_CAP_MS;
+  if (silentMs >= hard) return "hard-cap";
+  if (silentMs >= stuck) return "stuck";
+  if (silentMs >= slow) return "slow";
+  return "normal";
+}
 /**
  * **回合自动中止时限**（2026-10-21 客户要求：去掉默认 15 分钟自动关闭）。
  * 默认 **0 = 禁用**（看护只到点提示，不自动中止）；仅显式覆盖（测试）或
@@ -101,6 +134,14 @@ export interface WatchdogRoleView {
   turnStartedAt?: number;
   /** 本轮 turnId（若已 ACK）——#1 去重键的每轮身份。 */
   turnId?: string;
+  /** B 批：内置角色（巡检只汇总内置角色；项目 worker 可选、默认由任务卡查看）。 */
+  builtIn?: boolean;
+  /** B 批：正在投递的任务 id（有活动任务才判卡死/巡检）。 */
+  taskId?: string;
+  /** B 批：最近运行日志时间（ms；由 SessionManager 的同源内存缓存提供）。 */
+  lastActivityAt?: number;
+  /** B 批：最近动作摘要（日志 kind/摘要；巡检事实行用）。 */
+  lastAction?: string;
 }
 
 /** 一个项目的看护快照（**同源**：全部取自 SessionManager 的内存结构，读时同步、不引锁）。 */
@@ -112,6 +153,8 @@ export interface WatchdogProjectSnapshot {
    * 看护的「主人自身忙不报」「系统消息投向谁」都以它为准；未枚举到 → null。
    */
   governanceRoleId: string | null;
+  /** B 批：真实幕僚角色 id（trio chief；旧 liaison 别名不算）。巡检消息/结算用；single/旧交易无 → null。 */
+  chiefRoleId?: string | null;
   /** 活会话（busy 事实的唯一来源）。 */
   roles: WatchdogRoleView[];
   /** 全部非空队列（含目标无活会话者）。 */
@@ -156,6 +199,7 @@ function signalShortLabel(signal: WatchdogSignalKind): string {
     case "queue-stuck": return mainT("main.watchdog.signal.queueStuck");
     case "cmd-timeout": return mainT("main.watchdog.signal.cmdTimeout");
     case "repeat-fail": return mainT("main.watchdog.signal.repeatFail");
+    case "log-silence": return mainT("main.watchdog.signal.logSilence");
   }
 }
 
@@ -226,6 +270,15 @@ export interface WatchdogConfig {
   repeatFailCooldownMs: number;
   stormWindowMs: number;
   stormLimit: number;
+  /** B 批：10 分钟巡检间隔/未结算上限；日志静默阈值/重派上限/冷却；自动终止仅 env 显式。 */
+  patrolIntervalMs: number;
+  patrolPendingMax: number;
+  logSlowSilenceMs: number;
+  logStuckSilenceMs: number;
+  logHardCapMs: number;
+  logRedispatchMax: number;
+  logCooldownMs: number;
+  autoTerminateOnStuck: boolean;
   /** 与会话运行时**同源**的到点检查时限显式覆盖（`RuntimeAdapterFactoryOptions.promptTimeoutMs`；未设 ⇒ env/默认）。 */
   promptTimeoutOverrideMs?: number;
   /** 整轮最后兜底时限显式覆盖（生产固定 1 小时、无 env；测试注入小值用）。 */
@@ -254,6 +307,14 @@ export function resolveWatchdogConfig(env: Record<string, string | undefined> = 
     repeatFailCooldownMs: REPEAT_FAIL_COOLDOWN_MS,
     stormWindowMs: STORM_WINDOW_MS,
     stormLimit: STORM_LIMIT,
+    patrolIntervalMs: readPositive(env[PATROL_INTERVAL_ENV]) ?? PATROL_INTERVAL_MS,
+    patrolPendingMax: PATROL_PENDING_MAX,
+    logSlowSilenceMs: readPositive(env[LOG_SLOW_SILENCE_ENV]) ?? LOG_SLOW_SILENCE_MS,
+    logStuckSilenceMs: readPositive(env[LOG_STUCK_SILENCE_ENV]) ?? LOG_STUCK_SILENCE_MS,
+    logHardCapMs: readPositive(env[LOG_HARD_CAP_ENV]) ?? LOG_HARD_CAP_MS,
+    logRedispatchMax: readPositive(env[LOG_REDISPATCH_MAX_ENV]) ?? LOG_REDISPATCH_MAX,
+    logCooldownMs: readPositive(env[LOG_COOLDOWN_ENV]) ?? LOG_COOLDOWN_MS,
+    autoTerminateOnStuck: env[LOG_AUTO_TERMINATE_ENV] === LOG_AUTO_TERMINATE_VALUE,
     ...overrides,
   };
 }
@@ -285,6 +346,11 @@ export interface WatchdogServiceDeps {
    * 只记 `watchdog.tick-hook.failed` 诊断，不影响本 tick 其他信号与下个 tick。
    */
   onTickProject?: (projectRoot: string, at: number) => void;
+  /**
+   * B 批（2026-10-28）：`stuck`/`hard-cap` 且 env 显式 `auto-terminate` 时回调一次（同一角色同一活跃期）。
+   * 缺省 ⇒ 只告警（默认）；回调由桌面窗口执行终止（及按安全分类重派）。看护不直接终止。
+   */
+  onStuckRole?: (projectRoot: string, roleId: string, runtime: RuntimeKind, info: { state: "stuck" | "hard-cap"; taskId?: string; silentMs: number }) => void;
 }
 
 /** 看护的只读统计（`role_status` 用；全部来自看护内存态——不触盘、不改任何东西）。 */
@@ -346,6 +412,9 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
   const instantStates = new Map<string, InstantState>();
   /** 自动中止去重（2026-10-20）：`projectRoot\0roleId` → 已触发过的轮次身份（同一 role+turnId 恰一次）。 */
   const autoAbortFired = new Map<string, string>();
+  /** B 批：巡检状态（每项目：上次运行/未结算/连续跳过）；`stuck` 自动终止去重按角色活跃期。 */
+  const patrolStates = new Map<string, { lastRunAt?: number; pending: boolean; skipped: number }>();
+  const stuckFired = new Map<string, string>();
   let seq = 0;
   let timer: ReturnType<typeof setInterval> | undefined;
 
@@ -507,7 +576,10 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
       const colon = key.indexOf(":");
       const kind = key.slice(0, colon);
       const roleId = key.slice(colon + 1);
-      const signal: WatchdogSignalKind = kind === "turn-deadline" ? "turn-deadline" : kind === "queue-stuck" ? "queue-stuck" : "repeat-fail";
+      const signal: WatchdogSignalKind = kind === "turn-deadline" ? "turn-deadline"
+        : kind === "queue-stuck" ? "queue-stuck"
+          : kind === "log-silence" ? "log-silence"
+            : "repeat-fail";
       resolveEpisode(projectRoot, signal, roleId, key, st);
     }
   };
@@ -647,6 +719,56 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
       });
     }
 
+    // —— B 批：`log-silence`（slow≥5min / stuck≥10min / hard-cap≥30min；仅 busy 且有活动任务的内置角色）——
+    // 与 10 分钟巡检共享同一活跃期/去重/冷却；slow 只提醒、不终止。默认只告警，env `auto-terminate` 才回调终止。
+    for (const role of snapshot.roles) {
+      if (role.busy !== true || role.builtIn !== true || role.taskId === undefined || role.taskId === "") continue;
+      const key = `log-silence:${role.roleId}`;
+      evaluated.add(key);
+      const lastAt = role.lastActivityAt ?? role.turnStartedAt ?? at;
+      const silentMs = Math.max(0, at - lastAt);
+      const state = logSilenceState(silentMs, {
+        slowMs: config.logSlowSilenceMs,
+        stuckMs: config.logStuckSilenceMs,
+        hardCapMs: config.logHardCapMs,
+      });
+      const positive = state !== "normal" && pendingFor(role.roleId) === 0 && !govSuppressed(role.roleId);
+      const identity = `${role.turnId ?? role.turnStartedAt ?? "?"}:${role.taskId}`;
+      if ((state === "stuck" || state === "hard-cap") && config.autoTerminateOnStuck && deps.onStuckRole !== undefined) {
+        const fireKey = `${projectRoot}\u0000${role.roleId}`;
+        if (stuckFired.get(fireKey) !== identity) {
+          stuckFired.set(fireKey, identity);
+          try {
+            deps.onStuckRole(projectRoot, role.roleId, role.runtime, { state, taskId: role.taskId, silentMs });
+          } catch (err) {
+            loggerFor(projectRoot).error("watchdog.stuck-action.failed", err);
+          }
+          loggerFor(projectRoot).record("watchdog.stuck-terminate", { roleId: role.roleId, state, silentMs, taskId: role.taskId });
+        }
+      }
+      evaluateEpisode(projectRoot, {
+        key,
+        signal: "log-silence",
+        roleId: role.roleId,
+        positive,
+        identity,
+        cooldownMs: config.logCooldownMs,
+        buildAlert: () => ({
+          text: renderWatchdogAlert({
+            signal: "log-silence",
+            roleId: role.roleId,
+            facts: [
+              `状态：${state}（静默 ${formatDurationMs(silentMs)}；阈值 slow ${formatDurationMs(config.logSlowSilenceMs)} / stuck ${formatDurationMs(config.logStuckSilenceMs)} / hard-cap ${formatDurationMs(config.logHardCapMs)}）`,
+              `任务：#${role.taskId ?? "未关联"}；最后日志：${role.lastActivityAt !== undefined ? formatClock(role.lastActivityAt) : "无日志记录"}`,
+              `最近动作：${role.lastAction ?? (role.turnStartedAt !== undefined ? "轮次已开始，暂无日志摘要" : "未知")}`,
+              config.autoTerminateOnStuck ? "env 显式 auto-terminate：stuck 将由应用终止并按安全分类重派。" : "默认只告警；确认卡死后由幕僚决定是否终止/重派。",
+            ],
+          }),
+          summary: mainT("main.watchdog.signalSummary", { signal: signalShortLabel("log-silence"), roleId: role.roleId }),
+        }),
+      });
+    }
+
     // 清扫：本轮没评估到的活跃期（队列清空/会话消失/记录过期等）按「条件已不再成立」解除。
     sweepStates(projectRoot, evaluated);
 
@@ -654,6 +776,59 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
     for (const [full, st] of instantStates) {
       if (!full.startsWith(`${projectRoot}\u0000`)) continue;
       if (st.lastDeliveredAt !== undefined && at - st.lastDeliveredAt > config.cmdTimeoutCooldownMs * 4 && st.suppressedSinceDelivered === 0) instantStates.delete(full);
+    }
+
+    // —— B 批：10 分钟全局巡检（复用本 tick 计数，不新增第二个 setInterval）——
+    // 仅对存在「正在工作（busy）且有活动任务（taskId）」内置角色的项目发 `[系统·巡检]`；
+    // `patrolPending` 最多 1 条，上一轮未结算 ⇒ 跳过本 tick 并记 `patrol.skipped`，连续 2 次跳过记系统行/诊断。
+    const patrol = patrolStates.get(projectRoot) ?? { pending: false, skipped: 0 };
+    patrolStates.set(projectRoot, patrol);
+    if (patrol.lastRunAt === undefined) {
+      // 应用启动后的第一个 tick 只登记基准——首个 10 分钟窗口结束后才巡检（不在启动瞬间发「巡检」）。
+      patrol.lastRunAt = at;
+    } else if (at - patrol.lastRunAt >= config.patrolIntervalMs) {
+      patrol.lastRunAt = at;
+      if (patrol.pending && config.patrolPendingMax >= 1) {
+        patrol.skipped += 1;
+        loggerFor(projectRoot).record("patrol.skipped", { count: patrol.skipped, reasonCode: "pending" });
+        if (patrol.skipped === 2) {
+          outbound(projectRoot, {
+            text: `${WATCHDOG_ALERT_PREFIX} 巡检已连续跳过 2 次（上一轮巡检消息未结算）；在岗状态见 role_status。`,
+            summary: mainT("main.watchdog.patrolSkipped", { count: patrol.skipped }),
+          }, "patrol-skipped");
+        }
+      } else {
+        const roleLines: PatrolRoleLine[] = [];
+        for (const role of snapshot.roles) {
+          if (role.busy !== true || role.builtIn !== true || role.taskId === undefined || role.taskId === "") continue;
+          const lastAt = role.lastActivityAt ?? role.turnStartedAt ?? at;
+          const silentMs = Math.max(0, at - lastAt);
+          const state = logSilenceState(silentMs, {
+            slowMs: config.logSlowSilenceMs,
+            stuckMs: config.logStuckSilenceMs,
+            hardCapMs: config.logHardCapMs,
+          });
+          roleLines.push({
+            roleId: role.roleId,
+            taskId: role.taskId,
+            ...(role.lastActivityAt !== undefined ? { lastLogAt: new Date(role.lastActivityAt).toISOString() } : {}),
+            ...(role.lastAction !== undefined ? { lastAction: role.lastAction } : {}),
+            silentMs,
+            state,
+          });
+        }
+        roleLines.sort((a, b) => a.roleId.localeCompare(b.roleId));
+        if (roleLines.length > 0) {
+          const delivered = outbound(projectRoot, {
+            text: renderPatrolPrompt({ at: new Date(at).toISOString(), roles: roleLines, ...(patrol.skipped > 0 ? { skipped: patrol.skipped } : {}) }),
+            summary: mainT("main.watchdog.patrolSummary", { count: roleLines.length }),
+          }, "patrol");
+          if (delivered) {
+            patrol.pending = true;
+            patrol.skipped = 0;
+          }
+        }
+      }
     }
 
     // 2026-10-27 流程推进/停滞看护钩子（客户新设计第 3 项）：看护只提供 tick 时机；flow 读取/去重/投递
@@ -693,6 +868,16 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
             const list = failures.get(full) ?? [];
             list.push({ at: observation.at, outcome: observation.outcome });
             failures.set(full, list);
+          }
+          // B 批：幕僚轮次结算 ⇒ 巡检消息已结算，下一轮可再发（pending 最多 1）。
+          const snapshot = deps.snapshot(projectRoot);
+          const patrolOwner = snapshot?.chiefRoleId ?? snapshot?.governanceRoleId ?? null;
+          if (observation.roleId === patrolOwner) {
+            const patrol = patrolStates.get(projectRoot);
+            if (patrol !== undefined) {
+              patrol.pending = false;
+              patrol.skipped = 0;
+            }
           }
           return;
         }

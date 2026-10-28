@@ -405,6 +405,23 @@ export function describeTool(name: string): ToolDescription {
               "(the target role cannot see your context); for rework, restate the requirements and include the evidence",
           },
           reason: { type: "string", description: "Optional: why you are dispatching this task" },
+          sideEffect: {
+            type: "string",
+            enum: ["read-only", "docs", "code", "external", "destructive", "unknown"],
+            description:
+              "B 批（星形任务）：declared side-effect class. Missing/invalid is treated as unknown. The application may upgrade (never downgrade) it from the task text; external/destructive/unknown can never be auto-redispatched after a stuck termination.",
+          },
+          expectedOutput: { type: "string", description: "B 批：expected output (task-card field; shown to the target)" },
+          requestedEvidence: {
+            type: "array",
+            items: { type: "string" },
+            maxItems: 5,
+            description: "B 批：optional evidence hints (≤5 paths); hints only, not an acceptance decision",
+          },
+          idempotencyKey: {
+            type: "string",
+            description: "B 批：idempotency key; defaults to a hash of sender/target/task text. A redispatch keeps the original key.",
+          },
           flowId: {
             type: "string",
             pattern: GOVERNANCE_SLUG_PATTERN,
@@ -432,6 +449,7 @@ export function describeTool(name: string): ToolDescription {
         "投递时系统会据此自动附上「**必读（按序）**」块（先读完再动手），其中的 sha256 由投递系统在投递当刻计算——**不要自己算或转抄哈希**。" +
         "引用的契约文件不存在时投递会被**拒绝**（回执如实报错；补落盘后重派）；`docs/workflow.md` 缺失（旧项目过渡期）不拒投、必读块如实标注「未提供」。" +
         "roleId 通常是本项目角色；**产品（Lead/Liaison）还可把 `convener`（Steward）作为协调目标**——其余内置治理角色不可作为目标，也不能派发给调用者自己。" +
+        "B 批星形任务（幕僚）：`chief` 可将任务派给任意内置角色或项目 worker；报告统一回幕僚，任务落 `tasks.jsonl`，不再使用 flow 步骤语义。" +
         "产品向 Steward 派发属**内部协调**，**不是客户批准**；Steward/项目角色仍按自己的已接受边界与门禁执行。" +
         "本工具**不写盘、不做治理判定、不改变任何角色的写权**。" +
         "治理会话可附可选 `flowId`/`stepId`：治理角色派发须同时给出（用于派发范围门与去重）；**产品向 Steward 协调时带 `flowId`、`stepId` 可省**；旧 su 调用可缺席＝旧行为——" +
@@ -448,6 +466,7 @@ export function describeTool(name: string): ToolDescription {
           "任务文本**按地址引用**契约与工作流（给项目内路径），**不内嵌契约全文**——投递时系统会自动附上「**必读（按序）**」块并计算其中的 sha256；" +
           "**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（如实回执），补落盘后重派。",
         "返工时把**要求与证据**一并写进任务文本（复述返工要求 + 相关证据/路径），避免对方凭猜返工。",
+        "B 批星形任务：填写 `sideEffect`（应用会按任务文本升类，缺填/非法按 unknown）；`expectedOutput`/`requestedEvidence` 是任务卡字段与证据提示，不构成验收结论。",
       ],
     };
   }
@@ -616,6 +635,77 @@ export function describeTool(name: string): ToolDescription {
       promptGuidelines: [
         "session_tail 只读现有落盘会话的尾部——它不重放、不恢复、不修改任何会话；需要核对某角色近期在做什么时按其尾部按需读取。",
         "行列内容来自受保护投影（已脱敏），但仍是会话原文要点：只用于排查，不要转抄敏感细节，不要据此假设任何写权。",
+      ],
+    };
+  }
+  if (name === "role_activity_log") {
+    // B 批（2026-10-28）：幕僚只读每角色运行日志（`.ans/state/logs/<roleId>.jsonl`）。
+    // 文案纪律：只读/脱敏/项目相对路径/坏行跳过如实/不写完整 prompt；角色不可直接读文件。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          roleId: { type: "string", description: "Target role id (required)" },
+          since: { type: "string", description: "Optional ISO timestamp lower bound (inclusive)" },
+          limit: { type: "number", description: "How many recent entries to return; default 50, cap 200" },
+        },
+        required: ["roleId"],
+        additionalProperties: true,
+      },
+      description:
+        "**只读**角色运行日志（幕僚工具；只注入给幕僚）：读取 `.ans/state/logs/<roleId>.jsonl` 的最近条目" +
+        "（轮次开始/结束、消息摘要、工具调用/结果、任务/申请状态、错误、投递、终止/重派）。" +
+        "字段白名单、摘要已脱敏且≤200 字、路径项目相对；不写完整 prompt/完整命令参数/凭据。" +
+        "**纯读：不写盘、不改任何状态、不扩大任何写权**；坏行跳过并如实给数量；文件不存在 ⇒ 空日志（不是错误）。" +
+        "缺省 50 条、上限 200 条。",
+      promptGuidelines: [
+        "role_activity_log 只用于核对角色最后活动（卡死/巡检/重派前）；不要把它当心跳或验收证据。",
+        "日志摘要可能含此前会话要点（已脱敏）：按排查最小必要读取，不要转抄敏感细节，不要据此假设任何写权。",
+        "确认卡死后先终止（应用按子进程树/部分写入/副作用分类校验），仅安全分类才自动重派；external/destructive/unknown 零次自动重派。",
+      ],
+    };
+  }
+  if (name === "terminate_role_run") {
+    // B 批：幕僚终止当前轮次 + 子进程树；默认只告警，确认卡死后才终止；未确认不得自动重派。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          roleId: { type: "string", description: "Target role id (required)" },
+          taskId: { type: "string", description: "Optional task id associated with the stuck run (for partial-artifact scan)" },
+        },
+        required: ["roleId"],
+        additionalProperties: true,
+      },
+      description:
+        "**终止**角色当前轮次 + 该会话的 shell/外部命令子进程树（幕僚工具）。终止前应用读取后台任务并等待退出；" +
+        "回执如实给子进程数与 `terminationConfirmed`。**未确认/子进程未全停 ⇒ 不得自动重派**；发现部分写入时如实列出，" +
+        "重派前须核对/隔离。终止不是客户批准，也不改变任何写权。",
+      promptGuidelines: [
+        "只在确认卡死（role_activity_log / session_tail 核对）后终止；slow 只提醒，不终止。",
+        "terminationConfirmed=false 时不要调用 redispatch_task 自动重派；如实升级幕僚/客户。",
+      ],
+    };
+  }
+  if (name === "redispatch_task") {
+    // B 批：安全重派；外部/破坏性/未知副作用 0 次自动重派；同链最多 2 次。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: { type: "string", description: "Stuck task id (required)" },
+          to: { type: "string", description: "Optional new target role id; defaults to the original target" },
+        },
+        required: ["taskId"],
+        additionalProperties: true,
+      },
+      description:
+        "**安全重派**卡死任务（幕僚工具）：应用按副作用分类（external/destructive/unknown ⇒ 0 次自动重派）、" +
+        "终止确认、部分写入、已完成报告判定 `safety`；仅 `safe` 产生新任务（新 taskId + retryOf + 同 idempotencyKey），" +
+        "原任务 closed/rework。同链最多 2 次重派，第 3 次升级申请/决策。**重派 ≠ 授权**，不改变任何写权。",
+      promptGuidelines: [
+        "先终止并核对回执；safety=unsafe/needs-review 时如实告知原因，不得宣称已重派。",
+        "重派时缩窄任务/核对已完成部分；不得绕过副作用安全分类。",
       ],
     };
   }

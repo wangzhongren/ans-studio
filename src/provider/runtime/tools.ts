@@ -68,6 +68,8 @@ import type {
   GovernanceCardKind, GovernanceCardMetadata, GovernanceChoiceCardKind, GovernanceConfirmCardKind, GovernanceFlowMetadata,
   BackgroundTaskCapability, BackgroundTaskSnapshot,
   ViewImageFn, ViewImageInput, PromptImage, ViewImageReceipt, ViewImageDeliveryMode, RuntimeViewImagePolicy,
+  RoleActivityLogFn, RoleActivityLogPayload, TaskSideEffect,
+  TerminateRoleRunFn, TerminateRoleRunPayload, RedispatchTaskFn, RedispatchTaskPayload,
 } from "../../model/runtime.ts";
 import { GOVERNANCE_SLUG_PATTERN, FLOW_TOOL_STATUSES, FLOW_TOOL_STEP_KINDS } from "../../model/runtime.ts";
 import type { WriteDecision } from "../../model/decision.ts";
@@ -145,6 +147,15 @@ export const ROLE_STATUS_TOOL_NAME = "role_status";
 
 /** session_tail 工具名（G-2/R1；su 只读会话尾线——受保护投影后的规范化行，纯读无副作用）。 */
 export const SESSION_TAIL_TOOL_NAME = "session_tail";
+
+/** role_activity_log 工具名（B 批；幕僚只读每角色运行日志——纯读、脱敏、项目相对路径）。 */
+export const ROLE_ACTIVITY_LOG_TOOL_NAME = "role_activity_log";
+
+/** terminate_role_run 工具名（B 批；幕僚确认卡死后终止当前轮次 + 子进程树）。 */
+export const TERMINATE_ROLE_RUN_TOOL_NAME = "terminate_role_run";
+
+/** redispatch_task 工具名（B 批；卡死终止后按副作用安全分类重派，仅 safe 自动执行）。 */
+export const REDISPATCH_TASK_TOOL_NAME = "redispatch_task";
 
 /** propose_recovery 工具名（G-2/R2；su 恢复提议——只提议，客户一键确认后由应用执行）。 */
 export const PROPOSE_RECOVERY_TOOL_NAME = "propose_recovery";
@@ -2128,10 +2139,37 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
       const governance = readGovernanceFlowArgs(call.args, name);
       if (!governance.ok) return governance.result;
       const reason = readStringArg(call.args, ["reason"]);
+      // B 批（2026-10-28）：任务卡字段。缺填/非法副作用**不拒绝**——按契约交给应用归一为 unknown
+      // （B-08：幕僚声明但应用强制校验；工具层只做形状校验，不做安全分类）。
+      const sideEffectRaw = call.args["sideEffect"] ?? call.args["side_effect"];
+      if (sideEffectRaw !== undefined && sideEffectRaw !== null && typeof sideEffectRaw !== "string") {
+        return { ok: false, message: `${name}: sideEffect 参数非法（应为 read-only/docs/code/external/destructive/unknown）` };
+      }
+      const SIDE_EFFECTS = ["read-only", "docs", "code", "external", "destructive", "unknown"] as const;
+      const sideEffect: TaskSideEffect | undefined = typeof sideEffectRaw === "string"
+        ? (SIDE_EFFECTS as readonly string[]).includes(sideEffectRaw) ? sideEffectRaw as TaskSideEffect : "unknown"
+        : undefined;
+      const expectedOutput = readStringArg(call.args, ["expectedOutput", "expected_output"]);
+      const requestedEvidenceRaw = call.args["requestedEvidence"] ?? call.args["requested_evidence"];
+      let requestedEvidence: string[] | undefined;
+      if (requestedEvidenceRaw !== undefined && requestedEvidenceRaw !== null) {
+        if (!Array.isArray(requestedEvidenceRaw) || !requestedEvidenceRaw.every((item) => typeof item === "string" && item.trim() !== "")) {
+          return { ok: false, message: `${name}: requestedEvidence 参数非法（应为非空字符串数组，≤5 条）` };
+        }
+        requestedEvidence = (requestedEvidenceRaw as string[]).slice(0, 5);
+      }
+      const idempotencyKey = readStringArg(call.args, ["idempotencyKey", "idempotency_key"]);
+      if (idempotencyKey !== undefined && idempotencyKey.trim() === "") {
+        return { ok: false, message: `${name}: idempotencyKey 不能为空字符串` };
+      }
       const payload: DispatchTaskPayload = {
         roleId,
         task,
         ...(reason !== undefined ? { reason } : {}),
+        ...(sideEffect !== undefined ? { sideEffect } : {}),
+        ...(expectedOutput !== undefined ? { expectedOutput } : {}),
+        ...(requestedEvidence !== undefined ? { requestedEvidence } : {}),
+        ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
         ...governance.value,
       };
 
@@ -2540,6 +2578,131 @@ function makeSessionTailTool(fn: SessionTailFn, currentTurnId?: () => string | u
       }
       const clampNote = requested > SESSION_TAIL_MAX_LINES ? `[已按上限取尾：请求 ${requested} 行 → 取 ${SESSION_TAIL_MAX_LINES} 行]\n` : "";
       return { ok: true, message: `${clampNote}${receipt.text}` };
+    },
+  };
+}
+
+/** role_activity_log 行数：缺省 50、上限 200（工具层归一后传给数据源）。 */
+const ROLE_ACTIVITY_DEFAULT_LIMIT = 50;
+const ROLE_ACTIVITY_MAX_LIMIT = 200;
+
+/**
+ * role_activity_log：幕僚的**只读**运行日志查询（B 批，2026-10-28）。本层只做形状校验/归一
+ * （roleId 必填、since 可解析、limit 1..200）→ 调注入数据源 → 如实转达（≤8 KiB，超限标注）。
+ * **绝无副作用**：不写盘、不入队、不改任务/会话状态；数据源失败如实回报，不编造日志。
+ */
+function makeRoleActivityLogTool(fn: RoleActivityLogFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  const name = ROLE_ACTIVITY_LOG_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const turnId = currentTurnId?.();
+      const roleId = readStringArg(call.args, ["roleId", "role_id", "role"]);
+      if (roleId === undefined || roleId.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 roleId 参数（目标角色 id），无法读取运行日志` };
+      }
+      const sinceRaw = call.args["since"];
+      if (sinceRaw !== undefined && sinceRaw !== null && (typeof sinceRaw !== "string" || sinceRaw.trim() === "" || Number.isNaN(Date.parse(sinceRaw)))) {
+        return { ok: false, message: `${name}: since 参数非法（应为可解析的 ISO 时间；缺省不限）` };
+      }
+      const limitRaw = call.args["limit"];
+      if (limitRaw !== undefined && limitRaw !== null && (typeof limitRaw !== "number" || !Number.isInteger(limitRaw) || limitRaw < 1)) {
+        return { ok: false, message: `${name}: limit 参数非法（应为 ≥1 的整数；缺省 ${ROLE_ACTIVITY_DEFAULT_LIMIT}，上限 ${ROLE_ACTIVITY_MAX_LIMIT}）` };
+      }
+      const requested = typeof limitRaw === "number" ? limitRaw : ROLE_ACTIVITY_DEFAULT_LIMIT;
+      const query: RoleActivityLogPayload = {
+        roleId,
+        ...(typeof sinceRaw === "string" ? { since: sinceRaw } : {}),
+        limit: Math.min(requested, ROLE_ACTIVITY_MAX_LIMIT),
+      };
+      let result: unknown;
+      try {
+        result = await raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return turnId === undefined ? fn(query) : fn(query, handbackMetadata(turnId, scope)); }), call.signal, `${name} 读取日志`);
+      } catch (err) {
+        return { ok: false, message: `${name}：运行日志读取**未完成**（原因：${reasonOf(err)}）——不要凭空推断该角色活动。` };
+      }
+      const receipt = watchdogResultOf(result);
+      if (receipt === undefined) return { ok: false, message: `${name}：数据源未返回明确结果（回执缺失或非法）——不要据此判断任何状态。` };
+      if (!receipt.ok) return { ok: false, message: watchdogFailureMessage(name, receipt.message) };
+      if (typeof receipt.text !== "string" || receipt.text === "") return { ok: false, message: `${name}：数据源未返回文本（结果不明）——不要据此判断任何状态。` };
+      const text = receipt.text;
+      if (Buffer.byteLength(text, "utf8") <= ROLE_STATUS_MAX_BYTES) return { ok: true, message: text };
+      const capped = truncateUtf8(text, ROLE_STATUS_MAX_BYTES - Buffer.byteLength(ROLE_STATUS_TRUNCATED_MARKER, "utf8"));
+      return { ok: true, message: `${capped.text}${ROLE_STATUS_TRUNCATED_MARKER}` };
+    },
+  };
+}
+
+/**
+ * terminate_role_run：幕僚的终止动作（B-07/B-08）。本层只做形状校验并如实转达回执：
+ * `terminationConfirmed:false` / 子进程未全部停止 ⇒ 明确「未确认」——**不得**当已终止/可重派。
+ */
+function makeTerminateRoleRunTool(fn: TerminateRoleRunFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  const name = TERMINATE_ROLE_RUN_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const turnId = currentTurnId?.();
+      const roleId = readStringArg(call.args, ["roleId", "role_id", "role"]);
+      if (roleId === undefined || roleId.trim() === "") return { ok: false, message: `${name}: 缺少 roleId 参数（目标角色 id），无法终止` };
+      const taskId = readStringArg(call.args, ["taskId", "task_id"]);
+      const payload: TerminateRoleRunPayload = { roleId, ...(taskId !== undefined ? { taskId } : {}) };
+      let result: unknown;
+      try {
+        result = await raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return turnId === undefined ? fn(payload) : fn(payload, handbackMetadata(turnId, scope)); }), call.signal, `${name} 终止`);
+      } catch (err) {
+        return { ok: false, message: `${name}：终止**未完成**（原因：${reasonOf(err)}）——不得当作已终止或可重派。` };
+      }
+      const rec = result !== null && typeof result === "object" ? result as Record<string, unknown> : undefined;
+      if (rec === undefined || typeof rec.ok !== "boolean") return { ok: false, message: `${name}：终止结果不明（回执缺失或非法）——不得当作已终止。` };
+      const confirmed = rec.terminationConfirmed === true;
+      const children = typeof rec.childProcesses === "number" ? rec.childProcesses : 0;
+      const stopped = typeof rec.childProcessesStopped === "number" ? rec.childProcessesStopped : 0;
+      const partial = Array.isArray(rec.partialArtifacts) ? rec.partialArtifacts.filter((item): item is string => typeof item === "string") : [];
+      const detail = typeof rec.message === "string" ? ` ${rec.message}` : "";
+      if (rec.ok === true && confirmed) {
+        return {
+          ok: true,
+          message: `${name}：已终止角色「${roleId}」当前轮次；子进程 ${stopped}/${children} 已停止。${partial.length > 0 ? `发现部分写入 ${partial.length} 项——重派前须核对/隔离，不得自动重派。` : ""}${detail}`,
+        };
+      }
+      return {
+        ok: false,
+        message: `${name}：终止**未确认**（子进程 ${stopped}/${children} 已停止；回执 ok=${String(rec.ok)}）。${partial.length > 0 ? `部分写入 ${partial.length} 项。` : ""}${detail} 不得自动重派；如实告知幕僚/客户。`,
+      };
+    },
+  };
+}
+
+/**
+ * redispatch_task：幕僚的安全重派动作（B-08）。本层只转达回执：`safety!=="safe"` / `autoAllowed!==true`
+ * ⇒ 明确「未重派」及原因（external/destructive/unknown 0 次自动重派）。
+ */
+function makeRedispatchTaskTool(fn: RedispatchTaskFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  const name = REDISPATCH_TASK_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const turnId = currentTurnId?.();
+      const taskId = readStringArg(call.args, ["taskId", "task_id"]);
+      if (taskId === undefined || taskId.trim() === "") return { ok: false, message: `${name}: 缺少 taskId 参数，无法重派` };
+      const to = readStringArg(call.args, ["to", "roleId", "role_id"]);
+      const payload: RedispatchTaskPayload = { taskId, ...(to !== undefined ? { to } : {}) };
+      let result: unknown;
+      try {
+        result = await raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return turnId === undefined ? fn(payload) : fn(payload, handbackMetadata(turnId, scope)); }), call.signal, `${name} 重派`);
+      } catch (err) {
+        return { ok: false, message: `${name}：重派**未完成**（原因：${reasonOf(err)}）——不得当作已重派。` };
+      }
+      const rec = result !== null && typeof result === "object" ? result as Record<string, unknown> : undefined;
+      if (rec === undefined || typeof rec.ok !== "boolean") return { ok: false, message: `${name}：重派结果不明（回执缺失或非法）——不得当作已重派。` };
+      const safety = rec.safety === "safe" || rec.safety === "unsafe" || rec.safety === "needs-review" ? rec.safety : "unsafe";
+      const reasons = Array.isArray(rec.reasons) ? rec.reasons.filter((item): item is string => typeof item === "string").join("；") : "";
+      const message = typeof rec.message === "string" ? rec.message : "";
+      if (rec.ok === true && safety === "safe" && rec.autoAllowed === true) {
+        return { ok: true, message: `${name}：已重派：新任务 #${String(rec.taskId ?? "?")}（retryOf #${String(rec.retryOf ?? taskId)}）。${message}` };
+      }
+      return { ok: false, message: `${name}：**未重派**（safety=${safety}；autoAllowed=${String(rec.autoAllowed)}）。${reasons !== "" ? `原因：${reasons}。` : ""}${message} 不得当作已重派。` };
     },
   };
 }
@@ -3868,6 +4031,15 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   if (roleStatus !== undefined) tools.push(makeRoleStatusTool(roleStatus, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
   const sessionTail = options?.sessionTail;
   if (sessionTail !== undefined) tools.push(makeSessionTailTool(sessionTail, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  // B 批（2026-10-28）：role_activity_log 同属「注入才注册」；只由编排给幕僚注入，
+  // 其他角色/项目角色未注入 ⇒ 工具不存在（结构性 fail-closed）。
+  const roleActivityLog = options?.roleActivityLog;
+  if (roleActivityLog !== undefined) tools.push(makeRoleActivityLogTool(roleActivityLog, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  // B 批：终止/重派动作同属「注入才注册」；只由编排给幕僚注入。
+  const terminateRoleRun = options?.terminateRoleRun;
+  if (terminateRoleRun !== undefined) tools.push(makeTerminateRoleRunTool(terminateRoleRun, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  const redispatchTask = options?.redispatchTask;
+  if (redispatchTask !== undefined) tools.push(makeRedispatchTaskTool(redispatchTask, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
 
   // 结构性保证（G-2/R2，同 dispatch_task 先例）：**未注入恢复提议能力时 `propose_recovery` 不存在**。
   const proposeRecovery = options?.proposeRecovery;

@@ -32,6 +32,7 @@ import {
 import { createDesktopInterface } from "../../app/desktop/interface.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { readGovernanceLedger, appendGovernanceLedger, type GovernanceLedgerEntry } from "../../src/pipeline/orchestration/govern-session.ts";
+import { readTaskState } from "../../src/common/编排/task-state.ts";
 import type { SessionEventEnvelope, RuntimeKind } from "../../app/desktop/session.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
@@ -291,6 +292,7 @@ interface OpenInputView {
   projectRoot: string;
   roleId: string;
   runtime?: RuntimeKind;
+  dispatchTask?: import("../../src/model/runtime.ts").DispatchTaskFn;
 }
 
 interface Harness {
@@ -317,6 +319,7 @@ async function makeHarness(projectRoot: string, options: HarnessOptions): Promis
         projectRoot: input.project.projectRoot,
         roleId: input.roleId,
         ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
+        ...(input.dispatchTask !== undefined ? { dispatchTask: input.dispatchTask } : {}),
       });
       const sends: string[] = [];
       sendsByRole.set(input.roleId, sends);
@@ -701,6 +704,49 @@ test("客户 openSession 成功即记住 per-project 引擎选择（供下次冷
       assert.equal(opened.ok, true, opened.ok ? "" : (opened.error ?? "unknown"));
       await waitForAsync(async () => (await readPersistedProjectRuntime(statePath, root)) === "codex");
       assert.equal(await readPersistedProjectRuntime(statePath, root), "codex", "成功开启会话后持久化所选引擎");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    await removeTempDirEventually(root);
+  }
+});
+
+// —————————————— B 批（2026-10-28）：星形派发按目标会话的真实引擎投递 ——————————————
+test("幕僚星形派发：目标已有活会话 ⇒ 用目标 runtime 投递（不串用幕僚引擎）", async () => {
+  const root = makeTempDir("ans-runtime-star-");
+  try {
+    const envPath = writeEnvFile(root, { ...PI_KEYS, ...CODEX_KEYS });
+    const listing: ProjectListing = {
+      projectRoot: root,
+      roles: [
+        { roleId: "chief", cardPath: "", boundaryPath: "", cardText: "# chief", boundary: { entries: [], boundarySource: "<built-in>", acceptance: { accepted: false, source: "" } }, builtIn: true, governanceFunction: "chief" },
+        { roleId: "convener", cardPath: "", boundaryPath: "", cardText: "# convener", boundary: { entries: [], boundarySource: "<built-in>", acceptance: { accepted: false, source: "" } }, builtIn: true, governanceFunction: "schedule" },
+        { roleId: "worker", cardPath: "角色卡/worker/role-card.md", boundaryPath: "角色卡/worker/boundary.yaml", cardText: "# worker", boundary: { entries: [{ root: "project", path: "src/w.ts", kind: "file", purpose: "p" }], boundarySource: "角色卡/worker/boundary.yaml", acceptance: { accepted: false, source: "" } } },
+      ],
+      warnings: [],
+      hasRoles: true,
+      primaryRoleId: "chief",
+      governanceModel: "trio",
+    };
+    const harness = await makeHarness(root, { listing, envFilePath: envPath, piConfigEnv: { ...PI_KEYS } });
+    try {
+      const workerOpened = await harness.iface.openSession({ projectRoot: root, roleId: "worker", runtime: "pi" });
+      assert.equal(workerOpened.ok, true, workerOpened.error ?? "");
+      const chiefOpened = await harness.iface.openSession({ projectRoot: root, roleId: "chief", runtime: "codex" });
+      assert.equal(chiefOpened.ok, true, chiefOpened.error ?? "");
+      const dispatch = harness.openInputs.find((entry) => entry.roleId === "chief")?.dispatchTask;
+      assert.equal(typeof dispatch, "function", "chief 获得 dispatch_task");
+      const receipt = (await dispatch!({ roleId: "worker", task: "按目标引擎实现 X", sideEffect: "code" }))!;
+      assert.equal(receipt.ok, true, receipt.message ?? "");
+      await waitForAsync(async () => (harness.sendsByRole.get("worker") ?? []).some((text) => /按目标引擎实现 X/.test(text)));
+      const workerOpens = harness.openInputs.filter((entry) => entry.roleId === "worker");
+      assert.equal(workerOpens.length, 1, "复用已开 worker 会话，不再按幕僚引擎开第二会话");
+      assert.equal(workerOpens[0].runtime, "pi");
+      await waitForAsync(async () => (await readTaskState(root)).records.size === 1);
+      const task = [...(await readTaskState(root)).records.values()][0];
+      assert.equal(task.created?.to, "worker");
+      assert.equal(task.delivered?.to, "worker");
     } finally {
       await harness.iface.stopSession();
     }

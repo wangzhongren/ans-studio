@@ -92,6 +92,9 @@ import type {
   RequestClarificationFn,
   RoleStatusFn,
   SessionTailFn,
+  RoleActivityLogFn,
+  TerminateRoleRunFn,
+  RedispatchTaskFn,
   ProposeRecoveryFn,
   InstallSkillFn,
   UninstallSkillFn,
@@ -370,6 +373,12 @@ export interface AdapterCapabilities {
   shellVerdict?: ShellVerdictFn;
   roleStatus?: RoleStatusFn;
   sessionTail?: SessionTailFn;
+  /** B 批（2026-10-28）：`role_activity_log` 数据源；只给幕僚（trio chief）注入。 */
+  roleActivityLog?: RoleActivityLogFn;
+  /** B 批：终止动作；只给幕僚注入。 */
+  terminateRoleRun?: TerminateRoleRunFn;
+  /** B 批：安全重派动作；只给幕僚注入。 */
+  redispatchTask?: RedispatchTaskFn;
   proposeRecovery?: ProposeRecoveryFn;
   installSkill?: InstallSkillFn;
   uninstallSkill?: UninstallSkillFn;
@@ -726,6 +735,15 @@ export async function openRoleSession(
      */
     sessionTail?: SessionTailFn;
     /**
+     * B 批（2026-10-28）：`role_activity_log` 数据源（每角色运行日志）。**只对幕僚（trio chief）转交**；
+     * 其他角色/项目角色即便调用方误给也不注入（工具不注册）。纯读、脱敏、项目相对路径；不扩大任何写权。
+     */
+    roleActivityLog?: RoleActivityLogFn;
+    /** B 批：终止动作；只给幕僚（trio chief）转交。 */
+    terminateRoleRun?: TerminateRoleRunFn;
+    /** B 批：安全重派动作；只给幕僚（trio chief）转交。 */
+    redispatchTask?: RedispatchTaskFn;
+    /**
      * **G-2 恢复提议能力（R2；`propose_recovery`「注入才注册」）**——**只给 su**（同上一判据）。
      * 前端路由：校验（角色/枚举/证据非空）→ 客户一键确认卡 →（**恰 allow:true 才**）执行既有动作
      * → 回执四值如实（executed/declined/unsupported/error；恰 executed 为已执行）。**su 只能提议**：
@@ -848,7 +866,13 @@ export async function openRoleSession(
     isTrio || governanceModel === "trio"
       ? appGovernanceBoundary(setup.role.boundary.acceptance)
       : setup.role.boundary;
-  const cap = builtInGovernance ? governanceCapabilitiesOf(setup.role.id) : undefined;
+  const registryCapabilities = builtInGovernance ? governanceCapabilitiesOf(setup.role.id) : undefined;
+  // B 批（2026-10-28）：chief 的目标能力在运行时注入端生效（A 批未改注册表能力矩阵；D 批随目标态清理）：
+  // `dispatch_task`（星形任意 worker）/`role_status`/`session_tail`。convener 的旧能力保持到 D。
+  // 只叠加**新增**能力位；不改变其他角色/项目角色的注入矩阵。
+  const cap = registryCapabilities !== undefined && trioSpec?.id === "chief"
+    ? { ...registryCapabilities, dispatchTask: true, roleStatus: true, sessionTail: true }
+    : registryCapabilities;
   // 预授权目录（评审 §5.6）：trio 按注册表；su 用既有四棵；项目角色没有预授权。
   // 2026-10-25 起 trio 的写盘预授权改由 **Section 1 条目**给出（含 `docs/workflow.md` 这类精确文件；
   // 见下方 section1PreauthorizedEntries），本表只保留 su 的四棵与 artifact 观察目录用途。
@@ -1323,10 +1347,15 @@ export async function openRoleSession(
     input.persistSession === false ? undefined : sessionDirFor(input.project.projectRoot, setup.role.id, input.runtime);
 
   // H-1 派发任务（评审 §5.6）：能力矩阵驱动——仅 `capabilities.dispatchTask`（trio=Convener；su 旧行为）。
-  // trio 下再包一层**派发范围门**（评审 §6.2 五条）：门禁拒绝即 `{ok:false}` 如实回执，不进入前端路由。
+  // B 批（2026-10-28）：**幕僚（trio chief）的星形派发不套旧 flow 派发门**——任务/汇报主链走
+  // `tasks.jsonl`，目标由桌面星形路由校验（任意内置/项目 worker、自身除外）。convener 的旧 dispatch
+  // 仍逐字走原派发范围门（保留至 D）；single/su 旧行为不变。
+  const chiefStarDispatch = trioSpec?.id === "chief";
   const dispatchTask: DispatchTaskFn | undefined =
     cap?.dispatchTask === true && input.dispatchTask !== undefined
-      ? isTrio
+      ? chiefStarDispatch
+        ? input.dispatchTask
+        : isTrio
         ? async (dispatch, metadata) => {
             // 2026-10-20 客户拍板：Lead 可给 Steward 发协调消息——Liaison→Convener 走 coordinate 门
             // （不需要提案接受/任命/流程步骤/去重）；其余仍走既有 dispatch 门（Convener→项目角色）。
@@ -1513,8 +1542,12 @@ export async function openRoleSession(
   // G-2 看护三能力（R1/R2）：能力矩阵驱动——仅 `capabilities.roleStatus/sessionTail/proposeRecovery`
   // （trio=Convener；su 旧行为）。未注入 ⇒ 不注入（能力缺席 = 最强 fail-closed）。
   // 承载契约（字段名/形状）单一来源：`common/编排/watchdog.ts`。
+  // B 批（2026-10-28）：chief 经上方能力叠加获得 roleStatus/sessionTail；`role_activity_log` 只给 chief。
   const roleStatus = cap?.roleStatus === true ? input.roleStatus : undefined;
   const sessionTail = cap?.sessionTail === true ? input.sessionTail : undefined;
+  const roleActivityLog = trioSpec?.id === "chief" ? input.roleActivityLog : undefined;
+  const terminateRoleRun = trioSpec?.id === "chief" ? input.terminateRoleRun : undefined;
+  const redispatchTask = trioSpec?.id === "chief" ? input.redispatchTask : undefined;
   const proposeRecovery = cap?.proposeRecovery === true ? input.proposeRecovery : undefined;
 
   // 2026-10-25 独立复核请求（request_acceptance）：只给内置治理角色会话注入；项目角色即便调用方
@@ -1659,6 +1692,9 @@ export async function openRoleSession(
     ...(reportArtifact !== undefined ? { reportArtifact } : {}),
     ...(roleStatus !== undefined ? { roleStatus } : {}),
     ...(sessionTail !== undefined ? { sessionTail } : {}),
+    ...(roleActivityLog !== undefined ? { roleActivityLog } : {}),
+    ...(terminateRoleRun !== undefined ? { terminateRoleRun } : {}),
+    ...(redispatchTask !== undefined ? { redispatchTask } : {}),
     ...(proposeRecovery !== undefined ? { proposeRecovery } : {}),
     ...(installSkill !== undefined ? { installSkill } : {}),
     ...(uninstallSkill !== undefined ? { uninstallSkill } : {}),
@@ -3717,6 +3753,9 @@ export function createRuntimeAdapterFactory(
     // `undefined` ⇒ 对应工具不注册（能力缺席 = 最强 fail-closed，同 dispatch_task 先例）。
     roleStatus: capabilities?.roleStatus,
     sessionTail: capabilities?.sessionTail,
+    roleActivityLog: capabilities?.roleActivityLog,
+    terminateRoleRun: capabilities?.terminateRoleRun,
+    redispatchTask: capabilities?.redispatchTask,
     proposeRecovery: capabilities?.proposeRecovery,
     // G-4/I1-I2：技能安装/卸载两能力并入适配器选项——**契约字段名** `installSkill` / `uninstallSkill`
     // （运行时核心 `GovernedToolsOptions` 同名能力位，形状同源 `model/runtime.ts`）；

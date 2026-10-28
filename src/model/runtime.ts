@@ -540,6 +540,177 @@ export type ReportHandbackFn = (
   | void
   | Promise<ReportHandbackReceipt | null | undefined | void>;
 
+// —————————————— B 批：任务/汇报主干与最小状态（2026-10-28） ——————————————
+//
+// 形状单一来源＝本模块：`tasks.jsonl` 事件、每角色运行日志条目、星形派发载荷扩展与
+// `role_activity_log` 能力。编排 `task-state.ts`/`role-log.ts` 只按这些形状读写；
+// 桌面窗口只接线、运行时核心只声明工具面——任一层不得另立第二份字段名。
+
+/** 任务副作用分类（B-08）：幕僚声明，应用**只升不降**校验。 */
+export type TaskSideEffect = "read-only" | "docs" | "code" | "external" | "destructive" | "unknown";
+
+/** `task.reported` 的工作结果状态（B-05；内部 `completed` 落盘为 `done`）。 */
+export type TaskReportStatus = "done" | "blocked" | "failed";
+
+/** 任务收口结论（B-03）。 */
+export type TaskClosedOutcome = "accepted" | "rework" | "rejected";
+
+/** 重派安全结论（B-08）：仅 `safe` 允许自动重派。 */
+export type TaskRedispatchSafety = "safe" | "unsafe" | "needs-review";
+
+/** 所有任务事件的公共字段（`v=1`；时间 ISO 8601；坏行读取侧跳过并记日志）。 */
+export interface TaskStateEventBase {
+  v: 1;
+  at: string;
+}
+
+export interface TaskCreatedEvent extends TaskStateEventBase {
+  kind: "task.created";
+  taskId: string;
+  flowId?: string;
+  /** B 批新任务只由幕僚派发（星形路由）；旧 flow 派发不写本事件。 */
+  from: "chief";
+  to: string;
+  text: string;
+  expectedOutput?: string;
+  requestedEvidence?: string[];
+  sideEffect: TaskSideEffect;
+  /** 必填：同键视为同一任务（重派沿用原键，任务 id 另给）。 */
+  idempotencyKey: string;
+}
+
+export interface TaskDeliveredEvent extends TaskStateEventBase {
+  kind: "task.delivered";
+  taskId: string;
+  to: string;
+  sessionId?: string;
+}
+
+export interface TaskReportedEvent extends TaskStateEventBase {
+  kind: "task.reported";
+  taskId: string;
+  from: string;
+  status: TaskReportStatus;
+  /** 单行摘要，≤200 字（写入侧截断并标注）。 */
+  summary: string;
+  evidence?: string[];
+  turnId?: string;
+}
+
+export interface TaskClosedEvent extends TaskStateEventBase {
+  kind: "task.closed";
+  taskId: string;
+  by: "chief";
+  outcome: TaskClosedOutcome;
+  note?: string;
+}
+
+export interface TaskRedispatchEvent extends TaskStateEventBase {
+  kind: "task.redispatch";
+  /** 重派产生的新任务 id。 */
+  taskId: string;
+  retryOf: string;
+  to: string;
+  reason: "stuck";
+  safety: TaskRedispatchSafety;
+}
+
+/** 委派变更（可选；B 批只定义形状，不改变任何权限）。 */
+export interface DelegationChangedEvent extends TaskStateEventBase {
+  kind: "delegation.changed";
+  roleId: string;
+  from?: string;
+  to?: string;
+  reason?: string;
+}
+
+/** `.ans/state/tasks.jsonl` 的单行事件联合（append-only；每行一个事件）。 */
+export type TaskStateEvent =
+  | TaskCreatedEvent
+  | TaskDeliveredEvent
+  | TaskReportedEvent
+  | TaskClosedEvent
+  | TaskRedispatchEvent
+  | DelegationChangedEvent;
+
+/** 每角色运行日志条目（B-04；字段白名单，写入侧脱敏/截断）。 */
+export interface RoleLogEntry {
+  v: 1;
+  at: string;
+  roleId: string;
+  taskId?: string;
+  turnId?: string;
+  /** 事件类别：turn.start/turn.end/tool.call/tool.result/delivery/task/terminate/redispatch/patrol/... */
+  kind: string;
+  /** 工具名（仅工具事件；名称白名单由写入侧清洗）。 */
+  tool?: string;
+  /** 单行摘要，≤200 字；不写完整 prompt/完整命令参数/凭据。 */
+  summary: string;
+  status?: string;
+  /** 证据引用（项目相对路径或稳定 id；不写绝对路径）。 */
+  ref?: string;
+}
+
+/** `role_activity_log` 查询载荷（仅幕僚可用；缺省 limit=50，上限 200）。 */
+export interface RoleActivityLogPayload {
+  roleId: string;
+  /** ISO 时间下界（含）；缺省不限。 */
+  since?: string;
+  limit?: number;
+}
+
+/**
+ * `role_activity_log` 的注入数据源（桌面主进程读 `.ans/state/logs/<roleId>.jsonl`）。
+ * 纯读、字段白名单、项目相对路径；失败以 `{ok:false,message}` 如实表达，不抛、不编造。
+ */
+export type RoleActivityLogFn = (
+  query: RoleActivityLogPayload,
+  metadata?: ReportHandbackMetadata,
+) => WatchdogToolResult | null | undefined | void | Promise<WatchdogToolResult | null | undefined | void>;
+
+/** `terminate_role_run` 载荷（B-07；幕僚确认卡死后终止当前轮次 + 子进程树）。 */
+export interface TerminateRoleRunPayload {
+  roleId: string;
+  taskId?: string;
+}
+
+/** `terminate_role_run` 回执（B-08）：终止是否确认/子进程数/部分写入如实；未确认 ⇒ 禁止自动重派。 */
+export interface TerminateRoleRunReceipt {
+  ok: boolean;
+  terminationConfirmed: boolean;
+  childProcesses: number;
+  childProcessesStopped: number;
+  partialArtifacts?: string[];
+  message?: string;
+}
+
+export type TerminateRoleRunFn = (
+  payload: TerminateRoleRunPayload,
+  metadata?: ReportHandbackMetadata,
+) => TerminateRoleRunReceipt | null | undefined | void | Promise<TerminateRoleRunReceipt | null | undefined | void>;
+
+/** `redispatch_task` 载荷（B-07/B-08；按安全分类重派，目标缺省沿用原任务）。 */
+export interface RedispatchTaskPayload {
+  taskId: string;
+  to?: string;
+}
+
+/** `redispatch_task` 回执：仅 `safety:"safe"` 且 `ok:true` 产生新任务。 */
+export interface RedispatchTaskReceipt {
+  ok: boolean;
+  taskId?: string;
+  retryOf?: string;
+  safety: "safe" | "unsafe" | "needs-review";
+  autoAllowed: boolean;
+  reasons?: string[];
+  message: string;
+}
+
+export type RedispatchTaskFn = (
+  payload: RedispatchTaskPayload,
+  metadata?: ReportHandbackMetadata,
+) => RedispatchTaskReceipt | null | undefined | void | Promise<RedispatchTaskReceipt | null | undefined | void>;
+
 export interface DispatchTaskPayload {
 
   roleId: string;
@@ -547,6 +718,18 @@ export interface DispatchTaskPayload {
   task: string;
 
   reason?: string;
+
+  /** B 批：幕僚声明的副作用分类（缺填/非法由应用按 `unknown` 处理，只升不降）。 */
+  sideEffect?: TaskSideEffect;
+
+  /** B 批：期望产出（任务卡固定字段；纯展示/派发文本用）。 */
+  expectedOutput?: string;
+
+  /** B 批：建议证据（≤5 条路径的提示；不构成验收结论）。 */
+  requestedEvidence?: string[];
+
+  /** B 批：幂等键（缺省由应用按 from/to/正文生成）。 */
+  idempotencyKey?: string;
 
   /**
    * 治理流程元数据（评审 §5.8/§6.3-5）：治理角色（Convener）派发须带 flowId+stepId
@@ -1918,6 +2101,16 @@ export interface GovernedToolsOptions {
   roleStatus?: RoleStatusFn;
   /** G-2/R1：`session_tail` 数据源（受保护投影后的会话尾线）。只给内置治理角色 注入；未注入 ⇒ 工具不注册。 */
   sessionTail?: SessionTailFn;
+  /**
+   * B 批（2026-10-28）：`role_activity_log` 数据源——每角色运行日志（`.ans/state/logs/<roleId>.jsonl`）。
+   * **只给幕僚（trio chief）注入**；其他角色（含 convener、项目角色）未注入 ⇒ 工具不注册。
+   * 纯读、字段白名单、脱敏/项目相对路径由数据源保证；不写盘、不入队、不改任何判定链。
+   */
+  roleActivityLog?: RoleActivityLogFn;
+  /** B 批：终止动作（只给幕僚；未注入 ⇒ `terminate_role_run` 不注册）。 */
+  terminateRoleRun?: TerminateRoleRunFn;
+  /** B 批：安全重派动作（只给幕僚；未注入 ⇒ `redispatch_task` 不注册）。 */
+  redispatchTask?: RedispatchTaskFn;
   /** G-2/R2：恢复提议能力（只提交载荷、三态回执）。只给内置治理角色 注入；未注入 ⇒ 工具不注册。 */
   proposeRecovery?: ProposeRecoveryFn;
   /**

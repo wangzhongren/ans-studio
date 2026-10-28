@@ -214,6 +214,47 @@ export function renderHandbackBatchPrompt(handbacks: readonly TaskHandback[]): s
 }
 
 /**
+ * **B 批（2026-10-28）星形工作结果——投递给幕僚的短报**（单一来源；任务/汇报主链走新状态）。
+ * 固定字段：任务编号 / 来源角色 / 状态（done|blocked|failed）/ 摘要≤200 / 证据≤5。
+ * 纪律不变：工作结果只搬任务与证据，不转移身份或写权；未报告/失败不得当完成。
+ */
+export function renderWorkReportPrompt(hb: TaskHandback): string {
+  return renderWorkReportBatchPrompt([hb]);
+}
+
+export function renderWorkReportBatchPrompt(handbacks: readonly TaskHandback[]): string {
+  const statusOf = (status: TaskHandback["status"]): string =>
+    status === "completed" ? "done" : status === "failed" || status === "aborted" ? "failed" : "blocked";
+  const clip = (text: string, max: number): string => {
+    const flat = text.replace(/\s+/g, " ").trim();
+    return [...flat].length <= max ? flat : `${[...flat].slice(0, max - 1).join("")}…`;
+  };
+  const lines: string[] = handbacks.length === 1
+    ? ["[工作结果] 已收到 1 份角色结果。"]
+    : [`[工作结果] 已收到 ${handbacks.length} 份角色结果。`];
+  for (const hb of handbacks) {
+    lines.push(`任务：#${hb.taskId ?? "未关联"}`);
+    lines.push(`来源角色：${hb.roleId}`);
+    lines.push(`状态：${statusOf(hb.status)}`);
+    lines.push(`摘要：${clip(hb.summary, 200)}`);
+    lines.push("证据：");
+    const evidence = hb.evidence.filter((item) => typeof item === "string" && item.trim() !== "");
+    if (evidence.length > 0) {
+      for (const item of evidence.slice(0, 5)) lines.push(`  - ${item}`);
+      if (evidence.length > 5) lines.push(`  - （仅列前 5 条，另有 ${evidence.length - 5} 条）`);
+    } else {
+      lines.push("  - 无可验收证据；需要原角色补充，不能推定通过。");
+    }
+    lines.push("");
+  }
+  lines.push(
+    "请核对工作结果并向客户汇总：实际完成了什么、产物路径、实际测试结果、哪些未完成或需返工，以及下一步。",
+    "只有证据支持才确认通过；blocked/failed 或未报告不得当作完成。工作结果不构成任何写权或验收结论。",
+  );
+  return lines.join("\n").trimEnd();
+}
+
+/**
  * 去重键单一来源：角色、任务、turnId（旧替身降级round）与内容哈希，不含时间戳。
  * 同轮重放同键；同文返工的新turnId异键；桌面负责登记和排队，不自行拼at。
  */
@@ -350,6 +391,12 @@ export interface DispatchPromptOptions {
    * 仅当 `references` 里**没有** `docs/workflow.md` 时生效（引用为准——矛盾输入以探测后的事实渲染）。
    */
   workflowMissing?: boolean;
+  /** B 批（2026-10-28）：任务编号（星形派发落盘 `tasks.jsonl` 后给出；旧调用缺席 ⇒ 文案不变）。 */
+  taskId?: string;
+  /** B 批：期望产出（任务卡固定字段；旧调用缺席 ⇒ 不渲染）。 */
+  expectedOutput?: string;
+  /** B 批：可选证据提示（≤5 条；旧调用缺席 ⇒ 不渲染）。 */
+  requestedEvidence?: readonly string[];
 }
 
 /**
@@ -371,13 +418,21 @@ export function renderDispatchPrompt(req: DispatchTaskPayload, opts?: DispatchPr
   const reason = req.reason !== undefined && req.reason !== "" ? `（原因：${req.reason}）` : "";
   const sourceRoleId = opts?.sourceRoleId ?? "su";
   const references = opts?.references ?? [];
+  // B 批任务卡固定字段（旧调用无 taskId/期望产出/证据 ⇒ 以下数组为空、文案逐字不变）。
+  const taskMeta: string[] = [];
+  if (opts?.taskId !== undefined && opts.taskId !== "") taskMeta.push(`任务编号：#${opts.taskId}`);
+  if (opts?.expectedOutput !== undefined && opts.expectedOutput.trim() !== "") taskMeta.push(`期望产出：${opts.expectedOutput.trim()}`);
+  if (opts?.requestedEvidence !== undefined && opts.requestedEvidence.length > 0) {
+    taskMeta.push(`可选证据：${opts.requestedEvidence.slice(0, 5).join("；")}`);
+  }
   // 引用为准：同路径既在 references 又有缺失标注（矛盾输入）→ 以探测后的事实渲染，抑制标注。
   const workflowMissing = opts?.workflowMissing === true && !references.some((r) => r.path === WORKFLOW_REL);
   if (references.length === 0 && !workflowMissing) {
     // 无必读引用：旧格式**逐字不变**（设计 §四.1 的引用块是「加」出来的，不是重排版式的理由）。
-    return [`[派发] 来自 ${sourceRoleId} 的任务${reason}`, req.task, "完成后请交回报告（改了什么/结论/证据）。"].join("\n");
+    return [`[派发] 来自 ${sourceRoleId} 的任务${reason}`, ...taskMeta, req.task, "完成后请交回报告（改了什么/结论/证据）。"].join("\n");
   }
   const lines = [`[派发] 来自 ${sourceRoleId} 的任务${reason}`];
+  lines.push(...taskMeta);
   lines.push("必读（按序，先读完再动手；哈希由系统在投递时计算，与文件当刻字节绑定）：");
   if (workflowMissing) lines.push("  （本项目未提供 workflow.md）"); // 如实标注（§四.3 第 2 条，措辞照设计原文）
   references.forEach((ref, i) => lines.push(`  ${i + 1}. ${ref.path}（sha256:${ref.sha256}）`));

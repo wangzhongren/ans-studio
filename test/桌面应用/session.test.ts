@@ -2636,3 +2636,53 @@ test("意图交接骨架：intent 缺失/坏 frontmatter 回落 intentId+product
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// —————————————— B 批（2026-10-28）：SessionManager 任务数据面/终止入口 ——————————————
+test("B: listTasks/restoreTasks/terminateRoleRun 在 SessionManager 上可用（无任务=空；未开会话终止如实失败）", async () => {
+  const { appendTaskEvent, taskEvent } = await import("../../src/common/编排/task-state.ts");
+  const root = mkdtempSync(path.join(tmpdir(), "ans-session-b-"));
+  const listing: ProjectListing = {
+    projectRoot: root,
+    roles: [
+      { roleId: "chief", cardPath: "", boundaryPath: "", cardText: "chief", boundary: { entries: [], boundarySource: "<built-in>", acceptance: { accepted: false, source: "" } }, builtIn: true, governanceFunction: "chief" },
+      { roleId: "worker", cardPath: "角色卡/worker/role-card.md", boundaryPath: "角色卡/worker/boundary.yaml", cardText: "worker", boundary: { entries: [{ root: "project", path: "src/w.ts", kind: "file", purpose: "p" }], boundarySource: "角色卡/worker/boundary.yaml", acceptance: { accepted: false, source: "" } } },
+    ],
+    warnings: [],
+    hasRoles: true,
+    primaryRoleId: "chief",
+    governanceModel: "trio",
+  };
+  const mgr = new SessionManager({
+    openRoleSession: async (input): Promise<RoleSessionHandle> => ({
+      async send() {},
+      events() { return { [Symbol.asyncIterator]() { return { async next(): Promise<IteratorResult<OrchestrationEvent>> { await tick(50); return { value: undefined as unknown as OrchestrationEvent, done: true }; } }; } }; },
+      async abort() { return { ok: true, supported: true }; },
+      listBackgroundTasks(): BackgroundTaskSnapshot[] { return []; },
+      async dispose() {},
+    }),
+    createPiAdapterFactory: () => { throw new Error("no pi"); },
+    createDemoAdapter: () => { throw new Error("no demo"); },
+    buildProjectConfig,
+    getListing: (r) => (r === root ? listing : undefined),
+    emitEvent: () => {},
+  });
+  try {
+    const empty = await mgr.listTasks(root);
+    assert.deepEqual({ tasks: empty.tasks.length, errors: empty.errors, unclosed: empty.unclosed }, { tasks: 0, errors: 0, unclosed: 0 });
+    const noSession = await mgr.terminateRoleRun({ projectRoot: root, roleId: "worker", runtime: "demo" });
+    assert.equal(noSession.ok, false);
+    assert.equal(noSession.terminationConfirmed, false);
+    assert.match(noSession.message ?? "", /会话未开/);
+
+    await appendTaskEvent(root, taskEvent("task.created", { taskId: "t-session", from: "chief", to: "worker", text: "实现", sideEffect: "code", idempotencyKey: "k-session" }));
+    const restored = await mgr.restoreTasks(root);
+    assert.equal(restored.restored, 1);
+    await tick(120);
+    const list = await mgr.listTasks(root);
+    assert.equal(list.tasks[0].taskId, "t-session");
+    assert.equal(list.tasks[0].status, "delivered");
+  } finally {
+    await mgr.stop(null);
+    rmSync(root, { recursive: true, force: true });
+  }
+});

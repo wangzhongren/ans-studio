@@ -8497,3 +8497,33 @@ test("flow 状态 preload/main（2026-10-25）：getFlowStatus 白名单方法�
   assert.match(handler, /event\.sender !== win\.webContents/, "flow:status 必须有来源校验");
   assert.match(handler, /desktop\.flowStatus\(projectRoot\)/, "校验后只透传字符串给 Interface");
 });
+
+// —————————————— B 批（2026-10-28）：任务/日志数据面（Interface 参数校验与只读透传） ——————————————
+test("B: listTasks / readRoleActivityLog 只读透传；空/非法参数如实返回", async () => {
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { appendTaskEvent, taskEvent } = await import("../../src/common/编排/task-state.ts");
+  const { appendRoleLog } = await import("../../src/common/编排/role-log.ts");
+  const { tmpdir } = await import("node:os");
+  const root = mkdtempSync(path.join(tmpdir(), "ans-iface-b-"));
+  try {
+    const listing: ProjectListing = { ...FAKE_LISTING, projectRoot: root };
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: () => {},
+      listProjectFn: async () => listing,
+    });
+    await iface.listProject({ projectRoot: root });
+    await appendTaskEvent(root, taskEvent("task.created", { taskId: "t-iface", from: "chief", to: "A", text: "实现", sideEffect: "code", idempotencyKey: "k-iface" }));
+    await appendRoleLog(root, "A", { kind: "turn.start", summary: "开始", taskId: "t-iface" });
+    const tasks = await iface.listTasks({ projectRoot: root });
+    assert.equal(tasks.tasks[0].taskId, "t-iface");
+    assert.equal(tasks.unclosed, 1);
+    const log = await iface.readRoleActivityLog({ projectRoot: root, roleId: "A" });
+    assert.equal(log.ok, true);
+    assert.match(log.text ?? "", /turn\.start/);
+    assert.equal((await iface.readRoleActivityLog({ projectRoot: root, roleId: "" })).ok, false);
+    assert.deepEqual(await iface.restoreTasks({ projectRoot: "" }), { restored: 0, skipped: 0, taskIds: [] });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
