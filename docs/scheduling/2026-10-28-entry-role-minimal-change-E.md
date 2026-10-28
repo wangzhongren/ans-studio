@@ -52,14 +52,48 @@
 | F-E6 E2E 假绿 | 删除旧聊天卡 anchor/chip 段；OPX 按模态语义重写；E-03/04/05/06 关键项纳入 hardChecks；仍 false 项见 §6 | E2E `OPX_DUP_SINGLE_CARD/EXPIRED_HISTORY/OP_CANCEL=true`；`E2E_PASS` 由 hardChecks+repairCheck 共同决定 |
 | E-02 偏差 | `operator-view/history-dedupe/role-status-view` 本批保留复核（行为不变）；F-04 完整差异表解释 | §7 |
 
-## 6. E2E 仍 false 项（非本批 E-03/E-04/E-05/E-06 行为）
+## 6. E2E 仍 false 项（实际 36 项，与 40 行分类口径）
 
-以下为报告中的旧断言/旧夹具/旧 UI 快照，均不属于 E 对话框/待办/任务日志行为；E 关键项已全部 true：
+口径：最终 E2E 报告（`307e749c…`）实际 `=false` 共 **36 项**（40 行分类表）；以下逐项列出 36 项及非阻断说明。E-03/E-04/E-05/E-06 关键项已全部 true，且已纳入 hardChecks。
 
-- 旧左侧/空态/CTA：`HAS_OTHER_GROUP`、`CHAT_CTA_PRESENT`、`SESSION_NOT_AUTO_OPENED`、`BOOTSTRAP_HAS_ROLES`、`REFRESH_OTHER_GROUP_SHOWN`。
-- 旧聊天/报告/工具行夹具：`OLD_GENERAL_CLAIM_PRESENT`、`DENIED_REASON_VISIBLE`、`DISPATCH_ROW_NO_WITHDRAW`、`HANDBACK_CARD_PRESENT`、`HANDBACK_STATUS_OK`、`MD_STRONG_RENDERED`、`MD_TAG_TEXT_ESCAPED`、`LINK_OPEN_EXTERNAL_CALLED`、`INJECTED_STYLE_PRESENT`、`REPORT_DELIVERY_DETAILS_COLLAPSED`、`REPORT_DELIVERY_INLINE_BODY_NEW`、`INJECTED_CHIP_DELIVERY_LABEL`、`INJECTED_NOT_USER_BUBBLE`、`STATUS_LAST_EVENT_RECORDED`。
-- 旧侧栏/队列/滚动/设置快照：`BADGE_ON_WORK_WHILE_COLLAPSED`、`BADGES_CLEAR_ON_EMPTY`、`NO_SELECT_ELEMENTS`、`COMPOSER_ROWS_ARE_ATTACH_CAPSULE_NOTE`、`ROLE_STATE_BADGE_WORKING_PENDING`、`ROLE_STATE_BADGE_HAS_ICON`、`ROLE_STATE_BADGE_HOVER_FULL`、`ROLE_STATE_QUEUE_ROW`、`SHELL_CONFIRM_ESC_NOT_ALLOWED`（phase3b 已真实覆盖 shell Esc=不放行）、`RIGHT_QUEUE_RUNNING_FIRST`、`RIGHT_QUEUE_SOURCES`、`S1_NOT_YANKED`、`S1_STAYED_AWAY_FROM_BOTTOM`、`VIEWPORT_TOP_SINGLE_HAS_VISIBLE_ROWS`、`PI_KEYS_ARE_FIVE`、`PI_FIELDS_MATCH_REGISTRY`、`DRAWER_CLOSED_AFTER_PI`、`SWITCH_CONFIRM_ON_BUSY`、`SWITCH_CONFIRM_RELOADED`、`SWITCH_IDLE_HINT`、`REPLAY_DEDUP_REBUILD`。
-- 说明：这些旧断言随 D/E UI 结构或夹具变化失效，F-04 终态回归统一重写/删除；E2E 的 E 关键检查已纳入 hardChecks，不再只靠 repairCheck。
+| # | 仍 false 检查 | 分类 / 非阻断说明 |
+| ---: | --- | --- |
+| 1 | `HAS_OTHER_GROUP` | 旧左树分组快照（C4 单/旧项目夹具） |
+| 2 | `CHAT_CTA_PRESENT` | 旧空态 CTA 快照 |
+| 3 | `SESSION_NOT_AUTO_OPENED` | 旧会话自动打开快照 |
+| 4 | `OLD_GENERAL_CLAIM_PRESENT` | 旧写入说明文案快照 |
+| 5 | `DENIED_REASON_VISIBLE` | 旧聊天流拒绝行夹具 |
+| 6 | `DISPATCH_ROW_NO_WITHDRAW` | 旧派发行夹具 |
+| 7 | `BADGE_ON_WORK_WHILE_COLLAPSED` | 旧折叠 tab 徽标快照 |
+| 8 | `BADGES_CLEAR_ON_EMPTY` | 旧空队列徽标快照 |
+| 9 | `NO_SELECT_ELEMENTS` | 旧无 select 守卫（E 新增抽屉 select，隐藏时仍存在） |
+| 10 | `COMPOSER_ROWS_ARE_ATTACH_CAPSULE_NOTE` | 旧 composer 行快照（E 加开关提示） |
+| 11 | `BOOTSTRAP_HAS_ROLES` | 旧 bootstrap 夹具 |
+| 12 | `REFRESH_OTHER_GROUP_SHOWN` | 旧刷新分组快照 |
+| 13 | `SU_DELIVERY_CARD_PRESENT` | 旧交付卡夹具（聊天流无卡，非 E 核心） |
+| 14 | `MD_STRONG_RENDERED` | 旧 Markdown 夹具 |
+| 15 | `MD_TAG_TEXT_ESCAPED` | 旧 Markdown 夹具 |
+| 16 | `LINK_OPEN_EXTERNAL_CALLED` | 旧链接外开夹具 |
+| 17 | `TOOLROW_HAS_PATH` | 旧工具行夹具（聊天流无卡，非 E 核心） |
+| 18 | `REPORT_DELIVERY_DETAILS_COLLAPSED` | 旧报告交付折叠快照 |
+| 19 | `STATUS_LAST_EVENT_RECORDED` | 旧状态 lastEvent 快照 |
+| 20 | `ROLE_STATE_BADGE_WORKING_PENDING` | 旧角色状态徽标快照 |
+| 21 | `ROLE_STATE_BADGE_HAS_ICON` | 旧角色状态徽标快照 |
+| 22 | `ROLE_STATE_BADGE_HOVER_FULL` | 旧角色状态徽标悬停快照 |
+| 23 | `ROLE_STATE_QUEUE_ROW` | 旧角色队列行快照 |
+| 24 | `SHELL_CONFIRM_ESC_NOT_ALLOWED` | 旧 shell 卡快照；phase3b 已真实覆盖 Esc=不放行 |
+| 25 | `RIGHT_QUEUE_RUNNING_FIRST` | 旧右栏队列快照 |
+| 26 | `RIGHT_QUEUE_SOURCES` | 旧右栏队列来源快照 |
+| 27 | `S1_NOT_YANKED` | 旧滚动贴底快照 |
+| 28 | `S1_STAYED_AWAY_FROM_BOTTOM` | 旧滚动贴底快照 |
+| 29 | `VIEWPORT_TOP_SINGLE_HAS_VISIBLE_ROWS` | 旧视口窗口化快照 |
+| 30 | `PI_KEYS_ARE_FIVE` | 旧 Pi 设置快照 |
+| 31 | `PI_FIELDS_MATCH_REGISTRY` | 旧 Pi 字段快照 |
+| 32 | `DRAWER_CLOSED_AFTER_PI` | 旧抽屉关闭快照（E 新增 tab） |
+| 33 | `SWITCH_CONFIRM_ON_BUSY` | 旧 shell 开关快照；phase3b 覆盖 |
+| 34 | `SWITCH_CONFIRM_RELOADED` | 旧 shell 开关快照；phase3b 覆盖 |
+| 35 | `SWITCH_IDLE_HINT` | 旧开关提示快照 |
+| 36 | `REPLAY_DEDUP_REBUILD` | 旧回放重建快照 |
 
 ## 7. 测试差异 / E-02 偏差
 
@@ -67,7 +101,7 @@
 - E-02 偏差：`operator-view`/`history-dedupe`/`role-status-view` 计划写“重写”，实际本批行为未变，保留复核；F-04 完整差异表解释断言数与未改原因。
 - 全量测试文件仍 335（334 执行），E 批无删除/新增 skip。
 
-## 8. E-10 逐文件哈希（最终候选 `692af439`，44 文件 = 23 A + 21 M）
+## 8. E-10 逐文件哈希（最终 HEAD `dfd7361a`，44 文件 = 23 A + 21 M）
 
 | 文件 | 状态 | `git hash-object` | `sha256sum` |
 | --- | --- | --- | --- |
@@ -92,7 +126,7 @@
 | `app/renderer/src/stores/decision-center-store.ts` | A | `df0dca575c411787737344ad413b2f7460eeb9a4` | `58f5109823b6e02708b70f94ffaa8e0b01c22949bee395141bfe4da3ae22b5bd` |
 | `app/renderer/src/stores/drawer-store.ts` | M | `fd5478a4908a2475338a8dd2508a882d52ca3239` | `98bf5ee144eb1c5ac47533a330fba054e63bff2cc9e6cfd5b57316344e678026` |
 | `app/renderer/src/test-driver.ts` | M | `926a438f373824ff9dfd4cfaf9c93727960c05ed` | `b245cc982cdc29e6bcb4dad5ac9a3314ffc32c83b0cb3e8d21a9a121babdcfcd` |
-| `docs/scheduling/2026-10-28-entry-role-minimal-change-E.md` | A | `29b2727a42c4a97d3634e46c18fc4053de636e04` | `4db385912a0cf24989325ee8d142e8241f3542972ce28a39e6d26e7a100c3d84` |
+| `docs/scheduling/2026-10-28-entry-role-minimal-change-E.md` | A | `ee059be85c149cf0e7ea39acbe1196dffcaf59bc` | `e3cef3bbb7fb926058fca53f3c8049255c4b5ba921c3c30cd112d37fdf5098fd` |
 | `src/common/shared/i18n/messages/en-US.ts` | M | `2720ab5e6e74c456ba69bc7f8e9054a3a8797953` | `50762682dfff37a12e969cd93a59f4814b0046fb99f377b4ca1847a6c91ff471` |
 | `src/common/shared/i18n/messages/zh-CN.ts` | M | `a60e9f5c08f188ae3c62ccb8585a05a288684cb7` | `cef3a5fa72c1abc4c6610f491f15cb4d7215a9257672eb844ac0679fbf8112e7` |
 | `test/桌面UI/decision-card-view.test.ts` | A | `312849d619b8962ce523f4e72307741b70fd2af3` | `778578b0be9fc4e4a42b5209eacaafa9c22c213cc6ed5a1727d8352ba50a6d74` |
@@ -104,23 +138,23 @@
 | `test/桌面UI/phase5a-electron-smoke.mjs` | M | `1f6db3e0549fa9534e9cd7ad315e4b86bf633bdb` | `bd25e679877d44a563dba42e29f38ee88f8b55d8858d2607833c7d49f969fbea` |
 | `test/桌面UI/role-log-view.test.ts` | A | `d34fc6986e1ed07706bceb8ba486595b09195438` | `0c44b31b96560dc63818e01ac6b8fc766b0c52c03b1ac426d1eb53b6b02c067b` |
 | `test/桌面应用/ans-wiring.test.ts` | M | `0c295539d51a3e332b5a8a69cb4619febdcd129e` | `94bac889df7b5f7f49fe98913489d89d87634fc0193d647a7c174e6b75e2f554` |
-| `test/桌面应用/e2e/main.mjs` | M | `a4c200b30516e21f4b7754088dffffda7a17e75c` | `2236d11d9f1cda88d104104e45dcaa128d0bd5f3b8b5e9e269fda2be59e565e8` |
+| `test/桌面应用/e2e/main.mjs` | M | `7ed0728b8b4a59aace8c040071a829d4d6088fd9` | `58115cfb66951b7f6b3c2e7bce1800e450dc54557a6dec52f845eadcbe67386b` |
 | `test/项目管理/shared/i18n.test.ts` | M | `b78021e2406a06b6b53af3eb80d93e86b9a45adf` | `975ba980e10232d73b5d06fd8cd45ff2a1b521752dbb69780c8c1eac963047cd` |
-| `角色卡/Claude适配器/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `07315a8cf1403e6ac826ae59e05a39654e44e57b` | `0463afe31f019518140ba72f1e4b3a05f17a0c4ec7a5e9e7a1e14c333def6a38` |
-| `角色卡/桌面UI/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `41ce52a97d8f62e5eabd6fca735a0f38c8ab028e` | `0712c114c33512fac570614fb0591fef2ddcd74db13b0b1a85185d7c4932d3cb` |
-| `角色卡/桌面窗口/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `d18cdb321f403121620c034a33bcbb82a8f6f30f` | `8df7accf8e26669d4eb4b9d5f00302d753590a24b5add92bb2dc9742a10e91cd` |
-| `角色卡/测试/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `0bb97b38375eb66e4776197a24bed87eff782a6d` | `cd781cf2dcf5f7eaebb8a1509bbc2b9f87204f1eba51039abb1e0baa6a5ae5e6` |
-| `角色卡/独立验收/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `5e8ce9e1a23dfd8dd1fd2ea89e7dab4d9bf3a258` | `65bb98eacc2d1aee8d8d7bf8d1ef544170df5f4efce5ee87197478f9d69f93a6` |
-| `角色卡/编排/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `e418d6a1308407937e5eaef880ada97b5c7e0f4b` | `b57d23ecbc6f5f3b167859b2f891b29ed16846a1e5b43fc3a8668e179fda0178` |
-| `角色卡/运行时核心/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `8451444fc39f03f1d957a90a2b4dc03709ca08e8` | `ef8ae2f9b1f0fd46f70055b40dfa3a050b6c0d1205169c74a3be133810d0aedc` |
-| `角色卡/门禁引擎/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `e79404b27356aa7230697a8cd5576152bc05c0a6` | `02b20cb8a77272d954b5591491985abf1392625aa4607adea573589786f55571` |
-| `角色卡/项目管理/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `3fda866b53fcc1bd0e46a2682258441b5f82867d` | `8ff77b61f7b74ffdcfaa4459406548931099cff707990e6de4713c6755d7fa8a` |
+| `角色卡/Claude适配器/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `3b0e5b37ca47847951fe30b486d8753457012362` | `5e74ca44e64c4f0b6173dcd27088316bb51ca9811e09b321ae535e9d72438fdd` |
+| `角色卡/桌面UI/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `f60193e892fa50dad8eeeb79a771b211121d826c` | `2caf293ba5e476d067204ce11058bda1e3e0ee348e8417f9b72caebadaada3f8` |
+| `角色卡/桌面窗口/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `42aac5d642c0288c9d6b7ec32ebcc91db6e345a1` | `24871441a231d5f696b0ca3a9173f27f52dad9f7c505d17723d808a761c0d2cf` |
+| `角色卡/测试/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `bc900e50d4fb0403700799ca38d009c721b95adc` | `17286c6b9aec5e8130167772bcd21d5b18b955d489ef20a4d169d2977c6fa45b` |
+| `角色卡/独立验收/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `c89f237cb18fb9ea8601ab23fcae6e2b2a3343b7` | `77862a354200e2826ca07325332a606c5c526822b7501a61fee976fb6a35a9ee` |
+| `角色卡/编排/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `cad262138ea8e951026b52ea35a319c5da5afd4c` | `d44460aa97d5e84e4e400c68740590e85717f753fa821d4963c88d4742b25c4e` |
+| `角色卡/运行时核心/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `91c830fcce74e681d20a6942ad43b24a4152c65d` | `87d9a63c3811ecfddad6bfa6405b45ba16b709779d24905987354e6ef1f29d7d` |
+| `角色卡/门禁引擎/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `0e8ba5ee69007953689f5ceea9053909c67e7878` | `b7b03a27c54e802f0e8bee99101a1249a796cdf9e164eaa138049c0c1b44313c` |
+| `角色卡/项目管理/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `b14118a873c2094dc6a211c749ee1e68ead93902` | `484e3043fecd6d24d0228d028c00aec92126f281761fc669e14a9213b2b76e31` |
 
-统计：候选 `692af439` 的 23 A + 21 M = 44 文件。
+统计：最终 HEAD `dfd7361a` 的 23 A + 21 M = 44 文件。
 
 ## 9. 文件统计 / 回滚
 
 - E 文档提交：`d436c07` 10 files / +325；`93dd42c` 10 files / +198 / −147；`692af43` 1 file / +2 / −1。
-- E rework 代码/测试 `d30f648`：9 files / +189 / −127；E 初版代码/测试 `e7ac5b2`：33 files / +2099 / −1722；`e019ffe..692af439` 合计 **44 files / +2626 / −1810**。
-- 本证据修订提交仅改 change-E/owner 记录；产品/测试文件与 `692af439` 相同。最终 HEAD 统计/整树哈希见最终报告；package/lock 零改动；无新依赖/目录（Delta-6）。
+- E rework 代码/测试 `d30f648`：9 files / +189 / −127；E 初版代码/测试 `e7ac5b2`：33 files / +2099 / −1722；`e019ffe..692af439` 中间口径：**44 files / +2626 / −1810**；最终 HEAD `dfd7361a`：**44 files = 23 A + 21 M，+2628 / −1810**，整树 `5df80978…`。
+- 本证据修订提交仅改 change-E/owner 记录；产品/测试文件与 `dfd7361a` 相同。最终 HEAD 统计/整树哈希见最终报告；package/lock 零改动；无新依赖/目录（Delta-6）。
 - 回滚：`git revert` E rework 代码/文档 + E 初版代码/文档，恢复 `e019ffec` 并重跑 D 验证；待办/历史为 UI 状态可丢，不迁移。
