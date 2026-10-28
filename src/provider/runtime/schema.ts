@@ -151,6 +151,20 @@ export function describeTool(name: string): ToolDescription {
         type: "object",
         properties: {
           title: { type: "string", description: "One-line summary of what you ask the customer to confirm" },
+          taskId: { type: "string", description: "C 批：optional task attribution key (flowId|intentId|taskId at least one recommended)" },
+          intentId: { type: "string", description: "C 批：optional intent attribution key" },
+          targetRoleId: {
+            type: "string",
+            description:
+              "C 批 appointment-write only: the project role (never a built-in id) whose 角色卡/** files are being written. " +
+              "The application validates it against the customer's D3 `request.resolved` (decisionId + targetRoleIds) before showing the card",
+          },
+          decisionId: {
+            type: "string",
+            description:
+              "C 批 appointment-write only: the D3 decision id from `request.resolved` that authorized this role-card/boundary write. " +
+              "Missing/mismatched targetRoleId + decisionId ⇒ no card is shown (fail-closed)",
+          },
           preview: {
             type: "string",
             description:
@@ -174,8 +188,8 @@ export function describeTool(name: string): ToolDescription {
             type: "string",
             pattern: GOVERNANCE_SLUG_PATTERN,
             description:
-              "Optional for ordinary project roles and single/su (legacy calls). The five built-in governance roles " +
-              "(liaison / rapporteur / nominator / convener / verifier) MUST always provide flowId + cardKind together; " +
+              "Optional for ordinary project roles and single/su (legacy calls). The six built-in governance roles " +
+              "(chief / product / rapporteur / nominator / convener / verifier) MUST always provide an attribution key (flowId | intentId | taskId) + cardKind together; " +
               "the call is rejected by the application if either is missing, and NO card is shown to the customer — fix and resend",
           },
           stepId: {
@@ -185,14 +199,14 @@ export function describeTool(name: string): ToolDescription {
           },
           cardKind: {
             type: "string",
-            enum: ["write", "appointment-write", "schedule-write"],
+            enum: ["appointment-write", "schedule-write"],
             description:
-              "Optional for ordinary project roles and single/su (legacy calls). The five built-in governance roles " +
-              "(liaison / rapporteur / nominator / convener / verifier) MUST always provide flowId + cardKind together; " +
+              "Optional for ordinary project roles and single/su (legacy calls). The six built-in governance roles " +
+              "(chief / product / rapporteur / nominator / convener / verifier) MUST always provide an attribution key (flowId | intentId | taskId) + cardKind together; " +
               "a missing or out-of-role kind is rejected by the application and NO card is shown to the customer — fix and resend. " +
-              "Kind semantics: `write` = ordinary write confirmation; `appointment-write` = write confirmation for role cards / " +
-              "boundaries after the customer's appointment (sent by Crew, per appointed role; the old post-nomination flow is legacy); " +
-              "`schedule-write` = scheduling / flow write confirmation sent by Convener. " +
+              "Kind semantics: `appointment-write` = write confirmation for role cards / boundaries after the customer's appointment " +
+              "(sent by Crew, per appointed role); `schedule-write` = scheduling / flow write confirmation sent by Convener. " +
+              "The generic `write` card was removed in batch C; ordinary in-boundary writes do not need a confirmation card. " +
               "Which kinds a role may send is decided by the application — this field alone grants nothing",
           },
         },
@@ -214,8 +228,8 @@ export function describeTool(name: string): ToolDescription {
         "路径作为 Markdown 标题（如 `### <路径>`）或代码围栏说明（如 ```md <路径>```）出现，锚点后紧跟该路径的非空正文/代码。" +
         "**缺失任一路径正文时，系统会在呈现前拒绝该卡并要求补全——不会先给客户看半张卡。**" +
         "注意：列出路径**不等于**获准——获准的唯一凭据是 `confirmed:true`。" +
-        "**五个内置治理角色（liaison / rapporteur / nominator / convener / verifier）必须始终同时携带 `flowId` + `cardKind`**" +
-        "（cardKind 仅 `write` / `appointment-write` / `schedule-write`，且须属于该角色允许的卡种）；" +
+        "**六个内置治理角色（chief / product / rapporteur / nominator / convener / verifier）必须始终同时携带归属键（`flowId` | `intentId` | `taskId`）与 `cardKind`**" +
+        "（cardKind 仅 `appointment-write` / `schedule-write`；通用 `write` 已在 C 批删除、`schedule-write` 留 D；且须属于该角色允许的卡种）；" +
         "`appointment-write` 指客户**任命**（appointment）后的角色卡/边界写入确认——由 Crew 按任命名单逐路径发起；旧流程的「提名后写卡」为 legacy。" +
         "缺失任一项会被应用拒绝且**不会向客户发卡**——工具回执为「卡片未发出」，请补齐后重新调用。" +
         "普通项目角色与 single/su 的 `flowId`/`stepId`/`cardKind` 仍为可选；" +
@@ -226,7 +240,7 @@ export function describeTool(name: string): ToolDescription {
           "把将写出的路径逐条列入 preview，客户返回 `confirmed:true` 后系统才会为这些路径发行写盘许可；对话里的口头同意不是凭据。" +
           "**治理写盘的预授权例外（仅内置治理角色 su）**：`docs/su/**`、`docs/contracts/**`、`docs/skills/**` 与 `docs/mcp/**` 的写盘许可已预置——写这四棵目录树无需逐次确认、直接写即可（开会话与重建后均生效）；四棵树之外的治理敏感写盘仍按既有规则逐条确认。" +
           "新建或扩张角色边界、治理写集须由 su 经 request_confirmation 取得客户的**明确同意**。未获该变更同意 → 不执行治理变更，不得假设同意。",
-        "**内置治理角色**（liaison / rapporteur / nominator / convener / verifier）每次调用 request_confirmation 都必须同时携带 `flowId` 与 `cardKind`；" +
+        "**内置治理角色**（chief / product / rapporteur / nominator / convener / verifier）每次调用 request_confirmation 都必须同时携带归属键（`flowId` | `intentId` | `taskId` 至少一个）与 `cardKind`；" +
           "缺失任一项会被应用拒绝且不会向客户发卡——不要省略、不要猜测；收到「卡片未发出」回执时补齐后重新调用。",
         "新建角色或扩张角色边界时：先把**角色卡全文 + 边界摘要**放进 request_confirmation 的 preview 请客户预览，同意后才写入治理变更。",
         "request_confirmation 的 preview **必须列出将要写出的具体路径**（每个待写文件一行，相对项目根、含目录，如 " +
@@ -252,6 +266,8 @@ export function describeTool(name: string): ToolDescription {
         type: "object",
         properties: {
           title: { type: "string", description: "Short heading of the choice you ask the customer to make" },
+          taskId: { type: "string", description: "C 批：optional task attribution key (flowId|intentId|taskId at least one recommended)" },
+          intentId: { type: "string", description: "C 批：optional intent attribution key" },
           question: { type: "string", description: "Optional question text" },
           options: {
             type: "array",
@@ -313,7 +329,7 @@ export function describeTool(name: string): ToolDescription {
         "返回客户已选中的选项 id。**未获明确选择（拒绝/超时/通道不可用）→ 不要据此写盘，也不得擅自代选**；如实告知客户。" +
         "若 preview 里展示将要写出的内容，**必须列出具体路径**（相对项目根、含目录）——但注意：" +
         "**选择≠写盘同意**或扩张写权。已接受项目边界内的已授权任务无需重复确认；真正新建或扩张角色边界、治理写集仍由 su 请求客户确认，仅 confirmed:true 才执行该治理变更。" +
-        "治理会话可附可选 `flowId`/`stepId`/`cardKind`（cardKind 仅 `proposal` / `appointment` / `acceptance` / `intent-confirm`；" +
+        "治理会话可附可选 `flowId`/`intentId`/`taskId`/`stepId`/`cardKind`（cardKind 仅 `proposal` / `appointment` / `acceptance` / `intent-confirm` / `decision`；" +
         "`appointment` 为**任命**卡——由 Convener 依客户确认的团队计划发起、任命 Crew，旧流程的「提名」卡为 legacy；" +
         "卡种须属于该角色允许的卡种，由应用校验）；" +
         "这些字段只用于卡片显示与账本分类，**字段本身不构成任何授权**——治理门禁只认应用签发的客户决定。" +
@@ -1398,7 +1414,11 @@ export function describeTool(name: string): ToolDescription {
             type: "string",
             pattern: GOVERNANCE_SLUG_PATTERN,
             description:
-              "Intent record id (slug) whose requirement/scope may need to change; give this or flowId (at least one is required)",
+              "Intent record id (slug) whose requirement/scope may need to change; give this or flowId/taskId (at least one is required)",
+          },
+          taskId: {
+            type: "string",
+            description: "C 批：task attribution key; give this when there is no flowId/intentId (at least one attribution key is required)",
           },
           changeKind: {
             type: "string",

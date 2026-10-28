@@ -77,6 +77,7 @@ test("注入后注册 request_requirement_change；changeKind/summary/rationale 
     "proposedIntentPatch",
     "rationale",
     "summary",
+    "taskId",
   ]);
   assert.equal(props.flowId.type, "string");
   assert.equal(typeof props.flowId.pattern, "string");
@@ -145,6 +146,7 @@ test("载荷原样交给注入能力：flowId/intentId 至少一个、changeKind
 
   assert.equal((await tool.handler(call({ flowId: "flow-a", changeKind: "scope", summary: "s", rationale: "r" }))).ok, true);
   assert.equal((await tool.handler(call({ intentId: "intent-b", changeKind: "authorization", summary: "s", rationale: "r" }))).ok, true);
+  assert.equal((await tool.handler(call({ taskId: "t-1", changeKind: "scope", summary: "s", rationale: "r" }))).ok, true, "taskId-only attribution");
   for (const changeKind of ["scope", "authorization", "constraint", "cost", "other"]) {
     assert.equal(
       (await tool.handler(call({ flowId: "flow-a", intentId: "intent-a", changeKind, summary: "s", rationale: "r" }))).ok,
@@ -166,6 +168,7 @@ test("载荷原样交给注入能力：flowId/intentId 至少一个、changeKind
   assert.deepEqual(received, [
     { flowId: "flow-a", changeKind: "scope", summary: "s", rationale: "r" },
     { intentId: "intent-b", changeKind: "authorization", summary: "s", rationale: "r" },
+    { taskId: "t-1", changeKind: "scope", summary: "s", rationale: "r" },
     { flowId: "flow-a", intentId: "intent-a", changeKind: "scope", summary: "s", rationale: "r" },
     { flowId: "flow-a", intentId: "intent-a", changeKind: "authorization", summary: "s", rationale: "r" },
     { flowId: "flow-a", intentId: "intent-a", changeKind: "constraint", summary: "s", rationale: "r" },

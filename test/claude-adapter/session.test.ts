@@ -1540,7 +1540,8 @@ test("governance judge mode registers exactly the three governance tools, force-
     assert.equal(list.isError, false);
     assert.match(JSON.stringify(list.content), /README\.md/);
     assert.equal(JSON.stringify(list.content).includes(".env"), false, "sensitive entries are never named");
-    const verdict = { verdict: "approve", group: "approval", cardKind: "write", selected: ["accept"], pathDecisions: [{ path: "docs/a.md", ok: true }], extraneous: "kept-raw" };
+    // Delta-3（C 批）：通用 write 卡已删除；judge 回调夹具改用 appointment-write（approval 组）。
+    const verdict = { verdict: "approve", group: "approval", cardKind: "appointment-write", selected: ["accept"], pathDecisions: [{ path: "docs/a.md", ok: true }], extraneous: "kept-raw" };
     const report = await client.callTool({ name: "report_governance_judgement", arguments: verdict });
     assert.equal(report.isError, false);
     assert.deepEqual(reports, [verdict]);

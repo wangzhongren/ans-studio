@@ -1151,8 +1151,8 @@ test("F1 复验收口：system 写盘预授权拒绝仍记 governance.preauthori
       try {
         const out = await captured.caps!.customerInput!({
           kind: "confirm",
-          title: "写盘确认",
-          cardKind: "write",
+          title: "调度写盘确认",
+          cardKind: "schedule-write",
           flowId: "flow-a",
           preview: "## docs/scheduling/note.md\n正文内容。\n",
           paths: ["docs/scheduling/note.md"],

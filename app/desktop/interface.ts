@@ -324,6 +324,8 @@ import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
 // 目录级授权（2026-10-23 v3）：计划目录 vs 边界的 same/ancestor/大小写口径复用共享路径原语
 // （设计 §8.2「路径规范化/大小写/realpath 复用 path-primitives，不另写第二份」）。
 import { compareKey, isUnderOrEqual } from "../../src/common/shared/path-primitives.ts";
+// C 批（方案 §6.4.1/C-06）：角色卡必填章节的单一来源在门禁引擎；本文件只读导入、不复制第二份。
+import { ROLE_CARD_REQUIRED_SECTIONS as REQUIRED_ROLE_CARD_SECTIONS } from "../../src/common/门禁引擎/governance-roles.ts";
 import { createWatchdogService, type WatchdogConfig } from "./watchdog.ts";
 // 输入区图片附件（K-2）：校验/解码/嗅探的**纯逻辑**（渲染进程不碰文件；字节交主进程校验——内容为准）。
 import {
@@ -11182,9 +11184,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     }
     const flowId = assessment.flowId;
     const intentId = assessment.intentId;
-    // 显示/文案用有效 id（只给一个时按本仓约定互为对方；票据仍如实记录显式给出的那个）。
-    const effectiveFlowId = flowId ?? intentId!;
-    const effectiveIntentId = intentId ?? flowId!;
+    const taskId = assessment.taskId;
+    // 显示/文案用有效 id（只给一个时按本仓约定互为对方；taskId-only 不伪造 intent/flow）。
+    const effectiveFlowId = flowId ?? intentId ?? taskId!;
+    const effectiveIntentId = intentId ?? flowId ?? taskId!;
     // 发起方白名单（客户纠正：仅统筹/提案可发起/持有审批卡；其他内置治理角色、项目角色不可）——
     // 在写任何票据/呈现任何卡之前 fail-closed（零票据、零卡、零投递）。
     const initiatorListing = await requirementChangeListing(root, diagnostic);
@@ -11240,6 +11243,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       requestedBy: requester,
       ...(flowId !== undefined ? { flowId } : {}),
       ...(intentId !== undefined ? { intentId } : {}),
+      ...(taskId !== undefined ? { taskId } : {}),
       changeKind: assessment.changeKind,
       summary: assessment.summary,
       rationale: assessment.rationale,
@@ -11293,6 +11297,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         requestedBy: requester,
         flowId: flowId ?? null,
         intentId: intentId ?? null,
+        taskId: taskId ?? null,
         changeKind: assessment.changeKind,
         summary: assessment.summary,
         rationale: assessment.rationale,
@@ -11661,19 +11666,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
    */
   const appointmentArtifactFeedback = new Map<string, Set<string>>();
 
-  /** 新/变更角色的 role-card 必填章节（方案 §6.1 第 1–9 项；等价标题即可）。 */
-  const REQUIRED_ROLE_CARD_SECTIONS: ReadonlyArray<{ label: string; test: RegExp }> = [
-    { label: "组别", test: /组别|group/i },
-    { label: "工作立场", test: /工作立场/ },
-    { label: "能力描述", test: /能力描述|职责与能力/ },
-    { label: "职责与功能导航", test: /系统功能导航|职责与功能导航/ },
-    { label: "必读资料", test: /必读资料/ },
-    { label: "交接输入输出", test: /交接/ },
-    { label: "执行原则", test: /执行原则/ },
-    { label: "质量职责", test: /质量/ },
-    { label: "标准工作流", test: /工作流/ },
-    { label: "交付物清单", test: /交付物/ },
-  ];
+  /** 新/变更角色的 role-card 必填章节；单一来源见门禁引擎 `ROLE_CARD_REQUIRED_SECTIONS`（C 批）。 */
   /** 角色根工作文档（新/变更角色必填；existing 只做存在检查并记提醒）。 */
   const ROLE_WORK_DOC_FILES = ["feature-map.md", "functional-description.md", "memo.md", "api-spec.md"] as const;
 

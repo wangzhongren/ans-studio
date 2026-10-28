@@ -433,7 +433,7 @@ test("schema：三个治理元数据字段可选、slug pattern 单点、cardKin
     assert.equal(properties.flowId.pattern, GOVERNANCE_SLUG_PATTERN);
     assert.equal(properties.stepId.pattern, GOVERNANCE_SLUG_PATTERN);
   }
-  assert.deepEqual(confirm.cardKind.enum, ["write", "appointment-write", "schedule-write"]);
+  assert.deepEqual(confirm.cardKind.enum, ["appointment-write", "schedule-write"], "C 批：通用 write 卡已删除，appointment-write/schedule-write 保留");
   assert.deepEqual(choice.cardKind.enum, ["proposal", "appointment", "acceptance", "intent-confirm", "decision"]);
   for (const name of ["request_confirmation", "request_choice", "dispatch_task"]) {
     const required = (describeTool(name).parameters as { required?: string[] }).required ?? [];
@@ -456,28 +456,28 @@ test("schema 文案（2026-10-22）：任命/提名语义与角色允许卡种�
   const confirm = describeTool("request_confirmation");
   const confirmText = [confirm.description, ...(confirm.promptGuidelines ?? [])].join("\n");
   assert.match(confirmText, /`appointment-write` 指客户\*\*任命\*\*（appointment）后的角色卡\/边界写入确认/, "appointment-write 写任命后写卡语义");
-  assert.deepEqual(propertiesOf("request_confirmation").cardKind.enum, ["write", "appointment-write", "schedule-write"], "不新增 cardKind");
+  assert.deepEqual(propertiesOf("request_confirmation").cardKind.enum, ["appointment-write", "schedule-write"], "C 批：write 已删除（schedule-write 留 D）");
   const confirmKindDescription = propertiesOf("request_confirmation").cardKind.description ?? "";
   assert.match(confirmKindDescription, /appointment-write.*after the customer's appointment/, "字段说明写明任命后写卡语义");
   assert.match(confirmKindDescription, /Which kinds a role may send is decided by the application/, "角色允许卡种由应用判定");
 });
 
-test("T13 schema：request_confirmation 描述明确内置治理角色必须同时携带 flowId + cardKind；缺失不发卡，旧调用仍被接受", async () => {
+test("T13 schema：request_confirmation 描述明确内置治理角色必须同时携带归属键 + cardKind；缺失不发卡，旧调用仍被接受", async () => {
   const described = describeTool("request_confirmation");
   const properties = (described.parameters as { properties: Record<string, { description?: string }> }).properties;
   for (const field of ["flowId", "cardKind"] as const) {
     const description = properties[field].description ?? "";
-    assert.match(description, /five built-in governance roles/, `${field} 描述须点名五个内置治理角色`);
-    assert.match(description, /flowId \+ cardKind/, `${field} 描述须写明两者必须同时携带`);
+    assert.match(description, /six built-in governance roles/, `${field} 描述须点名六个内置治理角色`);
+    assert.match(description, /attribution key \(flowId \| intentId \| taskId\) \+ cardKind/, `${field} 描述须写明归属键与 cardKind 必须同时携带`);
     assert.match(description, /rejected by the application/, `${field} 描述须写明会被应用拒绝`);
     assert.match(description, /NO card is shown to the customer/, `${field} 描述须写明不会向客户发卡`);
     assert.match(description, /Optional for ordinary project roles and single\/su/, `${field} 对普通角色/single/su 仍为可选`);
   }
-  assert.match(described.description, /五个内置治理角色（liaison \/ rapporteur \/ nominator \/ convener \/ verifier）必须始终同时携带 `flowId` \+ `cardKind`/);
+  assert.match(described.description, /六个内置治理角色（chief \/ product \/ rapporteur \/ nominator \/ convener \/ verifier）必须始终同时携带归属键（`flowId` \| `intentId` \| `taskId`）与 `cardKind`/);
   assert.match(described.description, /缺失任一项会被应用拒绝且\*\*不会向客户发卡\*\*/);
   assert.match(described.description, /普通项目角色与 single\/su 的 `flowId`\/`stepId`\/`cardKind` 仍为可选/);
   const guidelines = (described.promptGuidelines ?? []).join("\n");
-  assert.match(guidelines, /每次调用 request_confirmation 都必须同时携带 `flowId` 与 `cardKind`/);
+  assert.match(guidelines, /每次调用 request_confirmation 都必须同时携带归属键（`flowId` \| `intentId` \| `taskId` 至少一个）与 `cardKind`/);
   assert.match(guidelines, /不会向客户发卡/);
 
   // 形状校验不变：Provider 仍接受不带任何治理字段的旧调用，请求与 metadata 不凭空出现字段。

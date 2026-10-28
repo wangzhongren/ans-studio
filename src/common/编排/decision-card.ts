@@ -95,7 +95,10 @@ export function validateDecisionCardRequest(input: {
   const cardKind = typeof rawCardKind === "string" ? rawCardKind : undefined;
   if (cardKind !== "decision") return { ok: true, applicable: false };
 
-  if (input.governanceModel !== "trio" || !DECISION_CARD_ALLOWED_ROLES.includes(roleId)) {
+  // C 批：应用自有 decision 卡（`application:true`）不借用任何角色发行槽位；角色发行上限仍严格不变。
+  // 该标志只由应用侧构造；角色工具载荷不读取/不转发（见 GovernanceCardMetadata 注释）。
+  const applicationOwned = (request as { application?: unknown }).application === true;
+  if (!applicationOwned && (input.governanceModel !== "trio" || !DECISION_CARD_ALLOWED_ROLES.includes(roleId))) {
     return {
       ok: false,
       reasonCode: "role-not-allowed",

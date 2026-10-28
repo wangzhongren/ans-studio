@@ -588,14 +588,14 @@ test("B1–B4 key 分区：ui/main/shared 计数与总 key 数符合契约（漏
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
   assert.deepEqual(prefixes, {
-    ui: 825, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7 + 2026-10-25 chat-panel 10 + background tasks 25 + flow status 22 + acceptance triage 28 + 2026-10-26 decision card 3 + 2026-10-26 view_image 1 + 2026-10-27 view_image preview 3 + 2026-10-27 view_image lightbox 2 + 2026-10-28 六角色 chief/product 4 + 2026-10-28 B 批 task/workReport/roleLog 29
+    ui: 841, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7 + 2026-10-25 chat-panel 10 + background tasks 25 + flow status 22 + acceptance triage 28 + 2026-10-26 decision card 3 + 2026-10-26 view_image 1 + 2026-10-27 view_image preview 3 + 2026-10-27 view_image lightbox 2 + 2026-10-28 六角色 chief/product 4 + 2026-10-28 B 批 task/workReport/roleLog 29 + C 批 request/judge 16
     main: 541, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6 + backgroundTasks 1 + flowStatus 2 + write preauthorization 6 + 2026-10-26 gate review 13 + 2026-10-27 gate review flow-busy 1 + 2026-10-26 decision card 6 + 2026-10-26 view_image 2 + 2026-10-27 view_image same-turn 1 + 2026-10-26 requirement change 13 + 2026-10-27 gate review return routing 7 + 2026-10-28 B 批 logSilence/patrol 3
     shared: 62, // B4 元数据 + 跨层通用短词
     preferences: 3, // B0
   });
-  assert.equal(keys.length, 1431);
+  assert.equal(keys.length, 1447);
   // B1/B2 与 B3 分区（扣除 B0 的 5 个 ui.* / 5 个 main.*）。
-  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 820);
+  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 836);
   assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 536);
 });
 

@@ -35,7 +35,12 @@ export const DEFAULT_TASKS_MAX_BYTES = 5 * 1024 * 1024;
 export const DEFAULT_TASKS_ROTATIONS = 3;
 
 const SIDE_EFFECTS: readonly TaskSideEffect[] = ["read-only", "docs", "code", "external", "destructive", "unknown"];
-const TASK_EVENT_KINDS = new Set(["task.created", "task.delivered", "task.reported", "task.closed", "task.redispatch", "delegation.changed"]);
+const TASK_EVENT_KINDS = new Set([
+  "task.created", "task.delivered", "task.reported", "task.closed", "task.redispatch", "delegation.changed",
+  // C 批：申请/决策/审批事件（C-03）；与任务事件同文件、append-only。
+  "request.created", "request.presented", "request.resolved", "request.notified", "request.orphaned",
+  "approval.created", "approval.resolved", "approval.expired",
+]);
 const REPORT_STATUSES: readonly TaskReportStatus[] = ["done", "blocked", "failed"];
 const CLOSED_OUTCOMES: readonly TaskClosedOutcome[] = ["accepted", "rework", "rejected"];
 const REDISPATCH_SAFETIES: readonly TaskRedispatchSafety[] = ["safe", "unsafe", "needs-review"];
@@ -249,6 +254,27 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
     if (typeof rec["roleId"] !== "string" || rec["roleId"] === "") return { ok: false, message: "delegation.changed 缺 roleId" };
     return { ok: true, event: rec as unknown as TaskStateEvent };
   }
+  if (kind.startsWith("request.")) {
+    if (typeof rec["requestId"] !== "string" || rec["requestId"] === "") return { ok: false, message: "request 事件缺 requestId" };
+    if (kind === "request.created") {
+      if (typeof rec["sourceRoleId"] !== "string" || rec["sourceRoleId"] === "") return { ok: false, message: "request.created 缺 sourceRoleId" };
+      if (typeof rec["title"] !== "string" || rec["title"] === "") return { ok: false, message: "request.created 缺 title" };
+      if (!Array.isArray(rec["options"])) return { ok: false, message: "request.created 缺 options" };
+    }
+    if (kind === "request.resolved") {
+      if (rec["by"] !== "judge" && rec["by"] !== "customer") return { ok: false, message: "request.resolved.by 非法" };
+      if (typeof rec["choice"] !== "string") return { ok: false, message: "request.resolved 缺 choice" };
+    }
+    return { ok: true, event: rec as unknown as TaskStateEvent };
+  }
+  if (kind.startsWith("approval.")) {
+    if (typeof rec["approvalId"] !== "string" || rec["approvalId"] === "") return { ok: false, message: "approval 事件缺 approvalId" };
+    if (kind === "approval.created") {
+      if (rec["approvalKind"] !== "shell" && rec["approvalKind"] !== "appointment-write") return { ok: false, message: "approval.created.approvalKind 非法" };
+      if (typeof rec["sourceRoleId"] !== "string" || rec["sourceRoleId"] === "") return { ok: false, message: "approval.created 缺 sourceRoleId" };
+    }
+    return { ok: true, event: rec as unknown as TaskStateEvent };
+  }
   if (typeof rec["taskId"] !== "string" || rec["taskId"] === "") return { ok: false, message: "缺 taskId" };
   if (kind === "task.created") {
     if (rec["from"] !== "chief") return { ok: false, message: "task.created.from 必须为 chief" };
@@ -292,7 +318,9 @@ export function replayTaskEvents(events: readonly TaskStateEvent[], errors: Task
   let line = 0;
   for (const event of events) {
     line += 1;
-    const taskId = event.kind === "delegation.changed" ? undefined : event.taskId;
+    const taskId = event.kind === "delegation.changed" || event.kind.startsWith("request.") || event.kind.startsWith("approval.")
+      ? undefined
+      : (event as { taskId?: string }).taskId;
     if (taskId === undefined) continue;
     if (event.kind === "task.created") {
       const existing = records.get(taskId);

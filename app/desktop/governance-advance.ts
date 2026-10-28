@@ -1107,8 +1107,10 @@ const MIRRORED_GOVERNANCE_CARD_KINDS: ReadonlySet<GovernanceCardKind> = new Set(
   "write",
 ]);
 
-export function isMirroredGovernanceCard(cardKind: GovernanceCardKind | undefined): boolean {
-  return cardKind !== undefined && MIRRORED_GOVERNANCE_CARD_KINDS.has(cardKind);
+export function isMirroredGovernanceCard(_cardKind: GovernanceCardKind | undefined): boolean {
+  // C 批（2026-10-28，方案 §3.6/C-04）：决定卡镜像面已删除——申请直达来源角色，幕僚只收系统通知。
+  // 保留导出仅为旧测试/兼容调用；恒 false。
+  return false;
 }
 
 /**

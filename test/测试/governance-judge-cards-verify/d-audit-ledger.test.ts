@@ -70,6 +70,21 @@ async function openRapporteur(root: string, h: ChannelHarness, script: Array<{ n
   return { handle, capture };
 }
 
+async function openConvener(root: string, h: ChannelHarness, script: Array<{ name: string; args: Record<string, unknown> }>) {
+  const capture: SessionCapture = { results: [] };
+  const handle = await openRoleSession(
+    {
+      roleId: "convener",
+      runtime: "claude",
+      project: trioProject(root),
+      taskId: "T-judge-audit",
+      customerInput: bridge(h, root),
+    },
+    { createAdapter: toolAdapterFactory(capture, { root, script }) },
+  );
+  return { handle, capture };
+}
+
 async function drive(handle: { send(text: string): Promise<void>; events(): AsyncIterable<{ kind?: string }> }, text: string): Promise<void> {
   await handle.send(text);
   for await (const event of handle.events()) {
@@ -212,20 +227,20 @@ test("写盘代批：账本 kind=judge、group=approval、judge.paths 逐路径�
         model: "fixture-model",
         reasonCode: "sufficient",
         reason: "预览与提案一致，路径均在写区内。",
-        evidence: ["docs/proposals/flow-a-v1.md"],
+        evidence: ["docs/scheduling/flow-a-note.md"],
         value: { confirmed: true },
         paths: request.paths,
         pathDecisions: (request.paths ?? []).map((path) => ({ path, ok: true })),
       }), judgeRequests),
     });
-    const { handle } = await openRapporteur(root, h, [{
+    const { handle } = await openConvener(root, h, [{
       name: "request_confirmation",
       args: {
-        title: "写盘确认 flow-a",
+        title: "调度写盘确认 flow-a",
         // 2026-10-19 呈现前完整性闸：声明路径后须有可核对正文。
-        preview: "将写入 docs/proposals/flow-a-v1.md\n\n提案正文：目标、范围与验收标准。\n",
+        preview: "将写入 docs/scheduling/flow-a-note.md\n\n提案正文：目标、范围与验收标准。\n",
         flowId: FLOW,
-        cardKind: "write",
+        cardKind: "schedule-write",
       },
     }]);
     await drive(handle, "请写入提案文件");
@@ -237,22 +252,22 @@ test("写盘代批：账本 kind=judge、group=approval、judge.paths 逐路径�
     const entry = ledger.entries.find((candidate) => candidate.decisionEvidence?.judge?.group === "approval");
     assert.ok(entry !== undefined);
     assert.equal(entry.customerDecision, "accepted");
-    assert.equal(entry.actorRoleId, "rapporteur");
-    assert.equal(entry.power, "proposal");
+    assert.equal(entry.actorRoleId, "convener");
+    assert.equal(entry.power, "schedule");
     assert.equal(entry.decisionEvidence?.kind, "judge");
-    assert.equal(entry.decisionEvidence?.judge?.cardKind, "write");
+    assert.equal(entry.decisionEvidence?.judge?.cardKind, "schedule-write");
     assert.equal(entry.decisionEvidence?.judge?.confirmed, true);
-    assert.deepEqual(entry.decisionEvidence?.judge?.paths, ["docs/proposals/flow-a-v1.md"]);
+    assert.deepEqual(entry.decisionEvidence?.judge?.paths, ["docs/scheduling/flow-a-note.md"]);
     assert.deepEqual(entry.decisionEvidence?.judge?.pathDecisions?.map((decision) => ({ path: decision.path, ok: decision.ok })), [
-      { path: "docs/proposals/flow-a-v1.md", ok: true },
+      { path: "docs/scheduling/flow-a-note.md", ok: true },
     ]);
-    assert.ok(Array.isArray(entry.paths) && entry.paths.includes("docs/proposals/flow-a-v1.md"), "发行路径仍照旧入账");
+    assert.ok(Array.isArray(entry.paths) && entry.paths.includes("docs/scheduling/flow-a-note.md"), "发行路径仍照旧入账");
 
     assert.equal(h.presented.length, 0, "写盘代批成功 0 卡");
     assert.equal(h.rows.length, 1);
     assert.match(judgeResultSummary(h.rows[0]!), /judge 代批 · 代审批/);
     assert.equal(judgeRequests.length, 1);
-    assert.deepEqual(judgeRequests[0]!.paths, ["docs/proposals/flow-a-v1.md"]);
+    assert.deepEqual(judgeRequests[0]!.paths, ["docs/scheduling/flow-a-note.md"]);
     assert.equal(judgeRequests[0]!.pathProbes?.[0]?.allowed, true, "pathProbes 由 run-role 用 resolveWrite 计算");
   } finally {
     cleanup();

@@ -285,6 +285,8 @@ const GOVERNANCE_SLUG = new RegExp(GOVERNANCE_SLUG_PATTERN);
 // 2026-10-26 客户要求：`decision`（材料性选择卡，仅统筹使用；卡内恰一个 `recommended: true`）加入
 // choice 白名单。本层只做 enumerate 校验——不另立卡种表、不校验推荐项个数（应用/角色侧校验）。
 const CHOICE_CARD_KINDS: readonly GovernanceChoiceCardKind[] = ["proposal", "appointment", "acceptance", "intent-confirm", "decision"];
+// C 批：`write` 已从 schema 枚举删除；工具层保留 legacy 字符串解析以兼容旧调用/旧项目，
+// 新会话模型看不到该枚举；D 批随旧工具面清理。
 const CONFIRM_CARD_KINDS: readonly GovernanceConfirmCardKind[] = ["write", "appointment-write", "schedule-write"];
 
 type GovernanceArgs<T> = { ok: true; value: T } | { ok: false; result: ToolResult };
@@ -1772,7 +1774,7 @@ async function askCustomer(
  * - `ok:true` 且措辞「客户已确认」＝**拿到明确同意**（`confirmed:true`）——模型此时才可据此继续（如落盘）；
  * - `ok:false` 且措辞「未获客户同意」＝ 拒绝 / 明确选「否」/ 超时 / 通道不可用 / 出错——**不要写盘**；
  * - `ok:false` 且措辞「治理确认卡未发出」＝ 应用在**呈现前**拒绝发卡（`declined + notPresented:true`，
- *   如治理角色缺 `flowId`/`cardKind`）——客户**从未看到**卡片：不要写盘，也不要声称客户拒绝或同意；
+ *   如治理角色缺归属键（flowId/intentId/taskId）或 `cardKind`）——客户**从未看到**卡片：不要写盘，也不要声称客户拒绝或同意；
  *   按回执补齐参数后重新调用（2026-10-22 无效治理卡守卫设计 §4.6）。
  * - `operatorId` 以 `system:` 开头（如 `system:write-preauthorization`，2026-10-25 边界内写入预授权）：
  *   `answered + confirmed:true` ＝ 系统预授权**直接放行**（边界内写入；**不是客户确认**）；
@@ -1791,7 +1793,20 @@ function makeRequestConfirmationTool(
   return {
     name,
     async handler(call) {
-      const metadata = customerMetadata(call.signal, currentTurnId?.(), scope, call.toolCallId);
+      const baseMetadata = customerMetadata(call.signal, currentTurnId?.(), scope, call.toolCallId);
+      const taskId = readStringArg(call.args, ["taskId", "task_id"]);
+      const intentId = readStringArg(call.args, ["intentId", "intent_id"]);
+      // C 批（方案 §6.4.1/R2）：appointment-write 的目标角色与 D3 决定 id——只透传给应用校验，
+      // 字段本身不发行任何写权（应用按 D3 `request.resolved` 校验失败即不发卡）。
+      const targetRoleId = readStringArg(call.args, ["targetRoleId", "target_role_id"]);
+      const decisionId = readStringArg(call.args, ["decisionId", "decision_id"]);
+      const metadata: CustomerInputMetadata = {
+        ...baseMetadata,
+        ...(taskId !== undefined && taskId !== "" ? { taskId } : {}),
+        ...(intentId !== undefined && intentId !== "" ? { intentId } : {}),
+        ...(targetRoleId !== undefined && targetRoleId !== "" ? { targetRoleId } : {}),
+        ...(decisionId !== undefined && decisionId !== "" ? { decisionId } : {}),
+      };
       const title = readStringArg(call.args, ["title"]);
       if (title === undefined || title.trim() === "") {
         return { ok: false, message: `${name}: 缺少 title 参数，无法向客户发起确认` };
@@ -1944,7 +1959,14 @@ function makeRequestChoiceTool(
   return {
     name,
     async handler(call) {
-      const metadata = customerMetadata(call.signal, currentTurnId?.(), scope, call.toolCallId);
+      const baseMetadata = customerMetadata(call.signal, currentTurnId?.(), scope, call.toolCallId);
+      const taskId = readStringArg(call.args, ["taskId", "task_id"]);
+      const intentId = readStringArg(call.args, ["intentId", "intent_id"]);
+      const metadata: CustomerInputMetadata = {
+        ...baseMetadata,
+        ...(taskId !== undefined && taskId !== "" ? { taskId } : {}),
+        ...(intentId !== undefined && intentId !== "" ? { intentId } : {}),
+      };
       const title = readStringArg(call.args, ["title"]);
       if (title === undefined || title.trim() === "") {
         return { ok: false, message: `${name}: 缺少 title 参数，无法向客户发起选择` };
@@ -3645,6 +3667,7 @@ function makeRequestBoundaryChangeTool(fn: RequestBoundaryChangeFn): ExecutableT
 const REQUEST_REQUIREMENT_CHANGE_ARG_KEYS: ReadonlySet<string> = new Set([
   "flowId",
   "intentId",
+  "taskId",
   "changeKind",
   "summary",
   "rationale",
@@ -3785,8 +3808,12 @@ function makeRequestRequirementChangeTool(fn: RequestRequirementChangeFn): Execu
       if (!flowId.ok) return flowId.result;
       const intentId = readGovernanceSlugArg(call.args, "intentId", name);
       if (!intentId.ok) return intentId.result;
-      if (flowId.value === undefined && intentId.value === undefined) {
-        return flowArgumentError(name, "缺少 flowId/intentId 参数（至少给出一个，用于归属校验/去重）");
+      const taskId = readStringArg(call.args, ["taskId", "task_id"]);
+      if (taskId !== undefined && taskId.trim() === "") {
+        return flowArgumentError(name, "taskId 不能为空字符串");
+      }
+      if (flowId.value === undefined && intentId.value === undefined && (taskId === undefined || taskId.trim() === "")) {
+        return flowArgumentError(name, "缺少 flowId/intentId/taskId 参数（至少给出一个，用于归属校验/去重）");
       }
       const changeKind = call.args["changeKind"];
       if (typeof changeKind !== "string" || !(REQUEST_REQUIREMENT_CHANGE_KINDS as readonly string[]).includes(changeKind)) {
@@ -3803,6 +3830,7 @@ function makeRequestRequirementChangeTool(fn: RequestRequirementChangeFn): Execu
       const input: RequestRequirementChangeInput = {
         ...(flowId.value !== undefined ? { flowId: flowId.value } : {}),
         ...(intentId.value !== undefined ? { intentId: intentId.value } : {}),
+        ...(taskId !== undefined && taskId.trim() !== "" ? { taskId } : {}),
         changeKind: changeKind as RequestRequirementChangeInput["changeKind"],
         summary: summary.value,
         rationale: rationale.value,

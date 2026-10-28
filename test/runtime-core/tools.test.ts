@@ -313,7 +313,7 @@ test("declined 措辞按 operatorId / cardKind 区分 judge 与客户/通道（2
   // request_confirmation：所有 judge 退回（含写卡）一律通用文案，不出现返工/验收字样。
   for (const [label, args] of [
     ["request_confirmation(无 cardKind)", { title: "写盘" }],
-    ["request_confirmation(write)", { title: "写盘", cardKind: "write" }],
+    ["request_confirmation(appointment-write)", { title: "写盘", cardKind: "appointment-write" }],
   ] as const) {
     const result = await judgeCall("request_confirmation", args);
     assertJudgeCommon(result, label);
@@ -477,7 +477,7 @@ test("写入预授权 system 回执（2026-10-25）：放行不说成客户确�
     "边界外不给写；本次未向客户呈现确认卡、未调用判断 agent。";
   const rejected = await call(
     { outcome: "declined", operatorId: systemId, notPresented: true, reason },
-    { title: "写入 src/impl/main.ts", paths: ["src/impl/main.ts"], cardKind: "write", flowId: "demo-flow" },
+    { title: "写入 src/impl/main.ts", paths: ["src/impl/main.ts"], cardKind: "appointment-write", flowId: "demo-flow" },
   );
   assert.equal(rejected.ok, false, "系统拒绝仍 fail-closed（无写盘许可）");
   assert.match(rejected.message, /系统预授权拒绝/);

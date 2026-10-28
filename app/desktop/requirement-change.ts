@@ -76,7 +76,9 @@ export type RequirementChangeAssessmentOk = {
   flowId?: string;
   /** 显式给出的意图 id（未给则缺席；不凭空编造）。 */
   intentId?: string;
-  /** 票据目录与「同一 flow 去重」的归属键：`flowId ?? intentId`。 */
+  /** C 批：无 flow/intent 时的 task 归属键。 */
+  taskId?: string;
+  /** 票据目录与「同一 flow 去重」的归属键：`flowId ?? intentId ?? taskId`。 */
   scopeKey: string;
   changeKind: RequestRequirementChangeKind;
   summary: string;
@@ -145,8 +147,13 @@ export function assessRequirementChangeRequest(input: unknown): RequirementChang
   if (!flowId.ok) return flowId;
   const intentId = governanceSlugOrFailure(record["intentId"], "intentId");
   if (!intentId.ok) return intentId;
-  if (flowId.value === undefined && intentId.value === undefined) {
-    return { ok: false, detail: "缺少 flowId/intentId（至少给出一个，用于归属校验/去重）" };
+  const taskIdRaw = record["taskId"];
+  const taskId = typeof taskIdRaw === "string" ? taskIdRaw.trim() : undefined;
+  if (taskIdRaw !== undefined && (typeof taskIdRaw !== "string" || taskId === "")) {
+    return { ok: false, detail: "taskId 已给出但不能为空" };
+  }
+  if (flowId.value === undefined && intentId.value === undefined && taskId === undefined) {
+    return { ok: false, detail: "缺少 flowId/intentId/taskId（至少给出一个，用于归属校验/去重）" };
   }
   const changeKind = record["changeKind"];
   if (typeof changeKind !== "string" || !(REQUIREMENT_CHANGE_KINDS as readonly string[]).includes(changeKind)) {
@@ -168,7 +175,8 @@ export function assessRequirementChangeRequest(input: unknown): RequirementChang
     ok: true,
     ...(flowId.value !== undefined ? { flowId: flowId.value } : {}),
     ...(intentId.value !== undefined ? { intentId: intentId.value } : {}),
-    scopeKey: flowId.value ?? intentId.value!,
+    ...(taskId !== undefined ? { taskId } : {}),
+    scopeKey: flowId.value ?? intentId.value ?? taskId!,
     changeKind: changeKind as RequestRequirementChangeKind,
     summary: summary.value,
     rationale: rationale.value,
@@ -186,6 +194,7 @@ export function requirementChangeRequestId(input: {
   requestedBy: string;
   flowId?: string;
   intentId?: string;
+  taskId?: string;
   changeKind: RequestRequirementChangeKind;
   summary: string;
   rationale: string;
@@ -196,6 +205,7 @@ export function requirementChangeRequestId(input: {
     input.requestedBy.trim(),
     input.flowId ?? null,
     input.intentId ?? null,
+    input.taskId ?? null,
     input.changeKind,
     input.summary.trim(),
     input.rationale.trim(),
@@ -266,6 +276,8 @@ export interface RequirementChangeTicketRecord {
   flowId: string | null;
   /** 显式给出的意图 id；未给出为 null（不编造）。 */
   intentId: string | null;
+  /** C 批：显式给出的 taskId；未给出为 null。 */
+  taskId: string | null;
   changeKind: RequestRequirementChangeKind;
   summary: string;
   rationale: string;

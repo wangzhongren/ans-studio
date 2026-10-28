@@ -2542,7 +2542,7 @@ test("run-role：治理 confirm 卡缺 cardKind ⇒ 呈现前拒绝（严格口�
         assert.equal(rawCalls, 0, `${testCase.roleId} 缺 cardKind 不得调用客户通道`);
         await assertNotPresented(root, out, [
           /缺少 cardKind/,
-          /治理角色的 request_confirmation 必须同时携带 flowId 与 cardKind/,
+          /治理角色的 request_confirmation 必须同时携带归属键（flowId \/ intentId \/ taskId 至少一个）与 cardKind/,
           /本角色允许：/,
           /本次未发行任何写入路径、未写入账本/,
         ]);
@@ -3726,8 +3726,8 @@ test("run-role：pathProbes 只取 preview 声明路径，散文路径不进 pro
     const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
     const handle = await openRoleSession(
       {
-        roleId: "rapporteur",
-        project: trioProject(root),
+        roleId: "convener",
+        project: trioProject(root, "convener"),
         autoRepin: false,
         customerInput: ((_req, metadata) => {
           capturedInput.metadata = metadata;
@@ -3737,8 +3737,8 @@ test("run-role：pathProbes 只取 preview 声明路径，散文路径不进 pro
       { createAdapter: capturingFactory(captured) },
     );
     try {
-      const targetA = "docs/proposals/local-ledger-cli.proposal-v1.md";
-      const targetB = "docs/contracts/local-ledger-cli.md";
+      const targetA = "docs/scheduling/local-ledger-cli.proposal-v1.md";
+      const targetB = "docs/scheduling/local-ledger-cli.contract.md";
       await captured.caps!.customerInput!(
         {
           kind: "confirm",
@@ -3747,7 +3747,7 @@ test("run-role：pathProbes 只取 preview 声明路径，散文路径不进 pro
             `将写入以下文件：\n- ${targetA}\n- ${targetB}\n\n` +
             "说明：不会修改 src/**、test/**，也不改 data/ledger.json、bin/ledger.js。\n\n" +
             `## ${targetA}\n提案正文（测试用）。\n\n## ${targetB}\n契约正文（测试用）。`,
-          cardKind: "write",
+          cardKind: "schedule-write",
           flowId: "local-ledger-cli",
         },
         { toolCallId: "call-paths" },
@@ -3766,7 +3766,7 @@ test("run-role：pathProbes 只取 preview 声明路径，散文路径不进 pro
             "说明：不会修改 docs/proposals/other-1.md、docs/proposals/other-2.md、docs/contracts/other-3.md、" +
             "src/**、test/**、data/ledger.json 等 10 个文件。\n\n" +
             `## ${targetA}\n提案正文（测试用）。\n\n## ${targetB}\n契约正文（测试用）。`,
-          cardKind: "write",
+          cardKind: "schedule-write",
           flowId: "local-ledger-cli",
           paths: [targetA, targetB],
         } as unknown as CustomerInputRequest,
@@ -3783,7 +3783,7 @@ test("run-role：pathProbes 只取 preview 声明路径，散文路径不进 pro
           preview:
             `将写入以下文件：\n- ${targetA}\n- ${targetB}\n\n` +
             `## ${targetA}\n提案正文（测试用）。\n\n## ${targetB}\n契约正文（测试用）。`,
-          cardKind: "write",
+          cardKind: "schedule-write",
           flowId: "local-ledger-cli",
           paths: [],
         } as unknown as CustomerInputRequest,
@@ -3799,7 +3799,7 @@ test("run-role：pathProbes 只取 preview 声明路径，散文路径不进 pro
           preview:
             `将写入以下文件：\n- ${targetA}\n- src/evil.ts\n\n` +
             `## ${targetA}\n提案正文（测试用）。\n\n## src/evil.ts\n// 越界（测试用）。`,
-          cardKind: "write",
+          cardKind: "schedule-write",
           flowId: "local-ledger-cli",
         },
         { toolCallId: "call-paths-2" },
@@ -3923,17 +3923,17 @@ test("账本：judge 代批写 decisionEvidence.kind=judge + group；actorRoleId
 
 test("账本：judge.group 与卡种交叉校验——不翻转决定、不改成 customer-input", async () => {
   await withRoot(async (root) => {
-    const project = trioProject(root);
+    const project = trioProject(root, "convener");
     const audit: GovernanceJudgeAudit = {
       group: "decision",
-      cardKind: "write",
+      cardKind: "schedule-write",
       engine: "claude",
       reasonCode: "sufficient",
     };
     const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
     const handle = await openRoleSession(
       {
-        roleId: "rapporteur",
+        roleId: "convener",
         project,
         autoRepin: false,
         customerInput: () => ({
@@ -3950,7 +3950,7 @@ test("账本：judge.group 与卡种交叉校验——不翻转决定、不改�
           kind: "confirm",
           title: "写入",
           preview: "docs/proposals/flow-a-v1.md\n\n## docs/proposals/flow-a-v1.md\n提案正文（测试用）。",
-          cardKind: "write",
+          cardKind: "schedule-write",
           flowId: "flow-a",
         },
         { toolCallId: "call-mismatch" },

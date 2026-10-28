@@ -90,6 +90,8 @@ import type { OrchestrationEvent, HandbackEvent } from "../../src/common/编排/
 // E-1（2026-10-12）：「回交后的 su 验收」的两件**单一来源**（编排提供，只读导入、不复制）——
 // `renderHandbackPrompt`（投递给 su 的输入文案）与 `handbackKey`（去重键）。**两前端共用、不得各写一份**。
 import { renderHandbackPrompt, renderHandbackBatchPrompt, renderWorkReportPrompt, renderWorkReportBatchPrompt, handbackKey, extractDispatchReadPaths, planDispatchDelivery, type TaskHandback } from "../../src/common/编排/handback.ts";
+// C 批（方案 §6.4.1/C-06）：appointment-write 的应用侧结构/D3 校验使用编排出品的声明路径单一实现。
+import { declaredConfirmPaths } from "../../src/common/编排/confirmed-writes.ts";
 // B 批（2026-10-28）：任务/汇报主干与最小状态（编排单一来源，本层只接线）。
 import {
   appendTaskEvent,
@@ -206,8 +208,8 @@ import type {
   RequestClarificationPayload,
   RequestClarificationReceipt,
 } from "../../src/model/runtime.ts";
-// W6-B：决定卡镜像判据与意图交接任务文案（纯逻辑在 governance-advance.ts；本层只做接线）。
-import { buildIntentHandoffMessage, governanceAcceptanceReportPath, isMirroredGovernanceCard } from "./governance-advance.ts";
+// W6-B：决定卡镜像已由 C 批移除（申请/结果直达来源角色，幕僚只收系统通知）；意图交接文案仍在此接线。
+import { buildIntentHandoffMessage, governanceAcceptanceReportPath } from "./governance-advance.ts";
 // H-1（2026-10-12）：派发能力的冻结契约（§4 冻结家；只读导入、不复制形状）。
 import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions, TaskSideEffect, TaskStateEvent, RoleActivityLogPayload, RoleActivityLogFn, TerminateRoleRunFn, RedispatchTaskFn } from "../../src/model/runtime.ts";
 // G-4/I3（2026-10-16 客户批准）：技能安装/卸载能力的冻结契约（设计 §3.2 冻结家 `src/model/runtime.ts`；
@@ -468,6 +470,10 @@ export interface TaskRestoreReport {
   restored: number;
   skipped: number;
   taskIds: string[];
+  /** C 批：重启时标记 orphaned 的未决申请数。 */
+  orphanedRequests?: number;
+  /** C 批：重启时标记 expired 的未决审批数。 */
+  expiredApprovals?: number;
 }
 
 export interface TerminateRoleRunInput {
@@ -1256,6 +1262,10 @@ export class SessionManager {
   private readonly reportedTaskKeys = new Set<string>();
   /** B-07：连续卡死升级卡（按链根去重；同一链只提交一次）。 */
   private readonly escalationRequests = new Map<string, Promise<{ escalated: boolean; requestId?: string; selected?: string; message: string }>>();
+  /** C 批：系统通知去重（`requestId\0event`）。 */
+  private readonly requestNotifiedKeys = new Set<string>();
+  /** C 批：已呈现过的申请（`requestId\0customer|judge`）。 */
+  private readonly requestPresentedKeys = new Set<string>();
   /** B 批：每角色最近运行日志的内存摘要（看护巡检/日志静默用；真实日志在 `.ans/state/logs/`）。 */
   private readonly lastRoleActivity = new Map<string, { at: number; kind: string; summary: string }>();
   private readonly reportStates = new Map<string, { owner?: LiveSession; event?: HandbackEvent; state?: ReportSaveStateV1; queued: boolean }>();
@@ -2637,16 +2647,9 @@ export class SessionManager {
       }
     }
 
-    // W6-B（四角色评审 §6.1）：**决定卡镜像面** = 主入口（`primaryRoleId`，trio 下恒为 liaison）。
-    // 仅 trio、仅治理决定卡（`isMirroredGovernanceCard`）且来源角色 ≠ 主入口时给出；single/普通写盘/
-    // 无 cardKind 旧卡不镜像。镜像只是**呈现路由**：同一请求 id、同一份 pending、只结算一次。
-    const mirrorRoleIdFor = (request: CustomerInputRequest): string | undefined => {
-      if (governanceModel !== "trio") return undefined;
-      if (!isMirroredGovernanceCard(request.cardKind)) return undefined;
-      const primaryRoleId = typeof listing.primaryRoleId === "string" ? listing.primaryRoleId : "";
-      if (primaryRoleId === "" || primaryRoleId === req.roleId) return undefined;
-      return primaryRoleId;
-    };
+    // C 批（2026-10-28）：**删除决定卡镜像面**——申请卡只在来源角色会话/客户通道呈现，
+    // 幕僚只收 `request.notified` 系统通知（不呈现第二张卡、不代答、不代决）。
+    const mirrorRoleIdFor = (_request: CustomerInputRequest): string | undefined => undefined;
 
     // H-1：**派发能力**（契约在 §4 冻结家 `model/runtime.ts`）——2026-10-20 客户拍板：主理 Lead 成为
     // 工作流管理者，`dispatchTask` 从「仅 schedule/legacy」扩展为 **schedule ∪ liaison**（Convener 派项目
@@ -2929,8 +2932,17 @@ export class SessionManager {
           // 点亮 B-3「等待你确认」）。**镜像面**（§6.1）：trio 治理决定卡额外带 `mirrorRoleId=主入口`，
           // 同一请求 id、同一份 pending、只答一次——不是第二个请求。普通角色逐字不传。
           ...(customerInput
-            ? { customerInput: (r: CustomerInputRequest, metadata?: CustomerInputMetadata) =>
-                customerInput(r, buildCustomerInputContext(r), metadata) }
+            ? {
+                customerInput: (r: CustomerInputRequest, metadata?: CustomerInputMetadata) =>
+                  this.withRequestLifecycle(
+                    req.projectRoot,
+                    req.roleId,
+                    r,
+                    metadata,
+                    (request, context, meta) => customerInput(request, context, meta),
+                    (request, extras) => buildCustomerInputContext(request, extras),
+                  ),
+              }
             : {}),
           // H-1：派发能力（仅 su 会话注入；契约字段名 `dispatchTask`——编排落地后由其转发给适配器）。
           ...(dispatchTask ? { dispatchTask } : {}),
@@ -3617,6 +3629,265 @@ export class SessionManager {
 
   // —————————————— B 批：任务列表 / 重启恢复 / 终止 / 重派（界面与专项测试入口） ——————————————
 
+  /** C 批：申请 id（稳定：来源/轮次/工具调用/卡片内容；同一调用重放同 id）。 */
+  private requestIdFor(projectRoot: string, sourceRoleId: string, request: CustomerInputRequest, metadata?: CustomerInputMetadata): string {
+    const options = request.kind === "choice" ? request.options.map((option) => `${option.id}:${option.label}:${option.recommended === true ? "1" : "0"}`).join("|") : "";
+    const digest = createHash("sha256")
+      .update([
+        projectRoot,
+        sourceRoleId,
+        metadata?.turnId ?? "",
+        metadata?.toolCallId ?? "",
+        request.kind,
+        request.title,
+        options,
+      ].join("\u0000"))
+      .digest("hex")
+      .slice(0, 16);
+    return `req-${digest}`;
+  }
+
+  /** C 批：系统通知幕僚（按 requestId+event 去重；系统行不是客户卡/不是决定）。 */
+  private notifyRequest(
+    projectRoot: string,
+    requestId: string,
+    sourceRoleId: string,
+    title: string,
+    event: "created" | "presented" | "resolved",
+    detail?: string,
+    after?: Promise<unknown>,
+  ): void {
+    const key = `${requestId}\u0000${event}`;
+    if (this.requestNotifiedKeys.has(key)) return;
+    this.requestNotifiedKeys.add(key);
+    if (this.requestNotifiedKeys.size > 5000) {
+      const oldest = this.requestNotifiedKeys.values().next().value;
+      if (oldest !== undefined) this.requestNotifiedKeys.delete(oldest);
+    }
+    const write = after !== undefined
+      ? after.then(() => this.appendTaskState(projectRoot, taskEvent("request.notified", { requestId, to: "chief", event }, () => new Date(this.now()))))
+      : this.appendTaskState(projectRoot, taskEvent("request.notified", { requestId, to: "chief", event }, () => new Date(this.now())));
+    void write;
+    const labels: Record<typeof event, string> = { created: "已提交", presented: "已呈现", resolved: "已裁决" };
+    const text = `[系统·申请] ${labels[event]}：角色「${sourceRoleId}」的申请「${shortenSummary(title, 80)}」（#${requestId}）${detail !== undefined && detail !== "" ? `｜${shortenSummary(detail, 120)}` : ""}。申请直达客户/应用裁决，幕僚不转发、不审批、不代选。`;
+    try {
+      const target = this.chiefTaskRoleIdOf(projectRoot) ?? this.handbackOwnerRoleId(projectRoot) ?? "";
+      const targetRuntime = this.findLiveRuntime(projectRoot, target) ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo";
+      this.deps.emitEvent({
+        roleId: target,
+        projectRoot,
+        runtime: targetRuntime,
+        event: { kind: "message", summary: text, detail: { source: "request-notified" } },
+      });
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: sourceRoleId }).error("request.notify.failed", error);
+    }
+  }
+
+  private async recordRequestPresented(projectRoot: string, requestId: string, sourceRoleId: string, title: string, to: "customer" | "judge"): Promise<void> {
+    const key = `${requestId}\u0000${to}`;
+    if (this.requestPresentedKeys.has(key)) return;
+    this.requestPresentedKeys.add(key);
+    await this.appendTaskState(projectRoot, taskEvent("request.presented", { requestId, to }, () => new Date(this.now())));
+    this.notifyRequest(projectRoot, requestId, sourceRoleId, title, "presented", to === "judge" ? "判断 agent" : "客户");
+  }
+
+  /**
+   * C-06（方案 §6.4.1/R2）：`appointment-write` 的**应用侧**事实校验（新路径）。
+   *
+   * 旧 flow 路径（带合法 `flowId` 且未给 targetRoleId/decisionId）逐字保持既有行为（D 批收敛）。
+   * 新路径（无 flow，用 intentId/taskId 归属）必须满足：
+   *  · `targetRoleId` 为非内置项目角色、`decisionId` 非空；
+   *  · 声明写入路径全部位于 `角色卡/<targetRoleId>/`；
+   *  · `.ans/state/tasks.jsonl` 存在对应 D3 `request.resolved`：`decisionId` 相符、`targetRoleIds`
+   *    含目标、且 `intentId|taskId` 与本次申请至少一项相符（D3 记录至少带一项）。
+   * 任一不满足 ⇒ 返回拒绝原因；调用方**不发卡、不写请求事件、不发行写入路径**（fail-closed）。
+   * 本函数只读 `.ans/state/tasks.jsonl`（app-only），不读账本、不写账本。
+   */
+  private async appointmentWriteApplicationRejection(
+    projectRoot: string,
+    request: CustomerInputRequest,
+    metadata: CustomerInputMetadata | undefined,
+  ): Promise<string | undefined> {
+    if (request.cardKind !== "appointment-write") return undefined;
+    const targetRoleId = typeof metadata?.targetRoleId === "string" ? metadata.targetRoleId.trim() : "";
+    const decisionId = typeof metadata?.decisionId === "string" ? metadata.decisionId.trim() : "";
+    const rawFlowId = request.flowId ?? metadata?.flowId;
+    const legacyFlow = typeof rawFlowId === "string" && rawFlowId.trim() !== "";
+    if (legacyFlow && targetRoleId === "" && decisionId === "") return undefined;
+    // 新路径必须至少带一个归属键（run-role 同样 fail-closed；应用层在此再兜一次，避免直调包装器绕过）。
+    if (!legacyFlow && metadata?.intentId === undefined && metadata?.taskId === undefined) {
+      return "appointment-write 新路径缺少归属键（flowId / intentId / taskId 至少一个）；未向客户发卡、未发行任何写入路径。";
+    }
+    if (targetRoleId === "") {
+      return "appointment-write 新路径缺少 targetRoleId（D3 目标项目角色）；未向客户发卡、未发行任何写入路径。";
+    }
+    if (targetRoleId.includes("/") || targetRoleId.includes("\\") || targetRoleId === "." || targetRoleId === "..") {
+      return `appointment-write 的 targetRoleId 非法：${targetRoleId}；未向客户发卡、未发行任何写入路径。`;
+    }
+    if (isBuiltInGovernanceRoleId(targetRoleId)) {
+      return `appointment-write 的 targetRoleId=${targetRoleId} 是内置治理角色/su（禁止）；未向客户发卡、未发行任何写入路径。`;
+    }
+    if (decisionId === "") {
+      return "appointment-write 新路径缺少 decisionId（D3 request.resolved 决定 id）；未向客户发卡、未发行任何写入路径。";
+    }
+    const paths = declaredConfirmPaths(request);
+    if (paths.length === 0) {
+      return "appointment-write 必须声明至少一个实际写入路径（paths 或 preview 路径锚点）；未向客户发卡。";
+    }
+    const prefix = `角色卡/${targetRoleId}/`;
+    const outside = paths.filter((rel) => !rel.startsWith(prefix));
+    if (outside.length > 0) {
+      return (
+        `appointment-write 声明路径不在 角色卡/${targetRoleId}/ 之内：${outside.slice(0, 4).join("、")}` +
+        `${outside.length > 4 ? ` 等 ${outside.length} 条` : ""}；未向客户发卡、未发行任何写入路径。`
+      );
+    }
+    const state = await this.readTasks(projectRoot);
+    const matched = state.events.some((event) => {
+      if (event.kind !== "request.resolved") return false;
+      const record = event as unknown as {
+        decisionId?: unknown;
+        targetRoleIds?: unknown;
+        intentId?: unknown;
+        taskId?: unknown;
+      };
+      if (record.decisionId !== decisionId) return false;
+      if (!Array.isArray(record.targetRoleIds) || !record.targetRoleIds.includes(targetRoleId)) return false;
+      const resolvedIntent = typeof record.intentId === "string" ? record.intentId : undefined;
+      const resolvedTask = typeof record.taskId === "string" ? record.taskId : undefined;
+      if (metadata?.taskId !== undefined) return resolvedTask === metadata.taskId;
+      if (metadata?.intentId !== undefined) return resolvedIntent === metadata.intentId;
+      return resolvedIntent !== undefined || resolvedTask !== undefined;
+    });
+    if (!matched) {
+      return (
+        `appointment-write 未找到匹配的 D3 裁决：request.resolved（decisionId=${decisionId}、` +
+        `targetRoleIds 含 ${targetRoleId}、intentId/taskId 一致）不存在；未向客户发卡、未发行任何写入路径。` +
+        "请先由人事发起 D3 并取得客户/判断裁决后，再逐次写卡。"
+      );
+    }
+    return undefined;
+  }
+
+  /**
+   * C 批：申请生命周期（created → presented(customer|judge) → resolved → notified 幕僚）。
+   * 只记录/通知，不改变通道裁决；工具调用结束后结果仍原样返回发起角色。
+   */
+  private async withRequestLifecycle(
+    projectRoot: string,
+    sourceRoleId: string,
+    request: CustomerInputRequest,
+    metadata: CustomerInputMetadata | undefined,
+    raw: (request: CustomerInputRequest, context: Parameters<DesktopCustomerInputFn>[1], metadata?: CustomerInputMetadata) => Promise<CustomerInputOutcome | null | undefined> | CustomerInputOutcome | null | undefined,
+    buildContext: (request: CustomerInputRequest, extras?: { onPresented?: () => void }) => Parameters<DesktopCustomerInputFn>[1],
+    requestIdOverride?: string,
+  ): Promise<CustomerInputOutcome | null | undefined> {
+    const requestId = requestIdOverride ?? this.requestIdFor(projectRoot, sourceRoleId, request, metadata);
+    const options = request.kind === "choice"
+      ? request.options.map((option) => ({ id: option.id, label: option.label, ...(option.recommended === true ? { recommended: true } : {}) }))
+      : [];
+    // C-06：appointment-write 先在应用层校验 D3 事实；失败**不创建请求事件/不呈现卡片**（fail-closed）。
+    if (request.cardKind === "appointment-write") {
+      const rejection = await this.appointmentWriteApplicationRejection(projectRoot, request, metadata);
+      if (rejection !== undefined) {
+        this.appendRoleActivity(projectRoot, sourceRoleId, {
+          kind: "request.rejected",
+          summary: rejection,
+          status: "not-presented",
+        });
+        return { outcome: "declined", notPresented: true, reason: rejection };
+      }
+    }
+    // **呈现不得等待落盘**（D1「调用即呈现」+ 同一轮 signal 身份）：事件写入先发起、后串行收口，
+    // 但 `raw`（客户卡通道）在首次 await 前同步调用——否则调用方会在卡片出现前看到 pending 空档，
+    // 会话被释放时还会把原本有效的轮次 signal 误判为已中止。落盘顺序仍为
+    // created → approval.created → presented → resolved（每一步 `.then` 接力）。
+    const createdWrite = this.appendTaskState(projectRoot, taskEvent("request.created", {
+      requestId,
+      ...(request.flowId !== undefined ? { flowId: request.flowId } : {}),
+      ...(metadata?.intentId !== undefined ? { intentId: metadata.intentId } : {}),
+      ...(metadata?.taskId !== undefined ? { taskId: metadata.taskId } : {}),
+      sourceRoleId,
+      title: request.title,
+      ...(request.kind === "choice" && request.question !== undefined ? { context: request.question } : {}),
+      options,
+      ...(options.some((option) => option.recommended === true) ? { recommended: options.filter((option) => option.recommended === true).map((option) => option.id) } : {}),
+    }, () => new Date(this.now())));
+    const approvalWrite = request.cardKind === "appointment-write"
+      ? createdWrite.then(() => this.appendTaskState(projectRoot, taskEvent("approval.created", {
+          approvalId: requestId,
+          sourceRoleId,
+          approvalKind: "appointment-write",
+          summary: shortenSummary(request.title, 200),
+          ...(request.kind === "confirm" && request.paths !== undefined ? { declaredPaths: [...request.paths] } : {}),
+          ...(metadata?.toolCallId !== undefined ? { toolCallId: metadata.toolCallId } : {}),
+          ...(metadata?.turnId !== undefined ? { turnId: metadata.turnId } : {}),
+        }, () => new Date(this.now()))))
+      : Promise.resolve(true);
+    this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "created", undefined, createdWrite);
+    let presented = false;
+    let presentedWrite: Promise<void> | null = null;
+    const markPresented = (to: "customer" | "judge"): Promise<void> => {
+      if (presentedWrite !== null) return presentedWrite;
+      presented = true;
+      presentedWrite = createdWrite.then(() => this.recordRequestPresented(projectRoot, requestId, sourceRoleId, request.title, to));
+      return presentedWrite;
+    };
+    const context = buildContext(request, {
+      onPresented: () => { void markPresented("customer"); },
+    });
+    let out: CustomerInputOutcome | null | undefined;
+    try {
+      out = await raw(request, context, metadata);
+    } catch (error) {
+      await createdWrite;
+      await this.appendTaskState(projectRoot, taskEvent("request.resolved", {
+        requestId,
+        by: "customer",
+        choice: "unavailable",
+        reason: shortenSummary(error instanceof Error ? error.message : String(error), 200),
+      }, () => new Date(this.now())));
+      this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "resolved", "通道异常（未执行）");
+      throw error;
+    }
+    await createdWrite;
+    await approvalWrite;
+    const answeredOut = out !== null && out !== undefined && out.outcome === "answered" ? out : undefined;
+    const judged = answeredOut !== undefined && (answeredOut.judge !== undefined || (typeof answeredOut.operatorId === "string" && answeredOut.operatorId.startsWith("judge:")));
+    if (judged && !presented && answeredOut !== undefined) await markPresented("judge");
+    else if (presentedWrite !== null) await presentedWrite;
+    const choice = answeredOut !== undefined
+      ? (answeredOut.value.confirmed === true ? "confirmed" : answeredOut.value.confirmed === false ? "denied" : (answeredOut.value.selected ?? []).join(",") || "answered")
+      : out?.outcome ?? "unavailable";
+    const selected = answeredOut?.value.selected ?? [];
+    const operatorId = out !== null && out !== undefined && "operatorId" in out && typeof out.operatorId === "string" ? out.operatorId : undefined;
+    await this.appendTaskState(projectRoot, taskEvent("request.resolved", {
+      requestId,
+      ...(answeredOut !== undefined ? { decisionId: `decision-${requestId}` } : {}),
+      ...(selected.length > 0 ? { targetRoleIds: selected } : {}),
+      ...(metadata?.intentId !== undefined ? { intentId: metadata.intentId } : {}),
+      ...(metadata?.taskId !== undefined ? { taskId: metadata.taskId } : {}),
+      by: judged ? "judge" : "customer",
+      ...(operatorId !== undefined ? { operatorId } : {}),
+      choice,
+      ...(out?.outcome === "declined" && out.reason !== undefined ? { reason: shortenSummary(out.reason, 200) } : {}),
+      ...(judged && answeredOut?.judge !== undefined ? { judge: answeredOut.judge } : {}),
+    }, () => new Date(this.now())));
+    if (request.cardKind === "appointment-write") {
+      await this.appendTaskState(projectRoot, taskEvent("approval.resolved", {
+        approvalId: requestId,
+        by: judged ? "judge" : "customer",
+        ...(operatorId !== undefined ? { operatorId } : {}),
+        decision: choice,
+        ...(out?.outcome === "declined" && out.reason !== undefined ? { reason: shortenSummary(out.reason, 200) } : {}),
+        ...(judged && answeredOut?.judge !== undefined ? { judge: answeredOut.judge } : {}),
+      }, () => new Date(this.now())));
+    }
+    this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "resolved", judged ? `判断代批：${choice}` : choice);
+    return out;
+  }
+
   /** 公开只读入口：角色运行日志（供 `role_activity_log` 工具/界面；失败如实）。 */
   async readRoleActivityLog(projectRoot: string, query: RoleActivityLogPayload): Promise<WatchdogToolResult> {
     return this.roleActivityLogText(projectRoot, query);
@@ -3640,10 +3911,71 @@ export class SessionManager {
    * 已投递/已报告未收口的任务只展示（不重复执行）。投递队列自身的恢复仍由
    * `restorePersistedDeliveries` 负责；本方法不伪造投递成功，失败只计数/诊断。
    */
+  /**
+   * C-08：重启重放申请/审批——未决 `request.created` 标 `request.orphaned`（不自动执行原动作，系统通知幕僚）；
+   * 未决 `approval.created` 标 `approval.expired`（命令/写盘不重放）。已结算/已标记幂等跳过。
+   */
+  private async restoreRequestState(
+    projectRoot: string,
+    state: TaskReplay,
+  ): Promise<{ orphaned: number; expired: number }> {
+    const resolved = new Set<string>();
+    const orphaned = new Set<string>();
+    const approvalDone = new Set<string>();
+    const createdRequests = new Map<string, { sourceRoleId: string; title: string }>();
+    const createdApprovals = new Map<string, { sourceRoleId: string; summary: string }>();
+    for (const event of state.events) {
+      if (event.kind === "request.resolved") resolved.add(event.requestId);
+      else if (event.kind === "request.orphaned") orphaned.add(event.requestId);
+      else if (event.kind === "request.created") createdRequests.set(event.requestId, { sourceRoleId: event.sourceRoleId, title: event.title });
+      else if (event.kind === "approval.created") createdApprovals.set(event.approvalId, { sourceRoleId: event.sourceRoleId, summary: event.summary });
+      else if (event.kind === "approval.resolved" || event.kind === "approval.expired") approvalDone.add(event.approvalId);
+    }
+    let orphanedCount = 0;
+    for (const [requestId, info] of createdRequests) {
+      if (resolved.has(requestId) || orphaned.has(requestId)) continue;
+      const appended = await this.appendTaskState(projectRoot, taskEvent("request.orphaned", { requestId, reason: "restart" }, () => new Date(this.now())));
+      if (!appended) continue;
+      orphanedCount += 1;
+      // C-08：原 tool call 已不存在——结果只作系统通知/任务回投发起角色，**不自动执行原动作**。
+      const sourceRuntime = this.findLiveRuntime(projectRoot, info.sourceRoleId) ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo";
+      this.emitDeliveryNote(
+        projectRoot,
+        sourceRuntime,
+        info.sourceRoleId,
+        "chief",
+        `[系统·申请] 重启后申请 #${requestId}「${shortenSummary(info.title, 80)}」未决，已标记 orphaned；不会自动执行原动作，请重新发起或人工处理。`,
+      );
+      if (info.sourceRoleId !== "application") {
+        this.notifyRequest(projectRoot, requestId, info.sourceRoleId, info.title, "resolved", "重启后未决（orphaned；不自动执行原动作）");
+      }
+    }
+    let expiredCount = 0;
+    for (const [approvalId, info] of createdApprovals) {
+      if (approvalDone.has(approvalId)) continue;
+      const appended = await this.appendTaskState(projectRoot, taskEvent("approval.expired", { approvalId, reason: "restart" }, () => new Date(this.now())));
+      if (!appended) continue;
+      expiredCount += 1;
+      // C-08：命令/写盘不重放；如实通知发起角色。
+      const sourceRuntime = this.findLiveRuntime(projectRoot, info.sourceRoleId) ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo";
+      this.emitDeliveryNote(
+        projectRoot,
+        sourceRuntime,
+        info.sourceRoleId,
+        "chief",
+        `[系统·审批] 重启后审批 #${approvalId}「${shortenSummary(info.summary, 80)}」未决，已标记 expired；命令/写盘不重放，请重新发起并逐次确认。`,
+      );
+    }
+    return { orphaned: orphanedCount, expired: expiredCount };
+  }
+
   async restoreTasks(projectRoot: string): Promise<TaskRestoreReport> {
     const state = await this.readTasks(projectRoot);
     for (const record of state.records.values()) this.starTaskIds.add(record.taskId);
     const report: TaskRestoreReport = { restored: 0, skipped: 0, taskIds: [] };
+    const requests = await this.restoreRequestState(projectRoot, state);
+    report.orphanedRequests = requests.orphaned;
+    report.expiredApprovals = requests.expired;
     for (const record of state.unclosed) {
       const created = record.created;
       if (created === undefined) continue;
@@ -4176,21 +4508,15 @@ export class SessionManager {
     const key = `${projectRoot}\u0000${rootTaskId}`;
     const existing = this.escalationRequests.get(key);
     if (existing !== undefined) return existing;
-    const listing = this.deps.getListing(projectRoot);
-    // 应用申请/决策卡走既有 decision 卡种；该卡种的机械发行槽位是 convener/rapporteur（单一来源
-    // `DECISION_CARD_ALLOWED_ROLES`）。本卡由应用发起、经既有客户通道发行，judge 开关开启时按唯一推荐代选。
-    const issuerRoleId = listing?.roles.find((role) => role.governanceFunction === "schedule")?.roleId
-      ?? listing?.roles.find((role) => role.governanceFunction === "proposal")?.roleId
-      ?? null;
     const chiefRoleId = this.chiefTaskRoleIdOf(projectRoot);
     const runtime = this.findLiveRuntime(projectRoot, chiefRoleId ?? "") ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo";
     const requestId = `task-escalation-${rootTaskId}-${attempts}`;
     const promise = (async () => {
       const channel = this.deps.customerInput;
-      if (channel === undefined || issuerRoleId === null) {
+      if (channel === undefined) {
         this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
           kind: "task.escalation.unavailable",
-          summary: `任务 #${taskId} 连续卡死升级卡未提交：${channel === undefined ? "客户交互/决策通道未接线" : "缺少 decision 卡发行槽位（convener/rapporteur）"}`,
+          summary: `任务 #${taskId} 连续卡死升级卡未提交：客户交互/决策通道未接线`,
           taskId,
           status: "unavailable",
         });
@@ -4200,6 +4526,8 @@ export class SessionManager {
       const request: CustomerInputRequest = {
         kind: "choice",
         cardKind: "decision",
+        application: true,
+        sourceRoleId: "application",
         flowId,
         title: `应用·任务升级：任务连续卡死 ${taskId}`,
         question: "任务已连续 2 次重派仍卡死。请选择处置（唯一推荐：终止）。",
@@ -4212,13 +4540,21 @@ export class SessionManager {
       };
       let outcome: CustomerInputOutcome | null | undefined;
       try {
-        outcome = await channel(request, {
-          roleId: issuerRoleId,
-          runtime,
+        outcome = await this.withRequestLifecycle(
           projectRoot,
-          governanceModel: "trio",
-          ...(chiefRoleId !== null ? { mirrorRoleId: chiefRoleId } : {}),
-        });
+          "application",
+          request,
+          { taskId },
+          (req, context) => channel(req, context),
+          (req, extras) => ({
+            roleId: "application",
+            runtime,
+            projectRoot,
+            governanceModel: "trio",
+            ...(extras?.onPresented !== undefined ? { onPresented: extras.onPresented } : {}),
+          }),
+          requestId,
+        );
       } catch (error) {
         this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
           kind: "task.escalation.failed",
@@ -4252,6 +4588,22 @@ export class SessionManager {
           outcome: "rejected",
           note: "stuck-escalation:terminate",
         }, () => new Date(this.now())));
+      } else if (selected === "continue" || selected === "redispatch" || selected === "replace") {
+        // C 批（协调者放行前置）：continue/redispatch/replace 不自动执行第二条危险路径，但**必须定义并
+        // 落地人工处置**——写角色日志 + 向幕僚发系统行，任务保持未收口（不伪造完成、不重复副作用）。
+        const manual: Record<typeof selected, string> = {
+          continue: "保持观察：不自动重派、不终止；巡检继续，需要收口时由幕僚手动终止或派新任务。",
+          redispatch: "自动重派上限已到，不再自动重派；请人工核对部分产物后新建/重派任务（可先终止原任务）。",
+          replace: "不自动换人；请人工选择替代角色并派新任务（必要时先终止原角色运行）。",
+        };
+        const text = `任务 #${taskId} 升级裁决「${selected}」：${manual[selected]}`;
+        this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
+          kind: "task.escalation.manual",
+          summary: text,
+          taskId,
+          status: selected,
+        });
+        this.emitDeliveryNote(projectRoot, runtime, chiefRoleId ?? "chief", "chief", `[系统·升级] ${text}`);
       }
       return {
         escalated: true,

@@ -254,7 +254,11 @@ export interface GovernanceFlowMetadata {
  */
 export type GovernanceChoiceCardKind = "proposal" | "appointment" | "acceptance" | "intent-confirm" | "decision";
 
-/** `request_confirmation` 允许的治理卡片种类（评审 §5.8）。 */
+/**
+ * `request_confirmation` 允许的治理卡片种类（C 批目标态：`write` 已删除——**模型可见工具 schema 与
+ * 新申请事件均不再列出/接受**；旧 direct/legacy 项目与旧测试仍在通道层按编译期 deprecated 别名保留至 D，
+ * 不向模型列出。`schedule-write` 留 D）。
+ */
 export type GovernanceConfirmCardKind = "write" | "appointment-write" | "schedule-write";
 
 /** 治理决定卡种类（两交互工具的并集；非法/缺席不能解锁任何治理门禁）。 */
@@ -282,6 +286,7 @@ export type GovernanceJudgeGroup = "approval" | "decision";
  * decision 卡独立于提案/任命/验收，不触发门禁/验收，也不构成客户批准。
  */
 export const GOVERNANCE_CARD_GROUP: Readonly<Partial<Record<GovernanceCardKind, GovernanceJudgeGroup>>> = Object.freeze({
+  // 兼容：`write` 已从工具 schema/角色矩阵删除（C）；通道层对旧 direct/legacy 调用仍按 approval 组处理，D 删除。
   write: "approval",
   "appointment-write": "approval",
   "schedule-write": "approval",
@@ -305,6 +310,14 @@ export function governanceCardGroup(kind: GovernanceCardKind | undefined): Gover
 /** 客户交互卡的治理元数据：并入 `CustomerInputRequest`（供桌面卡片显示）与 `CustomerInputMetadata`（供账本分类）。 */
 export interface GovernanceCardMetadata extends GovernanceFlowMetadata {
   cardKind?: GovernanceCardKind;
+  /**
+   * C 批（2026-10-28）：**应用自有申请/决策卡**（不是角色模型发起）。仅应用侧可设置；decision 卡校验
+   * 据此放行，不扩大 `DECISION_CARD_ALLOWED_ROLES`。角色工具载荷即使夹带本字段也不得获得额外权限
+   * （工具层不读取/不转发；应用侧入口自行构造）。
+   */
+  application?: true;
+  /** 应用自有申请的发起来源（通常为 `"application"`；仅审计/展示，不构成角色身份）。 */
+  sourceRoleId?: string;
 }
 
 /** 提案卡固定选项 id（评审 §5.8；非标准 id → 账本 `unclassified`，门禁拒绝并提示重发）。 */
@@ -491,6 +504,16 @@ export interface CustomerInputMetadata {
   flowId?: GovernanceFlowId;
   stepId?: GovernanceStepId;
   cardKind?: GovernanceCardKind;
+  /** C 批：申请归属键（`flowId|intentId|taskId` 至少一个；工具入参显式给出时透传）。 */
+  intentId?: string;
+  taskId?: string;
+  /**
+   * C 批：`appointment-write` 的目标项目角色与 D3 决定 id（方案 §6.4.1/R2）。
+   * 应用只把它们用于**校验**（目标非内置、路径位于 `角色卡/<targetRoleId>/`、D3 `request.resolved`
+   * 的 `decisionId/targetRoleIds/intentId|taskId` 一致）；不因字段本身获得任何写权。
+   */
+  targetRoleId?: string;
+  decisionId?: string;
   /**
    * 确认卡显式给出的**实际写入路径**（2026-10-18 真机修复）：仅当工具入参 `paths` 合法时透传；
    * 项目相对、逐文件、posix 化、≤64 项。缺席＝旧卡（由预览文本提取，零行为变化）。
@@ -624,6 +647,87 @@ export interface DelegationChangedEvent extends TaskStateEventBase {
   reason?: string;
 }
 
+// —————————————— C 批：申请/决策/审批事件（2026-10-28；全部写 `.ans/state/tasks.jsonl`） ——————————————
+
+/** `request.created`（C-03）：申请提交时立即落盘（应用已受理，不依赖是否呈现）。 */
+export interface RequestCreatedEvent extends TaskStateEventBase {
+  kind: "request.created";
+  requestId: string;
+  flowId?: string;
+  intentId?: string;
+  taskId?: string;
+  sourceRoleId: string;
+  title: string;
+  context?: string;
+  options: { id: string; label: string; recommended?: boolean }[];
+  recommended?: string[];
+}
+
+/** `request.presented`（C-03）：`to` 如实区分客户卡/判断卡。 */
+export interface RequestPresentedEvent extends TaskStateEventBase {
+  kind: "request.presented";
+  requestId: string;
+  to: "customer" | "judge";
+}
+
+/** `request.resolved`（C-03）：裁决/回落；judge 审计随行（不得写成客户本人）。 */
+export interface RequestResolvedEvent extends TaskStateEventBase {
+  kind: "request.resolved";
+  requestId: string;
+  decisionId?: string;
+  targetRoleIds?: string[];
+  intentId?: string;
+  taskId?: string;
+  by: "judge" | "customer";
+  operatorId?: string;
+  choice: string;
+  reason?: string;
+  judge?: GovernanceJudgeAudit;
+}
+
+/** `request.notified`（C-03）：系统通知幕僚；按 `requestId+event` 去重。 */
+export interface RequestNotifiedEvent extends TaskStateEventBase {
+  kind: "request.notified";
+  requestId: string;
+  to: "chief";
+  event: "created" | "presented" | "resolved";
+}
+
+/** `request.orphaned`（C-08）：重启时未决申请；原 tool call 已不存在，不自动执行原动作。 */
+export interface RequestOrphanedEvent extends TaskStateEventBase {
+  kind: "request.orphaned";
+  requestId: string;
+  reason: "restart";
+}
+
+export interface ApprovalCreatedEvent extends TaskStateEventBase {
+  kind: "approval.created";
+  approvalId: string;
+  sourceRoleId: string;
+  approvalKind: "shell" | "appointment-write";
+  summary: string;
+  declaredPaths?: string[];
+  commandHash?: string;
+  toolCallId?: string;
+  turnId?: string;
+}
+
+export interface ApprovalResolvedEvent extends TaskStateEventBase {
+  kind: "approval.resolved";
+  approvalId: string;
+  by: "judge" | "customer";
+  operatorId?: string;
+  decision: string;
+  reason?: string;
+  judge?: GovernanceJudgeAudit;
+}
+
+export interface ApprovalExpiredEvent extends TaskStateEventBase {
+  kind: "approval.expired";
+  approvalId: string;
+  reason: "restart" | "timeout" | "unavailable";
+}
+
 /** `.ans/state/tasks.jsonl` 的单行事件联合（append-only；每行一个事件）。 */
 export type TaskStateEvent =
   | TaskCreatedEvent
@@ -631,7 +735,15 @@ export type TaskStateEvent =
   | TaskReportedEvent
   | TaskClosedEvent
   | TaskRedispatchEvent
-  | DelegationChangedEvent;
+  | DelegationChangedEvent
+  | RequestCreatedEvent
+  | RequestPresentedEvent
+  | RequestResolvedEvent
+  | RequestNotifiedEvent
+  | RequestOrphanedEvent
+  | ApprovalCreatedEvent
+  | ApprovalResolvedEvent
+  | ApprovalExpiredEvent;
 
 /** 每角色运行日志条目（B-04；字段白名单，写入侧脱敏/截断）。 */
 export interface RoleLogEntry {
@@ -1329,6 +1441,8 @@ export type RequestRequirementChangeKind = "scope" | "authorization" | "constrai
 export interface RequestRequirementChangeInput {
   flowId?: string;
   intentId?: string;
+  /** C 批新增归属键：无 flow 的需求变更可用 taskId（flowId|intentId|taskId 至少一个）。 */
+  taskId?: string;
   changeKind: RequestRequirementChangeKind;
   summary: string;
   rationale: string;

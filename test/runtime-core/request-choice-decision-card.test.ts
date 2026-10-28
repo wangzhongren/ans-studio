@@ -39,8 +39,8 @@ test("schema（2026-10-26）：request_choice 仅新增 cardKind=decision 与 op
   assert.equal(items.properties["recommended"]!.type, "boolean");
   assert.equal(items.required!.includes("recommended"), false, "recommended 必须是可选字段");
 
-  // 其他工具（request_confirmation / request_gate_review / request_acceptance）的 cardKind/参数不受影响。
-  assert.deepEqual(propertiesOf("request_confirmation")["cardKind"]!.enum, ["write", "appointment-write", "schedule-write"]);
+  // C 批：通用 `write` 卡已从 request_confirmation schema 删除；appointment-write/schedule-write 保留。
+  assert.deepEqual(propertiesOf("request_confirmation")["cardKind"]!.enum, ["appointment-write", "schedule-write"]);
   assert.equal(propertiesOf("request_acceptance")["cardKind"], undefined);
   assert.equal(propertiesOf("request_gate_review")["cardKind"], undefined);
 });

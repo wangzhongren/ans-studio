@@ -1683,6 +1683,25 @@ export function isTrioGovernanceRoleId(id: string): boolean {
   return BUILT_IN_GOVERNANCE_ROLES.some((spec) => spec.id === id);
 }
 
+/**
+ * 新/变更角色的 `role-card.md` 必填章节（方案 §6.1 第 1–9 项；等价中文标题即可）。
+ * C 批（方案 §6.4.1/C-06）：appointment-write 的结构校验**单一来源**——桌面写卡产物校验
+ * （`interface.ts::validateAppointmentArtifacts`）与编排呈现前预览校验（`run-role.ts`）共用本表，
+ * 不复制第二份；`existing` 迁移只做存在/标题检查。
+ */
+export const ROLE_CARD_REQUIRED_SECTIONS: ReadonlyArray<{ label: string; test: RegExp }> = Object.freeze([
+  { label: "组别", test: /组别|group/i },
+  { label: "工作立场", test: /工作立场/ },
+  { label: "能力描述", test: /能力描述|职责与能力/ },
+  { label: "职责与功能导航", test: /系统功能导航|职责与功能导航/ },
+  { label: "必读资料", test: /必读资料/ },
+  { label: "交接输入输出", test: /交接/ },
+  { label: "执行原则", test: /执行原则/ },
+  { label: "质量职责", test: /质量/ },
+  { label: "标准工作流", test: /工作流/ },
+  { label: "交付物清单", test: /交付物/ },
+]);
+
 /** trio 内置角色边界来源标签（评审 §5.3 逐字格式）。 */
 export function trioGovernanceSource(roleId: string): string {
   return `<built-in:trio/${roleId}>`;

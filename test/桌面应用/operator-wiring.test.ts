@@ -668,7 +668,8 @@ function trioMirrorListing(): ProjectListing {
   };
 }
 
-test("W6-B 镜像判据（SessionManager）：trio 的 proposal/write 都带主入口、无 cardKind 不镜像；single 不镜像", async () => {  const contexts: { roleId: string; mirrorRoleId?: string }[] = [];
+test("C 批：SessionManager 不再镜像决定卡（proposal/appointment-write/无 cardKind 都不带主入口）；single 不镜像", async () => {
+  const contexts: { roleId: string; mirrorRoleId?: string }[] = [];
   const listing = trioMirrorListing();
   let rapporteurInput: { customerInput?: CustomerInputFn } | undefined;
   const mgr = new SessionManager({
@@ -691,7 +692,7 @@ test("W6-B 镜像判据（SessionManager）：trio 的 proposal/write 都带主�
     },
   });
   assert.equal((await mgr.open({ projectRoot: "/proj", roleId: "rapporteur", runtime: "demo" })).ok, true);
-  assert.ok(rapporteurInput?.customerInput, "Rapporteur 注入客户通道（镜像由此通道计算）");
+  assert.ok(rapporteurInput?.customerInput, "Rapporteur 注入客户通道");
 
   const proposal: CustomerInputRequest = {
     kind: "choice",
@@ -701,14 +702,14 @@ test("W6-B 镜像判据（SessionManager）：trio 的 proposal/write 都带主�
     options: [{ id: "accept", label: "接受" }],
   };
   await rapporteurInput!.customerInput!(proposal, { cardKind: "proposal", flowId: "flow-a" });
-  const writeCard: CustomerInputRequest = { kind: "confirm", title: "写盘", cardKind: "write" };
-  await rapporteurInput!.customerInput!(writeCard, { cardKind: "write" });
+  const writeCard: CustomerInputRequest = { kind: "confirm", title: "写盘", cardKind: "appointment-write", flowId: "flow-a" };
+  await rapporteurInput!.customerInput!(writeCard, { cardKind: "appointment-write", flowId: "flow-a" });
   const legacy: CustomerInputRequest = { kind: "confirm", title: "旧卡" };
   await rapporteurInput!.customerInput!(legacy);
   assert.deepEqual(
     contexts.map((ctx) => ctx.mirrorRoleId),
-    ["liaison", "liaison", undefined],
-    "trio：proposal 与 write 都镜像到主入口；无 cardKind 不镜像",
+    [undefined, undefined, undefined],
+    "C 批：申请/决定不再镜像到幕僚（只发系统通知）",
   );
   await mgr.stop(null);
 
