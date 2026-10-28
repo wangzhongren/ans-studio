@@ -1,8 +1,8 @@
 # entry-role-minimal 批次 D 变更记录（门禁引擎）
 
 - 日期：2026-10-28｜任务：`2026-10-28-entry-role-minimal`｜批次：D（治理机器撤除）｜风险档位：**T3**
-- 实施提交：D1 `c2b6cf97d2ea59f3cd239a2b0f39b2b36ff188ec`；D2 `98d3fe2f59cedd7fe1c78b5387a4ebaf9ed846ce`；D3 测试/文档提交见最终报告。
-- 交接材料：`docs/scheduling/2026-10-28-entry-role-minimal-change-D.md`（225 行；最终字节哈希见最终报告）。
+- 实施提交：D1 `c2b6cf97d2ea59f3cd239a2b0f39b2b36ff188ec`；D2 `98d3fe2f59cedd7fe1c78b5387a4ebaf9ed846ce`；D3 `4c24149`；D 返工 `e8e5c1f`；最终文档提交见最终报告。
+- 交接材料：`docs/scheduling/2026-10-28-entry-role-minimal-change-D.md`（511 行；最终字节哈希见最终报告）。
 
 ## 范围
 
@@ -15,8 +15,8 @@
 
 ## 验证摘要
 
-- 全量（排除 `write-sequencing.test.ts`）：**2817 tests / 2787 pass / 12 fail / 18 skip**；对比 C 基线 4569/4535/15/19，新增确定性失败 **0**、无新 skip；12 fail 均为既有基线（9 Windows symlink + T1 ×3）。
-- D 专项：`test/测试/entry-role-minimal-d.test.ts` **4/4**。
+- 全量（排除 `write-sequencing.test.ts`）：**2880 tests / 2850 pass / 12 fail / 18 skip**；对比 C 基线 4569/4535/15/19，新增确定性失败 **0**、无新 skip；12 fail 均为既有基线（9 Windows symlink + T1 ×3）。D-03/D-10 强制质量基线已删除；D-05 i18n counts/parity/泄漏测试已恢复；D-11 测试差异表与 D-12 逐文件哈希已补入 change-D。
+- D 专项：`test/测试/entry-role-minimal-d.test.ts` **5/5**。
 - 静态：`typecheck` / `typecheck:renderer` / `build:renderer` 均 exit 0。
 - Electron：`E2E_PASS=true`、`E2E_DONE=1`、`E2E_FAILURES=` 空；截图 16/17（`00-titlebar.png` 环境性 `UnknownVizError`）。
 - D-04 rg：`src`/`app` 生产源码（排除 `dist`）**0 命中**。
