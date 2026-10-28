@@ -120,6 +120,14 @@ contextBridge.exposeInMainWorld("desktop", {
     });
   },
 
+  // —— B/E 批：任务/运行日志/收口/终止重派（只读或应用独占动作；不新增客户裁决卡）——
+  listTasks: (input) => ipcRenderer.invoke("tasks:list", input),
+  restoreTasks: (input) => ipcRenderer.invoke("tasks:restore", input),
+  readRoleActivityLog: (input) => ipcRenderer.invoke("roles:activity-log", input),
+  terminateRoleRun: (input) => ipcRenderer.invoke("roles:terminate", input),
+  redispatchTask: (input) => ipcRenderer.invoke("tasks:redispatch", input),
+  closeTask: (input) => ipcRenderer.invoke("tasks:close", input),
+
   /**
    * 停止某个后台任务：入参 `{projectRoot, runtime, roleId, taskId, force?}`。
    * 底层结果**原样**返回：`{ok:true, task, alreadyEnded}` 或

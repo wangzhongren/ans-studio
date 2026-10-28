@@ -246,3 +246,20 @@ test("Phase 5A 入口接线：main.ts/main.mjs 经唯一路径事实源，未写
   assert.ok(e2eSrc.includes('log("RENDERER_ENTRY="'));
   assert.ok(e2eSrc.includes('log("E2E_PASS="'));
 });
+
+test("E 批任务/日志接线：preload 白名单与 main.ts 通道逐字对上", () => {
+  const preloadSrc = readFileSync(new URL("../../app/preload.cjs", import.meta.url), "utf8");
+  const mainSrc = readFileSync(new URL("../../app/main.ts", import.meta.url), "utf8");
+  for (const [method, channel] of [
+    ["listTasks", "tasks:list"],
+    ["restoreTasks", "tasks:restore"],
+    ["readRoleActivityLog", "roles:activity-log"],
+    ["terminateRoleRun", "roles:terminate"],
+    ["redispatchTask", "tasks:redispatch"],
+    ["closeTask", "tasks:close"],
+  ] as const) {
+    assert.ok(preloadSrc.includes(`${method}:`), `preload 暴露 ${method}`);
+    assert.ok(preloadSrc.includes(`"${channel}"`), `preload 使用通道 ${channel}`);
+    assert.ok(mainSrc.includes(`registerHandler("${channel}"`), `main.ts 注册 ${channel}`);
+  }
+});

@@ -208,6 +208,12 @@ function registerIpc() {
   //   ④ 运行时配置读写（Pi 设置面板现行通道；原 pi-config:* 双注册保留——与 main.ts 同形）。
   registerHandler("session:live-views", () => desktop.listLiveSessionViews());
   registerHandler("session:history-get", (_e, input) => desktop.getSessionHistory(input));
+  registerHandler("tasks:list", (_e, input) => desktop.listTasks(input));
+  registerHandler("tasks:restore", (_e, input) => desktop.restoreTasks(input));
+  registerHandler("roles:activity-log", (_e, input) => desktop.readRoleActivityLog(input));
+  registerHandler("roles:terminate", (_e, input) => desktop.terminateRoleRun(input));
+  registerHandler("tasks:redispatch", (_e, input) => desktop.redispatchTask(input));
+  registerHandler("tasks:close", (_e, input) => desktop.closeTask(input));
   registerHandler("report:retry-save", (_e, input) => desktop.retryReportSave(input));
   registerHandler("report:get-save-state", (_e, input) => desktop.getReportSaveState(input));
   registerHandler("delivery:retry-history-save", (_e, input) => desktop.retryDeliveryHistorySave(input));
@@ -862,28 +868,28 @@ async function run() {
   );
   await sleep(300);
   const xId = operatorPresentations[operatorPresentations.length - 1].id;
-  log("OPX_NOT_IN_VIEWED_PANE=" + (await wc().executeJavaScript("!document.querySelector('#chat .op-request')")));
-  log("OPX_POINTER_IN_VIEWED_PANE=" + (await wc().executeJavaScript("document.querySelector('#chat').textContent.includes('【待确认】角色 示例角色')")));
+  log("OPX_NOT_IN_VIEWED_PANE=" + (await wc().executeJavaScript("!document.querySelector('#chat .op-request') && !!document.querySelector('#decision-dialog')")));
+  log("OPX_POINTER_IN_VIEWED_PANE=" + (await wc().executeJavaScript("!!document.querySelector('#tab-decisions .tab-badge')")));
   log("OPX_BADGE_LIT=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((e)=>e.querySelector('.ti-name').textContent==='示例角色'); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-confirm'); })()")));
   await wc().executeJavaScript("window.__ansRenderer.selectRole('示例角色')");
   await sleep(600);
-  log("OPX_CARD_ON_RETURN=" + (await wc().executeJavaScript("!!document.querySelector('#chat .op-request .op-submit')")));
+  log("OPX_CARD_ON_RETURN=" + (await wc().executeJavaScript("!!document.querySelector('#decision-dialog .dd-submit')")));
   // 重复推送（同一 id 的原始推送 ×2）→ 幂等：恰一张卡。
   wc().send("session:operator-request", { id: "dup-1", roleId: "示例角色", request: { kind: "confirm", title: "重复？" } });
   wc().send("session:operator-request", { id: "dup-1", roleId: "示例角色", request: { kind: "confirm", title: "重复？" } });
   await sleep(250);
-  log("OPX_DUP_SINGLE_CARD=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .op-request[data-request-id=dup-1]').length === 1")));
+  log("OPX_DUP_SINGLE_CARD=" + (await wc().executeJavaScript("document.querySelectorAll('#decision-dialog[data-request-id=dup-1]').length === 1")));
   // 对已失效请求（dup-1 未经真实通道；G-1：唯一真实失效＝应用重启/关闭）作答 → 通道 expired → 卡片定格
   // （按钮隐藏 + 「已失效（应用已重启/关闭）」说明），不再解冻。
-  await wc().executeJavaScript("(() => { const c=document.querySelector('#chat .op-request[data-request-id=dup-1]'); const b=c && c.querySelector('.op-confirm'); if (b) b.click(); })()");
+  await wc().executeJavaScript("(() => { const c=document.querySelector('#decision-dialog[data-request-id=dup-1]'); const b=c && c.querySelector('.dd-confirm'); if (b) b.click(); })()");
   await sleep(300);
-  log("OPX_EXPIRED_FROZEN=" + (await wc().executeJavaScript("(() => { const c=document.querySelector('#chat .op-request[data-request-id=dup-1]'); const b=c && c.querySelector('.op-actions button'); return !!b && b.hidden === true && !!c && c.textContent.includes('已失效'); })()")));
+  log("OPX_EXPIRED_FROZEN=" + (await wc().executeJavaScript("!document.querySelector('#decision-dialog[data-request-id=dup-1]')")));
   // 真请求作答照常（单选提交）。Phase 5A：React 受控 input 用 click() 驱动（直接改 .checked 不触发 onChange），
   // 并按请求 id 精确定位卡片（避免命中同 pane 的 dup-1/旧卡）。
   const xCardExpr = (body) => "(() => { const c=document.querySelector('[data-request-id=" + JSON.stringify(xId) + "]'); " + body + " })()";
   await wc().executeJavaScript(xCardExpr("const r=c && c.querySelector('input'); if (r) r.click();"));
   await sleep(120);
-  await wc().executeJavaScript(xCardExpr("const b=c && c.querySelector('.op-submit'); if (b) b.click();"));
+  await wc().executeJavaScript(xCardExpr("const b=c && c.querySelector('.dd-submit'); if (b) b.click();"));
   await sleep(300);
   const oX = await withTimeout(pX, 3000, "opx");
   log("OPX_ANSWERED=" + (!!oX && oX.outcome === "answered"));
@@ -916,16 +922,16 @@ async function run() {
     { roleId: "su" },
   );
   await sleep(300);
-  log("OP_CARD_PRESENT=" + (await wc().executeJavaScript("!!document.querySelector('#chat .op-request.op-kind-preview')")));
-  log("OP_CARD_TITLE_SHOWS=" + (await wc().executeJavaScript("(document.querySelector('#chat .op-request .op-title')||{textContent:''}).textContent.includes('示例角色')")));
-  log("OP_PREVIEW_COLLAPSED=" + (await wc().executeJavaScript("(() => { const d=document.querySelector('#chat .op-request details.op-preview'); return !!d && d.open === false; })()")));
+  log("OP_CARD_PRESENT=" + (await wc().executeJavaScript("!!document.querySelector('#decision-dialog')")));
+  log("OP_CARD_TITLE_SHOWS=" + (await wc().executeJavaScript("(document.querySelector('#decision-dialog .dd-title')||{textContent:''}).textContent.includes('示例角色')")));
+  log("OP_PREVIEW_COLLAPSED=" + (await wc().executeJavaScript("(() => { const d=document.querySelector('#decision-dialog .dd-preview'); return !!d && d.textContent.includes('角色卡'); })()")));
   log("OP_B3_AWAITING_CONFIRM=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('su')>=0); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-confirm'); })()")));
   log("SHOT_11_OPERATOR=" + (await shot("11-operator-card.png")));
-  await wc().executeJavaScript("(() => { const b=document.querySelector('#chat .op-request .op-confirm'); if (b) b.click(); })()");
+  await wc().executeJavaScript("(() => { const b=document.querySelector('#decision-dialog .dd-confirm'); if (b) b.click(); })()");
   await sleep(300);
   const oOp1 = await withTimeout(pOp1, 3000, "op1");
   log("OP_CONFIRM_ANSWERED=" + (!!oOp1 && oOp1.outcome === "answered" && oOp1.value.confirmed === true));
-  log("OP_CARD_FROZEN=" + (await wc().executeJavaScript("(document.querySelector('#chat .op-request .op-actions')||{textContent:''}).textContent.includes('已确认')")));
+  log("OP_CARD_FROZEN=" + (await wc().executeJavaScript("!document.querySelector('#decision-dialog')")));
   log("OP_B3_AWAITING_CLEARED=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('su')>=0); const s=it && it.querySelector('.ti-status'); return !!s && !s.className.includes('st-confirm'); })()")));
 
   // ② 单选（radio）：未选时提交禁用 → 选一项 → 提交 → selected 回传。
@@ -935,11 +941,11 @@ async function run() {
   );
   await sleep(600);
   const op2Id = operatorPresentations[operatorPresentations.length - 1].id;
-  log("OP_SELECT_HAS_RADIO=" + (await wc().executeJavaScript("!!document.querySelector('#chat .op-request.op-kind-select input[type=radio]')")));
-  log("OP_SUBMIT_DISABLED_INITIALLY=" + (await wc().executeJavaScript("(" + "document.querySelector('[data-request-id=" + JSON.stringify(op2Id) + "] .op-submit')" + "||{}).disabled === true")));
+  log("OP_SELECT_HAS_RADIO=" + (await wc().executeJavaScript("!!document.querySelector('#decision-dialog input[type=radio]')")));
+  log("OP_SUBMIT_DISABLED_INITIALLY=" + (await wc().executeJavaScript("(" + "document.querySelector('#decision-dialog[data-request-id=" + JSON.stringify(op2Id) + "] .dd-submit')" + "||{}).disabled === true")));
   await wc().executeJavaScript(opCardExpr(op2Id, "const rs=c && c.querySelectorAll('input[type=radio]'); if (rs && rs[1]) rs[1].click();"));
   await sleep(150);
-  await wc().executeJavaScript(opCardExpr(op2Id, "const b=c && c.querySelector('.op-submit'); if (b) b.click();"));
+  await wc().executeJavaScript(opCardExpr(op2Id, "const b=c && c.querySelector('.dd-submit'); if (b) b.click();"));
   await sleep(300);
   const oOp2 = await withTimeout(pOp2, 3000, "op2");
   log("OP_SELECT_ANSWERED=" + (!!oOp2 && oOp2.outcome === "answered" && JSON.stringify(oOp2.value.selected) === JSON.stringify(["beta"])));
@@ -951,10 +957,10 @@ async function run() {
   );
   await sleep(600);
   const op3Id = operatorPresentations[operatorPresentations.length - 1].id;
-  log("OP_MULTI_HAS_CHECKBOX=" + (await wc().executeJavaScript("!!document.querySelector('#chat .op-request.op-kind-multi input[type=checkbox]')")));
+  log("OP_MULTI_HAS_CHECKBOX=" + (await wc().executeJavaScript("!!document.querySelector('#decision-dialog input[type=checkbox]')")));
   await wc().executeJavaScript(opCardExpr(op3Id, "const i=c && c.querySelectorAll('input[type=checkbox]'); if (i && i[0]) i[0].click(); if (i && i[2]) i[2].click();"));
   await sleep(150);
-  await wc().executeJavaScript(opCardExpr(op3Id, "const b=c && c.querySelector('.op-submit'); if (b) b.click();"));
+  await wc().executeJavaScript(opCardExpr(op3Id, "const b=c && c.querySelector('.dd-submit'); if (b) b.click();"));
   await sleep(300);
   const oOp3 = await withTimeout(pOp3, 3000, "op3");
   log("OP_MULTI_ANSWERED=" + (!!oOp3 && oOp3.outcome === "answered" && JSON.stringify(oOp3.value.selected) === JSON.stringify(["a", "c"])));
@@ -971,7 +977,7 @@ async function run() {
   const realId = op4Id;
   const outOfSet = customerChannel.respond({ id: realId, decision: { kind: "choice", selected: ["zzz"] } });
   log("OP_OUT_OF_SET_REJECTED=" + (outOfSet.ok === false));
-  await wc().executeJavaScript(opCardExpr(op4Id, "const b=c && c.querySelector('.op-cancel'); if (b) b.click();"));
+  await wc().executeJavaScript(opCardExpr(op4Id, "const b=c && c.querySelector('.dd-reject'); if (b) b.click();"));
   await sleep(300);
   const oOp4 = await withTimeout(pOp4, 3000, "op4");
   log("OP_CANCEL_DECLINED=" + (!!oOp4 && oOp4.outcome === "declined"));
@@ -1176,62 +1182,42 @@ async function run() {
   await sleep(200);
   log("DRAWER_CLOSED_AFTER_N3=" + (await wc().executeJavaScript("!document.getElementById('right-drawer').classList.contains('open')")));
 
-  // P-1（2026-10-12 真机：su 的卡被 288 行活动淹掉、客户以为卡丢了）：到达即达 + 常驻 chip + 逐张定位 + 切回滚到卡。
-  // 先造一屏高内容（40 行）并把视口拉到底，再注入待确认卡。
-  for (let i = 0; i < 40; i += 1) {
-    wc().send("session:event", { roleId: "桌面窗口", event: { kind: "message", summary: "P-1 填充行 " + i } });
-  }
-  await sleep(400);
-  await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); c.scrollTop = c.scrollHeight; })()");
-  await sleep(100);
-  await wc().executeJavaScript("window.__ansRenderer.appendOperatorRequest({ id: 'p1-card-1', roleId: '桌面窗口', request: { kind: 'confirm', title: 'P-1 探针卡一', detail: '到达即达' } })");
-  await sleep(250);
-  // Phase 5A：新渲染器把行包在 .chat-row 内；按 request-id 查询（旧端同样命中）。
-  const p1CardExpr = (id, body) => "(() => { const pane=document.querySelector('#chat .chat-pane'); const card=pane && pane.querySelector('[data-request-id=" + JSON.stringify(id) + "]'); " + body + " })()";
-  log("P1_ARRIVAL_SCROLLED=" + (await wc().executeJavaScript(p1CardExpr("p1-card-1", "const c=document.getElementById('chat'); if (!card) return false; const cr=card.getBoundingClientRect(); const cc=c.getBoundingClientRect(); return cr.top>=cc.top-1 && cr.bottom<=cc.bottom+1;"))));
-  log("P1_ARRIVAL_DEBUG=" + JSON.stringify(await wc().executeJavaScript(p1CardExpr("p1-card-1", "const c=document.getElementById('chat'); const cr=card?card.getBoundingClientRect():null; const cc=c.getBoundingClientRect(); const chip=document.getElementById('op-chip'); return { hasCard:!!card, dist: Math.round(c.scrollHeight-c.scrollTop-c.clientHeight), st:Math.round(c.scrollTop), sh:Math.round(c.scrollHeight), ch:Math.round(c.clientHeight), crTop: cr?Math.round(cr.top):null, crBottom: cr?Math.round(cr.bottom):null, ccTop:Math.round(cc.top), ccBottom:Math.round(cc.bottom), chipHidden: chip ? chip.hidden : null };"))));
-  log("P1_ARRIVAL_DEBUG_NEW=" + (await wc().executeJavaScript(p1CardExpr("p1-card-1", "const c=document.getElementById('chat'); const dbg=window.__ansRenderer.rowModelDebug('桌面窗口')||{}; const ops=Array.isArray(dbg.operators)?dbg.operators:[]; if (!card) return false; const cr=card.getBoundingClientRect(); const cc=c.getBoundingClientRect(); return ops.some(o=>o&&o.requestId==='p1-card-1') && dbg.count>0 && cr.top>=cc.top-1 && cr.bottom<=cc.bottom+1;"))));
-  log("P1_CHIP_VISIBLE=" + (await wc().executeJavaScript("(() => { const el=document.getElementById('op-chip'); return !!el && !el.hidden && el.textContent.includes('有 1 条待确认'); })()")));
-  // 在往上翻（滚到顶）→ 第二张卡到达 ⇒ **不打断**（scrollTop 不变、卡不在视野）+ chip 计数=2。
-  await wc().executeJavaScript("(() => { document.getElementById('chat').scrollTop = 0; })()");
-  await sleep(100);
-  const p1TopBefore = await wc().executeJavaScript("document.getElementById('chat').scrollTop");
-  await wc().executeJavaScript("window.__ansRenderer.appendOperatorRequest({ id: 'p1-card-2', roleId: '桌面窗口', request: { kind: 'confirm', title: 'P-1 探针卡二', detail: '不打断' } })");
-  await sleep(250);
-  log("P1_NO_INTERRUPT_TOP=" + ((await wc().executeJavaScript("document.getElementById('chat').scrollTop")) === p1TopBefore));
-  log("P1_CHIP_COUNT2=" + (await wc().executeJavaScript("document.getElementById('op-chip').textContent.includes('有 2 条待确认')")));
-  // 点 chip → 定位到一张并高亮（在视野内）；再点一次 → 轮到另一张（两张都留下 is-flash 痕）。
-  await wc().executeJavaScript("(() => { const b=document.getElementById('op-chip'); if (b) b.click(); })()");
-  await sleep(200);
-  log("P1_CHIP_CLICK_LOCATES=" + (await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); const active=document.activeElement; const focused=active && active.closest ? active.closest('#chat .op-request') : null; const card=document.querySelector('#chat .op-request.is-flash') || focused; if (!card) return false; const cr=card.getBoundingClientRect(); const cc=c.getBoundingClientRect(); return cr.top >= cc.top - 1 && cr.bottom <= cc.bottom + 1; })()")));
-  await wc().executeJavaScript("(() => { const b=document.getElementById('op-chip'); if (b) b.click(); })()");
-  await sleep(200);
-  log("P1_CHIP_SECOND_CARD=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .op-request.is-flash').length === 2")));
-  // Phase 5A 等价：新端 chip 只定位第一张；第二张由 4A 工作概览「定位」按钮覆盖（同一用户行为）。
-  await wc().executeJavaScript("document.getElementById('tab-work').click()");
-  await sleep(250);
-  await wc().executeJavaScript("(() => { const b=document.querySelector('.pending-locate[data-request-id=" + JSON.stringify("p1-card-2") + "]'); if (b) b.click(); })()");
-  await sleep(350);
-  log("P1_SECOND_CARD_LOCATE_VIA_WORK_OVERVIEW=" + (await wc().executeJavaScript(p1CardExpr("p1-card-2", "const c=document.getElementById('chat'); const active=document.activeElement; if (!card) return false; const cr=card.getBoundingClientRect(); const cc=c.getBoundingClientRect(); return (active===card || card.contains(active)) && cr.top>=cc.top-1 && cr.bottom<=cc.bottom+1;"))));
-  // 作答（真实 IPC：探针卡无主进程挂起 ⇒ expired 终态）⇒ chip 计数减一，全部终态后隐藏。
-  await wc().executeJavaScript(p1CardExpr("p1-card-1", "const b=card && card.querySelector('.op-deny'); if (b) b.click();"));
-  await sleep(300);
-  log("P1_CHIP_COUNT1_AFTER_TERMINAL=" + (await wc().executeJavaScript("(() => { const el=document.getElementById('op-chip'); return !!el && !el.hidden && el.textContent.includes('有 1 条待确认'); })()")));
-  await wc().executeJavaScript(p1CardExpr("p1-card-2", "const b=card && card.querySelector('.op-deny'); if (b) b.click();"));
-  await sleep(300);
-  log("P1_CHIP_HIDDEN_AFTER_ALL_TERMINAL=" + (await wc().executeJavaScript("document.getElementById('op-chip').hidden")));
-  // 切回：再注入一张卡 → 切走（su）→ 切回 ⇒ 应**滚动到卡**（而不是停在底部）。
-  await wc().executeJavaScript("window.__ansRenderer.appendOperatorRequest({ id: 'p1-card-3', roleId: '桌面窗口', request: { kind: 'confirm', title: 'P-1 探针卡三', detail: '切回滚到卡' } })");
-  await sleep(200);
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
-  await sleep(900);
+  // ————— E 批：独立决策对话框（一次一卡/优先级/稍后处理/待办/聊天流无卡）—————
   await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
-  await sleep(900);
-  log("P1_SWITCHBACK_SCROLLS_TO_CARD=" + (await wc().executeJavaScript(p1CardExpr("p1-card-3", "const c=document.getElementById('chat'); if (!card) return false; const cr=card.getBoundingClientRect(); const cc=c.getBoundingClientRect(); return cr.top>=cc.top-1 && cr.bottom<=cc.bottom+1;"))));
-  // 探针清理：把 p1-card-3 作答掉（expired 终态），chip 应灭（不影响后续步骤）。
-  await wc().executeJavaScript(p1CardExpr("p1-card-3", "const b=card && card.querySelector('.op-deny'); if (b) b.click();"));
+  await sleep(400);
+  await wc().executeJavaScript("window.__ansRenderer.appendOperatorRequest({ id: 'e-low', roleId: '桌面窗口', request: { kind: 'confirm', title: 'E 低风险确认' } })");
+  await sleep(120);
+  await wc().executeJavaScript("window.__ansRenderer.appendOperatorRequest({ id: 'e-high', roleId: '桌面窗口', risk: 'high', request: { kind: 'confirm', title: 'E 高风险审批' } })");
+  await sleep(250);
+  log("E_DIALOG_SINGLE=" + (await wc().executeJavaScript("document.querySelectorAll('#decision-dialog').length === 1")));
+  log("E_DIALOG_PRIORITY_HIGH=" + (await wc().executeJavaScript("(document.querySelector('#decision-dialog .dd-title')||{textContent:''}).textContent.includes('E 高风险审批')")));
+  log("E_CHAT_NO_ACTIONABLE_CARD=" + (await wc().executeJavaScript("!document.querySelector('#chat .op-request') && !!document.querySelector('#chat .sys-operator-note')")));
+  log("E_DIALOG_MORE_COUNT=" + (await wc().executeJavaScript("(document.querySelector('#decision-dialog .dd-more')||{textContent:''}).textContent.includes('还有 1 张待处理')")));
+  await wc().executeJavaScript("document.querySelector('#decision-dialog .dd-later').click()");
+  await sleep(200);
+  log("E_LATER_ADVANCES=" + (await wc().executeJavaScript("(document.querySelector('#decision-dialog .dd-title')||{textContent:''}).textContent.includes('E 低风险确认')")));
+  await wc().executeJavaScript("document.querySelector('#decision-dialog .dd-later').click()");
+  await sleep(200);
+  log("E_LATER_CLOSES_DIALOG_NO_DEFAULT=" + (await wc().executeJavaScript("!document.querySelector('#decision-dialog')")));
+  await wc().executeJavaScript("document.getElementById('tab-decisions').click()");
+  await sleep(250);
+  log("E_TODO_PANEL_HAS_DEFERRED=" + (await wc().executeJavaScript("(() => { const p=document.getElementById('decision-center-pending'); return !!p && p.textContent.includes('E 低风险确认') && p.textContent.includes('E 高风险审批') && p.textContent.includes('稍后处理'); })()")));
+  await wc().executeJavaScript("document.querySelector('#decision-center-pending .dc-open').click()");
+  await sleep(200);
+  log("E_TODO_OPEN_REOPENS_DIALOG=" + (await wc().executeJavaScript("!!document.querySelector('#decision-dialog')")));
+  await wc().executeJavaScript("document.querySelector('#decision-dialog .dd-later').click()");
+  await sleep(150);
+  await wc().executeJavaScript("document.getElementById('tab-decisions').click()");
+  await sleep(150);
+  log("E_HISTORY_PANEL_EXISTS=" + (await wc().executeJavaScript("!!document.getElementById('decision-center-history')")));
+  log("E_QUEUE_PRIORITY_CHAT_NO_CARD_SHOT=" + (await shot("11b-decision-dialog.png")));
+  // 任务/日志独立面板（数据面失败如实显示，不伪造）
+  await wc().executeJavaScript("document.getElementById('tab-tasks').click()");
   await sleep(300);
-  log("P1_CLEANUP_CHIP_HIDDEN=" + (await wc().executeJavaScript("document.getElementById('op-chip').hidden")));
+  log("E_TASK_PANEL_VISIBLE=" + (await wc().executeJavaScript("!!document.querySelector('.task-center') && !!document.querySelector('.task-center .tc-title')")));
+  log("E_ROLE_LOG_VIEW_VISIBLE=" + (await wc().executeJavaScript("!!document.querySelector('.role-log-view') && !!document.querySelector('.role-log-badge')")));
+  await wc().executeJavaScript("document.getElementById('tab-work').click()");
+  await sleep(150);
 
   // 真机缺陷修复（2026-10-12「已确认的卡切走再切回变成最下面」）：交互卡**锚点物化**——「回放重建 + 已决卡」
   // 时序断言（上次暴露时序类 bug 的正是本 harness，故钉在这里）。夹具：临时项目 + su 会话 JSONL（含
@@ -1803,7 +1789,7 @@ async function run() {
   await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   await sleep(150);
   log("PENDING_DIAG=" + JSON.stringify(await wc().executeJavaScript("(() => { const id=" + JSON.stringify(pendingId) + "; const sel=`[data-request-id='${id}']`; const els=[...document.querySelectorAll(sel)]; const chat=document.getElementById('chat'); return { count: els.length, confirmButtons: document.querySelectorAll(sel+' .op-confirm').length, scrollTop: chat ? chat.scrollTop : null, chatRect: chat ? { top: chat.getBoundingClientRect().top, bottom: chat.getBoundingClientRect().bottom } : null, selectedRoleId: window.__ansRenderer.state.selectedRoleId, pendingKeys: Object.keys(window.__ansRenderer.state.pendingOperator || {}), rowCount: (window.__ansRenderer.rowModelDebug('桌面窗口') || {}).count, anyCards: document.querySelectorAll('#chat .op-request').length, paneRoleIds: [...document.querySelectorAll('#chat .chat-pane')].map((p) => p.dataset.roleId), cards: els.map((el) => { const r=el.getBoundingClientRect(); return { top:r.top, bottom:r.bottom, text:(el.textContent||'').slice(0,60) }; }) }; })()")));
-  repairCheck("PENDING_EXPLICIT_SAME_ROLE_CARD_AND_BUTTON_VISIBLE", await wc().executeJavaScript("(() => {const card=document.querySelector('[data-request-id=" + pendingId + "]'),button=card&&card.querySelector('.op-confirm'),view=document.getElementById('chat').getBoundingClientRect();if(!card||!button)return false;const r=card.getBoundingClientRect(),b=button.getBoundingClientRect();return card.textContent.includes('重载后仍需客户明确作答') && r.top>=view.top-1 && r.bottom<=view.bottom+1 && b.top>=view.top && b.bottom<=view.bottom;})()"));
+  repairCheck("PENDING_EXPLICIT_SAME_ROLE_CARD_AND_BUTTON_VISIBLE", await wc().executeJavaScript("(() => {const card=document.querySelector('#decision-dialog[data-request-id=" + pendingId + "]'),button=card&&card.querySelector('.dd-confirm');if(!card||!button)return false;const r=card.getBoundingClientRect(),b=button.getBoundingClientRect();return card.textContent.includes('重载后仍需客户明确作答') && r.width>0 && b.width>0;})()"));
   const sendsBeforeCrash = repairSendRequests.length;
   const projectBeforeCrash = recoverySnapshot.projectRoot;
   const failureLoaded = new Promise((resolve) => wc().once("did-finish-load", resolve));
@@ -1819,7 +1805,7 @@ async function run() {
   await sleep(100);
   log("RECOVERY_CARD_DIAG=" + JSON.stringify(await wc().executeJavaScript("(() => { const id=" + JSON.stringify(pendingId) + "; const sel=`[data-request-id='${id}']`; const els=[...document.querySelectorAll(sel)]; const chat=document.getElementById('chat'); return { count: els.length, confirmButtons: document.querySelectorAll(sel+' .op-confirm').length, scrollTop: chat ? chat.scrollTop : null, chatRect: chat ? { top: chat.getBoundingClientRect().top, bottom: chat.getBoundingClientRect().bottom } : null, cards: els.map((el) => { const r=el.getBoundingClientRect(); return { top:r.top, bottom:r.bottom, text:(el.textContent||'').slice(0,80) }; }) }; })()")));
   log("RECOVERY_PRESENTATIONS_AT_CARD_CHECK=" + operatorPresentations.length);
-  repairCheck("RECOVERY_SAME_PENDING_CARD_ONCE", await wc().executeJavaScript("document.querySelectorAll('[data-request-id=" + pendingId + "]').length === 1"));
+  repairCheck("RECOVERY_SAME_PENDING_CARD_ONCE", await wc().executeJavaScript("document.querySelectorAll('#decision-dialog[data-request-id=" + pendingId + "]').length === 1"));
   repairCheck("RECOVERY_NO_AUTO_REPLY_OR_SEND", pendingAnswered === false && repairSendRequests.length === sendsBeforeCrash);
   const answered = await wc().executeJavaScript("window.desktop.operatorRespond({id:" + JSON.stringify(pendingId) + ",decision:{kind:'confirm',confirmed:true}})");
   const pendingResult = await withTimeout(pendingOutcome, 5000, "pending-outcome");

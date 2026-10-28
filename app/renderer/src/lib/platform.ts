@@ -40,6 +40,14 @@ export interface DesktopBridge {
   ) => Promise<unknown>;
   readBackgroundTask?: (input: unknown) => Promise<unknown>;
   stopBackgroundTask?: (input: unknown) => Promise<unknown>;
+  // —— E 批：任务/运行日志/收口/终止重派（定义/实现属桌面窗口；此处只按名消费）——
+  listTasks?: (input: { projectRoot: string }) => Promise<unknown>;
+  restoreTasks?: (input: { projectRoot: string }) => Promise<unknown>;
+  readRoleActivityLog?: (input: { projectRoot: string; roleId: string; since?: string; limit?: number }) => Promise<unknown>;
+  terminateRoleRun?: (input: unknown) => Promise<unknown>;
+  redispatchTask?: (input: unknown) => Promise<unknown>;
+  closeTask?: (input: unknown) => Promise<unknown>;
+
   // —— 流程状态只读（2026-10-25；定义/实现属桌面窗口，此处只按名消费）——
   getFlowStatus?: (projectRoot: string) => Promise<unknown>;
   onSessionEvent?: (callback: (payload: unknown) => void) => () => void;

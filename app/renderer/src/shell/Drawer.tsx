@@ -26,6 +26,8 @@ import { documentSourceTitle } from "@/chat/document-view";
 import { SettingsPanel } from "@/shell/SettingsPanel";
 import { ProfilePanel } from "@/shell/ProfilePanel";
 import { WorkOverview } from "@/shell/WorkOverview";
+import { DecisionCenterPanel } from "@/chat/DecisionCenterPanel";
+import { TaskCenterPanel } from "@/chat/TaskCenterPanel";
 import { DocumentView } from "@/shell/DocumentView";
 import { QueueSubview } from "@/shell/QueueSubview";
 import { useLocaleState, useT } from "@/i18n";
@@ -69,7 +71,11 @@ export function Drawer() {
       ? engineSettingsTitle(runtimeLabel(settingsEngine, locale), locale)
       : effective === "work"
         ? workTitle(roleName, locale)
-        : effective === "document" && docsView
+        : effective === "decisions"
+          ? t("ui.decisionDialog.panelTitle")
+          : effective === "tasks"
+            ? t("ui.taskCenter.title")
+            : effective === "document" && docsView
           ? documentSourceTitle(documentRoleName, locale)
           : profileTitle(roleName, locale);
 
@@ -249,6 +255,8 @@ export function Drawer() {
           ) : null}
           {!showingQueue && effective === "card" ? <ProfilePanel roleId={selectedRoleId || null} /> : null}
           {!showingQueue && effective === "work" ? <WorkOverview roleId={selectedRoleId || null} /> : null}
+          {effective === "decisions" ? <DecisionCenterPanel /> : null}
+          {effective === "tasks" ? <TaskCenterPanel /> : null}
           {effective === "document" ? <DocumentView /> : null}
         </div>
       </motion.aside>

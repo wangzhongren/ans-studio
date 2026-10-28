@@ -788,6 +788,31 @@ function registerIpc(win: BrowserWindow): void {
     if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
     return desktop.stopBackgroundTask(input);
   });
+  // E 批：任务/运行日志/收口/终止重派（来源校验同后台任务；参数校验/执行在 Interface）。
+  registerHandler("tasks:list", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
+    return desktop.listTasks(input);
+  });
+  registerHandler("tasks:restore", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
+    return desktop.restoreTasks(input);
+  });
+  registerHandler("roles:activity-log", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
+    return desktop.readRoleActivityLog(input);
+  });
+  registerHandler("roles:terminate", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
+    return desktop.terminateRoleRun(input);
+  });
+  registerHandler("tasks:redispatch", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
+    return desktop.redispatchTask(input);
+  });
+  registerHandler("tasks:close", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
+    return desktop.closeTask(input);
+  });
   // B-1：Markdown 链接外开——渲染进程输入经 Interface 校验（仅 http/https）后交系统浏览器。
   registerHandler("app:open-external", (_e, input) => desktop.openExternal(input));
   // K-2：输入区图片——选图（主进程读文件）与粘贴/拖入字节校验（渲染进程不碰文件）；

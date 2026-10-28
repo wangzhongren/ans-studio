@@ -16,6 +16,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { ChatStream } from "@/chat/ChatStream";
+import { DecisionDialog } from "@/chat/DecisionDialog";
 import { installChatRuntime } from "@/chat/ipc";
 import { useChatStore } from "@/chat/chat-store";
 import { workingRolesSummary } from "@/chat/role-status-view";
@@ -26,6 +27,7 @@ import { Drawer } from "@/shell/Drawer";
 import { Sidebar } from "@/shell/Sidebar";
 import { TitleBar } from "@/shell/TitleBar";
 import { installTestDriver } from "@/test-driver";
+import { installDecisionCenter } from "@/stores/decision-center-store";
 import { useLocaleStore } from "@/i18n";
 import { useT } from "@/i18n";
 import { useUiStore } from "@/stores/ui-store";
@@ -62,6 +64,11 @@ export default function App() {
     installTestDriver();
     // i18n B0：首屏镜像已在 store 创建时读入；这里补 lang/文件校正/广播订阅。
     void useLocaleStore.getState().init();
+  }, []);
+
+  // E 批：决策中心订阅（新请求按优先级弹独立对话框；输入中只显示角标）。
+  useEffect(() => {
+    installDecisionCenter();
   }, []);
 
   useEffect(() => {
@@ -171,6 +178,7 @@ export default function App() {
           <Drawer />
         </div>
         <ConfirmCard />
+        <DecisionDialog />
         </div>
       </CSPProvider>
     </TooltipProvider>

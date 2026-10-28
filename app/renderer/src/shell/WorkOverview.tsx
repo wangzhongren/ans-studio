@@ -14,6 +14,7 @@ import { FileCheck2, Inbox, ListOrdered, MapPin, PlayCircle } from "lucide-react
 import { useChatStore, getRowModel } from "@/chat/chat-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useDrawerStore } from "@/stores/drawer-store";
+import { useDecisionCenterStore } from "@/stores/decision-center-store";
 import {
   badgeText,
   isWorkOverviewEmpty,
@@ -30,19 +31,9 @@ import { useLocaleState, useT } from "@/i18n";
 const QUEUE_PREVIEW_LIMIT = 3;
 
 function locateRequest(requestId: string): void {
-  // 关闭抽屉（右抽屉状态同步清空；不恢复触发按钮焦点，焦点给原卡）。
+  // E 批：客户决定在独立模态对话框处理；关闭抽屉后打开该卡（不自动作答）。
   useDrawerStore.getState().close({ restoreFocus: false });
-  // 抽屉关闭的 React effect 稍后才摘背景 inert；先同步摘除，否则卡片 focus() 会被浏览器拒绝。
-  document.querySelector(".col-left")?.removeAttribute("inert");
-  document.querySelector(".col-mid")?.removeAttribute("inert");
-  const card = document.querySelector<HTMLElement>(
-    '[data-request-id="' + CSS.escape(requestId) + '"]',
-  );
-  if (!card) return; // 未挂载：4B 的虚拟行 locator；4A 不做假滚动。
-  card.removeAttribute("inert");
-  if (!card.hasAttribute("tabindex")) card.setAttribute("tabindex", "-1");
-  card.scrollIntoView({ block: "center" });
-  card.focus({ preventScroll: true });
+  useDecisionCenterStore.getState().open(requestId);
 }
 
 function WorkSection({
@@ -181,7 +172,7 @@ export function WorkOverview({ roleId }: { roleId: string | null }) {
                     onClick={() => locateRequest(item.requestId)}
                   >
                     <MapPin size={12} strokeWidth={1.5} aria-hidden="true" />
-                    {t("ui.work.locate")}
+                    {t("ui.decisionDialog.open")}
                   </button>
                 </li>
               ))}

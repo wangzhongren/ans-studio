@@ -655,189 +655,29 @@ function HandbackRow({ row, roleId }: { row: ChatRow; roleId: string }) {
   );
 }
 
-function OperatorRow({ row, roleId }: { row: ChatRow; roleId: string }) {
+/**
+ * operator 行在聊天流只保留**系统通知**：客户决定/审批已转入独立决策对话框/待办面板。
+ * 不渲染选项、按钮、preview 正文或其他可作答元素（E-03/E-07）。
+ */
+function OperatorNotice({ row }: { row: ChatRow }) {
   const t = useT();
-  const locale = useLocaleState((s) => s.locale);
   const data = asRecord(row.data);
   const payload = asRecord(data.payload);
   const request = asRecord(payload.request);
   const id = asString(payload.id) || row.requestId || "";
   const state = asString(data.state) || "open";
-  const finalNote = asString(data.finalNote);
-  const retryError = asString(data.retryError);
-  const kind = asString(request.kind);
-  const options = asArray<Record<string, unknown>>(request.options);
-  const selected = asArray<string>(data.selected);
-  const judgeNotice = asString(payload.judgeNotice);
-  const isMirror = data.isMirror === true;
-  const surfaceRoleId = asString(data.surfaceRoleId) || roleId;
-  const queued = data.queued === true || operatorQueued(payload);
-  const meta = governanceCardMetaView(request, locale);
-  const decisionCard = decisionCardView(request, locale);
-  const toolLifecycle = asRecord(data.toolLifecycle);
-  const lifecycleStages = asRecord(toolLifecycle.stages);
-  const lifecycleText = ["start", "blocked", "result"]
-    .map((phase) => asRecord(lifecycleStages[phase]) as unknown as ActivityItem)
-    .filter((item) => Object.keys(item).length > 0)
-    .map((item) => asString(item.label) || asString(item.statusText))
-    .filter((text) => text !== "")
-    .join(" → ");
-  const roles = useChatStore((s) => s.roles);
-  const drawerOpen = useUiStore((s) => s.drawerOpen);
-  const sourceName = roleDisplayName(findRole(roles, asString(payload.roleId)), locale);
-  const setSelected = (next: string[]) => {
-    useChatStore.getState().setOperatorSelected(roleId, row.id, next);
-  };
-  const submitting = state === "submitting";
-  const closed = state === "decided" || state === "expired";
-  const preview = asString(request.preview);
-  const respond = (decision: unknown) => {
-    if (closed || submitting || queued) return;
-    void useChatStore.getState().respondOperator(id, decision);
-  };
-  const note = retryError
-    ? retryError
-    : submitting
-      ? operatorSubmittingNote(locale)
-      : closed
-        ? finalNote || t("ui.operator.expired")
-        : queued
-          ? governanceQueueNote(locale)
-          : "";
-  const noteClass =
-    state === "expired" || retryError ? "op-note op-note-err" : "op-note";
+  const title = asString(request.title) || t("ui.decisionDialog.titleFallback");
+  const status =
+    state === "decided"
+      ? t("ui.decisionDialog.statusDecided")
+      : state === "expired"
+        ? t("ui.decisionDialog.statusExpired")
+        : t("ui.decisionDialog.statusPending");
   return (
-    <div
-      className={"op-request" + (isMirror ? " is-mirror" : "")}
-      data-request-id={id}
-      data-surface-role-id={surfaceRoleId}
-      data-state={state}
-      role="group"
-      aria-label={asString(request.title) || t("ui.work.requestFallback")}
-      inert={drawerOpen ? true : undefined}
-    >
-      {meta.governance || decisionCard.decision || isMirror ? (
-        <div className="op-badges">
-          {meta.governance ? <span className="op-gov-badge">{meta.badge}</span> : null}
-          {decisionCard.notApprovalBadge ? (
-            <span className="op-decision-badge">{decisionCard.notApprovalBadge}</span>
-          ) : null}
-          {isMirror ? (
-            <span className="op-mirror-badge">{governanceMirrorBadge(locale)}</span>
-          ) : null}
-        </div>
-      ) : null}
-      {isMirror ? (
-        <p className="op-mirror-source">
-          {governanceMirrorSourceLabel(
-            sourceName || asString(payload.roleId),
-            locale,
-          )}
-        </p>
-      ) : null}
-      {meta.lines.length > 0 ? (
-        <div className="op-meta">
-          {meta.lines.map((line, index) => (
-            <p key={index}>{line}</p>
-          ))}
-        </div>
-      ) : null}
-      <div className="op-title">
-        {decisionCard.title ||
-          asString(request.title) ||
-          (kind === "choice" ? t("ui.chatRow.choose") : t("ui.chatRow.confirm"))}
-      </div>
-      {decisionCard.decision && (decisionCard.question || decisionCard.questionNote) ? (
-        <>
-          {decisionCard.question ? (
-            <p className="op-question">{decisionCard.question}</p>
-          ) : null}
-          {decisionCard.questionNote ? (
-            <p className="op-note">{decisionCard.questionNote}</p>
-          ) : null}
-        </>
-      ) : null}
-      {lifecycleText ? <div className="op-tool-lifecycle">{lifecycleText}</div> : null}
-      {request.detail ? <p className="op-note">{asString(request.detail)}</p> : null}
-      {preview ? (
-        <details className="op-preview">
-          <summary>{t("ui.chatRow.preview")}</summary>
-          <div
-            className="op-preview-body card-md"
-            dangerouslySetInnerHTML={markdownHtml(preview)}
-          />
-        </details>
-      ) : null}
-      {kind === "choice" && options.length > 0 ? (
-        <div className="op-options">
-          {options.map((option, index) => {
-            const optionId = asString(option.id) || String(index);
-            const recommendedBadge = decisionOptionBadge(decisionCard, option);
-            return (
-              <label
-                key={optionId}
-                className={selected.includes(optionId) ? "is-selected" : undefined}
-              >
-                <input
-                  type={request.multiple === true ? "checkbox" : "radio"}
-                  name={"op-" + id}
-                  value={optionId}
-                  disabled={closed || submitting}
-                  checked={selected.includes(optionId)}
-                  onChange={() => {
-                    if (request.multiple === true) {
-                      setSelected(
-                        selected.includes(optionId)
-                          ? selected.filter((value) => value !== optionId)
-                          : [...selected, optionId],
-                      );
-                    } else {
-                      setSelected([optionId]);
-                    }
-                  }}
-                />
-                <span>{asString(option.label) || optionId}</span>
-                {recommendedBadge ? (
-                  <span className="op-recommended-badge">{recommendedBadge}</span>
-                ) : null}
-              </label>
-            );
-          })}
-        </div>
-      ) : null}
-      {judgeNotice ? <div className="op-judge-notice">{judgeNotice}</div> : null}
-      {queued ? <p className="op-queued">{governanceQueueNote(locale)}</p> : null}
-      {/* PM §十三 最小例外（2026-10-21）：失效/已答卡（closed）收起全部动作按钮，
-          保留 disabled、finalNote、aria 与卡片容器（旧 freezeOperatorCard 同义）；
-          只此一处，不改其它行渲染。排队卡不提供可操作按钮。 */}
-      <div className="op-actions" hidden={closed || queued}>
-        {kind === "choice" ? (
-          <>
-            <button
-              className="op-submit"
-              type="button"
-              hidden={closed}
-              disabled={closed || submitting || selected.length === 0 || (request.multiple !== true && selected.length !== 1)}
-              onClick={() => respond({ kind: "choice", selected })}
-            >
-              {t("ui.chatRow.submit")}
-            </button>
-            <button className="op-cancel" type="button" hidden={closed} disabled={closed || submitting} onClick={() => respond({ kind: "choice", cancelled: true })}>
-              {t("shared.common.cancel")}
-            </button>
-          </>
-        ) : (
-          <>
-            <button className="op-confirm" type="button" hidden={closed} disabled={closed || submitting} onClick={() => respond({ kind: "confirm", confirmed: true })}>
-              {t("ui.chatRow.confirmAction")}
-            </button>
-            <button className="op-deny" type="button" hidden={closed} disabled={closed || submitting} onClick={() => respond({ kind: "confirm", confirmed: false })}>
-              {t("ui.chatRow.rejectAction")}
-            </button>
-          </>
-        )}
-      </div>
-      {note ? <p className={noteClass} role={submitting ? "status" : undefined}>{note}</p> : null}
+    <div className="sys sys-operator-note" data-operator-id={id} role="note">
+      <span className="sys-text">
+        {t("ui.decisionDialog.panelTitle")} · {title} · {status}
+      </span>
     </div>
   );
 }
@@ -1100,7 +940,7 @@ function ChatRowViewInner({ row, roleId }: ChatRowViewProps) {
     case "handback":
       return <HandbackRow row={row} roleId={roleId} />;
     case "operator":
-      return <OperatorRow row={row} roleId={roleId} />;
+      return <OperatorNotice row={row} />;
     case "queue-aggregate":
       return <QueueAggregateRow row={row} />;
     case "turn-terminal":

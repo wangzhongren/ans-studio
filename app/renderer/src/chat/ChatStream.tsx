@@ -5,11 +5,11 @@
  * （run/idle/err），不按事件流自行猜测忙闲。
  *
  * 4B：治理记录空态（pin-mismatch / 无记录 / 不可用 / 治理角色说明）、
- * 待确认 chip（同状态源 pendingOperator；定位原卡）、chip 可见时尾行让位。
+ * E 批：客户决定/审批移入独立对话框/待办面板；聊天流只保留沟通与系统通知。
  */
 
 import { useEffect, useRef, useState } from "react";
-import { MessageSquareText, ShieldCheck } from "lucide-react";
+import { MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getRowModel, useChatStore } from "@/chat/chat-store";
 import { BusySpinner } from "@/chat/BusySpinner";
@@ -26,7 +26,6 @@ import {
 import { getDesktopBridge } from "@/lib/platform";
 import { useUiStore } from "@/stores/ui-store";
 import { useDrawerStore } from "@/stores/drawer-store";
-import { operatorSurfaces } from "@/chat/operator-view";
 import { translate, useLocaleState, useT } from "@/i18n";
 
 /** 稳定缺省引用：zustand selector 不得每次返回新数组（getSnapshot 缓存要求）。 */
@@ -127,55 +126,6 @@ function QueueRows({ roleId }: { roleId: string }) {
   );
 }
 
-function pendingIdsFor(
-  pending: Record<string, Record<string, unknown>>,
-  roleId: string | null,
-): string[] {
-  if (!roleId) return [];
-  const ids: string[] = [];
-  for (const [id, payload] of Object.entries(pending)) {
-    if (operatorSurfaces(payload).indexOf(roleId) >= 0) ids.push(id);
-  }
-  return ids;
-}
-
-/** 定位到该角色的第一张未决卡：先按行模型算位置，再滚到位、聚焦卡（不自动作答）。 */
-function locatePendingCard(
-  roleId: string,
-  requestId: string,
-  chat: HTMLDivElement | null,
-): void {
-  if (!chat) return;
-  const model = getRowModel(roleId);
-  if (model) {
-    const index = model.rows.findIndex(
-      (row) => row.kind === "operator" && row.requestId === requestId,
-    );
-    if (index >= 0) {
-      const sums = model.rebuild();
-      const pane = chat.querySelector<HTMLElement>(
-        '.chat-pane[data-role-id="' + CSS.escape(roleId) + '"]',
-      );
-      const paneTop = pane
-        ? pane.getBoundingClientRect().top - chat.getBoundingClientRect().top + chat.scrollTop
-        : 0;
-      const height = Math.max(1, model.rows[index].height || 0);
-      const target = paneTop + sums[index] - Math.max(0, (chat.clientHeight - height) / 2);
-      chat.scrollTop = Math.max(0, target);
-    }
-  }
-  const focus = () => {
-    const card = chat.querySelector<HTMLElement>(
-      '[data-request-id="' + CSS.escape(requestId) + '"]',
-    );
-    if (!card) return;
-    if (!card.hasAttribute("tabindex")) card.setAttribute("tabindex", "-1");
-    card.scrollIntoView({ block: "center" });
-    card.focus({ preventScroll: true });
-  };
-  requestAnimationFrame(() => requestAnimationFrame(focus));
-}
-
 export function ChatStream() {
   const t = useT();
   const locale = useLocaleState((s) => s.locale);
@@ -190,7 +140,6 @@ export function ChatStream() {
   const paneMeta = useChatStore((s) => s.paneMeta);
   const paneVersions = useChatStore((s) => s.paneVersions);
   const scrollNonce = useChatStore((s) => s.scrollNonce);
-  const pendingOperator = useChatStore((s) => s.pendingOperator);
   const queueCount = useChatStore((s) =>
     selectedRoleId ? (s.queueByRole[selectedRoleId] || []).length : 0,
   );
@@ -211,7 +160,6 @@ export function ChatStream() {
   const rowCount = model ? model.rows.length : 0;
   const sessionOpen = sessionOpenRoleId === selectedRoleId;
   const loading = meta?.loading === true;
-  const pendingIds = pendingIdsFor(pendingOperator, selectedRoleId);
   let emptyTitle = "";
   let emptySub = "";
   let emptyHint = "";
@@ -247,16 +195,6 @@ export function ChatStream() {
       emptySub = t("ui.chatStream.empty.openedSub");
     }
   }
-
-  const onChipClick = () => {
-    if (!selectedRoleId || pendingIds.length === 0) return;
-    const first = pendingIds[0];
-    // 主动定位先关闭抽屉（普通到达/刷新不关），再滚到原卡并聚焦。
-    if (useUiStore.getState().drawerOpen) {
-      useDrawerStore.getState().close();
-    }
-    locatePendingCard(selectedRoleId, first, chatRef.current);
-  };
 
   return (
     <div
@@ -310,29 +248,14 @@ export function ChatStream() {
       ) : null}
 
       {selectedRoleId ? <QueueRows roleId={selectedRoleId} /> : null}
-      {busy && selectedRoleId && pendingIds.length === 0 ? (
+      {busy && selectedRoleId ? (
         <div className="tool-current">
           <BusySpinner />
           <span className="sys-text">{t("ui.chatStream.working")}</span>
         </div>
       ) : null}
-      {selectedRoleId && pendingIds.length > 0 ? (
-        <button
-          id="op-chip"
-          className="op-chip"
-          type="button"
-          aria-label={t("ui.chatStream.pendingLocate", { count: pendingIds.length })}
-          onClick={onChipClick}
-        >
-          <ShieldCheck size={12} strokeWidth={1.5} aria-hidden="true" />
-          <span className="op-chip-text">
-            {t("ui.chatStream.pendingLocate", { count: pendingIds.length })}
-          </span>
-        </button>
-      ) : (
-        <button id="op-chip" className="op-chip" type="button" hidden aria-hidden="true" />
-      )}
-
+      {/* E 批：客户决定/审批只在独立对话框/待办面板处理；聊天流无可作答卡。 */}
+      <button id="op-chip" className="op-chip" type="button" hidden aria-hidden="true" />
       {/* view_image 放大层：fixed + portal 到 body，不占聊天流布局。 */}
       <ViewImageLightbox />
     </div>

@@ -108,6 +108,7 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
   const contextWarningMatch = /恢复失败：(.+)）$/.exec(contextText);
 
   const pendingCount = pendingCountFor(pendingOperator, selectedRoleId || null);
+  const pendingTotal = Object.keys(pendingOperator).length;
   const roleCount = roleBadgeCount(
     !!selectedRoleId && roleBusy[selectedRoleId] === true,
     selectedRoleId ? (queueByRole[selectedRoleId] || []).length : 0,
@@ -213,6 +214,35 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
                   {badgeText(backgroundRunning)}
                 </span>
               ) : null}
+            </Button>
+            <Button
+              id="tab-decisions"
+              variant="ghost"
+              size="sm"
+              className={drawerOpen && drawerTab === "decisions" ? "active" : undefined}
+              aria-haspopup="dialog"
+              aria-expanded={drawerOpen && drawerTab === "decisions"}
+              aria-label={t("ui.decisionDialog.panelTitle")}
+              onClick={() => useDrawerStore.getState().openTab("decisions")}
+            >
+              {t("ui.decisionDialog.panelEntry")}
+              {pendingTotal > 0 ? (
+                <span className="tab-badge" aria-hidden="true">
+                  {badgeText(pendingTotal)}
+                </span>
+              ) : null}
+            </Button>
+            <Button
+              id="tab-tasks"
+              variant="ghost"
+              size="sm"
+              className={drawerOpen && drawerTab === "tasks" ? "active" : undefined}
+              aria-haspopup="dialog"
+              aria-expanded={drawerOpen && drawerTab === "tasks"}
+              aria-label={t("ui.taskCenter.title")}
+              onClick={() => useDrawerStore.getState().openTab("tasks")}
+            >
+              {t("ui.taskCenter.panelEntry")}
             </Button>
             <Button
               id="tab-card"

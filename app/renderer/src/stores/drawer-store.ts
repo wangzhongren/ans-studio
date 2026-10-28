@@ -31,7 +31,7 @@ function currentLocale(): Locale {
   return useLocaleStore.getState().locale;
 }
 
-export type DrawerTab = "card" | "work" | "pi" | "document" | null;
+export type DrawerTab = "card" | "work" | "pi" | "document" | "decisions" | "tasks" | null;
 
 export interface ReadingState {
   sections: Record<string, boolean>;

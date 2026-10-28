@@ -1564,3 +1564,110 @@
     z-index: 1;
   }
 }
+
+/* —— E 批：客户决定模态对话框、决策中心、任务/日志面板 —— */
+.decision-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 42%);
+}
+.decision-dialog {
+  width: min(640px, 100%);
+  max-height: min(82vh, 760px);
+  overflow: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-drawer);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.decision-dialog.is-high-risk { border-color: var(--danger-border); }
+.decision-dialog.is-destructive { border-color: var(--warning-border); }
+.dd-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.dd-heading { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.dd-title { font-size: 15px; font-weight: 650; color: var(--text); }
+.dd-kind { font-size: 10px; }
+.dd-risk-badge { font-size: 10px; border-color: var(--warning-border); color: var(--warning); }
+.dd-close { border: 0; background: transparent; color: var(--text-3); cursor: pointer; padding: 4px; border-radius: var(--radius-micro); }
+.dd-close:hover, .dd-close:focus-visible { background: var(--selected); color: var(--text); }
+.dd-source, .dd-risk { margin: 0; color: var(--text-3); font-size: 11.5px; }
+.dd-risk { display: flex; align-items: center; gap: 4px; }
+.dd-risk.is-high { color: var(--warning); }
+.dd-judge { margin: 0; color: var(--info); font-size: 11.5px; }
+.dd-preview, .dd-detail, .dd-question { margin: 0; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-micro); background: var(--selected); color: var(--text-2); font-size: 11.5px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; }
+.dd-options { display: flex; flex-direction: column; gap: 6px; }
+.dd-option { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px 8px; align-items: center; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius-micro); cursor: pointer; }
+.dd-option.is-checked { border-color: var(--primary); background: var(--selected); }
+.dd-option input { margin: 0; }
+.dd-option-label { font-size: 12px; color: var(--text); }
+.dd-option-desc { grid-column: 2; color: var(--text-3); font-size: 11px; }
+.dd-hint { margin: 0; color: var(--text-3); font-size: 11px; }
+.dd-empty, .dd-error, .dd-hint { margin: 0; }
+.dd-error { color: var(--danger); font-size: 11.5px; }
+.dd-second-confirm { margin: 0; color: var(--warning); font-size: 11.5px; font-weight: 600; }
+.dd-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+.dd-actions button { min-height: 30px; padding: 0 12px; border-radius: var(--radius-micro); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer; }
+.dd-actions .dd-later { margin-right: auto; }
+.dd-actions .dd-confirm, .dd-actions .dd-submit { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+.dd-actions button:disabled { opacity: .55; cursor: not-allowed; }
+.dd-actions button:focus-visible, .dd-option:focus-within { outline: 2px solid var(--focus); outline-offset: 1px; }
+.dd-more { margin: 0; color: var(--text-3); font-size: 11px; text-align: right; }
+
+.decision-center, .task-center { display: flex; flex-direction: column; gap: 12px; padding: 10px 12px 18px; }
+.dc-tools, .tc-tools, .role-log-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dc-search-wrap { display: flex; align-items: center; gap: 6px; flex: 1 1 180px; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-micro); padding: 0 8px; background: var(--surface); }
+.dc-search { border: 0; background: transparent; color: var(--text); font-size: 11.5px; height: 28px; flex: 1; min-width: 0; outline: none; }
+.dc-filter, .role-log-select { height: 28px; border: 1px solid var(--border-strong); border-radius: var(--radius-micro); background: var(--surface); color: var(--text); font-size: 11.5px; }
+.dc-section { display: flex; flex-direction: column; gap: 6px; }
+.dc-heading { margin: 0; font-size: 11px; color: var(--text-3); font-weight: 600; text-transform: none; }
+.dc-list, .task-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.dc-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 6px; align-items: center; padding: 7px 8px; border: 1px solid var(--border); border-radius: var(--radius-micro); background: var(--surface); }
+.dc-status { font-size: 10px; color: var(--text-3); border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px; }
+.dc-status.is-deferred { color: var(--warning); border-color: var(--warning-border); }
+.dc-status.is-decided { color: var(--primary); border-color: var(--primary); }
+.dc-status.is-expired { color: var(--danger); border-color: var(--danger-border); }
+.dc-title { font-size: 11.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dc-source, .dc-result { font-size: 10.5px; color: var(--text-3); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dc-open { border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); border-radius: var(--radius-micro); font-size: 10.5px; padding: 2px 8px; cursor: pointer; }
+.dc-empty, .dc-empty-row { display: flex; align-items: center; gap: 6px; color: var(--text-3); font-size: 11px; padding: 8px; }
+.dc-empty-row { list-style: none; }
+
+.task-center .tc-title { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text); }
+.tc-unclosed { font-size: 10px; color: var(--warning); }
+.tc-refresh { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border-strong); border-radius: var(--radius-micro); background: var(--surface); color: var(--text); font-size: 10.5px; padding: 3px 8px; cursor: pointer; }
+.tc-error, .role-log-error { margin: 0; color: var(--danger); font-size: 11px; }
+.tc-empty { margin: 0; color: var(--text-3); font-size: 11px; }
+.task-card { padding: 8px; border: 1px solid var(--border); border-radius: var(--radius-micro); background: var(--surface); display: flex; flex-direction: column; gap: 4px; }
+.task-card.is-failed, .task-card.is-closed { opacity: .82; }
+.task-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.task-id { font-family: var(--font-mono, monospace); font-size: 10px; color: var(--text-3); }
+.task-status { font-size: 10px; color: var(--primary); border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px; }
+.task-target { margin-left: auto; font-size: 10.5px; color: var(--text-3); }
+.task-text { margin: 0; font-size: 11.5px; color: var(--text); }
+.task-expected, .task-report { margin: 0; font-size: 10.5px; color: var(--text-3); }
+.task-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+.task-actions button { border: 1px solid var(--border); border-radius: var(--radius-micro); background: var(--surface); color: var(--text); font-size: 10px; padding: 2px 6px; cursor: pointer; }
+.task-actions button:hover { background: var(--selected); }
+.role-log-tools { gap: 6px; }
+.role-log-badge { font-size: 10px; border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px; color: var(--text-3); }
+.role-log-badge.is-normal { color: var(--primary); border-color: var(--primary); }
+.role-log-badge.is-slow { color: var(--warning); border-color: var(--warning-border); }
+.role-log-badge.is-stuck { color: var(--danger); border-color: var(--danger-border); }
+.role-log-badge.is-waiting { color: var(--info); border-color: var(--info-border); }
+.role-log-time { font-size: 10px; color: var(--text-3); }
+.role-log-action { margin: 0; font-size: 10.5px; color: var(--text-3); overflow-wrap: anywhere; }
+.role-log-view { margin: 0; padding: 8px; max-height: 260px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-micro); background: var(--selected); color: var(--text-2); font-size: 10.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .dc-item { grid-template-columns: auto minmax(0, 1fr); }
+  .dc-source, .dc-result, .dc-open { grid-column: 2; justify-self: start; }
+}
+
+.composer-trust-hint { flex-basis: 100%; font-size: 10px; color: var(--text-3); line-height: 1.35; }

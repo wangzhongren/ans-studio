@@ -694,6 +694,9 @@ export function Composer() {
             <span className="composer-trust-title">
               {t("ui.composer.trustGroupTitle")}
             </span>
+            <span id="judge-switch-hint" className="composer-trust-hint">
+              {t("ui.decisionDialog.switchHint")}
+            </span>
             <label
               className={
                 "composer-auto-approve" +

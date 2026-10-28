@@ -33,7 +33,7 @@ export interface AnsRendererStateSnapshot {
   selectedRoleId: string | null;
   runtime: RuntimeId;
   sessionOpenRoleId: string | null;
-  rightTab: "card" | "work" | "pi" | "document" | null;
+  rightTab: "card" | "work" | "pi" | "document" | "decisions" | "tasks" | null;
   roleBusy: Record<string, boolean>;
   roleMeta: Record<string, unknown>;
   hasRoles: boolean;
