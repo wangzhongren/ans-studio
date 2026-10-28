@@ -1,7 +1,7 @@
 # entry-role-minimal 批次 B：任务/汇报主干与最小状态（change-package）
 
 - 日期：2026-10-28｜任务：`2026-10-28-entry-role-minimal`｜批次：**B（任务/汇报主干与最小状态）**｜档位：T3
-- 候选分支：`feat/entry-role-minimal`；B 批基线：`778a7f2`（A 批收口 + Delta-1 边界前置 `c64fe98`）；本批提交：`{{COMMIT}}`。
+- 候选分支：`feat/entry-role-minimal`；B 批基线：`778a7f2`（A 批收口 + Delta-1 边界前置 `c64fe98`）；本批提交：`e5a533d6afca53c2dcf032011ef6735b00bd8402`。
 - 隔离：实施 worktree `.claude/worktrees/entry-role-minimal`；不 push、不合并 main。
 - 依据：团队计划 §3.3/§3.4/§3.5/§4.2、验收标准 v1.1 B-01–B-12、方案 v9.2 §3.3/§3.4/§3.6/§7/§8.5。
 - Delta-1：人事已把本批 10 个桌面测试文件精确补入 `角色卡/桌面窗口/boundary.{md,yaml}` + changelog（提交 `c64fe98`）；本批未新增名单外桌面测试。
@@ -90,7 +90,7 @@ B 批把任务/汇报主链切到应用独占的最小状态，同时保留旧 g
 
 ## 6. 改动文件与统计
 
-见 `git show --stat {{COMMIT}}`；按 owner 分组：
+见 `git show --stat e5a533d6afca53c2dcf032011ef6735b00bd8402`；按 owner 分组：
 
 | owner | 文件 | 说明 |
 | --- | --- | --- |
@@ -152,11 +152,11 @@ B 批把任务/汇报主链切到应用独占的最小状态，同时保留旧 g
 
 ## 10. 证据与回滚
 
-- 本文件 SHA-256：`{{CHANGE_SHA}}`；行数：`{{CHANGE_LINES}}`。
+- 本文件行数：`194`；SHA-256：自引用限制——本行占位符替换前字节为 `c0268b7e26d49b0081961af72cd6ec8a2335caf6356509f13410441c3fd75697`（最终以 `git show <证据提交>:docs/scheduling/2026-10-28-entry-role-minimal-change-B.md | sha256sum` 为准；最终报告给出复算值）。
 - 全量日志：`%TEMP%\ans-b-final3-tests.log`（sha256 `752d908a22470ec81cf666c37d64729066e1092f4902df050a53e8cebcd72458`）。
 - 专项日志：`%TEMP%\ans-b-special-tests.log`（403/403；sha256 `8538dfd4bd9c9000787ff602d3a8eb2a9df6cb22e69076e934bcefc9cbc74396`）。
 - Electron 报告：`%TEMP%\ans-e2e-b-out-13865\report.txt`（sha256 `76f9d072fe1d4630dfa24161804734a12cbb19115fa65830fe0fdf19098871a7`）。
-- 整树哈希（候选）：`{{TREE_SHA}}`；逐文件哈希：
+- 整树哈希（候选）：`4fdb955b99beca19cbce985d4ff6031eadec6599bcba85759a3ccc3fcab20146`；逐文件哈希：
 | --- | --- | --- |
 | `app/desktop/governance-advance.ts` | `13a04b9f1580898404b7f9d0e43a0ce4ef8acbde` | `b66dbaea4607d31a132e87e27143ea996820e9a666b6b34840f7ce27f1b44bed` |
 | `app/desktop/interface.ts` | `f0afce64a3aee173a8707d54bfcd807d38bbf883` | `0aa38780ccd1ca174879c223f4cd5ac8fe7e4c8848f41db4e3027a24bdcfff6d` |
