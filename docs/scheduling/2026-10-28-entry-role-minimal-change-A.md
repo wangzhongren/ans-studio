@@ -152,10 +152,11 @@
 
 ## 六、证据、环境与整树标识
 
-- **提交 SHA**：首提交 `f4aa073a7032d35afc2e964dc22b4d171f1d26dc`；**rework 提交** `<!-- REWORK_SHA -->`（追加提交；本文件随 rework 证据提交 `<!-- DOC_COMMIT_SHA -->`）。
+- **提交 SHA**：首提交 `f4aa073a7032d35afc2e964dc22b4d171f1d26dc`；**rework 提交（代码/测试/属主记录/本文件初版）** `83f2d2e30fd8df0c51a50f809f61fc9b28a05097`；本文件最终版位于其后的**证据补录提交**（其父为 `83f2d2e`；SHA 见 `git log --format=%H -1`）。
 - **整树标识（可复算口径）**：
   - 首提交批次差异：`git diff --binary 8fc673e f4aa073a | sha256sum` = `35167593ace525d1cc6ef139684a4344766a0fe91cc6a58f9775025fd118dbd4`（含变更包）。
-  - **rework 候选**：`git diff --binary 8fc673e <rework commit> | sha256sum` = `<!-- TREE_HASH -->`（含变更包与属主记录）。
+  - **rework 候选（C1）**：`git diff --binary 8fc673e 83f2d2e30fd8df0c51a50f809f61fc9b28a05097 | sha256sum` = `fbcc6e8448576f48adc2bc0467641d98fc9db946c62810008c4cc62b05cd5311`（含 C1 版变更包与属主记录）。
+  - **证据补录提交（C2）**：只更新本 change-package（文档，不改变产品候选）；其 `git diff --binary 8fc673e <C2>` 由复审/最终报告按 `git log` 取 C2 后复算。
   - 口径说明：首版 change-package 曾记录 `46af3a06…`，那是**提交前 `git diff --binary`（tracked-only，未含未跟踪的 change-package 文件）**；验收按提交后整批差异复算为 `35167593…`。本版统一以「提交后 `git diff --binary 8fc673e <commit>`」为准并记录。
 - **属主 change 记录（P7）**：`角色卡/{门禁引擎,编排,桌面窗口,桌面UI,项目管理,测试}/docs/change/2026-10-28_change_entry-role-minimal-A.md`。
 - **全量/静态日志**：`/tmp/final3-tests.log`（sha256 见 §3.2）、`/tmp/final3-typecheck.log`、`/tmp/final3-typecheck-renderer.log`、`/tmp/final3-build-renderer.log`（sha256 见 §3.1/§3.2 与复审记录）。
@@ -185,7 +186,57 @@
 
 ## 附录 A：候选逐文件哈希（`git hash-object` + `sha256sum`）
 
-<!-- HASHES -->
+| 文件 | git hash-object | sha256 |
+| --- | --- | --- |
+| `app/desktop/project.ts` | `607f26217d3024fc501b95b004ab5ce6855a1b11` | `c8b3b476c51b394a93ff832838472c24d90c6a6a01d411b357f172522276e486` |
+| `app/desktop/session.ts` | `cb97f4c34a70ba091bf8d7dc2c24d59456c98b68` | `6e4a9493e94f6bfb8be324ea30c80a8ab86fef2c58865b8fc1b7e3f191bd2241` |
+| `app/renderer/src/chat/governance-view.ts` | `f9ced12ed29b667649411167227d4e0cf0d22349` | `6ab039f3448552a546446441779db9a5e69ef395ff1dd9c9f5f7ac05d95c028f` |
+| `app/renderer/src/chat/judge.ts` | `4c2c73a2e86792bbef63847a84200d3778e7b5fc` | `e677b661ee9f19a7a990c7f347fdb19c6442018254a5263e6cdacb6d6909a334` |
+| `app/renderer/src/chat/role-view.ts` | `e0925eda7188fa549e903c3323a3f3e40c9279a1` | `d56f5b92a070150bddcba1151befcade18759d0454ca74ad18f32c75fb64fc0b` |
+| `docs/scheduling/2026-10-28-entry-role-minimal-gate2-amendment-2.md` | `64f237cfea811a9ce7e211bf33d26c2ca375b2c5` | `8d5ddeb5d45690d34ac5ef9031cae80768f47b8e07ecd37685d61e940395aaae` |
+| `src/common/shared/i18n/messages/en-US.ts` | `99ca2d4be920057a6562fd7ee7b7a3010fe9c342` | `dca8c7b7a91e7aa3e3bc7dd359f8144ccb0d11a203fc0ce3f3e4c33994eadc02` |
+| `src/common/shared/i18n/messages/zh-CN.ts` | `5c37936879a01ad3ae1db097ff63d28082fba5d1` | `e0c070077ffacb365698ae1fb1d3dc6d0030e1bf9aff14f73fa8f092b63384d5` |
+| `src/common/门禁引擎/governance-roles.ts` | `98e21d3bc3205c6c63be66f1de4f5ebc68408050` | `5920b46689bcf7f1d5213bfabdf2ae05fca9f4bc4d5aa6688a6ac5794dc5ee38` |
+| `src/model/role.ts` | `fbc8527cf05e16a946431e00eb8448e3cf9f0bd2` | `7c8ccc91942b4c2e423d4ef0c39baae7a820e47ae66b23ed4ca4f1a3f0fd1b52` |
+| `src/pipeline/orchestration/govern-session.ts` | `34a654ac91d89e2bb8dc993fa761c1b8d8a58e3c` | `f5aa6ce1c33e763b27be3ab5feb5676f1aa611e420c67a93fbd40fe743d33109` |
+| `src/pipeline/orchestration/run-role.ts` | `cd6e91a414dfb540849279c60fd09ce987c8a52d` | `10ecc61ac485b73508feece8f7f92a039247ab4aca2351fa7ccbccac0c836433` |
+| `src/service/boundary/resolve-boundary.ts` | `ad9ba8bf158f084d351bd50350864b008517e0af` | `7faaf83ec5d63a9c374aef2e9a0a64cb454559aec50e6868ef56e46368673b53` |
+| `src/service/role/resolve-role.ts` | `63b57b0a36a2ff72ac6663aa81b4f93e31d9a245` | `c935cdf213f06a0b3d64bb00f41381ec5a9058162d4f6e3ac3e050724923868f` |
+| `test/桌面UI/i18n-b1-b2.test.ts` | `1cb8105904747234d9f18cf3d499e2df71d34e9b` | `3f36ffc3facf8a2158a30fb215a1ba1456fbe30077c082af3aef2e83bded2f83` |
+| `test/桌面UI/judge.test.ts` | `2e03944f8421af41babb23cf40b094676d6baecd` | `96f3ed70a470204171accc49d99ed20c70f282bc6371ba2daa02898b24672ab3` |
+| `test/桌面UI/role-view.test.ts` | `99071b1b70e65fc768b0c3c4d7fca0808be0f6e8` | `97b5ea7b6c2581cb91cac71dc480a374cc8107c059cfaff8178e58e90af1223d` |
+| `test/桌面应用/genesis-bootstrap.test.ts` | `2fd53a177042a4c763038a217ff5723fe492529f` | `dc049d59a67ea6403c450b4a15d786a7c99e7d04951bb000f5ff3339c92630fc` |
+| `test/测试/governance-e2e-auto/acceptance-triage-e2e.test.ts` | `0cdcfd81dc96ff7d9b8a93dae0a5514c9aad0ff5` | `2882cf5ebbe8b1896ca42b72b36e6e8fa255bace3a026d8011612cceb2cc8787` |
+| `test/测试/governance-e2e-auto/i-full-chain.test.ts` | `e32e543beae0ccf15ae234da8288f61ed1822266` | `df977681f3a39fe994ae07e730628663134cba6d0d771e42b8324c5fe7da0529` |
+| `test/测试/governance-e2e-auto/k-governance-feedback.test.ts` | `34c8cbae83947e1decc99885d1c5b190fd3fbf9d` | `24cf4cdef4da519ca3b34bb66e79cb49e6d8e26c89805b161dddec0362aab378` |
+| `test/测试/governance-e2e-auto/l-crew-write-validation.test.ts` | `69f21035a349a4d9f0b8633a562e695d877753da` | `8528545c79051044caa09b8aa00ff14148a7fc8317277c65927b5b25bae6ab58` |
+| `test/测试/governance-e2e-auto/m-lead-internal-choice.test.ts` | `5ecd346331eb8d56115d5a90c5442dfc3acfea0a` | `5d6c713960640c081d788089dd01d32e0c84c37ff68a99830b009965ead07e39` |
+| `test/测试/governance-e2e-auto/s-acceptance-rework-routing.test.ts` | `d29f8704da95bbda9182a1691a0d73805d5464f7` | `1b5341590e08f3d87602799236ecfbf27286292aef20bb22f010000be96f09cf` |
+| `test/测试/governance-e2e-auto/t-gate-review-return-routing.test.ts` | `7aad837e3f684b6656876e569979771e34d6a2a2` | `b3f2a8f87b8e2f1e9efbeab4dc5d2d5c4723fc7f8a05b0cba49f06b3b2d0bc7c` |
+| `test/测试/governance-liaison-verify/a-roles-writes-caps.test.ts` | `bb017cfe9d5ac165631e2319ee87ad72c06579a7` | `ff7365191c79d007712b1b2fd26c678c4df08c0e0c1f0d032caa842b76a49c90` |
+| `test/测试/governance-liaison-verify/b-intent-handoff.test.ts` | `52983e6ff68540306d163e957aed0ed8b741de1c` | `afd511c19cdf82f376e440b9a9b32e4f31d02d5bf51443435b09f8eb03c5ec28` |
+| `test/测试/governance-liaison-verify/c-clarification.test.ts` | `ff58ab9e9d16851fdb366eaa219b9adf301813dd` | `7fae68b81357dda8191485f2ed7ca5d1adb04c9df91c9d06389da00a46b3c477` |
+| `test/测试/governance-liaison-verify/fixture.ts` | `86462995e6bb3851cd6dd1ca72fb6b9fed25fd4e` | `f7597819e08d69cdf32e4dfc014c89eeb6b388cce28f688ad38da9bde755d050` |
+| `test/测试/governance-trio-verify/a-listing-sessions-writes.test.ts` | `c034456b8e56132e0568fc123b6b2792fa82a6cb` | `033d0a539b09d7b8805e9f07e90434d24ff0986d368022c35e5d491da0e1d0c0` |
+| `test/测试/governance-trio-verify/c-migration.test.ts` | `28f3a2969fa2efd1323792402ccac8deb2d75802` | `2a38c00e4e164f1b66a5564dfe810e05df194ad404ada514cf56f42afd2d405c` |
+| `test/测试/t9-block1-bootstrap.test.ts` | `40fb481052479237b3169b9f2e576f6c77cb4a24` | `3c6cbeaeb90798e744b46ef1138ab0a38d4b662ff3719fe7e7956e018c0c48dd` |
+| `test/门禁引擎/customer-card-rules.test.ts` | `834b0f5b5f27102fd38dd9e085a16db5f55e5cf4` | `89e4f3bae6d919674368abbb0dc0b9f509b6f019b4d502aaee182795599a431c` |
+| `test/门禁引擎/gate-review-flow-busy.test.ts` | `95da322926b8413f09def6901b6f0e489adb1a2f` | `e4ba3d73f60558fc995da4bab836d7c63f500cad022ce4b009f8e3101effe756` |
+| `test/门禁引擎/governance-standard-workflow.test.ts` | `63fb15fe8776d383c26ec12544f644a36c0bc650` | `48205f350cfac4992f4bb49f46bab2ebaf29c53812a75408fd963494b2369323` |
+| `test/门禁引擎/governance-trio.test.ts` | `03481a8f1a3f2c7ce373071d9d6ea3977a3a2aff` | `37133327e3edc45331c9b609f6f9fd4e9925c88df6a7ddeca383f4bf4df465eb` |
+| `test/门禁引擎/liaison-role.test.ts` | `204aa561308a4b51e4a6345c8b5837723004c891` | `988cf048d82c3124d6885d8ab9cb73b566235596ab7609fd53eba544b4e0ebec` |
+| `test/门禁引擎/list-project.test.ts` | `a9160bb2427a5b9960ef6dbaca506b19e5a3c6bc` | `a5421874a020c5d1eb2bc4b3c2e27069c755aedd865a0dd6314fddad0c549b5d` |
+| `test/门禁引擎/requirement-change-cards.test.ts` | `074bbac8afe305cb6ab096ce65cd092e16f0bd03` | `bc01a46a0282a951904b51d7c8dcbdc74c2e53782cc3276140eb139d6f79cc4e` |
+| `test/门禁引擎/screenshot-only-evidence.test.ts` | `74ded6aafc2d382420b726ca8cda14c62a4e93b8` | `511b6551ab25fa89e32a8e54ef5d21076e60cc84decfa37c7ea684159b77e7aa` |
+| `test/门禁引擎/verifier-artifact-report.test.ts` | `9a586998c383679b5b4f2cb817ea4f759b677190` | `965d030746448146ef20147e6e70ea07163eb086ffab6d510346ba14f32d1182` |
+| `test/门禁引擎/view-image-cards.test.ts` | `47d09aba5bf2c4ba782a42d5400b3f1617fb0b46` | `bb6f7e08730af82392d8cdce672fb8418257012c649e81510ed663ce2dfc4da2` |
+| `test/项目管理/shared/i18n.test.ts` | `24aa5dc3e63c7ae2cbaeec12185f332d6864c4f2` | `3267eb6fcf360cb9bfda5f2f57e6d2af32ce667819d7e3c0a1f9edd97159a6ed` |
+| `角色卡/桌面UI/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `c5dffa741aaddd24ac0b4684157d181e69385c6d` | `0972c7c8d6b10d864bea733d722d9df939d9077f3d954d6e145a4012c5872c67` |
+| `角色卡/桌面窗口/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `d2a186aaaa88fce7f6782023674303fc12a1a60d` | `93c5e525408f775dd24854acb0ca8bbf63e1a0dfc646014f1fd9c36b006da050` |
+| `角色卡/测试/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `b6a1c83b901f146a35e9849c821aed1b562296d6` | `e637997d112a94244f605846916acf4c0218314721f7c92cdb46ef4df715d8a5` |
+| `角色卡/编排/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `1f8d3d375349ddcbfb0d5a908bd2e807ae6daa61` | `90fcef6a70a95f2ce1a1f6af7411a13abb6e34bb1cf6bff64d8dde8e8d724c41` |
+| `角色卡/门禁引擎/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `98b32a9b9905ffd61f9412deecfb805c899b9dd0` | `f8c4f0f450a8af2912f3546df8d21877bd2c57e4ccef70b53f112300fa34c11e` |
+| `角色卡/项目管理/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `585572145b89ed97db10a79639884468139ca452` | `ae1bd6ad57bf79e825bd3697d9a78f99351e4fddb2ddf2da8ea40f265db03423` |
 
 > change-package 自身随提交写入，无法自含自身哈希；其最终行数/SHA-256 见提交后的复审报告与最终报告。
 
