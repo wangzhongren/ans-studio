@@ -164,10 +164,11 @@ test("注册表：六内置顺序 chief→product→rapporteur→nominator→con
   assert.equal(governanceCapabilitiesOf("实现者"), undefined);
 });
 
-test("注册表：Section 1 与现行（旧）写区逐项一致（root 恒 project；目标写区 D 批切换）", () => {
+test("注册表：Section 1 与现行（旧）写区逐项一致（root 恒 project；product 承接旧 liaison 现行值）", () => {
   const expected: Record<string, string[]> = {
     chief: ["docs/intents/"],
-    product: ["docs/product/"],
+    // amendment-2 §2.3：product 的 Section 1/预授权保持旧 liaison 现行值 docs/intents/；docs/product/ 在 D 生效。
+    product: ["docs/intents/"],
     rapporteur: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
     nominator: ["角色卡/", "docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
     convener: ["docs/flows/", "docs/workflow.md", "docs/scheduling/", "docs/governance/convener/"],
@@ -181,9 +182,9 @@ test("注册表：Section 1 与现行（旧）写区逐项一致（root 恒 proj
   }
 });
 
-test("注册表：预授权目录按治理分工调整（现行旧写区保留；chief/product 为身份层新增）", () => {
+test("注册表：预授权目录按治理分工调整（现行旧写区保留；product 承接旧 liaison 现行值）", () => {
   assert.deepEqual(governanceRoleOf("chief")?.preauthorizedDirs, ["docs/intents/"]);
-  assert.deepEqual(governanceRoleOf("product")?.preauthorizedDirs, ["docs/product/"]);
+  assert.deepEqual(governanceRoleOf("product")?.preauthorizedDirs, ["docs/intents/"], "A 批承接旧 liaison 现行值");
   assert.deepEqual(governanceRoleOf("rapporteur")?.preauthorizedDirs, [
     "docs/proposals/",
     "docs/contracts/",
@@ -229,8 +230,8 @@ test("注册表：能力矩阵——chief 承接旧主入口（沟通+交接+协
     [false, false, false, false, false],
   );
   assert.equal(c.shell, "operator-approve");
-  // 产品：标准 worker——只保留客户通道（申请线在 C 批），无派发/看护/安装。
-  assert.equal(p.customerInput, true);
+  // 产品：A 批身份占位——不启用目标写区/新增能力（申请线 C、星形汇报 B、写区 D）。
+  assert.equal(p.customerInput, false, "A 批 product 不启用客户通道（C 生效）");
   assert.deepEqual(
     [p.handOffIntent, p.requestClarification, p.dispatchTask, p.roleStatus, p.sessionTail, p.proposeRecovery, p.installSkill, p.installMcp],
     [false, false, false, false, false, false, false, false],
@@ -288,7 +289,9 @@ test("注册表：能力矩阵——chief 承接旧主入口（沟通+交接+协
 test("客户 2026-10-19：五内置角色统一 shell 审批档（operator-approve），卡文本含审批与读写语义", () => {
   // 客户原文：「所有的角色，都应该有有运行shell 的权限，包括读写，以及任何的需要命令的权限，
   // 只不过都要提交审批，按照原有的流程审批。」⇒ 不再有 `none`/`readonly`，su 保持审批档。
-  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+  // 批次 A：旧五名角色卡文本断言（product 为身份占位，不启用写区/共享总则；见 A-04a）。
+  for (const id of ["liaison", "rapporteur", "nominator", "convener", "verifier"] as const) {
+    const spec = governanceRoleOf(id)!;
     assert.equal(spec.capabilities.shell, "operator-approve", `${spec.id} 须为审批档`);
     assert.match(spec.cardText, /shell 审批档——只读白名单直接执行/, `${spec.id} 卡文本须写明只读白名单直接执行`);
     assert.match(spec.cardText, /逐条提交客户\/判断 agent 审批/, `${spec.id} 卡文本须写明逐条审批`);
@@ -662,7 +665,9 @@ test("治理卡参数纪律（2026-10-22 客户严格口径，N5/T14）：五卡
   // 卡文本必须与错误回执同口径——应用拒绝、不生成客户卡，不再把缺项当旧卡交给客户手动审批。
   const NEW_DISCIPLINE =
     "缺任何一项＝无效治理调用：本次不发卡、不生成客户卡、未向客户呈现，应用直接退回并提示补齐重发。必须补齐两项重发。";
-  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+  // 批次 A：旧五名角色卡文本断言（product 为身份占位，不启用治理卡通道）。
+  for (const id of ["liaison", "rapporteur", "nominator", "convener", "verifier"] as const) {
+    const spec = governanceRoleOf(id)!;
     const t = spec.cardText;
     assert.ok(t.includes(NEW_DISCIPLINE), `${spec.id} 卡须逐字包含新参数纪律文案`);
     assert.equal(t.split(NEW_DISCIPLINE).length - 1, 1, `${spec.id} 新参数纪律文案须恰出现一次`);
@@ -1312,7 +1317,7 @@ test("批次 A 六角色身份层：注册表 entries/预授权/禁写/能力位
   ];
   const expectedEntries: Record<string, string[]> = {
     chief: ["docs/intents/"],
-    product: ["docs/product/"],
+    product: ["docs/intents/"],
     rapporteur: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
     nominator: ["角色卡/", "docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
     convener: ["docs/flows/", "docs/workflow.md", "docs/scheduling/", "docs/governance/convener/"],
@@ -1320,47 +1325,28 @@ test("批次 A 六角色身份层：注册表 entries/预授权/禁写/能力位
   };
   const expectedPreauthorized: Record<string, string[]> = {
     chief: ["docs/intents/"],
-    product: ["docs/product/"],
+    product: ["docs/intents/"],
     rapporteur: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
     nominator: ["docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
     convener: ["docs/flows/", "docs/scheduling/", "docs/governance/convener/"],
     verifier: ["docs/acceptance/", "docs/verification/", "docs/governance/verifier/"],
   };
+  const oldCoordinatorForbidden = [
+    ...appOnly,
+    "角色卡/",
+    "docs/proposals/",
+    "docs/contracts/",
+    "docs/nominations/",
+    "docs/skills/",
+    "docs/mcp/",
+    "docs/flows/",
+    "docs/governance/",
+    "docs/workflow.md",
+  ];
   const expectedForbidden: Record<string, string[]> = {
-    chief: [
-      ...appOnly,
-      "角色卡/",
-      "docs/proposals/",
-      "docs/contracts/",
-      "docs/nominations/",
-      "docs/skills/",
-      "docs/mcp/",
-      "docs/flows/",
-      "docs/product/",
-      "docs/scheduling/",
-      "docs/acceptance/",
-      "docs/verification/",
-      "docs/quality/",
-      "docs/governance/",
-      "docs/workflow.md",
-    ],
-    product: [
-      ...appOnly,
-      "角色卡/",
-      "docs/intents/",
-      "docs/proposals/",
-      "docs/contracts/",
-      "docs/nominations/",
-      "docs/skills/",
-      "docs/mcp/",
-      "docs/flows/",
-      "docs/scheduling/",
-      "docs/acceptance/",
-      "docs/verification/",
-      "docs/quality/",
-      "docs/governance/",
-      "docs/workflow.md",
-    ],
+    // A 批：chief/product 禁写清单与基线 liaison 逐字一致（不提前扩张目标写区）。
+    chief: oldCoordinatorForbidden,
+    product: oldCoordinatorForbidden,
     rapporteur: [...appOnly, ...builtInDirs, "docs/nominations/", "docs/flows/"],
     nominator: [...appOnly, ...builtInDirs, "docs/proposals/", "docs/flows/", "docs/scheduling/"],
     convener: [...appOnly, "角色卡/", "docs/proposals/", "docs/nominations/", "docs/skills/", "docs/mcp/"],
@@ -1392,7 +1378,8 @@ test("批次 A 六角色身份层：注册表 entries/预授权/禁写/能力位
   });
   const expectedCapabilities: Record<string, Record<string, boolean | string>> = {
     chief: caps({ handOffIntent: true, dispatchTask: true }),
-    product: caps(),
+    // A 批 product 不启用客户通道（C 生效）与任何特殊能力。
+    product: { ...caps(), customerInput: false },
     rapporteur: caps({ requestClarification: true }),
     nominator: caps({ installSkill: true, installMcp: true }),
     convener: caps({
@@ -1848,11 +1835,13 @@ test("2026-10-25 验收分诊：Proof 卡要求验收报告含恰好一个 accep
 
 // —————————————————————— 11) 2026-10-25 写入预授权：边界内直接写、确认仅限治理敏感 ——————————————————————
 
-test("2026-10-25 写入预授权：五卡写明 Section 1 边界内直接写、不逐次 request_confirmation；确认只保留给治理敏感写入与客户决定", () => {
+test("2026-10-25 写入预授权：旧五卡写明 Section 1 边界内直接写、不逐次 request_confirmation；确认只保留给治理敏感写入与客户决定", () => {
   // 客户新规则原文：「写自己角色权限内的路径，直接放行。」——边界内写入预授权、直接写；
   // 写权上界仍由 WriteGate 判定（边界外照旧拒绝）；request_confirmation 只保留给治理敏感写入
   // （角色卡/边界、共享目录或他人写集、流程 YAML/账本、发布/变更包等按既有规则）与客户决定。
-  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+  // 批次 A：旧五名角色卡文本断言（product 为身份占位，不启用写区）。
+  for (const id of ["liaison", "rapporteur", "nominator", "convener", "verifier"] as const) {
+    const spec = governanceRoleOf(id)!;
     const t = spec.cardText;
     // 单一来源常量逐字复用（恰出现一次），不各卡手写分叉。
     assert.ok(t.includes(BOUNDARY_WRITE_PREAUTHORIZATION_PRINCIPLE), `${spec.id} 卡须逐字包含写入预授权总则`);
@@ -1962,7 +1951,7 @@ test("2026-10-25 写入预授权：五卡写明 Section 1 边界内直接写、�
   // 注册表数据面（预授权目录 / 能力位）冻结为现行旧态：本批只改身份层。
   const expectedPreauthorized: Record<string, string[]> = {
     chief: ["docs/intents/"],
-    product: ["docs/product/"],
+    product: ["docs/intents/"],
     rapporteur: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
     nominator: ["docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
     convener: ["docs/flows/", "docs/scheduling/", "docs/governance/convener/"],

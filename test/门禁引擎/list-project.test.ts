@@ -147,6 +147,7 @@ test("T14/六角色：导入空目录（新空项目）→ 不抛错、trio 六�
     assert.equal(builtIn.boundaryPath, "");
     assert.ok(builtIn.cardText.length > 0);
     assert.equal(builtIn.boundary.acceptance.accepted, false); // 展示用，fail-closed 由 resolveBoundarySection 把关
+    // amendment-2 §2.3：product 承接旧 liaison 现行写区 docs/intents/；目标 docs/product/ 在 D 生效。
     assert.ok(builtIn.boundary.entries.length > 0);
   }
   assert.equal(listing.roles.find((r) => r.roleId === "chief")?.governanceFunction, "chief");

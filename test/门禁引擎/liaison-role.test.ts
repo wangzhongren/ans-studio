@@ -3,7 +3,7 @@
 // `liaison-role` 退役为 **chief（幕僚）/ product（产品）** 六角色身份层覆盖：
 //   · listProject 六角色（chief→product→rapporteur→nominator→convener→verifier）、primaryRoleId=chief；
 //   · chief 承接旧主入口的写区（docs/intents/）与能力（沟通/意图交接/旧 coordinate 派发），
-//     product 为幕僚 worker（docs/product/、无派发/看护/安装能力）；
+//     product 在 A 批承接旧 liaison 现行写区（docs/intents/）；目标 docs/product/ 在 D 生效；
 //   · 保留 id：角色卡/chief|product|liaison 项目目录被跳过并警告、roles 映射不得遮蔽内置角色；
 //   · 旧 liaison 仅保留**只读别名**（可解析、不列表；D 批删除）；
 //   · single 模型逐字不变（只有 su），三权角色在 single 下结构性不可用。
@@ -209,17 +209,19 @@ test("chief 越界拒绝文案（AC3）：指回正确归属——提案找策�
   if (!r.allowed) assert.doesNotMatch(r.reason, /运营 \/ Steward/);
 });
 
-test("product 写权：docs/product/** 放行；其余路径（含角色卡/.ans/提案/验收）一律拒", async () => {
+test("product 写权（A 批承接旧 liaison 现行值）：docs/intents/** 放行；docs/product/** 目标写区 D 生效、本批拒", async () => {
   const b = await resolveBoundarySection("product", acceptedProject());
   assert.equal(b.boundarySource, "<built-in:trio/product>");
-  assert.deepEqual(b.entries.map((e) => e.path), ["docs/product/"]);
-  for (const p of ["docs/product/nav.md", "docs/product/reviews/v1.md"]) {
-    assert.equal(allows(b, p), true, `product 应可写 ${p}`);
+  assert.deepEqual(b.entries.map((e) => e.path), ["docs/intents/"], "A 批承接旧 liaison 现行 Section 1");
+  assert.deepEqual(governanceRoleOf("product")!.preauthorizedDirs, ["docs/intents/"], "A 批预授权=旧 liaison 现行值");
+  for (const p of ["docs/intents/i.md", "docs/intents/2026-10-28/sub/intent.md"]) {
+    assert.equal(allows(b, p), true, `A 批 product 应可写旧 liaison 现行写区：${p}`);
   }
   for (const p of [
+    "docs/product/nav.md",
+    "docs/product/reviews/v1.md",
     "角色卡/实现者/role-card.md",
     ".ans/project.json",
-    "docs/intents/i.md",
     "docs/proposals/p-v1.md",
     "docs/contracts/c-v1.md",
     "docs/scheduling/f-team-v1.md",
@@ -230,7 +232,7 @@ test("product 写权：docs/product/** 放行；其余路径（含角色卡/.ans
     "docs/mcp/m.md",
     "src/x.ts",
   ]) {
-    assert.equal(allows(b, p), false, `product 越界写入应拒：${p}`);
+    assert.equal(allows(b, p), false, `A 批 product 不得写入（目标写区 docs/product/ 在 D 生效）：${p}`);
   }
 });
 
@@ -257,11 +259,12 @@ test("chief 能力：customerInput/handOffIntent/dispatchTask（旧主入口值�
   assert.equal(spec!.preauthorizedDirs.some((d) => d.startsWith("docs/governance/")), false);
 });
 
-test("product 能力：标准 worker——只保留客户通道；无派发/看护/恢复/安装；shell=审批档", () => {
+test("product 能力（A 批身份占位）：不启用客户通道/派发/看护/恢复/安装；shell=审批档", () => {
   const spec = governanceRoleOf("product");
   assert.ok(spec);
   assert.deepEqual(spec!.capabilities, {
-    customerInput: true,
+    // A 批只注册身份：申请线 C、星形汇报 B、写区 D 生效；本批不新增任何特殊能力。
+    customerInput: false,
     handOffIntent: false,
     requestClarification: false,
     dispatchTask: false,
@@ -272,7 +275,8 @@ test("product 能力：标准 worker——只保留客户通道；无派发/看�
     installMcp: false,
     shell: "operator-approve",
   });
-  assert.deepEqual(spec!.preauthorizedDirs, ["docs/product/"]);
+  assert.deepEqual(spec!.preauthorizedDirs, ["docs/intents/"], "A 批承接旧 liaison 现行值；docs/product/ 在 D 生效");
+  assert.deepEqual(spec!.entries.map((e) => e.path), ["docs/intents/"], "A 批 Section 1=旧 liaison 现行值");
 });
 
 // —————————————————————— 5) 卡文本 ——————————————————————
@@ -292,16 +296,20 @@ test("chief 卡文本：工作流管理/客户沟通/通知接收，不转发/�
   assert.match(t, /docs\/intents\//);
 });
 
-test("product 卡文本：幕僚 worker——产品评审/建议、结果只向幕僚、可直接提交申请", () => {
+test("product 卡文本：A 批只注册身份并明确目标能力 B/C/D 生效；不得宣称已启用 docs/product 或申请线", () => {
   const t = governanceRoleOf("product")!.cardText;
-  assert.match(t, /产品视角评审与建议/);
-  assert.match(t, /幕僚的 worker/);
+  assert.match(t, /批次 A 身份层说明/);
+  assert.match(t, /只注册\*\*角色身份\*\*/);
+  assert.match(t, /不启用目标写区与新增能力/);
+  assert.match(t, /Section 1 \/ 预授权本批沿用旧 liaison 的现行值 `docs\/intents\/`/);
+  assert.match(t, /目标写区 `docs\/product\/` 在 \*\*D 批\*\*生效/);
+  assert.match(t, /直接申请线在 \*\*C 批\*\*生效/);
+  assert.match(t, /星形任务\/短报在 \*\*B 批\*\*生效/);
   assert.match(t, /不拥有最终批准权/);
-  assert.match(t, /工作结果只向幕僚/);
-  assert.match(t, /`submit_report`/);
-  assert.match(t, /直接提交申请/);
-  assert.match(t, /docs\/product\//);
+  assert.match(t, /不审批、不代选、不代决/);
   assert.match(t, /不得创建额外的治理角色/);
+  // 反向守卫：不得把目标写区写成 A 批已生效的写盘指令。
+  assert.doesNotMatch(t, /产物写入 `docs\/product\/`/);
 });
 
 // —————————————————————— 6) 保留 id 守卫 ——————————————————————
