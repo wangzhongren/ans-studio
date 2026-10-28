@@ -1,5 +1,9 @@
 # 独立验收治理变更记录
 
+## 2026-10-29 — entry-role-minimal F 批交接（非验收结论）
+
+接收实施侧终态报告 `docs/acceptance/entry-role-minimal-final-report-v1.md`（组合候选 `e008187`，整树 `70412769…`；F 文档提交见报告）与证据索引（规范全量 2908/2878/12/18、双 typecheck/build 0、E2E `E2E_PASS=true`、phase3b 45 checks、phase5a 30/30、D-04 `rg` 0、主检出快照一致）。终态判定按 criteria §11–§12 另写 `entry-role-minimal-final-acceptance-report-v1.md`；本记录不代判、不代批。Doc: `docs/change/2026-10-28_change_entry-role-minimal-F.md`。
+
 ## 2026-10-21 建立 D3 最小独立验收角色（ANS Team Formation）
 
 依据用户“按 D3 轻量方案，用 ANS 技能安排各角色实施，改完测试一下”的实施授权及必要治理前置，建立独立固定角色。只授自身 feature-map、memo、functional-description 及 docs/design、docs/change、docs/fix；产品与测试源码、他人证据、治理和调度状态均不在执行写区。根 changelog 由 ANS Team Formation 维护。无软件导出/共享或装配接口，api-spec 不适用。

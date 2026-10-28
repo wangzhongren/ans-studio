@@ -1,5 +1,9 @@
 # 门禁引擎 变更记录
 
+## 2026-10-29 — entry-role-minimal F 批：清理旧 liaison 写归属来源（无行为变化）
+
+`src/common/门禁引擎/governance-roles.ts` 删除 `governanceWriteOwnerGuidance` 中旧 `liaison` boundarySource 来源与过时别名注释（−12 行）；六角色注册表/写区/能力/卡文本不变。验证：D 专项 5/5、`list-project` 全过、规范全量 2908/2878/12/18、typecheck 0。Doc: `docs/change/2026-10-28_change_entry-role-minimal-F.md`。
+
 ## 2026-10-27 — gate 复核 `flow-busy` 可重试：在途交付/轮次/回交稍后重试，不当失败/已派发/验收失败
 
 任务：客户要求——gate 复核「流程仍有在途工作」返回**可重试**的 `flow-busy`（不是 `unavailable`）并告知

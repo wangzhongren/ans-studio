@@ -1,5 +1,9 @@
 # 测试 变更记录
 
+## 2026-10-29 — entry-role-minimal F 批终态回归（T3）
+
+`test/测试/governance-e2e-auto/i-full-chain.test.ts` 以既有文件名收口：保留 D 最小系统全链，新增幕僚调度 review 任务→质检回交只回幕僚→无自动验收任务/无 flow/账本文件。规范全量（排除基线挂起 `write-sequencing`）：**2908 / 2878 / 12 / 18**（日志 `18a44152…`）；相对 E 2903/2873/12/18 = +5/+5/fail 0 增/skip 0 增；12 fail = 9 Windows symlink EPERM + T1×3；无新增确定性失败。合并差异视图见 `docs/scheduling/2026-10-28-entry-role-minimal-change-F.md` §4。Doc: `docs/change/2026-10-28_change_entry-role-minimal-F.md`。
+
 ## 2026-10-21（修复后构建 34484f3 真机复核）— 需求卡/角色名/品牌图标/派发去重全过；genesis 加载自动恢复 verifier 待办
 
 **触发**：PR 分支修复 `34484f3`（dedupe replayed dispatch rows、黑底绿 ANS 图标、watchdog 默认不再 15min 自动中止），用修复后构建做真机复核。
