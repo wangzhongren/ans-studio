@@ -1,0 +1,157 @@
+// test/测试/governance-e2e-auto/i-full-chain.test.ts
+// D 批（2026-10-28）：最小系统全链（既有文件名重写，Delta-6 不新增 e2e 目录/文件）。
+//
+// 覆盖 D 最小系统：
+//   · 六角色注册表（chief → product → rapporteur → nominator → convener → verifier）+ 项目角色枚举；
+//   · 幕僚星形派发 → 任务落 `.ans/state/tasks.jsonl` → 投递 worker；
+//   · 不产生 flow/gate/ledger 文件（治理机器已撤除）；
+//   · 运营不再拥有 dispatch（D-03）。
+//
+// 使用真实 SessionManager/routeDispatch + 假 openRoleSession（不启动模型、不触网）。
+
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { test } from "node:test";
+
+import { SessionManager } from "../../../app/desktop/session.ts";
+import { buildProjectConfig } from "../../../app/desktop/project.ts";
+import { readTaskState } from "../../../src/common/编排/task-state.ts";
+import type { ProjectListing } from "../../../src/service/role/resolve-role.ts";
+import type { OrchestrationEvent } from "../../../src/common/编排/handback.ts";
+import type { RoleSessionHandle, RoleSessionSendOptions } from "../../../src/pipeline/orchestration/run-role.ts";
+import type { DispatchTaskFn, DispatchReceipt } from "../../../src/model/runtime.ts";
+
+const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
+async function waitUntil(check: () => boolean, timeoutMs = 2000): Promise<void> {
+  const start = Date.now();
+  while (!check()) {
+    if (Date.now() - start > timeoutMs) throw new Error("等待超时");
+    await tick(10);
+  }
+}
+
+function listing(root: string): ProjectListing {
+  const builtIn = (roleId: string, governanceFunction: ProjectListing["roles"][number]["governanceFunction"]) => ({
+    roleId,
+    cardPath: "",
+    boundaryPath: "",
+    cardText: roleId,
+    boundary: { entries: [], boundarySource: `<built-in:${roleId}>`, acceptance: { accepted: false, source: "" } },
+    builtIn: true,
+    governanceFunction,
+  });
+  const worker = (roleId: string) => ({
+    roleId,
+    cardPath: `角色卡/${roleId}/role-card.md`,
+    boundaryPath: `角色卡/${roleId}/boundary.yaml`,
+    cardText: roleId,
+    boundary: {
+      entries: [{ root: "project" as const, path: `src/${roleId}.ts`, kind: "file" as const, purpose: "p" }],
+      boundarySource: `角色卡/${roleId}/boundary.yaml`,
+      acceptance: { accepted: false, source: "" },
+    },
+  });
+  return {
+    projectRoot: root,
+    roles: [
+      builtIn("chief", "chief"),
+      builtIn("product", "product"),
+      builtIn("rapporteur", "proposal"),
+      builtIn("nominator", "nomination"),
+      builtIn("convener", "schedule"),
+      builtIn("verifier", "verification"),
+      worker("worker"),
+    ],
+    warnings: [],
+    hasRoles: true,
+    primaryRoleId: "chief",
+    governanceModel: "trio",
+  };
+}
+
+function harness(root: string) {
+  const sent: Record<string, string[]> = {};
+  const sendOptions: Record<string, RoleSessionSendOptions[]> = {};
+  const caps: Record<string, DispatchTaskFn | undefined> = {};
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      caps[input.roleId] = (input as { dispatchTask?: DispatchTaskFn }).dispatchTask;
+      const handle: RoleSessionHandle = {
+        async send(text, options) {
+          (sent[input.roleId] ??= []).push(text);
+          (sendOptions[input.roleId] ??= []).push(options ?? {});
+        },
+        events() {
+          let i = 0;
+          return {
+            [Symbol.asyncIterator]() {
+              return {
+                async next(): Promise<IteratorResult<OrchestrationEvent>> {
+                  for (let tries = 0; tries < 100; tries += 1) {
+                    const arr: OrchestrationEvent[] = [];
+                    if (i < arr.length) return { value: arr[i++], done: false };
+                    await tick(5);
+                  }
+                  return { value: undefined as unknown as OrchestrationEvent, done: true };
+                },
+              };
+            },
+          };
+        },
+        async dispose() {},
+      };
+      return handle;
+    },
+    createPiAdapterFactory: () => { throw new Error("no pi"); },
+    createDemoAdapter: () => { throw new Error("no demo"); },
+    buildProjectConfig,
+    getListing: (r) => (r === root ? listing(root) : undefined),
+    emitEvent: () => {},
+  });
+  return { mgr, sent, sendOptions, caps };
+}
+
+test("D 最小系统全链：六角色枚举 + 幕僚派发落 tasks.jsonl + 无 flow/gate/ledger", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-d-full-chain-"));
+  const h = harness(root);
+  try {
+    const roles = listing(root).roles.map((role) => role.roleId);
+    assert.deepEqual(roles, ["chief", "product", "rapporteur", "nominator", "convener", "verifier", "worker"]);
+    await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
+    await tick(30);
+    const dispatch = h.caps.chief;
+    assert.equal(typeof dispatch, "function", "幕僚有 dispatch_task");
+    const receipt = (await dispatch!({
+      roleId: "worker",
+      task: "实现 D 最小系统切片",
+      sideEffect: "code",
+      expectedOutput: "src/worker.ts",
+      requestedEvidence: ["src/worker.ts"],
+    })) as DispatchReceipt;
+    assert.equal(receipt.ok, true, receipt.message ?? "");
+    await waitUntil(() => (h.sent.worker?.length ?? 0) > 0);
+    assert.match(h.sent.worker[0] ?? "", /任务编号：#t-/);
+    const state = await readTaskState(root);
+    assert.equal(state.errors.length, 0);
+    const task = [...state.records.values()][0];
+    assert.equal(task.created?.from, "chief");
+    assert.equal(task.created?.to, "worker");
+    assert.equal(task.delivered?.to, "worker");
+    assert.equal(h.sendOptions.worker[0].handback?.taskId, task.taskId);
+
+    // D 撤除：不产生 flow/gate/ledger 文件；任务状态是唯一机器状态。
+    assert.equal(await fs.stat(path.join(root, "docs", "flows")).then(() => true, () => false), false);
+    assert.equal(await fs.stat(path.join(root, ".ans", "governance", "ledger.jsonl")).then(() => true, () => false), false);
+    assert.equal(await fs.stat(path.join(root, ".ans", "state", "tasks.jsonl")).then(() => true, () => false), true);
+
+    // 运营不再拥有 dispatch（D-03）。
+    await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+    await tick(30);
+    assert.equal(h.caps.convener, undefined, "convener 不再注入 dispatch_task");
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});

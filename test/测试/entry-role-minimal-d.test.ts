@@ -138,3 +138,17 @@ test("D-04 撤除残留：src/app 生产源码零命中（排除 dist/node_modul
   }
   assert.deepEqual(hits, [], "D-04 撤除残留");
 });
+
+const QUALITY_BASELINE_RESIDUE = /ENGINEERING_QUALITY_BASELINE|ENGINEERING_QUALITY_STAGE_REQUIREMENTS|工程质量基线/;
+
+test("D-03/D-10：强制工程质量/证据基线常量与文本不得存在", () => {
+  const hits: string[] = [];
+  for (const dir of [join(ROOT, "src"), join(ROOT, "app")]) {
+    for (const file of filesUnder(dir)) {
+      const text = readFileSync(file, "utf8");
+      const match = QUALITY_BASELINE_RESIDUE.exec(text);
+      if (match !== null) hits.push(`${relative(ROOT, file)}: ${match[0]}`);
+    }
+  }
+  assert.deepEqual(hits, [], "强制质量/证据基线残留");
+});
