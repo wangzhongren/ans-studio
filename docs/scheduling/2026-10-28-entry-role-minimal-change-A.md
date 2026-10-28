@@ -81,6 +81,8 @@
 | 结构检查 | 注册表/列表快照、`rg`、`git diff --name-only`、`package.json` 零改动 | 通过（§二/§六） |
 
 > 说明：首提交 `f4aa073` 的 Electron 证据曾以 worktree 作为导入项目（验收 F6 指出）；本返工版按 P3 改为**临时夹具项目**重跑，夹具在 `%TEMP%`、未指向仓库/目标项目/演示，报告与 17 截图见 §六。两轮均 `E2E_PASS=true`；以夹具轮为准。
+>
+> **C3 后复跑（2026-10-28）**：第三轮窄修候选 `ae702eb` 按同一临时夹具口径额外复跑 2 次（`%TEMP%\ans-e2e-a3-out-keEE`、`%TEMP%\ans-e2e-a3b-out-f2YY`）——均 exit 0、`E2E_PASS=true`、`E2E_DONE=1`、`E2E_FAILURES=` 空、`BOOTSTRAP_PRIMARY=chief`；`00-titlebar.png` 截图捕获偶发 `UnknownVizError`（16/17 PNG，不影响 E2E_PASS）。C3 仅改卡文本/测试/属主记录/本文件，未改路由/UI 行为；17/17 截图证据仍以 §六 的 C2 临时夹具轮为准（报告 `973c7d70…`）。
 
 ### 3.2 基线与本批对照（测试差异）
 
@@ -152,12 +154,12 @@
 
 ## 六、证据、环境与整树标识
 
-- **提交 SHA**：首提交 `f4aa073a7032d35afc2e964dc22b4d171f1d26dc`；返工提交（代码/测试/属主记录/change-package 初版）`83f2d2e30fd8df0c51a50f809f61fc9b28a05097`；证据补录提交（C2）`b6ff88734c4b5f743c639582d22daaf57509a691`；**第三轮窄修提交（C3，本文件最终版；SHA 见 `git log --format=%H -1`）**。
+- **提交 SHA**：首提交 `f4aa073a7032d35afc2e964dc22b4d171f1d26dc`；返工提交（代码/测试/属主记录/change-package 初版）`83f2d2e30fd8df0c51a50f809f61fc9b28a05097`；证据补录提交（C2）`b6ff88734c4b5f743c639582d22daaf57509a691`；第三轮窄修提交（C3）`ae702eb67ca8cb408d6541cb40893375a6b4dc14`；**C4（本文件最终版，仅补 C3 后 E2E 复跑说明；SHA 见 `git log --format=%H -1`）**。
 - **整树标识（可复算口径）**：
   - 首提交批次差异：`git diff --binary 8fc673e f4aa073a | sha256sum` = `35167593ace525d1cc6ef139684a4344766a0fe91cc6a58f9775025fd118dbd4`（含变更包）。
   - **rework 候选（C1）**：`git diff --binary 8fc673e 83f2d2e30fd8df0c51a50f809f61fc9b28a05097 | sha256sum` = `fbcc6e8448576f48adc2bc0467641d98fc9db946c62810008c4cc62b05cd5311`（含 C1 版变更包与属主记录）。
   - **证据补录提交（C2 `b6ff8873`）**：只更新 change-package（文档）；`git diff --binary 8fc673e b6ff8873 | sha256sum` = `60133ba8a68d8c8059d220e032eddce66f51f21365f117a1bff1e8de0b608671`（复审已记录）。
-  - **第三轮窄修提交（C3）**：修正 R1 卡文本、R2 属主记录、R3 文字、R4 证据口径/R5 附录口径；只改卡文本/测试/记录/本文件；其 `git diff --binary 8fc673e <C3>` 由最终报告/复审按 `git log` 取 C3 后复算（自引用限制）。
+  - **第三轮窄修提交（C3 `ae702eb`）**：修正 R1 卡文本、R2 属主记录、R3 文字、R4 证据口径/R5 附录口径；只改卡文本/测试/记录/本文件；`git diff --binary 8fc673e ae702eb67ca8cb408d6541cb40893375a6b4dc14 | sha256sum` = `ff6051e24951782b4e7f23ac7443f314cd05918ed276a8e1e7d7dfb47cda5a5d`。\n  - **C4（本文件最终版）**：仅补 C3 后 E2E 复跑说明；其 `git diff --binary 8fc673e <C4>` 由最终报告/复审按 `git log` 取 C4 后复算（自引用限制）。
   - 口径说明：首版 change-package 曾记录 `46af3a06…`，那是**提交前 `git diff --binary`（tracked-only，未含未跟踪的 change-package 文件）**；验收按提交后整批差异复算为 `35167593…`。本版统一以「提交后 `git diff --binary 8fc673e <commit>`」为准并记录。
 - **属主 change 记录（P7）**：`角色卡/{门禁引擎,编排,桌面窗口,桌面UI,项目管理,测试}/docs/change/2026-10-28_change_entry-role-minimal-A.md`。
 - **全量/静态日志**：`/tmp/final3-tests.log`（sha256 见 §3.2）、`/tmp/final3-typecheck.log`、`/tmp/final3-typecheck-renderer.log`、`/tmp/final3-build-renderer.log`（sha256 见 §3.1/§3.2 与复审记录）。
