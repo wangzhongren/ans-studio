@@ -1,8 +1,8 @@
 # entry-role-minimal 批次 E 变更记录（编排）
 
 - 日期：2026-10-28｜任务：`2026-10-28-entry-role-minimal`｜批次：E（UI 对话框）｜风险档位：**T3**
-- 提交：E 初版代码/测试 `e7ac5b2`；**E rework 代码/测试 `d30f648`**；最终文档提交见最终报告。
-- 交接材料：`docs/scheduling/2026-10-28-entry-role-minimal-change-E.md`（124 行 / sha256 `4db385912a0cf24989325ee8d142e8241f3542972ce28a39e6d26e7a100c3d84`）；E v1 验收报告 `8d8bea68…`（rework 请求）。
+- 提交：E 初版代码/测试 `e7ac5b2`；**E rework 代码/测试 `d30f648`**；E2E hardChecks 修正 `5043ceb`；最终文档提交见最终报告。
+- 交接材料：`docs/scheduling/2026-10-28-entry-role-minimal-change-E.md`（126 行 / sha256 `e3cef3bbb7fb926058fca53f3c8049255c4b5ba921c3c30cd112d37fdf5098fd`）；E v1 验收报告 `8d8bea68…`（rework 请求）。
 
 ## 范围
 

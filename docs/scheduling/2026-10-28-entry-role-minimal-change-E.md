@@ -36,7 +36,7 @@
 - **E 专项**：`decision-dialog` 5/5、`dialog-queue` 3/3、`dialog-a11y` 5/5、`dialog-history` 2/2、`role-log-view` 3/3、`decision-card-view` 2/2、`i18n-b1-b2` 2/2、`ans-wiring` 7/7、`i18n` 6/6；既有 `operator-view` 8、`history-dedupe` 4、`role-status-view` 9、`source-guard` 10、`i18n-guard` 6 全过。
 - **运行时 Electron 行为（phase5a rework，既有文件名）**：**30/30 checks、failures=0**，新增真实点击覆盖：choice 未选择拒绝→cancelled、Esc=稍后不提交、焦点陷阱 Tab、ARIA modal/labelledby/describedby、破坏性与二次确认、双击只提交一次、输入中 decision 不打断/高风险打断/空闲推进、已有对话框 decision 不替换、过期申请进入历史；日志 sha256 `efdae1a6…`，report.json `0c77c913…`。
 - **phase3b smoke**：45 checks 全过、无 console/CSP；日志 sha256 `e7a2f664…`，report.json `a8bb2c9a…`。
-- **Electron E2E（最终）**：`E2E_PASS=true`、`E2E_DONE=1`、`E2E_FAILURES=` 空；17 PNG + `00-titlebar.png` 环境性 `UnknownVizError`；`OP_CANCEL_DECLINED=true`、`OPX_EXPIRED_HISTORY=true`、E_DIALOG/E_CHAT/E_LATER/E_TODO 全 true；report sha256 `3ee429c0…`，SHA256SUMS `247bf3da…`。
+- **Electron E2E（最终）**：`E2E_PASS=true`、`E2E_DONE=1`、`E2E_FAILURES=` 空；17 PNG + `00-titlebar.png` 环境性 `UnknownVizError`；`OP_CANCEL_DECLINED=true`、`OPX_EXPIRED_HISTORY=true`、E_DIALOG/E_CHAT/E_LATER/E_TODO 全 true；report sha256 `307e749c…`，SHA256SUMS `4e123528…`（hardChecks 补齐后最终复跑）。
 - **静态**：`typecheck`/`typecheck:renderer`/`build:renderer` exit 0；日志 sha256 `aee16865…`/`914780f6…`/`7ac9084e…`。
 - 环境：Windows 11 Pro 10.0.26300；Node v24.22.1；Electron 44.7.0；无 `.env`。
 
@@ -48,7 +48,7 @@
 | F-E2 输入中/打断语义 | 仅高风险可在输入中打断；已有卡只允许更高优先级高风险替换；focusout/stop-input idle（1.2s）推进 | `shouldOpenDecision` 单测 5/5；phase5a 输入中 decision 不打断/高风险打断/空闲推进/decision 不替换全 true |
 | F-E3 运行时无障碍 | phase5a 实机覆盖 Esc/焦点陷阱/ARIA/二次确认/双击/取消；源码正则仅保留辅助 | phase5a 30/30 |
 | F-E4 过期历史 | `chat-store.expireOperator` 调用决策中心 `expire(...,payload)`；历史显示已失效 | phase5a 过期历史 true；E2E `OPX_EXPIRED_HISTORY=true` |
-| F-E5 哈希/owner | §8 补 43 文件逐文件 blob/sha256；owner 记录补代码/change-E 哈希；最终文档提交见报告 | §8、9 owner |
+| F-E5 哈希/owner | §8 补 **44 文件（23 A + 21 M）**逐文件 blob/sha256；owner 记录补代码/change-E 哈希；最终文档提交见报告 | §8、9 owner |
 | F-E6 E2E 假绿 | 删除旧聊天卡 anchor/chip 段；OPX 按模态语义重写；E-03/04/05/06 关键项纳入 hardChecks；仍 false 项见 §6 | E2E `OPX_DUP_SINGLE_CARD/EXPIRED_HISTORY/OP_CANCEL=true`；`E2E_PASS` 由 hardChecks+repairCheck 共同决定 |
 | E-02 偏差 | `operator-view/history-dedupe/role-status-view` 本批保留复核（行为不变）；F-04 完整差异表解释 | §7 |
 
@@ -57,7 +57,7 @@
 以下为报告中的旧断言/旧夹具/旧 UI 快照，均不属于 E 对话框/待办/任务日志行为；E 关键项已全部 true：
 
 - 旧左侧/空态/CTA：`HAS_OTHER_GROUP`、`CHAT_CTA_PRESENT`、`SESSION_NOT_AUTO_OPENED`、`BOOTSTRAP_HAS_ROLES`、`REFRESH_OTHER_GROUP_SHOWN`。
-- 旧聊天/报告/工具行夹具：`OLD_GENERAL_CLAIM_PRESENT`、`DENIED_REASON_VISIBLE`、`DISPATCH_ROW_NO_WITHDRAW`、`HANDBACK_CARD_PRESENT`、`HANDBACK_STATUS_OK`、`MD_STRONG_RENDERED`、`MD_TAG_TEXT_ESCAPED`、`LINK_OPEN_EXTERNAL_CALLED`、`SU_DELIVERY_CARD_PRESENT`、`TOOLROW_HAS_PATH`、`INJECTED_STYLE_PRESENT`、`REPORT_DELIVERY_DETAILS_COLLAPSED`、`REPORT_DELIVERY_INLINE_BODY_NEW`、`INJECTED_CHIP_DELIVERY_LABEL`、`INJECTED_NOT_USER_BUBBLE`、`STATUS_LAST_EVENT_RECORDED`。
+- 旧聊天/报告/工具行夹具：`OLD_GENERAL_CLAIM_PRESENT`、`DENIED_REASON_VISIBLE`、`DISPATCH_ROW_NO_WITHDRAW`、`HANDBACK_CARD_PRESENT`、`HANDBACK_STATUS_OK`、`MD_STRONG_RENDERED`、`MD_TAG_TEXT_ESCAPED`、`LINK_OPEN_EXTERNAL_CALLED`、`INJECTED_STYLE_PRESENT`、`REPORT_DELIVERY_DETAILS_COLLAPSED`、`REPORT_DELIVERY_INLINE_BODY_NEW`、`INJECTED_CHIP_DELIVERY_LABEL`、`INJECTED_NOT_USER_BUBBLE`、`STATUS_LAST_EVENT_RECORDED`。
 - 旧侧栏/队列/滚动/设置快照：`BADGE_ON_WORK_WHILE_COLLAPSED`、`BADGES_CLEAR_ON_EMPTY`、`NO_SELECT_ELEMENTS`、`COMPOSER_ROWS_ARE_ATTACH_CAPSULE_NOTE`、`ROLE_STATE_BADGE_WORKING_PENDING`、`ROLE_STATE_BADGE_HAS_ICON`、`ROLE_STATE_BADGE_HOVER_FULL`、`ROLE_STATE_QUEUE_ROW`、`SHELL_CONFIRM_ESC_NOT_ALLOWED`（phase3b 已真实覆盖 shell Esc=不放行）、`RIGHT_QUEUE_RUNNING_FIRST`、`RIGHT_QUEUE_SOURCES`、`S1_NOT_YANKED`、`S1_STAYED_AWAY_FROM_BOTTOM`、`VIEWPORT_TOP_SINGLE_HAS_VISIBLE_ROWS`、`PI_KEYS_ARE_FIVE`、`PI_FIELDS_MATCH_REGISTRY`、`DRAWER_CLOSED_AFTER_PI`、`SWITCH_CONFIRM_ON_BUSY`、`SWITCH_CONFIRM_RELOADED`、`SWITCH_IDLE_HINT`、`REPLAY_DEDUP_REBUILD`。
 - 说明：这些旧断言随 D/E UI 结构或夹具变化失效，F-04 终态回归统一重写/删除；E2E 的 E 关键检查已纳入 hardChecks，不再只靠 repairCheck。
 
@@ -67,7 +67,7 @@
 - E-02 偏差：`operator-view`/`history-dedupe`/`role-status-view` 计划写“重写”，实际本批行为未变，保留复核；F-04 完整差异表解释断言数与未改原因。
 - 全量测试文件仍 335（334 执行），E 批无删除/新增 skip。
 
-## 8. E-10 逐文件哈希（候选 `d436c07`，43 文件 = 23 A + 20 M）
+## 8. E-10 逐文件哈希（最终候选 `692af439`，44 文件 = 23 A + 21 M）
 
 | 文件 | 状态 | `git hash-object` | `sha256sum` |
 | --- | --- | --- | --- |
@@ -78,9 +78,10 @@
 | `app/renderer/src/chat/ChatRow.tsx` | M | `0950a992ba7cb0106dd74b706d015ccdb500b74e` | `476fa4bce011d18e2807aa3408405bf45e1f2f0204e6ab95bb904f3b4836c2ba` |
 | `app/renderer/src/chat/ChatStream.tsx` | M | `279221908c3bf3c2498c17e7ce26e5dcd478c8fa` | `20a9443bd5e6b3e4402d4a905001ce4f38e98774b1f3cd90a33dc5fddc8c8be9` |
 | `app/renderer/src/chat/DecisionCenterPanel.tsx` | A | `b3ddb21411adec64de06444fa89dc373cd4eac6a` | `c6066d127b9bb014a12939cc4cdd25d8bb10b836e70c0f075e834e2be517796c` |
-| `app/renderer/src/chat/DecisionDialog.tsx` | A | `94c1d3b0bc6a5e5a61228880306001033894aa82` | `0a52609957e30e4fef644b9d242ba68f3b70987b614161d059569e3b80a6c6e1` |
+| `app/renderer/src/chat/DecisionDialog.tsx` | A | `2f5e12f914ca48dd5b6eb9ed744e8a0b8069cd54` | `fb5196bbaac32d76360cb0ab1466f4e86e04362509fb0332a49f54a1dceee5ab` |
 | `app/renderer/src/chat/TaskCenterPanel.tsx` | A | `0005c8cb67150ca9fba9fa262b26802584dc5d60` | `91619d7839d46919b4d2e5d79ac313dc6c878901c38f2bd7bc76d5be07b5745f` |
-| `app/renderer/src/chat/decision-dialog.ts` | A | `e515e87986e42702082fa4c7a209ecbb703da100` | `a5e653beb80498cb3a812ea5f8d4a8d1cc4455be860ff824ebf43d305ac64462` |
+| `app/renderer/src/chat/chat-store.ts` | M | `4ccb05ded6f8ed9ace31782894fac469b7f9faaa` | `87b5dbcba4d2bbc3dea356165b2faf7ae2565d995ad4a42c361dcbe8255ebeb8` |
+| `app/renderer/src/chat/decision-dialog.ts` | A | `f3352f142120a9da790a21cc433e712deb00620e` | `3dd969bff29f66817d691960de713be5c20a46582d99c7e52e8f497c0025c736` |
 | `app/renderer/src/chat/role-log-view.ts` | A | `20ab996e582e082fa04100554bad07c8f77ca84d` | `0fc2b2b1335241fa67d64d065075f27cfa524c9de4d54c8dcab96d35dfffa60b` |
 | `app/renderer/src/lib/platform.ts` | M | `f4ee9f35652150a411cfe5f753638755904e1cec` | `c47ee04416bacc18a83bed2180173fe7e5b4d56c0100e8899463c9aa530739a3` |
 | `app/renderer/src/shell/ChatHeader.tsx` | M | `19b0f3aea98465df9e9d45139c44eef9e996b92a` | `680cd61c1e923700b9ef73cc831fa7cf4f4b617a61bf566e833aab2584fd5ed4` |
@@ -88,37 +89,38 @@
 | `app/renderer/src/shell/Drawer.tsx` | M | `71bee5e56e501b5d808338398d665fdcb82886d2` | `7ea558188e14b76f9b0db4886056514f7bbd3c9e35fae86b916f9d8f2b721adc` |
 | `app/renderer/src/shell/WorkOverview.tsx` | M | `d2460aeb06642a7832649c4e325a2966b8722015` | `85405e816852abaa3bc4284ca77f92bd2c3e484c07255787a5ced99d1d3b41f0` |
 | `app/renderer/src/shell/phase4a.css` | M | `143336416d3670471b7eecc3f28bc29135d38fa1` | `b8d4959e1dd7174f1e7177777a19cb0c110fb1a2f5870797a034edddb50866bf` |
-| `app/renderer/src/stores/decision-center-store.ts` | A | `a53562f2922d8aac2f12084c2abc259126e760bc` | `104764fdfa85f68363f28ef64d11d21d9e1fffa006d2a77ef400578bfcaff51c` |
+| `app/renderer/src/stores/decision-center-store.ts` | A | `df0dca575c411787737344ad413b2f7460eeb9a4` | `58f5109823b6e02708b70f94ffaa8e0b01c22949bee395141bfe4da3ae22b5bd` |
 | `app/renderer/src/stores/drawer-store.ts` | M | `fd5478a4908a2475338a8dd2508a882d52ca3239` | `98bf5ee144eb1c5ac47533a330fba054e63bff2cc9e6cfd5b57316344e678026` |
-| `app/renderer/src/test-driver.ts` | M | `fb4c1c59bb5d523b1d541c9d6e684e5bec0fa190` | `909e0f33f81b10b18d99d106fd8a6ff296088d42147c49e37a2c8eac1e53261d` |
-| `docs/scheduling/2026-10-28-entry-role-minimal-change-E.md` | A | `8e1f695be9de5d7d1c146ee24bab1a19c29aa99e` | `553cc681007443ec996a9c0aba70316fb91394d4933ef6ae9f462a049696907b` |
+| `app/renderer/src/test-driver.ts` | M | `926a438f373824ff9dfd4cfaf9c93727960c05ed` | `b245cc982cdc29e6bcb4dad5ac9a3314ffc32c83b0cb3e8d21a9a121babdcfcd` |
+| `docs/scheduling/2026-10-28-entry-role-minimal-change-E.md` | A | `29b2727a42c4a97d3634e46c18fc4053de636e04` | `4db385912a0cf24989325ee8d142e8241f3542972ce28a39e6d26e7a100c3d84` |
 | `src/common/shared/i18n/messages/en-US.ts` | M | `2720ab5e6e74c456ba69bc7f8e9054a3a8797953` | `50762682dfff37a12e969cd93a59f4814b0046fb99f377b4ca1847a6c91ff471` |
 | `src/common/shared/i18n/messages/zh-CN.ts` | M | `a60e9f5c08f188ae3c62ccb8585a05a288684cb7` | `cef3a5fa72c1abc4c6610f491f15cb4d7215a9257672eb844ac0679fbf8112e7` |
 | `test/桌面UI/decision-card-view.test.ts` | A | `312849d619b8962ce523f4e72307741b70fd2af3` | `778578b0be9fc4e4a42b5209eacaafa9c22c213cc6ed5a1727d8352ba50a6d74` |
-| `test/桌面UI/decision-dialog.test.ts` | A | `f6da8204f1413910d1319f74dd6076062938943a` | `d5121ca0add422640aecbdcdb5a104c81d2886e0fed1722d8730b312d4baa8ce` |
-| `test/桌面UI/dialog-a11y.test.ts` | A | `be98237dfc93748f796dd9823c47c39a10975b68` | `6111a273a53b014f556d64ff6a090f340e6b649976df6754b3a86fbdaff4f95d` |
+| `test/桌面UI/decision-dialog.test.ts` | A | `b7e2391de88010f7f62c5b6c9310d0b2c2b81445` | `6a12cdf19d785c8045e83cbd3cf282ce04821a05c4599af4b74ca8fc2de02c25` |
+| `test/桌面UI/dialog-a11y.test.ts` | A | `078db9e53b23787dc0f9bd4eee3762aeeedd2b50` | `f52eedd8f932142f1a7815cd37bcd852b2f83bb80eff58da244addc30a6eea71` |
 | `test/桌面UI/dialog-history.test.ts` | A | `24bca6aa1390234d70c92bfda7a8c4cc359259df` | `5544ae14a059769015b9b969113feb01e448782a5c6e08ecfd3922d88d0b59df` |
 | `test/桌面UI/dialog-queue.test.ts` | A | `23e48e600a16f9028456b201e2288b59855a0e09` | `581b1304e79b4b9904e2766523e90ea1cc3c1d51c7c024f608f622174eb6d782` |
 | `test/桌面UI/i18n-b1-b2.test.ts` | A | `db30bc8ce14b7e083db21e4cc45b5caa8f5d6dfe` | `9ea86f2fcb87c701333d4772384ad2f9511d69584b568804044494cb50d6d0c7` |
-| `test/桌面UI/phase5a-electron-smoke.mjs` | M | `277c40431589419f9fec85597bedadc250ef0b39` | `f9a5f3a0dc93c72b79e746b5b5f60e123b8d58c72dd78799ed7f78859b6744cc` |
+| `test/桌面UI/phase5a-electron-smoke.mjs` | M | `1f6db3e0549fa9534e9cd7ad315e4b86bf633bdb` | `bd25e679877d44a563dba42e29f38ee88f8b55d8858d2607833c7d49f969fbea` |
 | `test/桌面UI/role-log-view.test.ts` | A | `d34fc6986e1ed07706bceb8ba486595b09195438` | `0c44b31b96560dc63818e01ac6b8fc766b0c52c03b1ac426d1eb53b6b02c067b` |
 | `test/桌面应用/ans-wiring.test.ts` | M | `0c295539d51a3e332b5a8a69cb4619febdcd129e` | `94bac889df7b5f7f49fe98913489d89d87634fc0193d647a7c174e6b75e2f554` |
-| `test/桌面应用/e2e/main.mjs` | M | `b1846e684ab6df5ff76a230be6435a664d05a182` | `79681e185fb449997f773a70cc9c84359d7d7ecf8bc6512c6bad4b74d1aeadc7` |
+| `test/桌面应用/e2e/main.mjs` | M | `a4c200b30516e21f4b7754088dffffda7a17e75c` | `2236d11d9f1cda88d104104e45dcaa128d0bd5f3b8b5e9e269fda2be59e565e8` |
 | `test/项目管理/shared/i18n.test.ts` | M | `b78021e2406a06b6b53af3eb80d93e86b9a45adf` | `975ba980e10232d73b5d06fd8cd45ff2a1b521752dbb69780c8c1eac963047cd` |
-| `角色卡/Claude适配器/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `997b5a195aa122764287ab8c6048cd8880ed1122` | `3b029f4a00aa9cea460559e64ff5ba1a49bcf7badf46287dfe08fc8c6720eabc` |
-| `角色卡/桌面UI/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `fbe220d88afaabec1c210261bc2044b3a22e7602` | `a2e9575f0988829ae7295d19f22d2e65866347c911c158708c4382c926992871` |
-| `角色卡/桌面窗口/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `32e1d6d8a52deadea959d100df6d20aa9d031492` | `9f1793f6710d993f8575b9ec50368a0ef965f11c72fc9a4f94c7e4534caf5638` |
-| `角色卡/测试/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `03efb4b139284b1cdb9df5dd778eebe7952c25a8` | `ca7d9ab04817618347e01a63fb283dba9bdc5156406ff46e96486a03d800346d` |
-| `角色卡/独立验收/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `8e3117d49fe31bddb10c83dad781582fa59776f3` | `950a192b902f17f5a73cdaff5602143119b58b818ed9721131177c0727b68dcb` |
-| `角色卡/编排/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `14de25fd387c084db6e2c57d231f73963cbd7591` | `6eb3d543e79ddf5dcc5acb48eeff3d3ba48e82aa18a83aa6cbda10817ffc3ac2` |
-| `角色卡/运行时核心/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `c47f8c89c6c7577cb8f8b1da49eadde92680bba5` | `80826204e1170e5bd564f390e72ecbbb77513e834164157e131db27ecf92a405` |
-| `角色卡/门禁引擎/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `1e6260685a2d05f426adb836685ef4bb4d21c9a7` | `16737061fb1b5c47baf6641fdb08fc9e9fcb86e98b7604b6d96bdf7133271303` |
-| `角色卡/项目管理/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `48053cf0a9498697c08f56c678266edd2149dc74` | `a7e944c1fef5b1bce579321ee2a56d10e76e752b0cb9c6cc2ba4309e966572a3` |
+| `角色卡/Claude适配器/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `07315a8cf1403e6ac826ae59e05a39654e44e57b` | `0463afe31f019518140ba72f1e4b3a05f17a0c4ec7a5e9e7a1e14c333def6a38` |
+| `角色卡/桌面UI/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `41ce52a97d8f62e5eabd6fca735a0f38c8ab028e` | `0712c114c33512fac570614fb0591fef2ddcd74db13b0b1a85185d7c4932d3cb` |
+| `角色卡/桌面窗口/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `d18cdb321f403121620c034a33bcbb82a8f6f30f` | `8df7accf8e26669d4eb4b9d5f00302d753590a24b5add92bb2dc9742a10e91cd` |
+| `角色卡/测试/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `0bb97b38375eb66e4776197a24bed87eff782a6d` | `cd781cf2dcf5f7eaebb8a1509bbc2b9f87204f1eba51039abb1e0baa6a5ae5e6` |
+| `角色卡/独立验收/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `5e8ce9e1a23dfd8dd1fd2ea89e7dab4d9bf3a258` | `65bb98eacc2d1aee8d8d7bf8d1ef544170df5f4efce5ee87197478f9d69f93a6` |
+| `角色卡/编排/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `e418d6a1308407937e5eaef880ada97b5c7e0f4b` | `b57d23ecbc6f5f3b167859b2f891b29ed16846a1e5b43fc3a8668e179fda0178` |
+| `角色卡/运行时核心/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `8451444fc39f03f1d957a90a2b4dc03709ca08e8` | `ef8ae2f9b1f0fd46f70055b40dfa3a050b6c0d1205169c74a3be133810d0aedc` |
+| `角色卡/门禁引擎/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `e79404b27356aa7230697a8cd5576152bc05c0a6` | `02b20cb8a77272d954b5591491985abf1392625aa4607adea573589786f55571` |
+| `角色卡/项目管理/docs/change/2026-10-28_change_entry-role-minimal-E.md` | A | `3fda866b53fcc1bd0e46a2682258441b5f82867d` | `8ff77b61f7b74ffdcfaa4459406548931099cff707990e6de4713c6755d7fa8a` |
 
-统计：候选 `d436c07` 的 23 A + 20 M = 43 文件。
+统计：候选 `692af439` 的 23 A + 21 M = 44 文件。
 
 ## 9. 文件统计 / 回滚
 
-- E rework 代码/测试 `d30f648`：9 files / +189 / −127；E 初版代码/测试 `e7ac5b2`：33 files / +2099 / −1722；E 文档累计（`d436c07` 10 files / +325 + 本文件后续）见最终报告。
-- E 范围（`e019ffe..最终 HEAD`）最终统计/整树哈希见最终报告；package/lock 零改动；无新依赖/目录（Delta-6）。
+- E 文档提交：`d436c07` 10 files / +325；`93dd42c` 10 files / +198 / −147；`692af43` 1 file / +2 / −1。
+- E rework 代码/测试 `d30f648`：9 files / +189 / −127；E 初版代码/测试 `e7ac5b2`：33 files / +2099 / −1722；`e019ffe..692af439` 合计 **44 files / +2626 / −1810**。
+- 本证据修订提交仅改 change-E/owner 记录；产品/测试文件与 `692af439` 相同。最终 HEAD 统计/整树哈希见最终报告；package/lock 零改动；无新依赖/目录（Delta-6）。
 - 回滚：`git revert` E rework 代码/文档 + E 初版代码/文档，恢复 `e019ffec` 并重跑 D 验证；待办/历史为 UI 状态可丢，不迁移。
