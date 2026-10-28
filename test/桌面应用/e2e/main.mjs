@@ -1202,16 +1202,16 @@ async function run() {
   log("E_DIALOG_SINGLE=" + hardCheck("E_DIALOG_SINGLE", await wc().executeJavaScript("document.querySelectorAll('#decision-dialog').length === 1")));
   log("E_DIALOG_PRIORITY_HIGH=" + hardCheck("E_DIALOG_PRIORITY_HIGH", await wc().executeJavaScript("(document.querySelector('#decision-dialog .dd-title')||{textContent:''}).textContent.includes('E 高风险审批')")));
   log("E_CHAT_NO_ACTIONABLE_CARD=" + hardCheck("E_CHAT_NO_ACTIONABLE_CARD", await wc().executeJavaScript("!document.querySelector('#chat .op-request') && !!document.querySelector('#chat .sys-operator-note')")));
-  log("E_DIALOG_MORE_COUNT=" + (await wc().executeJavaScript("(document.querySelector('#decision-dialog .dd-more')||{textContent:''}).textContent.includes('还有 1 张待处理')")));
+  log("E_DIALOG_MORE_COUNT=" + hardCheck("E_DIALOG_MORE_COUNT", await wc().executeJavaScript("(document.querySelector('#decision-dialog .dd-more')||{textContent:''}).textContent.includes('还有 1 张待处理')")));
   await wc().executeJavaScript("document.querySelector('#decision-dialog .dd-later').click()");
   await sleep(200);
   log("E_LATER_ADVANCES=" + hardCheck("E_LATER_ADVANCES", await wc().executeJavaScript("(document.querySelector('#decision-dialog .dd-title')||{textContent:''}).textContent.includes('E 低风险确认')")));
   await wc().executeJavaScript("document.querySelector('#decision-dialog .dd-later').click()");
   await sleep(200);
-  log("E_LATER_CLOSES_DIALOG_NO_DEFAULT=" + (await wc().executeJavaScript("!document.querySelector('#decision-dialog')")));
+  log("E_LATER_CLOSES_DIALOG_NO_DEFAULT=" + hardCheck("E_LATER_CLOSES_DIALOG_NO_DEFAULT", await wc().executeJavaScript("!document.querySelector('#decision-dialog')")));
   await wc().executeJavaScript("document.getElementById('tab-decisions').click()");
   await sleep(250);
-  log("E_TODO_PANEL_HAS_DEFERRED=" + (await wc().executeJavaScript("(() => { const p=document.getElementById('decision-center-pending'); return !!p && p.textContent.includes('E 低风险确认') && p.textContent.includes('E 高风险审批') && p.textContent.includes('稍后处理'); })()")));
+  log("E_TODO_PANEL_HAS_DEFERRED=" + hardCheck("E_TODO_PANEL_HAS_DEFERRED", await wc().executeJavaScript("(() => { const p=document.getElementById('decision-center-pending'); return !!p && p.textContent.includes('E 低风险确认') && p.textContent.includes('E 高风险审批') && p.textContent.includes('稍后处理'); })()")));
   await wc().executeJavaScript("document.querySelector('#decision-center-pending .dc-open').click()");
   await sleep(200);
   log("E_TODO_OPEN_REOPENS_DIALOG=" + hardCheck("E_TODO_OPEN_REOPENS_DIALOG", await wc().executeJavaScript("!!document.querySelector('#decision-dialog')")));
@@ -1219,14 +1219,14 @@ async function run() {
   await sleep(150);
   await wc().executeJavaScript("document.getElementById('tab-decisions').click()");
   await sleep(150);
-  log("E_HISTORY_PANEL_EXISTS=" + (await wc().executeJavaScript("!!document.getElementById('decision-center-history')")));
+  log("E_HISTORY_PANEL_EXISTS=" + hardCheck("E_HISTORY_PANEL_EXISTS", await wc().executeJavaScript("!!document.getElementById('decision-center-history')")));
   log("SHOT_11C_DECISION_HISTORY=" + (await shot("11c-decision-history.png")));
   log("E_QUEUE_PRIORITY_CHAT_NO_CARD_SHOT=" + (await shot("11b-decision-dialog.png")));
   // 任务/日志独立面板（数据面失败如实显示，不伪造）
   await wc().executeJavaScript("document.getElementById('tab-tasks').click()");
   await sleep(300);
-  log("E_TASK_PANEL_VISIBLE=" + (await wc().executeJavaScript("!!document.querySelector('.task-center') && !!document.querySelector('.task-center .tc-title')")));
-  log("E_ROLE_LOG_VIEW_VISIBLE=" + (await wc().executeJavaScript("!!document.querySelector('.role-log-view') && !!document.querySelector('.role-log-badge')")));
+  log("E_TASK_PANEL_VISIBLE=" + hardCheck("E_TASK_PANEL_VISIBLE", await wc().executeJavaScript("!!document.querySelector('.task-center') && !!document.querySelector('.task-center .tc-title')")));
+  log("E_ROLE_LOG_VIEW_VISIBLE=" + hardCheck("E_ROLE_LOG_VIEW_VISIBLE", await wc().executeJavaScript("!!document.querySelector('.role-log-view') && !!document.querySelector('.role-log-badge')")));
   await wc().executeJavaScript("document.getElementById('tab-work').click()");
   await sleep(150);
 
