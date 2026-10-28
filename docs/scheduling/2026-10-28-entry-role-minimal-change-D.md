@@ -4,7 +4,7 @@
 - 性质：实施候选的 change-package；**不是验收结论、不是发布决定**。独立验收按验收标准 §8（D-01–D-09）。
 - 隔离：worktree `.claude/worktrees/entry-role-minimal`；分支 `feat/entry-role-minimal`；本地逐批提交，不 push、不合并 main。
 - 依据：C 批已判 pass（v1 报告 122 行 / `945623f8…`，候选 `d364ea6931a7bdf2388caf8855d7af36e09bd2a7`）；D 批放行口径（Delta-2/3/7 已确认，A 口径；方案 §16、团队计划 §4.4、amendment-1/2）。
-- D 实施提交：**D1 `c2b6cf97d2ea59f3cd239a2b0f39b2b36ff188ec`**（核心撤除）、**D2 `98d3fe2f59cedd7fe1c78b5387a4ebaf9ed846ce`**（桌面/UI 撤除）；D3 测试/文档提交见最终报告（本文件在 D3 内）。
+- D 实施提交：**D1 `c2b6cf97d2ea59f3cd239a2b0f39b2b36ff188ec`**（核心撤除）、**D2 `98d3fe2f59cedd7fe1c78b5387a4ebaf9ed846ce`**（桌面/UI 撤除）；D3 证据提交 `4c2414909d4336a5e2a259b513ad16c74a899571`；最终文档提交见最终报告（本文件在 D3 内）。
 - 代码树哈希（git diff --binary）：D1 = `ecd8bedae2f8470ce81b2512dff1c87dce89871c3d52f84aeafef56473c11f2b`；D1+D2 = `ecb3afdd3b08a1392199757ce5506be1f1f7bba2c6e7a5f1d3a3cc229ff0f0e8`。D3 最终全树哈希由最终报告记录。
 
 ## 1. 批次目标与生效口径
@@ -83,11 +83,12 @@
 - **Electron**（真实 Electron 44.7.0，临时夹具 `/tmp/ans-e2e-c4-fixture-q897xP`，输出 `%TEMP%\ans-e2e-d-out2-avh3mV`）：**`E2E_PASS=true`、`E2E_DONE=1`、`E2E_FAILURES=` 空、`ROLE_COUNT=2`、`PRIMARY_ROLE_ID=su`、`BOOTSTRAP_PRIMARY=chief`、`BOOTSTRAP_ROLE_COUNT=6`、`GOVERNANCE_COORDINATION={"verifierSends":0,"sessions":0,"events":0}`**；截图 **16/17**（`00-titlebar.png` 捕获偶发 `UnknownVizError`，环境性；其余 16 张成功）；报告 `report.txt`（sha256 `af0931ca3b5ab0ddf3f255d67430f9c4ec4d0fe048802f73307c473a008b53e5`）；截图清单 `SHA256SUMS`（sha256 `9ea569b07d361c21efea0156061b333e99592977bf19eef35ca68b4efda0d7d7`，16 项）。
 - **环境**：Windows 11 Pro 10.0.26300（win32 x64）；Node v24.22.1；Electron 44.7.0。
 
-## 6. 文件统计（D1+D2 代码提交）
+## 6. 文件统计
 
-- 代码提交（`d364ea6..98d3fe2`）：**65 files changed / +830 / −26106**（生产代码与测试夹具；不含 D3 文档与测试删除）。
-- 生产删除 23 个文件（§2）；新增 `app/renderer/src/chat/card-meta.ts`。
-- 工作区最终统计（含 D3 测试/文档，见最终报告）：**201 tracked files / +961 / −119727**，另新增 D 专项测试文件 140 行。
+- D1+D2 代码提交（`d364ea6..98d3fe2`）：**65 files changed / +830 / −26106**。
+- D3 测试/文档提交（`98d3fe2..HEAD`）：**147 files changed / +757 / −93621**（含 115 个测试/夹具删除、6 个测试恢复改造、D 专项测试与 change-D/属主记录；其中最终文档修订 10 files / +14 / −13）。
+- 合计（`d364ea6..HEAD`）：**212 files changed / +1587 / −119727**。
+- 生产删除 23 个文件（§2）；新增 `app/renderer/src/chat/card-meta.ts` 与 `test/测试/entry-role-minimal-d.test.ts`。
 - `package.json` / `package-lock.json`：**零改动**。
 
 ## 7. 删除测试逐文件登记（115 个）

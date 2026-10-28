@@ -2,7 +2,7 @@
 
 - 日期：2026-10-28｜任务：`2026-10-28-entry-role-minimal`｜批次：D（治理机器撤除）｜风险档位：**T3**
 - 实施提交：D1 `c2b6cf97d2ea59f3cd239a2b0f39b2b36ff188ec`；D2 `98d3fe2f59cedd7fe1c78b5387a4ebaf9ed846ce`；D3 测试/文档提交见最终报告。
-- 交接材料：`docs/scheduling/2026-10-28-entry-role-minimal-change-D.md`（224 行；最终哈希见报告）。
+- 交接材料：`docs/scheduling/2026-10-28-entry-role-minimal-change-D.md`（225 行；最终字节哈希见最终报告）。
 
 ## 范围
 
