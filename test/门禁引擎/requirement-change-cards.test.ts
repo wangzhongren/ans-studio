@@ -427,9 +427,9 @@ test("2026-10-26 需求变更：通道只由 Draft / Steward 发起，Lead 只�
   assert.ok(rapporteur.cardText.includes("只用 `write`"), "Draft 仍只出 write 写盘卡");
   assert.ok(liaison.cardText.includes("只用 `intent-confirm`"), "Lead 仍只出 intent-confirm 需求确认卡");
 
-  // 五角色注册表仍在且顺序不变（只改卡文本）。
+  // 六角色注册表仍在且顺序不变（只改卡文本）。
   assert.deepEqual(
     BUILT_IN_GOVERNANCE_ROLES.map((s) => s.id),
-    ["liaison", "rapporteur", "nominator", "convener", "verifier"],
+    ["chief", "product", "rapporteur", "nominator", "convener", "verifier"],
   );
 });

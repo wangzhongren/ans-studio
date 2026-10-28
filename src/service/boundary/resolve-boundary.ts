@@ -67,6 +67,8 @@ export {
 } from "../../common/门禁引擎/governance-roles.ts";
 export type {
   BuiltInGovernanceRoleSpec,
+  DeprecatedLiaisonRoleSpec,
   GovernanceCapabilities,
+  GovernanceRoleSpec,
   TrioGovernanceRoleId,
 } from "../../common/门禁引擎/governance-roles.ts";

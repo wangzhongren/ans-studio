@@ -56,7 +56,7 @@ import { listProject, resolveGovernanceRole, resolveRole } from "../../service/r
 import {
   LEGACY_SU_PREAUTHORIZED_DIRS,
   governanceRoleOf,
-  type BuiltInGovernanceRoleSpec,
+  type GovernanceRoleSpec,
 } from "../../service/boundary/resolve-boundary.ts";
 import { formatEvent } from "../../common/编排/output.ts";
 import type { OrchestrationEvent } from "../../common/编排/handback.ts";
@@ -233,13 +233,16 @@ export type { CreateGovernanceJudgeOptions } from "../../common/编排/governanc
 /** 角色目录名（与 `listProject` 口径一致：项目角色的目录 `角色卡/<id>/`）。 */
 const ROLE_CARD_DIR = "角色卡";
 
-/** 治理职能 → 权力文案（唯一文案表；Liaison 是沟通权而非决定权）。 */
+/** 治理职能 → 权力文案（唯一文案表；主入口是工作流/沟通权而非决定权）。 */
 const GOVERNANCE_FUNCTION_LABEL: Record<GovernanceFunction, string> = {
-  liaison: "沟通权",
+  chief: "工作流管理权",
+  product: "产品评审权",
   proposal: "提案权",
   nomination: "提名权",
   schedule: "编排权",
   verification: "验收权",
+  /** @deprecated 批次 A 只读别名（D 删除）。 */
+  liaison: "沟通权",
 };
 
 /**
@@ -739,7 +742,7 @@ function buildGovernPrompt(
   opts: {
     canWrite: boolean;
     confirmFirst: boolean;
-    spec?: BuiltInGovernanceRoleSpec;
+    spec?: GovernanceRoleSpec;
     /** 无任务级 scope 收窄 ⇒ Section 1 全量预授权（与编排 gate 同口径）。 */
     section1Preauthorized: boolean;
     /** 有任务 scope 时仍免确认的既有预授权目录（trio 注册表；su 分支不用本项）。 */
@@ -824,8 +827,25 @@ function buildGovernPrompt(
  * 不能做什么」，**绝不写成「已批准/已授权」**——客户决定只由应用签发的确认卡 + 账本表达。
  * 角色名称/职能来自注册表 spec（**不写死 su/rapporteur**）。
  */
-function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
+function governanceFunctionDiscipline(spec: GovernanceRoleSpec): string {
   switch (spec.function) {
+    case "chief":
+      return (
+        `**工作流管理纪律（${spec.displayName}，不拥有最终批准权）**：` +
+        "工作任务只由你派发、工作结果只向你简短汇报；角色申请直达客户（应用呈现 / 裁决），" +
+        "应用向你发系统通知（申请事件与结果）；你**不转发、不审批、不代选、不代决、不改写**；" +
+        "决策权归应用（两开关 + 判断 agent），开关关闭时由应用弹卡客户。\n" +
+        "旧流程（批次 A–C 过渡）：意图确认卡 `request_choice(cardKind=intent-confirm)` 仍由本角色发出，" +
+        "`confirm` 后才用 `hand_off_intent` 交策划；旧 gate / flow / ledger 机器按原行为保留。\n" +
+        "你不批准提案 / 任命 / 验收，不得把「已派发」写成「已完成」，不得代标 `delivered`。"
+      );
+    case "product":
+      return (
+        `**产品评审纪律（${spec.displayName}，不拥有最终批准权）**：` +
+        "工作任务只来自幕僚，工作结果只向幕僚简短汇报（`submit_report`）；" +
+        "需要客户决定时直接提交申请（应用呈现 / 裁决）；不审批、不派发、不代选、不代决。\n" +
+        "评审结论必须可核对：写清依据（文件 / 行为 / 边界）、影响与建议，不编造事实。"
+      );
     case "proposal":
       return (
         `**提案权纪律（${spec.displayName}，不拥有最终批准权）**：` +

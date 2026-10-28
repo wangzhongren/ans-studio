@@ -28,21 +28,25 @@ import {
 
 // —————————————————————— 1) 新空项目默认 ——————————————————————
 
-test("新空项目：listProject 恰 5 个 builtIn（顺序 liaison→rapporteur→nominator→convener→verifier）、primaryRoleId=liaison、governanceModel=trio", async () => {
+test("新空项目：listProject 恰 6 个 builtIn（chief→product→rapporteur→nominator→convener→verifier）、primaryRoleId=chief、governanceModel=trio", async () => {
   const { root, cleanup } = makeRoot("empty-listing");
   try {
     const listing = await listProject(root);
     const builtIns = listing.roles.filter((r) => r.builtIn === true);
     assert.deepEqual(
       builtIns.map((r) => r.roleId),
-      ["liaison", "rapporteur", "nominator", "convener", "verifier"],
-      "恰 5 个内置、顺序固定（2026-10-18 客户拍板「三权 · 五角色」）",
+      ["chief", "product", "rapporteur", "nominator", "convener", "verifier"],
+      "恰 6 个内置、顺序固定（2026-10-28 批次 A 六角色）",
     );
-    assert.deepEqual(builtIns.map((r) => r.governanceFunction), ["liaison", "proposal", "nomination", "schedule", "verification"]);
-    assert.equal(listing.primaryRoleId, "liaison", "主入口 = 产品 / Lead");
+    assert.deepEqual(
+      builtIns.map((r) => r.governanceFunction),
+      ["chief", "product", "proposal", "nomination", "schedule", "verification"],
+    );
+    assert.equal(listing.primaryRoleId, "chief", "主入口 = 幕僚");
     assert.equal(listing.governanceModel, "trio", "新空项目默认 trio");
     assert.equal(listing.hasRoles, false, "尚无项目角色");
     assert.equal(listing.roles.some((r) => r.roleId === "su"), false, "trio 下不枚举 su");
+    assert.equal(listing.roles.some((r) => r.roleId === "liaison"), false, "旧 liaison 退休、不枚举");
     assert.deepEqual(listing.warnings, [], "空项目是正常态：不报警");
     for (const r of builtIns) {
       assert.equal(r.cardPath, "", "内置角色没有角色目录");
@@ -63,9 +67,12 @@ test("治理会话可开：openGovernanceSession 按 function 选择角色；显
     writeProjectRole(root, "A");
     const base = trioProject(root);
     const cases = [
+      [{ governanceFunction: "chief" as const }, "chief", "chief"],
+      [{ governanceFunction: "product" as const }, "product", "product"],
       [{ governanceFunction: "proposal" as const }, "rapporteur", "proposal"],
       [{ governanceFunction: "nomination" as const }, "nominator", "nomination"],
       [{ governanceFunction: "schedule" as const }, "convener", "schedule"],
+      [{ governanceRoleId: "chief" }, "chief", "chief"],
       [{ governanceRoleId: "rapporteur" }, "rapporteur", "proposal"],
       [{ governanceRoleId: "convener" }, "convener", "schedule"],
       [{}, "rapporteur", "proposal"], // trio 缺省 = rapporteur

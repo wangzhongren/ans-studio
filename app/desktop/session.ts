@@ -63,7 +63,7 @@ import type { GovernanceModel, ProjectConfig } from "../../src/model/role.ts";
 import type { ReportArtifactFn, ReportArtifactInput, ReportArtifactReceipt } from "../../src/model/runtime.ts";
 // 三权（评审 §5.1/§5.6）：内置治理角色 id 判定 / 注册表统一来自门禁引擎的 Service 公开出口
 // （桌面**不复制**第二份 id 列表，也不直接导入 `src/common/门禁引擎/` 私有模块）。
-import { isBuiltInGovernanceRoleId, resolveBoundary } from "../../src/service/boundary/resolve-boundary.ts";
+import { governanceRoleOf, isBuiltInGovernanceRoleId, resolveBoundary, trioGovernanceSource } from "../../src/service/boundary/resolve-boundary.ts";
 // 治理账本与派发门禁（评审 §5.6/§5.7/§6.2）：只经编排的 Pipeline 公共出口（`govern-session.ts`
 // 薄再导出）消费——桌面**不直接导入**编排私有 `common/`（§十一.3）。
 import {
@@ -2384,7 +2384,30 @@ export class SessionManager {
         role = listing?.roles.find((r) => r.roleId === req.roleId);
       }
       if (!role || !listing) {
-        return { ok: false, error: mainT("main.session.roleNotFound", { projectRoot: req.projectRoot, roleId: req.roleId }) };
+        // 批次 A 只读别名（方案 §16.3，D 批删除）：旧 `liaison` 不进入角色列表，但存量旧会话仍可按 id
+        // 打开——用注册表别名规格合成一个展示用内置角色条目（不新增状态、不写入 listing）。
+        const legacySpec = (listing?.governanceModel ?? "single") === "trio" ? governanceRoleOf("liaison") : undefined;
+        if (!role && listing && req.roleId === "liaison" && legacySpec !== undefined) {
+          role = {
+            roleId: legacySpec.id,
+            displayName: legacySpec.displayName,
+            cardPath: "",
+            boundaryPath: "",
+            cardText: legacySpec.cardText,
+            boundary: {
+              entries: legacySpec.entries.map((e) => ({ ...e })),
+              boundarySource: trioGovernanceSource(String(legacySpec.id)),
+              acceptance: { accepted: false, source: "" },
+            },
+            builtIn: true,
+            governanceFunction: legacySpec.function,
+          };
+          createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId }).record(
+            "session.open.legacy-liaison-alias",
+          );
+        } else {
+          return { ok: false, error: mainT("main.session.roleNotFound", { projectRoot: req.projectRoot, roleId: req.roleId }) };
+        }
       }
       createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId }).record(
         "session.open.stale-listing-refreshed",
@@ -2441,8 +2464,9 @@ export class SessionManager {
     const legacyBuiltIn = role.builtIn === true && governanceFunction === undefined && governanceModel === "single";
     const canSchedule = governanceFunction === "schedule" || legacyBuiltIn;
     const canNominate = governanceFunction === "nomination" || legacyBuiltIn;
-    // W6-B（四角色评审 §4.3）：按 governanceFunction 路由新增两能力——Liaison 只交接、Rapporteur 只澄清。
-    const canLiaise = governanceFunction === "liaison";
+    // W6-B（四角色评审 §4.3）：按 governanceFunction 路由新增两能力——主入口（旧 Liaison / 新幕僚
+    // chief）只交接、Rapporteur 只澄清。批次 A 身份层：chief 承接旧 liaison 的全部旧路径。
+    const canLiaise = governanceFunction === "chief" || governanceFunction === "liaison";
     const canClarify = governanceFunction === "proposal";
 
     // ——— 客户确认制交互（A-1/A-3/A-5）：**仅内置治理角色（su 或 trio 五人）**的会话注入客户交互通道 ———
@@ -4206,12 +4230,18 @@ export class SessionManager {
         mainT("main.session.dispatchNoDispatcherShort"),
       );
     }
+    // 主入口/协调者角色 id（数据驱动）：批次 A 起为 chief；旧 liaison 仅作只读别名兼容。
+    const coordinatorRoleId =
+      model === "trio"
+        ? (listing?.roles.find((role) => role.governanceFunction === "chief")?.roleId ??
+           listing?.roles.find((role) => role.governanceFunction === "liaison")?.roleId ??
+           null)
+        : null;
     // Lead→Steward = 协调消息（coordinate 门；字面 id 与编排 `evaluateCoordinateGate` 同口径）：
     // 不走项目步骤的 dispatch 门（不要求提案接受/任命/步骤存在/未派发），也不弹客户卡。
-    const isCoordinate = model === "trio" && fromRoleId === "liaison" && targetRoleId === "convener";
-    const liaisonRoleId =
-      model === "trio" ? (listing?.roles.find((role) => role.governanceFunction === "liaison")?.roleId ?? null) : null;
-    if (fromRoleId !== dispatcherRoleId && (liaisonRoleId === null || fromRoleId !== liaisonRoleId)) {
+    // 批次 A：主入口 id 由角色列表解析（chief；旧 liaison 别名兼容），不硬编码。
+    const isCoordinate = model === "trio" && fromRoleId === coordinatorRoleId && targetRoleId === "convener";
+    if (fromRoleId !== dispatcherRoleId && (coordinatorRoleId === null || fromRoleId !== coordinatorRoleId)) {
       return fail(
         mainT("main.session.dispatchWrongSource", {
           from: this.roleDisplayName(projectRoot, fromRoleId),
@@ -4263,7 +4293,9 @@ export class SessionManager {
       {
         projectRoot,
         model,
-        roleId: fromRoleId,
+        // 批次 A 身份层：幕僚 chief 的旧 coordinate 消息沿用旧 liaison 门（校验器仍只认旧值；
+        // 这是只读别名，不改变旧门行为，D 批随旧 flow/gate 删除）。
+        roleId: isCoordinate && fromRoleId !== "liaison" ? "liaison" : fromRoleId,
         // 2026-10-20：Lead→Steward 走 coordinate 门（要求 flowId，stepId 可选）；
         // 其余（Convener→项目角色 / single 旧行为）仍走既有 dispatch 门，逐字不变。
         action: isCoordinate ? "coordinate" : "dispatch",

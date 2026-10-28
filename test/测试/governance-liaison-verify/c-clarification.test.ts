@@ -258,7 +258,7 @@ test("桌面澄清：系统行落主入口 Liaison，客户确认通道零调用
     assert.ok(entries.some((e) => e.kind === "clarification.requested"), "编排写账本");
     const notes = events.filter(
       (envelope) =>
-        envelope.roleId === "liaison" &&
+        envelope.roleId === "chief" &&
         envelope.event.kind === "message" &&
         (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
     );

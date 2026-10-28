@@ -45,10 +45,11 @@ function stringList(value: unknown): string[] {
 // `governanceRoleDisplayNameById`（英文 / 中文）。非内置 id ⇒ 空串，走兜底文案。
 
 // judge shell 确认标题的内置治理角色名：顺序按现源码（英文在前）。
-// draft/crew/steward 与 `ui.role.governance.*.name` 逐字相同，复用；liaison/verifier
-// 的现源码顺序与目录相反，使用 judge 专用 key（不改 roleId/GovernanceFunction）。
+// draft/crew/steward 与 `ui.role.governance.*.name` 逐字相同，复用；chief/product/verifier
+// 使用 judge 专用 key（不改 roleId/GovernanceFunction）。
 const GOVERNANCE_ROLE_NAME_KEYS: Record<string, MessageKey> = {
-  liaison: "ui.judge.roleName.liaison",
+  chief: "ui.judge.roleName.chief",
+  product: "ui.judge.roleName.product",
   rapporteur: "ui.role.governance.draft.name",
   nominator: "ui.role.governance.crew.name",
   convener: "ui.role.governance.steward.name",

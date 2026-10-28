@@ -588,14 +588,14 @@ test("B1–B4 key 分区：ui/main/shared 计数与总 key 数符合契约（漏
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
   assert.deepEqual(prefixes, {
-    ui: 792, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7 + 2026-10-25 chat-panel 10 + background tasks 25 + flow status 22 + acceptance triage 28 + 2026-10-26 decision card 3 + 2026-10-26 view_image 1 + 2026-10-27 view_image preview 3 + 2026-10-27 view_image lightbox 2
+    ui: 796, // B0 5 + B1/B2 676 + 2026-10-23 key supplement 10 + role-root-docs S5 7 + 2026-10-25 chat-panel 10 + background tasks 25 + flow status 22 + acceptance triage 28 + 2026-10-26 decision card 3 + 2026-10-26 view_image 1 + 2026-10-27 view_image preview 3 + 2026-10-27 view_image lightbox 2 + 2026-10-28 六角色 chief/product 4
     main: 538, // B0 5 + B3 452 + 2026-10-23 B3 key supplement 23 + acceptance-rework routing 6 + backgroundTasks 1 + flowStatus 2 + write preauthorization 6 + 2026-10-26 gate review 13 + 2026-10-27 gate review flow-busy 1 + 2026-10-26 decision card 6 + 2026-10-26 view_image 2 + 2026-10-27 view_image same-turn 1 + 2026-10-26 requirement change 13 + 2026-10-27 gate review return routing 7
     shared: 62, // B4 元数据 + 跨层通用短词
     preferences: 3, // B0
   });
-  assert.equal(keys.length, 1395);
+  assert.equal(keys.length, 1399);
   // B1/B2 与 B3 分区（扣除 B0 的 5 个 ui.* / 5 个 main.*）。
-  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 787);
+  assert.equal(prefixes.ui - B0_KEYS.filter((key) => key.startsWith("ui.")).length, 791);
   assert.equal(prefixes.main - B0_KEYS.filter((key) => key.startsWith("main.")).length, 533);
 });
 
@@ -1036,8 +1036,9 @@ const B1_B2_KEY_SUPPLEMENT_KEYS = [
   "ui.confirm.expiredShell",
   // stores/governance-store.ts：nextStep 兜底
   "ui.governanceStore.stepFallback",
-  // chat/judge.ts：顺序与 ui.role.governance.*.name 相反的两个内置角色名
-  "ui.judge.roleName.liaison",
+  // chat/judge.ts：顺序与 ui.role.governance.*.name 相反的内置角色名（批次 A：chief/product/verifier）
+  "ui.judge.roleName.chief",
+  "ui.judge.roleName.product",
   "ui.judge.roleName.verifier",
   // chat/judge.ts：路径 > 3 的完整标题（替代「 等 N 个」字符串拼接）
   "ui.judge.headline.writeConfirmOverflow",
@@ -1045,7 +1046,7 @@ const B1_B2_KEY_SUPPLEMENT_KEYS = [
   "ui.reportView.savingHistory",
 ] as const satisfies readonly MessageKey[];
 
-test("B1/B2 key 增补：10 个 key 全部存在（zh + en），zh 逐字取当前源码", () => {
+test("B1/B2 key 增补：11 个 key 全部存在（zh + en），zh 逐字取当前源码", () => {
   for (const key of B1_B2_KEY_SUPPLEMENT_KEYS) {
     assert.ok(key in zhCN, `zh-CN 缺增补 key：${key}`);
     assert.ok(key in enUS, `en-US 缺增补 key：${key}`);
@@ -1062,7 +1063,8 @@ test("B1/B2 key 增补：10 个 key 全部存在（zh + en），zh 逐字取当�
     "此确认已失效，未获放行——请让角色重新发起。",
   );
   assert.equal(zhCN["ui.governanceStore.stepFallback"], "治理步骤");
-  assert.equal(zhCN["ui.judge.roleName.liaison"], "产品");
+  assert.equal(zhCN["ui.judge.roleName.chief"], "幕僚");
+  assert.equal(zhCN["ui.judge.roleName.product"], "产品");
   assert.equal(zhCN["ui.judge.roleName.verifier"], "质检");
   assert.deepEqual(zhCN["ui.judge.headline.writeConfirmOverflow"], {
     other: "确认写入 {count} 个路径（{paths} 等 {count} 个）",
@@ -1083,7 +1085,8 @@ test("B1/B2 key 增补：en-US 自然英文；judge 复用 3 个既有治理角�
     "This confirmation has expired and was not approved — ask the role to initiate it again.",
   );
   assert.equal(enUS["ui.governanceStore.stepFallback"], "Governance step");
-  assert.equal(enUS["ui.judge.roleName.liaison"], "Product");
+  assert.equal(enUS["ui.judge.roleName.chief"], "Chief of Staff");
+  assert.equal(enUS["ui.judge.roleName.product"], "Product");
   assert.equal(enUS["ui.judge.roleName.verifier"], "QA");
   assert.equal(enUS["ui.reportView.savingHistory"], "Saving history…");
   // 顺序相同的三个内置治理角色名不重复收录，复用既有 ui.role.governance.*.name。
@@ -1097,17 +1100,19 @@ test("B1/B2 key 增补：en-US 自然英文；judge 复用 3 个既有治理角�
 
 test("zh-CN 内置角色名：治理角色与 judge 角色名为纯中文；目录值不含英文角色别名", () => {
   const roleNameKeys = [
-    "ui.role.governance.liaison.name",
+    "ui.role.governance.chief.name",
+    "ui.role.governance.product.name",
     "ui.role.governance.draft.name",
     "ui.role.governance.crew.name",
     "ui.role.governance.steward.name",
     "ui.role.governance.verifier.name",
-    "ui.judge.roleName.liaison",
+    "ui.judge.roleName.chief",
+    "ui.judge.roleName.product",
     "ui.judge.roleName.verifier",
   ] as const satisfies readonly MessageKey[];
   assert.deepEqual(
     roleNameKeys.map((key) => zhCN[key]),
-    ["产品", "策划", "人事", "运营", "质检", "产品", "质检"],
+    ["幕僚", "产品", "策划", "人事", "运营", "质检", "幕僚", "产品", "质检"],
   );
   for (const key of roleNameKeys) {
     assert.match(String(zhCN[key]), /^[\p{Script=Han}]+$/u, `zh-CN 角色名必须为纯中文：${key}`);

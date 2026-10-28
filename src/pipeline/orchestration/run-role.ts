@@ -62,7 +62,7 @@ import {
   governanceCapabilitiesOf,
   governanceRoleOf,
   isBuiltInGovernanceRoleId,
-  type BuiltInGovernanceRoleSpec,
+  type GovernanceRoleSpec,
 } from "../../service/boundary/resolve-boundary.ts";
 import { resolveWrite } from "../../service/gate/resolve-write.ts";
 import type {
@@ -145,6 +145,7 @@ import {
   type GovernanceDecisionKind,
   type GovernanceLedgerEntry,
   type GovernanceLedgerSnapshot,
+  type GovernancePower,
 } from "../../common/编排/governance-ledger.ts";
 import {
   DECISION_CARD_MIN_OPTIONS,
@@ -837,7 +838,7 @@ export async function openRoleSession(
   // `governanceCapabilitiesOf`；`su` 得到 `LEGACY_SU_CAPABILITIES`（single 旧行为逐字不变）；
   // 项目角色没有治理能力（`undefined`），保持既有「只给内置治理角色」的注入纪律。
   const builtInGovernance = setup.role.kind === "built-in-governance";
-  const trioSpec: BuiltInGovernanceRoleSpec | undefined = governanceRoleOf(setup.role.id);
+  const trioSpec: GovernanceRoleSpec | undefined = governanceRoleOf(setup.role.id);
   const isTrio = trioSpec !== undefined;
   const governanceModel = input.project.governanceModel ?? "single";
   // 评审 §5.3：trio 下自动收尾/重 pin 的写权来自**应用专用边界**——三人的 Section 1 不含
@@ -1058,7 +1059,7 @@ export async function openRoleSession(
           // 2026-10-20 真机：Lead 的通用 choice（如 keep-v1/do-v2/lead-decide）没有 confirm 选项，属于
           // **内部协调/工程决策**，不应呈现客户；显式 intent-confirm 缺 confirm 也同样拒绝。
           // 不发卡、不发行、不调判断、不写 customer.decision（客户只处理 intent-confirm 需求确认）。
-          if (isTrio && req.kind === "choice" && setup.role.id === "liaison") {
+          if (isTrio && req.kind === "choice" && isCoordinatorGovernanceSpec(trioSpec)) {
             const optionIds = req.options.map((option) => option.id);
             if (!optionIds.includes("confirm") && (cardKind === undefined || cardKind === "intent-confirm")) {
               const reason = cardKind === "intent-confirm"
@@ -1118,11 +1119,12 @@ export async function openRoleSession(
                   "missing-flow-id",
                 );
               }
-              // 设计 §4.2：liaison 的确认卡一律拒绝（其确认卡允许集为空；需求确认只走 request_choice 的
-              // intent-confirm）。即便直接调用包装器给出白名单内的 choice 类 cardKind 也不放行。
-              if (trioSpec!.id === "liaison") {
+              // 设计 §4.2：主入口（旧 liaison / 新 chief）的确认卡一律拒绝（其确认卡允许集为空；
+              // 需求确认只走 request_choice 的 intent-confirm）。即便直接调用包装器给出白名单内的
+              // choice 类 cardKind 也不放行。
+              if (isCoordinatorGovernanceSpec(trioSpec)) {
                 return rejectNotPresented(
-                  "治理角色 liaison 不使用 request_confirmation 做治理写盘；确认卡一律不发送" +
+                  `治理角色 ${trioSpec!.id} 不使用 request_confirmation 做治理写盘；确认卡一律不发送` +
                     "（需求确认请用 request_choice 的 intent-confirm）。本次未发行任何写入路径、未写入账本。",
                   "role-not-allowed",
                 );
@@ -1333,7 +1335,9 @@ export async function openRoleSession(
               {
                 projectRoot: input.project.projectRoot,
                 model: governanceModel,
-                roleId: setup.role.id,
+                // 批次 A 身份层：幕僚 chief 的旧 coordinate 消息沿用旧 liaison 门（校验器仍只认旧值；
+                // 只读别名，不改变旧门行为，D 批随旧 flow/gate 删除）。
+                roleId: action === "coordinate" && setup.role.id !== "liaison" ? "liaison" : setup.role.id,
                 action,
                 flowId: dispatch.flowId,
                 stepId: dispatch.stepId,
@@ -1378,7 +1382,9 @@ export async function openRoleSession(
             { projectRoot: input.project.projectRoot, ...payload },
             {
               governanceModel,
-              governanceFunction: trioSpec!.function,
+              // 批次 A 身份层：幕僚 chief 取代旧 liaison 走同一条旧交接路径（校验器仍只认旧值；
+              // 这是只读别名，不改变行为，D 批随旧路径一并删除）。
+              governanceFunction: trioSpec!.function === "chief" ? "liaison" : trioSpec!.function,
               roleId: setup.role.id,
               ...(turnId !== undefined ? { turnId } : {}),
               ...(boundSessionForEvidence?.nativeSessionId !== undefined
@@ -1980,7 +1986,7 @@ export async function openRoleSession(
                     at: new Date().toISOString(),
                     kind: "artifact.observed",
                     actorRoleId: setup.role.id,
-                    power: trioSpec?.function ?? "project",
+                    power: trioSpec !== undefined ? legacyGovernancePower(trioSpec.function) : "project",
                     artifactPath: artifact.relPath,
                     artifactSha256: artifact.sha256,
                     ...artifactFlowMetadata(artifact.relPath),
@@ -2193,11 +2199,21 @@ function governanceWriteOwnerHint(rel: string): string {
 }
 
 /**
+ * 批次 A 身份层：旧治理账本 `power` 值保持到 D 批——chief 复用旧 `liaison` 审计标签，
+ * product 记 `project`（账本只作审计标记，门禁不读 `power`）。
+ */
+function legacyGovernancePower(fn: GovernanceFunction): GovernancePower {
+  if (fn === "chief") return "liaison";
+  if (fn === "product") return "project";
+  return fn;
+}
+
+/**
  * trio 门禁包装的**第一道**：`forbiddenWritePaths`（应用独占 + 其他治理角色资料）。
  * 命中即拒（先于三道门禁与 `resolveWrite`）；文案指回归属（AC3 口径）。
  */
 function forbiddenWriteDecision(
-  spec: BuiltInGovernanceRoleSpec,
+  spec: GovernanceRoleSpec,
   rel: string | undefined,
 ): WriteDecision | undefined {
   if (rel === undefined) return undefined;
@@ -2261,11 +2277,11 @@ function governanceActionForPath(rel: string | undefined): RoutedGovernanceActio
 }
 
 /**
- * 2026-10-20 客户拍板：Lead（Liaison）可给 Steward（Convener）发协调消息。该 `dispatch_task`
- * 走 `coordinate` 门（不是项目步骤派发）；其余角色/目标仍走既有 `dispatch` 门，逐字不变。
+ * 2026-10-20 客户拍板：主入口（旧 Liaison / 新幕僚 chief）可给运营 Steward（Convener）发协调消息。
+ * 该 `dispatch_task` 走 `coordinate` 门（不是项目步骤派发）；其余角色/目标仍走既有 `dispatch` 门，逐字不变。
  */
 export function governanceDispatchActionFor(roleId: string, targetRoleId: string): GovernanceGateAction {
-  return roleId === "liaison" && targetRoleId === "convener" ? "coordinate" : "dispatch";
+  return (roleId === "chief" || roleId === "liaison") && targetRoleId === "convener" ? "coordinate" : "dispatch";
 }
 
 /**
@@ -2365,11 +2381,12 @@ function decisionCardRejectionReason(
 }
 
 function defaultGovernanceChoiceCardKind(
-  roleId: BuiltInGovernanceRoleSpec["id"],
+  roleId: GovernanceRoleSpec["id"],
   optionIds: readonly string[],
 ): GovernanceCardKind | undefined {
   const has = (id: string): boolean => optionIds.includes(id);
   switch (roleId) {
+    case "chief":
     case "liaison":
       return has("confirm") ? "intent-confirm" : undefined;
     case "rapporteur":
@@ -2380,7 +2397,7 @@ function defaultGovernanceChoiceCardKind(
       return undefined;
     case "verifier":
       return has("accept") ? "acceptance" : undefined;
-    default:
+    case "product":
       return undefined;
   }
 }
@@ -2698,6 +2715,14 @@ function serializeGovernanceTask<T>(
 }
 
 /**
+ * 批次 A 身份层：旧 `liaison` 与新的 `chief` 共享同一条「主入口/协调者」旧流程路径
+ * （意图确认卡、意图交接、幕僚→运营 coordinate）。旧路径保留到 D 批；两者只是 id 不同。
+ */
+function isCoordinatorGovernanceSpec(spec: GovernanceRoleSpec | undefined): boolean {
+  return spec !== undefined && (spec.function === "chief" || spec.function === "liaison");
+}
+
+/**
  * 每角色允许的 `cardKind` 白名单（评审 §5.8 表；越权不弹卡，由 customerInput 包装器直接拒绝）。
  *
  * 2026-10-26 客户新增 **decision 卡**（`request_choice(cardKind="decision")`，运行时核心已在
@@ -2708,10 +2733,13 @@ function serializeGovernanceTask<T>(
  * appointment/proposal 决定、不进入 `latestAcceptanceDecision`、也不能充当 flow 的
  * `customer-decision` 证据；分类只写 `decisionKind:"material-choice"`，**不得被当成提案/验收批准**。
  */
-const TRIO_CARD_KINDS: Record<BuiltInGovernanceRoleSpec["id"], readonly GovernanceCardKind[]> = {
-  // 2026-10-18 客户拍板：Liaison（Lead/主理）开通客户通道，只用于 hand_off_intent 前的
-  // `intent-confirm` 需求确认卡（判断 agent 永不介入）；其它治理卡仍结构性拒绝。
+const TRIO_CARD_KINDS: Record<GovernanceRoleSpec["id"], readonly GovernanceCardKind[]> = {
+  // 2026-10-28 批次 A：幕僚（chief）承接旧主入口的 intent-confirm 需求确认卡；其它治理卡仍结构性拒绝。
+  // 旧 `liaison` 是只读别名（D 批删除），行为与基线逐字一致（仅 intent-confirm）。
+  chief: ["intent-confirm"],
   liaison: ["intent-confirm"],
+  // 产品（product）是幕僚的 worker；批次 A 只做身份层，不开放治理选择/确认卡（申请线在 C 批）。
+  product: [],
   // 2026-10-26 客户纠正/补充：报告员可发 **decision 卡，仅限需求变更审批**（发起方不得自批；
   // 审批人是判断 agent/客户，主理只执行）；提案与写盘卡不变。
   rapporteur: ["proposal", "write", "decision"],
@@ -2736,8 +2764,8 @@ const GOVERNANCE_CONFIRM_CARD_KINDS: readonly GovernanceCardKind[] = [
   "schedule-write",
 ];
 
-/** 某内置治理角色允许的**确认卡** kinds（工具枚举 ∩ `TRIO_CARD_KINDS`，按设计 §4.2 表序；liaison 为空）。 */
-function confirmCardKindsOf(roleId: BuiltInGovernanceRoleSpec["id"]): readonly GovernanceCardKind[] {
+/** 某内置治理角色允许的**确认卡** kinds（工具枚举 ∩ `TRIO_CARD_KINDS`，按设计 §4.2 表序；主入口为空）。 */
+function confirmCardKindsOf(roleId: GovernanceRoleSpec["id"]): readonly GovernanceCardKind[] {
   return GOVERNANCE_CONFIRM_CARD_KINDS.filter((kind) => TRIO_CARD_KINDS[roleId].includes(kind));
 }
 
@@ -2993,7 +3021,7 @@ async function recordCustomerDecision(args: {
     actorRoleId: args.roleId,
     // 2026-10-22 第 1 项（行为变化）：appointment 由 Convener 发起 ⇒ power=schedule（发起角色职能）；
     // 旧 Nominator 发起的存量决定仍为 nomination。验收决定仍固定 acceptance。
-    power: cardKind === "acceptance" ? "acceptance" : args.function,
+    power: cardKind === "acceptance" ? "acceptance" : legacyGovernancePower(args.function),
     ...(classification.decisionKind !== undefined
       ? { decisionKind: classification.decisionKind }
       : {}),
@@ -3265,7 +3293,7 @@ async function computeJudgeContext(args: {
   projectRoot: string;
   skillRoot: string;
   boundary: ResolvedRole["boundary"];
-  trioSpec: BuiltInGovernanceRoleSpec;
+  trioSpec: GovernanceRoleSpec;
   flowId: string;
   req: CustomerInputRequest;
   metadata?: CustomerInputMetadata;

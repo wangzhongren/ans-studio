@@ -32,21 +32,26 @@ import {
 
 // —————————————————————— 1) 五角色枚举与主入口 ——————————————————————
 
-test("五角色枚举：新空项目恰 5 个 builtIn（liaison→rapporteur→nominator→convener→verifier）、primary=liaison、governanceModel=trio", async () => {
+test("六角色枚举：新空项目恰 6 个 builtIn（chief→product→rapporteur→nominator→convener→verifier）、primary=chief、governanceModel=trio", async () => {
   const { root, cleanup } = makeRoot("listing-five");
   try {
     const listing = await listOf(root);
     const builtIns = listing.roles.filter((r) => r.builtIn === true);
-    assert.deepEqual(builtIns.map((r) => r.roleId), [...FIVE_ROLE_IDS], "恰 5 个内置、顺序固定");
+    assert.deepEqual(
+      builtIns.map((r) => r.roleId),
+      ["chief", "product", "rapporteur", "nominator", "convener", "verifier"],
+      "恰 6 个内置、顺序固定（批次 A 六角色）",
+    );
     assert.deepEqual(
       builtIns.map((r) => r.governanceFunction),
-      ["liaison", "proposal", "nomination", "schedule", "verification"],
+      ["chief", "product", "proposal", "nomination", "schedule", "verification"],
       "职能与角色一一对应（含验收权 verification）",
     );
-    assert.equal(listing.primaryRoleId, "liaison", "主入口 = 产品 / Lead");
-    assert.equal(listing.governanceModel, "trio", "治理模型仍叫 trio（三权 · 五角色）");
+    assert.equal(listing.primaryRoleId, "chief", "主入口 = 幕僚");
+    assert.equal(listing.governanceModel, "trio", "治理模型仍叫 trio");
     assert.equal(listing.hasRoles, false);
     assert.equal(listing.roles.some((r) => r.roleId === "su"), false, "trio 下不枚举 su");
+    assert.equal(listing.roles.some((r) => r.roleId === "liaison"), false, "旧 liaison 退休、不枚举");
     assert.deepEqual(listing.warnings, [], "空项目是正常态：不报警");
     for (const r of builtIns) {
       assert.equal(r.cardPath, "", "内置角色没有角色目录");
@@ -54,9 +59,8 @@ test("五角色枚举：新空项目恰 5 个 builtIn（liaison→rapporteur→n
       assert.ok(r.cardText.length > 0, "内置卡文本由注册表合成");
       assert.equal(r.boundary.boundarySource, `<built-in:trio/${r.roleId}>`);
     }
-    // 卡文本职责（四角色评审 §二-3）：Liaison 明确沟通权与非批准；Rapporteur 不再自称客户沟通主入口；
-    // Convener 的提名步骤改为应用后台派发。
-    const liaison = builtIns.find((r) => r.roleId === "liaison")!;
+    // 旧 liaison 只读别名：卡文本仍可解析（存量旧会话兼容；D 删除）。
+    const liaison = governanceRoleOf("liaison")!;
     assert.match(liaison.cardText, /客户沟通权/);
     assert.match(liaison.cardText, /不拥有最终批准权/);
     assert.match(liaison.cardText, /docs\/intents\//);
@@ -69,6 +73,11 @@ test("五角色枚举：新空项目恰 5 个 builtIn（liaison→rapporteur→n
     assert.match(liaison.cardText, /flow_get.*flow_step_update.*flow_step_supersede/);
     assert.match(liaison.cardText, /派发\/推进 ≠ 客户批准/);
     assert.match(liaison.cardText, /不改变任何角色的写边界/);
+    // 幕僚（chief）卡文本：工作流管理/客户沟通/通知接收，不代决。
+    const chief = builtIns.find((r) => r.roleId === "chief")!;
+    assert.match(chief.cardText, /工作流管理/);
+    assert.match(chief.cardText, /不拥有最终批准权/);
+    assert.match(chief.cardText, /不转发、不审批、不代选、不代决/);
     const rapporteur = builtIns.find((r) => r.roleId === "rapporteur")!;
     assert.match(rapporteur.cardText, /request_clarification/, "Rapporteur 有澄清通道");
     assert.doesNotMatch(rapporteur.cardText, /客户沟通主入口/, "Rapporteur 不再自称客户沟通主入口");
@@ -79,7 +88,7 @@ test("五角色枚举：新空项目恰 5 个 builtIn（liaison→rapporteur→n
   }
 });
 
-test("旧 trio 项目：自动获得 Liaison 主入口、零迁移（`.ans`/文件树逐字节不变）", async () => {
+test("旧 trio 项目：主入口变化为零迁移（`.ans`/文件树逐字节不变），旧 liaison 别名可解析", async () => {
   const { root, cleanup } = makeRoot("old-trio");
   try {
     writeProjectRole(root, "A");
@@ -88,18 +97,18 @@ test("旧 trio 项目：自动获得 Liaison 主入口、零迁移（`.ans`/文�
     const listing = await listOf(root);
     assert.deepEqual(snapshotTree(root), before, "listProject 不得重写 `.ans`/角色卡/任何文件");
     assert.equal(listing.governanceModel, "trio");
-    assert.equal(listing.primaryRoleId, "liaison", "旧 trio 项目升级后默认入口 = Liaison");
+    assert.equal(listing.primaryRoleId, "chief", "批次 A：旧 trio 项目主入口变为 chief");
     assert.deepEqual(
       listing.roles.map((r) => r.roleId),
-      ["liaison", "rapporteur", "nominator", "convener", "verifier", "A"],
-      "五内置在前、项目角色保留",
+      ["chief", "product", "rapporteur", "nominator", "convener", "verifier", "A"],
+      "六内置在前、项目角色保留",
     );
   } finally {
     cleanup();
   }
 });
 
-test("保留 id：`角色卡/liaison/` 被跳过并警告；项目角色不能遮蔽内置 Liaison", async () => {
+test("保留 id：`角色卡/liaison/` 被跳过并警告；旧 liaison 不再进入列表", async () => {
   const { root, cleanup } = makeRoot("reserved-liaison");
   try {
     write(root, "角色卡/liaison/role-card.md", "# 假 Liaison\n");
@@ -108,10 +117,10 @@ test("保留 id：`角色卡/liaison/` 被跳过并警告；项目角色不能�
     const listing = await listOf(root);
     assert.equal(
       listing.roles.filter((r) => r.roleId === "liaison").length,
-      1,
-      "项目目录不得再枚举出第二个 liaison",
+      0,
+      "旧 liaison 退休后不再枚举（项目目录也不得再枚举出）",
     );
-    assert.equal(listing.roles.find((r) => r.roleId === "liaison")!.builtIn, true);
+    assert.equal(listing.roles.find((r) => r.roleId === "chief")!.builtIn, true);
     assert.match(listing.warnings.join("\n"), /角色卡\/liaison：与内置治理角色 id 冲突，已跳过/);
   } finally {
     cleanup();

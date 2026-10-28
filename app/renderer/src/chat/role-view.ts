@@ -18,7 +18,8 @@ export interface GovernanceView {
 }
 
 type GovernanceFunction =
-  | "liaison"
+  | "chief"
+  | "product"
   | "proposal"
   | "nomination"
   | "schedule"
@@ -28,9 +29,13 @@ const GOVERNANCE_KEYS: Record<
   GovernanceFunction,
   { name: MessageKey; power: MessageKey }
 > = {
-  liaison: {
-    name: "ui.role.governance.liaison.name",
-    power: "ui.role.governance.liaison.power",
+  chief: {
+    name: "ui.role.governance.chief.name",
+    power: "ui.role.governance.chief.power",
+  },
+  product: {
+    name: "ui.role.governance.product.name",
+    power: "ui.role.governance.product.power",
   },
   proposal: {
     name: "ui.role.governance.draft.name",

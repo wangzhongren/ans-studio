@@ -37,6 +37,14 @@ function cardTextOf(id: string): string {
   return spec!.cardText;
 }
 
+/**
+ * 批次 A（2026-10-28）：旧五名角色的卡文本断言（liaison 为只读别名）。新角色 chief/product 的
+ * 卡文本由生产实现与批次 A 验收覆盖；本文件的旧 flow/gate/evidence 卡文本断言仍只针对旧角色。
+ */
+const OLD_FIVE_SPECS = ["liaison", "rapporteur", "nominator", "convener", "verifier"].map(
+  (id) => governanceRoleOf(id)!,
+);
+
 function assertIncludesAll(text: string, needles: readonly string[], label: string): void {
   for (const needle of needles) {
     assert.ok(text.includes(needle), `${label} 须含「${needle}」`);
@@ -44,7 +52,7 @@ function assertIncludesAll(text: string, needles: readonly string[], label: stri
 }
 
 test("标准工作流：五卡各恰有一个「标准工作流」章节，并含应用负责阶段流转的总则", () => {
-  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+  for (const spec of OLD_FIVE_SPECS) {
     const t = spec.cardText;
     const headings = t.match(/## 标准工作流/g) ?? [];
     assert.equal(headings.length, 1, `${spec.id} 卡须恰有一个「标准工作流」章节`);
@@ -406,7 +414,7 @@ test("标准工作流：slug 校验引用 Model 常量（单一来源）——�
 test("标准工作流：五卡流程状态引用统一为 YAML（唯一机器状态），Markdown 仅人读视图；Crew/Proof 按 YAML 读取", () => {
   // 客户 2026-10-19 决定「这些全部改成yaml」：不只是 Steward 写 YAML，其余四张卡的治理文件命名与
   // 流程读取也必须统一为 YAML 机器状态；Markdown 只在人读视图出现。
-  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+  for (const spec of OLD_FIVE_SPECS) {
     const t = spec.cardText;
     assert.ok(t.includes("`docs/flows/<flowId>.yaml`"), `${spec.id} 须引用 YAML 机器状态路径`);
     assert.ok(t.includes("唯一机器状态"), `${spec.id} 须写明 YAML 是唯一机器状态`);
@@ -477,7 +485,7 @@ test("标准工作流：写卡被 declined——Crew/Steward 按 reason 修正�
   );
 
   // 五卡统一：judge deny 是系统审批拒绝，不是客户决定，不写入客户决定账本。
-  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+  for (const spec of OLD_FIVE_SPECS) {
     assertIncludesAll(
       spec.cardText,
       [
@@ -878,7 +886,7 @@ test("标准工作流：质检 / Proof——实施前写标准→核对档位/�
 });
 
 test("标准工作流：五卡保留既有 shell 审批档、质量基线、写区/禁写、判断代批与治理卡参数原文", () => {
-  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+  for (const spec of OLD_FIVE_SPECS) {
     const t = spec.cardText;
     // shell 审批档逐字保留（单一来源常量原文）。
     assert.ok(t.includes(SHELL_APPROVAL_CARD_LINE), `${spec.id} 卡须逐字保留 shell 审批档`);
@@ -908,7 +916,7 @@ test("标准工作流：2026-10-25 写入预授权——五卡边界内直接写
   // 客户新规则原文：「写自己角色权限内的路径，直接放行。」本批只改卡文本：Section 1 边界内的
   // 写入是预授权（write_file / edit_file 直接写），request_confirmation 只保留给治理敏感写入
   // （角色卡/边界、共享目录或他人写集、流程 YAML/账本、发布/变更包等按既有规则）与客户决定。
-  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+  for (const spec of OLD_FIVE_SPECS) {
     const t = spec.cardText;
     // 单一来源常量逐字复用，且不得被逐卡改写分叉。
     assert.ok(t.includes(BOUNDARY_WRITE_PREAUTHORIZATION_PRINCIPLE), `${spec.id} 卡须逐字包含写入预授权总则`);
@@ -970,7 +978,7 @@ test("注册表：按 2026-10-22 治理分工只调整 Convener/Crew/Verifier �
     convener: ["docs/flows/", "docs/scheduling/", "docs/governance/convener/"],
     verifier: ["docs/acceptance/", "docs/verification/", "docs/governance/verifier/"],
   };
-  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+  for (const spec of OLD_FIVE_SPECS) {
     assert.deepEqual(spec.entries.map((e) => e.path), expectedEntries[spec.id], `${spec.id} Section 1 须按本项调整`);
     assert.deepEqual(spec.preauthorizedDirs, expectedPreauthorized[spec.id], `${spec.id} 预授权须按本项调整`);
     assert.equal(spec.capabilities.shell, "operator-approve", `${spec.id} shell 档不得变化`);
@@ -1263,8 +1271,8 @@ test("2026-10-26 基础设施先行（真机教训）：Steward 团队计划必�
   assert.equal(steward.capabilities.shell, "operator-approve");
   assert.deepEqual(
     BUILT_IN_GOVERNANCE_ROLES.map((spec) => spec.id),
-    ["liaison", "rapporteur", "nominator", "convener", "verifier"],
-    "不得新增固定基础设施角色",
+    ["chief", "product", "rapporteur", "nominator", "convener", "verifier"],
+    "批次 A 六角色身份层；不新增固定基础设施角色",
   );
 });
 

@@ -11,8 +11,9 @@ export type RoleKind = "project" | "built-in-governance";
  * 冻结契约：`角色卡/项目管理/docs/design/2026-10-17_design_governance-trio-review.md` §5.1）。
  *
  * - `"single"`：旧治理模型（内置角色 `su`）——**缺省值**，任何未显式声明 trio 的调用方行为逐字不变。
- * - `"trio"`：三权治理模型（**三权不变、五个内置治理角色**：`liaison` / `rapporteur` /
- *   `nominator` / `convener` / `verifier` 五个内置治理角色；`trio` 命名的是权力模型而不是角色数量）。
+ * - `"trio"`：三权治理模型（**三权不变、六个内置角色**：`chief` / `product` / `rapporteur` /
+ *   `nominator` / `convener` / `verifier`；`trio` 命名的是权力模型而不是角色数量）。
+ *   2026-10-28 批次 A：`liaison` 退休（仅编译期 deprecated 别名），主入口 `primaryRoleId="chief"`。
  *
  * 模型来源：`src/common/shared/config-loader.ts::readGovernanceModel`（PM 属主，只读消费）；
  * `listProject` 按本模型枚举内置角色，`resolveBoundarySection` 按本模型选择边界来源。
@@ -20,12 +21,25 @@ export type RoleKind = "project" | "built-in-governance";
 export type GovernanceModel = "single" | "trio";
 
 /**
- * 内置治理角色的治理职能：沟通权 `liaison` / 提案权 `proposal` / 提名权 `nomination` /
- * 编排权 `schedule` / 验收权 `verification`（2026-10-18 客户拍板「都按推荐的来」：新增第五个
- * 内置治理角色 Proof / 验收 `verifier`；最终批准权归属不变）。
- * 仅 trio 的五个内置治理角色携带；`su`（single）与项目角色为 `undefined`。
+ * 内置治理角色的治理职能（2026-10-28 方案 v9.2「幕僚 + 最小系统」）：
+ * 幕僚 `chief` / 产品 `product` / 提案 `proposal` / 提名 `nomination` / 编排 `schedule` /
+ * 验收 `verification`。`schedule` 仅作职能 id / 兼容标签，**不再有调度权**（调度归幕僚）。
+ *
+ * `liaison` 是**批次 A 的编译期 deprecated shim**（方案 §16.3：中间批次可用只读别名维持
+ * typecheck；行为不变，D 批删除）：它**不进入** `BUILT_IN_GOVERNANCE_ROLES` / 角色列表 /
+ * 新项目主入口，只用于存量旧会话/旧测试按 id 解析。
+ *
+ * 仅 trio 的六个内置治理角色携带；`su`（single）与项目角色为 `undefined`。
  */
-export type GovernanceFunction = "liaison" | "proposal" | "nomination" | "schedule" | "verification";
+export type GovernanceFunction =
+  | "chief"
+  | "product"
+  | "proposal"
+  | "nomination"
+  | "schedule"
+  | "verification"
+  /** @deprecated 批次 A 临时 shim（方案 §16.3），D 批删除；不进入注册表枚举/列表。 */
+  | "liaison";
 
 /** 角色卡声明的协作信息，仅供展示；不授予权限或改变角色身份。 */
 export interface RoleGroupMetadata {
@@ -46,7 +60,8 @@ export interface ResolvedRole extends RoleGroupMetadata {
   boundary: BoundarySection1;
   boundarySource: string;
   location: RoleLocation;
-  /** 仅 trio 的五个内置治理角色携带（liaison/proposal/nomination/schedule/verification）；su 与项目角色不出现。 */
+  /** 仅 trio 的内置治理角色携带（chief/product/proposal/nomination/schedule/verification）；su 与项目角色不出现。
+   *  批次 A 兼容：旧 `liaison` 仍可经 deprecated 只读别名解析，但不进入列表。 */
   governanceFunction?: GovernanceFunction;
 }
 

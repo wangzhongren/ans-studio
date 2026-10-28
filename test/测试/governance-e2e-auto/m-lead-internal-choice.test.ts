@@ -96,11 +96,11 @@ test("Lead 通用 choice 不呈现客户：declined + 指导；随后 flow_get/d
     approval: true,
     decision: true,
     scriptForRole: (ctx) =>
-      ctx.roleId === "liaison" && !ctx.prompt.includes("[系统·治理反馈]") ? internalChoiceScript() : [],
+      ctx.roleId === "chief" && !ctx.prompt.includes("[系统·治理反馈]") ? internalChoiceScript() : [],
   });
   try {
-    await h.open("liaison");
-    const sent = await h.send("liaison", "内部方案请自行决定，不要打扰客户。");
+    await h.open("chief");
+    const sent = await h.send("chief", "内部方案请自行决定，不要打扰客户。");
     assert.equal(sent.ok, true, sent.error ?? "");
 
     assert.equal(h.presented.length, 0, "通用 choice 不得呈现客户卡");
@@ -135,7 +135,7 @@ test("Lead 通用 choice 不呈现客户：declined + 指导；随后 flow_get/d
       (entry) => entry.kind === "dispatch.accepted" && entry.targetRoleId === "convener",
     );
     assert.ok(coordinate, "Lead 协调派发应入账");
-    assert.equal(coordinate!.actorRoleId, "liaison", "协调消息归因 Lead（不是客户）");
+    assert.equal(coordinate!.actorRoleId, "chief", "协调消息归因 Lead（不是客户）");
     await h.waitFor(() => (h.prompts.get("convener")?.length ?? 0) === 1, 3000);
     assert.equal(h.prompts.get("convener")!.length, 1, "Convener 收到 Lead 的协调任务");
   } finally {
@@ -154,13 +154,13 @@ test("显式 intent-confirm 缺 confirm 选项 ⇒ 0 客户卡、declined、无�
     approval: true,
     decision: true,
     scriptForRole: (ctx) =>
-      ctx.roleId === "liaison" && !ctx.prompt.includes("[系统·治理反馈]")
+      ctx.roleId === "chief" && !ctx.prompt.includes("[系统·治理反馈]")
         ? intentConfirmScript([{ id: "revise", label: "修改" }])
         : [],
   });
   try {
-    await h.open("liaison");
-    const sent = await h.send("liaison", "请确认需求。");
+    await h.open("chief");
+    const sent = await h.send("chief", "请确认需求。");
     assert.equal(sent.ok, true, sent.error ?? "");
 
     assert.equal(h.presented.length, 0, "缺 confirm 选项不得呈现客户卡");
@@ -193,7 +193,7 @@ test("含 confirm 的 intent-confirm 旧路径：decision 开 ⇒ 判断代批 c
     approval: true,
     decision: true,
     scriptForRole: (ctx) =>
-      ctx.roleId === "liaison" && !ctx.prompt.includes("[系统·治理反馈]")
+      ctx.roleId === "chief" && !ctx.prompt.includes("[系统·治理反馈]")
         ? intentConfirmScript([
             { id: "confirm", label: "确认" },
             { id: "revise", label: "修改" },
@@ -201,8 +201,8 @@ test("含 confirm 的 intent-confirm 旧路径：decision 开 ⇒ 判断代批 c
         : [],
   });
   try {
-    await h.open("liaison");
-    const sent = await h.send("liaison", "请确认需求后交给报告员。");
+    await h.open("chief");
+    const sent = await h.send("chief", "请确认需求后交给报告员。");
     assert.equal(sent.ok, true, sent.error ?? "");
     assert.equal(h.presented.length, 0, "decision 开 ⇒ 判断代批 confirm，0 客户卡");
     const row = h.judgeRows.find((entry) => entry.cardKind === "intent-confirm");
@@ -235,7 +235,7 @@ test("含 confirm 的 intent-confirm 旧路径：decision 关 ⇒ 客户卡手�
     approval: true,
     decision: false,
     scriptForRole: (ctx) =>
-      ctx.roleId === "liaison" && !ctx.prompt.includes("[系统·治理反馈]")
+      ctx.roleId === "chief" && !ctx.prompt.includes("[系统·治理反馈]")
         ? intentConfirmScript([
             { id: "confirm", label: "确认" },
             { id: "revise", label: "修改" },
@@ -243,8 +243,8 @@ test("含 confirm 的 intent-confirm 旧路径：decision 关 ⇒ 客户卡手�
         : [],
   });
   try {
-    await h.open("liaison");
-    const sending = h.send("liaison", "请确认需求后交给报告员。");
+    await h.open("chief");
+    const sending = h.send("chief", "请确认需求后交给报告员。");
     await h.waitFor(() => h.presented.length === 1, 5000);
     const card = h.presented[0]!;
     assert.equal(card.request.cardKind, "intent-confirm");

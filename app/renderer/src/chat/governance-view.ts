@@ -146,7 +146,8 @@ export function governanceEmptyState(
 // —————— 治理角色说明（按 governanceFunction；appointment 相关文案按 2026-10-22 治理拆分更新）——————
 
 const GOVERNANCE_ROLE_HINT_KEYS: Record<string, MessageKey> = {
-  liaison: "ui.governance.roleIntro.liaison",
+  chief: "ui.governance.roleIntro.chief",
+  product: "ui.governance.roleIntro.product",
   proposal: "ui.governance.roleIntro.proposal",
   nomination: "ui.governance.roleIntro.nomination",
   schedule: "ui.governance.roleIntro.schedule",

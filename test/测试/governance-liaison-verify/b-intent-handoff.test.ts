@@ -58,7 +58,7 @@ interface HandoffHarness {
 async function openLiaison(
   root: string,
   delivery: "ok" | "fail" | "throw" = "ok",
-  roleId: "liaison" | "rapporteur" = "liaison",
+  roleId: "chief" | "rapporteur" = "chief",
 ): Promise<HandoffHarness> {
   const cap = capture();
   const calls: HandoffHarness["calls"] = [];
@@ -100,7 +100,7 @@ test("合法交接：工具调用成功 → 账本 intent.handed-off 字段完�
     const calls: unknown[] = [];
     const handle = await openRoleSession(
       {
-        roleId: "liaison",
+        roleId: "chief",
         project: trioProject(root),
         taskId: "T-handoff-tool",
         handOffIntent: (payload) => {
@@ -128,8 +128,8 @@ test("合法交接：工具调用成功 → 账本 intent.handed-off 字段完�
     assert.deepEqual(errors, []);
     const entry = handoffs(entries)[0];
     assert.ok(entry, "成功交接应写 intent.handed-off");
-    assert.equal(entry!.actorRoleId, "liaison", "谁转的交 = Liaison");
-    assert.equal(entry!.power, "liaison", "power 统一为 liaison（评审 §7.1；AC5 修复后）");
+    assert.equal(entry!.actorRoleId, "chief", "谁转的交 = Liaison");
+    assert.equal(entry!.power, "liaison", "power 保持旧 liaison 审计标签（批次 A 别名；D 删除）");
     assert.equal(entry!.intentId, INTENT);
     assert.equal(entry!.handoffKind, "initial");
     assert.equal(entry!.targetRoleId, "rapporteur");
@@ -160,9 +160,9 @@ test("AC5 双事件：成功交接同时写 intent.handed-off 与 dispatch.accep
     const listing = await listProject(root);
     const harness = makeDesktop(root, listing, {
       scriptForRole: (roleId) =>
-        roleId === "liaison" ? [{ name: "hand_off_intent", args: handoffPayload() }] : [],
+        roleId === "chief" ? [{ name: "hand_off_intent", args: handoffPayload() }] : [],
     });
-    assert.equal((await harness.manager.open({ projectRoot: root, roleId: "liaison", runtime: "demo" })).ok, true);
+    assert.equal((await harness.manager.open({ projectRoot: root, roleId: "chief", runtime: "demo" })).ok, true);
     await harness.manager.send("请把意图交给报告员");
     const { entries } = await waitForLedger(
       root,
@@ -173,7 +173,7 @@ test("AC5 双事件：成功交接同时写 intent.handed-off 与 dispatch.accep
     await harness.manager.stop(null);
     const handoff = entries.find((e) => e.kind === "intent.handed-off");
     assert.ok(handoff, "应有 intent.handed-off（谁转的交）");
-    assert.equal(handoff!.actorRoleId, "liaison");
+    assert.equal(handoff!.actorRoleId, "chief");
     const dispatched = entries.find((e) => e.kind === "dispatch.accepted" && e.trigger === "intent-handoff");
     assert.ok(dispatched, "交接成功后应有 dispatch.accepted{trigger:'intent-handoff'}（评审 §7.2/AC5）");
     assert.equal(dispatched!.actorRoleId, "app");
@@ -465,7 +465,7 @@ test("Liaison 每轮 settle 观察 docs/intents：artifact.observed（谁写了�
     const cap = capture();
     const handle = await openRoleSession(
       {
-        roleId: "liaison",
+        roleId: "chief",
         project: trioProject(root),
         taskId: "T-artifact",
         handOffIntent: () => ({ ok: true, message: "stub" }),
@@ -502,8 +502,8 @@ test("Liaison 每轮 settle 观察 docs/intents：artifact.observed（谁写了�
       (e) => e.kind === "artifact.observed" && e.artifactPath === `docs/intents/${INTENT}.md`,
     );
     assert.ok(observed, "Liaison 的预授权目录 docs/intents 应被 settle 观察");
-    assert.equal(observed!.actorRoleId, "liaison", "谁写了客户意图 = Liaison");
-    assert.equal(observed!.power, "liaison", "意图观察 power 统一为 liaison（评审 §7.1）");
+    assert.equal(observed!.actorRoleId, "chief", "谁写了客户意图 = Liaison");
+    assert.equal(observed!.power, "liaison", "意图观察 power 保持旧 liaison 审计标签（批次 A 别名）");
     assert.equal(handoffs(entries).length, 1, "同一轮交接账本一条");
   } finally {
     cleanup();
@@ -572,19 +572,19 @@ test("桌面交接闭环：后台开 Rapporteur + 恰一条任务；不切换 pa
     const listing = await listProject(root);
     const harness = makeDesktop(root, listing, {
       scriptForRole: (roleId) =>
-        roleId === "liaison" ? [{ name: "hand_off_intent", args: handoffPayload() }] : [],
+        roleId === "chief" ? [{ name: "hand_off_intent", args: handoffPayload() }] : [],
     });
     const { manager, events, prompted, openAttempts } = harness;
-    const opened = await manager.open({ projectRoot: root, roleId: "liaison", runtime: "demo" });
+    const opened = await manager.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     assert.equal(opened.ok, true, opened.error ?? "");
-    assert.equal(manager.openForRoleId(), "liaison");
+    assert.equal(manager.openForRoleId(), "chief");
     await manager.send("请把意图交给报告员");
     const { entries } = await waitForLedger(root, (list) => list.some((e) => e.kind === "intent.handed-off"));
     assert.equal(handoffs(entries).length, 1, "恰一条成功交接账本");
 
-    assert.deepEqual(openAttempts.slice(0, 2), ["liaison", "rapporteur"], "客户打开 Lead、后台投递 Rapporteur");
+    assert.deepEqual(openAttempts.slice(0, 2), ["chief", "rapporteur"], "客户打开 Lead、后台投递 Rapporteur");
     assert.ok(
-      openAttempts.slice(2).every((roleId) => roleId === "liaison"),
+      openAttempts.slice(2).every((roleId) => roleId === "chief"),
       `其余打开只能是治理反馈对 Lead 的（重）打开；实得：${openAttempts.join(" → ")}`,
     );
     assert.deepEqual(
@@ -596,12 +596,12 @@ test("桌面交接闭环：后台开 Rapporteur + 恰一条任务；不切换 pa
     // 会话若因边界刷新被重建，active 可能暂为 null（用户重开前不冒充仍在）。
     const activeAfterHandoff = manager.openForRoleId();
     assert.ok(
-      activeAfterHandoff === "liaison" || activeAfterHandoff === null,
+      activeAfterHandoff === "chief" || activeAfterHandoff === null,
       `后台投递不得抢 activeRoleId（实得：${String(activeAfterHandoff)}）`,
     );
     const notes = events.filter(
       (envelope) =>
-        envelope.roleId === "liaison" &&
+        envelope.roleId === "chief" &&
         envelope.event.kind === "message" &&
         (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
     );
@@ -610,16 +610,16 @@ test("桌面交接闭环：后台开 Rapporteur + 恰一条任务；不切换 pa
     assert.equal(notes.length, 1, `成功系统行恰一条，落 Lead 聊天流（实得：${notes.map((envelope) => envelope.event.summary ?? "").join(" | ")}）`);
     assert.equal(notes[0]?.event.summary, "已交给策划（工作中）");
     // 当前 pane 仍可对 Liaison 发言（投递可能异步入队，轮询到真实 prompt 发生）。
-    if (manager.openForRoleId() !== "liaison") {
-      const reopened = await manager.open({ projectRoot: root, roleId: "liaison", runtime: "demo" });
+    if (manager.openForRoleId() !== "chief") {
+      const reopened = await manager.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
       assert.equal(reopened.ok, true, reopened.error ?? "");
     }
-    prompted.get("liaison")!.length = 0;
+    prompted.get("chief")!.length = 0;
     await manager.send("客户继续说话");
-    for (let i = 0; i < 100 && !prompted.get("liaison")!.includes("客户继续说话"); i += 1) {
+    for (let i = 0; i < 100 && !prompted.get("chief")!.includes("客户继续说话"); i += 1) {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
-    assert.ok(prompted.get("liaison")!.includes("客户继续说话"), "客户消息仍落 Liaison");
+    assert.ok(prompted.get("chief")!.includes("客户继续说话"), "客户消息仍落 Liaison");
     await manager.stop(null);
   } finally {
     cleanup();
@@ -637,19 +637,19 @@ test("桌面交接失败：只落失败系统行、无成功账本、不循环�
     const harness = makeDesktop(root, listing, {
       failRapporteurOpen: true,
       scriptForRole: (roleId) =>
-        roleId === "liaison" ? [{ name: "hand_off_intent", args: handoffPayload() }] : [],
+        roleId === "chief" ? [{ name: "hand_off_intent", args: handoffPayload() }] : [],
     });
     const { manager, events, openAttempts } = harness;
-    const opened = await manager.open({ projectRoot: root, roleId: "liaison", runtime: "demo" });
+    const opened = await manager.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     assert.equal(opened.ok, true, opened.error ?? "");
     await manager.send("请把意图交给报告员");
-    assert.deepEqual(openAttempts, ["liaison", "rapporteur"], "失败不循环重试（恰一次投递尝试）");
+    assert.deepEqual(openAttempts, ["chief", "rapporteur"], "失败不循环重试（恰一次投递尝试）");
     const { entries } = await ledgerOf(root);
     assert.equal(handoffs(entries).length, 0, "失败零成功账本");
-    assert.equal(manager.openForRoleId(), "liaison", "失败不切 pane");
+    assert.equal(manager.openForRoleId(), "chief", "失败不切 pane");
     const notes = events.filter(
       (envelope) =>
-        envelope.roleId === "liaison" &&
+        envelope.roleId === "chief" &&
         envelope.event.kind === "message" &&
         (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
     );

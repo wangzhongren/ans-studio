@@ -78,10 +78,16 @@ test("B1 纯逻辑 en-US：状态/角色/工作概览/确认/治理/设置", () 
   assert.equal(statusBadge("stopped", 0, "en-US").label, "Stopped");
 
   assert.equal(roleDisplayName(null, "en-US"), "No role selected");
-  const lead = governanceView("liaison", "en-US");
-  assert.equal(lead?.name, "Product");
-  assert.equal(lead?.power, "Customer communication · no final approval power");
-  assert.equal(lead?.builtinNote, "Built-in role: shipped with the app, no role directory");
+  const chief = governanceView("chief", "en-US");
+  assert.equal(chief?.name, "Chief of Staff");
+  assert.equal(
+    chief?.power,
+    "Workflow management · customer communication · no final approval power",
+  );
+  assert.equal(chief?.builtinNote, "Built-in role: shipped with the app, no role directory");
+  const product = governanceView("product", "en-US");
+  assert.equal(product?.name, "Product");
+  assert.equal(product?.power, "Product review · no final approval power");
   assert.equal(
     roleSubtitle({ roleId: "x", builtIn: true } as never, "en-US"),
     "Built-in governance role (see SKILL.md)",
@@ -353,7 +359,8 @@ test("PM 补齐的缺口 key 已接线（ChatHeader/QueueSubview/设置/确认/�
     ["app/renderer/src/chat/runtime-config.ts", '"ui.settings.saveNoteNoChanges"'],
     ["app/renderer/src/stores/confirm-store.ts", '"ui.confirm.expiredShell"'],
     ["app/renderer/src/stores/governance-store.ts", '"ui.governanceStore.stepFallback"'],
-    ["app/renderer/src/chat/judge.ts", '"ui.judge.roleName.liaison"'],
+    ["app/renderer/src/chat/judge.ts", '"ui.judge.roleName.chief"'],
+    ["app/renderer/src/chat/judge.ts", '"ui.judge.roleName.product"'],
     ["app/renderer/src/chat/judge.ts", '"ui.judge.roleName.verifier"'],
     ["app/renderer/src/chat/judge.ts", '"ui.judge.headline.writeConfirmOverflow"'],
     ["app/renderer/src/chat/report-view.ts", '"ui.reportView.savingHistory"'],

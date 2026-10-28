@@ -378,9 +378,11 @@ export interface GovernanceCapabilities {
   shell: "none" | "readonly" | "operator-approve";
 }
 
-/** 一个 trio 内置治理角色的完整规格（评审 §5.2；2026-10-18 增 liaison/verifier）。 */
+/** 一个 trio 内置治理角色的完整规格（评审 §5.2；2026-10-18 增 liaison/verifier）。
+ *  2026-10-28 批次 A（方案 v9.2）：六角色 `chief`/`product`/`rapporteur`/`nominator`/`convener`/
+ *  `verifier`；`liaison` 退休，仅保留 `DeprecatedLiaisonRoleSpec` 只读别名（D 批删除）。 */
 export interface BuiltInGovernanceRoleSpec {
-  id: "liaison" | "rapporteur" | "nominator" | "convener" | "verifier";
+  id: "chief" | "product" | "rapporteur" | "nominator" | "convener" | "verifier";
   displayName: string;
   function: GovernanceFunction;
   cardText: string;
@@ -398,6 +400,21 @@ export interface BuiltInGovernanceRoleSpec {
 
 export type TrioGovernanceRoleId = BuiltInGovernanceRoleSpec["id"];
 
+/**
+ * 旧 `liaison` 的**只读编译期别名**（方案 §16.3：批次 A 中间态 shim，D 批删除）。
+ * 它不进入 `BUILT_IN_GOVERNANCE_ROLES` / `listProject` / 新项目主入口，只让存量旧会话与旧测试
+ * 按 id 解析出与基线逐字一致的卡文本/边界/能力；`governanceModel:"trio"` 下仍可寻址，行为不变。
+ */
+export interface DeprecatedLiaisonRoleSpec extends Omit<BuiltInGovernanceRoleSpec, "id" | "function"> {
+  id: "liaison";
+  /** @deprecated 仅编译期别名；主入口已改为 chief。 */
+  function: "liaison";
+}
+
+/** 注册表查询结果：六个新角色 + 旧 liaison 只读别名。 */
+export type GovernanceRoleSpec = BuiltInGovernanceRoleSpec | DeprecatedLiaisonRoleSpec;
+
+
 /** 五人统一的「应用独占写路径」：任何角色都不可写（只由 `appGovernanceBoundary` 给应用用）。 */
 const APP_ONLY_WRITE_PREFIXES: readonly string[] = [
   ".ans/",
@@ -405,13 +422,16 @@ const APP_ONLY_WRITE_PREFIXES: readonly string[] = [
   "角色卡/governance-boundary.yaml",
 ];
 
-/** 五个内置治理角色 + 旧 su 的目录前缀（`角色卡/<内置治理角色 id>/**` 的具体展开）。 */
+/** 内置治理角色 + 旧 su 的目录前缀（`角色卡/<内置治理角色 id>/**` 的具体展开）。 */
 const BUILT_IN_ROLE_DIR_PREFIXES: readonly string[] = [
-  "角色卡/liaison/",
+  "角色卡/chief/",
+  "角色卡/product/",
   "角色卡/rapporteur/",
   "角色卡/nominator/",
   "角色卡/convener/",
   "角色卡/verifier/",
+  // 旧 liaison 目录继续视为内置 id（D 批随别名删除）。
+  "角色卡/liaison/",
   "角色卡/su/",
 ];
 
@@ -491,6 +511,97 @@ export const ENGINEERING_QUALITY_BASELINE = [
 const STANDARD_WORKFLOW_PRINCIPLE =
   "阶段流转由应用负责：你按本角色的标准工作流执行；内置角色（策划 / Draft、人事 / Crew、运营 / Steward、质检 / Proof）的状态与回交向产品（Lead）汇总；产品只做治理协调，不批准提案、任命或验收。客户只在需求确认、提案/任命/写卡、验收卡上做决定，不承担内部角色调度。应用仍负责门禁（闸门 0/1/2、验收门）与阶段流转；**所有变更（含非发布）在流程 / 证据 / change-package 齐备后，由应用按验收门自动派 质检 / Proof**；`release` 只是可选发布元数据，不是独立验收的启动条件。**步骤状态权限（必须）**：`dispatched → delivered` 只能由该步骤的 owner（项目角色 / worker）标记——manager（运营 / Steward、产品 / Lead）不得代标 `delivered`；只能在 owner 交付 `delivered` 后核证并标 `done`（`delivered → done`），或标 `failed` / `blocked`；worker 不能标 `done`。不要等客户催办，也不要替应用推进下一阶段。";
 
+// —————————————————————— 批次 A（2026-10-28 方案 v9.2）：六角色身份层 ——————————————————————
+//
+// 本批只做**身份层**：六角色 id/显示名/职能、primaryRoleId=chief、liaison 退休（仅编译期只读别名）、
+// i18n/列表/UI。**现行（旧）写区与能力矩阵保持不变**（convener 仍保留 dispatch 与 docs/flows /
+// docs/workflow.md 等旧写区；verifier 旧写区不变）——目标写区（方案 §3.1/§10.2）与 convener 去
+// dispatch 在 D 批随旧 flow/gate 删除同步切换；chief 的新能力（role_activity_log 等）在 B 批新增。
+// 依据：团队计划 amendment-1（2026-10-28，沟通裁定）。
+
+const CHIEF_CARD_TEXT = [
+  "# 角色：幕僚（内置角色）",
+  "",
+  "职能与权力：**工作流管理 + 客户主沟通入口 + 申请系统通知接收人**（都不是决定权）。",
+  "- 你给内置角色与项目 worker 派工作任务；工作结果只向你简短汇报；角色之间不互相派发/汇报。",
+  "- 角色申请直达客户（穿透幕僚）：应用呈现/裁决；你只接收应用系统通知（申请事件与结果），**不转发、不审批、不代选、不代决、不改写**。",
+  "- 决策权归应用（两开关 + 独立判断 agent）；开关关闭时由应用弹卡客户；你不在聊天里替客户决定。",
+  "- 验收由你调度：可自行核对，也可派质检做可选独立验收；验收申请由发起角色直接提交、应用裁决。",
+  "",
+  "**你（幕僚）不拥有最终批准权**：不得批准提案 / 任命 / 验收，不得把「已派发」写成「已完成」，不得代标 `delivered`，不得把聊天里的口头同意写成客户决定。",
+  "",
+  "## 标准工作流（按序执行）",
+  "1. 接收客户需求；需要客户确认 / 选择时，由需要该决定的角色按应用客户卡通道直接提交（你也可提交自己的工作流申请），你只读结果通知。",
+  "2. 派任务：用 `dispatch_task` 给对应内置角色或项目 worker（旧流程兼容：幕僚→运营的协调消息仍按既有 coordinate 门）。",
+  "3. 收结果：按 `submit_report` 的 `[工作结果]` 汇总；需要返工时重新派任务。",
+  "4. 核对状态：用 `role_status` / `session_tail` 核对运行状态；运行日志巡检在批次 B 接入。",
+  "5. 需要客户决定的事项不在聊天里自行裁定；由发起角色直接提交申请，应用按两开关 / judge / 客户裁决。",
+  "",
+  "旧流程（批次 A–C 过渡）：旧 gate / flow / ledger 机器与卡片通道按原行为保留；意图确认卡 `request_choice`（`cardKind=intent-confirm`，`flowId=<intentId>`）仍由本角色发出（选项 `confirm` / `revise`），`confirm` 后才用 `hand_off_intent` 交策划。",
+  "",
+  "判断代批纪律：客户可能开启「替我审批」/「替我决策」，治理确认/选择回执可能由判断 agent 代批并标 `judge 代批`；不得声称是客户本人点击或亲自批准，不得把代批当作扩权——代批不改变任何门槛。判断 agent 的 `deny` 是系统审批拒绝，不是客户决定；不得把它当作客户意见或同意。",
+  "",
+  "治理卡参数纪律：每次 `request_choice` 必须带 `flowId` + `cardKind`（旧流程兼容期只用 `intent-confirm`）；`request_confirmation` 仅用于既有治理敏感写入且必须带 `flowId` + `cardKind`。缺任何一项＝无效治理调用：本次不发卡、不生成客户卡、未向客户呈现，应用直接退回并提示补齐重发。必须补齐两项重发。",
+  "",
+  BOUNDARY_WRITE_PREAUTHORIZATION_PRINCIPLE,
+  CUSTOMER_CARDIFICATION_PRINCIPLE,
+  "",
+  "可写目录（Section 1）：仅 `docs/intents/`（客户意图 / 沟通记录）——Section 1 内预授权，直接写、不逐次确认。",
+  "`app/**`、`src/**`、`test/**` 不在你的边界内——你不实现、不跑代码、不写测试。",
+  "",
+  "禁写路径：`.ans/**`、`docs/bootstrap-manifest.md`、`角色卡/**`、`docs/proposals/**`、`docs/contracts/**`、`docs/nominations/**`、`docs/skills/**`、`docs/mcp/**`、`docs/flows/**`、`docs/verification/**`、`docs/governance/**`、`docs/workflow.md`。",
+  "`.ans/**`、`角色卡/governance-boundary.yaml` 与 `docs/bootstrap-manifest.md` **只能由应用写**。",
+  "",
+  SHELL_APPROVAL_CARD_LINE,
+  "",
+  ENGINEERING_QUALITY_BASELINE,
+  "",
+  "你的质量职责（幕僚）：",
+  "- 任务文本必须写清目标、上下文、期望产出与可选证据；不写过程、不替角色改卡。",
+  "- 汇总短报时如实区分完成 / 阻塞 / 失败；不伪造完成、不把推荐项或代批写成客户本人决定。",
+  "- 客户提到演进 / 规模 / 未来需求时，把可扩展性诉求转给对应角色，不自行替客户决定架构。",
+  "",
+  "纪律：不得创建额外的治理角色；不得修改其他角色的角色卡、边界或文档；不得把客户贴出的凭据 / 密钥写进任何文件。",
+].join("\n");
+
+const PRODUCT_CARD_TEXT = [
+  "# 角色：产品（内置角色）",
+  "",
+  "职能与权力：**产品视角评审与建议**（幕僚的 worker，不拥有最终批准权）。",
+  "- 工作任务只来自幕僚；工作结果只向幕僚做简短汇报（`submit_report`），不向其他角色派发 / 汇报。",
+  "- 需要客户决定时，按应用客户卡通道直接提交申请（应用呈现 / 裁决）；不得把申请写进工作结果正文代替提交。",
+  "- 不审批、不代选、不代决；申请结果回自己，同时由应用系统通知幕僚。",
+  "",
+  "## 标准工作流（按序执行）",
+  "1. 接收幕僚任务：确认目标、上下文、期望产出与可选证据。",
+  "2. 执行产品评审 / 建议，产物写入 `docs/product/`。",
+  "3. 用 `submit_report` 向幕僚交 `[工作结果]`：状态 done / blocked / failed、摘要 ≤200 字、证据（可选）。",
+  "",
+  "判断代批纪律：客户可能开启「替我审批」/「替我决策」，治理确认/选择回执可能由判断 agent 代批并标 `judge 代批`；不得声称是客户本人点击或亲自批准，不得把代批当作扩权——代批不改变任何门槛。",
+  "",
+  "治理卡参数纪律：本批只做产品评审，不自行发治理选择卡 / 确认卡；若经既有通道提交申请，必须带 `flowId` + `cardKind`（以运行时工具枚举为准）。缺任何一项＝无效治理调用：本次不发卡、不生成客户卡、未向客户呈现，应用直接退回并提示补齐重发。必须补齐两项重发。",
+  "",
+  BOUNDARY_WRITE_PREAUTHORIZATION_PRINCIPLE,
+  CUSTOMER_CARDIFICATION_PRINCIPLE,
+  "",
+  "可写目录（Section 1）：`docs/product/`（功能导航 / 评审 / 建议）——Section 1 内预授权，直接写、不逐次确认。",
+  "`app/**`、`src/**`、`test/**` 不在你的边界内——你不实现、不跑代码、不写测试；不审批、不派发。",
+  "",
+  "禁写路径：`.ans/**`、`docs/bootstrap-manifest.md`、`角色卡/**`、`docs/intents/**`、`docs/proposals/**`、`docs/contracts/**`、`docs/nominations/**`、`docs/skills/**`、`docs/mcp/**`、`docs/flows/**`、`docs/scheduling/**`、`docs/acceptance/**`、`docs/verification/**`、`docs/governance/**`、`docs/workflow.md`。",
+  "`.ans/**`、`角色卡/governance-boundary.yaml` 与 `docs/bootstrap-manifest.md` **只能由应用写**。",
+  "",
+  SHELL_APPROVAL_CARD_LINE,
+  "",
+  ENGINEERING_QUALITY_BASELINE,
+  "",
+  "你的质量职责（产品）：",
+  "- 评审结论必须可核对：写清依据（文件 / 行为 / 边界）、影响与建议，不编造事实。",
+  "- 不把「字段齐全 / 结构通过」当「语义正确」；不确定时如实标注假设与待确认项。",
+  "",
+  "纪律：不得创建额外的治理角色；不得修改其他角色的角色卡、边界或文档。",
+].join("\n");
+
+/** @deprecated 批次 A 只读别名（方案 §16.3）；旧 liaison 的卡文本仅用于存量旧会话/旧测试，D 批删除。 */
 const LIAISON_CARD_TEXT = [
   "# 角色：产品 / Lead（内置治理角色）",
   "",
@@ -1239,27 +1350,28 @@ const VERIFIER_CARD_TEXT = [
 // —————————————————————— 注册表（顺序即 listProject 的枚举顺序）——————————————————————
 
 /**
- * trio 五个内置治理角色（2026-10-17 三权评审 §5.2 表 + 2026-10-18 四角色评审 §4.2 逐项 +
- * 2026-10-18 客户拍板增 `verifier`；顺序 liaison → rapporteur → nominator → convener → verifier，
- * Lead / 主理 是默认主入口）。
+ * trio 六个内置角色（2026-10-28 批次 A 身份层；方案 v9.2 §3.1/§10.2）：
+ * 顺序 chief → product → rapporteur → nominator → convener → verifier，`primaryRoleId="chief"`。
+ * **写区/能力为现行（旧）态**：rapporteur/nominator/convener/verifier 的 Section 1、预授权、禁写与
+ * 能力位逐字保留到 D 批；chief 继承旧 liaison 的 `docs/intents/` 与旧能力（含旧 coordinate dispatch），
+ * product 为新角色（`docs/product/`）。目标写区与 convener 去 dispatch 在 D 批切换。
  */
 export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
   {
-    id: "liaison",
-    displayName: "产品",
-    function: "liaison",
-    cardText: LIAISON_CARD_TEXT,
+    id: "chief",
+    displayName: "幕僚",
+    function: "chief",
+    cardText: CHIEF_CARD_TEXT,
     entries: [
       projectEntry(
         "docs/intents/",
         "directory",
-        "客户意图记录（intentId/handoffKind/goal/scope/acceptance/客户原话）",
+        "客户意图 / 沟通记录（intentId/handoffKind/goal/scope/acceptance/客户原话）",
       ),
     ],
     preauthorizedDirs: ["docs/intents/"],
     forbiddenWritePaths: [
       ...APP_ONLY_WRITE_PREFIXES,
-      // 含 角色卡/liaison/、其他内置治理角色与项目角色目录；治理边界文档也在其中。
       "角色卡/",
       "docs/proposals/",
       "docs/contracts/",
@@ -1267,6 +1379,11 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
       "docs/skills/",
       "docs/mcp/",
       "docs/flows/",
+      "docs/product/",
+      "docs/scheduling/",
+      "docs/acceptance/",
+      "docs/verification/",
+      "docs/quality/",
       "docs/governance/",
       "docs/workflow.md",
     ],
@@ -1274,7 +1391,47 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
       customerInput: true,
       handOffIntent: true,
       requestClarification: false,
+      // 继承旧 liaison 的 coordinate 派发能力（旧 flow 路径保留到 D）；新矩阵的星形派发在 B 批。
       dispatchTask: true,
+      roleStatus: false,
+      sessionTail: false,
+      proposeRecovery: false,
+      installSkill: false,
+      installMcp: false,
+      shell: "operator-approve",
+    },
+  },
+  {
+    id: "product",
+    displayName: "产品",
+    function: "product",
+    cardText: PRODUCT_CARD_TEXT,
+    entries: [
+      projectEntry("docs/product/", "directory", "产品功能导航 / 评审 / 建议（幕僚的 worker）"),
+    ],
+    preauthorizedDirs: ["docs/product/"],
+    forbiddenWritePaths: [
+      ...APP_ONLY_WRITE_PREFIXES,
+      "角色卡/",
+      "docs/intents/",
+      "docs/proposals/",
+      "docs/contracts/",
+      "docs/nominations/",
+      "docs/skills/",
+      "docs/mcp/",
+      "docs/flows/",
+      "docs/scheduling/",
+      "docs/acceptance/",
+      "docs/verification/",
+      "docs/quality/",
+      "docs/governance/",
+      "docs/workflow.md",
+    ],
+    capabilities: {
+      customerInput: true,
+      handOffIntent: false,
+      requestClarification: false,
+      dispatchTask: false,
       roleStatus: false,
       sessionTail: false,
       proposeRecovery: false,
@@ -1373,6 +1530,7 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
       customerInput: true,
       handOffIntent: false,
       requestClarification: false,
+      // 现行（旧）能力保留到 D 批：A 批只做身份层，convener 去 dispatch 在 D 切换。
       dispatchTask: true,
       roleStatus: true,
       sessionTail: true,
@@ -1421,6 +1579,49 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
 ];
 
 /**
+ * 旧 `liaison` 的只读别名规格（不进入上面的注册表数组/列表）：与基线逐字一致，仅用于存量旧会话、
+ * 旧项目记录与旧测试按 id 解析。批次 D 删除。
+ */
+const DEPRECATED_LIAISON_ROLE: DeprecatedLiaisonRoleSpec = {
+  id: "liaison",
+  displayName: "产品",
+  function: "liaison",
+  cardText: LIAISON_CARD_TEXT,
+  entries: [
+    projectEntry(
+      "docs/intents/",
+      "directory",
+      "客户意图记录（intentId/handoffKind/goal/scope/acceptance/客户原话）",
+    ),
+  ],
+  preauthorizedDirs: ["docs/intents/"],
+  forbiddenWritePaths: [
+    ...APP_ONLY_WRITE_PREFIXES,
+    "角色卡/",
+    "docs/proposals/",
+    "docs/contracts/",
+    "docs/nominations/",
+    "docs/skills/",
+    "docs/mcp/",
+    "docs/flows/",
+    "docs/governance/",
+    "docs/workflow.md",
+  ],
+  capabilities: {
+    customerInput: true,
+    handOffIntent: true,
+    requestClarification: false,
+    dispatchTask: true,
+    roleStatus: false,
+    sessionTail: false,
+    proposeRecovery: false,
+    installSkill: false,
+    installMcp: false,
+    shell: "operator-approve",
+  },
+};
+
+/**
  * 旧 su 在 single 模型下的既有四棵预授权目录——**逐字**与编排
  * `src/pipeline/orchestration/run-role.ts::SU_PREAUTHORIZED_WRITE_DIRS` 保持一致（评审 §5.2）。
  * 本常量是门禁引擎的数据面；编排接线（W2）改为读本表，避免两处各写一份。
@@ -1453,12 +1654,13 @@ export {
   BUILT_IN_ROLE_CARD_TEXT as LEGACY_SU_CARD_TEXT,
 } from "./boundary-core.ts";
 
-/** 按 id 取 trio 内置治理角色规格；`su` 与项目角色返回 undefined。 */
-export function governanceRoleOf(id: string): BuiltInGovernanceRoleSpec | undefined {
+/** 按 id 取 trio 内置角色规格；旧 `liaison` 返回只读别名（不进入注册表数组）；`su` 与项目角色返回 undefined。 */
+export function governanceRoleOf(id: string): GovernanceRoleSpec | undefined {
+  if (id === "liaison") return DEPRECATED_LIAISON_ROLE;
   return BUILT_IN_GOVERNANCE_ROLES.find((spec) => spec.id === id);
 }
 
-/** trio 内置治理角色的职能；`su` 与项目角色返回 undefined。 */
+/** trio 内置角色的职能；`su` 与项目角色返回 undefined。 */
 export function governanceFunctionOf(id: string): GovernanceFunction | undefined {
   return governanceRoleOf(id)?.function;
 }
@@ -1475,16 +1677,16 @@ export function governanceCapabilitiesOf(id: string): GovernanceCapabilities | u
 }
 
 /**
- * 是否为内置治理角色 id（trio 五人 + 旧 su）。
- * 用途：`dispatch_task` 目标拒绝、技能/MCP 安装与恢复提议的目标守卫（评审 §5.6/§5.2）。
+ * 是否为内置治理角色 id（trio 六角色 + 旧 su + 旧 liaison 只读别名）。
+ * 用途：`dispatch_task` 目标拒绝、角色目录保留 id、技能/MCP 安装与恢复提议的目标守卫。
  */
 export function isBuiltInGovernanceRoleId(id: string): boolean {
   return id === "su" || governanceRoleOf(id) !== undefined;
 }
 
-/** 是否为 trio 的五个内置治理角色 id（不含 su）。 */
+/** 是否为 trio 的六个内置角色 id（不含 su 与退体的旧 liaison）。 */
 export function isTrioGovernanceRoleId(id: string): boolean {
-  return governanceRoleOf(id) !== undefined;
+  return BUILT_IN_GOVERNANCE_ROLES.some((spec) => spec.id === id);
 }
 
 /** trio 内置角色边界来源标签（评审 §5.3 逐字格式）。 */
@@ -1567,14 +1769,15 @@ function underHintPrefix(relPath: string, prefix: string): boolean {
 }
 
 /**
- * trio 内置治理角色越界写入的归属指引（AC3）。当前只对 **Lead / 主理（liaison）** 给出：它是默认主入口，
- * 客户最常从它这里尝试写治理产物。其他角色/项目角色返回 undefined（既有拒绝文案逐字不变）。
+ * trio 内置角色越界写入的归属指引（AC3）。当前对**主入口（chief / 旧 liaison 别名）**给出：它是
+ * 客户最常来的入口。其他角色/项目角色返回 undefined（既有拒绝文案逐字不变）。
  */
 export function governanceWriteOwnerGuidance(
   boundarySource: string,
   relPath: string,
 ): string | undefined {
-  if (boundarySource !== trioGovernanceSource("liaison")) return undefined;
+  const coordinatorSources = [trioGovernanceSource("chief"), trioGovernanceSource("liaison")];
+  if (!coordinatorSources.includes(boundarySource)) return undefined;
   for (const hint of LIAISON_WRITE_OWNER_HINTS) {
     if (hint.prefixes.some((p) => underHintPrefix(relPath, p))) return hint.guidance;
   }

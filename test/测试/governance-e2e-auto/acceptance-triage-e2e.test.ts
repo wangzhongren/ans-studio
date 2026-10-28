@@ -245,7 +245,7 @@ function deliveryNotes(h: Harness, roleId: string): string[] {
 }
 
 /** 投给主理（Lead / liaison）的返工任务（区别于 Proof settle 的治理反馈任务）。 */
-function reworkPrompts(h: Harness, roleId = "liaison"): string[] {
+function reworkPrompts(h: Harness, roleId = "chief"): string[] {
   return (h.prompts.get(roleId) ?? []).filter((prompt) => prompt.includes("验收未通过"));
 }
 
@@ -468,10 +468,10 @@ test("T1 仅 nit/minor + 判断代批：不返工、记录 report-only、产品�
 
     // 主理确定性汇报：结论 + 逐项原因 + 改进建议 + 决定来源 + 报告路径。
     await h.waitFor(
-      () => deliveryNotes(h, "liaison").some((note) => note.includes("验收结论：不通过") && note.includes("本次不返工")),
+      () => deliveryNotes(h, "chief").some((note) => note.includes("验收结论：不通过") && note.includes("本次不返工")),
       5000,
     );
-    const reportNote = deliveryNotes(h, "liaison").find((note) => note.includes("验收结论：不通过"))!;
+    const reportNote = deliveryNotes(h, "chief").find((note) => note.includes("验收结论：不通过"))!;
     assert.match(reportNote, /N1 · 风格建议：注释措辞可更简洁/);
     assert.match(reportNote, /M1 · 次要：命名一致性/);
     assert.match(reportNote, /改进建议：调整注释措辞（src\/owned-executor\/impl\.ts）/);
@@ -530,7 +530,7 @@ test("T2 可执行 blocker + 判断代批：返工任务含 id/severity/reason/a
     assert.match(task, /id=M1 .*severity=minor（非阻断，可选后续）/, "minor 标非阻断");
     assert.match(task, /id=N1 .*severity=nit（非阻断，可选后续）/, "nit 标非阻断");
     assert.match(task, /minor\/nit 项为非阻断（可选后续）/, "任务应显式声明非阻断");
-    assert.match(task, /实际接收方：产品（liaison）/, "trio 实际接收方 = 产品");
+    assert.match(task, /实际接收方：幕僚（chief）/, "trio 实际接收方 = 幕僚");
 
     // routing record：结构化 triage 清单（不依赖旧 acceptance-rework 段）。
     // 说明：acceptance.triage 账本条目在「routing 记录 sent + 分诊记录 dispatched」之后追加，
@@ -582,7 +582,7 @@ test("T3 客户分诊卡：稳定 id/卡面齐全；选择「下发运营修改�
     const expectedCardId = `triage-${FLOW}-${reportSha.slice(0, 8)}`;
     const card = h.presented.find((entry) => entry.id === expectedCardId);
     assert.ok(card, `分诊卡应使用稳定 id ${expectedCardId}（实际 ${h.presented.map((entry) => entry.id).join("、")}）`);
-    assert.equal(card!.roleId, "liaison", "分诊卡呈现面 = 主入口产品");
+    assert.equal(card!.roleId, "chief", "分诊卡呈现面 = 主入口产品");
     const request = card!.request;
     if (request.kind !== "choice") throw new Error("分诊卡必须是 choice 卡");
     assert.deepEqual(
@@ -672,7 +672,7 @@ test("T4 缺 triage 段（只有旧 acceptance-rework/v1）⇒ 退回 Proof 补�
 
     // 主理如实系统行；零返工/零客户决定/零 Proof 重派。
     await h.waitFor(
-      () => deliveryNotes(h, "liaison").some((note) => note.includes("验收报告缺少分诊结构，已退回质检补充")),
+      () => deliveryNotes(h, "chief").some((note) => note.includes("验收报告缺少分诊结构，已退回质检补充")),
       5000,
     );
     assert.equal(reworkPrompts(h).length, 0, "缺结构不得返工");

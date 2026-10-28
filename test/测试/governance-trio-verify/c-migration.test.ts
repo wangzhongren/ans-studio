@@ -211,7 +211,7 @@ test("确认迁移：`.ans` 仅增/改 governanceModel（未知字段/roles/pin 
 
 // —————————————————————— 3) 迁移后：su 隐藏/不可开启，历史仍在 ——————————————————————
 
-test("迁移后：listProject 无 su、五内置顺序不变（liaison 首位）；su 不可开启（resolveRole/resolveGovernanceRole）；治理模型来自 `.ans`", async () => {
+test("迁移后：listProject 无 su、六内置顺序不变（chief 首位）；su 不可开启（resolveRole/resolveGovernanceRole）；治理模型来自 `.ans`", async () => {
   const { root, cleanup } = makeRoot("mig-after");
   try {
     seedSingleProject(root);
@@ -225,11 +225,11 @@ test("迁移后：listProject 无 su、五内置顺序不变（liaison 首位）
 
     const listing = await listProject(root);
     assert.equal(listing.governanceModel, "trio");
-    assert.equal(listing.primaryRoleId, "liaison", "迁移后默认主入口 = 产品 / Lead（2026-10-18 五角色）");
+    assert.equal(listing.primaryRoleId, "chief", "迁移后默认主入口 = 幕僚（批次 A 六角色）");
     assert.deepEqual(
       listing.roles.map((r) => r.roleId),
-      ["liaison", "rapporteur", "nominator", "convener", "verifier", "A", "B"],
-      "trio 五内置在前、项目角色保留",
+      ["chief", "product", "rapporteur", "nominator", "convener", "verifier", "A", "B"],
+      "trio 六内置在前、项目角色保留",
     );
     assert.equal(listing.roles.some((r) => r.roleId === "su"), false, "迁移后 su 从列表消失");
 

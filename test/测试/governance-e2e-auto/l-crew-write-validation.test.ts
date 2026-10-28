@@ -91,7 +91,7 @@ function assertOnlyExpectedConvenerPrompts(h: Harness, allowed: readonly RegExp[
 
 function leadValidationNotes(h: Harness): string[] {
   return h.events.flatMap((envelope) => {
-    if (envelope.roleId !== "liaison") return [];
+    if (envelope.roleId !== "chief") return [];
     const event = envelope.event as { detail?: { source?: string }; summary?: string };
     if (event.detail?.source !== "delivery-note") return [];
     const summary = event.summary ?? "";

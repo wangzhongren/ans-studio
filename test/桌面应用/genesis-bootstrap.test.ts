@@ -63,7 +63,7 @@ test("未 bootstrap（hasRoles:false）：新空项目默认 trio，ProjectConfi
   const listing = await listProject(root);
   assert.equal(listing.hasRoles, false, "空项目应枚举为未 bootstrap");
   assert.equal(listing.governanceModel, "trio", "新空项目默认 trio（评审 §5.4）");
-  assert.equal(listing.primaryRoleId, "liaison", "trio 主入口为联络官 Liaison（2026-10-18 四角色评审 §4.5）");
+  assert.equal(listing.primaryRoleId, "chief", "trio 主入口为幕僚 chief（2026-10-28 批次 A 六角色）");
 
   const cfg = buildProjectConfig(listing, { ...ACCEPTED }, { ANS_SKILL_ROOT: "/x/skill" });
   assert.equal(cfg.governanceModel, "trio", "ProjectConfig 必须带上枚举出的治理模型（否则边界按 single 解析）");

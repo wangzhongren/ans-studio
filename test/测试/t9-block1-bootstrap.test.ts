@@ -145,19 +145,19 @@ async function openSuViaDesktop(dir: string): Promise<DesktopGateCapture> {
 
 // —————————————————————— 1) 导入空文件夹：listProject（IPC）不抛错 ——————————————————————
 
-test("用户入口/空文件夹：IPC listProject 不抛错，新空项目默认三权（5 内置 / liaison 主入口）", async () => {
+test("用户入口/空文件夹：IPC listProject 不抛错，新空项目默认三权（6 内置 / chief 主入口）", async () => {
   const dir = tempRoot("empty");
   const iface = createDesktopInterface({ pickDirectory: async () => dir, emitEvent: () => {} });
   const listing = await iface.listProject({ projectRoot: dir });
 
   assert.equal(listing.hasRoles, false, "空项目应 hasRoles:false（尚未 bootstrap）");
-  // 2026-10-18 客户拍板「三权不变、五角色」：新增主理 Lead 默认入口与验收 Proof。
+  // 2026-10-28 批次 A：六角色（幕僚 + 产品 + 策划/人事/运营/质检），主入口 chief。
   assert.equal(listing.governanceModel, "trio", "新空项目默认 trio（评审 §5.4）");
-  assert.equal(listing.primaryRoleId, "liaison", "primaryRoleId 应是主入口 liaison（由门禁引擎给出）");
+  assert.equal(listing.primaryRoleId, "chief", "primaryRoleId 应是主入口 chief（由门禁引擎给出）");
   assert.deepEqual(
     listing.roles.map((r) => r.roleId),
-    ["liaison", "rapporteur", "nominator", "convener", "verifier"],
-    "空项目 roles 恰含五个内置治理角色（顺序固定）",
+    ["chief", "product", "rapporteur", "nominator", "convener", "verifier"],
+    "空项目 roles 恰含六个内置角色（顺序固定）",
   );
   for (const r of listing.roles) {
     assert.equal(r.builtIn, true);
@@ -165,7 +165,7 @@ test("用户入口/空文件夹：IPC listProject 不抛错，新空项目默认
   }
   assert.deepEqual(
     listing.roles.map((r) => r.governanceFunction),
-    ["liaison", "proposal", "nomination", "schedule", "verification"],
+    ["chief", "product", "proposal", "nomination", "schedule", "verification"],
     "治理职能原样透传（渲染侧不硬编码 id）",
   );
   // 空项目是**正常状态**（**客户 2026-10-11 裁定**）：「无角色目录」=「项目尚未 bootstrap」的**初始态**，

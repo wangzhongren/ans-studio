@@ -147,8 +147,11 @@ export const enUS = {
   "ui.role.group.governance": "Governance functions (built-in)",
   "ui.role.group.default": "Work roles",
   "ui.role.governance.builtinNote": "Built-in role: shipped with the app, no role directory",
-  "ui.role.governance.liaison.name": "Product",
-  "ui.role.governance.liaison.power": "Customer communication · no final approval power",
+  "ui.role.governance.chief.name": "Chief of Staff",
+  "ui.role.governance.chief.power":
+    "Workflow management · customer communication · no final approval power",
+  "ui.role.governance.product.name": "Product",
+  "ui.role.governance.product.power": "Product review · no final approval power",
   "ui.role.governance.draft.name": "Planner",
   "ui.role.governance.draft.power": "Proposal power · no final approval power",
   "ui.role.governance.crew.name": "People Ops",
@@ -526,8 +529,10 @@ export const enUS = {
   "ui.governance.recordUnavailableTitle": "Governance record unavailable",
   "ui.governance.establishHint":
     "Before talking to {roleName}, create the governance record; you can also run ans govern <project-dir> in a terminal.",
-  "ui.governance.roleIntro.liaison":
-    "Default customer entry: you say what to do, and I first confirm goal, scope, and acceptance, then hand it to Planner to form a proposal. I neither write proposals nor approve. From this version the default entry is Product; Planner and historical proposals are unchanged.",
+  "ui.governance.roleIntro.chief":
+    "Default customer entry: manages workflow, dispatches tasks and patrols, and receives request notifications; does not decide, forward, or approve. Role requests go directly to the customer and are presented/adjudicated by the app.",
+  "ui.governance.roleIntro.product":
+    "A product review/advisory worker; tasks come only from the Chief of Staff and results are briefly reported only to it; submits requests directly when a customer decision is needed.",
   "ui.governance.roleIntro.proposal":
     "Usually opened via a handoff from Product; customers may also come to me directly. I only write proposals and do not approve.",
   "ui.governance.roleIntro.nomination":
@@ -1005,7 +1010,8 @@ export const enUS = {
   "ui.judge.mode.approval": "Approval delegation",
   "ui.judge.mode.decision": "Decision delegation",
   "ui.judge.titleWithRole": "Command approval · {roleName}",
-  "ui.judge.roleName.liaison": "Product",
+  "ui.judge.roleName.chief": "Chief of Staff",
+  "ui.judge.roleName.product": "Product",
   "ui.judge.roleName.verifier": "QA",
   "ui.judge.titleSu": "SU command approval",
   "ui.judge.titleShell": "shell command request",

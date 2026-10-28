@@ -150,8 +150,10 @@ export const zhCN = {
   "ui.role.group.governance": "治理职能（内置）",
   "ui.role.group.default": "工作角色",
   "ui.role.governance.builtinNote": "内置角色：随应用发布，无角色目录",
-  "ui.role.governance.liaison.name": "产品",
-  "ui.role.governance.liaison.power": "客户沟通 · 不拥有最终批准权",
+  "ui.role.governance.chief.name": "幕僚",
+  "ui.role.governance.chief.power": "工作流管理 · 客户沟通 · 不拥有最终批准权",
+  "ui.role.governance.product.name": "产品",
+  "ui.role.governance.product.power": "产品评审 · 不拥有最终批准权",
   "ui.role.governance.draft.name": "策划",
   "ui.role.governance.draft.power": "提案权 · 不拥有最终批准权",
   "ui.role.governance.crew.name": "人事",
@@ -510,8 +512,10 @@ export const zhCN = {
   "ui.governance.recordUnavailableTitle": "治理记录不可用",
   "ui.governance.establishHint":
     "与 {roleName} 对话前，请先建立治理记录；也可在终端运行 ans govern <项目目录>。",
-  "ui.governance.roleIntro.liaison":
-    "客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给策划角色形成提案。我不写提案、不批准。本版起默认入口为产品；策划角色与历史提案不变。",
+  "ui.governance.roleIntro.chief":
+    "客户默认入口：管理工作流、调度任务与巡检，接收申请系统通知；不代决、不转发、不审批。角色申请直达客户（应用呈现 / 裁决），结果同时通知幕僚。",
+  "ui.governance.roleIntro.product":
+    "产品的评审 / 建议 worker；任务只来自幕僚，结果只向幕僚简短汇报；需要客户决定时直接提交申请（应用呈现 / 裁决）。",
   "ui.governance.roleIntro.proposal":
     "通常由产品交接打开；客户也可以直接找我。我只写提案，不批准。",
   "ui.governance.roleIntro.nomination": "客户任命后打开写卡；只按团队计划与任命名单写角色卡与边界，不选择角色、不批准。",
@@ -922,8 +926,9 @@ export const zhCN = {
   "ui.judge.titleWithRole": "命令审批 · {roleName}",
   // judge shell 确认标题的内置治理角色名（2026-10-24 起 zh-CN 为纯中文角色名）。
   // draft / crew / steward 与 `ui.role.governance.*.name` 逐字相同，复用这 3 个 key；
-  // liaison / verifier 单列 judge key（不改 roleId/GovernanceFunction）。
-  "ui.judge.roleName.liaison": "产品",
+  // chief / product / verifier 单列 judge key（不改 roleId/GovernanceFunction）。
+  "ui.judge.roleName.chief": "幕僚",
+  "ui.judge.roleName.product": "产品",
   "ui.judge.roleName.verifier": "质检",
   "ui.judge.titleSu": "SU 命令审批",
   "ui.judge.titleShell": "shell 命令请求",

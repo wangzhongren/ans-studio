@@ -117,7 +117,8 @@ export function trioProject(root: string, overrides: Partial<ProjectConfig> = {}
     skillRoot: root,
     roles: {},
     governanceModel: "trio",
-    builtInRoles: [...FIVE_ROLE_IDS],
+    // 批次 A：六角色身份层（chief/product 为列表角色；旧 liaison 仍作只读别名可开会话，D 删除）。
+    builtInRoles: [...FIVE_ROLE_IDS, "chief", "product"],
     governanceBoundary: {
       path: GOV_REL,
       acceptance: { accepted: true, source: "test:liaison-trio-accepted" },

@@ -7,15 +7,15 @@
 //
 // 治理三权分立 V1（客户 2026-10-17 拍板；PM 评审 §5.1/§5.3/§5.4）：
 //  - `governanceModel`（缺省 `"single"`，旧行为逐字不变）决定内置角色集与主入口：
-//      single → `su`；trio → `liaison` / `rapporteur` / `nominator` / `convener` / `verifier`
-//      （此顺序，`primaryRoleId=liaison`；2026-10-18 客户拍板「三权不变」+ 第五个内置治理角色
-//      Proof / 验收；Lead / 主理 为默认主入口）。
-//  - 五人的卡文本/Section 1 来自内置注册表；旧 `su` 迁移后隐藏且不可开启；
-//    五个内置治理 id 是**保留 id**：项目里的同名角色目录被跳过并警告，`roles` 映射不得遮蔽它们。
+//      single → `su`；trio → `chief` / `product` / `rapporteur` / `nominator` / `convener` / `verifier`
+//      （此顺序，`primaryRoleId="chief"`；2026-10-28 批次 A「幕僚 + 最小系统」：liaison 退休，
+//      只保留编译期只读别名，不进入列表）。
+//  - 六人的卡文本/Section 1 来自内置注册表；旧 `su` 迁移后隐藏且不可开启；
+//    内置治理 id 是**保留 id**：项目里的同名角色目录被跳过并警告，`roles` 映射不得遮蔽它们。
 //  - `listProject` 的模型来源：共享载入器 `readGovernanceModel`（PM 属主，只读消费）；
 //    无显式值且项目既无 `.ans/project.json`、也无任何项目角色目录 ⇒ 新空项目按 `trio`。
-//  - 旧 trio 项目（`.ans` 已写 `governanceModel:"trio"`）升级后自动获得 Liaison 主入口：
-//    不迁移、不重写 `.ans`/pin/manifest；single/su 逐字不变。
+//  - 旧 trio 项目（`.ans` 已写 `governanceModel:"trio"`）升级后角色列表/主入口变为六角色 + chief：
+//    不迁移、不重写 `.ans`/pin/manifest；single/su 逐字不变；旧 liaison 按只读别名可寻址（D 删除）。
 
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import type {
@@ -115,7 +115,7 @@ export async function resolveRole(roleId: string, project: ProjectConfig): Promi
 
 export interface ProjectRoleSummary extends RoleGroupMetadata {
   roleId: string;
-  /** 内置治理角色的统一显示名（来自注册表，如 `Lead / 主理`）；项目角色不填（无统一显示名）。 */
+  /** 内置治理角色的统一显示名（来自注册表，如 `幕僚`）；项目角色不填（无统一显示名）。 */
   displayName?: string;
   cardPath: string; // 项目相对路径（内置角色为空串：没有角色卡文件）
   boundaryPath: string; // 项目相对路径（内置角色为空串：用内置边界）
@@ -123,7 +123,7 @@ export interface ProjectRoleSummary extends RoleGroupMetadata {
   boundary: BoundarySection1;
   /** 内置治理角色（无角色目录，由引擎合成；不参与 roles 映射，故解析时下沉为 built-in-governance）。 */
   builtIn?: boolean;
-  /** 仅 trio 的四个内置治理角色携带；`su` 与项目角色不出现（评审 §5.1/§4.1）。 */
+  /** 仅 trio 的内置治理角色携带；旧 `liaison` 只读别名不进入列表；`su` 与项目角色不出现。 */
   governanceFunction?: GovernanceFunction;
 }
 
@@ -135,9 +135,8 @@ export interface ProjectListing {
    *  空项目（尚无 bootstrap）为 false——此时 `roles` 只含内置治理角色；
    *  界面据此显示「项目尚未 bootstrap」并引导与主入口角色对话（§10.3）。 */
   hasRoles: boolean;
-  /** **主入口角色 id**：single → `su`；trio → `liaison`（评审 §5.4；2026-10-18 客户拍板
-   *  Liaison 为默认主入口）。由门禁引擎给、**单一来源**；桌面渲染侧据此设主位/默认选中，
-   *  **不得硬编码角色 id**（本项目既有纪律：不硬编码角色 id，权限/入口以数据表达，§10.7）。 */
+  /** **主入口角色 id**：single → `su`；trio → `chief`（2026-10-28 批次 A 六角色；liaison 退休）。
+   *  由门禁引擎给、**单一来源**；桌面渲染侧据此设主位/默认选中，**不得硬编码角色 id**。 */
   primaryRoleId: string;
   /** 治理模型（评审 §5.4/§5.5）：`listProject` **恒返回**该字段；类型上可选只为让其他角色
    *  在 W3 前构造的测试夹具保持可编译——消费方读取时 `?? "single"` 即旧行为。 */
@@ -158,8 +157,9 @@ export interface ResolvedGovernanceRole {
  * 不得自行枚举 `builtIn`（避免各自写一份判定）。
  *
  * **缺省职能仍是 `proposal`（共享解析器语义不变）**：CLI `ans govern` 走本出口，而 V1 的 CLI
- * 不提供 Liaison（没有跨会话后台交接能力，半可用的主入口比不提供更危险，四角色评审 §4.6）。
- * 桌面主入口的 `liaison` 来自 `listProject().primaryRoleId`，不经本函数的缺省路径。
+ * 不提供主入口会话（没有跨会话后台交接能力，半可用的主入口比不提供更危险，四角色评审 §4.6）。
+ * 桌面主入口的 `chief` 来自 `listProject().primaryRoleId`，不经本函数的缺省路径。
+ * 旧 `liaison` 仍可按显式 roleId 解析（批次 A 只读别名，D 删除）。
  */
 export function resolveGovernanceRole(
   listing: ProjectListing,
@@ -182,16 +182,17 @@ export function resolveGovernanceRole(
   }
 
   // trio
+  const trioRoleList = BUILT_IN_GOVERNANCE_ROLES.map((s) => s.id).join("/");
   if (explicitId !== undefined) {
     if (explicitId === BUILT_IN_GOVERNANCE_ROLE_ID) {
       throw new Error(
-        `su 已归档（当前为三权治理模型），不可开启；请选择 liaison/rapporteur/nominator/convener/verifier`,
+        `su 已归档（当前为三权治理模型），不可开启；请选择 ${trioRoleList}`,
       );
     }
     const spec = governanceRoleOf(explicitId);
     if (spec === undefined) {
       throw new Error(
-        `三权治理模型下角色 ${explicitId} 不是内置治理角色；可用：liaison/rapporteur/nominator/convener/verifier`,
+        `三权治理模型下角色 ${explicitId} 不是内置治理角色；可用：${trioRoleList}`,
       );
     }
     if (explicitFunction !== undefined && explicitFunction !== spec.function) {
@@ -203,9 +204,12 @@ export function resolveGovernanceRole(
   }
 
   const fn: GovernanceFunction = explicitFunction ?? "proposal";
-  const spec = BUILT_IN_GOVERNANCE_ROLES.find((s) => s.function === fn);
+  const spec =
+    BUILT_IN_GOVERNANCE_ROLES.find((s) => s.function === fn) ??
+    // 批次 A 只读别名：旧 `function: "liaison"` 仍可解析（不进入列表/缺省路由；D 删除）。
+    (fn === "liaison" ? governanceRoleOf("liaison") : undefined);
   if (spec === undefined) {
-    throw new Error(`未知治理职能：${fn}（可用：liaison/proposal/nomination/schedule/verification）`);
+    throw new Error(`未知治理职能：${fn}（可用：${BUILT_IN_GOVERNANCE_ROLES.map((s) => s.function).join("/")}）`);
   }
   return { roleId: spec.id, function: spec.function, model };
 }
@@ -245,8 +249,9 @@ async function firstExistingFile(dirAbs: string, names: string[]): Promise<strin
  * - **归档目录**（边界顶层 `archived: true`，客户 2026-10-14 约定）→ **静默跳过**：不枚举、不产生
  *   任何警告（归档对枚举不可见，替代「缺少 boundary.yaml」类告警路径；禁止改名绕过——归档角色用
  *   原名 boundary.yaml + 该标记留档；resolveRole 对同一标记 fail-closed 拒绝开启）；
- * - **保留 id**（客户 2026-10-17 拍板的 trio V1，评审 §5.4；2026-10-18 增 `liaison` / `verifier`）：
- *   `su`/`liaison`/`rapporteur`/`nominator`/`convener`/`verifier` 是内置治理角色 id；项目里的同名目录
+ * - **保留 id**（客户 2026-10-17 拍板的 trio V1，评审 §5.4；2026-10-28 批次 A 六角色）：
+ *   `su`/`chief`/`product`/`rapporteur`/`nominator`/`convener`/`verifier`（旧 `liaison` 仍按 retired
+ *   内置 id 保留，避免项目目录遮蔽与历史冲突）是内置治理角色 id；项目里的同名目录
  *   **跳过并警告**（「与内置治理角色 id 冲突，已跳过」），绝不枚举为项目角色、不遮蔽内置角色；
  * - **项目级真错误**（项目根不存在/不是目录、角色目录路径是文件、无读权限）→ 抛出明确错误。
  * - listProject 无接受证据入参，故所列 boundary 的 acceptance 一律为未接受（仅用于展示）。
@@ -395,9 +400,9 @@ export async function listProject(projectRoot: string): Promise<ProjectListing> 
     }
   }
 
-  // 内置角色前置（顺序即枚举顺序；评审 §5.4）：
-  //  single → su（既有行为逐字不变）；trio → liaison / rapporteur / nominator / convener / verifier
-  //  （2026-10-18 五角色：新增 Proof / 验收；Lead / 主理 首位 = 默认主入口）。
+  // 内置角色前置（顺序即枚举顺序；评审 §5.4；2026-10-28 批次 A 六角色）：
+  //  single → su（既有行为逐字不变）；trio → chief / product / rapporteur / nominator / convener / verifier
+  //  （chief 首位 = 默认主入口；旧 liaison 不枚举，仅按只读别名可寻址，D 删除）。
   const builtIns: ProjectRoleSummary[] =
     governanceModel === "trio"
       ? BUILT_IN_GOVERNANCE_ROLES.map((spec) => ({
@@ -427,7 +432,7 @@ export async function listProject(projectRoot: string): Promise<ProjectListing> 
         ];
 
   const roles: ProjectRoleSummary[] = [...builtIns, ...projectRoles];
-  const primaryRoleId = governanceModel === "trio" ? "liaison" : BUILT_IN_GOVERNANCE_ROLE_ID;
+  const primaryRoleId = governanceModel === "trio" ? "chief" : BUILT_IN_GOVERNANCE_ROLE_ID;
 
   // hasRoles：是否枚举到**项目角色**（非内置）。内置角色恒在 roles 里，故不能只看 roles.length。
   const hasRoles = projectRoles.length > 0;

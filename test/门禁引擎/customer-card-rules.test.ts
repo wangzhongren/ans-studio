@@ -160,10 +160,10 @@ test("2026-10-27 质检：report_artifact_ready 是向应用汇报，不是客�
   }
 });
 
-test("2026-10-27 客户卡化：注册表数据面零变化；不新增角色 / cardKind / 能力位 / 写权", () => {
+test("2026-10-27 客户卡化：注册表数据面零变化；不新增能力位 / 写权（批次 A 六角色身份层）", () => {
   assert.deepEqual(
     BUILT_IN_GOVERNANCE_ROLES.map((s) => s.id),
-    ["liaison", "rapporteur", "nominator", "convener", "verifier"],
+    ["chief", "product", "rapporteur", "nominator", "convener", "verifier"],
   );
 
   // cardKind 白名单不扩散：卡文本只出现既有值；新增 cardKind 会在此失败。

@@ -157,10 +157,10 @@ test("2026-10-27 工件就绪汇报：既有验收标准结构/证据/风险档/
 });
 
 test("2026-10-27 工件就绪汇报：只改卡文本——注册表数据面（角色顺序/entries/预授权/能力位）零变化", () => {
-  // 五角色注册表仍在且顺序不变。
+  // 六角色注册表仍在且顺序不变（批次 A 身份层）。
   assert.deepEqual(
     BUILT_IN_GOVERNANCE_ROLES.map((s) => s.id),
-    ["liaison", "rapporteur", "nominator", "convener", "verifier"],
+    ["chief", "product", "rapporteur", "nominator", "convener", "verifier"],
   );
 
   const verifier = governanceRoleOf("verifier")!;

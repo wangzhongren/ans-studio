@@ -645,7 +645,7 @@ test("S6-7 路由记录损坏：fail-closed 零发送、不改 gate 记录、主
     await poke(h);
     await h.waitFor(
       () =>
-        [...deliveryNotes(h, "convener"), ...deliveryNotes(h, "liaison")].some(
+        [...deliveryNotes(h, "convener"), ...deliveryNotes(h, "chief")].some(
           (note) => note.includes("路由记录损坏") && note.includes("fail-closed"),
         ),
       10000,

@@ -250,7 +250,7 @@ test("五角色全自动链路：意图→提案→团队计划→任命→Crew 
 
   const scriptForRole = (ctx: ScriptContext): ToolCall[] => {
     if (
-      ctx.roleId === "liaison" &&
+      ctx.roleId === "chief" &&
       !ctx.prompt.includes("[系统·治理反馈]") &&
       !/已交给报告员|客户意图已交接/.test(ctx.prompt)
     ) {
@@ -434,8 +434,8 @@ test("五角色全自动链路：意图→提案→团队计划→任命→Crew 
     governanceChain: { pollIntervalMs: 10, timeoutMs: 5000, settledGraceMs: 10 },
   });
   try {
-    await h.open("liaison");
-    const sent = await h.send("liaison", "请把客户意图交给报告员。");
+    await h.open("chief");
+    const sent = await h.send("chief", "请把客户意图交给报告员。");
     assert.equal(sent.ok, true, sent.error ?? "");
     assert.equal(h.presented.length, 0, "intent-confirm 由判断代批，0 张客户卡");
     const intentRow = h.judgeRows.find((row) => row.cardKind === "intent-confirm");
@@ -574,7 +574,7 @@ test("五角色全自动链路：意图→提案→团队计划→任命→Crew 
       () =>
         h.events.some(
           (envelope) =>
-            envelope.roleId === "liaison" &&
+            envelope.roleId === "chief" &&
             envelope.event.kind === "message" &&
             (envelope.event as { detail?: { source?: string } }).detail?.source === "delivery-note" &&
             String((envelope.event as { summary?: string }).summary).includes("已自动派发验收复核"),
@@ -584,7 +584,7 @@ test("五角色全自动链路：意图→提案→团队计划→任命→Crew 
     const releaseGateNotes = h.events
       .filter(
         (envelope) =>
-          envelope.roleId === "liaison" &&
+          envelope.roleId === "chief" &&
           envelope.event.kind === "message" &&
           (envelope.event as { detail?: { source?: string } }).detail?.source === "delivery-note",
       )
@@ -630,8 +630,8 @@ test("五角色全自动链路：意图→提案→团队计划→任命→Crew 
 
     // —— 汇总断言：链路顺序、账本可还原、0 张手卡 ——
     const first = (roleId: string): number => h.openRoles.indexOf(roleId);
-    assert.ok(first("liaison") >= 0, "Liaison 由客户打开");
-    assert.ok(first("rapporteur") > first("liaison"), "交接后后台开 Rapporteur");
+    assert.ok(first("chief") >= 0, "Liaison 由客户打开");
+    assert.ok(first("rapporteur") > first("chief"), "交接后后台开 Rapporteur");
     assert.ok(first("convener") > first("rapporteur"), "接受提案后开 Convener");
     assert.ok(first("nominator") > first("convener"), "任命决定后开 Crew（不是 Convener）");
     // 2026-10-24 客户修订：标准由应用在任命确认后**自动**派发，不再由用例按固定顺序手动驱动；
@@ -698,7 +698,7 @@ test("五角色全自动链路：意图→提案→团队计划→任命→Crew 
     assert.equal(listing.roles.some((role) => role.roleId === "executor"), true);
     assert.ok(h.projectChanged > 0, "listing 刷新触发 project:changed");
     assert.equal(h.presented.length, 0, "decision 开：全部治理卡由判断代批，0 张手动卡");
-    assert.deepEqual(h.userOpened, ["liaison"], "全程只有 Liaison 由客户打开（后台派发不抢活动角色）");
+    assert.deepEqual(h.userOpened, ["chief"], "全程只有 Liaison 由客户打开（后台派发不抢活动角色）");
   } finally {
     await h.stop();
     h.cleanup();
@@ -726,7 +726,7 @@ test("v2 完整链路：团队计划 v2 → appointment → Crew 写卡 → read
 
   const scriptForRole = (ctx: ScriptContext): ToolCall[] => {
     if (
-      ctx.roleId === "liaison" &&
+      ctx.roleId === "chief" &&
       !ctx.prompt.includes("[系统·治理反馈]") &&
       !/已交给报告员|客户意图已交接/.test(ctx.prompt)
     ) {
@@ -889,8 +889,8 @@ test("v2 完整链路：团队计划 v2 → appointment → Crew 写卡 → read
     governanceChain: { pollIntervalMs: 10, timeoutMs: 5000, settledGraceMs: 10 },
   });
   try {
-    await h.open("liaison");
-    const sent = await h.send("liaison", "请把客户意图交给报告员。");
+    await h.open("chief");
+    const sent = await h.send("chief", "请把客户意图交给报告员。");
     assert.equal(sent.ok, true, sent.error ?? "");
 
     // —— 阶段 1：v2 计划 + 并行契约 → appointment → Crew 写两个 Map 角色 + Reduce 既有角色 ——
@@ -1257,7 +1257,7 @@ test("v3 完整链路：计划 v3 → appointment → Crew 目录边界 → read
 
   const scriptForRole = (ctx: ScriptContext): ToolCall[] => {
     if (
-      ctx.roleId === "liaison" &&
+      ctx.roleId === "chief" &&
       !ctx.prompt.includes("[系统·治理反馈]") &&
       !/已交给报告员|客户意图已交接/.test(ctx.prompt)
     ) {
@@ -1438,8 +1438,8 @@ test("v3 完整链路：计划 v3 → appointment → Crew 目录边界 → read
     governanceChain: { pollIntervalMs: 10, timeoutMs: 5000, settledGraceMs: 10 },
   });
   try {
-    await h.open("liaison");
-    const sent = await h.send("liaison", "请把客户意图交给报告员。");
+    await h.open("chief");
+    const sent = await h.send("chief", "请把客户意图交给报告员。");
     assert.equal(sent.ok, true, sent.error ?? "");
 
     // —— 阶段 1：v3 计划 + 目录边界 → appointment → Crew 写两个 new 角色（tester 为既有） ——
@@ -1781,7 +1781,7 @@ async function runCompleteContractFlow(tag: string, options: { release?: boolean
       const notes = h.events
         .filter(
           (envelope) =>
-            envelope.roleId === "liaison" &&
+            envelope.roleId === "chief" &&
             envelope.event.kind === "message" &&
             (envelope.event as { detail?: { source?: string } }).detail?.source === "delivery-note",
         )

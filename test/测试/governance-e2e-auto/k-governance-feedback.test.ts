@@ -23,10 +23,10 @@ test("内部角色 settle：Lead 收到 [系统·治理反馈] 汇总任务，�
     assert.equal(sent.ok, true, sent.error ?? "");
 
     await h.waitFor(
-      () => (h.prompts.get("liaison") ?? []).some((prompt) => prompt.startsWith("[系统·治理反馈]")),
+      () => (h.prompts.get("chief") ?? []).some((prompt) => prompt.startsWith("[系统·治理反馈]")),
       5000,
     );
-    const feedback = h.prompts.get("liaison")!.find((prompt) => prompt.startsWith("[系统·治理反馈]"))!;
+    const feedback = h.prompts.get("chief")!.find((prompt) => prompt.startsWith("[系统·治理反馈]"))!;
     assert.match(feedback, /^\[系统·治理反馈\] 来自 提案 的内部反馈/, "显示名取listing的 displayName（提案）");
     assert.match(feedback, /请写提案/, "内部正文作为内部材料带给 Lead");
     assert.match(feedback, /汇总后告知客户/, "要求 Lead 汇总后再告知客户");
@@ -34,7 +34,7 @@ test("内部角色 settle：Lead 收到 [系统·治理反馈] 汇总任务，�
 
     const rawNotes = h.events.filter(
       (envelope) =>
-        envelope.roleId === "liaison" &&
+        envelope.roleId === "chief" &&
         envelope.event.kind === "message" &&
         (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note" &&
         typeof envelope.event.summary === "string" &&

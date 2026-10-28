@@ -143,10 +143,10 @@ test("2026-10-27 截图-only：产品画面证据只核对截图；M1 材料缺�
   }
 });
 
-test("2026-10-27 截图-only：数据面零变化（角色顺序 / 能力位 / cardKind 白名单不变）", () => {
+test("2026-10-27 截图-only：数据面零变化（角色顺序为批次 A 六角色 / 能力位 / cardKind 白名单不变）", () => {
   assert.deepEqual(
     BUILT_IN_GOVERNANCE_ROLES.map((s) => s.id),
-    ["liaison", "rapporteur", "nominator", "convener", "verifier"],
+    ["chief", "product", "rapporteur", "nominator", "convener", "verifier"],
   );
   const allowedCardKinds = new Set([
     "intent-confirm",

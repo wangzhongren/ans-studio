@@ -17,9 +17,10 @@ import type { RoleView } from "../../app/renderer/src/chat/types.ts";
 const role = (extra: Partial<RoleView> & { roleId: string }): RoleView =>
   ({ cardText: "", boundary: { entries: [] }, ...extra }) as RoleView;
 
-test("W4/W6-C：五角色纯中文名/权力副标题/内置标识按 governanceFunction 派生", () => {
+test("六角色纯中文名/权力副标题/内置标识按 governanceFunction 派生", () => {
   const cases: Array<[string, string, string]> = [
-    ["liaison", "产品", "客户沟通 · 不拥有最终批准权"],
+    ["chief", "幕僚", "工作流管理 · 客户沟通 · 不拥有最终批准权"],
+    ["product", "产品", "产品评审 · 不拥有最终批准权"],
     ["proposal", "策划", "提案权 · 不拥有最终批准权"],
     ["nomination", "人事", "写卡权（客户任命后） · 不拥有最终批准权"],
     ["schedule", "运营", "排期权 · 不拥有最终批准权"],
@@ -61,22 +62,22 @@ test("角色卡首句：去标题、按换行/句号/分号取首句；超 42 �
 
 test("W4：左树三组——主入口/治理职能（内置）/工作角色；治理组排除主入口", () => {
   const roles = [
-    role({ roleId: "liaison", governanceFunction: "liaison", builtIn: true, group: "治理职能（内置）" }),
+    role({ roleId: "chief", governanceFunction: "chief", builtIn: true, group: "治理职能（内置）" }),
     role({ roleId: "proposal", governanceFunction: "proposal", builtIn: true }),
     role({ roleId: "worker", group: "平台组" }),
     role({ roleId: "solo" }),
   ];
-  const groups = groupRoles(roles, "liaison");
+  const groups = groupRoles(roles, "chief");
   assert.deepEqual(groups.map((group) => group.label), [
     "主入口",
     "治理职能（内置）",
     "平台组",
     "工作角色",
   ]);
-  assert.deepEqual(groups[0].roles.map((item) => item.roleId), ["liaison"]);
+  assert.deepEqual(groups[0].roles.map((item) => item.roleId), ["chief"]);
   assert.deepEqual(groups[1].roles.map((item) => item.roleId), ["proposal"]);
   assert.deepEqual(flattenRoles(groups).map((item) => item.roleId), [
-    "liaison",
+    "chief",
     "proposal",
     "worker",
     "solo",
@@ -86,7 +87,7 @@ test("W4：左树三组——主入口/治理职能（内置）/工作角色；�
   assert.equal(findRole(roles, "missing"), null);
 });
 
-test("主入口由 primaryRoleId 驱动（不硬编码 liaison）；无主入口时省略该组", () => {
+test("主入口由 primaryRoleId 驱动（不硬编码 chief/liaison）；无主入口时省略该组", () => {
   const roles = [
     role({ roleId: "lead-x", group: "平台组" }),
     role({ roleId: "worker" }),

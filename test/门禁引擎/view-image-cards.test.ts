@@ -243,9 +243,9 @@ test("2026-10-27 view_image：规则只落在 Lead / Steward / Proof 三卡；Dr
   assert.equal(liaison.capabilities.handOffIntent, true);
   assert.equal(liaison.capabilities.dispatchTask, true);
 
-  // 五角色注册表仍在且顺序不变（只改卡文本）。
+  // 六角色注册表仍在且顺序不变（批次 A 身份层；只改卡文本）。
   assert.deepEqual(
     BUILT_IN_GOVERNANCE_ROLES.map((s) => s.id),
-    ["liaison", "rapporteur", "nominator", "convener", "verifier"],
+    ["chief", "product", "rapporteur", "nominator", "convener", "verifier"],
   );
 });

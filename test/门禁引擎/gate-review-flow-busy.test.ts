@@ -113,10 +113,10 @@ test("2026-10-27 gate flow-busy：只有 Convener 卡定义该 gate 回执；注
     );
   }
 
-  // 角色顺序 / Convener 写区 / 能力位零变化。
+  // 角色顺序 / Convener 写区 / 能力位（批次 A：六角色身份层；现行旧写区/能力保留到 D）。
   assert.deepEqual(
     BUILT_IN_GOVERNANCE_ROLES.map((s) => s.id),
-    ["liaison", "rapporteur", "nominator", "convener", "verifier"],
+    ["chief", "product", "rapporteur", "nominator", "convener", "verifier"],
   );
   const convener = governanceRoleOf("convener")!;
   assert.deepEqual(convener.entries.map((e) => e.path), [

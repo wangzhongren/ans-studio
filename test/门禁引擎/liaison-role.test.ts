@@ -1,15 +1,13 @@
-// 门禁引擎测试：四角色（2026-10-18 客户拍板「三权不变、角色四名」）
-//
-// 契约：`角色卡/项目管理/docs/design/2026-10-18_design_governance-liaison-review.md`
-// §4.1–§4.7（Liaison 注册表/能力/写权/listProject/resolveGovernanceRole/旧项目兼容）。
-// 本文件只钉住门禁引擎的交付面；交接工具、镜像卡、账本、UI 属各自属主。
-//
-// 覆盖：
-//  1. 旧 trio 项目自动获得 Liaison 主入口，`.ans` 逐字节不变（零迁移）；
-//  2. single 项目逐字不变（仍 su、无 Liaison、无交接/镜像能力）；
-//  3. Liaison 写权：`docs/intents/**` 放行；`角色卡/**`/`.ans/**`/`docs/proposals/**` 等拒；
-//  4. Liaison 能力：只有沟通（handOffIntent）；无 dispatch/install/roleStatus/recovery/shell；
-//  5. 保留 id：`角色卡/liaison/` 被跳过并警告、项目 roles 映射不得遮蔽。
+// test/门禁引擎/liaison-role.test.ts
+// 批次 A（2026-10-28 方案 v9.2「幕僚 + 最小系统」）：旧 liaison 角色**退休**——本文件由
+// `liaison-role` 退役为 **chief（幕僚）/ product（产品）** 六角色身份层覆盖：
+//   · listProject 六角色（chief→product→rapporteur→nominator→convener→verifier）、primaryRoleId=chief；
+//   · chief 承接旧主入口的写区（docs/intents/）与能力（沟通/意图交接/旧 coordinate 派发），
+//     product 为幕僚 worker（docs/product/、无派发/看护/安装能力）；
+//   · 保留 id：角色卡/chief|product|liaison 项目目录被跳过并警告、roles 映射不得遮蔽内置角色；
+//   · 旧 liaison 仅保留**只读别名**（可解析、不列表；D 批删除）；
+//   · single 模型逐字不变（只有 su），三权角色在 single 下结构性不可用。
+// 现行（旧）写区与能力位保持到 D 批（团队计划 amendment-1）；目标写区在 D 生效。
 //
 // 全部临时目录，用完清理；不读 `.env`、不跑真实模型/凭据/网络。
 
@@ -24,12 +22,14 @@ import {
   BUILT_IN_GOVERNANCE_ROLES,
   governanceCapabilitiesOf,
   governanceRoleOf,
+  isBuiltInGovernanceRoleId,
+  isTrioGovernanceRoleId,
 } from "../../src/common/门禁引擎/governance-roles.ts";
 import { listProject, resolveGovernanceRole, resolveRole } from "../../src/service/role/resolve-role.ts";
 import { resolveWrite } from "../../src/service/gate/resolve-write.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
 
-const ROOT = mkdtempSync(join(tmpdir(), "liaison-"));
+const ROOT = mkdtempSync(join(tmpdir(), "chief-"));
 after(() => {
   try {
     rmSync(ROOT, { recursive: true, force: true });
@@ -45,6 +45,16 @@ function project(overrides: Partial<ProjectConfig> = {}): ProjectConfig {
   return { projectRoot: ROOT, skillRoot: SKILL, roles: {}, governanceModel: "trio", ...overrides };
 }
 
+function acceptedProject(overrides: Partial<ProjectConfig> = {}): ProjectConfig {
+  return project({
+    governanceBoundary: {
+      path: "角色卡/governance-boundary.yaml",
+      acceptance: { accepted: true, source: "test:accepted" },
+    },
+    ...overrides,
+  });
+}
+
 function allows(
   boundary: Awaited<ReturnType<typeof resolveBoundarySection>>,
   rel: string,
@@ -52,52 +62,59 @@ function allows(
   return resolveWrite(rel, boundary, undefined, { projectRoot: ROOT, skillRoot: SKILL }).allowed;
 }
 
-// —————————————————————— 1) 旧 trio 项目：自动获得 Liaison、零迁移 ——————————————————————
+// —————————————————————— 1) 六角色列表与主入口 ——————————————————————
 
-test("旧 trio 项目：listProject 自动返回五内置（liaison 首位）、primaryRoleId=liaison、`.ans` 逐字节不变", async () => {
+test("新空项目：listProject 恰 6 个 builtIn（chief 首位）、primaryRoleId=chief、liaison 不枚举", async () => {
+  const proj = join(ROOT, "empty-six");
+  mkdirSync(proj, { recursive: true });
+  const listing = await listProject(proj);
+  assert.equal(listing.governanceModel, "trio");
+  assert.equal(listing.primaryRoleId, "chief", "主入口 = 幕僚");
+  assert.deepEqual(
+    listing.roles.map((r) => r.roleId),
+    ["chief", "product", "rapporteur", "nominator", "convener", "verifier"],
+    "六角色顺序固定",
+  );
+  assert.deepEqual(
+    listing.roles.map((r) => r.displayName),
+    ["幕僚", "产品", "策划", "人事", "运营", "质检"],
+  );
+  assert.equal(listing.roles.some((r) => r.roleId === "liaison"), false, "liaison 不再枚举");
+  assert.equal(listing.roles.some((r) => r.roleId === "su"), false, "trio 下不枚举 su");
+  assert.deepEqual(listing.warnings, [], "空项目是正常态：不报警");
+  for (const r of listing.roles) {
+    assert.equal(r.builtIn, true);
+    assert.equal(r.cardPath, "", "内置角色没有角色目录");
+    assert.equal(r.boundaryPath, "", "内置角色没有边界文件");
+    assert.ok(r.cardText.length > 0, "内置卡文本由注册表合成");
+    assert.equal(r.boundary.boundarySource, `<built-in:trio/${r.roleId}>`);
+  }
+});
+
+test("旧 trio 项目：列表/主入口变化但 `.ans` 逐字节不变（零迁移；liaison 只读别名可解析）", async () => {
   const proj = join(ROOT, "old-trio");
   const ansDir = join(proj, ".ans");
   mkdirSync(ansDir, { recursive: true });
   const ansPath = join(ansDir, "project.json");
   const ansText = JSON.stringify({ projectRoot: proj, roles: {}, governanceModel: "trio" });
   writeFileSync(ansPath, ansText);
-  const roleDir = join(proj, "角色卡", "实现者");
-  mkdirSync(roleDir, { recursive: true });
-  writeFileSync(join(roleDir, "role-card.md"), "# 实现者\n");
-  writeFileSync(
-    join(roleDir, "boundary.yaml"),
-    "entries:\n  - kind: directory\n    path: src/\n    purpose: t\n",
-  );
-
   const listing = await listProject(proj);
-  assert.equal(listing.governanceModel, "trio", "governanceModel 仍为 trio（不新增 quad）");
-  assert.equal(listing.primaryRoleId, "liaison", "旧 trio 项目升级后默认入口为 Liaison");
+  assert.equal(listing.governanceModel, "trio");
+  assert.equal(listing.primaryRoleId, "chief");
   assert.deepEqual(
     listing.roles.map((r) => r.roleId),
-    ["liaison", "rapporteur", "nominator", "convener", "verifier", "实现者"],
-    "旧项目自动获得 Liaison，无需迁移目录或角色卡",
+    ["chief", "product", "rapporteur", "nominator", "convener", "verifier"],
   );
-  assert.deepEqual(listing.warnings, []);
   assert.equal(readFileSync(ansPath, "utf8"), ansText, "listProject 不得重写 `.ans`");
-});
-
-test("旧 trio 项目：历史 `.ans` 无角色映射也能解析 Liaison（注册表数据，不写项目文件）", async () => {
-  const proj = join(ROOT, "old-trio-min");
-  mkdirSync(join(proj, ".ans"), { recursive: true });
-  writeFileSync(join(proj, ".ans", "project.json"), JSON.stringify({ governanceModel: "trio" }));
-  const listing = await listProject(proj);
-  const liaison = listing.roles.find((r) => r.roleId === "liaison");
-  assert.ok(liaison, "旧 trio 项目必须枚举到 Liaison");
-  assert.equal(liaison.builtIn, true);
-  assert.equal(liaison.governanceFunction, "liaison");
-  assert.equal(liaison.cardPath, "");
-  assert.equal(liaison.boundaryPath, "");
-  assert.match(liaison.cardText, /客户沟通 · 不拥有最终批准权/);
+  // 旧 liaison 仍是保留 id / 只读别名：可解析，但不进入列表。
+  assert.equal(isBuiltInGovernanceRoleId("liaison"), true);
+  assert.equal(isTrioGovernanceRoleId("liaison"), false);
+  assert.equal(governanceRoleOf("liaison")?.function, "liaison");
 });
 
 // —————————————————————— 2) single：逐字不变 ——————————————————————
 
-test("single 项目：仍只返回 su、primaryRoleId=su；无 Liaison、无交接能力", async () => {
+test("single 项目：仍只返回 su、primaryRoleId=su；六角色与旧 liaison 均不可写", async () => {
   const proj = join(ROOT, "single");
   const d = join(proj, "角色卡", "旧角色");
   mkdirSync(d, { recursive: true });
@@ -108,48 +125,39 @@ test("single 项目：仍只返回 su、primaryRoleId=su；无 Liaison、无交�
   assert.equal(listing.governanceModel, "single");
   assert.equal(listing.primaryRoleId, "su");
   assert.deepEqual(listing.roles.map((r) => r.roleId), ["su", "旧角色"]);
-  assert.equal(listing.roles.some((r) => r.roleId === "liaison"), false);
-
   assert.deepEqual(resolveGovernanceRole(listing), { roleId: "su", function: null, model: "single" });
-  assert.throws(() => resolveGovernanceRole(listing, { roleId: "liaison" }), /旧治理模型/);
+  assert.throws(() => resolveGovernanceRole(listing, { roleId: "chief" }), /旧治理模型/);
 
-  const b = await resolveBoundarySection(
-    "liaison",
-    project({ projectRoot: proj, governanceModel: "single" }),
-  );
-  assert.equal(b.acceptance.accepted, false);
-  assert.match(b.parseError ?? "", /三权角色在 single 治理模型下不可用/);
-  assert.equal(allows(b, "docs/intents/i.md"), false, "single 下 Liaison 不得写入");
+  for (const id of ["chief", "product", "liaison", "rapporteur", "nominator", "convener", "verifier"]) {
+    const b = await resolveBoundarySection(id, project({ projectRoot: proj, governanceModel: "single" }));
+    assert.equal(b.acceptance.accepted, false);
+    assert.match(b.parseError ?? "", /三权角色在 single 治理模型下不可用/);
+    assert.equal(allows(b, "docs/proposals/i.md"), false, `${id} 在 single 下不得写入`);
+  }
 });
 
-// —————————————————————— 3) Liaison 写权 ——————————————————————
+// —————————————————————— 3) chief 写权（旧主入口写区保持到 D） ——————————————————————
 
-test("Liaison 写权：docs/intents/** 放行；角色卡//.ans//proposals/契约/提名/团队计划/验收/流程 拒", async () => {
-  const accepted: ProjectConfig = project({
-    governanceBoundary: {
-      path: "角色卡/governance-boundary.yaml",
-      acceptance: { accepted: true, source: "test:accepted" },
-    },
-  });
-  const b = await resolveBoundarySection("liaison", accepted);
-  assert.equal(b.boundarySource, "<built-in:trio/liaison>");
+test("chief 写权：docs/intents/** 放行；角色卡/.ans/提案/契约/流程/团队计划/验收/技能/MCP 等拒", async () => {
+  const b = await resolveBoundarySection("chief", acceptedProject());
+  assert.equal(b.boundarySource, "<built-in:trio/chief>");
   assert.equal(b.acceptance.accepted, true);
   assert.deepEqual(
     b.entries.map((e) => `${e.path}:${e.kind}`),
     ["docs/intents/:directory"],
-    "Liaison 的 Section 1 只有 docs/intents/",
+    "chief 的 Section 1 只有 docs/intents/",
   );
-
-  for (const p of ["docs/intents/i.md", "docs/intents/2026-10-18/sub/i.md"]) {
-    assert.equal(allows(b, p), true, `Liaison 应可写 ${p}`);
+  for (const p of ["docs/intents/i.md", "docs/intents/2026-10-28/sub/i.md"]) {
+    assert.equal(allows(b, p), true, `chief 应可写 ${p}`);
   }
   for (const p of [
-    "角色卡/liaison/role-card.md",
+    "角色卡/chief/role-card.md",
     "角色卡/实现者/boundary.yaml",
     "角色卡/governance-boundary.yaml",
     ".ans/project.json",
     ".ans/governance/ledger.jsonl",
     "docs/bootstrap-manifest.md",
+    "docs/product/p.md",
     "docs/proposals/p-v1.md",
     "docs/contracts/c-v1.md",
     "docs/nominations/n-v1.md",
@@ -159,24 +167,16 @@ test("Liaison 写权：docs/intents/** 放行；角色卡//.ans//proposals/契�
     "docs/skills/s/SKILL.md",
     "docs/mcp/m.md",
     "docs/verification/r-v1.md",
-    "docs/governance/liaison/notes.md",
+    "docs/governance/chief/notes.md",
     "docs/workflow.md",
     "src/x.ts",
   ]) {
-    assert.equal(allows(b, p), false, `Liaison 越界写入应拒：${p}`);
+    assert.equal(allows(b, p), false, `chief 越界写入应拒：${p}`);
   }
 });
 
-test("Liaison 越界拒绝文案（AC3）：指回正确归属——提案找 Draft、角色卡找 Crew、团队计划找 Steward、验收找 Proof、应用路径点名应用", async () => {
-  const b = await resolveBoundarySection(
-    "liaison",
-    project({
-      governanceBoundary: {
-        path: "角色卡/governance-boundary.yaml",
-        acceptance: { accepted: true, source: "test:accepted" },
-      },
-    }),
-  );
+test("chief 越界拒绝文案（AC3）：指回正确归属——提案找策划、角色卡找人事、团队计划找运营、验收找质检、应用路径点名应用", async () => {
+  const b = await resolveBoundarySection("chief", acceptedProject());
   const ctx = { projectRoot: ROOT, skillRoot: SKILL };
   const cases: Array<[string, RegExp]> = [
     ["docs/proposals/p-v1.md", /策划 \/ Draft/],
@@ -202,190 +202,209 @@ test("Liaison 越界拒绝文案（AC3）：指回正确归属——提案找 Dr
       assert.deepEqual(d.allowedByRoot, { skill: [], project: ["docs/intents"] });
     }
   }
-  // 2026-10-22：旧提名文件是 legacy（只读历史/过渡），不再归属 Crew 写区，拒绝文案不再指引 Crew。
-  const legacy = resolveWrite("docs/nominations/n-v1.md", b, undefined, ctx);
-  assert.equal(legacy.allowed, false);
-  if (!legacy.allowed) {
-    assert.match(legacy.reason, /目标路径未匹配任何边界条目/);
-    assert.doesNotMatch(legacy.reason, /人事 \/ Crew/, "legacy nominations 不再指引 Crew 写区");
-  }
-  // 非 Liaison 边界不追加该指引（既有角色拒绝文案不变）。
-  const rapporteur = await resolveBoundarySection(
-    "rapporteur",
-    project({
-      governanceBoundary: {
-        path: "角色卡/governance-boundary.yaml",
-        acceptance: { accepted: true, source: "test:accepted" },
-      },
-    }),
-  );
-  const r = resolveWrite("docs/flows/f.md", rapporteur, undefined, ctx);
+  // 非主入口边界不追加该指引（其他角色拒绝文案不变）。
+  const product = await resolveBoundarySection("product", acceptedProject());
+  const r = resolveWrite("docs/flows/f.md", product, undefined, ctx);
   assert.equal(r.allowed, false);
-  if (!r.allowed) assert.doesNotMatch(r.reason, /召集人 Convener/);
+  if (!r.allowed) assert.doesNotMatch(r.reason, /运营 \/ Steward/);
 });
 
-// —————————————————————— 4) 能力矩阵：只有沟通/交接 ——————————————————————
+test("product 写权：docs/product/** 放行；其余路径（含角色卡/.ans/提案/验收）一律拒", async () => {
+  const b = await resolveBoundarySection("product", acceptedProject());
+  assert.equal(b.boundarySource, "<built-in:trio/product>");
+  assert.deepEqual(b.entries.map((e) => e.path), ["docs/product/"]);
+  for (const p of ["docs/product/nav.md", "docs/product/reviews/v1.md"]) {
+    assert.equal(allows(b, p), true, `product 应可写 ${p}`);
+  }
+  for (const p of [
+    "角色卡/实现者/role-card.md",
+    ".ans/project.json",
+    "docs/intents/i.md",
+    "docs/proposals/p-v1.md",
+    "docs/contracts/c-v1.md",
+    "docs/scheduling/f-team-v1.md",
+    "docs/flows/f.md",
+    "docs/acceptance/a.md",
+    "docs/verification/v.md",
+    "docs/skills/s/SKILL.md",
+    "docs/mcp/m.md",
+    "src/x.ts",
+  ]) {
+    assert.equal(allows(b, p), false, `product 越界写入应拒：${p}`);
+  }
+});
 
-test("Liaison 能力：customerInput=true（仅 intent-confirm）、handOffIntent=true、dispatchTask=true（工作流管理者）；无 install/roleStatus/recovery；shell=审批档", () => {
-  const spec = governanceRoleOf("liaison");
+// —————————————————————— 4) 能力矩阵 ——————————————————————
+
+test("chief 能力：customerInput/handOffIntent/dispatchTask（旧主入口值）；无看护/恢复/安装；shell=审批档", () => {
+  const spec = governanceRoleOf("chief");
   assert.ok(spec);
-  assert.equal(governanceCapabilitiesOf("liaison"), spec!.capabilities, "能力矩阵单点来自注册表");
+  assert.equal(governanceCapabilitiesOf("chief"), spec!.capabilities, "能力矩阵单点来自注册表");
   assert.deepEqual(spec!.capabilities, {
     customerInput: true,
     handOffIntent: true,
     requestClarification: false,
-    // 客户 2026-10-20：Lead / 主理 兼任工作流管理者，可向 Steward / 统筹 派协调任务；项目 worker 由 Steward 派。
+    // 批次 A：承接旧 liaison 的 coordinate 派发；新矩阵的星形派发/巡检能力在 B 批新增。
     dispatchTask: true,
     roleStatus: false,
     sessionTail: false,
     proposeRecovery: false,
     installSkill: false,
     installMcp: false,
-    // 客户 2026-10-19：所有角色 shell 均接审批档（只读白名单直接执行、其余逐条审批）。
     shell: "operator-approve",
   });
   assert.equal(spec!.preauthorizedDirs.includes("docs/intents/"), true);
   assert.equal(spec!.preauthorizedDirs.some((d) => d.startsWith("docs/governance/")), false);
 });
 
-test("Lead 卡文本：治理协调（2026-10-24）——接报内置状态/回交、闸门 0/1 后才交接/coordinate、不直派 Crew/Proof/项目 worker、Proof 只收状态+指针、协调≠批准", () => {
-  const t = governanceRoleOf("liaison")!.cardText;
-  assert.match(t, /## 治理协调（产品 \/ Lead）/);
-  assert.match(
-    t,
-    /策划 \/ Draft、运营 \/ Steward、人事 \/ Crew、质检 \/ Proof 的状态与回交向\*\*你\*\*汇总/,
-    "Lead 接报 Draft/Steward/Crew/Proof 的状态与回交",
-  );
-  assert.match(t, /维护「阶段 \/ 阻塞 \/ 下一步」视图/, "Lead 维护阶段/阻塞/下一步视图");
-  assert.match(
-    t,
-    /代批 `confirm`（闸门 0 已结算）后，才用 `hand_off_intent`/,
-    "闸门 0 结算后才 hand_off_intent 给 Draft",
-  );
-  assert.match(
-    t,
-    /客户已接受提案（闸门 1 已结算）后，才用 `dispatch_task` 的 coordinate 向 运营 \/ Steward 派/,
-    "闸门 1 结算后才 coordinate 给 Steward",
-  );
-  assert.match(t, /不直接派 Crew \/ Proof \/ 项目 worker/, "Lead 不直接派 Crew/Proof/项目 worker");
-  assert.match(t, /项目 worker（Map \/ Reduce）由 运营 \/ Steward 派/, "项目 worker 由 Steward 派");
-  assert.match(t, /只收 Proof 的状态与报告指针/, "Proof 只给 Lead 状态+报告指针");
-  assert.match(t, /不批准提案、任命、验收/, "Lead 不批准提案/任命/验收");
-  assert.match(t, /协调 ≠ 客户批准/, "协调 ≠ 客户批准");
-  assert.match(t, /应用仍执行闸门 0\/1\/2/, "应用门禁仍执行");
-  assert.match(t, /你的协调不替代任何门禁/, "协调不替代门禁");
-  // 2026-10-26 客户追加规则：系统消息（[系统·治理协调]、gate pass/fail 系统行、交付/阻塞通知）
-  // 只向客户汇报，不得据此 dispatch_task 派 Steward；客户消息 / 客户明确要求触发的协调不回归。
-  assert.match(t, /\*\*系统消息只汇报、不派任务（必须）\*\*/, "Lead 卡须写死系统消息只汇报、不派任务");
-  assert.match(
-    t,
-    /`\[系统·治理协调\]`、gate pass \/ fail 系统行、交付 \/ 阻塞通知等系统消息/,
-    "系统消息种类须列明（[系统·治理协调]、gate 系统行、交付/阻塞通知）",
-  );
-  assert.match(t, /只向客户如实汇报/, "Lead 收到系统消息只向客户如实汇报");
-  assert.match(
-    t,
-    /不得给 运营 \/ Steward 发任务、不得调用 `dispatch_task`/,
-    "Lead 收到系统消息不得派 Steward / 不得 dispatch_task",
-  );
-  assert.match(t, /不得把系统消息当成客户指令/, "系统消息不得当客户指令");
-  assert.match(t, /客户明确要求或客户消息触发的协调仍按原规则/, "客户消息路径不回归");
-  assert.match(t, /客户消息不是系统消息/, "客户消息与系统消息须区分");
-  // 工作流管理章节同样写死；闸门 1 后的客户消息 coordinate 路径仍保留，dispatchTask 能力不变。
-  assert.match(
-    t,
-    /系统消息（`\[系统·治理协调\]`、gate pass \/ fail 系统行、交付 \/ 阻塞通知等）只向客户汇报/,
-    "工作流管理章节须同步系统消息纪律",
-  );
-  assert.match(t, /只有客户明确要求或客户消息触发的协调才可派发/, "只有客户触发才可派发");
-  assert.equal(
-    governanceRoleOf("liaison")!.capabilities.dispatchTask,
-    true,
-    "dispatch_task 仍保留（客户消息触发才可派）",
-  );
-  // 2026-10-24 P1-7：Lead 作为 manager（与 Steward 同权限）不得代标 delivered；
-  // 只能在 owner 交付 delivered 后核证 done，或标 failed/blocked；worker 不能 done。
-  assert.match(t, /与 运营 \/ Steward 同权限/, "Lead 管理工作流的管理权限描述保留");
-  assert.match(
-    t,
-    /`dispatched → delivered` 只能由该步骤的 owner（项目角色 \/ worker）标记/,
-    "Lead 不得代标 delivered",
-  );
-  assert.match(t, /不得代标 `delivered`/, "Lead 卡须写明不得代标 delivered");
-  assert.match(
-    t,
-    /只能在 owner 交付 `delivered` 后核证并标 `done`（`delivered → done`）/,
-    "Lead 只能核证 delivered→done",
-  );
-  assert.match(t, /或标 `failed` \/ `blocked`/, "Lead 仍可标 failed/blocked");
-  assert.match(t, /worker 不能标 `done`/, "worker 不能 done");
-  // 旧「向项目角色派发协调任务」必须消失（Q1：项目 worker 由 Steward 派）。
-  assert.doesNotMatch(t, /向 运营 \/ Steward 与项目角色派发协调任务/);
-  assert.doesNotMatch(t, /向 运营 \/ Steward与项目角色派发协调任务/);
-  assert.doesNotMatch(t, /派给 Steward \/ 项目角色/);
-  assert.doesNotMatch(t, /向项目角色派发协调任务/);
-  // 能力位不变：治理协调不新增工具/能力位。
-  const cap = governanceRoleOf("liaison")!.capabilities;
-  assert.equal(cap.handOffIntent, true, "hand_off_intent 仍保留");
-  assert.equal(cap.dispatchTask, true, "dispatch_task 仍保留（仅向 Steward 协调）");
-  assert.deepEqual(
-    [cap.roleStatus, cap.sessionTail, cap.proposeRecovery, cap.installSkill, cap.installMcp],
-    [false, false, false, false, false],
-    "治理协调不新增看护/恢复/技能/MCP 能力",
-  );
+test("product 能力：标准 worker——只保留客户通道；无派发/看护/恢复/安装；shell=审批档", () => {
+  const spec = governanceRoleOf("product");
+  assert.ok(spec);
+  assert.deepEqual(spec!.capabilities, {
+    customerInput: true,
+    handOffIntent: false,
+    requestClarification: false,
+    dispatchTask: false,
+    roleStatus: false,
+    sessionTail: false,
+    proposeRecovery: false,
+    installSkill: false,
+    installMcp: false,
+    shell: "operator-approve",
+  });
+  assert.deepEqual(spec!.preauthorizedDirs, ["docs/product/"]);
 });
 
-test("Lead 卡文本：需求确认——先发 intent-confirm 复述目标/范围/验收，confirm（客户或判断代批）后才交接；revise 永不由判断代选", () => {
-  const t = governanceRoleOf("liaison")!.cardText;
+// —————————————————————— 5) 卡文本 ——————————————————————
+
+test("chief 卡文本：工作流管理/客户沟通/通知接收，不转发/不审批/不代决，intent-confirm 旧流程保留", () => {
+  const t = governanceRoleOf("chief")!.cardText;
+  assert.match(t, /工作流管理/);
+  assert.match(t, /客户主沟通入口/);
+  assert.match(t, /不拥有最终批准权/);
+  assert.match(t, /不转发、不审批、不代选、不代决、不改写/);
   assert.match(t, /`cardKind=intent-confirm`/);
-  assert.match(t, /`flowId=<intentId>`/);
-  assert.match(t, /选项固定为 `confirm` \/ `revise`/);
-  assert.match(t, /客户或判断 agent 代批 `confirm` 后才能调用 `hand_off_intent`/);
-  assert.match(t, /客户开启「替我决策」时，判断 agent 可代批 `confirm`/);
-  assert.match(t, /`revise` 永远不由判断代选/);
-  assert.match(t, /代批不是客户逐项批准、不改写客户意图/);
-  assert.match(t, /选 `revise` 时先按反馈修改意图文件/);
-  assert.match(t, /确认前不得交接/);
-  // 真机 2026-10-18：意图 frontmatter 只支持字符串值；YAML 列表会让 hand_off_intent 解析失败。
-  assert.match(t, /goal \/ scope \/ acceptance 必须是\*\*字符串值\*\*/);
-  assert.match(t, /不要用 YAML 列表（`-` 项）或嵌套映射/);
-  assert.match(t, /列表项会让 `hand_off_intent` 解析失败/);
-  // 其他角色的卡不得写 intent-confirm（卡片白名单不扩散）。
-  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
-    if (spec.id === "liaison") continue;
-    assert.doesNotMatch(spec.cardText, /intent-confirm/, `${spec.id} 不写 intent-confirm`);
-  }
+  assert.match(t, /`hand_off_intent`/);
+  assert.match(t, /不得创建额外的治理角色/);
+  assert.match(t, /dispatch_task/);
+  assert.match(t, /role_status/);
+  assert.match(t, /session_tail/);
+  assert.match(t, /docs\/intents\//);
 });
 
-// —————————————————————— 5) 保留 id 守卫 ——————————————————————
+test("product 卡文本：幕僚 worker——产品评审/建议、结果只向幕僚、可直接提交申请", () => {
+  const t = governanceRoleOf("product")!.cardText;
+  assert.match(t, /产品视角评审与建议/);
+  assert.match(t, /幕僚的 worker/);
+  assert.match(t, /不拥有最终批准权/);
+  assert.match(t, /工作结果只向幕僚/);
+  assert.match(t, /`submit_report`/);
+  assert.match(t, /直接提交申请/);
+  assert.match(t, /docs\/product\//);
+  assert.match(t, /不得创建额外的治理角色/);
+});
 
-test("保留 id：角色卡/liaison/ 被跳过并警告；resolveRole('liaison') 不被项目映射遮蔽", async () => {
+// —————————————————————— 6) 保留 id 守卫 ——————————————————————
+
+test("保留 id：角色卡/chief|product|liaison 被跳过并警告；resolveRole 不被项目映射遮蔽", async () => {
   const proj = join(ROOT, "shadow");
-  mkdirSync(join(proj, "角色卡", "liaison"), { recursive: true });
-  writeFileSync(join(proj, "角色卡", "liaison", "role-card.md"), "# 假 Liaison\n");
-  writeFileSync(
-    join(proj, "角色卡", "liaison", "boundary.yaml"),
-    "entries:\n  - kind: directory\n    path: src/\n    purpose: t\n",
-  );
+  for (const id of ["chief", "product", "liaison"]) {
+    mkdirSync(join(proj, "角色卡", id), { recursive: true });
+    writeFileSync(join(proj, "角色卡", id, "role-card.md"), `# 假 ${id}\n`);
+    writeFileSync(
+      join(proj, "角色卡", id, "boundary.yaml"),
+      "entries:\n  - kind: directory\n    path: src/\n    purpose: t\n",
+    );
+  }
   mkdirSync(join(proj, ".ans"), { recursive: true });
   writeFileSync(join(proj, ".ans", "project.json"), JSON.stringify({ governanceModel: "trio" }));
 
   const listing = await listProject(proj);
-  assert.equal(listing.roles.some((r) => r.roleId === "liaison" && r.builtIn === true), true);
-  assert.equal(
-    listing.roles.filter((r) => r.roleId === "liaison").length,
-    1,
-    "项目里的 角色卡/liaison/ 不得再枚举为项目角色",
-  );
-  assert.match(listing.warnings.join("\n"), /角色卡\/liaison：与内置治理角色 id 冲突，已跳过/);
+  for (const id of ["chief", "product"]) {
+    assert.equal(
+      listing.roles.filter((r) => r.roleId === id).length,
+      1,
+      `项目里的 角色卡/${id}/ 不得再枚举为项目角色`,
+    );
+    assert.equal(listing.roles.find((r) => r.roleId === id)?.builtIn, true);
+  }
+  const w = listing.warnings.join("\n");
+  for (const id of ["chief", "product", "liaison"]) {
+    assert.match(w, new RegExp(`角色卡/${id}：与内置治理角色 id 冲突，已跳过`));
+  }
 
-  const role = await resolveRole("liaison", {
-    projectRoot: proj,
-    skillRoot: SKILL,
-    governanceModel: "trio",
-    roles: { liaison: { card: "角色卡/liaison/role-card.md", boundary: "角色卡/liaison/boundary.yaml" } },
-  });
+  for (const id of ["chief", "product"]) {
+    const role = await resolveRole(id, {
+      projectRoot: proj,
+      skillRoot: SKILL,
+      governanceModel: "trio",
+      roles: { [id]: { card: `角色卡/${id}/role-card.md`, boundary: `角色卡/${id}/boundary.yaml` } },
+    });
+    assert.equal(role.kind, "built-in-governance");
+    assert.equal(role.governanceFunction, id);
+    assert.doesNotMatch(role.cardText, new RegExp(`假 ${id}`), `项目映射不得遮蔽内置 ${id}`);
+  }
+});
+
+// —————————————————————— 7) 旧 liaison 只读别名 ——————————————————————
+
+test("旧 liaison：不在注册表/列表，但按 id 仍解析出基线卡文本/边界/能力（D 批删除）", async () => {
+  assert.equal(BUILT_IN_GOVERNANCE_ROLES.some((s) => (s.id as string) === "liaison"), false);
+  const role = await resolveRole("liaison", project());
   assert.equal(role.kind, "built-in-governance");
   assert.equal(role.governanceFunction, "liaison");
-  assert.doesNotMatch(role.cardText, /假 Liaison/, "项目映射不得遮蔽内置 Liaison");
+  assert.match(role.cardText, /客户沟通/);
+  assert.match(role.cardText, /不拥有最终批准权/);
+  assert.equal(role.boundarySource, "<built-in:trio/liaison>");
+  assert.deepEqual(role.boundary.entries.map((e) => e.path), ["docs/intents/"]);
+  assert.deepEqual(governanceCapabilitiesOf("liaison"), {
+    customerInput: true,
+    handOffIntent: true,
+    requestClarification: false,
+    dispatchTask: true,
+    roleStatus: false,
+    sessionTail: false,
+    proposeRecovery: false,
+    installSkill: false,
+    installMcp: false,
+    shell: "operator-approve",
+  });
+});
+
+// —————————————————————— 8) resolveGovernanceRole 公共出口 ——————————————————————
+
+test("resolveGovernanceRole：六角色按 roleId/function 解析；缺省 proposal→rapporteur；旧 liaison 显式别名可解析", async () => {
+  const root = join(ROOT, "trio-listing-resolve");
+  mkdirSync(join(root, ".ans"), { recursive: true });
+  writeFileSync(join(root, ".ans", "project.json"), JSON.stringify({ governanceModel: "trio" }));
+  const trio = await listProject(root);
+
+  assert.deepEqual(resolveGovernanceRole(trio), { roleId: "rapporteur", function: "proposal", model: "trio" });
+  for (const [roleId, fn] of [
+    ["chief", "chief"],
+    ["product", "product"],
+    ["rapporteur", "proposal"],
+    ["nominator", "nomination"],
+    ["convener", "schedule"],
+    ["verifier", "verification"],
+  ] as const) {
+    assert.deepEqual(resolveGovernanceRole(trio, { roleId }), { roleId, function: fn, model: "trio" });
+    assert.deepEqual(resolveGovernanceRole(trio, { function: fn }), { roleId, function: fn, model: "trio" });
+  }
+  // 旧 liaison 只读别名仍可显式解析（不进入列表/缺省路由）。
+  assert.deepEqual(resolveGovernanceRole(trio, { roleId: "liaison" }), {
+    roleId: "liaison",
+    function: "liaison",
+    model: "trio",
+  });
+  assert.throws(() => resolveGovernanceRole(trio, { roleId: "su" }), /已归档/);
+  assert.throws(
+    () => resolveGovernanceRole(trio, { roleId: "su" }),
+    /chief\/product\/rapporteur\/nominator\/convener\/verifier/,
+  );
+  assert.throws(() => resolveGovernanceRole(trio, { roleId: "rapporteur", function: "schedule" }), /不一致/);
+  assert.throws(
+    () => resolveGovernanceRole(trio, { roleId: "实现者" }),
+    /chief\/product\/rapporteur\/nominator\/convener\/verifier/,
+  );
 });
