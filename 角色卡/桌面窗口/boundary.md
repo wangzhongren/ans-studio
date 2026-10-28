@@ -43,6 +43,21 @@
 | 单文件 | `test/桌面应用/project-document.test.ts` | B 专属测试：服务/Provider 预算、编码、句柄竞态、grant/scope 与引用失效 |
 | 单文件 | `test/桌面应用/acceptance-dispatch.test.ts` | 主进程侧测试——自动验收证据门、触发面与持久化去重（interface/governance-advance） |
 | 单文件 | `test/桌面应用/runtime-resolution.test.ts` | 主进程侧测试——自动派发/冷启动引擎解析优先级、per-project 持久化与「无法确定时不派发」 |
+| 单文件 | `test/桌面应用/task-restart.test.ts` | 主进程侧测试——任务/报告/未决申请重启恢复（`request.orphaned`/`approval.expired`；结果只通知、任务回投，不自动执行原动作） |
+| 单文件 | `test/桌面应用/star-routing.test.ts` | 主进程侧测试——星形派发/汇报路由：幕僚→任意角色、任意→幕僚；角色间无工作派发/汇报、运营无 dispatch |
+| 单文件 | `test/桌面应用/chief-workflow.test.ts` | 主进程侧测试——幕僚任务卡字段、短报截断/合批、项目 worker 直接汇报、系统通知 |
+| 单文件 | `test/桌面应用/role-log.test.ts` | 主进程侧测试——每角色日志写入点/格式/脱敏/轮转/坏行跳过（不写密钥/完整 prompt） |
+| 单文件 | `test/桌面应用/log-patrol.test.ts` | 主进程侧测试——10 分钟日志巡检 tick 计数、巡检消息、只列 working、防重入跳过与连续跳过日志 |
+| 单文件 | `test/桌面应用/log-stuck.test.ts` | 主进程侧测试——最后日志慢/卡死阈值、长任务正常日志不误杀、等待态暂停、`role_activity_log` 读取 |
+| 单文件 | `test/桌面应用/stuck-redispatch.test.ts` | 主进程侧测试——卡死判定→终止→任务标失败→重派（同角色/新角色）→`retryOf` 链→上限 2→应用决策升级 |
+| 单文件 | `test/桌面应用/stuck-redispatch-safety.test.ts` | 主进程侧测试——终止/重派副作用安全（子进程树/幂等/部分写入） |
+| 单文件 | `test/桌面应用/log-actions.test.ts` | 主进程侧测试——幕僚提醒/终止/重派/换人/上报客户；应用执行、日志、去重与风暴护栏 |
+| 单文件 | `test/桌面应用/watchdog-reuse.test.ts` | 主进程侧测试——既有四信号与 `log-silence` 不重复告警、主人改为幕僚、tick 复用、自动中止默认关 |
+| 单文件 | `test/桌面应用/application-line.test.ts` | 主进程侧测试——角色直接提交申请：来源角色、应用呈现/裁决、系统通知幕僚、结果回角色（幕僚不转发/不代答） |
+| 单文件 | `test/桌面应用/decision-service.test.ts` | 主进程侧测试——两开关、decision 卡按唯一推荐代选、approval 卡按现有 rubric、关闭客户卡、fail-closed、judge 代批审计 |
+| 单文件 | `test/桌面应用/pending-card-restart.test.ts` | 主进程侧测试——申请/审批卡快照持久化、重启回待办/对话框、无原 tool call 的结算与回投、shell/审批卡不重放、requestId/approvalId 幂等 |
+| 单文件 | `test/桌面应用/write-safety.test.ts` | 主进程侧测试——边界内预授权/边界外拒绝/`.ans` 禁写、appointment-write 审批与结构校验失败不落盘、写后刷新、负例（内置 id/越界/重叠） |
+| 单文件 | `test/桌面应用/optional-acceptance.test.ts` | 主进程侧测试——可选验收链路：幕僚调度→质检/交付角色直接提交→judge/客户 |
 | 单文件 | `角色卡/桌面窗口/feature-map.md` | 功能导航 |
 | 单文件 | `角色卡/桌面窗口/memo.md` | 本角色工作备忘录 |
 | 单文件 | `角色卡/桌面窗口/changelog.md` | 本角色治理变更记录 |
