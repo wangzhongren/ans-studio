@@ -28,6 +28,7 @@ fs.mkdirSync(OUT, { recursive: true });
 app.setPath("userData", path.join(OUT, "user-data"));
 
 const report = { entry: ENTRY, checks: [], console: [], csp: [], screenshots: [], failures: 0 };
+const operatorResponses = [];
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function check(name, value, detail) {
   report.checks.push({ name, value: value === true, detail: detail === undefined ? null : detail });
@@ -97,7 +98,11 @@ ipcMain.handle("session:stop", () => ({ ok: true }));
 ipcMain.handle("session:abort", (_e, input) => ({ ok: true, supported: true, ...input }));
 ipcMain.handle("session:send", () => ({ ok: true }));
 ipcMain.handle("session:withdraw", () => ({ ok: true }));
-ipcMain.handle("session:operator-response", () => ({ ok: true }));
+ipcMain.handle("session:operator-response", (_e, input) => {
+  operatorResponses.push(input);
+  if (input?.id === "e-expire") return { ok: false, expired: true, error: "E2E 过期探针" };
+  return { ok: true };
+});
 ipcMain.handle("shell:judge-get", () => ({ version: 1, ok: true, enabled: false }));
 ipcMain.handle("shell:judge-set", (_e, input) => ({ version: 1, ok: true, enabled: input?.enabled === true }));
 ipcMain.handle("decision:judge-get", () => ({ version: 1, ok: true, enabled: false }));
@@ -189,6 +194,70 @@ app.whenReady().then(async () => {
     check("任务/日志面板存在", await js(`!!document.querySelector('.task-center .tc-title')`));
     check("角色日志徽标/视图存在", await js(`!!document.querySelector('.role-log-badge') && !!document.querySelector('.role-log-view')`));
     await shot("04-task-center");
+
+    // F-E2：输入中仅高风险打断；已有对话框低风险/decision 新卡不替换；停止输入后空闲推进。
+    operatorResponses.length = 0;
+    await js(`window.__ansRenderer.drawer.close()`);
+    await sleep(180);
+    await js(`document.getElementById('inp-message').focus(); document.getElementById('inp-message').dispatchEvent(new Event('input', { bubbles: true }))`);
+    await js(`window.__ansRenderer.appendOperatorRequest({ id: 'e-typing-decision', roleId: 'chief', request: { kind: 'choice', cardKind: 'proposal', title: 'E 输入中 decision', options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }] } })`);
+    await sleep(220);
+    check("输入中 decision 不打断", await js(`!(document.querySelector('#decision-dialog .dd-title')||{textContent:''}).textContent.includes('E 输入中 decision')`));
+    await js(`window.__ansRenderer.appendOperatorRequest({ id: 'e-typing-high', roleId: 'chief', risk: 'high', request: { kind: 'confirm', title: 'E 输入中高风险' } })`);
+    await sleep(220);
+    check("输入中高风险可打断", await js(`(document.querySelector('#decision-dialog .dd-title')||{textContent:''}).textContent.includes('E 输入中高风险')`));
+    await js(`document.querySelector('#decision-dialog .dd-later').click()`);
+    await sleep(1600);
+    check("停止输入后空闲推进 decision", await js(`(document.querySelector('#decision-dialog .dd-title')||{textContent:''}).textContent.includes('E 输入中 decision')`));
+    await js(`window.__ansRenderer.appendOperatorRequest({ id: 'e-new-decision', roleId: 'chief', request: { kind: 'choice', cardKind: 'decision', title: 'E 新 decision 不替换', options: [{ id: 'x', label: 'X' }, { id: 'y', label: 'Y' }] } })`);
+    await sleep(220);
+    check("已有对话框：decision 新卡排队不替换", await js(`(document.querySelector('#decision-dialog .dd-title')||{textContent:''}).textContent.includes('E 输入中 decision')`));
+    await js(`document.querySelector('#decision-dialog .dd-later').click()`);
+    await sleep(150);
+    await js(`document.querySelector('#decision-dialog .dd-later')?.click()`);
+    await sleep(150);
+
+    // F-E1/F-E3/F-E4：真实 Electron 运行时行为（拒绝/Esc/焦点/二次确认/双击/过期历史）。
+    operatorResponses.length = 0;
+    await js(`window.__ansRenderer.appendOperatorRequest({ id: 'e-choice-reject', roleId: 'chief', request: { kind: 'choice', title: 'E 选择题拒绝', options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }] } })`);
+    await sleep(180);
+    await js(`document.querySelector('#decision-dialog .dd-reject').click()`);
+    await sleep(180);
+    check("choice 未选择时拒绝可提交 cancelled", operatorResponses.some((item) => item?.id === 'e-choice-reject' && item?.decision?.kind === 'choice' && item?.decision?.cancelled === true));
+    check("choice 拒绝后对话框关闭", await js(`!document.querySelector('#decision-dialog')`));
+
+    operatorResponses.length = 0;
+    await js(`window.__ansRenderer.appendOperatorRequest({ id: 'e-esc', roleId: 'chief', request: { kind: 'confirm', title: 'E Esc 稍后' } })`);
+    await sleep(180);
+    await js(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+    await sleep(180);
+    check("Esc=稍后、不确认不拒绝", await js(`!document.querySelector('#decision-dialog')`) && operatorResponses.length === 0);
+
+    await js(`window.__ansRenderer.appendOperatorRequest({ id: 'e-destructive', roleId: 'chief', risk: 'high', request: { kind: 'confirm', title: 'E 破坏性二次确认' } })`);
+    await sleep(180);
+    await js(`document.querySelector('#decision-dialog .dd-confirm').click()`);
+    await sleep(100);
+    check("破坏性第一次点击不提交", operatorResponses.length === 0);
+    check("破坏性显示二次确认", await js(`(document.querySelector('#decision-dialog .dd-confirm')||{textContent:''}).textContent.includes('再次确认')`));
+    await js(`document.querySelector('#decision-dialog .dd-confirm').click(); document.querySelector('#decision-dialog .dd-confirm')?.click();`);
+    await sleep(220);
+    check("破坏性二次点击仅提交一次", operatorResponses.filter((item) => item?.id === 'e-destructive').length === 1);
+    await js(`document.querySelector('#decision-dialog .dd-later')?.click()`);
+    await sleep(120);
+
+    await js(`window.__ansRenderer.appendOperatorRequest({ id: 'e-expire', roleId: 'chief', request: { kind: 'confirm', title: 'E 过期历史' } })`);
+    await sleep(180);
+    const aria = await js(`(() => { const d=document.querySelector('#decision-dialog'); return d ? { modal:d.getAttribute('aria-modal'), labelled:d.getAttribute('aria-labelledby'), described:d.getAttribute('aria-describedby'), role:d.getAttribute('role') } : null; })()`);
+    check("ARIA 模态/标题/描述", !!aria && aria.role === 'dialog' && aria.modal === 'true' && aria.labelled === 'dd-title' && aria.described === 'dd-source dd-risk', aria);
+    const trapped = await js(`(() => { const d=document.querySelector('#decision-dialog'); if (!d) return false; const f=[...d.querySelectorAll('button:not([disabled])')]; if (f.length < 2) return false; const first=f[0], last=f[f.length-1]; last.focus(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })); return document.activeElement === first && first !== d.querySelector('.dd-confirm'); })()`);
+    check("焦点陷阱：Tab 从末项回到首项且不在确认", trapped);
+    await js(`document.querySelector('#decision-dialog .dd-confirm').click()`);
+    await sleep(500);
+    await js(`document.getElementById('tab-decisions').click()`);
+    await sleep(250);
+    check("过期申请进入历史", await js(`(() => { const h=document.getElementById('decision-center-history'); return !!h && h.textContent.includes('E 过期历史') && h.textContent.includes('已失效'); })()`));
+    await js(`document.getElementById('tab-work').click()`);
+    await sleep(150);
 
     // 200% 窄屏：对话框/面板不产生横向滚动。
     wc.setZoomFactor(2);

@@ -31,7 +31,8 @@ test("误触/二次确认：破坏性卡需二次确认，提交中禁用，双�
   assert.match(DIALOG, /view\.destructive && !armed/);
   assert.match(DIALOG, /setArmed\(true\)/);
   assert.match(DIALOG, /disabled=\{!canSubmit \|\| busy\}/);
-  assert.match(DIALOG, /if \(busy \|\| !canSubmit\) return/);
+  assert.match(DIALOG, /options\?\.allowCancel !== true/);
+  assert.match(DIALOG, /cancelled: true \}, \{ allowCancel: true \}/);
   assert.match(DIALOG, /ui\.decisionDialog\.secondConfirm/);
 });
 

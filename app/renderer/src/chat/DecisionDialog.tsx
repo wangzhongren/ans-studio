@@ -43,6 +43,7 @@ export function DecisionDialog() {
   const [armed, setArmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const sendLock = useRef(false);
   const laterRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
@@ -58,6 +59,7 @@ export function DecisionDialog() {
       setSelected([]);
       setArmed(false);
       setBusy(false);
+      sendLock.current = false;
       setError("");
       const previous = restoreRef.current;
       restoreRef.current = null;
@@ -71,6 +73,7 @@ export function DecisionDialog() {
     setSelected(recommended);
     setArmed(false);
     setBusy(false);
+    sendLock.current = false;
     setError("");
     requestAnimationFrame(() => laterRef.current?.focus({ preventScroll: true }));
   }, [activeId]);
@@ -122,14 +125,17 @@ export function DecisionDialog() {
       ? view.answerable
       : view.answerable && selected.length > 0 && (view.multiple || selected.length === 1);
 
-  const send = async (decision: unknown) => {
-    if (busy || !canSubmit) return;
+  const send = async (decision: unknown, options?: { allowCancel?: boolean }) => {
+    // 取消/拒绝不要求选项完整性；只有正向提交受 canSubmit 约束。
+    if (sendLock.current || busy || (!canSubmit && options?.allowCancel !== true)) return;
+    sendLock.current = true;
     setBusy(true);
     setError("");
     await useChatStore.getState().respondOperator(activeId, decision);
     const remaining = useChatStore.getState().pendingOperator[activeId];
     setBusy(false);
     if (remaining) {
+      sendLock.current = false;
       setError(translate(locale, "ui.operator.retryFailed", { detail: translate(locale, "ui.chatStore.operatorChannelNotAccepted") }));
       setArmed(false);
       return;
@@ -147,9 +153,9 @@ export function DecisionDialog() {
 
   const reject = () => {
     if (view.kind === "choice") {
-      void send({ kind: "choice", cancelled: true });
+      void send({ kind: "choice", cancelled: true }, { allowCancel: true });
     } else {
-      void send({ kind: "confirm", confirmed: false });
+      void send({ kind: "confirm", confirmed: false }, { allowCancel: true });
     }
   };
 

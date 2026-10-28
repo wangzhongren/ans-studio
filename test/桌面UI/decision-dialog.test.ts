@@ -11,6 +11,7 @@ import {
   nextDecisionId,
   orderedDecisionIds,
   pendingMoreCount,
+  shouldOpenDecision,
 } from "../../app/renderer/src/chat/decision-dialog.ts";
 
 function payload(over: Record<string, unknown> = {}, request: Record<string, unknown> = {}) {
@@ -89,4 +90,14 @@ test("待办/队列：稍后处理不参与自动弹出，但仍在 pending 计�
   assert.equal(nextDecisionId(pending, ["a", "b"], ["a", "b", "c"], "c"), null);
   assert.equal(pendingMoreCount(pending, "a"), 2);
   assert.equal(pendingMoreCount(pending, null), 3);
+});
+
+test("E-05：输入中仅高风险打断；已有卡仅更高优先级高风险替换", () => {
+  assert.equal(shouldOpenDecision({ activePriority: null, bestPriority: 3, suppressed: false }), true);
+  assert.equal(shouldOpenDecision({ activePriority: null, bestPriority: 2, suppressed: true }), false);
+  assert.equal(shouldOpenDecision({ activePriority: null, bestPriority: 0, suppressed: true }), true);
+  assert.equal(shouldOpenDecision({ activePriority: 3, bestPriority: 2, suppressed: false }), false, "decision 不能替换低风险确认");
+  assert.equal(shouldOpenDecision({ activePriority: 2, bestPriority: 1, suppressed: false }), false, "审批不能替换 decision");
+  assert.equal(shouldOpenDecision({ activePriority: 3, bestPriority: 0, suppressed: false }), true, "高风险可打断");
+  assert.equal(shouldOpenDecision({ activePriority: 0, bestPriority: 0, suppressed: false }), false, "同级高风险 FIFO，不替换");
 });

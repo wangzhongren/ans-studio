@@ -48,6 +48,8 @@ export interface AnsRendererStateSnapshot {
   confirmLastDecision: ConfirmDemoDecision;
   governanceModel: "single" | "trio" | null;
   governanceRecord: Record<string, unknown> | null;
+  pendingOperator: Record<string, Record<string, unknown>>;
+  queuedOperator: Record<string, Record<string, unknown>>;
   hint: string;
 }
 
@@ -192,6 +194,8 @@ function snapshot(): AnsRendererStateSnapshot {
     confirmLastDecision: lastDemoDecision,
     governanceModel: chat.governanceModel,
     governanceRecord: chat.governanceRecord,
+    pendingOperator: chat.pendingOperator,
+    queuedOperator: chat.queuedOperator,
     hint: chat.hint,
   };
 }

@@ -1927,7 +1927,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   expireOperator: (id, reason) => {
-    const roleId = asString(get().pendingOperator[id]?.roleId);
+    const expiredPayload = get().pendingOperator[id];
+    const roleId = asString(expiredPayload?.roleId);
     const pendingOperator = { ...get().pendingOperator };
     delete pendingOperator[id];
     const queuedOperator = { ...get().queuedOperator };
@@ -1947,6 +1948,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       ),
     });
     refreshQueueAggregate();
+    // E-06：过期申请写入决策中心历史（UI 状态；来源/结果可查）。
+    if (expiredPayload !== undefined) {
+      void import("../stores/decision-center-store.ts").then((module) => {
+        module.useDecisionCenterStore.getState().expire(id, note, expiredPayload);
+      });
+    }
   },
 
   queueOperator: (payload) => {

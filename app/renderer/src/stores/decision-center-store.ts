@@ -10,6 +10,7 @@ import { useChatStore } from "../chat/chat-store.ts";
 import {
   decisionPriority,
   decisionSourceRoleId,
+  shouldOpenDecision,
   decisionView,
   nextDecisionId,
   orderedDecisionIds,
@@ -36,7 +37,7 @@ interface DecisionCenterState {
   open: (id: string) => void;
   defer: (id: string) => void;
   resolve: (id: string, result: string, locale?: Locale) => void;
-  expire: (id: string, reason: string) => void;
+  expire: (id: string, reason: string, payload?: Record<string, unknown>) => void;
   recordJudge: (entry: Omit<DecisionHistoryEntry, "status" | "id"> & { id: string }) => void;
   reset: () => void;
 }
@@ -45,12 +46,18 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+const INPUT_IDLE_MS = 1200;
+let lastInputAt = 0;
+
 function isTyping(): boolean {
   if (typeof document === "undefined") return false;
   const active = document.activeElement as HTMLElement | null;
   if (!active) return false;
   const tag = active.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || active.isContentEditable === true;
+  const inField = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || active.isContentEditable === true;
+  if (!inField) return false;
+  // 输入中 ≠ 永久抑制：停止输入 INPUT_IDLE_MS 后视为空闲（E-05 空闲推进）。
+  return Date.now() - lastInputAt < INPUT_IDLE_MS;
 }
 
 function entryFor(
@@ -86,11 +93,16 @@ export const useDecisionCenterStore = create<DecisionCenterState>((set, get) => 
     let activeId = state.activeId && pending[state.activeId] ? state.activeId : null;
     const suppressed = isTyping();
     const best = nextDecisionId(pending, deferred, order);
-    if (!suppressed && best !== null) {
+    if (best !== null) {
       const bestPriority = decisionPriority(pending[best]);
       const activePriority = activeId !== null ? decisionPriority(pending[activeId]) : Number.POSITIVE_INFINITY;
-      // 一次一卡；新到的高优先级可打断当前低优先级卡（高风险可打断但不自动聚焦确认）。
-      if (activeId === null || bestPriority < activePriority) activeId = best;
+      if (shouldOpenDecision({
+        activePriority: activeId === null ? null : activePriority,
+        bestPriority,
+        suppressed,
+      })) {
+        activeId = best;
+      }
     }
     set({ order, deferred, activeId, suppressed });
   },
@@ -123,9 +135,9 @@ export const useDecisionCenterStore = create<DecisionCenterState>((set, get) => 
     set({ history, deferred, order, activeId: activeId === id ? null : activeId });
   },
 
-  expire: (id, reason) => {
+  expire: (id, reason, payloadOverride) => {
     const pending = useChatStore.getState().pendingOperator;
-    const payload = pending[id];
+    const payload = payloadOverride ?? pending[id];
     const history = [...get().history];
     if (payload) history.unshift(entryFor(id, payload, reason, "expired", DEFAULT_LOCALE));
     const deferred = get().deferred.filter((item) => item !== id);
@@ -162,9 +174,21 @@ export function installDecisionCenter(): void {
     if (state.pendingOperator === previous.pendingOperator) return;
     useDecisionCenterStore.getState().sync(state.pendingOperator);
   });
-  document.addEventListener("focusin", () => {
-    const state = useDecisionCenterStore.getState();
-    if (state.activeId !== null) return;
-    state.sync(useChatStore.getState().pendingOperator);
-  });
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  const scheduleSync = (delay: number): void => {
+    if (idleTimer !== null) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      idleTimer = null;
+      useDecisionCenterStore.getState().sync(useChatStore.getState().pendingOperator);
+    }, delay);
+  };
+  const noteInput = (): void => {
+    lastInputAt = Date.now();
+    // 停止输入后自动推进（高风险仍可在输入中立即打断）。
+    scheduleSync(INPUT_IDLE_MS + 20);
+  };
+  document.addEventListener("focusin", noteInput, true);
+  document.addEventListener("input", noteInput, true);
+  document.addEventListener("keydown", noteInput, true);
+  document.addEventListener("focusout", () => scheduleSync(0), true);
 }

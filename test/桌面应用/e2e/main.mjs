@@ -56,6 +56,9 @@ const operatorPresentations = [];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const report = [];
 const log = (s) => { report.push(s); };
+const hardChecks = [];
+const hardCheck = (name, value) => { if (value !== true) hardChecks.push(name); return value; };
+
 // A-5（2026-10-12）：客户交互通道——用**真实** `createCustomerInputChannel`（app/desktop/customer-input.ts）
 // 装配：presenter 推给渲染侧为交互卡；`session:operator-response` 直连通道（**按请求快照校验**——
 // 非法回包不受理在 e2e 现场可见）。不经真实模型工具，直接以通道推请求（与桌面接线同形）。
@@ -868,25 +871,32 @@ async function run() {
   );
   await sleep(300);
   const xId = operatorPresentations[operatorPresentations.length - 1].id;
-  log("OPX_NOT_IN_VIEWED_PANE=" + (await wc().executeJavaScript("!document.querySelector('#chat .op-request') && !!document.querySelector('#decision-dialog')")));
+  log("OPX_NOT_IN_VIEWED_PANE=" + (await wc().executeJavaScript("!document.querySelector('#chat .op-request') && Object.prototype.hasOwnProperty.call(window.__ansRenderer.state.pendingOperator," + JSON.stringify(xId) + ")")));
   log("OPX_POINTER_IN_VIEWED_PANE=" + (await wc().executeJavaScript("!!document.querySelector('#tab-decisions .tab-badge')")));
   log("OPX_BADGE_LIT=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((e)=>e.querySelector('.ti-name').textContent==='示例角色'); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-confirm'); })()")));
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('示例角色')");
-  await sleep(600);
   log("OPX_CARD_ON_RETURN=" + (await wc().executeJavaScript("!!document.querySelector('#decision-dialog .dd-submit')")));
-  // 重复推送（同一 id 的原始推送 ×2）→ 幂等：恰一张卡。
+  // 重复推送（同一 id 的原始推送 ×2）→ 模型 pending 表恰一条、无第二张可作答卡。
   wc().send("session:operator-request", { id: "dup-1", roleId: "示例角色", request: { kind: "confirm", title: "重复？" } });
   wc().send("session:operator-request", { id: "dup-1", roleId: "示例角色", request: { kind: "confirm", title: "重复？" } });
   await sleep(250);
-  log("OPX_DUP_SINGLE_CARD=" + (await wc().executeJavaScript("document.querySelectorAll('#decision-dialog[data-request-id=dup-1]').length === 1")));
-  // 对已失效请求（dup-1 未经真实通道；G-1：唯一真实失效＝应用重启/关闭）作答 → 通道 expired → 卡片定格
-  // （按钮隐藏 + 「已失效（应用已重启/关闭）」说明），不再解冻。
-  await wc().executeJavaScript("(() => { const c=document.querySelector('#decision-dialog[data-request-id=dup-1]'); const b=c && c.querySelector('.dd-confirm'); if (b) b.click(); })()");
-  await sleep(300);
-  log("OPX_EXPIRED_FROZEN=" + (await wc().executeJavaScript("!document.querySelector('#decision-dialog[data-request-id=dup-1]')")));
-  // 真请求作答照常（单选提交）。Phase 5A：React 受控 input 用 click() 驱动（直接改 .checked 不触发 onChange），
-  // 并按请求 id 精确定位卡片（避免命中同 pane 的 dup-1/旧卡）。
-  const xCardExpr = (body) => "(() => { const c=document.querySelector('[data-request-id=" + JSON.stringify(xId) + "]'); " + body + " })()";
+  log("OPX_DUP_SINGLE_CARD=" + (await wc().executeJavaScript("Object.keys(window.__ansRenderer.state.pendingOperator).filter((id)=>id==='dup-1').length === 1 && document.querySelectorAll('#chat .op-request').length === 0")));
+  // 打开待办中 dup-1 → 模态作答 → 通道无挂起 ⇒ expired + 决策中心历史（不是聊天卡）。
+  await wc().executeJavaScript("document.getElementById('tab-decisions').click()");
+  await sleep(150);
+  await wc().executeJavaScript("document.querySelector('#decision-center-pending .dc-item[data-request-id=\"dup-1\"] .dc-open').click()");
+  await sleep(200);
+  log("OPX_DUP_DIALOG_OPEN=" + (await wc().executeJavaScript("!!document.querySelector('#decision-dialog[data-request-id=\"dup-1\"]')")));
+  await wc().executeJavaScript("document.querySelector('#decision-dialog .dd-confirm').click()");
+  await sleep(400);
+  await wc().executeJavaScript("document.getElementById('tab-decisions').click()");
+  await sleep(220);
+  log("OPX_EXPIRED_HISTORY=" + hardCheck("OPX_EXPIRED_HISTORY", await wc().executeJavaScript("(() => { const h=document.getElementById('decision-center-history'); return !!h && h.textContent.includes('重复？') && h.textContent.includes('已失效') && !Object.prototype.hasOwnProperty.call(window.__ansRenderer.state.pendingOperator,'dup-1'); })()")));
+  // 退回到 x 卡并作答。
+  await wc().executeJavaScript("document.getElementById('tab-decisions').click()");
+  await sleep(150);
+  await wc().executeJavaScript("(() => { const item=document.querySelector('#decision-center-pending .dc-item[data-request-id=" + JSON.stringify(xId) + "] .dc-open'); if (item) item.click(); })()");
+  await sleep(180);
+  const xCardExpr = (body) => "(() => { const c=document.querySelector('#decision-dialog[data-request-id=" + JSON.stringify(xId) + "]'); " + body + " })()";
   await wc().executeJavaScript(xCardExpr("const r=c && c.querySelector('input'); if (r) r.click();"));
   await sleep(120);
   await wc().executeJavaScript(xCardExpr("const b=c && c.querySelector('.dd-submit'); if (b) b.click();"));
@@ -925,14 +935,14 @@ async function run() {
   log("OP_CARD_PRESENT=" + (await wc().executeJavaScript("!!document.querySelector('#decision-dialog')")));
   log("OP_CARD_TITLE_SHOWS=" + (await wc().executeJavaScript("(document.querySelector('#decision-dialog .dd-title')||{textContent:''}).textContent.includes('示例角色')")));
   log("OP_PREVIEW_COLLAPSED=" + (await wc().executeJavaScript("(() => { const d=document.querySelector('#decision-dialog .dd-preview'); return !!d && d.textContent.includes('角色卡'); })()")));
-  log("OP_B3_AWAITING_CONFIRM=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('su')>=0); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-confirm'); })()")));
+  log("OP_B3_AWAITING_CONFIRM=" + (await wc().executeJavaScript("!!document.querySelector('#tab-decisions .tab-badge') && !!document.querySelector('#decision-dialog')")));
   log("SHOT_11_OPERATOR=" + (await shot("11-operator-card.png")));
   await wc().executeJavaScript("(() => { const b=document.querySelector('#decision-dialog .dd-confirm'); if (b) b.click(); })()");
   await sleep(300);
   const oOp1 = await withTimeout(pOp1, 3000, "op1");
   log("OP_CONFIRM_ANSWERED=" + (!!oOp1 && oOp1.outcome === "answered" && oOp1.value.confirmed === true));
   log("OP_CARD_FROZEN=" + (await wc().executeJavaScript("!document.querySelector('#decision-dialog')")));
-  log("OP_B3_AWAITING_CLEARED=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('su')>=0); const s=it && it.querySelector('.ti-status'); return !!s && !s.className.includes('st-confirm'); })()")));
+  log("OP_B3_AWAITING_CLEARED=" + (await wc().executeJavaScript("!document.querySelector('#tab-decisions .tab-badge')")));
 
   // ② 单选（radio）：未选时提交禁用 → 选一项 → 提交 → selected 回传。
   const pOp2 = customerChannel.customerInput(
@@ -980,7 +990,7 @@ async function run() {
   await wc().executeJavaScript(opCardExpr(op4Id, "const b=c && c.querySelector('.dd-reject'); if (b) b.click();"));
   await sleep(300);
   const oOp4 = await withTimeout(pOp4, 3000, "op4");
-  log("OP_CANCEL_DECLINED=" + (!!oOp4 && oOp4.outcome === "declined"));
+  log("OP_CANCEL_DECLINED=" + hardCheck("OP_CANCEL_DECLINED", !!oOp4 && oOp4.outcome === "declined"));
 
   // 收口面已删守卫：入口容器/旧卡**不存在**（断言「它不在」，防回潮）。
   log("OP_OLD_ENTRY_REMOVED=" + (await wc().executeJavaScript("document.getElementById('bootstrap-action') === null")));
@@ -1189,13 +1199,13 @@ async function run() {
   await sleep(120);
   await wc().executeJavaScript("window.__ansRenderer.appendOperatorRequest({ id: 'e-high', roleId: '桌面窗口', risk: 'high', request: { kind: 'confirm', title: 'E 高风险审批' } })");
   await sleep(250);
-  log("E_DIALOG_SINGLE=" + (await wc().executeJavaScript("document.querySelectorAll('#decision-dialog').length === 1")));
-  log("E_DIALOG_PRIORITY_HIGH=" + (await wc().executeJavaScript("(document.querySelector('#decision-dialog .dd-title')||{textContent:''}).textContent.includes('E 高风险审批')")));
-  log("E_CHAT_NO_ACTIONABLE_CARD=" + (await wc().executeJavaScript("!document.querySelector('#chat .op-request') && !!document.querySelector('#chat .sys-operator-note')")));
+  log("E_DIALOG_SINGLE=" + hardCheck("E_DIALOG_SINGLE", await wc().executeJavaScript("document.querySelectorAll('#decision-dialog').length === 1")));
+  log("E_DIALOG_PRIORITY_HIGH=" + hardCheck("E_DIALOG_PRIORITY_HIGH", await wc().executeJavaScript("(document.querySelector('#decision-dialog .dd-title')||{textContent:''}).textContent.includes('E 高风险审批')")));
+  log("E_CHAT_NO_ACTIONABLE_CARD=" + hardCheck("E_CHAT_NO_ACTIONABLE_CARD", await wc().executeJavaScript("!document.querySelector('#chat .op-request') && !!document.querySelector('#chat .sys-operator-note')")));
   log("E_DIALOG_MORE_COUNT=" + (await wc().executeJavaScript("(document.querySelector('#decision-dialog .dd-more')||{textContent:''}).textContent.includes('还有 1 张待处理')")));
   await wc().executeJavaScript("document.querySelector('#decision-dialog .dd-later').click()");
   await sleep(200);
-  log("E_LATER_ADVANCES=" + (await wc().executeJavaScript("(document.querySelector('#decision-dialog .dd-title')||{textContent:''}).textContent.includes('E 低风险确认')")));
+  log("E_LATER_ADVANCES=" + hardCheck("E_LATER_ADVANCES", await wc().executeJavaScript("(document.querySelector('#decision-dialog .dd-title')||{textContent:''}).textContent.includes('E 低风险确认')")));
   await wc().executeJavaScript("document.querySelector('#decision-dialog .dd-later').click()");
   await sleep(200);
   log("E_LATER_CLOSES_DIALOG_NO_DEFAULT=" + (await wc().executeJavaScript("!document.querySelector('#decision-dialog')")));
@@ -1204,7 +1214,7 @@ async function run() {
   log("E_TODO_PANEL_HAS_DEFERRED=" + (await wc().executeJavaScript("(() => { const p=document.getElementById('decision-center-pending'); return !!p && p.textContent.includes('E 低风险确认') && p.textContent.includes('E 高风险审批') && p.textContent.includes('稍后处理'); })()")));
   await wc().executeJavaScript("document.querySelector('#decision-center-pending .dc-open').click()");
   await sleep(200);
-  log("E_TODO_OPEN_REOPENS_DIALOG=" + (await wc().executeJavaScript("!!document.querySelector('#decision-dialog')")));
+  log("E_TODO_OPEN_REOPENS_DIALOG=" + hardCheck("E_TODO_OPEN_REOPENS_DIALOG", await wc().executeJavaScript("!!document.querySelector('#decision-dialog')")));
   await wc().executeJavaScript("document.querySelector('#decision-dialog .dd-later').click()");
   await sleep(150);
   await wc().executeJavaScript("document.getElementById('tab-decisions').click()");
@@ -1219,92 +1229,8 @@ async function run() {
   await wc().executeJavaScript("document.getElementById('tab-work').click()");
   await sleep(150);
 
-  // 真机缺陷修复（2026-10-12「已确认的卡切走再切回变成最下面」）：交互卡**锚点物化**——「回放重建 + 已决卡」
-  // 时序断言（上次暴露时序类 bug 的正是本 harness，故钉在这里）。夹具：临时项目 + su 会话 JSONL（含
-  // request_confirmation 调用行+结论行）→ 回放重建 pane → 真通道发**同题**请求（卡，首物化=当时行表尾=
-  // 它发生的位置）→ 作答（decided）→ 灌 200 行触发**窗口化**（卡行离屏脱挂）→ 切走/切回 ×2（客户动作）
-  // → 断言行模型：恰**一条**卡行（不重建重复行）、行序索引**恒定在锚点**、绝不落到行表尾；未决卡同法回归。
-  const anchorProj = fs.mkdtempSync(path.join(OUTDIR, "anchor-"));
-  const rdirAnchor = path.join(anchorProj, "角色卡", "示例角色");
-  fs.mkdirSync(rdirAnchor, { recursive: true });
-  fs.writeFileSync(path.join(rdirAnchor, "role-card.md"), "# 示例角色\n");
-  fs.writeFileSync(path.join(rdirAnchor, "boundary.yaml"), "entries:\n  - kind: file\n    path: src/x.ts\n    purpose: t\n");
-  const sessAnchor = path.join(anchorProj, ".ans", "sessions", "su");
-  fs.mkdirSync(sessAnchor, { recursive: true });
-  const ANCHOR_TITLE = "写入 3 个文件：docs/design/…";
-  const mkAnchorHeader = (id) => JSON.stringify({ type: "session", version: 3, id, timestamp: "2026-10-12T01:00:00.000Z", cwd: anchorProj });
-  const mkAnchorMsg = (id, message) => JSON.stringify({ type: "message", id, parentId: null, timestamp: "2026-10-12T01:00:01.000Z", message });
-  fs.writeFileSync(
-    path.join(sessAnchor, "s.jsonl"),
-    [
-      mkAnchorHeader("anchor1"),
-      mkAnchorMsg("h1", { role: "user", content: "请创建文档骨架" }),
-      mkAnchorMsg("h2", { role: "assistant", content: [{ type: "text", text: "好的，先请你确认。" }] }),
-      mkAnchorMsg("h3", { role: "assistant", content: [{ type: "toolCall", id: "call_anchor_1", name: "request_confirmation", arguments: { title: ANCHOR_TITLE } }] }),
-      mkAnchorMsg("h4", { role: "toolResult", toolCallId: "call_anchor_1", toolName: "request_confirmation", content: [{ type: "text", text: "request_confirmation：客户已确认「" + ANCHOR_TITLE + "」（confirmed:true；操作者：e2e）" }] }),
-      mkAnchorMsg("h5", { role: "assistant", content: "已完成落盘并读回。" }),
-    ].join("\n"),
-  );
-  await wc().executeJavaScript("window.__ansRenderer.loadProject(" + JSON.stringify(anchorProj) + ")");
-  await sleep(700);
-  await ensurePiRuntime();
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
-  await sleep(1000);
-  log("ANCHOR_PANE_DIAG=" + JSON.stringify(await wc().executeJavaScript("(() => ({ hasRoles: window.__ansRenderer.state.hasRoles, selectedRoleId: window.__ansRenderer.state.selectedRoleId, roleIds: (window.__ansRenderer.state.roles || []).map((r) => r.roleId), paneRoleIds: [...document.querySelectorAll('#chat .chat-pane')].map((p) => p.dataset.roleId), anyCards: document.querySelectorAll('#chat .op-request').length }))()")));
-  // 回放锚点表：调用行/结论行被登记且相邻（conclusion = request + 1）。
-  log("ANCHOR_TABLE_REGISTERED=" + (await wc().executeJavaScript(
-    "(() => { const a=window.__ansRenderer.replayAnchorDebug('su'); return a.length===1 && a[0].requestIndex!==null && a[0].conclusionIndex!==null && a[0].conclusionIndex===a[0].requestIndex+1; })()",
-  )));
-  // 同题请求（真通道）：卡首物化=当时行表尾（首次到达不加锚——它就是当下最新事件）。
-  const pAnchor = customerChannel.customerInput({ kind: "confirm", title: ANCHOR_TITLE, detail: "回放后的重新确认" }, { roleId: "su" });
-  await sleep(400);
-  const anchorAtArrival = await wc().executeJavaScript("(() => { const m=window.__ansRenderer.rowModelDebug('su'); return m && m.operators.length===1 ? m.operators[0].index : -1; })()");
-  log("ANCHOR_CARD_AT_ARRIVAL=" + anchorAtArrival);
-  await wc().executeJavaScript("(() => { const c=document.querySelector('#chat .op-request'); if (c) c.querySelector('.op-confirm').click(); })()");
-  await sleep(300);
-  const oAnchor = await withTimeout(pAnchor, 3000, "anchor");
-  log("ANCHOR_CARD_ANSWERED=" + (!!oAnchor && oAnchor.outcome === "answered"));
-  // 灌 200 行 → 窗口化（卡行离屏脱挂——旧缺陷据此在切回时重建落尾）。
-  const anchorFill = [];
-  for (let i = 0; i < 200; i += 1) anchorFill.push({ roleId: "su", event: { kind: "tool_call", summary: "锚点填充行 read_file：docs/a-" + i + ".md" } });
-  wc().send("session:events", anchorFill);
-  await sleep(700);
-  const anchorCheck = "(() => { const m=window.__ansRenderer.rowModelDebug('su'); return JSON.stringify({ count:m.count, last:m.lastIndex, ops:m.operators }); })()";
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('示例角色')");
-  await sleep(800);
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
-  await sleep(900);
-  const anchorAfter1 = JSON.parse(await wc().executeJavaScript(anchorCheck));
-  log("ANCHOR_ROW_AFTER_SWITCHBACK=" + JSON.stringify(anchorAfter1));
-  log("ANCHOR_STABLE_NOT_TAIL_ONCE=" + (anchorAfter1.ops.length === 1 && anchorAfter1.ops[0].index === anchorAtArrival && anchorAfter1.ops[0].index < anchorAfter1.last));
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('示例角色')");
-  await sleep(600);
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
-  await sleep(800);
-  const anchorAfter2 = JSON.parse(await wc().executeJavaScript(anchorCheck));
-  log("ANCHOR_STABLE_NOT_TAIL_TWICE=" + (anchorAfter2.ops.length === 1 && anchorAfter2.ops[0].index === anchorAtArrival && anchorAfter2.ops[0].index < anchorAfter2.last));
-  log("ANCHOR_NO_DUPLICATE_ROW=" + (anchorAfter2.ops.length === 1));
-  // 开卡回归（未决卡行为不变）：再发一张**未答**的卡 → 切走/切回 → 行序索引同样恒定；P-1 chip 照常亮。
-  const pOpenAnchor = customerChannel.customerInput({ kind: "confirm", title: "未决回归卡", detail: "open 卡落位回归" }, { roleId: "su" });
-  await sleep(400);
-  const openAtArrival = await wc().executeJavaScript("(() => { const m=window.__ansRenderer.rowModelDebug('su'); return m && m.operators.length===2 ? m.operators[1].index : -1; })()");
-  log("OPEN_CARD_AT_ARRIVAL=" + openAtArrival);
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('示例角色')");
-  await sleep(700);
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
-  await sleep(900);
-  const openAfter = JSON.parse(await wc().executeJavaScript(anchorCheck));
-  // 未决卡回归口径：**索引恒定**（=到达时的锚点）且不重复建行。它到达后没有后续行 ⇒ 其锚点恰为当时行表尾
-  // （「≠行表尾」的时序断言由上面的已决卡承担——它后面还有 200 行填充）。
-  log("OPEN_CARD_ROWS_AFTER_SWITCHBACK=" + JSON.stringify(openAfter));
-  log("OPEN_CARD_STABLE_AT_ANCHOR=" + (openAfter.ops.length === 2 && openAfter.ops[1].index === openAtArrival));
-  log("OPEN_CARD_CHIP_VISIBLE=" + (await wc().executeJavaScript("(() => { const el=document.getElementById('op-chip'); return !!el && !el.hidden && el.textContent.includes('有 1 条待确认'); })()")));
-  // 清理：把未决卡作答掉（探针卡无主进程挂起 ⇒ expired 终态；chip 灭，不影响后续步骤），回到仓库根项目。
-  await wc().executeJavaScript("(() => { const cs=document.querySelectorAll('#chat .op-request'); const c=cs[cs.length-1]; const b=c && c.querySelector('.op-deny'); if(b) b.click(); })()");
-  await sleep(300);
-  log("OPEN_CARD_CLEANED_CHIP_HIDDEN=" + (await wc().executeJavaScript("(() => { const el=document.getElementById('op-chip'); return !el || el.hidden === true; })()")));
-  log("SHOT_15_ANCHOR=" + (await shot("15-anchor-reanchor.png")));
-  // 回到仓库根项目并恢复 S-1 段的前置（挂载的 pane = 桌面窗口——loadProject 会重置选中为主入口）。
+  // E 批：旧「聊天流交互卡锚点/chip」断言已随模态对话框撤除；聊天流不应再有可作答卡。
+  log("E_OLD_CHAT_CARD_ANCHOR_REMOVED=" + (await wc().executeJavaScript("!document.querySelector('#chat .op-request') && !document.getElementById('op-chip')?.offsetParent")));
   await tryEval("window.__ansRenderer.loadProject(" + JSON.stringify(REPO_ROOT) + ")", "anchor-load-project");
   await sleep(500);
   await ensurePiRuntime();
@@ -1659,7 +1585,7 @@ async function run() {
   log("REPLAY_NO_DOUBLE_ON_REFRESH=" + (afterRefresh === beforeRefresh && (suBefore < 0 || suAfter === suBefore)));
 
   // 修复验证使用真实 renderer、preload 和 IPC；失败注入只在测试主进程，不新增生产接口。
-  const repairFailures = [];
+  const repairFailures = [...hardChecks];
   const repairCheck = (name, value) => {
     log(name + "=" + value);
     // Phase 5A（PM §17.4）：失败累计并继续，让后续检查名都能产出；判据本身不放宽。

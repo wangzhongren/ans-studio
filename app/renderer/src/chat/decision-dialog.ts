@@ -165,3 +165,17 @@ export function pendingMoreCount(
 ): number {
   return Object.keys(pending).filter((id) => id !== activeId).length;
 }
+
+/** E-05：是否打开/替换当前卡（纯判定）。
+ *  - 无活动卡：空闲时打开最优；输入中只有高风险可立即打断；
+ *  - 已有活动卡：只允许更高优先级的高风险（priority 0）替换，其余排队到当前卡处理完。
+ */
+export function shouldOpenDecision(input: {
+  activePriority: number | null;
+  bestPriority: number;
+  suppressed: boolean;
+}): boolean {
+  const highRisk = input.bestPriority === 0;
+  if (input.activePriority === null) return !input.suppressed || highRisk;
+  return highRisk && input.activePriority > 0;
+}
