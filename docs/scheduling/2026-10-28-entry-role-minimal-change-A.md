@@ -77,7 +77,7 @@
 | 主 typecheck | `npm run typecheck` | exit 0 |
 | 渲染 typecheck | `npm run typecheck:renderer` | exit 0 |
 | 渲染构建 | `npm run build:renderer` | exit 0（产物不入候选） |
-| 真实 Electron（**F6：临时夹具项目**） | `ANS_E2E_PROJECT=<临时夹具：仅 角色卡/桌面窗口/ >`、`ANS_E2E_OUTDIR=<临时>`、`node_modules/electron/dist/electron.exe test/桌面应用/e2e/main.mjs` | **exit 0；`E2E_PASS=true`；`E2E_DONE=1`；`E2E_FAILURES=` 空；`PROJECT=<%TEMP%>\ans-e2e-a2-fixture-P2wK`；`ROLE_COUNT=2`；`PRIMARY_ROLE_ID=su`（single 夹具）；`BOOTSTRAP_PRIMARY=chief`；17 截图（1360x860，逐图 sha256 见 §六）**；报告 `%TEMP%\ans-e2e-a2-out-Xoxa\report.txt`（sha256 `973c7d705818daf2ba84ba1c11e6d01a0e4d4128f168761d37569530313ed87b`） |
+| 真实 Electron（**F6：临时夹具项目**） | `ANS_E2E_PROJECT=<临时夹具：仅 角色卡/桌面窗口/ >`、`ANS_E2E_OUTDIR=<临时>`、`node_modules/electron/dist/electron.exe test/桌面应用/e2e/main.mjs` | **exit 0；`E2E_PASS=true`；`E2E_DONE=1`；`E2E_FAILURES=` 空；`PROJECT=<%TEMP%>\ans-e2e-a5-fixture-4isC`；`ROLE_COUNT=2`；`PRIMARY_ROLE_ID=su`（single 夹具）；`BOOTSTRAP_PRIMARY=chief`；16/17 截图（00-titlebar 捕获偶发 `UnknownVizError`，环境性；其余 16 张 1360x860）**；最终候选报告 `%TEMP%\ans-e2e-a5-out-UrDy\report.txt`（sha256 `20ea7880cfcd53e4713b6280e53e3a1779a1c49f696b466358b58b099d802734`）；canonical C2 17/17 截图证据仍为 `%TEMP%\ans-e2e-a2-out-Xoxa\report.txt`（`973c7d70…`，逐图 sha256 见 §六） |
 | 结构检查 | 注册表/列表快照、`rg`、`git diff --name-only`、`package.json` 零改动 | 通过（§二/§六） |
 
 > 说明：首提交 `f4aa073` 的 Electron 证据曾以 worktree 作为导入项目（验收 F6 指出）；本返工版按 P3 改为**临时夹具项目**重跑，夹具在 `%TEMP%`、未指向仓库/目标项目/演示，报告与 17 截图见 §六。两轮均 `E2E_PASS=true`；以夹具轮为准。
@@ -89,10 +89,11 @@
 - **S1 基线（`8fc673e`）**：409 个 `*.test.ts` 枚举 / 408 执行（排除 hang 的 `write-sequencing`）；tests **4495** / pass **4460** / fail **16** / skip **19** / exit 1。
 - **基线 16 红分类**：9 条 Windows symlink EPERM（`claude-adapter/session`、`codex-adapter/session`、`pi-adapter/injected-runtime`×2、`runtime-core/file-write-safety`、`runtime-core/session-store`×2、`测试/g4-skill-verify/b-render-double-check`、`编排/shell-authorized-routine`）+ 7 条断言既红（`桌面应用/acceptance-dispatch:7756`、`测试/governance-e2e-auto/k-governance-feedback`、`测试/governance-e2e-auto/s-acceptance-rework-routing` S7-F、`测试/governance-liaison-verify/e-audit`、`测试/t1-pipeline-integration`×3）。
 
-- **本批最终运行（2026-10-28，rework 最终候选）**：文件枚举 **409** / 执行 **408**（与 S1 同口径排除 `write-sequencing`）；tests **4499** / pass **4463** / fail **17** / skip **19** / exit 1；原始日志 `/tmp/final3-tests.log`（sha256 `55efc7654ba72ef17bbff5512904ebe64c15b54d07a6c4a52fc0d4d7088fe2c3`）。
-- **失败分类（17）**：**9 条 Windows symlink EPERM**（`claude-adapter/session`、`codex-adapter/session`、`pi-adapter/injected-runtime`×2、`runtime-core/file-write-safety`、`runtime-core/session-store`×2、`测试/g4-skill-verify/b-render-double-check`、`编排/shell-authorized-routine`）+ **6 条稳定基线断言既红**（`测试/governance-e2e-auto/s-acceptance-rework-routing` S7-F、`测试/t1-pipeline-integration`×3、`测试/governance-e2e-auto/k-governance-feedback`、`测试/governance-liaison-verify/e-audit`）+ **2 条 `test/桌面应用/acceptance-dispatch.test.ts` 环境/时序敏感项**（`2026-10-23 重派门` 与 S1 既红 `2026-10-27 gate 路由记录写失败`）——该文件不在本批改动；在最终候选上**单独运行 3 次**登记：run1 `142/143` fail `gate 报告不可读（R2b）`（`/tmp/a3-ad-run1.log`，`2762fe52…`）、run2 `143/143` pass（`/tmp/a3-ad-run2.log`，`364edd52…`）、run3 `142/143` fail S1 既红 `gate 路由记录写失败`（`/tmp/a3-ad-run3.log`，`cc99f6e8…`）——**环境/时序敏感 flake（失败项逐轮不同）**，非本批确定性回归，也不作为稳定全绿证据。**新增确定性失败 = 0；无新增 skip；未删除/弱化测试断言保绿。**
-- **对照 S1（4495/4460/16/19）**：tests **+4**（`liaison-role.test.ts` 重写 9→13 个 `test()`）；skip **19 不变**；fail 16→17、pass 4460→4463 的差异来自上述 acceptance-dispatch 时序敏感项（其 7756 为 S1 既红；3 次单跑见下：142/143、143/143、142/143）。此前同一批代码区域的全量运行（amendment-2 前的 rework 候选）为 4499/4465/15/19，失败集为 9 symlink + 6 稳定断言既红，可作为同候选对照。
-- **基线红转绿/复红说明**：`test/桌面应用/acceptance-dispatch.test.ts:7756` 在 S1 为既红；在本候选的多次运行中与全量负载相关地摆动（3 次单跑：142/143、143/143、142/143，失败项不同）。本批未以它为目标、未据此声明修复；D 批随 `acceptance-dispatch` 重写；发布前 gate 需 clean 运行。
+- **本批最终运行（2026-10-28，最终 A 候选；clean 全量）**：文件枚举 **409** / 执行 **408**（与 S1 同口径排除 `write-sequencing`）；tests **4500** / pass **4465** / fail **16** / skip **19** / exit 1；原始日志 `/tmp/ab-clean-tests.log`（sha256 `4af9cadd09d4c022a290c3f7eaf5c15eedb235ee102735fb99989c9b2ece73f8`）。
+- **失败分类（16）**：**9 条 Windows symlink EPERM**（`claude-adapter/session`、`codex-adapter/session`、`pi-adapter/injected-runtime`×2、`runtime-core/file-write-safety`、`runtime-core/session-store`×2、`测试/g4-skill-verify/b-render-double-check`、`编排/shell-authorized-routine`）+ **6 条稳定基线断言既红**（`测试/governance-e2e-auto/s-acceptance-rework-routing` S7-F、`测试/t1-pipeline-integration`×3、`测试/governance-e2e-auto/k-governance-feedback`、`测试/governance-liaison-verify/e-audit`）+ **1 条 `test/桌面应用/acceptance-dispatch.test.ts` 环境/时序敏感项**（本轮为 `2026-10-26 gate 处置：报告 pass …` 的 gate.review 审计条数 0≠1；该文件不在本批改动）。**新增确定性失败 = 0；无新增 skip；未删除/弱化测试断言保绿。**
+- **R4 全量/单文件 flake 登记**：该文件单跑 3 次为 `142/143`（R2b）、`143/143`、`142/143`（7756），本轮全量又出现第 4 个不同失败项（gate.review 审计计数），逐轮不同——确认**环境/时序敏感 flake**，不作为稳定全绿证据；全量 16 红与 S1 的 16 红数量相同但构成不同（1 条 acceptance-dispatch flake 替换了 C2 运行中的 2 条 acceptance-dispatch flake，其余 15 条分类一致）。
+- **对照 S1（4495/4460/16/19）**：tests **+5**（`liaison-role.test.ts` 重写 9→13 的 +4，R1 卡文本一致性测试 +1）；pass **+5**（4465）；fail **16 与 S1 相同**；skip **19 不变**。C2 候选 `/tmp/final3-tests.log`（`55efc765…`，4499/4463/17/19）作为 C2 证据保留；C3 新增 1 个测试后由本轮 clean 全量覆盖（`/tmp/ab-clean-tests.log`）。
+- **基线红转绿/复红说明**：`test/桌面应用/acceptance-dispatch.test.ts:7756` 在 S1 为既红；在本候选的多次运行中与全量负载相关地摆动（单跑 3 次见 R4；本轮全量未命中该条，命中同文件另一条时序敏感项）。本批未以它为目标、未据此声明修复；D 批随 `acceptance-dispatch` 重写；发布前 gate 需 clean 运行。
 - **静态/构建**：`npm run typecheck` exit 0（`aee16865…`）；`typecheck:renderer` exit 0（`914780f6…`）；`build:renderer` exit 0（`397e0c68…`；第三轮窄修后重跑 `/tmp/a3-build-renderer.log` = `0a148231…`）。
 
 ### 3.3 测试差异表（逐文件；含断言数前后对照）
@@ -130,7 +131,7 @@
 | `test/桌面应用/genesis-bootstrap.test.ts` | 最小断言同步 | 28 → 28 | trio 主入口 liaison→chief。 |
 | `test/测试/governance-e2e-auto/q-role-granularity.test.ts`、`test/测试/real-entry.test.ts` | 复核（未改） | — | 无旧角色集断言，实际运行通过。 |
 
-**测试数变化**：`test()` 用例 +4（`liaison-role.test.ts` 9→13）；断言数全部持平或增加（F3 已补回：93→96）。
+**测试数变化**：`test()` 用例 +5（`liaison-role.test.ts` 9→13 的 +4；R1 卡文本一致性测试 +1，计入 `governance-trio.test.ts` 472→489）；断言数全部持平或增加（F3 已补回：93→96）。
 
 ---
 
@@ -154,15 +155,18 @@
 
 ## 六、证据、环境与整树标识
 
-- **提交 SHA**：首提交 `f4aa073a7032d35afc2e964dc22b4d171f1d26dc`；返工提交（代码/测试/属主记录/change-package 初版）`83f2d2e30fd8df0c51a50f809f61fc9b28a05097`；证据补录提交（C2）`b6ff88734c4b5f743c639582d22daaf57509a691`；第三轮窄修提交（C3）`ae702eb67ca8cb408d6541cb40893375a6b4dc14`；**C4（本文件最终版，仅补 C3 后 E2E 复跑说明；SHA 见 `git log --format=%H -1`）**。
+- **提交 SHA**：首提交 `f4aa073a7032d35afc2e964dc22b4d171f1d26dc`；返工提交（代码/测试/属主记录/change-package 初版）`83f2d2e30fd8df0c51a50f809f61fc9b28a05097`；证据补录提交（C2）`b6ff88734c4b5f743c639582d22daaf57509a691`；第三轮窄修提交（C3）`ae702eb67ca8cb408d6541cb40893375a6b4dc14`；C4（仅补 C3 后 E2E 说明）`b1addff20aa56ef024fa3dd2b8f51110f0dd90ad`；**C5（本文件最终版：clean 全量/E2E/记录小修；SHA 见 `git log --format=%H -1`）**。
+- **分支附加提交（非 A 批写集）**：C4 之后出现 `c64fe98`（chore(governance): add batch B/C/F desktop test files to boundary (Delta-1)，人事按 Delta-1 为 B 批前置写入 `角色卡/桌面窗口/boundary.{md,yaml}` + `changelog.md` 三文件）；**该提交属 B 批边界更新，不在 A 批 50 路径写集/候选内，C5 不包含也不修改该三文件**；A 批验收候选仍为 `b1addff`（C5 仅文档/属主记录小修）。
 - **整树标识（可复算口径）**：
   - 首提交批次差异：`git diff --binary 8fc673e f4aa073a | sha256sum` = `35167593ace525d1cc6ef139684a4344766a0fe91cc6a58f9775025fd118dbd4`（含变更包）。
   - **rework 候选（C1）**：`git diff --binary 8fc673e 83f2d2e30fd8df0c51a50f809f61fc9b28a05097 | sha256sum` = `fbcc6e8448576f48adc2bc0467641d98fc9db946c62810008c4cc62b05cd5311`（含 C1 版变更包与属主记录）。
   - **证据补录提交（C2 `b6ff8873`）**：只更新 change-package（文档）；`git diff --binary 8fc673e b6ff8873 | sha256sum` = `60133ba8a68d8c8059d220e032eddce66f51f21365f117a1bff1e8de0b608671`（复审已记录）。
-  - **第三轮窄修提交（C3 `ae702eb`）**：修正 R1 卡文本、R2 属主记录、R3 文字、R4 证据口径/R5 附录口径；只改卡文本/测试/记录/本文件；`git diff --binary 8fc673e ae702eb67ca8cb408d6541cb40893375a6b4dc14 | sha256sum` = `ff6051e24951782b4e7f23ac7443f314cd05918ed276a8e1e7d7dfb47cda5a5d`。\n  - **C4（本文件最终版）**：仅补 C3 后 E2E 复跑说明；其 `git diff --binary 8fc673e <C4>` 由最终报告/复审按 `git log` 取 C4 后复算（自引用限制）。
+  - **第三轮窄修提交（C3 `ae702eb`）**：修正 R1 卡文本、R2 属主记录、R3 文字、R4 证据口径/R5 附录口径；只改卡文本/测试/记录/本文件；`git diff --binary 8fc673e ae702eb67ca8cb408d6541cb40893375a6b4dc14 | sha256sum` = `ff6051e24951782b4e7f23ac7443f314cd05918ed276a8e1e7d7dfb47cda5a5d`。
+  - **C4 `b1addff`**：仅补 C3 后 E2E 复跑说明；`git diff --binary 8fc673e b1addff20aa56ef024fa3dd2b8f51110f0dd90ad | sha256sum` = `37fb6563bb4ba32a685e01201a97c8aaa74e4d7b5e33c3b114e0a8618c1d2fce`。
+  - **C5（本文件最终版）**：clean 全量/E2E/change-package 与属主记录小修；仅文档/卡文本一致性测试与记录变更；其 `git diff --binary 8fc673e <C5>` 由最终报告/复审按 `git log` 取 C5 后复算（自引用限制）。
   - 口径说明：首版 change-package 曾记录 `46af3a06…`，那是**提交前 `git diff --binary`（tracked-only，未含未跟踪的 change-package 文件）**；验收按提交后整批差异复算为 `35167593…`。本版统一以「提交后 `git diff --binary 8fc673e <commit>`」为准并记录。
 - **属主 change 记录（P7）**：`角色卡/{门禁引擎,编排,桌面窗口,桌面UI,项目管理,测试}/docs/change/2026-10-28_change_entry-role-minimal-A.md`。
-- **全量/静态日志**：`/tmp/final3-tests.log`（sha256 见 §3.2）、`/tmp/final3-typecheck.log`、`/tmp/final3-typecheck-renderer.log`、`/tmp/final3-build-renderer.log`（sha256 见 §3.1/§3.2 与复审记录）。
+- **全量/静态日志**：最终 clean 全量 `/tmp/ab-clean-tests.log`（`4af9cadd…`，C5 候选）；C2 全量 `/tmp/final3-tests.log`（`55efc765…`）；静态 `/tmp/a3-typecheck.log`、`/tmp/a3-typecheck-renderer.log`、`/tmp/a3-build-renderer.log`（sha256 见 §3.1/§3.2）。
 - **Electron（临时夹具）**：报告 `%TEMP%\ans-e2e-a2-out-Xoxa\report.txt` sha256 `973c7d705818daf2ba84ba1c11e6d01a0e4d4128f168761d37569530313ed87b`；17 张截图逐图 sha256/尺寸：
 
 | 文件 | 尺寸 | sha256 |
@@ -241,9 +245,19 @@
 | `角色卡/门禁引擎/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `118b9f80203a794970860dd6c3b56779a09b98d5` | `72928884f209d1056d8051c7696437aa7bdf212defb330fce44d30e5ce56be33` |
 | `角色卡/项目管理/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `93f2ffec01f386a6a7373599cc30eb1a96fd1150` | `49bc09221efc368cc3b334dbb9054a2f8a516606b81f200841b9dfddc2506250` |
 
-> **sha256 口径（R5）**：附录 A 的 sha256 为**提交 blob 内容**口径（`git cat-file blob <git hash> | sha256sum`），与工作区文件字节（CRLF）的 `sha256sum` 可能不同；逐文件 `git hash-object` 为提交 blob id，两者均可复算。
+> **sha256 口径（R5）**：附录 A 的 sha256 为**提交 blob 内容**口径（`git cat-file blob <git hash> | sha256sum`），与工作区文件字节（CRLF）的 `sha256sum` 可能不同；逐文件 `git hash-object` 为提交 blob id，两者均可复算。附录 A 只覆盖 A 批 50 路径（不含 change-A 自身）；分支附加提交 `c64fe98` 的 `角色卡/桌面窗口/{boundary.md,boundary.yaml,changelog.md}` 属 B 批 Delta-1、不在 A 批候选，未计入本附录。
 >
 > change-package 自身随提交写入，无法自含自身哈希；其最终行数/SHA-256 见提交后的复审报告与最终报告。
+
+## 附录 B-1：v2 复审 R1–R5 处置对照
+
+| Finding | 处置 |
+| --- | --- |
+| **R1 卡文本/代码不一致** | `CHIEF_CARD_TEXT` 移除 `docs/verification/**`、`PRODUCT_CARD_TEXT` 移除 `docs/intents/**`；新增 `governance-trio` R1 卡文本一致性测试（Section 1 不得出现在禁写段、`forbiddenWritePaths` 全覆盖、不得提前列目标写区）；断言 472→489。 |
+| **R2 属主记录过期** | 6 份记录全部刷新到最终候选/证据（product `docs/intents/`、amendment-2 已落盘、最终计数、93→96、R4 多次登记、最终 E2E）；显式记录 `ae702eb`/`b1addff`。 |
+| **R3 93→95/96 不一致** | 统一为 **93→96**；change-package §3.3 末句与测试属主记录一致。 |
+| **R4 acceptance-dispatch 稳定性** | 单跑 3 次逐次登记（142/143、143/143、142/143，失败项不同）+ 最终 clean 全量的第 4 个不同失败项；固定为环境/时序敏感 flake，不作为稳定全绿证据；clean 全量已在本候选执行（4500/4465/16/19）。 |
+| **R5 附录 sha256 口径** | 标注为提交 blob 内容口径（`git cat-file blob | sha256sum`，与工作区 CRLF 字节可能不同）；C2 `60133ba8…`、C3 `ff6051e2…`、C4 `37fb6563…` 已记录，C5 由外部复算。 |
 
 ## 附录 B：返工处置对照（F1–F7）
 
