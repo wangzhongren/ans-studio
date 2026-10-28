@@ -9,7 +9,9 @@
 
 - **F 代码/测试候选：`e008187`**（父 `9a23b88`），整树 `70412769a5b1876c289738d0793720422be5c557`；F diff：**6 files = 5 M + 1 A，+643 / −12501**。
 - **F 文档提交**：见本文档所在提交（change-F/终态报告/属主记录/处置记录）；change-F 自身行数/SHA-256 与最终 HEAD 由验收/最终记录复算。
-- 程序累计（相对基线 `8fc673e`）：**294 files / +13112 / −131336**（79 A / 125 D / 90 M；31 个本地提交）。
+- **最终组合候选（含 F 文档）：HEAD `044811f48cba849556ce76ca9cef9cd7c623b005`**，整树 `8dcbdb8d4df197388ad284ec534e62289d40a974`；**`8fc673e..044811f4` = 308 files = 87 A + 125 D + 96 M，+13594 / −131336**；`git diff --binary` sha256 `34b5d22189fae51f5182f6b929297c61dfd49d588f14e333a3bdc0eda5e6f408`。
+- 口径说明：`8fc673e..e008187` 的 294 files（79 A / 125 D / 90 M，+13112/−131336）是 **F 代码/测试候选**统计（不含 F 文档/owner 记录）；最终组合候选补入 F 文档 14 files（8 A + 6 M，+482）后为 308 files（87 A / 125 D / 96 M，+13594/−131336）。F 范围 `9a23b88..044811f4` = 21 files = 9 A + 12 M，+1125/−12501。
+- 完整差异集：见 **change-F §10 的最终组合候选 308 文件逐文件 `git hash-object` + `sha256sum` 表**（A/M 取 candidate blob；D 取基线 8fc673e blob）；完整 diff 集合与状态计数如上。隔离核对：未使用 `.claude/worktrees/refactor-b1`/`gate-review-flow-busy`，未吸收主检出未提交改动（主检出前后快照 status/HEAD/diff/index/stash 全同）；未 push/合并 main。
 - 批次链：A `f4aa073`→返工 `e5a533d`；B `e5a533d`→`f151a86`；C `d364ea6`；D `c2b6cf9`/`98d3fe2`/`4c24149`→返工 `e8e5c1f`；E `e7ac5b2`→返工 `d30f648`；E 文档 `9a23b88`；F `e008187`。
 - 候选身份/逐文件哈希：本报告 §8（F）与 `change-D` §10（74 文件）、`change-E` §8（44 文件）、A/B/C change-package 附录（各自候选）。所有哈希可按 `git hash-object` + `git cat-file blob | sha256sum` 复算。
 
@@ -40,6 +42,30 @@
 | G6 边界 | 只改批准写集；未改旧项目角色卡/边界/目标项目；产品角色卡不改；不 push/合并 | §5；git status |
 | G7 回滚 | 各批 `git revert` 可执行；无数据/schema 迁移；tasks.jsonl/日志可删/忽略 | change-A~F §回滚 |
 
+
+## 2.1 C1–C16 代价清单（方案 v9.2 §13；客户闸门 1 已接受为前提，不作为缺陷）
+
+| # | 代价 | 客户状态（闸门 1） | 本程序处置/缓解 | 证据 |
+| ---: | --- | --- | --- | --- |
+| C1 | 客户强制检查点（闸门 0/1/2）撤除 | 客户已选择接受 | 角色按需直接提交申请；幕僚调度；角色卡提示+客户可要求；应用申请服务保留 | P3/C-04；`application-line`、`decision-service` |
+| C2 | 强制独立验收撤除 | 客户已选择「不一定每次」 | 幕僚调度/可自核后由发起角色直接提交；客户可要求独立验收 | P7；`optional-acceptance`；F-03 |
+| C3 | 可审计性（append-only 账本）弱化 | 部分接受 | 任务/运行日志 + judge 代批审计；无 append-only 账本 | P5/P14；`tasks.jsonl`/角色日志测试 |
+| C4 | 强制真实运行/截图/哈希证据弱化 | 接受但需自律 | 报告可选证据；任务可要求可选证据；幕僚可拒收无证据 | P14；`stuck-redispatch`/E2E |
+| C5 | 流程依赖控制（flow YAML）撤除 | 接受；复杂项目风险高 | 任务卡+短报+幕僚核对；无 flow 依赖机 | P2/P5；`star-routing`/`i-full-chain` |
+| C6 | 应用自动编排撤除 | 接受；幕僚负担高 | 任务卡/队列/短报；幕僚手动任务 | P2/P9；E2E 任务面板 |
+| C7 | 运营两层执行收缩 | 接受；上下文压力大 | 项目 worker 也回幕僚；短报压缩；可交摘要分析 | P2；`handback-delivery` |
+| C8 | 角色间协作走幕僚 | 接受 | 任务/汇报只经幕僚；申请直达客户 | P2/P3；`star-routing`/`application-line` |
+| C9 | 团队/写集机械保障弱化 | 接受 | 写区安全仍限制路径；团队/目录一致性靠角色卡+幕僚核对 | P8；`write-safety`/边界测试 |
+| C10 | 决策判断面变窄（仅 Q4 B） | **不适用（Q4 A 保留现状）** | judge rubric/回落语义保留 | P4；`decision-service`/`operator-view` |
+| C11 | 申请直达/通知噪声 | 接受；需 UI/通知设计 | 主窗口统一呈现+来源标签；通知去重/摘要；幕僚只收通知 | P3/P9；E 对话框/待办 |
+| C12 | 运行日志成本/误判 | 接受；需调参 | 轮转/上限/脱敏；`slow` 只提醒；重派上限 2；超限客户 | P14；`role-log`/`log-patrol`/`log-stuck` |
+| C13 | 独立对话框成本 | 接受；需 UI 投入 | 一次一卡/优先级/稍后/待办/焦点策略/无障碍/高风险二次确认 | P9；`dialog-*`/phase5a 30/30 |
+| C14 | 审计与合规不能满足第三方 | 高风险/合规项目另议 | 如需要另建记录（不属最小系统） | 范围说明 |
+| C15 | single/su 行为变化 | 需客户明确（闸门 1 选 Q15 A 接受） | single/su 角色模型/入口保留；共享 flow/gate/ledger 撤除；旧项目不迁移 | P6/P11；D 测试/single 打开 |
+| C16 | 终止/重派重复副作用 | 接受但需严格实现 | 副作用分类/幂等键/部分写入隔离/子进程树终止；external/destructive/unknown 不自动重派；升级客户；上限 2 | P14；`stuck-redispatch-safety`/`log-actions` |
+
+> 口径：C1–C16 为客户闸门 1 已接受的前提（FIN-07），本程序不将其作为缺陷；C10 在 Q4 A 下不适用；新代价/退化才需另交沟通/策划。
+
 ## 3. 终态验证（与 change-F §3 同一原始记录）
 
 - **规范全量**（排除基线挂起 `write-sequencing.test.ts`）：**2908 tests / 2878 pass / 12 fail / 18 skip**；相对 E 2903/2873/12/18 = +5/+5/0/0；12 fail = 9 Windows symlink EPERM + T1×3（基线既红）；日志 `%TEMP%\f-full-canonical.log` sha256 `18a4415283ab5f2e929d75ffe84e63997a24b00c5e49fde5300a3c789a0d6be9`。
@@ -48,6 +74,7 @@
 - **Electron E2E**：临时夹具 `%TEMP%\ans-e2e-f-fixture-5mKJRC`（仅 `角色卡/桌面窗口/`）、fresh userData；exit 0；`E2E_PASS=true`、`E2E_FAILURES=` 空、17/17 PNG；报告 `2b73e5f6aee7b0613b484ce7977fa58e4ecf46e0d8c3a00917e956be8bcd775c`。
 - **phase3b**：45 checks / 0 false；report.json `2f98c884…`。**phase5a**：30/30、failures=0；report.json `76dc0c91…`。
 - 环境：Windows 11 Pro 10.0.26300；Node v24.22.1；Electron 44.7.0；无 `.env`；E2E/冒烟均用临时夹具与临时 userData。
+- **test-only `@ts-nocheck` 例外**：生产源码 `src/`+`app/` 全仓 0 标记、typecheck 真实 exit 0；`test/测试/redispatch-target-recompute.ts:1` 为旧 flow/账本机器的一次性目标复算历史脚本（非 `*.test.ts`、不被 `node --test` 收集、不被任何测试/产品代码 import；依赖的 `governance-e2e-auto/fixture.ts` 已在 D 删除，脚本不可执行），保留 `@ts-nocheck` 作为 **test-only 例外**，不影响生产 typecheck；若要求全仓清零需另开变更删除该历史脚本（超出 F-02 e2e 写集）。
 
 ## 4. 测试差异闭环
 
@@ -76,7 +103,7 @@
 
 ## 8. 证据文件与哈希
 
-- change-F 代码/测试 6 文件逐文件 blob/sha256：`change-F` §8（候选 `e008187`，整树 `70412769…`）。
+- **最终组合候选 308 文件逐文件 blob/sha256：`change-F` §10（`044811f4`，整树 `8dcbdb8d…`，完整 diff `34b5d221…`）**；F 代码/测试 6 文件另见 `change-F` §8（`e008187`，整树 `70412769…`）。
 - D：`change-D` §10（74 文件）+ §7（测试 119 表）；E：`change-E` §8（44 文件）；A/B/C：各自 change-package 附录。
 - 本报告与 change-F 的最终行数/SHA-256：由文档提交后复算并记入 memo/最终报告回执（自引用文件不在自身内嵌最终哈希）。
 - 结论（本报告）：**事实层面 F-01–F-08 所述工作已完成，证据如上；是否终态 pass 由独立验收判定**。本报告不授权提交/推送/合并/发布。
