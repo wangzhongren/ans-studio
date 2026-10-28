@@ -481,17 +481,6 @@ function registerIpc(win: BrowserWindow): void {
   //
   // 治理下一步（2026-10-18 客户修正）：通道先于 `desktop` 装配（desktop 需要 customerInput），故用可变句柄
   // 在 desktop 建立后接上——在此之前不可能有客户回包，句柄必已就位。
-  let advanceGovernanceFlow:
-    | ((payload: GovernanceNextStepPayload, context: GovernanceNextStepContext) => void)
-    | undefined;
-  // 2026-10-23 验收返工路由：judge auto-rework（acceptance 卡 deny/manual）结算后的隔离回调句柄——
-  // 与 `advanceGovernanceFlow` 同模式，在 desktop 建立后接到 `routeAcceptanceAutoRework`；只接线，不放业务。
-  let routeAcceptanceAutoRework:
-    | ((info: AutoReworkCallbackInfo) => void)
-    | undefined;
-  // 2026-10-25 验收分诊：客户通道的**呈现前闸**句柄——desktop 建立后接到 `evaluateAcceptanceTriage`
-  // （与上两个同模式；在此之前不会有验收卡到达——会话尚未开启）。缺省 ⇒ 通道不分诊（旧行为）。
-  let acceptanceTriageGate: DesktopInterface["evaluateAcceptanceTriage"] | undefined;
   const customerChannel = createCustomerInputChannel({
     presenter: (payload) => {
       if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现交互请求");
@@ -504,25 +493,6 @@ function registerIpc(win: BrowserWindow): void {
     onQueued: (payload, waitingFor) => {
       if (!win.isDestroyed()) win.webContents.send("session:operator-queued", { ...payload, waitingFor });
     },
-    // 客户决定**成功结算**后：先发契约事件 `governance:next-step`（供 UI 显示状态行，UI **不再**据此
-    // 打开/切换会话），再由应用在后台派发唯一一条任务（不抢当前 pane、不自动批准、不写账本）。
-    // 取消/拒绝/expired 不会走到这里（customer-input 只对 answered 回调）。
-    onNextStep: (payload, context) => {
-      // 窗口已关：不发事件、也不再后台派发（关窗不清账本、不造活动；客户决定本身已由编排入账）。
-      if (win.isDestroyed()) return;
-      win.webContents.send("governance:next-step", payload);
-      advanceGovernanceFlow?.(payload, context);
-    },
-    // 2026-10-23 验收返工路由（Q7 A）：acceptance 卡的 judge deny/manual 自动退回**结算后**隔离回调。
-    // 本通道只传事实；路由/记录/系统行在 Interface（`routeAcceptanceAutoRework`）。窗口已关不派发。
-    onAutoRework: (info) => {
-      if (win.isDestroyed()) return;
-      routeAcceptanceAutoRework?.(info);
-    },
-    // 2026-10-25 验收分诊（呈现前闸）：只对 cardKind=acceptance 的请求调用；desktop 建立后接线。
-    // gate 未接线 ⇒ proceed（既有验收卡路径逐字不变）；分诊卡/结算/路由全在 Interface。
-    acceptanceTriage: (facts) =>
-      acceptanceTriageGate !== undefined ? acceptanceTriageGate(facts) : Promise.resolve({ action: "proceed" }),
     // 2026-10-25 客户新规则「写自己角色权限内的路径，直接放行」：写盘确认在**呈现卡片/调用判断之前**
     // 做边界预授权判定（边界唯一来源 = 门禁 resolveWrite；会话边界快照由 SessionManager 提供）。
     // accept/reject 直接结算（不弹卡、不调 judge）；治理敏感类别返回 confirm ⇒ 走既有卡片/判断路径。
@@ -571,31 +541,15 @@ function registerIpc(win: BrowserWindow): void {
   });
   win.on("closed", () => shellConfirm.rejectAllPending("窗口已关闭，未获放行（fail-closed）"));
 
-  // —————— G-2/W5（2026-10-16 客户批准）：恢复确认卡的呈现端 ——————
-  // su 经 `propose_recovery` 提议恢复动作（停止本轮 / 重建会话 / 重投任务）→ 主进程校验后把卡推渲染侧
-  // （`recovery:confirm-request`——桌面UI 已落树消费面：恰 {allow:true} 才作为执行请求，取消为默认焦点）；
-  // 回包经 `recovery:confirm-response` 受理（通道内按请求快照校验、恰 allow:true 才为真）。
-  // fail-closed：窗口已关时推达抛错 ⇒ 恢复桥归「未获执行」如实回执；关窗 ⇒ 全部挂起未获执行。
-  // **等待不设限**（裁定 4，沿 G-1）：本卡**无**兜底计时器——唯一失效＝关窗/会话重建（组合信号中止）。
-  const recoveryConfirm = createRecoveryConfirmPresenter({
-    present: (request) => {
-      if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现恢复确认请求");
-      win.webContents.send("recovery:confirm-request", request);
-    },
-    onExpired: (payload) => { if (!win.isDestroyed()) win.webContents.send("session:operator-expired", payload); },
-    operatorId: desktopOperatorId(),
-  });
-  win.on("closed", () => recoveryConfirm.rejectAllPending("窗口已关闭，未获执行（fail-closed）"));
   // F-4-opt1（2026-10-16 客户批准）：窗口重新获得焦点/重新显示（最小化还原、被遮挡后回到前台）时**幂等重推**
   // 未决确认卡——若某次推达在渲染侧丢失，操作者一回到窗口即可再收到（复用既有幂等重推，与
   // `app:recovery-ready` 同款；只重推**仍挂起**的项——过期/已决项绝无放行语义，重推不改变任何判定）。
-  win.on("focus", () => { shellConfirm.replayPending(); recoveryConfirm.replayPending(); });
-  win.on("show", () => { shellConfirm.replayPending(); recoveryConfirm.replayPending(); });
+  win.on("focus", () => { shellConfirm.replayPending(); });
+  win.on("show", () => { shellConfirm.replayPending(); });
   registerHandler("app:recovery-ready", (event) => {
     if (event.sender !== win.webContents) return { ok: false };
     customerChannel.replayPending();
     shellConfirm.replayPending();
-    recoveryConfirm.replayPending();
     return { ok: true };
   });
   registerHandler("shell:confirm-response", (_e, input) => shellConfirm.respond(input));
@@ -643,8 +597,6 @@ function registerIpc(win: BrowserWindow): void {
     }
     return result;
   });
-  // G-2/W5：恢复确认卡回包——通道内**恰 allow:true 才为真**；未知/已失效 id → expired（绝不当执行）。
-  registerHandler("recovery:confirm-response", (_e, input) => recoveryConfirm.respond(input));
 
   // I-1（2026-10-12，客户裁定 arm——「现在开放 shell…如果 su 觉得危险可以让客户决定」）+ I-1 补丁
   // （2026-10-12 客户**重发授权**：接上 (c) 规则集实件）：arm 的**两件**——(c) 实件（`classifyShell` +
@@ -711,12 +663,6 @@ function registerIpc(win: BrowserWindow): void {
     },
     // 客户交互通道（A-5）：仅内置治理角色（su）会话消费（见 session.ts 的注入判据）。
     customerInput: customerChannel.customerInput,
-    // 2026-10-25 验收分诊：重启恢复时由 Interface 以稳定 id 重推分诊卡（同通道、同 pending/作答校验；
-    // 无活体验收请求时只执行处置，不伪造 customer.decision）。
-    presentAcceptanceTriageCard: customerChannel.presentAcceptanceTriageCard,
-    // G-2/W5（2026-10-16 客户批准）：恢复确认卡通道（仅 su 的 propose_recovery 桥消费；缺省 ⇒ 未接线
-    // 即「未获执行」如实回执——fail-closed，绝不「没人问就执行」）。
-    recoveryConfirm,
     // G-2/W1：三通道（su 交互卡 / shell 卡 / 恢复卡）按角色挂起数**合并视图**——看护静默谓词与
     // 「正确等待不报」排除用（缺省 ⇒ 恒 0「无待确认」；本应用内恒提供）。
     watchdogPendingSnapshot: () => {
@@ -724,8 +670,7 @@ function registerIpc(win: BrowserWindow): void {
       const merge = (m: Map<string, number>): void => { for (const [rid, n] of m) byRole.set(rid, (byRole.get(rid) ?? 0) + n); };
       merge(customerChannel.pendingRoles());
       merge(shellConfirm.pendingRoles());
-      merge(recoveryConfirm.pendingRoles());
-      return { total: customerChannel.pendingCount() + shellConfirm.pendingCount() + recoveryConfirm.pendingCount(), byRole };
+      return { total: customerChannel.pendingCount() + shellConfirm.pendingCount(), byRole };
     },
     // B-1：Markdown 链接外开——**校验在 Interface 层**（仅 http/https），此处只接系统浏览器（表现层）。
     // §17.12：同一窗口内与导航兜底共用去重闸，避免渲染侧与主进程双重外开。
@@ -781,21 +726,6 @@ function registerIpc(win: BrowserWindow): void {
       }
     },
   });
-  // 治理下一步的后台派发（2026-10-18 客户修正）：打开目标治理角色会话并投递一条任务；不调用任何渲染侧
-  // open/select，当前会话与输入焦点不变。Interface 内部已隔离失败（诊断 + 系统行），此处只兜底意外抛错。
-  advanceGovernanceFlow = (payload, context) => {
-    void desktop.advanceGovernanceFlow({ payload, context }).catch((error) => {
-      mainDiagnostic.error("governance.advance.failed", error, { cardKind: payload.cardKind, flowId: payload.flowId });
-    });
-  };
-  // 2026-10-23 验收返工路由：judge auto-rework 事实交 Interface（只接线；失败只诊断，不影响已结算的 decline）。
-  routeAcceptanceAutoRework = (info) => {
-    void desktop.routeAcceptanceAutoRework(info).catch((error) => {
-      mainDiagnostic.error("acceptance.rework.auto.failed", error, { flowId: info.flowId, source: info.source });
-    });
-  };
-  // 2026-10-25 验收分诊：呈现前闸接到 Interface（只接线；gate 内部已 fail-safe 回落既有验收卡）。
-  acceptanceTriageGate = (facts) => desktop.evaluateAcceptanceTriage(facts);
   desktop.startWatchdog(); // G-2/W1：看护周期 tick（默认 30s，仅 env 可调）——窗口注册后启动
   win.on("closed", () => {
     desktop.stopWatchdog(); // G-2/W1：窗关停 tick（看护绝不跨窗口残留）
@@ -811,19 +741,6 @@ function registerIpc(win: BrowserWindow): void {
 
   registerHandler("app:pick-project", () => desktop.pickProject());
   registerHandler("project:document-read", (_e, input) => desktop.readProjectDocument(input));
-  // I2/C1（existing-project-compat V1，2026-10-17 PM 评审 §四.2/§4.6）：建立治理记录的预览与显式建立。
-  // 守卫（当前导入项目 / `confirm:true` / 机制内按项目互斥）**全在 Interface**——主进程只透传，不做额外授权判断。
-  registerHandler("project:governance-preview", (_e, input) => desktop.previewGovernanceRecord(input));
-  registerHandler("project:governance-establish", (_e, input) => desktop.establishGovernanceRecord(input));
-  // C2/C3（治理记录 pin 不符的重新接受恢复，2026-10-17 PM 评审 §5.3）：预览与显式重新接受。
-  // 守卫（当前导入项目 / `confirm:true` / 64 hex previewDigest / 机制内互斥与写前重算）**全在 Interface**——
-  // 主进程只透传，不做额外授权判断。
-  registerHandler("project:governance-reaccept-preview", (_e, input) => desktop.previewGovernanceReacceptance(input));
-  registerHandler("project:governance-reaccept", (_e, input) => desktop.reacceptGovernancePins(input));
-  // V1b 预留（评审 §5.5/§11.2）：治理模型迁移预览/写入入口先占位——Interface 恒回 `not-available`
-  // （零写入、不改 `.ans`/manifest）。渲染侧据此显示「升级入口待本版后续」，不假装可用。
-  registerHandler("project:governance-migrate-preview", (_e, input) => desktop.previewGovernanceMigration(input));
-  registerHandler("project:governance-migrate", (_e, input) => desktop.migrateGovernanceModel(input));
   registerHandler("report:retry-save", (_e, input) => desktop.retryReportSave(input));
   registerHandler("report:get-save-state", (_e, input) => desktop.getReportSaveState(input));
   registerHandler("delivery:retry-history-save", (_e, input) => desktop.retryDeliveryHistorySave(input));
@@ -870,17 +787,6 @@ function registerIpc(win: BrowserWindow): void {
   registerHandler("background-tasks:stop", (event, input) => {
     if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
     return desktop.stopBackgroundTask(input);
-  });
-  // —— 流程状态只读（2026-10-25）：扫描 `<projectRoot>/docs/flows/*.yaml` 供渲染侧展示步骤进度 ——
-  // 渲染进程输入不可信：**来源校验在本 handler**；参数校验与只读扫描全在 Interface
-  // （非空 projectRoot 且目录存在；坏文件逐文件回 errors；不写文件/不碰账本/不改 revision）。
-  registerHandler("flow:status", (event, input) => {
-    if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
-    const projectRoot =
-      input !== null && typeof input === "object" && typeof (input as { projectRoot?: unknown }).projectRoot === "string"
-        ? (input as { projectRoot: string }).projectRoot
-        : "";
-    return desktop.flowStatus(projectRoot);
   });
   // B-1：Markdown 链接外开——渲染进程输入经 Interface 校验（仅 http/https）后交系统浏览器。
   registerHandler("app:open-external", (_e, input) => desktop.openExternal(input));

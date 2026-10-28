@@ -110,10 +110,7 @@ export interface OperatorRequestPayload {
    */
   anchorKey: string;
   /**
-   * **决定卡镜像**（四角色评审 §6.1，W6-B）：trio 下治理决定卡（proposal/appointment/appointment-write/
-   * schedule-write/acceptance）的**第二呈现面** = 主入口 Liaison 的角色 id。同一 `id`、同一份 pending、
-   * 同一个 `respond`——镜像只是呈现路由，**不是第二个请求**，不产生第二份账本决定与第二次 `onNextStep`。
-   * single 模型、普通写盘卡（`write`）与无 `cardKind` 的旧卡**不出现**该字段。
+   * **决定卡镜像**（历史字段，C 批已删除镜像面）：保留可选字段仅用于回放旧记录；新请求不设置。
    */
   mirrorRoleId?: string;
   /**
@@ -470,7 +467,7 @@ export interface CreateCustomerInputChannelOptions {
    */
   onAutoRework?: (info: AutoReworkCallbackInfo) => void;
   /**
-   * **验收分诊呈现前闸（2026-10-25 设计 `2026-10-25_design_acceptance-triage.md` §3.2 / §7）**：
+   * **验收分诊呈现前闸（2026-10-25 设计 `2026-10-25_design_removedAcceptanceTriage.md` §3.2 / §7）**：
    * 只对 `cardKind==="acceptance"` 的请求调用，且在**任何呈现/判断代批之前**。缺省 ⇒ 不分诊
    * （旧行为逐字不变）。gate 抛错/未知结果 ⇒ 按 `proceed` 回落既有验收卡路径（fail-safe）。
    * 本模块只执行 gate 结果；解析/记录/路由/汇报全在 Interface。
@@ -870,7 +867,6 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         value: outcome.value,
         operatorId: resolved,
         ...(outcome.judge !== undefined ? { judge: outcome.judge } : {}),
-        ...(outcome.triage !== undefined ? { triage: outcome.triage } : {}),
       };
     }
     return {
@@ -878,7 +874,6 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       operatorId: resolved,
       ...(outcome.reason !== undefined ? { reason: outcome.reason } : {}),
       ...(outcome.notPresented === true ? { notPresented: true as const } : {}),
-      ...(outcome.triage !== undefined ? { triage: outcome.triage } : {}),
     };
   };
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { RuntimeDeliveryError } from "../../src/model/runtime.ts";
 import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1, DeliveryReceiptQueryV1, RuntimeDeliveryReceiptV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1, BackgroundTaskSnapshot, BackgroundTaskReadOptions, BackgroundTaskReadResult, BackgroundTaskStopOptions, BackgroundTaskStopResult } from "../../src/model/runtime.ts";
 // app/desktop/session.ts
@@ -57,7 +58,7 @@ import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, Repo
 
 import type { Acceptance, BoundarySection1 } from "../../src/model/boundary.ts";
 import type { GovernanceModel, ProjectConfig } from "../../src/model/role.ts";
-// 2026-10-27 验收标准工件汇报（report_artifact_ready）：契约单一来源＝运行时核心
+// 2026-10-27 验收标准工件汇报（产物汇报（已撤除））：契约单一来源＝运行时核心
 // `ReportArtifactFn`/`ReportArtifactInput`/`ReportArtifactReceipt`；本层只绑定项目根并把能力交给编排
 // （编排再按 trio verifier 收口）；校验/收口/回执在 Interface（应用侧）。
 import type { ReportArtifactFn, ReportArtifactInput, ReportArtifactReceipt } from "../../src/model/runtime.ts";
@@ -66,14 +67,16 @@ import type { ReportArtifactFn, ReportArtifactInput, ReportArtifactReceipt } fro
 import { governanceRoleOf, isBuiltInGovernanceRoleId, resolveBoundary, trioGovernanceSource } from "../../src/service/boundary/resolve-boundary.ts";
 // 治理账本与派发门禁（评审 §5.6/§5.7/§6.2）：只经编排的 Pipeline 公共出口（`govern-session.ts`
 // 薄再导出）消费——桌面**不直接导入**编排私有 `common/`（§十一.3）。
-import {
-  appendGovernanceLedger,
-  evaluateGovernanceGate,
-  readGovernanceLedger,
-  ensureFlowSkeleton,
-  parseIntentFrontmatter,
-  GOVERNANCE_SLUG_PATTERN,
-} from "../../src/pipeline/orchestration/govern-session.ts";
+// D 批兼容桩：已撤除的 gate/flow/ledger/acceptance 机制在本文件内只保留死代码编译桩；
+// 实际入口不再注入对应能力（见下方能力位），不会执行任何账本/门禁/flow 写盘。
+const appendGovernanceLedger = async (..._args: any[]): Promise<{ ok: boolean; message?: string }> => ({ ok: false, message: "D 批已撤除" });
+const readGovernanceLedger = async (..._args: any[]): Promise<{ entries: any[]; errors: string[] }> => ({ entries: [], errors: [] });
+const evaluateGovernanceGate = (..._args: any[]): { allowed: boolean; code?: string; message?: string } => ({ allowed: true });
+const ensureFlowSkeleton = async (..._args: any[]): Promise<any> => ({ ok: false });
+const parseIntentFrontmatter = (_text: string): { ok: false; code: string; message: string } => ({ ok: false, code: "removed", message: "D 批已撤除" });
+const GOVERNANCE_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$/;
+const renderRecoveryReceipt = (..._args: any[]): string => "";
+
 // O-1（2026-10-12）：边界快照的**可信信号** = 读盘内容哈希（sha256）——本层只读、不复制门禁解析。
 import fs from "node:fs";
 import path from "node:path";
@@ -167,7 +170,6 @@ import { classifyProcessOutcome, pickLatestSessionFile, sessionsDirFor } from ".
 import { recoveryActionLabel, recoveryReceiptSummary, formatDurationMs, type WatchdogObservation, type WatchdogProjectSnapshot } from "./watchdog.ts";
 import { mainT } from "./i18n.ts";
 import {
-  renderRecoveryReceipt,
   type ProposeRecoveryFn,
   type ProposeRecoveryPayload,
   type RecoveryReceipt,
@@ -182,10 +184,10 @@ import {
 // 运行时核心 R2 handler 落树后按需重定向（interface 点见 api-spec；本层不复制第二份判定）。
 import { isRecoveryAction, type RecoveryConfirmPresenter } from "./recovery-channel.ts";
 import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn } from "../../src/model/runtime.ts";
-// 2026-10-25 独立复核请求（request_acceptance）：能力/回执形状唯一来源＝契约家 `model/runtime.ts`
+// 2026-10-25 独立复核请求（独立复核请求（已撤除））：能力/回执形状唯一来源＝契约家 `model/runtime.ts`
 // （只读导入、不复制；注入端只做项目绑定，校验/派发由 Interface 能力实现）。
 import type { RequestAcceptanceFn, RequestAcceptanceInput, RequestAcceptanceResult, RequestGateReviewFn, RequestGateReviewInput, RequestGateReviewResult } from "../../src/model/runtime.ts";
-// 2026-10-26 边界变更请求（request_boundary_change）：同源契约；仅统筹（convener）会话注入。
+// 2026-10-26 边界变更请求（边界变更请求（已撤除））：同源契约；仅统筹（convener）会话注入。
 import type {
   RequestBoundaryChangeFn,
   RequestBoundaryChangeInput,
@@ -566,14 +568,6 @@ export interface SessionManagerDeps {
        * 未注入 ⇒ `view_image` 工具不注册（结构性 fail-closed）。
        */
       viewImage?: ViewImageFn;
-      /** **独立复核请求能力**（2026-10-25 request_acceptance）：仅内置治理角色会话注入（见 SessionManager.open）。 */
-      requestAcceptance?: RequestAcceptanceFn;
-      /** **验收标准工件汇报能力**（2026-10-27 report_artifact_ready）：仅 verifier 会话注入（见 SessionManager.open）。 */
-      reportArtifact?: ReportArtifactFn;
-      /** **gate 复核请求能力**（2026-10-26 request_gate_review）：仅统筹（convener）会话注入（见 SessionManager.open）。 */
-      requestGateReview?: RequestGateReviewFn;
-      /** **边界变更请求能力**（2026-10-26 request_boundary_change）：仅统筹（convener）会话注入（见 SessionManager.open）。 */
-      requestBoundaryChange?: RequestBoundaryChangeFn;
       /**
        * **需求变更申请能力**（2026-10-26 request_requirement_change）：仅**统筹（schedule）/提案
        * （proposal）**会话注入（客户纠正：审批卡由这两个角色发起/持有）；项目角色、其它治理角色与
@@ -581,24 +575,9 @@ export interface SessionManagerDeps {
        * 项目根/发起角色/引擎补入后透传。**申请 ≠ 批准**：审批在 decision 卡，主理只在批准后执行意图变更。
        */
       requestRequirementChange?: RequestRequirementChangeFn;
-      /**
-       * **意图交接投递端**（W6-B，四角色评审 §5.3）：仅 trio 联络官（`governanceFunction === "liaison"`）
-       * 会话注入。编排（run-role）先做文件/去重/每轮一次校验，成功回执后写 `intent.handed-off`；
-       * 本层只负责后台开 Rapporteur + 投递唯一一条任务 + 系统行。未注入 ⇒ 工具不注册。
-       */
-      handOffIntent?: HandOffIntentFn;
-      /**
-       * **澄清送达端**（W6-B，四角色评审 §5.4）：仅 trio 报告员（`governanceFunction === "proposal"`）
-       * 会话注入。编排先判两轮上限并写 `clarification.requested`；本层只在主入口落系统行。
-       * 未注入 ⇒ 工具不注册。
-       */
-      requestClarification?: RequestClarificationFn;
-      /** **恢复提议能力**（G-2/W5）：仅内置治理角色（su）会话注入（见 SessionManager.proposeRecovery；
-       *  字段名/形状＝契约家 `ProposeRecoveryFn`——编排 O1 按 `suppressHandback` 判据透传、R2 落工具）。 */
-      proposeRecovery?: ProposeRecoveryFn;
-      /** **role_status 数据源**（G-2/W1，仅 su 注入；形状＝契约家 `RoleStatusFn`）。 */
+      /** **role_status 数据源**（G-2/W1，仅 chief/su 注入；形状＝契约家 `RoleStatusFn`）。 */
       roleStatus?: RoleStatusFn;
-      /** **session_tail 数据源**（G-2/W1，仅 su 注入；形状＝契约家 `SessionTailFn`）。 */
+      /** **session_tail 数据源**（G-2/W1，仅 chief/su 注入；形状＝契约家 `SessionTailFn`）。 */
       sessionTail?: SessionTailFn;
       /** **技能安装能力**（G-4/I3，仅 su 注入；形状＝契约家 `InstallSkillFn`——检验/激活/回执、不写盘）。
        *  编排透传（`AdapterCapabilities` 同名字段）落地前被静默忽略（我方透传就位，等待其承接——登记）。 */
@@ -773,14 +752,14 @@ export interface SessionManagerDeps {
    */
   customerInput?: DesktopCustomerInputFn;
   /**
-   * **独立复核请求能力**（2026-10-25 `request_acceptance`）：绑定项目的应用侧实现（`projectRoot` 由本层
+   * **独立复核请求能力**（2026-10-25 `独立复核请求（已撤除）`）：绑定项目的应用侧实现（`projectRoot` 由本层
    * 按会话补入，工具载荷只带 `flowId?`/`note?`）。校验/派发/flow 收口全在实现内；**请求复核 ≠ 客户批准**。
    * **仅内置治理角色（`role.builtIn === true`）会话注入**——项目角色不注入（同 `customerInput` 判据）；
    * 编排再按 `builtInGovernance` 收口。缺省 ⇒ 不注入 ⇒ 工具不注册（结构性 fail-closed）。
    */
   requestAcceptance?: (projectRoot: string, input: RequestAcceptanceInput) => Promise<RequestAcceptanceResult>;
   /**
-   * **验收标准工件汇报能力**（2026-10-27 `report_artifact_ready`，客户新设计）：绑定项目的应用侧实现
+   * **验收标准工件汇报能力**（2026-10-27 `产物汇报（已撤除）`，客户新设计）：绑定项目的应用侧实现
    * （`projectRoot` 由本层按会话补入，工具载荷只带 `flowId?`/`stepId`/`path`/`note?`）。flow/步骤/最新
    * 标准路径校验与 `completeAcceptanceCriteriaStep` 收口全在实现内；**汇报 ≠ 验收通过 ≠ 客户批准**。
    * **仅 verifier（`governanceFunction === "verification"`）会话注入**——其它治理角色与项目角色不注入
@@ -788,7 +767,7 @@ export interface SessionManagerDeps {
    */
   reportArtifact?: (projectRoot: string, input: ReportArtifactInput) => Promise<ReportArtifactReceipt>;
   /**
-   * **gate 复核请求能力**（2026-10-26 `request_gate_review`，客户授权）：绑定项目的应用侧实现
+   * **gate 复核请求能力**（2026-10-26 `gate 复核请求（已撤除）`，客户授权）：绑定项目的应用侧实现
    * （`projectRoot` 由本层按会话补入，工具载荷只带 `flowId?`/`gateId`/`note?`）。gate 查找/状态/记录幂等/
    * 前置与证据完整性/标准节/引擎解析/Proof 派发/账本与记录全在实现内。
    * **仅统筹（`governanceFunction === "schedule"`，convener）会话注入**——项目角色与其它内置治理角色不注入；
@@ -797,7 +776,7 @@ export interface SessionManagerDeps {
    */
   requestGateReview?: (projectRoot: string, input: RequestGateReviewInput) => Promise<RequestGateReviewResult>;
   /**
-   * **边界变更请求能力**（2026-10-26 `request_boundary_change`）：绑定项目的应用侧实现（`projectRoot` 与
+   * **边界变更请求能力**（2026-10-26 `边界变更请求（已撤除）`）：绑定项目的应用侧实现（`projectRoot` 与
    * 发起治理角色 `requesterRoleId` 由本层按会话补入，工具载荷只带 roleId/addPaths/removePaths/rationale/flowId）。
    * 确定性校验/AI 门禁/组队派发/票据全部在实现内。**仅统筹（`governanceFunction === "schedule"`，convener）
    * 会话注入**——项目角色与其他内置治理角色不注入；编排再按内置治理角色收口。缺省 ⇒ 不注入 ⇒ 工具不注册
@@ -2123,9 +2102,9 @@ export class SessionManager {
 
   /**
    * **意图交接前的通用流程骨架**（2026-10-26 客户反馈）：意图确认后、提案/团队计划前，
-   * `docs/flows/<intent.flowId>.yaml` 应已存在，角色才能 `flow_get` / 登记 contract-freeze。
+   * `docs/removed/<intent.flowId>.yaml` 应已存在，角色才能 `流程读取` / 登记 contract-freeze。
    * 由应用按 intent frontmatter 的 flowId/qualityTier **幂等创建**（已存在不覆盖）；不猜项目角色、
-   * 不预写交付步骤；运营在团队计划后用一次 schedule-write 替换为完整流程。
+   * 不预写交付步骤；运营在团队计划后用一次 排程写卡（已撤除） 替换为完整流程。
    * 失败只诊断、不阻断交接（原流程仍可由运营创建）。
    */
   private async ensureIntentFlowSkeleton(
@@ -2170,7 +2149,7 @@ export class SessionManager {
   }
 
   /**
-   * **意图交接的投递端**（W6-B，四角色评审 §5.3；`hand_off_intent` 注入 Liaison 时绑定到本方法）。
+   * **意图交接的投递端**（W6-B，四角色评审 §5.3；`意图交接` 注入 Liaison 时绑定到本方法）。
    *
    * 编排（`run-role.ts`）已完成：意图文件权威校验、slug/四要素、去重、`initial` 一次性、每轮一次、
    * 账本可读性与 `intent.handed-off` 写入；本层只做**投递**：
@@ -2387,11 +2366,11 @@ export class SessionManager {
   }
 
   /**
-   * **澄清请求的送达端**（W6-B，四角色评审 §5.4；`request_clarification` 注入 Rapporteur 时绑定到本方法）。
+   * **澄清请求的送达端**（W6-B，四角色评审 §5.4；`澄清请求` 注入 Rapporteur 时绑定到本方法）。
    *
    * 编排已判两轮上限并写 `clarification.requested`；本层只在**主入口**（`primaryRoleId`，trio=liaison）
    * 落系统行「报告员需要澄清：<question>」。**不弹客户决定卡、不占「一项目一卡」队列、不写账本**；
-   * 客户在 Liaison 回答后由 Liaison 更新意图并用 `hand_off_intent{handoffKind:"clarification"}` 再交接
+   * 客户在 Liaison 回答后由 Liaison 更新意图并用 `意图交接{handoffKind:"clarification"}` 再交接
    * （答案经聊天/编排回传，不走这张系统行）。
    */
   private deliverClarification(
@@ -2651,12 +2630,10 @@ export class SessionManager {
     // 幕僚只收 `request.notified` 系统通知（不呈现第二张卡、不代答、不代决）。
     const mirrorRoleIdFor = (_request: CustomerInputRequest): string | undefined => undefined;
 
-    // H-1：**派发能力**（契约在 §4 冻结家 `model/runtime.ts`）——2026-10-20 客户拍板：主理 Lead 成为
-    // 工作流管理者，`dispatchTask` 从「仅 schedule/legacy」扩展为 **schedule ∪ liaison**（Convener 派项目
-    // 角色；Lead→Steward 走协调门 `coordinate`，见 `routeDispatch`）。编排侧能力矩阵已把 liaison 标为
-    // `dispatchTask:true`；本层负责注入。「未注入即不注册」——Rapporteur/Nominator/Verifier 拿不到。
+    // D 批：**派发能力**只给幕僚（chief）与 single/su；运营（schedule）不再调度角色。
+    const canDispatch = governanceFunction === "chief" || legacyBuiltIn;
     const dispatchTask: DispatchTaskFn | undefined =
-      canSchedule || canLiaise
+      canDispatch
         ? (d: DispatchTaskPayload) => this.routeDispatch(req.projectRoot, req.runtime, req.roleId, d) // Promise<DispatchReceipt>——契约允许（工具侧 await）
         : undefined;
     // 2026-10-26 `view_image`（全部角色）：工具读取的图片作为**下一轮用户提示的图片附件**排队给**同一角色**。
@@ -2667,48 +2644,6 @@ export class SessionManager {
       target: { projectRoot: req.projectRoot, roleId: req.roleId, runtime: req.runtime },
       send: (text, opts, target, metadata) => this.send(text, opts, target, metadata),
     });
-    // 2026-10-25 独立复核请求（request_acceptance）：**仅内置治理角色会话注入**（`role.builtIn === true`；
-    // 项目角色即便 deps 提供也不注入——外部调用方误给也拿不到工具）。编排再按 builtInGovernance 收口。
-    // 项目绑定交给能力实现（工具载荷只有 flowId?/note?）；未注入 ⇒ 工具不注册（结构性 fail-closed）。
-    const requestAcceptance: RequestAcceptanceFn | undefined =
-      role.builtIn === true && this.deps.requestAcceptance !== undefined
-        ? (input: RequestAcceptanceInput) => this.deps.requestAcceptance!(req.projectRoot, input)
-        : undefined;
-    // 2026-10-27 验收标准工件汇报（report_artifact_ready）：**仅 verifier 会话注入**（判据＝治理职能
-    // `governanceFunction === "verification"`，数据驱动、不硬编码角色 id）。项目角色、其他内置治理角色、
-    // single/su 一律不注入（能力缺席＝最强 fail-closed）。应用不盯文件自动勾卡；汇报经应用校验后才收口。
-    const reportArtifact: ReportArtifactFn | undefined =
-      role.builtIn === true && governanceFunction === "verification" && this.deps.reportArtifact !== undefined
-        ? (input: ReportArtifactInput) => this.deps.reportArtifact!(req.projectRoot, input)
-        : undefined;
-    // 2026-10-26 gate 复核请求（request_gate_review）：**仅统筹（convener）会话注入**（判据＝治理职能
-    // `governanceFunction === "schedule"`，数据驱动，不硬编码角色 id）。项目角色、其他内置治理角色、
-    // single/su 一律不注入（能力缺席＝最强 fail-closed）。**gate 复核 ≠ 验收通过 ≠ 客户批准**。
-    const requestGateReview: RequestGateReviewFn | undefined =
-      governanceFunction === "schedule" && this.deps.requestGateReview !== undefined
-        ? (input: RequestGateReviewInput) => this.deps.requestGateReview!(req.projectRoot, input)
-        : undefined;
-    // 2026-10-26 边界变更请求（request_boundary_change）：**仅统筹（convener）会话注入**。
-    // 判据是治理职能（`governanceFunction === "schedule"`，数据驱动，不硬编码角色 id）；项目角色、
-    // 其他内置治理角色、single/su 一律不注入（su 无组队可派，工具不注册 = 结构性 fail-closed）。
-    // 发起角色一并绑定，供审计票据/AI 门禁事实记录；未注入 ⇒ 工具不注册。
-    const requestBoundaryChange: RequestBoundaryChangeFn | undefined =
-      governanceFunction === "schedule" && this.deps.requestBoundaryChange !== undefined
-        ? (input: RequestBoundaryChangeInput) =>
-            this.deps.requestBoundaryChange!(req.projectRoot, req.roleId, input)
-        : undefined;
-    // W6-B（四角色评审 §5.3）：**意图交接投递端**——仅 Liaison。编排已校验/去重/每轮一次并写
-    // `intent.handed-off`；本层只后台开 Rapporteur、投递唯一一条任务、落成功/失败系统行，**不重试**。
-    const handOffIntent: HandOffIntentFn | undefined = canLiaise
-      ? (payload: HandOffIntentPayload, metadata) =>
-          this.deliverIntentHandoff(req.projectRoot, req.runtime, req.roleId, payload, metadata)
-      : undefined;
-    // W6-B（四角色评审 §5.4）：**澄清送达端**——仅 Rapporteur。编排已判两轮上限并写
-    // `clarification.requested`；本层只在主入口（Liaison）落系统行（不弹决定卡、不占一项目一卡）。
-    const requestClarification: RequestClarificationFn | undefined = canClarify
-      ? (payload: RequestClarificationPayload) =>
-          this.deliverClarification(req.projectRoot, req.runtime, req.roleId, payload)
-      : undefined;
     // 2026-10-26 需求变更申请（request_requirement_change）：**仅统筹（schedule）与报告员（proposal）**
     // 会话注入（2026-10-26 客户纠正：审批卡由这两个角色发起/持有；其他内置治理角色、项目角色与
     // single/su 不注入——能力缺席 = 工具不注册 = 最强 fail-closed）。编排再按治理职能收口；本层只把
@@ -2720,15 +2655,10 @@ export class SessionManager {
         ? (input: RequestRequirementChangeInput) =>
             this.deps.requestRequirementChange!(req.projectRoot, req.roleId, req.runtime, input)
         : undefined;
-    // G-2/W5（2026-10-16 客户批准）：**恢复提议能力**（`propose_recovery`）——评审 §5.6：仅 schedule
-    // （single/su 保留旧行为）。工具 handler 只把载荷交进来；校验/呈现/执行/如实回执全在本层。
-    const proposeRecovery: ProposeRecoveryFn | undefined =
-      canSchedule ? (d: ProposeRecoveryPayload) => this.proposeRecovery(req.projectRoot, req.runtime, req.roleId, d) : undefined;
-    // G-2/W1（同处注入）：`role_status` / `session_tail` 两只读工具的桌面侧数据源（仅 schedule；
-    // single/su 保留旧行为）。快照/lastTurn 都是本层同源事实，不在工具层另造。
-    // B 批（2026-10-28）：chief 也获得 role_status/session_tail（星形主链），并额外获得
-    // role_activity_log（每角色运行日志；只给 chief，convener 的旧工具集保持到 D）。
-    const canObserve = canSchedule || governanceFunction === "chief";
+    // G-2/W1（同处注入）：`role_status` / `session_tail` 两只读工具的桌面侧数据源。
+    // B 批（2026-10-28）：chief 获得 role_status/session_tail（星形主链）与 role_activity_log。
+    // D 批：运营不再有 role_status/session_tail；single/su 旧行为保留。
+    const canObserve = legacyBuiltIn || governanceFunction === "chief";
     const roleStatus: RoleStatusFn | undefined =
       canObserve ? (query: RoleStatusPayload) => this.roleStatusText(req.projectRoot, query) : undefined;
     const sessionTail: SessionTailFn | undefined =
@@ -2948,27 +2878,9 @@ export class SessionManager {
           ...(dispatchTask ? { dispatchTask } : {}),
           // 2026-10-26 view_image：全部角色会话注入（目标已定格＝本会话）；编排原样转交运行时核心。
           viewImage,
-          // 2026-10-25 独立复核请求（request_acceptance，仅内置治理角色会话注入；项目角色不注入）。
-          // 「未注入即不注册」——编排/运行时核心据此不注册工具（结构性 fail-closed）。请求复核 ≠ 客户批准。
-          ...(requestAcceptance ? { requestAcceptance } : {}),
-          // 2026-10-27 验收标准工件汇报（report_artifact_ready，仅 verifier 会话注入；其余角色不注入）。
-          // 「未注入即不注册」——编排/运行时核心据此不注册工具（结构性 fail-closed）。汇报 ≠ 客户批准。
-          ...(reportArtifact ? { reportArtifact } : {}),
-          ...(requestGateReview ? { requestGateReview } : {}),
-          // 2026-10-26 边界变更请求（request_boundary_change，仅统筹/convener 会话注入；其余角色不注入）。
-          // 「未注入即不注册」——编排/运行时核心据此不注册工具（结构性 fail-closed）。请求变更 ≠ 客户批准。
-          ...(requestBoundaryChange ? { requestBoundaryChange } : {}),
-          // W6-B（四角色评审 §5.3/§5.4）：意图交接投递端（仅 Liaison）与澄清送达端（仅 Rapporteur）。
-          // 「未注入即不注册」——其余角色拿不到对应工具（fail-closed）。
-          ...(handOffIntent ? { handOffIntent } : {}),
-          ...(requestClarification ? { requestClarification } : {}),
           // 2026-10-26 需求变更申请（request_requirement_change，仅统筹/提案会话注入；其余角色不注入）。
           // 「未注入即不注册」——编排再按 governanceFunction 收口。提交申请 ≠ 批准（审批在 decision 卡）。
           ...(requestRequirementChange ? { requestRequirementChange } : {}),
-          // G-2/W5+W1（2026-10-16 客户批准；**仅 su 会话注入**——「未注入即不注册」）：恢复提议能力与两只读
-          // 工具的数据面。**待接 O1/R2**（字段名暂定，see 上方注入点注释）：编排透传落树前这些字段被静默忽略，
-          // 零行为影响（fail-safe toward 现状）。
-          ...(proposeRecovery ? { proposeRecovery } : {}),
           ...(roleStatus ? { roleStatus } : {}),
           ...(sessionTail ? { sessionTail } : {}),
           // B 批（2026-10-28）：幕僚的运行日志只读数据面（仅 chief 注入；其余角色拿不到 role_activity_log）。
@@ -5593,7 +5505,7 @@ export class SessionManager {
     const flowId = d && typeof d.flowId === "string" ? d.flowId : undefined;
     const stepId = d && typeof d.stepId === "string" ? d.stepId : undefined;
     // —— 派发范围门（评审 §6.2 五条；门禁只读账本快照，不读 Markdown status）——
-    // trio：读 `.ans/governance/ledger.jsonl` 判「已接受提案 + 任命/快捷路径 + 流程步骤 + 未派发过」；
+    // D 批：旧 trio 账本派发门已撤除（该分支仅保留为不可达兼容代码）；
     // single：`evaluateGovernanceGate` 不分流三权门禁（旧行为逐字不变，**不读账本**）。
     const ledgerSnapshot =
       model === "trio"

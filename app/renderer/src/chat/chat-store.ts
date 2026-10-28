@@ -75,7 +75,6 @@ import {
   reportVersionSupported,
   sortHistoryReports,
 } from "@/chat/report-view";
-import { governanceQueueAggregateText } from "@/chat/governance-view";
 import type {
   ActivityItem,
   ChatRow,
@@ -587,7 +586,7 @@ function refreshQueueAggregate(): void {
   const runtime = useUiStore.getState().runtime;
   const queued = queuedWithoutPresented(state.queuedOperator, state.pendingOperator);
   const count = trio && primary ? queuedCountForView(queued, state.projectRoot, runtime) : 0;
-  const text = governanceQueueAggregateText(count, currentLocale());
+  const text = count > 0 ? String(count) : "";
   const dirty = new Set<string>();
   for (const [roleId, model] of models) {
     const rows = model.rows.filter((row) => row.kind === "queue-aggregate");

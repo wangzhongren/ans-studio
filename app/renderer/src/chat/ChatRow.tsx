@@ -32,12 +32,7 @@ import { projectionStatusText } from "@/chat/projection-view";
 import type { ActivityItem, ChatRow } from "@/chat/types";
 import { useChatStore } from "@/chat/chat-store";
 import { findRole, roleDisplayName } from "@/chat/role-view";
-import {
-  governanceCardMetaView,
-  governanceMirrorSourceLabel,
-  governanceQueueNote,
-  governanceMirrorBadge,
-} from "@/chat/governance-view";
+import { governanceCardMetaView, governanceMirrorBadge, governanceMirrorSourceLabel, governanceQueueNote } from "@/chat/card-meta";
 import {
   operatorQueued,
   operatorSubmittingNote,

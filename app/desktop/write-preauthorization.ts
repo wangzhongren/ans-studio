@@ -21,7 +21,7 @@
 //
 // 纪律：
 //  · 预授权接受 ≠ 跳过任何门禁——写盘许可的发行、真实写入、三权治理门禁（write-flow /
-//    write-role-card / write-team-plan）与 forbiddenWritePaths 仍由编排/文件工具执行；本模块只决定
+//    write-role-card / write-change-package）与 forbiddenWritePaths 仍由编排/文件工具执行；本模块只决定
 //    「这张写盘确认卡要不要客户/判断 agent」；
 //  · 不伪造客户手批、不伪造判断代批：接受/拒绝都以 `WRITE_PREAUTHORIZATION_OPERATOR_ID`
 //    （`system:` 前缀）结算，`judge` 审计字段永不出现；
@@ -112,7 +112,7 @@ export interface WritePreauthorizationEvent {
 //
 // 依据（单一来源的口径，不在本模块发明新类别）：
 //  · 客户 2026-10-25 规则与门禁引擎 `BOUNDARY_WRITE_PREAUTHORIZATION_PRINCIPLE`：`request_confirmation`
-//    只保留给治理敏感写入——角色卡 / 边界变更、共享目录或他人写集、`docs/flows/**` 流程 YAML /
+//    只保留给治理敏感写入——角色卡 / 边界变更、共享目录或他人写集、`docs/removed/**` 流程 YAML /
 //    治理账本、发布 / 变更包等；
 //  · 团队计划 v3「治理关键路径」清单（`.ans/`、`角色卡/`、`docs/{scheduling,acceptance,communication,
 //    flows,nominations,verification}/`、`src/common/shared/`、release/packaging、`.env`/密钥、根单例
@@ -120,10 +120,9 @@ export interface WritePreauthorizationEvent {
 //    验收标准与报告 / 治理工作记录等属各自角色 Section 1 内预授权，**不**列入敏感类别。
 //
 // 说明：这里只做**类别归类**（决定「保持既有卡片/判断」），不做边界判定；归类命中一律交还既有
-// 路径，绝不因归类而放行或拒绝。团队计划 / readiness / 治理工作记录属各自角色 Section 1 内预授权，
+// 路径，绝不因归类而放行或拒绝。计划 / 分析 / 治理工作记录属各自角色 Section 1 内预授权，
 // **不**列入敏感类别（照常自动放行）；`docs/scheduling/` 下仅**变更包**（`*-change-vN.md`）保留确认。
-// `docs/workflow.md` 是 **Convener Section 1 的精确文件预授权**（编排已确认）——不列为敏感类别，
-// 由角色边界判定：Convener 自动放行；其它角色边界不含该文件 ⇒ 按边界外直接拒绝。
+// D 批已撤除 flow 机器：旧流程 YAML 目录不再是治理写区。
 
 interface SensitivePrefixRule {
   prefix: string;
@@ -133,7 +132,6 @@ interface SensitivePrefixRule {
 const SENSITIVE_PREFIXES: readonly SensitivePrefixRule[] = [
   { prefix: ".ans", category: "应用治理记录（.ans/**）" },
   { prefix: "角色卡", category: "角色卡/边界（appointment-write）" },
-  { prefix: "docs/flows", category: "流程 YAML（schedule-write）" },
   { prefix: "docs/nominations", category: "旧提名（legacy 治理）" },
   { prefix: "docs/audit", category: "应用 shell 审计" },
   { prefix: "src/common/shared", category: "共享目录（src/common/shared/**）" },
@@ -315,8 +313,8 @@ export function evaluateWritePreauthorization(facts: WritePreauthorizationFacts)
     return { action: "confirm", reason: "no-declared-write-paths", source: declared.source };
   }
 
-  // 治理敏感类别优先于边界判定：这些路径有各自的专用确认流程（appointment-write / schedule-write /
-  // 发布与变更包等），不是「普通边界外写入」——保持既有卡片/判断，绝不在这里放行或拒绝。
+  // 治理敏感类别优先于边界判定：这些路径有各自的专用确认流程（appointment-write / 发布与变更包等），
+  // 不是「普通边界外写入」——保持既有卡片/判断，绝不在这里放行或拒绝。
   const sensitive: string[] = [];
   for (const path of declared.paths) {
     if (governanceSensitiveWriteCategory(path) !== undefined) sensitive.push(path);

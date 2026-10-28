@@ -6,7 +6,7 @@
  */
 
 import { DEFAULT_LOCALE, translate, type Locale } from "../i18n/index.ts";
-import { governanceCardMetaView, type GovernanceCardMeta } from "./governance-view.ts";
+import { governanceCardMetaView, type GovernanceCardMeta } from "./card-meta.ts";
 
 export interface OperatorPayloadLike {
   id?: unknown;

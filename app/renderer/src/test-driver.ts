@@ -17,7 +17,6 @@ import { saveSettingsFormFromDom } from "@/shell/SettingsPanel";
 import { useConfirmStore } from "@/stores/confirm-store";
 import { useDrawerStore, openSettingsDrawer } from "@/stores/drawer-store";
 import { useSettingsStore } from "@/stores/settings-store";
-import { useGovernanceStore } from "@/stores/governance-store";
 import {
   RUNTIME_OPTIONS,
   useUiStore,
@@ -49,16 +48,6 @@ export interface AnsRendererStateSnapshot {
   confirmLastDecision: ConfirmDemoDecision;
   governanceModel: "single" | "trio" | null;
   governanceRecord: Record<string, unknown> | null;
-  /** 4B：治理预览只读快照（打开/模式/previewDigest/canConfirm）。 */
-  governancePreview: {
-    open: boolean;
-    mode: "establish" | "reaccept" | "migrate";
-    loading: boolean;
-    busy: boolean;
-    previewDigest: string;
-    canConfirm: boolean;
-    nextStep: string;
-  };
   hint: string;
 }
 
@@ -203,15 +192,6 @@ function snapshot(): AnsRendererStateSnapshot {
     confirmLastDecision: lastDemoDecision,
     governanceModel: chat.governanceModel,
     governanceRecord: chat.governanceRecord,
-    governancePreview: {
-      open: useGovernanceStore.getState().open,
-      mode: useGovernanceStore.getState().mode,
-      loading: useGovernanceStore.getState().loading,
-      busy: useGovernanceStore.getState().busy,
-      previewDigest: useGovernanceStore.getState().previewDigest,
-      canConfirm: useGovernanceStore.getState().canConfirm,
-      nextStep: useGovernanceStore.getState().nextStep,
-    },
     hint: chat.hint,
   };
 }

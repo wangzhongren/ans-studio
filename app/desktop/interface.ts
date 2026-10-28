@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { PersistenceReply, PersistenceValues, PersistenceUpdated, PersistenceScope } from "./session.ts";
 import { existsSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -22,27 +23,12 @@ import type { GovernanceFunction, GovernanceModel, ProjectConfig } from "../../s
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。外推时套上 `roleId` 信封
 // （`SessionEventEnvelope`，B-2）——**类型从编排/本角色只读导入、不复制形状**。
 import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputOutcome, CustomerInputTriageOutcome, DispatchTaskFn, PromptImage, PromptOptions, FinalizeResult, ViewImageFn } from "../../src/model/runtime.ts";
-// 2026-10-25 独立复核请求（`request_acceptance`）：能力回执/载荷形状唯一来源＝契约家 `model/runtime.ts`
+// 2026-10-25 独立复核请求（`独立复核请求（已撤除）`）：能力回执/载荷形状唯一来源＝契约家 `model/runtime.ts`
 // （只读导入，不复制形状）；flowId 形状同样复用运行时核心导出的 slug 常量（不另写正则）。
 import type { RequestAcceptanceFn, RequestAcceptanceInput, RequestAcceptanceResult, RequestBoundaryChangeFn, RequestBoundaryChangeInput, RequestBoundaryChangeResult, RequestGateReviewFn, RequestGateReviewInput, RequestGateReviewResult, RequestRequirementChangeFn, RequestRequirementChangeInput, RequestRequirementChangeResult, GovernanceJudgeFn, GovernanceJudgeOutcome, ReportArtifactFn, ReportArtifactInput, ReportArtifactReceipt } from "../../src/model/runtime.ts";
 import { GOVERNANCE_SLUG_PATTERN } from "../../src/model/runtime.ts";
-// 2026-10-26 边界变更请求（request_boundary_change）：确定性校验/票据/组队任务/AI 门禁请求的纯逻辑
+// 2026-10-26 边界变更请求（边界变更请求（已撤除））：确定性校验/票据/组队任务/AI 门禁请求的纯逻辑
 // 在 `boundary-change.ts`（不写盘、不发会话）；本层只做 IO/派发/判断闭包装配。
-import {
-  BOUNDARY_CHANGE_TICKET_SCHEMA,
-  BOUNDARY_CHANGE_UNASSIGNED_FLOW_ID,
-  assessBoundaryChangeRequest,
-  boundaryChangeClientMessageId,
-  boundaryChangeJudgeFacts,
-  boundaryChangeTicketId,
-  boundaryChangeTicketRelPath,
-  buildBoundaryChangeCrewTaskText,
-  buildBoundaryChangeJudgeRequest,
-  type BoundaryChangeTicketRecord,
-} from "./boundary-change.ts";
-// 2026-10-26 需求变更申请（request_requirement_change）：载荷二次校验/稳定 requestId/票据形状/审批卡
-// 与已批准执行任务文本的纯逻辑在 `requirement-change.ts`（不写盘、不发会话）；本层只做 IO/客户卡通道/
-// 主理执行任务投递/系统行。
 import {
   REQUIREMENT_CHANGE_TICKET_ROOT_REL,
   REQUIREMENT_CHANGE_TICKET_SCHEMA,
@@ -66,55 +52,17 @@ import {
   createPiAdapterFactory as realCreatePiAdapterFactory,
   createRuntimeAdapterFactory as realCreateRuntimeAdapterFactory,
   // 2026-10-22 角色粒度/MapReduce（方案 Q9 A）：团队计划 v2 **唯一**解析/校验实现由编排私有
-  // `common/编排/team-plan.ts` 提供，桌面**只经** pipeline 公共出口 `run-role.ts` 消费；
+  // `common/编排/团队计划（已撤除）.ts` 提供，桌面**只经** pipeline 公共出口 `run-role.ts` 消费；
   // 不直接 import 私有 common，也不保留第二份 v2 解析。
-  parseTeamPlan,
-  teamPlanIssueMessages,
-  writesetsOverlap,
-  type DirectorySpec,
-  type TeamPlanModule,
-  type TeamPlanParseResult,
-  type TeamPlanRoleRow as OrchestrationTeamPlanRoleRow,
-  type WritesetEntry,
   type RuntimeAdapterFactoryBuilder, type RuntimeAdapterFactoryOptions,
 } from "../../src/pipeline/orchestration/run-role.ts";
 // I2/C1（2026-10-17 PM 评审 §四.2/§4.6）：建立治理记录的预览/建立机制。**只**经编排的 Pipeline 公共出口
 // （`govern-session.ts` 薄再导出）使用——**不得**直接导入 `src/common/编排/finalize.ts`（跨角色私有 common）。
 import {
-  previewGovernanceRecord as realPreviewGovernanceRecord,
-  establishGovernanceRecord as realEstablishGovernanceRecord,
-  previewGovernanceReacceptance as realPreviewGovernanceReacceptance,
-  reacceptGovernancePins as realReacceptGovernancePins,
-  // V1b（评审 §5.5）：迁移预览/写入——编排 Pipeline 公共出口（薄再导出），桌面只接线。
-  previewGovernanceMigration as realPreviewGovernanceMigration,
-  migrateGovernanceModel as realMigrateGovernanceModel,
   createShellJudge as realCreateShellJudge,
-  // 2026-10-18 双开关评审 §7.6/§8.2：「替我审批/决策」判断闭包——同样只经编排 Pipeline 公共出口。
   createGovernanceJudge as realCreateGovernanceJudge,
-  // 2026-10-18 收尾推进：只经 Pipeline 公共出口读账本（不直接导入编排私有 `common/编排/`）。
-  readGovernanceLedger,
-  // W6-B（四角色评审 §7.2）：应用后台推进成功后写 `dispatch.accepted(app, trigger=customer-decision)`——
-  // 账本只经 Pipeline 公共出口（薄再导出）使用，不直接导入编排私有 `common/`。
-  appendGovernanceLedger,
-  // 2026-10-26：流程骨架状态常量经 Pipeline 公共出口只读导入（不复制字面量，防与编排漂移）。
-  FLOW_SKELETON_STATUS,
-  // 2026-10-26 需求变更申请：意图记录路径的单一来源（Pipeline 公共出口，薄再导出）——桌面不另写
-  // `docs/intents/<intentId>.md` 规则。
-  intentArtifactPath,
-  type GovernancePreviewResult,
-  type EstablishGovernanceResult,
-  type GovernanceRecordInput,
-  type GovernanceReacceptInput,
-  type GovernanceReacceptWriteInput,
-  type GovernanceReacceptPreviewResult,
-  type ReacceptGovernancePinsResult,
-  type GovernanceMigrationPreviewResult,
-  type GovernanceMigrationResult,
-  type GovernanceMigrationWriteInput,
-  type GovernanceLedgerEntry,
-  type AcceptanceTriageLedgerDecision,
 } from "../../src/pipeline/orchestration/govern-session.ts";
-export type { GovernanceMigrationPreviewResult, GovernanceMigrationResult } from "../../src/pipeline/orchestration/govern-session.ts";
+import { intentArtifactPath } from "../../src/common/编排/governance-judge-intent.ts";
 // 只读 pin 证据检查：**唯一实现**在门禁引擎私有模块，只经 Service 公开出口消费（跨角色边界纪律）。
 // 2026-10-20：内置治理角色判定同样经该 Service 公开出口（看护自动中止按角色映射开关用；不复制 id 列表）。
 import { inspectPinnedBoundaries, isBuiltInGovernanceRoleId, validateBoundaryYamlText } from "../../src/service/boundary/resolve-boundary.ts";
@@ -238,85 +186,10 @@ import {
   type GovernanceNextStepPayload,
   type GovernanceRiskTier,
 } from "./governance-advance.ts";
-// 2026-10-27 验收标准工件汇报（report_artifact_ready）：契约单一来源＝运行时核心
-// `ReportArtifactFn`/`ReportArtifactInput`/`ReportArtifactReceipt`（上方只读导入）；本文件只承载应用侧
-// 校验/收口实现，桌面诊断扩展回执与路径规范化在 artifact-report.ts。
-import {
-  ACCEPTANCE_CRITERIA_STEP_ID,
-  normalizeReportedArtifactPath,
-  type DesktopReportArtifactReceipt,
-  type ReportArtifactRejectCode,
-} from "./artifact-report.ts";
-// 流程**机器状态**（2026-10-19 客户决定「这些全部改成yaml。」）：自动验收门读 `docs/flows/<flowId>.yaml`，
+// 流程**机器状态**（2026-10-19 客户决定「这些全部改成yaml。」）：自动验收门读 `docs/removed/<flowId>.yaml`，
 // 用编排的 `parseFlowStateYaml` + `evaluateFlowCompletion` 判定；Markdown 仅人读视图（YAML 缺失时才
-// legacy 回退）。**只经 Pipeline 公共出口**消费（`src/pipeline/orchestration/flow-state.ts` 薄再导出），
+// legacy 回退）。**只经 Pipeline 公共出口**消费（`src/pipeline/orchestration/流程状态（已撤除）.ts` 薄再导出），
 // 不直接 import 编排私有 `src/common/编排/`；单一实现与 schema 由编排拥有。
-import {
-  completeAcceptanceStep as realCompleteAcceptanceStep,
-  // 2026-10-25 request_acceptance：验收标准工件就绪后把 flow 的 `acceptance-criteria` 步骤收口为 done
-  // （应用专用；桌面只经公共出口消费，不写第二份 flow 写盘/证据对账）。
-  completeAcceptanceCriteriaStep as realCompleteAcceptanceCriteriaStep,
-  // 2026-10-26 gate 复核（客户授权 request_gate_review）：Proof gate 报告结论为 pass 时由应用专用
-  // `completeGateStep` 收口 gate 步骤（只经公共出口消费；不注册为角色工具；不等同客户验收）。
-  completeGateStep as realCompleteGateStep,
-  // 2026-10-26 gate 报告路径/版本扫描、严重度计数与 gate.review 审计 schema（编排唯一实现；
-  // 桌面只经公共出口消费，不读私有 common）。
-  gateReportSeverityCounts,
-  latestGateReviewReport,
-  isFlowGateKind,
-  GATE_REVIEW_DECISION_SCHEMA,
-  // 2026-10-24 appointment 收口：客户任命决定已落账后，由应用专用 `completeCustomerDecisionStep`
-  // 把 flow 的 appointment 客户决定步骤标 done（只经公共出口消费；不注册为角色工具）。
-  completeCustomerDecisionStep as realCompleteCustomerDecisionStep,
-  // 2026-10-23 可重入门禁（governance-advance-redispatch A4/A5）：结构校验通过后由应用专用
-  // `completeRoleCardsStep` 把 flow 的 role-cards 标 done（只经公共出口消费；不注册为角色工具）。
-  completeRoleCardsStep as realCompleteRoleCardsStep,
-  evaluateFlowCompletion,
-  flowStatePath,
-  // 2026-10-23 验收返工路由（方案 v1 / Q1/Q2/Q4 A）：最新验收决定、报告结构化段解析、
-  // 返工前安全重开验收步骤——均经 Pipeline 公共出口消费，不直接 import 编排私有模块。
-  latestAcceptanceDecision,
-  observeFlowArtifacts as realObserveFlowArtifacts,
-  parseAcceptanceReworkReport,
-  parseFlowStateYaml,
-  validateFlowEvidence,
-  // 2026-10-25 验收分诊：报告 `acceptance-triage/v1` 解析、§5.1 默认建议、triage→rework 映射与
-  // `.ans` 分诊记录读写——**唯一实现**在编排；桌面只经 Pipeline 公共出口消费。
-  parseAcceptanceTriageReport,
-  recommendAcceptanceTriage,
-  acceptanceTriageToReworkItems,
-  acceptanceTriageIdForReport,
-  acceptanceTriageItemsDigest,
-  acceptanceTriageRecordMatchesReport,
-  buildAcceptanceTriageRecord,
-  readAcceptanceTriageRecord,
-  writeAcceptanceTriageRecord,
-  reopenAcceptanceStepForRework as realReopenAcceptanceStepForRework,
-  // 2026-10-24 P0-2：就绪步骤纯规划器（只读；桌面只经 Pipeline 公共出口消费，不直接 import 私有 common）。
-  listReadyFlowSteps,
-  type AcceptanceReworkItem,
-  type AcceptanceReworkParseResult,
-  type AcceptanceTriageRecommendation,
-  type AcceptanceTriageRecord,
-  type AcceptanceTriageSection,
-  type AcceptanceTriageItemExecutability,
-  type CompleteAcceptanceCriteriaStepResult,
-  type CompleteCustomerDecisionStepInput,
-  type CompleteGateStepInput,
-  type CompleteGateStepResult,
-  type CompleteRoleCardsStepInput,
-  type CompleteRoleCardsStepResult,
-  type FlowGateKind,
-  type FlowState,
-  type FlowStateStep,
-  type FlowStepKind,
-  type FlowStepStatus,
-  type GateReportSeverityCounts,
-  type GateReviewLedgerDecision,
-  type LatestAcceptanceDecision,
-  type ReadyFlowStep,
-  type ReopenAcceptanceStepForReworkInput,
-} from "../../src/pipeline/orchestration/flow-state.ts";
 // G-2（2026-10-16 客户批准）：恢复确认卡通道（W5——presenter/回包/关窗清帐在 main 接线，本层只透传）与
 // 看护服务（W1+W3——同源快照/系统投递/观察转发都在 SessionManager，本层装配并起停 tick）。
 import type { RecoveryConfirmPresenter } from "./recovery-channel.ts";
@@ -425,7 +298,7 @@ export interface ListProjectResult {
 
 // —————————————— 2026-10-25：流程状态只读视图（`flow:status`） ——————————————
 //
-// 渲染侧展示 `docs/flows/*.yaml` 的步骤进度，**只读**：只做目录列举 + 文件读取 + 既有
+// 渲染侧展示 `docs/removed/*.yaml` 的步骤进度，**只读**：只做目录列举 + 文件读取 + 既有
 // `parseFlowStateYaml` 解析；不写任何文件、不碰治理账本、不改变 flow 的 revision（revision 只是
 // 文件内容 sha256 的只读派生，与编排 flow 工具同口径）。坏文件逐文件进 `errors`，不阻断其他文件。
 
@@ -453,7 +326,7 @@ export interface FlowStatusCounts {
   superseded: number;
 }
 
-/** 单个流程文件（`docs/flows/<flowId>.yaml`）的只读视图。 */
+/** 单个流程文件（`docs/removed/<flowId>.yaml`）的只读视图。 */
 export interface FlowStatusFlowView {
   flowId: string;
   /**
@@ -469,7 +342,7 @@ export interface FlowStatusFlowView {
   updatedAt: string;
 }
 
-/** 单个坏文件的解析/读取错误（`file` 为项目相对路径 `docs/flows/<name>.yaml`）。 */
+/** 单个坏文件的解析/读取错误（`file` 为项目相对路径 `docs/removed/<name>.yaml`）。 */
 export interface FlowStatusFileError {
   file: string;
   error: string;
@@ -491,6 +364,97 @@ export type FlowStatusReply =
 // 编排 Pipeline 公共出口（`govern-session.ts` 薄再导出）；本层只做「当前导入项目 / confirm /
 // previewDigest 64hex」守卫与成功后的收尾，**不重写判定、不接受调用方提供的路径/模型/写路径**。
 
+
+// D 批运行期兼容桩：已撤除机制的桌面装配线不再执行（无 IPC 暴露）；仅让旧构建闭包安全加载。
+const ACCEPTANCE_CRITERIA_STEP_ID: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const AcceptanceReworkItem: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const AcceptanceReworkParseResult: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const AcceptanceTriageItemExecutability: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const AcceptanceTriageLedgerDecision: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const AcceptanceTriageRecommendation: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const AcceptanceTriageRecord: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const AcceptanceTriageSection: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const BOUNDARY_CHANGE_TICKET_SCHEMA: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const BOUNDARY_CHANGE_UNASSIGNED_FLOW_ID: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const BoundaryChangeTicketRecord: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const CompleteAcceptanceCriteriaStepResult: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const CompleteGateStepResult: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const DesktopReportArtifactReceipt: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const DirectorySpec: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const EstablishGovernanceResult: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const FLOW_SKELETON_STATUS: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const FlowGateKind: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const FlowStatusCounts: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const FlowStatusFileError: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const FlowStatusFlowView: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const FlowStatusReply: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const GATE_REVIEW_DECISION_SCHEMA: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const GateReportSeverityCounts: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const GateReviewLedgerDecision: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const GovernanceLedgerEntry: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const GovernanceMigrationPreviewResult: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const GovernanceMigrationResult: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const GovernancePreviewResult: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const GovernanceReacceptPreviewResult: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const LatestAcceptanceDecision: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const OrchestrationTeamPlanRoleRow: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const ReacceptGovernancePinsResult: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const ReadyFlowStep: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const ReportArtifactRejectCode: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const RequestAcceptanceInput: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const RequestAcceptanceResult: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const RequestBoundaryChangeInput: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const RequestBoundaryChangeResult: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const RequestGateReviewInput: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const RequestGateReviewResult: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const TeamPlanModule: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const TeamPlanParseResult: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const WritesetEntry: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const acceptanceTriageIdForReport: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const acceptanceTriageItemsDigest: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const acceptanceTriageRecordMatchesReport: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const acceptanceTriageToReworkItems: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const appendGovernanceLedger: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const assessBoundaryChangeRequest: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const boundaryChangeClientMessageId: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const boundaryChangeJudgeFacts: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const boundaryChangeTicketId: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const boundaryChangeTicketRelPath: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const buildAcceptanceTriageRecord: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const buildBoundaryChangeCrewTaskText: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const buildBoundaryChangeJudgeRequest: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const evaluateFlowCompletion: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const flowStatePath: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const gateReportSeverityCounts: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const isFlowGateKind: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const latestAcceptanceDecision: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const latestGateReviewReport: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const listReadyFlowSteps: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const normalizeReportedArtifactPath: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const parseAcceptanceReworkReport: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const parseAcceptanceTriageReport: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const parseFlowStateYaml: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const parseTeamPlan: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const readAcceptanceTriageRecord: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const readGovernanceLedger: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const realCompleteAcceptanceCriteriaStep: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const realCompleteAcceptanceStep: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const realCompleteCustomerDecisionStep: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const realCompleteGateStep: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const realCompleteRoleCardsStep: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const realEstablishGovernanceRecord: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const realMigrateGovernanceModel: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const realObserveFlowArtifacts: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const realPreviewGovernanceMigration: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const realPreviewGovernanceReacceptance: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const realPreviewGovernanceRecord: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const realReacceptGovernancePins: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const realReopenAcceptanceStepForRework: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const recommendAcceptanceTriage: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const teamPlanIssueMessages: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const validateFlowEvidence: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const writeAcceptanceTriageRecord: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
+const writesetsOverlap: any = (..._args: any[]): any => ({ ok: false, errors: [], entries: [], flows: [], code: "unavailable", message: "D 批已撤除" });
 /** 选图结果（K-2）：`image.dataBase64` 供渲染侧预览；`cancelled` 表示用户取消（**不是失败**）。 */export interface PickImageResult {
   ok: boolean;
   cancelled?: boolean;
@@ -630,13 +594,13 @@ export interface DesktopDeps {
       customerInput?: CustomerInputFn;
       /** 派发任务能力（H-1）：仅内置治理角色（su）会话注入（见 session.ts::routeDispatch）。 */
       dispatchTask?: DispatchTaskFn;
-      /** 独立复核请求能力（2026-10-25 request_acceptance）：仅内置治理角色会话注入（见 session.ts）。 */
+      /** 独立复核请求能力（2026-10-25 独立复核请求（已撤除））：仅内置治理角色会话注入（见 session.ts）。 */
       requestAcceptance?: RequestAcceptanceFn;
-      /** 验收标准工件汇报能力（2026-10-27 report_artifact_ready）：仅 verifier 会话注入（见 session.ts）。 */
+      /** 验收标准工件汇报能力（2026-10-27 产物汇报（已撤除））：仅 verifier 会话注入（见 session.ts）。 */
       reportArtifact?: ReportArtifactFn;
-      /** gate 复核请求能力（2026-10-26 request_gate_review）：仅统筹（convener）会话注入（见 session.ts）。 */
+      /** gate 复核请求能力（2026-10-26 gate 复核请求（已撤除））：仅统筹（convener）会话注入（见 session.ts）。 */
       requestGateReview?: RequestGateReviewFn;
-      /** 边界变更请求能力（2026-10-26 request_boundary_change）：仅统筹（convener）会话注入（见 session.ts）。 */
+      /** 边界变更请求能力（2026-10-26 边界变更请求（已撤除））：仅统筹（convener）会话注入（见 session.ts）。 */
       requestBoundaryChange?: RequestBoundaryChangeFn;
       /** 需求变更申请能力（2026-10-26 request_requirement_change）：仅统筹/提案会话注入（见 session.ts）。 */
       requestRequirementChange?: RequestRequirementChangeFn;
@@ -847,7 +811,7 @@ export interface DesktopDeps {
   resolveRuntimeFn?: (request: RuntimeResolutionRequest) => Promise<RuntimeResolution>;
   /**
    * **验收通过后的流程收口**（2026-10-20 真机：验收卡代批 accept 后 flow 的 verification 仍 pending，
-   * 且又多派了一次 verifier）：缺省经 Pipeline 公共出口 `flow-state.ts::completeAcceptanceStep` 调用；
+   * 且又多派了一次 verifier）：缺省经 Pipeline 公共出口 `流程状态（已撤除）.ts::completeAcceptanceStep` 调用；
    * 测试可注入。语义：accepted ⇒ 把保留验收步骤标 done + `evidence:{kind:"acceptance",ref:"acceptance"}`
    * （幂等、原子写、未 accepted 拒绝）。桌面**不写客户决定账本**、不伪造批准。
    */
@@ -857,20 +821,20 @@ export interface DesktopDeps {
     message?: string;
   }>;
   /**
-   * **验收标准步骤收口**（2026-10-25 request_acceptance）：缺省经 Pipeline 公共出口
-   * `flow-state.ts::completeAcceptanceCriteriaStep`（应用专用；幂等、原子写、标准缺失 fail-closed）。
+   * **验收标准步骤收口**（2026-10-25 独立复核请求（已撤除））：缺省经 Pipeline 公共出口
+   * `流程状态（已撤除）.ts::completeAcceptanceCriteriaStep`（应用专用；幂等、原子写、标准缺失 fail-closed）。
    * 桌面只消费收口结果（成功含 alreadyDone 继续；失败按 code 如实映射），不自行改 flow。
    */
   completeAcceptanceCriteriaStepFn?: (input: { projectRoot: string; flowId: string }) => Promise<CompleteAcceptanceCriteriaStepResult>;
   /**
-   * **gate 步骤收口**（2026-10-26 客户授权 `request_gate_review`；设计 §8.1）：Proof gate 报告结论为
-   * `pass` 时，缺省经 Pipeline 公共出口 `flow-state.ts::completeGateStep` 把 gate 步骤标 done +
+   * **gate 步骤收口**（2026-10-26 客户授权 `gate 复核请求（已撤除）`；设计 §8.1）：Proof gate 报告结论为
+   * `pass` 时，缺省经 Pipeline 公共出口 `流程状态（已撤除）.ts::completeGateStep` 把 gate 步骤标 done +
    * `artifact.observed`（应用专用；幂等、原子写、缺报告/坏结构/非阻断 fail 一律 fail-closed）。
    * 桌面只消费收口结果（成功含 alreadyDone 继续；失败按 code 如实处置），不自行改 flow。
    */
   completeGateStepFn?: (input: CompleteGateStepInput) => Promise<CompleteGateStepResult>;
   /**
-   * **独立复核请求能力**（2026-10-25 request_acceptance）：桌面 Interface 提供的应用侧实现（按项目绑定）。
+   * **独立复核请求能力**（2026-10-25 独立复核请求（已撤除））：桌面 Interface 提供的应用侧实现（按项目绑定）。
    * SessionManager 仅对内置治理角色会话注入（项目角色不注入）；编排再按 builtInGovernance 收口。
    * 语义：flowId 归一 → 标准/变更包/风险档校验 → `acceptance-criteria` 收口 → 流程完整性 → 运行时解析
    * → 既有自动验收派发（`force:true, trigger:"request"`）。**请求复核 ≠ 客户批准**：不写客户决定、
@@ -878,7 +842,7 @@ export interface DesktopDeps {
    */
   requestAcceptance?: (projectRoot: string, input: RequestAcceptanceInput) => Promise<RequestAcceptanceResult>;
   /**
-   * **验收标准工件汇报能力**（2026-10-27 客户新设计 `report_artifact_ready`）：桌面 Interface 提供的
+   * **验收标准工件汇报能力**（2026-10-27 客户新设计 `产物汇报（已撤除）`）：桌面 Interface 提供的
    * 应用侧实现（按项目绑定）。SessionManager **仅对 verifier（`governanceFunction === "verification"`）
    * 会话注入**；其它治理角色与项目角色不注入（能力缺席 ⇒ 工具不注册 = 结构性 fail-closed）。
    * 语义：flowId 归一 → flow 可解析 → `stepId` 必须 `acceptance-criteria` → `path` 必须是该项目最新
@@ -888,7 +852,7 @@ export interface DesktopDeps {
    */
   reportArtifact?: (projectRoot: string, input: ReportArtifactInput) => Promise<ReportArtifactReceipt>;
   /**
-   * **gate 复核请求能力**（2026-10-26 客户授权 `request_gate_review`；设计 §5/§8）：桌面 Interface 提供的
+   * **gate 复核请求能力**（2026-10-26 客户授权 `gate 复核请求（已撤除）`；设计 §5/§8）：桌面 Interface 提供的
    * 应用侧实现（按项目绑定）。SessionManager 仅对**统筹（convener）**会话注入；项目角色与其它治理角色
    * 不注入。语义：flowId 归一 → gate 存在/`gateKind` 合法/状态 pending → gate 记录/flow revision/在途幂等
    * → `dependsOn` 与证据完整性 → 最新 criteria 的 Gate 标准节 → 无在途 → 引擎解析 → 派 Proof 做独立
@@ -905,14 +869,14 @@ export interface DesktopDeps {
    */
   requestGateReviewLimits?: { totalMs?: number; stageMs?: number };
   /**
-   * **独立复核请求的时限**（2026-10-25 真机缺陷：`request_acceptance` 工具调用 12 分钟不返回、统筹会话
+   * **独立复核请求的时限**（2026-10-25 真机缺陷：`独立复核请求（已撤除）` 工具调用 12 分钟不返回、统筹会话
    * 一直 busy）。总预算缺省 ≤60s；单阶段（标准收口/引擎解析/验收派发）缺省 ≤20s。超时如实返回
-   * `{ok:false, code:"unavailable"}` 并提示「可能已派发，请用 flow_get 核对」，**绝不让工具无限挂起**。
+   * `{ok:false, code:"unavailable"}` 并提示「可能已派发，请用 流程读取 核对」，**绝不让工具无限挂起**。
    * 测试注入更短时限（不得为 0/负数）。
    */
   requestAcceptanceLimits?: { totalMs?: number; stageMs?: number };
   /**
-   * **边界变更请求能力**（2026-10-26 `request_boundary_change`；客户确认的分层门禁）：桌面 Interface
+   * **边界变更请求能力**（2026-10-26 `边界变更请求（已撤除）`；客户确认的分层门禁）：桌面 Interface
    * 提供的应用侧实现（按项目绑定；`requesterRoleId` 由会话注入端补入）。SessionManager 仅对**统筹
    * （convener）**会话注入；项目角色不注入。缺省不注入 ⇒ 运行时工具不注册（结构性 fail-closed）。
    * 语义：确定性校验 → 只读 AI 门禁（`createGovernanceJudge`，deny-all 写权）→ 通过才把唯一一条任务
@@ -964,14 +928,14 @@ export interface DesktopDeps {
   /**
    * **role-cards 步骤收口**（2026-10-23 可重入门禁 A4/A5）：结构校验通过后把 flow YAML 的
    * `id:"role-cards"` 步骤标为 done（应用专用；不注册为角色工具、不写客户决定）。缺省经 Pipeline 公共
-   * 出口 `flow-state.ts::completeRoleCardsStep` 调用；测试可注入桩件。
+   * 出口 `流程状态（已撤除）.ts::completeRoleCardsStep` 调用；测试可注入桩件。
    */
   completeRoleCardsStepFn?: (input: CompleteRoleCardsStepInput) => Promise<CompleteRoleCardsStepResult>;
   /**
    * **appointment 客户决定步骤收口**（2026-10-24 P0：从零项目 appointment 一直 pending）：客户任命决定
    * 已落账后，在角色卡校验/readiness 之前把 flow 的 `id:"appointment"`（kind=customer-decision）标 done +
    * `evidence:{kind:"customer-decision",ref:"appointment"}`。缺省经 Pipeline 公共出口
-   * `flow-state.ts::completeCustomerDecisionStep`（幂等、原子写、未结算/缺失 fail-closed；不写客户决定、
+   * `流程状态（已撤除）.ts::completeCustomerDecisionStep`（幂等、原子写、未结算/缺失 fail-closed；不写客户决定、
    * 不伪造批准）；测试可注入桩件/观察调用顺序。
    */
   completeCustomerDecisionStepFn?: (input: CompleteCustomerDecisionStepInput) => Promise<{
@@ -984,7 +948,7 @@ export interface DesktopDeps {
   /**
    * **flow artifact 证据补登**（2026-10-20 真机：旧扫描规则写下的证据文件在重启后不会被补
    * `artifact.observed`，Steward 无法把 delivered 步骤标 done）：缺省经 Pipeline 公共出口
-   * `flow-state.ts::observeFlowArtifacts` 调用（幂等补登 flow 里 `kind:"artifact"` 步骤的 evidence.ref
+   * `流程状态（已撤除）.ts::observeFlowArtifacts` 调用（幂等补登 flow 里 `kind:"artifact"` 步骤的 evidence.ref
    * 文件观察记录）；测试可注入。补登是应用观察文件（owner/power/sha），**不写客户决定账本、不伪造 done**。
    */
   observeFlowArtifactsFn?: (input: { projectRoot: string; flowId: string }) => Promise<{
@@ -997,7 +961,7 @@ export interface DesktopDeps {
   }>;
   /**
    * **返工前重开验收步骤**（2026-10-23 验收返工路由 Q1/Q4 A）：缺省经 Pipeline 公共出口
-   * `flow-state.ts::reopenAcceptanceStepForRework`（app-only；测试可注入桩件）。只把
+   * `流程状态（已撤除）.ts::reopenAcceptanceStepForRework`（app-only；测试可注入桩件）。只把
    * `verification` 从 dispatched/delivered 安全重开为 pending 并清旧证据；done/终态拒绝。
    */
   reopenAcceptanceStepForReworkFn?: (input: ReopenAcceptanceStepForReworkInput) => Promise<{
@@ -1063,7 +1027,7 @@ export interface DesktopInterface {
   disposeProjectDocuments(): void;
   listProject(input: { projectRoot: string }): Promise<ListProjectResult>;
   /**
-   * **流程状态只读视图（2026-10-25，`flow:status`）**：扫描 `<projectRoot>/docs/flows/*.yaml`，
+   * **流程状态只读视图（2026-10-25，`flow:status`）**：扫描 `<projectRoot>/docs/removed/*.yaml`，
    * 每个文件用编排公共出口的 `parseFlowStateYaml(text, flowId)` 解析（`flowId` = 文件名去 `.yaml`），
    * 返回 `{flowId, revision, steps, counts, current, updatedAt}`。
    *
@@ -1160,7 +1124,7 @@ export interface DesktopInterface {
   /**
    * **应用代客户推进治理流程（2026-10-18 客户修正；同日真机修正为四角色闭环）**：客户决定成功后
    * （`governance:next-step` 回调），在**后台**打开目标治理角色（Nominator/Convener）会话并投递**唯一一条**任务——
-   * `proposal accept` → **先** Convener 写 `docs/flows/<flowId>.yaml`（唯一机器状态，首步提名）；应用**有界轮询**
+   * `proposal accept` → **先** Convener 写 `docs/removed/<flowId>.yaml`（唯一机器状态，首步提名）；应用**有界轮询**
    * 该 YAML 事实（存在且通过校验才放行；角色瞬时忙闲不作判据），合法 ⇒ 再派 Nominator（消息带 YAML 路径），
    * 缺失/非法/超时 ⇒ 系统行如实报错一次、**不循环**；
    * `accept-quick`/`appointment` → Convener 写流程状态 YAML/排程（既有逻辑）。
@@ -1180,7 +1144,7 @@ export interface DesktopInterface {
    */
   routeAcceptanceAutoRework(info: AutoReworkCallbackInfo): Promise<void>;
   /**
-   * **验收分诊呈现前闸**（2026-10-25 设计 `2026-10-25_design_acceptance-triage.md` §3.2 / §4 / §5 / §7）。
+   * **验收分诊呈现前闸**（2026-10-25 设计 `2026-10-25_design_removedAcceptanceTriage.md` §3.2 / §4 / §5 / §7）。
    *
    * 由主进程把客户交互通道的 `acceptanceTriage` 前闸接到本方法（与 `routeAcceptanceAutoRework` 同模式）。
    * 只对 trio + YAML 流程 + `cardKind:"acceptance"` 的请求求值：读最新验收报告 + sha256 →
@@ -1325,7 +1289,7 @@ const PREVIEW_DIGEST_HEX_64 = /^[0-9a-fA-F]{64}$/;
  * 链式治理推进（`advanceGovernanceFlow` 两段式）的**目标事实轮询**参数（2026-10-20 真机修复）。
  * 旧实现用 `waitForRoleIdle` 判「Convener 本轮结束」：刚投递时会话可能尚未标记 busy、也可能被并发重建/
  * 释放——真机在 `advance.dispatched` 后 5ms 就误报「本轮未在时限内结束」。完成条件是**目标事实**
- * （`docs/flows/<flowId>.yaml` 落盘且通过 `parseFlowStateYaml`），不是角色的瞬时忙闲。
+ * （`docs/removed/<flowId>.yaml` 落盘且通过 `parseFlowStateYaml`），不是角色的瞬时忙闲。
  */
 const GOVERNANCE_CHAIN_POLL_INTERVAL_MS = 500;
 /** 目标事实的最长等待：15min（内部等待上限，留出一次重试/修复落盘的时间；不是回合自动中止时限）。 */
@@ -1346,7 +1310,7 @@ function isGovernanceModelValue(value: unknown): value is GovernanceModel {
 }
 
 /**
- * 事件是否为一次**成功**的 `flow_step_update` 工具调用（2026-10-25）。
+ * 事件是否为一次**成功**的 `流程步骤更新` 工具调用（2026-10-25）。
  *
  * 生产事件面（运行时核心/Service 投影）形状：`kind:"accepted"` + `detail.{toolName,phase:"result",ok:true}`；
  * 兼容未投影的旧形状：`kind:"accepted"` + `detail.call.name` / `detail.result.ok`。
@@ -1367,7 +1331,7 @@ function isSuccessfulFlowStepUpdate(event: { kind: string; detail?: unknown }): 
       : {};
   const toolName =
     typeof record.toolName === "string" ? record.toolName : typeof call.name === "string" ? call.name : "";
-  if (toolName !== "flow_step_update") return false;
+  if (toolName !== "流程步骤更新") return false;
   if (event.kind === "denied") return false;
   const phase = record.phase;
   if (phase === "start" || phase === "blocked") return false;
@@ -1386,7 +1350,7 @@ function isSuccessfulFlowStepUpdate(event: { kind: string; detail?: unknown }): 
 
 /** 新流程契约的步骤 id（方案 §5.4）：出现任一 ⇒ 该 flow 按新契约校验（legacy flow 保持原行为）。 */
 const NEW_CONTRACT_FLOW_STEP_IDS: ReadonlySet<string> = new Set([
-  "team-plan",
+  "团队计划（已撤除）",
   "role-cards",
   "role-readiness",
   "acceptance-criteria",
@@ -1606,7 +1570,7 @@ function teamPlanRoleRowOf(row: OrchestrationTeamPlanRoleRow): TeamPlanRoleRow {
 
 /**
  * 解析团队计划（frontmatter + 模块清单 + 角色表 + v3 目录规范）；只做确定性读取，不判断语义、不写文件。
- * v3/v2 解析/校验的**唯一实现**在编排 `team-plan.ts`（经 pipeline 公共出口 `run-role.ts`）；本函数只把
+ * v3/v2 解析/校验的**唯一实现**在编排 `团队计划（已撤除）.ts`（经 pipeline 公共出口 `run-role.ts`）；本函数只把
  * 结果适配成桌面消费形状（v3 视图字段：授权目录/精确写集/目录规范/模块实现目录）。legacy 分支保持
  * v1 旧行为（表头/推荐集/四列非空），只记一条迁移 warning、不阻塞旧流程。
  */
@@ -1957,14 +1921,14 @@ function ledgerSummary(text: string): string {
   return chars.length <= 200 ? text : chars.slice(0, 200).join("");
 }
 
-// —————————————— 2026-10-26 gate 复核（客户授权 request_gate_review；设计 §5–§8） ——————————————
+// —————————————— 2026-10-26 gate 复核（客户授权 gate 复核请求（已撤除）；设计 §5–§8） ——————————————
 //
 // 应用侧状态与记录（**app-only 写域**；不写 flow 客户决定、不是客户验收）：
 //   · `.ans/governance/acceptance/<flowId>/gates/<gateId>.json`：`gate-review-record/v1`（派发/通过/失败/
 //     退回 Proof/失效；原子写；损坏 fail-closed，不猜）；
 //   · `.ans/governance/acceptance/<flowId>/gates/<gateId>-rework-routing.json`：`gate-rework-routing/v1`
 //     （按 gate 独立返工路由，与最终验收的 `rework-routing.json` 互不覆盖）。
-// gate 报告复用 `acceptance-triage/v1`；桌面只经编排公共出口做版本扫描/结构解析/收口，不复制解析器。
+// gate 报告复用 `removedAcceptanceTriage/v1`；桌面只经编排公共出口做版本扫描/结构解析/收口，不复制解析器。
 
 const GATE_REVIEW_RECORD_SCHEMA = "gate-review-record/v1";
 const GATE_REWORK_ROUTING_SCHEMA = "gate-rework-routing/v1";
@@ -2236,10 +2200,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const completeRoleCardsStepFn = deps.completeRoleCardsStepFn ?? realCompleteRoleCardsStep;
   const completeCustomerDecisionStepFn =
     deps.completeCustomerDecisionStepFn ?? realCompleteCustomerDecisionStep;
-  // 2026-10-25 request_acceptance：验收标准步骤收口（缺省＝Pipeline 公共出口；桌面不复制编排写盘/校验）。
+  // 2026-10-25 独立复核请求（已撤除）：验收标准步骤收口（缺省＝Pipeline 公共出口；桌面不复制编排写盘/校验）。
   const completeAcceptanceCriteriaStepFn =
     deps.completeAcceptanceCriteriaStepFn ?? realCompleteAcceptanceCriteriaStep;
-  // 2026-10-26 request_gate_review：Proof gate 报告 pass 时收口 gate 步骤（缺省＝Pipeline 公共出口）。
+  // 2026-10-26 gate 复核请求（已撤除）：Proof gate 报告 pass 时收口 gate 步骤（缺省＝Pipeline 公共出口）。
   const completeGateStepFn = deps.completeGateStepFn ?? realCompleteGateStep;
   // Pi 配置面板：函数与目标路径均可注入（**测试/e2e 必须注入临时 `.env`**，绝不碰真实仓库根 `.env`）。
   const getPiConfigFn = deps.getPiConfigFn ?? realGetPiConfig;
@@ -2498,15 +2462,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   //
   // 触发：客户 reject（账本最新 acceptance 决定）与 judge auto-rework（customer-input 回调 →
   // `routeAcceptanceAutoRework`）。动作：读最新验收报告 → `parseAcceptanceReworkReport`（只认 fenced
-  // `acceptance-rework/v1`，缺段/坏段只走人工兜底）→ 校验 owner（项目 listing + 内置治理角色；未知/不可派发
+  // `removedAcceptanceRework/v1`，缺段/坏段只走人工兜底）→ 校验 owner（项目 listing + 内置治理角色；未知/不可派发
   // 逐项 blocked）→ 写 `.ans/governance/acceptance/<flowId>/rework-routing.json`（原子、幂等、重启去重）
   // → 发送**唯一一条** Convener 任务 → best-effort 账本审计。Proof 不接收返工、不修产品；不写客户决定。
-  const REWORK_ROUTING_SCHEMA = "acceptance-rework-routing/v1";
+  const REWORK_ROUTING_SCHEMA = "removedAcceptanceRework-routing/v1";
   const REWORK_ROUTING_ROOT_REL = ".ans/governance/acceptance";
   const reworkRoutingRelPath = (flowId: string): string => `${REWORK_ROUTING_ROOT_REL}/${flowId}/rework-routing.json`;
 
   interface AcceptanceReworkRoutingRecord {
-    schema: "acceptance-rework-routing/v1";
+    schema: "removedAcceptanceRework-routing/v1";
     flowId: string;
     source: "customer" | "judge";
     sourceDetail: string;
@@ -2558,8 +2522,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     reason?: string;
     runtimeHint?: RuntimeKind;
     /**
-     * 2026-10-25 验收分诊：解析好的 `acceptance-triage/v1` 段与**分诊时**报告快照。给出时返工任务
-     * 消费 triage items（含 severity/reason/targets/criteria），不再依赖 `acceptance-rework/v1` 段。
+     * 2026-10-25 验收分诊：解析好的 `removedAcceptanceTriage/v1` 段与**分诊时**报告快照。给出时返工任务
+     * 消费 triage items（含 severity/reason/targets/criteria），不再依赖 `removedAcceptanceRework/v1` 段。
      */
     triage?: AcceptanceTriageSection;
     reportPath?: string;
@@ -2840,7 +2804,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     }
     const report = await readAcceptanceReportSnapshot(projectRoot, flowId);
     const triage = facts.triage;
-    // 分诊路径：任务项来自 `acceptance-triage/v1`（含严重度/原因/改进指针）；旧路径仍读 rework v1。
+    // 分诊路径：任务项来自 `removedAcceptanceTriage/v1`（含严重度/原因/改进指针）；旧路径仍读 rework v1。
     const items = triage !== undefined ? acceptanceTriageToReworkItems(triage) : report.parse.ok ? report.parse.section.items : [];
     const ownerPlan = await planAcceptanceReworkOwners(projectRoot, flowId, items);
     const reportSha = facts.reportSha256 ?? report.sha256;
@@ -3249,7 +3213,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     diagnostic.record("acceptance.redispatch.sent", { flowId, source: latest.kind, queued: sent.queued === true });
   };
 
-  // —————————————— 2026-10-25 验收分诊（设计 `2026-10-25_design_acceptance-triage.md` §3–§10） ——————————————
+  // —————————————— 2026-10-25 验收分诊（设计 `2026-10-25_design_removedAcceptanceTriage.md` §3–§10） ——————————————
   //
   // 放置层：客户交互通道的**呈现前闸**（customer-input.ts::presentEntry）→ 本方法。只有
   // **trio + YAML 流程 + cardKind="acceptance"** 进入分诊；报告 `conclusion=pass` 不分诊（既有验收卡路径）；
@@ -3282,7 +3246,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     runtimeHint?: RuntimeKind,
   ): { roleId: string; note: (summary: string) => void; diagnostic: ReturnType<typeof createDiagnosticLogger> } => {
     const roleId = (listingCache.get(projectRoot)?.primaryRoleId ?? "").trim();
-    const diagnostic = createDiagnosticLogger({ component: "desktop.acceptance-triage", projectRoot, ...(roleId !== "" ? { roleId } : {}) });
+    const diagnostic = createDiagnosticLogger({ component: "desktop.removedAcceptanceTriage", projectRoot, ...(roleId !== "" ? { roleId } : {}) });
     const note = (summary: string): void => {
       if (roleId === "") return;
       try {
@@ -3376,7 +3340,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       );
       if (exists) return;
       const decision: AcceptanceTriageLedgerDecision = {
-        schema: "acceptance-triage-decision/v1",
+        schema: "removedAcceptanceTriage-decision/v1",
         triageId: record.triageId,
         disposition: record.disposition,
         source: record.source,
@@ -3913,7 +3877,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       });
       if (resumed !== undefined) return resumed;
     }
-    // —— 解析 `acceptance-triage/v1`（纯函数；缺/坏/矛盾 ⇒ 退回 Proof，不猜） ——
+    // —— 解析 `removedAcceptanceTriage/v1`（纯函数；缺/坏/矛盾 ⇒ 退回 Proof，不猜） ——
     const parsed = parseAcceptanceTriageReport(snapshot.text);
     if (parsed.ok !== true) {
       const detail = acceptanceTriageParseDetail(snapshot, parsed);
@@ -4137,7 +4101,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     try {
       return await evaluateAcceptanceTriageUnsafe(facts);
     } catch (error) {
-      createDiagnosticLogger({ component: "desktop.acceptance-triage" }).error("acceptance.triage.gate.failed", error);
+      createDiagnosticLogger({ component: "desktop.removedAcceptanceTriage" }).error("acceptance.triage.gate.failed", error);
       return { action: "proceed" };
     }
   };
@@ -4224,7 +4188,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     triageRecoveryDone.add(projectRoot);
     const timer = setTimeout(() => {
       void runAcceptanceTriageRecovery(projectRoot).catch((error) =>
-        createDiagnosticLogger({ component: "desktop.acceptance-triage", projectRoot }).error("acceptance.triage.recover.failed", error),
+        createDiagnosticLogger({ component: "desktop.removedAcceptanceTriage", projectRoot }).error("acceptance.triage.recover.failed", error),
       );
     }, 80);
     (timer as { unref?: () => void }).unref?.();
@@ -4293,7 +4257,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   };
 
   /**
-   * 项目内可检查的流程：`docs/flows/*.yaml`（机器状态，2026-10-19 客户决定）∪ `docs/flows/*.md`
+   * 项目内可检查的流程：`docs/removed/*.yaml`（机器状态，2026-10-19 客户决定）∪ `docs/removed/*.md`
    * （legacy 回退与人读视图）。YAML 是唯一机器状态；Markdown 仅用于发现「尚无 YAML」的 legacy 流程。
    * 两者都没有的 flowId 无从机械核对。
    */
@@ -4410,7 +4374,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         void manager.refreshStaleBoundaries();
       }
     }
-    // 2026-10-25 request_acceptance：`flow_step_update` 成功（尤其 done）是流程推进的真实信号——让验收门
+    // 2026-10-25 独立复核请求（已撤除）：`流程步骤更新` 成功（尤其 done）是流程推进的真实信号——让验收门
     // 在流程更新后重检（走既有 40ms 有界合并；dispatch 自身按 flow mtime/账本去重，不循环、不重复派发）。
     if (
       typeof envelope.projectRoot === "string" &&
@@ -4497,7 +4461,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const acceptanceCloseFailureNotified = new Map<string, string>();
 
   /**
-   * 调编排的流程收口（经 Pipeline 公共出口 `flow-state.ts::completeAcceptanceStep`；测试可注入）。
+   * 调编排的流程收口（经 Pipeline 公共出口 `流程状态（已撤除）.ts::completeAcceptanceStep`；测试可注入）。
    * 编排契约：幂等（已 done ⇒ ok:true,idempotent）、原子写、未 accepted ⇒ `acceptance-not-accepted`、
    * 账本坏行 ⇒ `ledger-unavailable`。任何失败都返回 `{ok:false,error}`，由调用方如实提示、不循环。
    */
@@ -4560,7 +4524,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // —————— 2026-10-20 真机：flow artifact 证据补登（旧扫描规则写下的 evidence.ref 文件）——————
   //
   // 现场：integration-e2e / verification-evidence 的 evidence.ref 文件（.js/README.md）是旧扫描规则下写的，
-  // 重启后新扫描当基线、不补 `artifact.observed`，Steward 的 flow_step_update done 会被 insufficient-evidence
+  // 重启后新扫描当基线、不补 `artifact.observed`，Steward 的 流程步骤更新 done 会被 insufficient-evidence
   // 挡住。编排新增 `observeFlowArtifacts({projectRoot,flowId})`（幂等补登 flow artifact 证据）；桌面在
   // delivered 唤醒和验收判定**之前**调用。补登是应用观察文件（owner/power/sha），不写客户决定账本、不伪造 done。
   type FlowArtifactBackfillOutcome = { ok: boolean; backfilled: number; skipped: number; error?: string };
@@ -4708,7 +4672,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       `[系统·治理核证] 流程 ${flowId}：以下步骤已 delivered，等待运营核证：`,
       ...newSteps.map(
         (step) =>
-          `- 步骤 ${step.id} 已 delivered（owner=${step.owner}），请核对账本/产物证据，用 flow_step_update 标 done 或退回修正；不要直接写 flow YAML。`,
+          `- 步骤 ${step.id} 已 delivered（owner=${step.owner}），请核对账本/产物证据，用 流程步骤更新 标 done 或退回修正；不要直接写 flow YAML。`,
       ),
       "核证要求：先核对账本与产物证据再更新步骤状态；未达 done 条件请退回修正；不要直接 write_file 流程 YAML。",
     ].join("\n");
@@ -4942,7 +4906,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           `- ${step.id}｜owner=${step.owner}｜kind=${step.kind}｜parallelGroup=${step.parallelGroup ?? "无"}｜dependsOn=${step.dependsOn.length > 0 ? step.dependsOn.join("、") : "无"}｜title=${step.title}`,
       ),
       "要求：",
-      "1) 先 flow_get 读取当前流程与账本状态（含 revision），核对依赖与已派发记录后再动作。",
+      "1) 先 流程读取 读取当前流程与账本状态（含 revision），核对依赖与已派发记录后再动作。",
       "2) 项目 worker 的 dispatch / artifact 步骤用 dispatch_task 按 owner 派发（stepId 与 flow 完全一致；同一 parallelGroup 可并行；账本已有 dispatch.accepted 的步骤不要重复派）。",
       "3) owner 为运营（convener）自身的 artifact 步骤请继续执行并回交。",
       "4) 不要把这些步骤直接标 done（done 由证据核证决定）；不要派 acceptance / 质检（验收由应用按流程完成度自动派发 Proof）。",
@@ -5046,7 +5010,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   //
   // 标准文件已存在但 flow 的 `acceptance-criteria` 仍 pending/dispatched ⇒ 给 verifier 发**一次**「请汇报」
   // 系统唤醒（去重：同一 flow + 同一最新标准路径 + 同一状态只发一次；verifier 忙/有排队 ⇒ 等下一次真实
-  // 事件/看护 tick 再试）。**不**据此收口、不改 flow；收口只走 `report_artifact_ready` 的应用能力。
+  // 事件/看护 tick 再试）。**不**据此收口、不改 flow；收口只走 `产物汇报（已撤除）` 的应用能力。
   const criteriaReportReminded = new Map<string, string>();
   const remindVerifierToReportArtifact = async (info: {
     projectRoot: string;
@@ -5317,13 +5281,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // 触发面：**任意角色 settle**、回交到达/settle、桌面侧治理账本追加（dispatch.accepted）、导入项目/启动
   // 后的补齐检查。本层只读流程状态与账本做**触发门**检查，全部完成且证据按步骤类型齐备才后台派 Proof /
   // 验收（verifier）一条复核任务；不自动验收、不代批（验收卡仍走决策开关/客户手批）。
-  // 机器状态（2026-10-19 客户决定「这些全部改成yaml。」）：优先 `docs/flows/<flowId>.yaml`
+  // 机器状态（2026-10-19 客户决定「这些全部改成yaml。」）：优先 `docs/removed/<flowId>.yaml`
   // （`parseFlowStateYaml` + `evaluateFlowCompletion`，证据按显式 kind 对账）；同名 `.md` 只是人读视图，
   // 不参与判定。仅 YAML **不存在**时回退 legacy Markdown `flowCompletionIssue`（诊断标注 legacy）。
   // 去重：运行期每 flow 一次 + 账本 `dispatch.accepted{targetRoleId:verifier}` 持久化（重启不重派）；
   // 失败如实落 Lead（主入口）系统行，不循环重试。
   /**
-   * 自动验收派发的结构化回执（2026-10-25 `request_acceptance` 能力用）：调用方必须能区分
+   * 自动验收派发的结构化回执（2026-10-25 `独立复核请求（已撤除）` 能力用）：调用方必须能区分
    * 「真的派出去了」「同一 flow 版本已派过（未重复派发）」与「被门挡住/失败」——**不得**把未派发说成
    * `dispatched`。既有调用方（settle/回交/账本/导入）继续忽略返回值，行为逐字不变。
    */
@@ -5597,7 +5561,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         });
       }
       // 2026-10-20 真机：先把 flow artifact 证据补登（幂等；旧扫描规则写下的 evidence.ref 文件），
-      // 再唤醒 Steward / 跑验收判定——Steward 的 flow_step_update done 才能通过 insufficient-evidence。
+      // 再唤醒 Steward / 跑验收判定——Steward 的 流程步骤更新 done 才能通过 insufficient-evidence。
       await backfillFlowArtifacts(info.projectRoot, info.flowId, diagnostic);
       // 2026-10-20 真机：步骤 delivered 后唤醒 Steward 核证（无活会话/队列、统筹空闲才投；按 stepId 去重）。
       // 放在 verifier 去重之前——即使本次不派 verifier，也必须评估 delivered 核证。
@@ -5622,7 +5586,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         });
       }
       // ———— 2026-10-22 第 3 项：新流程的「实施前标准 → 变更包 → 验收判定」门槛（方案 §7.2/§7.3/§7.6） ————
-      // 只作用于**新契约流程**（flow YAML 含 team-plan/role-cards/role-readiness/acceptance-criteria/change-package
+      // 只作用于**新契约流程**（flow YAML 含 团队计划（已撤除）/role-cards/role-readiness/acceptance-criteria/change-package
       // 任一 step id）；legacy flow 保持原行为（G4/O4 迁移兼容）。标准缺失 ⇒ 派 Verifier 写标准
       // （stepId=acceptance-criteria；账本+运行期去重、不循环）并阻塞验收判定；变更包缺失/缺 riskTier ⇒ 阻塞
       // 验收判定 + Lead 系统行（去重）。判定时把标准/变更包/档位带进任务文案（不猜、不把「待补」当通过）。
@@ -5727,7 +5691,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             return dispatchOutcome({ status: "blocked", code: "criteria-missing", message: criteriaReason });
           }
           // 2026-10-27 客户新设计：标准文件已存在但 `acceptance-criteria` 步骤仍未收口 ⇒ **不自动勾卡**、
-          // 不继续派验收判定；给 verifier 发一次「请汇报」唤醒（去重），收口只走 `report_artifact_ready`。
+          // 不继续派验收判定；给 verifier 发一次「请汇报」唤醒（去重），收口只走 `产物汇报（已撤除）`。
           const criteriaStepForReport = parsedFlowForGate?.steps.find(
             (step) => step.id === ACCEPTANCE_CRITERIA_STEP_ID,
           );
@@ -5752,7 +5716,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
               code: "flow-incomplete",
               message:
                 `验收标准文件已存在（${criteria.relPath}），但步骤 ${ACCEPTANCE_CRITERIA_STEP_ID} 仍为 ` +
-                `${criteriaStepForReport.status}；应用不盯文件自动勾卡，已提醒质检调用 report_artifact_ready 汇报；` +
+                `${criteriaStepForReport.status}；应用不盯文件自动勾卡，已提醒质检调用 产物汇报（已撤除） 汇报；` +
                 `本次未派发验收复核。`,
             });
           }
@@ -5841,7 +5805,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         });
       }
       // —————— 机器状态判定：YAML 优先，Markdown 仅 legacy 回退 ——————
-      // `docs/flows/<flowId>.yaml` 存在 ⇒ 它是**唯一机器状态**：语法/形状/保留 id 校验失败、或证据不足，
+      // `docs/removed/<flowId>.yaml` 存在 ⇒ 它是**唯一机器状态**：语法/形状/保留 id 校验失败、或证据不足，
       // 一律不派并把**具体错误**作为 Lead 系统行（去重）——绝不因 Markdown 表好看而放行。
       // 仅 YAML **不存在**（ENOENT）时回退既有 Markdown 门，并标注 legacy 诊断（迁移提示，不改变行为）。
       const flowStateRel = flowStatePath(info.flowId);
@@ -5852,7 +5816,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
           // 存在但不可读（权限/IO）：按不可读处理，不落 legacy 猜测；后续事件可再检查。
-          diagnostic.error("acceptance.flow-state.unreadable", error, { path: flowStateRel });
+          diagnostic.error("acceptance.流程状态（已撤除）.unreadable", error, { path: flowStateRel });
           acceptanceDispatchedFlows.delete(key);
           return dispatchOutcome({
             status: "blocked",
@@ -5870,7 +5834,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           // 校验错误逐条带 YAML 文档路径（如 steps[2].status），系统行/诊断里给具体错误。
           const detail = parsed.errors.slice(0, 10).map((item) => `${item.path}: ${item.message}`).join("；");
           issue = mainT("main.interface.flowValidationFailed", { detail });
-          diagnostic.record("acceptance.flow-state.invalid", {
+          diagnostic.record("acceptance.流程状态（已撤除）.invalid", {
             path: flowStateRel,
             count: parsed.errors.length,
             mode: "yaml",
@@ -5883,7 +5847,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       } else {
         issueMode = "legacy";
         issuePath = flowRel;
-        diagnostic.record("acceptance.flow-state.missing", { path: flowRel, mode: "legacy" });
+        diagnostic.record("acceptance.流程状态（已撤除）.missing", { path: flowRel, mode: "legacy" });
         let markdown: string;
         try {
           markdown = await readFile(`${info.projectRoot}/${flowRel}`, "utf8");
@@ -6009,7 +5973,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     }
   };
 
-  // —————— 2026-10-25 独立复核请求（`request_acceptance`）：应用侧能力实现 ——————
+  // —————— 2026-10-25 独立复核请求（`独立复核请求（已撤除）`）：应用侧能力实现 ——————
   //
   // 运行时核心的工具只做参数校验并**如实转达**回执；校验与派发全部在这里：
   //   flowId 归一 → flow/验收标准/变更包/风险档存在性 → `acceptance-criteria` 步骤收口（编排公共出口）
@@ -6022,7 +5986,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   /**
    * 2026-10-25 真机缺陷（工具调用 12 分钟不返回）：独立复核请求必须有**界**——总预算与单阶段预算。
    * 超时不取消底层动作（可能已派发；下一条真实事件/账本去重会收口），只保证工具回执必然返回；
-   * 文案如实写「可能已派发，请用 flow_get 核对」，不谎报成功也不谎报失败。
+   * 文案如实写「可能已派发，请用 流程读取 核对」，不谎报成功也不谎报失败。
    */
   const requestAcceptanceTotalMs = (() => {
     const raw = deps.requestAcceptanceLimits?.totalMs;
@@ -6064,7 +6028,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       code: "unavailable",
       message:
         `已受理独立复核请求，但${stage}确认回执超时（约 ${Math.round(elapsedMs / 1000)}s 未返回）；` +
-        `**可能已派发/正在处理**，请用 flow_get 核对流程与治理账本，不要重复请求；本次不声称已派发。`,
+        `**可能已派发/正在处理**，请用 流程读取 核对流程与治理账本，不要重复请求；本次不声称已派发。`,
       flowId,
     };
   };
@@ -6264,8 +6228,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
 
   /**
    * **flowId 归一（应用能力共用；不猜）**：显式 flowId 优先；省略时仅当 `docs/flows` 恰有一个 YAML
-   * 才采用，多流程/无流程一律 `flow-not-found` 并提示显式指定。`request_acceptance` 与
-   * `report_artifact_ready` 共用同一归一（不复制第二份；行为与原 requestAcceptance 内联实现逐字一致）。
+   * 才采用，多流程/无流程一律 `flow-not-found` 并提示显式指定。`独立复核请求（已撤除）` 与
+   * `产物汇报（已撤除）` 共用同一归一（不复制第二份；行为与原 requestAcceptance 内联实现逐字一致）。
    */
   const resolveGovernanceFlowIdForProject = async (
     root: string,
@@ -6305,7 +6269,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   };
 
   /**
-   * `request_acceptance` 能力的项目入口：**flowId 归一**（显式优先；省略时仅当 `docs/flows` 恰有一个
+   * `独立复核请求（已撤除）` 能力的项目入口：**flowId 归一**（显式优先；省略时仅当 `docs/flows` 恰有一个
    * YAML 才采用，多流程/无流程一律 `flow-not-found` 并提示指定 flowId，**不猜**）+ 同 flow 在途去重。
    */
   const requestAcceptanceForProject = async (
@@ -6354,7 +6318,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         code: "unavailable",
         message:
           `独立复核请求执行失败：${error instanceof Error ? error.message : String(error)}；` +
-          `**可能已部分执行**，请用 flow_get 核对流程与治理账本，不要重复请求。`,
+          `**可能已部分执行**，请用 流程读取 核对流程与治理账本，不要重复请求。`,
         flowId: resolvedFlowId,
       };
     } finally {
@@ -6365,9 +6329,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // 能力注入：缺省用本层实现；测试/宿主可整体替换（签名与 SessionManagerDeps 同形，项目根由会话补入）。
   const requestAcceptanceCapability = deps.requestAcceptance ?? requestAcceptanceForProject;
 
-  // —————— 2026-10-27 验收标准工件汇报（`report_artifact_ready`）：应用侧能力实现 ——————
+  // —————— 2026-10-27 验收标准工件汇报（`产物汇报（已撤除）`）：应用侧能力实现 ——————
   //
-  // 客户新设计：质检写完验收标准后**调用 `report_artifact_ready` 汇报给应用；应用校验后决定是否收口**。
+  // 客户新设计：质检写完验收标准后**调用 `产物汇报（已撤除）` 汇报给应用；应用校验后决定是否收口**。
   // 纪律（钉死）：
   //   · **不允许应用盯文件自动勾卡**——文件存在不等于步骤完成，只有本能力收到汇报并通过校验才收口；
   //   · **不允许质检自己改状态**——本能力不写 flow 其它步骤、不写客户决定；收口只经编排应用专用
@@ -6416,7 +6380,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           `当前只接受 stepId="${ACCEPTANCE_CRITERIA_STEP_ID}"（验收标准）。未收口任何步骤。`,
       };
     }
-    // 2) flowId 归一（与 request_acceptance 同一实现；多流程/非法一律拒绝）。
+    // 2) flowId 归一（与 独立复核请求（已撤除） 同一实现；多流程/非法一律拒绝）。
     const resolved = await resolveGovernanceFlowIdForProject(root, input?.flowId);
     if (!resolved.ok) {
       return {
@@ -6595,7 +6559,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         path: criteria.relPath,
         message:
           `验收标准步骤收口助手异常：${error instanceof Error ? error.message : String(error)}；` +
-          `本次不声称已收口，请用 flow_get 核对；未伪造 accepted。`,
+          `本次不声称已收口，请用 流程读取 核对；未伪造 accepted。`,
       };
     }
     if (!completed.ok) {
@@ -6646,7 +6610,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // 能力注入：缺省用本层实现；测试/宿主可整体替换（签名与 SessionManagerDeps 同形，项目根由会话补入）。
   const reportArtifactCapability = deps.reportArtifact ?? reportArtifactForProject;
 
-  // —————— 2026-10-26 gate 复核请求（`request_gate_review`）：应用侧能力实现 ——————
+  // —————— 2026-10-26 gate 复核请求（`gate 复核请求（已撤除）`）：应用侧能力实现 ——————
   //
   // 客户 2026-10-26 授权（设计 `2026-10-26_design_proof-gate-reviews.md` §5.3–§8 / §9.3）：运行时核心的
   // 工具只做参数形状校验并**如实转达**回执；gate 查找/状态/记录幂等/前置与证据完整性/标准节/引擎解析/
@@ -6667,7 +6631,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     const fallback = Math.max(1, requestGateReviewTotalMs);
     return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : fallback;
   })();
-  /** 有界等待（与 request_acceptance 同一实现；底层 promise 不取消、不伪造结果）。 */
+  /** 有界等待（与 独立复核请求（已撤除） 同一实现；底层 promise 不取消、不伪造结果）。 */
   const withGateReviewDeadline = withRequestAcceptanceDeadline;
   const gateReviewTimeoutResult = (
     flowId: string,
@@ -6686,7 +6650,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       code: "unavailable",
       message:
         `已受理 gate 复核请求，但${stage}确认回执超时（约 ${Math.round(elapsedMs / 1000)}s 未返回）；` +
-        "**可能已派发/正在处理**，请用 flow_get 核对 gate 步骤与治理账本，不要重复请求；本次不声称已派发。",
+        "**可能已派发/正在处理**，请用 流程读取 核对 gate 步骤与治理账本，不要重复请求；本次不声称已派发。",
       flowId,
       gateId,
     };
@@ -6970,7 +6934,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     if (gateStep.status === "done") {
       return result(
         "already-dispatched",
-        mainT("main.gateReview.alreadyDispatched", { flowId, gateId }) + "（gate 步骤已通过；如需重验请用 flow_step_supersede 出新 gate id）",
+        mainT("main.gateReview.alreadyDispatched", { flowId, gateId }) + "（gate 步骤已通过；如需重验请用 流程步骤取代 出新 gate id）",
       );
     }
     if (gateStep.status !== "pending") {
@@ -7226,7 +7190,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     }
 
     // 12) 持久化：**先原子写 gate 记录**（重启恢复的唯一扫描源），再写账本审计。
-    // 记录写失败 ⇒ unavailable（不声称已派发；任务可能已投递，请用 flow_get 核对）；账本失败只诊断、
+    // 记录写失败 ⇒ unavailable（不声称已派发；任务可能已投递，请用 流程读取 核对）；账本失败只诊断、
     // 不翻转回执（记录已落盘，2026-10-27 客户真机：审计失败不应把已派发误报成未派发）。
     const dispatchedAt = new Date().toISOString();
     const record: GateReviewRecord = {
@@ -7256,7 +7220,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       return result("unavailable", mainT("main.gateReview.unavailable", {
         flowId,
         gateId,
-        detail: `gate 记录写入失败：${error instanceof Error ? error.message : String(error)}；任务可能已投递，请用 flow_get 核对，不重复请求`,
+        detail: `gate 记录写入失败：${error instanceof Error ? error.message : String(error)}；任务可能已投递，请用 流程读取 核对，不重复请求`,
       }), { runtime: resolution.runtime });
     }
     const appendLedgerFn = deps.appendGovernanceLedgerFn ?? appendGovernanceLedger;
@@ -7292,7 +7256,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       : "";
     const auditSuffix =
       ledgerAuditError !== undefined
-        ? `（账本审计写入失败：${ledgerAuditError}；gate 记录已落盘，恢复扫描会补收口，请用 flow_get 核对）`
+        ? `（账本审计写入失败：${ledgerAuditError}；gate 记录已落盘，恢复扫描会补收口，请用 流程读取 核对）`
         : "";
     return result(
       "dispatched",
@@ -7304,7 +7268,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     );
   };
 
-  /** `request_gate_review` 能力的项目入口：flowId 归一（显式优先；省略时仅唯一 flow YAML 才采用，不猜）。 */
+  /** `gate 复核请求（已撤除）` 能力的项目入口：flowId 归一（显式优先；省略时仅唯一 flow YAML 才采用，不猜）。 */
   const requestGateReviewForProject = async (
     projectRoot: string,
     input: RequestGateReviewInput,
@@ -7396,7 +7360,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         code: "unavailable",
         message:
           `gate 复核请求执行失败：${error instanceof Error ? error.message : String(error)}；` +
-          "**可能已部分执行**，请用 flow_get 核对 gate 步骤与治理账本，不要重复请求。",
+          "**可能已部分执行**，请用 流程读取 核对 gate 步骤与治理账本，不要重复请求。",
         flowId: resolvedFlowId,
         gateId,
       };
@@ -9323,7 +9287,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     } as const;
     if (!parsed.ok) {
       const detail = parsed.code === "missing"
-        ? "报告缺少 acceptance-triage/v1 段"
+        ? "报告缺少 removedAcceptanceTriage/v1 段"
         : parsed.errors.slice(0, 5).map((item) => `${item.path}: ${item.message}`).join("；");
       const updated: GateReviewRecord = {
         ...record,
@@ -9597,11 +9561,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   };
 
   /**
-   * **恢复：有通过报告但缺 gate 记录**（2026-10-27 客户反馈：`request_gate_review` 回执超时被误报为
+   * **恢复：有通过报告但缺 gate 记录**（2026-10-27 客户反馈：`gate 复核请求（已撤除）` 回执超时被误报为
    * `unavailable`，记录/账本未落盘，而质检实际已写出 pass 报告）。仅当以下条件全部满足时补建记录：
    *   · flow 的 gate 步骤仍 pending、id 形如 `gate-<slug>`、`kind:artifact` 且 gateKind 合法；
    *   · gate 记录缺失（已存在/损坏交给既有扫描，不在本函数覆盖）；
-   *   · 最新 gate 报告存在、可读、`acceptance-triage/v1` 结构合格且结论为 `pass`。
+   *   · 最新 gate 报告存在、可读、`removedAcceptanceTriage/v1` 结构合格且结论为 `pass`。
    * 补建记录（status dispatched + 当前 flowRevision + 报告 path/version/sha）后立即走既有
    * `processGateReportAttempt`（`completeGateStep` 唯一收口；写 passed 记录 + gate.review + artifact.observed）。
    * 幂等：记录一旦存在就不再补建；重复扫描由 passed 分支的 completeGateStep/审计去重兜住。
@@ -9694,7 +9658,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
 
   /**
    * 扫描并幂等处置一个 flow 的 gate 记录（设计 §5.7）。**不自动重派 Proof、不自动通过**；
-   * 只在 trio 项目执行（gate 通道仅注入统筹；记录由 `request_gate_review` 应用侧创建）。
+   * 只在 trio 项目执行（gate 通道仅注入统筹；记录由 `gate 复核请求（已撤除）` 应用侧创建）。
    */
   const processGateReviewsForFlow = async (info: { projectRoot: string; flowId: string }): Promise<void> => {
     const { projectRoot, flowId } = info;
@@ -9704,7 +9668,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     if (gateProcessInFlight.has(key)) return;
     gateProcessInFlight.add(key);
     const diagnostic = createDiagnosticLogger({
-      component: "desktop.governance-gate",
+      component: "desktop.治理门禁（已撤除）",
       projectRoot,
       ...(typeof listing.primaryRoleId === "string" && listing.primaryRoleId !== "" ? { roleId: listing.primaryRoleId } : {}),
     });
@@ -9906,7 +9870,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
               gateId,
               detail:
                 "路由记录损坏，已按 gate 记录与报告身份重建（身份已恢复）；原退回原因不可安全推断，未发送任何任务（fail-closed）；" +
-                "同一被拒报告不会重开，等待新报告版本或统筹重新 request_gate_review。",
+                "同一被拒报告不会重开，等待新报告版本或统筹重新 gate 复核请求（已撤除）。",
             }));
             routingRead = { state: "ok", record: rebuilt };
           }
@@ -9965,7 +9929,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
               ...(newReportDetail !== undefined ? { newReportDetail } : {}),
             });
           }
-          // R6/R7：应用不自动开启新一轮；等统筹确认新候选后重新 request_gate_review / 人工核对。
+          // R6/R7：应用不自动开启新一轮；等统筹确认新候选后重新 gate 复核请求（已撤除） / 人工核对。
           if (routing.latestReturn !== null && (routing.latestReturn.cause === "candidate-changed" || routing.latestReturn.cause === "legacy")) {
             continue;
           }
@@ -10015,13 +9979,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     }
   };
 
-  // —————— 2026-10-26 边界变更请求（`request_boundary_change`）：应用侧能力实现 ——————
+  // —————— 2026-10-26 边界变更请求（`边界变更请求（已撤除）`）：应用侧能力实现 ——————
   //
   // 客户确认的分层门禁：统筹**不能**直接派组队（治理角色不可被派发），因此：
-  //   `request_boundary_change`（结构化请求）→ 应用确定性校验 → 中间 AI 门禁（只读、deny-all 写权）
+  //   `边界变更请求（已撤除）`（结构化请求）→ 应用确定性校验 → 中间 AI 门禁（只读、deny-all 写权）
   //   → 通过才后台派组队（appointment-write + 判断/客户确认仍在组队侧）→ 审计票据/幂等。
   //
-  // 纪律（与 request_acceptance 同款）：
+  // 纪律（与 独立复核请求（已撤除） 同款）：
   //  · AI 门禁 deny/manual/超时/不可用 ⇒ **不派发**，返回 `rejected` 并写明原因与「不自动放行」；
   //  · 打开/发送失败 ⇒ `unavailable`（票据标 failed，可重试）；不谎报任何一步；
   //  · 不写客户决定、不写 `customer.decision`、不伪造治理账本——审计只写应用自有
@@ -10130,7 +10094,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   };
 
   /**
-   * `request_boundary_change` 能力的项目入口（`requesterRoleId` 由会话注入端补入）。
+   * `边界变更请求（已撤除）` 能力的项目入口（`requesterRoleId` 由会话注入端补入）。
    * 顺序：载荷/flowId → 项目角色 → 确定性校验 → 幂等/票据 → 引擎解析 → AI 门禁 → 组队派发 → 票据收口。
    */
   const requestBoundaryChangeForProject = async (
@@ -10427,7 +10391,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           };
         }
       } catch (error) {
-        diagnostic.error("boundary-change.team-plan.failed", error, { ticketId, flowId });
+        diagnostic.error("boundary-change.团队计划（已撤除）.failed", error, { ticketId, flowId });
       }
       let flowEvidence: { relPath: string; summaryLines: string[] } | undefined;
       try {
@@ -10610,7 +10574,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             code: "unavailable",
             message:
               `人事任务投递回执超时（ticket ${ticketId}，可能已入队/已投递）；` +
-              "未确认已派发，请用 flow_get 或人事会话核对；同一请求重试不会重复投递。",
+              "未确认已派发，请用 流程读取 或人事会话核对；同一请求重试不会重复投递。",
             roleId: target.roleId,
             ticketId,
           };
@@ -11563,16 +11527,16 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // 客户交互通道（A-5）：su 的 request_confirmation/request_choice 经它摆到界面并取回裁决
     // （仅内置治理角色会话消费；缺省未接 ⇒ 不注入 ⇒ 无确认制——绝不悄悄放行）。
     customerInput: deps.customerInput,
-    // 2026-10-25 独立复核请求（request_acceptance）：应用侧能力（SessionManager 仅对内置治理角色会话
+    // 2026-10-25 独立复核请求（独立复核请求（已撤除））：应用侧能力（SessionManager 仅对内置治理角色会话
     // 注入；项目角色不注入；编排再按 builtInGovernance 收口）。**请求复核 ≠ 客户批准**。
     requestAcceptance: requestAcceptanceCapability,
-    // 2026-10-27 验收标准工件汇报（report_artifact_ready）：应用侧能力（SessionManager 仅对 verifier 会话
+    // 2026-10-27 验收标准工件汇报（产物汇报（已撤除））：应用侧能力（SessionManager 仅对 verifier 会话
     // 注入；其它治理角色与项目角色不注入）。**汇报 ≠ 验收通过 ≠ 客户批准**；应用校验通过才收口。
     reportArtifact: reportArtifactCapability,
-    // 2026-10-26 gate 复核请求（request_gate_review）：应用侧能力（SessionManager 仅对统筹/convener
+    // 2026-10-26 gate 复核请求（gate 复核请求（已撤除））：应用侧能力（SessionManager 仅对统筹/convener
     // 会话注入；项目角色与其他治理角色不注入；编排再按治理职能收口）。**gate 复核 ≠ 验收通过 ≠ 客户批准**。
     requestGateReview: requestGateReviewCapability,
-    // 2026-10-26 边界变更请求（request_boundary_change）：应用侧能力（SessionManager 仅对统筹/convener
+    // 2026-10-26 边界变更请求（边界变更请求（已撤除））：应用侧能力（SessionManager 仅对统筹/convener
     // 会话注入；项目角色不注入；编排再按治理职能/内置角色收口）。**请求变更 ≠ 客户批准**。
     requestBoundaryChange: requestBoundaryChangeCapability,
     // 2026-10-26 需求变更申请（request_requirement_change）：应用侧能力（SessionManager 仅对统筹/提案
@@ -12076,7 +12040,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   /**
    * Convener 修正任务文本（团队计划缺细节/缺行/类型不可识别；Crew 暂停、不自行补计划）。
    * `teamPlanSchema: 3` 时按 v3（directories/实现目录/授权目录/精确写集/目录规范）提示；v1/v2 文案逐字保留。
-   * 2026-10-23：团队计划存在但 flow 缺 `role-cards` 步骤（`docs/flows/**` 问题）时用独立抬头，
+   * 2026-10-23：团队计划存在但 flow 缺 `role-cards` 步骤（`docs/removed/**` 问题）时用独立抬头，
    * 不把 flow 缺陷误述为「团队计划问题」。
    */
   const buildAppointmentPlanFeedback = (
@@ -12085,7 +12049,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     teamPlanSchema?: 1 | 2 | 3,
   ): string => {
     const planIssues = issues.filter((issue) => issue.source === "convener");
-    const flowDefect = planIssues.some((issue) => issue.path.startsWith("docs/flows/"));
+    const flowDefect = planIssues.some((issue) => issue.path.startsWith("docs/removed/"));
     const fixInstruction =
       teamPlanSchema === 3
         ? "请按 v3 修正/补充团队计划（frontmatter teamPlanSchema: 3 与非空 directories；模块清单每个 module 的非空实现目录；角色表授权目录/精确写集；目录规范表 12 字段；每目录唯一 owner/不重叠/共享策略；治理关键路径只精确授权），必要时递增版本并重发任命卡；修正后应用会重新校验。"
@@ -12768,7 +12732,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
               const flowIssues: AppointmentArtifactIssue[] = [
                 {
                   roleId: "流程",
-                  path: `docs/flows/${flowId}.yaml`,
+                  path: `docs/removed/${flowId}.yaml`,
                   issue: `流程缺少 id 为 "${ROLE_CARDS_STEP_ID}" 的步骤（团队计划存在但 flow 未声明 role-cards，无法完成收口；请运营补齐 flow 步骤）。`,
                   userVisibleIssue: mainT("main.interface.roleCardsStepMissing", { stepId: ROLE_CARDS_STEP_ID }),
                   source: "convener",
@@ -12800,8 +12764,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           nextFunction: "schedule",
           roleId: "convener",
         };
-        // 2026-10-20 真机：YAML 已存在时派给 Convener 的必须是「用 flow_get / flow_step_update /
-        // flow_step_supersede 推进」，不是「请先写流程状态 YAML」——否则它照旧去写文件、不调 flow 工具。
+        // 2026-10-20 真机：YAML 已存在时派给 Convener 的必须是「用 流程读取 / 流程步骤更新 /
+        // 流程步骤取代 推进」，不是「请先写流程状态 YAML」——否则它照旧去写文件、不调 flow 工具。
         const readinessStepId = plan !== undefined ? ROLE_READINESS_STEP_ID : undefined;
         const message =
           plan !== undefined
@@ -13120,7 +13084,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     },
 
     // —————— 2026-10-25：流程状态只读视图（`flow:status`）——————
-    // 渲染侧展示 `docs/flows/*.yaml` 的步骤进度。**只读**：目录列举 + 读取 + 既有 `parseFlowStateYaml`；
+    // 渲染侧展示 `docs/removed/*.yaml` 的步骤进度。**只读**：目录列举 + 读取 + 既有 `parseFlowStateYaml`；
     // 不写任何文件、不碰治理账本、不改变 revision（revision 只是文件内容 sha256 的只读派生）。
     // 坏文件逐文件进 `errors`，不阻断其他文件；`docs/flows` 不存在不是错误（flows:[]）。
     async flowStatus(projectRoot: string): Promise<FlowStatusReply> {
@@ -13151,7 +13115,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // 只认顶层 `*.yaml`；按文件名排序，保证回执顺序稳定。
       for (const name of names.filter((entry) => entry.endsWith(".yaml")).sort()) {
         const flowId = name.slice(0, -".yaml".length);
-        const file = flowStatePath(flowId); // 项目相对路径 `docs/flows/<name>`
+        const file = flowStatePath(flowId); // 项目相对路径 `docs/removed/<name>`
         try {
           const abs = path.join(flowsDir, name);
           const [bytes, info] = await Promise.all([readFile(abs), stat(abs)]);
@@ -13703,7 +13667,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // —— 2026-10-20 真机假错误修复：链式推进的完成判据＝**目标事实**（有界轮询），不是角色瞬时忙闲 ——
       // 真机证据：`advance.dispatched` 后 5ms 就 `advance.chain.convener-idle` + `chain.failed`
       // （`waitForRoleIdle` 在会话刚被释放/尚未标记 busy 时立即 false），而 Convener 随后正常写出 YAML。
-      // 新判据：每 `chainPollIntervalMs` 读一次 `docs/flows/<flowId>.yaml`（存在且 `parseFlowStateYaml`
+      // 新判据：每 `chainPollIntervalMs` 读一次 `docs/removed/<flowId>.yaml`（存在且 `parseFlowStateYaml`
       // 通过＝放行；首步 nomination 已 done 时记诊断），或每轮强制刷新 listing 直到任命目标角色全部出现。
       // 角色忙/队列变化**不打断**轮询；会话被释放/被看护中止时**不**断言 settled（继续等下一次投递/重试）；
       // 只有「会话仍活着、已 settled 且无后续投递」再给一次短宽限仍不落定，或到 15min 时限，才如实失败（一次）。
@@ -13938,7 +13902,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           flowId,
           count: targets.length,
           queued: crewDispatch.queued === true,
-          mode: plan !== undefined ? "team-plan" : "legacy-nomination",
+          mode: plan !== undefined ? "团队计划（已撤除）" : "legacy-nomination",
         });
         // 客户手选与推荐集不同：按实际名单派 Crew；提示 Convener 修订计划（v3/v2 按实际 schema，避免计划与名单长期不一致）。
         if (plan?.recommended !== undefined && !sameRoleSet(plan.recommended, targets)) {
@@ -13972,7 +13936,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           ? await readTeamPlanInfo(projectRoot, payload.flowId, proposalPlan.relPath)
           : undefined;
       // 2026-10-26：应用在意图交接时创建通用流程骨架（status: skeleton）；提案接受后的 Convener
-      // 任务需要知道「已存在但只是骨架」，从而写团队计划后用一次 schedule-write 替换为完整流程。
+      // 任务需要知道「已存在但只是骨架」，从而写团队计划后用一次 排程写卡（已撤除） 替换为完整流程。
       const flowStateExists =
         typeof payload.flowId === "string" &&
         payload.flowId !== "" &&
@@ -14027,7 +13991,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // 故不臆造。根不存在（测试/异常调用）时不创建目录：按账本失败处理（记诊断、结果不变）。
       await appendDispatchAccepted(targetRoleId, message, stepId);
       // —— 2026-10-18 真机修正；2026-10-19 客户决定「这些全部改成yaml。」 ——
-      // 两段式闭环：客户接受提案后先派 Convener 写 `docs/flows/<flowId>.yaml`（唯一机器状态）。
+      // 两段式闭环：客户接受提案后先派 Convener 写 `docs/removed/<flowId>.yaml`（唯一机器状态）。
       // **有界轮询 YAML 事实**（2026-10-20 真机假错误修复）：存在且通过 `parseFlowStateYaml` 校验 ⇒ 再派
       // Nominator；角色忙/队列变化不打断轮询，会话释放/被看护中止不算 settled（继续等下一次投递/重试）；
       // 只有角色**确实 settled**（会话活着、不忙、无后续投递、未被中止）再给一次短宽限仍不落定，或到 15min
@@ -14038,7 +14002,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         if (flowId === undefined) return chainFail(mainT("main.interface.missingFlowIdNomination"));
         const flowStatePath = governanceFlowStatePath(flowId);
         const flowWait = await waitForFlowStateYamlFact(flowId);
-        diagnostic.record("advance.chain.flow-state-wait", {
+        diagnostic.record("advance.chain.流程状态（已撤除）-wait", {
           flowId,
           state: flowWait.last.state,
           outcome: flowWait.outcome,

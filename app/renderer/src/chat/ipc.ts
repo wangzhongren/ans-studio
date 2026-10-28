@@ -22,7 +22,6 @@ import { setJudgeResultSink, noteShellId, useConfirmStore, installGovernanceMode
 import { useUiStore, type RuntimeId } from "@/stores/ui-store";
 import { useSettingsStore, invalidatePendingSaves } from "@/stores/settings-store";
 import { useReportStore } from "@/stores/report-store";
-import { useGovernanceStore } from "@/stores/governance-store";
 import {
   useDrawerStore,
 } from "@/stores/drawer-store";
@@ -368,7 +367,6 @@ function onProjectChanged(nextRoot: string | null, previousRoot: string | null):
     invalidatePendingSaves();
     useReportStore.getState().clearProject(previousRoot);
     useReportStore.getState().clearProject(nextRoot);
-    useGovernanceStore.getState().close();
     useSettingsStore.getState().projectChanged(nextRoot);
     useDrawerStore.getState().resetProject();
     useUiStore.getState().setDrawerOpen(false);

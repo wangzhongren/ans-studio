@@ -17,11 +17,6 @@ import {
   backgroundRunningCount,
   loadBackgroundTasks,
 } from "@/chat/background-tasks";
-import {
-  flowBadgeView,
-  loadFlowStatus,
-  startFlowStatusPolling,
-} from "@/chat/flow-status";
 import { getDesktopBridge } from "@/lib/platform";
 import {
   badgeText,
@@ -43,10 +38,8 @@ import {
 } from "@/stores/drawer-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useBackgroundTasksStore } from "@/stores/background-tasks-store";
-import { useFlowStatusStore } from "@/stores/flow-status-store";
 import { useUiStore } from "@/stores/ui-store";
 import { EngineSelect } from "@/shell/EngineSelect";
-import { GovernancePanel } from "@/shell/GovernancePanel";
 import { useLocaleState, useT } from "@/i18n";
 import "@/shell/phase4b.css";
 export interface ChatHeaderProps {
@@ -69,9 +62,6 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
   const pendingOperator = useChatStore((s) => s.pendingOperator);
   const notice = useSettingsStore((s) => s.notice);
   const backgroundRunning = useBackgroundTasksStore((s) => s.runningCount);
-  const flowBadgeVisible = useFlowStatusStore((s) => s.visible);
-  const flowBadgeText = useFlowStatusStore((s) => s.text);
-  const flowBadgeTitle = useFlowStatusStore((s) => s.title);
   const anyRoleBusy = Object.values(roleBusy).some((busy) => busy === true);
   // 入口徽标的一次性读取（不是轮询）：面板未打开时也能显示最近运行中任务数。
   useEffect(() => {
@@ -106,54 +96,6 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
     };
   }, [projectRoot, runtime, locale, anyRoleBusy]);
 
-  // 流程进度徽标：30s 拉一次（窗口隐藏跳过）；方法缺失/失败只隐藏徽标，不报错。
-  useEffect(() => {
-    let cancelled = false;
-    if (!projectRoot) {
-      useFlowStatusStore.getState().setBadge({ visible: false });
-      return () => {
-        cancelled = true;
-      };
-    }
-    const refresh = async () => {
-      const model = await loadFlowStatus(
-        getDesktopBridge(),
-        projectRoot,
-        locale,
-      );
-      if (!cancelled) {
-        useFlowStatusStore
-          .getState()
-          .setBadge(flowBadgeView(model, locale));
-      }
-    };
-    const stop = startFlowStatusPolling(
-      () => {
-        void refresh();
-      },
-      30000,
-      {
-        isHidden: () =>
-          typeof document !== "undefined" &&
-          document.visibilityState === "hidden",
-      },
-    );
-    const onVisibility = () => {
-      if (
-        typeof document !== "undefined" &&
-        document.visibilityState !== "hidden"
-      ) {
-        void refresh();
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      cancelled = true;
-      stop();
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [projectRoot, locale]);
-
   const role = findRole(roles, selectedRoleId);
   const roleName = roleDisplayName(role, locale);
   const contextText =
@@ -184,9 +126,6 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
     workAriaParts.push(
       t("ui.background.runningSummary", { count: backgroundRunning }),
     );
-  }
-  if (flowBadgeVisible) {
-    workAriaParts.push(t("ui.flow.title") + " " + flowBadgeText);
   }
   const workAriaLabel =
     workAriaParts.length === 0
@@ -274,15 +213,6 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
                   {badgeText(backgroundRunning)}
                 </span>
               ) : null}
-              {flowBadgeVisible ? (
-                <span
-                  className="tab-badge is-flow"
-                  aria-hidden="true"
-                  title={flowBadgeTitle || undefined}
-                >
-                  {flowBadgeText}
-                </span>
-              ) : null}
             </Button>
             <Button
               id="tab-card"
@@ -304,8 +234,6 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
           </div>
         </div>
       </header>
-
-      <GovernancePanel />
 
       <div
         id="runtime-config-notice"

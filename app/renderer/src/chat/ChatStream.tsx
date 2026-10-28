@@ -26,15 +26,6 @@ import {
 import { getDesktopBridge } from "@/lib/platform";
 import { useUiStore } from "@/stores/ui-store";
 import { useDrawerStore } from "@/stores/drawer-store";
-import { useGovernanceStore } from "@/stores/governance-store";
-import {
-  changedEntries,
-  governanceInvalidText,
-  governanceMissingText,
-  governancePinMismatchEmptyState,
-  governanceRoleEmptyHint,
-  projectRoleCount,
-} from "@/chat/governance-view";
 import { operatorSurfaces } from "@/chat/operator-view";
 import { translate, useLocaleState, useT } from "@/i18n";
 
@@ -192,7 +183,6 @@ export function ChatStream() {
   const hasRoles = useChatStore((s) => s.hasRoles);
   const roles = useChatStore((s) => s.roles);
   const governanceModel = useChatStore((s) => s.governanceModel);
-  const governanceRecord = useChatStore((s) => s.governanceRecord);
   const selectedRoleId = useUiStore((s) => s.selectedRoleId);
   const sessionOpenRoleId = useChatStore((s) => s.sessionOpenRoleId);
   const roleBusy = useChatStore((s) => s.roleBusy);
@@ -222,16 +212,9 @@ export function ChatStream() {
   const sessionOpen = sessionOpenRoleId === selectedRoleId;
   const loading = meta?.loading === true;
   const pendingIds = pendingIdsFor(pendingOperator, selectedRoleId);
-  const record = (governanceRecord || {}) as Record<string, unknown>;
-  const recordState = typeof record.state === "string" ? record.state : "";
-  const governanceHint = role
-    ? governanceRoleEmptyHint(role.governanceFunction, locale)
-    : "";
-
   let emptyTitle = "";
   let emptySub = "";
   let emptyHint = "";
-  let emptyActions: "governance" | null = null;
   let showStart = false;
   if (!projectRoot) {
     emptyTitle = t("ui.sidebar.noProject");
@@ -252,29 +235,6 @@ export function ChatStream() {
   } else if (!selectedRoleId) {
     emptyTitle = t("ui.chatStream.empty.selectRoleTitle");
     emptySub = t("ui.chatStream.empty.selectRoleSub");
-  } else if (rowCount === 0 && !loading && recordState === "pin-mismatch") {
-    // 治理记录与盘上边界不一致：复用 su 空态宿主（说明 + 检查入口），不自动开会话。
-    const view = governancePinMismatchEmptyState(
-      record.pinCount,
-      changedEntries(record),
-      locale,
-    );
-    emptyTitle = view.title;
-    emptySub = view.sub;
-    emptyHint = view.hint;
-    emptyActions = "governance";
-  } else if (rowCount === 0 && !loading && recordState === "missing") {
-    emptyTitle = t("ui.governance.noRecordTitle");
-    emptySub = governanceMissingText(projectRoleCount(roles), locale);
-    emptyActions = "governance";
-  } else if (rowCount === 0 && !loading && recordState === "invalid") {
-    emptyTitle = t("ui.governance.recordUnavailableTitle");
-    emptySub = governanceInvalidText(record.reason, locale);
-    emptyActions = "governance";
-  } else if (rowCount === 0 && !loading && governanceHint !== "") {
-    // 治理角色空态（主入口 Liaison 等）：说明客户入口，不自带 CTA。
-    emptyTitle = roleDisplayName(role, locale);
-    emptySub = governanceHint;
   } else if (rowCount === 0 && !loading) {
     if (!sessionOpen) {
       emptyTitle = t("ui.chatStream.startConversation", {
@@ -287,12 +247,6 @@ export function ChatStream() {
       emptySub = t("ui.chatStream.empty.openedSub");
     }
   }
-
-  const openGovernancePreview = () => {
-    void useGovernanceStore.getState().openPreview(
-      recordState === "pin-mismatch" ? "reaccept" : undefined,
-    );
-  };
 
   const onChipClick = () => {
     if (!selectedRoleId || pendingIds.length === 0) return;
@@ -330,18 +284,6 @@ export function ChatStream() {
           <p className="empty-title">{emptyTitle}</p>
           <p className="empty-sub">{emptySub}</p>
           {emptyHint ? <p className="empty-hint muted small">{emptyHint}</p> : null}
-          {emptyActions === "governance" ? (
-            <Button
-              id="btn-governance-empty-action"
-              className="chat-cta"
-              type="button"
-              onClick={openGovernancePreview}
-            >
-              {recordState === "pin-mismatch"
-                ? t("ui.governance.checkAndReaccept")
-                : t("ui.governance.establish")}
-            </Button>
-          ) : null}
           {showStart && selectedRoleId ? (
             <Button
               id="btn-start-primary"

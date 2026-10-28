@@ -254,63 +254,9 @@ export const enUS = {
   "ui.background.loadFailed": "Failed to load background tasks: {detail}",
   "ui.background.refresh": "Refresh",
 
-  // Flow status panel (renderer; step progress from docs/flows/<flowId>.yaml)
-  "ui.flow.title": "Flow status",
-  "ui.flow.progress": "{done}/{total} steps",
-  "ui.flow.current": "Current step",
-  "ui.flow.owner": "Owner",
-  "ui.flow.updatedAt": "Updated",
-  "ui.flow.empty": "No flow status",
-  "ui.flow.loadFailed": "Failed to load flow status: {detail}",
-  "ui.flow.parseError": "Failed to parse {file}: {detail}",
-  "ui.flow.showAll": "Show all steps",
-  "ui.flow.hideAll": "Hide unfinished steps",
-  "ui.flow.state.pending": "Pending",
-  "ui.flow.state.dispatched": "Dispatched",
-  "ui.flow.state.delivered": "Delivered",
-  "ui.flow.state.done": "Done",
-  "ui.flow.state.failed": "Failed",
-  "ui.flow.state.blocked": "Blocked",
-  "ui.flow.state.superseded": "Superseded",
-  "ui.flow.kind.artifact": "Artifact",
-  "ui.flow.kind.dispatch": "Dispatch",
-  "ui.flow.kind.customerDecision": "Customer decision",
-  "ui.flow.kind.acceptance": "Acceptance",
-  "ui.flow.refresh": "Refresh",
+  // Flow status panel (renderer; step progress from docs/removed/<flowId>.yaml)
 
   // Acceptance triage card (result/severity/options/advice/source/report text; desktop UI wiring)
-  "ui.triage.title": "Acceptance triage",
-  "ui.triage.question": "How should this acceptance result be handled?",
-  "ui.triage.option.rework": "Send to coordinator for fixes",
-  "ui.triage.option.reportOnly": "Report only, no rework",
-  "ui.triage.advice.rework":
-    "Recommend sending to the coordinator for fixes — blockers: {blockers}, major items: {majors}; the improvement plan is actionable",
-  "ui.triage.advice.reportOnly":
-    "Recommend reporting only, without rework — minor/style items: {minors}",
-  "ui.triage.advice.none": "No automatic recommendation; please decide manually",
-  "ui.triage.conclusion.pass": "Pass",
-  "ui.triage.conclusion.fail": "Fail",
-  "ui.triage.conclusion.conditional": "Conditional pass",
-  "ui.triage.severity.blocker": "Blocker",
-  "ui.triage.severity.major": "Major",
-  "ui.triage.severity.minor": "Minor",
-  "ui.triage.severity.nit": "Nit",
-  "ui.triage.section.summary": "Result",
-  "ui.triage.section.failures": "Failures",
-  "ui.triage.section.improvements": "Improvements",
-  "ui.triage.section.source": "Decision source",
-  "ui.triage.source.judge": "Judge delegation",
-  "ui.triage.source.customer": "Customer choice",
-  "ui.triage.warn.blockingReportOnly":
-    "The report contains blockers; reporting only will leave them unfixed",
-  "ui.triage.report.head": "Acceptance result: {conclusion}",
-  "ui.triage.report.reasonLine": "{id} · {severity}: {reason}",
-  "ui.triage.report.actionLine": "Suggested improvement: {action}",
-  "ui.triage.report.pathLine": "Report: {path}",
-  "ui.triage.report.noRework": "No rework this time ({source})",
-  "ui.triage.returnedToVerifier":
-    "Acceptance report lacks the triage structure; returned to QA to fill it in",
-  "ui.triage.missingReport": "Acceptance report unreadable: {detail}",
 
   // Decision card (material choice, single recommended option, separate from acceptance; desktop UI wiring).
   // A decision card records a material choice only: it is not a proposal/appointment/acceptance, not
@@ -636,6 +582,7 @@ export const enUS = {
   "ui.governance.intentBadge": "Intent confirmation · customer",
   "ui.governance.queueNote": "Waiting for the previous decision",
   "ui.governance.mirrorBadge": "Mirror · primary",
+  "ui.governance.mirrorSource": "Source: {source}",
   "ui.governance.power.proposal": "Proposal",
   "ui.governance.power.appointment": "Appointment",
   "ui.governance.power.appointmentWrite": "Appointment card-writing",
@@ -1025,16 +972,16 @@ export const enUS = {
   "ui.judge.bridgeMissing": "Automatic judging is not supported in this version; staying manual",
   "ui.judge.decisionSingleNote": "The legacy governance model (single) does not support decision delegation",
   "ui.judge.shellOffTitle":
-    "Manually confirm each shell command and each trio write/appointment-write confirmation (default)",
+    "Manually confirm each shell command and necessary writes (default)",
   "ui.judge.shellOnTitle":
-    "The automatic agent evaluates shell commands and trio write/appointment-write confirmations first; can be turned off anytime",
+    "The automatic agent evaluates shell commands and necessary writes first; can be turned off anytime",
   "ui.judge.decisionOffTitle":
     "Manually confirm each proposal acceptance, appointment, and acceptance (default)",
   "ui.judge.decisionOnTitle":
     "The automatic agent evaluates proposal acceptance, appointments, and acceptance first; can be turned off anytime",
   "ui.judge.warningClose": "Got it",
   "ui.judge.toggleOn.shell":
-    "Approving for you: shell commands and write/appointment-write/schedule-write confirmations (write / appointment-write / schedule-write) will be auto-approved by the automatic agent.",
+    "Approving for you: shell commands and write/appointment-write/removedScheduleWrite confirmations (write / appointment-write / removedScheduleWrite) will be auto-approved by the automatic agent.",
   "ui.judge.toggleOn.decision":
     "Deciding for you: proposal acceptance, appointments, and acceptance will be auto-approved by the automatic agent.",
   "ui.judge.scopeNote":
@@ -1140,7 +1087,7 @@ export const enUS = {
   // Background task service
   "main.backgroundTasks.unavailable": "Background task service unavailable",
 
-  // Flow status service (docs/flows/<flowId>.yaml reads)
+  // Flow status service (docs/removed/<flowId>.yaml reads)
   "main.flowStatus.unavailable": "Flow status service unavailable",
   "main.flowStatus.invalidProject": "Invalid project directory",
 
@@ -1413,7 +1360,7 @@ export const enUS = {
   "main.interface.deliveredStepsHeader":
     "Flow {flowId}: the following steps are delivered, awaiting Operations verification:",
   "main.interface.deliveredStepLine":
-    "- Step {stepId} is delivered (owner={owner}); verify the ledger/artifact evidence, then mark it done with flow_step_update or return it for rework; do not write the flow YAML directly.",
+    "- Step {stepId} is delivered (owner={owner}); verify the ledger/artifact evidence, then mark it done with removedFlowStepUpdate or return it for rework; do not write the flow YAML directly.",
   "main.interface.deliveredVerificationNote":
     "Verification requirements: check ledger and artifact evidence before updating step status; return for rework when done conditions are not met; do not write the flow YAML directly with write_file.",
   "main.interface.deliveredWaitNote":
@@ -1436,7 +1383,7 @@ export const enUS = {
   "main.interface.teamPlanMissingUnreadable":
     "The team plan is missing or unreadable (the ledger appointment is bound to it); have Operations rewrite the plan before validating again",
   "main.interface.teamPlanMissingLegacy":
-    "Team plan missing: only the minimum structural checks are performed for legacy flows (migrating to the team-plan / role-cards flow is recommended)",
+    "Team plan missing: only the minimum structural checks are performed for legacy flows (migrating to the removedTeamPlan / role-cards flow is recommended)",
   "main.interface.teamPlanRoleMissing":
     "The team plan is missing a role row for recommended/appointed role {roleId}",
   "main.interface.teamPlanRoleTypeInvalid":
@@ -1536,7 +1483,7 @@ export const enUS = {
   "main.interface.staleStepFact":
     "- Step {stepId} (owner: {owner}, status: {status})",
   "main.interface.staleSteps":
-    "Flow {flowId}: {count} steps may have been lost due to an app restart/crash (the flow YAML marks them dispatched, but the owner has no session/queue/in-flight delivery):\n{facts}\nUse flow_get to check the current revision; if needed, use flow_step_supersede to create new steps and dispatch_task to redispatch; do not reuse dispatched stepIds.",
+    "Flow {flowId}: {count} steps may have been lost due to an app restart/crash (the flow YAML marks them dispatched, but the owner has no session/queue/in-flight delivery):\n{facts}\nUse removedFlowGet to check the current revision; if needed, use removedFlowStepSupersede to create new steps and dispatch_task to redispatch; do not reuse dispatched stepIds.",
   "main.interface.saveProjectNotActive": "This project is not the current imported project.",
   "main.interface.missingProjectRoot": "Missing project root path.",
   "main.interface.pinCheckFailed": "Pin evidence check failed: {detail}",
@@ -1631,13 +1578,13 @@ export const enUS = {
   "main.governance.acceptanceReworkPending":
     "Flow {flowId}: rework routing is not complete yet (waiting to send or waiting for the next event to retry); the app is not dispatching acceptance review for now and will not notify repeatedly.",
   "main.governance.acceptanceReworkReportIncomplete":
-    "Flow {flowId}: the acceptance report has no parseable acceptance-rework/v1 structured rework section ({detail}); the app passed report path {reportPath} and the parse error to Operations (Operations) for manual rework; no rework items were generated and no flow steps were created.",
+    "Flow {flowId}: the acceptance report has no parseable removedAcceptanceRework/v1 structured rework section ({detail}); the app passed report path {reportPath} and the parse error to Operations (Operations) for manual rework; no rework items were generated and no flow steps were created.",
   "main.governance.acceptanceReworkFailed":
     "Flow {flowId}: rework routing failed ({detail}); the app does not claim delivery and will not dispatch acceptance review; the next event retries automatically after the issue is fixed.",
   "main.governance.acceptanceReworkAuditFailed":
     "Flow {flowId}: the rework task was routed, but writing the audit record failed ({detail}); the sent fact is not reversed, the app does not fabricate ledger entries; check the ledger and diagnostics.",
 
-  // Gate review receipts and system lines (2026-10-26 request_gate_review; design §5–§8/§12).
+  // Gate review receipts and system lines (2026-10-26 removedRequestGateReview; design §5–§8/§12).
   // Placeholders: {flowId} flow id; {gateId} gate step id; {reportPath} gate report path;
   // {detail} bounded diagnostic/missing-item note; {severity} failure severity summary (blocker/major).
   // A gate review is not an acceptance pass and not customer approval; gate decisions never write
@@ -1646,7 +1593,7 @@ export const enUS = {
   "main.gateReview.dispatched":
     "Flow {flowId}: gate {gateId} review submitted to QA (working); this is not an acceptance pass and not customer approval.",
   "main.gateReview.alreadyDispatched":
-    "Flow {flowId}: gate {gateId} review was already submitted (in flight or passed); not dispatched again. Check the gate step status with flow_get.",
+    "Flow {flowId}: gate {gateId} review was already submitted (in flight or passed); not dispatched again. Check the gate step status with removedFlowGet.",
   "main.gateReview.gateNotFound":
     "Flow {flowId}: gate {gateId} not found (the step does not exist or is not a gate); check the flow YAML and submit again.",
   "main.gateReview.criteriaMissing":
@@ -1656,7 +1603,7 @@ export const enUS = {
   "main.gateReview.flowBusy":
     "The flow still has in-flight deliveries, runs, or handbacks, so the gate is not dispatched yet; this is a retryable state, not a failure or a gate failure — retry after the in-flight work finishes.",
   "main.gateReview.unavailable":
-    "Flow {flowId}: the gate {gateId} review channel is unavailable ({detail}); it may already have been dispatched — check with flow_get. The app does not claim dispatch and never decides a pass on its own.",
+    "Flow {flowId}: the gate {gateId} review channel is unavailable ({detail}); it may already have been dispatched — check with removedFlowGet. The app does not claim dispatch and never decides a pass on its own.",
   "main.gateReview.rejected":
     "Flow {flowId}: the gate {gateId} review request was rejected ({detail}); fix the cause and resubmit instead of retrying unchanged.",
   "main.gateReview.passNote":

@@ -23,7 +23,6 @@ import {
 } from "@/chat/work-view";
 import { findRole, roleDisplayName } from "@/chat/role-view";
 import { QueuePanel } from "@/shell/QueuePanel";
-import { FlowStatusPanel } from "@/shell/FlowStatusPanel";
 import { BackgroundTasksPanel } from "@/shell/BackgroundTasksPanel";
 import { useLocaleState, useT } from "@/i18n";
 
@@ -234,7 +233,6 @@ export function WorkOverview({ roleId }: { roleId: string | null }) {
         </WorkSection>
       </div>
 
-      <FlowStatusPanel projectRoot={projectRoot} />
 
       <BackgroundTasksPanel projectRoot={projectRoot} runtime={runtime} />
 

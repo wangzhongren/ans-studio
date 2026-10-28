@@ -24,7 +24,7 @@ import type {
   RequestRequirementChangeInput,
   RequestRequirementChangeKind,
 } from "../../src/model/runtime.ts";
-import { intentArtifactPath } from "../../src/pipeline/orchestration/govern-session.ts";
+import { intentArtifactPath } from "../../src/common/编排/governance-judge-intent.ts";
 import { mainT } from "./i18n.ts";
 
 /**
@@ -408,7 +408,7 @@ export function buildRequirementChangeLeadExecutionTaskText(input: {
     "请按以下顺序处理：",
     `1) 读意图 ${intentRel} 与上述票据，核对批准的授权确属新授权及其影响；只在批准范围内执行。`,
     "2) 按需更新 docs/intents/**（goal / scope / acceptance 与客户原话）：写清变更点、理由与影响，保留客户原话与原需求、写清变更前后差异；不得静默扩权、不得借机删减既有需求。",
-    "3) 更新后按既有 hand_off_intent（clarification / revision）通知 策划 / Draft 依据已批准的新意图修订提案；由 Draft 出新版本提案并重发提案卡，不由你改提案。",
+    "3) 更新后通知策划 / Draft 依据已批准的新意图修订提案；由 Draft 出新版本提案并重发提案卡，不由你改提案。",
     "硬性禁止：",
     "- 不得自行批准 / 拒绝 / 代选需求变更，也不得再发 intent-confirm 充当需求变更审批（审批已在 decision 卡完成）。",
     "- 不得把新授权写进提案卡，不得让 Draft 以提案卡替代需求变更审批。",

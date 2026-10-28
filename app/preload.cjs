@@ -39,59 +39,6 @@ contextBridge.exposeInMainWorld("desktop", {
   /** 枚举项目下的角色（含角色卡正文、边界条目、文档与变更记录索引）。 */
   listProject: (projectRoot) => ipcRenderer.invoke("app:list-project", { projectRoot }),
 
-  // —— 流程状态只读（2026-10-25）：docs/flows/<flowId>.yaml 的步骤进度（拉取式；无主→渲推送）——
-  /**
-   * 扫描 `<projectRoot>/docs/flows/*.yaml` 并返回 `{ok:true, flows:[...], errors:[{file,error}]}`
-   * 或 `{ok:false, error}`。`docs/flows` 不存在 ⇒ 空列表（不是错误）；坏文件只进 `errors`，不影响其他文件；
-   * 每个 flow 的 `current` 可能为空数组。**只读**：不写文件、不碰治理账本。只传字符串，不暴露 Node 能力。
-   */
-  getFlowStatus: (projectRoot) =>
-    ipcRenderer.invoke("flow:status", { projectRoot: typeof projectRoot === "string" ? projectRoot : "" }),
-
-  /**
-   * I2（existing-project-compat V1，PM 评审 §四.2）：预览「建立治理记录」——**只读**，不写文件。
-   * 主进程守卫：projectRoot 必须是当前导入项目；`governanceModel`（可选，single|trio）由 Interface
-   * 校验并透传给机制（缺省＝single，旧行为逐字不变）。其余状态由机制原样回执。
-   */
-  previewGovernanceRecord: (projectRoot, options) => ipcRenderer.invoke("project:governance-preview", {
-    projectRoot,
-    ...(options && Object.prototype.hasOwnProperty.call(options, "governanceModel") ? { governanceModel: options.governanceModel } : {}),
-  }),
-
-  /**
-   * I2：显式建立治理记录——**仅**由渲染侧预览面板的确认按钮调用（导入/枚举/定时器等一律不得调用）。
-   * `confirm: true` 固定在本桥内；`governanceModel`（可选）原样上送、由 Interface 校验（非法即 invalid-request）。
-   */
-  establishGovernanceRecord: (projectRoot, options) =>
-    ipcRenderer.invoke("project:governance-establish", {
-      projectRoot,
-      confirm: true,
-      ...(options && Object.prototype.hasOwnProperty.call(options, "governanceModel") ? { governanceModel: options.governanceModel } : {}),
-    }),
-
-  /**
-   * C2（治理记录 pin 不符的重新接受恢复，PM 评审 §5.3）：预览重新接受——**只读**，不写文件。
-   * 主进程守卫：projectRoot 必须是当前导入项目；其余状态由机制原样回执。
-   */
-  previewGovernanceReacceptance: (projectRoot) =>
-    ipcRenderer.invoke("project:governance-reaccept-preview", { projectRoot }),
-
-  /**
-   * C2：显式重新接受现有 pin——**仅**由渲染侧预览面板的确认按钮调用。
-   * `confirm: true` 固定在本桥内；主进程 Interface 再校验它、当前导入项目与 64 hex previewDigest。
-   */
-  reacceptGovernancePins: (projectRoot, previewDigest) =>
-    ipcRenderer.invoke("project:governance-reaccept", { projectRoot, confirm: true, previewDigest }),
-
-  /**
-   * V1b 预留（评审 §5.5/§11.2）：治理模型迁移预览/写入。本版 Interface 恒回 `not-available`
-   * （零写入、不改 `.ans`/manifest）——渲染侧据此显示「升级入口待本版后续」，**不得**当作已可用。
-   */
-  previewGovernanceMigration: (projectRoot) =>
-    ipcRenderer.invoke("project:governance-migrate-preview", { projectRoot }),
-  migrateGovernanceModel: (projectRoot, previewDigest) =>
-    ipcRenderer.invoke("project:governance-migrate", { projectRoot, confirm: true, previewDigest }),
-
   /** B/2: only opaque current-project refs; no renderer filesystem paths. */
   readProjectDocument: (input) => ipcRenderer.invoke("project:document-read", input),
   retryReportSave: input => ipcRenderer.invoke('report:retry-save', input),
@@ -253,18 +200,6 @@ contextBridge.exposeInMainWorld("desktop", {
   },
 
   /**
-   * 订阅「治理流程下一步」（2026-10-18 客户修正）：客户决定**成功结算**后主进程推 `governance:next-step`，
-   * 载荷 `{version:1, flowId?, cardKind, nextFunction, roleId, proposalPath?}`。
-   * **仅供界面显示状态行/提示**——UI 不得据此打开/切换会话：下一步任务由主进程在后台派发，
-   * 当前会话与输入焦点不变。取消/拒绝/失效不发。返回取消订阅函数。
-   */
-  onGovernanceNextStep: (cb) => {
-    const listener = (_event, payload) => cb(payload);
-    ipcRenderer.on("governance:next-step", listener);
-    return () => ipcRenderer.removeListener("governance:next-step", listener);
-  },
-
-  /**
    * 订阅「shell 命令确认请求」（M-1，2026-10-12）：三层闸 (a) 层为**应用内确认卡**（不再用原生对话框）。
    * 主进程推 `{id, command, summary, reasonPlain, reasonRaw, argvLines, cwd}`——`command` 为**逐字原文**；
    * `summary`/`reasonPlain` 已由主进程翻成**人话**（内部行话不外露）；`reasonRaw`/`argvLines`/`cwd` 供
@@ -331,30 +266,6 @@ contextBridge.exposeInMainWorld("desktop", {
     ipcRenderer.on("session:operator-judge", listener);
     return () => ipcRenderer.removeListener("session:operator-judge", listener);
   },
-
-  /**
-   * 订阅「恢复确认请求」（G-2/W5，2026-10-16 客户批准）：su 经 `propose_recovery` 提议恢复动作
-   * （停止本轮 / 重建会话 / 重投任务，带逐字证据）时，主进程把卡推来——渲染侧渲染为确认卡
-   * （**取消为默认焦点**）。载荷 `{id, projectRoot?, runtime?, roleId, action, evidence, reason?,
-   * requestedBy?, requestedAt?, itemId?}`——`evidence` 逐字；缺省位隐藏、不假装有值。
-   * 返回取消订阅函数。（通道缺席 = 未接线：无卡可点即无执行路径——fail-closed。）
-   */
-  onRecoveryConfirm: (cb) => {
-    const listener = (_event, payload) => cb(payload);
-    ipcRenderer.on("recovery:confirm-request", listener);
-    return () => ipcRenderer.removeListener("recovery:confirm-request", listener);
-  },
-
-  /**
-   * 回传对恢复确认卡的决定（G-2/W5）：`{id, allow}`——**恰 `allow:true` 才作为执行请求**；
-   * 取消 / Esc / 关闭 = 不执行（fail-closed 的 UI 侧同向）。回报 `{ok:true}` | `{ok:false, expired:true}`
-   * （失效/旧回包——**未获执行**）| `{ok:false, error}`（非法回包不受理）。
-   */
-  recoveryConfirmRespond: (input) =>
-    ipcRenderer.invoke("recovery:confirm-response", {
-      id: input && typeof input.id === "string" ? input.id : "",
-      allow: !!(input && input.allow === true),
-    }),
 
   /**
    * 读取 Pi 配置面板视图（设计 §11/T28）：返回 `{ path, fields:[{key,secret,value,isSet}] }`。

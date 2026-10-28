@@ -471,11 +471,7 @@ function governanceJudgeKindClass(cardKind: string): GovernanceJudgeKindClass {
   if (cardKind === "proposal") return "proposal";
   if (cardKind === "acceptance") return "acceptance";
   if (cardKind === "appointment") return "appointment";
-  if (
-    cardKind === "write" ||
-    cardKind === "appointment-write" ||
-    cardKind === "schedule-write"
-  ) {
+  if (cardKind === "appointment-write") {
     return "write";
   }
   return "generic";
@@ -523,11 +519,7 @@ export function governanceJudgeResultView(
     headline = selected.length
       ? translate(locale, "ui.judge.headline.appointment", { selected: selection })
       : translate(locale, "ui.judge.headline.appointmentNotReported");
-  } else if (
-    cardKind === "write" ||
-    cardKind === "appointment-write" ||
-    cardKind === "schedule-write"
-  ) {
+  } else if (cardKind === "appointment-write") {
     const pathCount = paths.length;
     const shownPaths = paths.slice(0, 3).join(locale === "zh-CN" ? "、" : ", ");
     headline = pathCount
@@ -559,12 +551,7 @@ export function governanceJudgeResultView(
   ) {
     lines.push(translate(locale, "ui.judge.selectedLine", { items: selection }));
   }
-  if (
-    paths.length &&
-    cardKind !== "write" &&
-    cardKind !== "appointment-write" &&
-    cardKind !== "schedule-write"
-  ) {
+  if (paths.length && cardKind !== "appointment-write") {
     lines.push(
       translate(locale, "ui.judge.pathsLine", {
         paths: paths.join(locale === "zh-CN" ? "、" : ", "),

@@ -254,59 +254,9 @@ export const zhCN = {
   "ui.background.loadFailed": "读取后台任务失败：{detail}",
   "ui.background.refresh": "刷新",
 
-  // ---- 流程状态面板（渲染层；展示 docs/flows/<flowId>.yaml 的步骤进度）----
-  "ui.flow.title": "流程状态",
-  "ui.flow.progress": "{done}/{total} 步",
-  "ui.flow.current": "当前步骤",
-  "ui.flow.owner": "负责",
-  "ui.flow.updatedAt": "更新时间",
-  "ui.flow.empty": "暂无流程状态",
-  "ui.flow.loadFailed": "读取流程状态失败：{detail}",
-  "ui.flow.parseError": "{file} 解析失败：{detail}",
-  "ui.flow.showAll": "显示全部步骤",
-  "ui.flow.hideAll": "收起未完成步骤",
-  "ui.flow.state.pending": "待处理",
-  "ui.flow.state.dispatched": "已派发",
-  "ui.flow.state.delivered": "已交付",
-  "ui.flow.state.done": "已完成",
-  "ui.flow.state.failed": "失败",
-  "ui.flow.state.blocked": "阻塞",
-  "ui.flow.state.superseded": "已替代",
-  "ui.flow.kind.artifact": "产物",
-  "ui.flow.kind.dispatch": "派工",
-  "ui.flow.kind.customerDecision": "客户决定",
-  "ui.flow.kind.acceptance": "验收",
-  "ui.flow.refresh": "刷新",
+  // ---- 流程状态面板（渲染层；展示 docs/removed/<flowId>.yaml 的步骤进度）----
 
   // ---- 验收分诊卡（验收分诊：结论/严重度/建议/来源/汇报文本；桌面UI 接线）----
-  "ui.triage.title": "验收分诊",
-  "ui.triage.question": "对本次验收结果如何处理？",
-  "ui.triage.option.rework": "下发运营修改",
-  "ui.triage.option.reportOnly": "仅汇报不返工",
-  "ui.triage.advice.rework": "建议下发运营修改（{blockers} 个阻断、{majors} 个重要项，改进方案可执行）",
-  "ui.triage.advice.reportOnly": "建议仅汇报不返工（仅 {minors} 个次要/风格项）",
-  "ui.triage.advice.none": "无法自动建议，请人工判断",
-  "ui.triage.conclusion.pass": "通过",
-  "ui.triage.conclusion.fail": "不通过",
-  "ui.triage.conclusion.conditional": "有条件通过",
-  "ui.triage.severity.blocker": "阻断",
-  "ui.triage.severity.major": "重要",
-  "ui.triage.severity.minor": "次要",
-  "ui.triage.severity.nit": "风格建议",
-  "ui.triage.section.summary": "验收结论",
-  "ui.triage.section.failures": "不通过原因",
-  "ui.triage.section.improvements": "改进方案",
-  "ui.triage.section.source": "决定来源",
-  "ui.triage.source.judge": "判断代批（替我决策）",
-  "ui.triage.source.customer": "客户选择",
-  "ui.triage.warn.blockingReportOnly": "报告含阻断项，仅汇报将不修复",
-  "ui.triage.report.head": "验收结论：{conclusion}",
-  "ui.triage.report.reasonLine": "{id} · {severity}：{reason}",
-  "ui.triage.report.actionLine": "改进建议：{action}",
-  "ui.triage.report.pathLine": "报告：{path}",
-  "ui.triage.report.noRework": "本次不返工（{source}）",
-  "ui.triage.returnedToVerifier": "验收报告缺少分诊结构，已退回质检补充",
-  "ui.triage.missingReport": "验收报告不可读：{detail}",
 
   // ---- 决策卡（decision card；2026-10-26 客户规则：材料性选择、唯一推荐项、与验收分离；桌面UI 接线）----
   // 语义：decision 卡只记录材料性选择，不是提案/任命/验收，不是客户批准，不触发 gate/验收。
@@ -596,6 +546,7 @@ export const zhCN = {
   "ui.governance.intentBadge": "需求确认 · 客户",
   "ui.governance.queueNote": "等待前一个决定",
   "ui.governance.mirrorBadge": "镜像 · 主入口",
+  "ui.governance.mirrorSource": "来源：{source}",
   "ui.governance.power.proposal": "提案",
   "ui.governance.power.appointment": "任命",
   "ui.governance.power.appointmentWrite": "任命写卡",
@@ -941,13 +892,13 @@ export const zhCN = {
   "ui.judge.decisionOff": "替我决策",
   "ui.judge.bridgeMissing": "当前版本不支持自动判断，保持手动",
   "ui.judge.decisionSingleNote": "旧治理模型（single）不支持代决策",
-  "ui.judge.shellOffTitle": "手动逐条确认 shell 命令与 trio 写盘/写卡确认（默认）",
-  "ui.judge.shellOnTitle": "自动代理先评估 shell 命令与 trio 写盘/写卡确认；可随时关闭",
+  "ui.judge.shellOffTitle": "手动逐条确认 shell 命令与必要写入（默认）",
+  "ui.judge.shellOnTitle": "自动代理先评估 shell 命令与必要写入；可随时关闭",
   "ui.judge.decisionOffTitle": "手动逐张确认提案接受、任命与验收（默认）",
   "ui.judge.decisionOnTitle": "自动代理先评估提案接受、任命与验收；可随时关闭",
   "ui.judge.warningClose": "知道了",
   "ui.judge.toggleOn.shell":
-    "替我审批中：shell 命令与写盘/写卡确认（write / appointment-write / schedule-write）将由自动代理代批。",
+    "替我审批中：shell 命令与写盘/写卡确认（write / appointment-write / removedScheduleWrite）将由自动代理代批。",
   "ui.judge.toggleOn.decision": "替我决策中：提案接受、任命、验收将由自动代理代批。",
   "ui.judge.scopeNote":
     "自动代理只读项目内代码/文档/角色卡（不含 .env、密钥/凭据、.ans 账本/会话、审计日志与项目外），不写文件、不执行命令；只代你「接受/任命/确认/验收」，不会代你拒绝、要求修改或勾选证据不足的候选；不确定、缺证据、读取失败、引擎不可用、超时或解析失败会按所属开关回落逐张卡，由你决定。",
@@ -1035,7 +986,7 @@ export const zhCN = {
   // ---- 后台任务服务（background tasks）----
   "main.backgroundTasks.unavailable": "后台任务服务不可用",
 
-  // ---- 流程状态服务（flow status；docs/flows/<flowId>.yaml 读取）----
+  // ---- 流程状态服务（flow status；docs/removed/<flowId>.yaml 读取）----
   "main.flowStatus.unavailable": "流程状态服务不可用",
   "main.flowStatus.invalidProject": "无效的项目目录",
 
@@ -1266,7 +1217,7 @@ export const zhCN = {
     "验收已通过（判断代批或客户手批，以账本 customer.decision 为准），流程 {flowId} 已收口（保留验收步骤已标 done）。",
   "main.interface.deliveredStepsHeader": "流程 {flowId}：以下步骤已 delivered，等待运营核证：",
   "main.interface.deliveredStepLine":
-    "- 步骤 {stepId} 已 delivered（owner={owner}），请核对账本/产物证据，用 flow_step_update 标 done 或退回修正；不要直接写 flow YAML。",
+    "- 步骤 {stepId} 已 delivered（owner={owner}），请核对账本/产物证据，用 removedFlowStepUpdate 标 done 或退回修正；不要直接写 flow YAML。",
   "main.interface.deliveredVerificationNote":
     "核证要求：先核对账本与产物证据再更新步骤状态；未达 done 条件请退回修正；不要直接 write_file 流程 YAML。",
   "main.interface.deliveredWaitNote":
@@ -1282,7 +1233,7 @@ export const zhCN = {
   "main.interface.readFileFailed": "读取失败：{detail}",
   "main.interface.teamPlanMissingUnreadable":
     "团队计划缺失或不可读（账本 appointment 已绑定该计划）；请运营重新写出计划后再校验",
-  "main.interface.teamPlanMissingLegacy": "团队计划缺失：按 legacy 流程只做最低结构检查（建议迁移 team-plan / role-cards 流程）",
+  "main.interface.teamPlanMissingLegacy": "团队计划缺失：按 legacy 流程只做最低结构检查（建议迁移 removedTeamPlan / role-cards 流程）",
   "main.interface.teamPlanRoleMissing": "团队计划缺少推荐/任命角色 {roleId} 的角色行",
   "main.interface.teamPlanRoleTypeInvalid":
     "团队计划角色 {roleId} 的类型缺失或不可识别（须为 new / changed / existing）",
@@ -1367,7 +1318,7 @@ export const zhCN = {
     "已从上次运行恢复 {count} 条任务并重投（应用重启/崩溃后续跑；不弹客户卡、不把步骤标 done）：\n{lines}",
   "main.interface.staleStepFact": "- 步骤 {stepId}（owner: {owner}，status: {status}）",
   "main.interface.staleSteps":
-    "流程 {flowId}：检测到 {count} 个步骤可能因应用重启/崩溃丢失（flow YAML 标记为已派发，但 owner 无会话/队列/在途投递）：\n{facts}\n请用 flow_get 核对当前 revision，必要时用 flow_step_supersede 换新步骤并 dispatch_task 重派；不要重复使用已派 stepId。",
+    "流程 {flowId}：检测到 {count} 个步骤可能因应用重启/崩溃丢失（flow YAML 标记为已派发，但 owner 无会话/队列/在途投递）：\n{facts}\n请用 removedFlowGet 核对当前 revision，必要时用 removedFlowStepSupersede 换新步骤并 dispatch_task 重派；不要重复使用已派 stepId。",
   "main.interface.saveProjectNotActive": "该项目不是当前导入项目。",
   "main.interface.missingProjectRoot": "缺少项目根路径。",
   "main.interface.pinCheckFailed": "pin 证据检查失败：{detail}",
@@ -1444,13 +1395,13 @@ export const zhCN = {
   "main.governance.acceptanceReworkPending":
     "流程 {flowId}：返工路由尚未完成（等待发送或等待下一次事件重试）；应用暂不派发验收复核，也不会重复通知。",
   "main.governance.acceptanceReworkReportIncomplete":
-    "流程 {flowId}：验收报告缺少可解析的 acceptance-rework/v1 结构化返工段（{detail}）；应用已把报告路径 {reportPath} 与解析错误交运营组织人工返工，未生成返工项、未创建流程步骤。",
+    "流程 {flowId}：验收报告缺少可解析的 removedAcceptanceRework/v1 结构化返工段（{detail}）；应用已把报告路径 {reportPath} 与解析错误交运营组织人工返工，未生成返工项、未创建流程步骤。",
   "main.governance.acceptanceReworkFailed":
     "流程 {flowId}：返工路由失败（{detail}）；应用不声称已送达，也不会派发验收复核；修正后下一次事件会自动重试。",
   "main.governance.acceptanceReworkAuditFailed":
     "流程 {flowId}：返工任务已按路由规则转交，但审计记录写入失败（{detail}）；已发送事实不翻转，应用不会伪造账本，请检查账本与诊断。",
 
-  // ---- Gate 复核回执与系统行（2026-10-26 request_gate_review；设计 §5–§8/§12）----
+  // ---- Gate 复核回执与系统行（2026-10-26 removedRequestGateReview；设计 §5–§8/§12）----
   // 参数契约：{flowId} 流程 id；{gateId} gate 步骤 id；{reportPath} gate 报告相对路径；
   // {detail} 有界诊断/缺项说明；{severity} 失败严重度摘要（blocker/major）。
   // 语义：gate 复核 ≠ 验收通过 ≠ 客户批准；gate 结论不写 customer.decision、不进入验收分诊。
@@ -1459,7 +1410,7 @@ export const zhCN = {
   "main.gateReview.dispatched":
     "流程 {flowId}：已提交 gate {gateId} 复核给质检（工作中）；gate 复核 ≠ 验收通过 ≠ 客户批准。",
   "main.gateReview.alreadyDispatched":
-    "流程 {flowId}：gate {gateId} 复核已提交过（在途或已通过），未重复派发；请用 flow_get 核对 gate 步骤状态。",
+    "流程 {flowId}：gate {gateId} 复核已提交过（在途或已通过），未重复派发；请用 removedFlowGet 核对 gate 步骤状态。",
   "main.gateReview.gateNotFound":
     "流程 {flowId}：未找到 gate {gateId}（步骤不存在或不是 gate）；请核对 flow YAML 后重新提交。",
   "main.gateReview.criteriaMissing":
@@ -1469,7 +1420,7 @@ export const zhCN = {
   "main.gateReview.flowBusy":
     "流程仍有在途交付/轮次/回交，gate 暂不派发；这是可重试状态，不是故障或 gate 失败；请在在途工作结束后重试。",
   "main.gateReview.unavailable":
-    "流程 {flowId}：gate {gateId} 复核通道不可用（{detail}）；可能已派发，请用 flow_get 核对；应用未声称已派发，不自行判定通过。",
+    "流程 {flowId}：gate {gateId} 复核通道不可用（{detail}）；可能已派发，请用 removedFlowGet 核对；应用未声称已派发，不自行判定通过。",
   "main.gateReview.rejected":
     "流程 {flowId}：gate {gateId} 复核请求被拒（{detail}）；请按原因修正后重交，不原样重试。",
   "main.gateReview.passNote":
