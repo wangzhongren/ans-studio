@@ -1414,6 +1414,47 @@ test("批次 A 六角色身份层：注册表 entries/预授权/禁写/能力位
   }
 });
 
+test("R1 卡文本一致性：chief/product 的禁写路径段与 Section 1/代码 forbiddenWritePaths 一致，不提前列目标写区", () => {
+  for (const id of ["chief", "product"] as const) {
+    const spec = governanceRoleOf(id)!;
+    const line = spec.cardText.split("\n").find((l) => l.startsWith("禁写路径："));
+    assert.ok(line !== undefined, `${id} 卡须有禁写路径段`);
+    const mentioned = [...line!.matchAll(/`([^`]+)`/g)].map((m) => m[1]!.replace(/\*\*$/, ""));
+    // Section 1 路径不得出现在禁写路径段（F2/R1：product 写 docs/intents 又禁 docs/intents 的矛盾）。
+    for (const entry of spec.entries) {
+      const p = entry.path.replace(/\/$/, "");
+      assert.equal(
+        mentioned.some((m) => m === p || m === `${p}/` || m.startsWith(`${p}/`)),
+        false,
+        `${id} 卡禁写路径不得包含 Section 1 路径 ${entry.path}`,
+      );
+    }
+    // 代码 forbiddenWritePaths 的每个前缀都须被卡文本覆盖（exact 文件可出现在卡文本其他行）。
+    for (const forbidden of spec.forbiddenWritePaths) {
+      const p = forbidden.replace(/\/$/, "");
+      const covered =
+        mentioned.some((m) => m === p || m === `${p}/` || m.startsWith(`${p}/`)) ||
+        spec.cardText.includes(forbidden) ||
+        spec.cardText.includes(`${p}/**`);
+      assert.ok(covered, `${id} 卡文本须覆盖代码禁写前缀 ${forbidden}`);
+    }
+    // 反向：不得提前列出 D 生效的目标写区（chief 曾残留 docs/verification）。
+    for (const target of [
+      "docs/product/",
+      "docs/scheduling/",
+      "docs/acceptance/",
+      "docs/verification/",
+      "docs/quality/",
+    ]) {
+      assert.equal(
+        mentioned.some((m) => m === target || m === target.replace(/\/$/, "") || m.startsWith(target)),
+        false,
+        `${id} 卡禁写段不得提前列出目标写区 ${target}`,
+      );
+    }
+  }
+});
+
 test("2026-10-22 角色粒度/MapReduce：ENGINEERING_QUALITY_BASELINE 文本逐字不变（P10/P12）", () => {
   // 工程基线是客户 2026-10-19 批准的单一来源文本；本批不得改动（真实启动/演示要求不降）。
   const expected = [

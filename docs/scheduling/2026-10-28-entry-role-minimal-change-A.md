@@ -88,16 +88,16 @@
 - **基线 16 红分类**：9 条 Windows symlink EPERM（`claude-adapter/session`、`codex-adapter/session`、`pi-adapter/injected-runtime`×2、`runtime-core/file-write-safety`、`runtime-core/session-store`×2、`测试/g4-skill-verify/b-render-double-check`、`编排/shell-authorized-routine`）+ 7 条断言既红（`桌面应用/acceptance-dispatch:7756`、`测试/governance-e2e-auto/k-governance-feedback`、`测试/governance-e2e-auto/s-acceptance-rework-routing` S7-F、`测试/governance-liaison-verify/e-audit`、`测试/t1-pipeline-integration`×3）。
 
 - **本批最终运行（2026-10-28，rework 最终候选）**：文件枚举 **409** / 执行 **408**（与 S1 同口径排除 `write-sequencing`）；tests **4499** / pass **4463** / fail **17** / skip **19** / exit 1；原始日志 `/tmp/final3-tests.log`（sha256 `55efc7654ba72ef17bbff5512904ebe64c15b54d07a6c4a52fc0d4d7088fe2c3`）。
-- **失败分类（17）**：**9 条 Windows symlink EPERM**（`claude-adapter/session`、`codex-adapter/session`、`pi-adapter/injected-runtime`×2、`runtime-core/file-write-safety`、`runtime-core/session-store`×2、`测试/g4-skill-verify/b-render-double-check`、`编排/shell-authorized-routine`）+ **6 条稳定基线断言既红**（`测试/governance-e2e-auto/s-acceptance-rework-routing` S7-F、`测试/t1-pipeline-integration`×3、`测试/governance-e2e-auto/k-governance-feedback`、`测试/governance-liaison-verify/e-audit`）+ **2 条 `test/桌面应用/acceptance-dispatch.test.ts` 环境/时序敏感项**（`2026-10-23 重派门` 与 S1 既红 `2026-10-27 gate 路由记录写失败`）——该文件在最终候选上**单独运行 143/143 pass**（日志 `/tmp/acceptance-dispatch-alone.log`），说明为全量负载下的非确定性，非本批行为回归。**新增确定性失败 = 0；无新增 skip；未删除/弱化测试断言保绿。**
-- **对照 S1（4495/4460/16/19）**：tests **+4**（`liaison-role.test.ts` 重写 9→13 个 `test()`）；skip **19 不变**；fail 16→17、pass 4460→4463 的差异来自上述 acceptance-dispatch 时序敏感项（其 7756 为 S1 既红；本轮全量再次红、单独运行绿）。此前同一批代码区域的全量运行（amendment-2 前的 rework 候选）为 4499/4465/15/19，失败集为 9 symlink + 6 稳定断言既红，可作为同候选对照。
-- **基线红转绿/复红说明**：`test/桌面应用/acceptance-dispatch.test.ts:7756` 在 S1 为既红；在本候选的多次运行中与全量负载相关地摆动（单独运行 143/143 全绿）。本批未以它为目标、未据此声明修复；D 批随 `acceptance-dispatch` 重写。
-- **静态/构建**：`npm run typecheck` exit 0（`aee16865…`）；`typecheck:renderer` exit 0（`914780f6…`）；`build:renderer` exit 0（`397e0c68…`）。
+- **失败分类（17）**：**9 条 Windows symlink EPERM**（`claude-adapter/session`、`codex-adapter/session`、`pi-adapter/injected-runtime`×2、`runtime-core/file-write-safety`、`runtime-core/session-store`×2、`测试/g4-skill-verify/b-render-double-check`、`编排/shell-authorized-routine`）+ **6 条稳定基线断言既红**（`测试/governance-e2e-auto/s-acceptance-rework-routing` S7-F、`测试/t1-pipeline-integration`×3、`测试/governance-e2e-auto/k-governance-feedback`、`测试/governance-liaison-verify/e-audit`）+ **2 条 `test/桌面应用/acceptance-dispatch.test.ts` 环境/时序敏感项**（`2026-10-23 重派门` 与 S1 既红 `2026-10-27 gate 路由记录写失败`）——该文件不在本批改动；在最终候选上**单独运行 3 次**登记：run1 `142/143` fail `gate 报告不可读（R2b）`（`/tmp/a3-ad-run1.log`，`2762fe52…`）、run2 `143/143` pass（`/tmp/a3-ad-run2.log`，`364edd52…`）、run3 `142/143` fail S1 既红 `gate 路由记录写失败`（`/tmp/a3-ad-run3.log`，`cc99f6e8…`）——**环境/时序敏感 flake（失败项逐轮不同）**，非本批确定性回归，也不作为稳定全绿证据。**新增确定性失败 = 0；无新增 skip；未删除/弱化测试断言保绿。**
+- **对照 S1（4495/4460/16/19）**：tests **+4**（`liaison-role.test.ts` 重写 9→13 个 `test()`）；skip **19 不变**；fail 16→17、pass 4460→4463 的差异来自上述 acceptance-dispatch 时序敏感项（其 7756 为 S1 既红；3 次单跑见下：142/143、143/143、142/143）。此前同一批代码区域的全量运行（amendment-2 前的 rework 候选）为 4499/4465/15/19，失败集为 9 symlink + 6 稳定断言既红，可作为同候选对照。
+- **基线红转绿/复红说明**：`test/桌面应用/acceptance-dispatch.test.ts:7756` 在 S1 为既红；在本候选的多次运行中与全量负载相关地摆动（3 次单跑：142/143、143/143、142/143，失败项不同）。本批未以它为目标、未据此声明修复；D 批随 `acceptance-dispatch` 重写；发布前 gate 需 clean 运行。
+- **静态/构建**：`npm run typecheck` exit 0（`aee16865…`）；`typecheck:renderer` exit 0（`914780f6…`）；`build:renderer` exit 0（`397e0c68…`；第三轮窄修后重跑 `/tmp/a3-build-renderer.log` = `0a148231…`）。
 
 ### 3.3 测试差异表（逐文件；含断言数前后对照）
 
 | 文件 | 处置 | 断言数（基线→候选） | 原因/说明 |
 | --- | --- | --- | --- |
-| `test/门禁引擎/governance-trio.test.ts` | 重写 | 472 → 485 | 六角色注册/显示名/职能；A 批快照「当前旧态 + 目标态」；product 承接旧 liaison 现行写区；旧卡文本断言收窄到旧五名。 |
+| `test/门禁引擎/governance-trio.test.ts` | 重写 | 472 → 489 | 六角色注册/显示名/职能；A 批快照「当前旧态 + 目标态」；product 承接旧 liaison 现行写区；旧卡文本断言收窄到旧五名。 |
 | `test/门禁引擎/list-project.test.ts` | 重写 | 84 → 87 | trio 六角色/`primaryRoleId=chief`；product `docs/intents/` 现行写区断言。 |
 | `test/门禁引擎/liaison-role.test.ts` | 重写/退役 | **93 → 96**（test() 9→13） | 由 liaison 覆盖改为 chief/product 覆盖；补 product 当前写区/写权/卡文本断言，覆盖未弱化（+3）。 |
 | `test/门禁引擎/customer-card-rules.test.ts` | 最小断言同步 | 10 → 10 | 仅「注册表五角色」→六角色。 |
@@ -128,7 +128,7 @@
 | `test/桌面应用/genesis-bootstrap.test.ts` | 最小断言同步 | 28 → 28 | trio 主入口 liaison→chief。 |
 | `test/测试/governance-e2e-auto/q-role-granularity.test.ts`、`test/测试/real-entry.test.ts` | 复核（未改） | — | 无旧角色集断言，实际运行通过。 |
 
-**测试数变化**：`test()` 用例 +4（`liaison-role.test.ts` 9→13）；断言数全部持平或增加（F3 已补回：93→95）。
+**测试数变化**：`test()` 用例 +4（`liaison-role.test.ts` 9→13）；断言数全部持平或增加（F3 已补回：93→96）。
 
 ---
 
@@ -152,11 +152,12 @@
 
 ## 六、证据、环境与整树标识
 
-- **提交 SHA**：首提交 `f4aa073a7032d35afc2e964dc22b4d171f1d26dc`；**rework 提交（代码/测试/属主记录/本文件初版）** `83f2d2e30fd8df0c51a50f809f61fc9b28a05097`；本文件最终版位于其后的**证据补录提交**（其父为 `83f2d2e`；SHA 见 `git log --format=%H -1`）。
+- **提交 SHA**：首提交 `f4aa073a7032d35afc2e964dc22b4d171f1d26dc`；返工提交（代码/测试/属主记录/change-package 初版）`83f2d2e30fd8df0c51a50f809f61fc9b28a05097`；证据补录提交（C2）`b6ff88734c4b5f743c639582d22daaf57509a691`；**第三轮窄修提交（C3，本文件最终版；SHA 见 `git log --format=%H -1`）**。
 - **整树标识（可复算口径）**：
   - 首提交批次差异：`git diff --binary 8fc673e f4aa073a | sha256sum` = `35167593ace525d1cc6ef139684a4344766a0fe91cc6a58f9775025fd118dbd4`（含变更包）。
   - **rework 候选（C1）**：`git diff --binary 8fc673e 83f2d2e30fd8df0c51a50f809f61fc9b28a05097 | sha256sum` = `fbcc6e8448576f48adc2bc0467641d98fc9db946c62810008c4cc62b05cd5311`（含 C1 版变更包与属主记录）。
-  - **证据补录提交（C2）**：只更新本 change-package（文档，不改变产品候选）；其 `git diff --binary 8fc673e <C2>` 由复审/最终报告按 `git log` 取 C2 后复算。
+  - **证据补录提交（C2 `b6ff8873`）**：只更新 change-package（文档）；`git diff --binary 8fc673e b6ff8873 | sha256sum` = `60133ba8a68d8c8059d220e032eddce66f51f21365f117a1bff1e8de0b608671`（复审已记录）。
+  - **第三轮窄修提交（C3）**：修正 R1 卡文本、R2 属主记录、R3 文字、R4 证据口径/R5 附录口径；只改卡文本/测试/记录/本文件；其 `git diff --binary 8fc673e <C3>` 由最终报告/复审按 `git log` 取 C3 后复算（自引用限制）。
   - 口径说明：首版 change-package 曾记录 `46af3a06…`，那是**提交前 `git diff --binary`（tracked-only，未含未跟踪的 change-package 文件）**；验收按提交后整批差异复算为 `35167593…`。本版统一以「提交后 `git diff --binary 8fc673e <commit>`」为准并记录。
 - **属主 change 记录（P7）**：`角色卡/{门禁引擎,编排,桌面窗口,桌面UI,项目管理,测试}/docs/change/2026-10-28_change_entry-role-minimal-A.md`。
 - **全量/静态日志**：`/tmp/final3-tests.log`（sha256 见 §3.2）、`/tmp/final3-typecheck.log`、`/tmp/final3-typecheck-renderer.log`、`/tmp/final3-build-renderer.log`（sha256 见 §3.1/§3.2 与复审记录）。
@@ -196,7 +197,7 @@
 | `docs/scheduling/2026-10-28-entry-role-minimal-gate2-amendment-2.md` | `64f237cfea811a9ce7e211bf33d26c2ca375b2c5` | `8d5ddeb5d45690d34ac5ef9031cae80768f47b8e07ecd37685d61e940395aaae` |
 | `src/common/shared/i18n/messages/en-US.ts` | `99ca2d4be920057a6562fd7ee7b7a3010fe9c342` | `dca8c7b7a91e7aa3e3bc7dd359f8144ccb0d11a203fc0ce3f3e4c33994eadc02` |
 | `src/common/shared/i18n/messages/zh-CN.ts` | `5c37936879a01ad3ae1db097ff63d28082fba5d1` | `e0c070077ffacb365698ae1fb1d3dc6d0030e1bf9aff14f73fa8f092b63384d5` |
-| `src/common/门禁引擎/governance-roles.ts` | `98e21d3bc3205c6c63be66f1de4f5ebc68408050` | `5920b46689bcf7f1d5213bfabdf2ae05fca9f4bc4d5aa6688a6ac5794dc5ee38` |
+| `src/common/门禁引擎/governance-roles.ts` | `0fb47b6f9f62a40b2476d0fbec37818ad5fa9eef` | `401c2a66f32a2fd526965a18fa12b05c5225c5dfd5e97fe5b6510906b65d733e` |
 | `src/model/role.ts` | `fbc8527cf05e16a946431e00eb8448e3cf9f0bd2` | `7c8ccc91942b4c2e423d4ef0c39baae7a820e47ae66b23ed4ca4f1a3f0fd1b52` |
 | `src/pipeline/orchestration/govern-session.ts` | `34a654ac91d89e2bb8dc993fa761c1b8d8a58e3c` | `f5aa6ce1c33e763b27be3ab5feb5676f1aa611e420c67a93fbd40fe743d33109` |
 | `src/pipeline/orchestration/run-role.ts` | `cd6e91a414dfb540849279c60fd09ce987c8a52d` | `10ecc61ac485b73508feece8f7f92a039247ab4aca2351fa7ccbccac0c836433` |
@@ -223,7 +224,7 @@
 | `test/门禁引擎/customer-card-rules.test.ts` | `834b0f5b5f27102fd38dd9e085a16db5f55e5cf4` | `89e4f3bae6d919674368abbb0dc0b9f509b6f019b4d502aaee182795599a431c` |
 | `test/门禁引擎/gate-review-flow-busy.test.ts` | `95da322926b8413f09def6901b6f0e489adb1a2f` | `e4ba3d73f60558fc995da4bab836d7c63f500cad022ce4b009f8e3101effe756` |
 | `test/门禁引擎/governance-standard-workflow.test.ts` | `63fb15fe8776d383c26ec12544f644a36c0bc650` | `48205f350cfac4992f4bb49f46bab2ebaf29c53812a75408fd963494b2369323` |
-| `test/门禁引擎/governance-trio.test.ts` | `03481a8f1a3f2c7ce373071d9d6ea3977a3a2aff` | `37133327e3edc45331c9b609f6f9fd4e9925c88df6a7ddeca383f4bf4df465eb` |
+| `test/门禁引擎/governance-trio.test.ts` | `169890c372e36065a55db8327d07a0d74d931420` | `0fd041861775eef16897fc9e4f450992105ed36b34034580317a9912ecd4af0e` |
 | `test/门禁引擎/liaison-role.test.ts` | `204aa561308a4b51e4a6345c8b5837723004c891` | `988cf048d82c3124d6885d8ab9cb73b566235596ab7609fd53eba544b4e0ebec` |
 | `test/门禁引擎/list-project.test.ts` | `a9160bb2427a5b9960ef6dbaca506b19e5a3c6bc` | `a5421874a020c5d1eb2bc4b3c2e27069c755aedd865a0dd6314fddad0c549b5d` |
 | `test/门禁引擎/requirement-change-cards.test.ts` | `074bbac8afe305cb6ab096ce65cd092e16f0bd03` | `bc01a46a0282a951904b51d7c8dcbdc74c2e53782cc3276140eb139d6f79cc4e` |
@@ -231,13 +232,15 @@
 | `test/门禁引擎/verifier-artifact-report.test.ts` | `9a586998c383679b5b4f2cb817ea4f759b677190` | `965d030746448146ef20147e6e70ea07163eb086ffab6d510346ba14f32d1182` |
 | `test/门禁引擎/view-image-cards.test.ts` | `47d09aba5bf2c4ba782a42d5400b3f1617fb0b46` | `bb6f7e08730af82392d8cdce672fb8418257012c649e81510ed663ce2dfc4da2` |
 | `test/项目管理/shared/i18n.test.ts` | `24aa5dc3e63c7ae2cbaeec12185f332d6864c4f2` | `3267eb6fcf360cb9bfda5f2f57e6d2af32ce667819d7e3c0a1f9edd97159a6ed` |
-| `角色卡/桌面UI/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `c5dffa741aaddd24ac0b4684157d181e69385c6d` | `0972c7c8d6b10d864bea733d722d9df939d9077f3d954d6e145a4012c5872c67` |
-| `角色卡/桌面窗口/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `d2a186aaaa88fce7f6782023674303fc12a1a60d` | `93c5e525408f775dd24854acb0ca8bbf63e1a0dfc646014f1fd9c36b006da050` |
-| `角色卡/测试/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `b6a1c83b901f146a35e9849c821aed1b562296d6` | `e637997d112a94244f605846916acf4c0218314721f7c92cdb46ef4df715d8a5` |
-| `角色卡/编排/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `1f8d3d375349ddcbfb0d5a908bd2e807ae6daa61` | `90fcef6a70a95f2ce1a1f6af7411a13abb6e34bb1cf6bff64d8dde8e8d724c41` |
-| `角色卡/门禁引擎/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `98b32a9b9905ffd61f9412deecfb805c899b9dd0` | `f8c4f0f450a8af2912f3546df8d21877bd2c57e4ccef70b53f112300fa34c11e` |
-| `角色卡/项目管理/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `585572145b89ed97db10a79639884468139ca452` | `ae1bd6ad57bf79e825bd3697d9a78f99351e4fddb2ddf2da8ea40f265db03423` |
+| `角色卡/桌面UI/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `c242c4267a54ece052fe3cc340b3b0c005c06240` | `6c9c77ca182cb0442300117fbb45b50aca0371b12b676b232797bbad2d5c8e47` |
+| `角色卡/桌面窗口/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `dddd18635d07cba19ae8c8453df005fcb6b79d65` | `604b2cf09a51ea023ba0b5e5cb7b7abcf515de23858726b41f18d2e3dfe36993` |
+| `角色卡/测试/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `3e1a205d19d896b454a569101b15b7ab7548f8a6` | `38f1991148a888e86f5ae41e6e3a9c2a97ebf553cbe538188b292714ccbb78f0` |
+| `角色卡/编排/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `b1147707667f7bf6d9d6ffec26c2744df34709b2` | `d060039fff402ee52f5fefc52f024b81226796aed28c58a904369c836312ecad` |
+| `角色卡/门禁引擎/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `118b9f80203a794970860dd6c3b56779a09b98d5` | `72928884f209d1056d8051c7696437aa7bdf212defb330fce44d30e5ce56be33` |
+| `角色卡/项目管理/docs/change/2026-10-28_change_entry-role-minimal-A.md` | `93f2ffec01f386a6a7373599cc30eb1a96fd1150` | `49bc09221efc368cc3b334dbb9054a2f8a516606b81f200841b9dfddc2506250` |
 
+> **sha256 口径（R5）**：附录 A 的 sha256 为**提交 blob 内容**口径（`git cat-file blob <git hash> | sha256sum`），与工作区文件字节（CRLF）的 `sha256sum` 可能不同；逐文件 `git hash-object` 为提交 blob id，两者均可复算。
+>
 > change-package 自身随提交写入，无法自含自身哈希；其最终行数/SHA-256 见提交后的复审报告与最终报告。
 
 ## 附录 B：返工处置对照（F1–F7）
