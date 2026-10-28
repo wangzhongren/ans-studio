@@ -4,7 +4,7 @@
 - 性质：实施候选的 change-package；**不是验收结论、不是发布决定**。独立验收按验收标准 §8（C-01–C-11）判定。
 - 隔离：worktree `.claude/worktrees/entry-role-minimal`；分支 `feat/entry-role-minimal`；本地提交，不 push、不合并 main。
 - 依据：团队计划 `docs/scheduling/2026-10-28-entry-role-minimal-team-plan.md`（**717 行**；SHA-256 `d7bc2626e6d504c250482e90e5c6eb3344072d43d29f6ea09566c54ce2f90921`；§4.2 run-role 已回写）§4.3（348–365 行）、验收标准 §8（C-01–C-11）、协调者 C 批放行前置（2026-10-28）。
-- 候选：B 候选 `c4ee7ade2635ef45f2fa2ecbe4830c270163f2ad`；**C 实施提交 `d85031f665657f191af50fb606a2375e2ea1a71c`**；证据提交见 §12（最终报告给出完整 SHA）。
+- 候选：B 候选 `c4ee7ade2635ef45f2fa2ecbe4830c270163f2ad`；**C 实施提交 `d85031f665657f191af50fb606a2375e2ea1a71c`**；证据提交 `0d1e7a4bd936f9c266fb93a8e9d729c43061b465`（本文件的最终复跑记录提交见最终报告）。
 - 整树哈希（实施）：`git diff --binary c4ee7ade d85031f | sha256sum` = `1249ca13a453ea7c79ec1daca83d7647573c3066fed781cb345d8fec5dc461e8`。
 
 ## 1. 批次目标与生效口径
@@ -110,7 +110,7 @@
 
 ## 10. 验证
 
-- 全量（与 B 同口径，排除 `write-sequencing.test.ts`）：**4569 tests / 4535 pass / 15 fail / 19 skip**；B 基线 4552/4518/15/19 ⇒ **tests +17、pass +17、fail +0、skip +0**。15 fail 全部为基线既红（9 条 Windows symlink + 6 条稳定断言：S7-F、T1 pi/codex/claude×3、k-governance-feedback、e-audit）。日志 `%TEMP%\c-full-final.log`（sha256 `19f8188ef787573a5e863b494250aa1b59adea6306c8f135a4e59e64ab428dcb`）。
+- 全量（与 B 同口径，排除 `write-sequencing.test.ts`）：**4569 tests / 4535 pass / 15 fail / 19 skip**；B 基线 4552/4518/15/19 ⇒ **tests +17、pass +17、fail +0、skip +0**。15 fail 全部为基线既红（9 条 Windows symlink + 6 条稳定断言：S7-F、T1 pi/codex/claude×3、k-governance-feedback、e-audit）。**最终候选（证据提交 HEAD `0d1e7a4bd936f9c266fb93a8e9d729c43061b465`）clean 复跑**；运行前工作区无 `.ans` 残留（残留会令既有 acceptance-dispatch 时序断言偶发超时；复跑前已清理）。日志 `%TEMP%\c-full-final5.log`（sha256 `1ab460491fafc00097ad9b45552c1c5d0eba17b5557194026749fdde53dfb60c`）；实施提交 `d85031f` 上的 clean 全量日志 `%TEMP%\c-full-final.log`（`19f8188ef787573a5e863b494250aa1b59adea6306c8f135a4e59e64ab428dcb`）同为 15 fail。
 - C 专项（7 文件）：**63/63**；日志 `%TEMP%\c-special-final.log`（`ecabc76629c9c55ce2bb46c40ae8bfb9dfa3457b0af9c14b9c651f87559ab7c2`）。
 - 桌面应用全量：**803/803**；日志 `%TEMP%\c-desktop2.log`（`b009973923a1fe368c48c00c0261f7644a034e91add8cd2055e87b3037283ade`）；C-listed 编排/judge/门禁集：304/304（其中 1 条 symlink 基线在 Claude 适配器文件内）；日志 `%TEMP%\c-judge.log`（`7aec18f6907875bafd83980f923e144bc847f84140c54fd7e48bf9475feb3492`）。
 - 静态（逐个 exit 0）：`typecheck` `%TEMP%\c-typecheck.log`（`a5f639a1f80ac13a0066e40c0b9b16a9c0e45ad18dbac0e9ef45489b545a9347`）；`typecheck:renderer`（`f849a6813604908999067fdfa819bc1bf9795df0fe2430105171eabe88593005`）；`build:renderer`（`7f23f216c307f2d776e671b5fce6cc291b7af2e2d2efa55a730acaf9947763d8`）。
