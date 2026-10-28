@@ -4,6 +4,8 @@
 - 候选：`feat/entry-role-minimal`，提交 `e5a533d6afca53c2dcf032011ef6735b00bd8402`；B 基线 `778a7f2`。
 - 改动文件：新增 `src/common/编排/task-state.ts`、`src/common/编排/role-log.ts`；修改 `src/common/编排/handback.ts`、`src/common/编排/watchdog.ts`；测试 `test/编排/task-state.test.ts`（新增）、`test/编排/dispatch-reads.test.ts`（B 段）。
 - 内容：`tasks.jsonl` 事件/重放/坏行/轮转/幂等/副作用升类；每角色日志脱敏/白名单/轮转/保留；`[工作结果]` 短报；`log-silence`/巡检文案；`evaluateRedispatchSafety` 终止/重派安全判定（仅 safe 自动重派）；旧四信号保留。
-- 验证：全量 `4548 tests / 4514 pass / 15 fail / 19 skip（419 个测试文件；基线 4500/4465/16/19）`；专项 11 个新增 + 5 个 B 段全绿；typecheck/build 见 change-B §8；新增确定性失败 0、无新增 skip。
+- 验证：全量 `4552 tests / 4518 pass / 15 fail / 19 skip（419 个测试文件；基线 4500/4465/16/19）`；专项 11 个新增 + 5 个 B 段全绿；typecheck/build 见 change-B §8；新增确定性失败 0、无新增 skip。
 - 边界：未改门禁注册表/旧 gate/flow/ledger；未新增 `src/provider/runtime/` 文件；B 的 chief 注入端在 `run-role.ts` 由团队计划 §3.3 授权。
 - 证据/回滚：`docs/scheduling/2026-10-28-entry-role-minimal-change-B.md`；撤销本批提交并重跑 B 验证。
+
+- B-07/B-08 返工（2026-10-28）：提交 `f151a86529b7e947465ab3112f7196442edf92c1`；fresh 会话/自动换人/decision 升级卡/共享 episode、exit-signal/staging 隔离/in-flight needs-review；全量 4552/4518/15/19、专项 407/407、Electron 17/17。逐文件与属主记录哈希见 change-B §10（41 文件表；worktree sha256 + git blob 双口径）。

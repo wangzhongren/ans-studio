@@ -7,3 +7,5 @@
 - 验证：`typecheck:renderer`/`build:renderer` 见 change-B §8；无 UI 断言变更（旧视图保留到 D）。
 - 边界：未写 `app/renderer/**`、未写 `test/桌面UI/**`；E 批再改。
 - 证据：change-B §1/§5；回滚=撤销 B 提交（本角色零产品代码）。
+
+- B-07/B-08 返工（2026-10-28）：提交 `f151a86529b7e947465ab3112f7196442edf92c1`；fresh 会话/自动换人/decision 升级卡/共享 episode、exit-signal/staging 隔离/in-flight needs-review；全量 4552/4518/15/19、专项 407/407、Electron 17/17。逐文件与属主记录哈希见 change-B §10（41 文件表；worktree sha256 + git blob 双口径）。
