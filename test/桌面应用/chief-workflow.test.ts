@@ -52,7 +52,7 @@ interface Caps {
   redispatchTask?: RedispatchTaskFn;
 }
 
-test("能力矩阵（B 生效）：chief 六能力；convener 旧三能力但无 role_activity_log/终止/重派；项目角色零注入", async () => {
+test("能力矩阵（D 生效）：chief 六能力；convener 不再有 dispatch/role_status/session_tail；项目角色零注入", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chief-"));
   const caps: Record<string, Caps> = {};
   const makeHandle = (): RoleSessionHandle => ({
@@ -84,9 +84,9 @@ test("能力矩阵（B 生效）：chief 六能力；convener 旧三能力但无
     assert.equal(typeof caps.chief.roleActivityLog, "function");
     assert.equal(typeof caps.chief.terminateRoleRun, "function", "chief 获得 terminate_role_run");
     assert.equal(typeof caps.chief.redispatchTask, "function", "chief 获得 redispatch_task");
-    assert.equal(typeof caps.convener.dispatchTask, "function", "convener 旧 dispatch 保留至 D");
-    assert.equal(typeof caps.convener.roleStatus, "function");
-    assert.equal(typeof caps.convener.sessionTail, "function");
+    assert.equal(caps.convener.dispatchTask, undefined, "D 批：convener 不再有 dispatch_task");
+    assert.equal(caps.convener.roleStatus, undefined, "D 批：convener 不再有 role_status");
+    assert.equal(caps.convener.sessionTail, undefined, "D 批：convener 不再有 session_tail");
     assert.equal(caps.convener.roleActivityLog, undefined, "role_activity_log 只给幕僚");
     assert.equal(caps.convener.terminateRoleRun, undefined, "终止动作只给幕僚");
     assert.equal(caps.convener.redispatchTask, undefined, "重派动作只给幕僚");

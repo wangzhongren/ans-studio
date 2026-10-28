@@ -31,17 +31,8 @@
 // 本文件是测试夹具，不是产品代码；路径相对仓库根、POSIX 分隔符、按字典序排列。
 
 export const I18N_GUARD_ALLOWLIST: readonly string[] = [
-  // `request_boundary_change` 桌面纯逻辑：治理关键路径机器常量（`角色卡`、`docs/**`）、
-  // agent-facing 校验失败回执（tool output，交治理 agent，不直接作为 UI 文案）、发给 Crew 的
-  // 边界变更任务正文，以及 AI 门禁判定请求卡（title/question/options/preview 仅进 judge prompt，
-  // 不是客户卡）——均为 classification §4 机器/agent-facing 文本，非用户可见 UI；
-  // 用户可见系统行由调用方按 i18n key 生成（2026-10-26 分类核对）。
-  "app/desktop/boundary-change.ts",
   // 演示运行时 agent-facing `systemPrompt`（demo 演示提示词，不面向客户）——classification §4。
   "app/desktop/chat-adapter.ts",
-  // 发给 Convener/Crew/Lead 的任务正文/提示词（build*TaskMessage）、flow 收口原因常量
-  // （持久化机器状态与解析）、正则与技能路径「编排」——classification §4。
-  "app/desktop/governance-advance.ts",
   // 角色卡/团队计划 schema 词汇（组别/写集/依赖…）、`new/changed/existing` 输入别名、
   // 写卡校验正则、发给 Convener 的任务正文（`userVisibleIssue` 已走 mainT）——classification §4/§6。
   // TODO(B3/PM)：`{label}`（`Crew / 组队`、`Steward / 统筹`）仍是中文参数，被拼进用户可见的

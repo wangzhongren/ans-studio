@@ -156,18 +156,15 @@ test("星形目标：任意内置角色可被派发；幕僚自身拒绝", async
   }
 });
 
-test("convener 旧 dispatch 保留：仍走旧派发门（此处无账本/flow ⇒ 如实拒绝），不写 tasks.jsonl", async () => {
+test("convener D 批撤除 dispatch：运营会话不注入 dispatch_task，不写 tasks.jsonl", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-star-old-"));
   const h = harness(root);
   try {
     await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
     await tick(30);
-    const dispatch = h.caps.convener;
-    assert.equal(typeof dispatch, "function", "convener 旧 dispatch 保留至 D");
-    const receipt = (await dispatch!({ roleId: "worker", task: "旧流程任务", flowId: "flow-1", stepId: "impl" })) as DispatchReceipt;
-    assert.equal(receipt.ok, false, "无账本/提案/任命 ⇒ 旧门拒绝");
+    assert.equal(h.caps.convener, undefined, "D 批：convener 不再拥有 dispatch_task");
     const state = await readTaskState(root);
-    assert.equal(state.records.size, 0, "旧 flow 派发不写 tasks.jsonl");
+    assert.equal(state.records.size, 0, "未注入能力 ⇒ 不写 tasks.jsonl");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true });

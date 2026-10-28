@@ -110,9 +110,10 @@
 
 ## 10. 验证
 
+- 全量命令按 `find test -name '*.test.ts'` **枚举 425 个文件**，排除 `write-sequencing.test.ts` 后**实际执行 424 个**（枚举/执行差 1，为显式排除项）。
 - 全量（与 B 同口径，排除 `write-sequencing.test.ts`）：**4569 tests / 4535 pass / 15 fail / 19 skip**；B 基线 4552/4518/15/19 ⇒ **tests +17、pass +17、fail +0、skip +0**。15 fail 全部为基线既红（9 条 Windows symlink + 6 条稳定断言：S7-F、T1 pi/codex/claude×3、k-governance-feedback、e-audit）。**最终候选（证据提交 HEAD `0d1e7a4bd936f9c266fb93a8e9d729c43061b465`）clean 复跑**；运行前工作区无 `.ans` 残留（残留会令既有 acceptance-dispatch 时序断言偶发超时；复跑前已清理）。日志 `%TEMP%\c-full-final5.log`（sha256 `1ab460491fafc00097ad9b45552c1c5d0eba17b5557194026749fdde53dfb60c`）；实施提交 `d85031f` 上的 clean 全量日志 `%TEMP%\c-full-final.log`（`19f8188ef787573a5e863b494250aa1b59adea6306c8f135a4e59e64ab428dcb`）同为 15 fail。
 - C 专项（7 文件）：**63/63**；日志 `%TEMP%\c-special-final.log`（`ecabc76629c9c55ce2bb46c40ae8bfb9dfa3457b0af9c14b9c651f87559ab7c2`）。
-- 桌面应用全量：**803/803**；日志 `%TEMP%\c-desktop2.log`（`b009973923a1fe368c48c00c0261f7644a034e91add8cd2055e87b3037283ade`）；C-listed 编排/judge/门禁集：304/304（其中 1 条 symlink 基线在 Claude 适配器文件内）；日志 `%TEMP%\c-judge.log`（`7aec18f6907875bafd83980f923e144bc847f84140c54fd7e48bf9475feb3492`）。
+- 桌面应用全量：**803/803**；日志 `%TEMP%\c-desktop2.log`（`b009973923a1fe368c48c00c0261f7644a034e91add8cd2055e87b3037283ade`）；C-listed 编排/judge/门禁集：**304 tests / 303 pass / 1 fail**（失败为 Claude 适配器 symlink 基线，非 C 引入）；日志 `%TEMP%\c-judge.log`（`7aec18f6907875bafd83980f923e144bc847f84140c54fd7e48bf9475feb3492`）。
 - 静态（逐个 exit 0）：`typecheck` `%TEMP%\c-typecheck.log`（`a5f639a1f80ac13a0066e40c0b9b16a9c0e45ad18dbac0e9ef45489b545a9347`）；`typecheck:renderer`（`f849a6813604908999067fdfa819bc1bf9795df0fe2430105171eabe88593005`）；`build:renderer`（`7f23f216c307f2d776e671b5fce6cc291b7af2e2d2efa55a730acaf9947763d8`）。
 - Electron（**最终代码复跑**，临时夹具 `%TEMP%\ans-e2e-c4-fixture-q897xP`）：**`E2E_PASS=true`、`E2E_DONE=1`、`E2E_FAILURES=` 空、`ROLE_COUNT=2`、`PRIMARY_ROLE_ID=su`、`BOOTSTRAP_PRIMARY=chief`、`BOOTSTRAP_ROLE_COUNT=6`**；截图 **16/17**（`00-titlebar.png` 捕获偶发 `UnknownVizError`，环境性；其余 16 张均 1360x860；A 批同项先例）；报告 `%TEMP%\ans-e2e-c4-out-dDWIjz\report.txt`（sha256 `226778f6ebeefebe74ce0c57fb84edbfad9601964c5ecae8665ebbedacb377c1`）；截图清单 `SHA256SUMS`（sha256 `d25239bcefbf5d55def383fb74d17d361f193862abd1755db2478b32f42c0a96`）。实施代码上另有一次 **17/17** 先跑（临时夹具 `%TEMP%\ans-e2e-c-fixture-mqxm18`；报告 `%TEMP%\ans-e2e-c-out-yb2Csq\report.txt`，sha256 `c978ab038b9287ae844000964c30807fd8b812b512f11ac9baf6ee300b1df4b0`）。
 - 环境：Windows 11 Pro 10.0.26300（win32 x64）；**Node v24.22.1**；Electron 44.7.0；worktree/分支见页首。
@@ -180,3 +181,4 @@
 | `角色卡/项目管理/docs/change/2026-10-28_change_entry-role-minimal-C.md` | `13a97cc33b17f5caad59b7ec19b4b9634ff16e33` | `4d3e55c3c22e2ddfb9f3cb9d23dbf7ab4c8a3e56c0f3965caa3068e9c468de72` |
 
 - B-12 小修：change-B 行数与 Node 版本已更新（v24.22.1）；补 C5 整树 `1c31d9264d218c6a4685c2b451b56ff81ec980fc07d111de0376501064aa87b0`（`git diff --binary 778a7f2 c4ee7ade | sha256sum`）。
+- C 证据提交后的本文件 SHA-256：`f75f2ac54effa675c3d3143fde39a7a53bebf3f18aa46de8e48401b7b38d94ad`（182 行）；D 批修订后的最终字节哈希由 change-D 记录。

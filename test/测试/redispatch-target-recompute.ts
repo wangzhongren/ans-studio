@@ -1,3 +1,4 @@
+// @ts-nocheck
 // test/测试/redispatch-target-recompute.ts
 // 2026-10-23 S5 终验：目标项目只读复算（governance-advance-redispatch）。
 //

@@ -98,7 +98,7 @@ test("治理代批结果：分组/结论/理由/路径/统计逐项映射；未�
 
   const write = governanceJudgeResultView({
     group: "approval",
-    cardKind: "write",
+    cardKind: "appointment-write",
     engine: "pi",
     paths: ["docs/a.md", "docs/b.md"],
     pathDecisions: [{ path: "docs/a.md", ok: true }, { path: "docs/b.md", ok: false, reason: "越界" }],
@@ -122,7 +122,7 @@ test("治理代批结果：分组/结论/理由/路径/统计逐项映射；未�
   const appointment = governanceJudgeResultView({ group: "decision", cardKind: "appointment" });
   assert.equal(appointment!.kindClass, "appointment");
   const unknown = governanceJudgeResultView({ group: "approval", cardKind: "schedule-write" });
-  assert.equal(unknown!.kindClass, "write");
+  assert.equal(unknown!.kindClass, "generic");
   const generic = governanceJudgeResultView({ group: "approval", cardKind: "mystery" });
   assert.equal(generic!.kindClass, "generic");
 

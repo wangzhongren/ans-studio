@@ -86,13 +86,14 @@ test("终态文案：确认/拒绝/取消/提交；过期与重试原因如实",
   assert.ok(operatorRetryNote("").includes("——请重试。"));
 });
 
-test("治理卡元信息透传（cardKind/flowId）；普通卡无徽标", () => {
+test("治理卡元信息透传（D 批仅 appointment-write）；普通卡无徽标", () => {
   assert.equal(operatorCardMeta(payload()).badge, "");
   const meta = operatorCardMeta(
-    payload({ request: { kind: "confirm", title: "提案", cardKind: "proposal", flowId: "f" } }),
+    payload({ request: { kind: "confirm", title: "写角色卡", cardKind: "appointment-write" } }),
   );
-  assert.equal(meta.badge, "治理决定 · 客户最终批准");
-  assert.ok(meta.lines.includes("流程：f"));
+  assert.equal(meta.badge, "任命写卡");
+  assert.deepEqual(meta.lines, ["权力类型：任命写卡"]);
+  assert.equal(meta.flowId, "");
 });
 
 test("pending 按 surfaces 计数：镜像面同样可见同一请求", () => {

@@ -147,7 +147,7 @@ test("T14/六角色：导入空目录（新空项目）→ 不抛错、trio 六�
     assert.equal(builtIn.boundaryPath, "");
     assert.ok(builtIn.cardText.length > 0);
     assert.equal(builtIn.boundary.acceptance.accepted, false); // 展示用，fail-closed 由 resolveBoundarySection 把关
-    // amendment-2 §2.3：product 承接旧 liaison 现行写区 docs/intents/；目标 docs/product/ 在 D 生效。
+    // D 批：写区已切换到目标态；内置角色 Section 1 非空（具体写区由 D 专项测试钉住）。
     assert.ok(builtIn.boundary.entries.length > 0);
   }
   assert.equal(listing.roles.find((r) => r.roleId === "chief")?.governanceFunction, "chief");
@@ -217,18 +217,18 @@ test("三权：`.ans` 不可解析 → single（行为不变，不崩）", async
 // 真机缺陷 2026-10-18（live-ci）：新 trio 项目由 Liaison 建档后，Nominator 写出**首个项目角色**
 // `builder`，而 `.ans/project.json` 尚未写出（`repinIfBootstrapped` 此时无可 pin 之物、零副作用）。
 // 旧判定「无显式模型 + 有角色目录 ⇒ single」令模型翻转，Convener 的 dispatch_task 被
-// `dispatcherRoleIdOf` 判成「来源角色不是派发主人 su」而拒绝。`trio` 账本是确定事实（single 不建
-// 治理账本目录），据此封住该窗口；以下四个夹具钉死边界。
+// `dispatcherRoleIdOf` 判成「来源角色不是派发主人 su」而拒绝。`trio` 任务状态是确定事实（single 不建
+// 任务状态），据此封住该窗口；以下四个夹具钉死边界。
 
-test("三权：首角色已落盘但 `.ans` 未写出、账本存在 → trio、chief 主入口、六内置角色", async () => {
+test("三权：首角色已落盘但 `.ans` 未写出、任务状态存在 → trio、chief 主入口、六内置角色", async () => {
   const proj = join(ROOT, "first-role-trio");
   const d = join(proj, "角色卡", "builder");
   mkdirSync(d, { recursive: true });
   writeFileSync(join(d, "role-card.md"), "# builder");
   writeFileSync(join(d, "boundary.yaml"), "entries:\n  - kind: directory\n    path: src/\n    purpose: t\n");
-  // 账本只 stat、不读内容：空文件也满足（真实账本一行一条 JSON）。
-  mkdirSync(join(proj, ".ans", "governance"), { recursive: true });
-  writeFileSync(join(proj, ".ans", "governance", "ledger.jsonl"), "");
+  // 任务状态只 stat、不读内容：空文件也满足（真实状态一行一条 JSON）。
+  mkdirSync(join(proj, ".ans", "state"), { recursive: true });
+  writeFileSync(join(proj, ".ans", "state", "tasks.jsonl"), "");
 
   const listing = await listProject(proj);
   assert.equal(listing.governanceModel, "trio");
@@ -242,8 +242,8 @@ test("三权：首角色已落盘但 `.ans` 未写出、账本存在 → trio、
   assert.deepEqual(listing.warnings, []);
 });
 
-test("三权：同上但无账本 → single、su 主入口（旧项目行为逐字不变）", async () => {
-  const proj = join(ROOT, "first-role-no-ledger");
+test("三权：同上但无任务状态 → single、su 主入口（旧项目行为逐字不变）", async () => {
+  const proj = join(ROOT, "first-role-no-tasks");
   const d = join(proj, "角色卡", "builder");
   mkdirSync(d, { recursive: true });
   writeFileSync(join(d, "role-card.md"), "# builder");
@@ -255,23 +255,23 @@ test("三权：同上但无账本 → single、su 主入口（旧项目行为逐
   assert.deepEqual(listing.roles.map((r) => r.roleId), ["su", "builder"]);
 });
 
-test("三权：显式 `.ans/project.json` single 优先于账本 → 仍 single", async () => {
-  const proj = join(ROOT, "explicit-single-ledger");
-  mkdirSync(join(proj, ".ans", "governance"), { recursive: true });
+test("三权：显式 `.ans/project.json` single 优先于任务状态 → 仍 single", async () => {
+  const proj = join(ROOT, "explicit-single-tasks");
+  mkdirSync(join(proj, ".ans", "state"), { recursive: true });
   writeFileSync(join(proj, ".ans", "project.json"), JSON.stringify({ governanceModel: "single" }));
-  writeFileSync(join(proj, ".ans", "governance", "ledger.jsonl"), "");
+  writeFileSync(join(proj, ".ans", "state", "tasks.jsonl"), "");
 
   const listing = await listProject(proj);
-  assert.equal(listing.governanceModel, "single", "显式值优先，账本不得覆盖");
+  assert.equal(listing.governanceModel, "single", "显式值优先，任务状态不得覆盖");
   assert.equal(listing.primaryRoleId, "su");
   assert.deepEqual(listing.roles.map((r) => r.roleId), ["su"]);
 });
 
-test("三权：`.ans/project.json` 不可解析 + 账本存在 → 仍 single（unreadable fail-closed 不变）", async () => {
-  const proj = join(ROOT, "unreadable-ledger");
-  mkdirSync(join(proj, ".ans", "governance"), { recursive: true });
+test("三权：`.ans/project.json` 不可解析 + 任务状态存在 → 仍 single（unreadable fail-closed 不变）", async () => {
+  const proj = join(ROOT, "unreadable-tasks");
+  mkdirSync(join(proj, ".ans", "state"), { recursive: true });
   writeFileSync(join(proj, ".ans", "project.json"), "{not-json");
-  writeFileSync(join(proj, ".ans", "governance", "ledger.jsonl"), "");
+  writeFileSync(join(proj, ".ans", "state", "tasks.jsonl"), "");
 
   const listing = await listProject(proj);
   assert.equal(listing.governanceModel, "single");

@@ -531,10 +531,11 @@ test("M-1 数据面：白话摘要只取命令首词（不编意图）；升级�
 
 // ————— 2026-10-19 客户反馈：审批档展示文案按实际内置治理角色显示（不再一律「SU」） —————
 
-test("审批档角色化（纯映射）：五内置治理角色显示其注册名；su/缺省保持 SU；项目角色不显示治理角色名", () => {
+test("审批档角色化（纯映射）：六内置治理角色显示其注册名；su/缺省保持 SU；项目角色不显示治理角色名", () => {
   const reason = "su-审批档[risky]：命中规则（ruleset:x）；批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界。";
   const builtInNames: [string, string][] = [
-    ["liaison", "产品"],
+    ["chief", "幕僚"],
+    ["product", "产品"],
     ["rapporteur", "策划"],
     ["nominator", "人事"],
     ["convener", "运营"],
@@ -1079,13 +1080,13 @@ test("F-4-T3 诊断补录（opt2）：超时 ⇒ shell-confirm.timeout（含时�
   }
 });
 
-test("F-4-opt1 接线钉与幂等行为：main.ts 在窗口 focus/show 时重推挂起确认卡（与 app:recovery-ready 同款）；replayPending 只推仍挂起者", async () => {
+test("F-4-opt1 接线钉与幂等行为：main.ts 在窗口 focus/show 时重推挂起的 shell 确认卡；replayPending 只推仍挂起者", async () => {
   const mainSrc = fs.readFileSync(path.join(APP_DIR, "main.ts"), "utf8");
-  // G-2/W5（2026-10-16）起同一重推点同时覆盖恢复确认卡（recoveryConfirm）——接线形状按现行实文钉住
-  // （行为不变：**幂等**重推、只推仍挂起者；新增的 recoveryConfirm.replayPending() 见 recovery 通道用例）。
-  assert.ok(/win\.on\("focus", \(\) => \{ shellConfirm\.replayPending\(\); recoveryConfirm\.replayPending\(\); \}\)/.test(mainSrc), "focus ⇒ 幂等重推挂起卡（shell＋恢复；渲染侧丢推的兜底）");
-  assert.ok(/win\.on\("show", \(\) => \{ shellConfirm\.replayPending\(\); recoveryConfirm\.replayPending\(\); \}\)/.test(mainSrc), "show ⇒ 幂等重推挂起卡（shell＋恢复）");
+  // D 批：恢复确认卡已撤除；shell 确认卡的幂等重推保持。
+  assert.ok(/win\.on\("focus", \(\) => \{ shellConfirm\.replayPending\(\); \}\)/.test(mainSrc), "focus ⇒ 幂等重推挂起 shell 卡（渲染侧丢推的兜底）");
+  assert.ok(/win\.on\("show", \(\) => \{ shellConfirm\.replayPending\(\); \}\)/.test(mainSrc), "show ⇒ 幂等重推挂起 shell 卡");
   assert.ok(mainSrc.includes("shellConfirm.replayPending()"), "复用既有幂等重推入口");
+  assert.equal(mainSrc.includes("recoveryConfirm"), false, "D 批恢复确认卡接线不得复活");
 
   // 行为面：只重推**仍挂起**的项；已决项绝不复活（重推不改判定）。
   const sent: ShellConfirmRequest[] = [];

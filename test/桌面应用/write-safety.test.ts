@@ -35,19 +35,19 @@ function requestConfirmationTool(customerInput: (req: unknown) => unknown) {
   return tool!;
 }
 
-test("通用 write 卡已从工具 schema 删除；appointment-write 保留（审批路径）", async () => {
+test("通用 write 卡与 legacy 直调已删除；appointment-write 保留（审批路径）", async () => {
   const schema = describeTool("request_confirmation");
   const enumValues = (schema.parameters.properties as Record<string, { enum?: unknown[] }>).cardKind!.enum;
-  assert.deepEqual(enumValues, ["appointment-write", "schedule-write"], "模型可见 schema 不再列出 write");
+  assert.deepEqual(enumValues, ["appointment-write"], "模型可见 schema 仅 appointment-write");
   let called = 0;
   const tool = requestConfirmationTool(() => {
     called += 1;
     return { outcome: "answered", value: { confirmed: true } };
   });
-  // legacy 直接调用兼容（旧项目/旧测试）；新模型 schema 已看不到 write。
+  // D 批：write legacy 直调也已删除，非法 cardKind 在触达客户前拒绝。
   const write = await tool.handler({ name: "request_confirmation", args: { title: "普通写盘", cardKind: "write" }, toolCallId: "c1" });
-  assert.equal(write.ok, true);
-  assert.equal(called, 1);
+  assert.equal(write.ok, false);
+  assert.equal(called, 0);
 
   const appointment = await tool.handler({
     name: "request_confirmation",
@@ -61,7 +61,7 @@ test("通用 write 卡已从工具 schema 删除；appointment-write 保留（�
     toolCallId: "c2",
   });
   assert.equal(appointment.ok, true);
-  assert.equal(called, 2);
+  assert.equal(called, 1);
 });
 
 test("角色卡边界 YAML：缺 role/entries 或坏语法 ⇒ 校验失败；合法结构通过", () => {

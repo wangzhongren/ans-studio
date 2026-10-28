@@ -29,7 +29,7 @@ import { buildGovernanceJudgeSystemPrompt } from "../../src/common/编排/govern
 
 // —————————————————————— 夹具 ——————————————————————
 
-const INTENT_REL = "docs/intents/intent-a.md";
+const INTENT_REL = "docs/intents/flow-a.md";
 
 function withRoot<T>(fn: (root: string) => Promise<T>): Promise<T> {
   const root = mkdtempSync(join(tmpdir(), "ans-intent-drift-"));
@@ -60,7 +60,7 @@ function seedIntent(root: string, over: {
     INTENT_REL,
     [
       "---",
-      "intentId: intent-a",
+      "intentId: flow-a",
       "handoffKind: initial",
       `goal: ${over.goal ?? "实现示例能力"}`,
       `scope: ${over.scope ?? "只改编排模块，不新增角色"}`,
@@ -70,7 +70,7 @@ function seedIntent(root: string, over: {
       `flowId: ${over.flowId ?? "flow-a"}`,
       "---",
       "",
-      "# 意图 intent-a",
+      "# 意图 flow-a",
       "",
       "客户原话摘录：「只改编排，不要越界。」",
       "",
@@ -134,33 +134,6 @@ function seedTeamPlan(root: string, recommended: readonly string[]): void {
       "",
     ].join("\n"),
   );
-}
-
-/** 客户确认意图 + 交接；可附提案接受/dispatch 记录（验收用）。 */
-function seedLedger(root: string, extra: readonly Record<string, unknown>[] = []): void {
-  const lines: Record<string, unknown>[] = [
-    {
-      at: "2026-10-19T00:00:00.000Z",
-      kind: "customer.decision",
-      flowId: "flow-a",
-      actorRoleId: "liaison",
-      power: "liaison",
-      decisionKind: "intent-confirm",
-      customerDecision: "accepted",
-      decisionEvidence: { kind: "customer-input" },
-    },
-    {
-      at: "2026-10-19T00:00:00.500Z",
-      kind: "intent.handed-off",
-      flowId: "flow-a",
-      actorRoleId: "liaison",
-      power: "liaison",
-      intentId: "intent-a",
-      handoffKind: "initial",
-    },
-    ...extra,
-  ];
-  writeFile(root, ".ans/governance/ledger.jsonl", `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`);
 }
 
 function facts(over: Partial<GovernanceJudgeFacts> = {}): GovernanceJudgeFacts {
@@ -272,7 +245,6 @@ test("proposal：与意图一致但缺架构章节 ⇒ 仍可 allow（架构由 
   await withRoot(async (root) => {
     writeFile(root, "docs/proposals/flow-a-v1.md", PROPOSAL_NO_ARCHITECTURE);
     seedIntent(root);
-    seedLedger(root);
     const { judge } = makeJudge({
       readPaths: [INTENT_REL, "docs/proposals/flow-a-v1.md"],
       report: {
@@ -302,16 +274,7 @@ test("proposal：超出意图范围/引入未授权非目标/与已接受决定�
       "# 提案\n\n## 目标\n重写全仓架构。\n\n## 范围\n改全仓并新增治理角色。\n",
     );
     seedIntent(root, { scope: "只改编排模块，不新增角色" });
-    seedLedger(root, [{
-      at: "2026-10-19T00:00:01.000Z",
-      kind: "customer.decision",
-      flowId: "flow-a",
-      actorRoleId: "rapporteur",
-      power: "proposal",
-      decisionKind: "proposal-accept",
-      customerDecision: "accepted",
-      decisionEvidence: { kind: "customer-input" },
-    }]);
+    
     for (const reason of [
       "提案超出意图范围：意图只允许改编排模块，提案要改全仓。",
       "提案引入意图未授权的非目标：重写架构。",
@@ -345,7 +308,6 @@ test("appointment：任命名单/写区扩张未经客户意图确认 ⇒ manual
   await withRoot(async (root) => {
     seedTeamPlan(root, ["alpha", "beta"]);
     seedIntent(root, { scope: "只改编排模块，不新增角色" });
-    seedLedger(root);
     const { judge } = makeJudge({
       readPaths: [INTENT_REL, "docs/scheduling/flow-a-team-v1.md"],
       report: {
@@ -384,26 +346,7 @@ test("acceptance：验收选择与意图/已接受提案冲突 ⇒ manual/intent
     writeFile(root, "docs/flows/flow-a.md", "# 流程\n\n| stepId | 步骤 | 状态 |\n| --- | --- | --- |\n| s1 | 实现 | done |\n");
     seedAcceptanceArtifacts(root);
     seedIntent(root, { acceptance: "只验收编排改动" });
-    seedLedger(root, [
-      {
-        at: "2026-10-19T00:00:01.000Z",
-        kind: "customer.decision",
-        flowId: "flow-a",
-        actorRoleId: "rapporteur",
-        power: "proposal",
-        decisionKind: "proposal-accept",
-        customerDecision: "accepted",
-        decisionEvidence: { kind: "customer-input" },
-      },
-      {
-        at: "2026-10-19T00:00:02.000Z",
-        kind: "dispatch.accepted",
-        flowId: "flow-a",
-        stepId: "s1",
-        actorRoleId: "app",
-        power: "app",
-      },
-    ]);
+    
     const { judge } = makeJudge({
       readPaths: [INTENT_REL, "docs/proposals/flow-a-v1.md"],
       report: {

@@ -94,11 +94,11 @@ test("敏感文件/目录读取全部被拒且不泄露内容；列表不列敏�
       assert.equal(result.message.includes(root), false, `${target} 拒绝文案不得回显绝对路径`);
     }
 
-    // 2026-10-18 客户裁定：`.ans` 只读开放 `.ans/project.json` 与 `.ans/governance/ledger.jsonl`；
-    // 其余 `.ans` 内容（sessions/其他文件）仍 app-private 拒绝且不泄露内容。独立会话，避免预算串扰。
+    // D 批：治理账本已撤除；`.ans` 只读开放仅剩 `.ans/project.json`，其余 `.ans` 内容
+    // （sessions/governance/其他文件）仍 app-private 拒绝且不泄露内容。独立会话，避免预算串扰。
     const ansFixture = fixture(root);
     const ansRead = ansFixture.byName.get(SHELL_JUDGE_READ_TOOL)!;
-    for (const target of [".ans/sessions/x.jsonl", ".ans/notes.txt", ".ans/governance/other.jsonl"]) {
+    for (const target of [".ans/sessions/x.jsonl", ".ans/notes.txt", ".ans/governance/other.jsonl", ".ans/governance/ledger.jsonl"]) {
       const deniedRead = await ansRead.handler(call(SHELL_JUDGE_READ_TOOL, { path: target }));
       assert.equal(deniedRead.ok, false, `${target} 必须被拒绝`);
       assert.match(deniedRead.message, /应用私有数据/, `${target} 拒绝原因须标注 app-private`);
@@ -107,12 +107,7 @@ test("敏感文件/目录读取全部被拒且不泄露内容；列表不列敏�
     }
     // 契约：app-private 拒绝不计入 `deniedReads`（不触发 allow 降级），只单独计数。
     assert.equal(ansFixture.stats.deniedReads, 0, "app-private 拒绝不得计入 deniedReads");
-    assert.equal(ansFixture.stats.appPrivateDeniedReads, 3);
-
-    const ledgerRead = await ansRead.handler(call(SHELL_JUDGE_READ_TOOL, { path: ".ans/governance/ledger.jsonl" }));
-    assert.equal(ledgerRead.ok, true, "账本只读开放（2026-10-18 客户裁定）");
-    assert.match(ledgerRead.message, /ledger-readable/, "账本内容可读");
-    assert.equal(ledgerRead.message.includes(SECRET_SENTINEL), false, "读账本不得带出其他 .ans 内容");
+    assert.equal(ansFixture.stats.appPrivateDeniedReads, 4);
 
     const projectRead = await ansRead.handler(call(SHELL_JUDGE_READ_TOOL, { path: ".ans/project.json" }));
     assert.equal(projectRead.ok, true, ".ans/project.json 只读开放");
@@ -135,10 +130,11 @@ test("敏感文件/目录读取全部被拒且不泄露内容；列表不列敏�
     assert.equal(ans.ok, false, ".ans 整体拒绝（应用私有数据，不是只隐藏 sessions）");
     assert.match(ans.message, /应用私有数据/);
     assert.equal(ans.message.includes("sessions"), false, ".ans 拒绝文案不得列出内部目录名");
-    // `.ans/governance/` 目录可列，但只显示 ledger.jsonl（客户裁定；其余内容不列名）。
+    // D 批：`.ans/governance/` 与其他 `.ans/**` 一样按应用私有数据整体拒绝，不列任何内部文件名。
     const gov = await listingFixture.byName.get(SHELL_JUDGE_LIST_TOOL)!.handler(call(SHELL_JUDGE_LIST_TOOL, { path: ".ans/governance" }));
-    assert.equal(gov.ok, true, ".ans/governance 目录可列（只读开放）");
-    assert.match(gov.message, /ledger\.jsonl/, "账本可见");
+    assert.equal(gov.ok, false, ".ans/governance 不再开放列举");
+    assert.match(gov.message, /应用私有数据/);
+    assert.equal(gov.message.includes("ledger.jsonl"), false, "目录内文件不得列名");
     assert.equal(gov.message.includes("other.jsonl"), false, "目录内其他文件不得列名");
     assert.equal(gov.message.includes(SECRET_SENTINEL), false);
     const sensitiveDir = await listingFixture.byName.get(SHELL_JUDGE_LIST_TOOL)!.handler(call(SHELL_JUDGE_LIST_TOOL, { path: ".git" }));

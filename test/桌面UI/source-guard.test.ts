@@ -153,7 +153,6 @@ test("治理/报告事实不持久化：localStorage 仅左栏偏好与语言镜
   assert.match(ui, /SIDEBAR_WIDTH_STORAGE_KEY = "ans\.sidebar\.width"/);
   assert.match(ui, /SIDEBAR_COLLAPSED_STORAGE_KEY = "ans\.sidebar\.collapsed"/);
   for (const file of [
-    "stores/governance-store.ts",
     "stores/report-store.ts",
     "chat/chat-store.ts",
     "chat/ipc.ts",
@@ -224,29 +223,6 @@ test("视觉/组件单一来源：状态转轮只用 lucide LoaderCircle；无�
     read(join(RENDERER, "shell", "phase4a.css")) +
     phase4b;
   assert.equal(/\.ti-count\s*\{/.test(css), true);
-});
-
-test("治理状态行：警告详情走可换行 gov-detail；chip 可收缩换行不撑破状态行", () => {
-  const panel = read(join(RENDERER, "shell", "GovernancePanel.tsx"));
-  // 异常态与正常态共用同一语义：核心文本进 chip，流程/下一步统一进 detail。
-  assert.equal(panel.includes('statusChip + " · " + nextStep'), false, "warn nextStep must not be concatenated into chip");
-  assert.match(panel, /statusChip = core;/);
-  assert.match(panel, /statusDetail = nextStep;/);
-  // 窄屏单行裁剪时仍能通过 title 拿到完整文案。
-  assert.match(panel, /title=\{statusVisible \? statusText : undefined\}/);
-
-  const css = read(join(RENDERER, "shell", "phase4b.css"));
-  const chipBlock = css.match(/\.gov-chip\s*\{([^}]*)\}/)?.[1] ?? "";
-  assert.ok(chipBlock.length > 0, ".gov-chip base rule missing");
-  assert.equal(/(^|\n)\s*flex:\s*0\s+0\s+auto/.test(chipBlock), false, "chip must not be fixed-size");
-  assert.match(chipBlock, /flex:\s*0\s+1\s+auto/);
-  assert.match(chipBlock, /min-width:\s*0/);
-  assert.match(chipBlock, /white-space:\s*normal/);
-  assert.match(chipBlock, /overflow-wrap:\s*anywhere/);
-  // 480 极窄档保持单行紧凑：chip/detail 仍 nowrap + hidden。
-  const narrow = css.slice(css.indexOf("@media (max-width: 480px)"));
-  assert.match(narrow, /\.governance-status \.gov-chip,\s*\n\s*\.governance-status \.gov-detail\s*\{[^}]*white-space:\s*nowrap/);
-  assert.match(narrow, /\.governance-status \.gov-chip,[\s\S]{0,200}?overflow:\s*hidden/);
 });
 
 test("配置与依赖：markdown-it 由 npm 提供且版本 15.0.3；渲染器无第二个 Markdown 实现", () => {

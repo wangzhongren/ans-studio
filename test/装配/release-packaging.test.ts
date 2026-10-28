@@ -117,7 +117,6 @@ test('release overlay includes exactly the reviewed v1.5.0 fix batch by exact pa
 // 同目录未列名 test/ 仍 excluded，未列名 src/ 仍 fail-closed。断言不放宽。
 test('release overlay includes exactly the reviewed v1.7.0 blocking-fix batch by exact path', () => {
   const result = selectOverlay(['package.json',
-    'src/common/编排/team-plan.ts',
     'src/common/shared/diagnostics.ts',
     'test/桌面应用/interface.test.ts',
     'test/桌面应用/project-document.test.ts',
@@ -125,7 +124,6 @@ test('release overlay includes exactly the reviewed v1.7.0 blocking-fix batch by
     'test/桌面应用/runtime-resolution.test.ts',
     'test/桌面应用/session-rebuild-race.test.ts']);
   assert.deepEqual(result.selected, ['package.json',
-    'src/common/编排/team-plan.ts',
     'src/common/shared/diagnostics.ts',
     'test/桌面应用/interface.test.ts',
     'test/桌面应用/project-document.test.ts',
