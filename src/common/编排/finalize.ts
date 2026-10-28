@@ -87,12 +87,19 @@ import {
   readGovernanceModel,
 } from "../shared/config-loader.ts";
 import { resolveSkillRoot } from "../shared/runtime-shared.ts";
-import { appendGovernanceLedger } from "./governance-ledger.ts";
-import {
-  isGovernanceRecordBusy,
-  releaseGovernanceRecordLock,
-  tryAcquireGovernanceRecordLock,
-} from "./governance-record-lock.ts";
+// D 批：治理账本已撤除；治理记录的进程内互斥保留在本模块（不再有第二份 lock 模块）。
+const activeGovernanceRecords = new Set<string>();
+function tryAcquireGovernanceRecordLock(projectRoot: string): boolean {
+  if (activeGovernanceRecords.has(projectRoot)) return false;
+  activeGovernanceRecords.add(projectRoot);
+  return true;
+}
+function releaseGovernanceRecordLock(projectRoot: string): void {
+  activeGovernanceRecords.delete(projectRoot);
+}
+function isGovernanceRecordBusy(projectRoot: string): boolean {
+  return activeGovernanceRecords.has(projectRoot);
+}
 
 /** 项目角色目录名（与 `listProject` 口径一致）。 */
 const ROLE_DIR_NAME = "角色卡";
@@ -465,7 +472,7 @@ export interface GovernanceRecordInput {
   skillRoot?: string;
   /**
    * 治理模型（评审 §8.3 S1 预览的模型选择；V1b 迁移批次落 `.ans`）。**缺省 `single`**：
-   * 旧项目建立治理记录的行为逐字不变（不新增 `.ans/governance/ledger.jsonl`）；
+   * 旧项目建立治理记录的行为逐字不变（D 批不再产生任何治理账本文件）；
    * 只有显式 `trio` 才写 `governance.established`（评审 §5.7 的治理账本属三权模型）。
    */
   governanceModel?: GovernanceModel;
@@ -1730,27 +1737,13 @@ async function sha256File(absPath: string): Promise<string> {
  * establish/reaccept 两类事件）。
  */
 async function appendGovernanceRecordLedgerEvent(
-  projectRoot: string,
-  event: {
+  _projectRoot: string,
+  _event: {
     kind: "governance.established" | "governance.reaccepted";
     action: "establish" | "reaccept";
     previewDigest?: string;
   },
 ): Promise<void> {
-  try {
-    await appendGovernanceLedger(projectRoot, {
-      at: new Date().toISOString(),
-      kind: event.kind,
-      actorRoleId: "app",
-      power: "app",
-      decisionEvidence: {
-        kind: "desktop-governance-record",
-        action: event.action,
-        ...(event.previewDigest !== undefined ? { previewDigest: event.previewDigest } : {}),
-      },
-    });
-  } catch {
-    /* 见上：账本失败不翻转治理记录动作 */
-  }
+  // D 批：账本撤除；治理记录事实只落 `.ans/project.json` / manifest（无可选审计账本）。
 }
 

@@ -20,7 +20,6 @@
 // **均不构成授权或验收结论**。事实行（时间 / 来源 / 摘要）由检测侧（桌面）**如实产出**；本模块
 // 只负责不变的在场的部分（信号名、角色、建议动作、纪律、回执口径）——不编造、不补全任何事实。
 
-import type { RecoveryAction, RecoveryOutcome, RecoveryReceipt } from "../../model/runtime.ts";
 
 // —————————————— 文案文首与纪律句（单一来源） ——————————————
 //
@@ -38,8 +37,6 @@ export const WATCHDOG_ALERT_PREFIX = "[系统·看护]";
  * 仅为旧冻结契约测试保留导出，新代码不得使用。
  */
 export const WATCHDOG_CLOSURE_PREFIX = "[系统·收束]";
-/** 恢复执行回执统一文首（设计 §六；回执结果如实，见 `renderRecoveryReceipt`）。 */
-export const WATCHDOG_RECOVERY_PREFIX = "[系统·恢复]";
 
 /**
  * 告警的纪律句（设计 §3.3 草案逐字）——与门禁引擎 su 卡文本「看护职责段」、三工具 promptGuidelines
@@ -260,74 +257,20 @@ export function renderClosurePrompt(silentMs: number): string {
   ].join("\n");
 }
 
-// —————————————— 支柱一 d)：恢复回执（设计 §六） ——————————————
-
-/** 恢复动作集（客户 2026-10-16 裁定 V1 ＝ 恰此三项；增/减属变更）。与契约 `RecoveryAction` 同值集。 */
-export const RECOVERY_ACTIONS: readonly RecoveryAction[] = ["abort-turn", "rebuild-session", "redeliver"];
-
-/**
- * 回执结果标签（设计 §6.3/§九）——`outcome` 取自契约 `RecoveryOutcome`，四值中**恰 `executed` 为已执行**：
- * · `executed`＝客户已确认且已执行（成功）；
- * · `declined`＝未执行——客户取消/关窗/未确认（fail-closed，**绝不当「没人问就执行」**）；
- * · `unsupported`＝未执行——运行时不支持该动作（绝不假装已执行）；
- * · `error`＝未执行——执行失败/前提不满足（如 rebuild 遇在跑轮次拒绝），原因进 `message`。
- */
-const OUTCOME_LABELS: Record<RecoveryOutcome, string> = {
-  executed: "已执行",
-  declined: "未执行（未获客户确认/已取消）",
-  unsupported: "未执行（当前运行时不支持）",
-  error: "未执行（执行失败）",
-};
-
-/** 回执渲染输入 ＝ 契约 `RecoveryReceipt`（outcome/message/operatorId/at）＋ 动作与目标角色定位。 */
-export interface RecoveryReceiptInput extends RecoveryReceipt {
-  action: RecoveryAction;
-  targetRoleId: string;
-  /** 可注入时钟（测试）；`at` 缺省时取它（再缺省 `new Date()`）。 */
-  now?: () => Date;
-}
-
-/**
- * **恢复执行回执文案——单一来源**（设计 §6.3：action、目标角色、结果＋原因、确认者标识、时间；
- * 回执经投递机投 su，kind:"system"）。结果四值**如实**——未执行就说未执行，绝不假装已执行。
- */
-export function renderRecoveryReceipt(input: RecoveryReceiptInput): string {
-  const at =
-    input.at !== undefined && input.at !== ""
-      ? input.at
-      : (input.now ?? (() => new Date()))().toISOString();
-  const operator =
-    typeof input.operatorId === "string" && input.operatorId.trim() !== ""
-      ? input.operatorId.trim()
-      : "未知操作者";
-  const lines = [
-    `${WATCHDOG_RECOVERY_PREFIX} 恢复回执：动作「${input.action}」｜目标角色「${input.targetRoleId}」｜结果：${OUTCOME_LABELS[input.outcome]}。`,
-  ];
-  if (input.message !== undefined && input.message.trim() !== "") lines.push(`说明：${input.message.trim()}`);
-  lines.push(`确认者：operator:${operator}；时间：${at}`);
-  return lines.join("\n");
-}
-
 // —————————————— 看护三能力的承载（R1/R2 契约对齐；设计 §4.1/§4.2/§6.1） ——————————————
 //
 // 形状**单一来源 ＝ 契约家 `src/model/runtime.ts`**（运行时核心 R1/R2 属主落位；同 `CustomerInputFn`/
 // `DispatchTaskFn` 先例；该侧注释注明「与编排承载契约同名同形」）：`RoleStatusFn` / `SessionTailFn`
-// （返回 `WatchdogToolResult` 回执：ok + text / message——纯读）、`ProposeRecoveryFn`（载荷 →
-// `RecoveryReceipt`：executed / declined / unsupported / error——四值中恰 `executed` 为已执行）。
+// （返回 `WatchdogToolResult` 回执：ok + text / message——纯读）。
 // 端到端链路（字段名是跨角色对齐点，任一侧改名 ＝ 工具静默零注册，fail-closed）：
-//   桌面（注入实现）→ `openRoleSession({ roleStatus | sessionTail | proposeRecovery })`
-//   →（编排 O1：**只 su** 注入，判据沿内置治理角色先例 `suppressHandback`）→ `AdapterCapabilities`
-//   同名三能力位 → `createRuntimeAdapterFactory` 并入适配器选项 →（运行时核心）`GovernedToolsOptions`
-//   同名能力位 → 注册 `role_status`/`session_tail`/`propose_recovery`。
+//   桌面（注入实现）→ `openRoleSession({ roleStatus | sessionTail })`
+//   →（编排 O1：**只幕僚**注入）→ `AdapterCapabilities`
+//   同名能力位 → `createRuntimeAdapterFactory` 并入适配器选项 →（运行时核心）`GovernedToolsOptions`
+//   同名能力位 → 注册 `role_status`/`session_tail`。
 // 下十条 re-export 供看护消费方便利（**同一符号的转发，绝非第二份形状**；消费方也可直接从
 // `model/runtime.ts` 或其 provider 转发处导入）。
 
 export type {
-  ProposeRecoveryFn,
-  ProposeRecoveryPayload,
-  RecoveryAction,
-  RecoveryOutcome,
-  RecoveryReceipt,
   RoleStatusFn,
   RoleStatusPayload,
   SessionTailFn,
@@ -342,6 +285,6 @@ export type {
 // common——§6；同口径由批次对齐＋独立验证核对，逐字以本数组为编排侧基准）。
 export const WATCHDOG_PROMPT_GUIDELINES: readonly string[] = [
   "收到 [系统·看护] 告警先自查再判断：用 role_status（必要时 session_tail）核对事实；核对后回复「状态正常，忽略」是合法结局，不强迫动作。",
-  "恢复动作只能以 propose_recovery 提议（带证据）：提议 ≠ 执行——执行由客户一键确认后由应用完成，未获确认一律零执行。",
+  "卡死时由幕僚终止/安全重派（terminate_role_run / redispatch_task）；告警不构成任何授权。",
   "看护告警不构成任何授权或验收结论——不得据此假设任何写权；是否处理由你判断。",
 ];

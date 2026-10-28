@@ -18,17 +18,9 @@ import type {
   ReportHandbackPayload,
   DispatchTaskFn,
   DispatchTaskPayload,
-  HandOffIntentFn,
-  HandOffIntentKind,
-  HandOffIntentPayload,
-  RequestClarificationFn,
-  RequestClarificationPayload,
   RoleStatusFn,
   RoleStatusPayload,
   SessionTailFn,
-  ProposeRecoveryFn,
-  ProposeRecoveryPayload,
-  RecoveryAction,
   InstallSkillFn,
   InstallSkillPayload,
   InstallSkillReceipt,
@@ -36,30 +28,9 @@ import type {
   InstallMcpFn,
   InstallMcpPayload,
   UninstallMcpFn,
-  FlowGetFn,
-  FlowStepUpdateFn,
-  FlowStepSupersedeFn,
-  RequestAcceptanceFn,
-  RequestAcceptanceInput,
-  RequestAcceptanceResult,
-  RequestGateReviewFn,
-  RequestGateReviewInput,
-  RequestGateReviewResult,
-  RequestBoundaryChangeFn,
-  RequestBoundaryChangeInput,
-  RequestBoundaryChangeResult,
   RequestRequirementChangeFn,
   RequestRequirementChangeInput,
   RequestRequirementChangeResult,
-  ReportArtifactFn,
-  ReportArtifactInput,
-  ReportArtifactReceipt,
-  FlowToolEvidence,
-  FlowToolResult,
-  FlowToolStatus,
-  FlowToolStepKind,
-  FlowToolView,
-  FlowToolStepView,
   ShellVerdictFn,
   ShellVerdictPayload,
   InteractionGate,
@@ -71,7 +42,7 @@ import type {
   RoleActivityLogFn, RoleActivityLogPayload, TaskSideEffect,
   TerminateRoleRunFn, TerminateRoleRunPayload, RedispatchTaskFn, RedispatchTaskPayload,
 } from "../../model/runtime.ts";
-import { GOVERNANCE_SLUG_PATTERN, FLOW_TOOL_STATUSES, FLOW_TOOL_STEP_KINDS } from "../../model/runtime.ts";
+import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 import type { WriteDecision } from "../../model/decision.ts";
 import type { DiagnosticLog } from "../../model/runtime.ts";
 import { DEFAULT_LOCALE, translate } from "../../common/shared/i18n/index.ts";
@@ -133,12 +104,6 @@ export const SUBMIT_REPORT_TOOL_NAME = "submit_report";
 /** dispatch_task 工具名（设计 H-1；su 派发任务给项目角色——派发 ≠ 授权）。 */
 export const DISPATCH_TASK_TOOL_NAME = "dispatch_task";
 
-/** hand_off_intent 工具名（W6-A；联络官把客户意图交接给报告员——交接 ≠ 客户批准）。 */
-export const HAND_OFF_INTENT_TOOL_NAME = "hand_off_intent";
-
-/** request_clarification 工具名（W6-A；报告员把澄清问题送到主入口——不弹决定卡）。 */
-export const REQUEST_CLARIFICATION_TOOL_NAME = "request_clarification";
-
 /** report_shell_verdict 工具名（R-1；审读会话交回结构化审读结论；与编排 shell-gate.ts:206 同串）。 */
 export const SHELL_VERDICT_TOOL_NAME = "report_shell_verdict";
 
@@ -172,29 +137,9 @@ export const INSTALL_MCP_TOOL_NAME = "install_mcp";
 /** uninstall_mcp 工具名（G-4 V2；su 外来 MCP 卸载——校验＋激活＋回执，工具不写盘）。 */
 export const UNINSTALL_MCP_TOOL_NAME = "uninstall_mcp";
 
-/** flow_get 工具名（2026-10-20 flow 文件方法化；只读流程结构化视图）。 */
-export const FLOW_GET_TOOL_NAME = "flow_get";
-
-/** flow_step_update 工具名（2026-10-20；推进单个步骤状态——迁移/权限/证据裁决在编排 flow-service）。 */
-export const FLOW_STEP_UPDATE_TOOL_NAME = "flow_step_update";
-
-/** flow_step_supersede 工具名（2026-10-20；新步骤取代旧步骤，Steward/Lead（工作流管理者）——服务端校验）。 */
-export const FLOW_STEP_SUPERSEDE_TOOL_NAME = "flow_step_supersede";
-
-/** request_acceptance 工具名（2026-10-25；交付就绪后由统筹直接请应用派独立复核/Proof）。 */
-export const REQUEST_ACCEPTANCE_TOOL_NAME = "request_acceptance";
-
-/** request_gate_review 工具名（2026-10-26 客户授权；gate 证据齐备后由统筹请应用派 Proof 独立复核——与最终验收独立）。 */
-export const REQUEST_GATE_REVIEW_TOOL_NAME = "request_gate_review";
-
-/** request_boundary_change 工具名（2026-10-26；项目角色写集/边界不足时由统筹请应用派组队修改）。 */
-export const REQUEST_BOUNDARY_CHANGE_TOOL_NAME = "request_boundary_change";
-
 /** request_requirement_change 工具名（2026-10-26；报告员提交需求变更审批（提案/统筹 decision 卡）——申请≠批准，发起方不得自批）。 */
 export const REQUEST_REQUIREMENT_CHANGE_TOOL_NAME = "request_requirement_change";
 
-/** report_artifact_ready 工具名（2026-10-27 客户要求；质检把写好的验收标准产物汇报给应用，应用校验后决定是否收口）。 */
-export const REPORT_ARTIFACT_READY_TOOL_NAME = "report_artifact_ready";
 
 /** view_image 工具名（2026-10-26；读取项目内图片并按运行时策略交付——同轮附图优先 / 下一轮附件回退；注入才注册）。 */
 export const VIEW_IMAGE_TOOL_NAME = "view_image";
@@ -277,7 +222,7 @@ function customerMetadata(signal: AbortSignal | undefined, turnId: string | unde
 // 本层只把合法字段原样并入卡片请求与 metadata / 派发载荷；是否构成治理决定由编排按账本判定。
 
 const GOVERNANCE_SLUG = new RegExp(GOVERNANCE_SLUG_PATTERN);
-// 2026-10-18：`intent-confirm`（客户需求确认卡，主理在 hand_off_intent 前发出）加入 choice 白名单。
+// 2026-10-18：`intent-confirm`（客户需求确认卡）加入 choice 白名单。
 // 2026-10-20 客户拍板「勾了替我决策就不用我管」：它进入 `GOVERNANCE_CARD_GROUP` 的 decision 组——
 // 判断 agent 可代批 `confirm`；`revise` 仍交回客户/发起角色（不替客户修改）。
 // 2026-10-22 治理分工第 1 项：`appointment` 语义改为「任命」（由 Convener 依客户确认的团队计划发起；
@@ -287,7 +232,7 @@ const GOVERNANCE_SLUG = new RegExp(GOVERNANCE_SLUG_PATTERN);
 const CHOICE_CARD_KINDS: readonly GovernanceChoiceCardKind[] = ["proposal", "appointment", "acceptance", "intent-confirm", "decision"];
 // C 批：`write` 已从 schema 枚举删除；工具层保留 legacy 字符串解析以兼容旧调用/旧项目，
 // 新会话模型看不到该枚举；D 批随旧工具面清理。
-const CONFIRM_CARD_KINDS: readonly GovernanceConfirmCardKind[] = ["write", "appointment-write", "schedule-write"];
+const CONFIRM_CARD_KINDS: readonly GovernanceConfirmCardKind[] = ["appointment-write"];
 
 type GovernanceArgs<T> = { ok: true; value: T } | { ok: false; result: ToolResult };
 
@@ -1598,58 +1543,11 @@ function systemPreauthorizationDeclined(name: string, reason: string | undefined
   };
 }
 
-/**
- * 验收分诊回执（2026-10-25 验收分诊设计 §7.3）：客户在**分诊卡**上的选择（下发统筹修改 / 仅汇报不返工）
- * 不是客户在验收卡上直接 accept/reject——即使「仅汇报」按既有 accepted 结算，也不得说成客户选择 accept。
- */
-function acceptanceTriageReceipt(
-  name: string,
-  triage: { disposition: "rework" | "report-only"; source: "judge" | "customer"; conclusion: string },
-  selection: string,
-): ToolResult {
-  const source = triage.source === "judge" ? "判断代批（替我决策）" : "客户在验收分诊卡上的选择";
-  const headline =
-    triage.disposition === "report-only"
-      ? "按验收分诊卡选择「仅汇报不返工」处理（不是客户在验收卡上直接选择 accept）"
-      : "按验收分诊卡选择「下发运营修改」处理（以验收 reject 结算并交运营组织返工；不是客户放弃验收）";
-  return {
-    ok: true,
-    message:
-      `${name}：${source}——${headline}；验收结论仍为 ${triage.conclusion}。` +
-      `请如实向客户说明这是分诊处置，不要宣称客户直接接受或直接拒绝了验收。` +
-      `（实际选项回执：${selection}）`,
-  };
-}
-
-/**
- * 验收分诊**自动处置**回执（2026-10-25 验收分诊设计 §4.4 / §8）：判断代批或结构不足时验收卡
- * **未向客户呈现**，应用已按分诊结果处置——不得说成客户拒绝/同意。
- */
-function acceptanceTriageDeclinedReceipt(
-  name: string,
-  triage: { disposition: "rework" | "report-only"; source: "judge" | "customer"; conclusion: string },
-  reason: string | undefined,
-): ToolResult {
-  const label = triage.disposition === "report-only" ? "仅汇报不返工" : "下发运营修改";
-  const source = triage.source === "judge" ? "判断代批（替我决策）" : "客户分诊选择";
-  const detail = reason !== undefined && reason.trim() !== "" ? `；说明：${reason}` : "";
-  return {
-    ok: false,
-    message:
-      `${name}：验收分诊已按「${label}」处置（${source}；验收结论 ${triage.conclusion}）——` +
-      `验收卡未向客户呈现，**不是客户拒绝**；请用 flow_get 核对流程与治理账本，` +
-      `不要宣称客户拒绝或同意，也不要重复提交同一报告${detail}。`,
-  };
-}
-
 function abortedToolResult(name: string, viewImageDelivery?: ViewImageDeliveryMode): ToolResult {
   if (name === REQUEST_CONFIRMATION_TOOL_NAME || name === REQUEST_CHOICE_TOOL_NAME) return notConsented(name, "会话已中止");
   if (name === SUBMIT_REPORT_TOOL_NAME) return { ok: false, message: `${name}：报告**未能交回**（原因：会话已中止）` };
   if (name === SHELL_VERDICT_TOOL_NAME) return { ok: false, message: `${name}：审读结论**未能交回**（原因：会话已中止）` };
   if (name === DISPATCH_TASK_TOOL_NAME) return { ok: false, message: `${name}：任务**未能派发**（原因：会话已中止）` };
-  // W6-A：交接/澄清中止时**不假设已投递/已提交**（零副作用面如实）。
-  if (name === HAND_OFF_INTENT_TOOL_NAME) return { ok: false, message: `${name}：意图**未能交接**（原因：会话已中止）——**不要当它已交接**；如实告知客户。` };
-  if (name === REQUEST_CLARIFICATION_TOOL_NAME) return { ok: false, message: `${name}：澄清请求**未能提交**（原因：会话已中止）——**不要当客户已看到该问题**；如实告知客户。` };
   // G-2/R2：中止时**不假设已执行**——等待被中止的提议其结果以系统回执为准（确认卡可能仍被处理）。
   if (name === PROPOSE_RECOVERY_TOOL_NAME) return { ok: false, message: `${name}：本次提议**未获结果**（原因：会话已中止）——**不要假设已执行**；如实告知客户。` };
   // G-4/I2：中止时**不假设已安装/已卸载**（零副作用面如实）。
@@ -1658,30 +1556,9 @@ function abortedToolResult(name: string, viewImageDelivery?: ViewImageDeliveryMo
   // G-4 V2：中止时**不假设已安装/已卸载**（同技能版口径；零副作用面如实）。
   if (name === INSTALL_MCP_TOOL_NAME) return { ok: false, message: `${name}：MCP**未能安装**（原因：会话已中止）——**不要当它已安装**；如实告知客户。` };
   if (name === UNINSTALL_MCP_TOOL_NAME) return { ok: false, message: `${name}：MCP**未能卸载**（原因：会话已中止）——**不要当它已卸载**；如实告知客户。` };
-  // flow 方法化：中止时**不假设已读/已变更**（以服务端 revision 为准）。
-  if (name === FLOW_GET_TOOL_NAME) return { ok: false, message: `${name}：流程读取**未完成**（原因：会话已中止）——不要据此推断流程状态。` };
-  if (name === FLOW_STEP_UPDATE_TOOL_NAME || name === FLOW_STEP_SUPERSEDE_TOOL_NAME) {
-    return { ok: false, message: `${name}：变更**未完成**（原因：会话已中止）——**不要当它已生效**；如确需，先 flow_get 看最新 revision 再重试。` };
-  }
-  // 独立复核请求（2026-10-25）：中止时**不假设已派发**（零副作用面如实）。
-  if (name === REQUEST_ACCEPTANCE_TOOL_NAME) {
-    return { ok: false, message: `${name}：独立复核请求**未获结果**（原因：会话已中止）——**不要当已派发**；如实告知客户。` };
-  }
-  // Gate 复核请求（2026-10-26）：中止时**不假设已派发、更不假设 gate 已通过**（零副作用面如实）。
-  if (name === REQUEST_GATE_REVIEW_TOOL_NAME) {
-    return { ok: false, message: `${name}：gate 复核请求**未获结果**（原因：会话已中止）——**不要当已派发，更不要当 gate 已通过**；如实告知客户。` };
-  }
-  // 边界变更请求（2026-10-26）：中止时**不假设已派发/已修改**（零副作用面如实）。
-  if (name === REQUEST_BOUNDARY_CHANGE_TOOL_NAME) {
-    return { ok: false, message: `${name}：边界变更请求**未获结果**（原因：会话已中止）——**不要当已派发/已修改**；如实告知客户。` };
-  }
   // 需求变更申请（2026-10-26）：中止时**不假设已提交/已获批准**（零副作用面如实）。
   if (name === REQUEST_REQUIREMENT_CHANGE_TOOL_NAME) {
     return { ok: false, message: `${name}：需求变更申请**未获结果**（原因：会话已中止）——**不要当已提交/已获批准**；如实告知客户。` };
-  }
-  // 验收标准产物汇报（2026-10-27）：中止时**不假设应用已收到/已接受**，更不假设已收口。
-  if (name === REPORT_ARTIFACT_READY_TOOL_NAME) {
-    return { ok: false, message: `${name}：产物汇报**未获结果**（原因：会话已中止）——**不要当应用已收到/已接受**；如实告知客户，也不要自行修改 flow 状态。` };
   }
   // 图片查看（2026-10-26；2026-10-27 同轮设计）：中止时不谎称「已提供/未提供」。
   // 文案按当前交付方式分支：next-turn 保持「排队未获确认；下一轮以系统为准」原意；
@@ -1997,10 +1874,7 @@ function makeRequestChoiceTool(
       const out = await askCustomer(name, req, fn, timeoutMs, call.signal, gate, { ...metadata, ...governance.value });
       if ("ok" in out) return out; // 通道故障 / 超时 / 中止 → 未获同意
       if (out.outcome === "declined") {
-        // 验收分诊自动处置（判断代批 / 异常卡分诊选择）：卡未呈现、应用已按分诊处置；
-        // 不得说成客户拒绝，也不得说成客户同意（2026-10-25 验收分诊设计 §4.4 / §8）。
-        if (out.triage !== undefined) return acceptanceTriageDeclinedReceipt(name, out.triage, out.reason);
-        // 应用在触达客户通道之前结算（验收分诊退回补报告等）：卡片未呈现，不得说成客户拒绝。
+        // 应用在触达客户通道之前结算：卡片未呈现，不得说成客户拒绝。
         if (out.notPresented === true) return cardNotPresented(name, out.reason);
         // 判断 agent 自动退回：不是客户拒绝。仅验收卡（cardKind:"acceptance"）走应用返工路由
         // （2026-10-23 验收返工路由 §5.3.3）；其他卡种/未给 cardKind 用通用文案。
@@ -2026,10 +1900,6 @@ function makeRequestChoiceTool(
         return opt !== undefined ? `${opt.id}（${opt.label}）` : id;
       });
       const selection = labels.length > 0 ? labels.join("、") : "（未选择任何项）";
-      if (out.triage !== undefined) {
-        // 验收分诊卡的选择：按分诊结果结算了验收请求，但**不是**客户在验收卡上直接 accept/reject。
-        return acceptanceTriageReceipt(name, out.triage, selection);
-      }
       if (out.judge !== undefined) {
         // 判断 agent 代批：不得说成客户本人选择（评审 §7.5）。
         return {
@@ -2223,21 +2093,7 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
   };
 }
 
-// —————————————— 治理四角色：意图交接与澄清（W6-A；hand_off_intent / request_clarification） ——————————————
-//
-// 依据：`角色卡/项目管理/docs/design/2026-10-18_design_governance-liaison-review.md` §5.1/§5.4
-// （四角色 liaison → rapporteur → nominator → convener；治理模型仍 `trio`）。两工具均**由能力注入面
-// 决定可用性**：`hand_off_intent` 只给联络官、`request_clarification` 只给报告员（判据在编排/桌面
-// 注入端，本层不硬编码角色 id）；未注入 ⇒ 工具不存在（沿 dispatch_task 先例，最强 fail-closed）。
-// 本层纪律：**不读文件、不写账本、不投递、不做治理判定**——handler 只做**严格参数校验**（非法值
-// 在触达注入能力前拒绝，不猜测、不截断、不静默丢弃）并把载荷原样交给能力，随后**如实**转达回执：
-// 交接 ≠ 客户批准；澄清 ≠ 客户已回答；契约外回执一律按未交接/未提交 fail-closed。
-
-const HAND_OFF_INTENT_KINDS: readonly HandOffIntentKind[] = ["initial", "clarification", "revision"];
-const HAND_OFF_INTENT_ARG_KEYS: ReadonlySet<string> = new Set(["intentId", "handoffKind", "goal", "scope", "acceptance", "summary", "flowId"]);
-const REQUEST_CLARIFICATION_ARG_KEYS: ReadonlySet<string> = new Set(["flowId", "intentId", "question", "summary"]);
-/** 摘要长度上限（评审 §5.1/§5.4：200 字；按 Unicode 码点计——超长拒绝，不静默截断）。 */
-const SUMMARY_MAX_CHARS = 200;
+// —————————————— 需求变更申请等治理工具的严格参数面 ——————————————
 
 /** 严格参数面：不接受未声明参数（schema `additionalProperties:false` 的 handler 同款守卫）。 */
 function unknownGovernanceArg(args: Record<string, unknown>, allowed: ReadonlySet<string>, toolName: string): ToolResult | undefined {
@@ -2247,172 +2103,6 @@ function unknownGovernanceArg(args: Record<string, unknown>, allowed: ReadonlySe
     }
   }
   return undefined;
-}
-
-/** 必填非空字符串（只做空串判定，**不改写**载荷值——文件为权威，比较在编排侧）。 */
-function readRequiredTextArg(args: Record<string, unknown>, key: string, toolName: string): { ok: true; value: string } | { ok: false; result: ToolResult } {
-  const value = args[key];
-  if (typeof value !== "string" || value.trim() === "") {
-    return { ok: false, result: { ok: false, message: `${toolName}: 缺少或非法的 ${key} 参数（须为非空字符串）——未执行；请更正后重试` } };
-  }
-  return { ok: true, value };
-}
-
-/** 可选摘要校验：给出时必须是非空字符串且 ≤200 字；缺席保持缺席（不凭空生成键）。 */
-function readOptionalSummaryArg(args: Record<string, unknown>, toolName: string): { ok: true; value: string | undefined } | { ok: false; result: ToolResult } {
-  const value = args["summary"];
-  if (value === undefined) return { ok: true, value: undefined };
-  if (typeof value !== "string") {
-    return { ok: false, result: { ok: false, message: `${toolName}: summary 参数非法（须为字符串）——未执行；请更正后重试` } };
-  }
-  const length = Array.from(value).length;
-  if (length > SUMMARY_MAX_CHARS) {
-    return { ok: false, result: { ok: false, message: `${toolName}: summary 超过 ${SUMMARY_MAX_CHARS} 字（${length} 字）——未执行；请压缩后重试` } };
-  }
-  return { ok: true, value };
-}
-
-/** 交接/澄清共用的两态回执归一：契约外（缺失/非对象/ok 非布尔）→ undefined，由调用方 fail-closed。 */
-function simpleReceiptOf(value: unknown): { ok: boolean; message?: string } | undefined {
-  if (value === null || typeof value !== "object") return undefined;
-  const record = value as Record<string, unknown>;
-  if (record["ok"] !== true && record["ok"] !== false) return undefined;
-  const message = typeof record["message"] === "string" && record["message"].trim() !== "" ? record["message"] : undefined;
-  return { ok: record["ok"] === true, ...(message !== undefined ? { message } : {}) };
-}
-
-/**
- * hand_off_intent：**意图交接**工具（W6-A，**只给联络官注入**）。把 `HandOffIntentPayload` 原样交给
- * 注入的能力（编排/桌面窗口执行文件校验、去重、`initial` 仅一次、每轮一次与后台投递）。
- *
- * 行为钉点（评审 §5.1/§5.2）：非法参数（slug/枚举/四要素/summary 超长/未知参数）在**触达能力前**拒绝；
- * 合法载荷原样透传（含可选 flowId，缺席不造键）；metadata 沿 dispatch_task 先例（turnId/roleId/runtime）；
- * 成功 → 「已交接」并重申**交接 ≠ 客户批准**；`ok:false` / 抛错 / 契约外回执 → 明确「**未能交接**」，
- * **绝不**说成已交接。悬挂防护：`raceAbort`（会话中止即立即返回；本地调用，不设等待超时）。
- */
-function makeHandOffIntentTool(fn: HandOffIntentFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
-  const name = HAND_OFF_INTENT_TOOL_NAME;
-  return {
-    name,
-    async handler(call) {
-      const turnId = currentTurnId?.();
-      const unknown = unknownGovernanceArg(call.args, HAND_OFF_INTENT_ARG_KEYS, name);
-      if (unknown !== undefined) return unknown;
-      const intentId = readGovernanceSlugArg(call.args, "intentId", name);
-      if (!intentId.ok) return intentId.result;
-      if (intentId.value === undefined) {
-        return { ok: false, message: `${name}: 缺少 intentId 参数（意图记录 slug，对应 docs/intents/<intentId>.md）——未交接` };
-      }
-      const handoffKind = call.args["handoffKind"];
-      if (typeof handoffKind !== "string" || !HAND_OFF_INTENT_KINDS.includes(handoffKind as HandOffIntentKind)) {
-        return { ok: false, message: `${name}: handoffKind 参数非法（应为 "initial" / "clarification" / "revision" 之一）——未交接` };
-      }
-      const goal = readRequiredTextArg(call.args, "goal", name);
-      if (!goal.ok) return goal.result;
-      const intentScope = readRequiredTextArg(call.args, "scope", name);
-      if (!intentScope.ok) return intentScope.result;
-      const acceptance = readRequiredTextArg(call.args, "acceptance", name);
-      if (!acceptance.ok) return acceptance.result;
-      const summary = readRequiredTextArg(call.args, "summary", name);
-      if (!summary.ok) return summary.result;
-      const summaryLength = Array.from(summary.value).length;
-      if (summaryLength > SUMMARY_MAX_CHARS) {
-        return { ok: false, message: `${name}: summary 超过 ${SUMMARY_MAX_CHARS} 字（${summaryLength} 字）——未交接；请压缩后重试` };
-      }
-      const flowId = readGovernanceSlugArg(call.args, "flowId", name);
-      if (!flowId.ok) return flowId.result;
-      const payload: HandOffIntentPayload = {
-        intentId: intentId.value,
-        handoffKind: handoffKind as HandOffIntentKind,
-        goal: goal.value,
-        scope: intentScope.value,
-        acceptance: acceptance.value,
-        summary: summary.value,
-        ...(flowId.value !== undefined ? { flowId: flowId.value } : {}),
-      };
-
-      let receipt: unknown;
-      try {
-        receipt = await raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return turnId === undefined ? fn(payload) : fn(payload, handbackMetadata(turnId, scope)); }), call.signal, `${name} 交接意图`);
-      } catch (err) {
-        return { ok: false, message: `${name}：意图**未能交接**（原因：${reasonOf(err)}）——请如实向客户说明；**不要当它已交接、不要重复派发**。` };
-      }
-      const normalized = simpleReceiptOf(receipt);
-      if (normalized === undefined) {
-        return { ok: false, message: `${name}：能力未返回明确回执（回执缺失或非法）——按**未交接**处理；**不要当它已交接**，如实告知客户。` };
-      }
-      const detail = normalized.message !== undefined ? ` ${normalized.message}` : "";
-      if (normalized.ok) {
-        return {
-          ok: true,
-          message:
-            `${name}：意图「${payload.intentId}」已交接（handoffKind: ${payload.handoffKind}）——应用已把一条任务交给报告员。${detail}` +
-            `注意：**交接 ≠ 客户批准**——它不是客户决定，不能据此宣称提案已被接受或已获授权；不要重复交接。`,
-        };
-      }
-      return { ok: false, message: `${name}：意图**未能交接**（回执：${normalized.message ?? "能力侧被拒且未提供原因"}）——请如实向客户说明；**不要当它已交接、不要重复派发**。` };
-    },
-  };
-}
-
-/**
- * request_clarification：**澄清请求**工具（W6-A，**只给报告员注入**）。把 `RequestClarificationPayload`
- * 原样交给注入的能力（账本 `clarification.requested` 与主入口系统行在能力侧）。
- *
- * 行为钉点（评审 §5.4）：`question` 必填非空；`flowId`/`intentId` **至少一个**（皆缺→拒绝，不猜测归属）；
- * 可选 `summary` ≤200 字；未知参数拒绝；非法值在**触达能力前**拒绝；合法载荷原样透传（缺席键不凭空出现）。
- * 成功 → 「已提交」并重申「不弹决定卡、不改变任何权力/写权、同一 flow 最多 2 轮」；失败/抛错/契约外
- * 回执 → 明确「**未能提交**」，**绝不**说成客户已看到。悬挂防护：`raceAbort`（不设等待超时）。
- */
-function makeRequestClarificationTool(fn: RequestClarificationFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
-  const name = REQUEST_CLARIFICATION_TOOL_NAME;
-  return {
-    name,
-    async handler(call) {
-      const turnId = currentTurnId?.();
-      const unknown = unknownGovernanceArg(call.args, REQUEST_CLARIFICATION_ARG_KEYS, name);
-      if (unknown !== undefined) return unknown;
-      const flowId = readGovernanceSlugArg(call.args, "flowId", name);
-      if (!flowId.ok) return flowId.result;
-      const intentId = readGovernanceSlugArg(call.args, "intentId", name);
-      if (!intentId.ok) return intentId.result;
-      if (flowId.value === undefined && intentId.value === undefined) {
-        return { ok: false, message: `${name}: 缺少 flowId/intentId 参数（至少给出一个，用于同一 flow 的澄清轮次计数）——未提交` };
-      }
-      const question = readRequiredTextArg(call.args, "question", name);
-      if (!question.ok) return question.result;
-      const summary = readOptionalSummaryArg(call.args, name);
-      if (!summary.ok) return summary.result;
-      const payload: RequestClarificationPayload = {
-        ...(flowId.value !== undefined ? { flowId: flowId.value } : {}),
-        ...(intentId.value !== undefined ? { intentId: intentId.value } : {}),
-        question: question.value,
-        ...(summary.value !== undefined ? { summary: summary.value } : {}),
-      };
-
-      let receipt: unknown;
-      try {
-        receipt = await raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return turnId === undefined ? fn(payload) : fn(payload, handbackMetadata(turnId, scope)); }), call.signal, `${name} 提交澄清`);
-      } catch (err) {
-        return { ok: false, message: `${name}：澄清请求**未能提交**（原因：${reasonOf(err)}）——请如实向客户说明；**不要当客户已看到该问题**。` };
-      }
-      const normalized = simpleReceiptOf(receipt);
-      if (normalized === undefined) {
-        return { ok: false, message: `${name}：能力未返回明确回执（回执缺失或非法）——按**未提交**处理；**不要当客户已看到该问题**，如实告知客户。` };
-      }
-      const detail = normalized.message !== undefined ? ` ${normalized.message}` : "";
-      const target = [flowId.value !== undefined ? `flowId: ${flowId.value}` : undefined, intentId.value !== undefined ? `intentId: ${intentId.value}` : undefined].filter((part): part is string => part !== undefined).join("、");
-      if (normalized.ok) {
-        return {
-          ok: true,
-          message:
-            `${name}：澄清请求已提交（${target}）——应用已记录并在主入口显示。${detail}` +
-            `注意：本工具**不弹客户决定卡、不改变任何权力或写权**；同一 flow 最多 2 轮，超过后请在提案卡上请客户决定（带假设/备选）。`,
-        };
-      }
-      return { ok: false, message: `${name}：澄清请求**未能提交**（回执：${normalized.message ?? "能力侧被拒且未提供原因"}）——请如实向客户说明；**不要当客户已看到该问题**。` };
-    },
-  };
 }
 
 // —————————————— 审读结论工具（R-1；report_shell_verdict） ——————————————
@@ -2730,7 +2420,6 @@ function makeRedispatchTaskTool(fn: RedispatchTaskFn, currentTurnId?: () => stri
 }
 
 /** 恢复动作三值（G-2 §6.3，客户批准）。工具层严格校验（非法 → 拒绝且**不调用能力**，沿 report_shell_verdict 先例）。 */
-const RECOVERY_ACTIONS: readonly RecoveryAction[] = ["abort-turn", "rebuild-session", "redeliver"];
 
 /**
  * propose_recovery：**恢复提议**工具（G-2 §6，**只给内置治理角色**）。把 `{roleId, action, evidence, reason?, itemId?}`
@@ -2746,70 +2435,6 @@ const RECOVERY_ACTIONS: readonly RecoveryAction[] = ["abort-turn", "rebuild-sess
  * 等待客户期间挂**活动闸**（G-1 语义适用，§6.2）：su 的等待轮次不吃整轮硬超时；会话中止用 `raceAbort`
  * 即刻返回「未获结果」——不承诺执行与否（确认卡可能仍被处理，最终结果以系统回执为准）。
  */
-function makeProposeRecoveryTool(fn: ProposeRecoveryFn, currentTurnId?: () => string | undefined, gate?: InteractionGate, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
-  const name = PROPOSE_RECOVERY_TOOL_NAME;
-  return {
-    name,
-    async handler(call) {
-      const turnId = currentTurnId?.();
-      const roleId = readStringArg(call.args, ["roleId", "role_id", "role"]);
-      if (roleId === undefined || roleId.trim() === "") {
-        return { ok: false, message: `${name}: 缺少 roleId 参数（目标角色 id），无法提议恢复` };
-      }
-      const actionRaw = call.args["action"];
-      if (typeof actionRaw !== "string" || !RECOVERY_ACTIONS.includes(actionRaw as RecoveryAction)) {
-        return { ok: false, message: `${name}: action 参数非法（应为 "abort-turn" / "rebuild-session" / "redeliver" 之一——本工具不提议任何其他动作）` };
-      }
-      const evidence = readStringArg(call.args, ["evidence"]);
-      if (evidence === undefined || evidence.trim() === "") {
-        return { ok: false, message: `${name}: 缺少 evidence 参数（支撑提议的事实：状态快照/时间线/会话行）——无证据不提议` };
-      }
-      const reason = readStringArg(call.args, ["reason"]);
-      const itemId = readStringArg(call.args, ["itemId", "item_id"]);
-      const payload: ProposeRecoveryPayload = {
-        roleId,
-        action: actionRaw as RecoveryAction,
-        evidence,
-        ...(reason !== undefined ? { reason } : {}),
-        ...(itemId !== undefined ? { itemId } : {}),
-      };
-
-      gate?.begin();
-      try {
-        let receipt: unknown;
-        try {
-          receipt = await raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return turnId === undefined ? fn(payload) : fn(payload, handbackMetadata(turnId, scope)); }), call.signal, `${name} 等待客户确认`);
-        } catch (err) {
-          return { ok: false, message: `${name}：本次提议**未获结果**（原因：${reasonOf(err)}）——**不要假设已执行**；如实告知客户。` };
-        }
-        const record = receipt !== null && typeof receipt === "object" ? receipt as { outcome?: unknown; message?: unknown; operatorId?: unknown } : undefined;
-        const outcome = record?.outcome;
-        const detail = typeof record?.message === "string" ? record.message : undefined;
-        if (outcome === "executed") {
-          const operator = typeof record?.operatorId === "string" ? record.operatorId : undefined;
-          return {
-            ok: true,
-            message:
-              `${name}：客户已确认（${operatorTag(operator)}），恢复动作已执行：${payload.action} → 角色「${roleId}」。` +
-              `${detail !== undefined ? ` ${detail}` : ""}请据回执继续处理（既有回交/重派路径）。`,
-          };
-        }
-        if (outcome === "declined") {
-          return { ok: false, message: `${name}：**未获执行**——客户未确认（取消/关闭/通道不可用，fail-closed，零执行）。${detail !== undefined ? `${detail} ` : ""}**不要当它已执行**；如实告知客户。` };
-        }
-        if (outcome === "unsupported") {
-          return { ok: false, message: `${name}：恢复动作**未执行**——当前运行时**不支持**该动作（unsupported）。${detail !== undefined ? `${detail} ` : ""}**不要当它已执行**；如实告知客户。` };
-        }
-        if (outcome === "error") {
-          return { ok: false, message: `${name}：恢复动作**未执行**——执行失败或前提不满足（error）。${detail ?? "原因未提供"} **不要当它已执行**；如实告知客户。` };
-        }
-        return { ok: false, message: `${name}：能力未返回明确的回执结果（回执缺失或四值之外）——按**未获明确结果**处理；**不要当它已执行**，如实告知客户。` };
-      } finally {
-        gate?.end();
-      }
-    },
-  };
-}
 
 // —————————————— 角色能力安装（G-4；install_skill / uninstall_skill） ——————————————
 //
@@ -3003,650 +2628,9 @@ function makeUninstallMcpTool(fn: UninstallMcpFn, currentTurnId?: () => string |
   return makeMcpReceiptTool("uninstall", fn, currentTurnId, scope);
 }
 
-// —————————————— Flow 文件方法化（2026-10-20 客户拍板；最小闭环） ——————————————
-//
-// 三工具只做两件事：**参数形状校验**（非法在触达能力前拒绝，不猜测、不静默丢弃）＋**调用注入能力
-// 并如实转达回执**。权限/状态迁移合法性/证据完整性/revision 冲突/Steward/Lead 权限等**一律由编排
-// flow-service 裁决**——本层不读写 flow 文件、不写账本、不做第二份裁决。
-// 未注入对应能力 ⇒ 工具不注册（沿 dispatch_task 先例，能力缺席＝最强 fail-closed）。
-//
-// 诚实面：步骤推进 ≠ 客户批准——需要客户决定的步骤仍须走 request_confirmation/request_choice；
-// 回执 `ok:true` 只表示服务端接受了变更（`idempotent:true`＝同一 idempotencyKey 重放、未重复变更）。
-
-const FLOW_TOOL_STATUS_SET: ReadonlySet<string> = new Set(FLOW_TOOL_STATUSES);
-const FLOW_TOOL_STEP_KIND_SET: ReadonlySet<string> = new Set(FLOW_TOOL_STEP_KINDS);
-
 /** 参数形状错误：触达能力前拒绝，明确「未执行」。 */
-function flowArgumentError(name: string, detail: string): ToolResult {
+function governanceArgumentError(name: string, detail: string): ToolResult {
   return { ok: false, message: `${name}: ${detail}——未执行；请更正后重试（不要猜测参数）` };
-}
-
-/** 必填非空字符串（不改写载荷值）。 */
-function readFlowRequiredText(args: Record<string, unknown>, key: string, name: string): { ok: true; value: string } | { ok: false; result: ToolResult } {
-  const value = args[key];
-  if (typeof value !== "string" || value.trim() === "") {
-    return { ok: false, result: flowArgumentError(name, `缺少或非法的 ${key} 参数（须为非空字符串）`) };
-  }
-  return { ok: true, value };
-}
-
-/** 可选非空字符串：缺席保持缺席（不造键）；给出时必须是字符串。 */
-function readFlowOptionalText(args: Record<string, unknown>, key: string, name: string): { ok: true; value: string | undefined } | { ok: false; result: ToolResult } {
-  const value = args[key];
-  if (value === undefined || value === null) return { ok: true, value: undefined };
-  if (typeof value !== "string" || value.trim() === "") {
-    return { ok: false, result: flowArgumentError(name, `${key} 参数非法（须为非空字符串；可省略）`) };
-  }
-  return { ok: true, value };
-}
-
-/** 可选证据 `{kind, ref}`：形状校验（枚举/非空 ref）在工具层；存在性与完整性在 flow-service。 */
-function readFlowEvidence(args: Record<string, unknown>, name: string): { ok: true; value: FlowToolEvidence | undefined } | { ok: false; result: ToolResult } {
-  const raw = args["evidence"];
-  if (raw === undefined || raw === null) return { ok: true, value: undefined };
-  if (typeof raw !== "object" || Array.isArray(raw)) {
-    return { ok: false, result: flowArgumentError(name, "evidence 参数非法（须为 {kind, ref} 对象）") };
-  }
-  const record = raw as Record<string, unknown>;
-  if (typeof record["kind"] !== "string" || !FLOW_TOOL_STEP_KIND_SET.has(record["kind"])) {
-    return { ok: false, result: flowArgumentError(name, `evidence.kind 非法（须为 ${FLOW_TOOL_STEP_KINDS.join("/")} 之一）`) };
-  }
-  if (typeof record["ref"] !== "string" || record["ref"].trim() === "") {
-    return { ok: false, result: flowArgumentError(name, "evidence.ref 非法（须为非空字符串）") };
-  }
-  return { ok: true, value: { kind: record["kind"] as FlowToolStepKind, ref: record["ref"] } };
-}
-
-/** 服务端回执里的 issues：只转达非空字符串项（其它类型忽略，不猜）。 */
-function flowIssuesOf(value: unknown): string[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const issues = value.filter((item): item is string => typeof item === "string" && item.trim() !== "");
-  return issues.length > 0 ? issues : undefined;
-}
-
-/** 结构化流程视图 → 可读文本（原样投影字段，不重算状态；格式异常只跳过，不抛）。 */
-function renderFlowView(flow: unknown): string {
-  if (flow === null || typeof flow !== "object" || Array.isArray(flow)) return "";
-  const record = flow as Partial<FlowToolView>;
-  const lines: string[] = [];
-  const header: string[] = [];
-  if (typeof record.flowId === "string") header.push(`flowId=${record.flowId}`);
-  if (typeof record.revision === "string") header.push(`revision=${record.revision}`);
-  if (typeof record.qualityTier === "string") header.push(`qualityTier=${record.qualityTier}`);
-  if (header.length > 0) lines.push(`流程：${header.join("；")}`);
-  const canUpdate = Array.isArray(record.canUpdate) ? record.canUpdate.filter((id): id is string => typeof id === "string") : [];
-  lines.push(`当前角色可更新步骤：${canUpdate.length > 0 ? canUpdate.join(", ") : "（无）"}`);
-  const steps = Array.isArray(record.steps) ? record.steps : [];
-  if (steps.length > 0) {
-    lines.push("步骤：");
-    for (const rawStep of steps) {
-      if (rawStep === null || typeof rawStep !== "object") continue;
-      const step = rawStep as Partial<FlowToolStepView>;
-      const text = `- ${String(step.id ?? "?")}：${String(step.title ?? "")}（owner=${String(step.owner ?? "?")}；kind=${String(step.kind ?? "?")}；status=${String(step.status ?? "?")}）`;
-      const extras: string[] = [];
-      const evidence = step.evidence as Partial<FlowToolEvidence> | undefined;
-      if (evidence !== undefined && typeof evidence.kind === "string" && typeof evidence.ref === "string") {
-        extras.push(`evidence=${evidence.kind}:${evidence.ref}`);
-      }
-      if (Array.isArray(step.supersedes) && step.supersedes.length > 0) {
-        extras.push(`supersedes=${step.supersedes.filter((id): id is string => typeof id === "string").join(",")}`);
-      }
-      if (typeof step.supersededBy === "string") extras.push(`supersededBy=${step.supersededBy}`);
-      lines.push(extras.length > 0 ? `${text} ${extras.join(" ")}` : text);
-    }
-  }
-  return `\n${lines.join("\n")}`;
-}
-
-/**
- * flow 回执 → 工具结果：**原样**转达 `ok/code/revision/error/issues`（含 idempotent 与 flow 视图）。
- * 契约外回执（缺失/非对象/ok 非布尔）⇒ fail-closed「未获明确结果」，绝不当成功。
- */
-function flowResultMessage(name: string, value: unknown): ToolResult {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return { ok: false, message: `${name}：flow 服务未返回明确结果（回执缺失或非法）——不要据此推断流程状态。` };
-  }
-  const receipt = value as Partial<FlowToolResult>;
-  if (typeof receipt.ok !== "boolean") {
-    return { ok: false, message: `${name}：flow 服务未返回明确结果（缺少 ok 布尔）——不要据此推断流程状态。` };
-  }
-  const parts: string[] = [`ok=${receipt.ok}`];
-  if (typeof receipt.code === "string" && receipt.code !== "") parts.push(`code=${receipt.code}`);
-  if (typeof receipt.revision === "string" && receipt.revision !== "") parts.push(`revision=${receipt.revision}`);
-  if (receipt.idempotent === true) parts.push("idempotent=true");
-  if (typeof receipt.error === "string" && receipt.error !== "") parts.push(`error=${receipt.error}`);
-  const issues = flowIssuesOf(receipt.issues);
-  if (issues !== undefined) parts.push(`issues=${issues.join("；")}`);
-  const detail = `（${parts.join("；")}）`;
-  if (!receipt.ok) {
-    return {
-      ok: false,
-      message: `${name}：操作**未完成**${detail}——请如实向客户说明；按 code/error/issues 修正后重试，最新状态以服务端 revision 为准。`,
-    };
-  }
-  return {
-    ok: true,
-    message: `${name}：操作成功${detail}${renderFlowView(receipt.flow)}\n注意：步骤推进 ≠ 客户批准；需要客户决定的步骤仍须走客户交互工具。`,
-  };
-}
-
-/** flow_get：只读流程结构化视图（`flowId` 可选；缺省＝当前/默认 flow，由服务端归一）。 */
-function makeFlowGetTool(fn: FlowGetFn): ExecutableTool {
-  const name = FLOW_GET_TOOL_NAME;
-  return {
-    name,
-    async handler(call) {
-      const raw = call.args["flowId"];
-      if (raw !== undefined && raw !== null && typeof raw !== "string") {
-        return flowArgumentError(name, "flowId 参数非法（应为字符串；可省略＝当前流程）");
-      }
-      const flowId = typeof raw === "string" && raw.trim() !== "" ? raw : undefined;
-      let result: unknown;
-      try {
-        result = await raceAbort(
-          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(flowId !== undefined ? { flowId } : {}); }),
-          call.signal,
-          `${name} 读取流程`,
-        );
-      } catch (err) {
-        return { ok: false, message: `${name}：流程读取**未完成**（原因：${reasonOf(err)}）——没有拿到视图就**不要推断流程状态**；如确需，可稍后重试。` };
-      }
-      return flowResultMessage(name, result);
-    },
-  };
-}
-
-/** flow_step_update：推进单个步骤状态（迁移/权限/证据/revision 裁决在 flow-service）。 */
-function makeFlowStepUpdateTool(fn: FlowStepUpdateFn): ExecutableTool {
-  const name = FLOW_STEP_UPDATE_TOOL_NAME;
-  return {
-    name,
-    async handler(call) {
-      const flowId = readFlowRequiredText(call.args, "flowId", name);
-      if (!flowId.ok) return flowId.result;
-      const stepId = readFlowRequiredText(call.args, "stepId", name);
-      if (!stepId.ok) return stepId.result;
-      const statusRaw = call.args["status"];
-      if (typeof statusRaw !== "string" || !FLOW_TOOL_STATUS_SET.has(statusRaw)) {
-        return flowArgumentError(name, `status 参数非法（须为 ${FLOW_TOOL_STATUSES.join("/")} 之一）`);
-      }
-      const expectedRevision = readFlowRequiredText(call.args, "expectedRevision", name);
-      if (!expectedRevision.ok) return expectedRevision.result;
-      const evidence = readFlowEvidence(call.args, name);
-      if (!evidence.ok) return evidence.result;
-      const idempotencyKey = readFlowOptionalText(call.args, "idempotencyKey", name);
-      if (!idempotencyKey.ok) return idempotencyKey.result;
-      const note = readFlowOptionalText(call.args, "note", name);
-      if (!note.ok) return note.result;
-      const input: Parameters<FlowStepUpdateFn>[0] = {
-        flowId: flowId.value,
-        stepId: stepId.value,
-        status: statusRaw as FlowToolStatus,
-        expectedRevision: expectedRevision.value,
-        ...(evidence.value !== undefined ? { evidence: evidence.value } : {}),
-        ...(idempotencyKey.value !== undefined ? { idempotencyKey: idempotencyKey.value } : {}),
-        ...(note.value !== undefined ? { note: note.value } : {}),
-      };
-      let result: unknown;
-      try {
-        result = await raceAbort(
-          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(input); }),
-          call.signal,
-          `${name} 更新步骤`,
-        );
-      } catch (err) {
-        return { ok: false, message: `${name}：步骤更新**未完成**（原因：${reasonOf(err)}）——**不要当它已生效**；如确需，先 flow_get 看最新 revision 再重试。` };
-      }
-      return flowResultMessage(name, result);
-    },
-  };
-}
-
-/** flow_step_supersede：新步骤取代旧步骤（Steward/Lead——服务端按调用角色校验）。 */
-function makeFlowStepSupersedeTool(fn: FlowStepSupersedeFn): ExecutableTool {
-  const name = FLOW_STEP_SUPERSEDE_TOOL_NAME;
-  return {
-    name,
-    async handler(call) {
-      const flowId = readFlowRequiredText(call.args, "flowId", name);
-      if (!flowId.ok) return flowId.result;
-      const oldStepId = readFlowRequiredText(call.args, "oldStepId", name);
-      if (!oldStepId.ok) return oldStepId.result;
-      const newStepId = readFlowRequiredText(call.args, "newStepId", name);
-      if (!newStepId.ok) return newStepId.result;
-      const title = readFlowRequiredText(call.args, "title", name);
-      if (!title.ok) return title.result;
-      const owner = readFlowRequiredText(call.args, "owner", name);
-      if (!owner.ok) return owner.result;
-      const kindRaw = call.args["kind"];
-      if (typeof kindRaw !== "string" || !FLOW_TOOL_STEP_KIND_SET.has(kindRaw)) {
-        return flowArgumentError(name, `kind 参数非法（须为 ${FLOW_TOOL_STEP_KINDS.join("/")} 之一）`);
-      }
-      const expectedRevision = readFlowRequiredText(call.args, "expectedRevision", name);
-      if (!expectedRevision.ok) return expectedRevision.result;
-      const reason = readFlowOptionalText(call.args, "reason", name);
-      if (!reason.ok) return reason.result;
-      const idempotencyKey = readFlowOptionalText(call.args, "idempotencyKey", name);
-      if (!idempotencyKey.ok) return idempotencyKey.result;
-      const input: Parameters<FlowStepSupersedeFn>[0] = {
-        flowId: flowId.value,
-        oldStepId: oldStepId.value,
-        newStepId: newStepId.value,
-        title: title.value,
-        owner: owner.value,
-        kind: kindRaw as FlowToolStepKind,
-        expectedRevision: expectedRevision.value,
-        ...(reason.value !== undefined ? { reason: reason.value } : {}),
-        ...(idempotencyKey.value !== undefined ? { idempotencyKey: idempotencyKey.value } : {}),
-      };
-      let result: unknown;
-      try {
-        result = await raceAbort(
-          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(input); }),
-          call.signal,
-          `${name} 替代步骤`,
-        );
-      } catch (err) {
-        return { ok: false, message: `${name}：步骤替代**未完成**（原因：${reasonOf(err)}）——**不要当它已生效**；如确需，先 flow_get 看最新 revision 再重试。` };
-      }
-      return flowResultMessage(name, result);
-    },
-  };
-}
-
-// —————————————— 独立复核请求（2026-10-25 客户要求；request_acceptance） ——————————————
-//
-// 背景：统筹（Steward）交付完成后应能**直接提交独立复核**，不再等应用的一次 settle/账本事件才派 Proof。
-// 本层只做两件事：**参数形状校验**（非法在触达能力前拒绝，不猜测、不静默丢弃）＋**调用注入能力并如实
-// 转达回执**（`ok`/`code`/`message`；失败不伪装成功）。派发（Proof/验收）、验收标准/变更包/风险档/流程
-// 完整性校验与 flow/账本写入全部在**应用注入的能力**侧——本工具不写 flow/账本、不做治理判定、不改客户
-// 决定、不代表客户批准。未注入能力 ⇒ 工具不注册（沿 flow_get 先例，能力缺席＝最强 fail-closed）。
-
-/** `request_acceptance` 回执 code 的冻结枚举（与 `RequestAcceptanceResult` 同一契约；契约外回执 fail-closed）。 */
-const REQUEST_ACCEPTANCE_CODES: readonly RequestAcceptanceResult["code"][] = Object.freeze([
-  "dispatched",
-  "flow-not-found",
-  "criteria-missing",
-  "change-package-missing",
-  "change-package-no-risk",
-  "flow-incomplete",
-  "runtime-unresolved",
-  "already-dispatched",
-  "unavailable",
-]);
-const REQUEST_ACCEPTANCE_CODE_SET: ReadonlySet<string> = new Set(REQUEST_ACCEPTANCE_CODES);
-
-/**
- * 回执 → 工具结果：**原样**转达 `ok`/`code`/`message`（可选 `flowId`/`runtime` 一并如实呈现）。
- * 契约外回执（缺失/非对象/缺 ok/code/message/未知 code）⇒ fail-closed「未获明确结果」，按未派发处理，
- * **绝不说成已派发**。`dispatched` 也不代表客户批准或验收通过（见文案纪律）。
- */
-function requestAcceptanceResultMessage(name: string, value: unknown): ToolResult {
-  const contractExternal = (): ToolResult => ({
-    ok: false,
-    message: `${name}：应用未返回明确结果（回执缺失或非法）——按**未派发**处理；**不要当已派发**，如实告知客户。`,
-  });
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return contractExternal();
-  const receipt = value as Partial<RequestAcceptanceResult>;
-  if (
-    typeof receipt.ok !== "boolean" ||
-    typeof receipt.code !== "string" ||
-    !REQUEST_ACCEPTANCE_CODE_SET.has(receipt.code) ||
-    typeof receipt.message !== "string" ||
-    receipt.message.trim() === ""
-  ) {
-    return contractExternal();
-  }
-  const parts = [`ok=${receipt.ok}`, `code=${receipt.code}`];
-  if (typeof receipt.flowId === "string" && receipt.flowId !== "") parts.push(`flowId=${receipt.flowId}`);
-  if (typeof receipt.runtime === "string" && receipt.runtime.length > 0) parts.push(`runtime=${receipt.runtime}`);
-  const detail = `（${parts.join("；")}）：${receipt.message}`;
-  if (receipt.ok) {
-    const headline = receipt.code === "dispatched" ? "独立复核已派发" : "请求已受理";
-    return {
-      ok: true,
-      message:
-        `${name}：${headline}${detail}。` +
-        `注意：**请求复核 ≠ 客户批准**——本工具不改客户决定、不代表客户批准；派发与 flow/账本状态由应用实现，` +
-        `不要宣称验收已通过。`,
-    };
-  }
-  return { ok: false, message: `${name}：独立复核请求**未成功**${detail}——**不要当已派发**；如实告知客户。` };
-}
-
-/** request_acceptance：交付就绪后请应用派独立复核（参数 `flowId?`/`note?`；回执如实转达）。 */
-function makeRequestAcceptanceTool(fn: RequestAcceptanceFn): ExecutableTool {
-  const name = REQUEST_ACCEPTANCE_TOOL_NAME;
-  return {
-    name,
-    async handler(call) {
-      // flowId 可选：缺省/空白＝当前流程（由应用归一）；非字符串 ⇒ 在触达能力前拒绝。
-      const rawFlowId = call.args["flowId"];
-      if (rawFlowId !== undefined && rawFlowId !== null && typeof rawFlowId !== "string") {
-        return flowArgumentError(name, "flowId 参数非法（应为字符串；可省略＝当前流程）");
-      }
-      const flowId = typeof rawFlowId === "string" && rawFlowId.trim() !== "" ? rawFlowId : undefined;
-      const note = readFlowOptionalText(call.args, "note", name);
-      if (!note.ok) return note.result;
-      const input: RequestAcceptanceInput = {
-        ...(flowId !== undefined ? { flowId } : {}),
-        ...(note.value !== undefined ? { note: note.value } : {}),
-      };
-      let result: unknown;
-      try {
-        result = await raceAbort(
-          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(input); }),
-          call.signal,
-          `${name} 派发独立复核`,
-        );
-      } catch (err) {
-        return { ok: false, message: `${name}：独立复核请求**未完成**（原因：${reasonOf(err)}）——**不要当已派发**；如实告知客户。` };
-      }
-      return requestAcceptanceResultMessage(name, result);
-    },
-  };
-}
-
-// —————————————— Gate 复核请求（2026-10-26 客户授权；request_gate_review） ——————————————
-//
-// 背景：客户 2026-10-26 确认独立复核权威只归验收（Proof），统筹只做证据完整性检查并**请求**复核；
-// 关键节点验收门禁（gate）的复核是**独立于最终验收**的通道，`request_acceptance` 语义不变（只用于
-// 最终验收）。本层只做两件事：**参数形状校验**（`gateId` 必填且为 slug；`note` 有界；非法在触达
-// 能力前拒绝，不猜测、不截断、不静默丢弃）＋**调用注入能力并如实转达回执**（`ok`/`code`/`message`；
-// 失败不伪装成功）。gate 查找/前置/证据/标准校验、Proof 派发、gate 记录与账本写入全部在**应用注入的
-// 能力**侧——本工具不写 flow/账本、不做治理判定。`dispatched` 只表示已派 Proof：**gate 复核 ≠ 验收
-// 通过 ≠ 客户批准**；gate fail 只按 blocker/major 判失败，只有 minor/nit 不返工（防吹毛求疵）。
-// 未注入能力 ⇒ 工具不注册（沿 request_acceptance 先例，能力缺席＝最强 fail-closed）。
-
-/** `request_gate_review` 回执 code 的冻结枚举（与 `RequestGateReviewResult` 同一契约；契约外回执 fail-closed）。 */
-const REQUEST_GATE_REVIEW_CODES: readonly RequestGateReviewResult["code"][] = Object.freeze([
-  "dispatched",
-  "already-dispatched",
-  "flow-busy",
-  "gate-not-found",
-  "criteria-missing",
-  "flow-incomplete",
-  "unavailable",
-  "rejected",
-]);
-const REQUEST_GATE_REVIEW_CODE_SET: ReadonlySet<string> = new Set(REQUEST_GATE_REVIEW_CODES);
-
-/** `note` 长度上限（按 Unicode 码点计；有界文本——超长拒绝，不静默截断；不写账本、不参与判定）。 */
-const REQUEST_GATE_REVIEW_NOTE_MAX_CHARS = 2000;
-
-/** 可选 `note`：缺席保持缺席（不造键）；给出时须为非空字符串且 ≤ 上限（超长拒绝，不截断）。 */
-function readGateReviewNote(args: Record<string, unknown>, name: string): { ok: true; value: string | undefined } | { ok: false; result: ToolResult } {
-  const value = args["note"];
-  if (value === undefined || value === null) return { ok: true, value: undefined };
-  if (typeof value !== "string" || value.trim() === "") {
-    return { ok: false, result: flowArgumentError(name, "note 参数非法（须为非空字符串；可省略）") };
-  }
-  const length = Array.from(value).length;
-  if (length > REQUEST_GATE_REVIEW_NOTE_MAX_CHARS) {
-    return { ok: false, result: flowArgumentError(name, `note 超过 ${REQUEST_GATE_REVIEW_NOTE_MAX_CHARS} 字（${length} 字；有界文本）`) };
-  }
-  return { ok: true, value };
-}
-
-/**
- * 回执 → 工具结果：**原样**转达 `ok`/`code`/`message`（可选 `flowId`/`gateId`/`runtime` 一并如实呈现）。
- * 契约外回执（缺失/非对象/缺 ok/code/message/未知 code）⇒ fail-closed「未获明确结果」，按未派发/失败
- * 处理，**绝不说成已派发或 gate 已通过**。`dispatched` 只表示已派 Proof——不等于 gate 通过、不等于
- * 验收通过、不代表客户批准（见文案纪律）。
- */
-function requestGateReviewResultMessage(name: string, value: unknown): ToolResult {
-  const contractExternal = (): ToolResult => ({
-    ok: false,
-    message: `${name}：应用未返回明确结果（回执缺失或非法）——按**未派发/失败**处理；**不要当已派发，更不要当 gate 已通过**，如实告知客户。`,
-  });
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return contractExternal();
-  const receipt = value as Partial<RequestGateReviewResult>;
-  if (
-    typeof receipt.ok !== "boolean" ||
-    typeof receipt.code !== "string" ||
-    !REQUEST_GATE_REVIEW_CODE_SET.has(receipt.code) ||
-    typeof receipt.message !== "string" ||
-    receipt.message.trim() === ""
-  ) {
-    return contractExternal();
-  }
-  const parts = [`ok=${receipt.ok}`, `code=${receipt.code}`];
-  if (typeof receipt.flowId === "string" && receipt.flowId !== "") parts.push(`flowId=${receipt.flowId}`);
-  if (typeof receipt.gateId === "string" && receipt.gateId !== "") parts.push(`gateId=${receipt.gateId}`);
-  if (typeof receipt.runtime === "string" && receipt.runtime.length > 0) parts.push(`runtime=${receipt.runtime}`);
-  const detail = `（${parts.join("；")}）：${receipt.message}`;
-  // `flow-busy`（2026-10-27 客户要求）：流程仍有在途工作⇒gate 暂不派发——**可稍后重试**的独立状态。
-  // 无论应用把 ok 写成什么，都不得当作成功/已派发（防止矛盾回执伪造成功）。
-  if (receipt.code === "flow-busy") {
-    return {
-      ok: false,
-      message:
-        `${name}：流程仍有在途工作（交付/轮次/回交），gate **暂不派发**${detail}——` +
-        `这是**可重试**的独立状态：**不是故障、不是 gate 失败**，也**不要当已派发**；` +
-        `请等当前在途工作结束后**稍后重试**，并如实告知客户；不要据此判断 gate 通过或失败。` +
-        (receipt.ok ? `（应用回执 ok=true 与 flow-busy 矛盾，按“暂未派发”处理，不视为成功。）` : ""),
-    };
-  }
-  if (receipt.ok) {
-    const headline = receipt.code === "dispatched" ? "gate 复核已派发（已请 Proof 独立复核）" : "请求已受理";
-    return {
-      ok: true,
-      message:
-        `${name}：${headline}${detail}。` +
-        `注意：**gate 复核 ≠ 验收通过 ≠ 客户批准**——\`dispatched\` 只表示已派 Proof，不代表 gate 已通过、` +
-        `不代表最终验收通过，也不代表客户批准；结论以 Proof 报告与 flow 步骤状态为准，不要宣称已通过。` +
-        `gate 失败只按 blocker/major 判定；只有 minor/nit 不构成返工依据。`,
-    };
-  }
-  if (receipt.code === "rejected") {
-    return {
-      ok: false,
-      message:
-        `${name}：gate 复核请求被应用**退回**（rejected）${detail}——**不要当已派发，更不要当 gate 已通过**；` +
-        `按 message 区分「gate 已 done / 已 superseded / 返工未完成」，协调修复后重交，如实告知客户。`,
-    };
-  }
-  return { ok: false, message: `${name}：gate 复核请求**未成功**${detail}——**不要当已派发，更不要当 gate 已通过**；如实告知客户。` };
-}
-
-/** request_gate_review：gate 证据齐备后请应用派 Proof 做独立复核（参数 `flowId?`/`gateId`/`note?`；回执如实转达）。 */
-function makeRequestGateReviewTool(fn: RequestGateReviewFn): ExecutableTool {
-  const name = REQUEST_GATE_REVIEW_TOOL_NAME;
-  return {
-    name,
-    async handler(call) {
-      // gateId 必填：须为匹配 GOVERNANCE_SLUG_PATTERN 的 gate 步骤 id；非法在触达能力前拒绝（不猜测、不截断）。
-      const rawGateId = call.args["gateId"];
-      if (typeof rawGateId !== "string" || !GOVERNANCE_SLUG.test(rawGateId)) {
-        return flowArgumentError(name, `缺少或非法的 gateId 参数（必填，须为匹配 ${GOVERNANCE_SLUG_PATTERN} 的 gate 步骤 id，如 gate-vertical-slice）`);
-      }
-      // flowId 可选：缺省/空白＝当前流程（由应用归一）；非字符串 ⇒ 在触达能力前拒绝。
-      const rawFlowId = call.args["flowId"];
-      if (rawFlowId !== undefined && rawFlowId !== null && typeof rawFlowId !== "string") {
-        return flowArgumentError(name, "flowId 参数非法（应为字符串；可省略＝当前流程）");
-      }
-      const flowId = typeof rawFlowId === "string" && rawFlowId.trim() !== "" ? rawFlowId : undefined;
-      const note = readGateReviewNote(call.args, name);
-      if (!note.ok) return note.result;
-      const input: RequestGateReviewInput = {
-        gateId: rawGateId,
-        ...(flowId !== undefined ? { flowId } : {}),
-        ...(note.value !== undefined ? { note: note.value } : {}),
-      };
-      let result: unknown;
-      try {
-        result = await raceAbort(
-          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(input); }),
-          call.signal,
-          `${name} 派发 gate 复核`,
-        );
-      } catch (err) {
-        return { ok: false, message: `${name}：gate 复核请求**未完成**（原因：${reasonOf(err)}）——**不要当已派发，更不要当 gate 已通过**；如实告知客户。` };
-      }
-      return requestGateReviewResultMessage(name, result);
-    },
-  };
-}
-
-// —————————————— 边界变更请求（2026-10-26 客户要求；request_boundary_change） ——————————————
-//
-// 真机缺口：治理门禁规定「内置治理角色不可被派发、治理角色之间不 dispatch」，统筹无法让组队（Crew）
-// 修改项目角色边界（例：castle 项目 app-shell 缺 `tsconfig.node.json` 写权）。本工具是统筹可用的
-// 专用请求通道：本层只做**参数形状校验**（roleId/rationale 非空；至少一个非空增删数组；元素去重；
-// 禁绝对路径与 `..`——存在性/项目内校验由注入能力负责）＋**调用注入能力并如实转达回执**
-// （`ok`/`code`/`message`；失败不伪装成功）。真正的 Crew 派发、appointment-write 与客户/判断确认
-// 全部在应用侧——本工具不派发、不写盘、不做治理判定、不代表客户批准。未注入 ⇒ 工具不注册。
-
-/** `request_boundary_change` 回执 code 的冻结枚举（与 `RequestBoundaryChangeResult` 同一契约；契约外回执 fail-closed）。 */
-const REQUEST_BOUNDARY_CHANGE_CODES: readonly RequestBoundaryChangeResult["code"][] = Object.freeze([
-  "dispatched",
-  "already-dispatched",
-  "rejected",
-  "invalid-role",
-  "invalid-path",
-  "no-change",
-  "unavailable",
-]);
-const REQUEST_BOUNDARY_CHANGE_CODE_SET: ReadonlySet<string> = new Set(REQUEST_BOUNDARY_CHANGE_CODES);
-
-/**
- * 精确路径的**句法层**校验：只接受项目相对路径。绝对路径/盘符路径/UNC 与任何 `..` 段一律拒绝；
- * 存在性、是否在项目内、是否与被修改角色相关等语义校验由注入能力负责（本层不访问文件系统）。
- */
-function boundaryPathSyntaxError(value: string): string | undefined {
-  if (value.trim() === "") return "路径为空";
-  if (isAbsolute(value) || isAbsoluteAny(value) || /^[A-Za-z]:/.test(value)) return "不得为绝对路径/盘符路径";
-  if (value.split(/[\\/]+/).includes("..")) return "不得包含 `..` 段";
-  return undefined;
-}
-
-/**
- * 可选路径数组：缺席保持缺席（不造键）；空数组等价于未提供。给出时逐项校验非空字符串与路径句法，
- * 并按**原字符串**去重（保留首次出现顺序）。数组元素不去空白——路径按提交值精确转达。
- */
-function readBoundaryPathList(
-  args: Record<string, unknown>,
-  key: string,
-  name: string,
-): { ok: true; value: string[] | undefined } | { ok: false; result: ToolResult } {
-  const raw = args[key];
-  if (raw === undefined || raw === null) return { ok: true, value: undefined };
-  if (!Array.isArray(raw)) {
-    return { ok: false, result: flowArgumentError(name, `${key} 参数非法（须为非空字符串数组；可省略）`) };
-  }
-  const paths: string[] = [];
-  const seen = new Set<string>();
-  for (const item of raw) {
-    if (typeof item !== "string" || item.trim() === "") {
-      return { ok: false, result: flowArgumentError(name, `${key} 含空或非字符串元素（须为非空字符串）`) };
-    }
-    const syntaxError = boundaryPathSyntaxError(item);
-    if (syntaxError !== undefined) {
-      return { ok: false, result: flowArgumentError(name, `${key} 含非法路径 ${JSON.stringify(item)}（${syntaxError}）`) };
-    }
-    if (seen.has(item)) continue;
-    seen.add(item);
-    paths.push(item);
-  }
-  return { ok: true, value: paths.length > 0 ? paths : undefined };
-}
-
-/**
- * 回执 → 工具结果：**原样**转达 `ok`/`code`/`message`（可选 `roleId`/`ticketId` 一并如实呈现）。
- * 契约外回执（缺失/非对象/缺 ok/code/message/未知 code）⇒ fail-closed「未获明确结果」，按未派发处理，
- * **绝不说成已派发**。`dispatched` 也不代表客户批准或边界已修改（见文案纪律）。
- */
-function requestBoundaryChangeResultMessage(name: string, value: unknown): ToolResult {
-  const contractExternal = (): ToolResult => ({
-    ok: false,
-    message: `${name}：应用未返回明确结果（回执缺失或非法）——按**未派发**处理；**不要当已派发/已修改**，如实告知客户。`,
-  });
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return contractExternal();
-  const receipt = value as Partial<RequestBoundaryChangeResult>;
-  if (
-    typeof receipt.ok !== "boolean" ||
-    typeof receipt.code !== "string" ||
-    !REQUEST_BOUNDARY_CHANGE_CODE_SET.has(receipt.code) ||
-    typeof receipt.message !== "string" ||
-    receipt.message.trim() === ""
-  ) {
-    return contractExternal();
-  }
-  const parts = [`ok=${receipt.ok}`, `code=${receipt.code}`];
-  if (typeof receipt.roleId === "string" && receipt.roleId !== "") parts.push(`roleId=${receipt.roleId}`);
-  if (typeof receipt.ticketId === "string" && receipt.ticketId !== "") parts.push(`ticketId=${receipt.ticketId}`);
-  const detail = `（${parts.join("；")}）：${receipt.message}`;
-  if (receipt.ok) {
-    const headline =
-      receipt.code === "dispatched"
-        ? "边界变更请求已派发给人事"
-        : receipt.code === "already-dispatched"
-          ? "此前已派发，未重复派发"
-          : "请求已受理";
-    return {
-      ok: true,
-      message:
-        `${name}：${headline}${detail}。` +
-        `注意：**请求变更 ≠ 客户批准**——实际修改仍由人事走 appointment-write 与客户/判断确认；` +
-        `本工具不代表客户批准，也不代表边界已修改。`,
-    };
-  }
-  // 分层门禁退回（2026-10-26 客户确认）：确定性校验/AI 门禁 deny/manual/超时 ⇒ 未派给组队、不自动放行；
-  // 这是应用门禁的判断，**不代表客户拒绝**——如实转达原因，不要诱导改写后反复重试。
-  if (receipt.code === "rejected") {
-    return {
-      ok: false,
-      message:
-        `${name}：边界变更请求被应用门禁**退回**（rejected）${detail}——**不自动放行**，**不代表客户拒绝**；` +
-        `**不要当已派发/已修改**，如实告知客户。`,
-    };
-  }
-  return { ok: false, message: `${name}：边界变更请求**未成功**${detail}——**不要当已派发/已修改**；如实告知客户。` };
-}
-
-/** request_boundary_change：提交精确的边界增删路径与理由（派发/确认/写入由应用实现；回执如实转达）。 */
-function makeRequestBoundaryChangeTool(fn: RequestBoundaryChangeFn): ExecutableTool {
-  const name = REQUEST_BOUNDARY_CHANGE_TOOL_NAME;
-  return {
-    name,
-    async handler(call) {
-      const roleId = readFlowRequiredText(call.args, "roleId", name);
-      if (!roleId.ok) return roleId.result;
-      const rationale = readFlowRequiredText(call.args, "rationale", name);
-      if (!rationale.ok) return rationale.result;
-      const addPaths = readBoundaryPathList(call.args, "addPaths", name);
-      if (!addPaths.ok) return addPaths.result;
-      const removePaths = readBoundaryPathList(call.args, "removePaths", name);
-      if (!removePaths.ok) return removePaths.result;
-      if (addPaths.value === undefined && removePaths.value === undefined) {
-        return flowArgumentError(name, "addPaths/removePaths 至少提供一个非空路径数组（无变更的请求不要提交）");
-      }
-      // flowId 可选：缺省/空白＝当前流程（由应用归一）；非字符串 ⇒ 在触达能力前拒绝。
-      const rawFlowId = call.args["flowId"];
-      if (rawFlowId !== undefined && rawFlowId !== null && typeof rawFlowId !== "string") {
-        return flowArgumentError(name, "flowId 参数非法（应为字符串；可省略＝当前流程）");
-      }
-      const flowId = typeof rawFlowId === "string" && rawFlowId.trim() !== "" ? rawFlowId : undefined;
-      const input: RequestBoundaryChangeInput = {
-        roleId: roleId.value,
-        ...(addPaths.value !== undefined ? { addPaths: addPaths.value } : {}),
-        ...(removePaths.value !== undefined ? { removePaths: removePaths.value } : {}),
-        rationale: rationale.value,
-        ...(flowId !== undefined ? { flowId } : {}),
-      };
-      let result: unknown;
-      try {
-        result = await raceAbort(
-          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(input); }),
-          call.signal,
-          `${name} 派发边界变更`,
-        );
-      } catch (err) {
-        return { ok: false, message: `${name}：边界变更请求**未完成**（原因：${reasonOf(err)}）——**不要当已派发/已修改**；如实告知客户。` };
-      }
-      return requestBoundaryChangeResultMessage(name, result);
-    },
-  };
 }
 
 // —————————————— 需求变更申请（2026-10-26 客户要求；request_requirement_change） ——————————————
@@ -3662,7 +2646,7 @@ function makeRequestBoundaryChangeTool(fn: RequestBoundaryChangeFn): ExecutableT
 // 侧——本工具不写盘、不弹客户卡、不做治理判定、不改变任何写权。
 // 纪律：**申请≠批准，也不代表意图已变更**；`dispatched` 只表示已提交、不代表通过；
 // 不要把新授权写进提案卡；`proposedIntentPatch` 只是建议。
-// 未注入能力 ⇒ 工具不注册（沿 request_acceptance 先例，能力缺席＝最强 fail-closed）。
+// 未注入能力 ⇒ 工具不注册（沿 独立复核请求 先例，能力缺席＝最强 fail-closed）。
 
 const REQUEST_REQUIREMENT_CHANGE_ARG_KEYS: ReadonlySet<string> = new Set([
   "flowId",
@@ -3713,12 +2697,12 @@ function readRequirementChangeRequiredText(
 ): { ok: true; value: string } | { ok: false; result: ToolResult } {
   const value = args[key];
   if (typeof value !== "string" || value.trim() === "") {
-    return { ok: false, result: flowArgumentError(name, `缺少或非法的 ${key} 参数（须为非空字符串）`) };
+    return { ok: false, result: governanceArgumentError(name, `缺少或非法的 ${key} 参数（须为非空字符串）`) };
   }
   const length = Array.from(value).length;
   const max = REQUEST_REQUIREMENT_CHANGE_LIMITS[key];
   if (length > max) {
-    return { ok: false, result: flowArgumentError(name, `${key} 超过 ${max} 字（${length} 字；有界文本）`) };
+    return { ok: false, result: governanceArgumentError(name, `${key} 超过 ${max} 字（${length} 字；有界文本）`) };
   }
   return { ok: true, value };
 }
@@ -3732,12 +2716,12 @@ function readRequirementChangeOptionalText(
   const value = args[key];
   if (value === undefined || value === null) return { ok: true, value: undefined };
   if (typeof value !== "string" || value.trim() === "") {
-    return { ok: false, result: flowArgumentError(name, `${key} 参数非法（须为非空字符串；可省略）`) };
+    return { ok: false, result: governanceArgumentError(name, `${key} 参数非法（须为非空字符串；可省略）`) };
   }
   const length = Array.from(value).length;
   const max = REQUEST_REQUIREMENT_CHANGE_LIMITS[key];
   if (length > max) {
-    return { ok: false, result: flowArgumentError(name, `${key} 超过 ${max} 字（${length} 字；有界文本）`) };
+    return { ok: false, result: governanceArgumentError(name, `${key} 超过 ${max} 字（${length} 字；有界文本）`) };
   }
   return { ok: true, value };
 }
@@ -3810,14 +2794,14 @@ function makeRequestRequirementChangeTool(fn: RequestRequirementChangeFn): Execu
       if (!intentId.ok) return intentId.result;
       const taskId = readStringArg(call.args, ["taskId", "task_id"]);
       if (taskId !== undefined && taskId.trim() === "") {
-        return flowArgumentError(name, "taskId 不能为空字符串");
+        return governanceArgumentError(name, "taskId 不能为空字符串");
       }
       if (flowId.value === undefined && intentId.value === undefined && (taskId === undefined || taskId.trim() === "")) {
-        return flowArgumentError(name, "缺少 flowId/intentId/taskId 参数（至少给出一个，用于归属校验/去重）");
+        return governanceArgumentError(name, "缺少 flowId/intentId/taskId 参数（至少给出一个，用于归属校验/去重）");
       }
       const changeKind = call.args["changeKind"];
       if (typeof changeKind !== "string" || !(REQUEST_REQUIREMENT_CHANGE_KINDS as readonly string[]).includes(changeKind)) {
-        return flowArgumentError(name, `changeKind 参数非法（须为 ${REQUEST_REQUIREMENT_CHANGE_KINDS.join(" / ")} 之一）`);
+        return governanceArgumentError(name, `changeKind 参数非法（须为 ${REQUEST_REQUIREMENT_CHANGE_KINDS.join(" / ")} 之一）`);
       }
       const summary = readRequirementChangeRequiredText(call.args, "summary", name);
       if (!summary.ok) return summary.result;
@@ -3848,110 +2832,6 @@ function makeRequestRequirementChangeTool(fn: RequestRequirementChangeFn): Execu
         return { ok: false, message: `${name}：需求变更申请**未完成**（原因：${reasonOf(err)}）——**不要当已提交/已获批准**；如实告知客户。` };
       }
       return requestRequirementChangeResultMessage(name, result);
-    },
-  };
-}
-
-// —————————————— 验收标准产物汇报（2026-10-27 客户要求；report_artifact_ready） ——————————————
-//
-// 客户新设计：验收标准由质检写完后，**质检只向应用汇报，应用校验后决定是否收口**——质检不盯文件
-// 自动勾卡、也不自行修改 flow 状态。本层只做两件事：**参数形状校验**（flowId/stepId/path 必填非空
-// 字符串；summary/sha256 可选非空字符串；未知参数拒绝；非法在触达能力前拒绝，不猜测、不截断、不
-// 静默丢弃）＋**调用注入能力并如实转达回执**（`ok`/`accepted`/`message`）。路径是否存在、步骤是否
-// 属于该 flow、摘要/哈希是否与文件一致、是否收口全部由**应用注入的能力**校验——本工具不读文件、
-// 不写盘、不写 flow、不做治理判定。**汇报成功 ≠ 自动完成**：`accepted:true` 只表示应用已收到并接受
-// 该产物，收口由应用决定；`ok:true` 但 `accepted` 缺席/为 false 时按**未接受** fail-closed 转达，
-// 绝不宣称已收口。未注入能力 ⇒ 工具不注册（沿 request_acceptance 先例，能力缺席＝最强 fail-closed）。
-
-/** `report_artifact_ready` 的参数面（严格；未知参数在触达能力前拒绝）。 */
-const REPORT_ARTIFACT_READY_ARG_KEYS: ReadonlySet<string> = new Set(["flowId", "stepId", "path", "summary", "sha256"]);
-
-/**
- * 回执 → 工具结果：**原样**转达应用的 `ok`/`accepted`/`message`。
- * - `ok:false` → 未获受理/未通过校验，按**未接受**处理；
- * - `ok:true` + `accepted:true` → 已接受（仍须重申「不等于自动完成/不自行修改 flow」）；
- * - `ok:true` 但 `accepted` 为 false/缺席 → 按**未接受** fail-closed（不得宣称已接受）；
- * - 契约外回执（缺失/非对象/`ok` 非布尔/`accepted` 给出但非布尔）→ fail-closed「未返回明确结果」，
- *   按未受理/未接受处理。
- */
-function reportArtifactResultMessage(name: string, value: unknown, toolInput: ReportArtifactInput): ToolResult {
-  const contractExternal = (): ToolResult => ({
-    ok: false,
-    message: `${name}：应用未返回明确结果（回执缺失或非法）——按**未受理/未接受**处理；**不要当应用已接受**，更不要自行修改 flow 状态；如实告知客户。`,
-  });
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return contractExternal();
-  const receipt = value as Partial<ReportArtifactReceipt>;
-  if (typeof receipt.ok !== "boolean") return contractExternal();
-  if (receipt.accepted !== undefined && typeof receipt.accepted !== "boolean") return contractExternal();
-  const message = typeof receipt.message === "string" && receipt.message.trim() !== "" ? receipt.message : undefined;
-  const parts = [
-    `ok=${receipt.ok}`,
-    `accepted=${receipt.accepted === undefined ? "未声明" : receipt.accepted}`,
-    `flowId=${toolInput.flowId}`,
-    `stepId=${toolInput.stepId}`,
-    `path=${toolInput.path}`,
-  ];
-  const detail = `（${parts.join("；")}）${message !== undefined ? `：${message}` : ""}`;
-  if (!receipt.ok) {
-    return { ok: false, message: `${name}：产物汇报**未获受理/未通过应用校验**${detail}——**不要当应用已接受**，更不要自行修改 flow 状态（是否收口由应用决定）；按回执原因修正后重试或如实告知客户。` };
-  }
-  if (receipt.accepted === true) {
-    return {
-      ok: true,
-      message:
-        `${name}：应用已收到并**接受**该产物汇报${detail}。` +
-        `注意：**汇报成功不等于自动完成**——是否收口/推进 flow 步骤由应用校验后决定并写入；` +
-        `**不要自行修改 flow 状态**，也不要把 accepted 说成验收已通过。`,
-    };
-  }
-  return {
-    ok: false,
-    message: `${name}：应用已收到汇报但**未接受该产物**${detail}——**不要当已收口/已完成**，更不要自行修改 flow 状态；按回执原因修正后重试或如实告知客户。`,
-  };
-}
-
-/**
- * report_artifact_ready：质检把写好的验收标准产物**汇报给应用**（客户 2026-10-27 新设计）。
- * handler 只做基本参数形状校验，把 `ReportArtifactInput` 原样交给注入能力并**如实**转达回执：
- * 不写盘、不读写 flow、不做治理判定、不假装应用已接受；汇报成功只表示应用已收到并决定，
- * **不等于自动完成**（收口由应用校验后决定）。能力抛错/中止 ⇒ 如实「未获结果」，不假设已接受。
- */
-function makeReportArtifactReadyTool(fn: ReportArtifactFn): ExecutableTool {
-  const name = REPORT_ARTIFACT_READY_TOOL_NAME;
-  return {
-    name,
-    async handler(call) {
-      const unknown = unknownGovernanceArg(call.args, REPORT_ARTIFACT_READY_ARG_KEYS, name);
-      if (unknown !== undefined) return unknown;
-      // flowId/stepId/path：工具层只做**基本非空字符串**校验（slug/归属/存在性/路径语义由能力侧校验）。
-      const flowId = readFlowRequiredText(call.args, "flowId", name);
-      if (!flowId.ok) return flowId.result;
-      const stepId = readFlowRequiredText(call.args, "stepId", name);
-      if (!stepId.ok) return stepId.result;
-      const path = readFlowRequiredText(call.args, "path", name);
-      if (!path.ok) return path.result;
-      const summary = readFlowOptionalText(call.args, "summary", name);
-      if (!summary.ok) return summary.result;
-      const sha256 = readFlowOptionalText(call.args, "sha256", name);
-      if (!sha256.ok) return sha256.result;
-      const input: ReportArtifactInput = {
-        flowId: flowId.value,
-        stepId: stepId.value,
-        path: path.value,
-        ...(summary.value !== undefined ? { summary: summary.value } : {}),
-        ...(sha256.value !== undefined ? { sha256: sha256.value } : {}),
-      };
-      let result: unknown;
-      try {
-        result = await raceAbort(
-          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(input); }),
-          call.signal,
-          `${name} 汇报产物`,
-        );
-      } catch (err) {
-        return { ok: false, message: `${name}：产物汇报**未获结果**（原因：${reasonOf(err)}）——**不要当应用已收到/已接受**，更不要自行修改 flow 状态；如实告知客户。` };
-      }
-      return reportArtifactResultMessage(name, result, input);
     },
   };
 }
@@ -4036,14 +2916,6 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   // 结构性保证（W6-A，同 dispatch_task 先例）：**未注入交接/澄清能力时对应工具不存在**。
   // 只给联络官/报告员——由能力注入面（编排/桌面窗口）决定「注入才注册」；本层不硬编码角色 id。
   // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。两能力各自独立、互不隐含。
-  const handOffIntent = options?.handOffIntent;
-  if (handOffIntent !== undefined) {
-    tools.push(makeHandOffIntentTool(handOffIntent, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
-  }
-  const requestClarification = options?.requestClarification;
-  if (requestClarification !== undefined) {
-    tools.push(makeRequestClarificationTool(requestClarification, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
-  }
 
   // 结构性保证（R-1，同 run_shell / customerInput 等先例）：**未注入审读结论能力时
   // `report_shell_verdict` 不存在**。只给审读会话——由调用方以是否注入表达。
@@ -4070,10 +2942,6 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   if (redispatchTask !== undefined) tools.push(makeRedispatchTaskTool(redispatchTask, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
 
   // 结构性保证（G-2/R2，同 dispatch_task 先例）：**未注入恢复提议能力时 `propose_recovery` 不存在**。
-  const proposeRecovery = options?.proposeRecovery;
-  if (proposeRecovery !== undefined) {
-    tools.push(makeProposeRecoveryTool(proposeRecovery, options?.currentTurnId, options?.interactionGate, { roleId: options?.roleId, runtime: options?.runtime }));
-  }
 
   // 结构性保证（G-4/I2，同 dispatch_task 先例）：**未注入安装/卸载能力时对应工具不存在**。
   // 只给内置治理角色——由调用方（注入端判据沿 dispatch_task 的 suppressHandback 先例）决定注入；
@@ -4098,32 +2966,20 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     tools.push(makeUninstallMcpTool(uninstallMcp, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
   }
   // 结构性保证（2026-10-20 flow 文件方法化，同 dispatch_task 先例）：**未注入对应能力时三工具不存在**。
-  // 三能力各自独立「注入才注册」；权限/迁移/证据/revision 冲突/Steward/Lead 权限裁决在编排 flow-service，
+  // 三能力各自独立「注入才注册」；权限/迁移/证据/revision 冲突/Steward/Lead 权限裁决在编排 编排层，
   // 本层只做参数形状校验并如实转达回执（不做第二份裁决）。
-  const flowGet = options?.flowGet;
-  if (flowGet !== undefined) tools.push(makeFlowGetTool(flowGet));
-  const flowStepUpdate = options?.flowStepUpdate;
-  if (flowStepUpdate !== undefined) tools.push(makeFlowStepUpdateTool(flowStepUpdate));
-  const flowStepSupersede = options?.flowStepSupersede;
-  if (flowStepSupersede !== undefined) tools.push(makeFlowStepSupersedeTool(flowStepSupersede));
-  // 结构性保证（2026-10-25 独立复核请求，沿 flow_get 先例）：**未注入能力时 `request_acceptance` 不存在**。
+  // 结构性保证（2026-10-25 独立复核请求，沿 流程读取 先例）：**未注入能力时 `独立复核请求` 不存在**。
   // 只给内置治理角色——由调用方（编排/桌面注入端）决定注入；未注入 ⇒ 模型无法请求
   // （能力缺席 = 最强 fail-closed）。派发/校验/flow/账本由能力实现，本层只路由并如实转达回执。
-  const requestAcceptance = options?.requestAcceptance;
-  if (requestAcceptance !== undefined) tools.push(makeRequestAcceptanceTool(requestAcceptance));
-  // 结构性保证（2026-10-26 gate 复核请求，沿 requestAcceptance 先例）：**未注入能力时
-  // `request_gate_review` 不存在**。只给统筹（convener）——由调用方（编排/桌面注入端）决定注入；
+  // 结构性保证（2026-10-26 gate 复核请求，沿既有先例）：**未注入能力时
+  // `gate 复核请求` 不存在**。只给统筹（convener）——由调用方（编排/桌面注入端）决定注入；
   // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。gate 校验/派发/记录/账本由能力实现，
   // 本层只做参数形状校验并如实转达回执——gate 复核 ≠ 验收通过 ≠ 客户批准。
-  const requestGateReview = options?.requestGateReview;
-  if (requestGateReview !== undefined) tools.push(makeRequestGateReviewTool(requestGateReview));
-  // 结构性保证（2026-10-26 边界变更请求，沿 requestAcceptance 先例）：**未注入能力时
-  // `request_boundary_change` 不存在**。只给内置治理角色——由调用方（编排/桌面注入端）决定注入；
+  // 结构性保证（2026-10-26 边界变更请求，沿既有先例）：**未注入能力时
+  // `边界变更请求` 不存在**。只给内置治理角色——由调用方（编排/桌面注入端）决定注入；
   // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。派发/appointment-write/客户确认/写盘
   // 由能力实现，本层只校验精确增删路径与理由并如实转达回执。
-  const requestBoundaryChange = options?.requestBoundaryChange;
-  if (requestBoundaryChange !== undefined) tools.push(makeRequestBoundaryChangeTool(requestBoundaryChange));
-  // 结构性保证（2026-10-26 需求变更申请，沿 requestAcceptance 先例）：**未注入能力时
+  // 结构性保证（2026-10-26 需求变更申请，沿既有先例）：**未注入能力时
   // `request_requirement_change` 不存在**。只给报告员（Draft/rapporteur）——由调用方（编排/桌面注入端）
   // 决定注入；未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。意图校验/去重/派发/账本/系统行
   // 由能力实现，本层只做参数形状校验并如实转达回执——申请≠批准；审批卡可由提案角色（Rapporteur）或
@@ -4131,12 +2987,10 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   // 只在批准后执行意图变更。
   const requestRequirementChange = options?.requestRequirementChange;
   if (requestRequirementChange !== undefined) tools.push(makeRequestRequirementChangeTool(requestRequirementChange));
-  // 结构性保证（2026-10-27 验收标准产物汇报，沿 requestAcceptance 先例）：**未注入能力时
-  // `report_artifact_ready` 不存在**。只给质检（内置 verifier）——由调用方（编排/桌面注入端）决定注入；
+  // 结构性保证（2026-10-27 验收标准产物汇报，沿既有先例）：**未注入能力时
+  // `产物汇报` 不存在**。只给质检（内置 verifier）——由调用方（编排/桌面注入端）决定注入；
   // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。工具只转交载荷并如实转达回执：不写盘、
   // 不写 flow、不假装应用已接受；**汇报成功 ≠ 自动完成**，是否收口由应用校验后决定。
-  const reportArtifact = options?.reportArtifact;
-  if (reportArtifact !== undefined) tools.push(makeReportArtifactReadyTool(reportArtifact));
   // Observe customer waits without storing titles, previews or selected values.
   // 中止兜底文案需要知道 view_image 的交付方式（tool-result 不得声称排队/下一轮附件）。
   const viewImageDelivery = (options?.viewImagePolicy ?? VIEW_IMAGE_DEFAULT_POLICY).delivery;

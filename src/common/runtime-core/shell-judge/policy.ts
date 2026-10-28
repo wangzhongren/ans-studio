@@ -49,13 +49,10 @@ export const SHELL_JUDGE_MAX_DENIED_PATHS = 16;
 
 /**
  * 判断 agent 在 `.ans/**` 中**只读开放**的精确文件（2026-10-18 客户裁定）：
- * `.ans/project.json` 与 `.ans/governance/ledger.jsonl`（账本/哈希证据，无凭据）。
- * 其余 `.ans` 内容（含 `.ans/sessions/**` 会话转录）继续 `app-private` 拒绝。
+ * 仅 `.ans/project.json`。其余 `.ans` 内容（含 `.ans/sessions/**` 会话转录与治理运行数据）继续
+ * `app-private` 拒绝。D 批已撤除治理账本，不再对任何账本文件开放读取。
  */
-const JUDGE_ANS_READ_ALLOW = new Set([".ans/project.json", ".ans/governance/ledger.jsonl"]);
-
-/** `.ans/governance/` 目录可列，但只显示 `ledger.jsonl`（其余内容不列名）。 */
-const JUDGE_ANS_GOVERNANCE_DIR = ".ans/governance";
+const JUDGE_ANS_READ_ALLOW = new Set([".ans/project.json"]);
 
 function segmentsKey(segments: readonly string[]): string {
   return segments.map((segment) => segment.toLowerCase()).join("/");
@@ -63,10 +60,6 @@ function segmentsKey(segments: readonly string[]): string {
 
 function isAnsReadAllowed(segments: readonly string[]): boolean {
   return JUDGE_ANS_READ_ALLOW.has(segmentsKey(segments));
-}
-
-function isAnsGovernanceDir(segments: readonly string[]): boolean {
-  return segmentsKey(segments) === JUDGE_ANS_GOVERNANCE_DIR;
 }
 
 /** 二进制探测窗口（PM 评审 §7.2：前 8KB 含 NUL 即拒绝）。 */
@@ -672,7 +665,7 @@ export async function resolveJudgeRead(input: JudgeReadInput): Promise<JudgeRead
   if (!consumeCall(stats, budget)) return budgetDenied(stats);
 
   // 请求路径本身也做敏感检查（防「真实路径别名」在解析前就被当成普通文件）；
-  // `.ans/project.json` 与 `.ans/governance/ledger.jsonl` 是客户裁定的只读白名单。
+  // `.ans/project.json` 是唯一只读白名单。
   const requestedSegmentList = requestedSegments(input.projectRoot, requested);
   const requestedSensitive = sensitiveClass(requestedSegmentList);
   if (requestedSensitive !== undefined && !isAnsReadAllowed(requestedSegmentList)) {
@@ -838,8 +831,8 @@ export async function resolveJudgeList(input: JudgeListInput): Promise<JudgeList
   const requestedRel = requestedProjectRel(input.projectRoot, requested);
   const requestedSegmentList = requestedSegments(input.projectRoot, requested);
   const requestedSensitive = sensitiveClass(requestedSegmentList);
-  // `.ans/governance/` 是客户裁定的只读开放目录（仅列 ledger.jsonl）；其余 `.ans/**` 仍拒绝。
-  if (requestedSensitive !== undefined && !isAnsGovernanceDir(requestedSegmentList)) {
+  // `.ans/**` 整体是应用私有数据；D 批撤除账本后不再开放 `.ans/governance/` 目录。
+  if (requestedSensitive !== undefined) {
     return deniedSensitive(requestedSensitive, stats, requestedRel);
   }
 
@@ -856,8 +849,7 @@ export async function resolveJudgeList(input: JudgeListInput): Promise<JudgeList
   const rel = relative(rootReal, real);
   const relSegments = segmentsOf(rel);
   const realSensitive = sensitiveClass(relSegments);
-  const ansGovernance = isAnsGovernanceDir(relSegments);
-  if (realSensitive !== undefined && !ansGovernance) {
+  if (realSensitive !== undefined) {
     return deniedSensitive(realSensitive, stats, requestedRel);
   }
 
@@ -872,10 +864,7 @@ export async function resolveJudgeList(input: JudgeListInput): Promise<JudgeList
   let names: string[];
   try {
     const all = await readdir(real);
-    names = (ansGovernance
-      ? all.filter((name) => name.toLowerCase() === "ledger.jsonl")
-      : all.filter((name) => !sensitiveEntry(relSegments, name))
-    ).sort((a, b) => a.localeCompare(b));
+    names = all.filter((name) => !sensitiveEntry(relSegments, name)).sort((a, b) => a.localeCompare(b));
   } catch {
     return denied("read-failed", "unknown", stats, requestedRel);
   }

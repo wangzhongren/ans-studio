@@ -52,9 +52,7 @@ export type {
 export {
   APP_GOVERNANCE_SOURCE,
   BUILT_IN_GOVERNANCE_ROLES,
-  LEGACY_GOVERNANCE_ROLE_ID,
   LEGACY_SU_CAPABILITIES,
-  LEGACY_SU_CARD_TEXT,
   LEGACY_SU_PREAUTHORIZED_DIRS,
   appGovernanceBoundary,
   appGovernanceEntries,
@@ -67,7 +65,6 @@ export {
 } from "../../common/门禁引擎/governance-roles.ts";
 export type {
   BuiltInGovernanceRoleSpec,
-  DeprecatedLiaisonRoleSpec,
   GovernanceCapabilities,
   GovernanceRoleSpec,
   TrioGovernanceRoleId,

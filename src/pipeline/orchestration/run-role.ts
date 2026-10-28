@@ -25,7 +25,7 @@
 //     可写集——内置治理五角色（trio）按注册表 Section 1 条目、项目角色按自己的边界条目（含
 //     `docs/workflow.md` 这类精确文件）；写入直接经 gate 放行，不要求逐路径
 //     `request_confirmation`。判定仍是同一个 resolveWrite：边界外、禁写路径、跨根/逃逸、F6 接受门
-//     与治理门禁（角色卡 appointment-write、`docs/flows/**` schedule-write 等，由 trio gate 包装
+//     与治理写入（角色卡 appointment-write 等，由 trio 能力包装
 //     先行判定）逐字不变。有任务 writeSet 时保持 F4 收窄（不并入 Section 1）。
 //     见 scopeWithPreauthorizedWrites。
 //   · **例外（客户裁定 2026-10-16）**：内置治理角色（su）的**初始** writeSet 恒含 `docs/su/**`、
@@ -85,20 +85,13 @@ import type {
   GovernanceCardKind,
   DispatchTaskFn,
   DispatchTaskPayload,
-  RequestAcceptanceFn,
-  RequestGateReviewFn,
-  RequestBoundaryChangeFn,
   RequestRequirementChangeFn,
-  ReportArtifactFn,
   ViewImageFn,
-  HandOffIntentFn,
-  RequestClarificationFn,
   RoleStatusFn,
   SessionTailFn,
   RoleActivityLogFn,
   TerminateRoleRunFn,
   RedispatchTaskFn,
-  ProposeRecoveryFn,
   InstallSkillFn,
   UninstallSkillFn,
   InstallMcpFn,
@@ -144,90 +137,18 @@ import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-code
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
 import { conditionSlugsOf, declaredPathBodies, createConfirmedWriteIssuer, explicitConfirmPaths, validateConfirmPreviewCompleteness } from "../../common/编排/confirmed-writes.ts";
-import { parseFlowStateYaml } from "../../common/编排/flow-state.ts";
-import {
-  appendGovernanceLedger,
-  readGovernanceLedger,
-  type GovernanceDecisionKind,
-  type GovernanceLedgerEntry,
-  type GovernanceLedgerSnapshot,
-  type GovernancePower,
-} from "../../common/编排/governance-ledger.ts";
 import {
   DECISION_CARD_MIN_OPTIONS,
   validateDecisionCardRequest,
   type DecisionCardValidation,
 } from "../../common/编排/decision-card.ts";
-import { evaluateGovernanceGate, type GovernanceGateAction } from "../../common/编排/governance-gate.ts";
 import {
   buildGovernanceJudgeFacts,
   declaredWritePathsFromPreview,
   parseRecommendedRoleIds,
-  unavailableGovernanceJudgeFacts,
 } from "../../common/编排/governance-judge-facts.ts";
 import { boundedGovernanceJudgeAudit } from "../../common/编排/governance-judge-verdict.ts";
-import {
-  CLARIFICATION_MAX_ROUNDS,
-  countClarificationRounds,
-  validateIntentHandoff,
-} from "../../common/编排/governance-handoff.ts";
 import { CLI_POSITIONING } from "../../common/编排/cli-positioning.ts";
-import {
-  createFlowService,
-  validateReleaseOnlyExtension,
-  type FlowGetFn,
-  type FlowStepSupersedeFn,
-  type FlowStepUpdateFn,
-} from "../../common/编排/flow-service.ts";
-// 2026-10-22 角色粒度/MapReduce（方案 Q9 A）：团队计划 v2 的**单一**解析/校验实现。
-// 桌面不直接 import 本私有 common；经本文件（pipeline 公共出口）再导出消费。
-import {
-  legacyTeamPlanRoleRowIssues,
-  parseTeamPlan,
-  teamPlanIssueMessages,
-  validateTeamPlanFlowConsistency,
-  type TeamPlanParseResult,
-} from "../../common/编排/team-plan.ts";
-// 公共出口（Map C 桌面经 `src/pipeline/orchestration/run-role.ts` 消费；不直接 import 编排私有 common）。
-// 2026-10-23 目录级授权 v3：目录规范类型/校验与布局核对纯函数也只经本出口给桌面/测试消费。
-export {
-  TEAM_PLAN_SCHEMA_LEGACY,
-  TEAM_PLAN_SCHEMA_V2,
-  TEAM_PLAN_SCHEMA_V3,
-  parseTeamPlan,
-  parseTeamPlanModuleIds,
-  parseWritesetCell,
-  writesetsOverlap,
-  isGovernanceWritesetPath,
-  governanceDirectoryHit,
-  legacyTeamPlanRoleRowIssues,
-  teamPlanIssueMessages,
-  validateTeamPlanFlowConsistency,
-} from "../../common/编排/team-plan.ts";
-export {
-  checkDirectoryLayout,
-  layoutCheckPassed,
-} from "../../common/编排/directory-conformance.ts";
-export type {
-  LayoutCheckChecks,
-  LayoutCheckInput,
-  LayoutCheckResult,
-  LayoutCheckRow,
-} from "../../common/编排/directory-conformance.ts";
-export type {
-  DirectoryKind,
-  DirectoryShared,
-  DirectorySpec,
-  DirectorySubdirs,
-  ModuleIdParse,
-  ParseTeamPlanOptions,
-  TeamPlanIssue,
-  TeamPlanIssueSeverity,
-  TeamPlanModule,
-  TeamPlanParseResult,
-  TeamPlanRoleRow,
-  WritesetEntry,
-} from "../../common/编排/team-plan.ts";
 // 2026-10-26 decision 卡结构校验：**单一共享实现**在 `common/编排/decision-card.ts`；
 // 经本 Pipeline 公共出口供桌面窗口后续复用（桌面不得再复制第二份校验）。
 export {
@@ -314,44 +235,6 @@ export interface AdapterCapabilities {
   viewImage?: ViewImageFn;
   dispatchTask?: DispatchTaskFn;
   /**
-   * 独立复核请求（`request_acceptance`，2026-10-25 客户要求）：交付/证据/变更包就绪后，由统筹直接
-   * 请应用派 Proof / 验收做独立复核。**只给内置治理角色会话注入**（运行时核心契约：判据在编排/
-   * 桌面注入端，本层按 `builtInGovernance` 收口）；应用实现派发/校验/flow/账本写入，编排只透传。
-   * 未提供 ⇒ 不注入（运行时核心据此不注册工具，结构性 fail-closed）。**请求复核 ≠ 客户批准**。
-   */
-  requestAcceptance?: RequestAcceptanceFn;
-  /**
-   * Gate 复核请求（`request_gate_review`，2026-10-26 客户授权）：gate 证据完整性检查通过后，由统筹
-   * 直接请应用派 Proof 做**独立 gate 复核**；与最终验收（`requestAcceptance`）是两条独立通道，互不替代。
-   * **只给内置治理角色中的统筹/Steward（convener）注入**（项目角色、其他内置治理角色即便调用方误给
-   * 也不注入）；未提供 ⇒ 不注入（运行时核心据此不注册工具，结构性 fail-closed）。**gate 复核 ≠ 验收
-   * 通过 ≠ 客户批准**；`dispatched` 只表示已派 Proof；gate fail 只按 blocker/major 判失败。
-   */
-  requestGateReview?: RequestGateReviewFn;
-  /**
-   * 边界变更请求（`request_boundary_change`，2026-10-26 客户要求）：项目角色写集/边界不足时，由统筹
-   * 直接请应用把**精确增删路径**派发给组队（Crew）修改角色卡/边界，不绕过 appointment-write 与
-   * 客户/判断确认。**只给内置治理角色中的统筹/Steward（convener）注入**（项目角色、其他内置治理角色
-   * 即便调用方误给也不注入）；判据在编排注入端，运行时核心不硬编码角色 id。未提供 ⇒ 不注入
-   * （运行时核心据此不注册工具，结构性 fail-closed）。应用实现确定性校验、AI 门禁审核与派发；本层
-   * **纯透传**，只把同一引用交给适配器。**请求变更 ≠ 客户批准、不代表边界已修改**。
-   */
-  requestBoundaryChange?: RequestBoundaryChangeFn;
-  /**
-   * W6-A：`hand_off_intent` 能力（四角色评审 §5.1/§5.2）。**只给联络官 Liaison**（能力矩阵
-   * `handOffIntent`）；本编排层已在校验/去重/每轮一次/账本成功后才调到这里——本字段是**投递端**
-   * （桌面窗口：后台开 Rapporteur、`sendBackground`、系统行；`dispatch.accepted{trigger:"intent-handoff"}`
-   * 由投递端写）。未注入 ⇒ 工具不注册（结构性 fail-closed）。**交接 ≠ 客户批准**。
-   */
-  handOffIntent?: HandOffIntentFn;
-  /**
-   * W6-A：`request_clarification` 能力（四角色评审 §5.4）。**只给报告员 Rapporteur**（能力矩阵
-   * `requestClarification`）；本编排层已做两轮上限判定并写 `clarification.requested`，本字段负责把
-   * 问题送到主入口（桌面窗口：系统行；若其实现经客户通道发问，答案可随回执 message 返回）。
-   * 未注入 ⇒ 工具不注册（结构性 fail-closed）。**澄清 ≠ 客户已回答，不弹决定卡**。
-   */
-  requestClarification?: RequestClarificationFn;
-  /**
    * 需求变更申请能力（`request_requirement_change`「注入才注册」，2026-10-26 客户要求 + 同日纠正/补充）。
    * **只给内置治理角色中的报告员 Rapporteur 与统筹 Convener 注入**（其他内置治理角色、single 的 su 与
    * 项目角色即便调用方误给也不注入，工具不注册，结构性 fail-closed）。形状单一来源＝契约家
@@ -362,16 +245,6 @@ export interface AdapterCapabilities {
    * 提案卡不得承载未批准的新授权，也不得删除需求绕过。
    */
   requestRequirementChange?: RequestRequirementChangeFn;
-  /**
-   * 验收标准产物汇报能力（`report_artifact_ready`「注入才注册」，2026-10-27 客户新设计）：质检写完
-   * 实施前验收标准后**只向应用汇报**，由应用校验路径/步骤/产物一致性并决定是否收口（质检不盯文件
-   * 自动勾卡、不自行修改 flow 状态、不自批）。**只给内置治理角色中的质检/Proof（trio verifier）
-   * 注入**（其他内置治理角色、single 模型的旧 su 与项目角色即便调用方误给也不注入，工具不注册，
-   * 结构性 fail-closed）。形状单一来源＝契约家 `model/runtime.ts`（`ReportArtifactFn`/
-   * `ReportArtifactInput`/`ReportArtifactReceipt`）。本层**纯透传**，不写盘、不读写 flow、不做治理
-   * 判定、不伪造接受或决定。**汇报成功 ≠ 自动完成**（`accepted:true` 只表示应用已接受该产物）。
-   */
-  reportArtifact?: ReportArtifactFn;
   shellGate?: ShellGate;
   shellVerdict?: ShellVerdictFn;
   roleStatus?: RoleStatusFn;
@@ -382,7 +255,6 @@ export interface AdapterCapabilities {
   terminateRoleRun?: TerminateRoleRunFn;
   /** B 批：安全重派动作；只给幕僚注入。 */
   redispatchTask?: RedispatchTaskFn;
-  proposeRecovery?: ProposeRecoveryFn;
   installSkill?: InstallSkillFn;
   uninstallSkill?: UninstallSkillFn;
   installMcp?: InstallMcpFn;
@@ -403,15 +275,6 @@ export interface AdapterCapabilities {
    * （未注入 ⇒ 对应工具不注册，逐字现状）。运行时核心据此走 `buildGovernanceJudgeTools`。
    */
   governanceJudge?: GovernanceJudgeToolOptions;
-  /**
-   * 2026-10-20 Flow 文件方法化（客户拍板「按这个方案做吧」）：应用是 `docs/flows/<flowId>.yaml`
-   * 的**唯一写者**。`flowGet` 给所有角色；`flowStepUpdate` 也给所有角色（2026-10-24 P1-7：项目 owner
-   * 需要用既有工具把 owner=自己的步骤标 `delivered`；迁移/权限仍由 flow-service 裁决）；
-   * `flowStepSupersede` 只给内置治理角色（工作流管理者）。未注入 ⇒ 对应工具不注册。
-   */
-  flowGet?: FlowGetFn;
-  flowStepUpdate?: FlowStepUpdateFn;
-  flowStepSupersede?: FlowStepSupersedeFn;
 }
 
 export interface RunRoleInput {
@@ -662,49 +525,6 @@ export async function openRoleSession(
      */
     dispatchTask?: DispatchTaskFn;
     /**
-     * **独立复核请求能力（`request_acceptance`「注入才注册」，2026-10-25 客户要求）**：前端（桌面
-     * 窗口）提供的实现——交付/证据/变更包就绪后，统筹直接请应用派 Proof / 验收做独立复核；派发、
-     * 验收标准/变更包/风险档/流程完整性校验与 flow/账本写入全部由该能力实现。**只对内置治理角色
-     * 会话转交**（项目角色即便调用方误给也不注入，工具不注册）；未给出 ⇒ 不注入（结构性 fail-closed）。
-     * 形状单一来源＝契约家 `model/runtime.ts`（`RequestAcceptanceFn`/`RequestAcceptanceResult`）。
-     * **请求复核 ≠ 客户决定，不代表客户批准**（工具层原样转达回执）。
-     */
-    requestAcceptance?: RequestAcceptanceFn;
-    /**
-     * **Gate 复核请求能力（`request_gate_review`「注入才注册」，2026-10-26 客户授权）**：前端（桌面
-     * 窗口）提供的实现——gate 证据完整性检查通过后，统筹直接请应用派 Proof 做独立 gate 复核；gate
-     * 校验/派发/gate 记录/账本全部由该能力实现。**只对内置治理角色中的统筹/Steward（convener）
-     * 转交**（项目角色、其他内置治理角色即便调用方误给也不注入，工具不注册）；未给出 ⇒ 不注入
-     * （结构性 fail-closed）。形状单一来源＝契约家 `model/runtime.ts`（`RequestGateReviewFn`）。
-     * **gate 复核 ≠ 验收通过 ≠ 客户批准**（工具层原样转达回执）。
-     */
-    requestGateReview?: RequestGateReviewFn;
-    /**
-     * **边界变更请求能力（`request_boundary_change`「注入才注册」，2026-10-26 客户要求）**：前端
-     * （桌面窗口）提供的实现——项目角色写集/边界不足时，统筹直接请应用把**精确增删路径**派发给
-     * 组队（Crew）修改角色卡/边界；确定性校验、AI 门禁审核、派发与 appointment-write 确认全部由该
-     * 能力实现。**只对内置治理角色中的统筹/Steward（convener）转交**（项目角色、其他内置治理角色
-     * 即便调用方误给也不注入，工具不注册）；未给出 ⇒ 不注入（结构性 fail-closed）。
-     * 形状单一来源＝契约家 `model/runtime.ts`（`RequestBoundaryChangeFn`/`RequestBoundaryChangeResult`）。
-     * **请求变更 ≠ 客户批准**（工具层原样转达回执）。
-     */
-    requestBoundaryChange?: RequestBoundaryChangeFn;
-    /**
-     * **W6-A 意图交接的投递能力（`hand_off_intent`「注入才注册」）**：前端（桌面窗口）提供的实现——
-     * 校验通过后把**一条**任务投给 Rapporteur（后台开/发、不打开/不切换、系统行、写
-     * `dispatch.accepted{trigger:"intent-handoff"}`）。**只对联络官 Liaison 注入**（能力矩阵
-     * `handOffIntent`；其余角色即使误给也不注入）；编排在此之上先做文件/去重/每轮一次校验并写
-     * `intent.handed-off`。未给出 ⇒ 工具不注册。**交接不是客户批准**。
-     */
-    handOffIntent?: HandOffIntentFn;
-    /**
-     * **W6-A 澄清请求的送达能力（`request_clarification`「注入才注册」）**：前端（桌面窗口）提供的
-     * 实现——把报告员的问题送到主入口（系统行；若其实现经客户通道发问，答案可随回执 message 返回）。
-     * **只对报告员 Rapporteur 注入**（能力矩阵 `requestClarification`）；编排先读账本判两轮上限并写
-     * `clarification.requested`。未给出 ⇒ 工具不注册。**澄清不弹决定卡、不改变任何权力/写权**。
-     */
-    requestClarification?: RequestClarificationFn;
-    /**
      * **需求变更申请能力（`request_requirement_change`「注入才注册」，2026-10-26 客户要求 + 同日纠正/补充）**：
      * 前端（桌面窗口）提供的实现——报告员起草提案时若需要**新的客户授权/范围**（或约束/成本变化），
      * 不应把未获授权的诉求塞进提案卡「顺带获批」，而应发起需求变更申请。**只对内置治理角色中的
@@ -715,16 +535,6 @@ export async function openRoleSession(
      * 也不代表意图已变更**。
      */
     requestRequirementChange?: RequestRequirementChangeFn;
-    /**
-     * **验收标准产物汇报能力（`report_artifact_ready`「注入才注册」，2026-10-27 客户新设计）**：前端
-     * （桌面窗口）提供的实现——质检写完实施前验收标准后**只向应用汇报**，由应用校验路径/步骤/产物
-     * 一致性并决定是否收口（质检不盯文件自动勾卡、不自行修改 flow 状态、不自批）。**只对内置治理
-     * 角色中的质检/Proof（trio verifier）转交**；其他内置治理角色、single 模型的旧 su 与项目角色即便
-     * 调用方误给也不注入（工具不注册，结构性 fail-closed）。形状单一来源＝契约家 `model/runtime.ts`
-     * （`ReportArtifactFn`/`ReportArtifactInput`/`ReportArtifactReceipt`）。本层纯透传，不写盘、
-     * 不写 flow、不伪造接受或决定；未给出 ⇒ 不注入。**汇报成功 ≠ 自动完成**。
-     */
-    reportArtifact?: ReportArtifactFn;
     /**
      * **G-2 看护自查能力（R1；`role_status`「注入才注册」）**：前端提供的实现（主进程读同源快照＋
      * 诊断尾部 → 结构化文本）。**只对治理角色会话（su）转交**（判据同 `dispatchTask`）；形状单一来源
@@ -746,13 +556,6 @@ export async function openRoleSession(
     terminateRoleRun?: TerminateRoleRunFn;
     /** B 批：安全重派动作；只给幕僚（trio chief）转交。 */
     redispatchTask?: RedispatchTaskFn;
-    /**
-     * **G-2 恢复提议能力（R2；`propose_recovery`「注入才注册」）**——**只给 su**（同上一判据）。
-     * 前端路由：校验（角色/枚举/证据非空）→ 客户一键确认卡 →（**恰 allow:true 才**）执行既有动作
-     * → 回执四值如实（executed/declined/unsupported/error；恰 executed 为已执行）。**su 只能提议**：
-     * 无确认 ＝ 不执行；能力实现方不得据此授予任何写权。
-     */
-    proposeRecovery?: ProposeRecoveryFn;
     /**
      * **G-4 技能安装能力（I1/I2 工具 `install_skill`「注入才注册」）**——**只对治理角色会话（su）
      * 转交**（判据复用 `suppressHandback`，同 `dispatchTask`/看护三能力）；项目角色会话即便调用方
@@ -912,23 +715,8 @@ export async function openRoleSession(
   };
   const hasPreauthorization = preauthorization.entries.length > 0 || preauthorization.dirs.length > 0;
 
-  // 账本快照（评审 §5.7）：open 时读一次；每次 send 前刷新；客户决定后**同步更新内存快照**并异步落盘。
-  // `local` 保存本会话已作出但可能尚未落盘的决定，刷新时按签名去重合并——避免「刷新读到旧盘面」把
-  // 刚作出的决定丢掉。
-  const ledgerState: { snapshot: GovernanceLedgerSnapshot; local: GovernanceLedgerEntry[] } = {
-    snapshot: { entries: [], errors: [] },
-    local: [],
-  };
-  let currentFlowId: string | undefined;
   let boundSessionForEvidence: RoleSession | undefined;
-  const refreshLedger = async (): Promise<void> => {
-    const disk = await readGovernanceLedger(input.project.projectRoot);
-    const missingLocal = ledgerState.local.filter(
-      (local) => !disk.entries.some((entry) => sameLedgerEntry(entry, local)),
-    );
-    ledgerState.snapshot = { entries: [...disk.entries, ...missingLocal], errors: disk.errors };
-  };
-  if (isTrio) await refreshLedger();
+  let currentFlowId: string | undefined;
 
   // 确认制的初始动态集：**任务级 writeSet（若声明）∪ 已发行集**。任务 writeSet 即「收窄」本身
   // （客户 2026-10-25 规则只把**无任务收窄**时的 Section 1 全量并入预授权，不会扩大任务写集）；
@@ -959,39 +747,15 @@ export async function openRoleSession(
           )
       : buildGate(setup.role, input.project, input.scope);
 
-  // trio gate 包装（评审 §5.2/§5.6）：先判 `forbiddenWritePaths`（应用治理记录/其他治理角色资料，
-  // 任何角色不可写），再按路径分派三道门禁（write-flow / write-nomination / write-role-card），
-  // 最后才走既有 resolveWrite。门禁只读账本快照，不读 Markdown status。
-  const gate: WriteGate = isTrio
+  // D 批：门禁/账本撤除；仅保留 `forbiddenWritePaths`（应用治理记录/其他治理角色资料）硬拒绝，
+  // 其余写入交给 `resolveWrite` 的写区/预授权判定。
+  const gate: WriteGate = trioSpec !== undefined
     ? (p) => {
         const rel = projectRelativeLexical(p, input.project.projectRoot);
         const forbidden = forbiddenWriteDecision(trioSpec!, rel);
         if (forbidden !== undefined) {
           log.record("governance.write.forbidden", { path: rel ?? p });
           return forbidden;
-        }
-        const routed = governanceActionForPath(rel);
-        if (routed !== undefined) {
-          const decision = evaluateGovernanceGate(
-            {
-              projectRoot: input.project.projectRoot,
-              model: governanceModel,
-              roleId: setup.role.id,
-              action: routed.action,
-              flowId: routed.flowId ?? currentFlowId,
-              targetRoleId: routed.targetRoleId,
-              path: rel ?? undefined,
-            },
-            ledgerState.snapshot,
-          );
-          if (!decision.allowed) {
-            log.record("governance.gate.rejected", {
-              action: routed.action,
-              path: rel ?? p,
-              code: decision.code,
-            });
-            return { allowed: false, reason: decision.message, allowedByRoot: { skill: [], project: [] } };
-          }
         }
         return baseGate(p);
       }
@@ -1091,7 +855,7 @@ export async function openRoleSession(
             if (!optionIds.includes("confirm") && (cardKind === undefined || cardKind === "intent-confirm")) {
               const reason = cardKind === "intent-confirm"
                 ? "intent-confirm 必须有 confirm/revise 选项；本卡缺少 confirm 选项，未向客户呈现。请补齐选项后重试。"
-                : "这是内部协调/工程决策，不应要求客户选择；请 Lead 自行决定，或用 dispatch_task 派给 Steward/项目角色，并用 flow_step_update 记录。客户只处理 intent-confirm 需求确认。";
+                : "这是内部协调/工程决策，不应要求客户选择；请幕僚自行决定，或用 dispatch_task 派给项目角色；客户只处理 intent-confirm 需求确认。";
               log.record("governance.choice.rejected", {
                 roleId: setup.role.id,
                 reason,
@@ -1183,45 +947,6 @@ export async function openRoleSession(
               if (isGovernanceFlowId(flowId)) currentFlowId = flowId;
             }
           }
-          // 2026-10-22 治理分工第 1 项（方案 §5.3）：Convener 的 appointment choice 在**触达客户之前**
-          // 过团队计划卡前守卫（flowId 合法/计划存在可读/frontmatter flowId 一致/推荐集非空无重复不含
-          // 内置角色/卡选项覆盖推荐集且不含内置角色/每角色职责·能力·写集·依赖行齐全）。
-          // 失败：不生成客户卡、不镜像、不调判断、不写账本、不占 pending，退回 Convener。
-          if (
-            isTrio &&
-            req.kind === "choice" &&
-            trioSpec!.id === "convener" &&
-            cardKind === "appointment"
-          ) {
-            const appointmentFlowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
-            if (!isGovernanceFlowId(appointmentFlowId)) {
-              log.record("governance.card.rejected", {
-                state: "not-presented",
-                reasonCode: "appointment-missing-flow-id",
-                ok: false,
-              });
-              return {
-                outcome: "declined",
-                notPresented: true,
-                reason:
-                  `任命卡缺少合法的 flowId（须匹配 ${GOVERNANCE_SLUG_PATTERN}）；` +
-                  "请补齐后重发。本次未向客户发卡、未写账本。",
-              };
-            }
-            const appointmentGuard = await validateConvenerAppointmentCard({
-              projectRoot: input.project.projectRoot,
-              flowId: appointmentFlowId,
-              req: effectiveReq,
-            });
-            if (!appointmentGuard.ok) {
-              log.record("governance.card.rejected", {
-                state: "not-presented",
-                reasonCode: "appointment-team-plan-invalid",
-                ok: false,
-              });
-              return { outcome: "declined", notPresented: true, reason: appointmentGuard.reason };
-            }
-          }
           // 2026-10-19 真机 op-2 修复（呈现前 fail-closed）：写盘类确认卡声明了写入路径时，preview
           // 必须对**每一条**路径给出可核对正文/结构。不完整 ⇒ **不发卡**、不发行任何写入路径，直接
           // 把缺正文的路径与重试要求如实交回模型（不让「证据完整性」依赖判断 agent/模型自觉）。
@@ -1258,35 +983,10 @@ export async function openRoleSession(
             });
             return { outcome: "declined", notPresented: true, reason: appointmentPreviewError };
           }
-          // 2026-10-19 Flow YAML 契约（客户「这些全部改成yaml」）：确认卡若声明写
-          // `docs/flows/<flowId>.yaml`（唯一机器状态），preview 中的 YAML 必须先通过确定性校验；
-          // 不合法 ⇒ 拒绝该卡（不发卡、不发行、不写账本），把具体 path + reason 交回 Steward 修正。
-          // `schedule-write` 与普通 `write` 走同一闸；未声明 YAML 的旧版 .md 卡保持迁移兼容。
-          // 2026-10-24（P0-1 受控扩展）：目标文件已存在时，仅当涉及 release 标记（任一侧 release: true）
-          // 才执行 release-only 校验；双方都非发布时保持普通 flow 写卡（既有 YAML 校验）。
-          const flowYamlError = await validateFlowYamlCard(
-            input.project.projectRoot,
-            effectiveReq,
-            completeness.declaredPaths,
-            effectiveReq.flowId ?? effectiveMetadata?.flowId,
-          );
-          if (flowYamlError !== undefined) {
-            log.record("flow.yaml.invalid", {
-              roleId: setup.role.id,
-              declaredPaths: completeness.declaredPaths,
-            });
-            return { outcome: "declined", reason: flowYamlError };
-          }
-          // 2026-10-18 双开关评审 §5.2：judgeContext 的**唯一计算点**。只在 trio 角色、允许的
-          // cardKind、且 flowId 合法时计算；并入传给客户通道的 metadata（桌面只消费）。
-          // 账本先刷新，确保事实不是陈旧快照；recordCustomerDecision 仍用 originalMetadata 的
-          // toolCallId/turnId。事实计算失败 ⇒ `unavailableReason` + `ledgerErrors>0`（禁止 approve）。
+          // D 批：judgeContext 只从申请上下文构造（无账本/flow 事实）；Q4 A rubric 保留。
           let judgeMetadata = effectiveMetadata;
           if (isTrio && cardKind !== undefined && TRIO_CARD_KINDS[trioSpec!.id].includes(cardKind)) {
             const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
-            // C 批（方案 §6.4.1/R2）：judgeContext 的归属键同样放宽为 flowId|intentId|taskId。
-            // 旧 flow 路径顺序/事实不变；新路径以 task/intent 归属，appointment-write 的目标事实由
-            // 应用校验过的 D3 targetRoleId 注入（替代账本 appointment 事实），D 删除账本依赖。
             const judgeAttribution = isGovernanceFlowId(flowId)
               ? flowId
               : isGovernanceFlowId(effectiveMetadata?.intentId)
@@ -1295,63 +995,27 @@ export async function openRoleSession(
                   ? effectiveMetadata!.taskId
                   : undefined;
             if (judgeAttribution !== undefined) {
-              let judgeContext: GovernanceJudgeContext;
-              try {
-                await refreshLedger();
-                judgeContext = await computeJudgeContext({
-                  projectRoot: input.project.projectRoot,
-                  skillRoot: input.project.skillRoot,
-                  boundary: setup.role.boundary,
-                  trioSpec: trioSpec!,
-                  flowId: judgeAttribution,
-                  req: effectiveReq,
-                  metadata: effectiveMetadata,
-                  snapshot: ledgerState.snapshot,
-                  conditions,
-                });
-              } catch (err) {
-                log.error("governance-judge.context.failed", err);
-                judgeContext = {
-                  flowId: judgeAttribution,
-                  facts: unavailableGovernanceJudgeFacts(judgeAttribution),
-                  unavailableReason: truncateText(errText(err), 512),
-                };
-              }
               const targetRoleId =
                 typeof effectiveMetadata?.targetRoleId === "string" ? effectiveMetadata.targetRoleId.trim() : "";
-              if (cardKind === "appointment-write" && targetRoleId !== "" && judgeContext.unavailableReason === undefined) {
-                judgeContext = {
-                  ...judgeContext,
-                  facts: { ...judgeContext.facts, appointmentTargetRoleIds: [targetRoleId] },
-                };
-              }
+              const facts = buildGovernanceJudgeFacts({
+                flowId: judgeAttribution,
+                ...(cardKind === "appointment-write" && targetRoleId !== ""
+                  ? { facts: { appointmentTargetRoleIds: [targetRoleId] } }
+                  : {}),
+              });
+              const judgeContext: GovernanceJudgeContext = {
+                flowId: judgeAttribution,
+                facts,
+                ...(effectiveMetadata?.toolCallId !== undefined ? { toolCallId: effectiveMetadata.toolCallId } : {}),
+                ...(effectiveMetadata?.turnId !== undefined ? { turnId: effectiveMetadata.turnId } : {}),
+                ...(effectiveReq.kind === "confirm" && effectiveReq.paths !== undefined ? { paths: [...effectiveReq.paths] } : {}),
+              };
               judgeMetadata = { ...(effectiveMetadata ?? {}), judgeContext };
             }
           }
           const out = await raw(effectiveReq, judgeMetadata);
-          const issuedPaths = issue(effectiveReq, out ?? null, effectiveMetadata);
-          if (isTrio) {
-            const recorded = recordCustomerDecision({
-              state: ledgerState,
-              projectRoot: input.project.projectRoot,
-              roleId: setup.role.id,
-              function: trioSpec!.function,
-              req: effectiveReq,
-              metadata: effectiveMetadata,
-              out,
-              issuedPaths,
-              sessionId: boundSessionForEvidence?.nativeSessionId,
-              runtime: input.runtime ?? boundSessionForEvidence?.runtime,
-              log,
-            });
-            if (cardKind === "intent-confirm") {
-              // 2026-10-18 真机竞态：客户刚确认，Lead 紧接着 hand_off_intent；校验器读磁盘必须能看到
-              // 该决定 ⇒ intent-confirm 卡等追加完成再返回。其余卡保持非阻塞（既有语义不变）。
-              await recorded;
-            } else {
-              void recorded;
-            }
-          }
+          // 发行「已确认且在边界内」的实际写入路径（D 批无账本；发行器仍按同一份校验）。
+          issue(effectiveReq, out ?? null, effectiveMetadata);
           return out;
         };
       })()
@@ -1397,192 +1061,7 @@ export async function openRoleSession(
   // 仍逐字走原派发范围门（保留至 D）；single/su 旧行为不变。
   const chiefStarDispatch = trioSpec?.id === "chief";
   const dispatchTask: DispatchTaskFn | undefined =
-    cap?.dispatchTask === true && input.dispatchTask !== undefined
-      ? chiefStarDispatch
-        ? input.dispatchTask
-        : isTrio
-        ? async (dispatch, metadata) => {
-            // 2026-10-20 客户拍板：Lead 可给 Steward 发协调消息——Liaison→Convener 走 coordinate 门
-            // （不需要提案接受/任命/流程步骤/去重）；其余仍走既有 dispatch 门（Convener→项目角色）。
-            const action = governanceDispatchActionFor(setup.role.id, dispatch.roleId);
-            const decision = evaluateGovernanceGate(
-              {
-                projectRoot: input.project.projectRoot,
-                model: governanceModel,
-                // 批次 A 身份层：幕僚 chief 的旧 coordinate 消息沿用旧 liaison 门（校验器仍只认旧值；
-                // 只读别名，不改变旧门行为，D 批随旧 flow/gate 删除）。
-                roleId: action === "coordinate" && setup.role.id !== "liaison" ? "liaison" : setup.role.id,
-                action,
-                flowId: dispatch.flowId,
-                stepId: dispatch.stepId,
-                targetRoleId: dispatch.roleId,
-              },
-              ledgerState.snapshot,
-            );
-            if (!decision.allowed) {
-              log.record("governance.dispatch.rejected", {
-                flowId: dispatch.flowId,
-                stepId: dispatch.stepId,
-                targetRoleId: dispatch.roleId,
-                action,
-                code: decision.code,
-              });
-              const label = action === "coordinate" ? "协调消息" : "派发";
-              return { ok: false, message: `${label}被治理门禁拒绝：${decision.message}` };
-            }
-            return input.dispatchTask!(dispatch as DispatchTaskPayload, metadata);
-          }
-        : input.dispatchTask
-      : undefined;
-
-  // W6-A 意图交接（四角色评审 §5.1/§5.2）：能力矩阵驱动——仅 `capabilities.handOffIntent`（trio=Liaison）。
-  // 编排侧先做机械校验（意图文件权威、slug、四要素、去重、initial 一次性、每轮一次、账本可读），
-  // 通过后调用前端投递能力；**先投递成功、后写账本**；投递失败如实回执、不重试、不写成功账本。
-  // 交接不是客户批准：本包装器不产生任何 customer.decision，也不解锁任何门禁。
-  const successfulHandoffTurns = new Set<string>();
-  // 同一会话的交接/澄清串行链：即便模型在同一轮并行发起两次调用，第二个也等第一个落盘后再校验
-  // （「每轮一次」「两轮上限」才是机械成立的，而不是赌工具调用顺序）。
-  const handoffSerial: { chain: Promise<void> } = { chain: Promise.resolve() };
-  const clarificationSerial: { chain: Promise<void> } = { chain: Promise.resolve() };
-  const handOffIntent: HandOffIntentFn | undefined =
-    isTrio && cap?.handOffIntent === true && input.handOffIntent !== undefined
-      ? (payload, metadata) =>
-          serializeGovernanceTask(handoffSerial, async () => {
-          const turnId = metadata?.turnId;
-          if (turnId !== undefined && successfulHandoffTurns.has(turnId)) {
-            return { ok: false, message: "同一轮已交接过一次意图（每轮至多一次）；未交接；请在本轮结束后再交接。" };
-          }
-          const validation = await validateIntentHandoff(
-            { projectRoot: input.project.projectRoot, ...payload },
-            {
-              governanceModel,
-              // 批次 A 身份层：幕僚 chief 取代旧 liaison 走同一条旧交接路径（校验器仍只认旧值；
-              // 这是只读别名，不改变行为，D 批随旧路径一并删除）。
-              governanceFunction: trioSpec!.function === "chief" ? "liaison" : trioSpec!.function,
-              roleId: setup.role.id,
-              ...(turnId !== undefined ? { turnId } : {}),
-              ...(boundSessionForEvidence?.nativeSessionId !== undefined
-                ? { sessionId: boundSessionForEvidence.nativeSessionId }
-                : {}),
-            },
-          );
-          if (!validation.ok) {
-            log.record("governance.handoff.rejected", { code: validation.code, intentId: payload.intentId });
-            return { ok: false, message: validation.message };
-          }
-          for (const warning of validation.warnings ?? []) {
-            log.record("governance.handoff.warning", { message: warning });
-          }
-          let receipt;
-          try {
-            receipt = await input.handOffIntent!(payload, metadata);
-          } catch (err) {
-            log.error("governance.handoff.delivery.failed", err, { intentId: payload.intentId });
-            return { ok: false, message: `应用无法把意图交给报告员：${errText(err)}；未重试。` };
-          }
-          if (receipt?.ok !== true) {
-            const reason = receipt?.message ?? "投递端未确认";
-            log.record("governance.handoff.delivery.rejected", { intentId: payload.intentId, reason });
-            return { ok: false, message: `应用无法把意图交给报告员：${reason}；未重试。` };
-          }
-          if (turnId !== undefined) successfulHandoffTurns.add(turnId);
-          // 先投递成功、后写账本；账本失败只记诊断，不翻转投递结果、不重试（评审 §7.2）。
-          const entryRuntime = input.runtime ?? boundSessionForEvidence?.runtime;
-          const entry: GovernanceLedgerEntry = {
-            at: new Date().toISOString(),
-            kind: "intent.handed-off",
-            actorRoleId: setup.role.id,
-            power: "liaison",
-            intentId: payload.intentId,
-            handoffKind: payload.handoffKind,
-            targetRoleId: "rapporteur",
-            ...(validation.flowId !== undefined ? { flowId: validation.flowId } : {}),
-            artifactPath: validation.artifactPath,
-            artifactSha256: validation.artifactSha256,
-            messageSummary: truncateText(payload.summary, 200),
-            ...(turnId !== undefined ? { turnId } : {}),
-            ...(boundSessionForEvidence?.nativeSessionId !== undefined
-              ? { sessionId: boundSessionForEvidence.nativeSessionId }
-              : {}),
-            ...(entryRuntime !== undefined ? { runtime: entryRuntime } : {}),
-          };
-          const appended = await appendGovernanceLedger(input.project.projectRoot, entry);
-          if (!appended.ok) log.record("governance.handoff.append.failed", { message: appended.message });
-          return {
-            ok: true,
-            message: `已把意图「${payload.intentId}」交给报告员（handoffKind=${payload.handoffKind}）——交接 ≠ 客户批准。`,
-          };
-        })
-      : undefined;
-
-  // W6-A 澄清请求（四角色评审 §5.4）：能力矩阵驱动——仅 `capabilities.requestClarification`（trio=Rapporteur）。
-  // 编排侧先读账本判两轮上限（同一 flowId，无则同一 intentId）；通过后把问题交给前端送达主入口，
-  // 再写 `clarification.requested`（actor=rapporteur, power=proposal）。失败如实回执、不重试、不写账本。
-  // 澄清不弹决定卡、不占「一项目一卡」、不改变任何权力或写权。
-  const requestClarification: RequestClarificationFn | undefined =
-    isTrio && cap?.requestClarification === true && input.requestClarification !== undefined
-      ? (payload, metadata) =>
-          serializeGovernanceTask(clarificationSerial, async () => {
-          const rounds = await countClarificationRounds(input.project.projectRoot, payload);
-          if (!rounds.ok) return { ok: false, message: rounds.message };
-          if (rounds.rounds >= CLARIFICATION_MAX_ROUNDS) {
-            return {
-              ok: false,
-              message:
-                `同一${rounds.scope === "flow" ? "流程" : "意图"}已有 ${rounds.rounds} 轮澄清` +
-                `（上限 ${CLARIFICATION_MAX_ROUNDS} 轮）：请在提案卡上请客户决定（带假设/备选），未提交。`,
-            };
-          }
-          let receipt;
-          try {
-            receipt = await input.requestClarification!(payload, metadata);
-          } catch (err) {
-            log.error("governance.clarification.submit.failed", err, {
-              flowId: payload.flowId,
-              intentId: payload.intentId,
-            });
-            return { ok: false, message: `澄清请求未能提交：${errText(err)}；未重试。` };
-          }
-          if (receipt?.ok !== true) {
-            return { ok: false, message: `澄清请求未能提交：${receipt?.message ?? "送达端未确认"}；未重试。` };
-          }
-          const entryRuntime = input.runtime ?? boundSessionForEvidence?.runtime;
-          const entry: GovernanceLedgerEntry = {
-            at: new Date().toISOString(),
-            kind: "clarification.requested",
-            actorRoleId: setup.role.id,
-            power: "proposal",
-            ...(payload.flowId !== undefined ? { flowId: payload.flowId } : {}),
-            ...(payload.intentId !== undefined ? { intentId: payload.intentId } : {}),
-            messageSummary: truncateText(payload.summary ?? payload.question, 200),
-            ...(metadata?.turnId !== undefined ? { turnId: metadata.turnId } : {}),
-            ...(boundSessionForEvidence?.nativeSessionId !== undefined
-              ? { sessionId: boundSessionForEvidence.nativeSessionId }
-              : {}),
-            ...(entryRuntime !== undefined ? { runtime: entryRuntime } : {}),
-          };
-          const appended = await appendGovernanceLedger(input.project.projectRoot, entry);
-          if (!appended.ok) log.record("governance.clarification.append.failed", { message: appended.message });
-          const detail = receipt.message !== undefined ? ` ${receipt.message}` : "";
-          return {
-            ok: true,
-            message:
-              `澄清请求已记录（第 ${rounds.rounds + 1} 轮）——不弹决定卡、不改变任何权力/写权；` +
-              `应用已在主入口显示。${detail}`,
-          };
-        })
-      : undefined;
-
-  // 2026-10-26 需求变更申请（request_requirement_change）：**只给内置治理角色中的报告员 Rapporteur
-  // 与统筹 Convener** 注入（2026-10-26 客户纠正/补充：需求变更审批卡这两个角色都可以发起，发起方不得
-  // 自批）；其它内置治理角色（含 single 模型的旧 su、主理 liaison、Crew/Proof）与项目角色即便调用方
-  // 误给也不注入（工具不注册，结构性 fail-closed）。判据在编排注入端（运行时核心只声明能力位名，不硬
-  // 编码角色 id）；未提供 ⇒ 不注入（同 request_acceptance 先例）。本层纯透传，不做意图校验/去重/派发；
-  // **提交申请 ≠ 客户批准，也不代表意图已变更**。
-  const requestRequirementChange: RequestRequirementChangeFn | undefined =
-    isTrio && (trioSpec?.id === "rapporteur" || trioSpec?.id === "convener") && input.requestRequirementChange !== undefined
-      ? input.requestRequirementChange
-      : undefined;
+    cap?.dispatchTask === true && input.dispatchTask !== undefined ? input.dispatchTask : undefined;
 
   // G-2 看护三能力（R1/R2）：能力矩阵驱动——仅 `capabilities.roleStatus/sessionTail/proposeRecovery`
   // （trio=Convener；su 旧行为）。未注入 ⇒ 不注入（能力缺席 = 最强 fail-closed）。
@@ -1593,41 +1072,6 @@ export async function openRoleSession(
   const roleActivityLog = trioSpec?.id === "chief" ? input.roleActivityLog : undefined;
   const terminateRoleRun = trioSpec?.id === "chief" ? input.terminateRoleRun : undefined;
   const redispatchTask = trioSpec?.id === "chief" ? input.redispatchTask : undefined;
-  const proposeRecovery = cap?.proposeRecovery === true ? input.proposeRecovery : undefined;
-
-  // 2026-10-25 独立复核请求（request_acceptance）：只给内置治理角色会话注入；项目角色即便调用方
-  // 误给也不注入（工具不注册）。判据放在编排注入端（运行时核心只声明能力位名；不硬编码角色 id）；
-  // 未提供 ⇒ 不注入（能力缺席 = 最强 fail-closed，同 dispatch_task 先例）。
-  const requestAcceptance: RequestAcceptanceFn | undefined =
-    builtInGovernance && input.requestAcceptance !== undefined ? input.requestAcceptance : undefined;
-
-  // 2026-10-26 gate 复核请求（request_gate_review）：**只给内置治理角色中的统筹/Steward（trio convener）**
-  // 注入；项目角色、其他内置治理角色（含 single 模型的旧 su 与主理 liaison）即便调用方误给也不注入
-  // （工具不注册，结构性 fail-closed）。判据在编排注入端（运行时核心只声明能力位名，不硬编码角色 id）；
-  // 未提供 ⇒ 不注入（同 request_acceptance 先例）。本层纯透传。**gate 复核 ≠ 验收通过 ≠ 客户批准**。
-  const requestGateReview: RequestGateReviewFn | undefined =
-    builtInGovernance && trioSpec?.id === "convener" && input.requestGateReview !== undefined
-      ? input.requestGateReview
-      : undefined;
-
-  // 2026-10-26 边界变更请求（request_boundary_change）：**只给内置治理角色中的统筹/Steward（trio
-  // convener）**注入；项目角色、其他内置治理角色（含 single 模型的旧 su 与主理 liaison）即便调用方
-  // 误给也不注入（工具不注册，结构性 fail-closed）。判据在编排注入端（运行时核心只声明能力位名，
-  // 不硬编码角色 id）；未提供 ⇒ 不注入（同 request_acceptance 先例）。本层纯透传，不做任何校验/判定。
-  const requestBoundaryChange: RequestBoundaryChangeFn | undefined =
-    builtInGovernance && trioSpec?.id === "convener" && input.requestBoundaryChange !== undefined
-      ? input.requestBoundaryChange
-      : undefined;
-
-  // 2026-10-27 验收标准产物汇报（report_artifact_ready）：**只给内置治理角色中的质检/Proof（trio
-  // verifier）**注入；项目角色、其他内置治理角色（含 single 模型的旧 su）即便调用方误给也不注入
-  // （工具不注册，结构性 fail-closed）。判据在编排注入端（运行时核心只声明能力位名，不硬编码角色 id）；
-  // 未提供 ⇒ 不注入（同 request_acceptance 先例）。本层纯透传——路径/步骤归属/哈希一致性与是否收口
-  // 由能力实现校验并决定；质检不得自批 flow 状态。**汇报成功 ≠ 自动完成**。
-  const reportArtifact: ReportArtifactFn | undefined =
-    builtInGovernance && trioSpec?.id === "verifier" && input.reportArtifact !== undefined
-      ? input.reportArtifact
-      : undefined;
 
   // G-4 技能安装/卸载两能力（I1/I2）：能力矩阵驱动——仅 `capabilities.installSkill`
   // （trio=Nominator；su 旧行为）。字段名**逐字**＝契约家能力名（错一名 ⇒ 工具静默零注册）。
@@ -1695,24 +1139,11 @@ export async function openRoleSession(
     }
   }
 
-  // 2026-10-20 Flow 文件方法化：应用是 `docs/flows/<flowId>.yaml` 唯一写者。
-  // `flow_get` 给所有角色；`flow_step_update` 也给所有角色（2026-10-24 P1-7：项目 owner 用既有工具
-  // 标自己的 delivered；权限/迁移仍由 flow-service 校验）；`flow_step_supersede` 只给内置治理角色。
-  // `flowGet` 缺省 flowId 用**调用时**的 currentFlowId（会话中途切 flow 也能取对）。
-  const flowService = createFlowService({
-    projectRoot: input.project.projectRoot,
-    actorRoleId: setup.role.id,
-    actorPower: trioSpec?.function ?? "project",
-  });
-  const flowGet: FlowGetFn = (payload) => {
-    const flowId = payload.flowId ?? currentFlowId;
-    return flowService.get(flowId !== undefined ? { flowId } : {});
-  };
-  // P1-7：项目 worker 是步骤 owner，需要用自己的 flow_step_update 标 delivered（不能标 done）。
-  const flowStepUpdate: FlowStepUpdateFn = (payload) => flowService.update(payload);
-  const flowStepSupersede: FlowStepSupersedeFn | undefined = builtInGovernance
-    ? (payload) => flowService.supersede(payload)
-    : undefined;
+  // 需求变更申请：只给内置治理角色中的报告员/统筹注入（沿用 C 批发起方规则）。
+  const requestRequirementChange: RequestRequirementChangeFn | undefined =
+    isTrio && (trioSpec?.id === "rapporteur" || trioSpec?.id === "convener") && input.requestRequirementChange !== undefined
+      ? input.requestRequirementChange
+      : undefined;
 
   const capabilities: AdapterCapabilities = {
     ...(governedInput !== undefined ? { customerInput: governedInput } : {}),
@@ -1725,31 +1156,21 @@ export async function openRoleSession(
     ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
     ...(input.persistSession !== undefined ? { persistSession: input.persistSession } : {}),
     ...(dispatchTask !== undefined ? { dispatchTask } : {}),
-    ...(requestAcceptance !== undefined ? { requestAcceptance } : {}),
-    ...(requestGateReview !== undefined ? { requestGateReview } : {}),
-    ...(requestBoundaryChange !== undefined ? { requestBoundaryChange } : {}),
-    ...(handOffIntent !== undefined ? { handOffIntent } : {}),
-    ...(requestClarification !== undefined ? { requestClarification } : {}),
     ...(requestRequirementChange !== undefined ? { requestRequirementChange } : {}),
-    // 2026-10-27 验收标准产物汇报（report_artifact_ready）：只给质检/Proof（trio verifier）注入；
+    // D 批：验收产物汇报能力已撤除（不注入 reportArtifact）；
     // 未注入 ⇒ 字段缺席、工具不注册（能力缺席 = 最强 fail-closed）。本层只透传同一引用，不包装、
     // 不调用、不写盘/flow、不伪造接受或决定。
-    ...(reportArtifact !== undefined ? { reportArtifact } : {}),
     ...(roleStatus !== undefined ? { roleStatus } : {}),
     ...(sessionTail !== undefined ? { sessionTail } : {}),
     ...(roleActivityLog !== undefined ? { roleActivityLog } : {}),
     ...(terminateRoleRun !== undefined ? { terminateRoleRun } : {}),
     ...(redispatchTask !== undefined ? { redispatchTask } : {}),
-    ...(proposeRecovery !== undefined ? { proposeRecovery } : {}),
     ...(installSkill !== undefined ? { installSkill } : {}),
     ...(uninstallSkill !== undefined ? { uninstallSkill } : {}),
     ...(installMcp !== undefined ? { installMcp } : {}),
     ...(uninstallMcp !== undefined ? { uninstallMcp } : {}),
     ...(shellGate !== undefined ? { shellGate } : {}),
     ...(input.shellVerdict !== undefined ? { shellVerdict: input.shellVerdict } : {}),
-    flowGet,
-    ...(flowStepUpdate !== undefined ? { flowStepUpdate } : {}),
-    ...(flowStepSupersede !== undefined ? { flowStepSupersede } : {}),
   };
   const createAdapter = deps.createAdapter ?? createRuntimeAdapterFactory(input.project, input.runtime ?? "pi", deps.runtimeOptions);
   const adapter = createAdapter(
@@ -1765,30 +1186,6 @@ export async function openRoleSession(
   }
   boundSessionForEvidence = session;
   log.record("session.open.ready");
-
-  // §5.7 `artifact.observed`：会话 open 时扫一次观察目录作为基线（只记哈希、不写账本），每轮 settle 后
-  // 只对「新增/变更」的物证追加 `artifact.observed`。
-  // 2026-10-20：**项目角色也参与观察**（boundary directory 的代码/文档/图片等 + boundary file 条目）；
-  // 内置治理角色沿用 preauthorizedDirs（仅 `.md`，既有行为逐字不变）。
-  // single/su 项目不参与治理账本——旧项目行为不变（不因开会话/每轮 settle 凭空写 `.ans`）。
-  const artifactDirs = artifactScanDirsFor(setup.role, preauthorizedDirs, builtInGovernance);
-  const artifactFiles = builtInGovernance ? [] : artifactScanFilesFor(setup.role);
-  const artifactHashes = new Map<string, string>();
-  const artifactScanEnabled =
-    (isTrio || governanceModel === "trio") && (artifactDirs.length > 0 || artifactFiles.length > 0);
-  const scanArtifacts = (): Promise<ObservedArtifact[]> =>
-    builtInGovernance
-      ? scanPreauthorizedArtifacts(input.project.projectRoot, artifactDirs)
-      : scanProjectRoleArtifacts(input.project.projectRoot, artifactDirs, artifactFiles, log);
-  if (artifactScanEnabled) {
-    try {
-      for (const artifact of await scanArtifacts()) {
-        artifactHashes.set(artifact.relPath, artifact.sha256);
-      }
-    } catch (err) {
-      log.error("governance.artifact.baseline.failed", err);
-    }
-  }
 
   // 自动收尾的授权边界 = **本会话解析出的边界**（创世态下即治理种子边界；普通角色下即其项目
   // 边界）——与 su 同一授权。治理边界文档落点：项目未声明（如桌面创世 `path` 为空串）时用默认约定路径。
@@ -1911,7 +1308,6 @@ export async function openRoleSession(
       legacyReport = undefined;
       // 账本快照刷新（评审 §5.7 时序边界）：每次 send 开始时重读盘面——跨会话的新客户决定在此生效；
       // 未含决定则门禁拒，绝不猜。读取失败 → 快照 errors 非空 → 门禁 fail-closed。
-      if (isTrio) await refreshLedger();
       // F-5-opt1：排入的模型可见注记作为**本轮输入前缀**送出（不单独开轮、不改判定；送达一次即消费）。
       const notice = pendingModelNotice;
       const outbound = notice !== undefined && notice !== "" ? `${notice}\n\n${text}` : text;
@@ -2053,30 +1449,6 @@ export async function openRoleSession(
               } catch (err) {
                 log.error("session.repin.failed", err);
                 /* 自动收尾/重 pin 是 best-effort；失败不打断会话事件流 */
-              }
-            }
-            // §5.7 `artifact.observed`（trio 项目：内置角色预授权目录 / 项目角色 boundary directory，
-            // 仅新增/变更的 `.md`）：应用算 sha256；账本失败只记诊断，不打断事件流、不回滚角色产物。
-            if (artifactScanEnabled) {
-              try {
-                const artifacts = await scanArtifacts();
-                for (const artifact of artifacts) {
-                  if (artifactHashes.get(artifact.relPath) === artifact.sha256) continue;
-                  artifactHashes.set(artifact.relPath, artifact.sha256);
-                  const entry: GovernanceLedgerEntry = {
-                    at: new Date().toISOString(),
-                    kind: "artifact.observed",
-                    actorRoleId: setup.role.id,
-                    power: trioSpec !== undefined ? legacyGovernancePower(trioSpec.function) : "project",
-                    artifactPath: artifact.relPath,
-                    artifactSha256: artifact.sha256,
-                    ...artifactFlowMetadata(artifact.relPath),
-                  };
-                  const result = await appendGovernanceLedger(input.project.projectRoot, entry);
-                  if (!result.ok) log.record("governance.artifact.append.failed", { message: result.message });
-                }
-              } catch (err) {
-                log.error("governance.artifact.scan.failed", err);
               }
             }
           }
@@ -2260,12 +1632,12 @@ function governanceWriteOwnerHint(rel: string): string {
       guidance: "该路径属 Crew（Nominator）的写区（角色卡/技能/MCP，按客户任命的团队计划写卡）；请交给 Crew。",
     },
     {
-      prefixes: ["docs/flows/", "docs/workflow.md", "docs/scheduling/", "docs/governance/convener/"],
-      guidance: "该路径属 Steward（Convener）的写区（流程/团队计划/readiness/变更包）；请交给 Steward。",
+      prefixes: ["docs/scheduling/", "docs/governance/convener/"],
+      guidance: "该路径属运营（Convener）的写区（计划/分析/调度记录）；请交给运营。",
     },
     {
-      prefixes: ["docs/acceptance/", "docs/verification/", "docs/governance/verifier/"],
-      guidance: "该路径属 质检 / Proof（Verifier）的写区（实施前标准/验收报告/证据附件）；请交给质检角色。",
+      prefixes: ["docs/quality/", "docs/verification/", "docs/governance/verifier/"],
+      guidance: "该路径属质检（Verifier）的写区（质量记录/可选核对证据）；请交给质检角色。",
     },
   ];
   for (const hint of hints) {
@@ -2280,18 +1652,7 @@ function governanceWriteOwnerHint(rel: string): string {
 }
 
 /**
- * 批次 A 身份层：旧治理账本 `power` 值保持到 D 批——chief 复用旧 `liaison` 审计标签，
- * product 记 `project`（账本只作审计标记，门禁不读 `power`）。
- */
-function legacyGovernancePower(fn: GovernanceFunction): GovernancePower {
-  if (fn === "chief") return "liaison";
-  if (fn === "product") return "project";
-  return fn;
-}
-
-/**
- * trio 门禁包装的**第一道**：`forbiddenWritePaths`（应用独占 + 其他治理角色资料）。
- * 命中即拒（先于三道门禁与 `resolveWrite`）；文案指回归属（AC3 口径）。
+ * D 批：不再有治理账本；本函数只按角色注册表的 forbiddenWritePaths 给出拒绝与归属提示。
  */
 function forbiddenWriteDecision(
   spec: GovernanceRoleSpec,
@@ -2307,97 +1668,10 @@ function forbiddenWriteDecision(
   };
 }
 
-/** 路径 → 三道门禁动作（只认固定形状；写流程/团队计划的非标准文件名 → 无 flowId，门禁 fail-closed）。 */
-interface RoutedGovernanceAction {
-  action: GovernanceGateAction;
-  flowId?: string;
-  targetRoleId?: string;
-}
-
-function governanceActionForPath(rel: string | undefined): RoutedGovernanceAction | undefined {
-  if (rel === undefined) return undefined;
-  const parts = rel.split("/");
-  if (parts[0] === "docs" && parts[1] === "flows") {
-    // 2026-10-19 Flow YAML 契约：`.yaml` 是唯一机器状态；`.md` 为旧版人读视图（迁移兼容）。
-    if (parts.length === 3 && /\.(?:md|ya?ml)$/i.test(parts[2]!)) {
-      const flowId = parts[2]!.replace(/\.(?:md|ya?ml)$/i, "");
-      return { action: "write-flow", ...(isGovernanceFlowId(flowId) ? { flowId } : {}) };
-    }
-    if (parts.length > 3) return { action: "write-flow" }; // 非标准子路径：无 flowId → 拒
-    return undefined;
-  }
-  if (parts[0] === "docs" && parts[1] === "scheduling") {
-    // 2026-10-22 第 1 项：团队计划 `docs/scheduling/<flowId>-team-vN.md` → write-team-plan（Convener）。
-    // readiness/变更包等同目录普通 artifact 不在此路由（走边界写 + 写盘确认）。
-    if (parts.length === 3) {
-      const match = /^(.+)-team-v\d+\.md$/.exec(parts[2]!);
-      if (match !== null) {
-        return {
-          action: "write-team-plan",
-          ...(isGovernanceFlowId(match[1]) ? { flowId: match[1] } : {}),
-        };
-      }
-    }
-    return undefined;
-  }
-  if (parts[0] === "docs" && parts[1] === "nominations") {
-    if (parts.length === 3 && parts[2].endsWith(".md")) {
-      const match = /^(.+)-v\d+\.md$/.exec(parts[2]);
-      return {
-        action: "write-nomination",
-        ...(match !== null && isGovernanceFlowId(match[1]) ? { flowId: match[1] } : {}),
-      };
-    }
-    if (parts.length > 3) return { action: "write-nomination" };
-    return undefined;
-  }
-  if (parts[0] === "角色卡" && parts.length >= 3) {
-    return { action: "write-role-card", targetRoleId: parts[1] };
-  }
-  return undefined;
-}
-
-/**
- * 2026-10-20 客户拍板：主入口（旧 Liaison / 新幕僚 chief）可给运营 Steward（Convener）发协调消息。
- * 该 `dispatch_task` 走 `coordinate` 门（不是项目步骤派发）；其余角色/目标仍走既有 `dispatch` 门，逐字不变。
- */
-export function governanceDispatchActionFor(roleId: string, targetRoleId: string): GovernanceGateAction {
-  return (roleId === "chief" || roleId === "liaison") && targetRoleId === "convener" ? "coordinate" : "dispatch";
-}
-
-/**
- * 治理 flowId 形状（**单一来源**：运行时核心 `src/model/runtime.ts` 的 `GOVERNANCE_SLUG_PATTERN`；
- * 2026-10-22 收紧为禁止首/尾连字符——设计
- * `角色卡/项目管理/docs/design/2026-10-22_design_governance-slug-no-trailing-hyphen.md` §3.3/§3.4）。
- * 本地保留谓词 `isGovernanceFlowId`（仅本文件使用），正则不再有第二份副本。
- */
-const GOVERNANCE_FLOW_ID_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
+const GOVERNANCE_SLUG_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
 
 function isGovernanceFlowId(value: unknown): value is string {
-  return typeof value === "string" && GOVERNANCE_FLOW_ID_RE.test(value);
-}
-
-// —————————————————————— Flow YAML 写前校验（2026-10-19） ——————————————————————
-
-/**
- * 确认卡声明的 Flow YAML 路径形状（唯一机器状态）：**宽捕获**单段候选文件名
- * `docs/flows/<候选>.yaml|yml`。候选是否为合法 flowId **不在本正则判定**，由
- * `validateFlowYamlCard` 先用 `isGovernanceFlowId` 显式校验——非法候选（如 `docs/flows/flow-.yaml`）
- * 必须被拒绝该卡，不得因路径不匹配而被静默跳过、绕过 YAML 校验。
- */
-const FLOW_YAML_PATH_RE = /^docs\/flows\/([^/\\]+)\.(?:yaml|yml)$/;
-
-/** 从声明路径中宽捕获 Flow YAML 候选（合法性由 `validateFlowYamlCard` 显式校验，不在此过滤）。 */
-function flowYamlTargetsOf(paths: readonly string[]): Array<{ rel: string; flowId: string }> {
-  const targets: Array<{ rel: string; flowId: string }> = [];
-  const seen = new Set<string>();
-  for (const rel of paths) {
-    const match = FLOW_YAML_PATH_RE.exec(rel);
-    if (match === null || seen.has(rel)) continue;
-    seen.add(rel);
-    targets.push({ rel, flowId: match[1]! });
-  }
-  return targets;
+  return typeof value === "string" && GOVERNANCE_SLUG_RE.test(value);
 }
 
 /**
@@ -2468,7 +1742,6 @@ function defaultGovernanceChoiceCardKind(
   const has = (id: string): boolean => optionIds.includes(id);
   switch (roleId) {
     case "chief":
-    case "liaison":
       return has("confirm") ? "intent-confirm" : undefined;
     case "rapporteur":
       return has("accept") ? "proposal" : undefined;
@@ -2482,306 +1755,6 @@ function defaultGovernanceChoiceCardKind(
       return undefined;
   }
 }
-
-/** 去掉包住 YAML 正文的一层代码围栏（```yaml … ``` / ~~~yaml … ~~~；容忍围栏后还有说明文字）。 */
-function stripYamlFence(body: string): string {
-  const lines = body.replace(/\r\n/g, "\n").split("\n");
-  let start = 0;
-  while (start < lines.length && lines[start]!.trim() === "") start += 1;
-  const opener = start < lines.length ? /^(`{3,}|~{3,})\s*([A-Za-z0-9_-]*)\s*$/.exec(lines[start]!.trim()) : null;
-  if (opener !== null && (opener[2] === "" || /^ya?ml$/i.test(opener[2]!))) {
-    const fence = opener[1]!;
-    const fenceChar = fence[0]!;
-    for (let end = start + 1; end < lines.length; end += 1) {
-      const trimmed = lines[end]!.trim();
-      if (trimmed.length >= fence.length && [...trimmed].every((char) => char === fenceChar)) {
-        return lines.slice(start + 1, end).join("\n");
-      }
-    }
-  }
-  return body;
-}
-
-/**
- * 从确认卡 preview 提取 `docs/flows/<flowId>.yaml` 的 YAML 正文：
- *   1. 优先取该路径锚点之后的逐路径正文（与证据包/完整性闸共用 `declaredPathBodies`）；
- *   2. 回退 preview 中第一个含 `flowId:` 的 YAML 围栏；
- *   3. 再回退「整个 preview 就是 YAML」。
- * 取不到 ⇒ undefined（调用方 fail-closed 拒绝该卡）。
- */
-function flowYamlBodyFromPreview(preview: string | undefined, rel: string): string | undefined {
-  const text = typeof preview === "string" ? preview : "";
-  const body = declaredPathBodies(text, [rel]).find((entry) => entry.path === rel);
-  if (body !== undefined && body.hasBody) {
-    const stripped = stripYamlFence(body.body).trim();
-    if (stripped !== "") return stripped;
-  }
-  const fenced = /(`{3,}|~{3,})\s*(?:ya?ml)?\s*\n([\s\S]*?)\n\1/.exec(text);
-  if (fenced !== null && /^\s*flowId\s*:/m.test(fenced[2]!)) return fenced[2]!.trim();
-  const trimmed = text.trim();
-  if (/^\s*flowId\s*:/m.test(trimmed)) return trimmed;
-  return undefined;
-}
-
-/**
- * 确认卡的 Flow YAML 写前校验（**确定性**，不调用模型）：
- *   · 仅当声明路径含 `docs/flows/<flowId>.yaml`（或 `.yml`）时生效；
- *   · 文件名候选先按 `isGovernanceFlowId` 校验：**非空但不合法 ⇒ 拒绝该卡**（明确写出候选值与
- *     现行规则），不得因路径正则不匹配而静默跳过 YAML 校验（2026-10-22 slug 收紧，设计 §3.4）；
- *   · 卡片 flowId（若有）必须与文件名一致；
- *   · preview 必须能提取出 YAML 正文，且 `parseFlowStateYaml` 全部通过；
- *   · **2026-10-24 P0-1 受控扩展**：目标文件已存在时，仅当涉及 release 标记（previous/next 任一为
- *     true）才执行 release-only 校验——只允许 release false/缺省→true 且其余字段/步骤逐字段不变；
- *     release true→false、true/true 或 false→true 伴随其它变化一律拒绝。**双方都非发布时不做
- *     release-only 限制**（普通流程扩展/字段写卡按既有 `parseFlowStateYaml` 校验放行）。
- * 返回 `undefined` = 通过；否则返回给模型/Steward 的具体错误文案（含每条 path + reason）。
- */
-async function validateFlowYamlCard(
-  projectRoot: string,
-  req: CustomerInputRequest,
-  declaredPaths: readonly string[],
-  cardFlowId: string | undefined,
-): Promise<string | undefined> {
-  if (req.kind !== "confirm") return undefined;
-  const targets = flowYamlTargetsOf(declaredPaths);
-  if (targets.length === 0) return undefined;
-
-  const failures: string[] = [];
-  for (const target of targets) {
-    if (!isGovernanceFlowId(target.flowId)) {
-      failures.push(
-        `${target.rel}: 文件名 flowId「${target.flowId}」不是合法 slug` +
-          `（须匹配 ${GOVERNANCE_SLUG_PATTERN}；2–64 位、首尾小写字母/数字、禁止首尾连字符）；` +
-          "拒绝该卡（不得跳过 YAML 校验）",
-      );
-      continue;
-    }
-    if (cardFlowId !== undefined && cardFlowId !== target.flowId) {
-      failures.push(`${target.rel}: 卡片 flowId="${cardFlowId}" 与文件名 flowId="${target.flowId}" 不一致`);
-      continue;
-    }
-    const yamlText = flowYamlBodyFromPreview(req.preview, target.rel);
-    if (yamlText === undefined) {
-      failures.push(
-        `${target.rel}: 无法从 preview 提取 YAML 正文；请以标题（如 \`## ${target.rel}\`）或代码围栏说明锚定该路径，并给出完整 YAML`,
-      );
-      continue;
-    }
-    const parsed = parseFlowStateYaml(yamlText, target.flowId);
-    if (!parsed.ok) {
-      for (const error of parsed.errors.slice(0, 50)) {
-        failures.push(`${target.rel} ${error.path}: ${error.message}`);
-      }
-      continue;
-    }
-    // 受控扩展：仅 release 标记（任一侧 release: true）受 release-only 约束；普通写卡按既有 YAML 校验。
-    let previousText: string | undefined;
-    try {
-      previousText = await readFile(path.join(projectRoot, ...target.rel.split("/")), "utf8");
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
-        failures.push(
-          `${target.rel}: 现有流程 YAML 不可读（${err instanceof Error ? err.message : String(err)}）；` +
-            "拒绝该卡（fail-closed）",
-        );
-        continue;
-      }
-    }
-    if (previousText !== undefined) {
-      const extension = validateReleaseOnlyExtension({
-        flowId: target.flowId,
-        previousText,
-        nextText: yamlText,
-      });
-      if (!extension.ok) {
-        failures.push(`${target.rel}: ${extension.error ?? "受控扩展校验失败"}`);
-      }
-    }
-  }
-
-  if (failures.length === 0) return undefined;
-  return (
-    `流程 YAML 未通过校验：\n- ${failures.join("\n- ")}\n` +
-    "本次未向客户发卡，也未发行任何写入路径。" +
-    "请按上述路径与原因修正 docs/flows/<flowId>.yaml（唯一机器状态；.md 仅人读视图）后重试。"
-  );
-}
-
-/**
- * 团队计划角色表校验（单一实现 = `common/编排/team-plan.ts`）：
- *   · legacy（缺省/`teamPlanSchema: 1`）⇒ 只跑既有 v1 表格检查（推荐角色职责/能力/写集/依赖非空）；
- *   · v2 ⇒ V1–V10 的 error 条目；v3 ⇒ V1–V10 + V-D1–V-D9 的 error 条目（warning/exception-review 不阻断发卡）。
- * 只做确定性表格/结构解析，不做语义判断（语义由 Convener readiness 复核）。
- */
-function teamPlanRoleRowIssues(text: string, recommended: readonly string[], projectRoot: string): string[] {
-  const plan = parseTeamPlan(text, { projectRoot });
-  if (plan.legacy) return legacyTeamPlanRoleRowIssues(text, recommended);
-  return teamPlanIssueMessages(plan);
-}
-
-/**
- * **团队计划卡前守卫**（2026-10-22 治理分工第 1 项；方案 §5.3「应用在呈现卡之前的确定性守卫」）。
- *
- * 只在 Convener 发 `request_choice(cardKind=appointment)` 时生效；以下校验全部通过才允许触达客户：
- *   1. flowId 合法（调用方已判定；此处再验）；
- *   2. 团队计划存在且可读（`docs/scheduling/<flowId>-team-vN.md`，取最新版本）；
- *   3. 计划 frontmatter `flowId` 与卡片一致；
- *   4. `recommended` 非空、无重复、不含内置治理角色（复用 `parseRecommendedRoleIds`，空集不静默接受）；
- *   5. 卡片选项覆盖 recommended 且不含内置治理角色；
- *   6. 计划含每个推荐角色的职责目标/能力要求/写集/依赖行；
- *   7. v2 ⇒ V1–V11；v3 ⇒ V1–V11 + V-D1–V-D9（目录覆盖/唯一 owner/不重叠/目录规范/模块实现目录/
- *      治理关键路径/共享/路径安全，含 realpath 逃逸）。
- * 失败 ⇒ 调用方**不生成客户卡、不镜像、不调判断、不写账本、不占 pending**，把具体问题退回 Convener。
- */
-async function validateConvenerAppointmentCard(args: {
-  projectRoot: string;
-  flowId: string;
-  req: CustomerInputRequest;
-}): Promise<
-  | { ok: true; teamPlanPath: string; teamPlanSchema: 1 | 2 | 3; modules: string[] }
-  | { ok: false; reason: string }
-> {
-  if (args.req.kind !== "choice") {
-    return { ok: false, reason: "任命卡必须是 request_choice（choice）卡；本次未向客户发卡。" };
-  }
-  const plan = await latestVersionedArtifact(args.projectRoot, "docs/scheduling", args.flowId, "team");
-  if (plan === undefined) {
-    return {
-      ok: false,
-      reason:
-        `团队计划缺失：docs/scheduling/${args.flowId}-team-vN.md 不存在；` +
-        "请先写出团队计划（含 flowId/version/riskTier/推荐集与角色行）再发任命卡。本次未向客户发卡、未写账本。",
-    };
-  }
-  let text: string;
-  try {
-    text = await readFile(path.join(args.projectRoot, ...plan.relPath.split("/")), "utf8");
-  } catch {
-    return {
-      ok: false,
-      reason: `团队计划不可读：${plan.relPath}；请修正后重发任命卡。本次未向客户发卡、未写账本。`,
-    };
-  }
-  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
-  const flowIdMatch = frontmatter === null ? null : /^\s*flowId\s*:\s*(.+?)\s*$/m.exec(frontmatter[1]!);
-  const frontmatterFlowId = flowIdMatch === null ? undefined : flowIdMatch[1]!.trim().replace(/^["'`]|["'`]$/g, "");
-  if (frontmatterFlowId === undefined) {
-    return {
-      ok: false,
-      reason: `团队计划 ${plan.relPath} 缺少 frontmatter flowId；请补齐后重发任命卡。本次未向客户发卡、未写账本。`,
-    };
-  }
-  if (frontmatterFlowId !== args.flowId) {
-    return {
-      ok: false,
-      reason:
-        `团队计划 ${plan.relPath} 的 flowId="${frontmatterFlowId}" 与卡片 flowId="${args.flowId}" 不一致；` +
-        "请修正计划或卡片后重发。本次未向客户发卡、未写账本。",
-    };
-  }
-
-  const recommended = parseRecommendedRoleIds(text);
-  if (recommended === undefined || recommended.length === 0) {
-    return {
-      ok: false,
-      reason:
-        `团队计划 ${plan.relPath} 缺少唯一的机器可读推荐集（须为 frontmatter 内联数组 ` +
-        "`recommended: [role-a, role-b]` 或固定行「推荐：role-a、role-b」；空集/重复/歧义不接受）。" +
-        "本次未向客户发卡、未写账本。",
-    };
-  }
-  const builtInRecommended = recommended.filter((id) => isBuiltInGovernanceRoleId(id));
-  if (builtInRecommended.length > 0) {
-    return {
-      ok: false,
-      reason:
-        `团队计划 ${plan.relPath} 的推荐集含内置治理角色（${builtInRecommended.join("、")}）；` +
-        "任命卡只能任命项目角色。本次未向客户发卡、未写账本。",
-    };
-  }
-
-  const optionIds = args.req.options.map((option) => option.id);
-  const missingOptions = recommended.filter((id) => !optionIds.includes(id));
-  if (missingOptions.length > 0) {
-    return {
-      ok: false,
-      reason:
-        `任命卡选项未覆盖团队计划推荐集（缺：${missingOptions.join("、")}）；` +
-        "请让卡选项与推荐集一致后重发。本次未向客户发卡、未写账本。",
-    };
-  }
-  const builtInOptions = optionIds.filter((id) => isBuiltInGovernanceRoleId(id));
-  if (builtInOptions.length > 0) {
-    return {
-      ok: false,
-      reason:
-        `任命卡选项含内置治理角色（${builtInOptions.join("、")}）；任命卡不得包含内置治理角色。` +
-        "本次未向客户发卡、未写账本。",
-    };
-  }
-
-  const rowIssues = teamPlanRoleRowIssues(text, recommended, args.projectRoot);
-  if (rowIssues.length > 0) {
-    return {
-      ok: false,
-      reason: `团队计划 ${plan.relPath} 不完整：${rowIssues.join("；")}。本次未向客户发卡、未写账本。`,
-    };
-  }
-
-  // 2026-10-22 角色粒度/MapReduce（Q9 A）：v2 计划同时做 V11（flow 已写时）的一致性核对。
-  // 2026-10-23 目录级授权（Q1/Q9 A）：v3 计划的 V-D1–V-D9 已由上面的同一 `parseTeamPlan` 完成
-  // （含 realpath 逃逸核对）；此处只补 flow-plan 一致性（V11），语义复核仍归 Convener readiness。
-  const planParse = parseTeamPlan(text, { flowId: args.flowId, projectRoot: args.projectRoot });
-  if (!planParse.legacy) {
-    if (!planParse.ok) {
-      return {
-        ok: false,
-        reason:
-          `团队计划 ${plan.relPath} 不完整：${teamPlanIssueMessages(planParse).join("；")}。` +
-          "本次未向客户发卡、未写账本。",
-      };
-    }
-    const flowIssues = await teamPlanFlowConsistencyIssues(args.projectRoot, args.flowId, planParse);
-    if (flowIssues.length > 0) {
-      return {
-        ok: false,
-        reason:
-          `团队计划 ${plan.relPath} 与流程不一致：${flowIssues.join("；")}。` +
-          "本次未向客户发卡、未写账本。",
-      };
-    }
-  }
-  return {
-    ok: true,
-    teamPlanPath: plan.relPath,
-    teamPlanSchema: planParse.teamPlanSchema,
-    modules: planParse.modules,
-  };
-}
-
-/**
- * V11（flow-plan 一致性）：**仅在 `docs/flows/<flowId>.yaml` 已写时**执行。
- * YAML 不可读（非 ENOENT）或校验失败 ⇒ fail-closed（不弹卡）；仅旧 `.md` 视图 ⇒ 跳过（迁移兼容）。
- * 返回可读问题列表（空 = 一致/无需检查）。
- */
-async function teamPlanFlowConsistencyIssues(
-  projectRoot: string,
-  flowId: string,
-  plan: TeamPlanParseResult,
-): Promise<string[]> {
-  const rel = `docs/flows/${flowId}.yaml`;
-  let text: string;
-  try {
-    text = await readFile(path.join(projectRoot, ...rel.split("/")), "utf8");
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
-    return [`流程状态 ${rel} 不可读`];
-  }
-  const parsed = parseFlowStateYaml(text, flowId);
-  if (!parsed.ok) return [`流程 YAML 校验失败：${parsed.error}`];
-  return validateTeamPlanFlowConsistency(plan, parsed.flow).map((issue) => issue.message);
-}
-
 
 function serializeGovernanceTask<T>(
   state: { chain: Promise<void> },
@@ -2800,7 +1773,7 @@ function serializeGovernanceTask<T>(
  * （意图确认卡、意图交接、幕僚→运营 coordinate）。旧路径保留到 D 批；两者只是 id 不同。
  */
 function isCoordinatorGovernanceSpec(spec: GovernanceRoleSpec | undefined): boolean {
-  return spec !== undefined && (spec.function === "chief" || spec.function === "liaison");
+  return spec !== undefined && spec.function === "chief";
 }
 
 /**
@@ -2820,20 +1793,19 @@ const TRIO_CARD_KINDS: Record<GovernanceRoleSpec["id"], readonly GovernanceCardK
   // 2026-10-28 批次 A：幕僚（chief）承接旧主入口的 intent-confirm 需求确认卡；其它治理卡仍结构性拒绝。
   // 旧 `liaison` 是只读别名（D 批删除），行为与基线逐字一致（仅 intent-confirm）。
   chief: ["intent-confirm"],
-  liaison: ["intent-confirm"],
   // 产品（product）是幕僚的 worker；批次 A 只做身份层，不开放治理选择/确认卡（申请线在 C 批）。
   product: [],
   // 2026-10-26 客户纠正/补充：报告员可发 **decision 卡，仅限需求变更审批**（发起方不得自批；
   // 审批人是判断 agent/客户，主理只执行）；提案与写盘卡不变。
-  rapporteur: ["proposal", "write", "decision"],
+  rapporteur: ["proposal", "decision"],
   // 2026-10-22 第 1 项：Crew（Nominator）只按客户任命的团队计划写卡，不再发 appointment 卡；
   // `appointment-write`（写角色卡/边界）保留。
-  nominator: ["appointment-write", "write"],
+  nominator: ["appointment-write"],
   // 2026-10-22 第 1 项：Convener（Steward/统筹）依团队计划发起 appointment 卡。
   // 2026-10-26 客户新增：统筹可发 decision 卡（材料性选择；需求变更审批卡统筹也可发起）。
-  convener: ["appointment", "decision", "schedule-write", "write"],
+  convener: ["appointment", "decision"],
   // 验收权归 Proof / 验收（verifier）；Draft / 提案不再发 acceptance。
-  verifier: ["acceptance", "write"],
+  verifier: ["acceptance"],
 };
 
 /**
@@ -2841,11 +1813,7 @@ const TRIO_CARD_KINDS: Record<GovernanceRoleSpec["id"], readonly GovernanceCardK
  * 本地只用于在拒绝文案里给出「本角色允许的确认卡 kind」——TRIO_CARD_KINDS 同时混有 choice 类，
  * 直接列出会把 `proposal`/`acceptance` 等误报成可确认卡种。
  */
-const GOVERNANCE_CONFIRM_CARD_KINDS: readonly GovernanceCardKind[] = [
-  "write",
-  "appointment-write",
-  "schedule-write",
-];
+const GOVERNANCE_CONFIRM_CARD_KINDS: readonly GovernanceCardKind[] = ["appointment-write"];
 
 /** 某内置治理角色允许的**确认卡** kinds（工具枚举 ∩ `TRIO_CARD_KINDS`，按设计 §4.2 表序；主入口为空）。 */
 function confirmCardKindsOf(roleId: GovernanceRoleSpec["id"]): readonly GovernanceCardKind[] {
@@ -2853,304 +1821,6 @@ function confirmCardKindsOf(roleId: GovernanceRoleSpec["id"]): readonly Governan
 }
 
 /** 账本条目签名（本会话内存合并去重用；只比较能唯一识别一次决定/事件的字段）。 */
-function ledgerEntrySignature(entry: GovernanceLedgerEntry): string {
-  return [
-    entry.at,
-    entry.kind,
-    entry.actorRoleId,
-    entry.flowId ?? "",
-    entry.decisionKind ?? "",
-    entry.artifactPath ?? "",
-    (entry.targetRoleIds ?? []).join(","),
-    (entry.selectedOptions ?? []).join(","),
-    entry.customerDecision ?? "",
-  ].join("\u0000");
-}
-
-function sameLedgerEntry(a: GovernanceLedgerEntry, b: GovernanceLedgerEntry): boolean {
-  return ledgerEntrySignature(a) === ledgerEntrySignature(b);
-}
-
-type CustomerDecisionClassification = {
-  decisionKind?: GovernanceDecisionKind;
-  customerDecision?: GovernanceLedgerEntry["customerDecision"];
-  targetRoleIds?: string[];
-  /**
-   * 仅 decision 卡：客户恰好选中的一个**卡上选项 id**（审计留痕；选中项同时出现在 tool 回执/会话）。
-   * 不是 `targetRoleIds`（不伪装成任命），也不是写盘 `paths`；任何门禁都不读本字段。
-   */
-  selectedOptions?: string[];
-};
-
-/**
- * 按 `cardKind` + 客户**实际返回**（`CustomerInputOutcome`）分类；**不采信角色自述**：
- *   · `unavailable`/null → `undefined`（没有客户决定，不写账本）；
- *   · `declined` → `unclassified`（fail-closed：后续依赖该 flow 决定的门禁拒，直至客户重新决定）；
- *   · `answered` + 标准选项 id → 评审 §5.8 映射；非标准/多选冲突 → `unclassified`。
- * `optionIds`（可选）= 本卡 `options` 的 id 集（仅 choice 卡）：decision 卡据此判定「未知选项」。
- */
-function classifyCustomerDecision(
-  cardKind: GovernanceCardKind | undefined,
-  out: CustomerInputOutcome | null | undefined,
-  optionIds?: readonly string[],
-): CustomerDecisionClassification | undefined {
-  if (out === null || out === undefined) return undefined;
-  if (out.outcome === "unavailable") return undefined;
-  if (out.outcome === "declined") return { decisionKind: "unclassified", customerDecision: "none" };
-
-  const selected = Array.isArray(out.value.selected) ? out.value.selected : [];
-  switch (cardKind) {
-    case "proposal": {
-      const recognized = selected.filter((id) =>
-        ["accept", "accept-quick", "revise", "reject"].includes(id),
-      );
-      if (recognized.length !== 1) return { decisionKind: "unclassified", customerDecision: "none" };
-      switch (recognized[0]) {
-        case "accept":
-          return { decisionKind: "proposal-accept", customerDecision: "accepted" };
-        case "accept-quick":
-          return { decisionKind: "proposal-accept-quick", customerDecision: "accepted-quick" };
-        case "revise":
-          return { decisionKind: "proposal-revise", customerDecision: "changes-requested" };
-        default:
-          return { decisionKind: "proposal-reject", customerDecision: "rejected" };
-      }
-    }
-    case "appointment":
-      return selected.length > 0
-        ? { decisionKind: "appointment", customerDecision: "appointed", targetRoleIds: [...selected] }
-        : { decisionKind: "unclassified", customerDecision: "none" };
-    case "acceptance": {
-      if (selected.length !== 1 || !["accept", "reject"].includes(selected[0])) {
-        return { decisionKind: "unclassified", customerDecision: "none" };
-      }
-      return {
-        decisionKind: "acceptance",
-        customerDecision: selected[0] === "accept" ? "accepted" : "rejected",
-      };
-    }
-    case "intent-confirm": {
-      // 需求确认卡（客户专属；选项 id 固定 confirm/revise）：恰好一项才分类，其余 fail-closed。
-      if (selected.length !== 1) return { decisionKind: "unclassified", customerDecision: "none" };
-      if (selected[0] === "confirm") return { decisionKind: "intent-confirm", customerDecision: "accepted" };
-      if (selected[0] === "revise") return { decisionKind: "intent-confirm", customerDecision: "changes-requested" };
-      return { decisionKind: "unclassified", customerDecision: "none" };
-    }
-    case "write":
-      // legacy 兼容（C 目标态删除；工具 schema 与角色矩阵不再向模型列出）：普通写盘确认不解锁
-      // 任何治理门禁（无 decisionKind），仍如实留痕客户是否同意——旧项目/旧测试经 direct 调用仍可审计。
-      return { customerDecision: out.value.confirmed === true ? "accepted" : "rejected" };
-    case "appointment-write":
-    case "schedule-write":
-      return {
-        decisionKind: cardKind,
-        customerDecision: out.value.confirmed === true ? "accepted" : "rejected",
-      };
-    case "decision": {
-      // 2026-10-26 decision 卡（事务性选择；统筹或报告员可发，报告员仅限需求变更审批）：**恰好选中一个卡上存在的选项**才分类；
-      // 多选/空选/未知选项 ⇒ unclassified/none（fail-closed，客户可重新选择/重发卡）。
-      // 分类只写审计的 `material-choice`：不进入 proposal-*/appointment/acceptance 任何语义，
-      // 不写 `targetRoleIds`（不伪装成任命），不满足任何 gate/acceptance 门，也不得被当成客户批准。
-      // 选中项以 tool 回执/会话为准；账本仅按 `selectedOptions` 留审计（门禁不读）。
-      if (selected.length !== 1) return { decisionKind: "unclassified", customerDecision: "none" };
-      const chosen = selected[0];
-      if (optionIds === undefined || !optionIds.includes(chosen)) {
-        return { decisionKind: "unclassified", customerDecision: "none" };
-      }
-      return { decisionKind: "material-choice", customerDecision: "accepted", selectedOptions: [chosen] };
-    }
-    default:
-      return { decisionKind: "unclassified", customerDecision: "none" };
-  }
-}
-
-/**
- * `customer.decision` 写入（评审 §5.7/§5.8）：仅 trio 内置角色、仅带合法 `flowId` 的卡。
- * 同步更新内存快照（本会话后续写入立即受该决定约束），异步补 artifact 哈希并落盘；
- * 账本失败只记诊断，**不改变客户决定、不放宽门禁、不阻断写盘**（§九-16）。
- */
-async function recordCustomerDecision(args: {
-  state: { snapshot: GovernanceLedgerSnapshot; local: GovernanceLedgerEntry[] };
-  projectRoot: string;
-  roleId: string;
-  function: GovernanceFunction;
-  req: CustomerInputRequest;
-  metadata?: CustomerInputMetadata;
-  out: CustomerInputOutcome | null | undefined;
-  issuedPaths: string[];
-  sessionId?: string;
-  runtime?: RuntimeKind;
-  log: ReturnType<typeof createDiagnosticLogger>;
-}): Promise<void> {
-  const flowId = args.req.flowId ?? args.metadata?.flowId;
-  if (!isGovernanceFlowId(flowId)) return; // 无治理流程上下文的普通交互：不写账本
-  const cardKind = args.req.cardKind ?? args.metadata?.cardKind;
-  // 2026-10-18 真机：只有**治理卡**（显式 cardKind）才写 `customer.decision`。Lead/Crew 的普通
-  // 选择/确认（无 cardKind）若也写，会以 unclassified/none 污染账本并覆盖真正的提案决定。
-  if (cardKind === undefined) return;
-  // 2026-10-19：判断 agent 的 approval deny 由桌面以 `declined`（operatorId=`judge:<engine>`）回投角色，
-  // 它不是客户决定——不写 `customer.decision`（否则 unclassified/none 会污染账本并挡住收尾门）。
-  if (
-    args.out?.outcome === "declined" &&
-    typeof args.out.operatorId === "string" &&
-    args.out.operatorId.startsWith("judge:")
-  ) {
-    return;
-  }
-  // 2026-10-25 桌面「写入预授权」前闸（`operatorId = system:write-preauthorization`）：边界内写确认由
-  // 系统直接放行、边界外直接拒绝——两条都**不是客户决定**，也不是 judge 代批。
-  //   · 接受：写一条审计账本（`decisionEvidence.kind:"system-preauthorization"` + operatorId），但
-  //     **不写 `decisionKind`**（门禁键；`latestAcceptanceDecision` 等收口门只认客户决定），不派生
-  //     客户选择（不伪造客户手批）；`customerDecision` 只记结算结果 `"accepted"`。
-  //   · 拒绝：**不写 `customer.decision`**（不写 unclassified/none 污染账本、不挡收尾门），只记诊断。
-  // 判定只认 `system:` 前缀：真实客户（`operation-…`/`cli`）与 `judge:<engine>` 路径逐字不变。
-  const systemOperatorId =
-    args.out !== null &&
-    args.out !== undefined &&
-    args.out.outcome !== "unavailable" &&
-    typeof args.out.operatorId === "string" &&
-    args.out.operatorId.startsWith("system:")
-      ? args.out.operatorId
-      : undefined;
-  if (systemOperatorId !== undefined) {
-    // 系统预授权只结算写盘确认的放行（answered + confirmed:true）；其余形状不写账本。
-    if (args.out?.outcome !== "answered" || args.out.value.confirmed !== true) {
-      if (args.out?.outcome === "declined") {
-        args.log.record("governance.preauthorization.declined", {
-          authorizationSource: systemOperatorId,
-          reasonCode: "system-preauthorization",
-          count: args.issuedPaths.length,
-          toolCallId: args.metadata?.toolCallId,
-        });
-      }
-      return;
-    }
-  }
-  // 2026-10-26（独立验收 F1）：卡片**从未呈现**（应用 fail-closed：`declined + notPresented:true`）不是
-  // 客户决定——不写 `customer.decision`（否则 unclassified/none 会成为未结算决定，永久挡住收尾门/
-  // 最终验收）。与 judge 退回、system 预授权拒绝同口径：无呈现 = 无决定。
-  // 位置在 **system 预授权分支之后**（2026-10-26 复验收据）：`system:` 拒绝仍须先记
-  // `governance.preauthorization.declined` 诊断，本早退不得把它吞掉（账本行为不变）。
-  if (args.out?.outcome === "declined" && args.out.notPresented === true) return;
-  // 系统预授权接受不采信客户分类（不派生 decisionKind/targetRoleIds）：只记结算结果 accepted。
-  // decision 卡以**本卡选项 id** 判定「未知选项」（仅 choice 卡有 options；confirm 卡不适用）。
-  const classification = systemOperatorId !== undefined
-    ? { customerDecision: "accepted" as const }
-    : classifyCustomerDecision(
-        cardKind,
-        args.out,
-        args.req.kind === "choice" ? args.req.options.map((option) => option.id) : undefined,
-      );
-  if (classification === undefined) return;
-
-  const stepId = args.req.stepId ?? args.metadata?.stepId;
-  // 2026-10-18 双开关评审 §7.4：judge 只是**审计证据**；`actorRoleId`/`power` 照旧，绝不伪装成客户。
-  const judge = args.out?.outcome === "answered" ? args.out.judge : undefined;
-  // 2026-10-26：decision 卡在 `GOVERNANCE_CARD_GROUP` 中属 decision 组（判断可正向代批唯一推荐项）；
-  // 映射单一来源仍是 Model 契约，本层不维护第二张表。
-  const derivedGroup = cardKind !== undefined ? governanceCardGroup(cardKind) : undefined;
-  if (judge !== undefined && derivedGroup !== undefined && judge.group !== derivedGroup) {
-    // 交叉校验：不翻转已发生的决定、不改成 customer-input（那会错误归因给客户），只记诊断。
-    args.log.record("governance-judge.group.mismatch", {
-      cardKind,
-      group: judge.group,
-      expectedGroup: derivedGroup,
-    });
-  }
-  const evidence: GovernanceLedgerEntry["decisionEvidence"] = systemOperatorId !== undefined
-    ? {
-        kind: "system-preauthorization",
-        operatorId: systemOperatorId,
-        ...(typeof args.metadata?.toolCallId === "string" && args.metadata.toolCallId !== ""
-          ? { toolCallId: args.metadata.toolCallId }
-          : {}),
-        ...(typeof args.metadata?.turnId === "string" && args.metadata.turnId !== ""
-          ? { turnId: args.metadata.turnId }
-          : {}),
-        ...(typeof args.sessionId === "string" && args.sessionId !== ""
-          ? { sessionId: args.sessionId }
-          : {}),
-      }
-    : judge !== undefined
-      ? {
-          kind: "judge",
-          ...(typeof args.metadata?.toolCallId === "string" && args.metadata.toolCallId !== ""
-            ? { toolCallId: args.metadata.toolCallId }
-            : {}),
-          ...(typeof args.metadata?.turnId === "string" && args.metadata.turnId !== ""
-            ? { turnId: args.metadata.turnId }
-            : {}),
-          ...(typeof args.sessionId === "string" && args.sessionId !== ""
-            ? { sessionId: args.sessionId }
-            : {}),
-          judge: boundedGovernanceJudgeAudit(judge),
-        }
-      : {
-          kind: "customer-input",
-          ...(typeof args.metadata?.toolCallId === "string" && args.metadata.toolCallId !== ""
-            ? { toolCallId: args.metadata.toolCallId }
-            : {}),
-          ...(typeof args.metadata?.turnId === "string" && args.metadata.turnId !== ""
-            ? { turnId: args.metadata.turnId }
-            : {}),
-          ...(typeof args.sessionId === "string" && args.sessionId !== ""
-            ? { sessionId: args.sessionId }
-            : {}),
-        };
-  const entry: GovernanceLedgerEntry = {
-    at: new Date().toISOString(),
-    kind: "customer.decision",
-    flowId,
-    ...(isGovernanceFlowId(stepId) ? { stepId } : {}),
-    actorRoleId: args.roleId,
-    // 2026-10-22 第 1 项（行为变化）：appointment 由 Convener 发起 ⇒ power=schedule（发起角色职能）；
-    // 旧 Nominator 发起的存量决定仍为 nomination。验收决定仍固定 acceptance。
-    power: cardKind === "acceptance" ? "acceptance" : legacyGovernancePower(args.function),
-    ...(classification.decisionKind !== undefined
-      ? { decisionKind: classification.decisionKind }
-      : {}),
-    ...(classification.targetRoleIds !== undefined
-      ? { targetRoleIds: classification.targetRoleIds }
-      : {}),
-    // 2026-10-26 decision 卡：只记客户选中的选项 id（审计）；不是 targetRoleIds、不参与任何门禁。
-    ...(classification.selectedOptions !== undefined
-      ? { selectedOptions: [...classification.selectedOptions] }
-      : {}),
-    ...(classification.customerDecision !== undefined
-      ? { customerDecision: classification.customerDecision }
-      : {}),
-    ...(args.issuedPaths.length > 0 ? { paths: [...args.issuedPaths] } : {}),
-    decisionEvidence: evidence,
-    messageSummary: truncateText(args.req.title, 200),
-    ...(args.runtime !== undefined ? { runtime: args.runtime } : {}),
-  };
-
-  // 同步快照：客户决定即刻生效（本会话后续写盘不再等磁盘）。
-  args.state.local.push(entry);
-  args.state.snapshot = {
-    entries: [...args.state.snapshot.entries, entry],
-    errors: args.state.snapshot.errors,
-  };
-
-  try {
-    const artifact = await findDecisionArtifact(args.projectRoot, entry, args.issuedPaths);
-    if (artifact !== undefined) Object.assign(entry, artifact);
-    const result = await appendGovernanceLedger(args.projectRoot, entry);
-    if (!result.ok) {
-      args.log.record("governance.decision.append.failed", { message: result.message });
-      if (entry.decisionEvidence?.kind === "judge") {
-        // 账本失败不翻转决定（结果行/诊断兜底；评审 §7.4）。
-        args.log.record("governance-judge.audit.failed", {
-          toolCallId: args.metadata?.toolCallId,
-          reason: truncateText(result.message, 512),
-        });
-      }
-    }
-  } catch (err) {
-    args.log.error("governance.decision.append.failed", err);
-  }
-}
-
 function truncateText(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max)}…`;
 }
@@ -3159,201 +1829,12 @@ function truncateText(text: string, max: number): string {
  * 为客户决定补 `artifactPath`/`artifactVersion`/`artifactSha256`（应用算；评审 §5.7）。
  * 找不到对应候选物（如尚未写出的 flow 文件）→ 不补，不阻断、不猜。
  */
-async function findDecisionArtifact(
-  projectRoot: string,
-  entry: GovernanceLedgerEntry,
-  issuedPaths: string[],
-): Promise<Pick<GovernanceLedgerEntry, "artifactPath" | "artifactVersion" | "artifactSha256"> | undefined> {
-  let candidate: string | undefined;
-  let version: number | undefined;
-
-  if (entry.decisionKind === "appointment") {
-    // 2026-10-22 第 1 项：appointment 决定绑定**团队计划** `docs/scheduling/<flowId>-team-vN.md`；
-    // 仅旧流程（O4）在没有团队计划时回落 legacy 提名文件（绝不猜其它目录）。
-    const teamPlan = await latestVersionedArtifact(projectRoot, "docs/scheduling", entry.flowId, "team");
-    if (teamPlan !== undefined) {
-      candidate = teamPlan.relPath;
-      version = teamPlan.version;
-    } else {
-      const legacy = await latestVersionedArtifact(projectRoot, "docs/nominations", entry.flowId);
-      candidate = legacy?.relPath;
-      version = legacy?.version;
-    }
-  } else if (entry.decisionKind === "schedule-write") {
-    // 2026-10-19 Flow YAML 契约：机器状态 = docs/flows/<flowId>.yaml；旧版 .md 仅迁移兼容。
-    if (entry.flowId !== undefined) {
-      const yamlRel = `docs/flows/${entry.flowId}.yaml`;
-      candidate = (await isRegularFileForJudge(projectRoot, yamlRel))
-        ? yamlRel
-        : `docs/flows/${entry.flowId}.md`;
-    }
-  } else if (entry.decisionKind === "appointment-write" || entry.decisionKind === undefined) {
-    candidate = issuedPaths.find((p) => p.endsWith(".md")) ?? issuedPaths[0];
-  } else if (
-    entry.decisionKind === "proposal-accept" ||
-    entry.decisionKind === "proposal-accept-quick" ||
-    entry.decisionKind === "proposal-revise" ||
-    entry.decisionKind === "proposal-reject" ||
-    entry.decisionKind === "acceptance"
-  ) {
-    const latest = await latestVersionedArtifact(projectRoot, "docs/proposals", entry.flowId);
-    candidate = latest?.relPath;
-    version = latest?.version;
-  }
-
-  if (candidate === undefined) return undefined;
-  try {
-    const data = await readFile(path.join(projectRoot, candidate));
-    return {
-      artifactPath: candidate,
-      ...(version !== undefined ? { artifactVersion: version } : {}),
-      artifactSha256: createHash("sha256").update(data).digest("hex"),
-    };
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * 在给定目录中找最高版本物证：
- *   · `variant:"default"`（`docs/proposals|nominations`）：`<flowId>-v<N>.md` 与
- *     `<flowId>.proposal-vN.md` / `<flowId>.nomination-vN.md`；
- *   · `variant:"team"`（`docs/scheduling`）：`<flowId>-team-v<N>.md`（2026-10-22 团队计划）；
- *   · `variant:"criteria"|"report"`（`docs/acceptance`）与 `"change"`（`docs/scheduling`）：
- *     `<flowId>-criteria-vN.md` / `<flowId>-report-vN.md` / `<flowId>-change-vN.md`（2026-10-22 第 3 项）。
- */
-async function latestVersionedArtifact(
-  projectRoot: string,
-  dirRel: string,
-  flowId: string | undefined,
-  variant: "default" | "team" | "criteria" | "report" | "change" = "default",
-): Promise<{ relPath: string; version: number } | undefined> {
-  if (!isGovernanceFlowId(flowId)) return undefined;
-  let names: string[];
-  try {
-    names = await readdir(path.join(projectRoot, dirRel));
-  } catch {
-    return undefined;
-  }
-  // 容忍实际命名（2026-10-18 真机）：`<flowId>-vN.md` 与 `<flowId>.proposal-vN.md` /
-  // `<flowId>.nomination-vN.md` 都按同一 flow 的最新版本解析（取最大 N）。
-  // 2026-10-22：`variant:"team"` 匹配 `docs/scheduling/<flowId>-team-vN.md`（版本扫描扩展）；
-  // criteria/report/change 分别匹配 `<flowId>-<kind>-vN.md`。
-  const escaped = flowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const suffix = variant === "default" ? "" : `-${variant}`;
-  const pattern = variant === "default"
-    ? new RegExp(`^${escaped}(?:\\.(?:proposal|nomination))?-v(\\d+)\\.md$`)
-    : new RegExp(`^${escaped}${suffix}-v(\\d+)\\.md$`);
-  let best: { name: string; version: number } | undefined;
-  for (const name of names) {
-    const match = pattern.exec(name);
-    if (match === null) continue;
-    const version = Number(match[1]);
-    if (best === undefined || version > best.version) best = { name, version };
-  }
-  return best === undefined ? undefined : { relPath: `${dirRel}/${best.name}`, version: best.version };
-}
-
-/** 项目根相对路径是否为常规文件（judge 物证存在性判定；不跟随目录）。 */
 async function isRegularFileForJudge(projectRoot: string, rel: string): Promise<boolean> {
   try {
     const info = await stat(path.join(projectRoot, ...rel.split("/")));
     return info.isFile();
   } catch {
     return false;
-  }
-}
-
-/**
- * 按 cardKind（+ 来源角色）计算规范物证路径（2026-10-18 双开关评审 §5.4）。
- * 只给判断上下文/桌面提示用；**不做门禁判定**，缺失由 driver 回落 `manual/artifact-missing`。
- */
-async function judgeArtifactsForCard(args: {
-  projectRoot: string;
-  flowId: string;
-  cardKind: GovernanceCardKind;
-  governanceFunction: GovernanceFunction;
-}): Promise<NonNullable<GovernanceJudgeContext["artifacts"]>> {
-  const proposal = await latestVersionedArtifact(args.projectRoot, "docs/proposals", args.flowId);
-  /** legacy：旧提名文件（仅旧流程 O4 过渡回落；新流程不再产生）。 */
-  const nomination = await latestVersionedArtifact(args.projectRoot, "docs/nominations", args.flowId);
-  // 2026-10-22 第 1 项：团队计划 `docs/scheduling/<flowId>-team-vN.md`（取最新版本）。
-  const teamPlan = await latestVersionedArtifact(args.projectRoot, "docs/scheduling", args.flowId, "team");
-  // 2026-10-22 第 3 项：验收标准/报告/变更包（取最新版本）。
-  const criteria = await latestVersionedArtifact(args.projectRoot, "docs/acceptance", args.flowId, "criteria");
-  const report = await latestVersionedArtifact(args.projectRoot, "docs/acceptance", args.flowId, "report");
-  const changePackage = await latestVersionedArtifact(args.projectRoot, "docs/scheduling", args.flowId, "change");
-  // 2026-10-19 Flow YAML 契约：优先机器状态 `.yaml`；旧版 `.md` 仅人读视图/迁移兼容。
-  const flowYamlRel = `docs/flows/${args.flowId}.yaml`;
-  const flowMdRel = `docs/flows/${args.flowId}.md`;
-  const flowRel = (await isRegularFileForJudge(args.projectRoot, flowYamlRel))
-    ? flowYamlRel
-    : (await isRegularFileForJudge(args.projectRoot, flowMdRel))
-      ? flowMdRel
-      : undefined;
-
-  const proposalPath = proposal?.relPath;
-  const nominationPath = nomination?.relPath;
-  const teamPlanPath = teamPlan?.relPath;
-  const flowPath = flowRel;
-
-  const only = (pathValue: string | undefined): NonNullable<GovernanceJudgeContext["artifacts"]> =>
-    pathValue !== undefined ? { proposalPath: pathValue } : {};
-  const onlyNomination = (pathValue: string | undefined): NonNullable<GovernanceJudgeContext["artifacts"]> =>
-    pathValue !== undefined ? { nominationPath: pathValue } : {};
-  const onlyTeamPlan = (pathValue: string | undefined): NonNullable<GovernanceJudgeContext["artifacts"]> =>
-    pathValue !== undefined ? { teamPlanPath: pathValue } : {};
-  const onlyFlow = (pathValue: string | undefined): NonNullable<GovernanceJudgeContext["artifacts"]> =>
-    pathValue !== undefined ? { flowPath: pathValue } : {};
-
-  switch (args.cardKind) {
-    case "proposal":
-      return only(proposalPath);
-    case "appointment":
-      // 团队计划优先；仅旧流程在没有团队计划时回落 legacy 提名文件（O4）。
-      return teamPlanPath !== undefined ? onlyTeamPlan(teamPlanPath) : onlyNomination(nominationPath);
-    case "acceptance":
-      return {
-        ...only(proposalPath),
-        ...onlyFlow(flowPath),
-        ...(criteria?.relPath !== undefined ? { acceptanceCriteriaPath: criteria.relPath } : {}),
-        ...(report?.relPath !== undefined ? { acceptanceReportPath: report.relPath } : {}),
-        ...(changePackage?.relPath !== undefined ? { changePackagePath: changePackage.relPath } : {}),
-      };
-    case "appointment-write":
-      return {
-        ...(teamPlanPath !== undefined ? onlyTeamPlan(teamPlanPath) : onlyNomination(nominationPath)),
-        ...onlyFlow(flowPath),
-      };
-    case "schedule-write":
-      return onlyFlow(flowPath);
-    case "decision":
-      // 2026-10-26 客户 decision 卡（材料性选择）：与提案/任命/验收独立——不挂任何规范物证，
-      // 判断只需卡片选项（含唯一推荐项）；不得借用 proposal/team-plan/flow 物证制造额外门槛。
-      return {};
-    case "write":
-      // legacy 兼容（C 目标态删除；工具 schema 已不列出）：按来源角色挂既有物证，供旧测试/旧项目。
-      switch (args.governanceFunction) {
-        case "proposal":
-          return only(proposalPath);
-        case "nomination":
-          return onlyNomination(nominationPath);
-        case "schedule":
-          return { ...onlyFlow(flowPath), ...onlyTeamPlan(teamPlanPath) };
-        case "verification":
-          return {
-            ...(changePackage?.relPath !== undefined ? { changePackagePath: changePackage.relPath } : {}),
-            ...(criteria?.relPath !== undefined ? { acceptanceCriteriaPath: criteria.relPath } : {}),
-          };
-        default:
-          return {};
-      }
-    default:
-      return {
-        ...only(proposalPath),
-        ...(teamPlanPath !== undefined ? onlyTeamPlan(teamPlanPath) : onlyNomination(nominationPath)),
-        ...onlyFlow(flowPath),
-      };
   }
 }
 
@@ -3457,341 +1938,6 @@ export function validateAppointmentWritePreview(args: {
  * 写根/禁写、规范物证、推荐集、账本事实。桌面只消费，不重算、不读 `.ans`。
  * 2026-10-22：推荐集从**团队计划**解析（legacy 提名回落）；acceptance 暴露变更包档位 `facts.riskTier`。
  */
-async function computeJudgeContext(args: {
-  projectRoot: string;
-  skillRoot: string;
-  boundary: ResolvedRole["boundary"];
-  trioSpec: GovernanceRoleSpec;
-  flowId: string;
-  req: CustomerInputRequest;
-  metadata?: CustomerInputMetadata;
-  snapshot: GovernanceLedgerSnapshot;
-  conditions: string[];
-}): Promise<GovernanceJudgeContext> {
-  const cardKind = args.req.cardKind ?? args.metadata?.cardKind;
-  const context: GovernanceJudgeContext = {
-    flowId: args.flowId,
-    facts: buildGovernanceJudgeFacts({ snapshot: args.snapshot, flowId: args.flowId }),
-  };
-  if (cardKind === undefined) return context;
-
-  const stepId = args.req.stepId ?? args.metadata?.stepId;
-  if (typeof stepId === "string" && stepId !== "") context.stepId = stepId;
-  if (typeof args.metadata?.toolCallId === "string" && args.metadata.toolCallId !== "") {
-    context.toolCallId = args.metadata.toolCallId;
-  }
-  if (typeof args.metadata?.turnId === "string" && args.metadata.turnId !== "") {
-    context.turnId = args.metadata.turnId;
-  }
-
-  const artifacts = await judgeArtifactsForCard({
-    projectRoot: args.projectRoot,
-    flowId: args.flowId,
-    cardKind,
-    governanceFunction: args.trioSpec.function,
-  });
-  if (Object.keys(artifacts).length > 0) context.artifacts = artifacts;
-
-  if (cardKind === "appointment") {
-    // 2026-10-22 第 1 项：推荐集来源改为**团队计划**（legacy 提名仅旧流程回落，O4）。
-    const planPath = artifacts.teamPlanPath ?? artifacts.nominationPath;
-    if (planPath !== undefined) {
-      try {
-        const text = await readFile(path.join(args.projectRoot, ...planPath.split("/")), "utf8");
-        const recommended = parseRecommendedRoleIds(text);
-        if (recommended !== undefined) context.recommendedRoleIds = recommended;
-        // 2026-10-22 角色粒度/MapReduce：把团队计划 schema/模块摘要放进 facts（可选；不新增 artifact kind）。
-        // 只是机器摘要，**不**代表应用已做粒度语义判断（语义复核仍在 Convener readiness）。
-        const parsedPlan = parseTeamPlan(text);
-        const boundedModules = parsedPlan.modules.slice(0, 20).map((module) => module.slice(0, 64));
-        const boundedDirectories = parsedPlan.directories.slice(0, 20).map((dir) => dir.slice(0, 96));
-        context.facts = {
-          ...context.facts,
-          teamPlanSchema: parsedPlan.teamPlanSchema,
-          ...(boundedModules.length > 0 ? { teamPlanModules: boundedModules } : {}),
-          ...(boundedDirectories.length > 0 ? { teamPlanDirectories: boundedDirectories } : {}),
-        };
-      } catch {
-        // 团队计划不可读 ⇒ 不提供推荐集（driver 回落 manual/insufficient-evidence）。
-      }
-    }
-  }
-  if (cardKind === "acceptance" && artifacts.changePackagePath !== undefined) {
-    // 2026-10-22 第 3 项：把变更包档位放进 facts（判断/报告核对档位用；不采信模型自报）。
-    try {
-      const text = await readFile(path.join(args.projectRoot, ...artifacts.changePackagePath.split("/")), "utf8");
-      const tier = changePackageRiskTier(text);
-      if (tier !== undefined) context.facts = { ...context.facts, riskTier: tier };
-    } catch {
-      // 不可读 ⇒ 不提供档位（driver 按缺失证据回落 manual）。
-    }
-  }
-
-  // 写根/禁写：只读事实；不做第二份判定（判定仍由 driver 的机械复核与门禁完成）。
-  context.allowedPathRoots = args.boundary.entries
-    .filter((entry) => entry.root === "project")
-    .map((entry) => normalizeLexical(entry.path))
-    .filter((entry) => entry !== "" && entry !== ".");
-  context.forbiddenPaths = [...args.trioSpec.forbiddenWritePaths];
-
-  if (args.req.kind === "confirm") {
-    // 2026-10-18 真机修复：候选路径**优先取显式 `req.paths`**（运行时核心新增；空数组视为未给）；
-    // 未给时回退 preview 的「一行一个路径」声明，**不从散文扫描**——预览里提到的 src/**、test/**、
-    // data/ledger.json 等不是本次写入目标，不应变成越界 probe。
-    const candidates = explicitConfirmPaths(args.req) ?? declaredWritePathsFromPreview(args.req.preview ?? "");
-    context.paths = candidates;
-    context.pathProbes = candidates.map((candidate) => {
-      let allowed = false;
-      let reason: string | undefined;
-      try {
-        const decision = resolveWrite(
-          candidate,
-          args.boundary,
-          { writeSet: [candidate], conditions: args.conditions },
-          { skillRoot: args.skillRoot, projectRoot: args.projectRoot },
-        );
-        allowed = decision.allowed === true;
-        if (decision.allowed !== true) reason = truncateText(decision.reason, 512);
-      } catch (err) {
-        reason = truncateText(errText(err), 512);
-      }
-      return { path: candidate, allowed, ...(reason !== undefined ? { reason } : {}) };
-    });
-  }
-
-  return context;
-}
-
-/** 预授权/角色边界目录下的 artifact 扫描结果（项目相对 posix 路径 + 应用算的 sha256）。 */
-interface ObservedArtifact {
-  relPath: string;
-  sha256: string;
-}
-
-/** 项目角色 artifact 观察允许的扩展名（代码/文档/样式/图片；至少覆盖链路证据常见文件）。 */
-const PROJECT_ARTIFACT_EXTENSIONS: ReadonlySet<string> = new Set([
-  ".md", ".js", ".mjs", ".cjs", ".json", ".html", ".css", ".txt", ".yaml", ".yml",
-  ".png", ".jpg", ".jpeg", ".webp", ".svg",
-]);
-/** 项目角色单文件观察上限（超过只记诊断、不读不记 sha）。 */
-const PROJECT_ARTIFACT_MAX_BYTES = 2 * 1024 * 1024;
-/** 项目角色 artifact 观察排除的路径段（应用私有/治理产物/依赖/版本库）。 */
-const PROJECT_ARTIFACT_SKIP_SEGMENTS: ReadonlySet<string> = new Set([".ans", "角色卡", "node_modules", ".git"]);
-/** 图片类扩展不做 NUL 二进制探测（它们本来就是二进制，但属于合法物证）。 */
-const PROJECT_ARTIFACT_IMAGE_EXTENSIONS: ReadonlySet<string> = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg"]);
-
-/** 规范化项目相对路径；空/绝对/`..`/含空段 ⇒ undefined。 */
-function normalizeArtifactRel(raw: string): string | undefined {
-  const rel = raw.replace(/\\/g, "/").replace(/\/+$/, "").trim();
-  if (rel === "" || rel === "." || rel.startsWith("/") || rel.startsWith("../")) return undefined;
-  if (rel.split("/").some((segment) => segment === "" || segment === "." || segment === "..")) return undefined;
-  return rel;
-}
-
-/** 排除应用私有/治理产物/依赖/版本库路径（任一路径段命中即排除）+ `docs/audit/`。 */
-function isSkippedArtifactRel(rel: string): boolean {
-  if (rel === "docs/audit" || rel.startsWith("docs/audit/")) return true;
-  return rel.split("/").some((segment) => PROJECT_ARTIFACT_SKIP_SEGMENTS.has(segment));
-}
-
-function artifactExtension(rel: string): string {
-  const base = rel.split("/").pop() ?? "";
-  const index = base.lastIndexOf(".");
-  return index === -1 ? "" : base.slice(index).toLowerCase();
-}
-
-/** 明显二进制探测（前 8KiB 含 NUL）；图片扩展豁免。 */
-function looksBinaryArtifact(data: Buffer, rel: string): boolean {
-  if (PROJECT_ARTIFACT_IMAGE_EXTENSIONS.has(artifactExtension(rel))) return false;
-  return data.subarray(0, Math.min(data.length, 8192)).includes(0);
-}
-
-/**
- * 2026-10-20：artifact 观察目录。
- * - 内置治理角色：沿用注册表 `preauthorizedDirs`（既有行为逐字不变）；
- * - 项目角色：boundary Section 1 中 `kind:"directory"` 且 `root:"project"` 的目录（tester 的 `test/`、
- *   `scripts/`，backend 的 `src/`，frontend 的 `public/` 等）；与 `preauthorizedDirs` 去重合并。
- * 安全排除：`.ans/`、`角色卡/`、`node_modules/`、`.git/`、`docs/audit/`、空/绝对/`..` 路径。
- */
-function artifactScanDirsFor(
-  role: ResolvedRole,
-  preauthorizedDirs: readonly string[],
-  builtInGovernance: boolean,
-): string[] {
-  const dirs = new Set<string>();
-  const add = (raw: string): void => {
-    const rel = normalizeArtifactRel(raw);
-    if (rel === undefined || isSkippedArtifactRel(rel)) return;
-    dirs.add(rel);
-  };
-  for (const dir of preauthorizedDirs) add(dir);
-  if (!builtInGovernance) {
-    for (const entry of role.boundary.entries) {
-      if (entry.kind !== "directory" || entry.root !== "project") continue;
-      add(entry.path);
-    }
-  }
-  return [...dirs];
-}
-
-/** 项目角色 boundary 显式 `kind:"file"` 条目（如 README.md、package.json）；排除私有/治理路径。 */
-function artifactScanFilesFor(role: ResolvedRole): string[] {
-  const files = new Set<string>();
-  for (const entry of role.boundary.entries) {
-    if (entry.kind !== "file" || entry.root !== "project") continue;
-    const rel = normalizeArtifactRel(entry.path);
-    if (rel !== undefined && !isSkippedArtifactRel(rel)) files.add(rel);
-  }
-  return [...files];
-}
-
-/**
- * 2026-10-20 项目角色 artifact 扫描：
- *   · boundary directory 递归（扩展名白名单；不再只 `.md`）；
- *   · boundary file 条目按路径收录（如 README.md / package.json）；
- *   · 跳过符号链接、`.ans/`/`角色卡/`/`node_modules/`/`.git/`/`docs/audit/`；
- *   · 单文件 >2MiB 或明显二进制（文本扩展名含 NUL）跳过并记诊断；
- *   · 按路径排序、去重；应用算 sha256。
- */
-async function scanProjectRoleArtifacts(
-  projectRoot: string,
-  dirs: readonly string[],
-  files: readonly string[],
-  log: ReturnType<typeof createDiagnosticLogger>,
-): Promise<ObservedArtifact[]> {
-  const out: ObservedArtifact[] = [];
-  const seen = new Set<string>();
-
-  const record = async (rel: string, allowAnyExtension: boolean): Promise<void> => {
-    if (seen.has(rel) || isSkippedArtifactRel(rel)) return;
-    if (!allowAnyExtension && !PROJECT_ARTIFACT_EXTENSIONS.has(artifactExtension(rel))) return;
-    const abs = path.join(projectRoot, ...rel.split("/"));
-    let info;
-    try {
-      info = await lstat(abs);
-    } catch {
-      return;
-    }
-    if (!info.isFile() || info.isSymbolicLink()) return;
-    if (info.size > PROJECT_ARTIFACT_MAX_BYTES) {
-      log.record("governance.artifact.skipped", { path: rel, reason: "too-large", size: info.size });
-      return;
-    }
-    let data: Buffer;
-    try {
-      data = await readFile(abs);
-    } catch {
-      return;
-    }
-    if (looksBinaryArtifact(data, rel)) {
-      log.record("governance.artifact.skipped", { path: rel, reason: "binary" });
-      return;
-    }
-    seen.add(rel);
-    out.push({ relPath: rel, sha256: createHash("sha256").update(data).digest("hex") });
-  };
-
-  const walk = async (absDir: string, relDir: string): Promise<void> => {
-    let entries;
-    try {
-      entries = await readdir(absDir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const rel = relDir === "" ? entry.name : `${relDir}/${entry.name}`;
-      if (entry.isSymbolicLink() || isSkippedArtifactRel(rel)) continue;
-      if (entry.isDirectory()) {
-        await walk(path.join(absDir, entry.name), rel);
-        continue;
-      }
-      if (!entry.isFile()) continue;
-      await record(rel, false);
-    }
-  };
-
-  for (const dir of dirs) {
-    const relDir = normalizeArtifactRel(dir);
-    if (relDir === undefined) continue;
-    const abs = path.join(projectRoot, ...relDir.split("/"));
-    try {
-      const info = await stat(abs);
-      if (!info.isDirectory()) continue;
-    } catch {
-      continue;
-    }
-    await walk(abs, relDir);
-  }
-  for (const rel of files) await record(rel, true);
-  return out.sort((a, b) => a.relPath.localeCompare(b.relPath));
-}
-
-/**
- * 扫描预授权/角色边界目录内的 `.md`（评审 §5.7：`artifact.observed` 只扫角色可写目录，不扫 `角色卡/` 全树）。
- * 跳过符号链接（防经链接逃逸），按路径排序保证顺序稳定。
- */
-async function scanPreauthorizedArtifacts(
-  projectRoot: string,
-  dirs: readonly string[],
-): Promise<ObservedArtifact[]> {
-  const out: ObservedArtifact[] = [];
-  const seen = new Set<string>();
-  const walk = async (absDir: string, relDir: string): Promise<void> => {
-    let entries;
-    try {
-      entries = await readdir(absDir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const rel = relDir === "" ? entry.name : `${relDir}/${entry.name}`;
-      if (entry.isSymbolicLink()) continue;
-      if (entry.isDirectory()) {
-        await walk(path.join(absDir, entry.name), rel);
-        continue;
-      }
-      if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".md")) continue;
-      if (seen.has(rel)) continue;
-      seen.add(rel);
-      try {
-        const data = await readFile(path.join(projectRoot, ...rel.split("/")));
-        out.push({ relPath: rel, sha256: createHash("sha256").update(data).digest("hex") });
-      } catch {
-        /* 读失败：跳过本次观察（下次 settle 再试） */
-      }
-    }
-  };
-  for (const dir of dirs) {
-    const relDir = dir.replace(/\\/g, "/").replace(/\/+$/, "");
-    if (relDir === "") continue;
-    const abs = path.join(projectRoot, ...relDir.split("/"));
-    try {
-      const info = await stat(abs);
-      if (!info.isDirectory()) continue;
-    } catch {
-      continue;
-    }
-    await walk(abs, relDir);
-  }
-  return out.sort((a, b) => a.relPath.localeCompare(b.relPath));
-}
-
-/** 从候选物路径推导报告用的 flowId / 版本（只用于账本留痕；不做任何门禁判定）。 */
-function artifactFlowMetadata(relPath: string): Pick<GovernanceLedgerEntry, "flowId" | "artifactVersion"> {
-  const proposal = /^docs\/(?:proposals|nominations)\/(.+?)(?:\.(?:proposal|nomination))?-v(\d+)\.md$/.exec(relPath);
-  if (proposal !== null && isGovernanceFlowId(proposal[1])) {
-    return { flowId: proposal[1], artifactVersion: Number(proposal[2]) };
-  }
-  const flow = /^docs\/flows\/(.+)\.(?:md|ya?ml)$/.exec(relPath);
-  if (flow !== null && isGovernanceFlowId(flow[1])) return { flowId: flow[1] };
-  return {};
-}
-
-/**
- * D-1：会话自持目录的**约定路径**，`<projectRoot>/.ans/sessions/<roleId>/`（含尾分隔符）。
- * 不满足前置（projectRoot 为空 / roleId 为空、含路径分隔符或 `..`）→ `undefined`（不持久化，旧行为）。
- * **本函数只算路径**；目录的创建归适配器（见 `AdapterCapabilities.sessionDir` 注释）。
- */
 function sessionDirFor(projectRoot: string, roleId: string, runtime?: RuntimeKind): string | undefined {
   if (typeof projectRoot !== "string" || projectRoot.trim() === "") return undefined;
   if (roleId === "" || roleId.includes("/") || roleId.includes("\\") || roleId.includes("..")) return undefined;
@@ -3851,35 +1997,11 @@ export function createRuntimeAdapterFactory(
     // 类型/大小校验在工具层，能力侧只负责排队并如实回执；不改变任何写权。
     viewImage: capabilities?.viewImage,
     dispatchTask: capabilities?.dispatchTask,
-    // 2026-10-25 独立复核请求（request_acceptance）：运行时核心 `GovernedToolsOptions` 同名能力位
-    // （形状同源 `model/runtime.ts`）；`undefined` ⇒ 工具不注册（同 dispatch_task 先例）。
-    requestAcceptance: capabilities?.requestAcceptance,
-    // 2026-10-26 gate 复核请求（request_gate_review）：运行时核心 `GovernedToolsOptions` 同名能力位
-    // （形状同源 `model/runtime.ts` `RequestGateReviewFn`）；`undefined` ⇒ 工具不注册
-    // （同 request_acceptance 先例）。本层纯透传，不做 gate 校验/派发/记录。
-    requestGateReview: capabilities?.requestGateReview,
-    // 2026-10-26 边界变更请求（request_boundary_change）：运行时核心 `GovernedToolsOptions` 同名能力位
-    // （形状同源 `model/runtime.ts`）；条件展开透传，缺省/未注入 ⇒ 字段缺席、工具不注册
-    // （同 flow_get 先例）。本层纯透传，不做确定性校验/AI 门禁/派发。
-    ...(capabilities?.requestBoundaryChange !== undefined
-      ? { requestBoundaryChange: capabilities.requestBoundaryChange }
-      : {}),
-    // W6-A：意图交接/澄清两能力并入适配器选项——**契约字段名** `handOffIntent` /
-    // `requestClarification`（运行时核心 `GovernedToolsOptions` 同名能力位，形状同源
-    // `model/runtime.ts`）；`undefined` ⇒ 对应工具不注册（最弱接触面，同 dispatch_task 先例）。
-    handOffIntent: capabilities?.handOffIntent,
-    requestClarification: capabilities?.requestClarification,
     // 2026-10-26 需求变更申请（request_requirement_change）：运行时核心 `GovernedToolsOptions` 同名
     // 能力位（形状同源 `model/runtime.ts` `RequestRequirementChangeFn`）；`undefined` ⇒ 工具不注册
-    // （能力缺席 = 最强 fail-closed，同 request_clarification 先例）。本层纯透传——意图校验/去重/
+    // （能力缺席 = 最强 fail-closed）。本层纯透传——意图校验/去重/
     // 派发/账本由能力实现；**提交申请 ≠ 客户批准 ≠ 意图已变更**。
     requestRequirementChange: capabilities?.requestRequirementChange,
-    // 2026-10-27 验收标准产物汇报（report_artifact_ready）：运行时核心 `GovernedToolsOptions` 同名
-    // 能力位（形状同源 `model/runtime.ts` `ReportArtifactFn`）；**显式字段**（非条件展开）——未注入时
-    // 置 undefined，覆盖 `deps.runtimeOptions` 可能残留的同名值，保证非 verifier 会话不能经依赖选项
-    // 旁路拿到能力。未注入 ⇒ 工具不注册（能力缺席 = 最强 fail-closed，同 request_acceptance 先例）。
-    // 本层纯透传——路径/步骤/哈希校验与是否收口由能力实现；**汇报成功 ≠ 自动完成**。
-    reportArtifact: capabilities?.reportArtifact,
     // G-2/R1-R2：看护三能力并入适配器选项——**契约字段名** `roleStatus` / `sessionTail` /
     // `proposeRecovery`（运行时核心 `GovernedToolsOptions` 同名能力位，形状同源 `model/runtime.ts`）；
     // `undefined` ⇒ 对应工具不注册（能力缺席 = 最强 fail-closed，同 dispatch_task 先例）。
@@ -3888,7 +2010,6 @@ export function createRuntimeAdapterFactory(
     roleActivityLog: capabilities?.roleActivityLog,
     terminateRoleRun: capabilities?.terminateRoleRun,
     redispatchTask: capabilities?.redispatchTask,
-    proposeRecovery: capabilities?.proposeRecovery,
     // G-4/I1-I2：技能安装/卸载两能力并入适配器选项——**契约字段名** `installSkill` / `uninstallSkill`
     // （运行时核心 `GovernedToolsOptions` 同名能力位，形状同源 `model/runtime.ts`）；
     // `undefined` ⇒ 对应工具不注册（能力缺席 = 最强 fail-closed，同 dispatch_task 先例）。
@@ -3909,11 +2030,6 @@ export function createRuntimeAdapterFactory(
     governanceJudge: capabilities?.governanceJudge ?? options.governanceJudge,
     shellGate: capabilities?.shellGate ?? options.shellGate,
     shellVerdict: capabilities?.shellVerdict,
-    // 2026-10-20 Flow 文件方法化：运行时核心 `GovernedToolsOptions` 同名能力位（未注入 ⇒ 对应工具不注册）。
-    // 以 spread 并入，运行时核心补齐类型前后均可透传（buildGovernedTools 读 options 同名键）。
-    ...(capabilities?.flowGet !== undefined ? { flowGet: capabilities.flowGet } : {}),
-    ...(capabilities?.flowStepUpdate !== undefined ? { flowStepUpdate: capabilities.flowStepUpdate } : {}),
-    ...(capabilities?.flowStepSupersede !== undefined ? { flowStepSupersede: capabilities.flowStepSupersede } : {}),
   });
 }
 

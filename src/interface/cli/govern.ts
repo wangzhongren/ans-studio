@@ -123,7 +123,7 @@ export async function governCommand(argv: string[], deps?: GovernDeps): Promise<
   //   · 其余值 ⇒ 沿用旧语义「本次要创建/重构的项目角色 id」（targetRoleIds，scope 可写集来源）。
   //   两者混用（多个值且含内置 id）→ 用法错误，不静默择一。
   //   **CLI 收窄（AC21）**：`--function liaison` 在参数解析处显式拒绝；`--role liaison` 也在此显式拒绝——
-  //   联络官的 `hand_off_intent` 需要桌面后台投递，CLI 单进程没有这条路径，半可用的主入口比不提供更危险。
+  //   联络官的 `意图交接` 需要桌面后台投递，CLI 单进程没有这条路径，半可用的主入口比不提供更危险。
   const builtInSelections = parsed.roleIds.filter((id) => isBuiltInGovernanceRoleId(id));
   if (builtInSelections.length > 0 && parsed.roleIds.length > 1) {
     process.stderr.write(

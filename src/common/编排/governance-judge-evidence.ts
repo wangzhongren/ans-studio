@@ -36,25 +36,18 @@ import path, { sep } from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { CustomerInputRequest, GovernanceJudgeRequest } from "../../model/runtime.ts";
 import { declaredPathBodies } from "./confirmed-writes.ts";
-import { intentArtifactPath } from "./governance-handoff.ts";
+import { intentArtifactPath } from "./governance-judge-intent.ts";
 import {
-  buildGovernanceJudgeFacts,
   declaredWritePathsFromPreview,
   isGovernanceJudgeFlowId,
-  parseFlowSteps,
-  parseRecommendedRoleIds,
   requiredArtifactPaths,
 } from "./governance-judge-facts.ts";
 import {
-  intentConfirmedByLedger,
   resolveIntentReference,
   summarizeIntent,
   type DecisionIntentSummary,
 } from "./governance-judge-intent.ts";
-import type { GovernanceLedgerEntry } from "./governance-ledger.ts";
-import { readGovernanceLedger } from "./governance-ledger.ts";
 import { isHardForbiddenPath } from "./governance-judge-verdict.ts";
-import { parseFlowStateYaml } from "./flow-state.ts";
 
 // —————————————————————— 有界常量 ——————————————————————
 
@@ -90,7 +83,6 @@ const REQUESTER_TURN_TEXT_MAX_BYTES = 4 * 1024;
 
 /**
  * 物证种类。2026-10-22 治理分工第 1/3/5 项新增：
- *   · `team-plan`（团队计划 `docs/scheduling/<flowId>-team-vN.md`，第 1 项）；
  *   · `acceptance-criteria` / `acceptance-report`（验收标准/报告，第 3 项）；
  *   · `change-package`（变更包，第 3 项）。
  * `nomination` 保留为 legacy（旧流程 O4 一次性过渡回落）。
@@ -98,7 +90,6 @@ const REQUESTER_TURN_TEXT_MAX_BYTES = 4 * 1024;
 export type EvidenceArtifactKind =
   | "proposal"
   | "nomination"
-  | "team-plan"
   | "flow"
   | "acceptance-criteria"
   | "acceptance-report"
@@ -595,37 +586,11 @@ function flowIdFromPath(relPath: string): string {
 }
 
 function extractFlowExcerpts(text: string, relPath: string): EvidenceExcerpt[] {
+  // D 批：flow YAML 机器状态已撤除；流程/计划文件按纯文本人读材料取有界摘录。
   const collector = createExcerptCollector(2 * 1024);
-  if (isFlowYamlPath(relPath)) {
-    // 2026-10-19 Flow YAML 契约：机器状态按 `parseFlowStateYaml` 解析，给出有界结构化摘要；
-    // 不再把 YAML 当 Markdown 表塞进「流程单（未解析）」。
-    const parsed = parseFlowStateYaml(text, flowIdFromPath(relPath));
-    if (parsed.ok) {
-      const summary = [
-        `flowId: ${parsed.flow.flowId}`,
-        `version: ${parsed.flow.version}`,
-        `qualityTier: ${parsed.flow.qualityTier}`,
-        ...parsed.flow.steps.slice(0, 50).map((step) =>
-          `- ${step.id} | ${step.kind} | ${step.status}` +
-          (step.evidence !== undefined ? ` | evidence: ${step.evidence.kind}:${step.evidence.ref}` : ""),
-        ),
-      ].join("\n");
-      collector.push(excerptOf("流程状态 YAML", summary, DECISION_EVIDENCE_EXCERPT_MAX_BYTES));
-    } else {
-      const detail = parsed.errors.slice(0, 8).map((error) => `${error.path}: ${error.message}`).join("\n");
-      collector.push(
-        excerptOf("流程状态 YAML（校验失败）", `${detail}\n\n${text}`, DECISION_EVIDENCE_EXCERPT_MAX_BYTES),
-      );
-    }
-    return collector.excerpts;
-  }
-  // legacy Markdown 流程单：行为逐字不变。
   const frontmatter = frontmatterExcerpt(text);
   if (frontmatter !== undefined) collector.push(frontmatter);
-  const parsed = parseFlowSteps(text);
-  if (!parsed.wellFormed) {
-    collector.push(excerptOf("流程单（未解析）", text, DECISION_EVIDENCE_EXCERPT_MAX_BYTES));
-  }
+  collector.push(excerptOf(relPath, text, DECISION_EVIDENCE_EXCERPT_MAX_BYTES));
   return collector.excerpts;
 }
 
@@ -768,7 +733,7 @@ interface Conflict {
 }
 
 function isWriteCardKind(cardKind: string): boolean {
-  return cardKind === "write" || cardKind === "appointment-write" || cardKind === "schedule-write";
+  return cardKind === "appointment-write";
 }
 
 /** decision 组（只判意图漂移）：proposal / appointment / acceptance。
@@ -805,11 +770,11 @@ function artifactRequired(
 
 const PROBLEM_PRIORITY: readonly string[] = [
   "artifact-missing",
-  "flow-state-invalid",
+  "removedFlowState-invalid",
   "intent-missing",
   "intent-ambiguous",
   "intent-unconfirmed",
-  "ledger-unavailable",
+  "facts-unavailable",
   "path-outside-boundary",
   "path-unverified",
   "insufficient-evidence",
@@ -836,27 +801,6 @@ function requesterOptions(card: CustomerInputRequest): Array<{ id: string; label
     // 其余卡种不带该字段时包体与旧版逐字一致（向后兼容）。
     ...(option.recommended === true ? { recommended: true } : {}),
   }));
-}
-
-function ledgerFlowEntries(entries: readonly GovernanceLedgerEntry[], flowId: string): Array<Record<string, unknown>> {
-  const out: Array<Record<string, unknown>> = [];
-  for (const entry of entries) {
-    if (entry.flowId !== flowId) continue;
-    const summary: Record<string, unknown> = {
-      at: boundedTextOrRaw(entry.at, 40),
-      kind: boundedTextOrRaw(entry.kind, 40),
-      actorRoleId: boundedTextOrRaw(entry.actorRoleId, 128),
-      power: boundedTextOrRaw(entry.power, 32),
-    };
-    if (entry.decisionKind !== undefined) summary.decisionKind = boundedTextOrRaw(entry.decisionKind, 64);
-    if (entry.customerDecision !== undefined) summary.customerDecision = boundedTextOrRaw(entry.customerDecision, 32);
-    if (entry.stepId !== undefined) summary.stepId = boundedTextOrRaw(entry.stepId, 128);
-    if (entry.targetRoleIds !== undefined) summary.targetRoleIds = entry.targetRoleIds.slice(0, 20).map((id) => boundedTextOrRaw(id, 128));
-    if (entry.artifactPath !== undefined) summary.artifactPath = boundedTextOrRaw(entry.artifactPath, 256);
-    if (entry.paths !== undefined) summary.paths = entry.paths.slice(0, 20).map((item) => boundedTextOrRaw(item, 256));
-    out.push(summary);
-  }
-  return out.slice(Math.max(0, out.length - DECISION_EVIDENCE_LEDGER_ENTRY_LIMIT));
 }
 
 function sameStringArray(left: readonly string[] | undefined, right: readonly string[] | undefined): boolean {
@@ -1024,7 +968,6 @@ function artifactExcerpts(kind: EvidenceArtifactKind, text: string, relPath: str
       return extractProposalExcerpts(text);
     case "nomination":
       return extractNominationExcerpts(text);
-    case "team-plan":
       return extractTeamPlanExcerpts(text);
     case "flow":
       return extractFlowExcerpts(text, relPath);
@@ -1154,17 +1097,7 @@ async function buildInner(input: {
   const artifacts = request.artifacts ?? {};
   const pickArtifactPath = (value: unknown): string | undefined =>
     typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
-  const teamPlanPath = pickArtifactPath(artifacts.teamPlanPath);
-  /** legacy：旧提名文件（仅旧流程过渡回落；新流程不产生）。 */
-  const nominationPath = pickArtifactPath(artifacts.nominationPath);
-  const planKind: EvidenceArtifactKind = teamPlanPath !== undefined ? "team-plan" : "nomination";
-  const planPath = teamPlanPath ?? nominationPath;
-  const planRequired =
-    (request.cardKind === "appointment" || request.cardKind === "appointment-write") && planPath !== undefined;
   addSpec("proposal", artifacts.proposalPath, artifactRequired(request.cardKind, "proposal"));
-  // 计划物证（第 1 项）：团队计划优先；仅 legacy 流程回落提名文件（O4）。
-  if (planPath !== undefined) addSpec(planKind, planPath, planRequired);
-  addSpec("flow", artifacts.flowPath, artifactRequired(request.cardKind, "flow"));
   // 第 3 项：验收标准/报告/变更包。
   addSpec(
     "acceptance-criteria",
@@ -1225,45 +1158,9 @@ async function buildInner(input: {
       bytes: fact.bytes,
       excerpts: artifactExcerpts(spec.kind, fact.text, spec.path),
     };
-    if (spec.kind === "nomination" || spec.kind === "team-plan") {
-      // 推荐集统一复用 `parseRecommendedRoleIds`（不写第二份 parser）；团队计划必须内联数组/固定行，
-      // 块数组解析为空 ⇒ 推荐集缺失，由 driver 回落 manual（不静默接受空集）。
-      const recommended = parseRecommendedRoleIds(fact.text);
-      if (recommended !== undefined) entry.recommendedRoleIds = recommended;
-    }
     if (spec.kind === "flow") {
-      // 2026-10-19 Flow YAML 契约：`.yaml|.yml` 是唯一机器状态——按文件名 flowId 复用
-      // `parseFlowStateYaml`（不复制第二份解析器）；非法时给具体 path+message（flow-state-invalid），
-      // 不再笼统报「缺少可解析的步骤表」。`.md` legacy 分支逐字不变。
-      if (isFlowYamlPath(spec.path)) {
-        const fileFlowId = flowIdFromPath(spec.path);
-        if (fileFlowId !== request.flowId) {
-          problems.push({
-            code: "flow-state-invalid",
-            detail: `流程 YAML 文件名 flowId=${fileFlowId} 与卡片 flowId=${request.flowId} 不一致：${spec.path}`,
-          });
-        } else {
-          const parsed = parseFlowStateYaml(fact.text, fileFlowId);
-          if (parsed.ok) {
-            entry.steps = parsed.flow.steps.slice(0, 50).map((step) => ({
-              id: truncateUtf8(step.id, 128),
-              status: truncateUtf8(step.status, 256),
-            }));
-          } else {
-            const detail = parsed.errors.slice(0, 8).map((error) => `${error.path}: ${error.message}`).join("；");
-            problems.push({
-              code: "flow-state-invalid",
-              detail: `流程 YAML 校验失败（${spec.path}）：${detail}`,
-            });
-          }
-        }
-      } else {
-        const parsed = parseFlowSteps(fact.text);
-        if (parsed.wellFormed) entry.steps = parsed.steps.slice(0, 50).map((step) => ({
-          id: truncateUtf8(step.id, 128),
-          status: truncateUtf8(step.status, 256),
-        }));
-      }
+      // D 批：不再解析/校验 flow YAML；仅保留有界文本摘录（人读材料）。
+      entry.steps = [];
     }
     if (spec.kind === "boundary") {
       entry.boundaryEntries = extractBoundaryEntries(fact.text);
@@ -1287,45 +1184,10 @@ async function buildInner(input: {
     });
   }
 
-  // —— 账本机械事实（重新读盘，与请求 facts 对账）——
-  let ledgerEntries: GovernanceLedgerEntry[] = [];
-  let ledgerErrors = 0;
-  let freshFacts;
-  try {
-    const ledger = await readGovernanceLedger(projectRoot);
-    ledgerEntries = ledger.entries;
-    ledgerErrors = ledger.errors.length;
-    freshFacts = buildGovernanceJudgeFacts({ snapshot: { entries: ledger.entries, errors: ledger.errors }, flowId: request.flowId });
-  } catch (err) {
-    problems.push({ code: "ledger-unavailable", detail: `治理账本不可读：${err instanceof Error ? err.message : String(err)}` });
-    freshFacts = undefined;
-  }
-  if (freshFacts !== undefined && request.facts !== undefined) {
-    if (request.facts.ledgerErrors !== ledgerErrors) {
-      conflicts.push({
-        code: "ledger-errors-drift",
-        detail: `请求 facts.ledgerErrors=${request.facts.ledgerErrors} 与重读账本错误数=${ledgerErrors} 不一致`,
-      });
-    }
-    if (freshFacts.proposalDecision !== request.facts.proposalDecision) {
-      conflicts.push({
-        code: "ledger-proposal-decision-drift",
-        detail: `请求 facts.proposalDecision=${String(request.facts.proposalDecision)} 与重读账本=${String(freshFacts.proposalDecision)} 不一致`,
-      });
-    }
-    if (!sameStringArray(freshFacts.appointmentTargetRoleIds, request.facts.appointmentTargetRoleIds)) {
-      conflicts.push({
-        code: "ledger-appointment-drift",
-        detail: `请求 facts.appointmentTargetRoleIds=${JSON.stringify(request.facts.appointmentTargetRoleIds ?? [])} 与重读账本=${JSON.stringify(freshFacts.appointmentTargetRoleIds ?? [])} 不一致`,
-      });
-    }
-    if (freshFacts.unresolvedClarificationCount !== request.facts.unresolvedClarificationCount) {
-      conflicts.push({
-        code: "ledger-clarification-drift",
-        detail: `请求 facts.unresolvedClarificationCount=${request.facts.unresolvedClarificationCount} 与重读账本=${freshFacts.unresolvedClarificationCount} 不一致`,
-      });
-    }
-  }
+  // —— D 批：账本已撤除；事实只来自请求方注入的 `facts`（tasks.jsonl/context 的只读投影）——
+  const ledgerErrors = 0;
+  const freshFacts = request.facts;
+  const ledgerEntries: never[] = [];
 
   // —— decision 组的意图基准（2026-10-19 客户定位修正）——
   // 只判「是否偏离客户已确认的意图」：意图文件缺失/歧义/未经客户确认 ⇒ 直接 fail-closed，
@@ -1334,7 +1196,7 @@ async function buildInner(input: {
   if (isDecisionCardKind(request.cardKind)) {
     const resolved = resolveIntentReference({
       flowId: request.flowId,
-      ledgerEntries,
+      ...(typeof (request as unknown as { intentId?: unknown }).intentId === "string" ? { intentId: (request as unknown as { intentId: string }).intentId } : {}),
       ...(proposalText !== undefined ? { proposalText } : {}),
     });
     if (!resolved.ok) {
@@ -1349,18 +1211,12 @@ async function buildInner(input: {
         if (!summarized.ok) {
           problems.push({ code: summarized.reasonCode, detail: summarized.detail });
         } else {
-          const confirmed = intentConfirmedByLedger(ledgerEntries, request.flowId, resolved.reference.intentId);
-          if (!confirmed) {
-            problems.push({
-              code: "intent-unconfirmed",
-              detail: `意图文件 ${rel} 没有客户已确认的 intent-confirm accepted 决定`,
-            });
-          }
+          // D 批：decision 卡由应用/客户在申请通道直接裁决；意图文件存在即作为判断基准。
           intent = {
             ...summarized.summary,
             sha256: fact.sha256,
             bytes: fact.bytes,
-            confirmed,
+            confirmed: true,
           };
         }
       }
@@ -1371,24 +1227,12 @@ async function buildInner(input: {
   const cardOptionIds = request.card.kind === "choice"
     ? request.card.options.map((option) => truncateUtf8(option.id, 128))
     : [];
-  // 推荐集来源：团队计划优先；仅旧流程回落 legacy 提名文件（O4）。
-  const planArtifact = evidence.find((entry) => entry.kind === "team-plan")
-    ?? evidence.find((entry) => entry.kind === "nomination");
-  const parsedRecommended = planArtifact?.recommendedRoleIds;
-  const planSourceLabel = planArtifact?.kind === "nomination" ? "提名文件（legacy）" : "团队计划";
+  // D 批：任命推荐集只来自请求上下文（无团队计划/提名文件重解析）。
   const requestRecommended = Array.isArray(request.recommendedRoleIds) ? request.recommendedRoleIds : undefined;
-  if (request.cardKind === "appointment" && requestRecommended !== undefined && parsedRecommended !== undefined) {
-    if (!sameStringArray(requestRecommended, parsedRecommended)) {
-      conflicts.push({
-        code: "recommended-roles-mismatch",
-        detail: `应用推荐集=${JSON.stringify(requestRecommended)} 与${planSourceLabel}重解析=${JSON.stringify(parsedRecommended)} 不一致`,
-      });
-    }
-  }
   if (request.cardKind === "appointment" && (requestRecommended === undefined || requestRecommended.length === 0)) {
     problems.push({
       code: "insufficient-evidence",
-      detail: `${planSourceLabel}缺少唯一的机器可读推荐集（frontmatter 内联数组 recommended: [id] 或固定行「推荐：id」）`,
+      detail: "任命材料缺少推荐集 recommendedRoleIds",
     });
   }
 
@@ -1396,16 +1240,7 @@ async function buildInner(input: {
   // 2026-10-19 定位修正：decision 组只判意图漂移；架构章节/工程质量/测试覆盖/证据充分性不归
   // 判断 agent（由 Draft/Proof 的工作流与验收负责），builder **不**做架构标题关键词硬门槛。
   // builder 只保证：意图文件 + goal/scope/acceptance 可解析、客户已确认；物证路径 + sha256 + 可提取片段存在。
-  if (request.cardKind === "acceptance") {
-    const flow = evidence.find((entry) => entry.kind === "flow");
-    if (flow !== undefined && (flow.steps === undefined || flow.steps.length === 0)) {
-      // YAML 的失败原因已由物证循环以 flow-state-invalid 具体登记（path+message）；此处只为 legacy
-      // Markdown 保留旧文案，避免 YAML-only 流程被误报成「缺少可解析的步骤表」。
-      if (!isFlowYamlPath(flow.path)) {
-        problems.push({ code: "insufficient-evidence", detail: "流程单缺少可解析的步骤表" });
-      }
-    }
-  }
+  // D 批：不再解析/校验 flow 步骤表（flow 机器已撤除）。
 
   const factsForPacket = freshFacts ?? (request.facts !== undefined
     ? {
@@ -1468,7 +1303,7 @@ async function buildInner(input: {
       })),
       targetFiles: declaredPathEvidence.map((entry) => ({ path: entry.path, ...entry.target })),
       ledger: {
-        path: ".ans/governance/ledger.jsonl",
+        path: "",
         errors: ledgerErrors,
         flowId: request.flowId,
         ...(factsForPacket.proposalDecision !== undefined ? { proposalDecision: factsForPacket.proposalDecision } : {}),
@@ -1477,11 +1312,11 @@ async function buildInner(input: {
           : {}),
         dispatchedStepIds: [...(factsForPacket.dispatchedStepIds ?? [])],
         unresolvedClarificationCount: factsForPacket.unresolvedClarificationCount,
-        flowEntries: ledgerFlowEntries(ledgerEntries, request.flowId),
+        flowEntries: [],
       },
       roles: {
         cardOptionIds,
-        ...(requestRecommended !== undefined ? { recommendedRoleIds: [...requestRecommended] } : (parsedRecommended !== undefined ? { recommendedRoleIds: [...parsedRecommended] } : {})),
+        ...(requestRecommended !== undefined ? { recommendedRoleIds: [...requestRecommended] } : {}),
         ...(appointmentTargets.length > 0 ? { appointmentTargetRoleIds: [...appointmentTargets] } : {}),
       },
     },

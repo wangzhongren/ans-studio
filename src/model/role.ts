@@ -39,7 +39,7 @@ export type GovernanceFunction =
   | "schedule"
   | "verification"
   /** @deprecated 批次 A 临时 shim（方案 §16.3），D 批删除；不进入注册表枚举/列表。 */
-  | "liaison";
+;
 
 /** 角色卡声明的协作信息，仅供展示；不授予权限或改变角色身份。 */
 export interface RoleGroupMetadata {

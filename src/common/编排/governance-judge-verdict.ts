@@ -59,9 +59,9 @@ const BUILT_IN_GOVERNANCE_ROLE_IDS: ReadonlySet<string> = new Set([
 const SOURCE_WRITE_ROOTS: Readonly<Record<string, readonly string[]>> = {
   rapporteur: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
   nominator: ["docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
-  convener: ["docs/flows/", "docs/workflow.md", "docs/scheduling/", "docs/governance/convener/"],
-  // 验收角色（verification）：标准/报告写入 docs/acceptance/，证据附件写入 docs/verification/。
-  verifier: ["docs/acceptance/", "docs/verification/", "docs/governance/verifier/"],
+  convener: ["docs/removed/", "docs/workflow.md", "docs/scheduling/", "docs/governance/convener/"],
+  // 验收角色（verification）：质量记录写入 docs/quality/，证据附件写入 docs/verification/。
+  verifier: ["docs/quality/", "docs/verification/", "docs/governance/verifier/"],
 };
 
 function writeSourceMatches(roleId: string, path: string): boolean {
@@ -80,9 +80,9 @@ function scheduleWriteMatches(flowId: string, path: string): boolean {
   return (
     normalized === "docs/workflow.md" ||
     // 2026-10-19 Flow YAML 契约：`.yaml` 是唯一机器状态；`.md` 旧版人读视图迁移兼容。
-    normalized === `docs/flows/${flowId}.yaml` ||
-    normalized === `docs/flows/${flowId}.yml` ||
-    normalized === `docs/flows/${flowId}.md`
+    normalized === `docs/removed/${flowId}.yaml` ||
+    normalized === `docs/removed/${flowId}.yml` ||
+    normalized === `docs/removed/${flowId}.md`
   );
 }
 
@@ -116,7 +116,7 @@ const SAFE_MANUAL_REASON_CODES: ReadonlySet<string> = new Set([
   "path-unverified",
   "path-outside-boundary",
   "group-mismatch",
-  "ledger-unavailable",
+  "facts-unavailable",
   // 2026-10-19 客户定位修正：decision 组只判意图漂移。
   "intent-drift",
   "intent-missing",
@@ -399,9 +399,9 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
     return manualOutcome(args, "group-mismatch", "判断结论的卡种与请求不一致；请修正后重新提交。");
   }
 
-  // 2) 账本事实不可读/有坏行 ⇒ 禁止 approve（fail-closed）。
-  if (request.facts === undefined || request.facts.ledgerErrors !== 0) {
-    return manualOutcome(args, "ledger-unavailable", "治理账本不可读或存在坏行，无法保证判断无损；请修复 .ans/governance/ledger.jsonl 后重新提交。");
+  // 2) 判断事实缺失 ⇒ 禁止 approve（fail-closed）。D 批不再有账本事实。
+  if (request.facts === undefined) {
+    return manualOutcome(args, "facts-unavailable", "判断事实不可用，无法保证判断无损；请由应用补充任务/申请上下文后重新提交。");
   }
 
   // 3) 读取损伤：approve 必须无损（与 shell judge 同口径；预算优先）。
@@ -492,7 +492,7 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
         return manualOutcome(args, "insufficient-evidence", "任命卡形状非法；请修正后重新提交。");
       }
       if (!Array.isArray(recommended) || recommended.length === 0 || new Set(recommended).size !== recommended.length) {
-        return manualOutcome(args, "insufficient-evidence", "团队计划缺少唯一的机器可读推荐集（内联数组 recommended 或固定行「推荐：」）；请补齐推荐集后重新提交。");
+        return manualOutcome(args, "insufficient-evidence", "任命材料缺少唯一的机器可读推荐集（内联数组 recommended 或固定行「推荐：」）；请补齐推荐集后重新提交。");
       }
       const optionIds = new Set(request.card.options.map((option) => option.id));
       if (!recommended.every((id) => optionIds.has(id))) {
@@ -516,9 +516,7 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
       }
       break;
     }
-    case "write":
-    case "appointment-write":
-    case "schedule-write": {
+    case "appointment-write": {
       if (verdict.confirmed !== true) {
         return manualOutcome(args, "not-recommended", "写盘卡未给出 confirmed:true；请修正后重新提交。");
       }
@@ -561,23 +559,14 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
         }
       }
 
-      // 来源匹配（评审 §7.3）：write 只能写来源角色写区；appointment-write 目标必须在最新任命名单
-      // 且非内置；schedule-write 必须匹配 flowId。
-      if (request.cardKind === "write") {
-        if (!paths.every((path) => writeSourceMatches(request.roleId, path))) {
-          return manualOutcome(args, "path-outside-boundary", "写盘路径与来源角色的写区不匹配；请改为来源角色写区内的路径后重新提交。");
-        }
-      } else if (request.cardKind === "appointment-write") {
+      // 来源匹配（D 批：仅 appointment-write）：目标必须在 D3/最新任命目标内且非内置。
+      {
         const appointed = new Set(request.facts.appointmentTargetRoleIds ?? []);
         for (const path of paths) {
           const target = appointmentWriteTarget(path);
           if (target === undefined || BUILT_IN_GOVERNANCE_ROLE_IDS.has(target) || !appointed.has(target)) {
             return manualOutcome(args, "path-outside-boundary", `路径 ${path} 不在最新任命名单内或指向内置治理角色；请改为已任命项目角色的角色卡路径后重新提交。`);
           }
-        }
-      } else if (request.cardKind === "schedule-write") {
-        if (!paths.every((path) => scheduleWriteMatches(request.flowId, path))) {
-          return manualOutcome(args, "path-outside-boundary", "流程写盘路径与 flowId 不一致；请改为 docs/flows/<flowId>.yaml 后重新提交。");
         }
       }
 
@@ -637,9 +626,7 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
   }
 
   // 只有真正的写盘确认卡才返回 confirmed:true；proposal/appointment/acceptance/intent-confirm 返回 selected。
-  const isConfirm = request.cardKind === "write"
-    || request.cardKind === "appointment-write"
-    || request.cardKind === "schedule-write";
+  const isConfirm = request.cardKind === "appointment-write";
   const paths = isConfirm ? uniquePaths(Array.isArray(request.paths) ? request.paths : []) : [];
   const pathDecisions = isConfirm
     ? (verdict.pathDecisions ?? []).map((decision) => {

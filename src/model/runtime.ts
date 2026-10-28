@@ -215,12 +215,11 @@ export interface FinalizeResult {
 //
 // 依据：PM 评审《治理三权分立——项目管理评审与 V1 拆发》（2026-10-17，
 // `角色卡/项目管理/docs/design/2026-10-17_design_governance-trio-review.md`）§5.8/§6.3。
-// 本模块**只定义中立形状**：流程标识、卡片种类、步骤状态与载荷。提案接受门、任命写入门、
-// 派发范围门、账本读取与判定都在编排（`common/编排/governance-gate.ts`、`governance-ledger.ts`）；
-// 本层不实现任何判定、不读写账本、不改变任何写权。
+// 本模块**只定义中立形状**：归属标识、卡片种类与载荷。D 批已撤除治理 gate/flow 机器与账本；
+// 应用只按客户卡与任务/申请上下文裁决，本层不实现任何判定、不读写账本、不改变任何写权。
 //
-// **缺席＝旧形状**：下列字段全部可选；旧调用不带 flow 元数据时零行为变化，且缺席的
-// flowId/stepId/cardKind **不能**解锁任何治理门禁（门禁只认账本中应用签发的客户决定）。
+// **缺席＝旧形状**：下列字段全部可选；旧调用不带元数据时零行为变化，且缺席的
+// flowId/stepId/cardKind **不能**解锁任何治理动作（只认应用签发的客户决定与申请上下文）。
 
 /**
  * 治理流程/步骤标识的 slug 形状（评审 §5.8；2026-10-22 客户确认收紧，设计
@@ -244,7 +243,7 @@ export interface GovernanceFlowMetadata {
 
 /**
  * `request_choice` 允许的治理卡片种类（评审 §5.8）。
- * `intent-confirm`（2026-10-18 客户拍板）：主理（Lead/liaison）在 `hand_off_intent` 前发给客户的
+ * `intent-confirm`（2026-10-18 客户拍板）：主理在意图交接前发给客户的
  * **需求确认卡**，选项 id 固定 `confirm`/`revise`。**2026-10-20 客户新要求「勾了替我决策就不用我管」**：
  * 该卡纳入 `decision` 组，判断 agent 可代批 `confirm`；`revise` 仍交回客户/发起角色（不替客户修改）。
  * `decision`（2026-10-26 客户要求）：**材料性选择卡**——主理发现材料性选择（如演示/验收证据方式、
@@ -255,11 +254,10 @@ export interface GovernanceFlowMetadata {
 export type GovernanceChoiceCardKind = "proposal" | "appointment" | "acceptance" | "intent-confirm" | "decision";
 
 /**
- * `request_confirmation` 允许的治理卡片种类（C 批目标态：`write` 已删除——**模型可见工具 schema 与
- * 新申请事件均不再列出/接受**；旧 direct/legacy 项目与旧测试仍在通道层按编译期 deprecated 别名保留至 D，
- * 不向模型列出。`schedule-write` 留 D）。
+ * `request_confirmation` 允许的治理卡片种类（D 批：仅保留 `appointment-write`，用于 `角色卡/**`
+ * 写入的审批 + 结构校验；通用写卡已删除）。
  */
-export type GovernanceConfirmCardKind = "write" | "appointment-write" | "schedule-write";
+export type GovernanceConfirmCardKind = "appointment-write";
 
 /** 治理决定卡种类（两交互工具的并集；非法/缺席不能解锁任何治理门禁）。 */
 export type GovernanceCardKind = GovernanceChoiceCardKind | GovernanceConfirmCardKind;
@@ -286,10 +284,7 @@ export type GovernanceJudgeGroup = "approval" | "decision";
  * decision 卡独立于提案/任命/验收，不触发门禁/验收，也不构成客户批准。
  */
 export const GOVERNANCE_CARD_GROUP: Readonly<Partial<Record<GovernanceCardKind, GovernanceJudgeGroup>>> = Object.freeze({
-  // 兼容：`write` 已从工具 schema/角色矩阵删除（C）；通道层对旧 direct/legacy 调用仍按 approval 组处理，D 删除。
-  write: "approval",
   "appointment-write": "approval",
-  "schedule-write": "approval",
   proposal: "decision",
   appointment: "decision",
   acceptance: "decision",
@@ -328,73 +323,6 @@ export type GovernanceAcceptanceOptionId = "accept" | "reject";
 
 /** 提案版本（评审 §6.3-3：一个提案最多 v2）。 */
 export type GovernanceProposalVersion = 1 | 2;
-
-/**
- * 流程步骤种类（评审 §6.1 闭环：提案 → 流程/团队计划 → 派发 → 验收）。
- *
- * **2026-10-22 治理分工第 1/3/5 项（§9.3 Q4 A）契约冻结**：保留现有值与形状，本层**不新增**
- * `team-plan`（也不得改 `FlowStepKind`）——新流程用 step id 表达角色/阶段（如 `team-plan`、
- * `role-cards`），`kind` 仍取现有值；旧 flow 继续可解析。
- */
-export type GovernanceStepKind =
-  | "proposal"
-  /** @deprecated legacy：旧流程的「提名」步骤；新流程用团队计划 + 现有 kind，不再新增 nomination 步骤。 */
-  | "nomination"
-  | "dispatch"
-  | "acceptance";
-
-/**
- * 流程步骤状态（评审 §6.3 机械规则的中立形状；判定在编排，不在本层）：
- * - `in-progress` 必须有主人（无主人的步骤不得 in-progress）；
- * - 同一版本同一步骤第二次 `returned` → `escalated-to-customer`，三人停止转交；
- * - 24h 无状态变化且无客户动作 → 只报 `paused`/`blocked`，不自动催办、不自动换人。
- */
-export type GovernanceStepStatus =
-  | "pending"
-  | "in-progress"
-  | "returned"
-  | "escalated-to-customer"
-  | "paused"
-  | "blocked"
-  | "done";
-
-/** 流程单中的一个步骤（`docs/flows/<flowId>.md` 的中立形状；解析/判定归编排）。 */
-export interface GovernanceFlowStep {
-  stepId: GovernanceStepId;
-  kind: GovernanceStepKind;
-  /** 步骤主人（项目角色 id）；`in-progress` 时必须有主人（规则在编排）。 */
-  ownerRoleId?: string;
-  status: GovernanceStepStatus;
-}
-
-/** 提案步骤载荷（`docs/proposals/<flowId>-v<version>.md`；只定形状，不实现门禁）。 */
-export interface GovernanceProposalStepPayload {
-  flowId: GovernanceFlowId;
-  stepId?: GovernanceStepId;
-  cardKind: "proposal";
-  /** 提案文件的项目相对路径。 */
-  proposalPath: string;
-  version: GovernanceProposalVersion;
-}
-
-/**
- * 任命步骤载荷（2026-10-22 治理分工第 1 项）。
- * 团队计划（`docs/scheduling/<flowId>-team-v<n>.md`）是任命与推荐集的权威物证；
- * `nominationPath` 保留为 **legacy**（旧提名文件时代；新流程不再产生）。
- * 快捷路径 `accept-quick` 可没有物证文件（按既有快捷语义处理）。
- */
-export interface GovernanceAppointmentStepPayload {
-  flowId: GovernanceFlowId;
-  stepId?: GovernanceStepId;
-  cardKind: "appointment";
-  /** 团队计划文件的项目相对路径（`docs/scheduling/<flowId>-team-v<n>.md`；第 1 项）。 */
-  teamPlanPath?: string;
-  /** @deprecated legacy：旧提名文件路径（`docs/nominations/<flowId>-v<n>.md`）；新流程用 `teamPlanPath`。 */
-  nominationPath?: string;
-  /** 客户任命的项目角色 id（任命决定的 `targetRoleIds`）。 */
-  targetRoleIds: readonly string[];
-  version: number;
-}
 
 export interface CustomerInputOption {
 
@@ -442,23 +370,6 @@ export type CustomerInputRequest = (
   GovernanceCardMetadata;
 
 /**
- * 验收分诊卡上客户实际选择的**结构化归因**（2026-10-25 验收分诊设计 §7.3 / §12.3）。
- *
- * 只在桌面把被拦住的验收请求按分诊结果结算时出现：它说明这次结算来自「下发统筹修改 / 仅汇报不返工」
- * 的分诊卡，而不是客户在验收卡上直接选择了 accept/reject。可选、向后兼容——旧生产者不置位，
- * 工具回执文案逐字不变。`report-only` 按既有 accepted 结算，但**不得**被回执说成「客户选择了 accept」。
- */
-export interface CustomerInputTriageOutcome {
-  disposition: "rework" | "report-only";
-  /** `judge` = 判断代批（v1 为确定性规则 `judge-rule`）；`customer` = 客户在分诊卡上选择。 */
-  source: "judge" | "customer";
-  /** 报告结论（原样；分诊不改变验收结论）。 */
-  conclusion: "pass" | "fail" | "conditional";
-  /** 稳定分诊 id（`triage-<flowId>-<reportSha 前 8 位>`）。 */
-  triageId: string;
-}
-
-/**
  * 客户输入结算结果。`operatorId` 前缀是工具回执分流依据（2026-10-25）：`judge:<engine>` = 判断
  * agent 代批；`system:<机制>` = 系统裁决（如 `system:write-preauthorization` 边界内写入预授权，
  * **不是客户手批**，也不是判断代批）；其余/缺席 = 客户或旧通道来源（既有语义逐字不变）。
@@ -473,8 +384,6 @@ export type CustomerInputOutcome =
        * 客户手批不带本字段（仍是 `decisionEvidence.kind:"customer-input"`）。`declined`/`unavailable` 不加。
        */
       judge?: GovernanceJudgeAudit;
-      /** 验收分诊归因（2026-10-25；仅分诊结算置位；不是客户在验收卡上的直接选择）。 */
-      triage?: CustomerInputTriageOutcome;
     }
   | {
       outcome: "declined";
@@ -487,8 +396,6 @@ export type CustomerInputOutcome =
        * 工具处理器据此区分「系统拒绝发卡」与「客户拒绝」：不得回报「未获客户同意」。
        */
       notPresented?: true;
-      /** 验收分诊归因（2026-10-25；自动处置/退回等不呈现验收卡时的来源说明）。 */
-      triage?: CustomerInputTriageOutcome;
     }
   | { outcome: "unavailable"; reason?: string };
 
@@ -862,71 +769,6 @@ export type DispatchTaskFn = (
   metadata?: ReportHandbackMetadata,
 ) => DispatchReceipt | null | undefined | void | Promise<DispatchReceipt | null | undefined | void>;
 
-// —————————————— 治理四角色：意图交接与澄清（W6-A；2026-10-18 PM 评审 §5.1/§5.4） ——————————————
-//
-// 依据：`角色卡/项目管理/docs/design/2026-10-18_design_governance-liaison-review.md`（四角色
-// liaison → rapporteur → nominator → convener；治理模型仍 `trio`）。本模块**只定义中立形状**：
-// 工具层不读文件、不写账本、不投递，只把载荷交给注入的能力（校验/去重/后台投递/账本在编排与
-// 桌面窗口）。**交接 ≠ 客户批准**：本类型不产生任何能解锁门禁的客户决定；谁拥有
-// `hand_off_intent`（仅联络官 Liaison）/`request_clarification`（仅报告员 Rapporteur）由能力
-// 注入面保证，本层不硬编码角色 id、不做治理判定。
-
-/** 意图交接种类（评审 §5.1）：`initial` 每个 intentId 仅一次；`clarification`/`revision` 须引用既有成功交接。 */
-export type HandOffIntentKind = "initial" | "clarification" | "revision";
-
-/**
- * `hand_off_intent` 载荷（评审 §5.1；形状冻结）。四要素 `goal`/`scope`/`acceptance`/`summary`
- * 由工具层严格校验（非空、summary 1..200 字，超长拒绝不截断）；意图文件
- * `docs/intents/<intentId>.md` 是权威，入参与文件不一致由编排侧校验拒绝。
- */
-export interface HandOffIntentPayload {
-  /** 意图记录 slug（`GOVERNANCE_SLUG_PATTERN`）；对应 `docs/intents/<intentId>.md`。 */
-  intentId: string;
-  handoffKind: HandOffIntentKind;
-  goal: string;
-  scope: string;
-  acceptance: string;
-  /** 一句话摘要（1..200 字）。 */
-  summary: string;
-  /** 可选流程 id（slug）；clarification/revision 建议携带。 */
-  flowId?: GovernanceFlowId;
-}
-
-/** `hand_off_intent` 回执：`ok:false` 的 `message` 必须能指导模型下一步；工具层对缺失/非法回执 fail-closed。 */
-export interface HandOffIntentReceipt {
-  ok: boolean;
-  message?: string;
-}
-
-export type HandOffIntentFn = (
-  payload: HandOffIntentPayload,
-  metadata?: ReportHandbackMetadata,
-) => HandOffIntentReceipt | Promise<HandOffIntentReceipt>;
-
-/**
- * `request_clarification` 载荷（评审 §5.4）。`flowId` 与 `intentId` **至少给一个**（同一 flow 的
- * 2 轮上限由注入能力按账本计数判定）；本工具不弹客户决定卡、不占「一项目一卡」队列。
- */
-export interface RequestClarificationPayload {
-  flowId?: GovernanceFlowId;
-  intentId?: string;
-  /** 给客户看的一句话问题（非空）。 */
-  question: string;
-  /** 可选摘要（≤200 字）。 */
-  summary?: string;
-}
-
-/** `request_clarification` 回执：`ok:false` 的 `message` 必须能指导模型下一步；工具层对缺失/非法回执 fail-closed。 */
-export interface RequestClarificationReceipt {
-  ok: boolean;
-  message?: string;
-}
-
-export type RequestClarificationFn = (
-  payload: RequestClarificationPayload,
-  metadata?: ReportHandbackMetadata,
-) => RequestClarificationReceipt | Promise<RequestClarificationReceipt>;
-
 // —————————————— 看护只读工具与恢复提议（G-2；只给内置治理角色 注入，注入才注册） ——————————————
 //
 // 依据：客户 2026-10-16 批准 G-2（设计 `角色卡/产品/docs/design/2026-10-16_design_role-watchdog-and-closure.md`
@@ -990,63 +832,6 @@ export type SessionTailFn = (
 ) => WatchdogToolResult | null | undefined | void | Promise<WatchdogToolResult | null | undefined | void>;
 
 /** 恢复动作集（G-2 §6.3，客户批准恰三值；不含禁用角色/删会话/改边界类动作）。 */
-export type RecoveryAction = "abort-turn" | "rebuild-session" | "redeliver";
-
-/** `propose_recovery` 载荷（G-2 §6.1）：su 只能**提议**——校验、确认卡与执行都在注入能力侧。 */
-export interface ProposeRecoveryPayload {
-  roleId: string;
-  action: RecoveryAction;
-  /** 支撑提议的证据（非空才提交；无证据不提议）。 */
-  evidence: string;
-  reason?: string;
-  /** 仅 `redeliver` 有意义：针对该排队条目（队列期去重键类 id）。 */
-  itemId?: string;
-}
-
-/**
- * 恢复回执结果（G-2 §6.3/§九）——四值中**恰 `executed` 为已执行**、其余三值一律**未执行**：
- * · `executed`＝客户已确认且已执行（成功）；
- * · `declined`＝**未执行**——客户取消/关窗/未确认（fail-closed，**绝不当「没人问就执行」**）；
- * · `unsupported`＝**未执行**——运行时不支持该动作（绝不假装已执行）；
- * · `error`＝**未执行**——执行失败/前提不满足（如 rebuild 遇在跑轮次拒绝），原因进 `message`。
- */
-export type RecoveryOutcome = "executed" | "declined" | "unsupported" | "error";
-
-/** 恢复提议回执（G-2 §6.1）：`executed` 仅在**客户已确认且已执行**（恰一次）时给出。 */
-export interface RecoveryReceipt {
-  outcome: RecoveryOutcome;
-  /** 如实说明（成功细节 / 未执行原因 / 不支持原因 / 错误原文）。 */
-  message?: string;
-  /** 确认者标识（操作者 id 先例，`operator-channel.ts`）。 */
-  operatorId?: string;
-  /** 回执时间（ISO 8601）。 */
-  at?: string;
-}
-
-/**
- * `propose_recovery` 的注入能力（桌面窗口 W4/W5 路由：校验 → 恢复确认卡 →（恰 allow:true 才）执行
- * → 回执；G-2 §6）。
- *
- * 纪律（沿 `dispatch_task` 先例）：本工具**只提交载荷、如实转达回执**——**提议 ≠ 执行**，无客户
- * 确认＝零执行；能力实现方不得据此授予任何写权、不得静默执行、不得把未执行当作已执行。契约外返回
- * （`null`/`undefined`/未知 outcome）由工具层按「未获明确结果」fail-closed 处理，绝不当已执行。
- */
-export type ProposeRecoveryFn = (
-  proposal: ProposeRecoveryPayload,
-  metadata?: ReportHandbackMetadata,
-) => RecoveryReceipt | null | undefined | void | Promise<RecoveryReceipt | null | undefined | void>;
-
-// —————————————— 角色能力安装：技能安装/卸载（G-4 V1；只给内置治理角色 注入，注入才注册） ——————————————
-//
-// 依据：客户 2026-10-16 批准 G-4 V1（设计 `角色卡/产品/docs/design/2026-10-16_design_role-capability-install.md`
-// §3.2/§3.3；PM 派发「运行时核心＝I1/I2」）。两工具均**只给内置治理角色**——由调用方注入能力表达
-// 「注入才注册」（未注入 ⇒ 工具不存在，沿 dispatch_task 先例）。本层纪律：**工具不写盘**——落盘
-// 永远由 su 的 `write_file` 完成（「先落盘再激活」＝G-1「先落盘再派发」的镜像）；工具只
-// **校验＋激活＋回执**（校验/激活在注入能力侧＝桌面 handler；激活复用既有重建，在跑不打断）。
-//
-// **形状单一来源＝本模块**（桌面窗口按此接线；三适配器经能力注入读取）。
-
-/** `install_skill` / `uninstall_skill` 载荷（G-4 §3.2）：目标角色与技能名（稳定短 slug，与目录名一致）。 */
 export interface InstallSkillPayload {
   /** 目标项目角色 id（不能是内置治理角色；校验在能力实现侧）。 */
   roleId: string;
@@ -1193,244 +978,6 @@ export type UninstallMcpFn = (
   metadata?: ReportHandbackMetadata,
 ) => Promise<InstallMcpReceipt>;
 
-// —————————————— Flow 文件方法化（2026-10-20 客户拍板；最小闭环） ——————————————
-//
-// 客户批准「按这个方案做」：把 flow 文件从「只能整文件读写」升级为**方法化**——模型经三只工具
-// （`flow_get` / `flow_step_update` / `flow_step_supersede`）读取结构化视图并推进步骤状态。
-// 本模块只承载**中立类型**；三工具只调用注入能力并如实转达回执，**权限/状态迁移/证据完整性/
-// revision 冲突/Steward/Lead 权限等全部裁决在编排 flow-service**（`src/common/编排/**` 属编排角色）。
-// 未注入对应能力 ⇒ 工具不注册（结构性 fail-closed，沿 dispatch_task 先例）。
-// 诚实面：flow 步骤推进 ≠ 客户批准——需要客户决定的步骤仍须走 request_confirmation/request_choice。
-
-/** flow 步骤状态（合法取值；状态迁移合法性由编排 flow-service 裁决，本层不判）。 */
-export type FlowToolStatus = "pending" | "dispatched" | "delivered" | "done" | "superseded" | "failed" | "blocked" | "aborted";
-
-/** flow 步骤状态枚举的运行时单一来源（schema 与工具层参数校验共用，避免两处漂移）。 */
-export const FLOW_TOOL_STATUSES: readonly FlowToolStatus[] = Object.freeze([
-  "pending", "dispatched", "delivered", "done", "superseded", "failed", "blocked", "aborted",
-]);
-
-/** flow 步骤种类（dispatch＝派发型；customer-decision＝客户决定型；artifact＝产物型；acceptance＝验收型）。 */
-export type FlowToolStepKind = "dispatch" | "customer-decision" | "artifact" | "acceptance";
-
-/** flow 步骤种类枚举的运行时单一来源（schema 与工具层参数校验共用）。 */
-export const FLOW_TOOL_STEP_KINDS: readonly FlowToolStepKind[] = Object.freeze([
-  "dispatch", "customer-decision", "artifact", "acceptance",
-]);
-
-/** 步骤证据：kind＝证据类别，ref＝项目相对路径或任务事实（合法性/存在性由编排 flow-service 校验）。 */
-export interface FlowToolEvidence {
-  kind: FlowToolStepKind;
-  ref: string;
-}
-
-/**
- * `flow_get` 返回的步骤视图（服务端投影；工具层原样转达，不重算）。
- *
- * 2026-10-22 角色粒度/MapReduce 方案 A（`implemented-unverified`）：可选承载 `parallelGroup`/
- * `dependsOn`。本层**只定字段**；并行组语法、依赖目标存在性/环、同 Map 组无依赖、Reduce 覆盖
- * 全部 Map 等静态校验在编排 `flow-state`，dispatch 前置 `done` 检查在编排 `governance-gate`。
- * 两个字段均可选：旧 flow 不填 ⇒ 字段缺席，视图形状与旧行为逐字不变（不新增 `FlowToolStepKind`）。
- */
-export interface FlowToolStepView {
-  id: string;
-  title: string;
-  owner: string;
-  kind: FlowToolStepKind;
-  status: FlowToolStatus;
-  evidence?: FlowToolEvidence;
-  supersedes?: string[];
-  supersededBy?: string;
-  /** 并行组（可选）：`map-<slug>` 或 `reduce`；仅承载，校验在编排。 */
-  parallelGroup?: string;
-  /** 前置 step id 列表（可选）：仅承载，环检测与前置 `done` 检查在编排。 */
-  dependsOn?: string[];
-}
-
-/** `flow_get` 返回的流程视图。`canUpdate` 是服务端按调用角色计算的**可更新步骤 id**（权限裁决在服务端）；步骤视图可携带可选 `parallelGroup`/`dependsOn`（本层只承载）。 */
-export interface FlowToolView {
-  flowId: string;
-  revision: string;
-  qualityTier: string;
-  steps: FlowToolStepView[];
-  canUpdate: string[];
-}
-
-/**
- * 三只 flow 工具的统一回执（形状冻结；工具层**原样**转达，不解释为批准/不重算状态）。
- * - `ok:true`：`revision` 为本次操作后的新 revision；`flow` 为服务端视图（可选）；`idempotent:true`
- *   表示同一 `idempotencyKey` 重放、未重复变更；
- * - `ok:false`：`code` 机读原因（如 `revision-conflict`/`invalid-transition`/`insufficient-evidence`/
- *   `forbidden`），`error` 一句人话，`issues` 供修正的逐条问题。
- */
-export interface FlowToolResult {
-  ok: boolean;
-  revision?: string;
-  flow?: FlowToolView;
-  idempotent?: boolean;
-  error?: string;
-  code?: string;
-  issues?: string[];
-}
-
-/** `flow_get` 注入能力：读 flow 结构化视图；`flowId` 缺席＝当前/默认 flow（由服务端归一）。 */
-export type FlowGetFn = (input: { flowId?: string }) => Promise<FlowToolResult>;
-
-/** `flow_step_update` 注入能力：更新单个步骤状态（迁移/权限/证据/revision 裁决在服务端）。 */
-export type FlowStepUpdateFn = (input: {
-  flowId: string;
-  stepId: string;
-  status: FlowToolStatus;
-  evidence?: FlowToolEvidence;
-  expectedRevision: string;
-  idempotencyKey?: string;
-  note?: string;
-}) => Promise<FlowToolResult>;
-
-/** `flow_step_supersede` 注入能力：用新步骤取代旧步骤（旧步骤转 superseded；**仅 Steward/Lead（工作流管理者）**，服务端校验）。 */
-export type FlowStepSupersedeFn = (input: {
-  flowId: string;
-  oldStepId: string;
-  newStepId: string;
-  title: string;
-  owner: string;
-  kind: FlowToolStepKind;
-  expectedRevision: string;
-  reason?: string;
-  idempotencyKey?: string;
-  /**
-   * 新步骤的并行组（可选；2026-10-22 角色粒度/MapReduce 方案 A）：`map-<slug>` 或 `reduce`。
-   * 仅承载；语法/静态校验在编排 flow-service（本层不判）。
-   */
-  parallelGroup?: string;
-  /** 新步骤的前置 step id 列表（可选；仅承载，存在性/环/前置 `done` 校验在编排）。 */
-  dependsOn?: string[];
-}) => Promise<FlowToolResult>;
-
-// —————————————— 独立复核请求（2026-10-25 客户要求；request_acceptance） ——————————————
-//
-// 背景：统筹（Steward）在交付完成后应能**直接提交独立复核**，而不是等应用的一次 settle/账本事件
-// 才派 Proof。为此新增内置治理角色可用的 `request_acceptance` 工具：**工具面只路由载荷并如实转达
-// 回执**——真正的派发（Proof/验收）、验收标准/变更包/风险档/流程完整性校验、flow/账本写入全部由
-// **应用注入的能力**实现（本层不实现业务、不写 flow/账本、不做治理判定）。
-// 纪律：请求复核 ≠ 客户决定、不代表客户批准；能力未注入 ⇒ 工具不注册（沿 flowGet 先例，最强 fail-closed）。
-
-/** `request_acceptance` 载荷：`flowId` 缺席＝当前/默认流程（由应用归一）；`note` 为可选说明。 */
-export interface RequestAcceptanceInput {
-  flowId?: string;
-  note?: string;
-}
-
-/**
- * `request_acceptance` 的如实回执（形状冻结；工具层**原样**转达，不解释为客户批准）。
- * `ok:true`＋`code:"dispatched"`＝应用已派发独立复核；其余 code 为如实的未派发/已派发原因。
- */
-export interface RequestAcceptanceResult {
-  ok: boolean;
-  code: "dispatched" | "flow-not-found" | "criteria-missing" | "change-package-missing" | "change-package-no-risk" | "flow-incomplete" | "runtime-unresolved" | "already-dispatched" | "unavailable";
-  message: string;
-  flowId?: string;
-  runtime?: RuntimeKind;
-}
-
-/** `request_acceptance` 注入能力（派发/校验/flow/账本由应用实现；未注入 ⇒ 工具不注册）。 */
-export type RequestAcceptanceFn = (input: RequestAcceptanceInput) => Promise<RequestAcceptanceResult>;
-
-// —————————————— Gate 复核请求（2026-10-26 客户授权；request_gate_review） ——————————————
-//
-// 依据：客户 2026-10-26 确认「独立复核的权威只放在验收角色（Proof）；统筹只协调与检查证据完整性；
-// 对关键节点设置验收门禁（gate），由 Proof 独立判定」，授权在运行时核心落 Model/Provider 契约与工具
-// （设计 `2026-10-26_design_proof-gate-reviews.md` §5.2/§5.5/§10-A4/§12）。
-// gate 复核是**独立于最终验收**的通道：`request_acceptance` 保持原义（最终验收唯一主动通道），
-// `request_gate_review` 只用于关键节点 gate。本层只路由载荷并**如实转达回执**——gate 步骤查找、
-// 前置/证据/标准校验、Proof 派发、gate 记录与账本写入全部由**应用注入的能力**实现（本层不写
-// flow/账本、不做治理判定）。纪律：**gate 复核 ≠ 验收通过 ≠ 客户批准**；`dispatched` 只表示已派
-// Proof；gate fail 只按 blocker/major 判失败，只有 minor/nit 不构成返工依据（防吹毛求疵）。
-// 能力未注入 ⇒ 工具不注册（沿 requestAcceptance 先例，能力缺席＝最强 fail-closed）。
-
-/**
- * `request_gate_review` 载荷：`flowId` 缺席＝当前/默认流程（由应用归一）；`gateId` 必填
- * （gate 步骤 id，匹配 `GOVERNANCE_SLUG_PATTERN` 的 slug，如 `gate-vertical-slice`）；
- * `note` 为可选有界说明（工具层有上限，不写账本、不参与判定）。
- */
-export interface RequestGateReviewInput {
-  flowId?: string;
-  gateId: string;
-  note?: string;
-}
-
-/**
- * `request_gate_review` 的如实回执（形状冻结；工具层**原样**转达）。
- * `ok:true`＋`code:"dispatched"`＝应用已派 Proof 做 gate 复核——**不等于 gate 通过、不代表验收通过、
- * 不代表客户批准**；其余 code 为如实的未派发/已派发原因（`rejected`＝应用在派发前退回统筹）。
- *
- * **`flow-busy`（2026-10-27 客户要求）**：流程仍有在途工作（在途交付/轮次/回交等），gate **暂不派发**，
- * 可稍后重试——这是**可重试的独立返回码**，不是故障、不是 gate 失败，也不代表已派发；`message` 必须带原因。
- */
-export interface RequestGateReviewResult {
-  ok: boolean;
-  code: "dispatched" | "already-dispatched" | "flow-busy" | "gate-not-found" | "criteria-missing" | "flow-incomplete" | "unavailable" | "rejected";
-  message: string;
-  flowId?: string;
-  gateId?: string;
-  runtime?: RuntimeKind;
-}
-
-/** `request_gate_review` 注入能力（gate 校验/派发/记录/账本由应用实现；未注入 ⇒ 工具不注册）。 */
-export type RequestGateReviewFn = (input: RequestGateReviewInput) => Promise<RequestGateReviewResult>;
-
-// —————————————— 边界变更请求（2026-10-26 客户要求；request_boundary_change） ——————————————
-//
-// 真机缺口：治理门禁规定「内置治理角色不可被派发、治理角色之间不 dispatch」，统筹无法让组队（Crew）
-// 修改项目角色的写集/边界（例：castle 项目 app-shell 缺 `tsconfig.node.json` 写权，只能上报等客户手动
-// 触发组队）。为此新增内置治理角色可用的 `request_boundary_change` 工具：**工具面只提交精确增删路径
-// 与理由并如实转达回执**——真正的 Crew 派发、确定性校验、AI 门禁审核、appointment-write 与客户/判断确认
-// 全部由**应用注入的能力**实现（本层不派发、不写盘、不做治理判定）。
-// 纪律：本工具只提交请求 ≠ 客户批准、不代表边界已修改；能力未注入 ⇒ 工具不注册（沿 requestAcceptance 先例）。
-
-/**
- * `request_boundary_change` 载荷：只提交**精确增删路径**与理由（不重写整个边界、不扩其它路径）。
- * `addPaths`/`removePaths` 至少一个非空；`flowId` 缺席＝当前/默认流程（由应用归一）。
- */
-export interface RequestBoundaryChangeInput {
-  roleId: string;
-  addPaths?: string[];
-  removePaths?: string[];
-  rationale: string;
-  flowId?: string;
-}
-
-/**
- * `request_boundary_change` 的如实回执（形状冻结；工具层**原样**转达）。
- * `ok:true`＋`code:"dispatched"`＝应用已把精确修改请求派发给组队；其余 code 为如实的未派发/已派发原因。
- * `code:"rejected"`＝应用在派发给组队前的确定性校验／AI 门禁审核未通过（deny/manual/超时）——请求被退回
- * 统筹，**不自动放行**，也不代表客户拒绝（message 写明原因）。
- */
-export interface RequestBoundaryChangeResult {
-  ok: boolean;
-  code: "dispatched" | "already-dispatched" | "rejected" | "invalid-role" | "invalid-path" | "no-change" | "unavailable";
-  message: string;
-  roleId?: string;
-  ticketId?: string;
-}
-
-/** `request_boundary_change` 注入能力（派发/确定性校验/AI 门禁/客户确认/appointment-write 由应用实现；未注入 ⇒ 工具不注册）。 */
-export type RequestBoundaryChangeFn = (input: RequestBoundaryChangeInput) => Promise<RequestBoundaryChangeResult>;
-
-// —————————————— 需求变更申请（2026-10-26 客户要求；request_requirement_change） ——————————————
-//
-// 背景：报告员（Draft/rapporteur）起草提案时若发现需要**新的客户授权/范围**（或约束/成本变化），
-// 不应把未获授权的诉求塞进提案卡「顺带获批」；应提交**需求变更审批**，进入**独立审批**。
-// **审批不由主理完成**（2026-10-26 客户纠正）：申请由**提案角色（Rapporteur）或统筹**发起；审批卡由
-// 应用在申请成功后自动经发起方会话呈现（decision 卡）——「替我决策」开启时由判断 agent 按推荐项决定，
-// 未开启时由客户手选；**发起方不得自批、不得重复发卡**；主理不审批，只在批准后执行意图变更。本工具是报告员可用的专用申请通道：本层只做参数形状
-// 校验并**如实转达回执**——意图记录校验、去重/派发、账本/系统行与 decision 卡触发全部由**应用注入
-// 的能力**实现（本层不写盘、不弹客户卡、不做治理判定、不改变任何写权）。
-// 纪律：**申请≠批准，也不代表意图已变更**；`dispatched` 只表示已提交、不代表通过；
-// 不要把新授权写进提案卡；`proposedIntentPatch` 只是建议，绝不替客户改意图；能力未注入 ⇒ 工具不注册
-// （沿 requestAcceptance / requestClarification 先例）。
-
-/** 需求变更种类：范围 / 授权 / 约束 / 成本 / 其它。 */
 export type RequestRequirementChangeKind = "scope" | "authorization" | "constraint" | "cost" | "other";
 
 /**
@@ -1469,51 +1016,6 @@ export interface RequestRequirementChangeResult {
 
 /** `request_requirement_change` 注入能力（意图校验/去重/派发/账本/系统行由应用实现；未注入 ⇒ 工具不注册）。 */
 export type RequestRequirementChangeFn = (input: RequestRequirementChangeInput) => Promise<RequestRequirementChangeResult>;
-
-// —————————————— 验收标准产物汇报（2026-10-27 客户要求；report_artifact_ready） ——————————————
-//
-// 背景（客户 2026-10-27 新设计）：验收标准由质检写完后，**质检只向应用汇报，应用校验后决定是否收口**；
-// 质检不再盯文件自动勾卡、也不自行修改 flow 状态。本层只定义中立形状与工具路由：
-// `report_artifact_ready` 工具仅在 `GovernedToolsOptions.reportArtifact` 注入时注册（未注入 ⇒ 工具不
-// 存在，最强 fail-closed，沿 request_acceptance 先例）；工具**不写盘、不读写 flow、不做治理判定、
-// 不假装应用已接受**——只把输入原样交给注入能力并如实转达回执。**汇报成功不等于自动完成**：
-// `accepted:true` 只表示应用已收到并接受该产物；是否收口/推进 flow 步骤由应用校验后决定并写入
-// （不由本工具或质检代做）。能力实现（路径/步骤/哈希/收口校验与 flow 写入）属编排/桌面注入端。
-
-/**
- * `report_artifact_ready` 载荷（2026-10-27 客户要求）：质检把已写好的验收标准产物汇报给应用。
- * `flowId`/`stepId`/`path` 由工具层做**基本非空字符串**校验；路径是否存在、步骤是否属于该 flow、
- * 摘要/哈希与文件内容是否一致、是否满足收口条件等**全部由应用注入的能力校验**（本层不读文件、
- * 不判 flow、不写盘）。`sha256` 为可选的内容摘要（十六进制字符串；**格式与是否与文件一致由能力侧
- * 校验**，本层不重算）。
- */
-export interface ReportArtifactInput {
-  flowId: string;
-  stepId: string;
-  path: string;
-  summary?: string;
-  sha256?: string;
-}
-
-/**
- * `report_artifact_ready` 的如实回执（形状冻结；工具层原样转达）。
- * - `ok`：应用是否已受理本次汇报并给出明确结果（false＝未受理/校验失败/应用不可用）；
- * - `accepted`：应用对产物的校验决定——`true`＝已接受（**是否收口/推进 flow 仍由应用决定**）、
- *   `false`＝明确拒绝、缺席＝未声明接受（工具层**不得**宣称已接受）；
- * - `message`：一句如实说明（拒绝原因/已接受细节），工具层原样转达。
- */
-export interface ReportArtifactReceipt {
-  ok: boolean;
-  accepted?: boolean;
-  message?: string;
-}
-
-/**
- * `report_artifact_ready` 注入能力（校验/收口/flow 写入由应用实现；未注入 ⇒ 工具不注册）。
- * 纪律：能力侧必须自行校验路径/步骤/flow 与产物一致性后再决定是否收口；**接受 ≠ 已完成**——
- * 能力不得因本调用授予任何写权，也不得跳过既有门禁/验收标准规则。
- */
-export type ReportArtifactFn = (input: ReportArtifactInput) => Promise<ReportArtifactReceipt>;
 
 // —————————————— 推理与推理强度（G-5 wave 1 契约层；冻结符号，单一来源＝本模块） ——————————————
 //
@@ -2195,18 +1697,6 @@ export interface GovernedToolsOptions {
   interactionGate?: InteractionGate;
   reportHandback?: ReportHandbackFn;
   dispatchTask?: DispatchTaskFn;
-  /**
-   * W6-A：`hand_off_intent` 能力（意图交接：校验/去重/后台投递/账本在注入能力侧）。
-   * **只给联络官 Liaison 会话注入**（判据在注入端＝编排/桌面窗口，本层不硬编码角色 id）；
-   * 未注入 ⇒ 工具不注册（结构性 fail-closed）。交接 ≠ 客户批准。
-   */
-  handOffIntent?: HandOffIntentFn;
-  /**
-   * W6-A：`request_clarification` 能力（澄清请求：账本＋主入口系统行在注入能力侧；同一 flow 最多 2 轮）。
-   * **只给报告员 Rapporteur 会话注入**（判据在注入端，本层不硬编码角色 id）；
-   * 未注入 ⇒ 工具不注册（结构性 fail-closed）。
-   */
-  requestClarification?: RequestClarificationFn;
   shellVerdict?: ShellVerdictFn;
   /**
    * G-2/R1：`role_status` 数据源（看护只读快照）。**只给内置治理角色 会话注入**（编排注入端判据沿
@@ -2225,8 +1715,6 @@ export interface GovernedToolsOptions {
   terminateRoleRun?: TerminateRoleRunFn;
   /** B 批：安全重派动作（只给幕僚；未注入 ⇒ `redispatch_task` 不注册）。 */
   redispatchTask?: RedispatchTaskFn;
-  /** G-2/R2：恢复提议能力（只提交载荷、三态回执）。只给内置治理角色 注入；未注入 ⇒ 工具不注册。 */
-  proposeRecovery?: ProposeRecoveryFn;
   /**
    * G-4/I2：`install_skill` 能力（校验＋激活＋回执，**不写盘**）。只给内置治理角色 注入（判据沿
    * dispatch_task 的 suppressHandback 先例）；未注入 ⇒ 工具不注册（结构性 fail-closed）。
@@ -2242,43 +1730,6 @@ export interface GovernedToolsOptions {
   /** G-4 V2：`uninstall_mcp` 能力（校验＋激活＋回执，不写盘）。只给内置治理角色 注入；未注入 ⇒ 工具不注册。 */
   uninstallMcp?: UninstallMcpFn;
   /**
-   * Flow 文件方法化（2026-10-20 客户拍板，最小闭环）：`flow_get` / `flow_step_update` /
-   * `flow_step_supersede` 三能力的注入面。能力实现＝编排 flow-service（权限/状态迁移/证据/
-   * revision 冲突/Steward/Lead 权限全部在服务端裁决）；本层只调用并如实转达回执。
-   * 每项**未注入 ⇒ 对应工具不注册**（结构性 fail-closed，沿 dispatch_task 先例）。
-   */
-  flowGet?: FlowGetFn;
-  /** `flow_step_update` 能力；未注入 ⇒ 工具不注册。 */
-  flowStepUpdate?: FlowStepUpdateFn;
-  /** `flow_step_supersede` 能力（仅 Steward/Lead 可成功，服务端校验）；未注入 ⇒ 工具不注册。 */
-  flowStepSupersede?: FlowStepSupersedeFn;
-  /**
-   * 独立复核请求（2026-10-25 客户要求）：`request_acceptance` 能力——交付/证据/变更包已就绪后，
-   * 由统筹直接请应用派 Proof / 验收做**独立复核**，不再等待应用的一次 settle/账本事件。
-   * **只给内置治理角色 注入**（判据在编排/桌面注入端，本层不硬编码角色 id）；
-   * 未注入 ⇒ 工具不注册（结构性 fail-closed，沿 flowGet 先例）。派发/校验/flow/账本由能力实现；
-   * 本层只路由载荷并如实转达回执——**请求复核 ≠ 客户决定，不代表客户批准**。
-   */
-  requestAcceptance?: RequestAcceptanceFn;
-  /**
-   * Gate 复核请求（2026-10-26 客户授权）：`request_gate_review` 能力——关键节点验收门禁（gate）的
-   * 证据完整性检查通过后，由统筹直接请应用派 Proof 做**独立 gate 复核**；与最终验收
-   * （`requestAcceptance`）是两条独立通道，互不替代。**只给统筹（convener）会话注入**（判据在
-   * 编排/桌面注入端，本层不硬编码角色 id）；未注入 ⇒ 工具不注册（结构性 fail-closed，沿
-   * requestAcceptance 先例）。gate 校验/派发/gate 记录/账本由能力实现；本层只做参数形状校验并如实
-   * 转达回执——**gate 复核 ≠ 验收通过 ≠ 客户批准**；`dispatched` 只表示已派 Proof；gate fail 只按
-   * blocker/major 判失败，只有 minor/nit 不返工。
-   */
-  requestGateReview?: RequestGateReviewFn;
-  /**
-   * 边界变更请求（2026-10-26 客户要求）：`request_boundary_change` 能力——项目角色写集/边界不足时，
-   * 由统筹直接请应用把**精确增删路径**派发给组队（Crew）修改角色卡/边界，不绕过 appointment-write
-   * 与客户/判断确认。**只给内置治理角色 注入**（判据在编排/桌面注入端，本层不硬编码角色 id）；
-   * 未注入 ⇒ 工具不注册（结构性 fail-closed，沿 requestAcceptance 先例）。派发/角色/路径校验/
-   * AI 门禁审核/确认/写入由能力实现；本层只做参数形状校验并如实转达回执——**请求变更 ≠ 客户批准**。
-   */
-  requestBoundaryChange?: RequestBoundaryChangeFn;
-  /**
    * 需求变更申请（2026-10-26 客户要求）：`request_requirement_change` 能力——报告员（Draft/rapporteur）
    * 起草提案时发现需要**新的客户授权/范围**（或约束/成本变化）时，**不把未获授权的诉求塞进提案卡**，
    * 而是提交需求变更审批，进入**独立审批**：申请由**提案角色（Rapporteur）或统筹**发起；审批卡由应用
@@ -2291,15 +1742,6 @@ export interface GovernedToolsOptions {
    * 不要把新授权写进提案卡；`proposedIntentPatch` 只是建议，不替客户改意图。
    */
   requestRequirementChange?: RequestRequirementChangeFn;
-  /**
-   * 验收标准产物汇报（2026-10-27 客户要求）：`report_artifact_ready` 能力——质检写完验收标准后
-   * **只向应用汇报**，由应用校验路径/步骤/产物一致性后**决定是否收口**（质检不盯文件自动勾卡、
-   * 不自行修改 flow 状态）。**只给质检（内置 verifier）会话注入**（判据在编排/桌面注入端，本层不
-   * 硬编码角色 id）；未注入 ⇒ 工具不注册（结构性 fail-closed，沿 requestAcceptance 先例）。
-   * 工具层只做基本参数形状校验并**原样转达**回执（`ok`/`accepted`/`message`）——不写盘、不写 flow、
-   * 不做治理判定、不假装应用已接受；**汇报成功 ≠ 自动完成**（是否收口由应用决定）。
-   */
-  reportArtifact?: ReportArtifactFn;
   /**
    * 判断 agent（「替我审」）只读能力注入。**这是能力注入，不是工具注入**：注入后 Service 必须走
    * `buildShellJudgeTools`（`src/common/runtime-core/shell-judge/`），**不得**走 `buildGovernedTools`——

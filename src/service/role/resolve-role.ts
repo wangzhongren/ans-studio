@@ -204,10 +204,7 @@ export function resolveGovernanceRole(
   }
 
   const fn: GovernanceFunction = explicitFunction ?? "proposal";
-  const spec =
-    BUILT_IN_GOVERNANCE_ROLES.find((s) => s.function === fn) ??
-    // 批次 A 只读别名：旧 `function: "liaison"` 仍可解析（不进入列表/缺省路由；D 删除）。
-    (fn === "liaison" ? governanceRoleOf("liaison") : undefined);
+  const spec = BUILT_IN_GOVERNANCE_ROLES.find((s) => s.function === fn);
   if (spec === undefined) {
     throw new Error(`未知治理职能：${fn}（可用：${BUILT_IN_GOVERNANCE_ROLES.map((s) => s.function).join("/")}）`);
   }
@@ -217,8 +214,8 @@ export function resolveGovernanceRole(
 const ROLE_DIR_NAMES = ["角色卡", "role-cards"]; // 中文 / 英文项目角色目录名
 const CARD_NAMES = ["role-card.md"];
 const BOUNDARY_NAMES = ["boundary.yaml", "boundary.yml", "boundary.md"];
-/** 与编排 `GOVERNANCE_LEDGER_REL` 同一约定路径（门禁引擎不反向依赖编排，故本地声明）。 */
-const GOVERNANCE_LEDGER_REL = ".ans/governance/ledger.jsonl";
+/** B 批任务主干路径（与编排 `TASKS_STATE_REL` 同一约定；门禁引擎不反向依赖编排，故本地声明）。 */
+const TASKS_STATE_REL = ".ans/state/tasks.jsonl";
 
 async function statKind(p: string): Promise<"dir" | "file" | "other" | "none"> {
   try {
@@ -257,10 +254,10 @@ async function firstExistingFile(dirAbs: string, names: string[]): Promise<strin
  * - listProject 无接受证据入参，故所列 boundary 的 acceptance 一律为未接受（仅用于展示）。
  * - **治理模型**（评审 §5.4/§5.5）：显式 `readGovernanceModel` 优先；`.ans` 不可读/不可解析 →
  *   single（行为不变）；无显式值且既无 `.ans/project.json` 也无任何角色目录 → 新空项目 trio；
- *   其余（旧项目）→ single，**但 `.ans/governance/ledger.jsonl` 存在 ⇒ trio**。trio 账本是确定事实
- *   （账本只在 trio 流程中产生，single 明确不建治理账本目录），用于封住「首个项目角色已落盘但
+ *   其余（旧项目）→ single，**但 `.ans/state/tasks.jsonl` 存在 ⇒ trio**。任务主干是确定事实
+ *   （B 批星形任务只在 trio 流程中产生，single 不建任务状态文件），用于封住「首个项目角色已落盘但
  *   `.ans` 尚未写出」的模型翻转窗口（真机缺陷 2026-10-18：Nominator 写出 builder 后 Convener 的
- *   `dispatch_task` 被误判为 single→su 而拒绝，左树/主入口短暂回退）。账本只 stat 文件、不读内容；
+ *   `dispatch_task` 被误判为 single→su 而拒绝，左树/主入口短暂回退）。任务状态只 stat 文件、不读内容；
  *   不存在/不可读 ⇒ 按旧规则。不按 `docs/proposals|nominations|flows` 等产物猜模型。
  * - 结果含 `primaryRoleId` 与 `governanceModel`：桌面据此设主入口/模型提示，**渲染侧不硬编码 id**。
  */
@@ -316,8 +313,9 @@ export async function listProject(projectRoot: string): Promise<ProjectListing> 
       const relDir = `${root.name}/${roleId}`;
 
       // 保留 id（评审 §5.4）：内置治理角色 id 不得被项目角色目录遮蔽。跳过并警告——
-      // 警告文案是跨角色可断言契约的一部分（不静默丢弃）。
-      if (isBuiltInGovernanceRoleId(roleId)) {
+      // 警告文案是跨角色可断言契约的一部分（不静默丢弃）。`liaison` 是批次 D 退休的旧内置 id：
+      // 不再是内置角色/别名，但其历史目录仍按保留 id 跳过，避免旧目录被误枚举为项目角色。
+      if (isBuiltInGovernanceRoleId(roleId) || roleId === "liaison") {
         warnings.push(`${relDir}：与内置治理角色 id 冲突，已跳过`);
         continue;
       }
@@ -391,12 +389,12 @@ export async function listProject(projectRoot: string): Promise<ProjectListing> 
     if (!ansRecordExists && totalRoleDirs === 0) {
       governanceModel = "trio";
     } else {
-      // 确定事实：trio 账本只在 trio 流程中产生（single 明确不建治理账本目录）。用于封住
+      // 确定事实：B 批星形任务只在 trio 流程中产生（single 不建任务状态）。用于封住
       // 「首个项目角色已落盘但 `.ans` 尚未写出」的模型翻转窗口（真机缺陷 2026-10-18：builder
       // 落盘后本行曾翻成 single，Convener 派发被误判为「来源角色不是派发主人 su」而拒绝）。
       // 只 stat 文件、不读内容；不存在/不可读（含路径不是文件）⇒ 按旧规则 single。
-      const ledgerExists = (await statKind(joinRoot(projAbs, GOVERNANCE_LEDGER_REL))) === "file";
-      governanceModel = ledgerExists ? "trio" : "single";
+      const tasksExist = (await statKind(joinRoot(projAbs, TASKS_STATE_REL))) === "file";
+      governanceModel = tasksExist ? "trio" : "single";
     }
   }
 

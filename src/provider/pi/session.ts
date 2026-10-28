@@ -33,7 +33,6 @@ import type {
   ToolCall, SessionEvent, PromptOptions, RoleSession, WriteGate, ShellGate, CustomerInputFn,
   ReportHandbackFn, DispatchTaskFn, ShellVerdictFn, RuntimeAdapter, RuntimeProviderOptions,
   ShellJudgeToolOptions, GovernanceJudgeToolOptions, ToolDefinition,
-  FlowGetFn, FlowStepUpdateFn, FlowStepSupersedeFn,
 } from "../../model/runtime.ts";
 
 /**
@@ -148,15 +147,6 @@ export function createFakeRuntimeAdapter(opts: {
    */
   shellVerdict?: ShellVerdictFn;
   /**
-   * Flow 文件方法化三能力（2026-10-20 客户拍板，最小闭环）：由编排 flow-service 构造、注入。
-   * **各自仅当注入时**对应 `flow_get` / `flow_step_update` / `flow_step_supersede` 工具才注册
-   * （同 `shellGate` 的「未注入即不注册」先例）。权限/状态迁移/证据/revision 裁决全在服务端，
-   * 本层只调用并如实转达回执。
-   */
-  flowGet?: FlowGetFn;
-  flowStepUpdate?: FlowStepUpdateFn;
-  flowStepSupersede?: FlowStepSupersedeFn;
-  /**
    * 判断 agent（「替我审」）只读工具选项（PM 评审 2026-10-17 §6.1）。**注入即判断模式**：
    * 只走运行时核心的 `buildShellJudgeTools`（恰 `judge_read_file`/`judge_list_dir`/
    * `report_shell_judgement` 三只只读工具）；**不得**构造 write/edit/run_shell/客户交互/回交/派发
@@ -195,9 +185,6 @@ export function createFakeRuntimeAdapter(opts: {
         reportHandback: opts.reportHandback,
         dispatchTask: opts.dispatchTask,
         shellVerdict: opts.shellVerdict,
-        flowGet: opts.flowGet,
-        flowStepUpdate: opts.flowStepUpdate,
-        flowStepSupersede: opts.flowStepSupersede,
       });
       const byName = new Map(tools.map((t) => [t.name, t]));
       const queue = createEventQueue<SessionEvent>();
@@ -298,15 +285,6 @@ export interface PiRuntimeAdapterOptions extends PiProviderConfigInput {
    * **仅当注入时** `report_shell_verdict` 工具才注册。
    */
   shellVerdict?: ShellVerdictFn;
-  /**
-   * Flow 文件方法化三能力（2026-10-20 客户拍板，最小闭环）：由编排 flow-service 构造、注入。
-   * **各自仅当注入时**对应 `flow_get` / `flow_step_update` / `flow_step_supersede` 工具才注册
-   * （同 `shellGate` 的「未注入即不注册」先例）。权限/状态迁移/证据/revision 裁决全在服务端，
-   * 本层只调用并如实转达回执。判断模式（shellJudge/governanceJudge）不构造这些工具。
-   */
-  flowGet?: FlowGetFn;
-  flowStepUpdate?: FlowStepUpdateFn;
-  flowStepSupersede?: FlowStepSupersedeFn;
   /**
    * 会话持久化目录（设计 D-1，重启恢复）：**给了** ⇒ 该项目角色的会话以 JSONL 落盘于该目录
    * （有最近会话即恢复，否则新建；**应逐角色隔离**，如 `<项目>/.ans/sessions/<角色>/`）；

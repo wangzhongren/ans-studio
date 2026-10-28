@@ -43,10 +43,8 @@ import type { RuntimeAdapterFactory, RuntimeAdapterFactoryOptions } from "../../
 import { RUNTIME_KINDS } from "../shared/runtime-shared.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 import { buildGovernanceJudgePrompt, buildGovernanceJudgeSystemPrompt } from "./governance-judge-prompt.ts";
-import { evaluateAcceptanceCompletion, requiredArtifactPaths, isGovernanceJudgeFlowId } from "./governance-judge-facts.ts";
+import { requiredArtifactPaths, isGovernanceJudgeFlowId } from "./governance-judge-facts.ts";
 import { buildDecisionEvidencePacket, safeProjectRelativePath, verifyEvidenceHashes } from "./governance-judge-evidence.ts";
-import { readGovernanceLedger } from "./governance-ledger.ts";
-import { evaluateFlowCompletion, parseFlowStateYaml } from "./flow-state.ts";
 import {
   boundedGovernanceJudgeAudit,
   evaluateGovernanceJudgeVerdict,
@@ -235,170 +233,6 @@ function artifactFileNameMatches(rel: string, flowId: string, kind: "criteria" |
  *   · 报告档位**不低于**变更包档位（Verifier 可升档，不可降档）。
  * 缺失/不一致 ⇒ `insufficient-evidence`（driver 落 manual，不 auto-approve）。
  */
-async function verifyAcceptanceArtifacts(
-  request: GovernanceJudgeRequest,
-  projectRoot: string,
-): Promise<{ ok: true } | { ok: false; reasonCode: string; reason: string }> {
-  const readArtifact = async (
-    raw: string | undefined,
-    label: string,
-    kind: "criteria" | "report" | "change",
-  ): Promise<{ ok: true; rel: string; text: string } | { ok: false; reasonCode: string; reason: string }> => {
-    const rel = typeof raw === "string" ? safeProjectRelativePath(raw) : undefined;
-    if (rel === undefined) {
-      return {
-        ok: false,
-        reasonCode: "insufficient-evidence",
-        reason: `验收卡缺少${label}物证路径；请补齐后重新提交验收（不把「待补」当通过）。`,
-      };
-    }
-    let text: string;
-    try {
-      text = await readFile(path.join(projectRoot, ...rel.split("/")), "utf8");
-    } catch {
-      return {
-        ok: false,
-        reasonCode: "insufficient-evidence",
-        reason: `${label}不可读（${rel}）；请补齐后重新提交验收。`,
-      };
-    }
-    const frontmatterFlowId = frontmatterFlowIdOf(text);
-    const flowIdOk = frontmatterFlowId !== undefined
-      ? frontmatterFlowId === request.flowId
-      : artifactFileNameMatches(rel, request.flowId, kind);
-    if (!flowIdOk) {
-      return {
-        ok: false,
-        reasonCode: "insufficient-evidence",
-        reason: `${label}的 flowId 与卡片不一致（文件 ${rel}，卡片 ${request.flowId}）；请修正后重新提交验收。`,
-      };
-    }
-    return { ok: true, rel, text };
-  };
-
-  const criteria = await readArtifact(request.artifacts?.acceptanceCriteriaPath, "实施前验收标准", "criteria");
-  if (!criteria.ok) return criteria;
-
-  const report = await readArtifact(request.artifacts?.acceptanceReportPath, "验收报告", "report");
-  if (!report.ok) return report;
-  const firstLine = firstNonEmptyLine(report.text);
-  const missingLabels = REPORT_FIRST_LINE_LABELS.filter((label) => !firstLine.includes(label));
-  if (missingLabels.length > 0) {
-    return {
-      ok: false,
-      reasonCode: "insufficient-evidence",
-      reason: `验收报告首行缺少五项中的：${missingLabels.join("、")}（应为「风险档位｜判定依据｜选定检查｜复用证据｜全量回归」）；请按模板重写报告后重新提交验收。`,
-    };
-  }
-  const reportTier = parseRiskTierToken(/风险档位\s*[:：]\s*([^｜|]+)/.exec(firstLine)?.[1]);
-  if (reportTier === undefined) {
-    return {
-      ok: false,
-      reasonCode: "insufficient-evidence",
-      reason: "验收报告首行未给出可识别的风险档位（T0–T3）；请修正报告后重新提交验收。",
-    };
-  }
-
-  const changePackage = await readArtifact(request.artifacts?.changePackagePath, "变更包", "change");
-  if (!changePackage.ok) return changePackage;
-  const changeTier = frontmatterRiskTierOf(changePackage.text);
-  if (changeTier === undefined) {
-    return {
-      ok: false,
-      reasonCode: "insufficient-evidence",
-      reason: `变更包 ${changePackage.rel} frontmatter 缺少 riskTier（T0–T3）；请补齐后重新提交验收。`,
-    };
-  }
-  if (RISK_TIER_RANK[reportTier] < RISK_TIER_RANK[changeTier]) {
-    return {
-      ok: false,
-      reasonCode: "insufficient-evidence",
-      reason:
-        `验收报告档位 ${reportTier} 低于变更包档位 ${changeTier}；` +
-        "Verifier 可以升档、不能降档；请按不低于变更包的档位补充证据后重新提交验收。",
-    };
-  }
-  return { ok: true };
-}
-
-/**
- * 验收机械门槛（P6 验收观察，安全项）：只读流程状态 + 账本 + 标准/报告/变更包，**不采信模型自报**。
- *
- * 2026-10-19 Flow YAML 契约（客户「这些全部改成yaml」）：流程物证是 `docs/flows/<flowId>.yaml` 时，
- * 用 **YAML 契约**判定——`parseFlowStateYaml` 校验文档，`evaluateFlowCompletion` 按显式 `kind`
- * 对账账本证据（不再按 stepId 前缀猜）。YAML 不合法 / 未通过收尾门 ⇒ `manual`。
- * 旧版 `.md` 流程单保留原 Markdown 判定（迁移兼容）。
- * 2026-10-22：在流程收尾门之外追加 `verifyAcceptanceArtifacts`（标准/报告/档位）。
- */
-async function verifyAcceptanceMechanics(
-  request: GovernanceJudgeRequest,
-  projectRoot: string,
-): Promise<{ ok: true } | { ok: false; reasonCode: string; reason: string }> {
-  const flowPath = request.artifacts?.flowPath;
-  const rel = typeof flowPath === "string" ? safeProjectRelativePath(flowPath) : undefined;
-  if (rel === undefined) {
-    return { ok: false, reasonCode: "artifact-missing", reason: "验收卡缺少流程状态物证路径；请补齐流程状态路径后重新提交验收。" };
-  }
-  let flowText: string;
-  try {
-    flowText = await readFile(path.join(projectRoot, ...rel.split("/")), "utf8");
-  } catch {
-    return { ok: false, reasonCode: "artifact-missing", reason: "流程状态不可读，无法核对验收完成度；请补齐可读流程状态后重新提交验收。" };
-  }
-  let ledger;
-  try {
-    ledger = await readGovernanceLedger(projectRoot);
-  } catch {
-    return { ok: false, reasonCode: "ledger-unavailable", reason: "治理账本不可读，无法核对验收完成度；请修复账本后重新提交验收。" };
-  }
-
-  // 2026-10-22（第 3 项）：标准/报告/变更包与档位门槛（与流程格式无关）。
-  const artifacts = await verifyAcceptanceArtifacts(request, projectRoot);
-  if (!artifacts.ok) return artifacts;
-
-  if (/\.ya?ml$/i.test(rel)) {
-    // flowId 以**文件名**为准（契约规则 1）；并核对卡片 flowId，防止用别的流程状态验收本流程。
-    const fileName = rel.split("/").pop() ?? "";
-    const fileFlowId = fileName.replace(/\.ya?ml$/i, "");
-    if (!isGovernanceJudgeFlowId(fileFlowId) || fileFlowId !== request.flowId) {
-      return {
-        ok: false,
-        reasonCode: "insufficient-evidence",
-        reason: `流程 YAML 路径与卡片 flowId 不一致（文件 ${rel}，卡片 ${request.flowId}）；请修正流程状态路径后重新提交验收。`,
-      };
-    }
-    const parsed = parseFlowStateYaml(flowText, fileFlowId);
-    if (!parsed.ok) {
-      const detail = parsed.errors.slice(0, 8).map((error) => `${error.path}: ${error.message}`).join("；");
-      return {
-        ok: false,
-        reasonCode: "insufficient-evidence",
-        reason: `流程 YAML 校验失败（${rel}）：${detail}；请修正流程状态 YAML 后重新提交验收。`,
-      };
-    }
-    if (ledger.errors.length > 0) {
-      return { ok: false, reasonCode: "ledger-unavailable", reason: "治理账本不可读或存在坏行，无法核对验收完成度；请修复账本后重新提交验收。" };
-    }
-    const completion = evaluateFlowCompletion(parsed.flow, ledger.entries);
-    if (!completion.ready) {
-      return {
-        ok: false,
-        reasonCode: "insufficient-evidence",
-        reason: `流程未通过收尾门（${rel}）：${completion.issues.slice(0, 8).join("；")}；请补齐流程步骤/证据后重新提交验收。`,
-      };
-    }
-    return { ok: true };
-  }
-
-  return evaluateAcceptanceCompletion({
-    flowMarkdown: flowText,
-    facts: request.facts,
-    ledgerEntries: ledger.entries,
-    ledgerErrors: ledger.errors.length,
-  });
-}
-
-/** 解析降级路径：最后一条 message 必须是**纯 JSON 对象**（可去代码围栏）；夹带解释/多个 JSON → undefined。 */
 function parseMessageVerdict(summary: string): NormalizedGovernanceJudgeVerdict | undefined {
   let text = summary.trim();
   if (text === "" || text.startsWith("用户指令：")) return undefined;
@@ -513,26 +347,6 @@ export function createGovernanceJudge(opts: CreateGovernanceJudgeOptions): Gover
         ? { intentId: evidence.packet.intent.intentId, intentConfirmed: evidence.packet.intent.confirmed }
         : {}),
     });
-
-    // 验收卡：先机械核对流程完成度（不靠模型自报），未完成/阻塞/待派发/未结算 ⇒ 直接 manual。
-    if (request.cardKind === "acceptance") {
-      const acceptance = await verifyAcceptanceMechanics(request, projectRoot);
-      if (!acceptance.ok) {
-        log.record("governance-judge.manual", {
-          toolCallId: request.toolCallId,
-          reasonCode: acceptance.reasonCode,
-          reason: acceptance.reason,
-          group: request.group,
-          cardKind: request.cardKind,
-        });
-        return {
-          ...manualOutcome(acceptance.reasonCode, acceptance.reason),
-          group: request.group,
-          cardKind: request.cardKind,
-          engine: request.runtime,
-        };
-      }
-    }
 
     // 超时/中止：AbortController + AbortSignal.any。**计时只从模型判断开始**——此前的
     // 上下文校验/物证预检/排队与等卡均不计入（busy 在此前已直接回落）。

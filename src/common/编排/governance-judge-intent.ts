@@ -12,19 +12,22 @@
 //     （客户先确认后改口 revise ⇒ 旧 accepted 不得放行，与 `validateIntentHandoff` §5.1 同口径）；
 //   · 缺失/歧义/未确认一律给出 fail-closed 的 reasonCode，由证据包 builder 直接回落 manual。
 
-import type { GovernanceLedgerEntry } from "./governance-ledger.ts";
-import {
-  GOVERNANCE_SLUG_PATTERN,
-  intentArtifactPath,
-  parseIntentFrontmatter,
-} from "./governance-handoff.ts";
+import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
+
+const GOVERNANCE_SLUG_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
+export const INTENT_DIR_REL = "docs/intents";
+
+/** 意图记录项目相对路径（`docs/intents/<intentId>.md`）。 */
+export function intentArtifactPath(intentId: string): string {
+  return `${INTENT_DIR_REL}/${intentId}.md`;
+}
 
 /** 意图摘要单字段上限（goal/scope/acceptance/非目标/客户原话各自有界）。 */
 export const DECISION_INTENT_FIELD_MAX_BYTES = 2 * 1024;
 /** 意图正文摘录总量上限（客户原话/非目标等章节）。 */
 export const DECISION_INTENT_EXCERPT_MAX_BYTES = 4 * 1024;
 
-export type IntentReferenceSource = "ledger" | "proposal" | "flow-id";
+export type IntentReferenceSource = "proposal" | "flow-id";
 
 export interface ResolvedIntentReference {
   intentId: string;
@@ -100,68 +103,38 @@ function firstField(fields: Readonly<Record<string, string>>, names: readonly st
  */
 export function resolveIntentReference(input: {
   flowId: string;
-  ledgerEntries: readonly GovernanceLedgerEntry[];
+  /** 新系统优先使用申请显式携带的意图 id（无 flow/ledger 机器）。 */
+  intentId?: string;
   proposalText?: string;
 }): IntentResolveResult {
-  const { flowId, ledgerEntries, proposalText } = input;
-  const handoffIntentIds: string[] = [];
-  const invalidHandoffIntentIds: string[] = [];
-  for (const entry of ledgerEntries) {
-    if (entry === null || typeof entry !== "object") continue;
-    if (entry.kind !== "intent.handed-off" || entry.flowId !== flowId) continue;
-    const intentId = trimValue(entry.intentId);
-    if (intentId === "") continue;
-    if (!GOVERNANCE_SLUG_PATTERN.test(intentId)) {
-      // 非空旧值不合现行规则：显式 fail-closed，不当作「没有意图」。
-      if (!invalidHandoffIntentIds.includes(intentId)) invalidHandoffIntentIds.push(intentId);
-      continue;
+  const { flowId, proposalText } = input;
+  const explicit = typeof input.intentId === "string" ? input.intentId.trim() : "";
+  if (explicit !== "") {
+    if (!GOVERNANCE_SLUG_RE.test(explicit)) {
+      return {
+        ok: false,
+        reasonCode: "intent-unconfirmed",
+        detail: `intentId「${explicit}」不符合现行 slug 规则（${GOVERNANCE_SLUG_PATTERN}）`,
+      };
     }
-    if (!handoffIntentIds.includes(intentId)) handoffIntentIds.push(intentId);
+    return { ok: true, reference: { intentId: explicit, source: "proposal" } };
   }
-  if (invalidHandoffIntentIds.length > 0) {
-    return {
-      ok: false,
-      reasonCode: "intent-unconfirmed",
-      detail:
-        `账本 intent.handed-off 的 intentId（${invalidHandoffIntentIds.join("、")}）不符合现行 slug 规则` +
-        `（${GOVERNANCE_SLUG_PATTERN}；2–64 位、首尾小写字母/数字、禁止首尾连字符）；` +
-        "不得静默跳过或回落其他意图来源，请修正意图记录/账本后重试",
-    };
-  }
-  if (handoffIntentIds.length > 1) {
-    return {
-      ok: false,
-      reasonCode: "intent-ambiguous",
-      detail:
-        `同一 flow（${flowId}）关联多个意图（${handoffIntentIds.join("、")}），` +
-        "无法确定客户已确认的出发点",
-    };
-  }
-  if (handoffIntentIds.length === 1) {
-    return { ok: true, reference: { intentId: handoffIntentIds[0]!, source: "ledger" } };
-  }
-
   if (typeof proposalText === "string" && proposalText.trim() !== "") {
     const parsed = parseIntentFrontmatter(proposalText);
     if (parsed.ok) {
-      const intentId = trimValue(parsed.fields["intentId"]);
+      const intentId = parsed.fields["intentId"]?.trim() ?? "";
       if (intentId !== "") {
-        if (!GOVERNANCE_SLUG_PATTERN.test(intentId)) {
-          // 非空旧值不合现行规则：显式 fail-closed，不静默回落 `flow-id` 来源。
+        if (!GOVERNANCE_SLUG_RE.test(intentId)) {
           return {
             ok: false,
             reasonCode: "intent-unconfirmed",
-            detail:
-              `提案 frontmatter 的 intentId「${intentId}」不符合现行 slug 规则` +
-              `（${GOVERNANCE_SLUG_PATTERN}；2–64 位、首尾小写字母/数字、禁止首尾连字符）；` +
-              "不得静默回落 docs/intents/<flowId>.md，请修正提案 frontmatter 后重试",
+            detail: `提案 frontmatter 的 intentId「${intentId}」不符合现行 slug 规则（${GOVERNANCE_SLUG_PATTERN}）`,
           };
         }
         return { ok: true, reference: { intentId, source: "proposal" } };
       }
     }
   }
-
   return { ok: true, reference: { intentId: flowId, source: "flow-id" } };
 }
 
@@ -305,23 +278,89 @@ export function summarizeIntent(input: {
   };
 }
 
-/**
- * 意图是否经客户确认：账本中**最后一条**匹配的 `customer.decision{decisionKind:"intent-confirm"}`
- * 必须为 `accepted`（客户先确认后改口 revise ⇒ 不放行；与 `validateIntentHandoff` 同口径）。
- * 匹配口径：flowId、意图 id（无 flowId 的旧交接把 intentId 作为 flowId 写入）、或条目自带 intentId。
- */
-export function intentConfirmedByLedger(
-  entries: readonly GovernanceLedgerEntry[],
-  flowId: string,
-  intentId: string,
-): boolean {
-  const last = [...entries].reverse().find(
-    (entry) =>
-      entry !== null
-      && typeof entry === "object"
-      && entry.kind === "customer.decision"
-      && entry.decisionKind === "intent-confirm"
-      && (entry.flowId === flowId || entry.flowId === intentId || entry.intentId === intentId),
-  );
-  return last?.customerDecision === "accepted";
+/** 意图 frontmatter 解析结果。 */
+type FrontmatterParse =
+  | { ok: true; fields: Record<string, string> }
+  | { ok: false; code: string; message: string };
+
+function unquote(value: string): string {
+  if (value.length >= 2) {
+    const first = value[0];
+    const last = value[value.length - 1];
+    if ((first === '"' && last === '"') || (first === "'" && last === "'")) return value.slice(1, -1);
+  }
+  return value;
+}
+
+function blockScalarLines(lines: readonly string[]): { indent: number } {
+  const indents = lines.filter((line) => line.trim() !== "").map((line) => /^[ \t]*/.exec(line)![0].length);
+  return { indent: indents.length > 0 ? Math.min(...indents) : 0 };
+}
+
+function foldBlockLines(lines: readonly string[]): string {
+  let out = "";
+  let pendingBlank = 0;
+  let started = false;
+  for (const line of lines) {
+    if (line.trim() === "") { pendingBlank += 1; continue; }
+    if (!started) { out += "\n".repeat(pendingBlank) + line; started = true; }
+    else out += (pendingBlank > 0 ? "\n".repeat(pendingBlank) : " ") + line;
+    pendingBlank = 0;
+  }
+  return out;
+}
+
+function renderBlockScalar(style: "|" | ">", chomp: "-" | "+" | "", lines: readonly string[], indentIndicator: number | undefined): string {
+  const common = blockScalarLines(lines);
+  const indent = indentIndicator ?? common.indent;
+  const stripped = lines.map((line) => (line.trim() === "" ? "" : line.slice(Math.min(indent, /^[ \t]*/.exec(line)![0].length))));
+  let trailingBlanks = 0;
+  while (trailingBlanks < stripped.length && stripped[stripped.length - 1 - trailingBlanks]!.trim() === "") trailingBlanks += 1;
+  const coreLines = stripped.slice(0, stripped.length - trailingBlanks);
+  const core = style === ">" ? foldBlockLines(coreLines) : coreLines.join("\n");
+  if (core === "") return chomp === "+" ? "\n".repeat(trailingBlanks) : "";
+  if (chomp === "-") return core;
+  if (chomp === "+") return core + "\n".repeat(1 + trailingBlanks);
+  return core + "\n";
+}
+
+function parseIntentFrontmatter(text: string): FrontmatterParse {
+  const normalized = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  const lines = normalized.split(/\r?\n/);
+  if (lines.length === 0 || lines[0]!.trim() !== "---") {
+    return { ok: false, code: "missing-frontmatter", message: "意图文件必须以 `---` 开头并在 frontmatter 内给出 intentId/goal/scope/acceptance。" };
+  }
+  const fields: Record<string, string> = {};
+  let closed = false;
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (line.trim() === "---") { closed = true; break; }
+    const trimmed = line.trim();
+    if (trimmed === "" || trimmed.startsWith("#")) continue;
+    const match = /^([A-Za-z0-9_-]+)\s*:\s*(.*)$/.exec(trimmed);
+    if (match === null) {
+      return { ok: false, code: "invalid-frontmatter", message: `意图文件 frontmatter 第 ${i + 1} 行无法解析（只支持顶层 key: value）。` };
+    }
+    const rawValue = match[2]!.trim();
+    const block = /^([|>])([+-]?)([1-9]?)([+-]?)\s*(?:#.*)?$/.exec(rawValue);
+    if (block !== null) {
+      const style = block[1] as "|" | ">";
+      const chompGroup = block[2] !== "" ? block[2] : block[4];
+      const chomp = chompGroup === "+" ? "+" : chompGroup === "-" ? "-" : "";
+      const indentIndicator = block[3] !== "" ? Number(block[3]) : undefined;
+      const content: string[] = [];
+      let j = i + 1;
+      for (; j < lines.length; j++) {
+        const next = lines[j]!;
+        if (next.trim() !== "" && !/^[ \t]/.test(next)) break;
+        content.push(next);
+      }
+      fields[match[1]!] = renderBlockScalar(style, chomp, content, indentIndicator);
+      i = j - 1;
+      continue;
+    }
+    fields[match[1]!] = unquote(rawValue);
+  }
+  if (!closed) return { ok: false, code: "missing-frontmatter", message: "意图文件 frontmatter 没有闭合的 `---`。" };
+  return { ok: true, fields };
 }
