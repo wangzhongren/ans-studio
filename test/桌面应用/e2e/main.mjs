@@ -541,7 +541,7 @@ async function run() {
   // 会话头按钮守卫（2026-10-16 v3 后重锚）：会话头只允许**已批准的**钮——引擎只读入口 + 图标簇
   // （#runtime-select / #tab-work / #tab-card，与桌面UI renderer.test.ts 同口径）；旧的单功能钮
   // （Pi 设置 / 停止 / 状态 pill——#btn-pi-settings/#btn-stop/#session-state）绝不回归。
-  log("CHAT_HEAD_ONLY_APPROVED_BUTTONS=" + (await wc().executeJavaScript("(() => { const ok=['runtime-select','tab-work','tab-card']; return [...document.querySelectorAll('.chat-head button')].every(b=>ok.includes(b.id)) && !document.querySelector('.chat-head #btn-pi-settings, .chat-head #btn-stop, .chat-head #session-state'); })()")));
+  log("CHAT_HEAD_ONLY_APPROVED_BUTTONS=" + (await wc().executeJavaScript("(() => { const ok=['runtime-select','tab-work','tab-card','tab-decisions','tab-tasks']; return [...document.querySelectorAll('.chat-head button')].every(b=>ok.includes(b.id)) && !document.querySelector('.chat-head #btn-pi-settings, .chat-head #btn-stop, .chat-head #session-state'); })()")));
   await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: false, summaries: [], queue: [], running: null })");
   await sleep(150);
   log("STOP_HIDDEN_WHEN_IDLE=" + (await wc().executeJavaScript("document.getElementById('btn-halt').hidden === true")));
@@ -1220,6 +1220,7 @@ async function run() {
   await wc().executeJavaScript("document.getElementById('tab-decisions').click()");
   await sleep(150);
   log("E_HISTORY_PANEL_EXISTS=" + (await wc().executeJavaScript("!!document.getElementById('decision-center-history')")));
+  log("SHOT_11C_DECISION_HISTORY=" + (await shot("11c-decision-history.png")));
   log("E_QUEUE_PRIORITY_CHAT_NO_CARD_SHOT=" + (await shot("11b-decision-dialog.png")));
   // 任务/日志独立面板（数据面失败如实显示，不伪造）
   await wc().executeJavaScript("document.getElementById('tab-tasks').click()");
