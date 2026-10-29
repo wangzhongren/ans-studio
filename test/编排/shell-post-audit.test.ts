@@ -172,3 +172,27 @@ test("P6 返工（R2 审计诚实口径）：`.ans/` 项目内变化按越界记
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test("v2.4 P6：显式 extraRoots（如 skillRoot）的变化按越界记录；审计不宣称任意项目外兜底", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-post-audit-root2-"));
+  const outside = await fs.mkdtemp(path.join(os.tmpdir(), "ans-post-audit-scope-"));
+  try {
+    await fs.mkdir(path.join(root, "src"), { recursive: true });
+    await fs.writeFile(path.join(root, "src", "a.ts"), "a", "utf8");
+    await fs.writeFile(path.join(outside, "state.txt"), "one", "utf8");
+    const before = await snapshotProjectTree({ projectRoot: root, extraRoots: [outside] });
+    assert.ok([...before.keys()].some((key) => key.startsWith("@outside:")), "额外监视根以 @outside 键记录");
+    await fs.writeFile(path.join(outside, "state.txt"), "two-changed", "utf8");
+    const after = await snapshotProjectTree({ projectRoot: root, extraRoots: [outside] });
+    const changes = diffTreeSnapshots(before, after);
+    const violations = findOutOfBoundChanges({
+      changes,
+      forbiddenPrefixes: [],
+      checkWrite: () => ({ allowed: true }),
+    });
+    assert.ok(violations.some((violation) => violation.path.startsWith("@outside:")), "extraRoots 变化按越界记录");
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+    await fs.rm(outside, { recursive: true, force: true });
+  }
+});

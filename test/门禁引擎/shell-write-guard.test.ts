@@ -170,6 +170,9 @@ test("P6 返工（客户 Q1/Q2 口径修正）：静态可证明越界 ⇒ deny�
     ["find", ".", "-exec", "rm", "{}", ";"],
     // 复验 F2：mv -t 的源删除同样校验。
     ["mv", "-t", "src/", "/outside/a"],
+    // 复验 F6：长内联/超界仍 deny。
+    ["node", "-e", "x".repeat(3000)],
+    ["python", "-c", Array.from({ length: 11 }, () => "print(1)").join("\n")],
   ];
   for (const argv of provableOutside) {
     const result = guard(argv);

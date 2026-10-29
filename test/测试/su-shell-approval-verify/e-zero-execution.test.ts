@@ -2,7 +2,7 @@
 // 测试角色：su 命令审批策略——**真实 gate + 真实 run_shell 工具** 的零执行哨兵（2026-10-17）。
 //
 // 覆盖 PM 评审 §5.2「安全端到端（临时目录）」：
-//   · deny（真实规则 `node -e`）批准 → 真实执行并产生哨兵；拒绝/超时/不可用 → **哨兵不存在**；
+//   · review（真实规则**短 `node -e`**，v2.4 起短内联走脚本审查）批准 → 真实执行并产生哨兵；拒绝/超时/不可用 → **哨兵不存在**；
 //   · risky（测试分类器）批准/拒绝 → 同上；
 //   · review（不存在的程序）批准 → 判定已放行但 spawn 失败（如实失败，不假成功）；
 //   · 审计逐条落 sink，command 原文。
@@ -62,19 +62,19 @@ function runShell(gate: ShellGate, cwd: string) {
 const DENY_CMD = sentinelCommand("sentinel-deny.txt");
 const RISKY_CMD = sentinelCommand("sentinel-risky.txt");
 
-test("E1 deny（真实规则 node -e）：批准 → 真实执行并产生哨兵；审计结论 allow", async () => {
+test("E1 review（真实规则短 node -e）：批准 → 真实执行并产生哨兵；审计结论 allow", async () => {
   const fx = makeTempProject();
   try {
     const prompts: OperatorPrompt[] = [];
     const { gate, audit } = makeGate({ operator: operatorStub({ outcome: "allow", operatorId: "客户" }, prompts) });
     const tool = runShell(gate, fx.root);
     const res = await tool.handler({ name: "run_shell", args: { command: DENY_CMD }, toolCallId: "e1" });
-    assert.equal(prompts.length, 1, "deny 档必须出 1 卡");
+    assert.equal(prompts.length, 1, "review 档必须出 1 卡");
     assert.equal(res.ok, true, JSON.stringify(res));
     assert.equal(fs.existsSync(path.join(fx.root, "sentinel-deny.txt")), true, "批准后必须真实执行");
     assert.equal(audit.records.length, 1);
     assert.equal(audit.records[0].conclusion, "allow");
-    assert.equal(audit.records[0].branch, "c-deny→a-allow");
+    assert.equal(audit.records[0].branch, "c-review→a-allow");
     assert.equal(audit.records[0].command, DENY_CMD, "审计 command 原文");
   } finally {
     fx.cleanup();
@@ -82,12 +82,12 @@ test("E1 deny（真实规则 node -e）：批准 → 真实执行并产生哨兵
 });
 
 const NO_EXEC_ARMS: { name: string; outcome: OperatorOutcome | (() => Promise<OperatorOutcome>); branch: string }[] = [
-  { name: "拒绝", outcome: { outcome: "deny", operatorId: "客户", reason: "不同意" }, branch: "c-deny→a-deny" },
-  { name: "不可用", outcome: { outcome: "unavailable", reason: "无人值守" }, branch: "c-deny→a-unavailable" },
+  { name: "拒绝", outcome: { outcome: "deny", operatorId: "客户", reason: "不同意" }, branch: "c-review→a-deny" },
+  { name: "不可用", outcome: { outcome: "unavailable", reason: "无人值守" }, branch: "c-review→a-unavailable" },
 ];
 
 for (const arm of NO_EXEC_ARMS) {
-  test(`E2 deny × ${arm.name}：零执行（哨兵不存在）；审计 branch=${arm.branch}`, async () => {
+  test(`E2 review × ${arm.name}：零执行（哨兵不存在）；审计 branch=${arm.branch}`, async () => {
     const fx = makeTempProject();
     try {
       const prompts: OperatorPrompt[] = [];
@@ -105,7 +105,7 @@ for (const arm of NO_EXEC_ARMS) {
   });
 }
 
-test("E2b deny × 超时：零执行（哨兵不存在）；审计 branch=c-deny→a-timeout", async () => {
+test("E2b review × 超时：零执行（哨兵不存在）；审计 branch=c-review→a-timeout", async () => {
   const fx = makeTempProject();
   try {
     const prompts: OperatorPrompt[] = [];
@@ -121,7 +121,7 @@ test("E2b deny × 超时：零执行（哨兵不存在）；审计 branch=c-deny
     assert.equal(prompts.length, 1);
     assert.equal(res.ok, false);
     assert.equal(fs.existsSync(path.join(fx.root, "sentinel-deny.txt")), false);
-    assert.equal(audit.records[0].branch, "c-deny→a-timeout");
+    assert.equal(audit.records[0].branch, "c-review→a-timeout");
   } finally {
     fx.cleanup();
   }

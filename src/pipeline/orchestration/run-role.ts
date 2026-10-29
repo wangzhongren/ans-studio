@@ -1117,6 +1117,12 @@ export async function openRoleSession(
     projectRoot: input.project.projectRoot,
     forbiddenPrefixes: trioSpec?.forbiddenWritePaths ?? [],
     checkWrite: shellCheckWrite,
+    // 2026-10-29（v2.4 P6）：显式声明的额外监视根（skillRoot）纳入执行后审计；不是项目外兜底。
+    extraRoots:
+      typeof input.project.skillRoot === "string" && input.project.skillRoot !== "" &&
+      path.resolve(input.project.skillRoot) !== path.resolve(input.project.projectRoot)
+        ? [input.project.skillRoot]
+        : [],
   });
 
   // 回交（设计 §10.8）：角色会话 settle → 编排发 `handback` 事件，交回治理角色。

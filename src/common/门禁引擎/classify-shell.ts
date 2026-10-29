@@ -96,6 +96,33 @@ function hasFlag(args: string[], flags: string[]): boolean {
   return false;
 }
 
+// 2026-10-29（v2.4 / 复验 F6）：短内联代码进入脚本审查；长内联仍硬拒。阈值与
+// `shell-command-guard.ts` 的 inline-too-large 同口径（2048B / 10 行 / 单行 1024B）。
+export const SHELL_INLINE_SHORT_MAX_COMMAND_BYTES = 2048;
+export const SHELL_INLINE_SHORT_MAX_LINES = 10;
+export const SHELL_INLINE_SHORT_MAX_LINE_BYTES = 1024;
+
+/** 短内联代码（bounds 内）⇒ 可由上层生成 approvalContext 交脚本审查；超界 ⇒ 硬拒。 */
+export function isShortInlineCode(code: string): boolean {
+  const bytes = Buffer.byteLength(code, "utf8");
+  if (bytes > SHELL_INLINE_SHORT_MAX_COMMAND_BYTES) return false;
+  const lines = code.split(/\r?\n/);
+  if (lines.length > SHELL_INLINE_SHORT_MAX_LINES) return false;
+  return lines.every((line) => Buffer.byteLength(line, "utf8") <= SHELL_INLINE_SHORT_MAX_LINE_BYTES);
+}
+
+/** 从 args（含程序名）中提取内联代码（`node -e X` / `python -c X` / `--eval=X` 等）。 */
+export function inlineCodeOf(args: readonly string[], flags: readonly string[]): string | undefined {
+  for (let i = 1; i < args.length; i += 1) {
+    const arg = args[i]!;
+    for (const flag of flags) {
+      if (arg === flag) return args[i + 1];
+      if (flag.startsWith("--") && arg.startsWith(`${flag}=`)) return arg.slice(flag.length + 1);
+    }
+  }
+  return undefined;
+}
+
 /** 校验规则集形状与版本；合法返回 null，非法返回原因（调用方据此 fail-closed 硬拒）。 */
 function validateRules(rules: unknown): string | null {
   if (typeof rules !== "object" || rules === null || Array.isArray(rules)) return "规则集缺失或非对象";
@@ -169,6 +196,12 @@ function matchHardDeny(args: string[], program: string, rules: ShellHardDenyRule
     if (r.onlyWithSubcommand !== undefined) {
       const sub = typeof args[1] === "string" ? args[1].toLowerCase() : "";
       if (!r.onlyWithSubcommand.map((s) => s.toLowerCase()).includes(sub)) continue;
+    }
+    // 2026-10-29（复验 F6）：短内联（bounds 内）不硬拒——进入脚本审查（approvalContext 携带代码原文）；
+    // 长内联/超界仍硬拒（预封堵 inline-too-large 与本节同口径）。
+    if (r.id === "interpreter-inline") {
+      const code = inlineCodeOf(args, r.onlyWithFlag ?? []);
+      if (code !== undefined && isShortInlineCode(code)) continue;
     }
     // 2026-10-29（客户 Q1/Q2 口径修正，R2）：`bash/sh <script>` 不再硬拒——脚本文件进入脚本审查
     // （approvalContext 携带内容）。`-c/--command` 内联形态仍按 re-shell 硬拒（G3 不变）。

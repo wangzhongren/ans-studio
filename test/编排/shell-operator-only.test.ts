@@ -42,6 +42,7 @@ import {
 } from "../../src/common/编排/shell-gate.ts";
 import { createMemoryAuditSink } from "../../src/common/编排/shell-audit.ts";
 import { evaluateShellWriteTargets } from "../../src/common/门禁引擎/shell-write-guard.ts";
+import { buildShellApprovalContext as realApprovalContext } from "../../src/common/编排/shell-approval-context.ts";
 import { formatOperatorPrompt } from "../../src/common/编排/operator-channel.ts";
 import { assembleOperatorShellGate, type AssembleOperatorShellGateOptions } from "../../src/pipeline/orchestration/shell-arming.ts";
 import { openRoleSession, type AdapterCapabilities } from "../../src/pipeline/orchestration/run-role.ts";
@@ -176,26 +177,29 @@ test("review：批准 → c-review→a-allow；拒绝 → c-review→a-deny（�
   assert.match(okPrompts[0].reason!, /^su-审批档\[review\]：/);
 });
 
-test("deny + approveDeny=true：批准 → c-deny→a-allow；拒绝 → c-deny→a-deny", async () => {
+test("deny + approveDeny=true（非 re-shell 的硬拒例）：批准 → c-deny→a-allow；拒绝 → c-deny→a-deny", async () => {
+  // 2026-10-29（复验 F7）：re-shell（sh -c/eval/exec/source）在真实守卫层一律 deny、不可批准；
+  // 本用例改用**非 re-shell** 的硬拒（sudo 提权）验证 approveDeny 的边界。
+  const privilegeReq = { ...REQ, command: "sudo cat /etc/shadow", argv: ["sudo", "cat", "/etc/shadow"] };
   const approvePrompts: OperatorPrompt[] = [];
   const approveGate = gateWith({
-    classify: classifier("deny", "deny:reshell", "命中硬拒程序规则：reshell"),
+    classify: classifier("deny", "deny:privilege", "命中硬拒程序规则：privilege"),
     operator: operatorStub({ outcome: "allow", operatorId: "客户" }, approvePrompts),
     approveDeny: true,
   });
-  const approved = await approveGate.gate({ ...REQ, command: 'sh -c "echo hi"', argv: ["sh", "-c", "echo hi"] });
+  const approved = await approveGate.gate(privilegeReq);
   assert.equal(approved.allow, true);
   assert.equal(approvePrompts.length, 1);
   assert.match(approvePrompts[0].reason!, /^su-审批档\[deny\]：/);
-  assert.match(approvePrompts[0].reason!, /reshell/);
+  assert.match(approvePrompts[0].reason!, /privilege/);
   assert.equal(approveGate.audit.records[0].branch, `${BRANCH_C_DENY}→a-allow`);
 
   const denyPrompts: OperatorPrompt[] = [];
   const denied = await gateWith({
-    classify: classifier("deny", "deny:reshell"),
+    classify: classifier("deny", "deny:privilege"),
     operator: operatorStub({ outcome: "deny", operatorId: "客户" }, denyPrompts),
     approveDeny: true,
-  }).gate(REQ);
+  }).gate(privilegeReq);
   assert.equal(denied.allow, false);
   assert.equal(denyPrompts.length, 1);
 });
@@ -547,6 +551,8 @@ test("P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不�
     ["awk", "BEGIN{system(\"rm -rf src\")}"],
     ["find", ".", "-exec", "rm", "{}", ";"],
     ["mv", "-t", "src/", "/outside/a"],
+    // 复验 F6：长内联/超界 ⇒ deny。
+    ["node", "-e", "x".repeat(3000)],
   ];
   for (const [index, argv] of outside.entries()) {
     const result = await gate({ command: argv.join(" "), argv, cwd: "/proj", toolCallId: `outside-${index}` });
@@ -562,6 +568,9 @@ test("P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不�
     ["git", "checkout", "--", "."],
     ["rsync", "-a", "src/a", "src/"],
     ["tar", "-xf", "x.tar", "-C", "src/"],
+    // 复验 F6：短内联 ⇒ script（代码内容随 approvalContext）。
+    ["node", "-e", "console.log('ok')"],
+    ["python", "-c", "print(1)"],
   ];
   for (const [index, argv] of opaque.entries()) {
     const result = await gate({ command: argv.join(" "), argv, cwd: "/proj", toolCallId: `opaque-${index}` });
@@ -578,4 +587,47 @@ test("P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不�
   const denied = await gate({ command: "cp src/a.ts other/b.ts", argv: ["cp", "src/a.ts", "other/b.ts"], cwd: "/proj", toolCallId: "plain-outside" });
   assert.equal(denied.allow, false);
   assert.equal(prompts.length, plainCount + 1, "plain 越界拒绝不弹卡");
+});
+
+
+// ————————————————— 2026-10-29（复验 F6）：短内联 → script → gate 携带代码原文 —————————————————
+
+test("F6 真实 gate：短 node -e 进入 script 审查并携带代码原文；长内联硬拒", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-inline-gate-"));
+  const prompts: OperatorPrompt[] = [];
+  const gate = createShellGate({
+    classifyShell: classifier("review", "r-review"),
+    rules: RULES,
+    rulesId: "test",
+    audit: createMemoryAuditSink(),
+    operatorOnly: true,
+    approveDeny: true,
+    operatorChannel: operatorStub({ outcome: "allow", operatorId: "judge:pi" }, prompts),
+    writeGuard: (req) =>
+      evaluateShellWriteTargets({
+        argv: req.argv,
+        cwd: req.cwd,
+        projectRoot: root,
+        skillRoot: root,
+        boundary: { entries: [], boundarySource: "<test>", acceptance: { accepted: false, source: "" } },
+        forbiddenPrefixes: [".ans/"],
+        checkWrite: () => ({ allowed: true }),
+      }),
+    approvalContextLoader: (req) => realApprovalContext({ request: req, projectRoot: root }),
+  });
+  try {
+    const code = "console.log('short-inline')";
+    const ok = await gate({ command: `node -e "${code}"`, argv: ["node", "-e", code], cwd: root, toolCallId: "inline-short" });
+    assert.equal(ok.allow, true, "短内联经审批通过 ⇒ 放行");
+    assert.equal(prompts.length, 1);
+    assert.equal(prompts[0]!.approvalContext?.scripts?.[0]?.content, code, "judge 看到代码原文");
+    assert.match(prompts[0]!.approvalContext?.scripts?.[0]?.sha256 ?? "", /^[0-9a-f]{64}$/);
+
+    const longCode = "x".repeat(3000);
+    const denied = await gate({ command: `node -e "${longCode}"`, argv: ["node", "-e", longCode], cwd: root, toolCallId: "inline-long" });
+    assert.equal(denied.allow, false, "长内联 ⇒ 硬拒");
+    assert.equal(prompts.length, 1, "长内联不弹卡、不交 judge");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });

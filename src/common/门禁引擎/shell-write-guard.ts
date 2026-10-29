@@ -14,7 +14,7 @@
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import type { TaskScope } from "../../model/decision.ts";
 import path from "node:path";
-import { isOpaqueShellExecution } from "./classify-shell.ts";
+import { inlineCodeOf, isOpaqueShellExecution, isShortInlineCode } from "./classify-shell.ts";
 
 export interface ShellWriteGuardInput {
   argv: readonly string[];
@@ -468,6 +468,34 @@ export function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWri
     const awkPrograms = new Set(["awk", "gawk", "mawk", "nawk"]);
     if (awkPrograms.has(program)) {
       return { kind: "deny", reason: "awk 可执行 system()/重定向，硬拒", targets: [] };
+    }
+    // 2026-10-29（复验 F6）：短内联代码（bounds 内）⇒ script（approvalContext 携带代码原文）；
+    // 长内联/超界 ⇒ deny（与 preblock inline-too-large 同口径）。
+    const interpreterInlineFlags: Record<string, readonly string[]> = {
+      node: ["-e", "--eval", "-p", "--print"],
+      python: ["-c"],
+      python2: ["-c"],
+      python3: ["-c"],
+      perl: ["-e", "-E"],
+      ruby: ["-e"],
+      php: ["-r"],
+      lua: ["-e"],
+      rscript: ["-e"],
+      bun: ["-e", "--eval"],
+      "ts-node": ["-e", "--eval"],
+    };
+    const inlineFlags = interpreterInlineFlags[program];
+    if (inlineFlags !== undefined) {
+      const code = inlineCodeOf([program, ...args], inlineFlags);
+      if (code !== undefined) {
+        if (isShortInlineCode(code)) {
+          return {
+            kind: "script",
+            reason: "短内联代码（bounds 内）：代码原文进入审查（开关开启时由判断 agent 核对，关闭时客户本人确认）。",
+          };
+        }
+        return { kind: "deny", reason: "长内联/超界代码硬拒（请改为落盘脚本后走脚本审查）", targets: [] };
+      }
     }
     const shellPrograms = new Set(["sh", "bash", "zsh", "dash", "ash", "ksh", "csh", "tcsh", "fish"]);
     if (shellPrograms.has(program)) {

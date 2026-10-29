@@ -2,7 +2,7 @@
 
 - 日期：2026-10-29｜任务：内置角色工作流维护者化 + 招人流程强制化 + shell 写区约束（方案 v2.1，客户闸门 1/2 已过）｜风险档位：T3（治理/权限/流程变更）
 - 分支/worktree：`feat/entry-role-minimal` @ `.claude/worktrees/entry-role-minimal`｜实施基线：`a27644d`（含人事 chain-enforcement 边界 Delta-2）
-- 依据：`docs/planning/2026-10-29_design-workflow-maintainers-hiring.md`（v2.1，772 行 / `fd20099a…`）；复核记录 `docs/planning/2026-10-29_review-workflow-maintainers-hiring.md`（246 行 / `dd6d2a4e…`，结论通过）；拓扑 v4.1 与真机测试日志 `docs/communication/2026-10-29_*.md`；客户确认 Q1–Q11 按推荐项（Q4 D3 带 decisionId、Q6 验收 judge 最小链事实）；**Q1/Q2 已由客户 2026-10-29 修正**：不强制客户审批，改为判断 agent 审查脚本内容（开关关闭仍弹客户卡；不可用/超时/解析失败 fail-closed），Q2 测试/安装普通审批+审计。
+- 依据：`docs/planning/2026-10-29_design-workflow-maintainers-hiring.md`（v2.5，含 §五 delta、R1–R5、验收 v3 F6/F7 处置与 v2.5 三处文档小修；文件随本批入库）；复核记录 `docs/planning/2026-10-29_review-workflow-maintainers-hiring.md`（246 行 / `dd6d2a4e…`，结论通过）；拓扑 v4.1 与真机测试日志 `docs/communication/2026-10-29_*.md`；客户确认 Q1–Q11 按推荐项（Q4 D3 带 decisionId、Q6 验收 judge 最小链事实）；**Q1/Q2 已由客户 2026-10-29 修正**：不强制客户审批，改为判断 agent 审查脚本内容（开关关闭仍弹客户卡；不可用/超时/解析失败 fail-closed），Q2 测试/安装普通审批+审计。
 - 性质：实施与验证记录（**不是验收结论**）；本地提交，不 push、不合并 main。
 
 ## 1. 实施范围（严格按方案 §8 写集）
@@ -10,7 +10,7 @@
 ### 1.1 门禁引擎
 
 - `src/common/门禁引擎/governance-roles.ts`：六张内置卡按拓扑 v4.1 重写——幕僚五步链（产品意图 → 策划方案+名单+架构 → 人事按名单招人 → 交付运营）与「一次一步/不跳步」；产品意图文档；策划 `project-roster/v1` 名单（schema/version/roles/directories）；人事 D3（`cardKind=appointment` 多选、decisionId、写卡目录 ⊆ 名单）；运营接交付/派实现/收报/发起验收；质检回报**发起方**。convener 能力位 `dispatchTask: true`（已批准权限 delta；目标矩阵由桌面 M6/M7 执行）。worker 卡模板要点（实现任务只来自运营、只写名单目录、验收归质检）并入人事卡。
-- `src/common/门禁引擎/classify-shell.ts`：新增 `isOpaqueShellExecution(argv)`——解释器执行脚本文件 / `-m` 模块 / `npm run`、`npx`、`corepack` / 构建任务工具 ⇒ opaque；**Q2 A**：`node --test`、`npm test`/`install`/`ci` 等按普通审批（开关可代批）+ 审计；`node -e`/`sh -c` 等 hardDeny 不变（G3）。
+- `src/common/门禁引擎/classify-shell.ts`：新增 `isOpaqueShellExecution(argv)`——解释器执行脚本文件 / `-m` 模块 / `npm run`、`npx`、`corepack` / 构建任务工具 ⇒ opaque；**Q2 A**：`node --test`、`npm test`/`install`/`ci` 等按普通审批（开关可代批）+ 审计；**F6/G3**：短内联（`node -e`/`python -c`，≤2048B、≤10 行、单行 ≤1024B）不硬拒、走脚本审查；长内联与 re-shell（`bash -c`/`sh -c`/`eval`/`exec`/`source`/`awk`/`find -exec`）维持 hardDeny；`bash script.sh` 走脚本审查。
 - `src/common/门禁引擎/shell-write-guard.ts`（新增）：确定性写目标判定 + 注入 `checkWrite`（同一 `resolveWrite`，realpath/F4/scope 口径一致）。显式写目标（cp/mv/tee/touch/mkdir/rm/sed -i/chmod/ln/dd 等）逐目标判定：越界/`..`/绝对越界/禁写前缀 ⇒ deny；全部在边界内 ⇒ pass（继续既有审批链）；不透明执行 ⇒ opaque。cwd 异常时以项目根为基准（防按外部目录解释后放行）。
 
 ### 1.2 编排
@@ -18,8 +18,8 @@
 - `src/common/编排/workflow-preconditions.ts`（新增）：`project-roster/v1` 名单解析/校验（schema/flowId/version/角色 id/内置 id 拒绝/目录合法与不重叠/治理路径拒绝）、最新名单发现与 `version + sha256`、D3 卡形状校验与推荐集生成、派发矩阵 M1–M8、报告路由 M9。
 - `src/common/编排/task-state.ts`：`task.created.from` / `task.closed.by` 放宽为 `chief | convener`；新增 `flowId`/`stepId` 与 `request.resolved.rosterVersion/rosterSha256` 校验（slug / 正整数 / 64 位 hex）；旧记录（无新字段）逐字可读（F9 兼容）。
 - `src/common/编排/governance-judge-facts.ts` / `governance-judge-verdict.ts` / `governance-judge-prompt.ts`：验收 judge **最小链事实**（Q6 A）——产品意图 + 提案 + 名单（version/hash）+ D3 裁决 + 质检报告；撤除旧 flow 的 proposalDecision/criteria/change-package 门槛；appointment 推荐集按名单校验。
-- `src/common/编排/shell-gate.ts` / `src/pipeline/orchestration/shell-arming.ts`：注入 `writeGuard`、`snapshotBefore` 与 `approvalContextLoader`。显式写目标越界 deny 直接拒绝（0 卡、0 judge）；script 先加载**脚本审查上下文**（不可用 ⇒ fail-closed 拒绝），再交既有审批链（开关开 → judge；开关关 → 客户卡）；只读档 script 拒绝；非 advisory 项目链的 c=deny 硬地板保持；最终 allow 后、spawn 前拍快照。新增 `shell-approval-context.ts`：`node/python/bash <script>`、`node -e`、`npm run <script>` 读取有界内容；`package.json#scripts`、内联代码、非脚本 opaque 说明；judge 提示词（`shell-judge-prompt.ts`）展示脚本路径/内容并要求核对写区/破坏性/越权。
-- `src/common/编排/shell-post-audit.ts`（新增）：执行前轻量快照（路径+mtime+size）→ 执行后 diff → 越界新增/修改/删除写 `docs/audit/shell-gate.jsonl` 并返回越界清单（不自动回滚；审计写失败只诊断）。**返工（P6/R2）**：`.ans/` 不再排除（应用独占治理记录区的项目内变化按越界审计）；执行后审计**只做项目内可见性**，不宣称兜底项目外写入——项目外越界由 static guard（脚本路径/显式目标）与 judge 审查拦截。
+- `src/common/编排/shell-gate.ts` / `src/pipeline/orchestration/shell-arming.ts`：注入 `writeGuard`、`snapshotBefore` 与 `approvalContextLoader`。显式写目标越界 deny 直接拒绝（0 卡、0 judge）；script 先加载**脚本审查上下文**（不可用 ⇒ fail-closed 拒绝），再交既有审批链（开关开 → judge；开关关 → 客户卡）；只读档 script 拒绝；非 advisory 项目链的 c=deny 硬地板保持；最终 allow 后、spawn 前拍快照。新增 `shell-approval-context.ts`：`node/python/bash <script>`、短内联 `node -e`/`python -c`、`npm run <script>` 读取有界内容；`package.json#scripts`、内联代码、非脚本 opaque 说明；judge 提示词（`shell-judge-prompt.ts`）展示脚本路径/内容并要求核对写区/破坏性/越权。
+- `src/common/编排/shell-post-audit.ts`（新增）：执行前轻量快照（路径+mtime+size）→ 执行后 diff → 越界新增/修改/删除写 `docs/audit/shell-gate.jsonl` 并返回越界清单（不自动回滚；审计写失败只诊断）。**返工（P6/R2/v2.4）**：`.ans/` 不再排除（应用独占治理记录区的项目内变化按越界审计）；执行后审计覆盖项目树 + **显式声明的 extraRoots（skillRoot）**边界，**不宣称**兜底任意项目外写入——项目外越界由 static guard（脚本路径/显式目标）与 judge 审查拦截。
 - `src/pipeline/orchestration/run-role.ts`：招人卡只由人事发起（选项=最新名单角色、多选、推荐集由应用生成）；`TRIO_CARD_KINDS.convener` 移除 `appointment`、nominator 增 `appointment`；appointment-write boundary 条目 ⊆ 名单授权目录（可读名单时强制）；shell 装配构造 `checkWrite` 闭包（boundary/scope/skillRoot/forbidden），并挂 `shellPostAudit` 能力。
 
 ### 1.3 桌面窗口
@@ -38,38 +38,41 @@
 
 | 文件 | 动作 | tests | 覆盖 |
 | --- | --- | ---: | --- |
-| `test/门禁引擎/shell-write-guard.test.ts` | 新增（返工后 9，含 F1/F2 形态） | 9 | 显式写目标边界/越界/禁写/逃逸、opaque 与 Q2 例外、cwd 防御、TaskScope 经 checkWrite 收窄；**P6 十种绕过形态全部 opaque**、plain 形态不误伤 |
-| `test/编排/workflow-preconditions.test.ts` | 新增 | 7 | 名单解析正/负例、最新名单 version/hash、D3 卡形状/推荐集、M1–M8 矩阵、M9 路由 |
-| `test/编排/shell-post-audit.test.ts` | 新增（返工后 5） | 5 | 快照 diff、越界判定、审计记录、真实文件系统排除项；**`.ans/` 与项目根之外（extraRoots/`..`/绝对路径）越界检测** |
+| `test/门禁引擎/classify-shell.test.ts` | 更新（v2.4 F6） | 52 | 短内联 review/长内联与 re-shell deny；bash 脚本文件 review；find -exec deny |
+| `test/门禁引擎/shell-write-guard.test.ts` | 新增（返工后 9，含 F1/F2/F6 形态） | 9 | 显式写目标边界/越界/禁写/逃逸、opaque 与 Q2 例外、cwd 防御、TaskScope 经 checkWrite 收窄；**P6 十种绕过形态全部 opaque**、plain 形态不误伤 |
+| `test/编排/workflow-preconditions.test.ts` | 新增 | 8 | 名单解析正/负例、最新名单 version/hash、D3 卡形状/推荐集、M1–M8 矩阵、M9 路由 |
+| `test/编排/shell-post-audit.test.ts` | 新增（返工后 6） | 6 | 快照 diff、越界判定、审计记录、真实文件系统排除项；**`.ans/` 与项目根之外（extraRoots/`..`/绝对路径）越界检测** |
 | `test/编排/appointment-roster.test.ts` | 新增 | 4 | 人事发卡/推荐集、选项≠名单拒绝、convener 发卡拒绝、boundary 目录 ⊆ 名单目录 |
 | `test/编排/acceptance-judge-minimal.test.ts` | 新增 | 3 | 验收最小链事实通过/缺项 manual/物证缺失 |
-| `test/编排/shell-operator-only.test.ts` | 更新（+2，返工 +1） | 15 | opaque → 审批（含脚本上下文，不强制客户本人）、上下文不可用 fail-closed、写目标 deny 直拒；**P6 真实守卫 × 审批档集成（越界 deny / 不可解析交判断）** |
+| `test/编排/shell-operator-only.test.ts` | 更新（+2，返工 +3） | 16 | opaque → 审批（含脚本上下文，不强制客户本人）、上下文不可用 fail-closed、写目标 deny 直拒；**P6 真实守卫 × 审批档集成（越界 deny / 不可解析交判断）** |
 | `test/编排/shell-approval-context.test.ts` | 新增（R2 后 9） | 9 | 脚本/内联/npm run/test/install/构建配置内容与 sha256；深度 ≤2 引用展开；64KB/2000 行/3 文件/128KB bounds fail-closed；注入防护与 judge 提示词 |
 | `test/编排/task-state.test.ts` | 更新（+2） | 9 | from/closed 放宽、stepId/flowId、roster 字段校验、旧记录兼容 |
 | `test/编排/trio-worker-report.test.ts` | 更新（+1） | 4 | v4.1 卡文本（五步链/名单/D3/验收发起方）、convener dispatch 能力 |
 | `test/桌面应用/chain-enforcement.test.ts` | 新增（返工后 6） | 6 | 跳步拒绝（M1/M2/M8）且拒绝在 task.created 之前、交付/运营作用域（M5–M7）、报告路由（M9，含**质检回报发起方**）、M11 名单版本（含 flowId-only） |
 | `test/桌面应用/operator-channel.test.ts` | 更新（+3） | 56 | judge 收到脚本内容并据其裁决（deny/allow）；开关关 → 客户卡展示内容；manualOnly 兼容能力 |
 | `test/runtime-core/customer-input-context.test.ts` | 更新（+1） | 3 | request_choice 回执 decisionId |
+| `test/测试/su-shell-approval-verify/e-zero-execution.test.ts` | 更新（v2.4 F6） | 6 | 短 `node -e` 由 c-deny 改判 c-review→a-* 脚本审查分支；长内联/re-shell 仍 deny |
 | 既有更新 | — | — | `chief-workflow`（convener dispatch v4.1）、`star-routing`（M8/M5/M6）、`entry-role-minimal-d`、`i-full-chain` |
 
-定向：门禁引擎 261 计（260 过 / 1 skip）、编排 503 计（502 过 / 1 红＝既有 Windows symlink EPERM）、桌面应用 340/340、runtime-core 257 计（250 过 / 3 红 / 4 skip，红均既有 symlink）、测试 544 计（534 过 / 4 红 / 6 skip，红均基线）、项目管理 154 计（149 过 / 5 skip）、装配 85/85。
+定向（返工 v3 后重跑）：门禁引擎 264 计（263 过 / 1 skip）、编排 518 计（517 过 / 1 红＝既有 Windows symlink EPERM）、桌面应用 344/344、runtime-core 258 计（251 过 / 3 红 / 4 skip，红均既有 symlink）、测试 544 计（534 过 / 4 红 / 6 skip，红均基线）、项目管理 154 计（149 过 / 5 skip）、装配 85/85；逐文件：classify-shell 52、shell-write-guard 9、shell-operator-only 16、shell-post-audit 6、shell-approval-context 9、workflow-preconditions 8、appointment-roster 4、acceptance-judge-minimal 3、task-state 9、trio-worker-report 4、chain-enforcement 6、operator-channel 56、su zero-execution 6（合计 188/188 全过）。
 
 ## 3. 验证（串行）
 
-- 全量：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（340 文件）→ **见执行终值**（基线 2919/2889/12/18；日志 `%TEMP%\ans-full-hiring-final.log`）。
-- `npm run typecheck` exit 0；`npm run typecheck:renderer` exit 0；`npm run build:renderer` exit 0。
-- phase5a 真实 Electron：**34/34 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-hiring\report.json`，sha256 `05849042…`）。
-- 桌面 E2E（临时夹具 `%TEMP%\ans-e2e-g-fixture-1029`；fresh userData）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告见 `%TEMP%ns-e2e-hiring2-out
-eport.txt`（返工后重跑）；`session:role-states` 未注册错误 0。
+- 全量（返工 v3 后）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（340 文件）→ **2977 tests / 2947 pass / 12 fail / 18 skip**（vs 基线 2919/2889/12/18：+58/+58/0/0；12 红＝9 Windows symlink EPERM + T1×3 既有环境问题）；日志 `%TEMP%\ans-full-hiring-rework6.log`，sha256 `a1fe13f5f2d5923d413bb84c5f32670f788c770915afad5c313af94b118210bc`。
+- `npm run typecheck` exit 0；`npm run typecheck:renderer` exit 0；`npm run build:renderer` exit 0（返工 v3 后重跑）。
+- phase5a 真实 Electron（返工 v3 后）：**34/34 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-hiring4\report.json`，sha256 `66db07d6f9fcb34ff2cfbe07c040b45117522bf9549bf74e97b3fb1c61633372`；5 PNG）。
+- 桌面 E2E（返工 v3 后；临时夹具 `%TEMP%\ans-e2e-g-fixture-1029`；fresh userData）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-hiring4-out\report.txt`，sha256 `e283f34a36b464f2fa0668a03bc135ca3e9147782135e11c18eec706bfd5cf03`；`session:role-states` 未注册错误 0。
 
 ## 4. 应用冒烟（重启后）
 
 - 11:14–11:15（本地）：停止旧进程 → `npm run app -- --remote-debugging-port=9235`（worktree 新代码）后台启动；CDP 在线、渲染器加载（标题「ANS 治理会话工作台」）。
 - 两开关按持久值恢复为**开**（`preferences.json` 此前的 `judgeSwitches:{approval:true,decision:true}`）。
 - 经渲染器真实入口 `loadProject('C:/Users/51054/Desktop/work/trial-focus-timer')` **只读**导入：六角色枚举（chief/product/rapporteur/nominator/convener/verifier）、`primaryRoleId=chief`、`governanceModel=trio`；未打开会话、未向 trial 项目写入。
-- 截图 `%TEMP%ns-regress-1029 8-hiring-smoke.png`；启动日志 `%TEMP%ns-regress-1029pp-hiring-smoke.log` 无 error/failed/exception。应用保持运行（CDP 9235）。**真机回归约定**：一律使用 Pi 运行时（项目已配置 `ANS_PI_*`/`ANTHROPIC_AUTH_TOKEN`）；UI 默认 Claude 运行时需要 `ANTHROPIC_API_KEY`，本批不配置、不使用 Claude 做真机回归。
+- 截图 `%TEMP%\ans-regress-1029\08-hiring-smoke.png`；启动日志 `%TEMP%\ans-regress-1029\app-hiring-smoke.log` 无 error/failed/exception。应用保持运行（CDP 9235）。**真机回归约定**：一律使用 Pi 运行时（项目已配置 `ANS_PI_*`/`ANTHROPIC_AUTH_TOKEN`）；UI 默认 Claude 运行时需要 `ANTHROPIC_API_KEY`，本批不配置、不使用 Claude 做真机回归。
 
-**返工 v2 后冒烟（F1–F5）**：停止旧进程 → 最终代码后台启动（CDP 9235）→ 两开关持久值仍为开 → `loadProject('trial-focus-timer')` 只读导入并 `selectRuntime('pi')`（六角色/primary=chief/trio）→ 截图 `%TEMP%ns-regress-1029-hiring-rework2-smoke.png`；启动日志 `%TEMP%ns-regress-1029pp-hiring-rework3.log` 无 error/failed/exception（未出现 Claude/ANTHROPIC_API_KEY 缺失）。**trial 项目 SHA-256 前后清单**：`trial-manifest-pre.txt` 与 `trial-manifest-post2.txt` 均 28 文件、sha256 同为 `5af6cd98…`，`diff` 为空（TRIAL_UNCHANGED）——冒烟未改 trial 任何文件。
+**返工 v2 后冒烟（F1–F5）**：停止旧进程 → 最终代码后台启动（CDP 9235）→ 两开关持久值仍为开 → `loadProject('trial-focus-timer')` 只读导入并 `selectRuntime('pi')`（六角色/primary=chief/trio）→ 截图 `%TEMP%\ans-regress-1029\10-hiring-rework2-smoke.png`；启动日志 `%TEMP%\ans-regress-1029\app-hiring-rework3.log` 无 error/failed/exception（未出现 Claude/ANTHROPIC_API_KEY 缺失）。**trial 项目 SHA-256 前后清单**：`trial-manifest-pre.txt` 与 `trial-manifest-post2.txt` 均 28 文件、sha256 同为 `5af6cd98…`，`diff` 为空（TRIAL_UNCHANGED）——冒烟未改 trial 任何文件。
+
+**返工 v3 后冒烟（F6/F7，最终代码）**：停止旧进程 → 当前 worktree 代码后台启动（CDP 9235；日志 `%TEMP%\ans-regress-1029\app-hiring-rework4.log` 无 error/failed/exception，未出现 Claude/ANTHROPIC_API_KEY 缺失，Pi 包加载/bindRole 正常）→ 两开关持久值仍为开（`auto-approve-toggle`、`judge-decision-toggle` 均 checked）→ `loadProject('C:/Users/51054/Desktop/work/trial-focus-timer')` 只读导入（六角色、`primaryRoleId=chief`、`governanceModel=trio`、`session=null`）→ 项目载入后 `selectRuntime('pi')` 返回 true、`runtime=pi`（UI「Pi 已配置」）→ 截图 `%TEMP%\ans-regress-1029\11-hiring-rework3-smoke.png`。**trial 项目 SHA-256 前后清单**：`trial-manifest-pre3.txt` 与 `trial-manifest-post3.txt` 均 28 文件、sha256 同为 `5af6cd981a2d82e7c553e01b1852a1cd6dd52b40436e98f382101b06ff99c9ec`，`diff` 为空（TRIAL_UNCHANGED）——冒烟未改 trial 任何文件。应用保持运行（CDP 9235）。
 
 ## 4.1 回滚前置（F3 返工）
 

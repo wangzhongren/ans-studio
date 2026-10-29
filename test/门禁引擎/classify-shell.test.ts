@@ -3,7 +3,7 @@
 //       「危险但有正当用途」→ risky（过 b 且必过 a）；常规未命中 → review；
 //       规则集缺失/非法/版本未知/模型未知 → deny（绝不放行）；argv 非法 → deny；argv[0] 藏命令 → deny；
 //       **执行模型耦合（§7.10）**：argv-noshell 下元字符是参数字符；shell-string/缺省下元字符恢复拦截；
-//       **反向守卫（§14.4）**：`sh -c`/`eval`/`node -e`/`awk` 仍 deny，**不是** risky、**不是** allow——
+//       **反向守卫（§14.4）**：`sh -c`/`eval`/长内联/`awk` 仍 deny（短内联按 v2.4 走脚本审查），**不是** risky、**不是** allow——
 //       防止后人「顺手放宽」把「任意代码」并进「有界的危险命令」；
 //       以及**记录在案的已知缺口**（间接执行类无法穷尽，如实断言为 review）。
 import { test } from "node:test";
@@ -40,7 +40,7 @@ test("D3：保留裸读取命令、exe、既有窄re-shell及原deny/risky", () 
     ["cmd.exe", "/c", "dir"]]) {
     assert.equal(classifyShell(argv, rules), "allow", argv.join(" "));
   }
-  for (const argv of [["./sh", "-c", "anything"], ["node.ps1", "-e", "anything"],
+  for (const argv of [["./sh", "-c", "anything"], ["node.ps1", "-e", "x".repeat(3000)],
     ["C:\\Windows\\System32\\cmd.exe", "/c", "dir"]]) {
     assert.equal(classifyShell(argv, rules), "deny", argv.join(" "));
   }
@@ -218,7 +218,6 @@ test("只读 re-shell 仍守住：del/Get-Process/元字符/变量/绝对路径/
       "Test-Path 'C:\\x'",
     ],
     ["pwsh", "-NoProfile", "-Command", "Test-Path 'C:\\x'"],
-    ["node", "-e", "1"],
   ]) {
     assert.equal(classifyShell(argv, rules), "deny", `必须仍 deny：${argv.join(" ")}`);
   }
@@ -257,22 +256,25 @@ test("硬拒：eval / exec / source / command（求值内建）→ deny；同样
   }
 });
 
-test("硬拒：解释器内联求值 node -e / --eval、python -c、perl -e、ruby -e、php -r、deno eval → deny", () => {
-  assert.equal(classifyShell(["node", "-e", "require('fs').writeFileSync('x','')"], rules), "deny");
-  assert.equal(classifyShell(["node", "--eval", "1"], rules), "deny");
-  assert.equal(classifyShell(["python", "-c", "open('x','w').write('')"], rules), "deny");
-  assert.equal(classifyShell(["perl", "-e", "unlink 'x'"], rules), "deny");
-  assert.equal(classifyShell(["ruby", "-e", "File.write('x','')"], rules), "deny");
-  assert.equal(classifyShell(["php", "-r", "file_put_contents('x','');"], rules), "deny");
+test("解释器内联：短内联（bounds 内）→ script 审查（review）；长内联/超界 → deny；deno eval 仍 deny", () => {
+  // 2026-10-29（复验 F6）：短内联交脚本审查（approvalContext 携带代码原文，受 2048B/10 行/1024B 行上限）。
+  assert.equal(classifyShell(["node", "-e", "console.log('ok')"], rules), "review");
+  assert.equal(classifyShell(["node", "--eval", "1"], rules), "review");
+  assert.equal(classifyShell(["python", "-c", "print(1)"], rules), "review");
+  assert.equal(classifyShell(["perl", "-e", "print 1"], rules), "review");
+  // 长内联/超界仍硬拒。
+  assert.equal(classifyShell(["node", "-e", "x".repeat(3000)], rules), "deny");
+  assert.equal(classifyShell(["python", "-c", Array.from({ length: 11 }, () => "print(1)").join("\n")], rules), "deny");
+  assert.equal(classifyShell(["node", "-e", "x".repeat(1100)], rules), "deny", "单行 >1024B 仍硬拒");
+  // deno eval 属独立硬拒规则（维持不变）。
   assert.equal(classifyShell(["deno", "eval", "Deno.writeTextFileSync('x','')"], rules), "deny");
 });
 
-// ★★ 反向守卫：内联求值同样不得被放宽 ★★
-test("反向守卫：node -e / python -c 仍 deny——不是 risky、不是 allow（argv 里没有可读程序名）", () => {
+// ★★ 反向守卫：长内联仍 deny；短内联只能落 review（不得 risky/allow） ★★
+test("反向守卫：长内联仍 deny；短内联落 review——不是 risky、不是 allow", () => {
   for (const argv of [
-    ["node", "-e", "1"],
-    ["python", "-c", "print(1)"],
-    ["perl", "-e", "1"],
+    ["node", "-e", "x".repeat(3000)],
+    ["python", "-c", Array.from({ length: 11 }, () => "print(1)").join("\n")],
   ]) {
     const d = classifyShell(argv, rules);
     assert.equal(d, "deny");

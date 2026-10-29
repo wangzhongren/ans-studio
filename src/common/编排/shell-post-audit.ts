@@ -21,6 +21,14 @@ export interface TreeEntryFacts {
 
 export type TreeSnapshot = Map<string, TreeEntryFacts>;
 
+/** 显式声明的额外监视根（如 skillRoot）的快照键前缀；**不是**项目外写入的兜底覆盖。 */
+export const OUTSIDE_SNAPSHOT_PREFIX = "@outside:";
+
+export function isOutsideSnapshotPath(rel: string): boolean {
+  return rel.startsWith(OUTSIDE_SNAPSHOT_PREFIX) || rel.startsWith("../") ||
+    rel.startsWith("/") || /^[a-zA-Z]:[\/]/.test(rel);
+}
+
 export interface ShellPostAuditChange {
   path: string;
   change: "added" | "modified" | "deleted";
@@ -80,10 +88,38 @@ async function walk(
 }
 
 /** 轻量快照（路径 + mtimeMs + size；排除项见 DEFAULT_EXCLUDED_PREFIXES）。 */
+async function walkOutside(root: string, current: string, out: TreeSnapshot, limit: number): Promise<void> {
+  if (out.size >= limit) return;
+  let entries;
+  try {
+    entries = await fs.readdir(current, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (out.size >= limit) return;
+    const abs = path.join(current, entry.name);
+    if (entry.isSymbolicLink()) continue;
+    if (entry.isDirectory()) {
+      await walkOutside(root, abs, out, limit);
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    try {
+      const stat = await fs.stat(abs);
+      out.set(`${OUTSIDE_SNAPSHOT_PREFIX}${abs.replace(/\\/g, "/")}`, { mtimeMs: stat.mtimeMs, size: stat.size });
+    } catch {
+      /* 并发删除：忽略 */
+    }
+  }
+}
+
 export async function snapshotProjectTree(input: {
   projectRoot: string;
   excludedPrefixes?: readonly string[];
   maxEntries?: number;
+  /** 显式声明的额外监视根（如 skillRoot）；其变化以 @outside 键记录为越界。不是项目外兜底覆盖。 */
+  extraRoots?: readonly string[];
 }): Promise<TreeSnapshot> {
   const snapshot: TreeSnapshot = new Map();
   await walk(
@@ -93,6 +129,11 @@ export async function snapshotProjectTree(input: {
     snapshot,
     input.maxEntries ?? DEFAULT_MAX_ENTRIES,
   );
+  for (const extra of input.extraRoots ?? []) {
+    if (typeof extra !== "string" || extra.trim() === "") continue;
+    if (path.resolve(extra) === path.resolve(input.projectRoot)) continue;
+    await walkOutside(input.projectRoot, path.resolve(extra), snapshot, input.maxEntries ?? DEFAULT_MAX_ENTRIES);
+  }
   return snapshot;
 }
 
@@ -118,9 +159,9 @@ export function findOutOfBoundChanges(input: {
 }): ShellPostAuditChange[] {
   const out: ShellPostAuditChange[] = [];
   for (const change of input.changes) {
-    // 防御：快照键不应出现绝对路径/`..`（只做项目内可见性）；万一出现，按越界记录但不宣称
-    // 覆盖项目外写入——项目外拦截由 static guard 与 judge 负责。
-    if (change.path.startsWith("../") || change.path.startsWith("/") || /^[a-zA-Z]:[\/]/.test(change.path)) {
+    // 显式额外监视根（@outside）或防御性绝对/`..` 键：按越界记录；审计**不宣称**覆盖任意项目外写入
+    // （项目外拦截由 static guard 与 judge 负责）。
+    if (isOutsideSnapshotPath(change.path)) {
       out.push(change);
       continue;
     }
@@ -171,6 +212,8 @@ export interface CreateShellPostAuditOptions {
   now?: () => Date;
   excludedPrefixes?: readonly string[];
   maxEntries?: number;
+  /** 显式声明的额外监视根（如 skillRoot）。 */
+  extraRoots?: readonly string[];
 }
 
 export function createShellPostAudit(options: CreateShellPostAuditOptions): ShellPostAudit {
@@ -181,6 +224,7 @@ export function createShellPostAudit(options: CreateShellPostAuditOptions): Shel
       projectRoot: input.projectRoot,
       ...(options.excludedPrefixes !== undefined ? { excludedPrefixes: options.excludedPrefixes } : {}),
       ...(options.maxEntries !== undefined ? { maxEntries: options.maxEntries } : {}),
+      ...(options.extraRoots !== undefined ? { extraRoots: options.extraRoots } : {}),
     }));
 
   const writeRecord = async (record: ShellPostAuditRecord): Promise<void> => {
