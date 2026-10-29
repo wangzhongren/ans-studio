@@ -691,12 +691,15 @@ export function Composer() {
             role="group"
             aria-label={t("ui.composer.trustGroupTitle")}
           >
-            <span className="composer-trust-title">
-              {t("ui.composer.trustGroupTitle")}
+            <span className="composer-trust-text">
+              <span className="composer-trust-title">
+                {t("ui.composer.trustGroupTitle")}
+              </span>
+              <span id="judge-switch-hint" className="composer-trust-hint">
+                {t("ui.decisionDialog.switchHint")}
+              </span>
             </span>
-            <span id="judge-switch-hint" className="composer-trust-hint">
-              {t("ui.decisionDialog.switchHint")}
-            </span>
+            <span className="composer-trust-actions">
             <label
               className={
                 "composer-auto-approve" +
@@ -771,6 +774,7 @@ export function Composer() {
               hidden={decisionStatus === ""}
             >
               {decisionStatus}
+            </span>
             </span>
           </div>
 
