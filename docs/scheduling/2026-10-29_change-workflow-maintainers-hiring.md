@@ -59,10 +59,10 @@
 
 ## 3. 验证（串行）
 
-- 全量（最终提交 b7813ad）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（340 文件）→ **3000 tests / 2970 pass / 12 fail / 18 skip**（12 红＝9 Windows symlink EPERM + T1×3 既有环境问题）；日志 `%TEMP%\ans-env-full.log`，sha256 `9017f225bcc796747b504e73ebbadb883708f7ac1d49456a5ebfd4a5a964fdbf`。
+- 全量（最终提交 fe11554）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（340 文件）→ **3000 tests / 2970 pass / 12 fail / 18 skip**（12 红＝9 Windows symlink EPERM + T1×3 既有环境问题）；日志 `%TEMP%\ans-v220-full.log`，sha256 `e6154b5e9c6065d8dc016151db3caca3689f666d3945e4039f28f1ae361373a9`。
 - `npm run typecheck` exit 0；`npm run typecheck:renderer` exit 0；`npm run build:renderer` exit 0（最终代码重跑）。
-- phase5a 真实 Electron（最终）：**34/34 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-env\report.json`，sha256 `2b4902b428c7cdacaf89286a55ea30bc237895b727e0281be9a0032f90834945`）。
-- 桌面 E2E（最终；临时夹具 `%TEMP%\ans-e2e-g-fixture-1029`；fresh APPDATA）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-env-out\report.txt`，sha256 `342ba23911121be552a258cbffacd344359889bada407db34c35f71e9932db49`；`session:role-states` 未注册错误 0。
+- phase5a 真实 Electron（最终）：**34/34 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-v220\report.json`，sha256 `9d811a04ed7646898807ccdfec75dc4a082f4a2769849326a5c2e100198fa7c3`）。
+- 桌面 E2E（最终；临时夹具 `%TEMP%\ans-e2e-g-fixture-1029`；fresh APPDATA）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-v220-out\report.txt`，sha256 `4c364185ffa280ab782a7db684ce9b9831dc3f49b9fb6abfa5ae84cb972e45e0`；`session:role-states` 未注册错误 0。
 
 ## 4. 应用冒烟（重启后）
 
