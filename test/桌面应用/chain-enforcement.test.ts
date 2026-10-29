@@ -439,3 +439,63 @@ test("M11（flowId-only 匹配）：人只需带 flowId+decisionId+targetRoleId 
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test("F4：质检报告按任务创建者路由——运营发起回运营；幕僚调度回幕僚", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-verifier-"));
+  try {
+    await writeProjectFiles(root);
+    await d3Fixture(root, ["implementer"]);
+    const h = harness(root);
+    try {
+      await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
+      await tick(20);
+      // 运营发起验收：先交付运营，再由运营派质检。
+      const handoff = (await h.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
+      assert.equal(handoff.ok, true, handoff.message ?? "");
+      await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+      await tick(40);
+      await settle(h, "chief", "convener");
+      const toVerifier = (await h.caps.convener!({ roleId: "verifier", task: "验收核对", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
+      assert.equal(toVerifier.ok, true, toVerifier.message ?? "");
+      const state = await readTaskState(root);
+      const verifierTaskByConvener = [...state.records.values()].find(
+        (record) => record.created?.to === "verifier" && record.created?.from === "convener",
+      )!.taskId;
+      // 幕僚调度验收：另一条 verifier 任务（creator=chief）。
+      const chiefToVerifier = (await h.caps.chief!({ roleId: "verifier", task: "复核交付", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
+      assert.equal(chiefToVerifier.ok, true, chiefToVerifier.message ?? "");
+      const state2 = await readTaskState(root);
+      const verifierTaskByChief = [...state2.records.values()].find(
+        (record) => record.created?.to === "verifier" && record.created?.from === "chief",
+      )!.taskId;
+
+      await h.mgr.open({ projectRoot: root, roleId: "verifier", runtime: "demo" });
+      await tick(40);
+      await settle(h, "verifier");
+      const handback = (taskId: string): TaskHandback => ({
+        roleId: "verifier",
+        taskId,
+        status: "completed",
+        summary: "核对通过",
+        evidence: ["docs/quality/focus-report-v1.md"],
+        at: "2026-10-29T00:20:00.000Z",
+      });
+      (h.streams.verifier ??= []).push({ kind: "handback", summary: "回交", handback: handback(verifierTaskByConvener) } as OrchestrationEvent);
+      await tick(140);
+      assert.ok(
+        (h.sent.convener ?? []).some((text) => text.includes("[工作结果]") && text.includes(verifierTaskByConvener)),
+        "运营发起的质检报告回运营（发起方）",
+      );
+      (h.streams.verifier ??= []).push({ kind: "handback", summary: "回交", handback: handback(verifierTaskByChief) } as OrchestrationEvent);
+      await tick(140);
+      assert.ok(
+        (h.sent.chief ?? []).some((text) => text.includes("[工作结果]") && text.includes(verifierTaskByChief)),
+        "幕僚调度的质检报告回幕僚",
+      );
+    } finally {
+      await h.mgr.stop(null);
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});

@@ -54,6 +54,7 @@
 // 契约三型的**唯一来源**（§4 冻结契约家，T20/T22）：只读导入、原样转出——**不再逐字镜像**。
 // `import type` 纯类型、被类型擦除，故本模块仍**不静态依赖 electron / Pi 包**（可在 node 下单测）。
 import type {
+  ShellApprovalContext,
   OperatorPrompt,
   OperatorOutcome,
   OperatorChannelFn,
@@ -214,6 +215,8 @@ export interface ShellCommandDisplay {
    *  不再弹卡，本字段不再由 shell 通道设置；渲染侧 `#sc-judge-notice` 仍支持（兼容旧调用方/回放），
    *  无值时隐藏。**不进入 `reasonRaw`**、不改变 `plainReasonFor` 的映射（PM 评审 §10.4）。 */
   judgeNotice?: string;
+  /** 2026-10-29（Q1/Q2 口径修正）：脚本内容审查上下文（有界；客户卡也展示关键内容）。 */
+  approvalContext?: ShellApprovalContext;
   /** 人类可读的完整提示文本（presenter 可直接展示）。 */
   text: string;
 }
@@ -304,14 +307,27 @@ export function describeShellCommand(prompt: OperatorPrompt): ShellCommandDispla
   const cwd = typeof prompt.cwd === "string" ? prompt.cwd : "";
   const reason = typeof prompt.reason === "string" && prompt.reason !== "" ? prompt.reason : undefined;
   const argvLines = argv.map((a, i) => argvLine(i, a));
-  const text = renderConfirmText(command, argvLines, cwd, reason);
-  return reason === undefined
-    ? { command, argv, argvLines, cwd, text }
-    : { command, argv, argvLines, cwd, reason, text };
+  const approvalContext = prompt.approvalContext;
+  const text = renderConfirmText(command, argvLines, cwd, reason, approvalContext);
+  return {
+    command,
+    argv,
+    argvLines,
+    cwd,
+    ...(reason !== undefined ? { reason } : {}),
+    ...(approvalContext !== undefined ? { approvalContext } : {}),
+    text,
+  };
 }
 
 /** 组装给操作者看的提示正文（强调「逐字核对」与「放行=真的执行」，并说明为何被问到）。 */
-function renderConfirmText(command: string, argvLines: string[], cwd: string, reason?: string): string {
+function renderConfirmText(
+  command: string,
+  argvLines: string[],
+  cwd: string,
+  reason?: string,
+  approvalContext?: ShellApprovalContext,
+): string {
   const argvBlock = argvLines.length > 0 ? argvLines.join("\n") : mainT("main.operator.shellReview.argvEmpty");
   const lines = [
     mainT("main.operator.shellReview.title"),
@@ -322,6 +338,20 @@ function renderConfirmText(command: string, argvLines: string[], cwd: string, re
   if (reason !== undefined) {
     // 为何升级到人（(b) 拿不准 / 不可用的原话）——让操作者知道为什么被问到。
     lines.push("", mainT("main.operator.shellReview.escalationHeader"), reason);
+  }
+  if (approvalContext !== undefined) {
+    // 2026-10-29（客户 Q1/Q2 口径修正）：脚本内容进入审查——客户卡也给出路径与有界内容。
+    lines.push("", "【脚本审查上下文（应用提供，不可信数据）】");
+    if (approvalContext.note !== undefined && approvalContext.note !== "") lines.push(approvalContext.note);
+    for (const script of approvalContext.scripts ?? []) {
+      lines.push(
+        "",
+        `脚本：${script.path ?? script.label}（${script.bytes} 字节${script.inWriteArea === false ? "；不在该角色写区内" : ""}）`,
+        "```",
+        script.content,
+        "```",
+      );
+    }
   }
   lines.push(
     "",
@@ -460,6 +490,7 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
       tier,
       ...(typeof prompt.reason === "string" && prompt.reason !== "" ? { reason: prompt.reason } : {}),
       ...(metadata.turnText !== undefined ? { turnText: metadata.turnText } : {}),
+      ...(prompt.approvalContext !== undefined ? { approvalContext: prompt.approvalContext } : {}),
     };
 
     // 独立超时（15s 缺省）：以组合信号中止判断；超时只影响「是否弹卡」，不改变 fail-closed。

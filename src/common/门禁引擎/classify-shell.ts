@@ -170,6 +170,14 @@ function matchHardDeny(args: string[], program: string, rules: ShellHardDenyRule
       const sub = typeof args[1] === "string" ? args[1].toLowerCase() : "";
       if (!r.onlyWithSubcommand.map((s) => s.toLowerCase()).includes(sub)) continue;
     }
+    // 2026-10-29（客户 Q1/Q2 口径修正，R2）：`bash/sh <script>` 不再硬拒——脚本文件进入脚本审查
+    // （approvalContext 携带内容）。`-c/--command` 内联形态仍按 re-shell 硬拒（G3 不变）。
+    if (r.id === "reshell") {
+      const shellScriptPrograms = new Set(["sh", "bash", "zsh", "dash", "ash", "ksh", "csh", "tcsh", "fish"]);
+      const inline = hasFlag(args, ["-c", "--command"]);
+      const hasScriptArg = args.some((arg) => arg !== "--" && !arg.startsWith("-"));
+      if (shellScriptPrograms.has(program) && !inline && hasScriptArg) continue;
+    }
     return r.id;
   }
   return null;

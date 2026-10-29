@@ -1790,3 +1790,82 @@ test("替我审·session：每会话构造 judge 闭包（同一份 runtimeOptio
   assert.equal(metadataSeen.at(-1)?.judge, undefined, "dispose 后不再提供 judge 闭包");
   assert.equal(metadataSeen.at(-1)?.turnText, undefined, "dispose 后不残留 turnText");
 });
+
+// ————————————————— 2026-10-29（客户 Q1/Q2 口径修正）：脚本内容进入 judge 审查 —————————————————
+
+test("替我审 + 脚本上下文：judge 收到脚本内容并据其裁决；开关关 ⇒ 客户卡展示内容", async () => {
+  const seen: ShellJudgeRequest[] = [];
+  const prompts: OperatorPrompt[] = [];
+  let presented = 0;
+  let displayText = "";
+  const presenter = {
+    async present(_prompt: OperatorPrompt, display: { text: string }) {
+      presented += 1;
+      displayText = display.text;
+      return { allow: true };
+    },
+  };
+  const scriptPrompt = {
+    ...req("node src/tool.mjs", ["node", "src/tool.mjs"]),
+    approvalContext: {
+      scriptPaths: ["src/tool.mjs"],
+      scripts: [{ path: "src/tool.mjs", label: "node 脚本", content: "fs.rmSync('index.html')", bytes: 22, sha256: "b".repeat(64), inWriteArea: false }],
+    },
+  };
+  const captureJudge = (verdict: "allow" | "deny") => ({
+    verdict,
+    reason: "核对脚本内容后裁决",
+    reasonCode: verdict === "allow" ? "necessary" : "outside-boundary",
+    customerMessage: "脚本会写项目根",
+  });
+
+  // judge=deny：脚本内容被看到，裁决 deny。
+  const denyCh = createDesktopOperatorChannel({
+    presenter,
+    operatorId: "alice",
+    judge: { isEnabled: () => true },
+    emitJudgeResult: () => {},
+  });
+  const deny = await denyCh(scriptPrompt, judgeMetadata({ judge: async (request) => { seen.push(request); return captureJudge("deny"); } }));
+  assert.equal(deny.outcome, "deny");
+  assert.equal(presented, 0, "judge 裁决不弹客户卡");
+  assert.match(seen[0]?.approvalContext?.scripts?.[0]?.content ?? "", /fs\.rmSync/);
+  assert.equal(seen[0]?.approvalContext?.scripts?.[0]?.inWriteArea, false);
+
+  // judge=allow：安全脚本放行（judge 同样看到内容）。
+  const safePrompt = {
+    ...scriptPrompt,
+    approvalContext: {
+      scriptPaths: ["src/tool.mjs"],
+      scripts: [{ path: "src/tool.mjs", label: "node 脚本", content: "console.log('safe')", bytes: 21, sha256: "c".repeat(64), inWriteArea: true }],
+    },
+  };
+  const allowCh = createDesktopOperatorChannel({
+    presenter,
+    operatorId: "alice",
+    judge: { isEnabled: () => true },
+    emitJudgeResult: () => {},
+  });
+  const allow = await allowCh(safePrompt, judgeMetadata({ judge: async (request) => { seen.push(request); return captureJudge("allow"); } }));
+  assert.equal(allow.outcome, "allow", "judge 审查后放行");
+  assert.match(seen.at(-1)?.approvalContext?.scripts?.[0]?.content ?? "", /console\.log\('safe'\)/);
+
+  // judge=manual（不可用/超时/解析失败路径）⇒ fail-closed 拒绝，不弹客户卡。
+  const manualCh = createDesktopOperatorChannel({
+    presenter,
+    operatorId: "alice",
+    judge: { isEnabled: () => true },
+    emitJudgeResult: () => {},
+  });
+  const manual = await manualCh(safePrompt, judgeMetadata({ judge: async () => ({ verdict: "manual", reasonCode: "timeout", reason: "判断超时" }) }));
+  assert.equal(manual.outcome, "deny", "judge manual ⇒ fail-closed 拒绝");
+  assert.equal(presented, 0, "judge 不可用不回落客户卡（开关开启）");
+
+  // 开关关闭 ⇒ 客户卡；展示文本包含脚本路径与内容（有界）。
+  const offCh = createDesktopOperatorChannel({ presenter, operatorId: "bob", judge: { isEnabled: () => false } });
+  const off = await offCh(scriptPrompt);
+  assert.equal(off.outcome, "allow");
+  assert.equal(presented, 1, "开关关 ⇒ 客户本人确认");
+  assert.match(displayText, /src\/tool\.mjs/);
+  assert.match(displayText, /fs\.rmSync/);
+});

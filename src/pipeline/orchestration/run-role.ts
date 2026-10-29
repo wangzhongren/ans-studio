@@ -60,6 +60,7 @@ import { ROLE_CARD_REQUIRED_SECTIONS } from "../../common/门禁引擎/governanc
 import { evaluateShellWriteTargets } from "../../common/门禁引擎/shell-write-guard.ts";
 import { loadLatestRoster, rosterDirectoriesFor, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
 import { createShellPostAudit } from "../../common/编排/shell-post-audit.ts";
+import { buildShellApprovalContext } from "../../common/编排/shell-approval-context.ts";
 import { resolveRole } from "../../service/role/resolve-role.ts";
 import { resolveBoundary, validateBoundaryYamlText } from "../../service/boundary/resolve-boundary.ts";
 import {
@@ -1104,6 +1105,14 @@ export async function openRoleSession(
       checkWrite: shellCheckWrite,
     });
   // 执行后写审计（仅在 shell 已 arm 时挂到 run_shell；缺省无副作用）。
+  // 2026-10-29（客户 Q1/Q2 口径修正）：不透明执行/脚本命令的审查上下文（有界脚本内容）；
+  // 内容不可读/超限/脚本在项目外 ⇒ 返回不可用（shell-gate fail-closed 拒绝）。
+  const shellApprovalContextLoader = (req: ShellReviewRequest) =>
+    buildShellApprovalContext({
+      request: req,
+      projectRoot: input.project.projectRoot,
+      checkWrite: shellCheckWrite,
+    });
   const shellPostAudit = createShellPostAudit({
     projectRoot: input.project.projectRoot,
     forbiddenPrefixes: trioSpec?.forbiddenWritePaths ?? [],
@@ -1196,7 +1205,7 @@ export async function openRoleSession(
       log.record("shell.operatorOnly.rejected", { mode: "shellOperatorOnly", outcome: "not-armed", reasonCode: "capability-denied" });
     } else {
       try {
-        shellGate = await assembleOperatorShellGate({ project: input.project, ...input.shellOperatorOnly, writeGuard: shellWriteGuard, snapshotBefore: (req) => shellPostAudit.snapshotBefore(req) });
+        shellGate = await assembleOperatorShellGate({ project: input.project, ...input.shellOperatorOnly, writeGuard: shellWriteGuard, snapshotBefore: (req) => shellPostAudit.snapshotBefore(req), approvalContextLoader: shellApprovalContextLoader });
       } catch (err) {
         log.error("shell.arming.failed", err);
         shellGate = undefined; // 装配失败 ⇒ 不 arm（能力缺席 = fail-closed，run_shell 不注册）
@@ -1225,6 +1234,7 @@ export async function openRoleSession(
         ...(input.routineShellPolicy !== undefined ? { routineShellPolicy: input.routineShellPolicy } : {}),
         writeGuard: shellWriteGuard,
         snapshotBefore: (req) => shellPostAudit.snapshotBefore(req),
+        approvalContextLoader: shellApprovalContextLoader,
       });
     } catch (err) {
       log.error("shell.arming.failed", err);

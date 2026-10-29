@@ -120,17 +120,54 @@ test("真实文件系统快照：排除 .ans/.git/node_modules/dist；新增/修
     await fs.mkdir(path.join(root, "dist"), { recursive: true });
     await fs.writeFile(path.join(root, "src", "a.ts"), "a", "utf8");
     await fs.writeFile(path.join(root, "node_modules", "pkg", "index.js"), "x", "utf8");
-    await fs.writeFile(path.join(root, ".ans", "state", "tasks.jsonl"), "{}\n", "utf8");
+    await fs.writeFile(path.join(root, ".ans", "state", "tasks.jsonl"), "{}\\n", "utf8");
     await fs.writeFile(path.join(root, "dist", "bundle.js"), "x", "utf8");
 
     const before = await snapshotProjectTree({ projectRoot: root });
-    assert.deepEqual([...before.keys()], ["src/a.ts"], "排除项不进入快照");
+    // 2026-10-29 返工（P6）：`.ans/` 不再排除（其变化一律按越界审计）；node_modules/dist 仍排除。
+    assert.deepEqual([...before.keys()].sort(), [".ans/state/tasks.jsonl", "src/a.ts"], "排除项不进入快照（.ans 除外）");
 
     await fs.writeFile(path.join(root, "src", "new.ts"), "n", "utf8");
     await fs.writeFile(path.join(root, "node_modules", "pkg", "index.js"), "changed", "utf8");
     const after = await snapshotProjectTree({ projectRoot: root });
     const changes = diffTreeSnapshots(before, after);
     assert.deepEqual(changes, [{ path: "src/new.ts", change: "added" }], "node_modules 内的变化被排除");
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+
+test("P6 返工（R2 审计诚实口径）：`.ans/` 项目内变化按越界记录；审计不宣称覆盖项目外写入", async () => {
+  // `.ans/`：即使 checkWrite 错误地全部放行，也必须判越界（项目内可见性）。
+  const ansViolations = findOutOfBoundChanges({
+    changes: [{ path: ".ans/state/tasks.jsonl", change: "modified" }],
+    forbiddenPrefixes: [],
+    checkWrite: () => ({ allowed: true }),
+  });
+  assert.deepEqual(ansViolations, [{ path: ".ans/state/tasks.jsonl", change: "modified" }]);
+
+  // 防御：快照键若出现绝对路径/`..`（不该出现），按越界记录；但项目外写入的拦截由 static guard 与
+  // judge 负责，执行后审计**不宣称**覆盖项目外。
+  const defensive = findOutOfBoundChanges({
+    changes: [{ path: "../outside.txt", change: "added" }, { path: "C:/outside.txt", change: "added" }],
+    forbiddenPrefixes: [],
+    checkWrite: () => ({ allowed: true }),
+  });
+  assert.equal(defensive.length, 2);
+
+  // 真实快照只在项目内：`.ans/` 可见（不再排除），node_modules/dist 仍排除。
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-post-audit-root-"));
+  try {
+    await fs.mkdir(path.join(root, ".ans", "state"), { recursive: true });
+    await fs.mkdir(path.join(root, "node_modules", "pkg"), { recursive: true });
+    await fs.mkdir(path.join(root, "src"), { recursive: true });
+    await fs.writeFile(path.join(root, ".ans", "state", "tasks.jsonl"), "{}\\n", "utf8");
+    await fs.writeFile(path.join(root, "node_modules", "pkg", "index.js"), "x", "utf8");
+    await fs.writeFile(path.join(root, "src", "a.ts"), "a", "utf8");
+    const snapshot = await snapshotProjectTree({ projectRoot: root });
+    assert.deepEqual([...snapshot.keys()].sort(), [".ans/state/tasks.jsonl", "src/a.ts"]);
+    assert.ok([...snapshot.keys()].every((key) => !key.startsWith("@outside:")));
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }

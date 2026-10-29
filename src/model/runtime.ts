@@ -162,11 +162,35 @@ export interface RoleSession {
 
 export type WriteGate = (targetPath: string) => WriteDecision;
 
+/** 2026-10-29（客户 Q1/Q2 口径修正）：脚本/不透明执行的审查上下文（应用提供、有界、不可信数据）。 */
+export interface ShellApprovalScript {
+  /** 项目相对路径（posix）；内联代码为 null（用 label 标识）。 */
+  path?: string;
+  label: string;
+  content: string;
+  bytes: number;
+  /** 脚本内容 sha256（hex；有界内容摘要，供审计/复核）。 */
+  sha256: string;
+  /** 脚本路径是否落在请求角色的写区内（false = judge 需重点核对）。 */
+  inWriteArea?: boolean;
+}
+
+export interface ShellApprovalContext {
+  scriptPaths?: string[];
+  scripts?: ShellApprovalScript[];
+  /** npm/yarn/pnpm 运行的脚本名（内容取自 package.json#scripts）。 */
+  npmScriptName?: string;
+  /** 无法提供脚本内容时的说明（构建工具/无脚本可读）；judge 据此决定是否 manual。 */
+  note?: string;
+}
+
 export interface ShellReviewRequest {
   command: string;
   argv: string[];
   cwd: string;
   toolCallId: string;
+  /** 应用补充的脚本内容审查上下文（由编排 shell-approval-context 读取；有界）。 */
+  approvalContext?: ShellApprovalContext;
   /**
    * 2026-10-29（方案 v2.1 §6.4，Q1 A）：不透明执行类（`node <脚本>`/解释器脚本/构建包脚本等无法静态
    * 界定写范围）——**「替我审批」不得代批**，必须由客户本人确认。仅由 shell 写目标守卫置位。
@@ -205,8 +229,10 @@ export interface OperatorPrompt {
 
   reason?: string;
 
-  /** 客户本人确认标记（不透明执行类）：判断 agent 不得代批；由 shell 守卫置位。 */
+  /** 客户本人确认标记（旧口径；2026-10-29 客户口径修正后由守卫不再设置，保留兼容）。 */
   manualOnly?: boolean;
+  /** 脚本内容审查上下文（不透明执行类；随判断请求交给 judge）。 */
+  approvalContext?: ShellApprovalContext;
 }
 
 export type OperatorOutcome =
@@ -1189,6 +1215,8 @@ export interface ShellJudgeRequest {
   reason?: string;
   /** 当前轮投递给该角色的文本（≤4KB）；不读原始转录/历史回放。 */
   turnText?: string;
+  /** 脚本内容审查上下文（应用提供、有界；judge 必须据此核对写区/破坏性/越权）。 */
+  approvalContext?: ShellApprovalContext;
 }
 
 /** `deny` 的替代方案（文本；应用**不自动执行**）。 */

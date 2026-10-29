@@ -98,6 +98,7 @@ import {
 // （工程法案 §一.5、`docs/architecture/shared-components.md`）——**不得留第二份实现**。行为逐字不变。
 import { normalizeArgv } from "../shared/argv-primitives.ts";
 import type { ShellWriteGuardDecision } from "../门禁引擎/shell-write-guard.ts";
+import type { ShellApprovalContext } from "../../model/runtime.ts";
 
 // —— 契约（任务已定死，照做） ——
 // 类型定义归运行时核心的 src/model/runtime.ts（工具层与扩展层按同一形状编译）；此处按其形状
@@ -247,10 +248,12 @@ export const BRANCH_PREBLOCK_UNBOUNDED_SEARCH = "preblock:unbounded-search";
 // —— shell 写目标守卫（2026-10-29 方案 v2.1 §6.3/§6.4；客户 Q1 A）——
 /** 显式写目标越界/治理路径 → **直接拒绝**（不弹卡、不交 judge）。 */
 export const BRANCH_WRITE_GUARD_DENY = "write-guard:deny";
-/** 不透明执行（无法静态界定写目标）→ 交 (a) 且 `manualOnly`（「替我审批」不得代批）。 */
-export const BRANCH_OPAQUE_MANUAL = "opaque:manual-only";
-/** 只读档下的不透明执行 → 拒绝（只读档只放行 (c) 白名单）。 */
-export const BRANCH_OPAQUE_DENY = "opaque:readonly-deny";
+/** 脚本/不可静态解析的写命令 → 交审批（开关开 → judge 审查脚本内容；关 → 客户卡）。 */
+export const BRANCH_SCRIPT_REVIEW = "script:review";
+/** 只读档下的脚本/不透明执行 → 拒绝（只读档只放行 (c) 白名单）。 */
+export const BRANCH_SCRIPT_READONLY_DENY = "script:readonly-deny";
+/** 脚本/不透明执行但应用无法提供审查上下文（不可读/超限/越界）→ fail-closed 拒绝。 */
+export const BRANCH_SCRIPT_CONTEXT_FAILED = "script:context-unavailable";
 
 // —— 第二闸 (b) —— 触发分支。
 export const BRANCH_B_ALLOW = "b-allow"; // pm 判读为放行
@@ -383,6 +386,11 @@ export interface CreateShellGateOptions {
   writeGuard?: (req: ShellGateRequest) => ShellWriteGuardDecision;
   /** 执行前写审计快照（仅在最终 allow 时调用；失败不阻塞执行）。 */
   snapshotBefore?: (req: ShellGateRequest) => Promise<void> | void;
+  /**
+   * 2026-10-29（客户 Q1/Q2 口径修正）：不透明执行/脚本命令的审查上下文加载器（有界脚本内容）。
+   * 返回 ok:false ⇒ fail-closed 拒绝（不弹卡、不交 judge）；缺省不传 ⇒ 无上下文（旧行为）。
+   */
+  approvalContextLoader?: (req: ShellGateRequest) => Promise<{ ok: true; context: ShellApprovalContext } | { ok: false; reason: string }>;
 }
 
 /** 内部：一次审核的结论 + 审计所需的分支/结论分类。 */
@@ -532,7 +540,7 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
         branch: BRANCH_WRITE_GUARD_DENY,
       };
     }
-    const opaque = writeGuardDecision !== undefined && writeGuardDecision.kind === "opaque" ? writeGuardDecision : undefined;
+    const scriptDecision = writeGuardDecision !== undefined && writeGuardDecision.kind === "script" ? writeGuardDecision : undefined;
 
     // 分类：门禁引擎的纯函数。抛错 → 拒绝（保守）。
     let detail: ShellClassifyDetail;
@@ -560,13 +568,13 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
             : by;
 
     // 映射（§7.5）。
-    // —— 不透明执行（Q1 A）：无论 (c) 档位，均交 (a) **客户本人**；只读档直接拒；通道缺席即拒 ——
-    if (opaque !== undefined) {
+    // —— 脚本/不可静态解析的写命令（客户 Q1/Q2 修正）：开关开 → judge 审查内容；关 → 客户卡；只读档拒绝 ——
+    if (scriptDecision !== undefined) {
       if (opts.readonlyOnly === true) {
         return denyOutcome(
-          BRANCH_OPAQUE_DENY,
+          BRANCH_SCRIPT_READONLY_DENY,
           byTagged,
-          "只读档：不透明执行类（无法按写区校验）不在只读白名单内，拒绝执行——这是策略拒绝，不是环境故障。",
+          "只读档：脚本/不透明执行类（无法按写区校验）不在只读白名单内，拒绝执行——这是策略拒绝，不是环境故障。",
         );
       }
       // 非 advisory 的项目角色链：c=deny 仍是**不可翻案的硬地板**（G3 不变）；只有审批档
@@ -578,19 +586,52 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
           detail.reason ?? `命中 c 硬拒规则（${by}）`,
         );
       }
+      // 宿主显式委托的常规检查（仅精确匹配策略清单）仍可免审批——策略是客户/宿主授权事实。
+      if (detail.decision !== "deny" && matchesDelegatedRoutineCheck(req.argv, req.cwd, opts.routineShellPolicy)) {
+        log.record("shell.routine.delegated", { toolCallId: req.toolCallId, authorizationSource: opts.routineShellPolicy?.authorizationSource });
+        return {
+          result: { allow: true, by: `${byTagged} → customer-delegated-routine-checks` },
+          conclusion: "allow",
+          branch: "script:delegated-routine",
+        };
+      }
       if (typeof opts.operatorChannel !== "function") {
         return denyOutcome(
-          escalateBranch(BRANCH_OPAQUE_MANUAL, BRANCH_A_UNAVAILABLE),
+          escalateBranch(BRANCH_SCRIPT_REVIEW, BRANCH_A_UNAVAILABLE),
           `${byTagged} → operator:通道未接入`,
-          "不透明执行类必须由客户本人确认，但操作者通道未接入，拒绝（fail-closed）。",
+          "不透明执行类需要审批上下文审查，但操作者/判断通道未接入，拒绝（fail-closed）。",
         );
       }
-      return await runA({ ...req, manualOnly: true }, {
-        bBranch: BRANCH_OPAQUE_MANUAL,
+      // 2026-10-29（客户 Q1/Q2 口径修正）：不强制客户本人——开关开启时由判断 agent 审查（含脚本内容），
+      // 关闭时由客户卡确认；脚本内容不可用/超限/越界 ⇒ fail-closed 拒绝（不弹卡、不交 judge）。
+      let contextualReq = req;
+      if (typeof opts.approvalContextLoader === "function") {
+        let loaded: Awaited<ReturnType<NonNullable<typeof opts.approvalContextLoader>>>;
+        try {
+          loaded = await opts.approvalContextLoader(req);
+        } catch (err) {
+          return denyOutcome(
+            BRANCH_SCRIPT_CONTEXT_FAILED,
+            byTagged,
+            `不透明执行审查上下文加载失败：${reasonOf(err)}（fail-closed）`,
+          );
+        }
+        if (loaded.ok !== true) {
+          return denyOutcome(
+            BRANCH_SCRIPT_CONTEXT_FAILED,
+            byTagged,
+            `不透明执行审查上下文不可用：${loaded.reason}（fail-closed）`,
+          );
+        }
+        contextualReq = { ...req, approvalContext: loaded.context };
+      }
+      return await runA(contextualReq, {
+        bBranch: BRANCH_SCRIPT_REVIEW,
         bAttr: byTagged,
         why:
-          `不透明执行类：${opaque.reason} ` +
-          "「替我审批」开关不得代批，必须由客户本人确认；批准后命令以当前 OS 用户权限执行。",
+          `脚本/不可静态解析的写命令：${scriptDecision.reason} ` +
+          "请依据命令行/argv 与提供的脚本内容核对是否越出角色写区、是否破坏性/越权；" +
+          "开关开启时由判断 agent 决定，关闭时由客户本人确认。",
       });
     }
     if (detail.decision === "allow") {
@@ -786,6 +827,7 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       toolCallId: req.toolCallId,
       reason: b.why,
       ...(req.manualOnly === true ? { manualOnly: true } : {}),
+      ...(req.approvalContext !== undefined ? { approvalContext: req.approvalContext } : {}),
     };
 
     let out: OperatorOutcome | null | undefined;
@@ -982,6 +1024,8 @@ export interface ShellGateBuildDeps {
   writeGuard?: (req: ShellGateRequest) => ShellWriteGuardDecision;
   /** 执行前写审计快照（仅在最终 allow 时调用；失败不阻塞执行）。 */
   snapshotBefore?: (req: ShellGateRequest) => Promise<void> | void;
+  /** 不透明执行审查上下文加载器（见 `CreateShellGateOptions.approvalContextLoader`）。 */
+  approvalContextLoader?: (req: ShellGateRequest) => Promise<{ ok: true; context: ShellApprovalContext } | { ok: false; reason: string }>;
 }
 
 export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
@@ -1023,6 +1067,7 @@ export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
     advisoryRuleset: deps.advisoryRuleset,
     ...(deps.writeGuard !== undefined ? { writeGuard: deps.writeGuard } : {}),
     ...(deps.snapshotBefore !== undefined ? { snapshotBefore: deps.snapshotBefore } : {}),
+    ...(deps.approvalContextLoader !== undefined ? { approvalContextLoader: deps.approvalContextLoader } : {}),
   });
 }
 

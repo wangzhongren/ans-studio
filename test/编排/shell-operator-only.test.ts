@@ -41,6 +41,7 @@ import {
   type ShellRules,
 } from "../../src/common/编排/shell-gate.ts";
 import { createMemoryAuditSink } from "../../src/common/编排/shell-audit.ts";
+import { evaluateShellWriteTargets } from "../../src/common/门禁引擎/shell-write-guard.ts";
 import { formatOperatorPrompt } from "../../src/common/编排/operator-channel.ts";
 import { assembleOperatorShellGate, type AssembleOperatorShellGateOptions } from "../../src/pipeline/orchestration/shell-arming.ts";
 import { openRoleSession, type AdapterCapabilities } from "../../src/pipeline/orchestration/run-role.ts";
@@ -433,7 +434,7 @@ test("openRoleSession：su + shellOperatorOnly ⇒ arm；项目角色误传/与 
 
 // ————————————————— 2026-10-29（方案 v2.1 §6.3/§6.4，Q1 A）：写目标守卫接线 —————————————————
 
-test("不透明执行（writeGuard=opaque）⇒ 交 (a) 且 manualOnly=true（「替我审批」不得代批）", async () => {
+test("不透明执行（writeGuard=opaque）⇒ 交 (a)，审阅上下文含脚本内容；不再强制客户本人（Q1/Q2 口径修正）", async () => {
   const audit = createMemoryAuditSink();
   const prompts: OperatorPrompt[] = [];
   const gate = createShellGate({
@@ -443,14 +444,41 @@ test("不透明执行（writeGuard=opaque）⇒ 交 (a) 且 manualOnly=true（�
     audit,
     operatorOnly: true,
     approveDeny: true,
-    operatorChannel: operatorStub({ outcome: "allow", operatorId: "customer" }, prompts),
-    writeGuard: () => ({ kind: "opaque", reason: "node 脚本可执行任意代码" }),
+    operatorChannel: operatorStub({ outcome: "allow", operatorId: "judge:pi" }, prompts),
+    writeGuard: () => ({ kind: "script", reason: "node 脚本可执行任意代码" }),
+    approvalContextLoader: async () => ({
+      ok: true,
+      context: {
+        scriptPaths: ["src/tool.mjs"],
+        scripts: [{ path: "src/tool.mjs", label: "node 脚本", content: "console.log('ok')", bytes: 18, sha256: "a".repeat(64), inWriteArea: true }],
+      },
+    }),
   });
-  const result = await gate({ command: "node copy.mjs", argv: ["node", "copy.mjs"], cwd: "/proj", toolCallId: "call-opaque" });
-  assert.equal(result.allow, true, "客户本人批准 ⇒ 放行");
+  const result = await gate({ command: "node src/tool.mjs", argv: ["node", "src/tool.mjs"], cwd: "/proj", toolCallId: "call-opaque" });
+  assert.equal(result.allow, true, "审批通过 ⇒ 放行");
   assert.equal(prompts.length, 1);
-  assert.equal(prompts[0]!.manualOnly, true, "manualOnly 传给操作者通道（桌面据此跳过判断 agent）");
-  assert.match(prompts[0]!.reason ?? "", /不透明执行类|客户本人/);
+  assert.equal(prompts[0]!.manualOnly, undefined, "不再置 manualOnly（开关开启时由判断 agent 决定）");
+  assert.deepEqual(prompts[0]!.approvalContext?.scriptPaths, ["src/tool.mjs"]);
+  assert.match(prompts[0]!.approvalContext?.scripts?.[0]?.content ?? "", /console\.log/);
+});
+
+test("不透明执行但审查上下文不可用（脚本不可读/超限/越界）⇒ fail-closed 拒绝（0 卡、0 判断）", async () => {
+  const prompts: OperatorPrompt[] = [];
+  const gate = createShellGate({
+    classifyShell: classifier("review", "r-review"),
+    rules: RULES,
+    rulesId: "test",
+    audit: createMemoryAuditSink(),
+    operatorOnly: true,
+    approveDeny: true,
+    operatorChannel: operatorStub({ outcome: "allow", operatorId: "judge:pi" }, prompts),
+    writeGuard: () => ({ kind: "script", reason: "脚本无法静态确认" }),
+    approvalContextLoader: async () => ({ ok: false, reason: "脚本内容超过审查上限" }),
+  });
+  const result = await gate({ command: "node big.mjs", argv: ["node", "big.mjs"], cwd: "/proj", toolCallId: "call-big" });
+  assert.equal(result.allow, false);
+  assert.match(result.allow === false ? result.reason : "", /审查上下文不可用|fail-closed/);
+  assert.equal(prompts.length, 0);
 });
 
 test("显式写目标越界（writeGuard=deny）⇒ 直接拒绝：0 次 operator、审计分支 write-guard:deny", async () => {
@@ -471,4 +499,76 @@ test("显式写目标越界（writeGuard=deny）⇒ 直接拒绝：0 次 operato
   assert.match(result.allow === false ? result.reason : "", /写边界/);
   assert.equal(prompts.length, 0, "写区守卫拒绝不弹卡、不交 judge");
   assert.equal(audit.records.at(-1)?.branch, "write-guard:deny");
+});
+
+
+// ————————————————— 2026-10-29 返工（验收 P6）：真实守卫 × 审批档集成 —————————————————
+
+test("P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界", async () => {
+  const prompts: OperatorPrompt[] = [];
+  const context = {
+    scriptPaths: ["src/tool.mjs"],
+    scripts: [{ path: "src/tool.mjs", label: "node 脚本", content: "fs.writeFileSync('/etc/x','y')", bytes: 34, sha256: "c".repeat(64), inWriteArea: true }],
+  };
+  const gate = createShellGate({
+    classifyShell: classifier("risky", "r-risky"),
+    rules: RULES,
+    rulesId: "test",
+    audit: createMemoryAuditSink(),
+    operatorOnly: true,
+    approveDeny: true,
+    operatorChannel: operatorStub({ outcome: "allow", operatorId: "judge:pi" }, prompts),
+    writeGuard: (req) =>
+      evaluateShellWriteTargets({
+        argv: req.argv,
+        cwd: req.cwd,
+        projectRoot: "/proj",
+        skillRoot: "/proj",
+        boundary: { entries: [], boundarySource: "<test>", acceptance: { accepted: false, source: "" } },
+        forbiddenPrefixes: [".ans/", "角色卡/"],
+        checkWrite: (rel) => ({ allowed: rel === "src" || rel.startsWith("src/") }),
+      }),
+    approvalContextLoader: async () => ({ ok: true, context }),
+  });
+
+  // 1) 静态可证明越界 ⇒ deny（不弹卡、不进判断）。
+  const outside: string[][] = [
+    ["cp", "-t", "/outside/", "a.ts"],
+    ["cp", "--target-directory=/outside/", "a.ts"],
+    ["ln", "-t", "/outside/", "a.ts"],
+    ["install", "-t", "/outside/", "a.ts"],
+    ["find", "/outside", "-delete"],
+    ["rsync", "-a", "src/a", "/outside/"],
+    ["tar", "-xf", "x.tar", "-C", "/outside"],
+  ];
+  for (const [index, argv] of outside.entries()) {
+    const result = await gate({ command: argv.join(" "), argv, cwd: "/proj", toolCallId: `outside-${index}` });
+    assert.equal(result.allow, false, `${argv.join(" ")} 静态可证明越界 ⇒ deny`);
+  }
+  assert.equal(prompts.length, 0, "静态越界不弹卡、不进判断");
+
+  // 2) 无法静态解析 ⇒ 进入审批（开关开启时由 judge），上下文含脚本内容。
+  const opaque: string[][] = [
+    ["find", "src", "-delete"],
+    ["xargs", "rm", "-rf"],
+    ["git", "clean", "-fdx"],
+    ["git", "checkout", "--", "."],
+    ["rsync", "-a", "src/a", "src/"],
+    ["tar", "-xf", "x.tar", "-C", "src/"],
+  ];
+  for (const [index, argv] of opaque.entries()) {
+    const result = await gate({ command: argv.join(" "), argv, cwd: "/proj", toolCallId: `opaque-${index}` });
+    assert.equal(result.allow, true, `${argv.join(" ")}：审批通过 ⇒ 放行`);
+    assert.equal(prompts.at(-1)!.manualOnly, undefined, "不再强制客户本人");
+    assert.deepEqual(prompts.at(-1)!.approvalContext?.scriptPaths, ["src/tool.mjs"], "审批上下文含脚本路径/内容");
+  }
+
+  // 3) plain 形态仍按边界：边界内走普通审批（无脚本上下文）；越界直接拒绝。
+  const plainCount = prompts.length;
+  await gate({ command: "cp src/a.ts src/b.ts", argv: ["cp", "src/a.ts", "src/b.ts"], cwd: "/proj", toolCallId: "plain-inside" });
+  assert.equal(prompts.length, plainCount + 1);
+  assert.equal(prompts.at(-1)!.approvalContext, undefined, "plain 边界内不需要脚本上下文");
+  const denied = await gate({ command: "cp src/a.ts other/b.ts", argv: ["cp", "src/a.ts", "other/b.ts"], cwd: "/proj", toolCallId: "plain-outside" });
+  assert.equal(denied.allow, false);
+  assert.equal(prompts.length, plainCount + 1, "plain 越界拒绝不弹卡");
 });

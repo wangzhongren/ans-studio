@@ -26,8 +26,9 @@ export interface ShellPostAuditChange {
   change: "added" | "modified" | "deleted";
 }
 
+// 2026-10-29 返工（验收 P6）：`.ans/` 不再排除——应用独占治理记录区的任何写入都必须被审计
+// （角色写区永不含 `.ans/`；checkWrite/禁写前缀会把变化判为越界）。
 const DEFAULT_EXCLUDED_PREFIXES = [
-  ".ans/",
   ".git/",
   "node_modules/",
   "dist/",
@@ -117,7 +118,18 @@ export function findOutOfBoundChanges(input: {
 }): ShellPostAuditChange[] {
   const out: ShellPostAuditChange[] = [];
   for (const change of input.changes) {
+    // 防御：快照键不应出现绝对路径/`..`（只做项目内可见性）；万一出现，按越界记录但不宣称
+    // 覆盖项目外写入——项目外拦截由 static guard 与 judge 负责。
+    if (change.path.startsWith("../") || change.path.startsWith("/") || /^[a-zA-Z]:[\/]/.test(change.path)) {
+      out.push(change);
+      continue;
+    }
     const rel = change.path.toLowerCase();
+    // 应用独占治理记录区：任何角色写入都越界（即使 checkWrite 被错误放宽也兜底）。
+    if (rel === ".ans" || rel.startsWith(".ans/")) {
+      out.push(change);
+      continue;
+    }
     const forbidden = input.forbiddenPrefixes.some((prefix) => {
       const p = prefix.toLowerCase();
       return prefix.endsWith("/") ? rel === p.slice(0, -1) || rel.startsWith(p) : rel === p;

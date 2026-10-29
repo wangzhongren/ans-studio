@@ -42,6 +42,7 @@ import {
 } from "../../common/编排/shell-gate.ts";
 import type { ShellAuditSink } from "../../common/编排/shell-audit.ts";
 import type { ShellWriteGuardDecision } from "../../common/门禁引擎/shell-write-guard.ts";
+import type { ShellApprovalContext } from "../../model/runtime.ts";
 import { createPmReviewer, type OpenSessionFn } from "./pm-reviewer.ts";
 // F-6-1：审计边界刷新用**共享载入器**（pm 主属的 `src/common/shared/config-loader.ts`）——只读导入，
 // 工程法案 §一.5 的消费方名单已含编排（同源先例：`src/common/编排/finalize.ts` 亦从此导入）。
@@ -96,6 +97,8 @@ export interface AssembleShellGateOptions {
   writeGuard?: (req: Parameters<ShellGate>[0]) => ShellWriteGuardDecision;
   /** 2026-10-29（§6.5）：执行前写审计快照。 */
   snapshotBefore?: (req: Parameters<ShellGate>[0]) => Promise<void> | void;
+  /** 2026-10-29（Q1/Q2 口径修正）：不透明执行/脚本命令的审查上下文加载器（有界脚本内容）。 */
+  approvalContextLoader?: (req: Parameters<ShellGate>[0]) => Promise<{ ok: true; context: ShellApprovalContext } | { ok: false; reason: string }>;
   /** (b) 打开审读会话的函数（测试替换点；缺省 = 编排 `openRoleSession`，pm-reviewer 内定）。 */
   openSession?: OpenSessionFn;
   /** 审读会话的会话依赖（与本次被 arm 会话同一适配器工厂）。 */
@@ -176,6 +179,7 @@ export async function assembleProjectShellGate(opts: AssembleShellGateOptions): 
     ...(opts.auditSink !== undefined ? { auditSink: opts.auditSink } : {}),
     ...(opts.writeGuard !== undefined ? { writeGuard: opts.writeGuard } : {}),
     ...(opts.snapshotBefore !== undefined ? { snapshotBefore: opts.snapshotBefore } : {}),
+    ...(opts.approvalContextLoader !== undefined ? { approvalContextLoader: opts.approvalContextLoader } : {}),
     // 项目角色三层链默认 advisory（客户 2026-10-18）：规则只放行，不拒绝；拒绝交 (a)。
     advisoryRuleset: opts.advisoryRuleset ?? true,
   });
@@ -207,6 +211,8 @@ export interface AssembleReadonlyShellGateOptions {
   writeGuard?: (req: Parameters<ShellGate>[0]) => ShellWriteGuardDecision;
   /** 2026-10-29（§6.5）：执行前写审计快照。 */
   snapshotBefore?: (req: Parameters<ShellGate>[0]) => Promise<void> | void;
+  /** 2026-10-29（Q1/Q2 口径修正）：不透明执行/脚本命令的审查上下文加载器（有界脚本内容）。 */
+  approvalContextLoader?: (req: Parameters<ShellGate>[0]) => Promise<{ ok: true; context: ShellApprovalContext } | { ok: false; reason: string }>;
 }
 
 /**
@@ -262,6 +268,7 @@ export async function assembleReadonlyShellGate(opts: AssembleReadonlyShellGateO
     ...(opts.auditSink !== undefined ? { auditSink: opts.auditSink } : {}),
     ...(opts.writeGuard !== undefined ? { writeGuard: opts.writeGuard } : {}),
     ...(opts.snapshotBefore !== undefined ? { snapshotBefore: opts.snapshotBefore } : {}),
+    ...(opts.approvalContextLoader !== undefined ? { approvalContextLoader: opts.approvalContextLoader } : {}),
   });
 }
 
@@ -296,6 +303,8 @@ export interface AssembleOperatorShellGateOptions {
   writeGuard?: (req: Parameters<ShellGate>[0]) => ShellWriteGuardDecision;
   /** 2026-10-29（§6.5）：执行前写审计快照。 */
   snapshotBefore?: (req: Parameters<ShellGate>[0]) => Promise<void> | void;
+  /** 2026-10-29（Q1/Q2 口径修正）：不透明执行/脚本命令的审查上下文加载器（有界脚本内容）。 */
+  approvalContextLoader?: (req: Parameters<ShellGate>[0]) => Promise<{ ok: true; context: ShellApprovalContext } | { ok: false; reason: string }>;
 }
 
 /**
@@ -355,6 +364,7 @@ export async function assembleOperatorShellGate(
     ...(opts.auditSink !== undefined ? { auditSink: opts.auditSink } : {}),
     ...(opts.writeGuard !== undefined ? { writeGuard: opts.writeGuard } : {}),
     ...(opts.snapshotBefore !== undefined ? { snapshotBefore: opts.snapshotBefore } : {}),
+    ...(opts.approvalContextLoader !== undefined ? { approvalContextLoader: opts.approvalContextLoader } : {}),
   });
 }
 

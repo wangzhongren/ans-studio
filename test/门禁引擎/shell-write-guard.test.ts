@@ -1,6 +1,6 @@
 // test/门禁引擎/shell-write-guard.test.ts
 // 2026-10-29（方案 v2.1 §6.3/§6.4，Q1 A）：shell 写目标守卫单元测试——
-// 显式写目标越界/禁写路径 ⇒ deny；边界内 ⇒ pass（继续既有审批链）；不透明执行 ⇒ opaque；
+// 显式写目标越界/禁写路径 ⇒ deny；边界内 ⇒ pass（继续既有审批链）；不透明执行 ⇒ script；
 // 只读/测试命令不受影响；逐目标调用注入的 checkWrite（同一个 resolveWrite 口径）。
 
 import test from "node:test";
@@ -12,7 +12,7 @@ const ROOT = "/proj";
 
 function guard(
   argv: string[],
-  allowed: (rel: string) => boolean = (rel) => rel.startsWith("src/") || rel === "note.md",
+  allowed: (rel: string) => boolean = (rel) => rel === "src" || rel.startsWith("src/") || rel === "note.md",
   extras: Partial<ShellWriteGuardInput> = {},
 ) {
   const calls: string[] = [];
@@ -81,34 +81,47 @@ test("逃逸防御：绝对路径越界 / `..` 逃出项目根 ⇒ deny；项目
   assert.equal(insideAbs.decision.kind, "pass");
 });
 
-test("不透明执行（Q1 A/Q2 A）：node 脚本/解释器脚本/npm run/构建工具 ⇒ opaque；node --test、npm test/install ⇒ pass", () => {
+test("脚本审查（v2.3/R2）：解释器脚本/npm run/node --test/npm test/install/构建工具 ⇒ script（携带内容）；只读命令 pass", () => {
   for (const argv of [
     ["node", "docs/scheduling/copy-to-root.mjs"],
     ["python3", "tool.py"],
     ["node", "-m", "pkg"],
     ["npm", "run", "build"],
-    ["npx", "some-cli"],
-    ["make"],
-    ["cargo", "build"],
-    ["go", "build"],
-  ]) {
-    const result = guard(argv);
-    assert.equal(result.decision.kind, "opaque", `${argv.join(" ")} 应判 opaque`);
-  }
-  for (const argv of [
     ["node", "--test"],
     ["node", "--test", "test/a.test.ts"],
     ["npm", "test"],
     ["npm", "install"],
-    ["cat", "README.md"],
-    ["git", "status"],
+    ["npm", "ci"],
+    ["npx", "some-cli"],
+    ["make"],
+    ["cargo", "build"],
+    ["go", "build"],
+    ["bash", "src/job.sh"],
+    ["sh", "-c", "rm -rf src"],
   ]) {
     const result = guard(argv);
-    assert.equal(result.decision.kind, "pass", `${argv.join(" ")} 应 pass（无显式写目标/测试安装类）`);
+    assert.equal(result.decision.kind, "script", `${argv.join(" ")} 应判 script（进入脚本审查）`);
+  }
+  for (const argv of [["cat", "README.md"], ["git", "status"], ["ls", "-la"]]) {
+    const result = guard(argv);
+    assert.equal(result.decision.kind, "pass", `${argv.join(" ")} 应 pass（只读）`);
   }
 });
 
-test("cwd 不在项目根（旧桩/异常）⇒ 以项目根为基准，不按外部目录解释后放行", () => {
+test("mv/rename 源删除：源越界/目标越界都 deny；源与目标均在写区内 pass", () => {
+  for (const argv of [
+    ["mv", "other/a.ts", "src/a.ts"],
+    ["rename", "other/a.ts", "src/a.ts"],
+    ["mv", "src/a.ts", "other/a.ts"],
+    ["ren", "src/a.ts", "other/a.ts"],
+  ]) {
+    assert.equal(guard(argv).decision.kind, "deny", `${argv.join(" ")}（源删除/目标写入）越界 ⇒ deny`);
+  }
+  assert.equal(guard(["mv", "src/a.ts", "src/b.ts"]).decision.kind, "pass");
+  // `cp --target-directory <dir>` 空格形式：写区内 pass；项目外 deny。
+  assert.equal(guard(["cp", "--target-directory", "src/", "a.ts"]).decision.kind, "pass");
+  assert.equal(guard(["cp", "--target-directory", "/outside/", "a.ts"]).decision.kind, "deny");
+});test("cwd 不在项目根（旧桩/异常）⇒ 以项目根为基准，不按外部目录解释后放行", () => {
   const result = guard(["touch", "note.md"], undefined, { cwd: "/elsewhere" });
   assert.equal(result.decision.kind, "pass");
   assert.deepEqual(result.calls, ["note.md"]);
@@ -126,4 +139,71 @@ test("TaskScope 收窄经由注入的 checkWrite 生效（守卫不另写路径�
     checkWrite: (rel) => ({ allowed: rel === "src/a.ts" }),
   });
   assert.equal(result.kind, "deny", "任务 scope 外的目标被同一 checkWrite 拒绝");
+});
+
+
+test("P6 返工（客户 Q1/Q2 口径修正）：静态可证明越界 ⇒ deny；不可解析 ⇒ script（交审查）", () => {
+  // 1) 静态可证明写目标全在写区外（或含越界目标）⇒ 直接拒绝，不弹卡、不进 judge。
+  const provableOutside: string[][] = [
+    ["cp", "-t", "/outside/", "a.ts"],
+    ["cp", "--target-directory=/outside/", "a.ts"],
+    ["cp", "--target-directory", "/outside/", "a.ts"],
+    ["ln", "-t", "/outside/", "a.ts"],
+    ["install", "-t", "/outside/", "a.ts"],
+    ["install", "a.ts", "/outside/b.ts"],
+    ["find", "/outside", "-delete"],
+    ["rsync", "-a", "src/a", "/outside/"],
+    ["tar", "-xf", "x.tar", "-C", "/outside"],
+    ["curl", "-o", "/outside/out", "https://example.com"],
+    ["sort", "-o", "/outside/out", "src/in"],
+    ["dd", "of=/outside/x", "if=src/a"],
+    ["rm", "/outside/x"],
+  ];
+  for (const argv of provableOutside) {
+    const result = guard(argv);
+    assert.equal(result.decision.kind, "deny", `${argv.join(" ")} 静态可证明越界 ⇒ deny`);
+  }
+
+  // 2) 目标可判定且在写区内 ⇒ 正常放行（plain/目标型选项均可解析）。
+  for (const argv of [
+    ["cp", "src/a.ts", "src/b.ts"],
+    ["cp", "-t", "src/", "a.ts"],
+    ["cp", "--target-directory=src/", "a.ts"],
+    ["mv", "-t", "src/", "a.ts"],
+    ["ln", "-t", "src/", "a.ts"],
+    ["install", "-t", "src/", "a.ts"],
+    ["rm", "src/tmp"],
+    ["sort", "-o", "src/out", "src/in"],
+  ]) {
+    assert.equal(guard(argv).decision.kind, "pass", `${argv.join(" ")} 写区内 ⇒ pass`);
+  }
+
+  // 3) 写目标无法静态解析 ⇒ script（开关开 → judge 审查脚本/上下文；关 → 客户卡）。
+  for (const argv of [
+    ["find", "src", "-delete"],
+    ["find", ".", "-exec", "rm", "{}", ";"],
+    ["xargs", "rm", "-rf"],
+    ["git", "clean", "-fdx"],
+    ["git", "checkout", "--", "."],
+    ["git", "restore", "."],
+    ["rsync", "-a", "src/a", "src/"],
+    ["tar", "-xf", "x.tar", "-C", "src/"],
+    ["tar", "-cf", "src/x.tar", "src/"],
+    ["cp", "-S", ".bak", "src/a.ts", "src/b.ts"],
+    ["dd", "if=src/a"],
+    ["patch", "-p1"],
+  ]) {
+    assert.equal(guard(argv).decision.kind, "script", `${argv.join(" ")} 无法静态解析 ⇒ script`);
+  }
+
+  // 4) shell 脚本/内联代码 ⇒ script（内容进入审查）；版本查询等只读形态不受影响。
+  for (const argv of [["bash", "src/job.sh"], ["sh", "-c", "rm -rf src"], ["zsh", "tool.zsh"]]) {
+    assert.equal(guard(argv).decision.kind, "script", `${argv.join(" ")} shell 脚本/内联 ⇒ script`);
+  }
+  assert.equal(guard(["bash", "--version"]).decision.kind, "pass");
+
+  // 5) 只读形态不受影响。
+  assert.equal(guard(["tar", "-tf", "x.tar"]).decision.kind, "pass");
+  assert.equal(guard(["git", "status"]).decision.kind, "pass");
+  assert.equal(guard(["find", "src", "-name", "*.ts"]).decision.kind, "pass");
 });
