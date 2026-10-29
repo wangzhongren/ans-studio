@@ -772,6 +772,7 @@ function registerIpc(win: BrowserWindow): void {
   // B-2：保活会话列表（左树「有活动会话」小圆点的数据源）——纯读。
   registerHandler("session:live", () => desktop.listLiveSessions());
   registerHandler("session:live-views", () => desktop.listLiveSessionViews());
+  registerHandler("session:role-states", () => desktop.requestRoleStates());
   registerHandler("session:history-get", (_event, input) => desktop.getSessionHistory(input));
   // —— 会话级后台任务（2026-10-25，桌面任务面板）：聚合列表 / 读日志 / 停止 ——
   // 渲染进程输入不可信：**来源校验在本 handler**（同 app:recovery-state 等既有模式）；参数校验与失败回执

@@ -4591,6 +4591,13 @@ export class SessionManager {
     });
   }
 
+  /** 界面（重）加载后请求重放全部在场会话的角色状态快照：状态只在变化时外推，晚订阅的渲染侧否则会丢失忙/闲与队列。 */
+  broadcastRoleStates(): void {
+    for (const entry of this.sessions.values()) {
+      this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
+    }
+  }
+
   private persistenceScope(entry: LiveSession): PersistenceScope { return { projectRoot: entry.projectRoot, roleId: entry.roleId, runtime: entry.runtime }; }
   private persistenceKey(scope: PersistenceScope, id: string): string { return `${scope.projectRoot}\0${scope.roleId}\0${scope.runtime}\0${id}`; }
   private displayHandback(event: HandbackEvent): DesktopOrchestrationEvent {

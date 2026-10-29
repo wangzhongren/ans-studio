@@ -52,6 +52,7 @@ export interface DesktopBridge {
   getFlowStatus?: (projectRoot: string) => Promise<unknown>;
   onSessionEvent?: (callback: (payload: unknown) => void) => () => void;
   onRoleState?: (callback: (payload: unknown) => void) => () => void;
+  requestRoleStates?: () => Promise<{ ok: boolean }>;
   onSessionHistory?: (callback: (payload: unknown) => void) => () => void;
   onProjectChanged?: (callback: () => void) => () => void;
   onOperatorRequest?: (callback: (payload: unknown) => void) => () => void;

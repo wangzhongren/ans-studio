@@ -429,6 +429,8 @@ export function installChatRuntime(): void {
 
   bridge.onSessionEvent?.(handleSessionEvents);
   bridge.onRoleState?.(handleRoleState);
+  // 订阅晚于状态变化时（界面重载/项目刚导入）主动拉一次快照重放，避免其他角色忙态显示缺失。
+  void bridge.requestRoleStates?.();
   bridge.onSessionHistory?.(handleHistory);
   bridge.onProjectChanged?.(() => {
     void useChatStore.getState().refreshProject();

@@ -317,6 +317,8 @@ contextBridge.exposeInMainWorld("desktop", {
     ipcRenderer.on("session:role-state", listener);
     return () => ipcRenderer.removeListener("session:role-state", listener);
   },
+  /** 界面加载后请求重放全部在场角色状态快照（忙/闲/队列）；主进程经同一 session:role-state 通道回推。 */
+  requestRoleStates: () => ipcRenderer.invoke("session:role-states"),
 
   /**
    * 订阅「会话历史已恢复」（D-1，2026-10-12）：项目导入/重载后，主进程按项目/角色/runtime 读取 ANS 回放，把**规范化后的界面行**推来

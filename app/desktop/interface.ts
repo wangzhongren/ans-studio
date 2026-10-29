@@ -591,6 +591,8 @@ export interface DesktopInterface {
   /** 保活中的角色 id 列表（B-2：左树「有活动会话」小圆点的数据源；纯读、无副作用）。 */
   listLiveSessions(): Promise<string[]>;
   listLiveSessionViews(): Promise<{ projectRoot: string; roleId: string; runtime: RuntimeKind; profileRevision: number }[]>;
+  /** 界面加载后请求重放全部在场角色的状态快照（忙/闲/队列），走既有 `session:role-state` 通道。 */
+  requestRoleStates(): Promise<{ ok: boolean }>;
   /**
    * **后台任务聚合列表（2026-10-25，桌面任务面板）**：按 `projectRoot + runtime` 聚合当前所有已打开会话的
    * 后台任务——每项 = `BackgroundTaskSnapshot` + `roleId` + `runtime`。直接读各会话句柄、**不缓存/不持久化**；
@@ -2160,6 +2162,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     },
 
     async listLiveSessionViews() { return manager.liveSessionViews(); },
+
+    async requestRoleStates() {
+      manager.broadcastRoleStates();
+      return { ok: true };
+    },
 
     // —————— 会话级后台任务（2026-10-25，桌面任务面板）——————
     // 只做参数校验与转发：任务表/日志只存在于各会话内存（不缓存/不持久化），聚合与寻址在 SessionManager。

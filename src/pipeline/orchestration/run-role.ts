@@ -1022,8 +1022,10 @@ export async function openRoleSession(
     : undefined;
 
   // 回交（设计 §10.8）：角色会话 settle → 编排发 `handback` 事件，交回治理角色。
-  // **内置治理角色自身不回交**（回交的主体是**其他角色**）——`suppressHandback` 仅用于本语义。
-  const suppressHandback = builtInGovernance;
+  // **星形最小系统（2026-10-29 客户实测）**：内置 worker（产品/策划/人事/运营/质检）也是幕僚的 worker，
+  // 必须能经 `submit_report` 回报任务；仅幕僚本人（不自我回交）与 single/su 旧模型（非 trio）不注入。
+  const suppressHandback =
+    builtInGovernance && (trioSpec === undefined || trioSpec.id === "chief");
 
   // 交报告（C-1）：**只给回交主体（非 su）**注入 `reportHandback`——模型经 `submit_report` 交的报告
   // （`summary`/`evidence`/`status`）正常终局优先取报告值；su 不注入。无合法报告明确未报告。
