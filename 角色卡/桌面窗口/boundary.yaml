@@ -162,6 +162,10 @@ entries:
   - kind: file
     path: test/桌面应用/optional-acceptance.test.ts
     purpose: 主进程侧测试——可选验收链路：幕僚调度→质检/交付角色直接提交→judge/客户
+  # --- Delta-2（2026-10-29，方案 v2.1 §7.1/§8；闸门 2）：test/桌面应用/ 新增 1 个精确测试文件（chain-enforcement），逐文件授权，无目录级授权 ---
+  - kind: file
+    path: test/桌面应用/chain-enforcement.test.ts
+    purpose: 招人链/前置校验（意图文档→名单→D3→交付运营）负例与顺序断言
   - kind: file
     path: 角色卡/桌面窗口/feature-map.md
     purpose: 功能导航

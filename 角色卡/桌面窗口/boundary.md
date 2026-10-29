@@ -58,6 +58,7 @@
 | 单文件 | `test/桌面应用/pending-card-restart.test.ts` | 主进程侧测试——申请/审批卡快照持久化、重启回待办/对话框、无原 tool call 的结算与回投、shell/审批卡不重放、requestId/approvalId 幂等 |
 | 单文件 | `test/桌面应用/write-safety.test.ts` | 主进程侧测试——边界内预授权/边界外拒绝/`.ans` 禁写、appointment-write 审批与结构校验失败不落盘、写后刷新、负例（内置 id/越界/重叠） |
 | 单文件 | `test/桌面应用/optional-acceptance.test.ts` | 主进程侧测试——可选验收链路：幕僚调度→质检/交付角色直接提交→judge/客户 |
+| 单文件 | `test/桌面应用/chain-enforcement.test.ts` | 招人链/前置校验（意图文档→名单→D3→交付运营）负例与顺序断言 |
 | 单文件 | `角色卡/桌面窗口/feature-map.md` | 功能导航 |
 | 单文件 | `角色卡/桌面窗口/memo.md` | 本角色工作备忘录 |
 | 单文件 | `角色卡/桌面窗口/changelog.md` | 本角色治理变更记录 |
