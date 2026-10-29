@@ -59,10 +59,10 @@
 
 ## 3. 验证（串行）
 
-- 全量（v2.15 最终）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（340 文件）→ **2998 tests / 2968 pass / 12 fail / 18 skip**（12 红＝9 Windows symlink EPERM + T1×3 既有环境问题）；日志 `%TEMP%\ans-v215-full.log`。
-- `npm run typecheck` exit 0；`npm run typecheck:renderer` exit 0；`npm run build:renderer` exit 0（返工 v3 后重跑）。
-- phase5a 真实 Electron（v2.15）：**34/34 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-v215\report.json`，sha256 `14aa70c081f8a875cb44af2a0b65762db81eb284555b37bdd281f34c83e4d670`）。
-- 桌面 E2E（v2.15；临时夹具 `%TEMP%\ans-e2e-g-fixture-1029`；fresh APPDATA）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-v215-out\report.txt`，sha256 `5e646aa91d79417cd420ab779d67c64b99e662d7ebd229554847193b169fcd0f`；`session:role-states` 未注册错误 0。
+- 全量（最终提交 6e2665c）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（340 文件）→ **2998 tests / 2968 pass / 12 fail / 18 skip**（12 红＝9 Windows symlink EPERM + T1×3 既有环境问题）；日志 `%TEMP%\ans-final-6e2665c-full.log`，sha256 `6214aa8fa21d768c78a83f40b738aec8cd74ba903f981325d90ba382bcce69bf`。
+- `npm run typecheck` exit 0；`npm run typecheck:renderer` exit 0；`npm run build:renderer` exit 0（最终代码重跑）。
+- phase5a 真实 Electron（最终）：**34/34 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-final\report.json`，sha256 `645b503550e1eda00290205b8d7b8427a3077efcee3a39afff379d750fac5f86`）。
+- 桌面 E2E（最终；临时夹具 `%TEMP%\ans-e2e-g-fixture-1029`；fresh APPDATA）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-final-out\report.txt`，sha256 `3d5fde6467c7fb98fe8f77fb8c7124bc90fca5568dfdcf65fdcfcce1a98b381f`；`session:role-states` 未注册错误 0。
 
 ## 4. 应用冒烟（重启后）
 
