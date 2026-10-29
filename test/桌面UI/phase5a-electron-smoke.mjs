@@ -158,6 +158,10 @@ app.whenReady().then(async () => {
     await sleep(240);
     check("六角色左树/主入口 chief", await js(`(() => { const s=window.__ansRenderer.state; return s.roles.length===8 && s.primaryRoleId==='chief' && !!document.querySelector('#role-tree .tree-item.primary[data-role-id="chief"]') && !document.querySelector('#role-tree .ti-badge'); })()`));
     check("决策/任务入口在会话头", await js(`!!document.getElementById('tab-decisions') && !!document.getElementById('tab-tasks')`));
+    // 2026-10-29 客户缺陷：Composer 两开关曾把输入区撑出页面。结构 + 1360 实测（不溢出）。
+    check("Composer 两行结构：提示行/控件行", await js(`(() => { const line=document.querySelector('.composer-trust-line'), ctr=document.querySelector('.composer-controls'); if(!line||!ctr) return false; return line.textContent.trim().length>0 && !!line.querySelector('#judge-switch-hint') && !!ctr.querySelector('#btn-attach-image') && !!ctr.querySelector('#auto-approve-toggle') && !!ctr.querySelector('#judge-decision-toggle') && !!ctr.querySelector('#composer-scope'); })()`));
+    check("Composer 控件同一行（1360）", await js(`(() => { const ctr=document.querySelector('.composer-controls'); if(!ctr) return false; const r=ctr.getBoundingClientRect(); const boxes=[...ctr.children].filter(el=>el.offsetParent!==null).map(el=>el.getBoundingClientRect()); return boxes.length>=4 && Math.max(...boxes.map(b=>b.bottom))-Math.min(...boxes.map(b=>b.top)) <= 36 && r.bottom-r.top <= 36; })()`));
+    check("Composer 无横向溢出（1360）", await js(`(() => { const bottom=document.querySelector('.composer-bottom'); if(!bottom) return false; const r=bottom.getBoundingClientRect(); const pills=[...document.querySelectorAll('.composer-auto-approve')].map(el=>el.getBoundingClientRect()); return document.documentElement.scrollWidth<=innerWidth+1 && r.right<=innerWidth+1 && pills.every(p=>p.left>=-0.5&&p.right<=innerWidth+1) && bottom.scrollWidth<=bottom.clientWidth+1; })()`));
     await shot("01-six-roles");
 
     await js(`window.__ansRenderer.appendOperatorRequest({ id: 'e-low', roleId: 'chief', request: { kind: 'confirm', title: 'E 低风险确认' } })`);
@@ -266,6 +270,8 @@ app.whenReady().then(async () => {
     await js(`window.dispatchEvent(new Event('resize'))`);
     await sleep(200);
     check("200% 无横向溢出", await js(`document.documentElement.scrollWidth <= innerWidth + 1`));
+    // 2026-10-29：窄屏（200% / 960 物理 ≈ 480 CSS 像素）下 Composer 两开关也不得把页面撑开。
+    check("200% Composer 控件不溢出", await js(`(() => { const bottom=document.querySelector('.composer-bottom'), ctr=document.querySelector('.composer-controls'); if(!bottom||!ctr) return false; const r=bottom.getBoundingClientRect(), c=ctr.getBoundingClientRect(); const pills=[...document.querySelectorAll('.composer-auto-approve')].map(el=>el.getBoundingClientRect()); return c.right<=innerWidth+1 && r.right<=innerWidth+1 && pills.every(p=>p.left>=-0.5&&p.right<=innerWidth+1) && ctr.scrollWidth<=ctr.clientWidth+1; })()`));
     await shot("05-200pct");
     wc.setZoomFactor(1);
 

@@ -21,7 +21,7 @@ import { createDesktopInterface, createShellJudgeSwitch, isShellJudgeIpcSender, 
 // i18n B0（2026-10-23）：主进程 translator（窗口/对话框/启动错误框）与应用级语言偏好
 // （`<userData>/ans/preferences.json`，只写 userData；不写项目 `.ans`/`.env`）。
 import { createMainI18n, desktopTexts } from "./desktop/i18n.ts";
-import { preferencesFilePath, readPreferences } from "./desktop/preferences.ts";
+import { DEFAULT_JUDGE_SWITCHES, preferencesFilePath, readPreferences, type JudgeSwitchesPreference } from "./desktop/preferences.ts";
 // 运行时配置：开发使用仓库 `.env`，安装包使用 userData/.env，启动载入 `process.env`（补 Electron 缺失的 `--env-file`）；
 // 面板经 IPC 读写同一 `.env`。**`.env` 的读写全仓唯一**在共享模块 `src/common/shared/env-file.ts`
 // （pm 属主）——此处**只读导入，不复制**；路径由 `./desktop/pi-config.ts` 解析（可注入，测试/e2e 用临时路径）。
@@ -77,6 +77,9 @@ let desktopEnvPath: string | undefined;
 // main.ts 与 Interface 共享同一 translator 实例——窗口标题、对话框、启动错误框与 IPC 错误文案同一 locale。
 const mainI18n = createMainI18n();
 let preferencesPath: string | undefined;
+// 2026-10-29 客户缺陷修复：两个判断开关的启动持久值（whenReady 读盘后填充；缺省均关闭）。
+// 渲染重载（`loadInterface`）**不再复位**——主进程内存中的当前值跨重载保持；只有新启动从这里取初值。
+let initialJudgeSwitches: JudgeSwitchesPreference = DEFAULT_JUDGE_SWITCHES;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 5B：唯一生产入口 = Vite 构建产物 `renderer/dist/index.html`（PM §17.1）。
@@ -300,11 +303,12 @@ function registerIpc(win: BrowserWindow): void {
     onBlocked: (reasonCode) => mainDiagnostic.record("window.navigation.blocked", { reasonCode }),
   });
   // —————— 「替我审批」（approval）与「替我决策」（decision）开关（2026-10-17 / 2026-10-18 评审 §3.3） ——————
-  // 两个**独立**状态机：默认 false、启动/重载复位、不持久化、互不影响；只在主进程内存。
+  // 两个**独立**状态机：启动初值来自应用偏好（2026-10-29 客户缺陷修复）、跨渲染重载保持、互不影响；
+  // 变更由 Interface 经偏好服务持久化到 userData（不写项目文件）。只在主进程内存中**当前值**由两处共享。
   // 同一实例交给通道（调用当刻读 `isEnabled()`）与 Interface（`shell:judge-*` / `decision:judge-*`），
   // 两处永不漂移。代码符号沿用 `shellJudgeSwitch`（approval 组现为「shell + 写盘族」），通道名不改。
-  const shellJudgeSwitch = createShellJudgeSwitch();
-  const decisionJudgeSwitch = createShellJudgeSwitch();
+  const shellJudgeSwitch = createShellJudgeSwitch(initialJudgeSwitches.approval);
+  const decisionJudgeSwitch = createShellJudgeSwitch(initialJudgeSwitches.decision);
   const shellJudgeLog = createDiagnosticLogger({ component: "desktop.shell-judge" });
   const decisionJudgeLog = createDiagnosticLogger({ component: "desktop.decision-judge" });
   // —————— Phase 5A（PM §17.3）：入口解析 + dev server 一次性回退 ——————
@@ -378,9 +382,8 @@ function registerIpc(win: BrowserWindow): void {
     statesPushedForAttempt = false;
     devProbeActive = false;
     devFallbackPromise = undefined;
-    // §10.3：渲染重载/初次加载前**两个开关各自**复位为手动（不持久化）；已挂起卡不受影响。
-    shellJudgeSwitch.reset();
-    decisionJudgeSwitch.reset();
+    // 2026-10-29 客户缺陷修复：渲染重载**不再复位**两个开关——主进程内存中的当前值跨重载保持，
+    // 新启动的初值来自应用偏好（`initialJudgeSwitches`）；已挂起卡不受影响。
     const target = resolveRendererTarget();
     try {
       if (target.kind === "dev-url") {
@@ -560,12 +563,12 @@ function registerIpc(win: BrowserWindow): void {
     if (!isShellJudgeIpcSender(event.sender, win.webContents)) return { version: 1, ok: false, error: "请求来源无效。" };
     return desktop.getShellJudgeState();
   });
-  registerHandler("shell:judge-set", (event, input) => {
+  registerHandler("shell:judge-set", async (event, input) => {
     if (!isShellJudgeIpcSender(event.sender, win.webContents)) {
       shellJudgeLog.record("shell-judge.set.rejected", { reason: "sender-mismatch" });
       return { version: 1, ok: false, error: "请求来源无效。" };
     }
-    const result = desktop.setShellJudgeEnabled(input);
+    const result = await desktop.setShellJudgeEnabled(input);
     if (result.ok === true) {
       shellJudgeLog.record("shell-judge.toggled", { enabled: result.enabled, source: "renderer", at: new Date().toISOString() });
       // 成功后仅影响**之后新到**的 `(a)` 请求；推送让渲染侧以主进程状态为准（不显示假开启态）。
@@ -582,12 +585,12 @@ function registerIpc(win: BrowserWindow): void {
     if (!isShellJudgeIpcSender(event.sender, win.webContents)) return { version: 1, ok: false, error: "请求来源无效。" };
     return desktop.getDecisionJudgeState();
   });
-  registerHandler("decision:judge-set", (event, input) => {
+  registerHandler("decision:judge-set", async (event, input) => {
     if (!isShellJudgeIpcSender(event.sender, win.webContents)) {
       decisionJudgeLog.record("decision-judge.set.rejected", { reason: "sender-mismatch" });
       return { version: 1, ok: false, error: "请求来源无效。" };
     }
-    const result = desktop.setDecisionJudgeEnabled(input);
+    const result = await desktop.setDecisionJudgeEnabled(input);
     if (result.ok === true) {
       decisionJudgeLog.record("decision-judge.toggled", { enabled: result.enabled, source: "renderer", at: new Date().toISOString() });
       // 只影响之后新到的治理决定卡；已挂起/判断中的卡不追溯（通道在结果结算前会再查一次开关）。
@@ -633,6 +636,8 @@ function registerIpc(win: BrowserWindow): void {
     // i18n B0（2026-10-23）：应用级语言偏好文件与共享 translator（同一实例贯穿窗口/对话框/错误文案）。
     // 偏好只写 userData；不写项目 `.ans`/`.env`/治理账本。
     preferencesPath,
+    // 2026-10-29 客户缺陷修复：判断开关的启动持久值（同 whenReady 读盘结果；新启动恢复）。
+    initialJudgeSwitches,
     mainI18n,
     // 自动验收派发/冷启动补齐的 per-project 引擎选择：user-data 下的独立文件（不写项目 `.ans`、
     // 不碰治理账本）——下次冷启动据此选对引擎（2026-10-19 真机缺陷：无活跃会话时曾回退 claude）。
@@ -886,6 +891,8 @@ app.whenReady().then(async () => {
   preferencesPath = preferencesFilePath(userDataPath);
   const preferencesRead = await readPreferences(preferencesPath);
   mainI18n.setLocale(preferencesRead.locale);
+  // 2026-10-29 客户缺陷修复：判断开关按持久值初始化（新启动恢复；缺失/非法回退关闭，不阻塞启动）。
+  initialJudgeSwitches = preferencesRead.judgeSwitches;
   for (const diagnostic of preferencesRead.diagnostics) {
     mainDiagnostic.record(diagnostic.code, {
       reasonCode: diagnostic.reasonCode,

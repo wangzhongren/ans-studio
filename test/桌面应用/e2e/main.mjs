@@ -210,6 +210,8 @@ function registerIpc() {
   //   ③ 报告/投递持久化查询（卡片「报告存储」槽；只读，retry* 仅重试点击时触发）——同为现行卡片能力；
   //   ④ 运行时配置读写（Pi 设置面板现行通道；原 pi-config:* 双注册保留——与 main.ts 同形）。
   registerHandler("session:live-views", () => desktop.listLiveSessionViews());
+  // 2026-10-29：界面加载后角色状态快照重放（与 app/main.ts 同形；缺失会让渲染侧记一条未捕获拒绝）。
+  registerHandler("session:role-states", () => desktop.requestRoleStates());
   registerHandler("session:history-get", (_e, input) => desktop.getSessionHistory(input));
   registerHandler("tasks:list", (_e, input) => desktop.listTasks(input));
   registerHandler("tasks:restore", (_e, input) => desktop.restoreTasks(input));
@@ -226,14 +228,14 @@ function registerIpc() {
   registerHandler("runtime-config:save", (_e, input) => desktop.saveRuntimeConfig(input));
   // Phase 5A：与 app/main.ts 同步的双开关通道（旧/新渲染器启动时都会读取；缺失会让启动流程报错）。
   registerHandler("shell:judge-get", () => desktop.getShellJudgeState());
-  registerHandler("shell:judge-set", (_e, input) => {
-    const result = desktop.setShellJudgeEnabled(input);
+  registerHandler("shell:judge-set", async (_e, input) => {
+    const result = await desktop.setShellJudgeEnabled(input);
     if (result.ok === true && !win.isDestroyed()) win.webContents.send("shell:judge-state", { ...desktop.getShellJudgeState(), available: true });
     return result;
   });
   registerHandler("decision:judge-get", () => desktop.getDecisionJudgeState());
-  registerHandler("decision:judge-set", (_e, input) => {
-    const result = desktop.setDecisionJudgeEnabled(input);
+  registerHandler("decision:judge-set", async (_e, input) => {
+    const result = await desktop.setDecisionJudgeEnabled(input);
     if (result.ok === true && !win.isDestroyed()) win.webContents.send("decision:judge-state", { ...desktop.getDecisionJudgeState(), available: true });
     return result;
   });

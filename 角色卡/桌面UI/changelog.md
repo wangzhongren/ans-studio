@@ -1,5 +1,9 @@
 # 桌面UI 变更记录
 
+## 2026-10-29：Composer 两开关溢出修复的结构钉与窄屏实测补证
+
+**客户真机缺陷**（已由沟通在 `feat/entry-role-minimal` 提交 `928cd62`/`e410e6b`/`19331b2`）：两个「替我审批/替我决策」胶囊开关把输入区撑出页面。最终结构为两行——`.composer-trust-line`（标题 + 说明）与 `.composer-controls`（附件 + `.composer-trust` 两胶囊 + `.composer-scope` + `.composer-keyboard` + `.composer-actions`），样式在 `shell.css`。本批补 `test/桌面UI/composer-layout.test.ts`（3 tests：两行结构归属、控件一行与可收缩 CSS 前提、胶囊/标签/范围省略号，禁止固定像素宽度）；`phase5a-electron-smoke.mjs` 30→**34 checks**（新增 1360 控件同一行/无横向溢出、200%/960 物理窄屏 Composer 不溢出）。**实测**：phase5a 34/34、failures=0、console/CSP 0（report sha256 `7b08b227…`）；真机 1360 无横向溢出、窄屏 200% 通过（见 `docs/scheduling/2026-10-29_change-test-run-fixes.md` §4–5）。未改生产渲染代码。
+
 ## 2026-10-21：Phase 4A UIUX M1–M6 修正（needs-work → 修正）
 
 **UIUX Phase 4A 评审修正（needs-work，M1–M6，2026-10-21）**：①队列子视图（同一 424 抽屉，标题「<角色> · 队列」/返回来源/当前+排队全量；工作概览与资料仅预览前 3 条排队，>3 显示「查看全部队列」；`#right-queue-body` 唯一、`state.rightTab` 不新增值）；②撤回回执——成功聊天流「已撤回排队消息：…」，失败/异常保留就地回执并追加 system 行；③设置 Tabs ←/→/Home/End + roving tabindex + aria-controls/tabpanel；④保存条 `.pi-status` 64px 内两行完整（键数/缺项数+应用时点，完整逐键文案在 title）；⑤角色头 `statusBadge(status,0)` 状态-only；⑥补 960 焦点/Esc/inert 独立断言与 200% 实测。门禁重跑：冒烟 99/99 + 28 截图；CONFIG 20/20、ROLE_FOCUS 9/9、默认段 4A 项全过；gzip 263,904B；bench 3 有效轮全过；C1 Δ=16；3B 冒烟 45/45。详见 [4A 变更记录](docs/change/2026-10-21_change_ui-platform-phase4a-engine-settings-drawers.md) §三·五。

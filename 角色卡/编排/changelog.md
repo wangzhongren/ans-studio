@@ -1,5 +1,11 @@
 # 编排 变更记录
 
+## 2026-10-29 — trio 内建 worker 注入 `submit_report`（客户真机：幕僚派发的 worker 不回短报）
+
+**来源**：客户真机测试——幕僚派发给运营（convener）的任务完成后没有 `submit_report`，幕僚收不到回报、只能读文件/轮询。提交 `2499c01` 修正 `run-role.ts` 的 `suppressHandback`：`builtInGovernance && (trioSpec === undefined || trioSpec.id === "chief")`——trio 五个内建 worker（product/rapporteur/nominator/convener/verifier）**注入** `reportHandback`（`submit_report` 据此注册）；幕僚本人（不自我回交）与 single/su 旧模型**不注入**。幕僚卡同步改为「派发后立即结束本轮、不要 run_shell sleep / 连续 role_status 轮询」，5 张 worker 卡加「任务完成必须 submit_report 回短报」。本批只补测试与文档，未改生产逻辑。
+
+**测试**：新增 `test/编排/trio-worker-report.test.ts`（3 tests：注入矩阵逐角色、worker 报告端到端取报告值、卡文本钉）；`test/编排` 480 计（479 过 / 1 红＝既有 Windows symlink EPERM）。**真机**（worktree 应用，客户场景）：运营收到任务后 `submit_report` 于 01:48:11 调用、`task.reported` 01:48:16 落盘，幕僚收到 `[工作结果]` 自动开启新一轮并结束回合（`role_status` 0 次、sleep 0 次）。证据见 `docs/scheduling/2026-10-29_change-test-run-fixes.md` §5。
+
 ## 2026-10-27 — 验收标准/交付演示证据改为截图 only（不得要求录屏）
 
 **来源**：客户 2026-10-27 新规则（**ANS 系统，不是 demo**）——**策划的验收标准最多截图，不能要求录屏**；视觉证据最多真实运行截图，**不得要求录屏，缺录屏不得判失败**。本批只改编排边界内的治理会话提示词与测试；未改 `src/model/**`、`src/service/**`、`src/provider/**`、`app/**`、门禁引擎、角色卡、i18n、PM、skill、游戏项目；未新增角色/`FlowStepKind`/cardKind/权限；未 commit/push、未重启、未碰 `demos/`。

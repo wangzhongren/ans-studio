@@ -94,7 +94,7 @@ import type { RuntimeKind } from "../../src/model/runtime.ts";
 import { isLocale, type Locale } from "../../src/common/shared/i18n/index.ts";
 import { createMainI18n, mainT, type MainI18n } from "./i18n.ts";
 import { refreshRecoveryPage } from "./diagnostics.ts";
-import { createPreferencesService, type PreferencesDiagnostic, type PreferencesView } from "./preferences.ts";
+import { createPreferencesService, type JudgeSwitchesPreference, type PreferencesDiagnostic, type PreferencesView } from "./preferences.ts";
 
 export interface RoleView {
   readonly group?: string;
@@ -165,9 +165,11 @@ export interface AttachImageResult {
 
 // ————————————————— 2026-10-17：「替我审」开关（主进程权威，PM 评审 §6.6/§10.3） —————————————————
 //
-// 状态**只在主进程内存**：默认 false；启动/渲染重载复位；变化经 `shell:judge-state` 推送；**不写 localStorage/
-// `.env`/项目文件**。渲染侧只发意图（`shell:judge-set`），状态以主进程接受为准。开关**只影响之后新到的
-// `(a)` 请求**（通道在调用当刻读取 `isEnabled()`）；已挂起卡不受切换影响。
+// 状态在主进程内存中**跨渲染重载保持**；启动初值来自应用偏好（2026-10-29 客户缺陷修复：
+// 曾因每次 `loadInterface()` 无条件复位而丢失）。变化经 `shell:judge-state` 推送；请求本身不写
+// localStorage/项目文件，持久化只经 `<userData>/ans/preferences.json`。渲染侧只发意图
+// （`shell:judge-set`），状态以主进程接受为准。开关**只影响之后新到的 `(a)` 请求**（通道在调用当刻
+// 读取 `isEnabled()`）；已挂起卡不受切换影响。
 
 /** 开关应答（§6.6 钉死 `{version:1,...}`；2026-10-18 评审 §3.3 增可选 `available`）。 */
 export interface ShellJudgeStateReply {
@@ -188,13 +190,13 @@ export interface ShellJudgeSwitch {
   get(): ShellJudgeStateReply & { ok: true; enabled: boolean };
   /** 校验 `{enabled:boolean}`；**失败不改状态**。 */
   set(input: unknown): ShellJudgeStateReply;
-  /** 启动/渲染重载复位（默认 false）。 */
+  /** 显式复位为默认 false（**不再用于渲染重载**：启动初值来自应用偏好；保留给测试/显式重置）。 */
   reset(): void;
 }
 
 /** 构造开关。主进程（`main.ts`）与 Interface 共持同一实例——两处永不漂移。 */
-export function createShellJudgeSwitch(): ShellJudgeSwitch {
-  let enabled = false;
+export function createShellJudgeSwitch(initialEnabled = false): ShellJudgeSwitch {
+  let enabled = initialEnabled === true;
   return {
     isEnabled: () => enabled,
     get: () => ({ version: 1, ok: true, enabled }),
@@ -325,7 +327,8 @@ export interface DesktopDeps {
   createShellJudgeFn?: typeof realCreateShellJudge;
   /**
    * **「替我审」开关状态机（主进程权威）**：main.ts 创建**同一实例**并传给通道与 Interface；
-   * 缺省自建（默认 false）以便单测直用。开关**只影响之后新到的请求**，不自动打开会话、不持久化。
+   * 缺省自建（按 `initialJudgeSwitches.approval`，无注入时默认 false）以便单测直用。
+   * 开关**只影响之后新到的请求**，不自动打开会话；变更经偏好服务持久化到 userData。
    */
   shellJudgeSwitch?: ShellJudgeSwitch;
   /**
@@ -335,7 +338,8 @@ export interface DesktopDeps {
   createGovernanceJudgeFn?: typeof realCreateGovernanceJudge;
   /**
    * **「替我决策」开关状态机（主进程权威）**：与 approval 同形、**互不影响**；main.ts 创建**同一实例**
-   * 并传给客户交互通道与 Interface。缺省自建（默认 false）；只在主进程内存、重载复位、不持久化。
+   * 并传给客户交互通道与 Interface。缺省自建（按 `initialJudgeSwitches.decision`）；跨渲染重载保持，
+   * 启动初值来自应用偏好（2026-10-29 客户缺陷修复）。
    */
   decisionJudgeSwitch?: ShellJudgeSwitch;
   createPiAdapterFactoryFn?: (project: ProjectConfig, shellGate?: ShellGate) => (gate: WriteGate) => RuntimeAdapter;
@@ -448,6 +452,12 @@ export interface DesktopDeps {
    */
   preferencesPath?: string;
   /**
+   * **判断开关的启动持久值（2026-10-29 客户缺陷修复）**：main.ts 启动时从
+   * `<userData>/ans/preferences.json` 读取后传入；缺省 = 均关闭。只在**新启动**生效——
+   * 渲染重载保持主进程内存中的当前值（不再复位）。
+   */
+  initialJudgeSwitches?: JudgeSwitchesPreference;
+  /**
    * **主进程 translator（i18n B0）**：main.ts 与 Interface 共享**同一实例**（窗口/对话框/启动错误框
    * 与 IPC 错误文案同一 locale）；缺省自建 zh-CN（单测直用）。切换只影响之后新生成的文本，历史不追溯。
    */
@@ -508,25 +518,26 @@ export interface DesktopInterface {
   disposeProjectDocuments(): void;
   listProject(input: { projectRoot: string }): Promise<ListProjectResult>;
   /**
-   * **「替我审」开关读取**（PM 评审 §6.6）：主进程权威、默认 false。返回 `{version:1, ok:true, enabled}`。
-   * 只读，不改变任何会话或请求状态。
+   * **「替我审」开关读取**（PM 评审 §6.6）：主进程权威；启动初值来自持久化偏好（缺省 false），
+   * 跨渲染重载保持。返回 `{version:1, ok:true, enabled}`。只读，不改变任何会话或请求状态。
    */
   getShellJudgeState(): ShellJudgeStateReply & { ok: true; enabled: boolean };
   /**
    * **「替我审」开关设置**：仅接受 `{enabled:boolean}`；失败返回 `{ok:false, error}` 且**不改状态**。
-   * 成功后**只影响之后新到的 `(a)` 请求**（已挂起卡不受影响）；不打开会话、不写盘。
+   * 成功后**只影响之后新到的 `(a)` 请求**（已挂起卡不受影响）、不打开会话；并把新状态持久化到
+   * 应用偏好（写盘失败只记诊断——本次会话内开关仍生效，重启后回到最后一次成功持久的值）。
    */
-  setShellJudgeEnabled(input: unknown): ShellJudgeStateReply;
-  /** 启动/渲染重载复位（默认 false；PM 评审 §10.3，由 main.ts 在 `loadInterface()` 前调用）。 */
+  setShellJudgeEnabled(input: unknown): Promise<ShellJudgeStateReply>;
+  /** 显式复位为默认 false（**不再用于渲染重载**；只改内存，不影响已持久化的偏好）。 */
   resetShellJudgeState(): void;
   /**
    * **「替我决策」开关读取**（2026-10-18 双开关评审 §3.3）：与 approval 同形、**互不影响**；
-   * 主进程权威、默认 false、重载复位、不持久化。返回 `{version:1, ok:true, enabled, available}`。
+   * 主进程权威、启动初值来自持久化偏好、跨渲染重载保持。返回 `{version:1, ok:true, enabled, available}`。
    */
   getDecisionJudgeState(): ShellJudgeStateReply & { ok: true; enabled: boolean };
-  /** **「替我决策」开关设置**：仅接受 `{enabled:boolean}`；失败不改状态；只影响之后新到的卡。 */
-  setDecisionJudgeEnabled(input: unknown): ShellJudgeStateReply;
-  /** 启动/渲染重载复位（默认 false；与 approval 各自复位、互不影响）。 */
+  /** **「替我决策」开关设置**：仅接受 `{enabled:boolean}`；失败不改状态；只影响之后新到的卡；成功后持久化。 */
+  setDecisionJudgeEnabled(input: unknown): Promise<ShellJudgeStateReply>;
+  /** 显式复位为默认 false（**不再用于渲染重载**；与 approval 各自复位、互不影响）。 */
   resetDecisionJudgeState(): void;
   /**
    * **判断代批结果行落主入口进度行**（§8.3，best-effort）：`approve` 结算后由主进程调用；
@@ -682,10 +693,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // C1：pin 证据检查（缺省＝Service 公开出口；门禁引擎唯一实现）。
   const inspectPinnedBoundariesFn = deps.inspectPinnedBoundariesFn ?? inspectPinnedBoundaries;
   // 「替我审」（2026-10-17）：开关状态机（主进程权威）与判断闭包工厂（缺省＝编排 Pipeline 公共出口）。
-  const shellJudgeSwitch = deps.shellJudgeSwitch ?? createShellJudgeSwitch();
+  // 2026-10-29 客户缺陷修复：缺省自建的实例也按启动持久值初始化（main.ts 注入的共享实例同源）。
+  const shellJudgeSwitch = deps.shellJudgeSwitch ?? createShellJudgeSwitch(deps.initialJudgeSwitches?.approval === true);
   const createShellJudgeFn = deps.createShellJudgeFn ?? realCreateShellJudge;
   // 「替我决策」（2026-10-18 双开关评审 §3.3/§8.2）：同形第二套开关（互不影响）与治理判断闭包工厂。
-  const decisionJudgeSwitch = deps.decisionJudgeSwitch ?? createShellJudgeSwitch();
+  const decisionJudgeSwitch = deps.decisionJudgeSwitch ?? createShellJudgeSwitch(deps.initialJudgeSwitches?.decision === true);
   const createGovernanceJudgeFn = deps.createGovernanceJudgeFn ?? realCreateGovernanceJudge;
   // Pi 配置面板：函数与目标路径均可注入（**测试/e2e 必须注入临时 `.env`**，绝不碰真实仓库根 `.env`）。
   const getPiConfigFn = deps.getPiConfigFn ?? realGetPiConfig;
@@ -709,6 +721,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const preferencesService = createPreferencesService({
     ...(deps.preferencesPath !== undefined ? { filePath: deps.preferencesPath } : {}),
     initialLocale: mainI18n.getLocale(),
+    // 2026-10-29 客户缺陷修复：判断开关的启动持久值（main.ts 启动时读盘后传入；缺省关闭）。
+    initialJudgeSwitches: {
+      approval: deps.initialJudgeSwitches?.approval === true,
+      decision: deps.initialJudgeSwitches?.decision === true,
+    },
     onDiagnostic: (diagnostic) => {
       deps.onPreferencesDiagnostic?.(diagnostic);
       preferencesLog.record(diagnostic.code, {
@@ -2017,9 +2034,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // `available`：本版本恒接真实判断驱动；渲染侧只在明确 false 时禁用（§3.3）。
       return { ...shellJudgeSwitch.get(), available: true };
     },
-    setShellJudgeEnabled(input: unknown): ShellJudgeStateReply {
+    async setShellJudgeEnabled(input: unknown): Promise<ShellJudgeStateReply> {
       // 校验在状态机内完成；失败**不改状态**（§6.6）。主进程 handler 负责 `event.sender` 校验与推送。
-      return { ...shellJudgeSwitch.set(input), available: true };
+      const reply = shellJudgeSwitch.set(input);
+      if (reply.ok === true) {
+        // 2026-10-29 客户缺陷修复：持久化到应用偏好（只写 userData）。写失败只记诊断（偏好服务内部），
+        // 本次会话内开关仍按主进程内存生效——绝不假装「重启后仍开」。
+        await preferencesService.setJudgeSwitch("approval", reply.enabled === true);
+      }
+      return { ...reply, available: true };
     },
     resetShellJudgeState(): void {
       shellJudgeSwitch.reset();
@@ -2029,8 +2052,12 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     getDecisionJudgeState(): ShellJudgeStateReply & { ok: true; enabled: boolean } {
       return { ...decisionJudgeSwitch.get(), available: true };
     },
-    setDecisionJudgeEnabled(input: unknown): ShellJudgeStateReply {
-      return { ...decisionJudgeSwitch.set(input), available: true };
+    async setDecisionJudgeEnabled(input: unknown): Promise<ShellJudgeStateReply> {
+      const reply = decisionJudgeSwitch.set(input);
+      if (reply.ok === true) {
+        await preferencesService.setJudgeSwitch("decision", reply.enabled === true);
+      }
+      return { ...reply, available: true };
     },
     resetDecisionJudgeState(): void {
       decisionJudgeSwitch.reset();
