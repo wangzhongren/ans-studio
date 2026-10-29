@@ -132,6 +132,14 @@
 - **R8**：新增守卫与测试；`DispatchTaskPayload`/`dispatch_task`/`tools.ts` **不接受 moduleDirectory**（应用从名单模块派生落盘）；`TaskCreatedEvent.moduleDirectory` 仍由应用写入。`chain-enforcement` 覆盖目标不拥有模块拒绝、模块 id 落盘、旧路径夹具迁移。
 - **R9 基线（v2.9–v2.12）**：`.ans/state/versions.initialized`（`{v:1,initializedAt}`）+ `.ans/state/versions.jsonl`（记录 `v/flowId/doc/version/path/sha256/recordedAt/event/recordedBy`；`path` 为 `flowId/doc` 派生 canonical 逻辑路径，唯一键 `(flowId,doc,version)`）。仅 marker 与 jsonl **都不存在**时 TOFU 一次；marker 存在后 jsonl 缺失/空/坏行/旧条目缺失一律 fail-closed，不补齐旧条目（仅登记版本号更高的新版本，event=`version-added`）。v2.10 旧记录读取时只读归一化（`versioned-doc-baseline`→`baseline`、`recordedBy app`→`app:session`、旧实际 path→canonical），不追加迁移记录。`versions.lock` 用 O_EXCL 独占（`{pid,startedAt,token}`），陈旧锁凭 token 接管、超时 fail-closed、只释放自己 token；登记/TOFU/校验走项目级串行锁。`shell-post-audit` 对受管版本文件做 baseline 比对，baseline 缺失/坏行也 fail-closed。测试：`versioned-doc-guard.test.ts`（TOFU/marker/空/坏行/新版本/并发/锁/归一化）、`shell-post-audit.test.ts`、chain-enforcement 篡改用例。
 
+## 4.6 五步链真机回归（BUG-3 修复后，`trial-hiring-chain`）
+
+最终代码重启后从第②步续跑（`C:/Users/51054/Desktop/work/trial-hiring-chain`，全程未手工替角色写文件，只发客户澄清消息）：
+
+- **已走通**：策划重出 v2 模块/提案/名单/架构（roster v8 仅项目角色，topology management 含 convener）；D3 由 judge 代批（`decisionId=decision-req-ebd6998cb1685656`，bookmark-impl+bookmark-qa）；**BUG-3 修复验证通过**——appointment-write 两张卡各一次 `confirmed`，角色卡与 boundary.yaml 落盘（`角色卡/bookmark-impl/`、`角色卡/bookmark-qa/`）；第④步交付运营成功（`task.created to=convener stepId=project-handoff`）；运营按模块派发实现任务，worker 写出 `src/cli/*`、`src/store/index.js`、`test/*.test.js`；运营核对 `node --test` **24 pass / 0 fail**。
+- **现场暴露并已记录/修正的问题**：意图 frontmatter 仅支持顶层 key:value（三轮退回后修正）；任务文本引用未来契约被投递前置拒收；roster v3–v8 迭代（顶层 modules[] 缺失、topology management 形状、内置 convener 被误加入 roles、角色目录缺 boundary.yaml）；交付运营拒绝文案已改为「D3 选中的项目角色卡未齐备（缺：…）」并补测试；roster 内置角色负例已由解析器拒绝。
+- **当时状态**：实现/验收阶段进行中（未到最终 acceptance 汇总）；应用保持运行（CDP 9235）。`trial-focus-timer` 前后清单 28 文件 sha256 同为 `5af6cd98…`，未改动。
+
 ## 5. 决策点与遗留
 
 1. **Q6 A 已按客户确认实施**：验收 judge 最小链事实（facts + verdict + prompt + 桌面 enrich）；未改客户最终验收权。
