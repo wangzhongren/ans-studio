@@ -172,7 +172,9 @@ app.whenReady().then(async () => {
     check("优先级：高风险先弹", await js(`(document.querySelector('#decision-dialog .dd-title')||{textContent:''}).textContent.includes('E 高风险审批')`));
     check("聊天流无卡片、仅有系统通知", await js(`!document.querySelector('#chat .op-request') && !!document.querySelector('#chat .sys-operator-note')`));
     check("还有 N 张待处理", await js(`(document.querySelector('#decision-dialog .dd-more')||{textContent:''}).textContent.includes('还有 1 张待处理')`));
-    check("默认焦点不在确认", await js(`document.activeElement && document.activeElement.classList.contains('dd-later')`));
+    check("默认焦点不在确认", await waitFor(`document.activeElement && document.activeElement.classList.contains('dd-later')`, 2000));
+    // 2026-10-29（客户：弹窗透明）：决策弹窗背景必须不透明（--surface 已定义）且圆角生效（--radius-card）。
+    check("决策弹窗背景不透明且圆角生效", await js(`(() => { const el=document.getElementById('decision-dialog'); if(!el) return false; const s=getComputedStyle(el); const m=s.backgroundColor.match(/rgba?\(([^)]+)\)/); if(!m) return false; const parts=m[1].split(',').map(v=>Number(v.trim())); const alpha=parts.length>3?parts[3]:1; return alpha===1 && s.borderRadius!=='0px'; })()`));
     await shot("02-decision-dialog");
 
     await js(`document.querySelector('#decision-dialog .dd-later').click()`);

@@ -1181,6 +1181,8 @@ export const zhCN = {
     "有交付（来自 {sourceRoleId}）待投递，但**开启 {target} 会话失败**：{detail}——未投递（已保留；下次时机自动重试：你打开 {target}、或下一次交付/一轮结束）。",
   "main.session.delivery.openFailedDispatch":
     "有派发任务（来自 {sourceRoleId}）待投递给角色 {target}，但**开启其会话失败**：{detail}——未投递（已保留；下次时机自动重试：你打开该角色、或下一次派发/一轮结束）。",
+  "main.session.dispatchTargetOpenFailed":
+    "派发未投递：无法打开目标角色 {target} 的会话（{detail}）；未入队、未投递。请检查运行时配置后重试。",
   "main.session.delivery.handbackBatch": "交付批次 · {count} 份报告 · 来自 {roles}",
   "main.session.delivery.autoDelivered":
     "已将 {roles} 的交付自动投递给 {target}（等待验收与汇总）。",

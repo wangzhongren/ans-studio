@@ -14,6 +14,7 @@ import {
   appendTaskEvent,
   classifyTaskSideEffect,
   findOpenTaskByIdempotencyKey,
+  findTaskByIdempotencyKey,
   newTaskId,
   normalizeTaskSideEffect,
   readTaskState,
@@ -113,6 +114,14 @@ test("幂等键：显式键优先；缺省哈希稳定；同键未收口任务�
     taskEvent("task.closed", { taskId: "t1", by: "chief", outcome: "accepted" }),
   ]);
   assert.equal(findOpenTaskByIdempotencyKey(closed, a), undefined);
+  assert.equal(findTaskByIdempotencyKey(closed, a)?.taskId, "t1", "BUG-5：已收口任务仍可按幂等键识别并抑制重复派发");
+
+  const reported = replayTaskEvents([
+    created("t1", "同一个任务", { idempotencyKey: a }),
+    taskEvent("task.reported", { taskId: "t1", from: "worker", status: "done", summary: "完成" }),
+  ]);
+  assert.equal(findOpenTaskByIdempotencyKey(reported, a)?.taskId, "t1");
+  assert.equal(findTaskByIdempotencyKey(reported, a)?.taskId, "t1");
 });
 
 test("副作用分类：缺填/非法⇒unknown；应用只升不降", () => {

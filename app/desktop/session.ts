@@ -79,7 +79,7 @@ import { renderHandbackPrompt, renderHandbackBatchPrompt, renderWorkReportPrompt
 // C 批（方案 §6.4.1/C-06）：appointment-write 的应用侧结构/D3 校验使用编排出品的声明路径单一实现。
 import { declaredConfirmPaths } from "../../src/common/编排/confirmed-writes.ts";
 // B 批（2026-10-28）：任务/汇报主干与最小状态（编排单一来源，本层只接线）。
-import { appendTaskEvent, classifyTaskSideEffect, findOpenTaskByIdempotencyKey, newTaskId, readTaskState, redispatchCountOf, redispatchTaskId, renderTaskCardLines, shortenSummary, taskCardOf, taskCards, taskEvent, taskIdempotencyKey, taskReportStatusOf, type TaskCardView, type TaskReplay } from "../../src/common/编排/task-state.ts";
+import { appendTaskEvent, classifyTaskSideEffect, findTaskByIdempotencyKey, newTaskId, readTaskState, redispatchCountOf, redispatchTaskId, renderTaskCardLines, shortenSummary, taskCardOf, taskCards, taskEvent, taskIdempotencyKey, taskReportStatusOf, type TaskCardView, type TaskReplay } from "../../src/common/编排/task-state.ts";
 import { appendRoleLog, formatRoleActivityText, readRoleLog } from "../../src/common/编排/role-log.ts";
 // B 批：终止/重派安全判定（单一来源；桌面只提供终止事实/执行动作）。
 import { evaluateRedispatchSafety, type RedispatchSafetyDecision } from "../../src/common/编排/watchdog.ts";
@@ -4938,6 +4938,18 @@ export class SessionManager {
       } else if (ownerRoleId !== null && hb.roleId === ownerRoleId) {
         return; // single su 自身等防御（trio 的 Convener 走上方内置分支）
       }
+      // BUG-5：任务已完成（已报告/已收口）后的重复回交不再入队/不再产生新的报告投递。
+      if (starTask && typeof hb.taskId === "string" && hb.taskId !== "") {
+        const record = (await this.readTasks(projectRoot)).records.get(hb.taskId);
+        if (record !== undefined && (record.closed !== undefined || record.reports.length > 0)) {
+          diagnostic.record("report.suppressed.task-terminal", {
+            taskId: hb.taskId,
+            closed: record.closed !== undefined,
+            reports: record.reports.length,
+          });
+          return;
+        }
+      }
       const key = `${projectRoot}\u0000${runtime}\u0000${handbackKey(hb)}`;
       if (this.enqueuedHandbackKeys.has(key)) {
         diagnostic.record("report.duplicate");
@@ -5133,6 +5145,20 @@ export class SessionManager {
       return { ok: true, message: mainT("main.session.dispatchDuplicate", { roleId: targetRoleId }) };
     }
     this.activeDispatchKeys.add(dedupKey);
+    // 2026-10-29（BUG-5）：无活会话时先同步 open/resume；失败 ⇒ 释放去重键并如实拒发（不入队）。
+    if (!this.sessions.has(this.sessionKey(projectRoot, targetRoleId, runtime))) {
+      const opened = await this.openInternal({ projectRoot, roleId: targetRoleId, runtime }, false);
+      if (!opened.ok) {
+        this.activeDispatchKeys.delete(dedupKey);
+        return fail(
+          mainT("main.session.dispatchTargetOpenFailed", {
+            target: this.roleDisplayName(projectRoot, targetRoleId),
+            detail: opened.error ?? mainT("shared.common.unknownReason"),
+          }),
+          "派发未投递：目标会话无法打开（未入队；已如实回执）。",
+        );
+      }
+    }
     this.enqueueDelivery(projectRoot, targetRoleId, {
       kind: "dispatch",
       runtime,
@@ -5331,11 +5357,23 @@ export class SessionManager {
       ...(requestedModuleId !== undefined ? { moduleId: requestedModuleId } : {}),
     });
     const state = await this.readTasks(projectRoot);
-    const duplicate = findOpenTaskByIdempotencyKey(state, idempotencyKey);
+    // 2026-10-29（BUG-5）：同一幂等键的**已报告/已收口**任务也抑制重复派发——完成后的重复调用
+    // 不得再创建 task.created 或产生新的 task.delivered。显式返工须使用新的任务文本或新的
+    // `idempotencyKey`（重派走 redispatchTask，不重复本路径）。
+    const duplicate = findTaskByIdempotencyKey(state, idempotencyKey);
     if (duplicate !== undefined) {
+      const terminal = duplicate.closed !== undefined || duplicate.reports.length > 0;
+      if (terminal) {
+        createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: targetRoleId }).record(
+          "tasks.dispatch.duplicate-terminal",
+          { taskId: duplicate.taskId, closed: duplicate.closed !== undefined, reports: duplicate.reports.length },
+        );
+      }
       return {
         ok: true,
-        message: `已受理：同一任务已存在（#${duplicate.taskId}），未重复派发；受理 ≠ 完成。`,
+        message: terminal
+          ? `已受理：任务 #${duplicate.taskId} 已${duplicate.closed !== undefined ? "收口" : "报告"}，重复派发已抑制（未创建新任务、未投递）；如需返工请使用新的任务文本或幂等键。`
+          : `已受理：同一任务已存在（#${duplicate.taskId}），未重复派发；受理 ≠ 完成。`,
       };
     }
 
@@ -5455,7 +5493,28 @@ export class SessionManager {
       return fail(plan.message, plan.systemRow);
     }
     // 目标已有活会话 ⇒ 按其真实引擎投递（不让幕僚会话的引擎选择串到目标）。
-    const deliveryRuntime = this.findLiveRuntime(projectRoot, targetRoleId) ?? runtime;
+    // 2026-10-29（BUG-5）：目标**无活会话**时先同步 open/resume；失败则拒发并给派发者回执，
+    // 绝不再把任务静默留在队列里等一个可能永远不会出现的“下次时机”。
+    let deliveryRuntime = this.findLiveRuntime(projectRoot, targetRoleId) ?? runtime;
+    if (!this.sessions.has(this.sessionKey(projectRoot, targetRoleId, deliveryRuntime))) {
+      const opened = await this.openInternal({ projectRoot, roleId: targetRoleId, runtime: deliveryRuntime }, false);
+      if (!opened.ok) {
+        await this.appendTaskState(projectRoot, taskEvent("task.closed", {
+          taskId,
+          by: fromRoleId === this.handbackOwnerRoleId(projectRoot) ? "convener" : "chief",
+          outcome: "rejected",
+          note: `delivery-target-open-failed: ${shortenSummary(opened.error ?? mainT("shared.common.unknownReason"))}`,
+        }, () => new Date(this.now())));
+        return fail(
+          mainT("main.session.dispatchTargetOpenFailed", {
+            target: this.roleDisplayName(projectRoot, targetRoleId),
+            detail: opened.error ?? mainT("shared.common.unknownReason"),
+          }),
+          "派发未投递：目标会话无法打开（未入队；已如实回执）。",
+        );
+      }
+      deliveryRuntime = this.sessions.get(this.sessionKey(projectRoot, targetRoleId, deliveryRuntime))?.runtime ?? deliveryRuntime;
+    }
     const deliveryDedupKey = `${projectRoot}\u0000${deliveryRuntime}\u0000task\u0000${taskId}`;
     this.activeDispatchKeys.add(deliveryDedupKey);
     this.enqueueDelivery(projectRoot, targetRoleId, {
@@ -6306,6 +6365,25 @@ export class SessionManager {
       return;
     }
 
+    // **2026-10-29（BUG-5）**：任务在排队期间已完成（已报告/已收口）⇒ 该派发项不得再投递。
+    // 完成后的重复投递只记诊断与丢弃队列项，不产生 task.delivered/新一轮事件；不触碰其他条目。
+    if (item.kind === "dispatch" && typeof item.taskId === "string" && item.taskId !== "") {
+      const record = (await this.readTasks(projectRoot)).records.get(item.taskId);
+      if (record !== undefined && (record.closed !== undefined || record.reports.length > 0)) {
+        q.splice(headIndex, 1);
+        if (q.length === 0) this.deliveryQueues.delete(key);
+        diagnostic.record("delivery.skip.task-terminal", {
+          taskId: item.taskId,
+          closed: record.closed !== undefined,
+          reports: record.reports.length,
+        });
+        this.notifyRoleState(projectRoot, resolvedTarget, runtime);
+        this.persistDeliveryQueues();
+        void this.drainQueue(projectRoot, resolvedTarget, runtime); // 继续处理后续条目（不因丢弃一条而停滞）
+        return;
+      }
+    }
+
     // **2026-10-25 重复投递修复——重建后续投只重发未投递成功的消息**：同一应用任务（稳定
     // `clientMessageId`）已 ACK/投递成功 ⇒ 队列里残留的同键条目直接丢弃（不重开会话、不再发第二遍）。
     // 显式重新入队（返工同文再派）已在 `enqueueDelivery` 清掉标记，不会走到这里。
@@ -6439,16 +6517,27 @@ export class SessionManager {
       if (sent.kind === "dispatch") this.activeDispatchKeys.delete(sent.dedupKey); // 送达即释放窗口去重（返工可再派）
       // B 批：任务送达事件（仅星形任务携带 taskId；旧 flow 派发不写 tasks.jsonl）。
       if (sent.kind === "dispatch" && typeof sent.taskId === "string" && sent.taskId !== "") {
-        void this.appendTaskState(projectRoot, taskEvent("task.delivered", {
-          taskId: sent.taskId,
-          to: resolvedTarget,
-        }, () => new Date(this.now())));
-        this.appendRoleActivity(projectRoot, resolvedTarget, {
-          kind: "task.delivered",
-          summary: `收到任务 #${sent.taskId}`,
-          taskId: sent.taskId,
-          status: "delivered",
-        });
+        // BUG-5：发送期间任务已完成（已报告/已收口）⇒ 不再补写 delivered（重复投递只留诊断）。
+        const latest = (await this.readTasks(projectRoot)).records.get(sent.taskId);
+        const terminal = latest !== undefined && (latest.closed !== undefined || latest.reports.length > 0);
+        if (terminal) {
+          diagnostic.record("tasks.delivered.suppressed-terminal", {
+            taskId: sent.taskId,
+            closed: latest?.closed !== undefined,
+            reports: latest?.reports.length ?? 0,
+          });
+        } else {
+          void this.appendTaskState(projectRoot, taskEvent("task.delivered", {
+            taskId: sent.taskId,
+            to: resolvedTarget,
+          }, () => new Date(this.now())));
+          this.appendRoleActivity(projectRoot, resolvedTarget, {
+            kind: "task.delivered",
+            summary: `收到任务 #${sent.taskId}`,
+            taskId: sent.taskId,
+            status: "delivered",
+          });
+        }
       }
       if (sent.kind === "handback") {
         this.emitDeliveryNote(projectRoot, runtime, resolvedTarget, sent.sourceRoleId, mainT("main.session.delivery.autoDelivered", { roles: sentItems.map((queued) => queued.sourceRoleId).join("、"), target: resolvedTarget }));

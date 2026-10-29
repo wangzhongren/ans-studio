@@ -551,6 +551,16 @@ export function findOpenTaskByIdempotencyKey(snapshot: TaskReplay, idempotencyKe
   return undefined;
 }
 
+/** 同一幂等键下的任务（含已报告/已收口）；重复派发抑制用，返回最新一条。 */
+export function findTaskByIdempotencyKey(snapshot: TaskReplay, idempotencyKey: string): TaskRecord | undefined {
+  let found: TaskRecord | undefined;
+  for (const record of snapshot.records.values()) {
+    if (record.created?.idempotencyKey !== idempotencyKey) continue;
+    if (found === undefined || (record.created?.at ?? "") >= (found.created?.at ?? "")) found = record;
+  }
+  return found;
+}
+
 /** 某任务链已发生的重派次数（`retryOf` 反向链，最多 2 次自动重派；首次尝试不计）。 */
 export function redispatchCountOf(snapshot: TaskReplay, originalTaskId: string): number {
   let count = 0;

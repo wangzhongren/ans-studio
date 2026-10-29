@@ -1318,6 +1318,8 @@ export const enUS = {
     "A delivery (from {sourceRoleId}) is waiting for delivery, but **opening {target}'s session failed**: {detail} — not delivered (kept; retried automatically at the next opportunity: when you open {target}, or on the next delivery/turn end).",
   "main.session.delivery.openFailedDispatch":
     "A dispatched task (from {sourceRoleId}) is waiting for delivery to role {target}, but **opening its session failed**: {detail} — not delivered (kept; retried automatically at the next opportunity: when you open that role, or on the next dispatch/turn end).",
+  "main.session.dispatchTargetOpenFailed":
+    "Dispatch not delivered: could not open role {target}'s session ({detail}); not queued, not delivered. Check the runtime configuration and retry.",
   "main.session.delivery.handbackBatch":
     "Delivery batch · {count} reports · from {roles}",
   "main.session.delivery.autoDelivered":

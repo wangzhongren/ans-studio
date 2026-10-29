@@ -55,14 +55,14 @@
 | `test/门禁引擎/versioned-doc-guard.test.ts` | 新增（v2.8–v2.15 R6/R9） | 11 | 版本化路径/版本号；覆盖既有 -vN.md ⇒ deny；shell cp 旧版 deny/新版 pass；基线 TOFU/marker/坏行/缺失 fail-closed、canonical 路径、并发登记、O_EXCL 锁/活锁不接管/token fencing、旧记录归一化、属主写后单文件登记 |
 | 既有更新 | — | — | `chief-workflow`（convener dispatch v4.1）、`star-routing`（M8/M5/M6）、`entry-role-minimal-d`、`i-full-chain` |
 
-定向（本批最终代码）：门禁引擎 + 编排 + 桌面应用三组 **1152 计 / 1150 过 / 1 红 / 1 skip**（红＝既有 Windows symlink EPERM）；桌面 UI + 桌面应用 **658/658 全过**；逐文件：workflow-preconditions 16、appointment-roster 8、versioned-doc-guard 11、chain-enforcement 6、acceptance-judge-minimal 4、trio-worker-report 4、task-state 9、classify-shell 52、shell-write-guard 9、shell-operator-only 16、shell-post-audit 8、shell-approval-context 9、operator-channel 56、su zero-execution 6。
+定向（本批最终代码）：桌面 UI + 桌面应用 **664/664 全过**（含 BUG-5 幂等/唤醒负例、theme-tokens 令牌审计）；逐文件：workflow-preconditions 16、appointment-roster 8、versioned-doc-guard 11、chain-enforcement 6、acceptance-judge-minimal 4、trio-worker-report 4、task-state 9、classify-shell 52、shell-write-guard 9、shell-operator-only 16、shell-post-audit 8、shell-approval-context 9、operator-channel 56、su zero-execution 6。
 
 ## 3. 验证（串行）
 
-- 全量（本批最终代码重跑）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（346 文件）→ **3006 tests / 2976 pass / 12 fail / 18 skip**（12 红＝9 Windows symlink EPERM + T1×3 既有环境问题；与上一基线红项一致）；日志 `%TEMP%\ans-ui-full3.log`，sha256 `c10462812c23eae2dc0a32a7c1f36ab081a1b5db2b2d9ac016e85c864fc47cbb`。
+- 全量（本批最终代码重跑）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（346 文件）→ **3012 tests / 2982 pass / 12 fail / 18 skip**（12 红＝9 Windows symlink EPERM + T1×3 既有环境问题；与上一基线红项一致）；日志 `%TEMP%\ans-bug5-token-full.log`，sha256 `c9ba3adc0ec5fa558cd9c11f8b29ec3cbc5ccc0aa987ecaa9d8f3d7a2f452577`。
 - `npm run typecheck` exit 0；`npm run typecheck:renderer` exit 0；`npm run build:renderer` exit 0（本批最终代码重跑）。
-- phase5a 真实 Electron（本批最终代码）：**39/39 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-ui7\report.json`，sha256 `aefebba711ac648028c72708ba5090f703bb52eb902686f84cb330bedd9d9634`；UI 证据截图 `03b-dc-filter-open.png`、`03c-composer-narrow.png`，并含 judge 标题/时间行截图）。
-- 桌面 E2E（本批最终代码；`%TEMP%\ans-e2e-ui3`；fresh APPDATA）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、17 PNG（`00-titlebar.png` 截图环境报 `capture-failed:UnknownVizError`，非断言失败；其余 17 张齐全）；报告 `%TEMP%\ans-e2e-ui3\report.txt`，sha256 `fb31a6ba8db409cc0309d9b1931f434ea298e3180bad1bdef01354620e80d490`；`session:role-states` 未注册错误 0。
+- phase5a 真实 Electron（本批最终代码）：**40/40 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-token\report.json`，sha256 `e8cc23f352d1112bf03f69b79ce41fc71d2b0246245cb483e8954cb290cabf6c`；UI 证据截图 `03b-dc-filter-open.png`、`03c-composer-narrow.png`，并含 judge 标题/时间行截图与决策弹窗不透明断言）。
+- 桌面 E2E（本批最终代码；`%TEMP%\ans-e2e-token`；fresh APPDATA）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-token\report.txt`，sha256 `ab054cb99cf1e5e37d54d2ea92e007419baaa55e76ca01a1442e4d7adde3872c`；`session:role-states` 未注册错误 0。
 
 ## 4. 应用冒烟（重启后）
 
@@ -153,6 +153,20 @@
 - **judge 列表标题**：`OperatorJudgeResultPayload` 新增 `requestTitle`，治理代批与 decision 自动代选两条路径都写入原始申请标题；`GovernanceJudgeResultView.requestTitle` 透出；`DecisionCenterPanel` 从行内已存 view 读取（不再误把 `{view}` 当原始 payload 重解析），优先显示申请标题，缺失才回退 headline；列表同时显示来源角色、`HH:mm` 时间与裁决结果。测试：`decision-service`/`optional-acceptance` 断言 payload 标题，`judge.test` 断言 view 字段，`dialog-history` 断言面板优先级；phase5a 真实 Electron 断言两条 judge 行标题分别为「写 bookmark-qa 角色卡」「接受 bookmark 方案」，且不再全为兜底「判断代批」。
 - **决策面板下拉**：`dc-filter` 由原生 `<select>` 换成应用现有 `DropdownMenu`（button trigger + radio menu），使用 `--card`/`--popover`/`--border-strong`/`--ring` 令牌，补 hover/焦点环/圆角与展开项样式；保留 `.dc-filter` 类名与选项文案。phase5a 断言 trigger 为 button、菜单含全部/待办/历史、背景非透明，并截图 `03b-dc-filter-open.png`（后续 `03c` 也展示展开菜单）。
 - **三栏 composer 截断**：`.composer` 增加 `container-type/name: composer`；中间栏变窄时按容器宽度（≤720px）切换本地化短标签「审批/决策」并允许 `.composer-controls`/`.composer-trust` 换行，≤480px 再收紧间距；不再依赖窗口 480px 断点。新增 `ui.judge.shellShort`/`ui.judge.decisionShort` 双语 key（i18n 计数同步 1458）。phase5a 在抽屉推开中栏（composer 实宽 688px）断言全标签隐藏、短标签可见且无横向溢出，截图 `03c-composer-narrow.png`。
+
+## 4.9 BUG-5 重复投递与无会话派发（2026-10-29 武侠 run 实测）
+
+- **根因**：render-dev 的返工任务 `t-mvtkkoyq` 已于 13:24:02 完成并 `submit_report`，13:24:08 又出现 `task.delivered`——完成后的重复投递。原派发幂等只查“未收口任务”（`findOpenTaskByIdempotencyKey`），任务一旦 reported/closed 就被当作可再次派发；同时排队中的旧派发项在任务完成后仍可能被 drain 认领并投递。
+- **幂等修复**：新增 `findTaskByIdempotencyKey`（含已报告/已收口，取最新）；`routeStarDispatch` 对任何同幂等键任务直接回“已报告/已收口，重复派发已抑制”，不创建新 `task.created`、不产生新投递；drain 认领 `dispatch` 项前按 `taskId` 读取任务状态，reported/closed ⇒ 丢弃该队列项并记 `delivery.skip.task-terminal`，不 open/send；发送成功续段再次校验，完成态不补写 `task.delivered`/角色活动；`handleHandback` 对已完成任务的重复回交直接抑制（`report.suppressed.task-terminal`）。显式返工需新任务文本或新幂等键，重派仍走 `redispatchTask`（其 closed/完成报告检查保留）。
+- **无会话派发**：`routeStarDispatch` 与 single `routeDispatch` 在目标无活会话时先同步 `openInternal`（`userInitiated=false`，不抢活动角色）；打开失败 ⇒ 释放去重键、星形任务写 `task.closed/rejected` 并在回执中返回 `main.session.dispatchTargetOpenFailed`（未入队、未投递），不再静默留队；打开成功才入队/投递。活跃会话忙时仍沿用既有队列，settled 后按序放行。
+- **测试**：`star-routing` 7（完成/收口后重复派发不建任务不投递；无会话先 open、打开失败 rejected 回执且零发送；排队期间完成则旧派发被丢弃且不补 delivered；已报告后不同 handbackKey 的重复回交不重投）；`task-state` 增加已收口/已报告幂等键识别；桌面应用全套 363/363。
+
+## 4.10 令牌审计与透明决策弹窗（2026-10-29 客户）
+
+- **根因**：`.decision-dialog` 使用 `var(--surface)`（背景）与 `var(--radius-card)`（圆角），两个令牌从未定义——背景解析为透明、圆角失效。审核弹窗 `.sc-card` 使用的 `--background`/`--backdrop-strong` 均已定义，不透明；本次只修决策弹窗与同类缺失。
+- **令牌修复**：`index.css` 新增 `--surface: #1e2328`（抬升面，与 `--card` 同层）、`--radius-card: var(--radius)`、`--text: #f2f4f6`（旧组件正文色别名）；`--bg-soft`→`--hover`、`--focus`→`--ring`、`--sans`→`--font-sans`。全仓 renderer 变量审计后无其他主题令牌缺失。
+- **审计范围/例外**：扫描 `app/renderer/src/**/*.css` 与 `*.tsx/*.ts/*.mjs` 的 `var(--x)`/`(--x)`；已定义集合取自 CSS 声明。Tailwind/Base UI 运行时注入的 `--available-height`/`--anchor-width`/`--transform-origin`/`--card-spacing` 列入显式 allowlist（非主题令牌，不能静态定义）。审计测试 `test/桌面UI/theme-tokens.test.ts` 断言缺失集合为空且 `--surface`/`--radius-card`/`--text` 存在。
+- **测试**：phase5a 新增决策弹窗计算样式断言——`backgroundColor` alpha=1 且 `borderRadius !== 0px`；修复前截图 `%TEMP%ns-phase5a-ui7-decision-dialog.png`，修复后截图 `%TEMP%ns-phase5a-token-decision-dialog.png`。
 
 ## 5. 决策点与遗留
 

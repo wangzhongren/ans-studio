@@ -59,7 +59,7 @@ test("locale：SUPPORTED_LOCALES 只有 zh-CN/en-US，默认 zh-CN", () => {
   assert.equal(DEFAULT_LOCALE, "zh-CN");
 });
 
-test("key 分区计数：ui 852 / main 541 / shared 62 / preferences 3，总计 1458", () => {
+test("key 分区计数：ui 852 / main 542 / shared 62 / preferences 3，总计 1459", () => {
   const keys = Object.keys(zhCN);
   const prefixes = {
     ui: keys.filter((key) => key.startsWith("ui.")).length,
@@ -67,8 +67,8 @@ test("key 分区计数：ui 852 / main 541 / shared 62 / preferences 3，总计 
     shared: keys.filter((key) => key.startsWith("shared.")).length,
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
-  assert.deepEqual(prefixes, { ui: 852, main: 541, shared: 62, preferences: 3 });
-  assert.equal(keys.length, 1458);
+  assert.deepEqual(prefixes, { ui: 852, main: 542, shared: 62, preferences: 3 });
+  assert.equal(keys.length, 1459);
 });
 
 test("key parity：zh-CN 与 en-US 全集一致（顺序无关）", () => {

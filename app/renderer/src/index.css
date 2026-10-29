@@ -19,6 +19,8 @@
   --foreground: #f2f4f6;
   --card: #1e2328;
   --card-foreground: #f2f4f6;
+  /* 面板/列表/输入外壳的抬升面；决策弹窗、dc-item 等共用（2026-10-29 透明弹窗修复）。 */
+  --surface: #1e2328;
   --popover: #14171a;
   --popover-foreground: #f2f4f6;
   --primary: #6fa08b;
@@ -68,6 +70,8 @@
   --danger-line: #c97a6d;
   --text-2: #a7adb5;
   --text-3: #949ba4;
+  /* 旧组件沿用的正文色别名（与 --foreground 同值；补齐缺失令牌）。 */
+  --text: #f2f4f6;
   --selected: #2a3037;
   --selected-foreground: #f2f4f6;
   --drawer-surface: #171b1f;
@@ -75,6 +79,7 @@
 
   /* —— 形状 / 布局（UIUX 规范 §2.3、§3.1）—— */
   --radius: 8px;
+  --radius-card: var(--radius);
   --radius-control: 6px;
   --radius-micro: 4px;
   --content-max: 900px;
