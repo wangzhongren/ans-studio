@@ -170,6 +170,12 @@ export function describeTool(name: string): ToolDescription {
             description:
               "2026-10-29 (v2.8/R8): optional module id from the latest roster for an acceptance/role-card card. The application cross-checks it against the roster modules and the D3-selected owners; the field grants no write power. The folder address is derived by the application.",
           },
+          modulePaths: {
+            type: "array",
+            items: { type: "string" },
+            maxItems: 8,
+            description: "2026-10-29 (v2.20): module path array for the card; normal modules are single-element, fixed env/entry modules may carry multiple paths. Application verifies against the roster.",
+          },
           preview: {
             type: "string",
             description:
@@ -302,6 +308,12 @@ export function describeTool(name: string): ToolDescription {
             type: "string",
             description:
               "2026-10-29 (v2.8/R8): optional module id from the latest roster (acceptance/task scope). The application cross-checks it against roster modules; the folder address is derived by the application.",
+          },
+          modulePaths: {
+            type: "array",
+            items: { type: "string" },
+            maxItems: 8,
+            description: "2026-10-29 (v2.20): module path array for the choice card; application verifies against the roster.",
           },
           flowId: {
             type: "string",
@@ -465,6 +477,12 @@ export function describeTool(name: string): ToolDescription {
             pattern: GOVERNANCE_SLUG_PATTERN,
             description:
               "2026-10-29 (v2.8/R8): module id from the latest roster. Implementation tasks dispatched by the convener MUST carry it; the target role must own the module (one module = one owner). The folder address is derived by the application from the roster; do not send a directory.",
+          },
+          modulePaths: {
+            type: "array",
+            items: { type: "string" },
+            maxItems: 8,
+            description: "2026-10-29 (v2.20): module path array (normal modules single-element; fixed env/entry modules may be multi-path). The application derives canonical paths from the roster and verifies target ownership.",
           },
         },
         required: ["roleId", "task"],

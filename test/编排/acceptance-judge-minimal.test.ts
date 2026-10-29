@@ -89,7 +89,7 @@ test("最小链事实齐备 ⇒ 代批 accept（不要求旧 flow 的 proposalDe
 test("验收模块事实：moduleId/目录/属主随 facts 进入审批（R2/R3）", () => {
   const outcome = evaluateGovernanceJudgeVerdict({
     request: request({
-      facts: facts({ moduleId: "impl-core", moduleDirectory: "src/", moduleOwnerRoleId: "implementer" }),
+      facts: facts({ moduleId: "impl-core", moduleDirectory: "src/", modulePaths: ["src/"], moduleOwnerRoleId: "implementer" }),
     }),
     verdict: verdict(),
     stats,

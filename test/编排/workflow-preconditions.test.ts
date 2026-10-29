@@ -112,8 +112,8 @@ const PREFLIGHT_ROSTER: ProjectRoster = {
   ],
   modules: [
     ...VALID_ROSTER.modules,
-    { id: "env-setup", name: "环境装配", purpose: "零依赖与构建配置", path: "package.json", category: "env", publicContract: "package.json", architectureSource: "docs/contracts/focus-architecture-v1.md" },
-    { id: "project-entry", name: "项目入口", purpose: "入口文件", path: "index.html", category: "entry", publicContract: "index.html", architectureSource: "docs/contracts/focus-architecture-v1.md" },
+    { id: "env-setup", name: "环境装配", purpose: "零依赖与构建配置", paths: ["package.json"], path: "package.json", category: "env", publicContract: "package.json", architectureSource: "docs/contracts/focus-architecture-v1.md" },
+    { id: "project-entry", name: "项目入口", purpose: "入口文件", paths: ["index.html"], path: "index.html", category: "entry", publicContract: "index.html", architectureSource: "docs/contracts/focus-architecture-v1.md" },
   ],
 };
 
@@ -368,7 +368,7 @@ test("版本化引用：最新名单引用最新文档；旧版只读；缺文�
     const modulesPath = path.join(root, "docs/proposals/focus-modules-v1.md");
     const modulesText = await fs.readFile(modulesPath, "utf8");
     const drifted = VALID_ROSTER.modules.map((module) =>
-      module.id === "impl-core" ? { ...module, path: "src2/" } : module,
+      module.id === "impl-core" ? { ...module, path: "src2/", paths: ["src2/"] } : module,
     );
     await fs.writeFile(
       modulesPath,
@@ -601,14 +601,14 @@ test("模块路径可为文件或目录：文件模块正例；文件+目录同�
     "  - id: pkg",
     "    name: 包声明",
     "    purpose: 零依赖声明",
-    "    path: package.json",
+    "    paths: [package.json, scripts/, vite.config.js]",
     "    category: env",
     "    publicContract: package.json",
     "    architectureSource: docs/contracts/notes-architecture-v1.md",
     "  - id: readme",
     "    name: 文档",
     "    purpose: 用法文档",
-    "    path: README.md",
+    "    paths: [README.md]",
     "    category: core",
     "    publicContract: README.md",
     "    architectureSource: docs/contracts/notes-architecture-v1.md",
@@ -628,10 +628,10 @@ test("模块路径可为文件或目录：文件模块正例；文件+目录同�
     "    path: src/",
     "    roleId: dev",
     "  - id: pkg",
-    "    path: package.json",
+    "    paths: [package.json, scripts/, vite.config.js]",
     "    roleId: env-bootstrap",
     "  - id: readme",
-    "    path: README.md",
+    "    paths: [README.md]",
     "    roleId: doc",
     "  - id: entry",
     "    path: index.html",
@@ -650,14 +650,14 @@ test("模块路径可为文件或目录：文件模块正例；文件+目录同�
   assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
   if (parsed.ok) {
     assert.deepEqual(rosterDirectoriesFor(parsed.roster, "dev"), ["src/"]);
-    assert.deepEqual(rosterDirectoriesFor(parsed.roster, "env-bootstrap"), ["package.json", "index.html"]);
+    assert.deepEqual(rosterDirectoriesFor(parsed.roster, "env-bootstrap"), ["package.json", "scripts/", "vite.config.js", "index.html"]);
     assert.deepEqual(rosterDirectoriesFor(parsed.roster, "doc"), ["README.md"]);
   }
-  const contained = base.join("\n").replace("    path: package.json", "    path: src/package.json");
+  const contained = base.join("\n").replace("    paths: [package.json, scripts/, vite.config.js]", "    paths: [src/package.json]");
   const c = parseProjectRoster(contained);
   assert.equal(c.ok, false);
   if (!c.ok) assert.equal(c.code, "roster-module-directory-overlap");
-  const equal = base.join("\n").replace("    path: package.json", "    path: README.md");
+  const equal = base.join("\n").replace("    paths: [package.json, scripts/, vite.config.js]", "    paths: [README.md]");
   const e = parseProjectRoster(equal);
   assert.equal(e.ok, false);
   if (!e.ok) assert.equal(e.code, "roster-module-directory-overlap");

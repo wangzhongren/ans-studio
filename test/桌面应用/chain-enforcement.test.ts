@@ -343,9 +343,20 @@ test("M5/M6/M7 + 交付标记：幕僚交付运营需 D3 选中角色卡；运�
       assert.equal(workerTask.flowId, "focus");
       assert.equal(workerTask.moduleId, "impl-core", "任务模块 id 全链路落盘");
       assert.equal(workerTask.moduleDirectory, "src/", "任务模块目录以名单为准落盘");
+      assert.deepEqual(workerTask.modulePaths, ["src/"], "普通模块 modulePaths 为单元素数组");
 
       // R2/R3：目标不拥有任务模块 ⇒ 拒绝（不产生任务行）。
       const beforeWrongModule = (await readTaskState(root)).records.size;
+      const wrongPaths = (await convenerDispatch({
+        roleId: "implementer",
+        task: "实现番茄钟（越界路径）",
+        sideEffect: "code",
+        flowId: "focus",
+        moduleId: "impl-core",
+        modulePaths: ["other/"],
+      })) as DispatchReceipt;
+      assert.equal(wrongPaths.ok, false);
+      assert.match(wrongPaths.message ?? "", /modulePaths|不属于模块/);
       const wrongModule = (await convenerDispatch({
         roleId: "implementer",
         task: "实现测试套件",

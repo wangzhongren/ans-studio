@@ -315,6 +315,21 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
         return { ok: false, message: "task.created.moduleId 非法" };
       }
     }
+    if (rec["modulePaths"] !== undefined) {
+      const paths = rec["modulePaths"];
+      if (!Array.isArray(paths) || paths.length < 1 || paths.length > 8) return { ok: false, message: "task.created.modulePaths 非法" };
+      for (const path of paths) {
+        if (
+          typeof path !== "string" ||
+          path === "" ||
+          path.startsWith("/") ||
+          /^[a-zA-Z]:\//.test(path) ||
+          path.split("/").some((segment) => segment === ".." || segment === ".")
+        ) {
+          return { ok: false, message: "task.created.modulePaths 非法" };
+        }
+      }
+    }
     if (rec["moduleDirectory"] !== undefined) {
       const dir = rec["moduleDirectory"];
       const segments = typeof dir === "string" ? dir.replace(/\/$/, "").split("/") : [];
@@ -488,6 +503,7 @@ export interface TaskCardView {
   requestedEvidence?: string[];
   moduleId?: string;
   moduleDirectory?: string;
+  modulePaths?: string[];
   sideEffect: TaskSideEffect;
   status: "created" | "delivered" | "reported" | "closed" | "failed";
   createdAt: string;
@@ -509,6 +525,7 @@ export function taskCardOf(record: TaskRecord): TaskCardView | undefined {
     ...(record.created.requestedEvidence !== undefined ? { requestedEvidence: [...record.created.requestedEvidence] } : {}),
     ...(record.created.moduleId !== undefined ? { moduleId: record.created.moduleId } : {}),
     ...(record.created.moduleDirectory !== undefined ? { moduleDirectory: record.created.moduleDirectory } : {}),
+    ...(record.created.modulePaths !== undefined ? { modulePaths: [...record.created.modulePaths] } : {}),
     sideEffect: record.created.sideEffect,
     status: taskStatusOf(record),
     createdAt: record.created.at,
@@ -567,7 +584,7 @@ export function renderTaskCardLines(card: TaskCardView): string[] {
     ...(card.requestedEvidence !== undefined && card.requestedEvidence.length > 0
       ? [`可选证据：${card.requestedEvidence.slice(0, 5).join("；")}`]
       : []),
-    ...(card.moduleId !== undefined ? [`模块：${card.moduleId}${card.moduleDirectory !== undefined ? `（${card.moduleDirectory}）` : ""}`] : []),
+    ...(card.moduleId !== undefined ? [`模块：${card.moduleId}（${(card.modulePaths ?? (card.moduleDirectory !== undefined ? [card.moduleDirectory] : [])).join("、")}）`] : []),
     `状态：${card.status}｜副作用：${card.sideEffect}｜时间：${card.createdAt}`,
   ];
 }

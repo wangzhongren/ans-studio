@@ -59,10 +59,10 @@
 
 ## 3. 验证（串行）
 
-- 全量（最终提交 fe11554）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（340 文件）→ **3000 tests / 2970 pass / 12 fail / 18 skip**（12 红＝9 Windows symlink EPERM + T1×3 既有环境问题）；日志 `%TEMP%\ans-v220-full.log`，sha256 `e6154b5e9c6065d8dc016151db3caca3689f666d3945e4039f28f1ae361373a9`。
+- 全量（本批最终提交）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（340 文件）→ **3000 tests / 2970 pass / 12 fail / 18 skip**（12 红＝9 Windows symlink EPERM + T1×3 既有环境问题）；日志 `%TEMP%\ans-modulepaths-full.log`，sha256 `e0aa2eac3065f18d3834dd391998fb1031d2eaf40b738704aa429b30512c76b4`。
 - `npm run typecheck` exit 0；`npm run typecheck:renderer` exit 0；`npm run build:renderer` exit 0（最终代码重跑）。
-- phase5a 真实 Electron（最终）：**34/34 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-v220\report.json`，sha256 `9d811a04ed7646898807ccdfec75dc4a082f4a2769849326a5c2e100198fa7c3`）。
-- 桌面 E2E（最终；临时夹具 `%TEMP%\ans-e2e-g-fixture-1029`；fresh APPDATA）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-v220-out\report.txt`，sha256 `4c364185ffa280ab782a7db684ce9b9831dc3f49b9fb6abfa5ae84cb972e45e0`；`session:role-states` 未注册错误 0。
+- phase5a 真实 Electron（最终）：**34/34 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-mp\report.json`，sha256 `7c1179ea8694a656548620402a126ac853fd7ae59b83e5d405c48ceabee24520`）。
+- 桌面 E2E（最终；临时夹具 `%TEMP%\ans-e2e-g-fixture-1029`；fresh APPDATA）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-mp-out\report.txt`，sha256 `f23d44d7efbbd6071220b541fda04ad990a1a75242f2797a494b4f08c812d2c1`；`session:role-states` 未注册错误 0。
 
 ## 4. 应用冒烟（重启后）
 
@@ -144,7 +144,7 @@
 
 - **模块路径（v3/v2）**：`project-roster/v3` 的 `modules[].path` 可为单个文件或单个目录——以 `/` 结尾=目录，否则=文件；`category` 必填（env/entry 或领域类别）；modules 文档 `project-modules/v2`、topology 块 `project-topology/v2`、提案 `project-proposal/v2`；v1/v2 一律拒绝并要求按新版重出（不静默归一化）。冲突=路径相同或一方包含另一方（同父文件与目录合法）；文件模块授权=该文件本身，目录模块按 boundary kind；topology/绑定/唯一键/模块数规则同步。
 - **env-bootstrap（装配/入口）**：默认必带，固定 2 个领域中立模块：`category=env`（环境/资源装配）与 `category=entry`（入口/索引）；代码项目 package.json/scripts/src/main 仅为示例，写作/研究/设计/数据项目用 assets/、index.md 等同样成立。环境/入口类模块按 `category` 归属机械校验，误归属拒绝；小项目省略须写 `envBootstrapOmittedReason`，派人事前置拒绝无理由缺失；env-bootstrap 存在且未省略时 D3 必须选中它，取消需先出带理由的新名单版本并移除 env/entry 模块；omitted 时名单无 env 选项且不得存在 env/entry 模块。
-- **测试**：workflow-preconditions 13（文件模块正例、文件+目录同父、相等/包含负例、非代码写作项目 env/entry、env 归属负例）；chain-enforcement 夹具以 `envBootstrapOmittedReason` 保留最小链。
+- **多路径**：固定 env/entry 模块支持 `paths[]` 1–8 项（普通模块必须单路径）；`modulePaths` 随 dispatch/task.created/验收 facts 传递；convener 派发校验 modulePaths 属于目标模块，越界拒绝。测试：workflow-preconditions 13（多路径 env 正例、单路径普通模块、相等/包含负例、非代码写作项目）；chain-enforcement 增加 modulePaths 落盘与越界拒绝。
 
 ## 5. 决策点与遗留
 

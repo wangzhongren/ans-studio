@@ -1716,6 +1716,10 @@ function makeRequestConfirmationTool(
       const decisionId = readStringArg(call.args, ["decisionId", "decision_id"]);
       // 2026-10-29（v2.8/R8）：卡片引用的模块 id（验收/写卡）；文件夹地址由应用从名单派生，不接受自报。
       const moduleId = readStringArg(call.args, ["moduleId", "module_id"]);
+      const rawModulePaths = call.args["modulePaths"] ?? call.args["module_paths"];
+      const metadataModulePaths = Array.isArray(rawModulePaths)
+        ? rawModulePaths.filter((item): item is string => typeof item === "string" && item.trim() !== "").slice(0, 8)
+        : undefined;
       const metadata: CustomerInputMetadata = {
         ...baseMetadata,
         ...(taskId !== undefined && taskId !== "" ? { taskId } : {}),
@@ -1723,6 +1727,7 @@ function makeRequestConfirmationTool(
         ...(targetRoleId !== undefined && targetRoleId !== "" ? { targetRoleId } : {}),
         ...(decisionId !== undefined && decisionId !== "" ? { decisionId } : {}),
         ...(moduleId !== undefined && moduleId !== "" ? { moduleId } : {}),
+        ...(metadataModulePaths !== undefined && metadataModulePaths.length > 0 ? { modulePaths: metadataModulePaths } : {}),
       };
       const title = readStringArg(call.args, ["title"]);
       if (title === undefined || title.trim() === "") {
@@ -1880,11 +1885,16 @@ function makeRequestChoiceTool(
       const taskId = readStringArg(call.args, ["taskId", "task_id"]);
       const intentId = readStringArg(call.args, ["intentId", "intent_id"]);
       const moduleId = readStringArg(call.args, ["moduleId", "module_id"]);
+      const rawModulePaths = call.args["modulePaths"] ?? call.args["module_paths"];
+      const metadataModulePaths = Array.isArray(rawModulePaths)
+        ? rawModulePaths.filter((item): item is string => typeof item === "string" && item.trim() !== "").slice(0, 8)
+        : undefined;
       const metadata: CustomerInputMetadata = {
         ...baseMetadata,
         ...(taskId !== undefined && taskId !== "" ? { taskId } : {}),
         ...(intentId !== undefined && intentId !== "" ? { intentId } : {}),
         ...(moduleId !== undefined && moduleId !== "" ? { moduleId } : {}),
+        ...(metadataModulePaths !== undefined && metadataModulePaths.length > 0 ? { modulePaths: metadataModulePaths } : {}),
       };
       const title = readStringArg(call.args, ["title"]);
       if (title === undefined || title.trim() === "") {
@@ -2106,6 +2116,14 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
       if (moduleId !== undefined && moduleId.trim() === "") {
         return { ok: false, message: `${name}: moduleId 不能为空字符串` };
       }
+      const modulePathsRaw = call.args["modulePaths"] ?? call.args["module_paths"];
+      let modulePaths: string[] | undefined;
+      if (modulePathsRaw !== undefined && modulePathsRaw !== null) {
+        if (!Array.isArray(modulePathsRaw) || modulePathsRaw.length < 1 || modulePathsRaw.length > 8 || !modulePathsRaw.every((item) => typeof item === "string" && item.trim() !== "")) {
+          return { ok: false, message: `${name}: modulePaths 参数非法（应为 1–8 个非空字符串）` };
+        }
+        modulePaths = modulePathsRaw.map((item) => item.trim());
+      }
       const payload: DispatchTaskPayload = {
         roleId,
         task,
@@ -2115,6 +2133,7 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
         ...(requestedEvidence !== undefined ? { requestedEvidence } : {}),
         ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
         ...(moduleId !== undefined ? { moduleId } : {}),
+        ...(modulePaths !== undefined ? { modulePaths } : {}),
         ...governance.value,
       };
 

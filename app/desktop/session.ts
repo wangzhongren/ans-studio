@@ -3194,6 +3194,12 @@ export class SessionManager {
       acceptanceModule !== undefined && roster.ok
         ? roster.roster.roles.find((role) => role.modules.includes(acceptanceModule.id))?.id
         : undefined;
+    const acceptanceModulePaths =
+      acceptanceModule !== undefined
+        ? acceptanceModule.paths
+        : Array.isArray(metadata?.modulePaths)
+          ? metadata.modulePaths
+          : undefined;
     const reportText = await readText(reportRel);
     const reportOk = reportText !== undefined && reportText.trim() !== "";
     // 最新 D3（appointment 裁决）及 decisionId。
@@ -3235,6 +3241,7 @@ export class SessionManager {
         ? {
             moduleId: acceptanceModule.id,
             moduleDirectory: acceptanceModule.path,
+            ...(acceptanceModulePaths !== undefined ? { modulePaths: [...acceptanceModulePaths] } : {}),
             ...(acceptanceModuleOwner !== undefined ? { moduleOwnerRoleId: acceptanceModuleOwner } : {}),
           }
         : {}),
@@ -5312,6 +5319,9 @@ export class SessionManager {
       ? d.requestedEvidence.filter((item): item is string => typeof item === "string" && item.trim() !== "").slice(0, 5)
       : undefined;
     const requestedModuleId = d && typeof d.moduleId === "string" && d.moduleId.trim() !== "" ? d.moduleId.trim() : undefined;
+    const requestedModulePaths = d && Array.isArray(d.modulePaths)
+      ? [...new Set(d.modulePaths.filter((item): item is string => typeof item === "string" && item.trim() !== "").map((item) => item.trim()))].slice(0, 8)
+      : undefined;
     const sideEffect = classifyTaskSideEffect(d?.sideEffect, task);
     const idempotencyKey = taskIdempotencyKey({
       from: fromRoleId,
@@ -5354,6 +5364,7 @@ export class SessionManager {
       ...(chainFacts.roster !== undefined ? { roster: chainFacts.roster } : {}),
       d3Selected: chainFacts.d3Selected,
       ...(requestedModuleId !== undefined ? { moduleId: requestedModuleId } : {}),
+      ...(requestedModulePaths !== undefined && requestedModulePaths.length > 0 ? { modulePaths: requestedModulePaths } : {}),
       handoffFound: chainFacts.handoffFound,
       ...(chainFacts.missingSelectedCardIds.length > 0 ? { missingSelectedCardIds: chainFacts.missingSelectedCardIds } : {}),
       targetCardFound:
@@ -5398,7 +5409,7 @@ export class SessionManager {
       from: fromRoleId === convenerRoleId ? "convener" : "chief",
       ...(chainFacts.flowId !== undefined ? { flowId: chainFacts.flowId } : {}),
       ...(dispatchStepId !== undefined ? { stepId: dispatchStepId } : {}),
-      ...(taskModule !== undefined ? { moduleId: taskModule.id, moduleDirectory: taskModule.path } : {}),
+      ...(taskModule !== undefined ? { moduleId: taskModule.id, moduleDirectory: taskModule.path, modulePaths: [...taskModule.paths] } : {}),
       to: targetRoleId,
       text: task,
       ...(expectedOutput !== undefined ? { expectedOutput } : {}),

@@ -479,6 +479,8 @@ export interface CustomerInputMetadata {
   taskId?: string;
   /** 2026-10-29（v2.8/R8）：卡片/验收引用的模块 id（文件夹地址由应用从名单派生）。 */
   moduleId?: string;
+  /** v2.20：模块路径数组（普通模块单元素；固定模块多路径）。 */
+  modulePaths?: string[];
   /**
    * C 批：`appointment-write` 的目标项目角色与 D3 决定 id（方案 §6.4.1/R2）。
    * 应用只把它们用于**校验**（目标非内置、路径位于 `角色卡/<targetRoleId>/`、D3 `request.resolved`
@@ -590,6 +592,8 @@ export interface TaskCreatedEvent extends TaskStateEventBase {
   /** 2026-10-29（v2.6/R2）：任务模块归属（模块 id + 名单文件夹地址）；旧记录无此字段（兼容读取）。 */
   moduleId?: string;
   moduleDirectory?: string;
+  /** v2.20：模块路径数组（普通模块单元素；固定模块可多路径）。 */
+  modulePaths?: string[];
 }
 
 export interface TaskDeliveredEvent extends TaskStateEventBase {
@@ -852,6 +856,8 @@ export interface DispatchTaskPayload {
    * 文件夹地址由应用从名单模块派生落盘，模型不得自报。
    */
   moduleId?: string;
+  /** v2.20：模块路径数组（普通模块单元素；固定 env/entry 模块可多路径）。 */
+  modulePaths?: string[];
 }
 
 export interface DispatchReceipt {
@@ -1624,6 +1630,7 @@ export interface GovernanceJudgeFacts {
   /** 2026-10-29（v2.6/R2）：验收/派发引用的模块（名单事实：id、文件夹地址、属主角色）。 */
   moduleId?: string;
   moduleDirectory?: string;
+  modulePaths?: string[];
   moduleOwnerRoleId?: string;
   /** 最新人员名单版本/hash（应用从 `docs/proposals/<flowId>-roster-vN.md` 计算）。 */
   rosterVersion?: number;
