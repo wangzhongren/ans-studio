@@ -15,6 +15,7 @@ import type { BoundarySection1 } from "../../model/boundary.ts";
 import type { TaskScope } from "../../model/decision.ts";
 import path from "node:path";
 import { inlineCodeOf, isOpaqueShellExecution, isShortInlineCode } from "./classify-shell.ts";
+import { checkVersionedDocWrite, protectedVersionedPathsSync, versionedDocExists, versionedDocOverwriteDecision } from "./versioned-doc-guard.ts";
 
 export interface ShellWriteGuardInput {
   argv: readonly string[];
@@ -458,6 +459,11 @@ export function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWri
   const argv = Array.isArray(input.argv) ? input.argv.map((arg) => String(arg)) : [];
   const program = argv.length > 0 ? baseName(argv[0]!) : "";
   const args = argv.slice(1);
+  // 2026-10-29（v2.10）：脚本/argv 全通道——命令文本触及受管版本化路径时，写能力命令一律 deny。
+  const protectedPathMention = (): string | undefined => {
+    const text = argv.join(" ");
+    return protectedVersionedPathsSync(input.projectRoot).find((rel) => text.includes(rel));
+  };
 
   if (program !== "") {
     // 2026-10-29（v2.3 §6.4 / 复验 F1）：re-shell/内联求值仍是硬拒（不进入脚本审查）。
@@ -534,6 +540,10 @@ export function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWri
     }
     const explicit = parseExplicitWriteTargets(program, args);
     if (explicit.kind === "ambiguous") {
+      const protectedPath = protectedPathMention();
+      if (protectedPath !== undefined) {
+        return { kind: "deny", reason: `版本化文档只读：命令触及 ${protectedPath}（已存在，禁止覆盖）。`, targets: [protectedPath] };
+      }
       return {
         kind: "script",
         reason: `${explicit.reason}；写目标无法静态解析，交由审批判断（开关开启时由判断 agent 审查脚本/上下文，关闭时客户本人确认）。`,
@@ -568,6 +578,15 @@ export function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWri
             targets: [rel],
           };
         }
+        // 2026-10-29（v2.8 R6）：既有版本化文档只读——任何通道覆盖一律 deny（不进审批）。
+        if (versionedDocExists(input.projectRoot, rel)) {
+          const guarded = versionedDocOverwriteDecision({ relPath: rel, exists: true });
+          if (!guarded.allowed) return { kind: "deny", reason: guarded.reason, targets: [rel] };
+        }
+      }
+      const protectedPath = protectedPathMention();
+      if (protectedPath !== undefined) {
+        return { kind: "deny", reason: `版本化文档只读：命令触及 ${protectedPath}（已存在，禁止覆盖）。`, targets: [protectedPath] };
       }
       return { kind: "script", reason: `${explicit.reason}；交由审批判断（开关开启时由判断 agent 审查，关闭时客户本人确认）。` };
     }
@@ -597,6 +616,11 @@ export function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWri
             targets: [rel],
           };
         }
+        // 2026-10-29（v2.8 R6）：既有版本化文档只读——任何通道覆盖一律 deny（不进审批）。
+        if (versionedDocExists(input.projectRoot, rel)) {
+          const guarded = versionedDocOverwriteDecision({ relPath: rel, exists: true });
+          if (!guarded.allowed) return { kind: "deny", reason: guarded.reason, targets: [rel] };
+        }
         resolvedTargets.push(rel);
       }
       if (resolvedTargets.length > 0) return { kind: "pass" };
@@ -609,6 +633,10 @@ export function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWri
 
   const opaque = isOpaqueShellExecution(argv);
   if (opaque.opaque) {
+    const protectedPath = protectedPathMention();
+    if (protectedPath !== undefined) {
+      return { kind: "deny", reason: `版本化文档只读：命令触及 ${protectedPath}（已存在，禁止覆盖）。`, targets: [protectedPath] };
+    }
     return {
       kind: "script",
       reason:

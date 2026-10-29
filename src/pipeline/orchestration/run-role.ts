@@ -58,9 +58,10 @@ import { parse as parseYaml } from "yaml";
 // C 批（方案 §6.4.1/C-06）：appointment-write 预览的 role-card 必填章节单一来源。
 import { ROLE_CARD_REQUIRED_SECTIONS } from "../../common/门禁引擎/governance-roles.ts";
 import { evaluateShellWriteTargets } from "../../common/门禁引擎/shell-write-guard.ts";
-import { loadLatestRoster, rosterDirectoriesFor, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
+import { loadLatestRoster, rosterDirectoriesFor, rosterTopologyText, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
 import { createShellPostAudit } from "../../common/编排/shell-post-audit.ts";
 import { buildShellApprovalContext } from "../../common/编排/shell-approval-context.ts";
+import { registerVersionedDocAfterWrite, versionedDocExists, versionedDocOverwriteDecision } from "../../common/门禁引擎/versioned-doc-guard.ts";
 import { resolveRole } from "../../service/role/resolve-role.ts";
 import { resolveBoundary, validateBoundaryYamlText } from "../../service/boundary/resolve-boundary.ts";
 import {
@@ -757,17 +758,25 @@ export async function openRoleSession(
 
   // D 批：门禁/账本撤除；仅保留 `forbiddenWritePaths`（应用治理记录/其他治理角色资料）硬拒绝，
   // 其余写入交给 `resolveWrite` 的写区/预授权判定。
-  const gate: WriteGate = trioSpec !== undefined
-    ? (p) => {
-        const rel = projectRelativeLexical(p, input.project.projectRoot);
-        const forbidden = forbiddenWriteDecision(trioSpec!, rel);
-        if (forbidden !== undefined) {
-          log.record("governance.write.forbidden", { path: rel ?? p });
-          return forbidden;
-        }
-        return baseGate(p);
+  // 2026-10-29（v2.8 R6）：版本化文档只读——任何通道覆盖既有 -vN.md 一律 deny（不进审批）。
+  const gate: WriteGate = (p) => {
+    const rel = projectRelativeLexical(p, input.project.projectRoot);
+    if (trioSpec !== undefined) {
+      const forbidden = forbiddenWriteDecision(trioSpec, rel);
+      if (forbidden !== undefined) {
+        log.record("governance.write.forbidden", { path: rel ?? p });
+        return forbidden;
       }
-    : baseGate;
+    }
+    if (rel !== undefined && versionedDocExists(input.project.projectRoot, rel)) {
+      const guarded = versionedDocOverwriteDecision({ relPath: rel, exists: true });
+      if (!guarded.allowed) {
+        log.record("governance.write.versioned-doc-denied", { path: rel });
+        return { allowed: false, reason: guarded.reason, allowedByRoot: { skill: [], project: [] } };
+      }
+    }
+    return baseGate(p);
+  };
 
   // 客户通道包装（A-3）：客户确认后，把「已预览且校验在边界内的具体路径」发行进 writeSet。
   // trio 追加（评审 §5.7/§5.8）：
@@ -868,6 +877,13 @@ export async function openRoleSession(
               return rejectAppointment(`招人决定卡与最新名单不一致：${rosterCard.reason} 本次未向客户发卡。`);
             }
             appointmentRecommendedRoleIds = rosterCard.recommendedRoleIds;
+            // 2026-10-29（客户追加口径）：D3 卡 preview 必须带上「人员+模块拓扑图」（应用依据已校验名单生成）。
+            const topologyText = rosterTopologyText(roster.roster);
+            const existingPreview = typeof effectiveReq.preview === "string" ? effectiveReq.preview.trim() : "";
+            effectiveReq = {
+              ...effectiveReq,
+              preview: existingPreview === "" ? topologyText : `${existingPreview}\n\n${topologyText}`,
+            };
           }
           // 2026-10-26（独立验收 F2）：decision 卡结构校验的**单一共享实现**（`common/编排/decision-card.ts`）。
           // 在触达客户通道**之前**执行——CLI、single su 与项目角色没有桌面卡校验，必须由编排兜住；
@@ -1064,9 +1080,33 @@ export async function openRoleSession(
                   ? { facts: { appointmentTargetRoleIds: [targetRoleId] } }
                   : {}),
               });
+              // 2026-10-29（真机 BUG-3）：appointment-write 的判断事实必须带**角色可写根**与逐路径机械探测，
+              // 否则证据包读到空 allowedPathRoots，会把 `角色卡/<target>/` 的合法写盘判成越界（C 批测试
+              // 直接构造参数，漏了这条生产接线）。根 = 目标角色卡目录 ∪ 名单给该目标的授权目录（已按 M4
+              // 校验 ⊆ 名单）；探测与真实写盘同一个 `gate`（resolveWrite + 治理禁写前缀）。
+              const appointmentJudge =
+                cardKind === "appointment-write" && targetRoleId !== ""
+                  ? {
+                      allowedPathRoots: [
+                        `角色卡/${targetRoleId}/`,
+                        ...(appointmentAllowedDirectories ?? []),
+                      ],
+                      pathProbes: completeness.declaredPaths.map((declaredPath) => {
+                        const decision = gate(declaredPath);
+                        return decision.allowed === true
+                          ? { path: declaredPath, allowed: true }
+                          : {
+                              path: declaredPath,
+                              allowed: false,
+                              ...(decision.reason !== undefined ? { reason: decision.reason } : {}),
+                            };
+                      }),
+                    }
+                  : {};
               const judgeContext: GovernanceJudgeContext = {
                 flowId: judgeAttribution,
                 facts,
+                ...appointmentJudge,
                 ...(cardKind === "appointment" && appointmentRecommendedRoleIds !== undefined
                   ? { recommendedRoleIds: appointmentRecommendedRoleIds }
                   : {}),
@@ -2123,6 +2163,10 @@ export function createRuntimeAdapterFactory(
     shellCwd: project.projectRoot,
     persistSession: capabilities?.persistSession ?? options.persistSession ?? (capabilities?.sessionDir !== undefined),
     customerInput: capabilities?.customerInput,
+    // 2026-10-29（v2.13）：属主 write_file/edit_file 成功后，guard 在项目锁内登记版本基线。
+    versionedDocAfterWrite:
+      options.versionedDocAfterWrite ??
+      ((absPath: string) => registerVersionedDocAfterWrite({ projectRoot: project.projectRoot, absPath, recordedBy: "app:session" })),
     reportHandback: capabilities?.reportHandback,
     // 2026-10-26 图片查看（view_image）：运行时核心 `GovernedToolsOptions.viewImage` 同名能力位
     // （形状同源 `model/runtime.ts` `ViewImageFn`）；Service 以 `...options` 透传给

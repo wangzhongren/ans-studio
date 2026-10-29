@@ -165,6 +165,11 @@ export function describeTool(name: string): ToolDescription {
               "C 批 appointment-write only: the D3 decision id from `request.resolved` that authorized this role-card/boundary write. " +
               "Missing/mismatched targetRoleId + decisionId ⇒ no card is shown (fail-closed)",
           },
+          moduleId: {
+            type: "string",
+            description:
+              "2026-10-29 (v2.8/R8): optional module id from the latest roster for an acceptance/role-card card. The application cross-checks it against the roster modules and the D3-selected owners; the field grants no write power. The folder address is derived by the application.",
+          },
           preview: {
             type: "string",
             description:
@@ -293,6 +298,11 @@ export function describeTool(name: string): ToolDescription {
           },
           multiple: { type: "boolean", description: "true = multi-select (checkboxes); default false = single-select" },
           preview: { type: "string", description: "Optional preview content shown to the customer (markdown)" },
+          moduleId: {
+            type: "string",
+            description:
+              "2026-10-29 (v2.8/R8): optional module id from the latest roster (acceptance/task scope). The application cross-checks it against roster modules; the folder address is derived by the application.",
+          },
           flowId: {
             type: "string",
             pattern: GOVERNANCE_SLUG_PATTERN,
@@ -449,6 +459,12 @@ export function describeTool(name: string): ToolDescription {
             pattern: GOVERNANCE_SLUG_PATTERN,
             description:
               "Optional governance flow step id (slug); with flowId it becomes the dispatch dedup key. Missing = legacy behavior; Lead-to-Steward coordination may omit stepId while still carrying flowId; the fields grant nothing by themselves",
+          },
+          moduleId: {
+            type: "string",
+            pattern: GOVERNANCE_SLUG_PATTERN,
+            description:
+              "2026-10-29 (v2.8/R8): module id from the latest roster. Implementation tasks dispatched by the convener MUST carry it; the target role must own the module (one module = one owner). The folder address is derived by the application from the roster; do not send a directory.",
           },
         },
         required: ["roleId", "task"],

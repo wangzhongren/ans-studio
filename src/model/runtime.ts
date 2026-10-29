@@ -477,6 +477,8 @@ export interface CustomerInputMetadata {
   /** C 批：申请归属键（`flowId|intentId|taskId` 至少一个；工具入参显式给出时透传）。 */
   intentId?: string;
   taskId?: string;
+  /** 2026-10-29（v2.8/R8）：卡片/验收引用的模块 id（文件夹地址由应用从名单派生）。 */
+  moduleId?: string;
   /**
    * C 批：`appointment-write` 的目标项目角色与 D3 决定 id（方案 §6.4.1/R2）。
    * 应用只把它们用于**校验**（目标非内置、路径位于 `角色卡/<targetRoleId>/`、D3 `request.resolved`
@@ -585,6 +587,9 @@ export interface TaskCreatedEvent extends TaskStateEventBase {
    * `"project-handoff"`（M6/M7 的机械前置依据）。旧记录无此字段（兼容读取）。
    */
   stepId?: string;
+  /** 2026-10-29（v2.6/R2）：任务模块归属（模块 id + 名单文件夹地址）；旧记录无此字段（兼容读取）。 */
+  moduleId?: string;
+  moduleDirectory?: string;
 }
 
 export interface TaskDeliveredEvent extends TaskStateEventBase {
@@ -842,6 +847,11 @@ export interface DispatchTaskPayload {
    */
   flowId?: GovernanceFlowId;
   stepId?: GovernanceStepId;
+  /**
+   * 2026-10-29（v2.8 R8）：实现/验收任务的模块 id。目标角色必须拥有该模块（一模块一属主）；
+   * 文件夹地址由应用从名单模块派生落盘，模型不得自报。
+   */
+  moduleId?: string;
 }
 
 export interface DispatchReceipt {
@@ -1611,6 +1621,10 @@ export interface GovernanceJudgeFacts {
    * 可选；缺失＝应用未提供（验收判定按旧门槛或回落客户）。
    */
   intentDocumentPath?: string;
+  /** 2026-10-29（v2.6/R2）：验收/派发引用的模块（名单事实：id、文件夹地址、属主角色）。 */
+  moduleId?: string;
+  moduleDirectory?: string;
+  moduleOwnerRoleId?: string;
   /** 最新人员名单版本/hash（应用从 `docs/proposals/<flowId>-roster-vN.md` 计算）。 */
   rosterVersion?: number;
   rosterSha256?: string;
@@ -1788,6 +1802,11 @@ export interface GovernedToolsOptions {
    * 仅随 `shellGate` 一起注入；缺省 ⇒ 不审计（旧行为逐字不变）。
    */
   shellPostAudit?: ShellPostAuditFn;
+  /**
+   * 2026-10-29（v2.13）：属主 write_file/edit_file 成功后的版本登记入口（guard 锁内追加/回退）。
+   * 缺省 ⇒ 不登记（旧行为）；注入端由编排提供。
+   */
+  versionedDocAfterWrite?: (absPath: string) => boolean | void | Promise<boolean | void>;
   shellCwd?: string;
   shellReviewTimeoutMs?: number;
   /**

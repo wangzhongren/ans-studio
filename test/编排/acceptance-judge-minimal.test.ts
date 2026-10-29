@@ -49,7 +49,7 @@ function request(overrides: Partial<GovernanceJudgeRequest> = {}): GovernanceJud
     },
     facts: facts(),
     artifacts: {
-      proposalPath: "docs/proposals/focus-v1.md",
+      proposalPath: "docs/proposals/focus-proposal-v1.md",
       acceptanceReportPath: "docs/quality/focus-report-v1.md",
     },
     at: "2026-10-29T00:00:00.000Z",
@@ -69,7 +69,7 @@ function verdict(selected: string[] = ["accept"]) {
 const stats = {
   readCalls: 2,
   readBytes: 100,
-  readPaths: ["docs/proposals/focus-v1.md", "docs/quality/focus-report-v1.md"],
+  readPaths: ["docs/proposals/focus-proposal-v1.md", "docs/quality/focus-report-v1.md"],
   deniedReads: 0,
   truncatedReads: 0,
   budgetExceeded: false,
@@ -78,6 +78,19 @@ const stats = {
 test("最小链事实齐备 ⇒ 代批 accept（不要求旧 flow 的 proposalDecision/criteria/change-package）", () => {
   const outcome = evaluateGovernanceJudgeVerdict({
     request: request(),
+    verdict: verdict(),
+    stats,
+    engine: "pi",
+  });
+  assert.equal(outcome.verdict, "approve");
+  assert.deepEqual(outcome.value?.selected, ["accept"]);
+});
+
+test("验收模块事实：moduleId/目录/属主随 facts 进入审批（R2/R3）", () => {
+  const outcome = evaluateGovernanceJudgeVerdict({
+    request: request({
+      facts: facts({ moduleId: "impl-core", moduleDirectory: "src/", moduleOwnerRoleId: "implementer" }),
+    }),
     verdict: verdict(),
     stats,
     engine: "pi",
@@ -119,7 +132,7 @@ test("物证缺失/未读 ⇒ manual（proposal/report 仍为必需物证）", (
   const notRead = evaluateGovernanceJudgeVerdict({
     request: request(),
     verdict: verdict(),
-    stats: { ...stats, readPaths: ["docs/proposals/focus-v1.md"] },
+    stats: { ...stats, readPaths: ["docs/proposals/focus-proposal-v1.md"] },
     engine: "pi",
   });
   assert.equal(notRead.verdict, "manual");

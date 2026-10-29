@@ -3,7 +3,7 @@ import { coreToolTarget, utf8Prefix } from "../../common/runtime-core/tool-displ
 import { createEventQueue } from "../../common/runtime-core/event-queue.ts";
 import { resolveProjectList } from "../../common/runtime-core/list-dir.ts";
 import { spawn } from "node:child_process";
-import { readFile, realpath, stat } from "node:fs/promises";
+import { readFile, realpath, stat, unlink } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve } from "node:path";
 import type {
   WriteGate,
@@ -351,6 +351,7 @@ async function writeGuarded(
   data: Buffer,
   opts: { createParent: boolean },
   signal?: AbortSignal,
+  onWrite?: (abs: string) => boolean | void | Promise<boolean | void>,
 ): Promise<ToolResult> {
   if (signal?.aborted) return { ok: false, message: `${name}：会话已中止，未写入` };
   // 1) 只读守卫：词法 + 名称安全 + 真实路径复核（挡 symlink/junction 逃逸）——在 mkdir 之前。
@@ -387,11 +388,24 @@ async function writeGuarded(
   } catch (err) {
     return { ok: false, message: `${name} 写入失败：${path}（${reasonOf(err)}）` };
   }
+  if (onWrite !== undefined) {
+    try {
+      const registered = await onWrite(abs);
+      if (registered === false) {
+        // v2.15：guard 预检/登记失败 ⇒ 新建版本文件回退（仅 write_file 新建场景；edit 旧版已被 guard 拒绝）。
+        if (opts.createParent) await unlink(abs).catch(() => undefined);
+        return { ok: false, message: `${name}  wrote ${path} 但版本登记预检失败，已回退（不留下未登记的新版本）。` };
+      }
+    } catch (err) {
+      if (opts.createParent) await unlink(abs).catch(() => undefined);
+      return { ok: false, message: `${name} 已写入 ${path}，但版本登记失败：${reasonOf(err)}（已尝试回退新版本）` };
+    }
+  }
   return { ok: true, message: `${name} 已获准并落盘：${path}（${data.length} 字节写入 ${abs}）` };
 }
 
 /** write_file：获准后 mkdir -p 父目录 → 原子写 content（UTF-8，不加 BOM）。 */
-function makeWriteFileTool(gate: WriteGate, writeRoot: string | undefined): ExecutableTool {
+function makeWriteFileTool(gate: WriteGate, writeRoot: string | undefined, onWrite?: (abs: string) => boolean | void | Promise<boolean | void>): ExecutableTool {
   const name = "write_file";
   return {
     name,
@@ -411,7 +425,7 @@ function makeWriteFileTool(gate: WriteGate, writeRoot: string | undefined): Exec
         return { ok: true, message: `${name} 已获准（写入）：${path}（本次构造未配置 writeRoot，已判定但未落盘）` };
       }
       if (call.signal?.aborted) return { ok: false, message: `${name}：会话已中止，未写入` };
-      return writeGuarded(gate, name, path, pre.abs, writeRoot, Buffer.from(content, "utf8"), { createParent: true }, call.signal);
+      return writeGuarded(gate, name, path, pre.abs, writeRoot, Buffer.from(content, "utf8"), { createParent: true }, call.signal, onWrite);
     },
   };
 }
@@ -437,7 +451,7 @@ function decodeForEdit(raw: Buffer): { ok: true; text: string; bom: boolean } | 
 }
 
 /** edit_file：获准后读原文件 → old_string 替换（未命中不写）→ 原子写回。 */
-function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined): ExecutableTool {
+function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined, onWrite?: (abs: string) => boolean | void | Promise<boolean | void>): ExecutableTool {
   const name = "edit_file";
   return {
     name,
@@ -477,7 +491,7 @@ function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined): Execu
       if (invalidBoundary !== undefined) return invalidBoundary;
       const data = Buffer.from((decoded.bom ? "\uFEFF" : "") + next, "utf8");
 
-      return writeGuarded(gate, name, path, pre.abs, writeRoot, data, { createParent: false }, call.signal);
+      return writeGuarded(gate, name, path, pre.abs, writeRoot, data, { createParent: false }, call.signal, onWrite);
     },
   };
 }
@@ -1700,12 +1714,15 @@ function makeRequestConfirmationTool(
       // 字段本身不发行任何写权（应用按 D3 `request.resolved` 校验失败即不发卡）。
       const targetRoleId = readStringArg(call.args, ["targetRoleId", "target_role_id"]);
       const decisionId = readStringArg(call.args, ["decisionId", "decision_id"]);
+      // 2026-10-29（v2.8/R8）：卡片引用的模块 id（验收/写卡）；文件夹地址由应用从名单派生，不接受自报。
+      const moduleId = readStringArg(call.args, ["moduleId", "module_id"]);
       const metadata: CustomerInputMetadata = {
         ...baseMetadata,
         ...(taskId !== undefined && taskId !== "" ? { taskId } : {}),
         ...(intentId !== undefined && intentId !== "" ? { intentId } : {}),
         ...(targetRoleId !== undefined && targetRoleId !== "" ? { targetRoleId } : {}),
         ...(decisionId !== undefined && decisionId !== "" ? { decisionId } : {}),
+        ...(moduleId !== undefined && moduleId !== "" ? { moduleId } : {}),
       };
       const title = readStringArg(call.args, ["title"]);
       if (title === undefined || title.trim() === "") {
@@ -1862,10 +1879,12 @@ function makeRequestChoiceTool(
       const baseMetadata = customerMetadata(call.signal, currentTurnId?.(), scope, call.toolCallId);
       const taskId = readStringArg(call.args, ["taskId", "task_id"]);
       const intentId = readStringArg(call.args, ["intentId", "intent_id"]);
+      const moduleId = readStringArg(call.args, ["moduleId", "module_id"]);
       const metadata: CustomerInputMetadata = {
         ...baseMetadata,
         ...(taskId !== undefined && taskId !== "" ? { taskId } : {}),
         ...(intentId !== undefined && intentId !== "" ? { intentId } : {}),
+        ...(moduleId !== undefined && moduleId !== "" ? { moduleId } : {}),
       };
       const title = readStringArg(call.args, ["title"]);
       if (title === undefined || title.trim() === "") {
@@ -2082,6 +2101,11 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
       if (idempotencyKey !== undefined && idempotencyKey.trim() === "") {
         return { ok: false, message: `${name}: idempotencyKey 不能为空字符串` };
       }
+      // 2026-10-29（v2.8 R8）：模块 id（实现/验收任务）；文件夹地址由应用从名单派生，工具不接受自报目录。
+      const moduleId = readStringArg(call.args, ["moduleId", "module_id"]);
+      if (moduleId !== undefined && moduleId.trim() === "") {
+        return { ok: false, message: `${name}: moduleId 不能为空字符串` };
+      }
       const payload: DispatchTaskPayload = {
         roleId,
         task,
@@ -2090,6 +2114,7 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
         ...(expectedOutput !== undefined ? { expectedOutput } : {}),
         ...(requestedEvidence !== undefined ? { requestedEvidence } : {}),
         ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
+        ...(moduleId !== undefined ? { moduleId } : {}),
         ...governance.value,
       };
 
@@ -2875,8 +2900,8 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   const readRoot = options?.readRoot ?? process.cwd();
   const writeRoot = options?.writeRoot;
   const tools: ExecutableTool[] = [
-    makeWriteFileTool(gate, writeRoot),
-    makeEditFileTool(gate, writeRoot),
+    makeWriteFileTool(gate, writeRoot, options?.versionedDocAfterWrite),
+    makeEditFileTool(gate, writeRoot, options?.versionedDocAfterWrite),
     makeReadTool(readRoot),
     makeListDirTool(readRoot),
   ];

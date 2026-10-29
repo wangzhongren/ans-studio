@@ -2,7 +2,7 @@
 
 - 日期：2026-10-29｜任务：内置角色工作流维护者化 + 招人流程强制化 + shell 写区约束（方案 v2.1，客户闸门 1/2 已过）｜风险档位：T3（治理/权限/流程变更）
 - 分支/worktree：`feat/entry-role-minimal` @ `.claude/worktrees/entry-role-minimal`｜实施基线：`a27644d`（含人事 chain-enforcement 边界 Delta-2）
-- 依据：`docs/planning/2026-10-29_design-workflow-maintainers-hiring.md`（v2.5，含 §五 delta、R1–R5、验收 v3 F6/F7 处置与 v2.5 三处文档小修；文件随本批入库）；复核记录 `docs/planning/2026-10-29_review-workflow-maintainers-hiring.md`（246 行 / `dd6d2a4e…`，结论通过）；拓扑 v4.1 与真机测试日志 `docs/communication/2026-10-29_*.md`；客户确认 Q1–Q11 按推荐项（Q4 D3 带 decisionId、Q6 验收 judge 最小链事实）；**Q1/Q2 已由客户 2026-10-29 修正**：不强制客户审批，改为判断 agent 审查脚本内容（开关关闭仍弹客户卡；不可用/超时/解析失败 fail-closed），Q2 测试/安装普通审批+审计。
+- 依据：`docs/planning/2026-10-29_design-workflow-maintainers-hiring.md`（v2.6 模块先行；文档版本化/拓扑图/R2 为协调 2026-10-29 追加口径，实施以本记录 §4.3/§4.4 为准；文件随本批入库）；复核记录 `docs/planning/2026-10-29_review-workflow-maintainers-hiring.md`（246 行 / `dd6d2a4e…`，结论通过）；拓扑 v4.1 与真机测试日志 `docs/communication/2026-10-29_*.md`；客户确认 Q1–Q11 按推荐项（Q4 D3 带 decisionId、Q6 验收 judge 最小链事实）；**Q1/Q2 已由客户 2026-10-29 修正**：不强制客户审批，改为判断 agent 审查脚本内容（开关关闭仍弹客户卡；不可用/超时/解析失败 fail-closed），Q2 测试/安装普通审批+审计；**§六 delta 2 客户追加**：模块先行（一模块一文件夹/一属主）、人员+模块拓扑图、文档版本化。
 - 性质：实施与验证记录（**不是验收结论**）；本地提交，不 push、不合并 main。
 
 ## 1. 实施范围（严格按方案 §8 写集）
@@ -40,10 +40,10 @@
 | --- | --- | ---: | --- |
 | `test/门禁引擎/classify-shell.test.ts` | 更新（v2.4 F6） | 52 | 短内联 review/长内联与 re-shell deny；bash 脚本文件 review；find -exec deny |
 | `test/门禁引擎/shell-write-guard.test.ts` | 新增（返工后 9，含 F1/F2/F6 形态） | 9 | 显式写目标边界/越界/禁写/逃逸、opaque 与 Q2 例外、cwd 防御、TaskScope 经 checkWrite 收窄；**P6 十种绕过形态全部 opaque**、plain 形态不误伤 |
-| `test/编排/workflow-preconditions.test.ts` | 新增 | 8 | 名单解析正/负例、最新名单 version/hash、D3 卡形状/推荐集、M1–M8 矩阵、M9 路由 |
-| `test/编排/shell-post-audit.test.ts` | 新增（返工后 6） | 6 | 快照 diff、越界判定、审计记录、真实文件系统排除项；**`.ans/` 与项目根之外（extraRoots/`..`/绝对路径）越界检测** |
-| `test/编排/appointment-roster.test.ts` | 新增 | 4 | 人事发卡/推荐集、选项≠名单拒绝、convener 发卡拒绝、boundary 目录 ⊆ 名单目录 |
-| `test/编排/acceptance-judge-minimal.test.ts` | 新增 | 3 | 验收最小链事实通过/缺项 manual/物证缺失 |
+| `test/编排/workflow-preconditions.test.ts` | 新增（模块/拓扑/版本后 11） | 11 | 名单解析正/负例（v2 modules/roles.modules/拓扑）、版本化引用（最新/旧版只读/缺文件/链断裂）、最新名单 version/hash、D3 卡形状/推荐集、M1–M8 矩阵、M9 路由 |
+| `test/编排/shell-post-audit.test.ts` | 新增（返工后 8） | 8 | 快照 diff、越界判定、审计记录、真实文件系统排除项；**`.ans/` 与项目根之外（extraRoots/`..`/绝对路径）越界检测；R9 baseline 改写审计** |
+| `test/编排/appointment-roster.test.ts` | 新增（BUG-3 后 8） | 8 | 人事发卡/推荐集、选项≠名单拒绝、convener 发卡拒绝、boundary 目录 ⊆ 模块并集；**appointment-write judge 事实（allowedPathRoots=角色卡/<target>/ ∪ 模块并集、pathProbes 逐路径 allowed、缺 targetRoleId 拒绝）；一人多模块（同父兄弟目录）并集；D3 preview 附拓扑图** |
+| `test/编排/acceptance-judge-minimal.test.ts` | 新增（R2 后 4） | 4 | 验收最小链事实通过/缺项 manual/物证缺失；**验收模块事实 moduleId/目录/属主** |
 | `test/编排/shell-operator-only.test.ts` | 更新（+2，返工 +3） | 16 | opaque → 审批（含脚本上下文，不强制客户本人）、上下文不可用 fail-closed、写目标 deny 直拒；**P6 真实守卫 × 审批档集成（越界 deny / 不可解析交判断）** |
 | `test/编排/shell-approval-context.test.ts` | 新增（R2 后 9） | 9 | 脚本/内联/npm run/test/install/构建配置内容与 sha256；深度 ≤2 引用展开；64KB/2000 行/3 文件/128KB bounds fail-closed；注入防护与 judge 提示词 |
 | `test/编排/task-state.test.ts` | 更新（+2） | 9 | from/closed 放宽、stepId/flowId、roster 字段校验、旧记录兼容 |
@@ -52,16 +52,17 @@
 | `test/桌面应用/operator-channel.test.ts` | 更新（+3） | 56 | judge 收到脚本内容并据其裁决（deny/allow）；开关关 → 客户卡展示内容；manualOnly 兼容能力 |
 | `test/runtime-core/customer-input-context.test.ts` | 更新（+1） | 3 | request_choice 回执 decisionId |
 | `test/测试/su-shell-approval-verify/e-zero-execution.test.ts` | 更新（v2.4 F6） | 6 | 短 `node -e` 由 c-deny 改判 c-review→a-* 脚本审查分支；长内联/re-shell 仍 deny |
+| `test/门禁引擎/versioned-doc-guard.test.ts` | 新增（v2.8–v2.15 R6/R9） | 11 | 版本化路径/版本号；覆盖既有 -vN.md ⇒ deny；shell cp 旧版 deny/新版 pass；基线 TOFU/marker/坏行/缺失 fail-closed、canonical 路径、并发登记、O_EXCL 锁/活锁不接管/token fencing、旧记录归一化、属主写后单文件登记 |
 | 既有更新 | — | — | `chief-workflow`（convener dispatch v4.1）、`star-routing`（M8/M5/M6）、`entry-role-minimal-d`、`i-full-chain` |
 
-定向（返工 v3 后重跑）：门禁引擎 264 计（263 过 / 1 skip）、编排 518 计（517 过 / 1 红＝既有 Windows symlink EPERM）、桌面应用 344/344、runtime-core 258 计（251 过 / 3 红 / 4 skip，红均既有 symlink）、测试 544 计（534 过 / 4 红 / 6 skip，红均基线）、项目管理 154 计（149 过 / 5 skip）、装配 85/85；逐文件：classify-shell 52、shell-write-guard 9、shell-operator-only 16、shell-post-audit 6、shell-approval-context 9、workflow-preconditions 8、appointment-roster 4、acceptance-judge-minimal 3、task-state 9、trio-worker-report 4、chain-enforcement 6、operator-channel 56、su zero-execution 6（合计 188/188 全过）。
+定向（返工 v3 后重跑）：门禁引擎 275 计（274 过 / 1 skip）、编排 528 计（527 过 / 1 红＝既有 Windows symlink EPERM）、桌面应用 344/344、runtime-core 258 计（251 过 / 3 红 / 4 skip，红均既有 symlink）、测试 544 计（534 过 / 4 红 / 6 skip，红均基线）、项目管理 154 计（149 过 / 5 skip）、装配 85/85；逐文件：classify-shell 52、shell-write-guard 9、shell-operator-only 16、shell-post-audit 8、shell-approval-context 9、workflow-preconditions 11、appointment-roster 8、acceptance-judge-minimal 4、task-state 9、trio-worker-report 4、chain-enforcement 6、operator-channel 56、su zero-execution 6、versioned-doc-guard 11（合计 209/209 全过）。
 
 ## 3. 验证（串行）
 
-- 全量（返工 v3 后）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（340 文件）→ **2977 tests / 2947 pass / 12 fail / 18 skip**（vs 基线 2919/2889/12/18：+58/+58/0/0；12 红＝9 Windows symlink EPERM + T1×3 既有环境问题）；日志 `%TEMP%\ans-full-hiring-rework6.log`，sha256 `a1fe13f5f2d5923d413bb84c5f32670f788c770915afad5c313af94b118210bc`。
+- 全量（v2.15 最终）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（340 文件）→ **2998 tests / 2968 pass / 12 fail / 18 skip**（12 红＝9 Windows symlink EPERM + T1×3 既有环境问题）；日志 `%TEMP%\ans-v215-full.log`。
 - `npm run typecheck` exit 0；`npm run typecheck:renderer` exit 0；`npm run build:renderer` exit 0（返工 v3 后重跑）。
-- phase5a 真实 Electron（返工 v3 后）：**34/34 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-hiring4\report.json`，sha256 `66db07d6f9fcb34ff2cfbe07c040b45117522bf9549bf74e97b3fb1c61633372`；5 PNG）。
-- 桌面 E2E（返工 v3 后；临时夹具 `%TEMP%\ans-e2e-g-fixture-1029`；fresh userData）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-hiring4-out\report.txt`，sha256 `e283f34a36b464f2fa0668a03bc135ca3e9147782135e11c18eec706bfd5cf03`；`session:role-states` 未注册错误 0。
+- phase5a 真实 Electron（v2.15）：**34/34 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-v215\report.json`，sha256 `14aa70c081f8a875cb44af2a0b65762db81eb284555b37bdd281f34c83e4d670`）。
+- 桌面 E2E（v2.15；临时夹具 `%TEMP%\ans-e2e-g-fixture-1029`；fresh APPDATA）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-v215-out\report.txt`，sha256 `5e646aa91d79417cd420ab779d67c64b99e662d7ebd229554847193b169fcd0f`；`session:role-states` 未注册错误 0。
 
 ## 4. 应用冒烟（重启后）
 
@@ -93,6 +94,43 @@
    fs.writeFileSync(file, out.join("\n") + "\n");
    ```
 本批新读取器保持对旧记录的兼容（`from:"chief"`、`closed.by:"chief"`、无新字段），并有混合新旧记录测试。
+
+## 4.2 真机五步链回归（BUG-3 修复）
+
+**现象**：干净项目 `C:/Users/51054/Desktop/work/trial-hiring-chain` 真机走链时，D3 招人卡由判断 agent 代批通过（`decisionId=decision-req-b2c02d0d82c7609d`，resolved=bookmark-impl+bookmark-qa），但随后 4 次 `appointment-write`（含收窄为单卡单路径）均被自动审批层确定性拒绝：「写盘路径不在允许范围内（角色卡/<目标>/role-card.md 不在角色可写根内）」；第④步派运营被硬拒（目标角色卡不存在）⇒ 链条在③死锁。
+
+**根因**：`src/pipeline/orchestration/run-role.ts` 重建 `judgeContext` 时只带 `flowId/facts/paths`，**未设置 `allowedPathRoots` 与 `pathProbes`**；`governance-judge-evidence.ts` 读到空数组后把每条声明路径判为 `insideAllowedRoot=false` ⇒ verdict `path-outside-boundary`。C 批测试直接构造 judge 参数，未覆盖这条生产接线（本批新增的 M4/D3 校验亦未改变该缺口）。
+
+**修复**（`run-role.ts` judgeContext 构造）：
+- `allowedPathRoots` = `角色卡/<targetRoleId>/`（卡文件）∪ 名单给该目标的授权目录（`appointmentAllowedDirectories`，已由 M4 校验 boundary 条目 ⊆ 名单；名单不可读时仅卡目录，后续 M11 fail-closed）；
+- `pathProbes` = 对 `completeness.declaredPaths` 每条路径调用**同一个 `gate`**（`resolveWrite` + 治理禁写前缀）机械探测；allowed=false 时携带原因；
+- 既有 `validateAppointmentWritePreview`（targetRoleId/decisionId、角色卡目录、必需章节、boundary YAML）与桌面 D3/名单版本校验保持不变。
+
+**测试**（`test/编排/appointment-roster.test.ts`，4→7）：新增 ① judgeContext 含 `角色卡/implementer/` 与名单目录 `src/`、`pathProbes` 为 allowed；② `role-card.md` 与 `boundary.yaml` 两条声明路径均有 allowed 探针；③ 缺 `targetRoleId` 结构拒绝、不触达客户、无 judgeContext。越名单目录拒绝沿用既有用例。
+
+## 4.3 模块清单 + 模块归属（客户 §六 delta 2 / v2.6 R1–R5）
+
+**口径**：先写模块，再把模块安排给人；一个模块=一个文件夹，一模块一属主，模块目录互不重叠且不得互相嵌套（同父兄弟如 `src/bill/a` 与 `src/bill/b` 合法）；角色可拥有多个模块，授权目录=名下模块文件夹并集。
+
+- **schema `project-roster/v2`**：`modules[]` 1–12 项，每项 `id`（小写 slug、≥2 字符）/`name`/`purpose`/`directory`（恰好一个目录、非文件/数组、项目相对、治理子路径拒绝）/`publicContract`/`architectureSource`；`roles[].modules[]` 引用模块 id（每个模块恰一属主、每个角色至少一个模块、可多模块）；`intent`/`proposal`/`architecture` 版本化引用。
+- **topology**：名单正文必须有「人员+模块拓扑图」章节，含 ```topology YAML（modules id/directory/roleId + roles id/modules + management 含 convener 与全部项目角色），与 frontmatter 绑定完全一致；D3 卡 preview 由应用附加 `rosterTopologyText()`（模块→属主、角色→模块、运营管理关系）。
+- **appointment-write**：`allowedPathRoots` = `角色卡/<targetRoleId>/` ∪ 该角色名下**模块文件夹并集**；`pathProbes` 逐声明路径经同一 `gate` 探测；boundary 条目/子目录按模块并集判定（`validateAppointmentWritePreview`），越模块拒绝。
+- **派发/任务/验收（R2）**：`DispatchTaskPayload`/`TaskCreatedEvent`/`dispatch_task` schema/`routeStarDispatch`/任务卡增加 `moduleId`+`moduleDirectory`；convener 派项目 worker 必须带 moduleId 且目标拥有该模块（`module-required`/`module-missing`/`module-not-owned`/`module-directory-mismatch`），目录以名单为准落盘；幂等键纳入模块（同文本不同模块不误判）；验收 facts 增加 moduleId/目录/属主，验收卡可携带模块。
+- **测试**：workflow-preconditions 11（模块缺失/重叠/嵌套/多属主/未绑定/文件路径/治理子路径/同父兄弟/一人多模块）、appointment-roster 8（judge roots 模块并集、role-card/boundary 探针、一人多模块、缺 targetRoleId）、chain-enforcement 6（目标不拥有模块拒绝、模块 id/目录落盘、错误目录拒绝、既有链路）。
+
+## 4.4 文档版本化（客户追加口径）
+
+- **版本化命名**：产品意图 `docs/product/<flowId>-intent-vN.md`、提案 `docs/proposals/<flowId>-proposal-vN.md`、名单 `<flowId>-roster-vN.md`、架构 `docs/contracts/<flowId>-architecture-vN.md`；拓扑图在名单正文并随名单版本化。frontmatter/正文带版本与版本记录；不原地改、旧版只读。
+- **引用链**：名单 `intent`/`proposal`/`architecture` 必须版本化路径；`loadLatestRoster` 检查引用文件存在、非空、指向该 flow 的**最新**版本（旧引用 `roster-reference-stale`）；proposal 文本必须含名单声明的 intent 路径、architecture 文本必须含 proposal 路径（`roster-reference-inconsistent`）；D3/appointment-write 继续记录/校验 `rosterVersion`+`rosterSha256`，名单新版本使旧 D3 作废（M11 已有测试）。
+- **变更流程**：需求/功能变更 → 产品出意图新版本 → 策划出方案/模块/名单/架构新版本 → 派人事/验收前置按最新版本重走；旧版只读，引用最新。
+- **测试**：workflow-preconditions 版本化引用用例（最新/旧版只读/缺文件/stale/链断裂/格式）；chain-enforcement M11（D3 旧 rosterVersion 作废）；`chainDispatchFacts` 改为按最新 intent/proposal/architecture 版本探测。
+
+## 4.5 版本化只读守卫与模块权威源（v2.8 R6–R9）
+
+- **R6 `versioned-doc-guard`**（`src/common/门禁引擎/versioned-doc-guard.ts`）：识别 intent/proposal/roster/modules/topology/architecture 的 `-vN.md`；覆盖既有版本 ⇒ deny（不进入审批），新建 vN+1 允许。接入 `shell-write-guard` 显式写目标（cp/tee 等）与编排 `run-role` 的 `gate`（write_file/edit_file 等所有角色写入）；shell 覆盖旧版负例见 `versioned-doc-guard.test.ts`。
+- **R7 模块权威源**：`docs/proposals/<flowId>-modules-vN.md`（`project-modules/v1`）为唯一权威；`loadLatestRoster` 读取最新模块文档并与 roster `modules[]` 快照逐项比较——缺失 ⇒ `roster-modules-doc-missing`，非法 ⇒ `roster-modules-doc-invalid`，漂移 ⇒ `roster-modules-drift`（以模块文档为准重出 roster）。M2 派人事前置经 `loadLatestRoster` 自动执行。
+- **R8**：新增守卫与测试；`DispatchTaskPayload`/`dispatch_task`/`tools.ts` **不接受 moduleDirectory**（应用从名单模块派生落盘）；`TaskCreatedEvent.moduleDirectory` 仍由应用写入。`chain-enforcement` 覆盖目标不拥有模块拒绝、模块 id 落盘、旧路径夹具迁移。
+- **R9 基线（v2.9–v2.12）**：`.ans/state/versions.initialized`（`{v:1,initializedAt}`）+ `.ans/state/versions.jsonl`（记录 `v/flowId/doc/version/path/sha256/recordedAt/event/recordedBy`；`path` 为 `flowId/doc` 派生 canonical 逻辑路径，唯一键 `(flowId,doc,version)`）。仅 marker 与 jsonl **都不存在**时 TOFU 一次；marker 存在后 jsonl 缺失/空/坏行/旧条目缺失一律 fail-closed，不补齐旧条目（仅登记版本号更高的新版本，event=`version-added`）。v2.10 旧记录读取时只读归一化（`versioned-doc-baseline`→`baseline`、`recordedBy app`→`app:session`、旧实际 path→canonical），不追加迁移记录。`versions.lock` 用 O_EXCL 独占（`{pid,startedAt,token}`），陈旧锁凭 token 接管、超时 fail-closed、只释放自己 token；登记/TOFU/校验走项目级串行锁。`shell-post-audit` 对受管版本文件做 baseline 比对，baseline 缺失/坏行也 fail-closed。测试：`versioned-doc-guard.test.ts`（TOFU/marker/空/坏行/新版本/并发/锁/归一化）、`shell-post-audit.test.ts`、chain-enforcement 篡改用例。
 
 ## 5. 决策点与遗留
 

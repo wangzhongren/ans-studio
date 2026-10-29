@@ -12,7 +12,9 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import type { ShellExecutionOutcome, ShellPostAuditResult, ShellReviewRequest } from "../../model/runtime.ts";
+import { baselineShaFor, isVersionedDocPath } from "../门禁引擎/versioned-doc-guard.ts";
 
 export interface TreeEntryFacts {
   mtimeMs: number;
@@ -259,11 +261,32 @@ export function createShellPostAudit(options: CreateShellPostAuditOptions): Shel
       } catch {
         return { violations: [] };
       }
+      const changes = diffTreeSnapshots(before, after);
       const violations = findOutOfBoundChanges({
-        changes: diffTreeSnapshots(before, after),
+        changes,
         forbiddenPrefixes: options.forbiddenPrefixes,
         checkWrite: options.checkWrite,
       });
+      // R9：受管版本化文档与 baseline 比对——shell/外部写入导致旧版变化 ⇒ 越界审计。
+      for (const change of changes) {
+        if (!isVersionedDocPath(change.path) || violations.some((entry) => entry.path === change.path)) continue;
+        const baseline = await baselineShaFor(options.projectRoot, change.path);
+        if (!baseline.ok || baseline.sha256 === undefined) {
+          violations.push({ path: change.path, change: change.change === "deleted" ? "deleted" : "modified" });
+          continue;
+        }
+        if (change.change === "deleted") {
+          violations.push({ path: change.path, change: "deleted" });
+          continue;
+        }
+        try {
+          const bytes = await fs.readFile(path.join(options.projectRoot, change.path));
+          const actual = createHash("sha256").update(bytes).digest("hex");
+          if (actual !== baseline.sha256) violations.push({ path: change.path, change: "modified" });
+        } catch {
+          violations.push({ path: change.path, change: "deleted" });
+        }
+      }
       if (violations.length > 0) {
         await writeRecord({
           v: 1,

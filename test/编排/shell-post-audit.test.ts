@@ -17,6 +17,7 @@ import {
   type ShellPostAuditRecord,
   type TreeSnapshot,
 } from "../../src/common/编排/shell-post-audit.ts";
+import { recordVersionedDocBaselines } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 
 const req = (toolCallId = "call-1") => ({ command: "node script.mjs", argv: ["node", "script.mjs"], cwd: "/proj", toolCallId });
 
@@ -137,6 +138,52 @@ test("真实文件系统快照：排除 .ans/.git/node_modules/dist；新增/修
   }
 });
 
+
+test("R9：受管版本化文档被 shell/外部改写 ⇒ 执行后审计记录越界（baseline 比对）", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-post-versioned-"));
+  try {
+    await fs.mkdir(path.join(root, "docs", "product"), { recursive: true });
+    const file = path.join(root, "docs/product/focus-intent-v1.md");
+    await fs.writeFile(file, "# v1\n", "utf8");
+    await recordVersionedDocBaselines({ projectRoot: root });
+    const audit = createShellPostAudit({
+      projectRoot: root,
+      forbiddenPrefixes: [],
+      checkWrite: () => ({ allowed: true }),
+    });
+    const request = req("call-versioned");
+    await audit.snapshotBefore(request as never);
+    await fs.writeFile(file, "# v1 changed by script\n", "utf8");
+    const result = await audit.auditAfter(request as never, { exitCode: 0 } as never);
+    assert.ok(result.violations.some((violation) => violation.path === "docs/product/focus-intent-v1.md"));
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("R9：baseline 缺失/坏行 ⇒ 版本化文档变化仍按越界记录（fail-closed，不静默跳过）", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-post-baseline-missing-"));
+  try {
+    await fs.mkdir(path.join(root, "docs", "product"), { recursive: true });
+    await fs.mkdir(path.join(root, ".ans", "state"), { recursive: true });
+    const file = path.join(root, "docs/product/focus-intent-v1.md");
+    await fs.writeFile(file, "# v1\n", "utf8");
+    await fs.writeFile(path.join(root, ".ans/state/versions.initialized"), "{}\n", "utf8");
+    // 仅 marker、无 baseline ⇒ baselineShaFor fail-closed。
+    const audit = createShellPostAudit({
+      projectRoot: root,
+      forbiddenPrefixes: [],
+      checkWrite: () => ({ allowed: true }),
+    });
+    const request = req("call-baseline-missing");
+    await audit.snapshotBefore(request as never);
+    await fs.writeFile(file, "# changed without baseline\n", "utf8");
+    const result = await audit.auditAfter(request as never, { exitCode: 0 } as never);
+    assert.ok(result.violations.some((violation) => violation.path === "docs/product/focus-intent-v1.md"));
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
 
 test("P6 返工（R2 审计诚实口径）：`.ans/` 项目内变化按越界记录；审计不宣称覆盖项目外写入", async () => {
   // `.ans/`：即使 checkWrite 错误地全部放行，也必须判越界（项目内可见性）。

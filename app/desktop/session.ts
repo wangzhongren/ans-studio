@@ -90,6 +90,7 @@ import {
   rosterRoleIds,
   type RosterLoadResult,
 } from "../../src/common/编排/workflow-preconditions.ts";
+import { verifyVersionedDocBaselines } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 
 /**
  * 内置来源回交→Lead 与同轮 settle 治理反馈的去重窗口（2026-10-24）：标记只在回交入队后到本轮
@@ -3169,6 +3170,14 @@ export class SessionManager {
     const intentText = await readText(intentRel);
     const intentOk = intentText !== undefined && intentText.trim() !== "" && /^#/m.test(intentText);
     const roster = await loadLatestRoster({ projectRoot, flowId });
+    // 2026-10-29（v2.6/R2）：验收卡可引用模块（moduleId）；应用按最新名单核对并把模块事实放进 facts。
+    const acceptanceModuleId = typeof metadata?.moduleId === "string" ? metadata.moduleId.trim() : "";
+    const acceptanceModule =
+      acceptanceModuleId !== "" && roster.ok ? roster.roster.modules.find((module) => module.id === acceptanceModuleId) : undefined;
+    const acceptanceModuleOwner =
+      acceptanceModule !== undefined && roster.ok
+        ? roster.roster.roles.find((role) => role.modules.includes(acceptanceModule.id))?.id
+        : undefined;
     const reportText = await readText(reportRel);
     const reportOk = reportText !== undefined && reportText.trim() !== "";
     // 最新 D3（appointment 裁决）及 decisionId。
@@ -3191,6 +3200,7 @@ export class SessionManager {
       ...(roster.ok ? [] : ["人员名单"]),
       ...(d3?.decisionId !== undefined ? [] : ["D3 裁决"]),
       ...(reportOk ? [] : ["质检报告"]),
+      ...(acceptanceModuleId !== "" && acceptanceModule === undefined ? ["模块（最新名单未找到）"] : []),
     ];
     const baseContext = metadata?.judgeContext;
     const facts = {
@@ -3205,6 +3215,13 @@ export class SessionManager {
       ...(roster.ok ? { rosterVersion: roster.version, rosterSha256: roster.sha256 } : {}),
       ...(d3?.decisionId !== undefined ? { appointmentDecisionId: d3.decisionId } : {}),
       ...(reportOk ? { qualityReportPath: reportRel } : {}),
+      ...(acceptanceModule !== undefined
+        ? {
+            moduleId: acceptanceModule.id,
+            moduleDirectory: acceptanceModule.directory,
+            ...(acceptanceModuleOwner !== undefined ? { moduleOwnerRoleId: acceptanceModuleOwner } : {}),
+          }
+        : {}),
     };
     const judgeContext: GovernanceJudgeContext = {
       ...(baseContext ?? { flowId }),
@@ -3885,6 +3902,8 @@ export class SessionManager {
       from: created.from,
       ...(created.flowId !== undefined ? { flowId: created.flowId } : {}),
       ...(created.stepId !== undefined ? { stepId: created.stepId } : {}),
+      ...(created.moduleId !== undefined ? { moduleId: created.moduleId } : {}),
+      ...(created.moduleDirectory !== undefined ? { moduleDirectory: created.moduleDirectory } : {}),
       to,
       // B-07：同角色重派先缩窄任务（明确先做最小可验证部分；已完成部分核对后跳过）。
       text: `${created.text}\n\n[重派] 上次执行卡死；请缩窄范围，先完成最小可验证部分；已完成部分核对后跳过，不要重复。`,
@@ -5148,11 +5167,36 @@ export class SessionManager {
     };
     const intentNames = await readNames(path.posix.join("docs", "product"));
     const rosterNames = await readNames(path.posix.join("docs", "proposals"));
+    const contractNames = await readNames(path.posix.join("docs", "contracts"));
     const intentFlows = flowsOf(intentNames, intentPattern);
     const rosterFlows = flowsOf(rosterNames, rosterPattern);
     const flowId = flowHint
       ?? (intentFlows.length === 1 ? intentFlows[0] : undefined)
       ?? (rosterFlows.length === 1 ? rosterFlows[0] : undefined);
+    // 2026-10-29（客户追加口径）：文档版本化——链路只认最新版本文件（旧版只读，不原地改）。
+    const latestVersionedName = (names: readonly string[], pattern: RegExp): string | undefined => {
+      let best = 0;
+      let file: string | undefined;
+      for (const name of names) {
+        const match = pattern.exec(name);
+        if (match === null) continue;
+        const version = Number(match[1]);
+        if (Number.isInteger(version) && version > best) {
+          best = version;
+          file = name;
+        }
+      }
+      return file;
+    };
+    const escapedFlow = flowId !== undefined ? flowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : undefined;
+    const latestIntentName =
+      escapedFlow !== undefined ? latestVersionedName(intentNames, new RegExp(`^${escapedFlow}-intent-v(\\d+)\\.md$`)) : undefined;
+    const latestProposalName =
+      escapedFlow !== undefined ? latestVersionedName(rosterNames, new RegExp(`^${escapedFlow}-proposal-v(\\d+)\\.md$`)) : undefined;
+    const latestArchitectureName =
+      escapedFlow !== undefined
+        ? latestVersionedName(contractNames, new RegExp(`^${escapedFlow}-architecture-v(\\d+)\\.md$`))
+        : undefined;
     const existsFile = async (rel: string): Promise<boolean> => {
       try {
         return (await fs.promises.stat(path.join(projectRoot, rel))).isFile();
@@ -5161,16 +5205,18 @@ export class SessionManager {
       }
     };
     let intentFound = false;
-    if (flowId !== undefined) {
+    if (latestIntentName !== undefined) {
       try {
-        const text = await fs.promises.readFile(path.join(projectRoot, "docs", "product", `${flowId}-intent-v1.md`), "utf8");
+        const text = await fs.promises.readFile(path.join(projectRoot, "docs", "product", latestIntentName), "utf8");
         intentFound = text.trim() !== "" && /^#/m.test(text);
       } catch {
         intentFound = false;
       }
     }
-    const proposalFound = flowId !== undefined && (await existsFile(`docs/proposals/${flowId}-v1.md`));
-    const architectureFound = flowId !== undefined && (await existsFile(`docs/contracts/${flowId}-architecture-v1.md`));
+    const proposalFound =
+      latestProposalName !== undefined && (await existsFile(`docs/proposals/${latestProposalName}`));
+    const architectureFound =
+      latestArchitectureName !== undefined && (await existsFile(`docs/contracts/${latestArchitectureName}`));
     const roster = flowId !== undefined ? await loadLatestRoster({ projectRoot, flowId }) : undefined;
 
     // 最新 D3（appointment 裁决）：request.created.flowId ↔ request.resolved（roster 字段优先；旧记录按目标集兼容）。
@@ -5246,12 +5292,14 @@ export class SessionManager {
     const requestedEvidence = d && Array.isArray(d.requestedEvidence)
       ? d.requestedEvidence.filter((item): item is string => typeof item === "string" && item.trim() !== "").slice(0, 5)
       : undefined;
+    const requestedModuleId = d && typeof d.moduleId === "string" && d.moduleId.trim() !== "" ? d.moduleId.trim() : undefined;
     const sideEffect = classifyTaskSideEffect(d?.sideEffect, task);
     const idempotencyKey = taskIdempotencyKey({
       from: fromRoleId,
       to: targetRoleId,
       text: task,
       ...(typeof d?.idempotencyKey === "string" ? { idempotencyKey: d.idempotencyKey } : {}),
+      ...(requestedModuleId !== undefined ? { moduleId: requestedModuleId } : {}),
     });
     const state = await this.readTasks(projectRoot);
     const duplicate = findOpenTaskByIdempotencyKey(state, idempotencyKey);
@@ -5286,6 +5334,7 @@ export class SessionManager {
       architectureFound: chainFacts.architectureFound,
       ...(chainFacts.roster !== undefined ? { roster: chainFacts.roster } : {}),
       d3Selected: chainFacts.d3Selected,
+      ...(requestedModuleId !== undefined ? { moduleId: requestedModuleId } : {}),
       handoffFound: chainFacts.handoffFound,
       targetCardFound:
         convenerRoleId !== null && targetRoleId === convenerRoleId
@@ -5295,9 +5344,28 @@ export class SessionManager {
     if (!preflight.ok) {
       return fail(`派发未受理：${preflight.message}`, preflight.message);
     }
+    // R9：旧版/已记录版本化文档被外部修改（shell/手动）⇒ 拒绝派发（fail-closed）。
+    const baselineViolations = await verifyVersionedDocBaselines({ projectRoot });
+    if (baselineViolations.length > 0) {
+      const detail = baselineViolations
+        .slice(0, 3)
+        .map((violation) => `${violation.path}（${violation.reason === "missing" ? "缺失" : "被修改"}）`)
+        .join("、");
+      return fail(
+        `派发未受理：版本化文档基线校验失败：${detail}${baselineViolations.length > 3 ? " 等" : ""}；` +
+          "旧版只读，请从版本记录恢复或新建下一版本后重试。",
+        "派发未受理：版本化文档基线校验失败（旧版只读）。",
+      );
+    }
 
     const taskId = newTaskId(new Date(this.now()));
     const createdAt = new Date(this.now());
+    // 2026-10-29（v2.6/R2）：任务模块以**名单模块**为准落盘（模型自报目录仅用于核对，不落盘）。
+    const rosterForModule = chainFacts.roster !== undefined && chainFacts.roster.ok === true ? chainFacts.roster.roster : undefined;
+    const taskModule =
+      requestedModuleId !== undefined && rosterForModule !== undefined
+        ? rosterForModule.modules.find((module) => module.id === requestedModuleId)
+        : undefined;
     // 交付任务固定 stepId=project-handoff（M6/M7 的机械前置依据）；其余任务可带模型声明的 stepId。
     const dispatchStepId =
       fromRoleId === chiefRoleId && convenerRoleId !== null && targetRoleId === convenerRoleId
@@ -5310,6 +5378,7 @@ export class SessionManager {
       from: fromRoleId === convenerRoleId ? "convener" : "chief",
       ...(chainFacts.flowId !== undefined ? { flowId: chainFacts.flowId } : {}),
       ...(dispatchStepId !== undefined ? { stepId: dispatchStepId } : {}),
+      ...(taskModule !== undefined ? { moduleId: taskModule.id, moduleDirectory: taskModule.directory } : {}),
       to: targetRoleId,
       text: task,
       ...(expectedOutput !== undefined ? { expectedOutput } : {}),

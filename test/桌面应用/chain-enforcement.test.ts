@@ -14,6 +14,8 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 
 import { SessionManager } from "../../app/desktop/session.ts";
+import { parseProjectRoster } from "../../src/common/编排/workflow-preconditions.ts";
+import { recordVersionedDocBaselines } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { appendTaskEvent, readTaskState } from "../../src/common/编排/task-state.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
@@ -44,24 +46,56 @@ async function waitUntil(check: () => boolean, timeoutMs = 3000): Promise<void> 
 
 const ROSTER_TEXT = [
   "---",
-  "schema: project-roster/v1",
+  "schema: project-roster/v2",
   "flowId: focus",
   "version: 1",
+  "intent: docs/product/focus-intent-v1.md",
+  "proposal: docs/proposals/focus-proposal-v1.md",
+  "architecture: docs/contracts/focus-architecture-v1.md",
   "roles:",
   "  - id: implementer",
   "    displayName: 实现者",
   "    purpose: 实现番茄钟",
   "    capability: TypeScript",
-  "    directories:",
-  "      - src/",
+  "    modules:",
+  "      - impl-core",
   "  - id: qa",
   "    displayName: 测试",
   "    purpose: 质量核对",
   "    capability: 测试",
-  "    directories:",
-  "      - test/",
+  "    modules:",
+  "      - qa-suite",
+  "modules:",
+  "  - id: impl-core",
+  "    name: 实现",
+  "    purpose: 实现番茄钟",
+  "    directory: src/",
+  "    publicContract: src/index.ts",
+  "    architectureSource: docs/contracts/focus-architecture-v1.md",
+  "  - id: qa-suite",
+  "    name: 测试",
+  "    purpose: 独立测试",
+  "    directory: test/",
+  "    publicContract: test/",
+  "    architectureSource: docs/contracts/focus-architecture-v1.md",
   "---",
   "# 名单",
+  "## 人员+模块拓扑图",
+  "```topology",
+  "modules:",
+  "  - id: impl-core",
+  "    directory: src/",
+  "    roleId: implementer",
+  "  - id: qa-suite",
+  "    directory: test/",
+  "    roleId: qa",
+  "roles:",
+  "  - id: implementer",
+  "    modules: [impl-core]",
+  "  - id: qa",
+  "    modules: [qa-suite]",
+  "management: [convener, implementer, qa]",
+  "```",
 ].join("\n");
 
 async function writeProjectFiles(root: string): Promise<void> {
@@ -70,12 +104,28 @@ async function writeProjectFiles(root: string): Promise<void> {
     await fs.writeFile(path.join(root, rel), text, "utf8");
   };
   await write("docs/product/focus-intent-v1.md", "# 产品意图\n\n目标：番茄钟。\n");
-  await write("docs/proposals/focus-v1.md", "# 提案\n");
+  await write("docs/proposals/focus-proposal-v1.md", "# 提案\n\nintent: docs/product/focus-intent-v1.md\n");
   await write("docs/proposals/focus-roster-v1.md", ROSTER_TEXT);
-  await write("docs/contracts/focus-architecture-v1.md", "# 架构\n");
+  const parsedRoster = parseProjectRoster(ROSTER_TEXT);
+  if (!parsedRoster.ok) throw new Error(`fixture roster invalid: ${parsedRoster.reason}`);
+  await write(
+    "docs/proposals/focus-modules-v1.md",
+    [
+      "---",
+      "schema: project-modules/v1",
+      "flowId: focus",
+      "version: 1",
+      `modules: ${JSON.stringify(parsedRoster.roster.modules)}`,
+      "---",
+      "# 模块清单",
+    ].join("\n"),
+  );
+  await write("docs/contracts/focus-architecture-v1.md", "# 架构\n\nproposal: docs/proposals/focus-proposal-v1.md\n");
   await write("docs/quality/focus-report-v1.md", "# 质检报告\n\n通过。\n");
   await write("角色卡/implementer/role-card.md", "# 角色：实现者\n");
   await write("角色卡/implementer/boundary.yaml", "role: implementer\nentries: []\n");
+  // 测试夹具直接写盘：模拟属主写成功后 guard 的版本登记入口。
+  await recordVersionedDocBaselines({ projectRoot: root, recordedBy: "app:test" });
 }
 
 function listing(root: string): ProjectListing {
@@ -242,6 +292,12 @@ test("M1/M2：幕僚跳步被拒（意图/名单缺失），拒绝在 task.creat
       await fs.writeFile(path.join(root, "docs/proposals/focus-roster-v1.md"), ROSTER_TEXT, "utf8");
       const toNominator = (await dispatch({ roleId: "nominator", task: "按名单招人", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
       assert.equal(toNominator.ok, true, toNominator.message ?? "");
+
+      // R9：已记录版本化文档被外部修改（shell/手动）⇒ 基线校验拒绝派发。
+      await fs.writeFile(path.join(root, "docs/product/focus-intent-v1.md"), "# 外部篡改\n", "utf8");
+      const tampered = (await dispatch({ roleId: "rapporteur", task: "出方案 v2", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
+      assert.equal(tampered.ok, false);
+      assert.match(tampered.message ?? "", /基线|只读|版本化/);
     } finally {
       await h.mgr.stop(null);
     }
@@ -275,22 +331,36 @@ test("M5/M6/M7 + 交付标记：幕僚交付运营需 D3 选中角色卡；运�
       await tick(20);
       const convenerDispatch = h.caps.convener!;
       assert.equal(typeof convenerDispatch, "function");
-      const toWorker = (await convenerDispatch({ roleId: "implementer", task: "实现番茄钟", sideEffect: "code", flowId: "focus" })) as DispatchReceipt;
+      const toWorker = (await convenerDispatch({ roleId: "implementer", task: "实现番茄钟", sideEffect: "code", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
       assert.equal(toWorker.ok, true, toWorker.message ?? "");
       const state2 = await readTaskState(root);
       const workerTask = [...state2.records.values()].find((record) => record.created?.to === "implementer")!.created!;
       assert.equal(workerTask.from, "convener");
       assert.equal(workerTask.flowId, "focus");
+      assert.equal(workerTask.moduleId, "impl-core", "任务模块 id 全链路落盘");
+      assert.equal(workerTask.moduleDirectory, "src/", "任务模块目录以名单为准落盘");
 
-      // 运营 → 质检（验收核对）受理；运营 → 产品（内置非质检）被拒。
-      const toVerifier = (await convenerDispatch({ roleId: "verifier", task: "验收核对", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
+      // R2/R3：目标不拥有任务模块 ⇒ 拒绝（不产生任务行）。
+      const beforeWrongModule = (await readTaskState(root)).records.size;
+      const wrongModule = (await convenerDispatch({
+        roleId: "implementer",
+        task: "实现测试套件",
+        sideEffect: "code",
+        flowId: "focus",
+        moduleId: "qa-suite",
+      })) as DispatchReceipt;
+      assert.equal(wrongModule.ok, false);
+      assert.match(wrongModule.message ?? "", /模块|属主/);
+      assert.equal((await readTaskState(root)).records.size, beforeWrongModule, "模块不归属目标时不创建任务");
+      // 运营 → 质检（验收核对，带模块）受理；运营 → 产品（内置非质检）被拒。
+      const toVerifier = (await convenerDispatch({ roleId: "verifier", task: "验收核对", sideEffect: "read-only", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
       assert.equal(toVerifier.ok, true, toVerifier.message ?? "");
       const toProduct = (await convenerDispatch({ roleId: "product", task: "写意图", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
       assert.equal(toProduct.ok, false);
       assert.match(toProduct.message ?? "", /运营|项目 worker|质检/);
 
       // 名单外目标（qa 未在 D3 选中）被拒。
-      const toQa = (await convenerDispatch({ roleId: "qa", task: "测试", sideEffect: "code", flowId: "focus" })) as DispatchReceipt;
+      const toQa = (await convenerDispatch({ roleId: "qa", task: "测试", sideEffect: "code", flowId: "focus", moduleId: "qa-suite" })) as DispatchReceipt;
       assert.equal(toQa.ok, false);
       assert.match(toQa.message ?? "", /名单|D3/);
     } finally {
@@ -316,7 +386,7 @@ test("M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务
       await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
       await tick(40);
       await settle(h, "chief", "convener");
-      const toWorker = (await h.caps.convener!({ roleId: "implementer", task: "实现番茄钟", sideEffect: "code", flowId: "focus" })) as DispatchReceipt;
+      const toWorker = (await h.caps.convener!({ roleId: "implementer", task: "实现番茄钟", sideEffect: "code", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
       assert.equal(toWorker.ok, true, toWorker.message ?? "");
       await settle(h, "convener");
       const state = await readTaskState(root);

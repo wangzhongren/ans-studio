@@ -211,6 +211,8 @@ test("task.created.from 放宽到 chief/convener；flowId/stepId 可选且须为
       idempotencyKey: "key-convener",
       flowId: "focus",
       stepId: "implement",
+      moduleId: "impl-core",
+      moduleDirectory: "src/",
     }, () => new Date("2026-10-29T00:00:00.000Z"));
     const legacy = created("t-legacy");
     assert.equal((await appendTaskEvent(root, fromConvener)).ok, true);
@@ -220,21 +222,25 @@ test("task.created.from 放宽到 chief/convener；flowId/stepId 可选且须为
     assert.equal(state.records.get("t-convener")?.created?.from, "convener");
     assert.equal(state.records.get("t-convener")?.created?.stepId, "implement");
     assert.equal(state.records.get("t-convener")?.created?.flowId, "focus");
+    assert.equal(state.records.get("t-convener")?.created?.moduleId, "impl-core");
+    assert.equal(state.records.get("t-convener")?.created?.moduleDirectory, "src/");
     assert.equal(state.records.get("t-legacy")?.created?.from, "chief");
 
-    // 非法 from / 非法 stepId → 坏行（跳过但不阻塞其他行）。
+    // 非法 from / 非法 stepId / 非法模块 → 坏行（跳过但不阻塞其他行）。
     await fs.writeFile(
       path.join(root, TASKS_STATE_REL),
       [
         JSON.stringify({ ...fromConvener, taskId: "t-bad-from", from: "worker" }),
         JSON.stringify({ ...fromConvener, taskId: "t-bad-step", stepId: "Bad_Step" }),
+        JSON.stringify({ ...fromConvener, taskId: "t-bad-module", moduleId: "X" }),
+        JSON.stringify({ ...fromConvener, taskId: "t-bad-module-dir", moduleDirectory: "../src/" }),
         JSON.stringify(fromConvener),
       ].join("\n") + "\n",
       "utf8",
     );
     const bad = await readTaskState(root);
     assert.equal(bad.records.size, 1, "只有合法行进入重放");
-    assert.equal(bad.errors.length, 2, JSON.stringify(bad.errors));
+    assert.equal(bad.errors.length, 4, JSON.stringify(bad.errors));
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }

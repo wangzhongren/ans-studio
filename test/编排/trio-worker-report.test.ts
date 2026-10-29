@@ -191,10 +191,11 @@ test("v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/�
   assert.match(chief, /派人事：应用要求名单存在且合法/);
   assert.match(chief, /派运营：应用要求 D3 选中的角色卡已写好/);
 
-  assert.match(governanceRoleOf("product")!.cardText, /docs\/product\/<flowId>-intent-v1\.md/);
-  assert.match(governanceRoleOf("rapporteur")!.cardText, /project-roster\/v1/);
-  assert.match(governanceRoleOf("rapporteur")!.cardText, /<flowId>-roster-v1\.md/);
-  assert.match(governanceRoleOf("rapporteur")!.cardText, /<flowId>-architecture-v1\.md/);
+  assert.match(governanceRoleOf("product")!.cardText, /docs\/product\/<flowId>-intent-vN\.md/);
+  assert.match(governanceRoleOf("rapporteur")!.cardText, /project-roster\/v2/);
+  assert.match(governanceRoleOf("rapporteur")!.cardText, /<flowId>-roster-vN\.md/);
+  assert.match(governanceRoleOf("rapporteur")!.cardText, /<flowId>-architecture-vN\.md/);
+  assert.match(governanceRoleOf("rapporteur")!.cardText, /人员\+模块拓扑图/);
   assert.match(governanceRoleOf("nominator")!.cardText, /cardKind=appointment/);
   assert.match(governanceRoleOf("nominator")!.cardText, /decisionId/);
   assert.match(governanceRoleOf("convener")!.cardText, /D3 选中/);

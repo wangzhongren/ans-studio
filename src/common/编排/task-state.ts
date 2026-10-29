@@ -146,16 +146,19 @@ export interface TaskIdempotencyInput {
   from: string;
   to: string;
   text: string;
+  /** 2026-10-29（v2.6/R2）：模块归属参与去重（同文本派不同模块不得误判为同一任务）。 */
+  moduleId?: string;
+  moduleDirectory?: string;
   /** 显式键优先（空串/非字符串视为未提供）。 */
   idempotencyKey?: string;
 }
 
-/** 幂等键：显式键优先；否则 `sha256(from\0to\0text)` 前 32 位。重派沿用原键。 */
+/** 幂等键：显式键优先；否则 `sha256(from\0to\0moduleId\0moduleDirectory\0text)` 前 32 位。重派沿用原键。 */
 export function taskIdempotencyKey(input: TaskIdempotencyInput): string {
   const explicit = typeof input.idempotencyKey === "string" ? input.idempotencyKey.trim() : "";
   if (explicit !== "") return explicit;
   return createHash("sha256")
-    .update(`${input.from}\u0000${input.to}\u0000${input.text}`)
+    .update(`${input.from}\u0000${input.to}\u0000${input.moduleId ?? ""}\u0000${input.moduleDirectory ?? ""}\u0000${input.text}`)
     .digest("hex")
     .slice(0, 32);
 }
@@ -306,6 +309,25 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
     // 2026-10-29（F3）：可选治理字段——flowId/stepId 给出时必须是合法 slug（缺失 = 旧记录，兼容）。
     if (rec["flowId"] !== undefined && !isTaskSlug(rec["flowId"])) return { ok: false, message: "task.created.flowId 非法" };
     if (rec["stepId"] !== undefined && !isTaskSlug(rec["stepId"])) return { ok: false, message: "task.created.stepId 非法" };
+    // 2026-10-29（v2.6/R2）：模块归属（可选；旧记录兼容）。id 至少 2 字符；目录项目相对、以 / 结尾。
+    if (rec["moduleId"] !== undefined) {
+      if (typeof rec["moduleId"] !== "string" || rec["moduleId"].length < 2 || !isTaskSlug(rec["moduleId"])) {
+        return { ok: false, message: "task.created.moduleId 非法" };
+      }
+    }
+    if (rec["moduleDirectory"] !== undefined) {
+      const dir = rec["moduleDirectory"];
+      const segments = typeof dir === "string" ? dir.replace(/\/$/, "").split("/") : [];
+      if (
+        typeof dir !== "string" ||
+        !dir.endsWith("/") ||
+        dir.startsWith("/") ||
+        /^[a-zA-Z]:\//.test(dir) ||
+        segments.some((segment) => segment === ".." || segment === "." || segment === "")
+      ) {
+        return { ok: false, message: "task.created.moduleDirectory 非法" };
+      }
+    }
     return { ok: true, event: rec as unknown as TaskStateEvent };
   }
   if (kind === "task.reported") {
@@ -464,6 +486,8 @@ export interface TaskCardView {
   text: string;
   expectedOutput?: string;
   requestedEvidence?: string[];
+  moduleId?: string;
+  moduleDirectory?: string;
   sideEffect: TaskSideEffect;
   status: "created" | "delivered" | "reported" | "closed" | "failed";
   createdAt: string;
@@ -483,6 +507,8 @@ export function taskCardOf(record: TaskRecord): TaskCardView | undefined {
     text: record.created.text,
     ...(record.created.expectedOutput !== undefined ? { expectedOutput: record.created.expectedOutput } : {}),
     ...(record.created.requestedEvidence !== undefined ? { requestedEvidence: [...record.created.requestedEvidence] } : {}),
+    ...(record.created.moduleId !== undefined ? { moduleId: record.created.moduleId } : {}),
+    ...(record.created.moduleDirectory !== undefined ? { moduleDirectory: record.created.moduleDirectory } : {}),
     sideEffect: record.created.sideEffect,
     status: taskStatusOf(record),
     createdAt: record.created.at,
@@ -541,6 +567,7 @@ export function renderTaskCardLines(card: TaskCardView): string[] {
     ...(card.requestedEvidence !== undefined && card.requestedEvidence.length > 0
       ? [`可选证据：${card.requestedEvidence.slice(0, 5).join("；")}`]
       : []),
+    ...(card.moduleId !== undefined ? [`模块：${card.moduleId}${card.moduleDirectory !== undefined ? `（${card.moduleDirectory}）` : ""}`] : []),
     `状态：${card.status}｜副作用：${card.sideEffect}｜时间：${card.createdAt}`,
   ];
 }

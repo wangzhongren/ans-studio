@@ -140,7 +140,7 @@ export function buildGovernanceJudgeSystemPrompt(): string {
     "",
     "acceptance（decision，2026-10-29 最小链）：selected 恰为 [\"accept\"]；**不要提前关流程**。",
     "系统已机械核对最小链事实：产品意图文档、最新人员名单（version/hash）、D3 招人裁决、",
-    "质检报告 `docs/quality/<flowId>-report-v1.md`（kind=acceptance-report）与提案 `docs/proposals/<flowId>-v1.md`；",
+    "质检报告 `docs/quality/<flowId>-report-v1.md`（kind=acceptance-report）与提案 `docs/proposals/<flowId>-proposal-v1.md`；",
     "缺失/不一致时系统已直接 manual，你不再重复这些机械核对。",
     "任务/申请上下文也已由系统在调用你之前机械核对（packet.integrity / packet.mechanicalFacts）；",
     "你不重复做工程质量、证据充分性或实现细节审查。只判断：本次验收范围是否与意图 acceptance 及已接受提案一致；",
