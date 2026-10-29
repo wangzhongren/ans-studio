@@ -194,7 +194,10 @@ function parseExplicitWriteTargets(program: string, args: string[]): ExplicitPar
       if (parsed.ambiguousOption !== undefined) {
         return { kind: "ambiguous", reason: `${program} 选项 ${parsed.ambiguousOption} 可能改变写入目标，无法静态确认` };
       }
-      if (parsed.targetDir !== undefined) return { kind: "targets", targets: [parsed.targetDir] };
+      if (parsed.targetDir !== undefined) {
+        // mv -t DIR 会移动**并删除源**：源与目标全部校验（源在项目外/写区外同样 deny）。
+        return { kind: "targets", targets: [parsed.targetDir, ...parsed.positionals] };
+      }
       if (parsed.positionals.length === 0) return { kind: "none" };
       return { kind: "targets", targets: parsed.positionals };
     }
@@ -457,17 +460,32 @@ export function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWri
   const args = argv.slice(1);
 
   if (program !== "") {
-    // 2026-10-29（客户 Q1/Q2 口径修正）：shell 执行脚本/内联代码 ⇒ 内容进入审查（judge 决定）。
+    // 2026-10-29（v2.3 §6.4 / 复验 F1）：re-shell/内联求值仍是硬拒（不进入脚本审查）。
+    const inlineEvalPrograms = new Set(["eval", "exec", "source", "command", "."]);
+    if (inlineEvalPrograms.has(program)) {
+      return { kind: "deny", reason: `内联求值/命令包装（${program}）硬拒：无法按写区校验`, targets: [] };
+    }
+    const awkPrograms = new Set(["awk", "gawk", "mawk", "nawk"]);
+    if (awkPrograms.has(program)) {
+      return { kind: "deny", reason: "awk 可执行 system()/重定向，硬拒", targets: [] };
+    }
     const shellPrograms = new Set(["sh", "bash", "zsh", "dash", "ash", "ksh", "csh", "tcsh", "fish"]);
     if (shellPrograms.has(program)) {
       const hasInline = args.some((arg) => arg === "-c" || arg === "--command");
+      if (hasInline) {
+        return { kind: "deny", reason: `shell 内联求值（${program} -c）硬拒：真命令藏在字符串里，无法按写区校验`, targets: [] };
+      }
       const firstNonOption = args.find((arg) => arg !== "--" && !arg.startsWith("-"));
-      if (hasInline || firstNonOption !== undefined) {
+      if (firstNonOption !== undefined) {
         return {
           kind: "script",
-          reason: "shell 执行脚本/内联代码：脚本内容进入审查（开关开启时由判断 agent 核对，关闭时客户本人确认）。",
+          reason: "shell 执行脚本文件：脚本内容进入审查（开关开启时由判断 agent 核对，关闭时客户本人确认）。",
         };
       }
+    }
+    // find 的 -exec/-execdir/-ok/-okdir 会执行任意命令 ⇒ 硬拒；-delete/-fprint 仅写文件 ⇒ script。
+    if (program === "find" && args.some((arg) => arg === "-exec" || arg === "-execdir" || arg === "-ok" || arg === "-okdir")) {
+      return { kind: "deny", reason: "find -exec/-execdir/-ok 会执行任意命令，硬拒", targets: [] };
     }
     // 2026-10-29（R2）：`node --test <file...>` 运行测试文件 ⇒ 脚本审查（内容随上下文提供）。
     if (program === "node" && args.some((arg) => arg === "--test" || arg === "--test-only")) {

@@ -577,9 +577,9 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
           "只读档：脚本/不透明执行类（无法按写区校验）不在只读白名单内，拒绝执行——这是策略拒绝，不是环境故障。",
         );
       }
-      // 非 advisory 的项目角色链：c=deny 仍是**不可翻案的硬地板**（G3 不变）；只有审批档
-      // （approveDeny）或 advisory 链才把 deny 交客户。
-      if (detail.decision === "deny" && opts.operatorOnly !== true && opts.advisoryRuleset !== true) {
+      // 2026-10-29（复验 F1）：script 分支**必须保留 deny 硬地板**——无论审批档/ advisory，
+      // c=deny（sh -c/eval/exec/source/awk/...）一律终结拒绝，不交客户/判断。
+      if (detail.decision === "deny") {
         return denyOutcome(
           BRANCH_C_DENY,
           byTagged,
@@ -587,7 +587,7 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
         );
       }
       // 宿主显式委托的常规检查（仅精确匹配策略清单）仍可免审批——策略是客户/宿主授权事实。
-      if (detail.decision !== "deny" && matchesDelegatedRoutineCheck(req.argv, req.cwd, opts.routineShellPolicy)) {
+      if (matchesDelegatedRoutineCheck(req.argv, req.cwd, opts.routineShellPolicy)) {
         log.record("shell.routine.delegated", { toolCallId: req.toolCallId, authorizationSource: opts.routineShellPolicy?.authorizationSource });
         return {
           result: { allow: true, by: `${byTagged} → customer-delegated-routine-checks` },

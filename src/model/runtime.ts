@@ -180,8 +180,11 @@ export interface ShellApprovalContext {
   scripts?: ShellApprovalScript[];
   /** npm/yarn/pnpm 运行的脚本名（内容取自 package.json#scripts）。 */
   npmScriptName?: string;
-  /** 无法提供脚本内容时的说明（构建工具/无脚本可读）；judge 据此决定是否 manual。 */
+  /** 无法提供脚本内容时的说明（构建工具/无脚本可读）。 */
   note?: string;
+  /** 2026-10-29（复验 F3）：内容无法识别 ⇒ 开关开启时 fail-closed（不交 judge 代批）；关闭时客户卡。 */
+  failClosed?: boolean;
+  failClosedReason?: string;
 }
 
 export interface ShellReviewRequest {

@@ -1869,3 +1869,38 @@ test("替我审 + 脚本上下文：judge 收到脚本内容并据其裁决；�
   assert.match(displayText, /src\/tool\.mjs/);
   assert.match(displayText, /fs\.rmSync/);
 });
+
+// ————————————————— 2026-10-29（复验 F3）：无法识别内容 ⇒ 开关开启 fail-closed；关闭客户卡 —————————————————
+
+test("approvalContext.failClosed：开关开 ⇒ 不调 judge 直接拒绝；开关关 ⇒ 客户卡", async () => {
+  let judgeCalls = 0;
+  let presented = 0;
+  const prompt = {
+    ...req("make", ["make"]),
+    approvalContext: {
+      failClosed: true,
+      failClosedReason: "make 未找到可读的项目配置文件，无法核对（fail-closed）",
+      note: "无法识别内容",
+    },
+  };
+  const onCh = createDesktopOperatorChannel({
+    presenter: { async present() { presented += 1; return { allow: true }; } },
+    operatorId: "alice",
+    judge: { isEnabled: () => true },
+    emitJudgeResult: () => {},
+  });
+  const on = await onCh(prompt, judgeMetadata({ judge: async () => { judgeCalls += 1; return { verdict: "allow", reason: "x", reasonCode: "necessary" }; } }));
+  assert.equal(on.outcome, "deny", "开关开 + 内容无法识别 ⇒ fail-closed 拒绝");
+  assert.equal(judgeCalls, 0, "不交 judge 代批");
+  assert.equal(presented, 0, "不弹客户卡");
+
+  const offCh = createDesktopOperatorChannel({
+    presenter: { async present() { presented += 1; return { allow: true }; } },
+    operatorId: "bob",
+    judge: { isEnabled: () => false },
+  });
+  const off = await offCh(prompt);
+  assert.equal(off.outcome, "allow", "开关关 ⇒ 客户本人决定");
+  assert.equal(presented, 1);
+  assert.equal(judgeCalls, 0);
+});

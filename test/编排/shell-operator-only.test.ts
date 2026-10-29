@@ -540,6 +540,13 @@ test("P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不�
     ["find", "/outside", "-delete"],
     ["rsync", "-a", "src/a", "/outside/"],
     ["tar", "-xf", "x.tar", "-C", "/outside"],
+    // 复验 F1/F2：re-shell/内联求值/awk/find -exec 硬拒；mv -t 源删除越界 deny。
+    ["bash", "-c", "rm -rf src"],
+    ["sh", "-c", "rm -rf src"],
+    ["eval", "echo ok"],
+    ["awk", "BEGIN{system(\"rm -rf src\")}"],
+    ["find", ".", "-exec", "rm", "{}", ";"],
+    ["mv", "-t", "src/", "/outside/a"],
   ];
   for (const [index, argv] of outside.entries()) {
     const result = await gate({ command: argv.join(" "), argv, cwd: "/proj", toolCallId: `outside-${index}` });

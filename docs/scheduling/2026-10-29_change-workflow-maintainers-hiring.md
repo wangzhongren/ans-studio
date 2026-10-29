@@ -38,17 +38,17 @@
 
 | 文件 | 动作 | tests | 覆盖 |
 | --- | --- | ---: | --- |
-| `test/门禁引擎/shell-write-guard.test.ts` | 新增（返工后 9） | 9 | 显式写目标边界/越界/禁写/逃逸、opaque 与 Q2 例外、cwd 防御、TaskScope 经 checkWrite 收窄；**P6 十种绕过形态全部 opaque**、plain 形态不误伤 |
+| `test/门禁引擎/shell-write-guard.test.ts` | 新增（返工后 9，含 F1/F2 形态） | 9 | 显式写目标边界/越界/禁写/逃逸、opaque 与 Q2 例外、cwd 防御、TaskScope 经 checkWrite 收窄；**P6 十种绕过形态全部 opaque**、plain 形态不误伤 |
 | `test/编排/workflow-preconditions.test.ts` | 新增 | 7 | 名单解析正/负例、最新名单 version/hash、D3 卡形状/推荐集、M1–M8 矩阵、M9 路由 |
 | `test/编排/shell-post-audit.test.ts` | 新增（返工后 5） | 5 | 快照 diff、越界判定、审计记录、真实文件系统排除项；**`.ans/` 与项目根之外（extraRoots/`..`/绝对路径）越界检测** |
 | `test/编排/appointment-roster.test.ts` | 新增 | 4 | 人事发卡/推荐集、选项≠名单拒绝、convener 发卡拒绝、boundary 目录 ⊆ 名单目录 |
 | `test/编排/acceptance-judge-minimal.test.ts` | 新增 | 3 | 验收最小链事实通过/缺项 manual/物证缺失 |
 | `test/编排/shell-operator-only.test.ts` | 更新（+2，返工 +1） | 15 | opaque → 审批（含脚本上下文，不强制客户本人）、上下文不可用 fail-closed、写目标 deny 直拒；**P6 真实守卫 × 审批档集成（越界 deny / 不可解析交判断）** |
-| `test/编排/shell-approval-context.test.ts` | 新增（R2 后 8） | 8 | 脚本/内联/npm run/test/install/构建配置内容与 sha256；深度 ≤2 引用展开；64KB/2000 行/3 文件/128KB bounds fail-closed；注入防护与 judge 提示词 |
+| `test/编排/shell-approval-context.test.ts` | 新增（R2 后 9） | 9 | 脚本/内联/npm run/test/install/构建配置内容与 sha256；深度 ≤2 引用展开；64KB/2000 行/3 文件/128KB bounds fail-closed；注入防护与 judge 提示词 |
 | `test/编排/task-state.test.ts` | 更新（+2） | 9 | from/closed 放宽、stepId/flowId、roster 字段校验、旧记录兼容 |
 | `test/编排/trio-worker-report.test.ts` | 更新（+1） | 4 | v4.1 卡文本（五步链/名单/D3/验收发起方）、convener dispatch 能力 |
 | `test/桌面应用/chain-enforcement.test.ts` | 新增（返工后 6） | 6 | 跳步拒绝（M1/M2/M8）且拒绝在 task.created 之前、交付/运营作用域（M5–M7）、报告路由（M9，含**质检回报发起方**）、M11 名单版本（含 flowId-only） |
-| `test/桌面应用/operator-channel.test.ts` | 更新（+2） | — | judge 收到脚本内容并据其裁决（deny/allow）；开关关 → 客户卡展示内容；manualOnly 兼容能力 |
+| `test/桌面应用/operator-channel.test.ts` | 更新（+3） | 56 | judge 收到脚本内容并据其裁决（deny/allow）；开关关 → 客户卡展示内容；manualOnly 兼容能力 |
 | `test/runtime-core/customer-input-context.test.ts` | 更新（+1） | 3 | request_choice 回执 decisionId |
 | 既有更新 | — | — | `chief-workflow`（convener dispatch v4.1）、`star-routing`（M8/M5/M6）、`entry-role-minimal-d`、`i-full-chain` |
 
@@ -69,7 +69,7 @@ eport.txt`（返工后重跑）；`session:role-states` 未注册错误 0。
 - 经渲染器真实入口 `loadProject('C:/Users/51054/Desktop/work/trial-focus-timer')` **只读**导入：六角色枚举（chief/product/rapporteur/nominator/convener/verifier）、`primaryRoleId=chief`、`governanceModel=trio`；未打开会话、未向 trial 项目写入。
 - 截图 `%TEMP%ns-regress-1029 8-hiring-smoke.png`；启动日志 `%TEMP%ns-regress-1029pp-hiring-smoke.log` 无 error/failed/exception。应用保持运行（CDP 9235）。**真机回归约定**：一律使用 Pi 运行时（项目已配置 `ANS_PI_*`/`ANTHROPIC_AUTH_TOKEN`）；UI 默认 Claude 运行时需要 `ANTHROPIC_API_KEY`，本批不配置、不使用 Claude 做真机回归。
 
-**返工后冒烟（R3/F4）**：停止旧进程 → 新代码后台启动（CDP 9235）→ 两开关持久值仍为开 → `loadProject('trial-focus-timer')` 只读导入并 `selectRuntime('pi')`（六角色/primary=chief/trio）→ 截图 `%TEMP%ns-regress-1029 9-hiring-rework-smoke.png`；启动日志 `%TEMP%ns-regress-1029pp-hiring-rework.log` 无 error/failed/exception（未出现 Claude/ANTHROPIC_API_KEY 缺失）。**trial 项目 SHA-256 前后清单**：`trial-manifest-pre.txt` 与 `trial-manifest-post.txt` 均 28 文件、sha256 同为 `5af6cd98…`，`diff` 为空（TRIAL_UNCHANGED）——冒烟未改 trial 任何文件。
+**返工 v2 后冒烟（F1–F5）**：停止旧进程 → 最终代码后台启动（CDP 9235）→ 两开关持久值仍为开 → `loadProject('trial-focus-timer')` 只读导入并 `selectRuntime('pi')`（六角色/primary=chief/trio）→ 截图 `%TEMP%ns-regress-1029-hiring-rework2-smoke.png`；启动日志 `%TEMP%ns-regress-1029pp-hiring-rework3.log` 无 error/failed/exception（未出现 Claude/ANTHROPIC_API_KEY 缺失）。**trial 项目 SHA-256 前后清单**：`trial-manifest-pre.txt` 与 `trial-manifest-post2.txt` 均 28 文件、sha256 同为 `5af6cd98…`，`diff` 为空（TRIAL_UNCHANGED）——冒烟未改 trial 任何文件。
 
 ## 4.1 回滚前置（F3 返工）
 
@@ -80,18 +80,14 @@ eport.txt`（返工后重跑）；`session:role-states` 未注册错误 0。
    // node 迁移脚本（示意；先备份 tasks.jsonl）
    const fs = require("node:fs");
    const file = ".ans/state/tasks.jsonl";
-   const out = fs.readFileSync(file, "utf8").split(/
-?
-/).filter(Boolean).map((line) => {
+   const out = fs.readFileSync(file, "utf8").split(/\r?\n/).filter(Boolean).map((line) => {
      const e = JSON.parse(line);
      if (e.kind === "task.created" && e.from === "convener") { e.legacyFrom = "convener"; e.from = "chief"; }
      if (e.kind === "task.closed" && e.by === "convener") { e.legacyBy = "convener"; e.by = "chief"; }
      // 旧读取器忽略未知字段；若目标旧版本严格拒绝未知字段，再删除 stepId/rosterVersion/rosterSha256 并留档。
      return JSON.stringify(e);
    });
-   fs.writeFileSync(file, out.join("
-") + "
-");
+   fs.writeFileSync(file, out.join("\n") + "\n");
    ```
 本批新读取器保持对旧记录的兼容（`from:"chief"`、`closed.by:"chief"`、无新字段），并有混合新旧记录测试。
 

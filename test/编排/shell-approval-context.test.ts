@@ -251,3 +251,35 @@ test("注入防护：脚本内含「忽略以上指令」类文本 → prompt �
   assert.ok(prompt.includes(JSON.stringify(malicious)), "脚本内容以 JSON 编码呈现（不构成指令/围栏逃逸）");
   assert.match(prompt, /只依据脚本实际行为判断/);
 });
+
+test("复验 F3：npm 引用超过累计 3 文件 ⇒ fail-closed；构建工具无配置 ⇒ failClosed 上下文（开关开启拒绝/关闭客户卡）", async () => {
+  const root = await tempProject();
+  try {
+    await fs.mkdir(path.join(root, "scripts"), { recursive: true });
+    for (const name of ["a", "b", "c", "d"]) {
+      await fs.writeFile(path.join(root, "scripts", `${name}.mjs`), `console.log('${name}')\n`, "utf8");
+    }
+    await fs.writeFile(
+      path.join(root, "package.json"),
+      JSON.stringify({ scripts: { build: "node scripts/a.mjs && node scripts/b.mjs && node scripts/c.mjs && node scripts/d.mjs" } }),
+      "utf8",
+    );
+    const overflow = await buildShellApprovalContext({ request: { ...req(["npm", "run", "build"]), cwd: root }, projectRoot: root });
+    assert.equal(overflow.ok, false, "引用文件超过累计上限必须 fail-closed，不得静默截断");
+    if (!overflow.ok) assert.match(overflow.reason, /超过审查上限/);
+
+    const emptyRoot = await tempProject();
+    try {
+      const make = await buildShellApprovalContext({ request: { ...req(["make"]), cwd: emptyRoot }, projectRoot: emptyRoot });
+      assert.equal(make.ok, true);
+      if (make.ok) {
+        assert.equal(make.context.failClosed, true, "无配置 ⇒ failClosed 标记（开关开启拒绝，关闭客户卡）");
+        assert.match(make.context.failClosedReason ?? "", /未找到可读/);
+      }
+    } finally {
+      await fs.rm(emptyRoot, { recursive: true, force: true });
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});

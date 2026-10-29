@@ -522,6 +522,8 @@ function defaultHardDeny(): ShellHardDenyRule[] {
     { id: "deno-eval", programs: ["deno"], onlyWithSubcommand: ["eval"] },
     // ── A-1 awk 程序可 system()/重定向 ⇒ 等价任意代码（代价：普通文本处理也走 review 以上的硬拒）──
     { id: "awk-exec", programs: ["awk", "gawk", "mawk", "nawk"] },
+    // ── 2026-10-29（v2.3 / 复验 F1）：find -exec/-execdir/-ok/-okdir 执行任意命令 ⇒ 硬拒 ──
+    { id: "find-exec", programs: ["find"], onlyWithFlag: ["-exec", "-execdir", "-ok", "-okdir"] },
     // ── A-2 提权：受治理会话里无正当用途 ──
     { id: "privilege", programs: ["sudo", "doas", "su", "runas", "pkexec"] },
     // ── A-2 系统级破坏/控制：无正当用途 ──

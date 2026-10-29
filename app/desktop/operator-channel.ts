@@ -467,7 +467,17 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
       judgeEnabled = false; // 开关读取异常 ⇒ 视作关闭（绝不擅自开启判断）。
     }
     const judgeFn = metadata?.judge;
-    // 2026-10-29（方案 v2.1 §6.4，Q1 A）：不透明执行类强制客户本人——「替我审批」不得代批。
+    // 2026-10-29（复验 F3）：内容无法识别（如构建工具无项目配置）⇒ 开关开启时 fail-closed 拒绝
+    // （不交 judge 代批）；开关关闭时客户卡。脚本不可读/超限的项目外路径已由 gate 直接 fail-closed。
+    if (prompt.approvalContext?.failClosed === true) {
+      if (!judgeEnabled) return presentConfirmed(describeShellCommand(prompt));
+      return {
+        outcome: "deny",
+        ...(metadata !== undefined ? { operatorId: `judge:${metadata.runtime}` as `judge:${string}` } : {}),
+        reason: prompt.approvalContext.failClosedReason ?? "脚本/配置内容无法识别，按 fail-closed 拒绝。",
+      };
+    }
+    // 兼容旧口径：manualOnly 字段仍按客户本人（守卫已不再设置）。
     if (prompt.manualOnly === true) {
       return presentConfirmed(describeShellCommand(prompt));
     }

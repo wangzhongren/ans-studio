@@ -646,3 +646,20 @@ test("classifyShellDetailed 给出原因与命中规则 id（审计可用）", (
   assert.equal(classifyShellDetailed(["frobnicate"], rules).ruleId, "review");
   assert.match(classifyShellDetailed(["ls"] as never, undefined as never).ruleId, /rules-invalid/);
 });
+
+// ————————————————— 2026-10-29（v2.3 / 复验 F1）：shell 脚本文件放行到脚本审查，内联求值仍硬拒 —————————————————
+
+test("bash/sh <script> 不再是硬拒（进入脚本审查）；-c/eval/exec/source/awk/find -exec 仍 deny", () => {
+  // 脚本文件形态：不进门禁白名单，但**不是** reshell 硬拒 → review（交审批/脚本审查）。
+  assert.equal(classifyShell(["bash", "deploy.sh"], rules), "review");
+  assert.equal(classifyShell(["sh", "scripts/run.sh"], rules), "review");
+  assert.equal(classifyShell(["bash", "--version"], rules), "review");
+  // 内联求值/命令包装/awk/find -exec：硬拒不变。
+  assert.equal(classifyShell(["bash", "-c", "rm -rf src"], rules), "deny");
+  assert.equal(classifyShell(["sh", "-c", "rm -rf src"], rules), "deny");
+  assert.equal(classifyShell(["eval", "echo ok"], rules), "deny");
+  assert.equal(classifyShell(["exec", "rm", "-rf", "src"], rules), "deny");
+  assert.equal(classifyShell(["source", "run.sh"], rules), "deny");
+  assert.equal(classifyShell(["awk", "BEGIN{system(\"rm -rf src\")}"], rules), "deny");
+  assert.equal(classifyShell(["find", ".", "-exec", "rm", "{}", ";"], rules), "deny");
+});

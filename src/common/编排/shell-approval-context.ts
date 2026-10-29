@@ -362,12 +362,20 @@ export async function buildShellApprovalContext(
     // 但直达脚本本身不可读/超限已在上面 fail-closed。
     const seenRefs = new Set<string>();
     const queue: Array<{ text: string; depth: number }> = [{ text: scriptText, depth: 1 }];
-    while (queue.length > 0 && scripts.length < SHELL_CONTEXT_MAX_FILES) {
+    while (queue.length > 0) {
       const item = queue.shift()!;
       for (const referenced of extractReferencedPaths(item.text)) {
-        if (scripts.length >= SHELL_CONTEXT_MAX_FILES) break;
         if (seenRefs.has(referenced)) continue;
         seenRefs.add(referenced);
+        // 只有“存在且可读”的引用才占文件额度；一旦超出累计文件上限 ⇒ fail-closed（不静默截断）。
+        try {
+          await statFn(path.resolve(cwd, referenced));
+        } catch {
+          continue;
+        }
+        if (scripts.length >= SHELL_CONTEXT_MAX_FILES) {
+          return fail(`npm 脚本引用的项目内文件超过审查上限（${SHELL_CONTEXT_MAX_FILES} 个），按 fail-closed 拒绝`);
+        }
         const rejected = await addFile(referenced, `npm 脚本引用文件：${referenced}`, false);
         if (rejected !== undefined) return rejected;
         if (item.depth < 2) {
@@ -406,14 +414,23 @@ export async function buildShellApprovalContext(
       if (scripts.length >= SHELL_CONTEXT_MAX_FILES) break;
       await addFile(candidate, `${program} 配置/脚本：${candidate}`, false);
     }
+    if (scripts.length === 0) {
+      // 复验 F3：构建工具无法识别内容 ⇒ 开关开启时 fail-closed（不交 judge 代批）；关闭时客户卡。
+      return {
+        ok: true,
+        context: {
+          failClosed: true,
+          failClosedReason: `${program} 未找到可读的项目脚本/配置文件，无法核对写区与破坏性（fail-closed）`,
+          note: `${program} 未找到可读的项目配置文件；按 fail-closed 处理（开关开启时拒绝，关闭时客户确认）。`,
+        },
+      };
+    }
     return {
       ok: true,
       context: {
-        ...(scripts.length > 0 ? { scripts, scriptPaths } : {}),
-        note:
-          scripts.length > 0
-            ? `${program} 的项目配置/脚本内容已随上下文提供（有界）；请核对是否会越出角色写区/破坏性。`
-            : `${program} 未找到可读的项目配置文件；请按命令行与只读工具判断（无法证明安全时 manual）。`,
+        scripts,
+        scriptPaths,
+        note: `${program} 的项目配置/脚本内容已随上下文提供（有界）；请核对是否会越出角色写区/破坏性。`,
       },
     };
   }

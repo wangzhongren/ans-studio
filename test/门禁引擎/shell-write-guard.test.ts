@@ -97,7 +97,6 @@ test("脚本审查（v2.3/R2）：解释器脚本/npm run/node --test/npm test/i
     ["cargo", "build"],
     ["go", "build"],
     ["bash", "src/job.sh"],
-    ["sh", "-c", "rm -rf src"],
   ]) {
     const result = guard(argv);
     assert.equal(result.decision.kind, "script", `${argv.join(" ")} 应判 script（进入脚本审查）`);
@@ -118,6 +117,9 @@ test("mv/rename 源删除：源越界/目标越界都 deny；源与目标均在�
     assert.equal(guard(argv).decision.kind, "deny", `${argv.join(" ")}（源删除/目标写入）越界 ⇒ deny`);
   }
   assert.equal(guard(["mv", "src/a.ts", "src/b.ts"]).decision.kind, "pass");
+  assert.equal(guard(["mv", "-t", "src/", "src/a.ts"]).decision.kind, "pass");
+  assert.equal(guard(["mv", "-t", "src/", "/outside/a"]).decision.kind, "deny", "mv -t 的源在项目外被删除 ⇒ deny");
+  assert.equal(guard(["rename", "-t", "src/", "other/a"]).decision.kind, "deny", "mv -t 源在写区外 ⇒ deny");
   // `cp --target-directory <dir>` 空格形式：写区内 pass；项目外 deny。
   assert.equal(guard(["cp", "--target-directory", "src/", "a.ts"]).decision.kind, "pass");
   assert.equal(guard(["cp", "--target-directory", "/outside/", "a.ts"]).decision.kind, "deny");
@@ -158,6 +160,16 @@ test("P6 返工（客户 Q1/Q2 口径修正）：静态可证明越界 ⇒ deny�
     ["sort", "-o", "/outside/out", "src/in"],
     ["dd", "of=/outside/x", "if=src/a"],
     ["rm", "/outside/x"],
+    // 复验 F1：re-shell/内联求值/awk/find -exec 仍硬拒。
+    ["bash", "-c", "rm -rf src"],
+    ["sh", "-c", "rm -rf src"],
+    ["eval", "echo ok"],
+    ["exec", "rm", "-rf", "src"],
+    ["source", "src/job.sh"],
+    ["awk", "BEGIN{system(\"rm -rf src\")}"],
+    ["find", ".", "-exec", "rm", "{}", ";"],
+    // 复验 F2：mv -t 的源删除同样校验。
+    ["mv", "-t", "src/", "/outside/a"],
   ];
   for (const argv of provableOutside) {
     const result = guard(argv);
@@ -169,7 +181,7 @@ test("P6 返工（客户 Q1/Q2 口径修正）：静态可证明越界 ⇒ deny�
     ["cp", "src/a.ts", "src/b.ts"],
     ["cp", "-t", "src/", "a.ts"],
     ["cp", "--target-directory=src/", "a.ts"],
-    ["mv", "-t", "src/", "a.ts"],
+    ["mv", "-t", "src/", "src/a.ts"],
     ["ln", "-t", "src/", "a.ts"],
     ["install", "-t", "src/", "a.ts"],
     ["rm", "src/tmp"],
@@ -181,7 +193,6 @@ test("P6 返工（客户 Q1/Q2 口径修正）：静态可证明越界 ⇒ deny�
   // 3) 写目标无法静态解析 ⇒ script（开关开 → judge 审查脚本/上下文；关 → 客户卡）。
   for (const argv of [
     ["find", "src", "-delete"],
-    ["find", ".", "-exec", "rm", "{}", ";"],
     ["xargs", "rm", "-rf"],
     ["git", "clean", "-fdx"],
     ["git", "checkout", "--", "."],
@@ -197,8 +208,11 @@ test("P6 返工（客户 Q1/Q2 口径修正）：静态可证明越界 ⇒ deny�
   }
 
   // 4) shell 脚本/内联代码 ⇒ script（内容进入审查）；版本查询等只读形态不受影响。
-  for (const argv of [["bash", "src/job.sh"], ["sh", "-c", "rm -rf src"], ["zsh", "tool.zsh"]]) {
-    assert.equal(guard(argv).decision.kind, "script", `${argv.join(" ")} shell 脚本/内联 ⇒ script`);
+  for (const argv of [["bash", "src/job.sh"], ["zsh", "tool.zsh"]]) {
+    assert.equal(guard(argv).decision.kind, "script", `${argv.join(" ")} shell 脚本 ⇒ script`);
+  }
+  for (const argv of [["sh", "-c", "rm -rf src"], ["bash", "-c", "x"]]) {
+    assert.equal(guard(argv).decision.kind, "deny", `${argv.join(" ")} shell 内联 ⇒ deny`);
   }
   assert.equal(guard(["bash", "--version"]).decision.kind, "pass");
 
