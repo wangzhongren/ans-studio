@@ -115,11 +115,13 @@ export interface ProjectRoster {
   intent: string;
   proposal: string;
   architecture: string;
+  /** v2.21：模块清单版本化引用（可选；缺省时按最新 modules 文档自动发现）。 */
+  modulesDoc?: string;
   /** 模块清单（1–12 项；派生快照，权威源为 `<flowId>-modules-vN.md`）。 */
   modules: ProjectRosterModule[];
   roles: ProjectRosterRole[];
-  /** 小项目省略 env-bootstrap 时的书面理由（正常含 env-bootstrap 时缺省）。 */
-  envBootstrapOmittedReason?: string;
+  /** v2.20：env-bootstrap 状态对象（{omitted, omissionReason}）；旧扁平字段读时归一化。 */
+  envBootstrap?: { omitted: boolean; omissionReason?: string };
 }
 
 /** 模块清单文档（唯一权威源）。 */
@@ -243,7 +245,7 @@ function modulePathsOverlap(a: string, b: string): boolean {
 function parseVersionedRef(
   raw: unknown,
   flowId: string,
-  kind: "intent" | "proposal" | "architecture",
+  kind: "intent" | "proposal" | "modules" | "architecture",
 ): { ok: true; path: string; version: number } | { ok: false; reason: string } {
   if (typeof raw !== "string" || raw.trim() === "") {
     return { ok: false, reason: `缺 ${kind} 版本化引用（docs/.../<flowId>-${kind}-vN.md）。` };
@@ -254,7 +256,9 @@ function parseVersionedRef(
       ? new RegExp(`^docs/product/${escaped}-intent-v(\\d+)\\.md$`)
       : kind === "proposal"
         ? new RegExp(`^docs/proposals/${escaped}-proposal-v(\\d+)\\.md$`)
-        : new RegExp(`^docs/contracts/${escaped}-architecture-v(\\d+)\\.md$`);
+        : kind === "modules"
+          ? new RegExp(`^docs/proposals/${escaped}-modules-v(\\d+)\\.md$`)
+          : new RegExp(`^docs/contracts/${escaped}-architecture-v(\\d+)\\.md$`);
   const match = pattern.exec(raw.trim().replace(/\\/g, "/"));
   if (match === null) {
     return { ok: false, reason: `${kind} 引用必须为版本化路径 docs/.../<flowId>-${kind}-vN.md：${raw}` };
@@ -316,7 +320,7 @@ function validateRosterTopology(
     return {
       ok: false,
       code: "roster-topology-mismatch",
-      reason: `拓扑图 schema 必须恰为 ${PROJECT_TOPOLOGY_SCHEMA}；旧版请按 v2 重出拓扑图（不静默归一化）。`,
+      reason: `拓扑图 schema 必须恰为 ${PROJECT_TOPOLOGY_SCHEMA}；旧 v1 请按 v2 重出拓扑图（schema: project-topology/v2；modules[].path 或 paths[] + category，management.roles 含 convener 与全部项目角色），不做静默归一化。`,
     };
   }
   if (!Array.isArray(doc.modules) || !Array.isArray(doc.roles)) {
@@ -433,7 +437,7 @@ export function rosterTopologyText(roster: ProjectRoster): string {
  */
 export function parseProjectRoster(text: string, expectedFlowId?: string): RosterParseResult {
   if (typeof text !== "string") return rosterError("roster-frontmatter-missing", "名单内容不是文本。");
-  const normalized = text.replace(/^﻿/, "");
+  const normalized = text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
   if (!normalized.startsWith("---\n")) {
     return rosterError("roster-frontmatter-missing", "名单缺少 YAML frontmatter（文件必须以 `---` 开始）。");
   }
@@ -453,7 +457,7 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
   }
   const record = parsed as Record<string, unknown>;
   if (record.schema !== PROJECT_ROSTER_SCHEMA) {
-    return rosterError("roster-schema-invalid", `名单 schema 必须恰为 ${PROJECT_ROSTER_SCHEMA}。`);
+    return rosterError("roster-schema-invalid", `名单 schema 必须恰为 ${PROJECT_ROSTER_SCHEMA}；旧 v1/v2 请按 v3 重出名单（modules[].path/paths + 必填 category + envBootstrap 对象），不做静默归一化。`);
   }
   const flowId = typeof record.flowId === "string" ? record.flowId.trim() : "";
   if (flowId === "") return rosterError("roster-schema-invalid", "名单缺少 flowId。");
@@ -471,6 +475,8 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
   if (!proposalRef.ok) return rosterError("roster-reference-invalid", proposalRef.reason);
   const architectureRef = parseVersionedRef(record.architecture, flowId, "architecture");
   if (!architectureRef.ok) return rosterError("roster-reference-invalid", architectureRef.reason);
+  const modulesRef = record.modulesDoc === undefined ? undefined : parseVersionedRef(record.modulesDoc, flowId, "modules");
+  if (modulesRef !== undefined && !modulesRef.ok) return rosterError("roster-reference-invalid", modulesRef.reason);
   if (!Array.isArray(record.roles) || record.roles.length < 1 || record.roles.length > 12) {
     return rosterError("roster-roles-invalid", "名单 roles 必须是 1–12 项的数组。");
   }
@@ -572,8 +578,8 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
       : module.path !== undefined
         ? [module.path]
         : [];
-    if (rawPaths.length < 1 || rawPaths.length > 8) {
-      return rosterError("roster-module-directory-invalid", `模块「${name}」paths 必须是 1–8 项。`);
+    if (rawPaths.length < 1 || rawPaths.length > 20) {
+      return rosterError("roster-module-directory-invalid", `模块「${name}」paths 必须是 1–20 项。`);
     }
     const paths: string[] = [];
     for (const rawPath of rawPaths) {
@@ -637,13 +643,43 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
   }
   // 2026-10-29（客户采纳）：标准固定角色 env-bootstrap——默认必带，固定两个模块（环境装配/项目入口）；
   // 环境/入口类路径只能归它，误归属拒绝；小项目省略须有书面理由（预检检查）。
-  const envBootstrapReason =
-    typeof record.envBootstrapOmittedReason === "string" ? record.envBootstrapOmittedReason.trim() : undefined;
+  let envBootstrap: { omitted: boolean; omissionReason?: string } | undefined;
+  if (record.envBootstrap !== undefined) {
+    const raw = record.envBootstrap;
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw) || typeof (raw as { omitted?: unknown }).omitted !== "boolean") {
+      return rosterError("roster-schema-invalid", "envBootstrap 必须是对象且含 boolean omitted。");
+    }
+    const reason = typeof (raw as { omissionReason?: unknown }).omissionReason === "string"
+      ? (raw as { omissionReason: string }).omissionReason.trim()
+      : undefined;
+    envBootstrap = { omitted: (raw as { omitted: boolean }).omitted, ...(reason !== undefined && reason !== "" ? { omissionReason: reason } : {}) };
+  } else if (typeof record.envBootstrapOmittedReason === "string" && record.envBootstrapOmittedReason.trim() !== "") {
+    // 读时归一化旧扁平字段。
+    envBootstrap = { omitted: true, omissionReason: record.envBootstrapOmittedReason.trim() };
+  }
+  const envBootstrapOmitted = envBootstrap?.omitted === true;
   const envBootstrapRole = roles.find((role) => role.id === ENV_BOOTSTRAP_ROLE_ID);
+  if (envBootstrapOmitted) {
+    if (envBootstrap?.omissionReason === undefined || envBootstrap.omissionReason === "") {
+      return rosterError("roster-env-bootstrap-invalid", "envBootstrap.omitted=true 时必须提供非空 omissionReason（书面省略理由）。");
+    }
+    if (envBootstrapRole !== undefined) {
+      return rosterError("roster-env-bootstrap-invalid", `envBootstrap.omitted=true 时名单不得包含 ${ENV_BOOTSTRAP_ROLE_ID} 角色。`);
+    }
+    if (modules.some((module) => module.category === "env" || module.category === "entry")) {
+      return rosterError("roster-env-bootstrap-invalid", "envBootstrap.omitted=true 时名单不得包含 category=env/entry 模块。");
+    }
+  }
   if (envBootstrapRole !== undefined) {
     const owned = modules.filter((module) => envBootstrapRole.modules.includes(module.id));
-    if (owned.length !== 2) {
-      return rosterError("roster-env-bootstrap-invalid", `角色 ${ENV_BOOTSTRAP_ROLE_ID} 必须固定名下 2 个模块（装配/资源 + 入口/索引），实际 ${owned.length} 个。`);
+    const ownedIds = owned.map((module) => module.id).sort();
+    if (JSON.stringify(ownedIds) !== JSON.stringify(["entry-index", "env-resources"])) {
+      return rosterError("roster-env-bootstrap-invalid", `角色 ${ENV_BOOTSTRAP_ROLE_ID} 名下模块必须恰为 env-resources / entry-index，实际 ${ownedIds.join("、") || "无"}。`);
+    }
+    const envResources = owned.find((module) => module.id === "env-resources");
+    const entryIndex = owned.find((module) => module.id === "entry-index");
+    if (envResources?.category !== "env" || entryIndex?.category !== "entry") {
+      return rosterError("roster-env-bootstrap-invalid", `角色 ${ENV_BOOTSTRAP_ROLE_ID} 的固定模块必须为 env-resources（category=env）与 entry-index（category=entry）。`);
     }
     const hasCategory = owned.some((module) => module.category !== undefined);
     const hasEnv = owned.some((module) => module.category === "env") || (!hasCategory && owned.some((module) => isEnvBootstrapModulePath(module.path)));
@@ -674,9 +710,10 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
       intent: intentRef.path,
       proposal: proposalRef.path,
       architecture: architectureRef.path,
+      ...(modulesRef !== undefined && modulesRef.ok ? { modulesDoc: modulesRef.path } : {}),
       modules,
       roles,
-      ...(envBootstrapReason !== undefined && envBootstrapReason !== "" ? { envBootstrapOmittedReason: envBootstrapReason } : {}),
+      ...(envBootstrap !== undefined ? { envBootstrap } : {}),
     },
   };
 }
@@ -704,7 +741,7 @@ export function parseProjectModules(
   }
   const record = parsed as Record<string, unknown>;
   if (record.schema !== PROJECT_MODULES_SCHEMA) {
-    return { ok: false, code: "modules-doc-schema", reason: `模块清单 schema 必须恰为 ${PROJECT_MODULES_SCHEMA}。` };
+    return { ok: false, code: "modules-doc-schema", reason: `模块清单 schema 必须恰为 ${PROJECT_MODULES_SCHEMA}；旧 v1 请按 v2 重出模块清单（category/path 或 paths[]），不做静默归一化。` };
   }
   const flowId = typeof record.flowId === "string" ? record.flowId.trim() : "";
   if (flowId === "") return { ok: false, code: "modules-doc-schema", reason: "模块清单缺 flowId。" };
@@ -761,8 +798,8 @@ export function parseProjectModules(
       : module.path !== undefined
         ? [module.path]
         : [];
-    if (rawPaths.length < 1 || rawPaths.length > 8) {
-      return { ok: false, code: "modules-doc-directory", reason: `模块 ${id} paths 必须是 1–8 项。` };
+    if (rawPaths.length < 1 || rawPaths.length > 20) {
+      return { ok: false, code: "modules-doc-directory", reason: `模块 ${id} paths 必须是 1–20 项。` };
     }
     const paths: string[] = [];
     for (const rawPath of rawPaths) {
@@ -912,6 +949,16 @@ export async function loadLatestRoster(
       reason: `未找到权威模块清单 docs/proposals/${input.flowId}-modules-vN.md；请先让策划出模块清单，再重出 roster。`,
     };
   }
+  if (parsed.roster.modulesDoc !== undefined) {
+    const latestModulesPath = `docs/proposals/${latestModules.file}`;
+    if (parsed.roster.modulesDoc !== latestModulesPath) {
+      return {
+        ok: false,
+        code: "roster-reference-stale",
+        reason: `名单 modulesDoc=${parsed.roster.modulesDoc} 未指向最新模块清单 ${latestModulesPath}；请按最新版本重出 roster。`,
+      };
+    }
+  }
   let modulesText: string;
   try {
     modulesText = await readFileFn(path.join(input.projectRoot, "docs", "proposals", latestModules.file), "utf8");
@@ -990,7 +1037,7 @@ export async function loadLatestRoster(
     return {
       ok: false,
       code: "roster-reference-invalid",
-      reason: `提案文档 schema 必须恰为 ${PROJECT_PROPOSAL_SCHEMA}；旧版请按 v2 重出提案（不静默归一化）。`,
+      reason: `提案文档 schema 必须恰为 ${PROJECT_PROPOSAL_SCHEMA}；旧 v1 请按 v2 重出提案（schema: project-proposal/v2；模块表带 category/path 或 paths[]），不做静默归一化。`,
     };
   }
   if (!proposalText.includes(parsed.roster.intent)) {
@@ -1036,6 +1083,8 @@ export function validateAppointmentCardAgainstRoster(input: {
   roster: ProjectRoster;
   optionIds: readonly string[];
   multiple: boolean;
+  /** 可选：D3 实际选中项（judge/客户勾选）；未省略 env-bootstrap 时必须包含它。 */
+  selectedRoleIds?: readonly string[];
 }): { ok: true; recommendedRoleIds: string[] } | { ok: false; reason: string } {
   if (input.multiple !== true) return { ok: false, reason: "招人决定卡必须是多选（multiple=true）。" };
   const rosterIds = rosterRoleIds(input.roster);
@@ -1055,6 +1104,25 @@ export function validateAppointmentCardAgainstRoster(input: {
         `招人决定卡选项必须与最新名单角色完全一致（缺：${missing.join("、") || "无"}；` +
         `多：${extra.join("、") || "无"}）。`,
     };
+  }
+  const envBootstrapOmitted = input.roster.envBootstrap?.omitted === true;
+  const hasEnvBootstrap = rosterIds.includes(ENV_BOOTSTRAP_ROLE_ID);
+  if (!envBootstrapOmitted && !hasEnvBootstrap) {
+    return {
+      ok: false,
+      reason: `名单未省略 ${ENV_BOOTSTRAP_ROLE_ID}（envBootstrap.omitted=false 或缺省）但缺少该标准角色；请先出含 env-bootstrap 的新名单版本，或按 omitted:true + 非空 omissionReason 省略并移除 env/entry 模块。`,
+    };
+  }
+  if (hasEnvBootstrap && !envBootstrapOmitted) {
+    if (input.selectedRoleIds !== undefined && !input.selectedRoleIds.includes(ENV_BOOTSTRAP_ROLE_ID)) {
+      return {
+        ok: false,
+        reason: `D3 必须选中标准角色 ${ENV_BOOTSTRAP_ROLE_ID}；取消须先出带 envBootstrap.omitted/omissionReason 的新名单版本并移除 env/entry 模块。`,
+      };
+    }
+    if (!optionSet.has(ENV_BOOTSTRAP_ROLE_ID)) {
+      return { ok: false, reason: `D3 选项必须包含标准角色 ${ENV_BOOTSTRAP_ROLE_ID}。` };
+    }
   }
   return { ok: true, recommendedRoleIds: rosterIds };
 }
@@ -1156,7 +1224,7 @@ export function evaluateDispatchPreflight(input: DispatchPreflightInput): Dispat
         );
       }
       const hasEnvBootstrap = input.roster.roster.roles.some((role) => role.id === ENV_BOOTSTRAP_ROLE_ID);
-      if (!hasEnvBootstrap && (input.roster.roster.envBootstrapOmittedReason ?? "") === "") {
+      if (!hasEnvBootstrap && input.roster.roster.envBootstrap?.omitted !== true) {
         return reject(
           "env-bootstrap-missing",
           `派发未受理：名单缺标准角色 ${ENV_BOOTSTRAP_ROLE_ID}（环境装配，默认必带：package.json/scripts/构建配置 + 项目入口）；` +

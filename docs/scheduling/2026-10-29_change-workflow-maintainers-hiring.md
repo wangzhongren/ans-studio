@@ -55,14 +55,14 @@
 | `test/门禁引擎/versioned-doc-guard.test.ts` | 新增（v2.8–v2.15 R6/R9） | 11 | 版本化路径/版本号；覆盖既有 -vN.md ⇒ deny；shell cp 旧版 deny/新版 pass；基线 TOFU/marker/坏行/缺失 fail-closed、canonical 路径、并发登记、O_EXCL 锁/活锁不接管/token fencing、旧记录归一化、属主写后单文件登记 |
 | 既有更新 | — | — | `chief-workflow`（convener dispatch v4.1）、`star-routing`（M8/M5/M6）、`entry-role-minimal-d`、`i-full-chain` |
 
-定向（最终 b7813ad）：门禁引擎 275 计（274 过 / 1 skip）、编排 530 计（529 过 / 1 红＝既有 Windows symlink EPERM）、桌面应用 344/344、runtime-core 258 计（251 过 / 3 红 / 4 skip，红均既有 symlink）、测试 544 计（534 过 / 4 红 / 6 skip，红均基线）、项目管理 154 计（149 过 / 5 skip）、装配 85/85；逐文件：classify-shell 52、shell-write-guard 9、shell-operator-only 16、shell-post-audit 8、shell-approval-context 9、workflow-preconditions 13、appointment-roster 8、acceptance-judge-minimal 4、task-state 9、trio-worker-report 4、chain-enforcement 6、operator-channel 56、su zero-execution 6、versioned-doc-guard 11（合计 211/211 全过）。
+定向（本批最终代码）：门禁引擎 + 编排 + 桌面应用三组 **1152 计 / 1150 过 / 1 红 / 1 skip**（红＝既有 Windows symlink EPERM）；逐文件：workflow-preconditions 16、appointment-roster 8、versioned-doc-guard 11、chain-enforcement 6、acceptance-judge-minimal 4、trio-worker-report 4、task-state 9、classify-shell 52、shell-write-guard 9、shell-operator-only 16、shell-post-audit 8、shell-approval-context 9、operator-channel 56、su zero-execution 6。
 
 ## 3. 验证（串行）
 
-- 全量（本批最终提交）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（340 文件）→ **3000 tests / 2970 pass / 12 fail / 18 skip**（12 红＝9 Windows symlink EPERM + T1×3 既有环境问题）；日志 `%TEMP%\ans-modulepaths-full.log`，sha256 `e0aa2eac3065f18d3834dd391998fb1031d2eaf40b738704aa429b30512c76b4`。
-- `npm run typecheck` exit 0；`npm run typecheck:renderer` exit 0；`npm run build:renderer` exit 0（最终代码重跑）。
-- phase5a 真实 Electron（最终）：**34/34 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-mp\report.json`，sha256 `7c1179ea8694a656548620402a126ac853fd7ae59b83e5d405c48ceabee24520`）。
-- 桌面 E2E（最终；临时夹具 `%TEMP%\ans-e2e-g-fixture-1029`；fresh APPDATA）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-mp-out\report.txt`，sha256 `f23d44d7efbbd6071220b541fda04ad990a1a75242f2797a494b4f08c812d2c1`；`session:role-states` 未注册错误 0。
+- 全量（本批最终代码重跑）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（346 文件）→ **3003 tests / 2973 pass / 12 fail / 18 skip**（12 红＝9 Windows symlink EPERM + T1×3 既有环境问题；与上一基线红项一致）；日志 `%TEMP%\ans-final-full3.log`，sha256 `94b4be2b09c05916a7d480bd81af9f712f526179ada52ce824226e8522c508eb`。
+- `npm run typecheck` exit 0；`npm run typecheck:renderer` exit 0；`npm run build:renderer` exit 0（本批最终代码重跑）。
+- phase5a 真实 Electron（本批最终代码）：**34/34 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-final2\report.json`，sha256 `f21f7165db0e10e0147178ae01a992cc146f6b1bab81dc338c6881726620a25c`）。
+- 桌面 E2E（本批最终代码；`%TEMP%\ans-e2e-final2`；fresh APPDATA）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-final2\report.txt`，sha256 `c87c52df0fb777e3ee7feeab4e3c4dbeff322e7fa341d9eeea692bc36746e54b`；`session:role-states` 未注册错误 0。
 
 ## 4. 应用冒烟（重启后）
 
@@ -143,8 +143,10 @@
 ## 4.7 模块文件/目录与标准角色 env-bootstrap（客户追加）
 
 - **模块路径（v3/v2）**：`project-roster/v3` 的 `modules[].path` 可为单个文件或单个目录——以 `/` 结尾=目录，否则=文件；`category` 必填（env/entry 或领域类别）；modules 文档 `project-modules/v2`、topology 块 `project-topology/v2`、提案 `project-proposal/v2`；v1/v2 一律拒绝并要求按新版重出（不静默归一化）。冲突=路径相同或一方包含另一方（同父文件与目录合法）；文件模块授权=该文件本身，目录模块按 boundary kind；topology/绑定/唯一键/模块数规则同步。
-- **env-bootstrap（装配/入口）**：默认必带，固定 2 个领域中立模块：`category=env`（环境/资源装配）与 `category=entry`（入口/索引）；代码项目 package.json/scripts/src/main 仅为示例，写作/研究/设计/数据项目用 assets/、index.md 等同样成立。环境/入口类模块按 `category` 归属机械校验，误归属拒绝；小项目省略须写 `envBootstrapOmittedReason`，派人事前置拒绝无理由缺失；env-bootstrap 存在且未省略时 D3 必须选中它，取消需先出带理由的新名单版本并移除 env/entry 模块；omitted 时名单无 env 选项且不得存在 env/entry 模块。
-- **多路径**：固定 env/entry 模块支持 `paths[]` 1–8 项（普通模块必须单路径）；`modulePaths` 随 dispatch/task.created/验收 facts 传递；convener 派发校验 modulePaths 属于目标模块，越界拒绝。测试：workflow-preconditions 13（多路径 env 正例、单路径普通模块、相等/包含负例、非代码写作项目）；chain-enforcement 增加 modulePaths 落盘与越界拒绝。
+- **env-bootstrap（装配/入口）**：默认必带，固定 2 个模块 `env-resources`（category=env）与 `entry-index`（category=entry），模块 id/category 均机械校验、不可替换；`envBootstrap` 为对象 `{omitted, omissionReason}`（旧扁平字段 `envBootstrapOmittedReason` 读时归一化）；omitted=true 必须带非空 omissionReason，且不得含 env 角色或 env/entry 模块；代码项目 package.json/scripts/src/main 仅为示例，写作/研究/设计/数据项目用 assets/、index.md 等同样成立。环境/入口类模块按 `category` 归属机械校验，误归属拒绝；env-bootstrap 存在且未省略时 D3 必须包含并选中它（取消须先出带理由的新名单版本并移除 env/entry 模块），名单未省略却缺该角色在 D3 阶段即拒绝，不依赖 appointment-write 后置兜底；omitted 时名单无 env 选项且不得存在 env/entry 模块。
+- **多路径**：固定 env/entry 模块支持 `paths[]` **1–20 项**（普通模块必须单路径；XML/工具参数/任务事实同步上限 20）；`modulePaths` 随 dispatch/task.created/验收 facts 传递；convener 派发校验 modulePaths 属于目标模块，越界拒绝。测试：workflow-preconditions 16（多路径 env 正例、20 条上限正例/21 条拒绝、单路径普通模块、相等/包含负例、非代码写作项目、envBootstrap 旧字段归一化/省略理由、固定模块 id/category 负例、设计 v2.22 §5.2 示例正例）；chain-enforcement 增加 modulePaths 落盘与越界拒绝。
+- **旧 schema 文案（验收返工）**：roster v1/v2 → v3 重出（path/paths + category + envBootstrap 对象）；modules v1 → v2（category/path 或 paths[]）；topology v1 → v2（path 或 paths + management 含 convener 与全部项目角色）；proposal v1 → v2（模块表 path/category），均明确拒绝、不静默归一化。
+- **角色卡文案**：策划/人事卡已同步 v3/path/category/```topology（`project-topology/v2`）/env-bootstrap 固定 id 与 omissionReason 对象口径，不再出现 v2 目录制描述。
 
 ## 5. 决策点与遗留
 

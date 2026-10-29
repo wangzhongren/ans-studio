@@ -1718,7 +1718,7 @@ function makeRequestConfirmationTool(
       const moduleId = readStringArg(call.args, ["moduleId", "module_id"]);
       const rawModulePaths = call.args["modulePaths"] ?? call.args["module_paths"];
       const metadataModulePaths = Array.isArray(rawModulePaths)
-        ? rawModulePaths.filter((item): item is string => typeof item === "string" && item.trim() !== "").slice(0, 8)
+        ? rawModulePaths.filter((item): item is string => typeof item === "string" && item.trim() !== "").slice(0, 20)
         : undefined;
       const metadata: CustomerInputMetadata = {
         ...baseMetadata,
@@ -1887,7 +1887,7 @@ function makeRequestChoiceTool(
       const moduleId = readStringArg(call.args, ["moduleId", "module_id"]);
       const rawModulePaths = call.args["modulePaths"] ?? call.args["module_paths"];
       const metadataModulePaths = Array.isArray(rawModulePaths)
-        ? rawModulePaths.filter((item): item is string => typeof item === "string" && item.trim() !== "").slice(0, 8)
+        ? rawModulePaths.filter((item): item is string => typeof item === "string" && item.trim() !== "").slice(0, 20)
         : undefined;
       const metadata: CustomerInputMetadata = {
         ...baseMetadata,
@@ -2119,8 +2119,8 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
       const modulePathsRaw = call.args["modulePaths"] ?? call.args["module_paths"];
       let modulePaths: string[] | undefined;
       if (modulePathsRaw !== undefined && modulePathsRaw !== null) {
-        if (!Array.isArray(modulePathsRaw) || modulePathsRaw.length < 1 || modulePathsRaw.length > 8 || !modulePathsRaw.every((item) => typeof item === "string" && item.trim() !== "")) {
-          return { ok: false, message: `${name}: modulePaths 参数非法（应为 1–8 个非空字符串）` };
+        if (!Array.isArray(modulePathsRaw) || modulePathsRaw.length < 1 || modulePathsRaw.length > 20 || !modulePathsRaw.every((item) => typeof item === "string" && item.trim() !== "")) {
+          return { ok: false, message: `${name}: modulePaths 参数非法（应为 1–20 个非空字符串）` };
         }
         modulePaths = modulePathsRaw.map((item) => item.trim());
       }

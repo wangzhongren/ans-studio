@@ -317,7 +317,7 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
     }
     if (rec["modulePaths"] !== undefined) {
       const paths = rec["modulePaths"];
-      if (!Array.isArray(paths) || paths.length < 1 || paths.length > 8) return { ok: false, message: "task.created.modulePaths 非法" };
+      if (!Array.isArray(paths) || paths.length < 1 || paths.length > 20) return { ok: false, message: "task.created.modulePaths 非法" };
       for (const path of paths) {
         if (
           typeof path !== "string" ||

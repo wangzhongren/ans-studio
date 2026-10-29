@@ -15,6 +15,7 @@ import path from "node:path";
 import {
   evaluateDispatchPreflight,
   loadLatestRoster,
+  parseProjectModules,
   parseProjectRoster,
   reportTargetForTaskCreator,
   rosterDirectoriesFor,
@@ -33,6 +34,10 @@ const ROSTER_TEXT = [
   "intent: docs/product/focus-intent-v1.md",
   "proposal: docs/proposals/focus-proposal-v1.md",
   "architecture: docs/contracts/focus-architecture-v1.md",
+  "modulesDoc: docs/proposals/focus-modules-v1.md",
+  "envBootstrap:",
+  "  omitted: true",
+  "  omissionReason: 测试夹具省略装配/入口角色",
   "roles:",
   "  - id: implementer",
   "    displayName: 实现者",
@@ -106,14 +111,15 @@ const VALID_ROSTER: ProjectRoster = parsedRosterFixture.ok
 
 const PREFLIGHT_ROSTER: ProjectRoster = {
   ...VALID_ROSTER,
+  envBootstrap: { omitted: false },
   roles: [
     ...VALID_ROSTER.roles,
-    { id: "env-bootstrap", displayName: "环境装配", purpose: "环境与入口", capability: "build", modules: ["env-setup", "project-entry"] },
+    { id: "env-bootstrap", displayName: "环境装配", purpose: "环境与入口", capability: "build", modules: ["env-resources", "entry-index"] },
   ],
   modules: [
     ...VALID_ROSTER.modules,
-    { id: "env-setup", name: "环境装配", purpose: "零依赖与构建配置", paths: ["package.json"], path: "package.json", category: "env", publicContract: "package.json", architectureSource: "docs/contracts/focus-architecture-v1.md" },
-    { id: "project-entry", name: "项目入口", purpose: "入口文件", paths: ["index.html"], path: "index.html", category: "entry", publicContract: "index.html", architectureSource: "docs/contracts/focus-architecture-v1.md" },
+    { id: "env-resources", name: "环境装配", purpose: "零依赖与构建配置", paths: ["package.json"], path: "package.json", category: "env", publicContract: "package.json", architectureSource: "docs/contracts/focus-architecture-v1.md" },
+    { id: "entry-index", name: "项目入口", purpose: "入口文件", paths: ["index.html"], path: "index.html", category: "entry", publicContract: "index.html", architectureSource: "docs/contracts/focus-architecture-v1.md" },
   ],
 };
 
@@ -438,6 +444,30 @@ test("D3 卡形状：多选、选项恰为名单角色（无内置/重复/缺项
   assert.equal(extra.ok, false);
   const builtin = validateAppointmentCardAgainstRoster({ roster: VALID_ROSTER, optionIds: ["implementer", "qa", "chief"], multiple: true });
   assert.equal(builtin.ok, false);
+  // v2.20 D3：未省略 env-bootstrap 时必须选中它；取消须先出新名单版本。
+  const envCancel = validateAppointmentCardAgainstRoster({
+    roster: PREFLIGHT_ROSTER,
+    optionIds: PREFLIGHT_ROSTER.roles.map((role) => role.id),
+    multiple: true,
+    selectedRoleIds: ["implementer", "qa"],
+  });
+  assert.equal(envCancel.ok, false);
+  if (!envCancel.ok) assert.match(envCancel.reason, /env-bootstrap/);
+  const envSelected = validateAppointmentCardAgainstRoster({
+    roster: PREFLIGHT_ROSTER,
+    optionIds: PREFLIGHT_ROSTER.roles.map((role) => role.id),
+    multiple: true,
+    selectedRoleIds: PREFLIGHT_ROSTER.roles.map((role) => role.id),
+  });
+  assert.equal(envSelected.ok, true);
+  // 未省略但名单本身缺 env-bootstrap：D3 阶段即拒绝，不等 appointment-write 才兜。
+  const missingEnv = validateAppointmentCardAgainstRoster({
+    roster: { ...VALID_ROSTER, envBootstrap: { omitted: false } },
+    optionIds: VALID_ROSTER.roles.map((role) => role.id),
+    multiple: true,
+  });
+  assert.equal(missingEnv.ok, false);
+  if (!missingEnv.ok) assert.match(missingEnv.reason, /env-bootstrap/);
 });
 
 function preflight(overrides: Partial<DispatchPreflightInput>): DispatchPreflightInput {
@@ -589,7 +619,7 @@ test("模块路径可为文件或目录：文件模块正例；文件+目录同�
     "    displayName: 环境装配",
     "    purpose: 环境与入口",
     "    capability: build",
-    "    modules: [pkg, entry]",
+    "    modules: [env-resources, entry-index]",
     "modules:",
     "  - id: core",
     "    name: 核心",
@@ -598,7 +628,7 @@ test("模块路径可为文件或目录：文件模块正例；文件+目录同�
     "    category: core",
     "    publicContract: src/index.js",
     "    architectureSource: docs/contracts/notes-architecture-v1.md",
-    "  - id: pkg",
+    "  - id: env-resources",
     "    name: 包声明",
     "    purpose: 零依赖声明",
     "    paths: [package.json, scripts/, vite.config.js]",
@@ -612,7 +642,7 @@ test("模块路径可为文件或目录：文件模块正例；文件+目录同�
     "    category: core",
     "    publicContract: README.md",
     "    architectureSource: docs/contracts/notes-architecture-v1.md",
-    "  - id: entry",
+    "  - id: entry-index",
     "    name: 项目入口",
     "    purpose: 入口文件",
     "    path: index.html",
@@ -627,13 +657,13 @@ test("模块路径可为文件或目录：文件模块正例；文件+目录同�
     "  - id: core",
     "    path: src/",
     "    roleId: dev",
-    "  - id: pkg",
+    "  - id: env-resources",
     "    paths: [package.json, scripts/, vite.config.js]",
     "    roleId: env-bootstrap",
     "  - id: readme",
     "    paths: [README.md]",
     "    roleId: doc",
-    "  - id: entry",
+    "  - id: entry-index",
     "    path: index.html",
     "    roleId: env-bootstrap",
     "roles:",
@@ -642,7 +672,7 @@ test("模块路径可为文件或目录：文件模块正例；文件+目录同�
     "  - id: doc",
     "    modules: [readme]",
     "  - id: env-bootstrap",
-    "    modules: [pkg, entry]",
+    "    modules: [env-resources, entry-index]",
     "management: [convener, dev, doc, env-bootstrap]",
     "```",
   ];
@@ -682,7 +712,7 @@ test("env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + inde
     "    displayName: 装配/入口",
     "    purpose: 资源与索引",
     "    capability: assembly",
-    "    modules: [assets, index]",
+    "    modules: [env-resources, entry-index]",
     "modules:",
     "  - id: content",
     "    name: 正文",
@@ -691,14 +721,14 @@ test("env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + inde
     "    category: core",
     "    publicContract: content/",
     "    architectureSource: docs/contracts/essay-architecture-v1.md",
-    "  - id: assets",
+    "  - id: env-resources",
     "    name: 资源",
     "    purpose: 图片与素材",
     "    path: assets/",
     "    category: env",
     "    publicContract: assets/",
     "    architectureSource: docs/contracts/essay-architecture-v1.md",
-    "  - id: index",
+    "  - id: entry-index",
     "    name: 索引",
     "    purpose: 入口索引",
     "    path: index.md",
@@ -713,17 +743,17 @@ test("env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + inde
     "  - id: content",
     "    path: content/",
     "    roleId: writer",
-    "  - id: assets",
+    "  - id: env-resources",
     "    path: assets/",
     "    roleId: env-bootstrap",
-    "  - id: index",
+    "  - id: entry-index",
     "    path: index.md",
     "    roleId: env-bootstrap",
     "roles:",
     "  - id: writer",
     "    modules: [content]",
     "  - id: env-bootstrap",
-    "    modules: [assets, index]",
+    "    modules: [env-resources, entry-index]",
     "management: [convener, writer, env-bootstrap]",
     "```",
   ].join("\n");
@@ -733,8 +763,70 @@ test("env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + inde
     assert.deepEqual(rosterDirectoriesFor(parsed.roster, "env-bootstrap"), ["assets/", "index.md"]);
   }
   // category=env 的模块不能归其他角色。
-  const misowned = text.replace("    modules: [content]", "    modules: [content, assets]").replace("    modules: [assets, index]", "    modules: [index]");
+  const misowned = text.replace("    modules: [content]", "    modules: [content, env-resources]").replace("    modules: [env-resources, entry-index]", "    modules: [entry-index]");
   const bad = parseProjectRoster(misowned);
   assert.equal(bad.ok, false);
   if (!bad.ok) assert.ok(["roster-module-owner-invalid", "roster-env-bootstrap-invalid"].includes(bad.code));
+});
+
+test("设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例）", async () => {
+  const designPath = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\//, "")), "../../docs/planning/2026-10-29_design-workflow-maintainers-hiring.md");
+  const design = await fs.readFile(designPath, "utf8");
+  const start = design.indexOf("````markdown");
+  const end = design.indexOf("````", start + "````markdown".length);
+  assert.ok(start >= 0 && end > start, "设计文档应含四个反引号的 markdown 示例块");
+  const example = design.slice(start + "````markdown".length, end).trimStart();
+  const parsed = parseProjectRoster(example);
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
+  if (parsed.ok) {
+    assert.deepEqual(rosterDirectoriesFor(parsed.roster, "env-bootstrap"), ["templates/", "assets/", "references/", "index.md", "catalog/"]);
+  }
+  // 固定模块 id 不可替换：env-resources 改名后必须拒绝。
+  const renamed = parseProjectRoster(example.replaceAll("env-resources", "env-setup"));
+  assert.equal(renamed.ok, false);
+  if (!renamed.ok) assert.equal(renamed.code, "roster-env-bootstrap-invalid");
+  // 固定模块 category 必须为 env/entry。
+  const wrongCategory = parseProjectRoster(example.replace("category: env", "category: core"));
+  assert.equal(wrongCategory.ok, false);
+  if (!wrongCategory.ok) assert.equal(wrongCategory.code, "roster-env-bootstrap-invalid");
+});
+
+test("envBootstrap 对象语义：旧扁平字段读时归一化；omitted=true 必须有非空理由", () => {
+  const legacy = parseProjectRoster(ROSTER_TEXT.replace(
+    "envBootstrap:\n  omitted: true\n  omissionReason: 测试夹具省略装配/入口角色\n",
+    "envBootstrapOmittedReason: 旧扁平理由\n",
+  ));
+  assert.equal(legacy.ok, true, legacy.ok ? "" : legacy.reason);
+  if (legacy.ok) assert.deepEqual(legacy.roster.envBootstrap, { omitted: true, omissionReason: "旧扁平理由" });
+  const noReason = parseProjectRoster(ROSTER_TEXT.replace("  omissionReason: 测试夹具省略装配/入口角色\n", ""));
+  assert.equal(noReason.ok, false);
+  if (!noReason.ok) assert.equal(noReason.code, "roster-env-bootstrap-invalid");
+});
+
+test("固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示重出", () => {
+  const build = (paths: string[]): string => [
+    "---",
+    "schema: project-modules/v2",
+    "flowId: limits",
+    "version: 1",
+    "modules:",
+    "  - id: env-resources",
+    "    name: 环境资源",
+    "    purpose: 资源与配置",
+    `    paths: [${paths.join(", ")}]`,
+    "    category: env",
+    "    publicContract: assets/",
+    "    architectureSource: docs/contracts/limits-architecture-v1.md",
+    "---",
+  ].join("\n");
+  const paths20 = Array.from({ length: 20 }, (_, index) => `assets/p${index + 1}/`);
+  const ok = parseProjectModules(build(paths20), "limits");
+  assert.equal(ok.ok, true, ok.ok ? "" : ok.reason);
+  if (ok.ok) assert.equal(ok.doc.modules[0]!.paths.length, 20);
+  const tooMany = parseProjectModules(build([...paths20, "assets/p21/"]), "limits");
+  assert.equal(tooMany.ok, false);
+  if (!tooMany.ok) {
+    assert.equal(tooMany.code, "modules-doc-directory");
+    assert.match(tooMany.reason, /1–20/);
+  }
 });

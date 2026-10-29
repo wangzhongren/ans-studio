@@ -192,7 +192,7 @@ test("v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/�
   assert.match(chief, /派运营：应用要求 D3 选中的角色卡已写好/);
 
   assert.match(governanceRoleOf("product")!.cardText, /docs\/product\/<flowId>-intent-vN\.md/);
-  assert.match(governanceRoleOf("rapporteur")!.cardText, /project-roster\/v2/);
+  assert.match(governanceRoleOf("rapporteur")!.cardText, /project-roster\/v3/);
   assert.match(governanceRoleOf("rapporteur")!.cardText, /<flowId>-roster-vN\.md/);
   assert.match(governanceRoleOf("rapporteur")!.cardText, /<flowId>-architecture-vN\.md/);
   assert.match(governanceRoleOf("rapporteur")!.cardText, /人员\+模块拓扑图/);

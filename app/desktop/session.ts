@@ -3149,7 +3149,7 @@ export class SessionManager {
           : [];
         if (
           rosterHasEnv &&
-          (roster.roster.envBootstrapOmittedReason ?? "") === "" &&
+          roster.roster.envBootstrap?.omitted !== true &&
           !targets.includes(ENV_BOOTSTRAP_ROLE_ID)
         ) {
           return (
@@ -5320,7 +5320,7 @@ export class SessionManager {
       : undefined;
     const requestedModuleId = d && typeof d.moduleId === "string" && d.moduleId.trim() !== "" ? d.moduleId.trim() : undefined;
     const requestedModulePaths = d && Array.isArray(d.modulePaths)
-      ? [...new Set(d.modulePaths.filter((item): item is string => typeof item === "string" && item.trim() !== "").map((item) => item.trim()))].slice(0, 8)
+      ? [...new Set(d.modulePaths.filter((item): item is string => typeof item === "string" && item.trim() !== "").map((item) => item.trim()))].slice(0, 20)
       : undefined;
     const sideEffect = classifyTaskSideEffect(d?.sideEffect, task);
     const idempotencyKey = taskIdempotencyKey({

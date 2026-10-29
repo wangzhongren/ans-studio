@@ -1,8 +1,8 @@
-# 策划方案 v2.20：内置角色工作流维护者化 + 招人流程强制化 + shell 写区约束（按拓扑 v4.1；含 §五/§六 delta、模块先行、人员+模块拓扑图、文档版本化与旧版只读全通道）
+# 策划方案 v2.22：内置角色工作流维护者化 + 招人流程强制化 + shell 写区约束（按拓扑 v4.1；含 §五/§六 delta、模块先行、人员+模块拓扑图、文档版本化与旧版只读全通道）
 
-- 日期：2026-10-29（v1 初稿；v2 F1–F10；v2.1 复核补充；v2.2 客户 §五 Q1/Q2 delta；v2.3 R1–R5；v2.4 验收 v3 F6/F7；v2.5 复核小修；v2.6 §六 delta 2 模块先行；v2.7 人员+模块拓扑图 + v2.6 复核 R1–R5；v2.8 文档版本化与变更流程；v2.9 v2.8 复核 R6–R9 收口；v2.10 v2.9 复核 R9 小修；v2.11 v2.10 复核 R9 新版本基线例外与记录契约；v2.12 v2.11 复核并发保护与 path canonical；v2.13 v2.12 复核旧字段归一化与锁协议；v2.14 v2.13 复核活锁/fencing/原子锁；v2.15 v2.14 复核 M13/§8 同步与不采用租约；v2.16 客户同日4 文件/目录模块路径；v2.17 客户同日5 装配/入口固定角色；v2.18 客户同日6 领域中立；v2.19 v2.18 复核 D3/env-bootstrap/schema v3；v2.20 v2.19 复核 modules/topology/proposal schema 升版）
+- 日期：2026-10-29（v1 初稿；v2 F1–F10；v2.1 复核补充；v2.2 客户 §五 Q1/Q2 delta；v2.3 R1–R5；v2.4 验收 v3 F6/F7；v2.5 复核小修；v2.6 §六 delta 2 模块先行；v2.7 人员+模块拓扑图 + v2.6 复核 R1–R5；v2.8 文档版本化与变更流程；v2.9 v2.8 复核 R6–R9 收口；v2.10 v2.9 复核 R9 小修；v2.11 v2.10 复核 R9 新版本基线例外与记录契约；v2.12 v2.11 复核并发保护与 path canonical；v2.13 v2.12 复核旧字段归一化与锁协议；v2.14 v2.13 复核活锁/fencing/原子锁；v2.15 v2.14 复核 M13/§8 同步与不采用租约；v2.16 客户同日4 文件/目录模块路径；v2.17 客户同日5 装配/入口固定角色；v2.18 客户同日6 领域中立；v2.19 v2.18 复核 D3/env-bootstrap/schema v3；v2.20 v2.19 复核 modules/topology/proposal schema 升版；v2.21 验收 v1 返工 R1/R7 契约对齐；v2.22 R1 示例引用完整路径）
 - 角色：ANS 策划（Planning），独立上下文
-- 状态：**草案 v2.20（客户闸门 1 已确认；含 §五/§六 delta、v2.7 拓扑图、v2.8 文档版本化、v2.9 R6–R9、v2.10 基线标记、v2.11 新版本基线例外、v2.12 并发锁与 canonical path、v2.13 旧字段归一化/锁协议、v2.14 活锁/fencing/原子锁、v2.15 M13/§8 同步与不采用租约、v2.16 文件/目录模块、v2.17 装配/入口固定角色、v2.18 领域中立、v2.19 D3/env-bootstrap/schema v3、v2.20 modules/topology/proposal schema v2；待实施/验收）**；本文件是设计候选，**未实施、未测试、未验收**；实施授权按客户闸门 1 记录（团队/写集按本方案 §8，新增测试文件边界由人事补入；超出 §8 写集须停下回报）。
+- 状态：**草案 v2.22（客户闸门 1 已确认；含 §五/§六 delta、v2.7 拓扑图、v2.8 文档版本化、v2.9 R6–R9、v2.10 基线标记、v2.11 新版本基线例外、v2.12 并发锁与 canonical path、v2.13 旧字段归一化/锁协议、v2.14 活锁/fencing/原子锁、v2.15 M13/§8 同步与不采用租约、v2.16 文件/目录模块、v2.17 装配/入口固定角色、v2.18 领域中立、v2.19 D3/env-bootstrap/schema v3、v2.20 modules/topology/proposal schema v2、v2.21 refs/topology 形状与旧 schema 文案、v2.22 示例完整引用路径；待实施/验收）**；本文件是设计候选，**未实施、未测试、未验收**；实施授权按客户闸门 1 记录（团队/写集按本方案 §8，新增测试文件边界由人事补入；超出 §8 写集须停下回报）。
 - 风险档位：**T3（治理/权限/流程变更）**。本方案改变内置角色的派发权限矩阵（运营获得项目运营派发、人事获得招人卡、验收由运营发起/幕僚调度）、治理前置的机械校验、报告路由、`tasks.jsonl` 事件契约与 shell 写区强制力；即使大部分是文本与校验，也属于治理/权限变更，不能压成 T0–T2。
 - 闸门 0 / 客户拓扑依据：
   - `docs/communication/2026-10-29_role-topology.md`（**v4.1 + §四闸门 1 记录 + §五闸门 1 delta + §六闸门 1 delta 2/同日 4 文件目录模块 + 同日 5 装配/入口角色 + 同日 6 领域中立**，100 行，SHA-256 `cc4741de8d395bf205dbc87e479e6b90deaed5e83e907dd64501954e9a341725`；拓扑：产品意图 → 策划方案+名单+架构 → 人事按名单招人 → 交付运营运营；运营可发起验收，质检执行核对、结果回报运营；**§五：shell 不强制客户审批，开关开启时由替我审批 agent 审查命令+脚本内容**；**§六：策划先写模块清单（含文件/目录路径），再把模块安排给角色；名单是模块→角色绑定**；**同日 4：模块路径可为单文件或单目录，冲突仅「相同或包含」，同父文件模块与目录模块可共存**；**同日 5：固定角色「装配/入口」（id `env-bootstrap`）默认必带，两个模块「环境/资源」与「入口/索引」；小项目可省但须写省略理由**；**同日 6：系统不限于写代码，装配/入口与模块类别领域中立**；**另：名单须含人员+模块拓扑图，D3 审批卡向客户呈现**）
@@ -10,9 +10,10 @@
   - 最新回归现场（只读）：`C:/Users/51054/Desktop/work/trial-focus-timer/.ans/state/logs/`（chief.jsonl / convener.jsonl）与 `%TEMP%/ans-regress-1029/`
 - 独立复核：`docs/planning/2026-10-29_review-workflow-maintainers-hiring.md`（v1–v2.5 记录 **458 行**，SHA-256 `6595c713f91e267f408d8591303dcdac3980f0dd8f4f02431486071819750aae`；**v2.6 复核记录 526 行 / `925ea224…`（R1–R5，见 §13.1）**；**v2.8 复核记录 590 行 / `7639b439…`（R6–R9，见 §13.1）**；**v2.9 复核记录 635 行 / `1a712cf3…`（R9 阻断，见 §13.1）**；**v2.10 复核记录 699 行 / `d142152a…`（R9 新版本例外与记录契约，见 §13.1）**；**v2.11 复核记录 762 行 / `a5558311…`（并发保护与 path canonical，见 §13.1）**；**v2.12 复核记录 820 行 / `5dd61d40…`（旧字段归一化与锁协议，见 §13.1）**；**v2.13 复核记录 879 行 / `88f98fcd…`（活锁/fencing/原子锁创建，见 §13.1）**；**v2.14 复核记录 935 行 / `3c152500…`（M13/§8 同步与不采用租约，见 §13.1）**；**v2.18 复核记录 1047 行 / `93f485b9…`（D3/env-bootstrap/schema v3，见 §13.1）**；**v2.19 复核记录 1099 行 / `b9141a1d…`（modules/topology/proposal schema 升版，见 §13.1）**；v1 F1–F10；v2.1 通过；v2.4 通过（F6/F7 设计闭合）；v2.5 三处小修；v2.9 处置 R6–R9；v2.10 处置 R9 小修；v2.11 处置 R9 新版本例外；v2.12 处置 R9 并发/canonical；v2.13 处置 R9 旧字段/锁协议；v2.14 处置 R9 活锁/fencing/原子锁；v2.15 处置 M13/§8 同步与不采用租约；v2.16–18 处置文件/目录、装配/入口、领域中立；v2.19 处置 D3/env-bootstrap/schema v3）
 - 验收 v3：`docs/acceptance/2026-10-29_workflow-maintainers-hiring-acceptance-report-v3.md`（**148 行**，SHA-256 `929469009d1dea5f93e86eed59233e12c742708eefa6b1e215853bde2afdaff8`；F6/F7 已在 v2.4 处置）
+- 验收 v2.20 返工：`docs/acceptance/2026-10-29_workflow-hiring-v220-acceptance-report-v1.md`（**113 行**，SHA-256 `798b0c48…`；R1/R7 在 v2.21 处置，其余 5 项为实施缺陷）
 - 代码基线：实施 worktree `C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\entry-role-minimal`（分支 `feat/entry-role-minimal`，HEAD **`ce7c3ba`**，干净基线；当前 worktree 另有实施会话未提交改动，仅作接口/命名对齐参考，不作为已验收证据）；主分支 `main` = `ff7d8d9`。本文行号均为 **`ce7c3ba` 快照**，实施时以符号名与文本锚点为准。
-- 版本历史：**v1** = 641 / `4ce789c0…`；**v2** = 764 / `2fca68f8…`；**v2.1** = 772 / `fd20099a…`；**v2.2** = 810 / `66809b91…`；**v2.3** = 856 / `a897927d…`；**v2.4** = 872 / `1860a977…`；**v2.5** = 880 / `921b3770…`；**v2.6** = 920 / `ca19ab08…`；**v2.7** = 人员+模块拓扑图 + R1–R5（并入本稿，未单独交付）；**v2.8** = 1069 / `21070961…`（文档版本化与变更流程）；**v2.9** = 1112 / `3116856d…`（R6–R9 收口）；**v2.10** = 1128 / `8ce7a854…`（R9 基线标记小修）；**v2.11** = 1148 / `464d4fe7…`（R9 新版本例外与记录契约）；**v2.12** = 1163 / `e1479d76…`（并发锁与 canonical path）；**v2.13** = 1175 / `f16ebc36…`（旧字段归一化与锁协议）；**v2.14** = 1189 / `fc211531…`（活锁/fencing/原子锁）；**v2.15** = 1203 / `4e13eca4…`（M13/§8 同步与不采用租约）；**v2.16–v2.18** = 文件/目录模块、装配/入口固定角色、领域中立（合并）；**v2.19** = 1263 / `9ddffbb1…`（D3/env-bootstrap/schema v3）；**v2.20** = 本文件（modules/topology/proposal schema v2）。
-- 标记约定：**[现状]** 已核实代码/日志行为；**[设计候选]** 本方案提议、未实施；**[待客户决定]** 见 §11（v2.20 已记录闸门 1 确认、§五/§六 delta、v2.7 拓扑图、v2.8 版本化、v2.9 R6–R9、v2.10 基线标记、v2.11 新版本例外、v2.12 并发/canonical、v2.13 旧字段/锁协议、v2.14 活锁/fencing/原子锁、v2.15 不采用租约、v2.16–18 文件/目录/装配入口/领域中立、v2.19 roster v3/D3 与 v2.20 modules/topology/proposal v2；如实施需改变已确认口径仍须客户确认）
+- 版本历史：**v1** = 641 / `4ce789c0…`；**v2** = 764 / `2fca68f8…`；**v2.1** = 772 / `fd20099a…`；**v2.2** = 810 / `66809b91…`；**v2.3** = 856 / `a897927d…`；**v2.4** = 872 / `1860a977…`；**v2.5** = 880 / `921b3770…`；**v2.6** = 920 / `ca19ab08…`；**v2.7** = 人员+模块拓扑图 + R1–R5（并入本稿，未单独交付）；**v2.8** = 1069 / `21070961…`（文档版本化与变更流程）；**v2.9** = 1112 / `3116856d…`（R6–R9 收口）；**v2.10** = 1128 / `8ce7a854…`（R9 基线标记小修）；**v2.11** = 1148 / `464d4fe7…`（R9 新版本例外与记录契约）；**v2.12** = 1163 / `e1479d76…`（并发锁与 canonical path）；**v2.13** = 1175 / `f16ebc36…`（旧字段归一化与锁协议）；**v2.14** = 1189 / `fc211531…`（活锁/fencing/原子锁）；**v2.15** = 1203 / `4e13eca4…`（M13/§8 同步与不采用租约）；**v2.16–v2.18** = 文件/目录模块、装配/入口固定角色、领域中立（合并）；**v2.19** = 1263 / `9ddffbb1…`（D3/env-bootstrap/schema v3）；**v2.20** = 1277 / `671b5bc5…`（modules/topology/proposal schema v2）；**v2.21** = 1319 / `ec6b5ac1…`（refs/topology 形状与旧 schema 文案）；**v2.22** = 本文件（R1 示例完整引用路径）。
+- 标记约定：**[现状]** 已核实代码/日志行为；**[设计候选]** 本方案提议、未实施；**[待客户决定]** 见 §11（v2.22 已记录闸门 1 确认、§五/§六 delta、v2.7 拓扑图、v2.8 版本化、v2.9 R6–R9、v2.10 基线标记、v2.11 新版本例外、v2.12 并发/canonical、v2.13 旧字段/锁协议、v2.14 活锁/fencing/原子锁、v2.15 不采用租约、v2.16–18 文件/目录/装配入口/领域中立、v2.19 roster v3/D3、v2.20 modules/topology/proposal v2、v2.21 refs/topology 形状与 v2.22 示例完整路径；如实施需改变已确认口径仍须客户确认）
 
 ## v2 变更摘要（相对 v1，F1–F10）
 
@@ -183,6 +184,21 @@ v2.19 复核记录 1099 行 / `b9141a1d…`：剩三项，v2.20 定死：
 2. **`project-topology/v2` / `project-proposal/v2`**：拓扑节点标签 `path(s)/category`、方案模块表 `path/category` 属破坏性变更；v1 一律拒绝并提示重出；§5.5 三处 schema/字段同步（modules/topology/proposal）。
 3. **风险 19 同步**：补 D3 取消 env-bootstrap、roster v1/v2 与 modules/topology/proposal v1 拒绝/v3/v2 迁移、schema 破坏性变更风险；测试/夹具与 §8.1 同步。
 
+## v2.21 变更说明（验收 v1 返工 R1/R7：refs/topology 与旧 schema 文案对齐）
+
+验收报告 `docs/acceptance/2026-10-29_workflow-hiring-v220-acceptance-report-v1.md`（113 行 / `798b0c48…`）两项设计/实现契约对齐；裁定以实现口径为准：
+
+1. **roster refs/topology 形状**：roster frontmatter 只认**顶层** `intent`/`proposal`/`architecture` 版本化引用；`modules[]` 为模块清单数据（不再是嵌套 `references` 对象）。拓扑只认 roster 正文 `## 人员+模块拓扑图` 下的 **```topology YAML 块**（`schema: project-topology/v2`，含 `modules[]`/`roles[]`/`management[]`），**不再要求 Mermaid**；块是唯一机器可读格式，D3 预览从同一数据渲染。
+2. **旧 schema 文案**：v1/v2 拒绝必须给下一步——roster：「按 v3 重出名单（path/category/envBootstrap）」；modules：「按 v2 重出模块清单（category/path/paths）」；topology：「按 v2 重出拓扑（path/category）」；proposal：「按 v2 重出方案（模块表 path/category）」；不静默归一化。
+3. **同步**：§5.2 示例/字段/校验、§5.5 三处 schema、§7.1/P2 测试、§8.1、§13 已更新。
+
+## v2.22 变更说明（R1 示例引用完整路径）
+
+v2.21 复核：R7 通过；R1 未闭合——§5.2 示例仍写裸文件名，parser 返回 `roster-reference-invalid`。v2.22：
+
+1. 示例顶层引用改为**完整项目相对版本化路径**：`docs/product/handbook-intent-v1.md`、`docs/proposals/handbook-proposal-v1.md`、`docs/contracts/handbook-architecture-v1.md`；并明确规则：顶层 `intent`/`proposal`/`architecture` 必须是完整路径（不是裸文件名）。
+2. **测试正例**：P2 要求把 §5.2 示例原样送入 `parseProjectRoster`（flowId=handbook）解析通过；同时保留文件路径/拓扑块一致性负例。
+
 ---
 
 ## 1. 摘要
@@ -238,7 +254,7 @@ v2.19 复核记录 1099 行 / `b9141a1d…`：剩三项，v2.20 定死：
 
 ### 2.2 验收基线
 
-客户在闸门 1 确认的 v2.1 版本 + 2026-10-29 §五/§六 delta、v2.7 拓扑图、v2.8 文档版本化、v2.9 R6–R9、v2.10 R9 基线标记、v2.11 新版本基线例外、v2.12 并发/canonical、v2.13 旧字段/锁协议、v2.14 活锁/fencing/原子锁、v2.15 M13/§8 同步与不采用租约、v2.16 文件/目录模块、v2.17 装配/入口固定角色、v2.18 领域中立、v2.19 D3/env-bootstrap/schema v3、v2.20 modules/topology/proposal schema v2 后的 v2.20 版本是后续独立验收的基线。独立验收在实施前基于该版本写正式完成标准；§7.2 的 P/G 是方案自带的可核对标准，不是正式验收结论。
+客户在闸门 1 确认的 v2.1 版本 + 2026-10-29 §五/§六 delta、v2.7 拓扑图、v2.8 文档版本化、v2.9 R6–R9、v2.10 R9 基线标记、v2.11 新版本基线例外、v2.12 并发/canonical、v2.13 旧字段/锁协议、v2.14 活锁/fencing/原子锁、v2.15 M13/§8 同步与不采用租约、v2.16 文件/目录模块、v2.17 装配/入口固定角色、v2.18 领域中立、v2.19 D3/env-bootstrap/schema v3、v2.20 modules/topology/proposal schema v2、v2.21 refs/topology 形状、v2.22 示例完整引用路径后的 v2.22 版本是后续独立验收的基线。独立验收在实施前基于该版本写正式完成标准；§7.2 的 P/G 是方案自带的可核对标准，不是正式验收结论。
 
 ### 2.3 范围边界
 
@@ -370,7 +386,7 @@ v2.19 复核记录 1099 行 / `b9141a1d…`：剩三项，v2.20 定死：
 
 职能：据产品意图文档出「策划方案 + 人员名单 + 项目架构」；提案/契约。
 - 前置（机械）：必须存在最新 `docs/product/<flowId>-intent-vN.md`（版本链 M13：文件名 N = frontmatter `version` = `## 版本记录` 当前行；旧版只读；引用精确版本）；缺失/为空/引用旧版 → submit_report 阻塞（请幕僚先派产品出新版本），不得自造意图、不得跳过。
-- 产物顺序（客户 §六 delta 2 先模块后人员；v2.7 名单带拓扑图；v2.8 全文档版本化；**全部新版本文件、不原地改**）：① **方案**——写 `docs/proposals/<flowId>-proposal-vN.md`（`schema: project-proposal/v2`，`references.intent` 指向精确 intent 版本；含问题/目标/范围/流程/验收标准/模块清单表/质量证据计划；模块表必须与 modules 文档一致）。② **模块清单**——写 `docs/proposals/<flowId>-modules-vN.md`（`schema: project-modules/v2`，`references.proposal`）：每个模块字段 id/name/purpose/**category**/**path（固定 env 模块 paths[]）**/publicContract/architectureSource 完整，**模块数 1–12**，id 为 2–64 字符小写 slug；**`path` 项目相对、单个文件或单个目录**——以 `/` 结尾=目录，否则=文件模块（如 `usr/aa/package.json`）；不得多路径/通配/`..`/绝对路径，不含治理路径、**也不得是治理路径的父目录（如 `docs/`）**；**冲突仅「路径相同或一方包含另一方」**；**同父的文件模块与目录模块合法**（`usr/aa/package.json` 与 `usr/aa/bb/` 可共存）；文件与目录同路径/包含（如 `usr/aa/package.json` 与 `usr/aa/`）非法。**每个模块必须标 `category`（小写 slug）；默认必须包含固定角色 `env-bootstrap`（装配/入口）与其两个模块 `env-resources`（category `env`：工具/资源/配置/模板/样式/数据源）与 `entry-index`（category `entry`：入口/总目录/索引/引导页）；小项目可省略但 roster 必须写 `envBootstrap.omissionReason`**；`env`/`entry` 类别只能归 `env-bootstrap`，不得硬编码代码文件名（代码项目仅示例）。③ **模块 → 角色绑定**——写 `docs/proposals/<flowId>-roster-vN.md`（`schema: project-roster/v3`，`references.proposal`/`references.modules`；`modules[]` 为 modules 文档的登记快照 + `roles[].modules[]`；**一个模块一个属主；一个角色可以拥有多个模块**，授权写集 = 名下模块路径集（文件/目录）并集；role id 2–64 字符小写 slug、不得用内置 id）。④ **人员+模块拓扑图**——写 `docs/proposals/<flowId>-topology-vN.md`（`schema: project-topology/v2`，`references.roster`/`references.modules`；**模块（含 category 与文件/目录路径）→ 属主角色、角色 → 名下模块、运营（convener）→ 全部项目角色**的 Mermaid `flowchart`，固定节点/边格式见 §5.2）；roster 正文必须含同一拓扑副本，二者逐项一致（缺模块/多角色/错路径 ⇒ 名单非法）。⑤ **项目架构**——写 `docs/contracts/<flowId>-architecture-vN.md`（`schema: project-architecture/v1`，`references.modules`；按模块写分层/依赖方向/公开契约/数据流/扩展点）。每个文档都写 `## 版本记录`（1..N 连续）；旧版本保留只读；人员名单是「模块 → 角色」绑定的视图，不是孤立角色列表。
+- 产物顺序（客户 §六 delta 2 先模块后人员；v2.7 名单带拓扑图；v2.8 全文档版本化；**全部新版本文件、不原地改**）：① **方案**——写 `docs/proposals/<flowId>-proposal-vN.md`（`schema: project-proposal/v2`，`references.intent` 指向精确 intent 版本；含问题/目标/范围/流程/验收标准/模块清单表/质量证据计划；模块表必须与 modules 文档一致）。② **模块清单**——写 `docs/proposals/<flowId>-modules-vN.md`（`schema: project-modules/v2`，`references.proposal`）：每个模块字段 id/name/purpose/**category**/**path（固定 env 模块 paths[]）**/publicContract/architectureSource 完整，**模块数 1–12**，id 为 2–64 字符小写 slug；**`path` 项目相对、单个文件或单个目录**——以 `/` 结尾=目录，否则=文件模块（如 `usr/aa/package.json`）；不得多路径/通配/`..`/绝对路径，不含治理路径、**也不得是治理路径的父目录（如 `docs/`）**；**冲突仅「路径相同或一方包含另一方」**；**同父的文件模块与目录模块合法**（`usr/aa/package.json` 与 `usr/aa/bb/` 可共存）；文件与目录同路径/包含（如 `usr/aa/package.json` 与 `usr/aa/`）非法。**每个模块必须标 `category`（小写 slug）；默认必须包含固定角色 `env-bootstrap`（装配/入口）与其两个模块 `env-resources`（category `env`：工具/资源/配置/模板/样式/数据源）与 `entry-index`（category `entry`：入口/总目录/索引/引导页）；小项目可省略但 roster 必须写 `envBootstrap.omissionReason`**；`env`/`entry` 类别只能归 `env-bootstrap`，不得硬编码代码文件名（代码项目仅示例）。③ **模块 → 角色绑定**——写 `docs/proposals/<flowId>-roster-vN.md`（`schema: project-roster/v3`，**顶层 `intent`/`proposal`/`architecture` 精确版本引用**；`modules[]` 为 modules 文档的登记快照 + `roles[].modules[]`；**一个模块一个属主；一个角色可以拥有多个模块**，授权写集 = 名下模块路径集（文件/目录）并集；role id 2–64 字符小写 slug、不得用内置 id）。④ **人员+模块拓扑图**——写 roster 正文 `## 人员+模块拓扑图` 下的 ```topology YAML 块（`schema: project-topology/v2`；含 `modules[]`（id/paths/roleId）、`roles[]`（id/modules）、`management[]`（含 convener 与全部项目角色））；`docs/proposals/<flowId>-topology-vN.md` 如存在仅作版本化归档副本，必须与 roster 块一致；**不再使用 Mermaid**（缺模块/多角色/错路径 ⇒ 名单非法）。⑤ **项目架构**——写 `docs/contracts/<flowId>-architecture-vN.md`（`schema: project-architecture/v1`，`references.modules`；按模块写分层/依赖方向/公开契约/数据流/扩展点）。每个文档都写 `## 版本记录`（1..N 连续）；旧版本保留只读；人员名单是「模块 → 角色」绑定的视图，不是孤立角色列表。
 - 名单是人事招人的唯一依据；名单/模块/拓扑任何变更须新版本文件（v(N+1)）并重新 D3，不得原地改；旧版保留只读；功能/需求变更必须先有产品新 intent 版本。
 - 不写角色卡、不招人、不实现、不改产品意图；不写其他角色资料。
 - 完成后必须 submit_report 给幕僚（完成/证据/遗留）。
@@ -464,7 +480,7 @@ v2.19 复核记录 1099 行 / `b9141a1d…`：剩三项，v2.20 定死：
 | # | 检查点 | 机械规则 | 失败行为 |
 | --- | --- | --- | --- |
 | M1 | 幕僚 → 策划 | 最新 `docs/product/<flowId>-intent-vN.md` 存在、非空、含 Markdown 标题；文件名 N = frontmatter `version` = `## 版本记录` 当前行；flowId 与派发载荷一致（缺 flowId ⇒ 只接受唯一一份 `docs/product/*-intent-v*.md`；0/多份 ⇒ 拒绝） | 拒发，提示「先派产品出/更新意图文档」 |
-| M2 | 幕僚 → 人事 | 最新 `docs/proposals/<flowId>-roster-vN.md` 存在且通过**完整 v3 契约**校验：`schema` 恰为 `project-roster/v3`（**v1/v2 一律拒绝，不回落/不归一化**）；`modules[]` **1–12 项**，每项 `id`/`name`/`purpose`/**`category`**/**`path`（固定 env 模块 paths[]）**/`publicContract`/`architectureSource` 非空；模块/角色 `id` 为 **2–64 字符**小写 slug 且唯一；**`path` 为单个文件或单个目录**：以 `/` 结尾=目录，否则=文件模块（如 `usr/aa/package.json`）；不得多路径/通配/`..`/绝对路径；不得是治理路径或**其父目录**（如 `docs/`）；**冲突仅禁「路径相同或一方包含另一方」**；**同父的文件模块与目录模块合法（`usr/aa/package.json` 与 `usr/aa/bb/`）**；文件与目录同路径/包含（如 `usr/aa/package.json` 与 `usr/aa/`）非法；**每个模块含 `category`（小写 slug）；默认 `envBootstrap: {omitted:false}` 且 `roles[]` 含 `env-bootstrap`，其固定模块 `env-resources`（env，paths[] 多路径）/`entry-index`（entry，paths[] 多路径）；省略必须 `omitted:true`+非空 `omissionReason`，且不得存在 env/entry 类别模块；`category: env|entry` 归其他角色 ⇒ `env-bootstrap-misownership` 拒绝并说明**；`roles[].modules[]` 完整（`roles` 1–12 项）——每个模块**恰好一个属主**、**一个角色可拥有多个模块（含同父兄弟模块）**、无未绑定模块、角色至少绑定一个模块；**正文「人员+模块拓扑图」章节存在且与 `modules[]`/`roles[].modules[]` 逐项一致（角色集、模块集、属主边、文件/目录路径均一致，无缺失/多余）**；**modules 文档是唯一权威源；roster `modules[]` 是派生快照，必须与之一致；不一致以 modules 为准、退回策划重出 roster 新版本（不得反向覆盖 modules）；topology 文档存在且与 roster 拓扑副本一致**；方案模块表与 modules 文档的 id/名称/路径一致；**modules 文档 schema=`project-modules/v2`、topology 文档 schema=`project-topology/v2`、proposal 文档 schema=`project-proposal/v2`；任一是 v1 ⇒ 拒绝并提示按 v2 重出（不归一化）**；`docs/proposals/<flowId>-proposal-vN.md`、`docs/proposals/<flowId>-modules-vN.md`、`docs/proposals/<flowId>-topology-vN.md`、`docs/contracts/<flowId>-architecture-vN.md` 存在。缺模块/缺绑定/拓扑缺失或不一致/快照漂移/路径相同或包含/多属主/未绑定/路径非法/字段缺失/**env-bootstrap 缺失且无省略理由/env 类别误归属** ⇒ 名单不合法，**退回策划**，不派人事（版本链另由 M13 校验） | 拒发，提示「先派策划出模块清单、完整绑定、人员+模块拓扑图与最新版本链」 |
+| M2 | 幕僚 → 人事 | 最新 `docs/proposals/<flowId>-roster-vN.md` 存在且通过**完整 v3 契约**校验：`schema` 恰为 `project-roster/v3`（**v1/v2 一律拒绝，不回落/不归一化**）；`modules[]` **1–12 项**，每项 `id`/`name`/`purpose`/**`category`**/**`path`（固定 env 模块 paths[]）**/`publicContract`/`architectureSource` 非空；模块/角色 `id` 为 **2–64 字符**小写 slug 且唯一；**`path` 为单个文件或单个目录**：以 `/` 结尾=目录，否则=文件模块（如 `usr/aa/package.json`）；不得多路径/通配/`..`/绝对路径；不得是治理路径或**其父目录**（如 `docs/`）；**冲突仅禁「路径相同或一方包含另一方」**；**同父的文件模块与目录模块合法（`usr/aa/package.json` 与 `usr/aa/bb/`）**；文件与目录同路径/包含（如 `usr/aa/package.json` 与 `usr/aa/`）非法；**每个模块含 `category`（小写 slug）；默认 `envBootstrap: {omitted:false}` 且 `roles[]` 含 `env-bootstrap`，其固定模块 `env-resources`（env，paths[] 多路径）/`entry-index`（entry，paths[] 多路径）；省略必须 `omitted:true`+非空 `omissionReason`，且不得存在 env/entry 类别模块；`category: env|entry` 归其他角色 ⇒ `env-bootstrap-misownership` 拒绝并说明**；`roles[].modules[]` 完整（`roles` 1–12 项）——每个模块**恰好一个属主**、**一个角色可拥有多个模块（含同父兄弟模块）**、无未绑定模块、角色至少绑定一个模块；**正文「人员+模块拓扑图」章节存在且与 `modules[]`/`roles[].modules[]` 逐项一致（角色集、模块集、属主边、文件/目录路径均一致，无缺失/多余）**；**modules 文档是唯一权威源；roster `modules[]` 是派生快照，必须与之一致；不一致以 modules 为准、退回策划重出 roster 新版本（不得反向覆盖 modules）；topology 文档存在且与 roster 拓扑副本一致**；方案模块表与 modules 文档的 id/名称/路径一致；**modules 文档 schema=`project-modules/v2`、topology 文档 schema=`project-topology/v2`、proposal 文档 schema=`project-proposal/v2`；任一是 v1 ⇒ 拒绝并提示「modules 按 v2 重出（category/path/paths）、topology 按 v2 重出（path/category）、proposal 按 v2 重出（模块表 path/category）」，不归一化**；`docs/proposals/<flowId>-proposal-vN.md`、`docs/proposals/<flowId>-modules-vN.md`、`docs/proposals/<flowId>-topology-vN.md`、`docs/contracts/<flowId>-architecture-vN.md` 存在。缺模块/缺绑定/拓扑缺失或不一致/快照漂移/路径相同或包含/多属主/未绑定/路径非法/字段缺失/**env-bootstrap 缺失且无省略理由/env 类别误归属** ⇒ 名单不合法，**退回策划**，不派人事（版本链另由 M13 校验） | 拒发，提示「先派策划出模块清单、完整绑定、人员+模块拓扑图与最新版本链」 |
 | M3 | 人事 D3 卡 | **发卡者必须是人事**；`cardKind=appointment`、`multiple=true`；选项=名单角色 id（含默认 `env-bootstrap`；覆盖名单、无内置 id）；应用从名单生成 `recommendedRoleIds`（不采信模型自报）；**`omitted=false` 时 `env-bootstrap` 默认勾选且不可取消，`targetRoleIds` 必须包含它；取消/漏选 ⇒ 拒绝并提示「需先出带理由的新名单版本并移除 env/entry 模块」；`omitted=true` 时 D3 不出现 env-bootstrap 且不得有 env/entry 模块**；**D3 卡预览含应用从 roster 渲染的人员+模块拓扑图（或摘要：运营→角色→模块→文件/目录路径），客户据此审批**；**角色授权写集来自其绑定模块的路径集并集（文件模块=该文件；目录模块=目录；以 modules 文档为权威；roster 快照仅供校验）**。**convener 的 appointment 发卡通道必须移除/机械拒绝**（`TRIO_CARD_KINDS.convener` 去 `appointment`） | 不发卡（未向客户呈现），退回归档 |
 | M4 | appointment-write | `targetRoleId` ∈ 最新 D3 `request.resolved.targetRoleIds` ∧ ∈ 名单；声明路径全部在 `角色卡/<id>/`；**boundary 模块条目判定：文件模块=该文件本身（`kind: file` 必须恰等于模块 path；目录条目不得覆盖文件模块）；目录模块=`kind: directory` 为模块目录本身/子目录、`kind: file` 必须位于模块目录内（不得是父目录，如 `src/`）；`env-resources`/`entry-index` 的每个 path 逐个判定；模块路径集以 `modules-vN.md` 为权威（roster 快照仅供校验）；路径以 `/` 结尾=目录、否则=文件，`kind` 必须与模块形态一致；`category: env|entry` 仅 env-bootstrap 可写，误归属拒绝；不得用父目录/`..`/符号链接借道**；`角色卡/<id>/`、`temp/<id>/` 仅限既有模板固定条目，不计入模块授权；角色卡写明其 module；现有结构校验（role-card 必需章节、YAML 合法性）。**D3 卡回执必须携带 `decisionId`（`decision-<requestId>`），人事写卡时原样传入**；D3 的 `rosterVersion`/`rosterSha256` 必须等于最新名单 | 不发卡/不发行写入路径 |
 | M5 | 幕僚 → 运营 | **D3 选中**的每个角色都有合法角色卡（`listProject` 枚举 + 卡/边界存在）；D3 已 resolved；**未选中角色不要求卡片**；**`omitted=false` 时 D3 必须含 env-bootstrap；omitted=true 时 env/entry 模块不得存在；env/entry 模块的属主必须被 D3 选中**；模块绑定完整（同 M2） | 拒发，提示「先完成人事写卡/D3 未含 env-bootstrap」 |
@@ -475,22 +491,22 @@ v2.19 复核记录 1099 行 / `b9141a1d…`：剩三项，v2.20 定死：
 | M10 | 验收卡 | 只有 verifier 可发 `cardKind=acceptance`；验收结果由客户/judge 在卡上决定；**验收 facts/卡必须逐模块列 `moduleId`/`modulePaths`/属主与证据，模块集合 = 名单模块集合（或任务指定模块），不得缺失/多余/错属主；有 env/entry 模块时 env-bootstrap 必须在 D3 选中且 facts 含其模块；报告与证据必须按模块归档；缺任一模块证据 ⇒ 核对不完整，不得写成验收通过** | 非 verifier 发卡被拒；模块缺失/错配/证据不全；env 模块漏验收/owner 未选中 |
 | M11 | 名单/模块/版本变更 | 名单版本变化（含 modules/bindings/拓扑/**category/envBootstrap 省略状态**）或任一受管文档出新版本后，旧 D3/appointment-write 不得复用：`request.resolved.rosterVersion`+`rosterSha256` 与最新名单不一致 ⇒ 拒绝；新版本须新 D3；D3 后下游文档再出新版本 ⇒ M13 判定版本链陈旧，需重新走链 | 拒发/拒写 |
 | M12 | shell 写区 | 见 §6（显式写目标、治理路径、不可代批、执行后审计） | 拒绝/强制人工/任务失败 |
-| M13 | **文档版本链（v2.8–v2.20）** | 六类受管文档（intent/proposal/modules/roster/architecture/topology）都有最新版本文件 `<flowId>-<doc>-vN.md`，且 schema 符合 §5.5（`project-intent/v1`/`project-proposal/v2`/`project-modules/v2`/`project-roster/v3`/`project-architecture/v1`/`project-topology/v2`；**任一 v1/旧 schema ⇒ 拒绝并按对应 v2/v3 重出，不归一化**）；文件名 N = frontmatter `version` = `## 版本记录` 当前行；引用（proposal→intent、modules→proposal、roster→proposal/modules、topology→roster/modules、architecture→modules）指向**存在且为最新**的精确版本；**topology 与 roster 同版本号**；**modules 文档为唯一权威源，roster `modules[]` 为派生快照且必须与之一致（不一致以 modules 为准、退回策划重出 roster 新版本）；含 category/envBootstrap（默认/省略理由）与文件/目录 path/paths 校验**；roster 正文拓扑 = topology 文档；旧版本保留且**与 `.ans/state/versions.jsonl` 基线 hash 一致（marker/整文件校验；`path` canonical 由 flowId/doc 派生、`sha256`=实际 `<flowId>-<doc>-vN.md`、唯一键 `(flowId,doc,version)`；旧 event `versioned-doc-baseline`/recordedBy `app`/含 `-vN` path 读时归一化、写回只写新值、不追加迁移记录；仅两者皆无时首次 TOFU；已初始化后缺失/坏行/条目缺失/不一致 fail-closed；唯一合法追加是 `versioned-doc-guard` 在项目级锁内为属主合法新版本 vN+1 写 `event:"version-added"`，M13 只读不改 baseline；**锁为临时文件+link 原子创建、pid 存活不接管、写 baseline/rename 前 token 栅栏、旧 holder 拒绝**）**；任一缺失/旧引用/版本不一致/快照漂移/baseline 不一致 ⇒ 退回策划，不派人事、不发 D3 | 拒发，提示「先更新版本链（产品意图→方案→模块→名单/拓扑/架构）」 |
+| M13 | **文档版本链（v2.8–v2.22）** | 六类受管文档（intent/proposal/modules/roster/architecture/topology）都有最新版本文件 `<flowId>-<doc>-vN.md`，且 schema 符合 §5.5（`project-intent/v1`/`project-proposal/v2`/`project-modules/v2`/`project-roster/v3`/`project-architecture/v1`/`project-topology/v2`；**任一 v1/旧 schema ⇒ 拒绝并按对应 v2/v3 重出（roster：path/category/envBootstrap；modules：category/path/paths；topology：path/category；proposal：模块表 path/category），不归一化**）；文件名 N = frontmatter `version` = `## 版本记录` 当前行；引用（proposal→intent、modules→proposal、**roster→顶层 intent/proposal/architecture 完整项目相对路径**、topology→roster/modules、architecture→modules）指向**存在且为最新**的精确版本；**topology 与 roster 同版本号**；**modules 文档为唯一权威源，roster `modules[]` 为派生快照且必须与之一致（不一致以 modules 为准、退回策划重出 roster 新版本）；含 category/envBootstrap（默认/省略理由）与文件/目录 path/paths 校验**；roster 正文 ```topology 块为唯一机器拓扑，必须与 frontmatter/modules 一致；topology-vN.md 如存在仅归档副本；旧版本保留且**与 `.ans/state/versions.jsonl` 基线 hash 一致（marker/整文件校验；`path` canonical 由 flowId/doc 派生、`sha256`=实际 `<flowId>-<doc>-vN.md`、唯一键 `(flowId,doc,version)`；旧 event `versioned-doc-baseline`/recordedBy `app`/含 `-vN` path 读时归一化、写回只写新值、不追加迁移记录；仅两者皆无时首次 TOFU；已初始化后缺失/坏行/条目缺失/不一致 fail-closed；唯一合法追加是 `versioned-doc-guard` 在项目级锁内为属主合法新版本 vN+1 写 `event:"version-added"`，M13 只读不改 baseline；**锁为临时文件+link 原子创建、pid 存活不接管、写 baseline/rename 前 token 栅栏、旧 holder 拒绝**）**；任一缺失/旧引用/版本不一致/快照漂移/baseline 不一致 ⇒ 退回策划，不派人事、不发 D3 | 拒发，提示「先更新版本链（产品意图→方案→模块→名单/拓扑/架构）」 |
 
 > 说明：M3 复用现有 `cardKind=appointment` 的「选项=推荐集、judge 代批=全推荐集」机制；**不用 `cardKind=decision`**，因为 decision 卡的 agent 代批只选**唯一**推荐项，无法一次批准多角色名单（`governance-judge-verdict.ts:461-488`）。这也避免把招人卡混进材料性选择。
 
 ### 5.2 名单的机器可读形式（推荐；v2：模块先行）
 
-**推荐：策划在 `docs/proposals/<flowId>-roster-vN.md` 写严格的 YAML frontmatter**（仍是策划现有写区，不新增目录/权限）。**先生成模块清单（每个模块恰好一个路径：单个文件或单个目录），再做模块→角色绑定；`docs/proposals/<flowId>-modules-vN.md` 是模块清单的唯一定义源，roster 的 `modules[]` 只是派生快照，不一致时以 modules 文档为准、重出 roster 新版本（不得反向用 roster 覆盖 modules）；拓扑图独立为 `docs/proposals/<flowId>-topology-vN.md`，roster 正文含同内容副本。**
+**推荐：策划在 `docs/proposals/<flowId>-roster-vN.md` 写严格的 YAML frontmatter**（仍是策划现有写区，不新增目录/权限）。**先生成模块清单（每个模块恰好一个路径：单个文件或单个目录），再做模块→角色绑定；`docs/proposals/<flowId>-modules-vN.md` 是模块清单的唯一定义源，roster 的 `modules[]` 只是派生快照，不一致时以 modules 文档为准、重出 roster 新版本（不得反向用 roster 覆盖 modules）；拓扑写 roster 正文的 ```topology YAML 块（唯一机器可读格式）；topology-vN.md 如存在仅作版本化归档副本，必须与 roster 块一致，不参与机器读取。**
 
 ````markdown
 ---
 schema: project-roster/v3
 flowId: handbook
 version: 1
-references:
-  proposal: handbook-proposal-v1.md
-  modules: handbook-modules-v1.md
+intent: docs/product/handbook-intent-v1.md
+proposal: docs/proposals/handbook-proposal-v1.md
+architecture: docs/contracts/handbook-architecture-v1.md
 envBootstrap:
   omitted: false
 modules:
@@ -552,18 +568,32 @@ roles:
 
 ## 人员+模块拓扑图
 
-```mermaid
-flowchart LR
-  convener["运营（convener，项目管理）"] --> r_env_bootstrap["env-bootstrap｜装配/入口"]
-  convener --> r_writer["writer｜作者"]
-  convener --> r_data_editor["data-editor｜数据编辑"]
-  r_env_bootstrap --> m_env_resources["env-resources｜env｜环境/资源｜templates/, assets/, references/"]
-  r_env_bootstrap --> m_entry_index["entry-index｜entry｜入口/索引｜index.md, catalog/"]
-  r_writer --> m_content["content｜content｜正文内容｜chapters/"]
-  r_data_editor --> m_data["data｜data｜数据与素材｜data/"]
+```topology
+schema: project-topology/v2
+modules:
+  - id: env-resources
+    paths: [templates/, assets/, references/]
+    roleId: env-bootstrap
+  - id: entry-index
+    paths: [index.md, catalog/]
+    roleId: env-bootstrap
+  - id: content
+    paths: [chapters/]
+    roleId: writer
+  - id: data
+    paths: [data/]
+    roleId: data-editor
+roles:
+  - id: env-bootstrap
+    modules: [env-resources, entry-index]
+  - id: writer
+    modules: [content]
+  - id: data-editor
+    modules: [data]
+management: [convener, env-bootstrap, writer, data-editor]
 ```
 
-（模块 → 属主角色、角色 → 名下模块、运营 → 全部项目角色；节点 id 由角色/模块 id 的 `-` 替换为 `_` 并加 `r_`/`m_` 前缀；图必须与 frontmatter 绑定逐项一致。）
+（该 ```topology YAML 块是**唯一机器可读拓扑格式**；模块 → 文件/目录路径 → 属主角色、角色 → 名下模块、运营（convener）管理所有项目角色；必须与 frontmatter 的 modules[]/roles[].modules[] 逐项一致。**不再使用 Mermaid**。）
 
 ## 版本记录
 
@@ -573,12 +603,14 @@ flowchart LR
 ````
 
 > 以上为**写作领域示例**（非代码项目）。代码领域仅是示例：`package.json`/`scripts/`/构建配置≈环境/资源，`index.html`/`src/main.*`/`server.*`≈入口/索引；核心规则按 `category` 与路径，不依赖代码文件名。
+>
+> **机器可读形状（v2.21，以实现口径为准）**：frontmatter 只认**顶层** `intent`/`proposal`/`architecture` 版本化引用（不认嵌套 `references`）；`modules` 是顶层模块数组；拓扑只认正文 ```topology YAML 块（不认 Mermaid）。
 
 校验规则（应用确定性）：
 
 - **只接受 `schema: project-roster/v3`**。`project-roster/v1`/`project-roster/v2` 一律拒绝（reason 明示「v1/v2 已停用，请按 v3 重出名单：path/category/envBootstrap」），**不回落旧版本、不做静默归一化**；名单文件名 `-roster-vN.md` 的 N 与 frontmatter `version` 一致；最新版本非法即拒绝（不看更旧文件）。实现必须把 `workflow-preconditions.ts` 的 v1/v2 分支删除、`appointment-roster.test.ts` 夹具升级为 v3；不得在文档/回执中声称 v1/v2 仍兼容。
 - **modules/topology/proposal schema**：modules 文档必须 `project-modules/v2`（v1 拒绝，提示按 v2 重出：category/path/paths）；topology 文档必须 `project-topology/v2`（v1 拒绝，提示按 v2 重出：path/category）；proposal 文档必须 `project-proposal/v2`（v1 拒绝，提示按 v2 重出：模块表 path/category）；**v1 一律不静默归一化**。
-- **版本化（v2.8）**：roster 文件名 N = frontmatter `version` = `## 版本记录` 当前行（1..N 连续）；`references.proposal`/`references.modules` 必须是存在的**精确版本文件名且为各自最新版**；**`modules-vN.md` 是唯一权威源，roster `modules[]` 是派生快照，必须与其一致；不一致以 modules 为准、重出 roster 新版本（不得反向覆盖 modules）**；roster 正文拓扑副本必须等于 `topology-vN.md`（topology 文档 `references.roster` 指回本 roster 版本；不形成 roster→topology 的循环引用）；旧版保留只读。版本链不满足 ⇒ M13 拒绝（§5.5）。
+- **版本化（v2.8/v2.22）**：roster 文件名 N = frontmatter `version` = `## 版本记录` 当前行（1..N 连续）；**顶层 `intent`/`proposal`/`architecture` 必须是完整项目相对路径的精确版本文件且为各自最新版**——`intent: docs/product/<flowId>-intent-vN.md`、`proposal: docs/proposals/<flowId>-proposal-vN.md`、`architecture: docs/contracts/<flowId>-architecture-vN.md`；**裸文件名（如 `handbook-intent-v1.md`）拒绝**；**`modules-vN.md` 是唯一权威源，roster `modules[]` 是派生快照，必须与其一致；不一致以 modules 为准、重出 roster 新版本（不得反向覆盖 modules）**；roster 正文 ```topology 块是唯一机器可读拓扑，必须与 frontmatter `modules[]`/`roles[].modules[]` 一致；`topology-vN.md` 如存在仅作归档副本且必须与 roster 块一致；旧版保留只读。版本链不满足 ⇒ M13 拒绝（§5.5）。
 - `modules` **1–12 项**；`id` 匹配 `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`（**总长 2–64**，不含首/尾连字符）；唯一；`name`/`purpose`/`publicContract`/`architectureSource` 非空；**每个模块必须有 `category`（小写 slug）**。
 - **固定角色 `env-bootstrap`（装配/入口）**：默认必带；`envBootstrap: {omitted: false}` 或省略对象即要求 `roles[]` 含 `env-bootstrap`，且其固定模块恰为 `env-resources`（category `env`）与 `entry-index`（category `entry`）；小项目可 `envBootstrap: {omitted: true, omissionReason: "<非空合理理由>"}` 省略该角色，但省略后**不得存在 category `env`/`entry` 的模块**。`omitted:true` 仍出现角色、`omitted:false/省略` 但角色缺失、理由为空 ⇒ 拒绝。
 - **类别归属**：`category` 为 2–64 字符小写 slug；`env`/`entry` 为**保留类别**，只能由 `env-bootstrap` 的 `env-resources`/`entry-index` 持有；其他角色/模块声明 `category: env|entry` ⇒ `env-bootstrap-misownership` 拒绝并说明。其他类别（`content`/`research`/`design`/`data` 等）由策划定义，机械校验不硬编码 package.json/入口文件名；代码文件名仅是代码领域可选启发式（给出 warning，不替代 category）。
@@ -591,9 +623,21 @@ flowchart LR
 - **绑定完整**：`roles[].modules[]` 中的每个 id 必须在 `modules` 中存在；**每个模块必须恰好被一个角色绑定**（无未绑定、无多属主）；**一个角色可拥有多个模块**。
 - **env-bootstrap 绑定约束**：`env-bootstrap` 只拥有 `env-resources` 与 `entry-index`（恰两个，不得多/少）；`env-resources`/`entry-index` 为**保留模块 id**，其他角色不得使用/拥有；`category: env|entry` 的模块只能由 `env-bootstrap` 绑定（见上）；`env-bootstrap` 省略时这两个 id 不得出现。
 - **角色授权写集 = 其绑定模块路径集的并集**（文件模块=该文件本身；目录模块=目录；派生，不得自述额外路径；frontmatter 不再接受角色 `directories` 作为授权来源）。
-- **人员+模块拓扑图（必填）**：正文必须有 `## 人员+模块拓扑图`，含一个 Mermaid `flowchart`；节点集合 = `{convener} ∪ 全部角色 ∪ 全部模块`（**默认含 `env-bootstrap` 与其两个模块；omitted 时不含**），边集合 = `convener→每个角色` ∪ `每条 role→module 绑定`；模块节点标签必须含 `id`、`category` 与**文件/目录 path(s)**；不得缺失/多余/错边/错路径。应用解析并与 **modules 文档（模块权威）+ roster 绑定** 比较，不一致 ⇒ `roster-topology-mismatch`。拓扑图/摘要由同一份 modules+roster 数据派生（单源），D3 卡预览用应用渲染，不读手写图。
+- **人员+模块拓扑图（必填，v2.21）**：正文必须有 `## 人员+模块拓扑图` 章节，章节内含 **```topology YAML 块**（唯一机器可读格式，不要 Mermaid）。块语法：
+  ```yaml
+  schema: project-topology/v2
+  modules:
+    - id: <moduleId>
+      paths: [<文件或目录 path>, ...]   # 与 frontmatter modules[].path/paths 完全一致
+      roleId: <属主角色 id>
+  roles:
+    - id: <roleId>
+      modules: [<moduleId>, ...]        # 与 frontmatter roles[].modules[] 完全一致
+  management: [convener, <全部项目角色 id>]  # 必须含 convener 与全部项目角色
+  ```
+  应用解析并与 **modules 文档（模块权威）+ roster 绑定** 比较；模块/角色集合、路径、属主、绑定、management 任一缺失/多余/不一致 ⇒ `roster-topology-mismatch`。默认含 `env-bootstrap` 与其两个模块；omitted 时不含。D3 预览从同一数据渲染，不读手写图。
 - **模块表/快照一致（R7 权威源）**：`docs/proposals/<flowId>-modules-vN.md` 是模块清单的**唯一权威源**（正文按 `模块 id | 名称 | 类别 | 职责 | 模块路径（文件/目录） | 公开契约 | 架构来源` 固定列）；`docs/proposals/<flowId>-proposal-vN.md` 的模块清单表与 modules 文档的 id/名称/路径一致；**roster `modules[]` 是派生快照，必须与 modules 文档逐项一致；不一致以 modules 为准，退回策划重出 roster 新版本，不得用 roster 反向覆盖 modules**；缺行/值不一致/快照漂移 ⇒ 名单不合法。
-- **拓扑图/拓扑文档一致**：`docs/proposals/<flowId>-topology-vN.md` 与 roster 正文 `## 人员+模块拓扑图` 必须是同一 Mermaid（节点/边/文件或目录路径一致）；任一缺失或漂移 ⇒ 拒绝。
+- **拓扑图/拓扑文档一致（v2.21）**：机器校验只读 roster 正文 ```topology 块；`docs/proposals/<flowId>-topology-vN.md` 如存在仅作版本化归档副本，必须与 roster 块逐项一致（否则拒绝）；**不再要求 Mermaid**。
 - **boundary 判定（R5/v2.16–v2.18）**：模块写区条目必须落在角色模块路径集内（**多路径固定模块 `env-resources`/`entry-index` 的每个 path 逐个判定**）——**文件模块**：`kind: file` 必须**恰等于**该文件 path（目录条目不得覆盖文件模块）；**目录模块**：`kind: directory` 只能是该目录本身或子目录（如 `templates/` 允许 `templates/web/`；父目录不允许），`kind: file` 必须位于该目录内（严格子路径）。路径以 `/` 结尾=目录、否则=文件；`kind` 必须与模块形态一致；不得用父目录/`..`/符号链接逃逸。`角色卡/<id>/`、`temp/<id>/` 仅限既有角色模板的固定条目（role-card/boundary/工作文档/暂存），不计入模块授权、不得借道扩张。
 - 名单/模块/拓扑/方案/架构任一变更以新版本文件（`-v(N+1).md`）落盘，不原地改；同版本改内容由 sha256 识别并拒绝；旧版保留只读；D3 依据新 rosterVersion 重新决定。
 
@@ -659,11 +703,11 @@ flowchart LR
 | 产品意图 | `docs/product/<flowId>-intent-vN.md` | 产品（策划只读） | `schema: project-intent/v1`；`flowId`/`version`/`## 版本记录` |
 | 策划方案 | `docs/proposals/<flowId>-proposal-vN.md` | 策划 | `schema: project-proposal/v2`；`references.intent`（精确版本文件） |
 | 模块清单 | `docs/proposals/<flowId>-modules-vN.md` | 策划 | **唯一权威源**；`schema: project-modules/v2`；`references.proposal`；`modules[]`（id/name/purpose/**category**/**path（单文件/目录；固定 env 模块用 paths[]）**/publicContract/architectureSource） |
-| 人员名单 | `docs/proposals/<flowId>-roster-vN.md` | 策划 | `schema: project-roster/v3`；`references.proposal`/`references.modules`；**`envBootstrap`（omitted/omissionReason）**；**`modules[]` 仅为派生快照**（以 modules 文档为准）+ `roles[].modules[]` 绑定 |
+| 人员名单 | `docs/proposals/<flowId>-roster-vN.md` | 策划 | `schema: project-roster/v3`；**顶层 `intent`/`proposal`/`architecture` 完整项目相对路径精确版本引用**；**`envBootstrap`（omitted/omissionReason）**；**`modules[]` 仅为派生快照**（以 modules 文档为准）+ `roles[].modules[]` 绑定 + 正文 ```topology 块 |
 | 项目架构 | `docs/contracts/<flowId>-architecture-vN.md` | 策划 | `schema: project-architecture/v1`；`references.modules` |
-| 人员+模块拓扑图 | `docs/proposals/<flowId>-topology-vN.md` | 策划 | `schema: project-topology/v2`；`references.roster`/`references.modules`；固定 Mermaid |
+| 人员+模块拓扑图 | `docs/proposals/<flowId>-topology-vN.md` | 策划 | `schema: project-topology/v2`；`references.roster`/`references.modules`；**roster 正文 ```topology 块为唯一机器格式，本文件为归档副本** |
 
-> 注：**`modules-vN.md` 是模块清单的唯一权威源**；roster 的 `modules[]` 是派生快照（R1 要求名单带字段），必须与 modules 文档一致；**不一致以 modules 为准，重出 roster 新版本（不得反向用 roster 覆盖 modules）**。roster 正文另含 `## 人员+模块拓扑图` 副本，必须与 `topology-vN.md` 一致（满足「名单必须带拓扑图」且拓扑图可独立版本化）。**schema 版本（roster v3；modules/topology/proposal v2；intent/architecture v1）与文档版本（vN）分离**：`schema: project-roster/v3` 的文档可以是 `-roster-v1.md`/`-v2.md`；文件名 N 只表示文档第 N 版。
+> 注：**`modules-vN.md` 是模块清单的唯一权威源**；roster 的 `modules[]` 是派生快照（R1 要求名单带字段），必须与 modules 文档一致；**不一致以 modules 为准，重出 roster 新版本（不得反向用 roster 覆盖 modules）**。roster 正文 `## 人员+模块拓扑图` 下的 ```topology 块是唯一机器可读拓扑；`topology-vN.md` 如存在仅作版本化归档副本，必须与 roster 块一致。**schema 版本（roster v3；modules/topology/proposal v2；intent/architecture v1）与文档版本（vN）分离**：`schema: project-roster/v3` 的文档可以是 `-roster-v1.md`/`-v2.md`；文件名 N 只表示文档第 N 版。
 >
 > **写者/管控**：intent 由产品写、策划只读；其余五类由策划写。客户说的「策划管控」指**策划维护整条版本链的一致性**（引用、校验、退回），不是让策划越权写产品文档；功能变更必须先由产品出新 intent 版本。
 >
@@ -702,7 +746,7 @@ flowchart LR
 **变更流程（功能/需求变更必须从产品开始）：**
 
 1. **产品更新意图**：任何功能/需求变更，产品先写 `intent-v(N+1).md`（新文件；版本记录写变更原因/范围）；旧 intent 保留只读。策划不得直接改意图或绕过新版本。
-2. **策划更新版本链**（按序，全部新文件、不原地改；各文档按自身当前版本 +1）：proposal 下一版本引用新 intent → modules 下一版本引用新 proposal → roster 下一版本引用新 proposal+modules（`modules[]` 快照同步；**若快照与 modules 不一致，以 modules 为准，重出 roster 新版本**）→ topology 下一版本（与 roster 同号）引用新 roster+modules（Mermaid 同步）→ architecture 下一版本引用新 modules。方案模块表同步 modules 文档。
+2. **策划更新版本链**（按序，全部新文件、不原地改；各文档按自身当前版本 +1）：proposal 下一版本引用新 intent → modules 下一版本引用新 proposal → roster 下一版本引用新 proposal+modules（`modules[]` 快照同步；**若快照与 modules 不一致，以 modules 为准，重出 roster 新版本**）→ topology（roster 正文 ```topology 块，与 roster 同版本）引用新 roster+modules（YAML 块同步）→ architecture 下一版本引用新 modules。方案模块表同步 modules 文档。
 3. **机械前置按最新版本**：M13 先校验六类文档最新版本与引用链；M2 再校验 roster/modules/绑定/拓扑；任一旧引用、缺版本、版本号/历史表不一致、快照/拓扑漂移 ⇒ 退回策划，不派人事、不发 D3。
 4. **招人依据新 rosterVersion**：D3 卡预览用最新 roster/拓扑；`request.resolved` 记录新的 `rosterVersion`+`rosterSha256`；appointment-write 只认该版本；旧 D3/旧 decisionId 一律作废，需重新 D3。
 5. **实现/验收按派发时版本**：运营派发任务携带 `moduleId` + 应用派生的 `modulePaths`，并记录派发时的 `rosterVersion`/`rosterSha256`；任务按该快照完成/验收，不因后续新版本改义；新版本后新任务必须用新 D3/新 roster。验收 facts 按任务记录的 roster 版本逐模块核对。
@@ -712,7 +756,7 @@ flowchart LR
 
 - 六类文档最新版本存在；文件名/头部/版本记录一致、连续。
 - 引用链：proposal.intent = 最新 intent；modules.proposal = 最新 proposal；roster.proposal/modules = 最新；topology.roster/modules = 最新；architecture.modules = 最新；任何「引用了旧版本而更新版本已存在」⇒ 拒绝。
-- 内容一致性：**modules 文档是唯一权威源；roster.modules[] 是派生快照，必须与 modules 一致；不一致以 modules 为准，退回策划重出 roster 新版本（不得反向覆盖 modules）**；roster 正文拓扑 = topology 文档；**topology 版本号 = roster 版本号**；proposal 模块表 = modules；architecture 引用的模块 id 集合 = modules。
+- 内容一致性：**modules 文档是唯一权威源；roster.modules[] 是派生快照，必须与 modules 一致；不一致以 modules 为准，退回策划重出 roster 新版本（不得反向覆盖 modules）**；roster 正文 ```topology 块为唯一机器拓扑，必须与 frontmatter/modules 一致（topology-vN.md 仅归档副本）；**topology 版本号 = roster 版本号**；proposal 模块表 = modules；architecture 引用的模块 id 集合 = modules。
 - 旧版本 hash 与 `.ans/state/versions.jsonl` 基线一致（只读）；D3/任务记录的 rosterVersion 与最新一致（旧 D3 拒绝）；shell/post-audit 发现旧版变化即失败。
 - 测试覆盖：版本格式/历史表、旧版只读、引用最新、变更后重新走链路（D3 依据新 rosterVersion）、缺版本/旧引用/快照漂移负例（§7.1/P11）。
 
@@ -869,7 +913,7 @@ function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWriteGuard
 | --- | --- | --- |
 | 门禁引擎 | `test/门禁引擎/classify-shell.test.ts`、新增 `shell-write-guard.test.ts` | 写目标分类、边界/治理路径拒绝、script 类识别（脚本审查）、realpath/符号链接/F4 scope；**受管旧版本路径（cp/tee/重定向等）⇒ 结构性 deny、不进审批**；既有四态不回归 |
 | 门禁引擎 | `test/门禁引擎/boundary-*`、`resolve-write.test.ts` | 复用路径判定口径；不新增第二份 resolveWrite |
-| 编排 | 新增 `test/编排/workflow-preconditions.test.ts` | 模块清单/绑定解析（**只收 v3、v1/v2 明确拒绝且不归一化**；字段完整、模块 1–12、id 2–64、**path 为单文件或单目录（尾 `/`=目录、否则文件）**、治理路径**及其父目录**（`docs/`）拒绝、一模块一路径、**冲突仅相同/包含**、**同父文件+目录合法**、一模块一属主、角色多模块合法、未绑定/多属主非法；**文件模块/目录模块相同或包含负例**；**envBootstrap 默认包含/省略理由/category env|entry 归属 env-bootstrap、误归属负例；非代码写作项目（templates/assets/references + index/catalog）正例**；**人员+模块拓扑图解析与一致性（节点/边/文件或目录路径，缺模块/多角色/错路径负例）**；方案模块表一致性；**文档版本链（文件名/头部/版本记录、引用精确版本且为最新、旧引用/缺版本负例、`.ans/state/versions.jsonl` 基线与 `.initialized` marker（严格 schema）、`VersionsBaselineRecord` 坏行/缺字段整文件 fail-closed、event 白名单/recordedBy、已初始化后不得 TOFU/重建、v1 首次 TOFU、v2.10 旧 `-vN` path/旧 event `versioned-doc-baseline`/旧 recordedBy `app` 读取归一化/写回新值/不追加迁移记录、**旧 path 后缀 N 与 version 不一致负例**、canonical path/唯一键/`sha256` 实际文件、**并发锁：活锁永不接管（即使超龄）、仅 pid 不存在才接管、临时文件+link 原子创建、半内容锁重试/fail-closed、旧 holder token 栅栏拒绝、不丢 version-added**）**；boundary 子目录/文件/父目录判定；moduleId 查找/属主校验；派发矩阵（M1–M13）；报告路由；D3 推荐集/roster 版本 |
+| 编排 | 新增 `test/编排/workflow-preconditions.test.ts` | 模块清单/绑定解析（**只收 v3、v1/v2 明确拒绝且不归一化**；字段完整、模块 1–12、id 2–64、**path 为单文件或单目录（尾 `/`=目录、否则文件）**、治理路径**及其父目录**（`docs/`）拒绝、一模块一路径、**冲突仅相同/包含**、**同父文件+目录合法**、一模块一属主、角色多模块合法、未绑定/多属主非法；**文件模块/目录模块相同或包含负例**；**envBootstrap 默认包含/省略理由/category env|entry 归属 env-bootstrap、误归属负例；非代码写作项目（templates/assets/references + index/catalog）正例**；**人员+模块拓扑图解析与一致性（正文 ```topology YAML 块：modules[].id/paths/roleId、roles[].id/modules、management；缺模块/多角色/错路径/不要求 Mermaid）**；方案模块表一致性；**文档版本链（文件名/头部/版本记录、引用精确版本且为最新、旧引用/缺版本负例、`.ans/state/versions.jsonl` 基线与 `.initialized` marker（严格 schema）、`VersionsBaselineRecord` 坏行/缺字段整文件 fail-closed、event 白名单/recordedBy、已初始化后不得 TOFU/重建、v1 首次 TOFU、v2.10 旧 `-vN` path/旧 event `versioned-doc-baseline`/旧 recordedBy `app` 读取归一化/写回新值/不追加迁移记录、**旧 path 后缀 N 与 version 不一致负例**、canonical path/唯一键/`sha256` 实际文件、**并发锁：活锁永不接管（即使超龄）、仅 pid 不存在才接管、临时文件+link 原子创建、半内容锁重试/fail-closed、旧 holder token 栅栏拒绝、不丢 version-added**）**；boundary 子目录/文件/父目录判定；moduleId 查找/属主校验；派发矩阵（M1–M13）；报告路由；D3 推荐集/roster 版本 |
 | 门禁引擎 | 新增 `test/门禁引擎/versioned-doc-guard.test.ts` | 受管文档只增不改：首个版本 v1、已存在 `-vN.md` 的 `write_file`/`edit_file` 覆盖拒绝、新版本必须 N+1、非受管路径（quality report）不误伤；**shell 全通道**——`cp`/`mv`/`tee`/`install`/`sed -i`/重定向/`node -e`/`node <script>`/`python <script>` 命中既有版本路径 ⇒ **deny、不进客户卡/judge**；**脚本同时含受管目录/受管文档名模式（`*-intent-v*` 等）与写 API（动态拼接）⇒ deny**；新版本新文件由属主写成功；**marker 后 baseline 缺失/坏行/TOFU 不得重建；旧版本 hash 基线不变**；**合法新版本 vN+1 成功后 `version-added` 原子追加（预检→写文件→重读→tmp baseline→校验/rename→重读；失败回退旧 baseline/删除新文件），M13 只读；event 白名单/recordedBy/marker schema/同 `(flowId,doc,version)` 重复/canonical path 负例；旧 event `versioned-doc-baseline`+旧 recordedBy `app`+旧 path 组合归一化正例与旧字段非法值负例、不追加迁移记录；两写者按 projectRoot 锁串行且不丢 version-added；**活锁永不接管（即使 startedAt 超龄）、仅 pid 不存在才接管、临时文件+link 原子创建/半内容锁重试、旧 holder token 栅栏拒绝、锁不可得/超时/持有者崩溃/只释放自己 token**；v1 首次创建走 TOFU** |
 | 编排 | `test/编排/task-state.test.ts`（或现有 task-state 测试） | `task.created.from=chief / convener`、`stepId`、**`moduleId`/`modulePaths`/`rosterVersion`/`rosterSha256` 形状与旧记录兼容**、`task.closed.by`、`request.resolved.rosterVersion/rosterSha256`、旧记录兼容/回滚 |
 | 编排 | `test/编排/appointment-roster.test.ts`（**夹具升级 v3**） | v1/v2 名单拒绝（不兼容/不归一化）；v3 名单解析、env-bootstrap 默认/省略、category 归属、D3 推荐集、**D3 卡预览含人员+模块拓扑图/摘要**、写卡授权写集=模块路径集并集、拓扑与绑定不一致时拒绝；**名单新版本后旧 D3/旧 rosterVersion 拒绝、必须新 D3；D3 取消 env-bootstrap ≠ 省略（未省略时拒绝）** |
@@ -898,7 +942,7 @@ function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWriteGuard
 | ID | 标准 | 证据 | 失败示例 |
 | --- | --- | --- | --- |
 | P1 | **五步链不可跳**：幕僚→策划缺产品意图文档被拒；幕僚→人事缺名单被拒；幕僚→运营缺角色卡被拒；幕僚→项目 worker 被拒；**每条拒绝发生在 `task.created` 之前**（`tasks.jsonl` 行数不变、不打开会话） | `chain-enforcement.test.ts` 正/负例；真实应用截图/日志 | 仍能跳过；拒绝后仍创建任务；提示不含下一步 |
-| P2 | **模块清单 + 名单绑定 + 拓扑图（§六 delta 2 / v2.16–v2.20）**：`project-roster/v3` 解析/校验；**只收 v3，v1/v2 明确拒绝且不归一化**；`modules[]` 字段完整（id/name/purpose/**category**/**path（固定 env 模块 paths[]）**/publicContract/architectureSource）、**1–12 项**、id **2–64**；**一个模块 = 恰好一个文件或一个目录（固定 env-resources/entry-index 为多 paths[] 例外）**：`path` 以 `/` 结尾=目录，否则=文件模块（如 `usr/aa/package.json`）；不得多路径/通配/`..`/绝对路径；治理路径及其父目录拒绝；**冲突仅「路径相同或一方包含另一方」**；**同父文件模块与目录模块合法**（`usr/aa/package.json` 与 `usr/aa/bb/`）；文件与目录同路径/包含（`usr/aa/package.json` 与 `usr/aa/`）非法；**固定角色 `env-bootstrap` 默认包含（env-resources/entry-index，category env/entry，paths[] 多路径例外）；省略须 `envBootstrap.omissionReason` 非空且无 env/entry 模块；category env/entry 归其他角色 ⇒ 拒绝**；每个模块恰好一个属主、角色可拥有多个模块（含同父文件+目录模块）、所有模块已绑定；**角色授权写集 = 绑定模块路径集并集**；**人员+模块拓扑图章节存在且模块/角色/路径/边与绑定逐项一致**；**modules 文档是唯一权威源，roster `modules[]` 是派生快照且必须一致；不一致以 modules 为准、重出 roster 新版本；topology 文档与 roster 拓扑副本一致**；方案模块表与 modules 一致；名单/模块是 D3/写卡的唯一来源；缺模块/缺绑定/拓扑缺失或不一致/路径相同或包含/多属主/未绑定/路径非法 ⇒ 不合法并退回策划 | `workflow-preconditions.test.ts` 正/负例（v1/v2 roster 拒绝、modules/topology/proposal v1 拒绝、roster v3 / modules+topology+proposal v2 文件模块正例、**`usr/aa/package.json` 归 env-bootstrap 正例**、文件+目录同父正例、文件/目录相同或包含负例、**非代码写作项目 env-resources/entry-index 正例、省略理由正/负例、env/entry 误归属负例**）；`appointment-roster.test.ts` v1/v2 拒绝 + v3 夹具；拓扑一致性负例 | 名单 v1/v2 仍被接受；文件模块被当目录/目录写成文件；`docs/` 父目录被接受；文件与目录相同/包含被放过；同父文件+目录被误拒；env-bootstrap 默认缺失/省略无理由；env/entry 模块归错角色；非代码项目模板/索引被误判；多属主/未绑定；拓扑缺失/错路径/多角色；写卡越模块路径；角色自述额外路径 |
+| P2 | **模块清单 + 名单绑定 + 拓扑图（§六 delta 2 / v2.16–v2.22）**：`project-roster/v3` 解析/校验；**只收 v3，v1/v2 明确拒绝且不归一化**；`modules[]` 字段完整（id/name/purpose/**category**/**path（固定 env 模块 paths[]）**/publicContract/architectureSource）、**1–12 项**、id **2–64**；**一个模块 = 恰好一个文件或一个目录（固定 env-resources/entry-index 为多 paths[] 例外）**：`path` 以 `/` 结尾=目录，否则=文件模块（如 `usr/aa/package.json`）；不得多路径/通配/`..`/绝对路径；治理路径及其父目录拒绝；**冲突仅「路径相同或一方包含另一方」**；**同父文件模块与目录模块合法**（`usr/aa/package.json` 与 `usr/aa/bb/`）；文件与目录同路径/包含（`usr/aa/package.json` 与 `usr/aa/`）非法；**固定角色 `env-bootstrap` 默认包含（env-resources/entry-index，category env/entry，paths[] 多路径例外）；省略须 `envBootstrap.omissionReason` 非空且无 env/entry 模块；category env/entry 归其他角色 ⇒ 拒绝**；每个模块恰好一个属主、角色可拥有多个模块（含同父文件+目录模块）、所有模块已绑定；**角色授权写集 = 绑定模块路径集并集**；**人员+模块拓扑图章节存在且模块/角色/路径/边与绑定逐项一致**；**modules 文档是唯一权威源，roster `modules[]` 是派生快照且必须一致；不一致以 modules 为准、重出 roster 新版本；topology 文档与 roster 拓扑副本一致**；方案模块表与 modules 一致；名单/模块是 D3/写卡的唯一来源；缺模块/缺绑定/拓扑缺失或不一致/路径相同或包含/多属主/未绑定/路径非法 ⇒ 不合法并退回策划 | `workflow-preconditions.test.ts` 正/负例（v1/v2 roster 拒绝、modules/topology/proposal v1 拒绝且文案含「按 v3/v2 重出 + 字段指引」、roster v3 / modules+topology+proposal v2 文件模块正例、**§5.2 示例原样送入 parseProjectRoster(flowId=handbook) 解析通过（完整 docs/... refs + ```topology 块）**、**`usr/aa/package.json` 归 env-bootstrap 正例**、文件+目录同父正例、文件/目录相同或包含负例、**非代码写作项目 env-resources/entry-index 正例、省略理由正/负例、env/entry 误归属负例**）；`appointment-roster.test.ts` v1/v2 拒绝 + v3 夹具；拓扑一致性负例 | 名单 v1/v2 仍被接受；**裸文件名 intent/proposal/architecture 引用被接受**；文件模块被当目录/目录写成文件；`docs/` 父目录被接受；文件与目录相同/包含被放过；同父文件+目录被误拒；env-bootstrap 默认缺失/省略无理由；env/entry 模块归错角色；非代码项目模板/索引被误判；多属主/未绑定；拓扑缺失/错路径/多角色；写卡越模块路径；角色自述额外路径 |
 | P3 | **D3/招人**：人事发 `cardKind=appointment`（多选、选项=名单、推荐集由应用从名单生成）；**D3 卡预览含应用渲染的人员+模块拓扑图（或摘要：运营→角色→模块→文件/目录路径；默认含 env-bootstrap，omitted 时显示省略理由）**；**`omitted=false` 时 env-bootstrap 默认勾选/不可取消，targetRoleIds 必含；取消/漏选拒绝；omitted=true 时无 env-bootstrap 选项且无 env/entry 模块**；客户/judge 通过后 `targetRoleIds` 正确；appointment-write 目标 ⊆ D3 ∧ 名单；`decisionId` 可被模型获得；`task.created.stepId` 与 `request.resolved.rosterVersion/rosterSha256` 已持久化且可校验；convener 不能发 appointment | 桌面/编排测试；D3 回执/卡预览；task-state 测试 | 人事无法发卡；卡无拓扑图/摘要；judge 只批一个角色；写卡无 decisionId；convener 仍能发 D3；名单版本无法核对；D3 取消 env-bootstrap 未被拒；取消被误当省略 |
 | P4 | **交付与实现/报告路由（按模块，机械）**：运营接交付前 **D3 选中**角色卡齐备且模块绑定完整；**omitted=false 时 D3 必须含 env-bootstrap；env/entry 模块目标必须是 env-bootstrap**；运营只能派 D3 选中集合内、**拥有任务对应模块**的项目 worker；**运营→worker 必须带 `moduleId`，缺失/未知/非属主拒绝；`modulePaths` 由应用派生并写入 `task.created`/任务卡，模型自报无效**；运营派发前置失败不创建任务；**任务绑定报告按 `task.created.from` 路由：项目 worker/质检 → 发起者（运营或幕僚）；产品/策划/人事/运营 → 幕僚** | 桌面 + `task-state` 测试 + 真实应用；chain-enforcement 用例 | 运营无 dispatch；worker/质检报告回错人；运营派名单外角色/非模块属主；缺 moduleId 仍派发；D3 未含 env-bootstrap 仍交付；env/entry 模块派给非 env-bootstrap；事件路径与名单不一致；模块未绑定 |
 | P5 | **验收（按模块，机械）**：运营可发起质检（或幕僚调度）；质检执行核对、发 acceptance 卡；**结果回发起方（运营或幕僚）**、运营汇总幕僚；客户/judge 仍是最终决定者；质检不自批；**验收 facts/卡逐模块带 `moduleId`/`modulePaths`/属主/证据，集合=名单模块（或任务指定模块），缺模块/错属主/证据不全不得通过；有 env/entry 模块时 env-bootstrap 必须在 D3 选中且验收覆盖其模块**；**若客户选 Q6 A**，验收 judge 的最小事实按 §5.4/§6 写集改造并可代批 | 桌面/验收测试；真实应用验收卡；acceptance facts 测试 | 运营替客户验收；质检报告当客户批准；验收卡无法发出；结果回错人；缺模块/错模块属主仍显示通过；env 模块漏验收/env-bootstrap 未选中 |
@@ -907,13 +951,13 @@ function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWriteGuard
 | P8 | **权限 delta 已批准且无额外变化**：无新增内置角色/角色 id/写区；逐项列明并验证已批准 delta——① convener `dispatchTask`（实现阶段，目标限 D3 选中 worker + verifier）；② nominator 可发 `appointment`（仅招人）；③ convener 不可发 `appointment`；④ verifier 可发 acceptance（既有）；⑤ `task.created.from`/`task.closed.by` 放宽到 chief/convener；⑥ shell 按 §五 delta：开关开启 judge 脚本审查（开关关闭客户卡；不再 manualOnly）。不改 `appointment-write` 逐路径确认；不恢复 flow/gate/ledger；新模块不绕过 resolveWrite | diff + 枚举 grep + 注册表/白名单测试 | 出现未列出的权限变化；convener 仍能发 appointment；写区扩张；恢复旧机器 |
 | P9 | **测试证据**：受影响测试更新并通过；新增测试齐全；T3 全量回归；不弱化断言；真实应用 E2E | 命令/输出/哈希 | 只跑单测；跳过 E2E；改断言保绿 |
 | P10 | **不追溯**：trial 项目与既有已验证角色/文档不被改写（除测试新增）；用户可见状态如实 | 文件清单/哈希；diff | 改了 trial 项目；声称已实施 |
-| P11 | **文档版本化与变更流程（v2.8–v2.20）**：六类受管文档（intent/proposal/modules/roster/architecture/topology）文件名 `<flowId>-<doc>-vN.md`、头部 `version: N`、`## 版本记录` 连续一致；**旧版本只读（全通道，R6）**（已存在版本不可覆盖/编辑，**含 shell `cp`/`tee`/`node` 脚本等命中既有 `-vN.md` 时 deny、不进审批**；新版本只能 N+1；**旧版 hash 与 `.ans/state/versions.jsonl` 基线一致；marker（`.ans/state/versions.initialized`，严格 `{"v":1,"initializedAt":"<ISO8601>"}`）存在后 baseline 缺失/坏行/条目缺失不得 TOFU/重建；`VersionsBaselineRecord` 必含 v/flowId/doc/version/path/sha256/recordedAt/event/recordedBy，event 仅 `baseline`/`version-added`、recordedBy 精确 `app:session`，**path 为 flowId/doc 派生的 canonical 逻辑路径、sha256=实际 `<flowId>-<doc>-vN.md`、唯一键 `(flowId,doc,version)`**，坏行整文件 fail-closed、同 `(flowId,doc,version)` 重复 fail；**v2.10 旧 event `versioned-doc-baseline`/recordedBy `app`/含 `-vN` path 读时归一化为新值、写回只写新值、不追加迁移记录**；**新版本登记/TOFU 在 projectRoot 级锁/串行队列内；v1 首次创建走 TOFU（event=baseline），后续走 version-added**；唯一合法追加是属主合法新版本 vN+1 的 `event:"version-added"`（M13 只读）**）；引用精确版本且为最新（proposal→intent、modules→proposal、roster→proposal/modules、topology→roster/modules、architecture→modules；**topology 与 roster 同版本号**）；roster.modules[] 为 modules 文档的派生快照且必须一致（不一致以 modules 为准、重出 roster 新版本；**roster v3 的 envBootstrap/category/path/paths 同样参与版本链；modules/topology/proposal 必须 v2（v1 拒绝重出）**）、roster 拓扑 = topology 文档；**功能/需求变更必须产品先出新 intent 版本，再按序更新方案/模块/名单/拓扑/架构；变更后 D3 只认新 rosterVersion**；缺版本/旧引用/快照或拓扑漂移/旧版被改 ⇒ 拒绝并退回策划 | `workflow-preconditions.test.ts`；新增 `versioned-doc-guard.test.ts`；`chain-enforcement.test.ts`（新版本后重走链路、旧 D3 拒绝）；`appointment-roster.test.ts`；`.ans/state/versions.jsonl` + `.ans/state/versions.initialized` 基线/坏行/TOFU/canonical path/旧 path 归一化/并发锁负例 | 原地改旧版；文件名/头部版本不一致；引用旧版仍通过；roster/modules 快照漂移；变更后旧 D3 仍可写卡；无新 intent 版本直接改功能 |
+| P11 | **文档版本化与变更流程（v2.8–v2.22）**：六类受管文档（intent/proposal/modules/roster/architecture/topology）文件名 `<flowId>-<doc>-vN.md`、头部 `version: N`、`## 版本记录` 连续一致；**旧版本只读（全通道，R6）**（已存在版本不可覆盖/编辑，**含 shell `cp`/`tee`/`node` 脚本等命中既有 `-vN.md` 时 deny、不进审批**；新版本只能 N+1；**旧版 hash 与 `.ans/state/versions.jsonl` 基线一致；marker（`.ans/state/versions.initialized`，严格 `{"v":1,"initializedAt":"<ISO8601>"}`）存在后 baseline 缺失/坏行/条目缺失不得 TOFU/重建；`VersionsBaselineRecord` 必含 v/flowId/doc/version/path/sha256/recordedAt/event/recordedBy，event 仅 `baseline`/`version-added`、recordedBy 精确 `app:session`，**path 为 flowId/doc 派生的 canonical 逻辑路径、sha256=实际 `<flowId>-<doc>-vN.md`、唯一键 `(flowId,doc,version)`**，坏行整文件 fail-closed、同 `(flowId,doc,version)` 重复 fail；**v2.10 旧 event `versioned-doc-baseline`/recordedBy `app`/含 `-vN` path 读时归一化为新值、写回只写新值、不追加迁移记录**；**新版本登记/TOFU 在 projectRoot 级锁/串行队列内；v1 首次创建走 TOFU（event=baseline），后续走 version-added**；唯一合法追加是属主合法新版本 vN+1 的 `event:"version-added"`（M13 只读）**）；引用精确版本且为最新（proposal→intent、modules→proposal、roster→proposal/modules、topology→roster/modules、architecture→modules；**topology 与 roster 同版本号**）；roster.modules[] 为 modules 文档的派生快照且必须一致（不一致以 modules 为准、重出 roster 新版本；**roster v3 的 envBootstrap/category/path/paths 同样参与版本链；modules/topology/proposal 必须 v2（v1 拒绝重出）**）、roster 拓扑 = topology 文档；**功能/需求变更必须产品先出新 intent 版本，再按序更新方案/模块/名单/拓扑/架构；变更后 D3 只认新 rosterVersion**；缺版本/旧引用/快照或拓扑漂移/旧版被改 ⇒ 拒绝并退回策划 | `workflow-preconditions.test.ts`；新增 `versioned-doc-guard.test.ts`；`chain-enforcement.test.ts`（新版本后重走链路、旧 D3 拒绝）；`appointment-roster.test.ts`；`.ans/state/versions.jsonl` + `.ans/state/versions.initialized` 基线/坏行/TOFU/canonical path/旧 path 归一化/并发锁负例 | 原地改旧版；文件名/头部版本不一致；引用旧版仍通过；roster/modules 快照漂移；变更后旧 D3 仍可写卡；无新 intent 版本直接改功能 |
 | G1 | **报告不丢**：任务绑定报告按创建者路由失败时如实系统行，不静默丢弃；旧 chief 路由与 `task-state` 旧记录兼容回归 | 测试 | 报告丢失/重复；旧记录被判坏行 |
 | G2 | **D3 不伪造**：推荐集只来自名单文件；模型不能自报；拒绝/超时 fail-closed | 测试 | 模型自报推荐集被接受 |
 | G3 | **shell 硬拒不变（F6）**：**长内联**（>2048B/>10 行/单行 >1024B，`shell-command-guard` 预封堵）与 **re-shell**（`sh -c`/`bash -c`/`cmd`/`powershell -c`/`eval`/`exec`/`source`）仍 deny；提权/系统破坏/LOLBin 仍 deny；**短内联（bounds 内的 `node -e "<code>"`/`python -c "<code>"`）不在此列**，按 §6.4 进 `script` 审查并携带代码内容（不得写 deny） | classify-shell/shell-gate 测试；短内联→script+内容、长内联→deny、re-shell→deny 断言 | 短内联被硬拒（F6）；长内联/re-shell 被放行；硬拒被软化 |
 | G4 | **边界口径单一**：shell 守卫与 resolveWrite 使用同一路径语义（realpath/大小写/`..`） | 测试 + 代码 diff | 第二份路径判定漂移 |
 | G5 | **验收语义**：验收卡 accept/reject 由客户/judge 决定；质检/运营不能代写；成品结论可追溯 | 测试 + 卡记录 | 运营/质检代批 |
-| G6 | **版本链不漂移（v2.8–v2.20）**：受管文档版本文件只增不改、引用链指向最新精确版本、roster v3/envBootstrap/category/path 与 modules/topology 快照一致（**modules/topology/proposal v2，v1 拒绝**）；旧版本 hash 基线（`VersionsBaselineRecord` 必含 v/flowId/doc/version/path/sha256/recordedAt/event/recordedBy；event 仅 baseline/version-added、recordedBy 精确 `app:session`；**path canonical、sha 实际版本文件、键 `(flowId,doc,version)`；v2.10 旧 event/recordedBy/path 读时归一化、写回新值、不追加迁移记录**）不变；**marker 后 baseline 缺失/坏行/条目缺失/同键重复不得 TOFU/重建；唯一合法追加是属主合法新版本 vN+1 的 version-added，M13 只读；v1 首次创建走 TOFU；**并发写者按 projectRoot 锁串行（临时文件+link 原子创建/活锁永不接管（即使超龄）/仅 pid 不存在才接管/token 栅栏/超时/只释放自己 token）**；**shell 覆盖旧版（cp/tee/node 脚本）deny 且不进审批、post-audit 发现改写即失败**；D3/任务记录版本可追溯 | 测试 + 文件哈希 + diff | 旧版被覆盖；引用旧版；快照不一致；版本记录缺失/跳号；marker 后重洗基线；event/recordedBy/marker/path/sha/键非法；并发写覆盖/丢 version-added；shell 覆盖被当普通审批放行 |
+| G6 | **版本链不漂移（v2.8–v2.22）**：受管文档版本文件只增不改、引用链指向最新精确版本、roster v3/envBootstrap/category/path 与 modules/topology 快照一致（**modules/topology/proposal v2，v1 拒绝**）；旧版本 hash 基线（`VersionsBaselineRecord` 必含 v/flowId/doc/version/path/sha256/recordedAt/event/recordedBy；event 仅 baseline/version-added、recordedBy 精确 `app:session`；**path canonical、sha 实际版本文件、键 `(flowId,doc,version)`；v2.10 旧 event/recordedBy/path 读时归一化、写回新值、不追加迁移记录**）不变；**marker 后 baseline 缺失/坏行/条目缺失/同键重复不得 TOFU/重建；唯一合法追加是属主合法新版本 vN+1 的 version-added，M13 只读；v1 首次创建走 TOFU；**并发写者按 projectRoot 锁串行（临时文件+link 原子创建/活锁永不接管（即使超龄）/仅 pid 不存在才接管/token 栅栏/超时/只释放自己 token）**；**shell 覆盖旧版（cp/tee/node 脚本）deny 且不进审批、post-audit 发现改写即失败**；D3/任务记录版本可追溯 | 测试 + 文件哈希 + diff | 旧版被覆盖；引用旧版；快照不一致；版本记录缺失/跳号；marker 后重洗基线；event/recordedBy/marker/path/sha/键非法；并发写覆盖/丢 version-added；shell 覆盖被当普通审批放行 |
 
 ### 7.3 T3 与回归
 
@@ -977,7 +1021,7 @@ function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWriteGuard
 6. **路径/版本常量与基线（R9）**：`session.ts`/`run-role.ts`/`customer-input.ts`/`workflow-preconditions.ts` 同步受管文档目录与版本命名；`.ans/state/versions.jsonl` + `.ans/state/versions.initialized` + `.ans/state/versions.lock` 仅应用写、角色不可写/不可删；`VersionsBaselineRecord` 必含 v/flowId/doc/version/path/sha256/recordedAt/event/recordedBy；**path 为 flowId/doc 派生的 canonical 逻辑路径、sha256=实际 `<flowId>-<doc>-vN.md`、唯一键 `(flowId,doc,version)`**；event 白名单 `baseline`/`version-added`、recordedBy 精确 `app:session`；**v2.10 旧 event `versioned-doc-baseline`/recordedBy `app`/含 `-vN` path 读时归一化、写回新值、不追加迁移记录；旧 path 后缀 N 必须等于 version（`...-v1.md`+version:2 负例）**；marker 严格 `{"v":1,"initializedAt":"<ISO8601>"}`；坏行整文件 fail-closed、同键重复 fail（同 path 多版本允许）；仅两者皆无时首次 TOFU，marker 后缺失/坏行/条目缺失绝不重建；**新版本/TOFU 在 projectRoot 锁内串行；锁内容 `{pid,startedAt,token}`、临时文件+link 原子创建、活锁永不接管（即使超龄）、仅 pid 不存在才接管、写 baseline/rename 前 token 栅栏、只释放自己 token、半内容锁重试/fail-closed**。
 7. **Shell 负例**：`shell-write-guard.test.ts`/`shell-approval-context.test.ts`/`versioned-doc-guard.test.ts` 覆盖 `cp`/`mv`/`tee`/`install`/`sed -i`/重定向/`node -e`/`node <script>`/`python <script>` 覆盖既有 `-vN.md` ⇒ deny 且不进审批；新版本新文件由属主写成功。
 8. **基线负例（R9）**：已初始化（marker 存在）后 versions.jsonl 缺失/空/坏行/条目缺失 ⇒ 整文件 fail-closed，**不得重新 TOFU/补条目/重建 marker**；shell 改写旧版被 `shell-post-audit` 发现 ⇒ 任务失败、阻断下游；只有 marker 与 jsonl 均不存在的首次安装才允许 TOFU（v1 首次创建即 TOFU）；**唯一合法追加**是属主创建合法新版本 vN+1 后由 `versioned-doc-guard` 在 projectRoot 锁内原子追加 `event:"version-added"`（trigger/顺序/失败回退见 §5.5；M13 只读）；补 event 白名单/recordedBy/marker schema/同 `(flowId,doc,version)` 重复/canonical path/v2.10 旧 event+旧 recordedBy+旧 path 组合归一化正例与旧字段非法值负例、**旧 path 后缀 N 与 version 不一致负例**、不追加迁移记录、**活锁永不接管（即使超龄）/仅 pid 不存在才接管/旧 holder token 栅栏拒绝/临时文件+link 原子创建/半内容锁重试**、并发两写者/锁不可得/超时/持有者崩溃/只释放自己 token 负例（§7.1/P11/G6）。
-9. **模块语义（v2.16–v2.20）**：roster v3（v1/v2 拒绝不归一化）；modules v2（v1 拒绝）、topology v2（v1 拒绝）、proposal v2（v1 拒绝）；模块 `path` 单文件/单目录、冲突仅相同/包含、同父文件+目录合法；`category` 必填、`env`/`entry` 保留类别只归 env-bootstrap；env-bootstrap 默认必带/`omitted:true`+`omissionReason`/固定 env-resources+entry-index；固定模块 `paths[]` 多路径例外；任务/验收 `modulePaths[]` 派生；D3 `omitted=false` 必选 env-bootstrap、取消≠省略；v3/v2 夹具迁移。
+9. **模块语义（v2.16–v2.21）**：roster v3（v1/v2 拒绝不归一化）；modules v2（v1 拒绝）、topology v2（v1 拒绝）、proposal v2（v1 拒绝）；模块 `path` 单文件/单目录、冲突仅相同/包含、同父文件+目录合法；`category` 必填、`env`/`entry` 保留类别只归 env-bootstrap；env-bootstrap 默认必带/`omitted:true`+`omissionReason`/固定 env-resources+entry-index；固定模块 `paths[]` 多路径例外；任务/验收 `modulePaths[]` 派生；D3 `omitted=false` 必选 env-bootstrap、取消≠省略；**frontmatter 顶层 intent/proposal/architecture refs（不认嵌套 references）；拓扑只认 ```topology YAML 块（不认 Mermaid），topology-vN.md 仅为归档副本**；v3/v2 夹具迁移。
 
 **不需改**：`resolve-write.ts` 的**判定逻辑本身**（复用；需新增 `versioned-doc-guard` 适配调用/公开导出，不改 realpath/边界语义）、`appointment-write` 逐路径确认规则、两开关分组、角色 id/显示名、角色写区（除新增测试文件边界）。
 
@@ -1068,7 +1112,7 @@ function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWriteGuard
 - 不再保留 v2 的「测试/安装普通审批例外」和「强制客户」口径；长内联/re-shell 仍硬拒/预封堵；执行后审计继续覆盖测试/安装写入（排除 `node_modules/`、构建产物）。
 
 **Q3. 名单的机器可读形式**
-- 选择 A（推荐）：`docs/proposals/<flowId>-roster-vN.md` 的 YAML frontmatter（`schema: project-roster/v3`；`envBootstrap`（omitted/omissionReason）、`modules[]`（含 `category`/`path` 或固定 env 模块 `paths[]`）派生快照 + `roles[].modules[]` 绑定；`references.proposal`/`references.modules` 指向精确版本文件），策划写、应用校验。模块清单独立版本化为 `docs/proposals/<flowId>-modules-vN.md`（`project-modules/v2`，**唯一权威源**）；roster 的 `modules[]` 必须与之一致，不一致以 modules 为准、重出 roster 新版本。
+- 选择 A（推荐）：`docs/proposals/<flowId>-roster-vN.md` 的 YAML frontmatter（`schema: project-roster/v3`；**顶层 `intent`/`proposal`/`architecture` 精确版本引用**；`envBootstrap`（omitted/omissionReason）、`modules[]`（含 `category`/`path` 或固定 env 模块 `paths[]`）派生快照 + `roles[].modules[]` 绑定；正文 ```topology 块为唯一机器可读拓扑），策划写、应用校验。模块清单独立版本化为 `docs/proposals/<flowId>-modules-vN.md`（`project-modules/v2`，**唯一权威源**）；roster 的 `modules[]` 必须与之一致，不一致以 modules 为准、重出 roster 新版本。
 - 选择 B：提案文件内的 fenced YAML 块（单文件，但解析/定位更复杂）。
 - 选择 C：任务上下文/短报文本（不可审计、不可被后续角色独立校验，不推荐）。
 - 需确认：名单字段是否还要 `dependsOn`/顺序/技能；版本规则（v2 已定义 version+sha256 持久化；schema 版本与文档版本分离）。
@@ -1151,7 +1195,7 @@ function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWriteGuard
 
 ---
 
-## 13. 复核意见处置（2026-10-29，F1–F10 + R1–R5 + v2.6 复核 R1–R5 + v2.7–v2.20 补充）与交付状态
+## 13. 复核意见处置（2026-10-29，F1–F10 + R1–R5 + v2.6 复核 R1–R5 + v2.7–v2.22 补充）与交付状态
 
 ### 13.1 复核意见处置
 
@@ -1269,9 +1313,18 @@ function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWriteGuard
 - **topology/proposal v2**：`project-topology/v2` 标签 path/category、`project-proposal/v2` 模块表 path/category；v1 拒绝重出；§5.5 三处 schema/字段同步。
 - **风险/测试**：风险 19 补 D3 取消 env-bootstrap、roster v1/v2 与 modules/topology/proposal v1 拒绝、v3/v2 迁移与 schema 破坏性变更；§8.1 第 9 项与测试夹具同步。
 
+**v2.21 验收 v1 返工 R1/R7：**
+- **refs/topology 形状**：roster 顶层 `intent`/`proposal`/`architecture` 精确版本引用；`modules[]` 顶层数组；拓扑只认正文 ```topology YAML 块（`project-topology/v2`，modules id/paths/roleId、roles id/modules、management），不再要求 Mermaid；topology-vN.md 仅归档副本。
+- **旧 schema 文案**：roster v1/v2「按 v3 重出（path/category/envBootstrap）」；modules v1「按 v2 重出（category/path/paths）」；topology v1「按 v2 重出（path/category）」；proposal v1「按 v2 重出（模块表 path/category）」；不归一化。
+- **同步**：§5.2 示例/字段/校验、§5.5 三处 schema、§7.1/P2、§8.1 第 9 项、§13 已更新。
+
+**v2.22 R1 示例完整路径：**
+- §5.2 示例顶层引用改为 `docs/product/handbook-intent-v1.md`、`docs/proposals/handbook-proposal-v1.md`、`docs/contracts/handbook-architecture-v1.md`；规则明确顶层引用必须是完整项目相对路径，裸文件名拒绝。
+- P2 新增「§5.2 示例原样送入 parseProjectRoster(flowId=handbook) 解析通过」正例；失败示例含裸文件名引用被接受。
+
 ### 13.2 交付状态
 
-- **已完成**：本策划方案 v2.20（v1 F1–F10 + v2.1 复核补充 + v2.2 客户 §五 Q1/Q2 delta + v2.3 R1–R5 + v2.4 验收 v3 F6/F7 + v2.5 复核小修 + v2.6 客户 §六 delta 2 模块先行 + v2.7 人员+模块拓扑图与 v2.6 复核 R1–R5 + v2.8 文档版本化 + v2.9 R6–R9 收口 + v2.10 R9 基线标记 + v2.11 R9 新版本例外 + v2.12 R9 并发/canonical + v2.13 R9 旧字段/锁协议 + v2.14 R9 活锁/fencing/原子锁 + v2.15 M13/§8 同步与不采用租约 + v2.16 文件/目录模块 + v2.17 装配/入口固定角色 + v2.18 领域中立 + v2.19 D3/env-bootstrap/schema v3 + v2.20 modules/topology/proposal schema v2），基于 2026-10-29 对 `ce7c3ba` 的只读检索、trial-focus-timer 角色日志、拓扑 v4.1（含 §四/§五/§六）、独立复核与验收 v3 记录；**本次只改方案文档**，未改任何源码、测试、角色卡、边界、团队计划、验收、沟通文档或目标项目。
+- **已完成**：本策划方案 v2.22（v1 F1–F10 + v2.1 复核补充 + v2.2 客户 §五 Q1/Q2 delta + v2.3 R1–R5 + v2.4 验收 v3 F6/F7 + v2.5 复核小修 + v2.6 客户 §六 delta 2 模块先行 + v2.7 人员+模块拓扑图与 v2.6 复核 R1–R5 + v2.8 文档版本化 + v2.9 R6–R9 收口 + v2.10 R9 基线标记 + v2.11 R9 新版本例外 + v2.12 R9 并发/canonical + v2.13 R9 旧字段/锁协议 + v2.14 R9 活锁/fencing/原子锁 + v2.15 M13/§8 同步与不采用租约 + v2.16 文件/目录模块 + v2.17 装配/入口固定角色 + v2.18 领域中立 + v2.19 D3/env-bootstrap/schema v3 + v2.20 modules/topology/proposal schema v2 + v2.21 refs/topology 形状与旧 schema 文案 + v2.22 示例完整引用路径），基于 2026-10-29 对 `ce7c3ba` 的只读检索、trial-focus-timer 角色日志、拓扑 v4.1（含 §四/§五/§六）、独立复核与验收 v3/v2.20 记录；**本次只改方案文档**，未改任何源码、测试、角色卡、边界、团队计划、验收、沟通文档或目标项目。
 - **未做（本次策划）**：再复核、独立测试、独立验收；实施由独立实施角色按闸门 1 §四 授权执行，实施状态以实施会话/任务记录为准，本文件不声称已实施/已测试/已验收。
-- **下一步**：交沟通 → 按 v2.19 复核 modules/topology/proposal schema v2 + v2.18 D3/env-bootstrap/schema v3 做窄复核（v1 拒绝/v2 重出、category/path/paths 夹具、风险 19、§8.1）→ 实施（按闸门 1 授权、§8/§8.1 写集；团队/边界 Delta 按闸门 2）→ 实施后独立测试/验收。
-- **版本**：`2026-10-29 v2.20`（本文件写盘即冻结为当前设计版本；实质变更递增版本并重开相应确认）。
+- **下一步**：交沟通 → 按 R1 复测（§5.2 示例原样 parseProjectRoster 通过、完整 docs/... refs、```topology 块）→ 实施（按闸门 1 授权、§8/§8.1 写集；团队/边界 Delta 按闸门 2）→ 实施后独立测试/验收。
+- **版本**：`2026-10-29 v2.22`（本文件写盘即冻结为当前设计版本；实质变更递增版本并重开相应确认）。

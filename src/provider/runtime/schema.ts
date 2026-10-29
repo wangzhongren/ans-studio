@@ -173,7 +173,7 @@ export function describeTool(name: string): ToolDescription {
           modulePaths: {
             type: "array",
             items: { type: "string" },
-            maxItems: 8,
+            maxItems: 20,
             description: "2026-10-29 (v2.20): module path array for the card; normal modules are single-element, fixed env/entry modules may carry multiple paths. Application verifies against the roster.",
           },
           preview: {
@@ -312,7 +312,7 @@ export function describeTool(name: string): ToolDescription {
           modulePaths: {
             type: "array",
             items: { type: "string" },
-            maxItems: 8,
+            maxItems: 20,
             description: "2026-10-29 (v2.20): module path array for the choice card; application verifies against the roster.",
           },
           flowId: {
@@ -481,7 +481,7 @@ export function describeTool(name: string): ToolDescription {
           modulePaths: {
             type: "array",
             items: { type: "string" },
-            maxItems: 8,
+            maxItems: 20,
             description: "2026-10-29 (v2.20): module path array (normal modules single-element; fixed env/entry modules may be multi-path). The application derives canonical paths from the roster and verifies target ownership.",
           },
         },
