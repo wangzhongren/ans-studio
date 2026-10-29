@@ -55,14 +55,14 @@
 | `test/门禁引擎/versioned-doc-guard.test.ts` | 新增（v2.8–v2.15 R6/R9） | 11 | 版本化路径/版本号；覆盖既有 -vN.md ⇒ deny；shell cp 旧版 deny/新版 pass；基线 TOFU/marker/坏行/缺失 fail-closed、canonical 路径、并发登记、O_EXCL 锁/活锁不接管/token fencing、旧记录归一化、属主写后单文件登记 |
 | 既有更新 | — | — | `chief-workflow`（convener dispatch v4.1）、`star-routing`（M8/M5/M6）、`entry-role-minimal-d`、`i-full-chain` |
 
-定向（返工 v3 后重跑）：门禁引擎 275 计（274 过 / 1 skip）、编排 528 计（527 过 / 1 红＝既有 Windows symlink EPERM）、桌面应用 344/344、runtime-core 258 计（251 过 / 3 红 / 4 skip，红均既有 symlink）、测试 544 计（534 过 / 4 红 / 6 skip，红均基线）、项目管理 154 计（149 过 / 5 skip）、装配 85/85；逐文件：classify-shell 52、shell-write-guard 9、shell-operator-only 16、shell-post-audit 8、shell-approval-context 9、workflow-preconditions 13、appointment-roster 8、acceptance-judge-minimal 4、task-state 9、trio-worker-report 4、chain-enforcement 6、operator-channel 56、su zero-execution 6、versioned-doc-guard 11（合计 211/211 全过）。
+定向（最终 b7813ad）：门禁引擎 275 计（274 过 / 1 skip）、编排 530 计（529 过 / 1 红＝既有 Windows symlink EPERM）、桌面应用 344/344、runtime-core 258 计（251 过 / 3 红 / 4 skip，红均既有 symlink）、测试 544 计（534 过 / 4 红 / 6 skip，红均基线）、项目管理 154 计（149 过 / 5 skip）、装配 85/85；逐文件：classify-shell 52、shell-write-guard 9、shell-operator-only 16、shell-post-audit 8、shell-approval-context 9、workflow-preconditions 13、appointment-roster 8、acceptance-judge-minimal 4、task-state 9、trio-worker-report 4、chain-enforcement 6、operator-channel 56、su zero-execution 6、versioned-doc-guard 11（合计 211/211 全过）。
 
 ## 3. 验证（串行）
 
-- 全量（最终提交 6e2665c）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（340 文件）→ **2998 tests / 2968 pass / 12 fail / 18 skip**（12 红＝9 Windows symlink EPERM + T1×3 既有环境问题）；日志 `%TEMP%\ans-final-6e2665c-full.log`，sha256 `6214aa8fa21d768c78a83f40b738aec8cd74ba903f981325d90ba382bcce69bf`。
+- 全量（最终提交 b7813ad）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（340 文件）→ **3000 tests / 2970 pass / 12 fail / 18 skip**（12 红＝9 Windows symlink EPERM + T1×3 既有环境问题）；日志 `%TEMP%\ans-env-full.log`，sha256 `9017f225bcc796747b504e73ebbadb883708f7ac1d49456a5ebfd4a5a964fdbf`。
 - `npm run typecheck` exit 0；`npm run typecheck:renderer` exit 0；`npm run build:renderer` exit 0（最终代码重跑）。
-- phase5a 真实 Electron（最终）：**34/34 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-final\report.json`，sha256 `645b503550e1eda00290205b8d7b8427a3077efcee3a39afff379d750fac5f86`）。
-- 桌面 E2E（最终；临时夹具 `%TEMP%\ans-e2e-g-fixture-1029`；fresh APPDATA）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-final-out\report.txt`，sha256 `3d5fde6467c7fb98fe8f77fb8c7124bc90fca5568dfdcf65fdcfcce1a98b381f`；`session:role-states` 未注册错误 0。
+- phase5a 真实 Electron（最终）：**34/34 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-env\report.json`，sha256 `2b4902b428c7cdacaf89286a55ea30bc237895b727e0281be9a0032f90834945`）。
+- 桌面 E2E（最终；临时夹具 `%TEMP%\ans-e2e-g-fixture-1029`；fresh APPDATA）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-env-out\report.txt`，sha256 `342ba23911121be552a258cbffacd344359889bada407db34c35f71e9932db49`；`session:role-states` 未注册错误 0。
 
 ## 4. 应用冒烟（重启后）
 
