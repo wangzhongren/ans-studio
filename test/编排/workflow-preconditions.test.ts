@@ -75,6 +75,7 @@ const ROSTER_TEXT = [
   "## 人员+模块拓扑图",
   "",
   "```topology",
+  "schema: project-topology/v2",
   "modules:",
   "  - id: impl-core",
   "    path: src/",
@@ -179,6 +180,7 @@ test("模块清单：同父兄弟目录可作为不同模块；同一角色多�
     "---",
     "## 人员+模块拓扑图",
     "```topology",
+    "schema: project-topology/v2",
     "modules:",
     "  - id: bill-a",
     "    path: src/bill/a/",
@@ -261,7 +263,7 @@ test("最新名单：选 N 最大并校验文件名版本=frontmatter version；
     await fs.mkdir(path.join(root, "docs", "proposals"), { recursive: true });
     await fs.mkdir(path.join(root, "docs", "product"), { recursive: true });
     await fs.writeFile(path.join(root, "docs", "product", "focus-intent-v1.md"), "# 意图\n", "utf8");
-    await fs.writeFile(path.join(root, "docs", "proposals", "focus-proposal-v1.md"), "# 提案\n\nintent: docs/product/focus-intent-v1.md\n", "utf8");
+    await fs.writeFile(path.join(root, "docs", "proposals", "focus-proposal-v1.md"), "---\nschema: project-proposal/v2\nflowId: focus\nversion: 1\nintent: docs/product/focus-intent-v1.md\n---\n# 提案\n", "utf8");
     await fs.mkdir(path.join(root, "docs", "contracts"), { recursive: true });
     await fs.writeFile(
       path.join(root, "docs", "contracts", "focus-architecture-v1.md"),
@@ -320,8 +322,8 @@ test("版本化引用：最新名单引用最新文档；旧版只读；缺文�
     for (const dir of dirs) await fs.mkdir(path.join(root, dir), { recursive: true });
     await fs.writeFile(path.join(root, "docs/product/focus-intent-v1.md"), "# 意图 v1\n", "utf8");
     await fs.writeFile(path.join(root, "docs/product/focus-intent-v2.md"), "# 意图 v2\n", "utf8");
-    await fs.writeFile(path.join(root, "docs/proposals/focus-proposal-v1.md"), "# 提案 v1\n\nintent: docs/product/focus-intent-v1.md\n", "utf8");
-    await fs.writeFile(path.join(root, "docs/proposals/focus-proposal-v2.md"), "# 提案 v2\n\nintent: docs/product/focus-intent-v2.md\n", "utf8");
+    await fs.writeFile(path.join(root, "docs/proposals/focus-proposal-v1.md"), "---\nschema: project-proposal/v2\nflowId: focus\nversion: 1\nintent: docs/product/focus-intent-v1.md\n---\n# 提案 v1\n", "utf8");
+    await fs.writeFile(path.join(root, "docs/proposals/focus-proposal-v2.md"), "---\nschema: project-proposal/v2\nflowId: focus\nversion: 2\nintent: docs/product/focus-intent-v2.md\n---\n# 提案 v2\n", "utf8");
     await fs.writeFile(
       path.join(root, "docs/contracts/focus-architecture-v1.md"),
       "# 架构 v1\n\nproposal: docs/proposals/focus-proposal-v1.md\n",
@@ -404,7 +406,7 @@ test("版本化引用：最新名单引用最新文档；旧版只读；缺文�
 
     // proposal 未引用 intent ⇒ inconsistent（先把 roster 引用改回存在的 v2）。
     await fs.rm(path.join(root, "docs/proposals/focus-roster-v3.md"));
-    await fs.writeFile(path.join(root, "docs/proposals/focus-proposal-v2.md"), "# 提案 v2（漏引用）\n", "utf8");
+    await fs.writeFile(path.join(root, "docs/proposals/focus-proposal-v2.md"), "---\nschema: project-proposal/v2\nflowId: focus\nversion: 2\n---\n# 提案 v2（漏引用）\n", "utf8");
     const inconsistent = await loadLatestRoster({ projectRoot: root, flowId: "focus" });
     assert.equal(inconsistent.ok, false);
     if (!inconsistent.ok) assert.equal(inconsistent.code, "roster-reference-inconsistent", inconsistent.reason);
@@ -620,6 +622,7 @@ test("模块路径可为文件或目录：文件模块正例；文件+目录同�
     "---",
     "## 人员+模块拓扑图",
     "```topology",
+    "schema: project-topology/v2",
     "modules:",
     "  - id: core",
     "    path: src/",
@@ -705,6 +708,7 @@ test("env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + inde
     "---",
     "## 人员+模块拓扑图",
     "```topology",
+    "schema: project-topology/v2",
     "modules:",
     "  - id: content",
     "    path: content/",

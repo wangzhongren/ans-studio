@@ -20,6 +20,8 @@ import { parse as parseYaml } from "yaml";
 export const PROJECT_ROSTER_SCHEMA = "project-roster/v3" as const;
 /** 2026-10-29（v2.18）：模块清单文档是唯一权威源；roster modules[] 是派生快照。 */
 export const PROJECT_MODULES_SCHEMA = "project-modules/v2" as const;
+export const PROJECT_TOPOLOGY_SCHEMA = "project-topology/v2" as const;
+export const PROJECT_PROPOSAL_SCHEMA = "project-proposal/v2" as const;
 /** 2026-10-29（客户采纳）：标准固定角色「环境装配」；默认必带（小项目省略须写明理由）。 */
 export const ENV_BOOTSTRAP_ROLE_ID = "env-bootstrap" as const;
 const ENV_MODULE_PATTERNS: readonly RegExp[] = [
@@ -308,6 +310,13 @@ function validateRosterTopology(
     return { ok: false, code: "roster-topology-invalid", reason: "拓扑图必须是对象（modules/roles/management）。" };
   }
   const doc = parsed as Record<string, unknown>;
+  if (doc.schema !== PROJECT_TOPOLOGY_SCHEMA) {
+    return {
+      ok: false,
+      code: "roster-topology-mismatch",
+      reason: `拓扑图 schema 必须恰为 ${PROJECT_TOPOLOGY_SCHEMA}；旧版请按 v2 重出拓扑图（不静默归一化）。`,
+    };
+  }
   if (!Array.isArray(doc.modules) || !Array.isArray(doc.roles)) {
     return { ok: false, code: "roster-topology-invalid", reason: "拓扑图必须含 modules[] 与 roles[]。" };
   }
@@ -901,7 +910,16 @@ export async function loadLatestRoster(
       };
     }
   }
-  if (!refTexts.get("proposal")!.includes(parsed.roster.intent)) {
+  const proposalText = refTexts.get("proposal")!;
+  const proposalSchema = proposalText.includes("schema: project-proposal/v2") ? "project-proposal/v2" : undefined;
+  if (proposalSchema !== PROJECT_PROPOSAL_SCHEMA) {
+    return {
+      ok: false,
+      code: "roster-reference-invalid",
+      reason: `提案文档 schema 必须恰为 ${PROJECT_PROPOSAL_SCHEMA}；旧版请按 v2 重出提案（不静默归一化）。`,
+    };
+  }
+  if (!proposalText.includes(parsed.roster.intent)) {
     return {
       ok: false,
       code: "roster-reference-inconsistent",

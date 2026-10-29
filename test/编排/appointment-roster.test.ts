@@ -64,6 +64,7 @@ const ROSTER_TEXT = [
   "# 名单",
   "## 人员+模块拓扑图",
   "```topology",
+  "schema: project-topology/v2",
   "modules:",
   "  - id: impl-core",
   "    path: src/",
@@ -103,7 +104,7 @@ function trioProject(rosterText: string = ROSTER_TEXT): ProjectConfig {
   );
   fs.mkdirSync(path.join(root, "docs", "product"), { recursive: true });
   fs.writeFileSync(path.join(root, "docs", "product", "focus-intent-v1.md"), "# 意图\n", "utf8");
-  fs.writeFileSync(path.join(root, "docs", "proposals", "focus-proposal-v1.md"), "# 提案\n\nintent: docs/product/focus-intent-v1.md\n", "utf8");
+  fs.writeFileSync(path.join(root, "docs", "proposals", "focus-proposal-v1.md"), "---\nschema: project-proposal/v2\nflowId: focus\nversion: 1\nintent: docs/product/focus-intent-v1.md\n---\n# 提案\n", "utf8");
   fs.mkdirSync(path.join(root, "docs", "contracts"), { recursive: true });
   fs.writeFileSync(
     path.join(root, "docs", "contracts", "focus-architecture-v1.md"),
@@ -438,6 +439,7 @@ test("模块口径：一人多模块（同父兄弟目录）⇒ allowedPathRoots
     "# 名单",
     "## 人员+模块拓扑图",
     "```topology",
+    "schema: project-topology/v2",
     "modules:",
     "  - id: bill-a",
     "    path: src/bill/a/",

@@ -85,6 +85,7 @@ const ROSTER_TEXT = [
   "# 名单",
   "## 人员+模块拓扑图",
   "```topology",
+  "schema: project-topology/v2",
   "modules:",
   "  - id: impl-core",
   "    path: src/",
@@ -107,7 +108,7 @@ async function writeProjectFiles(root: string): Promise<void> {
     await fs.writeFile(path.join(root, rel), text, "utf8");
   };
   await write("docs/product/focus-intent-v1.md", "# 产品意图\n\n目标：番茄钟。\n");
-  await write("docs/proposals/focus-proposal-v1.md", "# 提案\n\nintent: docs/product/focus-intent-v1.md\n");
+  await write("docs/proposals/focus-proposal-v1.md", "---\nschema: project-proposal/v2\nflowId: focus\nversion: 1\nintent: docs/product/focus-intent-v1.md\n---\n# 提案\n");
   await write("docs/proposals/focus-roster-v1.md", ROSTER_TEXT);
   const parsedRoster = parseProjectRoster(ROSTER_TEXT);
   if (!parsedRoster.ok) throw new Error(`fixture roster invalid: ${parsedRoster.reason}`);

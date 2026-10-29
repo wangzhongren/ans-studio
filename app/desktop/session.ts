@@ -84,6 +84,7 @@ import { appendRoleLog, formatRoleActivityText, readRoleLog } from "../../src/co
 // B 批：终止/重派安全判定（单一来源；桌面只提供终止事实/执行动作）。
 import { evaluateRedispatchSafety, type RedispatchSafetyDecision } from "../../src/common/编排/watchdog.ts";
 import {
+  ENV_BOOTSTRAP_ROLE_ID,
   evaluateDispatchPreflight,
   loadLatestRoster,
   reportTargetForTaskCreator,
@@ -3139,6 +3140,21 @@ export class SessionManager {
           return (
             `appointment-write 的 D3 对应名单与当前最新名单不一致（D3 v${String(stamped.rosterVersion ?? "?")} / ` +
             `最新 v${roster.version}），旧 D3 已作废；未向客户发卡、未发行任何写入路径。请重新发起 D3 后再写卡。`
+          );
+        }
+        // 2026-10-29（v2.18）：名单未省略 env-bootstrap 时，D3 不得取消它；取消须先出新名单版本并移除 env/entry 模块。
+        const rosterHasEnv = roster.roster.roles.some((role) => role.id === ENV_BOOTSTRAP_ROLE_ID);
+        const targets = Array.isArray((resolvedEvent as { targetRoleIds?: unknown }).targetRoleIds)
+          ? ((resolvedEvent as { targetRoleIds?: unknown[] }).targetRoleIds ?? []).filter((id): id is string => typeof id === "string")
+          : [];
+        if (
+          rosterHasEnv &&
+          (roster.roster.envBootstrapOmittedReason ?? "") === "" &&
+          !targets.includes(ENV_BOOTSTRAP_ROLE_ID)
+        ) {
+          return (
+            `appointment-write 被拒：D3 未选中标准角色 ${ENV_BOOTSTRAP_ROLE_ID}，但当前名单未声明省略理由；` +
+            "取消 env-bootstrap 须先出带 envBootstrapOmittedReason 的新名单版本并移除 env/entry 模块，再重新发起 D3。"
           );
         }
       }

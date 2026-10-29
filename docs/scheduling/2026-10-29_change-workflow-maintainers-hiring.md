@@ -142,8 +142,8 @@
 
 ## 4.7 模块文件/目录与标准角色 env-bootstrap（客户追加）
 
-- **模块路径**：`directory` 字段可为单个文件或单个目录——以 `/` 结尾=目录，否则=文件；冲突=路径相同或一方包含另一方（同父文件与目录合法）；文件模块授权=该文件本身，目录模块按 boundary kind；topology/绑定/唯一键/模块数规则同步。
-- **env-bootstrap（装配/入口）**：默认必带，固定 2 个领域中立模块：`category=env`（环境/资源装配）与 `category=entry`（入口/索引）；代码项目 package.json/scripts/src/main 仅为示例，写作/研究/设计/数据项目用 assets/、index.md 等同样成立。环境/入口类模块按 `category` 归属机械校验，误归属拒绝；小项目省略须写 `envBootstrapOmittedReason`，派人事前置拒绝无理由缺失。
+- **模块路径（v3/v2）**：`project-roster/v3` 的 `modules[].path` 可为单个文件或单个目录——以 `/` 结尾=目录，否则=文件；`category` 必填（env/entry 或领域类别）；modules 文档 `project-modules/v2`、topology 块 `project-topology/v2`、提案 `project-proposal/v2`；v1/v2 一律拒绝并要求按新版重出（不静默归一化）。冲突=路径相同或一方包含另一方（同父文件与目录合法）；文件模块授权=该文件本身，目录模块按 boundary kind；topology/绑定/唯一键/模块数规则同步。
+- **env-bootstrap（装配/入口）**：默认必带，固定 2 个领域中立模块：`category=env`（环境/资源装配）与 `category=entry`（入口/索引）；代码项目 package.json/scripts/src/main 仅为示例，写作/研究/设计/数据项目用 assets/、index.md 等同样成立。环境/入口类模块按 `category` 归属机械校验，误归属拒绝；小项目省略须写 `envBootstrapOmittedReason`，派人事前置拒绝无理由缺失；env-bootstrap 存在且未省略时 D3 必须选中它，取消需先出带理由的新名单版本并移除 env/entry 模块；omitted 时名单无 env 选项且不得存在 env/entry 模块。
 - **测试**：workflow-preconditions 13（文件模块正例、文件+目录同父、相等/包含负例、非代码写作项目 env/entry、env 归属负例）；chain-enforcement 夹具以 `envBootstrapOmittedReason` 保留最小链。
 
 ## 5. 决策点与遗留
