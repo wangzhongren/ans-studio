@@ -715,6 +715,7 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  flex-wrap: wrap;
   font-size: 11px;
   color: var(--text-3);
 }
@@ -742,7 +743,9 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  row-gap: 4px;
   min-width: 0;
 }
 .composer-trust-title {
@@ -760,7 +763,8 @@
   padding: 0 8px;
   border: 1px solid transparent;
   border-radius: var(--radius-control);
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
   color: var(--text-2);
   user-select: none;
   white-space: nowrap;
@@ -769,6 +773,11 @@
     background var(--motion-fast) var(--ease-standard),
     border-color var(--motion-fast) var(--ease-standard),
     color var(--motion-fast) var(--ease-standard);
+}
+.composer-auto-approve > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .composer-auto-approve .trust-icon {
   flex: 0 0 auto;
