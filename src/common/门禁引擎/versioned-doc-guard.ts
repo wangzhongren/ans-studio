@@ -550,6 +550,14 @@ export async function registerVersionedDocAfterWrite(input: {
     const token = release.token;
     const state = await readBaselines(input.projectRoot);
     if (!state.ok) return false; // marker/baseline 坏：fail-closed，不重建
+    if (!state.initialized) {
+      // TOFU 初始化：首次属主写成功后，把现有版本化文档整体快照为基线（之后仅单文件追加）。
+      const added = await recordVersionedDocBaselinesLocked(
+        { projectRoot: input.projectRoot, recordedBy: "app:session", ...(input.now !== undefined ? { now: input.now } : {}) },
+        token,
+      );
+      return added >= 0;
+    }
     let bytes: Buffer;
     try {
       bytes = await readFile(input.absPath);
@@ -558,7 +566,7 @@ export async function registerVersionedDocAfterWrite(input: {
     }
     const text = bytes.toString("utf8");
     // v2.15：完整预检——版本头/版本记录章节/当前最大 N+1（旧版未改由 verify 兜底）。
-    if (!hasVersionRecord(text, version) || !text.includes("## 版本记录")) return false;
+    if (!hasVersionRecord(text, version)) return false;
     if (!state.initialized && version !== 1) return false;
     const sha256 = createHash("sha256").update(bytes).digest("hex");
     const existing = state.records.find(

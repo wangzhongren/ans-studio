@@ -5147,6 +5147,7 @@ export class SessionManager {
     d3Selected: string[];
     handoffFound: boolean;
     selectedCardsFound: boolean;
+    missingSelectedCardIds: string[];
   }> {
     const readNames = async (rel: string): Promise<string[]> => {
       try {
@@ -5248,9 +5249,10 @@ export class SessionManager {
     });
     const listing = this.deps.getListing(projectRoot);
     const selected = d3?.targetRoleIds ?? [];
-    const selectedCardsFound =
-      selected.length > 0 &&
-      selected.every((roleId) => listing?.roles.some((role) => role.roleId === roleId && role.builtIn !== true) === true);
+    const missingSelectedCardIds = selected.filter(
+      (roleId) => !listing?.roles.some((role) => role.roleId === roleId && role.builtIn !== true),
+    );
+    const selectedCardsFound = selected.length > 0 && missingSelectedCardIds.length === 0;
     return {
       ...(flowId !== undefined ? { flowId } : {}),
       intent: { found: intentFound, candidates: intentFlows.length },
@@ -5260,6 +5262,7 @@ export class SessionManager {
       d3Selected: selected,
       handoffFound,
       selectedCardsFound,
+      missingSelectedCardIds,
     };
   }
 
@@ -5336,6 +5339,7 @@ export class SessionManager {
       d3Selected: chainFacts.d3Selected,
       ...(requestedModuleId !== undefined ? { moduleId: requestedModuleId } : {}),
       handoffFound: chainFacts.handoffFound,
+      ...(chainFacts.missingSelectedCardIds.length > 0 ? { missingSelectedCardIds: chainFacts.missingSelectedCardIds } : {}),
       targetCardFound:
         convenerRoleId !== null && targetRoleId === convenerRoleId
           ? chainFacts.selectedCardsFound

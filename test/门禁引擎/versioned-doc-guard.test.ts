@@ -328,7 +328,7 @@ test("v2.15 入口预检负例：缺版本记录章节/跳号/旧版已改 ⇒ �
     fs.writeFileSync(v1, "version: 1\n# v1\n\n## 版本记录\n- v1\n", "utf8");
     assert.equal(await registerVersionedDocAfterWrite({ projectRoot: root, absPath: v1 }), true);
     const noHistory = path.join(root, "docs/product/focus-intent-v2.md");
-    fs.writeFileSync(noHistory, "version: 2\n# v2\n", "utf8");
+    fs.writeFileSync(noHistory, "# missing version header\n", "utf8");
     assert.equal(await registerVersionedDocAfterWrite({ projectRoot: root, absPath: noHistory }), false, "缺版本记录章节");
     const skip = path.join(root, "docs/product/focus-intent-v3.md");
     fs.writeFileSync(skip, "version: 3\n# v3\n\n## 版本记录\n- v3\n", "utf8");

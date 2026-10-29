@@ -468,9 +468,14 @@ test("派发矩阵 M1–M8：幕僚按序（意图/名单/交付）、运营作�
   const noD3 = evaluateDispatchPreflight(preflight({ targetRoleId: "convener" }));
   assert.equal(noD3.ok, false);
   if (!noD3.ok) assert.equal(noD3.code, "d3-missing");
-  const noCards = evaluateDispatchPreflight(preflight({ targetRoleId: "convener", d3Selected: ["implementer"], targetCardFound: false }));
+  const noCards = evaluateDispatchPreflight(preflight({ targetRoleId: "convener", d3Selected: ["implementer"], targetCardFound: false, missingSelectedCardIds: ["implementer"] }));
   assert.equal(noCards.ok, false);
-  if (!noCards.ok) assert.equal(noCards.code, "target-card-missing");
+  if (!noCards.ok) {
+    assert.equal(noCards.code, "target-card-missing");
+    assert.match(noCards.message, /D3 选中的项目角色卡未齐备/);
+    assert.match(noCards.message, /implementer/);
+    assert.match(noCards.message, /内置角色/);
+  }
   assert.equal(evaluateDispatchPreflight(preflight({ targetRoleId: "convener", d3Selected: ["implementer"] })).ok, true);
 
   // M8 幕僚→项目 worker：一律拒。

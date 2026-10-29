@@ -900,6 +900,8 @@ export type DispatchPreflightInput = {
   handoffFound: boolean;
   /** 目标项目角色卡/边界存在（M5/M6）。 */
   targetCardFound: boolean;
+  /** 幕僚→运营时 D3 选中但尚未枚举到角色卡的项目角色（用于明确拒绝文案）。 */
+  missingSelectedCardIds?: string[];
 };
 
 export type DispatchPreflightResult =
@@ -981,7 +983,12 @@ export function evaluateDispatchPreflight(input: DispatchPreflightInput): Dispat
         );
       }
       if (input.targetCardFound !== true) {
-        return reject("target-card-missing", "派发未受理：运营的目标角色卡不存在（角色未枚举到）。请先完成人事写卡。");
+        const missing = (input.missingSelectedCardIds ?? []).filter((id) => id !== "");
+        return reject(
+          "target-card-missing",
+          `派发未受理：D3 选中的项目角色卡未齐备${missing.length > 0 ? `（缺：${missing.join("、")}）` : ""}；` +
+            "请先完成人事写卡，再交付运营（运营/convener 是内置角色，不需要也不允许写运营角色卡）。",
+        );
       }
       return { ok: true };
     }
