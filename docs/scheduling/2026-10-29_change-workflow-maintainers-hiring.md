@@ -55,14 +55,14 @@
 | `test/门禁引擎/versioned-doc-guard.test.ts` | 新增（v2.8–v2.15 R6/R9） | 11 | 版本化路径/版本号；覆盖既有 -vN.md ⇒ deny；shell cp 旧版 deny/新版 pass；基线 TOFU/marker/坏行/缺失 fail-closed、canonical 路径、并发登记、O_EXCL 锁/活锁不接管/token fencing、旧记录归一化、属主写后单文件登记 |
 | 既有更新 | — | — | `chief-workflow`（convener dispatch v4.1）、`star-routing`（M8/M5/M6）、`entry-role-minimal-d`、`i-full-chain` |
 
-定向（本批最终代码）：门禁引擎 + 编排 + 桌面应用三组 **1152 计 / 1150 过 / 1 红 / 1 skip**（红＝既有 Windows symlink EPERM）；逐文件：workflow-preconditions 16、appointment-roster 8、versioned-doc-guard 11、chain-enforcement 6、acceptance-judge-minimal 4、trio-worker-report 4、task-state 9、classify-shell 52、shell-write-guard 9、shell-operator-only 16、shell-post-audit 8、shell-approval-context 9、operator-channel 56、su zero-execution 6。
+定向（本批最终代码）：门禁引擎 + 编排 + 桌面应用三组 **1152 计 / 1150 过 / 1 红 / 1 skip**（红＝既有 Windows symlink EPERM）；桌面 UI + 桌面应用 **658/658 全过**；逐文件：workflow-preconditions 16、appointment-roster 8、versioned-doc-guard 11、chain-enforcement 6、acceptance-judge-minimal 4、trio-worker-report 4、task-state 9、classify-shell 52、shell-write-guard 9、shell-operator-only 16、shell-post-audit 8、shell-approval-context 9、operator-channel 56、su zero-execution 6。
 
 ## 3. 验证（串行）
 
-- 全量（本批最终代码重跑）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（346 文件）→ **3003 tests / 2973 pass / 12 fail / 18 skip**（12 红＝9 Windows symlink EPERM + T1×3 既有环境问题；与上一基线红项一致）；日志 `%TEMP%\ans-final-full3.log`，sha256 `94b4be2b09c05916a7d480bd81af9f712f526179ada52ce824226e8522c508eb`。
+- 全量（本批最终代码重跑）：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')`（346 文件）→ **3006 tests / 2976 pass / 12 fail / 18 skip**（12 红＝9 Windows symlink EPERM + T1×3 既有环境问题；与上一基线红项一致）；日志 `%TEMP%\ans-ui-full3.log`，sha256 `c10462812c23eae2dc0a32a7c1f36ab081a1b5db2b2d9ac016e85c864fc47cbb`。
 - `npm run typecheck` exit 0；`npm run typecheck:renderer` exit 0；`npm run build:renderer` exit 0（本批最终代码重跑）。
-- phase5a 真实 Electron（本批最终代码）：**34/34 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-final2\report.json`，sha256 `f21f7165db0e10e0147178ae01a992cc146f6b1bab81dc338c6881726620a25c`）。
-- 桌面 E2E（本批最终代码；`%TEMP%\ans-e2e-final2`；fresh APPDATA）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-final2\report.txt`，sha256 `c87c52df0fb777e3ee7feeab4e3c4dbeff322e7fa341d9eeea692bc36746e54b`；`session:role-states` 未注册错误 0。
+- phase5a 真实 Electron（本批最终代码）：**39/39 checks、failures=0、console/CSP 0**（report `%TEMP%\ans-phase5a-ui7\report.json`，sha256 `aefebba711ac648028c72708ba5090f703bb52eb902686f84cb330bedd9d9634`；UI 证据截图 `03b-dc-filter-open.png`、`03c-composer-narrow.png`，并含 judge 标题/时间行截图）。
+- 桌面 E2E（本批最终代码；`%TEMP%\ans-e2e-ui3`；fresh APPDATA）：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、17 PNG（`00-titlebar.png` 截图环境报 `capture-failed:UnknownVizError`，非断言失败；其余 17 张齐全）；报告 `%TEMP%\ans-e2e-ui3\report.txt`，sha256 `fb31a6ba8db409cc0309d9b1931f434ea298e3180bad1bdef01354620e80d490`；`session:role-states` 未注册错误 0。
 
 ## 4. 应用冒烟（重启后）
 
@@ -147,6 +147,12 @@
 - **多路径**：固定 env/entry 模块支持 `paths[]` **1–20 项**（普通模块必须单路径；XML/工具参数/任务事实同步上限 20）；`modulePaths` 随 dispatch/task.created/验收 facts 传递；convener 派发校验 modulePaths 属于目标模块，越界拒绝。测试：workflow-preconditions 16（多路径 env 正例、20 条上限正例/21 条拒绝、单路径普通模块、相等/包含负例、非代码写作项目、envBootstrap 旧字段归一化/省略理由、固定模块 id/category 负例、设计 v2.22 §5.2 示例正例）；chain-enforcement 增加 modulePaths 落盘与越界拒绝。
 - **旧 schema 文案（验收返工）**：roster v1/v2 → v3 重出（path/paths + category + envBootstrap 对象）；modules v1 → v2（category/path 或 paths[]）；topology v1 → v2（path 或 paths + management 含 convener 与全部项目角色）；proposal v1 → v2（模块表 path/category），均明确拒绝、不静默归一化。
 - **角色卡文案**：策划/人事卡已同步 v3/path/category/```topology（`project-topology/v2`）/env-bootstrap 固定 id 与 omissionReason 对象口径，不再出现 v2 目录制描述。
+
+## 4.8 真机 UI 缺陷修复（2026-10-29 客户三则）
+
+- **judge 列表标题**：`OperatorJudgeResultPayload` 新增 `requestTitle`，治理代批与 decision 自动代选两条路径都写入原始申请标题；`GovernanceJudgeResultView.requestTitle` 透出；`DecisionCenterPanel` 从行内已存 view 读取（不再误把 `{view}` 当原始 payload 重解析），优先显示申请标题，缺失才回退 headline；列表同时显示来源角色、`HH:mm` 时间与裁决结果。测试：`decision-service`/`optional-acceptance` 断言 payload 标题，`judge.test` 断言 view 字段，`dialog-history` 断言面板优先级；phase5a 真实 Electron 断言两条 judge 行标题分别为「写 bookmark-qa 角色卡」「接受 bookmark 方案」，且不再全为兜底「判断代批」。
+- **决策面板下拉**：`dc-filter` 由原生 `<select>` 换成应用现有 `DropdownMenu`（button trigger + radio menu），使用 `--card`/`--popover`/`--border-strong`/`--ring` 令牌，补 hover/焦点环/圆角与展开项样式；保留 `.dc-filter` 类名与选项文案。phase5a 断言 trigger 为 button、菜单含全部/待办/历史、背景非透明，并截图 `03b-dc-filter-open.png`（后续 `03c` 也展示展开菜单）。
+- **三栏 composer 截断**：`.composer` 增加 `container-type/name: composer`；中间栏变窄时按容器宽度（≤720px）切换本地化短标签「审批/决策」并允许 `.composer-controls`/`.composer-trust` 换行，≤480px 再收紧间距；不再依赖窗口 480px 断点。新增 `ui.judge.shellShort`/`ui.judge.decisionShort` 双语 key（i18n 计数同步 1458）。phase5a 在抽屉推开中栏（composer 实宽 688px）断言全标签隐藏、短标签可见且无横向溢出，截图 `03c-composer-narrow.png`。
 
 ## 5. 决策点与遗留
 

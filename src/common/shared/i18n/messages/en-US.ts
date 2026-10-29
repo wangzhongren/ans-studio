@@ -967,8 +967,10 @@ export const enUS = {
   "ui.judge.tier.deny": "Hard-deny class (deny)",
   "ui.judge.shellOn": "Approving for you · automatic agent",
   "ui.judge.shellOff": "Approve for me",
+  "ui.judge.shellShort": "Approve",
   "ui.judge.decisionOn": "Deciding for you · automatic agent",
   "ui.judge.decisionOff": "Decide for me",
+  "ui.judge.decisionShort": "Decide",
   "ui.judge.bridgeMissing": "Automatic judging is not supported in this version; staying manual",
   "ui.judge.decisionSingleNote": "The legacy governance model (single) does not support decision delegation",
   "ui.judge.shellOffTitle":

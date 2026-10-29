@@ -182,8 +182,24 @@ app.whenReady().then(async () => {
     await sleep(200);
     check("稍后处理关闭对话框、不代答", await js(`!document.querySelector('#decision-dialog')`));
     await js(`document.getElementById('tab-decisions').click()`);
+    await sleep(520);
+    // 2026-10-29 客户缺陷：judge 结果行必须携带原始申请标题，决策列表不能再全显示兜底「判断代批」。
+    await js(`window.__ansRenderer.decisionJudge.onResult({ id: 'gj-ui-a', requestId: 'req-ui-a', roleId: 'chief', group: 'decision', cardKind: 'appointment-write', requestTitle: '写 bookmark-qa 角色卡', selected: ['bookmark-qa'], paths: ['角色卡/bookmark-qa/role-card.md'], engine: 'demo', at: '2026-10-29T08:00:00Z' })`);
+    await js(`window.__ansRenderer.decisionJudge.onResult({ id: 'gj-ui-b', requestId: 'req-ui-b', roleId: 'chief', group: 'decision', cardKind: 'proposal', requestTitle: '接受 bookmark 方案', selected: ['accept'], engine: 'demo', at: '2026-10-29T08:01:00Z' })`);
     await sleep(260);
     check("待办面板列出稍后项", await js(`(() => { const p=document.getElementById('decision-center-pending'); return !!p && p.textContent.includes('E 低风险确认') && p.textContent.includes('E 高风险审批') && p.textContent.includes('稍后处理'); })()`));
+    check("judge 列表显示原始申请标题而非兜底", await js(`(() => { const titles=[...document.querySelectorAll('#decision-center-pending .dc-item.is-judge .dc-title')].map(el=>el.textContent.trim()); return titles.includes('写 bookmark-qa 角色卡') && titles.includes('接受 bookmark 方案') && !titles.every(t=>t==='判断代批'); })()`));
+    check("judge 列表带来源与时间", await js(`(() => { const row=document.querySelector('#decision-center-pending .dc-item.is-judge'); if(!row) return false; const src=row.querySelector('.dc-source'), time=row.querySelector('.dc-time'); return !!src && src.textContent.includes('chief') && !!time && /\\d{1,2}:\\d{2}/.test(time.textContent); })()`));
+    await js(`document.querySelector('.dc-filter').click()`);
+    await sleep(360);
+    check("dc-filter 使用自定义下拉与令牌菜单", await js(`(() => { const trigger=document.querySelector('.dc-filter'); const menu=document.querySelector('.dc-filter-menu'); const opts=[...document.querySelectorAll('.dc-filter-option')].map(el=>el.textContent.trim()); const cs=trigger?getComputedStyle(trigger):null; return !!trigger && trigger.tagName==='BUTTON' && !!menu && opts.includes('全部') && opts.includes('待办') && opts.includes('历史') && !!cs && cs.borderRadius!=='0px' && cs.backgroundColor!=='rgba(0, 0, 0, 0)'; })()`));
+    await shot("03b-dc-filter-open");
+    await js(`document.querySelector('.dc-filter-option')?.click()`);
+    await sleep(120);
+    // 三栏（抽屉推开中栏）时 composer 必须按容器收窄，保留「审批/决策」短标签且不截成「替…」。
+    check("三栏窄中栏：审批/决策短标签可见", await js(`(() => { const a=document.querySelector('.composer-auto-approve[data-trust="approval"]'), d=document.querySelector('.composer-auto-approve[data-trust="decision"]'); if(!a||!d) return false; const af=a.querySelector('#auto-approve-label'), as=a.querySelector('.composer-label-short'), df=d.querySelector('#judge-decision-label'), ds=d.querySelector('.composer-label-short'); return getComputedStyle(af).display==='none' && getComputedStyle(as).display!=='none' && as.textContent==='审批' && getComputedStyle(df).display==='none' && getComputedStyle(ds).display!=='none' && ds.textContent==='决策'; })()`));
+    check("三栏窄中栏：composer 无横向溢出", await js(`(() => { const bottom=document.querySelector('.composer-bottom'), ctr=document.querySelector('.composer-controls'); if(!bottom||!ctr) return false; const r=bottom.getBoundingClientRect(), c=ctr.getBoundingClientRect(); return c.right<=innerWidth+1 && r.right<=innerWidth+1 && ctr.scrollWidth<=ctr.clientWidth+1; })()`));
+    await shot("03c-composer-narrow");
     await js(`document.querySelector('#decision-center-pending .dc-open').click()`);
     await sleep(200);
     check("待办可重新打开", await js(`!!document.querySelector('#decision-dialog')`));

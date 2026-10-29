@@ -242,6 +242,7 @@ test("开关开启：验收卡由判断 agent 代选推荐项（客户可不开�
   assert.equal(h.pushed.length, 0, "代批成功不呈现客户卡");
   assert.equal(h.results.length, 1);
   assert.equal(h.results[0]!.cardKind, "acceptance");
+  assert.equal(h.results[0]!.requestTitle, "验收复核结论：通过？");
   assert.deepEqual(h.results[0]!.selected, ["accept"]);
   assert.equal(outcome?.outcome, "answered");
   assert.deepEqual(outcome?.outcome === "answered" ? outcome.value.selected : undefined, ["accept"]);

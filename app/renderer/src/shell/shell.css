@@ -680,6 +680,8 @@
 .composer {
   flex: 0 0 auto;
   position: relative;
+  container-type: inline-size;
+  container-name: composer;
   padding: 12px var(--gutter) 10px;
   background: var(--card);
   border-top: 1px solid var(--border);
@@ -749,12 +751,16 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  row-gap: 6px;
+  flex-wrap: wrap;
   min-width: 0;
 }
 .composer-trust {
   display: flex;
   align-items: center;
   gap: 8px;
+  row-gap: 4px;
+  flex-wrap: wrap;
   flex: 0 1 auto;
   min-width: 0;
 }
@@ -800,6 +806,13 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.composer-label-short {
+  display: none;
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: inherit;
+  white-space: nowrap;
 }
 .composer-auto-approve .trust-icon {
   flex: 0 0 auto;

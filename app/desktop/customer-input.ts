@@ -231,6 +231,8 @@ export interface OperatorJudgeResultPayload {
   projectRoot?: string;
   runtime?: RuntimeKind;
   at: string;
+  /** 原始申请标题（客户/角色看到的卡面标题）；用于决策中心区分多条代批记录。 */
+  requestTitle?: string;
   group: GovernanceJudgeGroup;
   cardKind: GovernanceCardKind;
   flowId?: string;
@@ -1210,6 +1212,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
             toolCallId: entry.payload.toolCallId ?? "",
             roleId: entry.payload.roleId,
             at: new Date().toISOString(),
+            ...(entry.request.title.trim() !== "" ? { requestTitle: entry.request.title } : {}),
             group,
             cardKind,
             ...(plan.request.flowId !== "" ? { flowId: plan.request.flowId } : {}),
@@ -1425,6 +1428,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       toolCallId: entry.payload.toolCallId ?? "",
       roleId: entry.payload.roleId,
       at: new Date().toISOString(),
+      ...(entry.request.title.trim() !== "" ? { requestTitle: entry.request.title } : {}),
       group: "decision",
       cardKind: DECISION_CARD_KIND,
       flowId: decision.flowId,

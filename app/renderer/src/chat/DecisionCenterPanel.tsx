@@ -5,10 +5,18 @@
  */
 
 import { useMemo, useState } from "react";
-import { Inbox, Search } from "lucide-react";
+import { ChevronDown, Inbox, Search } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useChatStore, getRowModel } from "@/chat/chat-store";
 import { decisionView } from "@/chat/decision-dialog";
 import { governanceJudgeResultView, shellJudgeResultView } from "@/chat/judge";
+import type { GovernanceJudgeResultView, ShellJudgeResultView } from "@/chat/judge";
 import { useDecisionCenterStore } from "@/stores/decision-center-store";
 import { useDrawerStore } from "@/stores/drawer-store";
 import { useLocaleState, useT } from "@/i18n";
@@ -17,6 +25,13 @@ type Filter = "all" | "pending" | "history";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function formatAt(value: string, locale: string): string {
+  if (value === "") return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 }
 
 export function DecisionCenterPanel() {
@@ -69,20 +84,42 @@ export function DecisionCenterPanel() {
         if (row.kind !== "judge-result" && row.kind !== "governance-judge-result") continue;
         const data = asRecord(row.data);
         const payload = asRecord(data.payload ?? data);
+        const stored = asRecord(data.view);
         const view =
           row.kind === "governance-judge-result"
-            ? governanceJudgeResultView(payload, locale)
-            : shellJudgeResultView(payload);
-        const title =
+            ? typeof stored.headline === "string" && stored.headline !== ""
+              ? (stored as unknown as GovernanceJudgeResultView)
+              : governanceJudgeResultView(payload, locale)
+            : typeof stored.verdict === "string"
+              ? (stored as unknown as ShellJudgeResultView)
+              : shellJudgeResultView(payload);
+        const requestTitle =
+          view && "requestTitle" in view && typeof view.requestTitle === "string" && view.requestTitle !== ""
+            ? view.requestTitle
+            : "";
+        const headline =
           view && "headline" in view && typeof view.headline === "string" && view.headline !== ""
             ? view.headline
-            : t("ui.decisionDialog.judge");
-        const at = typeof data.at === "string" ? data.at : "";
+            : view && "summary" in view && typeof view.summary === "string" && view.summary !== ""
+              ? view.summary
+              : "";
+        const title = requestTitle !== "" ? requestTitle : headline !== "" ? headline : t("ui.decisionDialog.judge");
+        const at =
+          typeof data.at === "string" && data.at !== ""
+            ? data.at
+            : view && "at" in view
+              ? String(view.at)
+              : "";
         items.push({
           id: "judge-" + row.id,
           title,
           sourceRoleId: role.roleId,
-          result: view && "title" in view ? String(view.title) : t("ui.decisionDialog.judge"),
+          result:
+            requestTitle !== "" && headline !== ""
+              ? headline
+              : view && "title" in view
+                ? String(view.title)
+                : t("ui.decisionDialog.judge"),
           at,
         });
       }
@@ -123,16 +160,31 @@ export function DecisionCenterPanel() {
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
-        <select
-          className="dc-filter"
-          aria-label={t("ui.decisionDialog.panelTitle")}
-          value={filter}
-          onChange={(event) => setFilter(event.target.value as Filter)}
-        >
-          <option value="all">{t("ui.decisionDialog.all")}</option>
-          <option value="pending">{t("ui.decisionDialog.todo")}</option>
-          <option value="history">{t("ui.decisionDialog.history")}</option>
-        </select>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="dc-filter" aria-label={t("ui.decisionDialog.panelTitle")}>
+            <span className="dc-filter-value">
+              {filter === "all"
+                ? t("ui.decisionDialog.all")
+                : filter === "pending"
+                  ? t("ui.decisionDialog.todo")
+                  : t("ui.decisionDialog.history")}
+            </span>
+            <ChevronDown className="dc-filter-chevron" size={12} strokeWidth={1.5} aria-hidden="true" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="dc-filter-menu" align="end">
+            <DropdownMenuRadioGroup value={filter} onValueChange={(value) => setFilter(value as Filter)}>
+              <DropdownMenuRadioItem className="dc-filter-option" value="all">
+                {t("ui.decisionDialog.all")}
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem className="dc-filter-option" value="pending">
+                {t("ui.decisionDialog.todo")}
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem className="dc-filter-option" value="history">
+                {t("ui.decisionDialog.history")}
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {empty ? (
@@ -172,7 +224,10 @@ export function DecisionCenterPanel() {
               <li className="dc-item is-judge" key={item.id}>
                 <span className="dc-status is-judge">{t("ui.decisionDialog.judge")}</span>
                 <span className="dc-title">{item.title}</span>
-                <span className="dc-source">{item.sourceRoleId}</span>
+                <span className="dc-source">
+                  {item.sourceRoleId}
+                  {item.at !== "" ? <span className="dc-time"> · {formatAt(item.at, locale)}</span> : null}
+                </span>
               </li>
             ))}
             {visiblePending.length === 0 && visibleJudge.length === 0 ? (
@@ -196,7 +251,10 @@ export function DecisionCenterPanel() {
                       : t("ui.decisionDialog.statusDecided")}
                 </span>
                 <span className="dc-title">{item.title}</span>
-                <span className="dc-source">{item.sourceRoleId}</span>
+                <span className="dc-source">
+                  {item.sourceRoleId}
+                  {item.at !== "" ? <span className="dc-time"> · {formatAt(item.at, locale)}</span> : null}
+                </span>
                 <span className="dc-result">{item.result}</span>
               </li>
             ))}

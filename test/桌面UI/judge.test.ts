@@ -84,9 +84,11 @@ test("治理代批结果：分组/结论/理由/路径/统计逐项映射；未�
     readBytes: 4096,
     toolCallId: "gov-call",
     requestId: "gov-req",
+    requestTitle: "写 bookmark-qa 角色卡",
   });
   assert.ok(proposal);
   assert.equal(proposal!.title, "judge 代批 · 代决策");
+  assert.equal(proposal!.requestTitle, "写 bookmark-qa 角色卡");
   assert.equal(proposal!.headline, "接受提案（accept） · 流程 flow-a");
   assert.equal(proposal!.operatorText, "operator:judge:claude");
   assert.equal(proposal!.kindClass, "proposal");

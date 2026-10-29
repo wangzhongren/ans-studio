@@ -444,6 +444,8 @@ export interface GovernanceJudgeResultView {
   customerNote: string;
   title: string;
   badge: string;
+  /** 原始申请标题（主进程随结果行下发）；缺失时面板回退 headline。 */
+  requestTitle: string;
   headline: string;
   engineText: string;
   operatorText: string;
@@ -580,6 +582,7 @@ export function governanceJudgeResultView(
     customerNote: translate(locale, "ui.judge.autoNotCustomerNote"),
     title: translate(locale, "ui.judge.titlePrefix", { label: groupLabel }),
     badge: groupLabel,
+    requestTitle: str(record.requestTitle),
     headline,
     engineText: translate(locale, "ui.judge.engineText", {
       engine: shellJudgeEngineLabel(engine, locale),

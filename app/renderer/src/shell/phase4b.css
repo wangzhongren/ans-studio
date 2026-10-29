@@ -1006,16 +1006,57 @@
     width: 12px;
     height: 12px;
   }
-  .col-mid .composer .composer-auto-approve span {
-    font-size: 0;
+  .col-mid .composer #auto-approve-label,
+  .col-mid .composer #judge-decision-label {
+    display: none;
   }
-  .col-mid .composer #auto-approve-label::after {
-    content: "审批";
+  .col-mid .composer .composer-label-short {
+    display: inline;
     font-size: 10px;
   }
-  .col-mid .composer #judge-decision-label::after {
-    content: "决策";
+}
+
+/* 三栏中间列变窄（窗口宽度未触发 480 断点）时按 composer 自身宽度收窄：
+   既允许 controls 换行，也保留「审批/决策」两字短标签，避免截成「替…」。 */
+@container composer (max-width: 720px) {
+  .col-mid .composer .composer-controls {
+    flex-wrap: wrap;
+  }
+  .col-mid .composer .composer-trust {
+    flex-wrap: wrap;
+  }
+  .col-mid .composer .composer-auto-approve {
+    flex: 0 0 auto;
+  }
+  .col-mid .composer #auto-approve-label,
+  .col-mid .composer #judge-decision-label {
+    display: none;
+  }
+  .col-mid .composer .composer-label-short {
+    display: inline;
     font-size: 10px;
+  }
+}
+@container composer (max-width: 480px) {
+  .col-mid .composer .composer-bottom {
+    gap: 2px;
+  }
+  .col-mid .composer .composer-trust {
+    gap: 2px;
+  }
+  .col-mid .composer .composer-trust-title {
+    font-size: 10px;
+  }
+  .col-mid .composer .composer-auto-approve {
+    gap: 3px;
+    padding: 0 4px;
+  }
+  .col-mid .composer .composer-auto-approve .trust-icon {
+    display: none;
+  }
+  .col-mid .composer .composer-auto-approve input {
+    width: 12px;
+    height: 12px;
   }
 }
 

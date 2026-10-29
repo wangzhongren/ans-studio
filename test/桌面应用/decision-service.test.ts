@@ -65,6 +65,7 @@ test("decision 开关开启：唯一推荐 deterministic 代选（judge 代批�
   assert.equal(h.results.length, 1);
   assert.equal(h.results[0]!.group, "decision");
   assert.equal(h.results[0]!.cardKind, "decision");
+  assert.equal(h.results[0]!.requestTitle, "任务升级", "judge 结果行携带原始申请标题");
   assert.deepEqual(h.results[0]!.selected, ["terminate"]);
   assert.equal(outcome?.outcome, "answered");
   assert.deepEqual(outcome?.outcome === "answered" ? outcome.value.selected : undefined, ["terminate"]);

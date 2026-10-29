@@ -728,6 +728,7 @@ export function Composer() {
                 onChange={onJudgeToggle(JUDGE_GROUP_APPROVAL)}
               />
               <span id="auto-approve-label">{approvalView.label}</span>
+              <span className="composer-label-short" aria-hidden="true">{t("ui.judge.shellShort")}</span>
             </label>
             <span
               id="auto-approve-status"
@@ -767,6 +768,7 @@ export function Composer() {
                 onChange={onJudgeToggle(JUDGE_GROUP_DECISION)}
               />
               <span id="judge-decision-label">{decisionView.label}</span>
+              <span className="composer-label-short" aria-hidden="true">{t("ui.judge.decisionShort")}</span>
             </label>
             <span
               id="judge-decision-status"
