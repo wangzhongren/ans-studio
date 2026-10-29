@@ -2080,9 +2080,13 @@ export function validateAppointmentWritePreview(args: {
                     : undefined;
                   if (typeof entryPath !== "string") continue;
                   const normalized = entryPath.replace(/\\/g, "/");
-                  const allowed = args.allowedDirectories.some((dir) =>
-                    normalized === dir || normalized === dir.replace(/\/$/, "") || normalized.startsWith(dir),
-                  );
+                  const allowed = args.allowedDirectories.some((allowedPath) => {
+                    const modulePath = allowedPath.replace(/\\/g, "/");
+                    if (modulePath.endsWith("/")) {
+                      return normalized === modulePath.slice(0, -1) || normalized.startsWith(modulePath);
+                    }
+                    return normalized === modulePath;
+                  });
                   if (!allowed) {
                     problems.push(`${entry.path} 的目录 ${normalized} 不在名单给 ${targetRoleId} 的授权目录内`);
                   }

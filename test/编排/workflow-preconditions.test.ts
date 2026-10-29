@@ -99,6 +99,19 @@ const VALID_ROSTER: ProjectRoster = parseProjectRoster(ROSTER_TEXT).ok
       throw new Error("fixture roster invalid");
     })();
 
+const PREFLIGHT_ROSTER: ProjectRoster = {
+  ...VALID_ROSTER,
+  roles: [
+    ...VALID_ROSTER.roles,
+    { id: "env-bootstrap", displayName: "环境装配", purpose: "环境与入口", capability: "build", modules: ["env-setup", "project-entry"] },
+  ],
+  modules: [
+    ...VALID_ROSTER.modules,
+    { id: "env-setup", name: "环境装配", purpose: "零依赖与构建配置", directory: "package.json", publicContract: "package.json", architectureSource: "docs/contracts/focus-architecture-v1.md" },
+    { id: "project-entry", name: "项目入口", purpose: "入口文件", directory: "index.html", publicContract: "index.html", architectureSource: "docs/contracts/focus-architecture-v1.md" },
+  ],
+};
+
 test("名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期望校验", () => {
   const parsed = parseProjectRoster(ROSTER_TEXT, "focus");
   assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
@@ -141,13 +154,13 @@ test("模块清单：同父兄弟目录可作为不同模块；同一角色多�
     "  - id: bill-a",
     "    name: 计费 A",
     "    purpose: 实现 A",
-    "    directory: src/bill/a",
+    "    directory: src/bill/a/",
     "    publicContract: src/bill/a/index.js",
     "    architectureSource: docs/contracts/bills-architecture-v1.md",
     "  - id: bill-b",
     "    name: 计费 B",
     "    purpose: 实现 B",
-    "    directory: src/bill/b",
+    "    directory: src/bill/b/",
     "    publicContract: src/bill/b/index.js",
     "    architectureSource: docs/contracts/bills-architecture-v1.md",
     "  - id: bill-qa",
@@ -200,7 +213,6 @@ test("名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑", ()
     ],
     ["module-id-invalid", ROSTER_TEXT.replace("  - id: impl-core\n", "  - id: X\n"), "roster-module-id-invalid"],
     ["module-dir-array", ROSTER_TEXT.replace("    directory: src/\n", "    directory: [src/, lib/]\n"), "roster-module-directory-invalid"],
-    ["module-dir-file", ROSTER_TEXT.replace("    directory: src/\n", "    directory: src/cli.js\n"), "roster-module-directory-invalid"],
     ["module-dir-governance", ROSTER_TEXT.replace("    directory: test/\n", "    directory: src/docs/proposals/\n"), "roster-module-directory-governance"],
     ["module-dir-overlap", ROSTER_TEXT.replace("    directory: tests/\n", "    directory: src/sub/\n"), "roster-module-directory-overlap"],
     ["module-fields-missing", ROSTER_TEXT.replace("    publicContract: test/\n", ""), "roster-module-fields-missing"],
@@ -430,7 +442,7 @@ function preflight(overrides: Partial<DispatchPreflightInput>): DispatchPrefligh
     intent: { found: true, candidates: 1 },
     proposalFound: true,
     architectureFound: true,
-    roster: { ok: true, roster: VALID_ROSTER, path: "docs/proposals/focus-roster-v1.md", version: 1, sha256: "a".repeat(64) },
+    roster: { ok: true, roster: PREFLIGHT_ROSTER, path: "docs/proposals/focus-roster-v1.md", version: 1, sha256: "a".repeat(64) },
     d3Selected: [],
     moduleId: "impl-core",
     handoffFound: false,
@@ -542,4 +554,171 @@ test("链式派发必须带 flowId（Q9）：交付运营/运营派实现或验�
   );
   assert.equal(convenerNoFlow.ok, false);
   if (!convenerNoFlow.ok) assert.equal(convenerNoFlow.code, "flow-required");
+});
+
+test("模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例", () => {
+  const base = [
+    "---",
+    "schema: project-roster/v2",
+    "flowId: notes",
+    "version: 1",
+    "intent: docs/product/notes-intent-v1.md",
+    "proposal: docs/proposals/notes-proposal-v1.md",
+    "architecture: docs/contracts/notes-architecture-v1.md",
+    "roles:",
+    "  - id: dev",
+    "    displayName: 开发",
+    "    purpose: 实现",
+    "    capability: Node",
+    "    modules: [core]",
+    "  - id: doc",
+    "    displayName: 文档",
+    "    purpose: 文档",
+    "    capability: Markdown",
+    "    modules: [readme]",
+    "  - id: env-bootstrap",
+    "    displayName: 环境装配",
+    "    purpose: 环境与入口",
+    "    capability: build",
+    "    modules: [pkg, entry]",
+    "modules:",
+    "  - id: core",
+    "    name: 核心",
+    "    purpose: 核心实现",
+    "    directory: src/",
+    "    publicContract: src/index.js",
+    "    architectureSource: docs/contracts/notes-architecture-v1.md",
+    "  - id: pkg",
+    "    name: 包声明",
+    "    purpose: 零依赖声明",
+    "    directory: package.json",
+    "    publicContract: package.json",
+    "    architectureSource: docs/contracts/notes-architecture-v1.md",
+    "  - id: readme",
+    "    name: 文档",
+    "    purpose: 用法文档",
+    "    directory: README.md",
+    "    publicContract: README.md",
+    "    architectureSource: docs/contracts/notes-architecture-v1.md",
+    "  - id: entry",
+    "    name: 项目入口",
+    "    purpose: 入口文件",
+    "    directory: index.html",
+    "    publicContract: index.html",
+    "    architectureSource: docs/contracts/notes-architecture-v1.md",
+    "---",
+    "## 人员+模块拓扑图",
+    "```topology",
+    "modules:",
+    "  - id: core",
+    "    directory: src/",
+    "    roleId: dev",
+    "  - id: pkg",
+    "    directory: package.json",
+    "    roleId: env-bootstrap",
+    "  - id: readme",
+    "    directory: README.md",
+    "    roleId: doc",
+    "  - id: entry",
+    "    directory: index.html",
+    "    roleId: env-bootstrap",
+    "roles:",
+    "  - id: dev",
+    "    modules: [core]",
+    "  - id: doc",
+    "    modules: [readme]",
+    "  - id: env-bootstrap",
+    "    modules: [pkg, entry]",
+    "management: [convener, dev, doc, env-bootstrap]",
+    "```",
+  ];
+  const parsed = parseProjectRoster(base.join("\n"));
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
+  if (parsed.ok) {
+    assert.deepEqual(rosterDirectoriesFor(parsed.roster, "dev"), ["src/"]);
+    assert.deepEqual(rosterDirectoriesFor(parsed.roster, "env-bootstrap"), ["package.json", "index.html"]);
+    assert.deepEqual(rosterDirectoriesFor(parsed.roster, "doc"), ["README.md"]);
+  }
+  const contained = base.join("\n").replace("    directory: package.json", "    directory: src/package.json");
+  const c = parseProjectRoster(contained);
+  assert.equal(c.ok, false);
+  if (!c.ok) assert.equal(c.code, "roster-module-directory-overlap");
+  const equal = base.join("\n").replace("    directory: package.json", "    directory: README.md");
+  const e = parseProjectRoster(equal);
+  assert.equal(e.ok, false);
+  if (!e.ok) assert.equal(e.code, "roster-module-directory-overlap");
+});
+
+test("env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + index.md 索引）", () => {
+  const text = [
+    "---",
+    "schema: project-roster/v2",
+    "flowId: essay",
+    "version: 1",
+    "intent: docs/product/essay-intent-v1.md",
+    "proposal: docs/proposals/essay-proposal-v1.md",
+    "architecture: docs/contracts/essay-architecture-v1.md",
+    "roles:",
+    "  - id: writer",
+    "    displayName: 撰写",
+    "    purpose: 写作",
+    "    capability: writing",
+    "    modules: [content]",
+    "  - id: env-bootstrap",
+    "    displayName: 装配/入口",
+    "    purpose: 资源与索引",
+    "    capability: assembly",
+    "    modules: [assets, index]",
+    "modules:",
+    "  - id: content",
+    "    name: 正文",
+    "    purpose: 撰写正文",
+    "    directory: content/",
+    "    publicContract: content/",
+    "    architectureSource: docs/contracts/essay-architecture-v1.md",
+    "  - id: assets",
+    "    name: 资源",
+    "    purpose: 图片与素材",
+    "    directory: assets/",
+    "    category: env",
+    "    publicContract: assets/",
+    "    architectureSource: docs/contracts/essay-architecture-v1.md",
+    "  - id: index",
+    "    name: 索引",
+    "    purpose: 入口索引",
+    "    directory: index.md",
+    "    category: entry",
+    "    publicContract: index.md",
+    "    architectureSource: docs/contracts/essay-architecture-v1.md",
+    "---",
+    "## 人员+模块拓扑图",
+    "```topology",
+    "modules:",
+    "  - id: content",
+    "    directory: content/",
+    "    roleId: writer",
+    "  - id: assets",
+    "    directory: assets/",
+    "    roleId: env-bootstrap",
+    "  - id: index",
+    "    directory: index.md",
+    "    roleId: env-bootstrap",
+    "roles:",
+    "  - id: writer",
+    "    modules: [content]",
+    "  - id: env-bootstrap",
+    "    modules: [assets, index]",
+    "management: [convener, writer, env-bootstrap]",
+    "```",
+  ].join("\n");
+  const parsed = parseProjectRoster(text);
+  assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
+  if (parsed.ok) {
+    assert.deepEqual(rosterDirectoriesFor(parsed.roster, "env-bootstrap"), ["assets/", "index.md"]);
+  }
+  // category=env 的模块不能归其他角色。
+  const misowned = text.replace("    modules: [content]", "    modules: [content, assets]").replace("    modules: [assets, index]", "    modules: [index]");
+  const bad = parseProjectRoster(misowned);
+  assert.equal(bad.ok, false);
+  if (!bad.ok) assert.ok(["roster-module-owner-invalid", "roster-env-bootstrap-invalid"].includes(bad.code));
 });

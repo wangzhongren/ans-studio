@@ -20,6 +20,29 @@ import { parse as parseYaml } from "yaml";
 export const PROJECT_ROSTER_SCHEMA = "project-roster/v2" as const;
 /** 2026-10-29（v2.8 R7）：模块清单文档是唯一权威源；roster modules[] 是派生快照。 */
 export const PROJECT_MODULES_SCHEMA = "project-modules/v1" as const;
+/** 2026-10-29（客户采纳）：标准固定角色「环境装配」；默认必带（小项目省略须写明理由）。 */
+export const ENV_BOOTSTRAP_ROLE_ID = "env-bootstrap" as const;
+const ENV_MODULE_PATTERNS: readonly RegExp[] = [
+  /^package\.json$/i,
+  /^(?:package-lock\.json|pnpm-lock\.yaml|yarn\.lock|tsconfig\.json|Makefile|Dockerfile|requirements\.txt|pyproject\.toml|Cargo\.toml|go\.mod|pom\.xml|CMakeLists\.txt)$/i,
+  /^(?:vite|webpack|rollup|esbuild|babel|jest|vitest)\.config\.[a-z0-9]+$/i,
+  /^scripts\//i,
+  /^\.github\//i,
+];
+const ENTRY_MODULE_PATTERNS: readonly RegExp[] = [
+  /^index\.html$/i,
+  /^src\/main\.[a-z0-9]+$/i,
+  /^server\.[a-z0-9]+$/i,
+];
+function isEnvBootstrapModulePath(path: string): boolean {
+  return ENV_MODULE_PATTERNS.some((pattern) => pattern.test(path));
+}
+function isProjectEntryModulePath(path: string): boolean {
+  return ENTRY_MODULE_PATTERNS.some((pattern) => pattern.test(path));
+}
+function isEnvOrEntryPath(path: string): boolean {
+  return isEnvBootstrapModulePath(path) || isProjectEntryModulePath(path);
+}
 
 /** 名单角色 id 形状（小写 slug；与治理 slug 一致的收紧口径：不得首/尾连字符）。 */
 const ROSTER_ROLE_ID_RE = /^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$/;
@@ -72,8 +95,10 @@ export interface ProjectRosterModule {
   id: string;
   name: string;
   purpose: string;
-  /** 项目相对 POSIX 目录（以 `/` 结尾）。 */
+  /** 项目相对 POSIX 路径：以 `/` 结尾=目录，否则=文件。 */
   directory: string;
+  /** 领域中立类别：env=环境/资源装配，entry=入口/索引（用于 env-bootstrap 归属机械校验）。 */
+  category?: "env" | "entry";
   publicContract: string;
   architectureSource: string;
 }
@@ -89,6 +114,8 @@ export interface ProjectRoster {
   /** 模块清单（1–12 项；派生快照，权威源为 `<flowId>-modules-vN.md`）。 */
   modules: ProjectRosterModule[];
   roles: ProjectRosterRole[];
+  /** 小项目省略 env-bootstrap 时的书面理由（正常含 env-bootstrap 时缺省）。 */
+  envBootstrapOmittedReason?: string;
 }
 
 /** 模块清单文档（唯一权威源）。 */
@@ -128,6 +155,8 @@ export interface RosterParseError {
     | "roster-module-directory-governance"
     | "roster-module-directory-overlap"
     | "roster-module-role-invalid"
+    | "roster-module-owner-invalid"
+    | "roster-env-bootstrap-invalid"
     | "roster-module-unbound"
     | "roster-role-without-module"
     | "roster-module-multi-owner"
@@ -174,6 +203,38 @@ function directoriesOverlap(a: string, b: string): boolean {
   return aLower.startsWith(bLower) || bLower.startsWith(aLower);
 }
 
+/** 模块路径：以 `/` 结尾=目录（保留尾斜杠）；否则=单个文件（保留无尾斜杠）。 */
+function normalizeModulePath(raw: unknown): { path: string; kind: "file" | "directory" } | undefined {
+  if (typeof raw !== "string") return undefined;
+  const value = raw.trim().replace(/\\/g, "/");
+  if (value === "" || /[*?[\]{}!]/.test(value)) return undefined;
+  if (value.startsWith("/") || /^[a-zA-Z]:\//.test(value)) return undefined;
+  const segments = value.replace(/\/$/, "").split("/");
+  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) return undefined;
+  const normalized = segments.join("/");
+  if (value.endsWith("/")) return { path: `${normalized}/`, kind: "directory" };
+  return { path: normalized, kind: "file" };
+}
+
+function modulePathKind(path: string): "file" | "directory" {
+  return path.endsWith("/") ? "directory" : "file";
+}
+
+/** 冲突：路径相同或一方包含另一方；目录包含其下文件/子目录；同父文件与目录合法。 */
+function modulePathsOverlap(a: string, b: string): boolean {
+  const aKind = modulePathKind(a);
+  const bKind = modulePathKind(b);
+  const aLower = a.toLowerCase().replace(/\/+$/, "");
+  const bLower = b.toLowerCase().replace(/\/+$/, "");
+  if (aLower === bLower) return true;
+  if (aKind === "directory" && bKind === "directory") {
+    return aLower.startsWith(`${bLower}/`) || bLower.startsWith(`${aLower}/`);
+  }
+  if (aKind === "directory" && bKind === "file") return bLower.startsWith(`${aLower}/`);
+  if (aKind === "file" && bKind === "directory") return aLower.startsWith(`${bLower}/`);
+  return false;
+}
+
 /** 版本化文档引用：`docs/<dir>/<flowId>-<doc>-vN.md`（不原地改，引用最新版本）。 */
 function parseVersionedRef(
   raw: unknown,
@@ -201,13 +262,6 @@ function parseVersionedRef(
   return { ok: true, path: raw.trim().replace(/\\/g, "/"), version };
 }
 
-/** 模块 folder 地址不能是文件：未显式以 `/` 结尾且末段像文件名（有扩展名）⇒ 拒绝。 */
-function looksLikeFilePath(raw: string): boolean {
-  const value = raw.trim().replace(/\\/g, "/");
-  if (value.endsWith("/")) return false;
-  const last = value.split("/").pop() ?? "";
-  return /\.[A-Za-z0-9]{1,8}$/.test(last);
-}
 
 type TopologyValidation =
   | { ok: true }
@@ -284,7 +338,7 @@ function validateRosterTopology(
     }
     const entry = raw as Record<string, unknown>;
     const id = typeof entry.id === "string" ? entry.id.trim() : "";
-    const directory = typeof entry.directory === "string" ? normalizeRosterDirectory(entry.directory) : undefined;
+    const directory = typeof entry.directory === "string" ? normalizeModulePath(entry.directory)?.path : undefined;
     const roleId = typeof entry.roleId === "string" ? entry.roleId.trim() : "";
     if (id === "" || directory === undefined || roleId === "") {
       return { ok: false, code: "roster-topology-invalid", reason: `拓扑图模块第 ${index + 1} 项缺 id/directory/roleId。` };
@@ -461,6 +515,11 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
         : typeof module.responsibility === "string"
           ? module.responsibility.trim()
           : "";
+    const categoryRaw = typeof module.category === "string" ? module.category.trim() : "";
+    if (categoryRaw !== "" && categoryRaw !== "env" && categoryRaw !== "entry") {
+      return rosterError("roster-module-fields-missing", `模块 ${id} 的 category 只能是 env/entry（实际 ${categoryRaw}）。`);
+    }
+    const category = categoryRaw === "env" || categoryRaw === "entry" ? categoryRaw : undefined;
     const publicContract = typeof module.publicContract === "string" ? module.publicContract.trim() : "";
     const architectureSource = typeof module.architectureSource === "string" ? module.architectureSource.trim() : "";
     if (id === "" || !ROSTER_ROLE_ID_RE.test(id) || id.endsWith("-")) {
@@ -475,19 +534,17 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
       );
     }
     if (Array.isArray(module.directory)) {
-      return rosterError("roster-module-directory-invalid", `模块「${name}」必须恰好一个文件夹地址（不得数组）。`);
+      return rosterError("roster-module-directory-invalid", `模块「${name}」必须恰好一个文件或目录路径（不得数组）。`);
     }
-    if (typeof module.directory !== "string" || looksLikeFilePath(module.directory)) {
-      return rosterError("roster-module-directory-invalid", `模块「${name}」的 folder 地址必须是单个目录（不能是文件/数组）：${String(module.directory)}`);
+    const modulePath = normalizeModulePath(module.directory);
+    if (modulePath === undefined) {
+      return rosterError("roster-module-directory-invalid", `模块「${name}」的路径非法（项目相对、无通配/..；以 / 结尾=目录，否则=文件）：${String(module.directory)}`);
     }
-    const directory = normalizeRosterDirectory(module.directory);
-    if (directory === undefined) {
-      return rosterError("roster-module-directory-invalid", `模块「${name}」的目录非法（项目相对、无通配/..）：${String(module.directory)}`);
+    if (isGovernanceDirectory(modulePath.path)) {
+      return rosterError("roster-module-directory-governance", `模块「${name}」的路径落在治理/他人写区（含治理子路径）：${modulePath.path}`);
     }
-    if (isGovernanceDirectory(directory)) {
-      return rosterError("roster-module-directory-governance", `模块「${name}」的目录落在治理/他人写区（含治理子路径）：${directory}`);
-    }
-    modules.push({ id, name, purpose, directory, publicContract, architectureSource });
+    const directory = modulePath.path;
+    modules.push({ id, name, purpose, directory, ...(category !== undefined ? { category } : {}), publicContract, architectureSource });
   }
   const ownerOf = new Map<string, string[]>();
   for (const role of roles) {
@@ -511,12 +568,39 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
   }
   for (let i = 0; i < modules.length; i += 1) {
     for (let j = i + 1; j < modules.length; j += 1) {
-      if (directoriesOverlap(modules[i]!.directory, modules[j]!.directory)) {
+      if (modulePathsOverlap(modules[i]!.directory, modules[j]!.directory)) {
         return rosterError(
           "roster-module-directory-overlap",
           `模块目录重叠/嵌套：${modules[i]!.id} 的 ${modules[i]!.directory} 与 ${modules[j]!.id} 的 ${modules[j]!.directory}。`,
         );
       }
+    }
+  }
+  // 2026-10-29（客户采纳）：标准固定角色 env-bootstrap——默认必带，固定两个模块（环境装配/项目入口）；
+  // 环境/入口类路径只能归它，误归属拒绝；小项目省略须有书面理由（预检检查）。
+  const envBootstrapReason =
+    typeof record.envBootstrapOmittedReason === "string" ? record.envBootstrapOmittedReason.trim() : undefined;
+  const envBootstrapRole = roles.find((role) => role.id === ENV_BOOTSTRAP_ROLE_ID);
+  if (envBootstrapRole !== undefined) {
+    const owned = modules.filter((module) => envBootstrapRole.modules.includes(module.id));
+    if (owned.length !== 2) {
+      return rosterError("roster-env-bootstrap-invalid", `角色 ${ENV_BOOTSTRAP_ROLE_ID} 必须固定名下 2 个模块（装配/资源 + 入口/索引），实际 ${owned.length} 个。`);
+    }
+    const hasCategory = owned.some((module) => module.category !== undefined);
+    const hasEnv = owned.some((module) => module.category === "env") || (!hasCategory && owned.some((module) => isEnvBootstrapModulePath(module.directory)));
+    const hasEntry = owned.some((module) => module.category === "entry") || (!hasCategory && owned.some((module) => isProjectEntryModulePath(module.directory)));
+    if (!hasEnv || !hasEntry) {
+      return rosterError("roster-env-bootstrap-invalid", `角色 ${ENV_BOOTSTRAP_ROLE_ID} 必须同时拥有 category=env（装配/资源）与 category=entry（入口/索引）模块。`);
+    }
+  }
+  // 领域中立：按模块 category 机械校验归属（代码文件名仅作可选启发式，不据此硬编码拒绝）。
+  for (const module of modules) {
+    if (module.category === undefined) continue;
+    if (envBootstrapRole?.modules.includes(module.id) !== true) {
+      return rosterError(
+        "roster-module-owner-invalid",
+        `category=${module.category} 的模块 ${module.id}（${module.directory}）只能归属 ${ENV_BOOTSTRAP_ROLE_ID}。`,
+      );
     }
   }
   // 2026-10-29（客户追加口径）：名单必须附「人员+模块拓扑图」，且与 modules/roles 绑定一致。
@@ -533,6 +617,7 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
       architecture: architectureRef.path,
       modules,
       roles,
+      ...(envBootstrapReason !== undefined && envBootstrapReason !== "" ? { envBootstrapOmittedReason: envBootstrapReason } : {}),
     },
   };
 }
@@ -590,6 +675,11 @@ export function parseProjectModules(
         : typeof module.responsibility === "string"
           ? module.responsibility.trim()
           : "";
+    const categoryRaw = typeof module.category === "string" ? module.category.trim() : "";
+    if (categoryRaw !== "" && categoryRaw !== "env" && categoryRaw !== "entry") {
+      return { ok: false, code: "modules-doc-fields", reason: `模块 ${id} 的 category 只能是 env/entry。` };
+    }
+    const category = categoryRaw === "env" || categoryRaw === "entry" ? categoryRaw : undefined;
     const publicContract = typeof module.publicContract === "string" ? module.publicContract.trim() : "";
     const architectureSource = typeof module.architectureSource === "string" ? module.architectureSource.trim() : "";
     if (id === "" || !ROSTER_ROLE_ID_RE.test(id) || id.endsWith("-")) {
@@ -600,21 +690,22 @@ export function parseProjectModules(
     if (name === "" || purpose === "" || publicContract === "" || architectureSource === "") {
       return { ok: false, code: "modules-doc-fields", reason: `模块清单 ${id} 缺 name/purpose/publicContract/architectureSource。` };
     }
-    if (Array.isArray(module.directory) || typeof module.directory !== "string" || looksLikeFilePath(module.directory)) {
-      return { ok: false, code: "modules-doc-directory", reason: `模块 ${id} 必须恰好一个文件夹地址（不能是文件/数组）。` };
+    if (Array.isArray(module.directory)) {
+      return { ok: false, code: "modules-doc-directory", reason: `模块 ${id} 必须恰好一个文件或目录路径（不得数组）。` };
     }
-    const directory = normalizeRosterDirectory(module.directory);
-    if (directory === undefined) {
-      return { ok: false, code: "modules-doc-directory", reason: `模块 ${id} 目录非法：${String(module.directory)}` };
+    const modulePath = normalizeModulePath(module.directory);
+    if (modulePath === undefined) {
+      return { ok: false, code: "modules-doc-directory", reason: `模块 ${id} 路径非法：${String(module.directory)}` };
     }
-    if (isGovernanceDirectory(directory)) {
-      return { ok: false, code: "modules-doc-directory", reason: `模块 ${id} 目录落在治理/他人写区：${directory}` };
+    if (isGovernanceDirectory(modulePath.path)) {
+      return { ok: false, code: "modules-doc-directory", reason: `模块 ${id} 路径落在治理/他人写区：${modulePath.path}` };
     }
-    modules.push({ id, name, purpose, directory, publicContract, architectureSource });
+    const directory = modulePath.path;
+    modules.push({ id, name, purpose, directory, ...(category !== undefined ? { category } : {}), publicContract, architectureSource });
   }
   for (let i = 0; i < modules.length; i += 1) {
     for (let j = i + 1; j < modules.length; j += 1) {
-      if (directoriesOverlap(modules[i]!.directory, modules[j]!.directory)) {
+      if (modulePathsOverlap(modules[i]!.directory, modules[j]!.directory)) {
         return { ok: false, code: "modules-doc-overlap", reason: `模块目录重叠/嵌套：${modules[i]!.id} 与 ${modules[j]!.id}。` };
       }
     }
@@ -968,6 +1059,14 @@ export function evaluateDispatchPreflight(input: DispatchPreflightInput): Dispat
           "roster-modules-missing",
           "派发未受理：最新名单缺模块清单（每模块 name/purpose/directory/roleId，一模块一个文件夹、一模块一属主、目录不重叠/不嵌套，角色可多模块）。" +
             "请让策划出 v2 名单补齐模块→角色绑定后再招人。",
+        );
+      }
+      const hasEnvBootstrap = input.roster.roster.roles.some((role) => role.id === ENV_BOOTSTRAP_ROLE_ID);
+      if (!hasEnvBootstrap && (input.roster.roster.envBootstrapOmittedReason ?? "") === "") {
+        return reject(
+          "env-bootstrap-missing",
+          `派发未受理：名单缺标准角色 ${ENV_BOOTSTRAP_ROLE_ID}（环境装配，默认必带：package.json/scripts/构建配置 + 项目入口）；` +
+            "小项目省略须在名单写明 envBootstrapOmittedReason。请让策划补齐后再招人。",
         );
       }
       return { ok: true };

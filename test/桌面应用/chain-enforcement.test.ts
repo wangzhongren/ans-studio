@@ -49,6 +49,7 @@ const ROSTER_TEXT = [
   "schema: project-roster/v2",
   "flowId: focus",
   "version: 1",
+  "envBootstrapOmittedReason: 最小链测试夹具省略装配/入口角色",
   "intent: docs/product/focus-intent-v1.md",
   "proposal: docs/proposals/focus-proposal-v1.md",
   "architecture: docs/contracts/focus-architecture-v1.md",

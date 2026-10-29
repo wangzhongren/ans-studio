@@ -40,7 +40,7 @@
 | --- | --- | ---: | --- |
 | `test/门禁引擎/classify-shell.test.ts` | 更新（v2.4 F6） | 52 | 短内联 review/长内联与 re-shell deny；bash 脚本文件 review；find -exec deny |
 | `test/门禁引擎/shell-write-guard.test.ts` | 新增（返工后 9，含 F1/F2/F6 形态） | 9 | 显式写目标边界/越界/禁写/逃逸、opaque 与 Q2 例外、cwd 防御、TaskScope 经 checkWrite 收窄；**P6 十种绕过形态全部 opaque**、plain 形态不误伤 |
-| `test/编排/workflow-preconditions.test.ts` | 新增（模块/拓扑/版本后 11） | 11 | 名单解析正/负例（v2 modules/roles.modules/拓扑）、版本化引用（最新/旧版只读/缺文件/链断裂）、最新名单 version/hash、D3 卡形状/推荐集、M1–M8 矩阵、M9 路由 |
+| `test/编排/workflow-preconditions.test.ts` | 新增（模块/拓扑/版本/env 后 13） | 13 | 名单解析正/负例（v2 modules/roles.modules/拓扑）、版本化引用（最新/旧版只读/缺文件/链断裂）、最新名单 version/hash、D3 卡形状/推荐集、M1–M8 矩阵、M9 路由 |
 | `test/编排/shell-post-audit.test.ts` | 新增（返工后 8） | 8 | 快照 diff、越界判定、审计记录、真实文件系统排除项；**`.ans/` 与项目根之外（extraRoots/`..`/绝对路径）越界检测；R9 baseline 改写审计** |
 | `test/编排/appointment-roster.test.ts` | 新增（BUG-3 后 8） | 8 | 人事发卡/推荐集、选项≠名单拒绝、convener 发卡拒绝、boundary 目录 ⊆ 模块并集；**appointment-write judge 事实（allowedPathRoots=角色卡/<target>/ ∪ 模块并集、pathProbes 逐路径 allowed、缺 targetRoleId 拒绝）；一人多模块（同父兄弟目录）并集；D3 preview 附拓扑图** |
 | `test/编排/acceptance-judge-minimal.test.ts` | 新增（R2 后 4） | 4 | 验收最小链事实通过/缺项 manual/物证缺失；**验收模块事实 moduleId/目录/属主** |
@@ -55,7 +55,7 @@
 | `test/门禁引擎/versioned-doc-guard.test.ts` | 新增（v2.8–v2.15 R6/R9） | 11 | 版本化路径/版本号；覆盖既有 -vN.md ⇒ deny；shell cp 旧版 deny/新版 pass；基线 TOFU/marker/坏行/缺失 fail-closed、canonical 路径、并发登记、O_EXCL 锁/活锁不接管/token fencing、旧记录归一化、属主写后单文件登记 |
 | 既有更新 | — | — | `chief-workflow`（convener dispatch v4.1）、`star-routing`（M8/M5/M6）、`entry-role-minimal-d`、`i-full-chain` |
 
-定向（返工 v3 后重跑）：门禁引擎 275 计（274 过 / 1 skip）、编排 528 计（527 过 / 1 红＝既有 Windows symlink EPERM）、桌面应用 344/344、runtime-core 258 计（251 过 / 3 红 / 4 skip，红均既有 symlink）、测试 544 计（534 过 / 4 红 / 6 skip，红均基线）、项目管理 154 计（149 过 / 5 skip）、装配 85/85；逐文件：classify-shell 52、shell-write-guard 9、shell-operator-only 16、shell-post-audit 8、shell-approval-context 9、workflow-preconditions 11、appointment-roster 8、acceptance-judge-minimal 4、task-state 9、trio-worker-report 4、chain-enforcement 6、operator-channel 56、su zero-execution 6、versioned-doc-guard 11（合计 209/209 全过）。
+定向（返工 v3 后重跑）：门禁引擎 275 计（274 过 / 1 skip）、编排 528 计（527 过 / 1 红＝既有 Windows symlink EPERM）、桌面应用 344/344、runtime-core 258 计（251 过 / 3 红 / 4 skip，红均既有 symlink）、测试 544 计（534 过 / 4 红 / 6 skip，红均基线）、项目管理 154 计（149 过 / 5 skip）、装配 85/85；逐文件：classify-shell 52、shell-write-guard 9、shell-operator-only 16、shell-post-audit 8、shell-approval-context 9、workflow-preconditions 13、appointment-roster 8、acceptance-judge-minimal 4、task-state 9、trio-worker-report 4、chain-enforcement 6、operator-channel 56、su zero-execution 6、versioned-doc-guard 11（合计 211/211 全过）。
 
 ## 3. 验证（串行）
 
@@ -139,6 +139,12 @@
 - **已走通**：策划重出 v2 模块/提案/名单/架构（roster v8 仅项目角色，topology management 含 convener）；D3 由 judge 代批（`decisionId=decision-req-ebd6998cb1685656`，bookmark-impl+bookmark-qa）；**BUG-3 修复验证通过**——appointment-write 两张卡各一次 `confirmed`，角色卡与 boundary.yaml 落盘（`角色卡/bookmark-impl/`、`角色卡/bookmark-qa/`）；第④步交付运营成功（`task.created to=convener stepId=project-handoff`）；运营按模块派发实现任务，worker 写出 `src/cli/*`、`src/store/index.js`、`test/*.test.js`；运营核对 `node --test` **24 pass / 0 fail**。
 - **现场暴露并已记录/修正的问题**：意图 frontmatter 仅支持顶层 key:value（三轮退回后修正）；任务文本引用未来契约被投递前置拒收；roster v3–v8 迭代（顶层 modules[] 缺失、topology management 形状、内置 convener 被误加入 roles、角色目录缺 boundary.yaml）；交付运营拒绝文案已改为「D3 选中的项目角色卡未齐备（缺：…）」并补测试；roster 内置角色负例已由解析器拒绝。
 - **当时状态**：实现/验收阶段进行中（未到最终 acceptance 汇总）；应用保持运行（CDP 9235）。`trial-focus-timer` 前后清单 28 文件 sha256 同为 `5af6cd98…`，未改动。
+
+## 4.7 模块文件/目录与标准角色 env-bootstrap（客户追加）
+
+- **模块路径**：`directory` 字段可为单个文件或单个目录——以 `/` 结尾=目录，否则=文件；冲突=路径相同或一方包含另一方（同父文件与目录合法）；文件模块授权=该文件本身，目录模块按 boundary kind；topology/绑定/唯一键/模块数规则同步。
+- **env-bootstrap（装配/入口）**：默认必带，固定 2 个领域中立模块：`category=env`（环境/资源装配）与 `category=entry`（入口/索引）；代码项目 package.json/scripts/src/main 仅为示例，写作/研究/设计/数据项目用 assets/、index.md 等同样成立。环境/入口类模块按 `category` 归属机械校验，误归属拒绝；小项目省略须写 `envBootstrapOmittedReason`，派人事前置拒绝无理由缺失。
+- **测试**：workflow-preconditions 13（文件模块正例、文件+目录同父、相等/包含负例、非代码写作项目 env/entry、env 归属负例）；chain-enforcement 夹具以 `envBootstrapOmittedReason` 保留最小链。
 
 ## 5. 决策点与遗留
 
