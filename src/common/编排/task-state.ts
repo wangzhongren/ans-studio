@@ -45,6 +45,11 @@ const REPORT_STATUSES: readonly TaskReportStatus[] = ["done", "blocked", "failed
 const CLOSED_OUTCOMES: readonly TaskClosedOutcome[] = ["accepted", "rework", "rejected"];
 const REDISPATCH_SAFETIES: readonly TaskRedispatchSafety[] = ["safe", "unsafe", "needs-review"];
 
+/** 治理步骤/流程 slug 校验（2026-10-29，F3）：小写 slug、不含首/尾连字符；仅供事件字段形态校验。 */
+function isTaskSlug(value: unknown): boolean {
+  return typeof value === "string" && /^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$/.test(value);
+}
+
 export interface TaskStateReadError {
   /** 来源文件（项目相对或轮转文件名）。 */
   file: string;
@@ -264,6 +269,18 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
     if (kind === "request.resolved") {
       if (rec["by"] !== "judge" && rec["by"] !== "customer") return { ok: false, message: "request.resolved.by 非法" };
       if (typeof rec["choice"] !== "string") return { ok: false, message: "request.resolved 缺 choice" };
+      // 2026-10-29（方案 v2.1 §5.4，F3）：D3 名单版本/hash——给出时：正整数 + 64 位 hex（应用写，模型不可自报）。
+      if (rec["rosterVersion"] !== undefined) {
+        const version = rec["rosterVersion"];
+        if (typeof version !== "number" || !Number.isInteger(version) || version < 1) {
+          return { ok: false, message: "request.resolved.rosterVersion 必须是正整数" };
+        }
+      }
+      if (rec["rosterSha256"] !== undefined) {
+        if (typeof rec["rosterSha256"] !== "string" || !/^[0-9a-f]{64}$/.test(rec["rosterSha256"])) {
+          return { ok: false, message: "request.resolved.rosterSha256 必须是 64 位小写 hex" };
+        }
+      }
     }
     return { ok: true, event: rec as unknown as TaskStateEvent };
   }
@@ -277,12 +294,18 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
   }
   if (typeof rec["taskId"] !== "string" || rec["taskId"] === "") return { ok: false, message: "缺 taskId" };
   if (kind === "task.created") {
-    if (rec["from"] !== "chief") return { ok: false, message: "task.created.from 必须为 chief" };
+    // 2026-10-29（方案 v2.1 §5.4，F2）：创建者受控放宽到 chief / convener（运营派发实现任务）。
+    if (rec["from"] !== "chief" && rec["from"] !== "convener") {
+      return { ok: false, message: "task.created.from 必须为 chief 或 convener" };
+    }
     if (typeof rec["to"] !== "string" || rec["to"] === "") return { ok: false, message: "task.created 缺 to" };
     if (typeof rec["text"] !== "string" || rec["text"].trim() === "") return { ok: false, message: "task.created 缺 text" };
     const sideEffect = rec["sideEffect"];
     if (typeof sideEffect !== "string" || !(SIDE_EFFECTS as readonly string[]).includes(sideEffect)) return { ok: false, message: "sideEffect 非法" };
     if (typeof rec["idempotencyKey"] !== "string" || rec["idempotencyKey"] === "") return { ok: false, message: "缺 idempotencyKey" };
+    // 2026-10-29（F3）：可选治理字段——flowId/stepId 给出时必须是合法 slug（缺失 = 旧记录，兼容）。
+    if (rec["flowId"] !== undefined && !isTaskSlug(rec["flowId"])) return { ok: false, message: "task.created.flowId 非法" };
+    if (rec["stepId"] !== undefined && !isTaskSlug(rec["stepId"])) return { ok: false, message: "task.created.stepId 非法" };
     return { ok: true, event: rec as unknown as TaskStateEvent };
   }
   if (kind === "task.reported") {
@@ -292,7 +315,8 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
     return { ok: true, event: rec as unknown as TaskStateEvent };
   }
   if (kind === "task.closed") {
-    if (rec["by"] !== "chief") return { ok: false, message: "task.closed.by 必须为 chief" };
+    // 2026-10-29（方案 v2.1 §5.4，F2）：任务创建者收口自己的任务（chief / convener）。
+    if (rec["by"] !== "chief" && rec["by"] !== "convener") return { ok: false, message: "task.closed.by 必须为 chief 或 convener" };
     if (typeof rec["outcome"] !== "string" || !(CLOSED_OUTCOMES as readonly string[]).includes(rec["outcome"])) return { ok: false, message: "task.closed.outcome 非法" };
     return { ok: true, event: rec as unknown as TaskStateEvent };
   }

@@ -1,5 +1,9 @@
 # 编排 变更记录
 
+## 2026-10-29 — 工作流维护者化（v4.1）：机械前置、报告路由、shell 写区守卫/审计、验收最小事实
+
+方案 v2.1 §5/§6/§8（T3；闸门 1/2 已过）。新增 `common/编排/workflow-preconditions.ts`（project-roster/v1 解析/校验、最新名单 version/hash、派发矩阵 M1–M8、报告路由 M9）。`task-state.ts`：`task.created.from`/`task.closed.by` 放宽到 chief/convener，`flowId/stepId` 与 `request.resolved.rosterVersion/rosterSha256` 校验（旧记录兼容）。`run-role.ts`：招人卡只由人事发起（选项=名单、推荐集应用生成）；移除 convener appointment 白名单；appointment-write boundary 目录 ⊆ 名单授权目录；shell 装配注入 `checkWrite` 守卫与执行前快照。`shell-gate.ts`/`shell-arming.ts`：deny 直拒、opaque → `manualOnly`、最终 allow 前快照。新增 `shell-post-audit.ts`（执行后越界写审计）。`governance-judge-facts/verdict/prompt.ts`：验收最小链事实（Q6 A），撤除旧 flow criteria/change-package 门槛。测试：新增 workflow-preconditions（8）、shell-post-audit（4）、appointment-roster（4）、acceptance-judge-minimal（3）；task-state +2、shell-operator-only +2、trio-worker-report +1；编排套件 503 计（502 过/1 红＝既有 symlink EPERM）。详见 `docs/scheduling/2026-10-29_change-workflow-maintainers-hiring.md`。
+
 ## 2026-10-29 — trio 内建 worker 注入 `submit_report`（客户真机：幕僚派发的 worker 不回短报）
 
 **来源**：客户真机测试——幕僚派发给运营（convener）的任务完成后没有 `submit_report`，幕僚收不到回报、只能读文件/轮询。提交 `2499c01` 修正 `run-role.ts` 的 `suppressHandback`：`builtInGovernance && (trioSpec === undefined || trioSpec.id === "chief")`——trio 五个内建 worker（product/rapporteur/nominator/convener/verifier）**注入** `reportHandback`（`submit_report` 据此注册）；幕僚本人（不自我回交）与 single/su 旧模型**不注入**。幕僚卡同步改为「派发后立即结束本轮、不要 run_shell sleep / 连续 role_status 轮询」，5 张 worker 卡加「任务完成必须 submit_report 回短报」。本批只补测试与文档，未改生产逻辑。

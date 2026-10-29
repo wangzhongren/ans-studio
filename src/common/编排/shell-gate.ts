@@ -97,6 +97,7 @@ import {
 // `normalizeArgv`；T23 起正文迁至 `src/common/shared/argv-primitives.ts`，本文件改为**只读导入**
 // （工程法案 §一.5、`docs/architecture/shared-components.md`）——**不得留第二份实现**。行为逐字不变。
 import { normalizeArgv } from "../shared/argv-primitives.ts";
+import type { ShellWriteGuardDecision } from "../门禁引擎/shell-write-guard.ts";
 
 // —— 契约（任务已定死，照做） ——
 // 类型定义归运行时核心的 src/model/runtime.ts（工具层与扩展层按同一形状编译）；此处按其形状
@@ -243,6 +244,14 @@ export const BRANCH_PREBLOCK_INLINE_TOO_LARGE = "preblock:inline-too-large";
 /** 无界/递归搜索（`grep -r` 无受限路径、`find /`、`rg` 全项目扫描）→ 直接拒绝。 */
 export const BRANCH_PREBLOCK_UNBOUNDED_SEARCH = "preblock:unbounded-search";
 
+// —— shell 写目标守卫（2026-10-29 方案 v2.1 §6.3/§6.4；客户 Q1 A）——
+/** 显式写目标越界/治理路径 → **直接拒绝**（不弹卡、不交 judge）。 */
+export const BRANCH_WRITE_GUARD_DENY = "write-guard:deny";
+/** 不透明执行（无法静态界定写目标）→ 交 (a) 且 `manualOnly`（「替我审批」不得代批）。 */
+export const BRANCH_OPAQUE_MANUAL = "opaque:manual-only";
+/** 只读档下的不透明执行 → 拒绝（只读档只放行 (c) 白名单）。 */
+export const BRANCH_OPAQUE_DENY = "opaque:readonly-deny";
+
 // —— 第二闸 (b) —— 触发分支。
 export const BRANCH_B_ALLOW = "b-allow"; // pm 判读为放行
 export const BRANCH_B_DENY = "b-deny"; // pm 判读为拒绝
@@ -366,6 +375,14 @@ export interface CreateShellGateOptions {
    * **构造期守卫**：与 `readonlyOnly`/`operatorOnly` 互斥；必须有 `operatorChannel`。
    */
   advisoryRuleset?: boolean;
+  /**
+   * **shell 写目标守卫**（2026-10-29 方案 v2.1 §6.3；注入——装配点用同一 `resolveWrite` 构造
+   * `checkWrite` 闭包）：deny 直接拒绝；opaque 交 (a) 且 `manualOnly`（开关不代批）；pass 继续既有链。
+   * 缺省不传 = 旧行为逐字不变（既有测试与旧调用方零变化）。
+   */
+  writeGuard?: (req: ShellGateRequest) => ShellWriteGuardDecision;
+  /** 执行前写审计快照（仅在最终 allow 时调用；失败不阻塞执行）。 */
+  snapshotBefore?: (req: ShellGateRequest) => Promise<void> | void;
 }
 
 /** 内部：一次审核的结论 + 审计所需的分支/结论分类。 */
@@ -493,6 +510,30 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       };
     }
 
+    // **shell 写目标守卫**（2026-10-29 方案 v2.1 §6.3/§6.4；注入）：显式写目标越界 → 直接拒绝；
+    // 无法静态界定写目标（不透明执行）→ 交 (a) 且 manualOnly（开关不代批）。缺省不传 ⇒ 旧行为逐字不变。
+    let writeGuardDecision: ShellWriteGuardDecision | undefined;
+    if (typeof opts.writeGuard === "function") {
+      try {
+        writeGuardDecision = opts.writeGuard(req);
+      } catch (err) {
+        return {
+          result: { allow: false, reason: `shell 写目标守卫异常，拒绝执行：${reasonOf(err)}`, by: "write-guard:error" },
+          conclusion: "error",
+          branch: BRANCH_WRITE_GUARD_DENY,
+        };
+      }
+    }
+    if (writeGuardDecision !== undefined && writeGuardDecision.kind === "deny") {
+      log.record("shell.write-guard.denied", { toolCallId: req.toolCallId, targets: writeGuardDecision.targets });
+      return {
+        result: { allow: false, reason: writeGuardDecision.reason, by: "write-guard" },
+        conclusion: "deny",
+        branch: BRANCH_WRITE_GUARD_DENY,
+      };
+    }
+    const opaque = writeGuardDecision !== undefined && writeGuardDecision.kind === "opaque" ? writeGuardDecision : undefined;
+
     // 分类：门禁引擎的纯函数。抛错 → 拒绝（保守）。
     let detail: ShellClassifyDetail;
     try {
@@ -519,6 +560,39 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
             : by;
 
     // 映射（§7.5）。
+    // —— 不透明执行（Q1 A）：无论 (c) 档位，均交 (a) **客户本人**；只读档直接拒；通道缺席即拒 ——
+    if (opaque !== undefined) {
+      if (opts.readonlyOnly === true) {
+        return denyOutcome(
+          BRANCH_OPAQUE_DENY,
+          byTagged,
+          "只读档：不透明执行类（无法按写区校验）不在只读白名单内，拒绝执行——这是策略拒绝，不是环境故障。",
+        );
+      }
+      // 非 advisory 的项目角色链：c=deny 仍是**不可翻案的硬地板**（G3 不变）；只有审批档
+      // （approveDeny）或 advisory 链才把 deny 交客户。
+      if (detail.decision === "deny" && opts.operatorOnly !== true && opts.advisoryRuleset !== true) {
+        return denyOutcome(
+          BRANCH_C_DENY,
+          byTagged,
+          detail.reason ?? `命中 c 硬拒规则（${by}）`,
+        );
+      }
+      if (typeof opts.operatorChannel !== "function") {
+        return denyOutcome(
+          escalateBranch(BRANCH_OPAQUE_MANUAL, BRANCH_A_UNAVAILABLE),
+          `${byTagged} → operator:通道未接入`,
+          "不透明执行类必须由客户本人确认，但操作者通道未接入，拒绝（fail-closed）。",
+        );
+      }
+      return await runA({ ...req, manualOnly: true }, {
+        bBranch: BRANCH_OPAQUE_MANUAL,
+        bAttr: byTagged,
+        why:
+          `不透明执行类：${opaque.reason} ` +
+          "「替我审批」开关不得代批，必须由客户本人确认；批准后命令以当前 OS 用户权限执行。",
+      });
+    }
     if (detail.decision === "allow") {
       // 命中 c 白名单 → 直接放行（**不产出 token**；审核与 spawn 同址于 execute，票据已废，§7.1 第 3 条）。
       return {
@@ -711,6 +785,7 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       cwd: req.cwd,
       toolCallId: req.toolCallId,
       reason: b.why,
+      ...(req.manualOnly === true ? { manualOnly: true } : {}),
     };
 
     let out: OperatorOutcome | null | undefined;
@@ -793,6 +868,14 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
     //（判定已完成且确定），但如实上报到 stderr，绝不静默。
     log.record("shell.review.end", { toolCallId: req.toolCallId, decision: outcome.conclusion, reasonCode: outcome.branch });
     await audit(req, outcome, now());
+    // 2026-10-29（§6.5）：最终放行后、spawn 之前拍快照（执行后由 run_shell 调 postAudit 对比）。
+    if (outcome.result.allow === true && typeof opts.snapshotBefore === "function") {
+      try {
+        await opts.snapshotBefore(req);
+      } catch (err) {
+        process.stderr.write(`shell 写审计快照失败（不影响执行）：${reasonOf(err)}\n`);
+      }
+    }
     return outcome.result;
   };
 
@@ -891,6 +974,14 @@ export interface ShellGateBuildDeps {
   approveDeny?: boolean;
   /** **advisory 规则集**（见 `CreateShellGateOptions.advisoryRuleset`）。 */
   advisoryRuleset?: boolean;
+  /**
+   * **shell 写目标守卫**（2026-10-29 方案 v2.1 §6.3；注入——装配点用同一 `resolveWrite` 构造
+   * `checkWrite` 闭包）：deny 直接拒绝；opaque 交 (a) 且 `manualOnly`（开关不代批）；pass 继续既有链。
+   * 缺省不传 = 旧行为逐字不变（既有测试与旧调用方零变化）。
+   */
+  writeGuard?: (req: ShellGateRequest) => ShellWriteGuardDecision;
+  /** 执行前写审计快照（仅在最终 allow 时调用；失败不阻塞执行）。 */
+  snapshotBefore?: (req: ShellGateRequest) => Promise<void> | void;
 }
 
 export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
@@ -930,6 +1021,8 @@ export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
     operatorOnly: deps.operatorOnly,
     approveDeny: deps.approveDeny,
     advisoryRuleset: deps.advisoryRuleset,
+    ...(deps.writeGuard !== undefined ? { writeGuard: deps.writeGuard } : {}),
+    ...(deps.snapshotBefore !== undefined ? { snapshotBefore: deps.snapshotBefore } : {}),
   });
 }
 

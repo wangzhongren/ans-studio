@@ -57,6 +57,9 @@ import path from "node:path";
 import { parse as parseYaml } from "yaml";
 // C 批（方案 §6.4.1/C-06）：appointment-write 预览的 role-card 必填章节单一来源。
 import { ROLE_CARD_REQUIRED_SECTIONS } from "../../common/门禁引擎/governance-roles.ts";
+import { evaluateShellWriteTargets } from "../../common/门禁引擎/shell-write-guard.ts";
+import { loadLatestRoster, rosterDirectoriesFor, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
+import { createShellPostAudit } from "../../common/编排/shell-post-audit.ts";
 import { resolveRole } from "../../service/role/resolve-role.ts";
 import { resolveBoundary, validateBoundaryYamlText } from "../../service/boundary/resolve-boundary.ts";
 import {
@@ -78,6 +81,8 @@ import type {
   SessionEvent,
   WriteGate,
   ShellGate,
+  ShellReviewRequest,
+  ShellPostAuditFn,
   CustomerInputFn,
   CustomerInputMetadata,
   CustomerInputOutcome,
@@ -246,6 +251,8 @@ export interface AdapterCapabilities {
    */
   requestRequirementChange?: RequestRequirementChangeFn;
   shellGate?: ShellGate;
+  /** 2026-10-29（§6.5）：run_shell 执行后写审计（与 shellGate 同注入；缺省不审计）。 */
+  shellPostAudit?: ShellPostAuditFn;
   shellVerdict?: ShellVerdictFn;
   roleStatus?: RoleStatusFn;
   sessionTail?: SessionTailFn;
@@ -823,6 +830,44 @@ export async function openRoleSession(
                 "请显式携带 cardKind（如 decision）后重试。",
             };
           }
+          // 2026-10-29（方案 v2.1 §5.1/M3）：招人决定卡（appointment）——只有人事可发；选项必须恰为
+          // 最新名单角色（多选）；推荐集由应用从名单生成（不采信模型自报）。不满足 ⇒ 不发卡。
+          let appointmentRecommendedRoleIds: string[] | undefined;
+          if (cardKind === "appointment") {
+            const rejectAppointment = (reason: string) => {
+              log.record("governance.card.rejected", {
+                state: "not-presented",
+                reasonCode: "appointment-invalid",
+                ok: false,
+              });
+              return { outcome: "declined" as const, notPresented: true as const, reason };
+            };
+            if (!isTrio || trioSpec?.id !== "nominator") {
+              return rejectAppointment(
+                "招人决定卡（appointment）只能由人事（nominator）发起；本次未向客户发卡、未写任何记录。",
+              );
+            }
+            const appointmentFlowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
+            if (typeof appointmentFlowId !== "string" || appointmentFlowId.trim() === "") {
+              return rejectAppointment("招人决定卡缺少 flowId（用于定位最新人员名单）；本次未向客户发卡。");
+            }
+            if (effectiveReq.kind !== "choice") {
+              return rejectAppointment("招人决定卡必须是 choice 卡（多选名单角色）；本次未向客户发卡。");
+            }
+            const roster = await loadLatestRoster({ projectRoot: input.project.projectRoot, flowId: appointmentFlowId });
+            if (!roster.ok) {
+              return rejectAppointment(`招人决定卡前置不满足：${roster.reason} 请先让策划产出合法名单。`);
+            }
+            const rosterCard = validateAppointmentCardAgainstRoster({
+              roster: roster.roster,
+              optionIds: effectiveReq.options.map((option) => option.id),
+              multiple: effectiveReq.multiple === true,
+            });
+            if (!rosterCard.ok) {
+              return rejectAppointment(`招人决定卡与最新名单不一致：${rosterCard.reason} 本次未向客户发卡。`);
+            }
+            appointmentRecommendedRoleIds = rosterCard.recommendedRoleIds;
+          }
           // 2026-10-26（独立验收 F2）：decision 卡结构校验的**单一共享实现**（`common/编排/decision-card.ts`）。
           // 在触达客户通道**之前**执行——CLI、single su 与项目角色没有桌面卡校验，必须由编排兜住；
           // 不通过 ⇒ declined + notPresented（不调 raw、不写账本、不带 operatorId）。桌面窗口后续经本文件
@@ -968,12 +1013,27 @@ export async function openRoleSession(
                 `本次未向客户发卡，也未发行任何写入路径。`,
             };
           }
+          // 2026-10-29（方案 v2.1 §5.1/M4）：名单给该角色的授权目录（boundary 条目必须 ⊆ 名单目录）。
+          // 最新名单可读时强制；不可读时由 M11 的 D3 名单版本校验兜底（新链 D3 必带名单 version/hash）。
+          let appointmentAllowedDirectories: string[] | undefined;
+          const previewCardKind = effectiveReq.cardKind ?? effectiveMetadata?.cardKind;
+          if (previewCardKind === "appointment-write") {
+            const previewFlowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
+            const previewTarget = typeof effectiveMetadata?.targetRoleId === "string" ? effectiveMetadata.targetRoleId.trim() : "";
+            if (typeof previewFlowId === "string" && previewFlowId !== "" && previewTarget !== "") {
+              const roster = await loadLatestRoster({ projectRoot: input.project.projectRoot, flowId: previewFlowId });
+              if (roster.ok) {
+                appointmentAllowedDirectories = rosterDirectoriesFor(roster.roster, previewTarget) ?? [];
+              }
+            }
+          }
           // C-06（方案 §6.4.1/R2）：appointment-write 预览结构校验（新路径 targetRoleId/decisionId +
           // 角色卡目录/必需章节/boundary YAML）。旧 flow 路径（只带 flowId）不新增门槛；失败不发卡。
           const appointmentPreviewError = validateAppointmentWritePreview({
             request: effectiveReq,
             metadata: effectiveMetadata,
             declaredPaths: completeness.declaredPaths,
+            ...(appointmentAllowedDirectories !== undefined ? { allowedDirectories: appointmentAllowedDirectories } : {}),
           });
           if (appointmentPreviewError !== undefined) {
             log.record("governance.card.rejected", {
@@ -1006,6 +1066,9 @@ export async function openRoleSession(
               const judgeContext: GovernanceJudgeContext = {
                 flowId: judgeAttribution,
                 facts,
+                ...(cardKind === "appointment" && appointmentRecommendedRoleIds !== undefined
+                  ? { recommendedRoleIds: appointmentRecommendedRoleIds }
+                  : {}),
                 ...(effectiveMetadata?.toolCallId !== undefined ? { toolCallId: effectiveMetadata.toolCallId } : {}),
                 ...(effectiveMetadata?.turnId !== undefined ? { turnId: effectiveMetadata.turnId } : {}),
                 ...(effectiveReq.kind === "confirm" && effectiveReq.paths !== undefined ? { paths: [...effectiveReq.paths] } : {}),
@@ -1020,6 +1083,32 @@ export async function openRoleSession(
         };
       })()
     : undefined;
+
+  // —————— 2026-10-29（方案 v2.1 §6.3/§6.5）：shell 写目标守卫 + 执行后写审计 ——————
+  // checkWrite 与 F4 写区判定**同一实现**（gate → resolveWrite，含 forbiddenWritePaths 与任务 scope 收窄）；
+  // 守卫不另写第二份真实路径判定。显式写目标越界即拒；不透明执行交客户本人（manualOnly）。
+  const shellCheckWrite = (relPath: string): { allowed: boolean; reason?: string } => {
+    const decision = gate(relPath);
+    return decision.allowed === true ? { allowed: true } : { allowed: false, reason: decision.reason };
+  };
+  const shellWriteGuard = (req: ShellReviewRequest) =>
+    evaluateShellWriteTargets({
+      argv: req.argv,
+      cwd: req.cwd,
+      projectRoot: input.project.projectRoot,
+      skillRoot: input.project.skillRoot,
+      boundary: setup.role.boundary,
+      ...(input.scope !== undefined ? { scope: input.scope } : {}),
+      conditions,
+      forbiddenPrefixes: trioSpec?.forbiddenWritePaths ?? [],
+      checkWrite: shellCheckWrite,
+    });
+  // 执行后写审计（仅在 shell 已 arm 时挂到 run_shell；缺省无副作用）。
+  const shellPostAudit = createShellPostAudit({
+    projectRoot: input.project.projectRoot,
+    forbiddenPrefixes: trioSpec?.forbiddenWritePaths ?? [],
+    checkWrite: shellCheckWrite,
+  });
 
   // 回交（设计 §10.8）：角色会话 settle → 编排发 `handback` 事件，交回治理角色。
   // **星形最小系统（2026-10-29 客户实测）**：内置 worker（产品/策划/人事/运营/质检）也是幕僚的 worker，
@@ -1107,7 +1196,7 @@ export async function openRoleSession(
       log.record("shell.operatorOnly.rejected", { mode: "shellOperatorOnly", outcome: "not-armed", reasonCode: "capability-denied" });
     } else {
       try {
-        shellGate = await assembleOperatorShellGate({ project: input.project, ...input.shellOperatorOnly });
+        shellGate = await assembleOperatorShellGate({ project: input.project, ...input.shellOperatorOnly, writeGuard: shellWriteGuard, snapshotBefore: (req) => shellPostAudit.snapshotBefore(req) });
       } catch (err) {
         log.error("shell.arming.failed", err);
         shellGate = undefined; // 装配失败 ⇒ 不 arm（能力缺席 = fail-closed，run_shell 不注册）
@@ -1134,6 +1223,8 @@ export async function openRoleSession(
         ...(input.shellArming ?? {}),
         runtime: input.runtime,
         ...(input.routineShellPolicy !== undefined ? { routineShellPolicy: input.routineShellPolicy } : {}),
+        writeGuard: shellWriteGuard,
+        snapshotBefore: (req) => shellPostAudit.snapshotBefore(req),
       });
     } catch (err) {
       log.error("shell.arming.failed", err);
@@ -1172,6 +1263,7 @@ export async function openRoleSession(
     ...(installMcp !== undefined ? { installMcp } : {}),
     ...(uninstallMcp !== undefined ? { uninstallMcp } : {}),
     ...(shellGate !== undefined ? { shellGate } : {}),
+    ...(shellGate !== undefined ? { shellPostAudit: shellPostAudit.auditAfter } : {}),
     ...(input.shellVerdict !== undefined ? { shellVerdict: input.shellVerdict } : {}),
   };
   const createAdapter = deps.createAdapter ?? createRuntimeAdapterFactory(input.project, input.runtime ?? "pi", deps.runtimeOptions);
@@ -1800,12 +1892,12 @@ const TRIO_CARD_KINDS: Record<GovernanceRoleSpec["id"], readonly GovernanceCardK
   // 2026-10-26 客户纠正/补充：报告员可发 **decision 卡，仅限需求变更审批**（发起方不得自批；
   // 审批人是判断 agent/客户，主理只执行）；提案与写盘卡不变。
   rapporteur: ["proposal", "decision"],
-  // 2026-10-22 第 1 项：Crew（Nominator）只按客户任命的团队计划写卡，不再发 appointment 卡；
-  // `appointment-write`（写角色卡/边界）保留。
-  nominator: ["appointment-write"],
-  // 2026-10-22 第 1 项：Convener（Steward/统筹）依团队计划发起 appointment 卡。
+  // 2026-10-29（方案 v2.1 §5.1/M3，F7）：**招人决定卡（appointment）只由人事发起**——
+  // 选项=最新名单角色、推荐集由应用从名单生成；写卡（appointment-write）保留。
+  nominator: ["appointment", "appointment-write"],
   // 2026-10-26 客户新增：统筹可发 decision 卡（材料性选择；需求变更审批卡统筹也可发起）。
-  convener: ["appointment", "decision"],
+  // 2026-10-29：从 convener 白名单**移除 appointment**（招人卡只归人事）。
+  convener: ["decision"],
   // 验收权归 Proof / 验收（verifier）；Draft / 提案不再发 acceptance。
   verifier: ["acceptance"],
 };
@@ -1865,6 +1957,9 @@ export function validateAppointmentWritePreview(args: {
   request: CustomerInputRequest;
   metadata?: CustomerInputMetadata;
   declaredPaths: readonly string[];
+  /** 2026-10-29（方案 v2.1 §5.1/M4）：名单给该角色的授权目录（项目相对、以 / 结尾）。
+   *  给出时 boundary.yaml 的每个条目必须落在其中（`[]` = 不在名单内，任何条目都拒绝）；缺省 = 旧路径不校验。 */
+  allowedDirectories?: readonly string[];
 }): string | undefined {
   const cardKind = args.request.cardKind ?? args.metadata?.cardKind;
   if (cardKind !== "appointment-write") return undefined;
@@ -1917,6 +2012,26 @@ export function validateAppointmentWritePreview(args: {
                 : undefined;
             if (declaredRole !== targetRoleId) {
               problems.push(`${entry.path} 顶层 role=${JSON.stringify(declaredRole)} 与目录 id=${targetRoleId} 不一致`);
+            }
+            if (args.allowedDirectories !== undefined) {
+              const entries = doc !== null && typeof doc === "object" && !Array.isArray(doc)
+                ? (doc as Record<string, unknown>).entries
+                : undefined;
+              if (Array.isArray(entries)) {
+                for (const rawEntry of entries) {
+                  const entryPath = rawEntry !== null && typeof rawEntry === "object" && !Array.isArray(rawEntry)
+                    ? (rawEntry as Record<string, unknown>).path
+                    : undefined;
+                  if (typeof entryPath !== "string") continue;
+                  const normalized = entryPath.replace(/\\/g, "/");
+                  const allowed = args.allowedDirectories.some((dir) =>
+                    normalized === dir || normalized === dir.replace(/\/$/, "") || normalized.startsWith(dir),
+                  );
+                  if (!allowed) {
+                    problems.push(`${entry.path} 的目录 ${normalized} 不在名单给 ${targetRoleId} 的授权目录内`);
+                  }
+                }
+              }
             }
           } catch {
             // 语法错误已由 validateBoundaryYamlText 报出；此处只做身份检查。
@@ -2031,6 +2146,10 @@ export function createRuntimeAdapterFactory(
     // Service 侧二者互斥（同时给出 ⇒ 抛配置错误）。
     governanceJudge: capabilities?.governanceJudge ?? options.governanceJudge,
     shellGate: capabilities?.shellGate ?? options.shellGate,
+    // 2026-10-29（方案 v2.1 §6.5）：执行后写审计钩子（能力面/选项同源透传；缺省不审计）。
+    ...(capabilities?.shellPostAudit !== undefined || options.shellPostAudit !== undefined
+      ? { shellPostAudit: capabilities?.shellPostAudit ?? options.shellPostAudit }
+      : {}),
     shellVerdict: capabilities?.shellVerdict,
   });
 }

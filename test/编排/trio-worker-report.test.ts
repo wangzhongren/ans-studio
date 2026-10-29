@@ -21,7 +21,7 @@ import {
   type AdapterCapabilities,
 } from "../../src/pipeline/orchestration/run-role.ts";
 import type { HandbackEvent, OrchestrationEvent } from "../../src/common/编排/handback.ts";
-import { governanceRoleOf } from "../../src/common/门禁引擎/governance-roles.ts";
+import { governanceCapabilitiesOf, governanceRoleOf } from "../../src/common/门禁引擎/governance-roles.ts";
 
 const WORKER_IDS = ["product", "rapporteur", "nominator", "convener", "verifier"] as const;
 
@@ -177,4 +177,30 @@ test("卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询�
     );
     assert.equal(spec!.cardText.includes("派发后立即结束本轮"), false, `${roleId} 卡不得混入幕僚的派发纪律`);
   }
+});
+
+
+test("v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力", () => {
+  const chief = governanceRoleOf("chief")!.cardText;
+  assert.match(chief, /主链顺序（必须）/);
+  assert.match(chief, /①产品出「产品意图文档」/);
+  assert.match(chief, /②策划出「方案 \+ 人员名单 \+ 项目架构」/);
+  assert.match(chief, /③人事按名单招人写卡/);
+  assert.match(chief, /④把项目交付运营/);
+  assert.match(chief, /不直接给项目 worker 派实现任务/);
+  assert.match(chief, /派人事：应用要求名单存在且合法/);
+  assert.match(chief, /派运营：应用要求 D3 选中的角色卡已写好/);
+
+  assert.match(governanceRoleOf("product")!.cardText, /docs\/product\/<flowId>-intent-v1\.md/);
+  assert.match(governanceRoleOf("rapporteur")!.cardText, /project-roster\/v1/);
+  assert.match(governanceRoleOf("rapporteur")!.cardText, /<flowId>-roster-v1\.md/);
+  assert.match(governanceRoleOf("rapporteur")!.cardText, /<flowId>-architecture-v1\.md/);
+  assert.match(governanceRoleOf("nominator")!.cardText, /cardKind=appointment/);
+  assert.match(governanceRoleOf("nominator")!.cardText, /decisionId/);
+  assert.match(governanceRoleOf("convener")!.cardText, /D3 选中/);
+  assert.match(governanceRoleOf("convener")!.cardText, /不得发 appointment/);
+  assert.match(governanceRoleOf("verifier")!.cardText, /发起方/);
+
+  assert.equal(governanceCapabilitiesOf("convener")!.dispatchTask, true, "v4.1：运营拥有 dispatch 能力（作用域由前置校验执行）");
+  assert.equal(governanceCapabilitiesOf("nominator")!.dispatchTask, false);
 });

@@ -1,5 +1,9 @@
 # 运行时核心变更记录
 
+## 2026-10-29 — 工作流维护者化（v4.1）契约与工具面
+
+方案 v2.1 §5.4/§6.5/§8。`src/model/runtime.ts`：`TaskCreatedEvent.from` 放宽为 chief/convener、增 `stepId`；`TaskClosedEvent.by` 同放宽；`RequestResolvedEvent` 增 `rosterVersion/rosterSha256`；`CustomerInputMetadata` 增名单字段、`CustomerInputOutcome` 增 `decisionId`；`ShellReviewRequest`/`OperatorPrompt` 增 `manualOnly`；新增 `ShellExecutionOutcome`/`ShellPostAuditFn` 与 `GovernedToolsOptions.shellPostAudit`；`GovernanceJudgeFacts` 增验收最小链事实字段。`src/provider/runtime/tools.ts`：`request_choice` 回执携带应用生成的 `decisionId`（D3 凭据）；`run_shell` 执行后调用写审计钩子（越界写如实附加、不静默）。`schema.ts`：dispatch_task 描述更新为 v4.1 派发矩阵。测试：runtime-core 新增 decisionId 回执 1 例，套件绿（仅既有 symlink 环境性红）。详见 `docs/scheduling/2026-10-29_change-workflow-maintainers-hiring.md`。
+
 ## 2026-10-21 D3 最小边界对齐（ANS Team Formation）
 
 显示兼容补正：保留原 `groupDuty=组长` 字段，明确仅为历史展示元数据，不授予派发或验收权。D3 不迁移既有界面角色展示；恢复该字段，避免改变实际角色枚举/解析的既有契约。边界对齐与独立验收规则保持不变。

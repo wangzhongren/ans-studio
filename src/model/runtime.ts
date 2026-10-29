@@ -167,7 +167,31 @@ export interface ShellReviewRequest {
   argv: string[];
   cwd: string;
   toolCallId: string;
+  /**
+   * 2026-10-29（方案 v2.1 §6.4，Q1 A）：不透明执行类（`node <脚本>`/解释器脚本/构建包脚本等无法静态
+   * 界定写范围）——**「替我审批」不得代批**，必须由客户本人确认。仅由 shell 写目标守卫置位。
+   */
+  manualOnly?: boolean;
 }
+
+/** run_shell 执行结果摘要（供执行后写审计；不含输出正文）。 */
+export interface ShellExecutionOutcome {
+  exitCode?: number;
+  signal?: string;
+  timedOut?: boolean;
+  error?: string;
+}
+
+/** 执行后写审计：越界写入清单（空 = 未发现）。 */
+export interface ShellPostAuditResult {
+  violations: { path: string; change: "added" | "modified" | "deleted" }[];
+}
+
+/** 执行后写审计钩子（2026-10-29 方案 v2.1 §6.5；由编排 shell-arming 装配、run_shell 执行完调用）。 */
+export type ShellPostAuditFn = (
+  req: ShellReviewRequest,
+  outcome: ShellExecutionOutcome,
+) => ShellPostAuditResult | Promise<ShellPostAuditResult>;
 
 export type ShellReviewResult = { allow: true; by: string } | { allow: false; reason: string; by: string };
 
@@ -180,6 +204,9 @@ export interface OperatorPrompt {
   toolCallId: string;
 
   reason?: string;
+
+  /** 客户本人确认标记（不透明执行类）：判断 agent 不得代批；由 shell 守卫置位。 */
+  manualOnly?: boolean;
 }
 
 export type OperatorOutcome =
@@ -380,6 +407,12 @@ export type CustomerInputOutcome =
       value: { confirmed?: boolean; selected?: string[] };
       operatorId?: string;
       /**
+       * 应用生成的裁决 id（`decision-<requestId>`；2026-10-29 方案 v2.1 §5.4/M4）：仅 application 层
+       * 在写入 `request.resolved` 后回填；工具回执据此把 decisionId 交给模型（appointment-write 凭据）。
+       * 模型不得自报。
+       */
+      decisionId?: string;
+      /**
        * 判断 agent 代批的审计归因（2026-10-18 双开关评审 §6.1/§四）：只有 `approve` 结算时才出现；
        * 客户手批不带本字段（仍是 `decisionEvidence.kind:"customer-input"`）。`declined`/`unavailable` 不加。
        */
@@ -389,6 +422,7 @@ export type CustomerInputOutcome =
       outcome: "declined";
       operatorId?: string;
       reason?: string;
+      decisionId?: string;
       /**
        * 卡片**从未呈现给客户**（2026-10-22 无效治理卡守卫设计 §4.6）：应用在触达客户通道之前
        * 拒绝发卡（如治理角色缺 `flowId`/`cardKind`）时置位。可选、向后兼容——既有 `declined`
@@ -421,6 +455,13 @@ export interface CustomerInputMetadata {
    */
   targetRoleId?: string;
   decisionId?: string;
+  /**
+   * 2026-10-29（方案 v2.1 §5.4，F3）：D3（appointment 招人决定）对应的名单版本与名单文件字节 sha256。
+   * 应用在 D3 resolved 时写入 `request.resolved`；appointment-write 校验时要求与**当前最新名单**一致
+   * （名单已变 ⇒ 旧 D3 作废）。模型不可自报——仅应用/测试注入。
+   */
+  rosterVersion?: number;
+  rosterSha256?: string;
   /**
    * 确认卡显式给出的**实际写入路径**（2026-10-18 真机修复）：仅当工具入参 `paths` 合法时透传；
    * 项目相对、逐文件、posix 化、≤64 项。缺席＝旧卡（由预览文本提取，零行为变化）。
@@ -498,8 +539,11 @@ export interface TaskCreatedEvent extends TaskStateEventBase {
   kind: "task.created";
   taskId: string;
   flowId?: string;
-  /** B 批新任务只由幕僚派发（星形路由）；旧 flow 派发不写本事件。 */
-  from: "chief";
+  /**
+   * 2026-10-29（方案 v2.1 §5.4，F2/F3）：任务创建者——幕僚派发主链 / 运营派发实现任务。
+   * 报告按本字段路由回创建者（M9）。
+   */
+  from: "chief" | "convener";
   to: string;
   text: string;
   expectedOutput?: string;
@@ -507,6 +551,11 @@ export interface TaskCreatedEvent extends TaskStateEventBase {
   sideEffect: TaskSideEffect;
   /** 必填：同键视为同一任务（重派沿用原键，任务 id 另给）。 */
   idempotencyKey: string;
+  /**
+   * 2026-10-29（方案 v2.1 §5.4，F3）：治理步骤 id（小写 slug）。幕僚→运营的交付任务固定
+   * `"project-handoff"`（M6/M7 的机械前置依据）。旧记录无此字段（兼容读取）。
+   */
+  stepId?: string;
 }
 
 export interface TaskDeliveredEvent extends TaskStateEventBase {
@@ -530,7 +579,8 @@ export interface TaskReportedEvent extends TaskStateEventBase {
 export interface TaskClosedEvent extends TaskStateEventBase {
   kind: "task.closed";
   taskId: string;
-  by: "chief";
+  /** 2026-10-29（方案 v2.1 §5.4，F2）：任务创建者收口自己的任务（chief / convener）。 */
+  by: "chief" | "convener";
   outcome: TaskClosedOutcome;
   note?: string;
 }
@@ -585,6 +635,12 @@ export interface RequestResolvedEvent extends TaskStateEventBase {
   targetRoleIds?: string[];
   intentId?: string;
   taskId?: string;
+  /**
+   * 2026-10-29（方案 v2.1 §5.4，F3）：仅 appointment（D3 招人）卡——名单 frontmatter `version` 与
+   * 名单文件字节 sha256（应用计算，模型不可自报）。M11 用它判断旧 D3 是否仍对应最新名单。
+   */
+  rosterVersion?: number;
+  rosterSha256?: string;
   by: "judge" | "customer";
   operatorId?: string;
   choice: string;
@@ -1519,6 +1575,18 @@ export interface GovernanceJudgeFacts {
    * V-D/V12/布局核对与 readiness 判定，本字段不构成写权、授权或语义结论。
    */
   teamPlanDirectories?: string[];
+  /**
+   * 2026-10-29（方案 v2.1 §5.1/Q6 A）：**验收最小链事实**——产品意图文档路径（存在、非空、含标题）。
+   * 可选；缺失＝应用未提供（验收判定按旧门槛或回落客户）。
+   */
+  intentDocumentPath?: string;
+  /** 最新人员名单版本/hash（应用从 `docs/proposals/<flowId>-roster-vN.md` 计算）。 */
+  rosterVersion?: number;
+  rosterSha256?: string;
+  /** 最新 D3（appointment）裁决 id（`request.resolved.decisionId`）。 */
+  appointmentDecisionId?: string;
+  /** 质检报告路径（`docs/quality/<flowId>-report-v1.md`；存在且可读）。 */
+  qualityReportPath?: string;
 }
 
 // —————————————— 会话级后台任务（2026-10-22 客户确认设计 B1–B4） ——————————————
@@ -1684,6 +1752,11 @@ export interface GovernedToolsOptions {
   readRoot?: string;
   writeRoot?: string;
   shellGate?: ShellGate;
+  /**
+   * 2026-10-29（方案 v2.1 §6.5）：run_shell 执行后的写审计钩子（编排 shell-arming 装配）。
+   * 仅随 `shellGate` 一起注入；缺省 ⇒ 不审计（旧行为逐字不变）。
+   */
+  shellPostAudit?: ShellPostAuditFn;
   shellCwd?: string;
   shellReviewTimeoutMs?: number;
   /**

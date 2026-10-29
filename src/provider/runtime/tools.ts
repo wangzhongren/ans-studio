@@ -8,6 +8,8 @@ import { extname, isAbsolute, relative, resolve } from "node:path";
 import type {
   WriteGate,
   ShellGate,
+  ShellPostAuditFn,
+  ShellExecutionOutcome,
   ShellReviewResult,
   CustomerInputFn,
   CustomerInputRequest,
@@ -1105,7 +1107,7 @@ function runShell(argv: string[], cwd: string, env: Record<string, string>, sign
  * **审核与 spawn 同址**（§7.1 第 3 条）：这是**唯一** spawn 点，且**没有 token**——不再「登记票据交扩展层」，
  * 因为票据可由公开输入重算、证明不了审核发生过。此处就是每调用保证的唯一落点。
  */
-function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutMs: number, execTimeoutMs: number, gate?: InteractionGate, diagnostics?: DiagnosticLog, currentTurnId?: () => string | undefined, extraCredentialEnvVars?: readonly string[]): ExecutableTool {
+function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutMs: number, execTimeoutMs: number, gate?: InteractionGate, diagnostics?: DiagnosticLog, currentTurnId?: () => string | undefined, extraCredentialEnvVars?: readonly string[], shellPostAudit?: ShellPostAuditFn): ExecutableTool {
   const name = SHELL_TOOL_NAME;
   return {
     name,
@@ -1120,6 +1122,24 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
       const cwd = shellCwd;
       const toolCallId = typeof call.toolCallId === "string" ? call.toolCallId : "";
       const turnId = currentTurnId?.();
+      // 2026-10-29（方案 v2.1 §6.5）：执行后写审计——越界写入如实附在工具结果里（不静默）。
+      const auditNote = async (outcome: ShellExecutionOutcome): Promise<{ note: string; violated: boolean }> => {
+        if (shellPostAudit === undefined) return { note: "", violated: false };
+        try {
+          const result = await shellPostAudit({ command, argv, cwd, toolCallId }, outcome);
+          if (result.violations.length === 0) return { note: "", violated: false };
+          const shown = result.violations.slice(0, 8).map((v) => `${v.change}:${v.path}`).join("、");
+          const more = result.violations.length > 8 ? ` 等 ${result.violations.length} 项` : "";
+          return {
+            note:
+              `\n写审计：检测到越界写入（${shown}${more}）——已记录 docs/audit/shell-gate.jsonl；` +
+              "请如实向客户/幕僚报告并核对（不自动回滚）。",
+            violated: true,
+          };
+        } catch {
+          return { note: "", violated: false };
+        }
+      };
 
       // —— F-7 执行层守卫（在 ShellGate 审核**之前**）：独立操作符 token（含内嵌/展开加固项）
       //    命中 → **不调 gate、不 spawn**，以明确文案拒绝；被拒命令本就什么都不会执行，
@@ -1164,6 +1184,7 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
       if (outcome.timedOut === true) {
         const timeoutMs = outcome.timeoutMs ?? execTimeoutMs;
         diagnostics?.record("shell.exec.timeout", { turnId, toolCallId, toolName: name, timeoutMs, durationMs: Date.now() - execBegan });
+        const audited = await auditNote({ ...(outcome.code !== undefined ? { exitCode: outcome.code } : {}), ...(outcome.signal ? { signal: outcome.signal } : {}), timedOut: true });
         const head = outcome.error === undefined
           ? `${name} 超时已终止（${timeoutMs} ms）：命令超过本次执行时限，已被终止。`
           : `${name} 超时已触发（${timeoutMs} ms），但终止清理未在预算内完成（${outcome.error}）——进程可能仍在运行，请如实向客户说明。`;
@@ -1179,19 +1200,21 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
             stdoutTruncated: outcome.stdoutTruncated === true,
             stderrTruncated: outcome.stderrTruncated === true,
           },
-          message: `${head}\nstdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}\n提示：可重试、拆分命令，或把逻辑写成脚本文件后执行；本轮可继续。`,
+          message: `${head}\nstdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}\n提示：可重试、拆分命令，或把逻辑写成脚本文件后执行；本轮可继续。` + audited.note,
         };
       }
       if (outcome.error !== undefined) {
-        return { ok: false, message: `${name} 执行失败（未能启动或运行）：${outcome.error}`, execution: { error: outcome.error, ...(outcome.code !== undefined ? { exitCode:outcome.code } : {}), ...(outcome.signal ? {signal:outcome.signal} : {}) } };
+        const audited = await auditNote({ error: outcome.error, ...(outcome.code !== undefined ? { exitCode: outcome.code } : {}), ...(outcome.signal ? { signal: outcome.signal } : {}) });
+        return { ok: false, message: `${name} 执行失败（未能启动或运行）：${outcome.error}` + audited.note, execution: { error: outcome.error, ...(outcome.code !== undefined ? { exitCode:outcome.code } : {}), ...(outcome.signal ? {signal:outcome.signal} : {}) } };
       }
       const code = outcome.code;
+      const audited = await auditNote({ ...(code !== undefined ? { exitCode: code } : {}), ...(outcome.signal ? { signal: outcome.signal } : {}) });
       return {
-        ok: code === 0,
+        ok: code === 0 && !audited.violated,
         execution: { ...(code !== undefined ? {exitCode:code} : {}), ...(outcome.signal ? {signal:outcome.signal} : {}), stdout:outcome.stdout, stderr:outcome.stderr, stdoutTruncated:outcome.stdoutTruncated === true, stderrTruncated:outcome.stderrTruncated === true },
         message:
           `${name} 已执行：${command}（exit ${code ?? "?"}${outcome.signal ? `，signal ${outcome.signal}` : ""}）\n` +
-          `stdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}`,
+          `stdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}` + audited.note,
       };
     },
   };
@@ -1900,11 +1923,16 @@ function makeRequestChoiceTool(
         return opt !== undefined ? `${opt.id}（${opt.label}）` : id;
       });
       const selection = labels.length > 0 ? labels.join("、") : "（未选择任何项）";
+      // 2026-10-29（方案 v2.1 §5.4/M4）：D3 裁决 id 随回执交给模型（appointment-write 的必要凭据；
+      // 只由应用写入 `out.decisionId`，模型不可自报）。非 D3 卡也如实透传，行为无害。
+      const decisionNote = out.decisionId !== undefined && out.decisionId !== ""
+        ? `\nD3 裁决 id（decisionId）：${out.decisionId}——appointment-write 必须原样携带。`
+        : "";
       if (out.judge !== undefined) {
         // 判断 agent 代批：不得说成客户本人选择（评审 §7.5）。
         return {
           ok: true,
-          message: judgeReceipt(name, out.judge, `已选择：${selection}`),
+          message: judgeReceipt(name, out.judge, `已选择：${selection}`) + decisionNote,
         };
       }
       return {
@@ -1912,7 +1940,7 @@ function makeRequestChoiceTool(
         message:
           `${name}：客户已选择（${operatorTag(out.operatorId)}）：` +
           `${selection}。` +
-          `请按客户的选择继续；**未选中的项不得擅自代选**。`,
+          `请按客户的选择继续；**未选中的项不得擅自代选**。` + decisionNote,
       };
     },
   };
@@ -2872,7 +2900,7 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     // 与 reviewMs 同址在构建时解析一次；`RuntimeSessionOptions` 以 `...options` 透传，桌面端经 env 即可起效。
     const execMs =
       options?.shellExecTimeoutMs ?? readTimeoutMs(process.env, SHELL_EXEC_TIMEOUT_ENV, DEFAULT_SHELL_EXEC_TIMEOUT_MS);
-    tools.push(makeRunShellTool(shellGate, shellCwd, reviewMs, execMs, options?.interactionGate, options?.diagnostics, options?.currentTurnId, options?.extraCredentialEnvVars));
+    tools.push(makeRunShellTool(shellGate, shellCwd, reviewMs, execMs, options?.interactionGate, options?.diagnostics, options?.currentTurnId, options?.extraCredentialEnvVars, options?.shellPostAudit));
 
     // 结构性保证（B1，同 run_shell 判据）：**只有 ShellGate 与后台任务管理器同时注入时**四工具才一起注册。
     // 判断会话不经过本函数（走 buildShellJudgeTools / buildGovernanceJudgeTools），因此天然不可见。

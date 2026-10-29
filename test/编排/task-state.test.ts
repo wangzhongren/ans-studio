@@ -196,3 +196,95 @@ test("任务卡固定字段：摘要≤200、可选证据/期望产出/重派来
   assert.match(text, /可选证据：src\/x\.ts；test\/x\.test\.ts/);
   assert.match(text, /状态：created｜副作用：code/);
 });
+
+// ————————————————— 2026-10-29（方案 v2.1 §5.4，F2/F3/F9）：契约放宽与旧记录兼容 —————————————————
+
+test("task.created.from 放宽到 chief/convener；flowId/stepId 可选且须为合法 slug；旧记录（无字段）可读", async () => {
+  const root = await tempRoot();
+  try {
+    const fromConvener = taskEvent("task.created", {
+      taskId: "t-convener",
+      from: "convener",
+      to: "implementer",
+      text: "实现 X",
+      sideEffect: "code",
+      idempotencyKey: "key-convener",
+      flowId: "focus",
+      stepId: "implement",
+    }, () => new Date("2026-10-29T00:00:00.000Z"));
+    const legacy = created("t-legacy");
+    assert.equal((await appendTaskEvent(root, fromConvener)).ok, true);
+    assert.equal((await appendTaskEvent(root, legacy)).ok, true);
+    const state = await readTaskState(root);
+    assert.equal(state.errors.length, 0, JSON.stringify(state.errors));
+    assert.equal(state.records.get("t-convener")?.created?.from, "convener");
+    assert.equal(state.records.get("t-convener")?.created?.stepId, "implement");
+    assert.equal(state.records.get("t-convener")?.created?.flowId, "focus");
+    assert.equal(state.records.get("t-legacy")?.created?.from, "chief");
+
+    // 非法 from / 非法 stepId → 坏行（跳过但不阻塞其他行）。
+    await fs.writeFile(
+      path.join(root, TASKS_STATE_REL),
+      [
+        JSON.stringify({ ...fromConvener, taskId: "t-bad-from", from: "worker" }),
+        JSON.stringify({ ...fromConvener, taskId: "t-bad-step", stepId: "Bad_Step" }),
+        JSON.stringify(fromConvener),
+      ].join("\n") + "\n",
+      "utf8",
+    );
+    const bad = await readTaskState(root);
+    assert.equal(bad.records.size, 1, "只有合法行进入重放");
+    assert.equal(bad.errors.length, 2, JSON.stringify(bad.errors));
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("task.closed.by 放宽到 chief/convener；request.resolved 名单 version/hash 校验（正整数/64 位 hex）", async () => {
+  const root = await tempRoot();
+  try {
+    await appendTaskEvent(root, created("t-close"));
+    assert.equal((await appendTaskEvent(root, taskEvent("task.closed", { taskId: "t-close", by: "convener", outcome: "accepted" }, () => new Date("2026-10-29T00:00:01.000Z")))).ok, true);
+    await appendTaskEvent(root, {
+      v: 1,
+      at: "2026-10-29T00:00:02.000Z",
+      kind: "request.created",
+      requestId: "req-d3",
+      flowId: "focus",
+      sourceRoleId: "nominator",
+      title: "D3",
+      options: [{ id: "implementer", label: "implementer" }],
+    });
+    await appendTaskEvent(root, {
+      v: 1,
+      at: "2026-10-29T00:00:03.000Z",
+      kind: "request.resolved",
+      requestId: "req-d3",
+      decisionId: "decision-req-d3",
+      targetRoleIds: ["implementer"],
+      rosterVersion: 2,
+      rosterSha256: "b".repeat(64),
+      by: "judge",
+      choice: "implementer",
+    });
+    const state = await readTaskState(root);
+    assert.equal(state.errors.length, 0, JSON.stringify(state.errors));
+    assert.equal(state.records.get("t-close")?.closed?.by, "convener");
+    const resolved = state.events.find((event) => event.kind === "request.resolved");
+    assert.equal(resolved?.kind === "request.resolved" ? resolved.rosterVersion : undefined, 2);
+
+    // 非法 roster 字段 → 坏行。
+    await fs.writeFile(
+      path.join(root, TASKS_STATE_REL),
+      [
+        JSON.stringify({ v: 1, at: "2026-10-29T00:00:04.000Z", kind: "request.resolved", requestId: "r1", rosterVersion: 0, by: "judge", choice: "x" }),
+        JSON.stringify({ v: 1, at: "2026-10-29T00:00:05.000Z", kind: "request.resolved", requestId: "r2", rosterSha256: "XYZ", by: "judge", choice: "x" }),
+      ].join("\n") + "\n",
+      "utf8",
+    );
+    const bad = await readTaskState(root);
+    assert.equal(bad.errors.length, 2, JSON.stringify(bad.errors));
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});

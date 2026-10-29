@@ -42,9 +42,11 @@ test("D 写区切换：六角色 Section 1 与能力矩阵按目标态生效", (
   for (const id of ["product", "convener", "verifier", "rapporteur", "nominator", "chief"]) {
     const caps = governanceRoleOf(id)!.capabilities;
     if (id === "convener") {
-      assert.equal(caps.dispatchTask, false, "convener 不再有 dispatch");
-      assert.equal(caps.roleStatus, false, "convener 不再有 role_status");
-      assert.equal(caps.sessionTail, false, "convener 不再有 session_tail");
+      // 2026-10-29（方案 v2.1/Topology v4.1，已批准权限 delta）：运营是项目运营者——拥有 dispatch，
+      // 目标矩阵由应用前置校验（M6/M7）机械执行；role_status/session_tail 仍不开放。
+      assert.equal(caps.dispatchTask, true, "v4.1：convener 获得 dispatch（作用域由前置校验执行）");
+      assert.equal(caps.roleStatus, false, "convener 仍无 role_status");
+      assert.equal(caps.sessionTail, false, "convener 仍无 session_tail");
     }
   }
   assert.equal(governanceRoleOf("liaison"), undefined, "liaison 不再是内置角色");

@@ -430,3 +430,45 @@ test("openRoleSession：su + shellOperatorOnly ⇒ arm；项目角色误传/与 
     cleanup(project);
   }
 });
+
+// ————————————————— 2026-10-29（方案 v2.1 §6.3/§6.4，Q1 A）：写目标守卫接线 —————————————————
+
+test("不透明执行（writeGuard=opaque）⇒ 交 (a) 且 manualOnly=true（「替我审批」不得代批）", async () => {
+  const audit = createMemoryAuditSink();
+  const prompts: OperatorPrompt[] = [];
+  const gate = createShellGate({
+    classifyShell: classifier("review", "r-review"),
+    rules: RULES,
+    rulesId: "test",
+    audit,
+    operatorOnly: true,
+    approveDeny: true,
+    operatorChannel: operatorStub({ outcome: "allow", operatorId: "customer" }, prompts),
+    writeGuard: () => ({ kind: "opaque", reason: "node 脚本可执行任意代码" }),
+  });
+  const result = await gate({ command: "node copy.mjs", argv: ["node", "copy.mjs"], cwd: "/proj", toolCallId: "call-opaque" });
+  assert.equal(result.allow, true, "客户本人批准 ⇒ 放行");
+  assert.equal(prompts.length, 1);
+  assert.equal(prompts[0]!.manualOnly, true, "manualOnly 传给操作者通道（桌面据此跳过判断 agent）");
+  assert.match(prompts[0]!.reason ?? "", /不透明执行类|客户本人/);
+});
+
+test("显式写目标越界（writeGuard=deny）⇒ 直接拒绝：0 次 operator、审计分支 write-guard:deny", async () => {
+  const audit = createMemoryAuditSink();
+  const prompts: OperatorPrompt[] = [];
+  const gate = createShellGate({
+    classifyShell: classifier("risky", "r-risky"),
+    rules: RULES,
+    rulesId: "test",
+    audit,
+    operatorOnly: true,
+    approveDeny: true,
+    operatorChannel: operatorStub({ outcome: "allow", operatorId: "customer" }, prompts),
+    writeGuard: () => ({ kind: "deny", reason: "写目标不在你的写边界内：index.html", targets: ["index.html"] }),
+  });
+  const result = await gate({ command: "cp build/index.html index.html", argv: ["cp", "build/index.html", "index.html"], cwd: "/proj", toolCallId: "call-deny" });
+  assert.equal(result.allow, false);
+  assert.match(result.allow === false ? result.reason : "", /写边界/);
+  assert.equal(prompts.length, 0, "写区守卫拒绝不弹卡、不交 judge");
+  assert.equal(audit.records.at(-1)?.branch, "write-guard:deny");
+});

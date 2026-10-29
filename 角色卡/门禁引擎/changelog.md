@@ -1,5 +1,9 @@
 # 门禁引擎 变更记录
 
+## 2026-10-29 — 工作流维护者化（v4.1）：六卡文本、convener dispatch delta、shell 写目标守卫
+
+方案 v2.1 §4/§6（客户闸门 1/2 已过；Q1 A/Q2 A 已确认）。`governance-roles.ts`：六张内置卡按拓扑 v4.1 重写（幕僚五步链/产品意图/策划名单+架构/人事 D3+写卡/运营接交付+派发+验收/质检回报发起方）；convener 能力位 `dispatchTask:true`（已批准权限 delta，目标矩阵由应用 M6/M7 执行）；worker 卡模板要点并入人事卡。新增 `shell-write-guard.ts`（确定性写目标判定 + 注入 `checkWrite` 闭包：显式写目标越界/禁写前缀直拒；不透明执行 opaque）与 `classify-shell.ts::isOpaqueShellExecution`（node 脚本/解释器脚本/npm run/构建工具 opaque；Q2 A 的 node --test/npm test/install 保持普通审批）。测试：新增 `test/门禁引擎/shell-write-guard.test.ts`（7），`view-image-cards` 保持绿；套件 261 计（260 过/1 skip）。详见 `docs/scheduling/2026-10-29_change-workflow-maintainers-hiring.md`。
+
 ## 2026-10-29 — entry-role-minimal F 批：清理旧 liaison 写归属来源（无行为变化）
 
 `src/common/门禁引擎/governance-roles.ts` 删除 `governanceWriteOwnerGuidance` 中旧 `liaison` boundarySource 来源与过时别名注释（−12 行）；六角色注册表/写区/能力/卡文本不变。验证：D 专项 5/5、`list-project` 全过、规范全量 2908/2878/12/18、typecheck 0。Doc: `docs/change/2026-10-28_change_entry-role-minimal-F.md`。

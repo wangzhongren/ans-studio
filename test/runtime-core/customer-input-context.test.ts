@@ -73,3 +73,26 @@ test("choice callback receives the captured original signal/turn and legacy sing
   await withoutId.handler({ name: withoutId.name, args: { title: "no call identity" } });
   assert.equal(Object.hasOwn(missing!, "toolCallId"), false);
 });
+
+// ————————————————— 2026-10-29（方案 v2.1 §5.4/M4）：D3 裁决 id 随 request_choice 回执 —————————————————
+
+test("request_choice 回执携带应用生成的 decisionId（appointment-write 的必要凭据）", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "ans-choice-decision-id-"));
+  try {
+    const gate: WriteGate = () => ({ allowed: false, reason: "no writes", allowedByRoot: { project: [], skill: [] } });
+    const byName = new Map(buildGovernedTools(gate, {
+      writeRoot: root,
+      customerInput: async () => ({ outcome: "answered", value: { selected: ["implementer"] }, decisionId: "decision-req-42" }),
+    }).map((tool) => [tool.name, tool]));
+    const result = await byName.get("request_choice")!.handler({
+      name: "request_choice",
+      args: { title: "D3 招人决定", options: [{ id: "implementer", label: "实现者" }] },
+      toolCallId: "call-d3",
+    });
+    assert.equal(result.ok, true);
+    assert.match(result.message, /decision-req-42/, "回执必须给出 decisionId");
+    assert.match(result.message, /appointment-write/, "并说明写卡时原样携带");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

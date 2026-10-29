@@ -439,11 +439,27 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
       if (!sameSet(selected, ["accept"])) {
         return manualOutcome(args, "not-recommended", "验收卡只能代批 accept；请修正后重新提交。");
       }
-      if (request.facts.proposalDecision !== "accepted" && request.facts.proposalDecision !== "accepted-quick") {
-        return manualOutcome(args, "insufficient-evidence", "提案尚未被客户接受，不能代批验收；请先取得客户提案接受后重新提交验收。");
+      // 2026-10-29（方案 v2.1 §5.1/Q6 A）：最小系统验收链——产品意图 + 提案 + 名单 + D3 通过 + 质检报告。
+      // 旧 flow 的 proposalDecision/criteria/change-package 门槛撤除；缺任一最小事实 ⇒ manual（fail-closed）。
+      const missingChain: string[] = [];
+      if (typeof request.facts.intentDocumentPath !== "string" || request.facts.intentDocumentPath === "") {
+        missingChain.push("产品意图文档");
       }
-      if (request.facts.unresolvedClarificationCount !== 0) {
-        return manualOutcome(args, "insufficient-evidence", "仍有未闭环的澄清，不能代批验收；请先闭环澄清后重新提交验收。");
+      if (typeof request.facts.rosterVersion !== "number" || typeof request.facts.rosterSha256 !== "string") {
+        missingChain.push("人员名单（version/hash）");
+      }
+      if (typeof request.facts.appointmentDecisionId !== "string" || request.facts.appointmentDecisionId === "") {
+        missingChain.push("D3 招人裁决");
+      }
+      if (typeof request.facts.qualityReportPath !== "string" || request.facts.qualityReportPath === "") {
+        missingChain.push("质检报告");
+      }
+      if (missingChain.length > 0) {
+        return manualOutcome(
+          args,
+          "insufficient-evidence",
+          `验收最小链事实缺失：${missingChain.join("、")}；不能代批验收，请补齐后重新提交或由客户本人决定。`,
+        );
       }
       break;
     }

@@ -627,3 +627,80 @@ export function defaultShellRules(): ShellRules {
     denyTokens: defaultDenyTokens(),
   };
 }
+
+// —————————————————————— 不透明执行识别（2026-10-29，方案 v2.1 §6.4 / Q1 A） ——————————————————————
+//
+// 定义：命令可执行任意代码、写入目标无法从 argv 静态确定。此类命令在「替我审批」开启时**不得由
+// 判断 agent 代批**，必须交给客户本人确认（shell 写目标守卫返回 `opaque` → `manualOnly`）。
+// 本函数只识别，不改变 (c) 四态分类；`node -e`/`sh -c` 等仍由 hardDeny 终结。
+//
+// Q2 A（客户 2026-10-29 明确接受，高风险）：`node --test`、`npm test`、`npm install`/`npm ci` 等
+// 常用测试/安装命令**按普通审批**（开关可代批）+ 执行后审计，不作 opaque；`npm run <脚本>` 一律 opaque。
+
+const OPAQUE_INTERPRETERS = new Set([
+  "node", "python", "python2", "python3", "perl", "ruby", "php", "lua", "rscript", "deno", "bun", "ts-node",
+]);
+const OPAQUE_BUILD_TOOLS = new Set([
+  "make", "gmake", "ninja", "cmake", "gradle", "gradlew", "mvn", "mvnw", "msbuild", "dotnet",
+  "cargo", "bazel", "bazelisk", "ant", "webpack", "rollup", "esbuild", "vite", "tsc", "gulp", "grunt",
+  "go", "dd", "patch",
+]);
+/** Q2 A：测试/安装类子命令（普通审批，可被开关代批）+ 执行后审计。 */
+const NPM_BUILTIN_SAFE = new Set(["test", "t", "tst", "install", "i", "ci", "it", "add"]);
+/** 解释器里明确的只读/测试形态（不按脚本执行任意文件）。 */
+const INTERPRETER_SAFE_FLAGS = new Set(["--version", "-v", "--test", "--test-only", "--check", "-h", "--help"]);
+
+function firstNonOption(args: string[]): { value?: string; index: number } {
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = stripQuotes(args[i]!.trim());
+    if (arg.startsWith("-")) continue;
+    return { value: arg, index: i };
+  }
+  return { index: -1 };
+}
+
+/**
+ * 是否属于「不透明执行」类（无法静态界定写目标 → 强制客户本人审批）。
+ * `argv[0]` 为程序名（可带路径），其余为参数；执行模型为 argv-noshell（无重定向/管道）。
+ */
+export function isOpaqueShellExecution(argv: readonly string[]): { opaque: boolean; reason?: string } {
+  if (!Array.isArray(argv) || argv.length === 0) return { opaque: false };
+  const program = programName(String(argv[0] ?? ""));
+  if (program === "") return { opaque: false };
+  const args = argv.slice(1).map((arg) => stripQuotes(String(arg).trim()));
+
+  if (OPAQUE_INTERPRETERS.has(program)) {
+    // 解释器：`-c/-e` 等内联已被 (c) 硬拒；这里把「执行脚本文件 / -m 模块」判 opaque。
+    const inline = args.some((arg) => ["-e", "--eval", "-c", "-r", "--require", "-p", "--print", "-m"].includes(arg));
+    const safeFlag = args.some((arg) => INTERPRETER_SAFE_FLAGS.has(arg));
+    if (inline) return { opaque: true, reason: `${program} 内联/模块执行可运行任意代码，无法按写区校验` };
+    if (safeFlag) return { opaque: false };
+    const script = firstNonOption(args);
+    if (script.value !== undefined) {
+      return { opaque: true, reason: `${program} 执行脚本文件「${script.value}」可运行任意代码，无法按写区校验` };
+    }
+    return { opaque: false };
+  }
+
+  if (program === "npm" || program === "pnpm" || program === "yarn") {
+    const sub = firstNonOption(args).value?.toLowerCase();
+    if (sub === undefined) return { opaque: false };
+    if (sub === "run" || sub === "run-script" || sub === "exec" || sub === "x" || sub === "dlx") {
+      return { opaque: true, reason: `${program} ${sub} 可运行任意包脚本，无法按写区校验` };
+    }
+    if (NPM_BUILTIN_SAFE.has(sub)) return { opaque: false };
+    // 其余子命令（如 start/自定义脚本）默认不透明（fail-closed）。
+    return { opaque: true, reason: `${program} ${sub} 可能运行任意包脚本，无法按写区校验` };
+  }
+  if (program === "npx" || program === "corepack") {
+    return { opaque: true, reason: `${program} 可下载并执行任意包/脚本，无法按写区校验` };
+  }
+  if (OPAQUE_BUILD_TOOLS.has(program)) {
+    // 统一按不透明处理；`go version`/`dotnet --version` 等只读版本查询不进入（由 (c) 只读白名单直放）。
+    if (args.some((arg) => arg === "--version" || arg === "-version" || arg === "version" || arg === "-v")) {
+      return { opaque: false };
+    }
+    return { opaque: true, reason: `${program} 是构建/任务工具，可执行任意脚本或写任意产物，无法按写区校验` };
+  }
+  return { opaque: false };
+}

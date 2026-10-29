@@ -25,7 +25,7 @@ async function waitUntil(check: () => boolean, timeoutMs = 2000): Promise<void> 
 }
 
 function listing(root: string): ProjectListing {
-  const builtIn = (roleId: string, fn: "chief" | "schedule"): ProjectListing["roles"][number] => ({
+  const builtIn = (roleId: string, fn: NonNullable<ProjectListing["roles"][number]["governanceFunction"]>): ProjectListing["roles"][number] => ({
     roleId,
     cardPath: "",
     boundaryPath: "",
@@ -47,7 +47,7 @@ function listing(root: string): ProjectListing {
   });
   return {
     projectRoot: root,
-    roles: [builtIn("chief", "chief"), builtIn("convener", "schedule"), worker("worker"), worker("other")],
+    roles: [builtIn("chief", "chief"), builtIn("product", "product"), builtIn("convener", "schedule"), worker("worker"), worker("other")],
     warnings: [],
     hasRoles: true,
     primaryRoleId: "chief",
@@ -98,7 +98,7 @@ function harness(root: string) {
   return { mgr, streams, sent, sendOptions, caps };
 }
 
-test("星形派发：chief → 项目 worker 受理、任务落盘、投递文本带任务编号、回交意图带 taskId", async () => {
+test("星形派发（2026-10-29 v4.1，M8）：chief → 项目 worker 被拒，拒绝发生在 task.created 之前（不写任务行）", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-star-"));
   const h = harness(root);
   try {
@@ -109,62 +109,52 @@ test("星形派发：chief → 项目 worker 受理、任务落盘、投递文�
     assert.equal(h.caps.worker, undefined, "项目角色不注入 dispatch_task");
 
     const receipt = (await dispatch!({ roleId: "worker", task: "实现 X", reason: "排期", sideEffect: "code", expectedOutput: "src/X.ts", requestedEvidence: ["src/X.ts"] })) as DispatchReceipt;
-    assert.equal(receipt.ok, true, receipt.message ?? "");
-    assert.match(receipt.message ?? "", /任务编号：#t-/);
-    await waitUntil(() => (h.sent.worker?.length ?? 0) > 0);
-    assert.match(h.sent.worker[0] ?? "", /任务编号：#t-/);
-    assert.match(h.sent.worker[0] ?? "", /期望产出：src\/X\.ts/);
-    assert.match(h.sent.worker[0] ?? "", /可选证据：src\/X\.ts/);
-
+    assert.equal(receipt.ok, false, "幕僚不得直接给项目 worker 派实现任务");
+    assert.match(receipt.message ?? "", /运营|convener|实现任务/);
     const state = await readTaskState(root);
-    assert.equal(state.errors.length, 0);
-    const task = [...state.records.values()][0];
-    assert.equal(task.created?.from, "chief");
-    assert.equal(task.created?.to, "worker");
-    assert.equal(task.created?.sideEffect, "code");
-    assert.equal(task.delivered?.to, "worker");
-    assert.equal(h.sendOptions.worker[0].handback?.taskId, task.taskId);
-
-    // 同 idempotencyKey 未收口：不重复派发。
-    const duplicate = (await dispatch!({ roleId: "worker", task: "实现 X", idempotencyKey: task.created!.idempotencyKey })) as DispatchReceipt;
-    assert.equal(duplicate.ok, true);
-    assert.match(duplicate.message ?? "", new RegExp(`#${task.taskId}`));
-    await tick(80);
-    assert.equal(h.sent.worker.filter((text) => /实现 X/.test(text)).length, 1, "同一任务只投递一次");
+    assert.equal(state.records.size, 0, "拒绝不产生 task.created 行（F10）");
+    assert.equal(h.sent.worker?.length ?? 0, 0, "拒绝不打开/投递目标会话");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true });
   }
 });
 
-test("星形目标：任意内置角色可被派发；幕僚自身拒绝", async () => {
+test("星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 被拒；幕僚自身拒绝", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-star-builtin-"));
   const h = harness(root);
   try {
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     await tick(30);
     const dispatch = h.caps.chief!;
-    const toConvener = (await dispatch({ roleId: "convener", task: "协调检查", sideEffect: "read-only" })) as DispatchReceipt;
-    assert.equal(toConvener.ok, true, toConvener.message ?? "");
+    const toProduct = (await dispatch({ roleId: "product", task: "写产品意图文档", sideEffect: "docs", flowId: "flow-a" })) as DispatchReceipt;
+    assert.equal(toProduct.ok, true, toProduct.message ?? "");
+    assert.match(toProduct.message ?? "", /任务编号：#t-/);
+    await waitUntil(() => (h.sent.product?.length ?? 0) > 0);
+    const toConvener = (await dispatch({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "flow-a" })) as DispatchReceipt;
+    assert.equal(toConvener.ok, false, "缺 D3/选中角色卡 ⇒ 交付运营被拒");
+    assert.match(toConvener.message ?? "", /D3|招人/);
     const self = (await dispatch({ roleId: "chief", task: "自派" })) as DispatchReceipt;
     assert.equal(self.ok, false);
     assert.match(self.message ?? "", /不能派发给幕僚自己/);
-    await waitUntil(() => (h.sent.convener?.length ?? 0) > 0);
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true });
   }
 });
 
-test("convener D 批撤除 dispatch：运营会话不注入 dispatch_task，不写 tasks.jsonl", async () => {
+test("convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 被拒（M6），不写 tasks.jsonl", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-star-old-"));
   const h = harness(root);
   try {
     await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
     await tick(30);
-    assert.equal(h.caps.convener, undefined, "D 批：convener 不再拥有 dispatch_task");
+    assert.equal(typeof h.caps.convener, "function", "v4.1：convener 拥有 dispatch_task");
+    const receipt = (await h.caps.convener!({ roleId: "worker", task: "实现 X", sideEffect: "code" })) as DispatchReceipt;
+    assert.equal(receipt.ok, false, "未接交付（无 project-handoff 任务）⇒ 拒绝");
+    assert.match(receipt.message ?? "", /交付|handoff/);
     const state = await readTaskState(root);
-    assert.equal(state.records.size, 0, "未注入能力 ⇒ 不写 tasks.jsonl");
+    assert.equal(state.records.size, 0, "拒绝在 task.created 之前 ⇒ 不写任务行");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true });

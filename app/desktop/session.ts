@@ -1,5 +1,5 @@
 import { RuntimeDeliveryError } from "../../src/model/runtime.ts";
-import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1, DeliveryReceiptQueryV1, RuntimeDeliveryReceiptV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1, BackgroundTaskSnapshot, BackgroundTaskReadOptions, BackgroundTaskReadResult, BackgroundTaskStopOptions, BackgroundTaskStopResult } from "../../src/model/runtime.ts";
+import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1, DeliveryReceiptQueryV1, RuntimeDeliveryReceiptV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1, GovernanceJudgeContext, BackgroundTaskSnapshot, BackgroundTaskReadOptions, BackgroundTaskReadResult, BackgroundTaskStopOptions, BackgroundTaskStopResult } from "../../src/model/runtime.ts";
 // app/desktop/session.ts
 // 桌面应用的「会话」装配（纯逻辑，不依赖 electron，可在 node 下单测）。
 //
@@ -83,6 +83,13 @@ import { appendTaskEvent, classifyTaskSideEffect, findOpenTaskByIdempotencyKey, 
 import { appendRoleLog, formatRoleActivityText, readRoleLog } from "../../src/common/编排/role-log.ts";
 // B 批：终止/重派安全判定（单一来源；桌面只提供终止事实/执行动作）。
 import { evaluateRedispatchSafety, type RedispatchSafetyDecision } from "../../src/common/编排/watchdog.ts";
+import {
+  evaluateDispatchPreflight,
+  loadLatestRoster,
+  reportTargetForTaskCreator,
+  rosterRoleIds,
+  type RosterLoadResult,
+} from "../../src/common/编排/workflow-preconditions.ts";
 
 /**
  * 内置来源回交→Lead 与同轮 settle 治理反馈的去重窗口（2026-10-24）：标记只在回交入队后到本轮
@@ -1063,6 +1070,8 @@ export class SessionManager {
   private readonly activeDeliveries = new Map<string, DeliveryItem>();
   /** B 批：星形任务 id（内存索引；派发/恢复/列表时登记——回交路由用同步判定，保持事件顺序）。 */
   private readonly starTaskIds = new Set<string>();
+  /** 2026-10-29（方案 v2.1 §5.4/M9）：任务创建者内存索引（`task.created.from`）——报告按创建者路由。 */
+  private readonly taskCreators = new Map<string, "chief" | "convener">();
   /** B 批：已写入 `task.reported` 的键（`taskId\0turnId|摘要`；防同轮重复事件）。 */
   private readonly reportedTaskKeys = new Set<string>();
   /** B-07：连续卡死升级卡（按链根去重；同一链只提交一次）。 */
@@ -2096,8 +2105,9 @@ export class SessionManager {
     // 幕僚只收 `request.notified` 系统通知（不呈现第二张卡、不代答、不代决）。
     const mirrorRoleIdFor = (_request: CustomerInputRequest): string | undefined => undefined;
 
-    // D 批：**派发能力**只给幕僚（chief）与 single/su；运营（schedule）不再调度角色。
-    const canDispatch = governanceFunction === "chief" || legacyBuiltIn;
+    // 2026-10-29（方案 v2.1/Topology v4.1）：派发能力给幕僚（主链/验收调度）、运营（实现任务/验收核对）
+    // 与 single/su；目标矩阵由 `routeDispatch` → `evaluateDispatchPreflight` 机械执行。
+    const canDispatch = governanceFunction === "chief" || governanceFunction === "schedule" || legacyBuiltIn;
     const dispatchTask: DispatchTaskFn | undefined =
       canDispatch
         ? (d: DispatchTaskPayload) => this.routeDispatch(req.projectRoot, req.runtime, req.roleId, d) // Promise<DispatchReceipt>——契约允许（工具侧 await）
@@ -2864,6 +2874,11 @@ export class SessionManager {
   }
 
   /** B 批：任务/汇报主链的幕僚角色 id（**只认真实 chief**，不把旧 liaison 别名算作星形主链）。 */
+  /** 登记任务创建者（读盘重放/新建/重派共用；缺字段的旧记录按 chief 兼容）。 */
+  private rememberTaskCreator(taskId: string, created: { from?: "chief" | "convener" } | undefined): void {
+    this.taskCreators.set(taskId, created?.from === "convener" ? "convener" : "chief");
+  }
+
   private chiefTaskRoleIdOf(projectRoot: string): string | null {
     const listing = this.deps.getListing(projectRoot);
     if (!listing || (listing.governanceModel ?? "single") !== "trio") return null;
@@ -3072,7 +3087,13 @@ export class SessionManager {
       );
     }
     const state = await this.readTasks(projectRoot);
-    const matched = state.events.some((event) => {
+    // 归属匹配也接受 **flowId**（D3 request.created.flowId）：真实链的人事卡只带 flowId 时，
+    // appointment-write 仅凭 flowId+decisionId+targetRoleId 也能对上（不强迫模型猜 intentId/taskId）。
+    const requestFlows = new Map<string, string | undefined>();
+    for (const event of state.events) {
+      if (event.kind === "request.created") requestFlows.set(event.requestId, event.flowId);
+    }
+    const resolvedEvent = state.events.find((event) => {
       if (event.kind !== "request.resolved") return false;
       const record = event as unknown as {
         decisionId?: unknown;
@@ -3084,18 +3105,121 @@ export class SessionManager {
       if (!Array.isArray(record.targetRoleIds) || !record.targetRoleIds.includes(targetRoleId)) return false;
       const resolvedIntent = typeof record.intentId === "string" ? record.intentId : undefined;
       const resolvedTask = typeof record.taskId === "string" ? record.taskId : undefined;
+      const eventFlow = requestFlows.get(event.requestId);
+      if (rawFlowId !== undefined && eventFlow !== undefined && eventFlow !== rawFlowId) return false;
       if (metadata?.taskId !== undefined) return resolvedTask === metadata.taskId;
       if (metadata?.intentId !== undefined) return resolvedIntent === metadata.intentId;
-      return resolvedIntent !== undefined || resolvedTask !== undefined;
+      return eventFlow !== undefined || resolvedIntent !== undefined || resolvedTask !== undefined;
     });
-    if (!matched) {
+    if (resolvedEvent === undefined) {
       return (
         `appointment-write 未找到匹配的 D3 裁决：request.resolved（decisionId=${decisionId}、` +
         `targetRoleIds 含 ${targetRoleId}、intentId/taskId 一致）不存在；未向客户发卡、未发行任何写入路径。` +
         "请先由人事发起 D3 并取得客户/判断裁决后，再逐次写卡。"
       );
     }
+    // 2026-10-29（方案 v2.1 §5.4/M11）：D3 若是新链记录（带名单版本/hash），必须与**当前最新名单**一致；
+    // 名单已变 ⇒ 旧 D3 作废（需重新发起 D3）。旧记录（无字段）保持既有行为（兼容/回滚测试）。
+    if (resolvedEvent.kind === "request.resolved") {
+      const stamped = resolvedEvent as { rosterVersion?: unknown; rosterSha256?: unknown };
+      if (stamped.rosterVersion !== undefined || stamped.rosterSha256 !== undefined) {
+        const rosterFlow = rawFlowId ?? (typeof metadata?.flowId === "string" ? metadata.flowId : undefined) ?? request.flowId;
+        if (typeof rosterFlow !== "string" || rosterFlow.trim() === "") {
+          return "appointment-write 无法定位最新名单（缺 flowId）；未向客户发卡、未发行任何写入路径。";
+        }
+        const roster = await loadLatestRoster({ projectRoot, flowId: rosterFlow });
+        if (!roster.ok) {
+          return (
+            `appointment-write 无法读取最新名单（${roster.reason}）；未向客户发卡、未发行任何写入路径。` +
+            "请先让策划产出合法名单并重新发起 D3。"
+          );
+        }
+        if (stamped.rosterVersion !== roster.version || stamped.rosterSha256 !== roster.sha256) {
+          return (
+            `appointment-write 的 D3 对应名单与当前最新名单不一致（D3 v${String(stamped.rosterVersion ?? "?")} / ` +
+            `最新 v${roster.version}），旧 D3 已作废；未向客户发卡、未发行任何写入路径。请重新发起 D3 后再写卡。`
+          );
+        }
+      }
+    }
     return undefined;
+  }
+
+  /**
+   * 2026-10-29（方案 v2.1 §5.1/Q6 A）：验收卡最小链事实（应用侧补充 judgeContext.facts）。
+   * 只读：产品意图文档 / 最新名单 / 最新 D3 裁决 / 质检报告；任一缺失 ⇒ unavailableReason（judge 回落手动）。
+   * 不伪造事实、不改变客户/判断的最终验收权。
+   */
+  private async enrichAcceptanceJudgeContext(
+    projectRoot: string,
+    request: CustomerInputRequest,
+    metadata: CustomerInputMetadata | undefined,
+  ): Promise<CustomerInputMetadata | undefined> {
+    const flowId = request.flowId ?? metadata?.flowId;
+    if (typeof flowId !== "string" || flowId.trim() === "") return metadata; // 无 flowId：上游已 fail-closed
+    const intentRel = `docs/product/${flowId}-intent-v1.md`;
+    const reportRel = `docs/quality/${flowId}-report-v1.md`;
+    const readText = async (rel: string): Promise<string | undefined> => {
+      try {
+        return await fs.promises.readFile(path.join(projectRoot, rel), "utf8");
+      } catch {
+        return undefined;
+      }
+    };
+    const intentText = await readText(intentRel);
+    const intentOk = intentText !== undefined && intentText.trim() !== "" && /^#/m.test(intentText);
+    const roster = await loadLatestRoster({ projectRoot, flowId });
+    const reportText = await readText(reportRel);
+    const reportOk = reportText !== undefined && reportText.trim() !== "";
+    // 最新 D3（appointment 裁决）及 decisionId。
+    const state = await this.readTasks(projectRoot);
+    const requestFlows = new Map<string, string | undefined>();
+    for (const event of state.events) {
+      if (event.kind === "request.created") requestFlows.set(event.requestId, event.flowId);
+    }
+    let d3: { decisionId?: string; at: string } | undefined;
+    for (const event of state.events) {
+      if (event.kind !== "request.resolved") continue;
+      const eventFlow = requestFlows.get(event.requestId);
+      if (eventFlow !== undefined && eventFlow !== flowId) continue;
+      if (event.decisionId === undefined) continue;
+      if (event.rosterVersion === undefined && event.rosterSha256 === undefined) continue; // 仅新链 D3
+      if (d3 === undefined || event.at > d3.at) d3 = { decisionId: event.decisionId, at: event.at };
+    }
+    const missing: string[] = [
+      ...(intentOk ? [] : ["产品意图文档"]),
+      ...(roster.ok ? [] : ["人员名单"]),
+      ...(d3?.decisionId !== undefined ? [] : ["D3 裁决"]),
+      ...(reportOk ? [] : ["质检报告"]),
+    ];
+    const baseContext = metadata?.judgeContext;
+    const facts = {
+      ...(baseContext?.facts ?? {
+        governanceModel: "trio" as const,
+        flowId,
+        ledgerErrors: 0,
+        unresolvedClarificationCount: 0,
+        latestDecisionKinds: [] as string[],
+      }),
+      ...(intentOk ? { intentDocumentPath: intentRel } : {}),
+      ...(roster.ok ? { rosterVersion: roster.version, rosterSha256: roster.sha256 } : {}),
+      ...(d3?.decisionId !== undefined ? { appointmentDecisionId: d3.decisionId } : {}),
+      ...(reportOk ? { qualityReportPath: reportRel } : {}),
+    };
+    const judgeContext: GovernanceJudgeContext = {
+      ...(baseContext ?? { flowId }),
+      flowId,
+      facts,
+      ...(missing.length > 0
+        ? { unavailableReason: `验收最小链事实缺失：${missing.join("、")}${roster.ok ? "" : `（${roster.reason}）`}` }
+        : {}),
+      artifacts: {
+        ...(baseContext?.artifacts ?? {}),
+        proposalPath: `docs/proposals/${flowId}-v1.md`,
+        acceptanceReportPath: reportRel,
+      },
+    };
+    return { ...(metadata ?? {}), judgeContext };
   }
 
   /**
@@ -3111,6 +3235,10 @@ export class SessionManager {
     buildContext: (request: CustomerInputRequest, extras?: { onPresented?: () => void }) => Parameters<DesktopCustomerInputFn>[1],
     requestIdOverride?: string,
   ): Promise<CustomerInputOutcome | null | undefined> {
+    // 2026-10-29（Q6 A）：验收卡的最小链事实由应用补充（产品意图/名单/D3/质检报告）。
+    if (request.cardKind === "acceptance") {
+      metadata = await this.enrichAcceptanceJudgeContext(projectRoot, request, metadata);
+    }
     const requestId = requestIdOverride ?? this.requestIdFor(projectRoot, sourceRoleId, request, metadata);
     const options = request.kind === "choice"
       ? request.options.map((option) => ({ id: option.id, label: option.label, ...(option.recommended === true ? { recommended: true } : {}) }))
@@ -3190,9 +3318,22 @@ export class SessionManager {
       : out?.outcome ?? "unavailable";
     const selected = answeredOut?.value.selected ?? [];
     const operatorId = out !== null && out !== undefined && "operatorId" in out && typeof out.operatorId === "string" ? out.operatorId : undefined;
+    // 2026-10-29（方案 v2.1 §5.4/M4/M11）：裁决 id 回填给工具回执（appointment-write 的凭据）；
+    // 招人卡同时记录**当前最新名单**的版本与 hash（应用计算，模型不可自报）。
+    const decisionId = answeredOut !== undefined ? `decision-${requestId}` : undefined;
+    if (answeredOut !== undefined && decisionId !== undefined) answeredOut.decisionId = decisionId;
+    let rosterStamp: { rosterVersion?: number; rosterSha256?: string } = {};
+    if (request.cardKind === "appointment" && answeredOut !== undefined) {
+      const rosterFlow = request.flowId ?? metadata?.flowId;
+      if (typeof rosterFlow === "string" && rosterFlow.trim() !== "") {
+        const roster = await loadLatestRoster({ projectRoot, flowId: rosterFlow });
+        if (roster.ok) rosterStamp = { rosterVersion: roster.version, rosterSha256: roster.sha256 };
+      }
+    }
     await this.appendTaskState(projectRoot, taskEvent("request.resolved", {
       requestId,
-      ...(answeredOut !== undefined ? { decisionId: `decision-${requestId}` } : {}),
+      ...(decisionId !== undefined ? { decisionId } : {}),
+      ...rosterStamp,
       ...(selected.length > 0 ? { targetRoleIds: selected } : {}),
       ...(metadata?.intentId !== undefined ? { intentId: metadata.intentId } : {}),
       ...(metadata?.taskId !== undefined ? { taskId: metadata.taskId } : {}),
@@ -3225,7 +3366,10 @@ export class SessionManager {
   async listTasks(projectRoot: string): Promise<TaskListView> {
     const state = await this.readTasks(projectRoot);
     const tasks = taskCards(state);
-    for (const record of state.records.values()) this.starTaskIds.add(record.taskId);
+    for (const record of state.records.values()) {
+      this.starTaskIds.add(record.taskId);
+      this.rememberTaskCreator(record.taskId, record.created);
+    }
     return {
       projectRoot,
       tasks,
@@ -3299,7 +3443,10 @@ export class SessionManager {
 
   async restoreTasks(projectRoot: string): Promise<TaskRestoreReport> {
     const state = await this.readTasks(projectRoot);
-    for (const record of state.records.values()) this.starTaskIds.add(record.taskId);
+    for (const record of state.records.values()) {
+      this.starTaskIds.add(record.taskId);
+      this.rememberTaskCreator(record.taskId, record.created);
+    }
     const report: TaskRestoreReport = { restored: 0, skipped: 0, taskIds: [] };
     const requests = await this.restoreRequestState(projectRoot, state);
     report.orphanedRequests = requests.orphaned;
@@ -3715,6 +3862,7 @@ export class SessionManager {
     }
     const newId = redispatchTaskId(record.taskId, attempts + 1);
     this.starTaskIds.add(newId);
+    this.rememberTaskCreator(newId, created);
     const now = () => new Date(this.now());
     // 原任务先收口（rework/stuck-terminated），再写重派事件与新任务；任一步写失败 ⇒ 不投递（如实失败）。
     if (!(await this.appendTaskState(projectRoot, taskEvent("task.closed", {
@@ -3734,7 +3882,9 @@ export class SessionManager {
     }, now);
     const newCreated = taskEvent("task.created", {
       taskId: newId,
-      from: "chief",
+      from: created.from,
+      ...(created.flowId !== undefined ? { flowId: created.flowId } : {}),
+      ...(created.stepId !== undefined ? { stepId: created.stepId } : {}),
       to,
       // B-07：同角色重派先缩窄任务（明确先做最小可验证部分；已完成部分核对后跳过）。
       text: `${created.text}\n\n[重派] 上次执行卡死；请缩窄范围，先完成最小可验证部分；已完成部分核对后跳过，不要重复。`,
@@ -4486,7 +4636,13 @@ export class SessionManager {
       }
       if (item.kind === "handback") this.enqueuedHandbackKeys.add(item.dedupKey);
       if (item.kind === "dispatch") this.activeDispatchKeys.add(item.dedupKey);
-      if (typeof item.taskId === "string" && item.taskId !== "") this.starTaskIds.add(item.taskId);
+      if (typeof item.taskId === "string" && item.taskId !== "") {
+        this.starTaskIds.add(item.taskId);
+        if (this.taskCreators.get(item.taskId) === undefined) {
+          const restored = (await this.readTasks(projectRoot)).records.get(item.taskId)?.created;
+          if (restored !== undefined) this.rememberTaskCreator(item.taskId, restored);
+        }
+      }
       this.enqueueDelivery(projectRoot, roleId, {
         kind: item.kind,
         runtime,
@@ -4712,11 +4868,13 @@ export class SessionManager {
       if (report) report = structuredClone(report);
       if (liveReport) liveReport = structuredClone(liveReport);
       const ownerRoleId = this.handbackOwnerRoleId(projectRoot);
-      // B 批（2026-10-28）：星形任务报告——`taskId` 已登记在内存索引（派发/恢复/列表时登记）时只回幕僚
-      // （工作结果主链）；旧 flow/无任务关联的回交保持原主人路由（convener/single-su；旧机器保留到 D）。
-      // 用同步内存判定，避免读 `tasks.jsonl` 改变并发回交的投递顺序。
+      // 2026-10-29（方案 v2.1 §5.1/M9，F1）：任务绑定报告**按 `task.created.from` 回创建者**——
+      // 项目 worker/质检 → 发起者（运营或幕僚）；产品/策划/人事/运营由幕僚派发 → 幕僚。
+      // 无任务绑定的内置 worker → 幕僚（下方既有防御分支）。用同步内存索引，避免读盘改变并发回交顺序。
       const starTask = typeof hb.taskId === "string" && hb.taskId !== "" && this.starTaskIds.has(hb.taskId);
       const chiefRoleId = this.chiefTaskRoleIdOf(projectRoot);
+      const convenerRoleId = this.handbackOwnerRoleId(projectRoot);
+      const taskCreator = starTask ? this.taskCreators.get(hb.taskId!) : undefined;
       // 2026-10-24（治理协调，设计 v1 §6.2/§6.3）：**按来源**选回交目标——
       //  · 内置治理角色（Draft/Steward/Crew/Proof；编排 `suppressHandback` 正常不发，这里只做防御路由）
       //    → Lead（`primaryRoleId`），Lead 自身不自我回交；single/su 保持旧行为（内置来源不自我回交）。
@@ -4726,8 +4884,9 @@ export class SessionManager {
       const model: GovernanceModel = listing?.governanceModel ?? "single";
       const builtInSource = isBuiltInGovernanceRoleId(hb.roleId);
       let targetRoleId: string | null = ownerRoleId;
-      if (starTask && chiefRoleId !== null && hb.roleId !== chiefRoleId) {
-        targetRoleId = chiefRoleId;
+      if (starTask && hb.roleId !== chiefRoleId) {
+        // 任务绑定：按创建者路由（creator 缺失的旧记录按 chief 兼容，保持既有主链行为）。
+        targetRoleId = reportTargetForTaskCreator({ creator: taskCreator ?? "chief", chiefRoleId, convenerRoleId });
       } else if (builtInSource) {
         if (model !== "trio") return; // single/su：内置来源（su 自身）不自我回交（旧行为逐字不变）
         const leadRoleId = typeof listing?.primaryRoleId === "string" ? listing.primaryRoleId : "";
@@ -4849,18 +5008,22 @@ export class SessionManager {
     const model: GovernanceModel = listing?.governanceModel ?? "single";
     const starChiefRoleId = this.chiefTaskRoleIdOf(projectRoot);
     if (model === "trio") {
-      if (starChiefRoleId === null || fromRoleId !== starChiefRoleId) {
-        const chiefLabel = starChiefRoleId !== null ? this.roleDisplayName(projectRoot, starChiefRoleId) : fromRoleId;
+      // 2026-10-29（方案 v2.1/Topology v4.1）：幕僚（主链/验收调度）与运营（实现/验收核对）都可派发；
+      // 具体目标矩阵由 `evaluateDispatchPreflight`（M5–M8）机械执行，来源只做身份判断。
+      const convenerCandidate = this.handbackOwnerRoleId(projectRoot);
+      const isChiefSource = starChiefRoleId !== null && fromRoleId === starChiefRoleId;
+      const isConvenerSource = convenerCandidate !== null && fromRoleId === convenerCandidate;
+      if (!isChiefSource && !isConvenerSource) {
         return fail(
           mainT("main.session.dispatchWrongSource", {
             from: this.roleDisplayName(projectRoot, fromRoleId),
-            dispatcher: chiefLabel,
+            dispatcher: starChiefRoleId !== null ? this.roleDisplayName(projectRoot, starChiefRoleId) : fromRoleId,
             modelNote: mainT("main.session.dispatchModelNote"),
           }),
-          mainT("main.session.dispatchWrongSourceShort", { from: fromRoleId, dispatcher: chiefLabel }),
+          mainT("main.session.dispatchWrongSourceShort", { from: fromRoleId, dispatcher: fromRoleId }),
         );
       }
-      // B 批：幕僚星形派发走新任务链（`tasks.jsonl`；不套旧 flow 派发门）。
+      // 星形任务链（`tasks.jsonl`；不套旧 flow 派发门）；前置检查在 task.created 之前（F10）。
       return this.routeStarDispatch(projectRoot, runtime, fromRoleId, d, targetRoleId, task);
     }
     const dispatcherRoleId = this.dispatcherRoleIdOf(projectRoot);
@@ -4953,6 +5116,108 @@ export class SessionManager {
   }
 
   /**
+   * 2026-10-29（方案 v2.1 §5.1）：五步链派发所需的机械事实（只读；不写盘、不猜）。
+   * 读盘失败一律按「未满足」处理（fail-closed）。
+   */
+  private async chainDispatchFacts(projectRoot: string, flowHint: string | undefined): Promise<{
+    flowId?: string;
+    intent: { found: boolean; candidates: number };
+    proposalFound: boolean;
+    architectureFound: boolean;
+    roster?: RosterLoadResult;
+    d3Selected: string[];
+    handoffFound: boolean;
+    selectedCardsFound: boolean;
+  }> {
+    const readNames = async (rel: string): Promise<string[]> => {
+      try {
+        return await fs.promises.readdir(path.join(projectRoot, rel));
+      } catch {
+        return [];
+      }
+    };
+    const intentPattern = /^(.+)-intent-v\d+\.md$/;
+    const rosterPattern = /^(.+)-roster-v\d+\.md$/;
+    const flowsOf = (names: readonly string[], pattern: RegExp): string[] => {
+      const flows = new Set<string>();
+      for (const name of names) {
+        const match = pattern.exec(name);
+        if (match !== null) flows.add(match[1]!);
+      }
+      return [...flows];
+    };
+    const intentNames = await readNames(path.posix.join("docs", "product"));
+    const rosterNames = await readNames(path.posix.join("docs", "proposals"));
+    const intentFlows = flowsOf(intentNames, intentPattern);
+    const rosterFlows = flowsOf(rosterNames, rosterPattern);
+    const flowId = flowHint
+      ?? (intentFlows.length === 1 ? intentFlows[0] : undefined)
+      ?? (rosterFlows.length === 1 ? rosterFlows[0] : undefined);
+    const existsFile = async (rel: string): Promise<boolean> => {
+      try {
+        return (await fs.promises.stat(path.join(projectRoot, rel))).isFile();
+      } catch {
+        return false;
+      }
+    };
+    let intentFound = false;
+    if (flowId !== undefined) {
+      try {
+        const text = await fs.promises.readFile(path.join(projectRoot, "docs", "product", `${flowId}-intent-v1.md`), "utf8");
+        intentFound = text.trim() !== "" && /^#/m.test(text);
+      } catch {
+        intentFound = false;
+      }
+    }
+    const proposalFound = flowId !== undefined && (await existsFile(`docs/proposals/${flowId}-v1.md`));
+    const architectureFound = flowId !== undefined && (await existsFile(`docs/contracts/${flowId}-architecture-v1.md`));
+    const roster = flowId !== undefined ? await loadLatestRoster({ projectRoot, flowId }) : undefined;
+
+    // 最新 D3（appointment 裁决）：request.created.flowId ↔ request.resolved（roster 字段优先；旧记录按目标集兼容）。
+    const state = await this.readTasks(projectRoot);
+    const requestFlows = new Map<string, string | undefined>();
+    for (const event of state.events) {
+      if (event.kind === "request.created") requestFlows.set(event.requestId, event.flowId);
+    }
+    let d3: { targetRoleIds: string[]; at: string } | undefined;
+    for (const event of state.events) {
+      if (event.kind !== "request.resolved") continue;
+      const targets = Array.isArray(event.targetRoleIds)
+        ? event.targetRoleIds.filter((id): id is string => typeof id === "string" && id !== "")
+        : [];
+      if (targets.length === 0) continue;
+      const eventFlow = requestFlows.get(event.requestId);
+      if (flowId !== undefined && eventFlow !== undefined && eventFlow !== flowId) continue;
+      if (event.rosterVersion === undefined && event.rosterSha256 === undefined && eventFlow === undefined) continue;
+      if (d3 === undefined || event.at > d3.at) d3 = { targetRoleIds: targets, at: event.at };
+    }
+    const convenerRoleId = this.handbackOwnerRoleId(projectRoot);
+    const handoffFound = state.unclosed.some((record) => {
+      const created = record.created;
+      if (created === undefined) return false;
+      if (created.from !== "chief" || convenerRoleId === null || created.to !== convenerRoleId) return false;
+      if (created.stepId === "project-handoff") return true;
+      // 旧记录无 stepId ⇒ flowId + 受限文本标记等价判定（F3 兼容口径）。
+      return flowId !== undefined && created.flowId === flowId && /交付|handoff|运营/.test(created.text);
+    });
+    const listing = this.deps.getListing(projectRoot);
+    const selected = d3?.targetRoleIds ?? [];
+    const selectedCardsFound =
+      selected.length > 0 &&
+      selected.every((roleId) => listing?.roles.some((role) => role.roleId === roleId && role.builtIn !== true) === true);
+    return {
+      ...(flowId !== undefined ? { flowId } : {}),
+      intent: { found: intentFound, candidates: intentFlows.length },
+      proposalFound,
+      architectureFound,
+      ...(roster !== undefined ? { roster } : {}),
+      d3Selected: selected,
+      handoffFound,
+      selectedCardsFound,
+    };
+  }
+
+  /**
    * B 批（2026-10-28）：**幕僚星形派发**——新任务链（不套旧 flow 派发门）。
    * 校验：目标须在本项目角色表（含内置角色），不能是幕僚自身；内置目标允许（B-05：任意内置/项目 worker）。
    * 持久化：先写 `task.created`（失败 ⇒ 不投递、如实回执），送达成功再写 `task.delivered`。
@@ -4996,11 +5261,55 @@ export class SessionManager {
         message: `已受理：同一任务已存在（#${duplicate.taskId}），未重复派发；受理 ≠ 完成。`,
       };
     }
+
+    // —— 2026-10-29（方案 v2.1 §5.1，F10）：M1–M8 机械前置必须发生在 newTaskId / task.created **之前** ——
+    // 拒绝不产生任务行、不打开目标会话（chain-enforcement 负例断言 tasks.jsonl 行数不变）。
+    // 先刷一次角色枚举：写卡/D3 后同轮派发要能看到新角色（与界面 listProject 同一缓存）。
+    await this.refreshListingNow(projectRoot);
+    const listingForPreflight = this.deps.getListing(projectRoot);
+    const targetRole = listingForPreflight?.roles.find((role) => role.roleId === targetRoleId);
+    const targetBuiltIn = targetRole?.builtIn === true || isBuiltInGovernanceRoleId(targetRoleId);
+    const convenerRoleId = this.handbackOwnerRoleId(projectRoot);
+    if (chiefRoleId === null) {
+      return fail("派发未受理：未枚举到幕僚角色，无法建立任务。", "派发未受理：未枚举到幕僚角色。");
+    }
+    const chainFacts = await this.chainDispatchFacts(projectRoot, d?.flowId);
+    const preflight = evaluateDispatchPreflight({
+      fromRoleId,
+      targetRoleId,
+      targetBuiltIn,
+      chiefRoleId,
+      convenerRoleId,
+      ...(chainFacts.flowId !== undefined ? { flowId: chainFacts.flowId } : {}),
+      intent: chainFacts.intent,
+      proposalFound: chainFacts.proposalFound,
+      architectureFound: chainFacts.architectureFound,
+      ...(chainFacts.roster !== undefined ? { roster: chainFacts.roster } : {}),
+      d3Selected: chainFacts.d3Selected,
+      handoffFound: chainFacts.handoffFound,
+      targetCardFound:
+        convenerRoleId !== null && targetRoleId === convenerRoleId
+          ? chainFacts.selectedCardsFound
+          : targetRole !== undefined,
+    });
+    if (!preflight.ok) {
+      return fail(`派发未受理：${preflight.message}`, preflight.message);
+    }
+
     const taskId = newTaskId(new Date(this.now()));
     const createdAt = new Date(this.now());
+    // 交付任务固定 stepId=project-handoff（M6/M7 的机械前置依据）；其余任务可带模型声明的 stepId。
+    const dispatchStepId =
+      fromRoleId === chiefRoleId && convenerRoleId !== null && targetRoleId === convenerRoleId
+        ? "project-handoff"
+        : typeof d?.stepId === "string" && d.stepId.trim() !== ""
+          ? d.stepId.trim()
+          : undefined;
     const created = taskEvent("task.created", {
       taskId,
-      from: "chief",
+      from: fromRoleId === convenerRoleId ? "convener" : "chief",
+      ...(chainFacts.flowId !== undefined ? { flowId: chainFacts.flowId } : {}),
+      ...(dispatchStepId !== undefined ? { stepId: dispatchStepId } : {}),
       to: targetRoleId,
       text: task,
       ...(expectedOutput !== undefined ? { expectedOutput } : {}),
@@ -5015,6 +5324,7 @@ export class SessionManager {
       );
     }
     this.starTaskIds.add(taskId);
+    this.taskCreators.set(taskId, fromRoleId === this.handbackOwnerRoleId(projectRoot) ? "convener" : "chief");
     this.appendRoleActivity(projectRoot, fromRoleId, {
       kind: "task.created",
       summary: `派发任务 #${taskId} → ${targetRoleId}：${shortenSummary(task)}`,
@@ -5038,7 +5348,7 @@ export class SessionManager {
     if (plan.action === "reject") {
       void this.appendTaskState(projectRoot, taskEvent("task.closed", {
         taskId,
-        by: "chief",
+        by: fromRoleId === this.handbackOwnerRoleId(projectRoot) ? "convener" : "chief",
         outcome: "rejected",
         note: `delivery-rejected: ${shortenSummary(plan.message)}`,
       }, () => new Date(this.now())));

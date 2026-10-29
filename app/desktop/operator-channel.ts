@@ -437,6 +437,10 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
       judgeEnabled = false; // 开关读取异常 ⇒ 视作关闭（绝不擅自开启判断）。
     }
     const judgeFn = metadata?.judge;
+    // 2026-10-29（方案 v2.1 §6.4，Q1 A）：不透明执行类强制客户本人——「替我审批」不得代批。
+    if (prompt.manualOnly === true) {
+      return presentConfirmed(describeShellCommand(prompt));
+    }
     if (!judgeEnabled || judgeFn === undefined || metadata === undefined || metadata.signal.aborted === true) {
       return presentConfirmed(describeShellCommand(prompt));
     }

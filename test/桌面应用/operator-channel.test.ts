@@ -322,7 +322,7 @@ test("I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实�
   );
 });
 
-test("su 审批档（**真正接通**核查）：真实 openRoleSession + 真实装配——su 会话能力面产出审批档 ShellGate（ls 免审批直放 / rm 出卡经客户批准或拒绝）", async () => {
+test("su 审批档（**真正接通**核查）：真实 openRoleSession + 真实装配——ls 免审批直放 / 显式越界写被写区守卫拒绝 / risky 网络命令出卡经客户批准或拒绝", async () => {
   // 客户裁定 2026-10-17「只读的免审批，其他的要客户审批」＋「deny 也走客户审批」的**桌面侧端到端核查**：
   // SessionManager（内置治理角色判据）→ 真实 `openRoleSession`（`shellOperatorOnly` arm）→ 真实
   // `assembleOperatorShellGate` + 真实 (c) 实件（`buildDesktopShellArming`）⇒ 能力面 `capabilities.shellGate`
@@ -443,15 +443,20 @@ test("su 审批档（**真正接通**核查）：真实 openRoleSession + 真实
     const ls = await gate!({ command: "ls -la", argv: ["ls", "-la"], cwd: root, toolCallId: "call-ls" });
     assert.equal(ls.allow, true, "只读白名单命令（ls）放行——su 审批档的免审批路径");
     assert.equal(prompts.length, 0, "只读白名单 ⇒ 不弹审批卡（0 次通道调用）");
-    // (c)=risky ⇒ 出 1 卡；客户批准 ⇒ 执行。
+    // 2026-10-29（方案 v2.1 §6.3）：显式写目标越界 ⇒ 写区守卫**直接拒绝**（不弹卡、不交 judge）。
     const rm = await gate!({ command: "rm -rf x", argv: ["rm", "-rf", "x"], cwd: root, toolCallId: "call-rm" });
-    assert.equal(prompts.length, 1, "risky（rm）⇒ 出 1 张客户审批卡");
-    assert.equal(rm.allow, true, "客户批准 ⇒ 执行");
+    assert.equal(rm.allow, false, "显式写目标越界（rm 项目根）⇒ 拒绝");
+    if (!rm.allow) assert.match(rm.reason, /写边界|禁写|写目标/);
+    assert.equal(prompts.length, 0, "写区守卫拒绝不弹卡");
+    // (c)=risky 且无显式写目标（curl 网络）⇒ 出 1 卡；客户批准 ⇒ 执行。
+    const curl = await gate!({ command: "curl https://example.com", argv: ["curl", "https://example.com"], cwd: root, toolCallId: "call-curl" });
+    assert.equal(prompts.length, 1, "risky（curl）⇒ 出 1 张客户审批卡");
+    assert.equal(curl.allow, true, "客户批准 ⇒ 执行");
     assert.match(prompts[0].reason ?? "", /^su-审批档\[(risky|review|deny)\]/, "卡片原因＝审批档固定前缀 + 档位");
     // 客户拒绝 ⇒ 拒绝（fail-closed）。
     outcome = "deny";
-    const rmDenied = await gate!({ command: "rm -rf y", argv: ["rm", "-rf", "y"], cwd: root, toolCallId: "call-rm2" });
-    assert.equal(rmDenied.allow, false, "客户拒绝 ⇒ 拒绝（fail-closed）");
+    const curlDenied = await gate!({ command: "curl https://example.com/deny", argv: ["curl", "https://example.com/deny"], cwd: root, toolCallId: "call-curl2" });
+    assert.equal(curlDenied.allow, false, "客户拒绝 ⇒ 拒绝（fail-closed）");
     assert.equal(prompts.length, 2);
     // (c)=review 同样交客户审批（不是只读档式的直接拒）。
     const nodeTest = await gate!({ command: "node --test", argv: ["node", "--test"], cwd: root, toolCallId: "call-nt" });
@@ -1210,6 +1215,22 @@ test("替我审·开关关：不调 judge，presenter 原路径逐字不变（�
   assert.deepEqual(res, { outcome: "allow", operatorId: "alice" }, "开关关 ⇒ 原人工放行");
   assert.equal(judgeCalls, 0, "开关关绝不调用判断");
   assert.equal(presented, 1, "走原确认卡");
+});
+
+test("替我审·开关开 + manualOnly（不透明执行类）：判断 agent 不代批，强制客户本人确认（Q1 A）", async () => {
+  let judgeCalls = 0;
+  let presented = 0;
+  const ch = createDesktopOperatorChannel({
+    presenter: { async present() { presented += 1; return { allow: false, note: "客户本人拒绝" }; } },
+    operatorId: "alice",
+    judge: { isEnabled: () => true },
+    emitJudgeResult: () => { throw new Error("manualOnly 不该发 judge 结果行"); },
+  });
+  const prompt = { ...req("node docs/scheduling/copy.mjs", ["node", "docs/scheduling/copy.mjs"]), manualOnly: true as const };
+  const res = await ch(prompt, judgeMetadata({ judge: async () => { judgeCalls += 1; return { verdict: "allow", reason: "x", reasonCode: "necessary" }; } }));
+  assert.equal((res as { reason?: string }).reason, "客户本人拒绝");
+  assert.equal(judgeCalls, 0, "manualOnly ⇒ 绝不调用判断 agent");
+  assert.equal(presented, 1, "manualOnly ⇒ 必走客户确认卡");
 });
 
 test("替我审·无 metadata.judge：不调判断，原 present 路径", async () => {

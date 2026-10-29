@@ -3,9 +3,9 @@
 //
 // 覆盖 D 最小系统：
 //   · 六角色注册表（chief → product → rapporteur → nominator → convener → verifier）+ 项目角色枚举；
-//   · 幕僚星形派发 → 任务落 `.ans/state/tasks.jsonl` → 投递 worker；
+//   · 幕僚按序派发（链首产品）→ 任务落 `.ans/state/tasks.jsonl` → 投递目标；
 //   · 不产生 flow/gate/ledger 文件（治理机器已撤除）；
-//   · 运营不再拥有 dispatch（D-03）。
+//   · 运营拥有 dispatch（v4.1）但未接交付时派 worker 被拒（M6）。
 //
 // 使用真实 SessionManager/routeDispatch + 假 openRoleSession（不启动模型、不触网）。
 
@@ -114,7 +114,7 @@ function harness(root: string) {
   return { mgr, sent, sendOptions, caps, streams };
 }
 
-test("D 最小系统全链：六角色枚举 + 幕僚派发落 tasks.jsonl + 无 flow/gate/ledger", async () => {
+test("最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-d-full-chain-"));
   const h = harness(root);
   try {
@@ -124,33 +124,40 @@ test("D 最小系统全链：六角色枚举 + 幕僚派发落 tasks.jsonl + 无
     await tick(30);
     const dispatch = h.caps.chief;
     assert.equal(typeof dispatch, "function", "幕僚有 dispatch_task");
+    // 2026-10-29（v4.1）：幕僚按序派发——链首派产品（无前置）；不得跳过链直接派项目 worker（M8）。
     const receipt = (await dispatch!({
-      roleId: "worker",
-      task: "实现 D 最小系统切片",
-      sideEffect: "code",
-      expectedOutput: "src/worker.ts",
-      requestedEvidence: ["src/worker.ts"],
+      roleId: "product",
+      task: "写产品意图文档",
+      sideEffect: "docs",
+      expectedOutput: "docs/product/focus-intent-v1.md",
+      requestedEvidence: ["docs/product/focus-intent-v1.md"],
     })) as DispatchReceipt;
     assert.equal(receipt.ok, true, receipt.message ?? "");
-    await waitUntil(() => (h.sent.worker?.length ?? 0) > 0);
-    assert.match(h.sent.worker[0] ?? "", /任务编号：#t-/);
+    await waitUntil(() => (h.sent.product?.length ?? 0) > 0);
+    assert.match(h.sent.product[0] ?? "", /任务编号：#t-/);
     const state = await readTaskState(root);
     assert.equal(state.errors.length, 0);
     const task = [...state.records.values()][0];
     assert.equal(task.created?.from, "chief");
-    assert.equal(task.created?.to, "worker");
-    assert.equal(task.delivered?.to, "worker");
-    assert.equal(h.sendOptions.worker[0].handback?.taskId, task.taskId);
+    assert.equal(task.created?.to, "product");
+    assert.equal(task.delivered?.to, "product");
+    assert.equal(h.sendOptions.product[0].handback?.taskId, task.taskId);
+    const toWorker = (await dispatch!({ roleId: "worker", task: "实现切片", sideEffect: "code" })) as DispatchReceipt;
+    assert.equal(toWorker.ok, false, "幕僚不得直接派项目 worker（M8）");
+    assert.equal((await readTaskState(root)).records.size, 1, "拒绝不产生新任务行");
 
     // D 撤除：不产生 flow/gate/ledger 文件；任务状态是唯一机器状态。
     assert.equal(await fs.stat(path.join(root, "docs", "flows")).then(() => true, () => false), false);
     assert.equal(await fs.stat(path.join(root, ".ans", "governance", "ledger.jsonl")).then(() => true, () => false), false);
     assert.equal(await fs.stat(path.join(root, ".ans", "state", "tasks.jsonl")).then(() => true, () => false), true);
 
-    // 运营不再拥有 dispatch（D-03）。
+    // 运营拥有 dispatch（v4.1）但未接交付（无 project-handoff）⇒ 派 worker 被拒（M6）。
     await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
     await tick(30);
-    assert.equal(h.caps.convener, undefined, "convener 不再注入 dispatch_task");
+    assert.equal(typeof h.caps.convener, "function", "v4.1：convener 注入 dispatch_task");
+    const convenerDispatch = (await h.caps.convener!({ roleId: "worker", task: "实现切片", sideEffect: "code" })) as DispatchReceipt;
+    assert.equal(convenerDispatch.ok, false, "未接交付 ⇒ 运营派实现任务被拒");
+    assert.match(convenerDispatch.message ?? "", /交付/);
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true });

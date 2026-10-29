@@ -154,7 +154,10 @@ export function buildGovernanceJudgeFacts(input: {
  * - 返回**必须可读**的物证路径与「是否有必需物证缺失」；
  * - `missingPaths` 是缺失物证的**约定路径**（客户可读；flowId 缺失时退化为文字，不编造路径）；
  * - 第 1 项：任命材料以请求携带的 `recommendedRoleIds` 为唯一来源（D 批撤除团队计划）；
- * - 第 3 项：acceptance 增加实施前标准、验收报告、变更包三类物证；
+ * - 第 3 项（2026-10-29 方案 v2.1 / Q6 A）：acceptance 只要求**提案**与**质检报告**
+ *   （`docs/quality/<flowId>-report-v1.md`，经 `acceptanceReportPath` 传入）；意图/名单/D3 由
+ *   `facts.intentDocumentPath`/`rosterVersion`/`rosterSha256`/`appointmentDecisionId` 机械核对；
+ *   旧 flow 的验收标准/变更包不再作为 acceptance 物证；
  * - `write` 卡的物证由 `run-role` 按来源角色收窄后放入 `artifacts`，此处取全部已给项（Convener 的
  *   `write` 可带 teamPlan，若已存在）；
  * - `appointment-write` 的 flow 物证可选（存在才要求读，缺失不单独阻断）。
@@ -168,15 +171,11 @@ export function requiredArtifactPaths(request: GovernanceJudgeRequest): {
   const pick = (value: unknown): string | undefined =>
     typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
   const proposal = pick(artifacts.proposalPath);
-  const criteria = pick(artifacts.acceptanceCriteriaPath);
   const report = pick(artifacts.acceptanceReportPath);
-  const changePackage = pick(artifacts.changePackagePath);
   const flowId = typeof request.flowId === "string" && request.flowId.trim() !== "" ? request.flowId.trim() : undefined;
   // 约定路径（flowId 缺失 ⇒ 文字，不编造路径）。
   const expectedProposal = flowId !== undefined ? `docs/proposals/${flowId}-v1.md` : "提案";
-  const expectedCriteria = flowId !== undefined ? `docs/acceptance/${flowId}-criteria-v1.md` : "实施前验收标准";
-  const expectedReport = flowId !== undefined ? `docs/acceptance/${flowId}-report-v1.md` : "验收报告";
-  const expectedChangePackage = flowId !== undefined ? `docs/scheduling/${flowId}-change-v1.md` : "变更包";
+  const expectedQualityReport = flowId !== undefined ? `docs/quality/${flowId}-report-v1.md` : "质检报告";
 
   switch (request.cardKind) {
     case "proposal":
@@ -190,14 +189,15 @@ export function requiredArtifactPaths(request: GovernanceJudgeRequest): {
         : { paths: [], missing: true, missingPaths: ["任命推荐集 recommendedRoleIds"] };
     }
     case "acceptance": {
+      // 2026-10-29（方案 v2.1 §5.1/Q6 A）：最小链事实——产品意图 + 提案 + 名单 + D3 通过 + 质检报告。
+      // 物证只要求**提案**与**质检报告**（后者经 `acceptanceReportPath` 传 `docs/quality/<flowId>-report-v1.md`）；
+      // 不再要求旧 flow 的验收标准/变更包（最小系统无这些物证）。意图/名单/D3 事实由应用注入 facts。
       const missingPaths = [
         ...(proposal === undefined ? [expectedProposal] : []),
-        ...(criteria === undefined ? [expectedCriteria] : []),
-        ...(report === undefined ? [expectedReport] : []),
-        ...(changePackage === undefined ? [expectedChangePackage] : []),
+        ...(report === undefined ? [expectedQualityReport] : []),
       ];
       return {
-        paths: [proposal, criteria, report, changePackage].filter((p): p is string => p !== undefined),
+        paths: [proposal, report].filter((p): p is string => p !== undefined),
         missing: missingPaths.length > 0,
         ...(missingPaths.length > 0 ? { missingPaths } : {}),
       };
