@@ -670,6 +670,19 @@ export function Composer() {
         />
 
         <div className="composer-bottom">
+          <div className="composer-trust-line">
+            <span className="composer-trust-title">
+              {t("ui.composer.trustGroupTitle")}
+            </span>
+            <span
+              id="judge-switch-hint"
+              className="composer-trust-hint"
+              title={t("ui.decisionDialog.switchHint")}
+            >
+              {t("ui.decisionDialog.switchHint")}
+            </span>
+          </div>
+          <div className="composer-controls">
           <button
             id="btn-attach-image"
             className="cap-icon"
@@ -691,15 +704,6 @@ export function Composer() {
             role="group"
             aria-label={t("ui.composer.trustGroupTitle")}
           >
-            <span className="composer-trust-text">
-              <span className="composer-trust-title">
-                {t("ui.composer.trustGroupTitle")}
-              </span>
-              <span id="judge-switch-hint" className="composer-trust-hint">
-                {t("ui.decisionDialog.switchHint")}
-              </span>
-            </span>
-            <span className="composer-trust-actions">
             <label
               className={
                 "composer-auto-approve" +
@@ -775,7 +779,6 @@ export function Composer() {
             >
               {decisionStatus}
             </span>
-            </span>
           </div>
 
           <span id="composer-scope" className="composer-scope">
@@ -823,6 +826,7 @@ export function Composer() {
               {t("ui.composer.send")}
               <ArrowUp size={14} strokeWidth={1.5} aria-hidden="true" />
             </Button>
+          </div>
           </div>
         </div>
       </div>

@@ -712,10 +712,10 @@
 }
 .composer-bottom {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   min-width: 0;
-  flex-wrap: wrap;
+  width: 100%;
   font-size: 11px;
   color: var(--text-3);
 }
@@ -739,54 +739,58 @@
   opacity: 0.45;
   cursor: default;
 }
-.composer-trust {
+.composer-trust-line {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.composer-trust-text {
-  display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
   gap: 6px;
   min-width: 0;
 }
-.composer-trust-text .composer-trust-hint {
-  flex: 1 1 auto;
-  min-width: 0;
-  white-space: normal;
-}
-.composer-trust-actions {
+.composer-controls {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+.composer-trust {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
   min-width: 0;
 }
 .composer-trust-title {
   flex: 0 0 auto;
   color: var(--text-3);
-  font-size: 11.5px;
-  line-height: 1.5;
+  font-size: 10.5px;
+  line-height: 1.4;
   white-space: nowrap;
+  opacity: 0.9;
+}
+.composer-bottom .composer-trust-hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+  font-size: 10.5px;
+  line-height: 1.4;
 }
 .composer-auto-approve {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 32px;
-  padding: 0 8px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
   flex: 0 1 auto;
   min-width: 0;
   color: var(--text-2);
   user-select: none;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 11.5px;
   transition:
     background var(--motion-fast) var(--ease-standard),
     border-color var(--motion-fast) var(--ease-standard),
@@ -908,14 +912,17 @@
 }
 .composer-scope {
   min-width: 0;
+  margin-left: auto;
   color: var(--text-2);
+  font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .composer-keyboard {
-  margin-left: auto;
+  margin-left: 0;
   color: var(--text-3);
+  font-size: 10.5px;
   white-space: nowrap;
 }
 .composer-scope-demo {
