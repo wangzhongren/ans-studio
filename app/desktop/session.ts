@@ -3218,7 +3218,7 @@ export class SessionManager {
       ...(acceptanceModule !== undefined
         ? {
             moduleId: acceptanceModule.id,
-            moduleDirectory: acceptanceModule.directory,
+            moduleDirectory: acceptanceModule.path,
             ...(acceptanceModuleOwner !== undefined ? { moduleOwnerRoleId: acceptanceModuleOwner } : {}),
           }
         : {}),
@@ -5382,7 +5382,7 @@ export class SessionManager {
       from: fromRoleId === convenerRoleId ? "convener" : "chief",
       ...(chainFacts.flowId !== undefined ? { flowId: chainFacts.flowId } : {}),
       ...(dispatchStepId !== undefined ? { stepId: dispatchStepId } : {}),
-      ...(taskModule !== undefined ? { moduleId: taskModule.id, moduleDirectory: taskModule.directory } : {}),
+      ...(taskModule !== undefined ? { moduleId: taskModule.id, moduleDirectory: taskModule.path } : {}),
       to: targetRoleId,
       text: task,
       ...(expectedOutput !== undefined ? { expectedOutput } : {}),

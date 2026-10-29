@@ -27,7 +27,7 @@ import {
 
 const ROSTER_TEXT = [
   "---",
-  "schema: project-roster/v2",
+  "schema: project-roster/v3",
   "flowId: focus",
   "version: 1",
   "intent: docs/product/focus-intent-v1.md",
@@ -51,19 +51,22 @@ const ROSTER_TEXT = [
   "  - id: impl-core",
   "    name: 核心实现",
   "    purpose: 实现前端与存储",
-  "    directory: src/",
+  "    path: src/",
+    "    category: core",
   "    publicContract: src/index.ts",
   "    architectureSource: docs/contracts/focus-architecture-v1.md",
   "  - id: impl-tests",
   "    name: 实现测试",
   "    purpose: 实现测试与夹具",
-  "    directory: tests/",
+  "    path: tests/",
+    "    category: core",
   "    publicContract: tests/",
   "    architectureSource: docs/contracts/focus-architecture-v1.md",
   "  - id: qa-suite",
   "    name: 质量核对",
   "    purpose: 独立质量核对",
-  "    directory: test/",
+  "    path: test/",
+    "    category: core",
   "    publicContract: test/",
   "    architectureSource: docs/contracts/focus-architecture-v1.md",
   "---",
@@ -74,13 +77,13 @@ const ROSTER_TEXT = [
   "```topology",
   "modules:",
   "  - id: impl-core",
-  "    directory: src/",
+  "    path: src/",
   "    roleId: implementer",
   "  - id: impl-tests",
-  "    directory: tests/",
+  "    path: tests/",
   "    roleId: implementer",
   "  - id: qa-suite",
-  "    directory: test/",
+  "    path: test/",
   "    roleId: qa",
   "roles:",
   "  - id: implementer",
@@ -93,10 +96,11 @@ const ROSTER_TEXT = [
   "说明文字。",
 ].join("\n");
 
-const VALID_ROSTER: ProjectRoster = parseProjectRoster(ROSTER_TEXT).ok
-  ? (parseProjectRoster(ROSTER_TEXT) as { roster: ProjectRoster }).roster
+const parsedRosterFixture = parseProjectRoster(ROSTER_TEXT);
+const VALID_ROSTER: ProjectRoster = parsedRosterFixture.ok
+  ? parsedRosterFixture.roster
   : (() => {
-      throw new Error("fixture roster invalid");
+      throw new Error(`fixture roster invalid: ${parsedRosterFixture.reason}`);
     })();
 
 const PREFLIGHT_ROSTER: ProjectRoster = {
@@ -107,8 +111,8 @@ const PREFLIGHT_ROSTER: ProjectRoster = {
   ],
   modules: [
     ...VALID_ROSTER.modules,
-    { id: "env-setup", name: "环境装配", purpose: "零依赖与构建配置", directory: "package.json", publicContract: "package.json", architectureSource: "docs/contracts/focus-architecture-v1.md" },
-    { id: "project-entry", name: "项目入口", purpose: "入口文件", directory: "index.html", publicContract: "index.html", architectureSource: "docs/contracts/focus-architecture-v1.md" },
+    { id: "env-setup", name: "环境装配", purpose: "零依赖与构建配置", path: "package.json", category: "env", publicContract: "package.json", architectureSource: "docs/contracts/focus-architecture-v1.md" },
+    { id: "project-entry", name: "项目入口", purpose: "入口文件", path: "index.html", category: "entry", publicContract: "index.html", architectureSource: "docs/contracts/focus-architecture-v1.md" },
   ],
 };
 
@@ -116,7 +120,7 @@ test("名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期�
   const parsed = parseProjectRoster(ROSTER_TEXT, "focus");
   assert.equal(parsed.ok, true, parsed.ok ? "" : parsed.reason);
   if (parsed.ok) {
-    assert.equal(parsed.roster.schema, "project-roster/v2");
+    assert.equal(parsed.roster.schema, "project-roster/v3");
     assert.equal(parsed.roster.flowId, "focus");
     assert.equal(parsed.roster.version, 1);
     assert.deepEqual(rosterRoleIds(parsed.roster), ["implementer", "qa"]);
@@ -133,7 +137,7 @@ test("名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期�
 test("模块清单：同父兄弟目录可作为不同模块；同一角色多模块合法（授权目录=并集）", () => {
   const siblingText = [
     "---",
-    "schema: project-roster/v2",
+    "schema: project-roster/v3",
     "flowId: bills",
     "version: 1",
     "intent: docs/product/bills-intent-v1.md",
@@ -154,19 +158,22 @@ test("模块清单：同父兄弟目录可作为不同模块；同一角色多�
     "  - id: bill-a",
     "    name: 计费 A",
     "    purpose: 实现 A",
-    "    directory: src/bill/a/",
+    "    path: src/bill/a/",
+    "    category: core",
     "    publicContract: src/bill/a/index.js",
     "    architectureSource: docs/contracts/bills-architecture-v1.md",
     "  - id: bill-b",
     "    name: 计费 B",
     "    purpose: 实现 B",
-    "    directory: src/bill/b/",
+    "    path: src/bill/b/",
+    "    category: core",
     "    publicContract: src/bill/b/index.js",
     "    architectureSource: docs/contracts/bills-architecture-v1.md",
     "  - id: bill-qa",
     "    name: 质量",
     "    purpose: 测试",
-    "    directory: test/",
+    "    path: test/",
+    "    category: core",
     "    publicContract: test/",
     "    architectureSource: docs/contracts/bills-architecture-v1.md",
     "---",
@@ -174,13 +181,13 @@ test("模块清单：同父兄弟目录可作为不同模块；同一角色多�
     "```topology",
     "modules:",
     "  - id: bill-a",
-    "    directory: src/bill/a/",
+    "    path: src/bill/a/",
     "    roleId: impl",
     "  - id: bill-b",
-    "    directory: src/bill/b/",
+    "    path: src/bill/b/",
     "    roleId: impl",
     "  - id: bill-qa",
-    "    directory: test/",
+    "    path: test/",
     "    roleId: qa",
     "roles:",
     "  - id: impl",
@@ -200,7 +207,7 @@ test("模块清单：同父兄弟目录可作为不同模块；同一角色多�
 test("名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑", () => {
   const cases: Array<[string, string, string]> = [
     ["missing-frontmatter", "# no frontmatter\n", "roster-frontmatter-missing"],
-    ["bad-schema", ROSTER_TEXT.replace("schema: project-roster/v2", "schema: project-roster/v1"), "roster-schema-invalid"],
+    ["bad-schema", ROSTER_TEXT.replace("schema: project-roster/v3", "schema: project-roster/v1"), "roster-schema-invalid"],
     ["bad-version", ROSTER_TEXT.replace("version: 1", "version: 0"), "roster-version-invalid"],
     ["builtin-id", ROSTER_TEXT.replace("id: implementer", "id: convener"), "roster-role-builtin"],
     ["bad-id", ROSTER_TEXT.replace("id: implementer", "id: Bad_ID"), "roster-role-id-invalid"],
@@ -212,9 +219,9 @@ test("名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑", ()
       "roster-role-modules-invalid",
     ],
     ["module-id-invalid", ROSTER_TEXT.replace("  - id: impl-core\n", "  - id: X\n"), "roster-module-id-invalid"],
-    ["module-dir-array", ROSTER_TEXT.replace("    directory: src/\n", "    directory: [src/, lib/]\n"), "roster-module-directory-invalid"],
-    ["module-dir-governance", ROSTER_TEXT.replace("    directory: test/\n", "    directory: src/docs/proposals/\n"), "roster-module-directory-governance"],
-    ["module-dir-overlap", ROSTER_TEXT.replace("    directory: tests/\n", "    directory: src/sub/\n"), "roster-module-directory-overlap"],
+    ["module-dir-array", ROSTER_TEXT.replace("    path: src/\n", "    path: [src/, lib/]\n"), "roster-module-directory-invalid"],
+    ["module-dir-governance", ROSTER_TEXT.replace("    path: test/\n", "    path: src/docs/proposals/\n"), "roster-module-directory-governance"],
+    ["module-dir-overlap", ROSTER_TEXT.replace("    path: tests/\n", "    path: src/sub/\n"), "roster-module-directory-overlap"],
     ["module-fields-missing", ROSTER_TEXT.replace("    publicContract: test/\n", ""), "roster-module-fields-missing"],
     [
       "module-multi-owner",
@@ -241,7 +248,7 @@ test("名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑", ()
   // 未被任何角色绑定的模块 ⇒ unbound。
   const orphanText = ROSTER_TEXT.replace(
     "  - id: qa-suite\n    name: 质量核对\n",
-    "  - id: orphan\n    name: 孤儿模块\n    purpose: 未绑定\n    directory: lib/\n    publicContract: lib/\n    architectureSource: docs/contracts/focus-architecture-v1.md\n  - id: qa-suite\n    name: 质量核对\n",
+    "  - id: orphan\n    name: 孤儿模块\n    purpose: 未绑定\n    path: lib/\n    category: core\n    publicContract: lib/\n    architectureSource: docs/contracts/focus-architecture-v1.md\n  - id: qa-suite\n    name: 质量核对\n",
   );
   const orphan = parseProjectRoster(orphanText);
   assert.equal(orphan.ok, false);
@@ -265,7 +272,7 @@ test("最新名单：选 N 最大并校验文件名版本=frontmatter version；
       path.join(root, "docs", "proposals", "focus-modules-v1.md"),
       [
         "---",
-        "schema: project-modules/v1",
+        "schema: project-modules/v2",
         "flowId: focus",
         "version: 1",
         `modules: ${JSON.stringify(VALID_ROSTER.modules)}`,
@@ -329,7 +336,7 @@ test("版本化引用：最新名单引用最新文档；旧版只读；缺文�
       path.join(root, "docs/proposals/focus-modules-v1.md"),
       [
         "---",
-        "schema: project-modules/v1",
+        "schema: project-modules/v2",
         "flowId: focus",
         "version: 1",
         `modules: ${JSON.stringify(VALID_ROSTER.modules)}`,
@@ -359,13 +366,13 @@ test("版本化引用：最新名单引用最新文档；旧版只读；缺文�
     const modulesPath = path.join(root, "docs/proposals/focus-modules-v1.md");
     const modulesText = await fs.readFile(modulesPath, "utf8");
     const drifted = VALID_ROSTER.modules.map((module) =>
-      module.id === "impl-core" ? { ...module, directory: "src2/" } : module,
+      module.id === "impl-core" ? { ...module, path: "src2/" } : module,
     );
     await fs.writeFile(
       modulesPath,
       [
         "---",
-        "schema: project-modules/v1",
+        "schema: project-modules/v2",
         "flowId: focus",
         "version: 1",
         `modules: ${JSON.stringify(drifted)}`,
@@ -559,7 +566,7 @@ test("链式派发必须带 flowId（Q9）：交付运营/运营派实现或验�
 test("模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例", () => {
   const base = [
     "---",
-    "schema: project-roster/v2",
+    "schema: project-roster/v3",
     "flowId: notes",
     "version: 1",
     "intent: docs/product/notes-intent-v1.md",
@@ -585,25 +592,29 @@ test("模块路径可为文件或目录：文件模块正例；文件+目录同�
     "  - id: core",
     "    name: 核心",
     "    purpose: 核心实现",
-    "    directory: src/",
+    "    path: src/",
+    "    category: core",
     "    publicContract: src/index.js",
     "    architectureSource: docs/contracts/notes-architecture-v1.md",
     "  - id: pkg",
     "    name: 包声明",
     "    purpose: 零依赖声明",
-    "    directory: package.json",
+    "    path: package.json",
+    "    category: env",
     "    publicContract: package.json",
     "    architectureSource: docs/contracts/notes-architecture-v1.md",
     "  - id: readme",
     "    name: 文档",
     "    purpose: 用法文档",
-    "    directory: README.md",
+    "    path: README.md",
+    "    category: core",
     "    publicContract: README.md",
     "    architectureSource: docs/contracts/notes-architecture-v1.md",
     "  - id: entry",
     "    name: 项目入口",
     "    purpose: 入口文件",
-    "    directory: index.html",
+    "    path: index.html",
+    "    category: entry",
     "    publicContract: index.html",
     "    architectureSource: docs/contracts/notes-architecture-v1.md",
     "---",
@@ -611,16 +622,16 @@ test("模块路径可为文件或目录：文件模块正例；文件+目录同�
     "```topology",
     "modules:",
     "  - id: core",
-    "    directory: src/",
+    "    path: src/",
     "    roleId: dev",
     "  - id: pkg",
-    "    directory: package.json",
+    "    path: package.json",
     "    roleId: env-bootstrap",
     "  - id: readme",
-    "    directory: README.md",
+    "    path: README.md",
     "    roleId: doc",
     "  - id: entry",
-    "    directory: index.html",
+    "    path: index.html",
     "    roleId: env-bootstrap",
     "roles:",
     "  - id: dev",
@@ -639,11 +650,11 @@ test("模块路径可为文件或目录：文件模块正例；文件+目录同�
     assert.deepEqual(rosterDirectoriesFor(parsed.roster, "env-bootstrap"), ["package.json", "index.html"]);
     assert.deepEqual(rosterDirectoriesFor(parsed.roster, "doc"), ["README.md"]);
   }
-  const contained = base.join("\n").replace("    directory: package.json", "    directory: src/package.json");
+  const contained = base.join("\n").replace("    path: package.json", "    path: src/package.json");
   const c = parseProjectRoster(contained);
   assert.equal(c.ok, false);
   if (!c.ok) assert.equal(c.code, "roster-module-directory-overlap");
-  const equal = base.join("\n").replace("    directory: package.json", "    directory: README.md");
+  const equal = base.join("\n").replace("    path: package.json", "    path: README.md");
   const e = parseProjectRoster(equal);
   assert.equal(e.ok, false);
   if (!e.ok) assert.equal(e.code, "roster-module-directory-overlap");
@@ -652,7 +663,7 @@ test("模块路径可为文件或目录：文件模块正例；文件+目录同�
 test("env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + index.md 索引）", () => {
   const text = [
     "---",
-    "schema: project-roster/v2",
+    "schema: project-roster/v3",
     "flowId: essay",
     "version: 1",
     "intent: docs/product/essay-intent-v1.md",
@@ -673,20 +684,21 @@ test("env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + inde
     "  - id: content",
     "    name: 正文",
     "    purpose: 撰写正文",
-    "    directory: content/",
+    "    path: content/",
+    "    category: core",
     "    publicContract: content/",
     "    architectureSource: docs/contracts/essay-architecture-v1.md",
     "  - id: assets",
     "    name: 资源",
     "    purpose: 图片与素材",
-    "    directory: assets/",
+    "    path: assets/",
     "    category: env",
     "    publicContract: assets/",
     "    architectureSource: docs/contracts/essay-architecture-v1.md",
     "  - id: index",
     "    name: 索引",
     "    purpose: 入口索引",
-    "    directory: index.md",
+    "    path: index.md",
     "    category: entry",
     "    publicContract: index.md",
     "    architectureSource: docs/contracts/essay-architecture-v1.md",
@@ -695,13 +707,13 @@ test("env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + inde
     "```topology",
     "modules:",
     "  - id: content",
-    "    directory: content/",
+    "    path: content/",
     "    roleId: writer",
     "  - id: assets",
-    "    directory: assets/",
+    "    path: assets/",
     "    roleId: env-bootstrap",
     "  - id: index",
-    "    directory: index.md",
+    "    path: index.md",
     "    roleId: env-bootstrap",
     "roles:",
     "  - id: writer",
