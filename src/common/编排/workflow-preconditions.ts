@@ -1155,6 +1155,8 @@ export type DispatchPreflightInput = {
   targetCardFound: boolean;
   /** 幕僚→运营时 D3 选中但尚未枚举到角色卡的项目角色（用于明确拒绝文案）。 */
   missingSelectedCardIds?: string[];
+  /** 2026-10-30（方案 v3 §3.1）：run 锚点事实（应用读取 manifest；legacy 无 manifest 显式标记）。 */
+  run?: { state: "draft" | "pinned" | "legacy"; runId?: string; roles?: readonly string[] };
 };
 
 export type DispatchPreflightResult =
@@ -1237,6 +1239,9 @@ export function evaluateDispatchPreflight(input: DispatchPreflightInput): Dispat
       if (input.flowId === undefined) {
         return reject("flow-required", "派发未受理：交付运营必须携带 flowId（用于定位最新 D3 与名单）。");
       }
+      if (input.run === undefined || input.run.runId === undefined) {
+        return reject("run-missing", "派发未受理：交付运营缺少 runId（应用应在 M1 前生成 draft run）。");
+      }
       if (input.d3Selected.length === 0) {
         return reject(
           "d3-missing",
@@ -1269,6 +1274,15 @@ export function evaluateDispatchPreflight(input: DispatchPreflightInput): Dispat
         "handoff-missing",
         "派发未受理：尚未收到幕僚的交付任务（stepId=project-handoff）。请让幕僚先把项目交付运营。",
       );
+    }
+    if (input.run === undefined || input.run.runId === undefined) {
+      return reject("run-missing", "派发未受理：实现/验收任务缺少 runId（run 内项目任务必须绑定 pinned run）。");
+    }
+    if (input.run.state !== "pinned") {
+      return reject("run-pin-required", `派发未受理：run ${input.run.runId} 未 pinned；实现/验收只能使用 frozen 契约。`);
+    }
+    if (!targetBuiltIn && input.run.roles !== undefined && !input.run.roles.includes(targetRoleId)) {
+      return reject("run-role-missing", `派发未受理：目标 ${targetRoleId} 不在 run ${input.run.runId} 的项目角色集合内。`);
     }
     if (input.flowId === undefined) {
       return reject("flow-required", "派发未受理：实现/验收任务必须携带 flowId（用于定位 D3 名单与交付记录）。");

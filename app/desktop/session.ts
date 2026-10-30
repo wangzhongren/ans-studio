@@ -80,6 +80,7 @@ import { renderHandbackPrompt, renderHandbackBatchPrompt, renderWorkReportPrompt
 import { declaredConfirmPaths } from "../../src/common/编排/confirmed-writes.ts";
 // B 批（2026-10-28）：任务/汇报主干与最小状态（编排单一来源，本层只接线）。
 import { appendTaskEvent, classifyTaskSideEffect, findTaskByIdempotencyKey, newTaskId, readTaskState, redispatchCountOf, redispatchTaskId, renderTaskCardLines, shortenSummary, taskCardOf, taskCards, taskEvent, taskIdempotencyKey, taskReportStatusOf, type TaskCardView, type TaskReplay } from "../../src/common/编排/task-state.ts";
+import { applyRunChange, buildRunChangeCard, ensureDraftRun, findActiveRun, loadPinnedRoster, mapRunChangeAnswer, pinRun, pinnedDocsSummary, verifyPinnedRun, type RunManifest, type RunChangeMode } from "../../src/common/编排/run-manifest.ts";
 import { appendRoleLog, formatRoleActivityText, readRoleLog } from "../../src/common/编排/role-log.ts";
 // B 批：终止/重派安全判定（单一来源；桌面只提供终止事实/执行动作）。
 import { evaluateRedispatchSafety, type RedispatchSafetyDecision } from "../../src/common/编排/watchdog.ts";
@@ -1803,6 +1804,119 @@ export class SessionManager {
     return { ok: true, outcome, first };
   }
 
+  /**
+   * 2026-10-30（方案 v3 §3.1）：应用发起 run-change 卡（复用 decision，不新增 cardKind）。
+   * 只由 app 发行；客户/judge 选择 continue-frozen/stop-and-restart/stop（或 approve/reject/cancel 回退）。
+   * 本方法选择有客户卡通道的统筹/提案会话呈现；无 pinned run / 无会话 / 无通道 ⇒ fail-closed。
+   */
+  async requestRunChangeDecision(input: {
+    projectRoot: string;
+    flowId: string;
+    requestedBy?: "convener" | "planner" | "product";
+    reason?: string;
+    proposed?: { documents: Record<string, string>; schemas: Record<string, string> };
+  }): Promise<
+    | {
+        ok: true;
+        outcome: Promise<CustomerInputOutcome>;
+        first: Promise<{ kind: "presented" } | { kind: "outcome"; outcome: CustomerInputOutcome }>;
+      }
+    | { ok: false; error: string }
+  > {
+    const active = await findActiveRun(input.projectRoot, input.flowId);
+    if (!active.ok) return { ok: false, error: active.reason };
+    if (active.manifest === null || active.manifest.state !== "pinned") {
+      return { ok: false, error: "当前 flow 没有 pinned run，不能发起 run-change" };
+    }
+    const preferred = [this.handbackOwnerRoleId(input.projectRoot), "rapporteur"];
+    let selectedEntry: LiveSession | undefined;
+    for (const [key, entry] of this.sessions) {
+      if (!key.startsWith(`${input.projectRoot} `)) continue;
+      if (entry.projectRoot !== input.projectRoot) continue;
+      if (entry.requirementChangeCard === undefined) continue;
+      if (selectedEntry === undefined) selectedEntry = entry;
+      if (preferred.includes(entry.roleId)) {
+        selectedEntry = entry;
+        if (entry.roleId === preferred[0]) break;
+      }
+    }
+    if (selectedEntry === undefined || selectedEntry.requirementChangeCard === undefined) {
+      return { ok: false, error: "没有可呈现 run-change 卡的统筹/提案会话（需先打开会话）" };
+    }
+    const currentDocs: Record<string, string> = {};
+    for (const [kind, ref] of Object.entries(active.manifest.documents)) {
+      if (ref !== null && ref !== undefined) currentDocs[kind] = ref.path;
+    }
+    const requestId = `run-change-${active.manifest.runId}`;
+    const card = buildRunChangeCard({
+      runId: active.manifest.runId,
+      flowId: input.flowId,
+      requestId,
+      ...(input.requestedBy !== undefined ? { requestedBy: input.requestedBy } : {}),
+      ...(input.reason !== undefined ? { reason: input.reason } : {}),
+      current: { state: active.manifest.state, documents: currentDocs, schemas: active.manifest.schemas },
+      ...(input.proposed !== undefined ? { proposed: input.proposed } : {}),
+    });
+    const channel = selectedEntry.requirementChangeCard;
+    let settleFirst: ((signal: { kind: "presented" } | { kind: "outcome"; outcome: CustomerInputOutcome }) => void) | undefined;
+    let firstSettled = false;
+    const first = new Promise<{ kind: "presented" } | { kind: "outcome"; outcome: CustomerInputOutcome }>((resolve) => {
+      settleFirst = (signal) => {
+        if (firstSettled) return;
+        firstSettled = true;
+        resolve(signal);
+      };
+    });
+    const onPresented = (): void => settleFirst?.({ kind: "presented" });
+    let rawOutcome: Promise<CustomerInputOutcome>;
+    try {
+      rawOutcome = Promise.resolve(channel(card.request, undefined, onPresented));
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+    const outcome = rawOutcome.then(async (settled) => {
+      if (settled.outcome !== "answered") {
+        settleFirst?.({ kind: "outcome", outcome: settled });
+        return settled;
+      }
+      const mode: RunChangeMode | undefined = mapRunChangeAnswer({
+        ...(settled.value?.selected !== undefined ? { selected: settled.value.selected } : {}),
+      });
+      if (mode === undefined) {
+        const unavailable: CustomerInputOutcome = { outcome: "unavailable", reason: "run-change 选择无法映射到唯一模式（fail-closed）" };
+        settleFirst?.({ kind: "outcome", outcome: unavailable });
+        return unavailable;
+      }
+      const newHashes: Record<string, string> = {};
+      for (const [kind, rel] of Object.entries(input.proposed?.documents ?? {})) {
+        try {
+          newHashes[kind] = createHash("sha256").update(await fs.promises.readFile(path.join(input.projectRoot, rel))).digest("hex");
+        } catch {
+          /* 新文档不可读：不伪造 hash；apply 记录只带可读者。 */
+        }
+      }
+      const applied = await applyRunChange(input.projectRoot, active.manifest!, {
+        decisionId: settled.decisionId ?? `decision-${requestId}`,
+        requestId,
+        mode,
+        decidedBy: settled.operatorId !== undefined && settled.operatorId.startsWith("judge:") ? "judge" : "customer",
+        ...(Object.keys(newHashes).length > 0 ? { newHashes } : {}),
+      });
+      if (!applied.ok) {
+        const unavailable: CustomerInputOutcome = { outcome: "unavailable", reason: applied.reason };
+        settleFirst?.({ kind: "outcome", outcome: unavailable });
+        return unavailable;
+      }
+      settleFirst?.({ kind: "outcome", outcome: settled });
+      return settled;
+    });
+    outcome.catch((error) => settleFirst?.({
+      kind: "outcome",
+      outcome: { outcome: "unavailable", reason: error instanceof Error ? error.message : String(error) },
+    }));
+    return { ok: true, outcome, first };
+  }
+
   /** 治理主人（回交/系统行落位；2026-10-19 验收自动派发用）：trio=Convener；single=主入口（su）；未枚举 ⇒ null。 */
   governanceOwnerRoleId(projectRoot: string): string | null {
     return this.handbackOwnerRoleId(projectRoot);
@@ -3174,7 +3288,9 @@ export class SessionManager {
   ): Promise<CustomerInputMetadata | undefined> {
     const flowId = request.flowId ?? metadata?.flowId;
     if (typeof flowId !== "string" || flowId.trim() === "") return metadata; // 无 flowId：上游已 fail-closed
-    const intentRel = `docs/product/${flowId}-intent-v1.md`;
+    const activeRun = await findActiveRun(projectRoot, flowId);
+    const pinnedRun = activeRun.ok && activeRun.manifest !== null && activeRun.manifest.state === "pinned" ? activeRun.manifest : undefined;
+    const intentRel = pinnedRun?.documents.intent?.path ?? `docs/product/${flowId}-intent-v1.md`;
     const reportRel = `docs/quality/${flowId}-report-v1.md`;
     const readText = async (rel: string): Promise<string | undefined> => {
       try {
@@ -3185,7 +3301,7 @@ export class SessionManager {
     };
     const intentText = await readText(intentRel);
     const intentOk = intentText !== undefined && intentText.trim() !== "" && /^#/m.test(intentText);
-    const roster = await loadLatestRoster({ projectRoot, flowId });
+    const roster = pinnedRun !== undefined ? await loadPinnedRoster(projectRoot, pinnedRun) : await loadLatestRoster({ projectRoot, flowId });
     // 2026-10-29（v2.6/R2）：验收卡可引用模块（moduleId）；应用按最新名单核对并把模块事实放进 facts。
     const acceptanceModuleId = typeof metadata?.moduleId === "string" ? metadata.moduleId.trim() : "";
     const acceptanceModule =
@@ -3235,8 +3351,15 @@ export class SessionManager {
       }),
       ...(intentOk ? { intentDocumentPath: intentRel } : {}),
       ...(roster.ok ? { rosterVersion: roster.version, rosterSha256: roster.sha256 } : {}),
-      ...(d3?.decisionId !== undefined ? { appointmentDecisionId: d3.decisionId } : {}),
+      ...(pinnedRun?.d3?.decisionId !== undefined
+        ? { appointmentDecisionId: pinnedRun.d3.decisionId }
+        : d3?.decisionId !== undefined
+          ? { appointmentDecisionId: d3.decisionId }
+          : {}),
       ...(reportOk ? { qualityReportPath: reportRel } : {}),
+      ...(pinnedRun !== undefined
+        ? { runId: pinnedRun.runId, runState: "pinned" as const, pinnedDocs: pinnedDocsSummary(pinnedRun) }
+        : {}),
       ...(acceptanceModule !== undefined
         ? {
             moduleId: acceptanceModule.id,
@@ -3927,6 +4050,9 @@ export class SessionManager {
       ...(created.stepId !== undefined ? { stepId: created.stepId } : {}),
       ...(created.moduleId !== undefined ? { moduleId: created.moduleId } : {}),
       ...(created.moduleDirectory !== undefined ? { moduleDirectory: created.moduleDirectory } : {}),
+      ...(created.runId !== undefined ? { runId: created.runId } : {}),
+      ...(created.runState !== undefined ? { runState: created.runState } : {}),
+      ...(created.runStage !== undefined ? { runStage: created.runStage } : {}),
       to,
       // B-07：同角色重派先缩窄任务（明确先做最小可验证部分；已完成部分核对后跳过）。
       text: `${created.text}\n\n[重派] 上次执行卡死；请缩窄范围，先完成最小可验证部分；已完成部分核对后跳过，不要重复。`,
@@ -5194,6 +5320,7 @@ export class SessionManager {
     architectureFound: boolean;
     roster?: RosterLoadResult;
     d3Selected: string[];
+    d3DecisionId?: string;
     handoffFound: boolean;
     selectedCardsFound: boolean;
     missingSelectedCardIds: string[];
@@ -5275,7 +5402,7 @@ export class SessionManager {
     for (const event of state.events) {
       if (event.kind === "request.created") requestFlows.set(event.requestId, event.flowId);
     }
-    let d3: { targetRoleIds: string[]; at: string } | undefined;
+    let d3: { targetRoleIds: string[]; at: string; decisionId?: string } | undefined;
     for (const event of state.events) {
       if (event.kind !== "request.resolved") continue;
       const targets = Array.isArray(event.targetRoleIds)
@@ -5285,7 +5412,9 @@ export class SessionManager {
       const eventFlow = requestFlows.get(event.requestId);
       if (flowId !== undefined && eventFlow !== undefined && eventFlow !== flowId) continue;
       if (event.rosterVersion === undefined && event.rosterSha256 === undefined && eventFlow === undefined) continue;
-      if (d3 === undefined || event.at > d3.at) d3 = { targetRoleIds: targets, at: event.at };
+      if (d3 === undefined || event.at > d3.at) {
+        d3 = { targetRoleIds: targets, at: event.at, ...(event.decisionId !== undefined ? { decisionId: event.decisionId } : {}) };
+      }
     }
     const convenerRoleId = this.handbackOwnerRoleId(projectRoot);
     const handoffFound = state.unclosed.some((record) => {
@@ -5309,6 +5438,7 @@ export class SessionManager {
       architectureFound,
       ...(roster !== undefined ? { roster } : {}),
       d3Selected: selected,
+      ...(d3?.decisionId !== undefined ? { d3DecisionId: d3.decisionId } : {}),
       handoffFound,
       selectedCardsFound,
       missingSelectedCardIds,
@@ -5389,6 +5519,42 @@ export class SessionManager {
       return fail("派发未受理：未枚举到幕僚角色，无法建立任务。", "派发未受理：未枚举到幕僚角色。");
     }
     const chainFacts = await this.chainDispatchFacts(projectRoot, d?.flowId);
+    const dispatchFlowId = d?.flowId ?? chainFacts.flowId;
+    const handoffDispatch = fromRoleId === chiefRoleId && convenerRoleId !== null && targetRoleId === convenerRoleId;
+    let runManifest: RunManifest | undefined;
+    let runState: "draft" | "pinned" | "legacy" | undefined;
+    let runRoster = chainFacts.roster;
+    let d3Selected = chainFacts.d3Selected;
+    if (dispatchFlowId !== undefined) {
+      const active = await findActiveRun(projectRoot, dispatchFlowId);
+      if (!active.ok) {
+        return fail(`派发未受理：run 状态读取失败（${active.reason}）；未创建任务、未投递。`, "派发未受理：run 状态读取失败。");
+      }
+      if (active.manifest !== null) {
+        runManifest = active.manifest;
+        runState = active.manifest.state === "pinned" ? "pinned" : "draft";
+      } else if (handoffDispatch || targetRoleId === "product" || targetRoleId === "rapporteur" || targetRoleId === "nominator") {
+        const draft = await ensureDraftRun(projectRoot, dispatchFlowId, new Date(this.now()));
+        if (!draft.ok) {
+          return fail(`派发未受理：draft run 创建失败（${draft.reason}）；未创建任务、未投递。`, "派发未受理：draft run 创建失败。");
+        }
+        runManifest = draft.manifest;
+        runState = "draft";
+      }
+      if (runManifest !== undefined && runManifest.state === "pinned") {
+        const verified = await verifyPinnedRun(projectRoot, runManifest);
+        if (!verified.ok || verified.violations.length > 0) {
+          const detail = verified.ok ? verified.violations.slice(0, 3).join("；") : verified.reason;
+          return fail(`派发未受理：pinned run 文档 hash 校验失败（${detail}）；未创建任务、未投递。`, "派发未受理：pinned run 文档 hash 校验失败。");
+        }
+        const pinnedRoster = await loadPinnedRoster(projectRoot, runManifest);
+        if (!pinnedRoster.ok) {
+          return fail(`派发未受理：pinned run 文档校验失败（${pinnedRoster.reason}）；未创建任务、未投递。`, "派发未受理：pinned run 文档校验失败。");
+        }
+        runRoster = pinnedRoster;
+        d3Selected = runManifest.d3?.targetRoleIds ?? d3Selected;
+      }
+    }
     const preflight = evaluateDispatchPreflight({
       fromRoleId,
       targetRoleId,
@@ -5399,8 +5565,11 @@ export class SessionManager {
       intent: chainFacts.intent,
       proposalFound: chainFacts.proposalFound,
       architectureFound: chainFacts.architectureFound,
-      ...(chainFacts.roster !== undefined ? { roster: chainFacts.roster } : {}),
-      d3Selected: chainFacts.d3Selected,
+      ...(runRoster !== undefined ? { roster: runRoster } : {}),
+      d3Selected,
+      ...(runManifest !== undefined && runState !== undefined
+        ? { run: { state: runState, runId: runManifest.runId, ...(runManifest.roles !== undefined ? { roles: runManifest.roles } : {}) } }
+        : {}),
       ...(requestedModuleId !== undefined ? { moduleId: requestedModuleId } : {}),
       ...(requestedModulePaths !== undefined && requestedModulePaths.length > 0 ? { modulePaths: requestedModulePaths } : {}),
       handoffFound: chainFacts.handoffFound,
@@ -5427,10 +5596,39 @@ export class SessionManager {
       );
     }
 
+    if (handoffDispatch) {
+      if (runManifest === undefined || dispatchFlowId === undefined) {
+        return fail("派发未受理：交付运营缺少 runId（应用应在 M1 前生成 draft run）；未创建任务、未投递。", "派发未受理：缺少 runId。");
+      }
+      if (runManifest.state === "pinned") {
+        const verified = await verifyPinnedRun(projectRoot, runManifest);
+        if (!verified.ok || verified.violations.length > 0) {
+          const detail = verified.ok ? verified.violations.slice(0, 3).join("；") : verified.reason;
+          return fail(`派发未受理：pinned run 文档 hash 校验失败（${detail}）；未创建交接任务、未投递。`, "派发未受理：pinned run 文档 hash 校验失败。");
+        }
+      } else {
+        const pinned = await pinRun(projectRoot, runManifest.runId, {
+          ...(chainFacts.d3DecisionId !== undefined && chainFacts.d3Selected.length > 0
+            ? { d3: { decisionId: chainFacts.d3DecisionId, targetRoleIds: [...chainFacts.d3Selected] } }
+            : {}),
+        });
+        if (!pinned.ok) {
+          return fail(`派发未受理：run pin 失败（${pinned.reason}）；未创建交接任务、未投递。`, "派发未受理：run pin 失败（交付前必须先冻结契约）。");
+        }
+        runManifest = pinned.manifest;
+        runState = "pinned";
+        const pinnedRoster = await loadPinnedRoster(projectRoot, pinned.manifest);
+        if (!pinnedRoster.ok) {
+          return fail(`派发未受理：pinned run 文档校验失败（${pinnedRoster.reason}）；未创建交接任务、未投递。`, "派发未受理：pinned run 文档校验失败。");
+        }
+        runRoster = pinnedRoster;
+        d3Selected = pinned.manifest.d3?.targetRoleIds ?? d3Selected;
+      }
+    }
     const taskId = newTaskId(new Date(this.now()));
     const createdAt = new Date(this.now());
     // 2026-10-29（v2.6/R2）：任务模块以**名单模块**为准落盘（模型自报目录仅用于核对，不落盘）。
-    const rosterForModule = chainFacts.roster !== undefined && chainFacts.roster.ok === true ? chainFacts.roster.roster : undefined;
+    const rosterForModule = runRoster !== undefined && runRoster.ok === true ? runRoster.roster : undefined;
     const taskModule =
       requestedModuleId !== undefined && rosterForModule !== undefined
         ? rosterForModule.modules.find((module) => module.id === requestedModuleId)
@@ -5450,6 +5648,13 @@ export class SessionManager {
       ...(taskModule !== undefined ? { moduleId: taskModule.id, moduleDirectory: taskModule.path, modulePaths: [...taskModule.paths] } : {}),
       to: targetRoleId,
       text: task,
+      ...(runManifest !== undefined && runState !== undefined
+        ? {
+            runId: runManifest.runId,
+            runState,
+            ...(runManifest.stage?.current !== undefined ? { runStage: runManifest.stage.current } : {}),
+          }
+        : {}),
       ...(expectedOutput !== undefined ? { expectedOutput } : {}),
       ...(requestedEvidence !== undefined ? { requestedEvidence } : {}),
       sideEffect,

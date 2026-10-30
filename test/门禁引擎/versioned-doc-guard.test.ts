@@ -341,3 +341,12 @@ test("v2.15 入口预检负例：缺版本记录章节/跳号/旧版已改 ⇒ �
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("2026-10-30（3.1/Delta-W1-1）：assets 作为第七类 vN 文档纳入只读守卫", () => {
+  assert.equal(isVersionedDocPath("docs/contracts/focus-assets-v1.md"), true);
+  assert.equal(versionedDocVersionOf("docs/contracts/focus-assets-v2.md"), 2);
+  const deny = versionedDocOverwriteDecision({ relPath: "docs/contracts/focus-assets-v1.md", exists: true });
+  assert.equal(deny.allowed, false);
+  const allow = versionedDocOverwriteDecision({ relPath: "docs/contracts/focus-assets-v2.md", exists: false });
+  assert.equal(allow.allowed, true);
+});

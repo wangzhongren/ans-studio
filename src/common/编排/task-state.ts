@@ -330,6 +330,21 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
         }
       }
     }
+    if (rec["runId"] !== undefined) {
+      if (typeof rec["runId"] !== "string" || !/^run-[a-z0-9][a-z0-9-]{2,95}$/.test(rec["runId"])) {
+        return { ok: false, message: "task.created.runId 非法" };
+      }
+    }
+    if (rec["runState"] !== undefined) {
+      if (rec["runState"] !== "draft" && rec["runState"] !== "pinned" && rec["runState"] !== "legacy") {
+        return { ok: false, message: "task.created.runState 非法" };
+      }
+    }
+    if (rec["runStage"] !== undefined) {
+      if (typeof rec["runStage"] !== "string" || rec["runStage"].trim() === "") {
+        return { ok: false, message: "task.created.runStage 非法" };
+      }
+    }
     if (rec["moduleDirectory"] !== undefined) {
       const dir = rec["moduleDirectory"];
       const segments = typeof dir === "string" ? dir.replace(/\/$/, "").split("/") : [];
@@ -504,6 +519,10 @@ export interface TaskCardView {
   moduleId?: string;
   moduleDirectory?: string;
   modulePaths?: string[];
+  flowId?: string;
+  runId?: string;
+  runState?: "draft" | "pinned" | "legacy";
+  runStage?: string;
   sideEffect: TaskSideEffect;
   status: "created" | "delivered" | "reported" | "closed" | "failed";
   createdAt: string;
@@ -526,6 +545,10 @@ export function taskCardOf(record: TaskRecord): TaskCardView | undefined {
     ...(record.created.moduleId !== undefined ? { moduleId: record.created.moduleId } : {}),
     ...(record.created.moduleDirectory !== undefined ? { moduleDirectory: record.created.moduleDirectory } : {}),
     ...(record.created.modulePaths !== undefined ? { modulePaths: [...record.created.modulePaths] } : {}),
+    ...(record.created.flowId !== undefined ? { flowId: record.created.flowId } : {}),
+    ...(record.created.runId !== undefined ? { runId: record.created.runId } : {}),
+    ...(record.created.runState !== undefined ? { runState: record.created.runState } : {}),
+    ...(record.created.runStage !== undefined ? { runStage: record.created.runStage } : {}),
     sideEffect: record.created.sideEffect,
     status: taskStatusOf(record),
     createdAt: record.created.at,
@@ -588,6 +611,11 @@ export function taskEvent<T extends TaskStateEvent["kind"]>(
 export function renderTaskCardLines(card: TaskCardView): string[] {
   return [
     `[任务] #${card.taskId}${card.retryOf !== undefined ? `（重派自 ${card.retryOf}）` : ""}`,
+    ...(card.runId !== undefined
+      ? [`run：${card.runId}（${card.runState ?? "legacy"}${card.runStage !== undefined ? `，stage ${card.runStage}` : ""}）`]
+      : card.flowId !== undefined
+        ? ["run：legacy（未冻结）"]
+        : []),
     `目标角色：${card.targetRoleId}`,
     `目标：${shortenSummary(card.text, 200)}`,
     ...(card.expectedOutput !== undefined ? [`期望产出：${shortenSummary(card.expectedOutput, 200)}`] : []),

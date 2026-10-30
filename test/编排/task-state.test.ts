@@ -303,3 +303,24 @@ test("task.closed.by 放宽到 chief/convener；request.resolved 名单 version/
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test("task.created.runId：run 内任务携带 runId/state/stage；legacy 缺省可读；非法 runId 拒绝", async () => {
+  const withRun = replayTaskEvents([
+    created("t-run", "实现", { runId: "run-20261030-focus-abcdef12", runState: "pinned", runStage: "stage-1" }),
+  ]);
+  const record = withRun.records.get("t-run")!;
+  assert.equal(record.created?.runId, "run-20261030-focus-abcdef12");
+  const lines = renderTaskCardLines(taskCardOf(record)!).join("\n");
+  assert.match(lines, /run：run-20261030-focus-abcdef12（pinned，stage stage-1）/);
+  const legacy = replayTaskEvents([created("t-legacy-task")]);
+  assert.equal(legacy.records.get("t-legacy-task")?.created?.runId, undefined);
+  const root = await tempRoot();
+  try {
+    await appendTaskEvent(root, created("t-bad", "实现", { runId: "not-a-run" }));
+    const read = await readTaskState(root);
+    assert.equal(read.records.has("t-bad"), false, "非法 runId 的 task.created 读侧 fail-closed");
+    assert.ok(read.errors.some((error) => error.message.includes("runId")));
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});

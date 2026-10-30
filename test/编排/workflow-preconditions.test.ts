@@ -483,6 +483,7 @@ function preflight(overrides: Partial<DispatchPreflightInput>): DispatchPrefligh
     architectureFound: true,
     roster: { ok: true, roster: PREFLIGHT_ROSTER, path: "docs/proposals/focus-roster-v1.md", version: 1, sha256: "a".repeat(64) },
     d3Selected: [],
+    run: { state: "pinned", runId: "run-20261030-focus-test", roles: ["implementer", "qa"] },
     moduleId: "impl-core",
     handoffFound: false,
     targetCardFound: true,
@@ -829,4 +830,24 @@ test("固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示�
     assert.equal(tooMany.code, "modules-doc-directory");
     assert.match(tooMany.reason, /1–20/);
   }
+});
+
+test("2026-10-30（3.1）：run 条件必填——交付需 draft/pinned run；实现/验收需 pinned 且目标在 manifest.roles", () => {
+  const noRun = evaluateDispatchPreflight(preflight({ targetRoleId: "convener", d3Selected: ["implementer"], run: undefined }));
+  assert.equal(noRun.ok, false);
+  if (!noRun.ok) assert.equal(noRun.code, "run-missing");
+  const draftHandoff = evaluateDispatchPreflight(preflight({ targetRoleId: "convener", d3Selected: ["implementer"], run: { state: "draft", runId: "run-20261030-focus-draft" } }));
+  assert.equal(draftHandoff.ok, true, "交付前 preflight 允许 draft；会话层在 task.created 前 pin");
+  const implDraft = evaluateDispatchPreflight(preflight({
+    fromRoleId: "convener", targetRoleId: "implementer", targetBuiltIn: false, handoffFound: true,
+    run: { state: "draft", runId: "run-20261030-focus-draft", roles: ["implementer"] },
+  }));
+  assert.equal(implDraft.ok, false);
+  if (!implDraft.ok) assert.equal(implDraft.code, "run-pin-required");
+  const roleMissing = evaluateDispatchPreflight(preflight({
+    fromRoleId: "convener", targetRoleId: "implementer", targetBuiltIn: false, handoffFound: true,
+    run: { state: "pinned", runId: "run-20261030-focus-pinned", roles: ["qa"] },
+  }));
+  assert.equal(roleMissing.ok, false);
+  if (!roleMissing.ok) assert.equal(roleMissing.code, "run-role-missing");
 });

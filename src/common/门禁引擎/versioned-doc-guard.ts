@@ -19,6 +19,7 @@ const VERSIONED_DOC_PATTERNS: readonly RegExp[] = [
   /^docs\/proposals\/[a-z0-9][a-z0-9-]{0,62}[a-z0-9]-topology-v[1-9]\d*\.md$/i,
   /^docs\/proposals\/[a-z0-9][a-z0-9-]{0,62}[a-z0-9]-proposal-v[1-9]\d*\.md$/i,
   /^docs\/contracts\/[a-z0-9][a-z0-9-]{0,62}[a-z0-9]-architecture-v[1-9]\d*\.md$/i,
+  /^docs\/contracts\/[a-z0-9][a-z0-9-]{0,62}[a-z0-9]-assets-v[1-9]\d*\.md$/i,
 ];
 
 /** 项目相对 POSIX 路径归一化（去掉 `./`、反斜杠）；失败返回 undefined。 */
@@ -128,7 +129,7 @@ export const VERSION_LOCK_REL = ".ans/state/versions.lock";
 export interface VersionBaselineRecord {
   v: 1;
   flowId: string;
-  doc: "intent" | "proposal" | "roster" | "modules" | "topology" | "architecture";
+  doc: "intent" | "proposal" | "roster" | "modules" | "topology" | "architecture" | "assets";
   version: number;
   path: string;
   sha256: string;
@@ -146,12 +147,13 @@ function docKindOf(rel: string): VersionBaselineRecord["doc"] | undefined {
   if (/^docs\/proposals\/[^/]+-topology-v\d+\.md$/i.test(rel)) return "topology";
   if (/^docs\/proposals\/[^/]+-proposal-v\d+\.md$/i.test(rel)) return "proposal";
   if (/^docs\/contracts\/[^/]+-architecture-v\d+\.md$/i.test(rel)) return "architecture";
+  if (/^docs\/contracts\/[^/]+-assets-v\d+\.md$/i.test(rel)) return "assets";
   return undefined;
 }
 
 function flowIdOf(rel: string): string {
   const base = rel.split("/").pop() ?? "";
-  const match = /^(.+?)-(?:intent|roster|modules|topology|proposal|architecture)?-?v\d+\.md$/i.exec(base);
+  const match = /^(.+?)-(?:intent|roster|modules|topology|proposal|architecture|assets)?-?v\d+\.md$/i.exec(base);
   return match?.[1] ?? "";
 }
 
@@ -159,6 +161,7 @@ function flowIdOf(rel: string): string {
 function canonicalPathFor(flowId: string, doc: VersionBaselineRecord["doc"]): string {
   if (doc === "intent") return `docs/product/${flowId}-intent`;
   if (doc === "architecture") return `docs/contracts/${flowId}-architecture`;
+  if (doc === "assets") return `docs/contracts/${flowId}-assets`;
   return `docs/proposals/${flowId}-${doc}`;
 }
 
@@ -204,7 +207,8 @@ async function readBaselines(projectRoot: string, markerExists?: (abs: string) =
         record.doc !== "roster" &&
         record.doc !== "modules" &&
         record.doc !== "topology" &&
-        record.doc !== "architecture") ||
+        record.doc !== "architecture" &&
+        record.doc !== "assets") ||
       typeof record.version !== "number" ||
       !Number.isInteger(record.version) ||
       record.version < 1 ||

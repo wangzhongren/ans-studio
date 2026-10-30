@@ -594,6 +594,10 @@ export interface TaskCreatedEvent extends TaskStateEventBase {
   moduleDirectory?: string;
   /** v2.20：模块路径数组（普通模块单元素；固定模块可多路径）。 */
   modulePaths?: string[];
+  /** 2026-10-30（方案 v3 §3.1）：run 锚点；run 内项目任务（含 M1/M2/M3）必填，全局/legacy 可空。 */
+  runId?: string;
+  runState?: "draft" | "pinned" | "legacy";
+  runStage?: string;
 }
 
 export interface TaskDeliveredEvent extends TaskStateEventBase {
@@ -1639,6 +1643,10 @@ export interface GovernanceJudgeFacts {
   appointmentDecisionId?: string;
   /** 质检报告路径（`docs/quality/<flowId>-report-v1.md`；存在且可读）。 */
   qualityReportPath?: string;
+  /** 2026-10-30（run 冻结）：验收依据的 runId / 状态 / pinned 文档摘要；legacy 无 manifest 显式标记。 */
+  runId?: string;
+  runState?: "draft" | "pinned" | "legacy";
+  pinnedDocs?: Array<{ kind: string; path: string; sha256?: string }>;
 }
 
 // —————————————— 会话级后台任务（2026-10-22 客户确认设计 B1–B4） ——————————————
