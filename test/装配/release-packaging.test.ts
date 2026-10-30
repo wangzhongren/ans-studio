@@ -142,13 +142,15 @@ test('release overlay includes exactly the reviewed v1.8.0 blocking-fix batch by
     'test/测试/lightweight-permission-repairs.test.ts',
     'test/测试/t1-pipeline-integration.test.ts',
     'test/编排/workflow-preconditions.test.ts',
+    'test/测试/governance-e2e-auto/i-full-chain.test.ts',
     'test/桌面应用/stuck-redispatch.test.ts']);
   assert.deepEqual(result.selected, ['package.json',
     'app/desktop/session.ts',
     'test/桌面应用/role-log.test.ts',
     'test/测试/lightweight-permission-repairs.test.ts',
     'test/测试/t1-pipeline-integration.test.ts',
-    'test/编排/workflow-preconditions.test.ts']);
+    'test/编排/workflow-preconditions.test.ts',
+    'test/测试/governance-e2e-auto/i-full-chain.test.ts']);
   assert.deepEqual(result.excluded, ['test/桌面应用/stuck-redispatch.test.ts']);
   assert.throws(() => selectOverlay(['app/desktop/interface.ts']), /Unreviewed production overlay/);
 });

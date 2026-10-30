@@ -95,4 +95,6 @@ events:
   - `test/编排/workflow-preconditions.test.ts`：改用 `fileURLToPath`。
 - **本地验证（Windows）**：五文件 51/45/0/6（6 skip 均为既有 `skip: !posix`）；全量 **3064/3037/9/18**（T1×3 转绿；9 红全为既有 symlink EPERM）；双 typecheck 0；未删测试、未新增 skip、未放宽断言；C-04 连续 8×10/10。
 - **overlay 白名单**：`release-policy.mjs` files 增上述 5 条精确路径；`release-packaging.test.ts` 增 v1.8.0 blocking-fix 批次用例；tag `v1.8.0` 未移动。
-- **CI 重跑**：待触发 / 待回填。
+- **第二轮 CI（run 41015368973）**：macOS x64 与 Windows 通过；macOS arm64 两处「写后即读」竞态——`request.resolved` 的幕僚通知行未落盘、派发投递后 `task.delivered` 未落盘。
+- **第三轮修复**：`cdbe54f`（父 `dce4a25`；2 文件 +34/−12）：`app/desktop/session.ts` 持久化 await（`notifyRequest` 可等待、request 生命周期三行 awaited、投递成功后 await `task.delivered` 与角色日志、拒绝路径 await `task.closed`；仅 handback `task.reported` 保留 fire-and-forget 并注明理由）；`test/测试/governance-e2e-auto/i-full-chain.test.ts` 以真实可读的 `task.delivered` 为观测点（断言不变）。白名单增 `test/测试/governance-e2e-auto/i-full-chain.test.ts`。本地：两文件 12 轮 48/48；七文件 55/49/0/6；全量 3065/3038/9/18；双 typecheck 0。
+- **CI 重跑 #3**：待触发 / 待回填。

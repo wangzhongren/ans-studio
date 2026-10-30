@@ -8,6 +8,8 @@ export const SOURCE_SHA = '6211e08b7481c1346022fe2c36d47759dee3384f';
 //   · 测试 4 条：test/桌面应用/role-log.test.ts（平台原生 fixture）、test/测试/lightweight-permission-repairs.test.ts
 //     （短内联 review 口径 + 长内联/sh -c deny 更严断言）、test/测试/t1-pipeline-integration.test.ts（补任务 scope
 //     使确认成为唯一写源）、test/编排/workflow-preconditions.test.ts（fileURLToPath）。
+//   · 第二轮（arm64 写后即读竞态）：app/desktop/session.ts 增持久化 await（notify 链、投递与拒绝审计行）；
+//     test/测试/governance-e2e-auto/i-full-chain.test.ts 以真实可读的 task.delivered 为观测点（断言不变）。
 // v1.7.0 overlay（历史）：冻结源 tag v1.7.0 已含全部产品/测试代码（独立验收覆盖所有变更、release 仅可选元数据、
 // 验收标准门、任命客户决定自动收口、写卡校验反馈去重/忙时门控、中文角色名、角色根文档、目录级授权、
 // i18n、自动推进、验收返工路由、Lead 治理协调）；白名单保持基础集，未列名 app//src/ 仍 fail-closed。
@@ -42,6 +44,7 @@ const files = new Set(['package.json', 'package-lock.json', '.github/workflows/r
   'test/测试/lightweight-permission-repairs.test.ts',
   'test/测试/t1-pipeline-integration.test.ts',
   'test/编排/workflow-preconditions.test.ts',
+  'test/测试/governance-e2e-auto/i-full-chain.test.ts',
   'src/common/shared/diagnostics.ts',
   'test/桌面应用/interface.test.ts',
   'test/桌面应用/project-document.test.ts',
