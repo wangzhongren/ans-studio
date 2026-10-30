@@ -80,7 +80,7 @@ import { renderHandbackPrompt, renderHandbackBatchPrompt, renderWorkReportPrompt
 import { declaredConfirmPaths } from "../../src/common/编排/confirmed-writes.ts";
 // B 批（2026-10-28）：任务/汇报主干与最小状态（编排单一来源，本层只接线）。
 import { appendTaskEvent, classifyTaskSideEffect, findTaskByIdempotencyKey, newTaskId, readTaskState, redispatchCountOf, redispatchTaskId, renderTaskCardLines, shortenSummary, taskCardOf, taskCards, taskEvent, taskIdempotencyKey, taskReportStatusOf, type TaskCardView, type TaskReplay } from "../../src/common/编排/task-state.ts";
-import { applyRunChange, buildRunChangeCard, ensureDraftRun, findActiveRun, loadPinnedRoster, mapRunChangeAnswer, pinRun, pinnedDocsSummary, verifyPinnedRun, type RunManifest, type RunChangeMode } from "../../src/common/编排/run-manifest.ts";
+import { applyRunChange, buildRunChangeCard, ensureDraftRun, findActiveRun, loadPinnedRoster, mapRunChangeAnswer, pinRun, pinnedDocsSummary, verifyPinnedRun, RUN_PENDING_FLOW_ID, type RunManifest, type RunChangeMode } from "../../src/common/编排/run-manifest.ts";
 import { appendRoleLog, formatRoleActivityText, readRoleLog } from "../../src/common/编排/role-log.ts";
 // B 批：终止/重派安全判定（单一来源；桌面只提供终止事实/执行动作）。
 import { evaluateRedispatchSafety, type RedispatchSafetyDecision } from "../../src/common/编排/watchdog.ts";
@@ -5520,13 +5520,15 @@ export class SessionManager {
     }
     const chainFacts = await this.chainDispatchFacts(projectRoot, d?.flowId);
     const dispatchFlowId = d?.flowId ?? chainFacts.flowId;
+    // M1（幕僚→产品）允许尚未写 flowId：仍先生成 pending draft；后续真实 flow 到达时领养同一 runId。
+    const runFlowId = dispatchFlowId ?? (fromRoleId === chiefRoleId && targetRoleId === "product" ? RUN_PENDING_FLOW_ID : undefined);
     const handoffDispatch = fromRoleId === chiefRoleId && convenerRoleId !== null && targetRoleId === convenerRoleId;
     let runManifest: RunManifest | undefined;
     let runState: "draft" | "pinned" | "legacy" | undefined;
     let runRoster = chainFacts.roster;
     let d3Selected = chainFacts.d3Selected;
-    if (dispatchFlowId !== undefined) {
-      const active = await findActiveRun(projectRoot, dispatchFlowId);
+    if (runFlowId !== undefined) {
+      const active = await findActiveRun(projectRoot, runFlowId);
       if (!active.ok) {
         return fail(`派发未受理：run 状态读取失败（${active.reason}）；未创建任务、未投递。`, "派发未受理：run 状态读取失败。");
       }
@@ -5534,7 +5536,7 @@ export class SessionManager {
         runManifest = active.manifest;
         runState = active.manifest.state === "pinned" ? "pinned" : "draft";
       } else if (handoffDispatch || targetRoleId === "product" || targetRoleId === "rapporteur" || targetRoleId === "nominator") {
-        const draft = await ensureDraftRun(projectRoot, dispatchFlowId, new Date(this.now()));
+        const draft = await ensureDraftRun(projectRoot, runFlowId, new Date(this.now()));
         if (!draft.ok) {
           return fail(`派发未受理：draft run 创建失败（${draft.reason}）；未创建任务、未投递。`, "派发未受理：draft run 创建失败。");
         }
@@ -5620,6 +5622,11 @@ export class SessionManager {
         const pinnedRoster = await loadPinnedRoster(projectRoot, pinned.manifest);
         if (!pinnedRoster.ok) {
           return fail(`派发未受理：pinned run 文档校验失败（${pinnedRoster.reason}）；未创建交接任务、未投递。`, "派发未受理：pinned run 文档校验失败。");
+        }
+        const verifiedAfterPin = await verifyPinnedRun(projectRoot, pinned.manifest);
+        if (!verifiedAfterPin.ok || verifiedAfterPin.violations.length > 0) {
+          const detail = verifiedAfterPin.ok ? verifiedAfterPin.violations.slice(0, 3).join("；") : verifiedAfterPin.reason;
+          return fail(`派发未受理：pin 后 run 文档校验失败（${detail}）；未创建交接任务、未投递。`, "派发未受理：pin 后 run 文档校验失败。");
         }
         runRoster = pinnedRoster;
         d3Selected = pinned.manifest.d3?.targetRoleIds ?? d3Selected;

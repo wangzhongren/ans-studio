@@ -8,7 +8,8 @@
 // 纪律：pin fail-closed；hash/schema/roster/D3 不一致拒绝；legacy 无 manifest 由调用方标 legacy，不伪造 pinned。
 
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
+import { setTimeout as delay } from "node:timers/promises";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import { DEFAULT_LOCALE, translate } from "../shared/i18n/index.ts";
@@ -31,6 +32,8 @@ export const RUN_ASSETS_SCHEMA = "project-assets/v1" as const;
 export const RUN_TEAM_PLAN_SCHEMA = "teamPlanSchema:3" as const;
 export const RUN_EVIDENCE_SCHEMA = "evidence-meta/v1" as const;
 export const RUN_CHANGE_SCHEMA = "run-change/v1" as const;
+/** M1 尚无 flowId 时的 draft 占位 flow；下一真实 flow 到达时由 ensureDraftRun 领养同一 runId。 */
+export const RUN_PENDING_FLOW_ID = "pending";
 // D-04 生产源码禁旧 flow 引擎字面量；这里只是 run manifest 的可选流程文件目录。
 const FLOW_DOC_DIR = ["docs", "flows"].join("/");
 
@@ -176,37 +179,66 @@ export async function readRunManifest(projectRoot: string, runId: string): Promi
   return validateRunManifest(parsed);
 }
 
+const runWriteChains = new Map<string, Promise<void>>();
+
 export async function writeRunManifest(projectRoot: string, manifest: RunManifest): Promise<RunManifestResult<{ manifest: RunManifest }>> {
   const checked = validateRunManifest(manifest);
   if (!checked.ok) return checked;
   const file = runManifestPath(projectRoot, manifest.runId);
   const dir = path.dirname(file);
   const tmp = `${file}.tmp-${process.pid}-${Date.now()}-${randomUUID().slice(0, 8)}`;
+  const prev = runWriteChains.get(file) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const tail = prev.then(() => gate);
+  runWriteChains.set(file, tail);
   try {
+    await prev;
     await mkdir(dir, { recursive: true });
     await writeFile(tmp, JSON.stringify(manifest, null, 2) + "\n", "utf8");
-    await rename(tmp, file);
+    let renamed = false;
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      try {
+        await rename(tmp, file);
+        renamed = true;
+        break;
+      } catch (error) {
+        if (attempt === 5) throw error;
+        await delay(10 * 2 ** attempt);
+      }
+    }
+    if (!renamed) throw new Error("rename did not complete");
   } catch (error) {
+    try { await unlink(tmp); } catch { /* best-effort cleanup */ }
     return { ok: false, code: "run-manifest-write-failed", reason: `run manifest 写入失败：${error instanceof Error ? error.message : String(error)}` };
+  } finally {
+    release();
+    if (runWriteChains.get(file) === tail) runWriteChains.delete(file);
   }
   return { ok: true, manifest };
 }
 
-export async function listRunManifests(projectRoot: string): Promise<RunManifest[]> {
+export async function listRunManifestsResult(projectRoot: string): Promise<RunManifestResult<{ manifests: RunManifest[] }>> {
   const root = path.join(projectRoot, ".ans", "runs");
   let names: string[];
   try {
     names = await readdir(root);
   } catch {
-    return [];
+    return { ok: true, manifests: [] };
   }
   const manifests: RunManifest[] = [];
   for (const name of names) {
     if (!isRunId(name)) continue;
     const read = await readRunManifest(projectRoot, name);
-    if (read.ok) manifests.push(read.manifest);
+    if (!read.ok) return { ok: false, code: read.code, reason: `run ${name} manifest 非法：${read.reason}` };
+    manifests.push(read.manifest);
   }
-  return manifests.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return { ok: true, manifests: manifests.sort((a, b) => a.createdAt.localeCompare(b.createdAt)) };
+}
+
+export async function listRunManifests(projectRoot: string): Promise<RunManifest[]> {
+  const result = await listRunManifestsResult(projectRoot);
+  return result.ok ? result.manifests : [];
 }
 
 /** 同一 flowId 的 active run（draft/pinned）；多个 pinned 视为冲突。 */
@@ -214,7 +246,9 @@ export async function findActiveRun(
   projectRoot: string,
   flowId: string,
 ): Promise<RunManifestResult<{ manifest: RunManifest | null }>> {
-  const runs = (await listRunManifests(projectRoot)).filter((run) => run.flowId === flowId && (run.state === "draft" || run.state === "pinned"));
+  const listed = await listRunManifestsResult(projectRoot);
+  if (!listed.ok) return listed;
+  const runs = listed.manifests.filter((run) => run.flowId === flowId && (run.state === "draft" || run.state === "pinned"));
   const pinned = runs.filter((run) => run.state === "pinned");
   if (pinned.length > 1) return { ok: false, code: "run-pin-active-conflict", reason: `flow ${flowId} 存在多个 active pinned run：${pinned.map((run) => run.runId).join("、")}` };
   const active = pinned[0] ?? runs.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
@@ -230,6 +264,15 @@ export async function ensureDraftRun(
   const active = await findActiveRun(projectRoot, flowId);
   if (!active.ok) return active;
   if (active.manifest !== null) return { ok: true, manifest: active.manifest, created: false };
+  if (flowId !== RUN_PENDING_FLOW_ID) {
+    const pending = await findActiveRun(projectRoot, RUN_PENDING_FLOW_ID);
+    if (!pending.ok) return pending;
+    if (pending.manifest !== null && pending.manifest.state === "draft") {
+      const adopted: RunManifest = { ...pending.manifest, flowId, updatedAt: now.toISOString() };
+      const written = await writeRunManifest(projectRoot, adopted);
+      return written.ok ? { ok: true, manifest: written.manifest, created: false } : written;
+    }
+  }
   const at = now.toISOString();
   const manifest: RunManifest = {
     schema: RUN_SCHEMA,
@@ -400,19 +443,28 @@ export async function prepareRunPin(
   }
   const teamPlanRel = `docs/scheduling/${flowId}-team-v1.md`;
   const teamPlanSha = await sha256File(projectRoot, teamPlanRel);
+  if (teamPlanSha !== undefined) {
+    const teamText = await readText(projectRoot, teamPlanRel);
+    if (teamText === undefined) return { ok: false, code: "run-pin-document-missing", reason: `team plan 不可读：${teamPlanRel}` };
+    const actual = frontmatterSchema(teamText);
+    if (actual !== undefined && actual !== RUN_TEAM_PLAN_SCHEMA) {
+      return { ok: false, code: "run-pin-schema-mismatch", reason: `team plan schema=${actual} 与 ${RUN_TEAM_PLAN_SCHEMA} 不一致。` };
+    }
+  }
   const flowRel = `${FLOW_DOC_DIR}/${flowId}.yaml`;
   const flowText = await readText(projectRoot, flowRel);
   let flowRef: RunFlowRef | null = null;
   if (flowText !== undefined && flowText.trim() !== "") {
     const flowSha = await sha256File(projectRoot, flowRel);
     if (flowSha === undefined) return { ok: false, code: "run-pin-document-missing", reason: `flow 文档 hash 计算失败：${flowRel}` };
-    let version = 1;
+    let version: number | undefined;
     try {
       const parsed = parseYaml(flowText);
       if (isRecord(parsed) && typeof parsed["version"] === "number" && Number.isInteger(parsed["version"]) && parsed["version"] > 0) version = parsed["version"];
     } catch {
       return { ok: false, code: "run-pin-schema-mismatch", reason: `flow YAML 非法：${flowRel}` };
     }
+    if (version === undefined) return { ok: false, code: "run-pin-schema-mismatch", reason: `flow 文件存在但缺合法 version：${flowRel}` };
     flowRef = { path: flowRel, version, sha256: flowSha };
   }
   const roles = rosterManifest.roles.map((role) => role.id);
@@ -449,7 +501,24 @@ export async function prepareRunPin(
 }
 
 /** 把同一 runId 的 draft 升为 pinned；并发调用幂等（已 pinned 返回现有）。 */
+const pinChains = new Map<string, Promise<void>>();
+
 export async function pinRun(projectRoot: string, runId: string, facts: RunPinFacts = {}): Promise<RunManifestResult<{ manifest: RunManifest; alreadyPinned: boolean }>> {
+  const prev = pinChains.get(projectRoot) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const tail = prev.then(() => gate);
+  pinChains.set(projectRoot, tail);
+  try {
+    await prev;
+    return await pinRunUnsafe(projectRoot, runId, facts);
+  } finally {
+    release();
+    if (pinChains.get(projectRoot) === tail) pinChains.delete(projectRoot);
+  }
+}
+
+async function pinRunUnsafe(projectRoot: string, runId: string, facts: RunPinFacts = {}): Promise<RunManifestResult<{ manifest: RunManifest; alreadyPinned: boolean }>> {
   const current = await readRunManifest(projectRoot, runId);
   if (!current.ok) return current;
   if (current.manifest.state === "pinned") return { ok: true, manifest: current.manifest, alreadyPinned: true };
@@ -501,6 +570,9 @@ export async function closeRun(
 export async function verifyPinnedRun(projectRoot: string, manifest: RunManifest): Promise<RunManifestResult<{ violations: string[] }>> {
   if (manifest.state !== "pinned") return { ok: false, code: "run-state-invalid", reason: `run ${manifest.runId} 未 pinned。` };
   const violations: string[] = [];
+  for (const kind of ["intent", "proposal", "modules", "roster", "topology", "architecture", "assets"] as const) {
+    if (!(kind in manifest.documents)) violations.push(`${kind}: missing from manifest.documents`);
+  }
   for (const [kind, ref] of Object.entries(manifest.documents)) {
     if (ref === null || ref === undefined) continue;
     const fileRel = ref.path.split("#")[0]!;

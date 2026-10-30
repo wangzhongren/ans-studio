@@ -374,3 +374,36 @@ test("P1.3：文档 schema 不符/缺文档 pin 拒绝；pin 后 hash 漂移 ver
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }
 });
+
+test("P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-pending-"));
+  const h = harness(root);
+  try {
+    await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
+    await tick(30);
+    const m1 = (await h.caps.chief!({ roleId: "product", task: "先写产品意图（flow 未定）", sideEffect: "docs" })) as DispatchReceipt;
+    assert.equal(m1.ok, true, m1.message ?? "");
+    const state1 = await readTaskState(root);
+    const m1Record = [...state1.records.values()].find((record) => record.created?.to === "product")!;
+    const runId = m1Record.created!.runId!;
+    assert.match(runId, /^run-/);
+    const pending = await readRunManifest(root, runId);
+    assert.equal(pending.ok, true);
+    if (pending.ok) {
+      assert.equal(pending.manifest.state, "draft");
+      assert.equal(pending.manifest.flowId, "pending");
+    }
+    await writeProject(root);
+    const m2 = (await h.caps.chief!({ roleId: "rapporteur", task: "出方案与名单", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
+    assert.equal(m2.ok, true, m2.message ?? "");
+    const state2 = await readTaskState(root);
+    const m2Record = [...state2.records.values()].find((record) => record.created?.to === "rapporteur")!;
+    assert.equal(m2Record.created!.runId, runId, "真实 flow 到达时领养同一 draft runId");
+    const adopted = await readRunManifest(root, runId);
+    assert.equal(adopted.ok, true);
+    if (adopted.ok) assert.equal(adopted.manifest.flowId, "focus");
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});

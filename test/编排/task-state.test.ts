@@ -312,8 +312,10 @@ test("task.created.runId：run 内任务携带 runId/state/stage；legacy 缺省
   assert.equal(record.created?.runId, "run-20261030-focus-abcdef12");
   const lines = renderTaskCardLines(taskCardOf(record)!).join("\n");
   assert.match(lines, /run：run-20261030-focus-abcdef12（pinned，stage stage-1）/);
-  const legacy = replayTaskEvents([created("t-legacy-task")]);
+  const legacy = replayTaskEvents([created("t-legacy-task", "实现", { flowId: "focus" })]);
   assert.equal(legacy.records.get("t-legacy-task")?.created?.runId, undefined);
+  assert.equal(legacy.records.get("t-legacy-task")?.created?.runState, "legacy");
+  assert.match(renderTaskCardLines(taskCardOf(legacy.records.get("t-legacy-task")!)!).join("\n"), /run：legacy（未冻结）/);
   const root = await tempRoot();
   try {
     await appendTaskEvent(root, created("t-bad", "实现", { runId: "not-a-run" }));

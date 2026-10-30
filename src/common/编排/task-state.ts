@@ -404,9 +404,13 @@ export function replayTaskEvents(events: readonly TaskStateEvent[], errors: Task
         allErrors.push({ file: TASKS_STATE_REL, line, message: `重复 task.created：${taskId}` });
         continue;
       }
+      // 2026-10-30（3.1/P1.3）：无 runId 的既有 flow 任务按 legacy 读取；不补造 runId/manifest。
+      const createdEvent = event.flowId !== undefined && event.runId === undefined && event.runState === undefined
+        ? { ...event, runState: "legacy" as const }
+        : event;
       records.set(taskId, {
         taskId,
-        created: event,
+        created: createdEvent,
         reports: [],
         redispatches: [],
         ...(pendingRetry.has(taskId) ? { retryOf: pendingRetry.get(taskId) } : {}),
@@ -547,7 +551,11 @@ export function taskCardOf(record: TaskRecord): TaskCardView | undefined {
     ...(record.created.modulePaths !== undefined ? { modulePaths: [...record.created.modulePaths] } : {}),
     ...(record.created.flowId !== undefined ? { flowId: record.created.flowId } : {}),
     ...(record.created.runId !== undefined ? { runId: record.created.runId } : {}),
-    ...(record.created.runState !== undefined ? { runState: record.created.runState } : {}),
+    ...(record.created.runState !== undefined
+      ? { runState: record.created.runState }
+      : record.created.flowId !== undefined
+        ? { runState: "legacy" as const }
+        : {}),
     ...(record.created.runStage !== undefined ? { runStage: record.created.runStage } : {}),
     sideEffect: record.created.sideEffect,
     status: taskStatusOf(record),
