@@ -1,3 +1,3 @@
-export const SOURCE_REF: 'v1.7.0';
-export const SOURCE_SHA: '358cde9152584be29eff3a7564c99d9dd53463d8';
+export const SOURCE_REF: 'v1.8.0';
+export const SOURCE_SHA: '6211e08b7481c1346022fe2c36d47759dee3384f';
 export function selectOverlay(paths: string[]): { selected: string[]; excluded: string[] };

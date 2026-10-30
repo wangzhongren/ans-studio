@@ -1,6 +1,9 @@
-export const SOURCE_REF = 'v1.7.0';
-export const SOURCE_SHA = '358cde9152584be29eff3a7564c99d9dd53463d8';
-// v1.7.0 overlay：冻结源 tag v1.7.0 已含全部产品/测试代码（独立验收覆盖所有变更、release 仅可选元数据、
+export const SOURCE_REF = 'v1.8.0';
+export const SOURCE_SHA = '6211e08b7481c1346022fe2c36d47759dee3384f';
+// v1.8.0 overlay：冻结源 tag v1.8.0 已含全部产品/测试代码（内建角色最小系统与五步雇佣链、模块/名单/拓扑 v2
+// 与 roster v3、run 冻结、机械拒绝三段式与 contract_check、证据自洽校验与 evidence_check、桌面缺陷修复）；
+// 白名单保持基础集与历史保留条目，未列名 app//src/ 仍 fail-closed。
+// v1.7.0 overlay（历史）：冻结源 tag v1.7.0 已含全部产品/测试代码（独立验收覆盖所有变更、release 仅可选元数据、
 // 验收标准门、任命客户决定自动收口、写卡校验反馈去重/忙时门控、中文角色名、角色根文档、目录级授权、
 // i18n、自动推进、验收返工路由、Lead 治理协调）；白名单保持基础集，未列名 app//src/ 仍 fail-closed。
 // v1.7.0 发布阻断修复（tag v1.7.0 不可移动，经评审走显式 overlay；按精确路径、单文件不开目录、断言不放宽）：

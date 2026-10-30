@@ -14,6 +14,9 @@ events:
   - date: "2026-10-30"
     kind: verified
     summary: 本地预检 npm run typecheck 0、npm run typecheck:renderer 0、装配测试 85/85 通过
+  - date: "2026-10-30"
+    kind: updated
+    summary: tag v1.8.0 已打并推送（6211e08）；release-policy/workflow/打包测试切到 v1.8.0；prepare 预演与 CI 结果发布后回填
 ---
 
 # v1.8.0 发布准备
@@ -24,8 +27,8 @@ events:
 
 - 版本 1.7.0 → **1.8.0**（minor）。`package.json` 与 `package-lock.json` 仅根两处版本字段，依赖与锁结构零变动。
 - 发布源（冻结源）：**`4cddd5a`**（`fix(governance): close 3.4 evidence-check acceptance findings F1-F5`，第一波流程改进终态候选；自 v1.7.0 起 107 个提交）。
-- annotated tag **`v1.8.0`**：待打；指向 `release/v1.8.0-prepare` 的 PR 合并提交，SHA 在下一轮填入。
-- 发布准备提交：**待填**（本轮改动提交后回填）。
+- annotated tag **`v1.8.0`**：已打并推送，指向 PR #25 合并提交 **`6211e08b7481c1346022fe2c36d47759dee3384f`**。
+- 发布准备提交：**`5dff8ff`**（`chore(release): prepare v1.8.0`，PR #25）；流水线切换提交：`ci(release): point pipeline at v1.8.0`（本轮）。
 
 ## 本轮变化
 
@@ -64,6 +67,8 @@ events:
 - `test/装配/release-packaging.test.ts`：`SOURCE_REF` / `SOURCE_SHA` 断言及打包面用例全部切到 v1.8.0 与对应 SHA；断言不放宽。
 - `.github/workflows/release.yml`：workflow_dispatch `source_ref` 默认、并发组、`gh release view/create/upload/edit`、标题与 notes 全部 → v1.8.0；未签名沿用 `CSC_IDENTITY_AUTO_DISCOVERY: 'false'`；`publish` 默认仍为 false（draft）。
 - 下一轮完成上述切换并打 annotated tag v1.8.0 后，运行 prepare 预演并记录 overlayPaths / actualTree / overlayPatchSha256。
+
+上述切换已随本轮提交完成（tag v1.8.0 = `6211e08`）；prepare 预演（overlayPaths / actualTree / overlayPatchSha256）以 CI 构建产生的 provenance 为准，随发布回填。
 
 ## CI、资产与 SHA（待回填）
 

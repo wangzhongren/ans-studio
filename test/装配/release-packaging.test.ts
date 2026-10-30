@@ -7,11 +7,11 @@ test('release overlay preserves Chinese build paths and excludes private data an
     'package.json', '.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
   assert.deepEqual(result.selected, ['src/common/装配/release-prepare.mjs', 'test/装配/release-packaging.test.ts', 'package.json']);
   assert.deepEqual(result.excluded, ['.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
-  assert.equal(SOURCE_REF, 'v1.7.0');
-  assert.equal(SOURCE_SHA, '358cde9152584be29eff3a7564c99d9dd53463d8');
+  assert.equal(SOURCE_REF, 'v1.8.0');
+  assert.equal(SOURCE_SHA, '6211e08b7481c1346022fe2c36d47759dee3384f');
 });
 
-test('release overlay selects the v1.7.0 packaging surface', () => {
+test('release overlay selects the v1.8.0 packaging surface', () => {
   const result = selectOverlay(['.github/workflows/release.yml',
     'src/common/装配/release-policy.mjs', 'src/common/装配/release-policy.d.mts',
     'test/装配/release-packaging.test.ts', 'package.json', 'package-lock.json', 'README.md']);
