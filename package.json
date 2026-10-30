@@ -1,6 +1,6 @@
 {
   "name": "ans-cli",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "private": true,
   "license": "MIT",
   "description": "受治理会话链路 CLI（v1 原型）：解析角色/边界 -> 受治理工具集 -> 写入前拦截。",
