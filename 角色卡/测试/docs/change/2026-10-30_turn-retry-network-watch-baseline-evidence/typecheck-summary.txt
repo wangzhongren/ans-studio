@@ -1,0 +1,4 @@
+# Typechecks and renderer build (S1 baseline)
+- npm run typecheck: exit 0, 0 "error TS" (typecheck.log)
+- npm run typecheck:renderer: exit 0, 0 "error TS" (typecheck-renderer.log)
+- npm run build:renderer: exit 0, built in 493ms (build-renderer.log)

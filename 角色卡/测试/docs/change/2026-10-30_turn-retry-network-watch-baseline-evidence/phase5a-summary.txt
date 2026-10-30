@@ -1,0 +1,4 @@
+# phase5a Electron renderer smoke (S1 baseline)
+- command: node_modules/.bin/electron test/桌面UI/phase5a-electron-smoke.mjs "" phase5a-smoke
+- result: PHASE5A_SMOKE_DONE failures=0 checks=40; exit code 0
+- report: phase5a-smoke/report.json

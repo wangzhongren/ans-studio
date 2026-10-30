@@ -1,0 +1,35 @@
+# S1 baseline full regression summary
+
+- command: node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')
+- cwd: .claude/worktrees/turn-retry-network-watch (git HEAD c001ce2, tree a24ffaa2)
+- files included: 358 (359 total *.test.ts minus write-sequencing.test.ts)
+- excluded: test/pi-adapter/write-sequencing.test.ts (known hang; same exclusion as prior baselines)
+- result: tests 3077 / pass 3050 / fail 9 / skipped 18 / todo 0 / cancelled 0
+- exit code: 1
+- duration_ms: 246779.0555
+- raw log: full-regression-serial.log
+
+## Failure classification (9)
+
+All 9 are pre-existing Windows symlink EPERM (errno -4048) environment failures, matching the recorded local baseline:
+
+1. test/claude-adapter/session.test.ts — native symlink and storage runtime mismatch fail before SDK query
+2. test/codex-adapter/session.test.ts — native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary
+3. test/pi-adapter/injected-runtime.test.ts — store validate callback rejects directory symlink before Pi parse or new native write
+4. test/pi-adapter/injected-runtime.test.ts — Pi storage refuses file symlink and role/runtime mismatch without touching other storage
+5. test/runtime-core/file-write-safety.test.ts — D3 linked workspace root remains usable; linked target itself is not replaced
+6. test/runtime-core/file-write-safety.test.ts — store: traversal, mismatched scope and symlinked runtime directories rejected
+7. test/runtime-core/file-write-safety.test.ts — store: native validation stays lazy and native symlink is rejected before effects
+8. test/编排/g4-skill-verify.test.ts — 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛
+9. test/编排/shell-authorized-routine.test.ts — node test外指符号链接路径不获委托；项目内测试路径获委托
+
+No other deterministic failures. No new skips/todos.
+
+## Skipped (18, pre-existing platform skips)
+
+- runtime-core file-write-safety: 4 (chmod/mode semantics not applicable on Windows)
+- runtime-core lightweight-permission-repairs: 6 (D3 POSIX-mode cases)
+- codex-adapter: 1 (native process-group SIGTERM case)
+- pi-adapter: 1 (chmod semantics on Windows)
+- 门禁引擎 pin-evidence: 1 (unreadable file permission case)
+- shared atomic-write: 5 (D3 mode/umask cases)

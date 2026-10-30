@@ -1,0 +1,6 @@
+# Real Electron E2E (S1 baseline)
+- command: ANS_E2E_PROJECT=<worktree root> ANS_E2E_OUTDIR=electron-e2e node_modules/.bin/electron test/桌面应用/e2e/main.mjs
+- result: E2E_PASS=true; E2E_FAILURES=<empty>; E2E_DONE=1
+- exit code: 0
+- screenshots: 18 PNG under electron-e2e/ (hashes in electron-e2e-screenshots.sha256)
+- report: electron-e2e/report.txt
