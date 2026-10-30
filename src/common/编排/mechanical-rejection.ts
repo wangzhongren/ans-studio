@@ -64,9 +64,17 @@ const RULES: Record<string, RejectionRule> = {
   "path-outside-boundary": { owner: "app", action: "若为 appointment-write/角色卡路径，属于应用可写根接线问题；否则按 boundary.yaml 修正声明路径。", retryable: true },
   "appointment-invalid": { owner: "nominator", action: "按 D3 回执修正 appointment-write（decisionId/targetRoleId/路径）后重试。", retryable: true },
   "shell-write-outside": { owner: "convener", action: "命令/写目标不得越角色边界；改为模块/角色卡允许路径或申请边界变更。", retryable: true },
+  "shell-write-hard-deny": { owner: "convener", action: "该命令形态被硬拒（内联求值/包装/awk 等）；改为落盘脚本或等价安全命令后重试。", retryable: true },
   "versioned-doc-overwrite": { owner: "app", action: "旧版本只读；新建 -vN+1 并在引用链中指向最新。", retryable: true },
   "run-change-invalid": { owner: "app", action: "run-change 选择无法映射为唯一模式；重新呈现三模式卡，不自动选择。", retryable: true },
   "evidence-mismatch": { owner: "verifier", action: "重算 artifact/meta/sidecar 并修正证据后重提验收。", retryable: true },
+  "not-recommended": { owner: "chief", action: "按推荐项/客户选择修正卡面或流程后重新提交；不得自行发明选项。", retryable: true },
+  "insufficient-evidence": { owner: "verifier", action: "补齐判断所需证据/理由后重新提交。", retryable: true },
+  "path-unverified": { owner: "app", action: "检查写盘卡结构与逐路径探测接线；应用修正后原样重试。", retryable: true },
+  "group-mismatch": { owner: "app", action: "检查请求 group/cardKind 与卡面一致性；应用/发卡方修正后重新提交。", retryable: true },
+  "parse-failed": { owner: "app", action: "判断输出无法解析；检查判断引擎/格式后重新提交。", retryable: true },
+  "artifact-missing": { owner: "verifier", action: "补齐规范物证/证据后重新提交验收。", retryable: true },
+  "artifact-not-read": { owner: "verifier", action: "先读取规范物证再判断；补齐读取证据后重新提交。", retryable: true },
   "asset-missing": { owner: "rapporteur", action: "补齐 assets 需求/清单或按 Gate 规则处理。", retryable: true },
 };
 

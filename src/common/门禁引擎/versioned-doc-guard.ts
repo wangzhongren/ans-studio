@@ -11,6 +11,7 @@ import { link, mkdir, open, readFile, readdir, rename, unlink, writeFile } from 
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { formatMechanicalRejection, makeMechanicalRejection, type MechanicalRejection } from "../编排/mechanical-rejection.ts";
 
 const VERSIONED_DOC_PATTERNS: readonly RegExp[] = [
   /^docs\/product\/[a-z0-9][a-z0-9-]{0,62}[a-z0-9]-intent-v[1-9]\d*\.md$/i,
@@ -46,18 +47,25 @@ export function versionedDocVersionOf(relPath: string): number | undefined {
   return Number.isInteger(version) && version >= 1 ? version : undefined;
 }
 
-export type VersionedDocDecision = { allowed: true } | { allowed: false; reason: string };
+export type VersionedDocDecision =
+  | { allowed: true }
+  | { allowed: false; reason: string; code: "versioned-doc-overwrite"; rejection: MechanicalRejection };
 
 /** 覆盖既有版本化文档 ⇒ deny（不进入审批；新建 vN+1 不受影响）。 */
 export function versionedDocOverwriteDecision(input: { relPath: string; exists: boolean }): VersionedDocDecision {
   const rel = normalizeVersionedDocPath(input.relPath);
   if (rel === undefined || !isVersionedDocPath(rel)) return { allowed: true };
   if (input.exists !== true) return { allowed: true };
+  const rejection = makeMechanicalRejection(
+    "versioned-doc-overwrite",
+    [`版本化文档只读：${rel} 已存在（禁止覆盖/原地修改）`],
+    { docs: [rel] },
+  );
   return {
     allowed: false,
-    reason:
-      `版本化文档只读：${rel} 已存在，禁止覆盖/原地修改；` +
-      "请新建下一个版本（-vN+1）并在引用链中指向最新版本。",
+    code: "versioned-doc-overwrite",
+    rejection,
+    reason: formatMechanicalRejection(rejection),
   };
 }
 

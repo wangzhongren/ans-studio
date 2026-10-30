@@ -16,6 +16,7 @@ import type { TaskScope } from "../../model/decision.ts";
 import path from "node:path";
 import { inlineCodeOf, isOpaqueShellExecution, isShortInlineCode } from "./classify-shell.ts";
 import { checkVersionedDocWrite, protectedVersionedPathsSync, versionedDocExists, versionedDocOverwriteDecision } from "./versioned-doc-guard.ts";
+import { formatMechanicalRejection, makeMechanicalRejection, type MechanicalRejection } from "../编排/mechanical-rejection.ts";
 
 export interface ShellWriteGuardInput {
   argv: readonly string[];
@@ -38,7 +39,7 @@ export interface ShellWriteGuardInput {
 /** 守卫三态（2026-10-29 R2 对齐）：pass / deny / script（进入脚本内容审查）。 */
 export type ShellWriteGuardDecision =
   | { kind: "pass" }
-  | { kind: "deny"; reason: string; targets: string[] }
+  | { kind: "deny"; reason: string; targets: string[]; code?: string; rejection?: MechanicalRejection }
   | { kind: "script"; reason: string };
 
 const EXE_SUFFIX = /\.(exe|cmd|bat|ps1|com)$/i;
@@ -456,6 +457,17 @@ function underForbiddenPrefix(rel: string, prefix: string): boolean {
  * 顺序：显式写目标（deny 优先）→ 写能力但无法解析（opaque）→ 解释器/构建 opaque → pass。
  */
 export function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWriteGuardDecision {
+  const decision = evaluateShellWriteTargetsUnsafe(input);
+  if (decision.kind !== "deny") return decision;
+  if (decision.rejection !== undefined) return decision;
+  const code = decision.reason.includes("版本化文档") ? "versioned-doc-overwrite"
+    : decision.reason.includes("硬拒") ? "shell-write-hard-deny"
+      : "shell-write-outside";
+  const rejection = makeMechanicalRejection(code, [decision.reason], { docs: decision.targets.slice(0, 5) });
+  return { ...decision, code, rejection, reason: formatMechanicalRejection(rejection) };
+}
+
+function evaluateShellWriteTargetsUnsafe(input: ShellWriteGuardInput): ShellWriteGuardDecision {
   const argv = Array.isArray(input.argv) ? input.argv.map((arg) => String(arg)) : [];
   const program = argv.length > 0 ? baseName(argv[0]!) : "";
   const args = argv.slice(1);
@@ -542,7 +554,10 @@ export function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWri
     if (explicit.kind === "ambiguous") {
       const protectedPath = protectedPathMention();
       if (protectedPath !== undefined) {
-        return { kind: "deny", reason: `版本化文档只读：命令触及 ${protectedPath}（已存在，禁止覆盖）。`, targets: [protectedPath] };
+        return (() => {
+          const rejection = makeMechanicalRejection("versioned-doc-overwrite", [`版本化文档只读：命令触及 ${protectedPath}（已存在，禁止覆盖）`], { docs: [protectedPath] });
+          return { kind: "deny" as const, reason: formatMechanicalRejection(rejection), targets: [protectedPath], code: "versioned-doc-overwrite" as const, rejection };
+        })();
       }
       return {
         kind: "script",
@@ -581,12 +596,15 @@ export function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWri
         // 2026-10-29（v2.8 R6）：既有版本化文档只读——任何通道覆盖一律 deny（不进审批）。
         if (versionedDocExists(input.projectRoot, rel)) {
           const guarded = versionedDocOverwriteDecision({ relPath: rel, exists: true });
-          if (!guarded.allowed) return { kind: "deny", reason: guarded.reason, targets: [rel] };
+          if (!guarded.allowed) return { kind: "deny", reason: guarded.reason, targets: [rel], code: guarded.code, rejection: guarded.rejection };
         }
       }
       const protectedPath = protectedPathMention();
       if (protectedPath !== undefined) {
-        return { kind: "deny", reason: `版本化文档只读：命令触及 ${protectedPath}（已存在，禁止覆盖）。`, targets: [protectedPath] };
+        return (() => {
+          const rejection = makeMechanicalRejection("versioned-doc-overwrite", [`版本化文档只读：命令触及 ${protectedPath}（已存在，禁止覆盖）`], { docs: [protectedPath] });
+          return { kind: "deny" as const, reason: formatMechanicalRejection(rejection), targets: [protectedPath], code: "versioned-doc-overwrite" as const, rejection };
+        })();
       }
       return { kind: "script", reason: `${explicit.reason}；交由审批判断（开关开启时由判断 agent 审查，关闭时客户本人确认）。` };
     }
@@ -619,7 +637,7 @@ export function evaluateShellWriteTargets(input: ShellWriteGuardInput): ShellWri
         // 2026-10-29（v2.8 R6）：既有版本化文档只读——任何通道覆盖一律 deny（不进审批）。
         if (versionedDocExists(input.projectRoot, rel)) {
           const guarded = versionedDocOverwriteDecision({ relPath: rel, exists: true });
-          if (!guarded.allowed) return { kind: "deny", reason: guarded.reason, targets: [rel] };
+          if (!guarded.allowed) return { kind: "deny", reason: guarded.reason, targets: [rel], code: guarded.code, rejection: guarded.rejection };
         }
         resolvedTargets.push(rel);
       }

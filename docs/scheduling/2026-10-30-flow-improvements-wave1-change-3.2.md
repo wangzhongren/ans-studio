@@ -30,11 +30,11 @@
 
 ## 3. 验证（串行）
 
-- 定向：`rejection-copy` 7/7；`run-pin` 9/9；桌面应用全套 **367/367**。
+- 定向：`rejection-copy` **9/9**；`run-pin` **9/9**；桌面应用全套 **369/369**（rework 后）。
 - 全量：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')` → **3043 tests / 3013 pass / 12 fail / 18 skip**（基线 3034/3004/12/18；+9 新测试全过，12 红仍为 9 Windows symlink EPERM + T1×3，无新增确定性失败/新 skip）；日志 `%TEMP%\ans-wave1-32-full3.log`，sha256 `591c741bd1eee1a27639fc5edc66b527017dac1f6bd0fd6fcf8cf8e2e050bc1e`。
 - `npm run typecheck`、`typecheck:renderer`、`build:renderer` exit 0（最终代码重跑）。
-- 真实 Electron E2E：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-wave1-32\report.txt`，sha256 `1d3a53f0670911c73b78178cfd268e388024b001a3715b313596ecb2f87b7267`。
-- phase5a：40/40 checks、failures=0、console/CSP 0；report `%TEMP%\ans-phase5a-wave1-32\report.json`，sha256 `e3c994786083e968256baf15547d9a1a4fd697df8c880349cc5e88d54e97352e`。
+- 真实 Electron E2E：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-wave1-32r\report.txt`，sha256 `849f0247f69adb5343d178f930dc3f07866a12f3bf48e4f3d353acc5c722e8cc`。
+- phase5a：40/40 checks、failures=0、console/CSP 0；report `%TEMP%\ans-phase5a-wave1-32r\report.json`，sha256 `2840f11776566fb81c88d0e81c1c009076b7e48a82e29df0e6edc5ac2f242f04`。
 
 ## 4. 决策点 / 边界
 
@@ -43,3 +43,12 @@
 - contract_check 不构成放行/授权；只读数据源异常由工具如实回错，不编造 pin/写区。
 - 不实现 3.3 asset gate / 3.4 evidence checker / 3.5 stage release；不新增 cardKind；不改 renderer；未改 manifest/任务状态数据。
 - 回滚=撤销本批提交并重跑 3.2 验证；旧 code 兼容表随代码回滚。
+
+## 5. 验收 rework（3.2 v1）
+
+- **P2.1/P2.5 真实接线**：`shell-write-guard.ts` 的 deny 统一经 `makeMechanicalRejection`/`formatMechanicalRejection`，返回保留 `kind/targets` 旧字段并增 `code/rejection`；版本化文档 `versionedDocOverwriteDecision` 返回 `allowed:false + code + rejection + 三段式 reason`；governance judge `manualOutcome` 统一格式化三段式（reasonCode 保留）。`shell-write-outside`/`shell-write-hard-deny`/`versioned-doc-overwrite` 等 owner/action 入集中表；旧字段兼容。
+- **P2.2 BUG-3 真路径**：`governance-judge-verdict.ts` 在 appointment-write 缺 allowedPathRoots 时改返回 `appointment-write-root-missing`（owner=app、检查可写根接线、可原样重试）；`rejection-copy` 用例改为构造真实 `evaluateGovernanceJudgeVerdict`，不直接调用 makeMechanicalRejection 自证。
+- **P2.3 补强**：`run-pin` 增 pinned run 的 session `contract_check` 用例（runId/state=pinned、七类文档 path/hash、角色模块/写区、taskKind 必填）。
+- **P2.4**：quickref 决策维持——纯生成器 `renderRunQuickref(manifest)` + 一致性测试；不强制落盘静态文件。
+- shell/versioned/judge 测试：`rejection-copy` 9/9；`shell-write-guard` 9/9；`versioned-doc-guard` 12/12；governance judge 相关既有套件随全量通过。
+- 全量（rework 后）：**3045 tests / 3015 pass / 12 fail / 18 skip**（+2 真实 shell/versioned 用例；12 红仍为既有环境问题）；日志 `%TEMP%\ans-wave1-32-rework-full.log`，sha256 `a26465f973886f4d2ec0feb88aa6729a942f610564ad1638407f8bfabc566c89`。

@@ -15,6 +15,7 @@
 //      一律回落 `manual`；模型自报 `reasonCode` 只作提示，最终 code 由本模块安全映射；
 //   4. **审计字段有界**（§7.4）：reason ≤1KB、evidence ≤10 条、pathDecisions ≤50 条，超出截断。
 
+import { formatMechanicalRejection, makeMechanicalRejection } from "./mechanical-rejection.ts";
 import type {
   GovernanceCardKind,
   GovernanceJudgeAudit,
@@ -295,12 +296,13 @@ function manualOutcome(
   reasonCode: string,
   reason: string,
 ): GovernanceJudgeOutcome {  const stats = args.stats;
+  const rejection = makeMechanicalRejection(reasonCode, [reason]);
   return {
     verdict: "manual",
     group: args.request.group,
     cardKind: args.request.cardKind,
     reasonCode,
-    reason: redactJudgeText(reason),
+    reason: redactJudgeText(formatMechanicalRejection(rejection)),
     engine: args.engine,
     ...(args.model !== undefined ? { model: args.model } : {}),
     ...(args.durationMs !== undefined ? { durationMs: args.durationMs } : {}),
@@ -560,7 +562,7 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
       // 写根/禁写：第二道机械复核（不依赖模型自报）。
       const roots = Array.isArray(request.allowedPathRoots) ? request.allowedPathRoots : [];
       if (roots.length === 0) {
-        return manualOutcome(args, "path-outside-boundary", "缺少角色可写根事实，无法复核路径；请修正后重新提交。");
+        return manualOutcome(args, "appointment-write-root-missing", "应用未提供 allowedPathRoots/pathProbes 事实（可写根接线失败），无法复核角色卡路径；请应用检查接线后原样重试。");
       }
       const forbidden = [
         ...HARD_FORBIDDEN_PREFIXES,

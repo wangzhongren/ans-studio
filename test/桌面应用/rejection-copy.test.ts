@@ -12,6 +12,10 @@ import {
 } from "../../src/common/编排/mechanical-rejection.ts";
 import { evaluateDispatchPreflight, type DispatchPreflightInput, type ProjectRoster } from "../../src/common/编排/workflow-preconditions.ts";
 import { buildGovernedTools } from "../../src/provider/runtime/tools.ts";
+import { evaluateGovernanceJudgeVerdict, normalizeGovernanceJudgeVerdict } from "../../src/common/编排/governance-judge-verdict.ts";
+import { evaluateShellWriteTargets } from "../../src/common/门禁引擎/shell-write-guard.ts";
+import { versionedDocOverwriteDecision } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
+import type { GovernanceJudgeRequest } from "../../src/model/runtime.ts";
 import type { WriteGate } from "../../src/model/runtime.ts";
 
 test("三段式：missing/action/owner/docs/retryable 齐备；客户人话不含技术 code", () => {
@@ -70,15 +74,34 @@ test("BUG-4：target-card-missing 列出 D3 选中缺卡 id，不写“运营目
   assert.equal(formatMechanicalRejection(result.rejection).includes("运营目标角色卡不存在"), false);
 });
 
-test("BUG-3：appointment-write-root-missing 归因 app 并提示接线/重试", () => {
-  const rejection = makeMechanicalRejection("appointment-write-root-missing", ["应用未提供 allowedPathRoots/pathProbes"], {
-    docs: ["角色卡/render-dev/"],
+test("BUG-3：真实 appointment-write 判断路径返回 appointment-write-root-missing（owner=app，可重试）", () => {
+  const request: GovernanceJudgeRequest = {
+    group: "approval",
+    cardKind: "appointment-write",
+    roleId: "nominator",
+    projectRoot: "/proj",
+    runtime: "pi",
+    governanceModel: "trio",
+    flowId: "focus",
+    card: { kind: "confirm", title: "写 render-dev 角色卡", cardKind: "appointment-write", flowId: "focus", paths: ["角色卡/render-dev/role-card.md"] },
+    paths: ["角色卡/render-dev/role-card.md"],
+    pathProbes: [{ path: "角色卡/render-dev/role-card.md", allowed: true }],
+    facts: { governanceModel: "trio", flowId: "focus", ledgerErrors: 0, unresolvedClarificationCount: 0, latestDecisionKinds: [], appointmentTargetRoleIds: ["render-dev"] },
+    at: "2026-10-30T00:00:00.000Z",
+  };
+  const outcome = evaluateGovernanceJudgeVerdict({
+    request,
+    verdict: normalizeGovernanceJudgeVerdict({ verdict: "approve", confirmed: true, selected: ["render-dev"], reason: "可写" }),
+    engine: "pi",
   });
-  assert.equal(rejection.owner, "app");
-  assert.equal(rejection.retryable, true);
-  const full = formatMechanicalRejection(rejection);
-  assert.match(full, /应用修复 allowedPathRoots\/pathProbes/);
-  assert.match(full, /app/);
+  assert.equal(outcome.verdict, "manual");
+  if (outcome.verdict !== "manual") return;
+  assert.equal(outcome.reasonCode, "appointment-write-root-missing");
+  const reason = outcome.reason ?? "";
+  assert.match(reason, /appointment-write-root-missing/);
+  assert.match(reason, /谁来做：app/);
+  assert.match(reason, /原样重试/);
+  assert.equal(reason.includes("path-outside-boundary"), false);
 });
 
 test("code→owner 表覆盖高频拒绝点（run/roster/module/appointment/shell/versioned-doc）", () => {
@@ -146,4 +169,37 @@ test("旧 code 别名可读：canonical code + legacyCode 保留", async () => {
   assert.equal(rejection.code, "target-card-missing");
   assert.equal(rejection.legacyCode, "M5_TARGET_CARD_MISSING");
   assert.equal(rejection.owner, "nominator");
+});
+
+
+test("真实 shell 写目标拒绝：reason 三段式 + owner + 技术 code（保留 kind/targets 旧字段）", () => {
+  const decision = evaluateShellWriteTargets({
+    argv: ["cp", "a.txt", "other/b.txt"],
+    cwd: "/proj",
+    projectRoot: "/proj",
+    skillRoot: "/proj",
+    boundary: { entries: [], boundarySource: "test", acceptance: { accepted: false, source: "" } },
+    forbiddenPrefixes: [],
+    checkWrite: () => ({ allowed: false, reason: "不在写边界" }),
+  });
+  assert.equal(decision.kind, "deny");
+  if (decision.kind !== "deny") return;
+  assert.deepEqual(decision.targets, ["other/b.txt"]);
+  assert.equal(decision.code, "shell-write-outside");
+  assert.ok(decision.rejection);
+  assert.match(decision.reason, /拒绝：缺少/);
+  assert.match(decision.reason, /下一步：/);
+  assert.match(decision.reason, /谁来做：convener/);
+  assert.match(decision.reason, /技术 code：shell-write-outside/);
+});
+
+test("真实 versioned-doc 拒绝：allowed=false 带三段式与 versioned-doc-overwrite code", () => {
+  const decision = versionedDocOverwriteDecision({ relPath: "docs/proposals/focus-roster-v1.md", exists: true });
+  assert.equal(decision.allowed, false);
+  if (decision.allowed) return;
+  assert.equal(decision.code, "versioned-doc-overwrite");
+  assert.equal(decision.rejection.owner, "app");
+  assert.match(decision.reason, /拒绝：缺少/);
+  assert.match(decision.reason, /下一步：/);
+  assert.match(decision.reason, /技术 code：versioned-doc-overwrite/);
 });

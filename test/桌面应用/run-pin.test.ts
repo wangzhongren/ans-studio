@@ -244,6 +244,13 @@ test("run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任
     assert.equal(workerRecord.created!.runId, runId);
     assert.equal(workerRecord.created!.runState, "pinned");
     assert.equal(workerRecord.created!.moduleDirectory, "src/");
+    await h.mgr.open({ projectRoot: root, roleId: "implementer", runtime: "demo" });
+    await tick(20);
+    const pinnedCheck = await h.contractChecks.implementer!({ flowId: "focus", taskKind: "dispatch", moduleId: "impl-core" });
+    assert.match(pinnedCheck!, new RegExp(`run：${runId}.*pinned`));
+    assert.match(pinnedCheck!, /文档 roster：docs\/proposals\/focus-roster-v1\.md/);
+    assert.match(pinnedCheck!, /指定模块：impl-core/);
+    assert.match(pinnedCheck!, /taskKind dispatch 必填/);
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
