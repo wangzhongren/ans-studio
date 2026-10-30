@@ -160,18 +160,10 @@ export const VIEW_IMAGE_TOOL_NAME = "view_image";
 /** `view_image` 单文件大小上限（10 MB，按字节；超过即拒绝，不截断、不缩图）。 */
 export const VIEW_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
-/** `view_image` 每轮图片数预算缺省（2026-10-27 同轮设计建议 4 张；仅 `tool-result` 交付计数）。 */
-export const VIEW_IMAGE_MAX_IMAGES_PER_TURN = 4;
-
-/** `view_image` 每轮图片原始字节总预算缺省（20 MB；仅 `tool-result` 交付计数）。 */
-export const VIEW_IMAGE_MAX_BYTES_PER_TURN = 20 * 1024 * 1024;
-
 /** 工具层缺省策略（未注入 `viewImagePolicy` 时）：下一轮附件 + 全局 10 MB——与 2026-10-26 行为零变化。 */
 export const VIEW_IMAGE_DEFAULT_POLICY: RuntimeViewImagePolicy = Object.freeze({
   delivery: "next-turn",
   maxImageBytes: VIEW_IMAGE_MAX_BYTES,
-  maxImagesPerTurn: VIEW_IMAGE_MAX_IMAGES_PER_TURN,
-  maxBytesPerTurn: VIEW_IMAGE_MAX_BYTES_PER_TURN,
 });
 
 /** 扩展层对 run_shell 的能力级判定结果：非 undefined 即阻断（默认拒绝）。 */
@@ -647,7 +639,7 @@ function viewImagePolicyLimit(value: number, fallback: number): number {
  *
  * 顺序：取 path（`readTargetPath`，与 read_file 同口径）→ 路径句法校验 → realpath 根内复核（拒绝越界/
  * 符号链接逃逸）→ 必须是普通文件（目录明确指路 list_dir）→ 扩展名/MIME（.png/.jpg/.jpeg/.webp/.gif）→
- * 大小 ≤ min(10 MB, policy.maxImageBytes) → [tool-result] 每轮预算预留 → 读二进制并 base64 →
+ * 大小 ≤ min(10 MB, policy.maxImageBytes) → 读二进制并 base64 →
  * 调用注入能力（tool-result 时为 Service 注入的内联受理回执）→ 按回执归一交付。
  * 任一校验失败都不触达交付、不写盘、不联网；失败一律 fail-closed（不交付图片，文案如实）。
  */
@@ -656,28 +648,6 @@ function makeViewImageTool(fn: ViewImageFn, readRoot: string, options?: Governed
   const policy = options?.viewImagePolicy ?? VIEW_IMAGE_DEFAULT_POLICY;
   const delivery = policy.delivery;
   const maxImageBytes = Math.min(VIEW_IMAGE_MAX_BYTES, Math.floor(viewImagePolicyLimit(policy.maxImageBytes, VIEW_IMAGE_MAX_BYTES)));
-  const maxImagesPerTurn = Math.floor(viewImagePolicyLimit(policy.maxImagesPerTurn, VIEW_IMAGE_MAX_IMAGES_PER_TURN));
-  const maxBytesPerTurn = viewImagePolicyLimit(policy.maxBytesPerTurn, VIEW_IMAGE_MAX_BYTES_PER_TURN);
-  // 每轮预算（仅 tool-result 交付计数；next-turn 保持 2026-10-26 既有排队行为不变）。
-  // 按 `currentTurnId()` 变化重置；turnId 缺省按会话级单桶处理（避免无界）。
-  const budget = { turnKey: undefined as string | undefined, count: 0, bytes: 0 };
-  const budgetFor = (turnId: string | undefined): void => {
-    if (budget.turnKey !== turnId) { budget.turnKey = turnId; budget.count = 0; budget.bytes = 0; }
-  };
-  /** 预留一个名额与 stat 大小字节；超限返回拒绝原因且不预留。 */
-  const reserveBudget = (bytes: number): string | undefined => {
-    if (budget.count + 1 > maxImagesPerTurn) return `超出本轮图片数量预算（每轮最多 ${maxImagesPerTurn} 张）`;
-    if (budget.bytes + bytes > maxBytesPerTurn) {
-      return `超出本轮图片总字节预算（每轮最多 ${maxBytesPerTurn} 字节；已用 ${budget.bytes} 字节，本次 ${bytes} 字节）`;
-    }
-    budget.count += 1;
-    budget.bytes += bytes;
-    return undefined;
-  };
-  const releaseBudget = (bytes: number): void => {
-    budget.count = Math.max(0, budget.count - 1);
-    budget.bytes = Math.max(0, budget.bytes - bytes);
-  };
   /** 结构化审计（只记元数据，绝不落 base64/图片字节/`data:` URL）。 */
   const record = (fields: { ok: boolean; turnId?: string; path?: string; mimeType?: string; bytes?: number; delivery?: ViewImageDeliveryMode; reasonCode?: string }): void => {
     try {
@@ -757,41 +727,17 @@ function makeViewImageTool(fn: ViewImageFn, readRoot: string, options?: Governed
         return fail("too-large", `${name} 拒绝读取：${path} 大小 ${info.size} 字节，超过上限 ${limitNote}——${notReadNotQueued}`, { path, mimeType, bytes: info.size });
       }
 
-      // 每轮预算（仅同轮附图交付；next-turn 不引入新拒绝，保持既有排队行为）。
-      let charged = 0;
-      if (delivery === "tool-result") {
-        budgetFor(turnId);
-        const overBudget = reserveBudget(info.size);
-        if (overBudget !== undefined) {
-          return fail("budget", `${name} 拒绝读取：${path} ${overBudget}——${notReadNotQueued}`, { path, mimeType, bytes: info.size });
-        }
-        charged = info.size;
-      }
-
       let raw: Buffer;
       try {
         raw = await readFile(real);
       } catch (err) {
-        if (charged > 0) releaseBudget(charged);
         return fail("read-failed", `${name} 读取失败：${path}（${reasonOf(err)}）——${notQueued}`, { path, mimeType });
       }
       // 读取与 stat 之间文件可能被替换/增长：以实际字节数复核，绝不超限交付。
       if (raw.length > maxImageBytes) {
-        if (charged > 0) releaseBudget(charged);
         return fail("too-large", `${name} 拒绝读取：${path} 实际读取 ${raw.length} 字节，超过上限 ${limitNote}——${notReadNotQueued}`, { path, mimeType, bytes: raw.length });
       }
-      if (charged > 0 && raw.length !== charged) {
-        // 按实际字节调整预算占用；增长超出本轮总预算 ⇒ fail-closed。
-        const delta = raw.length - charged;
-        if (delta > 0 && budget.bytes + delta > maxBytesPerTurn) {
-          releaseBudget(charged);
-          return fail("budget", `${name} 拒绝读取：${path} 实际读取 ${raw.length} 字节，超出本轮图片总字节预算（每轮最多 ${maxBytesPerTurn} 字节）——${notReadNotQueued}`, { path, mimeType, bytes: raw.length });
-        }
-        budget.bytes += delta;
-        charged = raw.length;
-      }
       if (call.signal?.aborted) {
-        if (charged > 0) releaseBudget(charged);
         return fail("aborted", delivery === "tool-result"
           ? `${name}：本轮已中止，图片未提供——不要当它已提供；本轮不要假装已看到。`
           : `${name}：本轮已中止，图片附件未排队——不要当它已提供；本轮不要假装已看到。`, { path, mimeType, bytes: raw.length });
@@ -808,7 +754,6 @@ function makeViewImageTool(fn: ViewImageFn, readRoot: string, options?: Governed
           `${name} ${delivery === "tool-result" ? "确认图片交付" : "排队图片附件"}`,
         );
       } catch (err) {
-        if (charged > 0) releaseBudget(charged);
         // 中止时能力可能已经受理（raceAbort 不取消底层 promise）——不谎称失败，也不谎称已提供。
         if (call.signal?.aborted) {
           return fail("aborted", delivery === "tool-result"
@@ -821,13 +766,11 @@ function makeViewImageTool(fn: ViewImageFn, readRoot: string, options?: Governed
       }
       const normalized = viewImageReceiptOf(receipt);
       if (normalized === undefined) {
-        if (charged > 0) releaseBudget(charged);
         return fail("invalid-receipt", delivery === "tool-result"
           ? `${name}：能力未返回明确回执（回执缺失或非法）——按**未提供图片**处理；本轮不要假装已看到。`
           : `${name}：能力未返回明确回执（回执缺失或非法）——按**未排队**处理；下一轮不会收到该图片附件；本轮不要假装已看到。`, { path, mimeType, bytes: raw.length });
       }
       if (!normalized.ok) {
-        if (charged > 0) releaseBudget(charged);
         return fail("capability-rejected", delivery === "tool-result"
           ? `${name}：图片**未提供**（回执：${normalized.message ?? "能力侧被拒且未提供原因"}）——本轮不要假装已看到。`
           : `${name}：图片**未能排队**（回执：${normalized.message ?? "能力侧被拒且未提供原因"}）——下一轮不会收到该图片附件；本轮不要假装已看到。`, { path, mimeType, bytes: raw.length });
@@ -841,8 +784,7 @@ function makeViewImageTool(fn: ViewImageFn, readRoot: string, options?: Governed
         record({ ok: true, turnId, path, mimeType, bytes: raw.length, delivery: "tool-result" });
         return { ok: true, message: viewImageSameTurnMessage(path), images: [image], imageDelivery: "tool-result" };
       }
-      // 回退为下一轮附件（或策略本就是 next-turn）：本轮不交付图片；释放同轮预算占用（若已预留）。
-      if (charged > 0) releaseBudget(charged);
+      // 回退为下一轮附件（或策略本就是 next-turn）：本轮不交付图片。
       record({ ok: true, turnId, path, mimeType, bytes: raw.length, delivery: "next-turn" });
       return {
         ok: true,
@@ -3055,7 +2997,7 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
 
   // 结构性保证（2026-10-26 图片查看，沿 dispatch_task 先例）：**未注入 viewImage 能力时
   // `view_image` 不存在**（能力缺席 = 最强 fail-closed；即便 policy 为 tool-result 也不注册）。
-  // 工具层负责路径/类型/大小校验、PromptImage 转换与每轮预算；交付方式由注入的
+  // 工具层负责路径/类型/大小校验与 PromptImage 转换；交付方式由注入的
   // `viewImagePolicy`（Service 按 `RUNTIME_VIEW_IMAGE_POLICY` 注入）单一决定，工具层不写引擎分支。
   const viewImage = options?.viewImage;
   if (viewImage !== undefined) tools.push(makeViewImageTool(viewImage, readRoot, options));

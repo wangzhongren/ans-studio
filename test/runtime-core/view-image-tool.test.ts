@@ -13,8 +13,6 @@ import {
 import {
   VIEW_IMAGE_DEFAULT_POLICY,
   VIEW_IMAGE_MAX_BYTES,
-  VIEW_IMAGE_MAX_BYTES_PER_TURN,
-  VIEW_IMAGE_MAX_IMAGES_PER_TURN,
   VIEW_IMAGE_TOOL_NAME,
   buildGovernedTools,
 } from "../../src/provider/runtime/tools.ts";
@@ -35,8 +33,6 @@ const sameTurnText = (relPath: string) => translate(DEFAULT_LOCALE, SAME_TURN_KE
 const sameTurnPolicy = (overrides: Partial<RuntimeViewImagePolicy> = {}): RuntimeViewImagePolicy => ({
   delivery: "tool-result",
   maxImageBytes: VIEW_IMAGE_MAX_BYTES,
-  maxImagesPerTurn: VIEW_IMAGE_MAX_IMAGES_PER_TURN,
-  maxBytesPerTurn: VIEW_IMAGE_MAX_BYTES_PER_TURN,
   ...overrides,
 });
 const nextTurnPolicy = (overrides: Partial<RuntimeViewImagePolicy> = {}): RuntimeViewImagePolicy => ({
@@ -311,7 +307,7 @@ test("本轮已中止（tool-result）：兜底文案不声称排队/下一轮�
   }
 });
 
-// —————————————— 2026-10-27 同轮看图第一阶段：共享契约 / policy 分支 / 预算 / 审计 ——————————————
+// —————————————— 2026-10-27 同轮看图第一阶段：共享契约 / policy 分支 / 审计 ——————————————
 
 test("RUNTIME_VIEW_IMAGE_POLICY：Pi/Claude/Codex 已翻 tool-result（探针通过），demo 仍 next-turn；Claude 5 MB；数值与冻结状态", () => {
   assert.deepEqual(Object.keys(RUNTIME_VIEW_IMAGE_POLICY).sort(), ["claude", "codex", "demo", "pi"]);
@@ -325,8 +321,8 @@ test("RUNTIME_VIEW_IMAGE_POLICY：Pi/Claude/Codex 已翻 tool-result（探针通
   assert.equal(RUNTIME_VIEW_IMAGE_POLICY.demo.maxImageBytes, VIEW_IMAGE_MAX_BYTES);
   for (const runtime of ["demo", "pi", "claude", "codex"] as const) {
     const policy = RUNTIME_VIEW_IMAGE_POLICY[runtime];
-    assert.equal(policy.maxImagesPerTurn, VIEW_IMAGE_MAX_IMAGES_PER_TURN);
-    assert.equal(policy.maxBytesPerTurn, VIEW_IMAGE_MAX_BYTES_PER_TURN);
+    assert.equal("maxImagesPerTurn" in policy, false, `${runtime} policy 不得再含每轮图片数预算`);
+    assert.equal("maxBytesPerTurn" in policy, false, `${runtime} policy 不得再含每轮字节预算`);
     assert.equal(Object.isFrozen(policy), true, `${runtime} policy 必须冻结`);
   }
   assert.equal(Object.isFrozen(RUNTIME_VIEW_IMAGE_POLICY), true);
@@ -438,62 +434,38 @@ test("tool-result 下校验失败不带图且不调用能力（路径/类型/大
   }
 });
 
-test("每轮预算（tool-result）：超限失败无图；新轮重置；失败释放预留", async () => {
+test("每轮图片预算已移除：同一轮连续 6 张图片全部成功交付", async () => {
   const root = await temp();
   try {
-    for (const file of ["a.png", "b.png", "c.png"]) await writeFile(path.join(root, file), Buffer.from([1, 2, 3]));
-    let turn = "turn-1";
-    let failures = 0;
-    const fn: ViewImageFn = async () => {
-      if (failures > 0) { failures -= 1; throw new Error("临时失败"); }
-      return { ok: true, mode: "tool-result" };
-    };
+    const files = Array.from({ length: 6 }, (_, index) => `img-${index + 1}.png`);
+    for (const [index, file] of files.entries()) {
+      await writeFile(path.join(root, file), Buffer.from([0x89, 0x50, 0x4e, 0x47, index]));
+    }
+    const received: ViewImageInput[] = [];
+    const fn: ViewImageFn = async (input) => { received.push(input); return { ok: true, mode: "tool-result" }; };
     const tool = toolMap(allow, {
-      readRoot: root, viewImage: fn, currentTurnId: () => turn,
-      viewImagePolicy: sameTurnPolicy({ maxImagesPerTurn: 2 }),
+      readRoot: root, viewImage: fn, viewImagePolicy: sameTurnPolicy(), currentTurnId: () => "turn-many",
     }).get(VIEW_IMAGE_TOOL_NAME)!;
 
-    assert.equal((await tool.handler(call({ path: "a.png" }))).ok, true);
-    assert.equal((await tool.handler(call({ path: "b.png" }))).ok, true);
-    const third = await tool.handler(call({ path: "c.png" }));
-    assert.equal(third.ok, false, "第 3 张必须超过每轮 2 张的预算");
-    assert.match(third.message, /数量预算/);
-    assert.equal(third.images, undefined);
-
-    turn = "turn-2";
-    assert.equal((await tool.handler(call({ path: "c.png" }))).ok, true, "新轮次重置预算");
-
-    // 失败释放：每轮 1 张；第一次能力抛错后，第二次仍可预留并成功。
-    turn = "turn-3";
-    failures = 1;
-    const strict = toolMap(allow, {
-      readRoot: root, viewImage: fn, currentTurnId: () => turn,
-      viewImagePolicy: sameTurnPolicy({ maxImagesPerTurn: 1 }),
-    }).get(VIEW_IMAGE_TOOL_NAME)!;
-    const failed = await strict.handler(call({ path: "a.png" }));
-    assert.equal(failed.ok, false);
-    assert.match(failed.message, /未提供/);
-    const retry = await strict.handler(call({ path: "b.png" }));
-    assert.equal(retry.ok, true, "失败必须释放预留名额");
+    for (const file of files) {
+      const result = await tool.handler(call({ path: file }));
+      assert.equal(result.ok, true, `${file} 应成功（旧行为第 5 张起会因每轮 4 张预算被拒）：${result.message}`);
+      assert.equal(result.images?.length, 1, `${file} 必须交付图片`);
+      assert.equal(result.imageDelivery, "tool-result");
+    }
+    assert.equal(received.length, files.length, "6 张都必须调用能力交付");
+    assert.equal(received.every((input) => input.turnId === "turn-many"), true, "同一轮次内全部交付");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
 
-test("每轮字节预算与更严单图上限：超限失败且不触达能力", async () => {
+test("更严单图上限：超限失败且不触达能力", async () => {
   const root = await temp();
   try {
     await writeFile(path.join(root, "a.png"), Buffer.from([1, 2, 3, 4]));
     let calls = 0;
     const fn: ViewImageFn = async () => { calls += 1; return { ok: true, mode: "tool-result" }; };
-
-    const byteTool = toolMap(allow, {
-      readRoot: root, viewImage: fn, viewImagePolicy: sameTurnPolicy({ maxBytesPerTurn: 3 }),
-    }).get(VIEW_IMAGE_TOOL_NAME)!;
-    const overBytes = await byteTool.handler(call({ path: "a.png" }));
-    assert.equal(overBytes.ok, false);
-    assert.match(overBytes.message, /总字节预算/);
-    assert.equal(overBytes.images, undefined);
 
     const strictTool = toolMap(allow, {
       readRoot: root, viewImage: fn, viewImagePolicy: sameTurnPolicy({ maxImageBytes: 2 }),
@@ -503,7 +475,7 @@ test("每轮字节预算与更严单图上限：超限失败且不触达能力",
     assert.match(overSingle.message, /超过上限 2 字节/);
     assert.equal(overSingle.images, undefined);
 
-    assert.equal(calls, 0, "预算/更严上限失败不得触达能力");
+    assert.equal(calls, 0, "更严上限失败不得触达能力");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

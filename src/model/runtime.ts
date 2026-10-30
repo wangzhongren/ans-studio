@@ -88,10 +88,6 @@ export interface RuntimeViewImagePolicy {
   delivery: ViewImageDeliveryMode;
   /** 有效单图上限（字节）；`tool-result` 交付时工具取 `min(VIEW_IMAGE_MAX_BYTES, maxImageBytes)`。 */
   maxImageBytes: number;
-  /** 每模型轮次最多图片数（仅 `tool-result` 交付计数；`next-turn` 保持既有排队行为不变）。 */
-  maxImagesPerTurn: number;
-  /** 每模型轮次图片原始字节总预算（仅 `tool-result` 交付计数）。 */
-  maxBytesPerTurn: number;
 }
 
 /**
@@ -103,10 +99,10 @@ export interface RuntimeViewImagePolicy {
  * 翻表是唯一开关，也是回滚开关。
  */
 export const RUNTIME_VIEW_IMAGE_POLICY: Readonly<Record<RuntimeKind, RuntimeViewImagePolicy>> = Object.freeze({
-  demo: Object.freeze({ delivery: "next-turn", maxImageBytes: 10 * 1024 * 1024, maxImagesPerTurn: 4, maxBytesPerTurn: 20 * 1024 * 1024 }),
-  pi: Object.freeze({ delivery: "tool-result", maxImageBytes: 10 * 1024 * 1024, maxImagesPerTurn: 4, maxBytesPerTurn: 20 * 1024 * 1024 }),
-  claude: Object.freeze({ delivery: "tool-result", maxImageBytes: 5 * 1024 * 1024, maxImagesPerTurn: 4, maxBytesPerTurn: 20 * 1024 * 1024 }),
-  codex: Object.freeze({ delivery: "tool-result", maxImageBytes: 10 * 1024 * 1024, maxImagesPerTurn: 4, maxBytesPerTurn: 20 * 1024 * 1024 }),
+  demo: Object.freeze({ delivery: "next-turn", maxImageBytes: 10 * 1024 * 1024 }),
+  pi: Object.freeze({ delivery: "tool-result", maxImageBytes: 10 * 1024 * 1024 }),
+  claude: Object.freeze({ delivery: "tool-result", maxImageBytes: 5 * 1024 * 1024 }),
+  codex: Object.freeze({ delivery: "tool-result", maxImageBytes: 10 * 1024 * 1024 }),
 });
 
 export interface PromptTurnStartedMetadata {
