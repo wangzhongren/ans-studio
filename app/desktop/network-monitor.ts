@@ -167,6 +167,7 @@ export function createNetworkMonitor(options: NetworkMonitorOptions): NetworkMon
           stableHandle = undefined;
           if (stopped || pendingSince === undefined) return;
           const stillOnline = safeProbe(options.probe);
+          if (stillOnline === undefined) return; // 探针异常：保持已知状态与待定采样，不迁移
           if (!stillOnline) {
             const since = pendingSince;
             const pending = pendingCause ?? cause;
@@ -190,7 +191,10 @@ export function createNetworkMonitor(options: NetworkMonitorOptions): NetworkMon
       started = true;
       const at = clock.now();
       const online = safeProbe(options.probe);
-      if (online) {
+      if (online === undefined) {
+        // 首采样探针异常：保持保守在线占位（unknown）——**不产生状态迁移/onState**；
+        // 后续成功采样可纠正。绝不在异常路径上把未知/离线切换成在线。
+      } else if (online) {
         state = { online: true, source: "main-net", at, stableForMs: 0, reason: "initial" };
         gate.apply(state);
       } else {
@@ -201,7 +205,9 @@ export function createNetworkMonitor(options: NetworkMonitorOptions): NetworkMon
         try { options.onState?.({ ...state }); } catch { /* 观察者异常不得改变状态推进 */ }
       }
       intervalHandle = clock.setInterval(() => {
-        if (!stopped) evaluate(safeProbe(options.probe), { reason: "probe", source: "main-net" });
+        if (stopped) return;
+        const sampled = safeProbe(options.probe);
+        if (sampled !== undefined) evaluate(sampled, { reason: "probe", source: "main-net" });
       }, sampleIntervalMs);
     },
     stop() {
@@ -225,7 +231,9 @@ export function createNetworkMonitor(options: NetworkMonitorOptions): NetworkMon
       monitor.probeNow(event === "resume" ? "resume" : "probe", "power");
     },
     probeNow(reason: NetworkStateReason = "probe", source: NetworkStateSource = "main-net") {
-      evaluate(safeProbe(options.probe), { reason, source });
+      const online = safeProbe(options.probe);
+      // 探针异常（undefined）⇒ 保持已知状态：不迁移、不外推、不放行队列、不恢复请求计时。
+      if (online !== undefined) evaluate(online, { reason, source });
       return { ...state };
     },
   };
@@ -236,6 +244,10 @@ function positiveOr(value: number | undefined, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
 }
 
-function safeProbe(probe: () => boolean): boolean {
-  try { return probe() === true; } catch { return true; } // 探针异常不误判离线（保守在线）
+/**
+ * 探针结果：`true` 在线 / `false` 离线 / `undefined` **未知**（探针抛错）。
+ * 未知时调用方**保持已知状态**、不触发任何迁移/onState——绝不在异常路径上把离线当在线。
+ */
+function safeProbe(probe: () => boolean): boolean | undefined {
+  try { return probe() === true; } catch { return undefined; }
 }

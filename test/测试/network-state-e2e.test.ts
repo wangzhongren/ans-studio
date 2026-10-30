@@ -25,8 +25,9 @@ import { createClaudeRuntimeAdapter } from "../../src/provider/claude/session.ts
 import { listProject } from "../../src/service/role/resolve-role.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { SessionManager } from "../../app/desktop/session.ts";
+import { createNetworkMonitor } from "../../app/desktop/network-monitor.ts";
 import { createNetworkGate } from "../../src/common/runtime-core/network-gate.ts";
-import type { NetworkState } from "../../src/model/runtime.ts";
+import type { NetworkGate, NetworkState } from "../../src/model/runtime.ts";
 import type { OrchestrationEvent, TaskHandback } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
@@ -234,6 +235,87 @@ test("e2e 离线超窗：network-offline-timeout 终态 failed；人话短报、
   assert.ok(result.diagnostics.some((record) => record.event === "network.request.timeout" && record.errorCode === "network-offline-timeout"));
 });
 
+// —————— F1 返工（验收 v1）：探针异常必须保持已知离线 ——————
+
+async function runProbeThrowE2e(): Promise<{ events: OrchestrationEvent[]; failure: Error | undefined; diagnostics: DiagRecord[]; users: number; states: NetworkState[] }> {
+  return withDiagnostics(async (diagDir) => {
+    const root = projectFixture();
+    const fake = fakeSdk();
+    let probeMode: "online" | "offline" | "throw" = "online";
+    const states: NetworkState[] = [];
+    const monitor = createNetworkMonitor({
+      probe: () => { if (probeMode === "throw") throw new Error("probe fixture"); return probeMode === "online"; },
+      sampleIntervalMs: 60_000,
+      offlineStableWindowMs: 60_000,
+      offlineSampleCount: 2,
+      onState: (s) => states.push(s),
+    });
+    monitor.start(); // 在线
+    const { probeNow } = monitor;
+    const listing = await listProject(root);
+    const project = buildProjectConfig(listing, { accepted: true, source: "unit-test:network-state-e2e" });
+    const handle = await openRoleSession(
+      { roleId: "A", runtime: "claude", project, persistSession: false },
+      {
+        runtimeOptions: {
+          providerFactories: { claude: (providerOptions) => createClaudeRuntimeAdapter(providerOptions, fake.dependencies) },
+          requestFirstByteTimeoutMs: 40,
+          requestIdleTimeoutMs: 40,
+          networkGate: monitor.gate,
+          networkRetryWindowMs: 60_000,
+        },
+      },
+    );
+    const events: OrchestrationEvent[] = [];
+    const collector = (async () => {
+      for await (const event of handle.events()) {
+        events.push(event);
+        if (event.kind === "settled") break;
+      }
+    })();
+    const sending = handle.send("探针异常 e2e");
+    await tick(30);
+    // 真实 monitor：连续 2 次离线采样 ⇒ 离线并暂停请求计时。
+    probeMode = "offline";
+    probeNow();
+    probeNow();
+    await until(() => events.some((event) => event.kind === "message" && (event.detail as { reasonCode?: unknown } | undefined)?.reasonCode === "network-offline" && (event.detail as { state?: unknown }).state === "offline"), "未出现离线暂停系统行");
+    assert.equal(monitor.current().online, false);
+    const transitionsBeforeThrow = states.length;
+    // 探针异常：不得把已知离线翻成在线（否则会 resume deadline 并触发超时）。
+    probeMode = "throw";
+    probeNow();
+    await tick(150); // > first-byte 40ms：若异常路径被当在线，请求会超时失败
+    assert.equal(monitor.current().online, false, "探针异常后 monitor 保持离线");
+    assert.equal(monitor.gate.isOnline(), false, "gate 不得被翻成在线");
+    assert.equal(states.length, transitionsBeforeThrow, "探针异常不得触发 onState 迁移");
+    assert.equal(events.filter((event) => event.kind === "settled").length, 0, "探针异常不得解除离线暂停/不得出现终态");
+    // 真正恢复 ⇒ resume 并正常完成。
+    probeMode = "online";
+    probeNow();
+    fake.release();
+    const failure = await sending.then(() => undefined, (error: unknown) => error as Error);
+    await collector;
+    await handle.dispose();
+    monitor.stop();
+    assert.equal(existsSync(join(root, ".ans")), false, "探针异常回合不得写项目 .ans/（零项目写入）");
+    return { events, failure, diagnostics: await diagnosticEvents(diagDir), users: fake.users.length, states };
+  });
+}
+
+test("e2e F1：已知离线 + 探针异常 ⇒ 保持离线、不 resume deadline/不超时；真正恢复后正常完成", async () => {
+  const result = await runProbeThrowE2e();
+  assert.equal(result.failure, undefined, "恢复后必须正常完成");
+  const terminals = result.events.filter((event) => event.kind === "settled");
+  assert.equal(terminals.length, 1, "恰一条 settled");
+  assert.equal((terminals[0] as { detail?: { outcome?: unknown } }).detail?.outcome, "completed");
+  assert.equal(result.events.filter((event) => event.kind === "handback").length, 0);
+  assert.equal(result.users, 1, "ANS 只发一次请求输入");
+  assert.deepEqual(result.states.map((s) => s.online), [false, true], "离线/恢复各恰一次迁移；异常路径无迁移");
+  assert.ok(result.diagnostics.some((record) => record.event === "network.request.pause"));
+  assert.ok(result.diagnostics.some((record) => record.event === "network.request.resume"));
+});
+
 // —————————————— 队列 e2e（真实 SessionManager + 注入网络门） ——————————————
 
 interface QueueStateSnapshot {
@@ -274,11 +356,12 @@ function listing(): ProjectListing {
   return { projectRoot: "/proj", roles: [mk("su", true), mk("A")], warnings: [], hasRoles: true, primaryRoleId: "su" };
 }
 
-function makeQueueHarness(gate: ReturnType<typeof createNetworkGate>) {
+function makeQueueHarness(gate: NetworkGate) {
   const l = listing();
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
   const sent: Record<string, string[]> = { su: [], A: [] };
   const roleStates: QueueStateSnapshot[] = [];
+  const emitted: Array<{ projectRoot?: string; roleId?: string; runtime?: string; event?: unknown }> = [];
   const stopped: Record<string, boolean> = { su: false, A: false };
   const attempts: Record<string, number> = { su: 0, A: 0 };
   const makeHandle = (roleId: string): RoleSessionHandle => ({
@@ -316,7 +399,7 @@ function makeQueueHarness(gate: ReturnType<typeof createNetworkGate>) {
     createDemoAdapter: () => { throw new Error("本用例不应构造 demo 适配器"); },
     buildProjectConfig,
     getListing: (root) => (root === l.projectRoot ? l : undefined),
-    emitEvent: () => {},
+    emitEvent: (envelope) => { emitted.push(envelope); },
     emitRoleState: (info) => roleStates.push({
       roleId: info.roleId,
       busy: info.busy,
@@ -328,7 +411,7 @@ function makeQueueHarness(gate: ReturnType<typeof createNetworkGate>) {
     networkGate: gate,
     now: () => Date.now(),
   });
-  return { mgr, streams, sent, roleStates, latest: (roleId: string) => roleStates.filter((s) => s.roleId === roleId).at(-1) };
+  return { mgr, streams, sent, roleStates, emitted, latest: (roleId: string) => roleStates.filter((s) => s.roleId === roleId).at(-1) };
 }
 
 test("e2e 队列：离线保留并标 blockedReason=network；恢复后按既有 drain 继续且恰投递一次", async () => {
@@ -359,6 +442,89 @@ test("e2e 队列：离线保留并标 blockedReason=network；恢复后按既有
     await tick(80);
     assert.equal(h.sent.su.length, 1, "已投递条目不得重复投递");
     assert.equal(h.latest("su")?.blockedReason, null, "恢复且队列空后无阻塞原因");
+  } finally {
+    await h.mgr.stop(null);
+  }
+});
+
+test("e2e F1 队列：已知离线 + 探针异常 ⇒ 不解除 network 阻塞、不 drain；真正恢复后恰投递一次", async () => {
+  let probeMode: "online" | "offline" | "throw" = "online";
+  let mgrRef: SessionManager | undefined;
+  const monitor = createNetworkMonitor({
+    probe: () => { if (probeMode === "throw") throw new Error("probe fixture"); return probeMode === "online"; },
+    sampleIntervalMs: 60_000,
+    offlineStableWindowMs: 60_000,
+    offlineSampleCount: 2,
+    onState: (state) => { mgrRef?.applyNetworkState(state); },
+  });
+  const h = makeQueueHarness(monitor.gate);
+  mgrRef = h.mgr;
+  const { probeNow } = monitor;
+  try {
+    monitor.start(); // 在线
+    await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+    await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    await tick(30);
+    probeMode = "offline";
+    probeNow(); // 第 1 次离线采样
+    probeNow(); // 连续第 2 次 ⇒ 离线（onState → SessionManager）
+    assert.equal(monitor.gate.isOnline(), false);
+    h.streams.A.push({ kind: "handback", summary: "回交1", handback: handback("P2-NET-F1") });
+    await until(() => (h.latest("su")?.queue.length ?? 0) === 1, "离线回交未入队");
+    await tick(60);
+    assert.equal(h.sent.su.length, 0, "离线期间不得投递");
+    assert.equal(h.latest("su")?.blockedReason, "network");
+
+    probeMode = "throw";
+    probeNow(); // 探针异常：不得迁移/不得触发 onState → 不得 drain
+    await tick(80);
+    assert.equal(monitor.gate.isOnline(), false, "探针异常后 gate 保持离线");
+    assert.equal(h.sent.su.length, 0, "探针异常不得 drain/放行队列");
+    assert.equal(h.latest("su")?.blockedReason, "network", "队列仍标 network");
+
+    probeMode = "online";
+    probeNow(); // 真正恢复 ⇒ onState → applyNetworkState → drain
+    await until(() => h.sent.su.length === 1, "恢复后未继续投递");
+    assert.equal(h.sent.su.length, 1, "恢复后恰投递一次");
+    h.streams.su.push({ kind: "settled", summary: "回交轮完成", turnId: "turn-su-1", roleId: "su", runtime: "demo" });
+    await until(() => (h.latest("su")?.queue.length ?? 0) === 0 && h.latest("su")?.busy === false, "队列未排空");
+    await tick(60);
+    assert.equal(h.sent.su.length, 1, "不得重复投递");
+  } finally {
+    monitor.stop();
+    await h.mgr.stop(null);
+  }
+});
+
+test("e2e 网络失败系统行：settled(failed, network-offline-timeout) ⇒ 恰一条人话 delivery-note，无技术 code", async () => {
+  const gate = createNetworkGate();
+  const h = makeQueueHarness(gate);
+  try {
+    await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    await tick(30);
+    const pending = h.mgr.send("网络失败系统行", undefined, { projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    await until(() => h.latest("su")?.busy === true, "回合未开跑");
+    h.streams.su.push({
+      kind: "settled",
+      summary: "本轮运行失败",
+      turnId: "turn-su-1",
+      roleId: "su",
+      runtime: "demo",
+      detail: { outcome: "failed", errorCode: "network-offline-timeout", attempts: 1, replaySafe: true },
+    });
+    await pending;
+    const deliveryNotes = () => h.emitted
+      .filter((envelope) => {
+        const event = envelope.event as { kind?: unknown; detail?: { source?: unknown } } | undefined;
+        return event?.kind === "message" && (event.detail as { source?: unknown } | undefined)?.source === "delivery-note";
+      })
+      .map((envelope) => String((envelope.event as { summary?: unknown }).summary ?? ""));
+    await until(() => deliveryNotes().length >= 1, "未出现网络失败人话系统行");
+    const notes = deliveryNotes();
+    assert.equal(notes.filter((text) => text.includes("网络已断开")).length, 1, "恰一条网络失败人话系统行");
+    const human = notes.find((text) => text.includes("网络已断开"))!;
+    assert.match(human, /等待恢复超时/);
+    assert.doesNotMatch(human, /network-offline-timeout|NetworkOfflineError|ECONN|stack|https?:/i, "客户可见系统行不含技术 code");
   } finally {
     await h.mgr.stop(null);
   }

@@ -288,3 +288,123 @@ test("诊断字段：network.* 仅用既有白名单字段；探针异常不误�
   assert.equal(stateRecords.at(-1)!.mode, "main-net");
   monitor.stop();
 });
+
+// —————— F1 返工（验收 v1）：探针异常必须保持已知状态，绝不得把离线翻成在线 ——————
+
+test("F1：已知离线 + 探针异常 ⇒ 保持离线、gate 不回在线、无 onState 迁移", () => {
+  const clock = fakeClock();
+  const states: NetworkState[] = [];
+  let mode: "online" | "offline" | "throw" = "online";
+  const monitor = createNetworkMonitor({
+    probe: () => { if (mode === "throw") throw new Error("probe fixture"); return mode === "online"; },
+    clock,
+    sampleIntervalMs: 1_000,
+    offlineStableWindowMs: 500,
+    onState: (s) => states.push(s),
+  });
+  monitor.start();
+  mode = "offline";
+  clock.advance(1_000);
+  clock.advance(500);
+  assert.equal(monitor.current().online, false);
+  assert.equal(monitor.gate.isOnline(), false);
+  const transitions = states.length;
+  assert.equal(transitions, 1, "离线恰一次迁移");
+
+  mode = "throw";
+  const { probeNow } = monitor;
+  const returned = probeNow();
+  assert.equal(returned.online, false, "probeNow 异常路径返回已知离线");
+  clock.advance(10_000); // 采样全部异常
+  assert.equal(monitor.current().online, false, "已知离线在探针异常下保持不变");
+  assert.equal(monitor.gate.isOnline(), false, "状态门不得被翻成在线（否则会 resume 请求/放行队列）");
+  assert.equal(states.length, transitions, "不得触发 onState 迁移");
+  monitor.stop();
+});
+
+test("F1：启动即离线 + 探针异常 ⇒ 保持离线、不产生新迁移", () => {
+  const clock = fakeClock();
+  const states: NetworkState[] = [];
+  let mode: "offline" | "throw" = "offline";
+  const monitor = createNetworkMonitor({
+    probe: () => { if (mode === "throw") throw new Error("probe fixture"); return false; },
+    clock,
+    sampleIntervalMs: 1_000,
+    onState: (s) => states.push(s),
+  });
+  monitor.start();
+  assert.equal(monitor.current().online, false);
+  assert.equal(monitor.gate.isOnline(), false);
+  assert.equal(states.length, 1, "启动离线恰一次迁移");
+  mode = "throw";
+  const { probeNow } = monitor;
+  probeNow();
+  clock.advance(5_000);
+  assert.equal(monitor.current().online, false, "启动离线在探针异常下保持离线");
+  assert.equal(monitor.gate.isOnline(), false);
+  assert.equal(states.length, 1, "探针异常不得产生新迁移");
+  monitor.stop();
+});
+
+test("F1：启动首采样探针异常 ⇒ 保持在线占位（unknown）、不迁移；后续采样可正常判定", () => {
+  const clock = fakeClock();
+  const states: NetworkState[] = [];
+  let mode: "throw" | "online" | "offline" = "throw";
+  const monitor = createNetworkMonitor({
+    probe: () => { if (mode === "throw") throw new Error("probe fixture"); return mode === "online"; },
+    clock,
+    sampleIntervalMs: 1_000,
+    offlineStableWindowMs: 500,
+    onState: (s) => states.push(s),
+  });
+  monitor.start();
+  assert.equal(monitor.current().online, true, "未知时保持保守在线占位");
+  assert.equal(monitor.current().source, "unknown");
+  assert.equal(states.length, 0, "异常首采样不产生迁移");
+  mode = "online";
+  clock.advance(1_000);
+  assert.equal(states.length, 0, "在线采样不外推");
+  mode = "offline";
+  clock.advance(1_000);
+  clock.advance(500);
+  assert.equal(monitor.current().online, false);
+  assert.equal(states.length, 1);
+  monitor.stop();
+});
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+async function until(predicate: () => boolean, label: string): Promise<void> {
+  for (let i = 0; i < 400; i += 1) {
+    if (predicate()) return;
+    await sleep(5);
+  }
+  assert.fail(label);
+}
+
+test("F1 真实计时（默认时钟）：已知离线 + probe 抛错 ⇒ 保持离线、无 onState 迁移", async () => {
+  let mode: "online" | "offline" | "throw" = "online";
+  const states: NetworkState[] = [];
+  const monitor = createNetworkMonitor({
+    probe: () => { if (mode === "throw") throw new Error("probe fixture"); return mode === "online"; },
+    sampleIntervalMs: 10,
+    offlineStableWindowMs: 5,
+    offlineSampleCount: 2,
+    onState: (s) => states.push(s),
+  });
+  try {
+    monitor.start();
+    mode = "offline";
+    await until(() => monitor.current().online === false, "真实计时下未判离线");
+    assert.equal(monitor.gate.isOnline(), false);
+    const transitions = states.length;
+    mode = "throw";
+    const { probeNow } = monitor;
+    probeNow();
+    await sleep(60); // 覆盖多个真实采样周期
+    assert.equal(monitor.current().online, false, "真实计时下探针异常保持已知离线");
+    assert.equal(monitor.gate.isOnline(), false);
+    assert.equal(states.length, transitions, "真实计时下探针异常不得触发 onState");
+  } finally {
+    monitor.stop();
+  }
+});

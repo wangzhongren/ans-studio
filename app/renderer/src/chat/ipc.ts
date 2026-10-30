@@ -440,7 +440,9 @@ export function installChatRuntime(): void {
   // P2（2026-10-30）：网络状态——首屏/重载读一次权威快照 + 订阅变化；渲染 `online/offline` 只作
   // 提示上报（主进程重探 `net.isOnline()`，可纠正误报；锁屏/渲染丢事件都不改主进程权威判定）。
   bridge.onNetworkState?.(handleNetworkState);
-  void bridge.getNetworkState?.().then(handleNetworkState, () => undefined);
+  // 显式判断桥方法存在性/返回值（旧 preload 无该方法时不构造 .then 链）。
+  const initialNetwork = bridge.getNetworkState?.();
+  if (initialNetwork !== undefined) void initialNetwork.then(handleNetworkState, () => undefined);
   if (typeof window.addEventListener === "function") {
     window.addEventListener("online", () => { void bridge.reportNetworkHint?.(true); });
     window.addEventListener("offline", () => { void bridge.reportNetworkHint?.(false); });
