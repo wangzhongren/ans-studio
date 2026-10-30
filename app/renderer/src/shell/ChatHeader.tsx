@@ -29,8 +29,10 @@ import {
 import { openEngineSettingsLabel, runtimeLabel } from "@/chat/runtime-config";
 import {
   chatWorkingChipView,
+  NetworkStatusLine,
   RoleStatusChip,
 } from "@/chat/role-status-view";
+import { networkStatusView } from "@/chat/status";
 import {
   openSettingsDrawer,
   setDrawerInvoker,
@@ -60,6 +62,7 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
   const roleBusy = useChatStore((s) => s.roleBusy);
   const queueByRole = useChatStore((s) => s.queueByRole);
   const pendingOperator = useChatStore((s) => s.pendingOperator);
+  const network = useChatStore((s) => s.network);
   const notice = useSettingsStore((s) => s.notice);
   const backgroundRunning = useBackgroundTasksStore((s) => s.runningCount);
   const anyRoleBusy = Object.values(roleBusy).some((busy) => busy === true);
@@ -106,6 +109,8 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
   const contextWarning =
     selectedRoleId ? roleMeta[selectedRoleId]?.contextWarning || "" : "";
   const contextWarningMatch = /恢复失败：(.+)）$/.exec(contextText);
+  // P2：网络状态行（人话；在线常态隐藏；恢复行 8s 后收起——由 store 计时清理）。
+  const networkStatus = networkStatusView(network, locale);
 
   const pendingCount = pendingCountFor(pendingOperator, selectedRoleId || null);
   const pendingTotal = Object.keys(pendingOperator).length;
@@ -178,6 +183,7 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
             >
               {contextText}
             </span>
+            <NetworkStatusLine view={networkStatus} />
           </div>
 
           <div className="session-actions" id="right-tabs">

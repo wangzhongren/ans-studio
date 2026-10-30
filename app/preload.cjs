@@ -320,6 +320,25 @@ contextBridge.exposeInMainWorld("desktop", {
   /** 界面加载后请求重放全部在场角色状态快照（忙/闲/队列）；主进程经同一 session:role-state 通道回推。 */
   requestRoleStates: () => ipcRenderer.invoke("session:role-states"),
 
+  // —— P2（2026-10-30）：网络状态（主进程权威；渲染 online/offline 仅提示）——
+  /**
+   * 读取当前网络状态快照：`{online, source, at, stableForMs, reason?}`（主进程 `net.isOnline` 权威）。
+   * 首屏/重载时调用一次；后续变化经 `onNetworkState` 推送。**不暴露任何 Node/Electron 能力。**
+   */
+  getNetworkState: () => ipcRenderer.invoke("network:get-state"),
+  /**
+   * 上报渲染层 online/offline 提示：主进程**只据此重探** `net.isOnline()`（可纠正误报），
+   * 不直接采信。回报 `{ok, state?}`。
+   */
+  reportNetworkHint: (online) =>
+    ipcRenderer.invoke("network:renderer-state", { online: online === true }),
+  /** 订阅网络状态变化（只在离线/恢复切换时推送）；返回取消订阅函数。 */
+  onNetworkState: (cb) => {
+    const listener = (_event, payload) => cb(payload);
+    ipcRenderer.on("network:state", listener);
+    return () => ipcRenderer.removeListener("network:state", listener);
+  },
+
   /**
    * 订阅「会话历史已恢复」（D-1，2026-10-12）：项目导入/重载后，主进程按项目/角色/runtime 读取 ANS 回放，把**规范化后的界面行**推来
    * （`{roleId,projectRoot,runtime,rows:[{kind:user|assistant|tool|denied,text,at}],error,skipped}`）——

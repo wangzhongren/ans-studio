@@ -7,7 +7,7 @@
 
 import { createElement, type ReactNode } from "react";
 import { DEFAULT_LOCALE, type Locale } from "../i18n/index.ts";
-import { deriveRoleStatus, statusBadge, type RoleFacts, type RoleStatus } from "./status.ts";
+import { deriveRoleStatus, statusBadge, type NetworkStatusView, type RoleFacts, type RoleStatus } from "./status.ts";
 
 export interface WorkingRolesSummary {
   ids: string[];
@@ -123,5 +123,25 @@ export function RoleStatusChip(props: RoleStatusChipProps) {
         })
       : null,
     createElement("span", { className: "role-status-label" }, props.label),
+  );
+}
+
+/**
+ * P2（2026-10-30）：网络状态行（`aria-live="polite"`；只呈现主进程权威快照的人话）。
+ * `view.visible === false` ⇒ 不渲染（在线常态不占位）。无 JSX，便于 node --test 直接渲染断言。
+ */
+export function NetworkStatusLine(props: { view: NetworkStatusView }) {
+  if (!props.view.visible) return null;
+  return createElement(
+    "span",
+    {
+      id: "network-status",
+      className: props.view.className,
+      role: "status",
+      "aria-live": props.view.ariaLive,
+      "data-status": props.view.status,
+      title: props.view.title || undefined,
+    },
+    props.view.label,
   );
 }

@@ -11,6 +11,7 @@ import type {
   RuntimeReplayCheckpoint, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1,
   DeliveryReceiptQueryV1, RuntimePersistenceErrorCode, RuntimeDeliveryProgressV1,
   RuntimeReasoningEventDetailV1,
+  NetworkGate,
   BackgroundTaskCapability,
   BackgroundTaskReadOptions,
   BackgroundTaskReadResult,
@@ -30,6 +31,7 @@ import { REPORT_LIMITS, makeReportSnapshot, canonicalJson, reportIdFor, validate
 import { createEventQueue } from "../../common/runtime-core/event-queue.ts";
 import { DEFAULT_TURN_LAST_RESORT_MS, createInteractionGate, isAbortError, isTimeoutError, raceAbort, resolveRuntimeTimeouts, withPausableTimeout, withTimeout } from "../../common/runtime-core/timeout.ts";
 import { isRequestFailureCode, requestTimeoutFailureFacts, requestTimeoutSummary } from "../../common/runtime-core/request-timeout.ts";
+import { isNetworkOfflineFailure, networkOfflineFailureFacts, networkOfflineSummary } from "../../common/runtime-core/network-gate.ts";
 import { REASONING_DIAGNOSTIC_SUMMARY, REASONING_EVENT_SUMMARY, resolveReasoningEffort } from "../../common/runtime-core/reasoning.ts";
 import { createBackgroundTaskManager } from "../../common/runtime-core/background-tasks.ts";
 
@@ -57,6 +59,15 @@ export interface RuntimeSessionOptions extends Omit<GovernedToolsOptions, "curre
   requestFirstByteTimeoutMs?: number;
   /** P1 请求级流空闲时限（毫秒；缺省 300000，测试可注入小值）。 */
   requestIdleTimeoutMs?: number;
+  /**
+   * P2（2026-10-30）网络状态门（主进程 `net.isOnline` 权威 + 渲染/power 提示；Model 共享契约）。
+   * 离线 ⇒ Claude 适配器对请求 deadline `pause()`（计时停走）；恢复 ⇒ `resume()`；
+   * 离线超过 `networkRetryWindowMs` ⇒ 终态 failed（`network-offline-timeout`），不自动重放。
+   * 缺省 ⇒ always-online（旧行为零变化；Pi/Codex 不消费）。
+   */
+  networkGate?: NetworkGate;
+  /** P2 离线等待恢复窗口（毫秒；缺省 300000＝5min，测试/宿主可注入小值）。 */
+  networkRetryWindowMs?: number;
   /** Demo-only script; no SDK and no fallback for another runtime. */
   script?: ToolCall[];
 }
@@ -212,6 +223,9 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           // `runtime-core/request-timeout.ts`）。Pi/Codex 不改超时语义（Q10）。
           ...(options.requestFirstByteTimeoutMs !== undefined ? { requestFirstByteTimeoutMs: options.requestFirstByteTimeoutMs } : {}),
           ...(options.requestIdleTimeoutMs !== undefined ? { requestIdleTimeoutMs: options.requestIdleTimeoutMs } : {}),
+          // P2 网络状态门/恢复窗口：宿主（主进程 monitor）注入才生效；缺省 always-online。
+          ...(options.networkGate !== undefined ? { networkGate: options.networkGate } : {}),
+          ...(options.networkRetryWindowMs !== undefined ? { networkRetryWindowMs: options.networkRetryWindowMs } : {}),
         };
         const factory = options.providerFactories?.[options.runtime] ?? (options.runtime === "demo"
           ? ((input: RuntimeProviderOptions) => createDemoRuntimeAdapter(input, options.script ?? [{ name: "write_file", args: { path: "src/evil.ts", content: "// 越界写入示例\n" } }]))
@@ -343,6 +357,8 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           let lastResortExpired = false;
           // P1：请求失败终态事实（仅在 outcome=failed 时填；最后兜底 timed_out 不填，T1 形状不变）。
           let requestFailureTimeout: ReturnType<typeof requestTimeoutFailureFacts>;
+          // P2：网络离线超窗失败事实（errorCode `network-offline-timeout`；终态 failed，不自动重放）。
+          let networkFailure: ReturnType<typeof networkOfflineFailureFacts>;
           let failureCode: string | undefined;
           let failureAttempts: number | undefined;
           let failureReplaySafe: boolean | undefined;
@@ -391,11 +407,13 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             if (turn.outcome === "failed") {
               // P1：请求超时/请求失败的结构化事实（errorCode/attempts/replaySafe/timeoutKind）随终态 detail
               // 如实外推；客户可见 summary 只用人话，不含技术 code（code 留在 detail/诊断）。
+              // P2：网络离线超窗错误同口径（errorCode `network-offline-timeout`）。
               requestFailureTimeout = requestTimeoutFailureFacts(error);
+              networkFailure = isNetworkOfflineFailure(error) ? networkOfflineFailureFacts(error) : undefined;
               const record = error instanceof Error ? error as Error & { code?: unknown; attempts?: unknown; replaySafe?: unknown } : undefined;
-              failureCode = typeof record?.code === "string" && isRequestFailureCode(record.code) ? record.code : undefined;
-              failureAttempts = requestFailureTimeout?.attempts ?? (typeof record?.attempts === "number" && Number.isFinite(record.attempts) ? record.attempts : undefined);
-              failureReplaySafe = requestFailureTimeout?.replaySafe ?? (typeof record?.replaySafe === "boolean" ? record.replaySafe : undefined);
+              failureCode = typeof record?.code === "string" && (isRequestFailureCode(record.code) || isNetworkOfflineFailure(error)) ? record.code : undefined;
+              failureAttempts = requestFailureTimeout?.attempts ?? networkFailure?.attempts ?? (typeof record?.attempts === "number" && Number.isFinite(record.attempts) ? record.attempts : undefined);
+              failureReplaySafe = requestFailureTimeout?.replaySafe ?? networkFailure?.replaySafe ?? (typeof record?.replaySafe === "boolean" ? record.replaySafe : undefined);
             }
             turn.controller.abort();
             if (inner.abort && underlying !== undefined && !underlyingFinished) {
@@ -408,7 +426,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             active = undefined;
             endedTurns.add(turn.id);
             provider.setTurn();
-            const event: SessionEvent = { kind: "settled", summary: turn.outcome === "completed" ? "会话结束" : turn.outcome === "aborted" ? "本轮已中止" : turn.outcome === "timed_out" ? (lastResortExpired ? "本轮超过最后兜底，已中止" : "本轮运行超时") : (requestFailureTimeout !== undefined ? requestTimeoutSummary(requestFailureTimeout.timeoutKind) : "本轮运行失败"), runtime: options.runtime, roleId: role.id, turnId: turn.id, detail: { turnId: turn.id, outcome: turn.outcome, ...(turn.outcome === "failed" && failureCode !== undefined ? { errorCode: failureCode, ...(failureAttempts !== undefined ? { attempts: failureAttempts } : {}), ...(failureReplaySafe !== undefined ? { replaySafe: failureReplaySafe } : {}), ...(requestFailureTimeout !== undefined ? { timeoutKind: requestFailureTimeout.timeoutKind } : {}) } : {}) } };
+            const event: SessionEvent = { kind: "settled", summary: turn.outcome === "completed" ? "会话结束" : turn.outcome === "aborted" ? "本轮已中止" : turn.outcome === "timed_out" ? (lastResortExpired ? "本轮超过最后兜底，已中止" : "本轮运行超时") : (networkFailure !== undefined ? networkOfflineSummary() : requestFailureTimeout !== undefined ? requestTimeoutSummary(requestFailureTimeout.timeoutKind) : "本轮运行失败"), runtime: options.runtime, roleId: role.id, turnId: turn.id, detail: { turnId: turn.id, outcome: turn.outcome, ...(turn.outcome === "failed" && failureCode !== undefined ? { errorCode: failureCode, ...(failureAttempts !== undefined ? { attempts: failureAttempts } : {}), ...(failureReplaySafe !== undefined ? { replaySafe: failureReplaySafe } : {}), ...(requestFailureTimeout !== undefined ? { timeoutKind: requestFailureTimeout.timeoutKind } : {}) } : {}) } };
             emit(event,plan,!plan);
             await pendingPersist;
             const record: RuntimeSessionRecord = { version: 1, id: recordId, roleId: role.id, runtime: options.runtime, contextSource: wrapper.contextSource ?? "fresh", nativeSessionId: wrapper.nativeSessionId, contextWarning: plan&&wrapper.contextWarning?provider.display.protectText(wrapper.contextWarning,4096).text:wrapper.contextWarning, createdAt, updatedAt: new Date().toISOString() };

@@ -198,6 +198,11 @@ export const zhCN = {
   "ui.queue.blocked.originMissing": "检测到收尾异常（忙态没有对应回合），可点「停止本轮」复位后队列继续",
   "ui.queue.blocked.sessionClosed": "目标会话尚未开启，等待自动开启后投递",
   "ui.queue.blocked.network": "网络不可用，队列已安全暂停",
+  // P2（2026-10-30）：网络状态行（会话头；主进程 net.isOnline 权威；人话，无技术 code）。
+  "ui.network.label.offline": "网络已断开",
+  "ui.network.label.recovered": "网络已恢复 · 正在继续",
+  "ui.network.title.offline": "网络已断开：进行中的请求计时已暂停，队列等待网络；恢复后自动继续。",
+  "ui.network.title.recovered": "网络已恢复：暂停的请求与队列已继续。",
 
   // ---- 队列子视图（shell/QueueSubview.tsx）----
   "ui.queueSubview.backRole": "返回角色资料",
@@ -1015,6 +1020,8 @@ export const zhCN = {
   "main.requestStatus.timeoutFirstByte": "请求超时：长时间没有收到模型响应；本轮已结束，可稍后重发。",
   "main.requestStatus.timeoutIdle": "请求超时：模型响应长时间中断；本轮已结束，可稍后重发。",
   "main.requestStatus.failed": "本轮请求失败，已结束；请检查后重发。",
+  // P2 网络离线超窗的系统行（客户可见人话；`network-offline-timeout` 只在诊断/detail）。
+  "main.networkStatus.offlineTimeout": "网络已断开，等待恢复超时；本轮已结束，可稍后重发。",
   "main.session.rebuiltBoundary":
     "该角色边界已更新或运行时配置已保存（{changed}），已作废旧会话，按新边界重开；上下文恢复结果以引擎实际返回为准。",
   "main.session.rebuiltSkills":

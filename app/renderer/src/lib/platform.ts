@@ -53,6 +53,10 @@ export interface DesktopBridge {
   onSessionEvent?: (callback: (payload: unknown) => void) => () => void;
   onRoleState?: (callback: (payload: unknown) => void) => () => void;
   requestRoleStates?: () => Promise<{ ok: boolean }>;
+  // —— P2（2026-10-30）：网络状态（定义/实现属桌面窗口；这里只按名消费）——
+  getNetworkState?: () => Promise<unknown>;
+  reportNetworkHint?: (online: boolean) => Promise<unknown>;
+  onNetworkState?: (callback: (payload: unknown) => void) => () => void;
   onSessionHistory?: (callback: (payload: unknown) => void) => () => void;
   onProjectChanged?: (callback: () => void) => () => void;
   onOperatorRequest?: (callback: (payload: unknown) => void) => () => void;

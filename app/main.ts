@@ -15,9 +15,14 @@ import os from "node:os";
 import fs from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, powerMonitor, shell } from "electron";
 
 import { createDesktopInterface, createShellJudgeSwitch, isShellJudgeIpcSender, registerPreferencesIpc, type DesktopInterface } from "./desktop/interface.ts";
+// P2（2026-10-30）：网络状态监听——主进程 `net.isOnline` 权威 + powerMonitor 提示；状态经 IPC 推渲染层，
+// 同时经 Interface 传入 SessionManager（离线队列保留）与运行时（请求 deadline 暂停/恢复）。
+// 纯逻辑在 `desktop/network-monitor.ts`（可注入 probe/clock；本文件只接 Electron 事件与 IPC）。
+import { createNetworkMonitor } from "./desktop/network-monitor.ts";
+import type { NetworkState } from "../src/model/runtime.ts";
 // i18n B0（2026-10-23）：主进程 translator（窗口/对话框/启动错误框）与应用级语言偏好
 // （`<userData>/ans/preferences.json`，只写 userData；不写项目 `.ans`/`.env`）。
 import { createMainI18n, desktopTexts } from "./desktop/i18n.ts";
@@ -283,6 +288,20 @@ function registerIpc(win: BrowserWindow): void {
     void win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(RECOVERY_PAGE)).catch((error) => mainDiagnostic.error("window.recovery-page.failed", error));
   };
   showMainFailure = showFailure;
+  // —————————————— P2（2026-10-30）：网络状态监听 ——————————————
+  // 权威来源＝主进程 `net.isOnline()` 初始 + 5s 采样；渲染 `online/offline` 上报只是提示（触发重探，
+  // 主进程可纠正误报）；powerMonitor suspend/resume/lock/unlock 只提示/重探——**锁屏 ≠ 离线**。
+  // 防抖：连续 2 次离线采样或 1s 稳定窗口才判离线；恢复立即。状态变化：推渲染 `network:state` +
+  // Interface/SessionManager（离线队列保留、blockedReason:"network"）；请求计时暂停由适配器经同一 gate 完成。
+  let desktopRef: DesktopInterface | null = null;
+  const networkMonitor = createNetworkMonitor({
+    probe: () => net.isOnline(),
+    diagnostics: createDiagnosticLogger({ component: "desktop.network" }),
+    onState: (state: NetworkState) => {
+      if (!win.isDestroyed()) win.webContents.send("network:state", state);
+      try { desktopRef?.applyNetworkState(state); } catch (error) { mainDiagnostic.error("network.apply.failed", error); }
+    },
+  });
   // —————— Phase 5A（PM §17.12）：真实主进程窗口的导航兜底 ——————
   // 渲染侧（桌面UI）应 preventDefault 并只对 http/https 调 openExternal 桥；本处兜住漏网导航：
   // 初始入口/同 URL reload 放行；http(s) 外开；file:/data:/javascript: 等一律阻止、不执行。
@@ -637,6 +656,9 @@ function registerIpc(win: BrowserWindow): void {
   if (!preferencesPath) throw new Error("语言偏好路径尚未初始化。");
   const desktop = createDesktopInterface({
     envFilePath: desktopEnvPath,
+    // P2（2026-10-30）：网络状态门经运行时选项透传（Service → Provider → 适配器 deadline 暂停/恢复）；
+    // 同一实例经 Interface 交给 SessionManager（离线队列保留、恢复继续）。
+    runtimeOptions: { networkGate: networkMonitor.gate },
     // i18n B0（2026-10-23）：应用级语言偏好文件与共享 translator（同一实例贯穿窗口/对话框/错误文案）。
     // 偏好只写 userData；不写项目 `.ans`/`.env`/治理账本。
     preferencesPath,
@@ -712,6 +734,18 @@ function registerIpc(win: BrowserWindow): void {
     },
   });
   iface = desktop;
+  // P2：monitor 在 Interface 就绪后启动（首采样定初始状态；离线时经 applyNetworkState 立即生效）。
+  desktopRef = desktop;
+  const onPowerSuspend = (): void => networkMonitor.notePower("suspend");
+  const onPowerResume = (): void => networkMonitor.notePower("resume");
+  // 锁屏/解锁**只记录提示并重探**——锁屏期间网络仍可能可用（现场验证），绝不直接判离线。
+  const onPowerLock = (): void => networkMonitor.notePower("lock");
+  const onPowerUnlock = (): void => networkMonitor.notePower("unlock");
+  powerMonitor.on("suspend", onPowerSuspend);
+  powerMonitor.on("resume", onPowerResume);
+  powerMonitor.on("lock-screen", onPowerLock);
+  powerMonitor.on("unlock-screen", onPowerUnlock);
+  networkMonitor.start();
   // —————— i18n B0（2026-10-23）：preferences:get / preferences:set-locale ——————
   // 成功切换后：更新窗口标题（新 locale）并广播 `preferences:locale-changed`。当前单窗口；
   // 遍历 BrowserWindow.getAllWindows() 为未来多窗口留好同一通道（多窗口联动本身不在 B0 验证）。
@@ -738,6 +772,12 @@ function registerIpc(win: BrowserWindow): void {
   desktop.startWatchdog(); // G-2/W1：看护周期 tick（默认 30s，仅 env 可调）——窗口注册后启动
   win.on("closed", () => {
     desktop.stopWatchdog(); // G-2/W1：窗关停 tick（看护绝不跨窗口残留）
+    // P2：网络监听随窗口收口（采样定时器、powerMonitor 监听与稳定窗口计时全部释放）。
+    networkMonitor.stop();
+    powerMonitor.removeListener("suspend", onPowerSuspend);
+    powerMonitor.removeListener("resume", onPowerResume);
+    powerMonitor.removeListener("lock-screen", onPowerLock);
+    powerMonitor.removeListener("unlock-screen", onPowerUnlock);
     desktop.disposeProjectDocuments();
     void desktop.stopSession({ roleId: null }).catch((error) => mainDiagnostic.error("window.sessions.close.failed", error));
   });
@@ -782,6 +822,17 @@ function registerIpc(win: BrowserWindow): void {
   registerHandler("session:live", () => desktop.listLiveSessions());
   registerHandler("session:live-views", () => desktop.listLiveSessionViews());
   registerHandler("session:role-states", () => desktop.requestRoleStates());
+  // P2（2026-10-30）：网络状态（主进程权威）——渲染首屏/重载读取当前快照；渲染 online/offline
+  // **只作为提示**上报（主进程据此重探 `net.isOnline()`，可纠正渲染层误报）。
+  registerHandler("network:get-state", (event) => {
+    if (event.sender !== win.webContents) return null;
+    return networkMonitor.current();
+  });
+  registerHandler("network:renderer-state", (event, input: { online?: unknown } | null) => {
+    if (event.sender !== win.webContents) return { ok: false };
+    if (!input || typeof input !== "object" || typeof input.online !== "boolean") return { ok: false };
+    return { ok: true, state: networkMonitor.noteRendererState(input.online === true) };
+  });
   registerHandler("session:history-get", (_event, input) => desktop.getSessionHistory(input));
   // —— 会话级后台任务（2026-10-25，桌面任务面板）：聚合列表 / 读日志 / 停止 ——
   // 渲染进程输入不可信：**来源校验在本 handler**（同 app:recovery-state 等既有模式）；参数校验与失败回执

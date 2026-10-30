@@ -195,6 +195,11 @@ export const enUS = {
   "ui.queue.blocked.originMissing": "Turn-settlement anomaly detected (busy with no tracked turn); use Stop to unwedge and resume the queue",
   "ui.queue.blocked.sessionClosed": "The target session is not open yet; queued items will be delivered once it opens",
   "ui.queue.blocked.network": "Network unavailable; the queue is safely paused",
+  // P2 (2026-10-30): network status line (chat header; main-process net.isOnline is authoritative).
+  "ui.network.label.offline": "Network disconnected",
+  "ui.network.label.recovered": "Network restored · continuing",
+  "ui.network.title.offline": "Network disconnected: the in-flight request timer is paused and the queue is waiting for the network; work continues automatically after recovery.",
+  "ui.network.title.recovered": "Network restored: paused requests and the queue have resumed.",
 
   "ui.queueSubview.backRole": "Back to role profile",
   "ui.queueSubview.backWork": "Back to work overview",
@@ -1119,6 +1124,8 @@ export const enUS = {
     "Request timed out: the model response stalled; this turn has ended and can be retried later.",
   "main.requestStatus.failed":
     "The request failed; this turn has ended and can be retried later.",
+  "main.networkStatus.offlineTimeout":
+    "The network was disconnected and did not recover within the wait window; this turn has ended and can be retried later.",
   "main.session.rebuiltBoundary":
     "This role's boundary was updated or the runtime configuration was saved ({changed}); the old session was invalidated and reopened against the new boundary. The context restore result is subject to the engine's actual response.",
   "main.session.rebuiltSkills":

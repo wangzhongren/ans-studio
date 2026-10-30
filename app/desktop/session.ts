@@ -1,6 +1,7 @@
 import { RuntimeDeliveryError, REQUEST_TIMEOUT_ERROR_CODES } from "../../src/model/runtime.ts";
 import { isRequestFailureCode } from "../../src/common/runtime-core/request-timeout.ts";
-import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1, DeliveryReceiptQueryV1, RuntimeDeliveryReceiptV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1, GovernanceJudgeContext, BackgroundTaskSnapshot, BackgroundTaskReadOptions, BackgroundTaskReadResult, BackgroundTaskStopOptions, BackgroundTaskStopResult } from "../../src/model/runtime.ts";
+import { isNetworkOfflineFailureCode } from "../../src/common/runtime-core/network-gate.ts";
+import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1, DeliveryReceiptQueryV1, RuntimeDeliveryReceiptV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1, GovernanceJudgeContext, BackgroundTaskSnapshot, BackgroundTaskReadOptions, BackgroundTaskReadResult, BackgroundTaskStopOptions, BackgroundTaskStopResult, NetworkGate, NetworkState } from "../../src/model/runtime.ts";
 // app/desktop/session.ts
 // 桌面应用的「会话」装配（纯逻辑，不依赖 electron，可在 node 下单测）。
 //
@@ -701,6 +702,12 @@ export interface SessionManagerDeps {
    * 启动/项目导入时用 `restorePersistedDeliveries()` 重新入队并按既有 drain 路径自动重投。
    */
   deliveryQueueStorePath?: string;
+  /**
+   * **P2 网络状态门（2026-10-30）**：主进程权威（`net.isOnline` 采样 + 渲染/power 提示）经 Interface 注入；
+   * 离线期间**不认领新的模型投递**（队列保留、`blockedReason:"network"` 可见），恢复后按既有顺序 drain。
+   * 缺省 ⇒ 视为在线（旧行为零变化）。
+   */
+  networkGate?: NetworkGate;
   /** **时钟（G-2；注入以便单测）**；缺省 `Date.now`。 */
   now?: () => number;
 }
@@ -1180,6 +1187,11 @@ export class SessionManager {
    * 防止启动早期（恢复之前）的一次入队用空内存快照覆盖磁盘上的待恢复条目。
    */
   private deliveryStoreArmed = false;
+  /**
+   * **P2 网络状态（2026-10-30）**：最近一次主进程网络快照（monitor 经 Interface 推入）。
+   * `null` = 尚未收到（按在线处理；不误判离线）。离线期间队列保留、不认领新投递；恢复后按既有 drain 继续。
+   */
+  private networkState: NetworkState | null = null;
 
   constructor(deps: SessionManagerDeps) {
     this.deps = deps;
@@ -2768,8 +2780,9 @@ export class SessionManager {
                     : undefined;
                 // P1（2026-10-30）：请求超时/请求失败的结构化 errorCode（来自 Service settled.detail）——
                 // 只用于人话系统行 + lastTurn 小状态；**不**进入客户可见文案（不显示技术 code/堆栈/URL）。
+                // P2：网络离线超窗（`network-offline-timeout`）同口径，用网络人话文案。
                 const settledErrorCodeRaw = (ev.detail as { errorCode?: unknown } | undefined)?.errorCode;
-                const settledErrorCode = typeof settledErrorCodeRaw === "string" && isRequestFailureCode(settledErrorCodeRaw) ? settledErrorCodeRaw : undefined;
+                const settledErrorCode = typeof settledErrorCodeRaw === "string" && (isRequestFailureCode(settledErrorCodeRaw) || isNetworkOfflineFailureCode(settledErrorCodeRaw)) ? settledErrorCodeRaw : undefined;
                 void this.mirrorGovernanceFeedback(projectRoot, runtime, roleId, {
                   ...(settledOrigin?.flowIds !== undefined && settledOrigin.flowIds.length > 0 ? { flowIds: settledOrigin.flowIds } : {}),
                   ...(settledOutcome !== undefined ? { outcome: settledOutcome } : {}),
@@ -2779,11 +2792,13 @@ export class SessionManager {
                 }
                 if (settledOutcome === "failed" && settledErrorCode !== undefined) {
                   // 人话系统行（客户卡不出现技术模板/code）：来源 i18n；delivery-note 只呈现，不触发模型/门禁。
-                  const human = settledErrorCode === REQUEST_TIMEOUT_ERROR_CODES["first-byte"]
-                    ? mainT("main.requestStatus.timeoutFirstByte")
-                    : settledErrorCode === REQUEST_TIMEOUT_ERROR_CODES.idle
-                      ? mainT("main.requestStatus.timeoutIdle")
-                      : mainT("main.requestStatus.failed");
+                  const human = isNetworkOfflineFailureCode(settledErrorCode)
+                    ? mainT("main.networkStatus.offlineTimeout")
+                    : settledErrorCode === REQUEST_TIMEOUT_ERROR_CODES["first-byte"]
+                      ? mainT("main.requestStatus.timeoutFirstByte")
+                      : settledErrorCode === REQUEST_TIMEOUT_ERROR_CODES.idle
+                        ? mainT("main.requestStatus.timeoutIdle")
+                        : mainT("main.requestStatus.failed");
                   this.emitDeliveryNote(en.projectRoot, runtime, roleId, roleId, human);
                 }
                 this.observeWatchdog(en.projectRoot, {
@@ -5149,17 +5164,20 @@ export class SessionManager {
     if (entry) contextInfo = this.contextInfo(entry.handle);
     // **为什么没动**（单一来源＝会话内存态，不造第二套）：队首类别 / 阻塞原因 / 当前回合 id。
     // `origin-missing` = 忙态但无对应在跑回合（收尾异常，可用「停止本轮」复位）；
-    // `target-busy` = 正常等待上一轮；`session-closed` = 目标会话未开且没有自动开启链。
+    // `target-busy` = 正常等待上一轮；`session-closed` = 目标会话未开且没有自动开启链；
+    // `network`（P2）= 主进程网络离线，队列安全暂停（恢复后按既有顺序继续）。
     const runningOrigin = entry?.origins.running;
     const headKind = q.length > 0 ? q[0].kind : null;
-    const blockedReason: "target-busy" | "origin-missing" | "session-closed" | null =
+    const blockedReason: "target-busy" | "origin-missing" | "session-closed" | "network" | null =
       q.length === 0
         ? null
-        : busy
-          ? (runningOrigin === undefined || runningOrigin.settled === true ? "origin-missing" : "target-busy")
-          : entry === undefined
-            ? (this.drainChains.has(projectRoot) ? null : "session-closed")
-            : null;
+        : this.isNetworkOffline()
+          ? "network"
+          : busy
+            ? (runningOrigin === undefined || runningOrigin.settled === true ? "origin-missing" : "target-busy")
+            : entry === undefined
+              ? (this.drainChains.has(projectRoot) ? null : "session-closed")
+              : null;
     this.deps.emitRoleState?.({
       ...contextInfo,
       roleId: targetRoleId, projectRoot, runtime, profileRevision: entry?.profileRevision ?? this.profileRevision(runtime),
@@ -5177,6 +5195,41 @@ export class SessionManager {
   broadcastRoleStates(): void {
     for (const entry of this.sessions.values()) {
       this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
+    }
+  }
+
+  // —————————————— P2（2026-10-30）：网络状态 → 队列/状态快照 ——————————————
+
+  /** 当前是否离线：优先主进程注入的门（权威）；未注入门时看最近快照（缺省在线）。 */
+  private isNetworkOffline(): boolean {
+    if (this.deps.networkGate !== undefined) return !this.deps.networkGate.isOnline();
+    return this.networkState?.online === false;
+  }
+
+  /**
+   * **P2：接收主进程网络状态**（monitor `onState` → Interface → 本方法；只在 online 变化时被调用）。
+   * - 离线：队列**保留**、不认领新投递，`role-state` 快照标 `blockedReason:"network"`（界面可见）；
+   * - 恢复：对全部有队列的项目按**既有** `drainAllQueuesFor` 路径继续投递（不重放已完成/失败回合）。
+   * 只改队列认领时机，不改 busy/租约/终态语义。
+   */
+  applyNetworkState(state: NetworkState): void {
+    const wasOffline = this.networkState === null
+      ? this.deps.networkGate?.isOnline() === false
+      : this.networkState.online === false;
+    this.networkState = { ...state };
+    const projects = new Set<string>();
+    for (const entry of this.sessions.values()) {
+      this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
+      projects.add(entry.projectRoot);
+    }
+    for (const key of [...this.deliveryQueues.keys()]) {
+      const [projectRoot, roleId, runtime] = key.split("\u0000");
+      if (projectRoot === undefined || roleId === undefined || runtime === undefined) continue;
+      this.notifyRoleState(projectRoot, roleId, runtime as RuntimeKind);
+      projects.add(projectRoot);
+    }
+    if (wasOffline && state.online) {
+      for (const projectRoot of projects) void this.drainAllQueuesFor(projectRoot);
     }
   }
 
@@ -7123,6 +7176,14 @@ ${formatted}` };
           mainT("main.session.delivery.noTarget", { kind: item.kind === "handback" ? mainT("main.watchdog.kind.handback") : mainT("ui.events.dispatchTask"), sourceRoleId: item.sourceRoleId })
         );
       }
+      return;
+    }
+
+    // P2（2026-10-30）：离线期间**不认领新的模型投递**——队列保留并标 `blockedReason:"network"`
+    // （数据面可见）；恢复后由 `applyNetworkState` 走同一 `drainAllQueuesFor` 继续（不把离线当完成/丢弃）。
+    if (this.isNetworkOffline()) {
+      diagnostic.record("delivery.blocked", { reasonCode: "network", queueDepth: q.length });
+      this.notifyRoleState(projectRoot, resolvedTarget, runtime);
       return;
     }
 

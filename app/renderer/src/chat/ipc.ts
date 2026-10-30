@@ -186,6 +186,11 @@ function handleRoleState(payload: unknown): void {
   }
 }
 
+/** P2（2026-10-30）：主进程网络状态 → store（状态行；离线/恢复的人话呈现）。 */
+function handleNetworkState(payload: unknown): void {
+  useChatStore.getState().applyNetworkState(payload);
+}
+
 function handleHistory(payload: unknown): void {
   const view = viewIdentity();
   const record = asRecord(payload);
@@ -432,6 +437,14 @@ export function installChatRuntime(): void {
   bridge.onRoleState?.(handleRoleState);
   // 订阅晚于状态变化时（界面重载/项目刚导入）主动拉一次快照重放，避免其他角色忙态显示缺失。
   void bridge.requestRoleStates?.();
+  // P2（2026-10-30）：网络状态——首屏/重载读一次权威快照 + 订阅变化；渲染 `online/offline` 只作
+  // 提示上报（主进程重探 `net.isOnline()`，可纠正误报；锁屏/渲染丢事件都不改主进程权威判定）。
+  bridge.onNetworkState?.(handleNetworkState);
+  void bridge.getNetworkState?.().then(handleNetworkState, () => undefined);
+  if (typeof window.addEventListener === "function") {
+    window.addEventListener("online", () => { void bridge.reportNetworkHint?.(true); });
+    window.addEventListener("offline", () => { void bridge.reportNetworkHint?.(false); });
+  }
   bridge.onSessionHistory?.(handleHistory);
   bridge.onProjectChanged?.(() => {
     void useChatStore.getState().refreshProject();

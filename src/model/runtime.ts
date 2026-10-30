@@ -1853,6 +1853,43 @@ export interface RuntimeRequestFailureFactsV1 {
   replaySafe: boolean;
   timeoutKind?: RequestTimeoutKind;
 }
+
+// —————— P2：网络状态（权威来源＝主进程 net.isOnline；锁屏≠离线） ——————
+/**
+ * 网络状态来源（方案 v1.1 §5.3.1）：
+ * · `main-net`：主进程 `net.isOnline()` 采样（**权威**）；
+ * · `renderer`：渲染层 online/offline 事件（**提示**，主进程可纠正误报）；
+ * · `power`：`powerMonitor` suspend/resume/lock/unlock（**提示/重探**，锁屏不判离线）；
+ * · `unknown`：启动前的保守占位。
+ */
+export type NetworkStateSource = "main-net" | "renderer" | "power" | "unknown";
+/** 状态原因（初始采样 / 接口断开 / 渲染层离线提示 / 恢复 / 重探）。 */
+export type NetworkStateReason = "initial" | "interface-down" | "renderer-offline" | "resume" | "probe";
+/** 网络状态（字段形状＝方案 v1.1 §5.3.1；`stableForMs` = 本次状态稳定时长）。 */
+export interface NetworkState {
+  online: boolean;
+  source: NetworkStateSource;
+  /** 状态确认时刻（毫秒 epoch；注入时钟，便于测试）。 */
+  at: number;
+  /** 当前状态已稳定时长（毫秒；`online` 切换时归零重计）。 */
+  stableForMs: number;
+  reason?: NetworkStateReason;
+}
+/**
+ * 网络状态门（Model 共享契约；主进程权威，渲染提示，power 提示）。
+ * 缺省（未注入）＝ always-online，旧行为零变化；适配器/桌面只读消费，不自行判网。
+ */
+export interface NetworkGate {
+  current(): NetworkState;
+  isOnline(): boolean;
+  /** 订阅在线状态变化（只在 online 变化时通知；返回退订函数）。 */
+  onChange(listener: (state: NetworkState) => void): () => void;
+}
+/**
+ * P2 网络失败 errorCode（终态 failed；等待恢复窗口耗尽，不自动重放——重试属 P3）。
+ * 只在结构化 detail/诊断中出现，**不得**进入客户可见文案。
+ */
+export const NETWORK_OFFLINE_TIMEOUT = "network-offline-timeout";
 export type JsonSchema = Record<string, unknown>;
 export type DiagnosticLog = ReturnType<typeof createDiagnosticLogger>;
 
@@ -2102,6 +2139,18 @@ export interface RuntimeProviderOptions {
    * 计时停走（中性 pause/resume 接口留给 P2 网络暂停接线）。
    */
   requestIdleTimeoutMs?: number;
+  /**
+   * P2（2026-10-30）**网络状态门**（主进程 `net.isOnline` 权威 + 渲染/power 提示；形状＝Model `NetworkGate`）。
+   * 离线时适配器对请求级 deadline `pause()`（计时停走，不触发超时），恢复后 `resume()`；
+   * 离线超过 `networkRetryWindowMs` 以 `network-offline-timeout` 失败（不自动重放——重试属 P3）。
+   * **缺省 ⇒ always-online**（旧行为零变化；Pi/Codex 不消费本字段）。
+   */
+  networkGate?: NetworkGate;
+  /**
+   * P2 **离线等待恢复窗口**（毫秒；缺省 300000＝5min，测试/宿主可注入小值）。
+   * 离线持续超过该窗口 ⇒ 本轮 `failed`（errorCode `network-offline-timeout`），如实终态、不重放。
+   */
+  networkRetryWindowMs?: number;
   /**
    * G-4 V2：该角色会话构造时装配的外来 MCP 声明（Service 在 providerFor 读取 `docs/mcp/**` 后注入；
    * **纯消费面**——适配器不得各自去找文件、不得写盘；缺省＝无声明可装配）。装配/放行/呈现属各平台

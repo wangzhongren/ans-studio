@@ -20,6 +20,12 @@ import {
   isRequestTimeoutFailure,
   type RequestDeadline,
 } from "../../common/runtime-core/request-timeout.ts";
+import {
+  DEFAULT_NETWORK_RETRY_WINDOW_MS,
+  createNetworkOfflineFailure,
+  isNetworkOfflineFailure,
+} from "../../common/runtime-core/network-gate.ts";
+import { NETWORK_OFFLINE_TIMEOUT } from "../../model/runtime.ts";
 import { toClaudeSchema } from "../../common/claude-adapter/schema.ts";
 import { CLAUDE_JUDGE_DISALLOWED_TOOLS, CLAUDE_JUDGE_TOOL_NAMES, assertClaudeJudgeToolSet, claudeJudgeReportToolName, claudeJudgeSystemPromptLine } from "../../common/claude-adapter/judge.ts";
 import { isClaudeImageMimeType, mapClaudeToolResultImages, type ClaudeImageMimeType } from "../../common/claude-adapter/tool-result-images.ts";
@@ -129,6 +135,10 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
   // 测试/宿主可注入小值）。与 1h 最后兜底并存：请求超时终态 failed + errorCode，1h 仍是 timed_out。
   const requestFirstByteTimeoutMs = options.requestFirstByteTimeoutMs ?? DEFAULT_REQUEST_FIRST_BYTE_TIMEOUT_MS;
   const requestIdleTimeoutMs = options.requestIdleTimeoutMs ?? DEFAULT_REQUEST_IDLE_TIMEOUT_MS;
+  // P2（2026-10-30）网络暂停：离线对同一 deadline `pause()/resume()`（引用计数），超窗失败。
+  // 缺省门 ⇒ always-online（旧行为零变化）；窗口缺省 5min，测试/宿主可注入小值。
+  const networkGate = options.networkGate;
+  const networkRetryWindowMs = options.networkRetryWindowMs ?? DEFAULT_NETWORK_RETRY_WINDOW_MS;
   // Auth, endpoint and redaction must use the same immutable profile snapshot.
   const env = { ...(dependencies.env ?? process.env) };
   const credentialName = options.apiKeyEnvVar ?? "ANTHROPIC_API_KEY";
@@ -279,7 +289,66 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
         }
       };
       // P1 请求级 deadline 生命周期（停止/暂停/恢复）。暂停引用计数：交互闸、工具执行、abort 清理可嵌套，
-      // 网络暂停（P2）接同一 pause()/resume()，本批不接线。
+      // P2 网络暂停接同一 `pause()/resume()`。网络监听绑定到**当前 attempt 的 deadline**：
+      // 离线 ⇒ 暂停（计时停走，不触发请求超时）；恢复 ⇒ 继续；离线超过窗口 ⇒ network-offline-timeout。
+      let networkUnsubscribe: (() => void) | undefined;
+      let networkPaused = false;
+      let networkOfflineSince: number | undefined;
+      let networkWindow: ReturnType<typeof setTimeout> | undefined;
+      const stopNetworkWatch = (): void => {
+        networkUnsubscribe?.();
+        networkUnsubscribe = undefined;
+        if (networkWindow !== undefined) {
+          clearTimeout(networkWindow);
+          networkWindow = undefined;
+        }
+        networkPaused = false;
+        networkOfflineSince = undefined;
+      };
+      const pauseRequestForNetwork = (turn: Turn, offlineAt: number): void => {
+        if (networkPaused || disposed || turn.controller.signal.aborted) return;
+        networkPaused = true;
+        networkOfflineSince = offlineAt;
+        requestDeadline?.pause();
+        diagnostics.record("network.request.pause", { turnId: turn.id, attempt: requestAttempt, state: "offline", mode: "claude" });
+        emit(turn, "message", "网络已断开，当前请求的计时已暂停；恢复后继续。", { source: "system", reasonCode: "network-offline", state: "offline" });
+        if (Number.isFinite(networkRetryWindowMs) && networkRetryWindowMs > 0) {
+          networkWindow = setTimeout(() => {
+            networkWindow = undefined;
+            if (!networkPaused || disposed || turn.controller.signal.aborted) return;
+            const offlineMs = Math.max(0, Date.now() - (networkOfflineSince ?? Date.now()));
+            // 只记录元数据（时长/次数）；不记录 prompt/URL/凭据。终态 failed + errorCode，不自动重放。
+            diagnostics.record("network.request.timeout", {
+              turnId: turn.id, attempt: requestAttempt, errorCode: NETWORK_OFFLINE_TIMEOUT,
+              timeoutMs: networkRetryWindowMs, durationMs: Math.round(offlineMs), mode: "offline-window",
+            });
+            turn.reject(createNetworkOfflineFailure(requestAttempt, turn.replayUnsafe, offlineMs));
+          }, networkRetryWindowMs);
+        }
+      };
+      const resumeRequestForNetwork = (turn: Turn): void => {
+        if (!networkPaused) return;
+        networkPaused = false;
+        networkOfflineSince = undefined;
+        if (networkWindow !== undefined) {
+          clearTimeout(networkWindow);
+          networkWindow = undefined;
+        }
+        requestDeadline?.resume();
+        diagnostics.record("network.request.resume", { turnId: turn.id, attempt: requestAttempt, state: "online", mode: "claude" });
+        emit(turn, "message", "网络已恢复，暂停的请求继续。", { source: "system", reasonCode: "network-offline", state: "online" });
+      };
+      /** 绑定本次 attempt 的网络状态订阅；当前已离线则立即暂停（先 pause 再 start 是合法顺序）。 */
+      const startNetworkWatch = (turn: Turn): void => {
+        stopNetworkWatch();
+        if (networkGate === undefined) return;
+        networkUnsubscribe = networkGate.onChange((state) => {
+          if (state.online) resumeRequestForNetwork(turn);
+          else pauseRequestForNetwork(turn, Number.isFinite(state.at) ? state.at : Date.now());
+        });
+        const current = networkGate.current();
+        if (!current.online) pauseRequestForNetwork(turn, current.at);
+      };
       const stopRequestDeadline = (): void => {
         requestDeadline?.stop();
         requestDeadline = undefined;
@@ -287,12 +356,14 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
         requestGateUnsubscribe = undefined;
         requestAbortUnsubscribe?.();
         requestAbortUnsubscribe = undefined;
+        stopNetworkWatch();
       };
       const pauseRequestTimer = (turn?: Turn): void => { if (turn === undefined || turn === active) requestDeadline?.pause(); };
       const resumeRequestTimer = (turn?: Turn): void => { if (turn === undefined || turn === active) requestDeadline?.resume(); };
       // P1：请求级超时错误原样上抛（name=RequestTimeoutError，code=request-timeout-*），不得被
-      // 「Claude SDK 运行失败」包装吞掉 code；AbortError/TimeoutError（最后兜底）语义不变。
-      const safeFailure = (error: unknown) => isRequestTimeoutFailure(error)
+      // 「Claude SDK 运行失败」包装吞掉 code；P2 网络离线超窗错误同理原样上抛；AbortError/TimeoutError
+      // （最后兜底）语义不变。
+      const safeFailure = (error: unknown) => isRequestTimeoutFailure(error) || isNetworkOfflineFailure(error)
         ? error
         : error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name)
           ? error : new Error(`Claude SDK 运行失败：${redact(error instanceof Error ? error.message : String(error))}`);
@@ -712,6 +783,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                   if (gate.isWaiting()) deadline.pause();
                   requestGateUnsubscribe = gate.onChange((waiting) => { if (waiting) deadline.pause(); else deadline.resume(); });
                 }
+                // P2：网络状态订阅绑定到本次 attempt 的 deadline（当前已离线则先 pause 再 start）。
+                startNetworkWatch(turn);
                 const onTurnAbort = () => stopRequestDeadline();
                 turn.controller.signal.addEventListener("abort", onTurnAbort, { once: true });
                 requestAbortUnsubscribe = () => turn.controller.signal.removeEventListener("abort", onTurnAbort);
@@ -749,10 +822,12 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             failure = safeFailure(error);
             outcome = failure.name === "TimeoutError" ? "timed_out" : turn.controller.signal.aborted || failure.name === "AbortError" ? "aborted" : "failed";
             if (outcome === "failed") {
-              // P1：请求失败结构化事实——请求超时保留自身 code；其余请求级失败标记 MODEL_REQUEST_FAILED。
+              // P1：请求失败结构化事实——请求超时保留自身 code；P2 网络离线超窗保留
+              // `network-offline-timeout`；其余请求级失败标记 MODEL_REQUEST_FAILED。
               // code/attempts/replaySafe 随错误上抛，由 Service 写入 settled.detail（客户文案仍为人话）。
               const tagged = failure as Error & { code?: string; attempts?: number; replaySafe?: boolean };
-              if (!isRequestTimeoutFailure(failure) || typeof tagged.code !== "string") tagged.code = MODEL_REQUEST_FAILED;
+              if (!isRequestTimeoutFailure(failure) && !isNetworkOfflineFailure(failure)) tagged.code = MODEL_REQUEST_FAILED;
+              else if (typeof tagged.code !== "string") tagged.code = MODEL_REQUEST_FAILED;
               tagged.attempts = Math.max(1, requestAttempt);
               tagged.replaySafe = turn.replayUnsafe;
               diagnostics.record("request.failed", {

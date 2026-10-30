@@ -85,6 +85,7 @@ import type {
   RoleView,
   SessionEnvelope,
 } from "@/chat/types";
+import { NETWORK_RECOVERED_VISIBLE_MS, type NetworkStatusFacts } from "@/chat/status";
 import { useUiStore, type RuntimeId } from "@/stores/ui-store";
 import { useReportStore } from "@/stores/report-store";
 import { useLocaleStore, translate, type Locale } from "@/i18n";
@@ -114,6 +115,8 @@ const localMessageIds = new Set<string>();
 const ackedClientIds = new Set<string>();
 const pendingSingles: SessionEnvelope[] = [];
 let singleFlushTimer: ReturnType<typeof setTimeout> | null = null;
+/** P2：网络恢复行收起计时（8s 后清 `recoveredAt`；纯 UI 展示，不影响任何执行）。 */
+let networkRecoveredTimer: ReturnType<typeof setTimeout> | null = null;
 
 // —————— 工具组折叠状态（对齐旧 renderer.js：分组依据 = turnId + 连续行）——————
 // 组指针只在连续工具行之间保留；助手/系统/卡片/无法关联的未放行行会切断它。
@@ -349,6 +352,12 @@ interface ChatStore {
   hint: string;
   /** 当前提示的来源（旧 currentHintSource 同义）：队列空快照只清同角色/同视图的排队提示。 */
   hintSource: HintSource | null;
+  /** P2（2026-10-30）：主进程网络状态快照（网络状态行；不是第二状态源，不在换项目时清空）。 */
+  network: NetworkStatusFacts | null;
+  /** P2：应用主进程网络快照（只认布尔 `online`；非法载荷忽略，不伪造离线/恢复）。 */
+  applyNetworkState: (payload: unknown) => void;
+  /** P2：收起「网络已恢复」行（仅当仍是同一次恢复时刻）。 */
+  clearNetworkRecovered: (recoveredAt: number) => void;
   setHint: (hint: string, source?: HintSource | null) => void;
   appendLocalUser: (roleId: string, text: string, clientMessageId?: string) => void;
   loadProject: (projectRoot: string, fresh?: boolean) => Promise<Listing | null>;
@@ -727,8 +736,37 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   queuedOperator: {},
   hint: "",
   hintSource: null,
+  network: null,
 
   setHint: (hint, source = null) => set({ hint, hintSource: source }),
+
+  // P2（2026-10-30）：主进程网络快照 → 状态行事实。离线 → 在线 时记恢复时刻并安排 8s 后收起；
+  // 只呈现，不推断、不触发任何执行（队列/请求的处置在主进程/Service）。
+  applyNetworkState: (payload) => {
+    const record = asDict(payload);
+    if (typeof record.online !== "boolean") return;
+    const online = record.online;
+    const previous = get().network;
+    const rawAt = typeof record.at === "number" && Number.isFinite(record.at) ? record.at : undefined;
+    const recoveredAt = online && previous?.online === false ? (rawAt ?? Date.now()) : null;
+    if (networkRecoveredTimer !== null) {
+      clearTimeout(networkRecoveredTimer);
+      networkRecoveredTimer = null;
+    }
+    set({ network: { online, ...(recoveredAt !== null ? { recoveredAt } : {}) } });
+    if (recoveredAt !== null) {
+      networkRecoveredTimer = setTimeout(() => {
+        networkRecoveredTimer = null;
+        useChatStore.getState().clearNetworkRecovered(recoveredAt);
+      }, NETWORK_RECOVERED_VISIBLE_MS);
+    }
+  },
+
+  clearNetworkRecovered: (recoveredAt) => {
+    const current = get().network;
+    if (!current || current.recoveredAt !== recoveredAt) return;
+    set({ network: { ...current, recoveredAt: null } });
+  },
 
   appendLocalUser: (roleId, text, clientMessageId) => {
     if (!roleId || !text.trim()) return;

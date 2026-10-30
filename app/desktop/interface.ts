@@ -22,7 +22,7 @@ import type { GovernanceFunction, GovernanceModel, ProjectConfig } from "../../s
 // 会话事件流类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。外推时套上 `roleId` 信封
 // （`SessionEventEnvelope`，B-2）——**类型从编排/本角色只读导入、不复制形状**。
-import type { WriteGate, RuntimeAdapter, ShellGate, CustomerInputFn, CustomerInputOutcome, DispatchTaskFn, PromptImage, PromptOptions, ViewImageFn } from "../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, CustomerInputFn, CustomerInputOutcome, DispatchTaskFn, PromptImage, PromptOptions, ViewImageFn, NetworkState } from "../../src/model/runtime.ts";
 // 2026-10-25 独立复核请求（`独立复核请求（已撤除）`）：能力回执/载荷形状唯一来源＝契约家 `model/runtime.ts`
 // （只读导入，不复制形状）；flowId 形状同样复用运行时核心导出的 slug 常量（不另写正则）。
 import type { RequestRequirementChangeFn, RequestRequirementChangeInput, RequestRequirementChangeResult } from "../../src/model/runtime.ts";
@@ -604,6 +604,12 @@ export interface DesktopInterface {
   listLiveSessionViews(): Promise<{ projectRoot: string; roleId: string; runtime: RuntimeKind; profileRevision: number }[]>;
   /** 界面加载后请求重放全部在场角色的状态快照（忙/闲/队列），走既有 `session:role-state` 通道。 */
   requestRoleStates(): Promise<{ ok: boolean }>;
+  /**
+   * **P2（2026-10-30）：接收主进程网络状态**（monitor 权威快照 → SessionManager）。
+   * 离线期间队列保留、`blockedReason:"network"` 可见、不认领新模型投递；恢复后按既有顺序 drain。
+   * 主进程在 monitor `onState` 时调用；不涉及权限/自动中止。
+   */
+  applyNetworkState(state: NetworkState): void;
   /**
    * **后台任务聚合列表（2026-10-25，桌面任务面板）**：按 `projectRoot + runtime` 聚合当前所有已打开会话的
    * 后台任务——每项 = `BackgroundTaskSnapshot` + `roleId` + `runtime`。直接读各会话句柄、**不缓存/不持久化**；
@@ -1752,6 +1758,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     createPiAdapterFactory: createPiAdapterFactoryFn,
     createRuntimeAdapterFactory: runtimeFactory,
     runtimeOptions: deps.runtimeOptions,
+    // P2（2026-10-30）：网络状态门（monitor 注入）——会话层据此在离线时保留队列、不认领新投递；
+    // 适配器经同一 gate 暂停/恢复请求计时（runtimeOptions 原样透传到 Service/Provider）。
+    networkGate: deps.runtimeOptions?.networkGate,
     // 「替我审」：每会话判断闭包工厂（会话用同一份 runtimeOptions/createAdapter 构造；缺省真实实现）。
     createShellJudge: createShellJudgeFn,
     // 「替我决策」（2026-10-18 双开关评审 §8.2）：每会话治理判断闭包工厂（仅 trio + 通道已接时构造）。
@@ -2193,6 +2202,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     async requestRoleStates() {
       manager.broadcastRoleStates();
       return { ok: true };
+    },
+
+    // P2（2026-10-30）：主进程网络状态 → SessionManager（队列保留/恢复放行）。只透传，不判定权限。
+    applyNetworkState(state) {
+      manager.applyNetworkState(state);
     },
 
     // —————— 会话级后台任务（2026-10-25，桌面任务面板）——————
