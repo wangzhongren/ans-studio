@@ -48,6 +48,7 @@ import {
   type DecisionIntentSummary,
 } from "./governance-judge-intent.ts";
 import { isHardForbiddenPath } from "./governance-judge-verdict.ts";
+import { intentEntryRejectionHint } from "../shared/intent-entry-contract.ts";
 
 // —————————————————————— 有界常量 ——————————————————————
 
@@ -1194,30 +1195,39 @@ async function buildInner(input: {
   // 不调用模型（模型无法凭空知道客户出发点）。写盘族不需要意图。
   let intent: DecisionIntentEvidence | undefined;
   if (isDecisionCardKind(request.cardKind)) {
-    const resolved = resolveIntentReference({
-      flowId: request.flowId,
-      ...(typeof (request as unknown as { intentId?: unknown }).intentId === "string" ? { intentId: (request as unknown as { intentId: string }).intentId } : {}),
-      ...(proposalText !== undefined ? { proposalText } : {}),
-    });
-    if (!resolved.ok) {
-      problems.push({ code: resolved.reasonCode, detail: resolved.detail });
+    if (request.intentResolutionError !== undefined) {
+      // §5A/P9.3：解析冲突/非法 slug 已在编排侧 fail-closed；不得再回落到 flowId 或猜一个来源。
+      problems.push({
+        code: request.intentResolutionError.code,
+        detail: `${request.intentResolutionError.detail}\n${intentEntryRejectionHint()}`,
+      });
     } else {
-      const rel = intentArtifactPath(resolved.reference.intentId);
-      const fact = await fileFact(projectRoot, rel);
-      if (!fact.exists || fact.text === undefined || fact.binary === true || fact.sha256 === undefined || fact.bytes === undefined) {
-        problems.push({ code: "intent-missing", detail: `意图文件不可读：${rel}` });
+      const resolved = resolveIntentReference({
+        flowId: request.flowId,
+        ...(typeof request.intentId === "string" && request.intentId.trim() !== "" ? { intentId: request.intentId } : {}),
+        ...(request.intentIdSource !== undefined ? { intentIdSource: request.intentIdSource } : {}),
+        ...(proposalText !== undefined ? { proposalText } : {}),
+      });
+      if (!resolved.ok) {
+        problems.push({ code: resolved.reasonCode, detail: resolved.detail });
       } else {
-        const summarized = summarizeIntent({ text: fact.text, reference: resolved.reference, flowId: request.flowId });
-        if (!summarized.ok) {
-          problems.push({ code: summarized.reasonCode, detail: summarized.detail });
+        const rel = intentArtifactPath(resolved.reference.intentId);
+        const fact = await fileFact(projectRoot, rel);
+        if (!fact.exists || fact.text === undefined || fact.binary === true || fact.sha256 === undefined || fact.bytes === undefined) {
+          problems.push({ code: "intent-missing", detail: `意图文件不可读：${rel}` });
         } else {
-          // D 批：decision 卡由应用/客户在申请通道直接裁决；意图文件存在即作为判断基准。
-          intent = {
-            ...summarized.summary,
-            sha256: fact.sha256,
-            bytes: fact.bytes,
-            confirmed: true,
-          };
+          const summarized = summarizeIntent({ text: fact.text, reference: resolved.reference, flowId: request.flowId });
+          if (!summarized.ok) {
+            problems.push({ code: summarized.reasonCode, detail: summarized.detail });
+          } else {
+            // D 批：decision 卡由应用/客户在申请通道直接裁决；意图文件存在即作为判断基准。
+            intent = {
+              ...summarized.summary,
+              sha256: fact.sha256,
+              bytes: fact.bytes,
+              confirmed: true,
+            };
+          }
         }
       }
     }

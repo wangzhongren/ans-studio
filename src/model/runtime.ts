@@ -1491,6 +1491,15 @@ export interface GovernanceJudgeRequest {
   runtime: RuntimeKind;
   governanceModel: "single" | "trio";
   flowId: string;
+  /**
+   * 2026-10-30（§5A）：显式意图 id（小写 slug）。来源优先级：请求显式 → 提案 frontmatter → 产品意图 frontmatter。
+   * 三者皆缺时才允许判断侧按 `flow-id` 回落（证据里保留 source 说明）。
+   */
+  intentId?: string;
+  /** intentId 的来源（随证据保留；缺省按请求显式处理）。 */
+  intentIdSource?: "request" | "proposal" | "product" | "flow-id";
+  /** 意图解析 fail-closed 原因（产品/提案冲突、请求显式冲突或非法 slug）；出现即禁止 approve。 */
+  intentResolutionError?: { code: string; detail: string };
   stepId?: string;
   toolCallId?: string;
   turnId?: string;
@@ -1599,6 +1608,12 @@ export interface GovernanceJudgeToolOptions {
  */
 export interface GovernanceJudgeContext {
   flowId: string;
+  /** 2026-10-30（§5A）：显式意图 id（请求显式携带；缺席时判断侧可从提案 frontmatter 解析）。 */
+  intentId?: string;
+  /** intentId 的来源（request / proposal / product / flow-id 回落），随判断证据保留。 */
+  intentIdSource?: "request" | "proposal" | "product" | "flow-id";
+  /** 意图解析 fail-closed 原因（冲突/非法 slug）；出现即禁止 approve。 */
+  intentResolutionError?: { code: string; detail: string };
   stepId?: string;
   toolCallId?: string;
   turnId?: string;

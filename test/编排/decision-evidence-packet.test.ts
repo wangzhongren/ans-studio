@@ -155,3 +155,144 @@ test("意图缺失 ⇒ intent-missing fail-closed（不得伪造客户确认）"
     if (!out.ok) assert.equal(out.reasonCode, "intent-missing");
   });
 });
+
+const INTENT_V1 = INTENT.replace("intentId: flow-a", "intentId: intent-focus-v1");
+const PROPOSAL_WITH_INTENT = [
+  "---",
+  "schema: project-proposal/v2",
+  "flowId: flow-a",
+  "version: 1",
+  "intentId: intent-focus-v1",
+  "intent: docs/product/flow-a-intent-v1.md",
+  "---",
+  "# 提案",
+  "",
+].join("\n");
+
+test("§5A 显式 intentId 优先：请求携带 intent-focus-v1 ⇒ packet.source=request", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/intents/intent-focus-v1.md", INTENT_V1);
+    writeFile(root, "docs/proposals/flow-a-v1.md", PROPOSAL_WITH_INTENT);
+    const out = await buildDecisionEvidencePacket({
+      request: request({
+        projectRoot: root,
+        intentId: "intent-focus-v1",
+        artifacts: { proposalPath: "docs/proposals/flow-a-v1.md" },
+      }),
+      projectRoot: root,
+    });
+    assert.equal(out.ok, true);
+    if (!out.ok) return;
+    assert.equal(out.packet.intent?.intentId, "intent-focus-v1");
+    assert.equal(out.packet.intent?.source, "request");
+    assert.equal(out.packet.intent?.path, "docs/intents/intent-focus-v1.md");
+  });
+});
+
+test("§5A proposal frontmatter 回退：请求未带 intentId ⇒ packet.source=proposal", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/intents/intent-focus-v1.md", INTENT_V1);
+    writeFile(root, "docs/proposals/flow-a-v1.md", PROPOSAL_WITH_INTENT);
+    const out = await buildDecisionEvidencePacket({
+      request: request({ projectRoot: root, artifacts: { proposalPath: "docs/proposals/flow-a-v1.md" } }),
+      projectRoot: root,
+    });
+    assert.equal(out.ok, true);
+    if (!out.ok) return;
+    assert.equal(out.packet.intent?.intentId, "intent-focus-v1");
+    assert.equal(out.packet.intent?.source, "proposal");
+  });
+});
+
+test("§5A intentId 不一致 ⇒ intent-ambiguous，拒绝含同源模板与命名规则", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/intents/intent-focus-v1.md", INTENT_V1.replace("intentId: intent-focus-v1", "intentId: intent-other-v1"));
+    writeFile(root, "docs/proposals/flow-a-v1.md", PROPOSAL_WITH_INTENT);
+    const out = await buildDecisionEvidencePacket({
+      request: request({
+        projectRoot: root,
+        intentId: "intent-focus-v1",
+        artifacts: { proposalPath: "docs/proposals/flow-a-v1.md" },
+      }),
+      projectRoot: root,
+    });
+    assert.equal(out.ok, false);
+    if (out.ok) return;
+    assert.equal(out.reasonCode, "intent-ambiguous");
+    assert.match(out.reason, /docs\/intents\/<intentId>\.md/);
+    assert.match(out.reason, /intentId: <小写 slug/);
+  });
+});
+
+test("§5A 无 frontmatter 的纯 Markdown 意图 ⇒ fail-closed，拒绝含模板片段", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/intents/flow-a.md", "# 纯 Markdown 意图\n\n目标：示例\n范围：示例\n验收：示例\n");
+    writeFile(root, "docs/proposals/flow-a-v1.md", "# 提案\n");
+    const out = await buildDecisionEvidencePacket({
+      request: request({ projectRoot: root, intentId: "flow-a", artifacts: { proposalPath: "docs/proposals/flow-a-v1.md" } }),
+      projectRoot: root,
+    });
+    assert.equal(out.ok, false);
+    if (out.ok) return;
+    assert.equal(out.reasonCode, "intent-missing");
+    assert.match(out.reason, /docs\/intents\/<intentId>\.md/);
+    assert.match(out.reason, /intentId: <小写 slug/);
+    assert.match(out.reason, /acceptance:/);
+  });
+});
+
+test("§5A 两者都缺席时按 flow-id 回落，但证据保留 source=flow-id（不裸猜）", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/intents/flow-a.md", INTENT);
+    writeFile(root, "docs/proposals/flow-a-v1.md", "# 提案\n");
+    const out = await buildDecisionEvidencePacket({
+      request: request({ projectRoot: root, artifacts: { proposalPath: "docs/proposals/flow-a-v1.md" } }),
+      projectRoot: root,
+    });
+    assert.equal(out.ok, true);
+    if (!out.ok) return;
+    assert.equal(out.packet.intent?.intentId, "flow-a");
+    assert.equal(out.packet.intent?.source, "flow-id");
+  });
+});
+
+test("§5A 产品-only：intentIdSource=product 进入证据包并按 product 标注", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/intents/intent-focus-v1.md", INTENT_V1);
+    writeFile(root, "docs/proposals/flow-a-v1.md", "# 提案\n");
+    const out = await buildDecisionEvidencePacket({
+      request: request({
+        projectRoot: root,
+        intentId: "intent-focus-v1",
+        intentIdSource: "product",
+        artifacts: { proposalPath: "docs/proposals/flow-a-v1.md" },
+      }),
+      projectRoot: root,
+    });
+    assert.equal(out.ok, true);
+    if (!out.ok) return;
+    assert.equal(out.packet.intent?.source, "product");
+    assert.equal(out.packet.intent?.intentId, "intent-focus-v1");
+  });
+});
+
+test("§5A 解析冲突 fail-closed：intentResolutionError 进入问题且拒绝含同源模板", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/intents/intent-focus-v1.md", INTENT_V1);
+    writeFile(root, "docs/proposals/flow-a-v1.md", "# 提案\n");
+    const out = await buildDecisionEvidencePacket({
+      request: request({
+        projectRoot: root,
+        intentId: "intent-focus-v1",
+        intentResolutionError: { code: "intent-ambiguous", detail: "产品意图与提案 frontmatter intentId 不一致" },
+        artifacts: { proposalPath: "docs/proposals/flow-a-v1.md" },
+      }),
+      projectRoot: root,
+    });
+    assert.equal(out.ok, false);
+    if (out.ok) return;
+    assert.equal(out.reasonCode, "intent-ambiguous");
+    assert.match(out.reason, /docs\/intents\/<intentId>\.md/);
+    assert.match(out.reason, /intentId: <小写 slug/);
+  });
+});
