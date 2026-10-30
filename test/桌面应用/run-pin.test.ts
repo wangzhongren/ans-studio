@@ -500,3 +500,82 @@ test("F2：版本化文档基线违规的真实派发回执带 versioned-doc-bas
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }
 });
+
+test("§5A contract_check：四角色按裁剪输出意图入口契约与当前事实；其他角色不输出", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-intent-contract-check-"));
+  const h = harness(root);
+  try {
+    await writeProject(root);
+    const intentEntry = "docs/intents/intent-focus-v1.md";
+    const productIntent = [
+      "---",
+      "intentId: intent-focus-v1",
+      "flowId: focus",
+      "version: 1",
+      "goal: 示例目标",
+      "scope: 示例范围",
+      "acceptance: 示例验收",
+      "---",
+      "# 产品意图",
+      "",
+    ].join("\n");
+    const proposal = [
+      "---",
+      "schema: project-proposal/v2",
+      "flowId: focus",
+      "version: 1",
+      "intentId: intent-focus-v1",
+      "intent: docs/product/focus-intent-v1.md",
+      "---",
+      "# 提案",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(root, "docs/product/focus-intent-v1.md"), productIntent, "utf8");
+    await fs.writeFile(path.join(root, "docs/proposals/focus-proposal-v1.md"), proposal, "utf8");
+    await fs.mkdir(path.join(root, "docs/intents"), { recursive: true });
+    await fs.writeFile(path.join(root, intentEntry), ["---", "intentId: intent-focus-v1", "flowId: focus", "goal: 示例目标", "scope: 示例范围", "acceptance: 示例验收", "---", "# 意图", ""].join("\n"), "utf8");
+
+    const contractRoleIds = ["chief", "product", "rapporteur", "nominator"] as const;
+    for (const roleId of contractRoleIds) {
+      await h.mgr.open({ projectRoot: root, roleId, runtime: "demo" });
+      await tick(20);
+    }
+    await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+    await tick(20);
+    await h.mgr.open({ projectRoot: root, roleId: "verifier", runtime: "demo" });
+    await tick(20);
+
+    for (const roleId of contractRoleIds) {
+      const check = h.contractChecks[roleId];
+      assert.equal(typeof check, "function", `${roleId} 应注入 contract_check`);
+      const text = (await check!({ flowId: "focus" })) ?? "";
+      assert.match(text, /意图入口契约/, roleId);
+      assert.match(text, /docs\/intents\/<intentId>\.md/, roleId);
+      assert.match(text, /intentId: <小写 slug/, roleId);
+      assert.match(text, /意图入口事实：intentId=intent-focus-v1/, roleId);
+      assert.match(text, /入口 docs\/intents\/intent-focus-v1\.md/, roleId);
+      assert.match(text, /存在=yes/, roleId);
+      assert.match(text, /intentId 匹配=yes/, roleId);
+      assert.match(text, /一致性=yes/, roleId);
+    }
+    for (const roleId of ["convener", "verifier"] as const) {
+      const check = h.contractChecks[roleId];
+      assert.equal(typeof check, "function");
+      const text = (await check!({ flowId: "focus" })) ?? "";
+      assert.doesNotMatch(text, /意图入口契约/, roleId);
+      assert.doesNotMatch(text, /intentId: <小写 slug/, roleId);
+    }
+
+    // 入口文件 intentId 与解析结果不一致 ⇒ 事实行给出 no（不改判断/不放行）。
+    await fs.writeFile(path.join(root, intentEntry), ["---", "intentId: intent-other-v1", "flowId: focus", "goal: 示例目标", "scope: 示例范围", "acceptance: 示例验收", "---", "# 意图", ""].join("\n"), "utf8");
+    const mismatched = (await h.contractChecks.chief!({ flowId: "focus" })) ?? "";
+    assert.match(mismatched, /intentId 匹配=no/);
+    // 提案 frontmatter 与产品意图不一致 ⇒ 一致性=no。
+    await fs.writeFile(path.join(root, "docs/proposals/focus-proposal-v1.md"), proposal.replace("intentId: intent-focus-v1", "intentId: intent-other-v1"), "utf8");
+    const inconsistent = (await h.contractChecks.chief!({ flowId: "focus" })) ?? "";
+    assert.match(inconsistent, /一致性=no/);
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});

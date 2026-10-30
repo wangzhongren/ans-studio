@@ -23,7 +23,7 @@ import { createCustomerInputChannel, type OperatorJudgeResultPayload, type Opera
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
-import type { DispatchTaskFn, DispatchReceipt, GovernanceJudgeFn, CustomerInputRequest } from "../../src/model/runtime.ts";
+import type { DispatchTaskFn, DispatchReceipt, GovernanceJudgeFn, GovernanceJudgeRequest, CustomerInputRequest } from "../../src/model/runtime.ts";
 
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 async function waitUntil(check: () => boolean, timeoutMs = 2000): Promise<void> {
@@ -247,4 +247,39 @@ test("开关开启：验收卡由判断 agent 代选推荐项（客户可不开�
   assert.equal(outcome?.outcome, "answered");
   assert.deepEqual(outcome?.outcome === "answered" ? outcome.value.selected : undefined, ["accept"]);
   assert.equal(outcome?.outcome === "answered" ? outcome.operatorId : undefined, "judge:demo");
+});
+
+test("§5A judgeContext.intentId 进入 GovernanceJudgeRequest；metadata.intentId 兜底", async () => {
+  const facts = { governanceModel: "trio" as const, flowId: "flow-a", ledgerErrors: 0, unresolvedClarificationCount: 0, latestDecisionKinds: [] };
+  const makeChannel = (): { seen?: GovernanceJudgeRequest; channel: ReturnType<typeof createCustomerInputChannel> } => {
+    const holder: { seen?: GovernanceJudgeRequest; channel: ReturnType<typeof createCustomerInputChannel> } = {
+      channel: undefined as unknown as ReturnType<typeof createCustomerInputChannel>,
+    };
+    const judge: GovernanceJudgeFn = async (request) => {
+      holder.seen = request;
+      return {
+        verdict: "approve",
+        group: "decision",
+        cardKind: "acceptance",
+        engine: request.runtime,
+        value: { selected: ["accept"] },
+        selected: ["accept"],
+        reasonCode: "judged",
+        durationMs: 1,
+      };
+    };
+    holder.channel = createCustomerInputChannel({
+      presenter: () => {},
+      operatorId: "tester",
+      judge: { isGroupEnabled: () => true, fn: judge },
+    });
+    return holder;
+  };
+  const viaContext = makeChannel();
+  await viaContext.channel.customerInput(acceptanceRequest(), ctx, { judgeContext: { flowId: "flow-a", intentId: "intent-focus-v1", facts } });
+  assert.equal(viaContext.seen?.intentId, "intent-focus-v1", "judgeContext.intentId 原样进入判断请求");
+  assert.equal(viaContext.seen?.intentIdSource, "request", "显式 intentId 缺省来源为 request");
+  const viaMetadata = makeChannel();
+  await viaMetadata.channel.customerInput(acceptanceRequest(), ctx, { intentId: "intent-meta-v1", judgeContext: { flowId: "flow-a", facts } });
+  assert.equal(viaMetadata.seen?.intentId, "intent-meta-v1", "旧调用 metadata.intentId 兜底");
 });

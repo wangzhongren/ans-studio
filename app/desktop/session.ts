@@ -124,6 +124,7 @@ const PROOF_STATUS_TEXT: Readonly<Record<RuntimeTurnOutcome, string>> = {
 // **单一来源**——本层**只做接线**（投递时用 `filePrint` 探测各引用、按判据拒投或入队），不得各写一份。
 // 本批已删除本地副本 `renderDispatchPromptLocal`（既有登记依赖收口——落地后必须切换、不得两处并存）。
 import { createDiagnosticLogger, getDiagnosticsStatus } from "../../src/common/shared/diagnostics.ts";
+import { intentEntryContractText, readIntentEntryFacts, type IntentContractRole } from "../../src/common/shared/intent-entry-contract.ts";
 // 整轮硬超时求值的**单一来源**（与看护 signal #1、会话运行时同一函数；本层不另写时长/env 解析）。
 import { resolveRuntimeTimeouts } from "../../src/common/runtime-core/timeout.ts";
 // G-2/W1：role_status 的会话尾部数据面**复用受保护投影管线**（`getSessionHistory` 同路径——凭据清洗、
@@ -6577,6 +6578,34 @@ ${formatted}` };
       lines.push("可写边界：（未枚举/内置治理角色按既有拓扑与治理规则）");
     }
     lines.push("禁止：角色卡/、其他角色模块、.ans/、治理/版本化文档覆盖、docs/product|proposals|contracts|scheduling|quality|verification（越界拒绝）");
+    // 2026-10-30（§5A）：意图入口契约按角色裁剪（chief/product/rapporteur/nominator），
+    // 并给出当前项目可核对的事实（期望 docs/intents/<intentId>.md 是否存在/匹配）。
+    const intentContractRoles = new Set<IntentContractRole>(["chief", "product", "rapporteur", "nominator"]);
+    if (intentContractRoles.has(roleId as IntentContractRole)) {
+      lines.push("意图入口契约（与角色卡/判断拒绝文案同源）：");
+      lines.push(intentEntryContractText(roleId as IntentContractRole));
+      const intentFlowId = flowId !== "" ? flowId : run?.flowId ?? "";
+      if (intentFlowId !== "") {
+        const intentFacts = await readIntentEntryFacts({
+          projectRoot,
+          flowId: intentFlowId,
+          ...(run?.documents.intent?.path !== undefined ? { productIntentPath: run.documents.intent.path } : {}),
+          ...(run?.documents.proposal?.path !== undefined ? { proposalPath: run.documents.proposal.path } : {}),
+        });
+        if (intentFacts.resolvedIntentId === undefined) {
+          lines.push("意图入口事实：未解析到 intentId（产品意图/提案 frontmatter 缺 intentId）");
+        } else {
+          const entryMatch = intentFacts.entryMatches === undefined ? "无法核对" : intentFacts.entryMatches ? "yes" : "no";
+          lines.push(
+            `意图入口事实：intentId=${intentFacts.resolvedIntentId}｜入口 ${intentFacts.intentEntryPath}｜存在=${intentFacts.intentEntryExists === true ? "yes" : "no"}｜intentId 匹配=${entryMatch}`,
+          );
+          const idsMatch = intentFacts.intentIdsMatch === undefined ? "无法核对" : intentFacts.intentIdsMatch ? "yes" : "no";
+          lines.push(
+            `意图来源：产品意图=${intentFacts.productIntentId ?? "缺失"}｜提案=${intentFacts.proposalIntentId ?? "缺失"}｜一致性=${idsMatch}`,
+          );
+        }
+      }
+    }
     const kind = input.taskKind;
     const required: Record<string, string[]> = {
       dispatch: ["flowId", "targetRoleId", "runId(pinned)", "moduleId(运营派实现)", "modulePaths"],

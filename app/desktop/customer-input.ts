@@ -1090,6 +1090,11 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     const turnId = judgeContext.turnId ?? entry.metadata?.turnId;
     if (typeof turnId === "string" && turnId !== "") request.turnId = turnId;
     if (typeof entry.ctx.turnText === "string" && entry.ctx.turnText !== "") request.turnText = entry.ctx.turnText;
+    // 2026-10-30（§5A）：请求显式 intentId 优先（judgeContext 由编排解析；metadata 兜底旧调用）。
+    const explicitIntentId = judgeContext.intentId ?? entry.metadata?.intentId;
+    if (typeof explicitIntentId === "string" && explicitIntentId.trim() !== "") request.intentId = explicitIntentId.trim();
+    if (judgeContext.intentIdSource !== undefined) request.intentIdSource = judgeContext.intentIdSource;
+    else if (typeof explicitIntentId === "string" && explicitIntentId.trim() !== "") request.intentIdSource = "request";
     if (judgeContext.paths !== undefined) request.paths = judgeContext.paths;
     if (judgeContext.pathProbes !== undefined) request.pathProbes = judgeContext.pathProbes;
     if (judgeContext.allowedPathRoots !== undefined) request.allowedPathRoots = judgeContext.allowedPathRoots;

@@ -1196,7 +1196,8 @@ async function buildInner(input: {
   if (isDecisionCardKind(request.cardKind)) {
     const resolved = resolveIntentReference({
       flowId: request.flowId,
-      ...(typeof (request as unknown as { intentId?: unknown }).intentId === "string" ? { intentId: (request as unknown as { intentId: string }).intentId } : {}),
+      ...(typeof request.intentId === "string" && request.intentId.trim() !== "" ? { intentId: request.intentId } : {}),
+      ...(request.intentIdSource !== undefined ? { intentIdSource: request.intentIdSource } : {}),
       ...(proposalText !== undefined ? { proposalText } : {}),
     });
     if (!resolved.ok) {

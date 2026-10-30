@@ -169,6 +169,7 @@ export type {
   DecisionCardValidation,
 } from "../../common/编排/decision-card.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
+import { readIntentEntryFacts } from "../../common/shared/intent-entry-contract.ts";
 // 跨角色共享路径原语（**单一来源** = pm 属主 `src/common/shared/path-primitives.ts`；工程法案 §一.5
 // 消费方名单已含编排；同 `confirmed-writes.ts` 先例）——用于 su 预授权目录的**词法**归属判定：
 // 与 resolveWrite 同源取值规则，不从门禁引擎私有 common 另行导入/复制。
@@ -1111,8 +1112,23 @@ export async function openRoleSession(
                       }),
                     }
                   : {};
+              // 2026-10-30（§5A）：决策组显式携带 intentId——请求显式优先，其次提案 frontmatter；
+              // 两者都没有时不把 flowId 冒充 intentId（判断侧按 flow-id 回落并保留 source 说明）。
+              const explicitIntentId =
+                typeof effectiveMetadata?.intentId === "string" ? effectiveMetadata.intentId.trim() : "";
+              let judgeIntentId = explicitIntentId;
+              let judgeIntentIdSource: "request" | "proposal" | undefined = explicitIntentId !== "" ? "request" : undefined;
+              if (judgeIntentId === "" && (cardKind === "proposal" || cardKind === "appointment" || cardKind === "acceptance")) {
+                const intentFacts = await readIntentEntryFacts({
+                  projectRoot: input.project.projectRoot,
+                  flowId: judgeAttribution,
+                });
+                judgeIntentId = intentFacts.proposalIntentId ?? intentFacts.productIntentId ?? "";
+                if (judgeIntentId !== "") judgeIntentIdSource = "proposal";
+              }
               const judgeContext: GovernanceJudgeContext = {
                 flowId: judgeAttribution,
+                ...(judgeIntentId !== "" ? { intentId: judgeIntentId, ...(judgeIntentIdSource !== undefined ? { intentIdSource: judgeIntentIdSource } : {}) } : {}),
                 facts,
                 ...appointmentJudge,
                 ...(cardKind === "appointment" && appointmentRecommendedRoleIds !== undefined

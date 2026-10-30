@@ -199,6 +199,54 @@ test("人事发招人卡：选项=最新名单角色 ⇒ 应用生成推荐集�
   }
 });
 
+test("§5A 任命 judgeContext 显式携带 intentId：请求显式优先，其次提案 frontmatter", async () => {
+  const project = trioProject();
+  try {
+    // 提案 frontmatter 提供 intentId；意图入口文件也按契约存在。
+    fs.writeFileSync(
+      path.join(project.projectRoot, "docs", "proposals", "focus-proposal-v1.md"),
+      [
+        "---",
+        "schema: project-proposal/v2",
+        "flowId: focus",
+        "version: 1",
+        "intentId: intent-focus-v1",
+        "intent: docs/product/focus-intent-v1.md",
+        "---",
+        "# 提案",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    fs.mkdirSync(path.join(project.projectRoot, "docs", "intents"), { recursive: true });
+    fs.writeFileSync(
+      path.join(project.projectRoot, "docs", "intents", "intent-focus-v1.md"),
+      ["---", "intentId: intent-focus-v1", "flowId: focus", "goal: 示例目标", "scope: 示例范围", "acceptance: 示例验收", "---", "# 意图", ""].join("\n"),
+      "utf8",
+    );
+    const captured: CustomerInputMetadata[] = [];
+    const raw: CustomerInputFn = (_request, metadata) => {
+      if (metadata !== undefined) captured.push(metadata);
+      return { outcome: "answered", value: { selected: ["implementer", "qa"] } } satisfies CustomerInputOutcome;
+    };
+    const stub = stubAdapter();
+    const handle = await openRoleSession(
+      { roleId: "nominator", project, customerInput: raw },
+      { createAdapter: stub.createAdapter },
+    );
+    const input = stub.caps()!.customerInput!;
+    await input(appointmentCard(["qa", "implementer"]), { flowId: "focus" });
+    assert.equal(captured[0]?.judgeContext?.intentId, "intent-focus-v1", "提案 frontmatter 的 intentId 进入 judgeContext");
+    assert.equal(captured[0]?.judgeContext?.intentIdSource, "proposal", "来源标为 proposal");
+    await input(appointmentCard(["qa", "implementer"]), { flowId: "focus", intentId: "intent-request-v1" });
+    assert.equal(captured[1]?.judgeContext?.intentId, "intent-request-v1", "请求显式 intentId 优先于提案 frontmatter");
+    assert.equal(captured[1]?.judgeContext?.intentIdSource, "request", "来源标为 request");
+    await handle.dispose();
+  } finally {
+    fs.rmSync(project.projectRoot, { recursive: true, force: true });
+  }
+});
+
 test("招人卡与名单不一致（缺项）⇒ declined + notPresented，不触达客户通道", async () => {
   const project = trioProject();
   try {
