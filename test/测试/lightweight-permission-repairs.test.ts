@@ -208,7 +208,11 @@ test("D3 AC5: review follows ordinary/operator/advisory policy; readonly refuses
       assert.equal(fs.existsSync(sentinel), mode !== "readonly", mode);
       if (fs.existsSync(sentinel)) fs.unlinkSync(sentinel);
     }
-    assert.equal(classifyShell(["node", "-e", "1"], defaultShellRules()), "deny");
+    // F6（f5f1bdd）：短内联（≤2048B/≤10 行/≤1024B 每行）进入脚本审查 ⇒ review；
+    // 长内联与 re-shell 仍是硬拒（不得把短内联的放行误扩到长内联）。
+    assert.equal(classifyShell(["node", "-e", "1"], defaultShellRules()), "review");
+    assert.equal(classifyShell(["node", "-e", "x".repeat(3000)], defaultShellRules()), "deny");
+    assert.equal(classifyShell(["sh", "-c", "echo hi"], defaultShellRules()), "deny");
     assert.equal(classifyShell(["rm", "file"], defaultShellRules()), "risky");
   } finally {
     workspace.cleanup();

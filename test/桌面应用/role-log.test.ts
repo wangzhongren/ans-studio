@@ -29,14 +29,18 @@ async function tempRoot(): Promise<string> {
 }
 
 test("脱敏：凭据/令牌/项目外绝对路径/换行与 200 字截断", () => {
-  const root = "C:\\work\\proj";
+  // 平台原生 fixture：项目根必须是本机 path 规则可解析的临时目录；异平台风格根不是生产形态
+  // （POSIX 上 `C:\work\proj` 只是普通文件名，既不能作为项目前缀剥离，也会被正确判成外部绝对路径）。
+  const root = path.resolve(os.tmpdir(), "ans-role-log-redact-project");
+  const inside = path.join(root, "docs", "a.md");
+  const outside = path.resolve(os.tmpdir(), "ans-role-log-redact-outside", "secret.txt");
   const redacted = redactRoleLogSummary(
     `token=supersecret api_key=sk-1234567890abcdef Authorization: Bearer abcdefghijklmnop ` +
-      `path ${root}\\docs\\a.md other C:\\Users\\me\\secret.txt\nsecond line`,
+      `path ${inside} other ${outside}\nsecond line`,
     root,
   );
-  assert.doesNotMatch(redacted, /supersecret|sk-1234567890|abcdefghijklmnop|C:\\Users/i);
-  assert.match(redacted, /docs\\a\.md|\/docs\/a\.md|docs/);
+  assert.doesNotMatch(redacted, /supersecret|sk-1234567890|abcdefghijklmnop|secret\.txt/i);
+  assert.match(redacted, /docs[\\/]a\.md/);
   assert.match(redacted, /\[redacted\]/);
   assert.match(redacted, /\[absolute-path\]/);
   assert.doesNotMatch(redacted, /\n/);

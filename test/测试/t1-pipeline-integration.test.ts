@@ -65,7 +65,9 @@ for (const runtime of ["pi", "codex", "claude"] as const) {
         receipts.push(await tool(options, "submit_report", { status: "completed", summary: "T1 current report", evidence: ["src/X/current.txt"] }, signal));
       }
     });
-    const handle = await openRoleSession({ roleId: "X", taskId: "T1", project, runtime,
+    // 任务级 writeSet 收窄（空集）：2026-10-25 起无 scope 的聊天会话对 Section 1 边界内路径预授权，
+    // 会把本用例要验证的“确认发行”短路成无条件可写；scope 让确认成为唯一写权来源，保留原断言。
+    const handle = await openRoleSession({ roleId: "X", taskId: "T1", project, runtime, scope: { writeSet: [], conditions: [] },
       customerInput: (_request, context) => {
         if (phase) return { outcome: "answered", value: { confirmed: true } };
         metadata = context; return new Promise<CustomerInputOutcome>(r => { answer = r; });

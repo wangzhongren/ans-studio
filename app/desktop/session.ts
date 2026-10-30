@@ -3039,9 +3039,11 @@ export class SessionManager {
     projectRoot: string,
     roleId: string,
     input: { kind: string; summary: string; tool?: string; status?: string; taskId?: string; turnId?: string; ref?: string },
-  ): void {
+  ): Promise<void> {
     this.lastRoleActivity.set(`${projectRoot}\u0000${roleId}`, { at: this.now(), kind: input.kind, summary: input.summary });
-    void appendRoleLog(projectRoot, roleId, input).then((result) => {
+    // 返回可等待的追加链：调用方若需要「返回即已落盘/可读」（如升级裁决）必须 await；
+    // 其余观察器路径保持 fire-and-forget（不阻塞会话事件泵）。
+    return appendRoleLog(projectRoot, roleId, input).then((result) => {
       if (!result.ok) {
         createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("role-log.append.failed", new Error(result.message));
       }
@@ -4279,7 +4281,7 @@ export class SessionManager {
       const selected = outcome?.outcome === "answered"
         ? (outcome.value.selected ?? []).find((id) => ["continue", "redispatch", "replace", "terminate"].includes(id))
         : undefined;
-      this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
+      await this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
         kind: "task.escalation",
         summary: `任务 #${taskId} 连续卡死升级：${outcome?.outcome ?? "unavailable"}${selected !== undefined ? `（${selected}）` : ""}`,
         taskId,
@@ -4309,7 +4311,7 @@ export class SessionManager {
           replace: "不自动换人；请人工选择替代角色并派新任务（必要时先终止原角色运行）。",
         };
         const text = `任务 #${taskId} 升级裁决「${selected}」：${manual[selected]}`;
-        this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
+        await this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
           kind: "task.escalation.manual",
           summary: text,
           taskId,

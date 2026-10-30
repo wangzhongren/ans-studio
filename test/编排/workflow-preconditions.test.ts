@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   evaluateDispatchPreflight,
@@ -771,7 +772,7 @@ test("env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + inde
 });
 
 test("设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例）", async () => {
-  const designPath = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\//, "")), "../../docs/planning/2026-10-29_design-workflow-maintainers-hiring.md");
+  const designPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../docs/planning/2026-10-29_design-workflow-maintainers-hiring.md");
   const design = await fs.readFile(designPath, "utf8");
   const start = design.indexOf("````markdown");
   const end = design.indexOf("````", start + "````markdown".length);
