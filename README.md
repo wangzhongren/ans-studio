@@ -6,7 +6,7 @@
 
 它把「谁决定、谁派发、谁写入、谁验收」写进运行时，而不是只写在提示词里。桌面应用与 CLI 共用同一套角色与治理工具：桌面默认使用 Claude，可切换 Pi、Codex；CLI 支持 demo（不调用模型）、Pi、Codex 与 Claude。
 
-**版本状态**：当前公开运行包为 **v1.7.0**（2026-10-24）。`main` 已合入 `request_acceptance`、验收分诊与后台任务/流程状态面板；本分支在 `main` 之上新增 `request_boundary_change`（含中间 AI 门禁）、脚手架先行治理与「统筹完成即主动提交验收」。main 与本分支的新增能力都将随下一次发布进入运行包，文中逐项标注。
+**版本状态**：当前公开运行包为 **v1.8.0**（2026-10-30）。该运行包在 v1.7.0 基础上新增内建角色最小系统与「策划出名单 → 人事招人 → 交付运营」雇佣链、模块/名单/拓扑两层契约、run 期间冻结契约版本（run manifest + pin）、机械拒绝三段式与只读 `contract_check` 契约速查、证据自洽校验（`evidence-meta/v1` sidecar、应用重算 lines/bytes/sha256 与 P0 criteria 派生、只读 `evidence_check`），以及桌面跨窗口状态同步、重复投递抑制与决策/审核弹窗、窄栏排版修复；旧 v1/v2/v3 计划、流程与角色卡保持兼容。
 
 ![ANS Studio 桌面：五角色导航与需求确认卡](角色卡/桌面UI/docs/change/2026-10-20_readme-v1.4-screenshot/desktop-intent-confirm.png)
 
@@ -247,34 +247,28 @@ Wang, Zhongren. 2026. *Role-First Software Governance: Asymmetric Authority Boun
 
 ### 下载运行包
 
-当前公开版本：**v1.7.0**（2026-10-24 发布）。运行包自带运行环境，启动应用无需另装 Node.js；执行项目的 `npm test`、Git 等命令，仍需安装该项目所需的开发工具链。
+当前公开版本：**v1.8.0**（2026-10-30 发布）。运行包自带运行环境，启动应用无需另装 Node.js；执行项目的 `npm test`、Git 等命令，仍需安装该项目所需的开发工具链。
 
 | 系统 | 下载 | 校验文件 | 启动方式 |
 | --- | --- | --- | --- |
-| macOS 13+ · Apple Silicon | [mac-arm64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/ANS-Studio-1.7.0-mac-arm64.zip) | [SHA256SUMS-darwin-arm64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/SHA256SUMS-darwin-arm64.txt) | 完整解压，打开 `ANS Studio.app` |
-| macOS 13+ · Intel | [mac-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/ANS-Studio-1.7.0-mac-x64.zip) | [SHA256SUMS-darwin-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/SHA256SUMS-darwin-x64.txt) | 完整解压，打开 `ANS Studio.app` |
-| Windows 10/11 · x64 | [win-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/ANS-Studio-1.7.0-win-x64.zip) | [SHA256SUMS-win32-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/SHA256SUMS-win32-x64.txt) | 完整解压，打开 `ANS Studio.exe`，保留同目录资源文件 |
+| macOS 13+ · Apple Silicon | [mac-arm64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/ANS-Studio-1.8.0-mac-arm64.zip) | [SHA256SUMS-darwin-arm64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/SHA256SUMS-darwin-arm64.txt) | 完整解压，打开 `ANS Studio.app` |
+| macOS 13+ · Intel | [mac-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/ANS-Studio-1.8.0-mac-x64.zip) | [SHA256SUMS-darwin-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/SHA256SUMS-darwin-x64.txt) | 完整解压，打开 `ANS Studio.app` |
+| Windows 10/11 · x64 | [win-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/ANS-Studio-1.8.0-win-x64.zip) | [SHA256SUMS-win32-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/SHA256SUMS-win32-x64.txt) | 完整解压，打开 `ANS Studio.exe`，保留同目录资源文件 |
 
-下载后先核对 SHA256：macOS 在下载目录执行 `shasum -a 256 -c SHA256SUMS-darwin-arm64.txt`（Intel 用 `SHA256SUMS-darwin-x64.txt`）；Windows PowerShell 执行 `Get-FileHash .\ANS-Studio-1.7.0-win-x64.zip -Algorithm SHA256`，与 `SHA256SUMS-win32-x64.txt` 对照。
+下载后先核对 SHA256：macOS 在下载目录执行 `shasum -a 256 -c SHA256SUMS-darwin-arm64.txt`（Intel 用 `SHA256SUMS-darwin-x64.txt`）；Windows PowerShell 执行 `Get-FileHash .\ANS-Studio-1.8.0-win-x64.zip -Algorithm SHA256`，与 `SHA256SUMS-win32-x64.txt` 对照。
 
 <details>
-<summary>v1.7.0 SHA256 与来源核验</summary>
+<summary>v1.8.0 SHA256（发布后回填）</summary>
 
-| 产物 | SHA256 |
-| --- | --- |
-| `ANS-Studio-1.7.0-mac-arm64.zip` | `734aa9325adaf30b3fec0ab2f1392470a4645e8d2143c17f3eb1125091206f42` |
-| `ANS-Studio-1.7.0-mac-x64.zip` | `45d493d0dd3f339265d482d1f1bb374723c46cb9789b570fb9f2c43b15191a77` |
-| `ANS-Studio-1.7.0-win-x64.zip` | `7a3fc9cbcd6e49585ab535aebf4bbfa571814121b65162f8c16a327857de20a3` |
-| `overlay.patch` | `8d30b0cfbf953fe47e51752081671a17a0b95c6ece40051d6f09c20800e3f131` |
-| `release-provenance.json` | `283ee68bbfe8d332027d6bc48a82c39e644c6d26dd6ae35776ee38a2e07456d2` |
+v1.8.0 的 SHA256 在构建完成前无法确定，本表不预填：v1.8.0 发布后由 Release 的 `SHA256SUMS-darwin-arm64.txt`、`SHA256SUMS-darwin-x64.txt`、`SHA256SUMS-win32-x64.txt` 与 `SHA256SUMS-overlay.txt` 回填/核对。
 
-[SHA256SUMS-overlay.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/SHA256SUMS-overlay.txt)、[release-provenance.json](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/release-provenance.json) 与 [overlay.patch](https://github.com/wangzhongren/ans-studio/releases/download/v1.7.0/overlay.patch) 记录固定源码与打包适配，来源核验见[本次发布记录](角色卡/装配/docs/change/2026-10-24_change_release-v1.7.0-prepare.md)。
+[SHA256SUMS-overlay.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/SHA256SUMS-overlay.txt)、[release-provenance.json](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/release-provenance.json) 与 [overlay.patch](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/overlay.patch) 记录固定源码与打包适配，来源核验见[本次发布记录](角色卡/装配/docs/change/2026-10-30_change_release-v1.8.0-prepare.md)。
 
 运行包**未签名、未公证**：macOS 未公证、Windows 未做代码签名，首次启动可能提示来源未验证。请从上述 Release 下载，先核对 SHA256 再运行。
 
 </details>
 
-v1.7.0 包含双语界面（zh-CN / en-US）、目录级授权、验收返工路由与覆盖所有变更的独立验收；本分支新增能力不在该运行包内。
+v1.8.0 包含双语界面（zh-CN / en-US）、目录级授权、验收返工路由与覆盖所有变更的独立验收，以及内建角色雇佣链、模块/名单/拓扑契约、run 冻结、拒绝三段式与契约速查、证据自洽校验；资产 gate（3.3）、分阶段放行（3.5）与时间线面板（3.6）仍不在该运行包内。
 
 ### 第一次使用
 
@@ -370,7 +364,7 @@ npm run typecheck:renderer
 
 ## 发布与校验
 
-发布构建使用 [GitHub Actions 工作流](.github/workflows/release.yml)，在 macOS（arm64 / x64）与 Windows（x64）原生 runner 上冻结源码、应用显式 overlay、`npm ci`、`npm run typecheck`、全量回归、构建渲染层、打包、解压并验证实际运行包，再生成 `SHA256SUMS`、`release-provenance.json` 与 `overlay.patch`。维护者的来源核验、构建命令与发布步骤见[桌面打包说明](角色卡/装配/docs/feature/desktop-release-packaging.md)与[v1.7.0 发布记录](角色卡/装配/docs/change/2026-10-24_change_release-v1.7.0-prepare.md)。
+发布构建使用 [GitHub Actions 工作流](.github/workflows/release.yml)，在 macOS（arm64 / x64）与 Windows（x64）原生 runner 上冻结源码、应用显式 overlay、`npm ci`、`npm run typecheck`、全量回归、构建渲染层、打包、解压并验证实际运行包，再生成 `SHA256SUMS`、`release-provenance.json` 与 `overlay.patch`。维护者的来源核验、构建命令与发布步骤见[桌面打包说明](角色卡/装配/docs/feature/desktop-release-packaging.md)与[v1.8.0 发布记录](角色卡/装配/docs/change/2026-10-30_change_release-v1.8.0-prepare.md)。
 
 运行包由原生 CI 构建、回归并做解压启动检查；包内测试不调用在线模型。既有真实验证记录中，在线桌面与代码任务以 Pi 为主；Codex、Claude 的受控/离线整链测试不等于在线模型全链路验收。桌面默认 Claude 只表示默认选择，不表示已获在线验收。
 
@@ -380,13 +374,13 @@ npm run typecheck:renderer
 - **Windows 暂不支持内置来源文档阅读。** 可查看完整摘要和执行记录，来源文件请通过系统编辑器打开。
 - **CLI 与桌面能力有差异。** CLI 使用终端确认，暂不提供桌面式任务派发与回交投递、队列界面。多任务依赖的自动调度尚未实现。
 - **ZIP 分发暂无安装器和自动更新。** 更新时需自行下载新版本。
-- **部分能力尚未随发布包提供。** `main` 上的 `request_acceptance`、验收分诊、后台任务/流程状态面板，以及本分支的 `request_boundary_change`、中间 AI 门禁、脚手架先行治理，均需下一次发布后才进入运行包；当前 v1.7.0 运行包不含这些能力。
+- **部分能力尚未随发布包提供。** 资产完备性 gate（3.3）、分阶段计划与阶段放行（3.5）、运行时间线与阶段面板（3.6）尚未实施，不在 v1.8.0 运行包内。
 - **脚手架先行目前是治理规则，不是确定性硬门。** 团队计划缺 `build-scaffold` 或把它后置时，应用尚不会确定性拒绝 appointment 卡；执行依赖角色卡要求与 `dependsOn` 通用派发门，真实模型对卡文本的遵从未在线验收。
 - **验证范围有限。** 三平台运行包由原生 CI 构建、回归并做解压启动检查；真实桌面与在线模型验证仍以 Pi 为主，Codex、Claude 的受控/离线测试不等于在线全链路验收。运行包未签名、未公证。
 
 ## 深入了解
 
-- [v1.7.0 发布准备](角色卡/装配/docs/change/2026-10-24_change_release-v1.7.0-prepare.md)：冻结源、发布配方与本地预检结果。
+- [v1.8.0 发布准备](角色卡/装配/docs/change/2026-10-30_change_release-v1.8.0-prepare.md)：冻结源、发布配方与本地预检结果。
 - [全部变更独立验收报告](docs/acceptance/2026-10-24_all-changes-independent-acceptance-report.md)：独立验收覆盖所有变更的依据与证据。
 - [验收分诊设计](角色卡/项目管理/docs/design/2026-10-25_design_acceptance-triage.md)：返工 / 仅汇报的状态与账本语义。
 - [后台任务与流程状态验收](角色卡/独立验收/docs/change/2026-10-25_change_app-ui-background-flow-acceptance.md)：后台任务面板与流程状态只读面。
