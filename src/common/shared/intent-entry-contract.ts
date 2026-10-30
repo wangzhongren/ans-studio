@@ -38,6 +38,72 @@ export const INTENT_ENTRY_TEMPLATE = [
 
 export type IntentContractRole = "chief" | "product" | "rapporteur" | "nominator";
 
+/** 意图引用来源（contract_check facts 与 judge context 共用，禁止两处各推一套）。 */
+export type IntentReferenceSource = "request" | "proposal" | "product" | "flow-id";
+export type IntentResolutionFailureCode = "intent-unconfirmed" | "intent-ambiguous";
+export type IntentEntryResolution =
+  | { ok: true; intentId: string; source: IntentReferenceSource }
+  | { ok: false; code: IntentResolutionFailureCode; detail: string };
+
+/**
+ * **唯一意图解析器**（§5A/P9.3）：
+ *   1. 请求显式 `intentId`（source=request）；
+ *   2. 提案 frontmatter（source=proposal）；
+ *   3. 产品意图 frontmatter（source=product）；
+ *   4. 三者皆缺 ⇒ flowId 回落（source=flow-id，证据如实标注）。
+ * 显式请求与提案/产品任一不一致 ⇒ fail-closed（intent-ambiguous）；产品与提案不一致 ⇒ fail-closed；
+ * 任一来源非空但不符合 slug ⇒ fail-closed（intent-unconfirmed）。本函数不做文件 IO、不判语义。
+ */
+export function resolveIntentEntryReference(input: {
+  flowId: string;
+  requestIntentId?: string;
+  proposalIntentId?: string;
+  productIntentId?: string;
+}): IntentEntryResolution {
+  const clean = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
+  const request = clean(input.requestIntentId);
+  const proposal = clean(input.proposalIntentId);
+  const product = clean(input.productIntentId);
+  const invalid = (label: string, value: string): IntentEntryResolution => ({
+    ok: false,
+    code: "intent-unconfirmed",
+    detail: `${label} intentId「${value}」不符合现行 slug 规则（${GOVERNANCE_SLUG_PATTERN}）`,
+  });
+  const validate = (label: string, value: string): IntentEntryResolution | undefined =>
+    value !== "" && !isValidIntentId(value) ? invalid(label, value) : undefined;
+
+  if (request !== "") {
+    const rejected = validate("请求显式", request) ?? validate("提案 frontmatter", proposal) ?? validate("产品意图 frontmatter", product);
+    if (rejected !== undefined) return rejected;
+    if (proposal !== "" && proposal !== request) {
+      return { ok: false, code: "intent-ambiguous", detail: `请求显式 intentId=${request} 与提案 frontmatter intentId=${proposal} 不一致` };
+    }
+    if (product !== "" && product !== request) {
+      return { ok: false, code: "intent-ambiguous", detail: `请求显式 intentId=${request} 与产品意图 frontmatter intentId=${product} 不一致` };
+    }
+    return { ok: true, intentId: request, source: "request" };
+  }
+  if (proposal !== "") {
+    const rejected = validate("提案 frontmatter", proposal) ?? validate("产品意图 frontmatter", product);
+    if (rejected !== undefined) return rejected;
+    if (product !== "" && product !== proposal) {
+      return { ok: false, code: "intent-ambiguous", detail: `提案 frontmatter intentId=${proposal} 与产品意图 frontmatter intentId=${product} 不一致` };
+    }
+    return { ok: true, intentId: proposal, source: "proposal" };
+  }
+  if (product !== "") {
+    const rejected = validate("产品意图 frontmatter", product);
+    if (rejected !== undefined) return rejected;
+    return { ok: true, intentId: product, source: "product" };
+  }
+  const flowId = clean(input.flowId);
+  if (flowId === "") {
+    return { ok: false, code: "intent-unconfirmed", detail: "flowId 为空，无法回落定位意图入口" };
+  }
+  return { ok: true, intentId: flowId, source: "flow-id" };
+}
+
+
 const ROLE_DUTY: Record<IntentContractRole, string> = {
   chief:
     "意图入口（你是唯一写者）：写 `docs/intents/<intentId>.md` 时照抄下方模板；intentId 取自产品意图文档 frontmatter 的 intentId（小写 slug、全文唯一），不得用 flowId 代替，也不得自造。",
@@ -89,8 +155,12 @@ export interface IntentEntryFacts {
   productIntentId?: string;
   proposalPath?: string;
   proposalIntentId?: string;
-  /** 产品意图优先；缺失时用提案 frontmatter（与判断定位口径一致）。 */
+  /** 与 judge 同一解析器：请求（无）→ 提案 → 产品 → flow-id；冲突时 fail-closed。 */
   resolvedIntentId?: string;
+  /** 解析来源：proposal / product / flow-id（contract_check 与 judge 共用）。 */
+  resolutionSource?: IntentReferenceSource;
+  /** 解析失败（产品/提案冲突或非法 slug）；fail-closed，不读入口文件。 */
+  resolutionError?: { code: IntentResolutionFailureCode; detail: string };
   /** 期望的意图入口文件（`docs/intents/<intentId>.md`）。 */
   intentEntryPath?: string;
   intentEntryExists?: boolean;
@@ -157,10 +227,15 @@ export async function readIntentEntryFacts(input: {
   const proposalText = await readText(input.projectRoot, proposalPath, readFileFn);
   const productRawIntentId = intentIdFromFrontmatter(productText);
   const proposalRawIntentId = intentIdFromFrontmatter(proposalText);
-  // 只有合法 slug 才用于拼 `docs/intents/<intentId>.md`，防止文档内自报路径穿越。
-  const productIntentId = isValidIntentId(productRawIntentId) ? productRawIntentId : undefined;
-  const proposalIntentId = isValidIntentId(proposalRawIntentId) ? proposalRawIntentId : undefined;
-  const resolvedIntentId = productIntentId ?? proposalIntentId;
+  const productIntentId = productRawIntentId;
+  const proposalIntentId = proposalRawIntentId;
+  // 与 judge 共用**唯一解析器**；冲突/非法 slug 时 fail-closed，不拼路径、不读入口文件。
+  const resolution = resolveIntentEntryReference({
+    flowId,
+    ...(proposalIntentId !== undefined && proposalIntentId !== "" ? { proposalIntentId } : {}),
+    ...(productIntentId !== undefined && productIntentId !== "" ? { productIntentId } : {}),
+  });
+  const resolvedIntentId = resolution.ok ? resolution.intentId : undefined;
   const intentEntryPath = resolvedIntentId !== undefined ? `${INTENT_ENTRY_DIR}/${resolvedIntentId}.md` : undefined;
   const entryText = await readText(input.projectRoot, intentEntryPath, readFileFn);
   const intentEntryIntentId = intentIdFromFrontmatter(entryText);
@@ -170,6 +245,7 @@ export async function readIntentEntryFacts(input: {
     ...(proposalPath !== undefined ? { proposalPath } : {}),
     ...(proposalIntentId !== undefined ? { proposalIntentId } : {}),
     ...(resolvedIntentId !== undefined ? { resolvedIntentId } : {}),
+    ...(resolution.ok ? { resolutionSource: resolution.source } : { resolutionError: { code: resolution.code, detail: resolution.detail } }),
     ...(intentEntryPath !== undefined ? { intentEntryPath } : {}),
     ...(intentEntryPath !== undefined ? { intentEntryExists: entryText !== undefined } : {}),
     ...(intentEntryIntentId !== undefined ? { intentEntryIntentId } : {}),

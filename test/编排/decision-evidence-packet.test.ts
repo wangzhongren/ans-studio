@@ -255,3 +255,44 @@ test("§5A 两者都缺席时按 flow-id 回落，但证据保留 source=flow-id
     assert.equal(out.packet.intent?.source, "flow-id");
   });
 });
+
+test("§5A 产品-only：intentIdSource=product 进入证据包并按 product 标注", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/intents/intent-focus-v1.md", INTENT_V1);
+    writeFile(root, "docs/proposals/flow-a-v1.md", "# 提案\n");
+    const out = await buildDecisionEvidencePacket({
+      request: request({
+        projectRoot: root,
+        intentId: "intent-focus-v1",
+        intentIdSource: "product",
+        artifacts: { proposalPath: "docs/proposals/flow-a-v1.md" },
+      }),
+      projectRoot: root,
+    });
+    assert.equal(out.ok, true);
+    if (!out.ok) return;
+    assert.equal(out.packet.intent?.source, "product");
+    assert.equal(out.packet.intent?.intentId, "intent-focus-v1");
+  });
+});
+
+test("§5A 解析冲突 fail-closed：intentResolutionError 进入问题且拒绝含同源模板", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/intents/intent-focus-v1.md", INTENT_V1);
+    writeFile(root, "docs/proposals/flow-a-v1.md", "# 提案\n");
+    const out = await buildDecisionEvidencePacket({
+      request: request({
+        projectRoot: root,
+        intentId: "intent-focus-v1",
+        intentResolutionError: { code: "intent-ambiguous", detail: "产品意图与提案 frontmatter intentId 不一致" },
+        artifacts: { proposalPath: "docs/proposals/flow-a-v1.md" },
+      }),
+      projectRoot: root,
+    });
+    assert.equal(out.ok, false);
+    if (out.ok) return;
+    assert.equal(out.reasonCode, "intent-ambiguous");
+    assert.match(out.reason, /docs\/intents\/<intentId>\.md/);
+    assert.match(out.reason, /intentId: <小写 slug/);
+  });
+});

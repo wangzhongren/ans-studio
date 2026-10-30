@@ -169,7 +169,7 @@ export type {
   DecisionCardValidation,
 } from "../../common/编排/decision-card.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
-import { readIntentEntryFacts } from "../../common/shared/intent-entry-contract.ts";
+import { readIntentEntryFacts, resolveIntentEntryReference } from "../../common/shared/intent-entry-contract.ts";
 // 跨角色共享路径原语（**单一来源** = pm 属主 `src/common/shared/path-primitives.ts`；工程法案 §一.5
 // 消费方名单已含编排；同 `confirmed-writes.ts` 先例）——用于 su 预授权目录的**词法**归属判定：
 // 与 resolveWrite 同源取值规则，不从门禁引擎私有 common 另行导入/复制。
@@ -1112,23 +1112,35 @@ export async function openRoleSession(
                       }),
                     }
                   : {};
-              // 2026-10-30（§5A）：决策组显式携带 intentId——请求显式优先，其次提案 frontmatter；
-              // 两者都没有时不把 flowId 冒充 intentId（判断侧按 flow-id 回落并保留 source 说明）。
+              // 2026-10-30（§5A/P9.3）：决策组**唯一解析器**——请求显式 → 提案 → 产品 → flow-id；
+              // 冲突/非法 slug fail-closed（intentResolutionError 随证据进入判断，禁止 approve）。
               const explicitIntentId =
                 typeof effectiveMetadata?.intentId === "string" ? effectiveMetadata.intentId.trim() : "";
-              let judgeIntentId = explicitIntentId;
-              let judgeIntentIdSource: "request" | "proposal" | undefined = explicitIntentId !== "" ? "request" : undefined;
-              if (judgeIntentId === "" && (cardKind === "proposal" || cardKind === "appointment" || cardKind === "acceptance")) {
+              let judgeIntentId: string | undefined;
+              let judgeIntentIdSource: "request" | "proposal" | "product" | "flow-id" | undefined;
+              let judgeIntentResolutionError: { code: string; detail: string } | undefined;
+              if (cardKind === "proposal" || cardKind === "appointment" || cardKind === "acceptance") {
                 const intentFacts = await readIntentEntryFacts({
                   projectRoot: input.project.projectRoot,
                   flowId: judgeAttribution,
                 });
-                judgeIntentId = intentFacts.proposalIntentId ?? intentFacts.productIntentId ?? "";
-                if (judgeIntentId !== "") judgeIntentIdSource = "proposal";
+                const resolution = resolveIntentEntryReference({
+                  flowId: judgeAttribution,
+                  ...(explicitIntentId !== "" ? { requestIntentId: explicitIntentId } : {}),
+                  ...(intentFacts.proposalIntentId !== undefined && intentFacts.proposalIntentId !== "" ? { proposalIntentId: intentFacts.proposalIntentId } : {}),
+                  ...(intentFacts.productIntentId !== undefined && intentFacts.productIntentId !== "" ? { productIntentId: intentFacts.productIntentId } : {}),
+                });
+                if (resolution.ok) {
+                  judgeIntentId = resolution.intentId;
+                  judgeIntentIdSource = resolution.source;
+                } else {
+                  judgeIntentResolutionError = { code: resolution.code, detail: resolution.detail };
+                }
               }
               const judgeContext: GovernanceJudgeContext = {
                 flowId: judgeAttribution,
-                ...(judgeIntentId !== "" ? { intentId: judgeIntentId, ...(judgeIntentIdSource !== undefined ? { intentIdSource: judgeIntentIdSource } : {}) } : {}),
+                ...(judgeIntentId !== undefined ? { intentId: judgeIntentId, ...(judgeIntentIdSource !== undefined ? { intentIdSource: judgeIntentIdSource } : {}) } : {}),
+                ...(judgeIntentResolutionError !== undefined ? { intentResolutionError: judgeIntentResolutionError } : {}),
                 facts,
                 ...appointmentJudge,
                 ...(cardKind === "appointment" && appointmentRecommendedRoleIds !== undefined

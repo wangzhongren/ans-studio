@@ -1095,6 +1095,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     if (typeof explicitIntentId === "string" && explicitIntentId.trim() !== "") request.intentId = explicitIntentId.trim();
     if (judgeContext.intentIdSource !== undefined) request.intentIdSource = judgeContext.intentIdSource;
     else if (typeof explicitIntentId === "string" && explicitIntentId.trim() !== "") request.intentIdSource = "request";
+    if (judgeContext.intentResolutionError !== undefined) request.intentResolutionError = judgeContext.intentResolutionError;
     if (judgeContext.paths !== undefined) request.paths = judgeContext.paths;
     if (judgeContext.pathProbes !== undefined) request.pathProbes = judgeContext.pathProbes;
     if (judgeContext.allowedPathRoots !== undefined) request.allowedPathRoots = judgeContext.allowedPathRoots;

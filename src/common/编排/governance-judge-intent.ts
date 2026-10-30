@@ -11,10 +11,13 @@
 //   · D 批已无账本：意图文件存在即作为判断基准（`intent.confirmed=true` 由证据 builder 写入，不伪造客户决定）；
 //   · 缺失/歧义/未确认一律给出 fail-closed 的 reasonCode，由证据包 builder 直接回落 manual。
 
-import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
-import { intentEntryRejectionHint } from "../shared/intent-entry-contract.ts";
+import {
+  intentEntryRejectionHint,
+  resolveIntentEntryReference,
+  type IntentReferenceSource,
+} from "../shared/intent-entry-contract.ts";
+export type { IntentReferenceSource } from "../shared/intent-entry-contract.ts";
 
-const GOVERNANCE_SLUG_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
 export const INTENT_DIR_REL = "docs/intents";
 
 /** 意图记录项目相对路径（`docs/intents/<intentId>.md`）。 */
@@ -26,9 +29,6 @@ export function intentArtifactPath(intentId: string): string {
 export const DECISION_INTENT_FIELD_MAX_BYTES = 2 * 1024;
 /** 意图正文摘录总量上限（客户原话/非目标等章节）。 */
 export const DECISION_INTENT_EXCERPT_MAX_BYTES = 4 * 1024;
-
-/** 来源：request = 请求显式携带；proposal = 提案 frontmatter；flow-id = 两者缺席时的显式回落（证据保留来源）。 */
-export type IntentReferenceSource = "request" | "proposal" | "flow-id";
 
 export interface ResolvedIntentReference {
   intentId: string;
@@ -113,33 +113,24 @@ export function resolveIntentReference(input: {
 }): IntentResolveResult {
   const { flowId, proposalText } = input;
   const explicit = typeof input.intentId === "string" ? input.intentId.trim() : "";
-  if (explicit !== "") {
-    if (!GOVERNANCE_SLUG_RE.test(explicit)) {
-      return {
-        ok: false,
-        reasonCode: "intent-unconfirmed",
-        detail: `intentId「${explicit}」不符合现行 slug 规则（${GOVERNANCE_SLUG_PATTERN}）`,
-      };
-    }
-    return { ok: true, reference: { intentId: explicit, source: input.intentIdSource ?? "request" } };
-  }
+  let proposalIntentId: string | undefined;
   if (typeof proposalText === "string" && proposalText.trim() !== "") {
     const parsed = parseIntentFrontmatter(proposalText);
     if (parsed.ok) {
-      const intentId = parsed.fields["intentId"]?.trim() ?? "";
-      if (intentId !== "") {
-        if (!GOVERNANCE_SLUG_RE.test(intentId)) {
-          return {
-            ok: false,
-            reasonCode: "intent-unconfirmed",
-            detail: `提案 frontmatter 的 intentId「${intentId}」不符合现行 slug 规则（${GOVERNANCE_SLUG_PATTERN}）`,
-          };
-        }
-        return { ok: true, reference: { intentId, source: "proposal" } };
-      }
+      const value = parsed.fields["intentId"]?.trim() ?? "";
+      if (value !== "") proposalIntentId = value;
     }
   }
-  return { ok: true, reference: { intentId: flowId, source: "flow-id" } };
+  const resolution = resolveIntentEntryReference({
+    flowId,
+    ...(explicit !== "" ? { requestIntentId: explicit } : {}),
+    ...(proposalIntentId !== undefined ? { proposalIntentId } : {}),
+  });
+  if (!resolution.ok) {
+    return { ok: false, reasonCode: resolution.code, detail: `${resolution.detail}\n${intentEntryRejectionHint()}` };
+  }
+  const source = explicit !== "" ? input.intentIdSource ?? resolution.source : resolution.source;
+  return { ok: true, reference: { intentId: resolution.intentId, source } };
 }
 
 const INTENT_SECTION_KEYWORDS =

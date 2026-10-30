@@ -6592,14 +6592,18 @@ ${formatted}` };
           ...(run?.documents.intent?.path !== undefined ? { productIntentPath: run.documents.intent.path } : {}),
           ...(run?.documents.proposal?.path !== undefined ? { proposalPath: run.documents.proposal.path } : {}),
         });
-        if (intentFacts.resolvedIntentId === undefined) {
+        const idsMatch = intentFacts.intentIdsMatch === undefined ? "无法核对" : intentFacts.intentIdsMatch ? "yes" : "no";
+        if (intentFacts.resolutionError !== undefined) {
+          lines.push(`意图入口解析：${intentFacts.resolutionError.code}｜${intentFacts.resolutionError.detail}`);
+        } else if (intentFacts.resolvedIntentId === undefined) {
           lines.push("意图入口事实：未解析到 intentId（产品意图/提案 frontmatter 缺 intentId）");
         } else {
           const entryMatch = intentFacts.entryMatches === undefined ? "无法核对" : intentFacts.entryMatches ? "yes" : "no";
           lines.push(
-            `意图入口事实：intentId=${intentFacts.resolvedIntentId}｜入口 ${intentFacts.intentEntryPath}｜存在=${intentFacts.intentEntryExists === true ? "yes" : "no"}｜intentId 匹配=${entryMatch}`,
+            `意图入口事实：intentId=${intentFacts.resolvedIntentId}｜来源=${intentFacts.resolutionSource ?? "未知"}｜入口 ${intentFacts.intentEntryPath}｜存在=${intentFacts.intentEntryExists === true ? "yes" : "no"}｜intentId 匹配=${entryMatch}`,
           );
-          const idsMatch = intentFacts.intentIdsMatch === undefined ? "无法核对" : intentFacts.intentIdsMatch ? "yes" : "no";
+        }
+        if (intentFacts.productIntentId !== undefined || intentFacts.proposalIntentId !== undefined) {
           lines.push(
             `意图来源：产品意图=${intentFacts.productIntentId ?? "缺失"}｜提案=${intentFacts.proposalIntentId ?? "缺失"}｜一致性=${idsMatch}`,
           );

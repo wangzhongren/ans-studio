@@ -283,3 +283,26 @@ test("§5A judgeContext.intentId 进入 GovernanceJudgeRequest；metadata.intent
   await viaMetadata.channel.customerInput(acceptanceRequest(), ctx, { intentId: "intent-meta-v1", judgeContext: { flowId: "flow-a", facts } });
   assert.equal(viaMetadata.seen?.intentId, "intent-meta-v1", "旧调用 metadata.intentId 兜底");
 });
+
+test("§5A/P9.2 客户卡人话：意图预解析失败只退回角色，不向客户呈现技术模板", async () => {
+  const pushed: OperatorRequestPayload[] = [];
+  const facts = { governanceModel: "trio" as const, flowId: "flow-a", ledgerErrors: 0, unresolvedClarificationCount: 0, latestDecisionKinds: [] };
+  const judge: GovernanceJudgeFn = async (request) => ({
+    verdict: "manual",
+    group: "decision",
+    cardKind: "acceptance",
+    engine: request.runtime,
+    reasonCode: "intent-missing",
+    reason: "意图文件必须以 --- 开头；模板 intentId: <小写 slug>；docs/intents/<intentId>.md",
+    durationMs: 1,
+  });
+  const channel = createCustomerInputChannel({
+    presenter: (payload) => pushed.push(payload),
+    operatorId: "tester",
+    judge: { isGroupEnabled: () => true, fn: judge },
+  });
+  const outcome = await channel.customerInput(acceptanceRequest(), ctx, { judgeContext: { flowId: "flow-a", facts } });
+  assert.equal(pushed.length, 0, "不向客户呈现含技术模板的卡");
+  assert.equal(outcome?.outcome, "declined");
+  assert.doesNotMatch(JSON.stringify(pushed), /intentId: <小写 slug>|docs\/intents/);
+});

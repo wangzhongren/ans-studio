@@ -556,7 +556,9 @@ test("§5A contract_check：四角色按裁剪输出意图入口契约与当前�
       assert.match(text, /入口 docs\/intents\/intent-focus-v1\.md/, roleId);
       assert.match(text, /存在=yes/, roleId);
       assert.match(text, /intentId 匹配=yes/, roleId);
+      assert.match(text, /来源=proposal/, roleId);
       assert.match(text, /一致性=yes/, roleId);
+      assert.ok(Buffer.byteLength(text, "utf8") <= 4096, `${roleId} contract_check 组合输出须 ≤4KB`);
     }
     for (const roleId of ["convener", "verifier"] as const) {
       const check = h.contractChecks[roleId];
@@ -570,10 +572,20 @@ test("§5A contract_check：四角色按裁剪输出意图入口契约与当前�
     await fs.writeFile(path.join(root, intentEntry), ["---", "intentId: intent-other-v1", "flowId: focus", "goal: 示例目标", "scope: 示例范围", "acceptance: 示例验收", "---", "# 意图", ""].join("\n"), "utf8");
     const mismatched = (await h.contractChecks.chief!({ flowId: "focus" })) ?? "";
     assert.match(mismatched, /intentId 匹配=no/);
-    // 提案 frontmatter 与产品意图不一致 ⇒ 一致性=no。
+    // 产品-only：提案 frontmatter 不含 intentId ⇒ 来源 product（与 judge 同一解析器）。
+    await fs.writeFile(path.join(root, intentEntry), ["---", "intentId: intent-focus-v1", "flowId: focus", "goal: 示例目标", "scope: 示例范围", "acceptance: 示例验收", "---", "# 意图", ""].join("\n"), "utf8");
+    await fs.writeFile(path.join(root, "docs/proposals/focus-proposal-v1.md"), proposal.replace("intentId: intent-focus-v1\n", ""), "utf8");
+    const productOnly = (await h.contractChecks.chief!({ flowId: "focus" })) ?? "";
+    assert.match(productOnly, /来源=product/);
+    assert.match(productOnly, /意图入口事实：intentId=intent-focus-v1/);
+    assert.match(productOnly, /存在=yes/);
+    assert.match(productOnly, /一致性=无法核对/);
+    // 产品/提案冲突 ⇒ fail-closed 且事实显式可见（不得任选一个来源冒充）。
     await fs.writeFile(path.join(root, "docs/proposals/focus-proposal-v1.md"), proposal.replace("intentId: intent-focus-v1", "intentId: intent-other-v1"), "utf8");
     const inconsistent = (await h.contractChecks.chief!({ flowId: "focus" })) ?? "";
+    assert.match(inconsistent, /意图入口解析：intent-ambiguous/);
     assert.match(inconsistent, /一致性=no/);
+    assert.doesNotMatch(inconsistent, /意图入口事实：intentId=/);
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
