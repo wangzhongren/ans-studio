@@ -607,10 +607,16 @@ export interface SessionManagerDeps {
     busy: boolean;
     summaries: string[];
     /** 结构化的排队条目（右栏「待办 / 队列」组用；来源/摘要/入队时间＋**撤回/展开定位键** `id`（= dedupKey）
-     *  与入队即定格的全文 `full`——**与 summaries 同源**，不另造数据源；G-2 起 `kind` 含第四类 `system`）。 */
-    queue: { kind: string; sourceRoleId: string; summary: string; at: string; id: string; full: string }[];
+     *  与入队即定格的全文 `full`——**与 summaries 同源**，不另造数据源；G-2 起 `kind` 含第四类 `system`）。
+     *  P0（2026-10-30）：`ageMs` = 该条等待时长（显示「为什么没动」）。 */
+    queue: { kind: string; sourceRoleId: string; summary: string; at: string; id: string; full: string; ageMs: number }[];
     /** **正在跑的那条投递**（若该轮由队列投递开跑且未结束）；null = 无（直接 send 的一轮不属于队列条目）。 */
-    running: { kind: string; sourceRoleId: string; summary: string; at: string } | null;
+    running: { kind: string; sourceRoleId: string; summary: string; at: string; ageMs?: number } | null;
+    /** **P0 队列可见性（2026-10-30）**：队首类别（空队列 ⇒ null）、阻塞原因、当前回合 id。
+     *  客户/界面据此看出「为什么没动」；`origin-missing` = 忙态无在跑回合（停止可复位）。 */
+    headKind?: string | null;
+    blockedReason?: "target-busy" | "origin-missing" | "session-closed" | "network" | null;
+    activeTurnId?: string | null;
   }) => void;
   /**
    * shell 命令级闸（设计 §7.2）——**已装配 gate** 的注入接缝（历史形状，保留）。
@@ -855,6 +861,11 @@ interface DeliveryItem {
   opts?: PromptOptions;
   handback?: TaskHandback;
   batchItems?: readonly DeliveryItem[];
+  /**
+   * **P0 收尾不变量（2026-10-30）**：该投递的终态记账（`delivery.end`/`delivery.failed`）是否已落——
+   * settle 收尾与 send promise 续段可能先后到达；**恰一次**，不重复、不静默。
+   */
+  terminalRecorded?: boolean;
 }
 
 /**
@@ -1320,7 +1331,35 @@ export class SessionManager {
     return { contextSource: "fresh", contextWarning: handle.contextWarning };
   }
 
-  private beginDeliveryOrigin(entry: LiveSession, clientMessageId?: string): DeliveryOrigin {
+  /**
+   * **P0 收尾不变量（2026-10-30 现场）**：`busy` 已复位但 `origins.running` 仍残留的陈旧投递归属——
+   * 标记 settled 并移除，记 `turn.origin-missing`。**只处理投递层状态，不伪造 turn**。
+   * 返回是否做了清理。
+   */
+  private healStaleOrigin(entry: LiveSession, reasonCode: string): boolean {
+    const stale = entry.origins.running;
+    if (entry.busy || stale === undefined) return false;
+    stale.settled = true;
+    delete entry.origins.running;
+    this.trimDeliveryOrigins(entry);
+    createDiagnosticLogger({ component: "desktop.session", projectRoot: entry.projectRoot, roleId: entry.roleId }).record(
+      "turn.origin-missing",
+      {
+        reasonCode,
+        ...(stale.turnId !== undefined ? { turnId: stale.turnId } : {}),
+        queueDepth: (this.deliveryQueues.get(this.queueKey(entry.projectRoot, entry.roleId, entry.runtime)) ?? []).length,
+      },
+    );
+    return true;
+  }
+
+  /**
+   * **turn lease**（P0：收尾不变量）：只有「未忙且没有正在跑的 origin」才能开跑新轮。
+   * 拿不到 lease ⇒ `undefined`（调用方入队/保留队首）——**绝不覆盖** `origins.running`（失败投递不得
+   * 删/盖另一个正在运行回合的归属）。
+   */
+  private beginDeliveryOrigin(entry: LiveSession, clientMessageId?: string): DeliveryOrigin | undefined {
+    if (entry.busy || entry.origins.running !== undefined) return undefined;
     const origin: DeliveryOrigin = { settled: false };
     if (clientMessageId !== undefined) origin.clientMessageId = clientMessageId;
     entry.origins.running = origin;
@@ -1358,6 +1397,9 @@ export class SessionManager {
           // **ACK 即已投递**（2026-10-25）：应用任务的稳定键在运行时同步开轮回执时即记「已投递」——
           // 之后即便发送 promise 因重建/收尾阶段报错，同一任务也不会被重投（at-most-once）。
           this.rememberAppTaskDelivered(origin.clientMessageId);
+          // **P0 队列可见性（2026-10-30）**：ACK 绑定 turnId 后立刻外推一次快照——
+          // `activeTurnId` 才能如实到达界面（claim 时的快照早于 ACK，会显示空）。
+          this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
         }
         opts?.onTurnStarted?.(metadata);
       };
@@ -2637,14 +2679,39 @@ export class SessionManager {
           // 投递触发**不挑目标**（历史上单队列按项目存放时就是如此）：一轮结束=下一次放行时机（E-1 的
           // 重试时机之一），各队列在 drainQueue 里各自检查「目标忙/未开」后再决定是否真投。
           const sourceMatches = ev.kind !== "handback" && (ev.runtime === undefined || ev.runtime === runtime) && (ev.roleId === undefined || ev.roleId === roleId);
-          const legacyTerminal = sourceMatches && origin === undefined && entry.origins.running?.turnId === undefined;
-          if (ev.kind === "settled" && sourceMatches && (origin === entry.origins.running || (origin?.settled === true && entry.origins.running === undefined) || legacyTerminal)) {
-            // 收尾推进：旧式空 turnId 的 settled 走 legacyTerminal 时 `origin` 为 undefined，
-            // 但本轮投递事实仍在 `origins.running` 上——先定格，再删除。
-            const settledOrigin = origin ?? entry.origins.running;
+          // **P0 收尾不变量（2026-10-30 现场）**：settled 按 turnId 兜底清 busy——即便 origin 精确匹配
+          // 不成立（origin 缺失/被失败投递删掉/事件缺 turnId），也不得让 busy 永久残留（现场 turn.end 后
+          // 无 delivery.end、busy 不复位、target-busy 冻结队列）。唯一例外：**两个已知 turnId 明确不同**
+          // ——迟到旧回合的 settled 不得清掉正在跑的新回合（多 runtime 既有语义）。
+          const runningOrigin = entry.origins.running;
+          const eventTurnId = ev.kind !== "handback" && typeof ev.turnId === "string" && ev.turnId !== "" ? ev.turnId : undefined;
+          const trackedTurnId = runningOrigin?.turnId;
+          const differentKnownTurn = trackedTurnId !== undefined && eventTurnId !== undefined && trackedTurnId !== eventTurnId;
+          const originMatchesRunning = origin !== undefined && origin === runningOrigin;
+          if (ev.kind === "settled" && sourceMatches && !differentKnownTurn) {
+            // 收尾推进：`origin` 可能为 undefined（旧式空 turnId / origin 已缺失），本轮投递事实仍在
+            // `origins.running` 上——先定格，再删除。
+            const settledOrigin = origin ?? runningOrigin;
             if (origin) origin.settled = true;
             delete entry.origins.running;
             this.trimDeliveryOrigins(entry);
+            const originMissing = !originMatchesRunning;
+            const settledDiagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId });
+            if (entry.busy || originMatchesRunning) {
+              const settledOutcomeRaw = (ev.detail as { outcome?: unknown } | undefined)?.outcome;
+              settledDiagnostic.record("turn.settled", {
+                ...(eventTurnId !== undefined ? { turnId: eventTurnId } : {}),
+                state: originMissing ? "origin-missing" : "origin-matched",
+                busy: entry.busy,
+                ...(typeof settledOutcomeRaw === "string" ? { outcome: settledOutcomeRaw } : {}),
+              });
+            }
+            if (originMissing && entry.busy) {
+              settledDiagnostic.record("turn.origin-missing", {
+                reasonCode: eventTurnId === undefined ? "settled-without-turn-id" : trackedTurnId === undefined ? "settled-before-turn-ack" : "settled-origin-mismatch",
+                ...(eventTurnId !== undefined ? { turnId: eventTurnId } : {}),
+              });
+            }
             entry.interactionState.turn.abort();
             const en = this.sessions.get(key);
             if (en) {
@@ -2660,9 +2727,24 @@ export class SessionManager {
               // 收束/恢复回执）决定该 settle 是否算**真实活动**（刻意排除 ⇒ 防「总结完→又被立即催」的骚扰
               // 回路；静默阈值默认 30s＝一个 tick 的最小防抖——客户 2026-10-16 run-5 裁定，隔离更须严格）。
               const finishedDelivery = this.activeDeliveries.get(this.queueKey(en.projectRoot, roleId, runtime));
+              // **P0（2026-10-30）：settle 收尾补 delivery 终态**。回合已经跑完 ⇒ 该投递的输入已被运行时接收；
+              // 若 send promise 尚未记账（快适配器/挂起续段），由 settle 关闭并落**恰一次** `delivery.end`
+              // （现场「turn.end 后无 delivery.end」的对账缺口）；随后续段不再重复记账。
+              if (finishedDelivery !== undefined && finishedDelivery.terminalRecorded !== true) {
+                finishedDelivery.terminalRecorded = true;
+                this.deliveredDeliveryKeys.add(`${this.queueKey(en.projectRoot, roleId, runtime)}\u0000${finishedDelivery.dedupKey}`);
+                this.rememberAppTaskDelivered(finishedDelivery.clientMessageId);
+                createDiagnosticLogger({ component: "desktop.delivery", projectRoot, roleId }).record("delivery.end", {
+                  ok: true,
+                  count: 1,
+                  state: finishedDelivery.kind,
+                  phase: "turn-settled",
+                });
+              }
               this.activeDeliveries.delete(this.queueKey(en.projectRoot, roleId, runtime)); // 「进行中」随本轮结束撤销
               // 2026-10-20 重启续跑：本轮结束 ⇒ 清理已完成标记并落盘（持久项已在 delivery.end 移除）。
-              if (finishedDelivery !== undefined) {
+              // P0：由 settle 补记账的条目**保留**「已投递」标记（防写盘竞态后重启重投）。
+              if (finishedDelivery !== undefined && finishedDelivery.terminalRecorded !== true) {
                 this.deliveredDeliveryKeys.delete(`${this.queueKey(en.projectRoot, roleId, runtime)}\u0000${finishedDelivery.dedupKey}`);
               }
               this.persistDeliveryQueues();
@@ -2831,7 +2913,9 @@ export class SessionManager {
     // **后台投递不复位活动指针**（应用代客户派发 ≠ 用户切换 pane；当前 pane 保持原样）。
     if (this.activeRoleId === null && this.selectionVersion === selectionVersion && !background) this.activeRoleId = targetRoleId;
     this.noteWatchdogActivity(entry.projectRoot, background ? "governance-advance" : "customer-send"); // G-2/W3：客户消息 = 真实活动（无论直发还是入队，都在此定格）
-    if (entry.busy || (entry.runtime === "pi" && entry.profileRevision !== this.profileRevision("pi") && this.hasBusyRuntime("pi"))) {
+    // P0（2026-10-30）：先自愈「busy 已复位但 origin 残留」的陈旧归属；忙/已有 origin 一律入队（不覆盖）。
+    this.healStaleOrigin(entry, "stale-origin-before-send");
+    const queueBecauseBusy = (): SendResult => {
       const roleId = entry.roleId;
       this.enqueueDelivery(entry.projectRoot, roleId, {
         kind: deliveryKind,
@@ -2850,12 +2934,16 @@ export class SessionManager {
       const q = this.deliveryQueues.get(this.queueKey(entry.projectRoot, roleId, entry.runtime));
       diagnostic.record("session.send.queued", { queueDepth: q?.length ?? 0 });
       return { ok: true, queued: true, position: q ? q.length : 1, ...(clientMessageId !== undefined ? { clientMessageId } : {}) };
+    };
+    if (entry.busy || entry.origins.running !== undefined || (entry.runtime === "pi" && entry.profileRevision !== this.profileRevision("pi") && this.hasBusyRuntime("pi"))) {
+      return queueBecauseBusy();
     }
     const roleId = entry.roleId;
     // L-1 顺序修正（与投递机同款，防竞态）：**先置忙再 await**——快适配器（如演示 runtime）的事件
     // （含 `settled`）可能在 `send` 返回前就被消费循环处理完；若此刻才置忙，settled 的复位会被反向覆盖，
     // 忙态将**永不复位**（队列也永不放行）。失败 ⇒ 复位 + 外推（并没有在跑，如实）。
     const origin = this.beginDeliveryOrigin(entry, clientMessageId);
+    if (origin === undefined) return queueBecauseBusy(); // turn lease 争用（同步段不可达；防御：入队不覆盖）
     // 直接投出的治理唤醒同样带 system 类别（与入队条目同口径；客户消息不设，既有语义不变）。
     if (deliveryKind === "system") origin.kind = "system";
     entry.interactionState.turn = new AbortController();
@@ -2917,10 +3005,70 @@ export class SessionManager {
       // 中止标记（链式治理推进的早失败护栏）：被请求中止 ≠ 正常结束——链路继续轮询等下一次投递/重试。
       entry.lastTurnAborted = true;
       entry.interactionState.turn.abort();
-      return await entry.handle.abort();
+      const result = await entry.handle.abort();
+      // **P0 手动停止解楔（2026-10-30 现场：10+ 次停止 ~1ms ok 但零变化）**：停止入口必须能强制复位
+      // 投递层楔死（origin/busy/activeDeliveries）并让队列继续；`handle.abort` 已如实返回成功才能这样做
+      // （不支持/失败 ⇒ 不假装已停）。这里**不伪造 turn**：只复位投递层状态并记 `turn.abort.forced`。
+      if (result.ok === true) this.forceResetDeliveryState(entry, "abort-requested");
+      return result;
     } catch (err) {
       return { ok: false, supported: true, error: err instanceof Error ? err.message : String(err) };
     }
+  }
+
+  /**
+   * **强制复位投递层状态（P0，2026-10-30）**：仅在「停止已成功请求」后由 `abort` 调用——
+   * 复位 `origins.running`/`busy`/`activeDeliveries`，为被放弃的在途投递落**恰一次**终态（`delivery.end`
+   * `mode:"aborted"`，at-most-once，不重投），结算 settle 等待者并放行队列。**不伪造回合终局**：
+   * 运行时若稍后仍发 settled，按既有幂等路径处理（busy 已复位，不产生第二次收尾）。
+   * 无忙态/无 origin/无在途 ⇒ no-op（幂等，不产生噪声）。
+   */
+  private forceResetDeliveryState(entry: LiveSession, reasonCode: string): void {
+    const key = this.queueKey(entry.projectRoot, entry.roleId, entry.runtime);
+    const origin = entry.origins.running;
+    const active = this.activeDeliveries.get(key);
+    const wasBusy = entry.busy;
+    if (!wasBusy && origin === undefined && active === undefined) return;
+    if (origin !== undefined) {
+      origin.settled = true;
+      delete entry.origins.running;
+      this.trimDeliveryOrigins(entry);
+    }
+    let activeClosed = 0;
+    if (active !== undefined && active.terminalRecorded !== true) {
+      active.terminalRecorded = true;
+      activeClosed = 1;
+      this.deliveredDeliveryKeys.add(`${key}\u0000${active.dedupKey}`);
+      this.rememberAppTaskDelivered(active.clientMessageId);
+      createDiagnosticLogger({ component: "desktop.delivery", projectRoot: entry.projectRoot, roleId: entry.roleId }).record("delivery.end", {
+        ok: true,
+        count: 1,
+        state: active.kind,
+        mode: "aborted",
+        reasonCode,
+      });
+    }
+    if (active !== undefined) this.activeDeliveries.delete(key);
+    entry.busy = false;
+    entry.busySince = undefined;
+    const settleWaiters = entry.settleWaiters;
+    entry.settleWaiters = undefined;
+    for (const finish of settleWaiters ?? []) finish(true);
+    createDiagnosticLogger({ component: "desktop.session", projectRoot: entry.projectRoot, roleId: entry.roleId }).record(
+      "turn.abort.forced",
+      {
+        reasonCode,
+        ...(origin?.turnId !== undefined ? { turnId: origin.turnId } : {}),
+        mode: "forced",
+        count: activeClosed,
+        queueDepth: (this.deliveryQueues.get(key) ?? []).length,
+        busy: wasBusy,
+      },
+    );
+    this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
+    this.persistDeliveryQueues();
+    void this.drainAllQueuesFor(entry.projectRoot);
+    if (entry.runtime === "pi") void this.drainPiQueuesAcrossProjects();
   }
 
   /**
@@ -4974,9 +5122,28 @@ export class SessionManager {
     const entry = this.sessions.get(this.sessionKey(projectRoot, targetRoleId, runtime));
     const busy = entry?.busy === true;
     const running = this.activeDeliveries.get(this.queueKey(projectRoot, targetRoleId, runtime));
-    const view = (i: DeliveryItem) => ({ runtime: i.runtime, kind: i.kind, sourceRoleId: i.sourceRoleId, summary: i.summary, at: i.enqueuedAt, id: i.dedupKey, full: i.kind === "handback" ? i.safeText ?? mainT("main.session.safeCopyPending") : i.text });
+    const now = this.now();
+    /** **P0 队列可见性（2026-10-30）**：每条排队项的等待时长（ms；入队时刻定格，显示用）。 */
+    const ageOf = (i: DeliveryItem): number => {
+      const parsed = Date.parse(i.enqueuedAt);
+      return Number.isFinite(parsed) ? Math.max(0, now - parsed) : 0;
+    };
+    const view = (i: DeliveryItem) => ({ runtime: i.runtime, kind: i.kind, sourceRoleId: i.sourceRoleId, summary: i.summary, at: i.enqueuedAt, id: i.dedupKey, full: i.kind === "handback" ? i.safeText ?? mainT("main.session.safeCopyPending") : i.text, ageMs: ageOf(i) });
     let contextInfo: Pick<OpenResult, "contextSource" | "contextWarning"> = {};
     if (entry) contextInfo = this.contextInfo(entry.handle);
+    // **为什么没动**（单一来源＝会话内存态，不造第二套）：队首类别 / 阻塞原因 / 当前回合 id。
+    // `origin-missing` = 忙态但无对应在跑回合（收尾异常，可用「停止本轮」复位）；
+    // `target-busy` = 正常等待上一轮；`session-closed` = 目标会话未开且没有自动开启链。
+    const runningOrigin = entry?.origins.running;
+    const headKind = q.length > 0 ? q[0].kind : null;
+    const blockedReason: "target-busy" | "origin-missing" | "session-closed" | null =
+      q.length === 0
+        ? null
+        : busy
+          ? (runningOrigin === undefined || runningOrigin.settled === true ? "origin-missing" : "target-busy")
+          : entry === undefined
+            ? (this.drainChains.has(projectRoot) ? null : "session-closed")
+            : null;
     this.deps.emitRoleState?.({
       ...contextInfo,
       roleId: targetRoleId, projectRoot, runtime, profileRevision: entry?.profileRevision ?? this.profileRevision(runtime),
@@ -4984,6 +5151,9 @@ export class SessionManager {
       summaries: q.map((i) => i.summary),
       queue: q.map(view),
       running: running !== undefined && busy ? view(running) : null,
+      headKind,
+      blockedReason,
+      activeTurnId: runningOrigin?.turnId ?? null,
     });
   }
 
@@ -5934,7 +6104,7 @@ ${formatted}` };
    * 恒空——呈现层按文首 `[系统·<子类>] ` 定格标记归类）。主人未枚举到 ⇒ 入 `""` 目标队列（投递机既有的
    * 一次性提示 + 保留待重试；**绝不静默丢**）。
    */
-  watchdogDeliver(projectRoot: string, message: { text: string; summary: string; dedupKey: string }): void {
+  watchdogDeliver(projectRoot: string, message: { text: string; summary: string; dedupKey: string; uiOnlyWhenBusy?: boolean }): void {
     // B 批：看护/巡检系统消息回幕僚（trio）；无幕僚（single/旧项目）保持原主人。
     const governanceRoleId = this.chiefTaskRoleIdOf(projectRoot) ?? this.handbackOwnerRoleId(projectRoot);
     let runtime: RuntimeKind | undefined;
@@ -5945,6 +6115,25 @@ ${formatted}` };
     }
     if (runtime === undefined) runtime = this.lastGovernanceRuntime.get(projectRoot) ?? "pi";
     const target = governanceRoleId ?? "";
+    // **P0 看护告警 UI-only 旁路（2026-10-30 设计 §7.3.3 / Q6）**：**看护服务发出**的消息
+    // （`uiOnlyWhenBusy`：轮次到点/静默/巡检/告警/恢复）在目标正在忙时**不进 busy 模型队列**——
+    // 否则看护自身的提示会被同一队列楔死（现场：`patrol.skipped (pending)` 持续、告警也排不进）。
+    // 改为经既有 UI 系统行（`delivery-note`，不触发模型/门禁/自动决策）呈现 + `watchdog.notice.bypass`
+    // 诊断；不忙时仍走正常 system 队列投递。直接调用（MCP 安装/申请系统行等，不带该标记）保持既有排队语义。
+    const live = target !== "" ? this.sessions.get(this.sessionKey(projectRoot, target, runtime)) : undefined;
+    if (live?.busy === true && message.uiOnlyWhenBusy === true) {
+      const queueDepth = (this.deliveryQueues.get(this.queueKey(projectRoot, target, runtime)) ?? []).length;
+      const parts = message.dedupKey.split("\u0000");
+      const signal = parts[0] === "watchdog" && parts.length >= 3 && parts[2] !== "" ? parts[2] : "watchdog";
+      createDiagnosticLogger({ component: "desktop.watchdog", projectRoot, roleId: target }).record("watchdog.notice.bypass", {
+        mode: "ui-only",
+        signal,
+        targetRoleId: target,
+        queueDepth,
+      });
+      this.emitDeliveryNote(projectRoot, runtime, target, "", message.summary);
+      return;
+    }
     this.enqueueDelivery(projectRoot, target, {
       kind: "system",
       runtime,
@@ -6970,7 +7159,8 @@ ${formatted}` };
       this.suDeliveryBlockedNoted.delete(this.queueKey(projectRoot, "", runtime));
     }
     if (!entry || entry.projectRoot !== projectRoot) return; // 防御：仍不可用则保持排队
-    if (entry.busy || (runtime === "pi" && entry.profileRevision !== this.profileRevision("pi") && this.hasBusyRuntime("pi"))) {
+    this.healStaleOrigin(entry, "stale-origin-before-drain");
+    if (entry.busy || entry.origins.running !== undefined || (runtime === "pi" && entry.profileRevision !== this.profileRevision("pi") && this.hasBusyRuntime("pi"))) {
       diagnostic.record("delivery.blocked", { reasonCode: "target-busy", queueDepth: q.length });
       return;
     }
@@ -6981,6 +7171,14 @@ ${formatted}` };
       if (!rebuilt.reopened.ok) return; // 队列保留（下次时机自动重试；失败已有如实一行）
       entry = this.sessions.get(this.sessionKey(projectRoot, resolvedTarget, runtime));
       if (!entry || entry.projectRoot !== projectRoot) return; // 防御：重开后仍不可用
+    }
+    // **P0 turn lease 复核（2026-10-30）**：上面的忙判据在 `await rebuildIfBoundaryStale` 之前读取——
+    // 该 await 期间另一条路径可能已开跑（busy/origin 置位）。认领前必须**再验一次**，否则会覆盖
+    // 正在运行回合的 origins.running（现场「失败回交覆盖 origin → turn.end 后 busy 不复位」根因类）。
+    this.healStaleOrigin(entry, "stale-origin-after-rebuild");
+    if (entry.busy || entry.origins.running !== undefined) {
+      diagnostic.record("delivery.blocked", { reasonCode: "target-busy", queueDepth: q.length });
+      return;
     }
 
     // —— F-2-opt3：认领段开始（自此到 claim.end 之间的同步改动都在串行链内；随后链即释放）——
@@ -7020,6 +7218,16 @@ ${formatted}` };
     }
     // 先置忙再 await（防「open 尾部放行」与本次调用竞态导致并发 send）；失败则复位。
     const origin = this.beginDeliveryOrigin(entry, sent.clientMessageId);
+    if (origin === undefined) {
+      // turn lease 争用（防御分支：同步段内不应发生）——**放回队首**，绝不覆盖正在运行的 origin。
+      q.unshift(...removedItems);
+      this.deliveryQueues.set(key, q);
+      diagnostic.record("delivery.blocked", { reasonCode: "turn-lease-busy", queueDepth: q.length });
+      diagnostic.record("delivery.claim.end", { state: item.kind, count: batchCount });
+      this.notifyRoleState(projectRoot, resolvedTarget, runtime);
+      this.persistDeliveryQueues();
+      return;
+    }
     // 收尾推进（2026-10-18）：把本轮的投递类别/流程 id/回交证据定格在 origin 上——settle 后据此决定
     // 是否请 Interface 检查「流程全部完成」。多流程批次保留集合；客户消息/系统消息无 flowId。
     origin.kind = sent.kind;
@@ -7062,11 +7270,15 @@ ${formatted}` };
         }
       }
       await this.sendDelivery(entry, origin, sent.text, sendOptions, sent.kind === "dispatch", sent.taskId);
-      diagnostic.record("delivery.end", { ok: true, count: batchCount, state: sent.kind });
-      // 2026-10-20 重启续跑：投递成功（delivery.end）即从持久队列移除——崩溃重启不重投已完成项。
-      this.deliveredDeliveryKeys.add(`${key}\u0000${sent.dedupKey}`);
-      // 2026-10-25：应用任务投递成功 ⇒ 记「已投递」（重建续投/应用侧同任务调用不再发第二遍）。
-      this.rememberAppTaskDelivered(sent.clientMessageId);
+      // P0（2026-10-30）：settle 收尾可能已先行记账（`terminalRecorded`）——终态诊断恰一次。
+      if (sent.terminalRecorded !== true) {
+        sent.terminalRecorded = true;
+        diagnostic.record("delivery.end", { ok: true, count: batchCount, state: sent.kind });
+        // 2026-10-20 重启续跑：投递成功（delivery.end）即从持久队列移除——崩溃重启不重投已完成项。
+        this.deliveredDeliveryKeys.add(`${key}\u0000${sent.dedupKey}`);
+        // 2026-10-25：应用任务投递成功 ⇒ 记「已投递」（重建续投/应用侧同任务调用不再发第二遍）。
+        this.rememberAppTaskDelivered(sent.clientMessageId);
+      }
       this.persistDeliveryQueues();
       this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 立即外推（running 行即时可见）
       if (sent.kind === "dispatch") this.activeDispatchKeys.delete(sent.dedupKey); // 送达即释放窗口去重（返工可再派）
@@ -7106,8 +7318,13 @@ ${formatted}` };
       // message 类（排队后的客户消息投递）：**不加额外文案**——消息本体随会话事件出现（真实 pi 的
       // 「用户指令：」回显走注入样式行），此前误落进派发分支（「已接收…派发任务」对消息是错口径，已修）。
     } catch (err) {
-      if (sent.kind === 'handback') diagnostic.record('delivery.failed', { count: batchCount, state: sent.kind });
-      else diagnostic.error("delivery.failed", err, { count: batchCount, state: sent.kind });
+      // P0（2026-10-30）：终态已由 settle 收尾记账（`delivery.end` phase:"turn-settled"）⇒ 本续段不再重复
+      // delivery.failed、也不再回队重投（at-most-once；回合已真实跑完）。
+      const terminalRecorded = sent.terminalRecorded === true;
+      if (!terminalRecorded) {
+        if (sent.kind === 'handback') diagnostic.record('delivery.failed', { count: batchCount, state: sent.kind });
+        else diagnostic.error("delivery.failed", err, { count: batchCount, state: sent.kind });
+      }
       const receipt = err instanceof RuntimeDeliveryError ? err.receipt : sent.attemptId ? this.attemptStates.get(this.persistenceKey(this.persistenceScope(entry), sent.attemptId))?.receipt : undefined;
       if (receipt) this.rememberReceipt(entry, receipt);
       const cAttempt = sent.kind === 'handback' && !!sent.attemptId;
@@ -7116,11 +7333,12 @@ ${formatted}` };
       // 真实回显。任一成立 ⇒ 输入已交给运行时，失败（如会话在收尾窗口被重建 dispose）不得回队重投，
       // 否则同一任务会在重建后以第二条 user 消息再出现（客户真机缺陷）。未 ACK 的失败仍按既有语义
       // 放回队首保留重试（失败重试仍允许）；回交保留 receipt 判据（providerMayHaveStarted）不变。
-      const acked = origin.turnId !== undefined || origin.inputAccepted === true;
-      const canRetry = cAttempt
+      // P0：settle 已记 `delivery.end` ⇒ 视为已处理（更不允许重投）。
+      const acked = origin.turnId !== undefined || origin.inputAccepted === true || terminalRecorded;
+      const canRetry = terminalRecorded ? false : cAttempt
         ? !!receipt && !receipt.providerMayHaveStarted && receipt.retryDeliveryAllowed
         : !acked;
-      const mayBeActive = cAttempt && (!receipt || receipt.providerMayHaveStarted);
+      const mayBeActive = terminalRecorded ? false : cAttempt && (!receipt || receipt.providerMayHaveStarted);
       const ownsRunningDelivery = entry.origins.running === origin;
       if (!mayBeActive) this.failDeliveryOrigin(entry, origin);
       // 投递失败：**如实提示 + 放回队首**（保持顺序）待重试——绝不静默丢。
@@ -7146,6 +7364,10 @@ ${formatted}` };
         this.rememberAppTaskDelivered(sent.clientMessageId);
       }
       this.persistDeliveryQueues();
+      if (terminalRecorded) {
+        // 回合已完成、终态已记账：不再向 pane 发「投递失败/保留重试」的错误口径系统行。
+        return;
+      }
       const base = sent.kind === "handback" && cAttempt ? !canRetry ? mainT("main.session.delivery.maybeProcessed") : mainT("main.session.delivery.retained") : err instanceof Error ? err.message : String(err);
       // 已 ACK 的非回交失败：如实说明「可能已处理，未自动重发」——绝不沿用「已保留待重试」的假话。
       const ackedNote = `${base}——${mainT("main.session.delivery.maybeProcessed")}`;

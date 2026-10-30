@@ -203,3 +203,13 @@ export interface RoleMeta {
   readableHistoryRetained?: boolean;
   lastEvent?: string;
 }
+
+/**
+ * **P0 队列可见性（2026-10-30）**：主进程 `session:role-state` 快照里的「为什么没动」事实——
+ * 队首类别 / 阻塞原因 / 当前回合 id。界面只读它，不自行推测（单一来源＝主进程会话内存态）。
+ */
+export interface RoleQueueMeta {
+  headKind: string | null;
+  blockedReason: "target-busy" | "origin-missing" | "session-closed" | "network" | null;
+  activeTurnId: string | null;
+}

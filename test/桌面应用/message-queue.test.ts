@@ -42,6 +42,8 @@ import { buildViewImagePrompt } from "../../app/desktop/view-image.ts";
 // G-2（2026-10-16 客户批准）：W2 `system` 第四类投递（快照/队列视图/撤回/投递机复用）＋ W3 完成态收束的
 // **SessionManager 集成**（真看护服务＋注入时钟＋同源快照——不起真实模型）。
 import { createWatchdogService, type WatchdogObservation } from "../../app/desktop/watchdog.ts";
+// P0（2026-10-30）：看护 UI-only 旁路的诊断留证（真实 createDiagnosticLogger）。
+import { configureDiagnostics, disposeDiagnostics, flushDiagnostics } from "../../src/common/shared/diagnostics.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.resolve(HERE, "..", "..", "app");
@@ -446,6 +448,8 @@ interface G2Harness {
   sent: Record<string, string[]>;
   roleStates: { roleId: string; busy: boolean; summaries: string[]; queue: { kind: string; sourceRoleId: string; summary: string; at: string; id: string; full: string }[]; running: { kind: string; sourceRoleId: string; summary: string; at: string } | null }[];
   observations: { projectRoot: string; observation: WatchdogObservation }[];
+  /** P0（2026-10-30）：事件外推留证（看护 UI-only 旁路的 delivery-note 断言）。 */
+  envelopes: { roleId: string; event: { kind: string; summary?: string; detail?: unknown } }[];
   service: ReturnType<typeof createWatchdogService>;
   advance: (ms: number) => void;
   latest: (roleId: string) => G2Harness["roleStates"][number] | undefined;
@@ -459,6 +463,7 @@ function makeG2Harness(): G2Harness {
   const sent: Record<string, string[]> = { su: [], A: [] };
   const roleStates: G2Harness["roleStates"] = [];
   const observations: { projectRoot: string; observation: WatchdogObservation }[] = [];
+  const envelopes: G2Harness["envelopes"] = [];
   const stopped: Record<string, boolean> = {};
   const gates: Record<string, Promise<void> | undefined> = {};
   const releases: Record<string, (() => void) | undefined> = {};
@@ -517,7 +522,7 @@ function makeG2Harness(): G2Harness {
     createDemoAdapter: () => { throw new Error("本用例不应构造 demo 适配器"); },
     buildProjectConfig,
     getListing: (root) => (root === "/proj" ? l : undefined),
-    emitEvent: () => {},
+    emitEvent: (env) => envelopes.push(env as G2Harness["envelopes"][number]),
     emitRoleState: (info) => roleStates.push({
       roleId: info.roleId,
       busy: info.busy,
@@ -533,7 +538,7 @@ function makeG2Harness(): G2Harness {
     now: () => ms,
   });
   return {
-    mgr, streams, sent, roleStates, observations, service,
+    mgr, streams, sent, roleStates, observations, envelopes, service,
     advance: (delta) => { ms += delta; },
     latest: (roleId) => {
       for (let i = roleStates.length - 1; i >= 0; i -= 1) if (roleStates[i].roleId === roleId) return roleStates[i];
@@ -544,17 +549,30 @@ function makeG2Harness(): G2Harness {
   };
 }
 
-test("G-2/W2：`system` 第四类投递——su 忙时入队（快照 kind=system、来源空白、无第二数据源）；不可撤回；settled 后按既有投递机送达", async () => {
+test("G-2/W2：`system` 第四类投递——忙时 P0 UI-only 旁路（不进模型队列）；空闲时同机入队/送达；不可撤回", async () => {
   const h = makeG2Harness();
   await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
   h.hangNext("su");
   const send = h.mgr.send("占住 su 本轮");
   await tick(30);
-  // 看护系统消息（kind:"system"——告警/收束/回执都走这里）：su 忙 ⇒ 入队。
-  h.mgr.watchdogDeliver("/proj", { text: "[系统·看护] 测试告警：角色「A」。", summary: "系统·看护 · 测试告警 · 角色 A", dedupKey: "watchdog\u0000/proj\u0000test\u00000" });
+  // P0（2026-10-30 现场）：su 忙 ⇒ 看护消息**不进模型队列**（否则看护自身被 target-busy 楔死），
+  // 改经既有 UI 系统行（delivery-note，不触发模型/门禁）呈现。
+  h.mgr.watchdogDeliver("/proj", { text: "[系统·看护] 测试告警：角色「A」。", summary: "系统·看护 · 测试告警 · 角色 A", dedupKey: "watchdog\u0000/proj\u0000test\u00000", uiOnlyWhenBusy: true });
   await tick(30);
+  assert.equal(h.latest("su")?.queue.length ?? 0, 0, "忙时看护消息不得进入模型队列（P0 旁路）");
+  assert.ok(
+    h.envelopes.some((envelope) => envelope.roleId === "su" && (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note" && /看护/.test(envelope.event.summary ?? "")),
+    "UI 系统行如实可见（不静默）",
+  );
+  assert.ok(!h.sent.su.includes("[系统·看护] 测试告警：角色「A」。"), "忙时旁路消息不得投给模型");
+  // 放行本轮 → settled → 空闲后同一入口走既有 system 队列：快照 kind=system、来源空白、不可撤回、送达。
+  h.release("su");
+  await send;
+  h.streams.su.push({ kind: "settled", summary: "su 一轮结束" });
+  await tick(150);
+  h.mgr.watchdogDeliver("/proj", { text: "[系统·看护] 测试告警：角色「A」。", summary: "系统·看护 · 测试告警 · 角色 A", dedupKey: "watchdog\u0000/proj\u0000test\u00001", uiOnlyWhenBusy: true });
   const q = h.latest("su");
-  assert.equal(q?.summaries.length, 1, "系统消息入队（同一套投递机）");
+  assert.equal(q?.queue.length, 1, "空闲时系统消息入队（同一套投递机）");
   assert.equal(q?.queue[0].kind, "system", "快照 kind=system（W2 第四类——渲染侧据此显示「系统」）");
   assert.equal(q?.queue[0].sourceRoleId, "", "来源标注恒空（U1 已落树契约：系统非角色）");
   assert.ok(q?.queue[0].id.startsWith("watchdog\u0000"), "去重键＝看护自持命名空间（与 handback/dispatch 键隔离）");
@@ -562,14 +580,47 @@ test("G-2/W2：`system` 第四类投递——su 忙时入队（快照 kind=syste
   const wd = h.mgr.withdraw("su", q!.queue[0].id);
   assert.equal(wd.ok, false, "system 不可撤回");
   assert.match(wd.error ?? "", /只读|不可撤回/, "如实说明");
-  // 放行本轮 → settled → 投递机按序送达。
-  h.release("su");
-  await send;
-  h.streams.su.push({ kind: "settled", summary: "su 一轮结束" });
   await tick(150);
   assert.ok(h.sent.su.includes("[系统·看护] 测试告警：角色「A」。"), "系统消息真投递给 su（同机送达）");
   assert.equal(h.latest("su")?.queue.length, 0, "送达后队列清空");
   await h.mgr.stop(null);
+});
+
+test("P0 看护旁路诊断：忙时 watchdogDeliver 记 watchdog.notice.bypass(mode=ui-only)、不改队列、不投模型", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ans-msgq-diag-"));
+  configureDiagnostics({ directory: dir });
+  const h = makeG2Harness();
+  try {
+    await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    h.hangNext("su");
+    const send = h.mgr.send("占住 su 本轮");
+    await tick(30);
+    h.mgr.watchdogDeliver("/proj", {
+      text: "[系统·巡检] 在岗状态",
+      summary: "系统·巡检 · 1 个角色",
+      dedupKey: "watchdog\u0000/proj\u0000patrol\u00009",
+      uiOnlyWhenBusy: true,
+    });
+    await tick(30);
+    assert.equal(h.latest("su")?.queue.length ?? 0, 0, "旁路消息不得进入忙目标队列");
+    assert.ok(!h.sent.su.includes("[系统·巡检] 在岗状态"), "旁路消息不得投给模型");
+    await flushDiagnostics();
+    const text = fs.readdirSync(dir).map((file) => fs.readFileSync(path.join(dir, file), "utf8")).join("");
+    const records = text.trim().split("\n").filter((line) => line !== "").map((line) => JSON.parse(line) as Record<string, unknown>);
+    const bypass = records.filter((record) => record.event === "watchdog.notice.bypass");
+    assert.equal(bypass.length, 1, "旁路恰一条诊断");
+    assert.equal(bypass[0].mode, "ui-only");
+    assert.equal(bypass[0].signal, "patrol");
+    assert.equal(bypass[0].targetRoleId, "su");
+    h.release("su");
+    await send;
+    h.streams.su.push({ kind: "settled", summary: "su 一轮结束" });
+    await tick(80);
+  } finally {
+    await h.mgr.stop(null);
+    await disposeDiagnostics();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("G-2/W3 已移除：完成静默不再投 `[系统·收束]`（验收通过即收束）", async () => {

@@ -7,35 +7,53 @@
  */
 
 import { useDrawerStore, currentReadingKey } from "@/stores/drawer-store";
-import { queueTimeText } from "@/chat/work-view";
+import { queueAgeText, queueBlockedView, queueTimeText } from "@/chat/work-view";
 import type { QueueItemView } from "@/chat/confirm-logic";
-import { useT } from "@/i18n";
+import type { RoleQueueMeta } from "@/chat/types";
+import { useLocaleState, useT } from "@/i18n";
 
 export function QueuePanel({
   roleId,
   items,
   emptyText,
+  meta = null,
 }: {
   roleId: string;
   items: readonly QueueItemView[];
   emptyText: string;
+  /** **P0 队列可见性（2026-10-30）**：主进程 role-state 快照的「为什么没动」（可选；旧调用不变）。 */
+  meta?: RoleQueueMeta | null;
 }) {
   const t = useT();
+  const locale = useLocaleState((s) => s.locale);
   const key = currentReadingKey(roleId);
   const reading = useDrawerStore((s) => s.reading[key]);
   const withdraw = useDrawerStore((s) => s.withdraw[key]);
   const pending = useDrawerStore((s) => s.withdrawPending);
   const toggleFull = useDrawerStore((s) => s.toggleFull);
   const withdrawQueued = useDrawerStore((s) => s.withdrawQueued);
+  const blocked = queueBlockedView(meta, locale);
 
   if (items.length === 0) {
     return <div className="muted small">{emptyText}</div>;
   }
 
   return (
-    <ul className="queue-list">
+    <>
+      {blocked ? (
+        <div
+          className="q-blocked"
+          role="status"
+          data-blocked-reason={blocked.blockedReason}
+          data-active-turn-id={blocked.activeTurnId ?? undefined}
+        >
+          {blocked.text}
+        </div>
+      ) : null}
+      <ul className="queue-list">
       {items.map((item) => {
         const running = item.running;
+        const ageText = queueAgeText(item.ageMs, locale);
         const opened = reading?.full?.[item.id] === true;
         const expandable =
           item.full !== "" && Array.from(item.full).length > Array.from(item.text).length;
@@ -54,6 +72,7 @@ export function QueuePanel({
               <div className="q-head">
                 <span className="q-src">{item.sourceLabel}</span>
                 <span className="q-time q-meta">{queueTimeText(item.at)}</span>
+                {ageText ? <span className="q-age q-meta" data-age-ms={item.ageMs}>{ageText}</span> : null}
               </div>
               <p className="q-text">{item.text}</p>
               {expandable || item.canWithdraw ? (
@@ -107,6 +126,7 @@ export function QueuePanel({
           </li>
         );
       })}
-    </ul>
+      </ul>
+    </>
   );
 }

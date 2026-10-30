@@ -320,6 +320,7 @@ async function doSwitch(runtime: RuntimeId): Promise<boolean> {
     useChatStore.setState({
       roleBusy: {},
       queueByRole: {},
+      queueMetaByRole: {},
       runningByRole: {},
       roleMeta: {},
       hint: "",

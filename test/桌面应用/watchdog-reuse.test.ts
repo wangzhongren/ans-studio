@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 
 import {
   createWatchdogService,
+  DEFAULT_TURN_ABORT_MS,
   type WatchdogProjectSnapshot,
   type WatchdogRoleView,
 } from "../../app/desktop/watchdog.ts";
@@ -35,6 +36,10 @@ function service(snapshot: () => WatchdogProjectSnapshot, env: Record<string, st
   });
   return { svc, delivered, setNow: (value: number) => { now = value; } };
 }
+
+test("P0（2026-10-30）：默认自动中止保持 0——本波不顺手改客户 2026-10-21 口径", () => {
+  assert.equal(DEFAULT_TURN_ABORT_MS, 0, "默认自动中止必须仍为 0（禁用）");
+});
 
 test("复用单一 tick：start 只创建一个 setInterval（幂等）；巡检/日志静默不新增定时器", () => {
   const h = service(() => snap());

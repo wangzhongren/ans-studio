@@ -81,6 +81,7 @@ import type {
   Listing,
   PaneMeta,
   RoleMeta,
+  RoleQueueMeta,
   RoleView,
   SessionEnvelope,
 } from "@/chat/types";
@@ -336,6 +337,8 @@ interface ChatStore {
   roleBusy: Dict<boolean>;
   roleMeta: Dict<RoleMeta>;
   queueByRole: Dict<Array<Record<string, unknown>>>;
+  /** 主进程 role-state 快照的「为什么没动」（队首类别/阻塞原因/当前回合 id；P0 2026-10-30）。 */
+  queueMetaByRole: Dict<RoleQueueMeta>;
   /** 主进程 role-state 快照的「正在跑的那条投递」（队列视图的「进行中」位）。 */
   runningByRole: Dict<Record<string, unknown> | null>;
   paneMeta: Dict<PaneMeta>;
@@ -715,6 +718,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   roleBusy: {},
   roleMeta: {},
   queueByRole: {},
+  queueMetaByRole: {},
   runningByRole: {},
   paneMeta: {},
   paneVersions: {},
@@ -782,6 +786,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       roleMeta: {},
       roleBusy: {},
       queueByRole: {},
+      queueMetaByRole: {},
     });
   },
 
@@ -1725,6 +1730,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           ? (record.running as Record<string, unknown>)
           : null,
     };
+    // P0 队列可见性（2026-10-30）：主进程快照的「为什么没动」事实原样入表（不推测）。
+    const rawBlocked = asString(record.blockedReason);
+    const blockedReason: RoleQueueMeta["blockedReason"] =
+      rawBlocked === "target-busy" || rawBlocked === "origin-missing" || rawBlocked === "session-closed" || rawBlocked === "network"
+        ? rawBlocked
+        : null;
+    const rawHeadKind = asString(record.headKind);
+    const rawActiveTurnId = asString(record.activeTurnId);
+    const queueMeta: RoleQueueMeta = {
+      headKind: rawHeadKind !== "" ? rawHeadKind : null,
+      blockedReason,
+      activeTurnId: rawActiveTurnId !== "" ? rawActiveTurnId : null,
+    };
+    const queueMetaByRole = { ...get().queueMetaByRole, [roleId]: queueMeta };
     const roleMeta = { ...get().roleMeta };
     const meta = ensureMeta(roleMeta, roleId);
     meta.live = true;
@@ -1765,6 +1784,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({
       roleBusy,
       queueByRole,
+      queueMetaByRole,
       runningByRole,
       roleMeta,
       paneMeta,

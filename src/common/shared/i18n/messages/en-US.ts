@@ -188,6 +188,13 @@ export const enUS = {
   "ui.queue.withdrawTitle": "Withdraw this queued message (only before delivery)",
   "ui.queue.withdrawing": "Withdrawing…",
   "ui.queue.withdraw": "Withdraw",
+  // P0 queue visibility (2026-10-30): why the queue is not moving
+  "ui.queue.ageMinutes": "waiting {minutes} min",
+  "ui.queue.headKind": "Queue head: {kind}",
+  "ui.queue.blocked.targetBusy": "The target role is finishing its previous turn; the queue is waiting",
+  "ui.queue.blocked.originMissing": "Turn-settlement anomaly detected (busy with no tracked turn); use Stop to unwedge and resume the queue",
+  "ui.queue.blocked.sessionClosed": "The target session is not open yet; queued items will be delivered once it opens",
+  "ui.queue.blocked.network": "Network unavailable; the queue is safely paused",
 
   "ui.queueSubview.backRole": "Back to role profile",
   "ui.queueSubview.backWork": "Back to work overview",

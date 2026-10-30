@@ -191,6 +191,13 @@ export const zhCN = {
   "ui.queue.withdrawTitle": "撤回该条排队消息（仅未投递者可撤）",
   "ui.queue.withdrawing": "撤回中…",
   "ui.queue.withdraw": "撤回",
+  // P0 队列可见性（2026-10-30）：为什么没动（age/阻塞原因/队首类别）
+  "ui.queue.ageMinutes": "已等待 {minutes} 分钟",
+  "ui.queue.headKind": "队首：{kind}",
+  "ui.queue.blocked.targetBusy": "目标角色正在执行上一轮，队列等待中",
+  "ui.queue.blocked.originMissing": "检测到收尾异常（忙态没有对应回合），可点「停止本轮」复位后队列继续",
+  "ui.queue.blocked.sessionClosed": "目标会话尚未开启，等待自动开启后投递",
+  "ui.queue.blocked.network": "网络不可用，队列已安全暂停",
 
   // ---- 队列子视图（shell/QueueSubview.tsx）----
   "ui.queueSubview.backRole": "返回角色资料",

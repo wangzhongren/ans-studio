@@ -463,8 +463,12 @@ function registerIpc(win: BrowserWindow): void {
     projectRoot: string; runtime: RuntimeKind;
     busy: boolean;
     summaries: string[];
-    queue: { kind: string; sourceRoleId: string; summary: string; at: string }[];
-    running: { kind: string; sourceRoleId: string; summary: string; at: string } | null;
+    queue: { kind: string; sourceRoleId: string; summary: string; at: string; ageMs?: number }[];
+    running: { kind: string; sourceRoleId: string; summary: string; at: string; ageMs?: number } | null;
+    /** P0 队列可见性（2026-10-30）：队首类别/阻塞原因/当前回合 id（原样透传，不重组）。 */
+    headKind?: string | null;
+    blockedReason?: "target-busy" | "origin-missing" | "session-closed" | "network" | null;
+    activeTurnId?: string | null;
   }>({
     windowMs: 100,
     key: (info) => `${info.projectRoot}\u0000${info.roleId}\u0000${info.runtime}`,

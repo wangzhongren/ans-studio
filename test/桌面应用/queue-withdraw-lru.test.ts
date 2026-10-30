@@ -311,7 +311,8 @@ test("G-2/W2：`system` 类（看护告警/收束/回执）不可撤回——归
   const release = h.hangNext("su");
   const send = h.mgr.send("占住 su 本轮");
   await tick(80);
-  // 看护系统消息（kind:"system"——同一套投递机）：su 忙 ⇒ 入队。
+  // 看护系统消息（kind:"system"——同一套投递机）：su 忙 ⇒ 入队（直接调用不带 uiOnlyWhenBusy 标记，
+  // 保持既有排队语义；看护服务自身发出的消息才走 P0 UI-only 旁路，见 message-queue P0 用例）。
   h.mgr.watchdogDeliver(l.projectRoot, { text: "[系统·看护] 钉子：角色「A」。", summary: "系统·看护 · 钉子", dedupKey: "watchdog\u0000/proj\u0000pin\u00000" });
   await tick(80);
   const states = h.roleStates.filter((s) => s.roleId === "su");
