@@ -135,7 +135,11 @@ export function buildGovernanceJudgeFacts(input: {
   /** D 批：账本已撤除；保留可选参数以兼容旧调用方（不读取）。 */
   snapshot?: { entries?: readonly unknown[]; errors?: readonly unknown[] };
   flowId: string;
-  /** 调用方从 `tasks.jsonl`/请求上下文提炼的事实（D 批单一来源）。 */
+  /**
+   * 调用方从 `tasks.jsonl`/请求上下文提炼的事实（D 批单一来源）。
+   * 3.4：`acceptanceFacts/evidenceMismatch/criteriaRef` 同为可选事实，经 `...input.facts` 原样有界透传；
+   * priority 由应用从 criteria 派生，builder 不采信/不改写角色自报。
+   */
   facts?: Partial<GovernanceJudgeFacts>;
 }): GovernanceJudgeFacts {
   const facts: GovernanceJudgeFacts = {

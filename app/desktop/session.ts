@@ -138,7 +138,8 @@ import { classifyProcessOutcome, pickLatestSessionFile, sessionsDirFor } from ".
 import { formatDurationMs, type WatchdogObservation, type WatchdogProjectSnapshot } from "./watchdog.ts";
 import { mainT } from "./i18n.ts";
 import { type RoleStatusFn, type RoleStatusPayload, type SessionTailFn, type SessionTailPayload, type WatchdogToolResult } from "../../src/common/编排/watchdog.ts";
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput } from "../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef } from "../../src/model/runtime.ts";
+import { checkEvidence, deriveAcceptanceFact, loadCriteria, parseEvidenceMeta, readArtifact, EVIDENCE_META_SCHEMA } from "../../src/common/编排/evidence-check.ts";
 // 2026-10-26 需求变更申请（request_requirement_change）：同源契约；仅统筹/提案会话注入。
 // 申请 ≠ 批准：审批由客户/判断 agent 在发起方会话的 decision 卡完成，主理只在批准后执行意图变更。
 import type { RequestRequirementChangeFn, RequestRequirementChangeInput, RequestRequirementChangeResult } from "../../src/model/runtime.ts";
@@ -506,6 +507,8 @@ export interface SessionManagerDeps {
       roleStatus?: RoleStatusFn;
       /** **contract_check 只读数据源**（3.2；所有角色注入）。 */
       contractCheck?: ContractCheckFn;
+      /** **evidence_check 只读数据源**（3.4；所有角色注入）。 */
+      evidenceCheck?: EvidenceCheckFn;
       /** **session_tail 数据源**（G-2/W1，仅 chief/su 注入；形状＝契约家 `SessionTailFn`）。 */
       sessionTail?: SessionTailFn;
       /** **技能安装能力**（G-4/I3，仅 su 注入；形状＝契约家 `InstallSkillFn`——检验/激活/回执、不写盘）。
@@ -2258,6 +2261,8 @@ export class SessionManager {
       canObserve ? (query: RoleStatusPayload) => this.roleStatusText(req.projectRoot, query) : undefined;
     const contractCheck: ContractCheckFn | undefined =
       (input: ContractCheckInput) => this.contractCheckText(req.projectRoot, req.roleId, input);
+    const evidenceCheck: EvidenceCheckFn | undefined =
+      (input: EvidenceCheckInput) => this.evidenceCheckText(req.projectRoot, req.roleId, input);
     const sessionTail: SessionTailFn | undefined =
       canObserve ? (query: SessionTailPayload) => this.sessionTailText(req.projectRoot, query) : undefined;
     const roleActivityLog: RoleActivityLogFn | undefined =
@@ -2480,6 +2485,7 @@ export class SessionManager {
           ...(requestRequirementChange ? { requestRequirementChange } : {}),
           ...(roleStatus ? { roleStatus } : {}),
           contractCheck,
+          evidenceCheck,
           ...(sessionTail ? { sessionTail } : {}),
           // B 批（2026-10-28）：幕僚的运行日志只读数据面（仅 chief 注入；其余角色拿不到 role_activity_log）。
           ...(roleActivityLog ? { roleActivityLog } : {}),
@@ -3342,12 +3348,57 @@ export class SessionManager {
     const hasLegacyFlowTask = [...state.records.values()].some(
       (record) => record.created?.flowId === flowId && record.created.runId === undefined,
     );
+    const criteriaRef = metadata?.criteriaRef;
+    const factInputs = Array.isArray(metadata?.acceptanceFacts) ? metadata.acceptanceFacts : [];
+    let criteriaDoc: Awaited<ReturnType<typeof loadCriteria>> | undefined;
+    const evidenceFacts: import("../../src/model/runtime.ts").AcceptanceFact[] = [];
+    const evidenceMismatch: string[] = [];
+    if (criteriaRef !== undefined) {
+      criteriaDoc = await loadCriteria(projectRoot, flowId, criteriaRef);
+      if (!criteriaDoc.ok) {
+        evidenceMismatch.push(`${criteriaDoc.code}：${criteriaDoc.rejection.missing.join("；")}`);
+      } else {
+        for (const factInput of factInputs) {
+          const derived = deriveAcceptanceFact(criteriaDoc.doc, {
+            acId: factInput.acId,
+            ...(factInput.artifact !== undefined ? { artifact: factInput.artifact } : {}),
+            ...(factInput.metaPath !== undefined ? { metaPath: factInput.metaPath } : {}),
+          });
+          if ("ok" in derived) {
+            evidenceMismatch.push(`${derived.code}：${derived.rejection.missing.join("；")}`);
+            continue;
+          }
+          if (factInput.artifact !== undefined) {
+            const checked = await checkEvidence({
+              projectRoot,
+              acId: factInput.acId,
+              criteria: criteriaDoc.doc,
+              artifact: factInput.artifact,
+              ...(factInput.metaPath !== undefined ? { metaPath: factInput.metaPath } : {}),
+            });
+            evidenceFacts.push({
+              ...derived,
+              valid: checked.valid,
+              unverified: checked.unverified,
+              legacy: checked.legacy,
+              mismatch: checked.mismatch,
+            });
+            if (checked.mismatch.length > 0) evidenceMismatch.push(...checked.mismatch);
+          } else {
+            evidenceFacts.push(derived);
+          }
+        }
+      }
+    }
     const missing: string[] = [
       ...(intentOk ? [] : ["产品意图文档"]),
       ...(roster.ok ? [] : ["人员名单"]),
       ...(d3?.decisionId !== undefined ? [] : ["D3 裁决"]),
       ...(reportOk ? [] : ["质检报告"]),
       ...(acceptanceModuleId !== "" && acceptanceModule === undefined ? ["模块（最新名单未找到）"] : []),
+      ...(criteriaRef === undefined && factInputs.length > 0 ? ["criteriaRef（验收 criteria 未显式引用，P0 未机器校验）"] : []),
+      ...(criteriaDoc !== undefined && !criteriaDoc.ok ? [`criteria（${criteriaDoc.code}）`] : []),
+      ...(evidenceMismatch.length > 0 ? ["证据自洽（evidence-mismatch）"] : []),
     ];
     const baseContext = metadata?.judgeContext;
     const facts = {
@@ -3371,6 +3422,9 @@ export class SessionManager {
         : hasLegacyFlowTask
           ? { runState: "legacy" as const }
           : {}),
+      ...(criteriaRef !== undefined ? { criteriaRef } : {}),
+      ...(evidenceFacts.length > 0 ? { acceptanceFacts: evidenceFacts } : {}),
+      ...(evidenceMismatch.length > 0 ? { evidenceMismatch } : {}),
       ...(acceptanceModule !== undefined
         ? {
             moduleId: acceptanceModule.id,
@@ -6317,6 +6371,63 @@ ${formatted}` };
   }
 
   // ——————— G-2/W1：role_status / session_tail 的桌面侧数据源（契约＝`model/runtime.ts`；编排转发） ———————
+
+  /**
+   * 2026-10-30（3.4）：`evidence_check` 只读证据检查——重算 artifact 实际值与 sidecar 比对；
+   * 不执行项目脚本、不修改 artifact/sidecar、不授予写权。
+   */
+  private async evidenceCheckText(projectRoot: string, roleId: string, input: EvidenceCheckInput): Promise<string> {
+    const ref = input.criteriaRef;
+    const artifact = typeof input.artifact === "string" ? input.artifact.trim().replace(/\\/g, "/") : "";
+    const base = { schema: "evidence-check/v1", roleId, artifact };
+    if (artifact === "" || artifact.startsWith("/") || artifact.startsWith("..") || artifact.includes("../") || artifact.startsWith(".ans/") || artifact === ".env") {
+      return JSON.stringify({ ...base, ok: false, code: "criteria-ref-mismatch", mismatch: ["artifact 必须是项目内可读证据路径（非绝对/非 .ans/.env）"] }, null, 2);
+    }
+    if (ref === undefined) {
+      return JSON.stringify({ ...base, ok: false, code: "criteria-version-unresolved", mismatch: ["缺少显式 criteriaRef（path+sha256+version）；不取 latest"] }, null, 2);
+    }
+    const flowMatch = /^docs\/acceptance\/([a-z0-9][a-z0-9-]{0,62})-criteria-v[1-9]\d*\.md$/.exec(ref.path.replace(/\\/g, "/"));
+    if (flowMatch === null) {
+      return JSON.stringify({ ...base, ok: false, code: "criteria-ref-mismatch", mismatch: [`criteriaRef 路径不合法：${ref.path}`] }, null, 2);
+    }
+    const criteria = await loadCriteria(projectRoot, flowMatch[1]!, ref);
+    if (!criteria.ok) {
+      return JSON.stringify({ ...base, ok: false, code: criteria.code, rejection: criteria.rejection }, null, 2);
+    }
+    const criteriaSummary = { path: criteria.doc.path, flowId: criteria.doc.flowId, version: criteria.doc.version, status: criteria.doc.status, sha256: criteria.doc.sha256 };
+    if (input.acId === undefined || input.acId.trim() === "") {
+      try {
+        const actual = await readArtifact(projectRoot, artifact);
+        let meta: unknown;
+        try { meta = parseEvidenceMeta(await fs.promises.readFile(path.join(projectRoot, input.metaPath ?? `${artifact}.meta.json`), "utf8")); } catch { meta = null; }
+        return JSON.stringify({ ...base, ok: true, criteria: criteriaSummary, actual: { path: actual.path, bytes: actual.bytes, lines: actual.lines, sha256: actual.sha256 }, meta, note: "未给 acId，未做 criteria/P0 关联" }, null, 2);
+      } catch (error) {
+        return JSON.stringify({ ...base, ok: false, code: "criteria-missing", mismatch: [`artifact 不可读：${error instanceof Error ? error.message : String(error)}`] }, null, 2);
+      }
+    }
+    const result = await checkEvidence({
+      projectRoot,
+      acId: input.acId,
+      criteria: criteria.doc,
+      artifact,
+      ...(input.metaPath !== undefined && input.metaPath.trim() !== "" ? { metaPath: input.metaPath.trim() } : {}),
+    });
+    return JSON.stringify({
+      ...base,
+      ok: result.ok && result.valid,
+      valid: result.valid,
+      unverified: result.unverified,
+      legacy: result.legacy,
+      p0Ignored: result.p0Ignored,
+      priority: result.priority,
+      criteria: criteriaSummary,
+      actual: result.actual !== undefined ? { path: result.actual.path, bytes: result.actual.bytes, lines: result.actual.lines, sha256: result.actual.sha256 } : undefined,
+      sidecar: result.meta,
+      claims: result.claims,
+      mismatch: result.mismatch,
+      ...(result.rejection !== undefined ? { code: result.rejection.code, rejection: result.rejection } : {}),
+    }, null, 2);
+  }
 
   /**
    * 2026-10-30（3.2）：`contract_check` 只读契约速查。不写盘、不放行；只返回调用角色可见信息。

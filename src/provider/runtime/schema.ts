@@ -547,6 +547,35 @@ export function describeTool(name: string): ToolDescription {
       ],
     };
   }
+  if (name === "evidence_check") {
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          artifact: { type: "string", description: "Project-relative artifact path (required)" },
+          metaPath: { type: "string", description: "Optional sidecar path; defaults to <artifact>.meta.json" },
+          acId: { type: "string", description: "Optional AC id for criteria/acIds matching" },
+          criteriaRef: {
+            type: "object",
+            description: "Explicit criteria ref {path,sha256,version}; latest is never selected",
+            properties: { path: { type: "string" }, sha256: { type: "string" }, version: { type: "number" } },
+            required: ["path", "sha256", "version"],
+          },
+        },
+        required: ["artifact", "criteriaRef"],
+        additionalProperties: true,
+      },
+      description:
+        "**只读证据自洽检查**（3.4）：重算 artifact 的 bytes/lines/sha256，与 `<artifact>.meta.json` sidecar 的“自述”比对；" +
+        "校验 generatedAt stale、acIds 与 criteria/acId、P0 必需 sidecar。**不执行项目脚本、不修改 artifact/sidecar、不授予写权**；" +
+        "只输出实际值 vs sidecar、mismatch 与 `evidence-check/v1` 结论。criteria 必须显式 ref，不取 latest。",
+      promptGuidelines: [
+        "P0 证据必须有 sidecar 且实际 lines/bytes/sha256/metrics 与 sidecar 一致；不一致/缺 sidecar 不得宣称通过。",
+        "证据被修改后 sidecar 过期 ⇒ mismatch；重新生成证据，不要修改 artifact 或伪造 sidecar。",
+        "evidence_check 只读速查，不是验收通过/授权。",
+      ],
+    };
+  }
   if (name === "contract_check") {
     return {
       parameters: {

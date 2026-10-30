@@ -96,6 +96,7 @@ import type {
   ViewImageFn,
   RoleStatusFn,
   ContractCheckFn,
+  EvidenceCheckFn,
   SessionTailFn,
   RoleActivityLogFn,
   TerminateRoleRunFn,
@@ -259,6 +260,7 @@ export interface AdapterCapabilities {
   shellVerdict?: ShellVerdictFn;
   roleStatus?: RoleStatusFn;
   contractCheck?: ContractCheckFn;
+  evidenceCheck?: EvidenceCheckFn;
   sessionTail?: SessionTailFn;
   /** B 批（2026-10-28）：`role_activity_log` 数据源；只给幕僚（trio chief）注入。 */
   roleActivityLog?: RoleActivityLogFn;
@@ -555,6 +557,8 @@ export async function openRoleSession(
     roleStatus?: RoleStatusFn;
     /** 2026-10-30（3.2）：只读 contract_check 数据源；所有角色可注入。 */
     contractCheck?: ContractCheckFn;
+    /** 3.4：只读 evidence_check 数据源；所有角色可注入。 */
+    evidenceCheck?: EvidenceCheckFn;
     /**
      * **G-2 会话巡检能力（R1；`session_tail`「注入才注册」）**——**只给 su**（同上一判据）。
      * 复用受保护投影管线返回尾部规范化行（凭据清洗/display 保护已在链上）；失败如实（不抛、不猜）。
@@ -1315,6 +1319,7 @@ export async function openRoleSession(
     // 不调用、不写盘/flow、不伪造接受或决定。
     ...(roleStatus !== undefined ? { roleStatus } : {}),
     ...(input.contractCheck !== undefined ? { contractCheck: input.contractCheck } : {}),
+    ...(input.evidenceCheck !== undefined ? { evidenceCheck: input.evidenceCheck } : {}),
     ...(sessionTail !== undefined ? { sessionTail } : {}),
     ...(roleActivityLog !== undefined ? { roleActivityLog } : {}),
     ...(terminateRoleRun !== undefined ? { terminateRoleRun } : {}),
@@ -2193,6 +2198,7 @@ export function createRuntimeAdapterFactory(
     // `undefined` ⇒ 对应工具不注册（能力缺席 = 最强 fail-closed，同 dispatch_task 先例）。
     roleStatus: capabilities?.roleStatus,
     contractCheck: capabilities?.contractCheck,
+    evidenceCheck: capabilities?.evidenceCheck,
     sessionTail: capabilities?.sessionTail,
     roleActivityLog: capabilities?.roleActivityLog,
     terminateRoleRun: capabilities?.terminateRoleRun,

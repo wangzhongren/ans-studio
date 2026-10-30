@@ -463,6 +463,38 @@ export type CustomerInputOutcome =
   | { outcome: "unavailable"; reason?: string };
 
 /** Captured at invocation. Issuers must reject late consent when this original signal is aborted. */
+export type EvidenceAcPriority = "P0" | "P1" | "P2" | "P3";
+
+/** 验收事实（3.4）：priority 由应用从 criteria 派生；角色不可自报。 */
+export interface AcceptanceFact {
+  acId: string;
+  priority: EvidenceAcPriority;
+  artifact?: string;
+  metaPath?: string;
+  valid: boolean;
+  unverified: boolean;
+  legacy: boolean;
+  mismatch: string[];
+}
+
+/** criteria 显式引用（path+sha256+version；禁止 latest）。 */
+export interface CriteriaRef {
+  path: string;
+  sha256: string;
+  version: number;
+}
+
+export interface EvidenceCheckInput {
+  artifact: string;
+  metaPath?: string;
+  acId?: string;
+  criteriaRef?: CriteriaRef;
+}
+export type EvidenceCheckFn = (
+  input: EvidenceCheckInput,
+  metadata?: { roleId?: string; turnId?: string; runtime?: RuntimeKind },
+) => string | null | undefined | void | Promise<string | null | undefined | void>;
+
 export interface CustomerInputMetadata {
   signal?: AbortSignal;
   turnId?: string;
@@ -506,6 +538,10 @@ export interface CustomerInputMetadata {
    * 缺席＝旧调用零变化；出现 `unavailableReason` 时判断必须回落 `manual`。
    */
   judgeContext?: GovernanceJudgeContext;
+  /** 3.4：验收 criteria 显式引用（应用/任务注入；缺失 ⇒ criteria-version-unresolved）。 */
+  criteriaRef?: CriteriaRef;
+  /** 3.4：验收事实（priority 由应用派生）。 */
+  acceptanceFacts?: AcceptanceFact[];
 }
 
 export type CustomerInputFn = (
@@ -1655,6 +1691,10 @@ export interface GovernanceJudgeFacts {
   appointmentDecisionId?: string;
   /** 质检报告路径（`docs/quality/<flowId>-report-v1.md`；存在且可读）。 */
   qualityReportPath?: string;
+  /** 3.4：验收 criteria 引用与派生事实/证据 mismatch。 */
+  criteriaRef?: CriteriaRef;
+  acceptanceFacts?: AcceptanceFact[];
+  evidenceMismatch?: string[];
   /** 2026-10-30（run 冻结）：验收依据的 runId / 状态 / pinned 文档摘要；legacy 无 manifest 显式标记。 */
   runId?: string;
   runState?: "draft" | "pinned" | "legacy";
@@ -1855,6 +1895,8 @@ export interface GovernedToolsOptions {
   roleStatus?: RoleStatusFn;
   /** 2026-10-30（3.2）：`contract_check` 只读数据源；未注入 ⇒ 工具不注册。 */
   contractCheck?: ContractCheckFn;
+  /** 3.4：`evidence_check` 只读数据源；未注入 ⇒ 工具不注册。 */
+  evidenceCheck?: EvidenceCheckFn;
   /** G-2/R1：`session_tail` 数据源（受保护投影后的会话尾线）。只给内置治理角色 注入；未注入 ⇒ 工具不注册。 */
   sessionTail?: SessionTailFn;
   /**

@@ -43,7 +43,7 @@ import type {
   ViewImageFn, ViewImageInput, PromptImage, ViewImageReceipt, ViewImageDeliveryMode, RuntimeViewImagePolicy,
   RoleActivityLogFn, RoleActivityLogPayload, TaskSideEffect,
   TerminateRoleRunFn, TerminateRoleRunPayload, RedispatchTaskFn, RedispatchTaskPayload,
-  ContractCheckFn, ContractCheckInput,
+  ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef,
 } from "../../model/runtime.ts";
 import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 import type { WriteDecision } from "../../model/decision.ts";
@@ -117,6 +117,10 @@ export const ROLE_STATUS_TOOL_NAME = "role_status";
 /** contract_check 工具名（2026-10-30 / 方案 v3 §3.2；只读契约速查，不改变任何门禁）。 */
 export const CONTRACT_CHECK_TOOL_NAME = "contract_check";
 const CONTRACT_CHECK_MAX_BYTES = 4096;
+
+/** evidence_check 工具名（3.4；只读证据重算，不执行项目脚本、不授予写权）。 */
+export const EVIDENCE_CHECK_TOOL_NAME = "evidence_check";
+const EVIDENCE_CHECK_MAX_BYTES = 4096;
 
 /** session_tail 工具名（G-2/R1；su 只读会话尾线——受保护投影后的规范化行，纯读无副作用）。 */
 export const SESSION_TAIL_TOOL_NAME = "session_tail";
@@ -2289,6 +2293,55 @@ function watchdogFailureMessage(name: string, message: unknown): string {
  * **绝无副作用**：不写盘、不入队、不改任何状态、不动任何判定链；数据源抛错/回执缺失如实回报
  * 「读取未完成/结果不明」，**绝不编造状态**。
  */
+function criteriaRefOf(args: Record<string, unknown>): CriteriaRef | undefined {
+  const raw = args["criteriaRef"] ?? args["criteria_ref"];
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const record = raw as Record<string, unknown>;
+  if (typeof record["path"] !== "string" || typeof record["sha256"] !== "string" || typeof record["version"] !== "number") return undefined;
+  return { path: record["path"], sha256: record["sha256"], version: record["version"] };
+}
+
+/**
+ * evidence_check：只读证据自洽检查（3.4/P4.4）。本层只做参数归一（artifact/metaPath/acId/criteriaRef）
+ * → 调注入数据源（`raceAbort`：会话中止即返回）→ 如实转达（≤4 KiB，超限截断标注）。
+ * **绝无副作用**：不执行项目脚本、不写盘、不改 artifact/sidecar、不授予写权；数据源缺席/失败如实回报，
+ * 不得据此宣称证据通过。
+ */
+function makeEvidenceCheckTool(fn: EvidenceCheckFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  const name = EVIDENCE_CHECK_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const artifact = readStringArg(call.args, ["artifact", "path", "artifactPath"]);
+      if (artifact === undefined || artifact.trim() === "") return { ok: false, message: `${name}: artifact 参数必填（项目相对路径）。` };
+      const metaPath = readStringArg(call.args, ["metaPath", "meta_path"]);
+      const acId = readStringArg(call.args, ["acId", "ac_id"]);
+      const criteriaRef = criteriaRefOf(call.args);
+      if (criteriaRef === undefined) return { ok: false, message: `${name}: criteriaRef 必填（{path,sha256,version}；不取 latest）。` };
+      const input: EvidenceCheckInput = {
+        artifact: artifact.trim(),
+        ...(metaPath !== undefined && metaPath.trim() !== "" ? { metaPath: metaPath.trim() } : {}),
+        ...(acId !== undefined && acId.trim() !== "" ? { acId: acId.trim() } : {}),
+        criteriaRef,
+      };
+      let text: string | null | undefined | void;
+      try {
+        const turnId = currentTurnId?.();
+        text = await raceAbort(Promise.resolve().then(() => fn(input, {
+          ...(scope?.roleId !== undefined ? { roleId: scope.roleId } : {}),
+          ...(turnId !== undefined ? { turnId } : {}),
+          ...(scope?.runtime !== undefined ? { runtime: scope.runtime } : {}),
+        })), call.signal, `${name} 证据检查`);
+      } catch (err) {
+        return { ok: false, message: `${name}: 证据检查未完成（${reasonOf(err)}）；不要据此判断证据通过。` };
+      }
+      if (typeof text !== "string" || text.trim() === "") return { ok: false, message: `${name}: 数据源未返回检查结果（结果不明）。` };
+      const marker = "\n…（已截断）";
+      return { ok: true, message: Buffer.byteLength(text, "utf8") <= EVIDENCE_CHECK_MAX_BYTES ? text : `${truncateUtf8(text, EVIDENCE_CHECK_MAX_BYTES - Buffer.byteLength(marker, "utf8")).text}${marker}` };
+    },
+  };
+}
+
 function makeContractCheckTool(fn: ContractCheckFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
   const name = CONTRACT_CHECK_TOOL_NAME;
   return {
@@ -3062,6 +3115,9 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   if (roleStatus !== undefined) tools.push(makeRoleStatusTool(roleStatus, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
   if (options?.contractCheck !== undefined) {
     tools.push(makeContractCheckTool(options.contractCheck, options?.currentTurnId, { ...(options.roleId !== undefined ? { roleId: options.roleId } : {}), ...(options.runtime !== undefined ? { runtime: options.runtime } : {}) }));
+  }
+  if (options?.evidenceCheck !== undefined) {
+    tools.push(makeEvidenceCheckTool(options.evidenceCheck, options?.currentTurnId, { ...(options.roleId !== undefined ? { roleId: options.roleId } : {}), ...(options.runtime !== undefined ? { runtime: options.runtime } : {}) }));
   }
   const sessionTail = options?.sessionTail;
   if (sessionTail !== undefined) tools.push(makeSessionTailTool(sessionTail, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
