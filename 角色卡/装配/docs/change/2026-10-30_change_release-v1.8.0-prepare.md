@@ -17,6 +17,9 @@ events:
   - date: "2026-10-30"
     kind: updated
     summary: tag v1.8.0 已打并推送（6211e08）；release-policy/workflow/打包测试切到 v1.8.0；prepare 预演与 CI 结果发布后回填
+  - date: "2026-10-30"
+    kind: fixed
+    summary: 首轮 CI 失败（T1×3 + macOS 3 处 + Windows C-04）；修复 fb0bd78 落 main 并加入 overlay 白名单，重跑 CI
 ---
 
 # v1.8.0 发布准备
@@ -80,3 +83,16 @@ events:
 
 - 本轮只做版本字段、README 发布说明与本记录，并运行本地 `typecheck`、`typecheck:renderer` 与装配测试；未运行全量测试、`build:renderer`、prepare 预演，未触发 CI，未下载或启动 ZIP。
 - 第一波全量 / Electron / phase5a 证据见波终态验收报告 `docs/acceptance/flow-improvements-wave1-final-acceptance-report-v1.md`（112 行 / `13ea2e3de805177cce6840688d3ca6fb3395fd46f4bc6845f0c1411e6e0bf921`）；三平台构建 / 解压 / 启动 smoke 仍由 CI 原生 runner 执行，不因本版扩大验证范围。
+
+## v1.8.0 发布阻断修复（overlay）
+
+- **首轮 CI（run 41013094926）**：三平台均在 Regression tests 失败，未生成 draft。失败 6 处：T1×3（pi/codex/claude，双平台；本地基线既有红）、macOS 专属 3 处（role-log 脱敏 fixture 硬编码 Windows 路径；D3 AC5 短内联 `node -e` 按 v2.4/F6 设计应为 review；roster 正例 `import.meta.url.pathname` 在 POSIX 拼出重复路径）、Windows 专属 1 处（C-04 人工处置日志 fire-and-forget 时序）。
+- **修复提交**：`fb0bd78`（父 `3feac24`；5 文件 +24/−11）。
+  - `app/desktop/session.ts`：升级路径 await `task.escalation` / `task.escalation.manual` 落盘后再返回（C-04）。
+  - `test/桌面应用/role-log.test.ts`：平台原生临时根 fixture（断言不变）。
+  - `test/测试/lightweight-permission-repairs.test.ts`：短内联改判 review（设计口径）+ 新增长内联与 `sh -c` 的 deny 断言（更严）。
+  - `test/测试/t1-pipeline-integration.test.ts`：补任务 scope `{writeSet: [], conditions: []}` 使确认成为唯一写源——原用例在无 scope 时被 Section 1 预授权短路，**非产品落盘缺陷**；abort→迟到 yes→write 被拒且零落盘，断言原样保留。
+  - `test/编排/workflow-preconditions.test.ts`：改用 `fileURLToPath`。
+- **本地验证（Windows）**：五文件 51/45/0/6（6 skip 均为既有 `skip: !posix`）；全量 **3064/3037/9/18**（T1×3 转绿；9 红全为既有 symlink EPERM）；双 typecheck 0；未删测试、未新增 skip、未放宽断言；C-04 连续 8×10/10。
+- **overlay 白名单**：`release-policy.mjs` files 增上述 5 条精确路径；`release-packaging.test.ts` 增 v1.8.0 blocking-fix 批次用例；tag `v1.8.0` 未移动。
+- **CI 重跑**：待触发 / 待回填。

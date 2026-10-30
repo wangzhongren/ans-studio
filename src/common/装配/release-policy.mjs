@@ -3,6 +3,11 @@ export const SOURCE_SHA = '6211e08b7481c1346022fe2c36d47759dee3384f';
 // v1.8.0 overlay：冻结源 tag v1.8.0 已含全部产品/测试代码（内建角色最小系统与五步雇佣链、模块/名单/拓扑 v2
 // 与 roster v3、run 冻结、机械拒绝三段式与 contract_check、证据自洽校验与 evidence_check、桌面缺陷修复）；
 // 白名单保持基础集与历史保留条目，未列名 app//src/ 仍 fail-closed。
+// v1.8.0 发布阻断修复（tag v1.8.0 不可移动，经评审走显式 overlay；按精确路径、单文件不开目录、断言不放宽）：
+//   · 生产 1 条：app/desktop/session.ts——升级裁决人工处置日志改为 await 落盘（C-04 Windows 时序）。
+//   · 测试 4 条：test/桌面应用/role-log.test.ts（平台原生 fixture）、test/测试/lightweight-permission-repairs.test.ts
+//     （短内联 review 口径 + 长内联/sh -c deny 更严断言）、test/测试/t1-pipeline-integration.test.ts（补任务 scope
+//     使确认成为唯一写源）、test/编排/workflow-preconditions.test.ts（fileURLToPath）。
 // v1.7.0 overlay（历史）：冻结源 tag v1.7.0 已含全部产品/测试代码（独立验收覆盖所有变更、release 仅可选元数据、
 // 验收标准门、任命客户决定自动收口、写卡校验反馈去重/忙时门控、中文角色名、角色根文档、目录级授权、
 // i18n、自动推进、验收返工路由、Lead 治理协调）；白名单保持基础集，未列名 app//src/ 仍 fail-closed。
@@ -32,6 +37,11 @@ export const SOURCE_SHA = '6211e08b7481c1346022fe2c36d47759dee3384f';
 // fail-closed 不变：未列名的 app//src/ 变更仍使 prepare 明确失败；
 // 未列名的 test/ 文件仍静默落 excluded、不随构建树（机制同前：经评审文件必须显式入列）。
 const files = new Set(['package.json', 'package-lock.json', '.github/workflows/release.yml',
+  'app/desktop/session.ts',
+  'test/桌面应用/role-log.test.ts',
+  'test/测试/lightweight-permission-repairs.test.ts',
+  'test/测试/t1-pipeline-integration.test.ts',
+  'test/编排/workflow-preconditions.test.ts',
   'src/common/shared/diagnostics.ts',
   'test/桌面应用/interface.test.ts',
   'test/桌面应用/project-document.test.ts',

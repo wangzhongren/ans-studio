@@ -133,6 +133,26 @@ test('release overlay includes exactly the reviewed v1.7.0 blocking-fix batch by
   assert.throws(() => selectOverlay(['src/common/编排/flow-service.ts']), /Unreviewed production overlay/);
 });
 
+// v1.8.0 发布阻断修复（tag v1.8.0 不可移动，经评审走显式 overlay）：1 项产品修复 + 4 项测试修复按精确路径入选；
+// 同目录未列名 test/ 仍 excluded，未列名 app//src/ 仍 fail-closed。断言不放宽。
+test('release overlay includes exactly the reviewed v1.8.0 blocking-fix batch by exact path', () => {
+  const result = selectOverlay(['package.json',
+    'app/desktop/session.ts',
+    'test/桌面应用/role-log.test.ts',
+    'test/测试/lightweight-permission-repairs.test.ts',
+    'test/测试/t1-pipeline-integration.test.ts',
+    'test/编排/workflow-preconditions.test.ts',
+    'test/桌面应用/stuck-redispatch.test.ts']);
+  assert.deepEqual(result.selected, ['package.json',
+    'app/desktop/session.ts',
+    'test/桌面应用/role-log.test.ts',
+    'test/测试/lightweight-permission-repairs.test.ts',
+    'test/测试/t1-pipeline-integration.test.ts',
+    'test/编排/workflow-preconditions.test.ts']);
+  assert.deepEqual(result.excluded, ['test/桌面应用/stuck-redispatch.test.ts']);
+  assert.throws(() => selectOverlay(['app/desktop/interface.ts']), /Unreviewed production overlay/);
+});
+
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
