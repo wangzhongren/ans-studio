@@ -28,6 +28,7 @@ import {
 } from "../../common/门禁引擎/paths.ts";
 import { reloadBoundaryEntriesSync } from "../../common/门禁引擎/boundary-core.ts";
 import { governanceWriteOwnerGuidance } from "../../common/门禁引擎/governance-roles.ts";
+import { makeMechanicalRejection } from "../../common/编排/mechanical-rejection.ts";
 
 /** 条目是否被当前任务的条件声明激活（非条件条目恒真；无 scope 时无声明 → 条件条目不激活） */
 function isActive(e: BoundaryEntry, scope: TaskScope | undefined): boolean {
@@ -112,8 +113,21 @@ const F6_DENIAL_GUIDANCE =
   "或在终端运行 ans govern <项目目录>（需已配置模型与凭据）；若 .ans/project.json 已存在，请检查它" +
   "可解析、accepted:true 且 pin 齐全、被 pin 的边界文件未被改动——程序不会自动覆盖或重新接受。";
 
+function rejectionCodeForReason(reason: string): string {
+  if (reason.includes("边界解析失败")) return "boundary-parse-failed";
+  if (reason.includes("边界未被接受") || reason.includes("（F6）")) return "boundary-unaccepted";
+  if (reason.includes("目标路径为空")) return "write-path-empty";
+  if (reason.includes("（F7）") || reason.includes("符号链接")) return "path-symlink-escape";
+  if (reason.includes("命中条件目录但缺少条件")) return "boundary-condition-missing";
+  if (reason.includes("跨根混淆")) return "path-cross-root";
+  if (reason.includes("writeSet")) return "task-write-set-missing";
+  return "path-outside-boundary";
+}
+
 function deny(reason: string, boundary: BoundarySection1, scope: TaskScope | undefined): WriteDecision {
-  return { allowed: false, reason, allowedByRoot: allowedByRootOf(boundary, scope) };
+  const code = rejectionCodeForReason(reason);
+  const rejection = makeMechanicalRejection(code, [reason]);
+  return { allowed: false, reason, allowedByRoot: allowedByRootOf(boundary, scope), code, rejection };
 }
 
 /** F4：writeSet 为精确集合，按根内相对路径精确匹配（仅在给了 scope 时调用） */
@@ -223,13 +237,21 @@ function resolveRelativeWrite(
   if (active.length > 0) {
     // F4：任务收窄 —— 仅当给了 scope 时，路径还须落在 writeSet 内；无 scope 则不做此收窄
     if (scope !== undefined && !writeSetContains(scope, rel)) {
-      return {
-        allowed: false,
-        // 原头逐字保留（跨角色断言依赖）；其后追加可操作指引（F-5-main）
-        reason: `路径在角色边界内，但不在任务 writeSet 内（F4）：${rel}${F4_DENIAL_GUIDANCE}`,
-        // F-5-main：F4 分支的列表＝当前已发行可写集（不是边界条目——那会与拒绝原因自相矛盾）
-        allowedByRoot: issuedByRootOf(boundary, scope),
-      };
+      {
+        const reason = `路径在角色边界内，但不在任务 writeSet 内（F4）：${rel}${F4_DENIAL_GUIDANCE}`;
+        const rejection = makeMechanicalRejection("task-write-set-missing", [reason], {
+          docs: Array.isArray(scope.writeSet) ? scope.writeSet.slice(0, 5) : [],
+        });
+        return {
+          allowed: false,
+          // 原头逐字保留（跨角色断言依赖）；其后追加可操作指引（F-5-main）
+          reason,
+          // F-5-main：F4 分支的列表＝当前已发行可写集（不是边界条目——那会与拒绝原因自相矛盾）
+          allowedByRoot: issuedByRootOf(boundary, scope),
+          code: rejection.code,
+          rejection,
+        };
+      }
     }
     return { allowed: true, matchedEntry: active[0] };
   }

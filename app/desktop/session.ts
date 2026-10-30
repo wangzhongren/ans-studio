@@ -5475,7 +5475,9 @@ export class SessionManager {
     const fail = (message: string, row: string, rejection?: MechanicalRejection): DispatchReceipt => {
       if (rejection !== undefined) {
         this.emitDeliveryNote(projectRoot, runtime, fromRoleId, fromRoleId, `${humanRejection(rejection)} ${technicalRejectionCode(rejection)}`);
-        return { ok: false, message: formatMechanicalRejection(rejection) };
+        const formatted = formatMechanicalRejection(rejection);
+        return { ok: false, message: formatted.includes(message) ? formatted : `${message}
+${formatted}` };
       }
       this.emitDeliveryNote(projectRoot, runtime, fromRoleId, fromRoleId, row);
       return { ok: false, message };
@@ -5611,10 +5613,16 @@ export class SessionManager {
         .slice(0, 3)
         .map((violation) => `${violation.path}（${violation.reason === "missing" ? "缺失" : "被修改"}）`)
         .join("、");
+      const rejection = makeMechanicalRejection(
+        "versioned-doc-baseline-violation",
+        baselineViolations.slice(0, 5).map((violation) => `${violation.path}（${violation.reason === "missing" ? "缺失" : "被修改"}）`),
+        { docs: baselineViolations.slice(0, 5).map((violation) => violation.path), owner: "app" },
+      );
       return fail(
         `派发未受理：版本化文档基线校验失败：${detail}${baselineViolations.length > 3 ? " 等" : ""}；` +
           "旧版只读，请从版本记录恢复或新建下一版本后重试。",
         "派发未受理：版本化文档基线校验失败（旧版只读）。",
+        rejection,
       );
     }
 

@@ -14,6 +14,10 @@ import { evaluateDispatchPreflight, type DispatchPreflightInput, type ProjectRos
 import { buildGovernedTools } from "../../src/provider/runtime/tools.ts";
 import { evaluateGovernanceJudgeVerdict, normalizeGovernanceJudgeVerdict } from "../../src/common/编排/governance-judge-verdict.ts";
 import { evaluateShellWriteTargets } from "../../src/common/门禁引擎/shell-write-guard.ts";
+import { resolveWrite } from "../../src/service/gate/resolve-write.ts";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { versionedDocOverwriteDecision } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 import type { GovernanceJudgeRequest } from "../../src/model/runtime.ts";
 import type { WriteGate } from "../../src/model/runtime.ts";
@@ -202,4 +206,32 @@ test("真实 versioned-doc 拒绝：allowed=false 带三段式与 versioned-doc-
   assert.match(decision.reason, /拒绝：缺少/);
   assert.match(decision.reason, /下一步：/);
   assert.match(decision.reason, /技术 code：versioned-doc-overwrite/);
+});
+
+
+test("F1 真实写门禁：resolveWrite → write_file 前置回执三段式，旧文案/零写入保留", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-reject-write-"));
+  try {
+    const boundary = { entries: [], boundarySource: "test", acceptance: { accepted: true, source: "test" } };
+    const gate = (abs: string) => resolveWrite(
+      abs.startsWith(root) ? path.relative(root, abs).replace(/\\/g, "/") : abs,
+      boundary,
+      undefined,
+      { skillRoot: root, projectRoot: root },
+    );
+    const tools = buildGovernedTools(gate as never, { readRoot: root, writeRoot: root });
+    const write = tools.find((tool) => tool.name === "write_file");
+    assert.ok(write);
+    const result = await write!.handler({ args: { path: "src/x.ts", content: "x" } } as never);
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.match(result.message, /拒绝：缺少/);
+    assert.match(result.message, /下一步：/);
+    assert.match(result.message, /谁来做：/);
+    assert.match(result.message, /技术 code：path-outside-boundary/);
+    assert.match(result.message, /写入被拒绝|目标路径未匹配任何边界条目/);
+    await assert.rejects(fs.stat(path.join(root, "src/x.ts")));
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
 });

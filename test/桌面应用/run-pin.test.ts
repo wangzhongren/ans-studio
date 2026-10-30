@@ -479,3 +479,24 @@ test("contract_check session：pinned run/角色写区/legacy 明示（只读）
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }
 });
+
+test("F2：版本化文档基线违规的真实派发回执带 versioned-doc-baseline-violation 三段式", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-baseline-reject-"));
+  const h = harness(root);
+  try {
+    await writeProject(root);
+    await fs.appendFile(path.join(root, "docs/product/focus-intent-v1.md"), "\n# 外部篡改\n", "utf8");
+    await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
+    await tick(30);
+    const before = (await readTaskState(root)).records.size;
+    const receipt = (await h.caps.chief!({ roleId: "product", task: "写产品意图", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
+    assert.equal(receipt.ok, false);
+    assert.match(receipt.message ?? "", /版本化文档基线校验失败/);
+    assert.match(receipt.message ?? "", /谁来做：app/);
+    assert.match(receipt.message ?? "", /技术 code：versioned-doc-baseline-violation/);
+    assert.equal((await readTaskState(root)).records.size, before, "基线拒绝不创建任务");
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});

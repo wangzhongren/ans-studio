@@ -17,7 +17,23 @@ export interface AllowedPathsByRoot {
 
 export type WriteDecision =
   | { allowed: true; matchedEntry: BoundaryEntry }
-  | { allowed: false; reason: string; allowedByRoot: AllowedPathsByRoot };
+  | {
+      allowed: false;
+      reason: string;
+      allowedByRoot: AllowedPathsByRoot;
+      /** 3.2：结构化拒绝；reason/allowedByRoot 旧字段保留。 */
+      code?: string;
+      rejection?: {
+        code: string;
+        missing: string[];
+        action: string;
+        owner: string;
+        docs: string[];
+        retryable: boolean;
+        detail?: string;
+        legacyCode?: string;
+      };
+    };
 
 // F4：任务级收窄
 export interface TaskScope {

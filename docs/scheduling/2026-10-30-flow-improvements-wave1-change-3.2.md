@@ -30,11 +30,11 @@
 
 ## 3. 验证（串行）
 
-- 定向：`rejection-copy` **9/9**；`run-pin` **9/9**；桌面应用全套 **369/369**（rework 后）。
+- 定向：`rejection-copy` **10/10**；`run-pin` **10/10**；桌面应用全套 **371/371**（F1/F2 rework 后）。
 - 全量：`node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')` → **3043 tests / 3013 pass / 12 fail / 18 skip**（基线 3034/3004/12/18；+9 新测试全过，12 红仍为 9 Windows symlink EPERM + T1×3，无新增确定性失败/新 skip）；日志 `%TEMP%\ans-wave1-32-full3.log`，sha256 `591c741bd1eee1a27639fc5edc66b527017dac1f6bd0fd6fcf8cf8e2e050bc1e`。
 - `npm run typecheck`、`typecheck:renderer`、`build:renderer` exit 0（最终代码重跑）。
-- 真实 Electron E2E：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-wave1-32r\report.txt`，sha256 `849f0247f69adb5343d178f930dc3f07866a12f3bf48e4f3d353acc5c722e8cc`。
-- phase5a：40/40 checks、failures=0、console/CSP 0；report `%TEMP%\ans-phase5a-wave1-32r\report.json`，sha256 `2840f11776566fb81c88d0e81c1c009076b7e48a82e29df0e6edc5ac2f242f04`。
+- 真实 Electron E2E：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；报告 `%TEMP%\ans-e2e-wave1-32f2\report.txt`，sha256 `529023bdf4a647521d7b387021c6d5bb83c8c4eda52c0a221e1bd82957a6dc4a`。
+- phase5a：40/40 checks、failures=0、console/CSP 0；report `%TEMP%\ans-phase5a-wave1-32f2\report.json`，sha256 `56e5934b195307b87669e19c4a91d76d2f640aaa9c23c35920afe021c9b2859e`。
 
 ## 4. 决策点 / 边界
 
@@ -52,3 +52,10 @@
 - **P2.4**：quickref 决策维持——纯生成器 `renderRunQuickref(manifest)` + 一致性测试；不强制落盘静态文件。
 - shell/versioned/judge 测试：`rejection-copy` 9/9；`shell-write-guard` 9/9；`versioned-doc-guard` 12/12；governance judge 相关既有套件随全量通过。
 - 全量（rework 后）：**3045 tests / 3015 pass / 12 fail / 18 skip**（+2 真实 shell/versioned 用例；12 红仍为既有环境问题）；日志 `%TEMP%\ans-wave1-32-rework-full.log`，sha256 `a26465f973886f4d2ec0feb88aa6729a942f610564ad1638407f8bfabc566c89`。
+
+## 6. 验收 rework v2（F1/F2）
+
+- **F1 直接写门禁接线**：`src/model/decision.ts` 的 `WriteDecision` 增可选 `code/rejection`（保留 allowed/reason/allowedByRoot）；`src/service/gate/resolve-write.ts` 所有 deny 分支经 `makeMechanicalRejection`（边界解析失败/未接受 F6/空路径/F7/条件缺失/跨根/F4/未匹配），F4 分支同样带结构化；`src/provider/runtime/tools.ts` 的 `govern()` 回执先输出三段式，再保留旧 `formatDenialMessage` 文案（旧整句/子串在），判定顺序与零文件副作用不变。新增真实路径测试：resolveWrite → write_file 前置，断言三段式字段 + 旧文案 + 目标文件未创建。
+- **F2 baseline 违规**：`session.ts` 的 `verifyVersionedDocBaselines` 失败改为 `fail(..., makeMechanicalRejection("versioned-doc-baseline-violation", 违规路径, {docs,owner:"app"}))`；客户/系统行人话保留原句，技术字段结构化。新增真实派发测试（篡改 intent → 回执 code/owner/三段式、不创建任务）。
+- 码表新增：boundary-parse-failed / boundary-unaccepted / write-path-empty / path-symlink-escape / boundary-condition-missing / path-cross-root / task-write-set-missing / versioned-doc-baseline-violation。
+- 验证：定向拒绝相关 **66/66**（rejection-copy 10、resolve-write、f4-denial-guidance、shell-write-guard、versioned-doc-guard、governance-judge-verdict）；全量 **3047 tests / 3017 pass / 12 fail / 18 skip**（+2 真实路径用例；12 红仍为既有环境问题）；日志 `%TEMP%\ans-wave1-32-rework2-full.log`，sha256 `a068404e4cfed07cc77b0a5d9ffd9e17e7fb531c682d4852074338dbbc714832`。

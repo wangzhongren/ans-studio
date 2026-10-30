@@ -52,6 +52,7 @@ import { DEFAULT_LOCALE, translate } from "../../common/shared/i18n/index.ts";
 import type { MessageKey } from "../../common/shared/i18n/keys.ts";
 import { describeTool } from "./schema.ts";
 import { formatDenialMessage } from "../../common/runtime-core/format-denial.ts";
+import { formatMechanicalRejection, type MechanicalRejection } from "../../common/编排/mechanical-rejection.ts";
 // 2026-10-18 真机修复：写前校验角色 boundary.yaml 内容（**只经 Service 公共出口**——Provider 不直接
 // import 门禁引擎私有 `common/门禁引擎/boundary-yaml.ts`；该出口再导出**同一函数引用**，单一来源不变，
 // 与运行时边界解析同一实现，避免「写得进、枚举不了」）。
@@ -301,7 +302,10 @@ function govern(gate: WriteGate, name: string, path: string, writeRoot: string |
     return { proceed: false, result: { ok: false, message: `${name} 门禁判定异常，未写入：${path}（${reasonOf(err)}）` } };
   }
   if (!decision.allowed) {
-    return { proceed: false, result: { ok: false, message: formatDenialMessage(decision) } };
+    const legacy = formatDenialMessage(decision);
+    const structured = decision.rejection !== undefined ? formatMechanicalRejection(decision.rejection as unknown as MechanicalRejection) : "";
+    return { proceed: false, result: { ok: false, message: structured !== "" ? `${structured}
+${legacy}` : legacy } };
   }
   return { proceed: true, abs: writeRoot !== undefined ? resolved : undefined };
 }
