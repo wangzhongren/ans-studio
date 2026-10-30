@@ -126,3 +126,18 @@ test("F5：verifyPinnedRun 要求七类文档键齐备（assets 可为 null，�
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }
 });
+
+test("P2.4：静态 quickref 由 manifest 生成，逐项与 manifest 文档/hash 一致", async () => {
+  const { renderRunQuickref } = await import("../../src/common/编排/run-manifest.ts");
+  const manifest = pinned();
+  const text = renderRunQuickref(manifest);
+  assert.match(text, new RegExp(manifest.runId));
+  for (const [kind, ref] of Object.entries(manifest.documents)) {
+    if (ref === null || ref === undefined) {
+      assert.match(text, new RegExp(`- ${kind}: null`));
+    } else {
+      assert.equal(text.includes(ref.path), true, `quickref 缺文档路径：${ref.path}`);
+      if (ref.sha256 !== undefined) assert.equal(text.includes(ref.sha256), true, `quickref 缺 hash：${kind}`);
+    }
+  }
+});

@@ -18,7 +18,7 @@ import { recordVersionedDocBaselines } from "../../src/common/门禁引擎/versi
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
-import type { CustomerInputFn, CustomerInputMetadata, CustomerInputRequest, DispatchReceipt, DispatchTaskFn } from "../../src/model/runtime.ts";
+import type { ContractCheckFn, CustomerInputFn, CustomerInputMetadata, CustomerInputRequest, DispatchReceipt, DispatchTaskFn } from "../../src/model/runtime.ts";
 import type { DesktopCustomerInputFn } from "../../app/desktop/customer-input.ts";
 
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -121,10 +121,12 @@ function harness(root: string, options: { customerInput?: DesktopCustomerInputFn
   const sent: Record<string, string[]> = {};
   const caps: Record<string, DispatchTaskFn | undefined> = {};
   const customerInputs: Record<string, CustomerInputFn | undefined> = {};
+  const contractChecks: Record<string, ContractCheckFn | undefined> = {};
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
       caps[input.roleId] = (input as { dispatchTask?: DispatchTaskFn }).dispatchTask;
       customerInputs[input.roleId] = (input as { customerInput?: CustomerInputFn }).customerInput;
+      contractChecks[input.roleId] = (input as { contractCheck?: ContractCheckFn }).contractCheck;
       const handle: RoleSessionHandle = {
         async send(text: string) { (sent[input.roleId] ??= []).push(text); },
         events() {
@@ -155,7 +157,7 @@ function harness(root: string, options: { customerInput?: DesktopCustomerInputFn
     emitEvent: () => {},
     customerInput: options.customerInput ?? (async () => ({ outcome: "declined", operatorId: "test" })),
   });
-  return { mgr, streams, sent, caps, customerInputs };
+  return { mgr, streams, sent, caps, customerInputs, contractChecks };
 }
 
 async function d3(root: string): Promise<void> {
@@ -440,6 +442,31 @@ test("R2（P1.3）：legacy 任务验收 facts 标 runState=legacy", async () =>
     };
     await channel!(request);
     assert.equal(captured?.judgeContext?.facts?.runState, "legacy");
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("contract_check session：pinned run/角色写区/legacy 明示（只读）", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-contract-check-"));
+  const h = harness(root);
+  try {
+    await writeProject(root);
+    await d3(root);
+    await h.mgr.open({ projectRoot: root, roleId: "implementer", runtime: "demo" });
+    await tick(30);
+    const check = h.contractChecks.implementer;
+    assert.equal(typeof check, "function");
+    const text = await check!({ flowId: "focus", taskKind: "dispatch", moduleId: "impl-core" });
+    assert.equal(typeof text, "string");
+    assert.match(text!, /legacy（未冻结）/);
+    assert.match(text!, /角色：implementer/);
+    assert.match(text!, /名下模块：impl-core/);
+    assert.match(text!, /taskKind dispatch 必填/);
+    const other = await check!({ roleId: "qa" });
+    assert.equal(typeof other, "string", "工具层会裁剪到调用角色；session 数据源按 caller 裁剪");
+    assert.match(other!, /角色：implementer/);
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });

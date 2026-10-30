@@ -80,8 +80,9 @@ import { renderHandbackPrompt, renderHandbackBatchPrompt, renderWorkReportPrompt
 import { declaredConfirmPaths } from "../../src/common/编排/confirmed-writes.ts";
 // B 批（2026-10-28）：任务/汇报主干与最小状态（编排单一来源，本层只接线）。
 import { appendTaskEvent, classifyTaskSideEffect, findTaskByIdempotencyKey, newTaskId, readTaskState, redispatchCountOf, redispatchTaskId, renderTaskCardLines, shortenSummary, taskCardOf, taskCards, taskEvent, taskIdempotencyKey, taskReportStatusOf, type TaskCardView, type TaskReplay } from "../../src/common/编排/task-state.ts";
-import { applyRunChange, buildRunChangeCard, ensureDraftRun, findActiveRun, loadPinnedRoster, mapRunChangeAnswer, pinRun, pinnedDocsSummary, verifyPinnedRun, RUN_PENDING_FLOW_ID, type RunManifest, type RunChangeMode } from "../../src/common/编排/run-manifest.ts";
+import { applyRunChange, buildRunChangeCard, ensureDraftRun, findActiveRun, loadPinnedRoster, listRunManifestsResult, mapRunChangeAnswer, pinRun, pinnedDocsSummary, verifyPinnedRun, RUN_PENDING_FLOW_ID, type RunManifest, type RunChangeMode } from "../../src/common/编排/run-manifest.ts";
 import { appendRoleLog, formatRoleActivityText, readRoleLog } from "../../src/common/编排/role-log.ts";
+import { docsForFlow, formatMechanicalRejection, humanRejection, makeMechanicalRejection, rejectionMapSnapshot, technicalRejectionCode, type MechanicalRejection } from "../../src/common/编排/mechanical-rejection.ts";
 // B 批：终止/重派安全判定（单一来源；桌面只提供终止事实/执行动作）。
 import { evaluateRedispatchSafety, type RedispatchSafetyDecision } from "../../src/common/编排/watchdog.ts";
 import {
@@ -137,7 +138,7 @@ import { classifyProcessOutcome, pickLatestSessionFile, sessionsDirFor } from ".
 import { formatDurationMs, type WatchdogObservation, type WatchdogProjectSnapshot } from "./watchdog.ts";
 import { mainT } from "./i18n.ts";
 import { type RoleStatusFn, type RoleStatusPayload, type SessionTailFn, type SessionTailPayload, type WatchdogToolResult } from "../../src/common/编排/watchdog.ts";
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn } from "../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput } from "../../src/model/runtime.ts";
 // 2026-10-26 需求变更申请（request_requirement_change）：同源契约；仅统筹/提案会话注入。
 // 申请 ≠ 批准：审批由客户/判断 agent 在发起方会话的 decision 卡完成，主理只在批准后执行意图变更。
 import type { RequestRequirementChangeFn, RequestRequirementChangeInput, RequestRequirementChangeResult } from "../../src/model/runtime.ts";
@@ -503,6 +504,8 @@ export interface SessionManagerDeps {
       requestRequirementChange?: RequestRequirementChangeFn;
       /** **role_status 数据源**（G-2/W1，仅 chief/su 注入；形状＝契约家 `RoleStatusFn`）。 */
       roleStatus?: RoleStatusFn;
+      /** **contract_check 只读数据源**（3.2；所有角色注入）。 */
+      contractCheck?: ContractCheckFn;
       /** **session_tail 数据源**（G-2/W1，仅 chief/su 注入；形状＝契约家 `SessionTailFn`）。 */
       sessionTail?: SessionTailFn;
       /** **技能安装能力**（G-4/I3，仅 su 注入；形状＝契约家 `InstallSkillFn`——检验/激活/回执、不写盘）。
@@ -2253,6 +2256,8 @@ export class SessionManager {
     const canObserve = legacyBuiltIn || governanceFunction === "chief";
     const roleStatus: RoleStatusFn | undefined =
       canObserve ? (query: RoleStatusPayload) => this.roleStatusText(req.projectRoot, query) : undefined;
+    const contractCheck: ContractCheckFn | undefined =
+      (input: ContractCheckInput) => this.contractCheckText(req.projectRoot, req.roleId, input);
     const sessionTail: SessionTailFn | undefined =
       canObserve ? (query: SessionTailPayload) => this.sessionTailText(req.projectRoot, query) : undefined;
     const roleActivityLog: RoleActivityLogFn | undefined =
@@ -2474,6 +2479,7 @@ export class SessionManager {
           // 「未注入即不注册」——编排再按 governanceFunction 收口。提交申请 ≠ 批准（审批在 decision 卡）。
           ...(requestRequirementChange ? { requestRequirementChange } : {}),
           ...(roleStatus ? { roleStatus } : {}),
+          contractCheck,
           ...(sessionTail ? { sessionTail } : {}),
           // B 批（2026-10-28）：幕僚的运行日志只读数据面（仅 chief 注入；其余角色拿不到 role_activity_log）。
           ...(roleActivityLog ? { roleActivityLog } : {}),
@@ -5466,7 +5472,11 @@ export class SessionManager {
     targetRoleId: string,
     task: string,
   ): Promise<DispatchReceipt> {
-    const fail = (message: string, row: string): DispatchReceipt => {
+    const fail = (message: string, row: string, rejection?: MechanicalRejection): DispatchReceipt => {
+      if (rejection !== undefined) {
+        this.emitDeliveryNote(projectRoot, runtime, fromRoleId, fromRoleId, `${humanRejection(rejection)} ${technicalRejectionCode(rejection)}`);
+        return { ok: false, message: formatMechanicalRejection(rejection) };
+      }
       this.emitDeliveryNote(projectRoot, runtime, fromRoleId, fromRoleId, row);
       return { ok: false, message };
     };
@@ -5592,7 +5602,7 @@ export class SessionManager {
           : targetRole !== undefined,
     });
     if (!preflight.ok) {
-      return fail(`派发未受理：${preflight.message}`, preflight.message);
+      return fail(`派发未受理：${preflight.message}`, preflight.message, preflight.rejection);
     }
     // R9：旧版/已记录版本化文档被外部修改（shell/手动）⇒ 拒绝派发（fail-closed）。
     const baselineViolations = await verifyVersionedDocBaselines({ projectRoot });
@@ -6299,6 +6309,87 @@ export class SessionManager {
   }
 
   // ——————— G-2/W1：role_status / session_tail 的桌面侧数据源（契约＝`model/runtime.ts`；编排转发） ———————
+
+  /**
+   * 2026-10-30（3.2）：`contract_check` 只读契约速查。不写盘、不放行；只返回调用角色可见信息。
+   */
+  private async contractCheckText(projectRoot: string, callerRoleId: string, input: ContractCheckInput): Promise<string> {
+    let listing = this.deps.getListing(projectRoot);
+    if (!listing) await this.refreshListingNow(projectRoot);
+    listing = this.deps.getListing(projectRoot);
+    const requestedRole = typeof input.roleId === "string" && input.roleId.trim() !== "" ? input.roleId.trim() : callerRoleId;
+    const roleId = callerRoleId !== "" ? callerRoleId : requestedRole;
+    const role = listing?.roles.find((item) => item.roleId === roleId);
+    let flowId = typeof input.flowId === "string" && input.flowId.trim() !== "" ? input.flowId.trim() : "";
+    const listed = await listRunManifestsResult(projectRoot);
+    let run: RunManifest | null = null;
+    if (listed.ok) {
+      const active = listed.manifests.filter((manifest) => manifest.state === "pinned" || manifest.state === "draft");
+      if (flowId !== "") {
+        run = active.find((manifest) => manifest.flowId === flowId && manifest.state === "pinned")
+          ?? active.find((manifest) => manifest.flowId === flowId)
+          ?? null;
+      } else {
+        run = active.find((manifest) => manifest.state === "pinned") ?? active[0] ?? null;
+        flowId = run?.flowId ?? "";
+      }
+    }
+    const lines: string[] = ["contract_check（只读速查；查询不构成放行/授权）"];
+    if (!listed.ok) {
+      lines.push(`run manifest：读取失败（${listed.reason}）——不要猜测 pin 状态。`);
+    } else if (run === null) {
+      lines.push(`run：legacy（未冻结）${flowId !== "" ? `｜flow ${flowId}` : ""}`);
+    } else {
+      lines.push(`run：${run.runId}｜flow ${run.flowId}｜state=${run.state}${run.pinnedAt !== undefined ? `｜pinnedAt ${run.pinnedAt}` : ""}`);
+      for (const [kind, ref] of Object.entries(run.documents)) {
+        if (ref === null || ref === undefined) lines.push(`文档 ${kind}：null（未钉）`);
+        else lines.push(`文档 ${kind}：${ref.path}${ref.sha256 !== undefined ? `（sha256 ${ref.sha256.slice(0, 12)}…）` : ""}`);
+      }
+      if (run.execution.teamPlan !== null) lines.push(`teamPlan：${run.execution.teamPlan.path}（${run.execution.teamPlan.schema ?? "schema?"}）`);
+      if (run.execution.flow !== null) lines.push(`flow：${run.execution.flow.path}（v${run.execution.flow.version}）`);
+      if (run.roles !== undefined) lines.push(`项目角色：${run.roles.join("、")}`);
+    }
+    const roster = run !== null && run.state === "pinned"
+      ? await loadPinnedRoster(projectRoot, run)
+      : flowId !== "" ? await loadLatestRoster({ projectRoot, flowId }) : undefined;
+    if (roster !== undefined && !roster.ok) lines.push(`roster：不可用（${roster.reason}）`);
+    const roleModules = roster !== undefined && roster.ok && role !== undefined
+      ? roster.roster.roles.find((entry) => entry.id === roleId)?.modules ?? []
+      : [];
+    const moduleId = typeof input.moduleId === "string" ? input.moduleId.trim() : "";
+    const module = roster !== undefined && roster.ok && moduleId !== "" ? roster.roster.modules.find((entry) => entry.id === moduleId) : undefined;
+    lines.push(`角色：${roleId || "（未指定）"}${role !== undefined ? `｜builtIn=${role.builtIn === true}` : ""}`);
+    if (roleModules.length > 0) lines.push(`名下模块：${roleModules.join("、")}`);
+    if (module !== undefined) lines.push(`指定模块：${module.id}｜paths=${module.paths.join("、")}｜category=${module.category}`);
+    const boundaryEntries = role?.boundary?.entries ?? [];
+    if (boundaryEntries.length > 0) {
+      lines.push(`可写边界：${boundaryEntries.map((entry) => `${entry.path}（${entry.kind}）`).slice(0, 12).join("、")}`);
+    } else {
+      lines.push("可写边界：（未枚举/内置治理角色按既有拓扑与治理规则）");
+    }
+    lines.push("禁止：角色卡/、其他角色模块、.ans/、治理/版本化文档覆盖、docs/product|proposals|contracts|scheduling|quality|verification（越界拒绝）");
+    const kind = input.taskKind;
+    const required: Record<string, string[]> = {
+      dispatch: ["flowId", "targetRoleId", "runId(pinned)", "moduleId(运营派实现)", "modulePaths"],
+      appointment: ["flowId", "multiple=true", "options=名单角色", "D3 选中含 env-bootstrap(未省略)"],
+      write: ["targetRoleId", "decisionId", "paths 全部在角色卡/<target>/", "boundary 模块路径一致"],
+      acceptance: ["flowId", "runId/pinnedDocs", "moduleId/modulePaths", "证据按模块归档"],
+      shell: ["command/argv", "cwd", "显式写目标在角色边界", "执行后审计"],
+    };
+    if (kind !== undefined) lines.push(`taskKind ${kind} 必填：${required[kind].join("；")}`);
+    else lines.push("taskKind：可传 dispatch/appointment/write/acceptance/shell 获取对应必填项");
+    lines.push("常见拒绝 → 下一步：");
+    for (const item of rejectionMapSnapshot().slice(0, 14)) lines.push(`- ${item.code} → ${item.owner}${item.retryable ? "（可重试）" : "（不可原样重试）"}`);
+    const text = lines.join("\n");
+    const max = 4096;
+    if (Buffer.byteLength(text, "utf8") <= max) return text;
+    const marker = "\n…（已截断）";
+    let truncated = text;
+    while (Buffer.byteLength(truncated, "utf8") > max - Buffer.byteLength(marker, "utf8") && truncated.length > 0) {
+      truncated = truncated.slice(0, -1);
+    }
+    return `${truncated}${marker}`;
+  }
 
   /** `role_status` 结构化文本（设计 §4.1：su 行 + 各角色行 + 队列明细 + 可选诊断节；**纯读**、无副作用；
    *  数据层失败以 `{ok:false, message}` 如实表达（不抛——抛错由工具层按「读取未完成」如实转达）；

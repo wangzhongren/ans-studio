@@ -43,6 +43,7 @@ import type {
   ViewImageFn, ViewImageInput, PromptImage, ViewImageReceipt, ViewImageDeliveryMode, RuntimeViewImagePolicy,
   RoleActivityLogFn, RoleActivityLogPayload, TaskSideEffect,
   TerminateRoleRunFn, TerminateRoleRunPayload, RedispatchTaskFn, RedispatchTaskPayload,
+  ContractCheckFn, ContractCheckInput,
 } from "../../model/runtime.ts";
 import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 import type { WriteDecision } from "../../model/decision.ts";
@@ -111,6 +112,10 @@ export const SHELL_VERDICT_TOOL_NAME = "report_shell_verdict";
 
 /** role_status 工具名（G-2/R1；su 只读状态查询——看护回路自查入口，纯读无副作用）。 */
 export const ROLE_STATUS_TOOL_NAME = "role_status";
+
+/** contract_check 工具名（2026-10-30 / 方案 v3 §3.2；只读契约速查，不改变任何门禁）。 */
+export const CONTRACT_CHECK_TOOL_NAME = "contract_check";
+const CONTRACT_CHECK_MAX_BYTES = 4096;
 
 /** session_tail 工具名（G-2/R1；su 只读会话尾线——受保护投影后的规范化行，纯读无副作用）。 */
 export const SESSION_TAIL_TOOL_NAME = "session_tail";
@@ -2280,6 +2285,56 @@ function watchdogFailureMessage(name: string, message: unknown): string {
  * **绝无副作用**：不写盘、不入队、不改任何状态、不动任何判定链；数据源抛错/回执缺失如实回报
  * 「读取未完成/结果不明」，**绝不编造状态**。
  */
+function makeContractCheckTool(fn: ContractCheckFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  const name = CONTRACT_CHECK_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const flowId = readStringArg(call.args, ["flowId", "flow_id"]);
+      const requestedRole = readStringArg(call.args, ["roleId", "role_id", "role"]);
+      if (requestedRole !== undefined && requestedRole !== "" && scope?.roleId !== undefined && requestedRole !== scope.roleId) {
+        return { ok: false, message: `${name}：只允许查询本角色（${scope.roleId}）的契约；未返回任何其他角色信息。` };
+      }
+      const taskKindRaw = readStringArg(call.args, ["taskKind", "task_kind"]);
+      const taskKind = taskKindRaw === "dispatch" || taskKindRaw === "appointment" || taskKindRaw === "write" || taskKindRaw === "acceptance" || taskKindRaw === "shell"
+        ? taskKindRaw
+        : undefined;
+      const moduleId = readStringArg(call.args, ["moduleId", "module_id"]);
+      const input: ContractCheckInput = {
+        ...(flowId !== undefined && flowId.trim() !== "" ? { flowId: flowId.trim() } : {}),
+        ...(scope?.roleId !== undefined && scope.roleId !== "" ? { roleId: scope.roleId } : requestedRole !== undefined && requestedRole !== "" ? { roleId: requestedRole } : {}),
+        ...(taskKind !== undefined ? { taskKind } : {}),
+        ...(moduleId !== undefined && moduleId.trim() !== "" ? { moduleId: moduleId.trim() } : {}),
+      };
+      let text: string | null | undefined | void;
+      try {
+        const turnId = currentTurnId?.();
+        text = await raceAbort(
+          Promise.resolve().then(() => fn(input, {
+            ...(scope?.roleId !== undefined ? { roleId: scope.roleId } : {}),
+            ...(turnId !== undefined ? { turnId } : {}),
+            ...(scope?.runtime !== undefined ? { runtime: scope.runtime } : {}),
+          })),
+          call.signal,
+          `${name} 读取契约`,
+        );
+      } catch (err) {
+        return { ok: false, message: `${name}：契约读取未完成（原因：${reasonOf(err)}）——不要据此猜测 pin/写区；可稍后重试。` };
+      }
+      if (typeof text !== "string" || text.trim() === "") {
+        return { ok: false, message: `${name}：数据源未返回契约摘要（结果不明）——不要据此猜测。` };
+      }
+      const marker = "\n…（已截断，完整规则见 run manifest）";
+      return {
+        ok: true,
+        message: Buffer.byteLength(text, "utf8") <= CONTRACT_CHECK_MAX_BYTES
+          ? text
+          : `${truncateUtf8(text, CONTRACT_CHECK_MAX_BYTES - Buffer.byteLength(marker, "utf8")).text}${marker}`,
+      };
+    },
+  };
+}
+
 function makeRoleStatusTool(fn: RoleStatusFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
   const name = ROLE_STATUS_TOOL_NAME;
   return {
@@ -3001,6 +3056,9 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。metadata 同 dispatch_task 先例（turnId 捕获）。
   const roleStatus = options?.roleStatus;
   if (roleStatus !== undefined) tools.push(makeRoleStatusTool(roleStatus, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  if (options?.contractCheck !== undefined) {
+    tools.push(makeContractCheckTool(options.contractCheck, options?.currentTurnId, { ...(options.roleId !== undefined ? { roleId: options.roleId } : {}), ...(options.runtime !== undefined ? { runtime: options.runtime } : {}) }));
+  }
   const sessionTail = options?.sessionTail;
   if (sessionTail !== undefined) tools.push(makeSessionTailTool(sessionTail, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
   // B 批（2026-10-28）：role_activity_log 同属「注入才注册」；只由编排给幕僚注入，

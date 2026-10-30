@@ -779,3 +779,24 @@ export async function loadPinnedRoster(projectRoot: string, manifest: RunManifes
   }
   return { ok: true, roster: parsed.roster, path: rosterRef.path, version: parsed.roster.version, sha256: sha };
 }
+
+/** 生成静态 quickref 文本（可选快照；以 manifest 为唯一来源，不手写第二份规则）。 */
+export function renderRunQuickref(manifest: RunManifest): string {
+  const lines = [
+    `# run quickref（生成自 manifest；${manifest.runId}｜${manifest.flowId}｜${manifest.state}）`,
+    ...(manifest.pinnedAt !== undefined ? [`pinnedAt：${manifest.pinnedAt}（${manifest.pinnedBy ?? "app"}）`] : []),
+    "",
+    "## 文档",
+    ...Object.entries(manifest.documents).map(([kind, ref]) =>
+      ref === null || ref === undefined ? `- ${kind}: null` : `- ${kind}: ${ref.path}${ref.sha256 !== undefined ? `（sha256 ${ref.sha256}）` : ""}`,
+    ),
+    "",
+    "## execution",
+    `- teamPlan: ${manifest.execution.teamPlan?.path ?? "null"}`,
+    `- flow: ${manifest.execution.flow?.path ?? "null"}${manifest.execution.flow !== null ? `（v${manifest.execution.flow.version}）` : ""}`,
+    "",
+    "## roles",
+    `- ${(manifest.roles ?? []).join("、") || "（未钉）"}`,
+  ];
+  return lines.join("\n");
+}

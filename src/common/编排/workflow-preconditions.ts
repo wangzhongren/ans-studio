@@ -15,6 +15,7 @@ import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
+import { makeMechanicalRejection, type MechanicalRejection } from "./mechanical-rejection.ts";
 
 /** 名单 schema 标识（client 2026-10-29 方案 §5.2；v2.6 模块先行升级为 v2）。 */
 export const PROJECT_ROSTER_SCHEMA = "project-roster/v3" as const;
@@ -1161,10 +1162,22 @@ export type DispatchPreflightInput = {
 
 export type DispatchPreflightResult =
   | { ok: true }
-  | { ok: false; code: string; message: string };
+  | { ok: false; code: string; message: string; rejection: MechanicalRejection };
 
-function reject(code: string, message: string): DispatchPreflightResult {
-  return { ok: false, code, message };
+function reject(
+  code: string,
+  message: string,
+  extra: { missing?: string[]; docs?: string[]; owner?: MechanicalRejection["owner"] } = {},
+): DispatchPreflightResult {
+  return {
+    ok: false,
+    code,
+    message,
+    rejection: makeMechanicalRejection(code, extra.missing ?? [message], {
+      ...(extra.docs !== undefined ? { docs: extra.docs } : {}),
+      ...(extra.owner !== undefined ? { owner: extra.owner } : {}),
+    }),
+  };
 }
 
 /**
@@ -1254,6 +1267,11 @@ export function evaluateDispatchPreflight(input: DispatchPreflightInput): Dispat
           "target-card-missing",
           `派发未受理：D3 选中的项目角色卡未齐备${missing.length > 0 ? `（缺：${missing.join("、")}）` : ""}；` +
             "请先完成人事写卡，再交付运营（运营/convener 是内置角色，不需要也不允许写运营角色卡）。",
+          {
+            missing: missing.length > 0
+              ? [`D3 选中角色 ${missing.join("、")} 的角色卡未齐备`]
+              : ["D3 选中角色的角色卡未齐备"],
+          },
         );
       }
       return { ok: true };

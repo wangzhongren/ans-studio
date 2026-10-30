@@ -923,6 +923,18 @@ export type RoleStatusFn = (
   metadata?: ReportHandbackMetadata,
 ) => WatchdogToolResult | null | undefined | void | Promise<WatchdogToolResult | null | undefined | void>;
 
+/** `contract_check` 只读查询（2026-10-30 / 方案 v3 §3.2）。 */
+export interface ContractCheckInput {
+  flowId?: string;
+  roleId?: string;
+  taskKind?: "dispatch" | "appointment" | "write" | "acceptance" | "shell";
+  moduleId?: string;
+}
+export type ContractCheckFn = (
+  input: ContractCheckInput,
+  metadata?: { roleId?: string; turnId?: string; runtime?: RuntimeKind },
+) => string | null | undefined | void | Promise<string | null | undefined | void>;
+
 /**
  * `session_tail` 的注入数据源（桌面主进程经**受保护投影管线**产出；G-2 §4.2）。契约（实现方＝桌面窗口 W5）：
  * - **纯读**；必须沿既有受保护投影（凭据清洗 / display 保护，`runtime-history.ts::getSessionHistory`
@@ -1841,6 +1853,8 @@ export interface GovernedToolsOptions {
    * dispatch_task 的 suppressHandback 先例）；未注入 ⇒ 工具不注册（结构性 fail-closed）。
    */
   roleStatus?: RoleStatusFn;
+  /** 2026-10-30（3.2）：`contract_check` 只读数据源；未注入 ⇒ 工具不注册。 */
+  contractCheck?: ContractCheckFn;
   /** G-2/R1：`session_tail` 数据源（受保护投影后的会话尾线）。只给内置治理角色 注入；未注入 ⇒ 工具不注册。 */
   sessionTail?: SessionTailFn;
   /**

@@ -547,6 +547,28 @@ export function describeTool(name: string): ToolDescription {
       ],
     };
   }
+  if (name === "contract_check") {
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          flowId: { type: "string", description: "Optional flow id; defaults to the active run flow" },
+          roleId: { type: "string", description: "Optional role id; only the caller's own role is visible" },
+          taskKind: { type: "string", enum: ["dispatch", "appointment", "write", "acceptance", "shell"], description: "Optional task kind for required schema/fields" },
+          moduleId: { type: "string", description: "Optional module id for path/write-root detail" },
+        },
+        additionalProperties: true,
+      },
+      description:
+        "**只读契约速查**（3.2）：返回当前 run pin/latest、七类文档路径+hash、调用角色的模块/写区/禁止路径、" +
+        "所选 taskKind 的必填 schema/字段与常见拒绝 code→下一步。**纯读**：不写盘、不改变权限、不代替门禁；" +
+        "查询不构成放行。无 manifest 的 legacy 会明示“未冻结”。输出有界（≤4KB），只含调用角色可见信息。",
+      promptGuidelines: [
+        "遇到机械拒绝先读 code/missing/action/owner/docs；完整规则再调用 contract_check，不要靠猜或改名单绕过。",
+        "contract_check 只读速查，不是批准/授权；不得把查询结果当作放行依据。",
+      ],
+    };
+  }
   if (name === "role_status") {
     // 看护只读工具（G-2/R1，只给 su 注入）：读取主进程权威快照的结构化文本。文案纪律：只读/8 KiB 截断如实/
     // 失败不编造/不做任何恢复（「注入才注册」由 tools.ts 结构性保证；本处只写语义与取用口径）。
