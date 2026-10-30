@@ -1,4 +1,4 @@
-# P2 Electron E2E summary (candidate: working tree @ 3c334b8 + P2 changes)
+# P2 Electron E2E summary (final candidate d6b30ef, baseline aa6b87c)
 command: ANS_E2E_PROJECT=<worktree root> ANS_E2E_OUTDIR=<evidence>/electron-e2e node_modules/.bin/electron test/桌面应用/e2e/main.mjs
 E2E_PASS=true
 E2E_FAILURES=

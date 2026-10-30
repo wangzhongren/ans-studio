@@ -1,4 +1,4 @@
-# P2 static/build summary (candidate: working tree @ 3c334b8 + P2 changes)
+# P2 static/build summary (final candidate d6b30ef, baseline aa6b87c)
 1. npm run typecheck -> exit 0 (see typecheck.log; 0 errors)
 2. npm run typecheck:renderer -> exit 0 (see typecheck-renderer.log; 0 errors)
-3. npm run build:renderer -> exit 0 (see build-renderer.log; built in 391ms)
+3. npm run build:renderer -> exit 0 (see build-renderer.log; built in 346ms)

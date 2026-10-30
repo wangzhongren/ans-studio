@@ -1,4 +1,4 @@
-# P2 target-project zero-write check (candidate: working tree @ 3c334b8 + P2 changes)
+# P2 target-project zero-write check (final candidate d6b30ef, baseline aa6b87c)
 targets: C:/Users/51054/Downloads/test, C:/Users/51054/Desktop/work/jinyong-rogue-2d
 references_in_test_sources=0
 references_in_p2_logs=0

@@ -1,0 +1,18 @@
+Manifest format and verification (turn-retry-network-watch P2, F1 rework)
+======================================================================
+
+- `sha256.txt` lists every evidence file except itself in `sha256sum` format
+  (`<sha256> *<path>`).
+- Generation/verification口径 (EOL):
+  * Text files (`*.txt`, `*.log`, `*.json`, `*.sha256`, `*.sh`) are normalized to
+    LF (CR stripped) before hashing. PNG screenshots are hashed raw (binary).
+  * In THIS worktree the files are stored LF as generated, so plain
+    `sha256sum -c sha256.txt` passes (run from this directory).
+  * On a fresh checkout, Git (`core.autocrlf=true`) may rewrite tracked text
+    files to CRLF. Use `bash verify-sha256-normalized.sh` — it strips CR from
+    both manifest lines and text content before hashing, and hashes `.png`
+    raw. This is the reproducible cross-checkout check.
+- Raw logs and PNG screenshots are gitignored (`.gitignore`: `*.log`,
+  `角色卡/**/docs/**/*.png`); they remain on disk in this evidence directory
+  and are fixed by these hashes. Committed files are the summaries, reports,
+  candidate hashes and this manifest.
