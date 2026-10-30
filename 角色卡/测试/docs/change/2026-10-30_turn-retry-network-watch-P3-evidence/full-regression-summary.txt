@@ -1,16 +1,17 @@
-# P3 full regression summary (final candidate, baseline 143a8cf)
+# P3 full regression summary (final rework candidate, baseline 143a8cf)
 command: node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')
-ℹ tests 3160
+ℹ tests 3169
 ℹ suites 0
-ℹ pass 3133
+ℹ pass 3142
 ℹ fail 9
 ℹ cancelled 0
 ℹ skipped 18
 ℹ todo 0
-ℹ duration_ms 240133.8923
+ℹ duration_ms 239324.8636
 exit: 1
 files: 375 (P2 372 -> P3 375; +3 new P3 test files)
-comparison: S1 3077/3050/9/18 -> P0 3094/3067/9/18 -> P1 3117/3090/9/18 -> P2 3144/3117/9/18 -> P3 3160/3133/9/18 (+16 tests/+16 pass vs P2; 0 new fail/skip)
+comparison: S1 3077/3050/9/18 -> P0 3094/3067/9/18 -> P1 3117/3090/9/18 -> P2 3144/3117/9/18 -> P3 rework 3169/3142/9/18 (+25 tests/+25 pass vs P2; 0 new fail/skip)
+rework delta vs P3 v1 2af8b50: +9 tests (budget/1h boundary, offline-during-backoff, result-status classification x2, thinking/redacted_thinking, native WebSearch, PreToolUse, isRequestFailureCode) and 0 new failures.
 
 ## Failure classification (9; identical set to S1/P0/P1/P2, all pre-existing Windows symlink EPERM errno -4048; 新增确定性失败 = 0)
   ✖ D3 linked workspace root remains usable; linked target itself is not replaced

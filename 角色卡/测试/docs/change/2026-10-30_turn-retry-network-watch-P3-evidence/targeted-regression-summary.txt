@@ -1,13 +1,14 @@
-# P3 targeted regression summary (final candidate, baseline 143a8cf)
+# P3 targeted regression summary (final rework candidate, baseline 143a8cf)
 command: node --test --test-concurrency=1 <18 files: P0 turn-lease/queue-visibility/abort-unwedge; P1 request-timeout adapter/e2e/wiring; P2 network-gate/network-monitor/network-state-e2e; P3 replay-safe-retry adapter/desktop/e2e; T1; desktop-UI request-status; i18n; g5 c-claude>
-ℹ tests 144
-ℹ pass 143
+ℹ tests 153
+ℹ pass 152
 ℹ fail 1
 ℹ skipped 0
-ℹ duration_ms 15044.3666
+ℹ duration_ms 15012.6462
 exit: 1
 failure: 1 × pre-existing Windows symlink EPERM (`native symlink and storage runtime mismatch fail before SDK query`), same as S1/P0/P1/P2 baseline.
-P3 new suites (16 tests): adapter 9/9, desktop 4/4, e2e 3/3 pass.
+P3 new tests (25): adapter 17/17 (incl. F1 budget/1h boundary, offline-during-backoff, result-status classification, thinking/redacted_thinking/native WebSearch/PreToolUse), desktop 4/4, e2e 3/3, runtime-core isRequestFailureCode 1/1.
 T1: 6/6 pass (pi/codex/claude + outer failed/timed_out).
-Stabilized P1 wiring file: 3/3 pass (single-file repeated 6/6 before this run).
+Stabilized P1 wiring file: 3/3 pass.
 g5 c-claude (pinned requestAttemptMax=1): 6/6 pass.
+F1 acceptance probe: 500 + requestRetryBudgetMs=50 + requestRetryBaseMs=200 => queries=1, MODEL_REQUEST_RETRY_EXHAUSTED, attempts=1, no request.retry (pass).

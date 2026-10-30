@@ -1,4 +1,4 @@
-# P3 phase5a smoke summary (final candidate, baseline 143a8cf)
+# P3 phase5a smoke summary (final rework candidate, baseline 143a8cf)
 command: node_modules/.bin/electron test/桌面UI/phase5a-electron-smoke.mjs app/renderer/dist/index.html <evidence>/phase5a-smoke
 CHECK no console errors=true []
 CHECK no CSP violations=true []
