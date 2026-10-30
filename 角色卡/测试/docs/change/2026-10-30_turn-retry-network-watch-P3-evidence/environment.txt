@@ -1,0 +1,13 @@
+date=2026-10-30T23:45:14+0800
+os=MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 x86_64 Msys
+node=v24.22.1 npm=11.19.1
+electron=44.7.0
+worktree=/c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/replay-safe-retry
+branch=feat/replay-safe-retry
+head=2af8b5059cb61df75c056e449da8d8e0875678d6
+candidate=turn-retry-network-watch P3 final candidate 2af8b5059cb61df75c056e449da8d8e0875678d6 (tree 4c1accee9e8212346ac8e511602c729c97c4ff63)
+baseline=143a8cf (main; contains P0/P1/P2, view_image budget removal and Delta-TR-2 desktop-window test boundary)
+git_status_after_candidate_commit:
+  ?? docs/scheduling/2026-10-30_turn-retry-network-watch-change-P3.md
+  ?? 角色卡/测试/docs/change/2026-10-30_turn-retry-network-watch-P3-evidence/
+tests=P3 3160 tests / 3133 pass / 9 fail (pre-existing Windows symlink EPERM) / 18 skip; files 375

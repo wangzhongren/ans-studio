@@ -1,0 +1,7 @@
+# P3 Electron E2E summary (final candidate, baseline 143a8cf)
+command: ANS_E2E_PROJECT=<worktree root> ANS_E2E_OUTDIR=<evidence>/electron-e2e node_modules/.bin/electron test/桌面应用/e2e/main.mjs
+E2E_PASS=true
+E2E_FAILURES=
+screenshots: 18 PNG (SHOT_00_TITLEBAR included)
+report: electron-e2e/report.txt; raw log: electron-e2e.log; screenshot hashes: electron-e2e-screenshots.sha256
+note: this environment intermittently failed the first `capturePage` with `UnknownVizError` (previously registered in the P2 acceptance report F3). The P3 evidence-only harness change adds a bounded retry (6 × 200ms) to the screenshot helper (test/桌面应用/e2e/main.mjs); screenshot content and all E2E assertions are unchanged. Final run: 18/18 PNG, E2E_PASS=true.

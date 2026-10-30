@@ -1,0 +1,18 @@
+# P3 candidate file hashes (final candidate 2af8b5059cb61df75c056e449da8d8e0875678d6, baseline 143a8cf)
+# path | git hash-object | sha256 | bytes
+app/desktop/session.ts | ee4f940902471f06cd0a8a1dde259bafb292c0ea | db750bc2edd9c84d8b02a33209006850823cebeac4c7511bc681aedae62da05f | 470805
+src/common/shared/i18n/messages/en-US.ts | c485db6cfb3b3e6ec5478886b1b45c5be69b0b6d | 6bcf5d57f11bafb34e022cad7cd914fe43d86ad26cce8d7e09b7f8bb2e5a9471 | 154985
+src/common/shared/i18n/messages/zh-CN.ts | 5a5695fdb6c1adff17d0273b00dca6e508531a46 | ef8ff7064266d571f296c1fab0f191a69b36e6d08b267aede10cac831c437a04 | 144736
+src/model/runtime.ts | 8fd0ea1be7f80991f92796b0489a6821f18bac46 | ea4995dd22b5549b565fb6d8b4fd505a461d33b35b53d199cdc4b597a0d771b3 | 123986
+src/provider/claude/session.ts | 9aed36db5071b1f2f9b9ddf920aadd6056e2d515 | 5cc24ffd142d5187dfb2edb064c661b799816dff1d780226234b79c873b4a151 | 73841
+src/service/runtime/session.ts | c4efc4e44f10458ee237c23b01d18216f2b3ce0d | 4cb90573bbfd70b732bf8baffeb5f5c718328c1b58fc026a71e75931f3a23861 | 66044
+test/claude-adapter/request-timeout.test.ts | 09f4b5f3b0fa6725306de28e010389f2b439a30e | 734d6fa23f339788cff26b6563f553486d809e6017cbc640345e312e8d543e72 | 20988
+test/claude-adapter/session.test.ts | 8c148416ef27f72b5d808c2d91a965316b0754e4 | edb68af20f701a7bab665c19b21342ddd1e3fbf2cf4dc8a4589a64836f072903 | 127842
+test/claude-adapter/replay-safe-retry.test.ts | bd14b3498377a3687414b56017ea066e0d895054 | 518a030ecd0dd8e6dbb96eeff5613f0bce701fa050c55192c11cdaaeea8b56b5 | 26388
+test/桌面应用/e2e/main.mjs | b6860b8cbeddee8a3da6e2bf829e615692bb2baf | 43eaa19ec104a40c37de2e834deb35bf5aeb2fc264c1f2026cc7cbe53ff2ca70 | 171374
+test/桌面应用/request-timeout-wiring.test.ts | b4565cf3cf9bb92cc40d60b90bf0ec9e1d5af190 | 69c1d4f2ad24aa5bfc58621a6dadff56402c27a29e070ac1d3a43234a73764a1 | 15110
+test/桌面应用/replay-safe-retry.test.ts | d3785f7f7cf38340d92f53ec04cef9a1489b938b | 1fe3425da11c7ab3766b336155ef119ad44abd90929b67bf286f505999574bd3 | 15097
+test/测试/g5-reasoning-verify/c-claude.test.ts | 792cd056277312523b320774dccd2464cfa82502 | 0c07c72aad8c6d0d472e700afbc9c079715e12fb9510b14d017d162649b01d75 | 18853
+test/测试/request-timeout-e2e.test.ts | 5a87ed3ce2e8d8b1b7be72013f0ac9b4af79e610 | db569bf8519c999e65521d1cf36d74eff7007d4acd85d27425b72d527a817dc7 | 10164
+test/测试/retry-safety-e2e.test.ts | e26588607dcf3330036bd3a8b576a57d84a9533b | 9b3eb5141dee857b8964d4a4ba32806991c8d687060ebd8d3b501e0259f15f79 | 15437
+test/项目管理/shared/i18n.test.ts | 039342d7c8416970385e0da67f804c8233e0c79b | bcfc57a07ff63a016a60050a428909c1ff806f51ec2112272bb2ce3d75f412c1 | 4225

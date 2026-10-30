@@ -1,0 +1,7 @@
+# P3 phase5a smoke summary (final candidate, baseline 143a8cf)
+command: node_modules/.bin/electron test/桌面UI/phase5a-electron-smoke.mjs app/renderer/dist/index.html <evidence>/phase5a-smoke
+CHECK no console errors=true []
+CHECK no CSP violations=true []
+PHASE5A_SMOKE_DONE failures=0 checks=40 out=<evidence>/phase5a-smoke
+checks=40 failures=0; screenshots=7 PNG
+report: phase5a-smoke/report.json; raw log: phase5a.log
