@@ -1826,7 +1826,37 @@ export interface RuntimeAdapter {
 }
 
 export type RuntimeContextSource = "in-memory" | "fresh" | "resumed" | "recovered";
+/**
+ * 回合终态。P1（2026-10-30）请求级首字节/流空闲超时**不**使用 `timed_out`：
+ * `timed_out` 只保留给 `turnLastResortMs`（1h 最后兜底）；请求超时是 `failed` + 明确 errorCode
+ * （`REQUEST_TIMEOUT_ERROR_CODES`），避免把「请求没起来」伪装成「整轮到点」。
+ */
 export type RuntimeTurnOutcome = "completed" | "failed" | "aborted" | "timed_out";
+
+// —————— P1：请求级超时/请求失败的错误码（终态 failed；1h 最后兜底仍 timed_out） ——————
+/** 请求级超时的错误码族（终态 failed；具体种类见 `REQUEST_TIMEOUT_ERROR_CODES`）。 */
+export const MODEL_REQUEST_TIMEOUT = "MODEL_REQUEST_TIMEOUT";
+/** 请求级失败（非超时）：SDK 流/结果错误等；终态 failed，errorCode 如实。 */
+export const MODEL_REQUEST_FAILED = "MODEL_REQUEST_FAILED";
+/** 请求超时种类：首字节超时（尚无任何 SDK 消息）与流空闲超时（已有活动后静默）。 */
+export type RequestTimeoutKind = "first-byte" | "idle";
+export const REQUEST_TIMEOUT_ERROR_CODES: Readonly<Record<RequestTimeoutKind, string>> = Object.freeze({
+  "first-byte": "request-timeout-first-byte",
+  idle: "request-timeout-idle",
+});
+/**
+ * 请求失败的结构化事实（P1）：`settled.detail` 携带，桌面/诊断据此显示人话；
+ * `errorCode` 只在结构化 detail/诊断中出现，**不得**进入客户可见文案。
+ */
+export interface RuntimeRequestFailureFactsV1 {
+  version: 1;
+  errorCode: string;
+  /** 本回合实际请求尝试次数（P1 恒为 1；P3 重试后递增）。 */
+  attempts: number;
+  /** 失败时是否已产生不可安全重放的副作用（文本/工具/客户交互）。 */
+  replaySafe: boolean;
+  timeoutKind?: RequestTimeoutKind;
+}
 export type JsonSchema = Record<string, unknown>;
 export type DiagnosticLog = ReturnType<typeof createDiagnosticLogger>;
 
@@ -2063,6 +2093,19 @@ export interface RuntimeProviderOptions {
    */
   turnLastResortMs?: number;
   constructTimeoutMs?: number;
+  /**
+   * P1（2026-10-30）**请求级首字节时限**（毫秒）：从输入交给模型到收到第一条 SDK 消息
+   * （assistant/user/result/system `api_retry` 任一）的上限。缺省 90000；测试/宿主可注入小值。
+   * 到点 ⇒ 本轮 `failed`（errorCode `request-timeout-first-byte`），**不是** `timed_out`；
+   * 与 1h 最后兜底（`turnLastResortMs`）并存，后者仍是唯一整轮自动上限。
+   */
+  requestFirstByteTimeoutMs?: number;
+  /**
+   * P1 **请求级流空闲时限**（毫秒）：已有流活动后，距上一条 SDK 消息的空闲上限；缺省 300000。
+   * 是「空闲」而非整轮墙钟：任何 SDK 消息都会重置；客户交互等待、工具执行、abort 清理期间
+   * 计时停走（中性 pause/resume 接口留给 P2 网络暂停接线）。
+   */
+  requestIdleTimeoutMs?: number;
   /**
    * G-4 V2：该角色会话构造时装配的外来 MCP 声明（Service 在 providerFor 读取 `docs/mcp/**` 后注入；
    * **纯消费面**——适配器不得各自去找文件、不得写盘；缺省＝无声明可装配）。装配/放行/呈现属各平台

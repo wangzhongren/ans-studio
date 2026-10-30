@@ -29,6 +29,7 @@ import { listInstalledMcpServers } from "../../common/runtime-core/mcp-declarati
 import { REPORT_LIMITS, makeReportSnapshot, canonicalJson, reportIdFor, validateProvenance, validateLivePresentation, projectLiveReport, projectHandbackInput, validAttemptId } from "../../common/runtime-core/report-provenance.ts";
 import { createEventQueue } from "../../common/runtime-core/event-queue.ts";
 import { DEFAULT_TURN_LAST_RESORT_MS, createInteractionGate, isAbortError, isTimeoutError, raceAbort, resolveRuntimeTimeouts, withPausableTimeout, withTimeout } from "../../common/runtime-core/timeout.ts";
+import { isRequestFailureCode, requestTimeoutFailureFacts, requestTimeoutSummary } from "../../common/runtime-core/request-timeout.ts";
 import { REASONING_DIAGNOSTIC_SUMMARY, REASONING_EVENT_SUMMARY, resolveReasoningEffort } from "../../common/runtime-core/reasoning.ts";
 import { createBackgroundTaskManager } from "../../common/runtime-core/background-tasks.ts";
 
@@ -49,6 +50,13 @@ export interface RuntimeSessionOptions extends Omit<GovernedToolsOptions, "curre
   /** 整轮最后兜底（毫秒；缺省 1 小时）；测试/宿主可注入小值。 */
   turnLastResortMs?: number;
   constructTimeoutMs?: number;
+  /**
+   * P1（2026-10-30）请求级首字节时限（毫秒；缺省 90000，测试可注入小值）。
+   * 到点 ⇒ 本轮 `failed`（errorCode `request-timeout-first-byte`）；1h 最后兜底语义不变。
+   */
+  requestFirstByteTimeoutMs?: number;
+  /** P1 请求级流空闲时限（毫秒；缺省 300000，测试可注入小值）。 */
+  requestIdleTimeoutMs?: number;
   /** Demo-only script; no SDK and no fallback for another runtime. */
   script?: ToolCall[];
 }
@@ -200,6 +208,10 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           // G-5：仅 `set` 态注入字段；`unset`/`invalid` 保持字段缺席，交各平台默认策略。
           ...(reasoningEffort.state === "set" ? { reasoningEffort: reasoningEffort.effort } : {}),
           ...resolveRuntimeTimeouts(options.runtime, options),
+          // P1 请求级超时：宿主/测试注入才覆盖；缺省由适配器用 90s/300s（单一来源
+          // `runtime-core/request-timeout.ts`）。Pi/Codex 不改超时语义（Q10）。
+          ...(options.requestFirstByteTimeoutMs !== undefined ? { requestFirstByteTimeoutMs: options.requestFirstByteTimeoutMs } : {}),
+          ...(options.requestIdleTimeoutMs !== undefined ? { requestIdleTimeoutMs: options.requestIdleTimeoutMs } : {}),
         };
         const factory = options.providerFactories?.[options.runtime] ?? (options.runtime === "demo"
           ? ((input: RuntimeProviderOptions) => createDemoRuntimeAdapter(input, options.script ?? [{ name: "write_file", args: { path: "src/evil.ts", content: "// 越界写入示例\n" } }]))
@@ -329,6 +341,11 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           let underlyingFinished = false;
           let failure: unknown;
           let lastResortExpired = false;
+          // P1：请求失败终态事实（仅在 outcome=failed 时填；最后兜底 timed_out 不填，T1 形状不变）。
+          let requestFailureTimeout: ReturnType<typeof requestTimeoutFailureFacts>;
+          let failureCode: string | undefined;
+          let failureAttempts: number | undefined;
+          let failureReplaySafe: boolean | undefined;
           let underlying: Promise<void> | undefined;
           try {
             persistenceError=undefined;
@@ -371,6 +388,15 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             if(plan?.capture && error instanceof Error && ["INVALID","PROVENANCE_TOO_LARGE","TEXT_PROJECTION_FAILED"].includes(error.message))plan.capture.receipt.code=error.message as RuntimePersistenceErrorCode;
             turn.outcome = isTimeoutError(error) ? "timed_out" : turn.controller.signal.aborted || isAbortError(error) ? "aborted" : "failed";
             turn.outcomeLocked = true;
+            if (turn.outcome === "failed") {
+              // P1：请求超时/请求失败的结构化事实（errorCode/attempts/replaySafe/timeoutKind）随终态 detail
+              // 如实外推；客户可见 summary 只用人话，不含技术 code（code 留在 detail/诊断）。
+              requestFailureTimeout = requestTimeoutFailureFacts(error);
+              const record = error instanceof Error ? error as Error & { code?: unknown; attempts?: unknown; replaySafe?: unknown } : undefined;
+              failureCode = typeof record?.code === "string" && isRequestFailureCode(record.code) ? record.code : undefined;
+              failureAttempts = requestFailureTimeout?.attempts ?? (typeof record?.attempts === "number" && Number.isFinite(record.attempts) ? record.attempts : undefined);
+              failureReplaySafe = requestFailureTimeout?.replaySafe ?? (typeof record?.replaySafe === "boolean" ? record.replaySafe : undefined);
+            }
             turn.controller.abort();
             if (inner.abort && underlying !== undefined && !underlyingFinished) {
               try { await requestAbort(turn); }
@@ -382,7 +408,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             active = undefined;
             endedTurns.add(turn.id);
             provider.setTurn();
-            const event: SessionEvent = { kind: "settled", summary: turn.outcome === "completed" ? "会话结束" : turn.outcome === "aborted" ? "本轮已中止" : turn.outcome === "timed_out" ? (lastResortExpired ? "本轮超过最后兜底，已中止" : "本轮运行超时") : "本轮运行失败", runtime: options.runtime, roleId: role.id, turnId: turn.id, detail: { turnId: turn.id, outcome: turn.outcome } };
+            const event: SessionEvent = { kind: "settled", summary: turn.outcome === "completed" ? "会话结束" : turn.outcome === "aborted" ? "本轮已中止" : turn.outcome === "timed_out" ? (lastResortExpired ? "本轮超过最后兜底，已中止" : "本轮运行超时") : (requestFailureTimeout !== undefined ? requestTimeoutSummary(requestFailureTimeout.timeoutKind) : "本轮运行失败"), runtime: options.runtime, roleId: role.id, turnId: turn.id, detail: { turnId: turn.id, outcome: turn.outcome, ...(turn.outcome === "failed" && failureCode !== undefined ? { errorCode: failureCode, ...(failureAttempts !== undefined ? { attempts: failureAttempts } : {}), ...(failureReplaySafe !== undefined ? { replaySafe: failureReplaySafe } : {}), ...(requestFailureTimeout !== undefined ? { timeoutKind: requestFailureTimeout.timeoutKind } : {}) } : {}) } };
             emit(event,plan,!plan);
             await pendingPersist;
             const record: RuntimeSessionRecord = { version: 1, id: recordId, roleId: role.id, runtime: options.runtime, contextSource: wrapper.contextSource ?? "fresh", nativeSessionId: wrapper.nativeSessionId, contextWarning: plan&&wrapper.contextWarning?provider.display.protectText(wrapper.contextWarning,4096).text:wrapper.contextWarning, createdAt, updatedAt: new Date().toISOString() };

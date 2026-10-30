@@ -1,4 +1,5 @@
-import { RuntimeDeliveryError } from "../../src/model/runtime.ts";
+import { RuntimeDeliveryError, REQUEST_TIMEOUT_ERROR_CODES } from "../../src/model/runtime.ts";
+import { isRequestFailureCode } from "../../src/common/runtime-core/request-timeout.ts";
 import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1, DeliveryReceiptQueryV1, RuntimeDeliveryReceiptV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1, GovernanceJudgeContext, BackgroundTaskSnapshot, BackgroundTaskReadOptions, BackgroundTaskReadResult, BackgroundTaskStopOptions, BackgroundTaskStopResult } from "../../src/model/runtime.ts";
 // app/desktop/session.ts
 // 桌面应用的「会话」装配（纯逻辑，不依赖 electron，可在 node 下单测）。
@@ -1124,7 +1125,7 @@ export class SessionManager {
    * （outcome + 时刻；只记四值终局——旧来源缺事实不猜）。看护 `role_status` 的「最近一轮」行与未来
    * 其他只读消费方取用；不参与任何判定。
    */
-  private readonly lastTurns = new Map<string, { outcome: RuntimeTurnOutcome; at: string }>();
+  private readonly lastTurns = new Map<string, { outcome: RuntimeTurnOutcome; at: string; errorCode?: string }>();
   /**
    * **各角色本轮 assistant 正文累积**（2026-10-18 客户反馈「内部治理角色，应该都向联络官反馈」）：
    * 只记 `kind:"message"` 且**无结构化 detail** 的普通助手消息（delivery-note/prompt-input/receipt/
@@ -2698,12 +2699,14 @@ export class SessionManager {
             const originMissing = !originMatchesRunning;
             const settledDiagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId });
             if (entry.busy || originMatchesRunning) {
-              const settledOutcomeRaw = (ev.detail as { outcome?: unknown } | undefined)?.outcome;
+              const settledOutcomeRaw = (ev.detail as { outcome?: unknown; errorCode?: unknown } | undefined)?.outcome;
+              const settledErrorCodeRaw = (ev.detail as { outcome?: unknown; errorCode?: unknown } | undefined)?.errorCode;
               settledDiagnostic.record("turn.settled", {
                 ...(eventTurnId !== undefined ? { turnId: eventTurnId } : {}),
                 state: originMissing ? "origin-missing" : "origin-matched",
                 busy: entry.busy,
                 ...(typeof settledOutcomeRaw === "string" ? { outcome: settledOutcomeRaw } : {}),
+                ...(typeof settledErrorCodeRaw === "string" ? { errorCode: settledErrorCodeRaw } : {}),
               });
             }
             if (originMissing && entry.busy) {
@@ -2763,12 +2766,25 @@ export class SessionManager {
                   settledOutcomeRaw === "completed" || settledOutcomeRaw === "failed" || settledOutcomeRaw === "aborted" || settledOutcomeRaw === "timed_out"
                     ? settledOutcomeRaw
                     : undefined;
+                // P1（2026-10-30）：请求超时/请求失败的结构化 errorCode（来自 Service settled.detail）——
+                // 只用于人话系统行 + lastTurn 小状态；**不**进入客户可见文案（不显示技术 code/堆栈/URL）。
+                const settledErrorCodeRaw = (ev.detail as { errorCode?: unknown } | undefined)?.errorCode;
+                const settledErrorCode = typeof settledErrorCodeRaw === "string" && isRequestFailureCode(settledErrorCodeRaw) ? settledErrorCodeRaw : undefined;
                 void this.mirrorGovernanceFeedback(projectRoot, runtime, roleId, {
                   ...(settledOrigin?.flowIds !== undefined && settledOrigin.flowIds.length > 0 ? { flowIds: settledOrigin.flowIds } : {}),
                   ...(settledOutcome !== undefined ? { outcome: settledOutcome } : {}),
                 });
                 if (settledOutcome !== undefined) {
-                  this.lastTurns.set(this.queueKey(en.projectRoot, roleId, runtime), { outcome: settledOutcome, at: new Date(this.now()).toISOString() });
+                  this.lastTurns.set(this.queueKey(en.projectRoot, roleId, runtime), { outcome: settledOutcome, at: new Date(this.now()).toISOString(), ...(settledErrorCode !== undefined ? { errorCode: settledErrorCode } : {}) });
+                }
+                if (settledOutcome === "failed" && settledErrorCode !== undefined) {
+                  // 人话系统行（客户卡不出现技术模板/code）：来源 i18n；delivery-note 只呈现，不触发模型/门禁。
+                  const human = settledErrorCode === REQUEST_TIMEOUT_ERROR_CODES["first-byte"]
+                    ? mainT("main.requestStatus.timeoutFirstByte")
+                    : settledErrorCode === REQUEST_TIMEOUT_ERROR_CODES.idle
+                      ? mainT("main.requestStatus.timeoutIdle")
+                      : mainT("main.requestStatus.failed");
+                  this.emitDeliveryNote(en.projectRoot, runtime, roleId, roleId, human);
                 }
                 this.observeWatchdog(en.projectRoot, {
                   kind: "settled",
@@ -6094,7 +6110,7 @@ ${formatted}` };
   }
 
   /** 某角色**最近一轮终局**（W1 的 `lastTurn` 小状态；纯读。消费方：role_status 等只读面）。 */
-  lastTurnOf(projectRoot: string, roleId: string, runtime: RuntimeKind): { outcome: RuntimeTurnOutcome; at: string } | undefined {
+  lastTurnOf(projectRoot: string, roleId: string, runtime: RuntimeKind): { outcome: RuntimeTurnOutcome; at: string; errorCode?: string } | undefined {
     return this.lastTurns.get(this.queueKey(projectRoot, roleId, runtime));
   }
 
@@ -6899,14 +6915,15 @@ ${formatted}` };
             `  当前轮：进行中（已耗 ${formatDurationMs(Math.max(0, at - live.turnStartedAt))} / 看护检查时限 ${formatDurationMs(timeouts.promptTimeoutMs)}；turnId=${live.turnId ?? "—"}；${lastResortText}最后兜底）`,
           );
         }
-        let last: { outcome: RuntimeTurnOutcome; at: string } | undefined;
+        let last: { outcome: RuntimeTurnOutcome; at: string; errorCode?: string } | undefined;
         for (const [key, value] of this.lastTurns) if (key.startsWith(`${projectRoot}\u0000${rid}\u0000`)) { last = value; break; }
         if (last) {
           const history = `该角色近 15 分钟 failed/timed_out 计 ${stats?.failuresByRole.get(rid) ?? 0}`;
+          const lastOutcome = last.errorCode !== undefined ? `${last.outcome}(${last.errorCode})` : last.outcome;
           lines.push(
             busy
-              ? `  上一轮终局：${last.outcome} @ ${last.at}（不表示当前轮；${history}）`
-              : `  最近一轮：${last.outcome} @ ${last.at}（${history}）`,
+              ? `  上一轮终局：${lastOutcome} @ ${last.at}（不表示当前轮；${history}）`
+              : `  最近一轮：${lastOutcome} @ ${last.at}（${history}）`,
           );
         }
         for (const item of queue?.items ?? []) {

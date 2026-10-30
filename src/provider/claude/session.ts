@@ -8,9 +8,18 @@ import type * as SDK from "@anthropic-ai/claude-agent-sdk";
 import type * as Zod from "zod";
 import type { ResolvedRole } from "../../model/role.ts";
 import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, RuntimeTurnOutcome, PromptOptions, RuntimeToolEventFactsV1, RuntimeReasoningFactsV1 } from "../../model/runtime.ts";
+import { MODEL_REQUEST_FAILED } from "../../model/runtime.ts";
 import { RUNTIME_CREDENTIAL_ENV_VARS } from "../../common/shared/runtime-shared.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 import { REASONING_EVENT_SUMMARY } from "../../common/runtime-core/reasoning.ts";
+import {
+  DEFAULT_REQUEST_FIRST_BYTE_TIMEOUT_MS,
+  DEFAULT_REQUEST_IDLE_TIMEOUT_MS,
+  createRequestDeadline,
+  createRequestTimeoutFailure,
+  isRequestTimeoutFailure,
+  type RequestDeadline,
+} from "../../common/runtime-core/request-timeout.ts";
 import { toClaudeSchema } from "../../common/claude-adapter/schema.ts";
 import { CLAUDE_JUDGE_DISALLOWED_TOOLS, CLAUDE_JUDGE_TOOL_NAMES, assertClaudeJudgeToolSet, claudeJudgeReportToolName, claudeJudgeSystemPromptLine } from "../../common/claude-adapter/judge.ts";
 import { isClaudeImageMimeType, mapClaudeToolResultImages, type ClaudeImageMimeType } from "../../common/claude-adapter/tool-result-images.ts";
@@ -116,6 +125,10 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
   }
   // One hour by default; tests/hosts may inject a smaller value. Never read from promptTimeoutMs.
   const turnLastResortMs = options.turnLastResortMs ?? DEFAULT_TURN_LAST_RESORT_MS;
+  // P1（2026-10-30）请求级时限：首字节 90s / 流空闲 300s（默认值单一来源 runtime-core/request-timeout.ts；
+  // 测试/宿主可注入小值）。与 1h 最后兜底并存：请求超时终态 failed + errorCode，1h 仍是 timed_out。
+  const requestFirstByteTimeoutMs = options.requestFirstByteTimeoutMs ?? DEFAULT_REQUEST_FIRST_BYTE_TIMEOUT_MS;
+  const requestIdleTimeoutMs = options.requestIdleTimeoutMs ?? DEFAULT_REQUEST_IDLE_TIMEOUT_MS;
   // Auth, endpoint and redaction must use the same immutable profile snapshot.
   const env = { ...(dependencies.env ?? process.env) };
   const credentialName = options.apiKeyEnvVar ?? "ANTHROPIC_API_KEY";
@@ -198,6 +211,13 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
       let disposed = false;
       let active: Turn | undefined;
       let engine: Engine | undefined;
+      // P1 请求级超时（每回合/每次尝试一把 deadline）：pump 的每条 SDK 消息喂 activity()；
+      // 客户交互（InteractionGate）、工具执行、abort 清理期间 pause()；P2 网络暂停复用同一中性接口。
+      let requestDeadline: RequestDeadline | undefined;
+      let requestGateUnsubscribe: (() => void) | undefined;
+      let requestAbortUnsubscribe: (() => void) | undefined;
+      let requestAttempt = 0;
+      let promptStartedAt = 0;
       let temporaryDirectory: string | undefined;
       let teardownError: Error | undefined;
       // A failed/cancelled compatibility attempt stays local to its prompt.
@@ -258,11 +278,28 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           emit(turn, "message", `已安装 MCP「${entry.name}」未连接：${category}`);
         }
       };
-      const safeFailure = (error: unknown) => error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name)
-        ? error : new Error(`Claude SDK 运行失败：${redact(error instanceof Error ? error.message : String(error))}`);
+      // P1 请求级 deadline 生命周期（停止/暂停/恢复）。暂停引用计数：交互闸、工具执行、abort 清理可嵌套，
+      // 网络暂停（P2）接同一 pause()/resume()，本批不接线。
+      const stopRequestDeadline = (): void => {
+        requestDeadline?.stop();
+        requestDeadline = undefined;
+        requestGateUnsubscribe?.();
+        requestGateUnsubscribe = undefined;
+        requestAbortUnsubscribe?.();
+        requestAbortUnsubscribe = undefined;
+      };
+      const pauseRequestTimer = (turn?: Turn): void => { if (turn === undefined || turn === active) requestDeadline?.pause(); };
+      const resumeRequestTimer = (turn?: Turn): void => { if (turn === undefined || turn === active) requestDeadline?.resume(); };
+      // P1：请求级超时错误原样上抛（name=RequestTimeoutError，code=request-timeout-*），不得被
+      // 「Claude SDK 运行失败」包装吞掉 code；AbortError/TimeoutError（最后兜底）语义不变。
+      const safeFailure = (error: unknown) => isRequestTimeoutFailure(error)
+        ? error
+        : error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name)
+          ? error : new Error(`Claude SDK 运行失败：${redact(error instanceof Error ? error.message : String(error))}`);
       const closeEngine = (current: Engine) => {
         if (current.closed) return;
         current.closed = true;
+        stopRequestDeadline();
         current.contexts.clear();
         current.nativeTurns.clear();
         current.pendingInputs.clear();
@@ -372,7 +409,14 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
               const facts = { toolCallId, toolName: tool.name, input: { rule: tool.displayInputRule, args: publicArgs } };
               emitTool(callTurn, { ...facts, phase: "start", origin: "handler-start" }, "tool_call", tool.name);
               try {
-                const result = await tool.handler({ name: tool.name, args: publicArgs, signal, toolCallId });
+                // P1：工具执行期间请求空闲计时停走（工具自身的 10min/60s 时限负责它自己的挂起）。
+                pauseRequestTimer(callTurn);
+                let result: Awaited<ReturnType<typeof tool.handler>>;
+                try {
+                  result = await tool.handler({ name: tool.name, args: publicArgs, signal, toolCallId });
+                } finally {
+                  resumeRequestTimer(callTurn);
+                }
                 if (signal.aborted || current.closed) return { content: [{ type: "text" as const, text: "本轮已中止，工具结果已丢弃" }], isError: true };
                 // 工具结果附图（同轮设计 §6.4）：仅 ok:true 且载荷合法时映射为 MCP image 块；
                 // 图片 data/base64 原引用透传，绝不经过 redact。事件 facts 只带白名单标量：
@@ -461,6 +505,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             // branch precedent). allowedTools only carries the server-level auto-allow fallback.
             if (hook.mcp_server && installedNames.has(hook.mcp_server.name) && hook.mcp_server.source === "dynamic" && hook.tool_name.startsWith(`mcp__${hook.mcp_server.name}__`) && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted) {
               originalTurn.replayUnsafe = true;
+              // P1：原生（外来 MCP）工具执行期间请求空闲计时停走，结果帧到达时恢复。
+              pauseRequestTimer(originalTurn);
               emitTool(originalTurn, { origin: "native-start", phase: "start", toolName: hook.tool_name,
                 toolCallId: `${originalTurn.id}:${hook.tool_use_id}`,
                 input: { rule: "none", args: hook.tool_input !== null && typeof hook.tool_input === "object" && !Array.isArray(hook.tool_input) ? hook.tool_input as Record<string, unknown> : {} } }, "tool_call", hook.tool_name);
@@ -472,6 +518,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             // query must reach the tool unchanged.
             if (webSearchEnabled && hook.tool_name === "WebSearch" && !hook.mcp_server && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted) {
               originalTurn.replayUnsafe = true;
+              // P1：原生 WebSearch 执行期间请求空闲计时停走，结果帧到达时恢复。
+              pauseRequestTimer(originalTurn);
               return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } };
             }
             if (originalTurn) {
@@ -494,6 +542,33 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             for await (const message of current.query) {
               const callTurn = active;
               if (current.closed || !callTurn || callTurn.controller.signal.aborted) continue;
+              // P1：流活动计数。首字节只认设计口径的四类消息（assistant/user/result/system api_retry）；
+              // 其余系统消息（如 init/status）不关闭首字节，但首字节到达后同样重置空闲计时。
+              const isFirstByteMessage = message.type === "assistant" || message.type === "user" || message.type === "result"
+                || (message.type === "system" && message.subtype === "api_retry");
+              if (requestDeadline !== undefined && (requestDeadline.firstByteSeen || isFirstByteMessage) && requestDeadline.activity()) {
+                diagnostics.record("request.first-byte", {
+                  turnId: callTurn.id,
+                  attempt: requestAttempt,
+                  durationMs: Math.max(0, Math.round(requestDeadline.firstByteElapsedMs ?? 0)),
+                });
+              }
+              if (message.type === "system" && message.subtype === "api_retry") {
+                // SDK 内部 API 重试可见（方案 v1.1 §4.3.3-5 / §6.3）：只记录计数/延迟/状态元数据，
+                // 不记录错误正文；SDK 重试期间 ANS **不并发**发起第二次请求（P1 无 ANS 重试；P3 复用该门槛）。
+                const retry = message as SDK.SDKAPIRetryMessage;
+                diagnostics.record("request.sdk-retry", {
+                  turnId: callTurn.id,
+                  attempt: retry.attempt,
+                  count: retry.max_retries,
+                  durationMs: retry.retry_delay_ms,
+                  errorCode: typeof retry.error_status === "number" ? String(retry.error_status) : "no-response",
+                  ...(retry.no_response !== undefined ? { state: "no-response", timeoutMs: retry.no_response.waited_ms } : {}),
+                });
+                // 角色日志一行摘要（客户可见的人话；不含错误正文/URL/凭据）。
+                emit(callTurn, "message", `接口请求重试中（第 ${retry.attempt}/${retry.max_retries} 次，等待 ${retry.retry_delay_ms}ms）`, { source: "system", reasonCode: "claude-api-retry", state: "retrying" });
+                continue;
+              }
               if (message.type === "assistant") {
                 if (message.error) {
                   lastFailureText = message.message.content.filter((block) => block.type === "text").map((block) => block.text).join("\n");
@@ -524,6 +599,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                   const call = current.nativeCalls.get(block.tool_use_id);
                   if (!call) continue;
                   current.nativeCalls.delete(block.tool_use_id);
+                  // P1：原生工具结果到达 ⇒ 恢复请求空闲计时（与 PreToolUse 放行处成对）。
+                  resumeRequestTimer(call.turn);
                   const content: ({ type: "text"; text: string } | { type: "unsupported" })[] = [];
                   if (typeof block.content === "string") content.push({ type: "text", text: block.content });
                   else if (Array.isArray(block.content)) for (const item of block.content) content.push(item.type === "text" && typeof item.text === "string" ? { type: "text", text: item.text } : { type: "unsupported" });
@@ -581,6 +658,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           const turn: Turn = { id: options.currentTurnId() ?? randomUUID(), sdkUuid: randomUUID(), controller: new AbortController(), done, resolve, reject, replayUnsafe: false };
           active = turn;
           lastFailureText = undefined;
+          promptStartedAt = Date.now();
+          requestAttempt = 0;
           let outcome: RuntimeTurnOutcome = "completed";
           let failure: Error | undefined;
           let compatibleAttempt = reasoningCompatible;
@@ -609,6 +688,38 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                 current.input.push({ type: "user", uuid: turn.sdkUuid, session_id: nativeId ?? "", parent_tool_use_id: null, message: {
                   role: "user", content: images.length ? [{ type: "text", text: wireText }, ...images.map((image) => ({ type: "image" as const, source: { type: "base64" as const, media_type: image.mimeType as ClaudeImageMimeType, data: image.data } }))] : wireText,
                 } });
+                // P1：输入已交给模型 ⇒ 起请求级 deadline（首字节 90s → 流空闲 300s；测试注入小值）。
+                // 交互闸等待、工具执行、abort 清理期间 pause；超时以 RequestTimeoutError 结束本次尝试
+                // （终态 failed + errorCode；不是最后兜底 timed_out）。
+                requestAttempt += 1;
+                stopRequestDeadline();
+                const deadline = createRequestDeadline({
+                  firstByteTimeoutMs: requestFirstByteTimeoutMs,
+                  idleTimeoutMs: requestIdleTimeoutMs,
+                  onTimeout: (kind, timeoutMs, elapsedMs) => {
+                    if (turn.controller.signal.aborted || disposed) return;
+                    const timeoutFailure = createRequestTimeoutFailure(kind, timeoutMs, elapsedMs, requestAttempt, turn.replayUnsafe);
+                    diagnostics.record("request.timeout", {
+                      turnId: turn.id, attempt: requestAttempt, mode: kind, timeoutMs,
+                      durationMs: Math.max(0, Math.round(elapsedMs)), replayPlan: turn.replayUnsafe ? "unsafe" : "safe",
+                    });
+                    turn.reject(timeoutFailure);
+                  },
+                });
+                requestDeadline = deadline;
+                if (options.interactionGate) {
+                  const gate = options.interactionGate;
+                  if (gate.isWaiting()) deadline.pause();
+                  requestGateUnsubscribe = gate.onChange((waiting) => { if (waiting) deadline.pause(); else deadline.resume(); });
+                }
+                const onTurnAbort = () => stopRequestDeadline();
+                turn.controller.signal.addEventListener("abort", onTurnAbort, { once: true });
+                requestAbortUnsubscribe = () => turn.controller.signal.removeEventListener("abort", onTurnAbort);
+                diagnostics.record("request.attempt.start", {
+                  turnId: turn.id, attempt: requestAttempt, timeoutMs: requestFirstByteTimeoutMs,
+                  durationMs: requestIdleTimeoutMs, mode: "claude",
+                });
+                deadline.start();
                 try {
                   await waitForTurn(attemptDone.then(() => current.toolTail), turn.controller.signal, turnLastResortMs, options.interactionGate);
                 } catch (error) {
@@ -616,6 +727,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                   // the error/terminal text names the last resort (inspect deadlines never abort).
                   throw isTurnLastResortError(error) ? error : error instanceof Error && error.name === "TimeoutError" ? turnLastResortError(turnLastResortMs) : error;
                 }
+                stopRequestDeadline();
                 if (turn.controller.signal.aborted) throw abortError();
                 if (compatibleAttempt && !reasoningCompatible) {
                   reasoningCompatible = true;
@@ -623,6 +735,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                 }
                 break;
               } catch (error) {
+                stopRequestDeadline();
                 if (!turn.controller.signal.aborted && !(error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name)) && !teardownError && !compatibleAttempt && !turn.replayUnsafe && isReasoningRejection(lastFailureText)) {
                   compatibleAttempt = true;
                   if (engine) closeEngine(engine);
@@ -635,10 +748,26 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           } catch (error) {
             failure = safeFailure(error);
             outcome = failure.name === "TimeoutError" ? "timed_out" : turn.controller.signal.aborted || failure.name === "AbortError" ? "aborted" : "failed";
+            if (outcome === "failed") {
+              // P1：请求失败结构化事实——请求超时保留自身 code；其余请求级失败标记 MODEL_REQUEST_FAILED。
+              // code/attempts/replaySafe 随错误上抛，由 Service 写入 settled.detail（客户文案仍为人话）。
+              const tagged = failure as Error & { code?: string; attempts?: number; replaySafe?: boolean };
+              if (!isRequestTimeoutFailure(failure) || typeof tagged.code !== "string") tagged.code = MODEL_REQUEST_FAILED;
+              tagged.attempts = Math.max(1, requestAttempt);
+              tagged.replaySafe = turn.replayUnsafe;
+              diagnostics.record("request.failed", {
+                turnId: turn.id,
+                errorCode: tagged.code,
+                attempt: tagged.attempts,
+                durationMs: Math.max(0, Date.now() - promptStartedAt),
+                replayPlan: turn.replayUnsafe ? "unsafe" : "safe",
+              });
+            }
             turn.controller.abort();
             if (engine) closeEngine(engine);
             if (!storage && nativeId) { nativeId = undefined; contextSource = "in-memory"; warning = "Claude 活会话已中断；下一条输入将新建上下文。"; }
           } finally {
+            stopRequestDeadline();
             turn.controller.abort();
             if (engine) for (const [token, context] of engine.contexts) if (context.turn === turn) engine.contexts.delete(token);
             if (engine) for (const [id, call] of engine.nativeCalls) if (call.turn === turn) engine.nativeCalls.delete(id);

@@ -1112,6 +1112,13 @@ export const enUS = {
 
   "main.session.contextRecoveryFailed":
     "Native context restore failed; the context was rebuilt.",
+  // P1 request-level timeout/failure system rows (customer-facing plain language; errorCode stays in diagnostics/detail).
+  "main.requestStatus.timeoutFirstByte":
+    "Request timed out: no response from the model for a long time; this turn has ended and can be retried later.",
+  "main.requestStatus.timeoutIdle":
+    "Request timed out: the model response stalled; this turn has ended and can be retried later.",
+  "main.requestStatus.failed":
+    "The request failed; this turn has ended and can be retried later.",
   "main.session.rebuiltBoundary":
     "This role's boundary was updated or the runtime configuration was saved ({changed}); the old session was invalidated and reopened against the new boundary. The context restore result is subject to the engine's actual response.",
   "main.session.rebuiltSkills":

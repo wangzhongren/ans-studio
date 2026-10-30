@@ -1011,6 +1011,10 @@ export const zhCN = {
 
   // ---- 会话主流程（session.ts）----
   "main.session.contextRecoveryFailed": "原生上下文恢复失败，已重建上下文。",
+  // P1 请求级超时/失败的系统行（客户可见人话；技术 errorCode 只在诊断/detail，不进文案）。
+  "main.requestStatus.timeoutFirstByte": "请求超时：长时间没有收到模型响应；本轮已结束，可稍后重发。",
+  "main.requestStatus.timeoutIdle": "请求超时：模型响应长时间中断；本轮已结束，可稍后重发。",
+  "main.requestStatus.failed": "本轮请求失败，已结束；请检查后重发。",
   "main.session.rebuiltBoundary":
     "该角色边界已更新或运行时配置已保存（{changed}），已作废旧会话，按新边界重开；上下文恢复结果以引擎实际返回为准。",
   "main.session.rebuiltSkills":
