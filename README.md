@@ -8,7 +8,7 @@
 
 **版本状态**：当前公开运行包为 **v1.8.0**（2026-10-30）。该运行包在 v1.7.0 基础上切换到**六角色最小系统**（幕僚 `chief`、产品 `product`、策划 `rapporteur`、人事 `nominator`、运营 `convener`、质检 `verifier`）：产品意图 → 策划（方案/模块/名单/架构）→ 人事（D3 招人 + appointment-write 写卡）→ 运营交付（可发起可选质检核对）；机器状态改为 `.ans/state/tasks.jsonl` + run manifest，不再有 flow YAML/gate/ledger。同时包含模块/名单/拓扑版本化契约、run 期间冻结契约版本（run manifest + pin）、机械拒绝三段式与只读 `contract_check`、证据自洽校验（`evidence-meta/v1` sidecar、P0 criteria 派生、只读 `evidence_check`）、shell 写区守卫，以及桌面跨窗口状态同步、重复投递抑制与决策/审核弹窗、窄栏排版修复。旧 v1/v2/v3 计划、流程与角色卡仅作历史兼容。
 
-![ANS Studio 桌面：五角色导航与需求确认卡](角色卡/桌面UI/docs/change/2026-10-20_readme-v1.4-screenshot/desktop-intent-confirm.png)
+![ANS Studio 桌面：六角色导航与幕僚会话](角色卡/桌面UI/docs/change/2026-10-30_readme-v1.8-screenshot/desktop-six-role-navigation.png)
 
 ## 三层结构：意图、组织、规则
 
