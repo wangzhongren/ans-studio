@@ -129,7 +129,7 @@ export interface NetworkOfflineFailure extends Error {
   code: string;
   /** 本回合已发起的请求尝试数（P2 恒为 1；P3 重试后递增）。 */
   attempts: number;
-  /** 失败时是否已产生不可安全重放的副作用。 */
+  /** 失败时本回合**是否仍可安全重放**（true = 无文本/thinking/工具/客户交互副作用）。 */
   replaySafe: boolean;
   /** 离线持续时长（毫秒，暂停/窗口语义的如实值）。 */
   offlineMs: number;

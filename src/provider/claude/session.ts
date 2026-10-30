@@ -863,22 +863,38 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                   emitReasoningSystem(turn, "trying", "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。");
                   continue;
                 }
-                // P3（2026-10-30）replay-safe 同回合重试：仅当失败属请求/流层、本回合尚无文本/
-                // thinking/工具/客户交互、网络在线、未取消、未发生清理失败，且 attempts/预算都允许时，
-                // 关闭当前 query 后以**同一输入、同一 turnId** 重开请求。任何不确定一律不重试。
+                // P3（2026-10-30，验收 F1 返工）replay-safe 同回合重试：仅当失败属请求/流层、
+                // 本回合尚无文本/thinking/工具/客户交互、网络在线、未取消、未发生清理失败，且
+                // **剩余总预算与 1h 护栏都足以覆盖本次退避** 时，关闭当前 query 后以同一输入、
+                // 同一 turnId 重开请求。退避结束后、真正启动 attempt 前再次复核（含在线/取消）。
                 const retryableFailure = isRequestTimeoutFailure(error) || (error as RetryableError).requestRetryable === true;
                 const replaySafe = !turn.replayUnsafe && !turn.interactionSeen;
                 const online = networkGate === undefined || networkGate.isOnline();
-                const stillWithinLastResort = Date.now() - promptStartedAt < turnLastResortMs;
                 const retryPolicyActive = requestAttemptMax > 1;
+                const delayMs = retryDelayFor(requestAttempt);
+                const elapsedAtDecision = Math.max(0, Date.now() - promptStartedAt);
+                const budgetCoversDelay = requestRetryBudgetMs - elapsedAtDecision > delayMs;
+                const lastResortCoversDelay = turnLastResortMs - elapsedAtDecision > delayMs;
                 const mayRetry = retryableFailure && replaySafe && online && !turn.controller.signal.aborted && !disposed
                   && teardownError === undefined && !isReasoningRejection(lastFailureText)
-                  && requestAttempt < requestAttemptMax && requestRetryBudgetMs - (Date.now() - promptStartedAt) > 0
-                  && stillWithinLastResort;
+                  && requestAttempt < requestAttemptMax && budgetCoversDelay && lastResortCoversDelay;
                 if (mayRetry) {
-                  const delayMs = retryDelayFor(requestAttempt);
-                  // 诊断沿用既有白名单字段：count←max、durationMs←退避 delay、mode←timeoutKind、
-                  // replayPlan←replaySafe（不新增诊断字段、不改 diagnostics 白名单）。
+                  // 先关闭当前 query（旧请求不残留），再退避；退避可取消（abort/dispose 立即终止）。
+                  if (engine) closeEngine(engine);
+                  if (teardownError !== undefined) throw teardownError;
+                  await waitForTurn(new Promise<void>((resolveDelay) => { setTimeout(resolveDelay, delayMs); }), turn.controller.signal, 0, options.interactionGate);
+                  if (turn.controller.signal.aborted || disposed) throw abortError();
+                  // 退避期间转为离线 ⇒ 不发起重试（P2 负责暂停/恢复与窗口终态；离线失败如实结束）。
+                  // 此刻尚未写 request.retry/角色日志，避免“已宣布重试但未发起”的观测噪音。
+                  if (networkGate !== undefined && !networkGate.isOnline()) throw error;
+                  // 退避后复核总预算/1h 护栏（防御定时器超时/时钟推进）：不足即按耗尽处理，不启动 attempt。
+                  const elapsedAfterDelay = Math.max(0, Date.now() - promptStartedAt);
+                  if (requestRetryBudgetMs - elapsedAfterDelay <= 0 || turnLastResortMs - elapsedAfterDelay <= 0) {
+                    retryExhausted = true;
+                    throw error;
+                  }
+                  // 真正即将启动 attempt 时才记录诊断/角色日志（attempt=即将开始的序号）。
+                  // 诊断沿用既有白名单字段：count←max、durationMs←退避 delay、mode←timeoutKind、replayPlan←replaySafe。
                   diagnostics.record("request.retry", {
                     turnId: turn.id,
                     attempt: requestAttempt + 1,
@@ -890,16 +906,9 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                   });
                   // 一行角色日志（客户可见人话；不含错误正文/URL/凭据/技术 code）。
                   emit(turn, "message", `接口请求未成功，正在自动重试（第 ${requestAttempt + 1}/${requestAttemptMax} 次）`, { source: "system", reasonCode: "claude-request-retry", state: "retrying" });
-                  // 先关闭当前 query（旧请求不残留），再退避；退避可取消（abort/dispose 立即终止）。
-                  if (engine) closeEngine(engine);
-                  if (teardownError !== undefined) throw teardownError;
-                  await waitForTurn(new Promise<void>((resolveDelay) => { setTimeout(resolveDelay, delayMs); }), turn.controller.signal, 0, options.interactionGate);
-                  if (turn.controller.signal.aborted || disposed) throw abortError();
-                  // 退避期间转为离线 ⇒ 不发起重试（P2 负责暂停/恢复与窗口终态；离线失败如实结束）。
-                  if (networkGate !== undefined && !networkGate.isOnline()) throw error;
                   continue;
                 }
-                // 有重试策略、本可安全重放且在线，但 attempts/预算已用尽 ⇒ 如实标记重试耗尽。
+                // 有重试策略、本可安全重放且在线，但 attempts/剩余预算/1h 护栏不允许 ⇒ 如实标记重试耗尽。
                 if (retryPolicyActive && retryableFailure && replaySafe && online && !turn.controller.signal.aborted && !disposed
                   && teardownError === undefined && !isReasoningRejection(lastFailureText)) retryExhausted = true;
                 throw error;

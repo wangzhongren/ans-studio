@@ -16,6 +16,7 @@
 // `turnLastResortMs`/`promptTimeoutMs`/`DEFAULT_TURN_ABORT_MS` 语义均不变。
 
 import {
+  MODEL_REQUEST_RETRY_EXHAUSTED,
   REQUEST_TIMEOUT_ERROR_CODES,
   type RequestTimeoutKind,
 } from "../../model/runtime.ts";
@@ -46,9 +47,9 @@ export interface RequestTimeoutFailure extends Error {
   timeoutMs: number;
   /** 本阶段有效计时（暂停不计）已消耗的毫秒数。 */
   elapsedMs: number;
-  /** 本回合已发起的请求尝试数（P1 恒为 1）。 */
+  /** 本回合已发起的请求尝试数（P1 恒为 1；P3 重试后递增，最多 3）。 */
   attempts: number;
-  /** 失败时是否已产生不可安全重放的副作用。 */
+  /** 失败时本回合**是否仍可安全重放**（true = 无文本/thinking/工具/客户交互副作用）。 */
   replaySafe: boolean;
 }
 
@@ -90,9 +91,9 @@ export function requestTimeoutSummary(kind: RequestTimeoutKind): string {
   return kind === "first-byte" ? "本轮请求超时（首字节未返回）" : "本轮请求超时（响应空闲超时）";
 }
 
-/** 是否为已知的请求失败 errorCode（`request-timeout-*` 或 `MODEL_REQUEST_FAILED`）。 */
+/** 是否为已知的请求失败 errorCode（`request-timeout-*`、`MODEL_REQUEST_FAILED` 或 P3 重试耗尽 `MODEL_REQUEST_RETRY_EXHAUSTED`）。 */
 export function isRequestFailureCode(code: unknown): code is string {
-  return typeof code === "string" && (code === REQUEST_TIMEOUT_ERROR_CODES["first-byte"] || code === REQUEST_TIMEOUT_ERROR_CODES.idle || code === "MODEL_REQUEST_FAILED");
+  return typeof code === "string" && (code === REQUEST_TIMEOUT_ERROR_CODES["first-byte"] || code === REQUEST_TIMEOUT_ERROR_CODES.idle || code === "MODEL_REQUEST_FAILED" || code === MODEL_REQUEST_RETRY_EXHAUSTED);
 }
 
 export interface RequestDeadline {

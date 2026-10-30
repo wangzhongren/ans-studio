@@ -1856,7 +1856,7 @@ export interface RuntimeRequestFailureFactsV1 {
   attempts: number;
   /**
    * 失败时本回合**是否仍可安全重放**（true = 未产生任何 assistant 文本/thinking、工具调用或
-   * 客户交互副作用）。P3 起与字段名一致；P1 曾按 `turn.replayUnsafe`（true = 已有副作用）置值，
+   * 客户交互副作用）。P3 起与字段名一致；P1 曾按 `turn.replayUnsafe` 置值（历史极性与字段名相反），
    * P3 一并修正（P1/P2 e2e 的该字段断言同步更新）。
    */
   replaySafe: boolean;

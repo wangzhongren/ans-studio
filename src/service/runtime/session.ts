@@ -434,7 +434,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
               requestFailureTimeout = requestTimeoutFailureFacts(error);
               networkFailure = isNetworkOfflineFailure(error) ? networkOfflineFailureFacts(error) : undefined;
               const record = error instanceof Error ? error as Error & { code?: unknown; attempts?: unknown; replaySafe?: unknown } : undefined;
-              failureCode = typeof record?.code === "string" && (isRequestFailureCode(record.code) || record.code === MODEL_REQUEST_RETRY_EXHAUSTED || isNetworkOfflineFailure(error)) ? record.code : undefined;
+              failureCode = typeof record?.code === "string" && (isRequestFailureCode(record.code) || isNetworkOfflineFailure(error)) ? record.code : undefined;
               failureAttempts = requestFailureTimeout?.attempts ?? networkFailure?.attempts ?? (typeof record?.attempts === "number" && Number.isFinite(record.attempts) ? record.attempts : undefined);
               failureReplaySafe = requestFailureTimeout?.replaySafe ?? networkFailure?.replaySafe ?? (typeof record?.replaySafe === "boolean" ? record.replaySafe : undefined);
             }

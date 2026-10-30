@@ -40,11 +40,12 @@ const apiRetryFrame = (fields: { attempt: number; max_retries: number; retry_del
   type: "system", subtype: "api_retry", error: "server_error", uuid: randomUUID(), session_id: "fixture", ...fields,
 }) as unknown as SDKMessage;
 
-type ScriptContext = { client: Client; options: Options; user: SDKUserMessage };
+type ScriptContext = { client: Client; options: Options; user: SDKUserMessage; promptId: string; setResultFailure(text: string): void };
 type Script = (ctx: ScriptContext) => AsyncGenerator<SDKMessage, void, unknown>;
 
-/** 假 SDK 传输：真实 MCP 注册/PreToolUse/工具 handler；只有 query 是假的（与 request-timeout.test.ts 同口径）。 */
-function fake(script: Script) {
+/** 假 SDK 传输：真实 MCP 注册/PreToolUse/工具 handler；只有 query 是假的（与 request-timeout.test.ts 同口径）。
+ *  `setResultFailure(text)` 让本次 attempt 以 result 错误帧收尾（用于结果状态分类/预算边界探针）。 */
+function fake(script: Script, envOverrides: Record<string, string | undefined> = {}) {
   const configurations: Options[] = [];
   const users: SDKUserMessage[] = [];
   let openQueries = 0;
@@ -55,6 +56,8 @@ function fake(script: Script) {
     configurations.push(opts);
     openQueries += 1;
     maxConcurrentQueries = Math.max(maxConcurrentQueries, openQueries);
+    let resultFailure: string | undefined;
+    const setResultFailure = (text: string) => { resultFailure = text; };
     const client = new Client({ name: "replay-safe-retry-fixture", version: "1.0.0" });
     const server = opts.mcpServers!.ans;
     assert.equal(server.type, "sdk");
@@ -83,13 +86,19 @@ function fake(script: Script) {
         const promptText = typeof user.message.content === "string" ? user.message.content : user.message.content.filter((block) => block.type === "text").map((block) => (block as { text: string }).text).join("\n");
         await opts.hooks!.UserPromptSubmit![0]!.hooks[0]!({ hook_event_name: "UserPromptSubmit", prompt_id: nativePromptId, prompt: promptText, session_id: "fixture", transcript_path: "fixture", cwd: opts.cwd! }, undefined, { signal: opts.abortController!.signal });
         if (closed) break;
-        const sequence = script({ client, options: opts, user });
+        const sequence = script({ client, options: opts, user, promptId: nativePromptId!, setResultFailure });
         for await (const frame of sequence) {
           if (closed) break;
           yield frame;
         }
         if (closed) break;
-        yield { type: "result", subtype: "success", is_error: false, session_id: nativeId, user_message_uuid: user.uuid } as SDKMessage;
+        if (resultFailure !== undefined) {
+          const resultText = resultFailure;
+          resultFailure = undefined;
+          yield { type: "result", subtype: "error_during_execution", is_error: true, session_id: nativeId, user_message_uuid: user.uuid, result: resultText } as unknown as SDKMessage;
+        } else {
+          yield { type: "result", subtype: "success", is_error: false, session_id: nativeId, user_message_uuid: user.uuid } as SDKMessage;
+        }
       }
     })();
     return Object.assign(generator, {
@@ -105,7 +114,7 @@ function fake(script: Script) {
     configurations,
     users,
     get maxConcurrentQueries() { return maxConcurrentQueries; },
-    dependencies: { env: environment, loadSdk: async () => ({ createSdkMcpServer, query }), loadZod: async () => z },
+    dependencies: { env: { ...environment, ...envOverrides }, loadSdk: async () => ({ createSdkMcpServer, query }), loadZod: async () => z },
   };
 }
 
@@ -422,6 +431,228 @@ test("SDK api_retry 期间 ANS 不并发重试；SDK 最终失败后才 replay-s
       const records = await diagnosticEvents(dir);
       assert.equal(records.filter((record) => record.event === "request.retry").length, 1);
       assert.ok(records.some((record) => record.event === "request.sdk-retry" && record.attempt === 1), "SDK 重试诊断仍可见");
+      await session.dispose();
+    });
+  });
+});
+
+test("结果帧状态分类：408/425/429/5xx/无状态文本/空文本均可重试（重开后成功）", async () => {
+  const cases: Array<[string, string]> = [
+    ["API Error: 408 upstream timeout", "408"],
+    ["API Error: 425 too early", "425"],
+    ["API Error: 429 rate limited", "429"],
+    ["API Error: 500 upstream unstable", "500"],
+    ["API Error: 503 unavailable", "503"],
+    ["upstream temporarily unavailable", "no-status"],
+    ["", "empty"],
+  ];
+  for (const [text, label] of cases) {
+    await withDiagnostics(async (dir) => {
+      await fixture(async (root) => {
+        let calls = 0;
+        const engine = fake(async function* ({ setResultFailure }) {
+          calls += 1;
+          if (calls === 1) { setResultFailure(text); return; }
+          yield assistantFrame([{ type: "text", text: "状态分类重试成功" }]);
+        });
+        const session = await createClaudeRuntimeAdapter(options(root, [], { requestRetryBaseMs: 10 }), engine.dependencies).bindRole(role);
+        const eventsPromise = collect(session);
+        await session.prompt(`状态分类 ${label}`);
+        const events = await eventsPromise;
+        assert.equal(detailOf(settledEvents(events)[0]!).outcome, "completed", label);
+        assert.equal(detailOf(settledEvents(events)[0]!).attempts, 2, label);
+        assert.equal(engine.configurations.length, 2, `${label}: 应重试一次`);
+        const records = await diagnosticEvents(dir);
+        assert.equal(records.filter((record) => record.event === "request.retry").length, 1, label);
+        await session.dispose();
+      });
+    });
+  }
+});
+
+test("结果帧确定性 4xx（400/401/403/422）不重试：queries=1、MODEL_REQUEST_FAILED、replaySafe=true", async () => {
+  const cases: Array<[string, string]> = [
+    ["API Error: 400 plain invalid request", "400"],
+    ["API Error: 401 authentication failed", "401"],
+    ["API Error: 403 forbidden", "403"],
+    ["API Error: 422 unprocessable entity", "422"],
+  ];
+  for (const [text, label] of cases) {
+    await withDiagnostics(async (dir) => {
+      await fixture(async (root) => {
+        let calls = 0;
+        const engine = fake(async function* ({ setResultFailure }) {
+          calls += 1;
+          if (calls === 1) { setResultFailure(text); return; }
+          yield assistantFrame([{ type: "text", text: "不应到达" }]);
+        });
+        const session = await createClaudeRuntimeAdapter(options(root, [], { requestRetryBaseMs: 10 }), engine.dependencies).bindRole(role);
+        const eventsPromise = collect(session);
+        const failure = await session.prompt(`确定性 ${label}`).then(() => undefined, (error: unknown) => error as Error & { code?: string; attempts?: number; replaySafe?: boolean });
+        assert.equal(failure?.code, "MODEL_REQUEST_FAILED", label);
+        assert.equal(failure?.attempts, 1, label);
+        assert.equal(failure?.replaySafe, true, label);
+        const events = await eventsPromise;
+        assert.equal(settledEvents(events).length, 1);
+        assert.equal(engine.configurations.length, 1, `${label}: 确定性 4xx 不重试`);
+        assert.equal(engine.users.length, 1);
+        const records = await diagnosticEvents(dir);
+        assert.equal(records.filter((record) => record.event === "request.retry").length, 0, label);
+        await session.dispose();
+      });
+    });
+  }
+});
+
+test("thinking / redacted_thinking 后失败 ⇒ 不重试（replaySafe=false、无 request.retry）", async () => {
+  const cases: Array<[string, unknown[]]> = [
+    ["thinking", [{ type: "thinking", thinking: "先推理一段" }]],
+    ["redacted_thinking", [{ type: "redacted_thinking", data: "fixture-redacted" }]],
+  ];
+  for (const [label, blocks] of cases) {
+    await withDiagnostics(async (dir) => {
+      await fixture(async (root) => {
+        const engine = fake(async function* () {
+          yield assistantFrame(blocks);
+          throw new Error(`fixture stream down after ${label}`);
+        });
+        const session = await createClaudeRuntimeAdapter(options(root, [], { requestRetryBaseMs: 10 }), engine.dependencies).bindRole(role);
+        const eventsPromise = collect(session);
+        const failure = await session.prompt(`${label} 后失败`).then(() => undefined, (error: unknown) => error as Error & { code?: string; attempts?: number; replaySafe?: boolean });
+        assert.equal(failure?.code, "MODEL_REQUEST_FAILED", label);
+        assert.equal(failure?.attempts, 1, label);
+        assert.equal(failure?.replaySafe, false, label);
+        assert.equal(settledEvents(await eventsPromise).length, 1);
+        assert.equal(engine.configurations.length, 1, `${label}: 已产生 thinking 副作用后绝不重放`);
+        const records = await diagnosticEvents(dir);
+        assert.equal(records.filter((record) => record.event === "request.retry").length, 0, label);
+        await session.dispose();
+      });
+    });
+  }
+});
+
+test("原生 WebSearch 工具使用后失败 ⇒ 不重试（tool_use 即 replayUnsafe）", async () => {
+  await withDiagnostics(async (dir) => {
+    await fixture(async (root) => {
+      const engine = fake(async function* () {
+        yield assistantFrame([{ type: "tool_use", id: "ws-1", name: "WebSearch", input: { query: "fixture" } }]);
+        throw new Error("fixture stream down after native websearch");
+      }, { ANS_CLAUDE_WEB_SEARCH: "1" });
+      const session = await createClaudeRuntimeAdapter(options(root, [], { requestRetryBaseMs: 10 }), engine.dependencies).bindRole(role);
+      const eventsPromise = collect(session);
+      const failure = await session.prompt("原生工具后失败").then(() => undefined, (error: unknown) => error as Error & { code?: string; attempts?: number; replaySafe?: boolean });
+      assert.equal(failure?.code, "MODEL_REQUEST_FAILED");
+      assert.equal(failure?.attempts, 1);
+      assert.equal(failure?.replaySafe, false);
+      assert.equal(settledEvents(await eventsPromise).length, 1);
+      assert.equal(engine.configurations.length, 1, "原生工具使用后绝不重放");
+      const records = await diagnosticEvents(dir);
+      assert.equal(records.filter((record) => record.event === "request.retry").length, 0);
+      await session.dispose();
+    });
+  });
+});
+
+test("PreToolUse 放行（外来 MCP）后失败 ⇒ 不重试（放行即 replayUnsafe）", async () => {
+  await withDiagnostics(async (dir) => {
+    await fixture(async (root) => {
+      const engine = fake(async function* ({ options: config, promptId }) {
+        const hook = config.hooks!.PreToolUse![0]!.hooks[0]!;
+        const result = await hook({ hook_event_name: "PreToolUse", prompt_id: promptId, tool_name: "mcp__ext__probe", tool_input: { value: 1 }, tool_use_id: "tu-ext-1", session_id: "fixture", transcript_path: "fixture", cwd: config.cwd!, mcp_server: { name: "ext", source: "dynamic" } }, "tu-ext-1", { signal: config.abortController!.signal }) as { hookSpecificOutput?: { permissionDecision?: string } };
+        assert.equal(result.hookSpecificOutput?.permissionDecision, "allow", "外来 MCP PreToolUse 应放行");
+        throw new Error("fixture stream down after pretooluse");
+      });
+      const session = await createClaudeRuntimeAdapter(options(root, [], { requestRetryBaseMs: 10, installedMcpServers: [{ name: "ext", command: process.execPath, args: [] }] }), engine.dependencies).bindRole(role);
+      const eventsPromise = collect(session);
+      const failure = await session.prompt("PreToolUse 后失败").then(() => undefined, (error: unknown) => error as Error & { code?: string; attempts?: number; replaySafe?: boolean });
+      assert.equal(failure?.code, "MODEL_REQUEST_FAILED");
+      assert.equal(failure?.attempts, 1);
+      assert.equal(failure?.replaySafe, false);
+      assert.equal(settledEvents(await eventsPromise).length, 1);
+      assert.equal(engine.configurations.length, 1, "PreToolUse 放行后绝不重放");
+      const records = await diagnosticEvents(dir);
+      assert.equal(records.filter((record) => record.event === "request.retry").length, 0);
+      await session.dispose();
+    });
+  });
+});
+
+test("预算边界（F1）：剩余预算 < 退避 delay ⇒ 不发起第二次 attempt（queries=1、如实耗尽）", async () => {
+  await withDiagnostics(async (dir) => {
+    await fixture(async (root) => {
+      let calls = 0;
+      const engine = fake(async function* ({ setResultFailure }) {
+        calls += 1;
+        if (calls === 1) { setResultFailure("API Error: 500 upstream unstable"); return; }
+        yield assistantFrame([{ type: "text", text: "不应到达" }]);
+      });
+      // 预算 50ms、退避 200ms：首次失败后剩余预算不足以覆盖退避 ⇒ 不得发起第二次 attempt。
+      const session = await createClaudeRuntimeAdapter(options(root, [], { requestRetryBaseMs: 200, requestRetryBudgetMs: 50 }), engine.dependencies).bindRole(role);
+      const eventsPromise = collect(session);
+      const failure = await session.prompt("预算边界 F1").then(() => undefined, (error: unknown) => error as Error & { code?: string; attempts?: number; replaySafe?: boolean });
+      assert.equal(failure?.code, "MODEL_REQUEST_RETRY_EXHAUSTED");
+      assert.equal(failure?.attempts, 1, "预算边界不得启动第二次 attempt");
+      assert.equal(failure?.replaySafe, true);
+      const events = await eventsPromise;
+      assert.equal(settledEvents(events).length, 1);
+      assert.equal(engine.configurations.length, 1, "queries=1（F1 验收探针）");
+      assert.equal(engine.users.length, 1);
+      assert.equal(events.filter((event) => event.kind === "message" && (event.detail as { reasonCode?: unknown } | undefined)?.reasonCode === "claude-request-retry").length, 0, "未发起 attempt 不得宣布重试");
+      const records = await diagnosticEvents(dir);
+      assert.equal(records.filter((record) => record.event === "request.retry").length, 0);
+      const failed = records.find((record) => record.event === "request.failed");
+      assert.equal(failed?.errorCode, "MODEL_REQUEST_RETRY_EXHAUSTED");
+      assert.equal(failed?.attempt, 1);
+      await session.dispose();
+    });
+  });
+});
+
+test("1h 护栏边界：剩余 1h 不足以覆盖退避 delay ⇒ 不发起 attempt、如实耗尽", async () => {
+  await withDiagnostics(async (dir) => {
+    await fixture(async (root) => {
+      let calls = 0;
+      const engine = fake(async function* ({ setResultFailure }) {
+        calls += 1;
+        if (calls === 1) { setResultFailure("API Error: 500 upstream unstable"); return; }
+        yield assistantFrame([{ type: "text", text: "不应到达" }]);
+      });
+      // 1h 护栏仅剩 150ms、退避 200ms：不得发起第二次 attempt（不能跨过最后兜底）。
+      const session = await createClaudeRuntimeAdapter(options(root, [], { requestRetryBaseMs: 200, turnLastResortMs: 150 }), engine.dependencies).bindRole(role);
+      const eventsPromise = collect(session);
+      const failure = await session.prompt("1h 护栏边界").then(() => undefined, (error: unknown) => error as Error & { code?: string; attempts?: number; replaySafe?: boolean });
+      assert.equal(failure?.code, "MODEL_REQUEST_RETRY_EXHAUSTED");
+      assert.equal(failure?.attempts, 1);
+      assert.equal(settledEvents(await eventsPromise).length, 1);
+      assert.equal(engine.configurations.length, 1);
+      const records = await diagnosticEvents(dir);
+      assert.equal(records.filter((record) => record.event === "request.retry").length, 0);
+      await session.dispose();
+    });
+  });
+});
+
+test("退避期间转离线 ⇒ 退避后不启动 attempt、不写 request.retry/角色日志", async () => {
+  await withDiagnostics(async (dir) => {
+    await fixture(async (root) => {
+      const networkGate = createNetworkGate();
+      const engine = fake(async function* () { throw new Error("fixture stream down before backoff"); });
+      const session = await createClaudeRuntimeAdapter(options(root, [], { requestRetryBaseMs: 500, networkGate, networkRetryWindowMs: 60_000 }), engine.dependencies).bindRole(role);
+      const eventsPromise = collect(session);
+      const pending = session.prompt("退避转离线").then(() => undefined, (error: unknown) => error as Error & { code?: string; attempts?: number; replaySafe?: boolean });
+      await delay(100); // 首次失败已发生、正处 500ms 退避窗口
+      networkGate.apply({ online: false, source: "main-net", at: Date.now(), stableForMs: 0, reason: "interface-down" });
+      const failure = await pending;
+      assert.equal(failure?.code, "MODEL_REQUEST_FAILED", "离线不标重试耗尽；P2 路径负责离线语义");
+      assert.equal(failure?.attempts, 1);
+      assert.equal(failure?.replaySafe, true);
+      const events = await eventsPromise;
+      assert.equal(settledEvents(events).length, 1);
+      assert.equal(engine.configurations.length, 1, "退避后离线不得启动 attempt");
+      assert.equal(events.filter((event) => event.kind === "message" && (event.detail as { reasonCode?: unknown } | undefined)?.reasonCode === "claude-request-retry").length, 0, "未发起 attempt 不得宣布重试");
+      const records = await diagnosticEvents(dir);
+      assert.equal(records.filter((record) => record.event === "request.retry").length, 0);
       await session.dispose();
     });
   });

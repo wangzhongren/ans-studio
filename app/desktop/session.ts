@@ -2786,7 +2786,7 @@ export class SessionManager {
                 // 只用于人话系统行 + lastTurn 小状态；**不**进入客户可见文案（不显示技术 code/堆栈/URL）。
                 // P2：网络离线超窗（`network-offline-timeout`）同口径，用网络人话文案。
                 const settledErrorCodeRaw = (ev.detail as { errorCode?: unknown } | undefined)?.errorCode;
-                const settledErrorCode = typeof settledErrorCodeRaw === "string" && (isRequestFailureCode(settledErrorCodeRaw) || settledErrorCodeRaw === MODEL_REQUEST_RETRY_EXHAUSTED || isNetworkOfflineFailureCode(settledErrorCodeRaw)) ? settledErrorCodeRaw : undefined;
+                const settledErrorCode = typeof settledErrorCodeRaw === "string" && (isRequestFailureCode(settledErrorCodeRaw) || isNetworkOfflineFailureCode(settledErrorCodeRaw)) ? settledErrorCodeRaw : undefined;
                 void this.mirrorGovernanceFeedback(projectRoot, runtime, roleId, {
                   ...(settledOrigin?.flowIds !== undefined && settledOrigin.flowIds.length > 0 ? { flowIds: settledOrigin.flowIds } : {}),
                   ...(settledOutcome !== undefined ? { outcome: settledOutcome } : {}),

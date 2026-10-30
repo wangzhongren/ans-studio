@@ -39,7 +39,7 @@ test("settled(failed) 终态行：可见文本 = 人话 summary；errorCode 不�
     turnId: "turn-1",
     runtime: "claude",
     roleId: "A",
-    detail: { turnId: "turn-1", outcome: "failed", errorCode: "request-timeout-first-byte", attempts: 1, replaySafe: false, timeoutKind: "first-byte" },
+    detail: { turnId: "turn-1", outcome: "failed", errorCode: "request-timeout-first-byte", attempts: 1, replaySafe: true, timeoutKind: "first-byte" },
   });
   assert.ok(row);
   assert.equal(row!.kind, "turn-terminal");

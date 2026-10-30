@@ -19,7 +19,7 @@ import {
   requestTimeoutSummary,
   type RequestDeadlineClock,
 } from "../../src/common/runtime-core/request-timeout.ts";
-import { MODEL_REQUEST_FAILED, REQUEST_TIMEOUT_ERROR_CODES } from "../../src/model/runtime.ts";
+import { MODEL_REQUEST_FAILED, MODEL_REQUEST_RETRY_EXHAUSTED, REQUEST_TIMEOUT_ERROR_CODES } from "../../src/model/runtime.ts";
 
 /** 可推进的假时钟：setTimeout 只登记，advance 按到期时刻依次触发。 */
 function fakeClock(): RequestDeadlineClock & { advance(ms: number): void; pending(): number } {
@@ -95,6 +95,15 @@ test("首字节：到点触发 first-byte，有效耗时如实；错误名不是
     timeoutKind: "first-byte",
   });
   assert.equal(isRequestTimeoutFailure(new Error("x")), false);
+});
+
+test("isRequestFailureCode：已知请求失败码包含 P3 重试耗尽；未知码不误收", () => {
+  for (const code of [REQUEST_TIMEOUT_ERROR_CODES["first-byte"], REQUEST_TIMEOUT_ERROR_CODES.idle, MODEL_REQUEST_FAILED, MODEL_REQUEST_RETRY_EXHAUSTED]) {
+    assert.equal(isRequestFailureCode(code), true, code);
+  }
+  for (const code of ["network-offline-timeout", "TURN_LAST_RESORT", "", undefined, null, 42]) {
+    assert.equal(isRequestFailureCode(code), false, String(code));
+  }
 });
 
 test("流空闲：首条消息关闭首字节；后续每条消息重置 idle；未超时（长回合）不被误杀", () => {
