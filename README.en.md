@@ -258,9 +258,15 @@ Current public version: **v1.8.0** (released 2026-10-30). The bundle ships with 
 Verify SHA256 before launching: on macOS, run `shasum -a 256 -c SHA256SUMS-darwin-arm64.txt` in the download directory (use `SHA256SUMS-darwin-x64.txt` for Intel); on Windows PowerShell, run `Get-FileHash .\ANS-Studio-1.8.0-win-x64.zip -Algorithm SHA256` and compare it with `SHA256SUMS-win32-x64.txt`.
 
 <details>
-<summary>v1.8.0 SHA256 (filled in after release)</summary>
+<summary>v1.8.0 SHA256 and provenance</summary>
 
-The v1.8.0 SHA256 values cannot be known before the build: they are back-filled/verified after release from the Release's `SHA256SUMS-darwin-arm64.txt`, `SHA256SUMS-darwin-x64.txt`, `SHA256SUMS-win32-x64.txt`, and `SHA256SUMS-overlay.txt`.
+| Artifact | SHA256 |
+| --- | --- |
+| `ANS-Studio-1.8.0-mac-arm64.zip` | `5a4944d9675d698e72d0303996a3f0e4634a19539dbc3cbf8b71ffffa5f97a68` |
+| `ANS-Studio-1.8.0-mac-x64.zip` | `e79ef4735290420da934d995ef47f4d3d31193268dbd820e0b8eca436c01cdf0` |
+| `ANS-Studio-1.8.0-win-x64.zip` | `5a2c99d467dd0b9ae39dac4bc3c0676bbdd0cb72b935e13958783658b5052249` |
+| `overlay.patch` | `fc21fd89a12561f0b6f963c4a6f8e42060906e658a3dec40b4b96d0f52cf1e34` |
+| `release-provenance.json` | `0d0738c60a7dcdbeabea879b06403e9adfb07515b0765b243a1f1d6faf579571` |
 
 [SHA256SUMS-overlay.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/SHA256SUMS-overlay.txt), [release-provenance.json](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/release-provenance.json), and [overlay.patch](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/overlay.patch) record the frozen source and packaging adaptations; see [this release record](角色卡/装配/docs/change/2026-10-30_change_release-v1.8.0-prepare.md) for provenance verification.
 

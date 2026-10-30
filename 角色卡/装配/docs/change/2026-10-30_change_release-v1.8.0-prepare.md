@@ -20,6 +20,9 @@ events:
   - date: "2026-10-30"
     kind: fixed
     summary: 首轮 CI 失败（T1×3 + macOS 3 处 + Windows C-04）；修复 fb0bd78 落 main 并加入 overlay 白名单，重跑 CI
+  - date: "2026-10-30"
+    kind: released
+    summary: CI #3（run 41018151118）三平台 + release job 全过；v1.8.0 正式发布，12 资产与 SHA256 已回填
 ---
 
 # v1.8.0 发布准备
@@ -73,10 +76,16 @@ events:
 
 上述切换已随本轮提交完成（tag v1.8.0 = `6211e08`）；prepare 预演（overlayPaths / actualTree / overlayPatchSha256）以 CI 构建产生的 provenance 为准，随发布回填。
 
-## CI、资产与 SHA（待回填）
+## CI、资产与 SHA（已回填）
 
-- 三平台 CI run：**待触发/待回填**；不编造 run id。
-- 资产：`ANS-Studio-1.8.0-mac-arm64.zip`、`ANS-Studio-1.8.0-mac-x64.zip`、`ANS-Studio-1.8.0-win-x64.zip`，以及各平台 `SHA256SUMS-*.txt`、`SHA256SUMS-overlay.txt`、`release-provenance.json`、`overlay.patch`；SHA256 在构建完成前未知，**未预填**，发布后由 Release 校验文件回填/核对。
+- **CI #3（run 41018151118）**：macOS arm64 / macOS x64 / Windows x64 三个 build job 与 release job 全部 success；draft 12 资产齐备（3 ZIP + 4 SHA256SUMS + 3 manifest + overlay.patch + release-provenance.json），release job 已执行 `sha256sum -c` 校验。
+- **发布**：`v1.8.0` 已去 draft 正式发布：https://github.com/wangzhongren/ans-studio/releases/tag/v1.8.0
+- **资产 SHA256**：
+  - `ANS-Studio-1.8.0-mac-arm64.zip`：`5a4944d9675d698e72d0303996a3f0e4634a19539dbc3cbf8b71ffffa5f97a68`
+  - `ANS-Studio-1.8.0-mac-x64.zip`：`e79ef4735290420da934d995ef47f4d3d31193268dbd820e0b8eca436c01cdf0`
+  - `ANS-Studio-1.8.0-win-x64.zip`：`5a2c99d467dd0b9ae39dac4bc3c0676bbdd0cb72b935e13958783658b5052249`
+  - `overlay.patch`：`fc21fd89a12561f0b6f963c4a6f8e42060906e658a3dec40b4b96d0f52cf1e34`（与本地预演 overlayPatchSha256 一致，provenance 复核通过）
+  - `release-provenance.json`：`0d0738c60a7dcdbeabea879b06403e9adfb07515b0765b243a1f1d6faf579571`
 - 三平台运行包**未签名、未公证**（同 v1.7.0 形态）：macOS 未公证、Windows 未做代码签名。
 
 ## 证据边界
@@ -97,4 +106,4 @@ events:
 - **overlay 白名单**：`release-policy.mjs` files 增上述 5 条精确路径；`release-packaging.test.ts` 增 v1.8.0 blocking-fix 批次用例；tag `v1.8.0` 未移动。
 - **第二轮 CI（run 41015368973）**：macOS x64 与 Windows 通过；macOS arm64 两处「写后即读」竞态——`request.resolved` 的幕僚通知行未落盘、派发投递后 `task.delivered` 未落盘。
 - **第三轮修复**：`cdbe54f`（父 `dce4a25`；2 文件 +34/−12）：`app/desktop/session.ts` 持久化 await（`notifyRequest` 可等待、request 生命周期三行 awaited、投递成功后 await `task.delivered` 与角色日志、拒绝路径 await `task.closed`；仅 handback `task.reported` 保留 fire-and-forget 并注明理由）；`test/测试/governance-e2e-auto/i-full-chain.test.ts` 以真实可读的 `task.delivered` 为观测点（断言不变）。白名单增 `test/测试/governance-e2e-auto/i-full-chain.test.ts`。本地：两文件 12 轮 48/48；七文件 55/49/0/6；全量 3065/3038/9/18；双 typecheck 0。
-- **CI 重跑 #3**：待触发 / 待回填。
+- **CI 重跑 #3（run 41018151118）**：macOS arm64 / macOS x64 / Windows x64 三个 build job 与 release job 全部 success；draft 12 资产齐备；`v1.8.0` 已正式发布。
