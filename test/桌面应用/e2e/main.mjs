@@ -284,14 +284,21 @@ function registerIpc() {
 }
 
 async function shot(name) {
-  try {
-    const img = await win.webContents.capturePage();
-    const p = path.join(OUTDIR, name);
-    fs.writeFileSync(p, img.toPNG());
-    return p;
-  } catch (err) {
-    return "capture-failed:" + (err && err.message);
+  // 首帧截图偶发 `UnknownVizError`（合成器首帧未就绪；P2 验收报告 F3 已登记为已知偶发）。
+  // 有界重试只补拍同一屏幕，不改变截图内容/断言；重试耗尽仍如实返回 capture-failed。
+  let lastError;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      const img = await win.webContents.capturePage();
+      const p = path.join(OUTDIR, name);
+      fs.writeFileSync(p, img.toPNG());
+      return p;
+    } catch (err) {
+      lastError = err;
+      await sleep(200);
+    }
   }
+  return "capture-failed:" + (lastError && lastError.message);
 }
 
 async function modalExists() {

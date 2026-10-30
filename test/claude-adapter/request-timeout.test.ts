@@ -120,9 +120,11 @@ const probeTool = (sleepMs: number): ToolDefinition => ({
   handler: async () => { await delay(sleepMs); return { ok: true, message: "probe done" }; },
 });
 
+// P3（2026-10-30）：P1 请求超时语义用 `requestAttemptMax: 1` 钉住（本文件不测 ANS 重试；
+// 重试由 test/claude-adapter/replay-safe-retry.test.ts 真实路径覆盖），保证超时终态/诊断断言不被重试改变。
 const options = (root: string, tools: readonly ToolDefinition[], overrides: Partial<RuntimeProviderOptions> = {}): RuntimeProviderOptions => ({
   runtime: "claude", projectRoot: root, skillRoot: root, tools, interactionGate: gate(), currentTurnId: () => undefined,
-  requestFirstByteTimeoutMs: 50, requestIdleTimeoutMs: 50, ...overrides,
+  requestFirstByteTimeoutMs: 50, requestIdleTimeoutMs: 50, requestAttemptMax: 1, ...overrides,
 });
 
 async function fixture(run: (root: string) => Promise<void>): Promise<void> {

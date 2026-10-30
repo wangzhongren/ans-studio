@@ -1,6 +1,6 @@
 // Public Service composition entry. Pipeline selects runtime and injects policy; Providers execute it.
 import { randomUUID, createHash } from "node:crypto";
-import { RuntimeDeliveryError, RUNTIME_VIEW_IMAGE_POLICY } from "../../model/runtime.ts";
+import { RuntimeDeliveryError, RUNTIME_VIEW_IMAGE_POLICY, MODEL_REQUEST_RETRY_EXHAUSTED } from "../../model/runtime.ts";
 import type { ResolvedRole } from "../../model/role.ts";
 import type {
   GovernedToolsOptions, PromptInputEventDetail, PromptOptions, RoleSession, RuntimeAdapter, RuntimeKind, RuntimeProviderFactory,
@@ -68,6 +68,18 @@ export interface RuntimeSessionOptions extends Omit<GovernedToolsOptions, "curre
   networkGate?: NetworkGate;
   /** P2 离线等待恢复窗口（毫秒；缺省 300000＝5min，测试/宿主可注入小值）。 */
   networkRetryWindowMs?: number;
+  /**
+   * P3（2026-10-30）**同回合 replay-safe 重试**：最多请求尝试次数（缺省 3＝首次 + 2 次重试；
+   * 实现 clamp 到 1..3）。仅在本回合无文本/thinking/工具/客户交互、在线且失败属请求/流层时生效；
+   * 不改变 1h 最后兜底/5min 看护/默认自动中止 0（Q2·Q3·Q11）。
+   */
+  requestAttemptMax?: number;
+  /** P3 指数退避基数（毫秒；缺省 1000；单次上限 `requestRetryMaxDelayMs` 缺省 8000）。 */
+  requestRetryBaseMs?: number;
+  /** P3 单次退避上限（毫秒；缺省 8000）。 */
+  requestRetryMaxDelayMs?: number;
+  /** P3 单回合所有 attempt 的总预算（毫秒；缺省 600000＝10min）；超出不再重试，终态 failed。 */
+  requestRetryBudgetMs?: number;
   /** Demo-only script; no SDK and no fallback for another runtime. */
   script?: ToolCall[];
 }
@@ -226,6 +238,12 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           // P2 网络状态门/恢复窗口：宿主（主进程 monitor）注入才生效；缺省 always-online。
           ...(options.networkGate !== undefined ? { networkGate: options.networkGate } : {}),
           ...(options.networkRetryWindowMs !== undefined ? { networkRetryWindowMs: options.networkRetryWindowMs } : {}),
+          // P3 replay-safe 同回合重试：宿主/测试注入才覆盖；缺省由 Claude 适配器用 3 attempts/
+          // 1s·2s 退避/10min 预算（Pi/Codex 不消费，本轮只回归）。
+          ...(options.requestAttemptMax !== undefined ? { requestAttemptMax: options.requestAttemptMax } : {}),
+          ...(options.requestRetryBaseMs !== undefined ? { requestRetryBaseMs: options.requestRetryBaseMs } : {}),
+          ...(options.requestRetryMaxDelayMs !== undefined ? { requestRetryMaxDelayMs: options.requestRetryMaxDelayMs } : {}),
+          ...(options.requestRetryBudgetMs !== undefined ? { requestRetryBudgetMs: options.requestRetryBudgetMs } : {}),
         };
         const factory = options.providerFactories?.[options.runtime] ?? (options.runtime === "demo"
           ? ((input: RuntimeProviderOptions) => createDemoRuntimeAdapter(input, options.script ?? [{ name: "write_file", args: { path: "src/evil.ts", content: "// 越界写入示例\n" } }]))
@@ -262,7 +280,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
       const queue = createEventQueue<SessionEvent>();
       const recordId = previous?.id ?? randomUUID();
       const createdAt = previous?.createdAt ?? new Date().toISOString();
-      type Turn = { plan?:DeliveryPlan; id: string; controller: AbortController; outcome: RuntimeTurnOutcome; outcomeLocked?: boolean; terminal: () => void; terminalPromise: Promise<void>; abortPromise?: Promise<void>; cleanupFailed?: boolean };
+      type Turn = { plan?:DeliveryPlan; id: string; controller: AbortController; outcome: RuntimeTurnOutcome; outcomeLocked?: boolean; terminal: () => void; terminalPromise: Promise<void>; abortPromise?: Promise<void>; cleanupFailed?: boolean; attempts?: number; replaySafe?: boolean };
       let active: Turn | undefined;
       let disposed = false;
       let quarantined = false;
@@ -311,8 +329,13 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             const turn = active;
             if (!turn || (event.turnId && event.turnId !== turn.id)) continue;
             if (event.kind === "settled") {
-              const outcome = (event.detail as { outcome?: unknown } | undefined)?.outcome;
+              const detail = event.detail as { outcome?: unknown; attempts?: unknown; replaySafe?: unknown } | undefined;
+              const outcome = detail?.outcome;
               if (!turn.outcomeLocked && ["failed", "aborted", "timed_out"].includes(String(outcome))) turn.outcome = outcome as RuntimeTurnOutcome;
+              // P3：适配器 settled.detail 的 attempts/replaySafe 如实带入本层终态 detail
+              // （成功但经过重试时也可见；失败时仍以错误结构化事实为准）。
+              if (typeof detail?.attempts === "number" && Number.isFinite(detail.attempts)) turn.attempts = detail.attempts;
+              if (typeof detail?.replaySafe === "boolean") turn.replaySafe = detail.replaySafe;
               turn.terminal();
             } else emit({ ...event, runtime: options.runtime, roleId: role.id, turnId: turn.id, detail: {
               ...(event.detail && typeof event.detail === "object" && !Array.isArray(event.detail) ? event.detail as Record<string, unknown> : event.detail === undefined ? {} : { value: event.detail }),
@@ -411,7 +434,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
               requestFailureTimeout = requestTimeoutFailureFacts(error);
               networkFailure = isNetworkOfflineFailure(error) ? networkOfflineFailureFacts(error) : undefined;
               const record = error instanceof Error ? error as Error & { code?: unknown; attempts?: unknown; replaySafe?: unknown } : undefined;
-              failureCode = typeof record?.code === "string" && (isRequestFailureCode(record.code) || isNetworkOfflineFailure(error)) ? record.code : undefined;
+              failureCode = typeof record?.code === "string" && (isRequestFailureCode(record.code) || record.code === MODEL_REQUEST_RETRY_EXHAUSTED || isNetworkOfflineFailure(error)) ? record.code : undefined;
               failureAttempts = requestFailureTimeout?.attempts ?? networkFailure?.attempts ?? (typeof record?.attempts === "number" && Number.isFinite(record.attempts) ? record.attempts : undefined);
               failureReplaySafe = requestFailureTimeout?.replaySafe ?? networkFailure?.replaySafe ?? (typeof record?.replaySafe === "boolean" ? record.replaySafe : undefined);
             }
@@ -426,7 +449,9 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             active = undefined;
             endedTurns.add(turn.id);
             provider.setTurn();
-            const event: SessionEvent = { kind: "settled", summary: turn.outcome === "completed" ? "会话结束" : turn.outcome === "aborted" ? "本轮已中止" : turn.outcome === "timed_out" ? (lastResortExpired ? "本轮超过最后兜底，已中止" : "本轮运行超时") : (networkFailure !== undefined ? networkOfflineSummary() : requestFailureTimeout !== undefined ? requestTimeoutSummary(requestFailureTimeout.timeoutKind) : "本轮运行失败"), runtime: options.runtime, roleId: role.id, turnId: turn.id, detail: { turnId: turn.id, outcome: turn.outcome, ...(turn.outcome === "failed" && failureCode !== undefined ? { errorCode: failureCode, ...(failureAttempts !== undefined ? { attempts: failureAttempts } : {}), ...(failureReplaySafe !== undefined ? { replaySafe: failureReplaySafe } : {}), ...(requestFailureTimeout !== undefined ? { timeoutKind: requestFailureTimeout.timeoutKind } : {}) } : {}) } };
+            // P3：重试耗尽 ≠ 网络失败；人话短报明说自动重试未成功（技术 code 只在 detail/诊断）。
+            const retryExhausted = failureCode === MODEL_REQUEST_RETRY_EXHAUSTED;
+            const event: SessionEvent = { kind: "settled", summary: turn.outcome === "completed" ? "会话结束" : turn.outcome === "aborted" ? "本轮已中止" : turn.outcome === "timed_out" ? (lastResortExpired ? "本轮超过最后兜底，已中止" : "本轮运行超时") : (networkFailure !== undefined ? networkOfflineSummary() : retryExhausted ? "本轮自动重试仍未成功，已结束。" : requestFailureTimeout !== undefined ? requestTimeoutSummary(requestFailureTimeout.timeoutKind) : "本轮运行失败"), runtime: options.runtime, roleId: role.id, turnId: turn.id, detail: { turnId: turn.id, outcome: turn.outcome, ...(turn.outcome === "failed" && failureCode !== undefined ? { errorCode: failureCode, ...(failureAttempts !== undefined ? { attempts: failureAttempts } : {}), ...(failureReplaySafe !== undefined ? { replaySafe: failureReplaySafe } : {}), ...(requestFailureTimeout !== undefined ? { timeoutKind: requestFailureTimeout.timeoutKind } : {}) } : {}), ...(turn.outcome === "completed" && (turn.attempts ?? 1) > 1 ? { attempts: turn.attempts, ...(turn.replaySafe !== undefined ? { replaySafe: turn.replaySafe } : {}) } : {}) } };
             emit(event,plan,!plan);
             await pendingPersist;
             const record: RuntimeSessionRecord = { version: 1, id: recordId, roleId: role.id, runtime: options.runtime, contextSource: wrapper.contextSource ?? "fresh", nativeSessionId: wrapper.nativeSessionId, contextWarning: plan&&wrapper.contextWarning?provider.display.protectText(wrapper.contextWarning,4096).text:wrapper.contextWarning, createdAt, updatedAt: new Date().toISOString() };

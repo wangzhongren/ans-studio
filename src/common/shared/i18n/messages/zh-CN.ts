@@ -1020,6 +1020,8 @@ export const zhCN = {
   "main.requestStatus.timeoutFirstByte": "请求超时：长时间没有收到模型响应；本轮已结束，可稍后重发。",
   "main.requestStatus.timeoutIdle": "请求超时：模型响应长时间中断；本轮已结束，可稍后重发。",
   "main.requestStatus.failed": "本轮请求失败，已结束；请检查后重发。",
+  // P3 同回合 replay-safe 重试耗尽的系统行（客户可见人话；`MODEL_REQUEST_RETRY_EXHAUSTED` 只在诊断/detail）。
+  "main.requestStatus.retryExhausted": "已自动重试仍未成功；本轮已结束，可稍后重发。",
   // P2 网络离线超窗的系统行（客户可见人话；`network-offline-timeout` 只在诊断/detail）。
   "main.networkStatus.offlineTimeout": "网络已断开，等待恢复超时；本轮已结束，可稍后重发。",
   "main.session.rebuiltBoundary":

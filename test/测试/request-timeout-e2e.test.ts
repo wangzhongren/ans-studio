@@ -112,6 +112,9 @@ async function runTimeoutE2e(mode: "never" | "after-first-frame"): Promise<{ eve
           providerFactories: { claude: (providerOptions) => createClaudeRuntimeAdapter(providerOptions, fake.dependencies) },
           requestFirstByteTimeoutMs: 40,
           requestIdleTimeoutMs: 40,
+          // P3（2026-10-30）：本文件钉住 P1 请求超时语义（无 ANS 重试）；P3 重试由
+          // test/测试/retry-safety-e2e.test.ts 真实路径覆盖。
+          requestAttemptMax: 1,
         },
       },
     );
@@ -144,7 +147,9 @@ test("e2e 首字节超时：service+编排透传 failed/errorCode；恰一条 se
   assert.equal(detail.outcome, "failed", "请求超时终态是 failed（不是最后兜底 timed_out）");
   assert.equal(detail.errorCode, "request-timeout-first-byte");
   assert.equal(detail.attempts, 1);
-  assert.equal(detail.replaySafe, false);
+  // P3（2026-10-30）修正 replaySafe 极性：true = 本回合仍可安全重放（无文本/工具/客户交互副作用）。
+  // P1 曾按 turn.replayUnsafe 置值；本断言随 P3 契约修正同步更新（安全超时 ⇒ true）。
+  assert.equal(detail.replaySafe, true);
   assert.equal(detail.timeoutKind, "first-byte");
   assert.equal(result.events.filter((event) => event.kind === "handback").length, 0, "失败回合不得产生 handback（重试属 P3）");
   assert.equal(result.users, 1, "ANS 只发一次请求输入（SDK 重试期间不并发重试；P1 无 ANS 重试）");

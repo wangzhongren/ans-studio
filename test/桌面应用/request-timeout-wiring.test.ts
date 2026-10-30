@@ -144,20 +144,24 @@ async function diagnosticEvents(dir: string): Promise<DiagRecord[]> {
 const NOTE = (envelopes: Envelope[]): Envelope[] => envelopes.filter((env) =>
   env.event.kind === "message" && (env.event.detail as { source?: unknown } | undefined)?.source === "delivery-note");
 
-/** 失败回合脚本：ACK 开轮 → 留出观察窗（开跑即外推 busy）→ 推 settled(failed + errorCode) → 挂起（让 consume 先处理终态）→ 释放后抛错。 */
-function failedTurn(h: Harness, roleId: string, turnId: string, errorCode: string, summary: string, timeoutKind?: string): { gate: ReturnType<typeof deferred>; pending: Promise<unknown> } {
+/** 失败回合脚本：ACK 开轮 → 留出观察窗 → 推 settled(failed + errorCode) → 挂起（让 consume 先处理终态）→ 释放后抛错。
+ *  `started` 在真实投递进入时结算——测试据此等待「已开跑」，不依赖瞬时 busy=true 快照（高负载下会被下一次
+ *  settled/队列放行覆盖而漏看；P2 证据 §七-10 已登记该文件时序脆弱，P3 以强终态观察替换）。 */
+function failedTurn(h: Harness, roleId: string, turnId: string, errorCode: string, summary: string, timeoutKind?: string): { gate: ReturnType<typeof deferred>; pending: Promise<unknown>; started: Promise<void> } {
   const gate = deferred();
+  const started = deferred();
   h.behaviors[roleId].push(async (ctx) => {
     ctx.opts?.onTurnStarted?.({ turnId, roleId, runtime: "demo" });
-    await tick(30); // 观察窗：测试先看到 busy=true，再让 settled 到达
+    started.release();
+    await tick(30); // 观察窗：先让 settled 之前的状态可观察，再推终态
     h.streams[roleId].push({
       kind: "settled", summary, turnId, roleId, runtime: "demo",
-      detail: { turnId, outcome: "failed", errorCode, attempts: 1, replaySafe: false, ...(timeoutKind !== undefined ? { timeoutKind } : {}) },
+      detail: { turnId, outcome: "failed", errorCode, attempts: 1, replaySafe: true, ...(timeoutKind !== undefined ? { timeoutKind } : {}) },
     } as OrchestrationEvent);
     await gate.promise;
     throw new Error(`fixture: ${errorCode}`);
   });
-  return { gate, pending: h.mgr.send(`第 ${turnId} 轮`) };
+  return { gate, pending: h.mgr.send(`第 ${turnId} 轮`), started: started.promise };
 }
 
 test("首字节超时终态：恰一条人话系统行（无技术 code）；lastTurn/诊断带 errorCode；失败后队列继续", async () => {
@@ -167,12 +171,13 @@ test("首字节超时终态：恰一条人话系统行（无技术 code）；las
       await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
       await tick(30);
       const first = failedTurn(h, "A", "turn-A1", "request-timeout-first-byte", "本轮请求超时（首字节未返回）", "first-byte");
-      await until(() => h.latest("A")?.busy === true, "第一轮未开跑");
+      await first.started;
       // 失败终态后队列继续：第二轮在忙时入队，settle 后自动投递。
       h.behaviors.A.push(async (ctx) => { ctx.opts?.onTurnStarted?.({ turnId: "turn-A2", roleId: "A", runtime: "demo" }); });
       const second = h.mgr.send("第二轮");
       await until(() => (h.latest("A")?.queue.length ?? 0) === 1, "第二轮未入队");
-      await until(() => h.latest("A")?.busy === false, "settled 未复位 busy");
+      // 以强终态观察（系统行）等待 settled 被 consume 处理；busy 复位属 P0 turn-lease 专项断言。
+      await until(() => NOTE(h.envelopes).length === 1, "请求超时未产生系统行");
       const notes = NOTE(h.envelopes);
       assert.equal(notes.length, 1, "请求超时失败恰一条人话系统行");
       const text = String(notes[0]!.event.summary ?? "");
@@ -210,14 +215,14 @@ test("空闲超时与一般请求失败：各自人话系统行（不串文案�
       await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
       await tick(30);
       const idle = failedTurn(h, "A", "turn-B1", "request-timeout-idle", "本轮请求超时（响应空闲超时）", "idle");
-      await until(() => h.latest("A")?.busy === true, "空闲超时轮未开跑");
-      await until(() => h.latest("A")?.busy === false, "空闲超时 settled 未复位 busy");
+      await idle.started;
+      await until(() => NOTE(h.envelopes).length === 1, "空闲超时未产生系统行");
       idle.gate.release();
       await idle.pending;
       await tick(30);
       const failed = failedTurn(h, "A", "turn-B2", "MODEL_REQUEST_FAILED", "本轮运行失败");
-      await until(() => h.latest("A")?.busy === true, "请求失败轮未开跑");
-      await until(() => h.latest("A")?.busy === false, "请求失败 settled 未复位 busy");
+      await failed.started;
+      await until(() => NOTE(h.envelopes).length === 2, "一般失败未产生系统行");
       failed.gate.release();
       await failed.pending;
       await tick(30);
@@ -240,15 +245,18 @@ test("无 errorCode 的普通失败：不新增系统行（既有语义不变）
       await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
       await tick(30);
       const gate = deferred();
+      const started = deferred();
       h.behaviors.A.push(async (ctx) => {
         ctx.opts?.onTurnStarted?.({ turnId: "turn-C1", roleId: "A", runtime: "demo" });
+        started.release();
         h.streams.A.push({ kind: "settled", summary: "本轮运行失败", turnId: "turn-C1", roleId: "A", runtime: "demo", detail: { turnId: "turn-C1", outcome: "failed" } } as OrchestrationEvent);
         await gate.promise;
         throw new Error("fixture failure");
       });
       const pending = h.mgr.send("普通失败");
-      await until(() => h.latest("A")?.busy === true, "普通失败轮未开跑");
-      await until(() => h.latest("A")?.busy === false, "settled 未复位 busy");
+      await started.promise;
+      // 以强终态观察（lastTurn 落表）等待 settled 被 consume 处理；busy 复位属 P0 turn-lease 专项断言。
+      await until(() => h.mgr.lastTurnOf("/proj", "A", "demo")?.outcome === "failed", "settled 未处理");
       gate.release();
       await pending;
       await tick(30);

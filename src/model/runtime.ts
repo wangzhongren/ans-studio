@@ -1834,6 +1834,11 @@ export type RuntimeTurnOutcome = "completed" | "failed" | "aborted" | "timed_out
 export const MODEL_REQUEST_TIMEOUT = "MODEL_REQUEST_TIMEOUT";
 /** 请求级失败（非超时）：SDK 流/结果错误等；终态 failed，errorCode 如实。 */
 export const MODEL_REQUEST_FAILED = "MODEL_REQUEST_FAILED";
+/**
+ * P3（2026-10-30）同回合 replay-safe 重试耗尽：最后一次尝试仍是请求/流层失败。
+ * 终态 `failed`；只在结构化 detail/诊断中出现，**不得**进入客户可见文案。
+ */
+export const MODEL_REQUEST_RETRY_EXHAUSTED = "MODEL_REQUEST_RETRY_EXHAUSTED";
 /** 请求超时种类：首字节超时（尚无任何 SDK 消息）与流空闲超时（已有活动后静默）。 */
 export type RequestTimeoutKind = "first-byte" | "idle";
 export const REQUEST_TIMEOUT_ERROR_CODES: Readonly<Record<RequestTimeoutKind, string>> = Object.freeze({
@@ -1847,9 +1852,13 @@ export const REQUEST_TIMEOUT_ERROR_CODES: Readonly<Record<RequestTimeoutKind, st
 export interface RuntimeRequestFailureFactsV1 {
   version: 1;
   errorCode: string;
-  /** 本回合实际请求尝试次数（P1 恒为 1；P3 重试后递增）。 */
+  /** 本回合实际请求尝试次数（P1 恒为 1；P3 重试后递增，最多 3）。 */
   attempts: number;
-  /** 失败时是否已产生不可安全重放的副作用（文本/工具/客户交互）。 */
+  /**
+   * 失败时本回合**是否仍可安全重放**（true = 未产生任何 assistant 文本/thinking、工具调用或
+   * 客户交互副作用）。P3 起与字段名一致；P1 曾按 `turn.replayUnsafe`（true = 已有副作用）置值，
+   * P3 一并修正（P1/P2 e2e 的该字段断言同步更新）。
+   */
   replaySafe: boolean;
   timeoutKind?: RequestTimeoutKind;
 }
@@ -2151,6 +2160,23 @@ export interface RuntimeProviderOptions {
    * 离线持续超过该窗口 ⇒ 本轮 `failed`（errorCode `network-offline-timeout`），如实终态、不重放。
    */
   networkRetryWindowMs?: number;
+  /**
+   * P3（2026-10-30）**同回合 replay-safe 重试**：最多请求尝试次数（缺省 3＝首次 + 2 次重试；
+   * 实现 clamp 到 1..3，注入不能放宽上限）。仅当本回合尚无文本/thinking/工具/客户交互、网络在线、
+   * 失败属请求/流层且未取消时，才在**同一 turn** 内关闭当前 query 后重开请求；任何副作用后绝不重放。
+   */
+  requestAttemptMax?: number;
+  /**
+   * P3 指数退避基数（毫秒；缺省 1000，即 1s/2s/4s 级别；单次上限见 `requestRetryMaxDelayMs`）。
+   */
+  requestRetryBaseMs?: number;
+  /** P3 单次退避上限（毫秒；缺省 8000）。 */
+  requestRetryMaxDelayMs?: number;
+  /**
+   * P3 单回合所有 attempt 的总预算（毫秒；缺省 600000＝10min）。超出不再重试，终态 `failed`；
+   * 与 1h 整轮最后兜底并存，不改变 `turnLastResortMs`/`promptTimeoutMs`/默认自动中止 0。
+   */
+  requestRetryBudgetMs?: number;
   /**
    * G-4 V2：该角色会话构造时装配的外来 MCP 声明（Service 在 providerFor 读取 `docs/mcp/**` 后注入；
    * **纯消费面**——适配器不得各自去找文件、不得写盘；缺省＝无声明可装配）。装配/放行/呈现属各平台

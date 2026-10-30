@@ -1124,6 +1124,8 @@ export const enUS = {
     "Request timed out: the model response stalled; this turn has ended and can be retried later.",
   "main.requestStatus.failed":
     "The request failed; this turn has ended and can be retried later.",
+  "main.requestStatus.retryExhausted":
+    "Automatic retries did not succeed; this turn has ended and can be retried later.",
   "main.networkStatus.offlineTimeout":
     "The network was disconnected and did not recover within the wait window; this turn has ended and can be retried later.",
   "main.session.rebuiltBoundary":

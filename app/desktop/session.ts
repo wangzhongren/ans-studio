@@ -1,4 +1,4 @@
-import { RuntimeDeliveryError, REQUEST_TIMEOUT_ERROR_CODES } from "../../src/model/runtime.ts";
+import { RuntimeDeliveryError, REQUEST_TIMEOUT_ERROR_CODES, MODEL_REQUEST_RETRY_EXHAUSTED } from "../../src/model/runtime.ts";
 import { isRequestFailureCode } from "../../src/common/runtime-core/request-timeout.ts";
 import { isNetworkOfflineFailureCode } from "../../src/common/runtime-core/network-gate.ts";
 import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1, DeliveryReceiptQueryV1, RuntimeDeliveryReceiptV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1, GovernanceJudgeContext, BackgroundTaskSnapshot, BackgroundTaskReadOptions, BackgroundTaskReadResult, BackgroundTaskStopOptions, BackgroundTaskStopResult, NetworkGate, NetworkState } from "../../src/model/runtime.ts";
@@ -2711,14 +2711,18 @@ export class SessionManager {
             const originMissing = !originMatchesRunning;
             const settledDiagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId });
             if (entry.busy || originMatchesRunning) {
-              const settledOutcomeRaw = (ev.detail as { outcome?: unknown; errorCode?: unknown } | undefined)?.outcome;
-              const settledErrorCodeRaw = (ev.detail as { outcome?: unknown; errorCode?: unknown } | undefined)?.errorCode;
+              const settledDetail = ev.detail as { outcome?: unknown; errorCode?: unknown; attempts?: unknown; replaySafe?: unknown } | undefined;
+              const settledOutcomeRaw = settledDetail?.outcome;
+              const settledErrorCodeRaw = settledDetail?.errorCode;
               settledDiagnostic.record("turn.settled", {
                 ...(eventTurnId !== undefined ? { turnId: eventTurnId } : {}),
                 state: originMissing ? "origin-missing" : "origin-matched",
                 busy: entry.busy,
                 ...(typeof settledOutcomeRaw === "string" ? { outcome: settledOutcomeRaw } : {}),
                 ...(typeof settledErrorCodeRaw === "string" ? { errorCode: settledErrorCodeRaw } : {}),
+                // P3：诊断沿用既有白名单字段承载 attempts/replaySafe（attempt←attempts、replayPlan←replaySafe）。
+                ...(typeof settledDetail?.attempts === "number" && Number.isFinite(settledDetail.attempts) ? { attempt: settledDetail.attempts } : {}),
+                ...(typeof settledDetail?.replaySafe === "boolean" ? { replayPlan: settledDetail.replaySafe ? "safe" : "unsafe" } : {}),
               });
             }
             if (originMissing && entry.busy) {
@@ -2782,7 +2786,7 @@ export class SessionManager {
                 // 只用于人话系统行 + lastTurn 小状态；**不**进入客户可见文案（不显示技术 code/堆栈/URL）。
                 // P2：网络离线超窗（`network-offline-timeout`）同口径，用网络人话文案。
                 const settledErrorCodeRaw = (ev.detail as { errorCode?: unknown } | undefined)?.errorCode;
-                const settledErrorCode = typeof settledErrorCodeRaw === "string" && (isRequestFailureCode(settledErrorCodeRaw) || isNetworkOfflineFailureCode(settledErrorCodeRaw)) ? settledErrorCodeRaw : undefined;
+                const settledErrorCode = typeof settledErrorCodeRaw === "string" && (isRequestFailureCode(settledErrorCodeRaw) || settledErrorCodeRaw === MODEL_REQUEST_RETRY_EXHAUSTED || isNetworkOfflineFailureCode(settledErrorCodeRaw)) ? settledErrorCodeRaw : undefined;
                 void this.mirrorGovernanceFeedback(projectRoot, runtime, roleId, {
                   ...(settledOrigin?.flowIds !== undefined && settledOrigin.flowIds.length > 0 ? { flowIds: settledOrigin.flowIds } : {}),
                   ...(settledOutcome !== undefined ? { outcome: settledOutcome } : {}),
@@ -2794,11 +2798,13 @@ export class SessionManager {
                   // 人话系统行（客户卡不出现技术模板/code）：来源 i18n；delivery-note 只呈现，不触发模型/门禁。
                   const human = isNetworkOfflineFailureCode(settledErrorCode)
                     ? mainT("main.networkStatus.offlineTimeout")
-                    : settledErrorCode === REQUEST_TIMEOUT_ERROR_CODES["first-byte"]
-                      ? mainT("main.requestStatus.timeoutFirstByte")
-                      : settledErrorCode === REQUEST_TIMEOUT_ERROR_CODES.idle
-                        ? mainT("main.requestStatus.timeoutIdle")
-                        : mainT("main.requestStatus.failed");
+                    : settledErrorCode === MODEL_REQUEST_RETRY_EXHAUSTED
+                      ? mainT("main.requestStatus.retryExhausted")
+                      : settledErrorCode === REQUEST_TIMEOUT_ERROR_CODES["first-byte"]
+                        ? mainT("main.requestStatus.timeoutFirstByte")
+                        : settledErrorCode === REQUEST_TIMEOUT_ERROR_CODES.idle
+                          ? mainT("main.requestStatus.timeoutIdle")
+                          : mainT("main.requestStatus.failed");
                   this.emitDeliveryNote(en.projectRoot, runtime, roleId, roleId, human);
                 }
                 this.observeWatchdog(en.projectRoot, {
