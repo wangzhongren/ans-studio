@@ -3121,7 +3121,7 @@ export class SessionManager {
     return `req-${digest}`;
   }
 
-  /** C 批：系统通知幕僚（按 requestId+event 去重；系统行不是客户卡/不是决定）。 */
+  /** C 批：系统通知幕僚（按 requestId+event 去重；系统行不是客户卡/不是决定）。返回可等待的落盘链。 */
   private notifyRequest(
     projectRoot: string,
     requestId: string,
@@ -3130,9 +3130,9 @@ export class SessionManager {
     event: "created" | "presented" | "resolved",
     detail?: string,
     after?: Promise<unknown>,
-  ): void {
+  ): Promise<void> {
     const key = `${requestId}\u0000${event}`;
-    if (this.requestNotifiedKeys.has(key)) return;
+    if (this.requestNotifiedKeys.has(key)) return Promise.resolve();
     this.requestNotifiedKeys.add(key);
     if (this.requestNotifiedKeys.size > 5000) {
       const oldest = this.requestNotifiedKeys.values().next().value;
@@ -3141,7 +3141,6 @@ export class SessionManager {
     const write = after !== undefined
       ? after.then(() => this.appendTaskState(projectRoot, taskEvent("request.notified", { requestId, to: "chief", event }, () => new Date(this.now()))))
       : this.appendTaskState(projectRoot, taskEvent("request.notified", { requestId, to: "chief", event }, () => new Date(this.now())));
-    void write;
     const labels: Record<typeof event, string> = { created: "已提交", presented: "已呈现", resolved: "已裁决" };
     const text = `[系统·申请] ${labels[event]}：角色「${sourceRoleId}」的申请「${shortenSummary(title, 80)}」（#${requestId}）${detail !== undefined && detail !== "" ? `｜${shortenSummary(detail, 120)}` : ""}。申请直达客户/应用裁决，幕僚不转发、不审批、不代选。`;
     try {
@@ -3156,6 +3155,7 @@ export class SessionManager {
     } catch (error) {
       createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: sourceRoleId }).error("request.notify.failed", error);
     }
+    return write.then(() => undefined, () => undefined);
   }
 
   private async recordRequestPresented(projectRoot: string, requestId: string, sourceRoleId: string, title: string, to: "customer" | "judge"): Promise<void> {
@@ -3163,7 +3163,7 @@ export class SessionManager {
     if (this.requestPresentedKeys.has(key)) return;
     this.requestPresentedKeys.add(key);
     await this.appendTaskState(projectRoot, taskEvent("request.presented", { requestId, to }, () => new Date(this.now())));
-    this.notifyRequest(projectRoot, requestId, sourceRoleId, title, "presented", to === "judge" ? "判断 agent" : "客户");
+    await this.notifyRequest(projectRoot, requestId, sourceRoleId, title, "presented", to === "judge" ? "判断 agent" : "客户");
   }
 
   /**
@@ -3512,7 +3512,7 @@ export class SessionManager {
           ...(metadata?.turnId !== undefined ? { turnId: metadata.turnId } : {}),
         }, () => new Date(this.now()))))
       : Promise.resolve(true);
-    this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "created", undefined, createdWrite);
+    const createdNotify = this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "created", undefined, createdWrite);
     let presented = false;
     let presentedWrite: Promise<void> | null = null;
     const markPresented = (to: "customer" | "judge"): Promise<void> => {
@@ -3529,17 +3529,20 @@ export class SessionManager {
       out = await raw(request, context, metadata);
     } catch (error) {
       await createdWrite;
+      await createdNotify;
+      if (presentedWrite !== null) await presentedWrite;
       await this.appendTaskState(projectRoot, taskEvent("request.resolved", {
         requestId,
         by: "customer",
         choice: "unavailable",
         reason: shortenSummary(error instanceof Error ? error.message : String(error), 200),
       }, () => new Date(this.now())));
-      this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "resolved", "通道异常（未执行）");
+      await this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "resolved", "通道异常（未执行）");
       throw error;
     }
     await createdWrite;
     await approvalWrite;
+    await createdNotify;
     const answeredOut = out !== null && out !== undefined && out.outcome === "answered" ? out : undefined;
     const judged = answeredOut !== undefined && (answeredOut.judge !== undefined || (typeof answeredOut.operatorId === "string" && answeredOut.operatorId.startsWith("judge:")));
     if (judged && !presented && answeredOut !== undefined) await markPresented("judge");
@@ -3584,7 +3587,7 @@ export class SessionManager {
         ...(judged && answeredOut?.judge !== undefined ? { judge: answeredOut.judge } : {}),
       }, () => new Date(this.now())));
     }
-    this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "resolved", judged ? `判断代批：${choice}` : choice);
+    await this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "resolved", judged ? `判断代批：${choice}` : choice);
     return out;
   }
 
@@ -4145,7 +4148,7 @@ export class SessionManager {
       },
     );
     if (plan.action === "reject") {
-      void this.appendTaskState(projectRoot, taskEvent("task.closed", {
+      await this.appendTaskState(projectRoot, taskEvent("task.closed", {
         taskId: newId,
         by: "chief",
         outcome: "rejected",
@@ -5781,7 +5784,7 @@ ${formatted}` };
       },
     );
     if (plan.action === "reject") {
-      void this.appendTaskState(projectRoot, taskEvent("task.closed", {
+      await this.appendTaskState(projectRoot, taskEvent("task.closed", {
         taskId,
         by: fromRoleId === this.handbackOwnerRoleId(projectRoot) ? "convener" : "chief",
         outcome: "rejected",
@@ -7046,11 +7049,13 @@ ${formatted}` };
             reports: latest?.reports.length ?? 0,
           });
         } else {
-          void this.appendTaskState(projectRoot, taskEvent("task.delivered", {
+          // durability（发布竞态修复）：投递成功后先落盘 task.delivered，再继续通知/收尾——
+          // 观察者读到「适配器已接收」时，任务的已投递状态应已可读（不改变“投递异步”的队列语义）。
+          await this.appendTaskState(projectRoot, taskEvent("task.delivered", {
             taskId: sent.taskId,
             to: resolvedTarget,
           }, () => new Date(this.now())));
-          this.appendRoleActivity(projectRoot, resolvedTarget, {
+          await this.appendRoleActivity(projectRoot, resolvedTarget, {
             kind: "task.delivered",
             summary: `收到任务 #${sent.taskId}`,
             taskId: sent.taskId,
