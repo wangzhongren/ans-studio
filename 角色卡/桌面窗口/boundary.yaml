@@ -166,6 +166,19 @@ entries:
   - kind: file
     path: test/桌面应用/chain-enforcement.test.ts
     purpose: 招人链/前置校验（意图文档→名单→D3→交付运营）负例与顺序断言
+  # --- Delta-W1-2（2026-10-30，第一波团队计划 §3.12/附录 B；闸门 2）：test/桌面应用/ 新增 4 个精确测试文件（run-pin/run-change/rejection-copy/acceptance-evidence），逐文件授权，无目录级授权 ---
+  - kind: file
+    path: test/桌面应用/run-pin.test.ts
+    purpose: 主进程侧测试：run 冻结——draft→pin 同 runId、pin 前 handoff 拒绝、pin 后只读 pinned、mid-run 新版本不激活与并发 pin，含 pin/run-change 负例（session/interface）
+  - kind: file
+    path: test/桌面应用/run-change.test.ts
+    purpose: 主进程侧测试：run-change 复用 decision 卡三路径（continue-frozen/stop-and-restart/stop）与 approve/reject/cancel 映射（customer-input/session）
+  - kind: file
+    path: test/桌面应用/rejection-copy.test.ts
+    purpose: 主进程侧测试：拒绝三段式文案——code/missing/action/owner/docs/retryable、客户卡只人话、系统行折叠技术 code（session/interface/customer-input/operator-channel）
+  - kind: file
+    path: test/桌面应用/acceptance-evidence.test.ts
+    purpose: 主进程侧测试：验收证据自洽——AcceptanceFact/P0 派生、sidecar 重算、evidence_check、mismatch 负例（AC-28）与未校验标识（interface/session/customer-input）
   - kind: file
     path: 角色卡/桌面窗口/feature-map.md
     purpose: 功能导航

@@ -59,6 +59,10 @@
 | 单文件 | `test/桌面应用/write-safety.test.ts` | 主进程侧测试——边界内预授权/边界外拒绝/`.ans` 禁写、appointment-write 审批与结构校验失败不落盘、写后刷新、负例（内置 id/越界/重叠） |
 | 单文件 | `test/桌面应用/optional-acceptance.test.ts` | 主进程侧测试——可选验收链路：幕僚调度→质检/交付角色直接提交→judge/客户 |
 | 单文件 | `test/桌面应用/chain-enforcement.test.ts` | 招人链/前置校验（意图文档→名单→D3→交付运营）负例与顺序断言 |
+| 单文件 | `test/桌面应用/run-pin.test.ts` | 主进程侧测试：run 冻结——draft→pin 同 runId、pin 前 handoff 拒绝、pin 后只读 pinned、mid-run 新版本不激活与并发 pin，含 pin/run-change 负例（session/interface） |
+| 单文件 | `test/桌面应用/run-change.test.ts` | 主进程侧测试：run-change 复用 decision 卡三路径（continue-frozen/stop-and-restart/stop）与 approve/reject/cancel 映射（customer-input/session） |
+| 单文件 | `test/桌面应用/rejection-copy.test.ts` | 主进程侧测试：拒绝三段式文案——code/missing/action/owner/docs/retryable、客户卡只人话、系统行折叠技术 code（session/interface/customer-input/operator-channel） |
+| 单文件 | `test/桌面应用/acceptance-evidence.test.ts` | 主进程侧测试：验收证据自洽——AcceptanceFact/P0 派生、sidecar 重算、evidence_check、mismatch 负例（AC-28）与未校验标识（interface/session/customer-input） |
 | 单文件 | `角色卡/桌面窗口/feature-map.md` | 功能导航 |
 | 单文件 | `角色卡/桌面窗口/memo.md` | 本角色工作备忘录 |
 | 单文件 | `角色卡/桌面窗口/changelog.md` | 本角色治理变更记录 |
