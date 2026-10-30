@@ -236,11 +236,6 @@ export async function listRunManifestsResult(projectRoot: string): Promise<RunMa
   return { ok: true, manifests: manifests.sort((a, b) => a.createdAt.localeCompare(b.createdAt)) };
 }
 
-export async function listRunManifests(projectRoot: string): Promise<RunManifest[]> {
-  const result = await listRunManifestsResult(projectRoot);
-  return result.ok ? result.manifests : [];
-}
-
 /** 同一 flowId 的 active run（draft/pinned）；多个 pinned 视为冲突。 */
 export async function findActiveRun(
   projectRoot: string,
@@ -447,14 +442,17 @@ export async function prepareRunPin(
     const teamText = await readText(projectRoot, teamPlanRel);
     if (teamText === undefined) return { ok: false, code: "run-pin-document-missing", reason: `team plan 不可读：${teamPlanRel}` };
     const actual = frontmatterSchema(teamText);
-    if (actual !== undefined && actual !== RUN_TEAM_PLAN_SCHEMA) {
-      return { ok: false, code: "run-pin-schema-mismatch", reason: `team plan schema=${actual} 与 ${RUN_TEAM_PLAN_SCHEMA} 不一致。` };
+    if (actual !== RUN_TEAM_PLAN_SCHEMA) {
+      return { ok: false, code: "run-pin-schema-mismatch", reason: `team plan 必须带 schema: ${RUN_TEAM_PLAN_SCHEMA}（实际 ${actual ?? "缺失"}）。` };
     }
   }
   const flowRel = `${FLOW_DOC_DIR}/${flowId}.yaml`;
   const flowText = await readText(projectRoot, flowRel);
   let flowRef: RunFlowRef | null = null;
-  if (flowText !== undefined && flowText.trim() !== "") {
+  if (flowText !== undefined) {
+    if (flowText.trim() === "") {
+      return { ok: false, code: "run-pin-schema-mismatch", reason: `flow 文件为空：${flowRel}` };
+    }
     const flowSha = await sha256File(projectRoot, flowRel);
     if (flowSha === undefined) return { ok: false, code: "run-pin-document-missing", reason: `flow 文档 hash 计算失败：${flowRel}` };
     let version: number | undefined;

@@ -1269,6 +1269,12 @@ export function evaluateDispatchPreflight(input: DispatchPreflightInput): Dispat
         "派发未受理：运营只能给项目 worker（实现）或质检（验收核对）派发；不得派产品/策划/人事/幕僚。",
       );
     }
+    if (input.run?.state === "legacy") {
+      return reject(
+        "run-legacy-readonly",
+        "派发未受理：该 flow 只有历史 legacy 任务（无 run manifest），legacy 只读，不能继续实现/验收；请先创建新 run 并在 handoff 前 pin。",
+      );
+    }
     if (input.handoffFound !== true) {
       return reject(
         "handoff-missing",

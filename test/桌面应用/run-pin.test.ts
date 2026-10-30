@@ -18,7 +18,8 @@ import { recordVersionedDocBaselines } from "../../src/common/门禁引擎/versi
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
-import type { DispatchReceipt, DispatchTaskFn } from "../../src/model/runtime.ts";
+import type { CustomerInputFn, CustomerInputMetadata, CustomerInputRequest, DispatchReceipt, DispatchTaskFn } from "../../src/model/runtime.ts";
+import type { DesktopCustomerInputFn } from "../../app/desktop/customer-input.ts";
 
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -115,13 +116,15 @@ function listing(root: string): ProjectListing {
   };
 }
 
-function harness(root: string) {
+function harness(root: string, options: { customerInput?: DesktopCustomerInputFn } = {}) {
   const streams: Record<string, OrchestrationEvent[]> = {};
   const sent: Record<string, string[]> = {};
   const caps: Record<string, DispatchTaskFn | undefined> = {};
+  const customerInputs: Record<string, CustomerInputFn | undefined> = {};
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
       caps[input.roleId] = (input as { dispatchTask?: DispatchTaskFn }).dispatchTask;
+      customerInputs[input.roleId] = (input as { customerInput?: CustomerInputFn }).customerInput;
       const handle: RoleSessionHandle = {
         async send(text: string) { (sent[input.roleId] ??= []).push(text); },
         events() {
@@ -150,9 +153,9 @@ function harness(root: string) {
     buildProjectConfig,
     getListing: (r) => (r === root ? listing(root) : undefined),
     emitEvent: () => {},
-    customerInput: async () => ({ outcome: "declined", operatorId: "test" }),
+    customerInput: options.customerInput ?? (async () => ({ outcome: "declined", operatorId: "test" })),
   });
-  return { mgr, streams, sent, caps };
+  return { mgr, streams, sent, caps, customerInputs };
 }
 
 async function d3(root: string): Promise<void> {
@@ -299,7 +302,7 @@ test("legacy：无 runId 的旧 task.created 仍可读取；legacy 项目不伪�
     await appendTaskEvent(root, {
       v: 1, at: "2026-10-29T00:00:00.000Z", kind: "task.created", taskId: "t-legacy", flowId: "focus",
       from: "chief", to: "product", text: "旧任务", sideEffect: "docs", idempotencyKey: "legacy-key",
-    });
+    }, { allowLegacyRun: true });
     const state = await readTaskState(root);
     assert.equal(state.records.get("t-legacy")?.created?.runId, undefined, "legacy 旧记录按缺省读取，不伪造 runId");
     const active = await findActiveRun(root, "focus");
@@ -317,7 +320,7 @@ test("P1.5：无 flow/teamPlan 源时 pin 为 null；存在时钉 path/version/h
     await fs.mkdir(path.join(root, "docs/flows"), { recursive: true });
     await fs.mkdir(path.join(root, "docs/scheduling"), { recursive: true });
     await fs.writeFile(path.join(root, "docs/flows/focus.yaml"), "version: 3\nstages: [stage-1]\n", "utf8");
-    await fs.writeFile(path.join(root, "docs/scheduling/focus-team-v1.md"), "# team plan\n", "utf8");
+    await fs.writeFile(path.join(root, "docs/scheduling/focus-team-v1.md"), "---\nschema: teamPlanSchema:3\n---\n# team plan\n", "utf8");
     const prepared = await prepareRunPin(root, "focus", { d3: { decisionId: "decision-flow", targetRoleIds: ["implementer"] } });
     assert.equal(prepared.ok, true, prepared.ok ? "" : prepared.reason);
     if (prepared.ok) {
@@ -402,6 +405,41 @@ test("P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同�
     const adopted = await readRunManifest(root, runId);
     assert.equal(adopted.ok, true);
     if (adopted.ok) assert.equal(adopted.manifest.flowId, "focus");
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("R2（P1.3）：legacy 任务验收 facts 标 runState=legacy", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-legacy-facts-"));
+  let captured: CustomerInputMetadata | undefined;
+  const h = harness(root, {
+    customerInput: async (
+      _request: Parameters<DesktopCustomerInputFn>[0],
+      _context: Parameters<DesktopCustomerInputFn>[1],
+      metadata: Parameters<DesktopCustomerInputFn>[2],
+    ) => {
+      captured = metadata;
+      return { outcome: "declined", operatorId: "test" };
+    },
+  });
+  try {
+    await writeProject(root);
+    await appendTaskEvent(root, {
+      v: 1, at: "2026-10-29T00:00:00.000Z", kind: "task.created", taskId: "t-legacy-facts", flowId: "focus",
+      from: "chief", to: "product", text: "旧任务", sideEffect: "docs", idempotencyKey: "legacy-facts",
+    }, { allowLegacyRun: true });
+    await h.mgr.open({ projectRoot: root, roleId: "verifier", runtime: "demo" });
+    await tick(30);
+    const channel = h.customerInputs.verifier;
+    assert.equal(typeof channel, "function");
+    const request: CustomerInputRequest = {
+      kind: "choice", cardKind: "acceptance", flowId: "focus", title: "验收核对",
+      options: [{ id: "accept", label: "通过", recommended: true }, { id: "rework", label: "返工" }],
+    };
+    await channel!(request);
+    assert.equal(captured?.judgeContext?.facts?.runState, "legacy");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });

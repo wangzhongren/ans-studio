@@ -175,7 +175,7 @@ export function redispatchTaskId(retryOf: string, attempt: number): string {
 
 // —————————————— 追加（轮转 + 原子行） ——————————————
 
-type AppendResult = { ok: true; path: string } | { ok: false; message: string };
+type AppendResult = { ok: true; path: string } | { ok: false; message: string; code?: string };
 
 function jsonLine(event: TaskStateEvent): string {
   return `${JSON.stringify(event)}\n`;
@@ -215,7 +215,18 @@ const appendChains = new Map<string, Promise<unknown>>();
  * 追加一个任务事件。写失败**不抛**：返回 `{ok:false,message}`，调用方如实回执/记日志。
  * 轮转在追加前按文件当刻大小判定；行内 JSON 不含换行（`JSON.stringify` 保证）。
  */
-export function appendTaskEvent(projectRoot: string, event: TaskStateEvent): Promise<AppendResult> {
+export function appendTaskEvent(
+  projectRoot: string,
+  event: TaskStateEvent,
+  options: { allowLegacyRun?: boolean } = {},
+): Promise<AppendResult> {
+  // 2026-10-30（3.1/P1.3 R1）：**新建**项目任务（flowId 有值）必须带 runId+runState；
+  // 只有历史既有/测试重放可用 allowLegacyRun 写入无 run 的旧形状。读侧仍按 legacy 兼容。
+  if (event.kind === "task.created" && event.flowId !== undefined && options.allowLegacyRun !== true) {
+    if (event.runId === undefined || event.runId === "" || event.runState === undefined) {
+      return Promise.resolve({ ok: false, code: "run-required", message: "task.created.run-required：新建项目任务必须带 runId 与 runState（legacy 仅历史重放允许）" });
+    }
+  }
   const file = tasksStatePath(projectRoot);
   const line = jsonLine(event);
   const previous = appendChains.get(file) ?? Promise.resolve();

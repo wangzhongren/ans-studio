@@ -851,3 +851,15 @@ test("2026-10-30（3.1）：run 条件必填——交付需 draft/pinned run；�
   assert.equal(roleMissing.ok, false);
   if (!roleMissing.ok) assert.equal(roleMissing.code, "run-role-missing");
 });
+
+test("R2（P1.3）：legacy run 只读——实现/验收 preflight 明确拒绝 run-legacy-readonly", () => {
+  const legacy = evaluateDispatchPreflight(preflight({
+    fromRoleId: "convener", targetRoleId: "implementer", targetBuiltIn: false, handoffFound: true,
+    d3Selected: ["implementer"], run: { state: "legacy" },
+  }));
+  assert.equal(legacy.ok, false);
+  if (!legacy.ok) {
+    assert.equal(legacy.code, "run-legacy-readonly");
+    assert.match(legacy.message, /legacy|只读/);
+  }
+});

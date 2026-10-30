@@ -219,6 +219,8 @@ test("task.created.from 放宽到 chief/convener；flowId/stepId 可选且须为
       sideEffect: "code",
       idempotencyKey: "key-convener",
       flowId: "focus",
+      runId: "run-20261030-focus-abcdef12",
+      runState: "pinned",
       stepId: "implement",
       moduleId: "impl-core",
       moduleDirectory: "src/",
@@ -322,6 +324,25 @@ test("task.created.runId：run 内任务携带 runId/state/stage；legacy 缺省
     const read = await readTaskState(root);
     assert.equal(read.records.has("t-bad"), false, "非法 runId 的 task.created 读侧 fail-closed");
     assert.ok(read.errors.some((error) => error.message.includes("runId")));
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("R1：新建项目任务缺 runId/runState 实时写入必须拒绝；allowLegacyRun 只供历史重放", async () => {
+  const root = await tempRoot();
+  try {
+    const rejected = await appendTaskEvent(root, created("t-no-run", "实现", { flowId: "focus" }));
+    assert.equal(rejected.ok, false);
+    if (!rejected.ok) {
+      assert.equal(rejected.code, "run-required");
+      assert.match(rejected.message, /run-required/);
+    }
+    const legacy = await appendTaskEvent(root, created("t-historic", "实现", { flowId: "focus" }), { allowLegacyRun: true });
+    assert.equal(legacy.ok, true);
+    const state = await readTaskState(root);
+    assert.equal(state.records.get("t-historic")?.created?.runState, "legacy");
+    assert.equal(state.records.has("t-no-run"), false);
   } finally {
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }

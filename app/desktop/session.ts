@@ -3333,6 +3333,9 @@ export class SessionManager {
       if (event.rosterVersion === undefined && event.rosterSha256 === undefined) continue; // 仅新链 D3
       if (d3 === undefined || event.at > d3.at) d3 = { decisionId: event.decisionId, at: event.at };
     }
+    const hasLegacyFlowTask = [...state.records.values()].some(
+      (record) => record.created?.flowId === flowId && record.created.runId === undefined,
+    );
     const missing: string[] = [
       ...(intentOk ? [] : ["产品意图文档"]),
       ...(roster.ok ? [] : ["人员名单"]),
@@ -3359,7 +3362,9 @@ export class SessionManager {
       ...(reportOk ? { qualityReportPath: reportRel } : {}),
       ...(pinnedRun !== undefined
         ? { runId: pinnedRun.runId, runState: "pinned" as const, pinnedDocs: pinnedDocsSummary(pinnedRun) }
-        : {}),
+        : hasLegacyFlowTask
+          ? { runState: "legacy" as const }
+          : {}),
       ...(acceptanceModule !== undefined
         ? {
             moduleId: acceptanceModule.id,
@@ -5523,6 +5528,9 @@ export class SessionManager {
     // M1（幕僚→产品）允许尚未写 flowId：仍先生成 pending draft；后续真实 flow 到达时领养同一 runId。
     const runFlowId = dispatchFlowId ?? (fromRoleId === chiefRoleId && targetRoleId === "product" ? RUN_PENDING_FLOW_ID : undefined);
     const handoffDispatch = fromRoleId === chiefRoleId && convenerRoleId !== null && targetRoleId === convenerRoleId;
+    const hasLegacyFlowTask = dispatchFlowId !== undefined && [...state.records.values()].some(
+      (record) => record.created?.flowId === dispatchFlowId && record.created.runId === undefined,
+    );
     let runManifest: RunManifest | undefined;
     let runState: "draft" | "pinned" | "legacy" | undefined;
     let runRoster = chainFacts.roster;
@@ -5571,7 +5579,9 @@ export class SessionManager {
       d3Selected,
       ...(runManifest !== undefined && runState !== undefined
         ? { run: { state: runState, runId: runManifest.runId, ...(runManifest.roles !== undefined ? { roles: runManifest.roles } : {}) } }
-        : {}),
+        : hasLegacyFlowTask
+          ? { run: { state: "legacy" as const } }
+          : {}),
       ...(requestedModuleId !== undefined ? { moduleId: requestedModuleId } : {}),
       ...(requestedModulePaths !== undefined && requestedModulePaths.length > 0 ? { modulePaths: requestedModulePaths } : {}),
       handoffFound: chainFacts.handoffFound,
