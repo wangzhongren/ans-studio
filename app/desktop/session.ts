@@ -91,6 +91,7 @@ import {
   loadLatestRoster,
   reportTargetForTaskCreator,
   rosterRoleIds,
+  type ProjectRoster,
   type RosterLoadResult,
 } from "../../src/common/编排/workflow-preconditions.ts";
 import { verifyVersionedDocBaselines } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
@@ -139,7 +140,7 @@ import { formatDurationMs, type WatchdogObservation, type WatchdogProjectSnapsho
 import { mainT } from "./i18n.ts";
 import { type RoleStatusFn, type RoleStatusPayload, type SessionTailFn, type SessionTailPayload, type WatchdogToolResult } from "../../src/common/编排/watchdog.ts";
 import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef } from "../../src/model/runtime.ts";
-import { checkEvidence, deriveAcceptanceFact, loadCriteria, parseEvidenceMeta, readArtifact, EVIDENCE_META_SCHEMA } from "../../src/common/编排/evidence-check.ts";
+import { checkEvidence, checkEvidenceCollection, deriveAcceptanceFact, isWithinEvidenceRoots, loadCriteria, parseEvidenceMeta, readArtifact, validateEvidencePath, EVIDENCE_META_SCHEMA } from "../../src/common/编排/evidence-check.ts";
 // 2026-10-26 需求变更申请（request_requirement_change）：同源契约；仅统筹/提案会话注入。
 // 申请 ≠ 批准：审批由客户/判断 agent 在发起方会话的 decision 卡完成，主理只在批准后执行意图变更。
 import type { RequestRequirementChangeFn, RequestRequirementChangeInput, RequestRequirementChangeResult } from "../../src/model/runtime.ts";
@@ -6373,46 +6374,69 @@ ${formatted}` };
   // ——————— G-2/W1：role_status / session_tail 的桌面侧数据源（契约＝`model/runtime.ts`；编排转发） ———————
 
   /**
-   * 2026-10-30（3.4）：`evidence_check` 只读证据检查——重算 artifact 实际值与 sidecar 比对；
-   * 不执行项目脚本、不修改 artifact/sidecar、不授予写权。
+   * 2026-10-30（3.4 / rework F1–F5）：`evidence_check` 只读证据检查——显式 criteriaRef、当前 run flow 绑定、
+   * 角色模块证据范围、项目内路径；单文件/collection sidecar 均走真实检查；不执行项目脚本、不写盘。
    */
   private async evidenceCheckText(projectRoot: string, roleId: string, input: EvidenceCheckInput): Promise<string> {
     const ref = input.criteriaRef;
-    const artifact = typeof input.artifact === "string" ? input.artifact.trim().replace(/\\/g, "/") : "";
-    const base = { schema: "evidence-check/v1", roleId, artifact };
-    if (artifact === "" || artifact.startsWith("/") || artifact.startsWith("..") || artifact.includes("../") || artifact.startsWith(".ans/") || artifact === ".env") {
-      return JSON.stringify({ ...base, ok: false, code: "criteria-ref-mismatch", mismatch: ["artifact 必须是项目内可读证据路径（非绝对/非 .ans/.env）"] }, null, 2);
-    }
+    const artifactRaw = typeof input.artifact === "string" ? input.artifact : "";
+    const artifact = validateEvidencePath(artifactRaw);
+    const meta = typeof input.metaPath === "string" && input.metaPath.trim() !== "" ? validateEvidencePath(input.metaPath) : undefined;
+    const base = { schema: "evidence-check/v1", roleId, artifact: artifact.ok ? artifact.path : artifactRaw.trim().replace(/\\/g, "/") };
+    const fail = (code: string, missing: string[], docs: string[] = []): string => {
+      const rejection = makeMechanicalRejection(code, missing, { docs });
+      return JSON.stringify({ ...base, ok: false, code, rejection }, null, 2);
+    };
+    if (!artifact.ok) return fail("evidence-path-invalid", [artifact.reason], [artifactRaw]);
+    if (meta !== undefined && !meta.ok) return fail("evidence-path-invalid", [meta.reason], [input.metaPath ?? ""]);
     if (ref === undefined) {
-      return JSON.stringify({ ...base, ok: false, code: "criteria-version-unresolved", mismatch: ["缺少显式 criteriaRef（path+sha256+version）；不取 latest"] }, null, 2);
+      return fail("criteria-version-unresolved", ["缺少显式 criteriaRef（path+sha256+version）；不取 latest"]);
     }
     const flowMatch = /^docs\/acceptance\/([a-z0-9][a-z0-9-]{0,62})-criteria-v[1-9]\d*\.md$/.exec(ref.path.replace(/\\/g, "/"));
     if (flowMatch === null) {
-      return JSON.stringify({ ...base, ok: false, code: "criteria-ref-mismatch", mismatch: [`criteriaRef 路径不合法：${ref.path}`] }, null, 2);
+      return fail("criteria-ref-mismatch", [`criteriaRef 路径不合法：${ref.path}`], [ref.path]);
     }
-    const criteria = await loadCriteria(projectRoot, flowMatch[1]!, ref);
-    if (!criteria.ok) {
-      return JSON.stringify({ ...base, ok: false, code: criteria.code, rejection: criteria.rejection }, null, 2);
+    const refFlow = flowMatch[1]!;
+    // F5②：ref 的 flow 必须等于当前 run 的 flow；无 run＝legacy（不绑定），多 active flow fail-closed。
+    const listed = await listRunManifestsResult(projectRoot);
+    if (!listed.ok) return fail(listed.code, [listed.reason]);
+    const activeRuns = listed.manifests.filter((run) => run.state === "draft" || run.state === "pinned");
+    const activeFlows = [...new Set(activeRuns.map((run) => run.flowId))];
+    if (activeFlows.length > 1) {
+      return fail("criteria-ref-mismatch", [`存在多个 active run flow（${activeFlows.join("、")}），无法唯一绑定当前 flow；不猜`]);
     }
+    const currentFlow = activeFlows[0];
+    if (currentFlow !== undefined && currentFlow !== refFlow) {
+      return fail("criteria-ref-mismatch", [`criteriaRef flow=${refFlow} 与当前 run flow=${currentFlow} 不一致`], [ref.path]);
+    }
+    const flowId = currentFlow ?? refFlow;
+    const run = activeRuns.find((item) => item.flowId === flowId);
+    const criteria = await loadCriteria(projectRoot, flowId, ref);
+    if (!criteria.ok) return fail(criteria.code, criteria.rejection.missing, criteria.rejection.docs);
     const criteriaSummary = { path: criteria.doc.path, flowId: criteria.doc.flowId, version: criteria.doc.version, status: criteria.doc.status, sha256: criteria.doc.sha256 };
+    // F2：按调用角色裁剪——只允许本角色模块目录内的证据（含 metaPath/collection item）。
+    const scope = await this.evidenceScopeRoots(projectRoot, flowId, run, roleId);
+    if (scope.length === 0) {
+      return fail("evidence-scope-denied", [`调用角色 ${roleId} 没有可用的模块证据范围（名单模块/任务 modulePaths 均缺失）`], [criteria.doc.path]);
+    }
+    const metaRel = meta?.path ?? `${artifact.path}.meta.json`;
+    if (!isWithinEvidenceRoots(artifact.path, scope)) {
+      return fail("evidence-scope-denied", [`artifact ${artifact.path} 不在调用角色 ${roleId} 的模块证据范围（${scope.join("、")}）`], [criteria.doc.path]);
+    }
+    if (!isWithinEvidenceRoots(metaRel, scope)) {
+      return fail("evidence-scope-denied", [`metaPath ${metaRel} 不在调用角色 ${roleId} 的模块证据范围（${scope.join("、")}）`], [criteria.doc.path]);
+    }
     if (input.acId === undefined || input.acId.trim() === "") {
       try {
-        const actual = await readArtifact(projectRoot, artifact);
-        let meta: unknown;
-        try { meta = parseEvidenceMeta(await fs.promises.readFile(path.join(projectRoot, input.metaPath ?? `${artifact}.meta.json`), "utf8")); } catch { meta = null; }
-        return JSON.stringify({ ...base, ok: true, criteria: criteriaSummary, actual: { path: actual.path, bytes: actual.bytes, lines: actual.lines, sha256: actual.sha256 }, meta, note: "未给 acId，未做 criteria/P0 关联" }, null, 2);
+        const actual = await readArtifact(projectRoot, artifact.path);
+        let parsedMeta: unknown;
+        try { parsedMeta = parseEvidenceMeta(await fs.promises.readFile(path.join(projectRoot, metaRel), "utf8")); } catch { parsedMeta = null; }
+        return JSON.stringify({ ...base, ok: true, criteria: criteriaSummary, actual: { path: actual.path, bytes: actual.bytes, lines: actual.lines, sha256: actual.sha256 }, meta: parsedMeta, note: "未给 acId，未做 criteria/P0 关联" }, null, 2);
       } catch (error) {
-        return JSON.stringify({ ...base, ok: false, code: "criteria-missing", mismatch: [`artifact 不可读：${error instanceof Error ? error.message : String(error)}`] }, null, 2);
+        return fail("criteria-missing", [`artifact 不可读：${error instanceof Error ? error.message : String(error)}`], [artifact.path]);
       }
     }
-    const result = await checkEvidence({
-      projectRoot,
-      acId: input.acId,
-      criteria: criteria.doc,
-      artifact,
-      ...(input.metaPath !== undefined && input.metaPath.trim() !== "" ? { metaPath: input.metaPath.trim() } : {}),
-    });
-    return JSON.stringify({
+    const render = (result: Awaited<ReturnType<typeof checkEvidence>>): string => JSON.stringify({
       ...base,
       ok: result.ok && result.valid,
       valid: result.valid,
@@ -6427,6 +6451,67 @@ ${formatted}` };
       mismatch: result.mismatch,
       ...(result.rejection !== undefined ? { code: result.rejection.code, rejection: result.rejection } : {}),
     }, null, 2);
+    // F1：真实会话/工具路径显式识别 collection sidecar 并路由 checkEvidenceCollection。
+    let metaText: string | undefined;
+    try { metaText = await fs.promises.readFile(path.join(projectRoot, metaRel), "utf8"); } catch { metaText = undefined; }
+    const parsedMeta = metaText === undefined ? undefined : parseEvidenceMeta(metaText);
+    if (parsedMeta !== undefined && parsedMeta.ok && "collection" in parsedMeta.meta) {
+      const collection = await checkEvidenceCollection({
+        projectRoot,
+        acId: input.acId,
+        criteria: criteria.doc,
+        metaPath: metaRel,
+        scopeRoots: scope,
+      });
+      return render(collection);
+    }
+    const result = await checkEvidence({
+      projectRoot,
+      acId: input.acId,
+      criteria: criteria.doc,
+      artifact: artifact.path,
+      metaPath: metaRel,
+      scopeRoots: scope,
+    });
+    return render(result);
+  }
+
+  /**
+   * F2（3.4 rework）：调用角色的模块证据范围——pinned/latest roster 中该角色的模块 paths，
+   * 加上当前 run 指派给该角色的任务的 modulePaths（治理/验收角色被派发模块任务时同样有界）。
+   */
+  private async evidenceScopeRoots(projectRoot: string, flowId: string, run: RunManifest | undefined, roleId: string): Promise<string[]> {
+    const roots = new Set<string>();
+    if (roleId === "") return [];
+    let roster: ProjectRoster | undefined;
+    if (run !== undefined && run.state === "pinned") {
+      const pinned = await loadPinnedRoster(projectRoot, run);
+      if (pinned.ok) roster = pinned.roster;
+    } else {
+      const latest = await loadLatestRoster({ projectRoot, flowId });
+      if (latest.ok) roster = latest.roster;
+    }
+    if (roster !== undefined) {
+      const role = roster.roles.find((item) => item.id === roleId);
+      for (const moduleId of role?.modules ?? []) {
+        const module = roster.modules.find((item) => item.id === moduleId);
+        for (const raw of module?.paths ?? []) {
+          const normalized = validateEvidencePath(raw);
+          if (normalized.ok) roots.add(normalized.path);
+        }
+      }
+    }
+    const state = await this.readTasks(projectRoot);
+    for (const record of state.records.values()) {
+      const created = record.created;
+      if (created === undefined || created.to !== roleId || created.flowId !== flowId) continue;
+      if (run !== undefined && created.runId !== run.runId) continue;
+      for (const raw of created.modulePaths ?? []) {
+        const normalized = validateEvidencePath(raw);
+        if (normalized.ok) roots.add(normalized.path);
+      }
+    }
+    return [...roots].sort();
   }
 
   /**

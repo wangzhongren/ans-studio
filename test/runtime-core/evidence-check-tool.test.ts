@@ -29,3 +29,26 @@ test("evidence_check：注入才注册；参数透传；≤4KB 截断", async ()
   assert.equal(missingRef.ok, false);
   assert.equal(buildGovernedTools(gate, { roleId: "verifier" }).some((item) => item.name === "evidence_check"), false);
 });
+
+test("evidence_check：工具层拒绝越界路径与跨角色查询（伪数据源也不放行）", async () => {
+  let calls = 0;
+  const tools = buildGovernedTools(gate, {
+    roleId: "verifier",
+    evidenceCheck: async () => { calls += 1; return "{\"ok\":true}"; },
+  });
+  const tool = tools.find((item) => item.name === "evidence_check");
+  assert.ok(tool);
+  if (!tool) return;
+  for (const metaPath of ["../outside.meta.json", "C:/outside.meta.json", ".ans/state.json", ".env"]) {
+    const denied = await tool.handler({ args: { artifact: "tests/evidence/a.txt", metaPath, acId: "AC-28", criteriaRef } } as never);
+    assert.equal(denied.ok, false, metaPath);
+    if (!denied.ok) assert.match(denied.message, /evidence-path-invalid/);
+  }
+  const foreign = await tool.handler({ args: { artifact: "tests/evidence/a.txt", roleId: "other-role", acId: "AC-28", criteriaRef } } as never);
+  assert.equal(foreign.ok, false);
+  if (!foreign.ok) assert.match(foreign.message, /evidence-scope-denied/);
+  assert.equal(calls, 0, "被拒的越界/跨角色调用不应触达数据源");
+  const own = await tool.handler({ args: { artifact: "tests/evidence/a.txt", roleId: "verifier", acId: "AC-28", criteriaRef } } as never);
+  assert.equal(own.ok, true);
+  assert.equal(calls, 1);
+});

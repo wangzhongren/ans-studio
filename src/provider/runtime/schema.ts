@@ -553,8 +553,9 @@ export function describeTool(name: string): ToolDescription {
         type: "object",
         properties: {
           artifact: { type: "string", description: "Project-relative artifact path (required)" },
-          metaPath: { type: "string", description: "Optional sidecar path; defaults to <artifact>.meta.json" },
+          metaPath: { type: "string", description: "Optional sidecar path; defaults to <artifact>.meta.json; project-relative only" },
           acId: { type: "string", description: "Optional AC id for criteria/acIds matching" },
+          roleId: { type: "string", description: "Optional role being queried; must equal the calling role (role-isolated)" },
           criteriaRef: {
             type: "object",
             description: "Explicit criteria ref {path,sha256,version}; latest is never selected",
@@ -568,7 +569,8 @@ export function describeTool(name: string): ToolDescription {
       description:
         "**只读证据自洽检查**（3.4）：重算 artifact 的 bytes/lines/sha256，与 `<artifact>.meta.json` sidecar 的“自述”比对；" +
         "校验 generatedAt stale、acIds 与 criteria/acId、P0 必需 sidecar。**不执行项目脚本、不修改 artifact/sidecar、不授予写权**；" +
-        "只输出实际值 vs sidecar、mismatch 与 `evidence-check/v1` 结论。criteria 必须显式 ref，不取 latest。",
+        "只输出实际值 vs sidecar、mismatch 与 `evidence-check/v1` 结论。criteria 必须显式 ref 且 flow 与当前 run 一致，不取 latest；" +
+        "artifact/metaPath/collection item 必须是本角色模块目录内的项目相对路径（禁绝对/../.ans/.env）。",
       promptGuidelines: [
         "P0 证据必须有 sidecar 且实际 lines/bytes/sha256/metrics 与 sidecar 一致；不一致/缺 sidecar 不得宣称通过。",
         "证据被修改后 sidecar 过期 ⇒ mismatch；重新生成证据，不要修改 artifact 或伪造 sidecar。",

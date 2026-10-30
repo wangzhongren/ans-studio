@@ -46,3 +46,23 @@
 - `npm run typecheck`、`typecheck:renderer`、`build:renderer` exit 0（最终代码重跑）。
 - 真实 Electron E2E：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；report `%TEMP%\ans-e2e-wave1-34\report.txt`，sha256 `f16c51e49280d7e27a459a883a8f8dabb0f892a4190934bbb5b8aeb9beeccb6b`。
 - phase5a：40/40 checks、failures=0、console/CSP 0；report `%TEMP%\ans-phase5a-wave1-34\report.json`，sha256 `dc7c03504cbdaf3bd1e0d07f44d2212d710c23b983387a9d90804326a8f02786`。
+
+## 5. 首轮验收 rework（F1–F5）
+
+- 触发：独立验收报告 `docs/acceptance/2026-10-30_wave1-3.4-acceptance-report-v1.md`（124 行 / `dd316a6633c7051f28580960dbd7e16cd35059e9755e14ea79926cd5fd84880b`）判 rework；本批只修 F1–F5，全部新增负例走真实会话/工具路径（不以 direct-function 自证）。
+- **F1 collection 真实路径**：`checkEvidence` 读到的 sidecar 为 collection 时自动路由 `checkEvidenceCollection`；`evidenceCheckText` 对真实会话输入同样生效。新增真实会话探针：`SessionManager.open` 捕获注入的 `evidenceCheck` 能力 → collection sidecar 经数据源 `ok:true/valid:true`；工具层用同一能力再次验证。
+- **F2 角色隔离**：`evidenceCheckText` 按调用角色裁剪。证据范围＝pinned/latest roster 中该角色所有模块 `paths` ∪ 当前 run 指派给该角色的任务 `modulePaths`；`artifact`/`metaPath`/collection item 均须落在范围内；范围为空 fail-closed。工具层对显式 `roleId` 与调用角色不一致同样拒绝。边界口径：角色只读自己的模块证据；治理/验收角色无模块/任务范围时不放开（应用验收 enrich 直接走数据层，不受此限，仍按 run/flow + criteria 全量核对）。
+- **F3 路径安全**：新增 `validateEvidencePath`，artifact/metaPath/collection item 统一规则——仅项目内相对路径；禁绝对路径/盘符、`..` 越界、`.ans`、`.env`/`.env.*`；工具层与数据层双重校验；结构化 `evidence-path-invalid`。
+- **F4 collection stale**：collection 必须有 `generatedAt`；逐文件比对 mtime（artifact 修改晚于 generatedAt ⇒ stale）、sha256/bytes/lines、自述行数与 `metrics.pass/fail`、`acIds`；空 collection 报 mismatch。
+- **F5① criteria 严格性**：`normalizeAcId` 的 P 形态收紧为 `P([1-9][0-9]{0,1})\.([1-9][0-9]{0,1})`（前导零归一化后），`P0.1`/`P0.0`/`P00.01`/`P4.000` ⇒ `criteria-id-invalid`；`title` 非字符串 ⇒ `criteria-schema-invalid`（不再静默忽略）。
+- **F5② flow 绑定**：`evidenceCheckText` 先解析 ref flow，再绑定 active run（draft/pinned）的唯一 flow；不一致 ⇒ `criteria-ref-mismatch`；多 active flow fail-closed；无 active run（legacy）不绑定、按显式 ref flow 继续。
+- **新增拒绝码**：`evidence-path-invalid`（owner verifier，retryable）与 `evidence-scope-denied`（owner verifier，not retryable），进入集中 `RULES`/三段式。
+- **测试**：`test/编排/evidence-check.test.ts` 10 例（新增 P0.0/P0.1、title、collection stale/自述/路径、metaPath 越界）、`test/runtime-core/evidence-check-tool.test.ts` 2 例（新增工具层路径/跨角色拒绝）、`test/桌面应用/acceptance-evidence.test.ts` 3 例（新增真实会话 collection/角色范围/路径/flow 绑定探针）＋UI 1＋E2E 1，共 17 例。
+
+### 5.1 rework 复跑（最终代码）
+
+- 定向：5 个 3.4 测试文件 **17/17 pass**（evidence-check 10、evidence-check-tool 2、acceptance-evidence 3、evidence-markers 1、evidence-sidecar-e2e 1）；桌面应用全套 **374/374**。
+- 全量：`node --test --test-concurrency=1 --test-timeout=120000 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')` → **3064 tests / 3034 pass / 12 fail / 18 skip**（首轮 3060/3030/+4 新测试全过；12 红仍为 9 Windows symlink EPERM + T1×3；无新增失败/skip）；日志 `%TEMP%\ans-wave1-34-rework-full2.log`，sha256 `7d9a2f29c62f300460113d697771ddf1376994d01b7b679e24060460a83f8956`。
+- `npm run typecheck`、`typecheck:renderer`、`build:renderer` exit 0（最终代码）。
+- 真实 Electron E2E：exit 0、`E2E_PASS=true`、`E2E_FAILURES=` 空、`E2E_DONE=1`、18 PNG；report `%TEMP%\ans-e2e-wave1-34-rework2\report.txt`，sha256 `fa7a901d0598a9679b703a1ba0e86b36cef6db43d79539603024ff838fefd760`。
+- phase5a：40/40 checks、failures=0、console/CSP 0、finished true；report `%TEMP%\ans-phase5a-wave1-34-rework2\report.json`，sha256 `690ee1122b751cdf10aa9939ca19b155de704b7b7c6887c8751f8cbb8e8be392`。

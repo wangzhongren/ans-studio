@@ -91,6 +91,8 @@ const RULES: Record<string, RejectionRule> = {
   "criteria-mismatch": { owner: "verifier", action: "补齐 fact.acId 在 criteria 中的条目；sidecar acIds 必须包含该 fact.acId。", retryable: true },
   "run-change-invalid": { owner: "app", action: "run-change 选择无法映射为唯一模式；重新呈现三模式卡，不自动选择。", retryable: true },
   "evidence-mismatch": { owner: "verifier", action: "重算 artifact/meta/sidecar 并修正证据后重提验收。", retryable: true },
+  "evidence-path-invalid": { owner: "verifier", action: "改为项目内相对路径；不得绝对路径、.. 越界、.ans、.env；修正后重试。", retryable: true },
+  "evidence-scope-denied": { owner: "verifier", action: "只查询本角色模块目录内的证据；换用本角色模块证据或由应用验收链核对。", retryable: false },
   "not-recommended": { owner: "chief", action: "按推荐项/客户选择修正卡面或流程后重新提交；不得自行发明选项。", retryable: true },
   "insufficient-evidence": { owner: "verifier", action: "补齐判断所需证据/理由后重新提交。", retryable: true },
   "path-unverified": { owner: "app", action: "检查写盘卡结构与逐路径探测接线；应用修正后原样重试。", retryable: true },

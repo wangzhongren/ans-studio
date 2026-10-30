@@ -53,10 +53,10 @@ test("ans-criteria/v1 正例：唯一 block、优先级派生、CRLF 归一化",
 });
 
 test("AC 归一化：NFKC/全半角/空白/前导零；非法形态拒绝", () => {
-  for (const [raw, expected] of [["ac-28", "AC-28"], ["ＡＣ－２８", "AC-28"], ["P 4 . 1", "P4.1"], ["P04.01", "P4.1"], ["AC-028", "AC-28"]]) {
+  for (const [raw, expected] of [["ac-28", "AC-28"], ["ＡＣ－２８", "AC-28"], ["P 4 . 1", "P4.1"], ["P04.01", "P4.1"], ["AC-028", "AC-28"], ["P12.10", "P12.10"]]) {
     assert.equal(normalizeAcId(raw), expected, raw);
   }
-  for (const raw of ["AC28", "P4", "P4-1", "AC-28/P0"]) assert.equal(normalizeAcId(raw), undefined, raw);
+  for (const raw of ["AC28", "P4", "P4-1", "AC-28/P0", "P0.1", "P0.0", "P00.01", "P4.000"]) assert.equal(normalizeAcId(raw), undefined, raw);
   assert.equal(normalizePriority("Ｐ０"), "P0");
   assert.equal(normalizePriority("P4"), undefined);
 });
@@ -74,6 +74,15 @@ test("criteria 负例：重复 canonical id、非法 priority、无/多 block、
   const ambiguous = parseCriteriaText("```ans-criteria\nschema: ans-criteria/v1\n```\n```ans-criteria\nschema: ans-criteria/v1\n```");
   assert.equal(ambiguous.ok, false);
   if (!ambiguous.ok) assert.equal(ambiguous.code, "criteria-format-ambiguous");
+  const zeroMajor = parseCriteriaText(CRITERIA_TEXT.replace("id: P4.1", "id: P0.1"));
+  assert.equal(zeroMajor.ok, false);
+  if (!zeroMajor.ok) assert.equal(zeroMajor.code, "criteria-id-invalid");
+  const zeroMinor = parseCriteriaText(CRITERIA_TEXT.replace("id: P4.3", "id: P4.0"));
+  assert.equal(zeroMinor.ok, false);
+  if (!zeroMinor.ok) assert.equal(zeroMinor.code, "criteria-id-invalid");
+  const badTitle = parseCriteriaText(CRITERIA_TEXT.replace("    priority: P1", "    priority: P1\n    title: 123"));
+  assert.equal(badTitle.ok, false);
+  if (!badTitle.ok) assert.equal(badTitle.code, "criteria-schema-invalid");
   const draft = parseCriteriaText(CRITERIA_TEXT.replace("status: final", "status: draft"));
   assert.equal(draft.ok, true);
   const mismatch = parseCriteriaText(CRITERIA_TEXT, { flowId: "focus", fileName: "focus-criteria-v4.md" });
@@ -217,6 +226,75 @@ test("collection：多文件 sidecar 逐文件 hash/bytes/lines 校验", async (
     const result = await checkEvidenceCollection({ projectRoot: root, acId: "AC-28", criteria, metaPath });
     assert.equal(result.ok, true, result.rejection?.missing.join("；") ?? "");
     assert.equal(result.valid, true);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("P4.3/F3/F4：collection generatedAt/mtime stale、item 自述、路径越界、角色范围拒绝", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-evidence-collection-rules-"));
+  try {
+    const criteria = parsed();
+    const artifact = "tests/evidence/c.txt";
+    await fs.mkdir(path.dirname(path.join(root, artifact)), { recursive: true });
+    const writeMeta = async (overrides: { generatedAt?: string; itemArtifact?: string; lines?: number } = {}): Promise<void> => {
+      const actual = await readArtifact(root, artifact);
+      const itemArtifact = overrides.itemArtifact ?? artifact;
+      await fs.writeFile(path.join(root, "tests/evidence/collection-rules.meta.json"), JSON.stringify({
+        schema: "evidence-meta/v1",
+        collection: [{ artifact: itemArtifact, sha256: actual.sha256, bytes: actual.bytes, lines: overrides.lines ?? actual.lines, metrics: { pass: 2, fail: 0 }, acIds: ["AC-28"] }],
+        acIds: ["AC-28"],
+        generatedAt: overrides.generatedAt ?? new Date(Date.now() + 2000).toISOString(),
+      }), "utf8");
+    };
+    const metaPath = "tests/evidence/collection-rules.meta.json";
+    await fs.writeFile(path.join(root, artifact), "共 3 行\npass: 2\nfail: 0\n", "utf8");
+    await writeMeta();
+    const good = await checkEvidenceCollection({ projectRoot: root, acId: "AC-28", criteria, metaPath });
+    assert.equal(good.ok, true, good.rejection?.missing.join("；") ?? "");
+    // 自述行数与实际不一致 ⇒ evidence-mismatch。
+    await fs.writeFile(path.join(root, artifact), "共 4 行\npass: 2\nfail: 0\n", "utf8");
+    await writeMeta();
+    const claims = await checkEvidenceCollection({ projectRoot: root, acId: "AC-28", criteria, metaPath });
+    assert.equal(claims.ok, false);
+    assert.ok(claims.mismatch.some((line) => /自述行数 4/.test(line)), claims.mismatch.join("；"));
+    // artifact 修改晚于 collection generatedAt ⇒ stale。
+    await fs.writeFile(path.join(root, artifact), "共 3 行\npass: 2\nfail: 0\n", "utf8");
+    await writeMeta({ generatedAt: "2000-01-01T00:00:00Z" });
+    const stale = await checkEvidenceCollection({ projectRoot: root, acId: "AC-28", criteria, metaPath });
+    assert.equal(stale.ok, false);
+    assert.ok(stale.mismatch.some((line) => /stale/.test(line)), stale.mismatch.join("；"));
+    // metaPath / collection item 路径越界 ⇒ 结构化 evidence-path-invalid。
+    await writeMeta();
+    const traversalMeta = await checkEvidenceCollection({ projectRoot: root, acId: "AC-28", criteria, metaPath: "../outside.meta.json" });
+    assert.equal(traversalMeta.ok, false);
+    assert.equal(traversalMeta.rejection?.code, "evidence-path-invalid");
+    await writeMeta({ itemArtifact: "../outside.txt" });
+    const traversalItem = await checkEvidenceCollection({ projectRoot: root, acId: "AC-28", criteria, metaPath });
+    assert.equal(traversalItem.ok, false);
+    assert.equal(traversalItem.rejection?.code, "evidence-path-invalid");
+    // 角色范围（scopeRoots）外的 collection ⇒ evidence-scope-denied。
+    await writeMeta();
+    const denied = await checkEvidenceCollection({ projectRoot: root, acId: "AC-28", criteria, metaPath, scopeRoots: ["other-role/"] });
+    assert.equal(denied.ok, false);
+    assert.equal(denied.rejection?.code, "evidence-scope-denied");
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("F3：单文件 metaPath 越界/绝对/.ans/.env 一律 evidence-path-invalid", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-evidence-path-"));
+  try {
+    const criteria = parsed();
+    const artifact = "tests/evidence/path.txt";
+    await fs.mkdir(path.dirname(path.join(root, artifact)), { recursive: true });
+    await fs.writeFile(path.join(root, artifact), "共 1 行\n", "utf8");
+    for (const metaPath of ["../outside.meta.json", "C:/outside.meta.json", ".ans/state.json", ".env", "tests/evidence/.env.local"]) {
+      const result = await checkEvidence({ projectRoot: root, acId: "AC-28", criteria, artifact, metaPath });
+      assert.equal(result.ok, false, metaPath);
+      assert.equal(result.rejection?.code, "evidence-path-invalid", metaPath);
+    }
   } finally {
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }

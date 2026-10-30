@@ -104,6 +104,69 @@ function criteriaFailure(code: string, missing: string, docs: string[] = []): Cr
   return { ok: false, code, rejection: makeMechanicalRejection(code, [missing], { docs }) };
 }
 
+export const EVIDENCE_PATH_CODE = "evidence-path-invalid" as const;
+export const EVIDENCE_SCOPE_CODE = "evidence-scope-denied" as const;
+
+export type EvidencePathResult = { ok: true; path: string } | { ok: false; code: typeof EVIDENCE_PATH_CODE; reason: string };
+
+export class EvidencePathError extends Error {
+  readonly code = EVIDENCE_PATH_CODE;
+  constructor(message: string) {
+    super(message);
+    this.name = "EvidencePathError";
+  }
+}
+
+/**
+ * 证据路径归一化（3.4/F3）：必须是项目内相对路径；拒绝绝对路径、`..` 越界、`.ans` 与 `.env`/`.env.*`。
+ * artifact/metaPath/collection item 共用同一规则；失败 fail-closed，不落到 readFile。
+ */
+export function validateEvidencePath(raw: unknown): EvidencePathResult {
+  if (typeof raw !== "string") return { ok: false, code: EVIDENCE_PATH_CODE, reason: "路径必须是字符串" };
+  const slashed = raw.trim().replace(/\\/g, "/");
+  if (slashed === "") return { ok: false, code: EVIDENCE_PATH_CODE, reason: "路径为空" };
+  if (slashed.includes("\0")) return { ok: false, code: EVIDENCE_PATH_CODE, reason: "路径包含空字符" };
+  if (slashed.startsWith("/") || /^[A-Za-z]:/.test(slashed)) {
+    return { ok: false, code: EVIDENCE_PATH_CODE, reason: `不允许绝对路径：${raw}` };
+  }
+  const segments: string[] = [];
+  for (const segment of slashed.split("/")) {
+    if (segment === "" || segment === ".") continue;
+    if (segment === "..") return { ok: false, code: EVIDENCE_PATH_CODE, reason: `不允许 .. 越界：${raw}` };
+    if (segment === ".ans") return { ok: false, code: EVIDENCE_PATH_CODE, reason: `不允许访问 .ans：${raw}` };
+    segments.push(segment);
+  }
+  if (segments.length === 0) return { ok: false, code: EVIDENCE_PATH_CODE, reason: `路径为空：${raw}` };
+  const base = segments[segments.length - 1]!;
+  if (base === ".env" || base.startsWith(".env.")) {
+    return { ok: false, code: EVIDENCE_PATH_CODE, reason: `不允许访问 .env：${raw}` };
+  }
+  return { ok: true, path: segments.join("/") };
+}
+
+/** 角色证据范围判定：路径等于 root 或位于 root 目录内。 */
+export function isWithinEvidenceRoots(relPath: string, roots: readonly string[]): boolean {
+  const target = relPath.trim().replace(/\\/g, "/").replace(/^\.\/+/, "").replace(/\/+$/, "");
+  return roots.some((root) => {
+    const normalized = root.trim().replace(/\\/g, "/").replace(/^\.\/+/, "").replace(/\/+$/, "");
+    return normalized !== "" && normalized !== "." && (target === normalized || target.startsWith(`${normalized}/`));
+  });
+}
+
+function failureResult(code: string, missing: string[], docs: string[] = [], priority?: AcPriority): EvidenceCheckResult {
+  const rejection = makeMechanicalRejection(code, missing, { docs });
+  return {
+    ok: false,
+    valid: false,
+    ...(priority !== undefined ? { priority } : {}),
+    unverified: false,
+    legacy: false,
+    p0Ignored: false,
+    mismatch: rejection.missing,
+    rejection,
+  };
+}
+
 /** AC canonical 归一化（NFKC/去空白/大写/去前导零）；失败返回 undefined。 */
 export function normalizeAcId(raw: unknown): string | undefined {
   if (typeof raw !== "string") return undefined;
@@ -113,7 +176,7 @@ export function normalizeAcId(raw: unknown): string | undefined {
     const digits = ac[1]!;
     return `AC-${digits === "" ? "0" : String(Number(digits))}`;
   }
-  const p = /^P0*(\d{1,2})\.0*(\d{1,2})$/.exec(value);
+  const p = /^P(0*[1-9]\d{0,1})\.(0*[1-9]\d{0,1})$/.exec(value);
   if (p !== null) return `P${Number(p[1])}.${Number(p[2])}`;
   return undefined;
 }
@@ -199,8 +262,11 @@ export function parseCriteriaText(text: string, input: { flowId: string; fileNam
     if (priority === undefined) return criteriaFailure("criteria-priority-invalid", `criteria[${index}] priority 非法：${String(raw["priority"])}`);
     if (seen.has(id)) return criteriaFailure("criteria-duplicate-ac", `重复 canonical AC id：${id}`);
     seen.add(id);
-    const title = typeof raw["title"] === "string" ? raw["title"] : undefined;
-    criteria.push({ id, priority, ...(title !== undefined ? { title } : {}) });
+    const title = raw["title"];
+    if (title !== undefined && typeof title !== "string") {
+      return criteriaFailure("criteria-schema-invalid", `criteria[${index}] title 必须是字符串`);
+    }
+    criteria.push({ id, priority, ...(typeof title === "string" ? { title } : {}) });
   }
   const sha256 = createHash("sha256").update(Buffer.from(normalized, "utf8")).digest("hex");
   return { ok: true, doc: { schema: CRITERIA_SCHEMA, flowId, version, status, criteria, path: input.ref?.path ?? "", sha256 } };
@@ -234,9 +300,11 @@ export async function loadCriteria(
   return { ok: true, doc: { ...parsed.doc, path: rel, sha256: actualSha } };
 }
 
-/** 读取 artifact 实际 bytes/lines/sha256/mtime（UTF-8，CRLF/LF 统一后计行）。 */
+/** 读取 artifact 实际 bytes/lines/sha256/mtime（UTF-8，CRLF/LF 统一后计行；路径先做项目内校验）。 */
 export async function readArtifact(projectRoot: string, relPath: string): Promise<ArtifactActual> {
-  const rel = relPath.replace(/\\/g, "/");
+  const validated = validateEvidencePath(relPath);
+  if (!validated.ok) throw new EvidencePathError(validated.reason);
+  const rel = validated.path;
   const abs = path.join(projectRoot, rel);
   const bytes = await readFile(abs);
   const info = await stat(abs);
@@ -263,6 +331,7 @@ export function parseEvidenceMeta(text: string): { ok: true; meta: EvidenceMetaV
   if (!isRecord(parsed) || parsed["schema"] !== EVIDENCE_META_SCHEMA) return { ok: false, reason: `sidecar schema 必须为 ${EVIDENCE_META_SCHEMA}` };
   const p0Ignored = Object.prototype.hasOwnProperty.call(parsed, "p0");
   if (Array.isArray(parsed["collection"])) {
+    if (typeof parsed["generatedAt"] !== "string") return { ok: false, reason: "collection 缺/非法字段 generatedAt" };
     const items: EvidenceCollectionItem[] = [];
     for (const [index, raw] of (parsed["collection"] as unknown[]).entries()) {
       if (!isRecord(raw)) return { ok: false, reason: `collection[${index}] 非法` };
@@ -307,6 +376,8 @@ export async function checkEvidence(input: {
   criteria: CriteriaDoc;
   artifact: string;
   metaPath?: string;
+  /** 调用角色证据范围（evidence_check 注入；缺省＝数据层直用，不做角色裁剪）。 */
+  scopeRoots?: string[];
 }): Promise<EvidenceCheckResult> {
   const acId = normalizeAcId(input.acId);
   const entry = acId === undefined ? undefined : input.criteria.criteria.find((item) => item.id === acId);
@@ -314,13 +385,23 @@ export async function checkEvidence(input: {
     const rejection = makeMechanicalRejection("criteria-mismatch", [`AC ${String(input.acId)} 不在 criteria`], { docs: [input.criteria.path] });
     return { ok: false, valid: false, unverified: false, legacy: false, p0Ignored: false, mismatch: rejection.missing, rejection };
   }
+  const artifactPath = validateEvidencePath(input.artifact);
+  if (!artifactPath.ok) return failureResult(EVIDENCE_PATH_CODE, [artifactPath.reason], [input.criteria.path], entry.priority);
+  if (input.scopeRoots !== undefined && !isWithinEvidenceRoots(artifactPath.path, input.scopeRoots)) {
+    return failureResult(EVIDENCE_SCOPE_CODE, [`artifact ${artifactPath.path} 不在调用角色的模块证据范围`], [input.criteria.path], entry.priority);
+  }
+  const metaPath = validateEvidencePath(input.metaPath ?? `${artifactPath.path}.meta.json`);
+  if (!metaPath.ok) return failureResult(EVIDENCE_PATH_CODE, [metaPath.reason], [input.criteria.path], entry.priority);
+  if (input.scopeRoots !== undefined && !isWithinEvidenceRoots(metaPath.path, input.scopeRoots)) {
+    return failureResult(EVIDENCE_SCOPE_CODE, [`metaPath ${metaPath.path} 不在调用角色的模块证据范围`], [input.criteria.path], entry.priority);
+  }
+  const metaRel = metaPath.path;
   let actual: ArtifactActual;
-  try { actual = await readArtifact(input.projectRoot, input.artifact); }
+  try { actual = await readArtifact(input.projectRoot, artifactPath.path); }
   catch {
-    const rejection = makeMechanicalRejection("criteria-missing", [`证据 artifact 不可读：${input.artifact}`], { docs: [input.criteria.path] });
+    const rejection = makeMechanicalRejection("criteria-missing", [`证据 artifact 不可读：${artifactPath.path}`], { docs: [input.criteria.path] });
     return { ok: false, valid: false, priority: entry.priority, unverified: false, legacy: false, p0Ignored: false, mismatch: rejection.missing, rejection };
   }
-  const metaRel = input.metaPath ?? `${actual.path}.meta.json`;
   let metaText: string;
   try { metaText = await readFile(path.join(input.projectRoot, metaRel), "utf8"); }
   catch {
@@ -336,8 +417,14 @@ export async function checkEvidence(input: {
     return { ok: false, valid: false, priority: entry.priority, unverified: false, legacy: false, p0Ignored: false, actual, mismatch: [parsedMeta.reason], rejection };
   }
   if ("collection" in parsedMeta.meta) {
-    const rejection = makeMechanicalRejection("evidence-mismatch", ["使用了 collection sidecar；请改走 checkEvidenceCollection"], { docs: [metaRel] });
-    return { ok: false, valid: false, priority: entry.priority, unverified: false, legacy: false, p0Ignored: parsedMeta.p0Ignored, actual, mismatch: rejection.missing, rejection };
+    // F1：collection sidecar 对真实路径同样生效——单证据入口自动路由到 collection 检查。
+    return checkEvidenceCollection({
+      projectRoot: input.projectRoot,
+      acId: input.acId,
+      criteria: input.criteria,
+      metaPath: metaRel,
+      ...(input.scopeRoots !== undefined ? { scopeRoots: input.scopeRoots } : {}),
+    });
   }
   const meta = parsedMeta.meta;
   const claims = parseArtifactClaims(actual.text);
@@ -365,12 +452,14 @@ export async function checkEvidence(input: {
   return { ok: true, valid: true, priority: entry.priority, unverified: false, legacy: false, p0Ignored: parsedMeta.p0Ignored, actual, meta, claims, mismatch: [] };
 }
 
-/** 多文件 collection sidecar 检查（每文件 path/hash/bytes/lines）。 */
+/** 多文件 collection sidecar 检查（每文件 path/hash/bytes/lines + collection generatedAt/mtime + 自述）。 */
 export async function checkEvidenceCollection(input: {
   projectRoot: string;
   acId: string;
   criteria: CriteriaDoc;
   metaPath: string;
+  /** 调用角色证据范围（evidence_check 注入；缺省＝数据层直用，不做角色裁剪）。 */
+  scopeRoots?: string[];
 }): Promise<EvidenceCheckResult> {
   const acId = normalizeAcId(input.acId);
   const entry = acId === undefined ? undefined : input.criteria.criteria.find((item) => item.id === acId);
@@ -378,35 +467,62 @@ export async function checkEvidenceCollection(input: {
     const rejection = makeMechanicalRejection("criteria-mismatch", [`AC ${String(input.acId)} 不在 criteria`], { docs: [input.criteria.path] });
     return { ok: false, valid: false, unverified: false, legacy: false, p0Ignored: false, mismatch: rejection.missing, rejection };
   }
+  const metaPath = validateEvidencePath(input.metaPath);
+  if (!metaPath.ok) return failureResult(EVIDENCE_PATH_CODE, [metaPath.reason], [input.criteria.path], entry.priority);
+  if (input.scopeRoots !== undefined && !isWithinEvidenceRoots(metaPath.path, input.scopeRoots)) {
+    return failureResult(EVIDENCE_SCOPE_CODE, [`collection metaPath ${metaPath.path} 不在调用角色的模块证据范围`], [input.criteria.path], entry.priority);
+  }
+  const metaRel = metaPath.path;
   let text: string;
-  try { text = await readFile(path.join(input.projectRoot, input.metaPath), "utf8"); }
+  try { text = await readFile(path.join(input.projectRoot, metaRel), "utf8"); }
   catch {
     if (entry.priority === "P0") {
-      const rejection = makeMechanicalRejection("evidence-mismatch", [`P0 collection sidecar 缺失：${input.metaPath}`], { docs: [input.metaPath] });
+      const rejection = makeMechanicalRejection("evidence-mismatch", [`P0 collection sidecar 缺失：${metaRel}`], { docs: [metaRel] });
       return { ok: false, valid: false, priority: entry.priority, unverified: false, legacy: false, p0Ignored: false, mismatch: rejection.missing, rejection };
     }
     return { ok: true, valid: false, priority: entry.priority, unverified: true, legacy: true, p0Ignored: false, mismatch: [] };
   }
   const parsed = parseEvidenceMeta(text);
   if (!parsed.ok || !("collection" in parsed.meta)) {
-    const rejection = makeMechanicalRejection("evidence-mismatch", [parsed.ok ? "sidecar 不是 collection" : parsed.reason], { docs: [input.metaPath] });
+    const rejection = makeMechanicalRejection("evidence-mismatch", [parsed.ok ? "sidecar 不是 collection" : parsed.reason], { docs: [metaRel] });
     return { ok: false, valid: false, priority: entry.priority, unverified: false, legacy: false, p0Ignored: parsed.ok ? parsed.p0Ignored : false, mismatch: rejection.missing, rejection };
   }
   const mismatch: string[] = [];
+  const generated = Date.parse(parsed.meta.generatedAt);
+  if (!Number.isFinite(generated)) mismatch.push("collection generatedAt 非 ISO 时间");
+  if (parsed.meta.collection.length === 0) mismatch.push("collection 为空（没有可校验文件）");
   if (acId !== undefined && !(parsed.meta.acIds ?? []).some((id) => normalizeAcId(id) === acId)) mismatch.push(`collection acIds 不含 ${acId}`);
   for (const item of parsed.meta.collection) {
+    const itemPath = validateEvidencePath(item.artifact);
+    if (!itemPath.ok) {
+      return failureResult(EVIDENCE_PATH_CODE, [`collection 项路径非法：${itemPath.reason}`], [metaRel], entry.priority);
+    }
+    if (input.scopeRoots !== undefined && !isWithinEvidenceRoots(itemPath.path, input.scopeRoots)) {
+      return failureResult(EVIDENCE_SCOPE_CODE, [`collection 项 ${itemPath.path} 不在调用角色的模块证据范围`], [metaRel], entry.priority);
+    }
     try {
-      const actual = await readArtifact(input.projectRoot, item.artifact);
-      if (actual.sha256 !== item.sha256) mismatch.push(`${item.artifact}: sha256 不一致`);
-      if (actual.bytes !== item.bytes) mismatch.push(`${item.artifact}: bytes 不一致`);
-      if (actual.lines !== item.lines) mismatch.push(`${item.artifact}: lines 不一致`);
-      if (item.acIds !== undefined && acId !== undefined && !item.acIds.some((id) => normalizeAcId(id) === acId)) mismatch.push(`${item.artifact}: acIds 不含 ${acId}`);
+      const actual = await readArtifact(input.projectRoot, itemPath.path);
+      if (actual.sha256 !== item.sha256) mismatch.push(`${itemPath.path}: sha256 不一致`);
+      if (actual.bytes !== item.bytes) mismatch.push(`${itemPath.path}: bytes 不一致`);
+      if (actual.lines !== item.lines) mismatch.push(`${itemPath.path}: lines 不一致`);
+      if (Number.isFinite(generated) && generated < actual.mtimeMs - 1000) {
+        mismatch.push(`${itemPath.path}: artifact 修改晚于 collection generatedAt（stale）`);
+      }
+      const claims = parseArtifactClaims(actual.text);
+      if (claims.lines !== undefined && claims.lines !== actual.lines) mismatch.push(`${itemPath.path}: 自述行数 ${claims.lines} 与实际 ${actual.lines} 不一致`);
+      if (claims.pass !== undefined && item.metrics?.["pass"] !== undefined && claims.pass !== item.metrics["pass"]) {
+        mismatch.push(`${itemPath.path}: 自述 pass ${claims.pass} 与 sidecar metrics.pass ${item.metrics["pass"]} 不一致`);
+      }
+      if (claims.fail !== undefined && item.metrics?.["fail"] !== undefined && claims.fail !== item.metrics["fail"]) {
+        mismatch.push(`${itemPath.path}: 自述 fail ${claims.fail} 与 sidecar metrics.fail ${item.metrics["fail"]} 不一致`);
+      }
+      if (item.acIds !== undefined && acId !== undefined && !item.acIds.some((id) => normalizeAcId(id) === acId)) mismatch.push(`${itemPath.path}: acIds 不含 ${acId}`);
     } catch {
-      mismatch.push(`${item.artifact}: 不可读`);
+      mismatch.push(`${itemPath.path}: 不可读`);
     }
   }
   if (mismatch.length > 0) {
-    const rejection = makeMechanicalRejection("evidence-mismatch", mismatch, { docs: [input.metaPath] });
+    const rejection = makeMechanicalRejection("evidence-mismatch", mismatch, { docs: [metaRel] });
     return { ok: false, valid: false, priority: entry.priority, unverified: false, legacy: false, p0Ignored: parsed.p0Ignored, meta: parsed.meta, mismatch, rejection };
   }
   return { ok: true, valid: true, priority: entry.priority, unverified: false, legacy: false, p0Ignored: parsed.p0Ignored, meta: parsed.meta, mismatch: [] };

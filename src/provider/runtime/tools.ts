@@ -52,7 +52,8 @@ import { DEFAULT_LOCALE, translate } from "../../common/shared/i18n/index.ts";
 import type { MessageKey } from "../../common/shared/i18n/keys.ts";
 import { describeTool } from "./schema.ts";
 import { formatDenialMessage } from "../../common/runtime-core/format-denial.ts";
-import { formatMechanicalRejection, type MechanicalRejection } from "../../common/编排/mechanical-rejection.ts";
+import { formatMechanicalRejection, makeMechanicalRejection, type MechanicalRejection } from "../../common/编排/mechanical-rejection.ts";
+import { validateEvidencePath } from "../../common/编排/evidence-check.ts";
 // 2026-10-18 真机修复：写前校验角色 boundary.yaml 内容（**只经 Service 公共出口**——Provider 不直接
 // import 门禁引擎私有 `common/门禁引擎/boundary-yaml.ts`；该出口再导出**同一函数引用**，单一来源不变，
 // 与运行时边界解析同一实现，避免「写得进、枚举不了」）。
@@ -2302,8 +2303,8 @@ function criteriaRefOf(args: Record<string, unknown>): CriteriaRef | undefined {
 }
 
 /**
- * evidence_check：只读证据自洽检查（3.4/P4.4）。本层只做参数归一（artifact/metaPath/acId/criteriaRef）
- * → 调注入数据源（`raceAbort`：会话中止即返回）→ 如实转达（≤4 KiB，超限截断标注）。
+ * evidence_check：只读证据自洽检查（3.4/P4.4；rework F2/F3）。本层只做参数归一（artifact/metaPath/acId/criteriaRef）
+ * → 项目内路径与调用角色裁剪（伪数据源也不放行越界/越权查询）→ 调注入数据源（`raceAbort`）→ 如实转达（≤4 KiB）。
  * **绝无副作用**：不执行项目脚本、不写盘、不改 artifact/sidecar、不授予写权；数据源缺席/失败如实回报，
  * 不得据此宣称证据通过。
  */
@@ -2312,15 +2313,30 @@ function makeEvidenceCheckTool(fn: EvidenceCheckFn, currentTurnId?: () => string
   return {
     name,
     async handler(call) {
-      const artifact = readStringArg(call.args, ["artifact", "path", "artifactPath"]);
-      if (artifact === undefined || artifact.trim() === "") return { ok: false, message: `${name}: artifact 参数必填（项目相对路径）。` };
-      const metaPath = readStringArg(call.args, ["metaPath", "meta_path"]);
+      const artifactRaw = readStringArg(call.args, ["artifact", "path", "artifactPath"]);
+      if (artifactRaw === undefined || artifactRaw.trim() === "") return { ok: false, message: `${name}: artifact 参数必填（项目相对路径）。` };
+      const artifact = validateEvidencePath(artifactRaw);
+      if (!artifact.ok) {
+        return { ok: false, message: `${name}: ${formatMechanicalRejection(makeMechanicalRejection("evidence-path-invalid", [artifact.reason]))}` };
+      }
+      const metaRaw = readStringArg(call.args, ["metaPath", "meta_path"]);
+      const metaPath = metaRaw !== undefined && metaRaw.trim() !== "" ? validateEvidencePath(metaRaw) : undefined;
+      if (metaPath !== undefined && !metaPath.ok) {
+        return { ok: false, message: `${name}: ${formatMechanicalRejection(makeMechanicalRejection("evidence-path-invalid", [metaPath.reason]))}` };
+      }
+      const requestedRole = readStringArg(call.args, ["roleId", "role_id"]);
+      if (requestedRole !== undefined && requestedRole.trim() !== "" && scope?.roleId !== undefined && requestedRole.trim() !== scope.roleId) {
+        return {
+          ok: false,
+          message: `${name}: ${formatMechanicalRejection(makeMechanicalRejection("evidence-scope-denied", [`只允许查询本角色（${scope.roleId}）的证据；请求角色=${requestedRole.trim()}`]))}`,
+        };
+      }
       const acId = readStringArg(call.args, ["acId", "ac_id"]);
       const criteriaRef = criteriaRefOf(call.args);
       if (criteriaRef === undefined) return { ok: false, message: `${name}: criteriaRef 必填（{path,sha256,version}；不取 latest）。` };
       const input: EvidenceCheckInput = {
-        artifact: artifact.trim(),
-        ...(metaPath !== undefined && metaPath.trim() !== "" ? { metaPath: metaPath.trim() } : {}),
+        artifact: artifact.path,
+        ...(metaPath !== undefined ? { metaPath: metaPath.path } : {}),
         ...(acId !== undefined && acId.trim() !== "" ? { acId: acId.trim() } : {}),
         criteriaRef,
       };
