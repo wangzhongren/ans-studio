@@ -63,6 +63,12 @@
 | 单文件 | `test/桌面应用/run-change.test.ts` | 主进程侧测试：run-change 复用 decision 卡三路径（continue-frozen/stop-and-restart/stop）与 approve/reject/cancel 映射（customer-input/session） |
 | 单文件 | `test/桌面应用/rejection-copy.test.ts` | 主进程侧测试：拒绝三段式文案——code/missing/action/owner/docs/retryable、客户卡只人话、系统行折叠技术 code（session/interface/customer-input/operator-channel） |
 | 单文件 | `test/桌面应用/acceptance-evidence.test.ts` | 主进程侧测试：验收证据自洽——AcceptanceFact/P0 派生、sidecar 重算、evidence_check、mismatch 负例（AC-28）与未校验标识（interface/session/customer-input） |
+| 单文件 | `test/桌面应用/turn-lease.test.ts` | 主进程侧测试：turn lease——origin 不覆盖、settled 按 turnId 兜底清 busy、补 delivery.end/failed、stop 强制复位投递 origin/busy/activeDeliveries 与空闲-busy 楔死自愈（P0，session） |
+| 单文件 | `test/桌面应用/queue-visibility.test.ts` | 主进程侧测试：队列可见性——ageMs/headKind/blockedReason/activeTurnId、drain/age/depth 与 role-state 队列字段（P0，session/interface） |
+| 单文件 | `test/桌面应用/abort-unwedge.test.ts` | 主进程侧测试：手动停止强制解开 target-busy 楔死——abort 复位 origin/busy/activeDeliveries、队列排空且不重复投递（P0，session/interface） |
+| 单文件 | `test/桌面应用/request-timeout-wiring.test.ts` | 主进程侧测试：请求超时接线——首字节/流空闲 deadline 的失败终态系统行/短报，不伪造成功（P1，session/interface） |
+| 单文件 | `test/桌面应用/network-monitor.test.ts` | 主进程侧测试：网络监听——net.isOnline/5s 采样、powerMonitor suspend/resume/lock/unlock、1s 稳定窗口与连续 2 次离线判定、离线 fail-fast/安全暂停/恢复重试窗口/锁屏≠离线（P2，main/interface/session） |
+| 单文件 | `test/桌面应用/replay-safe-retry.test.ts` | 主进程侧测试：仅 replay-safe 同 turn 安全重试——重试失败/终态/短报、不重复 settled/handback、取消优先（P3，session/interface） |
 | 单文件 | `角色卡/桌面窗口/feature-map.md` | 功能导航 |
 | 单文件 | `角色卡/桌面窗口/memo.md` | 本角色工作备忘录 |
 | 单文件 | `角色卡/桌面窗口/changelog.md` | 本角色治理变更记录 |
