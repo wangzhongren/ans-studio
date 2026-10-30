@@ -1,0 +1,5 @@
+# phase5a Electron renderer smoke (P0 candidate)
+- command: node_modules/.bin/electron test/桌面UI/phase5a-electron-smoke.mjs "" phase5a-smoke
+- result: PHASE5A_SMOKE_DONE failures=0 checks=40; exit code 0
+- report: phase5a-smoke/report.json
+- raw log: phase5a.log (local evidence; SHA-256 ac6b40316365a3b0ed957e0aceeaf6bcb5d3503e468b8ba2ea73a883633de17e)

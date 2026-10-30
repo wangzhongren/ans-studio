@@ -1,0 +1,52 @@
+# candidate source tree snapshot before final full regression (2026-10-30 20:33:35 +0800)
+## git status
+ M app/desktop/session.ts
+ M app/desktop/watchdog.ts
+ M app/main.ts
+ M app/renderer/src/chat/chat-store.ts
+ M app/renderer/src/chat/confirm-logic.ts
+ M app/renderer/src/chat/ipc.ts
+ M app/renderer/src/chat/types.ts
+ M app/renderer/src/chat/work-view.ts
+ M app/renderer/src/shell/QueuePanel.tsx
+ M app/renderer/src/shell/QueueSubview.tsx
+ M app/renderer/src/shell/WorkOverview.tsx
+ M src/common/shared/i18n/messages/en-US.ts
+ M src/common/shared/i18n/messages/zh-CN.ts
+ M test/桌面应用/handback-delivery.test.ts
+ M test/桌面应用/message-queue.test.ts
+ M test/桌面应用/queue-withdraw-lru.test.ts
+ M test/桌面应用/watchdog-reuse.test.ts
+ M test/项目管理/shared/i18n.test.ts
+?? docs/scheduling/2026-10-30_turn-retry-network-watch-change-P0.md
+?? test/桌面UI/queue-status.test.ts
+?? test/桌面应用/abort-unwedge.test.ts
+?? test/桌面应用/queue-visibility.test.ts
+?? test/桌面应用/turn-lease.test.ts
+?? test/测试/queue-recovery-e2e.test.ts
+?? 角色卡/测试/docs/change/2026-10-30_turn-retry-network-watch-P0-evidence/
+## changed file hashes
+00a59e3774f667d24a2bcd7492bfc9fe93c7f9ac30d8d034b25f84281836e94f  docs/scheduling/2026-10-30_turn-retry-network-watch-change-P0.md
+19ae3870e9ae017dcf273c1b9a21fecfe6d8a00205401178307ca0478ec2163d  app/desktop/session.ts
+1eead20c7a04fd54ce28660f241c0b754e2209755a7bea68e3ab90de014d3189  test/桌面应用/watchdog-reuse.test.ts
+31e1823cfb89bacd06f00a08f38b61491cb19966d1cebfd644627eefc1fe4a5e  test/桌面应用/message-queue.test.ts
+3a189770691a90548530d5519a622d132e287c5d486144df6af6d7a4e9d95958  test/桌面应用/queue-visibility.test.ts
+460e95150fa09013ac4da58c9d24c958f0d5b1b4849dd3ed5afec82c17b9d9ce  test/桌面UI/queue-status.test.ts
+46160c1e19225e719c3e169fe5af79f9f51ac6c876350d9fe6a307e713ca5bb7  app/renderer/src/chat/ipc.ts
+487839b1c9f3d48cdaee0be4c4ed46f61feaa867db9aca13e97d4d8c85f3946b  src/common/shared/i18n/messages/zh-CN.ts
+595a877cee6032758b62575940fb2bc7f39a37303d4aaa0b034e040564e2c73d  app/renderer/src/shell/QueueSubview.tsx
+6f2ebada9362ad5ded6287be2314eaa279a45aceeb94ebd6e63bb54aaf6cec62  src/common/shared/i18n/messages/en-US.ts
+710f5e17d2e6c9269b3d084ccfc91472c4a72bc95c968af46912f16514f5a982  test/桌面应用/turn-lease.test.ts
+7a7126b4421eca2a01b91e24e01fdad34be2dbfb25883efdf5dde937aebc1b5c  test/桌面应用/abort-unwedge.test.ts
+7ae49cc7b3690fb49b03a8ece048f358b3087294391ab3e4fa566d06a811c0d1  app/renderer/src/chat/types.ts
+81ce4a11b419014a455c88d6b6a1fb208292973ea4f625ab145b0e2113350f54  test/桌面应用/handback-delivery.test.ts
+8ccc8b177eef89bcdae9ee0cb82e02de4fb2261a52137a734229b5b7e20f44c4  test/项目管理/shared/i18n.test.ts
+8df434f96b0002e019d601f4f8d6291a167ddb3b9fbd2bdf9b69a3503a2cdf07  test/桌面应用/queue-withdraw-lru.test.ts
+a54842ad7bab0717ac84b281fe869b0f0c227d4dee0d0d4b0904b3c175663f17  app/main.ts
+adfd326f9309987ff1d42f5bb4780e496a34ede2260d9cc6b695772c8afab9d8  app/renderer/src/chat/chat-store.ts
+bc3ae89e3df0e7c7c404cd6d955cba7f54a3d981901eaad01c67892585b199b0  app/renderer/src/chat/confirm-logic.ts
+c1f664a46c0de988e8983642bac7eb23206e5ae3da9fe2722569dcf90e2dde5f  test/测试/queue-recovery-e2e.test.ts
+ed8c7aa50c5358b74735e35c09161b05ff14fc7841536e7b52456ab793d2178e  app/renderer/src/chat/work-view.ts
+ee22be8477ff514a4ffeca38aef0a345d8134739793f9175f178f2e02a8da8cc  app/renderer/src/shell/QueuePanel.tsx
+f310de553172cc20791fc5eee6cb3efcbb5c3965344bf84b23bd0ed4552176cc  app/renderer/src/shell/WorkOverview.tsx
+fdb7144dadac34a4e9e947dab6cfcfa183b1f8a931c801044402522b6cec62d5  app/desktop/watchdog.ts

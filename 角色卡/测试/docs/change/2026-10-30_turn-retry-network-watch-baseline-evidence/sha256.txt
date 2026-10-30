@@ -1,4 +1,4 @@
-# baseline evidence hashes (2026-10-30 19:56:40 +0800)
+# evidence hashes (2026-10-30 20:39:11 +0800); manifest itself excluded
 e8fd9f00454b9392d751cbcd5b01861f751e233a808787e54ee97616c0526b0e  build-renderer.log
 92ad1677d73bc19b0d8031b5769f0601fe886ce5ad11537486632058a505bfbd  electron-e2e-screenshots.sha256
 7f0b93fe144bc208d8282abb5b47c5c79d3a36cdb787db3620fcf2eff28b3ffe  electron-e2e-summary.txt
@@ -100,7 +100,6 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  phase5a-smoke/
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  phase5a-smoke/user-data/declarative_performance_observer.db-journal
 b2c2f9f0c7a622a8af7fec4a532b7b79fe1a2b08db202006cb18a099d3a2f737  phase5a-summary.txt
 e18fc20eb5cac7672106bebdd6f514051beefcbfd160395afddcc8e9c029f98d  phase5a.log
-08ee8011125161ec4133ad6f70d160ad35f35db0bea1c156101bc4db7f4e4ec3  sha256.txt
 92600c0941ed4a76102406159da3b014d87b2851af3ba933ca3d5ceca8606a10  target-file-hashes-before.txt
 2557948af89914f2311720c0fd8b75dd246d2e981e4f6f32240a82d3256479a5  target-jinyong-files-after.txt
 0afc1162e0d1ea5585f3bada2e8c1f82bf9ad66636578a910e8eee95ed80f35c  target-jinyong-files-before.txt
@@ -111,5 +110,3 @@ ffdfbdd9882a0ff2b2a32a3ff1dcd8926794e809b07645c030194b5150151d4a  target-test-fi
 9820dbef8d9d3a3da148da7a9c8ed0b7450e90f994512f5be706d2b89bf25f5b  typecheck-renderer.log
 641fc8857ad17a5454e13134f4a1dbb033f8c180f122befdd72fd22edb8b9ba5  typecheck-summary.txt
 dcc449f7f4fc1917d5986f149a0ea06e8e8c0b7a2b8fd838bfcdf008a42af36f  typecheck.log
-# record
-07a6e3bad4936116c390c8e1b46ee6b64f58f398fdf996a9d3cd919a17c74172 *角色卡/测试/docs/change/2026-10-30_turn-retry-network-watch-baseline.md

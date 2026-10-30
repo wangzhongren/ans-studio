@@ -1,0 +1,33 @@
+# Target-project zero-write check (P0 candidate verification)
+
+## Targets
+- C:/Users/51054/Downloads/test (live ANS project; read-only target)
+- C:/Users/51054/Desktop/work/jinyong-rogue-2d (read-only target; not a git repo)
+
+## Method
+- Read-only metadata snapshots (path|size|mtime; no file contents opened, no writes):
+  target-test-files-snapshot.txt / target-jinyong-files-snapshot.txt.
+- Path isolation: this P0 candidate's tests and commands never reference the target project:
+  - `grep -rl "Downloads/test" test/` => 0 files.
+  - `grep -a "Downloads/test"` over all P0 logs => 0 matches (recorded in final evidence hash run).
+  - Unit/integration tests use `%TEMP%` fixtures; the real-Electron E2E used
+    `ANS_E2E_PROJECT=<worktree root>` and `ANS_E2E_OUTDIR=<P0 evidence dir>` (loopback/temp only).
+- `jinyong-rogue-2d`: metadata diff vs the S1 baseline after-snapshot = only the snapshot header line
+  (timestamp); zero file entries changed.
+
+## `Downloads/test` external activity
+- The project is being actively written by a live ANS run throughout the window (its own
+  `.ans/sessions/**`, `.ans/state/**` and role work products advance continuously; same as observed
+  during S1). Those changes are external and are NOT caused by this candidate.
+- No project file was opened/read/written by this candidate's commands beyond directory metadata
+  fingerprints required by the zero-write check.
+
+## Snapshot hashes
+- target-test-files-snapshot.txt  sha256 a36948c47497fbcf2722d932438be1eb9cd9fbfee6ae6848c05b0eba57a81b0b
+- target-jinyong-files-snapshot.txt sha256 4d0fb810e988dca53dbd192d5c6adbd4e0d9aa8b7b13345173ffd2ac02a9ec20
+
+## Conclusion
+This P0 candidate caused zero writes to either target project.
+
+## Log reference check (final)
+- `grep -a "Downloads/test"` over all P0 logs (full regression, typechecks, build, E2E, phase5a) => 0 matches.
