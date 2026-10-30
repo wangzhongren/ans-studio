@@ -1,0 +1,43 @@
+# P1 full regression summary (candidate 105c187)
+command: node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')
+ℹ tests 3117
+ℹ suites 0
+ℹ pass 3090
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 18
+ℹ todo 0
+ℹ duration_ms 252744.6803
+files: 368 (S1 358 -> P0 363 -> P1 368; +5 new P1 test files)
+comparison: S1 3077/3050/9/18 -> P0 3094/3067/9/18 -> P1 3117/3090/9/18 (+23 tests/+23 pass)
+
+## Failure classification (9; identical set to S1, all pre-existing Windows symlink EPERM errno -4048)
+- test/claude-adapter/session.test.ts:637:1 :: native symlink and storage runtime mismatch fail before SDK query (3.4417ms)
+- test/codex-adapter/session.test.ts:351:1 :: native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary (16.7719ms)
+- test/pi-adapter/injected-runtime.test.ts:185:1 :: store validate callback rejects directory symlink before Pi parse or new native write (6.6147ms)
+- test/pi-adapter/injected-runtime.test.ts:193:1 :: Pi storage refuses file symlink and role/runtime mismatch without touching other storage (8.3915ms)
+- test/runtime-core/file-write-safety.test.ts:97:1 :: D3 linked workspace root remains usable; linked target itself is not replaced (7.6635ms)
+- test/runtime-core/session-store.test.ts:46:1 :: store: traversal, mismatched scope and symlinked runtime directories rejected (2.1643ms)
+- test/runtime-core/session-store.test.ts:58:1 :: store: native validation stays lazy and native symlink is rejected before effects (3.5868ms)
+- test/测试/g4-skill-verify/b-render-double-check.test.ts:182:1 :: 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛 (3.1868ms)
+- test/编排/shell-authorized-routine.test.ts:103:1 :: node test外指符号链接路径不获委托；项目内测试路径获委托 (1.9426ms)
+
+## Skips (runner count 18; unchanged from S1; 17 inline '# SKIP' lines listed below)
+  ﹣ owned native process group cleanup kills a wrapper and child that ignore SIGTERM (0.098ms) # SKIP
+  ﹣ D3 write and edit preserve existing ordinary modes and strip special bits (0.1229ms) # SKIP
+  ﹣ D3 handler under strict umask retains existing mode and keeps new files private (0.0508ms) # SKIP
+  ﹣ D3 chmod failure reaches the handler without committing file or mode (0.0565ms) # SKIP
+  ﹣ D3 sync failure reaches the handler without committing file or mode (0.032ms) # SKIP
+  ﹣ D3 AC3/5: explicit cat executable requires existing approval; refusal, unavailable, timeout and abort never execute (0.111ms) # SKIP
+  ﹣ D3 AC4: ordinary cat/ls/rg/git reads remain fast; rg --pre forms need approval without pattern/filename false positives (0.0684ms) # SKIP
+  ﹣ D3 AC5: review follows ordinary/operator/advisory policy; readonly refuses without asking (0.0388ms) # SKIP
+  ﹣ D3 AC6: real write/edit preserve regular modes and new files use safe creation (0.068ms) # SKIP
+  ﹣ D3 AC6: strict umask in isolated child cannot strip old executable mode (0.0707ms) # SKIP
+  ﹣ D3 AC7: chmod/fsync failure and abort do not commit or leave a temp (0.225ms) # SKIP
+  ﹣ unreadable（权限）：文件不可读 → status=unreadable、actual=null (0.0858ms) # SKIP
+  ﹣ D3 finalMode 应用普通权限位，未传时保持既有安全创建行为 (0.0891ms) # SKIP
+  ﹣ D3 严格 umask 下 finalMode 不丢执行位（独立子进程） (0.0248ms) # SKIP
+  ﹣ D3 chmod 失败不提交内容或权限，并清理临时文件 (0.015ms) # SKIP
+  ﹣ D3 sync 失败不提交内容或权限，并清理临时文件 (0.0141ms) # SKIP
+  ﹣ D3 chmod 完成后中止仍保留原文件及权限 (0.0144ms) # SKIP
+No new deterministic failures, no new skips, no deleted tests, no loosened assertions.

@@ -1,0 +1,101 @@
+b15be8a9e27c2a53f8269e3e6bb9f254afc02a8bdd0b7b303521a5b4a27f948d *./build-renderer.log
+3c834c9a0d886a135b5c67009da593d3da294d306f9715fea1a561b2c7da2b0a *./candidate-file-hashes.txt
+4edf4744aff78cb22e8c16c76c5a6a5a914e536ddde450c59eea3aaca32af98c *./electron-e2e-screenshots.sha256
+fdecbfb2f2338af0a685f8a248085a98d87cad1ccc6c2b177e298d9e082d21b5 *./electron-e2e-summary.txt
+77aa505ea8d45847b2a3fa6aef20b5826924a9f4f1ff518d41ad61fb59c5cf85 *./electron-e2e.log
+dcb352bc13cf8c845a49834c8a669b031ee6c8370f03872d415b9be5d3f08570 *./electron-e2e/00-titlebar.png
+5f167663b6647195780f1bc8e1048cf6280a54096385b9db2f69f81d28ccc89f *./electron-e2e/01-import.png
+5f167663b6647195780f1bc8e1048cf6280a54096385b9db2f69f81d28ccc89f *./electron-e2e/01b-su.png
+b59c736362bcfee8a70a1da14db75c6faae802a9628a11cb97f4ccfa12f642d9 *./electron-e2e/02-chat.png
+9717fcdb9853a342080c0755955b03c0127dea5dae50ecc6709a77efcf3279fe *./electron-e2e/03-denied.png
+f27577e00ad207c626c0c7630388ac920c2b11726cbcca27613d7ec99664cf1b *./electron-e2e/04-profile.png
+96ef12fb50118f69de0294a0436e15636b279fe9ef1b71c5f608cbd45cd442a5 *./electron-e2e/05-bootstrap.png
+0cd88f7a6968400b27ff57188ff11713f493da237960bdb066b08420a0c443bf *./electron-e2e/06-refresh.png
+0a57b9693a94e613dcb74a0ecad11be019a702172edbf88c3690002e344d6982 *./electron-e2e/07-handback.png
+ac0d5f4a888e1fa2ffdc9c29a445e5ea979478dcf28968bf8375e7a057656a16 *./electron-e2e/08-su-pane.png
+0c452cc00445e571b2f4471f882d4fa29bdb29cc14fd0c373a7b5af85fd79929 *./electron-e2e/09-pi-panel.png
+668c6b2d4387ab14bda00ba2ae4e6e874345ec58c14c5d99e153f270d5e0c1a4 *./electron-e2e/10-pi-saved.png
+d530f287c30100cde975421451a6aa060f7c9b0bcaa9365e54be6be9d5a1ca88 *./electron-e2e/11-operator-card.png
+24c5dea7097b69105c92cba548203961ed5a7ecf6ef0ebe087e660b37e2fe014 *./electron-e2e/11b-decision-dialog.png
+93c88ce0d18f8c08d3e30c6c2e9117d9bf9233581c0ddac3ea865f459d4c05b1 *./electron-e2e/11c-decision-history.png
+f27577e00ad207c626c0c7630388ac920c2b11726cbcca27613d7ec99664cf1b *./electron-e2e/12-composer.png
+31255f4d40a4a11bf8bbf22a2f870e76490bffeb7c343e4e710aeaec0518b4fc *./electron-e2e/12-restore.png
+acf156470de5ec26df2cef104d3ab947ce903978b53ac21da58a310b0fb95973 *./electron-e2e/14-operator-crosspane.png
+6e69604221b32ffdef9792981923a0f48c14e15896fc3b2722a48db358a7b1d8 *./electron-e2e/report.txt
+1af5fb5058c844ae0c5c103285457bcf5abaffbbc5661d28d07c4425f73b02d8 *./environment.txt
+8f24cab9a30ddce976b5bbafef4cf65e2075411711a7fcf8a284ae6cb0301666 *./full-regression-file-list.txt
+875f5bd46d9de0cbfc7f3705afd94ad59f3b335be43df135eeae0cb506c63c44 *./full-regression-serial.log
+0aab138677d416693337ba51f6f9d0457a0bf75cea3d94b1e321f7f0a67b0732 *./full-regression-summary.txt
+ec379af895febf7fffae44cac3c7cc4591a4db2d742e8e70129140b673b85fc4 *./phase5a-smoke/01-six-roles.png
+f9b203ba89c3c6c8d561820331d1df9d786cf59525be764a349ae1c969ccb143 *./phase5a-smoke/02-decision-dialog.png
+95405e015d622318f4224fad67d8278b6b2d57e4810e75cb4db45194f2b57267 *./phase5a-smoke/03-decision-center.png
+8f5355fdc879ffc4140e023e95d181276017f186f343569d2ba36356cc7535b7 *./phase5a-smoke/03b-dc-filter-open.png
+f7a3ba9ce337cc8316d7dc683286d0f408567eb527969401914f36e9925c0198 *./phase5a-smoke/03c-composer-narrow.png
+778c68ed8dd9febaebee11228d7dc770e6495282a364840f2e8c404b1ef78a28 *./phase5a-smoke/04-task-center.png
+343f3beb3aebe7a51e5c1331554407d815140622650c42627ce8db2698dd0a97 *./phase5a-smoke/05-200pct.png
+f5f158f0e2d99452905730f4a95aa922e5d98dfaeac0dbf0537bc83a2276f938 *./phase5a-smoke/report.json
+fbcfe23a2ecb82b7100c50811691dde0a33aa3da8d176be9882a9db485dc0f2d *./phase5a-smoke/user-data/Code Cache/js/index
+56db217ede2c0edcd83025094e352c73d9265861dc48521fa37a6be430fcf618 *./phase5a-smoke/user-data/Code Cache/js/index-dir/the-real-index
+fbcfe23a2ecb82b7100c50811691dde0a33aa3da8d176be9882a9db485dc0f2d *./phase5a-smoke/user-data/Code Cache/wasm/index
+56db217ede2c0edcd83025094e352c73d9265861dc48521fa37a6be430fcf618 *./phase5a-smoke/user-data/Code Cache/wasm/index-dir/the-real-index
+eefcb9b4ab2a16bfe73f0f8e79c0ea787385b96fd23164b41e8454ba791a1a9e *./phase5a-smoke/user-data/DIPS
+d6a5fe39cd672781b256e0e3102f7022635f1d4bb7cfcc90a80fffe4d0f3877e *./phase5a-smoke/user-data/DawnGraphiteCache/data_0
+b1e963d702392fb7224786e7d56d43973e9b9efd1b89c17814d7c558ffc0cdec *./phase5a-smoke/user-data/DawnGraphiteCache/data_1
+ec1702806f4cc7c42a82fc2b38e89835fde7c64bb32060e0823c9077ca92efb7 *./phase5a-smoke/user-data/DawnGraphiteCache/data_2
+e09f42c398d688dce168570291f1f92d079987deda3099a34adb9e8c0522b30c *./phase5a-smoke/user-data/DawnGraphiteCache/data_3
+a74f3dd4dc4f58508e41919044ead1877c16cb0ca5e4a968f3575a3b121d066b *./phase5a-smoke/user-data/DawnGraphiteCache/index
+d6a5fe39cd672781b256e0e3102f7022635f1d4bb7cfcc90a80fffe4d0f3877e *./phase5a-smoke/user-data/DawnWebGPUCache/data_0
+b1e963d702392fb7224786e7d56d43973e9b9efd1b89c17814d7c558ffc0cdec *./phase5a-smoke/user-data/DawnWebGPUCache/data_1
+ec1702806f4cc7c42a82fc2b38e89835fde7c64bb32060e0823c9077ca92efb7 *./phase5a-smoke/user-data/DawnWebGPUCache/data_2
+e09f42c398d688dce168570291f1f92d079987deda3099a34adb9e8c0522b30c *./phase5a-smoke/user-data/DawnWebGPUCache/data_3
+d80dd33a3ec735f599cc8e4487ec7a1fd6757d05d40e82fa159ad6750ef31eb7 *./phase5a-smoke/user-data/DawnWebGPUCache/index
+b8a69c1c8b72680d95fcae68806b765e535239f6a2302e6b591b8ca5524d9fca *./phase5a-smoke/user-data/GPUCache/data_0
+2b8625e339edc27f1aac632525b218d9e91a33dd886282d06c8887561962dcbe *./phase5a-smoke/user-data/GPUCache/data_1
+7f73a6fce9484f5c3e4682e69f6f4e4def958b84b8e42e6952277b852fb28d96 *./phase5a-smoke/user-data/GPUCache/data_2
+e09f42c398d688dce168570291f1f92d079987deda3099a34adb9e8c0522b30c *./phase5a-smoke/user-data/GPUCache/data_3
+c03a48daaed33b925a38acc534c03cf50aba327e048808bd2fc9d6be760bdbb9 *./phase5a-smoke/user-data/GPUCache/index
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *./phase5a-smoke/user-data/GPUPersistentCache/DawnGraphiteCache/5IQM42UTUKB3VIRRMR5FSNOJ6XMOWXDZ/cache.db
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *./phase5a-smoke/user-data/GPUPersistentCache/DawnGraphiteCache/5IQM42UTUKB3VIRRMR5FSNOJ6XMOWXDZ/cache.db-wal
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *./phase5a-smoke/user-data/GPUPersistentCache/DawnGraphiteCache/5IQM42UTUKB3VIRRMR5FSNOJ6XMOWXDZ/cache.journal
+b8bcc6b095d35dab69cde733f9a69df3be04c6429b861ec8667a9499d86baeab *./phase5a-smoke/user-data/GrShaderCache/data_0
+b2da29ebdb7104d06b6f56ff73361841c03490754a93a023ef66264b0291da2a *./phase5a-smoke/user-data/GrShaderCache/data_1
+ec1702806f4cc7c42a82fc2b38e89835fde7c64bb32060e0823c9077ca92efb7 *./phase5a-smoke/user-data/GrShaderCache/data_2
+247cda24dc9fc1792f866825dde9e0538e703a5824a0155bcc4f1b310f9368ab *./phase5a-smoke/user-data/GrShaderCache/data_3
+08ef70e7042b1907dd05c96d0bf6bee7d5709ddff648e87196c4e8b1159ad6cd *./phase5a-smoke/user-data/GrShaderCache/f_000001
+20bfac679addc7a5203e2847ecca01fa20ef849cbeb0e47a57667bb25ff5a888 *./phase5a-smoke/user-data/GrShaderCache/f_000002
+672bea7f1e713f67a69eeccca6407c32dcf66d06a59a1039a3ab2cead8218053 *./phase5a-smoke/user-data/GrShaderCache/f_000003
+2221d8988c20c85b8cad6708abe886e6498b978d33d36ceee28aa808b9882635 *./phase5a-smoke/user-data/GrShaderCache/f_000004
+c88ae0b94fe593d08cba29b8c3a969fb3ea829bd862f3bebfcb0b5498b14b06a *./phase5a-smoke/user-data/GrShaderCache/index
+027d603f550758cc8d6a9053f4084a9d65c1e9fab4b20e4dcfd3d40fab3890f5 *./phase5a-smoke/user-data/Local State
+8bd2ea70a0b70c91de138a5b87c7936c6a6fa7c4275c54b97f4ef0ccc5b79bb4 *./phase5a-smoke/user-data/Local Storage/leveldb/000003.log
+0f1bad70c7bd1e0a69562853ec529355462fcd0423263a3d39d6d0d70b780443 *./phase5a-smoke/user-data/Local Storage/leveldb/CURRENT
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *./phase5a-smoke/user-data/Local Storage/leveldb/LOCK
+1238ea14369ebdca83dac2adc810644ca042bc95fc72c02cfaaa5ecd6e629854 *./phase5a-smoke/user-data/Local Storage/leveldb/LOG
+f9d31b278e215eb0d0e9cd709edfa037e828f36214ab7906f612160fead4b2b4 *./phase5a-smoke/user-data/Local Storage/leveldb/MANIFEST-000001
+88c9590388d22bb0bd8da3f7d50389311957024ee5c2dfe562e2649ad427fd7d *./phase5a-smoke/user-data/Network/Network Persistent State
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *./phase5a-smoke/user-data/Network/NetworkDataMigrated
+48dc8b9acbedb0b7de6579f89e873e9434ca389b8c6ed986f705c86fd2819599 *./phase5a-smoke/user-data/Network/Trust Tokens
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *./phase5a-smoke/user-data/Network/Trust Tokens-journal
+be75ecaf8ed5bfa55de134424317dd7902733755b95268ae98bf1de5726c65cc *./phase5a-smoke/user-data/Preferences
+ffd700cf04be6fe8d51e2ffb8a2e37bc3fa95a6679a4102fa35e8494c2350eae *./phase5a-smoke/user-data/Session Storage/000003.log
+0f1bad70c7bd1e0a69562853ec529355462fcd0423263a3d39d6d0d70b780443 *./phase5a-smoke/user-data/Session Storage/CURRENT
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *./phase5a-smoke/user-data/Session Storage/LOCK
+dd8f2cf235bc25afe1384c2721fdd4e2ae2cb28d92edda5230134671f78c3145 *./phase5a-smoke/user-data/Session Storage/LOG
+f9d31b278e215eb0d0e9cd709edfa037e828f36214ab7906f612160fead4b2b4 *./phase5a-smoke/user-data/Session Storage/MANIFEST-000001
+d6a5fe39cd672781b256e0e3102f7022635f1d4bb7cfcc90a80fffe4d0f3877e *./phase5a-smoke/user-data/ShaderCache/data_0
+b1e963d702392fb7224786e7d56d43973e9b9efd1b89c17814d7c558ffc0cdec *./phase5a-smoke/user-data/ShaderCache/data_1
+ec1702806f4cc7c42a82fc2b38e89835fde7c64bb32060e0823c9077ca92efb7 *./phase5a-smoke/user-data/ShaderCache/data_2
+e09f42c398d688dce168570291f1f92d079987deda3099a34adb9e8c0522b30c *./phase5a-smoke/user-data/ShaderCache/data_3
+edb8b68939229d01214b20f3ac2472ee8037394cd695fd245e3e176ce549a0c9 *./phase5a-smoke/user-data/ShaderCache/index
+fbcfe23a2ecb82b7100c50811691dde0a33aa3da8d176be9882a9db485dc0f2d *./phase5a-smoke/user-data/Shared Dictionary/cache/index
+1ae8c583c9d19eec3faa7932f6b87cc2a07c4fe64a685f1a63ff5a72ecd62eca *./phase5a-smoke/user-data/Shared Dictionary/cache/index-dir/the-real-index
+db9734c1e3001f7abd08bcc472a7b4f5daf8076eaee708f04ba98b11bd70131d *./phase5a-smoke/user-data/Shared Dictionary/db
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *./phase5a-smoke/user-data/Shared Dictionary/db-journal
+6b77b54313df8d759334819fdad7d879f15dce045017bd11bb557dd94ce52f66 *./phase5a-smoke/user-data/declarative_performance_observer.db
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *./phase5a-smoke/user-data/declarative_performance_observer.db-journal
+b2cd34ad688f67302493a51cb79c5f76a6a2938f96f7e2158a0593bbf0881fd8 *./phase5a-summary.txt
+28c6aab0ba56342fcbf8c360c07590c09e7e98e180d36f56cca8b8f3ba7310a9 *./phase5a.log
+20d70ec20ffafaf1d87d234dbc3c5510fbaf3ff71f455aa968f772bc79996836 *./target-zero-write.txt
+bb9d7ec8fc7f622e290cc11b199e169fee23ccb1f87b2608e4224714edcaf3fa *./typecheck-renderer.log
+5dfeb402934d6004748707e68f32d241f2339329ab04b23a03241983a9009671 *./typecheck-summary.txt
+f8458c2a115610c1aa9e21efa3e8bc41cdae0eb8ebe8c35c3d7c5f6b52b300ed *./typecheck.log
