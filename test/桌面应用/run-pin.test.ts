@@ -257,6 +257,54 @@ test("run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任
   }
 });
 
+test("D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-d3-cardkind-"));
+  const h = harness(root);
+  try {
+    await writeProject(root);
+    await d3(root); // legacy 兼容：无 cardKind，带 appointment 专属 roster 戳
+    // 新格式 decision 卡：选项 qa 与真实角色同名，且（模拟污染）带 targetRoleIds。
+    await appendTaskEvent(root, {
+      v: 1, at: "2026-10-30T00:00:02.000Z", kind: "request.created", requestId: "req-decision", flowId: "focus",
+      cardKind: "decision", sourceRoleId: "convener", title: "浏览器验收方式",
+      options: [{ id: "qa", label: "qa" }, { id: "customer-local", label: "客户本机浏览器" }],
+    });
+    await appendTaskEvent(root, {
+      v: 1, at: "2026-10-30T00:00:03.000Z", kind: "request.resolved", requestId: "req-decision",
+      decisionId: "decision-req-decision", cardKind: "decision", targetRoleIds: ["qa"], by: "judge", choice: "qa",
+    });
+    // 旧格式（无 cardKind、无 roster 戳）历史污染：customer-local 被写进 targetRoleIds。
+    await appendTaskEvent(root, {
+      v: 1, at: "2026-10-30T00:00:04.000Z", kind: "request.created", requestId: "req-legacy-decision", flowId: "focus",
+      sourceRoleId: "convener", title: "旧决策卡", options: [{ id: "customer-local", label: "客户本机浏览器" }],
+    });
+    await appendTaskEvent(root, {
+      v: 1, at: "2026-10-30T00:00:05.000Z", kind: "request.resolved", requestId: "req-legacy-decision",
+      decisionId: "decision-req-legacy", targetRoleIds: ["customer-local"], by: "judge", choice: "customer-local",
+    });
+
+    await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
+    await tick(30);
+    const handoff = (await h.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
+    assert.equal(handoff.ok, true, handoff.message ?? "");
+    const state = await readTaskState(root);
+    const handoffRecord = [...state.records.values()].find((record) => record.created?.to === "convener")!;
+    assert.equal(handoffRecord.created!.runState, "pinned");
+    const manifest = await readRunManifest(root, handoffRecord.created!.runId!);
+    assert.equal(manifest.ok, true);
+    if (manifest.ok) {
+      assert.equal(manifest.manifest.state, "pinned");
+      assert.equal(manifest.manifest.d3?.decisionId, "decision-req-d3", "pin 用真实 appointment 裁决");
+      assert.deepEqual(manifest.manifest.d3?.targetRoleIds, ["implementer"], "decision 选项（含同名 qa）不得顶替 D3");
+    }
+  } finally {
+    await h.mgr.stop(null);
+    // 2026-10-31（CI 稳定性，macOS arm64）：stop 不等待后台投递链落盘；先让出一拍再带重试删除。
+    await tick(50);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+});
+
 test("run-pin：缺 D3 时 pin 失败，handoff 不建任务、不投递（draft 不伪造 pinned）", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-missing-"));
   const h = harness(root);
@@ -495,6 +543,97 @@ test("F2：版本化文档基线违规的真实派发回执带 versioned-doc-bas
     assert.match(receipt.message ?? "", /谁来做：app/);
     assert.match(receipt.message ?? "", /技术 code：versioned-doc-baseline-violation/);
     assert.equal((await readTaskState(root)).records.size, before, "基线拒绝不创建任务");
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("§5A contract_check：四角色按裁剪输出意图入口契约与当前事实；其他角色不输出", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-intent-contract-check-"));
+  const h = harness(root);
+  try {
+    await writeProject(root);
+    const intentEntry = "docs/intents/intent-focus-v1.md";
+    const productIntent = [
+      "---",
+      "intentId: intent-focus-v1",
+      "flowId: focus",
+      "version: 1",
+      "goal: 示例目标",
+      "scope: 示例范围",
+      "acceptance: 示例验收",
+      "---",
+      "# 产品意图",
+      "",
+    ].join("\n");
+    const proposal = [
+      "---",
+      "schema: project-proposal/v2",
+      "flowId: focus",
+      "version: 1",
+      "intentId: intent-focus-v1",
+      "intent: docs/product/focus-intent-v1.md",
+      "---",
+      "# 提案",
+      "",
+    ].join("\n");
+    await fs.writeFile(path.join(root, "docs/product/focus-intent-v1.md"), productIntent, "utf8");
+    await fs.writeFile(path.join(root, "docs/proposals/focus-proposal-v1.md"), proposal, "utf8");
+    await fs.mkdir(path.join(root, "docs/intents"), { recursive: true });
+    await fs.writeFile(path.join(root, intentEntry), ["---", "intentId: intent-focus-v1", "flowId: focus", "goal: 示例目标", "scope: 示例范围", "acceptance: 示例验收", "---", "# 意图", ""].join("\n"), "utf8");
+
+    const contractRoleIds = ["chief", "product", "rapporteur", "nominator"] as const;
+    for (const roleId of contractRoleIds) {
+      await h.mgr.open({ projectRoot: root, roleId, runtime: "demo" });
+      await tick(20);
+    }
+    await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+    await tick(20);
+    await h.mgr.open({ projectRoot: root, roleId: "verifier", runtime: "demo" });
+    await tick(20);
+
+    for (const roleId of contractRoleIds) {
+      const check = h.contractChecks[roleId];
+      assert.equal(typeof check, "function", `${roleId} 应注入 contract_check`);
+      const text = (await check!({ flowId: "focus" })) ?? "";
+      assert.match(text, /意图入口契约/, roleId);
+      assert.match(text, /docs\/intents\/<intentId>\.md/, roleId);
+      assert.match(text, /intentId: <小写 slug/, roleId);
+      assert.match(text, /意图入口事实：intentId=intent-focus-v1/, roleId);
+      assert.match(text, /入口 docs\/intents\/intent-focus-v1\.md/, roleId);
+      assert.match(text, /存在=yes/, roleId);
+      assert.match(text, /intentId 匹配=yes/, roleId);
+      assert.match(text, /来源=proposal/, roleId);
+      assert.match(text, /一致性=yes/, roleId);
+      assert.ok(Buffer.byteLength(text, "utf8") <= 4096, `${roleId} contract_check 组合输出须 ≤4KB`);
+    }
+    for (const roleId of ["convener", "verifier"] as const) {
+      const check = h.contractChecks[roleId];
+      assert.equal(typeof check, "function");
+      const text = (await check!({ flowId: "focus" })) ?? "";
+      assert.doesNotMatch(text, /意图入口契约/, roleId);
+      assert.doesNotMatch(text, /intentId: <小写 slug/, roleId);
+    }
+
+    // 入口文件 intentId 与解析结果不一致 ⇒ 事实行给出 no（不改判断/不放行）。
+    await fs.writeFile(path.join(root, intentEntry), ["---", "intentId: intent-other-v1", "flowId: focus", "goal: 示例目标", "scope: 示例范围", "acceptance: 示例验收", "---", "# 意图", ""].join("\n"), "utf8");
+    const mismatched = (await h.contractChecks.chief!({ flowId: "focus" })) ?? "";
+    assert.match(mismatched, /intentId 匹配=no/);
+    // 产品-only：提案 frontmatter 不含 intentId ⇒ 来源 product（与 judge 同一解析器）。
+    await fs.writeFile(path.join(root, intentEntry), ["---", "intentId: intent-focus-v1", "flowId: focus", "goal: 示例目标", "scope: 示例范围", "acceptance: 示例验收", "---", "# 意图", ""].join("\n"), "utf8");
+    await fs.writeFile(path.join(root, "docs/proposals/focus-proposal-v1.md"), proposal.replace("intentId: intent-focus-v1\n", ""), "utf8");
+    const productOnly = (await h.contractChecks.chief!({ flowId: "focus" })) ?? "";
+    assert.match(productOnly, /来源=product/);
+    assert.match(productOnly, /意图入口事实：intentId=intent-focus-v1/);
+    assert.match(productOnly, /存在=yes/);
+    assert.match(productOnly, /一致性=无法核对/);
+    // 产品/提案冲突 ⇒ fail-closed 且事实显式可见（不得任选一个来源冒充）。
+    await fs.writeFile(path.join(root, "docs/proposals/focus-proposal-v1.md"), proposal.replace("intentId: intent-focus-v1", "intentId: intent-other-v1"), "utf8");
+    const inconsistent = (await h.contractChecks.chief!({ flowId: "focus" })) ?? "";
+    assert.match(inconsistent, /意图入口解析：intent-ambiguous/);
+    assert.match(inconsistent, /一致性=no/);
+    assert.doesNotMatch(inconsistent, /意图入口事实：intentId=/);
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });

@@ -22,7 +22,7 @@ import type { GovernanceFunction, GovernanceModel, ProjectConfig } from "../../s
 // 会话事件流类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。外推时套上 `roleId` 信封
 // （`SessionEventEnvelope`，B-2）——**类型从编排/本角色只读导入、不复制形状**。
-import type { WriteGate, RuntimeAdapter, ShellGate, CustomerInputFn, CustomerInputOutcome, DispatchTaskFn, PromptImage, PromptOptions, ViewImageFn } from "../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, CustomerInputFn, CustomerInputOutcome, DispatchTaskFn, PromptImage, PromptOptions, ViewImageFn, NetworkState } from "../../src/model/runtime.ts";
 // 2026-10-25 独立复核请求（`独立复核请求（已撤除）`）：能力回执/载荷形状唯一来源＝契约家 `model/runtime.ts`
 // （只读导入，不复制形状）；flowId 形状同样复用运行时核心导出的 slug 常量（不另写正则）。
 import type { RequestRequirementChangeFn, RequestRequirementChangeInput, RequestRequirementChangeResult } from "../../src/model/runtime.ts";
@@ -50,7 +50,7 @@ export type { GovernanceRecordState, GovernanceRecordStatus } from "./project.ts
 // 载入器类型（只读导入共享组件类型；**实现**的唯一来源在 `src/common/shared/config-loader.ts`）。
 import type { LoadConfigOptions, LoadedConfig } from "../../src/common/shared/config-loader.ts";
 import { loadEffectiveConfig as realLoadEffectiveConfig } from "../../src/common/shared/config-loader.ts";
-import { SessionManager, type SessionOpenRequest, type SessionTarget, type SessionMessageMetadata, type SessionManagerDeps, type OpenResult, type SendResult, type StopResult, type WithdrawResult, type SessionEventEnvelope, type BackgroundTasksListReply, type BackgroundTaskReadInput, type BackgroundTaskReadReply, type BackgroundTaskStopInput, type BackgroundTaskStopReply, type TaskListView, type TaskRestoreReport, type TerminateRoleRunInput, type TerminateRoleRunResult, type RedispatchTaskInput, type RedispatchTaskResult, type CloseTaskInput, type CloseTaskResult } from "./session.ts";
+import { SessionManager, type ActiveRunView, type RunChangeMode, type SessionOpenRequest, type SessionTarget, type SessionMessageMetadata, type SessionManagerDeps, type OpenResult, type SendResult, type StopResult, type WithdrawResult, type SessionEventEnvelope, type BackgroundTasksListReply, type BackgroundTaskReadInput, type BackgroundTaskReadReply, type BackgroundTaskStopInput, type BackgroundTaskStopReply, type TaskListView, type TaskRestoreReport, type TerminateRoleRunInput, type TerminateRoleRunResult, type RedispatchTaskInput, type RedispatchTaskResult, type CloseTaskInput, type CloseTaskResult } from "./session.ts";
 // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状与构造（**只读转出**——形状 `Omit` 自编排
 // `AssembleShellGateOptions`，见 operator-channel.ts；本层不另立第二份）。
 import type { DesktopOperatorChannelFn, DesktopShellArming } from "./operator-channel.ts";
@@ -147,7 +147,29 @@ export interface ListProjectResult {
    * 本层只读派生：`listProject` 不写文件、不建目录、不触发 finalize。
    */
   governanceRecord: GovernanceRecordStatus;
+  /**
+   * 2026-10-31（run-change 触发）：当前项目的 active run（draft/pinned）只读摘要——驱动桌面
+   * 「契约变更 · 重开 run」入口的启用/禁用（无 pinned run ⇒ 禁用并给原因）。
+   * manifest 读取失败 ⇒ 空数组 + `activeRunsError`（如实，不伪装「无 run」）。
+   */
+  activeRuns?: ActiveRunView[];
+  activeRunsError?: string;
 }
+
+/**
+ * `run:change-request`（2026-10-31）回执：显式入口「契约变更 · 重开 run」把应用自有 run-change
+ * 三模式卡经统筹/提案/幕僚会话的客户卡通道呈现。**不代选模式**——`answered` 只在客户/judge 已作答时出现。
+ */
+export type RunChangeRequestReply =
+  | {
+      ok: true;
+      status: "presented" | "answered" | "declined" | "pending";
+      runId: string;
+      flowId: string;
+      /** `answered` 且选项可映射时的模式（continue-frozen / stop-and-restart / stop）。 */
+      mode?: RunChangeMode;
+    }
+  | { ok: false; error: string };
 
 /** 选图结果（K-2）：`image.dataBase64` 供渲染侧预览；`cancelled` 表示用户取消（**不是失败**）。 */export interface PickImageResult {
   ok: boolean;
@@ -518,6 +540,12 @@ export interface DesktopInterface {
   disposeProjectDocuments(): void;
   listProject(input: { projectRoot: string }): Promise<ListProjectResult>;
   /**
+   * **显式 run-change 入口（2026-10-31）**：呈现应用自有 run-change 三模式卡（继续冻结 / 停止并重开 /
+   * 停止），由客户（或判断代批）作答。`flowId` 缺省时只在**恰好一个** pinned run 时自动定位，多/零 ⇒ 如实失败。
+   * 无 pinned run / 无可呈现会话 ⇒ `{ok:false,error}`；**不自动替客户选模式**、不改 manifest 之外的状态。
+   */
+  requestRunChange(input: unknown): Promise<RunChangeRequestReply>;
+  /**
    * **「替我审」开关读取**（PM 评审 §6.6）：主进程权威；启动初值来自持久化偏好（缺省 false），
    * 跨渲染重载保持。返回 `{version:1, ok:true, enabled}`。只读，不改变任何会话或请求状态。
    */
@@ -604,6 +632,12 @@ export interface DesktopInterface {
   listLiveSessionViews(): Promise<{ projectRoot: string; roleId: string; runtime: RuntimeKind; profileRevision: number }[]>;
   /** 界面加载后请求重放全部在场角色的状态快照（忙/闲/队列），走既有 `session:role-state` 通道。 */
   requestRoleStates(): Promise<{ ok: boolean }>;
+  /**
+   * **P2（2026-10-30）：接收主进程网络状态**（monitor 权威快照 → SessionManager）。
+   * 离线期间队列保留、`blockedReason:"network"` 可见、不认领新模型投递；恢复后按既有顺序 drain。
+   * 主进程在 monitor `onState` 时调用；不涉及权限/自动中止。
+   */
+  applyNetworkState(state: NetworkState): void;
   /**
    * **后台任务聚合列表（2026-10-25，桌面任务面板）**：按 `projectRoot + runtime` 聚合当前所有已打开会话的
    * 后台任务——每项 = `BackgroundTaskSnapshot` + `roleId` + `runtime`。直接读各会话句柄、**不缓存/不持久化**；
@@ -1752,6 +1786,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     createPiAdapterFactory: createPiAdapterFactoryFn,
     createRuntimeAdapterFactory: runtimeFactory,
     runtimeOptions: deps.runtimeOptions,
+    // P2（2026-10-30）：网络状态门（monitor 注入）——会话层据此在离线时保留队列、不认领新投递；
+    // 适配器经同一 gate 暂停/恢复请求计时（runtimeOptions 原样透传到 Service/Provider）。
+    networkGate: deps.runtimeOptions?.networkGate,
     // 「替我审」：每会话判断闭包工厂（会话用同一份 runtimeOptions/createAdapter 构造；缺省真实实现）。
     createShellJudge: createShellJudgeFn,
     // 「替我决策」（2026-10-18 双开关评审 §8.2）：每会话治理判断闭包工厂（仅 trio + 通道已接时构造）。
@@ -2015,6 +2052,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         "project.listing.root-docs",
         { count: roles.reduce((n, role) => n + (role.rootDocs?.length ?? 0), 0), ok: true },
       );
+      // 2026-10-31（run-change 触发）：active run 摘要（只读；失败如实，不伪装「无 run」）。
+      const runViews = await manager.activeRunViews(listing.projectRoot);
       return {
         ...(documentListing.documentScope ? { documentScope: documentListing.documentScope } : {}),
         ...(documentListing.documentReadUnavailable ? { documentReadUnavailable: documentListing.documentReadUnavailable } : {}),
@@ -2027,7 +2066,64 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         primaryRoleId: listing.primaryRoleId,
         governanceModel: listing.governanceModel ?? "single",
         governanceRecord,
+        ...(runViews.ok ? { activeRuns: runViews.runs } : { activeRuns: [], activeRunsError: runViews.error }),
       };
+    },
+
+    async requestRunChange(input: unknown): Promise<RunChangeRequestReply> {
+      const value = input !== null && typeof input === "object" && !Array.isArray(input)
+        ? (input as Record<string, unknown>)
+        : {};
+      const projectRoot = typeof value.projectRoot === "string" ? value.projectRoot.trim() : "";
+      if (projectRoot === "") return { ok: false, error: mainT("main.interface.missingProjectRoot") };
+      let flowId = typeof value.flowId === "string" ? value.flowId.trim() : "";
+      if (flowId === "") {
+        const views = await manager.activeRunViews(projectRoot);
+        if (!views.ok) return { ok: false, error: mainT("main.runChange.requestFailed", { detail: views.error }) };
+        const pinned = views.runs.filter((run) => run.state === "pinned");
+        if (pinned.length === 0) return { ok: false, error: mainT("main.runChange.noPinnedRun") };
+        if (pinned.length > 1) {
+          return { ok: false, error: mainT("main.runChange.multiplePinnedRuns", { flows: pinned.map((run) => run.flowId).join("、") }) };
+        }
+        flowId = pinned[0]!.flowId;
+      }
+      const reason = typeof value.reason === "string" && value.reason.trim() !== "" ? value.reason.trim().slice(0, 500) : undefined;
+      const started = await manager.requestRunChangeDecision({
+        projectRoot,
+        flowId,
+        ...(reason !== undefined ? { reason } : {}),
+        // 客户显式入口：requestedBy 不冒充任何角色（卡片仍由 application 发行）。
+      });
+      if (!started.ok) return { ok: false, error: mainT("main.runChange.requestFailed", { detail: started.error }) };
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<{ kind: "timeout" }>((resolve) => {
+        timer = setTimeout(() => resolve({ kind: "timeout" }), 1500);
+      });
+      const first = await Promise.race([started.first, timeout]);
+      if (timer !== undefined) clearTimeout(timer);
+      if (first.kind === "presented") return { ok: true, status: "presented", runId: started.runId, flowId };
+      if (first.kind === "timeout") return { ok: true, status: "pending", runId: started.runId, flowId };
+      const outcome = first.outcome;
+      if (outcome.outcome === "answered") {
+        const selected = Array.isArray(outcome.value.selected)
+          ? outcome.value.selected.filter((item): item is string => typeof item === "string")
+          : [];
+        // 现有枚举回退（approve→stop-and-restart / reject→continue-frozen / cancel→stop）与卡内三模式同义。
+        const choice = selected.length === 1 ? selected[0] : undefined;
+        const mode: RunChangeMode | undefined =
+          choice === "continue-frozen" || choice === "stop-and-restart" || choice === "stop"
+            ? choice
+            : choice === "approve"
+              ? "stop-and-restart"
+              : choice === "reject"
+                ? "continue-frozen"
+                : choice === "cancel"
+                  ? "stop"
+                  : undefined;
+        return { ok: true, status: "answered", runId: started.runId, flowId, ...(mode !== undefined ? { mode } : {}) };
+      }
+      if (outcome.outcome === "declined") return { ok: true, status: "declined", runId: started.runId, flowId };
+      return { ok: false, error: mainT("main.runChange.requestFailed", { detail: outcome.reason ?? outcome.outcome }) };
     },
 
     getShellJudgeState(): ShellJudgeStateReply & { ok: true; enabled: boolean } {
@@ -2193,6 +2289,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     async requestRoleStates() {
       manager.broadcastRoleStates();
       return { ok: true };
+    },
+
+    // P2（2026-10-30）：主进程网络状态 → SessionManager（队列保留/恢复放行）。只透传，不判定权限。
+    applyNetworkState(state) {
+      manager.applyNetworkState(state);
     },
 
     // —————— 会话级后台任务（2026-10-25，桌面任务面板）——————

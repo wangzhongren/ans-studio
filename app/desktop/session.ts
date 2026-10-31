@@ -1,5 +1,7 @@
-import { RuntimeDeliveryError } from "../../src/model/runtime.ts";
-import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1, DeliveryReceiptQueryV1, RuntimeDeliveryReceiptV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1, GovernanceJudgeContext, BackgroundTaskSnapshot, BackgroundTaskReadOptions, BackgroundTaskReadResult, BackgroundTaskStopOptions, BackgroundTaskStopResult } from "../../src/model/runtime.ts";
+import { RuntimeDeliveryError, REQUEST_TIMEOUT_ERROR_CODES, MODEL_REQUEST_RETRY_EXHAUSTED } from "../../src/model/runtime.ts";
+import { isRequestFailureCode } from "../../src/common/runtime-core/request-timeout.ts";
+import { isNetworkOfflineFailureCode } from "../../src/common/runtime-core/network-gate.ts";
+import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1, DeliveryReceiptQueryV1, RuntimeDeliveryReceiptV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1, GovernanceJudgeContext, BackgroundTaskSnapshot, BackgroundTaskReadOptions, BackgroundTaskReadResult, BackgroundTaskStopOptions, BackgroundTaskStopResult, NetworkGate, NetworkState } from "../../src/model/runtime.ts";
 // app/desktop/session.ts
 // 桌面应用的「会话」装配（纯逻辑，不依赖 electron，可在 node 下单测）。
 //
@@ -80,7 +82,7 @@ import { renderHandbackPrompt, renderHandbackBatchPrompt, renderWorkReportPrompt
 import { declaredConfirmPaths } from "../../src/common/编排/confirmed-writes.ts";
 // B 批（2026-10-28）：任务/汇报主干与最小状态（编排单一来源，本层只接线）。
 import { appendTaskEvent, classifyTaskSideEffect, findTaskByIdempotencyKey, newTaskId, readTaskState, redispatchCountOf, redispatchTaskId, renderTaskCardLines, shortenSummary, taskCardOf, taskCards, taskEvent, taskIdempotencyKey, taskReportStatusOf, type TaskCardView, type TaskReplay } from "../../src/common/编排/task-state.ts";
-import { applyRunChange, buildRunChangeCard, ensureDraftRun, findActiveRun, loadPinnedRoster, listRunManifestsResult, mapRunChangeAnswer, pinRun, pinnedDocsSummary, verifyPinnedRun, RUN_PENDING_FLOW_ID, type RunManifest, type RunChangeMode } from "../../src/common/编排/run-manifest.ts";
+import { applyRunChange, buildRunChangeCard, ensureDraftRun, findActiveRun, findNewerContractDocs, loadPinnedRoster, listRunManifestsResult, mapRunChangeAnswer, pinRun, pinnedDocsSummary, verifyPinnedRun, RUN_PENDING_FLOW_ID, type NewerContractDoc, type RunManifest, type RunChangeMode } from "../../src/common/编排/run-manifest.ts";
 import { appendRoleLog, formatRoleActivityText, readRoleLog } from "../../src/common/编排/role-log.ts";
 import { docsForFlow, formatMechanicalRejection, humanRejection, makeMechanicalRejection, rejectionMapSnapshot, technicalRejectionCode, type MechanicalRejection } from "../../src/common/编排/mechanical-rejection.ts";
 // B 批：终止/重派安全判定（单一来源；桌面只提供终止事实/执行动作）。
@@ -124,6 +126,7 @@ const PROOF_STATUS_TEXT: Readonly<Record<RuntimeTurnOutcome, string>> = {
 // **单一来源**——本层**只做接线**（投递时用 `filePrint` 探测各引用、按判据拒投或入队），不得各写一份。
 // 本批已删除本地副本 `renderDispatchPromptLocal`（既有登记依赖收口——落地后必须切换、不得两处并存）。
 import { createDiagnosticLogger, getDiagnosticsStatus } from "../../src/common/shared/diagnostics.ts";
+import { intentEntryContractText, readIntentEntryFacts, type IntentContractRole } from "../../src/common/shared/intent-entry-contract.ts";
 // 整轮硬超时求值的**单一来源**（与看护 signal #1、会话运行时同一函数；本层不另写时长/env 解析）。
 import { resolveRuntimeTimeouts } from "../../src/common/runtime-core/timeout.ts";
 // G-2/W1：role_status 的会话尾部数据面**复用受保护投影管线**（`getSessionHistory` 同路径——凭据清洗、
@@ -139,7 +142,7 @@ import { classifyProcessOutcome, pickLatestSessionFile, sessionsDirFor } from ".
 import { formatDurationMs, type WatchdogObservation, type WatchdogProjectSnapshot } from "./watchdog.ts";
 import { mainT } from "./i18n.ts";
 import { type RoleStatusFn, type RoleStatusPayload, type SessionTailFn, type SessionTailPayload, type WatchdogToolResult } from "../../src/common/编排/watchdog.ts";
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef } from "../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind } from "../../src/model/runtime.ts";
 import { checkEvidence, checkEvidenceCollection, deriveAcceptanceFact, isWithinEvidenceRoots, loadCriteria, parseEvidenceMeta, readArtifact, validateEvidencePath, EVIDENCE_META_SCHEMA } from "../../src/common/编排/evidence-check.ts";
 // 2026-10-26 需求变更申请（request_requirement_change）：同源契约；仅统筹/提案会话注入。
 // 申请 ≠ 批准：审批由客户/判断 agent 在发起方会话的 decision 卡完成，主理只在批准后执行意图变更。
@@ -245,6 +248,23 @@ export interface SessionOpenRequest {
   roleId: string;
   runtime: RuntimeKind;
 }
+
+/**
+ * 2026-10-31（run-change 触发）：active run 的只读摘要（`activeRunViews` 返回；UI「契约变更 · 重开 run」
+ * 入口据此启用/禁用并显示原因）。字段全部来自 manifest，不读正文、不伪装 pinned。
+ */
+export interface ActiveRunView {
+  runId: string;
+  flowId: string;
+  state: "draft" | "pinned";
+  pinnedAt?: string;
+  rosterVersion?: number;
+  roles?: string[];
+  documents: Array<{ kind: string; path: string; sha256?: string }>;
+}
+
+/** run-change 三模式的**类型**再导出（形状唯一来源仍是 `run-manifest.ts`；界面/conftest 不复制形状）。 */
+export type { RunChangeMode } from "../../src/common/编排/run-manifest.ts";
 
 /**
  * 生效配置来源与接受状态（供界面**如实呈现**；界面只读此结构、不另作判定）。
@@ -606,10 +626,16 @@ export interface SessionManagerDeps {
     busy: boolean;
     summaries: string[];
     /** 结构化的排队条目（右栏「待办 / 队列」组用；来源/摘要/入队时间＋**撤回/展开定位键** `id`（= dedupKey）
-     *  与入队即定格的全文 `full`——**与 summaries 同源**，不另造数据源；G-2 起 `kind` 含第四类 `system`）。 */
-    queue: { kind: string; sourceRoleId: string; summary: string; at: string; id: string; full: string }[];
+     *  与入队即定格的全文 `full`——**与 summaries 同源**，不另造数据源；G-2 起 `kind` 含第四类 `system`）。
+     *  P0（2026-10-30）：`ageMs` = 该条等待时长（显示「为什么没动」）。 */
+    queue: { kind: string; sourceRoleId: string; summary: string; at: string; id: string; full: string; ageMs: number }[];
     /** **正在跑的那条投递**（若该轮由队列投递开跑且未结束）；null = 无（直接 send 的一轮不属于队列条目）。 */
-    running: { kind: string; sourceRoleId: string; summary: string; at: string } | null;
+    running: { kind: string; sourceRoleId: string; summary: string; at: string; ageMs?: number } | null;
+    /** **P0 队列可见性（2026-10-30）**：队首类别（空队列 ⇒ null）、阻塞原因、当前回合 id。
+     *  客户/界面据此看出「为什么没动」；`origin-missing` = 忙态无在跑回合（停止可复位）。 */
+    headKind?: string | null;
+    blockedReason?: "target-busy" | "origin-missing" | "session-closed" | "network" | null;
+    activeTurnId?: string | null;
   }) => void;
   /**
    * shell 命令级闸（设计 §7.2）——**已装配 gate** 的注入接缝（历史形状，保留）。
@@ -693,6 +719,12 @@ export interface SessionManagerDeps {
    * 启动/项目导入时用 `restorePersistedDeliveries()` 重新入队并按既有 drain 路径自动重投。
    */
   deliveryQueueStorePath?: string;
+  /**
+   * **P2 网络状态门（2026-10-30）**：主进程权威（`net.isOnline` 采样 + 渲染/power 提示）经 Interface 注入；
+   * 离线期间**不认领新的模型投递**（队列保留、`blockedReason:"network"` 可见），恢复后按既有顺序 drain。
+   * 缺省 ⇒ 视为在线（旧行为零变化）。
+   */
+  networkGate?: NetworkGate;
   /** **时钟（G-2；注入以便单测）**；缺省 `Date.now`。 */
   now?: () => number;
 }
@@ -854,6 +886,11 @@ interface DeliveryItem {
   opts?: PromptOptions;
   handback?: TaskHandback;
   batchItems?: readonly DeliveryItem[];
+  /**
+   * **P0 收尾不变量（2026-10-30）**：该投递的终态记账（`delivery.end`/`delivery.failed`）是否已落——
+   * settle 收尾与 send promise 续段可能先后到达；**恰一次**，不重复、不静默。
+   */
+  terminalRecorded?: boolean;
 }
 
 /**
@@ -1105,6 +1142,12 @@ export class SessionManager {
    * 派发」；在途窗口去重防重投，送达后放行以保返工回路可用——语义在 change 文档写明。
    */
   private readonly activeDispatchKeys = new Set<string>();
+  /**
+   * 2026-10-31（run-change 触发缺陷）：**自动**呈现 run-change 卡的去重键（`projectRoot\0runId`）。
+   * 同一 pinned run 只自动弹一次——客户已决定/已呈现后，后续冻结冲突只回结构化拒绝（走显式入口），
+   * 不刷屏、不重复替客户要决定。显式入口（会话头按钮/IPC）不受此集合限制。
+   */
+  private readonly runChangeAutoPrompted = new Set<string>();
   /** 「队列受阻」（枚举不到目标）只如实提示**一次**（避免每次触发刷同一行）。 */
   private readonly suDeliveryBlockedNoted = new Set<string>();
   /**
@@ -1112,7 +1155,7 @@ export class SessionManager {
    * （outcome + 时刻；只记四值终局——旧来源缺事实不猜）。看护 `role_status` 的「最近一轮」行与未来
    * 其他只读消费方取用；不参与任何判定。
    */
-  private readonly lastTurns = new Map<string, { outcome: RuntimeTurnOutcome; at: string }>();
+  private readonly lastTurns = new Map<string, { outcome: RuntimeTurnOutcome; at: string; errorCode?: string }>();
   /**
    * **各角色本轮 assistant 正文累积**（2026-10-18 客户反馈「内部治理角色，应该都向联络官反馈」）：
    * 只记 `kind:"message"` 且**无结构化 detail** 的普通助手消息（delivery-note/prompt-input/receipt/
@@ -1167,6 +1210,11 @@ export class SessionManager {
    * 防止启动早期（恢复之前）的一次入队用空内存快照覆盖磁盘上的待恢复条目。
    */
   private deliveryStoreArmed = false;
+  /**
+   * **P2 网络状态（2026-10-30）**：最近一次主进程网络快照（monitor 经 Interface 推入）。
+   * `null` = 尚未收到（按在线处理；不误判离线）。离线期间队列保留、不认领新投递；恢复后按既有 drain 继续。
+   */
+  private networkState: NetworkState | null = null;
 
   constructor(deps: SessionManagerDeps) {
     this.deps = deps;
@@ -1319,7 +1367,35 @@ export class SessionManager {
     return { contextSource: "fresh", contextWarning: handle.contextWarning };
   }
 
-  private beginDeliveryOrigin(entry: LiveSession, clientMessageId?: string): DeliveryOrigin {
+  /**
+   * **P0 收尾不变量（2026-10-30 现场）**：`busy` 已复位但 `origins.running` 仍残留的陈旧投递归属——
+   * 标记 settled 并移除，记 `turn.origin-missing`。**只处理投递层状态，不伪造 turn**。
+   * 返回是否做了清理。
+   */
+  private healStaleOrigin(entry: LiveSession, reasonCode: string): boolean {
+    const stale = entry.origins.running;
+    if (entry.busy || stale === undefined) return false;
+    stale.settled = true;
+    delete entry.origins.running;
+    this.trimDeliveryOrigins(entry);
+    createDiagnosticLogger({ component: "desktop.session", projectRoot: entry.projectRoot, roleId: entry.roleId }).record(
+      "turn.origin-missing",
+      {
+        reasonCode,
+        ...(stale.turnId !== undefined ? { turnId: stale.turnId } : {}),
+        queueDepth: (this.deliveryQueues.get(this.queueKey(entry.projectRoot, entry.roleId, entry.runtime)) ?? []).length,
+      },
+    );
+    return true;
+  }
+
+  /**
+   * **turn lease**（P0：收尾不变量）：只有「未忙且没有正在跑的 origin」才能开跑新轮。
+   * 拿不到 lease ⇒ `undefined`（调用方入队/保留队首）——**绝不覆盖** `origins.running`（失败投递不得
+   * 删/盖另一个正在运行回合的归属）。
+   */
+  private beginDeliveryOrigin(entry: LiveSession, clientMessageId?: string): DeliveryOrigin | undefined {
+    if (entry.busy || entry.origins.running !== undefined) return undefined;
     const origin: DeliveryOrigin = { settled: false };
     if (clientMessageId !== undefined) origin.clientMessageId = clientMessageId;
     entry.origins.running = origin;
@@ -1357,6 +1433,9 @@ export class SessionManager {
           // **ACK 即已投递**（2026-10-25）：应用任务的稳定键在运行时同步开轮回执时即记「已投递」——
           // 之后即便发送 promise 因重建/收尾阶段报错，同一任务也不会被重投（at-most-once）。
           this.rememberAppTaskDelivered(origin.clientMessageId);
+          // **P0 队列可见性（2026-10-30）**：ACK 绑定 turnId 后立刻外推一次快照——
+          // `activeTurnId` 才能如实到达界面（claim 时的快照早于 ACK，会显示空）。
+          this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
         }
         opts?.onTurnStarted?.(metadata);
       };
@@ -1814,7 +1893,8 @@ export class SessionManager {
   /**
    * 2026-10-30（方案 v3 §3.1）：应用发起 run-change 卡（复用 decision，不新增 cardKind）。
    * 只由 app 发行；客户/judge 选择 continue-frozen/stop-and-restart/stop（或 approve/reject/cancel 回退）。
-   * 本方法选择有客户卡通道的统筹/提案会话呈现；无 pinned run / 无会话 / 无通道 ⇒ fail-closed。
+   * 2026-10-31（触发缺陷）：会话选择顺序扩展为 convener → rapporteur → chief（均需有客户卡通道）；
+   * 无 pinned run / 无可呈现会话 / 无通道 ⇒ fail-closed（调用方回 `run-change-required` 结构化拒绝）。
    */
   async requestRunChangeDecision(input: {
     projectRoot: string;
@@ -1825,6 +1905,7 @@ export class SessionManager {
   }): Promise<
     | {
         ok: true;
+        runId: string;
         outcome: Promise<CustomerInputOutcome>;
         first: Promise<{ kind: "presented" } | { kind: "outcome"; outcome: CustomerInputOutcome }>;
       }
@@ -1835,16 +1916,19 @@ export class SessionManager {
     if (active.manifest === null || active.manifest.state !== "pinned") {
       return { ok: false, error: "当前 flow 没有 pinned run，不能发起 run-change" };
     }
-    const preferred = [this.handbackOwnerRoleId(input.projectRoot), "rapporteur"];
+    const preferred = [this.handbackOwnerRoleId(input.projectRoot), "rapporteur", this.chiefTaskRoleIdOf(input.projectRoot)]
+      .filter((id): id is string => id !== null && id !== "");
     let selectedEntry: LiveSession | undefined;
+    let bestRank = Number.POSITIVE_INFINITY;
     for (const [key, entry] of this.sessions) {
       if (!key.startsWith(`${input.projectRoot} `)) continue;
       if (entry.projectRoot !== input.projectRoot) continue;
       if (entry.requirementChangeCard === undefined) continue;
       if (selectedEntry === undefined) selectedEntry = entry;
-      if (preferred.includes(entry.roleId)) {
+      const rank = preferred.indexOf(entry.roleId);
+      if (rank >= 0 && rank < bestRank) {
+        bestRank = rank;
         selectedEntry = entry;
-        if (entry.roleId === preferred[0]) break;
       }
     }
     if (selectedEntry === undefined || selectedEntry.requirementChangeCard === undefined) {
@@ -1921,7 +2005,197 @@ export class SessionManager {
       kind: "outcome",
       outcome: { outcome: "unavailable", reason: error instanceof Error ? error.message : String(error) },
     }));
-    return { ok: true, outcome, first };
+    return { ok: true, runId: active.manifest.runId, outcome, first };
+  }
+
+  /**
+   * 2026-10-31（run-change 触发缺陷）：当前项目的 active run（draft/pinned）只读摘要——供桌面
+   * 「契约变更 · 重开 run」入口判断是否可用（无 pinned run 时禁用并给原因）。
+   * 只读 manifest；不读正文、不改状态、不伪装 pinned。
+   */
+  async activeRunViews(projectRoot: string): Promise<{ ok: true; runs: ActiveRunView[] } | { ok: false; error: string }> {
+    const listed = await listRunManifestsResult(projectRoot);
+    if (!listed.ok) return { ok: false, error: listed.reason };
+    return {
+      ok: true,
+      runs: listed.manifests
+        .filter((manifest) => manifest.state === "draft" || manifest.state === "pinned")
+        .map((manifest) => ({
+          runId: manifest.runId,
+          flowId: manifest.flowId,
+          state: manifest.state === "pinned" ? "pinned" : "draft",
+          ...(manifest.pinnedAt !== undefined ? { pinnedAt: manifest.pinnedAt } : {}),
+          ...(manifest.rosterVersion !== undefined ? { rosterVersion: manifest.rosterVersion } : {}),
+          ...(manifest.roles !== undefined ? { roles: [...manifest.roles] } : {}),
+          documents: pinnedDocsSummary(manifest),
+        })),
+    };
+  }
+
+  /**
+   * 2026-10-31（run-change 触发）：**派发被冻结事实拒绝**且可识别为「新版本契约依赖」时，先尝试
+   * 呈现 run-change 三模式卡（最佳努力、同一 run 只自动弹一次），再回 `run-change-required` 三段式。
+   * 识别不出/不确定 ⇒ undefined（调用方保留既有 `run-role-missing`/`module-*` 拒绝——宁可不弹）。
+   */
+  private async runChangeRejectionForDispatch(input: {
+    projectRoot: string;
+    flowId: string | undefined;
+    fromRoleId: string;
+    runManifest: RunManifest | undefined;
+    pinnedRoster: RosterLoadResult | undefined;
+    code: string;
+    targetRoleId: string;
+    moduleId: string | undefined;
+  }): Promise<MechanicalRejection | undefined> {
+    const manifest = input.runManifest;
+    if (manifest === undefined || manifest.state !== "pinned") return undefined;
+    if (input.flowId === undefined) return undefined;
+    const detail = await this.dispatchFrozenConflictDetail({ ...input, flowId: input.flowId, runManifest: manifest });
+    if (detail === undefined) return undefined;
+    const newer = await findNewerContractDocs(input.projectRoot, manifest);
+    if (newer.length === 0) return undefined; // 磁盘上没有更新版本契约 ⇒ 不弹（走既有拒绝）
+    const offered = await this.offerRunChangeOnFrozenContract({
+      projectRoot: input.projectRoot,
+      flowId: input.flowId,
+      manifest,
+      newer,
+      reason: `派发被冻结基线拒绝：${detail.reason}`,
+      missing: detail.missing,
+      ...(input.fromRoleId === this.handbackOwnerRoleId(input.projectRoot) ? { requestedBy: "convener" as const } : {}),
+    });
+    return offered.rejection;
+  }
+
+  /** 冻结冲突的**可核对事实**（只有「新名单包含目标角色/模块，而 pin 的名单不含」才返回）。 */
+  private async dispatchFrozenConflictDetail(input: {
+    projectRoot: string;
+    flowId: string;
+    runManifest: RunManifest | undefined;
+    pinnedRoster: RosterLoadResult | undefined;
+    code: string;
+    targetRoleId: string;
+    moduleId: string | undefined;
+  }): Promise<{ missing: string; reason: string } | undefined> {
+    if (input.code !== "run-role-missing" && input.code !== "module-missing" && input.code !== "module-not-owned") return undefined;
+    if (input.pinnedRoster === undefined || input.pinnedRoster.ok !== true) return undefined;
+    const latest = await loadLatestRoster({ projectRoot: input.projectRoot, flowId: input.flowId });
+    if (!latest.ok) return undefined;
+    const pinnedVersion = input.runManifest?.rosterVersion ?? input.pinnedRoster.version;
+    if (!(latest.version > pinnedVersion)) return undefined;
+    const pinned = input.pinnedRoster.roster;
+    if (input.code === "run-role-missing") {
+      const latestHas = latest.roster.roles.some((role) => role.id === input.targetRoleId);
+      const pinnedHas = pinned.roles.some((role) => role.id === input.targetRoleId);
+      if (!latestHas || pinnedHas) return undefined;
+      return {
+        missing: `目标角色 ${input.targetRoleId} 在当前 run 冻结的角色集内（roster v${latest.version} 新增；pin v${pinnedVersion}）`,
+        reason: `目标角色 ${input.targetRoleId} 属于更新版本名单（roster v${latest.version}），不在当前 run 冻结的 pin 角色集（v${pinnedVersion}）内`,
+      };
+    }
+    const moduleId = input.moduleId ?? "";
+    if (moduleId === "") return undefined;
+    if (input.code === "module-missing") {
+      const latestHas = latest.roster.modules.some((module) => module.id === moduleId);
+      const pinnedHas = pinned.modules.some((module) => module.id === moduleId);
+      if (!latestHas || pinnedHas) return undefined;
+      return {
+        missing: `模块 ${moduleId} 在当前 run 冻结的 pin 名单内（roster v${latest.version} 新增；pin v${pinnedVersion}）`,
+        reason: `模块 ${moduleId} 属于更新版本名单（roster v${latest.version}），不在当前 run 冻结的 pin 名单（v${pinnedVersion}）内`,
+      };
+    }
+    const latestOwner = latest.roster.roles.find((role) => role.modules.includes(moduleId))?.id;
+    const pinnedOwner = pinned.roles.find((role) => role.modules.includes(moduleId))?.id;
+    if (latestOwner !== input.targetRoleId || pinnedOwner === input.targetRoleId) return undefined;
+    return {
+      missing: `模块 ${moduleId} 在 pin 名单中归 ${input.targetRoleId}（roster v${latest.version} 改派；pin v${pinnedVersion} 归 ${pinnedOwner ?? "未绑定"}）`,
+      reason: `模块 ${moduleId} 在更新版本名单（roster v${latest.version}）中归 ${input.targetRoleId}，但当前 run 冻结的 pin 名单（v${pinnedVersion}）归 ${pinnedOwner ?? "未绑定"}`,
+    };
+  }
+
+  /**
+   * 冻结 run 上出现**比 pin 更新的提案卡**时的识别（`cardKind=proposal`）：提案卡意味着要对新版本
+   * 提案作答，而冻结语义规定 active run 不激活新版本 ⇒ 先尝试 run-change 卡，本提案卡以
+   * `run-change-required` 三段式拒发（`notPresented`，不冒充客户拒绝）。
+   * 无 pinned run / 提案版本不高于 pin ⇒ undefined（零行为变化）。
+   */
+  private async proposalCardFrozenRejection(
+    projectRoot: string,
+    request: CustomerInputRequest,
+    metadata: CustomerInputMetadata | undefined,
+  ): Promise<{ rejection: MechanicalRejection; presented: boolean } | undefined> {
+    if (request.cardKind !== "proposal") return undefined;
+    const flowId = request.flowId ?? metadata?.flowId;
+    if (typeof flowId !== "string" || flowId.trim() === "") return undefined;
+    const active = await findActiveRun(projectRoot, flowId);
+    if (!active.ok || active.manifest === null || active.manifest.state !== "pinned") return undefined;
+    const newer = await findNewerContractDocs(projectRoot, active.manifest);
+    const proposalDoc = newer.find((doc) => doc.kind === "proposal");
+    if (proposalDoc === undefined) return undefined;
+    return this.offerRunChangeOnFrozenContract({
+      projectRoot,
+      flowId,
+      manifest: active.manifest,
+      newer,
+      reason: `提案卡引用了比 pin 更新的提案（${proposalDoc.path}，v${proposalDoc.version} > pin v${proposalDoc.pinnedVersion ?? "?"}）；当前 run 已冻结，新版本不激活`,
+      missing: `当前 run 冻结基线内的提案版本（磁盘 ${proposalDoc.path} v${proposalDoc.version} > pin v${proposalDoc.pinnedVersion ?? "?"}）`,
+      requestedBy: "planner",
+    });
+  }
+
+  /**
+   * 2026-10-31：呈现 run-change 卡（同一 run 自动仅一次）+ 组装 `run-change-required` 三段式。
+   * 冻结语义不变——调用方仍拒绝原操作；客户决定后按 continue-frozen / stop-and-restart / stop 继续。
+   */
+  private async offerRunChangeOnFrozenContract(input: {
+    projectRoot: string;
+    flowId: string;
+    manifest: RunManifest;
+    newer: NewerContractDoc[];
+    reason: string;
+    /** 三段式 missing 用（「拒绝：缺少 …」通顺的名词短语）；缺省回退 reason。 */
+    missing?: string;
+    requestedBy?: "convener" | "planner" | "product";
+  }): Promise<{ rejection: MechanicalRejection; presented: boolean }> {
+    const key = `${input.projectRoot}\u0000${input.manifest.runId}`;
+    const proposedDocs: Record<string, string> = {};
+    for (const doc of input.newer) proposedDocs[doc.kind] = doc.path;
+    let presented = false;
+    if (!this.runChangeAutoPrompted.has(key)) {
+      this.runChangeAutoPrompted.add(key);
+      const started = await this.requestRunChangeDecision({
+        projectRoot: input.projectRoot,
+        flowId: input.flowId,
+        ...(input.requestedBy !== undefined ? { requestedBy: input.requestedBy } : {}),
+        reason: input.reason,
+        ...(Object.keys(proposedDocs).length > 0 ? { proposed: { documents: proposedDocs, schemas: {} } } : {}),
+      });
+      if (!started.ok) {
+        // 没有可呈现会话 ⇒ 不占用「已自动提示」名额：打开统筹/提案/幕僚会话后，下次冻结冲突仍可自动弹。
+        this.runChangeAutoPrompted.delete(key);
+      } else {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise<{ kind: "timeout" }>((resolve) => {
+          timer = setTimeout(() => resolve({ kind: "timeout" }), 1500);
+        });
+        const first = await Promise.race([started.first, timeout]);
+        if (timer !== undefined) clearTimeout(timer);
+        presented = first.kind === "presented" || (first.kind === "outcome" && first.outcome.outcome === "answered");
+      }
+    }
+    const pinnedRosterPath = input.manifest.documents.roster !== null && input.manifest.documents.roster !== undefined
+      ? input.manifest.documents.roster.path
+      : undefined;
+    const docs = [
+      ...input.newer.map((doc) => doc.path),
+      ...(pinnedRosterPath !== undefined ? [pinnedRosterPath] : []),
+    ].slice(0, 5);
+    const rejection = makeMechanicalRejection("run-change-required", [input.missing ?? input.reason], {
+      action: presented
+        ? "应用已向客户呈现 run-change 卡（继续冻结 / 停止并重开 run / 停止）；由客户选择模式，决定后按新模式继续。"
+        : "客户可在会话头点击「契约变更 · 重开 run」发起 run-change（继续冻结 / 停止并重开 run / 停止）；若无可呈现会话，先打开统筹/提案/幕僚会话再重试。",
+      docs,
+    });
+    return { rejection, presented };
   }
 
   /** 治理主人（回交/系统行落位；2026-10-19 验收自动派发用）：trio=Convener；single=主入口（su）；未枚举 ⇒ null。 */
@@ -2249,6 +2523,10 @@ export class SessionManager {
     // 项目根/发起角色/引擎补入后透传。**提交申请 ≠ 批准**：审批由客户/判断 agent 在 decision 卡上完成，
     // 主理不审批、只在批准后执行意图变更。
     const canInitiateRequirementChange = governanceFunction === "proposal" || governanceFunction === "schedule";
+    // 2026-10-31（run-change 触发）：应用自有的 run-change 卡可经统筹/提案/幕僚任一在场的客户卡通道呈现
+    // （会话选择顺序 convener → rapporteur → chief）。这只扩大**应用内**的发卡呈现面，不新增模型工具：
+    // `request_requirement_change` 仍只注入 proposal/schedule（上面 canInitiateRequirementChange 未变）。
+    const canPresentAppRunChange = canInitiateRequirementChange || governanceFunction === "chief";
     const requestRequirementChange: RequestRequirementChangeFn | undefined =
       canInitiateRequirementChange && this.deps.requestRequirementChange !== undefined
         ? (input: RequestRequirementChangeInput) =>
@@ -2554,10 +2832,10 @@ export class SessionManager {
       skillPaths,
       ...(shellJudge !== undefined ? { shellJudge } : {}),
       ...(governanceJudge !== undefined ? { governanceJudge } : {}),
-      // 需求变更审批卡通道（2026-10-26 客户纠正）：仅统筹/提案会话构造——绑定本会话客户卡上下文
-      // （roleId/signal/judge/turnText）与 `onPresented`；decision 卡结构与角色门仍由共享
-      // `validateDecisionCardRequest` 单一来源校验（统筹/提案均在其白名单内）。
-      ...(customerInput !== undefined && canInitiateRequirementChange
+      // 需求变更审批卡通道（2026-10-26 客户纠正；2026-10-31 run-change 触发扩展）：绑定本会话客户卡上下文
+      // （roleId/signal/judge/turnText）与 `onPresented`；`application:true` 的 run-change 卡不借用角色发行槽位，
+      // 但呈现面按治理会话收口（统筹/提案/幕僚），其他角色/项目角色不构造该通道。
+      ...(customerInput !== undefined && canPresentAppRunChange
         ? {
             requirementChangeCard: async (
               request: CustomerInputRequest,
@@ -2636,14 +2914,45 @@ export class SessionManager {
           // 投递触发**不挑目标**（历史上单队列按项目存放时就是如此）：一轮结束=下一次放行时机（E-1 的
           // 重试时机之一），各队列在 drainQueue 里各自检查「目标忙/未开」后再决定是否真投。
           const sourceMatches = ev.kind !== "handback" && (ev.runtime === undefined || ev.runtime === runtime) && (ev.roleId === undefined || ev.roleId === roleId);
-          const legacyTerminal = sourceMatches && origin === undefined && entry.origins.running?.turnId === undefined;
-          if (ev.kind === "settled" && sourceMatches && (origin === entry.origins.running || (origin?.settled === true && entry.origins.running === undefined) || legacyTerminal)) {
-            // 收尾推进：旧式空 turnId 的 settled 走 legacyTerminal 时 `origin` 为 undefined，
-            // 但本轮投递事实仍在 `origins.running` 上——先定格，再删除。
-            const settledOrigin = origin ?? entry.origins.running;
+          // **P0 收尾不变量（2026-10-30 现场）**：settled 按 turnId 兜底清 busy——即便 origin 精确匹配
+          // 不成立（origin 缺失/被失败投递删掉/事件缺 turnId），也不得让 busy 永久残留（现场 turn.end 后
+          // 无 delivery.end、busy 不复位、target-busy 冻结队列）。唯一例外：**两个已知 turnId 明确不同**
+          // ——迟到旧回合的 settled 不得清掉正在跑的新回合（多 runtime 既有语义）。
+          const runningOrigin = entry.origins.running;
+          const eventTurnId = ev.kind !== "handback" && typeof ev.turnId === "string" && ev.turnId !== "" ? ev.turnId : undefined;
+          const trackedTurnId = runningOrigin?.turnId;
+          const differentKnownTurn = trackedTurnId !== undefined && eventTurnId !== undefined && trackedTurnId !== eventTurnId;
+          const originMatchesRunning = origin !== undefined && origin === runningOrigin;
+          if (ev.kind === "settled" && sourceMatches && !differentKnownTurn) {
+            // 收尾推进：`origin` 可能为 undefined（旧式空 turnId / origin 已缺失），本轮投递事实仍在
+            // `origins.running` 上——先定格，再删除。
+            const settledOrigin = origin ?? runningOrigin;
             if (origin) origin.settled = true;
             delete entry.origins.running;
             this.trimDeliveryOrigins(entry);
+            const originMissing = !originMatchesRunning;
+            const settledDiagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId });
+            if (entry.busy || originMatchesRunning) {
+              const settledDetail = ev.detail as { outcome?: unknown; errorCode?: unknown; attempts?: unknown; replaySafe?: unknown } | undefined;
+              const settledOutcomeRaw = settledDetail?.outcome;
+              const settledErrorCodeRaw = settledDetail?.errorCode;
+              settledDiagnostic.record("turn.settled", {
+                ...(eventTurnId !== undefined ? { turnId: eventTurnId } : {}),
+                state: originMissing ? "origin-missing" : "origin-matched",
+                busy: entry.busy,
+                ...(typeof settledOutcomeRaw === "string" ? { outcome: settledOutcomeRaw } : {}),
+                ...(typeof settledErrorCodeRaw === "string" ? { errorCode: settledErrorCodeRaw } : {}),
+                // P3：诊断沿用既有白名单字段承载 attempts/replaySafe（attempt←attempts、replayPlan←replaySafe）。
+                ...(typeof settledDetail?.attempts === "number" && Number.isFinite(settledDetail.attempts) ? { attempt: settledDetail.attempts } : {}),
+                ...(typeof settledDetail?.replaySafe === "boolean" ? { replayPlan: settledDetail.replaySafe ? "safe" : "unsafe" } : {}),
+              });
+            }
+            if (originMissing && entry.busy) {
+              settledDiagnostic.record("turn.origin-missing", {
+                reasonCode: eventTurnId === undefined ? "settled-without-turn-id" : trackedTurnId === undefined ? "settled-before-turn-ack" : "settled-origin-mismatch",
+                ...(eventTurnId !== undefined ? { turnId: eventTurnId } : {}),
+              });
+            }
             entry.interactionState.turn.abort();
             const en = this.sessions.get(key);
             if (en) {
@@ -2659,9 +2968,24 @@ export class SessionManager {
               // 收束/恢复回执）决定该 settle 是否算**真实活动**（刻意排除 ⇒ 防「总结完→又被立即催」的骚扰
               // 回路；静默阈值默认 30s＝一个 tick 的最小防抖——客户 2026-10-16 run-5 裁定，隔离更须严格）。
               const finishedDelivery = this.activeDeliveries.get(this.queueKey(en.projectRoot, roleId, runtime));
+              // **P0（2026-10-30）：settle 收尾补 delivery 终态**。回合已经跑完 ⇒ 该投递的输入已被运行时接收；
+              // 若 send promise 尚未记账（快适配器/挂起续段），由 settle 关闭并落**恰一次** `delivery.end`
+              // （现场「turn.end 后无 delivery.end」的对账缺口）；随后续段不再重复记账。
+              if (finishedDelivery !== undefined && finishedDelivery.terminalRecorded !== true) {
+                finishedDelivery.terminalRecorded = true;
+                this.deliveredDeliveryKeys.add(`${this.queueKey(en.projectRoot, roleId, runtime)}\u0000${finishedDelivery.dedupKey}`);
+                this.rememberAppTaskDelivered(finishedDelivery.clientMessageId);
+                createDiagnosticLogger({ component: "desktop.delivery", projectRoot, roleId }).record("delivery.end", {
+                  ok: true,
+                  count: 1,
+                  state: finishedDelivery.kind,
+                  phase: "turn-settled",
+                });
+              }
               this.activeDeliveries.delete(this.queueKey(en.projectRoot, roleId, runtime)); // 「进行中」随本轮结束撤销
               // 2026-10-20 重启续跑：本轮结束 ⇒ 清理已完成标记并落盘（持久项已在 delivery.end 移除）。
-              if (finishedDelivery !== undefined) {
+              // P0：由 settle 补记账的条目**保留**「已投递」标记（防写盘竞态后重启重投）。
+              if (finishedDelivery !== undefined && finishedDelivery.terminalRecorded !== true) {
                 this.deliveredDeliveryKeys.delete(`${this.queueKey(en.projectRoot, roleId, runtime)}\u0000${finishedDelivery.dedupKey}`);
               }
               this.persistDeliveryQueues();
@@ -2680,12 +3004,30 @@ export class SessionManager {
                   settledOutcomeRaw === "completed" || settledOutcomeRaw === "failed" || settledOutcomeRaw === "aborted" || settledOutcomeRaw === "timed_out"
                     ? settledOutcomeRaw
                     : undefined;
+                // P1（2026-10-30）：请求超时/请求失败的结构化 errorCode（来自 Service settled.detail）——
+                // 只用于人话系统行 + lastTurn 小状态；**不**进入客户可见文案（不显示技术 code/堆栈/URL）。
+                // P2：网络离线超窗（`network-offline-timeout`）同口径，用网络人话文案。
+                const settledErrorCodeRaw = (ev.detail as { errorCode?: unknown } | undefined)?.errorCode;
+                const settledErrorCode = typeof settledErrorCodeRaw === "string" && (isRequestFailureCode(settledErrorCodeRaw) || isNetworkOfflineFailureCode(settledErrorCodeRaw)) ? settledErrorCodeRaw : undefined;
                 void this.mirrorGovernanceFeedback(projectRoot, runtime, roleId, {
                   ...(settledOrigin?.flowIds !== undefined && settledOrigin.flowIds.length > 0 ? { flowIds: settledOrigin.flowIds } : {}),
                   ...(settledOutcome !== undefined ? { outcome: settledOutcome } : {}),
                 });
                 if (settledOutcome !== undefined) {
-                  this.lastTurns.set(this.queueKey(en.projectRoot, roleId, runtime), { outcome: settledOutcome, at: new Date(this.now()).toISOString() });
+                  this.lastTurns.set(this.queueKey(en.projectRoot, roleId, runtime), { outcome: settledOutcome, at: new Date(this.now()).toISOString(), ...(settledErrorCode !== undefined ? { errorCode: settledErrorCode } : {}) });
+                }
+                if (settledOutcome === "failed" && settledErrorCode !== undefined) {
+                  // 人话系统行（客户卡不出现技术模板/code）：来源 i18n；delivery-note 只呈现，不触发模型/门禁。
+                  const human = isNetworkOfflineFailureCode(settledErrorCode)
+                    ? mainT("main.networkStatus.offlineTimeout")
+                    : settledErrorCode === MODEL_REQUEST_RETRY_EXHAUSTED
+                      ? mainT("main.requestStatus.retryExhausted")
+                      : settledErrorCode === REQUEST_TIMEOUT_ERROR_CODES["first-byte"]
+                        ? mainT("main.requestStatus.timeoutFirstByte")
+                        : settledErrorCode === REQUEST_TIMEOUT_ERROR_CODES.idle
+                          ? mainT("main.requestStatus.timeoutIdle")
+                          : mainT("main.requestStatus.failed");
+                  this.emitDeliveryNote(en.projectRoot, runtime, roleId, roleId, human);
                 }
                 this.observeWatchdog(en.projectRoot, {
                   kind: "settled",
@@ -2830,7 +3172,9 @@ export class SessionManager {
     // **后台投递不复位活动指针**（应用代客户派发 ≠ 用户切换 pane；当前 pane 保持原样）。
     if (this.activeRoleId === null && this.selectionVersion === selectionVersion && !background) this.activeRoleId = targetRoleId;
     this.noteWatchdogActivity(entry.projectRoot, background ? "governance-advance" : "customer-send"); // G-2/W3：客户消息 = 真实活动（无论直发还是入队，都在此定格）
-    if (entry.busy || (entry.runtime === "pi" && entry.profileRevision !== this.profileRevision("pi") && this.hasBusyRuntime("pi"))) {
+    // P0（2026-10-30）：先自愈「busy 已复位但 origin 残留」的陈旧归属；忙/已有 origin 一律入队（不覆盖）。
+    this.healStaleOrigin(entry, "stale-origin-before-send");
+    const queueBecauseBusy = (): SendResult => {
       const roleId = entry.roleId;
       this.enqueueDelivery(entry.projectRoot, roleId, {
         kind: deliveryKind,
@@ -2849,12 +3193,16 @@ export class SessionManager {
       const q = this.deliveryQueues.get(this.queueKey(entry.projectRoot, roleId, entry.runtime));
       diagnostic.record("session.send.queued", { queueDepth: q?.length ?? 0 });
       return { ok: true, queued: true, position: q ? q.length : 1, ...(clientMessageId !== undefined ? { clientMessageId } : {}) };
+    };
+    if (entry.busy || entry.origins.running !== undefined || (entry.runtime === "pi" && entry.profileRevision !== this.profileRevision("pi") && this.hasBusyRuntime("pi"))) {
+      return queueBecauseBusy();
     }
     const roleId = entry.roleId;
     // L-1 顺序修正（与投递机同款，防竞态）：**先置忙再 await**——快适配器（如演示 runtime）的事件
     // （含 `settled`）可能在 `send` 返回前就被消费循环处理完；若此刻才置忙，settled 的复位会被反向覆盖，
     // 忙态将**永不复位**（队列也永不放行）。失败 ⇒ 复位 + 外推（并没有在跑，如实）。
     const origin = this.beginDeliveryOrigin(entry, clientMessageId);
+    if (origin === undefined) return queueBecauseBusy(); // turn lease 争用（同步段不可达；防御：入队不覆盖）
     // 直接投出的治理唤醒同样带 system 类别（与入队条目同口径；客户消息不设，既有语义不变）。
     if (deliveryKind === "system") origin.kind = "system";
     entry.interactionState.turn = new AbortController();
@@ -2916,10 +3264,70 @@ export class SessionManager {
       // 中止标记（链式治理推进的早失败护栏）：被请求中止 ≠ 正常结束——链路继续轮询等下一次投递/重试。
       entry.lastTurnAborted = true;
       entry.interactionState.turn.abort();
-      return await entry.handle.abort();
+      const result = await entry.handle.abort();
+      // **P0 手动停止解楔（2026-10-30 现场：10+ 次停止 ~1ms ok 但零变化）**：停止入口必须能强制复位
+      // 投递层楔死（origin/busy/activeDeliveries）并让队列继续；`handle.abort` 已如实返回成功才能这样做
+      // （不支持/失败 ⇒ 不假装已停）。这里**不伪造 turn**：只复位投递层状态并记 `turn.abort.forced`。
+      if (result.ok === true) this.forceResetDeliveryState(entry, "abort-requested");
+      return result;
     } catch (err) {
       return { ok: false, supported: true, error: err instanceof Error ? err.message : String(err) };
     }
+  }
+
+  /**
+   * **强制复位投递层状态（P0，2026-10-30）**：仅在「停止已成功请求」后由 `abort` 调用——
+   * 复位 `origins.running`/`busy`/`activeDeliveries`，为被放弃的在途投递落**恰一次**终态（`delivery.end`
+   * `mode:"aborted"`，at-most-once，不重投），结算 settle 等待者并放行队列。**不伪造回合终局**：
+   * 运行时若稍后仍发 settled，按既有幂等路径处理（busy 已复位，不产生第二次收尾）。
+   * 无忙态/无 origin/无在途 ⇒ no-op（幂等，不产生噪声）。
+   */
+  private forceResetDeliveryState(entry: LiveSession, reasonCode: string): void {
+    const key = this.queueKey(entry.projectRoot, entry.roleId, entry.runtime);
+    const origin = entry.origins.running;
+    const active = this.activeDeliveries.get(key);
+    const wasBusy = entry.busy;
+    if (!wasBusy && origin === undefined && active === undefined) return;
+    if (origin !== undefined) {
+      origin.settled = true;
+      delete entry.origins.running;
+      this.trimDeliveryOrigins(entry);
+    }
+    let activeClosed = 0;
+    if (active !== undefined && active.terminalRecorded !== true) {
+      active.terminalRecorded = true;
+      activeClosed = 1;
+      this.deliveredDeliveryKeys.add(`${key}\u0000${active.dedupKey}`);
+      this.rememberAppTaskDelivered(active.clientMessageId);
+      createDiagnosticLogger({ component: "desktop.delivery", projectRoot: entry.projectRoot, roleId: entry.roleId }).record("delivery.end", {
+        ok: true,
+        count: 1,
+        state: active.kind,
+        mode: "aborted",
+        reasonCode,
+      });
+    }
+    if (active !== undefined) this.activeDeliveries.delete(key);
+    entry.busy = false;
+    entry.busySince = undefined;
+    const settleWaiters = entry.settleWaiters;
+    entry.settleWaiters = undefined;
+    for (const finish of settleWaiters ?? []) finish(true);
+    createDiagnosticLogger({ component: "desktop.session", projectRoot: entry.projectRoot, roleId: entry.roleId }).record(
+      "turn.abort.forced",
+      {
+        reasonCode,
+        ...(origin?.turnId !== undefined ? { turnId: origin.turnId } : {}),
+        mode: "forced",
+        count: activeClosed,
+        queueDepth: (this.deliveryQueues.get(key) ?? []).length,
+        busy: wasBusy,
+      },
+    );
+    this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
+    this.persistDeliveryQueues();
+    void this.drainAllQueuesFor(entry.projectRoot);
+    if (entry.runtime === "pi") void this.drainPiQueuesAcrossProjects();
   }
 
   /**
@@ -3039,9 +3447,11 @@ export class SessionManager {
     projectRoot: string,
     roleId: string,
     input: { kind: string; summary: string; tool?: string; status?: string; taskId?: string; turnId?: string; ref?: string },
-  ): void {
+  ): Promise<void> {
     this.lastRoleActivity.set(`${projectRoot}\u0000${roleId}`, { at: this.now(), kind: input.kind, summary: input.summary });
-    void appendRoleLog(projectRoot, roleId, input).then((result) => {
+    // 返回可等待的追加链：调用方若需要「返回即已落盘/可读」（如升级裁决）必须 await；
+    // 其余观察器路径保持 fire-and-forget（不阻塞会话事件泵）。
+    return appendRoleLog(projectRoot, roleId, input).then((result) => {
       if (!result.ok) {
         createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("role-log.append.failed", new Error(result.message));
       }
@@ -3119,7 +3529,7 @@ export class SessionManager {
     return `req-${digest}`;
   }
 
-  /** C 批：系统通知幕僚（按 requestId+event 去重；系统行不是客户卡/不是决定）。 */
+  /** C 批：系统通知幕僚（按 requestId+event 去重；系统行不是客户卡/不是决定）。返回可等待的落盘链。 */
   private notifyRequest(
     projectRoot: string,
     requestId: string,
@@ -3128,9 +3538,9 @@ export class SessionManager {
     event: "created" | "presented" | "resolved",
     detail?: string,
     after?: Promise<unknown>,
-  ): void {
+  ): Promise<void> {
     const key = `${requestId}\u0000${event}`;
-    if (this.requestNotifiedKeys.has(key)) return;
+    if (this.requestNotifiedKeys.has(key)) return Promise.resolve();
     this.requestNotifiedKeys.add(key);
     if (this.requestNotifiedKeys.size > 5000) {
       const oldest = this.requestNotifiedKeys.values().next().value;
@@ -3139,7 +3549,6 @@ export class SessionManager {
     const write = after !== undefined
       ? after.then(() => this.appendTaskState(projectRoot, taskEvent("request.notified", { requestId, to: "chief", event }, () => new Date(this.now()))))
       : this.appendTaskState(projectRoot, taskEvent("request.notified", { requestId, to: "chief", event }, () => new Date(this.now())));
-    void write;
     const labels: Record<typeof event, string> = { created: "已提交", presented: "已呈现", resolved: "已裁决" };
     const text = `[系统·申请] ${labels[event]}：角色「${sourceRoleId}」的申请「${shortenSummary(title, 80)}」（#${requestId}）${detail !== undefined && detail !== "" ? `｜${shortenSummary(detail, 120)}` : ""}。申请直达客户/应用裁决，幕僚不转发、不审批、不代选。`;
     try {
@@ -3154,6 +3563,7 @@ export class SessionManager {
     } catch (error) {
       createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: sourceRoleId }).error("request.notify.failed", error);
     }
+    return write.then(() => undefined, () => undefined);
   }
 
   private async recordRequestPresented(projectRoot: string, requestId: string, sourceRoleId: string, title: string, to: "customer" | "judge"): Promise<void> {
@@ -3161,7 +3571,7 @@ export class SessionManager {
     if (this.requestPresentedKeys.has(key)) return;
     this.requestPresentedKeys.add(key);
     await this.appendTaskState(projectRoot, taskEvent("request.presented", { requestId, to }, () => new Date(this.now())));
-    this.notifyRequest(projectRoot, requestId, sourceRoleId, title, "presented", to === "judge" ? "判断 agent" : "客户");
+    await this.notifyRequest(projectRoot, requestId, sourceRoleId, title, "presented", to === "judge" ? "判断 agent" : "客户");
   }
 
   /**
@@ -3468,6 +3878,20 @@ export class SessionManager {
     if (request.cardKind === "acceptance") {
       metadata = await this.enrichAcceptanceJudgeContext(projectRoot, request, metadata);
     }
+    // 2026-10-31（run-change 触发）：冻结 run 上出现比 pin 更新的提案卡 ⇒ 先尝试 run-change 卡，
+    // 本提案卡以 run-change-required 三段式拒发（未呈现；不冒充客户拒绝、不改冻结语义）。
+    if (request.cardKind === "proposal") {
+      const frozen = await this.proposalCardFrozenRejection(projectRoot, request, metadata);
+      if (frozen !== undefined) {
+        const formatted = formatMechanicalRejection(frozen.rejection);
+        this.appendRoleActivity(projectRoot, sourceRoleId, {
+          kind: "request.rejected",
+          summary: shortenSummary(`run-change-required：${frozen.rejection.missing.join("；")}`, 200),
+          status: "not-presented",
+        });
+        return { outcome: "declined", notPresented: true, reason: formatted };
+      }
+    }
     const requestId = requestIdOverride ?? this.requestIdFor(projectRoot, sourceRoleId, request, metadata);
     const options = request.kind === "choice"
       ? request.options.map((option) => ({ id: option.id, label: option.label, ...(option.recommended === true ? { recommended: true } : {}) }))
@@ -3491,6 +3915,8 @@ export class SessionManager {
     const createdWrite = this.appendTaskState(projectRoot, taskEvent("request.created", {
       requestId,
       ...(request.flowId !== undefined ? { flowId: request.flowId } : {}),
+      // 2026-10-31（D3 卡种收口）：卡种由应用从 request 对象落账（不信任模型/judge 自报）。
+      ...(request.cardKind !== undefined ? { cardKind: request.cardKind } : {}),
       ...(metadata?.intentId !== undefined ? { intentId: metadata.intentId } : {}),
       ...(metadata?.taskId !== undefined ? { taskId: metadata.taskId } : {}),
       sourceRoleId,
@@ -3510,7 +3936,7 @@ export class SessionManager {
           ...(metadata?.turnId !== undefined ? { turnId: metadata.turnId } : {}),
         }, () => new Date(this.now()))))
       : Promise.resolve(true);
-    this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "created", undefined, createdWrite);
+    const createdNotify = this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "created", undefined, createdWrite);
     let presented = false;
     let presentedWrite: Promise<void> | null = null;
     const markPresented = (to: "customer" | "judge"): Promise<void> => {
@@ -3527,17 +3953,21 @@ export class SessionManager {
       out = await raw(request, context, metadata);
     } catch (error) {
       await createdWrite;
+      await createdNotify;
+      if (presentedWrite !== null) await presentedWrite;
       await this.appendTaskState(projectRoot, taskEvent("request.resolved", {
         requestId,
+        ...(request.cardKind !== undefined ? { cardKind: request.cardKind } : {}),
         by: "customer",
         choice: "unavailable",
         reason: shortenSummary(error instanceof Error ? error.message : String(error), 200),
       }, () => new Date(this.now())));
-      this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "resolved", "通道异常（未执行）");
+      await this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "resolved", "通道异常（未执行）");
       throw error;
     }
     await createdWrite;
     await approvalWrite;
+    await createdNotify;
     const answeredOut = out !== null && out !== undefined && out.outcome === "answered" ? out : undefined;
     const judged = answeredOut !== undefined && (answeredOut.judge !== undefined || (typeof answeredOut.operatorId === "string" && answeredOut.operatorId.startsWith("judge:")));
     if (judged && !presented && answeredOut !== undefined) await markPresented("judge");
@@ -3563,7 +3993,12 @@ export class SessionManager {
       requestId,
       ...(decisionId !== undefined ? { decisionId } : {}),
       ...rosterStamp,
-      ...(selected.length > 0 ? { targetRoleIds: selected } : {}),
+      // 2026-10-31（D3 卡种收口）：只有 appointment（D3 招人）卡的选中项是角色集；其他 choice 卡
+      // （decision/intent-confirm/proposal/acceptance/普通卡）只写审计字段 selectedOptionIds，
+      // 防止选项 id（如 customer-local）污染 targetRoleIds 而被 D3 扫描误读。
+      ...(request.cardKind !== undefined ? { cardKind: request.cardKind } : {}),
+      ...(selected.length > 0 && request.cardKind === "appointment" ? { targetRoleIds: selected } : {}),
+      ...(selected.length > 0 && request.cardKind !== "appointment" ? { selectedOptionIds: selected } : {}),
       ...(metadata?.intentId !== undefined ? { intentId: metadata.intentId } : {}),
       ...(metadata?.taskId !== undefined ? { taskId: metadata.taskId } : {}),
       by: judged ? "judge" : "customer",
@@ -3582,7 +4017,7 @@ export class SessionManager {
         ...(judged && answeredOut?.judge !== undefined ? { judge: answeredOut.judge } : {}),
       }, () => new Date(this.now())));
     }
-    this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "resolved", judged ? `判断代批：${choice}` : choice);
+    await this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "resolved", judged ? `判断代批：${choice}` : choice);
     return out;
   }
 
@@ -4143,7 +4578,7 @@ export class SessionManager {
       },
     );
     if (plan.action === "reject") {
-      void this.appendTaskState(projectRoot, taskEvent("task.closed", {
+      await this.appendTaskState(projectRoot, taskEvent("task.closed", {
         taskId: newId,
         by: "chief",
         outcome: "rejected",
@@ -4279,7 +4714,7 @@ export class SessionManager {
       const selected = outcome?.outcome === "answered"
         ? (outcome.value.selected ?? []).find((id) => ["continue", "redispatch", "replace", "terminate"].includes(id))
         : undefined;
-      this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
+      await this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
         kind: "task.escalation",
         summary: `任务 #${taskId} 连续卡死升级：${outcome?.outcome ?? "unavailable"}${selected !== undefined ? `（${selected}）` : ""}`,
         taskId,
@@ -4309,7 +4744,7 @@ export class SessionManager {
           replace: "不自动换人；请人工选择替代角色并派新任务（必要时先终止原角色运行）。",
         };
         const text = `任务 #${taskId} 升级裁决「${selected}」：${manual[selected]}`;
-        this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
+        await this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
           kind: "task.escalation.manual",
           summary: text,
           taskId,
@@ -4968,9 +5403,31 @@ export class SessionManager {
     const entry = this.sessions.get(this.sessionKey(projectRoot, targetRoleId, runtime));
     const busy = entry?.busy === true;
     const running = this.activeDeliveries.get(this.queueKey(projectRoot, targetRoleId, runtime));
-    const view = (i: DeliveryItem) => ({ runtime: i.runtime, kind: i.kind, sourceRoleId: i.sourceRoleId, summary: i.summary, at: i.enqueuedAt, id: i.dedupKey, full: i.kind === "handback" ? i.safeText ?? mainT("main.session.safeCopyPending") : i.text });
+    const now = this.now();
+    /** **P0 队列可见性（2026-10-30）**：每条排队项的等待时长（ms；入队时刻定格，显示用）。 */
+    const ageOf = (i: DeliveryItem): number => {
+      const parsed = Date.parse(i.enqueuedAt);
+      return Number.isFinite(parsed) ? Math.max(0, now - parsed) : 0;
+    };
+    const view = (i: DeliveryItem) => ({ runtime: i.runtime, kind: i.kind, sourceRoleId: i.sourceRoleId, summary: i.summary, at: i.enqueuedAt, id: i.dedupKey, full: i.kind === "handback" ? i.safeText ?? mainT("main.session.safeCopyPending") : i.text, ageMs: ageOf(i) });
     let contextInfo: Pick<OpenResult, "contextSource" | "contextWarning"> = {};
     if (entry) contextInfo = this.contextInfo(entry.handle);
+    // **为什么没动**（单一来源＝会话内存态，不造第二套）：队首类别 / 阻塞原因 / 当前回合 id。
+    // `origin-missing` = 忙态但无对应在跑回合（收尾异常，可用「停止本轮」复位）；
+    // `target-busy` = 正常等待上一轮；`session-closed` = 目标会话未开且没有自动开启链；
+    // `network`（P2）= 主进程网络离线，队列安全暂停（恢复后按既有顺序继续）。
+    const runningOrigin = entry?.origins.running;
+    const headKind = q.length > 0 ? q[0].kind : null;
+    const blockedReason: "target-busy" | "origin-missing" | "session-closed" | "network" | null =
+      q.length === 0
+        ? null
+        : this.isNetworkOffline()
+          ? "network"
+          : busy
+            ? (runningOrigin === undefined || runningOrigin.settled === true ? "origin-missing" : "target-busy")
+            : entry === undefined
+              ? (this.drainChains.has(projectRoot) ? null : "session-closed")
+              : null;
     this.deps.emitRoleState?.({
       ...contextInfo,
       roleId: targetRoleId, projectRoot, runtime, profileRevision: entry?.profileRevision ?? this.profileRevision(runtime),
@@ -4978,6 +5435,9 @@ export class SessionManager {
       summaries: q.map((i) => i.summary),
       queue: q.map(view),
       running: running !== undefined && busy ? view(running) : null,
+      headKind,
+      blockedReason,
+      activeTurnId: runningOrigin?.turnId ?? null,
     });
   }
 
@@ -4985,6 +5445,41 @@ export class SessionManager {
   broadcastRoleStates(): void {
     for (const entry of this.sessions.values()) {
       this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
+    }
+  }
+
+  // —————————————— P2（2026-10-30）：网络状态 → 队列/状态快照 ——————————————
+
+  /** 当前是否离线：优先主进程注入的门（权威）；未注入门时看最近快照（缺省在线）。 */
+  private isNetworkOffline(): boolean {
+    if (this.deps.networkGate !== undefined) return !this.deps.networkGate.isOnline();
+    return this.networkState?.online === false;
+  }
+
+  /**
+   * **P2：接收主进程网络状态**（monitor `onState` → Interface → 本方法；只在 online 变化时被调用）。
+   * - 离线：队列**保留**、不认领新投递，`role-state` 快照标 `blockedReason:"network"`（界面可见）；
+   * - 恢复：对全部有队列的项目按**既有** `drainAllQueuesFor` 路径继续投递（不重放已完成/失败回合）。
+   * 只改队列认领时机，不改 busy/租约/终态语义。
+   */
+  applyNetworkState(state: NetworkState): void {
+    const wasOffline = this.networkState === null
+      ? this.deps.networkGate?.isOnline() === false
+      : this.networkState.online === false;
+    this.networkState = { ...state };
+    const projects = new Set<string>();
+    for (const entry of this.sessions.values()) {
+      this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
+      projects.add(entry.projectRoot);
+    }
+    for (const key of [...this.deliveryQueues.keys()]) {
+      const [projectRoot, roleId, runtime] = key.split("\u0000");
+      if (projectRoot === undefined || roleId === undefined || runtime === undefined) continue;
+      this.notifyRoleState(projectRoot, roleId, runtime as RuntimeKind);
+      projects.add(projectRoot);
+    }
+    if (wasOffline && state.online) {
+      for (const projectRoot of projects) void this.drainAllQueuesFor(projectRoot);
     }
   }
 
@@ -5462,11 +5957,19 @@ export class SessionManager {
       latestArchitectureName !== undefined && (await existsFile(`docs/contracts/${latestArchitectureName}`));
     const roster = flowId !== undefined ? await loadLatestRoster({ projectRoot, flowId }) : undefined;
 
-    // 最新 D3（appointment 裁决）：request.created.flowId ↔ request.resolved（roster 字段优先；旧记录按目标集兼容）。
+    // 最新 D3（appointment 裁决）：request.created.flowId ↔ request.resolved。
+    // 2026-10-31（卡种收口）：**只接受 appointment 卡**的裁决——
+    //   优先 `request.created.cardKind === "appointment"`（新事件）；resolved 自身 `cardKind === "appointment"` 亦可；
+    //   两者皆缺（旧事件）时，仅当带 appointment 专属 `rosterVersion`/`rosterSha256` 戳才接受；
+    //   其他 choice 卡（decision/intent-confirm/…）的裁决一律忽略——flow 匹配或仅有 targetRoleIds 都不是接受条件。
     const state = await this.readTasks(projectRoot);
     const requestFlows = new Map<string, string | undefined>();
+    const requestCardKinds = new Map<string, GovernanceCardKind | undefined>();
     for (const event of state.events) {
-      if (event.kind === "request.created") requestFlows.set(event.requestId, event.flowId);
+      if (event.kind === "request.created") {
+        requestFlows.set(event.requestId, event.flowId);
+        requestCardKinds.set(event.requestId, event.cardKind);
+      }
     }
     let d3: { targetRoleIds: string[]; at: string; decisionId?: string } | undefined;
     for (const event of state.events) {
@@ -5475,9 +5978,16 @@ export class SessionManager {
         ? event.targetRoleIds.filter((id): id is string => typeof id === "string" && id !== "")
         : [];
       if (targets.length === 0) continue;
+      const createdKind = requestCardKinds.get(event.requestId);
+      const resolvedKind = event.cardKind;
+      const appointment = createdKind === "appointment" || resolvedKind === "appointment";
+      const legacyAppointment =
+        createdKind === undefined &&
+        resolvedKind === undefined &&
+        (event.rosterVersion !== undefined || event.rosterSha256 !== undefined);
+      if (!appointment && !legacyAppointment) continue;
       const eventFlow = requestFlows.get(event.requestId);
       if (flowId !== undefined && eventFlow !== undefined && eventFlow !== flowId) continue;
-      if (event.rosterVersion === undefined && event.rosterSha256 === undefined && eventFlow === undefined) continue;
       if (d3 === undefined || event.at > d3.at) {
         d3 = { targetRoleIds: targets, at: event.at, ...(event.decisionId !== undefined ? { decisionId: event.decisionId } : {}) };
       }
@@ -5659,6 +6169,21 @@ ${formatted}` };
           : targetRole !== undefined,
     });
     if (!preflight.ok) {
+      // 2026-10-31（run-change 触发）：冻结基线拒绝且可识别为「新版本契约依赖」⇒ 先尝试呈现 run-change
+      // 三模式卡，再回 `run-change-required`；识别不出 ⇒ 保留既有 code/文案（旧行为兼容）。
+      const runChangeRejection = await this.runChangeRejectionForDispatch({
+        projectRoot,
+        flowId: dispatchFlowId,
+        fromRoleId,
+        runManifest,
+        pinnedRoster: runRoster,
+        code: preflight.code,
+        targetRoleId,
+        moduleId: requestedModuleId,
+      });
+      if (runChangeRejection !== undefined) {
+        return fail(preflight.message, preflight.message, runChangeRejection);
+      }
       return fail(`派发未受理：${preflight.message}`, preflight.message, preflight.rejection);
     }
     // R9：旧版/已记录版本化文档被外部修改（shell/手动）⇒ 拒绝派发（fail-closed）。
@@ -5779,7 +6304,7 @@ ${formatted}` };
       },
     );
     if (plan.action === "reject") {
-      void this.appendTaskState(projectRoot, taskEvent("task.closed", {
+      await this.appendTaskState(projectRoot, taskEvent("task.closed", {
         taskId,
         by: fromRoleId === this.handbackOwnerRoleId(projectRoot) ? "convener" : "chief",
         outcome: "rejected",
@@ -5918,7 +6443,7 @@ ${formatted}` };
   }
 
   /** 某角色**最近一轮终局**（W1 的 `lastTurn` 小状态；纯读。消费方：role_status 等只读面）。 */
-  lastTurnOf(projectRoot: string, roleId: string, runtime: RuntimeKind): { outcome: RuntimeTurnOutcome; at: string } | undefined {
+  lastTurnOf(projectRoot: string, roleId: string, runtime: RuntimeKind): { outcome: RuntimeTurnOutcome; at: string; errorCode?: string } | undefined {
     return this.lastTurns.get(this.queueKey(projectRoot, roleId, runtime));
   }
 
@@ -5928,7 +6453,7 @@ ${formatted}` };
    * 恒空——呈现层按文首 `[系统·<子类>] ` 定格标记归类）。主人未枚举到 ⇒ 入 `""` 目标队列（投递机既有的
    * 一次性提示 + 保留待重试；**绝不静默丢**）。
    */
-  watchdogDeliver(projectRoot: string, message: { text: string; summary: string; dedupKey: string }): void {
+  watchdogDeliver(projectRoot: string, message: { text: string; summary: string; dedupKey: string; uiOnlyWhenBusy?: boolean }): void {
     // B 批：看护/巡检系统消息回幕僚（trio）；无幕僚（single/旧项目）保持原主人。
     const governanceRoleId = this.chiefTaskRoleIdOf(projectRoot) ?? this.handbackOwnerRoleId(projectRoot);
     let runtime: RuntimeKind | undefined;
@@ -5939,6 +6464,25 @@ ${formatted}` };
     }
     if (runtime === undefined) runtime = this.lastGovernanceRuntime.get(projectRoot) ?? "pi";
     const target = governanceRoleId ?? "";
+    // **P0 看护告警 UI-only 旁路（2026-10-30 设计 §7.3.3 / Q6）**：**看护服务发出**的消息
+    // （`uiOnlyWhenBusy`：轮次到点/静默/巡检/告警/恢复）在目标正在忙时**不进 busy 模型队列**——
+    // 否则看护自身的提示会被同一队列楔死（现场：`patrol.skipped (pending)` 持续、告警也排不进）。
+    // 改为经既有 UI 系统行（`delivery-note`，不触发模型/门禁/自动决策）呈现 + `watchdog.notice.bypass`
+    // 诊断；不忙时仍走正常 system 队列投递。直接调用（MCP 安装/申请系统行等，不带该标记）保持既有排队语义。
+    const live = target !== "" ? this.sessions.get(this.sessionKey(projectRoot, target, runtime)) : undefined;
+    if (live?.busy === true && message.uiOnlyWhenBusy === true) {
+      const queueDepth = (this.deliveryQueues.get(this.queueKey(projectRoot, target, runtime)) ?? []).length;
+      const parts = message.dedupKey.split("\u0000");
+      const signal = parts[0] === "watchdog" && parts.length >= 3 && parts[2] !== "" ? parts[2] : "watchdog";
+      createDiagnosticLogger({ component: "desktop.watchdog", projectRoot, roleId: target }).record("watchdog.notice.bypass", {
+        mode: "ui-only",
+        signal,
+        targetRoleId: target,
+        queueDepth,
+      });
+      this.emitDeliveryNote(projectRoot, runtime, target, "", message.summary);
+      return;
+    }
     this.enqueueDelivery(projectRoot, target, {
       kind: "system",
       runtime,
@@ -6572,6 +7116,38 @@ ${formatted}` };
       lines.push("可写边界：（未枚举/内置治理角色按既有拓扑与治理规则）");
     }
     lines.push("禁止：角色卡/、其他角色模块、.ans/、治理/版本化文档覆盖、docs/product|proposals|contracts|scheduling|quality|verification（越界拒绝）");
+    // 2026-10-30（§5A）：意图入口契约按角色裁剪（chief/product/rapporteur/nominator），
+    // 并给出当前项目可核对的事实（期望 docs/intents/<intentId>.md 是否存在/匹配）。
+    const intentContractRoles = new Set<IntentContractRole>(["chief", "product", "rapporteur", "nominator"]);
+    if (intentContractRoles.has(roleId as IntentContractRole)) {
+      lines.push("意图入口契约（与角色卡/判断拒绝文案同源）：");
+      lines.push(intentEntryContractText(roleId as IntentContractRole));
+      const intentFlowId = flowId !== "" ? flowId : run?.flowId ?? "";
+      if (intentFlowId !== "") {
+        const intentFacts = await readIntentEntryFacts({
+          projectRoot,
+          flowId: intentFlowId,
+          ...(run?.documents.intent?.path !== undefined ? { productIntentPath: run.documents.intent.path } : {}),
+          ...(run?.documents.proposal?.path !== undefined ? { proposalPath: run.documents.proposal.path } : {}),
+        });
+        const idsMatch = intentFacts.intentIdsMatch === undefined ? "无法核对" : intentFacts.intentIdsMatch ? "yes" : "no";
+        if (intentFacts.resolutionError !== undefined) {
+          lines.push(`意图入口解析：${intentFacts.resolutionError.code}｜${intentFacts.resolutionError.detail}`);
+        } else if (intentFacts.resolvedIntentId === undefined) {
+          lines.push("意图入口事实：未解析到 intentId（产品意图/提案 frontmatter 缺 intentId）");
+        } else {
+          const entryMatch = intentFacts.entryMatches === undefined ? "无法核对" : intentFacts.entryMatches ? "yes" : "no";
+          lines.push(
+            `意图入口事实：intentId=${intentFacts.resolvedIntentId}｜来源=${intentFacts.resolutionSource ?? "未知"}｜入口 ${intentFacts.intentEntryPath}｜存在=${intentFacts.intentEntryExists === true ? "yes" : "no"}｜intentId 匹配=${entryMatch}`,
+          );
+        }
+        if (intentFacts.productIntentId !== undefined || intentFacts.proposalIntentId !== undefined) {
+          lines.push(
+            `意图来源：产品意图=${intentFacts.productIntentId ?? "缺失"}｜提案=${intentFacts.proposalIntentId ?? "缺失"}｜一致性=${idsMatch}`,
+          );
+        }
+      }
+    }
     const kind = input.taskKind;
     const required: Record<string, string[]> = {
       dispatch: ["flowId", "targetRoleId", "runId(pinned)", "moduleId(运营派实现)", "modulePaths"],
@@ -6672,14 +7248,15 @@ ${formatted}` };
             `  当前轮：进行中（已耗 ${formatDurationMs(Math.max(0, at - live.turnStartedAt))} / 看护检查时限 ${formatDurationMs(timeouts.promptTimeoutMs)}；turnId=${live.turnId ?? "—"}；${lastResortText}最后兜底）`,
           );
         }
-        let last: { outcome: RuntimeTurnOutcome; at: string } | undefined;
+        let last: { outcome: RuntimeTurnOutcome; at: string; errorCode?: string } | undefined;
         for (const [key, value] of this.lastTurns) if (key.startsWith(`${projectRoot}\u0000${rid}\u0000`)) { last = value; break; }
         if (last) {
           const history = `该角色近 15 分钟 failed/timed_out 计 ${stats?.failuresByRole.get(rid) ?? 0}`;
+          const lastOutcome = last.errorCode !== undefined ? `${last.outcome}(${last.errorCode})` : last.outcome;
           lines.push(
             busy
-              ? `  上一轮终局：${last.outcome} @ ${last.at}（不表示当前轮；${history}）`
-              : `  最近一轮：${last.outcome} @ ${last.at}（${history}）`,
+              ? `  上一轮终局：${lastOutcome} @ ${last.at}（不表示当前轮；${history}）`
+              : `  最近一轮：${lastOutcome} @ ${last.at}（${history}）`,
           );
         }
         for (const item of queue?.items ?? []) {
@@ -6882,6 +7459,14 @@ ${formatted}` };
       return;
     }
 
+    // P2（2026-10-30）：离线期间**不认领新的模型投递**——队列保留并标 `blockedReason:"network"`
+    // （数据面可见）；恢复后由 `applyNetworkState` 走同一 `drainAllQueuesFor` 继续（不把离线当完成/丢弃）。
+    if (this.isNetworkOffline()) {
+      diagnostic.record("delivery.blocked", { reasonCode: "network", queueDepth: q.length });
+      this.notifyRoleState(projectRoot, resolvedTarget, runtime);
+      return;
+    }
+
     // **2026-10-29（BUG-5）**：任务在排队期间已完成（已报告/已收口）⇒ 该派发项不得再投递。
     // 完成后的重复投递只记诊断与丢弃队列项，不产生 task.delivered/新一轮事件；不触碰其他条目。
     if (item.kind === "dispatch" && typeof item.taskId === "string" && item.taskId !== "") {
@@ -6932,7 +7517,8 @@ ${formatted}` };
       this.suDeliveryBlockedNoted.delete(this.queueKey(projectRoot, "", runtime));
     }
     if (!entry || entry.projectRoot !== projectRoot) return; // 防御：仍不可用则保持排队
-    if (entry.busy || (runtime === "pi" && entry.profileRevision !== this.profileRevision("pi") && this.hasBusyRuntime("pi"))) {
+    this.healStaleOrigin(entry, "stale-origin-before-drain");
+    if (entry.busy || entry.origins.running !== undefined || (runtime === "pi" && entry.profileRevision !== this.profileRevision("pi") && this.hasBusyRuntime("pi"))) {
       diagnostic.record("delivery.blocked", { reasonCode: "target-busy", queueDepth: q.length });
       return;
     }
@@ -6943,6 +7529,14 @@ ${formatted}` };
       if (!rebuilt.reopened.ok) return; // 队列保留（下次时机自动重试；失败已有如实一行）
       entry = this.sessions.get(this.sessionKey(projectRoot, resolvedTarget, runtime));
       if (!entry || entry.projectRoot !== projectRoot) return; // 防御：重开后仍不可用
+    }
+    // **P0 turn lease 复核（2026-10-30）**：上面的忙判据在 `await rebuildIfBoundaryStale` 之前读取——
+    // 该 await 期间另一条路径可能已开跑（busy/origin 置位）。认领前必须**再验一次**，否则会覆盖
+    // 正在运行回合的 origins.running（现场「失败回交覆盖 origin → turn.end 后 busy 不复位」根因类）。
+    this.healStaleOrigin(entry, "stale-origin-after-rebuild");
+    if (entry.busy || entry.origins.running !== undefined) {
+      diagnostic.record("delivery.blocked", { reasonCode: "target-busy", queueDepth: q.length });
+      return;
     }
 
     // —— F-2-opt3：认领段开始（自此到 claim.end 之间的同步改动都在串行链内；随后链即释放）——
@@ -6982,6 +7576,16 @@ ${formatted}` };
     }
     // 先置忙再 await（防「open 尾部放行」与本次调用竞态导致并发 send）；失败则复位。
     const origin = this.beginDeliveryOrigin(entry, sent.clientMessageId);
+    if (origin === undefined) {
+      // turn lease 争用（防御分支：同步段内不应发生）——**放回队首**，绝不覆盖正在运行的 origin。
+      q.unshift(...removedItems);
+      this.deliveryQueues.set(key, q);
+      diagnostic.record("delivery.blocked", { reasonCode: "turn-lease-busy", queueDepth: q.length });
+      diagnostic.record("delivery.claim.end", { state: item.kind, count: batchCount });
+      this.notifyRoleState(projectRoot, resolvedTarget, runtime);
+      this.persistDeliveryQueues();
+      return;
+    }
     // 收尾推进（2026-10-18）：把本轮的投递类别/流程 id/回交证据定格在 origin 上——settle 后据此决定
     // 是否请 Interface 检查「流程全部完成」。多流程批次保留集合；客户消息/系统消息无 flowId。
     origin.kind = sent.kind;
@@ -7024,11 +7628,15 @@ ${formatted}` };
         }
       }
       await this.sendDelivery(entry, origin, sent.text, sendOptions, sent.kind === "dispatch", sent.taskId);
-      diagnostic.record("delivery.end", { ok: true, count: batchCount, state: sent.kind });
-      // 2026-10-20 重启续跑：投递成功（delivery.end）即从持久队列移除——崩溃重启不重投已完成项。
-      this.deliveredDeliveryKeys.add(`${key}\u0000${sent.dedupKey}`);
-      // 2026-10-25：应用任务投递成功 ⇒ 记「已投递」（重建续投/应用侧同任务调用不再发第二遍）。
-      this.rememberAppTaskDelivered(sent.clientMessageId);
+      // P0（2026-10-30）：settle 收尾可能已先行记账（`terminalRecorded`）——终态诊断恰一次。
+      if (sent.terminalRecorded !== true) {
+        sent.terminalRecorded = true;
+        diagnostic.record("delivery.end", { ok: true, count: batchCount, state: sent.kind });
+        // 2026-10-20 重启续跑：投递成功（delivery.end）即从持久队列移除——崩溃重启不重投已完成项。
+        this.deliveredDeliveryKeys.add(`${key}\u0000${sent.dedupKey}`);
+        // 2026-10-25：应用任务投递成功 ⇒ 记「已投递」（重建续投/应用侧同任务调用不再发第二遍）。
+        this.rememberAppTaskDelivered(sent.clientMessageId);
+      }
       this.persistDeliveryQueues();
       this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 立即外推（running 行即时可见）
       if (sent.kind === "dispatch") this.activeDispatchKeys.delete(sent.dedupKey); // 送达即释放窗口去重（返工可再派）
@@ -7044,11 +7652,13 @@ ${formatted}` };
             reports: latest?.reports.length ?? 0,
           });
         } else {
-          void this.appendTaskState(projectRoot, taskEvent("task.delivered", {
+          // durability（发布竞态修复）：投递成功后先落盘 task.delivered，再继续通知/收尾——
+          // 观察者读到「适配器已接收」时，任务的已投递状态应已可读（不改变“投递异步”的队列语义）。
+          await this.appendTaskState(projectRoot, taskEvent("task.delivered", {
             taskId: sent.taskId,
             to: resolvedTarget,
           }, () => new Date(this.now())));
-          this.appendRoleActivity(projectRoot, resolvedTarget, {
+          await this.appendRoleActivity(projectRoot, resolvedTarget, {
             kind: "task.delivered",
             summary: `收到任务 #${sent.taskId}`,
             taskId: sent.taskId,
@@ -7066,8 +7676,13 @@ ${formatted}` };
       // message 类（排队后的客户消息投递）：**不加额外文案**——消息本体随会话事件出现（真实 pi 的
       // 「用户指令：」回显走注入样式行），此前误落进派发分支（「已接收…派发任务」对消息是错口径，已修）。
     } catch (err) {
-      if (sent.kind === 'handback') diagnostic.record('delivery.failed', { count: batchCount, state: sent.kind });
-      else diagnostic.error("delivery.failed", err, { count: batchCount, state: sent.kind });
+      // P0（2026-10-30）：终态已由 settle 收尾记账（`delivery.end` phase:"turn-settled"）⇒ 本续段不再重复
+      // delivery.failed、也不再回队重投（at-most-once；回合已真实跑完）。
+      const terminalRecorded = sent.terminalRecorded === true;
+      if (!terminalRecorded) {
+        if (sent.kind === 'handback') diagnostic.record('delivery.failed', { count: batchCount, state: sent.kind });
+        else diagnostic.error("delivery.failed", err, { count: batchCount, state: sent.kind });
+      }
       const receipt = err instanceof RuntimeDeliveryError ? err.receipt : sent.attemptId ? this.attemptStates.get(this.persistenceKey(this.persistenceScope(entry), sent.attemptId))?.receipt : undefined;
       if (receipt) this.rememberReceipt(entry, receipt);
       const cAttempt = sent.kind === 'handback' && !!sent.attemptId;
@@ -7076,11 +7691,12 @@ ${formatted}` };
       // 真实回显。任一成立 ⇒ 输入已交给运行时，失败（如会话在收尾窗口被重建 dispose）不得回队重投，
       // 否则同一任务会在重建后以第二条 user 消息再出现（客户真机缺陷）。未 ACK 的失败仍按既有语义
       // 放回队首保留重试（失败重试仍允许）；回交保留 receipt 判据（providerMayHaveStarted）不变。
-      const acked = origin.turnId !== undefined || origin.inputAccepted === true;
-      const canRetry = cAttempt
+      // P0：settle 已记 `delivery.end` ⇒ 视为已处理（更不允许重投）。
+      const acked = origin.turnId !== undefined || origin.inputAccepted === true || terminalRecorded;
+      const canRetry = terminalRecorded ? false : cAttempt
         ? !!receipt && !receipt.providerMayHaveStarted && receipt.retryDeliveryAllowed
         : !acked;
-      const mayBeActive = cAttempt && (!receipt || receipt.providerMayHaveStarted);
+      const mayBeActive = terminalRecorded ? false : cAttempt && (!receipt || receipt.providerMayHaveStarted);
       const ownsRunningDelivery = entry.origins.running === origin;
       if (!mayBeActive) this.failDeliveryOrigin(entry, origin);
       // 投递失败：**如实提示 + 放回队首**（保持顺序）待重试——绝不静默丢。
@@ -7106,6 +7722,10 @@ ${formatted}` };
         this.rememberAppTaskDelivered(sent.clientMessageId);
       }
       this.persistDeliveryQueues();
+      if (terminalRecorded) {
+        // 回合已完成、终态已记账：不再向 pane 发「投递失败/保留重试」的错误口径系统行。
+        return;
+      }
       const base = sent.kind === "handback" && cAttempt ? !canRetry ? mainT("main.session.delivery.maybeProcessed") : mainT("main.session.delivery.retained") : err instanceof Error ? err.message : String(err);
       // 已 ACK 的非回交失败：如实说明「可能已处理，未自动重发」——绝不沿用「已保留待重试」的假话。
       const ackedNote = `${base}——${mainT("main.session.delivery.maybeProcessed")}`;

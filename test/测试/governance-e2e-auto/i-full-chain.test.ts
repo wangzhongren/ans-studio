@@ -31,6 +31,20 @@ async function waitUntil(check: () => boolean, timeoutMs = 2000): Promise<void> 
     await tick(10);
   }
 }
+/** 投递是异步队列：回执只承诺“受理/已创建”；断言 task.delivered 前须等它真实落盘（不猜时序）。 */
+async function waitUntilTaskState(
+  root: string,
+  check: (state: Awaited<ReturnType<typeof readTaskState>>) => boolean,
+  timeoutMs = 2000,
+): Promise<void> {
+  const start = Date.now();
+  for (;;) {
+    const state = await readTaskState(root);
+    if (check(state)) return;
+    if (Date.now() - start > timeoutMs) throw new Error("等待 tasks.jsonl 超时");
+    await tick(10);
+  }
+}
 
 function listing(root: string): ProjectListing {
   const builtIn = (roleId: string, governanceFunction: ProjectListing["roles"][number]["governanceFunction"]) => ({
@@ -135,6 +149,9 @@ test("最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tas
     assert.equal(receipt.ok, true, receipt.message ?? "");
     await waitUntil(() => (h.sent.product?.length ?? 0) > 0);
     assert.match(h.sent.product[0] ?? "", /任务编号：#t-/);
+    // 回执仅为「受理」（受理 ≠ 完成）；task.delivered 在目标会话真实接收后异步落盘，等它可读再断言。
+    await waitUntilTaskState(root, (snapshot) =>
+      [...snapshot.records.values()].some((record) => record.created?.to === "product" && record.delivered?.to === "product"));
     const state = await readTaskState(root);
     assert.equal(state.errors.length, 0);
     const task = [...state.records.values()][0];

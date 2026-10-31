@@ -169,6 +169,7 @@ export type {
   DecisionCardValidation,
 } from "../../common/编排/decision-card.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
+import { readIntentEntryFacts, resolveIntentEntryReference } from "../../common/shared/intent-entry-contract.ts";
 // 跨角色共享路径原语（**单一来源** = pm 属主 `src/common/shared/path-primitives.ts`；工程法案 §一.5
 // 消费方名单已含编排；同 `confirmed-writes.ts` 先例）——用于 su 预授权目录的**词法**归属判定：
 // 与 resolveWrite 同源取值规则，不从门禁引擎私有 common 另行导入/复制。
@@ -976,12 +977,7 @@ export async function openRoleSession(
                   cardKind,
                   allowed: [...allowed],
                 });
-                return {
-                  outcome: "declined",
-                  reason:
-                    `治理角色 ${setup.role.id} 不允许 cardKind=${cardKind}；` +
-                    `允许：${allowed.join(" / ")}。本次未向客户发卡。`,
-                };
+                return { outcome: "declined", reason: cardKindNotAllowedReason(setup.role.id, cardKind, allowed) };
               }
               if (!flowIdOk) {
                 return rejectNotPresented(
@@ -1007,12 +1003,7 @@ export async function openRoleSession(
                   cardKind,
                   allowed: [...allowed],
                 });
-                return {
-                  outcome: "declined",
-                  reason:
-                    `治理角色 ${setup.role.id} 不允许 cardKind=${cardKind}；` +
-                    `允许：${allowed.join(" / ")}。本次未向客户发卡。`,
-                };
+                return { outcome: "declined", reason: cardKindNotAllowedReason(setup.role.id, cardKind, allowed) };
               }
               if (isGovernanceFlowId(flowId)) currentFlowId = flowId;
             }
@@ -1111,8 +1102,35 @@ export async function openRoleSession(
                       }),
                     }
                   : {};
+              // 2026-10-30（§5A/P9.3）：决策组**唯一解析器**——请求显式 → 提案 → 产品 → flow-id；
+              // 冲突/非法 slug fail-closed（intentResolutionError 随证据进入判断，禁止 approve）。
+              const explicitIntentId =
+                typeof effectiveMetadata?.intentId === "string" ? effectiveMetadata.intentId.trim() : "";
+              let judgeIntentId: string | undefined;
+              let judgeIntentIdSource: "request" | "proposal" | "product" | "flow-id" | undefined;
+              let judgeIntentResolutionError: { code: string; detail: string } | undefined;
+              if (cardKind === "proposal" || cardKind === "appointment" || cardKind === "acceptance") {
+                const intentFacts = await readIntentEntryFacts({
+                  projectRoot: input.project.projectRoot,
+                  flowId: judgeAttribution,
+                });
+                const resolution = resolveIntentEntryReference({
+                  flowId: judgeAttribution,
+                  ...(explicitIntentId !== "" ? { requestIntentId: explicitIntentId } : {}),
+                  ...(intentFacts.proposalIntentId !== undefined && intentFacts.proposalIntentId !== "" ? { proposalIntentId: intentFacts.proposalIntentId } : {}),
+                  ...(intentFacts.productIntentId !== undefined && intentFacts.productIntentId !== "" ? { productIntentId: intentFacts.productIntentId } : {}),
+                });
+                if (resolution.ok) {
+                  judgeIntentId = resolution.intentId;
+                  judgeIntentIdSource = resolution.source;
+                } else {
+                  judgeIntentResolutionError = { code: resolution.code, detail: resolution.detail };
+                }
+              }
               const judgeContext: GovernanceJudgeContext = {
                 flowId: judgeAttribution,
+                ...(judgeIntentId !== undefined ? { intentId: judgeIntentId, ...(judgeIntentIdSource !== undefined ? { intentIdSource: judgeIntentIdSource } : {}) } : {}),
+                ...(judgeIntentResolutionError !== undefined ? { intentResolutionError: judgeIntentResolutionError } : {}),
                 facts,
                 ...appointmentJudge,
                 ...(cardKind === "appointment" && appointmentRecommendedRoleIds !== undefined
@@ -1967,6 +1985,63 @@ const TRIO_CARD_KINDS: Record<GovernanceRoleSpec["id"], readonly GovernanceCardK
   // 验收权归 Proof / 验收（verifier）；Draft / 提案不再发 acceptance。
   verifier: ["acceptance"],
 };
+
+/**
+ * 卡种 → 可发起角色（由 `TRIO_CARD_KINDS` 反推，单一来源；不手写第二张权限表）。
+ * 越权拒绝文案据此告诉模型「该谁做」；不改变白名单或判定顺序。
+ */
+const TRIO_CARD_ORIGINATORS: ReadonlyMap<GovernanceCardKind, readonly GovernanceRoleSpec["id"][]> = (() => {
+  const map = new Map<GovernanceCardKind, GovernanceRoleSpec["id"][]>();
+  for (const roleId of Object.keys(TRIO_CARD_KINDS) as GovernanceRoleSpec["id"][]) {
+    for (const kind of TRIO_CARD_KINDS[roleId]) {
+      const originators = map.get(kind);
+      if (originators === undefined) map.set(kind, [roleId]);
+      else originators.push(roleId);
+    }
+  }
+  return map;
+})();
+
+/**
+ * 越权卡种的可操作改派提示（文案，不是权限；权限仍只由 `TRIO_CARD_KINDS` 决定）。
+ * 2026-10-31 真机：运营被执行官要求「重新提交验收」，按指示发 acceptance 被结构性拒绝；
+ * 旧文案只说「不允许」，没说该类卡该谁发起、下一步该怎么改派。
+ */
+const CARD_KIND_ROUTE_HINTS: Readonly<Record<GovernanceCardKind, string>> = {
+  acceptance: "请改为 dispatch_task 给 verifier 执行验收，或请幕僚调度质检",
+  appointment: "请改为请幕僚调度人事（nominator）发起招人决定卡",
+  "appointment-write": "请改为请幕僚调度人事（nominator）发起写卡审批",
+  proposal: "请改为请幕僚调度策划（rapporteur）发起提案卡",
+  decision: "请改为请幕僚调度运营（convener）或策划（rapporteur）发起 decision 卡",
+  "intent-confirm": "请改为请幕僚（chief）发起需求确认卡",
+};
+
+/**
+ * 越权 `cardKind` 的三段式拒绝文案：缺什么（不允许的卡种）/ 该做什么（改派提示）/
+ * 谁来做（发起该卡种的角色，由 `TRIO_CARD_KINDS` 反推）。调用方保证不弹卡、不写账本。
+ */
+function cardKindNotAllowedReason(
+  roleId: string,
+  cardKind: GovernanceCardKind,
+  allowed: readonly GovernanceCardKind[],
+): string {
+  const originators = TRIO_CARD_ORIGINATORS.get(cardKind);
+  const initiatorClause =
+    originators === undefined || originators.length === 0
+      ? "（该类卡没有可发起的内置治理角色）"
+      : `（该类卡由${originators
+          .map((id) => {
+            const displayName = governanceRoleOf(id)?.displayName;
+            return displayName === undefined ? id : `${displayName} ${id}`;
+          })
+          .join(" / ")} 发起）`;
+  const action = CARD_KIND_ROUTE_HINTS[cardKind] ?? "请检查 cardKind 是否正确，或改由有权限的治理角色发起";
+  const allowedText = allowed.length > 0 ? allowed.join(" / ") : "无";
+  return (
+    `治理角色 ${roleId} 不允许 cardKind=${cardKind}${initiatorClause}；` +
+    `允许：${allowedText}。${action}；本次未向客户发卡、未写任何记录。`
+  );
+}
 
 /**
  * `request_confirmation` 的**工具级** cardKind 枚举（与运行时核心 `CONFIRM_CARD_KINDS` 同值）。

@@ -1,0 +1,31 @@
+# P0 candidate full regression summary (final)
+
+- command: node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')
+- cwd: .claude/worktrees/turn-retry-network-watch (git HEAD for product base c001ce2 + baseline commit b9635bd + P0 working tree)
+- files included: 363 (359 baseline + 5 new test files - 1 excluded write-sequencing; see file list)
+- excluded: test/pi-adapter/write-sequencing.test.ts (known hang; same exclusion as S1)
+- result: tests 3094 / pass 3067 / fail 9 / skipped 18 / todo 0 / cancelled 0
+- exit code: 1
+- duration_ms: 238448.8527
+- raw log: full-regression-serial.log
+
+## Comparison with S1 baseline (b9635bd)
+- files: 358 -> 363 (+5 new test files)
+- tests: 3077 -> 3094 (+17)
+- pass: 3050 -> 3067 (+17)
+- fail: 9 -> 9 (same pre-existing Windows symlink EPERM set; zero new deterministic failures)
+- skipped: 18 -> 18 (no new skips/todos)
+
+## Failure classification (9, identical set to S1)
+All 9 are pre-existing Windows symlink EPERM (errno -4048):
+1. test/claude-adapter/session.test.ts — native symlink and storage runtime mismatch fail before SDK query
+2. test/codex-adapter/session.test.ts — native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary
+3. test/pi-adapter/injected-runtime.test.ts — store validate callback rejects directory symlink before Pi parse or new native write
+4. test/pi-adapter/injected-runtime.test.ts — Pi storage refuses file symlink and role/runtime mismatch without touching other storage
+5. test/runtime-core/file-write-safety.test.ts — D3 linked workspace root remains usable; linked target itself is not replaced
+6. test/runtime-core/file-write-safety.test.ts — store: traversal, mismatched scope and symlinked runtime directories rejected
+7. test/runtime-core/file-write-safety.test.ts — store: native validation stays lazy and native symlink is rejected before effects
+8. test/编排/g4-skill-verify.test.ts — 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛
+9. test/编排/shell-authorized-routine.test.ts — node test外指符号链接路径不获委托；项目内测试路径获委托
+
+No new skips/todos, no deleted tests, no loosened assertions.

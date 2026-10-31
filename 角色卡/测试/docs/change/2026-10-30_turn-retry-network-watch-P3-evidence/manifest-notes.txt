@@ -1,0 +1,22 @@
+Manifest format and verification (turn-retry-network-watch P3)
+================================================================
+
+- `sha256.txt` lists every evidence file except itself in `sha256sum` format
+  (`<sha256> *<path>`).
+- Generation/verification口径 (EOL):
+  * Text files (`*.txt`, `*.log`, `*.json`, `*.sha256`, `*.sh`) are normalized to
+    LF (CR stripped) before hashing. PNG screenshots are hashed raw (binary).
+  * Electron-written logs (`electron-e2e.log`, `phase5a.log`) contain CRLF in
+    this Windows run; plain `sha256sum -c sha256.txt` therefore reports FAILED
+    for exactly those two files (by design of the normalization). Use
+    `bash verify-sha256-normalized.sh` — it strips CR from both manifest lines
+    and text content before hashing, and hashes `.png` raw. Verified
+    `ok=47 failed=0`. This is also the reproducible cross-checkout check
+    (Git `core.autocrlf=true` may rewrite tracked text files to CRLF).
+- Raw logs and PNG screenshots are gitignored (`.gitignore`: `*.log`,
+  `角色卡/**/docs/**/*.png`); they remain on disk in this evidence directory
+  and are fixed by these hashes. Committed files are the summaries, reports,
+  candidate hashes and this manifest.
+- P3 evidence covers the final P3 candidate (see `environment.txt`):
+  targeted P0/P1/P2/P3/T1 suites, full regression, dual typecheck + renderer
+  build, real Electron E2E (18 PNG), and phase5a smoke (40 checks).

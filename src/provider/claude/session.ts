@@ -8,9 +8,24 @@ import type * as SDK from "@anthropic-ai/claude-agent-sdk";
 import type * as Zod from "zod";
 import type { ResolvedRole } from "../../model/role.ts";
 import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, RuntimeTurnOutcome, PromptOptions, RuntimeToolEventFactsV1, RuntimeReasoningFactsV1 } from "../../model/runtime.ts";
+import { MODEL_REQUEST_FAILED, MODEL_REQUEST_RETRY_EXHAUSTED } from "../../model/runtime.ts";
 import { RUNTIME_CREDENTIAL_ENV_VARS } from "../../common/shared/runtime-shared.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 import { REASONING_EVENT_SUMMARY } from "../../common/runtime-core/reasoning.ts";
+import {
+  DEFAULT_REQUEST_FIRST_BYTE_TIMEOUT_MS,
+  DEFAULT_REQUEST_IDLE_TIMEOUT_MS,
+  createRequestDeadline,
+  createRequestTimeoutFailure,
+  isRequestTimeoutFailure,
+  type RequestDeadline,
+} from "../../common/runtime-core/request-timeout.ts";
+import {
+  DEFAULT_NETWORK_RETRY_WINDOW_MS,
+  createNetworkOfflineFailure,
+  isNetworkOfflineFailure,
+} from "../../common/runtime-core/network-gate.ts";
+import { NETWORK_OFFLINE_TIMEOUT } from "../../model/runtime.ts";
 import { toClaudeSchema } from "../../common/claude-adapter/schema.ts";
 import { CLAUDE_JUDGE_DISALLOWED_TOOLS, CLAUDE_JUDGE_TOOL_NAMES, assertClaudeJudgeToolSet, claudeJudgeReportToolName, claudeJudgeSystemPromptLine } from "../../common/claude-adapter/judge.ts";
 import { isClaudeImageMimeType, mapClaudeToolResultImages, type ClaudeImageMimeType } from "../../common/claude-adapter/tool-result-images.ts";
@@ -33,6 +48,8 @@ type Turn = {
   reject(error: Error): void;
   /** Normal output or a tool allowed to start makes whole-input replay unsafe. */
   replayUnsafe: boolean;
+  /** 客户交互/确认一旦出现（等待或已回答），本回合即不可安全重放——运行时状态，非模型自报。 */
+  interactionSeen: boolean;
 };
 type Engine = {
   query: SDK.Query;
@@ -100,6 +117,28 @@ const isReasoningRejection = (text: string | undefined): boolean => {
     || /\b(?:thinking|effort|output_config(?:\.effort)?)\b["']?\s*(?:(?:parameter|field|value|level)\s*)?(?:(?:is|are)\s+)?(?:not supported|unsupported|not allowed|unrecognized|unknown|must be one of)\b/i.test(message);
 };
 
+// P3（2026-10-30）同回合 replay-safe 重试：缺省 3 attempts（首次 + 2 次重试）、指数退避
+// 1s/2s/4s 级别（单次上限 8s）、单回合预算 10min。仅当本回合没有文本/thinking/工具/客户交互
+// 时，才在同一 turn 内关闭当前 query 后重开请求；任何副作用后绝不重放（方案 v1.1 §4.3.3 / §10 Q2·Q3·Q11）。
+const DEFAULT_REQUEST_ATTEMPT_MAX = 3;
+const DEFAULT_REQUEST_RETRY_BASE_MS = 1_000;
+const DEFAULT_REQUEST_RETRY_MAX_DELAY_MS = 8_000;
+const DEFAULT_REQUEST_RETRY_BUDGET_MS = 600_000;
+/** 结果帧可重试状态：408/425/429 与 5xx；无状态文本按瞬时错误处理（只做分类，正文不入日志）。 */
+const isRetryableResultFailureText = (text: string | undefined): boolean => {
+  if (typeof text !== "string" || text.trim() === "") return true;
+  const status = /API Error:\s*(\d{3})\b/.exec(text)?.[1];
+  if (status === undefined) return true;
+  const code = Number(status);
+  return code === 408 || code === 425 || code === 429 || code >= 500;
+};
+type RetryableError = Error & { requestRetryable?: boolean };
+/** `requestRetryable` 只由运行时失败路径按真实来源打标（结果帧状态/流错误），不靠模型自报。 */
+const markRetryable = <T extends Error>(error: T, retryable: boolean): T => {
+  if (retryable) (error as RetryableError).requestRetryable = true;
+  return error;
+};
+
 export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, dependencies: ClaudeAdapterDependencies = {}): RuntimeAdapter {
   if (options.runtime !== "claude") throw new Error("Claude 适配器只接受 runtime=claude");
   // 判断模式（「替我审」/「替我审批」「替我决策」）：`judgeMode` 由 Service 在注入 `shellJudge`
@@ -116,6 +155,21 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
   }
   // One hour by default; tests/hosts may inject a smaller value. Never read from promptTimeoutMs.
   const turnLastResortMs = options.turnLastResortMs ?? DEFAULT_TURN_LAST_RESORT_MS;
+  // P1（2026-10-30）请求级时限：首字节 90s / 流空闲 300s（默认值单一来源 runtime-core/request-timeout.ts；
+  // 测试/宿主可注入小值）。与 1h 最后兜底并存：请求超时终态 failed + errorCode，1h 仍是 timed_out。
+  const requestFirstByteTimeoutMs = options.requestFirstByteTimeoutMs ?? DEFAULT_REQUEST_FIRST_BYTE_TIMEOUT_MS;
+  const requestIdleTimeoutMs = options.requestIdleTimeoutMs ?? DEFAULT_REQUEST_IDLE_TIMEOUT_MS;
+  // P2（2026-10-30）网络暂停：离线对同一 deadline `pause()/resume()`（引用计数），超窗失败。
+  // 缺省门 ⇒ always-online（旧行为零变化）；窗口缺省 5min，测试/宿主可注入小值。
+  const networkGate = options.networkGate;
+  const networkRetryWindowMs = options.networkRetryWindowMs ?? DEFAULT_NETWORK_RETRY_WINDOW_MS;
+  // P3（2026-10-30）replay-safe 同回合重试策略：clamp 到最多 3 attempts（注入不能放宽上限）；
+  // 退避基数/上限/预算可注入小值供测试；1h 最后兜底、5min 看护、默认自动中止 0 均不变。
+  const requestAttemptMax = Math.max(1, Math.min(DEFAULT_REQUEST_ATTEMPT_MAX, Math.floor(options.requestAttemptMax ?? DEFAULT_REQUEST_ATTEMPT_MAX)));
+  const requestRetryBaseMs = Math.max(1, Math.floor(options.requestRetryBaseMs ?? DEFAULT_REQUEST_RETRY_BASE_MS));
+  const requestRetryMaxDelayMs = Math.max(requestRetryBaseMs, Math.floor(options.requestRetryMaxDelayMs ?? DEFAULT_REQUEST_RETRY_MAX_DELAY_MS));
+  const requestRetryBudgetMs = Math.max(0, Math.floor(options.requestRetryBudgetMs ?? DEFAULT_REQUEST_RETRY_BUDGET_MS));
+  const retryDelayFor = (attempt: number): number => Math.min(requestRetryMaxDelayMs, requestRetryBaseMs * 2 ** Math.max(0, attempt - 1));
   // Auth, endpoint and redaction must use the same immutable profile snapshot.
   const env = { ...(dependencies.env ?? process.env) };
   const credentialName = options.apiKeyEnvVar ?? "ANTHROPIC_API_KEY";
@@ -198,6 +252,16 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
       let disposed = false;
       let active: Turn | undefined;
       let engine: Engine | undefined;
+      // P1 请求级超时（每回合/每次尝试一把 deadline）：pump 的每条 SDK 消息喂 activity()；
+      // 客户交互（InteractionGate）、工具执行、abort 清理期间 pause()；P2 网络暂停复用同一中性接口。
+      let requestDeadline: RequestDeadline | undefined;
+      let requestGateUnsubscribe: (() => void) | undefined;
+      let requestAbortUnsubscribe: (() => void) | undefined;
+      let requestAttempt = 0;
+      let retryExhausted = false;
+      /** 最近一次请求失败时的可重放性（true = 当时无文本/thinking/工具/客户交互副作用）。 */
+      let lastFailureReplaySafe: boolean | undefined;
+      let promptStartedAt = 0;
       let temporaryDirectory: string | undefined;
       let teardownError: Error | undefined;
       // A failed/cancelled compatibility attempt stays local to its prompt.
@@ -258,11 +322,89 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           emit(turn, "message", `已安装 MCP「${entry.name}」未连接：${category}`);
         }
       };
-      const safeFailure = (error: unknown) => error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name)
-        ? error : new Error(`Claude SDK 运行失败：${redact(error instanceof Error ? error.message : String(error))}`);
+      // P1 请求级 deadline 生命周期（停止/暂停/恢复）。暂停引用计数：交互闸、工具执行、abort 清理可嵌套，
+      // P2 网络暂停接同一 `pause()/resume()`。网络监听绑定到**当前 attempt 的 deadline**：
+      // 离线 ⇒ 暂停（计时停走，不触发请求超时）；恢复 ⇒ 继续；离线超过窗口 ⇒ network-offline-timeout。
+      let networkUnsubscribe: (() => void) | undefined;
+      let networkPaused = false;
+      let networkOfflineSince: number | undefined;
+      let networkWindow: ReturnType<typeof setTimeout> | undefined;
+      const stopNetworkWatch = (): void => {
+        networkUnsubscribe?.();
+        networkUnsubscribe = undefined;
+        if (networkWindow !== undefined) {
+          clearTimeout(networkWindow);
+          networkWindow = undefined;
+        }
+        networkPaused = false;
+        networkOfflineSince = undefined;
+      };
+      const pauseRequestForNetwork = (turn: Turn, offlineAt: number): void => {
+        if (networkPaused || disposed || turn.controller.signal.aborted) return;
+        networkPaused = true;
+        networkOfflineSince = offlineAt;
+        requestDeadline?.pause();
+        diagnostics.record("network.request.pause", { turnId: turn.id, attempt: requestAttempt, state: "offline", mode: "claude" });
+        emit(turn, "message", "网络已断开，当前请求的计时已暂停；恢复后继续。", { source: "system", reasonCode: "network-offline", state: "offline" });
+        if (Number.isFinite(networkRetryWindowMs) && networkRetryWindowMs > 0) {
+          networkWindow = setTimeout(() => {
+            networkWindow = undefined;
+            if (!networkPaused || disposed || turn.controller.signal.aborted) return;
+            const offlineMs = Math.max(0, Date.now() - (networkOfflineSince ?? Date.now()));
+            // 只记录元数据（时长/次数）；不记录 prompt/URL/凭据。终态 failed + errorCode，不自动重放。
+            diagnostics.record("network.request.timeout", {
+              turnId: turn.id, attempt: requestAttempt, errorCode: NETWORK_OFFLINE_TIMEOUT,
+              timeoutMs: networkRetryWindowMs, durationMs: Math.round(offlineMs), mode: "offline-window",
+            });
+            turn.reject(createNetworkOfflineFailure(requestAttempt, !turn.replayUnsafe && !turn.interactionSeen, offlineMs));
+          }, networkRetryWindowMs);
+        }
+      };
+      const resumeRequestForNetwork = (turn: Turn): void => {
+        if (!networkPaused) return;
+        networkPaused = false;
+        networkOfflineSince = undefined;
+        if (networkWindow !== undefined) {
+          clearTimeout(networkWindow);
+          networkWindow = undefined;
+        }
+        requestDeadline?.resume();
+        diagnostics.record("network.request.resume", { turnId: turn.id, attempt: requestAttempt, state: "online", mode: "claude" });
+        emit(turn, "message", "网络已恢复，暂停的请求继续。", { source: "system", reasonCode: "network-offline", state: "online" });
+      };
+      /** 绑定本次 attempt 的网络状态订阅；当前已离线则立即暂停（先 pause 再 start 是合法顺序）。 */
+      const startNetworkWatch = (turn: Turn): void => {
+        stopNetworkWatch();
+        if (networkGate === undefined) return;
+        networkUnsubscribe = networkGate.onChange((state) => {
+          if (state.online) resumeRequestForNetwork(turn);
+          else pauseRequestForNetwork(turn, Number.isFinite(state.at) ? state.at : Date.now());
+        });
+        const current = networkGate.current();
+        if (!current.online) pauseRequestForNetwork(turn, current.at);
+      };
+      const stopRequestDeadline = (): void => {
+        requestDeadline?.stop();
+        requestDeadline = undefined;
+        requestGateUnsubscribe?.();
+        requestGateUnsubscribe = undefined;
+        requestAbortUnsubscribe?.();
+        requestAbortUnsubscribe = undefined;
+        stopNetworkWatch();
+      };
+      const pauseRequestTimer = (turn?: Turn): void => { if (turn === undefined || turn === active) requestDeadline?.pause(); };
+      const resumeRequestTimer = (turn?: Turn): void => { if (turn === undefined || turn === active) requestDeadline?.resume(); };
+      // P1：请求级超时错误原样上抛（name=RequestTimeoutError，code=request-timeout-*），不得被
+      // 「Claude SDK 运行失败」包装吞掉 code；P2 网络离线超窗错误同理原样上抛；AbortError/TimeoutError
+      // （最后兜底）语义不变。
+      const safeFailure = (error: unknown) => isRequestTimeoutFailure(error) || isNetworkOfflineFailure(error)
+        ? error
+        : error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name)
+          ? error : new Error(`Claude SDK 运行失败：${redact(error instanceof Error ? error.message : String(error))}`);
       const closeEngine = (current: Engine) => {
         if (current.closed) return;
         current.closed = true;
+        stopRequestDeadline();
         current.contexts.clear();
         current.nativeTurns.clear();
         current.pendingInputs.clear();
@@ -372,7 +514,14 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
               const facts = { toolCallId, toolName: tool.name, input: { rule: tool.displayInputRule, args: publicArgs } };
               emitTool(callTurn, { ...facts, phase: "start", origin: "handler-start" }, "tool_call", tool.name);
               try {
-                const result = await tool.handler({ name: tool.name, args: publicArgs, signal, toolCallId });
+                // P1：工具执行期间请求空闲计时停走（工具自身的 10min/60s 时限负责它自己的挂起）。
+                pauseRequestTimer(callTurn);
+                let result: Awaited<ReturnType<typeof tool.handler>>;
+                try {
+                  result = await tool.handler({ name: tool.name, args: publicArgs, signal, toolCallId });
+                } finally {
+                  resumeRequestTimer(callTurn);
+                }
                 if (signal.aborted || current.closed) return { content: [{ type: "text" as const, text: "本轮已中止，工具结果已丢弃" }], isError: true };
                 // 工具结果附图（同轮设计 §6.4）：仅 ok:true 且载荷合法时映射为 MCP image 块；
                 // 图片 data/base64 原引用透传，绝不经过 redact。事件 facts 只带白名单标量：
@@ -461,6 +610,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             // branch precedent). allowedTools only carries the server-level auto-allow fallback.
             if (hook.mcp_server && installedNames.has(hook.mcp_server.name) && hook.mcp_server.source === "dynamic" && hook.tool_name.startsWith(`mcp__${hook.mcp_server.name}__`) && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted) {
               originalTurn.replayUnsafe = true;
+              // P1：原生（外来 MCP）工具执行期间请求空闲计时停走，结果帧到达时恢复。
+              pauseRequestTimer(originalTurn);
               emitTool(originalTurn, { origin: "native-start", phase: "start", toolName: hook.tool_name,
                 toolCallId: `${originalTurn.id}:${hook.tool_use_id}`,
                 input: { rule: "none", args: hook.tool_input !== null && typeof hook.tool_input === "object" && !Array.isArray(hook.tool_input) ? hook.tool_input as Record<string, unknown> : {} } }, "tool_call", hook.tool_name);
@@ -472,6 +623,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             // query must reach the tool unchanged.
             if (webSearchEnabled && hook.tool_name === "WebSearch" && !hook.mcp_server && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted) {
               originalTurn.replayUnsafe = true;
+              // P1：原生 WebSearch 执行期间请求空闲计时停走，结果帧到达时恢复。
+              pauseRequestTimer(originalTurn);
               return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } };
             }
             if (originalTurn) {
@@ -494,6 +647,33 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             for await (const message of current.query) {
               const callTurn = active;
               if (current.closed || !callTurn || callTurn.controller.signal.aborted) continue;
+              // P1：流活动计数。首字节只认设计口径的四类消息（assistant/user/result/system api_retry）；
+              // 其余系统消息（如 init/status）不关闭首字节，但首字节到达后同样重置空闲计时。
+              const isFirstByteMessage = message.type === "assistant" || message.type === "user" || message.type === "result"
+                || (message.type === "system" && message.subtype === "api_retry");
+              if (requestDeadline !== undefined && (requestDeadline.firstByteSeen || isFirstByteMessage) && requestDeadline.activity()) {
+                diagnostics.record("request.first-byte", {
+                  turnId: callTurn.id,
+                  attempt: requestAttempt,
+                  durationMs: Math.max(0, Math.round(requestDeadline.firstByteElapsedMs ?? 0)),
+                });
+              }
+              if (message.type === "system" && message.subtype === "api_retry") {
+                // SDK 内部 API 重试可见（方案 v1.1 §4.3.3-5 / §6.3）：只记录计数/延迟/状态元数据，
+                // 不记录错误正文；SDK 重试期间 ANS **不并发**发起第二次请求（P1 无 ANS 重试；P3 复用该门槛）。
+                const retry = message as SDK.SDKAPIRetryMessage;
+                diagnostics.record("request.sdk-retry", {
+                  turnId: callTurn.id,
+                  attempt: retry.attempt,
+                  count: retry.max_retries,
+                  durationMs: retry.retry_delay_ms,
+                  errorCode: typeof retry.error_status === "number" ? String(retry.error_status) : "no-response",
+                  ...(retry.no_response !== undefined ? { state: "no-response", timeoutMs: retry.no_response.waited_ms } : {}),
+                });
+                // 角色日志一行摘要（客户可见的人话；不含错误正文/URL/凭据）。
+                emit(callTurn, "message", `接口请求重试中（第 ${retry.attempt}/${retry.max_retries} 次，等待 ${retry.retry_delay_ms}ms）`, { source: "system", reasonCode: "claude-api-retry", state: "retrying" });
+                continue;
+              }
               if (message.type === "assistant") {
                 if (message.error) {
                   lastFailureText = message.message.content.filter((block) => block.type === "text").map((block) => block.text).join("\n");
@@ -524,6 +704,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                   const call = current.nativeCalls.get(block.tool_use_id);
                   if (!call) continue;
                   current.nativeCalls.delete(block.tool_use_id);
+                  // P1：原生工具结果到达 ⇒ 恢复请求空闲计时（与 PreToolUse 放行处成对）。
+                  resumeRequestTimer(call.turn);
                   const content: ({ type: "text"; text: string } | { type: "unsupported" })[] = [];
                   if (typeof block.content === "string") content.push({ type: "text", text: block.content });
                   else if (Array.isArray(block.content)) for (const item of block.content) content.push(item.type === "text" && typeof item.text === "string" ? { type: "text", text: item.text } : { type: "unsupported" });
@@ -536,8 +718,11 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                 if (message.subtype !== "success" || message.is_error) {
                   // Preserve the synthetic API error if this result omits its text.
                   lastFailureText = typeof (message as { result?: unknown }).result === "string" ? (message as { result: string }).result : lastFailureText;
+                  // P3：恢复中的会话出现失败结果 ⇒ 如实失败（不在同一 turn 内换新上下文重放）；
+                  // 普通引擎的瞬时结果错误且状态可重试时，才允许 replay-safe 重开。
+                  const resumeConflict = current.resumeId !== undefined;
                   resumeFailed(current);
-                  callTurn.reject(new Error("Claude SDK 本轮返回失败结果"));
+                  callTurn.reject(markRetryable(new Error("Claude SDK 本轮返回失败结果"), !resumeConflict && isRetryableResultFailureText(lastFailureText)));
                   closeEngine(current);
                 } else if (current.pendingInputs.has(callTurn.sdkUuid)) {
                   callTurn.reject(new Error("Claude 原生输入轮次关联未确认，未执行工具"));
@@ -553,12 +738,18 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                 }
               }
             }
-            if (!current.closed && active) active.reject(new Error("Claude SDK 事件流结束，未返回当前轮结果"));
+            if (!current.closed && active) active.reject(markRetryable(new Error("Claude SDK 事件流结束，未返回当前轮结果"), current.resumeId === undefined));
           } catch (error) {
             if (!current.closed) {
               lastFailureText ??= error instanceof Error ? error.message : String(error);
+              const resumeConflict = current.resumeId !== undefined;
               resumeFailed(current);
-              active?.reject(safeFailure(error));
+              const failure = safeFailure(error);
+              // P3：普通引擎的流/传输错误可安全重开；恢复中的会话、请求超时/网络窗口/abort/
+              // 最后兜底都不在此路径重试（各有自身终态语义）。
+              const retryable = !resumeConflict && !isRequestTimeoutFailure(failure) && !isNetworkOfflineFailure(failure)
+                && !["AbortError", "TimeoutError"].includes(failure.name);
+              active?.reject(markRetryable(failure, retryable));
             }
           } finally { closeEngine(current); }
         })();
@@ -578,9 +769,13 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           const done = new Promise<void>((pass, fail) => { resolve = pass; reject = fail; });
           // Observe rejection even if construction/abort fails before waitForTurn starts.
           void done.catch(() => {});
-          const turn: Turn = { id: options.currentTurnId() ?? randomUUID(), sdkUuid: randomUUID(), controller: new AbortController(), done, resolve, reject, replayUnsafe: false };
+          const turn: Turn = { id: options.currentTurnId() ?? randomUUID(), sdkUuid: randomUUID(), controller: new AbortController(), done, resolve, reject, replayUnsafe: false, interactionSeen: false };
           active = turn;
           lastFailureText = undefined;
+          promptStartedAt = Date.now();
+          requestAttempt = 0;
+          retryExhausted = false;
+          lastFailureReplaySafe = undefined;
           let outcome: RuntimeTurnOutcome = "completed";
           let failure: Error | undefined;
           let compatibleAttempt = reasoningCompatible;
@@ -609,6 +804,41 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                 current.input.push({ type: "user", uuid: turn.sdkUuid, session_id: nativeId ?? "", parent_tool_use_id: null, message: {
                   role: "user", content: images.length ? [{ type: "text", text: wireText }, ...images.map((image) => ({ type: "image" as const, source: { type: "base64" as const, media_type: image.mimeType as ClaudeImageMimeType, data: image.data } }))] : wireText,
                 } });
+                // P1：输入已交给模型 ⇒ 起请求级 deadline（首字节 90s → 流空闲 300s；测试注入小值）。
+                // 交互闸等待、工具执行、abort 清理期间 pause；超时以 RequestTimeoutError 结束本次尝试
+                // （终态 failed + errorCode；不是最后兜底 timed_out）。
+                requestAttempt += 1;
+                stopRequestDeadline();
+                const deadline = createRequestDeadline({
+                  firstByteTimeoutMs: requestFirstByteTimeoutMs,
+                  idleTimeoutMs: requestIdleTimeoutMs,
+                  onTimeout: (kind, timeoutMs, elapsedMs) => {
+                    if (turn.controller.signal.aborted || disposed) return;
+                    const timeoutFailure = createRequestTimeoutFailure(kind, timeoutMs, elapsedMs, requestAttempt, !turn.replayUnsafe && !turn.interactionSeen);
+                    diagnostics.record("request.timeout", {
+                      turnId: turn.id, attempt: requestAttempt, mode: kind, timeoutMs,
+                      durationMs: Math.max(0, Math.round(elapsedMs)), replayPlan: turn.replayUnsafe || turn.interactionSeen ? "unsafe" : "safe",
+                    });
+                    turn.reject(timeoutFailure);
+                  },
+                });
+                requestDeadline = deadline;
+                if (options.interactionGate) {
+                  const gate = options.interactionGate;
+                  // P3：客户交互一旦出现（等待/已回答）即本回合不可安全重放（运行时状态门槛）。
+                  if (gate.isWaiting()) { turn.interactionSeen = true; deadline.pause(); }
+                  requestGateUnsubscribe = gate.onChange((waiting) => { if (waiting) { turn.interactionSeen = true; deadline.pause(); } else deadline.resume(); });
+                }
+                // P2：网络状态订阅绑定到本次 attempt 的 deadline（当前已离线则先 pause 再 start）。
+                startNetworkWatch(turn);
+                const onTurnAbort = () => stopRequestDeadline();
+                turn.controller.signal.addEventListener("abort", onTurnAbort, { once: true });
+                requestAbortUnsubscribe = () => turn.controller.signal.removeEventListener("abort", onTurnAbort);
+                diagnostics.record("request.attempt.start", {
+                  turnId: turn.id, attempt: requestAttempt, timeoutMs: requestFirstByteTimeoutMs,
+                  durationMs: requestIdleTimeoutMs, mode: "claude",
+                });
+                deadline.start();
                 try {
                   await waitForTurn(attemptDone.then(() => current.toolTail), turn.controller.signal, turnLastResortMs, options.interactionGate);
                 } catch (error) {
@@ -616,6 +846,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                   // the error/terminal text names the last resort (inspect deadlines never abort).
                   throw isTurnLastResortError(error) ? error : error instanceof Error && error.name === "TimeoutError" ? turnLastResortError(turnLastResortMs) : error;
                 }
+                stopRequestDeadline();
                 if (turn.controller.signal.aborted) throw abortError();
                 if (compatibleAttempt && !reasoningCompatible) {
                   reasoningCompatible = true;
@@ -623,22 +854,96 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                 }
                 break;
               } catch (error) {
+                stopRequestDeadline();
+                // P3：记录本次失败时的真实可重放性（供重试门槛/诊断/终态如实标注；非模型自报）。
+                lastFailureReplaySafe = !turn.replayUnsafe && !turn.interactionSeen;
                 if (!turn.controller.signal.aborted && !(error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name)) && !teardownError && !compatibleAttempt && !turn.replayUnsafe && isReasoningRejection(lastFailureText)) {
                   compatibleAttempt = true;
                   if (engine) closeEngine(engine);
                   emitReasoningSystem(turn, "trying", "接口拒绝了本次思考参数，正在按兼容方式继续；已保存设置不变。");
                   continue;
                 }
+                // P3（2026-10-30，验收 F1 返工）replay-safe 同回合重试：仅当失败属请求/流层、
+                // 本回合尚无文本/thinking/工具/客户交互、网络在线、未取消、未发生清理失败，且
+                // **剩余总预算与 1h 护栏都足以覆盖本次退避** 时，关闭当前 query 后以同一输入、
+                // 同一 turnId 重开请求。退避结束后、真正启动 attempt 前再次复核（含在线/取消）。
+                const retryableFailure = isRequestTimeoutFailure(error) || (error as RetryableError).requestRetryable === true;
+                const replaySafe = !turn.replayUnsafe && !turn.interactionSeen;
+                const online = networkGate === undefined || networkGate.isOnline();
+                const retryPolicyActive = requestAttemptMax > 1;
+                const delayMs = retryDelayFor(requestAttempt);
+                const elapsedAtDecision = Math.max(0, Date.now() - promptStartedAt);
+                const budgetCoversDelay = requestRetryBudgetMs - elapsedAtDecision > delayMs;
+                const lastResortCoversDelay = turnLastResortMs - elapsedAtDecision > delayMs;
+                const mayRetry = retryableFailure && replaySafe && online && !turn.controller.signal.aborted && !disposed
+                  && teardownError === undefined && !isReasoningRejection(lastFailureText)
+                  && requestAttempt < requestAttemptMax && budgetCoversDelay && lastResortCoversDelay;
+                if (mayRetry) {
+                  // 先关闭当前 query（旧请求不残留），再退避；退避可取消（abort/dispose 立即终止）。
+                  if (engine) closeEngine(engine);
+                  if (teardownError !== undefined) throw teardownError;
+                  await waitForTurn(new Promise<void>((resolveDelay) => { setTimeout(resolveDelay, delayMs); }), turn.controller.signal, 0, options.interactionGate);
+                  if (turn.controller.signal.aborted || disposed) throw abortError();
+                  // 退避期间转为离线 ⇒ 不发起重试（P2 负责暂停/恢复与窗口终态；离线失败如实结束）。
+                  // 此刻尚未写 request.retry/角色日志，避免“已宣布重试但未发起”的观测噪音。
+                  if (networkGate !== undefined && !networkGate.isOnline()) throw error;
+                  // 退避后复核总预算/1h 护栏（防御定时器超时/时钟推进）：不足即按耗尽处理，不启动 attempt。
+                  const elapsedAfterDelay = Math.max(0, Date.now() - promptStartedAt);
+                  if (requestRetryBudgetMs - elapsedAfterDelay <= 0 || turnLastResortMs - elapsedAfterDelay <= 0) {
+                    retryExhausted = true;
+                    throw error;
+                  }
+                  // 真正即将启动 attempt 时才记录诊断/角色日志（attempt=即将开始的序号）。
+                  // 诊断沿用既有白名单字段：count←max、durationMs←退避 delay、mode←timeoutKind、replayPlan←replaySafe。
+                  diagnostics.record("request.retry", {
+                    turnId: turn.id,
+                    attempt: requestAttempt + 1,
+                    count: requestAttemptMax,
+                    durationMs: delayMs,
+                    errorCode: isRequestTimeoutFailure(error) ? error.code : MODEL_REQUEST_FAILED,
+                    ...(isRequestTimeoutFailure(error) ? { mode: error.timeoutKind } : {}),
+                    replayPlan: "safe",
+                  });
+                  // 一行角色日志（客户可见人话；不含错误正文/URL/凭据/技术 code）。
+                  emit(turn, "message", `接口请求未成功，正在自动重试（第 ${requestAttempt + 1}/${requestAttemptMax} 次）`, { source: "system", reasonCode: "claude-request-retry", state: "retrying" });
+                  continue;
+                }
+                // 有重试策略、本可安全重放且在线，但 attempts/剩余预算/1h 护栏不允许 ⇒ 如实标记重试耗尽。
+                if (retryPolicyActive && retryableFailure && replaySafe && online && !turn.controller.signal.aborted && !disposed
+                  && teardownError === undefined && !isReasoningRejection(lastFailureText)) retryExhausted = true;
                 throw error;
               }
             }
           } catch (error) {
             failure = safeFailure(error);
             outcome = failure.name === "TimeoutError" ? "timed_out" : turn.controller.signal.aborted || failure.name === "AbortError" ? "aborted" : "failed";
+            if (outcome === "failed") {
+              // P1：请求失败结构化事实——请求超时保留自身 code；P2 网络离线超窗保留
+              // `network-offline-timeout`；其余请求级失败标记 MODEL_REQUEST_FAILED。
+              // code/attempts/replaySafe 随错误上抛，由 Service 写入 settled.detail（客户文案仍为人话）。
+              const tagged = failure as Error & { code?: string; attempts?: number; replaySafe?: boolean };
+              if (retryExhausted) {
+                // P3：重试耗尽如实命名；保留 timeoutKind 等底层事实供诊断/短报使用。
+                tagged.code = MODEL_REQUEST_RETRY_EXHAUSTED;
+              } else if (!isRequestTimeoutFailure(failure) && !isNetworkOfflineFailure(failure)) tagged.code = MODEL_REQUEST_FAILED;
+              else if (typeof tagged.code !== "string") tagged.code = MODEL_REQUEST_FAILED;
+              tagged.attempts = Math.max(1, requestAttempt);
+              // P3：`replaySafe` = 本回合仍可安全重放（未产生文本/thinking/工具/客户交互副作用）；
+              // 以最近一次失败时的真实状态为准（成功重试后不再被后续输出翻转）。
+              tagged.replaySafe = lastFailureReplaySafe ?? (!turn.replayUnsafe && !turn.interactionSeen);
+              diagnostics.record("request.failed", {
+                turnId: turn.id,
+                errorCode: tagged.code,
+                attempt: tagged.attempts,
+                durationMs: Math.max(0, Date.now() - promptStartedAt),
+                replayPlan: tagged.replaySafe ? "safe" : "unsafe",
+              });
+            }
             turn.controller.abort();
             if (engine) closeEngine(engine);
             if (!storage && nativeId) { nativeId = undefined; contextSource = "in-memory"; warning = "Claude 活会话已中断；下一条输入将新建上下文。"; }
           } finally {
+            stopRequestDeadline();
             turn.controller.abort();
             if (engine) for (const [token, context] of engine.contexts) if (context.turn === turn) engine.contexts.delete(token);
             if (engine) for (const [id, call] of engine.nativeCalls) if (call.turn === turn) engine.nativeCalls.delete(id);
@@ -647,7 +952,15 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             const settledSummary = outcome === "timed_out" && isTurnLastResortError(failure)
               ? `Claude 本轮超过最后兜底（${turnLastResortMs}ms），已中止`
               : `Claude 本轮${outcome}`;
-            emit(turn, "settled", settledSummary, { outcome, turnId: turn.id, ...(teardownError ? { cleanupError: teardownError.message } : {}) });
+            const settledAttempts = Math.max(1, requestAttempt);
+            emit(turn, "settled", settledSummary, {
+              outcome, turnId: turn.id,
+              // P3：仅在发生失败/重试时追加事实（普通首轮成功的 settled 逐字保持旧形状）。
+              ...(settledAttempts > 1 || lastFailureReplaySafe !== undefined
+                ? { attempts: settledAttempts, ...(lastFailureReplaySafe !== undefined ? { replaySafe: lastFailureReplaySafe } : {}) }
+                : {}),
+              ...(teardownError ? { cleanupError: teardownError.message } : {}),
+            });
           }
           if (failure) throw failure;
         },

@@ -88,10 +88,6 @@ export interface RuntimeViewImagePolicy {
   delivery: ViewImageDeliveryMode;
   /** 有效单图上限（字节）；`tool-result` 交付时工具取 `min(VIEW_IMAGE_MAX_BYTES, maxImageBytes)`。 */
   maxImageBytes: number;
-  /** 每模型轮次最多图片数（仅 `tool-result` 交付计数；`next-turn` 保持既有排队行为不变）。 */
-  maxImagesPerTurn: number;
-  /** 每模型轮次图片原始字节总预算（仅 `tool-result` 交付计数）。 */
-  maxBytesPerTurn: number;
 }
 
 /**
@@ -103,10 +99,10 @@ export interface RuntimeViewImagePolicy {
  * 翻表是唯一开关，也是回滚开关。
  */
 export const RUNTIME_VIEW_IMAGE_POLICY: Readonly<Record<RuntimeKind, RuntimeViewImagePolicy>> = Object.freeze({
-  demo: Object.freeze({ delivery: "next-turn", maxImageBytes: 10 * 1024 * 1024, maxImagesPerTurn: 4, maxBytesPerTurn: 20 * 1024 * 1024 }),
-  pi: Object.freeze({ delivery: "tool-result", maxImageBytes: 10 * 1024 * 1024, maxImagesPerTurn: 4, maxBytesPerTurn: 20 * 1024 * 1024 }),
-  claude: Object.freeze({ delivery: "tool-result", maxImageBytes: 5 * 1024 * 1024, maxImagesPerTurn: 4, maxBytesPerTurn: 20 * 1024 * 1024 }),
-  codex: Object.freeze({ delivery: "tool-result", maxImageBytes: 10 * 1024 * 1024, maxImagesPerTurn: 4, maxBytesPerTurn: 20 * 1024 * 1024 }),
+  demo: Object.freeze({ delivery: "next-turn", maxImageBytes: 10 * 1024 * 1024 }),
+  pi: Object.freeze({ delivery: "tool-result", maxImageBytes: 10 * 1024 * 1024 }),
+  claude: Object.freeze({ delivery: "tool-result", maxImageBytes: 5 * 1024 * 1024 }),
+  codex: Object.freeze({ delivery: "tool-result", maxImageBytes: 10 * 1024 * 1024 }),
 });
 
 export interface PromptTurnStartedMetadata {
@@ -689,6 +685,11 @@ export interface RequestCreatedEvent extends TaskStateEventBase {
   kind: "request.created";
   requestId: string;
   flowId?: string;
+  /**
+   * 2026-10-31（D3 卡种收口）：卡片种类。应用从 `request.cardKind` 原样落账（与既有事件字段同口径），
+   * 不信任模型/判断 agent 自报。可选、向后兼容——旧事件无此字段。
+   */
+  cardKind?: GovernanceCardKind;
   intentId?: string;
   taskId?: string;
   sourceRoleId: string;
@@ -710,7 +711,22 @@ export interface RequestResolvedEvent extends TaskStateEventBase {
   kind: "request.resolved";
   requestId: string;
   decisionId?: string;
+  /**
+   * 2026-10-31（D3 卡种收口）：**仅 appointment（D3 招人）卡**的选中角色 id。
+   * 其他 choice 卡的选中项写入 `selectedOptionIds`（仅审计，不得当作角色集）。
+   * 旧事件可能无 `cardKind` 却写入了任意 choice 卡的选项（历史污染）；D3 读侧只接受
+   * appointment 卡或带 `rosterVersion`/`rosterSha256` 戳的 legacy 记录。
+   */
   targetRoleIds?: string[];
+  /**
+   * 2026-10-31：该裁决来自哪种卡。应用从 `request.cardKind` 原样落账，不信任模型/判断 agent 自报。
+   * 可选、向后兼容——旧事件无此字段。
+   */
+  cardKind?: GovernanceCardKind;
+  /**
+   * 2026-10-31：非 appointment 的 choice 卡选中选项 id（仅供审计；不得被任何角色集消费）。
+   */
+  selectedOptionIds?: string[];
   intentId?: string;
   taskId?: string;
   /**
@@ -1491,6 +1507,15 @@ export interface GovernanceJudgeRequest {
   runtime: RuntimeKind;
   governanceModel: "single" | "trio";
   flowId: string;
+  /**
+   * 2026-10-30（§5A）：显式意图 id（小写 slug）。来源优先级：请求显式 → 提案 frontmatter → 产品意图 frontmatter。
+   * 三者皆缺时才允许判断侧按 `flow-id` 回落（证据里保留 source 说明）。
+   */
+  intentId?: string;
+  /** intentId 的来源（随证据保留；缺省按请求显式处理）。 */
+  intentIdSource?: "request" | "proposal" | "product" | "flow-id";
+  /** 意图解析 fail-closed 原因（产品/提案冲突、请求显式冲突或非法 slug）；出现即禁止 approve。 */
+  intentResolutionError?: { code: string; detail: string };
   stepId?: string;
   toolCallId?: string;
   turnId?: string;
@@ -1599,6 +1624,12 @@ export interface GovernanceJudgeToolOptions {
  */
 export interface GovernanceJudgeContext {
   flowId: string;
+  /** 2026-10-30（§5A）：显式意图 id（请求显式携带；缺席时判断侧可从提案 frontmatter 解析）。 */
+  intentId?: string;
+  /** intentId 的来源（request / proposal / product / flow-id 回落），随判断证据保留。 */
+  intentIdSource?: "request" | "proposal" | "product" | "flow-id";
+  /** 意图解析 fail-closed 原因（冲突/非法 slug）；出现即禁止 approve。 */
+  intentResolutionError?: { code: string; detail: string };
   stepId?: string;
   toolCallId?: string;
   turnId?: string;
@@ -1811,7 +1842,83 @@ export interface RuntimeAdapter {
 }
 
 export type RuntimeContextSource = "in-memory" | "fresh" | "resumed" | "recovered";
+/**
+ * 回合终态。P1（2026-10-30）请求级首字节/流空闲超时**不**使用 `timed_out`：
+ * `timed_out` 只保留给 `turnLastResortMs`（1h 最后兜底）；请求超时是 `failed` + 明确 errorCode
+ * （`REQUEST_TIMEOUT_ERROR_CODES`），避免把「请求没起来」伪装成「整轮到点」。
+ */
 export type RuntimeTurnOutcome = "completed" | "failed" | "aborted" | "timed_out";
+
+// —————— P1：请求级超时/请求失败的错误码（终态 failed；1h 最后兜底仍 timed_out） ——————
+/** 请求级超时的错误码族（终态 failed；具体种类见 `REQUEST_TIMEOUT_ERROR_CODES`）。 */
+export const MODEL_REQUEST_TIMEOUT = "MODEL_REQUEST_TIMEOUT";
+/** 请求级失败（非超时）：SDK 流/结果错误等；终态 failed，errorCode 如实。 */
+export const MODEL_REQUEST_FAILED = "MODEL_REQUEST_FAILED";
+/**
+ * P3（2026-10-30）同回合 replay-safe 重试耗尽：最后一次尝试仍是请求/流层失败。
+ * 终态 `failed`；只在结构化 detail/诊断中出现，**不得**进入客户可见文案。
+ */
+export const MODEL_REQUEST_RETRY_EXHAUSTED = "MODEL_REQUEST_RETRY_EXHAUSTED";
+/** 请求超时种类：首字节超时（尚无任何 SDK 消息）与流空闲超时（已有活动后静默）。 */
+export type RequestTimeoutKind = "first-byte" | "idle";
+export const REQUEST_TIMEOUT_ERROR_CODES: Readonly<Record<RequestTimeoutKind, string>> = Object.freeze({
+  "first-byte": "request-timeout-first-byte",
+  idle: "request-timeout-idle",
+});
+/**
+ * 请求失败的结构化事实（P1）：`settled.detail` 携带，桌面/诊断据此显示人话；
+ * `errorCode` 只在结构化 detail/诊断中出现，**不得**进入客户可见文案。
+ */
+export interface RuntimeRequestFailureFactsV1 {
+  version: 1;
+  errorCode: string;
+  /** 本回合实际请求尝试次数（P1 恒为 1；P3 重试后递增，最多 3）。 */
+  attempts: number;
+  /**
+   * 失败时本回合**是否仍可安全重放**（true = 未产生任何 assistant 文本/thinking、工具调用或
+   * 客户交互副作用）。P3 起与字段名一致；P1 曾按 `turn.replayUnsafe` 置值（历史极性与字段名相反），
+   * P3 一并修正（P1/P2 e2e 的该字段断言同步更新）。
+   */
+  replaySafe: boolean;
+  timeoutKind?: RequestTimeoutKind;
+}
+
+// —————— P2：网络状态（权威来源＝主进程 net.isOnline；锁屏≠离线） ——————
+/**
+ * 网络状态来源（方案 v1.1 §5.3.1）：
+ * · `main-net`：主进程 `net.isOnline()` 采样（**权威**）；
+ * · `renderer`：渲染层 online/offline 事件（**提示**，主进程可纠正误报）；
+ * · `power`：`powerMonitor` suspend/resume/lock/unlock（**提示/重探**，锁屏不判离线）；
+ * · `unknown`：启动前的保守占位。
+ */
+export type NetworkStateSource = "main-net" | "renderer" | "power" | "unknown";
+/** 状态原因（初始采样 / 接口断开 / 渲染层离线提示 / 恢复 / 重探）。 */
+export type NetworkStateReason = "initial" | "interface-down" | "renderer-offline" | "resume" | "probe";
+/** 网络状态（字段形状＝方案 v1.1 §5.3.1；`stableForMs` = 本次状态稳定时长）。 */
+export interface NetworkState {
+  online: boolean;
+  source: NetworkStateSource;
+  /** 状态确认时刻（毫秒 epoch；注入时钟，便于测试）。 */
+  at: number;
+  /** 当前状态已稳定时长（毫秒；`online` 切换时归零重计）。 */
+  stableForMs: number;
+  reason?: NetworkStateReason;
+}
+/**
+ * 网络状态门（Model 共享契约；主进程权威，渲染提示，power 提示）。
+ * 缺省（未注入）＝ always-online，旧行为零变化；适配器/桌面只读消费，不自行判网。
+ */
+export interface NetworkGate {
+  current(): NetworkState;
+  isOnline(): boolean;
+  /** 订阅在线状态变化（只在 online 变化时通知；返回退订函数）。 */
+  onChange(listener: (state: NetworkState) => void): () => void;
+}
+/**
+ * P2 网络失败 errorCode（终态 failed；等待恢复窗口耗尽，不自动重放——重试属 P3）。
+ * 只在结构化 detail/诊断中出现，**不得**进入客户可见文案。
+ */
+export const NETWORK_OFFLINE_TIMEOUT = "network-offline-timeout";
 export type JsonSchema = Record<string, unknown>;
 export type DiagnosticLog = ReturnType<typeof createDiagnosticLogger>;
 
@@ -2048,6 +2155,48 @@ export interface RuntimeProviderOptions {
    */
   turnLastResortMs?: number;
   constructTimeoutMs?: number;
+  /**
+   * P1（2026-10-30）**请求级首字节时限**（毫秒）：从输入交给模型到收到第一条 SDK 消息
+   * （assistant/user/result/system `api_retry` 任一）的上限。缺省 90000；测试/宿主可注入小值。
+   * 到点 ⇒ 本轮 `failed`（errorCode `request-timeout-first-byte`），**不是** `timed_out`；
+   * 与 1h 最后兜底（`turnLastResortMs`）并存，后者仍是唯一整轮自动上限。
+   */
+  requestFirstByteTimeoutMs?: number;
+  /**
+   * P1 **请求级流空闲时限**（毫秒）：已有流活动后，距上一条 SDK 消息的空闲上限；缺省 300000。
+   * 是「空闲」而非整轮墙钟：任何 SDK 消息都会重置；客户交互等待、工具执行、abort 清理期间
+   * 计时停走（中性 pause/resume 接口留给 P2 网络暂停接线）。
+   */
+  requestIdleTimeoutMs?: number;
+  /**
+   * P2（2026-10-30）**网络状态门**（主进程 `net.isOnline` 权威 + 渲染/power 提示；形状＝Model `NetworkGate`）。
+   * 离线时适配器对请求级 deadline `pause()`（计时停走，不触发超时），恢复后 `resume()`；
+   * 离线超过 `networkRetryWindowMs` 以 `network-offline-timeout` 失败（不自动重放——重试属 P3）。
+   * **缺省 ⇒ always-online**（旧行为零变化；Pi/Codex 不消费本字段）。
+   */
+  networkGate?: NetworkGate;
+  /**
+   * P2 **离线等待恢复窗口**（毫秒；缺省 300000＝5min，测试/宿主可注入小值）。
+   * 离线持续超过该窗口 ⇒ 本轮 `failed`（errorCode `network-offline-timeout`），如实终态、不重放。
+   */
+  networkRetryWindowMs?: number;
+  /**
+   * P3（2026-10-30）**同回合 replay-safe 重试**：最多请求尝试次数（缺省 3＝首次 + 2 次重试；
+   * 实现 clamp 到 1..3，注入不能放宽上限）。仅当本回合尚无文本/thinking/工具/客户交互、网络在线、
+   * 失败属请求/流层且未取消时，才在**同一 turn** 内关闭当前 query 后重开请求；任何副作用后绝不重放。
+   */
+  requestAttemptMax?: number;
+  /**
+   * P3 指数退避基数（毫秒；缺省 1000，即 1s/2s/4s 级别；单次上限见 `requestRetryMaxDelayMs`）。
+   */
+  requestRetryBaseMs?: number;
+  /** P3 单次退避上限（毫秒；缺省 8000）。 */
+  requestRetryMaxDelayMs?: number;
+  /**
+   * P3 单回合所有 attempt 的总预算（毫秒；缺省 600000＝10min）。超出不再重试，终态 `failed`；
+   * 与 1h 整轮最后兜底并存，不改变 `turnLastResortMs`/`promptTimeoutMs`/默认自动中止 0。
+   */
+  requestRetryBudgetMs?: number;
   /**
    * G-4 V2：该角色会话构造时装配的外来 MCP 声明（Service 在 providerFor 读取 `docs/mcp/**` 后注入；
    * **纯消费面**——适配器不得各自去找文件、不得写盘；缺省＝无声明可装配）。装配/放行/呈现属各平台

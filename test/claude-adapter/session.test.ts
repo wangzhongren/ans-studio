@@ -91,7 +91,9 @@ function fake(script: Script, statuses: unknown[] | (() => Promise<unknown[]>) =
     dependencies: { env: environment, loadSdk: async () => { loadCount++; return { createSdkMcpServer, query }; }, loadZod: async () => z },
   };
 }
-const options = (root: string, tools: readonly ToolDefinition[], interactionGate = gate()): RuntimeProviderOptions => ({ runtime: "claude", projectRoot: root, skillRoot: root, tools, interactionGate, currentTurnId: () => undefined });
+// P3（2026-10-30）：本套件聚焦适配器既有语义，关闭 ANS 同回合重试（重试行为由
+// test/claude-adapter/replay-safe-retry.test.ts 真实路径覆盖），避免既有失败/恢复用例被重试改变。
+const options = (root: string, tools: readonly ToolDefinition[], interactionGate = gate()): RuntimeProviderOptions => ({ runtime: "claude", projectRoot: root, skillRoot: root, tools, interactionGate, currentTurnId: () => undefined, requestAttemptMax: 1 });
 async function fixture(run: (root: string) => Promise<void>) {
   const root = await mkdtemp(join(tmpdir(), "ans-claude-test-"));
   try { await run(root); } finally { await rm(root, { recursive: true, force: true }); }

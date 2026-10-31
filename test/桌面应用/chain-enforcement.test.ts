@@ -260,6 +260,48 @@ async function d3Fixture(root: string, selected: string[], rosterVersion = 1): P
   });
 }
 
+/**
+ * 2026-10-31（D3 卡种收口）：任意 choice 卡的账本序列。
+ * 用于模拟历史污染（旧写侧把选项写进 targetRoleIds）与新格式事件（cardKind 显式落账）。
+ */
+async function choiceResolution(
+  root: string,
+  opts: {
+    requestId: string;
+    flowId: string;
+    title: string;
+    selected: string[];
+    atCreated: string;
+    atResolved: string;
+    cardKind?: "proposal" | "appointment" | "acceptance" | "intent-confirm" | "decision";
+    rosterStamp?: { version: number; sha256: string };
+  },
+): Promise<void> {
+  await appendTaskEvent(root, {
+    v: 1,
+    at: opts.atCreated,
+    kind: "request.created",
+    requestId: opts.requestId,
+    flowId: opts.flowId,
+    ...(opts.cardKind !== undefined ? { cardKind: opts.cardKind } : {}),
+    sourceRoleId: "convener",
+    title: opts.title,
+    options: opts.selected.map((id) => ({ id, label: id })),
+  });
+  await appendTaskEvent(root, {
+    v: 1,
+    at: opts.atResolved,
+    kind: "request.resolved",
+    requestId: opts.requestId,
+    decisionId: `decision-${opts.requestId}`,
+    ...(opts.cardKind !== undefined ? { cardKind: opts.cardKind } : {}),
+    ...(opts.rosterStamp !== undefined ? { rosterVersion: opts.rosterStamp.version, rosterSha256: opts.rosterStamp.sha256 } : {}),
+    targetRoleIds: opts.selected,
+    by: "judge",
+    choice: opts.selected.join(","),
+  });
+}
+
 test("M1/M2：幕僚跳步被拒（意图/名单缺失），拒绝在 task.created 之前；补齐后受理", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-m1-"));
   try {
@@ -383,6 +425,136 @@ test("M5/M6/M7 + 交付标记：幕僚交付运营需 D3 选中角色卡；运�
     }
   } finally {
     await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不覆盖真实 D3（选项与角色同名也不覆盖）", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-d3-cardkind-"));
+  try {
+    await writeProjectFiles(root);
+    await d3Fixture(root, ["implementer"]); // legacy 兼容：无 cardKind，带 appointment 专属 roster 戳
+    const rosterBytes = await fs.readFile(path.join(root, "docs/proposals/focus-roster-v1.md"));
+    const rosterStamp = { version: 1, sha256: createHash("sha256").update(rosterBytes).digest("hex") };
+    // 新格式 decision 卡：即使（错误地）带 roster 戳与 targetRoleIds，且选项恰与真实角色 qa 同名，也不得被当作 D3。
+    await choiceResolution(root, {
+      requestId: "req-decision-qa",
+      flowId: "focus",
+      title: "浏览器验收方式",
+      selected: ["qa"],
+      cardKind: "decision",
+      rosterStamp,
+      atCreated: "2026-10-29T00:00:02.000Z",
+      atResolved: "2026-10-29T00:00:03.000Z",
+    });
+    // 旧格式（无 cardKind、无 roster 戳）历史污染：customer-local 选项被写进了 targetRoleIds。
+    await choiceResolution(root, {
+      requestId: "req-legacy-pollution",
+      flowId: "focus",
+      title: "旧决策卡",
+      selected: ["customer-local"],
+      atCreated: "2026-10-29T00:00:04.000Z",
+      atResolved: "2026-10-29T00:00:05.000Z",
+    });
+    // 另一张新格式 intent-confirm：confirm 选项同样不是角色。
+    await choiceResolution(root, {
+      requestId: "req-intent",
+      flowId: "focus",
+      title: "需求确认",
+      selected: ["confirm"],
+      cardKind: "intent-confirm",
+      atCreated: "2026-10-29T00:00:06.000Z",
+      atResolved: "2026-10-29T00:00:07.000Z",
+    });
+    // 新格式 acceptance 卡：accept/rework 选项同样不是角色。
+    await choiceResolution(root, {
+      requestId: "req-acceptance",
+      flowId: "focus",
+      title: "验收核对",
+      selected: ["rework"],
+      cardKind: "acceptance",
+      atCreated: "2026-10-29T00:00:08.000Z",
+      atResolved: "2026-10-29T00:00:09.000Z",
+    });
+    const h = harness(root);
+    try {
+      await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
+      await tick(20);
+      // M5 正例：D3 仍为真实角色集 ⇒ 交付受理。
+      const handoff = (await h.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
+      assert.equal(handoff.ok, true, handoff.message ?? "");
+      await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+      await tick(20);
+      const toImplementer = (await h.caps.convener!({ roleId: "implementer", task: "实现番茄钟", sideEffect: "code", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
+      assert.equal(toImplementer.ok, true, toImplementer.message ?? "");
+      // 决策选项 qa 与真实角色同名：若 D3 被污染，这里会被放行；收口后必须拒绝。
+      const toQa = (await h.caps.convener!({ roleId: "qa", task: "测试套件", sideEffect: "code", flowId: "focus", moduleId: "qa-suite" })) as DispatchReceipt;
+      assert.equal(toQa.ok, false, "decision 选项不得顶替 D3 角色集");
+      assert.match(toQa.message ?? "", /名单|D3/);
+    } finally {
+      await h.mgr.stop(null);
+      // 2026-10-31（CI 稳定性，macOS arm64）：stop 只释放会话句柄，不等待 `void drainQueue(...)`
+      // 的后台投递链（含 `task.delivered` 账本写入）。先让出一拍再删除，避免 rm 扫描后新文件落盘
+      // 导致 ENOTEMPTY；配合外层带重试的 fs.rm。
+      await tick(50);
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+});
+
+test("D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 cardKind 且无 roster 戳的裁决被忽略", async () => {
+  // B1：created.cardKind=appointment（无 roster 戳）也可作为 D3。
+  const rootNew = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-d3-new-"));
+  try {
+    await writeProjectFiles(rootNew);
+    await choiceResolution(rootNew, {
+      requestId: "req-new-d3",
+      flowId: "focus",
+      title: "D3 招人决定",
+      selected: ["implementer"],
+      cardKind: "appointment",
+      atCreated: "2026-10-29T00:00:00.000Z",
+      atResolved: "2026-10-29T00:00:01.000Z",
+    });
+    const hNew = harness(rootNew);
+    try {
+      await hNew.mgr.open({ projectRoot: rootNew, roleId: "chief", runtime: "demo" });
+      await tick(20);
+      const handoff = (await hNew.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
+      assert.equal(handoff.ok, true, handoff.message ?? "");
+    } finally {
+      await hNew.mgr.stop(null);
+      await tick(50); // 等后台投递链落盘后再删（见上条 ENOTEMPTY 说明）。
+    }
+  } finally {
+    await fs.rm(rootNew, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+
+  // B2：只有无 cardKind、无 roster 戳的裁决 ⇒ 不构成 D3（不得以 flow 匹配或 targetRoleIds 存在为接受条件）。
+  const rootLegacy = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-d3-unstamped-"));
+  try {
+    await writeProjectFiles(rootLegacy);
+    await choiceResolution(rootLegacy, {
+      requestId: "req-unstamped",
+      flowId: "focus",
+      title: "旧决策卡",
+      selected: ["implementer"],
+      atCreated: "2026-10-29T00:00:00.000Z",
+      atResolved: "2026-10-29T00:00:01.000Z",
+    });
+    const hLegacy = harness(rootLegacy);
+    try {
+      await hLegacy.mgr.open({ projectRoot: rootLegacy, roleId: "chief", runtime: "demo" });
+      await tick(20);
+      const handoff = (await hLegacy.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
+      assert.equal(handoff.ok, false);
+      assert.match(handoff.message ?? "", /D3/);
+    } finally {
+      await hLegacy.mgr.stop(null);
+      await tick(50); // 等后台投递链落盘后再删（见上条 ENOTEMPTY 说明）。
+    }
+  } finally {
+    await fs.rm(rootLegacy, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 

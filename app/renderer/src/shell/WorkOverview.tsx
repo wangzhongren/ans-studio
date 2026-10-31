@@ -102,6 +102,7 @@ export function WorkOverview({ roleId }: { roleId: string | null }) {
   const roles = useChatStore((s) => s.roles);
   const pendingOperator = useChatStore((s) => s.pendingOperator);
   const queueByRole = useChatStore((s) => s.queueByRole);
+  const queueMetaByRole = useChatStore((s) => s.queueMetaByRole);
   const runningByRole = useChatStore((s) => s.runningByRole);
   const paneVersions = useChatStore((s) => s.paneVersions);
   const openQueue = useDrawerStore((s) => s.openQueue);
@@ -191,6 +192,7 @@ export function WorkOverview({ roleId }: { roleId: string | null }) {
             roleId={roleId}
             items={groups.running}
             emptyText={t("ui.work.emptyQueue")}
+            meta={queueMetaByRole[roleId] || null}
           />
         </WorkSection>
 
@@ -208,6 +210,7 @@ export function WorkOverview({ roleId }: { roleId: string | null }) {
                 roleId={roleId}
                 items={visibleQueued}
                 emptyText={t("ui.work.emptyQueue")}
+                meta={queueMetaByRole[roleId] || null}
               />
               {groups.total > QUEUE_PREVIEW_LIMIT ? (
                 <button

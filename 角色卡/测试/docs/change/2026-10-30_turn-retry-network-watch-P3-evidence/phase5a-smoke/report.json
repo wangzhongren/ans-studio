@@ -1,0 +1,224 @@
+{
+  "entry": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\replay-safe-retry\\app\\renderer\\dist\\index.html",
+  "checks": [
+    {
+      "name": "六角色左树/主入口 chief",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "决策/任务入口在会话头",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "Composer 两行结构：提示行/控件行",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "Composer 控件同一行（1360）",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "Composer 无横向溢出（1360）",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "一次一卡：仅一个决策对话框",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "优先级：高风险先弹",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "聊天流无卡片、仅有系统通知",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "还有 N 张待处理",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "默认焦点不在确认",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "决策弹窗背景不透明且圆角生效",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "稍后处理推进下一张",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "稍后处理关闭对话框、不代答",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "待办面板列出稍后项",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "judge 列表显示原始申请标题而非兜底",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "judge 列表带来源与时间",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "dc-filter 使用自定义下拉与令牌菜单",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "三栏窄中栏：审批/决策短标签可见",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "三栏窄中栏：composer 无横向溢出",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "待办可重新打开",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "历史面板存在",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "任务/日志面板存在",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "角色日志徽标/视图存在",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "输入中 decision 不打断",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "输入中高风险可打断",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "停止输入后空闲推进 decision",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "已有对话框：decision 新卡排队不替换",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "choice 未选择时拒绝可提交 cancelled",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "choice 拒绝后对话框关闭",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "Esc=稍后、不确认不拒绝",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "破坏性第一次点击不提交",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "破坏性显示二次确认",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "破坏性二次点击仅提交一次",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "ARIA 模态/标题/描述",
+      "value": true,
+      "detail": {
+        "modal": "true",
+        "labelled": "dd-title",
+        "described": "dd-source dd-risk",
+        "role": "dialog"
+      }
+    },
+    {
+      "name": "焦点陷阱：Tab 从末项回到首项且不在确认",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "过期申请进入历史",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "200% 无横向溢出",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "200% Composer 控件不溢出",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "no console errors",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "no CSP violations",
+      "value": true,
+      "detail": []
+    }
+  ],
+  "console": [],
+  "csp": [],
+  "screenshots": [
+    "01-six-roles.png",
+    "02-decision-dialog.png",
+    "03b-dc-filter-open.png",
+    "03c-composer-narrow.png",
+    "03-decision-center.png",
+    "04-task-center.png",
+    "05-200pct.png"
+  ],
+  "failures": 0,
+  "finished": true,
+  "at": "2026-10-30T16:09:32.381Z"
+}

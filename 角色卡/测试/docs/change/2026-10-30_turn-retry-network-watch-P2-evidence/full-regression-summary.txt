@@ -1,0 +1,26 @@
+# P2 full regression summary (final candidate d6b30ef, baseline aa6b87c)
+command: node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts')
+ℹ tests 3144
+ℹ suites 0
+ℹ pass 3117
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 18
+ℹ todo 0
+ℹ duration_ms 236624.7005
+files: 372 (P1 368 -> base P2 372 -> F1 rework 372; +4 new P2 test files)
+comparison: S1 3077/3050/9/18 -> P0 3094/3067/9/18 -> P1 3117/3090/9/18 -> P2 base 3137/3110/9/18 -> P2 F1 rework 3144/3117/9/18 (+27 tests/+27 pass vs P1)
+
+## Failure classification (9; identical set to S1/P0/P1, all pre-existing Windows symlink EPERM errno -4048; 新增确定性失败 = 0)
+  ✖ D3 linked workspace root remains usable; linked target itself is not replaced (6.1194ms)
+  ✖ Pi storage refuses file symlink and role/runtime mismatch without touching other storage (7.8523ms)
+  ✖ native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary (17.1665ms)
+  ✖ native symlink and storage runtime mismatch fail before SDK query (2.7212ms)
+  ✖ node test外指符号链接路径不获委托；项目内测试路径获委托 (1.9209ms)
+  ✖ store validate callback rejects directory symlink before Pi parse or new native write (6.5883ms)
+  ✖ store: native validation stays lazy and native symlink is rejected before effects (3.1632ms)
+  ✖ store: traversal, mismatched scope and symlinked runtime directories rejected (3.1841ms)
+  ✖ 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛 (6.3936ms)
+
+## Skips (runner count 18; unchanged from S1/P1; no new skip)
+  (same 18 inline '# SKIP' entries as P1; see full-regression-serial.log)

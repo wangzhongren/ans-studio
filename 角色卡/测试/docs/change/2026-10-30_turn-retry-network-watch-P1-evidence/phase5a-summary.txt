@@ -1,0 +1,6 @@
+# P1 phase5a smoke summary (candidate 105c187)
+command: node_modules/.bin/electron test/桌面UI/phase5a-electron-smoke.mjs "" <evidence>/phase5a-smoke
+CHECK no CSP violations=true []
+PHASE5A_SMOKE_DONE failures=0 checks=40 out=C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\request-timeouts\角色卡\测试\docs\change\2026-10-30_turn-retry-network-watch-P1-evidence\phase5a-smoke
+report: phase5a-smoke/report.json; raw log: phase5a.log
+checks=40 failures=0

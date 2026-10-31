@@ -37,6 +37,16 @@ export interface RoleView {
   rootDocs?: RoleRootDocEntry[];
 }
 
+/** 2026-10-31（run-change 触发）：active run 只读摘要（主进程 listProject 附带；旧 main 缺省时按 [] 消费）。 */
+export interface ActiveRunSummary {
+  runId: string;
+  flowId: string;
+  state: "draft" | "pinned";
+  pinnedAt?: string;
+  rosterVersion?: number;
+  roles?: string[];
+}
+
 export interface Listing {
   projectRoot: string;
   primaryRoleId: string | null;
@@ -50,6 +60,8 @@ export interface Listing {
     pinFiles?: unknown[];
     pinCount?: number;
   };
+  activeRuns?: ActiveRunSummary[];
+  activeRunsError?: string;
 }
 
 export interface SessionEvent {
@@ -202,4 +214,14 @@ export interface RoleMeta {
   /** 会话 record 已恢复但模型未恢复（结构化标记；用于追加历史保留说明，不解析文案）。 */
   readableHistoryRetained?: boolean;
   lastEvent?: string;
+}
+
+/**
+ * **P0 队列可见性（2026-10-30）**：主进程 `session:role-state` 快照里的「为什么没动」事实——
+ * 队首类别 / 阻塞原因 / 当前回合 id。界面只读它，不自行推测（单一来源＝主进程会话内存态）。
+ */
+export interface RoleQueueMeta {
+  headKind: string | null;
+  blockedReason: "target-busy" | "origin-missing" | "session-closed" | "network" | null;
+  activeTurnId: string | null;
 }

@@ -1,0 +1,7 @@
+# P2 target-project zero-write check (final candidate d6b30ef, baseline aa6b87c)
+targets: C:/Users/51054/Downloads/test, C:/Users/51054/Desktop/work/jinyong-rogue-2d
+references_in_test_sources=0
+references_in_p2_logs=0
+fixtures: all P2 tests use os.tmpdir() fixtures; E2E used ANS_E2E_PROJECT=<worktree root> (default) and ANS_E2E_OUTDIR=<evidence>/electron-e2e; phase5a used an in-memory /phase5a-project route.
+runtime data: diagnostics/queue/state only under temp userData or os.tmpdir(); no repo-tracked product file written by tests.
+conclusion: P2 commands referenced neither target project; zero writes attributable to P2.

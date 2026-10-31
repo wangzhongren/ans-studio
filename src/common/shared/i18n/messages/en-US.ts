@@ -188,6 +188,18 @@ export const enUS = {
   "ui.queue.withdrawTitle": "Withdraw this queued message (only before delivery)",
   "ui.queue.withdrawing": "Withdrawing…",
   "ui.queue.withdraw": "Withdraw",
+  // P0 queue visibility (2026-10-30): why the queue is not moving
+  "ui.queue.ageMinutes": "waiting {minutes} min",
+  "ui.queue.headKind": "Queue head: {kind}",
+  "ui.queue.blocked.targetBusy": "The target role is finishing its previous turn; the queue is waiting",
+  "ui.queue.blocked.originMissing": "Turn-settlement anomaly detected (busy with no tracked turn); use Stop to unwedge and resume the queue",
+  "ui.queue.blocked.sessionClosed": "The target session is not open yet; queued items will be delivered once it opens",
+  "ui.queue.blocked.network": "Network unavailable; the queue is safely paused",
+  // P2 (2026-10-30): network status line (chat header; main-process net.isOnline is authoritative).
+  "ui.network.label.offline": "Network disconnected",
+  "ui.network.label.recovered": "Network restored · continuing",
+  "ui.network.title.offline": "Network disconnected: the in-flight request timer is paused and the queue is waiting for the network; work continues automatically after recovery.",
+  "ui.network.title.recovered": "Network restored: paused requests and the queue have resumed.",
 
   "ui.queueSubview.backRole": "Back to role profile",
   "ui.queueSubview.backWork": "Back to work overview",
@@ -977,6 +989,20 @@ export const enUS = {
   "ui.run.change.option.continueFrozen": "Keep frozen contract (recommended)",
   "ui.run.change.option.stopAndRestart": "Stop this run, restart and pin new documents",
   "ui.run.change.option.stop": "Stop this run without restart",
+  "ui.runChange.entry": "Contract change · restart run",
+  "ui.runChange.entryHint": "When this run is frozen, the customer chooses: keep the frozen contract / stop and restart / stop.",
+  "ui.runChange.disabledNoRun": "This project has no pinned run — no contract change is needed.",
+  "ui.runChange.disabledMultipleRuns": "Multiple pinned runs ({runs}); cannot tell which one to change. Close the extra runs first.",
+  "ui.runChange.disabledUnavailable": "This desktop bridge does not expose the run-change entry (restart the app and retry).",
+  "ui.runChange.disabledUnknown": "Cannot read run status ({detail}); refresh the project and retry.",
+  "ui.runChange.presented": "Run-change card presented: choose keep frozen / stop and restart / stop on the card.",
+  "ui.runChange.pending": "Run-change card submitted; check pending cards if it is not visible yet.",
+  "ui.runChange.answeredContinueFrozen": "Recorded: keep the frozen contract (new versions stay inactive).",
+  "ui.runChange.answeredStopAndRestart": "Recorded: old run closed and a new draft run created; re-pin before work resumes.",
+  "ui.runChange.answeredStop": "Recorded: the current run was stopped.",
+  "ui.runChange.answeredOther": "The customer answered the run-change card.",
+  "ui.runChange.declined": "The run-change card got no selection (no contract changed).",
+  "ui.runChange.failed": "Cannot start run-change: {detail}",
   "ui.judge.shellShort": "Approve",
   "ui.judge.decisionOn": "Deciding for you · automatic agent",
   "ui.judge.decisionOff": "Decide for me",
@@ -1105,6 +1131,17 @@ export const enUS = {
 
   "main.session.contextRecoveryFailed":
     "Native context restore failed; the context was rebuilt.",
+  // P1 request-level timeout/failure system rows (customer-facing plain language; errorCode stays in diagnostics/detail).
+  "main.requestStatus.timeoutFirstByte":
+    "Request timed out: no response from the model for a long time; this turn has ended and can be retried later.",
+  "main.requestStatus.timeoutIdle":
+    "Request timed out: the model response stalled; this turn has ended and can be retried later.",
+  "main.requestStatus.failed":
+    "The request failed; this turn has ended and can be retried later.",
+  "main.requestStatus.retryExhausted":
+    "Automatic retries did not succeed; this turn has ended and can be retried later.",
+  "main.networkStatus.offlineTimeout":
+    "The network was disconnected and did not recover within the wait window; this turn has ended and can be retried later.",
   "main.session.rebuiltBoundary":
     "This role's boundary was updated or the runtime configuration was saved ({changed}); the old session was invalidated and reopened against the new boundary. The context restore result is subject to the engine's actual response.",
   "main.session.rebuiltSkills":
@@ -1501,6 +1538,9 @@ export const enUS = {
   "main.interface.saveProjectNotActive": "This project is not the current imported project.",
   "main.interface.missingProjectRoot": "Missing project root path.",
   "main.interface.pinCheckFailed": "Pin evidence check failed: {detail}",
+  "main.runChange.noPinnedRun": "This project has no pinned run; run-change cannot start.",
+  "main.runChange.multiplePinnedRuns": "Multiple pinned runs ({flows}); cannot tell which one to change. Close the extra runs first.",
+  "main.runChange.requestFailed": "Cannot present the run-change card: {detail}",
   "main.interface.projectNotCurrent":
     "The project is not the current imported project; no files were written this time.",
   "main.interface.governanceModelInvalid":

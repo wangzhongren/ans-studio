@@ -27,6 +27,11 @@ export interface DesktopBridge {
   // —— Phase 3A 聊天流消费的受限通道（定义/实现属桌面窗口；这里只按名消费）——
   pickProject?: () => Promise<string | null>;
   listProject?: (projectRoot: string) => Promise<unknown>;
+  /**
+   * 2026-10-31（run-change 触发）：显式 run-change 入口——主进程呈现三模式卡并回
+   * `{ok, status, runId, flowId, mode?}` 或 `{ok:false,error}`；旧主进程缺省 ⇒ 按钮禁用并给原因。
+   */
+  requestRunChange?: (input: { projectRoot: string; flowId?: string; reason?: string }) => Promise<unknown>;
   openSession?: (input: unknown) => Promise<unknown>;
   sendSession?: (...args: unknown[]) => Promise<unknown>;
   stopSession?: (...args: unknown[]) => Promise<unknown>;
@@ -53,6 +58,10 @@ export interface DesktopBridge {
   onSessionEvent?: (callback: (payload: unknown) => void) => () => void;
   onRoleState?: (callback: (payload: unknown) => void) => () => void;
   requestRoleStates?: () => Promise<{ ok: boolean }>;
+  // —— P2（2026-10-30）：网络状态（定义/实现属桌面窗口；这里只按名消费）——
+  getNetworkState?: () => Promise<unknown>;
+  reportNetworkHint?: (online: boolean) => Promise<unknown>;
+  onNetworkState?: (callback: (payload: unknown) => void) => () => void;
   onSessionHistory?: (callback: (payload: unknown) => void) => () => void;
   onProjectChanged?: (callback: () => void) => () => void;
   onOperatorRequest?: (callback: (payload: unknown) => void) => () => void;

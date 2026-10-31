@@ -68,6 +68,27 @@ test("D 写区切换：六角色 Section 1 与能力矩阵按目标态生效", (
   );
 });
 
+test("§5A 意图入口契约：四卡含模板/命名规则，其他内置角色不携带", () => {
+  const card = (id: string): string => governanceRoleOf(id)?.cardText ?? "";
+  const common = ["docs/intents/<intentId>.md", "intentId:", "goal:", "验收标准", "不得用 flowId 代替"];
+  for (const id of ["chief", "product", "rapporteur", "nominator"]) {
+    for (const clause of common) assert.ok(card(id).includes(clause), `${id} 卡缺契约子句：${clause}`);
+  }
+  assert.match(card("chief"), /你是唯一写者/);
+  assert.match(card("chief"), /照抄下方模板/);
+  assert.match(card("product"), /必须含 YAML frontmatter/);
+  for (const key of ["intentId", "flowId", "version"]) assert.ok(card("product").includes(key), `product 卡缺 frontmatter 字段 ${key}`);
+  assert.match(card("rapporteur"), /提案 frontmatter 必须含 `intentId`/);
+  assert.match(card("rapporteur"), /原样复制/);
+  assert.match(card("rapporteur"), /roster\/architecture/);
+  assert.match(card("nominator"), /提交 appointment 前/);
+  assert.match(card("nominator"), /三者一致/);
+  for (const id of ["convener", "verifier"]) {
+    assert.equal(card(id).includes("意图入口（你是唯一写者）"), false, `${id} 卡不应携带意图入口契约`);
+    assert.equal(card(id).includes("intentId:"), false, `${id} 卡不应携带意图模板`);
+  }
+});
+
 test("D 工具面：flow/gate/账本/分诊/交接/产物汇报工具不注册", () => {
   const gate: WriteGate = (() => ({
     allowed: true,

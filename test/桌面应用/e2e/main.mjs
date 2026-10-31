@@ -212,6 +212,15 @@ function registerIpc() {
   registerHandler("session:live-views", () => desktop.listLiveSessionViews());
   // 2026-10-29：界面加载后角色状态快照重放（与 app/main.ts 同形；缺失会让渲染侧记一条未捕获拒绝）。
   registerHandler("session:role-states", () => desktop.requestRoleStates());
+  // P2（2026-10-30）：网络状态 IPC（与 app/main.ts 同形）。e2e 不接真实 net/powerMonitor——
+  // 状态由用例经 `network:state` 推送；渲染 online/offline 提示只记录（主进程重探语义由单测覆盖）。
+  let e2eNetworkState = { online: true, source: "main-net", at: Date.now(), stableForMs: 0, reason: "probe" };
+  registerHandler("network:get-state", (event) => event.sender === win.webContents ? e2eNetworkState : null);
+  registerHandler("network:renderer-state", (event, input) => {
+    if (event.sender !== win.webContents || !input || typeof input.online !== "boolean") return { ok: false };
+    e2eNetworkState = { online: input.online === true, source: "renderer", at: Date.now(), stableForMs: 0, reason: input.online === true ? "probe" : "renderer-offline" };
+    return { ok: true, state: e2eNetworkState };
+  });
   registerHandler("session:history-get", (_e, input) => desktop.getSessionHistory(input));
   registerHandler("tasks:list", (_e, input) => desktop.listTasks(input));
   registerHandler("tasks:restore", (_e, input) => desktop.restoreTasks(input));
@@ -275,14 +284,21 @@ function registerIpc() {
 }
 
 async function shot(name) {
-  try {
-    const img = await win.webContents.capturePage();
-    const p = path.join(OUTDIR, name);
-    fs.writeFileSync(p, img.toPNG());
-    return p;
-  } catch (err) {
-    return "capture-failed:" + (err && err.message);
+  // 首帧截图偶发 `UnknownVizError`（合成器首帧未就绪；P2 验收报告 F3 已登记为已知偶发）。
+  // 有界重试只补拍同一屏幕，不改变截图内容/断言；重试耗尽仍如实返回 capture-failed。
+  let lastError;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      const img = await win.webContents.capturePage();
+      const p = path.join(OUTDIR, name);
+      fs.writeFileSync(p, img.toPNG());
+      return p;
+    } catch (err) {
+      lastError = err;
+      await sleep(200);
+    }
   }
+  return "capture-failed:" + (lastError && lastError.message);
 }
 
 async function modalExists() {
@@ -543,7 +559,10 @@ async function run() {
   // 会话头按钮守卫（2026-10-16 v3 后重锚）：会话头只允许**已批准的**钮——引擎只读入口 + 图标簇
   // （#runtime-select / #tab-work / #tab-card，与桌面UI renderer.test.ts 同口径）；旧的单功能钮
   // （Pi 设置 / 停止 / 状态 pill——#btn-pi-settings/#btn-stop/#session-state）绝不回归。
-  log("CHAT_HEAD_ONLY_APPROVED_BUTTONS=" + (await wc().executeJavaScript("(() => { const ok=['runtime-select','tab-work','tab-card','tab-decisions','tab-tasks']; return [...document.querySelectorAll('.chat-head button')].every(b=>ok.includes(b.id)) && !document.querySelector('.chat-head #btn-pi-settings, .chat-head #btn-stop, .chat-head #session-state'); })()")));
+  // 2026-10-31（run-change 触发）：会话头新增**已批准**的「契约变更 · 重开 run」入口（#run-change）——
+  // 只在有 pinned run 时可用；此处项目无 pinned run ⇒ 应存在但禁用（禁用原因见 title）。
+  log("CHAT_HEAD_ONLY_APPROVED_BUTTONS=" + (await wc().executeJavaScript("(() => { const ok=['runtime-select','tab-work','tab-card','tab-decisions','tab-tasks','run-change']; return [...document.querySelectorAll('.chat-head button')].every(b=>ok.includes(b.id)) && !document.querySelector('.chat-head #btn-pi-settings, .chat-head #btn-stop, .chat-head #session-state'); })()")));
+  log("RUN_CHANGE_ENTRY_PRESENT=" + hardCheck("RUN_CHANGE_ENTRY_PRESENT", await wc().executeJavaScript("(() => { const b=document.getElementById('run-change'); return !!b && (b.textContent||'').includes('契约变更') && b.disabled === true && (b.title||'').length > 0; })()")));
   await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: false, summaries: [], queue: [], running: null })");
   await sleep(150);
   log("STOP_HIDDEN_WHEN_IDLE=" + (await wc().executeJavaScript("document.getElementById('btn-halt').hidden === true")));
@@ -1609,6 +1628,12 @@ async function run() {
       log("INPUT_REPAIR_ERROR=" + (error && error.message ? error.message : String(error)));
     }
   };
+  // P2（2026-10-30）：网络状态行——主进程 `network:state` → preload → store → 会话头人话；
+  // 离线可见（含「请求已暂停/队列等待网络」标题）、恢复后短暂「网络已恢复」；可见文本无技术 code。
+  wc().send("network:state", { online: false, source: "main-net", at: Date.now(), stableForMs: 0, reason: "interface-down" });
+  repairCheck("NETWORK_STATUS_OFFLINE_VISIBLE", await waitRepair("(() => { const n=document.getElementById('network-status'); return !!n && n.getAttribute('data-status')==='offline' && n.textContent.includes('网络已断开') && /请求计时已暂停/.test(n.title) && !/ECONN|network-offline|stack|https?:/.test(n.textContent + n.title); })()"));
+  wc().send("network:state", { online: true, source: "main-net", at: Date.now(), stableForMs: 0, reason: "probe" });
+  repairCheck("NETWORK_STATUS_RECOVERED_VISIBLE", await waitRepair("(() => { const n=document.getElementById('network-status'); return !!n && n.getAttribute('data-status')==='recovered' && n.textContent.includes('网络已恢复'); })()"));
   await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   const rowsBeforeConfirm = await wc().executeJavaScript("window.__ansRenderer.rowModelDebug('桌面窗口').count");
   const callsBeforeConfirm = repairOpenCalls;

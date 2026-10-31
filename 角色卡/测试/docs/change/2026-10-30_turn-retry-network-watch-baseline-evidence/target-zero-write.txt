@@ -1,0 +1,28 @@
+# Target-project zero-write check (S1 baseline)
+
+## Targets
+- C:/Users/51054/Downloads/test (live ANS project; read-only target)
+- C:/Users/51054/Desktop/work/jinyong-rogue-2d (read-only target; not a git repo)
+
+## Method
+- Read-only metadata snapshots before/after the baseline run: path|size|mtime for every file
+  (`find -type f -printf '%p|%s|%T@'`, no file contents opened, no writes).
+- `jinyong-rogue-2d`: before/after metadata diff = only the snapshot header line (timestamps); zero file entries changed.
+- `Downloads/test`: before/after differs in 178 lines. All differences are under the live application's own runtime
+  and work products (`.ans/sessions/**`, `.ans/state/**`, `docs/`, `src/`, `tests/`, `node_modules/.vite/**`), with
+  mtimes advancing continuously during the window (e.g. 19:48 before the baseline, 19:55 after). This is external
+  activity: a running ANS session is actively writing to that project throughout the window (session replay logs grow
+  by hundreds of KB; its agents write project source/docs). It is not caused by this baseline.
+- Attribution (path isolation, not equality):
+  - `grep -rl "Downloads/test" test/` => 0 files; the regression suite never references the target.
+  - `grep -al "Downloads/test" <all baseline logs>` => 0 matches; no baseline command targeted the path.
+  - Full suite runs in the worktree with `%TEMP%` fixtures; real-Electron E2E used
+    `ANS_E2E_PROJECT=<worktree root>` and `ANS_E2E_OUTDIR=<evidence dir>` (loopback/temp fixtures only).
+- Conclusion: this baseline caused zero writes to either target project. The observed `Downloads/test` changes are
+  external live-run activity and are recorded for transparency only.
+
+## Snapshot hashes
+- target-test-files-before.txt  sha256 35e026e3921b35536cadbbf5077473990d2eec42f151966779f9e77389235a1d (3152 lines)
+- target-test-files-after.txt   sha256 08778629c6568613814e70817f7a61591b209c85b6f102aca4859dff9737a9af
+- target-jinyong-files-before.txt sha256 0afc1162e0d1ea5585f3bada2e8c1f82bf9ad66636578a910e8eee95ed80f35c (629 lines)
+- target-jinyong-files-after.txt  sha256 2557948af89914f2311720c0fd8b75dd246d2e981e4f6f32240a82d3256479a5

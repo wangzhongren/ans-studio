@@ -95,7 +95,9 @@ function fakeClaude(script: Script): FakeClaude {
 }
 
 function options(root: string, extra: Partial<RuntimeProviderOptions> = {}): RuntimeProviderOptions {
-  return { runtime: "claude", projectRoot: root, skillRoot: root, tools: [], modelId: "fixture-model", currentTurnId: () => "g5-claude-turn", interactionGate: fakeGate(), ...extra };
+  // P3（2026-10-30）：本套件验证思考参数映射/兼容判据；关闭 ANS 同回合重试，避免“负例如实失败一次”
+  // 被重试改变（P3 重试语义由 test/claude-adapter/replay-safe-retry.test.ts 真实路径覆盖）。
+  return { runtime: "claude", projectRoot: root, skillRoot: root, tools: [], modelId: "fixture-model", currentTurnId: () => "g5-claude-turn", interactionGate: fakeGate(), requestAttemptMax: 1, ...extra };
 }
 
 function assistantFrame(content: unknown[]): Frame {

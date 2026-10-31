@@ -1,0 +1,14 @@
+date=2026-10-30T22:49:20+08:00
+os=MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+node=v24.22.1 npm=11.19.1
+electron=44.7.0
+worktree=/c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/network-monitor
+branch=feat/network-monitor
+head=d6b30ef1d390f3a1f82217b17db9f71366aabcf6
+candidate=turn-retry-network-watch P2 final candidate (F1 rework) d6b30ef1d390f3a1f82217b17db9f71366aabcf6
+base_p2_candidate=b02d1fd (P2 feature commit before F1 rework)
+baseline=aa6b87c (rebase baseline; contains P0/P1/§5A/view_image budget removal)
+git_status_after_candidate_commit:
+   M "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-30_turn-retry-network-watch-P2-evidence/electron-e2e/report.txt"
+   M "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-30_turn-retry-network-watch-P2-evidence/environment.txt"
+   M "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-30_turn-retry-network-watch-P2-evidence/phase5a-smoke/report.json"

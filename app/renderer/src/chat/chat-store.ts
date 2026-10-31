@@ -76,14 +76,17 @@ import {
   sortHistoryReports,
 } from "@/chat/report-view";
 import type {
+  ActiveRunSummary,
   ActivityItem,
   ChatRow,
   Listing,
   PaneMeta,
   RoleMeta,
+  RoleQueueMeta,
   RoleView,
   SessionEnvelope,
 } from "@/chat/types";
+import { NETWORK_RECOVERED_VISIBLE_MS, type NetworkStatusFacts } from "@/chat/status";
 import { useUiStore, type RuntimeId } from "@/stores/ui-store";
 import { useReportStore } from "@/stores/report-store";
 import { useLocaleStore, translate, type Locale } from "@/i18n";
@@ -113,6 +116,8 @@ const localMessageIds = new Set<string>();
 const ackedClientIds = new Set<string>();
 const pendingSingles: SessionEnvelope[] = [];
 let singleFlushTimer: ReturnType<typeof setTimeout> | null = null;
+/** P2：网络恢复行收起计时（8s 后清 `recoveredAt`；纯 UI 展示，不影响任何执行）。 */
+let networkRecoveredTimer: ReturnType<typeof setTimeout> | null = null;
 
 // —————— 工具组折叠状态（对齐旧 renderer.js：分组依据 = turnId + 连续行）——————
 // 组指针只在连续工具行之间保留；助手/系统/卡片/无法关联的未放行行会切断它。
@@ -332,10 +337,15 @@ interface ChatStore {
   warnings: string[];
   governanceModel: "single" | "trio" | null;
   governanceRecord: Record<string, unknown> | null;
+  /** 2026-10-31（run-change 触发）：active run 摘要（listProject 附带；驱动「契约变更 · 重开 run」）。 */
+  activeRuns: ActiveRunSummary[];
+  activeRunsError: string | null;
   sessionOpenRoleId: string | null;
   roleBusy: Dict<boolean>;
   roleMeta: Dict<RoleMeta>;
   queueByRole: Dict<Array<Record<string, unknown>>>;
+  /** 主进程 role-state 快照的「为什么没动」（队首类别/阻塞原因/当前回合 id；P0 2026-10-30）。 */
+  queueMetaByRole: Dict<RoleQueueMeta>;
   /** 主进程 role-state 快照的「正在跑的那条投递」（队列视图的「进行中」位）。 */
   runningByRole: Dict<Record<string, unknown> | null>;
   paneMeta: Dict<PaneMeta>;
@@ -346,6 +356,12 @@ interface ChatStore {
   hint: string;
   /** 当前提示的来源（旧 currentHintSource 同义）：队列空快照只清同角色/同视图的排队提示。 */
   hintSource: HintSource | null;
+  /** P2（2026-10-30）：主进程网络状态快照（网络状态行；不是第二状态源，不在换项目时清空）。 */
+  network: NetworkStatusFacts | null;
+  /** P2：应用主进程网络快照（只认布尔 `online`；非法载荷忽略，不伪造离线/恢复）。 */
+  applyNetworkState: (payload: unknown) => void;
+  /** P2：收起「网络已恢复」行（仅当仍是同一次恢复时刻）。 */
+  clearNetworkRecovered: (recoveredAt: number) => void;
   setHint: (hint: string, source?: HintSource | null) => void;
   appendLocalUser: (roleId: string, text: string, clientMessageId?: string) => void;
   loadProject: (projectRoot: string, fresh?: boolean) => Promise<Listing | null>;
@@ -711,10 +727,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   warnings: [],
   governanceModel: null,
   governanceRecord: null,
+  activeRuns: [],
+  activeRunsError: null,
   sessionOpenRoleId: null,
   roleBusy: {},
   roleMeta: {},
   queueByRole: {},
+  queueMetaByRole: {},
   runningByRole: {},
   paneMeta: {},
   paneVersions: {},
@@ -723,8 +742,37 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   queuedOperator: {},
   hint: "",
   hintSource: null,
+  network: null,
 
   setHint: (hint, source = null) => set({ hint, hintSource: source }),
+
+  // P2（2026-10-30）：主进程网络快照 → 状态行事实。离线 → 在线 时记恢复时刻并安排 8s 后收起；
+  // 只呈现，不推断、不触发任何执行（队列/请求的处置在主进程/Service）。
+  applyNetworkState: (payload) => {
+    const record = asDict(payload);
+    if (typeof record.online !== "boolean") return;
+    const online = record.online;
+    const previous = get().network;
+    const rawAt = typeof record.at === "number" && Number.isFinite(record.at) ? record.at : undefined;
+    const recoveredAt = online && previous?.online === false ? (rawAt ?? Date.now()) : null;
+    if (networkRecoveredTimer !== null) {
+      clearTimeout(networkRecoveredTimer);
+      networkRecoveredTimer = null;
+    }
+    set({ network: { online, ...(recoveredAt !== null ? { recoveredAt } : {}) } });
+    if (recoveredAt !== null) {
+      networkRecoveredTimer = setTimeout(() => {
+        networkRecoveredTimer = null;
+        useChatStore.getState().clearNetworkRecovered(recoveredAt);
+      }, NETWORK_RECOVERED_VISIBLE_MS);
+    }
+  },
+
+  clearNetworkRecovered: (recoveredAt) => {
+    const current = get().network;
+    if (!current || current.recoveredAt !== recoveredAt) return;
+    set({ network: { ...current, recoveredAt: null } });
+  },
 
   appendLocalUser: (roleId, text, clientMessageId) => {
     if (!roleId || !text.trim()) return;
@@ -782,6 +830,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       roleMeta: {},
       roleBusy: {},
       queueByRole: {},
+      queueMetaByRole: {},
     });
   },
 
@@ -825,6 +874,18 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         record.governanceRecord && typeof record.governanceRecord === "object"
           ? (record.governanceRecord as Listing["governanceRecord"])
           : undefined,
+      // 2026-10-31（run-change 触发）：旧 main 缺省 ⇒ []（按钮禁用并给原因，不伪造 pinned）。
+      activeRuns: Array.isArray(record.activeRuns)
+        ? (record.activeRuns as ActiveRunSummary[]).filter(
+            (run) =>
+              run !== null &&
+              typeof run === "object" &&
+              typeof run.runId === "string" &&
+              typeof run.flowId === "string" &&
+              (run.state === "pinned" || run.state === "draft"),
+          )
+        : [],
+      activeRunsError: typeof record.activeRunsError === "string" ? record.activeRunsError : undefined,
     };
     // 旧 loadProject 语义：显式导入/切换项目一律 fresh（停止旧会话、清空旧状态），
     // 即使路径与当前项目相同；只有 refreshProject 显式传 false 才保留当前会话/选择。
@@ -877,6 +938,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       warnings: Array.isArray(listing.warnings) ? listing.warnings : [],
       governanceModel: listing.governanceModel || null,
       governanceRecord: listing.governanceRecord || null,
+      activeRuns: Array.isArray(listing.activeRuns) ? listing.activeRuns : [],
+      activeRunsError: typeof listing.activeRunsError === "string" ? listing.activeRunsError : null,
       sessionOpenRoleId: fresh ? null : current.sessionOpenRoleId,
       paneMeta,
       paneVersions: bumpVersions(fresh ? {} : current.paneVersions, selected ? [selected] : []),
@@ -1725,6 +1788,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           ? (record.running as Record<string, unknown>)
           : null,
     };
+    // P0 队列可见性（2026-10-30）：主进程快照的「为什么没动」事实原样入表（不推测）。
+    const rawBlocked = asString(record.blockedReason);
+    const blockedReason: RoleQueueMeta["blockedReason"] =
+      rawBlocked === "target-busy" || rawBlocked === "origin-missing" || rawBlocked === "session-closed" || rawBlocked === "network"
+        ? rawBlocked
+        : null;
+    const rawHeadKind = asString(record.headKind);
+    const rawActiveTurnId = asString(record.activeTurnId);
+    const queueMeta: RoleQueueMeta = {
+      headKind: rawHeadKind !== "" ? rawHeadKind : null,
+      blockedReason,
+      activeTurnId: rawActiveTurnId !== "" ? rawActiveTurnId : null,
+    };
+    const queueMetaByRole = { ...get().queueMetaByRole, [roleId]: queueMeta };
     const roleMeta = { ...get().roleMeta };
     const meta = ensureMeta(roleMeta, roleId);
     meta.live = true;
@@ -1765,6 +1842,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({
       roleBusy,
       queueByRole,
+      queueMetaByRole,
       runningByRole,
       roleMeta,
       paneMeta,

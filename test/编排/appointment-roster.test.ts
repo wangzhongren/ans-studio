@@ -199,6 +199,67 @@ test("人事发招人卡：选项=最新名单角色 ⇒ 应用生成推荐集�
   }
 });
 
+test("§5A 任命 judgeContext 意图来源：request/proposal/product，冲突 fail-closed", async () => {
+  const project = trioProject();
+  try {
+    const productIntent = ["---", "intentId: intent-focus-v1", "flowId: focus", "version: 1", "goal: 示例目标", "scope: 示例范围", "acceptance: 示例验收", "---", "# 产品意图", ""].join("\n");
+    const proposal = (intentIdLine: string): string => [
+      "---",
+      "schema: project-proposal/v2",
+      "flowId: focus",
+      "version: 1",
+      ...(intentIdLine === "" ? [] : [intentIdLine]),
+      "intent: docs/product/focus-intent-v1.md",
+      "---",
+      "# 提案",
+      "",
+    ].join("\n");
+    fs.writeFileSync(path.join(project.projectRoot, "docs", "product", "focus-intent-v1.md"), productIntent, "utf8");
+    fs.writeFileSync(path.join(project.projectRoot, "docs", "proposals", "focus-proposal-v1.md"), proposal("intentId: intent-focus-v1"), "utf8");
+    fs.mkdirSync(path.join(project.projectRoot, "docs", "intents"), { recursive: true });
+    fs.writeFileSync(
+      path.join(project.projectRoot, "docs", "intents", "intent-focus-v1.md"),
+      ["---", "intentId: intent-focus-v1", "flowId: focus", "goal: 示例目标", "scope: 示例范围", "acceptance: 示例验收", "---", "# 意图", ""].join("\n"),
+      "utf8",
+    );
+    const captured: CustomerInputMetadata[] = [];
+    const raw: CustomerInputFn = (_request, metadata) => {
+      if (metadata !== undefined) captured.push(metadata);
+      return { outcome: "answered", value: { selected: ["implementer", "qa"] } } satisfies CustomerInputOutcome;
+    };
+    const stub = stubAdapter();
+    const handle = await openRoleSession(
+      { roleId: "nominator", project, customerInput: raw },
+      { createAdapter: stub.createAdapter },
+    );
+    const input = stub.caps()!.customerInput!;
+    await input(appointmentCard(["qa", "implementer"]), { flowId: "focus" });
+    assert.equal(captured[0]?.judgeContext?.intentId, "intent-focus-v1", "提案 frontmatter 的 intentId 进入 judgeContext");
+    assert.equal(captured[0]?.judgeContext?.intentIdSource, "proposal", "来源标为 proposal");
+    await input(appointmentCard(["qa", "implementer"]), { flowId: "focus", intentId: "intent-focus-v1" });
+    assert.equal(captured[1]?.judgeContext?.intentId, "intent-focus-v1", "请求显式与其它来源一致时可用");
+    assert.equal(captured[1]?.judgeContext?.intentIdSource, "request", "来源标为 request");
+    // 产品-only：提案不含 intentId ⇒ source=product。
+    fs.writeFileSync(path.join(project.projectRoot, "docs", "proposals", "focus-proposal-v1.md"), proposal(""), "utf8");
+    await input(appointmentCard(["qa", "implementer"]), { flowId: "focus" });
+    assert.equal(captured[2]?.judgeContext?.intentId, "intent-focus-v1", "产品意图 frontmatter 回退");
+    assert.equal(captured[2]?.judgeContext?.intentIdSource, "product", "产品-only 标 product");
+    // 产品/提案冲突 ⇒ fail-closed，不得任选一个冒充。
+    fs.writeFileSync(path.join(project.projectRoot, "docs", "proposals", "focus-proposal-v1.md"), proposal("intentId: intent-other-v1"), "utf8");
+    await input(appointmentCard(["qa", "implementer"]), { flowId: "focus" });
+    assert.equal(captured[3]?.judgeContext?.intentId, undefined, "冲突时不携带 intentId");
+    assert.equal(captured[3]?.judgeContext?.intentResolutionError?.code, "intent-ambiguous");
+    assert.match(captured[3]?.judgeContext?.intentResolutionError?.detail ?? "", /提案 frontmatter.*产品意图/);
+    // 请求显式与其它来源冲突 ⇒ fail-closed。
+    await input(appointmentCard(["qa", "implementer"]), { flowId: "focus", intentId: "intent-focus-v1" });
+    assert.equal(captured[4]?.judgeContext?.intentResolutionError?.code, "intent-ambiguous");
+    assert.match(captured[4]?.judgeContext?.intentResolutionError?.detail ?? "", /请求显式.*不一致/);
+    await handle.dispose();
+  } finally {
+    fs.rmSync(project.projectRoot, { recursive: true, force: true });
+  }
+});
+
 test("招人卡与名单不一致（缺项）⇒ declined + notPresented，不触达客户通道", async () => {
   const project = trioProject();
   try {

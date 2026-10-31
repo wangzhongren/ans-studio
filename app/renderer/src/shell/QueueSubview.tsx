@@ -27,6 +27,7 @@ export function QueueSubview({
 }) {
   const roles = useChatStore((s) => s.roles);
   const queueByRole = useChatStore((s) => s.queueByRole);
+  const queueMetaByRole = useChatStore((s) => s.queueMetaByRole);
   const runningByRole = useChatStore((s) => s.runningByRole);
   const [showAll, setShowAll] = useState(false);
   const backFromQueue = useDrawerStore((s) => s.backFromQueue);
@@ -98,7 +99,12 @@ export function QueueSubview({
         {groups.running.length > 0 ? (
           <section className="work-section" aria-label={t("ui.work.currentWork")}>
             <h3 className="work-heading">{t("ui.work.currentWork")}</h3>
-            <QueuePanel roleId={roleId} items={groups.running} emptyText={t("ui.work.emptyQueue")} />
+            <QueuePanel
+              roleId={roleId}
+              items={groups.running}
+              emptyText={t("ui.work.emptyQueue")}
+              meta={queueMetaByRole[roleId] || null}
+            />
           </section>
         ) : null}
         {groups.queued.length > 0 ? (
@@ -109,7 +115,12 @@ export function QueueSubview({
             <h3 className="work-heading">
               {t("ui.queueSubview.queued", { count: groups.queued.length })}
             </h3>
-            <QueuePanel roleId={roleId} items={queued} emptyText={t("ui.work.emptyQueue")} />
+            <QueuePanel
+              roleId={roleId}
+              items={queued}
+              emptyText={t("ui.work.emptyQueue")}
+              meta={queueMetaByRole[roleId] || null}
+            />
             {groups.queued.length > SUBVIEW_LIMIT ? (
               <button
                 type="button"

@@ -137,3 +137,66 @@ export function statusBadge(
   }
   return { label: pendingLabel, className: badge.className, title: pendingTitle };
 }
+
+// —————————————— P2（2026-10-30）：网络状态行 ——————————————
+//
+// 主进程 `net.isOnline` 权威 → 会话头状态行（`aria-live="polite"`）。只呈现人话：
+// · 离线：`网络已断开`（title 说明请求计时已暂停、队列等待网络、恢复后自动继续）；
+// · 恢复：从离线恢复后 8s 内显示 `网络已恢复 · 正在继续`（随后收起，不长期占位）；
+// · 在线常态：隐藏（不刷屏）。**不显示** ECONNRESET/SDK 堆栈/URL/凭据——技术细节只在诊断。
+
+/** 「网络已恢复」状态行的展示时长（毫秒）。 */
+export const NETWORK_RECOVERED_VISIBLE_MS = 8_000;
+
+/** 渲染层持有的网络事实（主进程快照 + 本地恢复时刻；不是第二状态源）。 */
+export interface NetworkStatusFacts {
+  online?: boolean;
+  /** 离线 → 在线 的恢复时刻（ms epoch）；仅用于短暂展示恢复行。 */
+  recoveredAt?: number | null;
+}
+
+export type NetworkStatusKind = "hidden" | "offline" | "recovered";
+
+export interface NetworkStatusView {
+  visible: boolean;
+  status: NetworkStatusKind;
+  label: string;
+  title: string;
+  className: string;
+  ariaLive: "polite";
+}
+
+/**
+ * 网络状态行视图（纯函数，locale/now 可注入）。`facts` 缺省（尚未收到快照）⇒ 隐藏——
+ * 不把「未知」误报为离线/在线。
+ */
+export function networkStatusView(
+  facts: NetworkStatusFacts | null | undefined,
+  locale: Locale = DEFAULT_LOCALE,
+  nowMs: number = Date.now(),
+): NetworkStatusView {
+  const offline = facts?.online === false;
+  if (offline) {
+    return {
+      visible: true,
+      status: "offline",
+      label: translate(locale, "ui.network.label.offline"),
+      title: translate(locale, "ui.network.title.offline"),
+      className: "network-status-line is-offline",
+      ariaLive: "polite",
+    };
+  }
+  const recoveredAt = typeof facts?.recoveredAt === "number" ? facts.recoveredAt : null;
+  const recoveredAge = recoveredAt === null ? Number.POSITIVE_INFINITY : nowMs - recoveredAt;
+  if (facts?.online === true && recoveredAge >= 0 && recoveredAge < NETWORK_RECOVERED_VISIBLE_MS) {
+    return {
+      visible: true,
+      status: "recovered",
+      label: translate(locale, "ui.network.label.recovered"),
+      title: translate(locale, "ui.network.title.recovered"),
+      className: "network-status-line is-recovered",
+      ariaLive: "polite",
+    };
+  }
+  return { visible: false, status: "hidden", label: "", title: "", className: "network-status-line", ariaLive: "polite" };
+}

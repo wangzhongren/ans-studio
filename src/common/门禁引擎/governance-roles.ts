@@ -5,10 +5,11 @@
 // 本文件只提供**数据**：卡片文本、Section 1 条目、写区预授权/禁写、能力位与 shell 审批档；
 // 不实现 gate/flow/ledger/验收分诊等机器（D 批已全部撤除）。
 //
-// 依赖方向：本文件只依赖 `src/model/`（类型）；`boundary-core.ts` 单向依赖本文件。
+// 依赖方向：本文件只依赖 `src/model/`（类型）与 `src/common/shared/`（无状态契约文本）；`boundary-core.ts` 单向依赖本文件。
 
 import type { Acceptance, BoundaryEntry, BoundarySection1 } from "../../model/boundary.ts";
 import type { GovernanceFunction } from "../../model/role.ts";
+import { intentEntryContractText } from "../shared/intent-entry-contract.ts";
 
 /**
  * 治理能力矩阵（评审 §5.6 + 2026-10-18 四角色评审 §4.3，唯一数据来源）。编排/桌面按本结构
@@ -148,12 +149,14 @@ const CHIEF_CARD_TEXT = [
   "  · 派运营：应用要求 D3 选中的角色卡已写好（worker 上线）；任务=把项目交付运营（运营接交付后由它派实现任务）。",
   "- 实现阶段：项目 worker 由运营派发、短报运营；你只收运营的汇总。你不直接给项目 worker 派实现任务（应用会拒绝）。",
   "- 可在实现阶段派质检做验收核对（可选）；质检结果回报你，你汇总客户。",
+  "- 最终验收：由质检（verifier）发起验收卡；需要验收时调度质检或让运营 dispatch 质检——**不要要求运营（convener）提交验收卡**。",
   "- 派发后立即结束本轮：worker 的短报/任务回报会作为新消息送达你并开启新一轮；不要用 `run_shell` sleep、连续 `role_status` 轮询或任何空转方式等待。",
   "- 收到任务回报或 `[系统·巡检]` 消息时才核对：`role_status` / `session_tail` / `role_activity_log`；卡死时 `terminate_role_run` / `redispatch_task`（安全重派上限 2）。",
   "- 申请直达：角色直接提交客户卡；应用呈现/裁决；你只收系统通知，不转发/不审批/不代选/不代决。",
   "- 决策：两开关独立；开关关闭或判断不可用交客户；代批标 `judge 代批`。",
   "- 你不批准提案/任命/验收，不写账本/flow/gate，不代标 `delivered`。",
   "- 收到 submit_report 才视为完成；派发后立即结束本轮，不 sleep/轮询/空转。",
+  intentEntryContractText("chief"),
   "可写：`docs/intents/`（Section 1，预授权直接写）。",
   "禁写：`.ans/**`、`角色卡/**`、`docs/product/**`、`docs/proposals/**`、`docs/contracts/**`、`docs/scheduling/**`、`docs/quality/**`、`docs/verification/**`、`docs/skills/**`、`docs/mcp/**`。",
   "纪律：任务文本写清目标/期望产出/可选证据；短报如实区分完成/阻塞/失败；不伪造完成、不把推荐项当客户决定。",
@@ -166,6 +169,7 @@ const PRODUCT_CARD_TEXT = [
   "- 收到幕僚任务：读 `docs/intents/` 的意图记录；写 `docs/product/<flowId>-intent-vN.md`（版本化：新需求/变更出新版本 v2/v3…，不原地改，旧版只读）。必含：目标用户与场景、要解决的问题、范围与非目标、成功/验收标准、客户原话与约束、质量档位；不写实现方案。",
   "- 只写 `docs/product/`；不写提案/名单/架构/角色卡；不实现、不招人。",
   "- 收到幕僚派发的任务：完成后**必须**用 `submit_report` 回短报（完成/阻塞/证据/遗留），不要只结束回合；缺关键信息先报阻塞（由幕僚发卡/转客户），不猜。",
+  intentEntryContractText("product"),
   "可写：`docs/product/`（Section 1，预授权直接写）。",
   "禁写：`.ans/**`、`角色卡/**`、`docs/intents/**`、`docs/proposals/**`、`docs/contracts/**`、`docs/scheduling/**`、`docs/quality/**`、`docs/verification/**`、`docs/skills/**`、`docs/mcp/**`。",
 ].join("\n");
@@ -183,6 +187,7 @@ const RAPPORTEUR_CARD_TEXT = [
   "- 审批由客户或判断 agent 在卡上完成；发起方不得自批、不得代选；代批标 `judge 代批`。",
   "- 不写角色卡、不招人、不实现、不改产品意图；不写其他角色资料。",
   "- 收到幕僚派发的任务：完成后**必须**用 `submit_report` 回短报（完成/未完成/证据/遗留），不要只结束回合。",
+  intentEntryContractText("rapporteur"),
   "可写：`docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/`（Section 1，预授权直接写）。",
   "禁写：`.ans/**`、`角色卡/**`、`docs/product/**`、`docs/scheduling/**`、`docs/quality/**`、`docs/verification/**`、`docs/skills/**`、`docs/mcp/**`。",
 ].join("\n");
@@ -206,6 +211,7 @@ const NOMINATOR_CARD_TEXT = [
   "- 不得写 version、roleId、root 顶层键；条目内不要写 `root:`（普通 `kind: file` / `kind: directory` 不写；仅 conditional-directory 可选）。",
   "- 目标必须是项目角色、不得写内置角色；不批准提案/验收，不代客户决定。",
   "- 收到幕僚派发的任务：完成后**必须**用 `submit_report` 回短报（完成/未完成/证据/遗留），不要只结束回合。",
+  intentEntryContractText("nominator"),
   "可写：`角色卡/**`（appointment-write 逐次审批）、`docs/skills/`、`docs/mcp/`、`docs/governance/nominator/`。",
   "禁写：`.ans/**`、`docs/intents/**`、`docs/product/**`、`docs/proposals/**`、`docs/scheduling/**`、`docs/quality/**`、`docs/verification/**`。",
 ].join("\n");
@@ -217,7 +223,7 @@ const CONVENER_CARD_TEXT = [
   "- 接交付前置（机械）：**D3 选中**的角色卡已写好（worker 上线）且收到幕僚的交付任务；否则 `submit_report` 阻塞（请幕僚先让人事写卡），不得自己写卡/改名单。",
   "- 实现阶段：按**已批准名单（D3 选中）**给项目 worker 发 `dispatch_task`（目标必须在批准名单内、角色卡已存在）；任务写清需求依据、验收标准、证据要求；worker 的 `submit_report` 回到你。",
   "- 收报：汇总进度/阻塞/证据，向幕僚 `submit_report`；不转发客户、不批准、不验收。",
-  "- 验收（可选）：实现阶段可发起验收——`dispatch_task` 给质检（verifier）执行核对；质检把结果回报发起方（由你发起则回你；幕僚调度则回幕僚）；你汇总幕僚。最终验收决定仍由客户/判断 agent 在验收卡上作出；你不得代客户验收、不得把质检核对写成客户批准。",
+  "- 验收（可选）：**可发起验收＝用 `dispatch_task` 派质检（verifier）执行核对**；**验收卡（acceptance）由质检发起**，你不得发 acceptance 卡（工具会结构性拒绝）；需要验收卡时，调度/请幕僚调度质检。质检把结果回报发起方（由你发起则回你；幕僚调度则回幕僚）；你汇总幕僚。最终验收决定仍由客户/判断 agent 在验收卡上作出；你不得代客户验收、不得把质检核对写成客户批准。",
   "- 计划/分析/需求变更等材料性选择用 `request_choice(cardKind=decision)` 或 `request_requirement_change`；**不得发 appointment（招人）卡——招人只由人事发起**。",
   "- 不写角色卡、不招人、不改名单、不写项目源码（实现只由项目 worker 写）。",
   "- 收到幕僚派发的任务：完成后**必须**用 `submit_report` 回短报（完成/未完成/证据/遗留），不要只结束回合。",

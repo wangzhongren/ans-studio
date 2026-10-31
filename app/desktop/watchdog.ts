@@ -324,8 +324,10 @@ export interface WatchdogServiceDeps {
   projects: () => string[];
   /** 同源快照；项目未知/无内容 ⇒ undefined（本项目本 tick 跳过）。 */
   snapshot: (projectRoot: string) => WatchdogProjectSnapshot | undefined;
-  /** 投递端：把系统消息交给**既有投递机**（SessionManager.watchdogDeliver——kind:"system" → su）。 */
-  deliver: (projectRoot: string, message: WatchdogOutboundMessage & { dedupKey: string }) => void;
+  /** 投递端：把系统消息交给**既有投递机**（SessionManager.watchdogDeliver——kind:"system" → su）。
+   *  `uiOnlyWhenBusy`：**看护服务发出**的消息为 true——目标忙时走 UI-only 旁路（P0 2026-10-30），
+   *  不进入忙目标模型队列；直接调用（如 MCP 安装系统行）不带此标记，保持既有排队语义。 */
+  deliver: (projectRoot: string, message: WatchdogOutboundMessage & { dedupKey: string; uiOnlyWhenBusy?: boolean }) => void;
   /**
    * **自动中止回调**（2026-10-20 真机：Convener 卡 1h、队列 24）：回合超过中止时限且该角色自动开关开启时，
    * 恰对**同一 role+turnId** 调用一次（去重由看护自持）。缺省 ⇒ 不中止（旧行为零变化）。
@@ -459,7 +461,8 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
   /** 投递一条系统消息（统一入口；失败（本层回调抛错）如实记诊断并视为未投出——绝不向上抛）。 */
   const outbound = (projectRoot: string, message: WatchdogOutboundMessage, label: string): boolean => {
     try {
-      deps.deliver(projectRoot, { ...message, dedupKey: nextSystemKey(projectRoot, label) });
+      // 看护服务发出的消息：目标忙时 UI-only 旁路（P0 2026-10-30）——看护不再被自己的队列楔死。
+      deps.deliver(projectRoot, { ...message, dedupKey: nextSystemKey(projectRoot, label), uiOnlyWhenBusy: true });
       return true;
     } catch (err) {
       loggerFor(projectRoot).error("watchdog.deliver.failed", err);

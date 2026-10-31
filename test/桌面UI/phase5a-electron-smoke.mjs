@@ -64,6 +64,8 @@ const listing = () => ({
   warnings: [],
   governanceModel: "trio",
   governanceRecord: { state: "present" },
+  // 2026-10-31（run-change 触发）：显式入口「契约变更 · 重开 run」只认 pinned run 事实。
+  activeRuns: [{ runId: "run-20261031-phase5a-abcdef12", flowId: "phase5a", state: "pinned", pinnedAt: "2026-10-31T00:00:00.000Z", rosterVersion: 1 }],
   roles: [
     govRole("chief", "chief"),
     govRole("product", "product"),
@@ -98,6 +100,12 @@ ipcMain.handle("session:stop", () => ({ ok: true }));
 ipcMain.handle("session:abort", (_e, input) => ({ ok: true, supported: true, ...input }));
 ipcMain.handle("session:send", () => ({ ok: true }));
 ipcMain.handle("session:withdraw", () => ({ ok: true }));
+// 2026-10-31（run-change 触发）：显式入口通道桩——记录入参并回「已呈现」。
+const runChangeRequests = [];
+ipcMain.handle("run:change-request", (_e, input) => {
+  runChangeRequests.push(input);
+  return { ok: true, status: "presented", runId: "run-20261031-phase5a-abcdef12", flowId: "phase5a" };
+});
 ipcMain.handle("session:operator-response", (_e, input) => {
   operatorResponses.push(input);
   if (input?.id === "e-expire") return { ok: false, expired: true, error: "E2E 过期探针" };
@@ -158,6 +166,12 @@ app.whenReady().then(async () => {
     await sleep(240);
     check("六角色左树/主入口 chief", await js(`(() => { const s=window.__ansRenderer.state; return s.roles.length===8 && s.primaryRoleId==='chief' && !!document.querySelector('#role-tree .tree-item.primary[data-role-id="chief"]') && !document.querySelector('#role-tree .ti-badge'); })()`));
     check("决策/任务入口在会话头", await js(`!!document.getElementById('tab-decisions') && !!document.getElementById('tab-tasks')`));
+    // 2026-10-31（run-change 触发）：显式入口按钮存在、有 pinned run 时可用、点击走 IPC 通道并如实回显。
+    check("契约变更入口：有 pinned run 时可用", await js(`(() => { const b=document.getElementById('run-change'); return !!b && !b.disabled && (b.textContent||'').includes('契约变更'); })()`));
+    await js(`document.getElementById('run-change').click()`);
+    await sleep(260);
+    check("契约变更入口：点击走 run:change-request 并回显", runChangeRequests.length === 1 && runChangeRequests[0]?.projectRoot === ROOT);
+    check("契约变更入口：结果行如实显示已呈现", await js(`(() => { const n=document.getElementById('run-change-notice'); return !!n && !n.hidden && n.textContent.includes('run-change'); })()`));
     // 2026-10-29 客户缺陷：Composer 两开关曾把输入区撑出页面。结构 + 1360 实测（不溢出）。
     check("Composer 两行结构：提示行/控件行", await js(`(() => { const line=document.querySelector('.composer-trust-line'), ctr=document.querySelector('.composer-controls'); if(!line||!ctr) return false; return line.textContent.trim().length>0 && !!line.querySelector('#judge-switch-hint') && !!ctr.querySelector('#btn-attach-image') && !!ctr.querySelector('#auto-approve-toggle') && !!ctr.querySelector('#judge-decision-toggle') && !!ctr.querySelector('#composer-scope'); })()`));
     check("Composer 控件同一行（1360）", await js(`(() => { const ctr=document.querySelector('.composer-controls'); if(!ctr) return false; const r=ctr.getBoundingClientRect(); const boxes=[...ctr.children].filter(el=>el.offsetParent!==null).map(el=>el.getBoundingClientRect()); return boxes.length>=4 && Math.max(...boxes.map(b=>b.bottom))-Math.min(...boxes.map(b=>b.top)) <= 36 && r.bottom-r.top <= 36; })()`));

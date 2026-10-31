@@ -1,0 +1,11 @@
+date=2026-10-31T00:10:50+0800
+os=MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 x86_64 Msys
+node=v24.22.1 npm=11.19.1
+electron=44.7.0
+worktree=/c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/replay-safe-retry
+branch=feat/replay-safe-retry
+head=7bbcc74ffc12764f4ab4e0fe9938ff2a22ada45f
+candidate=turn-retry-network-watch P3 final rework candidate 7bbcc74ffc12764f4ab4e0fe9938ff2a22ada45f (tree 7d86f0b384bf9690b78ae2f5dccfb67fd1c1972c; cumulative vs baseline 20 files +1450/-62; includes P3 v1 2af8b50)
+baseline=143a8cf (main; contains P0/P1/P2, view_image budget removal and Delta-TR-2 desktop-window test boundary)
+git_status_after_candidate_commit: only the governance change package and P3 evidence summaries/reports are modified (committed next as the rework governance record); no product/test file is dirty.
+tests=P3 rework 3169 tests / 3142 pass / 9 fail (pre-existing Windows symlink EPERM) / 18 skip; files 375

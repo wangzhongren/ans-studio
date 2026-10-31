@@ -1,0 +1,15 @@
+# P1 candidate file hashes (commit 105c187)
+# path | git hash-object | sha256 | bytes
+app/desktop/session.ts | 313a037b227332db97ab9d9b643cc0e6dc2d9dfd | e14ef9f7448f8c3970c11a514310f7c04a1971b1cb618310b9fa69076af806b1 | 466487
+src/common/runtime-core/request-timeout.ts | 516ddcdd7a0192068f1f2dc3d0a00745b0fa61e2 | 8cb07f01178c6715bb95d58c910dd63a76b3041c38e04e896b68fd2f9f8e29cd | 9868
+src/common/shared/i18n/messages/en-US.ts | df4183ba2522f23df5e70b4f2d3a585de16e5659 | b70c2f68d3384de105c948ce0358c5faac3f9365974e7eec5707c3d776a96702 | 154186
+src/common/shared/i18n/messages/zh-CN.ts | 2457d0339828ac4a94e131a7623256f926697369 | 19a026ed4c451d1824c407a2f2a95bb9eb1d69a17a19c7d0154c9e4349a90778 | 143793
+src/model/runtime.ts | 45a78b9fd030992cc53e05a780e2ac567b915036 | 7f0757a87650f8d13ca7da22fef821cc7a3c5746727724187f6a615c46f10e02 | 120192
+src/provider/claude/session.ts | a631e347a2b9cadb376e05afc068befa66e707fa | dde81de952d996a9f1f815ad68361e8a0a1e87451edb874ae74e4f966f6245d0 | 60407
+src/service/runtime/session.ts | db165709d95134253e2678e208f01b1dfd9da64e | 727c2352284a2de13173b8d795ecbd20bd9c23eea889f4c7dd1bf627e9a0a455 | 61819
+test/claude-adapter/request-timeout.test.ts | c525e2c20bf6869e57ca03cf69952da6981340d2 | c6cc5da1b3be371b94c1c0641501b56abe0de425aac4940fde27fe2b670cbd52 | 20389
+test/runtime-core/request-timeout.test.ts | eba61b03611b1a975157bf8a9595547fc3c77f1f | a26c5822641e0349904fb4bf7126c8edc3265e9211deaccfda1d4db496c0e7f8 | 7966
+test/桌面UI/request-status.test.ts | e8bde4e6e067780a858db621a4b694bd233f0274 | e107c7045cff97bf9f1433d1ace2633e571596d17b94ca7de5a8e9a5ef4c61e8 | 6481
+test/桌面应用/request-timeout-wiring.test.ts | b6bf0df0f04685b704d07668f3b134374cac51c3 | 09bd15cd4226fc763cabb9395cd57cb412fba718c828ab80e324b0b8cd35ba00 | 14357
+test/测试/request-timeout-e2e.test.ts | 37a6ef777c860b9c26ab3beaaae6a99f2a3a596f | 1cdfb809cc637406d94a3156e6160465add39abeeb09f1d1d5a50501b6fae391 | 9535
+test/项目管理/shared/i18n.test.ts | 2c7f4a9e61598dcc2eb8138072acf9b64bee29a8 | 02b46c9ceee55700090dac24dd97584c2754add6056c7d0844ea3fd5d7ed2422 | 4225

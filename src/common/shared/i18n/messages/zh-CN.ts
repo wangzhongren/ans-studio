@@ -191,6 +191,18 @@ export const zhCN = {
   "ui.queue.withdrawTitle": "撤回该条排队消息（仅未投递者可撤）",
   "ui.queue.withdrawing": "撤回中…",
   "ui.queue.withdraw": "撤回",
+  // P0 队列可见性（2026-10-30）：为什么没动（age/阻塞原因/队首类别）
+  "ui.queue.ageMinutes": "已等待 {minutes} 分钟",
+  "ui.queue.headKind": "队首：{kind}",
+  "ui.queue.blocked.targetBusy": "目标角色正在执行上一轮，队列等待中",
+  "ui.queue.blocked.originMissing": "检测到收尾异常（忙态没有对应回合），可点「停止本轮」复位后队列继续",
+  "ui.queue.blocked.sessionClosed": "目标会话尚未开启，等待自动开启后投递",
+  "ui.queue.blocked.network": "网络不可用，队列已安全暂停",
+  // P2（2026-10-30）：网络状态行（会话头；主进程 net.isOnline 权威；人话，无技术 code）。
+  "ui.network.label.offline": "网络已断开",
+  "ui.network.label.recovered": "网络已恢复 · 正在继续",
+  "ui.network.title.offline": "网络已断开：进行中的请求计时已暂停，队列等待网络；恢复后自动继续。",
+  "ui.network.title.recovered": "网络已恢复：暂停的请求与队列已继续。",
 
   // ---- 队列子视图（shell/QueueSubview.tsx）----
   "ui.queueSubview.backRole": "返回角色资料",
@@ -898,6 +910,20 @@ export const zhCN = {
   "ui.run.change.option.continueFrozen": "继续冻结旧契约（推荐）",
   "ui.run.change.option.stopAndRestart": "停止当前 run，按新文档重开并 pin",
   "ui.run.change.option.stop": "停止当前 run，不重开",
+  "ui.runChange.entry": "契约变更 · 重开 run",
+  "ui.runChange.entryHint": "当前 run 已冻结时，由客户选择：继续冻结旧契约 / 停止并重开 run / 停止。",
+  "ui.runChange.disabledNoRun": "当前项目没有已冻结（pinned）的 run——无需契约变更。",
+  "ui.runChange.disabledMultipleRuns": "存在多个 pinned run（{runs}），无法确定变更对象；请先收口多余的 run。",
+  "ui.runChange.disabledUnavailable": "当前桌面桥未提供 run-change 入口（重启应用后重试）。",
+  "ui.runChange.disabledUnknown": "无法读取 run 状态（{detail}）；请刷新项目后重试。",
+  "ui.runChange.presented": "已呈现 run-change 卡：请在卡片中选择继续冻结 / 停止并重开 / 停止。",
+  "ui.runChange.pending": "run-change 卡已提交呈现；若未出现，请查看待处理卡。",
+  "ui.runChange.answeredContinueFrozen": "已记录：继续冻结旧契约（新版本不激活）。",
+  "ui.runChange.answeredStopAndRestart": "已记录：旧 run 收口，新 run 草稿已建立；重新 pin 后再开工。",
+  "ui.runChange.answeredStop": "已记录：当前 run 已停止。",
+  "ui.runChange.answeredOther": "客户已作答 run-change 卡。",
+  "ui.runChange.declined": "run-change 卡未获选择（未改任何契约）。",
+  "ui.runChange.failed": "无法发起 run-change：{detail}",
   "ui.judge.shellShort": "审批",
   "ui.judge.decisionOn": "替我决策中 · 自动代理",
   "ui.judge.decisionOff": "替我决策",
@@ -1004,6 +1030,14 @@ export const zhCN = {
 
   // ---- 会话主流程（session.ts）----
   "main.session.contextRecoveryFailed": "原生上下文恢复失败，已重建上下文。",
+  // P1 请求级超时/失败的系统行（客户可见人话；技术 errorCode 只在诊断/detail，不进文案）。
+  "main.requestStatus.timeoutFirstByte": "请求超时：长时间没有收到模型响应；本轮已结束，可稍后重发。",
+  "main.requestStatus.timeoutIdle": "请求超时：模型响应长时间中断；本轮已结束，可稍后重发。",
+  "main.requestStatus.failed": "本轮请求失败，已结束；请检查后重发。",
+  // P3 同回合 replay-safe 重试耗尽的系统行（客户可见人话；`MODEL_REQUEST_RETRY_EXHAUSTED` 只在诊断/detail）。
+  "main.requestStatus.retryExhausted": "已自动重试仍未成功；本轮已结束，可稍后重发。",
+  // P2 网络离线超窗的系统行（客户可见人话；`network-offline-timeout` 只在诊断/detail）。
+  "main.networkStatus.offlineTimeout": "网络已断开，等待恢复超时；本轮已结束，可稍后重发。",
   "main.session.rebuiltBoundary":
     "该角色边界已更新或运行时配置已保存（{changed}），已作废旧会话，按新边界重开；上下文恢复结果以引擎实际返回为准。",
   "main.session.rebuiltSkills":
@@ -1336,6 +1370,9 @@ export const zhCN = {
   "main.interface.saveProjectNotActive": "该项目不是当前导入项目。",
   "main.interface.missingProjectRoot": "缺少项目根路径。",
   "main.interface.pinCheckFailed": "pin 证据检查失败：{detail}",
+  "main.runChange.noPinnedRun": "当前项目没有已冻结（pinned）的 run，不能发起 run-change。",
+  "main.runChange.multiplePinnedRuns": "存在多个 pinned run（{flows}），无法确定变更对象；请先收口多余的 run。",
+  "main.runChange.requestFailed": "无法呈现 run-change 卡：{detail}",
   "main.interface.projectNotCurrent": "项目不是当前导入项目；本次未写入任何文件。",
   "main.interface.governanceModelInvalid":
     "governanceModel 必须是 single 或 trio；本次未写入任何文件。",

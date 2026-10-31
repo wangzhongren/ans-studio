@@ -52,6 +52,13 @@ contextBridge.exposeInMainWorld("desktop", {
   /** 点角色即开：直接建立与该角色的会话（导入项目即授权，无确认框）。 */
   openSession: (input) => ipcRenderer.invoke("session:open", input),
 
+  /**
+   * 2026-10-31（run-change 触发）：显式入口「契约变更 · 重开 run」——入参
+   * `{projectRoot, flowId?, reason?}`；主进程经统筹/提案/幕僚会话的客户卡通道呈现 run-change
+   * 三模式卡（继续冻结 / 停止并重开 / 停止）。不代选模式；无 pinned run/无可呈现会话 ⇒ 如实失败。
+   */
+  requestRunChange: (input) => ipcRenderer.invoke("run:change-request", input),
+
   /** 发送一轮消息；开启后可反复调用（多轮聊天，不再确认）。
    *  **P0-1（2026-10-13 客户批准）**：`images` 为可选图片载荷（`[{type:"image", data:<base64>, mimeType}]`）——
    *  主进程按**真实字节重校验**（嗅探 + ≤5MB）后才送模型；渲染侧声明值不可信。 */
@@ -319,6 +326,25 @@ contextBridge.exposeInMainWorld("desktop", {
   },
   /** 界面加载后请求重放全部在场角色状态快照（忙/闲/队列）；主进程经同一 session:role-state 通道回推。 */
   requestRoleStates: () => ipcRenderer.invoke("session:role-states"),
+
+  // —— P2（2026-10-30）：网络状态（主进程权威；渲染 online/offline 仅提示）——
+  /**
+   * 读取当前网络状态快照：`{online, source, at, stableForMs, reason?}`（主进程 `net.isOnline` 权威）。
+   * 首屏/重载时调用一次；后续变化经 `onNetworkState` 推送。**不暴露任何 Node/Electron 能力。**
+   */
+  getNetworkState: () => ipcRenderer.invoke("network:get-state"),
+  /**
+   * 上报渲染层 online/offline 提示：主进程**只据此重探** `net.isOnline()`（可纠正误报），
+   * 不直接采信。回报 `{ok, state?}`。
+   */
+  reportNetworkHint: (online) =>
+    ipcRenderer.invoke("network:renderer-state", { online: online === true }),
+  /** 订阅网络状态变化（只在离线/恢复切换时推送）；返回取消订阅函数。 */
+  onNetworkState: (cb) => {
+    const listener = (_event, payload) => cb(payload);
+    ipcRenderer.on("network:state", listener);
+    return () => ipcRenderer.removeListener("network:state", listener);
+  },
 
   /**
    * 订阅「会话历史已恢复」（D-1，2026-10-12）：项目导入/重载后，主进程按项目/角色/runtime 读取 ANS 回放，把**规范化后的界面行**推来

@@ -1,0 +1,4 @@
+# Typechecks and renderer build (P0 candidate, final tree)
+- npm run typecheck: exit 0, 0 "error TS" (typecheck.log; SHA-256 a5f2b796ed79b6289f36c4cdf32694bc894e94b889cd19264ea5c5dbc9bf3d8f)
+- npm run typecheck:renderer: exit 0, 0 "error TS" (typecheck-renderer.log; SHA-256 057d983c31b1e6ccc39f735656c5556d6d091da006109a7cbc4889d07af41c95)
+- npm run build:renderer: exit 0, built in 367ms (build-renderer.log; SHA-256 da8e62952085c32af2a85a52e29839deb840e13a56e03e3d619f7720ba833cce)

@@ -5,7 +5,7 @@ on:
       source_ref:
         description: Frozen application source tag
         required: true
-        default: v1.7.0
+        default: v1.8.3
       publish:
         description: Publish draft after all native gates pass
         type: boolean
@@ -13,7 +13,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: release-v1.7.0
+  group: release-v1.8.3
   cancel-in-progress: false
 jobs:
   build:
@@ -127,10 +127,10 @@ jobs:
           cd release-assets
           test "$(find . -name '*.zip' | wc -l)" -eq 3
           for sums in SHA256SUMS-*.txt; do sha256sum -c "$sums"; done
-          if gh release view v1.7.0 --json isDraft --jq '.isDraft' > draft-state.txt; then
+          if gh release view v1.8.3 --json isDraft --jq '.isDraft' > draft-state.txt; then
             test "$(cat draft-state.txt)" = true
           else
-            gh release create v1.7.0 --verify-tag --draft --title 'ANS Studio 1.7.0' --notes '基于固定 v1.7.0 源码及 manifest 列明的打包适配 overlay。macOS arm64、macOS x64、Windows x64 各由原生 runner 构建并实际启动验证。本轮为独立验收覆盖所有变更、release 仅作为可选发布元数据、验收标准门覆盖所有新契约流程；任命（appointment）客户决定自动收口、写卡校验反馈去重与忙时门控；中文角色名、角色根文档展示、目录级授权、i18n、自动推进、验收返工路由与 Lead 治理协调。未签名、未公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示，请先核对 SHA256。最低 macOS 13；Windows 10/11 x64。Windows 暂不支持内置受限来源文档阅读；保留完整摘要与执行记录，来源文件可由系统编辑器查看。包内不含密钥，首次使用请在设置中填写。详细来源与测试见各平台 manifest。'
+            gh release create v1.8.3 --verify-tag --draft --title 'ANS Studio 1.8.3' --notes '基于固定 v1.8.3 源码及 manifest 列明的打包适配 overlay。macOS arm64、macOS x64、Windows x64 各由原生 runner 构建并实际启动验证。本补丁接通 run-change 契约变更通道：会话头新增「契约变更 · 重开 run」显式入口；pin 后出现更高版本契约且被引用/派发冲突时应用自动呈现 run-change 决策卡（继续冻结 / 停止并重启新 run / 停止，由客户选择、不自动代选）；冻结冲突的拒绝回执带 run-change-required 三段式指引。冻结语义本身不变。其余能力与 v1.8.2 相同（含 D3 选中集记账修复与 v1.8.1 全部能力）。未签名、未公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示，请先核对 SHA256。最低 macOS 13；Windows 10/11 x64。Windows 暂不支持内置受限来源文档阅读；保留完整摘要与执行记录，来源文件可由系统编辑器查看。发布包不包含任何凭据，首次使用请在设置中填写。详细来源与测试见各平台 manifest。'
           fi
-          gh release upload v1.7.0 ./*.zip ./manifest-*.json ./SHA256SUMS-*.txt ./release-provenance.json ./overlay.patch
-          if test "$RELEASE_PUBLISH" = true; then gh release edit v1.7.0 --draft=false; fi
+          gh release upload v1.8.3 ./*.zip ./manifest-*.json ./SHA256SUMS-*.txt ./release-provenance.json ./overlay.patch
+          if test "$RELEASE_PUBLISH" = true; then gh release edit v1.8.3 --draft=false; fi

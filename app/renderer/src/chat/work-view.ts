@@ -11,7 +11,7 @@
 import { DEFAULT_LOCALE, translate, type Locale, type MessageKey } from "../i18n/index.ts";
 import { queueItemViews, type QueueItemView } from "./confirm-logic.ts";
 import { operatorSurfaces } from "./operator-view.ts";
-import type { ChatRow } from "./types.ts";
+import type { ChatRow, RoleQueueMeta } from "./types.ts";
 
 export interface PendingRequestView {
   id: string;
@@ -80,6 +80,61 @@ export function queueGroups(
     running: views.filter((view) => view.running),
     queued: views.filter((view) => !view.running),
     total: views.length,
+  };
+}
+
+/** 队列条目类别的人话标签（复用既有来源标签 key；不含角色名）。 */
+export function queueKindLabel(kind: string, locale: Locale = DEFAULT_LOCALE): string {
+  if (kind === "dispatch") return translate(locale, "ui.confirm.sourceDispatch");
+  if (kind === "handback") return translate(locale, "ui.confirm.sourceHandback");
+  if (kind === "system") return translate(locale, "shared.common.system");
+  return translate(locale, "shared.common.customerMessage");
+}
+
+/** **P0 队列可见性（2026-10-30）**：等待时长人话（≥1 分钟才显示；入队时刻来自主进程快照）。 */
+export function queueAgeText(ageMs: number | null | undefined, locale: Locale = DEFAULT_LOCALE): string {
+  const value = typeof ageMs === "number" && Number.isFinite(ageMs) ? Math.max(0, ageMs) : 0;
+  const minutes = Math.floor(value / 60_000);
+  return minutes >= 1 ? translate(locale, "ui.queue.ageMinutes", { minutes }) : "";
+}
+
+export interface QueueBlockedView {
+  blockedReason: NonNullable<RoleQueueMeta["blockedReason"]>;
+  headKind: string | null;
+  activeTurnId: string | null;
+  text: string;
+}
+
+/** 句间连接符（结构标点；与 status.ts 同口径）。 */
+function clauseJoin(locale: Locale, text: string): string {
+  return (locale === "zh-CN" ? "；" : "; ") + text;
+}
+
+/** **「为什么没动」**：主进程快照的阻塞原因/队首类别 → 界面一行（只读快照，不推测）。 */
+export function queueBlockedView(
+  meta: RoleQueueMeta | null | undefined,
+  locale: Locale = DEFAULT_LOCALE,
+): QueueBlockedView | null {
+  const reason = meta?.blockedReason;
+  if (!reason) return null;
+  const reasonKey: MessageKey =
+    reason === "target-busy"
+      ? "ui.queue.blocked.targetBusy"
+      : reason === "origin-missing"
+        ? "ui.queue.blocked.originMissing"
+        : reason === "network"
+          ? "ui.queue.blocked.network"
+          : "ui.queue.blocked.sessionClosed";
+  const reasonText = translate(locale, reasonKey);
+  const headKind = meta?.headKind ?? null;
+  const headline = headKind
+    ? translate(locale, "ui.queue.headKind", { kind: queueKindLabel(headKind, locale) })
+    : "";
+  return {
+    blockedReason: reason,
+    headKind,
+    activeTurnId: meta?.activeTurnId ?? null,
+    text: headline ? headline + clauseJoin(locale, reasonText) : reasonText,
   };
 }
 

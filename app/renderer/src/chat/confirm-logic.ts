@@ -164,6 +164,8 @@ export interface QueueEntry {
   full: string;
   sourceRoleId: string;
   at: string;
+  /** **P0 队列可见性（2026-10-30）**：主进程快照给出的等待时长（ms；缺省 0——旧快照兼容）。 */
+  ageMs: number;
 }
 
 export interface QueueItemView extends QueueEntry {
@@ -210,6 +212,10 @@ function pickQueueEntry(value: unknown): QueueEntry {
     sourceRoleId:
       typeof record.sourceRoleId === "string" ? record.sourceRoleId : "",
     at: typeof record.at === "string" ? record.at : "",
+    ageMs:
+      typeof record.ageMs === "number" && Number.isFinite(record.ageMs) && record.ageMs > 0
+        ? record.ageMs
+        : 0,
   };
 }
 
