@@ -24,6 +24,7 @@ import type {
   TaskSideEffect,
   TaskStateEvent,
 } from "../../model/runtime.ts";
+import { GOVERNANCE_CARD_GROUP } from "../../model/runtime.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 
 /** 项目相对路径（POSIX 形式，便于跨平台展示与测试）。 */
@@ -48,6 +49,14 @@ const REDISPATCH_SAFETIES: readonly TaskRedispatchSafety[] = ["safe", "unsafe", 
 /** 治理步骤/流程 slug 校验（2026-10-29，F3）：小写 slug、不含首/尾连字符；仅供事件字段形态校验。 */
 function isTaskSlug(value: unknown): boolean {
   return typeof value === "string" && /^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$/.test(value);
+}
+
+/**
+ * 2026-10-31（D3 卡种收口）：`request.*.cardKind` 字段白名单校验——
+ * 唯一来源 = `model/runtime.ts` 的 `GOVERNANCE_CARD_GROUP` 键集（不另写第二张映射表）。
+ */
+function isGovernanceCardKind(value: unknown): boolean {
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, value);
 }
 
 export interface TaskStateReadError {
@@ -279,10 +288,25 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
       if (typeof rec["sourceRoleId"] !== "string" || rec["sourceRoleId"] === "") return { ok: false, message: "request.created 缺 sourceRoleId" };
       if (typeof rec["title"] !== "string" || rec["title"] === "") return { ok: false, message: "request.created 缺 title" };
       if (!Array.isArray(rec["options"])) return { ok: false, message: "request.created 缺 options" };
+      // 2026-10-31（D3 卡种收口）：可选卡种；给出时必须在治理卡种白名单内（缺失 = 旧记录，兼容）。
+      if (rec["cardKind"] !== undefined && !isGovernanceCardKind(rec["cardKind"])) {
+        return { ok: false, message: "request.created.cardKind 非法" };
+      }
     }
     if (kind === "request.resolved") {
       if (rec["by"] !== "judge" && rec["by"] !== "customer") return { ok: false, message: "request.resolved.by 非法" };
       if (typeof rec["choice"] !== "string") return { ok: false, message: "request.resolved 缺 choice" };
+      // 2026-10-31（D3 卡种收口）：可选卡种；给出时必须在治理卡种白名单内（缺失 = 旧记录，兼容）。
+      if (rec["cardKind"] !== undefined && !isGovernanceCardKind(rec["cardKind"])) {
+        return { ok: false, message: "request.resolved.cardKind 非法" };
+      }
+      // 2026-10-31：非 appointment 卡的选中选项（仅审计）——给出时必须是非空字符串数组。
+      if (rec["selectedOptionIds"] !== undefined) {
+        const ids = rec["selectedOptionIds"];
+        if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string" || id === "")) {
+          return { ok: false, message: "request.resolved.selectedOptionIds 必须是非空字符串数组" };
+        }
+      }
       // 2026-10-29（方案 v2.1 §5.4，F3）：D3 名单版本/hash——给出时：正整数 + 64 位 hex（应用写，模型不可自报）。
       if (rec["rosterVersion"] !== undefined) {
         const version = rec["rosterVersion"];

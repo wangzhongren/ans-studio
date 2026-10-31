@@ -109,6 +109,77 @@ test("申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源
   }
 });
 
+test("写侧卡种收口（2026-10-31）：decision 裁决写 selectedOptionIds、不写 targetRoleIds；appointment 仍写 targetRoleIds", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-cardkind-write-"));
+  const pushed: OperatorRequestPayload[] = [];
+  const channel = createCustomerInputChannel({ presenter: (payload) => pushed.push(payload), operatorId: "tester" });
+  const capabilities: Record<string, { customerInput?: CustomerInputFn }> = {};
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      capabilities[input.roleId] = input as { customerInput?: CustomerInputFn };
+      return handle();
+    },
+    createPiAdapterFactory: () => { throw new Error("no pi"); },
+    createDemoAdapter: () => { throw new Error("no demo"); },
+    buildProjectConfig,
+    getListing: (r) => (r === root ? listing(root) : undefined),
+    emitEvent: () => {},
+    customerInput: channel.customerInput,
+  });
+  try {
+    assert.equal((await mgr.open({ projectRoot: root, roleId: "rapporteur", runtime: "demo" })).ok, true);
+    await tick(20);
+
+    // 1) decision 卡：选项 customer-local 不是角色——只能进 selectedOptionIds。
+    const decisionRequest: CustomerInputRequest = {
+      kind: "choice",
+      title: "浏览器验收方式",
+      cardKind: "decision",
+      flowId: "flow-a",
+      options: [{ id: "customer-local", label: "客户本机浏览器", recommended: true }, { id: "cdp", label: "CDP" }],
+    };
+    const decisionPending = capabilities.rapporteur!.customerInput!(decisionRequest);
+    await tick(20);
+    assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "choice", selected: ["customer-local"] } }).ok, true);
+    assert.equal((await decisionPending)?.outcome, "answered");
+
+    // 2) appointment 卡：选中项仍是角色集（D3 唯一合法来源）。
+    const appointmentRequest: CustomerInputRequest = {
+      kind: "choice",
+      title: "任命项目角色",
+      cardKind: "appointment",
+      flowId: "flow-a",
+      options: [{ id: "implementer", label: "实现者" }, { id: "qa", label: "测试" }],
+    };
+    const appointmentPending = capabilities.rapporteur!.customerInput!(appointmentRequest);
+    await tick(20);
+    assert.equal(channel.respond({ id: pushed[1]!.id, decision: { kind: "choice", selected: ["implementer"] } }).ok, true);
+    assert.equal((await appointmentPending)?.outcome, "answered");
+
+    const state = await readTaskState(root);
+    const decisionCreated = state.events.find((event) => event.kind === "request.created" && event.title === "浏览器验收方式");
+    assert.ok(decisionCreated && decisionCreated.kind === "request.created");
+    assert.equal(decisionCreated.cardKind, "decision", "request.created 显式记卡种（应用从 request 取）");
+    const decisionResolved = state.events.find((event) => event.kind === "request.resolved" && event.requestId === decisionCreated.requestId);
+    assert.ok(decisionResolved && decisionResolved.kind === "request.resolved");
+    assert.equal(decisionResolved.cardKind, "decision");
+    assert.equal(decisionResolved.targetRoleIds, undefined, "decision 卡裁决不得写 targetRoleIds");
+    assert.deepEqual(decisionResolved.selectedOptionIds, ["customer-local"], "选项 id 只进审计字段");
+
+    const appointmentCreated = state.events.find((event) => event.kind === "request.created" && event.title === "任命项目角色");
+    assert.ok(appointmentCreated && appointmentCreated.kind === "request.created");
+    assert.equal(appointmentCreated.cardKind, "appointment");
+    const appointmentResolved = state.events.find((event) => event.kind === "request.resolved" && event.requestId === appointmentCreated.requestId);
+    assert.ok(appointmentResolved && appointmentResolved.kind === "request.resolved");
+    assert.equal(appointmentResolved.cardKind, "appointment");
+    assert.deepEqual(appointmentResolved.targetRoleIds, ["implementer"], "appointment 裁决仍写选中角色集");
+    assert.equal(appointmentResolved.selectedOptionIds, undefined, "appointment 角色集不重复写审计字段");
+  } finally {
+    await mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("项目 worker 无申请线：不注入 customerInput；内置角色才注入", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-application-target-"));
   const channel = createCustomerInputChannel({ presenter: () => {}, operatorId: "tester" });

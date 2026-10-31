@@ -142,7 +142,7 @@ import { classifyProcessOutcome, pickLatestSessionFile, sessionsDirFor } from ".
 import { formatDurationMs, type WatchdogObservation, type WatchdogProjectSnapshot } from "./watchdog.ts";
 import { mainT } from "./i18n.ts";
 import { type RoleStatusFn, type RoleStatusPayload, type SessionTailFn, type SessionTailPayload, type WatchdogToolResult } from "../../src/common/编排/watchdog.ts";
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef } from "../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind } from "../../src/model/runtime.ts";
 import { checkEvidence, checkEvidenceCollection, deriveAcceptanceFact, isWithinEvidenceRoots, loadCriteria, parseEvidenceMeta, readArtifact, validateEvidencePath, EVIDENCE_META_SCHEMA } from "../../src/common/编排/evidence-check.ts";
 // 2026-10-26 需求变更申请（request_requirement_change）：同源契约；仅统筹/提案会话注入。
 // 申请 ≠ 批准：审批由客户/判断 agent 在发起方会话的 decision 卡完成，主理只在批准后执行意图变更。
@@ -3679,6 +3679,8 @@ export class SessionManager {
     const createdWrite = this.appendTaskState(projectRoot, taskEvent("request.created", {
       requestId,
       ...(request.flowId !== undefined ? { flowId: request.flowId } : {}),
+      // 2026-10-31（D3 卡种收口）：卡种由应用从 request 对象落账（不信任模型/judge 自报）。
+      ...(request.cardKind !== undefined ? { cardKind: request.cardKind } : {}),
       ...(metadata?.intentId !== undefined ? { intentId: metadata.intentId } : {}),
       ...(metadata?.taskId !== undefined ? { taskId: metadata.taskId } : {}),
       sourceRoleId,
@@ -3719,6 +3721,7 @@ export class SessionManager {
       if (presentedWrite !== null) await presentedWrite;
       await this.appendTaskState(projectRoot, taskEvent("request.resolved", {
         requestId,
+        ...(request.cardKind !== undefined ? { cardKind: request.cardKind } : {}),
         by: "customer",
         choice: "unavailable",
         reason: shortenSummary(error instanceof Error ? error.message : String(error), 200),
@@ -3754,7 +3757,12 @@ export class SessionManager {
       requestId,
       ...(decisionId !== undefined ? { decisionId } : {}),
       ...rosterStamp,
-      ...(selected.length > 0 ? { targetRoleIds: selected } : {}),
+      // 2026-10-31（D3 卡种收口）：只有 appointment（D3 招人）卡的选中项是角色集；其他 choice 卡
+      // （decision/intent-confirm/proposal/acceptance/普通卡）只写审计字段 selectedOptionIds，
+      // 防止选项 id（如 customer-local）污染 targetRoleIds 而被 D3 扫描误读。
+      ...(request.cardKind !== undefined ? { cardKind: request.cardKind } : {}),
+      ...(selected.length > 0 && request.cardKind === "appointment" ? { targetRoleIds: selected } : {}),
+      ...(selected.length > 0 && request.cardKind !== "appointment" ? { selectedOptionIds: selected } : {}),
       ...(metadata?.intentId !== undefined ? { intentId: metadata.intentId } : {}),
       ...(metadata?.taskId !== undefined ? { taskId: metadata.taskId } : {}),
       by: judged ? "judge" : "customer",
@@ -5713,11 +5721,19 @@ export class SessionManager {
       latestArchitectureName !== undefined && (await existsFile(`docs/contracts/${latestArchitectureName}`));
     const roster = flowId !== undefined ? await loadLatestRoster({ projectRoot, flowId }) : undefined;
 
-    // 最新 D3（appointment 裁决）：request.created.flowId ↔ request.resolved（roster 字段优先；旧记录按目标集兼容）。
+    // 最新 D3（appointment 裁决）：request.created.flowId ↔ request.resolved。
+    // 2026-10-31（卡种收口）：**只接受 appointment 卡**的裁决——
+    //   优先 `request.created.cardKind === "appointment"`（新事件）；resolved 自身 `cardKind === "appointment"` 亦可；
+    //   两者皆缺（旧事件）时，仅当带 appointment 专属 `rosterVersion`/`rosterSha256` 戳才接受；
+    //   其他 choice 卡（decision/intent-confirm/…）的裁决一律忽略——flow 匹配或仅有 targetRoleIds 都不是接受条件。
     const state = await this.readTasks(projectRoot);
     const requestFlows = new Map<string, string | undefined>();
+    const requestCardKinds = new Map<string, GovernanceCardKind | undefined>();
     for (const event of state.events) {
-      if (event.kind === "request.created") requestFlows.set(event.requestId, event.flowId);
+      if (event.kind === "request.created") {
+        requestFlows.set(event.requestId, event.flowId);
+        requestCardKinds.set(event.requestId, event.cardKind);
+      }
     }
     let d3: { targetRoleIds: string[]; at: string; decisionId?: string } | undefined;
     for (const event of state.events) {
@@ -5726,9 +5742,16 @@ export class SessionManager {
         ? event.targetRoleIds.filter((id): id is string => typeof id === "string" && id !== "")
         : [];
       if (targets.length === 0) continue;
+      const createdKind = requestCardKinds.get(event.requestId);
+      const resolvedKind = event.cardKind;
+      const appointment = createdKind === "appointment" || resolvedKind === "appointment";
+      const legacyAppointment =
+        createdKind === undefined &&
+        resolvedKind === undefined &&
+        (event.rosterVersion !== undefined || event.rosterSha256 !== undefined);
+      if (!appointment && !legacyAppointment) continue;
       const eventFlow = requestFlows.get(event.requestId);
       if (flowId !== undefined && eventFlow !== undefined && eventFlow !== flowId) continue;
-      if (event.rosterVersion === undefined && event.rosterSha256 === undefined && eventFlow === undefined) continue;
       if (d3 === undefined || event.at > d3.at) {
         d3 = { targetRoleIds: targets, at: event.at, ...(event.decisionId !== undefined ? { decisionId: event.decisionId } : {}) };
       }
