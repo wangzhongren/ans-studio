@@ -6,7 +6,7 @@
 
 It puts "who decides, who dispatches, who writes, who accepts" into the runtime instead of leaving it in prompts. The desktop app and CLI share the same roles and governance tools. The desktop uses Claude by default and can switch to Pi or Codex; the CLI supports demo (no model calls), Pi, Codex, and Claude.
 
-**Version status:** the current public runtime bundle is **v1.8.0** (released 2026-10-30). On top of v1.7.0 it switches to the **six-role minimal system** (built-in roles `chief`, `product`, `rapporteur`, `nominator`, `convener`, `verifier`): product intent → rapporteur (plan/modules/roster/architecture) → nominator (D3 hiring + appointment-write cards) → convener delivery (with optional verifier checks); machine state moves to `.ans/state/tasks.jsonl` plus the run manifest, with no flow YAML/gate/ledger. It also includes module/roster/topology versioned contracts, per-run contract freezing (run manifest + pin), three-part mechanical rejections with the read-only `contract_check`, evidence self-consistency checks (`evidence-meta/v1` sidecars, P0 criteria derivation, read-only `evidence_check`), the shell write-area guard, plus desktop cross-window state sync, duplicate-dispatch suppression, decision/review dialogs, and narrow-layout fixes. Legacy v1/v2/v3 plans, flows, and role cards are kept for historical compatibility only.
+**Version status:** the current public runtime bundle is **v1.8.1** (released 2026-10-31). On top of v1.8.0 it adds: the intent-entry contract made visible to roles (chief/product/rapporteur/nominator cards and the read-only `contract_check` expose the frontmatter template, the `docs/intents/<intentId>.md` naming rule and explicit intentId, with fail-closed conflicts), delivery and turn-settlement invariants (failed deliveries never overwrite a turn, stop force-unwedges target-busy, idle-busy self-heals, queue state is visible, watchdog notices take a UI-only bypass, persistent queues resume after restart), request-level timeouts (90s first byte / 300s stream idle, paused during interaction/tools/abort/offline) with SDK `api_retry` diagnostics, network state monitoring (safe pause while offline, 5-minute resume window, UI status line), replay-safe same-turn retries only, three-part actionable refusals for acceptance-card ownership (acceptance cards are issued by verifier; convener/chief get rerouting guidance), and removal of the `view_image` per-turn image budget (single-image caps kept). v1.8.0 capabilities are unchanged: six-role minimal system and hiring chain, module/roster/topology versioned contracts, run freezing, three-part mechanical rejections with the contract quick reference, evidence self-consistency checks. Legacy v1/v2/v3 plans, flows, and role cards are kept for historical compatibility only.
 
 ![ANS Studio desktop: six-role navigation and a chief session](角色卡/桌面UI/docs/change/2026-10-30_readme-v1.8-screenshot/desktop-six-role-navigation.png)
 
@@ -151,7 +151,7 @@ flowchart TD
 
 - **Bad lines do not block startup.** Reading/replay skips bad lines and records them; rotated files are read oldest→newest.
 - **The run contract is stored separately.** `.ans/runs/<runId>/manifest.json` is application-only and stores only document paths, hashes, schemas, and references, never document content; project roles read it only.
-- **No legacy flow machinery.** v1.8.0 does not create or parse `docs/flows/<flowId>.yaml` and has no gate engine or ledger; tests assert that no `docs/flows` or `.ans/governance/ledger.jsonl` is produced. Legacy v1/v2/v3 flow/gate/ledger/acceptance-triage/`request_boundary_change` artifacts are no longer read or executed; they are kept only as historical records.
+- **No legacy flow machinery.** v1.8.1 does not create or parse `docs/flows/<flowId>.yaml` and has no gate engine or ledger; tests assert that no `docs/flows` or `.ans/governance/ledger.jsonl` is produced. Legacy v1/v2/v3 flow/gate/ledger/acceptance-triage/`request_boundary_change` artifacts are no longer read or executed; they are kept only as historical records.
 
 ### Organizational governance loop (run freezing and contract governance)
 
@@ -176,7 +176,7 @@ Application gates and the judge agent are complementary: the former makes determ
 - **Evidence self-consistency is recomputed by the application.** Evidence may carry an `evidence-meta/v1` sidecar; the application recomputes the artifact's lines/bytes/sha256 and compares them with the sidecar, the artifact's self-report, `generatedAt` freshness, and acIds. P0 is derived mechanically from `ans-criteria/v1` (P0 requires a sidecar; the sidecar's own `p0` is ignored; non-P0 evidence without a sidecar is marked unverified/legacy). A self-reported line/pass/fail mismatch, an artifact modified after the sidecar, or acIds missing the AC all fail closed. The read-only `evidence_check` reuses the same data layer, never executes project scripts or writes artifacts/sidecars, and is scoped to the calling role's module directories.
 - **AI gates perform structured review only.** The judge agent reads only permitted text and reviews only system risk (hangs, boundary violations, destruction, resources, sensitive exfiltration) or intent drift; it does not re-review engineering quality, architecture, or tests — the verifier checks those. `deny` / `manual` / timeout / unavailable never passes; delegated approval is marked "judge delegated" and never impersonates the customer.
 - **Application advancement, dispatch, pin, and acceptance requests are not customer approval.** Dispatch grants no extra write permission; pin only freezes the contract and does not mean acceptance passed; `appointment-write` confirmation issues only the exact previewed paths; verifier checks do not replace customer acceptance.
-- **Legacy mechanisms are retired.** v1.8.0 has no acceptance triage (`acceptance-triage/v1`), `request_boundary_change`, flow YAML, gate engine, or ledger. Those legacy v1/v2/v3 artifacts are no longer read or executed; they are kept only as historical records.
+- **Legacy mechanisms are retired.** v1.8.1 has no acceptance triage (`acceptance-triage/v1`), `request_boundary_change`, flow YAML, gate engine, or ledger. Those legacy v1/v2/v3 artifacts are no longer read or executed; they are kept only as historical records.
 
 Technical structure and cross-role interfaces are in [project architecture](角色卡/项目管理/docs/architecture.md).
 
@@ -190,34 +190,28 @@ Wang, Zhongren. 2026. *Role-First Software Governance: Asymmetric Authority Boun
 
 ### Download the runtime
 
-Current public version: **v1.8.0** (released 2026-10-30). The bundle ships with its own runtime, so no separate Node.js installation is needed to launch the app. Running a project's `npm test`, Git, and similar commands still requires that project's development toolchain.
+Current public version: **v1.8.1** (released 2026-10-31). The bundle ships with its own runtime, so no separate Node.js installation is needed to launch the app. Running a project's `npm test`, Git, and similar commands still requires that project's development toolchain.
 
 | System | Download | Checksum file | Launch |
 | --- | --- | --- | --- |
-| macOS 13+ · Apple Silicon | [mac-arm64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/ANS-Studio-1.8.0-mac-arm64.zip) | [SHA256SUMS-darwin-arm64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/SHA256SUMS-darwin-arm64.txt) | Extract fully, then open `ANS Studio.app` |
-| macOS 13+ · Intel | [mac-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/ANS-Studio-1.8.0-mac-x64.zip) | [SHA256SUMS-darwin-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/SHA256SUMS-darwin-x64.txt) | Extract fully, then open `ANS Studio.app` |
-| Windows 10/11 · x64 | [win-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/ANS-Studio-1.8.0-win-x64.zip) | [SHA256SUMS-win32-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/SHA256SUMS-win32-x64.txt) | Extract fully, open `ANS Studio.exe`, and keep the resource files in the same directory |
+| macOS 13+ · Apple Silicon | [mac-arm64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.1/ANS-Studio-1.8.1-mac-arm64.zip) | [SHA256SUMS-darwin-arm64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.1/SHA256SUMS-darwin-arm64.txt) | Extract fully, then open `ANS Studio.app` |
+| macOS 13+ · Intel | [mac-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.1/ANS-Studio-1.8.1-mac-x64.zip) | [SHA256SUMS-darwin-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.1/SHA256SUMS-darwin-x64.txt) | Extract fully, then open `ANS Studio.app` |
+| Windows 10/11 · x64 | [win-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.1/ANS-Studio-1.8.1-win-x64.zip) | [SHA256SUMS-win32-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.1/SHA256SUMS-win32-x64.txt) | Extract fully, open `ANS Studio.exe`, and keep the resource files in the same directory |
 
-Verify SHA256 before launching: on macOS, run `shasum -a 256 -c SHA256SUMS-darwin-arm64.txt` in the download directory (use `SHA256SUMS-darwin-x64.txt` for Intel); on Windows PowerShell, run `Get-FileHash .\ANS-Studio-1.8.0-win-x64.zip -Algorithm SHA256` and compare it with `SHA256SUMS-win32-x64.txt`.
+Verify SHA256 before launching: on macOS, run `shasum -a 256 -c SHA256SUMS-darwin-arm64.txt` in the download directory (use `SHA256SUMS-darwin-x64.txt` for Intel); on Windows PowerShell, run `Get-FileHash .\ANS-Studio-1.8.1-win-x64.zip -Algorithm SHA256` and compare it with `SHA256SUMS-win32-x64.txt`.
 
 <details>
-<summary>v1.8.0 SHA256 and provenance</summary>
+<summary>v1.8.1 SHA256 (filled in after release)</summary>
 
-| Artifact | SHA256 |
-| --- | --- |
-| `ANS-Studio-1.8.0-mac-arm64.zip` | `5a4944d9675d698e72d0303996a3f0e4634a19539dbc3cbf8b71ffffa5f97a68` |
-| `ANS-Studio-1.8.0-mac-x64.zip` | `e79ef4735290420da934d995ef47f4d3d31193268dbd820e0b8eca436c01cdf0` |
-| `ANS-Studio-1.8.0-win-x64.zip` | `5a2c99d467dd0b9ae39dac4bc3c0676bbdd0cb72b935e13958783658b5052249` |
-| `overlay.patch` | `fc21fd89a12561f0b6f963c4a6f8e42060906e658a3dec40b4b96d0f52cf1e34` |
-| `release-provenance.json` | `0d0738c60a7dcdbeabea879b06403e9adfb07515b0765b243a1f1d6faf579571` |
+The v1.8.1 SHA256 values cannot be known before the build: they are back-filled/verified after release from the Release's `SHA256SUMS-darwin-arm64.txt`, `SHA256SUMS-darwin-x64.txt`, `SHA256SUMS-win32-x64.txt`, and `SHA256SUMS-overlay.txt`.
 
-[SHA256SUMS-overlay.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/SHA256SUMS-overlay.txt), [release-provenance.json](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/release-provenance.json), and [overlay.patch](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.0/overlay.patch) record the frozen source and packaging adaptations; see [this release record](角色卡/装配/docs/change/2026-10-30_change_release-v1.8.0-prepare.md) for provenance verification.
+[SHA256SUMS-overlay.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.1/SHA256SUMS-overlay.txt), [release-provenance.json](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.1/release-provenance.json), and [overlay.patch](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.1/overlay.patch) record the frozen source and packaging adaptations; see [this release record](角色卡/装配/docs/change/2026-10-31_change_release-v1.8.1-prepare.md) for provenance verification.
 
 The runtime bundles are **unsigned and not notarized**: macOS builds are not notarized and Windows builds are not code-signed, so the first launch may warn that the source is unverified. Download from the Release above, verify SHA256, then run.
 
 </details>
 
-v1.8.0 includes the bilingual UI (zh-CN / en-US), directory-level authorization, acceptance rework routing, and independent acceptance covering all changes, plus the built-in role hiring chain, module/roster/topology contracts, run freezing, three-part rejections with the contract quick reference, and evidence self-consistency checks; the asset gate (3.3), staged release (3.5), and timeline panel (3.6) are still not in that bundle.
+v1.8.1 includes the bilingual UI (zh-CN / en-US), the six-role hiring chain, module/roster/topology contracts, run freezing, three-part rejections with the contract quick reference, evidence self-consistency checks, plus the visible intent-entry contract, delivery/settlement invariants with stop unwedging, request-level timeouts with SDK diagnostics, network state monitoring, replay-safe retries only, and acceptance-card ownership guidance (with the per-turn image budget removed); the asset gate (3.3), staged release (3.5), and timeline panel (3.6) are still not in that bundle.
 
 ### First use
 
@@ -311,7 +305,7 @@ Keep the quotes around the test path so it covers multiple directory levels. Som
 
 ## Release and verification
 
-Release builds use the [GitHub Actions workflow](.github/workflows/release.yml). On native macOS (arm64 / x64) and Windows (x64) runners it freezes the source, applies an explicit overlay, runs `npm ci`, `npm run typecheck`, the full regression suite, the renderer build, packaging, extraction, and a real launch check, then generates `SHA256SUMS`, `release-provenance.json`, and `overlay.patch`. Maintainer provenance checks, build commands, and release steps are in [desktop packaging notes](角色卡/装配/docs/feature/desktop-release-packaging.md) and the [v1.8.0 release record](角色卡/装配/docs/change/2026-10-30_change_release-v1.8.0-prepare.md).
+Release builds use the [GitHub Actions workflow](.github/workflows/release.yml). On native macOS (arm64 / x64) and Windows (x64) runners it freezes the source, applies an explicit overlay, runs `npm ci`, `npm run typecheck`, the full regression suite, the renderer build, packaging, extraction, and a real launch check, then generates `SHA256SUMS`, `release-provenance.json`, and `overlay.patch`. Maintainer provenance checks, build commands, and release steps are in [desktop packaging notes](角色卡/装配/docs/feature/desktop-release-packaging.md) and the [v1.8.1 release record](角色卡/装配/docs/change/2026-10-31_change_release-v1.8.1-prepare.md).
 
 The native CI builds, regresses, and extracts/starts each bundle; in-bundle tests do not call online models. In existing real verification records, online desktop and coding tasks are mainly Pi; controlled/offline whole-chain tests for Codex and Claude are not equivalent to online-model full-chain acceptance. The desktop default of Claude indicates the default choice only, not online acceptance.
 
@@ -321,13 +315,13 @@ The native CI builds, regresses, and extracts/starts each bundle; in-bundle test
 - **Windows does not yet support built-in source document reading.** You can view the full summary and execution record; open source files with the system editor.
 - **CLI and desktop capabilities differ.** The CLI uses terminal confirmation and does not yet provide desktop-style dispatch, handback delivery, or a queue UI. Automatic scheduling of multi-task dependencies is not implemented.
 - **ZIP distribution has no installer or auto-update.** Updates require downloading a new version yourself.
-- **Some capabilities are not in the release bundle yet.** The asset completeness gate (3.3), staged planning and stage release (3.5), and the runtime timeline and stage panels (3.6) are not implemented yet and are not in the v1.8.0 bundle.
+- **Some capabilities are not in the release bundle yet.** The asset completeness gate (3.3), staged planning and stage release (3.5), and the runtime timeline and stage panels (3.6) are not implemented yet and are not in the v1.8.1 bundle.
 - **Scaffold-first is governance guidance, not a deterministic hard gate yet.** When a team plan lacks `build-scaffold` or places it too late, the application does not yet deterministically reject the appointment card; enforcement relies on the role-card requirement and the generic `dependsOn` dispatch gate, and real-model compliance with the card text has not been verified online.
 - **Verification scope is limited.** The three-platform bundles are built and regressed by native CI with extraction/startup checks. Real desktop and online-model verification is still mainly Pi; controlled/offline tests for Codex and Claude are not online full-chain acceptance. The bundles are unsigned and not notarized.
 
 ## Learn more
 
-- [v1.8.0 release preparation](角色卡/装配/docs/change/2026-10-30_change_release-v1.8.0-prepare.md): frozen source, release recipe, and local precheck results.
+- [v1.8.1 release preparation](角色卡/装配/docs/change/2026-10-31_change_release-v1.8.1-prepare.md): frozen source, release recipe, and local precheck results.
 - [Independent acceptance report for all changes](docs/acceptance/2026-10-24_all-changes-independent-acceptance-report.md): basis and evidence for acceptance covering all changes.
 - [Acceptance triage design](角色卡/项目管理/docs/design/2026-10-25_design_acceptance-triage.md): rework / report-only states and ledger semantics.
 - [Background tasks and flow status acceptance](角色卡/独立验收/docs/change/2026-10-25_change_app-ui-background-flow-acceptance.md): the background-task panel and read-only flow-status surface.
