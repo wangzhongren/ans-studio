@@ -52,6 +52,13 @@ contextBridge.exposeInMainWorld("desktop", {
   /** 点角色即开：直接建立与该角色的会话（导入项目即授权，无确认框）。 */
   openSession: (input) => ipcRenderer.invoke("session:open", input),
 
+  /**
+   * 2026-10-31（run-change 触发）：显式入口「契约变更 · 重开 run」——入参
+   * `{projectRoot, flowId?, reason?}`；主进程经统筹/提案/幕僚会话的客户卡通道呈现 run-change
+   * 三模式卡（继续冻结 / 停止并重开 / 停止）。不代选模式；无 pinned run/无可呈现会话 ⇒ 如实失败。
+   */
+  requestRunChange: (input) => ipcRenderer.invoke("run:change-request", input),
+
   /** 发送一轮消息；开启后可反复调用（多轮聊天，不再确认）。
    *  **P0-1（2026-10-13 客户批准）**：`images` 为可选图片载荷（`[{type:"image", data:<base64>, mimeType}]`）——
    *  主进程按**真实字节重校验**（嗅探 + ≤5MB）后才送模型；渲染侧声明值不可信。 */

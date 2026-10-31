@@ -42,6 +42,8 @@ contextBridge.exposeInMainWorld("desktop", {
   __smoke: { emit },
 
   listProject: (projectRoot) => ipcRenderer.invoke("app:list-project", { projectRoot }),
+  // 2026-10-31（run-change 触发）：显式入口「契约变更 · 重开 run」的 smoke 桩通道。
+  requestRunChange: (input) => ipcRenderer.invoke("run:change-request", input),
   openSession: (input) => ipcRenderer.invoke("session:open", input),
   openExternal: (url) =>
     ipcRenderer.invoke("app:open-external", { url: String(url == null ? "" : url) }),

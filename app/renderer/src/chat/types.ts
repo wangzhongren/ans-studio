@@ -37,6 +37,16 @@ export interface RoleView {
   rootDocs?: RoleRootDocEntry[];
 }
 
+/** 2026-10-31（run-change 触发）：active run 只读摘要（主进程 listProject 附带；旧 main 缺省时按 [] 消费）。 */
+export interface ActiveRunSummary {
+  runId: string;
+  flowId: string;
+  state: "draft" | "pinned";
+  pinnedAt?: string;
+  rosterVersion?: number;
+  roles?: string[];
+}
+
 export interface Listing {
   projectRoot: string;
   primaryRoleId: string | null;
@@ -50,6 +60,8 @@ export interface Listing {
     pinFiles?: unknown[];
     pinCount?: number;
   };
+  activeRuns?: ActiveRunSummary[];
+  activeRunsError?: string;
 }
 
 export interface SessionEvent {

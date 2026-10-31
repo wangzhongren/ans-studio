@@ -76,6 +76,7 @@ import {
   sortHistoryReports,
 } from "@/chat/report-view";
 import type {
+  ActiveRunSummary,
   ActivityItem,
   ChatRow,
   Listing,
@@ -336,6 +337,9 @@ interface ChatStore {
   warnings: string[];
   governanceModel: "single" | "trio" | null;
   governanceRecord: Record<string, unknown> | null;
+  /** 2026-10-31（run-change 触发）：active run 摘要（listProject 附带；驱动「契约变更 · 重开 run」）。 */
+  activeRuns: ActiveRunSummary[];
+  activeRunsError: string | null;
   sessionOpenRoleId: string | null;
   roleBusy: Dict<boolean>;
   roleMeta: Dict<RoleMeta>;
@@ -723,6 +727,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   warnings: [],
   governanceModel: null,
   governanceRecord: null,
+  activeRuns: [],
+  activeRunsError: null,
   sessionOpenRoleId: null,
   roleBusy: {},
   roleMeta: {},
@@ -868,6 +874,18 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         record.governanceRecord && typeof record.governanceRecord === "object"
           ? (record.governanceRecord as Listing["governanceRecord"])
           : undefined,
+      // 2026-10-31（run-change 触发）：旧 main 缺省 ⇒ []（按钮禁用并给原因，不伪造 pinned）。
+      activeRuns: Array.isArray(record.activeRuns)
+        ? (record.activeRuns as ActiveRunSummary[]).filter(
+            (run) =>
+              run !== null &&
+              typeof run === "object" &&
+              typeof run.runId === "string" &&
+              typeof run.flowId === "string" &&
+              (run.state === "pinned" || run.state === "draft"),
+          )
+        : [],
+      activeRunsError: typeof record.activeRunsError === "string" ? record.activeRunsError : undefined,
     };
     // 旧 loadProject 语义：显式导入/切换项目一律 fresh（停止旧会话、清空旧状态），
     // 即使路径与当前项目相同；只有 refreshProject 显式传 false 才保留当前会话/选择。
@@ -920,6 +938,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       warnings: Array.isArray(listing.warnings) ? listing.warnings : [],
       governanceModel: listing.governanceModel || null,
       governanceRecord: listing.governanceRecord || null,
+      activeRuns: Array.isArray(listing.activeRuns) ? listing.activeRuns : [],
+      activeRunsError: typeof listing.activeRunsError === "string" ? listing.activeRunsError : null,
       sessionOpenRoleId: fresh ? null : current.sessionOpenRoleId,
       paneMeta,
       paneVersions: bumpVersions(fresh ? {} : current.paneVersions, selected ? [selected] : []),

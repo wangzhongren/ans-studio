@@ -90,6 +90,14 @@ const RULES: Record<string, RejectionRule> = {
   "criteria-empty": { owner: "verifier", action: "至少列一条 criteria。", retryable: true },
   "criteria-mismatch": { owner: "verifier", action: "补齐 fact.acId 在 criteria 中的条目；sidecar acIds 必须包含该 fact.acId。", retryable: true },
   "run-change-invalid": { owner: "app", action: "run-change 选择无法映射为唯一模式；重新呈现三模式卡，不自动选择。", retryable: true },
+  // 2026-10-31（run-change 触发缺陷）：pin 后出现更新版本契约且操作依赖它 ⇒ 冻结门禁正确拒绝；
+  // 唯一设计出口是应用发行的 run-change 三模式卡。owner=app，客户决定后可按新模式继续（可重试）。
+  "run-change-required": {
+    owner: "app",
+    action: "由应用呈现 run-change 三模式卡（继续冻结 / 停止并重开 run / 停止），或由客户在会话头点击「契约变更 · 重开 run」；客户决定后按新模式继续，不能自行改契约或绕过冻结。",
+    retryable: true,
+    docs: [ROSTER_DOC],
+  },
   "evidence-mismatch": { owner: "verifier", action: "重算 artifact/meta/sidecar 并修正证据后重提验收。", retryable: true },
   "evidence-path-invalid": { owner: "verifier", action: "改为项目内相对路径；不得绝对路径、.. 越界、.ans、.env；修正后重试。", retryable: true },
   "evidence-scope-denied": { owner: "verifier", action: "只查询本角色模块目录内的证据；换用本角色模块证据或由应用验收链核对。", retryable: false },
