@@ -32,3 +32,13 @@
 - 2026-10-29：主检出零写入口径澄清——实现侧 F 全程未写主检出（前后 status/HEAD/diff/index/stash 全同）；主检出后续唯一 delta 为独立验收角色写入的 `docs/acceptance/entry-role-minimal-final-acceptance-report-v1.md`（非实现侧写入）。
 
 - 2026-10-29：**F 证据修订最终值（本 memo 提交前）**：HEAD `ac44b53dd1679cf3920226dc394f8b4525d9d21e`，tree `9cf6024be2a71c8d7eb06aa03b80c8d9f7d604d0`；change-F **573 行 / `ed117a883d00041197d0a374a3c657a365a823cecc0e5503159a4792ce801d08`**；终态报告 **109 行 / `7956398a5cd5dd2108f7fb45c3119578f23890049b694b4ff8a79b44e62f1ea4`**；308 文件表与统计按被判定候选 `044811f4`（308=87 A+125 D+96 M，tree `8dcbdb8d…`，diff `34b5d221…`），rework 仅文档、代码/测试不变；本 memo 提交后的最终 HEAD 见回执。
+
+## 2026-10-31
+
+- 已写团队计划 `docs/scheduling/2026-10-31_team-plan_shell-deny-customer-escalation.md`（任务 `2026-10-31-shell-deny-customer-escalation`，flowId `shell-deny-customer-escalation`，T3）。基线 HEAD `9f670fb`（已合并 main `32d8f0d`/v1.8.3）；工作树写计划前仅三份未跟踪输入文档；无 `.ans/project.json`（未启用 task_ops）。
+- 输入基线：闸门 0/1 记录 `docs/communication/2026-10-31_intent_shell-deny-customer-escalation.md`（含闸门 1 记录后 57 行 / `51c1a967…`；方案头引用的 49 行 / `74e0596c…` 为追加前快照）；客户确认方案 v1.3 **857 行 / SHA-256 `6bd12a99af9cbf4bd131b0ee2353e66882c2376952c00e71bb01aabc322a23de`**（实测一致）；复核记录 **148 行 / `617d9a7f…`**。
+- 五维结论：**不变 + 改边界（3 项精确条目）**。实施角色：门禁引擎（A2 白名单谓词/写守卫/Service 出口/文案）、编排（B1 registry/闸/审计/回执/arming/run-role）、运行时核心（A1 模型契约/新工具/schema）、桌面窗口（C1 升级卡 presenter/仲裁/暂停 IPC/preload）、桌面UI（C2 多动作卡/暂停 UI）、项目管理（A3 i18n key+计数）、测试（D1/D2 集成/T3 全量/真实 E2E）；内置独立验收 V1/E2；统筹 G2/E1/E3；**装配本轮不参与实施**（新小版本发布另议）；不启用项目 `角色卡/独立验收` worker。
+- §4.5 边界变更（闸门 2 对象，人事执行）：B-1 门禁引擎 `boundary.md` 补 `src/service/gate/shell-rules.ts`（yaml 已列、md 漂移）；B-2 编排 `boundary.md` 补 `src/pipeline/orchestration/shell-arming.ts`（yaml 已列、md 漂移）；B-3 桌面窗口 `boundary.md`+`boundary.yaml` 新增 `test/桌面应用/shell-escalation.test.ts` 精确条目（逐文件授权）。与本写集无关的既有漂移（编排 `pm-reviewer.ts` YAML-only）不校正。
+- 阶段：G2 → H1/V1/B0 → A1/A2/A3（并行）→ B1 → C1 → C2 → D1 → D2 → E1 → E2 → E3；契约先行（A1/A2/A3 冻结）、共享文件单写者；`test/桌面应用/e2e/` 不得新建脚本（仅扩展 `main.mjs`）。
+- 发布：按方案建议新小版本、不用 overlay；本任务不写 `release-policy.mjs`/`package.json`/workflow；发布另行授权。
+- 下一步：交沟通向客户确认闸门 2；实施授权另行；实施前标准由内置独立验收写 `docs/acceptance/shell-escalation-criteria-v1.md`。本上下文待续接，不自行向客户确认或扩大授权。
