@@ -17,6 +17,12 @@ events:
   - date: "2026-10-31"
     kind: updated
     summary: PR #27 合并（1064ad8，含 D3 修复 a6d87a7）；annotated tag v1.8.2 已打并推送；release-policy/workflow/打包测试切到 v1.8.2
+  - date: "2026-10-31"
+    kind: blocked
+    summary: 首轮 CI（run 41172893105）macOS arm64 挂新增测试清理竞态（chain-enforcement ENOTEMPTY）；改测试清理（重试/确定性等待）后经显式 overlay 白名单重跑
+  - date: "2026-10-31"
+    kind: updated
+    summary: 测试清理修复 ff58dd4 合入 main；release-policy 白名单加入 4 个精确测试文件、打包测试增批次用例；重跑 CI 待触发
 ---
 
 # v1.8.2 发布准备
@@ -63,7 +69,7 @@ events:
 
 ## CI、资产与 SHA（待回填）
 
-- 三平台 CI run：**待触发/待回填**；不编造 run id。
+- 三平台 CI run：首轮 **run 41172893105 失败**（macOS arm64 新增测试清理竞态 `ENOTEMPTY`；Windows/macOS x64 通过）；测试稳定性修复后经 release-policy overlay 白名单（精确测试文件路径）重跑。重跑结果与资产**待回填**；不编造 run id。
 - 资产：`ANS-Studio-1.8.2-mac-arm64.zip`、`-mac-x64.zip`、`-win-x64.zip` + `SHA256SUMS-*` + `release-provenance.json` + `overlay.patch`；发布后回填。
 - 未签名、未公证。
 

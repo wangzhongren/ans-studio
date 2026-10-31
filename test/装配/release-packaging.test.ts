@@ -155,6 +155,24 @@ test('release overlay includes exactly the reviewed v1.8.0 blocking-fix batch by
   assert.throws(() => selectOverlay(['app/desktop/interface.ts']), /Unreviewed production overlay/);
 });
 
+// v1.8.2 发布阻断修复（tag v1.8.2 不可移动，经评审走显式 overlay）：4 个测试文件的清理竞态按精确路径入选；
+// 同目录未列名 test/ 仍 excluded，未列名 app//src/ 仍 fail-closed。断言不放宽。
+test('release overlay includes exactly the reviewed v1.8.2 test-cleanup batch by exact path', () => {
+  const result = selectOverlay(['package.json',
+    'test/桌面应用/chain-enforcement.test.ts',
+    'test/桌面应用/run-pin.test.ts',
+    'test/桌面应用/application-line.test.ts',
+    'test/编排/task-state.test.ts',
+    'test/桌面应用/watchdog-reuse.test.ts']);
+  assert.deepEqual(result.selected, ['package.json',
+    'test/桌面应用/chain-enforcement.test.ts',
+    'test/桌面应用/run-pin.test.ts',
+    'test/桌面应用/application-line.test.ts',
+    'test/编排/task-state.test.ts']);
+  assert.deepEqual(result.excluded, ['test/桌面应用/watchdog-reuse.test.ts']);
+  assert.throws(() => selectOverlay(['app/desktop/interface.ts']), /Unreviewed production overlay/);
+});
+
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
